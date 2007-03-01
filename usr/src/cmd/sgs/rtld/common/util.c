@@ -192,7 +192,7 @@ rd_event(Lm_list *lml, rd_event_e event, r_state_e state)
 	r_debug.rtd_rdebug.r_rdevent = RD_NONE;
 }
 
-#if	defined(sparc) || defined(i386) || defined(__amd64)
+#if	defined(__sparc) || defined(__x86)
 /*
  * Stack Cleanup.
  *
@@ -202,8 +202,8 @@ rd_event(Lm_list *lml, rd_event_e event, r_state_e state)
  * Which means we then need to slide everything above it on the stack down
  * accordingly.
  *
- * While the stack layout is platform specific - it just so happens that x86,
- * sparc, sparcv9, and amd64 all share the following initial stack layout.
+ * While the stack layout is platform specific - it just so happens that __x86,
+ * and __sparc platforms share the following initial stack layout.
  *
  *	!_______________________!  high addresses
  *	!			!
@@ -1057,9 +1057,9 @@ list_prepend(List * lst, const void * item)
  * Delete a 'listnode' from a list.
  */
 void
-list_delete(List * lst, void * item)
+list_delete(List *lst, void *item)
 {
-	Listnode *	clnp, * plnp;
+	Listnode	*clnp, *plnp;
 
 	for (plnp = NULL, clnp = lst->head; clnp; clnp = clnp->next) {
 		if (item == clnp->data)
@@ -1309,59 +1309,6 @@ lm_move(Lm_list *lml, Aliste nlmco, Aliste plmco, Lm_cntl *nlmc, Lm_cntl *plmc)
 		lml->lm_head = plmc->lc_head;
 		lml->lm_tail = plmc->lc_tail;
 	}
-}
-
-/*
- * Dlopening a family of objects occurs on a new link-map control list.  If the
- * dlopen fails, then its handle is used to tear down the family (dlclose).
- * However, the relocation of this family may have triggered other objects to
- * be loaded, and after their relocation they will have been moved to the
- * dlopen families control list.  After a dlopen() failure, see if there are
- * any objects that can be savaged before tearing down this control list.
- */
-int
-lm_salvage(Lm_list *lml, int test, Aliste nlmco)
-{
-	Lm_cntl	*nlmc;
-
-	/*
-	 * If a dlopen occurred on a new link-map list, then its dlclose may
-	 * have completely torn down the link-map list.  Check that the link-map
-	 * list still exists before proceeding.
-	 */
-	if (test) {
-		Listnode	*lnp;
-		Lm_list		*tlml;
-		int		found = 0;
-
-		for (LIST_TRAVERSE(&dynlm_list, lnp, tlml)) {
-			if (tlml == lml) {
-				found++;
-				break;
-			}
-		}
-		if (found == 0)
-			return (0);
-	}
-
-	/* LINTED */
-	nlmc = (Lm_cntl *)((char *)lml->lm_lists + nlmco);
-
-	/*
-	 * If this link-map control list still contains objects, determine the
-	 * previous control list and move the objects.
-	 */
-	if (nlmc->lc_head) {
-		Lm_cntl *plmc;
-		Aliste  plmco;
-
-		plmco = nlmco - lml->lm_lists->al_size;
-		/* LINTED */
-		plmc = (Lm_cntl *)((char *)lml->lm_lists + plmco);
-
-		lm_move(lml, nlmco, plmco, nlmc, plmc);
-	}
-	return (1);
 }
 
 /*
@@ -1833,7 +1780,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 			select |= SEL_ACT_SPEC_2;
 			variable = ENV_FLG_TRACE_OBJS;
 
-#if	defined(sparc) || defined(i386) || defined(__amd64)
+#if	defined(__sparc) || defined(__x86)
 			/*
 			 * The simplest way to "disable" this variable is to
 			 * truncate this string to "LD_'\0'". This string is

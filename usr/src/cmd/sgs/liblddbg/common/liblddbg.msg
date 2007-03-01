@@ -373,6 +373,7 @@
 @ MSG_FIL_DELETE	"file=%s;  deleting"
 @ MSG_FIL_DLOPEN	"file=%s;  dlopen() called from file=%s  %s"
 @ MSG_FIL_DLCLOSE	"file=%s;  dlclose()  %s"
+@ MSG_FIL_CLEANUP	"file=%s;  loading failed: cleaning up lmco 0x%llx"
 @ MSG_FIL_DLDUMP	"file=%s;  dldump() to file=%s  %s"
 @ MSG_FIL_LAZYLOAD	"file=%s;  lazy loading from file=%s: symbol=%s"
 @ MSG_FIL_PRELOAD	"file=%s;  preloading"
@@ -406,17 +407,19 @@
 @ MSG_FIL_DEP_NONE	"  file=%s;  has no dependencies"
 @ MSG_FIL_DEP_ENT	"  file=%s;  depends on:"
 
-@ MSG_FIL_DEP_ADD	"    file=%s;  object added  %s"
+@ MSG_FIL_DEP_ADD	"    file=%s;  object added  %s  %s"
 @ MSG_FIL_DEP_DELETE	"    file=%s;  object deleting  %s"
 @ MSG_FIL_DEP_REMOVE	"    file=%s;  object removed from handle  %s"
-@ MSG_FIL_DEP_REMAIN	"    file=%s;  object remains on handle  %s"
+@ MSG_FIL_DEP_REMAIN	"    file=%s;  object must remain on handle  %s"
+@ MSG_FIL_DEP_ORPHAN	"    file=%s;  object remains on orphan handle  %s"
+@ MSG_FIL_DEP_REINST	"    file=%s;  object reinstated  %s"
 
 @ MSG_FIL_HDL_CREATE	"handle=%s;  creating:"
 @ MSG_FIL_HDL_COLLECT	"handle=%s;  collected for possible removal  %s"
 @ MSG_FIL_HDL_RETAIN	"handle=%s;  externally referenced from %s: handle \
 			 retained"
 @ MSG_FIL_HDL_ADD	"handle=%s;  adding dependent objects:"
-@ MSG_FIL_HDL_DELETE	"handle=%s;  deleting:"
+@ MSG_FIL_HDL_DELETE	"handle=%s;  inspecting for deletion:"
 @ MSG_FIL_HDL_ORPHAN	"handle=%s;  deletion cannot be completed: moving to \
 			 orphan list:"
 @ MSG_FIL_HDL_REINST	"handle=%s;  reinstating from orphan list:"

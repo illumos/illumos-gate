@@ -65,8 +65,8 @@ static void
 sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	int ndx, Word nshndx, Word nsymflags)
 {
-	unsigned char	otype = ELF_ST_TYPE(sdp->sd_sym->st_info);
-	unsigned char	ntype = ELF_ST_TYPE(nsym->st_info);
+	uchar_t	otype = ELF_ST_TYPE(sdp->sd_sym->st_info);
+	uchar_t	ntype = ELF_ST_TYPE(nsym->st_info);
 
 	/*
 	 * Perform any machine specific type checking.
@@ -347,9 +347,9 @@ static void
 sym_twoundefs(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	int ndx, Word nshndx, Word nsymflags)
 {
-	Sym		*osym = sdp->sd_sym;
-	unsigned char	obind = ELF_ST_BIND(osym->st_info);
-	unsigned char	nbind = ELF_ST_BIND(nsym->st_info);
+	Sym	*osym = sdp->sd_sym;
+	uchar_t	obind = ELF_ST_BIND(osym->st_info);
+	uchar_t	nbind = ELF_ST_BIND(nsym->st_info);
 
 	/*
 	 * If two relocatable objects define a weak and non-weak undefined
@@ -375,14 +375,14 @@ static void
 sym_tworeals(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	int ndx, Word nshndx, Word nsymflags)
 {
-	Sym		*osym = sdp->sd_sym;
-	unsigned char   otype = ELF_ST_TYPE(osym->st_info);
-	unsigned char   obind = ELF_ST_BIND(osym->st_info);
-	unsigned char   ntype = ELF_ST_TYPE(nsym->st_info);
-	unsigned char   nbind = ELF_ST_BIND(nsym->st_info);
-	Half		ofile = sdp->sd_file->ifl_ehdr->e_type;
-	Half		nfile = ifl->ifl_ehdr->e_type;
-	int		warn = 0;
+	Sym	*osym = sdp->sd_sym;
+	uchar_t	otype = ELF_ST_TYPE(osym->st_info);
+	uchar_t	obind = ELF_ST_BIND(osym->st_info);
+	uchar_t	ntype = ELF_ST_TYPE(nsym->st_info);
+	uchar_t	nbind = ELF_ST_BIND(nsym->st_info);
+	Half	ofile = sdp->sd_file->ifl_ehdr->e_type;
+	Half	nfile = ifl->ifl_ehdr->e_type;
+	int	warn = 0;
 
 	/*
 	 * If both definitions are from relocatable objects, and have non-weak
@@ -474,17 +474,17 @@ static void
 sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	int ndx, Word nshndx, Word nsymflags)
 {
-	Sym		*osym = sdp->sd_sym;
-	unsigned char	otype = ELF_ST_TYPE(osym->st_info);
-	unsigned char   obind = ELF_ST_BIND(osym->st_info);
-	unsigned char	ntype = ELF_ST_TYPE(nsym->st_info);
-	unsigned char   nbind = ELF_ST_BIND(nsym->st_info);
-	Boolean		otent = FALSE, ntent = FALSE;
-	Half		ofile = sdp->sd_file->ifl_ehdr->e_type;
-	Half		nfile = ifl->ifl_ehdr->e_type;
-	int		warn = 0;
-	Word		osymvis = ELF_ST_VISIBILITY(osym->st_other);
-	Word		nsymvis = ELF_ST_VISIBILITY(nsym->st_other);
+	Sym	*osym = sdp->sd_sym;
+	uchar_t otype = ELF_ST_TYPE(osym->st_info);
+	uchar_t obind = ELF_ST_BIND(osym->st_info);
+	uchar_t ntype = ELF_ST_TYPE(nsym->st_info);
+	uchar_t nbind = ELF_ST_BIND(nsym->st_info);
+	Boolean	otent = FALSE, ntent = FALSE;
+	Half	ofile = sdp->sd_file->ifl_ehdr->e_type;
+	Half	nfile = ifl->ifl_ehdr->e_type;
+	int	warn = 0;
+	Word	osymvis = ELF_ST_VISIBILITY(osym->st_other);
+	Word	nsymvis = ELF_ST_VISIBILITY(nsym->st_other);
 
 	/*
 	 * Special rules for functions.
@@ -653,15 +653,15 @@ static void
 sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	int ndx, Word nshndx, Word nsymflags)
 {
-	Sym		*osym = sdp->sd_sym;
-	unsigned char   obind = ELF_ST_BIND(osym->st_info);
-	unsigned char   nbind = ELF_ST_BIND(nsym->st_info);
-	Half		ofile = sdp->sd_file->ifl_ehdr->e_type;
-	Half		nfile = ifl->ifl_ehdr->e_type;
-	size_t		size = 0;
-	Xword		value = 0;
+	Sym	*osym = sdp->sd_sym;
+	uchar_t	obind = ELF_ST_BIND(osym->st_info);
+	uchar_t	nbind = ELF_ST_BIND(nsym->st_info);
+	Half	ofile = sdp->sd_file->ifl_ehdr->e_type;
+	Half	nfile = ifl->ifl_ehdr->e_type;
+	size_t	size = 0;
+	Xword	value = 0;
 
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 	/*
 	 * If the original and new symbols are both COMMON, but of a different
 	 * size model, take the small one.
@@ -694,7 +694,7 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	    ((sdp->sd_flags & FLG_SY_SPECSEC) &&
 	    (sdp->sd_sym->st_shndx == SHN_COMMON) &&
 	    (nsymflags & FLG_SY_SPECSEC) &&
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 	    (nsym->st_shndx == SHN_COMMON)) ||
 	    ((sdp->sd_flags & FLG_SY_SPECSEC) &&
 	    (sdp->sd_sym->st_shndx == SHN_X86_64_LCOMMON) &&
@@ -941,7 +941,7 @@ ld_sym_resolve(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl, int ndx,
 	    (nsym->st_shndx == SHN_COMMON)) {
 		column = SYM_TENTATIVE;
 		nsymflags |= FLG_SY_TENTSYM;
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 	} else if ((nsymflags & FLG_SY_SPECSEC) &&
 	    (nsym->st_shndx == SHN_X86_64_LCOMMON)) {
 		column = SYM_TENTATIVE;

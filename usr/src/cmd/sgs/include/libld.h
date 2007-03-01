@@ -179,7 +179,7 @@ struct ofl_desc {
 	List		ofl_rtldinfo;	/* list of rtldinfo syms */
 	List		ofl_osgroups;	/* list of output GROUP sections */
 	List		ofl_ostlsseg;	/* pointer to sections in TLS segment */
-#if (defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 	List		ofl_unwind;	/* list of unwind output sections */
 	Os_desc		*ofl_unwindhdr;	/* Unwind hdr */
 #endif

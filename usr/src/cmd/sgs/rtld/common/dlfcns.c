@@ -23,12 +23,11 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  * Programmatic interface to the run_time linker.
@@ -174,7 +173,7 @@ hdl_add(Grp_hdl *ghp, Rt_map *lmp, uint_t flags)
 	gdp->gd_flags |= flags;
 
 	if (found == ALE_CREATE)
-		DBG_CALL(Dbg_file_hdl_action(ghp, lmp, DBG_DEP_ADD));
+		DBG_CALL(Dbg_file_hdl_action(ghp, lmp, DBG_DEP_ADD, flags));
 
 	return (found);
 }
@@ -247,6 +246,7 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t flags)
 		 */
 		if ((ghp = hdl_alloc()) == 0)
 			return (0);
+
 		if (alist_append(alpp, &ghp, sizeof (Grp_hdl *),
 		    AL_CNT_GROUPS) == 0)
 			return (0);
@@ -296,15 +296,20 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t flags)
 		}
 	} else {
 		/*
-		 * If a handle already exists bump its reference count.  If it's
-		 * count was 0 then this handle previously existed but could not
-		 * be removed as part of a dlclose().  Remove this handle from
-		 * the orphan list as it's once again in use.  Note that handles
-		 * associated with the link-map list itself (dlopen(0)) were
-		 * never deleted or removed to the orphan list.
+		 * If a handle already exists, bump its reference count.
+		 *
+		 * If the previous reference count was 0, then this is a handle
+		 * that an earlier call to dlclose() was unable to remove.  Such
+		 * handles are put on the orphan list.  As this handle is back
+		 * in use, it must be removed from the orphan list.
+		 *
+		 * Note, handles associated with a link-map list itself (i.e.
+		 * dlopen(0)) can have a reference count of 0.  However, these
+		 * handles are never deleted, and therefore are never moved to
+		 * the orphan list.
 		 */
 		if ((ghp->gh_refcnt++ == 0) &&
-		    ((ghp->gh_flags & (GPH_ZERO | GPH_STICKY)) == 0)) {
+		    ((ghp->gh_flags & GPH_ZERO) == 0)) {
 			uint_t	ndx;
 
 			/* LINTED */
@@ -320,14 +325,9 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t flags)
 				DBG_CALL(Dbg_file_hdl_title(DBG_DEP_REINST));
 				for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp))
 					DBG_CALL(Dbg_file_hdl_action(ghp,
-					    gdp->gd_depend, DBG_DEP_ADD));
+					    gdp->gd_depend, DBG_DEP_REINST, 0));
 			}
 		}
-
-		/*
-		 * Once a handle is referenced, remove any stick bit.
-		 */
-		ghp->gh_flags &= ~GPH_STICKY;
 	}
 
 	/*
@@ -337,7 +337,7 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t flags)
 	 * Note that a parent doesn't provide symbols via dlsym() so it also
 	 * isn't necessary to add its dependencies to the handle.
 	 */
-	if (flags & GPH_PARENT) {
+	if ((flags & GPH_PARENT) && clmp) {
 		if (hdl_add(ghp, clmp, GPD_PARENT) == 0)
 			return (0);
 	}
@@ -352,7 +352,7 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t flags)
  * object is loaded.
  */
 int
-hdl_initialize(Grp_hdl *ghp, Rt_map *nlmp, Rt_map *clmp, int mode, int promote)
+hdl_initialize(Grp_hdl *ghp, Rt_map *nlmp, int mode, int promote)
 {
 	Aliste		off;
 	Grp_desc	*gdp;
@@ -393,15 +393,10 @@ hdl_initialize(Grp_hdl *ghp, Rt_map *nlmp, Rt_map *clmp, int mode, int promote)
 			if ((bdp->b_flags & BND_NEEDED) == 0)
 				continue;
 
-			if (hdl_add(ghp, dlmp, (GPD_AVAIL | GPD_ADDEPS)) != 0)
-				(void) update_mode(dlmp, MODE(dlmp), mode);
-			else {
-				/*
-				 * Something failed.  Remove the new handle.
-				 */
-				(void) dlclose_intn(ghp, clmp);
+			if (hdl_add(ghp, dlmp, (GPD_AVAIL | GPD_ADDEPS)) == 0)
 				return (0);
-			}
+
+			(void) update_mode(dlmp, MODE(dlmp), mode);
 		}
 	}
 	ghp->gh_flags |= GPH_INITIAL;
@@ -432,8 +427,10 @@ hdl_validate(Grp_hdl *ghp)
  * Core dlclose activity.
  */
 int
-dlclose_core(Grp_hdl *ghp, Rt_map *clmp)
+dlclose_core(Grp_hdl *ghp, Rt_map *clmp, Lm_list *lml)
 {
+	int	error;
+
 	/*
 	 * If we're already at atexit() there's no point processing further,
 	 * all objects have already been tsorted for fini processing.
@@ -448,19 +445,10 @@ dlclose_core(Grp_hdl *ghp, Rt_map *clmp)
 		DBG_CALL(Dbg_file_dlclose(LIST(clmp), MSG_ORIG(MSG_STR_ZERO),
 		    DBG_DLCLOSE_IGNORE));
 	} else {
-		Rt_map		*olmp;
-		const char	*owner;
-
-		/*
-		 * Determine if we've an owner for this handle.
-		 */
-		if ((olmp = ghp->gh_ownlmp) != 0)
-			owner = NAME(olmp);
-		else
-			owner = MSG_INTL(MSG_STR_UNKNOWN);
-
-		DBG_CALL(Dbg_file_dlclose(LIST(clmp), owner, DBG_DLCLOSE_NULL));
+		DBG_CALL(Dbg_file_dlclose(LIST(clmp), NAME(ghp->gh_ownlmp),
+		    DBG_DLCLOSE_NULL));
 	}
+
 
 	/*
 	 * Decrement reference count of this object.
@@ -476,9 +464,16 @@ dlclose_core(Grp_hdl *ghp, Rt_map *clmp)
 		return (0);
 
 	/*
-	 * This handle is no longer being referenced, remove it.
+	 * This handle is no longer being referenced, remove it.  If this handle
+	 * is part of an alternative link-map list, determine if the whole list
+	 * can be removed also.
 	 */
-	return (remove_hdl(ghp, clmp, 0));
+	error = remove_hdl(ghp, clmp, 0);
+
+	if ((lml->lm_flags & (LML_FLG_BASELM | LML_FLG_RTLDLM)) == 0)
+		remove_lml(lml);
+
+	return (error);
 }
 
 /*
@@ -501,7 +496,7 @@ dlclose_intn(Grp_hdl *ghp, Rt_map *clmp)
 	 */
 	olml = ghp->gh_ownlml;
 
-	error = dlclose_core(ghp, clmp);
+	error = dlclose_core(ghp, clmp, olml);
 
 	/*
 	 * Determine whether the original link-map list still exists.  In the
@@ -642,7 +637,7 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 				promote = 1;
 		}
 		if (promote)
-			(void) relocate_lmc(lml, ALO_DATA, lml->lm_head);
+			(void) relocate_lmc(lml, ALO_DATA, clmp, lml->lm_head);
 
 		return (ghp);
 	}
@@ -655,14 +650,12 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	 * provides flexibility should we be able to support dlopening more
 	 * than one object in the future.
 	 */
-	if ((pnp = LM_FIX_NAME(clmp)(path, clmp, orig)) == 0) {
-		remove_lml(lml);
+	if ((pnp = LM_FIX_NAME(clmp)(path, clmp, orig)) == 0)
 		return (0);
-	}
+
 	if (((pnp->p_orig & (PN_TKN_ISALIST | PN_TKN_HWCAP)) || pnp->p_next) &&
 	    ((mode & RTLD_FIRST) == 0)) {
 		remove_pnode(pnp);
-		remove_lml(lml);
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_5));
 		return (0);
 	}
@@ -674,7 +667,6 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	if ((lmc = alist_append(&(lml->lm_lists), 0, sizeof (Lm_cntl),
 	    AL_CNT_LMLISTS)) == 0) {
 		remove_pnode(pnp);
-		remove_lml(lml);
 		return (0);
 	}
 	olmco = nlmco = (Aliste)((char *)lmc - (char *)lml->lm_lists);
@@ -689,7 +681,6 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	remove_pnode(pnp);
 	if (nlmp == 0) {
 		remove_cntl(lml, olmco);
-		remove_lml(lml);
 		return (0);
 	}
 
@@ -703,7 +694,6 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	 */
 	if ((flags & FLG_RT_AUDIT) && (LIST(nlmp) != lml)) {
 		remove_cntl(lml, olmco);
-		remove_lml(lml);
 		lml = LIST(nlmp);
 		olmco = 0;
 		nlmco = ALO_DATA;
@@ -713,19 +703,21 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	 * Finish processing the objects associated with this request.
 	 */
 	if ((analyze_lmc(lml, nlmco, nlmp) == 0) ||
-	    (relocate_lmc(lml, nlmco, nlmp) == 0)) {
-		(void) dlclose_core(ghp, clmp);
-		if (olmco && lm_salvage(lml, 1, olmco)) {
-			remove_cntl(lml, olmco);
-			remove_lml(lml);
-		}
-		return (0);
+	    (relocate_lmc(lml, nlmco, clmp, nlmp) == 0)) {
+		ghp = 0;
+		nlmp = 0;
 	}
 
 	/*
-	 * After a successful load, any objects collected on the new link-map
-	 * control list will have been moved to the callers link-map control
-	 * list.  This control list can now be deleted.
+	 * If this lazyload has failed, and we've created a new link-map
+	 * control list to which this request has added objects, then remove
+	 * all the objects that have been associated to this request.
+	 */
+	if ((nlmp == 0) && olmco && lmc->lc_head)
+		remove_lmc(lml, clmp, lmc, olmco, path);
+
+	/*
+	 * Finally, remove any link-map control list that was created.
 	 */
 	if (olmco)
 		remove_cntl(lml, olmco);
@@ -738,7 +730,7 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
  * opens that require a handle.
  */
 Grp_hdl *
-dlmopen_intn(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
+dlmopen_intn(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
     uint_t flags, uint_t orig, int *loaded)
 {
 	Rt_map	*dlmp = 0;
@@ -772,8 +764,12 @@ dlmopen_intn(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
 			lml->lm_flags |= LML_FLG_NOAUDIT;
 		}
 
-		if ((list_append(&dynlm_list, lml) == 0) ||
-		    (newlmid(lml) == 0)) {
+		if (list_append(&dynlm_list, lml) == 0) {
+			free(lml);
+			return (0);
+		}
+		if (newlmid(lml) == 0) {
+			list_delete(&dynlm_list, lml);
 			free(lml);
 			return (0);
 		}
@@ -801,13 +797,38 @@ dlmopen_intn(Lm_list * lml, const char *path, int mode, Rt_map * clmp,
 	}
 
 	/*
+	 * If loading an auditor was requested, and the auditor already existed,
+	 * then the link-map returned will be to the original auditor.  Remove
+	 * the link-map control list that was created for this request.
+	 */
+	if (dlmp && (flags & FLG_RT_AUDIT) && (LIST(dlmp) != lml)) {
+		remove_lml(lml);
+		lml = LIST(dlmp);
+	}
+
+	/*
 	 * Return the number of objects loaded if required.  This is used to
 	 * trigger used() processing on return from a dlopen().
 	 */
-	if (loaded && dlmp)
+	if (loaded)
 		*loaded = lml->lm_obj - objcnt;
 
+	/*
+	 * If this load failed, remove any alternative link-map list.
+	 */
+	if ((ghp == 0) &&
+	    ((lml->lm_flags & (LML_FLG_BASELM | LML_FLG_RTLDLM)) == 0)) {
+		remove_lml(lml);
+		lml = 0;
+	}
+
+	/*
+	 * Finish this load request.  If objects were loaded, .init processing
+	 * is computed.  Finally, the debuggers are informed of the link-map
+	 * lists being stable.
+	 */
 	load_completion(dlmp, clmp);
+
 	return (ghp);
 }
 

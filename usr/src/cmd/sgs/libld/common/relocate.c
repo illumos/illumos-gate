@@ -591,7 +591,7 @@ ld_reloc_plt(Rel_desc *rsp, Ofl_desc *ofl)
 {
 	Sym_desc	*sdp = rsp->rel_sym;
 
-#if	defined(__i386) || defined(__amd64)
+#if	defined(__x86)
 #if	defined(_ELF64)
 	/*
 	 * AMD64 TLS code sequences do not use a unique TLS relocation to
@@ -611,7 +611,7 @@ ld_reloc_plt(Rel_desc *rsp, Ofl_desc *ofl)
 		return (ld_add_actrel(FLG_REL_TLSFIX, rsp, ofl));
 	}
 #endif
-#endif	/* __i386 && __amd64 */
+#endif	/* __x86 */
 
 	/*
 	 * if (not PLT yet assigned)
@@ -1616,6 +1616,7 @@ reloc_section(Ofl_desc *ofl, Is_desc *isect, Is_desc *rsect, Os_desc *osect)
 	Rel_desc	reld;		/* relocation descriptor */
 	Shdr *		shdr;
 	Word		flags = 0;
+	uintptr_t	ret = 1;
 
 	shdr = rsect->is_shdr;
 	rsize = shdr->sh_size;
@@ -1662,9 +1663,9 @@ reloc_section(Ofl_desc *ofl, Is_desc *isect, Is_desc *rsect, Os_desc *osect)
 		rsndx = ld_init_rel(&reld, (void *)reloc);
 
 		if (process_reld(ofl, rsect, &reld, rsndx, reloc) == S_ERROR)
-			return (S_ERROR);
+			ret = S_ERROR;
 	}
-	return (1);
+	return (ret);
 }
 
 static uintptr_t
@@ -1858,16 +1859,17 @@ reloc_movesections(Ofl_desc *ofl)
 {
 	Listnode	*lnp1;
 	Is_desc		*risp;
+	uintptr_t	ret = 1;
 
 	/*
 	 * Generate/Expand relocation entries
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_mvrelisdescs, lnp1, risp)) {
 		if (process_movereloc(ofl, risp) == S_ERROR)
-			return (S_ERROR);
+			ret = S_ERROR;
 	}
 
-	return (1);
+	return (ret);
 }
 
 /*
@@ -1960,10 +1962,10 @@ ld_reloc_init(Ofl_desc *ofl)
 		if (ld_make_got(ofl) == S_ERROR)
 			return (S_ERROR);
 
-#if	defined(sparc) || defined(__sparcv9)
+#if	defined(__sparc)
 		if (ld_allocate_got(ofl) == S_ERROR)
 			return (S_ERROR);
-#elif	defined(i386) || defined(__amd64)
+#elif	defined(__x86)
 /* nothing to do */
 #else
 #error Unknown architecture!

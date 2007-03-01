@@ -23,8 +23,8 @@
  *	  All Rights Reserved
  *
  *
- *	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -392,12 +392,12 @@ is_runnable(GElf_Ehdr *ehdr)
 	    (ehdr->e_ident[EI_DATA] == M_DATA))
 		return (ELFCLASS32);
 
-#if	defined(sparc)
+#if	defined(__sparc)
 	if ((ehdr->e_machine == EM_SPARCV9) &&
 	    (ehdr->e_ident[EI_DATA] == M_DATA) &&
 	    (conv_sys_eclass() == ELFCLASS64))
 		return (ELFCLASS64);
-#elif	defined(i386) || defined(__amd64)
+#elif	defined(__x86)
 	if ((ehdr->e_machine == EM_AMD64) &&
 	    (ehdr->e_ident[EI_DATA] == ELFDATA2LSB) &&
 	    (conv_sys_eclass() == ELFCLASS64))

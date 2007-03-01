@@ -955,7 +955,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 
 		DBG_CALL(Dbg_util_nl(&lml_main, DBG_NL_STD));
 
-		if (relocate_lmc(&lml_main, ALO_DATA, mlmp) == 0)
+		if (relocate_lmc(&lml_main, ALO_DATA, mlmp, mlmp) == 0)
 			return (0);
 
 		/*

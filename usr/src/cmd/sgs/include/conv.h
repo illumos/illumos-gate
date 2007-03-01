@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,6 +166,7 @@ extern	const char	*conv_dl_mode(int, int);
 extern	const char	*conv_dwarf_ehe(uint_t);
 extern	const char	*conv_elfdata_type(Elf_Type);
 extern	const char	*conv_grphdl_flags(uint_t);
+extern	const char	*conv_grpdesc_flags(uint_t);
 extern	Isa_desc	*conv_isalist(void);
 extern	const char	*conv_lddstub(int);
 extern	const char	*conv_seg_flags(Half);

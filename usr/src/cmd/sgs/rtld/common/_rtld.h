@@ -441,7 +441,7 @@ extern uchar_t		search_rules[];	/* dependency search rules */
 
 extern Fct		elf_fct;	/* ELF file class dependent data */
 
-#if	defined(sparc) && !defined(__sparcv9)
+#if	defined(__sparc) && !defined(__sparcv9)
 extern Fct		aout_fct;	/* a.out (4.x) file class dependent */
 					/*	data */
 #endif
@@ -521,7 +521,7 @@ extern const char	*_conv_reloc_type(uint_t rel);
 extern uintptr_t	dbg_setup(const char *, Dbg_desc *);
 extern const char	*demangle(const char *);
 extern int		dlclose_intn(Grp_hdl *, Rt_map *);
-extern int		dlclose_core(Grp_hdl *, Rt_map *);
+extern int		dlclose_core(Grp_hdl *, Rt_map *, Lm_list *);
 extern Sym		*dlsym_handle(Grp_hdl *, Slookup *, Rt_map **,
 			    uint_t *);
 extern void		*dlsym_intn(void *, const char *, Rt_map *, Rt_map **);
@@ -542,7 +542,7 @@ extern ulong_t		elf_reloc_relative(ulong_t, ulong_t, ulong_t,
 			    ulong_t, ulong_t, ulong_t);
 extern ulong_t		elf_reloc_relacount(ulong_t, ulong_t,
 			    ulong_t, ulong_t);
-extern long		elf_static_tls(Rt_map *, Sym*, void *, uchar_t, char *,
+extern long		elf_static_tls(Rt_map *, Sym *, void *, uchar_t, char *,
 			    ulong_t, long);
 extern int		enter(void);
 extern uint_t		expand(char **, size_t *, char **, uint_t, uint_t,
@@ -564,10 +564,10 @@ extern Lmid_t		get_linkmap_id(Lm_list *);
 extern Pnode		*get_next_dir(Pnode **, Rt_map *, uint_t);
 extern int		hdl_add(Grp_hdl *, Rt_map *, uint_t);
 extern Grp_hdl		*hdl_create(Lm_list *, Rt_map *, Rt_map *, uint_t);
-extern int		hdl_initialize(Grp_hdl *, Rt_map *, Rt_map *, int, int);
+extern int		hdl_initialize(Grp_hdl *, Rt_map *, int, int);
 extern int		hwcap_check(Rej_desc *, Ehdr *);
-extern Pnode 		*hwcap_filtees(Pnode **, Aliste, Dyninfo *, Rt_map *,
-			    const char *, int, uint_t);
+extern Pnode 		*hwcap_filtees(Pnode **, Aliste, Lm_cntl *, Dyninfo *,
+			    Rt_map *, const char *, int, uint_t);
 extern void		is_dep_ready(Rt_map *, Rt_map *, int);
 extern void		is_dep_init(Rt_map *, Rt_map *);
 extern int		is_sym_interposer(Rt_map *, Sym *);
@@ -581,7 +581,6 @@ extern void		lm_append(Lm_list *, Aliste, Rt_map *);
 extern void		lm_delete(Lm_list *, Rt_map *);
 extern void		lm_move(Lm_list *, Aliste, Aliste, Lm_cntl *,
 			    Lm_cntl *);
-extern int		lm_salvage(Lm_list *, int, Aliste);
 extern void		load_completion(Rt_map *, Rt_map *);
 extern Rt_map 		*load_hwcap(Lm_list *, Aliste, const char *, Rt_map *,
 			    uint_t, uint_t, Grp_hdl **, Rej_desc *);
@@ -598,11 +597,12 @@ extern void		rd_event(Lm_list *, rd_event_e, r_state_e);
 extern int		readenv_user(const char **, Word *, Word *, int);
 extern int		readenv_config(Rtc_env *, Addr, int);
 extern void		rejection_inherit(Rej_desc *, Rej_desc *, Fdesc *);
-extern int		relocate_lmc(Lm_list *, Aliste, Rt_map *);
+extern int		relocate_lmc(Lm_list *, Aliste, Rt_map *, Rt_map *);
 extern int		relocate_finish(Rt_map *, Alist *, int, int);
-extern void		remove_caller(Grp_hdl *, Rt_map *);
 extern void		remove_cntl(Lm_list *, Aliste);
 extern int		remove_hdl(Grp_hdl *, Rt_map *, int *);
+extern void		remove_lmc(Lm_list *, Rt_map *, Lm_cntl *, Aliste,
+			    const char *);
 extern void		remove_incomplete(Lm_list *, Aliste);
 extern void		remove_lists(Rt_map *, int);
 extern void		remove_lml(Lm_list *);
@@ -639,7 +639,7 @@ extern void		unused(Lm_list *);
 extern int		update_mode(Rt_map *, int, int);
 extern void		zero(caddr_t, size_t);
 
-#if	defined(sparc)
+#if	defined(__sparc)
 /*
  * SPARC Register symbol support.
  */
@@ -651,7 +651,7 @@ extern void		set_sparc_g4(ulong_t);
 extern void		set_sparc_g5(ulong_t);
 extern void		set_sparc_g6(ulong_t);
 extern void		set_sparc_g7(ulong_t);
-#endif /* defined(sparc) */
+#endif
 
 extern long		_sysconfig(int);
 

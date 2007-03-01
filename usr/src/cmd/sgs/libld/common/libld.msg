@@ -238,8 +238,8 @@
 			 bad symbol type %s: symbol type must be TLS"
 @ MSG_REL_BADTLS	"relocation error: %s: file %s: symbol %s: \
 			 relocation illegal for TLS symbol"
-@ MSG_REL_BADGOTBASED	"relocation error: %s: file %s: symbol %s: \
-			 relocation must bind locally"
+@ MSG_REL_BADGOTBASED	"relocation error: %s: file %s: symbol %s: a GOT \
+			 relative relocation must reference a local symbol"
 @ MSG_REL_UNKNWSYM	"relocation error: %s: file %s: section %s: \
 			 attempt to relocate with respect to unknown \
 			 symbol %s: offset 0x%llx, symbol index %d"

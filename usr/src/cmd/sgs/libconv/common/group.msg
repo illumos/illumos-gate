@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,6 +31,11 @@
 @ MSG_GPH_PARENT	"GPH_PARENT"
 @ MSG_GPH_FILTEE	"GPH_FILTEE"
 @ MSG_GPH_INITIAL	"GPH_INITIAL"
-@ MSG_GPH_STICKY	"GPH_STICKY"
+
+@ MSG_GPD_AVAIL		"GPD_AVAIL"
+@ MSG_GPD_ADDEPS	"GPD_ADDEPS"
+@ MSG_GPD_PARENT	"GPD_PARENT"
+@ MSG_GPD_FILTER	"GPD_FILTER"
+@ MSG_GPD_REMOVE	"GPD_REMOVE"
 
 @ MSG_GBL_NULL		""

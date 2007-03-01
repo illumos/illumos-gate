@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -146,18 +146,26 @@ Dbg_file_hdl_title(int type)
 	/*
 	 * Establish a binding title for later use in Dbg_file_bind_entry.
 	 */
-	if (type == DBG_DEP_CREATE)
+	switch (type) {
+	case DBG_DEP_CREATE:
 	    hdl_str = MSG_FIL_HDL_CREATE;  /* MSG_INTL(MSG_FIL_HDL_CREATE) */
-	else if (type == DBG_DEP_ADD)
+	    break;
+	case DBG_DEP_ADD:
 	    hdl_str = MSG_FIL_HDL_ADD;	   /* MSG_INTL(MSG_FIL_HDL_ADD) */
-	else if (type == DBG_DEP_DELETE)
+	    break;
+	case DBG_DEP_DELETE:
 	    hdl_str = MSG_FIL_HDL_DELETE;  /* MSG_INTL(MSG_FIL_HDL_DELETE) */
-	else if (type == DBG_DEP_ORPHAN)
+	    break;
+	case DBG_DEP_ORPHAN:
 	    hdl_str = MSG_FIL_HDL_ORPHAN;  /* MSG_INTL(MSG_FIL_HDL_ORPHAN) */
-	else if (type == DBG_DEP_REINST)
+	    break;
+	case DBG_DEP_REINST:
 	    hdl_str = MSG_FIL_HDL_REINST;  /* MSG_INTL(MSG_FIL_HDL_REINST) */
-	else
+	    break;
+	default:
 	    hdl_str = 0;
+	    break;
+	}
 }
 
 void
@@ -188,10 +196,11 @@ Dbg_file_hdl_collect(Grp_hdl *ghp, const char *name)
 }
 
 void
-Dbg_file_hdl_action(Grp_hdl *ghp, Rt_map *lmp, int type)
+Dbg_file_hdl_action(Grp_hdl *ghp, Rt_map *lmp, int type, uint_t flags)
 {
-	Lm_list	*lml = LIST(lmp);
-	Msg	str;
+	const char	*mode, *group;
+	Lm_list		*lml = LIST(lmp);
+	Msg		str;
 
 	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
@@ -217,33 +226,46 @@ Dbg_file_hdl_action(Grp_hdl *ghp, Rt_map *lmp, int type)
 		hdl_title = 0;
 	}
 
-	if (type == DBG_DEP_ADD)
+	switch (type) {
+	case DBG_DEP_ADD:
 	    str = MSG_FIL_DEP_ADD;	/* MSG_INTL(MSG_FIL_DEP_ADD) */
-	else if (type == DBG_DEP_DELETE)
+	    break;
+	case DBG_DEP_DELETE:
 	    str = MSG_FIL_DEP_DELETE;	/* MSG_INTL(MSG_FIL_DEP_DELETE) */
-	else if (type == DBG_DEP_REMOVE)
+	    break;
+	case DBG_DEP_REMOVE:
 	    str = MSG_FIL_DEP_REMOVE;	/* MSG_INTL(MSG_FIL_DEP_REMOVE) */
-	else if (type == DBG_DEP_REMAIN)
+	    break;
+	case DBG_DEP_REMAIN:
 	    str = MSG_FIL_DEP_REMAIN;	/* MSG_INTL(MSG_FIL_DEP_REMAIN) */
-	else
-	    str = 0;
-
-	if (str) {
-		const char *mode;
-
-		if ((MODE(lmp) & (RTLD_GLOBAL | RTLD_NODELETE)) ==
-		    (RTLD_GLOBAL | RTLD_NODELETE))
-			mode = MSG_ORIG(MSG_MODE_GLOBNODEL);
-		else if (MODE(lmp) & RTLD_GLOBAL)
-			mode = MSG_ORIG(MSG_MODE_GLOB);
-
-		else if (MODE(lmp) & RTLD_NODELETE)
-			mode = MSG_ORIG(MSG_MODE_NODEL);
-		else
-			mode = MSG_ORIG(MSG_STR_EMPTY);
-
-		dbg_print(lml, MSG_INTL(str), NAME(lmp), mode);
+	    break;
+	case DBG_DEP_ORPHAN:
+	    str = MSG_FIL_DEP_ORPHAN;	/* MSG_INTL(MSG_FIL_DEP_ORPHAN) */
+	    break;
+	case DBG_DEP_REINST:
+	    str = MSG_FIL_DEP_REINST;	/* MSG_INTL(MSG_FIL_DEP_REINST) */
+	    break;
+	default:
+	    return;
 	}
+
+	if ((type == DBG_DEP_ADD) && flags)
+		group = conv_grpdesc_flags(flags);
+	else
+		group = MSG_ORIG(MSG_STR_EMPTY);
+
+	if ((MODE(lmp) & (RTLD_GLOBAL | RTLD_NODELETE)) ==
+	    (RTLD_GLOBAL | RTLD_NODELETE))
+		mode = MSG_ORIG(MSG_MODE_GLOBNODEL);
+	else if (MODE(lmp) & RTLD_GLOBAL)
+		mode = MSG_ORIG(MSG_MODE_GLOB);
+
+	else if (MODE(lmp) & RTLD_NODELETE)
+		mode = MSG_ORIG(MSG_MODE_NODEL);
+	else
+		mode = MSG_ORIG(MSG_STR_EMPTY);
+
+	dbg_print(lml, MSG_INTL(str), NAME(lmp), mode, group);
 }
 
 void
@@ -714,4 +736,14 @@ Dbg_file_modified(Lm_list *lml, const char *obj, const char *oname,
 		    EC_NATPTR(nelf), str);
 	}
 	Dbg_util_nl(lml, DBG_NL_STD);
+}
+
+void
+Dbg_file_cleanup(Lm_list *lml, const char *name, Aliste lmco)
+{
+	if (DBG_NOTCLASS(DBG_C_FILES))
+		return;
+
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_CLEANUP), name, EC_XWORD(lmco));
 }

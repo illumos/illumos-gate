@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -456,7 +456,7 @@ ld_create_outfile(Ofl_desc *ofl)
 			} else if (ptype == PT_TLS) {
 				if (flags & FLG_OF_TLSPHDR)
 					nseg++;
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 			} else if (ptype == PT_SUNW_UNWIND) {
 				if (ofl->ofl_unwindhdr)
 					nseg++;

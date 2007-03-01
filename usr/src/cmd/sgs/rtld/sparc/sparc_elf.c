@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -721,9 +721,14 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 		}
 
 		/*
-		 * If we're promoting plts determine if this one has already
-		 * been written. An uninitialized plts' second instruction is a
-		 * branch.
+		 * If we're promoting .plts try and determine if this one has
+		 * already been written.  An uninitialized .plts' second
+		 * instruction is a branch.  Note, elf_plt_write() optimizes
+		 * .plt relocations, and it's possible that a relocated entry
+		 * is a branch.  If this is the case, we can't tell the
+		 * difference between an uninitialized .plt and a relocated,
+		 * .plt that uses a branch.  In this case, we'll simply redo
+		 * the relocation calculation, which is a bit sad.
 		 */
 		if (plt) {
 			ulong_t	*_roffset = (ulong_t *)roffset;

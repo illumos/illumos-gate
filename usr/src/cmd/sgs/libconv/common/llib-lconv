@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* LINTLIBRARY */
@@ -51,6 +51,7 @@ const char	*conv_dwarf_ehe(uint_t);
 const char	*conv_elfdata_type(Elf_Type);
 int		conv_expn_field(CONV_EXPN_FIELD_ARG *);
 const char	*conv_grphdl_flags(uint_t);
+const char	*conv_grpdesc_flags(uint_t);
 Isa_desc	*conv_isalist(void);
 const char	*conv_lddstub(int);
 const char	*conv_seg_flags(Half);

@@ -63,7 +63,7 @@ extern	int	elf_rtld_load();
 extern	void	elf_plt2_init(uint_t *, Rt_map *);
 #endif
 
-#if	defined(i386)
+#if	defined(__i386)
 extern	ulong_t	elf_reloc_relacount(ulong_t, ulong_t, ulong_t, ulong_t);
 extern	int	elf_copy_gen(Rt_map *);
 #endif

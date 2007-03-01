@@ -574,7 +574,7 @@ ld_make_bss(Ofl_desc *ofl, Xword size, Xword align, Bss_Type which)
 		ofl->ofl_isbss = isec;
 		ident = M_ID_BSS;
 
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 	} else if (which == MAKE_LBSS) {
 		isec->is_name = MSG_ORIG(MSG_SCN_LBSS);
 		ofl->ofl_islbss = isec;
@@ -630,6 +630,7 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, List *list)
 	Rel_desc	reld;
 	Rela		reloc;
 	Os_desc		*osp;
+	uintptr_t	ret = 1;
 
 	if (list->head == NULL)
 		return (1);
@@ -689,14 +690,16 @@ make_array(Ofl_desc *ofl, Word shtype, const char *sectname, List *list)
 		reld.rel_sym = sdp;
 
 		if (ld_process_sym_reloc(ofl, &reld, (Rel *)&reloc, isec,
-		    MSG_INTL(MSG_STR_COMMAND)) == S_ERROR)
-			return (S_ERROR);
+		    MSG_INTL(MSG_STR_COMMAND)) == S_ERROR) {
+			ret = S_ERROR;
+			continue;
+		}
 
 		reld.rel_roffset += (Xword)sizeof (Addr);
 		reloc.r_offset = reld.rel_roffset;
 	}
 
-	return (1);
+	return (ret);
 }
 
 /*
@@ -1204,7 +1207,7 @@ make_plt(Ofl_desc *ofl)
 				(size_t)ofl->ofl_pltpad) * M_PLT_ENTSIZE);
 	size_t		rsize = (size_t)ofl->ofl_relocpltsz;
 
-#if	defined(sparc)
+#if	defined(__sparc)
 	/*
 	 * Account for the NOP at the end of the plt.
 	 */
@@ -2308,7 +2311,7 @@ ld_make_data(Ofl_desc *ofl, size_t size)
  * Define a set of templates for generating "void (*)(void)" function
  * definitions.
  */
-#if	defined(i386) || defined(__amd64)
+#if	defined(__i386) || defined(__amd64)
 #if	defined(__lint)
 static const uchar_t ret_template[] = { 0 };
 #else	/* __lint */
@@ -2331,7 +2334,7 @@ static const uchar_t ret64_template[] = {
 };
 #endif	/* __lint */
 
-#elif	defined(sparc) || defined(__sparcv9)
+#elif	defined(__sparc)
 static const uchar_t ret_template[] = {
 /* 0x00 */	0x81, 0xc3, 0xe0, 0x08,		/* retl */
 /* 0x04 */	0x01, 0x00, 0x00, 0x00		/* nop */

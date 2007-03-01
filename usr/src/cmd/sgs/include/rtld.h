@@ -401,9 +401,7 @@ typedef struct {
 #define	GPH_PARENT	0x0008		/* assign caller as a parent */
 #define	GPH_FILTEE	0x0010		/* handle used to specify a filtee */
 #define	GPH_INITIAL	0x0020		/* handle is initialized */
-#define	GPH_STICKY	0x0040		/* handle is unreferenced, but should */
-					/*	not trigger object removal */
-#define	GPH_NOPENDLAZY	0x0080		/* no pending lazy dependencies */
+#define	GPH_NOPENDLAZY	0x0040		/* no pending lazy dependencies */
 					/*	remain for this handle */
 
 /*

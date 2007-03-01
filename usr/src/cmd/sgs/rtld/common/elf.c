@@ -251,7 +251,7 @@ elf_rtld_load()
 	if (elf_needed(lml, ALO_DATA, lmp) == 0)
 		return (0);
 
-#if	defined(i386)
+#if	defined(__i386)
 	/*
 	 * This is a kludge to give ld.so.1 a performance benefit on i386.
 	 * It's based around two factors.
@@ -345,50 +345,30 @@ elf_lazy_load(Rt_map *clmp, uint_t ndx, const char *sym)
 		LIST(clmp)->lm_lazy--;
 
 	/*
-	 * Finish processing the objects associated with this request.
+	 * Finish processing the objects associated with this request, and
+	 * create an association between the caller and this dependency.
 	 */
-	if (nlmp && ((analyze_lmc(lml, lmco, nlmp) == 0) ||
-	    (relocate_lmc(lml, lmco, nlmp) == 0)))
+	if (nlmp && (((analyze_lmc(lml, lmco, nlmp) == 0)) ||
+	    (relocate_lmc(lml, lmco, clmp, nlmp) == 0) ||
+	    (bind_one(clmp, nlmp, BND_NEEDED) == 0)))
 		dip->di_info = nlmp = 0;
 
 	/*
-	 * If the dependency has been successfully processed, and it is part of
-	 * a link-map control list that is equivalent, or less, that the callers
-	 * control list, create an association between the caller and this
-	 * dependency.  If this dependency isn't yet apart of the callers
-	 * link-map control list, then it is still apart of a list that is being
-	 * relocated.  As the relocation of an object on this list might still
-	 * fail, we can't yet bind the caller to this object.  To do so, would
-	 * be locking the object so that it couldn't be deleted.  Mark this
-	 * object as free, and it will be reprocessed when this dependency is
-	 * next referenced.
+	 * If this lazyload has failed, and we've created a new link-map
+	 * control list to which this request has added objects, then remove
+	 * all the objects that have been associated to this request.
 	 */
-	if (nlmp) {
-		if (CNTL(nlmp) <= CNTL(clmp)) {
-			if (bind_one(clmp, nlmp, BND_NEEDED) == 0)
-				dip->di_info = nlmp = 0;
-		} else {
-			dip->di_info = 0;
-			dip->di_flags &= ~FLG_DI_PROCESSD;
-			if (LAZY(clmp)++ == 0)
-				LIST(clmp)->lm_lazy++;
-		}
-	}
+	if ((nlmp == 0) && lmc && lmc->lc_head)
+		remove_lmc(lml, clmp, lmc, lmco, name);
 
 	/*
-	 * After a successful load, any objects collected on the new link-map
-	 * control list will have been moved to the callers link-map control
-	 * list.  This control list can now be deleted.
+	 * Finally, remove any link-map control list that was created.
 	 */
-	if (lmc) {
-		if (nlmp == 0)
-			remove_incomplete(lml, lmco);
+	if (lmc)
 		remove_cntl(lml, lmco);
-	}
 
 	return (nlmp);
 }
-
 
 /*
  * Return the entry point of the ELF executable.
@@ -1463,18 +1443,15 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 				lmco = ALO_DATA;
 			}
 
-			pnp = hwcap_filtees(pnpp, lmco, dip, ilmp, filtees,
+			pnp = hwcap_filtees(pnpp, lmco, lmc, dip, ilmp, filtees,
 			    mode, (FLG_RT_HANDLE | FLG_RT_HWCAP));
 
 			/*
 			 * Now that any hardware capability objects have been
 			 * processed, remove any link-map control list.
 			 */
-			if (lmc) {
-				if (pnp->p_len == 0)
-					(void) lm_salvage(lml, 0, lmco);
+			if (lmc)
 				remove_cntl(lml, lmco);
-			}
 		}
 
 		if (pnp->p_len == 0)
@@ -1524,8 +1501,8 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 				 * allow ignore filtering to ld.so.1, otherwise
 				 * nothing is going to work.
 				 */
-				if ((lml->lm_tflags | FLAGS1(ilmp)) &
-				    LML_TFLG_AUD_OBJFILTER)
+				if (nlmp && ((lml->lm_tflags | FLAGS1(ilmp)) &
+				    LML_TFLG_AUD_OBJFILTER))
 					(void) audit_objfilter(ilmp, filtees,
 					    nlmp, 0);
 
@@ -1593,32 +1570,38 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 				 */
 				if (nlmp && ghp &&
 				    ((analyze_lmc(lml, lmco, nlmp) == 0) ||
-				    (relocate_lmc(lml, lmco, nlmp) == 0)))
+				    (relocate_lmc(lml, lmco, ilmp, nlmp) == 0)))
 					nlmp = 0;
 
 				/*
 				 * If the filtee has been successfully
-				 * processed, and it is part of a link-map
-				 * control list that is equivalent, or less,
-				 * than the filter control list, create an
-				 * association between the filter and filtee.
-				 * This association provides sufficient
-				 * information to tear down the filter and
-				 * filtee if necessary.
+				 * processed, then create an association
+				 * between the filter and filtee.  This
+				 * association provides sufficient information
+				 * to tear down the filter and filtee if
+				 * necessary.
 				 */
-				if (nlmp && ghp && (CNTL(nlmp) <= CNTL(ilmp)) &&
+				DBG_CALL(Dbg_file_hdl_title(DBG_DEP_ADD));
+				if (nlmp && ghp &&
 				    (hdl_add(ghp, ilmp, GPD_FILTER) == 0))
 					nlmp = 0;
 
 				/*
-				 * Now that this object has been processed,
-				 * remove any link-map control list.
+				 * If this filtee loading has failed, and we've
+				 * created a new link-map control list to which
+				 * this request has added objects, then remove
+				 * all the objects that have been associated to
+				 * this request.
 				 */
-				if (lmc) {
-					if (nlmp == 0)
-						(void) lm_salvage(lml, 0, lmco);
+				if ((nlmp == 0) && lmc && lmc->lc_head)
+					remove_lmc(lml, clmp, lmc, lmco, name);
+
+				/*
+				 * Remove any link-map control list that was
+				 * created.
+				 */
+				if (lmc)
 					remove_cntl(lml, lmco);
-				}
 			}
 
 			/*
@@ -1628,13 +1611,10 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 			 * for future symbol searches.
 			 */
 			if (nlmp == 0) {
-				pnp->p_info = 0;
 				DBG_CALL(Dbg_file_filtee(lml, 0, filtee,
 				    audit));
 
-				if (ghp)
-					(void) dlclose_core(ghp, ilmp);
-
+				pnp->p_info = 0;
 				pnp->p_len = 0;
 				continue;
 			}
@@ -1682,24 +1662,9 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 			}
 
 			/*
-			 * If this filtee has just been loaded (nlmp != 0),
-			 * determine whether the filtee was triggered by a
-			 * relocation from an object that is still being
-			 * relocated on a leaf link-map control list.  As the
-			 * relocation of an object on this list might still
-			 * fail, we can't yet bind the filter to the filtee.
-			 * To do so, would be locking the filtee so that it
-			 * couldn't be deleted, and the filtee itself could have
-			 * bound to an object that must be torn down.  Insure
-			 * the caller isn't bound to the handle at this time.
-			 * Any association will be reestablished when the filter
-			 * is later referenced and the filtee has propagated to
-			 * the same link-map control list.
+			 * If a symbol has been found, indicate the binding
+			 * and return the symbol.
 			 */
-			if (nlmp && (CNTL(nlmp) > CNTL(ilmp))) {
-				remove_caller(ghp, ilmp);
-				pnp->p_info = 0;
-			}
 			if (sym) {
 				*binfo |= DBG_BINFO_FILTEE;
 				return (sym);

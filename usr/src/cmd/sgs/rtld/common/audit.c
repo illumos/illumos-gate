@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Audit interfaces.  Auditing can be enabled in two ways:
@@ -809,7 +809,7 @@ static const Aud_info aud_info[] = {
 	{ MSG_SYM_LAV8PLTENTER,		/* MSG_ORIG(MSG_SYM_LAV8PLTENTER) */
 #elif	defined(__amd64)
 	{ MSG_SYM_LAAMD64PLTENTER, /* MSG_ORIG(MSG_SYM_LAAMD64PLTENTER) */
-#elif	defined(i386)
+#elif	defined(__i386)
 	{ MSG_SYM_LAX86PLTENTER,	/* MSG_ORIG(MSG_SYM_LAX86PLTENTER) */
 #else
 #error platform not defined!

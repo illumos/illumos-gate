@@ -263,8 +263,8 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
 }
 
 static Pnode *
-_hwcap_filtees(Pnode **pnpp, Aliste nlmco, Rt_map *flmp, const char *ref,
-    const char *dir, int mode, uint_t flags)
+_hwcap_filtees(Pnode **pnpp, Aliste nlmco, Lm_cntl *nlmc, Rt_map *flmp,
+    const char *ref, const char *dir, int mode, uint_t flags)
 {
 	Alist		*fdalp = 0;
 	Aliste		off;
@@ -308,6 +308,8 @@ _hwcap_filtees(Pnode **pnpp, Aliste nlmco, Rt_map *flmp, const char *ref,
 		nlmp = load_path(lml, nlmco, fdp->fd_nname, flmp, mode,
 		    (flags | FLG_RT_HANDLE), &ghp, fdp, &rej);
 		remove_fdesc(fdp);
+		if (nlmp == 0)
+			continue;
 
 		/*
 		 * Create a new Pnode to represent this filtee, and substitute
@@ -315,13 +317,17 @@ _hwcap_filtees(Pnode **pnpp, Aliste nlmco, Rt_map *flmp, const char *ref,
 		 * capability directory).
 		 */
 		if ((pnp = calloc(1, sizeof (Pnode))) == 0) {
-			if (ghp)
-				(void) dlclose_core(ghp, flmp);
+			if (ghp) {
+				remove_lmc(lml, flmp, nlmc, nlmco,
+				    fdp->fd_nname);
+			}
 			return (0);
 		}
 		if ((pnp->p_name = strdup(NAME(nlmp))) == 0) {
-			if (ghp)
-				(void) dlclose_core(ghp, flmp);
+			if (ghp) {
+				remove_lmc(lml, flmp, nlmc, nlmco,
+				    fdp->fd_nname);
+			}
 			free(pnp);
 			return (0);
 		}
@@ -372,18 +378,17 @@ _hwcap_filtees(Pnode **pnpp, Aliste nlmco, Rt_map *flmp, const char *ref,
 		 * Finish processing the objects associated with this request.
 		 */
 		if (nlmp && ghp && ((analyze_lmc(lml, nlmco, nlmp) == 0) ||
-		    (relocate_lmc(lml, nlmco, nlmp) == 0)))
+		    (relocate_lmc(lml, nlmco, flmp, nlmp) == 0)))
 			nlmp = 0;
 
 		/*
-		 * Finally, if the filtee is part of a link-map control list
-		 * that is equivalent, or less, than the filter control list,
-		 * create an association between the filter and filtee.  This
+		 * If the filtee has been successfully processed, then create
+		 * an association between the filter and the filtee.  This
 		 * association provides sufficient information to tear down the
 		 * filter and filtee if necessary.
 		 */
-		if (nlmp && ghp && (CNTL(nlmp) <= CNTL(flmp)) &&
-		    (hdl_add(ghp, flmp, GPD_FILTER) == 0))
+		DBG_CALL(Dbg_file_hdl_title(DBG_DEP_ADD));
+		if (nlmp && ghp && (hdl_add(ghp, flmp, GPD_FILTER) == 0))
 			nlmp = 0;
 
 		/*
@@ -393,16 +398,23 @@ _hwcap_filtees(Pnode **pnpp, Aliste nlmco, Rt_map *flmp, const char *ref,
 			unused = 1;
 
 		/*
-		 * Generate a diagnostic if the filtee couldn't be loaded, null
-		 * out the pnode entry, and continue the search.
+		 * If this filtee loading has failed, generate a diagnostic.
+		 * Null out the pnode entry, and continue the search.
 		 */
 		if (nlmp == 0) {
-			pnp->p_info = 0;
+			/*
+			 * If attempting to load this filtee required a new
+			 * link-map control list to which this request has
+			 * added objects, then remove all the objects that
+			 * have been associated to this request.
+			 */
+			if (nlmc && nlmc->lc_head)
+				remove_lmc(lml, flmp, nlmc, nlmco, pnp->p_name);
+
 			DBG_CALL(Dbg_file_filtee(lml, 0, pnp->p_name, audit));
-			if (ghp)
-				(void) dlclose_core(ghp, flmp);
 
 			pnp->p_len = 0;
+			pnp->p_info = 0;
 		}
 	}
 
@@ -411,8 +423,8 @@ _hwcap_filtees(Pnode **pnpp, Aliste nlmco, Rt_map *flmp, const char *ref,
 }
 
 Pnode *
-hwcap_filtees(Pnode **pnpp, Aliste nlmco, Dyninfo *dip, Rt_map *flmp,
-    const char *ref, int mode, uint_t flags)
+hwcap_filtees(Pnode **pnpp, Aliste nlmco, Lm_cntl *nlmc, Dyninfo *dip,
+    Rt_map *flmp, const char *ref, int mode, uint_t flags)
 {
 	Pnode		*pnp = *pnpp;
 	const char	*dir = pnp->p_name;
@@ -420,7 +432,7 @@ hwcap_filtees(Pnode **pnpp, Aliste nlmco, Dyninfo *dip, Rt_map *flmp,
 
 	DBG_CALL(Dbg_cap_hw_filter(flml, dir, flmp));
 
-	if ((pnp = _hwcap_filtees(pnpp, nlmco, flmp, ref, dir, mode,
+	if ((pnp = _hwcap_filtees(pnpp, nlmco, nlmc, flmp, ref, dir, mode,
 	    flags)) != 0)
 		return (pnp);
 

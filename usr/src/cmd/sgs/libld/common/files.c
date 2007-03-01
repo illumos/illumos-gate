@@ -592,7 +592,7 @@ process_nobits(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	if (ident) {
 		if (shdr->sh_flags & SHF_TLS)
 			ident = M_ID_TLSBSS;
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 		else if (shdr->sh_flags & SHF_AMD64_LARGE)
 			ident = M_ID_LBSS;
 #endif
@@ -1275,7 +1275,7 @@ process_exclude(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	return (process_section(name, ifl, shdr, scn, ndx, 0, ofl));
 }
 
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 
 static uintptr_t
 process_amd64_unwind(const char *name, Ifl_desc *ifl, Shdr *shdr,
@@ -1600,14 +1600,14 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 					return (S_ERROR);
 				vsyisp = ifl->ifl_isdesc[ndx];
 				break;
-#if	defined(sparc)
+#if	defined(__sparc)
 			case SHT_SPARC_GOTDATA:
 				if (process_section(name, ifl, shdr, scn,
 				    ndx, M_ID_GOTDATA, ofl) == S_ERROR)
 					return (S_ERROR);
 				break;
 #endif
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 			case SHT_AMD64_UNWIND:
 				if (column == 0) {
 					/*
@@ -1669,7 +1669,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 			    ifl->ifl_shnum)) == (Os_desc *)S_ERROR)
 				return (S_ERROR);
 
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 			/*
 			 * If this section is 'ordered' then it was not
 			 * caught in the previous 'place_section' operation.

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,16 +35,6 @@
 #include <procfs.h>
 
 #include "rdb.h"
-
-#if	defined(sparc) || defined(__sparcv9)
-#define	FRAME_PTR_INDEX R_FP
-#elif	defined(__amd64)
-#define	FRAME_PTR_INDEX R_FP
-#elif	defined(i386)
-#define	FRAME_PTR_INDEX R_FP
-#else
-#error	Unsupported architecture!
-#endif
 
 #ifndef	STACK_BIAS
 #define	STACK_BIAS	0
@@ -69,9 +59,9 @@ get_frame(struct ps_prochandle *ph, psaddr_t fp, struct frame *frm)
 		}
 
 		frm->fr_savpc = (long)frm32.fr_savpc;
-#if defined(__sparcv9)
+#if	defined(__sparcv9)
 		frm->fr_savfp = (struct frame *)(uintptr_t)frm32.fr_savfp;
-#elif defined(__amd64)
+#elif	defined(__amd64)
 		frm->fr_savfp = (long)frm32.fr_savfp;
 #endif
 		return (0);
@@ -105,7 +95,7 @@ CallStack(struct ps_prochandle *ph)
 	printf(" 0x%08lx:%-17s\n", pstatus.pr_lwp.pr_reg[R_PC],
 		symstr);
 
-	fp = pstatus.pr_lwp.pr_reg[FRAME_PTR_INDEX];
+	fp = pstatus.pr_lwp.pr_reg[R_FP];
 
 	while (fp) {
 		if (get_frame(ph, (psaddr_t)fp, &frm) == -1)

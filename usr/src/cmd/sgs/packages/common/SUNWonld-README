@@ -1071,6 +1071,32 @@ All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.8_x86	patch T109148-40
 --------------------------------------------------------------------------------
 
+-------------------------------------
+Solaris 10 607 (4th Q-update - s10u4)
+-------------------------------------
+Bugid   Risk Synopsis
+================================================================================
+6487273 ld.so.1 may open arbitrary locale files when relative path is built
+	from locale environment vars
+6487284 ld.so.1: buffer overflow in doprf() function
+--------------------------------------------------------------------------------
+All the above change is incorporated in the following patches:
+    Solaris/SunOS 5.10_sparc	patch T124922-01
+    Solaris/SunOS 5.10_x86	patch T124923-01
+    Solaris/SunOS 5.9_sparc	patch T112963-27
+    Solaris/SunOS 5.9_x86	patch T113986-22
+    Solaris/SunOS 5.8_sparc	patch T109147-42
+    Solaris/SunOS 5.8_x86	patch T109148-41
+--------------------------------------------------------------------------------
+6477132 ld.so.1: memory leak when running set*id application
+--------------------------------------------------------------------------------
+All the above change is incorporated in the following patches:
+    Solaris/SunOS 5.10_sparc	patch T124922-02
+    Solaris/SunOS 5.10_x86	patch T124923-02
+    Solaris/SunOS 5.9_sparc	patch T112963-30
+    Solaris/SunOS 5.9_x86	patch T113986-24
+--------------------------------------------------------------------------------
+
 --------------
 Solaris Nevada
 --------------
@@ -1136,7 +1162,6 @@ Bugid   Risk Synopsis
 	PSARC/2006/558 R_*_SIZE relocation support
 6475375 symbol search optimization to reduce rescans
 6475497 elfdump(1) is misreporting sh_link
-6477132 ld.so.1: memory leak when running set*id application
 6479848 Enhancements to the linker support interface needed. (D)
 	PSARC/2006/595 link-editor support library interface - ld_open()
 6482058 lari(1) could be faster, and handle per-symbol filters better
@@ -1146,9 +1171,6 @@ Bugid   Risk Synopsis
 	/a/var/ld/ld.config in failsafe
 6487499 link_audit "make clobber" creates and populates proto area
 6488141 ld(1) should detect attempt to reference 0-length .bss section
-6487273 ld.so.1 may open arbitrary locale files when relative path is built
-	from locale environment vars
-6487284 ld.so.1: buffer overflow in doprf() function
 6496718 restricted visibility symbol references should trigger archive
 	extraction
 6501793 GOTOP relocation transition (optimization) fails with offsets > 2^32
@@ -1169,3 +1191,5 @@ Bugid   Risk Synopsis
 6521608	assertion failure in runtime linker related to auditing
 6518322 Some ELF utilities need updating for .SUNW_ldynsym section (D)
 	PSARC/2007/074 -L option for nm(1) to display SHT_SUNW_LDYNSYM symbols
+6523787 dlopen() handle gets mistakenly orphaned - results in access to freed
+	memory

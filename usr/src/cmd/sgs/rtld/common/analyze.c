@@ -317,13 +317,10 @@ _relocate_lmc(Lm_list *lml, Rt_map *nlmp, int *relocated)
 		Aliste		off1;
 		Word		tracing;
 
-#if	defined(__sparc) || defined(__amd64)
-/* XX64 don't need this once the compilers are fixed */
-#elif	defined(i386)
+#if	defined(__i386)
 		if (elf_copy_gen(nlmp) == 0)
 			return (0);
 #endif
-
 		if (COPY(nlmp) == 0)
 			return (1);
 
@@ -375,7 +372,7 @@ _relocate_lmc(Lm_list *lml, Rt_map *nlmp, int *relocated)
 }
 
 int
-relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp)
+relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *clmp, Rt_map *nlmp)
 {
 	int	lret = 1, pret = 1;
 	Alist	*alp;
@@ -434,9 +431,16 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp)
 			lml->lm_flags |= LML_FLG_STARTREL;
 
 		/*
-		 * Relocate the link-map control list.
+		 * Relocate the link-map control list.  Should this relocation
+		 * fail, clean up this link-map list.  Relocations within this
+		 * list may have required relocation promotions on other lists,
+		 * so before acting upon these, and possibly adding more objects
+		 * to the present link-map control list, try and clean up any
+		 * failed objects now.
 		 */
 		lret = _relocate_lmc(lml, nlmp, &relocated);
+		if ((lret == 0) && (nlmco != ALO_DATA))
+			remove_lmc(lml, clmp, nlmc, nlmco, NAME(nlmp));
 	}
 
 	/*
@@ -531,16 +535,20 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp)
 	}
 
 	/*
-	 * Indicate that relocations are no longer active for this control list.
+	 * If relocations have been successful, indicate that relocations are
+	 * no longer active for this control list.  Otherwise, leave the
+	 * relocation flag, as this flag is used to determine the style of
+	 * cleanup (see remove_lmc()).
 	 */
-	/* LINTED */
-	nlmc = (Lm_cntl *)((char *)lml->lm_lists + nlmco);
-	nlmc->lc_flags &= ~LMC_FLG_RELOCATING;
+	if (lret && pret) {
+		/* LINTED */
+		nlmc = (Lm_cntl *)((char *)lml->lm_lists + nlmco);
+		nlmc->lc_flags &= ~LMC_FLG_RELOCATING;
 
-	if (lret && pret)
 		return (1);
-	else
-		return (0);
+	}
+
+	return (0);
 }
 
 /*
@@ -1922,7 +1930,7 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 		/*
 		 * Add any dependencies that are already loaded, to the handle.
 		 */
-		if (hdl_initialize(ghp, nlmp, clmp, nmode, promote) == 0)
+		if (hdl_initialize(ghp, nlmp, nmode, promote) == 0)
 			return (0);
 
 		if (hdl)

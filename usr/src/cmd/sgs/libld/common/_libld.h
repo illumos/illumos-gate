@@ -52,12 +52,12 @@ extern "C" {
 typedef enum {
 	LD_PHDR,	LD_INTERP,	LD_SUNWCAP,	LD_TEXT,
 	LD_DATA,	LD_BSS,
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 	LD_LRODATA,	LD_LDATA,
 #endif
 	LD_DYN,		LD_DTRACE,	 LD_NOTE,	LD_SUNWBSS,
 	LD_TLS,
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 	LD_UNWIND,
 #endif
 	LD_EXTRA,
@@ -315,7 +315,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_am_I_partial		ld64_am_I_partial
 #define	ld_ar_member		ld64_ar_member
 #define	ld_ar_setup		ld64_ar_setup
-#if	defined(sparc)
+#if	defined(__sparc)
 #define	ld_allocate_got		ld64_allocate_got
 #endif
 #define	ld_assign_got		ld64_assign_got
@@ -412,7 +412,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_am_I_partial		ld32_am_I_partial
 #define	ld_ar_member		ld32_ar_member
 #define	ld_ar_setup		ld32_ar_setup
-#if	defined(sparc)
+#if	defined(__sparc)
 #define	ld_allocate_got		ld32_allocate_got
 #endif
 #define	ld_assign_got		ld32_assign_got
@@ -512,7 +512,7 @@ extern Sym_desc * 	ld_am_I_partial(Rel_desc *, Xword);
 extern void		ld_ar_member(Ar_desc *, Elf_Arsym *, Ar_aux *,
 			    Ar_mem *);
 extern Ar_desc		*ld_ar_setup(const char *, Elf *, Ofl_desc *);
-#if	defined(sparc)
+#if	defined(__sparc)
 extern uintptr_t	ld_allocate_got(Ofl_desc *);
 #endif
 extern uintptr_t	ld_assign_got(Ofl_desc *, Sym_desc *);
@@ -640,7 +640,7 @@ extern Word		hashbkts(Word);
 extern Xword		lcm(Xword, Xword);
 extern Listnode *	list_where(List *, Word);
 
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 extern uintptr_t	append_amd64_unwind(Os_desc *, Ofl_desc *);
 extern uintptr_t	make_amd64_unwindhdr(Ofl_desc *);
 extern uintptr_t	populate_amd64_unwindhdr(Ofl_desc *);

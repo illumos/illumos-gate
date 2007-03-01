@@ -357,7 +357,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	if (sdflags & FLG_SY_SPECSEC) {
 		if (nsym->st_shndx == SHN_COMMON)
 			sdp->sd_flags |= FLG_SY_TENTSYM;
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 		else if (nsym->st_shndx == SHN_X86_64_LCOMMON)
 			sdp->sd_flags |= FLG_SY_TENTSYM;
 #endif
@@ -430,7 +430,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	if ((etype == ET_REL) &&
 	    (ELF_ST_BIND(nsym->st_info) == STB_GLOBAL) &&
 	    ((nsym->st_shndx == SHN_UNDEF) || ((sdflags & FLG_SY_SPECSEC) &&
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 	    ((nsym->st_shndx == SHN_COMMON) ||
 	    (nsym->st_shndx == SHN_X86_64_LCOMMON)))))
 #else
@@ -980,7 +980,7 @@ ld_sym_validate(Ofl_desc *ofl)
 	Word		undef = 0, needed = 0, verdesc = 0;
 	Xword		bssalign = 0, tlsalign = 0;
 	Xword		bsssize = 0, tlssize = 0;
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 	Xword		lbssalign = 0, lbsssize = 0;
 #endif
 	int		ret;
@@ -1331,7 +1331,7 @@ ld_sym_validate(Ofl_desc *ofl)
 			}
 		}
 
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 		/*
 		 * Calculate the size and alignment requirement for the global
 		 * .lbss. TLS or partially initialized symbols do not need to be
@@ -1482,7 +1482,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		if (ld_make_bss(ofl, tlssize, tlsalign, MAKE_TLS) == S_ERROR)
 			return (S_ERROR);
 	}
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 	if (lbsssize && !(oflags & FLG_OF_RELOBJ)) {
 		if (ld_make_bss(ofl, lbsssize, lbssalign, MAKE_LBSS) == S_ERROR)
 			return (S_ERROR);

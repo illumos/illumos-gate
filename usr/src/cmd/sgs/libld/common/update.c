@@ -180,7 +180,7 @@ update_osym(Ofl_desc *ofl)
 	Word		bssndx, etext_ndx, edata_ndx = 0, end_ndx, start_ndx;
 	Word		end_abs = 0, etext_abs = 0, edata_abs;
 	Word		tlsbssndx = 0, sunwbssndx = 0, sunwdata1ndx;
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 	Word		lbssndx = 0;
 	Addr		lbssaddr = 0;
 #endif
@@ -645,13 +645,13 @@ update_osym(Ofl_desc *ofl)
 			sdp = ifl->ifl_oldndx[lndx];
 			sym = sdp->sd_sym;
 
-#if	defined(sparc) || defined(__sparcv9)
+#if	defined(__sparc)
 			/*
 			 * Assign a got offset if necessary.
 			 */
 			if (ld_assign_got(ofl, sdp) == S_ERROR)
 				return ((Addr)S_ERROR);
-#elif defined(i386) || defined(__amd64)
+#elif	defined(__x86)
 /* nothing to do */
 #else
 #error Unknown architecture!
@@ -1126,10 +1126,10 @@ update_osym(Ofl_desc *ofl)
 		/*
 		 * Assign a got offset if necessary.
 		 */
-#if	defined(sparc) || defined(__sparcv9)
+#if	defined(__sparc)
 		if (ld_assign_got(ofl, sdp) == S_ERROR)
 			return ((Addr)S_ERROR);
-#elif	defined(i386) || defined(__amd64)
+#elif	defined(__x86)
 /* nothing to do */
 #else
 #error Unknown architecture!
@@ -3222,7 +3222,7 @@ ld_update_outfile(Ofl_desc *ofl)
 			}
 			continue;
 		}
-#if	defined(__x86) && defined(_ELF64)
+#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
 		if (phdr->p_type == PT_SUNW_UNWIND) {
 			Shdr	    *shdr;
 			if (ofl->ofl_unwindhdr == 0)

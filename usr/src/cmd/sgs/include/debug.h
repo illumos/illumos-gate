@@ -209,6 +209,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_file_ar_rescan	Dbg64_file_ar_rescan
 #define	Dbg_file_bind_entry	Dbg64_file_bind_entry
 #define	Dbg_file_bindings	Dbg64_file_bindings
+#define	Dbg_file_cleanup	Dbg64_file_cleanup
 #define	Dbg_file_cntl		Dbg64_file_cntl
 #define	Dbg_file_config_dis	Dbg64_file_config_dis
 #define	Dbg_file_config_obj	Dbg64_file_config_obj
@@ -405,6 +406,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_file_ar_rescan	Dbg32_file_ar_rescan
 #define	Dbg_file_bind_entry	Dbg32_file_bind_entry
 #define	Dbg_file_bindings	Dbg32_file_bindings
+#define	Dbg_file_cleanup	Dbg32_file_cleanup
 #define	Dbg_file_cntl		Dbg32_file_cntl
 #define	Dbg_file_config_dis	Dbg32_file_config_dis
 #define	Dbg_file_config_obj	Dbg32_file_config_obj
@@ -623,6 +625,7 @@ extern	void	Dbg_file_ar(Lm_list *, const char *, int);
 extern	void	Dbg_file_ar_rescan(Lm_list *);
 extern	void	Dbg_file_bind_entry(Lm_list *, Bnd_desc *);
 extern	void	Dbg_file_bindings(Rt_map *, int);
+extern	void	Dbg_file_cleanup(Lm_list *, const char *, Aliste);
 extern	void	Dbg_file_cntl(Lm_list *, Aliste, Aliste);
 extern	void	Dbg_file_config_dis(Lm_list *, const char *, int);
 extern	void	Dbg_file_config_obj(Lm_list *, const char *, const char *,
@@ -638,7 +641,7 @@ extern	void	Dbg_file_filtee(Lm_list *, const char *, const char *, int);
 extern	void	Dbg_file_filter(Lm_list *, const char *, const char *, int);
 extern	void	Dbg_file_fixname(Lm_list *, const char *, const char *);
 extern	void	Dbg_file_generic(Lm_list *, Ifl_desc *);
-extern	void	Dbg_file_hdl_action(Grp_hdl *, Rt_map *, int);
+extern	void	Dbg_file_hdl_action(Grp_hdl *, Rt_map *, int, uint_t);
 extern	void	Dbg_file_hdl_collect(Grp_hdl *, const char *);
 extern	void	Dbg_file_hdl_title(int);
 extern	void	Dbg_file_lazyload(Rt_map *, const char *, const char *);

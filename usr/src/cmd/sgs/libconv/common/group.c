@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,15 +30,14 @@
 #include	"_conv.h"
 #include	"group_msg.h"
 
-#define	FLAGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
+#define	HDLSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
 		MSG_GPH_ZERO_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_GPH_LDSO_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_GPH_FIRST_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_GPH_PARENT_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_GPH_FILTEE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_GPH_INITIAL_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-		MSG_GPH_STICKY_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+		CONV_INV_STRSIZE	+ CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 /*
  * String conversion routine for Grp_hdl flags.
@@ -46,7 +45,7 @@
 const char *
 conv_grphdl_flags(uint_t flags)
 {
-	static char	string[FLAGSZ];
+	static char	string[HDLSZ];
 	static Val_desc vda[] = {
 		{ GPH_ZERO,		MSG_ORIG(MSG_GPH_ZERO) },
 		{ GPH_LDSO,		MSG_ORIG(MSG_GPH_LDSO) },
@@ -54,7 +53,39 @@ conv_grphdl_flags(uint_t flags)
 		{ GPH_PARENT,		MSG_ORIG(MSG_GPH_PARENT) },
 		{ GPH_FILTEE,		MSG_ORIG(MSG_GPH_FILTEE) },
 		{ GPH_INITIAL,		MSG_ORIG(MSG_GPH_INITIAL) },
-		{ GPH_STICKY,		MSG_ORIG(MSG_GPH_STICKY) },
+		{ 0,			0 }
+	};
+	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
+
+	if (flags == 0)
+		return (MSG_ORIG(MSG_GBL_NULL));
+
+	conv_arg.oflags = conv_arg.rflags = flags;
+	(void) conv_expn_field(&conv_arg);
+
+	return ((const char *)string);
+}
+
+#define	DESCSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
+		MSG_GPD_AVAIL_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_GPD_ADDEPS_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_GPD_PARENT_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_GPD_FILTER_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_GPD_REMOVE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		CONV_INV_STRSIZE	+ CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+/*
+ * String conversion routine for Grp_desc flags.
+ */
+const char *
+conv_grpdesc_flags(uint_t flags)
+{
+	static char	string[DESCSZ];
+	static Val_desc vda[] = {
+		{ GPD_AVAIL,		MSG_ORIG(MSG_GPD_AVAIL) },
+		{ GPD_ADDEPS,		MSG_ORIG(MSG_GPD_ADDEPS) },
+		{ GPD_PARENT,		MSG_ORIG(MSG_GPD_PARENT) },
+		{ GPD_FILTER,		MSG_ORIG(MSG_GPD_FILTER) },
+		{ GPD_REMOVE,		MSG_ORIG(MSG_GPD_REMOVE) },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };

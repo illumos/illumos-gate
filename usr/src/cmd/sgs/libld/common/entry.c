@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -61,7 +61,7 @@ static Sg_desc sg_desc[LD_NUM] = {
 	{{PT_LOAD, M_DATASEG_PERM, 0, 0, 0, 0, 0, 0},
 		MSG_ORIG(MSG_ENT_BSS), 0, 0, NULL, NULL,
 		(FLG_SG_TYPE | FLG_SG_FLAGS | FLG_SG_DISABLED), NULL, 0, 0},
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 	{{PT_LOAD, PF_R, 0, 0, 0, 0, 0, 0},
 		MSG_ORIG(MSG_ENT_LRODATA), 0, 0, NULL, NULL,
 		(FLG_SG_TYPE | FLG_SG_FLAGS), NULL, 0, 0},
@@ -84,7 +84,7 @@ static Sg_desc sg_desc[LD_NUM] = {
 	{{PT_TLS, PF_R, 0, 0, 0, 0, 0, 0},
 		MSG_ORIG(MSG_ENT_TLS), 0, 0, NULL, NULL,
 		(FLG_SG_TYPE | FLG_SG_FLAGS), NULL, 0, 0},
-#if	defined(__i386) || defined(__amd64)
+#if	defined(__x86)
 	{{PT_SUNW_UNWIND, PF_R, 0, 0, 0, 0, 0, 0},
 		MSG_ORIG(MSG_ENT_UNWIND), 0, 0, NULL, NULL,
 		(FLG_SG_TYPE | FLG_SG_FLAGS), NULL, 0, 0},
@@ -149,7 +149,7 @@ static const Ent_desc	ent_desc[] = {
 		(Sg_desc *)LD_SUNWBSS, 0, FALSE},
 	{{NULL, NULL}, NULL, SHT_NOTE, 0, 0,
 		(Sg_desc *)LD_NOTE, 0, FALSE},
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 	{{NULL, NULL}, MSG_ORIG(MSG_SCN_LRODATA), NULL,
 		SHF_ALLOC + SHF_AMD64_LARGE, SHF_ALLOC + SHF_AMD64_LARGE,
 		(Sg_desc *)LD_LRODATA, 0, FALSE},
@@ -160,7 +160,7 @@ static const Ent_desc	ent_desc[] = {
 	{{NULL, NULL}, NULL, SHT_NOBITS,
 		SHF_ALLOC + SHF_WRITE, SHF_ALLOC + SHF_WRITE,
 		(Sg_desc *)LD_BSS, 0, FALSE},
-#if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
+#if	defined(__x86) && defined(_ELF64)
 	{{NULL, NULL}, NULL, SHT_NOBITS,
 		SHF_ALLOC + SHF_WRITE + SHF_AMD64_LARGE,
 		SHF_ALLOC + SHF_WRITE + SHF_AMD64_LARGE,
