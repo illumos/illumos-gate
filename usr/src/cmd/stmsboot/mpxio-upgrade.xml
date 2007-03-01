@@ -61,7 +61,7 @@
 	</dependency>
 
 	<dependent
-	    name='root'
+	    name='mpxio-root'
 	    grouping='optional_all'
 	    restart_on='none'>
 		<service_fmri value='svc:/system/filesystem/root' />

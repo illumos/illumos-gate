@@ -269,21 +269,15 @@ else
 	fi
 fi
 
-#delete old mpxio-upgrade service and import new mpxio-upgrade service
-OLD_MPXIO_SERVICE="svc:/platform/sun4u/mpxio-upgrade"
-OLD_MPXIO_XML=$PKG_INSTALL_ROOT/var/svc/manifest/platform/sun4u/mpxio-upgrade.xml
-NEW_MPXIO_XML=$PKG_INSTALL_ROOT/var/svc/manifest/system/device/mpxio-upgrade.xml
-
+# if platform/sun4u/mpxio-upgrade service exists, then
+# delete the service on boot after upgrading. 
 if [ "$UPDATE" = yes ]; then
-	if [ -x /usr/sbin/svcadm -a -x /usr/sbin/svccfg -a \
-    		-f $OLD_MPXIO_XML ]; then
-		svccfg delete $OLD_MPXIO_SERVICE:default > /dev/null 2>&1
-		svccfg delete $OLD_MPXIO_SERVICE > /dev/null 2>&1
-		rm $OLD_MPXIO_XML
-
-		if [ -f $NEW_MPXIO_XML ]; then
-			svccfg import $NEW_MPXIO_XML
-		fi
+	cat >> $BASEDIR/var/svc/profile/upgrade <<\_MPXIOUPGRD
+	/usr/bin/svcs platform/sun4u/mpxio-upgrade > /dev/null 2>&1
+	if [ "$?" = 0 ]; then
+		/usr/sbin/svccfg delete svc:/platform/sun4u/mpxio-upgrade
 	fi
+_MPXIOUPGRD
 fi
+
 exit 0
