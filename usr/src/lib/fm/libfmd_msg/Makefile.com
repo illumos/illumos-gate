@@ -42,7 +42,7 @@ SRCDIR =	../common
 CPPFLAGS += -I../common -I.
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
-LDLIBS += -lnvpair -lgen -lc
+LDLIBS += -lc
 
 LINTFLAGS = -msux
 LINTFLAGS64 = -msux -Xarch=$(MACH64:sparcv9=v9)
