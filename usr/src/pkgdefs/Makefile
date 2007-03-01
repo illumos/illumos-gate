@@ -272,6 +272,7 @@ COMMON_SUBDIRS= \
 	SUNWypu \
 	SUNWpamsc \
 	SUNWpapi \
+	SUNWpcan \
 	SUNWpcelx \
 	SUNWpcmci  \
 	SUNWpcmcu  \
@@ -279,6 +280,7 @@ COMMON_SUBDIRS= \
 	SUNWpcr	\
 	SUNWpcser \
 	SUNWpcu	\
+	SUNWpcwl \
 	SUNWpd    \
 	SUNWphx \
 	SUNWpolkit \

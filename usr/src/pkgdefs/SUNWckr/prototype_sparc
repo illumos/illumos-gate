@@ -158,6 +158,7 @@ d none kernel/ipp/sparcv9 755 root sys
 f none kernel/ipp/sparcv9/ipgpc 755 root sys
 d none kernel/mac/sparcv9 755 root sys
 f none kernel/mac/sparcv9/mac_ether 755 root sys
+f none kernel/mac/sparcv9/mac_wifi 755 root sys
 d none kernel/misc/sparcv9 755 root sys
 f none kernel/misc/sparcv9/busra 755 root sys
 f none kernel/misc/sparcv9/cardbus 755 root sys

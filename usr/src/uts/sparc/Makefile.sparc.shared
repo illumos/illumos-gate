@@ -257,6 +257,8 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= se
 #
 
 DRV_KMODS	+= e1000g
+DRV_KMODS	+= pcan
+DRV_KMODS	+= pcwl
 DRV_KMODS	+= rge
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ixgb
 
@@ -446,6 +448,7 @@ DACF_KMODS	+= usb_ac_dacf
 #	MAC-Type Plugin Modules (/kernel/mac)
 #
 MAC_KMODS	+= mac_ether
+MAC_KMODS	+= mac_wifi
 
 #
 # 'Devname' Modules (kernel/devname)
