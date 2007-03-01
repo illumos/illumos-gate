@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,6 @@
 /* local functions */
 static int	port_fd_callback(void *, int *, pid_t, int, void *);
 static int	port_bind_pollhead(pollhead_t **, polldat_t *, short *);
-static void	port_remove_fd_local(portfd_t *, port_fdcache_t *);
 static void	port_close_sourcefd(void *, int, pid_t, int);
 static void	port_cache_insert_fd(port_fdcache_t *, polldat_t *);
 
@@ -188,6 +187,7 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 	port_kevent_t	*pkevp;
 	short		revents;
 	int		error = 0;
+	int		active;
 
 	pcp = pp->port_queue.portq_pcp;
 	if (object > (uintptr_t)INT_MAX)
@@ -323,12 +323,7 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 	 * call VOP_POLL() again (see port_bind_pollhead()).
 	 */
 	if (error) {
-		/* dissociate the fd from the port */
-		delfd_port(fd, pfd);
-		port_remove_fd_local(pfd, pcp);
-		releasef(fd);
-		mutex_exit(&pcp->pc_lock);
-		return (error);
+		goto errout;
 	}
 
 	if (php != NULL) {
@@ -340,11 +335,7 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 		 */
 		error = port_bind_pollhead(&php, pdp, &revents);
 		if (error) {
-			delfd_port(fd, pfd);
-			port_remove_fd_local(pfd, pcp);
-			releasef(fd);
-			mutex_exit(&pcp->pc_lock);
-			return (error);
+			goto errout;
 		}
 	}
 
@@ -371,6 +362,32 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 	releasef(fd);
 	mutex_exit(&pcp->pc_lock);
 	return (error);
+
+errout:
+	delfd_port(fd, pfd);
+	/*
+	 * If the portkev is not valid, then an event was
+	 * delivered.
+	 *
+	 * If an event was delivered and got picked up, then
+	 * we return error = 0 treating this as a successful
+	 * port associate call. The thread which received
+	 * the event gets control of the object.
+	 */
+	active = 0;
+	mutex_enter(&pkevp->portkev_lock);
+	if (pkevp->portkev_flags & PORT_KEV_VALID) {
+		pkevp->portkev_flags &= ~PORT_KEV_VALID;
+		active = 1;
+	}
+	mutex_enter(&pkevp->portkev_lock);
+
+	if (!port_remove_fd_object(pfd, pp, pcp) && !active) {
+		error = 0;
+	}
+	releasef(fd);
+	mutex_exit(&pcp->pc_lock);
+	return (error);
 }
 
 /*
@@ -390,6 +407,8 @@ port_dissociate_fd(port_t *pp, uintptr_t object)
 	port_fdcache_t	*pcp;
 	portfd_t	*pfd;
 	file_t		*fp;
+	int		active;
+	port_kevent_t	*pkevp;
 
 	if (object > (uintptr_t)INT_MAX)
 		return (EBADFD);
@@ -401,7 +420,7 @@ port_dissociate_fd(port_t *pp, uintptr_t object)
 	if (pcp->pc_hash == NULL) {
 		/* no file descriptor cache available */
 		mutex_exit(&pcp->pc_lock);
-		return (0);
+		return (ENOENT);
 	}
 	if ((fp = getf(fd)) == NULL) {
 		mutex_exit(&pcp->pc_lock);
@@ -411,7 +430,7 @@ port_dissociate_fd(port_t *pp, uintptr_t object)
 	if (pfd == NULL) {
 		releasef(fd);
 		mutex_exit(&pcp->pc_lock);
-		return (0);
+		return (ENOENT);
 	}
 	/* only association owner is allowed to remove the association */
 	if (curproc->p_pid != PFTOD(pfd)->pd_portev->portkev_pid) {
@@ -424,29 +443,37 @@ port_dissociate_fd(port_t *pp, uintptr_t object)
 	delfd_port(fd, pfd);
 	releasef(fd);
 
-	/* remove polldat & port event structure */
-	port_remove_fd_object(pfd, pp, pcp);
-	mutex_exit(&pcp->pc_lock);
-	return (0);
-}
-
-/*
- * Remove the fd from the event port cache.
- */
-static void
-port_remove_fd_local(portfd_t *pfd, port_fdcache_t *pcp)
-{
-	polldat_t	*pdp = PFTOD(pfd);
-
-	ASSERT(MUTEX_HELD(&pcp->pc_lock));
-	pdp->pd_fp = NULL;
-	if (pdp->pd_php != NULL) {
-		pollhead_delete(pdp->pd_php, pdp);
-		pdp->pd_php = NULL;
+	/*
+	 * Deactivate the association. No events get posted after
+	 * this.
+	 */
+	pkevp = PFTOD(pfd)->pd_portev;
+	mutex_enter(&pkevp->portkev_lock);
+	if (pkevp->portkev_flags & PORT_KEV_VALID) {
+		pkevp->portkev_flags &= ~PORT_KEV_VALID;
+		active = 1;
+	} else {
+		active = 0;
 	}
-	port_free_event_local(pdp->pd_portev, 0);
-	/* remove polldat struct */
-	port_pcache_remove_fd(pcp, pfd);
+	mutex_exit(&pkevp->portkev_lock);
+
+	/* remove polldat & port event structure */
+	if (port_remove_fd_object(pfd, pp, pcp)) {
+		/*
+		 * An event was found and removed from the
+		 * port done queue. This means the event has not yet
+		 * been retrived. In this case we treat this as an active
+		 * association.
+		 */
+		ASSERT(active == 0);
+		active = 1;
+	}
+	mutex_exit(&pcp->pc_lock);
+
+	/*
+	 * Return ENOENT if there was no active association.
+	 */
+	return ((active ? 0 : ENOENT));
 }
 
 /*
@@ -564,7 +591,7 @@ port_remove_portfd(polldat_t *pdp, port_fdcache_t *pcp)
 	if (fp != NULL) {
 		delfd_port(pdp->pd_fd, PDTOF(pdp));
 		releasef(pdp->pd_fd);
-		port_remove_fd_object(PDTOF(pdp), pp, pcp);
+		(void) port_remove_fd_object(PDTOF(pdp), pp, pcp);
 	}
 }
 

@@ -229,7 +229,7 @@ void	port_unblock(port_queue_t *);
 
 /* PORT_SOURCE_FD cache management */
 void port_pcache_remove_fd(port_fdcache_t *, portfd_t *);
-void port_remove_fd_object(portfd_t *, struct port *, port_fdcache_t *);
+int port_remove_fd_object(portfd_t *, struct port *, port_fdcache_t *);
 
 /* file close management */
 extern void addfd_port(int, portfd_t *);

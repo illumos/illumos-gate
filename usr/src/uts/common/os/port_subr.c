@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -600,15 +600,17 @@ port_push_eventq(port_queue_t *portq)
 
 /*
  * The port_remove_fd_object() function frees all resources associated with
- * delivered portfd_t structure.
+ * delivered portfd_t structure. Returns 1 if the port_kevent was found
+ * and removed from the port queue.
  */
-void
+int
 port_remove_fd_object(portfd_t *pfd, port_t *pp, port_fdcache_t *pcp)
 {
 	port_queue_t	*portq;
 	polldat_t	*pdp = PFTOD(pfd);
 	port_kevent_t	*pkevp;
 	int		error;
+	int		removed = 0;
 
 	ASSERT(MUTEX_HELD(&pcp->pc_lock));
 	if (pdp->pd_php != NULL) {
@@ -629,6 +631,7 @@ port_remove_fd_object(portfd_t *pfd, port_t *pp, port_fdcache_t *pcp)
 		}
 		/* cleanup merged port queue */
 		port_remove_event_doneq(pkevp, portq);
+		removed = 1;
 	}
 	port_unblock(portq);
 	mutex_exit(&portq->portq_mutex);
@@ -641,6 +644,7 @@ port_remove_fd_object(portfd_t *pfd, port_t *pp, port_fdcache_t *pcp)
 
 	/* remove polldat struct */
 	port_pcache_remove_fd(pcp, pfd);
+	return (removed);
 }
 
 /*
@@ -663,7 +667,7 @@ port_close_pfd(portfd_t *pfd)
 	pp = PFTOD(pfd)->pd_portev->portkev_port;
 	pcp = pp->port_queue.portq_pcp;
 	mutex_enter(&pcp->pc_lock);
-	port_remove_fd_object(pfd, pp, pcp);
+	(void) port_remove_fd_object(pfd, pp, pcp);
 	mutex_exit(&pcp->pc_lock);
 }
 
