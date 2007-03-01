@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2120,7 +2120,7 @@ sbus_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	case DDI_INTROP_FREE:
 		break;
 	case DDI_INTROP_GETPRI:
-		if (hdlp->ih_vector == 0) {
+		if (hdlp->ih_pri == 0) {
 			/* Xlate the interrupt */
 			(void) sbus_xlate_intrs(dip, rdip,
 			    (uint32_t *)&hdlp->ih_vector, &hdlp->ih_pri,

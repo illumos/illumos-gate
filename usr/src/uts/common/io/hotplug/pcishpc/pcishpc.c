@@ -87,6 +87,31 @@
 #define	REG_BIT30	0x40000000
 #define	REG_BIT31	0x80000000
 
+/* Definitions used with the SHPC SHPC_SLOTS_AVAIL_I_REG register */
+#define	SHPC_AVAIL_33MHZ_CONV_SPEED_SHIFT	0
+#define	SHPC_AVAIL_66MHZ_PCIX_SPEED_SHIFT	8
+#define	SHPC_AVAIL_100MHZ_PCIX_SPEED_SHIFT	16
+#define	SHPC_AVAIL_133MHZ_PCIX_SPEED_SHIFT	24
+#define	SHPC_AVAIL_SPEED_MASK			0x1F
+
+/* Definitions used with the SHPC SHPC_SLOTS_AVAIL_II_REG register */
+#define	SHPC_AVAIL_66MHZ_CONV_SPEED_SHIFT	0
+
+/* Register bits used with the SHPC SHPC_PROF_IF_SBCR_REG register */
+#define	SHPC_SBCR_33MHZ_CONV_SPEED	0
+#define	SHPC_SBCR_66MHZ_CONV_SPEED	REG_BIT0
+#define	SHPC_SBCR_66MHZ_PCIX_SPEED	REG_BIT1
+#define	SHPC_SBCR_100MHZ_PCIX_SPEED	(REG_BIT0|REG_BIT1)
+#define	SHPC_SBCR_133MHZ_PCIX_SPEED	REG_BIT2
+#define	SHPC_SBCR_SPEED_MASK		(REG_BIT0|REG_BIT1|REG_BIT2)
+
+/* Register bits used with the SHPC SHPC_COMMAND_STATUS_REG register */
+#define	SHPC_COMM_STS_ERR_INVALID_SPEED		REG_BIT19
+#define	SHPC_COMM_STS_ERR_INVALID_COMMAND	REG_BIT18
+#define	SHPC_COMM_STS_ERR_MRL_OPEN		REG_BIT17
+#define	SHPC_COMM_STS_ERR_MASK			(REG_BIT17|REG_BIT18|REG_BIT19)
+#define	SHPC_COMM_STS_CTRL_BUSY			REG_BIT16
+#define	SHPC_COMM_STS_SET_SPEED			REG_BIT6
 
 /* Register bits used with the SHPC SHPC_CTRL_SERR_INT_REG register */
 #define	SHPC_SERR_INT_GLOBAL_IRQ_MASK	REG_BIT0
@@ -98,8 +123,18 @@
 #define	SHPC_SERR_INT_MASK_ALL		(REG_BIT0|REG_BIT1|REG_BIT2|REG_BIT3)
 
 /* Register bits used with the SHPC SHPC_LOGICAL_SLOT_REGS register */
+#define	SHPC_SLOT_POWER_ONLY		REG_BIT0
+#define	SHPC_SLOT_ENABLED		REG_BIT1
+#define	SHPC_SLOT_DISABLED		(REG_BIT0 | REG_BIT1)
+#define	SHPC_SLOT_STATE_MASK		(REG_BIT0 | REG_BIT1)
 #define	SHPC_SLOT_MRL_STATE_MASK	REG_BIT8
+#define	SHPC_SLOT_66MHZ_CONV_CAPABLE	REG_BIT9
 #define	SHPC_SLOT_CARD_EMPTY_MASK	(REG_BIT10 | REG_BIT11)
+#define	SHPC_SLOT_66MHZ_PCIX_CAPABLE	REG_BIT12
+#define	SHPC_SLOT_100MHZ_PCIX_CAPABLE	REG_BIT13
+#define	SHPC_SLOT_133MHZ_PCIX_CAPABLE	(REG_BIT12 | REG_BIT13)
+#define	SHPC_SLOT_PCIX_CAPABLE_MASK	(REG_BIT12 | REG_BIT13)
+#define	SHPC_SLOT_PCIX_CAPABLE_SHIFT	12
 #define	SHPC_SLOT_PRESENCE_DETECTED	REG_BIT16
 #define	SHPC_SLOT_ISO_PWR_DETECTED	REG_BIT17
 #define	SHPC_SLOT_ATTN_DETECTED		REG_BIT18
@@ -134,7 +169,13 @@
 #define	MAX_SHPC_SLOTS	31
 
 /* PCISHPC controller command complete delay in microseconds. */
-#define	SHPC_COMMAND_WAIT_TIME	10000
+#define	SHPC_COMMAND_WAIT_TIME			10000
+
+/*
+ * Power good wait time after issuing a command to change the slot state
+ * to power only state.
+ */
+#define	SHPC_POWER_GOOD_WAIT_TIME		220000
 
 /* reset delay to 1 sec. */
 static int pcishpc_reset_delay = 1000000;
@@ -155,7 +196,11 @@ typedef struct pcishpc_ctrl {
 	uint32_t	shpc_func;		/* SHPC function */
 	uint8_t		shpc_dword_select;	/* SHPC register offset */
 	uint8_t		shpc_dword_data_reg;	/* SHPC data register */
-	uint32_t	numSlots;		/* # of HotPlug Slots */
+	uint32_t	shpc_slots_avail1_reg;	/* SHPC Slots Available1 Reg */
+	uint32_t	shpc_slots_avail2_reg;	/* SHPC Slots Available2 Reg */
+	uint32_t	numSlotsImpl;		/* # of HP Slots Implemented */
+	uint32_t	numSlotsConn;		/* # of HP Slots Connected */
+	int		currBusSpeed;		/* Current Bus Speed */
 	uint32_t	deviceStart;		/* 1st PCI Device # */
 	uint32_t	physStart;		/* 1st Phys Device # */
 	uint32_t	deviceIncreases;	/* Device # Increases */
@@ -219,6 +264,7 @@ static int	pcishpc_setled(pcishpc_t *pcishpc_p, hpc_led_t led,
 				hpc_led_state_t state);
 static int	pcishpc_set_power_state(pcishpc_t *pcishpc_p,
 					hpc_slot_state_t state);
+static int	pcishpc_set_bus_speed(pcishpc_t *pcishpc_p);
 static int	pcishpc_probe_controller(pcishpc_ctrl_t *pcishpc_p);
 static int	pcishpc_get_pci_info(pcishpc_ctrl_t *pcishpc_p);
 static void	pcishpc_get_slot_state(pcishpc_t *pcishpc_p);
@@ -226,8 +272,9 @@ static int	pcishpc_process_intr(pcishpc_ctrl_t *ctrl_p);
 static int	pcishpc_enable_irqs(pcishpc_ctrl_t *ctrl_p);
 static int	pcishpc_disable_irqs(pcishpc_ctrl_t *ctrl_p);
 static void	pcishpc_set_soft_int(pcishpc_ctrl_t *ctrl_p);
-static int	pcishpc_wait_busy(pcishpc_t *pcishpc_p);
-static int	pcishpc_issue_command(pcishpc_t *pcishpc_p, uint8_t cmd_code);
+static int	pcishpc_wait_busy(pcishpc_ctrl_t *ctrl_p);
+static int	pcishpc_issue_command(pcishpc_ctrl_t *ctrl_p,
+				uint32_t cmd_code);
 static int	pcishpc_led_shpc_to_hpc(int state);
 static int	pcishpc_led_hpc_to_shpc(int state);
 static int	pcishpc_slot_shpc_to_hpc(int state);
@@ -515,7 +562,7 @@ pcishpc_intr(dev_info_t *dip)
 					SHPC_SERR_LOCATOR_REG);
 
 		/* Check for slot events that might have occured. */
-		for (slot = 0; slot < ctrl_p->numSlots; slot++) {
+		for (slot = 0; slot < ctrl_p->numSlotsImpl; slot++) {
 			if ((irq_locator & (SHPC_IRQ_SLOT_N_PENDING<<slot)) ||
 					(irq_serr_locator &
 					(SHPC_IRQ_SERR_SLOT_N_PENDING<<slot))) {
@@ -574,7 +621,7 @@ pcishpc_process_intr(pcishpc_ctrl_t *ctrl_p)
 	pcishpc_debug("pcishpc_process_intr() called");
 
 	/* XXX - add event handling code here */
-	for (slot = 0; slot < ctrl_p->numSlots; slot++) {
+	for (slot = 0; slot < ctrl_p->numSlotsImpl; slot++) {
 		if (ctrl_p->slots[slot]->slot_events &
 				SHPC_SLOT_PRESENCE_DETECTED)
 			pcishpc_debug("slot %d: SHPC_SLOT_PRESENCE_DETECTED",
@@ -772,7 +819,7 @@ pcishpc_init(dev_info_t *dip)
 #endif
 
 	/* Setup each HotPlug slot on this SHPC controller. */
-	for (i = 0; i < ctrl_p->numSlots; i++) {
+	for (i = 0; i < ctrl_p->numSlotsImpl; i++) {
 		if (pcishpc_register_slot(ctrl_p, i) != DDI_SUCCESS) {
 			pcishpc_debug("pcishpc_init() failed to register "
 				"slot %d", i);
@@ -815,16 +862,28 @@ pcishpc_enable_irqs(pcishpc_ctrl_t *ctrl_p)
 	pcishpc_write_reg(ctrl_p, SHPC_CTRL_SERR_INT_REG, reg);
 
 	/* Unmask the interrupts for each slot. */
-	for (slot = 0; slot < ctrl_p->numSlots; slot++) {
+	for (slot = 0; slot < ctrl_p->numSlotsImpl; slot++) {
 		ctrl_p->slots[slot]->slot_events = 0;
 
 		reg = pcishpc_read_reg(ctrl_p, SHPC_LOGICAL_SLOT_REGS+slot);
+		if ((reg & SHPC_SLOT_STATE_MASK) == SHPC_SLOT_ENABLED) {
+			reg &= ~(SHPC_SLOT_MASK_ALL | SHPC_SLOT_MRL_SERR_MASK);
+			ctrl_p->numSlotsConn++;
+			if (ctrl_p->currBusSpeed == -1)
+				ctrl_p->currBusSpeed = pcishpc_read_reg(ctrl_p,
+				    SHPC_PROF_IF_SBCR_REG) &
+				    SHPC_SBCR_SPEED_MASK;
+		} else {
+			reg &= ~(SHPC_SLOT_MASK_ALL);
+		}
 
 		/* Enable/Unmask all slot interrupts. */
-		reg &= (~SHPC_SLOT_MASK_ALL);
-
 		pcishpc_write_reg(ctrl_p, SHPC_LOGICAL_SLOT_REGS+slot, reg);
 	}
+
+	pcishpc_debug("pcishpc_enable_irqs: ctrl_p 0x%p, "
+	    "current bus speed 0x%x, slots connected 0x%x\n", ctrl_p,
+	    ctrl_p->currBusSpeed, ctrl_p->numSlotsConn);
 
 	return (DDI_SUCCESS);
 }
@@ -849,7 +908,7 @@ pcishpc_disable_irqs(pcishpc_ctrl_t *ctrl_p)
 	pcishpc_write_reg(ctrl_p, SHPC_CTRL_SERR_INT_REG, reg);
 
 	/* Unmask the interrupts for each slot. */
-	for (slot = 0; slot < ctrl_p->numSlots; slot++) {
+	for (slot = 0; slot < ctrl_p->numSlotsImpl; slot++) {
 		reg = pcishpc_read_reg(ctrl_p, SHPC_LOGICAL_SLOT_REGS+slot);
 
 		/* Disable/Mask all slot interrupts. */
@@ -857,6 +916,10 @@ pcishpc_disable_irqs(pcishpc_ctrl_t *ctrl_p)
 
 		pcishpc_write_reg(ctrl_p, SHPC_LOGICAL_SLOT_REGS+slot, reg);
 	}
+
+	pcishpc_debug("pcishpc_disable_irqs: ctrl_p 0x%p, "
+	    "current bus speed 0x%x, slots connected 0x%x\n", ctrl_p,
+	    ctrl_p->currBusSpeed, ctrl_p->numSlotsConn);
 
 	return (DDI_SUCCESS);
 }
@@ -987,8 +1050,21 @@ pcishpc_setup_controller(pcishpc_ctrl_t *ctrl_p)
 
 	config = pcishpc_read_reg(ctrl_p, SHPC_SLOT_CONFIGURATION_REG);
 
-	/* Get the number of HotPlug slots. */
-	ctrl_p->numSlots = ((config)&31);
+	/* Get the number of HotPlug slots implemented */
+	ctrl_p->numSlotsImpl = ((config)&31);
+
+	/*
+	 * Initilize the current bus speed and number of hotplug slots
+	 * currently connected.
+	 */
+	ctrl_p->currBusSpeed = -1;
+	ctrl_p->numSlotsConn = 0;
+
+	/* Save the value of Slots Available 1 and 2 registers */
+	ctrl_p->shpc_slots_avail1_reg = pcishpc_read_reg(ctrl_p,
+	    SHPC_SLOTS_AVAIL_I_REG);
+	ctrl_p->shpc_slots_avail2_reg = pcishpc_read_reg(ctrl_p,
+	    SHPC_SLOTS_AVAIL_II_REG);
 
 	/* Get the first PCI device Number used. */
 	/*
@@ -1018,7 +1094,7 @@ pcishpc_setup_controller(pcishpc_ctrl_t *ctrl_p)
 	ctrl_p->command_complete = B_FALSE;
 	ctrl_p->arbiter_timeout = B_FALSE;
 
-	if (ctrl_p->numSlots > MAX_SHPC_SLOTS) {
+	if (ctrl_p->numSlotsImpl > MAX_SHPC_SLOTS) {
 		pcishpc_debug("pcishpc_setup_controller() too many SHPC "
 			"slots error");
 		return (DDI_FAILURE);
@@ -1203,13 +1279,29 @@ pcishpc_set_power_state(pcishpc_t *pcishpc_p, hpc_slot_state_t state)
 	/* Set the slot state to the new slot state. */
 	pcishpc_p->slot_state = state;
 
+	/* Set the bus speed only if the bus segment is not running */
+	if (state == HPC_SLOT_CONNECTED) {
+		if (pcishpc_set_bus_speed(pcishpc_p) != DDI_SUCCESS)
+			return (DDI_FAILURE);
+
+		pcishpc_p->ctrl->numSlotsConn++;
+	} else {
+		if (--pcishpc_p->ctrl->numSlotsConn == 0)
+			pcishpc_p->ctrl->currBusSpeed = -1;
+	}
+
+	pcishpc_debug("pcishpc_set_power_state(): ctrl_p 0x%p, "
+	    "pcishpc_p 0x%p, slot state 0x%x,  current bus speed 0x%x, "
+	    "slots connected 0x%x\n", pcishpc_p->ctrl, pcishpc_p, state,
+	    pcishpc_p->ctrl->currBusSpeed, pcishpc_p->ctrl->numSlotsConn);
+
 	/* Mask or Unmask MRL Sensor SEER bit based on new slot state */
 	if (pcishpc_p->ctrl->has_mrl == B_TRUE) {
 		uint32_t reg;
 
 		reg = pcishpc_read_reg(pcishpc_p->ctrl,
 		    SHPC_LOGICAL_SLOT_REGS+pcishpc_p->slotNum);
-		reg = (pcishpc_p->slot_state == HPC_SLOT_CONNECTED) ?
+		reg = (state == HPC_SLOT_CONNECTED) ?
 		    (reg & ~SHPC_SLOT_MRL_SERR_MASK) :
 		    (reg | SHPC_SLOT_MRL_SERR_MASK);
 
@@ -1246,6 +1338,168 @@ pcishpc_set_power_state(pcishpc_t *pcishpc_p, hpc_slot_state_t state)
 
 	/* delay after powerON to let the device initialize itself */
 	delay(drv_usectohz(pcishpc_reset_delay));
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * pcishpc_set_bus_speed()
+ *
+ * Set the bus speed and mode.
+ */
+static int
+pcishpc_set_bus_speed(pcishpc_t *pcishpc_p)
+{
+	pcishpc_ctrl_t	*ctrl_p = pcishpc_p->ctrl;
+	int		curr_speed = ctrl_p->currBusSpeed;
+	int		speed = -1;
+	int		avail_slots;
+	uint32_t	status;
+
+	/* Make sure that the slot is in a correct state */
+	status = pcishpc_read_reg(ctrl_p,
+	    SHPC_LOGICAL_SLOT_REGS+pcishpc_p->slotNum);
+
+	/* Return failure if the slot is empty */
+	if ((status & SHPC_SLOT_CARD_EMPTY_MASK) ==
+	    SHPC_SLOT_CARD_EMPTY_MASK) {
+		pcishpc_debug("pcishpc_set_bus_speed() failed: "
+		    "the slot is empty.");
+		return (DDI_FAILURE);
+	}
+
+	/* Return failure if the slot is not in disabled state */
+	if ((status & SHPC_SLOT_STATE_MASK) != SHPC_SLOT_DISABLED) {
+		pcishpc_debug("pcishpc_set_bus_speed() failed: "
+		    "incorrect slot state.");
+		return (DDI_FAILURE);
+	}
+
+	/* Set the "power-only" mode for the slot */
+	if (pcishpc_issue_command(ctrl_p, ((1+pcishpc_p->slotNum)<<8) |
+	    SHPC_SLOT_POWER_ONLY) != DDI_SUCCESS) {
+		pcishpc_debug("pcishpc_set_bus_speed() failed to set "
+		    "the slot %d in the power-only mode", pcishpc_p->slotNum);
+		return (DDI_FAILURE);
+	}
+
+	/* Wait for power good */
+	delay(drv_usectohz(SHPC_POWER_GOOD_WAIT_TIME));
+
+	/* Make sure that the slot is in "power-only" state */
+	status = pcishpc_read_reg(ctrl_p,
+	    SHPC_LOGICAL_SLOT_REGS+pcishpc_p->slotNum);
+
+	if ((status & SHPC_SLOT_STATE_MASK) != SHPC_SLOT_POWER_ONLY) {
+		pcishpc_debug("pcishpc_set_bus_speed() "
+		    "power-only failed: incorrect slot state.");
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Check if SHPC has available slots and select the highest
+	 * available bus speed for the slot.
+	 *
+	 * The bus speed codes are:
+	 * 100 - 133Mhz; <--+
+	 * 011 - 100Mhz; <--+   PCI-X
+	 * 010 - 66Mhz;  <--+
+	 *
+	 * 001 - 66Mhz;  <--+
+	 * 000 - 33Mhz   <--+   Conv PCI
+	 */
+	switch (status & SHPC_SLOT_PCIX_CAPABLE_MASK) {
+	case SHPC_SLOT_133MHZ_PCIX_CAPABLE:
+		avail_slots = (ctrl_p->shpc_slots_avail1_reg >>
+		    SHPC_AVAIL_133MHZ_PCIX_SPEED_SHIFT) & SHPC_AVAIL_SPEED_MASK;
+
+		if (((curr_speed == -1) && avail_slots) ||
+		    (curr_speed == SHPC_SBCR_133MHZ_PCIX_SPEED)) {
+			speed = SHPC_SBCR_133MHZ_PCIX_SPEED;
+			break;
+		}
+		/* FALLTHROUGH */
+	case SHPC_SLOT_100MHZ_PCIX_CAPABLE:
+		avail_slots = (ctrl_p->shpc_slots_avail1_reg >>
+		    SHPC_AVAIL_100MHZ_PCIX_SPEED_SHIFT) & SHPC_AVAIL_SPEED_MASK;
+
+		if (((curr_speed == -1) && avail_slots) ||
+		    (curr_speed == SHPC_SBCR_100MHZ_PCIX_SPEED)) {
+			speed = SHPC_SBCR_100MHZ_PCIX_SPEED;
+			break;
+		}
+		/* FALLTHROUGH */
+	case SHPC_SLOT_66MHZ_PCIX_CAPABLE:
+		avail_slots = (ctrl_p->shpc_slots_avail1_reg >>
+		    SHPC_AVAIL_66MHZ_PCIX_SPEED_SHIFT) & SHPC_AVAIL_SPEED_MASK;
+
+		if (((curr_speed == -1) && avail_slots) ||
+		    (curr_speed == SHPC_SBCR_66MHZ_PCIX_SPEED)) {
+			speed = SHPC_SBCR_66MHZ_PCIX_SPEED;
+			break;
+		}
+		/* FALLTHROUGH */
+	default:
+		avail_slots = (ctrl_p->shpc_slots_avail2_reg >>
+		    SHPC_AVAIL_66MHZ_CONV_SPEED_SHIFT) & SHPC_AVAIL_SPEED_MASK;
+
+		if ((status & SHPC_SLOT_66MHZ_CONV_CAPABLE) &&
+		    (((curr_speed == -1) && avail_slots) ||
+		    (curr_speed == SHPC_SBCR_66MHZ_CONV_SPEED))) {
+			speed = SHPC_SBCR_66MHZ_CONV_SPEED;
+		} else {
+			avail_slots = (ctrl_p->shpc_slots_avail1_reg >>
+			    SHPC_AVAIL_33MHZ_CONV_SPEED_SHIFT) &
+			    SHPC_AVAIL_SPEED_MASK;
+
+			if (((curr_speed == -1) && (avail_slots)) ||
+			    (curr_speed == SHPC_SBCR_33MHZ_CONV_SPEED)) {
+				speed = SHPC_SBCR_33MHZ_CONV_SPEED;
+			} else {
+				pcishpc_debug("pcishpc_set_bus_speed() "
+				    " failed to set the bus speed, slot# %d",
+				    pcishpc_p->slotNum);
+				return (DDI_FAILURE);
+			}
+		}
+		break;
+	}
+
+	/*
+	 * If the bus segment is already running, check to see the card
+	 * in the slot can support the current bus speed.
+	 */
+	if (curr_speed == speed) {
+		/*
+		 * Check to see there is any slot available for the current
+		 * bus speed. Otherwise, we need fail the current slot connect
+		 * request.
+		 */
+		return ((avail_slots <= ctrl_p->numSlotsConn) ?
+		    DDI_FAILURE : DDI_SUCCESS);
+	}
+
+	/* Set the bus speed */
+	if (pcishpc_issue_command(ctrl_p, SHPC_COMM_STS_SET_SPEED |
+	    speed) == DDI_FAILURE) {
+		pcishpc_debug("pcishpc_set_bus_speed() failed "
+		    "to set bus %d speed", pcishpc_p->slotNum);
+		return (DDI_FAILURE);
+	}
+
+	/* Check the current bus speed */
+	status = pcishpc_read_reg(ctrl_p, SHPC_PROF_IF_SBCR_REG) &
+	    SHPC_SBCR_SPEED_MASK;
+	if ((status & SHPC_SBCR_SPEED_MASK) != speed) {
+		pcishpc_debug("pcishpc_set_bus_speed() an incorrect "
+		    "bus speed, slot = 0x%x, speed = 0x%x",
+		    pcishpc_p->slotNum, status & SHPC_SBCR_SPEED_MASK);
+		return (DDI_FAILURE);
+	}
+
+
+	/* Save the current bus speed */
+	ctrl_p->currBusSpeed = speed;
 
 	return (DDI_SUCCESS);
 }
@@ -1505,14 +1759,14 @@ static int
 pcishpc_set_slot_state(pcishpc_t *pcishpc_p)
 {
 	uint32_t reg;
-	uint8_t cmd_code;
+	uint32_t cmd_code;
 	hpc_slot_state_t slot_state;
 
 	reg = pcishpc_read_reg(pcishpc_p->ctrl,
 		SHPC_LOGICAL_SLOT_REGS+pcishpc_p->slotNum);
 
 	/* Default all states to unchanged. */
-	cmd_code = 0;
+	cmd_code = ((1+pcishpc_p->slotNum)<<8);
 
 	/* Has the slot state changed? */
 	if ((reg & SHPC_SLOT_CARD_EMPTY_MASK) == SHPC_SLOT_CARD_EMPTY_MASK)
@@ -1544,7 +1798,7 @@ pcishpc_set_slot_state(pcishpc_t *pcishpc_p)
 				<< 4);
 	}
 
-	return (pcishpc_issue_command(pcishpc_p, cmd_code));
+	return (pcishpc_issue_command(pcishpc_p->ctrl, cmd_code));
 }
 
 
@@ -1554,39 +1808,41 @@ pcishpc_set_slot_state(pcishpc_t *pcishpc_p)
  * Wait until the SHPC controller is not busy.
  */
 static int
-pcishpc_wait_busy(pcishpc_t *pcishpc_p)
+pcishpc_wait_busy(pcishpc_ctrl_t *ctrl_p)
 {
-	uint32_t status;
+	uint32_t	status;
 
-	/* Wait until SHPC controller is NOT busy. */
+	/* Wait until SHPC controller is NOT busy */
 	/*CONSTCOND*/
 	while (1) {
-		status = pcishpc_read_reg(pcishpc_p->ctrl,
-				SHPC_COMMAND_STATUS_REG);
+		status = pcishpc_read_reg(ctrl_p, SHPC_COMMAND_STATUS_REG);
 
 		/* Is there an MRL Sensor error? */
-		if (((status>>17) & 1)) {
+		if ((status & SHPC_COMM_STS_ERR_MASK) ==
+		    SHPC_COMM_STS_ERR_MRL_OPEN) {
 			pcishpc_debug("pcishpc_wait_busy() ERROR: MRL Sensor "
 				"error");
 			break;
 		}
 
 		/* Is there an Invalid command error? */
-		if (((status>>18) & 1)) {
+		if ((status & SHPC_COMM_STS_ERR_MASK) ==
+		    SHPC_COMM_STS_ERR_INVALID_COMMAND) {
 			pcishpc_debug("pcishpc_wait_busy() ERROR: Invalid "
 				"command error");
 			break;
 		}
 
 		/* Is there an Invalid Speed/Mode error? */
-		if (((status>>19) & 1)) {
+		if ((status & SHPC_COMM_STS_ERR_MASK) ==
+		    SHPC_COMM_STS_ERR_INVALID_SPEED) {
 			pcishpc_debug("pcishpc_wait_busy() ERROR: Invalid "
-					"Speed/Mode error");
+				"Speed/Mode error");
 			break;
 		}
 
 		/* Is the SHPC controller not BUSY? */
-		if (((status>>16)&1) == 0) {
+		if (!(status & SHPC_COMM_STS_CTRL_BUSY)) {
 			/* Return Success. */
 			return (DDI_SUCCESS);
 		}
@@ -1608,43 +1864,36 @@ pcishpc_wait_busy(pcishpc_t *pcishpc_p)
  * Sends a command to the SHPC controller.
  */
 static int
-pcishpc_issue_command(pcishpc_t *pcishpc_p, uint8_t cmd_code)
+pcishpc_issue_command(pcishpc_ctrl_t *ctrl_p, uint32_t cmd_code)
 {
-	uint32_t command;
-	int retCode;
+	int	retCode;
 
 	pcishpc_debug("pcishpc_issue_command() cmd_code=%02x", cmd_code);
 
-	/* Setup the slot for this command. */
-	command = ((1+pcishpc_p->slotNum)<<8) | (uint32_t)cmd_code;
+	mutex_enter(&ctrl_p->shpc_intr_mutex);
 
-	mutex_enter(&pcishpc_p->ctrl->shpc_intr_mutex);
-
-	pcishpc_p->ctrl->command_complete = B_FALSE;
+	ctrl_p->command_complete = B_FALSE;
 
 	/* Write the command to the SHPC controller. */
-	pcishpc_write_reg(pcishpc_p->ctrl, SHPC_COMMAND_STATUS_REG, command);
+	pcishpc_write_reg(ctrl_p, SHPC_COMMAND_STATUS_REG, cmd_code);
 
-	while (pcishpc_p->ctrl->command_complete == B_FALSE)
-		cv_wait(&pcishpc_p->ctrl->cmd_comp_cv,
-		    &pcishpc_p->ctrl->shpc_intr_mutex);
+	while (ctrl_p->command_complete == B_FALSE)
+		cv_wait(&ctrl_p->cmd_comp_cv, &ctrl_p->shpc_intr_mutex);
 
 	/* Wait until the SHPC controller processes the command. */
-	retCode = pcishpc_wait_busy(pcishpc_p);
+	retCode = pcishpc_wait_busy(ctrl_p);
 
 	/* Make sure the command completed. */
 	if (retCode == DDI_SUCCESS) {
-
 		/* Did the command fail to generate the command complete IRQ? */
-		if (pcishpc_p->ctrl->command_complete != B_TRUE) {
+		if (ctrl_p->command_complete != B_TRUE) {
 			pcishpc_debug("pcishpc_issue_command() Failed on "
 				"generate cmd complete IRQ");
 			retCode = DDI_FAILURE;
 		}
-
 	}
 
-	mutex_exit(&pcishpc_p->ctrl->shpc_intr_mutex);
+	mutex_exit(&ctrl_p->shpc_intr_mutex);
 
 	if (retCode == DDI_FAILURE)
 		pcishpc_debug("pcishpc_issue_command() Failed on cmd_code=%02x",
