@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,9 @@
 #include <sys/promimpl.h>
 #include <sys/ddi_implfuncs.h>
 
-#define	PCI_NPT_bits	(PCI_RELOCAT_B | PCI_PREFETCH_B | PCI_ALIAS_B)
+#define	PCI_NPT_bits		(PCI_RELOCAT_B | PCI_PREFETCH_B | PCI_ALIAS_B)
+#define	PCI_BDF_bits		(PCI_REG_BDFR_M & ~PCI_REG_REG_M)
+
 #define	PCICFG_CONF_INDIRECT_MAP	1
 
 static int pfc_map_in(dev_info_t *, fco_handle_t, fc_ci_t *);
@@ -856,10 +858,9 @@ pfc_config_fetch(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 
 	/*
 	 * Verify that the address is a configuration space address
-	 * ss must be zero, n,p,t must be zero.
+	 * ss must be zero.
 	 */
-	if (((p.pci_phys_hi & PCI_ADDR_MASK) != PCI_ADDR_CONFIG) ||
-	    ((p.pci_phys_hi & PCI_NPT_bits) != 0)) {
+	if ((p.pci_phys_hi & PCI_ADDR_MASK) != PCI_ADDR_CONFIG) {
 		cmn_err(CE_CONT, "pfc_config_fetch: "
 		    "invalid config addr: %x\n", p.pci_phys_hi);
 		return (fc_priv_error(cp, "non-config addr"));
@@ -869,8 +870,11 @@ pfc_config_fetch(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 	 * Extract the register number from the config address and
 	 * remove the register number from the physical address.
 	 */
-	reg = p.pci_phys_hi & PCI_REG_REG_M;
-	p.pci_phys_hi &= ~PCI_REG_REG_M;
+
+	reg = (p.pci_phys_hi & PCI_REG_REG_M) |
+	    (((p.pci_phys_hi & PCI_REG_EXTREG_M) >> PCI_REG_EXTREG_SHIFT) << 8);
+
+	p.pci_phys_hi &= PCI_BDF_bits;
 
 	/*
 	 * Determine the access width .. we can switch on the 9th
@@ -986,10 +990,9 @@ pfc_config_store(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 
 	/*
 	 * Verify that the address is a configuration space address
-	 * ss must be zero, n,p,t must be zero.
+	 * ss must be zero.
 	 */
-	if (((p.pci_phys_hi & PCI_ADDR_MASK) != PCI_ADDR_CONFIG) ||
-	    ((p.pci_phys_hi & PCI_NPT_bits) != 0)) {
+	if ((p.pci_phys_hi & PCI_ADDR_MASK) != PCI_ADDR_CONFIG) {
 		cmn_err(CE_CONT, "pfc_config_store: "
 		    "invalid config addr: %x\n", p.pci_phys_hi);
 		return (fc_priv_error(cp, "non-config addr"));
@@ -999,8 +1002,10 @@ pfc_config_store(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 	 * Extract the register number from the config address and
 	 * remove the register number from the physical address.
 	 */
-	reg = p.pci_phys_hi & PCI_REG_REG_M;
-	p.pci_phys_hi &= ~PCI_REG_REG_M;
+	reg = (p.pci_phys_hi & PCI_REG_REG_M) |
+	    (((p.pci_phys_hi & PCI_REG_EXTREG_M) >> PCI_REG_EXTREG_SHIFT) << 8);
+
+	p.pci_phys_hi &= PCI_BDF_bits;
 
 	/*
 	 * Determine the access width .. we can switch on the 8th

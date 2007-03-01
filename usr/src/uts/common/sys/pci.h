@@ -970,11 +970,13 @@ typedef struct pci_phys_spec pci_regspec_t;
 #define	PCI_REG_PF_M		0x40000000	/* prefetch bit mask */
 #define	PCI_REG_REL_M		0x80000000	/* relocation bit mask */
 #define	PCI_REG_BDFR_M		0xffffff	/* bus, dev, func, reg mask */
+#define	PCI_REG_EXTREG_M	0xF0000000	/* extended config bits mask */
 
 #define	PCI_REG_FUNC_SHIFT	8		/* Offset of function bits */
 #define	PCI_REG_DEV_SHIFT	11		/* Offset of device bits */
 #define	PCI_REG_BUS_SHIFT	16		/* Offset of bus bits */
 #define	PCI_REG_ADDR_SHIFT	24		/* Offset of address bits */
+#define	PCI_REG_EXTREG_SHIFT	28		/* Offset of ext. config bits */
 
 #define	PCI_REG_REG_G(x)	((x) & PCI_REG_REG_M)
 #define	PCI_REG_FUNC_G(x)	(((x) & PCI_REG_FUNC_M) >> PCI_REG_FUNC_SHIFT)
