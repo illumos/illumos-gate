@@ -386,14 +386,12 @@ pam_sm_acct_mgmt(
 		if (err == PAM_NO_MODULE_DATA) {
 			/*
 			 * pam_auth never called (possible config
-			 * error; no pam_krb5 auth entry in pam.conf)
-			 * or
-			 * auth module returned before module data
-			 * was instantiated (normal for auth 'acceptor')
+			 * error; no pam_krb5 auth entry in pam.conf),
 			 */
-			if (debug)
+			if (debug) {
 				__pam_log(LOG_AUTH | LOG_DEBUG,
 				    "PAM-KRB5 (acct): no module data");
+			}
 			err = PAM_IGNORE;
 			goto out;
 		} else {
@@ -420,14 +418,19 @@ pam_sm_acct_mgmt(
 	}
 
 	/*
-	 * auth mod set status to user_unknown, most likely cuz user is
-	 * not a kerberos user.
+	 * If there is no Kerberos related user and there is authentication
+	 * data, this means that while the user has successfully passed
+	 * authentication, Kerberos is not the account authority because there
+	 * is no valid Kerberos principal.  PAM_IGNORE is returned since
+	 * Kerberos is not authoritative for this user.  Other modules in the
+	 * account stack will need to determine the success or failure for this
+	 * user.
 	 */
 	if (kmd->auth_status == PAM_USER_UNKNOWN) {
 		if (debug)
 			syslog(LOG_DEBUG,
 			    "PAM-KRB5 (acct): kmd auth_status is USER UNKNOWN");
-		err = PAM_USER_UNKNOWN;
+		err = PAM_IGNORE;
 		goto out;
 	}
 
@@ -447,15 +450,18 @@ pam_sm_acct_mgmt(
 		goto out;
 	}
 
-	if (!(flags & PAM_SILENT) && !nowarn && kmd->password) {
+	if (kmd->auth_status == PAM_SUCCESS && !(flags & PAM_SILENT) &&
+	    !nowarn && kmd->password) {
 		/* if we fail, let it slide, it's only a warning brah */
 		(void) exp_warn(pamh, user, kmd, debug);
 	}
 
 	/*
-	 * Here we return any errors during the auth pass, if any.
+	 * If Kerberos is treated as optional in the PAM stack, it is possible
+	 * that there is a KRB5_DATA item and a non-Kerberos account authority.
+	 * In that case, PAM_IGNORE is returned.
 	 */
-	err = kmd->auth_status;
+	err = kmd->auth_status != PAM_SUCCESS ? PAM_IGNORE : kmd->auth_status;
 
 out:
 	if (debug)
