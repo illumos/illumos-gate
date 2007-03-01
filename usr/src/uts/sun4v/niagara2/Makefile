@@ -20,7 +20,7 @@
 #
 #
 # uts/sun4v/niagara2/Makefile
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -67,6 +67,9 @@ INSTALL_TARGET	= def $(BINARY) $(ROOTMODULE)
 # lint pass one enforcement
 #
 CFLAGS += $(CCVERBOSE) -DNIAGARA2_IMPL
+
+# The following is required to support Niagara2 1.0
+WORKAROUND_DEFS	+= -DN2_ERRATUM_49	# %stick_compare{6:0} ignored
 
 #
 # cpu-module-specific flags

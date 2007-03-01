@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,8 +57,10 @@ typedef struct {
 #define	CPC_OVF_NOTIFY_EMT	0x1
 #define	CPC_COUNT_USER		0x2
 #define	CPC_COUNT_SYSTEM	0x4
+#define	CPC_COUNT_HV		0x8
 
-#define	KCPC_REQ_ALL_FLAGS	0x7
+#define	KCPC_REQ_ALL_FLAGS	(CPC_OVF_NOTIFY_EMT | CPC_COUNT_USER | \
+		CPC_COUNT_SYSTEM | CPC_COUNT_HV)
 #define	KCPC_REQ_VALID_FLAGS(flags) \
 		(((flags) | KCPC_REQ_ALL_FLAGS) == KCPC_REQ_ALL_FLAGS)
 
@@ -216,6 +217,7 @@ extern int kcpc_pcbe_tryload(const char *, uint_t, uint_t, uint_t);
 #define	CPC_CONFLICTING_REQS		8	/* Reqs in the set conflict */
 #define	CPC_ATTR_REQUIRES_PRIVILEGE	9	/* Insufficient privs for atr */
 #define	CPC_PBIND_FAILED		10	/* Couldn't bind to processor */
+#define	CPC_HV_NO_ACCESS		11	/* No perm for HV events */
 
 #ifdef	__cplusplus
 }

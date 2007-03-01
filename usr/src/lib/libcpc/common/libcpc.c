@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -953,7 +953,8 @@ static const char *errstr[] = {
 "Invalid flags in a request\n",			/* CPC_REQ_INVALID_FLAGS */
 "Requests conflict with each other\n",		/* CPC_CONFLICTING_REQS */
 "Attribute requires the cpc_cpu privilege\n",  /* CPC_ATTR_REQUIRES_PRIVILEGE */
-"Couldn't bind LWP to requested processor\n"	/* CPC_PBIND_FAILED */
+"Couldn't bind LWP to requested processor\n",	/* CPC_PBIND_FAILED */
+"Hypervisor event access denied\n"		/* CPC_HV_NO_ACCESS */
 };
 
 /*VARARGS3*/

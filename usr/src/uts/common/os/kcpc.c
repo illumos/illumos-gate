@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -302,9 +302,13 @@ kcpc_configure_reqs(kcpc_ctx_t *ctx, kcpc_set_t *set, int *subcode)
 		    &(rp->kr_config), (void *)ctx)) != 0) {
 			kcpc_free_configs(set);
 			*subcode = ret;
-			if (ret == CPC_ATTR_REQUIRES_PRIVILEGE)
+			switch (ret) {
+			case CPC_ATTR_REQUIRES_PRIVILEGE:
+			case CPC_HV_NO_ACCESS:
 				return (EACCES);
-			return (EINVAL);
+			default:
+				return (EINVAL);
+			}
 		}
 
 		ctx->kc_pics[n].kp_req = rp;
@@ -364,6 +368,13 @@ kcpc_sample(kcpc_set_t *set, uint64_t *buf, hrtime_t *hrtime, uint64_t *tick)
 		}
 
 		kpreempt_enable();
+
+		/*
+		 * The config may have been invalidated by
+		 * the pcbe_sample op.
+		 */
+		if (ctx->kc_flags & KCPC_CTX_INVALID)
+			return (EAGAIN);
 	}
 
 	if (copyout(set->ks_data, buf,
@@ -746,8 +757,7 @@ kcpc_ctx_clone(kcpc_ctx_t *ctx, kcpc_ctx_t *cctx)
 		}
 	}
 	if (kcpc_configure_reqs(cctx, cks, &code) != 0)
-		panic("kcpc_ctx_clone: configure of context %p with "
-		    "set %p failed with subcode %d", cctx, cks, code);
+		kcpc_invalidate_config(cctx);
 }
 
 
@@ -890,7 +900,7 @@ kcpc_hw_overflow_intr(caddr_t arg1, caddr_t arg2)
 	if (pcbe_ops == NULL ||
 	    (bitmap = pcbe_ops->pcbe_overflow_bitmap()) == 0)
 		return (DDI_INTR_UNCLAIMED);
-#ifdef N2_ERRATUM_134
+#ifdef N2_1x_CPC_WORKAROUNDS
 	/*
 	 * Check if any of the supported counters overflowed. If
 	 * not, it's a spurious overflow trap (Niagara2 1.x silicon
@@ -1116,7 +1126,11 @@ kcpc_lwp_create(kthread_t *t, kthread_t *ct)
 	kcpc_ctx_clone(ctx, cctx);
 	rw_exit(&kcpc_cpuctx_lock);
 
-	cctx->kc_flags = ctx->kc_flags;
+	/*
+	 * Copy the parent context's kc_flags field, but don't overwrite
+	 * the child's in case it was modified during kcpc_ctx_clone.
+	 */
+	cctx->kc_flags |= ctx->kc_flags;
 	cctx->kc_thread = ct;
 	cctx->kc_cpuid = -1;
 	ct->t_cpc_set = cctx->kc_set;
@@ -1295,6 +1309,20 @@ kcpc_invalidate_all(void)
 			atomic_or_uint(&ctx->kc_flags, KCPC_CTX_INVALID);
 		mutex_exit(&kcpc_ctx_llock[hash]);
 	}
+}
+
+/*
+ * Interface for PCBEs to signal that an existing configuration has suddenly
+ * become invalid.
+ */
+void
+kcpc_invalidate_config(void *token)
+{
+	kcpc_ctx_t *ctx = token;
+
+	ASSERT(ctx != NULL);
+
+	atomic_or_uint(&ctx->kc_flags, KCPC_CTX_INVALID);
 }
 
 /*

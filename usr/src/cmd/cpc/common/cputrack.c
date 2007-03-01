@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,7 +80,9 @@ cputrack_pctx_errfn(const char *fn, const char *fmt, va_list ap)
 }
 
 static int cputrack(int argc, char *argv[], int optind);
+#if defined(__i386)
 static void p4_ht_error(void);
+#endif
 
 #if !defined(TEXT_DOMAIN)
 #define	TEXT_DOMAIN	"SYS_TEST"
@@ -343,9 +345,11 @@ pinit_lwp(pctx_t *pctx, pid_t pid, id_t lwpid, void *arg)
 		errstr = strerror(errno);
 		if (errno == EAGAIN)
 			(void) cpc_unbind(cpc, set);
+#if defined(__i386)
 		if (errno == EACCES)
 			p4_ht_error();
 		else
+#endif
 			(void) fprintf(stderr, gettext(
 				"%6d: init_lwp: can't bind perf counters "
 				    "to lwp%d - %s\n"), (int)pid, (int)lwpid,
@@ -690,6 +694,8 @@ cputrack(int argc, char *argv[], int optind)
 	return (err != 0 ? 1 : 0);
 }
 
+#if defined(__i386)
+
 #define	OFFLINE_CMD	"/usr/sbin/psradm -f "
 #define	BUFSIZE		5	/* enough for "n " where n is a cpuid */
 
@@ -811,3 +817,5 @@ p4_ht_error(void)
 
 	exit(1);
 }
+
+#endif /* defined(__i386) */

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,14 +77,6 @@ phys_install_has_changed(void)
 
 }
 
-#ifdef N2_IDLE_WORKAROUND
-/*
- * Tuneable to control enabling of IDLE loop workaround on Niagara2 1.x parts.
- * This workaround will be removed before the RR.
- */
-int	n2_idle_workaround;
-#endif
-
 /*
  * Halt the present CPU until awoken via an interrupt
  */
@@ -137,19 +129,6 @@ cpu_halt(void)
 		}
 		return;
 	}
-
-#ifdef N2_IDLE_WORKAROUND
-	/*
-	 * The following workaround for Niagara2, when enabled, forces the
-	 * IDLE CPU to wait in a tight loop until something becomes runnable
-	 * locally, minimizing the overall CPU usage on an IDLE CPU.
-	 */
-	if (n2_idle_workaround) {
-		while (cpup->cpu_disp->disp_nrunnable == 0) {
-			(void) hv_cpu_yield();
-		}
-	}
-#endif
 
 	/*
 	 * We're on our way to being halted.  Wait until something becomes

@@ -72,12 +72,34 @@ static hsvc_info_t niagara2_hsvc = {
 	NIAGARA2_HSVC_MINOR, cpu_module_name
 };
 
+#ifdef N2_1x_CPC_WORKAROUNDS
+static uint64_t cpu_ver;		/* Niagara2 CPU version reg */
+uint64_t	ni2_1x_perf_workarounds = 0;
+
+/* Niagara2 CPU version register */
+#define	VER_MASK_MAJOR_SHIFT	28
+#define	VER_MASK_MAJOR_MASK	0xf
+
+extern uint64_t va_to_pa(void *);
+extern uint64_t ni2_getver();		/* HV code to get %hver */
+extern uint64_t niagara2_getver(uint64_t ni2_getver_ra, uint64_t *cpu_version);
+#endif
+
 void
 cpu_setup(void)
 {
 	extern int mmu_exported_pagesize_mask;
 	extern int cpc_has_overflow_intr;
 	int status;
+
+#ifdef N2_1x_CPC_WORKAROUNDS
+	/*
+	 * Get CPU version for Niagara2 part.
+	 */
+	if (niagara2_getver(va_to_pa((void *)ni2_getver), &cpu_ver) == H_EOK &&
+	    ((cpu_ver >> VER_MASK_MAJOR_SHIFT) & VER_MASK_MAJOR_MASK) <= 1)
+		ni2_1x_perf_workarounds = 1;
+#endif
 
 	/*
 	 * Negotiate the API version for Niagara2 specific hypervisor
