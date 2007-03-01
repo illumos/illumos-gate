@@ -48,7 +48,7 @@ cmd_page_fault(fmd_hdl_t *hdl, nvlist_t *modasru, nvlist_t *modfru,
 {
 	cmd_page_t *page = cmd_page_lookup(afar);
 	const char *uuid;
-	nvlist_t *flt;
+	nvlist_t *flt, *nvlfru;
 
 	if (page == NULL)
 		page = cmd_page_create(hdl, modasru, afar);
@@ -66,9 +66,12 @@ cmd_page_fault(fmd_hdl_t *hdl, nvlist_t *modasru, nvlist_t *modfru,
 	    CMD_PTR_PAGE_CASE, &uuid);
 
 #ifdef sun4v
+	nvlfru = cmd_mem2hc(hdl, modfru);
 	flt = fmd_nvl_create_fault(hdl, "fault.memory.page", 100,
-	    page->page_asru_nvl, cmd_mem2hc(hdl, modfru), NULL);
+	    page->page_asru_nvl, nvlfru, NULL);
 	flt = cmd_fault_add_location(hdl, flt, cmd_fmri_get_unum(modfru));
+	if (nvlfru != NULL)
+		nvlist_free(nvlfru);
 #else /* sun4v */
 	flt = fmd_nvl_create_fault(hdl, "fault.memory.page", 100,
 	    page->page_asru_nvl, modfru, NULL);

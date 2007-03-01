@@ -81,8 +81,12 @@ cmd_dimm_create_fault(fmd_hdl_t *hdl, cmd_dimm_t *dimm, const char *fltnm,
     uint_t cert)
 {
 #ifdef sun4v
-	nvlist_t *flt = fmd_nvl_create_fault(hdl, fltnm, cert,
-	    dimm->dimm_asru_nvl, cmd_mem2hc(hdl, dimm->dimm_asru_nvl), NULL);
+	nvlist_t *flt, *nvlfru;
+	nvlfru = cmd_mem2hc(hdl, dimm->dimm_asru_nvl);
+	flt = fmd_nvl_create_fault(hdl, fltnm, cert,
+	    dimm->dimm_asru_nvl, nvlfru, NULL);
+	if (nvlfru != NULL)
+		nvlist_free(nvlfru);
 	return (cmd_fault_add_location(hdl, flt, dimm->dimm_unum));
 #else
 	return (fmd_nvl_create_fault(hdl, fltnm, cert, dimm->dimm_asru_nvl,

@@ -474,7 +474,7 @@ cmd_mem2hc(fmd_hdl_t *hdl, nvlist_t *mem_fmri) {
 
 	if (breakup_components(nac_name, "/", hc_list) < 0) {
 		fmd_hdl_error(hdl, "cannot allocate components for hc-list\n");
-		for (i = 0; i < n; n++) {
+		for (i = 0; i < n; i++) {
 			if (hc_list[i] != NULL)
 			    nvlist_free(hc_list[i]);
 		}
@@ -489,18 +489,20 @@ cmd_mem2hc(fmd_hdl_t *hdl, nvlist_t *mem_fmri) {
 	    (nvlist_add_string(fp, FM_FMRI_HC_ROOT, "/") != 0) ||
 	    (nvlist_add_uint32(fp, FM_FMRI_HC_LIST_SZ, n) != 0) ||
 	    (nvlist_add_nvlist_array(fp, FM_FMRI_HC_LIST, hc_list, n) != 0)) {
-		for (i = 0; i < n; n++) {
-			nvlist_free(hc_list[i]);
+		for (i = 0; i < n; i++) {
+			if (hc_list[i] != NULL)
+				nvlist_free(hc_list[i]);
 		}
 		fmd_hdl_free(hdl, hc_list, sizeof (nvlist_t *)*n);
 		fmd_hdl_free(hdl, nac_name, strlen(unum)+1);
 		nvlist_free(fp);
 		return (NULL);
 	}
-	/*
-	 * if the nvlist_add_nvlist_array succeeds, then it frees
-	 * the hc_list[i]'s.
-	 */
+
+	for (i = 0; i < n; i++) {
+		if (hc_list[i] != NULL)
+			nvlist_free(hc_list[i]);
+	}
 	fmd_hdl_free(hdl, hc_list, sizeof (nvlist_t *)*n);
 	fmd_hdl_free(hdl, nac_name, strlen(unum)+1);
 	if (nvlist_lookup_string_array(mem_fmri, FM_FMRI_HC_SERIAL_ID,
