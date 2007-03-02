@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -244,8 +244,10 @@ sdev_getattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cr)
 	return (error);
 }
 
+/*ARGSUSED4*/
 static int
-sdev_setattr(struct vnode *vp, struct vattr *vap, int flags, struct cred *cred)
+sdev_setattr(struct vnode *vp, struct vattr *vap, int flags,
+    struct cred *cred, caller_context_t *ctp)
 {
 	return (devname_setattr_func(vp, vap, flags, cred, NULL, 0));
 }
@@ -1220,16 +1222,18 @@ sdev_fid(struct vnode *vp, struct fid *fidp)
  * and VOP_READDIR requests.  The contents lock stops things
  * moving around while we're looking at them.
  */
-static void
-sdev_rwlock(struct vnode *vp, int write_flag)
+/*ARGSUSED2*/
+static int
+sdev_rwlock(struct vnode *vp, int write_flag, caller_context_t *ctp)
 {
-	rw_enter(&VTOSDEV(vp)->sdev_contents, write_flag ? RW_WRITER :
-		RW_READER);
+	rw_enter(&VTOSDEV(vp)->sdev_contents,
+	    write_flag ? RW_WRITER : RW_READER);
+	return (write_flag ? V_WRITELOCK_TRUE : V_WRITELOCK_FALSE);
 }
 
 /*ARGSUSED1*/
 static void
-sdev_rwunlock(struct vnode *vp, int write_flag)
+sdev_rwunlock(struct vnode *vp, int write_flag, caller_context_t *ctp)
 {
 	rw_exit(&VTOSDEV(vp)->sdev_contents);
 }
@@ -1308,7 +1312,6 @@ const fs_operation_def_t sdev_vnodeops_tbl[] = {
 	VOPNAME_READDIR, sdev_readdir,
 	VOPNAME_SYMLINK, sdev_symlink,
 	VOPNAME_READLINK, sdev_readlink, /* readlink */
-	VOPNAME_FSYNC, (fs_generic_func_p) fs_sync,
 	VOPNAME_INACTIVE, (fs_generic_func_p)sdev_inactive,
 	VOPNAME_FID, sdev_fid,
 	VOPNAME_RWLOCK, (fs_generic_func_p)sdev_rwlock,

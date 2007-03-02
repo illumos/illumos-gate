@@ -391,9 +391,10 @@ devpts_set_id(struct sdev_node *dv, struct vattr *vap, int protocol)
 
 }
 
+/*ARGSUSED4*/
 static int
 devpts_setattr(struct vnode *vp, struct vattr *vap, int flags,
-    struct cred *cred)
+    struct cred *cred, caller_context_t *ctp)
 {
 	ASSERT((vp->v_type == VCHR) || (vp->v_type == VDIR));
 	return (devname_setattr_func(vp, vap, flags, cred,
