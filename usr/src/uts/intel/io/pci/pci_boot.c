@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@
 #include <sys/pci_cfgspace_impl.h>
 #include <sys/psw.h>
 #include "../../../../common/pci/pci_strings.h"
+#include <sys/apic.h>
 #include <io/pciex/pcie_nvidia.h>
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
@@ -59,7 +60,6 @@
 /* See AMD-8111 Datasheet Rev 3.03, Page 149: */
 #define	LPC_IO_CONTROL_REG_1	0x40
 #define	AMD8111_ENABLENMI	(uint8_t)0x80
-#define	VENID_AMD		0x1022
 #define	DEVID_AMD8111_LPC	0x7468
 
 struct pci_fixundo {
@@ -93,6 +93,8 @@ static void add_bus_slot_names_prop(int);
 static void add_ppb_ranges_prop(int);
 static void add_bus_available_prop(int);
 static void alloc_res_array();
+static void create_ioapic_node(int bus, int dev, int fn, ushort_t vendorid,
+    ushort_t deviceid);
 
 extern int pci_slot_names_prop(int, char *, int);
 
@@ -816,7 +818,7 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 {
 	char nodename[32], unitaddr[5];
 	dev_info_t *dip;
-	uchar_t basecl, subcl, intr, revid;
+	uchar_t basecl, subcl, progcl, intr, revid;
 	ushort_t subvenid, subdevid, status;
 	ushort_t slot_num;
 	uint_t classcode, revclass;
@@ -857,6 +859,7 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	/* figure out if this is pci-ide */
 	basecl = classcode >> 16;
 	subcl = (classcode >> 8) & 0xff;
+	progcl = classcode & 0xff;
 	pciide = is_pciide(basecl, subcl, revid, vendorid, deviceid,
 	    subvenid, subdevid);
 
@@ -952,6 +955,11 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 
 	if ((basecl == PCI_CLASS_BRIDGE) && (subcl == PCI_BRIDGE_PCI))
 		add_ppb_props(dip, bus, dev, func, pciex);
+
+	if (config_op == CONFIG_INFO &&
+	    IS_CLASS_IOAPIC(basecl, subcl, progcl)) {
+		create_ioapic_node(bus, dev, func, vendorid, deviceid);
+	}
 
 	/* check for ck8-04 based PCI ISA bridge only */
 	if (NVIDIA_IS_LPC_BRIDGE(vendorid, deviceid) && (dev == 1) &&
@@ -1822,4 +1830,63 @@ alloc_res_array(void)
 		    old_max * sizeof (struct pci_bus_resource));
 		kmem_free(old_res, old_max * sizeof (struct pci_bus_resource));
 	}
+}
+
+static void
+create_ioapic_node(int bus, int dev, int fn, ushort_t vendorid,
+    ushort_t deviceid)
+{
+	static dev_info_t *ioapicsnode = NULL;
+	static int numioapics = 0;
+	dev_info_t *ioapic_node;
+	uint64_t physaddr;
+	uint32_t lobase, hibase = 0;
+
+	/* BAR 0 contains the IOAPIC's memory-mapped I/O address */
+	lobase = (*pci_getl_func)(bus, dev, fn, PCI_CONF_BASE0);
+
+	/* We (and the rest of the world) only support memory-mapped IOAPICs */
+	if ((lobase & PCI_BASE_SPACE_M) != PCI_BASE_SPACE_MEM)
+		return;
+
+	if ((lobase & PCI_BASE_TYPE_M) == PCI_BASE_TYPE_ALL)
+		hibase = (*pci_getl_func)(bus, dev, fn, PCI_CONF_BASE0 + 4);
+
+	lobase &= PCI_BASE_M_ADDR_M;
+
+	physaddr = (((uint64_t)hibase) << 32) | lobase;
+
+	/*
+	 * Create a nexus node for all IOAPICs under the root node.
+	 */
+	if (ioapicsnode == NULL) {
+		if (ndi_devi_alloc(ddi_root_node(), IOAPICS_NODE_NAME,
+		    (pnode_t)DEVI_SID_NODEID, &ioapicsnode) != NDI_SUCCESS) {
+			return;
+		}
+		(void) ndi_devi_online(ioapicsnode, 0);
+	}
+
+	/*
+	 * Create a child node for this IOAPIC
+	 */
+	ioapic_node = ddi_add_child(ioapicsnode, IOAPICS_CHILD_NAME,
+	    DEVI_SID_NODEID, numioapics++);
+	if (ioapic_node == NULL) {
+		return;
+	}
+
+	/* Vendor and Device ID */
+	(void) ndi_prop_update_int(DDI_DEV_T_NONE, ioapic_node,
+	    IOAPICS_PROP_VENID, vendorid);
+	(void) ndi_prop_update_int(DDI_DEV_T_NONE, ioapic_node,
+	    IOAPICS_PROP_DEVID, deviceid);
+
+	/* device_type */
+	(void) ndi_prop_update_string(DDI_DEV_T_NONE, ioapic_node,
+	    "device_type", IOAPICS_DEV_TYPE);
+
+	/* reg */
+	(void) ndi_prop_update_int64(DDI_DEV_T_NONE, ioapic_node,
+	    "reg", physaddr);
 }

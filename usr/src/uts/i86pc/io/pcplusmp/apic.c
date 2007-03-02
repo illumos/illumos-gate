@@ -136,10 +136,13 @@ int apic_enable_cpcovf_intr = 1;
 /*
  * The following vector assignments influence the value of ipltopri and
  * vectortoipl. Note that vectors 0 - 0x1f are not used. We can program
- * idle to 0 and IPL 0 to 0x10 to differentiate idle in case
+ * idle to 0 and IPL 0 to 0xf to differentiate idle in case
  * we care to do so in future. Note some IPLs which are rarely used
  * will share the vector ranges and heavily used IPLs (5 and 6) have
  * a wide range.
+ *
+ * This array is used to initialize apic_ipls[] (in apic_init()).
+ *
  *	IPL		Vector range.		as passed to intr_enter
  *	0		none.
  *	1,2,3		0x20-0x2f		0x0-0xf
@@ -150,13 +153,14 @@ int apic_enable_cpcovf_intr = 1;
  *	10		0x90-0x9f		0x70-0x7f
  *	11		0xa0-0xaf		0x80-0x8f
  *	...		...
- *	16		0xf0-0xff		0xd0-0xdf
+ *	15		0xe0-0xef		0xc0-0xcf
+ *	15		0xf0-0xff		0xd0-0xdf
  */
 uchar_t apic_vectortoipl[APIC_AVAIL_VECTOR / APIC_VECTOR_PER_IPL] = {
-	3, 4, 5, 5, 6, 6, 9, 10, 11, 12, 13, 14, 15, 16
+	3, 4, 5, 5, 6, 6, 9, 10, 11, 12, 13, 14, 15, 15
 };
 	/*
-	 * The ipl of an ISR at vector X is apic_vectortoipl[X<<4]
+	 * The ipl of an ISR at vector X is apic_vectortoipl[X>>4]
 	 * NOTE that this is vector as passed into intr_enter which is
 	 * programmed vector - 0x20 (APIC_BASE_VECT)
 	 */
@@ -167,6 +171,14 @@ uchar_t	apic_ipltopri[MAXIPL + 1];	/* unix ipl to apic pri	*/
 #if defined(__amd64)
 uchar_t	apic_cr8pri[MAXIPL + 1];	/* unix ipl to cr8 pri	*/
 #endif
+
+/*
+ * Correlation of the hardware vector to the IPL in use, initialized
+ * from apic_vectortoipl[] in apic_init().  The final IPLs may not correlate
+ * to the IPLs in apic_vectortoipl on some systems that share interrupt lines
+ * connected to errata-stricken IOAPICs
+ */
+uchar_t apic_ipls[APIC_AVAIL_VECTOR];
 
 /*
  * Patchable global variables.
@@ -725,11 +737,10 @@ apic_intr_enter(int ipl, int *vectorp)
 	apic_cpus_info_t *cpu_infop;
 
 	/*
-	 * The real vector programmed in APIC is *vectorp + 0x20
-	 * But, cmnint code subtracts 0x20 before pushing it.
-	 * Hence APIC_BASE_VECT is 0x20.
+	 * The real vector delivered is (*vectorp + 0x20), but our caller
+	 * subtracts 0x20 from the vector before passing it to us.
+	 * (That's why APIC_BASE_VECT is 0x20.)
 	 */
-
 	vector = (uchar_t)*vectorp;
 
 	/* if interrupted by the clock, increment apic_nsec_since_boot */
@@ -744,7 +755,8 @@ apic_intr_enter(int ipl, int *vectorp)
 		}
 
 		/* We will avoid all the book keeping overhead for clock */
-		nipl = apic_vectortoipl[vector >> APIC_IPL_SHIFT];
+		nipl = apic_ipls[vector];
+
 #if defined(__amd64)
 		setcr8((ulong_t)apic_cr8pri[nipl]);
 #else
@@ -778,7 +790,7 @@ apic_intr_enter(int ipl, int *vectorp)
 		intr_restore(iflag);
 	}
 
-	nipl = apic_vectortoipl[vector >> APIC_IPL_SHIFT];
+	nipl = apic_ipls[vector];
 	*vectorp = irq = apic_vector_to_irq[vector + APIC_BASE_VECT];
 
 #if defined(__amd64)

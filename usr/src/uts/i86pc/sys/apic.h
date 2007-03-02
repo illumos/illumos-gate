@@ -29,6 +29,8 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/psm_types.h>
+#include <sys/avintr.h>
+#include <sys/pci.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -144,6 +146,21 @@ extern "C" {
 #define	APIC_CT_SIZE	1024		/* conf table size		*/
 
 #define	APIC_ID		'MPAT'		/* conf table signature 	*/
+
+#define	VENID_AMD		0x1022
+#define	DEVID_8131_IOAPIC	0x7451
+#define	DEVID_8132_IOAPIC	0x7459
+
+#define	IOAPICS_NODE_NAME	"ioapics"
+#define	IOAPICS_CHILD_NAME	"ioapic"
+#define	IOAPICS_DEV_TYPE	"ioapic"
+#define	IOAPICS_PROP_VENID	"vendor-id"
+#define	IOAPICS_PROP_DEVID	"device-id"
+
+#define	IS_CLASS_IOAPIC(b, s, p) \
+	((b) == PCI_CLASS_PERIPH && (s) == PCI_PERIPH_PIC &&	\
+	((p) == PCI_PERIPH_PIC_IF_IO_APIC ||			\
+	(p) == PCI_PERIPH_PIC_IF_IOX_APIC))
 
 
 /*
@@ -705,7 +722,9 @@ extern int apic_pci_msi_enable_mode(dev_info_t *rdip, int type, int inum);
 extern volatile uint32_t *apicadr;	/* virtual addr of local APIC   */
 extern int apic_forceload;
 extern apic_cpus_info_t *apic_cpus;
+#ifdef _MACHDEP
 extern cpuset_t apic_cpumask;
+#endif
 extern uint_t apic_flag;
 extern uchar_t apic_ipltopri[MAXIPL+1];
 extern uchar_t apic_vector_to_irq[APIC_MAX_VECTOR+1];
@@ -735,7 +754,7 @@ extern int apic_redistribute_sample_interval;
 extern int apic_multi_msi_enable;
 extern int apic_multi_msi_max;
 extern int apic_sci_vect;
-
+extern uchar_t apic_ipls[];
 
 
 #ifdef	__cplusplus

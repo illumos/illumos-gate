@@ -98,6 +98,7 @@ static void apic_try_deferred_reprogram(int ipl, int vect);
 static void delete_defer_repro_ent(int which_irq);
 static void apic_ioapic_wait_pending_clear(int ioapicindex,
     int intin_no);
+static boolean_t apic_is_ioapic_AMD_813x(uint32_t physaddr);
 
 int apic_debug_mps_id = 0;	/* 1 - print MPS ID strings */
 
@@ -221,6 +222,8 @@ static	uchar_t	apic_io_vectbase[MAX_IO_APIC];
 static	uchar_t	apic_io_vectend[MAX_IO_APIC];
 uchar_t apic_reserved_irqlist[MAX_ISA_IRQ + 1];
 uint32_t apic_physaddr[MAX_IO_APIC];
+
+static	boolean_t ioapic_mask_workaround[MAX_IO_APIC];
 
 /*
  * First available slot to be used as IRQ index into the apic_irq_table
@@ -675,6 +678,8 @@ acpi_probe(char *modname)
 				    APIC_IO_MEMLEN, PROT_READ | PROT_WRITE);
 				if (!ioapic)
 					goto cleanup;
+				ioapic_mask_workaround[apic_io_max] =
+				    apic_is_ioapic_AMD_813x(mia->Address);
 				apic_io_max++;
 			}
 			break;
@@ -1040,6 +1045,10 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 				if (!apicioadr[apic_io_max])
 					return (PSM_FAILURE);
 
+				ioapic_mask_workaround[apic_io_max] =
+				    apic_is_ioapic_AMD_813x(
+					ioapicp->io_apic_addr);
+
 				apic_ix = apic_io_max;
 				id = ioapic_read(apic_ix, APIC_ID_CMD);
 				hid = (uchar_t)(id >> 24);
@@ -1130,10 +1139,24 @@ apic_checksum(caddr_t bptr, int len)
 void
 apic_init_common()
 {
-	int	i;
+	int	i, j, indx;
 	int	*iptr;
 
-	/* cpu 0 is always up */
+	/*
+	 * Initialize apic_ipls from apic_vectortoipl.  This array is
+	 * used in apic_intr_enter to determine the IPL to use for the
+	 * corresponding vector.  On some systems, due to hardware errata
+	 * and interrupt sharing, the IPL may not correspond to the IPL listed
+	 * in apic_vectortoipl (see apic_addspl and apic_delspl).
+	 */
+	for (i = 0; i < (APIC_AVAIL_VECTOR / APIC_VECTOR_PER_IPL); i++) {
+		indx = i * APIC_VECTOR_PER_IPL;
+
+		for (j = 0; j < APIC_VECTOR_PER_IPL; j++, indx++)
+			apic_ipls[indx] = apic_vectortoipl[i];
+	}
+
+	/* cpu 0 is always up (for now) */
 	apic_cpus[0].aci_status = APIC_CPU_ONLINE | APIC_CPU_INTR_ENABLE;
 
 	iptr = (int *)&apic_irq_table[0];
@@ -1285,7 +1308,9 @@ apic_addspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 	 * return failure. Not very elegant, but then we hope the
 	 * machine will blow up with ...
 	 */
-	if (irqptr->airq_ipl != max_ipl) {
+	if (irqptr->airq_ipl != max_ipl &&
+	    !ioapic_mask_workaround[irqptr->airq_ioapicindex]) {
+
 		vector = apic_allocate_vector(max_ipl, irqindex, 1);
 		if (vector == 0) {
 			irqptr->airq_share--;
@@ -1315,6 +1340,29 @@ apic_addspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 			}
 			irqptr = irqptr->airq_next;
 		}
+		return (PSM_SUCCESS);
+
+	} else if (irqptr->airq_ipl != max_ipl &&
+	    ioapic_mask_workaround[irqptr->airq_ioapicindex]) {
+		/*
+		 * We cannot upgrade the vector, but we can change
+		 * the IPL that this vector induces.
+		 *
+		 * Note that we subtract APIC_BASE_VECT from the vector
+		 * here because this array is used in apic_intr_enter
+		 * (no need to add APIC_BASE_VECT in that hot code
+		 * path since we can do it in the rarely-executed path
+		 * here).
+		 */
+		apic_ipls[irqptr->airq_vector - APIC_BASE_VECT] =
+		    (uchar_t)max_ipl;
+
+		irqptr = irqheadptr;
+		while (irqptr) {
+			irqptr->airq_ipl = (uchar_t)max_ipl;
+			irqptr = irqptr->airq_next;
+		}
+
 		return (PSM_SUCCESS);
 	}
 
@@ -1347,7 +1395,7 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 	uchar_t vector, bind_cpu;
 	int intin, irqindex;
 	int apic_ix;
-	apic_irq_t	*irqptr, *irqheadptr;
+	apic_irq_t	*irqptr, *irqheadptr, *irqp;
 	ulong_t iflag;
 
 	mutex_enter(&airq_mutex);
@@ -1391,7 +1439,8 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 	 * Downgrade vector to new max_ipl if needed.If we cannot allocate,
 	 * use old IPL. Not very elegant, but then we hope ...
 	 */
-	if ((irqptr->airq_ipl != max_ipl) && (max_ipl != PSM_INVALID_IPL)) {
+	if ((irqptr->airq_ipl != max_ipl) && (max_ipl != PSM_INVALID_IPL) &&
+	    !ioapic_mask_workaround[irqptr->airq_ioapicindex]) {
 		apic_irq_t	*irqp;
 		if (vector = apic_allocate_vector(max_ipl, irqno, 1)) {
 			apic_mark_vector(irqheadptr->airq_vector, vector);
@@ -1413,6 +1462,92 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 				}
 				irqp = irqp->airq_next;
 			}
+		}
+
+	} else if (irqptr->airq_ipl != max_ipl &&
+	    max_ipl != PSM_INVALID_IPL &&
+	    ioapic_mask_workaround[irqptr->airq_ioapicindex]) {
+
+	/*
+	 * We cannot downgrade the IPL of the vector below the vector's
+	 * hardware priority. If we did, it would be possible for a
+	 * higher-priority hardware vector to interrupt a CPU running at an IPL
+	 * lower than the hardware priority of the interrupting vector (but
+	 * higher than the soft IPL of this IRQ). When this happens, we would
+	 * then try to drop the IPL BELOW what it was (effectively dropping
+	 * below base_spl) which would be potentially catastrophic.
+	 *
+	 * (e.g. Suppose the hardware vector associated with this IRQ is 0x40
+	 * (hardware IPL of 4).  Further assume that the old IPL of this IRQ
+	 * was 4, but the new IPL is 1.  If we forced vector 0x40 to result in
+	 * an IPL of 1, it would be possible for the processor to be executing
+	 * at IPL 3 and for an interrupt to come in on vector 0x40, interrupting
+	 * the currently-executing ISR.  When apic_intr_enter consults
+	 * apic_irqs[], it will return 1, bringing the IPL of the CPU down to 1
+	 * so even though the processor was running at IPL 4, an IPL 1
+	 * interrupt will have interrupted it, which must not happen)).
+	 *
+	 * Effectively, this means that the hardware priority corresponding to
+	 * the IRQ's IPL (in apic_ipls[]) cannot be lower than the vector's
+	 * hardware priority.
+	 *
+	 * (In the above example, then, after removal of the IPL 4 device's
+	 * interrupt handler, the new IPL will continue to be 4 because the
+	 * hardware priority that IPL 1 implies is lower than the hardware
+	 * priority of the vector used.)
+	 */
+		/* apic_ipls is indexed by vector, starting at APIC_BASE_VECT */
+		const int apic_ipls_index = irqptr->airq_vector -
+		    APIC_BASE_VECT;
+		const int vect_inherent_hwpri = irqptr->airq_vector >>
+		    APIC_IPL_SHIFT;
+
+		/*
+		 * If there are still devices using this IRQ, determine the
+		 * new ipl to use.
+		 */
+		if (irqptr->airq_share) {
+			int vect_desired_hwpri, hwpri;
+
+			ASSERT(max_ipl < MAXIPL);
+			vect_desired_hwpri = apic_ipltopri[max_ipl] >>
+			    APIC_IPL_SHIFT;
+
+			/*
+			 * If the desired IPL's hardware priority is lower
+			 * than that of the vector, use the hardware priority
+			 * of the vector to determine the new IPL.
+			 */
+			hwpri = (vect_desired_hwpri < vect_inherent_hwpri) ?
+			    vect_inherent_hwpri : vect_desired_hwpri;
+
+			/*
+			 * Now, to get the right index for apic_vectortoipl,
+			 * we need to subtract APIC_BASE_VECT from the
+			 * hardware-vector-equivalent (in hwpri).  Since hwpri
+			 * is already shifted, we shift APIC_BASE_VECT before
+			 * doing the subtraction.
+			 */
+			hwpri -= (APIC_BASE_VECT >> APIC_IPL_SHIFT);
+
+			ASSERT(hwpri >= 0);
+			ASSERT(hwpri < MAXIPL);
+			max_ipl = apic_vectortoipl[hwpri];
+			apic_ipls[apic_ipls_index] = max_ipl;
+
+			irqp = irqheadptr;
+			while (irqp) {
+				irqp->airq_ipl = (uchar_t)max_ipl;
+				irqp = irqp->airq_next;
+			}
+		} else {
+			/*
+			 * No more devices on this IRQ, so reset this vector's
+			 * element in apic_ipls to the original IPL for this
+			 * vector
+			 */
+			apic_ipls[apic_ipls_index] =
+			    apic_vectortoipl[vect_inherent_hwpri];
 		}
 	}
 
@@ -1439,6 +1574,15 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 			    type, irqptr->airq_ioapicindex);
 		}
 	} else {
+		/*
+		 * The assumption here is that this is safe, even for
+		 * systems with IOAPICs that suffer from the hardware
+		 * erratum because all devices have been quiesced before
+		 * they unregister their interrupt handlers.  If that
+		 * assumption turns out to be false, this mask operation
+		 * can induce the same erratum result we're trying to
+		 * avoid.
+		 */
 		apic_ix = irqptr->airq_ioapicindex;
 		intin = irqptr->airq_intin_no;
 		ioapic_write(apic_ix, APIC_RDT_CMD + 2 * intin, AV_MASK);
@@ -3730,8 +3874,74 @@ ioapic_disable_redirection()
 		intin_max = (ioapic_read(ioapic_ix, APIC_VERS_CMD) >> 16)
 		    & 0xff;
 
-		for (intin_ix = 0; intin_ix < intin_max; intin_ix++)
+		for (intin_ix = 0; intin_ix < intin_max; intin_ix++) {
+			/*
+			 * The assumption here is that this is safe, even for
+			 * systems with IOAPICs that suffer from the hardware
+			 * erratum because all devices have been quiesced before
+			 * this function is called from apic_shutdown()
+			 * (or equivalent). If that assumption turns out to be
+			 * false, this mask operation can induce the same
+			 * erratum result we're trying to avoid.
+			 */
 			ioapic_write(ioapic_ix, APIC_RDT_CMD + 2 * intin_ix,
 			    AV_MASK);
+		}
 	}
+}
+
+/*
+ * Looks for an IOAPIC with the specified physical address in the /ioapics
+ * node in the device tree (created by the PCI enumerator).
+ */
+static boolean_t
+apic_is_ioapic_AMD_813x(uint32_t physaddr)
+{
+	/*
+	 * Look in /ioapics, for the ioapic with
+	 * the physical address given
+	 */
+	dev_info_t *ioapicsnode = ddi_find_devinfo(IOAPICS_NODE_NAME, -1, 0);
+	dev_info_t *ioapic_child;
+	boolean_t rv = B_FALSE;
+	int vid, did;
+	uint64_t ioapic_paddr;
+	boolean_t done = B_FALSE;
+
+	if (ioapicsnode == NULL)
+		return (B_FALSE);
+
+	/* Load first child: */
+	ioapic_child = ddi_get_child(ioapicsnode);
+	while (!done && ioapic_child != 0) { /* Iterate over children */
+
+		if ((ioapic_paddr = (uint64_t)ddi_prop_get_int64(DDI_DEV_T_ANY,
+		    ioapic_child, DDI_PROP_DONTPASS, "reg", 0))
+		    != 0 && physaddr == ioapic_paddr) {
+
+			vid = ddi_prop_get_int(DDI_DEV_T_ANY, ioapic_child,
+			    DDI_PROP_DONTPASS, IOAPICS_PROP_VENID, 0);
+
+			if (vid == VENID_AMD) {
+
+				did = ddi_prop_get_int(DDI_DEV_T_ANY,
+				    ioapic_child, DDI_PROP_DONTPASS,
+				    IOAPICS_PROP_DEVID, 0);
+
+				if (did == DEVID_8131_IOAPIC ||
+				    did == DEVID_8132_IOAPIC) {
+
+					rv = B_TRUE;
+					done = B_TRUE;
+				}
+			}
+		}
+
+		if (!done)
+			ioapic_child = ddi_get_next_sibling(ioapic_child);
+	}
+
+	/* The ioapics node was held by ddi_find_devinfo, so release it */
+	ndi_rele_devi(ioapicsnode);
+	return (rv);
 }
