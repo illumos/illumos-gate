@@ -646,7 +646,7 @@ mem_sync(caddr_t orig_va, size_t orig_len)
  * If resumable queue is full, we need to check if any cpu is in
  * error state. If not, we drive on. If yes, we need to panic. The
  * hypervisor call hv_cpu_state() is being used for checking the
- * cpu state.
+ * cpu state.  And reset %tick_compr in case tick-compare was lost.
  */
 static void
 errh_rq_full(struct async_flt *afltp)
@@ -654,6 +654,10 @@ errh_rq_full(struct async_flt *afltp)
 	processorid_t who;
 	uint64_t cpu_state;
 	uint64_t retval;
+	uint64_t current_tick;
+
+	current_tick = (uint64_t)gettick();
+	tickcmpr_set(current_tick);
 
 	for (who = 0; who < NCPU; who++)
 		if (CPU_IN_SET(cpu_ready_set, who)) {
