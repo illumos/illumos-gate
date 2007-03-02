@@ -3009,7 +3009,9 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	 * e.g. in the uiomove in kstrgetmsg.
 	 * This difference is not believed to be significant.
 	 */
-	error = so_lock_read_intr(so, uiop->uio_fmode);	/* Set SOREADLOCKED */
+	/* Set SOREADLOCKED */
+	error = so_lock_read_intr(so,
+	    uiop->uio_fmode | ((flags & MSG_DONTWAIT) ? FNONBLOCK : 0));
 	mutex_exit(&so->so_lock);
 	if (error)
 		return (error);

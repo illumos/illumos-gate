@@ -711,7 +711,8 @@ sosdp_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	/*
 	 * Allow just one reader at a time.
 	 */
-	error = so_lock_read_intr(so, uiop->uio_fmode);
+	error = so_lock_read_intr(so,
+	    uiop->uio_fmode | ((flags & MSG_DONTWAIT) ? FNONBLOCK : 0));
 	if (error != 0) {
 		mutex_exit(&so->so_lock);
 		return (error);
