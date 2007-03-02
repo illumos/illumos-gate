@@ -54,6 +54,11 @@ struct finddevhdl {
 };
 
 
+#define	GLOBAL_DEV_PATH(devpath)			\
+	((getzoneid() == GLOBAL_ZONEID) &&		\
+	    ((strcmp(devpath, "/dev") == 0) ||		\
+	    (strncmp(devpath, "/dev/", strlen("/dev/")) == 0)))
+
 /*
  * Return true if a device exists
  * If the path refers into the /dev filesystem, use a
@@ -70,9 +75,7 @@ device_exists(const char *devname)
 	int	rv;
 	struct stat st;
 
-	if ((getzoneid() == GLOBAL_ZONEID) &&
-	    ((strcmp(devname, "/dev") == 0) ||
-	    (strncmp(devname, "/dev/", 5) == 0))) {
+	if (GLOBAL_DEV_PATH(devname)) {
 		rv = modctl(MODDEVEXISTS, devname, strlen(devname));
 		return ((rv == 0) ? 1 : 0);
 	}
@@ -247,9 +250,7 @@ finddev_readdir_devfs(const char *path, finddevhdl_t *handlep)
 int
 finddev_readdir(const char *path, finddevhdl_t *handlep)
 {
-	if ((getzoneid() == GLOBAL_ZONEID) &&
-	    ((strcmp(path, "/dev") == 0) ||
-	    (strncmp(path, "/dev/", 4) == 0))) {
+	if (GLOBAL_DEV_PATH(path)) {
 		return (finddev_readdir_devfs(path, handlep));
 	}
 	return (finddev_readdir_alt(path, handlep));
