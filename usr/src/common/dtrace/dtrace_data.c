@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,8 +32,21 @@
  * In order to let the DTrace fasttrap provider trace processes before libc
  * is initialized, we place this structure in the thread pointer register.
  * This is communicated to the kernel (in the elfexec() function) by
- * placing the address of this structure in the PT_SUNWDTRACE program header
- * with the -zdtrace_data=<object> option to ld.
+ * placing the address of this structure in the PT_SUNWDTRACE program
+ * header with the -zdtrace_data=<object> option to ld(1).
+ *
+ * Besides DTrace use, the initialization sequence carried out for the
+ * PT_SUNWDTRACE data is an essential step required for the correct
+ * initialization of any process.  Therefore, PT_SUNWDTRACE data must
+ * exist in any interpretor available on Solaris.
+ *
+ * ld.so.1 is the standard interpretor on all Solaris platforms.  However,
+ * for ABI compliance, 32-bit executables are able to identify libc.so.1
+ * as their interpretor.  Therefore, this data file is used to build all
+ * instances of ld.so.1, and the 32-bit versions of libc.so.1.  Note,
+ * although libc.so.1 can act as an interpretor for 32-bit applications,
+ * libc.so.1 only provides a bootstrap mechanism to load and jump to
+ * ld.so.1.
  *
  * The fields of the program header are set as follows:
  *	p_type:         PT_SUNWDTRACE
@@ -48,6 +61,9 @@
  * See the comment in fasttrap.h for information on how to safely change
  * this data structure and the other places that need to be kept in sync.
  */
+
+#if defined(__sparc)
+
 #pragma align 64(dtrace_data)
 uint32_t	dtrace_data[32] = {
 	0, 0, 0, 0, 0, 0, 0, 0,
@@ -60,3 +76,38 @@ uint32_t	dtrace_data[32] = {
 	0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0
 };
+
+#elif defined(__amd64)
+
+#pragma align 64(dtrace_data)
+uint8_t	dtrace_data[64] = {
+	0, 0, 0, 0, 0, 0, 0, 0,		/* self pointer (must be zero) */
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0
+};
+
+#elif defined(__i386)
+
+#pragma align 64(dtrace_data)
+uint8_t	dtrace_data[64] = {
+	0, 0, 0, 0,			/* self pointer (must be zero)  */
+	0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0
+};
+
+#else
+
+#error "unknown ISA"
+
+#endif

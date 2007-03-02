@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,7 +43,7 @@ G_MACHOBJS=	doreloc.o
 
 P_MACHOBJS=	sparc_elf.o	_setup.o
 
-CP_MACHOBJS=	common_sparc.o	dtrace_data.o
+CP_MACHOBJS=	common_sparc.o
 
 S_MACHOBJS=	sparc_a.out.o
 

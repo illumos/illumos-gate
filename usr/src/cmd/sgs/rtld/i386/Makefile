@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,7 +44,7 @@ G_MACHOBJS=	doreloc.o
 
 P_MACHOBJS=	i386_elf.o	_setup.o	zero.o
 
-CP_MACHOBJS=	dtrace_data.o
+CP_MACHOBJS=
 
 S_MACHOBJS=
 

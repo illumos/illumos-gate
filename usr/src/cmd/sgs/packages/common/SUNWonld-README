@@ -1193,3 +1193,5 @@ Bugid   Risk Synopsis
 	PSARC/2007/074 -L option for nm(1) to display SHT_SUNW_LDYNSYM symbols
 6523787 dlopen() handle gets mistakenly orphaned - results in access to freed
 	memory
+6524709 executables using /usr/lib/libc.so.1 as the ELF interpreter dump core
+	(link-editor components only)

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -137,6 +137,14 @@ VAR_POUND_3=		$(POUND_SIGN)
 #
 VAR_AVLDIR=		$(SRCBASE)/common/avl
 VAR_AVLINCDIR=
+
+#
+# VAR_DTRDIR - directory to find dtrace_data.c in.
+#
+# The dtrace_data.c is under usr/src/common/dtrace in Solaris 11 (and later),
+# but in earlier releases was maintained as separate files under sgs/rtld.
+#
+VAR_DTRDIR=             $(SRCBASE)/common/dtrace
 
 #
 # ld

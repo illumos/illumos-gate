@@ -28,10 +28,12 @@
 RTLD=		ld.so.1
 
 AVLOBJ=		avl.o
+DTROBJ=		dtrace_data.o
 TOOLOBJS=	alist.o strhash.o
 BLTOBJ=		msg.o
 OBJECTS=	$(BLTOBJ) \
 		$(AVLOBJ) \
+		$(DTROBJ) \
 		$(TOOLOBJS) \
 		$(P_ASOBJS)   $(P_COMOBJS)   $(P_MACHOBJS)   $(G_MACHOBJS)  \
 		$(S_ASOBJS)   $(S_COMOBJS)   $(S_MACHOBJS)   $(CP_MACHOBJS)
@@ -47,7 +49,7 @@ include		$(SRC)/cmd/sgs/Makefile.com
 SRCDIR =	../common
 PLAT =		$(VAR_PLAT_$(BASEPLAT))
 
-# Dtrace needs an executable data segment.
+# DTrace needs an executable data segment.
 NX_MAP=
 
 MAPFILES +=	$(MAPFILE-ORDER) $(MAPFILE-PLAT)
@@ -125,6 +127,7 @@ SGSMSGFLAGS1=	$(SGSMSGFLAGS) -m $(BLTMESG)
 SGSMSGFLAGS2=	$(SGSMSGFLAGS) -h $(BLTDEFS) -d $(BLTDATA) -n rtld_msg
 
 SRCS=		$(AVLOBJ:%.o=$(VAR_AVLDIR)/%.c) \
+		$(DTROBJ:%.o=$(VAR_DTRDIR)/%.c) \
 		$(TOOLOBJS:%.o=$(SGSTOOLS)/common/%.c) \
 		$(COMOBJS:%.o=../common/%.c)  $(MACHOBJS:%.o=%.c) $(BLTDATA) \
 		$(G_MACHOBJS:%.o=$(SRCBASE)/uts/$(PLAT)/krtld/%.c) \

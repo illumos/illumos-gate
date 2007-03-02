@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -272,7 +272,11 @@ $(COMOBJS:%=pics/%): $(SRC)/common/util/$$(@F:.o=.c)
 	$(COMPILE.c) -o $@ $(SRC)/common/util/$(@F:.o=.c)
 	$(POST_PROCESS_O)
 
-# dtrace rules
+$(DTRACEOBJS:%=pics/%): $(SRC)/common/dtrace/$$(@F:.o=.c)
+	$(COMPILE.c) -o $@ $(SRC)/common/dtrace/$(@F:.o=.c)
+	$(POST_PROCESS_O)
+
+# DTrace rules
 pics/%.o: ../port/threads/%.d $(THREADSOBJS:%=pics/%)
 	$(COMPILE.d) -C -xlazyload -s $< -o $@ $(THREADSOBJS:%=pics/%)
 	$(POST_PROCESS_O)

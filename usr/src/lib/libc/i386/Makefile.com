@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -92,6 +92,9 @@ COMOBJS=			\
 	qsort.o			\
 	strtol.o		\
 	strtoul.o
+
+DTRACEOBJS=			\
+	dtrace_data.o
 
 GENOBJS=			\
 	_div64.o		\
@@ -874,6 +877,7 @@ MOSTOBJS=			\
 	$(FPASMOBJS)		\
 	$(ATOMICOBJS)		\
 	$(COMOBJS)		\
+	$(DTRACEOBJS)		\
 	$(GENOBJS)		\
 	$(PORTFP)		\
 	$(PORTGEN)		\
@@ -971,6 +975,14 @@ DYNFLAGS +=	$(RTLDINFO)
 DYNFLAGS +=	-e __rtboot
 DYNFLAGS +=	$(EXTN_DYNFLAGS)
 
+# Inform the kernel about the initial DTrace area (in case
+# libc is being used as the interpreter / runtime linker).
+DTRACE_DATA =	-zdtrace=dtrace_data
+DYNFLAGS +=	$(DTRACE_DATA)
+
+# DTrace needs an executable data segment.
+NX_MAP=
+
 BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
 
 # Override this top level flag so the compiler builds in its native
@@ -1001,6 +1013,7 @@ CLOBBERFILES +=	$(LIB_PIC)
 SRCS=							\
 	$(ATOMICOBJS:%.o=$(SRC)/common/atomic/%.c)	\
 	$(COMOBJS:%.o=$(SRC)/common/util/%.c)		\
+	$(DTRACEOBJS:%.o=$(SRC)/common/dtrace/%.c)	\
 	$(PORTFP:%.o=../port/fp/%.c)			\
 	$(PORTGEN:%.o=../port/gen/%.c)			\
 	$(PORTI18N:%.o=../port/i18n/%.c)		\
