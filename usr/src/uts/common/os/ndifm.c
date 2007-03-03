@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -278,18 +278,30 @@ fmc_grow(ndi_fmc_t *fcp, int flag, int grow_sz)
 		nep = nnep;
 	}
 
-	kmem_free(fcp->fc_elems, fcp->fc_len * sizeof (ndi_fmcentry_t));
-
 	/* Initialize and add remaining new cache entries to the free list */
-	olen = fcp->fc_len + 1;
-	fcp->fc_len = nlen;
-	for (fcp->fc_free = nep; nlen > olen; nlen--) {
+	for (fcp->fc_free = nep; nlen > fcp->fc_len + 1; nlen--) {
 		nep->fce_prev = nep + 1;
 		nep++;
 	}
 
+	oep = fcp->fc_elems;
+	olen = fcp->fc_len;
+	nlen = grow_sz + olen;
+
+	/*
+	 * Update the FM cache array and active list pointers.
+	 * Updates to these pointers require us to acquire the
+	 * FMA cache lock to prevent accesses to a stale active
+	 * list in ndi_fmc_error().
+	 */
+
+	mutex_enter(&fcp->fc_lock);
 	fcp->fc_active = ncp;
 	fcp->fc_elems = ncp;
+	fcp->fc_len = nlen;
+	mutex_exit(&fcp->fc_lock);
+
+	kmem_free(oep, olen * sizeof (ndi_fmcentry_t));
 
 	return (0);
 }
@@ -407,6 +419,7 @@ ndi_fmc_remove(dev_info_t *dip, int flag, const void *resource)
 
 		ASSERT(fcp);
 
+		mutex_enter(&fcp->fc_free_lock);
 		fep = ((ddi_dma_impl_t *)resource)->dmai_error.err_fep;
 		((ddi_dma_impl_t *)resource)->dmai_error.err_fep = NULL;
 	} else if (flag == ACC_HANDLE) {
@@ -419,16 +432,26 @@ ndi_fmc_remove(dev_info_t *dip, int flag, const void *resource)
 
 		ASSERT(fcp);
 
+		mutex_enter(&fcp->fc_free_lock);
 		fep = ((ddi_acc_impl_t *)resource)->ahi_err->err_fep;
 		((ddi_acc_impl_t *)resource)->ahi_err->err_fep = NULL;
+	} else {
+		return;
 	}
 
 	/*
 	 * Resource not in cache, return
 	 */
-	if (fep == NULL)
+	if (fep == NULL) {
+		mutex_exit(&fcp->fc_free_lock);
 		return;
+	}
 
+	/*
+	 * Updates to FM cache pointers require us to grab fmc_lock
+	 * to synchronize access to the cache for ndi_fmc_insert()
+	 * and ndi_fmc_error()
+	 */
 	mutex_enter(&fcp->fc_lock);
 	fep->fce_prev->fce_next = fep->fce_next;
 	if (fep == fcp->fc_tail)
@@ -438,7 +461,6 @@ ndi_fmc_remove(dev_info_t *dip, int flag, const void *resource)
 	mutex_exit(&fcp->fc_lock);
 
 	/* Add entry back to the free list */
-	mutex_enter(&fcp->fc_free_lock);
 	fep->fce_prev = fcp->fc_free;
 	fcp->fc_free = fep;
 	mutex_exit(&fcp->fc_free_lock);
