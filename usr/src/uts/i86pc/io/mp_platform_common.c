@@ -2819,8 +2819,6 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 	} else {
 		int type = (irq_ptr->airq_mps_intr_index == MSI_INDEX) ?
 		    DDI_INTR_TYPE_MSI : DDI_INTR_TYPE_MSIX;
-		(void) apic_pci_msi_disable_mode(irq_ptr->airq_dip, type,
-		    ioapicindex);
 		if (ioapicindex == irq_ptr->airq_origirq) {
 			/* first one */
 			DDI_INTR_IMPLDBG((CE_CONT, "apic_rebind: call "
