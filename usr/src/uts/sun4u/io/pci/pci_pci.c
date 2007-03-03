@@ -579,7 +579,7 @@ ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		as = (struct attachspec *)arg;
 		if ((ppb_p->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) &&
 		    (as->when == DDI_POST))
-			pf_init(rdip, ppb_p->fm_ibc);
+			pf_init(rdip, ppb_p->fm_ibc, as->cmd);
 
 		return (DDI_SUCCESS);
 
@@ -590,7 +590,7 @@ ppb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		ds = (struct detachspec *)arg;
 		if ((ppb_p->parent_bus == PCIE_PCIECAP_DEV_TYPE_PCIE_DEV) &&
 		    (ds->when == DDI_PRE))
-			pf_fini(rdip);
+			pf_fini(rdip, ds->cmd);
 
 		return (DDI_SUCCESS);
 

@@ -707,7 +707,7 @@ pxb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			if (as->cmd == DDI_ATTACH && as->result != DDI_SUCCESS)
 				pcie_pm_release(dip);
 
-			pf_init(rdip, (void *)pxb_p->pxb_fm_ibc);
+			pf_init(rdip, (void *)pxb_p->pxb_fm_ibc, as->cmd);
 
 			/*
 			 * For hotplug-capable slots, we should explicitly
@@ -739,7 +739,7 @@ pxb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		ds = (struct detachspec *)arg;
 		switch (ds->when) {
 		case DDI_PRE:
-			pf_fini(rdip);
+			pf_fini(rdip, ds->cmd);
 			return (DDI_SUCCESS);
 
 		case DDI_POST:

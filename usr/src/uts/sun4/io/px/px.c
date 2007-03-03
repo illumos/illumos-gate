@@ -1255,7 +1255,7 @@ px_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			if (as->cmd == DDI_ATTACH && as->result != DDI_SUCCESS)
 				pcie_pm_release(dip);
 
-			pf_init(rdip, (void *)px_p->px_fm_ibc);
+			pf_init(rdip, (void *)px_p->px_fm_ibc, as->cmd);
 
 			(void) pcie_postattach_child(rdip);
 
@@ -1281,7 +1281,7 @@ px_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			}
 			return (DDI_SUCCESS);
 		case DDI_PRE:
-			pf_fini(rdip);
+			pf_fini(rdip, ds->cmd);
 			return (DDI_SUCCESS);
 		default:
 			break;

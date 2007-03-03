@@ -190,7 +190,7 @@ pf_exit(dev_info_t *dip)
 
 /* Called during postattach to initalize FM lock */
 void
-pf_init(dev_info_t *dip, ddi_iblock_cookie_t ibc)
+pf_init(dev_info_t *dip, ddi_iblock_cookie_t ibc, ddi_attach_cmd_t cmd)
 {
 	pcie_ppd_t		*ppd_p = pcie_get_ppd(dip);
 	struct i_ddi_fmhdl	*fmhdl = DEVI(dip)->devi_fmhdl;
@@ -200,7 +200,10 @@ pf_init(dev_info_t *dip, ddi_iblock_cookie_t ibc)
 		fmhdl->fh_cap |= cap;
 	} else {
 		ppd_p->ppd_fm_flags |= PF_IS_NH;
-		ddi_fm_init(dip, &cap, &ibc);
+
+		if (cmd == DDI_ATTACH)
+			ddi_fm_init(dip, &cap, &ibc);
+
 		fmhdl = DEVI(dip)->devi_fmhdl;
 	}
 
@@ -216,7 +219,7 @@ pf_init(dev_info_t *dip, ddi_iblock_cookie_t ibc)
 
 /* undo OPL FMA lock, called at predetach */
 void
-pf_fini(dev_info_t *dip)
+pf_fini(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	pcie_ppd_t	*ppd_p = pcie_get_ppd(dip);
 
@@ -226,8 +229,10 @@ pf_fini(dev_info_t *dip)
 
 	/* undo non-hardened drivers */
 	if (ppd_p->ppd_fm_flags & PF_IS_NH) {
-		ppd_p->ppd_fm_flags &= ~PF_IS_NH;
-		ddi_fm_fini(dip);
+		if (cmd == DDI_DETACH) {
+			ppd_p->ppd_fm_flags &= ~PF_IS_NH;
+			ddi_fm_fini(dip);
+		}
 	}
 
 	/* no other code should set the flag to false */

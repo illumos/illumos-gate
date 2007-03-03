@@ -194,8 +194,9 @@ extern int pf_hdl_lookup(dev_info_t *rpdip, uint64_t ena,
     uint32_t flag, uint32_t addr, pcie_req_id_t bdf);
 extern int pf_scan_fabric(dev_info_t *rpdip, ddi_fm_error_t *derr,
     pf_data_t *dq_p, int *dq_tail_p);
-extern void pf_init(dev_info_t *dip, ddi_iblock_cookie_t ibc);
-extern void pf_fini(dev_info_t *dip);
+extern void pf_init(dev_info_t *dip, ddi_iblock_cookie_t ibc,
+    ddi_attach_cmd_t cmd);
+extern void pf_fini(dev_info_t *dip, ddi_detach_cmd_t cmd);
 extern boolean_t pf_ready(dev_info_t *dip);
 
 
