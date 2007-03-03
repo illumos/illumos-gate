@@ -12,7 +12,6 @@
 #include <string.h>
 
 #include <kmfapiP.h>
-#include <oidsalg.h>
 
 typedef struct {
 	KMF_OID * AlgOID;
@@ -23,15 +22,15 @@ typedef struct {
  * The following table defines the mapping of AlgOID's to AlgID's.
  */
 static KMF_OID_ID ALGOID_ID_Table[] = {
-	{&KMFOID_X9CM_DSA, KMF_ALGID_DSA},
-	{&KMFOID_X9CM_DSAWithSHA1, KMF_ALGID_SHA1WithDSA},
-	{&KMFOID_SHA1, KMF_ALGID_SHA1},
-	{&KMFOID_RSA, KMF_ALGID_RSA},
-	{&KMFOID_DSA, KMF_ALGID_DSA},
-	{&KMFOID_MD5WithRSA, KMF_ALGID_MD5WithRSA},
-	{&KMFOID_MD2WithRSA, KMF_ALGID_MD2WithRSA},
-	{&KMFOID_SHA1WithRSA, KMF_ALGID_SHA1WithRSA},
-	{&KMFOID_SHA1WithDSA, KMF_ALGID_SHA1WithDSA}
+	{(KMF_OID *)&KMFOID_X9CM_DSA, KMF_ALGID_DSA},
+	{(KMF_OID *)&KMFOID_X9CM_DSAWithSHA1, KMF_ALGID_SHA1WithDSA},
+	{(KMF_OID *)&KMFOID_SHA1, KMF_ALGID_SHA1},
+	{(KMF_OID *)&KMFOID_RSA, KMF_ALGID_RSA},
+	{(KMF_OID *)&KMFOID_DSA, KMF_ALGID_DSA},
+	{(KMF_OID *)&KMFOID_MD5WithRSA, KMF_ALGID_MD5WithRSA},
+	{(KMF_OID *)&KMFOID_MD2WithRSA, KMF_ALGID_MD2WithRSA},
+	{(KMF_OID *)&KMFOID_SHA1WithRSA, KMF_ALGID_SHA1WithRSA},
+	{(KMF_OID *)&KMFOID_SHA1WithDSA, KMF_ALGID_SHA1WithDSA}
 };
 
 #define	NUM_ALGOIDS ((sizeof (ALGOID_ID_Table))/(sizeof (ALGOID_ID_Table[0])))

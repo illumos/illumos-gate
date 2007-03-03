@@ -66,7 +66,6 @@
 #include <stdlib.h>
 #include <kmfapiP.h>
 #include <ber_der.h>
-#include <oidsalg.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <dirent.h>
@@ -138,11 +137,17 @@ mutex_t init_lock = DEFAULTMUTEX;
 static int ssl_initialized = 0;
 
 static KMF_RETURN
-extract_objects(KMF_HANDLE *, char *, CK_UTF8CHAR *, CK_ULONG,
-	EVP_PKEY **, KMF_DATA **, int *);
+extract_objects(KMF_HANDLE *, KMF_FINDCERT_PARAMS *, char *,
+	CK_UTF8CHAR *, CK_ULONG, EVP_PKEY **, KMF_DATA **, int *);
 
 static KMF_RETURN
 kmf_load_cert(KMF_HANDLE *, KMF_FINDCERT_PARAMS *, char *, KMF_DATA *);
+
+static KMF_RETURN
+sslBN2KMFBN(BIGNUM *, KMF_BIGINT *);
+
+static EVP_PKEY *
+ImportRawRSAKey(KMF_RAW_RSA_KEY *);
 
 KMF_RETURN
 OpenSSL_FindCert(KMF_HANDLE_T,
@@ -237,6 +242,10 @@ OpenSSL_VerifyCRLFile(KMF_HANDLE_T, KMF_VERIFYCRL_PARAMS *);
 KMF_RETURN
 OpenSSL_CheckCRLDate(KMF_HANDLE_T, KMF_CHECKCRLDATE_PARAMS *);
 
+KMF_RETURN
+OpenSSL_VerifyDataWithCert(KMF_HANDLE_T, KMF_ALGORITHM_INDEX,
+	KMF_DATA *, KMF_DATA *, KMF_DATA *);
+
 static
 KMF_PLUGIN_FUNCLIST openssl_plugin_table =
 {
@@ -265,6 +274,7 @@ KMF_PLUGIN_FUNCLIST openssl_plugin_table =
 	OpenSSL_CreateSymKey,
 	OpenSSL_GetSymKeyValue,
 	NULL,	/* SetTokenPin */
+	OpenSSL_VerifyDataWithCert,
 	NULL	/* Finalize */
 };
 
@@ -661,7 +671,7 @@ load_certs(KMF_HANDLE *kmfh, KMF_FINDCERT_PARAMS *params, char *pathname,
 		format != KMF_FORMAT_PEM_KEYPAIR) {
 
 		/* This function only works on PEM files */
-		rv = extract_objects(kmfh, pathname,
+		rv = extract_objects(kmfh, params, pathname,
 			(uchar_t *)NULL, 0, NULL,
 			&certs, &nc);
 	} else {
@@ -747,6 +757,162 @@ cleanup:
 	return (rv);
 }
 
+static KMF_RETURN
+readAltFormatPrivateKey(KMF_DATA *filedata, EVP_PKEY **pkey)
+{
+	KMF_RETURN ret = KMF_OK;
+	KMF_RAW_RSA_KEY rsa;
+	BerElement *asn1 = NULL;
+	BerValue filebuf;
+	BerValue OID = { NULL, 0 };
+	BerValue *Mod = NULL, *PubExp = NULL;
+	BerValue *PriExp = NULL, *Prime1 = NULL, *Prime2 = NULL;
+	BerValue *Coef = NULL;
+	BIGNUM *D = NULL, *P = NULL, *Q = NULL, *COEF = NULL;
+	BIGNUM *Exp1 = NULL, *Exp2 = NULL, *pminus1 = NULL;
+	BIGNUM *qminus1 = NULL;
+	BN_CTX *ctx = NULL;
+
+	*pkey = NULL;
+
+	filebuf.bv_val = (char *)filedata->Data;
+	filebuf.bv_len = filedata->Length;
+
+	asn1 = kmfder_init(&filebuf);
+	if (asn1 == NULL) {
+		ret = KMF_ERR_MEMORY;
+		goto out;
+	}
+
+	if (kmfber_scanf(asn1, "{{Dn{IIIIII}}}",
+		&OID, &Mod, &PubExp, &PriExp, &Prime1,
+		&Prime2, &Coef) == -1)  {
+		ret = KMF_ERR_ENCODING;
+		goto out;
+	}
+
+	/*
+	 * We have to derive the 2 Exponents using Bignumber math.
+	 * Exp1 = PriExp mod (Prime1 - 1)
+	 * Exp2 = PriExp mod (Prime2 - 1)
+	 */
+
+	/* D = PrivateExponent */
+	D = BN_bin2bn((const uchar_t *)PriExp->bv_val, PriExp->bv_len, D);
+	if (D == NULL) {
+		ret = KMF_ERR_MEMORY;
+		goto out;
+	}
+
+	/* P = Prime1 (first prime factor of Modulus) */
+	P = BN_bin2bn((const uchar_t *)Prime1->bv_val, Prime1->bv_len, P);
+	if (D == NULL) {
+		ret = KMF_ERR_MEMORY;
+		goto out;
+	}
+
+	/* Q = Prime2 (second prime factor of Modulus) */
+	Q = BN_bin2bn((const uchar_t *)Prime2->bv_val, Prime2->bv_len, Q);
+
+	if ((ctx = BN_CTX_new()) == NULL) {
+		ret = KMF_ERR_MEMORY;
+		goto out;
+	}
+
+	/* Compute (P - 1) */
+	pminus1 = BN_new();
+	(void) BN_sub(pminus1, P, BN_value_one());
+
+	/* Exponent1 = D mod (P - 1) */
+	Exp1 = BN_new();
+	(void) BN_mod(Exp1, D, pminus1, ctx);
+
+	/* Compute (Q - 1) */
+	qminus1 = BN_new();
+	(void) BN_sub(qminus1, Q, BN_value_one());
+
+	/* Exponent2 = D mod (Q - 1) */
+	Exp2 = BN_new();
+	(void) BN_mod(Exp2, D, qminus1, ctx);
+
+	/* Coef = (Inverse Q) mod P */
+	COEF = BN_new();
+	(void) BN_mod_inverse(COEF, Q, P, ctx);
+
+	/* Convert back to KMF format */
+	(void) memset(&rsa, 0, sizeof (rsa));
+
+	if ((ret = sslBN2KMFBN(Exp1, &rsa.exp1)) != KMF_OK)
+		goto out;
+	if ((ret = sslBN2KMFBN(Exp2, &rsa.exp2)) != KMF_OK)
+		goto out;
+	if ((ret = sslBN2KMFBN(COEF, &rsa.coef)) != KMF_OK)
+		goto out;
+
+	rsa.mod.val = (uchar_t *)Mod->bv_val;
+	rsa.mod.len = Mod->bv_len;
+
+	rsa.pubexp.val = (uchar_t *)PubExp->bv_val;
+	rsa.pubexp.len = PubExp->bv_len;
+
+	rsa.priexp.val = (uchar_t *)PriExp->bv_val;
+	rsa.priexp.len = PriExp->bv_len;
+
+	rsa.prime1.val = (uchar_t *)Prime1->bv_val;
+	rsa.prime1.len = Prime1->bv_len;
+
+	rsa.prime2.val = (uchar_t *)Prime2->bv_val;
+	rsa.prime2.len = Prime2->bv_len;
+
+	*pkey = ImportRawRSAKey(&rsa);
+out:
+	if (asn1 != NULL)
+		kmfber_free(asn1, 1);
+
+	if (OID.bv_val) {
+		free(OID.bv_val);
+	}
+	if (PriExp)
+		free(PriExp);
+
+	if (Mod)
+		free(Mod);
+
+	if (PubExp)
+		free(PubExp);
+
+	if (Coef) {
+		(void) memset(Coef->bv_val, 0, Coef->bv_len);
+		free(Coef->bv_val);
+		free(Coef);
+	}
+	if (Prime1)
+		free(Prime1);
+	if (Prime2)
+		free(Prime2);
+
+	if (ctx != NULL)
+		BN_CTX_free(ctx);
+
+	if (D)
+		BN_clear_free(D);
+	if (P)
+		BN_clear_free(P);
+	if (Q)
+		BN_clear_free(Q);
+	if (pminus1)
+		BN_clear_free(pminus1);
+	if (qminus1)
+		BN_clear_free(qminus1);
+	if (Exp1)
+		BN_clear_free(Exp1);
+	if (Exp2)
+		BN_clear_free(Exp2);
+
+	return (ret);
+
+}
+
 static EVP_PKEY *
 openssl_load_key(KMF_HANDLE_T handle, const char *file)
 {
@@ -754,6 +920,8 @@ openssl_load_key(KMF_HANDLE_T handle, const char *file)
 	EVP_PKEY *pkey = NULL;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
 	KMF_ENCODE_FORMAT format;
+	KMF_RETURN rv;
+	KMF_DATA filedata;
 
 	if (file == NULL) {
 		return (NULL);
@@ -767,11 +935,48 @@ openssl_load_key(KMF_HANDLE_T handle, const char *file)
 		goto end;
 	}
 
-	if (format == KMF_FORMAT_ASN1)
+	if (format == KMF_FORMAT_ASN1) {
 		pkey = d2i_PrivateKey_bio(keyfile, NULL);
-	else if (format == KMF_FORMAT_PEM ||
-		format == KMF_FORMAT_PEM_KEYPAIR)
+		if (pkey == NULL) {
+
+			(void) BIO_free(keyfile);
+			keyfile = NULL;
+			/* Try odd ASN.1 variations */
+			rv = KMF_ReadInputFile(kmfh, (char *)file,
+				&filedata);
+			if (rv == KMF_OK) {
+				(void) readAltFormatPrivateKey(&filedata,
+					&pkey);
+				KMF_FreeData(&filedata);
+			}
+		}
+	} else if (format == KMF_FORMAT_PEM ||
+		format == KMF_FORMAT_PEM_KEYPAIR) {
 		pkey = PEM_read_bio_PrivateKey(keyfile, NULL, NULL, NULL);
+		if (pkey == NULL) {
+			KMF_DATA derdata;
+			/*
+			 * Check if this is the alt. format
+			 * RSA private key file.
+			 */
+			rv = KMF_ReadInputFile(kmfh, (char *)file,
+				&filedata);
+			if (rv == KMF_OK) {
+				uchar_t *d = NULL;
+				int len;
+				rv = KMF_Pem2Der(filedata.Data,
+					filedata.Length, &d, &len);
+				if (rv == KMF_OK && d != NULL) {
+					derdata.Data = d;
+					derdata.Length = (size_t)len;
+					(void) readAltFormatPrivateKey(
+						&derdata, &pkey);
+					free(d);
+				}
+				KMF_FreeData(&filedata);
+			}
+		}
+	}
 
 end:
 	if (pkey == NULL)
@@ -1468,6 +1673,7 @@ OpenSSL_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 	KMF_ALGORITHM_INDEX		AlgId;
 	EVP_MD_CTX ctx;
 	const EVP_MD *md;
+
 	if (key == NULL || AlgOID == NULL ||
 		tobesigned == NULL || output == NULL ||
 		tobesigned->Data == NULL ||
@@ -1482,33 +1688,44 @@ OpenSSL_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 	if (key->keyalg == KMF_RSA) {
 		EVP_PKEY *pkey = (EVP_PKEY *)key->keyp;
 		uchar_t *p;
-		uint32_t len;
+		int len;
 		if (AlgId == KMF_ALGID_MD5WithRSA)
 			md = EVP_md5();
 		else if (AlgId == KMF_ALGID_MD2WithRSA)
 			md = EVP_md2();
 		else if (AlgId == KMF_ALGID_SHA1WithRSA)
 			md = EVP_sha1();
+		else if (AlgId == KMF_ALGID_RSA)
+			md = NULL;
 		else
 			return (KMF_ERR_BAD_PARAMETER);
 
-		if (md == NULL) {
-			SET_ERROR(kmfh, ERR_get_error());
-			return (KMF_ERR_MEMORY);
-		}
+		if ((md == NULL) && (AlgId == KMF_ALGID_RSA)) {
+			RSA *rsa = EVP_PKEY_get1_RSA((EVP_PKEY *)pkey);
 
-		(void) EVP_MD_CTX_init(&ctx);
-		(void) EVP_SignInit_ex(&ctx, md, NULL);
-		(void) EVP_SignUpdate(&ctx, tobesigned->Data,
-			(uint32_t)tobesigned->Length);
-		len = (uint32_t)output->Length;
-		p = output->Data;
-		if (!EVP_SignFinal(&ctx, p, &len, pkey)) {
-			SET_ERROR(kmfh, ERR_get_error());
-			output->Length = 0;
+			p = output->Data;
+			if ((len = RSA_private_encrypt(tobesigned->Length,
+				tobesigned->Data, p, rsa,
+				RSA_PKCS1_PADDING)) <= 0) {
+				SET_ERROR(kmfh, ERR_get_error());
+				ret = KMF_ERR_INTERNAL;
+			}
+			output->Length = len;
+		} else {
+			(void) EVP_MD_CTX_init(&ctx);
+			(void) EVP_SignInit_ex(&ctx, md, NULL);
+			(void) EVP_SignUpdate(&ctx, tobesigned->Data,
+				(uint32_t)tobesigned->Length);
+			len = (uint32_t)output->Length;
+			p = output->Data;
+			if (!EVP_SignFinal(&ctx, p, (uint32_t *)&len, pkey)) {
+				SET_ERROR(kmfh, ERR_get_error());
+				len = 0;
+				ret = KMF_ERR_INTERNAL;
+			}
+			output->Length = len;
+			(void) EVP_MD_CTX_cleanup(&ctx);
 		}
-		output->Length = len;
-		(void) EVP_MD_CTX_cleanup(&ctx);
 	} else if (key->keyalg == KMF_DSA) {
 		DSA *dsa = EVP_PKEY_get1_DSA(key->keyp);
 
@@ -2274,7 +2491,7 @@ OpenSSL_GetPrikeyByCert(KMF_HANDLE_T handle,
 	KMF_FINDKEY_PARAMS fkparms;
 	uint32_t numkeys = 0;
 
-	if (params == NULL && params->sslparms.keyfile == NULL)
+	if (params == NULL || params->sslparms.keyfile == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	/*
@@ -3433,7 +3650,8 @@ end:
  * However, the file may be just a list of X509 certs with no keys.
  */
 static KMF_RETURN
-extract_objects(KMF_HANDLE *kmfh, char *filename, CK_UTF8CHAR *pin,
+extract_objects(KMF_HANDLE *kmfh, KMF_FINDCERT_PARAMS *params,
+	char *filename, CK_UTF8CHAR *pin,
 	CK_ULONG pinlen, EVP_PKEY **priv_key, KMF_DATA **certs,
 	int *numcerts)
 /* ARGSUSED */
@@ -3441,7 +3659,7 @@ extract_objects(KMF_HANDLE *kmfh, char *filename, CK_UTF8CHAR *pin,
 	KMF_RETURN rv = KMF_OK;
 	FILE *fp;
 	STACK_OF(X509_INFO) *x509_info_stack;
-	int i, ncerts = 0;
+	int i, ncerts = 0, matchcerts = 0;
 	EVP_PKEY *pkey = NULL;
 	X509_INFO *info;
 	X509 *x;
@@ -3500,21 +3718,34 @@ extract_objects(KMF_HANDLE *kmfh, char *filename, CK_UTF8CHAR *pin,
 	/*
 	 * Convert all of the certs to DER format.
 	 */
+	matchcerts = 0;
 	for (i = 0; rv == KMF_OK && certs != NULL && i < ncerts; i++) {
+		boolean_t match = FALSE;
 		info =  cert_infos[ncerts - 1 - i];
 
-		rv = ssl_cert2KMFDATA(kmfh, info->x509, &certlist[i]);
+		if (params != NULL) {
+			rv = check_cert(info->x509, params, &match);
+			if (rv != KMF_OK || match != TRUE) {
+				X509_INFO_free(info);
+				rv = KMF_OK;
+				continue;
+			}
+		}
+
+		rv = ssl_cert2KMFDATA(kmfh, info->x509,
+			&certlist[matchcerts++]);
 
 		if (rv != KMF_OK) {
 			free(certlist);
 			certlist = NULL;
-			ncerts = 0;
+			ncerts = matchcerts = 0;
 		}
+
 		X509_INFO_free(info);
 	}
 
 	if (numcerts != NULL)
-		*numcerts = ncerts;
+		*numcerts = matchcerts;
 	if (certs != NULL)
 		*certs = certlist;
 
@@ -3891,7 +4122,7 @@ openssl_import_keypair(KMF_HANDLE *kmfh,
 	*keylist = NULL;
 	*ncerts = 0;
 	*nkeys = 0;
-	rv = extract_objects(kmfh, filename,
+	rv = extract_objects(kmfh, NULL, filename,
 		(uchar_t *)cred->cred,
 		(uint32_t)cred->credlen,
 		&privkey, certlist, ncerts);
@@ -4507,4 +4738,204 @@ OpenSSL_GetSymKeyValue(KMF_HANDLE_T handle, KMF_KEY_HANDLE *symkey,
 	}
 
 	return (rv);
+}
+
+/*
+ * id-sha1    OBJECT IDENTIFIER ::= {
+ *     iso(1) identified-organization(3) oiw(14) secsig(3)
+ *     algorithms(2) 26
+ * }
+ */
+#define	ASN1_SHA1_OID_PREFIX_LEN 15
+static uchar_t SHA1_DER_PREFIX[ASN1_SHA1_OID_PREFIX_LEN] = {
+	0x30, 0x21, 0x30, 0x09,
+	0x06, 0x05, 0x2b, 0x0e,
+	0x03, 0x02, 0x1a, 0x05,
+	0x00, 0x04, 0x14
+};
+
+/*
+ * id-md2 OBJECT IDENTIFIER ::= {
+ *     iso(1) member-body(2) us(840) rsadsi(113549) digestAlgorithm(2) 2
+ * }
+ */
+#define	ASN1_MD2_OID_PREFIX_LEN 18
+static uchar_t MD2_DER_PREFIX[ASN1_MD2_OID_PREFIX_LEN] = {
+	0x30, 0x20, 0x30, 0x0c,
+	0x06, 0x08, 0x2a, 0x86,
+	0x48, 0x86, 0xf7, 0x0d,
+	0x02, 0x02, 0x05, 0x00,
+	0x04, 0x10
+};
+
+/*
+ * id-md5 OBJECT IDENTIFIER ::= {
+ *     iso(1) member-body(2) us(840) rsadsi(113549) digestAlgorithm(2) 5
+ * }
+ */
+#define	ASN1_MD5_OID_PREFIX_LEN 18
+static uchar_t MD5_DER_PREFIX[ASN1_MD5_OID_PREFIX_LEN] = {
+	0x30, 0x20, 0x30, 0x0c,
+	0x06, 0x08, 0x2a, 0x86,
+	0x48, 0x86, 0xf7, 0x0d,
+	0x02, 0x05, 0x05, 0x00,
+	0x04, 0x10
+};
+
+KMF_RETURN
+OpenSSL_VerifyDataWithCert(KMF_HANDLE_T handle,
+	KMF_ALGORITHM_INDEX algid, KMF_DATA *indata,
+	KMF_DATA *insig, KMF_DATA *cert)
+{
+	KMF_RETURN ret = KMF_OK;
+	KMF_HANDLE	*kmfh = (KMF_HANDLE *)handle;
+	X509	*xcert = NULL;
+	EVP_PKEY *pkey = NULL;
+	uchar_t *p;
+	uchar_t *rsaout = NULL;
+	uchar_t *pfx = NULL;
+	const EVP_MD *md;
+	int pfxlen = 0, len;
+
+	if (handle == NULL || indata == NULL ||
+	    indata->Data == NULL || indata->Length == 0 ||
+	    insig == NULL|| insig->Data == NULL || insig->Length == 0 ||
+	    cert == NULL || cert->Data == NULL || cert->Length == 0)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	p = cert->Data;
+	xcert = d2i_X509(NULL, (const uchar_t **)&p, cert->Length);
+	if (xcert == NULL) {
+		SET_ERROR(kmfh, ERR_get_error());
+		ret = KMF_ERR_BAD_CERT_FORMAT;
+		goto cleanup;
+	}
+
+	pkey = X509_get_pubkey(xcert);
+	if (!pkey) {
+		SET_ERROR(kmfh, ERR_get_error());
+		ret = KMF_ERR_BAD_CERT_FORMAT;
+		goto cleanup;
+	}
+
+	if (algid != KMF_ALGID_NONE) {
+		switch (algid) {
+			case KMF_ALGID_MD5WithRSA:
+				md = EVP_md5();
+				break;
+			case KMF_ALGID_MD2WithRSA:
+				md = EVP_md2();
+				break;
+			case KMF_ALGID_SHA1WithRSA:
+				md = EVP_sha1();
+				break;
+			case KMF_ALGID_RSA:
+				md = NULL;
+				break;
+			default:
+				ret = KMF_ERR_BAD_PARAMETER;
+				goto cleanup;
+		}
+	} else {
+		/* Get the hash type from the cert signature */
+		md = EVP_get_digestbyobj(xcert->sig_alg->algorithm);
+		if (md == NULL) {
+			SET_ERROR(kmfh, ERR_get_error());
+			ret = KMF_ERR_BAD_PARAMETER;
+			goto cleanup;
+		}
+	}
+	switch (EVP_MD_type(md)) {
+		case NID_md2:
+		case NID_md2WithRSAEncryption:
+			pfxlen = ASN1_MD2_OID_PREFIX_LEN;
+			pfx = MD2_DER_PREFIX;
+			break;
+		case NID_md5:
+		case NID_md5WithRSAEncryption:
+			pfxlen = ASN1_MD5_OID_PREFIX_LEN;
+			pfx = MD5_DER_PREFIX;
+			break;
+		case NID_sha1:
+		case NID_sha1WithRSAEncryption:
+			pfxlen = ASN1_SHA1_OID_PREFIX_LEN;
+			pfx = SHA1_DER_PREFIX;
+			break;
+		default: /* Unsupported */
+			pfxlen = 0;
+			pfx = NULL;
+			break;
+	}
+
+	/* RSA with no hash is a special case */
+	rsaout = malloc(RSA_size(pkey->pkey.rsa));
+	if (rsaout == NULL)
+		return (KMF_ERR_MEMORY);
+
+	/* Decrypt the input signature */
+	len = RSA_public_decrypt(insig->Length,
+		insig->Data, rsaout, pkey->pkey.rsa, RSA_PKCS1_PADDING);
+	if (len < 1) {
+		SET_ERROR(kmfh, ERR_get_error());
+		ret = KMF_ERR_BAD_PARAMETER;
+	} else {
+		size_t hashlen = 0;
+		uint32_t dlen;
+		char *digest = NULL;
+
+		/*
+		 * If the AlgId requires it, hash the input data before
+		 * comparing it to the decrypted signature.
+		 */
+		if (md) {
+			EVP_MD_CTX ctx;
+
+			hashlen = md->md_size;
+
+			digest = malloc(hashlen + pfxlen);
+			if (digest == NULL)
+				return (KMF_ERR_MEMORY);
+			/* Add the prefix to the comparison buffer. */
+			if (pfx && pfxlen > 0) {
+				(void) memcpy(digest, pfx, pfxlen);
+			}
+			(void) EVP_DigestInit(&ctx, md);
+			(void) EVP_DigestUpdate(&ctx, indata->Data,
+				indata->Length);
+
+			/* Add the digest AFTER the ASN1 prefix */
+			(void) EVP_DigestFinal(&ctx,
+				(uchar_t *)digest + pfxlen, &dlen);
+
+			dlen += pfxlen;
+		} else {
+			digest = (char *)indata->Data;
+			dlen = indata->Length;
+		}
+
+		/*
+		 * The result of the RSA decryption should be ASN1(OID | Hash).
+		 * Compare the output hash to the input data for the final
+		 * result.
+		 */
+		if (memcmp(rsaout, digest, dlen))
+			ret = KMF_ERR_INTERNAL;
+		else
+			ret = KMF_OK;
+
+		/* If we had to allocate space for the digest, free it now */
+		if (hashlen)
+			free(digest);
+	}
+cleanup:
+	if (pkey)
+		EVP_PKEY_free(pkey);
+
+	if (xcert)
+		X509_free(xcert);
+
+	if (rsaout)
+		free(rsaout);
+
+	return (ret);
 }

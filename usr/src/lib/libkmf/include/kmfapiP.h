@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _KMFAPIP_H
@@ -162,6 +162,13 @@ typedef struct {
 			KMF_SETPIN_PARAMS *,
 			KMF_CREDENTIAL *);
 
+	KMF_RETURN	(*VerifyDataWithCert) (
+			KMF_HANDLE_T,
+			KMF_ALGORITHM_INDEX,
+			KMF_DATA *,
+			KMF_DATA *,
+			KMF_DATA *);
+
 	void		(*Finalize) ();
 
 } KMF_PLUGIN_FUNCLIST;
@@ -218,26 +225,7 @@ typedef struct _kmf_handle {
 KMF_PLUGIN_FUNCLIST *KMF_Plugin_Initialize();
 
 KMF_RETURN
-SignCert(KMF_HANDLE_T, const KMF_DATA *, KMF_KEY_HANDLE *, KMF_DATA *);
-
-KMF_RETURN
-VerifyCertWithKey(KMF_HANDLE_T, KMF_DATA *, const KMF_DATA *);
-
-KMF_RETURN
-VerifyCertWithCert(KMF_HANDLE_T, const KMF_DATA *, const KMF_DATA *);
-
-KMF_RETURN
-VerifyDataWithCert(KMF_HANDLE_T, KMF_DATA *, KMF_DATA *, const KMF_DATA *);
-
-KMF_RETURN
 VerifyDataWithKey(KMF_HANDLE_T, KMF_DATA *, KMF_ALGORITHM_INDEX, KMF_DATA *,
-	KMF_DATA *);
-
-KMF_RETURN
-EncryptWithCert(KMF_HANDLE_T, KMF_DATA *, KMF_DATA *, KMF_DATA *);
-
-KMF_RETURN
-DecryptWithCert(KMF_HANDLE_T, KMF_DATA *, KMF_KEY_HANDLE *, KMF_DATA *,
 	KMF_DATA *);
 
 KMF_RETURN
@@ -265,8 +253,11 @@ KMF_PLUGIN *FindPlugin(KMF_HANDLE_T, KMF_KEYSTORE_TYPE);
 KMF_BOOL IsEqualOid(KMF_OID *, KMF_OID *);
 
 KMF_OID *X509_AlgIdToAlgorithmOid(KMF_ALGORITHM_INDEX);
-
 KMF_ALGORITHM_INDEX X509_AlgorithmOidToAlgId(KMF_OID *);
+KMF_RETURN PKCS_AcquirePublicKeyHandle(CK_SESSION_HANDLE ckSession,
+	const KMF_X509_SPKI *, CK_KEY_TYPE, CK_OBJECT_HANDLE *,
+	KMF_BOOL *);
+
 KMF_RETURN GetIDFromSPKI(KMF_X509_SPKI *, KMF_DATA *);
 CK_RV DigestData(CK_SESSION_HANDLE, KMF_DATA *, KMF_DATA *);
 

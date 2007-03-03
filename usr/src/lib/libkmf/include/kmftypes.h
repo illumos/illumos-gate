@@ -106,6 +106,22 @@ typedef enum {
 	KMF_KU_ENCRYPT_DATA	= 2
 } KMF_KU_PURPOSE;
 
+/*
+ * Algorithms
+ * This type defines a set of constants used to identify cryptographic
+ * algorithms.
+ */
+typedef enum {
+	KMF_ALGID_NONE	= 0,
+	KMF_ALGID_CUSTOM,
+	KMF_ALGID_SHA1,
+	KMF_ALGID_RSA,
+	KMF_ALGID_DSA,
+	KMF_ALGID_MD5WithRSA,
+	KMF_ALGID_MD2WithRSA,
+	KMF_ALGID_SHA1WithRSA,
+	KMF_ALGID_SHA1WithDSA
+} KMF_ALGORITHM_INDEX;
 
 /* Keystore Configuration */
 typedef struct {
@@ -204,6 +220,7 @@ typedef struct {
 typedef struct {
 	KMF_KEYSTORE_TYPE	kstype;
 	KMF_DATA		*certificate;
+	KMF_BIGINT		*serial;
 	KMF_DATA		*ocsp_response;
 
 	union {
@@ -353,6 +370,7 @@ typedef struct {
 	KMF_CREDENTIAL		cred;
 	KMF_ENCODE_FORMAT	format; /* for key  */
 	char			*certLabel;
+	KMF_ALGORITHM_INDEX	algid;
 	union {
 	    KMF_NSS_PARAMS	nss_opts;
 	    KMF_OPENSSL_PARAMS	openssl_opts;
@@ -624,23 +642,6 @@ typedef enum {
 	KMF_ALGCLASS_KEYGEN,
 	KMF_ALGCLASS_DERIVEKEY
 } KMF_ALGCLASS;
-
-/*
- * Algorithms
- * This type defines a set of constants used to identify cryptographic
- * algorithms.
- */
-typedef enum {
-	KMF_ALGID_NONE		= 0,
-	KMF_ALGID_CUSTOM,
-	KMF_ALGID_SHA1,
-	KMF_ALGID_RSA,
-	KMF_ALGID_DSA,
-	KMF_ALGID_MD5WithRSA,
-	KMF_ALGID_MD2WithRSA,
-	KMF_ALGID_SHA1WithRSA,
-	KMF_ALGID_SHA1WithDSA
-} KMF_ALGORITHM_INDEX;
 
 typedef enum {
 	KMF_CERT_ISSUER		= 1,
@@ -1303,7 +1304,17 @@ KMFOID_PKIX_KP_IPSecEndSystem,
 KMFOID_PKIX_KP_IPSecTunnel,
 KMFOID_PKIX_KP_IPSecUser,
 KMFOID_PKIX_KP_TimeStamping,
-KMFOID_PKIX_KP_OCSPSigning;
+KMFOID_PKIX_KP_OCSPSigning,
+KMFOID_SHA1,
+KMFOID_RSA,
+KMFOID_DSA,
+KMFOID_MD5WithRSA,
+KMFOID_MD2WithRSA,
+KMFOID_SHA1WithRSA,
+KMFOID_SHA1WithDSA,
+KMFOID_OIW_DSAWithSHA1,
+KMFOID_X9CM_DSA,
+KMFOID_X9CM_DSAWithSHA1;
 
 /*
  * KMF Certificate validation codes.  These may be masked together.

@@ -44,6 +44,15 @@
 #define	X509_FORMAT_VERSION 2
 
 static KMF_RETURN
+SignCert(KMF_HANDLE_T, const KMF_DATA *, KMF_KEY_HANDLE	*, KMF_DATA *);
+
+static KMF_RETURN
+VerifyCertWithKey(KMF_HANDLE_T, KMF_DATA *, const KMF_DATA *);
+
+static KMF_RETURN
+VerifyCertWithCert(KMF_HANDLE_T, const KMF_DATA *, const KMF_DATA *);
+
+static KMF_RETURN
 get_keyalg_from_cert(KMF_DATA *cert, KMF_KEY_ALG *keyalg)
 {
 	KMF_RETURN rv;
@@ -273,6 +282,20 @@ KMF_EncodeCertRecord(KMF_X509_CERTIFICATE *CertData, KMF_DATA *encodedCert)
 	return (ret);
 }
 
+KMF_RETURN
+KMF_DecodeCertData(KMF_DATA *rawcert, KMF_X509_CERTIFICATE **certrec)
+{
+	KMF_RETURN ret = KMF_OK;
+
+	if (rawcert == NULL || rawcert->Data == NULL ||
+		rawcert->Length == 0 || certrec == NULL)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	ret = DerDecodeSignedCertificate(rawcert, certrec);
+
+	return (ret);
+}
+
 /*
  *
  * Name: KMF_SignCertWithKey
@@ -449,8 +472,15 @@ KMF_SignDataWithCert(KMF_HANDLE_T handle,
 
 	plugin = FindPlugin(handle, Signkey.kstype);
 	if (plugin != NULL && plugin->funclist->SignData != NULL) {
+		KMF_OID *oid;
+
+		if (params->algid != KMF_ALGID_NONE)
+			oid = X509_AlgIdToAlgorithmOid(params->algid);
+		else
+			oid = CERT_ALG_OID(SignerCert);
+
 		ret = plugin->funclist->SignData(handle, &Signkey,
-			CERT_ALG_OID(SignerCert), tobesigned, output);
+			oid, tobesigned, output);
 		if (ret != KMF_OK)
 			goto cleanup;
 
@@ -612,11 +642,14 @@ KMF_VerifyCertWithCert(KMF_HANDLE_T handle,
  */
 KMF_RETURN
 KMF_VerifyDataWithCert(KMF_HANDLE_T handle,
+	KMF_KEYSTORE_TYPE kstype,
+	KMF_ALGORITHM_INDEX algid,
 	KMF_DATA *indata,
 	KMF_DATA *insig,
 	const KMF_DATA *SignerCert)
 {
 	KMF_RETURN ret;
+	KMF_PLUGIN *plugin;
 
 	CLEAR_ERROR(handle, ret);
 	if (ret != KMF_OK)
@@ -631,7 +664,27 @@ KMF_VerifyDataWithCert(KMF_HANDLE_T handle,
 	if (ret != KMF_OK)
 		return (ret);
 
-	return (VerifyDataWithCert(handle, indata, insig, SignerCert));
+	/*
+	 * If NSS, use PKCS#11, we are not accessing the database(s),
+	 * we just prefer the "verify" operation from the crypto framework.
+	 * The OpenSSL version is unique in order to avoid a dependency loop
+	 * with the kcfd(1M) process.
+	 */
+	if (kstype == KMF_KEYSTORE_NSS)
+		kstype = KMF_KEYSTORE_PK11TOKEN;
+
+	plugin = FindPlugin(handle, kstype);
+	if (plugin == NULL)
+		return (KMF_ERR_PLUGIN_NOTFOUND);
+
+	if (plugin->funclist->VerifyDataWithCert == NULL)
+		return (KMF_ERR_FUNCTION_NOT_FOUND);
+
+	CLEAR_ERROR(handle, ret);
+	ret = (plugin->funclist->VerifyDataWithCert(handle,
+		algid, indata, insig, (KMF_DATA *)SignerCert));
+
+	return (ret);
 }
 
 /*
@@ -663,6 +716,10 @@ KMF_EncryptWithCert(KMF_HANDLE_T handle,
 	KMF_DATA *ciphertext)
 {
 	KMF_RETURN ret;
+	KMF_X509_CERTIFICATE *x509cert = NULL;
+	KMF_X509_SPKI *pubkey;
+	KMF_OID *alg;
+	KMF_ALGORITHM_INDEX algid;
 
 	CLEAR_ERROR(handle, ret);
 	if (ret != KMF_OK)
@@ -677,7 +734,31 @@ KMF_EncryptWithCert(KMF_HANDLE_T handle,
 	if (ret != KMF_OK)
 		return (ret);
 
-	return (EncryptWithCert(handle, cert, plaintext, ciphertext));
+	/* Decode the cert so we can get the SPKI data */
+	if ((ret = DerDecodeSignedCertificate(cert, &x509cert)) != KMF_OK)
+		return (ret);
+
+	/* Get the public key info from the certificate */
+	pubkey = &x509cert->certificate.subjectPublicKeyInfo;
+
+	/* Use the algorithm in SPKI to encrypt data */
+	alg = &pubkey->algorithm.algorithm;
+
+	algid = X509_AlgorithmOidToAlgId(alg);
+
+	/* DSA does not support encrypt */
+	if (algid == KMF_ALGID_DSA || algid == KMF_ALGID_NONE) {
+		KMF_FreeSignedCert(x509cert);
+		free(x509cert);
+		return (KMF_ERR_BAD_ALGORITHM);
+	}
+
+	ret = PKCS_EncryptData(handle, algid, pubkey, plaintext, ciphertext);
+
+	KMF_FreeSignedCert(x509cert);
+	free(x509cert);
+
+	return (ret);
 }
 
 /*
@@ -1775,8 +1856,6 @@ KMF_ValidateCert(KMF_HANDLE_T handle,
 		goto out;
 	}
 
-
-	(void) memset(&user_issuerDN, 0, sizeof (user_issuerDN));
 	if ((ret = KMF_DNParser(user_issuer,  &user_issuerDN)) != KMF_OK) {
 		*result |= KMF_CERT_VALIDATE_ERR_USER;
 		goto out;
@@ -1808,7 +1887,7 @@ KMF_ValidateCert(KMF_HANDLE_T handle,
 	KMF_FreeDN(&user_subjectDN);
 
 	/*
-	 * Check KeyUsage extension.
+	 * Check KeyUsage extension of the subscriber's certificate
 	 */
 	ret = cert_ku_check(handle, pcert);
 	if (ret != KMF_OK)  {
@@ -1817,7 +1896,7 @@ KMF_ValidateCert(KMF_HANDLE_T handle,
 	}
 
 	/*
-	 * Validate Extended KeyUsage extension.
+	 * Validate Extended KeyUsage extension
 	 */
 	ret = cert_eku_check(handle, pcert);
 	if (ret != KMF_OK)  {
@@ -1826,7 +1905,7 @@ KMF_ValidateCert(KMF_HANDLE_T handle,
 	}
 
 	/*
-	 * Check the certificate's validity period.
+	 * Check the certificate's validity period
 	 *
 	 * This step is needed when "ignore_date" in policy is set
 	 * to false.
@@ -1861,11 +1940,10 @@ KMF_ValidateCert(KMF_HANDLE_T handle,
 	 * TA certificate.
 	 */
 	if (self_signed) {
-		ret = KMF_VerifyCertWithCert(handle,
-		    pcert, pcert);
+		ret = KMF_VerifyCertWithCert(handle, pcert, pcert);
 	} else {
 		ret = kmf_find_ta_cert(handle, params, &ta_cert,
-		    &user_issuerDN);
+			&user_issuerDN);
 		if (ret != KMF_OK)  {
 			*result |= KMF_CERT_VALIDATE_ERR_TA;
 			goto out;
@@ -1873,7 +1951,6 @@ KMF_ValidateCert(KMF_HANDLE_T handle,
 
 		ret = KMF_VerifyCertWithCert(handle, pcert, &ta_cert);
 	}
-
 	if (ret != KMF_OK)  {
 		*result |= KMF_CERT_VALIDATE_ERR_SIGNATURE;
 		goto out;
@@ -1924,7 +2001,6 @@ check_revocation:
 			goto out;
 		}
 	}
-
 out:
 	if (user_issuer) {
 		KMF_FreeDN(&user_issuerDN);
@@ -2327,7 +2403,7 @@ copy_algoid(KMF_X509_ALGORITHM_IDENTIFIER *destid,
 	return (ret);
 }
 
-KMF_RETURN
+static KMF_RETURN
 SignCert(KMF_HANDLE_T handle,
 	const KMF_DATA *SubjectCert,
 	KMF_KEY_HANDLE	*Signkey,
@@ -2436,7 +2512,7 @@ cleanup:
 	return (ret);
 }
 
-KMF_RETURN
+static KMF_RETURN
 VerifyCertWithKey(KMF_HANDLE_T handle,
 	KMF_DATA *derkey,
 	const KMF_DATA *CertToBeVerified)
@@ -2509,6 +2585,9 @@ cleanup:
 	return (ret);
 }
 
+/*
+ * The key must be an ASN.1/DER encoded PKCS#1 key.
+ */
 KMF_RETURN
 VerifyDataWithKey(KMF_HANDLE_T handle,
 	KMF_DATA *derkey,
@@ -2535,7 +2614,7 @@ cleanup:
 	return (ret);
 }
 
-KMF_RETURN
+static KMF_RETURN
 VerifyCertWithCert(KMF_HANDLE_T handle,
 	const KMF_DATA *CertToBeVerifiedData,
 	const KMF_DATA *SignerCertData)
@@ -2623,58 +2702,6 @@ cleanup:
 }
 
 KMF_RETURN
-VerifyDataWithCert(KMF_HANDLE_T handle,
-	KMF_DATA *indata,
-	KMF_DATA *insig,
-	const KMF_DATA *SignerCertData)
-{
-	KMF_RETURN ret = KMF_OK;
-	KMF_X509_CERTIFICATE *SignerCert = NULL;
-	KMF_X509_SPKI *pubkey;
-	KMF_ALGORITHM_INDEX algid;
-
-	if (!indata ||
-	    !indata->Data ||
-	    !indata->Length)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	if (!insig ||
-	    !insig->Data ||
-	    !insig->Length)
-		return (KMF_ERR_BAD_PARAMETER);
-
-
-	if (!SignerCertData ||
-	    !SignerCertData->Data ||
-	    !SignerCertData->Length)
-		return (KMF_ERR_BAD_PARAMETER);
-
-	/* Decode the signer cert so we can get the SPKI data */
-	ret = DerDecodeSignedCertificate(SignerCertData, &SignerCert);
-	if (ret != KMF_OK)
-		goto cleanup;
-
-	/* Get the public key info from the signer certificate */
-	pubkey = &SignerCert->certificate.subjectPublicKeyInfo;
-
-	algid = X509_AlgorithmOidToAlgId(CERT_ALG_OID(SignerCert));
-	if (algid == KMF_ALGID_NONE) {
-		ret = KMF_ERR_BAD_ALGORITHM;
-	} else {
-		ret = PKCS_VerifyData(handle, algid,
-			pubkey, indata, insig);
-	}
-
-cleanup:
-	if (SignerCert) {
-		KMF_FreeSignedCert(SignerCert);
-		free(SignerCert);
-	}
-
-	return (ret);
-}
-
-KMF_RETURN
 SignCsr(KMF_HANDLE_T handle,
 	const KMF_DATA *SubjectCsr,
 	KMF_KEY_HANDLE	*Signkey,
@@ -2746,44 +2773,6 @@ cleanup:
 
 	KMF_FreeAlgOID(&subj_csr.signature.algorithmIdentifier);
 	KMF_FreeData(&signed_data);
-
-	return (ret);
-}
-
-KMF_RETURN
-EncryptWithCert(KMF_HANDLE_T handle,
-	KMF_DATA *cert,
-	KMF_DATA *plaintext,
-	KMF_DATA *ciphertext)
-{
-	KMF_RETURN ret = KMF_OK;
-	KMF_X509_CERTIFICATE *x509cert = NULL;
-	KMF_X509_SPKI *pubkey;
-	KMF_OID *alg;
-	KMF_ALGORITHM_INDEX algid;
-
-	/* Decode the cert so we can get the SPKI data */
-	if ((ret = DerDecodeSignedCertificate(cert, &x509cert)) != KMF_OK)
-		return (ret);
-
-	/* Get the public key info from the certificate */
-	pubkey = &x509cert->certificate.subjectPublicKeyInfo;
-
-	/* Use the algorithm in SPKI to encrypt data */
-	alg = &pubkey->algorithm.algorithm;
-
-	algid = X509_AlgorithmOidToAlgId(alg);
-
-	/* DSA does not support encrypt */
-	if (algid == KMF_ALGID_DSA || algid == KMF_ALGID_NONE) {
-		KMF_FreeSignedCert(x509cert);
-		free(x509cert);
-		return (KMF_ERR_BAD_ALGORITHM);
-	}
-
-	ret = PKCS_EncryptData(handle, algid, pubkey, plaintext, ciphertext);
-	KMF_FreeSignedCert(x509cert);
-	free(x509cert);
 
 	return (ret);
 }

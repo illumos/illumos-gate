@@ -316,7 +316,7 @@ cleanup:
  *  - Public Key with label:
  *    Attempts to find a public key with the corresponding label.
  */
-static KMF_RETURN
+KMF_RETURN
 PKCS_AcquirePublicKeyHandle(CK_SESSION_HANDLE ckSession,
 	const KMF_X509_SPKI *pKey,
 	CK_KEY_TYPE ckRequestedKeyType,

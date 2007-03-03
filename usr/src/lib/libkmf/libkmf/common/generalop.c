@@ -687,6 +687,34 @@ KMF_OID2String(KMF_OID *oid)
 	return (bp);
 }
 
+static boolean_t
+check_for_pem(char *filename)
+{
+	char buf[BUFSIZ];
+	int len, f;
+
+	if ((f = open(filename, O_RDONLY | O_NONBLOCK)) < 0)
+		return (FALSE);
+
+	while ((len = read(f, buf, sizeof (buf))) > 0) {
+		/* Look for "-----BEGIN" right after a newline */
+		char *p;
+
+		p = strtok(buf, "\n");
+		while (p != NULL) {
+			if (p < (buf + len)) {
+				if (strstr(p, "-----BEGIN") != NULL) {
+					(void) close(f);
+					return (TRUE);
+				}
+			}
+			p = strtok(NULL, "\n");
+		}
+	}
+	(void) close(f);
+	return (FALSE);
+}
+
 KMF_RETURN
 KMF_GetFileFormat(char *filename, KMF_ENCODE_FORMAT *fmt)
 {
@@ -707,9 +735,8 @@ KMF_GetFileFormat(char *filename, KMF_ENCODE_FORMAT *fmt)
 		goto end;
 	}
 
-	if (memcmp(buf, "-----BEG", 8) == 0) {
-		*fmt = KMF_FORMAT_PEM;
-	} else if (buf[0] == 0x30 && (buf[1] & 0x80)) {
+	(void) close(f);
+	if (buf[0] == 0x30 && (buf[1] & 0x80)) {
 		if ((buf[1] & 0xFF) == 0x80 &&
 		    (buf[2] & 0xFF) == 0x02 &&
 		    (buf[5] & 0xFF) == 0x30) {
@@ -725,12 +752,16 @@ KMF_GetFileFormat(char *filename, KMF_ENCODE_FORMAT *fmt)
 	} else if (memcmp(buf, "Bag Attr", 8) == 0) {
 		*fmt = KMF_FORMAT_PEM_KEYPAIR;
 	} else {
-		/* Cannot determine this file format */
-		*fmt = 0;
-		ret = KMF_ERR_ENCODING;
+		/* Try PEM */
+		if (check_for_pem(filename) == TRUE) {
+			*fmt = KMF_FORMAT_PEM;
+		} else {
+			/* Cannot determine this file format */
+			*fmt = 0;
+			ret = KMF_ERR_ENCODING;
+		}
 	}
 end:
-	(void) close(f);
 	return (ret);
 }
 
@@ -1037,6 +1068,8 @@ void
 KMF_FreeBigint(KMF_BIGINT *big)
 {
 	if (big != NULL && big->val != NULL) {
+		/* Clear it out before returning it to the pool */
+		(void) memset(big->val, 0x00, big->len);
 		free(big->val);
 		big->val = NULL;
 		big->len = 0;

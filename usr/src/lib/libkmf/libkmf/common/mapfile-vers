@@ -41,6 +41,7 @@ SUNWprivate_1.1 {
 	KMF_CreateSymKey;
 	KMF_DN2Der;
 	KMF_DNParser;
+	KMF_DecodeCertData;
 	KMF_DecryptWithCert;
 	KMF_DeleteCRL;
 	KMF_DeleteCertFromKeystore;
@@ -276,8 +277,19 @@ SUNWprivate_1.1 {
 	KMFOID_X_121Address;
 	KMFOID_domainComponent;
 	KMFOID_userid;
+	KMFOID_SHA1;
+	KMFOID_RSA;
+	KMFOID_DSA;
+	KMFOID_MD5WithRSA;
+	KMFOID_MD2WithRSA;
+	KMFOID_SHA1WithRSA;
+	KMFOID_SHA1WithDSA;
+	KMFOID_OIW_DSAWithSHA1;
+	KMFOID_X9CM_DSA;
+	KMFOID_X9CM_DSAWithSHA1;
 	PKCS_GetDefaultSignatureMode;
 	PKCS_GetAlgorithmMap;
+	PKCS_AcquirePublicKeyHandle;
 	X509_AlgIdToAlgorithmOid;
 	X509_AlgorithmOidToAlgId;
 	kmf_ekuname2oid;

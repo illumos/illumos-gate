@@ -35,7 +35,6 @@
 
 #include <kmfapiP.h>
 #include <ber_der.h>
-#include <oidsalg.h>
 /* NSS related headers */
 
 #include <mps/nss.h>
@@ -170,6 +169,7 @@ KMF_PLUGIN_FUNCLIST nss_plugin_table =
 	NSS_CreateSymKey,
 	NSS_GetSymKeyValue,
 	NSS_SetTokenPin,
+	NULL, /* VerifyData */
 	NULL /* Finalize */
 };
 

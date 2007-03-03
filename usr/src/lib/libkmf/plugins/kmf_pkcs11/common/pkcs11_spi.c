@@ -32,7 +32,6 @@
 #include <values.h>
 
 #include <kmfapiP.h>
-#include <oidsalg.h>
 #include <ber_der.h>
 #include <algorithm.h>
 
@@ -129,6 +128,10 @@ KMFPK11_GetSymKeyValue(KMF_HANDLE_T, KMF_KEY_HANDLE *, KMF_RAW_SYM_KEY *);
 KMF_RETURN
 KMFPK11_SetTokenPin(KMF_HANDLE_T, KMF_SETPIN_PARAMS *, KMF_CREDENTIAL *);
 
+KMF_RETURN
+KMFPK11_VerifyDataWithCert(KMF_HANDLE_T, KMF_ALGORITHM_INDEX, KMF_DATA *,
+	KMF_DATA *, KMF_DATA *);
+
 static
 KMF_PLUGIN_FUNCLIST pk11token_plugin_table =
 {
@@ -157,6 +160,7 @@ KMF_PLUGIN_FUNCLIST pk11token_plugin_table =
 	KMFPK11_CreateSymKey,
 	KMFPK11_GetSymKeyValue,
 	KMFPK11_SetTokenPin,
+	KMFPK11_VerifyDataWithCert,
 	NULL			/* Finalize */
 };
 
@@ -2951,5 +2955,178 @@ KMFPK11_SetTokenPin(KMF_HANDLE_T handle, KMF_SETPIN_PARAMS *params,
 end:
 	if (session != NULL)
 		(void) C_CloseSession(session);
+	return (ret);
+}
+
+static KMF_RETURN
+create_pk11_session(CK_SESSION_HANDLE *sessionp, CK_MECHANISM_TYPE wanted_mech,
+	CK_FLAGS wanted_flags)
+{
+	CK_RV rv;
+	KMF_RETURN kmf_rv = KMF_OK;
+	CK_SLOT_ID_PTR pSlotList;
+	CK_ULONG pulCount;
+	CK_MECHANISM_INFO info;
+	int i;
+
+	rv = C_Initialize(NULL);
+	if ((rv != CKR_OK) &&
+	    (rv != CKR_CRYPTOKI_ALREADY_INITIALIZED)) {
+		kmf_rv = KMF_ERR_UNINITIALIZED;
+		goto out;
+	}
+
+	rv = C_GetSlotList(0, NULL, &pulCount);
+	if (rv != CKR_OK) {
+		kmf_rv = KMF_ERR_UNINITIALIZED;
+		goto out;
+	}
+
+	pSlotList = (CK_SLOT_ID_PTR) malloc(pulCount * sizeof (CK_SLOT_ID));
+	if (pSlotList == NULL) {
+		kmf_rv = KMF_ERR_MEMORY;
+		goto out;
+	}
+
+	rv = C_GetSlotList(0, pSlotList, &pulCount);
+	if (rv != CKR_OK) {
+		kmf_rv = KMF_ERR_UNINITIALIZED;
+		goto out;
+	}
+
+	for (i = 0; i < pulCount; i++) {
+		rv = C_GetMechanismInfo(pSlotList[i], wanted_mech, &info);
+		if (rv == CKR_OK && (info.flags & wanted_flags))
+			break;
+	}
+	if (i < pulCount) {
+		rv = C_OpenSession(pSlotList[i], CKF_SERIAL_SESSION,
+			NULL, NULL, sessionp);
+
+		if (rv != CKR_OK) {
+			kmf_rv = KMF_ERR_UNINITIALIZED;
+		}
+	} else {
+		kmf_rv = KMF_ERR_UNINITIALIZED;
+	}
+
+out:
+	if (pSlotList != NULL)
+		free(pSlotList);
+	return (kmf_rv);
+
+}
+static KMF_RETURN
+verify_data(KMF_HANDLE_T handle,
+	KMF_ALGORITHM_INDEX AlgorithmId,
+	KMF_X509_SPKI *keyp,
+	KMF_DATA *data,
+	KMF_DATA *signed_data)
+{
+	KMF_RETURN ret;
+	PKCS_ALGORITHM_MAP *pAlgMap = NULL;
+	CK_RV ckRv;
+	CK_MECHANISM ckMechanism;
+	CK_OBJECT_HANDLE ckKeyHandle;
+	KMF_BOOL	bTempKey;
+	KMF_HANDLE	*kmfh = (KMF_HANDLE *)handle;
+	CK_SESSION_HANDLE	ckSession = NULL;
+
+	if (AlgorithmId == KMF_ALGID_NONE)
+		return (KMF_ERR_BAD_ALGORITHM);
+
+	pAlgMap = PKCS_GetAlgorithmMap(KMF_ALGCLASS_SIGNATURE,
+		AlgorithmId, PKCS_GetDefaultSignatureMode(AlgorithmId));
+
+	if (!pAlgMap)
+		return (KMF_ERR_BAD_ALGORITHM);
+
+	ret = create_pk11_session(&ckSession, pAlgMap->pkcs_mechanism,
+		CKF_VERIFY);
+	if (ret != KMF_OK)
+		return (ret);
+
+	/* Fetch the verifying key */
+	ret = PKCS_AcquirePublicKeyHandle(ckSession, keyp,
+		pAlgMap->key_type, &ckKeyHandle, &bTempKey);
+
+	if (ret != KMF_OK) {
+		return (ret);
+	}
+
+	ckMechanism.mechanism = pAlgMap->pkcs_mechanism;
+	ckMechanism.pParameter = NULL;
+	ckMechanism.ulParameterLen = 0;
+
+	ckRv = C_VerifyInit(ckSession, &ckMechanism, ckKeyHandle);
+	if (ckRv != CKR_OK) {
+		if (bTempKey)
+			(void) C_DestroyObject(ckSession, ckKeyHandle);
+		SET_ERROR(kmfh, ckRv);
+		ret = KMF_ERR_INTERNAL;
+		goto cleanup;
+	}
+
+	ckRv = C_Verify(ckSession,
+		(CK_BYTE *)data->Data,
+			(CK_ULONG)data->Length,
+			(CK_BYTE *)signed_data->Data,
+			(CK_ULONG)signed_data->Length);
+
+	if (ckRv != CKR_OK) {
+		SET_ERROR(kmfh, ckRv);
+		ret = KMF_ERR_INTERNAL;
+	}
+
+cleanup:
+	if (bTempKey)
+		(void) C_DestroyObject(ckSession, ckKeyHandle);
+
+	(void) C_CloseSession(ckSession);
+
+	return (ret);
+}
+
+KMF_RETURN
+KMFPK11_VerifyDataWithCert(KMF_HANDLE_T handle,
+	KMF_ALGORITHM_INDEX algid, KMF_DATA *indata,
+	KMF_DATA *insig, KMF_DATA *SignerCertData)
+{
+	KMF_RETURN ret = KMF_OK;
+	KMF_X509_CERTIFICATE *SignerCert = NULL;
+	KMF_X509_SPKI *pubkey;
+
+	if (handle == NULL || indata == NULL ||
+	    indata->Data == NULL || indata->Length == 0 ||
+	    insig == NULL|| insig->Data == NULL || insig->Length == 0 ||
+	    SignerCertData == NULL || SignerCertData->Data == NULL ||
+	    SignerCertData->Length == 0)
+		return (KMF_ERR_BAD_PARAMETER);
+
+	/* Decode the signer cert so we can get the SPKI data */
+	ret = DerDecodeSignedCertificate(SignerCertData, &SignerCert);
+	if (ret != KMF_OK)
+		goto cleanup;
+
+	/* Get the public key info from the signer certificate */
+	pubkey = &SignerCert->certificate.subjectPublicKeyInfo;
+
+	/* If no algorithm specified, use the certs signature algorithm */
+	if (algid == KMF_ALGID_NONE) {
+		algid = X509_AlgorithmOidToAlgId(CERT_ALG_OID(SignerCert));
+	}
+
+	if (algid == KMF_ALGID_NONE) {
+		ret = KMF_ERR_BAD_ALGORITHM;
+	} else {
+		ret = verify_data(handle, algid, pubkey, indata, insig);
+	}
+
+cleanup:
+	if (SignerCert) {
+		KMF_FreeSignedCert(SignerCert);
+		free(SignerCert);
+	}
+
 	return (ret);
 }

@@ -85,6 +85,8 @@ extern KMF_RETURN KMF_FindCert(KMF_HANDLE_T, KMF_FINDCERT_PARAMS *,
 
 extern KMF_RETURN KMF_EncodeCertRecord(KMF_X509_CERTIFICATE *,
 	KMF_DATA *);
+extern KMF_RETURN KMF_DecodeCertData(KMF_DATA *, KMF_X509_CERTIFICATE **);
+
 extern KMF_RETURN KMF_SignCertWithKey(KMF_HANDLE_T, const KMF_DATA *,
 	KMF_KEY_HANDLE *, KMF_DATA *);
 extern KMF_RETURN KMF_SignCertWithCert(KMF_HANDLE_T,
@@ -98,7 +100,8 @@ extern KMF_RETURN KMF_VerifyCertWithKey(KMF_HANDLE_T, KMF_KEY_HANDLE *,
 	const KMF_DATA *);
 extern KMF_RETURN KMF_VerifyCertWithCert(KMF_HANDLE_T, const KMF_DATA *,
 	const KMF_DATA *);
-extern KMF_RETURN KMF_VerifyDataWithCert(KMF_HANDLE_T, KMF_DATA *, KMF_DATA *,
+extern KMF_RETURN KMF_VerifyDataWithCert(KMF_HANDLE_T,
+	KMF_KEYSTORE_TYPE, KMF_ALGORITHM_INDEX, KMF_DATA *, KMF_DATA *,
 	const KMF_DATA *);
 
 extern KMF_RETURN KMF_EncryptWithCert(KMF_HANDLE_T, KMF_DATA *,
