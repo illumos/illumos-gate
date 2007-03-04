@@ -380,7 +380,7 @@ errout:
 		pkevp->portkev_flags &= ~PORT_KEV_VALID;
 		active = 1;
 	}
-	mutex_enter(&pkevp->portkev_lock);
+	mutex_exit(&pkevp->portkev_lock);
 
 	if (!port_remove_fd_object(pfd, pp, pcp) && !active) {
 		error = 0;
