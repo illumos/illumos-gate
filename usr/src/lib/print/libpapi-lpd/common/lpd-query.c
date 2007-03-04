@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -29,7 +29,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#define	__EXTENSIONS__	/* for strtok_r() */
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -40,86 +39,130 @@
 #include <ctype.h>
 #include <string.h>
 #include <stdarg.h>
+#include <regex.h>
 
 #include <papi_impl.h>
 
-static void
-parse_lpd_job_entry(service_t *svc, int fd, job_t **job)
+/* The string is modified by this call */
+static char *
+regvalue(regmatch_t match, char *string)
 {
-	char *iter = NULL;
-	char line[128];
+	char *result = NULL;
+
+	if (match.rm_so != match.rm_eo) {
+		result = string + match.rm_so;
+		*(result + (match.rm_eo - match.rm_so)) = '\0';
+	}
+
+	return (result);
+}
+
+/*
+ * Print job entries start with:
+ * 	(user):	(rank)			[job (number) (...)]
+ *   (user) is the job-owner's user name
+ *   (rank) is the rank in queue. (active, 1st, 2nd, ...)
+ *   (number) is the job number
+ *   (...) is an optional hostname
+ *   some servers will use whitespace a little differently than is displayed
+ *   above.  The regular expression below makes whitespace optional in some
+ *   places.
+ */
+static char *job_expr = "^(.*[[:alnum:]]):[[:space:]]+([[:alnum:]]+)[[:space:]]+[[][[:space:]]*job[[:space:]]*([[:digit:]]+)[[:space:]]*(.*)]";
+static regex_t job_re;
+
+/*
+ * status line(s) for "processing" printers will contain one of the following:
+ *	ready and printing
+ *	Printing
+ */
+static char *proc_expr = "(ready and printing|printing)";
+static regex_t proc_re;
+
+/*
+ * status line(s) for "idle" printers will contain one of the following:
+ *	no entries
+ *	(printer) is ready
+ *	idle
+ */
+static char *idle_expr = "(no entries|is ready| idle)";
+static regex_t idle_re;
+
+/*
+ * document line(s)
+ *	(copies) copies of (name)		(size) bytes
+ *	(name)		(size) bytes
+ *   document lines can be in either format above.
+ *   (copies) is the number of copies of the document to print
+ *   (name) is the name of the document: /etc/motd, ...
+ *   (size) is the number of bytes in the document data
+ */
+static char *doc1_expr = "[[:space:]]+(([[:digit:]]+) copies of )([^[:space:]]+)[[:space:]]*([[:digit:]]+) bytes";
+static char *doc2_expr = "[[:space:]]+()([^[:space:]]+)[[:space:]]*([[:digit:]]+) bytes";
+static regex_t doc1_re;
+static regex_t doc2_re;
+
+static void
+parse_lpd_job(service_t *svc, job_t **job, int fd, char *line, int len)
+{
 	papi_attribute_t **attributes = NULL;
-	char *p;
+	regmatch_t matches[5];
+	char *s;
 	int octets = 0;
 
-	*job = NULL;
-
-	if (fdgets(line, sizeof (line), fd) == NULL)
+	/* job_re was compiled in the calling function */
+	if (regexec(&job_re, line, (size_t)5, matches, 0) == REG_NOMATCH)
 		return;
-	/*
-	 * 1st line...
-	 *	 user: rank			[job (ID)(host)]\n
-	 */
-	if ((p = strtok_r(line, ": ", &iter)) == NULL)	 /* user: ... */
-		return; /* invalid format */
+
+	if ((s = regvalue(matches[1], line)) == NULL)
+		s = "nobody";
 	papiAttributeListAddString(&attributes, PAPI_ATTR_REPLACE,
-				"job-originating-user-name", p);
+				"job-originating-user-name", s);
 
-	p = strtok_r(NULL, "\t ", &iter);	/* ...rank... */
+	if ((s = regvalue(matches[2], line)) == NULL)
+		s = "0";
 	papiAttributeListAddInteger(&attributes, PAPI_ATTR_REPLACE,
-				"number-of-intervening-jobs", atoi(p) - 1);
-	p = strtok_r(NULL, " ", &iter);		/* ...[job ... */
-	if ((p = strtok_r(NULL, "]\n", &iter)) == NULL)	/* ...(id)(hostname)] */
-		return;
-	while (isspace(*p)) p++;
+				"number-of-intervening-jobs", atoi(s) - 1);
+
+	if ((s = regvalue(matches[3], line)) == NULL)
+		s = "0";
 	papiAttributeListAddInteger(&attributes, PAPI_ATTR_REPLACE,
-				"job-id", atoi(p));
-	while (isdigit(*(++p)));
-	while (isspace(*p)) p++;
+				"job-id", atoi(s));
+
+	if ((s = regvalue(matches[4], line)) == NULL)
+		s = svc->uri->host;
 	papiAttributeListAddString(&attributes, PAPI_ATTR_REPLACE,
-				"job-originating-host-name", p);
+				"job-originating-host-name", s);
 
-	/*
-	 * rest-o-lines
-	 *	[(num) copies of ]file			size bytes\n
-	 */
-	while ((fdgets(line, sizeof (line), fd) != NULL) && (line[0] != '\n')) {
-		int copies, size;
-		char *q;
+	while ((fdgets(line, len, fd) != NULL) &&
+	       (regexec(&job_re, line, (size_t)0, NULL, 0) == REG_NOMATCH)) {
+		int size = 0, copies = 1;
+		/* process copies/documents */
 
-		/* find the number of copies */
-		if ((p = strstr(line, "copies of")) != NULL) {
-			copies = atoi(line);
-			p += 9;
-		} else {
+		/* doc1_re and doc2_re were compiled in the calling function */
+		if ((regexec(&doc1_re, line, (size_t)4, matches, 0) != 0) &&
+		    (regexec(&doc2_re, line, (size_t)4, matches, 0) != 0))
+			continue;
+
+		if ((s = regvalue(matches[1], line)) == NULL)
+			s = "1";
+		if ((copies = atoi(s)) < 1)
 			copies = 1;
-			p = line;
-		}
-		papiAttributeListAddInteger(&attributes, PAPI_ATTR_EXCL,
-				"copies", copies);
 
-		/* eat the leading whitespace */
-		while (isspace(*p) != 0)
-			p++;
-		if ((q = strstr(p, " bytes\n")) != NULL) {
-			/* back up to the beginning of the size */
-			do { q--; } while (isdigit(*q) != 0);
+		if ((s = regvalue(matches[2], line)) == NULL)
+			s = "unknown";
+		papiAttributeListAddString(&attributes,
+				PAPI_ATTR_APPEND, "job-name", s);
+		papiAttributeListAddString(&attributes,
+				PAPI_ATTR_APPEND, "job-file-names", s);
 
-			/* seperate the name and size */
-			*q = '\0';
-			q++;
-
-			size = atoi(q);
-
-			papiAttributeListAddString(&attributes,
-				PAPI_ATTR_APPEND, "job-name", p);
-			papiAttributeListAddString(&attributes,
-				PAPI_ATTR_APPEND, "job-file-names", p);
-			papiAttributeListAddInteger(&attributes,
+		if ((s = regvalue(matches[3], line)) == NULL)
+			s = "0";
+		size = atoi(s);
+		papiAttributeListAddInteger(&attributes,
 				PAPI_ATTR_APPEND, "job-file-sizes", size);
 
-			octets += (size * copies);
-		}
+		octets += (size * copies);
 	}
 
 	papiAttributeListAddInteger(&attributes, PAPI_ATTR_APPEND,
@@ -133,19 +176,6 @@ parse_lpd_job_entry(service_t *svc, int fd, job_t **job)
 		(*job)->attributes = attributes;
 }
 
-static void
-parse_lpd_job_entries(service_t *svc, int fd)
-{
-	job_t *job = NULL;
-
-	do {
-		parse_lpd_job_entry(svc, fd, &job);
-		list_append(&svc->cache->jobs, job);
-	} while (job != NULL);
-
-}
-
-
 void
 parse_lpd_query(service_t *svc, int fd)
 {
@@ -153,26 +183,45 @@ parse_lpd_query(service_t *svc, int fd)
 	cache_t *cache = NULL;
 	int state = 0x03; /* idle */
 	char line[128];
-	char buf[1024];
-
-	/* get the status line */
-	if (fdgets(line, sizeof (line), fd) == NULL)
-		return;	/* this should not happen. */
+	char status[1024];
+	char *s;
 
 	papiAttributeListAddString(&attributes, PAPI_ATTR_APPEND,
 			"printer-name", queue_name_from_uri(svc->uri));
 
-	if (uri_to_string(svc->uri, buf, sizeof (buf)) == 0)
+	if (uri_to_string(svc->uri, status, sizeof (status)) == 0)
 		papiAttributeListAddString(&attributes, PAPI_ATTR_APPEND,
-				"printer-uri-supported", buf);
+				"printer-uri-supported", status);
+
+	/*
+	 * on most systems, status is a single line, but some appear to
+	 * return multi-line status messages.  To get the "best" possible
+	 * printer-state-reason, we accumulate the text until we hit the
+	 * first print job entry.
+	 *
+	 * Print job entries start with:
+	 * 	user:	rank			[job number ...]
+	 */
+	(void) regcomp(&job_re, job_expr, REG_EXTENDED|REG_ICASE);
+
+	status[0] = '\0';
+	while ((fdgets(line, sizeof (line), fd) != NULL) &&
+	       (regexec(&job_re, line, (size_t)0, NULL, 0) == REG_NOMATCH)) {
+		strlcat(status, line, sizeof (status));
+	}
+	/* chop off trailing whitespace */
+	s = status + strlen(status) - 1;
+	while ((s > status) && (isspace(*s) != 0))
+		*s-- = '\0';
 
 	papiAttributeListAddString(&attributes, PAPI_ATTR_REPLACE,
-			"printer-state-reasons", line);
+			"printer-state-reasons", status);
 
-	if (strstr(line, "ready and printing") != NULL)
+	(void) regcomp(&proc_re, proc_expr, REG_EXTENDED|REG_ICASE);
+	(void) regcomp(&idle_re, idle_expr, REG_EXTENDED|REG_ICASE);
+	if (regexec(&proc_re, status, (size_t)0, NULL, 0) == 0)
 		state = 0x04; /* processing */
-	else if ((strstr(line, "no entries") != NULL) ||
-		 (strstr(line, "is ready") != NULL))
+	else if (regexec(&idle_re, status, (size_t)0, NULL, 0) == 0)
 		state = 0x03; /* idle */
 	else
 		state = 0x05; /* stopped */
@@ -190,9 +239,16 @@ parse_lpd_query(service_t *svc, int fd)
 	cache->printer->attributes = attributes;
 	svc->cache = cache;
 
-	if (fdgets(line, sizeof (line), fd) != NULL) {
-		/* get the jobs */
-		parse_lpd_job_entries(svc, fd);
+	(void) regcomp(&doc1_re, doc1_expr, REG_EXTENDED|REG_ICASE);
+	(void) regcomp(&doc2_re, doc2_expr, REG_EXTENDED|REG_ICASE);
+	/* process job related entries */
+	while (line[0] != '\0') {
+		job_t *job = NULL;
+
+		parse_lpd_job(svc, &job, fd, line, sizeof (line));
+		if (job == NULL)
+			break;
+		list_append(&cache->jobs, job);
 	}
 
 	time(&cache->timestamp);
