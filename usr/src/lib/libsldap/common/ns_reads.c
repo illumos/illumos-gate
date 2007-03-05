@@ -1459,6 +1459,8 @@ setup_next_search(ns_ldap_cookie_t *cookie)
 			cookie->err_rc = NS_LDAP_INVALID_PARAM;
 			return (-1);
 		} else {
+			if (cookie->filter)
+				free(cookie->filter);
 			cookie->filter = strdup(cookie->i_filter);
 			if (cookie->filter == NULL) {
 				cookie->err_rc = NS_LDAP_MEMORY;
@@ -1466,6 +1468,8 @@ setup_next_search(ns_ldap_cookie_t *cookie)
 			}
 		}
 	} else {
+		if (cookie->filter)
+			free(cookie->filter);
 		cookie->filter = strdup(filter);
 		free(filter);
 		if (cookie->filter == NULL) {
@@ -1517,6 +1521,8 @@ setup_next_search(ns_ldap_cookie_t *cookie)
 		}
 		str = ((char **)param)[0];
 		baselen += strlen(str)+1;
+		if (cookie->basedn)
+			free(cookie->basedn);
 		cookie->basedn = (char *)malloc(baselen);
 		if (cookie->basedn == NULL) {
 			cookie->err_rc = NS_LDAP_MEMORY;
@@ -1526,6 +1532,8 @@ setup_next_search(ns_ldap_cookie_t *cookie)
 		(void) strcat(cookie->basedn, str);
 		(void) __ns_ldap_freeParam(&param);
 	} else {
+		if (cookie->basedn)
+			free(cookie->basedn);
 		cookie->basedn = strdup(dptr->basedn);
 	}
 	return (0);
