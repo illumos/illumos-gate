@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,12 +58,12 @@ typedef struct mdeg_clnt {
  *
  * Locking Strategy:
  *
- *   mdeg.lock - lock used to sychronize system wide MD updates. An
+ *   mdeg.lock - lock used to synchronize system-wide MD updates. An
  *	MD update must be treated as an atomic event. The lock is
  *	taken when notification that a new MD is available and held
  *	until all clients have been notified.
  *
- *   mdeg.rwlock - lock used to sychronize access to the table of
+ *   mdeg.rwlock - lock used to synchronize access to the table of
  *	registered clients. The reader lock must be held when looking
  *	up client information in the table. The writer lock must be
  *	held when modifying any client information.
@@ -253,9 +253,10 @@ mdeg_alloc_clnt(void)
 
 	/*
 	 * Since the old table was full, the first free entry
-	 * will be just past the end of the old table.
+	 * will be just past the end of the old table data in
+	 * the new table.
 	 */
-	clnt = &mdeg.tbl[mdeg.maxclnts];
+	clnt = &newtbl[mdeg.maxclnts];
 
 	/* clean up the old table */
 	kmem_free(mdeg.tbl, oldtblsz);
@@ -517,7 +518,7 @@ mdeg_unregister(mdeg_handle_t hdl)
  * Simple algorithm for now, grab the global lock and let all
  * the clients update themselves in parallel. There is a lot of
  * room for improvement here. We could eliminate some scans of
- * the DAG by imcrementally scanning at lower levels of the DAG
+ * the DAG by incrementally scanning at lower levels of the DAG
  * rather than having each client start its own scan from the root.
  */
 void

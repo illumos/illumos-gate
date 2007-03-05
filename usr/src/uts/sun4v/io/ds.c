@@ -32,7 +32,7 @@
  * The Domain Services (DS) module is responsible for communication
  * with external service entities. It provides an API for clients to
  * publish capabilities and handles the low level communication and
- * version negotiation required to export those capabilites to any
+ * version negotiation required to export those capabilities to any
  * interested service entity. Once a capability has been successfully
  * registered with a service entity, the DS module facilitates all
  * data transfers between the service entity and the client providing
@@ -67,7 +67,7 @@ static ds_portset_t	ds_allports;	/* all DS ports in the system */
 /*
  * Table of registered services
  *
- * Locking: Accesses to the table of services are sychronized using
+ * Locking: Accesses to the table of services are synchronized using
  *   a RW lock. The reader lock must be held when looking up service
  *   information in the table. The writer lock must be held when any
  *   service information is being modified.
@@ -236,7 +236,7 @@ static int ds_ldc_fini(ds_port_t *port);
 /* event processing functions */
 static uint_t ds_ldc_cb(uint64_t event, caddr_t arg);
 static void ds_dispatch_event(void *arg);
-static int ds_recv_msg(ldc_handle_t ldc_hdl, caddr_t msgp, size_t msglen);
+static int ds_recv_msg(ldc_handle_t ldc_hdl, caddr_t msgp, size_t *sizep);
 static void ds_handle_recv(void *arg);
 
 /* message sending functions */
@@ -301,7 +301,7 @@ _init(void)
 	ds_init();
 
 	if ((rv = ds_ports_init()) != 0) {
-		cmn_err(CE_WARN, "Domin Services initialization failed");
+		cmn_err(CE_WARN, "Domain Services initialization failed");
 		ds_fini();
 		return (rv);
 	}
@@ -599,7 +599,7 @@ ds_ldc_init(ds_port_t *port)
 
 	/* register the LDC callback */
 	if ((rv = ldc_reg_callback(port->ldc.hdl, ds_ldc_cb, cb_arg)) != 0) {
-		cmn_err(CE_WARN, "ds@%lx: dc_init: ldc_reg_callback error "
+		cmn_err(CE_WARN, "ds@%lx: ldc_init: ldc_reg_callback error "
 		    "(%d)", port->id, rv);
 		goto done;
 	}
@@ -757,12 +757,21 @@ done:
 	return (LDC_SUCCESS);
 }
 
+/*
+ * Attempt to read a specified number of bytes from a particular LDC.
+ * Returns zero for success or the return code from the LDC read on
+ * failure. The actual number of bytes read from the LDC is returned
+ * in the size parameter.
+ */
 static int
-ds_recv_msg(ldc_handle_t ldc_hdl, caddr_t msgp, size_t msglen)
+ds_recv_msg(ldc_handle_t ldc_hdl, caddr_t msgp, size_t *sizep)
 {
 	int	rv = 0;
+	size_t	msglen = *sizep;
 	size_t	amt_left = msglen;
 	int	loopcnt = 0;
+
+	*sizep = 0;
 
 	while (msglen > 0) {
 		if ((rv = ldc_read(ldc_hdl, msgp, &amt_left)) != 0) {
@@ -778,11 +787,20 @@ ds_recv_msg(ldc_handle_t ldc_hdl, caddr_t msgp, size_t msglen)
 				return (rv);
 			}
 		} else {
+			/*
+			 * Check for a zero length read. This
+			 * indicates that there is no more data
+			 * to read from the channel.
+			 */
+			if (amt_left == 0)
+				break;
+
+			*sizep += amt_left;
 			msgp += amt_left;
 			msglen -= amt_left;
 			amt_left = msglen;
 		}
-	} /* while (msglen > 0) */
+	}
 
 	return (rv);
 }
@@ -792,7 +810,7 @@ ds_handle_recv(void *arg)
 {
 	ds_port_t	*port = (ds_port_t *)arg;
 	char		*hbuf;
-	size_t		len;
+	size_t		msglen;
 	size_t		read_size;
 	boolean_t	hasdata;
 	ds_hdr_t	hdr;
@@ -807,8 +825,14 @@ ds_handle_recv(void *arg)
 	ldc_hdl = port->ldc.hdl;
 
 	mutex_enter(&port->lock);
-	while ((ldc_chkq(ldc_hdl, &hasdata) == 0) && hasdata) {
 
+	/*
+	 * Read messages from the channel until there are none
+	 * pending. Valid messages are dispatched to be handled
+	 * by a separate thread while any malformed messages are
+	 * dropped.
+	 */
+	while ((ldc_chkq(ldc_hdl, &hasdata) == 0) && hasdata) {
 
 		DS_DBG("ds@%lx: reading next message\n", port->id);
 
@@ -821,42 +845,52 @@ ds_handle_recv(void *arg)
 		currp = hbuf;
 
 		/* read in the message header */
-
-		if ((rv = ds_recv_msg(ldc_hdl, currp, read_size)) != 0) {
-			/*
-			 * Failed to read message. Drop it and see if
-			 * there are any more messages.
-			 */
-			cmn_err(CE_NOTE, "ldc_read returned %d", rv);
+		if ((rv = ds_recv_msg(ldc_hdl, currp, &read_size)) != 0) {
+			cmn_err(CE_NOTE, "ds@%lx: ldc_read returned %d",
+			    port->id, rv);
 			continue;
 		}
 
-		len = read_size;
+		if (read_size < DS_HDR_SZ) {
+			/*
+			 * A zero length read is a valid signal that
+			 * there is no data left on the channel.
+			 */
+			if (read_size != 0) {
+				cmn_err(CE_NOTE, "ds@%lx: invalid message "
+				    "length, received %ld bytes, expected %ld",
+				    port->id, read_size, DS_HDR_SZ);
+			}
+			continue;
+		}
 
-		/* get payload size and alloc a buffer */
-
+		/* get payload size and allocate a buffer */
 		read_size = ((ds_hdr_t *)hbuf)->payload_len;
-		msg = kmem_zalloc((DS_HDR_SZ + read_size), KM_SLEEP);
+		msglen = DS_HDR_SZ + read_size;
+		msg = kmem_zalloc(msglen, KM_SLEEP);
 
 		/* move message header into buffer */
-
 		bcopy(hbuf, msg, DS_HDR_SZ);
 		currp = (char *)(msg) + DS_HDR_SZ;
 
 		/* read in the message body */
-
-		if ((rv = ds_recv_msg(ldc_hdl, currp, read_size)) != 0) {
-			/*
-			 * Failed to read message. Drop it and see if
-			 * there are any more messages.
-			 */
-			kmem_free(msg, (DS_HDR_SZ + read_size));
-			cmn_err(CE_NOTE, "ldc_read returned %d", rv);
+		if ((rv = ds_recv_msg(ldc_hdl, currp, &read_size)) != 0) {
+			cmn_err(CE_NOTE, "ds@%lx: ldc_read returned %d",
+			    port->id, rv);
+			kmem_free(msg, msglen);
 			continue;
 		}
 
-		len += read_size;
-		DS_DUMP_LDC_MSG(msg, len);
+		/* validate the size of the message */
+		if ((DS_HDR_SZ + read_size) != msglen) {
+			cmn_err(CE_NOTE, "ds@%lx: invalid message length, "
+			    "received %ld bytes, expected %ld", port->id,
+			    (DS_HDR_SZ + read_size), msglen);
+			kmem_free(msg, msglen);
+			continue;
+		}
+
+		DS_DUMP_LDC_MSG(msg, msglen);
 
 		/*
 		 * Send the message for processing, and store it
@@ -867,14 +901,15 @@ ds_handle_recv(void *arg)
 		devent = kmem_zalloc(sizeof (ds_event_t), KM_SLEEP);
 		devent->port = port;
 		devent->buf = (char *)msg;
-		devent->buflen = len;
+		devent->buflen = msglen;
 
 		/* log the message */
-		(void) ds_log_add_msg(DS_LOG_IN(port->id), msg, len);
+		(void) ds_log_add_msg(DS_LOG_IN(port->id), msg, msglen);
 
 		/* send the message off to get processed in a new thread */
 		if (DS_DISPATCH(ds_dispatch_event, devent) == NULL) {
 			cmn_err(CE_WARN, "error initiating event handler");
+			kmem_free(devent, sizeof (ds_event_t));
 			continue;
 		}
 
@@ -897,7 +932,7 @@ ds_dispatch_event(void *arg)
 	if (!DS_MSG_TYPE_VALID(hdr->msg_type)) {
 		cmn_err(CE_NOTE, "ds@%lx: dispatch_event: invalid msg "
 		    "type (%d)", port->id, hdr->msg_type);
-		return;
+		goto done;
 	}
 
 	DS_DBG("ds@%lx: dispatch_event: msg_type=%d\n", port->id,
@@ -905,6 +940,7 @@ ds_dispatch_event(void *arg)
 
 	(*ds_msg_handlers[hdr->msg_type])(port, event->buf, event->buflen);
 
+done:
 	kmem_free(event, sizeof (ds_event_t));
 }
 
@@ -1001,7 +1037,7 @@ ds_handle_init_ack(ds_port_t *port, caddr_t buf, size_t len)
 	} else {
 		/*
 		 * Use the lower minor version returned in
-		 * the ack. By defninition, all lower minor
+		 * the ack. By definition, all lower minor
 		 * versions must be supported.
 		 */
 		port->ver.minor = ack->minor_vers;
@@ -1192,7 +1228,7 @@ ds_handle_reg_ack(ds_port_t *port, caddr_t buf, size_t len)
 	} else {
 		/*
 		 * Use the lower minor version returned in
-		 * the ack. By defninition, all lower minor
+		 * the ack. By definition, all lower minor
 		 * versions must be supported.
 		 */
 		svc->ver.minor = ack->minor_vers;

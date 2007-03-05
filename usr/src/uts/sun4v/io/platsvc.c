@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,7 +115,7 @@ static int ps_init(void);
 static void ps_fini(void);
 
 /*
- * Powerdown timeout value of 5 minutes.
+ * Power down timeout value of 5 minutes.
  */
 #define	PLATSVC_POWERDOWN_DELAY		1200
 
@@ -221,7 +221,7 @@ ps_md_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 	extern void mdeg_notify_clients(void);
 	extern void recalc_xc_timeouts(void);
 
-	ds_svc_hdl_t		 ds_handle;
+	ds_svc_hdl_t		 ds_handle = ds_md_handle;
 	platsvc_md_update_req_t	 *msg = buf;
 	platsvc_md_update_resp_t resp_msg;
 	uint_t			 rv;
@@ -229,7 +229,10 @@ ps_md_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 	if (arg == NULL)
 		return;
 
-	ds_handle = ds_md_handle;
+	if (ds_handle == DS_INVALID_HDL) {
+		DBG("ps_md_data_handler: DS handle no longer valid\n");
+		return;
+	}
 
 	if (msg == NULL || buflen != sizeof (platsvc_md_update_req_t)) {
 		resp_msg.req_num = 0;
@@ -265,7 +268,7 @@ ps_md_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 static void
 ps_shutdown_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 {
-	ds_svc_hdl_t		ds_handle;
+	ds_svc_hdl_t		ds_handle = ds_shutdown_handle;
 	platsvc_shutdown_req_t	*msg = buf;
 	platsvc_shutdown_resp_t	resp_msg;
 	uint_t			rv;
@@ -274,7 +277,10 @@ ps_shutdown_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 	if (arg == NULL)
 		return;
 
-	ds_handle = ds_shutdown_handle;
+	if (ds_handle == DS_INVALID_HDL) {
+		DBG("ps_shutdown_data_handler: DS handle no longer valid\n");
+		return;
+	}
 
 	if (msg == NULL || buflen != sizeof (platsvc_shutdown_req_t)) {
 		resp_msg.req_num = 0;
@@ -313,7 +319,7 @@ ps_shutdown_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 static void
 ps_panic_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 {
-	ds_svc_hdl_t		ds_handle;
+	ds_svc_hdl_t		ds_handle = ds_panic_handle;
 	platsvc_panic_req_t	*msg = buf;
 	platsvc_panic_resp_t	resp_msg;
 	uint_t			rv;
@@ -321,7 +327,10 @@ ps_panic_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 	if (arg == NULL)
 		return;
 
-	ds_handle = ds_panic_handle;
+	if (ds_handle == DS_INVALID_HDL) {
+		DBG("ps_panic_data_handler: DS handle no longer valid\n");
+		return;
+	}
 
 	if (msg == NULL || buflen != sizeof (platsvc_panic_req_t)) {
 		resp_msg.req_num = 0;
