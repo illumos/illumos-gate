@@ -355,7 +355,7 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 		goto pollout;
 	}
 
-	if (nfds >= p->p_fno_ctl) {
+	if (nfds > p->p_fno_ctl) {
 		mutex_enter(&p->p_lock);
 		(void) rctl_action(rctlproc_legacy[RLIMIT_NOFILE],
 		    p->p_rctls, p, RCA_SAFE);
