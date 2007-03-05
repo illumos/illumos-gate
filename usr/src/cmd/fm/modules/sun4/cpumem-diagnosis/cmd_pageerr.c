@@ -48,7 +48,10 @@ cmd_page_fault(fmd_hdl_t *hdl, nvlist_t *modasru, nvlist_t *modfru,
 {
 	cmd_page_t *page = cmd_page_lookup(afar);
 	const char *uuid;
-	nvlist_t *flt, *nvlfru;
+	nvlist_t *flt;
+#ifdef sun4v
+	nvlist_t *nvlfru;
+#endif
 
 	if (page == NULL)
 		page = cmd_page_create(hdl, modasru, afar);
