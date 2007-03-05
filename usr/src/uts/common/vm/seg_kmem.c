@@ -227,12 +227,22 @@ kernelheap_init(
 	size_t heap_size;
 	vmem_t *heaptext_parent;
 	size_t	heap_lp_size = 0;
+#ifdef __sparc
+	size_t kmem64_sz = kmem64_aligned_end - kmem64_base;
+#endif	/* __sparc */
 
 	kernelheap = heap_start;
 	ekernelheap = heap_end;
 
 #ifdef __sparc
 	heap_lp_size = (((uintptr_t)heap_end - (uintptr_t)heap_start) / 4);
+	/*
+	 * Bias heap_lp start address by kmem64_sz to reduce collisions
+	 * in 4M kernel TSB between kmem64 area and heap_lp
+	 */
+	kmem64_sz = P2ROUNDUP(kmem64_sz, MMU_PAGESIZE256M);
+	if (kmem64_sz <= heap_lp_size / 2)
+		heap_lp_size -= kmem64_sz;
 	heap_lp_base = ekernelheap - heap_lp_size;
 	heap_lp_end = heap_lp_base + heap_lp_size;
 #endif	/* __sparc */

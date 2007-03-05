@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -151,6 +151,7 @@ cpu_fiximp(pnode_t dnode)
 	max_privmap_lpsize = MMU_PAGESIZE;
 	max_utext_lpsize = MMU_PAGESIZE;
 	max_shm_lpsize = MMU_PAGESIZE;
+	max_bootlp_tteszc = TTE8K;
 }
 
 void
@@ -663,53 +664,36 @@ uint64_t ecache_tl1_flushaddr = (uint64_t)-1; /* physaddr for E$ flushing */
 
 /*
  * Allocate and initialize the exclusive displacement flush area.
- * Must be called before startup_bop_gone().
+ * Called twice. The first time allocates virtual address. The second
+ * call looks up the physical address.
  */
 caddr_t
 ecache_init_scrub_flush_area(caddr_t alloc_base)
 {
-	unsigned size = 2 * CH_ECACHE_8M_SIZE;
-	caddr_t tmp_alloc_base = alloc_base;
-	caddr_t flush_alloc_base =
-	    (caddr_t)roundup((uintptr_t)alloc_base, size);
-	caddr_t ecache_tl1_virtaddr;
+	static caddr_t ecache_tl1_virtaddr;
 
-	/*
-	 * Allocate the physical memory for the exclusive flush area
-	 *
-	 * Need to allocate an exclusive flush area that is twice the
-	 * largest supported E$ size, physically contiguous, and
-	 * aligned on twice the largest E$ size boundary.
-	 *
-	 * Memory allocated via BOP_ALLOC is included in the "cage"
-	 * from the DR perspective and due to this, its physical
-	 * address will never change and the memory will not be
-	 * removed.
-	 *
-	 * BOP_ALLOC takes 4 arguments: bootops, virtual address hint,
-	 * size of the area to allocate, and alignment of the area to
-	 * allocate. It returns zero if the allocation fails, or the
-	 * virtual address for a successful allocation. Memory BOP_ALLOC'd
-	 * is physically contiguous.
-	 */
-	if ((ecache_tl1_virtaddr = (caddr_t)BOP_ALLOC(bootops,
-	    flush_alloc_base, size, size)) != NULL) {
-
-		tmp_alloc_base =
-		    (caddr_t)roundup((uintptr_t)(ecache_tl1_virtaddr + size),
-		    ecache_alignsize);
-
+	if (alloc_base != NULL) {
 		/*
-		 * get the physical address of the exclusive flush area
+		 * Need to allocate an exclusive flush area that is twice the
+		 * largest supported E$ size, physically contiguous, and
+		 * aligned on twice the largest E$ size boundary.
 		 */
-		ecache_tl1_flushaddr = va_to_pa(ecache_tl1_virtaddr);
+		unsigned size = 2 * CH_ECACHE_8M_SIZE;
+		caddr_t va = (caddr_t)roundup((uintptr_t)alloc_base, size);
+
+		ecache_tl1_virtaddr = va;
+		alloc_base = va + size;
 
 	} else {
-		ecache_tl1_virtaddr = (caddr_t)-1;
-		cmn_err(CE_NOTE, "!ecache_init_scrub_flush_area failed\n");
+		/*
+		 * Get the physical address of the exclusive flush area.
+		 */
+		ASSERT(ecache_tl1_virtaddr != NULL);
+		ecache_tl1_flushaddr = va_to_pa(ecache_tl1_virtaddr);
+		ASSERT(ecache_tl1_flushaddr != ((uint64_t)-1));
 	}
 
-	return (tmp_alloc_base);
+	return (alloc_base);
 }
 
 /*

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -128,6 +128,7 @@ MACHINE_DEFS	+= -DMAX_MEM_NODES=8
 MACHINE_DEFS	+= -DLOCKED_DTLB_ENTRIES=6
 # Max IOSRAM TOC major version number supported
 MACHINE_DEFS	+= -DMAX_IOSRAM_TOC_VER=0x1
+MACHINE_DEFS	+= -DC_OBP
 
 #	Define for inline pre-processing since
 #	cpp is not smart about v9 yet.

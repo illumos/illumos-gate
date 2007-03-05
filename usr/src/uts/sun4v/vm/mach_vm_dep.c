@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,6 +91,11 @@ hw_pagesize_t hw_page_array[] = {
 	    MMU_PAGESIZE256M >> MMU_PAGESHIFT},
 	{0, 0, 0, 0}
 };
+
+/*
+ * Maximum page size used to map 64-bit memory segment kmem64_base..kmem64_end
+ */
+int	max_bootlp_tteszc = TTE256M;
 
 /*
  * Maximum and default segment size tunables for user heap, stack, private

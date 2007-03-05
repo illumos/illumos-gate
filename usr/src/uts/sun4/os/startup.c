@@ -159,6 +159,10 @@ caddr_t valloc_base;		/* beginning of kvalloc segment	*/
 
 caddr_t kmem64_base;		/* base of kernel mem segment in 64-bit space */
 caddr_t kmem64_end;		/* end of kernel mem segment in 64-bit space */
+caddr_t kmem64_aligned_end;	/* end of large page, overmaps 64-bit space */
+int	kmem64_alignsize;	/* page size for mem segment in 64-bit space */
+int	kmem64_szc;		/* page size code */
+uint64_t kmem64_pabase = (uint64_t)-1;	/* physical address of kmem64_base */
 
 uintptr_t shm_alignment;	/* VAC address consistency modulus */
 struct memlist *phys_install;	/* Total installed physical memory */
@@ -251,7 +255,6 @@ static pgcnt_t bop_alloc_pages;
 static caddr_t hblk_base;
 uint_t hblk_alloc_dynamic = 0;
 uint_t hblk1_min = H1MIN;
-uint_t hblk8_min;
 
 
 /*
@@ -415,6 +418,10 @@ static int bootops_gone_on = 0;
  * 0x000007FF.00000000  -|-----------------------|- hole_start -----
  *                       :                       :		   ^
  *                       :                       :		   |
+ * 0x00000XXX.XXX00000  -|-----------------------|- kmem64_	   |
+ *                       | overmapped area       |   alignend_end  |
+ *                       | (kmem64_alignsize     |		   |
+ *                       |  boundary)            |		   |
  * 0x00000XXX.XXXXXXXX  -|-----------------------|- kmem64_end	   |
  *                       |                       |		   |
  *                       |   64-bit kernel ONLY  |		   |
@@ -733,6 +740,85 @@ static size_t boot_physinstalled_len, boot_physavail_len, boot_virtavail_len;
 		(MAX_RSVD_IV * sizeof (intr_vec_t)) + \
 		(MAX_RSVD_IVX * sizeof (intr_vecx_t)))
 
+#if !defined(C_OBP)
+/*
+ * Install a temporary tte handler in OBP for kmem64 area.
+ *
+ * We map kmem64 area with large pages before the trap table is taken
+ * over. Since OBP makes 8K mappings, it can create 8K tlb entries in
+ * the same area. Duplicate tlb entries with different page sizes
+ * cause unpredicatble behavior.  To avoid this, we don't create
+ * kmem64 mappings via BOP_ALLOC (ends up as prom_alloc() call to
+ * OBP).  Instead, we manage translations with a temporary va>tte-data
+ * handler (kmem64-tte).  This handler is replaced by unix-tte when
+ * the trap table is taken over.
+ *
+ * The temporary handler knows the physical address of the kmem64
+ * area. It uses the prom's pgmap@ Forth word for other addresses.
+ *
+ * We have to use BOP_ALLOC() method for C-OBP platforms because
+ * pgmap@ is not defined in C-OBP. C-OBP is only used on serengeti
+ * sun4u platforms. On sun4u we flush tlb after trap table is taken
+ * over if we use large pages for kernel heap and kmem64. Since sun4u
+ * prom (unlike sun4v) calls va>tte-data first for client address
+ * translation prom's ttes for kmem64 can't get into TLB even if we
+ * later switch to prom's trap table again. C-OBP uses 4M pages for
+ * client mappings when possible so on all platforms we get the
+ * benefit from large mappings for kmem64 area immediately during
+ * boot.
+ *
+ * pseudo code:
+ * if (context != 0) {
+ * 	return false
+ * } else if (miss_va in range[kmem64_base, kmem64_end)) {
+ *	tte = tte_template +
+ *		(((miss_va & pagemask) - kmem64_base));
+ *	return tte, true
+ * } else {
+ *	return pgmap@ result
+ * }
+ */
+char kmem64_obp_str[] =
+	"h# %lx constant kmem64_base "
+	"h# %lx constant kmem64_end "
+	"h# %lx constant kmem64_pagemask "
+	"h# %lx constant kmem64_template "
+
+	": kmem64-tte ( addr cnum -- false | tte-data true ) "
+	"    if                                       ( addr ) "
+	"       drop false exit then                  ( false ) "
+	"    dup  kmem64_base kmem64_end  within  if  ( addr ) "
+	"	kmem64_pagemask and                   ( addr' ) "
+	"	kmem64_base -                         ( addr' ) "
+	"	kmem64_template +                     ( tte ) "
+	"	true                                  ( tte true ) "
+	"    else                                     ( addr ) "
+	"	pgmap@                                ( tte ) "
+	"       dup 0< if true else drop false then   ( tte true  |  false ) "
+	"    then                                     ( tte true  |  false ) "
+	"; "
+
+	"' kmem64-tte is va>tte-data "
+;
+
+void
+install_kmem64_tte()
+{
+	char b[sizeof (kmem64_obp_str) + (4 * 16)];
+	tte_t tte;
+
+	PRM_DEBUG(kmem64_pabase);
+	PRM_DEBUG(kmem64_szc);
+	sfmmu_memtte(&tte, kmem64_pabase >> MMU_PAGESHIFT,
+	    PROC_DATA | HAT_NOSYNC, kmem64_szc);
+	PRM_DEBUG(tte.ll);
+	(void) sprintf(b, kmem64_obp_str,
+	    kmem64_base, kmem64_end, TTE_PAGEMASK(kmem64_szc), tte.ll);
+	ASSERT(strlen(b) < sizeof (b));
+	prom_interpret(b, 0, 0, 0, 0, 0);
+}
+#endif	/* !C_OBP */
+
 /*
  * As OBP takes up some RAM when the system boots, pages will already be "lost"
  * to the system and reflected in npages by the time we see it.
@@ -768,7 +854,8 @@ startup_memlist(void)
 	struct memlist *cur;
 	size_t syslimit = (size_t)SYSLIMIT;
 	size_t sysbase = (size_t)SYSBASE;
-	int alloc_alignsize = MMU_PAGESIZE;
+	int alloc_alignsize = ecache_alignsize;
+	int i;
 	extern void page_coloring_init(void);
 	extern void page_set_colorequiv_arr(void);
 
@@ -833,7 +920,7 @@ startup_memlist(void)
 	PRM_DEBUG(e_text);
 	modtext = (caddr_t)roundup((uintptr_t)e_text, MMU_PAGESIZE);
 	if (((uintptr_t)modtext & MMU_PAGEMASK4M) != (uintptr_t)s_text)
-		panic("nucleus text overflow");
+		prom_panic("nucleus text overflow");
 	modtext_sz = (caddr_t)roundup((uintptr_t)modtext, MMU_PAGESIZE4M) -
 	    modtext;
 	PRM_DEBUG(modtext);
@@ -995,37 +1082,6 @@ startup_memlist(void)
 	}
 
 	/*
-	 * If we have enough memory, use 4M pages for alignment because it
-	 * greatly reduces the number of TLB misses we take albeit at the cost
-	 * of possible RAM wastage (degenerate case of 4 MB - MMU_PAGESIZE per
-	 * allocation.) Still, the speedup on large memory systems (e.g. > 64
-	 * GB) is quite noticeable, so it is worth the effort to do if we can.
-	 *
-	 * Note, however, that this speedup will only occur if the boot PROM
-	 * uses the largest possible MMU page size possible to map memory
-	 * requests that are properly aligned and sized (for example, a request
-	 * for a multiple of 4MB of memory aligned to a 4MB boundary will
-	 * result in a mapping using a 4MB MMU page.)
-	 *
-	 * Even then, the large page mappings will only speed things up until
-	 * the startup process proceeds a bit further, as when
-	 * sfmmu_map_prom_mappings() copies page mappings from the PROM to the
-	 * kernel it remaps everything but the TSBs using 8K pages anyway...
-	 *
-	 * At some point in the future, sfmmu_map_prom_mappings() will be
-	 * rewritten to copy memory mappings to the kernel using the same MMU
-	 * page sizes the PROM used.  When that occurs, if the PROM did use
-	 * large MMU pages to map memory, the alignment/sizing work we're
-	 * doing now should give us a nice extra performance boost, albeit at
-	 * the cost of greater RAM usage...
-	 */
-	alloc_alignsize = ((npages >= tune_npages) ? MMU_PAGESIZE4M :
-	    MMU_PAGESIZE);
-
-	PRM_DEBUG(tune_npages);
-	PRM_DEBUG(alloc_alignsize);
-
-	/*
 	 * Save off where the contiguous allocations to date have ended
 	 * in econtig32.
 	 */
@@ -1038,10 +1094,7 @@ startup_memlist(void)
 	/*
 	 * To avoid memory allocation collisions in the 32-bit virtual address
 	 * space, make allocations from this point forward in 64-bit virtual
-	 * address space starting at syslimit and working up.  Also use the
-	 * alignment specified by alloc_alignsize, as we may be able to save
-	 * ourselves TLB misses by using larger page sizes if they're
-	 * available.
+	 * address space starting at syslimit and working up.
 	 *
 	 * All this is needed because on large memory systems, the default
 	 * Solaris allocations will collide with SYSBASE32, which is hard
@@ -1058,7 +1111,11 @@ startup_memlist(void)
 	kmem64_base = (caddr_t)syslimit;
 	PRM_DEBUG(kmem64_base);
 
-	alloc_base = (caddr_t)roundup((uintptr_t)kmem64_base, alloc_alignsize);
+	/*
+	 * Allocate addresses, but not physical memory. None of these locations
+	 * can be touched until physical memory is allocated below.
+	 */
+	alloc_base = kmem64_base;
 
 	/*
 	 * If KHME and/or UHME hash buckets won't fit in the nucleus, allocate
@@ -1084,23 +1141,11 @@ startup_memlist(void)
 	 */
 	if (max_mem_nodes > 1) {
 		int mnode;
-		caddr_t alloc_start = alloc_base;
 
 		for (mnode = 1; mnode < max_mem_nodes; mnode++) {
 			alloc_base = alloc_page_freelists(mnode, alloc_base,
 				ecache_alignsize);
 		}
-
-		if (alloc_base > alloc_start) {
-			alloc_base = (caddr_t)roundup((uintptr_t)alloc_base,
-				alloc_alignsize);
-			if ((caddr_t)BOP_ALLOC(bootops, alloc_start,
-				alloc_base - alloc_start,
-				alloc_alignsize) != alloc_start)
-				cmn_err(CE_PANIC,
-					"Unable to alloc page freelists\n");
-		}
-
 		PRM_DEBUG(alloc_base);
 	}
 
@@ -1115,11 +1160,7 @@ startup_memlist(void)
 		alloc_sz = roundup(mmltable_sz, alloc_alignsize);
 		alloc_base = (caddr_t)roundup((uintptr_t)alloc_base,
 		    alloc_alignsize);
-
-		if ((mml_table = (kmutex_t *)BOP_ALLOC(bootops, alloc_base,
-		    alloc_sz, alloc_alignsize)) != (kmutex_t *)alloc_base)
-			panic("mml_table alloc failure");
-
+		mml_table = (kmutex_t *)alloc_base;
 		alloc_base += alloc_sz;
 		PRM_DEBUG(mml_table);
 		PRM_DEBUG(alloc_base);
@@ -1141,11 +1182,7 @@ startup_memlist(void)
 		alloc_base = (caddr_t)roundup((uintptr_t)alloc_base,
 		    alloc_alignsize);
 
-		table = BOP_ALLOC(bootops, alloc_base, alloc_sz,
-				alloc_alignsize);
-
-		if (table != alloc_base)
-			panic("kpmp_table or kpmp_stable alloc failure");
+		table = alloc_base;
 
 		if (kpm_smallpages == 0) {
 			kpmp_table = (kpm_hlk_t *)table;
@@ -1246,13 +1283,9 @@ startup_memlist(void)
 	if (pp_base == NULL) {
 		alloc_base = (caddr_t)roundup((uintptr_t)alloc_base,
 		    alloc_alignsize);
-
 		alloc_sz = roundup(pp_sz, alloc_alignsize);
 
-		if ((pp_base = (struct page *)BOP_ALLOC(bootops,
-		    alloc_base, alloc_sz, alloc_alignsize)) !=
-		    (struct page *)alloc_base)
-			panic("page alloc failure");
+		pp_base = (struct page *)alloc_base;
 
 		alloc_base += alloc_sz;
 	}
@@ -1309,8 +1342,8 @@ startup_memlist(void)
 		 */
 		kpm_npages_setup(memblocks + 4);
 		kpm_pp_sz = (kpm_smallpages == 0) ?
-				kpm_npages * sizeof (kpm_page_t):
-				kpm_npages * sizeof (kpm_spage_t);
+		    kpm_npages * sizeof (kpm_page_t):
+		    kpm_npages * sizeof (kpm_spage_t);
 
 		kpm_pp_base = (uintptr_t)ndata_alloc(&ndata, kpm_pp_sz,
 		    ecache_alignsize);
@@ -1331,9 +1364,7 @@ startup_memlist(void)
 
 		alloc_sz = roundup(alloc_sz, alloc_alignsize);
 
-		if ((bop_base = (uintptr_t)BOP_ALLOC(bootops, alloc_base,
-		    alloc_sz, alloc_alignsize)) != (uintptr_t)alloc_base)
-			panic("system page struct alloc failure");
+		bop_base = (uintptr_t)alloc_base;
 
 		alloc_base += alloc_sz;
 
@@ -1364,12 +1395,6 @@ startup_memlist(void)
 		ASSERT(bop_base <= (uintptr_t)alloc_base);
 	}
 
-	/*
-	 * Initialize per page size free list counters.
-	 */
-	ctrs_end = page_ctrs_alloc(ctrs_base);
-	ASSERT(ctrs_base + ctrs_sz >= ctrs_end);
-
 	PRM_DEBUG(page_hash);
 	PRM_DEBUG(memseg_base);
 	PRM_DEBUG(kpm_pp_base);
@@ -1379,25 +1404,96 @@ startup_memlist(void)
 	PRM_DEBUG(alloc_base);
 
 #ifdef	TRAPTRACE
-	/*
-	 * Allocate trap trace buffer last so as not to affect
-	 * the 4M alignments of the allocations above on V9 SPARCs...
-	 */
 	alloc_base = trap_trace_alloc(alloc_base);
 	PRM_DEBUG(alloc_base);
 #endif	/* TRAPTRACE */
 
-	if (kmem64_base) {
-		/*
-		 * Set the end of the kmem64 segment for V9 SPARCs, if
-		 * appropriate...
-		 */
-		kmem64_end = (caddr_t)roundup((uintptr_t)alloc_base,
-		    alloc_alignsize);
-
-		PRM_DEBUG(kmem64_base);
-		PRM_DEBUG(kmem64_end);
+	/*
+	 * In theory it's possible that kmem64 chunk is 0 sized
+	 * (on very small machines). Check for that.
+	 */
+	if (alloc_base == kmem64_base) {
+		kmem64_base = NULL;
+		kmem64_end = NULL;
+		kmem64_aligned_end = NULL;
+		goto kmem64_alloced;
 	}
+
+	/*
+	 * Allocate kmem64 memory.
+	 * Round up to end of large page and overmap.
+	 * kmem64_end..kmem64_aligned_end is added to memory list for reuse
+	 */
+	kmem64_end = (caddr_t)roundup((uintptr_t)alloc_base,
+	    MMU_PAGESIZE);
+
+	/*
+	 * Make one large memory alloc after figuring out the 64-bit size. This
+	 * will enable use of the largest page size appropriate for the system
+	 * architecture.
+	 */
+	ASSERT(mmu_exported_pagesize_mask & (1 << TTE8K));
+	ASSERT(IS_P2ALIGNED(kmem64_base, TTEBYTES(max_bootlp_tteszc)));
+	for (i = max_bootlp_tteszc; i >= TTE8K; i--) {
+		size_t asize;
+#if !defined(C_OBP)
+		unsigned long long pa;
+#endif	/* !C_OBP */
+
+		if ((mmu_exported_pagesize_mask & (1 << i)) == 0)
+			continue;
+		kmem64_alignsize = TTEBYTES(i);
+		kmem64_szc = i;
+
+		/* limit page size for small memory */
+		if (mmu_btop(kmem64_alignsize) > (npages >> 2))
+			continue;
+
+		kmem64_aligned_end = (caddr_t)roundup((uintptr_t)kmem64_end,
+		    kmem64_alignsize);
+		asize = kmem64_aligned_end - kmem64_base;
+#if !defined(C_OBP)
+		if (prom_allocate_phys(asize, kmem64_alignsize, &pa) == 0) {
+			if (prom_claim_virt(asize, kmem64_base) !=
+			    (caddr_t)-1) {
+				kmem64_pabase = pa;
+				install_kmem64_tte();
+				break;
+			} else {
+				prom_free_phys(asize, pa);
+			}
+		}
+#else	/* !C_OBP */
+		if ((caddr_t)BOP_ALLOC(bootops, kmem64_base, asize,
+		    kmem64_alignsize) == kmem64_base) {
+			kmem64_pabase = va_to_pa(kmem64_base);
+			break;
+		}
+#endif	/* !C_OBP */
+		if (i == TTE8K) {
+			prom_panic("kmem64 allocation failure");
+		}
+	}
+
+	PRM_DEBUG(kmem64_base);
+	PRM_DEBUG(kmem64_end);
+	PRM_DEBUG(kmem64_aligned_end);
+	PRM_DEBUG(kmem64_alignsize);
+
+	/*
+	 * Now set pa using saved va from above.
+	 */
+	if (&ecache_init_scrub_flush_area) {
+		(void) ecache_init_scrub_flush_area(NULL);
+	}
+
+kmem64_alloced:
+
+	/*
+	 * Initialize per page size free list counters.
+	 */
+	ctrs_end = page_ctrs_alloc(ctrs_base);
+	ASSERT(ctrs_base + ctrs_sz >= ctrs_end);
 
 	/*
 	 * Allocate space for the interrupt vector table and also for the
@@ -1406,14 +1502,14 @@ startup_memlist(void)
 	memspace = (caddr_t)BOP_ALLOC(bootops, (caddr_t)intr_vec_table,
 	    IVSIZE, MMU_PAGESIZE);
 	if (memspace != (caddr_t)intr_vec_table)
-		panic("interrupt vector table allocation failure");
+		prom_panic("interrupt vector table allocation failure");
 
 	/*
 	 * The memory lists from boot are allocated from the heap arena
 	 * so that later they can be freed and/or reallocated.
 	 */
 	if (BOP_GETPROP(bootops, "extent", &memlist_sz) == -1)
-		panic("could not retrieve property \"extent\"");
+		prom_panic("could not retrieve property \"extent\"");
 
 	/*
 	 * Between now and when we finish copying in the memory lists,
@@ -1479,6 +1575,20 @@ startup_memlist(void)
 	    &memlist, 0, 0);
 
 	/*
+	 * Add any unused kmem64 memory from overmapped page
+	 * (Note: va_to_pa does not work for kmem64_end)
+	 */
+	if (kmem64_end < kmem64_aligned_end) {
+		uint64_t overlap_size = kmem64_aligned_end - kmem64_end;
+		uint64_t overlap_pa = kmem64_pabase +
+		    (kmem64_end - kmem64_base);
+
+		PRM_DEBUG(overlap_pa);
+		PRM_DEBUG(overlap_size);
+		memlist_add(overlap_pa, overlap_size, &memlist, &phys_avail);
+	}
+
+	/*
 	 * Add any extra memory after e_text to the phys_avail list, as long
 	 * as there's at least a page to add.
 	 */
@@ -1505,7 +1615,7 @@ startup_memlist(void)
 	PRM_DEBUG(memspace);
 
 	if ((caddr_t)memlist > (memspace + memlist_sz))
-		panic("memlist overflow");
+		prom_panic("memlist overflow");
 
 	PRM_DEBUG(pp_base);
 	PRM_DEBUG(memseg_base);
@@ -1563,7 +1673,7 @@ startup_modules(void)
 {
 	int proplen, nhblk1, nhblk8;
 	size_t  nhblksz;
-	pgcnt_t hblk_pages, pages_per_hblk;
+	pgcnt_t pages_per_hblk;
 	size_t hme8blk_sz, hme1blk_sz;
 
 	/*
@@ -1709,49 +1819,35 @@ startup_modules(void)
 	    &boot_physavail, &boot_physavail_len,
 	    &boot_virtavail, &boot_virtavail_len);
 
-	bop_alloc_pages = size_virtalloc(boot_virtavail, boot_virtavail_len);
-
 	/*
 	 * Calculation and allocation of hmeblks needed to remap
-	 * the memory allocated by PROM till now:
-	 *
-	 * (1)  calculate how much virtual memory has been bop_alloc'ed.
-	 * (2)  roundup this memory to span of hme8blk, i.e. 64KB
-	 * (3)  calculate number of hme8blk's needed to remap this memory
-	 * (4)  calculate amount of memory that's consumed by these hme8blk's
-	 * (5)  add memory calculated in steps (2) and (4) above.
-	 * (6)  roundup this memory to span of hme8blk, i.e. 64KB
-	 * (7)  calculate number of hme8blk's needed to remap this memory
-	 * (8)  calculate amount of memory that's consumed by these hme8blk's
-	 * (9)  allocate additional hme1blk's to hold large mappings.
-	 *	H8TOH1 determines this.  The current SWAG gives enough hblk1's
-	 *	to remap everything with 4M mappings.
-	 * (10) account for partially used hblk8's due to non-64K aligned
-	 *	PROM mapping entries.
-	 * (11) add memory calculated in steps (8), (9), and (10) above.
-	 * (12) kmem_zalloc the memory calculated in (11); since segkmem
-	 *	is not ready yet, this gets bop_alloc'ed.
-	 * (13) there will be very few bop_alloc's after this point before
-	 *	trap table takes over
+	 * the memory allocated by PROM till now.
+	 * Overestimate the number of hblk1 elements by assuming
+	 * worst case of TTE64K mappings.
+	 * sfmmu_hblk_alloc will panic if this calculation is wrong.
 	 */
+	bop_alloc_pages = btopr(kmem64_end - kmem64_base);
+	pages_per_hblk = btop(HMEBLK_SPAN(TTE64K));
+	bop_alloc_pages = roundup(bop_alloc_pages, pages_per_hblk);
+	nhblk1 = bop_alloc_pages / pages_per_hblk + hblk1_min;
 
-	/* sfmmu_init_nucleus_hblks expects properly aligned data structures. */
+	bop_alloc_pages = size_virtalloc(boot_virtavail, boot_virtavail_len);
+
+	/* sfmmu_init_nucleus_hblks expects properly aligned data structures */
 	hme8blk_sz = roundup(HME8BLK_SZ, sizeof (int64_t));
 	hme1blk_sz = roundup(HME1BLK_SZ, sizeof (int64_t));
 
+	bop_alloc_pages += btopr(nhblk1 * hme1blk_sz);
+
 	pages_per_hblk = btop(HMEBLK_SPAN(TTE8K));
-	bop_alloc_pages = roundup(bop_alloc_pages, pages_per_hblk);
-	nhblk8 = bop_alloc_pages / pages_per_hblk;
-	nhblk1 = roundup(nhblk8, H8TOH1) / H8TOH1;
-	hblk_pages = btopr(nhblk8 * hme8blk_sz + nhblk1 * hme1blk_sz);
-	bop_alloc_pages += hblk_pages;
-	bop_alloc_pages = roundup(bop_alloc_pages, pages_per_hblk);
-	nhblk8 = bop_alloc_pages / pages_per_hblk;
-	nhblk1 = roundup(nhblk8, H8TOH1) / H8TOH1;
-	if (nhblk1 < hblk1_min)
-		nhblk1 = hblk1_min;
-	if (nhblk8 < hblk8_min)
-		nhblk8 = hblk8_min;
+	nhblk8 = 0;
+	while (bop_alloc_pages > 1) {
+		bop_alloc_pages = roundup(bop_alloc_pages, pages_per_hblk);
+		nhblk8 += bop_alloc_pages /= pages_per_hblk;
+		bop_alloc_pages *= hme8blk_sz;
+		bop_alloc_pages = btopr(bop_alloc_pages);
+	}
+	nhblk8 += 2;
 
 	/*
 	 * Since hblk8's can hold up to 64k of mappings aligned on a 64k
@@ -1834,6 +1930,9 @@ void
 startup_fixup_physavail(void)
 {
 	struct memlist *cur;
+	size_t kmem64_overmap_size = kmem64_aligned_end - kmem64_end;
+
+	PRM_DEBUG(kmem64_overmap_size);
 
 	/*
 	 * take the most current snapshot we can by calling mem-update
@@ -1850,6 +1949,16 @@ startup_fixup_physavail(void)
 	cur = memlist;
 	(void) copy_physavail(boot_physavail, boot_physavail_len,
 	    &memlist, 0, 0);
+
+	/*
+	 * Add any unused kmem64 memory from overmapped page
+	 * (Note: va_to_pa does not work for kmem64_end)
+	 */
+	if (kmem64_overmap_size) {
+		memlist_add(kmem64_pabase + (kmem64_end - kmem64_base),
+		    kmem64_overmap_size,
+		    &memlist, &cur);
+	}
 
 	/*
 	 * Add any extra memory after e_text we added to the phys_avail list

@@ -1245,8 +1245,6 @@ hat_lock_init()
 		    NULL);
 }
 
-extern caddr_t kmem64_base, kmem64_end;
-
 #define	SFMMU_KERNEL_MAXVA \
 	(kmem64_base ? (uintptr_t)kmem64_end : (SYSLIMIT))
 
@@ -9961,7 +9959,7 @@ sfmmu_hblk_alloc(sfmmu_t *sfmmup, caddr_t vaddr,
 				 * make sure that we are calculating the
 				 * number of hblk8's that we need correctly.
 				 */
-				panic("no nucleus hblk8 to allocate");
+				prom_panic("no nucleus hblk8 to allocate");
 			}
 			hmeblkp =
 			    (struct hme_blk *)&nucleus_hblk8.list[index];
@@ -9971,12 +9969,12 @@ sfmmu_hblk_alloc(sfmmu_t *sfmmup, caddr_t vaddr,
 			index = nucleus_hblk1.index;
 			if (nucleus_hblk1.index >= nucleus_hblk1.len) {
 				/*
-				 * If we panic here, see startup_modules()
-				 * and H8TOH1; most likely you need to
-				 * update the calculation of the number
-				 * of hblk1's the kernel needs to boot.
+				 * If we panic here, see startup_modules().
+				 * Most likely you need to update the
+				 * calculation of the number of hblk1 elements
+				 * that the kernel needs to boot.
 				 */
-				panic("no nucleus hblk1 to allocate");
+				prom_panic("no nucleus hblk1 to allocate");
 			}
 			hmeblkp =
 			    (struct hme_blk *)&nucleus_hblk1.list[index];

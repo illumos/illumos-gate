@@ -84,8 +84,9 @@ extern void cmp_set_nosteal_interval(void);
 
 #ifdef	TRAPTRACE
 /*
- * This function bop allocs traptrace buffers for all cpus
+ * This function sets traptrace buffers for all cpus
  * other than boot cpu.
+ * Note that the memory at base will be allocated later.
  */
 caddr_t
 trap_trace_alloc(caddr_t base)
@@ -97,10 +98,8 @@ trap_trace_alloc(caddr_t base)
 		return (base);
 	}
 
-	if ((vaddr = (caddr_t)BOP_ALLOC(bootops, base, (TRAP_TSIZE *
-		(max_ncpus - 1)), TRAP_TSIZE)) == NULL) {
-		panic("traptrace_alloc: can't bop alloc");
-	}
+	vaddr = (caddr_t)base;
+
 	ttrace_buf = vaddr;
 	PRM_DEBUG(ttrace_buf);
 	return (vaddr + (TRAP_TSIZE * (max_ncpus - 1)));

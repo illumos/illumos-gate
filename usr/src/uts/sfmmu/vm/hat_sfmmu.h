@@ -925,7 +925,6 @@ struct hmehash_bucket {
 #define	HME8BLK_SZ	(sizeof (struct hme_blk) + \
 			(NHMENTS - 1) * sizeof (struct sf_hment))
 #define	HME1BLK_SZ	(sizeof (struct hme_blk))
-#define	H8TOH1		(MMU_PAGESIZE4M / MMU_PAGESIZE)
 #define	H1MIN		(2 + MAX_BIGKTSB_TTES)	/* nucleus text+data, ktsb */
 
 /*

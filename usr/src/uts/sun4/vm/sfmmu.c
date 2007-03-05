@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,6 +124,15 @@ va_to_pfn(void *vaddr)
 	if (tba_taken_over)
 		return (hat_getpfnum(kas.a_hat, (caddr_t)vaddr));
 
+#if !defined(C_OBP)
+	if ((caddr_t)vaddr >= kmem64_base && (caddr_t)vaddr < kmem64_end) {
+		if (kmem64_pabase == (uint64_t)-1)
+			prom_panic("va_to_pfn: kmem64_pabase not init");
+		physaddr = kmem64_pabase + ((caddr_t)vaddr - kmem64_base);
+		return ((pfn_t)physaddr >> MMU_PAGESHIFT);
+	}
+#endif	/* !C_OBP */
+
 	if ((prom_translate_virt(vaddr, &valid, &physaddr, &mode) != -1) &&
 	    (valid == -1)) {
 		return ((pfn_t)(physaddr >> MMU_PAGESHIFT));
@@ -169,7 +178,6 @@ hat_kern_setup(void)
 	PRM_DEBUG(ktsb_pbase);
 	PRM_DEBUG(ktsb4m_pbase);
 
-	sfmmu_setup_4lp();
 	sfmmu_patch_ktsb();
 	sfmmu_patch_utsb();
 	sfmmu_patch_mmu_asi(ktsb_phys);
@@ -222,6 +230,12 @@ hat_kern_setup(void)
 #define	COMBINE(hi, lo) (((uint64_t)(uint32_t)(hi) << 32) | (uint32_t)(lo))
 
 /*
+ * Track larges pages used.
+ * Provides observability for this feature on non-debug kernels.
+ */
+ulong_t map_prom_lpcount[MMU_PAGE_SIZES];
+
+/*
  * This function traverses the prom mapping list and creates equivalent
  * mappings in the sfmmu mapping hash.
  */
@@ -243,10 +257,12 @@ sfmmu_map_prom_mappings(struct translation *trans_root, size_t ntrans_root)
 		ASSERT(promt->tte_hi != 0);
 		ASSERT32(promt->virt_hi == 0 && promt->size_hi == 0);
 
+		vaddr = (caddr_t)COMBINE(promt->virt_hi, promt->virt_lo);
+
 		/*
 		 * hack until we get rid of map-for-unix
 		 */
-		if (COMBINE(promt->virt_hi, promt->virt_lo) < KERNELBASE)
+		if (vaddr < (caddr_t)KERNELBASE)
 			continue;
 
 		ttep->tte_inthi = promt->tte_hi;
@@ -301,6 +317,34 @@ sfmmu_map_prom_mappings(struct translation *trans_root, size_t ntrans_root)
 					    "i/o page without side-effect");
 				}
 			}
+
+			/*
+			 * skip kmem64 area
+			 */
+			if (vaddr >= kmem64_base &&
+			    vaddr < kmem64_aligned_end) {
+#if !defined(C_OBP)
+				cmn_err(CE_PANIC,
+				    "unexpected kmem64 prom mapping\n");
+#else	/* !C_OBP */
+				size_t mapsz;
+
+				if (ptob(pfn) !=
+				    kmem64_pabase + (vaddr - kmem64_base)) {
+					cmn_err(CE_PANIC,
+					    "unexpected kmem64 prom mapping\n");
+				}
+
+				mapsz = kmem64_aligned_end - vaddr;
+				if (mapsz >= size) {
+					break;
+				}
+				size -= mapsz;
+				offset += mapsz;
+				continue;
+#endif	/* !C_OBP */
+			}
+
 			oldpfn = sfmmu_vatopfn(vaddr, KHATID, &oldtte);
 			ASSERT(oldpfn != PFN_SUSPENDED);
 			ASSERT(page_relocate_ready == 0);
@@ -335,6 +379,37 @@ sfmmu_map_prom_mappings(struct translation *trans_root, size_t ntrans_root)
 			size -= MMU_PAGESIZE;
 			offset += MMU_PAGESIZE;
 		}
+	}
+
+	/*
+	 * We claimed kmem64 from prom, so now we need to load tte.
+	 */
+	if (kmem64_base != NULL) {
+		pgcnt_t pages;
+		size_t psize;
+		int pszc;
+
+		pszc = kmem64_szc;
+#ifdef sun4u
+		if (pszc > TTE8K) {
+			pszc = segkmem_lpszc;
+		}
+#endif	/* sun4u */
+		psize = TTEBYTES(pszc);
+		pages = btop(psize);
+		basepfn = kmem64_pabase >> MMU_PAGESHIFT;
+		vaddr = kmem64_base;
+		while (vaddr < kmem64_end) {
+			sfmmu_memtte(ttep, basepfn,
+			    PROC_DATA | HAT_NOSYNC, pszc);
+			sfmmu_tteload(kas.a_hat, ttep, vaddr, NULL,
+			    HAT_LOAD_LOCK | SFMMU_NO_TSBLOAD);
+			vaddr += psize;
+			basepfn += pages;
+		}
+		map_prom_lpcount[pszc] =
+		    ((caddr_t)P2ROUNDUP((uintptr_t)kmem64_end, psize) -
+			kmem64_base) >> TTE_PAGE_SHIFT(pszc);
 	}
 }
 
@@ -714,13 +789,18 @@ calc_tsb_sizes(pgcnt_t npages)
 	 * We choose the TSB to hold kernel 4M mappings to have twice
 	 * the reach as the primary kernel TSB since this TSB will
 	 * potentially (currently) be shared by both mappings to all of
-	 * physical memory plus user TSBs.  Since the current
-	 * limit on primary kernel TSB size is 16MB this will top out
-	 * at 64K which we can certainly afford.
+	 * physical memory plus user TSBs. If this TSB has to be in nucleus
+	 * (only for Spitfire and Cheetah) limit its size to 64K.
 	 */
-	ktsb4m_szcode = ktsb_szcode - (MMU_PAGESHIFT4M - MMU_PAGESHIFT) + 1;
-	if (ktsb4m_szcode < TSB_MIN_SZCODE)
-		ktsb4m_szcode = TSB_MIN_SZCODE;
+	ktsb4m_szcode = highbit((2 * npages) / TTEPAGES(TTE4M) - 1);
+	ktsb4m_szcode -= TSB_START_SIZE;
+	ktsb4m_szcode = MAX(ktsb4m_szcode, TSB_MIN_SZCODE);
+	ktsb4m_szcode = MIN(ktsb4m_szcode, TSB_SOFTSZ_MASK);
+	if ((enable_bigktsb == 0 || ktsb_phys == 0) && ktsb4m_szcode >
+	    TSB_64K_SZCODE) {
+		ktsb4m_szcode = TSB_64K_SZCODE;
+		max_bootlp_tteszc = TTE8K;
+	}
 
 	ktsb_sz = TSB_BYTES(ktsb_szcode);	/* kernel 8K tsb size */
 	ktsb4m_sz = TSB_BYTES(ktsb4m_szcode);	/* kernel 4M tsb size */
@@ -733,6 +813,11 @@ calc_tsb_sizes(pgcnt_t npages)
 int
 ndata_alloc_tsbs(struct memlist *ndata, pgcnt_t npages)
 {
+	/*
+	 * Set ktsb_phys to 1 if the processor supports ASI_QUAD_LDD_PHYS.
+	 */
+	sfmmu_setup_4lp();
+
 	/*
 	 * Size the kernel TSBs based upon the amount of physical
 	 * memory in the system.
@@ -755,13 +840,17 @@ ndata_alloc_tsbs(struct memlist *ndata, pgcnt_t npages)
 	/*
 	 * Next, allocate 4M kernel TSB from the nucleus since it's small.
 	 */
-	if ((ktsb4m_base = ndata_alloc(ndata, ktsb4m_sz, ktsb4m_sz)) == NULL)
-		return (-1);
-	ASSERT(!((uintptr_t)ktsb4m_base & (ktsb4m_sz - 1)));
+	if (ktsb4m_szcode <= TSB_64K_SZCODE) {
 
-	PRM_DEBUG(ktsb4m_base);
-	PRM_DEBUG(ktsb4m_sz);
-	PRM_DEBUG(ktsb4m_szcode);
+		ktsb4m_base = ndata_alloc(ndata, ktsb4m_sz, ktsb4m_sz);
+		if (ktsb4m_base == NULL)
+			return (-1);
+		ASSERT(!((uintptr_t)ktsb4m_base & (ktsb4m_sz - 1)));
+
+		PRM_DEBUG(ktsb4m_base);
+		PRM_DEBUG(ktsb4m_sz);
+		PRM_DEBUG(ktsb4m_szcode);
+	}
 
 	return (0);
 }
@@ -927,42 +1016,31 @@ ndata_alloc_hat(struct memlist *ndata, pgcnt_t npages, pgcnt_t kpm_npages)
 	return (0);
 }
 
+/*
+ * Allocate virtual addresses at base with given alignment.
+ * Note that there is no physical memory behind the address yet.
+ */
 caddr_t
-alloc_hme_buckets(caddr_t base, int pagesize)
+alloc_hme_buckets(caddr_t base, int alignsize)
 {
 	size_t hmehash_sz = (uhmehash_num + khmehash_num) *
-	sizeof (struct hmehash_bucket);
+	    sizeof (struct hmehash_bucket);
 
 	ASSERT(khme_hash == NULL);
 	ASSERT(uhme_hash == NULL);
 
-	/* If no pagesize specified, use default MMU pagesize */
-	if (!pagesize)
-		pagesize = MMU_PAGESIZE;
+	base = (caddr_t)roundup((uintptr_t)base, alignsize);
+	hmehash_sz = roundup(hmehash_sz, alignsize);
 
-	/*
-	 * If we start aligned and ask for a multiple of a pagesize, and OBP
-	 * supports large pages, we will then use mappings of the largest size
-	 * possible for the BOP_ALLOC, possibly saving us tens of thousands of
-	 * TLB miss-induced traversals of the TSBs and/or the HME hashes...
-	 */
-	base = (caddr_t)roundup((uintptr_t)base, pagesize);
-	hmehash_sz = roundup(hmehash_sz, pagesize);
-
-	khme_hash = (struct hmehash_bucket *)BOP_ALLOC(bootops, base,
-		hmehash_sz, pagesize);
-
-	if ((caddr_t)khme_hash != base)
-		cmn_err(CE_PANIC, "Cannot bop_alloc hme hash buckets.");
-
+	khme_hash = (struct hmehash_bucket *)base;
 	uhme_hash = (struct hmehash_bucket *)((caddr_t)khme_hash +
-		khmehash_num * sizeof (struct hmehash_bucket));
+	    khmehash_num * sizeof (struct hmehash_bucket));
 	base += hmehash_sz;
 	return (base);
 }
 
 /*
- * This function bop allocs the kernel TSB.
+ * This function bop allocs kernel TSBs.
  */
 caddr_t
 sfmmu_ktsb_alloc(caddr_t tsbbase)
@@ -975,10 +1053,24 @@ sfmmu_ktsb_alloc(caddr_t tsbbase)
 		    ktsb_sz);
 		if (vaddr != ktsb_base)
 			cmn_err(CE_PANIC, "sfmmu_ktsb_alloc: can't alloc"
-			    " bigktsb");
+			    " 8K bigktsb");
 		ktsb_base = vaddr;
 		tsbbase = ktsb_base + ktsb_sz;
 		PRM_DEBUG(ktsb_base);
+		PRM_DEBUG(tsbbase);
+	}
+
+	if (ktsb4m_szcode > TSB_64K_SZCODE) {
+		ASSERT(ktsb_phys && enable_bigktsb);
+		ktsb4m_base = (caddr_t)roundup((uintptr_t)tsbbase, ktsb4m_sz);
+		vaddr = (caddr_t)BOP_ALLOC(bootops, ktsb4m_base, ktsb4m_sz,
+		    ktsb4m_sz);
+		if (vaddr != ktsb4m_base)
+			cmn_err(CE_PANIC, "sfmmu_ktsb_alloc: can't alloc"
+			    " 4M bigktsb");
+		ktsb4m_base = vaddr;
+		tsbbase = ktsb4m_base + ktsb4m_sz;
+		PRM_DEBUG(ktsb4m_base);
 		PRM_DEBUG(tsbbase);
 	}
 	return (tsbbase);

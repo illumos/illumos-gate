@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -423,6 +423,14 @@ extern int consistent_coloring;
 extern uint_t vac_colors_mask;
 extern int vac_size;
 extern int vac_shift;
+
+/*
+ * Kernel mem segment in 64-bit space
+ */
+extern caddr_t kmem64_base, kmem64_end, kmem64_aligned_end;
+extern int kmem64_alignsize, kmem64_szc;
+extern uint64_t kmem64_pabase;
+extern int max_bootlp_tteszc;
 
 /*
  * Maximum and default values for user heap, stack, private and shared
