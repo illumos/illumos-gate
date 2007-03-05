@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +55,7 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	userattr_t *user_entry;
 	char	*kva_value;
 	char	*username;
+	char	*auser;
 	char	*ruser;
 	char	*rhost;
 	char messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
@@ -67,6 +67,8 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	int allow_remote = 0;
 
 	(void) pam_get_item(pamh, PAM_USER, (void **)&username);
+
+	(void) pam_get_item(pamh, PAM_AUSER, (void **)&auser);
 
 	(void) pam_get_item(pamh, PAM_RUSER, (void **)&ruser);
 
@@ -89,9 +91,12 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 		(void) pam_get_item(pamh, PAM_SERVICE, (void **)&service);
 		__pam_log(LOG_AUTH | LOG_DEBUG, "pam_roles:pam_sm_acct_mgmt: "
-			"service = %s user = %s ruser = %s rhost = %s\n",
+			"service = %s, allow_remote = %d, user = %s auser = %s "
+			"ruser = %s rhost = %s\n",
 			(service) ? service : "not set",
+			allow_remote,
 			(username) ? username : "not set",
+			(auser) ? auser: "not set",
 			(ruser) ? ruser: "not set",
 			(rhost) ? rhost: "not set");
 	}
@@ -133,7 +138,23 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 	/* Who's the user requesting the role? */
 
-	if (ruser == NULL || *ruser == '\0') {
+	if (auser != NULL && *auser != '\0') {
+		/* authenticated requesting user */
+
+		user_entry = getusernam(auser);
+	} else if ((ruser != NULL && *ruser != '\0') &&
+	    (rhost == NULL || *rhost == '\0')) {
+		/*
+		 * PAM_RUSER is set but PAM_RHOST is not; this is
+		 * used by SMC and is a temporary solution until SMC
+		 * is converted to use the proper PAM_AUSER to specify
+		 * the "come-from" username.
+		 */
+		if (strcmp(username, ruser) == 0) {
+			return (PAM_IGNORE);
+		}
+		user_entry = getusernam(ruser);
+	} else {
 		/* user is implied by real UID */
 
 		if ((uid = getuid()) == 0) {
@@ -149,22 +170,10 @@ pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 			}
 			user_entry = getusernam(pw_entry->pw_name);
 		}
-	} else if (rhost == NULL || *rhost == '\0') {
-		/*
-		 * PAM_RUSER is set but PAM_RHOST is not; this is
-		 * used by SMC and is a temporary solution until a proper
-		 * interface is designed that specifies a "come-from"
-		 * username.
-		 */
-		if (strcmp(username, ruser) == 0) {
-			return (PAM_IGNORE);
-		}
-		user_entry = getusernam(ruser);
-	} else {
-		user_entry = getusernam(ruser);
 	}
 
-	if (rhost != NULL && allow_remote == 0) {
+	if ((rhost != NULL && *rhost != '\0') &&
+	    allow_remote == 0) {
 		/* don't allow remote roles for this service */
 
 		free_userattr(user_entry);
