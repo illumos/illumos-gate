@@ -296,10 +296,8 @@ space_map_load(space_map_t *sm, space_map_ops_t *ops, uint8_t maptype,
 	space_map_obj_t *smo, objset_t *os)
 {
 	uint64_t *entry, *entry_map, *entry_map_end;
-	uint64_t bufsize, size, offset;
+	uint64_t bufsize, size, offset, end, space;
 	uint64_t mapstart = sm->sm_start;
-	uint64_t end = smo->smo_objsize;
-	uint64_t space = smo->smo_alloc;
 
 	ASSERT(MUTEX_HELD(sm->sm_lock));
 
@@ -309,6 +307,8 @@ space_map_load(space_map_t *sm, space_map_ops_t *ops, uint8_t maptype,
 		return (0);
 
 	sm->sm_loading = B_TRUE;
+	end = smo->smo_objsize;
+	space = smo->smo_alloc;
 
 	ASSERT(sm->sm_ops == NULL);
 	VERIFY3U(sm->sm_space, ==, 0);
