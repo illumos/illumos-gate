@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -2230,6 +2229,7 @@ pr_szoneid(proc_t *p, zoneid_t zoneid, cred_t *cr)
 	cred_t *oldcred;
 	cred_t *newcred;
 	zone_t *zptr;
+	zoneid_t oldzoneid;
 
 	if (secpolicy_zone_config(cr) != 0)
 		return (EPERM);
@@ -2239,9 +2239,11 @@ pr_szoneid(proc_t *p, zoneid_t zoneid, cred_t *cr)
 		return (EINVAL);
 	mutex_exit(&p->p_lock);
 	mutex_enter(&p->p_crlock);
-	crhold(oldcred = p->p_cred);
+	oldcred = p->p_cred;
+	crhold(oldcred);
 	mutex_exit(&p->p_crlock);
 	newcred = crdup(oldcred);
+	oldzoneid = crgetzoneid(oldcred);
 	crfree(oldcred);
 
 	crsetzone(newcred, zptr);
@@ -2253,6 +2255,18 @@ pr_szoneid(proc_t *p, zoneid_t zoneid, cred_t *cr)
 	mutex_exit(&p->p_crlock);
 	crfree(oldcred);
 
+	/*
+	 * The target process is changing zones (according to its cred), so
+	 * update the per-zone upcounts, which are based on process creds.
+	 */
+	if (oldzoneid != zoneid) {
+		uid_t ruid = crgetruid(newcred);
+
+		mutex_enter(&pidlock);
+		upcount_dec(ruid, oldzoneid);
+		upcount_inc(ruid, zoneid);
+		mutex_exit(&pidlock);
+	}
 	/*
 	 * Broadcast the cred change to the threads.
 	 */
