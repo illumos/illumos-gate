@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/*
+ * Definitions, register offsets, register structure etc pertaining to
+ * the memory controller on AMD64 systems.  These are used by both the
+ * AMD cpu module and the mc-amd driver.
+ */
 
 /*
  * The mc-amd driver exports an nvlist to userland, where the primary
@@ -116,52 +122,6 @@ extern "C" {
 #define	MC_CHIP_DIMMPERCS	2	/* max number of dimms per cs */
 #define	MC_CHIP_DIMMPAIR(csnum)	(csnum / MC_CHIP_DIMMPERCS)
 
-#if	MC_CHIP_DIMMPERCS > MC_UNUM_NDIMM
-#error	"MC_CHIP_DIMMPERCS exceeds MC_UNUM_NDIMM"
-#endif
-
-/*
- * MC_REV_* are used a a convenient shorter form of the X86_CHIPREV
- * counterparts; these must map directly as we fill mcp_rev from
- * a cpuid_getchiprev call.
- */
-#define	MC_REV_UNKNOWN	X86_CHIPREV_UNKNOWN
-#define	MC_REV_B	X86_CHIPREV_AMD_F_REV_B
-#define	MC_REV_C	(X86_CHIPREV_AMD_F_REV_C0 | X86_CHIPREV_AMD_F_REV_CG)
-#define	MC_REV_D	X86_CHIPREV_AMD_F_REV_D
-#define	MC_REV_E	X86_CHIPREV_AMD_F_REV_E
-#define	MC_REV_F	X86_CHIPREV_AMD_F_REV_F
-#define	MC_REV_G	X86_CHIPREV_AMD_F_REV_G
-
-/*
- * The most common groupings for memory controller features.
- */
-#define	MC_REVS_BC	(MC_REV_B | MC_REV_C)
-#define	MC_REVS_DE	(MC_REV_D | MC_REV_E)
-#define	MC_REVS_BCDE	(MC_REVS_BC | MC_REVS_DE)
-#define	MC_REVS_FG	(MC_REV_F | MC_REV_G)
-
-/*
- * Is 'rev' included in the 'revmask' bitmask?
- */
-#define	MC_REV_MATCH(rev, revmask)	X86_CHIPREV_MATCH(rev, revmask)
-
-/*
- * Is 'rev' at least revision 'revmin' or greater
- */
-#define	MC_REV_ATLEAST(rev, minrev)	X86_CHIPREV_ATLEAST(rev, minrev)
-
-/*
- * Chip socket types
- */
-#define	MC_SKT_UNKNOWN	0x0
-#define	MC_SKT_754	0x1
-#define	MC_SKT_939	0x2
-#define	MC_SKT_940	0x3
-#define	MC_SKT_S1g1	0x4
-#define	MC_SKT_AM2	0x5
-#define	MC_SKT_F1207	0x6
-
 /*
  * Memory controller registers are read via PCI config space accesses on
  * bus 0, device 24 + NodeId, and function as follows:
@@ -170,7 +130,15 @@ extern "C" {
  * Function 1: Address Map
  * Function 2: DRAM Controller & HyperTransport Technology Trace Mode
  * Function 3: Miscellaneous Control
- *
+ */
+enum mc_funcnum {
+	MC_FUNC_HTCONFIG = 0,
+	MC_FUNC_ADDRMAP	= 1,
+	MC_FUNC_DRAMCTL = 2,
+	MC_FUNC_MISCCTL = 3
+};
+
+/*
  * For a given (bus, device, function) a particular offset selects the
  * desired register.  All registers are 32-bits wide.
  *
@@ -188,6 +156,45 @@ extern "C" {
  * through mcamd_get_numprop.  As such we expect most/all use of the
  * structures and macros defined below to be in those attach codepaths.
  */
+
+/*
+ * Function 0 (HT Config) offsets
+ */
+#define	MC_HT_REG_RTBL_NODE_0	0x40
+#define	MC_HT_REG_RTBL_INCR	4
+#define	MC_HT_REG_NODEID	0x60
+#define	MC_HT_REG_UNITID	0x64
+
+/*
+ * Function 1 (address map) offsets for DRAM base, DRAM limit, DRAM hole
+ * registers.
+ */
+#define	MC_AM_REG_DRAMBASE_0	0x40	/* Offset for DRAM Base 0 */
+#define	MC_AM_REG_DRAMLIM_0	0x44	/* Offset for DRAM Limit 0 */
+#define	MC_AM_REG_DRAM_INCR	8	/* incr between base/limit pairs */
+#define	MC_AM_REG_HOLEADDR	0xf0	/* DRAM Hole Address Register */
+
+/*
+ * Function 2 (dram controller) offsets for chip-select base, chip-select mask,
+ * DRAM bank address mapping, DRAM configuration registers.
+ */
+#define	MC_DC_REG_CS_INCR	4	/* incr for CS base and mask */
+#define	MC_DC_REG_CSBASE_0	0x40	/* 0x40 - 0x5c */
+#define	MC_DC_REG_CSMASK_0	0x60	/* 0x60 - 0x7c */
+#define	MC_DC_REG_BANKADDRMAP	0x80	/* DRAM Bank Address Mapping */
+#define	MC_DC_REG_DRAMCFGLO	0x90	/* DRAM Configuration Low */
+#define	MC_DC_REG_DRAMCFGHI	0x94	/* DRAM Configuration High */
+#define	MC_DC_REG_DRAMMISC	0xa0	/* DRAM Miscellaneous */
+
+/*
+ * Function 3 (misc control) offset for NB MCA config, scrubber control
+ * and online spare control.
+ */
+#define	MC_CTL_REG_NBCFG	0x44	/* MCA NB configuration register */
+#define	MC_CTL_REG_SCRUBCTL	0x58	/* Scrub control register */
+#define	MC_CTL_REG_SCRUBADDR_LO	0x5c	/* DRAM Scrub Address Low */
+#define	MC_CTL_REG_SCRUBADDR_HI	0x60	/* DRAM Scrub Address High */
+#define	MC_CTL_REG_SPARECTL	0xb0	/* On-line spare control register */
 
 /*
  * Registers will be represented as unions, with one fixed-width unsigned
@@ -213,6 +220,32 @@ extern "C" {
  * (even if the BKDG varies a little) so that the MC_REG_FIELD_* macros
  * can lookup that member based on revision only.
  */
+
+#define	MC_REV_UNKNOWN	X86_CHIPREV_UNKNOWN
+#define	MC_REV_B	X86_CHIPREV_AMD_F_REV_B
+#define	MC_REV_C	(X86_CHIPREV_AMD_F_REV_C0 | X86_CHIPREV_AMD_F_REV_CG)
+#define	MC_REV_D	X86_CHIPREV_AMD_F_REV_D
+#define	MC_REV_E	X86_CHIPREV_AMD_F_REV_E
+#define	MC_REV_F	X86_CHIPREV_AMD_F_REV_F
+#define	MC_REV_G	X86_CHIPREV_AMD_F_REV_G
+
+/*
+ * The most common groupings for memory controller features.
+ */
+#define	MC_REVS_BC	(MC_REV_B | MC_REV_C)
+#define	MC_REVS_DE	(MC_REV_D | MC_REV_E)
+#define	MC_REVS_BCDE	(MC_REVS_BC | MC_REVS_DE)
+#define	MC_REVS_FG	(MC_REV_F | MC_REV_G)
+
+/*
+ * Is 'rev' included in the 'revmask' bitmask?
+ */
+#define	MC_REV_MATCH(rev, revmask)	X86_CHIPREV_MATCH(rev, revmask)
+
+/*
+ * Is 'rev' at least revision 'revmin' or greater
+ */
+#define	MC_REV_ATLEAST(rev, minrev)	X86_CHIPREV_ATLEAST(rev, minrev)
 
 #define	_MCREG_FIELD(up, revsuffix, field) ((up)->_fmt_##revsuffix.field)
 

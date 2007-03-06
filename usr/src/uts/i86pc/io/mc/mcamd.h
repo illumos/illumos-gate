@@ -29,6 +29,12 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+/*
+ * Header file for the mc-amd AMD memory-controller driver.  This should be
+ * included from that driver source alone - any more-widely useful definitions
+ * belong in mc_amd.h.
+ */
+
 #include <sys/types.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
@@ -41,77 +47,32 @@
 extern "C" {
 #endif
 
+#if	MC_CHIP_DIMMPERCS > MC_UNUM_NDIMM
+#error	"MC_CHIP_DIMMPERCS exceeds MC_UNUM_NDIMM"
+#endif
+
 /*
- * PCI configuration space functions for the memory controller.  Note that
- * the function numbers here also serve as the mc_func indices in the mc_t.
- * We will not attach to function 3 "Miscellaneous Control" pci1022,1103
+ * The memory controller configuration registers are accessed via PCI bus 0,
+ * device 0x18 + nodeid, functions 0 to 3.  The function numbers are
+ * MC_FUNC_*, defined in mc_amd.h.
+ *
+ * We do not attach to function 3 "Miscellaneous Control" pci1022,1103
  * since the agpgart driver already attaches to that function; instead we
  * retrieve what function 3 parameters we require via direct PCI Mechanism 1
- * accesses.
- */
-enum mc_funcnum {
-	MC_FUNC_HTCONFIG = 0,
-#define	MC_FUNC_HTCONFIG_BINDNM	"pci1022,1100"
-	MC_FUNC_ADDRMAP	= 1,
-#define	MC_FUNC_ADDRMAP_BINDNM	"pci1022,1101"
-	MC_FUNC_DRAMCTL = 2,
-#define	MC_FUNC_DRAMCTL_BINDNM	"pci1022,1102"
-	MC_FUNC_MISCCTL = 3
-};
-
-/*
- * The memory controller driver attaches to several device nodes, but publishes
+ * accesses
+ *
+ * The memory controller driver attaches to these device nodes, but publishes
  * a single minor node.  We need to ensure that the minor node can be
- * consistently mapped back to a single (and the same) device node, so we need
- * to pick one to be used.  We'll use the misc control device node, as it'll
- * be the last to be attached (since we do not attach function 3)
+ * consistently mapped back to a single (and the same) device node, so we
+ * need to pick one to be used.  We'll use the dram address map device node,
+ * as it'll be the last to be attached.
  */
 #define	MC_FUNC_DEVIMAP		MC_FUNC_DRAMCTL
+#define	MC_FUNC_NUM		(MC_FUNC_MISCCTL + 1)
 
-#define	MC_FUNC_NUM		4	/* include MISCCTL, even if no attach */
-
-/*
- * The following define the offsets at which various MC registers are
- * accessed in PCI config space.  For defines describing the register
- * structure see mc_amd.h.
- */
-
-/*
- * Function 0 (HT Config) offsets
- */
-#define	MC_HT_REG_RTBL_NODE_0	0x40
-#define	MC_HT_REG_RTBL_INCR	4
-#define	MC_HT_REG_NODEID	0x60
-#define	MC_HT_REG_UNITID	0x64
-
-/*
- * Function 1 (address mask) offsets for DRAM base, DRAM limit, DRAM hole
- * registers.
- */
-#define	MC_AM_REG_DRAMBASE_0	0x40	/* Offset for DRAM Base 0 */
-#define	MC_AM_REG_DRAMLIM_0	0x44	/* Offset for DRAM Limit 0 */
-#define	MC_AM_REG_DRAM_INCR	8	/* incr between base/limit pairs */
-#define	MC_AM_REG_HOLEADDR	0xf0	/* DRAM Hole Address Register */
-
-/*
- * Function 2 (dram controller) offsets for chip-select base, chip-select mask,
- * DRAM bank address mapping, DRAM configuration registers.
- */
-#define	MC_DC_REG_CS_INCR	4	/* incr for CS base and mask */
-#define	MC_DC_REG_CSBASE_0	0x40	/* 0x40 - 0x5c */
-#define	MC_DC_REG_CSMASK_0	0x60	/* 0x60 - 0x7c */
-#define	MC_DC_REG_BANKADDRMAP	0x80
-#define	MC_DC_REG_DRAMCFGLO	0x90
-#define	MC_DC_REG_DRAMCFGHI	0x94
-#define	MC_DC_REG_DRAMMISC	0xa0
-
-/*
- * Function 3 (misc control) offset for NB MCA config, scrubber control
- * and online spare control.
- */
-#define	MC_CTL_REG_NBCFG	0x44	/* MCA NB configuration register */
-#define	MC_CTL_REG_SCRUBCTL	0x58	/* Scrub control register */
-#define	MC_CTL_REG_SPARECTL	0xb0	/* On-line spare control register */
+#define	MC_FUNC_HTCONFIG_BINDNM	"pci1022,1100"
+#define	MC_FUNC_ADDRMAP_BINDNM	"pci1022,1101"
+#define	MC_FUNC_DRAMCTL_BINDNM	"pci1022,1102"
 
 typedef struct mc_func {
 	uint_t mcf_instance;

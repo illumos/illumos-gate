@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -213,13 +213,15 @@ struct ao_chipshared {
 	uint64_t aos_bcfg_nb_misc;	/* BIOS value of MC4_MISC */
 	uint32_t aos_bcfg_nb_cfg;	/* BIOS value of NB MCA Config */
 	uint32_t aos_bcfg_nb_sparectl;	/* BIOS value of Online Spare Control */
+	uint32_t aos_bcfg_dcfg_lo;	/* BIOS value of DRAM Config Low */
+	uint32_t aos_bcfg_dcfg_hi;	/* BIOS value of DRAM Config High */
 };
 
 /* Bit numbers for aos_cfgonce */
 enum ao_cfgonce_bitnum {
-	AO_CFGONCE_NBMCA
+	AO_CFGONCE_NBMCA,
+	AO_CFGONCE_DRAMCFG
 };
-
 
 /*
  * Per-CPU state

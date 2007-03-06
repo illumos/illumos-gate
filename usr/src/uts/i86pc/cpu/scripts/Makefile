@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,7 +36,7 @@ GROUP=		bin
 
 .KEEP_STATE:
 
-all install setup: $(PERLFILES)
+def all install setup: $(PERLFILES)
 
 clean clobber:
 	$(RM) $(PERLFILES)

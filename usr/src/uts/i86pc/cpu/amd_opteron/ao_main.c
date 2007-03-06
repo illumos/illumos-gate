@@ -71,6 +71,19 @@ ao_init(cpu_t *cp, void **datap)
 	if (!(cap & MCG_CAP_CTL_P))
 		return (ENOTSUP);
 
+	/*
+	 * Arrange to fallback to generic.cpu if the bank count is not
+	 * as expected.  We're not silent about this - if we have X86_MCA
+	 * and MCG_CAP_CTL_P then we appear not to be virtualized.
+	 */
+	if ((cap & MCG_CAP_COUNT_MASK) != AMD_MCA_BANK_COUNT) {
+		cmn_err(CE_WARN, "CPU %d has %llu MCA banks; expected %u: "
+		    "disabling AMD-specific MCA support on this CPU",
+		    cp->cpu_id, (u_longlong_t)cap & MCG_CAP_COUNT_MASK,
+		    AMD_MCA_BANK_COUNT);
+		return (ENOTSUP);
+	}
+
 	ao = *datap = kmem_zalloc(sizeof (ao_data_t), KM_SLEEP);
 	ao->ao_cpu = cp;
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -320,21 +320,6 @@ extern "C" {
 #define	AMD_BANK_MKSYND(synd) \
 	(((uint64_t)(synd) << AMD_BANK_STAT_SYND_SHIFT) & \
 	AMD_BANK_STAT_SYND_MASK)
-
-/* northbridge (NB) status registers */
-
-#define	AMD_NB_FUNC			3
-#define	AMD_NB_REG_CFG			0x44
-#define	AMD_NB_REG_STLO			0x48	/* alias: NB_STATUS[0:31] */
-#define	AMD_NB_REG_STHI			0x4c	/* alias: NB_STATUS[32:63] */
-#define	AMD_NB_REG_ADDRLO		0x50	/* alias: NB_ADDR[0:31] */
-#define	AMD_NB_REG_ADDRHI		0x54	/* alias: NB_ADDR[32:63] */
-
-#define	AMD_NB_REG_SCRUBCTL		0x58
-#define	AMD_NB_REG_SCRUBADDR_LO		0x5c
-#define	AMD_NB_REG_SCRUBADDR_HI		0x60
-
-#define	AMD_NB_REG_SPARECTL		0xb0
 
 #define	AMD_NB_STAT_DRAMCHANNEL		0x0000020000000000ULL
 #define	AMD_NB_STAT_LDTLINK_MASK	0x0000007000000000ULL

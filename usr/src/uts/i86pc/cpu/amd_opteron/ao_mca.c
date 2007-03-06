@@ -408,7 +408,7 @@ nb_mcamisc_init(ao_data_t *ao, uint32_t rev)
 }
 
 /*
- * NorthBridge (NB) Configuration.
+ * NorthBridge (NB) MCA Configuration.
  *
  * We add and remove bits from the BIOS-configured value, rather than
  * writing an absolute value.  The variables ao_nb_cfg_{add,remove}_cmn and
@@ -483,7 +483,7 @@ ao_nb_cfg(ao_data_t *ao, uint32_t rev)
 	 * modify the settings accordingly, and store the new value back.
 	 */
 	ao->ao_shared->aos_bcfg_nb_cfg = val =
-	    ao_pcicfg_read(chipid, AMD_NB_FUNC, AMD_NB_REG_CFG);
+	    ao_pcicfg_read(chipid, MC_FUNC_MISCCTL, MC_CTL_REG_NBCFG);
 
 	switch (ao_nb_watchdog_policy) {
 	case AO_NB_WDOG_LEAVEALONE:
@@ -528,7 +528,28 @@ ao_nb_cfg(ao_data_t *ao, uint32_t rev)
 		nbcp++;
 	}
 
-	ao_pcicfg_write(chipid, AMD_NB_FUNC, AMD_NB_REG_CFG, val);
+	ao_pcicfg_write(chipid, MC_FUNC_MISCCTL, MC_CTL_REG_NBCFG, val);
+}
+
+static void
+ao_dram_cfg(ao_data_t *ao, uint32_t rev)
+{
+	uint_t chipid = pg_plat_hw_instance_id(CPU, PGHW_CHIP);
+	union mcreg_dramcfg_lo dcfglo;
+
+	ao->ao_shared->aos_bcfg_dcfg_lo = MCREG_VAL32(&dcfglo) =
+	    ao_pcicfg_read(chipid, MC_FUNC_DRAMCTL, MC_DC_REG_DRAMCFGLO);
+	ao->ao_shared->aos_bcfg_dcfg_hi =
+	    ao_pcicfg_read(chipid, MC_FUNC_DRAMCTL, MC_DC_REG_DRAMCFGHI);
+
+#ifdef OPTERON_ERRATUM_172
+	if (X86_CHIPREV_MATCH(rev, AO_REVS_FG) &&
+	    MCREG_FIELD_revFG(&dcfglo, ParEn)) {
+		MCREG_FIELD_revFG(&dcfglo, ParEn) = 0;
+		ao_pcicfg_write(chipid, MC_FUNC_DRAMCTL, MC_DC_REG_DRAMCFGLO,
+		    MCREG_VAL32(&dcfglo));
+	}
+#endif
 }
 
 /*
@@ -552,7 +573,7 @@ ao_sparectl_cfg(ao_data_t *ao)
 	int chan, cs;
 
 	ao->ao_shared->aos_bcfg_nb_sparectl = MCREG_VAL32(&sparectl) =
-	    ao_pcicfg_read(chipid, AMD_NB_FUNC, AMD_NB_REG_SPARECTL);
+	    ao_pcicfg_read(chipid, MC_FUNC_MISCCTL, MC_CTL_REG_SPARECTL);
 
 	if (ao_nb_cfg_sparectl_noseize)
 		return;	/* stash BIOS value, but no changes */
@@ -568,7 +589,7 @@ ao_sparectl_cfg(ao_data_t *ao)
 	MCREG_FIELD_revFG(&sparectl, EccErrCntWrEn) = 1;
 
 	/* First write, preparing for writes to EccErrCnt */
-	ao_pcicfg_write(chipid, AMD_NB_FUNC, AMD_NB_REG_SPARECTL,
+	ao_pcicfg_write(chipid, MC_FUNC_MISCCTL, MC_CTL_REG_SPARECTL,
 	    MCREG_VAL32(&sparectl));
 
 	/*
@@ -580,8 +601,8 @@ ao_sparectl_cfg(ao_data_t *ao)
 
 		for (cs = 0; cs < MC_CHIP_NCS; cs++) {
 			MCREG_FIELD_revFG(&sparectl, EccErrCntDramCs) = cs;
-			ao_pcicfg_write(chipid, AMD_NB_FUNC,
-			    AMD_NB_REG_SPARECTL, MCREG_VAL32(&sparectl));
+			ao_pcicfg_write(chipid, MC_FUNC_MISCCTL,
+			    MC_CTL_REG_SPARECTL, MCREG_VAL32(&sparectl));
 		}
 	}
 }
@@ -1052,25 +1073,21 @@ ao_mca_init(void *data)
 {
 	ao_data_t *ao = data;
 	ao_mca_t *mca = &ao->ao_mca;
-	uint64_t cap;
+	uint64_t cap = rdmsr(IA32_MSR_MCG_CAP);
 	uint32_t rev;
-	int donb;
+	int donb, dodcfg;
 	int i;
 
-	ASSERT(x86_feature & X86_MCA);
-	cap = rdmsr(IA32_MSR_MCG_CAP);
-	ASSERT(cap & MCG_CAP_CTL_P);
-
 	/*
-	 * If the hardware's bank count is different than what we expect, then
-	 * we're running on some Opteron variant that we don't understand yet.
+	 * cmi_mca_init is only called during cpu startup if features include
+	 * X86_MCA (defined as both MCA and MCE support indicated by CPUID).
+	 * Furthermore, our ao_init function returns ENOTSUP if features
+	 * lacked X86_MCA, IA32_MSR_MCG_CAP lacks MCG_CAP_CTL_P, or the
+	 * cpu has an unexpected number of detector banks.
 	 */
-	if ((cap & MCG_CAP_COUNT_MASK) != AMD_MCA_BANK_COUNT) {
-		cmn_err(CE_WARN, "CPU %d has %llu MCA banks; expected %u: "
-		    "disabling MCA on this CPU", ao->ao_cpu->cpu_id,
-		    (u_longlong_t)cap & MCG_CAP_COUNT_MASK, AMD_MCA_BANK_COUNT);
-		return;
-	}
+	ASSERT(x86_feature & X86_MCA);
+	ASSERT(cap & MCG_CAP_CTL_P);
+	ASSERT((cap & MCG_CAP_COUNT_MASK) == AMD_MCA_BANK_COUNT);
 
 	/*
 	 * Configure the logout areas.  We preset every logout area's acl_ao
@@ -1086,10 +1103,11 @@ ao_mca_init(void *data)
 	rev = ao->ao_shared->aos_chiprev = cpuid_getchiprev(ao->ao_cpu);
 
 	/*
-	 * Must this core perform NB MCA configuration?  This must be done
-	 * by just one core.
+	 * Must this core perform NB MCA or DRAM configuration?  This must be
+	 * done by just one core.
 	 */
 	donb = ao_chip_once(ao, AO_CFGONCE_NBMCA);
+	dodcfg = ao_chip_once(ao, AO_CFGONCE_DRAMCFG);
 
 	/*
 	 * Initialize poller data, but don't start polling yet.
@@ -1107,10 +1125,12 @@ ao_mca_init(void *data)
 	ao_bank_cfg(ao, rev, donb);
 
 	/*
-	 * Modify the MCA NB Configuration Register.
+	 * Modify the MCA NB Configuration and Dram Configuration Registers.
 	 */
 	if (donb)
 		ao_nb_cfg(ao, rev);
+	if (dodcfg)
+		ao_dram_cfg(ao, rev);
 
 	/*
 	 * Setup the Online Spare Control Register

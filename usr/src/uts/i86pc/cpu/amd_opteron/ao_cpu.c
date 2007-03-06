@@ -123,7 +123,7 @@ ao_scrubber_enable(void *data, uint64_t base, uint64_t ilen, int csdiscontig)
 	 * If ao_scrub_policy is DEFAULT, return immediately.  Otherwise we
 	 * disable scrubbing activity while we fiddle with the configuration.
 	 */
-	scrubctl = ao_pcicfg_read(chipid, AMD_NB_FUNC, AMD_NB_REG_SCRUBCTL);
+	scrubctl = ao_pcicfg_read(chipid, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBCTL);
 	cas32(&ao_scrub_bios, 0, scrubctl);
 
 	if (ao_scrub_policy == AO_SCRUB_BIOSDEFAULT)
@@ -133,15 +133,15 @@ ao_scrubber_enable(void *data, uint64_t base, uint64_t ilen, int csdiscontig)
 	scrubctl &= ~AMD_NB_SCRUBCTL_L2_MASK;
 	scrubctl &= ~AMD_NB_SCRUBCTL_DC_MASK;
 
-	ao_pcicfg_write(chipid, AMD_NB_FUNC, AMD_NB_REG_SCRUBCTL, scrubctl);
+	ao_pcicfg_write(chipid, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBCTL, scrubctl);
 
 	/*
 	 * Read the DRAM Scrub Address Low and High registers, clear their
 	 * address fields, enable sequential-redirect mode, and update the
 	 * address fields using the specified DRAM Base Address.
 	 */
-	lo = ao_pcicfg_read(chipid, AMD_NB_FUNC, AMD_NB_REG_SCRUBADDR_LO);
-	hi = ao_pcicfg_read(chipid, AMD_NB_FUNC, AMD_NB_REG_SCRUBADDR_HI);
+	lo = ao_pcicfg_read(chipid, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBADDR_LO);
+	hi = ao_pcicfg_read(chipid, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBADDR_HI);
 
 	lo &= ~AMD_NB_SCRUBADDR_LO_MASK;
 	hi &= ~AMD_NB_SCRUBADDR_HI_MASK;
@@ -152,8 +152,8 @@ ao_scrubber_enable(void *data, uint64_t base, uint64_t ilen, int csdiscontig)
 	ao_scrub_lo = lo;
 	ao_scrub_hi = hi;
 
-	ao_pcicfg_write(chipid, AMD_NB_FUNC, AMD_NB_REG_SCRUBADDR_LO, lo);
-	ao_pcicfg_write(chipid, AMD_NB_FUNC, AMD_NB_REG_SCRUBADDR_HI, hi);
+	ao_pcicfg_write(chipid, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBADDR_LO, lo);
+	ao_pcicfg_write(chipid, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBADDR_HI, hi);
 
 	if (ao_scrub_rate_dcache > AMD_NB_SCRUBCTL_RATE_MAX) {
 		cmn_err(CE_WARN, "ao_scrub_rate_dcache is too large; "
@@ -235,7 +235,7 @@ ao_scrubber_enable(void *data, uint64_t base, uint64_t ilen, int csdiscontig)
 	    ao_scrub_rate_l2cache, ao_scrub_rate_dram);
 
 	ao_scrub_system = scrubctl;
-	ao_pcicfg_write(chipid, AMD_NB_FUNC, AMD_NB_REG_SCRUBCTL, scrubctl);
+	ao_pcicfg_write(chipid, MC_FUNC_MISCCTL, MC_CTL_REG_SCRUBCTL, scrubctl);
 
 	return (rv);
 }
