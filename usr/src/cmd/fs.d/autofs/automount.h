@@ -257,6 +257,7 @@ extern struct mapent *parse_entry(char *, char *, char *, struct mapline *,
 				char *, uint_t, bool_t);
 extern int macro_expand(char *, char *, char *, int);
 extern void unquote(char *, char *);
+extern void unbracket(char **);
 extern void trim(char *);
 extern char *get_line(FILE *, char *, char *, int);
 extern int getword(char *, char *, char **, char **, char, int);

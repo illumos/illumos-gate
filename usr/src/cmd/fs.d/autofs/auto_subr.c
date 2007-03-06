@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -288,13 +288,12 @@ check_hier(mntpnt)
 }
 
 /*
- * Gets the next token from the string "p" and copies
- * it into "w".  Both "wq" and "w" are quote vectors
- * for "w" and "p".  Delim is the character to be used
- * as a delimiter for the scan.  A space means "whitespace".
- * The call to getword must provide buffers w and wq of size at
- * least wordsz. getword() will pass strings of maximum length
- * (wordsz-1), since it needs to null terminate the string.
+ * Gets the next token from the string "p" and copies it into "w".  The "wq" is
+ * a quote vector for "w" and is derived from "pq", which is a quote vector for
+ * "p". Delim is the character to be used as a delimiter for the scan.  A space
+ * means "whitespace". The call to getword must provide buffers w and wq of size
+ * at least wordsz. getword() will pass strings of maximum length (wordsz-1),
+ * since it needs to null terminate the string.
  * Returns 0 on ok and -1 on error.
  */
 int
@@ -651,21 +650,27 @@ macro_expand(key, pline, plineq, size)
 }
 
 /*
- * Removes quotes from the string "str" and returns
- * the quoting information in "qbuf". e.g.
- * original str: 'the "quick brown" f\ox'
- * unquoted str: 'the quick brown fox'
- * and the qbuf: '    ^^^^^^^^^^^  ^ '
+ * Removes backslashes, quotes and brackets from the string "str"
+ * and returns the quoting information in "qbuf". Character is
+ * considered escaped when it is
+ *
+ * 	preceded with '\'	e.g. \a
+ * 	within quotes		e.g. "string"
+ * 	a ':' in brackets 	e.g. [an:ip:6::ad::d:re:s:s]
+ *
+ * original str: 'the "brown" f\ox said: [fe80::20a:e4ff:fe35:8b0d]'
+ * unquoted str: 'the brown fox said: [fe80::20a:e4ff:fe35:8b0d]'
+ * and the qbuf: '    ^^^^^  ^             ^^   ^    ^    ^     '
  */
 void
 unquote(str, qbuf)
 	char *str, *qbuf;
 {
-	register int escaped, inquote, quoted;
+	register int escaped, inquote, inbracket, quoted;
 	register char *ip, *bp, *qp;
 	char buf[LINESZ];
 
-	escaped = inquote = quoted = 0;
+	escaped = inquote = inbracket = quoted = 0;
 
 	for (ip = str, bp = buf, qp = qbuf; *ip; ip++) {
 		if (!escaped) {
@@ -678,17 +683,42 @@ unquote(str, qbuf)
 				inquote = !inquote;
 				quoted++;
 				continue;
+			} else
+			if (*ip == '[') {
+				inbracket++;
+				quoted++;
+			} else
+			if (*ip == ']') {
+				if (inbracket > 0) inbracket--;
 			}
 		}
 
 		*bp++ = *ip;
-		*qp++ = (inquote || escaped) ? '^' : ' ';
+		*qp++ = (inquote || escaped) ? '^'
+				: ((inbracket && (*ip == ':')) ? '^' : ' ');
 		escaped = 0;
 	}
+
 	*bp = '\0';
 	*qp = '\0';
+
 	if (quoted)
 		(void) strcpy(str, buf);
+}
+
+/*
+ * If str is enclosed in [brackets], trim them off.
+ */
+void
+unbracket(s)
+	char **s;
+{
+	char *b = *s + strlen(*s) - 1;
+
+	if (*b == ']')
+		*b = '\0';
+	if (**s == '[')
+		(*s)++;
 }
 
 /*

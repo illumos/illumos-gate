@@ -671,7 +671,7 @@ nfsmount(
 	int retries;
 	char *nfs_proto = NULL;
 	uint_t nfs_port = 0;
-	char *p, *host, *dir;
+	char *p, *host, *rhost, *dir;
 	struct mapfs *mfs = NULL;
 	int error, last_error = 0;
 	int replicated;
@@ -855,7 +855,18 @@ nextentry:
 		if (mfs->mfs_ignore)
 			continue;
 
-		host = mfs->mfs_host;
+		/*
+		 * If the host is '[a:d:d:r:e:s:s'],
+		 * only use 'a:d:d:r:e:s:s' for communication
+		 */
+		host = strdup(mfs->mfs_host);
+		if (host == NULL) {
+			syslog(LOG_ERR, "nfsmount: no memory");
+			last_error = NFSERR_IO;
+			goto out;
+		}
+		unbracket(&host);
+
 		(void) memcpy(&mfssnego, &mfssnego_init, sizeof (mfs_snego_t));
 
 		if (use_pubfh == TRUE || mfs->mfs_flags & MFS_URL) {
@@ -1026,6 +1037,8 @@ nextentry:
 			}
 		}
 
+		free(host);
+
 		switch (vers) {
 		case NFS_V4: v4cnt++; break;
 		case NFS_V3: v3cnt++; break;
@@ -1052,11 +1065,12 @@ nextentry:
 		 * If the mount is not replicated, we don't want to
 		 * ping every entry, so we'll stop here.  This means
 		 * that we may have to go back to "nextentry" above
-		 * to consider another entry if there we can't get
+		 * to consider another entry if we can't get
 		 * all the way to mount(2) with this one.
 		 */
 		if (!replicated)
 			break;
+
 	}
 
 	if (nfsvers == 0) {
@@ -1142,7 +1156,21 @@ retry:
 		vers = mountversmax;
 		host = mfs->mfs_host;
 		dir = mfs->mfs_dir;
-		(void) sprintf(remname, "%s:%s", host, dir);
+
+		/*
+		 * Remember the possible '[a:d:d:r:e:s:s]' as the address to be
+		 * later passed to mount(2) and used in the mnttab line, but
+		 * only use 'a:d:d:r:e:s:s' for communication
+		 */
+		rhost = strdup(host);
+		if (rhost == NULL) {
+			syslog(LOG_ERR, "nfsmount: no memory");
+			last_error = NFSERR_IO;
+			goto out;
+		}
+		unbracket(&host);
+
+		(void) sprintf(remname, "%s:%s", rhost, dir);
 		if (trace > 4 && replicated)
 			trace_prt(1, "	nfsmount: examining %s\n", remname);
 
@@ -1798,8 +1826,13 @@ try_mnt_slash:
 
 		argp->flags |= NFSMNT_NEWARGS;
 		argp->flags |= NFSMNT_INT;	/* default is "intr" */
-		argp->hostname = strdup(host);
 		argp->flags |= NFSMNT_HOSTNAME;
+		argp->hostname = strdup(host);
+		if (argp->hostname == NULL) {
+			syslog(LOG_ERR, "nfsmount: no memory");
+			last_error = NFSERR_IO;
+			goto out;
+		}
 
 		/*
 		 * In this case, we want NFSv4 to behave like
@@ -2192,7 +2225,7 @@ try_mnt_slash:
 					mnttabcnt += strlen(remname) + 2;
 				} else {
 					*p = '\0';
-					mnttabcnt += strlen(host) + 2;
+					mnttabcnt += strlen(rhost) + 2;
 				}
 				if ((tmp = realloc(mnttabtext,
 				    mnttabcnt)) != NULL) {
@@ -3349,7 +3382,7 @@ pingnfs(
 	int attempts,
 	rpcvers_t *versp,
 	rpcvers_t versmin,
-	ushort_t port,			/* may be zeor */
+	ushort_t port,			/* may be zero */
 	bool_t usepub,
 	char *path,
 	char *proto)
@@ -3362,8 +3395,14 @@ pingnfs(
 	rpcvers_t versmax;	/* maximum version to try against server */
 	rpcvers_t outvers;	/* version supported by host on last call */
 	rpcvers_t vers_to_try;	/* to try different versions against host */
-	char *hostname = hostpart;
+	char *hostname;
 	struct netconfig *nconf;
+
+	hostname = strdup(hostpart);
+	if (hostname == NULL) {
+		return (RPC_SYSTEMERROR);
+	}
+	unbracket(&hostname);
 
 	if (path != NULL && strcmp(hostname, "nfs") == 0 &&
 	    strncmp(path, "//", 2) == 0) {
