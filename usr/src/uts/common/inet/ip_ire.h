@@ -371,6 +371,7 @@ extern  void	ire_freemblk(ire_t *);
 extern boolean_t	ire_match_args(ire_t *, ipaddr_t, ipaddr_t, ipaddr_t,
     int, const ipif_t *, zoneid_t, uint32_t, const struct ts_label_s *, int);
 extern  int	ire_nce_init(ire_t *, mblk_t *, mblk_t *);
+extern  boolean_t	ire_nce_valid_dlureq_mp(mblk_t *);
 extern  boolean_t	ire_walk_ill_match(uint_t, uint_t, ire_t *, ill_t *,
     zoneid_t, ip_stack_t *);
 

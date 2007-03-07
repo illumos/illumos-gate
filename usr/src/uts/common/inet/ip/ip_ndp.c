@@ -3276,8 +3276,12 @@ nce_fastpath(nce_t *nce)
 	int res;
 
 	ASSERT(ill != NULL);
-	if (nce->nce_fp_mp != NULL) {
-		/* Already contains fastpath info */
+	if ((nce->nce_fp_mp != NULL) ||
+	    !(ire_nce_valid_dlureq_mp(nce->nce_res_mp))) {
+		/*
+		 * Already contains fastpath info or nce is not
+		 * resolved, so cant process fastpath yet.
+		 */
 		return;
 	}
 	if (nce->nce_res_mp != NULL) {

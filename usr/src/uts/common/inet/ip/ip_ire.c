@@ -73,6 +73,7 @@
 
 #include <sys/tsol/label.h>
 #include <sys/tsol/tnet.h>
+#include <sys/dlpi.h>
 
 struct kmem_cache *rt_entry_cache;
 
@@ -6704,6 +6705,31 @@ cleanup:
 	kmem_free(ire_mp, sizeof (ire_t) + sizeof (frtn_t));
 }
 
+/*
+ * The mp passed to this function is typically res_mp.
+ * Note that res_mp field can contain the request (ie AR_ENTRY_QUERY)
+ * or the response (ie DL_UNITDATA_REQ). So in case of the
+ * forwarding path, there is a small window of time between the two
+ * when the forwarding path creates an unresolved nce and the
+ * ip_newroute path finds this and uses this in the creation of an
+ * ire cache. To account for this possible race case we we check
+ * for DL_UNITDATA_REQ to make sure this is indeed the response.
+ */
+boolean_t
+ire_nce_valid_dlureq_mp(mblk_t *mp)
+{
+	dl_unitdata_req_t *dlur;
+
+	if (mp == NULL)
+		return (B_FALSE);
+	dlur = (dl_unitdata_req_t *)mp->b_rptr;
+	if ((DB_TYPE(mp) == M_PROTO) &&
+	    (dlur->dl_primitive == DL_UNITDATA_REQ)) {
+		return (B_TRUE);
+	} else {
+		return (B_FALSE);
+	}
+}
 
 /*
  * create the neighbor cache entry  nce_t for  IRE_CACHE and
@@ -6777,10 +6803,15 @@ ire_nce_init(ire_t *ire, mblk_t *fp_mp, mblk_t *res_mp)
 		nce_state = ND_REACHABLE;
 		nce_flags = NCE_F_PERMANENT;
 	} else {
-		if (fp_mp != NULL)
+		/* Make sure you have the response and not the request. */
+		if (ire_nce_valid_dlureq_mp(res_mp)) {
 			nce_state = ND_REACHABLE;
-		else
+		} else {
 			nce_state = ND_INITIAL;
+			if (fp_mp)
+				freemsg(fp_mp);
+			fp_mp = NULL;
+		}
 		nce_flags = 0;
 	}
 
@@ -6818,8 +6849,9 @@ ire_nce_init(ire_t *ire, mblk_t *fp_mp, mblk_t *res_mp)
 	}
 #if DEBUG
 	/*
-	 * if an nce_fp_mp was passed in, we should be picking up an
-	 * existing nce_t in the ND_REACHABLE state.
+	 * If an nce_fp_mp was passed in by ndp_lookup_then_add()
+	 * we should be picking up an existing nce_t in
+	 * the ND_REACHABLE state.
 	 */
 	mutex_enter(&arpce->nce_lock);
 	ASSERT(arpce->nce_fp_mp == NULL || arpce->nce_state == ND_REACHABLE);
