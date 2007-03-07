@@ -77,6 +77,7 @@ extern "C" {
 #define	DEVICE_ID_5751M			0x167d
 #define	DEVICE_ID_5752			0x1600
 #define	DEVICE_ID_5752M			0x1601
+#define	DEVICE_ID_5754			0x167a
 #define	DEVICE_ID_5721			0x1659
 #define	DEVICE_ID_5714C			0x1668
 #define	DEVICE_ID_5714S			0x1669
@@ -129,6 +130,9 @@ extern "C" {
 #define	REVISION_ID_5715S_A0		0x00
 #define	REVISION_ID_5715S_A1		0x01
 
+#define	REVISION_ID_5754_A0		0x00
+#define	REVISION_ID_5754_A1		0x01
+
 #define	DEVICE_5704_SERIES_CHIPSETS(bgep)\
 		((bgep->chipid.device == DEVICE_ID_5700) ||\
 		(bgep->chipid.device == DEVICE_ID_5701) ||\
@@ -152,7 +156,8 @@ extern "C" {
 		(bgep->chipid.device == DEVICE_ID_5705F) ||\
 		(bgep->chipid.device == DEVICE_ID_5782) ||\
 		(bgep->chipid.device == DEVICE_ID_5788) ||\
-		(bgep->chipid.device == DEVICE_ID_5705_2))
+		(bgep->chipid.device == DEVICE_ID_5705_2) ||\
+		(bgep->chipid.device == DEVICE_ID_5754))
 
 #define	DEVICE_5721_SERIES_CHIPSETS(bgep) \
 		((bgep->chipid.device == DEVICE_ID_5721) ||\
@@ -249,6 +254,9 @@ extern "C" {
 #define	MHCR_CHIP_REV_5715S_A0		0x50000000
 #define	MHCR_CHIP_REV_5715S_A1		0x90010000
 
+#define	MHCR_CHIP_REV_5754_A0		0xb0000000
+#define	MHCR_CHIP_REV_5754_A1		0xb0010000
+
 #define	MHCR_CHIP_ASIC_REV(ChipRevId)	((ChipRevId) & 0xf0000000)
 #define	MHCR_CHIP_ASIC_REV_5700		(0x7 << 28)
 #define	MHCR_CHIP_ASIC_REV_5701		(0x0 << 28)
@@ -258,6 +266,7 @@ extern "C" {
 #define	MHCR_CHIP_ASIC_REV_5721_5751	(0x4 << 28)
 #define	MHCR_CHIP_ASIC_REV_5714 	(0x5 << 28)
 #define	MHCR_CHIP_ASIC_REV_5752		(0x6 << 28)
+#define	MHCR_CHIP_ASIC_REV_5754		(0xb << 28)
 #define	MHCR_CHIP_ASIC_REV_5715 	((uint32_t)0x9 << 28)
 
 

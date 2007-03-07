@@ -1833,6 +1833,7 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5751M:
 	case DEVICE_ID_5752:
 	case DEVICE_ID_5752M:
+	case DEVICE_ID_5754:
 	case DEVICE_ID_5721:
 	case DEVICE_ID_5714C:
 	case DEVICE_ID_5714S:
@@ -2002,7 +2003,14 @@ bge_chip_id_init(bge_t *bgep)
 	case DEVICE_ID_5705MA3:
 	case DEVICE_ID_5705F:
 	case DEVICE_ID_5705_2:
-		cidp->chip_label = 5705;
+	case DEVICE_ID_5754:
+		if (cidp->device == DEVICE_ID_5754) {
+			cidp->chip_label = 5754;
+			cidp->pci_type = BGE_PCI_E;
+		} else {
+			cidp->chip_label = 5705;
+			cidp->pci_type = BGE_PCI;
+		}
 		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
 		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
 		cidp->mbuf_hi_water = MBUF_HIWAT_5705;
@@ -2013,7 +2021,6 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
 		cidp->flags |= CHIP_FLAG_PARTIAL_CSUM;
-		cidp->pci_type = BGE_PCI;
 		cidp->statistic_type = BGE_STAT_REG;
 		dev_ok = B_TRUE;
 		break;

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -160,6 +160,7 @@ then
 	"pci14e4,1677"
 	"pci14e4,1678"
 	"pci14e4,1679"
+	"pciex14e4,167a"
 	"pci14e4,167d"
 	"pciex14e4,169d"' \
 	-b "$BASEDIR" bge
@@ -183,6 +184,7 @@ else if [ ${ARCH} = "sparc" ]
 	"pci14e4,1669"
 	"pci14e4,1677"
 	"pci14e4,1678"
+	"pciex14e4,167a"
 	"pci14e4,167d"' \
 	-b "$BASEDIR" bge
 	fi
