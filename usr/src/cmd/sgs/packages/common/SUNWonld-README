@@ -1195,3 +1195,4 @@ Bugid   Risk Synopsis
 	memory
 6524709 executables using /usr/lib/libc.so.1 as the ELF interpreter dump core
 	(link-editor components only)
+6531189 SEGV in dladdr()

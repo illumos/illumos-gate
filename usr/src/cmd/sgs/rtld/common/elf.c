@@ -2942,7 +2942,7 @@ static void
 elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
 {
 	ulong_t		ndx, cnt, base, _value;
-	Sym		*sym, *_sym;
+	Sym		*sym, *_sym = NULL;
 	const char	*str;
 	int		_flags;
 	uint_t		*dynaddr_ndx;
@@ -3004,7 +3004,6 @@ elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
 		 */
 		low_bnd = low;
 		high_bnd = high;
-		_sym = NULL;
 		while (low <= high) {
 			mid = (low + high) / 2;
 			mid_sym = &sym[dynaddr_ndx[mid]];
