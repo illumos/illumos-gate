@@ -2,7 +2,7 @@
 # Two "#" are comments that are copied to audit_record_attr
 # other comments are removed.
 ##
-## Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+## Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 ## Use is subject to license terms.
 ##
 ## CDDL HEADER START
@@ -55,9 +55,11 @@ token=privset:privilege
 token=proc:process
 token=text:text
 token=tid:terminal_adr
-token=uauth:use_of_privilege
+token=uauth:use_of_authorization
+token=upriv:use_of_privilege
 token=zone:zonename
 token=fmri:service_instance
+token=label:mandatory_label
 
 token=head:header
 token=subj:subject
@@ -73,7 +75,7 @@ message=socket:The socket token for a bad socket is reported as "argument (1, "f
 # basic record pattern ("insert" is where event-specific tokens
 # are listed.)
 
-kernel=head:insert:subj:[uauth]:ret
+kernel=head:insert:subj:[upriv]:ret
 user=head:subj:insert:ret
 
 # Second Section
@@ -2101,30 +2103,33 @@ label=AUE_filesystem_add
   program=SMC server
   see=
   title=SMC: filesystem add
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=initial values
 
 label=AUE_filesystem_modify
   program=SMC server
   see=
   title=SMC: filesystem modify
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=changed values
 
 label=AUE_filesystem_delete
   program=SMC server
   see=
   title=SMC: filesystem delete
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=deleted values
 
 label=AUE_halt_solaris
@@ -2253,7 +2258,7 @@ label=AUE_modify_user
 label=AUE_mountd_mount
   title=mountd: NFS mount
   program=/usr/lib/nfs/mountd
-  see:mountd(1M)
+  see=mountd(1M)
   format=text1:path2
     comment=remote client hostname:mount dir
 # See audit_mountd.c; old BSM manual is way off
@@ -2269,30 +2274,33 @@ label=AUE_network_add
   program=SMC server
   see=
   title=SMC: network add
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=initial values
 
 label=AUE_network_modify
   program=SMC server
   see=
   title=SMC: network modify
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=changed values
 
 label=AUE_network_delete
   program=SMC server
   see=
   title=SMC: network delete
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=deleted values
 
 label=AUE_newgrp_login
@@ -2311,30 +2319,33 @@ label=AUE_printer_add
   see=
   program=SMC server
   title=SMC: printer add
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=initial values
 
 label=AUE_printer_modify
   see=
   program=SMC server
   title=SMC: printer modify
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=changed values
 
 label=AUE_printer_delete
   program=SMC server
   see=
   title=SMC: printer delete
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=deleted values
 
 label=AUE_poweroff_solaris
@@ -2425,30 +2436,33 @@ label=AUE_scheduledjob_add
   program=SMC server
   see=
   title=SMC: scheduled job add
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=initial values
 
 label=AUE_scheduledjob_modify
   see=
   program=SMC server
   title=SMC: scheduled job modify
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=changed values
 
 label=AUE_scheduledjob_delete
   program=SMC server
   see=
   title=SMC: scheduled job delete
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=deleted values
 
 label=AUE_screenlock
@@ -2463,30 +2477,33 @@ label=AUE_serialport_add
   program=SMC server
   see=
   title=SMC: serial port add
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=initial values
 
 label=AUE_serialport_modify
   program=SMC server
   see=
   title=SMC: serial port modify
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=changed values
 
 label=AUE_serialport_delete
   program=SMC server
   see=
   title=SMC: serial port add
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=deleted values
 
 label=AUE_shutdown_solaris
@@ -2542,7 +2559,7 @@ label=AUE_uauth
   program=SMC server
   see=
   title=SMC:  Use of Authorization
-  format=text1:text2
+  format=uauth1:text2
   comment=authorization used:
   comment=object name
 
@@ -2550,10 +2567,11 @@ label=AUE_usermgr_add
   see=
   program=SMC server
   title=SMC: User Manager add
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=initial values
 #	header,137,2,add user/user attributes,,Tue Oct 23 12:45:26 2001, + 725 msec
 #	subject,tuser1,tuser1,emacs,tuser1,emacs,23404,2926062642,0 0 0.0.0.0
@@ -2567,20 +2585,22 @@ label=AUE_usermgr_modify
   program=SMC server
   see=
   title=SMC: User Manager modify
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=changed values
 
 label=AUE_usermgr_delete
   program=SMC server
   see=
   title=SMC: User Manager delete
-  format=text1:[text]2:text3:uauth:text4
+  format=text1:[text]2:text3:uauth4:text5
   comment=object name:
   comment=domain:
   comment=name_service:
+  comment=authorization used:
   comment=deleted values
 
 label=AUE_zone_state
@@ -2610,7 +2630,7 @@ label=AUE_pool_export
 
 label=AUE_dladm_create_secobj
   program=/usr/sbin/dladm
-  title:create wifi security object
+  title=create wifi security object
   see=dladm(1M)
   format=uauth1:text2:text3
   comment=authorization used:
@@ -2619,9 +2639,30 @@ label=AUE_dladm_create_secobj
 
 label=AUE_dladm_delete_secobj
   program=/usr/sbin/dladm
-  title:delete wifi security object
+  title=delete wifi security object
   see=dladm(1M)
   format=uauth1:text2:text3
   comment=authorization used:
   comment=object class name:
   comment=object name
+
+label=AUE_file_relabel
+  title=relabel file from one zone to another
+  program=setlabel(1)
+  see=setflabel(3TSOL)
+  format=uauth1:text2:label3:label4
+  comment=authorization used:
+  comment=file relabeled:
+  comment=original label:
+  comment=new label
+
+label=AUE_file_copy
+  title=copy file to another zone
+  program=dtfile(1X)
+  see=
+  format=uauth1:text2:label3:text4:label5
+  comment=authorization used:
+  comment=source file:
+  comment=source label:
+  comment=destination directory:
+  comment=destination label

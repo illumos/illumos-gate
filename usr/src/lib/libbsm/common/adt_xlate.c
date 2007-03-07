@@ -21,7 +21,7 @@
 /*
  * adt_xlate.c
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * AUTOMATICALLY GENERATED CODE; DO NOT EDIT; CONTACT AUDIT PROJECT
@@ -54,6 +54,7 @@ static datadef	adr5[4] =	{{ADT_UINT32, sizeof (uint32_t)},
 				{ADT_UINT16, sizeof (uint16_t)},
 				{ADT_UINT16, sizeof (uint16_t)},
 				{ADT_UINT32ARRAY, 4 * sizeof (uint32_t)}};
+static datadef	adr6[1] =	{{ADT_MLABELSTAR, sizeof (m_label_t *)}};
 
 /* External event structure to internal event structure */
 
@@ -156,6 +157,52 @@ static struct translation X_dladm_delete_secobj = {
 	5,
 	&XX_dladm_delete_secobj[0],
 	&XX_dladm_delete_secobj[0]
+};
+static struct entry XX_file_copy[7] = {
+	{AUT_SUBJECT,	1,	NULL,	&(XX_file_copy[1]),
+		0,	0,	0,	NULL},
+	{AUT_UAUTH,	1,	&adr1[0],	&(XX_file_copy[2]),
+		0,	1,	0,	NULL},
+	{AUT_PATH,	1,	&adr1[0],	&(XX_file_copy[3]),
+		0,	1,	0,	NULL},
+	{AUT_LABEL,	1,	&adr6[0],	&(XX_file_copy[4]),
+		0,	1,	0,	NULL},
+	{AUT_PATH,	1,	&adr1[0],	&(XX_file_copy[5]),
+		0,	1,	0,	NULL},
+	{AUT_LABEL,	1,	&adr6[0],	&(XX_file_copy[6]),
+		0,	1,	0,	NULL},
+	{AUT_RETURN,	1,	NULL,	NULL,
+		0,	0,	0,	NULL}
+};
+static struct translation X_file_copy = {
+	0,
+	ADT_file_copy,
+	AUE_file_copy,
+	7,
+	&XX_file_copy[0],
+	&XX_file_copy[0]
+};
+static struct entry XX_file_relabel[6] = {
+	{AUT_SUBJECT,	1,	NULL,	&(XX_file_relabel[1]),
+		0,	0,	0,	NULL},
+	{AUT_UAUTH,	1,	&adr1[0],	&(XX_file_relabel[2]),
+		0,	1,	0,	NULL},
+	{AUT_PATH,	1,	&adr1[0],	&(XX_file_relabel[3]),
+		0,	1,	0,	NULL},
+	{AUT_LABEL,	1,	&adr6[0],	&(XX_file_relabel[4]),
+		0,	1,	0,	NULL},
+	{AUT_LABEL,	1,	&adr6[0],	&(XX_file_relabel[5]),
+		0,	1,	0,	NULL},
+	{AUT_RETURN,	1,	NULL,	NULL,
+		0,	0,	0,	NULL}
+};
+static struct translation X_file_relabel = {
+	0,
+	ADT_file_relabel,
+	AUE_file_relabel,
+	6,
+	&XX_file_relabel[0],
+	&XX_file_relabel[0]
 };
 static struct entry XX_filesystem_add[7] = {
 	{AUT_SUBJECT,	1,	NULL,	&(XX_filesystem_add[1]),
@@ -1019,12 +1066,14 @@ static struct translation X_zone_state = {
 	&XX_zone_state[0],
 	&XX_zone_state[0]
 };
-struct translation *xlate_table[49] = {
+struct translation *xlate_table[51] = {
 	&X_admin_authenticate,
 	&X_attach,
 	&X_detach,
 	&X_dladm_create_secobj,
 	&X_dladm_delete_secobj,
+	&X_file_copy,
+	&X_file_relabel,
 	&X_filesystem_add,
 	&X_filesystem_delete,
 	&X_filesystem_modify,

@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -434,8 +434,9 @@
 # Trusted Extensions events:
 #
 9035:AUE_sl_change:Workspace label change:ap
+9036:AUE_file_relabel:relabel file:fm
 9037:AUE_file_copy:file copy:fm
-9038:AUE_file_move:file move:fm
+9038:AUE_file_move:file move:no
 9039:AUE_sel_mgr_xfer:selection manager transfer:fm
 9101:AUE_ClientConnect:client connection to x server:lo
 9102:AUE_ClientDisconnect:client disconn. from x server:lo

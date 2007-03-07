@@ -21,7 +21,7 @@
 /*
  * adt_event.h
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * AUTOMATICALLY GENERATED CODE; DO NOT EDIT; CONTACT AUDIT PROJECT
@@ -97,6 +97,8 @@ enum	adt_login_text {
 #define	ADT_detach		43
 #define	ADT_dladm_create_secobj	47
 #define	ADT_dladm_delete_secobj	48
+#define	ADT_file_copy		50
+#define	ADT_file_relabel	49
 #define	ADT_filesystem_add	4
 #define	ADT_filesystem_delete	5
 #define	ADT_filesystem_modify	6
@@ -176,6 +178,23 @@ struct adt_dladm_delete_secobj {	/* ADT_dladm_delete_secobj */
 	char 	*obj_name;	/* required */
 };
 typedef struct adt_dladm_delete_secobj adt_dladm_delete_secobj_t;
+
+struct adt_file_copy {	/* ADT_file_copy */
+	char 	*auth_used;	/* required */
+	char 	*src_file;	/* required */
+	m_label_t 	*src_label;	/* required */
+	char 	*dst_file;	/* required */
+	m_label_t 	*dst_label;	/* required */
+};
+typedef struct adt_file_copy adt_file_copy_t;
+
+struct adt_file_relabel {	/* ADT_file_relabel */
+	char 	*auth_used;	/* required */
+	char 	*file;	/* required */
+	m_label_t 	*src_label;	/* required */
+	m_label_t 	*dst_label;	/* required */
+};
+typedef struct adt_file_relabel adt_file_relabel_t;
 
 struct adt_filesystem_add {	/* ADT_filesystem_add */
 	char 	*object_name;	/* required */
@@ -501,6 +520,8 @@ union adt_event_data {
 		adt_detach_t	adt_detach;
 		adt_dladm_create_secobj_t	adt_dladm_create_secobj;
 		adt_dladm_delete_secobj_t	adt_dladm_delete_secobj;
+		adt_file_copy_t	adt_file_copy;
+		adt_file_relabel_t	adt_file_relabel;
 		adt_filesystem_add_t	adt_filesystem_add;
 		adt_filesystem_delete_t	adt_filesystem_delete;
 		adt_filesystem_modify_t	adt_filesystem_modify;

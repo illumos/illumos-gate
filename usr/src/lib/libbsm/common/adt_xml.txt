@@ -20,7 +20,7 @@
 
  CDDL HEADER END
 
-Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
 
   ident	"%Z%%M%	%I%	%E% SMI"
@@ -883,8 +883,69 @@ Use is subject to license terms.
 	header="0" idNo="48" omit="JNI">
     </event>
 
-<!-- add new everts here with the next higher idNo -->
-<!-- Highest idNo is 48, so next is 49, then fix this comment -->
+<!-- Trusted eXtensions (TX) events -->
+
+    <!-- labeld events -->
+    <event id="AUE_file_relabel" header="0" idNo="49" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="file">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="src_label">
+	    <internal token="label"/>
+	    <external opt="required" type="m_label_t *"/>
+	</entry>
+	<entry id="dst_label">
+	    <internal token="label"/>
+	    <external opt="required" type="m_label_t *"/>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+    <event id="AUE_file_copy" header="0" idNo="50" omit="JNI">
+	<entry id="subject">
+	    <internal token="subject"/>
+	    <external opt="none"/>
+	</entry>
+	<entry id="auth_used">
+	    <internal token="uauth"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="src_file">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="src_label">
+	    <internal token="label"/>
+	    <external opt="required" type="m_label_t *"/>
+	</entry>
+	<entry id="dst_file">
+	    <internal token="path"/>
+	    <external opt="required" type="char *"/>
+	</entry>
+	<entry id="dst_label">
+	    <internal token="label"/>
+	    <external opt="required" type="m_label_t *"/>
+	</entry>
+	<entry id="return">
+	    <internal token="return"/>
+	    <external opt="none"/>
+	</entry>
+    </event>
+
+<!-- add new events here with the next higher idNo -->
+<!-- Highest idNo is 50, so next is 51, then fix this comment -->
 <!-- end of C Only events -->
 
 
