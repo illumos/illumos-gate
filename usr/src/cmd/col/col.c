@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1998, 2001 by Sun Microsystems, Inc.
- * All Rights Reserved
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -52,6 +52,7 @@
 
 wchar_t	*page[PL];
 wchar_t	lbuff[LINELN], *line;
+wchar_t	*lbuffend = lbuff + LINELN - 1;
 wchar_t	ws_blank[2] = {' ', 0};
 char	esc_chars, underline, temp_off, smart;
 int	bflag, xflag, fflag, pflag;
@@ -71,6 +72,7 @@ static void	emit(wchar_t *, int);
 static void	incr(void);
 static void	decr(void);
 static void	wsinsert(wchar_t *, int);
+static void	incr_line(int);
 static int	wcscrwidth(wchar_t);
 
 int
@@ -131,8 +133,11 @@ main(int argc, char **argv)
 	while ((c = getwchar()) != EOF) {
 		if (underline && temp_off && c > ' ') {
 			outc(ESC);
-			if (*line) line++;
-			*line++ = 'X';
+			if (*line) {
+				incr_line(1);
+			}
+			*line = 'X';
+			incr_line(1);
 			*line = temp_off = '\0';
 		}
 		if (c != '\b')
@@ -142,9 +147,11 @@ main(int argc, char **argv)
 		case '\n':
 			if (underline && !temp_off) {
 				if (*line)
-					line++;
-				*line++ = ESC;
-				*line++ = 'Y';
+					incr_line(1);
+				*line = ESC;
+				incr_line(1);
+				*line = 'Y';
+				incr_line(1);
 				*line = '\0';
 				temp_off = '1';
 			}
@@ -191,15 +198,15 @@ main(int argc, char **argv)
 			default:
 				if (pflag)	{	/* pass through esc */
 					outc(ESC);
-					line++;
+					incr_line(1);
 					*line = c;
-					line++;
+					incr_line(1);
 					*line = '\0';
 					esc_chars = 1;
 					if (c == 'X')
 						underline = 1;
 					if (c == 'Y' && underline)
-						underline =	temp_off = '\0';
+						underline = temp_off = '\0';
 					if (c == ']')
 						smart = 1;
 					if (c == '[')
@@ -233,7 +240,8 @@ main(int argc, char **argv)
 
 		case '\b':
 			if (esc_chars) {
-				*line++ = '\b';
+				*line = '\b';
+				incr_line(1);
 				*line = '\0';
 			} else if (cp > 0)
 				cp--;
@@ -305,7 +313,7 @@ outc(wchar_t c)
 				esc_chars = '\0';
 			switch (*line)	{
 			case ESC:
-				line++;
+				incr_line(1);
 				esc_chars = 1;
 				break;
 			case '\0':
@@ -319,7 +327,7 @@ outc(wchar_t c)
 			default:
 				lp += wcscrwidth(*line);
 			}
-		line++;
+		incr_line(1);
 	}
 	while (*line == '\b') {
 		/*
@@ -328,19 +336,20 @@ outc(wchar_t c)
 		 * represents a two-column character, and a backspace
 		 * always goes back by one column.)
 		 */
-		for (n = 0; *line == '\b'; line++) {
+		for (n = 0; *line == '\b'; incr_line(1)) {
 			n++;
 			lp--;
 		}
 		while (n > 0 && lp < cp) {
-			i = *line++;
+			i = *line;
+			incr_line(1);
 			i = wcscrwidth(i);
 			n -= i;
 			lp += i;
 		}
 	}
 	while (*line == ESC)
-		line += 6;
+		incr_line(6);
 	widthc = wcscrwidth(c);
 	widthl = wcscrwidth(*line);
 	if (bflag || (*line == '\0') || *line == ' ') {
@@ -349,37 +358,61 @@ outc(wchar_t c)
 		} else if (widthl > widthc) {
 			n = widthl - widthc;
 			wsinsert(line, n);
-			*line++ = c;
-			for (i = 0; i < n; i++)
-				*line++ = ' ';
+			*line = c;
+			incr_line(1);
+			for (i = 0; i < n; i++) {
+				*line = ' ';
+				incr_line(1);
+			}
 			line = lbuff;
 			lp = 0;
 		} else {
 			n = widthc - widthl;
-			for (p1 = line+1; n > 0; n -= wcscrwidth(i))
-				i = *p1++;
-			*line = c;
-			(void) wcscpy(line+1, p1);
-
+			if (line < lbuffend) {
+				for (p1 = line+1; n > 0 && p1 < lbuffend;
+				    n -= wcscrwidth(i)) {
+						i = *p1++;
+				}
+				*line = c;
+				if (p1 < lbuffend) {
+					(void) wcscpy(line+1, p1);
+				} else {
+					(void) fprintf(stderr,
+					    gettext("col: Line too long.\n"));
+					exit(1);
+				}
+			} else {
+				(void) fprintf(stderr,
+				    gettext("col: Line too long.\n"));
+				exit(1);
+			}
 		}
 	} else {
 		if (smart && (widthl == 1) && (widthc == 1)) {
 			wchar_t	c1, c2, c3, c4, c5, c6, c7;
-			c1 = *++line;
-			*line++ = ESC;
+			incr_line(1);
+			c1 = *line;
+			*line = ESC;
+			incr_line(1);
 			c2 = *line;
-			*line++ = '[';
+			*line = '[';
+			incr_line(1);
 			c3 = *line;
-			*line++ = '\b';
+			*line = '\b';
+			incr_line(1);
 			c4 = *line;
-			*line++ = ESC;
+			*line = ESC;
+			incr_line(1);
 			c5 = *line;
-			*line++ = ']';
+			*line = ']';
+			incr_line(1);
 			c6 = *line;
-			*line++ = c;
+			*line = c;
+			incr_line(1);
 			while (c1) {
 				c7 = *line;
-				*line++ = c1;
+				*line = c1;
+				incr_line(1);
 				c1 = c2;
 				c2 = c3;
 				c3 = c4;
@@ -390,26 +423,37 @@ outc(wchar_t c)
 		} else	{
 			if ((widthl == 1) && (widthc == 1)) {
 				wchar_t	c1, c2, c3;
-				c1 = *++line;
-				*line++ = '\b';
+				incr_line(1);
+				c1 = *line;
+				*line = '\b';
+				incr_line(1);
 				c2 = *line;
-				*line++ = c;
+				*line = c;
+				incr_line(1);
 				while (c1) {
 					c3 = *line;
-					*line++ = c1;
+					*line = c1;
+					incr_line(1);
 					c1 = c2;
 					c2 = c3;
 				}
 			} else {
 				width = (widthc > widthl) ? widthc : widthl;
-				for (i = 0; i < width; i += wcscrwidth(c1))
-					c1 = *line++;
+				for (i = 0; i < width; i += wcscrwidth(c1)) {
+					c1 = *line;
+					incr_line(1);
+				}
 				wsinsert(line, width + (width - widthc + 1));
-				for (i = 0; i < width; i++)
-					*line++ = '\b';
-				*line++ = c;
-				for (i = widthc; i < width; i++)
-					*line++ = ' ';
+				for (i = 0; i < width; i++) {
+					*line = '\b';
+					incr_line(1);
+				}
+				*line = c;
+				incr_line(1);
+				for (i = widthc; i < width; i++) {
+					*line = ' ';
+					incr_line(1);
+				}
 			}
 		}
 		lp = 0;
@@ -567,6 +611,23 @@ wsinsert(wchar_t *s, int n)
 	while (p1 >= s)
 		*p2-- = *p1--;
 }
+
+/*
+ * incr_line - increments line pointer and checks for array out of bounds
+ * amt: assumed to be >= 1
+ * exit on error to avoid line pointer accessing out of the array
+ */
+static void
+incr_line(int amt)
+{
+	if (line < lbuffend - amt + 1) {
+		line += amt;
+	} else {
+		(void) fprintf(stderr, gettext("col: Line too long.\n"));
+		exit(1);
+	}
+}
+
 
 static int
 wcscrwidth(wchar_t wc)
