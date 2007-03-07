@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -882,7 +882,7 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, sqproc_t proc, void *arg,
 		 * of stack getting blown with multiple traversal.
 		 */
 		if (!(sqp->sq_state & SQS_REENTER) &&
-		    (sqp->sq_run == curthread) &&
+		    (sqp->sq_run == curthread) && sqp->sq_first == NULL &&
 		    (((conn_t *)arg)->conn_on_sqp == B_FALSE)) {
 			sqp->sq_state |= SQS_REENTER;
 			mutex_exit(&sqp->sq_lock);
@@ -1027,7 +1027,7 @@ squeue_enter_nodrain(squeue_t *sqp, mblk_t *mp, sqproc_t proc, void *arg,
 		 * of stack getting blown with multiple traversal.
 		 */
 		if (being_processed && !(sqp->sq_state & SQS_REENTER) &&
-		    (sqp->sq_run == curthread) &&
+		    (sqp->sq_run == curthread) && sqp->sq_first == NULL &&
 		    (((conn_t *)arg)->conn_on_sqp == B_FALSE)) {
 			sqp->sq_state |= SQS_REENTER;
 			mutex_exit(&sqp->sq_lock);
