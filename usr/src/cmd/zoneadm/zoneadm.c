@@ -4448,12 +4448,6 @@ detach_func(int argc, char *argv[])
 		 * We want a dry-run to work for a non-privileged user so we
 		 * only do minimal validation.
 		 */
-		if (getzoneid() != GLOBAL_ZONEID) {
-			zerror(gettext("must be in the global zone to %s a "
-			    "zone."), cmd_to_str(CMD_DETACH));
-			return (Z_ERR);
-		}
-
 		if (target_zone == NULL) {
 			zerror(gettext("no zone specified"));
 			return (Z_ERR);
@@ -4731,6 +4725,100 @@ done:
 	return ((res == Z_OK) ? Z_OK : Z_ERR);
 }
 
+/*
+ * Attempt to generate the information we need to make the zone look like
+ * it was properly detached by using the pkg information contained within
+ * the zone itself.
+ *
+ * We will perform a dry-run detach within the zone to generate the xml file.
+ * To do this we need to be able to get a handle on the zone so we can see
+ * how it is configured.  In order to get a handle, we need a copy of the
+ * zone configuration within the zone.  Since the zone's configuration is
+ * not available within the zone itself, we need to temporarily copy it into
+ * the zone.
+ *
+ * The sequence of actions we are doing is this:
+ *	[set zone state to installed]
+ *	[mount zone]
+ *	zlogin {zone} </etc/zones/{zone}.xml 'cat >/etc/zones/{zone}.xml'
+ *	zlogin {zone} 'zoneadm -z {zone} detach -n' >{zonepath}/SUNWdetached.xml
+ *	zlogin {zone} 'rm -f /etc/zones/{zone}.xml'
+ *	[unmount zone]
+ *	[set zone state to configured]
+ *
+ * The successful result of this function is that we will have a
+ * SUNWdetached.xml file in the zonepath and we can use that to attach the zone.
+ */
+static boolean_t
+gen_detach_info(char *zonepath)
+{
+	int		status;
+	boolean_t	mounted = B_FALSE;
+	boolean_t	res = B_FALSE;
+	char		cmdbuf[2 * MAXPATHLEN];
+
+	/*
+	 * The zone has to be installed to mount and zlogin.  Temporarily set
+	 * the state to 'installed'.
+	 */
+	if (zone_set_state(target_zone, ZONE_STATE_INSTALLED) != Z_OK)
+		return (B_FALSE);
+
+	/* Mount the zone so we can zlogin. */
+	if (mount_func(0, NULL) != Z_OK)
+		goto cleanup;
+	mounted = B_TRUE;
+
+	/*
+	 * We need to copy the zones xml configuration file into the
+	 * zone so we can get a handle for the zone while running inside
+	 * the zone.
+	 */
+	if (snprintf(cmdbuf, sizeof (cmdbuf), "/usr/sbin/zlogin -S %s "
+	    "</etc/zones/%s.xml '/usr/bin/cat >/etc/zones/%s.xml'",
+	    target_zone, target_zone, target_zone) >= sizeof (cmdbuf))
+		goto cleanup;
+
+	status = do_subproc_interactive(cmdbuf);
+	if (subproc_status("copy", status, B_TRUE) != ZONE_SUBPROC_OK)
+		goto cleanup;
+
+	/* Now run the detach command within the mounted zone. */
+	if (snprintf(cmdbuf, sizeof (cmdbuf), "/usr/sbin/zlogin -S %s "
+	    "'/usr/sbin/zoneadm -z %s detach -n' >%s/SUNWdetached.xml",
+	    target_zone, target_zone, zonepath) >= sizeof (cmdbuf))
+		goto cleanup;
+
+	status = do_subproc_interactive(cmdbuf);
+	if (subproc_status("detach", status, B_TRUE) != ZONE_SUBPROC_OK)
+		goto cleanup;
+
+	res = B_TRUE;
+
+cleanup:
+	/* Cleanup from the previous actions. */
+	if (mounted) {
+		if (snprintf(cmdbuf, sizeof (cmdbuf),
+		    "/usr/sbin/zlogin -S %s '/usr/bin/rm -f /etc/zones/%s.xml'",
+		    target_zone, target_zone) >= sizeof (cmdbuf)) {
+			res = B_FALSE;
+		} else {
+			status = do_subproc(cmdbuf);
+			if (subproc_status("rm", status, B_TRUE)
+			    != ZONE_SUBPROC_OK)
+				res = B_FALSE;
+		}
+
+		if (unmount_func(0, NULL) != Z_OK)
+			res =  B_FALSE;
+	}
+
+	if (zone_set_state(target_zone, ZONE_STATE_CONFIGURED) != Z_OK)
+		res = B_FALSE;
+
+	return (res);
+}
+
 static int
 attach_func(int argc, char *argv[])
 {
@@ -4742,6 +4830,7 @@ attach_func(int argc, char *argv[])
 	char zonepath[MAXPATHLEN];
 	char brand[MAXNAMELEN], atbrand[MAXNAMELEN];
 	boolean_t execute = B_TRUE;
+	boolean_t retried = B_FALSE;
 	char *manifest_path;
 
 	if (zonecfg_in_alt_root()) {
@@ -4816,15 +4905,39 @@ attach_func(int argc, char *argv[])
 		goto done;
 	}
 
+retry:
 	if ((err = zonecfg_get_attach_handle(zonepath, target_zone, B_TRUE,
 	    athandle)) != Z_OK) {
-		if (err == Z_NO_ZONE)
-			zerror(gettext("Not a detached zone"));
-		else if (err == Z_INVALID_DOCUMENT)
+		if (err == Z_NO_ZONE) {
+			/*
+			 * Zone was not detached.  Try to fall back to getting
+			 * the needed information from within the zone.
+			 * However, we can only try to generate the attach
+			 * information for native branded zones, so fail if the
+			 * zone is not native.
+			 */
+			if (!is_native_zone) {
+				zerror(gettext("Not a detached zone."));
+				goto done;
+			}
+
+			if (!retried) {
+				zerror(gettext("The zone was not properly "
+				    "detached.\n\tAttempting to attach "
+				    "anyway."));
+				if (gen_detach_info(zonepath)) {
+					retried = B_TRUE;
+					goto retry;
+				}
+			}
+			zerror(gettext("Cannot generate the information "
+			    "needed to attach this zone."));
+		} else if (err == Z_INVALID_DOCUMENT) {
 			zerror(gettext("Cannot attach to an earlier release "
 			    "of the operating system"));
-		else
+		} else {
 			zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
+		}
 		goto done;
 	}
 
