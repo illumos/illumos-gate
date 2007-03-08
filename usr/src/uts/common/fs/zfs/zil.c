@@ -880,23 +880,39 @@ zil_itx_clean(zilog_t *zilog)
 {
 	uint64_t synced_txg = spa_last_synced_txg(zilog->zl_spa);
 	uint64_t freeze_txg = spa_freeze_txg(zilog->zl_spa);
+	list_t clean_list;
 	itx_t *itx;
+
+	list_create(&clean_list, sizeof (itx_t), offsetof(itx_t, itx_node));
 
 	mutex_enter(&zilog->zl_lock);
 	/* wait for a log writer to finish walking list */
 	while (zilog->zl_writer) {
 		cv_wait(&zilog->zl_cv_writer, &zilog->zl_lock);
 	}
-	/* no need to set zl_writer as we never drop zl_lock */
+
+	/*
+	 * Move the sync'd log transactions to a separate list so we can call
+	 * kmem_free without holding the zl_lock.
+	 *
+	 * There is no need to set zl_writer as we don't drop zl_lock here
+	 */
 	while ((itx = list_head(&zilog->zl_itx_list)) != NULL &&
 	    itx->itx_lr.lrc_txg <= MIN(synced_txg, freeze_txg)) {
 		list_remove(&zilog->zl_itx_list, itx);
 		zilog->zl_itx_list_sz -= itx->itx_lr.lrc_reclen;
-		kmem_free(itx, offsetof(itx_t, itx_lr)
-		    + itx->itx_lr.lrc_reclen);
+		list_insert_tail(&clean_list, itx);
 	}
 	cv_broadcast(&zilog->zl_cv_writer);
 	mutex_exit(&zilog->zl_lock);
+
+	/* destroy sync'd log transactions */
+	while ((itx = list_head(&clean_list)) != NULL) {
+		list_remove(&clean_list, itx);
+		kmem_free(itx, offsetof(itx_t, itx_lr)
+		    + itx->itx_lr.lrc_reclen);
+	}
+	list_destroy(&clean_list);
 }
 
 /*
