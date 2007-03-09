@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -279,9 +279,10 @@ void
 px_dbg_detach(dev_info_t *dip, ddi_softint_handle_t *dbg_hdl)
 {
 #ifdef	DEBUG
+	if (dbg_hdl != NULL)
+		(void) ddi_intr_remove_softint(*dbg_hdl);
+
 	if (--px_dbg_reference == 0) {
-		if (dbg_hdl != NULL)
-			(void) ddi_intr_remove_softint(*dbg_hdl);
 		if (px_dbg_msgq != NULL)
 			kmem_free(px_dbg_msgq,
 			    sizeof (px_dbg_msg_t) * px_dbg_msg_size);
