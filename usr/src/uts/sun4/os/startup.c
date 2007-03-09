@@ -919,7 +919,7 @@ startup_memlist(void)
 	 */
 	PRM_DEBUG(e_text);
 	modtext = (caddr_t)roundup((uintptr_t)e_text, MMU_PAGESIZE);
-	if (((uintptr_t)modtext & MMU_PAGEMASK4M) != (uintptr_t)s_text)
+	if (((uintptr_t)e_text & MMU_PAGEMASK4M) != (uintptr_t)s_text)
 		prom_panic("nucleus text overflow");
 	modtext_sz = (caddr_t)roundup((uintptr_t)modtext, MMU_PAGESIZE4M) -
 	    modtext;
@@ -966,11 +966,11 @@ startup_memlist(void)
 	    modtext_sz > MODTEXT_SM_CAP) {
 		extra_etpg = mmu_btop(modtext_sz - MODTEXT_SM_CAP);
 		modtext_sz = MODTEXT_SM_CAP;
-	} else
-		extra_etpg = 0;
+		extra_etva = modtext + modtext_sz;
+	}
+
 	PRM_DEBUG(extra_etpg);
 	PRM_DEBUG(modtext_sz);
-	extra_etva = modtext + modtext_sz;
 	PRM_DEBUG(extra_etva);
 
 	/*
@@ -3227,8 +3227,8 @@ kobj_vmem_init(vmem_t **text_arena, vmem_t **data_arena)
 	    (void *)limit, (void *)(limit + PAGESIZE),
 	    VM_NOSLEEP | VM_BESTFIT | VM_PANIC);
 
-	*text_arena = vmem_create("module_text", modtext, modtext_sz,
-	    sizeof (uintptr_t), segkmem_alloc, segkmem_free,
+	*text_arena = vmem_create("module_text", modtext_sz ? modtext : NULL,
+	    modtext_sz, sizeof (uintptr_t), segkmem_alloc, segkmem_free,
 	    heaptext_arena, 0, VM_SLEEP);
 	*data_arena = vmem_create("module_data", moddata, MODDATA, 1,
 	    segkmem_alloc, segkmem_free, heap32_arena, 0, VM_SLEEP);
