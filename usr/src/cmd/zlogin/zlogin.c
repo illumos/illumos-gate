@@ -114,7 +114,19 @@ static const char *pname;
 #define	DEFAULTSHELL	"/sbin/sh"
 #define	DEF_PATH	"/usr/sbin:/usr/bin"
 
+/*
+ * The ZLOGIN_BUFSIZ is larger than PIPE_BUF so we can be sure we're clearing
+ * out the pipe when the child is exiting.  The ZLOGIN_RDBUFSIZ must be less
+ * than ZLOGIN_BUFSIZ (because we share the buffer in doio).  This value is
+ * also chosen in conjunction with the HI_WATER setting to make sure we
+ * don't fill up the pipe.  We can write FIFOHIWAT (16k) into the pipe before
+ * blocking.  By having ZLOGIN_RDBUFSIZ set to 1k and HI_WATER set to 8k, we
+ * know we can always write a ZLOGIN_RDBUFSIZ chunk into the pipe when there
+ * is less than HI_WATER data already in the pipe.
+ */
 #define	ZLOGIN_BUFSIZ	8192
+#define	ZLOGIN_RDBUFSIZ	1024
+#define	HI_WATER	8192
 
 /*
  * See canonify() below.  CANONIFY_LEN is the maximum length that a
@@ -637,10 +649,107 @@ retry:
 }
 
 /*
+ * This function prevents deadlock between zlogin and the application in the
+ * zone that it is talking to.  This can happen when we read from zlogin's
+ * stdin and write the data down the pipe to the application.  If the pipe
+ * is full, we'll block in the write.  Because zlogin could be blocked in
+ * the write, it would never read the application's stdout/stderr so the
+ * application can then block on those writes (when the pipe fills up).  If the
+ * the application gets blocked this way, it can never get around to reading
+ * its stdin so that zlogin can unblock from its write.  Once in this state,
+ * the two processes are deadlocked.
+ *
+ * To prevent this, we want to verify that we can write into the pipe before we
+ * read from our stdin.  If the pipe already is pretty full, we bypass the read
+ * for now.  We'll circle back here again after the poll() so that we can
+ * try again.  When this function is called, we already know there is data
+ * ready to read on STDIN_FILENO.  We return -1 if there is a problem, 0
+ * if everything is ok (even though we might not have read/written any data
+ * into the pipe on this iteration).
+ */
+static int
+process_raw_input(int stdin_fd, int appin_fd)
+{
+	int cc;
+	struct stat sb;
+	char ibuf[ZLOGIN_RDBUFSIZ];
+
+	/* Check how much data is already in the pipe */
+	if (fstat(appin_fd, &sb) == -1) {
+		perror("stat failed");
+		return (-1);
+	}
+
+	if (dead)
+		return (-1);
+
+	/*
+	 * The pipe already has a lot of data in it,  don't write any more
+	 * right now.
+	 */
+	if (sb.st_size >= HI_WATER)
+		return (0);
+
+	cc = read(STDIN_FILENO, ibuf, ZLOGIN_RDBUFSIZ);
+	if (cc == -1 && (errno != EINTR || dead))
+		return (-1);
+
+	if (cc == -1)	/* The read was interrupted. */
+		return (0);
+
+	/*
+	 * stdin_fd is stdin of the target; so, the thing we'll write the user
+	 * data *to*.  Also, unlike on the output side, we propagate
+	 * zero-length messages to the other side.
+	 */
+	if (write(stdin_fd, ibuf, cc) == -1)
+		return (-1);
+
+	return (0);
+}
+
+/*
+ * Write the output from the application running in the zone.  We can get
+ * a signal during the write (usually it would be SIGCHLD when the application
+ * has exited) so we loop to make sure we have written all of the data we read.
+ */
+static int
+process_output(int in_fd, int out_fd)
+{
+	int wrote = 0;
+	int cc;
+	char ibuf[ZLOGIN_BUFSIZ];
+
+	cc = read(in_fd, ibuf, ZLOGIN_BUFSIZ);
+	if (cc == -1 && (errno != EINTR || dead))
+		return (-1);
+	if (cc == 0)	/* EOF */
+		return (-1);
+	if (cc == -1)	/* The read was interrupted. */
+		return (0);
+
+	do {
+		int len;
+
+		len = write(out_fd, ibuf + wrote, cc - wrote);
+		if (len == -1 && errno != EINTR)
+			return (-1);
+		if (len != -1)
+			wrote += len;
+	} while (wrote < cc);
+
+	return (0);
+}
+
+/*
  * This is the main I/O loop, and is shared across all zlogin modes.
  * Parameters:
  * 	stdin_fd:  The fd representing 'stdin' for the slave side; input to
  *	           the zone will be written here.
+ *
+ * 	appin_fd:  The fd representing the other end of the 'stdin' pipe (when
+ *		   we're running non-interactive); used in process_raw_input
+ *		   to ensure we don't fill up the application's stdin pipe.
  *
  *	stdout_fd: The fd representing 'stdout' for the slave side; output
  *	           from the zone will arrive here.
@@ -656,7 +765,8 @@ retry:
  *
  */
 static void
-doio(int stdin_fd, int stdout_fd, int stderr_fd, boolean_t raw_mode)
+doio(int stdin_fd, int appin_fd, int stdout_fd, int stderr_fd,
+    boolean_t raw_mode)
 {
 	struct pollfd pollfds[3];
 	char ibuf[ZLOGIN_BUFSIZ];
@@ -696,12 +806,9 @@ doio(int stdin_fd, int stdout_fd, int stderr_fd, boolean_t raw_mode)
 		if (pollfds[0].revents) {
 			if (pollfds[0].revents &
 			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
-				cc = read(stdout_fd, ibuf, ZLOGIN_BUFSIZ);
-				if (cc == -1 && (errno != EINTR || dead))
+				if (process_output(stdout_fd, STDOUT_FILENO)
+				    != 0)
 					break;
-				if (cc == 0)	/* EOF */
-					break;
-				(void) write(STDOUT_FILENO, ibuf, cc);
 			} else {
 				pollerr = pollfds[0].revents;
 				break;
@@ -712,12 +819,9 @@ doio(int stdin_fd, int stdout_fd, int stderr_fd, boolean_t raw_mode)
 		if (pollfds[1].revents) {
 			if (pollfds[1].revents &
 			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
-				cc = read(stderr_fd, ibuf, ZLOGIN_BUFSIZ);
-				if (cc == -1 && (errno != EINTR || dead))
+				if (process_output(stderr_fd, STDERR_FILENO)
+				    != 0)
 					break;
-				if (cc == 0)	/* EOF */
-					break;
-				(void) write(STDERR_FILENO, ibuf, cc);
 			} else {
 				pollerr = pollfds[1].revents;
 				break;
@@ -728,10 +832,6 @@ doio(int stdin_fd, int stdout_fd, int stderr_fd, boolean_t raw_mode)
 		if (pollfds[2].revents) {
 			if (pollfds[2].revents &
 			    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
-				cc = read(STDIN_FILENO, ibuf, ZLOGIN_BUFSIZ);
-				if (cc == -1 && (errno != EINTR || dead))
-					break;
-
 				/*
 				 * stdin fd is stdin of the target; so,
 				 * the thing we'll write the user data *to*.
@@ -741,10 +841,18 @@ doio(int stdin_fd, int stdout_fd, int stderr_fd, boolean_t raw_mode)
 				 * other side.
 				 */
 				if (raw_mode == B_TRUE) {
-					if (write(stdin_fd, ibuf, cc) == -1)
+					if (process_raw_input(stdin_fd,
+					    appin_fd) == -1)
 						break;
 				} else {
-					if (process_user_input(stdin_fd,
+					cc = read(STDIN_FILENO, ibuf,
+					    ZLOGIN_RDBUFSIZ);
+					if (cc == -1 &&
+					    (errno != EINTR || dead))
+						break;
+
+					if (cc != -1 &&
+					    process_user_input(stdin_fd,
 					    stdout_fd, ibuf, cc) == -1)
 						break;
 				}
@@ -774,18 +882,22 @@ doio(int stdin_fd, int stdout_fd, int stderr_fd, boolean_t raw_mode)
 	 * timeout to see if we can catch the last bit of I/O from the
 	 * children.
 	 */
-	pollfds[0].revents = pollfds[1].revents = pollfds[2].revents = 0;
-	(void) poll(pollfds,
-	    sizeof (pollfds) / sizeof (struct pollfd), 100);
+retry:
+	pollfds[0].revents = pollfds[1].revents = 0;
+	(void) poll(pollfds, 2, 100);
 	if (pollfds[0].revents &
 	    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
-		if ((cc = read(stdout_fd, ibuf, ZLOGIN_BUFSIZ)) > 0)
+		if ((cc = read(stdout_fd, ibuf, ZLOGIN_BUFSIZ)) > 0) {
 			(void) write(STDOUT_FILENO, ibuf, cc);
+			goto retry;
+		}
 	}
 	if (pollfds[1].revents &
 	    (POLLIN | POLLRDNORM | POLLRDBAND | POLLPRI)) {
-		if ((cc = read(stderr_fd, ibuf, ZLOGIN_BUFSIZ)) > 0)
+		if ((cc = read(stderr_fd, ibuf, ZLOGIN_BUFSIZ)) > 0) {
 			(void) write(STDERR_FILENO, ibuf, cc);
+			goto retry;
+		}
 	}
 }
 
@@ -1390,7 +1502,8 @@ noninteractive_login(char *zonename, zoneid_t zoneid, char *login,
 	(void) close(tmpl_fd);
 
 	(void) sigprocmask(SIG_UNBLOCK, &block_cld, NULL);
-	doio(stdin_pipe[0], stdout_pipe[0], stderr_pipe[0], B_TRUE);
+	doio(stdin_pipe[0], stdin_pipe[1], stdout_pipe[0], stderr_pipe[0],
+	    B_TRUE);
 	do {
 		retval = waitpid(child_pid, &child_status, 0);
 		if (retval == -1) {
@@ -1591,7 +1704,7 @@ main(int argc, char **argv)
 		/*
 		 * Run the I/O loop until we get disconnected.
 		 */
-		doio(masterfd, masterfd, -1, B_FALSE);
+		doio(masterfd, -1, masterfd, -1, B_FALSE);
 		reset_tty();
 		(void) printf(gettext("\n[Connection to zone '%s' console "
 		    "closed]\n"), zonename);
@@ -1830,7 +1943,7 @@ main(int argc, char **argv)
 	postfork_dropprivs();
 
 	(void) sigprocmask(SIG_UNBLOCK, &block_cld, NULL);
-	doio(masterfd, masterfd, -1, B_FALSE);
+	doio(masterfd, -1, masterfd, -1, B_FALSE);
 
 	reset_tty();
 	(void) fprintf(stderr,
