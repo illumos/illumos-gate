@@ -173,9 +173,14 @@ timeout_common(void (*func)(void *), void *arg, clock_t delta,
 		delta = 1;
 	cp->c_runtime = runtime = lbolt + delta;
 
-	/* Calculate the future time in milli-second */
-	hresms = now.tv_sec * MILLISEC + now.tv_nsec / MICROSEC +
-	    TICK_TO_MSEC(delta);
+	/*
+	 * Calculate the future time in millisecond.
+	 * We must cast tv_sec and delta to 64-bit integers
+	 * to avoid integer overflow on 32-platforms.
+	 */
+	hresms = (int64_t)now.tv_sec * MILLISEC + now.tv_nsec / MICROSEC +
+	    TICK_TO_MSEC((int64_t)delta);
+
 	cp->c_hresms = hresms;
 
 	/*
@@ -349,8 +354,12 @@ callout_execute(callout_table_t *ct)
 
 	gethrestime(&now);
 
-	/* Calculate the current time in milli-second */
-	hresms = now.tv_sec * MILLISEC + now.tv_nsec / MICROSEC;
+	/*
+	 * Calculate the future time in millisecond.
+	 * We must cast tv_sec to 64-bit integer
+	 * to avoid integer overflow on 32-platforms.
+	 */
+	hresms = (int64_t)now.tv_sec * MILLISEC + now.tv_nsec / MICROSEC;
 
 	cp = ct->ct_hresq;
 	while (cp != NULL && hresms >= cp->c_hresms) {
@@ -420,8 +429,12 @@ callout_schedule_1(callout_table_t *ct)
 
 	gethrestime(&now);
 
-	/* Calculate the current time in milli-second */
-	hresms = now.tv_sec * MILLISEC + now.tv_nsec / MICROSEC;
+	/*
+	 * Calculate the future time in millisecond.
+	 * We must cast tv_sec to 64-bit integer
+	 * to avoid integer overflow on 32-platforms.
+	 */
+	hresms = (int64_t)now.tv_sec * MILLISEC + now.tv_nsec / MICROSEC;
 
 	cp = ct->ct_hresq;
 	while (cp != NULL && hresms >= cp->c_hresms) {
