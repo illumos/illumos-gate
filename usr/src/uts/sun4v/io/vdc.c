@@ -3422,6 +3422,7 @@ done:
 			mutex_enter(&vdcp->lock);
 
 			vdcp->state = VDC_STATE_RESETTING;
+			vdcp->self_reset = B_TRUE;
 			break;
 
 		case VDC_STATE_RESETTING:
