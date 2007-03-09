@@ -526,6 +526,7 @@ typedef struct	vsw {
 	uint32_t		mac_ring_tbl_sz;
 	vsw_mac_ring_t		*mac_ring_tbl;	/* Mac ring table. */
 
+	kmutex_t		hw_lock;	/* sync access to HW */
 	boolean_t		recfg_reqd;	/* Reconfig of addrs needed */
 	int			promisc_cnt;
 
@@ -539,6 +540,9 @@ typedef struct	vsw {
 	struct ether_addr	if_addr;	/* interface address */
 	krwlock_t		if_lockrw;
 	uint8_t			if_state;	/* interface state */
+
+	mac_addr_slot_t		addr_slot;	/* Unicast address slot */
+	int			addr_set;	/* Addr set where */
 
 	/* multicast addresses when configured as eth interface */
 	kmutex_t		mca_lock;	/* multicast lock */
