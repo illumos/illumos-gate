@@ -1196,3 +1196,4 @@ Bugid   Risk Synopsis
 6524709 executables using /usr/lib/libc.so.1 as the ELF interpreter dump core
 	(link-editor components only)
 6531189 SEGV in dladdr()
+6527318 dlopen(name, RTLD_NOLOAD) returns handle for unloaded library

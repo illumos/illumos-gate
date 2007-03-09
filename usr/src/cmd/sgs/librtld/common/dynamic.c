@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Update any dynamic entry offsets.  One issue with dynamic entries is that
@@ -71,8 +71,8 @@ update_dynamic(Cache *cache, Cache *_cache, Rt_map *lmp, int flags,
 				 * to, undo any lazy-loading position flag.
 				 */
 				if (dlmp = is_so_loaded(LIST(lmp),
-				    (strs + dyn->d_un.d_val), 1)) {
-					Bnd_desc **	bdpp;
+				    (strs + dyn->d_un.d_val))) {
+					Bnd_desc	**bdpp;
 					Aliste		off;
 
 					for (ALIST_TRAVERSE(DEPENDS(lmp), off,

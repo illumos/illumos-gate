@@ -1479,10 +1479,7 @@ dldump_core(Lm_list *lml, const char *ipath, const char *opath, int flags)
 	 * have to be revisited.
 	 */
 	if (ipath) {
-		if ((lmp = is_so_loaded(&lml_main, ipath, 0)) == 0)
-			lmp = is_so_loaded(&lml_main, ipath, 1);
-
-		if (lmp == 0) {
+		if ((lmp = is_so_loaded(&lml_main, ipath)) == 0) {
 			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_GEN_NOFILE),
 			    ipath);
 			return (1);

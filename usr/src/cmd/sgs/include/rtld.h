@@ -833,7 +833,7 @@ extern Lm_list		*lml_list[];
 
 extern Pltbindtype	elf_plt_write(uintptr_t, uintptr_t, void *, uintptr_t,
 			    Xword);
-extern Rt_map		*is_so_loaded(Lm_list *, const char *, int);
+extern Rt_map		*is_so_loaded(Lm_list *, const char *);
 extern Sym		*lookup_sym(Slookup *, Rt_map **, uint_t *);
 extern int		rt_dldump(Rt_map *, const char *, int, Addr);
 

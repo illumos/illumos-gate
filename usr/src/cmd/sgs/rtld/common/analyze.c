@@ -700,17 +700,16 @@ are_u_this(Rej_desc *rej, int fd, struct stat *status, const char *name)
 	return (0);
 }
 
-
 /*
- * Function that determines whether a file name has already been loaded; if so,
- * returns a pointer to its link map structure; else returns a NULL pointer.
+ * Helper routine for is_so_matched() that consolidates matching a path name,
+ * or file name component of a link-map name.
  */
 static int
-_is_so_matched(const char *name, const char *str, int base)
+_is_so_matched(const char *name, const char *str, int path)
 {
 	const char	*_str;
 
-	if (base && ((_str = strrchr(str, '/')) != NULL))
+	if ((path == 0) && ((_str = strrchr(str, '/')) != NULL))
 		_str++;
 	else
 		_str = str;
@@ -718,64 +717,137 @@ _is_so_matched(const char *name, const char *str, int base)
 	return (strcmp(name, _str));
 }
 
+/*
+ * Determine whether a search name matches one of the names associated with a
+ * link-map.  A link-map contains several names:
+ *
+ *  .	a NAME() - typically the full pathname of an object that has been
+ *	loaded.  For example, when looking for the dependency "libc.so.1", a
+ * 	search path is applied, with the eventual NAME() being "/lib/ld.so.1".
+ *	The name of the executable is typically a simple filename, such as
+ *	"main", as this is the name passed to exec() to start the process.
+ *
+ *  .	a PATHNAME() - this is maintained if the resolved NAME() is different
+ * 	to NAME(), ie. the original name is a symbolic link.  This is also
+ * 	the resolved full pathname for a dynamic executable.
+ *
+ *  .	a list of ALIAS() names - these are alternative names by which the
+ *	object has been found, ie. when dependencies are loaded through a
+ * 	variety of different symbolic links.
+ *
+ * The name pattern matching can differ depending on whether we are looking
+ * for a full path name (path != 0), or a simple file name (path == 0).  Full
+ * path names typically match NAME() or PATHNAME() entries, so these link-map
+ * names are inspected first when a full path name is being searched for.
+ * Simple file names typically match ALIAS() names, so these link-map names are
+ * inspected first when a simple file name is being searched for.
+ *
+ * For all full path name searches, the link-map names are taken as is.  For
+ * simple file name searches, only the file name component of any link-map
+ * names are used for comparison.
+ */
 static Rt_map *
-is_so_matched(Rt_map *lmp, const char *name, int base)
+is_so_matched(Rt_map *lmp, const char *name, int path)
 {
 	Aliste		off;
 	const char	**cpp;
 
 	/*
+	 * A pathname is typically going to match a NAME() or PATHNAME(), so
+	 * check these first.
+	 */
+	if (path) {
+		if (strcmp(name, NAME(lmp)) == 0)
+			return (lmp);
+
+		if (PATHNAME(lmp) != NAME(lmp)) {
+			if (strcmp(name, PATHNAME(lmp)) == 0)
+				return (lmp);
+		}
+	}
+
+	/*
 	 * Typically, dependencies are specified as simple file names
 	 * (DT_NEEDED == libc.so.1), which are expanded to full pathnames to
 	 * open the file.  The full pathname is NAME(), and the original name
-	 * is maintained on the ALIAS() list. Look through the ALIAS list first,
-	 * as this is most likely to match other dependency uses.
+	 * is maintained on the ALIAS() list.
+	 *
+	 * If this is a simple filename, or a pathname has failed to match the
+	 * NAME() and PATHNAME() check above, look through the ALIAS() list.
 	 */
 	for (ALIST_TRAVERSE(ALIAS(lmp), off, cpp)) {
-		if (_is_so_matched(name, *cpp, base) == 0)
+		/*
+		 * If we're looking for a simple filename, _is_so_matched()
+		 * will reduce the ALIAS name to its simple name.
+		 */
+		if (_is_so_matched(name, *cpp, path) == 0)
 			return (lmp);
 	}
 
 	/*
-	 * Finally compare full paths, this is sometimes useful for catching
-	 * filter names, or for those that dlopen() the dynamic executable.
+	 * Finally, if this is a simple file name, and any ALIAS() search has
+	 * been completed, match the simple file name of NAME() and PATHNAME().
 	 */
-	if (_is_so_matched(name, NAME(lmp), base) == 0)
-		return (lmp);
-
-	if (PATHNAME(lmp) != NAME(lmp)) {
-		if (_is_so_matched(name, PATHNAME(lmp), base) == 0)
+	if (path == 0) {
+		if (_is_so_matched(name, NAME(lmp), 0) == 0)
 			return (lmp);
+
+		if (PATHNAME(lmp) != NAME(lmp)) {
+			if (_is_so_matched(name, PATHNAME(lmp), 0) == 0)
+				return (lmp);
+		}
 	}
+
 	return (0);
 }
 
+/*
+ * Files are opened by ld.so.1 to satisfy dependencies, filtees and dlopen()
+ * requests.  Each request investigates the file based upon the callers
+ * environment, and once a full path name has been established a check is made
+ * against the FullpathNode AVL tree and a device/inode check, to ensure the
+ * same file isn't mapped multiple times.  See file_open().
+ *
+ * However, there are one of two cases where a test for an existing file name
+ * needs to be carried out, such as dlopen(NOLOAD) requests, dldump() requests,
+ * and as a final fallback to dependency loading.  These requests are handled
+ * by is_so_loaded().
+ *
+ * A traversal through the callers link-map list is carried out, and from each
+ * link-map, a comparison is made against all of the various names by which the
+ * object has been referenced.  The subroutine, is_so_matched() compares the
+ * link-map names against the name being searched for.  Whether the search name
+ * is a full path name or a simple file name, governs what comparisons are made.
+ *
+ * A full path name, which is a fully resolved path name that starts with a "/"
+ * character, or a relative path name that includes a "/" character, must match
+ * the link-map names explicitly.  A simple file name, which is any name *not*
+ * containing a "/" character, are matched against the file name component of
+ * any link-map names.
+ */
 Rt_map *
-is_so_loaded(Lm_list *lml, const char *name, int base)
+is_so_loaded(Lm_list *lml, const char *name)
 {
 	Rt_map		*lmp;
-	const char	*_name;
 	avl_index_t	where;
 	Lm_cntl		*lmc;
 	Aliste		off;
+	int		path = 0;
 
 	/*
-	 * If we've been asked to do a basename search, first determine if
-	 * the pathname is registered in the FullpathNode AVL tree.
+	 * If the name is a full path name, first determine if the path name is
+	 * registered in the FullpathNode AVL tree.
 	 */
-	if (base && (name[0] == '/') &&
+	if ((name[0] == '/') &&
 	    ((lmp = fpavl_loaded(lml, name, &where)) != NULL) &&
 	    ((FLAGS(lmp) & (FLG_RT_OBJECT | FLG_RT_DELETE)) == 0))
 		return (lmp);
 
 	/*
-	 * If we've been asked to do a basename search reduce the input name
-	 * to its basename.
+	 * Determine whether the name is a simple file name, or a path name.
 	 */
-	if (base && ((_name = strrchr(name, '/')) != NULL))
-		_name++;
-	else
-		_name = name;
+	if (strchr(name, '/'))
+		path++;
 
 	/*
 	 * Loop through the callers link-map lists.
@@ -785,13 +857,12 @@ is_so_loaded(Lm_list *lml, const char *name, int base)
 			if (FLAGS(lmp) & (FLG_RT_OBJECT | FLG_RT_DELETE))
 				continue;
 
-			if (is_so_matched(lmp, _name, base))
+			if (is_so_matched(lmp, name, path))
 				return (lmp);
 		}
 	}
 	return ((Rt_map *)0);
 }
-
 
 /*
  * Tracing is enabled by the LD_TRACE_LOADED_OPTIONS environment variable which
@@ -1712,7 +1783,7 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 		DBG_CALL(Dbg_libs_find(lml, oname));
 
 #if	!defined(ISSOLOAD_BASENAME_DISABLED)
-		if ((nlmp = is_so_loaded(lml, oname, 0)))
+		if ((nlmp = is_so_loaded(lml, oname)))
 			return (nlmp);
 #endif
 		/*
@@ -1757,7 +1828,7 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 		 * already been opened using its full pathname).
 		 */
 		if (nfdp->fd_nname == 0)
-			return (is_so_loaded(lml, oname, 1));
+			return (is_so_loaded(lml, oname));
 	}
 
 	/*
@@ -2100,8 +2171,7 @@ _load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
 		 * has already been loaded.
 		 */
 		/* LINTED */
-		if ((nlmp = is_so_loaded(lml, name, 0)) ||
-		    (nlmp = is_so_loaded(lml, name, 1))) {
+		if (nlmp = is_so_loaded(lml, name)) {
 			if ((lml->lm_flags & LML_FLG_TRC_VERBOSE) &&
 			    ((FLAGS1(clmp) & FL1_RT_LDDSTUB) == 0)) {
 				(void) printf(MSG_INTL(MSG_LDD_FIL_FIND), name,
