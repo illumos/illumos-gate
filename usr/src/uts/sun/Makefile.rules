@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -68,6 +68,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/dada/impl/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/dada/targets/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/esp.o	:=	CFLAGS += -dalign
 $(OBJS_DIR)/fas.o	:=	CFLAGS += -dalign
 $(OBJS_DIR)/fas_callbacks.o :=	CFLAGS += -dalign
@@ -106,6 +110,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/dada/impl/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/dada/conf/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/dada/targets/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/scsi/adapters/%.c
