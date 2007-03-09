@@ -1,6 +1,5 @@
-<?xml version='1.0'?>
-<!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
-
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
  CDDL HEADER START
 
@@ -20,11 +19,12 @@
  information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
-
+-->
+<!--
  Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
- ident	"%Z%%M%	%I%	%E% SMI"
+	ident	"%Z%%M%	%I%	%E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -32,52 +32,44 @@
 	file.
 -->
 
-<service_bundle type='manifest' name='SUNWpcr:rfc1179'>
+<service_bundle type='manifest' name='SUNWppm:ppd-cache-update'>
 
 <service
-    name='application/print/rfc1179'
-    type='service'
-    version='1'>
+	name='application/print/ppd-cache-update'
+	type='service'
+	version='1'>
 
-    	<create_default_instance enabled='false' />
+	<create_default_instance enabled='false' />
 
-	<restarter>
-		<service_fmri value='svc:/network/inetd:default' />
-	</restarter>
+	<single_instance />
 
+	<!--
+	  This service writes to/reads from /tmp, /var, and /usr.
+	-->
 	<dependency
-		name='lpsched'
+		name='filesystem'
 		grouping='require_all'
-		restart_on='refresh'
+		restart_on='none'
 		type='service'>
-		<service_fmri value='svc:/application/print/server' />
+		<service_fmri value='svc:/system/filesystem/minimal' />
 	</dependency>
 
 	<exec_method
 		type='method'
-		name='inetd_start'
-		exec='/usr/lib/print/in.lpd -u lp -d /var/run/in.lpd'
+		name='start'
+		exec='/lib/svc/method/ppd-cache-update start'
 		timeout_seconds='0'>
-		<method_context>
-			<method_credential user='root' group='lp' />
-		</method_context>
 	</exec_method>
-
 
 	<exec_method
 		type='method'
-		name='inetd_disable'
-		exec=':kill'
-		timeout_seconds='0'>
+		name='stop'
+		exec=':true'
+		timeout_seconds='3'>
 	</exec_method>
 
-	<property_group name='inetd' type='framework'>
-		<stability value='Evolving' />
-		<propval name='endpoint_type' type='astring' value='stream' />
-		<propval name='name' type='astring' value='printer' />
-		<propval name='wait' type='boolean' value='false' />
-		<propval name='isrpc' type='boolean' value='false' />
-		<propval name='proto' type='astring' value='tcp6' />
+	<property_group name='startd' type='framework'>
+		<propval name='duration' type='astring' value='transient' />
 	</property_group>
 
 	<stability value='Unstable' />
@@ -85,15 +77,14 @@
 	<template>
 		<common_name>
 			<loctext xml:lang='C'>
-			BSD print protocol adapter
+				ppd cache update
 			</loctext>
 		</common_name>
 		<documentation>
-			<manpage title='in.lpd' section='1M'
-			    manpath='/usr/share/man' />
+			<manpage title='ppdmgr' section='1M'
+				manpath='/usr/share/man' />
 		</documentation>
 	</template>
-
 </service>
 
 </service_bundle>

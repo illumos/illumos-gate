@@ -1,4 +1,4 @@
-#!/usr/bin/ksh
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -19,19 +19,15 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-#
-# get a list of the Manufacturers from the ppdcache
-#
+# Remove ppdmgr created cache files
+/bin/rm -f $BASEDIR/var/lp/ppd/caches/*
+/bin/rm -f $BASEDIR/var/lp/ppd/ppdcache
 
-[[ -f /var/lp/ppd/ppdcache ]] || exit 1
-/bin/cat /var/lp/ppd/ppdcache |
-    nawk '{FS=":"; print $1}' |
-    nawk '{print $1}' |
-    /bin/sort -u
 exit 0

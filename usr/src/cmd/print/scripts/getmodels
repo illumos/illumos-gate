@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,24 +19,27 @@
 #
 # CDDL HEADER END
 #
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
 #
 
 #
 # get a list of the Models for this Model from the ppdcache
 #
+# Input:
+#	Manufacturer	(Note: printmgr passes only the first word
+#	Lexmark		of the manufacturer name)
+# Output:
+#	Manufacturer Model
+#	Lexmark Optra Color 1200
 
 if [[ $# -lt 1 ]]; then
         exit 1
 fi
 
-if [[ -f /usr/lib/lp/model/ppd/ppdcache ]]; then
-	/bin/grep ^$1 /usr/lib/lp/model/ppd/ppdcache | nawk '{FS=":"; print $2}' | uniq 
-	exit 0
-else
-	exit 1
-fi
+cachefile=/var/lp/ppd/ppdcache
+[[ -f $cachefile ]] || exit 1
+/bin/grep "^$1" $cachefile | nawk '{FS=":"; print $2}' | uniq 
+exit 0

@@ -1033,6 +1033,7 @@ smf_obsolete_rc_files="
 
 # Obsolete smf manifests
 smf_obsolete_manifests="
+	var/svc/manifest/application/print/cleanup.xml
 	var/svc/manifest/network/tftp.xml
 	var/svc/manifest/network/lp.xml
 	var/svc/manifest/system/filesystem/volfs.xml
@@ -1048,6 +1049,7 @@ smf_renamed_manifests="
 
 # Obsolete smf methods
 smf_obsolete_methods="
+	lib/svc/method/print-cleanup
 	lib/svc/method/print-server
 	lib/svc/method/svc-volfs
 	lib/svc/method/pfil

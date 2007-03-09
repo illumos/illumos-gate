@@ -1,4 +1,4 @@
-#!/usr/bin/ksh
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -23,15 +23,18 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-#
-# get a list of the Manufacturers from the ppdcache
-#
+. /lib/svc/share/smf_include.sh
 
-[[ -f /var/lp/ppd/ppdcache ]] || exit 1
-/bin/cat /var/lp/ppd/ppdcache |
-    nawk '{FS=":"; print $1}' |
-    nawk '{print $1}' |
-    /bin/sort -u
-exit 0
+case "$1" in
+'start')
+	if [ -x /usr/sbin/ppdmgr ] ; then
+		/usr/sbin/ppdmgr -u -R all -L all
+	fi
+	;;
+*)
+	echo "Usage: $0 start"
+	exit 1
+	;;
+esac
+exit $SMF_EXIT_OK

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -854,7 +853,11 @@ E_ADM_ALSO_SEP_FORM
 	"Either use another name, or remove the conflicting form using `lpforms'."
 E_ADM_NOPPD
 	"The ppd \"%s\" does not exist."
-	"Use the command\n    ls /usr/lib/lp/model/ppd\nto find the list of known printer ppd definitions."
+	"Use the command\n    find <PPD file repository> -type f\n"
+	"where <PPD file repository> is one or more of the following:\n"
+	"    /usr/share/ppd/*/*/\n    /usr/share/local/ppd/*/*/\n"
+	"    /opt/share/ppd/*/*/\n    /var/lp/ppd/*/*/\n"
+	"to find the list of known printer ppd definitions."
 
 #endif
 

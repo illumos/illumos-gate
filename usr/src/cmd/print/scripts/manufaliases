@@ -1,4 +1,3 @@
-#!/usr/bin/ksh
 #
 # CDDL HEADER START
 #
@@ -23,15 +22,11 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
-
-#
-# get a list of the Manufacturers from the ppdcache
-#
-
-[[ -f /var/lp/ppd/ppdcache ]] || exit 1
-/bin/cat /var/lp/ppd/ppdcache |
-    nawk '{FS=":"; print $1}' |
-    nawk '{print $1}' |
-    /bin/sort -u
-exit 0
+Canon:Canon Inc.
+Dymo:Dymo-CoStar
+Epson
+HP:hewlett-packard
+Minolta:minolta-qms
+Okidata:oki:OKI DATA CORP
+Xerox
+Lexmark:Lexmark International

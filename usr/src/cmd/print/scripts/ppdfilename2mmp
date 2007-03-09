@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,64 +19,82 @@
 #
 # CDDL HEADER END
 #
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 
 #
-# Get the make/model/nickname from ppdfilename
+# Get the make/model/nickname as well as the repository/label from ppdfilename
+#
+
+# Input
+#	ppdfilename
+#	/var/lp/ppd/user/HP/foo.ppd.gz
+# Output
+#	make
+#	model
+#	label(repository letter): driver
+#
+#	Lexmark
+#	IBM Page Printer 3112
+#	foomatic(L): Foomatic/hpijs
 #
 
 if [[ $# -lt 1 ]]; then
         exit 1
 fi
 
-if [[ -f /usr/lib/lp/model/ppd/ppdcache ]]; then
+cachefile=/var/lp/ppd/ppdcache
+[[ -f $cachefile ]] || exit 1
 
-    ppdfile=`/bin/grep $1 /usr/lib/lp/model/ppd/ppdcache`
+cacheentry=$(/bin/grep "$1" $cachefile)
+[[ -n "$cacheentry" ]] || exit 1
 
-    if [[ -z "$ppdfile" ]]; then
+#
+# Retrieve the manufacturer (make)
+# Use only the first word in manufacturer entry
+#
+manuf=$(echo "$cacheentry" | 
+nawk '{FS=":"; print $1}' |
+nawk '{print $1}')
 
-	# Perhaps this is an old configuration file 
-	# look for ppd file in new directories
+# Retrieve the model
+model=$(echo "$cacheentry" | nawk '{FS=":"; print $2}')
 
-	# Get last two fields from arg1: full path/filename of ppd
-	# file. Separate with /.
-	# arg1: /usr/lib/lp/model/ppd/<MANU>/<filename>
+# Retrieve the driver
+driver=$(echo "$cacheentry" | nawk '{FS=":"; print $3}')
 
-	manufile=`echo $1 | /bin/nawk -F/ '{ print $7 "/"  $8 }`
+#
+# Retrieve the PPD path.  Parse the PPD path to get the
+# label path and to figure out the repository letter
+# associated with the label path.  Note:
+# the PPD file name is the 6th colon separated entry
+# in the cache entry.  This is may need to be modified if the
+# format changes.
+#
+ppdpath=$(echo "$cacheentry" | /bin/nawk '{FS=":"; print $6}' )
+manupath=$(/bin/dirname "$ppdpath")
+labelpath=$(/bin/dirname "$manupath")
 
-	# search for ppd file in all the directories under system 
-	# Use the first one found
+case "$labelpath" in
+/usr/share/ppd/*)
+	repltr=S
+		;;
+/opt/share/ppd/*)
+	repltr=V
+	;;
+/usr/local/share/ppd/*)
+	repltr=A
+	;;
+/var/lp/ppd/*)
+	repltr=U
+	;;
+esac
 
-	for dir in /usr/lib/lp/model/ppd/system/*; do
-		if [[ -d "$dir" ]]; then
-			target=$dir/$manufile
-			found=`/bin/grep $target /usr/lib/lp/model/ppd/ppdcache`
+[[ -n "${repltr}" ]] || exit 1
+echo "${manuf}\n${model}"
+echo "$(/bin/basename "$labelpath")(${repltr}): $driver"
 
-			if [[ -z "$ppdfile" &&  -n "$found" ]]; then
-				ppdfile=$found
-			fi
-		
-
-		fi 
-	done
-			
-    fi 	
-
-    if [[ -z "$ppdfile" ]]; then
-		exit 1
-    else
-		# Use only first word in manufacturer entry
-		echo $ppdfile | 
-		nawk '{FS=":"; print $1}' |
-		nawk '{print $1}'
-
-		echo $ppdfile | 
-		nawk '{FS=":"; print $2; print $3}'
-		exit 0
-    fi
-fi
+exit 0

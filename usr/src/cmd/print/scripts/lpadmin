@@ -37,6 +37,7 @@ LPGET=/usr/bin/lpget
 LPSTAT=/usr/bin/lpstat
 LPADMIN=/usr/lib/lp/local/lpadmin
 COMM=/usr/bin/comm
+PPDMGR=/usr/sbin/ppdmgr
 
 HOST=$(/bin/uname -n)
 exit_code=0
@@ -100,6 +101,28 @@ delete_all() {
 	done
 }
 
+# Call the ppdmgr utility to add a new PPD file to the system.
+#
+# $1  - path to PPD file
+# $2  - label name (optional)
+add_new_ppd_file() {
+	# Add new ppd file and echo full path it was actually saved to
+	ppdmgrcmd="${PPDMGR} -a ${1} -w"
+
+	ppderrfile=/tmp/lpadminerror.$$
+	ppd_file=$(${ppdmgrcmd} 2>${ppderrfile})
+	ppdmgrrc=$?
+	if [[ -s "${ppderrfile}" ]] ; then
+		print -n "lpadmin: " 1>&2
+		cat ${ppderrfile} 1>&2
+		rm -f ${ppderrfile} >/dev/null 2>&1
+		if [[ ${ppdmgrrc} -ne 0 ]] ; then
+			exit 1
+		fi
+	fi
+	rm -f ${ppderrfile} >/dev/null 2>&1
+}
+
 #
 # Execution begins here
 #
@@ -153,6 +176,9 @@ do
 	case $arg in
 	D)
 		description="${OPTARG}"
+	;;
+	n)
+		ppd_file="${OPTARG}"
 	;;
 	p)
 		if [[ -n "${delete}" ]] ; then
@@ -271,15 +297,26 @@ if [[ -x ${LPADMIN} && -n "${local}" ]] ; then
 		2>/dev/null) >${PRE}
 
 	# if there are no printers configured, enable LP service(s)
-	[[ -s "${PRE}" ]] && lp_config_service enable
+	[[ ! -s "${PRE}" ]] && lp_config_service enable
 
 	# add filters to LP service
 	lp_config_filters
+
+	# add new ppd file to PPD file repositories
+	if [[ -n "${ppd_file}" && -x ${PPDMGR} ]] ; then
+		add_new_ppd_file "${ppd_file}"
+	fi
 
 	# modify LP destination(s)
 	CMD=${LPADMIN}
 	while [[ -n "$*" ]] ; do	# to deal with multi-word arguments
 		CMD="$CMD \"$1\""
+		# replace the ppd_file originally specified with the -n option
+		# with the one returned from call to ppdmgr
+		if [[ "${1}" = "-n" ]] ; then
+			CMD="$CMD \"${ppd_file}\""
+			shift
+		fi
 		shift
 	done
 	case "$CMD" in

@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,41 +19,70 @@
 #
 # CDDL HEADER END
 #
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
 #
 
 #
 # Get the path/ppdfilename for this ppd NickName
 # Input:
-#	make: model: ppd:
-#	PrintersRus: ABC Model 1234: Foomatic/Postscript (recommended):
+#	make: model: ppdlabel: ppd:
+#	PrintersRus: ABC Model 1234: SUNWfoomatic(S): Foomatic/Postscript (recommended):
 #
 
-if [[ $# -lt 3 ]]; then
+#
+# Returns the full path to the repository associated with
+# the repository letter found between parenthesis in the
+# extended PPD label.
+#
+# $1	- Extended PPD label
+#
+rep_path()
+{
+	case "$(expr \"$1\" : ".*(\(.*\)).*")" in
+	"S")
+		echo "/usr/share/ppd"
+		;;
+	"V")
+		echo "/opt/share/ppd"
+		;;
+	"A")
+		echo "/usr/local/share/ppd"
+		;;
+	"U")
+		echo "/var/lp/ppd"
+		;;
+	esac
+}
+
+if [[ $# -lt 4 ]]; then
         exit 1
 fi
 
-if [[ -f /usr/lib/lp/model/ppd/ppdcache ]]; then
-	typeset make=$(echo $* | /usr/bin/nawk '{FS=":"; print $1}')
-	# strip leading blanks
-	typeset model=$(echo $* | /usr/bin/nawk '{FS=":"; print $2}' |
-			sed -e 's/^[ ]*//')
-	typeset ppd=$(echo $* | /usr/bin/nawk '{FS=":"; print $3}' |
-			sed -e 's/^[ ]*//')
+[[ -f /var/lp/ppd/ppdcache ]] || exit 1
+make=$(echo $* | /usr/bin/nawk '{FS=":"; print $1}')
+# strip leading blanks
+model=$(echo $* | /usr/bin/nawk '{FS=":"; print $2}' |
+    /bin/sed -e 's/^[ ]*//')
+extppdlabel=$(echo $* | /usr/bin/nawk '{FS=":"; print $3}' |
+    /bin/sed -e 's/^[ ]*//')
+ppd=$(echo $* | /usr/bin/nawk '{FS=":"; print $4}' |
+    /bin/sed -e 's/^[ ]*//')
 
-	# Do not use ":" with $make. printmgr collapses manufacturer name
-	# to first word, ie PrintersRus and PrintersRus International become
-	# PrintersRus
-	/bin/grep "${make}" /usr/lib/lp/model/ppd/ppdcache | 
-	/bin/grep "${model}:" |
-	/bin/grep "${ppd}:"  |
-	nawk '{FS=":"; print $4}' 
+#
+# Do not use ":" with $make. printmgr collapses manufacturer name
+# to first word, ie PrintersRus and PrintersRus International become
+# PrintersRus.  The full path to the PPD file will be the 6th
+# colon separated entry in the ppdcache entry.  If the format
+# of a ppdcache entry changes, then this will need to be modified
+# also.
+#
+/bin/grep "${make}" /var/lp/ppd/ppdcache | 
+    /bin/grep "${model}:" |
+    /bin/grep "${ppd}:"  |
+    /bin/grep "$(rep_path ${extppdlabel})/${extppdlabel%\(*}" |
+    /usr/bin/nawk '{FS=":"; print $6}' 
 
-	exit 0
-else
-	exit 1
-fi
+exit 0

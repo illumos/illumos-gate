@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -32,7 +32,9 @@ CMSD_FMRI=svc:/network/rpc/cde-calendar-manager
 BIND_FMRI=svc:/network/rpc/bind
 XSERVER_FMRI=svc:/application/x11/x11-server
 SENDMAIL_FMRI=svc:/network/smtp:sendmail
+PRINTSERVER_FMRI=svc:/application/print/server
 RFC1179_FMRI=svc:/application/print/rfc1179
+IPPLISTENER_FMRI=svc:/application/print/ipp-listener
 TTDB_FMRI=svc:/network/rpc/cde-ttdbserver
 DTLOGIN_FMRI=svc:/application/graphical-login/cde-login
 WEBCONSOLE_FMRI=svc:/system/webconsole
@@ -136,18 +138,6 @@ set_sendmail()
 	svcadm refresh $SENDMAIL_FMRI
 }
 
-set_rfc1179()
-{
-	svcprop -q $RFC1179_FMRI:default || return
-	if [ "$1" = "local" ]; then
-		val=localhost
-	else
-		val=
-	fi
-	inetadm -m $RFC1179_FMRI:default bind_addr="$val" 2>/dev/null
-	svcadm refresh $RFC1179_FMRI:default
-}
-
 set_ttdbserver()
 {
 	svcprop -q $TTDB_FMRI:tcp || return
@@ -247,7 +237,6 @@ set_cmsd $keyword
 set_rpcbind $keyword
 set_xserver $keyword
 set_sendmail $keyword
-set_rfc1179 $keyword
 set_ttdbserver $keyword
 set_dtlogin $keyword
 set_webconsole $keyword
@@ -262,6 +251,17 @@ if [ $profile = "generic_open.xml" ]
 then
 	# generic_open may not start inetd services on upgraded systems
 	svccfg apply /var/svc/profile/inetd_generic.xml
+
+	# disable rfc1179 and ipp-listener services if server is disabled
+	if [ "`svcprop -p restarter/state $PRINTSERVER_FMRI:default`" = \
+	    "disabled" ]
+	then
+		# need restart since refresh won't pick up new command-line
+		echo "print/server not enabled: disabling print/rfc1779"
+		svcadm disable $RFC1179_FMRI:default
+		echo "print/server not enabled: disabling print/ipp-listener"
+		svcadm disable $IPPLISTENER_FMRI:default
+	fi
 fi
 
 #

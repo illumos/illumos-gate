@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
 # This required package information file contains a list of package contents.
@@ -36,6 +35,8 @@
 i pkginfo
 i copyright
 i depend
+i preremove
+
 #
 # source locations relative to the prototype file
 #
@@ -57,7 +58,8 @@ s none usr/sadm/admin/printmgr/lib/libpmgr.so=./libpmgr.so.1
 f none usr/sadm/admin/printmgr/classes/pmserver.jar 644 root lp
 f none usr/sadm/admin/printmgr/classes/pmclient.jar 644 root lp
 #
-# Scripts for PPD files
+# Scripts and files for ppdmgr
+#
 d none usr/lib 755 root bin
 d none usr/lib/lp 755 root lp
 d none usr/lib/lp/bin 755 root lp
@@ -69,4 +71,11 @@ f none usr/lib/lp/bin/ppdfilename2mmp 555 root lp
 f none usr/lib/lp/bin/printer-info 555 root lp
 #
 d none usr/sbin 755 root bin
+f none usr/sbin/ppdmgr 0555 root lp
 s none usr/sbin/printmgr=../../usr/sadm/admin/bin/printmgr
+#
+d none var 755 root sys
+d none var/lp 775 lp lp
+d none var/lp/ppd 755 root lp
+d none var/lp/ppd/caches 755 root lp
+f none var/lp/ppd/manufaliases 444 root lp

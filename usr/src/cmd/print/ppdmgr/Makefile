@@ -1,4 +1,3 @@
-#!/usr/bin/ksh
 #
 # CDDL HEADER START
 #
@@ -19,19 +18,39 @@
 #
 # CDDL HEADER END
 #
+#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-#
-# get a list of the Manufacturers from the ppdcache
-#
+MANIFEST=		ppd-cache-update.xml
+SVCMETHOD=		ppd-cache-update
 
-[[ -f /var/lp/ppd/ppdcache ]] || exit 1
-/bin/cat /var/lp/ppd/ppdcache |
-    nawk '{FS=":"; print $1}' |
-    nawk '{print $1}' |
-    /bin/sort -u
-exit 0
+include		../Makefile.sp
+
+ROOTMANIFESTDIR=	$(ROOTSVCAPPLICATIONPRINT)
+$(ROOTMANIFEST):=	FILEMODE= 444
+
+ROOTVARLP=		$(ROOTVAR)/lp
+ROOTVARLPPPD=		$(ROOTVARLP)/ppd
+ROOTVARLPPPDCACHES=	$(ROOTVARLPPPD)/caches
+
+$(ROOTVARLP):=		OWNER= lp
+$(ROOTVARLP):=		DIRMODE= 775
+
+.KEEP_STATE:
+
+all:
+install:	$(ROOTMANIFEST) $(ROOTSVCMETHOD) \
+		$(ROOTVARLP) $(ROOTVARLPPPD) $(ROOTVARLPPPDCACHES)
+check:		$(CHKMANIFEST)
+clean:
+clobber:
+lint:
+
+$(ROOTVARLP) $(ROOTVARLPPPD) $(ROOTVARLPPPDCACHES):
+	$(INS.dir)
+
+include		$(SRC)/cmd/Makefile.targ

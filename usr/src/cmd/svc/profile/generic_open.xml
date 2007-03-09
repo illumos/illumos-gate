@@ -20,7 +20,7 @@
    
     CDDL HEADER END
    
-    Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+    Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
 
     ident	"%Z%%M%	%I%	%E% SMI"
@@ -129,9 +129,6 @@
   <service name='system/power' version='1' type='service'>
     <instance name='default' enabled='true'/>
   </service>
-  <service name='application/print/cleanup' version='1' type='service'>
-    <instance name='default' enabled='true' />
-  </service>
 
   <service name='application/management/sma' version='1' type='service'>
     <instance name='default' enabled='true' />
@@ -145,8 +142,13 @@
   <service name='application/management/wbem' version='1' type='service'>
     <instance name='default' enabled='true' />
   </service>
-
   <service name='application/print/ipp-listener' version='1' type='service'>
+    <instance name='default' enabled='true' />
+  </service>
+  <service name='application/print/ppd-cache-update' version='1' type='service'>
+    <instance name='default' enabled='true' />
+  </service>
+  <service name='application/print/rfc1179' version='1' type='service'>
     <instance name='default' enabled='true' />
   </service>
 

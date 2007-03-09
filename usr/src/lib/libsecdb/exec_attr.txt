@@ -237,6 +237,7 @@ Printer Management:suser:cmd:::/usr/sbin/lpforms:euid=lp
 Printer Management:suser:cmd:::/usr/sbin/lpmove:euid=lp
 Printer Management:suser:cmd:::/usr/sbin/lpshut:euid=lp
 Printer Management:suser:cmd:::/usr/sbin/lpusers:euid=lp
+Printer Management:suser:cmd:::/usr/sbin/ppdmgr:euid=0
 Printer Management:suser:cmd:::/usr/ucb/lpq:euid=0
 Printer Management:suser:cmd:::/usr/ucb/lprm:euid=0
 Process Management:solaris:cmd:::/usr/bin/kill:privs=proc_owner

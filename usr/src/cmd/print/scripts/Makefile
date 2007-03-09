@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,14 +31,18 @@ include			../Makefile.sp
 
 ROOTPRINTLIB = 		$(ROOTLIB)/print
 ROOTLIBLPBIN =		$(ROOTLIBLP)/bin
+ROOTVARLP =		$(ROOTVAR)/lp
+ROOTVARLPPPD =		$(ROOTVARLP)/ppd
 
 $(ROOTVARSPOOLPRINT)	:= OWNER=root
+$(ROOTVARLP)		:= OWNER=lp
+$(ROOTVARLP)		:= DIRMODE=0775
 
 OWNER =			root
 GROUP =			lp
 FILEMODE =		0755
 
-MSGFILES =              lpadmin
+MSGFILES =              lpadmin ppdmgr
 POFILE =                scripts.po
 
 PROG =			conv_lp conv_lpd Makefile.yp
@@ -46,7 +50,7 @@ ROOTLIBPRINTPROG=	$(PROG:%=$(ROOTPRINTLIB)/%)
 $(ROOTLIBPRINTPROG)	:= FILEMODE=0555
 $(ROOTPRINTLIB)/Makefile.yp		:= FILEMODE=0444
 
-USRSBINPROG=		lpsystem lpadmin
+USRSBINPROG=		lpsystem lpadmin ppdmgr
 ROOTUSRSBINPROG=	$(USRSBINPROG:%=$(ROOTUSRSBIN)/%)
 $(ROOTUSRSBINPROG)		:= FILEMODE=555
 
@@ -55,6 +59,12 @@ ROOTPCONF=		$(PCONF:%=$(ROOTETC)/%)
 $(ROOTPCONF)		:= OWNER=root
 $(ROOTPCONF)		:= GROUP=sys
 $(ROOTPCONF)		:= FILEMODE=644
+
+MANUFALIASES= 		manufaliases
+ROOTMANUFALIASES=	$(MANUFALIASES:%=$(ROOTVARLPPPD)/%)
+$(ROOTMANUFALIASES)	:= OWNER=root
+$(ROOTMANUFALIASES)	:= GROUP=lp
+$(ROOTMANUFALIASES)	:= FILEMODE=444
 
 PPDPROGS=	 	getmakes getmodels getppdfile getppds ppdfilename2mmp	
 ROOTPPDPROGS=		$(PPDPROGS:%=$(ROOTLIBLPBIN)/%)
@@ -69,13 +79,16 @@ LIBLINKS=		$(ROOTLIB)/lpadmin $(ROOTLIB)/lpsystem
 
 all :			$(PROG) 
 
-$(ROOTLIB)/print/% $(ROOTINIT_D)/%:	%
+$(ROOTLIB)/print/%:	%
 	$(INS.file)
 
 $(ROOTLIBLPBIN)/%: %
 	$(INS.file)
 
-$(ROOTINIT_D) $(ROOTUSRSBIN) $(ROOTVARSPOOLPRINT):
+$(ROOTVARLPPPD)/%: %
+	$(INS.file)
+
+$(ROOTUSRSBIN) $(ROOTVARSPOOLPRINT) $(ROOTVARLP) $(ROOTVARLPPPD):
 	$(INS.dir)
 
 $(ROOTLIB)/lpadmin:
@@ -104,11 +117,13 @@ _msg_test:
 	$(RM) $@ $(POFILE).i
 	mv messages.po $(POFILE)
 
-install:		$(ROOTINIT_D) $(ROOTLNKPROGS) \
+install:		$(ROOTLNKPROGS) \
 			$(ROOTLIBPRINTPROG) $(ROOTSTARTPROG) \
 			$(ROOTUSRSBIN) $(ROOTUSRSBINPROG) \
 			$(ROOTVARSPOOLPRINT) $(ROOTPCONF) \
-			$(ROOTPPDPROGS) $(LIBLINKS)
+			$(ROOTPPDPROGS) $(LIBLINKS) \
+			$(ROOTVARLP) $(ROOTVARLPPPD) \
+			$(ROOTMANUFALIASES)
 
 $(SYMLINKS1):
 	$(RM) $@; $(SYMLINK) ../sbin/$(SBINPROG1) $@
