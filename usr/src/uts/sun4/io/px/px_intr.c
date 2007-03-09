@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1207,10 +1207,6 @@ px_rem_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 	intr_dist_cpuid_rem_device_weight(ino_p->ino_cpuid, rdip);
 
 	if (ipil_p->ipil_ih_size == 0) {
-		if ((ret = px_lib_intr_setstate(px_p->px_dip, ino_p->ino_sysino,
-		    INTR_DELIVERED_STATE)) != DDI_SUCCESS)
-			goto fail;
-
 		hdlp->ih_vector = ino_p->ino_sysino;
 		i_ddi_rem_ivintr(hdlp);
 
@@ -1220,8 +1216,8 @@ px_rem_intx_intr(dev_info_t *dip, dev_info_t *rdip,
 	if (ino_p->ino_ipil_size == 0) {
 		kmem_free(ino_p, sizeof (px_ino_t));
 	} else {
-		/* Re-enable interrupt only if mapping regsiter still shared */
-		PX_INTR_ENABLE(px_p->px_dip, hdlp->ih_vector, curr_cpu);
+		/* Re-enable interrupt only if mapping register still shared */
+		PX_INTR_ENABLE(px_p->px_dip, ino_p->ino_sysino, curr_cpu);
 	}
 
 fail:
@@ -1405,10 +1401,6 @@ px_rem_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 	intr_dist_cpuid_rem_device_weight(ino_p->ino_cpuid, rdip);
 
 	if (ipil_p->ipil_ih_size == 0) {
-		if ((ret = px_lib_intr_setstate(px_p->px_dip, ino_p->ino_sysino,
-		    INTR_DELIVERED_STATE)) != DDI_SUCCESS)
-			goto fail;
-
 		hdlp->ih_vector = ino_p->ino_sysino;
 		i_ddi_rem_ivintr(hdlp);
 
@@ -1424,8 +1416,8 @@ px_rem_msiq_intr(dev_info_t *dip, dev_info_t *rdip,
 	if (ino_p->ino_ipil_size == 0) {
 		kmem_free(ino_p, sizeof (px_ino_t));
 	} else {
-		/* Re-enable interrupt only if mapping regsiter still shared */
-		PX_INTR_ENABLE(px_p->px_dip, hdlp->ih_vector, curr_cpu);
+		/* Re-enable interrupt only if mapping register still shared */
+		PX_INTR_ENABLE(px_p->px_dip, ino_p->ino_sysino, curr_cpu);
 	}
 
 fail:
