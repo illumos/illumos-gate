@@ -1890,18 +1890,20 @@ cpuid_getidstr(cpu_t *cpu, char *s, size_t n)
 	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
 
 	static const char fmt[] =
-	    "x86 (%s family %d model %d step %d clock %d MHz)";
+	    "x86 (%s %X family %d model %d step %d clock %d MHz)";
 	static const char fmt_ht[] =
-	    "x86 (chipid 0x%x %s family %d model %d step %d clock %d MHz)";
+	    "x86 (chipid 0x%x %s %X family %d model %d step %d clock %d MHz)";
 
 	ASSERT(cpuid_checkpass(cpu, 1));
 
 	if (cpuid_is_cmt(cpu))
 		return (snprintf(s, n, fmt_ht, cpi->cpi_chipid,
-		    cpi->cpi_vendorstr, cpi->cpi_family, cpi->cpi_model,
+		    cpi->cpi_vendorstr, cpi->cpi_std[1].cp_eax,
+		    cpi->cpi_family, cpi->cpi_model,
 		    cpi->cpi_step, cpu->cpu_type_info.pi_clock));
 	return (snprintf(s, n, fmt,
-	    cpi->cpi_vendorstr, cpi->cpi_family, cpi->cpi_model,
+	    cpi->cpi_vendorstr, cpi->cpi_std[1].cp_eax,
+	    cpi->cpi_family, cpi->cpi_model,
 	    cpi->cpi_step, cpu->cpu_type_info.pi_clock));
 }
 
