@@ -836,12 +836,14 @@ make_dynamic(Ofl_desc *ofl)
 	 * Reserve entries for any _init() and _fini() section addresses.
 	 */
 	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_INIT_U),
-	    SYM_NOHASH, 0, ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED)) {
+	    SYM_NOHASH, 0, ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED) &&
+	    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
 		sdp->sd_flags |= FLG_SY_UPREQD;
 		cnt++;
 	}
 	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_FINI_U),
-	    SYM_NOHASH, 0, ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED)) {
+	    SYM_NOHASH, 0, ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED) &&
+	    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
 		sdp->sd_flags |= FLG_SY_UPREQD;
 		cnt++;
 	}

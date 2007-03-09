@@ -2014,15 +2014,15 @@ update_odynamic(Ofl_desc *ofl)
 		}
 	}
 	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_INIT_U),
-	    SYM_NOHASH, 0, ofl)) != NULL) &&
-		sdp->sd_ref == REF_REL_NEED) {
+	    SYM_NOHASH, 0, ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED) &&
+	    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
 		dyn->d_tag = DT_INIT;
 		dyn->d_un.d_ptr = sdp->sd_sym->st_value;
 		dyn++;
 	}
 	if (((sdp = ld_sym_find(MSG_ORIG(MSG_SYM_FINI_U),
-	    SYM_NOHASH, 0, ofl)) != NULL) &&
-		sdp->sd_ref == REF_REL_NEED) {
+	    SYM_NOHASH, 0, ofl)) != NULL) && (sdp->sd_ref == REF_REL_NEED) &&
+	    (sdp->sd_sym->st_shndx != SHN_UNDEF)) {
 		dyn->d_tag = DT_FINI;
 		dyn->d_un.d_ptr = sdp->sd_sym->st_value;
 		dyn++;
@@ -2365,6 +2365,15 @@ update_odynamic(Ofl_desc *ofl)
 
 	dyn->d_tag = DT_NULL;
 	dyn->d_un.d_val = 0;
+
+	/*
+	 * Ensure that we wrote the right number of entries. If not,
+	 * we either miscounted in make_dynamic(), or we did something wrong
+	 * in this function.
+	 */
+	assert((ofl->ofl_osdynamic->os_shdr->sh_size /
+	    ofl->ofl_osdynamic->os_shdr->sh_entsize) ==
+	    ((uintptr_t)(dyn + 1) - (uintptr_t)_dyn) / sizeof (*dyn));
 
 	return (1);
 }

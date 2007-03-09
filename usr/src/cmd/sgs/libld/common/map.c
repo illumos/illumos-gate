@@ -1672,10 +1672,28 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				 * Make sure any parent or external declarations
 				 * fall back to references.
 				 */
-				if (sym_flags & (FLG_SY_PARENT | FLG_SY_EXTERN))
+				if (sym_flags &
+				    (FLG_SY_PARENT | FLG_SY_EXTERN)) {
+					/*
+					 * Turn it into a reference by setting
+					 * the section index to UNDEF.
+					 */
 					sym->st_shndx = shndx = SHN_UNDEF;
-				else
+
+					/*
+					 * It is wrong to to specify size
+					 * or value for an external symbol.
+					 */
+					if ((novalue == 0) || (size != 0)) {
+						eprintf(ofl->ofl_lml, ERR_FATAL,
+						    MSG_INTL(MSG_MAP_NOEXVLSZ),
+						    mapfile,
+						    EC_XWORD(Line_num));
+						return (S_ERROR);
+					}
+				} else {
 					sym->st_shndx = (Half)shndx;
+				}
 
 				sym->st_value = value;
 				sym->st_size = size;

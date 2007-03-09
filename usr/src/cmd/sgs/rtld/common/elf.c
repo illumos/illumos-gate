@@ -2117,10 +2117,14 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				JMPREL(lmp) = (void *)(ld->d_un.d_ptr + base);
 				break;
 			case DT_INIT:
-				INIT(lmp) = (void (*)())(ld->d_un.d_ptr + base);
+				if (ld->d_un.d_ptr != NULL)
+					INIT(lmp) =
+					    (void (*)())(ld->d_un.d_ptr + base);
 				break;
 			case DT_FINI:
-				FINI(lmp) = (void (*)())(ld->d_un.d_ptr + base);
+				if (ld->d_un.d_ptr != NULL)
+					FINI(lmp) =
+					    (void (*)())(ld->d_un.d_ptr + base);
 				break;
 			case DT_INIT_ARRAY:
 				INITARRAY(lmp) = (Addr *)(ld->d_un.d_ptr +

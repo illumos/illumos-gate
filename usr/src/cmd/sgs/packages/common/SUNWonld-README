@@ -1197,3 +1197,5 @@ Bugid   Risk Synopsis
 	(link-editor components only)
 6531189 SEGV in dladdr()
 6527318 dlopen(name, RTLD_NOLOAD) returns handle for unloaded library
+6518359 extern mapfiles references to _init/_fini can create INIT/FINI
+	addresses of 0

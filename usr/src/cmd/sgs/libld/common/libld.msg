@@ -917,6 +917,8 @@
 			 when building a dynamic executable"
 @ MSG_MAP_PROTNDIR	"%s: %lld: protected scope and no-direct declaration \
 			 are incompatible"
+@ MSG_MAP_NOEXVLSZ	"%s: %lld: value and size attributes are imcompatible \
+			 with extern or parent symbols"
 
 @ MSG_MAP_SEGSAME	"segments `%s' and `%s' have the same assigned \
 			 virtual address"
