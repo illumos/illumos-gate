@@ -546,6 +546,8 @@ f none usr/include/sys/bustypes.h 644 root bin
 f none usr/include/sys/byteorder.h 644 root bin
 f none usr/include/sys/callb.h 644 root bin
 f none usr/include/sys/callo.h 644 root bin
+f none usr/include/sys/cpucaps.h 644 root bin
+f none usr/include/sys/cpucaps_impl.h 644 root bin
 f none usr/include/sys/ccompile.h 644 root bin
 f none usr/include/sys/cdio.h 644 root bin
 f none usr/include/sys/cis.h 644 root bin
@@ -1205,6 +1207,7 @@ f none usr/include/sys/vuid_queue.h 644 root bin
 f none usr/include/sys/vuid_state.h 644 root bin
 f none usr/include/sys/vuid_store.h 644 root bin
 f none usr/include/sys/wait.h 644 root bin
+f none usr/include/sys/waitq.h 644 root bin
 f none usr/include/sys/watchpoint.h 644 root bin
 f none usr/include/sys/xti_inet.h 644 root bin
 f none usr/include/sys/xti_osi.h 644 root bin

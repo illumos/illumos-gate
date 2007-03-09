@@ -148,8 +148,7 @@ cpr_stop_user(int wait)
 
 			aston(tp);
 
-			if (tp->t_state == TS_SLEEP &&
-			    (tp->t_flag & T_WAKEABLE)) {
+			if (ISWAKEABLE(tp) || ISWAITING(tp)) {
 				setrun_locked(tp);
 			}
 		}

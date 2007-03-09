@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1996-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -98,11 +98,7 @@ struct classfuncs sys_classfuncs = {
 		sys_swappri,	/* swapin */
 		sys_swappri,	/* swapout */
 		sys_nullsys,	/* trapret */
-#ifdef KSLICE
-		sys_preempt,
-#else
-		setfrontdq,
-#endif
+		setfrontdq,	/* preempt */
 		setbackdq,	/* setrun */
 		sys_nullsys,	/* sleep */
 		sys_nullsys,	/* tick */
@@ -217,21 +213,6 @@ static void
 sys_nullsys()
 {
 }
-
-#ifdef KSLICE
-static void
-sys_preempt(t)
-	kthread_id_t	t;
-{
-	extern int	kslice;
-
-	if (kslice)
-		setbackdq(t);
-	else
-		setfrontdq(t);
-}
-#endif
-
 
 /* ARGSUSED */
 static int

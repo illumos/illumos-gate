@@ -508,6 +508,7 @@ extern int		max_ncpus;	/* max present before ncpus is known */
 extern int		boot_max_ncpus;	/* like max_ncpus but for real */
 extern processorid_t	max_cpuid;	/* maximum CPU number */
 extern struct cpu	*cpu_inmotion;	/* offline or partition move target */
+extern cpu_t		*clock_cpu_list;
 
 #if defined(__i386) || defined(__amd64)
 extern struct cpu *curcpup(void);

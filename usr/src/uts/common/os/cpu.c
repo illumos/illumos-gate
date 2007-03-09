@@ -105,6 +105,7 @@ static int cpu_state_change_hooks(int, cpu_setup_t, cpu_setup_t);
  */
 kmutex_t	cpu_lock;
 cpu_t		*cpu_list;		/* list of all CPUs */
+cpu_t		*clock_cpu_list;	/* used by clock to walk CPUs */
 cpu_t		*cpu_active;		/* list of active CPUs */
 static cpuset_t	cpu_available;		/* set of available CPUs */
 cpuset_t	cpu_seqid_inuse;	/* which cpu_seqids are in use */
@@ -1618,6 +1619,7 @@ cpu_list_init(cpu_t *cp)
 	cp->cpu_next = cp;
 	cp->cpu_prev = cp;
 	cpu_list = cp;
+	clock_cpu_list = cp;
 
 	cp->cpu_next_onln = cp;
 	cp->cpu_prev_onln = cp;
@@ -1763,7 +1765,10 @@ cpu_del_unit(int cpuid)
 	cp->cpu_prev->cpu_next = cp->cpu_next;
 	cp->cpu_next->cpu_prev = cp->cpu_prev;
 	if (cp == cpu_list)
-	    cpu_list = cpnext;
+		cpu_list = cpnext;
+	if (cp == clock_cpu_list)
+		clock_cpu_list = cpnext;
+
 
 	/*
 	 * Signals that the cpu has been deleted (see above).

@@ -305,6 +305,8 @@ typedef struct zone_kstat {
 	kstat_named_t zk_value;
 } zone_kstat_t;
 
+struct cpucap;
+
 typedef struct zone {
 	/*
 	 * zone_name is never modified once set.
@@ -416,6 +418,7 @@ typedef struct zone {
 	 */
 	struct dlnamelist *zone_dl_list;
 	netstack_t	*zone_netstack;
+	struct cpucap	*zone_cpucap;	/* CPU caps data */
 } zone_t;
 
 /*

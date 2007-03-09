@@ -236,6 +236,47 @@ new_cpu_mstate(int cmstate, hrtime_t curtime)
 }
 
 /*
+ * Return an aggregation of user and system CPU time consumed by
+ * the specified thread in scaled nanoseconds.
+ */
+hrtime_t
+mstate_thread_onproc_time(kthread_t *t)
+{
+	hrtime_t aggr_time;
+	hrtime_t now;
+	hrtime_t state_start;
+	struct mstate *ms;
+	klwp_t *lwp;
+	int	mstate;
+
+	ASSERT(THREAD_LOCK_HELD(t));
+
+	if ((lwp = ttolwp(t)) == NULL)
+		return (0);
+
+	mstate = t->t_mstate;
+	ms = &lwp->lwp_mstate;
+	state_start = ms->ms_state_start;
+
+	aggr_time = ms->ms_acct[LMS_USER] +
+	    ms->ms_acct[LMS_SYSTEM] + ms->ms_acct[LMS_TRAP];
+
+	now = gethrtime_unscaled();
+
+	/*
+	 * NOTE: gethrtime_unscaled on X86 taken on different CPUs is
+	 * inconsistent, so it is possible that now < state_start.
+	 */
+	if ((mstate == LMS_USER || mstate == LMS_SYSTEM ||
+		mstate == LMS_TRAP) && (now > state_start)) {
+			aggr_time += now - state_start;
+	}
+
+	scalehrtime(&aggr_time);
+	return (aggr_time);
+}
+
+/*
  * Return an aggregation of microstate times in scaled nanoseconds (high-res
  * time).  This keeps in mind that p_acct is already scaled, and ms_acct is
  * not.

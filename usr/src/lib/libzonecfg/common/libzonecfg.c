@@ -174,6 +174,7 @@ static struct alias {
 	{ALIAS_MAXLOCKEDMEM, "zone.max-locked-memory", "privileged", "deny", 0},
 	{ALIAS_MAXSWAP, "zone.max-swap", "privileged", "deny", 0},
 	{ALIAS_SHARES, "zone.cpu-shares", "privileged", "none", 0},
+	{ALIAS_CPUCAP, "zone.cpu-cap", "privileged", "deny", 0},
 	{NULL, NULL, NULL, NULL, 0}
 };
 

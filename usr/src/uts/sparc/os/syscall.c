@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -857,7 +857,7 @@ sig_check:
 		CL_TRAPRET(t);
 		thread_unlock(t);
 	}
-	if (CPU->cpu_runrun)
+	if (CPU->cpu_runrun || t->t_schedflag & TS_ANYWAITQ)
 		preempt();
 
 	/*

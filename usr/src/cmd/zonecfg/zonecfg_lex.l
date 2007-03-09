@@ -173,6 +173,8 @@ char *safe_strdup(char *s);
 
 <TSTATE>dedicated-cpu	{ return PSET; }
 
+<TSTATE>capped-cpu	{ return PCAP; }
+
 <TSTATE>capped-memory	{ return MCAP; }
 
 <TSTATE>zonepath	{ return ZONEPATH; }

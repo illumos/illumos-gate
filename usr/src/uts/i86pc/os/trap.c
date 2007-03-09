@@ -1408,7 +1408,7 @@ out:	/* We can't get here from a system trap */
 		CL_TRAPRET(ct);
 		thread_unlock(ct);
 	}
-	if (CPU->cpu_runrun)
+	if (CPU->cpu_runrun || curthread->t_schedflag & TS_ANYWAITQ)
 		preempt();
 	(void) new_mstate(ct, mstate);
 

@@ -94,9 +94,10 @@ typedef int bool;
 #define	RT_SHARES	22	/* really a rctl alias property, but for info */
 #define	RT_SCHED	23	/* really a property, but for info ... */
 #define	RT_IPTYPE	24	/* really a property, but for info ... */
+#define	RT_PCAP		25
 
 #define	RT_MIN		RT_UNKNOWN
-#define	RT_MAX		RT_IPTYPE
+#define	RT_MAX		RT_PCAP
 
 /* property types: increment PT_MAX when expanding this list */
 #define	PT_UNKNOWN	0

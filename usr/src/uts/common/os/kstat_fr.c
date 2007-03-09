@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -289,7 +289,9 @@ kstat_zone_add(kstat_t *k, zoneid_t zoneid)
 	ekstat_t *e = (ekstat_t *)k;
 	kstat_zone_t *kz;
 
-	kz = kmem_alloc(sizeof (*kz), KM_SLEEP);
+	kz = kmem_alloc(sizeof (*kz), KM_NOSLEEP);
+	if (kz == NULL)
+		return;
 	mutex_enter(&kstat_chain_lock);
 	kz->zoneid = zoneid;
 	kz->next = e->e_zone.next;

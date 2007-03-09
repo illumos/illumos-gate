@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -388,8 +388,7 @@ task_create(projid_t projid, zone_t *zone)
 	tk->tk_nlwps = 0;
 	tk->tk_nlwps_ctl = INT_MAX;
 	tk->tk_usage = tu;
-	tk->tk_proj = project_hold_by_id(projid, zone,
-	    PROJECT_HOLD_INSERT);
+	tk->tk_proj = project_hold_by_id(projid, zone, PROJECT_HOLD_INSERT);
 	tk->tk_flags = TASK_NORMAL;
 
 	/*
@@ -670,6 +669,21 @@ changeproj(proc_t *p, kproject_t *kpj, zone_t *zone, void *projbuf,
 
 			thread_lock(t);
 			oldkpj = ttoproj(t);
+
+			/*
+			 * Kick this thread so that he doesn't sit
+			 * on a wrong wait queue.
+			 */
+			if (ISWAITING(t))
+				setrun_locked(t);
+
+			/*
+			 * The thread wants to go on the project wait queue, but
+			 * the waitq is changing.
+			 */
+			if (t->t_schedflag & TS_PROJWAITQ)
+				t->t_schedflag &= ~ TS_PROJWAITQ;
+
 			t->t_proj = kpj;
 			t->t_pre_sys = 1;		/* For cred update */
 			thread_unlock(t);

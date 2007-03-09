@@ -39,6 +39,7 @@ extern "C" {
 #include <sys/mutex.h>
 #include <sys/rctl.h>
 #include <sys/ipc_rctl.h>
+#include <sys/zone.h>
 
 typedef struct kproject_kstat {
 	kstat_named_t kpk_zonename;
@@ -58,25 +59,29 @@ typedef struct kproject_data {		/* Datum protected by: */
 
 } kproject_data_t;
 
+struct cpucap;
+
 /*
  * The first two fields of this structure must not be reordered.
  */
 typedef struct kproject {
 	projid_t 	kpj_id;		/* project ID		*/
 	zoneid_t	kpj_zoneid;	/* zone ID		*/
+	struct zone	*kpj_zone;	/* zone pointer		*/
 	uint_t		kpj_count;	/* reference counter	*/
 	uint32_t	kpj_shares;	/* number of shares	*/
 	rctl_set_t	*kpj_rctls;	/* resource control set */
 	struct kproject	*kpj_prev;	/* previous project	*/
 	struct kproject	*kpj_next;	/* next project		*/
 	kproject_data_t	kpj_data;	/* subsystem-specfic data */
-	kmutex_t	kpj_poolbind;	/* synch. with pools	*/
+	kmutex_t	kpj_poolbind;	/* synchronization with pools	*/
 	rctl_qty_t	kpj_nlwps;	/* protected by project's zone's */
 					/* zone_nlwps_lock */
 	rctl_qty_t	kpj_nlwps_ctl;	/* protected by kpj_rctls->rcs_lock */
 	rctl_qty_t	kpj_ntasks;	/* protected by project's zone's */
 					/* zone_nlwps_lock */
 	rctl_qty_t	kpj_ntasks_ctl;	/* protected by kpj_rctls->rcs_lock */
+	struct cpucap	*kpj_cpucap;	/* CPU cap data			*/
 } kproject_t;
 
 #ifdef _KERNEL
@@ -86,8 +91,6 @@ typedef struct kproject {
  */
 #define	PROJECT_HOLD_FIND	1
 #define	PROJECT_HOLD_INSERT	2
-
-struct zone;
 
 void project_init(void);
 kproject_t *project_hold(kproject_t *);

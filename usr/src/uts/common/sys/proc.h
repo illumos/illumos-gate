@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -424,11 +424,12 @@ extern struct pid pid0;		/* p0's pid */
 /* stat codes */
 
 #define	SSLEEP	1		/* awaiting an event */
-#define	SRUN	2		/* running */
+#define	SRUN	2		/* runnable */
 #define	SZOMB	3		/* process terminated but not waited for */
 #define	SSTOP	4		/* process stopped by debugger */
 #define	SIDL	5		/* intermediate state in process creation */
 #define	SONPROC	6		/* process is being run on a processor */
+#define	SWAIT	7		/* process is waiting to become runnable */
 
 /* p_pidflag codes */
 #define	CLDPEND		0x0001	/* have yet to post a SIGCHLD to the parent */
@@ -639,6 +640,7 @@ extern	void	term_mstate(kthread_t *);
 extern	void	estimate_msacct(kthread_t *, hrtime_t);
 extern	void	disable_msacct(proc_t *);
 extern	hrtime_t mstate_aggr_state(proc_t *, int);
+extern	hrtime_t mstate_thread_onproc_time(kthread_t *);
 extern	void	syscall_mstate(int, int);
 
 extern	uint_t	cpu_update_pct(kthread_t *, hrtime_t);

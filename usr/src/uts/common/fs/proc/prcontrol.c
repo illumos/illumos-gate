@@ -1034,8 +1034,12 @@ pr_stop(prnode_t *pnp)
 			t->t_proc_flag |= TP_PRSTOP;
 			t->t_sig_check = 1;	/* do ISSIG */
 		}
-		if (t->t_state == TS_SLEEP &&
-		    (t->t_flag & T_WAKEABLE)) {
+
+		/* Move the thread from wait queue to run queue */
+		if (ISWAITING(t))
+			setrun_locked(t);
+
+		if (ISWAKEABLE(t)) {
 			if (t->t_wchan0 == NULL)
 				setrun_locked(t);
 			else if (!VSTOPPED(t)) {
@@ -1452,9 +1456,8 @@ pr_setsig(prnode_t *pnp, siginfo_t *sip)
 			}
 		}
 		thread_lock(t);
-		if (t->t_state == TS_SLEEP &&
-		    (t->t_flag & T_WAKEABLE)) {
-			/* Set signalled sleeping lwp running */
+		if (ISWAKEABLE(t) || ISWAITING(t)) {
+			/* Set signalled sleeping/waiting lwp running */
 			setrun_locked(t);
 		} else if (t->t_state == TS_STOPPED && sig == SIGKILL) {
 			/* If SIGKILL, set stopped lwp running */
@@ -1759,8 +1762,7 @@ pr_sethold(prnode_t *pnp, sigset_t *sp)
 
 	schedctl_finish_sigblock(t);
 	sigutok(sp, &t->t_hold);
-	if (t->t_state == TS_SLEEP &&
-	    (t->t_flag & T_WAKEABLE) &&
+	if (ISWAKEABLE(t) &&
 	    (fsig(&p->p_sig, t) || fsig(&t->t_sig, t)))
 		setrun_locked(t);
 	t->t_sig_check = 1;	/* so thread will see new holdmask */
@@ -2363,10 +2365,9 @@ pauselwps(proc_t *p)
 			thread_lock(t);
 			t->t_proc_flag |= TP_PAUSE;
 			aston(t);
-			if (t->t_state == TS_SLEEP &&
-			    (t->t_flag & T_WAKEABLE)) {
-				if (t->t_wchan0 == NULL)
-					setrun_locked(t);
+			if ((ISWAKEABLE(t) && (t->t_wchan0 == NULL)) ||
+			    ISWAITING(t)) {
+				setrun_locked(t);
 			}
 			prpokethread(t);
 			thread_unlock(t);

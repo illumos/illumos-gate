@@ -240,6 +240,7 @@
 #include <sys/brand.h>
 #include <sys/zone.h>
 #include <net/if.h>
+#include <sys/cpucaps.h>
 #include <vm/seg.h>
 
 /*
@@ -328,6 +329,7 @@ const char  *zone_status_table[] = {
 rctl_hndl_t rc_zone_cpu_shares;
 rctl_hndl_t rc_zone_locked_mem;
 rctl_hndl_t rc_zone_max_swap;
+rctl_hndl_t rc_zone_cpu_cap;
 rctl_hndl_t rc_zone_nlwps;
 rctl_hndl_t rc_zone_shmmax;
 rctl_hndl_t rc_zone_shmmni;
@@ -882,6 +884,43 @@ static rctl_ops_t zone_cpu_shares_ops = {
 	rcop_no_test
 };
 
+/*
+ * zone.cpu-cap resource control support.
+ */
+/*ARGSUSED*/
+static rctl_qty_t
+zone_cpu_cap_get(rctl_t *rctl, struct proc *p)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	return (cpucaps_zone_get(p->p_zone));
+}
+
+/*ARGSUSED*/
+static int
+zone_cpu_cap_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
+    rctl_qty_t nv)
+{
+	zone_t *zone = e->rcep_p.zone;
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_ZONE);
+
+	if (zone == NULL)
+		return (0);
+
+	/*
+	 * set cap to the new value.
+	 */
+	return (cpucaps_zone_set(zone, nv));
+}
+
+static rctl_ops_t zone_cpu_cap_ops = {
+	rcop_no_action,
+	zone_cpu_cap_get,
+	zone_cpu_cap_set,
+	rcop_no_test
+};
+
 /*ARGSUSED*/
 static rctl_qty_t
 zone_lwps_usage(rctl_t *r, proc_t *p)
@@ -1384,8 +1423,13 @@ zone_init(void)
 	rc_zone_cpu_shares = rctl_register("zone.cpu-shares",
 	    RCENTITY_ZONE, RCTL_GLOBAL_SIGNAL_NEVER | RCTL_GLOBAL_DENY_NEVER |
 	    RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT | RCTL_GLOBAL_SYSLOG_NEVER,
-	    FSS_MAXSHARES, FSS_MAXSHARES,
-	    &zone_cpu_shares_ops);
+	    FSS_MAXSHARES, FSS_MAXSHARES, &zone_cpu_shares_ops);
+
+	rc_zone_cpu_cap = rctl_register("zone.cpu-cap",
+	    RCENTITY_ZONE, RCTL_GLOBAL_SIGNAL_NEVER | RCTL_GLOBAL_DENY_ALWAYS |
+	    RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT |RCTL_GLOBAL_SYSLOG_NEVER |
+	    RCTL_GLOBAL_INFINITE,
+	    MAXCAP, MAXCAP, &zone_cpu_cap_ops);
 
 	rc_zone_nlwps = rctl_register("zone.max-lwps", RCENTITY_ZONE,
 	    RCTL_GLOBAL_NOACTION | RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT,
@@ -1529,6 +1573,13 @@ zone_free(zone_t *zone)
 	ASSERT(zone->zone_kcred == NULL);
 	ASSERT(zone_status_get(zone) == ZONE_IS_DEAD ||
 	    zone_status_get(zone) == ZONE_IS_UNINITIALIZED);
+
+	/*
+	 * Remove any zone caps.
+	 */
+	cpucaps_zone_remove(zone);
+
+	ASSERT(zone->zone_cpucap == NULL);
 
 	/* remove from deathrow list */
 	if (zone_status_get(zone) == ZONE_IS_DEAD) {
@@ -2501,6 +2552,10 @@ zthread_exit(void)
 		zone->zone_kthreads = NULL;
 		if (zone_status_get(zone) == ZONE_IS_EMPTY) {
 			zone_status_set(zone, ZONE_IS_DOWN);
+			/*
+			 * Remove any CPU caps on this zone.
+			 */
+			cpucaps_zone_remove(zone);
 		}
 	} else {
 		t->t_forw->t_back = t->t_back;
@@ -2616,8 +2671,9 @@ zone_start_init(void)
 		 * Make sure we are still in the booting state-- we could have
 		 * raced and already be shutting down, or even further along.
 		 */
-		if (zone_status_get(z) == ZONE_IS_BOOTING)
+		if (zone_status_get(z) == ZONE_IS_BOOTING) {
 			zone_status_set(z, ZONE_IS_SHUTTING_DOWN);
+		}
 		mutex_exit(&zone_status_lock);
 		/* It's gone bad, dispose of the process */
 		if (proc_exit(CLD_EXITED, z->zone_boot_err) != 0) {
@@ -3879,7 +3935,13 @@ zone_destroy(zoneid_t zoneid)
 
 	}
 
-	/* Get rid of the zone's kstats. */
+	/*
+	 * Remove CPU cap for this zone now since we're not going to
+	 * fail below this point.
+	 */
+	cpucaps_zone_remove(zone);
+
+	/* Get rid of the zone's kstats */
 	zone_kstat_delete(zone);
 
 	/* Say goodbye to brand framework. */
@@ -3938,8 +4000,8 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 	char *outstr;
 	zone_status_t zone_status;
 	pid_t initpid;
-	boolean_t global = (curproc->p_zone == global_zone);
-	boolean_t curzone = (curproc->p_zone->zone_id == zoneid);
+	boolean_t global = (curzone == global_zone);
+	boolean_t inzone = (curzone->zone_id == zoneid);
 	ushort_t flags;
 
 	mutex_enter(&zonehash_lock);
@@ -3980,7 +4042,7 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 			bcopy(zone->zone_rootpath, zonepath, size);
 			zonepath[size - 1] = '\0';
 		} else {
-			if (curzone || !is_system_labeled()) {
+			if (inzone || !is_system_labeled()) {
 				/*
 				 * Caller is not in the global zone.
 				 * if the query is on the current zone
@@ -4011,7 +4073,7 @@ zone_getattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 			if (err != 0 && err != ENAMETOOLONG)
 				error = EFAULT;
 		}
-		if (global || (is_system_labeled() && !curzone))
+		if (global || (is_system_labeled() && !inzone))
 			kmem_free(zonepath, size);
 		break;
 
@@ -4365,6 +4427,7 @@ zone_enter(zoneid_t zoneid)
 	int err = 0;
 	rctl_entity_p_t e;
 	size_t swap;
+	kthread_id_t t;
 
 	if (secpolicy_zone_config(CRED()) != 0)
 		return (set_errno(EPERM));
@@ -4625,6 +4688,28 @@ zone_enter(zoneid_t zoneid)
 	pgjoin(pp, zone->zone_zsched->p_pidp);
 
 	/*
+	 * If any threads are scheduled to be placed on zone wait queue they
+	 * should abandon the idea since the wait queue is changing.
+	 * We need to be holding pidlock & p_lock to do this.
+	 */
+	if ((t = pp->p_tlist) != NULL) {
+		do {
+			thread_lock(t);
+			/*
+			 * Kick this thread so that he doesn't sit
+			 * on a wrong wait queue.
+			 */
+			if (ISWAITING(t))
+				setrun_locked(t);
+
+			if (t->t_schedflag & TS_ANYWAITQ)
+				t->t_schedflag &= ~ TS_ANYWAITQ;
+
+			thread_unlock(t);
+		} while ((t = t->t_forw) != pp->p_tlist);
+	}
+
+	/*
 	 * If there is a default scheduling class for the zone and it is not
 	 * the class we are currently in, change all of the threads in the
 	 * process to the new class.  We need to be holding pidlock & p_lock
@@ -4633,7 +4718,6 @@ zone_enter(zoneid_t zoneid)
 	if (zone->zone_defaultcid > 0 &&
 	    zone->zone_defaultcid != curthread->t_cid) {
 		pcparms_t pcparms;
-		kthread_id_t t;
 
 		pcparms.pc_cid = zone->zone_defaultcid;
 		pcparms.pc_clparms[0] = 0;

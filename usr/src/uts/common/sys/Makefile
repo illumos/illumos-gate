@@ -110,6 +110,8 @@ CHKHDRS=			\
 	byteorder.h		\
 	callb.h			\
 	callo.h			\
+	cpucaps.h		\
+	cpucaps_impl.h		\
 	ccompile.h		\
 	cdio.h			\
 	cladm.h			\
@@ -564,6 +566,7 @@ CHKHDRS=			\
 	vuid_state.h		\
 	vuid_store.h		\
 	wait.h			\
+	waitq.h			\
 	wanboot_impl.h		\
 	watchpoint.h		\
 	winlockio.h		\

@@ -79,8 +79,7 @@
 #include <sys/inttypes.h>
 
 /*
- * clock is called straight from
- * the real time clock interrupt.
+ * clock() is called straight from the clock cyclic; see clock_init().
  *
  * Functions:
  *	reprime clock
@@ -314,10 +313,7 @@ static int genloadavg(struct loadavg_s *);
 static void loadavg_update();
 
 void (*cmm_clock_callout)() = NULL;
-
-#ifdef	KSLICE
-int kslice = KSLICE;
-#endif
+void (*cpucaps_clock_callout)() = NULL;
 
 static void
 clock(void)
@@ -513,9 +509,10 @@ clock(void)
 
 	/*
 	 * Do tick processing for all the active threads running in
-	 * the system.
+	 * the system.  We're trying to be more fair by walking the
+	 * list of CPUs starting from a different CPUs each time.
 	 */
-	cp = cpu_list;
+	cp = clock_cpu_list;
 	nrunning = 0;
 	do {
 		klwp_id_t lwp;
@@ -649,21 +646,11 @@ clock(void)
 			clock_tick(t);
 		}
 
-#ifdef KSLICE
-		/*
-		 * Ah what the heck, give this kid a taste of the real
-		 * world and yank the rug out from under it.
-		 * But, only if we are running UniProcessor.
-		 */
-		if ((kslice) && (ncpus == 1)) {
-			aston(t);
-			cp->cpu_runrun = 1;
-			cp->cpu_kprunrun = 1;
-		}
-#endif
 		if (!exiting)
 			mutex_exit(plockp);
-	} while ((cp = cp->cpu_next) != cpu_list);
+	} while ((cp = cp->cpu_next) != clock_cpu_list);
+
+	clock_cpu_list = clock_cpu_list->cpu_next;
 
 	/*
 	 * bump time in ticks
@@ -681,6 +668,9 @@ clock(void)
 	 * this to NULL if needed.
 	 */
 	if ((funcp = cmm_clock_callout) != NULL)
+		(*funcp)();
+
+	if ((funcp = cpucaps_clock_callout) != NULL)
 		(*funcp)();
 
 	/*

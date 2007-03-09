@@ -1564,7 +1564,7 @@ trap_rtt(void)
 		CL_TRAPRET(curthread);
 		thread_unlock(curthread);
 	}
-	if (CPU->cpu_runrun)
+	if (CPU->cpu_runrun || curthread->t_schedflag & TS_ANYWAITQ)
 		preempt();
 	if (lwp->lwp_pcb.pcb_step != STEP_NONE)
 		prdostep();

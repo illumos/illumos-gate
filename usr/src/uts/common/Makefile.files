@@ -40,6 +40,7 @@ COMMON_CORE_OBJS +=		\
 		bitset.o	\
 		bp_map.o	\
 		brand.o		\
+		cpucaps.o	\
 		cmt.o		\
 		cpu.o		\
 		cpu_intr.o	\
@@ -341,6 +342,7 @@ GENUNIX_OBJS +=	\
 		vnode.o		\
 		vuid_queue.o	\
 		vuid_store.o	\
+		waitq.o		\
 		watchpoint.o	\
 		yield.o		\
 		scsi_confdata.o	\

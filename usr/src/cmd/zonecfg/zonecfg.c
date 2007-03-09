@@ -179,6 +179,7 @@ static char *res_types[] = {
 	ALIAS_SHARES,
 	"scheduling-class",
 	"ip-type",
+	"capped-cpu",
 	NULL
 };
 
@@ -265,6 +266,7 @@ static const char *add_cmds[] = {
 	"add attr",
 	"add dataset",
 	"add dedicated-cpu",
+	"add capped-cpu",
 	"add capped-memory",
 	NULL
 };
@@ -294,6 +296,7 @@ static const char *remove_cmds[] = {
 	"remove attr ",
 	"remove dataset ",
 	"remove dedicated-cpu ",
+	"remove capped-cpu ",
 	"remove capped-memory ",
 	NULL
 };
@@ -307,6 +310,7 @@ static const char *select_cmds[] = {
 	"select attr ",
 	"select dataset ",
 	"select dedicated-cpu",
+	"select capped-cpu",
 	"select capped-memory",
 	NULL
 };
@@ -340,6 +344,7 @@ static const char *info_cmds[] = {
 	"info dataset ",
 	"info capped-memory",
 	"info dedicated-cpu",
+	"info capped-cpu",
 	"info zonename",
 	"info zonepath",
 	"info autoboot",
@@ -448,6 +453,16 @@ static const char *pset_res_scope_cmds[] = {
 	"set ncpus=",
 	"set importance=",
 	"clear importance",
+	NULL
+};
+
+static const char *pcap_res_scope_cmds[] = {
+	"cancel",
+	"end",
+	"exit",
+	"help",
+	"info",
+	"set ncpus=",
 	NULL
 };
 
@@ -605,6 +620,8 @@ CPL_MATCH_FN(cmd_cpl_fn)
 		return (add_stuff(cpl, line, dataset_res_scope_cmds, word_end));
 	case RT_DCPU:
 		return (add_stuff(cpl, line, pset_res_scope_cmds, word_end));
+	case RT_PCAP:
+		return (add_stuff(cpl, line, pcap_res_scope_cmds, word_end));
 	case RT_MCAP:
 		return (add_stuff(cpl, line, mcap_res_scope_cmds, word_end));
 	}
@@ -1003,6 +1020,20 @@ usage(bool verbose, uint_t flags)
 			    pt_to_str(PT_IMPORTANCE),
 			    gettext("<unsigned integer>"));
 			break;
+		case RT_PCAP:
+			(void) fprintf(fp, gettext("The '%s' resource scope is "
+			    "used to set an upper limit (a cap) on the\n"
+			    "percentage of CPU that can be used by this zone.  "
+			    "A '%s' value of 1\ncorresponds to one cpu.  The "
+			    "value can be set higher than 1, up to the total\n"
+			    "number of CPUs on the system.  The value can "
+			    "also be less than 1,\nrepresenting a fraction of "
+			    "a cpu.\n"),
+			    rt_to_str(resource_scope), pt_to_str(PT_NCPUS));
+			(void) fprintf(fp, gettext("Valid commands:\n"));
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_NCPUS), gettext("<unsigned decimal>"));
+			break;
 		case RT_MCAP:
 			(void) fprintf(fp, gettext("The '%s' resource scope is "
 			    "used to set an upper limit (a cap) on the\n"
@@ -1078,12 +1109,12 @@ usage(bool verbose, uint_t flags)
 	}
 	if (flags & HELP_RESOURCES) {
 		(void) fprintf(fp, "<%s> := %s | %s | %s | %s | %s | %s |\n\t"
-		    "%s | %s | %s\n\n",
+		    "%s | %s | %s | %s\n\n",
 		    gettext("resource type"), rt_to_str(RT_FS),
 		    rt_to_str(RT_IPD), rt_to_str(RT_NET), rt_to_str(RT_DEVICE),
 		    rt_to_str(RT_RCTL), rt_to_str(RT_ATTR),
 		    rt_to_str(RT_DATASET), rt_to_str(RT_DCPU),
-		    rt_to_str(RT_MCAP));
+		    rt_to_str(RT_PCAP), rt_to_str(RT_MCAP));
 	}
 	if (flags & HELP_PROPS) {
 		(void) fprintf(fp, gettext("For resource type ... there are "
@@ -1137,6 +1168,8 @@ usage(bool verbose, uint_t flags)
 		    pt_to_str(PT_NAME));
 		(void) fprintf(fp, "\t%s\t%s, %s\n", rt_to_str(RT_DCPU),
 		    pt_to_str(PT_NCPUS), pt_to_str(PT_IMPORTANCE));
+		(void) fprintf(fp, "\t%s\t%s\n", rt_to_str(RT_PCAP),
+		    pt_to_str(PT_NCPUS));
 		(void) fprintf(fp, "\t%s\t%s, %s, %s\n", rt_to_str(RT_MCAP),
 		    pt_to_str(PT_PHYSICAL), pt_to_str(PT_SWAP),
 		    pt_to_str(PT_LOCKED));
@@ -1835,6 +1868,11 @@ export_func(cmd_t *cmd)
 		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
 	}
 
+	/*
+	 * There is nothing to export for pcap since this resource is just
+	 * a container for an rctl alias.
+	 */
+
 done:
 	if (need_to_close)
 		(void) fclose(of);
@@ -1908,6 +1946,7 @@ add_resource(cmd_t *cmd)
 	int type;
 	struct zone_psettab tmp_psettab;
 	struct zone_mcaptab tmp_mcaptab;
+	uint64_t tmp;
 	uint64_t tmp_mcap;
 	char pool[MAXNAMELEN];
 
@@ -1951,10 +1990,16 @@ add_resource(cmd_t *cmd)
 		bzero(&in_progress_dstab, sizeof (in_progress_dstab));
 		return;
 	case RT_DCPU:
-		/* Make sure there isn't already a cpu-set entry. */
+		/* Make sure there isn't already a cpu-set or cpu-cap entry. */
 		if (zonecfg_lookup_pset(handle, &tmp_psettab) == Z_OK) {
 			zerr(gettext("The %s resource already exists."),
 			    rt_to_str(RT_DCPU));
+			goto bad;
+		}
+		if (zonecfg_get_aliased_rctl(handle, ALIAS_CPUCAP, &tmp) !=
+		    Z_NO_ENTRY) {
+			zerr(gettext("The %s resource already exists."),
+			    rt_to_str(RT_PCAP));
 			goto bad;
 		}
 
@@ -1969,6 +2014,32 @@ add_resource(cmd_t *cmd)
 		}
 
 		bzero(&in_progress_psettab, sizeof (in_progress_psettab));
+		return;
+	case RT_PCAP:
+		/*
+		 * Make sure there isn't already a cpu-set or incompatible
+		 * cpu-cap rctls.
+		 */
+		if (zonecfg_lookup_pset(handle, &tmp_psettab) == Z_OK) {
+			zerr(gettext("The %s resource already exists."),
+			    rt_to_str(RT_DCPU));
+			goto bad;
+		}
+
+		switch (zonecfg_get_aliased_rctl(handle, ALIAS_CPUCAP, &tmp)) {
+		case Z_ALIAS_DISALLOW:
+			zone_perror(rt_to_str(RT_PCAP), Z_ALIAS_DISALLOW,
+			    FALSE);
+			goto bad;
+
+		case Z_OK:
+			zerr(gettext("The %s resource already exists."),
+			    rt_to_str(RT_PCAP));
+			goto bad;
+
+		default:
+			break;
+		}
 		return;
 	case RT_MCAP:
 		/*
@@ -2967,6 +3038,25 @@ remove_pset()
 }
 
 static void
+remove_pcap()
+{
+	int err;
+	uint64_t tmp;
+
+	if (zonecfg_get_aliased_rctl(handle, ALIAS_CPUCAP, &tmp) != Z_OK) {
+		zerr("%s %s: %s", cmd_to_str(CMD_REMOVE), rt_to_str(RT_PCAP),
+		    zonecfg_strerror(Z_NO_RESOURCE_TYPE));
+		saw_error = TRUE;
+		return;
+	}
+
+	if ((err = zonecfg_rm_aliased_rctl(handle, ALIAS_CPUCAP)) != Z_OK)
+		z_cmd_rt_perror(CMD_REMOVE, RT_PCAP, err, TRUE);
+	else
+		need_to_commit = TRUE;
+}
+
+static void
 remove_mcap()
 {
 	int err, res1, res2, res3;
@@ -3073,6 +3163,9 @@ remove_resource(cmd_t *cmd)
 		return;
 	case RT_DCPU:
 		remove_pset();
+		return;
+	case RT_PCAP:
+		remove_pcap();
 		return;
 	case RT_MCAP:
 		remove_mcap();
@@ -3396,6 +3489,7 @@ select_func(cmd_t *cmd)
 {
 	int type, err, res;
 	uint64_t limit;
+	uint64_t tmp;
 
 	if (zone_is_read_only(CMD_SELECT))
 		return;
@@ -3492,6 +3586,13 @@ select_func(cmd_t *cmd)
 		}
 		bcopy(&old_psettab, &in_progress_psettab,
 		    sizeof (struct zone_psettab));
+		return;
+	case RT_PCAP:
+		if ((err = zonecfg_get_aliased_rctl(handle, ALIAS_CPUCAP, &tmp))
+		    != Z_OK) {
+			z_cmd_rt_perror(CMD_SELECT, RT_PCAP, err, TRUE);
+			global_scope = TRUE;
+		}
 		return;
 	case RT_MCAP:
 		/* if none of these exist, there is no resource to select */
@@ -3708,6 +3809,8 @@ set_func(cmd_t *cmd)
 	boolean_t force_set = FALSE;
 	size_t physmem_size = sizeof (in_progress_mcaptab.zone_physmem_cap);
 	uint64_t mem_cap, mem_limit;
+	float cap;
+	char *unitp;
 	struct zone_psettab tmp_psettab;
 	bool arg_err = FALSE;
 
@@ -4199,6 +4302,34 @@ set_func(cmd_t *cmd)
 		zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE, TRUE);
 		long_usage(CMD_SET, TRUE);
 		usage(FALSE, HELP_PROPS);
+		return;
+	case RT_PCAP:
+		if (prop_type != PT_NCPUS) {
+			zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE,
+			    TRUE);
+			long_usage(CMD_SET, TRUE);
+			usage(FALSE, HELP_PROPS);
+			return;
+		}
+
+		/*
+		 * We already checked that an rctl alias is allowed in
+		 * the add_resource() function.
+		 */
+
+		if ((cap = strtof(prop_id, &unitp)) <= 0 || *unitp != '\0' ||
+		    (int)(cap * 100) < 1) {
+			zerr(gettext("%s property is out of range."),
+			    pt_to_str(PT_NCPUS));
+			saw_error = TRUE;
+			return;
+		}
+
+		if ((err = zonecfg_set_aliased_rctl(handle, ALIAS_CPUCAP,
+		    (int)(cap * 100))) != Z_OK)
+			zone_perror(zone, err, TRUE);
+		else
+			need_to_commit = TRUE;
 		return;
 	case RT_MCAP:
 		switch (prop_type) {
@@ -4790,6 +4921,26 @@ info_pset(zone_dochandle_t handle, FILE *fp)
 }
 
 static void
+output_pcap(FILE *fp)
+{
+	uint64_t cap;
+
+	if (zonecfg_get_aliased_rctl(handle, ALIAS_CPUCAP, &cap) == Z_OK) {
+		float scaled = (float)cap / 100;
+		(void) fprintf(fp, "%s:\n", rt_to_str(RT_PCAP));
+		(void) fprintf(fp, "\t[%s: %.2f]\n", pt_to_str(PT_NCPUS),
+		    scaled);
+	}
+}
+
+static void
+info_pcap(FILE *fp)
+{
+	output_pcap(fp);
+}
+
+
+static void
 info_aliased_rctl(zone_dochandle_t handle, FILE *fp, char *alias)
 {
 	uint64_t limit;
@@ -4932,6 +5083,9 @@ info_func(cmd_t *cmd)
 		case RT_DCPU:
 			output_pset(fp, &in_progress_psettab);
 			break;
+		case RT_PCAP:
+			output_pcap(fp);
+			break;
 		case RT_MCAP:
 			res1 = zonecfg_get_aliased_rctl(handle, ALIAS_MAXSWAP,
 			    &swap_limit);
@@ -4986,6 +5140,7 @@ info_func(cmd_t *cmd)
 			info_dev(handle, fp, cmd);
 		}
 		info_pset(handle, fp);
+		info_pcap(fp);
 		info_mcap(handle, fp);
 		if (!global_zone) {
 			info_attr(handle, fp, cmd);
@@ -5061,6 +5216,9 @@ info_func(cmd_t *cmd)
 		break;
 	case RT_DCPU:
 		info_pset(handle, fp);
+		break;
+	case RT_PCAP:
+		info_pcap(fp);
 		break;
 	case RT_MCAP:
 		info_mcap(handle, fp);
@@ -5203,10 +5361,12 @@ verify_func(cmd_t *cmd)
 	char sched[MAXNAMELEN];
 	char brand[MAXNAMELEN];
 	int err, ret_val = Z_OK, arg;
+	int pset_res;
 	bool save = FALSE;
 	bool arg_err = FALSE;
 	zone_iptype_t iptype;
 	boolean_t has_cpu_shares = B_FALSE;
+	boolean_t has_cpu_cap = B_FALSE;
 
 	optind = 0;
 	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?")) != EOF) {
@@ -5333,6 +5493,9 @@ verify_func(cmd_t *cmd)
 		if (strcmp(rctltab.zone_rctl_name, "zone.cpu-shares") == 0)
 			has_cpu_shares = B_TRUE;
 
+		if (strcmp(rctltab.zone_rctl_name, "zone.cpu-cap") == 0)
+			has_cpu_cap = B_TRUE;
+
 		if (rctltab.zone_rctl_valptr == NULL) {
 			zerr(gettext("%s: no %s specified"),
 			    rt_to_str(RT_RCTL), pt_to_str(PT_VALUE));
@@ -5345,7 +5508,8 @@ verify_func(cmd_t *cmd)
 	}
 	(void) zonecfg_endrctlent(handle);
 
-	if (zonecfg_lookup_pset(handle, &psettab) == Z_OK && has_cpu_shares) {
+	if ((pset_res = zonecfg_lookup_pset(handle, &psettab)) == Z_OK &&
+	    has_cpu_shares) {
 		zerr(gettext("%s zone.cpu-shares and %s are incompatible."),
 		    rt_to_str(RT_RCTL), rt_to_str(RT_DCPU));
 		saw_error = TRUE;
@@ -5359,6 +5523,14 @@ verify_func(cmd_t *cmd)
 		zerr(gettext("WARNING: %s zone.cpu-shares and %s=%s are "
 		    "incompatible"),
 		    rt_to_str(RT_RCTL), rt_to_str(RT_SCHED), sched);
+		saw_error = TRUE;
+		if (ret_val == Z_OK)
+			ret_val = Z_INCOMPATIBLE;
+	}
+
+	if (pset_res == Z_OK && has_cpu_cap) {
+		zerr(gettext("%s zone.cpu-cap and the %s are incompatible."),
+		    rt_to_str(RT_RCTL), rt_to_str(RT_DCPU));
 		saw_error = TRUE;
 		if (ret_val == Z_OK)
 			ret_val = Z_INCOMPATIBLE;
@@ -5562,6 +5734,7 @@ end_func(cmd_t *cmd)
 	int err, arg, res1, res2, res3;
 	uint64_t swap_limit;
 	uint64_t locked_limit;
+	uint64_t proc_cap;
 
 	assert(cmd != NULL);
 
@@ -5887,6 +6060,17 @@ end_func(cmd_t *cmd)
 		} else {
 			err = zonecfg_modify_pset(handle, &in_progress_psettab);
 		}
+		break;
+	case RT_PCAP:
+		/* Make sure everything was filled in. */
+		if (zonecfg_get_aliased_rctl(handle, ALIAS_CPUCAP, &proc_cap)
+		    != Z_OK) {
+			zerr(gettext("%s not specified"), pt_to_str(PT_NCPUS));
+			saw_error = TRUE;
+			validation_failed = TRUE;
+			return;
+		}
+		err = Z_OK;
 		break;
 	case RT_MCAP:
 		/* Make sure everything was filled in. */

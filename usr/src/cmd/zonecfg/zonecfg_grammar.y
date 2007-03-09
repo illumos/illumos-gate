@@ -61,14 +61,14 @@ extern void yyerror(char *s);
 %token FS IPD ATTR DEVICE RCTL SPECIAL RAW DIR OPTIONS TYPE ADDRESS PHYSICAL
 %token IPTYPE
 %token NAME MATCH PRIV LIMIT ACTION VALUE EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
-%token OPEN_PAREN CLOSE_PAREN COMMA DATASET LIMITPRIV BOOTARGS BRAND PSET
+%token OPEN_PAREN CLOSE_PAREN COMMA DATASET LIMITPRIV BOOTARGS BRAND PSET PCAP
 %token MCAP NCPUS IMPORTANCE SHARES MAXLWPS MAXSHMMEM MAXSHMIDS MAXMSGIDS
 %token MAXSEMIDS LOCKED SWAP SCHED CLEAR
 
 %type <strval> TOKEN EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
     property_value OPEN_PAREN CLOSE_PAREN COMMA simple_prop_val
 %type <complex> complex_piece complex_prop_val
-%type <ival> resource_type NET FS IPD DEVICE RCTL ATTR DATASET PSET MCAP
+%type <ival> resource_type NET FS IPD DEVICE RCTL ATTR DATASET PSET PCAP MCAP
 %type <ival> property_name SPECIAL RAW DIR OPTIONS TYPE ADDRESS PHYSICAL NAME
     MATCH ZONENAME ZONEPATH AUTOBOOT POOL LIMITPRIV BOOTARGS VALUE PRIV LIMIT
     ACTION BRAND SCHED IPTYPE
@@ -700,6 +700,14 @@ select_command: SELECT
 		$$->cmd_handler = &select_func;
 		$$->cmd_res_type = RT_DCPU;
 	}
+	| SELECT PCAP
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &select_func;
+		$$->cmd_res_type = RT_PCAP;
+	}
 	| SELECT MCAP
 	{
 		if (($$ = alloc_cmd()) == NULL)
@@ -840,6 +848,7 @@ resource_type: NET	{ $$ = RT_NET; }
 	| ATTR		{ $$ = RT_ATTR; }
 	| DATASET	{ $$ = RT_DATASET; }
 	| PSET		{ $$ = RT_DCPU; }
+	| PCAP		{ $$ = RT_PCAP; }
 	| MCAP		{ $$ = RT_MCAP; }
 
 property_name: SPECIAL	{ $$ = PT_SPECIAL; }

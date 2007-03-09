@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +54,7 @@
 #include <sys/tnf_probe.h>
 #include <sys/policy.h>
 #include <sys/sdt.h>
+#include <sys/cpucaps.h>
 
 /*
  * FSS Data Structures:
@@ -1069,6 +1069,7 @@ fss_update_list(int i)
 			goto next;
 		if ((fssproc->fss_flags & FSSKPRI) != 0)
 			goto next;
+
 		fssproj = FSSPROC2FSSPROJ(fssproc);
 		if (fssproj == NULL)
 			goto next;
@@ -1084,7 +1085,7 @@ fss_update_list(int i)
 
 		if (t->t_schedctl && schedctl_get_nopreempt(t))
 			goto next;
-		if (t->t_state != TS_RUN) {
+		if (t->t_state != TS_RUN && t->t_state != TS_WAIT) {
 			/*
 			 * Make next syscall/trap call fss_trapret
 			 */
@@ -1373,6 +1374,7 @@ fss_enterclass(kthread_t *t, id_t cid, void *parmsp, cred_t *reqpcredp,
 
 	fssproc->fss_timeleft = fss_quantum;
 	fssproc->fss_tp = t;
+	cpucaps_sc_init(&fssproc->fss_caps);
 
 	/*
 	 * Put a lock on our fsspset structure.
@@ -1420,7 +1422,8 @@ fss_enterclass(kthread_t *t, id_t cid, void *parmsp, cred_t *reqpcredp,
 	t->t_cldata = (void *)fssproc;
 	t->t_schedflag |= TS_RUNQMATCH;
 	fss_change_priority(t, fssproc);
-	if (t->t_state == TS_RUN || t->t_state == TS_ONPROC)
+	if (t->t_state == TS_RUN || t->t_state == TS_ONPROC ||
+	    t->t_state == TS_WAIT)
 		fss_active(t);
 	thread_unlock(t);
 
@@ -1568,6 +1571,8 @@ fss_fork(kthread_t *pt, kthread_t *ct, void *bufp)
 	cfssproc->fss_upri = pfssproc->fss_upri;
 	cfssproc->fss_tp = ct;
 	cfssproc->fss_nice = pfssproc->fss_nice;
+	cpucaps_sc_init(&cfssproc->fss_caps);
+
 	cfssproc->fss_flags =
 	    pfssproc->fss_flags & ~(FSSKPRI | FSSBACKQ | FSSRESTORE);
 	ct->t_cldata = (void *)cfssproc;
@@ -1793,6 +1798,14 @@ fss_exit(kthread_t *t)
 	}
 	mutex_exit(&fsspset->fssps_lock);
 	mutex_exit(&fsspsets_lock);
+
+	if (CPUCAPS_ON()) {
+		thread_lock(t);
+		fssproc = FSSPROC(t);
+		(void) cpucaps_charge(t, &fssproc->fss_caps,
+		    CPUCAPS_CHARGE_ONLY);
+		thread_unlock(t);
+	}
 }
 
 static void
@@ -1861,7 +1874,8 @@ fss_swapout(kthread_t *t, int flags)
 	if (INHERITED(t) ||
 	    (fssproc->fss_flags & FSSKPRI) ||
 	    (t->t_proc_flag & TP_LWPEXIT) ||
-	    (t->t_state & (TS_ZOMB | TS_FREE | TS_STOPPED | TS_ONPROC)) ||
+	    (t->t_state & (TS_ZOMB | TS_FREE | TS_STOPPED |
+		TS_ONPROC | TS_WAIT)) ||
 	    !(t->t_schedflag & TS_LOAD) ||
 	    !(SWAP_OK(t)))
 		return (-1);
@@ -1971,6 +1985,20 @@ fss_preempt(kthread_t *t)
 		t->t_trapret = 1;	/* so that fss_trapret will run */
 		aston(t);
 	}
+
+	/*
+	 * This thread may be placed on wait queue by CPU Caps. In this case we
+	 * do not need to do anything until it is removed from the wait queue.
+	 * Do not enforce CPU caps on threads running at a kernel priority
+	 */
+	if (CPUCAPS_ON()) {
+		(void) cpucaps_charge(t, &fssproc->fss_caps,
+		    CPUCAPS_CHARGE_ONLY);
+
+		if (!(fssproc->fss_flags & FSSKPRI) && CPUCAPS_ENFORCE(t))
+			return;
+	}
+
 	/*
 	 * If preempted in user-land mark the thread as swappable because it
 	 * cannot be holding any kernel locks.
@@ -2077,6 +2105,12 @@ fss_sleep(kthread_t *t)
 	ASSERT(THREAD_LOCK_HELD(t));
 
 	ASSERT(t->t_state == TS_ONPROC);
+
+	/*
+	 * Account for time spent on CPU before going to sleep.
+	 */
+	(void) CPUCAPS_CHARGE(t, &fssproc->fss_caps, CPUCAPS_CHARGE_ONLY);
+
 	fss_inactive(t);
 
 	/*
@@ -2117,6 +2151,8 @@ fss_tick(kthread_t *t)
 	fssproc_t *fssproc;
 	fssproj_t *fssproj;
 	klwp_t *lwp;
+	boolean_t call_cpu_surrender = B_FALSE;
+	boolean_t cpucaps_enforce = B_FALSE;
 
 	ASSERT(MUTEX_HELD(&(ttoproc(t))->p_lock));
 
@@ -2133,6 +2169,17 @@ fss_tick(kthread_t *t)
 		fssproj->fssp_ticks += fss_nice_tick[fssproc->fss_nice];
 		fssproc->fss_ticks++;
 		disp_lock_exit_high(&fsspset->fssps_displock);
+	}
+
+	/*
+	 * Keep track of thread's project CPU usage.  Note that projects
+	 * get charged even when threads are running in the kernel.
+	 * Do not surrender CPU if running in the SYS class.
+	 */
+	if (CPUCAPS_ON()) {
+		cpucaps_enforce = cpucaps_charge(t,
+		    &fssproc->fss_caps, CPUCAPS_CHARGE_ENFORCE) &&
+		    !(fssproc->fss_flags & FSSKPRI);
 	}
 
 	/*
@@ -2180,8 +2227,7 @@ fss_tick(kthread_t *t)
 					t->t_schedflag &= ~TS_DONT_SWAP;
 				fssproc->fss_timeleft = fss_quantum;
 			} else {
-				fssproc->fss_flags |= FSSBACKQ;
-				cpu_surrender(t);
+				call_cpu_surrender = B_TRUE;
 			}
 		} else if (t->t_state == TS_ONPROC &&
 			    t->t_pri < t->t_disp_queue->disp_maxrunpri) {
@@ -2190,10 +2236,38 @@ fss_tick(kthread_t *t)
 			 * waiting for a processor, then thread surrenders
 			 * the processor.
 			 */
-			fssproc->fss_flags |= FSSBACKQ;
-			cpu_surrender(t);
+			call_cpu_surrender = B_TRUE;
 		}
 	}
+
+	if (cpucaps_enforce && 2 * fssproc->fss_timeleft > fss_quantum) {
+		/*
+		 * The thread used more than half of its quantum, so assume that
+		 * it used the whole quantum.
+		 *
+		 * Update thread's priority just before putting it on the wait
+		 * queue so that it gets charged for the CPU time from its
+		 * quantum even before that quantum expires.
+		 */
+		fss_newpri(fssproc);
+		if (t->t_pri != fssproc->fss_umdpri)
+			fss_change_priority(t, fssproc);
+
+		/*
+		 * We need to call cpu_surrender for this thread due to cpucaps
+		 * enforcement, but fss_change_priority may have already done
+		 * so. In this case FSSBACKQ is set and there is no need to call
+		 * cpu-surrender again.
+		 */
+		if (!(fssproc->fss_flags & FSSBACKQ))
+			call_cpu_surrender = B_TRUE;
+	}
+
+	if (call_cpu_surrender) {
+		fssproc->fss_flags |= FSSBACKQ;
+		cpu_surrender(t);
+	}
+
 	thread_unlock_nopreempt(t);	/* clock thread can't be preempted */
 }
 
@@ -2336,6 +2410,11 @@ fss_yield(kthread_t *t)
 	ASSERT(THREAD_LOCK_HELD(t));
 
 	/*
+	 * Collect CPU usage spent before yielding
+	 */
+	(void) CPUCAPS_CHARGE(t, &fssproc->fss_caps, CPUCAPS_CHARGE_ONLY);
+
+	/*
 	 * Clear the preemption control "yield" bit since the user is
 	 * doing a yield.
 	 */
@@ -2439,7 +2518,8 @@ fss_changeproj(kthread_t *t, void *kp, void *zp, fssbuf_t *projbuf,
 	ASSERT(fssproj_new != NULL);
 
 	thread_lock(t);
-	if (t->t_state == TS_RUN || t->t_state == TS_ONPROC)
+	if (t->t_state == TS_RUN || t->t_state == TS_ONPROC ||
+	    t->t_state == TS_WAIT)
 		fss_inactive(t);
 	ASSERT(fssproj_old->fssp_threads > 0);
 	if (--fssproj_old->fssp_threads == 0) {
@@ -2449,7 +2529,8 @@ fss_changeproj(kthread_t *t, void *kp, void *zp, fssbuf_t *projbuf,
 	fssproc->fss_proj = fssproj_new;
 	fssproc->fss_fsspri = 0;
 	fssproj_new->fssp_threads++;
-	if (t->t_state == TS_RUN || t->t_state == TS_ONPROC)
+	if (t->t_state == TS_RUN || t->t_state == TS_ONPROC ||
+	    t->t_state == TS_WAIT)
 		fss_active(t);
 	thread_unlock(t);
 	if (free) {
@@ -2528,12 +2609,14 @@ fss_changepset(kthread_t *t, void *newcp, fssbuf_t *projbuf,
 
 	fssproj_new->fssp_threads++;
 	thread_lock(t);
-	if (t->t_state == TS_RUN || t->t_state == TS_ONPROC)
-		fss_inactive(t);
+	if (t->t_state == TS_RUN || t->t_state == TS_ONPROC ||
+	    t->t_state == TS_WAIT)
+	    fss_inactive(t);
 	fssproc->fss_proj = fssproj_new;
 	fssproc->fss_fsspri = 0;
-	if (t->t_state == TS_RUN || t->t_state == TS_ONPROC)
-		fss_active(t);
+	if (t->t_state == TS_RUN || t->t_state == TS_ONPROC ||
+	    t->t_state == TS_WAIT)
+	    fss_active(t);
 	thread_unlock(t);
 	mutex_exit(&fsspset_new->fssps_lock);
 

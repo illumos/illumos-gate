@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,10 +59,10 @@
 #include <sys/policy.h>
 #include <sys/sdt.h>
 #include <sys/cpupart.h>
-
 #include <vm/rm.h>
 #include <vm/seg_kmem.h>
 #include <sys/modctl.h>
+#include <sys/cpucaps.h>
 
 static pri_t ts_init(id_t, int, classfuncs_t **);
 
@@ -194,6 +194,7 @@ static int	ts_parmsout(void *, pc_vaparms_t *);
 static int	ts_vaparmsin(void *, pc_vaparms_t *);
 static int	ts_vaparmsout(void *, pc_vaparms_t *);
 static int	ts_parmsset(kthread_t *, void *, id_t, cred_t *);
+static void	ts_exit(kthread_t *);
 static int	ts_donice(kthread_t *, cred_t *, int, int *);
 static void	ts_exitclass(void *);
 static int	ts_canexit(kthread_t *, cred_t *);
@@ -258,7 +259,7 @@ static struct classfuncs ts_classfuncs = {
 	ts_parmsget,
 	ts_parmsset,
 	ts_nullsys,	/* stop */
-	ts_nullsys,	/* exit */
+	ts_exit,
 	ts_nullsys,	/* active */
 	ts_nullsys,	/* inactive */
 	ts_swapin,
@@ -302,7 +303,7 @@ static struct classfuncs ia_classfuncs = {
 	ia_parmsget,
 	ia_parmsset,
 	ts_nullsys,	/* stop */
-	ts_nullsys,	/* exit */
+	ts_exit,
 	ts_nullsys,	/* active */
 	ts_nullsys,	/* inactive */
 	ts_swapin,
@@ -622,6 +623,7 @@ ts_enterclass(kthread_t *t, id_t cid, void *parmsp,
 	tspp->ts_dispwait = 0;
 	tspp->ts_timeleft = ts_dptbl[tspp->ts_cpupri].ts_quantum;
 	tspp->ts_tp = t;
+	cpucaps_sc_init(&tspp->ts_caps);
 
 	/*
 	 * Reset priority. Process goes to a "user mode" priority
@@ -703,6 +705,7 @@ ts_fork(kthread_t *t, kthread_t *ct, void *bufp)
 	ctspp->ts_dispwait = 0;
 	ctspp->ts_flags = ptspp->ts_flags & ~(TSKPRI | TSBACKQ | TSRESTORE);
 	ctspp->ts_tp = ct;
+	cpucaps_sc_init(&ctspp->ts_caps);
 	thread_unlock(t);
 
 	/*
@@ -1307,6 +1310,24 @@ ia_parmsset(kthread_t *tx, void *parmsp, id_t reqpcid, cred_t *reqpcredp)
 	return (ts_parmsset(tx, parmsp, reqpcid, reqpcredp));
 }
 
+static void
+ts_exit(kthread_t *t)
+{
+	tsproc_t *tspp;
+
+	if (CPUCAPS_ON()) {
+		/*
+		 * A thread could be exiting in between clock ticks,
+		 * so we need to calculate how much CPU time it used
+		 * since it was charged last time.
+		 */
+		thread_lock(t);
+		tspp = (tsproc_t *)t->t_cldata;
+		(void) cpucaps_charge(t, &tspp->ts_caps, CPUCAPS_CHARGE_ONLY);
+		thread_unlock(t);
+	}
+}
+
 /*
  * Return the global scheduling priority that would be assigned
  * to a thread entering the time-sharing class with the ts_upri.
@@ -1337,10 +1358,7 @@ static void
 ts_preempt(kthread_t *t)
 {
 	tsproc_t	*tspp = (tsproc_t *)(t->t_cldata);
-	klwp_t		*lwp;
-#ifdef KSLICE
-	extern int	kslice;
-#endif
+	klwp_t		*lwp = curthread->t_lwp;
 	pri_t		oldpri = t->t_pri;
 
 	ASSERT(t == curthread);
@@ -1350,7 +1368,6 @@ ts_preempt(kthread_t *t)
 	 * If preempted in the kernel, make sure the thread has
 	 * a kernel priority if needed.
 	 */
-	lwp = curthread->t_lwp;
 	if (!(tspp->ts_flags & TSKPRI) && lwp != NULL && t->t_kpri_req) {
 		tspp->ts_flags |= TSKPRI;
 		THREAD_CHANGE_PRI(t, ts_kmdpris[0]);
@@ -1358,9 +1375,21 @@ ts_preempt(kthread_t *t)
 		t->t_trapret = 1;		/* so ts_trapret will run */
 		aston(t);
 	}
+
 	/*
-	 * If preempted in user-land mark the thread
-	 * as swappable because I know it isn't holding any locks.
+	 * This thread may be placed on wait queue by CPU Caps. In this case we
+	 * do not need to do anything until it is removed from the wait queue.
+	 * Do not enforce CPU caps on threads running at a kernel priority
+	 */
+	if (CPUCAPS_ON()) {
+		(void) cpucaps_charge(t, &tspp->ts_caps, CPUCAPS_CHARGE_ONLY);
+		if (!(tspp->ts_flags & TSKPRI) && CPUCAPS_ENFORCE(t))
+			return;
+	}
+
+	/*
+	 * If thread got preempted in the user-land then we know
+	 * it isn't holding any locks.  Mark it as swappable.
 	 */
 	ASSERT(t->t_schedflag & TS_DONT_SWAP);
 	if (lwp != NULL && lwp->lwp_state == LWP_USER)
@@ -1420,12 +1449,7 @@ ts_preempt(kthread_t *t)
 		tspp->ts_flags &= ~TSBACKQ;
 		setbackdq(t);
 	} else {
-#ifdef KSLICE
-		if (kslice)
-			setbackdq(t);
-		else
-#endif
-			setfrontdq(t);
+		setfrontdq(t);
 	}
 
 done:
@@ -1481,6 +1505,11 @@ ts_sleep(kthread_t *t)
 
 	ASSERT(t == curthread);
 	ASSERT(THREAD_LOCK_HELD(t));
+
+	/*
+	 * Account for time spent on CPU before going to sleep.
+	 */
+	(void) CPUCAPS_CHARGE(t, &tspp->ts_caps, CPUCAPS_CHARGE_ONLY);
 
 	flags = tspp->ts_flags;
 	if (t->t_kpri_req) {
@@ -1605,7 +1634,8 @@ ts_swapout(kthread_t *t, int flags)
 
 	if (INHERITED(t) || (tspp->ts_flags & (TSKPRI | TSIASET)) ||
 	    (t->t_proc_flag & TP_LWPEXIT) ||
-	    (t->t_state & (TS_ZOMB | TS_FREE | TS_STOPPED | TS_ONPROC)) ||
+	    (t->t_state & (TS_ZOMB | TS_FREE | TS_STOPPED |
+	    TS_ONPROC | TS_WAIT)) ||
 	    !(t->t_schedflag & TS_LOAD) || !SWAP_OK(t))
 		return (-1);
 
@@ -1653,17 +1683,27 @@ ts_swapout(kthread_t *t, int flags)
  * move thread to priority specified in tsdptbl for time slice expiration
  * and set runrun to cause preemption.
  */
-
 static void
 ts_tick(kthread_t *t)
 {
 	tsproc_t *tspp = (tsproc_t *)(t->t_cldata);
 	klwp_t *lwp;
+	boolean_t call_cpu_surrender = B_FALSE;
 	pri_t	oldpri = t->t_pri;
 
 	ASSERT(MUTEX_HELD(&(ttoproc(t))->p_lock));
 
 	thread_lock(t);
+
+	/*
+	 * Keep track of thread's project CPU usage.  Note that projects
+	 * get charged even when threads are running in the kernel.
+	 */
+	if (CPUCAPS_ON()) {
+		call_cpu_surrender = cpucaps_charge(t, &tspp->ts_caps,
+		    CPUCAPS_CHARGE_ENFORCE) && !(tspp->ts_flags & TSKPRI);
+	}
+
 	if ((tspp->ts_flags & TSKPRI) == 0) {
 		if (--tspp->ts_timeleft <= 0) {
 			pri_t	new_pri;
@@ -1709,17 +1749,21 @@ ts_tick(kthread_t *t)
 				tspp->ts_timeleft =
 				    ts_dptbl[tspp->ts_cpupri].ts_quantum;
 			} else {
-				tspp->ts_flags |= TSBACKQ;
-				cpu_surrender(t);
+				call_cpu_surrender = B_TRUE;
 			}
 			TRACE_2(TR_FAC_DISP, TR_TICK,
 			    "tick:tid %p old pri %d", t, oldpri);
 		} else if (t->t_state == TS_ONPROC &&
 			    t->t_pri < t->t_disp_queue->disp_maxrunpri) {
-			tspp->ts_flags |= TSBACKQ;
-			cpu_surrender(t);
+			call_cpu_surrender = B_TRUE;
 		}
 	}
+
+	if (call_cpu_surrender) {
+		tspp->ts_flags |= TSBACKQ;
+		cpu_surrender(t);
+	}
+
 	thread_unlock_nopreempt(t);	/* clock thread can't be preempted */
 }
 
@@ -1877,8 +1921,8 @@ ts_update_list(int i)
 			goto next;
 		if (tx->t_schedctl && schedctl_get_nopreempt(tx))
 			goto next;
-		if (tx->t_state != TS_RUN && (tx->t_state != TS_SLEEP ||
-		    !ts_sleep_promote)) {
+		if (tx->t_state != TS_RUN && tx->t_state != TS_WAIT &&
+		    (tx->t_state != TS_SLEEP || !ts_sleep_promote)) {
 			/* make next syscall/trap do CL_TRAPRET */
 			tx->t_trapret = 1;
 			aston(tx);
@@ -1906,7 +1950,6 @@ next:
 
 	return (updated);
 }
-
 
 /*
  * Processes waking up go to the back of their queue.  We don't
@@ -1979,6 +2022,11 @@ ts_yield(kthread_t *t)
 
 	ASSERT(t == curthread);
 	ASSERT(THREAD_LOCK_HELD(t));
+
+	/*
+	 * Collect CPU usage spent before yielding
+	 */
+	(void) CPUCAPS_CHARGE(t, &tspp->ts_caps, CPUCAPS_CHARGE_ONLY);
 
 	/*
 	 * Clear the preemption control "yield" bit since the user is

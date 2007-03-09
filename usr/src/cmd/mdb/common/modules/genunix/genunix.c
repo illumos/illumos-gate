@@ -124,6 +124,7 @@ pstat2ch(uchar_t state)
 		case SIDL: return ('I');
 		case SONPROC: return ('O');
 		case SSTOP: return ('T');
+		case SWAIT: return ('W');
 		default: return ('?');
 	}
 }
@@ -148,6 +149,7 @@ ps_threadprint(uintptr_t addr, const void *data, void *private)
 		{ "TS_ONPROC",	TS_ONPROC,	TS_ONPROC	},
 		{ "TS_ZOMB",	TS_ZOMB,	TS_ZOMB		},
 		{ "TS_STOPPED",	TS_STOPPED,	TS_STOPPED	},
+		{ "TS_WAIT",	TS_WAIT,	TS_WAIT		},
 		{ NULL,		0,		0		}
 	};
 

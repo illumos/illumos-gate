@@ -781,6 +781,7 @@ lwp_exit(void)
 
 	t->t_proc_flag |= TP_LWPEXIT;
 	term_mstate(t);
+
 #ifndef NPROBE
 	/* Kernel probe */
 	if (t->t_tnf_tpdp)
@@ -916,10 +917,12 @@ top:
 		 * XXX Should use virtual stop like /proc does instead of
 		 * XXX waking the thread to get it to stop.
 		 */
-		if (t->t_state == TS_SLEEP && (t->t_flag & T_WAKEABLE))
+		if (ISWAKEABLE(t) || ISWAITING(t)) {
 			setrun_locked(t);
-		else if (t->t_state == TS_ONPROC && t->t_cpu != CPU)
+		} else if (t->t_state == TS_ONPROC && t->t_cpu != CPU) {
 			poke_cpu(t->t_cpu->cpu_id);
+		}
+
 		tid = t->t_tid;	 /* remember thread ID */
 		/*
 		 * Wait for lwp to stop
@@ -1360,9 +1363,8 @@ pokelwps(proc_t *p)
 			continue;
 		thread_lock(t);
 		aston(t);	/* make thread trap or do post_syscall */
-		if (t->t_state == TS_SLEEP) {
-			if (t->t_flag & T_WAKEABLE)
-				setrun_locked(t);
+		if (ISWAKEABLE(t) || ISWAITING(t)) {
+			setrun_locked(t);
 		} else if (t->t_state == TS_STOPPED) {
 			/*
 			 * Ensure that proc_exit() is not blocked by lwps

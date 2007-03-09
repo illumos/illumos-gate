@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,7 @@ extern "C" {
 #define	TS_ONPROC	0x04	/* Thread is being run on a processor */
 #define	TS_ZOMB		0x08	/* Thread has died but hasn't been reaped */
 #define	TS_STOPPED	0x10	/* Stopped, initial state */
+#define	TS_WAIT		0x20	/* Waiting to become runnable */
 
 typedef struct ctxop {
 	void	(*save_op)(void *);	/* function to invoke to save context */
@@ -98,6 +99,7 @@ struct trap_info;
 struct upimutex;
 struct kproject;
 struct on_trap_data;
+struct waitq;
 
 /* Definition for kernel thread identifier type */
 typedef uint64_t kt_did_t;
@@ -333,6 +335,7 @@ typedef struct _kthread {
 #endif
 	hrtime_t	t_hrtime;	/* high-res last time on cpu */
 	kmutex_t	t_ctx_lock;	/* protects t_ctx in removectx() */
+	struct waitq	*t_waitq;	/* wait queue */
 } kthread_t;
 
 /*
@@ -391,6 +394,8 @@ typedef struct _kthread {
 #define	TS_SWAPENQ	0x0004	/* swap thread when it reaches a safe point */
 #define	TS_ON_SWAPQ	0x0008	/* thread is on the swap queue */
 #define	TS_SIGNALLED	0x0010	/* thread was awakened by cv_signal() */
+#define	TS_PROJWAITQ	0x0020	/* thread is on its project's waitq */
+#define	TS_ZONEWAITQ	0x0040	/* thread is on its zone's waitq */
 #define	TS_CSTART	0x0100	/* setrun() by continuelwps() */
 #define	TS_UNPAUSE	0x0200	/* setrun() by unpauselwps() */
 #define	TS_XSTART	0x0400	/* setrun() by SIGCONT */
@@ -400,6 +405,7 @@ typedef struct _kthread {
 #define	TS_RUNQMATCH	0x4000	/* exact run queue balancing by setbackdq() */
 #define	TS_ALLSTART	\
 	(TS_CSTART|TS_UNPAUSE|TS_XSTART|TS_PSTART|TS_RESUME|TS_CREATE)
+#define	TS_ANYWAITQ	(TS_PROJWAITQ|TS_ZONEWAITQ)
 
 /*
  * No locking needed for AST field.
@@ -410,6 +416,13 @@ typedef struct _kthread {
 /* True if thread is stopped on an event of interest */
 #define	ISTOPPED(t) ((t)->t_state == TS_STOPPED && \
 			!((t)->t_schedflag & TS_PSTART))
+
+/* True if thread is asleep and wakeable */
+#define	ISWAKEABLE(t) (((t)->t_state == TS_SLEEP && \
+			((t)->t_flag & T_WAKEABLE)))
+
+/* True if thread is on the wait queue */
+#define	ISWAITING(t) ((t)->t_state == TS_WAIT)
 
 /* similar to ISTOPPED except the event of interest is CPR */
 #define	CPR_ISTOPPED(t) ((t)->t_state == TS_STOPPED && \
@@ -465,6 +478,9 @@ typedef struct _kthread {
  * ttoproj(x)
  * 	convert a thread pointer to its project pointer.
  *
+ * ttozone(x)
+ * 	convert a thread pointer to its zone pointer.
+ *
  * lwptot(x)
  *	convert a lwp pointer to its thread pointer.
  *
@@ -476,6 +492,7 @@ typedef struct _kthread {
 #define	ttolwp(x)	((x)->t_lwp)
 #define	ttoproc(x)	((x)->t_procp)
 #define	ttoproj(x)	((x)->t_proj)
+#define	ttozone(x)	((x)->t_procp->p_zone)
 #define	lwptot(x)	((x)->lwp_thread)
 #define	lwptoproc(x)	((x)->lwp_procp)
 
@@ -488,6 +505,7 @@ extern	kthread_t	*threadp(void);	/* inline, returns thread pointer */
 #define	curthread	(threadp())		/* current thread pointer */
 #define	curproc		(ttoproc(curthread))	/* current process pointer */
 #define	curproj		(ttoproj(curthread))	/* current project pointer */
+#define	curzone		(curproc->p_zone)	/* current zone pointer */
 
 extern	struct _kthread	t0;		/* the scheduler thread */
 extern	kmutex_t	pidlock;	/* global process lock */
@@ -583,6 +601,12 @@ caddr_t	thread_stk_init(caddr_t);	/* init thread stack */
 #define	THREAD_RUN(tp, lp)	THREAD_SET_STATE(tp, TS_RUN, lp)
 
 /*
+ * Put thread in wait state, and set the lock pointer to the wait queue
+ * lock pointer provided.  This lock should be held.
+ */
+#define	THREAD_WAIT(tp, lp)	THREAD_SET_STATE(tp, TS_WAIT, lp)
+
+/*
  * Put thread in run state, and set the lock pointer to the dispatcher queue
  * lock pointer provided (i.e., the "swapped_lock").  This lock should be held.
  */
@@ -619,7 +643,6 @@ caddr_t	thread_stk_init(caddr_t);	/* init thread stack */
  */
 #define	THREAD_FREEINTR(tp, cpu)	\
 		THREAD_SET_STATE(tp, TS_FREE, &(cpu)->cpu_thread_lock)
-
 
 #ifdef	__cplusplus
 }

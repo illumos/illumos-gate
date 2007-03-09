@@ -145,6 +145,7 @@ extern "C" {
 #define	ALIAS_MAXLOCKEDMEM	"locked"
 #define	ALIAS_MAXSWAP		"swap"
 #define	ALIAS_SHARES		"cpu-shares"
+#define	ALIAS_CPUCAP		"cpu-cap"
 
 /*
  * Bit flag definitions for passing into libzonecfg functions.

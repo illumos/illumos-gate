@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +53,7 @@
 #include <sys/policy.h>
 #include <sys/sdt.h>
 #include <sys/cpupart.h>
+#include <sys/cpucaps.h>
 
 static pri_t fx_init(id_t, int, classfuncs_t **);
 
@@ -83,40 +83,6 @@ static struct modlinkage modlinkage = {
 #define	FXMAXUPRI 60		/* maximum user priority setting */
 
 #define	FX_MAX_UNPRIV_PRI	0	/* maximum unpriviledge priority */
-
-/*
- * The fxproc_t structures are kept in an array of circular doubly linked
- * lists. A hash on the thread pointer is used to determine which list
- * each fxproc structure should be placed. Each list has a dummy "head" which
- * is never removed, so the list is never empty.
- */
-
-#define	FX_LISTS 16		/* number of lists, must be power of 2 */
-#define	FX_LIST_HASH(tp)	(((uintptr_t)(tp) >> 9) & (FX_LISTS - 1))
-
-#define	FX_LIST_INSERT(fxpp)						\
-{									\
-	int index = FX_LIST_HASH(fxpp->fx_tp);				\
-	kmutex_t *lockp = &fx_list_lock[index];				\
-	fxproc_t *headp = &fx_plisthead[index];				\
-	mutex_enter(lockp);						\
-	fxpp->fx_next = headp->fx_next;					\
-	fxpp->fx_prev = headp;						\
-	headp->fx_next->fx_prev = fxpp;					\
-	headp->fx_next = fxpp;						\
-	mutex_exit(lockp);						\
-}
-
-#define	FX_LIST_DELETE(fxpp)						\
-{									\
-	int index = FX_LIST_HASH(fxpp->fx_tp);				\
-	kmutex_t *lockp = &fx_list_lock[index];				\
-	mutex_enter(lockp);						\
-	fxpp->fx_prev->fx_next = fxpp->fx_next;				\
-	fxpp->fx_next->fx_prev = fxpp->fx_prev;				\
-	mutex_exit(lockp);						\
-}
-
 
 /*
  * The fxproc_t structures that have a registered callback vector,
@@ -190,10 +156,6 @@ static pri_t	fx_maxumdpri;	/* max user mode fixed priority */
 
 static pri_t	fx_maxglobpri;	/* maximum global priority used by fx class */
 static kmutex_t	fx_dptblock;	/* protects fixed priority dispatch table */
-
-
-static kmutex_t	fx_list_lock[FX_LISTS];	/* protects fxproc lists */
-static fxproc_t	fx_plisthead[FX_LISTS];	/* dummy fxproc at head of lists */
 
 
 static kmutex_t	fx_cb_list_lock[FX_CB_LISTS];	/* protects list of fxprocs */
@@ -314,14 +276,6 @@ fx_init(id_t cid, int clparmsz, classfuncs_t **clfuncspp)
 	fx_maxglobpri = fx_dptbl[fx_maxumdpri].fx_globpri;
 
 	fx_cid = cid;		/* Record our class ID */
-
-	/*
-	 * Initialize the fxproc hash table
-	 */
-	for (i = 0; i < FX_LISTS; i++) {
-		fx_plisthead[i].fx_next = fx_plisthead[i].fx_prev =
-		    &fx_plisthead[i];
-	}
 
 	/*
 	 * Initialize the hash table for fxprocs with callbacks
@@ -477,7 +431,6 @@ fx_admin(caddr_t uaddr, cred_t *reqpcredp)
 	return (0);
 }
 
-
 /*
  * Allocate a fixed priority class specific thread structure and
  * initialize it with the parameters supplied. Also move the thread
@@ -565,6 +518,7 @@ fx_enterclass(kthread_t *t, id_t cid, void *parmsp, cred_t *reqpcredp,
 	}
 
 	fxpp->fx_timeleft = fxpp->fx_pquantum;
+	cpucaps_sc_init(&fxpp->fx_caps);
 	fxpp->fx_tp = t;
 
 	thread_lock(t);			/* get dispatcher lock on thread */
@@ -574,8 +528,6 @@ fx_enterclass(kthread_t *t, id_t cid, void *parmsp, cred_t *reqpcredp,
 	t->t_schedflag &= ~TS_RUNQMATCH;
 	fx_change_priority(t, fxpp);
 	thread_unlock(t);
-
-	FX_LIST_INSERT(fxpp);
 
 	return (0);
 }
@@ -591,6 +543,8 @@ fx_exit(kthread_t *t)
 	thread_lock(t);
 	fxpp = (fxproc_t *)(t->t_cldata);
 
+	(void) CPUCAPS_CHARGE(t, &fxpp->fx_caps, CPUCAPS_CHARGE_ONLY);
+
 	if (FX_HAS_CB(fxpp)) {
 		FX_CB_EXIT(FX_CALLB(fxpp), fxpp->fx_cookie);
 		fxpp->fx_callback = NULL;
@@ -599,6 +553,7 @@ fx_exit(kthread_t *t)
 		FX_CB_LIST_DELETE(fxpp);
 		return;
 	}
+
 	thread_unlock(t);
 }
 
@@ -621,7 +576,6 @@ fx_exitclass(void *procp)
 		FX_CB_LIST_DELETE(fxpp);
 	} else
 		thread_unlock(fxpp->fx_tp);
-	FX_LIST_DELETE(fxpp);
 
 	kmem_free(fxpp, sizeof (fxproc_t));
 }
@@ -662,6 +616,7 @@ fx_fork(kthread_t *t, kthread_t *ct, void *bufp)
 	cfxpp->fx_callback = NULL;
 	cfxpp->fx_cookie = NULL;
 	cfxpp->fx_flags = pfxpp->fx_flags & ~(FXBACKQ);
+	cpucaps_sc_init(&cfxpp->fx_caps);
 
 	cfxpp->fx_tp = ct;
 	ct->t_cldata = (void *)cfxpp;
@@ -670,7 +625,6 @@ fx_fork(kthread_t *t, kthread_t *ct, void *bufp)
 	/*
 	 * Link new structure into fxproc list.
 	 */
-	FX_LIST_INSERT(cfxpp);
 	return (0);
 }
 
@@ -1157,12 +1111,11 @@ static void
 fx_preempt(kthread_t *t)
 {
 	fxproc_t	*fxpp = (fxproc_t *)(t->t_cldata);
-#ifdef KSLICE
-	extern int	kslice;
-#endif
 
 	ASSERT(t == curthread);
 	ASSERT(THREAD_LOCK_HELD(curthread));
+
+	(void) CPUCAPS_CHARGE(t, &fxpp->fx_caps, CPUCAPS_CHARGE_ONLY);
 
 	/*
 	 * Check to see if we're doing "preemption control" here.  If
@@ -1209,17 +1162,20 @@ fx_preempt(kthread_t *t)
 		THREAD_CHANGE_PRI(t, fx_dptbl[fxpp->fx_pri].fx_globpri);
 	}
 
+	/*
+	 * This thread may be placed on wait queue by CPU Caps. In this case we
+	 * do not need to do anything until it is removed from the wait queue.
+	 */
+	if (CPUCAPS_ENFORCE(t)) {
+		return;
+	}
+
 	if ((fxpp->fx_flags & (FXBACKQ)) == FXBACKQ) {
 		fxpp->fx_timeleft = fxpp->fx_pquantum;
 		fxpp->fx_flags &= ~FXBACKQ;
 		setbackdq(t);
 	} else {
-#ifdef KSLICE
-		if (kslice)
-			setbackdq(t);
-		else
-#endif
-			setfrontdq(t);
+		setfrontdq(t);
 	}
 }
 
@@ -1249,6 +1205,11 @@ fx_sleep(kthread_t *t)
 
 	ASSERT(t == curthread);
 	ASSERT(THREAD_LOCK_HELD(t));
+
+	/*
+	 * Account for time spent on CPU before going to sleep.
+	 */
+	(void) CPUCAPS_CHARGE(t, &fxpp->fx_caps, CPUCAPS_CHARGE_ONLY);
 
 	if (FX_HAS_CB(fxpp)) {
 		FX_CB_SLEEP(FX_CALLB(fxpp), fxpp->fx_cookie);
@@ -1318,6 +1279,7 @@ fx_stop(kthread_t *t, int why, int what)
 static void
 fx_tick(kthread_t *t)
 {
+	boolean_t call_cpu_surrender = B_FALSE;
 	fxproc_t *fxpp;
 
 	ASSERT(MUTEX_HELD(&(ttoproc(t))->p_lock));
@@ -1342,6 +1304,14 @@ fx_tick(kthread_t *t)
 			fx_change_priority(t, fxpp);
 		}
 	}
+
+	/*
+	 * Keep track of thread's project CPU usage.  Note that projects
+	 * get charged even when threads are running in the kernel.
+	 */
+	call_cpu_surrender =  CPUCAPS_CHARGE(t, &fxpp->fx_caps,
+	    CPUCAPS_CHARGE_ENFORCE);
+
 	if ((fxpp->fx_pquantum != FX_TQINF) &&
 	    (--fxpp->fx_timeleft <= 0)) {
 		pri_t	new_pri;
@@ -1379,15 +1349,17 @@ fx_tick(kthread_t *t)
 		if (thread_change_pri(t, new_pri, 0)) {
 			fxpp->fx_timeleft = fxpp->fx_pquantum;
 		} else {
-			fxpp->fx_flags |= FXBACKQ;
-			cpu_surrender(t);
+			call_cpu_surrender = B_TRUE;
 		}
 	} else if (t->t_state == TS_ONPROC &&
 		    t->t_pri < t->t_disp_queue->disp_maxrunpri) {
+		call_cpu_surrender = B_TRUE;
+	}
+
+	if (call_cpu_surrender) {
 		fxpp->fx_flags |= FXBACKQ;
 		cpu_surrender(t);
 	}
-
 	thread_unlock_nopreempt(t);	/* clock thread can't be preempted */
 }
 
@@ -1452,6 +1424,11 @@ fx_yield(kthread_t *t)
 
 	ASSERT(t == curthread);
 	ASSERT(THREAD_LOCK_HELD(t));
+
+	/*
+	 * Collect CPU usage spent before yielding CPU.
+	 */
+	(void) CPUCAPS_CHARGE(t, &fxpp->fx_caps, CPUCAPS_CHARGE_ONLY);
 
 	if (FX_HAS_CB(fxpp))  {
 		clock_t new_quantum =  (clock_t)fxpp->fx_pquantum;

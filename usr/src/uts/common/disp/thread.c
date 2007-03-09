@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,6 +73,8 @@
 #include <sys/sdt.h>
 #include <sys/reboot.h>
 #include <sys/kdi.h>
+#include <sys/waitq.h>
+#include <sys/cpucaps.h>
 
 struct kmem_cache *thread_cache;	/* cache of free threads */
 struct kmem_cache *lwp_cache;		/* cache of free lwps */
@@ -185,10 +187,18 @@ thread_init(void)
 	label_init();
 	cred_init();
 
+	/*
+	 * Initialize various resource management facilities.
+	 */
 	rctl_init();
+	cpucaps_init();
+	/*
+	 * Zone_init() should be called before project_init() so that project ID
+	 * for the first project is initialized correctly.
+	 */
+	zone_init();
 	project_init();
 	brand_init();
-	zone_init();
 	task_init();
 	tcache_init();
 	pool_init();
@@ -1070,6 +1080,8 @@ setrun_locked(kthread_t *t)
 		 * Already on dispatcher queue.
 		 */
 		return;
+	} else if (t->t_state == TS_WAIT) {
+		waitq_setrun(t);
 	} else if (t->t_state == TS_STOPPED) {
 		/*
 		 * All of the sending of SIGCONT (TC_XSTART) and /proc
@@ -1111,8 +1123,6 @@ setrun_locked(kthread_t *t)
 		 */
 		CL_SETRUN(t);
 	}
-
-
 }
 
 void
@@ -1623,7 +1633,7 @@ thread_change_epri(kthread_t *t, pri_t disp_pri)
 	 * If it's not on a queue, change the priority with
 	 * impunity.
 	 */
-	if ((state & (TS_SLEEP | TS_RUN)) == 0) {
+	if ((state & (TS_SLEEP | TS_RUN | TS_WAIT)) == 0) {
 		t->t_epri = disp_pri;
 
 		if (state == TS_ONPROC) {
@@ -1639,7 +1649,6 @@ thread_change_epri(kthread_t *t, pri_t disp_pri)
 	 * It's either on a sleep queue or a run queue.
 	 */
 	if (state == TS_SLEEP) {
-
 		/*
 		 * Take the thread out of its sleep queue.
 		 * Change the inherited priority.
@@ -1648,6 +1657,13 @@ thread_change_epri(kthread_t *t, pri_t disp_pri)
 		 * to do this in an appropriate manner.
 		 */
 		SOBJ_CHANGE_EPRI(t->t_sobj_ops, t, disp_pri);
+	} else if (state == TS_WAIT) {
+		/*
+		 * Re-enqueue a thread on the wait queue if its
+		 * effective priority needs to change.
+		 */
+		if (disp_pri != t->t_epri)
+			waitq_change_pri(t, disp_pri);
 	} else {
 		/*
 		 * The thread is on a run queue.
@@ -1682,7 +1698,7 @@ thread_change_pri(kthread_t *t, pri_t disp_pri, int front)
 	 * If it's not on a queue, change the priority with
 	 * impunity.
 	 */
-	if ((state & (TS_SLEEP | TS_RUN)) == 0) {
+	if ((state & (TS_SLEEP | TS_RUN | TS_WAIT)) == 0) {
 		t->t_pri = disp_pri;
 
 		if (state == TS_ONPROC) {
@@ -1707,6 +1723,13 @@ thread_change_pri(kthread_t *t, pri_t disp_pri, int front)
 		 */
 		if (disp_pri != t->t_pri)
 			SOBJ_CHANGE_PRI(t->t_sobj_ops, t, disp_pri);
+	} else if (state == TS_WAIT) {
+		/*
+		 * Re-enqueue a thread on the wait queue if its
+		 * priority needs to change.
+		 */
+		if (disp_pri != t->t_pri)
+			waitq_change_pri(t, disp_pri);
 	} else {
 		/*
 		 * The thread is on a run queue.

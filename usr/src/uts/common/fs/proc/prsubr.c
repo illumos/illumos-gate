@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,6 +166,7 @@ prchoose(proc_t *p)
 			}
 			break;
 		case TS_RUN:
+		case TS_WAIT:
 			if (t_run == NULL)
 				t_run = t;
 			break;
@@ -2507,6 +2508,7 @@ prgetlwpsinfo(kthread_t *t, lwpsinfo_t *psp)
 	case TS_ONPROC:		state = SONPROC;	c = 'O';	break;
 	case TS_ZOMB:		state = SZOMB;		c = 'Z';	break;
 	case TS_STOPPED:	state = SSTOP;		c = 'T';	break;
+	case TS_WAIT:		state = SWAIT;		c = 'W';	break;
 	default:		state = 0;		c = '?';	break;
 	}
 	psp->pr_state = state;
@@ -2573,6 +2575,7 @@ prgetlwpsinfo32(kthread_t *t, lwpsinfo32_t *psp)
 	case TS_ONPROC:		state = SONPROC;	c = 'O';	break;
 	case TS_ZOMB:		state = SZOMB;		c = 'Z';	break;
 	case TS_STOPPED:	state = SSTOP;		c = 'T';	break;
+	case TS_WAIT:		state = SWAIT;		c = 'W';	break;
 	default:		state = 0;		c = '?';	break;
 	}
 	psp->pr_state = state;

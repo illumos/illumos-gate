@@ -589,6 +589,7 @@ realprofexpire(void *arg)
 			}
 			break;
 		case TS_RUN:
+		case TS_WAIT:
 			mstate = LMS_WAIT_CPU;
 			break;
 		case TS_ONPROC:

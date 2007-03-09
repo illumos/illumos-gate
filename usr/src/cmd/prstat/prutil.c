@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -197,8 +197,8 @@ Format_state(char *str, char state, processorid_t pr_id, int length)
 	case 'I':
 		(void) strncpy(str, "idle", length);
 		break;
-	case 'X':
-		(void) strncpy(str, "xbrk", length);
+	case 'W':
+		(void) strncpy(str, "wait", length);
 		break;
 	case 'O':
 		(void) snprintf(str, length, "cpu%-3d", (int)pr_id);

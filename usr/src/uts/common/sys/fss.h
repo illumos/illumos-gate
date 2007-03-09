@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,10 +32,13 @@
 #include <sys/types.h>
 #include <sys/thread.h>
 #include <sys/project.h>
+#include <sys/cpucaps.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#ifdef	_KERNEL
 
 typedef uint64_t fsspri_t;
 typedef	uint64_t fssusage_t;
@@ -74,7 +76,7 @@ void fss_changepset(kthread_id_t, void *, fssbuf_t *, fssbuf_t *);
 typedef struct fsspset {
 	kmutex_t	fssps_lock;	/* lock to protect per-pset	*/
 					/* list of fssproj structures	*/
-	disp_lock_t	fssps_displock;	/* lock for fsps_maxfspri	*/
+	disp_lock_t	fssps_displock;	/* lock for fsps_maxfsspri	*/
 	struct cpupart	*fssps_cpupart;	/* ptr to our cpu partition	*/
 					/* protected by fsspsets_lock	*/
 	fsspri_t	fssps_maxfsspri; /* maximum fsspri value among	*/
@@ -113,7 +115,7 @@ typedef struct fssproj {
  */
 typedef struct fssproc {
 	kthread_t *fss_tp;	/* pointer back to our thread		*/
-	fssproj_t *fss_proj;	/* pointer to our project FS data	*/
+	fssproj_t *fss_proj;	/* pointer to our project FSS data	*/
 	uchar_t fss_flags;	/* flags defined below			*/
 	int	fss_timeleft;	/* time remaining in procs quantum	*/
 	uint32_t fss_ticks;	/* ticks accumulated by this thread	*/
@@ -126,20 +128,22 @@ typedef struct fssproc {
 	int	fss_runnable;	/* to indicate runnable/sleeping thread	*/
 	struct fssproc *fss_next; /* pointer to next fssproc_t struct	*/
 	struct fssproc *fss_prev; /* pointer to prev fssproc_t sturct	*/
+	caps_sc_t fss_caps;	/* CPU caps specific data		*/
 } fssproc_t;
 
 /*
- * One of these structures is allocated to each zone running within each active
- * cpu partition.
+ * One of these structures is allocated to each zone running within
+ * each active cpu partition.  This means that if a zone spans more
+ * than one cpu partition then it will have a few of these structures.
  */
 typedef struct fsszone {
-	struct zone 	*fssz_zone;	/* ptr to our zone structure */
-	struct fsszone	*fssz_next;	/* ptr to next fsszone in fsspset */
-	struct fsszone	*fssz_prev;	/* ptr to prev fsszone in fsspset */
-	uint32_t	fssz_shares;	/* total #shares for projs in zone */
-	uint32_t	fssz_nproj;	/* # fssproj_t's in this fsszone */
-	uint32_t	fssz_rshares;	/* "real" shares given to zone */
-	uint32_t	fssz_runnable;	/* # projects with runnable threads */
+	struct zone 	*fssz_zone;	/* ptr to our zone structure	*/
+	struct fsszone	*fssz_next;	/* next fsszone_t in fsspset_t	*/
+	struct fsszone	*fssz_prev;	/* prev fsszone_t in fsspset_t	*/
+	uint32_t	fssz_shares;	/* sum of all project shares	*/
+	uint32_t	fssz_nproj;	/* # of projects		*/
+	uint32_t	fssz_rshares;	/* "real" shares given to zone	*/
+	uint32_t	fssz_runnable;	/* # of runnable projects	*/
 } fsszone_t;
 
 #define	FSSPROC(tx)		((fssproc_t *)(tx->t_cldata))
@@ -158,6 +162,9 @@ typedef struct fsszone {
 				/* the dispatch queue if preempted */
 #define	FSSRESTORE	0x04	/* thread was not preempted, due to schedctl */
 				/* restore priority from fss_scpri */
+
+#endif	/* _KERNEL */
+
 #ifdef	__cplusplus
 }
 #endif

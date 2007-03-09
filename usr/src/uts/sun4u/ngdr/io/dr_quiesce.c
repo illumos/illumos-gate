@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -566,8 +566,7 @@ dr_stop_user_threads(dr_sr_handle_t *srh)
 
 				aston(tp);
 
-				if (tp->t_state == TS_SLEEP &&
-				    (tp->t_flag & T_WAKEABLE)) {
+				if (ISWAKEABLE(tp) || ISWAITING(tp)) {
 					setrun_locked(tp);
 				}
 

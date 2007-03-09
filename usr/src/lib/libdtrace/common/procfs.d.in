@@ -49,6 +49,8 @@ inline char SIDL = @SIDL@;
 #pragma D binding "1.0" SIDL
 inline char SONPROC = @SONPROC@;
 #pragma D binding "1.0" SONPROC
+inline char SWAIT = @SWAIT@;
+#pragma D binding "1.0" SWAIT
 
 inline int PR_STOPPED = @PR_STOPPED@;
 #pragma D binding "1.0" PR_STOPPED
@@ -322,14 +324,16 @@ translator lwpsinfo_t < kthread_t *T > {
 	    (T->t_state == @TS_RUN@) ? SRUN :
 	    (T->t_state == @TS_ONPROC@) ? SONPROC :
 	    (T->t_state == @TS_ZOMB@) ? SZOMB :
-	    (T->t_state == @TS_STOPPED@) ? SSTOP : 0;
+	    (T->t_state == @TS_STOPPED@) ? SSTOP :
+	    (T->t_state == @TS_WAIT@) ? SWAIT : 0;
 
 	pr_sname = (T->t_proc_flag & @TP_PRVSTOP@) ? 'T' :
 	    (T->t_state == @TS_SLEEP@) ? 'S' :
 	    (T->t_state == @TS_RUN@) ? 'R' :
 	    (T->t_state == @TS_ONPROC@) ? 'O' :
 	    (T->t_state == @TS_ZOMB@) ? 'Z' :
-	    (T->t_state == @TS_STOPPED@) ? 'T' : '?';
+	    (T->t_state == @TS_STOPPED@) ? 'T' :
+	    (T->t_state == @TS_WAIT@) ? 'W' : '?';
 
 	pr_syscall = T->t_sysnum;
 	pr_pri = T->t_pri;

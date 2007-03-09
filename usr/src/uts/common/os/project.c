@@ -41,6 +41,7 @@
 #include <sys/port_kernel.h>
 #include <sys/task.h>
 #include <sys/zone.h>
+#include <sys/cpucaps.h>
 
 int project_hash_size = 64;
 static kmutex_t project_hash_lock;
@@ -49,6 +50,7 @@ static mod_hash_t *projects_hash;
 static kproject_t *projects_list;
 
 rctl_hndl_t rc_project_cpu_shares;
+rctl_hndl_t rc_project_cpu_cap;
 rctl_hndl_t rc_project_nlwps;
 rctl_hndl_t rc_project_ntasks;
 rctl_hndl_t rc_project_msgmni;
@@ -156,6 +158,7 @@ project_hash_val_dtor(mod_hash_val_t val)
 	kproject_t *kp = (kproject_t *)val;
 
 	ASSERT(kp->kpj_count == 0);
+	ASSERT(kp->kpj_cpucap == NULL);
 	kmem_free(kp, sizeof (kproject_t));
 }
 
@@ -251,6 +254,7 @@ project_hold_by_id(projid_t id, zone_t *zone, int flag)
 
 		p = spare_p;
 		p->kpj_id = id;
+		p->kpj_zone = zone;
 		p->kpj_zoneid = zone->zone_id;
 		p->kpj_count = 0;
 		p->kpj_shares = 1;
@@ -304,6 +308,13 @@ project_hold_by_id(projid_t id, zone_t *zone, int flag)
 	 * across reboots.
 	 */
 	if (create == B_TRUE) {
+		/*
+		 * Inform CPU caps framework of the new project
+		 */
+		cpucaps_project_add(p);
+		/*
+		 * Set up project kstats
+		 */
 		ksp = project_kstat_create(p, zone);
 		mutex_enter(&project_hash_lock);
 		ASSERT(p->kpj_data.kpd_lockedmem_kstat == NULL);
@@ -342,6 +353,8 @@ project_rele(kproject_t *p)
 		if (projects_list == p)
 			projects_list = p->kpj_next;
 		mutex_exit(&projects_list_lock);
+
+		cpucaps_project_remove(p);
 
 		rctl_set_free(p->kpj_rctls);
 		project_kstat_delete(p);
@@ -431,11 +444,47 @@ project_cpu_shares_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
 	return (0);
 }
 
-
 static rctl_ops_t project_cpu_shares_ops = {
 	rcop_no_action,
 	project_cpu_shares_usage,
 	project_cpu_shares_set,
+	rcop_no_test
+};
+
+
+/*
+ * project.cpu-cap resource control support.
+ */
+/*ARGSUSED*/
+static rctl_qty_t
+project_cpu_cap_get(rctl_t *rctl, struct proc *p)
+{
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	return (cpucaps_project_get(p->p_task->tk_proj));
+}
+
+/*ARGSUSED*/
+static int
+project_cpu_cap_set(rctl_t *rctl, struct proc *p, rctl_entity_p_t *e,
+    rctl_qty_t nv)
+{
+	kproject_t *kpj = e->rcep_p.proj;
+
+	ASSERT(MUTEX_HELD(&p->p_lock));
+	ASSERT(e->rcep_t == RCENTITY_PROJECT);
+	if (kpj == NULL)
+		return (0);
+
+	/*
+	 * set cap to the new value.
+	 */
+	return (cpucaps_project_set(kpj,  nv));
+}
+
+static rctl_ops_t project_cpu_cap_ops = {
+	rcop_no_action,
+	project_cpu_cap_get,
+	project_cpu_cap_set,
 	rcop_no_test
 };
 
@@ -803,6 +852,13 @@ project_init(void)
 	    &project_cpu_shares_ops);
 	rctl_add_default_limit("project.cpu-shares", 1, RCPRIV_PRIVILEGED,
 	    RCTL_LOCAL_NOACTION);
+
+	rc_project_cpu_cap = rctl_register("project.cpu-cap",
+	    RCENTITY_PROJECT, RCTL_GLOBAL_SIGNAL_NEVER |
+	    RCTL_GLOBAL_DENY_ALWAYS | RCTL_GLOBAL_NOBASIC |
+	    RCTL_GLOBAL_COUNT | RCTL_GLOBAL_SYSLOG_NEVER |
+	    RCTL_GLOBAL_INFINITE,
+	    MAXCAP, MAXCAP, &project_cpu_cap_ops);
 
 	rc_project_nlwps = rctl_register("project.max-lwps", RCENTITY_PROJECT,
 	    RCTL_GLOBAL_NOACTION | RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_COUNT,

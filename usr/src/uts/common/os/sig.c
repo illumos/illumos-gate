@@ -181,7 +181,7 @@ eat_signal(kthread_t *t, int sig)
 	 */
 	if (!signal_is_blocked(t, sig)) {
 		t->t_sig_check = 1;	/* have thread do an issig */
-		if (t->t_state == TS_SLEEP && (t->t_flag & T_WAKEABLE)) {
+		if (ISWAKEABLE(t) || ISWAITING(t)) {
 			setrun_locked(t);
 			rval = 1;
 		} else if (t->t_state == TS_STOPPED && sig == SIGKILL &&
@@ -974,6 +974,11 @@ stop(int why, int what)
 						notify = 1;
 					}
 				}
+
+				/* Move waiting thread to run queue */
+				if (ISWAITING(tx))
+					setrun_locked(tx);
+
 				/*
 				 * force the thread into the kernel
 				 * if it is not already there.

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _SYS_FX_H
@@ -33,6 +32,7 @@
 #include <sys/thread.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/cpucaps.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -114,9 +114,6 @@ typedef struct fxproc {
 	char		fx_nice;	/* nice value for compatibility */
 	uchar_t 	fx_flags;	/* flags defined below */
 	kthread_t 	*fx_tp;		/* pointer to thread */
-	struct fxproc 	*fx_next;	/* pointer to next fxproc */
-
-	struct fxproc 	*fx_prev;	/* pointer to previous fxproc */
 
 	/* the following are used only when we have callbacks registered */
 	kt_did_t	fx_ktid;
@@ -128,6 +125,7 @@ typedef struct fxproc {
 	fx_cookie_t	fx_cookie;	/* cookie with which callback */
 					/* was registered */
 	fx_callbacks_t 	*fx_callback;	/* pointer to callback structure */
+	caps_sc_t	fx_caps;	/* CPU caps specific data */
 } fxproc_t;
 
 
