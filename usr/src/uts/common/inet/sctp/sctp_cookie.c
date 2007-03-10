@@ -527,7 +527,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 	if (initcollision)
 		iacklen += sctp_supaddr_param_len(sctp);
 	if (!linklocal)
-		iacklen += sctp_addr_params_len(sctp, supp_af, B_FALSE);
+		iacklen += sctp_addr_params(sctp, supp_af, NULL, B_FALSE);
 	ipsctplen += sizeof (*iacksh) + iacklen;
 	iacklen += errlen;
 	if ((pad = ipsctplen % 4) != 0) {
@@ -627,7 +627,7 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 	if (initcollision)
 		p += sctp_supaddr_param(sctp, (uchar_t *)p);
 	if (!linklocal)
-		p += sctp_addr_params(sctp, supp_af, (uchar_t *)p);
+		p += sctp_addr_params(sctp, supp_af, (uchar_t *)p, B_FALSE);
 	if (((sctp_options & SCTP_PRSCTP_OPTION) || initcollision) &&
 	    sctp->sctp_prsctp_aware && sctps->sctps_prsctp_enabled) {
 		p += sctp_options_param(sctp, p, SCTP_PRSCTP_OPTION);
@@ -1148,7 +1148,7 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 
 	/* Timestamp is int64_t, and we only guarantee 32-bit alignment */
 	bcopy(p, &ts, sizeof (ts));
-	/* Cookie life time, int32_t */
+	/* Cookie life time, uint32_t */
 	lt = (uint32_t *)(p + sizeof (ts));
 
 	/*
@@ -1171,11 +1171,18 @@ sctp_process_cookie(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *cmp,
 	*iackpp = iack;
 	*recv_adaption = 0;
 
-	/* Check the timestamp */
-	diff = lbolt64 - ts;
-	if (diff > *lt && (init->sic_inittag != sctp->sctp_fvtag ||
+	/*
+	 * Check the staleness of the Cookie, specified in 3.3.10.3 of
+	 * RFC 2960.
+	 *
+	 * The mesaure of staleness is the difference, in microseconds,
+	 * between the current time and the time the State Cookie expires.
+	 * So it is lbolt64 - (ts + *lt).  If it is positive, it means
+	 * that the Cookie has expired.
+	 */
+	diff = lbolt64 - (ts + *lt);
+	if (diff > 0 && (init->sic_inittag != sctp->sctp_fvtag ||
 	    iack->sic_inittag != sctp->sctp_lvtag)) {
-
 		uint32_t staleness;
 
 		staleness = TICK_TO_USEC(diff);

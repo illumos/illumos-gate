@@ -297,7 +297,7 @@ sctp_sendmsg(sctp_t *sctp, mblk_t *mp, int flags)
 	sctp->sctp_unsent += msg_len;
 	BUMP_LOCAL(sctp->sctp_msgcount);
 	if (sctp->sctp_state == SCTPS_ESTABLISHED)
-		sctp_output(sctp);
+		sctp_output(sctp, UINT_MAX);
 process_sendq:
 	WAKE_SCTP(sctp);
 	sctp_process_sendq(sctp);
@@ -968,7 +968,7 @@ sctp_fast_rexmit(sctp_t *sctp)
 }
 
 void
-sctp_output(sctp_t *sctp)
+sctp_output(sctp_t *sctp, uint_t num_pkt)
 {
 	mblk_t			*mp = NULL;
 	mblk_t			*nmp;
@@ -989,7 +989,7 @@ sctp_output(sctp_t *sctp)
 	sctp_data_hdr_t		*sdc;
 	int			error;
 	boolean_t		notsent = B_TRUE;
-	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	sctp_stack_t		*sctps = sctp->sctp_sctps;
 
 	if (sctp->sctp_ftsn == sctp->sctp_lastacked + 1) {
 		sacklen = 0;
@@ -1017,7 +1017,7 @@ sctp_output(sctp_t *sctp)
 	}
 	if (meta != NULL)
 		mp = meta->b_cont;
-	while (cansend > 0) {
+	while (cansend > 0 && num_pkt-- != 0) {
 		pad = 0;
 
 		/*
@@ -1108,8 +1108,8 @@ sctp_output(sctp_t *sctp)
 			 * a while, do slow start again.
 			 */
 			if (now - fp->lastactive > fp->rto) {
-				fp->cwnd = sctps->sctps_slow_start_after_idle *
-				    fp->sfa_pmss;
+				SET_CWND(fp, fp->sfa_pmss,
+				    sctps->sctps_slow_start_after_idle);
 			}
 
 			pathmax = fp->cwnd - fp->suna;
@@ -1643,7 +1643,6 @@ sctp_rexmit(sctp_t *sctp, sctp_faddr_t *oldfp)
 	boolean_t	ftsn_check = B_TRUE;
 	uint32_t	first_ua_tsn;
 	sctp_msg_hdr_t	*mhdr;
-	uint32_t	tot_wnd;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	while (meta != NULL) {
@@ -1722,9 +1721,17 @@ window_probe:
 		 */
 		if (sctp->sctp_frwnd < (oldfp->sfa_pmss - sizeof (*sdc)))
 			sctp->sctp_frwnd = oldfp->sfa_pmss - sizeof (*sdc);
+
 		/* next TSN to send */
 		sctp->sctp_rxt_nxttsn = sctp->sctp_ltsn;
-		sctp_output(sctp);
+
+		/*
+		 * The above sctp_frwnd adjustment is coarse.  The "changed"
+		 * sctp_frwnd may allow us to send more than 1 packet.  So
+		 * tell sctp_output() to send only 1 packet.
+		 */
+		sctp_output(sctp, 1);
+
 		/* Last sent TSN */
 		sctp->sctp_rxt_maxtsn = sctp->sctp_ltsn - 1;
 		ASSERT(sctp->sctp_rxt_maxtsn >= sctp->sctp_rxt_nxttsn);
@@ -1734,7 +1741,13 @@ window_probe:
 	return;
 out:
 	/*
-	 * If were are probing for zero window, don't adjust retransmission
+	 * After a time out, assume that everything has left the network.  So
+	 * we can clear rxt_unacked for the original peer address.
+	 */
+	oldfp->rxt_unacked = 0;
+
+	/*
+	 * If we were probing for zero window, don't adjust retransmission
 	 * variables, but the timer is still backed off.
 	 */
 	if (sctp->sctp_zero_win_probe) {
@@ -1756,8 +1769,14 @@ out:
 		} else {
 			SCTP_KSTAT(sctps, sctp_ss_rexmit_failed);
 		}
+
+		/*
+		 * The strikes will be clear by sctp_faddr_alive() when the
+		 * other side sends us an ack.
+		 */
 		oldfp->strikes++;
 		sctp->sctp_strikes++;
+
 		SCTP_CALC_RXT(oldfp, sctp->sctp_rto_max);
 		if (oldfp != fp && oldfp->suna != 0)
 			SCTP_FADDR_TIMER_RESTART(sctp, oldfp, fp->rto);
@@ -1873,18 +1892,8 @@ out:
 
 	mp = mp->b_next;
 
-	/* Check how much more we can send. */
-	tot_wnd = MIN(fp->cwnd, sctp->sctp_frwnd);
-	/*
-	 * If the number of outstanding bytes is more than what we are
-	 * allowed to send, stop.
-	 */
-	if (tot_wnd <= chunklen || tot_wnd < fp->suna + chunklen)
-		goto done_bundle;
-	else
-		tot_wnd -= chunklen;
-
 try_bundle:
+	/* We can at least and at most send 1 packet at timeout. */
 	while (seglen < fp->sfa_pmss) {
 		int32_t new_len;
 
@@ -1917,8 +1926,6 @@ try_bundle:
 		sdc = (sctp_data_hdr_t *)mp->b_rptr;
 		new_len = ntohs(sdc->sdh_len);
 		chunklen = new_len - sizeof (*sdc);
-		if (chunklen > tot_wnd)
-			break;
 
 		if ((extra = new_len & (SCTP_ALIGN - 1)) != 0)
 			extra = SCTP_ALIGN - extra;
@@ -1942,7 +1949,6 @@ try_bundle:
 		SCTP_CHUNK_SENT(sctp, mp, sdc, fp, chunklen, meta);
 
 		seglen = new_len;
-		tot_wnd -= chunklen;
 		mp = mp->b_next;
 	}
 done_bundle:
@@ -1956,6 +1962,8 @@ done_bundle:
 		 */
 		iph->ipha_fragment_offset_and_flags = 0;
 	}
+	fp->rxt_unacked += seglen;
+
 	dprint(2, ("sctp_rexmit: Sending packet %d bytes, tsn %x "
 	    "ssn %d to %p (rwnd %d, lastack_rxd %x)\n",
 	    seglen, ntohl(sdc->sdh_tsn), ntohs(sdc->sdh_ssn),
@@ -2049,7 +2057,7 @@ sctp_wput(queue_t *q, mblk_t *mp)
  * This function is called by sctp_ss_rexmit() to create a packet
  * to be retransmitted to the given fp.  The given meta and mp
  * parameters are respectively the sctp_msg_hdr_t and the mblk of the
- * first chunk to be retransmitted. This is also called when we want
+ * first chunk to be retransmitted.  This is also called when we want
  * to retransmit a zero window probe from sctp_rexmit() or when we
  * want to retransmit the zero window probe after the window has
  * opened from sctp_got_sack().
@@ -2173,6 +2181,7 @@ try_bundle:
 		*mp = (*mp)->b_next;
 	}
 	*packet_len = seglen;
+	fp->rxt_unacked += seglen;
 	return (head);
 }
 
@@ -2219,16 +2228,36 @@ sctp_ss_rexmit(sctp_t *sctp)
 	fp = sctp->sctp_current;
 
 	/*
-	 * Since we are retransmitting, we can only use cwnd to determine
-	 * how much we can send as we were allowed to send those chunks
-	 * previously.
+	 * Since we are retransmitting, we only need to use cwnd to determine
+	 * how much we can send as we were allowed (by peer's receive window)
+	 * to send those retransmitted chunks previously when they are first
+	 * sent.  If we record how much we have retransmitted but
+	 * unacknowledged using rxt_unacked, then the amount we can now send
+	 * is equal to cwnd minus rxt_unacked.
+	 *
+	 * The field rxt_unacked is incremented when we retransmit a packet
+	 * and decremented when we got a SACK acknowledging something.  And
+	 * it is reset when the retransmission timer fires as we assume that
+	 * all packets have left the network after a timeout.  If this
+	 * assumption is not true, it means that after a timeout, we can
+	 * get a SACK acknowledging more than rxt_unacked (its value only
+	 * contains what is retransmitted when the timer fires).  So
+	 * rxt_unacked will become very big (it is an unsiged int so going
+	 * negative means that the value is huge).  This is the reason we
+	 * always send at least 1 MSS bytes.
+	 *
+	 * The reason why we do not have an accurate count is that we
+	 * only know how many packets are outstanding (using the TSN numbers).
+	 * But we do not know how many bytes those packets contain.  To
+	 * have an accurate count, we need to walk through the send list.
+	 * As it is not really important to have an accurate count during
+	 * retransmission, we skip this walk to save some time.  This should
+	 * not make the retransmission too aggressive to cause congestion.
 	 */
-	tot_wnd = fp->cwnd;
-	/* So we have sent more than we can, just return. */
-	if (tot_wnd < fp->suna || tot_wnd - fp->suna < fp->sfa_pmss)
-		return;
+	if (fp->cwnd <= fp->rxt_unacked)
+		tot_wnd = fp->sfa_pmss;
 	else
-		tot_wnd -= fp->suna;
+		tot_wnd = fp->cwnd - fp->rxt_unacked;
 
 	/* Find the first unack'ed chunk */
 	for (meta = sctp->sctp_xmit_head; meta != NULL; meta = meta->b_next) {

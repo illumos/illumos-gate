@@ -192,7 +192,7 @@ sctp_init_mp(sctp_t *sctp)
 		initlen += (sizeof (sctp_parm_hdr_t) + sizeof (uint32_t));
 	}
 	initlen += sctp_supaddr_param_len(sctp);
-	initlen += sctp_addr_params_len(sctp, supp_af, B_TRUE);
+	initlen += sctp_addr_params(sctp, supp_af, NULL, B_TRUE);
 	if (sctp->sctp_prsctp_aware && sctps->sctps_prsctp_enabled)
 		initlen += sctp_options_param_len(sctp, SCTP_PRSCTP_OPTION);
 
@@ -234,7 +234,7 @@ sctp_init_mp(sctp_t *sctp)
 	p += sctp_supaddr_param(sctp, p);
 
 	/* Add address parameters */
-	p += sctp_addr_params(sctp, supp_af, p);
+	p += sctp_addr_params(sctp, supp_af, p, B_FALSE);
 
 	/* Add Forward-TSN-Supported param */
 	if (sctp->sctp_prsctp_aware && sctps->sctps_prsctp_enabled)
@@ -261,32 +261,21 @@ sctp_init2vtag(sctp_chunk_hdr_t *initch)
 }
 
 size_t
-sctp_addr_params_len(sctp_t *sctp, int af, boolean_t modify)
+sctp_addr_params(sctp_t *sctp, int af, uchar_t *p, boolean_t modify)
 {
+	size_t	param_len;
+
 	ASSERT(sctp->sctp_nsaddrs > 0);
 
 	/*
 	 * If we have only one local address or it is a loopback or linklocal
 	 * association, we let the peer pull the address from the IP header.
 	 */
-	if (sctp->sctp_nsaddrs == 1 || sctp->sctp_loopback ||
+	if ((!modify && sctp->sctp_nsaddrs == 1) || sctp->sctp_loopback ||
 	    sctp->sctp_linklocal) {
 		return (0);
 	}
 
-	return (sctp_saddr_info(sctp, af, NULL, modify));
-}
-
-size_t
-sctp_addr_params(sctp_t *sctp, int af, uchar_t *p)
-{
-	/*
-	 * If we have only one local address or it is a loopback or linklocal
-	 * association, we let the peer pull the address from the IP header.
-	 */
-	if (sctp->sctp_nsaddrs == 1 || sctp->sctp_loopback ||
-	    sctp->sctp_linklocal) {
-		return (0);
-	}
-	return (sctp_saddr_info(sctp, af, p, B_FALSE));
+	param_len = sctp_saddr_info(sctp, af, p, modify);
+	return ((sctp->sctp_nsaddrs == 1) ? 0 : param_len);
 }

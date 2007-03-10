@@ -232,8 +232,8 @@ sctp_get_ire(sctp_t *sctp, sctp_faddr_t *fp)
 		/* Make sure that sfa_pmss is a multiple of SCTP_ALIGN. */
 		fp->sfa_pmss = (ire->ire_max_frag - hdrlen) & ~(SCTP_ALIGN - 1);
 		if (fp->cwnd < (fp->sfa_pmss * 2)) {
-			fp->cwnd = fp->sfa_pmss *
-			    sctps->sctps_slow_start_initial;
+			SET_CWND(fp, fp->sfa_pmss,
+			    sctps->sctps_slow_start_initial);
 		}
 	}
 
@@ -1788,7 +1788,7 @@ sctp_congest_reset(sctp_t *sctp)
 
 	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
 		fp->ssthresh = sctps->sctps_initial_mtu;
-		fp->cwnd = fp->sfa_pmss * sctps->sctps_slow_start_initial;
+		SET_CWND(fp, fp->sfa_pmss, sctps->sctps_slow_start_initial);
 		fp->suna = 0;
 		fp->pba = 0;
 	}
@@ -1871,6 +1871,7 @@ sctp_init_faddr(sctp_t *sctp, sctp_faddr_t *fp, in6_addr_t *addr,
 	(void) random_get_pseudo_bytes((uint8_t *)&fp->hb_secret,
 	    sizeof (fp->hb_secret));
 	fp->hb_expiry = lbolt64;
+	fp->rxt_unacked = 0;
 
 	sctp_get_ire(sctp, fp);
 }

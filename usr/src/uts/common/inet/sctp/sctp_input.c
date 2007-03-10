@@ -1248,8 +1248,9 @@ sctp_data_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch, mblk_t *mp, mblk_t **dups,
 		/* Drop and SACK, but don't advance the cumulative TSN. */
 		sctp->sctp_force_sack = 1;
 		dprint(0, ("sctp_data_chunk: exceed rwnd %d rxqueued %d "
-			"ssn %d tsn %x\n", sctp->sctp_rwnd,
-			sctp->sctp_rxqueued, dc->sdh_ssn, ntohl(dc->sdh_tsn)));
+		    "dlen %d ssn %d tsn %x\n", sctp->sctp_rwnd,
+		    sctp->sctp_rxqueued, dlen, ntohs(dc->sdh_ssn),
+		    ntohl(dc->sdh_tsn)));
 		return;
 	}
 
@@ -2893,12 +2894,15 @@ check_ss_rxmit:
 			 * this signals that some chunks are still
 			 * missing.
 			 */
-			if (cumack_forward)
+			if (cumack_forward) {
+				fp->rxt_unacked -= acked;
 				sctp_ss_rexmit(sctp);
+			}
 		} else {
 			sctp->sctp_rexmitting = B_FALSE;
 			sctp->sctp_rxt_nxttsn = sctp->sctp_ltsn;
 			sctp->sctp_rxt_maxtsn = sctp->sctp_ltsn;
+			fp->rxt_unacked = 0;
 		}
 	}
 	return (trysend);
@@ -4143,7 +4147,7 @@ nomorechunks:
 	}
 
 	if (trysend) {
-		sctp_output(sctp);
+		sctp_output(sctp, UINT_MAX);
 		if (sctp->sctp_cxmit_list != NULL)
 			sctp_wput_asconf(sctp, NULL);
 	}

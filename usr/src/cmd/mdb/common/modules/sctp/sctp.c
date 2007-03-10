@@ -163,6 +163,7 @@ sctp_faddr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("pba\t\t%?u\tacked\t\t%?u\n", fa->pba, fa->acked);
 	mdb_printf("lastactive\t%?ld\thb_secret\t%?#lx\n", fa->lastactive,
 	    fa->hb_secret);
+	mdb_printf("rxt_unacked\t\t%?u\n", fa->rxt_unacked);
 	mdb_printf("timer_mp\t%?p\tire\t\t%?p\n", fa->timer_mp, fa->ire);
 	mdb_printf("hb_pending\t%?d\ttimer_running\t%?d\n"
 	    "df\t\t%?d\tpmtu_discovered\t%?d\n"

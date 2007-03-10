@@ -512,6 +512,7 @@ typedef struct sctp_faddr_s {
 	uint32_t	T3expire;	/* # of times T3 timer expired */
 
 	uint64_t	hb_secret;	/* per addr "secret" in heartbeat */
+	uint32_t	rxt_unacked;	/* # unack'ed retransmitted bytes */
 } sctp_faddr_t;
 
 /* Flags to indicate supported address type in the PARM_SUP_ADDRS. */
@@ -533,6 +534,19 @@ typedef	struct	sctp_ipif_hash_s {
 	list_t	sctp_ipif_list;
 	int	ipif_count;
 } sctp_ipif_hash_t;
+
+
+/*
+ * Initialize cwnd according to RFC 3390.  def_max_init_cwnd is
+ * either sctp_slow_start_initial or sctp_slow_start_after idle
+ * depending on the caller.
+ */
+#define	SET_CWND(fp, mss, def_max_init_cwnd)				\
+{									\
+	(fp)->cwnd = MIN(def_max_init_cwnd * (mss),			\
+	    MIN(4 * (mss), MAX(2 * (mss), 4380 / (mss) * (mss))));	\
+}
+
 
 struct sctp_s;
 
@@ -811,7 +825,7 @@ typedef struct sctp_s {
 	int64_t		sctp_last_secret_update;
 	uint8_t		sctp_secret[SCTP_SECRET_LEN]; /* for cookie auth */
 	uint8_t		sctp_old_secret[SCTP_SECRET_LEN];
-	uint32_t	sctp_cookie_lifetime;	/* cookie lifetime in ms */
+	uint32_t	sctp_cookie_lifetime;	/* cookie lifetime in tick */
 
 	/*
 	 * Address family that app wishes returned addrsses to be in.
@@ -919,8 +933,7 @@ extern boolean_t sctp_add_ftsn_set(sctp_ftsn_set_t **, sctp_faddr_t *, mblk_t *,
 extern boolean_t sctp_add_recvq(sctp_t *, mblk_t *, boolean_t);
 extern void	sctp_add_sendq(sctp_t *, mblk_t *);
 extern void	sctp_add_unrec_parm(sctp_parm_hdr_t *, mblk_t **);
-extern size_t	sctp_addr_params(sctp_t *, int, uchar_t *);
-extern size_t	sctp_addr_params_len(sctp_t *, int, boolean_t);
+extern size_t	sctp_addr_params(sctp_t *, int, uchar_t *, boolean_t);
 extern mblk_t	*sctp_add_proto_hdr(sctp_t *, sctp_faddr_t *, mblk_t *, int,
 		    int *);
 extern void	sctp_addr_req(sctp_t *, mblk_t *);
@@ -1040,7 +1053,7 @@ extern sctp_parm_hdr_t *sctp_next_parm(sctp_parm_hdr_t *, ssize_t *);
 extern void	sctp_ootb_shutdown_ack(sctp_t *, mblk_t *, uint_t);
 extern size_t	sctp_options_param(const sctp_t *, void *, int);
 extern size_t	sctp_options_param_len(const sctp_t *, int);
-extern void	sctp_output(sctp_t *sctp);
+extern void	sctp_output(sctp_t *, uint_t);
 
 extern boolean_t sctp_param_register(IDP *, sctpparam_t *, int, sctp_stack_t *);
 extern void	sctp_partial_delivery_event(sctp_t *);
