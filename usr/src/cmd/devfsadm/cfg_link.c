@@ -87,6 +87,7 @@ static int	di_propall_lookup_ints(di_prom_handle_t, int,
 		    dev_t, di_node_t, const char *, int **);
 static int	di_propall_lookup_strings(di_prom_handle_t, int,
 		    dev_t, di_node_t, const char *, char **);
+static int 	serid_printable(uint64_t *seridp);
 
 
 /*
@@ -544,8 +545,11 @@ DEF:
  * <24 bits: IEEE company id><40 bits: serial number>
  *
  * sun encoding of 40 bit serial number:
- * first byte = device type indicator (ignored in naming scheme)
+ * first byte = device type indicator
  * next 4 bytes = 4 ascii characters
+ *
+ * In the unlikely event that serial id contains non-printable characters
+ * the full 64 bit raw hex string will be used for the attachment point.
  */
 /*ARGSUSED*/
 static int
@@ -554,28 +558,33 @@ pci_cfg_iob_name(di_minor_t minor, di_node_t node, di_prom_handle_t ph,
 {
 	int64_t *seridp;
 	uint64_t serid;
+	char *idstr;
 
 	if (di_prop_lookup_int64(DDI_DEV_T_ANY, node, PROP_SERID,
 	    &seridp) < 1) {
 		(void) strlcpy(buf, IOB_PRE, bufsz);
 		return (1);
 	}
+
 	serid = (uint64_t)*seridp;
 
-	if ((serid >> 40) != (uint64_t)IEEE_SUN_ID) {
+	if ((serid >> 40) != (uint64_t)IEEE_SUN_ID ||
+		!serid_printable(&serid)) {
 		(void) snprintf(buf, bufsz, "%s%llx", IOB_PRE, serid);
 		return (1);
 	}
 
 	/*
-	 * skip 32 bits because the first 3 bytes are the company id and the
-	 * next byte is the PCIe or PCI-X indicator. The last 4 bytes
-	 * is being treated as raw unsigned integer instead of a string
-	 * because some of the bytes are 0x0 (NULL).
+	 * the serial id is constructed from lower 40 bits of the serialid
+	 * property and is represented by 5 ascii characters. The first
+	 * character indicates if the IO Box is PCIe or PCI-X.
 	 */
 
-	(void) snprintf(buf, bufsz, "%s%08x", IOB_PRE,
-	    (uint32_t)(SIZE2MASK64(32) & serid));
+	serid <<= 24;
+	idstr = (char *)&serid;
+	idstr[sizeof (serid) -1] = '\0';
+
+	(void) snprintf(buf, bufsz, "%s%s", IOB_PRE, idstr);
 
 	return (1);
 }
@@ -1176,4 +1185,23 @@ ib_cfg_creat_cb(di_minor_t minor, di_node_t node)
 
 	(void) devfsadm_mklink(path, node, minor, 0);
 	return (DEVFSADM_CONTINUE);
+}
+
+/*
+ * This function verifies if the serial id is printable.
+ */
+
+static int
+serid_printable(uint64_t *seridp)
+{
+
+	char *ptr;
+	int i = 0;
+
+	for (ptr = (char *)seridp+3; i < 5; ptr++, i++)
+		if (*ptr < 0x21 || *ptr >= 0x7f)
+			return (0);
+
+	return (1);
+
 }
