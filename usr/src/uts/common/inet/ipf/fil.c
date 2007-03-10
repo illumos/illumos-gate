@@ -6628,7 +6628,7 @@ ipf_stack_t *ifs;
 	return error;
 }
 
-static void ipf_unlinktoken(token, ifs)
+void ipf_unlinktoken(token, ifs)
 ipftoken_t *token;
 ipf_stack_t *ifs;
 {
@@ -6785,14 +6785,14 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr, ipf_stack_t *ifs)
 	if (next != NULL) {
 		if (next->fr_next == NULL) {
 			t->ipt_alive = 0;
-			/*ipf_freetoken(t, ifs);
-			fr = NULL; */
+			ipf_unlinktoken(t, ifs);
+			KFREE(t);	
 		} else {
 			MUTEX_ENTER(&next->fr_lock);
 			next->fr_ref++;
 			MUTEX_EXIT(&next->fr_lock);
+			t->ipt_data = next;
 		}
-		t->ipt_data = next;
 	} else {
 		bzero(&zero, sizeof(zero));
 		next = &zero;

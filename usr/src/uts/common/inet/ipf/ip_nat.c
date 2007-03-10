@@ -5022,8 +5022,8 @@ ipf_stack_t *ifs;
 		if (nexthm != NULL) {
 			if (nexthm->hm_hnext == NULL) {
 				t->ipt_alive = 0;
-				/* ipf_freetoken(t, ifs);
-				hm = NULL; */
+				ipf_unlinktoken(t, ifs);
+				KFREE(t);
 			} else {
 				/*MUTEX_ENTER(&nexthm->hm_lock);*/
 				nexthm->hm_ref++;
@@ -5033,6 +5033,7 @@ ipf_stack_t *ifs;
 		} else {
 			bzero(&zerohm, sizeof(zerohm));
 			nexthm = &zerohm;
+			ipf_freetoken(t, ifs);
 		}
 		break;
 
@@ -5046,8 +5047,8 @@ ipf_stack_t *ifs;
 		if (nextipnat != NULL) {
 			if (nextipnat->in_next == NULL) {
 				t->ipt_alive = 0;
-				/*ipf_freetoken(t, ifs);
-				ipn = NULL;*/
+				ipf_unlinktoken(t, ifs);
+				KFREE(t);
 			} else {
 				/* MUTEX_ENTER(&nextipnat->in_lock); */
 				nextipnat->in_use++;
@@ -5056,6 +5057,7 @@ ipf_stack_t *ifs;
 		} else {
 			bzero(&zeroipn, sizeof(zeroipn));
 			nextipnat = &zeroipn;
+			ipf_freetoken(t, ifs);
 		}
 		break;
 
@@ -5069,8 +5071,8 @@ ipf_stack_t *ifs;
 		if (nextnat != NULL) {
 			if (nextnat->nat_next == NULL) {
 				t->ipt_alive = 0;
-				/*ipf_freetoken(t, ifs);
-				nat = NULL;*/
+				ipf_unlinktoken(t, ifs);
+				KFREE(t);
 			} else {
 				MUTEX_ENTER(&nextnat->nat_lock);
 				nextnat->nat_ref++;
@@ -5079,6 +5081,7 @@ ipf_stack_t *ifs;
 		} else {
 			bzero(&zeronat, sizeof(zeronat));
 			nextnat = &zeronat;
+			ipf_freetoken(t, ifs);
 		}
 		break;
 	}
@@ -5093,7 +5096,8 @@ ipf_stack_t *ifs;
 			fr_hostmapderef(&hm);
 			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 		}
-		t->ipt_data = nexthm;
+		if (nexthm->hm_hnext != NULL) 
+			t->ipt_data = nexthm;
 		error = COPYOUT(nexthm, itp->igi_data, sizeof(*nexthm));
 		if (error != 0)
 			error = EFAULT;
@@ -5102,7 +5106,8 @@ ipf_stack_t *ifs;
 	case IPFGENITER_IPNAT :
 		if (ipn != NULL)
 			fr_ipnatderef(&ipn, ifs);
-		t->ipt_data = nextipnat;
+		if (nextipnat->in_next != NULL) 
+			t->ipt_data = nextipnat;
 		error = COPYOUT(nextipnat, itp->igi_data, sizeof(*nextipnat));
 		if (error != 0)
 			error = EFAULT;
@@ -5111,7 +5116,8 @@ ipf_stack_t *ifs;
 	case IPFGENITER_NAT :
 		if (nat != NULL)
 			fr_natderef(&nat, ifs);
-		t->ipt_data = nextnat;
+		if (nextnat->nat_next != NULL) 
+			t->ipt_data = nextnat;
 		error = COPYOUT(nextnat, itp->igi_data, sizeof(*nextnat));
 		if (error != 0)
 			error = EFAULT;

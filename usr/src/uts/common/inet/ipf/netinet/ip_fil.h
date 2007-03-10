@@ -1467,6 +1467,7 @@ extern	int		fr_zerostats __P((char *, ipf_stack_t *));
 extern  ipftoken_t      *ipf_findtoken __P((int, int, void *, ipf_stack_t *));
 extern  int             ipf_getnextrule __P((ipftoken_t *, void *, ipf_stack_t *));
 extern  void            ipf_expiretokens __P((ipf_stack_t *));
+extern  void            ipf_unlinktoken __P((ipftoken_t *, ipf_stack_t *));
 extern  void            ipf_freetoken __P((ipftoken_t *, ipf_stack_t *));
 extern  int             ipf_deltoken __P((int,int, void *, ipf_stack_t *));
 extern  int             ipf_genericiter __P((void *, int, void *, ipf_stack_t *));

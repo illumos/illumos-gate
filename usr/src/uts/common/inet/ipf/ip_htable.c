@@ -668,14 +668,17 @@ ipf_stack_t *ifs;
 		}
 
 		if (nextiph != NULL) {
-			if (nextiph->iph_next == NULL)
+			if (nextiph->iph_next == NULL) {
 				token->ipt_alive = 0;
-			else {
+				ipf_unlinktoken(token, ifs);
+				KFREE(token);
+			} else {
 				ATOMIC_INC(nextiph->iph_ref);
 			}
 		} else {
 			bzero((char *)&zp, sizeof(zp));
 			nextiph = &zp;
+			ipf_freetoken(token, ifs);
 		}
 		break;
 
@@ -693,14 +696,17 @@ ipf_stack_t *ifs;
 		}
 
 		if (nextnode != NULL) {
-			if (nextnode->ipe_snext == NULL)
+			if (nextnode->ipe_snext == NULL) {
 				token->ipt_alive = 0;
-			else {
+				ipf_unlinktoken(token, ifs);
+				KFREE(token);
+			} else {
 				ATOMIC_INC(nextnode->ipe_ref);
 			}
 		} else {
 			bzero((char *)&zn, sizeof(zn));
 			nextnode = &zn;
+			ipf_freetoken(token, ifs);
 		}
 		break;
 	default :
@@ -720,7 +726,9 @@ ipf_stack_t *ifs;
 			fr_derefhtable(iph, ifs);
 			RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
 		}
-		token->ipt_data = nextiph;
+		if (nextiph->iph_next != NULL) 
+			token->ipt_data = nextiph;
+		
 		err = COPYOUT(nextiph, ilp->ili_data, sizeof(*nextiph));
 		if (err != 0)
 			err = EFAULT;
@@ -732,7 +740,8 @@ ipf_stack_t *ifs;
 			fr_derefhtent(node);
 			RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
 		}
-		token->ipt_data = nextnode;
+		if (nextnode->ipe_snext != NULL) 
+			token->ipt_data = nextnode;
 		err = COPYOUT(nextnode, ilp->ili_data, sizeof(*nextnode));
 		if (err != 0)
 			err = EFAULT;

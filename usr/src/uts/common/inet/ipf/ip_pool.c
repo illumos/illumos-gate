@@ -785,14 +785,17 @@ ipf_stack_t *ifs;
 		}
 
 		if (nextipo != NULL) {
-			if (nextipo->ipo_next == NULL)
+			if (nextipo->ipo_next == NULL) {
 				token->ipt_alive = 0;
-			else {
+				ipf_unlinktoken(token, ifs);
+				KFREE(token);
+			} else {
 				ATOMIC_INC(nextipo->ipo_ref);
 			}
 		} else {
 			bzero((char *)&zp, sizeof(zp));
 			nextipo = &zp;
+			ipf_freetoken(token, ifs);
 		}
 		break;
 
@@ -811,14 +814,17 @@ ipf_stack_t *ifs;
 		}
 
 		if (nextnode != NULL) {
-			if (nextnode->ipn_next == NULL)
+			if (nextnode->ipn_next == NULL) {
 				token->ipt_alive = 0;
-			else {
+				ipf_unlinktoken(token, ifs);
+				KFREE(token);
+			} else {
 				ATOMIC_INC(nextnode->ipn_ref);
 			}
 		} else {
 			bzero((char *)&zn, sizeof(zn));
 			nextnode = &zn;
+			ipf_freetoken(token, ifs);
 		}
 		break;
 	default :
@@ -839,7 +845,8 @@ ipf_stack_t *ifs;
 			ip_pool_deref(ipo, ifs);
 			RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
 		}
-		token->ipt_data = nextipo;
+		if (nextipo->ipo_next != NULL) 
+			token->ipt_data = nextipo;
 		err = COPYOUT(nextipo, ilp->ili_data, sizeof(*nextipo));
 		if (err != 0)
 			err = EFAULT;
@@ -851,7 +858,8 @@ ipf_stack_t *ifs;
 			ip_pool_node_deref(node, ifs);
 			RWLOCK_EXIT(&ifs->ifs_ip_poolrw);
 		}
-		token->ipt_data = nextnode;
+		if (nextnode->ipn_next != NULL) 
+			token->ipt_data = nextnode;
 		err = COPYOUT(nextnode, ilp->ili_data, sizeof(*nextnode));
 		if (err != 0)
 			err = EFAULT;
