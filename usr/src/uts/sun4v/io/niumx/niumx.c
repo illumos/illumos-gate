@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,8 @@
 #include <sys/hypervisor_api.h>
 #include "niumx_var.h"
 
-
+static int niumx_fm_init_child(dev_info_t *, dev_info_t *, int,
+	ddi_iblock_cookie_t *);
 static int niumx_intr_ops(dev_info_t *dip, dev_info_t *rdip,
 	ddi_intr_op_t intr_op, ddi_intr_handle_impl_t *hdlp, void *result);
 static int niumx_attach(dev_info_t *devi, ddi_attach_cmd_t cmd);
@@ -96,7 +97,7 @@ static struct bus_ops niumx_bus_ops = {
 	0,				/* (*bus_intr_ctl)();		*/
 	0,				/* (*bus_config)(); 		*/
 	0,				/* (*bus_unconfig)(); 		*/
-	0,				/* (*bus_fm_init)(); 		*/
+	niumx_fm_init_child,		/* (*bus_fm_init)(); 		*/
 	0,				/* (*bus_fm_fini)(); 		*/
 	0,				/* (*bus_enter)()		*/
 	0,				/* (*bus_exit)()		*/
@@ -259,8 +260,7 @@ niumx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		/* add interrupt redistribution callback */
 		intr_dist_add(niumx_intr_dist, &niumxds_p->niumx_mutex);
 
-		niumxds_p->niumx_fm_cap = DDI_FM_EREPORT_CAPABLE |
-			DDI_FM_ACCCHK_CAPABLE | DDI_FM_DMACHK_CAPABLE;
+		niumxds_p->niumx_fm_cap = DDI_FM_EREPORT_CAPABLE;
 
 		ddi_fm_init(niumxds_p->dip, &niumxds_p->niumx_fm_cap,
 			&niumxds_p->niumx_fm_ibc);
@@ -306,6 +306,25 @@ niumx_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 	return (DDI_FAILURE);
 }
+
+
+/*
+ * Function used to initialize FMA for our children nodes. Called
+ * through pci busops when child node calls ddi_fm_init.
+ */
+/*ARGSUSED*/
+int
+niumx_fm_init_child(dev_info_t *dip, dev_info_t *cdip, int cap,
+    ddi_iblock_cookie_t *ibc_p)
+{
+	niumx_devstate_t	*niumxds_p = DIP_TO_STATE(dip);
+
+	ASSERT(ibc_p != NULL);
+	*ibc_p = niumxds_p->niumx_fm_ibc;
+
+	return (niumxds_p->niumx_fm_cap);
+}
+
 
 /*ARGSUSED*/
 int
@@ -740,9 +759,6 @@ niumx_set_intr(dev_info_t *dip, dev_info_t *rdip,
 	int		inoslen, ret = DDI_SUCCESS;
 	uint64_t	hvret;
 
-	DBG(DBG_A_INTX, dip, "niumx_set_intr: rdip=%s%d, valid=%d\n",
-		NAMEINST(rdip), valid);
-
 	ASSERT(hdlp->ih_inum < NIUMX_MAX_INTRS);
 
 	/* find the appropriate slot from the fixed table */
@@ -752,8 +768,9 @@ niumx_set_intr(dev_info_t *dip, dev_info_t *rdip,
 		goto fail;
 	}
 	ih_p = niumx_ihtable + inos_p[hdlp->ih_inum];
-	DBG(DBG_A_INTX, dip, "enabling (%x,%x,%x)\n", ih_p->ih_inum,
-			ih_p->ih_ino, ih_p->ih_sysino);
+	DBG(DBG_A_INTX, dip, "niumx_set_intr: rdip=%s%d, valid=%d %s (%x,%x)\n",
+		NAMEINST(rdip), valid, valid ? "enabling" : "disabling",
+		ih_p->ih_inum, ih_p->ih_sysino);
 
 	if ((hvret = hvio_intr_setvalid(ih_p->ih_sysino, valid))
 		!= H_EOK) {
@@ -783,8 +800,6 @@ fail:
  *   [35]    - mac1
  *   [36-43] - func1 Rx (qty. 8)
  *   [44-51] - func1 Tx (qty. 8)
- *
- *   [52] - Error Interrupt hook
  */
 int
 niumx_add_intr(dev_info_t *dip, dev_info_t *rdip,
@@ -793,19 +808,8 @@ niumx_add_intr(dev_info_t *dip, dev_info_t *rdip,
 	niumx_ih_t	*ih_p;
 	int		inoslen, ret = DDI_SUCCESS;
 	uint64_t	hvret;
-	devino_t	*inos_p;
+	devino_t	*inos_p, ino; /* INO numbers, from "interrupts" prop */
 	sysino_t	sysino;
-
-	/* FMA Err handling hook */
-	if (dip == rdip) {
-		/*
-		 * this is not the leaf calling us, so hardwire in the
-		 * FMA interrupt details.
-		 */
-		ih_p = niumx_ihtable + NIUMX_EI_IH;
-		ih_p->ih_ino = NIUMX_EI_IH;
-		goto get_sysino;
-	}
 
 	/* get new ino */
 	if (hdlp->ih_inum >= NIUMX_MAX_INTRS) {
@@ -820,11 +824,10 @@ niumx_add_intr(dev_info_t *dip, dev_info_t *rdip,
 		goto done;
 	}
 	ih_p = niumx_ihtable + inos_p[hdlp->ih_inum];
-	ih_p->ih_ino = inos_p[hdlp->ih_inum];
+	ino = inos_p[hdlp->ih_inum];
 	kmem_free(inos_p, inoslen);
-get_sysino:
-	if ((hvret = hvio_intr_devino_to_sysino(DIP_TO_HANDLE(dip),
-		ih_p->ih_ino, &sysino)) != H_EOK) {
+	if ((hvret = hvio_intr_devino_to_sysino(DIP_TO_HANDLE(dip), ino,
+		&sysino)) != H_EOK) {
 		DBG(DBG_INTR, dip, "hvio_intr_devino_to_sysino failed, "
 			"ret 0x%x\n", hvret);
 		ret = DDI_FAILURE;
@@ -852,8 +855,8 @@ get_sysino:
 	DDI_INTR_ASSIGN_HDLR_N_ARGS(hdlp, (ddi_intr_handler_t *)niumx_intr_hdlr,
 			(void *)ih_p, NULL);
 
-	DBG(DBG_A_INTX, dip, "adding (%x,%x,%x)\n", ih_p->ih_inum,
-			ih_p->ih_ino, ih_p->ih_sysino);
+	DBG(DBG_A_INTX, dip, "for ino %x adding (%x,%x)\n", ino, ih_p->ih_inum,
+			ih_p->ih_sysino);
 	ret = i_ddi_add_ivintr(hdlp);
 
 	/* Restore orig. interrupt handler & args in handle. */
@@ -904,8 +907,8 @@ niumx_rem_intr(dev_info_t *dip, dev_info_t *rdip,
 		goto fail1;
 	}
 	ih_p = niumx_ihtable + inos_p[hdlp->ih_inum];
-	DBG(DBG_R_INTX, dip, "removing (%x,%x,%x)\n", ih_p->ih_inum,
-			ih_p->ih_ino, ih_p->ih_sysino);
+	DBG(DBG_R_INTX, dip, "removing (%x,%x)\n", ih_p->ih_inum,
+			ih_p->ih_sysino);
 
 	/* Get the current cpu */
 	if ((hvret = hvio_intr_gettarget(ih_p->ih_sysino, &curr_cpu))
@@ -921,8 +924,6 @@ niumx_rem_intr(dev_info_t *dip, dev_info_t *rdip,
 	hdlp->ih_vector = ih_p->ih_sysino;
 	if (hdlp->ih_vector !=  NULL) i_ddi_rem_ivintr(hdlp);
 
-	/* clear out this entry */
-	ih_p->ih_ino = NULL;
 fail2:
 	kmem_free(inos_p, inoslen);
 fail1:

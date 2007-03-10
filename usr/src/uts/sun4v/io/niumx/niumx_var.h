@@ -19,12 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef	_SYS_NMX_H
-#define	_SYS_NMX_H
+#ifndef	_SYS_NIUMX_VAR_H
+#define	_SYS_NIUMX_VAR_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -66,7 +66,6 @@ typedef	uint64_t sysino_t;
 typedef struct niumx_ih {
 	dev_info_t	*ih_dip;	/* devinfo structure */
 	uint32_t	ih_inum;	/* interrupt index, from leaf */
-	devino_t	ih_ino;		/* INO number, from "interrupts" prop */
 	sysino_t	ih_sysino;	/* System virtual inumber, from HV */
 	cpuid_t		ih_cpuid;	/* cpu that ino is targeting */
 	uint_t		(*ih_hdlr)();	/* interrupt handler */
@@ -86,9 +85,6 @@ typedef struct niumx_devstate {
 #define	NIUMX_FUNC_NUM_MASK	1
 #define	NIUMX_MAX_INTRS	64
 #define	NIUMX_RSVD_INTRS	16
-
-/* currently Error Interrupt handler slot is hardcoded */
-#define	NIUMX_EI_IH 52
 
 /*
  * flags for overloading dmai_inuse field of the dma request structure:
@@ -145,4 +141,4 @@ typedef struct {
 }
 #endif
 
-#endif	/* _SYS_NMX_H */
+#endif	/* _SYS_NIUMX_VAR_H */
