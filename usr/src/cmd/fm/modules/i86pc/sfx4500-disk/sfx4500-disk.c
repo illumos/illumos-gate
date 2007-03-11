@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,9 +51,9 @@
 #include "fault_mgr.h"
 #include "hotplug_mgr.h"
 #include "schg_mgr.h"
-#include "plugin_mgr.h"
 #include "fm_disk_events.h"
 #include "topo_gather.h"
+#include "dm_platform.h"
 
 #define	THIS_FMD_MODULE_NAME "sfx4500-disk"
 
@@ -93,7 +93,6 @@ diskmon_teardown_all(void)
 	cleanup_fault_manager(config_data);
 	cleanup_hotplug_manager();
 	cleanup_state_change_manager(config_data);
-	cleanup_plugin_manager();
 	config_fini();
 }
 
@@ -121,10 +120,8 @@ diskmon_init(void)
 	 */
 	block_state_change_events();
 
-	if (init_plugin_manager() != 0)
+	if (dm_platform_init() != 0)
 		goto cleanup;
-	else
-		g_init_state |= PLUGIN_MGR_INITTED;
 
 	if (init_hotplug_manager() != 0)
 		goto cleanup;
@@ -157,8 +154,7 @@ cleanup:
 		cleanup_hotplug_manager();
 	if (g_init_state & STATE_CHANGE_MGR_INITTED)
 		cleanup_state_change_manager(config_data);
-	if (g_init_state & PLUGIN_MGR_INITTED)
-		cleanup_plugin_manager();
+	dm_platform_fini();
 
 	return (E_ERROR);
 }
@@ -197,7 +193,6 @@ dm_fault_execute_actions(diskmon_t *diskp, disk_flt_src_e fsrc)
 {
 	const char		*action_prop = NULL;
 	const char		*action_string;
-	dm_plugin_error_t	rv;
 
 	/*
 	 * The predictive failure action is the activation of the fault
@@ -221,8 +216,7 @@ dm_fault_execute_actions(diskmon_t *diskp, disk_flt_src_e fsrc)
 	    (action_string = dm_prop_lookup(diskp->props, action_prop))
 	    != NULL) {
 
-		rv = dm_pm_indicator_execute(action_string);
-		if (rv != DMPE_SUCCESS) {
+		if (dm_platform_indicator_execute(action_string) != 0) {
 			log_warn("Fault action `%s' did not successfully "
 			    "complete.\n", action_string);
 		}
@@ -390,11 +384,11 @@ diskmon_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 
 	fltclass =
 	    fmd_nvl_class_match(hdl, nvl, EREPORT_SATA_PREDFAIL) ?
-		FAULT_DISK_PREDFAIL :
+	    FAULT_DISK_PREDFAIL :
 	    fmd_nvl_class_match(hdl, nvl, EREPORT_SATA_OVERTEMP) ?
-		FAULT_DISK_OVERTEMP :
+	    FAULT_DISK_OVERTEMP :
 	    fmd_nvl_class_match(hdl, nvl, EREPORT_SATA_STFAIL) ?
-		FAULT_DISK_STFAIL : NULL;
+	    FAULT_DISK_STFAIL : NULL;
 
 	if (fltclass != NULL) {
 
@@ -432,8 +426,6 @@ static const fmd_prop_t fmd_props[] = {
 	 * OPTION_OVERTEMP_ERRS_ARE_FATAL) == 0xC
 	 */
 	{ GLOBAL_PROP_FAULT_OPTIONS, FMD_TYPE_UINT32, "0xC" },
-	{ GLOBAL_PROP_IPMI_BMC_MON, FMD_TYPE_UINT32, "1" },
-	{ GLOBAL_PROP_IPMI_ERR_INJ, FMD_TYPE_UINT32, "0" },
 	{ NULL, 0, NULL }
 };
 

@@ -139,6 +139,8 @@ f none usr/lib/libike.so.1 755 root bin
 s none usr/lib/libinetcfg.so.1=../../lib/libinetcfg.so.1
 s none usr/lib/libintl.so=../../lib/libintl.so.1
 s none usr/lib/libintl.so.1=../../lib/libintl.so.1
+f none usr/lib/libipmi.so.1 755 root bin
+s none usr/lib/libipmi.so=./libipmi.so.1
 s none usr/lib/libipmp.so=./libipmp.so.1
 f none usr/lib/libipmp.so.1 755 root bin
 s none usr/lib/libipp.so=./libipp.so.1

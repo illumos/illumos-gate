@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,7 +148,7 @@ extern "C" {
 #define	ESC_DOMAIN_LOGHOST_CHANGE	"ESC_domain_loghost_change"
 
 /*
- * EC_AP_DRIVER subclass defintions - supporting attributes (name/value pairs)
+ * EC_AP_DRIVER subclass definitions - supporting attributes (name/value pairs)
  * are found in sys/sysevent/ap_driver.h
  */
 
@@ -161,7 +161,7 @@ extern "C" {
 	"ESC_ap_driver_phys_path_status_change"
 
 /*
- * EC_IPMP subclass defintions - supporting attributes (name/value pairs)
+ * EC_IPMP subclass definitions - supporting attributes (name/value pairs)
  * are found in sys/sysevent/ipmp.h
  */
 
@@ -179,7 +179,7 @@ extern "C" {
 
 
 /*
- * EC_DEV_ADD and EC_DEV_REMOVE subclass defintions - supporting attributes
+ * EC_DEV_ADD and EC_DEV_REMOVE subclass definitions - supporting attributes
  * (name/value pairs) are found in sys/sysevent/dev.h
  */
 #define	ESC_DISK	"disk"		/* disk device */
@@ -187,7 +187,7 @@ extern "C" {
 #define	ESC_PRINTER	"printer"	/* printer device */
 
 /*
- * EC_DEV_BRANCH subclass defintions - supporting attributes (name/value pairs)
+ * EC_DEV_BRANCH subclass definitions - supporting attributes (name/value pairs)
  * are found in sys/sysevent/dev.h
  */
 
@@ -200,6 +200,10 @@ extern "C" {
 /* FMA Fault and Error event protocol subclass */
 #define	ESC_FM_ERROR		"ESC_FM_error"
 #define	ESC_FM_ERROR_REPLAY	"ESC_FM_error_replay"
+
+/* Service processor subclass definitions */
+#define	ESC_PLATFORM_SP_RESET	"ESC_platform_sp_reset"
+
 #ifdef	__cplusplus
 }
 #endif

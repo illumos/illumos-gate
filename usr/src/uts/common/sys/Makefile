@@ -48,7 +48,6 @@ i386_HDRS=			\
 	audio/audio810.h	\
 	audio/audiohd.h	\
 	audio/audioixp.h	\
-	bmc_intf.h		\
 	fd_debug.h		\
 	fdc.h			\
 	fdmedia.h		\
@@ -99,6 +98,7 @@ CHKHDRS=			\
 	bitmap.h		\
 	bitset.h		\
 	bl.h			\
+	bmc_intf.h		\
 	bofi.h			\
 	bofi_impl.h		\
 	bpp_io.h		\

@@ -330,6 +330,7 @@ COMMON_SUBDIRS = \
 	lib/libinetcfg \
 	lib/libinetsvc \
 	lib/libinetutil \
+	lib/libipmi \
 	lib/libipmp \
 	lib/libipp \
 	lib/libipsecutil \

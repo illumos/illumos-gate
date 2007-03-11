@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@
 #include "sfx4500-disk.h"
 #include "hotplug_mgr.h"
 #include "schg_mgr.h"
+#include "dm_platform.h"
 
 typedef struct sysevent_event {
 	sysevent_t	*evp;
@@ -434,15 +435,23 @@ dm_process_sysevent(sysevent_t *dupev)
 {
 	char		*class_name;
 	char		*pub;
+	char		*subclass = sysevent_get_subclass_name(dupev);
 	diskmon_t	*diskp;
 
 	class_name = sysevent_get_class_name(dupev);
 	log_msg(MM_HPMGR, "****EVENT: %s %s (by %s)\n", class_name,
-	    sysevent_get_subclass_name(dupev),
+	    subclass,
 	    ((pub = sysevent_get_pub_name(dupev)) != NULL) ? pub : "UNKNOWN");
 
 	if (pub)
 		free(pub);
+
+	if (strcmp(class_name, EC_PLATFORM) == 0 &&
+	    strcmp(subclass, ESC_PLATFORM_SP_RESET) == 0) {
+		if (dm_platform_resync() != 0)
+			log_warn("failed to resync SP platform\n");
+		return;
+	}
 
 	/*
 	 * We will handle this event if the event's target matches one of the
@@ -538,6 +547,9 @@ init_sysevents(void)
 	const char *dr_subclasses[] = {
 		ESC_DR_AP_STATE_CHANGE
 	};
+	const char *platform_subclasses[] = {
+		ESC_PLATFORM_SP_RESET
+	};
 
 	if ((sysevent_handle = sysevent_bind_handle(event_handler)) == NULL) {
 		rv = errno;
@@ -565,7 +577,19 @@ init_sysevents(void)
 		fini_sysevents();
 
 		rv = -1;
+	} else if (sysevent_subscribe_event(sysevent_handle, EC_PLATFORM,
+	    platform_subclasses, 1) != 0) {
+
+		log_err("Could not initialize the hotplug manager "
+		    "sysevent_subscribe_event(event class = EC_PLATFORM) "
+		    "failure");
+
+		/* Unsubscribe from all sysevents in the event of a failure */
+		fini_sysevents();
+
+		rv = -1;
 	}
+
 
 	return (rv);
 }

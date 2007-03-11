@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,11 +35,11 @@
 #include "sfx4500-disk.h"
 #include "schg_mgr.h"
 #include "hotplug_mgr.h"
-#include "plugin_mgr.h"
 #include "fault_mgr.h"
 #include "fault_analyze.h"
 #include "topo_gather.h"
 #include "fm_disk_events.h"
+#include "dm_platform.h"
 
 /* State-change event processing thread data */
 static pthread_t	g_schg_tid;
@@ -131,8 +131,7 @@ dm_fault_indicator_set(diskmon_t *diskp, ind_state_t istate)
 	if (astring != NULL) {
 		log_msg(MM_SCHGMGR, "Executing action `%s'\n", astring);
 
-		if (dm_pm_indicator_execute(astring)
-		    != DMPE_SUCCESS) {
+		if (dm_platform_indicator_execute(astring) != 0) {
 			log_warn("[Disk in %s] Action `%s' did not complete "
 			    "successfully.\n",
 			    diskp->location,
@@ -192,8 +191,7 @@ schg_execute_state_change_action(diskmon_t *diskp, hotplug_state_t oldstate,
 
 			log_msg(MM_SCHGMGR, "Executing action `%s'\n", astring);
 
-			if (dm_pm_indicator_execute(astring)
-			    != DMPE_SUCCESS) {
+			if (dm_platform_indicator_execute(astring) != 0) {
 				log_warn("[Disk in %s][State transition from "
 				    "%s to %s] Action `%s' did not complete "
 				    "successfully.\n",
@@ -214,7 +212,7 @@ schg_execute_state_change_action(diskmon_t *diskp, hotplug_state_t oldstate,
 }
 
 static void
-schg_send_fru_to_plugin(diskmon_t *diskp, dm_fru_t *frup)
+schg_send_fru_update(diskmon_t *diskp, dm_fru_t *frup)
 {
 	const char *action = dm_prop_lookup(diskp->props, DISK_PROP_FRUACTION);
 
@@ -224,7 +222,7 @@ schg_send_fru_to_plugin(diskmon_t *diskp, dm_fru_t *frup)
 		return;
 	}
 
-	if (dm_pm_update_fru(action, frup) != DMPE_SUCCESS) {
+	if (dm_platform_update_fru(action, frup) != 0) {
 		log_warn("Error updating FRU information for disk in %s.\n",
 		    diskp->location);
 	}
@@ -238,7 +236,7 @@ schg_update_fru_info(diskmon_t *diskp)
 		diskp->initial_configuration = B_FALSE;
 		dm_assert(pthread_mutex_lock(&diskp->fru_mutex) == 0);
 		if (diskp->frup != NULL)
-			schg_send_fru_to_plugin(diskp, diskp->frup);
+			schg_send_fru_update(diskp, diskp->frup);
 		else
 			log_warn("frup unexpectedly went away: not updating "
 			    "FRU information for disk %s!\n", diskp->location);

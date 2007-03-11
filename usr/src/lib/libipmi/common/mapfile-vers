@@ -18,22 +18,29 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+#ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = cpumem-retire		\
-	eversholt		\
-	io-retire		\
-	ip-transport		\
-	snmp-trapgen		\
-	sp-monitor		\
-	syslog-msgs		\
-	zfs-diagnosis		\
-	zfs-retire
-
-include ../../Makefile.subdirs
+SUNWprivate_1.1 {
+    global:
+	ipmi_close;
+	ipmi_errmsg;
+	ipmi_errno;
+	ipmi_get_deviceid;
+	ipmi_get_sensor_reading;
+	ipmi_open;
+	ipmi_sdr_get;
+	ipmi_sdr_lookup_fru;
+	ipmi_sdr_lookup_generic;
+	ipmi_send;
+	ipmi_set_sensor_reading;
+	ipmi_sunoem_led_get;
+	ipmi_sunoem_led_set;
+	ipmi_sunoem_update_fru;
+	ipmi_sunoem_uptime;
+    local:
+	*;
+};

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,7 +99,6 @@ typedef enum log_class {
 	MM_FLTANALYZE	= 0x0010,
 	MM_SCSI		= 0x0020,
 	MM_MAIN		= 0x0040,
-	MM_PLUGIN	= 0x0080,
 	MM_TOPO 	= 0x0100,
 	MM_ERR		= 0x0200,
 	MM_WARN		= 0x0400,

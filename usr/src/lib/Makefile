@@ -229,6 +229,7 @@ SUBDIRS += \
 	policykit	\
 	hal		\
 	libshare	\
+	libipmi		\
 	$($(MACH)_SUBDIRS)
 
 sparc_SUBDIRS= .WAIT	\
@@ -343,6 +344,7 @@ HDRSUBDIRS=		\
 	libinetcfg	\
 	libinetsvc	\
 	libinetutil	\
+	libipmi		\
 	libipmp		\
 	libipp		\
 	libiscsitgt	\

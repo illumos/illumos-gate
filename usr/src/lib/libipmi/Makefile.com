@@ -18,22 +18,41 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+#ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = cpumem-retire		\
-	eversholt		\
-	io-retire		\
-	ip-transport		\
-	snmp-trapgen		\
-	sp-monitor		\
-	syslog-msgs		\
-	zfs-diagnosis		\
-	zfs-retire
+LIBRARY=	libipmi.a
+VERS=		.1
 
-include ../../Makefile.subdirs
+OBJECTS=	ipmi_bmc.o	\
+		ipmi_misc.o	\
+		ipmi_sdr.o	\
+		ipmi_sensor.o	\
+		ipmi_sunoem.o	\
+		ipmi_util.o	\
+		libipmi.o
+
+SRCS=		$(OBJECTS:%.o:$(SRCDIR)/%c.)
+
+include ../../Makefile.lib
+
+LIBS=		$(DYNLIB) $(LINTLIB)
+
+SRCDIR=		../common
+
+INCS +=		-I$(SRCDIR)
+LDLIBS +=	-lc
+CPPFLAGS +=	$(INCS)
+
+$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
+
+.KEEP_STATE:
+
+all: $(LIBS)
+
+lint: lintcheck
+
+include ../../Makefile.targ

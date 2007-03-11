@@ -71,6 +71,8 @@ f none usr/lib/fm/fmd/plugins/ip-transport.so 555 root bin
 f none usr/lib/fm/fmd/plugins/ip-transport.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/snmp-trapgen.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/snmp-trapgen.so 555 root bin
+f none usr/lib/fm/fmd/plugins/sp-monitor.conf 644 root bin
+f none usr/lib/fm/fmd/plugins/sp-monitor.so 555 root bin
 f none usr/lib/fm/fmd/plugins/syslog-msgs.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/syslog-msgs.so 555 root bin
 f none usr/lib/fm/fmd/plugins/zfs-diagnosis.conf 644 root bin

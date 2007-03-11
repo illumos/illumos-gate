@@ -18,22 +18,16 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+#ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = cpumem-retire		\
-	eversholt		\
-	io-retire		\
-	ip-transport		\
-	snmp-trapgen		\
-	sp-monitor		\
-	syslog-msgs		\
-	zfs-diagnosis		\
-	zfs-retire
+MODULE = sp-monitor
+CLASS = common
+SRCS = sp_monitor.c
 
-include ../../Makefile.subdirs
+include ../../Makefile.plugin
+
+LDLIBS += -lipmi -lsysevent

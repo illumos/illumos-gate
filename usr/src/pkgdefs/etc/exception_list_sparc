@@ -869,6 +869,10 @@ lib/llib-ltsol				sparc
 #
 usr/include/nss.h			sparc
 #
+# bmc (IPMI) interfaces shared within ON.
+#
+usr/include/sys/bmc_intf.h		sparc
+#
 # This file is used in ON to build DSCP clients.  It is not for customers.
 #
 usr/include/libdscp.h			sparc
