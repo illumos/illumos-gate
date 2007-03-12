@@ -800,6 +800,13 @@ setup_door(target_queue_t *q, char *door_name)
 	}
 }
 
+/*ARGSUSED*/
+void
+exit_after_door_setup(int sig, siginfo_t *sip, void *v)
+{
+	exit(SMF_EXIT_OK);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -842,14 +849,6 @@ main(int argc, char **argv)
 	(void) sigignore(SIGPIPE);
 
 	/*
-	 * Look at the function lu_buserr_handler() in t10_sam.c to see the
-	 * details of why we need to handle segmentation violations.
-	 */
-	bzero(&act, sizeof (act));
-	act.sa_sigaction	= lu_buserr_handler;
-	act.sa_flags		= SA_SIGINFO;
-
-	/*
 	 * Setup memory caches
 	 */
 	if ((iscsi_cmd_cache = umem_cache_create("iSCSI conn cmds",
@@ -869,6 +868,14 @@ main(int argc, char **argv)
 		exit(SMF_EXIT_ERR_CONFIG);
 	}
 
+	/*
+	 * Look at the function lu_buserr_handler() in t10_sam.c to see the
+	 * details of why we need to handle segmentation violations.
+	 */
+	bzero(&act, sizeof (act));
+	act.sa_sigaction	= lu_buserr_handler;
+	act.sa_flags		= SA_SIGINFO;
+
 	if (sigaction(SIGBUS, &act, NULL) == -1) {
 		perror("sigaction");
 		exit(SMF_EXIT_ERR_CONFIG);
@@ -876,29 +883,6 @@ main(int argc, char **argv)
 
 	if (process_config(config_file) == False)
 		exit(SMF_EXIT_ERR_CONFIG);
-
-	if (process_target_config() == False)
-		exit(SMF_EXIT_ERR_CONFIG);
-
-	(void) tgt_find_value_boolean(main_config, XML_ELEMENT_DBGDAEMON,
-	    &daemonize);
-	if (daemonize == True) {
-		switch (fork()) {
-		case 0:
-			/* ---- I'm the daemon, continue running ---- */
-			break;
-
-		case -1:
-			/* ---- Failed to fork!. Trouble ---- */
-			exit(SMF_EXIT_ERR_CONFIG);
-
-		default:
-			exit(SMF_EXIT_OK);
-		}
-		closefrom(0);
-	}
-
-	q = queue_alloc();
 
 	/*
 	 * During the normal corse of events 'target_basedir' will be
@@ -911,6 +895,70 @@ main(int argc, char **argv)
 	 */
 	if (target_basedir == NULL)
 		target_basedir = strdup(DEFAULT_TARGET_BASEDIR);
+
+	if (process_target_config() == False)
+		exit(SMF_EXIT_ERR_CONFIG);
+
+	(void) tgt_find_value_boolean(main_config, XML_ELEMENT_DBGDAEMON,
+	    &daemonize);
+
+	q = queue_alloc();
+	if (daemonize == True) {
+		closefrom(0);
+
+		/*
+		 * Set up a signal handler to catch SIGUSR2. Once the child
+		 * has setup the door, it will signal the parent that it's
+		 * safe to exit. Without doing this it's possible that the
+		 * daemon will start and the parent exit before the child has
+		 * setup the door. If that happens 'zfs share -a iscsi' which
+		 * is run from svc-iscsitgt will fail to open the door and try
+		 * to wait for the iscsitgt service to come online. Since
+		 * the zfs command is part of the service start, the service
+		 * will not come online and we'll fail to share any ZVOLs.
+		 */
+		bzero(&act, sizeof (act));
+		act.sa_sigaction	= exit_after_door_setup;
+		act.sa_flags		= SA_SIGINFO;
+		if (sigaction(SIGUSR2, &act, NULL) == -1) {
+			perror("sigaction");
+			exit(SMF_EXIT_ERR_CONFIG);
+		}
+
+		switch (fork()) {
+		case 0:
+			/*
+			 * As the child process, setup the door and then
+			 * signal the parent that it can exit since the child
+			 * is now ready to start accepting requests on the
+			 * door.
+			 */
+			setup_door(q, door_name);
+			(void) kill(getppid(), SIGUSR2);
+			break;
+
+		case -1:
+			/* ---- Failed to fork!. Trouble ---- */
+			exit(SMF_EXIT_ERR_CONFIG);
+
+		default:
+			/*
+			 * If pause() returns with an error something
+			 * interrupted the process which was not a SIGUSR2.
+			 * Exit with an error code such that SMF can flag
+			 * this problem.
+			 */
+			if (pause() == -1)
+				exit(SMF_EXIT_ERR_CONFIG);
+		}
+	} else {
+
+		/*
+		 * The daemon is working in debug mode, so go ahead and
+		 * setup the door now.
+		 */
+		setup_door(q, door_name);
+	}
 
 	/*
 	 * Initialize the various subsystems. In most cases these are
@@ -951,7 +999,6 @@ main(int argc, char **argv)
 	port1.port_num		= iscsi_port;
 	(void) pthread_create(&junk, NULL, port_watcher, &port1);
 
-	setup_door(q, door_name);
 	if ((tgt_find_value_int(main_config, XML_ELEMENT_MGMTPORT,
 	    &port2.port_num) == True) && (port2.port_num != -1)) {
 		port2.port_mgmtq	= q;
