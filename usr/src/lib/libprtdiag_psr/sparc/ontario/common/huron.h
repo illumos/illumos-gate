@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,18 +67,16 @@ extern "C" {
 #define	HURON_USB_2		"/pci@0/pci@0/pci@1/pci@0/pci@1/pci@0/usb@1c,2"
 #define	HURON_USB_3		"/pci@0/pci@0/pci@1/pci@0/pci@1/pci@0/usb@1c,3"
 #define	HURON_IDE		"/pci@0/pci@0/pci@1/pci@0/pci@1/pci@0/ide@1f"
-#define	HURON_PCIE_SLOT1	"/pci@0/pci@0/pci@8/pci@0/pci@2"
+#define	HURON_PCIE_SLOT1	"/pci@0/pci@0/pci@8/pci@0/pci@9"
 #define	HURON_PCIE_SLOT2	"/pci@0/pci@0/pci@8/pci@0/pci@1"
-#define	HURON_PCIE_SLOT3	"/pci@0/pci@0/pci@8/pci@0/pci@8"
-#define	HURON_PCIE_SLOT4	"/pci@0/pci@0/pci@9"
-#define	HURON_PCIE_SLOT5	"/pci@0/pci@0/pci@8/pci@0/pci@a"
-#define	HURON_PCIE_SLOT6	"/pci@0/pci@0/pci@8/pci@0/pci@9"
+#define	HURON_PCIE_SLOT3	"/pci@0/pci@0/pci@9"
+#define	HURON_PCIE_SLOT4	"/pci@0/pci@0/pci@8/pci@0/pci@a"
+#define	HURON_PCIE_SLOT5	"/pci@0/pci@0/pci@8/pci@0/pci@2"
+#define	HURON_PCIE_SLOT6	"/pci@0/pci@0/pci@8/pci@0/pci@8"
 #define	HURON_LSI_PATH		"/pci@0/pci@0/pci@2/scsi@0"
 #define	HURON_N2_XAUI0		"/niu@80/network@0"
 #define	HURON_N2_XAUI1		"/niu@80/network@1"
 #define	SAS_SATA_HBA		"SAS-SATA-HBA"
-
-
 
 /*
  * Property names
