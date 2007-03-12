@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -161,6 +161,6 @@ INSTALL_DEPS_library =		$(ROOTLINKS) $(ROOTLINT) $(ROOTLIBS)
 LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
 LINTFLAGS64 +=	-erroff=E_BAD_PTR_CAST_ALIGN
 
-DYNFLAGS +=     $(ZINTERPOSE)
+DYNFLAGS +=     $(ZINTERPOSE) $(ZINITFIRST)
 
 .KEEP_STATE:
