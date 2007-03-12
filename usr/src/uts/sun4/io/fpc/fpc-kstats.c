@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,7 @@
  * they are different from the other entries in that busstat won't show them to
  * the user.
  */
-#define	DEVICE_NAME_LEN		12
+#define	DEVICE_NAME_LEN		4
 #define	PIC_STR_LEN		12
 
 /*
@@ -260,25 +260,25 @@ fpc_dev_kstat(fire_perfcnt_t reg_group, uint8_t num_inst)
 
 	switch (reg_group) {
 	case imu:
-		(void) strncpy(dev_name, "pciex_imu", sizeof (dev_name));
+		(void) strncpy(dev_name, "imu", sizeof (dev_name));
 		num_events = sizeof (fire_imu_events) / sizeof (fi_kev_mask_t);
 		fire_events = fire_imu_events;
 		num_cntrs = NUM_IMU_COUNTERS;
 		break;
 	case mmu:
-		(void) strncpy(dev_name, "pciex_mmu", sizeof (dev_name));
+		(void) strncpy(dev_name, "mmu", sizeof (dev_name));
 		num_events = sizeof (fire_mmu_events) / sizeof (fi_kev_mask_t);
 		fire_events = fire_mmu_events;
 		num_cntrs = NUM_MMU_COUNTERS;
 		break;
 	case lpu:
-		(void) strncpy(dev_name, "pciex_lpu", sizeof (dev_name));
+		(void) strncpy(dev_name, "lpu", sizeof (dev_name));
 		num_events = sizeof (fire_lpu_events) / sizeof (fi_kev_mask_t);
 		fire_events = fire_lpu_events;
 		num_cntrs = NUM_LPU_COUNTERS;
 		break;
 	case tlu:
-		(void) strncpy(dev_name, "pciex_tlu", sizeof (dev_name));
+		(void) strncpy(dev_name, "tlu", sizeof (dev_name));
 		num_events = sizeof (fire_tlu_events) / sizeof (fi_kev_mask_t);
 		num_events2 = sizeof (fire_tlu2_events) /
 					sizeof (fi_kev_mask_t);
