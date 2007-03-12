@@ -13988,78 +13988,107 @@ ip_check_and_align_header(queue_t *q, mblk_t *mp, ip_stack_t *ipst)
 	return (B_TRUE);
 }
 
-static boolean_t
-ip_rput_notforus(queue_t **qp, mblk_t *mp, ire_t *ire, ill_t *ill)
+ire_t *
+ip_check_multihome(void *addr, ire_t *ire, ill_t *ill)
 {
-	ill_group_t	*ill_group;
-	ill_group_t	*ire_group;
-	queue_t 	*q;
+	ire_t		*new_ire;
 	ill_t		*ire_ill;
-	uint_t		ill_ifindex;
-	ip_stack_t *ipst = ill->ill_ipst;
+	uint_t		ifindex;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	boolean_t	strict_check = B_FALSE;
 
-	q = *qp;
 	/*
-	 * We need to check to make sure the packet came in
-	 * on the queue associated with the destination IRE.
-	 * Note that for multicast packets and broadcast packets sent to
-	 * a broadcast address which is shared between multiple interfaces
-	 * we should not do this since we just got a random broadcast ire.
+	 * This packet came in on an interface other than the one associated
+	 * with the first ire we found for the destination address. We do
+	 * another ire lookup here, using the ingress ill, to see if the
+	 * interface is in an interface group.
+	 * As long as the ills belong to the same group, we don't consider
+	 * them to be arriving on the wrong interface. Thus, if the switch
+	 * is doing inbound load spreading, we won't drop packets when the
+	 * ip*_strict_dst_multihoming switch is on. Note, the same holds true
+	 * for 'usesrc groups' where the destination address may belong to
+	 * another interface to allow multipathing to happen.
+	 * We also need to check for IPIF_UNNUMBERED point2point interfaces
+	 * where the local address may not be unique. In this case we were
+	 * at the mercy of the initial ire cache lookup and the IRE_LOCAL it
+	 * actually returned. The new lookup, which is more specific, should
+	 * only find the IRE_LOCAL associated with the ingress ill if one
+	 * exists.
 	 */
-	if (ire->ire_rfq && ire->ire_type != IRE_BROADCAST) {
-		boolean_t check_multi = B_TRUE;
 
-		/*
-		 * This packet came in on an interface other than the
-		 * one associated with the destination address.
-		 * "Gateway" it to the appropriate interface here.
-		 * As long as the ills belong to the same group,
-		 * we don't consider them to arriving on the wrong
-		 * interface. Thus, when the switch is doing inbound
-		 * load spreading, we won't drop packets when we
-		 * are doing strict multihoming checks. Note, the
-		 * same holds true for 'usesrc groups' where the
-		 * destination address may belong to another interface
-		 * to allow multipathing to happen
-		 */
-		ill_group = ill->ill_group;
-		ire_ill = (ill_t *)(ire->ire_rfq)->q_ptr;
-		ill_ifindex = ill->ill_usesrc_ifindex;
-		ire_group = ire_ill->ill_group;
-
-		/*
-		 * If it's part of the same IPMP group, or if it's a legal
-		 * address on the 'usesrc' interface, then bypass strict
-		 * checks.
-		 */
-		if (ill_group != NULL && ill_group == ire_group) {
-			check_multi = B_FALSE;
-		} else if (ill_ifindex != 0 &&
-		    ill_ifindex == ire_ill->ill_phyint->phyint_ifindex) {
-			check_multi = B_FALSE;
-		}
-
-		if (check_multi &&
-		    ipst->ips_ip_strict_dst_multihoming &&
-		    ((ill->ill_flags &
-		    ire->ire_ipif->ipif_ill->ill_flags &
-		    ILLF_ROUTER) == 0)) {
-			/* Drop packet */
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
-			freemsg(mp);
-			return (B_TRUE);
-		}
-
-		/*
-		 * Change the queue (for non-virtual destination network
-		 * interfaces) and ip_rput_local will be called with the right
-		 * queue
-		 */
-		q = ire->ire_rfq;
+	if (ire->ire_ipversion == IPV4_VERSION) {
+		if (ipst->ips_ip_strict_dst_multihoming)
+			strict_check = B_TRUE;
+		new_ire = ire_ctable_lookup(*((ipaddr_t *)addr), 0, IRE_LOCAL,
+		    ill->ill_ipif, ALL_ZONES, NULL,
+		    (MATCH_IRE_TYPE|MATCH_IRE_ILL_GROUP), ipst);
+	} else {
+		ASSERT(!IN6_IS_ADDR_MULTICAST((in6_addr_t *)addr));
+		if (ipst->ips_ipv6_strict_dst_multihoming)
+			strict_check = B_TRUE;
+		new_ire = ire_ctable_lookup_v6((in6_addr_t *)addr, NULL,
+		    IRE_LOCAL, ill->ill_ipif, ALL_ZONES, NULL,
+		    (MATCH_IRE_TYPE|MATCH_IRE_ILL_GROUP), ipst);
 	}
-	/* Must be broadcast.  We'll take it. */
-	*qp = q;
-	return (B_FALSE);
+	/*
+	 * If the same ire that was returned in ip_input() is found then this
+	 * is an indication that interface groups are in use. The packet
+	 * arrived on a different ill in the group than the one associated with
+	 * the destination address.  If a different ire was found then the same
+	 * IP address must be hosted on multiple ills. This is possible with
+	 * unnumbered point2point interfaces. We switch to use this new ire in
+	 * order to have accurate interface statistics.
+	 */
+	if (new_ire != NULL) {
+		if ((new_ire != ire) && (new_ire->ire_rfq != NULL)) {
+			ire_refrele(ire);
+			ire = new_ire;
+		} else {
+			ire_refrele(new_ire);
+		}
+		return (ire);
+	} else if ((ire->ire_rfq == NULL) &&
+		    (ire->ire_ipversion == IPV4_VERSION)) {
+		/*
+		 * The best match could have been the original ire which
+		 * was created against an IRE_LOCAL on lo0. In the IPv4 case
+		 * the strict multihoming checks are irrelevant as we consider
+		 * local addresses hosted on lo0 to be interface agnostic. We
+		 * only expect a null ire_rfq on IREs which are associated with
+		 * lo0 hence we can return now.
+		 */
+		return (ire);
+	}
+
+	/*
+	 * Chase pointers once and store locally.
+	 */
+	ire_ill = (ire->ire_rfq == NULL) ? NULL :
+	    (ill_t *)(ire->ire_rfq->q_ptr);
+	ifindex = ill->ill_usesrc_ifindex;
+
+	/*
+	 * Check if it's a legal address on the 'usesrc' interface.
+	 */
+	if ((ifindex != 0) && (ire_ill != NULL) &&
+	    (ifindex == ire_ill->ill_phyint->phyint_ifindex)) {
+		return (ire);
+	}
+
+	/*
+	 * If the ip*_strict_dst_multihoming switch is on then we can
+	 * only accept this packet if the interface is marked as routing.
+	 */
+	if (!(strict_check))
+		return (ire);
+
+	if ((ill->ill_flags & ire->ire_ipif->ipif_ill->ill_flags &
+	    ILLF_ROUTER) != 0) {
+		return (ire);
+	}
+
+	ire_refrele(ire);
+	return (NULL);
 }
 
 ire_t *
@@ -15439,10 +15468,25 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 		}
 
 local:
-		/* packet not for us */
-		if (ire->ire_rfq != q) {
-			if (ip_rput_notforus(&q, mp, ire, ill))
+		/*
+		 * If the queue in the ire is different to the ingress queue
+		 * then we need to check to see if we can accept the packet.
+		 * Note that for multicast packets and broadcast packets sent
+		 * to a broadcast address which is shared between multiple
+		 * interfaces we should not do this since we just got a random
+		 * broadcast ire.
+		 */
+		if ((ire->ire_rfq != q) && (ire->ire_type != IRE_BROADCAST)) {
+			if ((ire = ip_check_multihome(&ipha->ipha_dst, ire,
+			    ill)) == NULL) {
+				/* Drop packet */
+				BUMP_MIB(ill->ill_ip_mib,
+				    ipIfStatsForwProhibits);
+				freemsg(mp);
 				continue;
+			}
+			if (ire->ire_rfq != NULL)
+				q = ire->ire_rfq;
 		}
 
 		switch (ipha->ipha_protocol) {

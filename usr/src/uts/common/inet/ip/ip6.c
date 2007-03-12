@@ -7245,7 +7245,6 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
     uint_t flags, mblk_t *hada_mp, mblk_t *dl_mp)
 {
 	ire_t		*ire = NULL;
-	queue_t		*rq;
 	ill_t		*ill = inill;
 	ill_t		*outill;
 	ipif_t		*ipif;
@@ -7418,7 +7417,6 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 			pr_addr_dbg("ip_rput_data_v6: multicast for us: %s\n",
 			    AF_INET6, &ip6h->ip6_dst);
 		}
-		rq = ill->ill_rq;
 		zoneid = GLOBAL_ZONEID;
 		goto ipv6forus;
 	}
@@ -7687,77 +7685,29 @@ forward:
 		IRE_REFRELE(ire);
 		return;
 	}
-	rq = ire->ire_rfq;
 
 	/*
 	 * Need to put on correct queue for reassembly to find it.
 	 * No need to use put() since reassembly has its own locks.
 	 * Note: multicast packets and packets destined to addresses
 	 * assigned to loopback (ire_rfq is NULL) will be reassembled on
-	 * the arriving ill.
+	 * the arriving ill. Unlike the IPv4 case, enabling strict
+	 * destination multihoming will prevent accepting packets
+	 * addressed to an IRE_LOCAL on lo0.
 	 */
-	if (rq != q) {
-		boolean_t check_multi = B_TRUE;
-		ill_group_t *ill_group = NULL;
-		ill_group_t *ire_group = NULL;
-		ill_t	*ire_ill = NULL;
-		uint_t	ill_ifindex = ill->ill_usesrc_ifindex;
-
-		/*
-		 * To be quicker, we may wish not to chase pointers
-		 * (ire->ire_ipif->ipif_ill...) and instead store the
-		 * forwarding policy in the ire.  An unfortunate side-
-		 * effect of this would be requiring an ire flush whenever
-		 * the ILLF_ROUTER flag changes.  For now, chase pointers
-		 * once and store in the boolean no_forward.
-		 */
-		no_forward = ((ill->ill_flags &
-		    ire->ire_ipif->ipif_ill->ill_flags & ILLF_ROUTER) == 0);
-
-		ill_group = ill->ill_group;
-		if (rq != NULL) {
-			ire_ill = (ill_t *)(rq->q_ptr);
-			ire_group = ire_ill->ill_group;
-		}
-
-		/*
-		 * If it's part of the same IPMP group, or if it's a legal
-		 * address on the 'usesrc' interface, then bypass strict
-		 * checks.
-		 */
-		if (ill_group != NULL && ill_group == ire_group) {
-			check_multi = B_FALSE;
-		} else if (ill_ifindex != 0 && ire_ill != NULL &&
-		    ill_ifindex == ire_ill->ill_phyint->phyint_ifindex) {
-			check_multi = B_FALSE;
-		}
-
-		ASSERT(!IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst));
-		if (check_multi && ipst->ips_ipv6_strict_dst_multihoming &&
-		    no_forward) {
-			/*
-			 * This packet came in on an interface other than the
-			 * one associated with the destination address
-			 * and we are strict about matches.
-			 *
-			 * As long as the ills belong to the same group,
-			 * we don't consider them to arriving on the wrong
-			 * interface. Thus, when the switch is doing inbound
-			 * load spreading, we won't drop packets when we
-			 * are doing strict multihoming checks.
-			 */
+	if (ire->ire_rfq != q) {
+		if ((ire = ip_check_multihome(&ip6h->ip6_dst, ire, ill))
+		    == NULL) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsForwProhibits);
 			freemsg(hada_mp);
 			freemsg(first_mp);
-			ire_refrele(ire);
 			return;
 		}
-
-		if (rq != NULL)
-			q = rq;
-
-		ill = (ill_t *)q->q_ptr;
-		ASSERT(ill);
+		if (ire->ire_rfq != NULL) {
+			q = ire->ire_rfq;
+			ill = (ill_t *)q->q_ptr;
+			ASSERT(ill != NULL);
+		}
 	}
 
 	zoneid = ire->ire_zoneid;
