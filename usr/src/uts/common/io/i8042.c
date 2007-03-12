@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -473,13 +473,58 @@ i8042_cleanup(struct i8042 *global)
 	return (DDI_SUCCESS);
 }
 
+#define	OBF_WAIT_COUNT 1000	/* in granules of 10uS */
+
+/*
+ * Wait for the 8042 to fill the 'output' (from 8042 to host)
+ * buffer.  If 8042 fails to fill the output buffer within an
+ * allowed time, return 1 (which means there is no data available),
+ * otherwise return 0
+ */
+static int
+i8042_wait_obf(struct i8042 *global)
+{
+	int timer = 0;
+
+	while (!(ddi_get8(global->io_handle, global->io_addr + I8042_STAT) &
+	    I8042_STAT_OUTBF)) {
+		if (++timer > OBF_WAIT_COUNT)
+			return (1);
+		drv_usecwait(10);
+	}
+	return (0);
+}
+
+/*
+ * Drain all queued bytes from the 8042.
+ * Return 0 for no error, <> 0 if there was an error.
+ */
+static int
+i8042_purge_outbuf(struct i8042 *global)
+{
+	int	i;
+
+	for (i = 0; i < MAX_JUNK_ITERATIONS; i++) {
+		if (i8042_wait_obf(global))
+			break;
+		(void) ddi_get8(global->io_handle,
+			global->io_addr + I8042_DATA);
+	}
+
+	/*
+	 * If we hit the maximum number of iterations, then there
+	 * was a serious problem (e.g. our hardware may not be
+	 * present or working properly).
+	 */
+	return (i == MAX_JUNK_ITERATIONS);
+}
+
 static int
 i8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	struct i8042_port	*port;
 	enum i8042_ports	which_port;
 	int			i;
-	unsigned char		stat;
 	static ddi_device_acc_attr_t attr = {
 		DDI_DEVICE_ATTR_V0,
 		DDI_NEVERSWAP_ACC,
@@ -632,21 +677,7 @@ i8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	global->init_state &= ~I8042_INIT_INTRS_ENABLED;
 
 	/* Discard any junk data that may have been left around */
-	for (i = 0; i < MAX_JUNK_ITERATIONS; i++) {
-		stat = ddi_get8(global->io_handle,
-			global->io_addr + I8042_STAT);
-		if (! (stat & I8042_STAT_OUTBF))
-			break;
-		(void) ddi_get8(global->io_handle,
-			global->io_addr + I8042_DATA);
-	}
-
-	/*
-	 * If we hit the maximum number of iterations, then there
-	 * was a serious problem (e.g. our hardware may not be
-	 * present or working properly).
-	 */
-	if (i == MAX_JUNK_ITERATIONS)
+	if (i8042_purge_outbuf(global) != 0)
 		goto fail;
 
 	/*
@@ -676,7 +707,6 @@ i8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Enable the main and aux data ports and interrupts
 	 */
 	i8042_write_command_byte(global, I8042_CMD_ENABLE_ALL);
-
 	global->init_state |= I8042_INIT_INTRS_ENABLED;
 
 #ifdef __sparc
