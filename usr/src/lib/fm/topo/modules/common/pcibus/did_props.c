@@ -425,8 +425,11 @@ FRU_fmri_hack(topo_mod_t *mp, tnode_t *tn, const char *label)
 	while (pnode != NULL) {
 		if (topo_node_label(pnode, &plabel, &err) < 0)
 			break;
-		if (strcmp(plabel, label) != 0)
+		if (strcmp(plabel, label) != 0) {
+			topo_mod_strfree(mp, plabel);
 			break;
+		}
+		topo_mod_strfree(mp, plabel);
 		cnode = pnode;
 		pnode = pnode->tn_parent;
 	}
