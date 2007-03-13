@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -319,6 +319,7 @@ dr_pre_attach_cpu(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 	 * devinfo tree branches
 	 */
 	dr_lock_status(hp->h_bd);
+	ndi_devi_enter(ddi_root_node(), (int *)(&hp->h_ndi));
 	mutex_enter(&cpu_lock);
 
 	return (0);
@@ -368,7 +369,6 @@ dr_post_attach_cpu(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 	static fn_t	f = "dr_post_attach_cpu";
 
 	PR_CPU("%s...\n", f);
-	hp->h_ndi = 0;
 
 	/* Startup and online newly-attached CPUs */
 	for (i = 0; i < devnum; i++) {
@@ -404,6 +404,7 @@ dr_post_attach_cpu(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 	}
 
 	mutex_exit(&cpu_lock);
+	ndi_devi_exit(ddi_root_node(), hp->h_ndi);
 	dr_unlock_status(hp->h_bd);
 
 	if (errflag)
