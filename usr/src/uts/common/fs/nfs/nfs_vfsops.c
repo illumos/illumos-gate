@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
@@ -1445,6 +1445,8 @@ nfs_root(vfs_t *vfsp, vnode_t **vpp)
 	mntinfo_t *mi;
 	vnode_t *vp;
 	servinfo_t *svp;
+	rnode_t *rp;
+	int error = 0;
 
 	mi = VFTOMI(vfsp);
 
@@ -1456,15 +1458,25 @@ nfs_root(vfs_t *vfsp, vnode_t **vpp)
 		mutex_enter(&svp->sv_lock);
 		svp->sv_flags &= ~SV_ROOT_STALE;
 		mutex_exit(&svp->sv_lock);
-		return (ENOENT);
+		error = ENOENT;
 	}
 
 	vp = makenfsnode((fhandle_t *)mi->mi_curr_serv->sv_fhandle.fh_buf,
 	    NULL, vfsp, gethrtime(), CRED(), NULL, NULL);
 
-	if (VTOR(vp)->r_flags & RSTALE) {
+	/*
+	 * if the SV_ROOT_STALE flag was reset above, reset the
+	 * RSTALE flag if needed and return an error
+	 */
+	if (error == ENOENT) {
+		rp = VTOR(vp);
+		if (svp && rp->r_flags & RSTALE) {
+			mutex_enter(&rp->r_statelock);
+			rp->r_flags &= ~RSTALE;
+			mutex_exit(&rp->r_statelock);
+		}
 		VN_RELE(vp);
-		return (ENOENT);
+		return (error);
 	}
 
 	ASSERT(vp->v_type == VNON || vp->v_type == mi->mi_type);
