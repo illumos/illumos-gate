@@ -412,6 +412,9 @@ PSARC 2002/762: RULE W3: lib/amd64/libtsol.so.2
 PSARC 2005/204: RULE W3: usr/lib/libraidcfg.so.1
 PSARC 2005/204: RULE W3: usr/lib/amd64/libraidcfg.so.1
 PSARC 2005/204: RULE W3: usr/lib/sparcv9/libraidcfg.so.1
+6518277: RULE W3: usr/lib/libipmi.so.1
+6518277: RULE W3: usr/lib/amd64/libipmi.so.1
+6518277: RULE W3: usr/lib/sparcv9/libipmi.so.1
  
 #############################################
 # WARNINGs exempted from RULE W4 (See RULES section of intf_check manpage) 
