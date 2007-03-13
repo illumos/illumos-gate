@@ -2925,7 +2925,7 @@ ldc_up(ldc_handle_t handle)
 	int 		rv;
 	ldc_chan_t 	*ldcp;
 	ldc_msg_t 	*ldcmsg;
-	uint64_t 	tx_tail, tstate;
+	uint64_t 	tx_tail, tstate, link_state;
 
 	if (handle == NULL) {
 		DWARN(DBG_ALL_LDCS, "ldc_up: invalid channel handle\n");
@@ -2985,6 +2985,9 @@ ldc_up(ldc_handle_t handle)
 
 	mutex_enter(&ldcp->tx_lock);
 
+	/* save current link state */
+	link_state = ldcp->link_state;
+
 	/* get the current tail for the LDC msg */
 	rv = i_ldc_get_tx_tail(ldcp, &tx_tail);
 	if (rv) {
@@ -2993,6 +2996,30 @@ ldc_up(ldc_handle_t handle)
 		mutex_exit(&ldcp->tx_lock);
 		mutex_exit(&ldcp->lock);
 		return (ECONNREFUSED);
+	}
+
+	/*
+	 * If i_ldc_get_tx_tail() changed link_state to either RESET or UP,
+	 * from a previous state of DOWN, then mark the channel as
+	 * being ready for handshake.
+	 */
+	if ((link_state == LDC_CHANNEL_DOWN) &&
+	    (link_state != ldcp->link_state)) {
+
+		ASSERT((ldcp->link_state == LDC_CHANNEL_RESET) ||
+		    (ldcp->link_state == LDC_CHANNEL_UP));
+
+		if (ldcp->mode == LDC_MODE_RAW) {
+			ldcp->status = LDC_UP;
+			ldcp->tstate = TS_UP;
+			mutex_exit(&ldcp->tx_lock);
+			mutex_exit(&ldcp->lock);
+			return (0);
+		} else {
+			ldcp->status = LDC_READY;
+			ldcp->tstate |= TS_LINK_READY;
+		}
+
 	}
 
 	ldcmsg = (ldc_msg_t *)(ldcp->tx_q_va + tx_tail);
