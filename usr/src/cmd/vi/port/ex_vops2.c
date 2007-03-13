@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,10 +55,18 @@ extern size_t strlcpy(char *, const char *, size_t);
 extern unsigned char	*vUA1, *vUA2;		/* extern; also in ex_vops.c */
 extern unsigned char	*vUD1, *vUD2;		/* extern; also in ex_vops.c */
 
+#ifdef XPG6
+/* XPG6 assertion 313 & 254 [count]r\n :  Also used in ex_vmain.c */
+extern int redisplay;
+#endif
+
 int vmaxrep(unsigned char, int);
 static void imultlinerep(int, line *, int, int);
 static void omultlinerep(int, line *, int);
-static void fixdisplay(void);
+#ifdef XPG6
+static void rmultlinerep(int, int);
+#endif
+void fixdisplay(void);
 
 /*
  * Obleeperate characters in hardcopy
@@ -92,6 +99,14 @@ vdcMID(void)
 	if (wcursor < cursor)
 		cp = wcursor, wcursor = cursor, cursor = cp;
 	vUD1 = vUA1 = vUA2 = cursor; vUD2 = wcursor;
+	/*
+	 * XPG6 assertion 273: Set vmcurs so that undo positions the
+	 * cursor column correctly when we've moved off the initial line
+	 * that was changed, as with the C, c, and s commands,
+	 * when G has moved us off the line, or when a
+	 * multi-line change was done.
+	 */
+	fixundo();
 	return (lcolumn(wcursor));
 }
 
@@ -207,6 +222,10 @@ vappend(int ch, int cnt, int indent)
 		(void) vmove();
 		*gcursor = i;
 	}
+	/*
+	 * If vrep() passed indent = 0, this is the 'r' command,
+	 * so don't autoindent until the last char.
+	 */
 	vaifirst = indent == 0;
 
 	/*
@@ -402,11 +421,23 @@ vappend(int ch, int cnt, int indent)
 			escape = 0;
 		else {
 			ixlatctl(1);
+			/*
+			 * When vgetline() returns, gcursor is
+			 * pointing to '\0' and vgetline() has
+			 * read an ESCAPE or NL.
+			 */
 			gcursor = vgetline(repcnt, gcursor, &escape, ch);
-
-			/* vgetline() only returns when it got ESCAPE or NL */
 			if (escape == '\n') {
 				gotNL = 1;
+#ifdef XPG6
+				if (ch == 'r') {
+					/*
+					 * XPG6 assertion 313 [count]r\n :
+					 * Arrange to set cursor correctly.
+					 */
+					endsrccol = gcursor - genbuf - 1;
+				}
+#endif /* XPG6 */
 			} else {
 				/*
 				 * Upon escape, gcursor is pointing to '\0'
@@ -442,7 +473,7 @@ vappend(int ch, int cnt, int indent)
 		/*
 		 * Smash the generated and preexisting indents together
 		 * and generate one cleanly made out of tabs and spaces
-		 * if we are using autoindent.
+		 * if we are using autoindent and this isn't 'r' command.
 		 */
 		if (!vaifirst && value(vi_AUTOINDENT)) {
 			i = fixindent(indent);
@@ -468,8 +499,18 @@ vappend(int ch, int cnt, int indent)
 		 * in linebuf.
 		 */
 		cnt = vmaxrep(ch, cnt);
+		/*
+		 * cursor points to linebuf
+		 * Copy remaining old text (cursor) in original
+		 * line to after new text (gcursor + 1) in genbuf.
+		 */
 		CP(gcursor + 1, cursor);
+		/*
+		 * For [count] r \n command, when replacing [count] chars
+		 * with '\n', this loop replaces [count] chars with "".
+		 */
 		do {
+			/* cp new text (genbuf) into linebuf (cursor) */
 			CP(cursor, genbuf);
 			if (cnt > 1) {
 				int oldhold = hold;
@@ -480,16 +521,19 @@ vappend(int ch, int cnt, int indent)
 				hold = oldhold;
 				Outchar = vputchar;
 			}
+			/* point cursor after new text in linebuf */
 			cursor += gcursor - genbuf;
 		} while (--cnt > 0);
 		endim();
 		vUA2 = cursor;
+		/* add the remaining old text after the cursor */
 		if (escape != '\n')
 			CP(cursor, gcursor + 1);
 
 		/*
 		 * If doomed characters remain, clobber them,
 		 * and reopen the line to get the display exact.
+		 * eg. c$ to change to end of line
 		 */
 		if (state != HARDOPEN) {
 			DEPTH(vcline) = 0;
@@ -514,7 +558,9 @@ vappend(int ch, int cnt, int indent)
 		}
 
 		/*
-		 * All done unless we are continuing on to another line.
+		 * Unless we are continuing on to another line
+		 * (got a NL), break out of the for loop (got
+		 * an ESCAPE).
 		 */
 		if (escape != '\n') {
 			vshowmode("");
@@ -529,6 +575,7 @@ vappend(int ch, int cnt, int indent)
 		 */
 		killU();
 		addtext(gobblebl ? " " : "\n");
+		/* save vutmp (for undo state) into temp file */
 		vsave();
 		cnt = 1;
 		if (value(vi_AUTOINDENT)) {
@@ -545,6 +592,11 @@ vappend(int ch, int cnt, int indent)
 				gcursor = genbuf;
 			CP(gcursor, linebuf);
 		} else {
+			/*
+			 * Put gcursor at start of genbuf to wipe
+			 * out previous line in preparation for
+			 * the next vgetline() loop.
+			 */
 			CP(genbuf, gcursor + 1);
 			gcursor = genbuf;
 		}
@@ -562,7 +614,8 @@ vappend(int ch, int cnt, int indent)
 
 		/*
 		 * Now do the append of the new line in the buffer,
-		 * and update the display.  If slowopen
+		 * and update the display, ie: append genbuf to
+		 * the file after dot.  If slowopen
 		 * we don't do very much.
 		 */
 		vdoappend(genbuf);
@@ -631,6 +684,7 @@ vappend(int ch, int cnt, int indent)
 			}
 		}
 		strcLIN(gcursor);
+		/* zero genbuf */
 		*gcursor = 0;
 		cursor = linebuf;
 		vgotoCL(nqcolumn(cursor - 1, genbuf));
@@ -640,6 +694,15 @@ vappend(int ch, int cnt, int indent)
 		imultlinerep(savecnt, startsrcline, startsrccol, endsrccol);
 	} else if (omultlinecnt) {
 		omultlinerep(savecnt, startsrcline, endsrccol);
+#ifdef XPG6
+	} else if (savecnt > 1 && ch == 'r' && gotNL) {
+		/*
+		 * XPG6 assertion 313 & 254 : Position cursor for [count]r\n
+		 * then insert [count -1] newlines.
+		 */
+		endsrccol = gcursor - genbuf - 1;
+		rmultlinerep(savecnt, endsrccol);
+#endif /* XPG6 */
 	}
 
 	/*
@@ -649,8 +712,32 @@ vappend(int ch, int cnt, int indent)
 	hold = oldhold;
 	if ((imultlinecnt && gotNL) || omultlinecnt) {
 		fixdisplay();
+#ifdef XPG6
+	} else if (savecnt > 1 && ch == 'r' && gotNL) {
+		fixdisplay();
+		/*
+		 * XPG6 assertion 313 & 254 [count]r\n : Set flag to call
+		 * fixdisplay() after operate() has finished.  To be sure that
+		 * the text (after the last \n followed by an indent) is always
+		 * displayed, fixdisplay() is called right before getting
+		 * the next command.
+		 */
+		redisplay = 1;
+#endif /* XPG6 */
 	} else if (cursor > linebuf) {
 		cursor = lastchr(linebuf, cursor);
+#ifdef XPG6
+		/*
+		 * XPG6 assertion 313 & 254 [count]r\n :
+		 * For 'r' command, when the replacement char causes new
+		 * lines to be created, point cursor to first non-blank.
+		 * The old code, ie: cursor = lastchr(linebuf, cursor);
+		 * set cursor to the blank before the first non-blank
+		 * for r\n
+		 */
+		if (ch == 'r' && gotNL && isblank((int)*cursor))
+			++cursor;
+#endif /* XPG6 */
 	}
 	if (state != HARDOPEN)
 		vsyncCL();
@@ -763,12 +850,55 @@ omultlinerep(int savecnt, line *startsrcline, int endsrccol)
 	cursor = linebuf + endsrccol;
 }
 
+#ifdef XPG6
+/*
+ * XPG6 assertion 313 & 254 : To repeat '\n' for [count]r\n
+ * insert '\n' savecnt-1 more times before the already added '\n'.
+ */
+
+static void
+rmultlinerep(int savecnt, int endsrccol)
+{
+	int tmpcnt = 2;	/* 1st replacement counts as 1 repeat */
+
+	/* Save linebuf into temp file before moving off the line. */
+	vsave();
+	/*
+	 * At this point the temp file contains the line followed by '\n',
+	 * which is preceded by indentation if autoindent is set.
+	 * '\n' must be repeated [savecnt - 1] more times in the temp file.
+	 * dot is the current line containing the '\n'.  Decrement dot so that
+	 * vdoappend() will append each '\n' before the current '\n'.
+	 * This will allow only the last line to contain any autoindent
+	 * characters.
+	 */
+	--dot;
+	--vcline;
+
+	/*
+	 * Append after dot.
+	 */
+	while (tmpcnt <= savecnt) {
+		linebuf[0] = '\0';
+		/* append linebuf below current line in temp file */
+		vdoappend(linebuf);
+		vcline++;
+		++tmpcnt;
+	}
+	/* set the current line to the line after the last '\n' */
+	++dot;
+	++vcline;
+	/* point cursor after (linebuf + endsrccol) */
+	vcursaft(linebuf + endsrccol);
+}
+#endif /* XPG6 */
+
 /*
  * Similiar to a ctrl-l, however always vrepaint() in case the last line
  * of the repeat would exceed the bottom of the screen.
  */
 
-static void
+void
 fixdisplay(void)
 {
 	vclear();

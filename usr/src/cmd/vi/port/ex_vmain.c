@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +57,9 @@
 
 extern int windowchg;
 extern int sigok;
+#ifdef XPG6
+int redisplay;	/* XPG6 assertion 313 [count]r\n :  Also used in ex_vops2.c */
+#endif
 void redraw(), windowinit();
 
 #ifdef XPG4
@@ -149,6 +151,13 @@ vmain(void)
 		} else if(windowchg)
 			redraw();
 
+#ifdef XPG6
+		if (redisplay) {
+			/* XPG6 assertion 313 & 254 : after [count]r\n */
+			fixdisplay();
+		}
+		redisplay = 0;
+#endif
 		/*
 		 * Gobble up counts and named buffer specifications.
 		 */
@@ -1355,7 +1364,17 @@ vremote(cnt, f, arg)
 	inglobal = oing;
 	if (FIXUNDO)
 		vundkind = VMANY;
-	vmcurs = 0;
+	/*
+	 * XPG6 assertion 273: For the following commands, don't set vmcurs
+	 * to 0, so that undo positions the cursor column correctly when
+	 * we've moved off the initial line that was changed eg. when G has
+	 * moved us off the line, or when a multi-line change was done.
+	 */
+	if (lastcmd[0] != 'C' && lastcmd[0] != 'c' && lastcmd[0] != 'o' &&
+	    lastcmd[0] != 'R' && lastcmd[0] != 'S' && lastcmd[0] != 's' &&
+	    lastcmd[0] != 'i' && lastcmd[0] != 'a' && lastcmd[0] != 'A') {
+		vmcurs = 0;
+	}
 }
 
 /*

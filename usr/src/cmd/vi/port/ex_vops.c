@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +34,8 @@
 #include "ex.h"
 #include "ex_tty.h"
 #include "ex_vis.h"
+
+void fixundo(void);
 
 /*
  * This file defines the operation sequences which interface the
@@ -319,8 +320,18 @@ bool fromvis;
 void
 vnoapp(void)
 {
-
 	vUD1 = vUD2 = cursor;
+	/*
+	 * XPG6 assertion 273: Set vmcurs so that undo positions the
+	 * cursor column correctly when we've moved off the initial
+	 * line that was changed with the A, a, i, and R commands,
+	 * eg: when G has moved us off the line, or when a
+	 * multi-line change was done.
+	 */
+	if (lastcmd[0] == 'A' || lastcmd[0] == 'a' || lastcmd[0] == 'i' ||
+	    lastcmd[0] == 'R') {
+		vmcurs = cursor;
+	}
 }
 
 /*
@@ -588,6 +599,11 @@ vchange(unsigned char c)
 		 * after a S command.
 		 */
 		if (ind >= 0) {
+			/*
+			 * XPG6 assertion 273: Set vmcurs so that cursor
+			 * column will be set by undo.
+			 */
+			fixundo();
 			*genindent(ind) = 0;
 			vdoappend(genbuf);
 		} else {
@@ -620,10 +636,22 @@ vchange(unsigned char c)
 		if (c != 'd') {
 			if (ind >= 0) {
 				cursor = linebuf;
+				/*
+				 * XPG6 assertion 273: Set vmcurs so that
+				 * cursor column will be set by undo.  When
+				 * undo is preceded by 'S' or 'O' command,
+				 * white space isn't skipped in vnline(vmcurs).
+				 */
+				fixundo();
 				linebuf[0] = 0;
 				vfixcurs();
 			} else {
 				ind = 0;
+				/*
+				 * XPG6 assertion 273: Set vmcurs so that
+				 * cursor column will be set by undo.
+				 */
+				fixundo();
 				vcursat(cursor);
 			}
 			vappend('x', 1, ind);
@@ -670,6 +698,11 @@ smallchange:
 	cursor = cp;
 	setDEL();
 	CP(cursor, wcursor);
+	/*
+	 * XPG6 assertion 273: Set vmcurs so that cursor column will be
+	 * set by undo.
+	 */
+	fixundo();
 	if (state != HARDOPEN) {
 		/* place cursor at beginning of changing text */
 		vgotoCL(lcolumn(cp));
@@ -741,6 +774,12 @@ voOpen(int c, int cnt)
 	else
 		vsync1(LINE(vcline));
 	cursor = linebuf;
+	/*
+	 * XPG6 assertion 273: Set vmcurs so that cursor column will be
+	 * set by undo.  For undo preceded by 'o' command, white space
+	 * isn't skipped in vnline(vmcurs).
+	 */
+	fixundo();
 	linebuf[0] = 0;
 	vappend('o', cnt, ind);
 }
@@ -897,7 +936,8 @@ xdw(void)
 	 *			necessitating some optimization.
 	 */
 	vreg = 0;
-	if (any(op, "cd")) {
+	/* XPG6 assertion 194 and 264: use numeric buffers for 'C' and 'S' */
+	if (any(op, (unsigned char *)"cdCS")) {
 		vremote(cnt, YANKreg, '1');
 /*
 		if (notp)
@@ -928,6 +968,7 @@ vrep(int cnt)
 	int i, c;
 	unsigned char *endcurs;
 	endcurs = cursor;
+	/* point endcurs to last char entered */
 	for(i = 1; i <= cnt; i++) {
 		if(!*endcurs) {
 			(void) beep();
@@ -950,6 +991,7 @@ vrep(int cnt)
 	else
 		vshowmode(gettext("REPLACE 1 CHAR"));
 	if (!vglobp) {
+		/* get a key using getkey() */
 		c = getesc();
 		if (c == 0) {
 			vshowmode("");
@@ -964,6 +1006,7 @@ vrep(int cnt)
 	wcursor = endcurs;
 	vUD1 = cursor; vUD2 = wcursor;
 	CP(cursor, wcursor);
+	/* before appending lines, set addr1 and undo information */
 	prepapp();
 	vappend('r', cnt, 0);
 	*lastcp++ = INS[0];
@@ -1022,5 +1065,18 @@ setpk(void)
 	if (wcursor) {
 		pkill[0] = cursor;
 		pkill[1] = wcursor;
+	}
+}
+
+/*
+ * XPG6 assertion 273 : If the command is C, c, o, R, S, or s, set vmcurs
+ * so that the cursor column will be set by undo.
+ */
+void
+fixundo(void)
+{
+	if (lastcmd[0] == 'C' || lastcmd[0] == 'c' || lastcmd[0] == 'o' ||
+	    lastcmd[0] == 'R' || lastcmd[0] == 'S' || lastcmd[0] == 's') {
+		vmcurs = cursor;
 	}
 }
