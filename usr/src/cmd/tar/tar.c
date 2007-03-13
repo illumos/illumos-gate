@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -396,7 +396,7 @@ static void check_prefix(char **namep, char **dirp, char **compp);
 static void closevol(void);
 static void copy(void *dst, void *src);
 static int convtoreg(off_t);
-static void delete_target(int fd, char *namep);
+static void delete_target(int fd, char *comp, char *namep);
 static void doDirTimes(char *name, timestruc_t modTime);
 static void done(int n);
 static void dorep(char *argv[]);
@@ -2906,7 +2906,7 @@ doxtract(char *argv[])
 		}
 		if (dblock.dbuf.typeflag == '0' ||
 		    dblock.dbuf.typeflag == NULL || convflag) {
-			delete_target(dirfd, comp);
+			delete_target(dirfd, comp, namep);
 			linkp = templink;
 			if (*linkp != NULL) {
 				if (Aflag && *linkp == '/')
@@ -5621,20 +5621,20 @@ setPathTimes(int dirfd, char *path, timestruc_t modTime)
  */
 
 static void
-delete_target(int fd, char *namep)
+delete_target(int fd, char *comp, char *namep)
 {
 	struct	stat	xtractbuf;
 	char buf[PATH_MAX + 1];
 	int n;
 
 
-	if (unlinkat(fd, namep, AT_REMOVEDIR) < 0) {
+	if (unlinkat(fd, comp, AT_REMOVEDIR) < 0) {
 		if (errno == ENOTDIR && !hflag) {
-			(void) unlinkat(fd, namep, 0);
+			(void) unlinkat(fd, comp, 0);
 		} else if (errno == ENOTDIR && hflag) {
 			if (!lstat(namep, &xtractbuf)) {
 				if ((xtractbuf.st_mode & S_IFMT) != S_IFLNK) {
-					(void) unlinkat(fd, namep, 0);
+					(void) unlinkat(fd, comp, 0);
 				} else if ((n = readlink(namep, buf,
 				    PATH_MAX)) != -1) {
 					buf[n] = (char)NULL;
@@ -5643,10 +5643,10 @@ delete_target(int fd, char *namep)
 					if (errno == ENOTDIR)
 						(void) unlinkat(fd, buf, 0);
 				} else {
-					(void) unlinkat(fd, namep, 0);
+					(void) unlinkat(fd, comp, 0);
 				}
 			} else {
-				(void) unlinkat(fd, namep, 0);
+				(void) unlinkat(fd, comp, 0);
 			}
 		}
 	}
