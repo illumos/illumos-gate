@@ -126,6 +126,19 @@ typedef struct di_lnode *di_lnode_t; /* opaque handle to endpoint */
 #define	DI_PROM_HANDLE_NIL	NULL
 #define	DI_PATH_NIL	NULL
 
+/*
+ * IEEE 1275 properties and other standardized property names
+ */
+#define	DI_PROP_FIRST_CHAS	"first-in-chassis"
+#define	DI_PROP_SLOT_NAMES	"slot-names"
+#define	DI_PROP_PHYS_SLOT	"physical-slot#"
+#define	DI_PROP_DEV_TYPE	"device_type"
+#define	DI_PROP_BUS_RANGE	"bus-range"
+#define	DI_PROP_SERID		"serialid#"
+#define	DI_PROP_REG		"reg"
+#define	DI_PROP_AP_NAMES	"ap-names"
+
+
 /* Interface Prototypes */
 
 /*
@@ -266,6 +279,30 @@ extern int di_prom_prop_lookup_bytes(di_prom_handle_t prom, di_node_t node,
  * Applications and drivers using these interfaces will fail
  * to run on future releases.
  */
+
+extern di_prop_t di_prop_find(dev_t match_dev, di_node_t node,
+    const char *name);
+
+/*
+ * Interfaces for handling IEEE 1275 and other standardized properties
+ */
+
+/* structure for a single slot */
+typedef struct di_slot_name {
+	int num;	/* corresponding pci device number */
+	char *name;
+} di_slot_name_t;
+
+extern void di_slot_names_free(int count, di_slot_name_t *slot_names);
+extern int di_slot_names_decode(uchar_t *rawdata, int rawlen,
+    di_slot_name_t **prop_data);
+extern int di_prop_slot_names(di_prop_t prop, di_slot_name_t **prop_data);
+extern int di_prom_prop_slot_names(di_prom_prop_t prom_prop,
+    di_slot_name_t **prop_data);
+extern int di_prop_lookup_slot_names(dev_t dev, di_node_t node,
+    di_slot_name_t **prop_data);
+extern int di_prom_prop_lookup_slot_names(di_prom_handle_t ph, di_node_t node,
+    di_slot_name_t **prop_data);
 
 /*
  * Interfaces for accessing I/O multipathing data

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,8 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1488,6 +1486,31 @@ di_prop_search(dev_t match_dev, di_node_t node, const char *name,
 	return (DI_PROP_NIL);
 }
 
+di_prop_t
+di_prop_find(dev_t match_dev, di_node_t node, const char *name)
+{
+	di_prop_t prop = DI_PROP_NIL;
+
+	if ((node == DI_NODE_NIL) || (name == NULL) || (strlen(name) == 0) ||
+	    (match_dev == DDI_DEV_T_NONE)) {
+		errno = EINVAL;
+		return (DI_PROP_NIL);
+	}
+
+	while ((prop = di_prop_next(node, prop)) != DI_PROP_NIL) {
+		DPRINTF((DI_TRACE1, "found prop name %s, devt 0x%lx, type %d\n",
+		    di_prop_name(prop), di_prop_devt(prop),
+		    di_prop_type(prop)));
+
+		if (strcmp(name, di_prop_name(prop)) == 0 &&
+		    (match_dev == DDI_DEV_T_ANY ||
+		    di_prop_devt(prop) == match_dev))
+			return (prop);
+	}
+
+	return (DI_PROP_NIL);
+}
+
 int
 di_prop_lookup_ints(dev_t dev, di_node_t node, const char *prop_name,
 	int **prop_data)
@@ -2686,6 +2709,98 @@ di_prom_prop_lookup_bytes(di_prom_handle_t ph, di_node_t node,
 	*prom_prop_data = prop->data;
 
 	return (len);
+}
+
+/*
+ * returns an allocated array through <prop_data> only when its count > 0
+ * and the number of entries (count) as the function return value;
+ * use di_slot_names_free() to free the array
+ */
+int
+di_prop_slot_names(di_prop_t prop, di_slot_name_t **prop_data)
+{
+	int rawlen, count;
+	uchar_t *rawdata;
+	char *nm = di_prop_name(prop);
+
+	if (nm == NULL || strcmp(DI_PROP_SLOT_NAMES, nm) != 0)
+		goto ERROUT;
+
+	rawlen = di_prop_rawdata(prop, &rawdata);
+	if (rawlen <= 0 || rawdata == NULL)
+		goto ERROUT;
+
+	count = di_slot_names_decode(rawdata, rawlen, prop_data);
+	if (count < 0 || *prop_data == NULL)
+		goto ERROUT;
+
+	return (count);
+	/*NOTREACHED*/
+ERROUT:
+	errno = EFAULT;
+	*prop_data = NULL;
+	return (-1);
+}
+
+int
+di_prop_lookup_slot_names(dev_t dev, di_node_t node,
+    di_slot_name_t **prop_data)
+{
+	di_prop_t prop;
+
+	/*
+	 * change this if and when DI_PROP_TYPE_COMPOSITE is implemented
+	 * and slot-names is properly flagged as such
+	 */
+	if ((prop = di_prop_find(dev, node, DI_PROP_SLOT_NAMES)) ==
+	    DI_PROP_NIL) {
+		*prop_data = NULL;
+		return (-1);
+	}
+
+	return (di_prop_slot_names(prop, (void *)prop_data));
+}
+
+/*
+ * returns an allocated array through <prop_data> only when its count > 0
+ * and the number of entries (count) as the function return value;
+ * use di_slot_names_free() to free the array
+ */
+int
+di_prom_prop_slot_names(di_prom_prop_t prom_prop, di_slot_name_t **prop_data)
+{
+	int rawlen, count;
+	uchar_t *rawdata;
+
+	rawlen = di_prom_prop_data(prom_prop, &rawdata);
+	if (rawlen <= 0 || rawdata == NULL)
+		goto ERROUT;
+
+	count = di_slot_names_decode(rawdata, rawlen, prop_data);
+	if (count < 0 || *prop_data == NULL)
+		goto ERROUT;
+
+	return (count);
+	/*NOTREACHED*/
+ERROUT:
+	errno = EFAULT;
+	*prop_data = NULL;
+	return (-1);
+}
+
+int
+di_prom_prop_lookup_slot_names(di_prom_handle_t ph, di_node_t node,
+    di_slot_name_t **prop_data)
+{
+	struct di_prom_prop *prom_prop;
+
+	prom_prop = di_prom_prop_lookup_common(ph, node, DI_PROP_SLOT_NAMES);
+	if (prom_prop == NULL) {
+		*prop_data = NULL;
+		return (-1);
+	}
+
+	return (di_prom_prop_slot_names(prom_prop, prop_data));
 }
 
 di_lnode_t

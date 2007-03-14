@@ -88,6 +88,8 @@ static int	di_propall_lookup_ints(di_prom_handle_t, int,
 static int	di_propall_lookup_strings(di_prom_handle_t, int,
 		    dev_t, di_node_t, const char *, char **);
 static int 	serid_printable(uint64_t *seridp);
+static int	di_propall_lookup_slot_names(di_prom_handle_t, int,
+		    dev_t, di_node_t, di_slot_name_t **);
 
 
 /*
@@ -399,7 +401,7 @@ pci_cfg_chassis_node(di_node_t node, di_prom_handle_t ph)
 
 	do {
 		if (di_propall_lookup_ints(ph, 0, DDI_DEV_T_ANY, curnode,
-		    PROP_FIRST_CHAS, &firstchas) >= 0)
+		    DI_PROP_FIRST_CHAS, &firstchas) >= 0)
 			return (curnode);
 	} while ((curnode = di_parent_node(curnode)) != DI_NODE_NIL);
 
@@ -407,18 +409,28 @@ pci_cfg_chassis_node(di_node_t node, di_prom_handle_t ph)
 }
 
 
+static int
+di_propall_lookup_slot_names(di_prom_handle_t ph, int flags,
+    dev_t dev, di_node_t node, di_slot_name_t **prop_data)
+{
+	int rv;
+
+	if (flags & DIPROP_PRI_PROM) {
+		rv = di_prom_prop_lookup_slot_names(ph, node, prop_data);
+		if (rv < 0)
+			rv = di_prop_lookup_slot_names(dev, node, prop_data);
+	} else {
+		rv = di_prop_lookup_slot_names(dev, node, prop_data);
+		if (rv < 0)
+			rv = di_prom_prop_lookup_slot_names(ph, node,
+			    prop_data);
+	}
+	return (rv);
+}
+
 /*
- * yet another redundant common routine to:
- * decode the ieee1275 "slot-names" property and returns the string matching
- * the pci device number <pci_dev>, if any.
- *
- * callers must NOT free the returned string
- *
- * "slot-names" format: [int][string1][string2]...[stringN]
- *	- each bit position in [int] represent a pci device number
- *	- [string1]...[stringN] are concatenated null-terminated strings
- *	- the number of bits set in [int] == the number of strings that follow
- *	- each bit that is set corresponds to a string in the following segment
+ * returns an allocated string containing the slot name for the slot with
+ * device number <pci_dev> on bus <node>
  */
 static char *
 pci_cfg_slotname(di_node_t node, di_prom_handle_t ph, minor_t pci_dev)
@@ -426,54 +438,29 @@ pci_cfg_slotname(di_node_t node, di_prom_handle_t ph, minor_t pci_dev)
 #ifdef	DEBUG
 	char *fnm = "pci_cfg_slotname";
 #endif
-	int *snp;
-	int snlen;
-	int snentlen = sizeof (int);
-	int i, max, len, place, curplace;
-	char *str;
+	int i, count;
+	char *name = NULL;
+	di_slot_name_t *slot_names = NULL;
 
-	snlen = di_propall_lookup_ints(ph, 0, DDI_DEV_T_ANY, node,
-	    PROP_SLOT_NAMES, &snp);
-	if (snlen < 1)
-		return (NULL);
-	if ((snp[0] & (1 << pci_dev)) == 0)
+	count = di_propall_lookup_slot_names(ph, 0, DDI_DEV_T_ANY, node,
+	    &slot_names);
+	if (count < 0)
 		return (NULL);
 
-	/*
-	 * pci device number must be less than the amount of bits in the first
-	 * [int] component of slot-names
-	 */
-	if (pci_dev >= snentlen * 8) {
-		dprint(("%s: pci_dev out of range for %s%d\n",
-		    fnm, DRVINST(node)));
-		return (NULL);
-	}
-
-	place = 0;
-	for (i = 0; i < pci_dev; i++) {
-		if (snp[0] & (1 << i))
-			place++;
-	}
-
-	max = (snlen * snentlen) - snentlen;
-	str = (char *)&snp[1];
-	i = 0;
-	curplace = 0;
-	while (i < max && curplace < place) {
-		len = strlen(str);
-		if (len <= 0)
+	for (i = 0; i < count; i++) {
+		if (slot_names[i].num == (int)pci_dev) {
+			name = strdup(slot_names[i].name);
 			break;
-		str += len + 1;
-		i += len + 1;
-		curplace++;
+		}
 	}
-	/* the following condition indicates a badly formed slot-names */
-	if (i >= max || *str == '\0') {
-		dprint(("%s: badly formed slot-names for %s%d\n",
-		    fnm, DRVINST(node)));
-		str = NULL;
-	}
-	return (str);
+#ifdef	DEBUG
+	if (name == NULL)
+		dprint(("%s: slot w/ pci_dev %d not found in %s for %s%d\n",
+		    fnm, (int)pci_dev, DI_PROP_SLOT_NAMES, DRVINST(node)));
+#endif
+	if (count > 0)
+		di_slot_names_free(count, slot_names);
+	return (name);
 }
 
 
@@ -482,11 +469,11 @@ pci_cfg_slotname(di_node_t node, di_prom_handle_t ph, minor_t pci_dev)
  * for its slot identified by child pci device number <pci_dev>, through <buf>
  *
  * prioritized naming scheme:
- *	1) <PROP_SLOT_NAMES property>    (see pci_cfg_slotname())
- *	2) <device-type><PROP_PHYS_SLOT property>
+ *	1) <DI_PROP_SLOT_NAMES property>    (see pci_cfg_slotname())
+ *	2) <device-type><DI_PROP_PHYS_SLOT property>
  *	3) <drv name><drv inst>.<device-type><pci_dev>
  *
- * where <device-type> is derived from the PROP_DEV_TYPE property:
+ * where <device-type> is derived from the DI_PROP_DEV_TYPE property:
  *	if its value is "pciex" then <device-type> is "pcie"
  *	else the raw value is used
  *
@@ -501,7 +488,7 @@ pci_cfg_ap_node(minor_t pci_dev, di_node_t node, di_prom_handle_t ph,
 	char *str, *devtype;
 
 	rv = di_propall_lookup_strings(ph, 0, DDI_DEV_T_ANY, node,
-	    PROP_DEV_TYPE, &devtype);
+	    DI_PROP_DEV_TYPE, &devtype);
 	if (rv < 1)
 		return (0);
 
@@ -514,11 +501,12 @@ pci_cfg_ap_node(minor_t pci_dev, di_node_t node, di_prom_handle_t ph,
 	str = pci_cfg_slotname(node, ph, pci_dev);
 	if (str != NULL) {
 		(void) strlcpy(buf, str, bufsz);
+		free(str);
 		return (1);
 	}
 
-	if (di_propall_lookup_ints(ph, 0, DDI_DEV_T_ANY, node, PROP_PHYS_SLOT,
-	    &nump) > 0) {
+	if (di_propall_lookup_ints(ph, 0, DDI_DEV_T_ANY, node,
+	    DI_PROP_PHYS_SLOT, &nump) > 0) {
 		if (*nump > 0) {
 			(void) snprintf(buf, bufsz, "%s%d", devtype, *nump);
 			return (1);
@@ -537,11 +525,11 @@ DEF:
  * through <buf>
  *
  * prioritized naming scheme:
- *	1) <IOB_PRE string><PROP_SERID property: sun specific portion>
- *	2) <IOB_PRE string><full PROP_SERID property in hex>
+ *	1) <IOB_PRE string><DI_PROP_SERID property: sun specific portion>
+ *	2) <IOB_PRE string><full DI_PROP_SERID property in hex>
  *	3) <IOB_PRE string>
  *
- * PROP_SERID encoding <64-bit int: msb ... lsb>:
+ * DI_PROP_SERID encoding <64-bit int: msb ... lsb>:
  * <24 bits: IEEE company id><40 bits: serial number>
  *
  * sun encoding of 40 bit serial number:
@@ -560,7 +548,7 @@ pci_cfg_iob_name(di_minor_t minor, di_node_t node, di_prom_handle_t ph,
 	uint64_t serid;
 	char *idstr;
 
-	if (di_prop_lookup_int64(DDI_DEV_T_ANY, node, PROP_SERID,
+	if (di_prop_lookup_int64(DDI_DEV_T_ANY, node, DI_PROP_SERID,
 	    &seridp) < 1) {
 		(void) strlcpy(buf, IOB_PRE, bufsz);
 		return (1);
@@ -599,12 +587,12 @@ pci_cfg_pcidev(di_node_t node, di_prom_handle_t ph)
 	int rv;
 	int *regp;
 
-	rv = di_propall_lookup_ints(ph, 0, DDI_DEV_T_ANY, node, PROP_REG,
+	rv = di_propall_lookup_ints(ph, 0, DDI_DEV_T_ANY, node, DI_PROP_REG,
 	    &regp);
 
 	if (rv < 1) {
 		dprint(("pci_cfg_pcidev: property %s not found "
-		    "for %s%d\n", PROP_REG, DRVINST(node)));
+		    "for %s%d\n", DI_PROP_REG, DRVINST(node)));
 		return (PCIDEV_NIL);
 	}
 
@@ -624,7 +612,7 @@ pci_cfg_pcidev(di_node_t node, di_prom_handle_t ph)
  * each component using pci_cfg_ap_node().  If we detect that a certain
  * segment is contained within an expansion chassis, then we skip any bus
  * nodes in between our current node and the topmost node of the chassis,
- * which is identified by the PROP_FIRST_CHAS property, and prepend the name
+ * which is identified by the DI_PROP_FIRST_CHAS property, and prepend the name
  * of the expansion chassis as given by pci_cfg_iob_name()
  *
  * This scheme is always used for <pathret>.  If however, the size of
@@ -815,12 +803,12 @@ OUT:
 
 
 /*
- * the PROP_AP_NAMES property contains the first integer section of the
+ * the DI_PROP_AP_NAMES property contains the first integer section of the
  * ieee1275 "slot-names" property and functions as a bitmask; see comment for
  * pci_cfg_slotname()
  *
  * we use the name of the attachment point minor node if its pci device
- * number (encoded in the minor number) is allowed by PROP_AP_NAMES
+ * number (encoded in the minor number) is allowed by DI_PROP_AP_NAMES
  *
  * returns non-zero if we return a valid attachment point through <path>
  */
@@ -831,7 +819,7 @@ pci_cfg_ap_legacy(di_minor_t minor, di_node_t node, di_prom_handle_t ph,
 	minor_t pci_dev;
 	int *anp;
 
-	if (di_propall_lookup_ints(ph, 0, DDI_DEV_T_ANY, node, PROP_AP_NAMES,
+	if (di_propall_lookup_ints(ph, 0, DDI_DEV_T_ANY, node, DI_PROP_AP_NAMES,
 	    &anp) < 1)
 		return (0);
 
@@ -855,7 +843,7 @@ pci_cfg_is_ap_path(di_node_t node, di_prom_handle_t ph)
 
 	do {
 		if (di_propall_lookup_strings(ph, 0, DDI_DEV_T_ANY, curnode,
-		    PROP_DEV_TYPE, &devtype) > 0)
+		    DI_PROP_DEV_TYPE, &devtype) > 0)
 			if (strcmp(devtype, PROPVAL_PCIEX) == 0)
 				return (1);
 	} while ((curnode = di_parent_node(curnode)) != DI_NODE_NIL);

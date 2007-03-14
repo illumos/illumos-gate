@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -199,6 +199,13 @@ SUNWprivate_1.1 {
 	di_dli_openr;
 	di_dli_openw;
 	di_dli_close;
+	di_slot_names_free;
+	di_slot_names_decode;
+	di_prop_slot_names;
+	di_prom_prop_slot_names;
+	di_prop_lookup_slot_names;
+	di_prom_prop_lookup_slot_names;
+	di_prop_find;
 	device_exists;
 	finddev_readdir;
 	finddev_close;

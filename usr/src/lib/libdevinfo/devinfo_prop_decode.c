@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -932,4 +931,103 @@ di_prop_decode_common(void *data, int size, int prop_type, int prom)
 	return (nelements);
 }
 
-/* end of devinfo_prop_decode.c */
+void
+di_slot_names_free(int count, di_slot_name_t *slot_names)
+{
+	if (slot_names == NULL)
+		return;
+
+	while (--count >= 0) {
+		if (slot_names[count].name != NULL)
+			free(slot_names[count].name);
+	}
+	free(slot_names);
+}
+
+/*
+ * 1275 "slot-names" format: [int][string1][string2]...[stringN]
+ *	- [int] is a 1275 encoded integer
+ *      - [string1]...[stringN] are concatenated null-terminated strings
+ *      - each bit position in [int] represents a pci device number
+ *	- each bit which is set in [int] represents a slot with a device
+ *	  number of that bit position
+ *      - each string in [string1]...[stringN] identifies a slot name only
+ *	  for the bits which are set in [int]
+ *	- the ordering of strings follow the ordering of bits set in [int]
+ *
+ * an allocated array of di_slot_name_t is returned through prop_data if
+ * [int] is non-zero and the number of entries as the return value;
+ * use di_slot_names_free() to free the array
+ */
+int
+di_slot_names_decode(uchar_t *rawdata, int rawlen,
+    di_slot_name_t **prop_data)
+{
+	char *sp, *maxsp;
+	int count, i;
+	size_t len;
+	int slots;
+	int maxcount = 0;
+	int maxslots = 0;
+	di_slot_name_t *slot_names = NULL;
+
+	if (rawlen < sizeof (slots))
+		goto ERROUT;
+
+	slots = impl_di_prop_int_from_prom(rawdata, sizeof (slots));
+	if (slots == 0) {
+		*prop_data = NULL;
+		return (0);
+	}
+
+	maxslots = sizeof (slots) * 8;
+	count = 0;
+	for (i = 0; i < maxslots; i++) {
+		if (slots & (1 << i))
+			count++;
+	}
+	maxslots = i;
+	maxcount = count;
+	slot_names = malloc(sizeof (*slot_names) * maxcount);
+	bzero(slot_names, sizeof (*slot_names) * maxcount);
+
+	/* also handle unterminated strings */
+	sp = (char *)(rawdata + sizeof (slots));
+	maxsp = sp + (rawlen - sizeof (slots));
+	count = 0;
+	for (i = 0; i < maxslots; i++) {
+		if (slots & (1 << i)) {
+			if (sp > maxsp)
+				break;
+			len = strnlen(sp, (maxsp - sp) + 1);
+			if (len == 0)
+				break;
+
+			slot_names[count].name =
+			    malloc(sizeof (char) * (len + 1));
+			(void) strlcpy(slot_names[count].name, sp, len + 1);
+
+			slot_names[count].num = i;
+
+			sp += len + 1;
+			count++;
+		}
+	}
+
+	/*
+	 * check if the number of strings match with the number of slots;
+	 * we can also get a lesser string count even when there appears to be
+	 * the correct number of strings if one or more pair of strings are
+	 * seperated by more than one NULL byte
+	 */
+	if (count != maxcount)
+		goto ERROUT;
+
+	*prop_data = slot_names;
+	return (maxcount);
+	/*NOTREACHED*/
+ERROUT:
+	di_slot_names_free(maxcount, slot_names);
+	*prop_data = NULL;
+	return (-1);
+}

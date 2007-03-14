@@ -47,14 +47,6 @@ extern "C" {
 
 #define	CFG_DIRNAME		"cfg"
 
-#define	PROP_FIRST_CHAS		"first-in-chassis"
-#define	PROP_SLOT_NAMES		"slot-names"
-#define	PROP_PHYS_SLOT		"physical-slot#"
-#define	PROP_DEV_TYPE		"device_type"
-#define	PROP_BUS_RANGE		"bus-range"
-#define	PROP_SERID		"serialid#"
-#define	PROP_REG		"reg"
-#define	PROP_AP_NAMES		"ap-names"
 #define	PROPVAL_PCIEX		"pciex"
 #define	DEVTYPE_PCIE		"pcie"
 #define	IOB_PRE			"iob"
