@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1228,16 +1228,26 @@ chkfiles(char *source, char **to)
 			override = !cpy && (access(target, 2) < 0) &&
 			    !silent && use_stdin() && !ISLNK(s2);
 
-			if (overwrite && override)
+			if (overwrite && override) {
 				(void) fprintf(stderr,
 				    gettext("%s: overwrite %s and override "
 				    "protection %o (%s/%s)? "), cmd, target,
 				    FMODE(s2) & MODEBITS, yeschr, nochr);
-			else if (overwrite && ISREG(s2))
+				if (getresp()) {
+					if (buf != NULL)
+						free(buf);
+					return (2);
+				}
+			} else if (overwrite && ISREG(s2)) {
 				(void) fprintf(stderr,
 				    gettext("%s: overwrite %s (%s/%s)? "),
 				    cmd, target, yeschr, nochr);
-			else if (override)
+				if (getresp()) {
+					if (buf != NULL)
+						free(buf);
+					return (2);
+				}
+			} else if (override) {
 				(void) fprintf(stderr,
 				    gettext("%s: %s: override protection "
 				    /*CSTYLED*/
@@ -1245,15 +1255,13 @@ chkfiles(char *source, char **to)
 				    /*CSTYLED*/
 				    cmd, target, FMODE(s2) & MODEBITS,
 				    yeschr, nochr);
-			if (overwrite || override) {
-				if (ISREG(s2)) {
-					if (getresp()) {
-						if (buf != NULL)
-							free(buf);
-						return (2);
-					}
+				if (getresp()) {
+					if (buf != NULL)
+						free(buf);
+					return (2);
 				}
 			}
+
 			if (lnk && unlink(target) < 0) {
 				(void) fprintf(stderr,
 				    gettext("%s: cannot unlink %s: "),
