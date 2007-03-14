@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +51,7 @@
 #include <security/cryptoki.h>
 #include <limits.h>
 #include <cryptoutil.h>
+#include <kmfapi.h>
 
 #define	BUFFERSIZE	(4096)		/* Buffer size for reading file */
 
@@ -78,15 +78,23 @@
 #define	EXIT_USAGE	2	/* usage/syntax error */
 
 #define	MAC_NAME	"mac"		/* name of mac command */
-#define	MAC_OPTIONS	"lva:k:"		/* for getopt */
+#define	MAC_OPTIONS	"lva:k:T:K:"		/* for getopt */
 #define	DIGEST_NAME	"digest"	/* name of mac command */
 #define	DIGEST_OPTIONS	"lva:"		/* for getopt */
+#define	DEFAULT_TOKEN_PROMPT	"Enter PIN for %s: "
+#define	PK_DEFAULT_PK11TOKEN	SOFT_TOKEN_LABEL
 
 static boolean_t vflag = B_FALSE;	/* -v (verbose) flag, optional */
 static boolean_t aflag = B_FALSE;	/* -a <algorithm> flag, required */
 static boolean_t lflag = B_FALSE;	/* -l flag, for mac and digest */
+static boolean_t kflag = B_FALSE;
+static boolean_t Tflag = B_FALSE;
+static boolean_t Kflag = B_FALSE;
 
 static char *keyfile = NULL;	/* name of keyfile */
+static char *token_label = NULL;
+static char *key_label = NULL;
+
 static CK_BYTE buf[BUFFERSIZE];
 
 struct mech_alias {
@@ -125,6 +133,7 @@ static CK_RV do_mac(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pmech,
 static CK_RV do_digest(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pmech,
 	int fd, CK_BYTE_PTR *pdigest, CK_ULONG_PTR pdigestlen);
 static int getkey(char *filename, CK_BYTE_PTR *pkeydata);
+static int getpasswd(char *token_spec, CK_BYTE_PTR *pdata, CK_ULONG_PTR psize);
 
 int
 main(int argc, char **argv)
@@ -184,10 +193,19 @@ main(int argc, char **argv)
 			algo_str = optarg;
 			break;
 		case 'k':
+			kflag = B_TRUE;
 			keyfile = optarg;
 			break;
 		case 'l':
 			lflag = B_TRUE;
+			break;
+		case 'T':
+			Tflag = B_TRUE;
+			token_label = optarg;
+			break;
+		case 'K':
+			Kflag = B_TRUE;
+			key_label = optarg;
 			break;
 		default:
 			errflag++;
@@ -196,7 +214,7 @@ main(int argc, char **argv)
 
 	filecount = argc - optind;
 	if (errflag || (!aflag && !lflag) || (lflag && argc > 2) ||
-	    filecount < 0) {
+	    (kflag && Kflag) || (Tflag && !Kflag) || filecount < 0) {
 		usage(mac_cmd);
 		exit(EXIT_USAGE);
 	}
@@ -216,14 +234,15 @@ main(int argc, char **argv)
 static void
 usage(boolean_t mac_cmd)
 {
+	(void) fprintf(stderr, gettext("Usage:\n"));
 	if (mac_cmd) {
-		cryptoerror(LOG_STDERR, gettext(
-		"usage: mac -l | [-v] -a <algorithm> [-k <keyfile>] "
-		    "[file...]"));
+		(void) fprintf(stderr, gettext("  mac -l\n"));
+		(void) fprintf(stderr, gettext("  mac [-v] -a <algorithm> "
+		    "[-k <keyfile> | -K <keylabel> [-T <tokenspec>]] "
+		    "[file...]\n"));
 	} else {
-		cryptoerror(LOG_STDERR,
-		    gettext("usage: digest -l | [-v] -a <algorithm> "
-			"[file...]"));
+		(void) fprintf(stderr, gettext("  digest -l | [-v] "
+		    "-a <algorithm> [file...]\n"));
 	}
 }
 
@@ -325,6 +344,80 @@ generate_pkcs5_key(CK_SESSION_HANDLE hSession,
 }
 
 
+static int
+get_token_key(CK_SESSION_HANDLE hSession, CK_KEY_TYPE keytype,
+    char *keylabel, CK_BYTE *password, int password_len,
+    CK_OBJECT_HANDLE *keyobj)
+{
+	CK_RV rv;
+	CK_ATTRIBUTE pTmpl[10];
+	CK_OBJECT_CLASS class = CKO_SECRET_KEY;
+	CK_BBOOL true = 1;
+	CK_BBOOL is_token = 1;
+	CK_ULONG key_obj_count = 1;
+	int i;
+	CK_KEY_TYPE ckKeyType = keytype;
+
+
+	rv = C_Login(hSession, CKU_USER, (CK_UTF8CHAR_PTR)password,
+	    password_len);
+	if (rv != CKR_OK) {
+		(void) fprintf(stderr, "Cannot login to the token."
+		    " error = %s\n", pkcs11_strerror(rv));
+		return (-1);
+	}
+
+	i = 0;
+	pTmpl[i].type = CKA_TOKEN;
+	pTmpl[i].pValue = &is_token;
+	pTmpl[i].ulValueLen = sizeof (CK_BBOOL);
+	i++;
+
+	pTmpl[i].type = CKA_CLASS;
+	pTmpl[i].pValue = &class;
+	pTmpl[i].ulValueLen = sizeof (class);
+	i++;
+
+	pTmpl[i].type = CKA_LABEL;
+	pTmpl[i].pValue = keylabel;
+	pTmpl[i].ulValueLen = strlen(keylabel);
+	i++;
+
+	pTmpl[i].type = CKA_KEY_TYPE;
+	pTmpl[i].pValue = &ckKeyType;
+	pTmpl[i].ulValueLen = sizeof (ckKeyType);
+	i++;
+
+	pTmpl[i].type = CKA_PRIVATE;
+	pTmpl[i].pValue = &true;
+	pTmpl[i].ulValueLen = sizeof (true);
+	i++;
+
+	rv = C_FindObjectsInit(hSession, pTmpl, i);
+	if (rv != CKR_OK) {
+		goto out;
+	}
+
+	rv = C_FindObjects(hSession, keyobj, 1, &key_obj_count);
+	(void) C_FindObjectsFinal(hSession);
+
+out:
+	if (rv != CKR_OK) {
+		(void) fprintf(stderr,
+		    "Cannot retrieve key object. error = %s\n",
+		    pkcs11_strerror(rv));
+		return (-1);
+	}
+
+	if (key_obj_count == 0) {
+		(void) fprintf(stderr, "Cannot find the key object.\n");
+		return (-1);
+	}
+
+	return (0);
+}
+
+
 /*
  * Execute the command.
  *   algo_str - name of algorithm
@@ -359,6 +452,9 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 	CK_BYTE		salt[PBKD2_SALT_SIZE];
 	CK_ULONG	keysize;
 	CK_ULONG	iterations = PBKD2_ITERATIONS;
+	CK_KEY_TYPE keytype;
+	KMF_RETURN kmfrv;
+	CK_SLOT_ID token_slot_id;
 
 	if (aflag) {
 		/*
@@ -382,17 +478,36 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 
 		/* Get key to do a MAC operation */
 		if (mac_cmd) {
-			keylen = getkey(keyfile, &pkeydata);
-			if (keylen <= 0 || pkeydata == NULL) {
-				cryptoerror(LOG_STDERR,
-				    gettext("invalid key."));
-				return (EXIT_FAILURE);
+			if (Kflag) {
+				int status;
+
+				if (token_label == NULL ||
+				    !strlen(token_label)) {
+					token_label = PK_DEFAULT_PK11TOKEN;
+				}
+
+				status = getpasswd(token_label, &pkeydata,
+				    (CK_ULONG *)&keylen);
+				if (status == -1) {
+					cryptoerror(LOG_STDERR,
+					    gettext("invalid passphrase."));
+					return (EXIT_FAILURE);
+				}
+
+			} else {
+				keylen = getkey(keyfile, &pkeydata);
+				if (keylen <= 0 || pkeydata == NULL) {
+					cryptoerror(LOG_STDERR,
+					    gettext("invalid key."));
+					return (EXIT_FAILURE);
+				}
 			}
 		}
 	}
 
 	/* Initialize, and get list of slots */
-	if ((rv = C_Initialize(NULL)) != CKR_OK) {
+	rv = C_Initialize(NULL);
+	if (rv != CKR_OK && rv != CKR_CRYPTOKI_ALREADY_INITIALIZED) {
 		cryptoerror(LOG_STDERR,
 		    gettext("failed to initialize PKCS #11 framework: %s"),
 		    pkcs11_strerror(rv));
@@ -472,34 +587,56 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 		goto cleanup;
 	}
 
-	/* Find a slot with matching mechanism */
-	for (i = 0; i < slotcount; i++) {
-		slotID = pSlotList[i];
-		rv = C_GetMechanismInfo(slotID, mech_type, &info);
-		if (rv != CKR_OK) {
-			continue; /* to the next slot */
-		} else {
-			if (mac_cmd) {
-				/*
-				 * Make sure the slot supports
-				 * PKCS5 key generation if we
-				 * will be using it later.
-				 * We use it whenever the key
-				 * is entered at command line.
-				 */
-				if ((info.flags & CKF_SIGN) &&
-				    (keyfile == NULL)) {
-					CK_MECHANISM_INFO kg_info;
-					rv = C_GetMechanismInfo(slotID,
-					    CKM_PKCS5_PBKD2, &kg_info);
-					if (rv == CKR_OK)
-					    break;
-				} else if (info.flags & CKF_SIGN) {
-					break;
-				}
+	/*
+	 * Find a slot with matching mechanism
+	 *
+	 * If -K is specified, we find the slot id for the token first, then
+	 * check if the slot supports the algorithm.
+	 */
+	i = 0;
+	if (Kflag) {
+		kmfrv = KMF_PK11TokenLookup(NULL, token_label, &token_slot_id);
+		if (kmfrv != KMF_OK) {
+			cryptoerror(LOG_STDERR,
+			    gettext("no matching PKCS#11 token"));
+			exitcode = EXIT_FAILURE;
+			goto cleanup;
+		}
+		rv = C_GetMechanismInfo(token_slot_id, mech_type, &info);
+		if (rv == CKR_OK && (info.flags & CKF_SIGN))
+			slotID = token_slot_id;
+		else
+			i = slotcount;
+
+	} else {
+		for (i = 0; i < slotcount; i++) {
+			slotID = pSlotList[i];
+			rv = C_GetMechanismInfo(slotID, mech_type, &info);
+			if (rv != CKR_OK) {
+				continue; /* to the next slot */
 			} else {
-				if (info.flags & CKF_DIGEST)
-					break;
+				if (mac_cmd) {
+					/*
+					 * Make sure the slot supports
+					 * PKCS5 key generation if we
+					 * will be using it later.
+					 * We use it whenever the key
+					 * is entered at command line.
+					 */
+					if ((info.flags & CKF_SIGN) &&
+					    (keyfile == NULL)) {
+						CK_MECHANISM_INFO kg_info;
+						rv = C_GetMechanismInfo(slotID,
+						    CKM_PKCS5_PBKD2, &kg_info);
+						if (rv == CKR_OK)
+							break;
+					} else if (info.flags & CKF_SIGN) {
+						break;
+					}
+				} else {
+					if (info.flags & CKF_DIGEST)
+						break;
+				}
 			}
 		}
 	}
@@ -570,6 +707,21 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 
 			rv = C_CreateObject(hSession, template,
 				nattr, &key);
+
+		} else if (Kflag) {
+
+			if (mech_type == CKM_DES_MAC) {
+				keytype = CKK_DES;
+			} else {
+				keytype = CKK_GENERIC_SECRET;
+			}
+
+			rv = get_token_key(hSession, keytype, key_label,
+			    pkeydata, keylen, &key);
+			if (rv != CKR_OK) {
+				exitcode = EXIT_FAILURE;
+				goto cleanup;
+			}
 		} else {
 			CK_KEY_TYPE keytype;
 			if (mech_type == CKM_DES_MAC) {
@@ -716,7 +868,7 @@ cleanup:
 		free(pSlotList);
 	}
 
-	if (key != (CK_OBJECT_HANDLE) 0) {
+	if (!Kflag && key != (CK_OBJECT_HANDLE) 0) {
 		(void) C_DestroyObject(hSession, key);
 	}
 
@@ -938,4 +1090,33 @@ getkey(char *filename, CK_BYTE_PTR *pkeydata)
 	*pkeydata = (CK_BYTE_PTR)keybuf;
 
 	return (keylen);
+}
+
+static int
+getpasswd(char *token_spec, CK_BYTE_PTR *pdata, CK_ULONG *psize)
+{
+	char *databuf;
+	char *tmpbuf;
+	char prompt[1024];
+
+	if (token_spec == NULL)
+		return (-1);
+
+	(void) snprintf(prompt, sizeof (prompt), DEFAULT_TOKEN_PROMPT,
+	    token_spec);
+	tmpbuf = getpassphrase(gettext(prompt));
+
+	if (tmpbuf == NULL) {
+		return (-1);	/* error */
+	}
+
+	databuf = strdup(tmpbuf);
+	(void) memset(tmpbuf, 0, strlen(tmpbuf));
+	if (databuf == NULL)
+		return (-1);
+
+	*pdata = (CK_BYTE_PTR)databuf;
+	*psize = (CK_ULONG)strlen(databuf);
+
+	return (0);
 }

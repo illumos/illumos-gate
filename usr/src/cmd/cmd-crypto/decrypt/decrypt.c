@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 /* Portions Copyright 2005 Richard Lowe */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,6 +73,7 @@
 #include <netinet/in.h>
 #include <security/cryptoki.h>
 #include <cryptoutil.h>
+#include <kmfapi.h>
 
 #define	BUFFERSIZE	(2048)		/* Buffer size for reading file */
 #define	BLOCKSIZE	(128)		/* Largest guess for block size */
@@ -97,9 +97,11 @@
 #define	RANDOM_DEVICE	"/dev/urandom"	/* random device name */
 
 #define	ENCRYPT_NAME	"encrypt"	/* name of encrypt command */
-#define	ENCRYPT_OPTIONS "a:k:i:o:lv"	/* options for encrypt */
+#define	ENCRYPT_OPTIONS "a:T:K:k:i:o:lv"	/* options for encrypt */
 #define	DECRYPT_NAME	"decrypt"	/* name of decrypt command */
-#define	DECRYPT_OPTIONS "a:k:i:o:lv"	/* options for decrypt */
+#define	DECRYPT_OPTIONS "a:T:K:k:i:o:lv"	/* options for decrypt */
+#define	DEFAULT_TOKEN_PROMPT	"Enter PIN for %s: "
+#define	PK_DEFAULT_PK11TOKEN	SOFT_TOKEN_LABEL
 
 /*
  * Structure containing info for encrypt/decrypt
@@ -170,10 +172,14 @@ static boolean_t iflag = B_FALSE; /* -i <infile> flag, use stdin if absent */
 static boolean_t oflag = B_FALSE; /* -o <outfile> flag, use stdout if absent */
 static boolean_t lflag = B_FALSE; /* -l flag (list) */
 static boolean_t vflag = B_FALSE; /* -v flag (verbose) */
+static boolean_t Tflag = B_FALSE;
+static boolean_t Kflag = B_FALSE;
 
 static char *keyfile = NULL;	/* name of keyfile */
 static char *inputfile = NULL;	/* name of input file */
 static char *outputfile = NULL;	/* name of output file */
+static char *token_label = NULL;
+static char *key_label = NULL;
 
 static int status_pos = 0; /* current position of progress bar element */
 
@@ -182,7 +188,7 @@ static int status_pos = 0; /* current position of progress bar element */
  */
 static void usage(struct CommandInfo *cmd);
 static int execute_cmd(struct CommandInfo *cmd, char *algo_str);
-static int cryptogetkey(CK_BYTE_PTR *pkeydata, CK_ULONG_PTR pkeysize);
+static int cryptogetdata(char *, CK_BYTE_PTR *pkeydata, CK_ULONG_PTR pkeysize);
 static int cryptoreadfile(char *filename, CK_BYTE_PTR *pdata,
 	CK_ULONG_PTR pdatalen);
 static int get_random_data(CK_BYTE_PTR pivbuf, int ivlen);
@@ -240,6 +246,14 @@ main(int argc, char **argv)
 			kflag = B_TRUE;
 			keyfile = optarg;
 			break;
+		case 'T':
+			Tflag = B_TRUE;
+			token_label = optarg;
+			break;
+		case 'K':
+			Kflag = B_TRUE;
+			key_label = optarg;
+			break;
 		case 'i':
 			iflag = B_TRUE;
 			inputfile = optarg;
@@ -260,6 +274,7 @@ main(int argc, char **argv)
 	}
 
 	if (errflag || (!aflag && !lflag) || (lflag && argc > 2) ||
+	    (kflag && Kflag) || (Tflag && !Kflag) ||
 	    (optind < argc)) {
 		usage(cmd);
 		exit(EXIT_USAGE);
@@ -274,14 +289,18 @@ main(int argc, char **argv)
 static void
 usage(struct CommandInfo *cmd)
 {
+	(void) fprintf(stderr, gettext("Usage:\n"));
 	if (cmd->type == CKA_ENCRYPT) {
-		cryptoerror(LOG_STDERR, gettext("usage: encrypt -l | -a "
-		    "<algorithm> [-v] [-k <keyfile>] [-i <infile>]"
-		    "\n\t\t\t[-o <outfile>]"));
+		(void) fprintf(stderr, gettext("  encrypt -l\n"));
+		(void) fprintf(stderr, gettext("  encrypt -a <algorithm> "
+		    "[-v] [-k <keyfile> | -K <keylabel> [-T <tokenspec>]] "
+		    "[-i <infile>] [-o <outfile>]\n"));
+
 	} else {
-		cryptoerror(LOG_STDERR, gettext("usage: decrypt -l | -a "
-		    "<algorithm> [-v] [-k <keyfile>] [-i <infile>]"
-		    "\n\t\t\t[-o <outfile>]"));
+		(void) fprintf(stderr, gettext("  decrypt -l\n"));
+		(void) fprintf(stderr, gettext("  decrypt -a <algorithm> "
+		    "[-v] [-k <keyfile> | -K <keylabel> [-T <tokenspec>]] "
+		    "[-i <infile>] [-o <outfile>]\n"));
 	}
 }
 
@@ -381,6 +400,84 @@ generate_pkcs5_key(CK_SESSION_HANDLE hSession,
 	return (rv);
 }
 
+/*
+ * This function will login into the token with the provided password and
+ * find the token key object with the specified keytype and keylabel.
+ */
+static int
+get_token_key(CK_SESSION_HANDLE hSession, CK_KEY_TYPE keytype,
+    char *keylabel, CK_BYTE *password, int password_len,
+    CK_OBJECT_HANDLE *keyobj)
+{
+	CK_RV	rv;
+	CK_ATTRIBUTE pTmpl[10];
+	CK_OBJECT_CLASS class = CKO_SECRET_KEY;
+	CK_BBOOL true = 1;
+	CK_BBOOL is_token = 1;
+	CK_ULONG key_obj_count = 1;
+	int i;
+	CK_KEY_TYPE ckKeyType = keytype;
+
+
+	rv = C_Login(hSession, CKU_USER, (CK_UTF8CHAR_PTR)password,
+	    (CK_ULONG)password_len);
+	if (rv != CKR_OK) {
+		(void) fprintf(stderr, "Cannot login to the token."
+		    " error = %s\n", pkcs11_strerror(rv));
+		return (-1);
+	}
+
+	i = 0;
+	pTmpl[i].type = CKA_TOKEN;
+	pTmpl[i].pValue = &is_token;
+	pTmpl[i].ulValueLen = sizeof (CK_BBOOL);
+	i++;
+
+	pTmpl[i].type = CKA_CLASS;
+	pTmpl[i].pValue = &class;
+	pTmpl[i].ulValueLen = sizeof (class);
+	i++;
+
+	pTmpl[i].type = CKA_LABEL;
+	pTmpl[i].pValue = keylabel;
+	pTmpl[i].ulValueLen = strlen(keylabel);
+	i++;
+
+	pTmpl[i].type = CKA_KEY_TYPE;
+	pTmpl[i].pValue = &ckKeyType;
+	pTmpl[i].ulValueLen = sizeof (ckKeyType);
+	i++;
+
+	pTmpl[i].type = CKA_PRIVATE;
+	pTmpl[i].pValue = &true;
+	pTmpl[i].ulValueLen = sizeof (true);
+	i++;
+
+	rv = C_FindObjectsInit(hSession, pTmpl, i);
+	if (rv != CKR_OK) {
+		goto out;
+	}
+
+	rv = C_FindObjects(hSession, keyobj, 1, &key_obj_count);
+
+	(void) C_FindObjectsFinal(hSession);
+
+out:
+	if (rv != CKR_OK) {
+		(void) fprintf(stderr,
+		    "Cannot retrieve key object. error = %s\n",
+		    pkcs11_strerror(rv));
+		return (-1);
+	}
+
+	if (key_obj_count == 0) {
+		(void) fprintf(stderr, "Cannot find the key object.\n");
+		return (-1);
+	}
+
+	return (0);
+}
+
 
 /*
  * Execute the command.
@@ -419,6 +516,8 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 	CK_ULONG	keylen;
 	int version = SUNW_ENCRYPT_FILE_VERSION;
 	CK_KEY_TYPE keytype;
+	KMF_RETURN kmfrv;
+	CK_SLOT_ID token_slot_id;
 
 	if (aflag) {
 		/* Determine if algorithm is valid */
@@ -438,27 +537,40 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 		}
 
 		/*
-		 * Process keyfile
+		 * Process keyfile or get the token pin if -K is specified.
 		 *
 		 * If a keyfile is provided, get the key data from
 		 * the file. Otherwise, prompt for a passphrase. The
 		 * passphrase is used as the key data.
 		 */
-		if (kflag) {
+		if (Kflag) {
+			/* get the pin of the token */
+			if (token_label == NULL || !strlen(token_label)) {
+				token_label = PK_DEFAULT_PK11TOKEN;
+			}
+
+			status = cryptogetdata(token_label, &pkeydata,
+			    &keysize);
+		} else if (kflag) {
+			/* get the key file */
 			status = cryptoreadfile(keyfile, &pkeydata, &keysize);
 		} else {
-			status = cryptogetkey(&pkeydata, &keysize);
+			/* get the key from input */
+			status = cryptogetdata(NULL, &pkeydata, &keysize);
 		}
 
 		if (status == -1 || keysize == 0L) {
-			cryptoerror(LOG_STDERR, gettext("invalid key."));
+			cryptoerror(LOG_STDERR,
+			    Kflag ? gettext("invalid password.") :
+			    gettext("invalid key."));
 			return (EXIT_FAILURE);
 		}
 	}
 
 	bzero(salt, sizeof (salt));
 	/* Initialize pkcs */
-	if ((rv = C_Initialize(NULL)) != CKR_OK) {
+	rv = C_Initialize(NULL);
+	if (rv != CKR_OK && rv != CKR_CRYPTOKI_ALREADY_INITIALIZED) {
 		cryptoerror(LOG_STDERR, gettext("failed to initialize "
 		    "PKCS #11 framework: %s"), pkcs11_strerror(rv));
 		goto cleanup;
@@ -529,29 +641,52 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 		goto cleanup;
 	}
 
-	/* Find a slot with matching mechanism */
-	for (i = 0; i < slotcount; i++) {
-		slotID = pSlotList[i];
-		rv = C_GetMechanismInfo(slotID, mech_type, &info);
-		if (rv != CKR_OK) {
-			continue; /* to the next slot */
-		} else {
-			/*
-			 * If the slot support the crypto, also
-			 * make sure it supports the correct
-			 * key generation mech if needed.
-			 *
-			 * We need PKCS5 when RC4 is used or
-			 * when the key is entered on cmd line.
-			 */
-			if ((info.flags & cmd->flags) &&
-			    (mech_type == CKM_RC4) || (keyfile == NULL)) {
-				rv = C_GetMechanismInfo(slotID,
-					CKM_PKCS5_PBKD2, &kg_info);
-				if (rv == CKR_OK)
+
+	/*
+	 * Find a slot with matching mechanism
+	 *
+	 * If -K is specified, we find the slot id for the token first, then
+	 * check if the slot supports the algorithm.
+	 */
+	i = 0;
+	if (Kflag) {
+		kmfrv = KMF_PK11TokenLookup(NULL, token_label, &token_slot_id);
+		if (kmfrv != KMF_OK) {
+			cryptoerror(LOG_STDERR,
+			    gettext("no matching PKCS#11 token"));
+			errflag = B_TRUE;
+			goto cleanup;
+		}
+		rv = C_GetMechanismInfo(token_slot_id, mech_type, &info);
+		if (rv == CKR_OK && (info.flags & cmd->flags))
+			slotID = token_slot_id;
+		else
+			i = slotcount;
+	} else {
+		for (i = 0; i < slotcount; i++) {
+			slotID = pSlotList[i];
+			rv = C_GetMechanismInfo(slotID, mech_type, &info);
+			if (rv != CKR_OK) {
+				continue; /* to the next slot */
+			} else {
+				/*
+				 * If the slot support the crypto, also
+				 * make sure it supports the correct
+				 * key generation mech if needed.
+				 *
+				 * We need PKCS5 when RC4 is used or
+				 * when the key is entered on cmd line.
+				 */
+				if ((info.flags & cmd->flags) &&
+				    (mech_type == CKM_RC4) ||
+				    (keyfile == NULL)) {
+					rv = C_GetMechanismInfo(slotID,
+					    CKM_PKCS5_PBKD2, &kg_info);
+					if (rv == CKR_OK)
+						break;
+				} else if (info.flags & cmd->flags) {
 					break;
-			} else if (info.flags & cmd->flags) {
-				break;
+				}
 			}
 		}
 	}
@@ -563,7 +698,6 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 		    "found for this algorithm -- %s"), algo_str);
 		goto cleanup;
 	}
-
 
 	/* Open a session */
 	rv = C_OpenSession(slotID, CKF_SERIAL_SESSION,
@@ -726,13 +860,26 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 			break;
 		}
 	}
+
 	/*
-	 * If encrypting, we need some random
+	 * If Kflag is set, let's find the token key now.
+	 *
+	 * If Kflag is not set and if encrypting, we need some random
 	 * salt data to create the key.  If decrypting,
 	 * the salt should come from head of the file
 	 * to be decrypted.
 	 */
-	if (cmd->type == CKA_ENCRYPT) {
+	if (Kflag) {
+		rv = get_token_key(hSession, keytype, key_label, pkeydata,
+		    keysize, &key);
+		if (rv != CKR_OK) {
+			cryptoerror(LOG_STDERR, gettext(
+			    "Can not find the token key"));
+			goto cleanup;
+		} else {
+			goto do_crypto;
+		}
+	} else if (cmd->type == CKA_ENCRYPT) {
 		rv = get_random_data(salt, sizeof (salt));
 		if (rv != 0) {
 			cryptoerror(LOG_STDERR,
@@ -741,6 +888,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 			goto cleanup;
 		}
 	}
+
 
 	/*
 	 * If key input is read from  a file, treat it as
@@ -810,6 +958,8 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 		goto cleanup;
 	}
 
+
+do_crypto:
 	/* Setup up mechanism */
 	mech.mechanism = mech_type;
 	mech.pParameter = (CK_VOID_PTR)pivbuf;
@@ -878,7 +1028,7 @@ cleanup:
 	}
 
 	/* Destroy key object */
-	if (key != (CK_OBJECT_HANDLE) 0) {
+	if (Kflag != B_FALSE && key != (CK_OBJECT_HANDLE) 0) {
 		(void) C_DestroyObject(hSession, key);
 	}
 
@@ -1200,38 +1350,44 @@ cryptoreadfile(char *filename, CK_BYTE_PTR *pdata, CK_ULONG_PTR pdatalen)
 
 	return (0);
 }
+
 /*
- * cryptogetkey - prompt user for a key
+ * cryptogetdata - prompt user for a key or the PIN for a token
  *
- *   pkeydata - buffer for returning key data
+ *   pdata - buffer for returning key or pin data
  *	must be freed by caller using free()
- *   pkeysize - size of buffer returned
+ *   psize - size of buffer returned
  *
  * returns
  *   0 for success, -1 for failure
  */
 
 static int
-cryptogetkey(CK_BYTE_PTR *pkeydata, CK_ULONG_PTR pkeysize)
-
+cryptogetdata(char *token_spec, CK_BYTE_PTR *pdata, CK_ULONG_PTR psize)
 {
-	char *keybuf;
-	char *tmpbuf;
+	char *databuf = NULL;
+	char *tmpbuf = NULL;
+	char prompt[1024];
 
-
-
-	tmpbuf = getpassphrase(gettext("Enter key:"));
+	if (token_spec != NULL) {
+		(void) snprintf(prompt, sizeof (prompt),
+		    DEFAULT_TOKEN_PROMPT, token_spec);
+		tmpbuf = getpassphrase(gettext(prompt));
+	} else {
+		tmpbuf = getpassphrase(gettext("Enter key:"));
+	}
 
 	if (tmpbuf == NULL) {
 		return (-1);	/* error */
 	} else {
-		keybuf = strdup(tmpbuf);
-		(void) memset(tmpbuf, 0, strlen(tmpbuf));
+		databuf = strdup(tmpbuf);
+		(void) memset(tmpbuf, 0, strlen(tmpbuf)); /* clean up */
+		if (databuf == NULL)
+			return (-1);
 	}
 
-	*pkeydata = (CK_BYTE_PTR)keybuf;
-	*pkeysize = (CK_ULONG)strlen(keybuf);
-
+	*pdata = (CK_BYTE_PTR)databuf;
+	*psize = (CK_ULONG)strlen(databuf);
 
 	return (0);
 }

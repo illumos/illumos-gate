@@ -220,7 +220,6 @@ typedef struct {
 typedef struct {
 	KMF_KEYSTORE_TYPE	kstype;
 	KMF_DATA		*certificate;
-	KMF_BIGINT		*serial;
 	KMF_DATA		*ocsp_response;
 
 	union {
@@ -237,7 +236,8 @@ typedef enum {
 	KMF_AES = 3,
 	KMF_RC4 = 4,
 	KMF_DES = 5,
-	KMF_DES3 = 6
+	KMF_DES3 = 6,
+	KMF_GENERIC_SECRET = 7
 }KMF_KEY_ALG;
 
 typedef enum {

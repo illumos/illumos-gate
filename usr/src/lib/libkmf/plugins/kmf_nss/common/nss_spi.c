@@ -2360,6 +2360,12 @@ NSS_CreateSymKey(KMF_HANDLE_T handle,
 		keyType = CKM_DES3_KEY_GEN;
 		keySize = 0; /* required by PK11_TokenKeyGen() */
 		break;
+	case KMF_GENERIC_SECRET:
+		keyType = CKM_GENERIC_SECRET_KEY_GEN;
+		keySize = params->keylength;
+		if (keySize == 0 || (keySize % 8) != 0)
+			return (KMF_ERR_BAD_KEY_SIZE);
+		break;
 	default:
 		rv = KMF_ERR_BAD_KEY_TYPE;
 		goto out;

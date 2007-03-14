@@ -4379,8 +4379,8 @@ OpenSSL_CreateSymKey(KMF_HANDLE_T handle, KMF_CREATESYMKEY_PARAMS *params,
 		rkey->keydata.val = (uchar_t *)des3key;
 		rkey->keydata.len = DES3_KEY_SIZE;
 		symkey->keyalg = KMF_DES3;
-
-	} else if (params->keytype == KMF_AES || params->keytype == KMF_RC4) {
+	} else if (params->keytype == KMF_AES || params->keytype == KMF_RC4 ||
+	    params->keytype == KMF_GENERIC_SECRET) {
 		int bytes;
 
 		if (params->keylength % 8 != 0) {

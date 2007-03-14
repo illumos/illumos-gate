@@ -378,8 +378,8 @@ static verbcmd	cmds[] = {
 
 	"genkey [ keystore=pkcs11 ]\n\t\t"
 		"label=key-label\n\t\t"
-		"[ keytype=aes|arcfour|des|3des ]\n\t\t"
-		"[ keylen=key-size (AES or ARCFOUR only)]\n\t\t"
+		"[ keytype=aes|arcfour|des|3des|generic ]\n\t\t"
+		"[ keylen=key-size (AES, ARCFOUR or GENERIC only)]\n\t\t"
 		"[ token=token[:manuf[:serial]]]\n\t\t"
 		"[ sensitive=y|n ]\n\t\t"
 		"[ extractable=y|n ]\n\t\t"
@@ -387,16 +387,16 @@ static verbcmd	cmds[] = {
 
 	"genkey keystore=nss\n\t\t"
 		"label=key-label\n\t\t"
-		"[ keytype=aes|arcfour|des|3des ]\n\t\t"
-		"[ keylen=key-size (AES or ARCFOUR only)]\n\t\t"
+		"[ keytype=aes|arcfour|des|3des|generic ]\n\t\t"
+		"[ keylen=key-size (AES, ARCFOUR or GENERIC only)]\n\t\t"
 		"[ token=token[:manuf[:serial]]]\n\t\t"
 		"[ dir=directory-path ]\n\t\t"
 		"[ prefix=DBprefix ]\n\t"
 
 	"genkey keystore=file\n\t\t"
 		"outkey=key-fn\n\t\t"
-		"[ keytype=aes|arcfour|des|3des ]\n\t\t"
-		"[ keylen=key-size (AES or ARCFOUR only)]\n\t\t"
+		"[ keytype=aes|arcfour|des|3des|generic ]\n\t\t"
+		"[ keylen=key-size (AES, ARCFOUR or GENERIC only)]\n\t\t"
 		"[ dir=directory-path ]\n\t\t"
 		"[ print=y|n ]\n\t"
 	},

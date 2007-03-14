@@ -30,6 +30,7 @@
 #include <stdio.h> /* debugging only */
 #include <errno.h>
 #include <values.h>
+#include <fcntl.h>
 
 #include <kmfapiP.h>
 #include <ber_der.h>
@@ -38,6 +39,8 @@
 #include <cryptoutil.h>
 #include <security/cryptoki.h>
 #include <security/pkcs11.h>
+
+#define	DEV_RANDOM	"/dev/random"
 
 #define	SETATTR(t, n, atype, value, size) \
 	t[n].type = atype; \
@@ -61,6 +64,10 @@ getObjectLabel(KMF_HANDLE_T, CK_OBJECT_HANDLE, char **);
 
 static KMF_RETURN
 keyObj2RawKey(KMF_HANDLE_T, KMF_KEY_HANDLE *, KMF_RAW_KEY_DATA **);
+
+static KMF_RETURN
+create_generic_secret_key(KMF_HANDLE_T, KMF_CREATESYMKEY_PARAMS *,
+    CK_OBJECT_HANDLE *);
 
 KMF_RETURN
 KMFPK11_ConfigureKeystore(KMF_HANDLE_T, KMF_CONFIG_PARAMS *);
@@ -2225,7 +2232,8 @@ keyObj2RawKey(KMF_HANDLE_T handle, KMF_KEY_HANDLE *inkey,
 	} else if (inkey->keyalg == KMF_AES ||
 	    inkey->keyalg == KMF_RC4 ||
 	    inkey->keyalg == KMF_DES ||
-	    inkey->keyalg == KMF_DES3) {
+	    inkey->keyalg == KMF_DES3 ||
+	    inkey->keyalg == KMF_GENERIC_SECRET) {
 		rv = get_raw_sym(kmfh, (CK_OBJECT_HANDLE)inkey->keyp,
 		    &rkey->rawdata.sym);
 	} else {
@@ -2264,6 +2272,9 @@ kmf2pk11keytype(KMF_KEY_ALG keyalg, CK_KEY_TYPE *type)
 		break;
 	case KMF_DES3:
 		*type = CKK_DES3;
+		break;
+	case KMF_GENERIC_SECRET:
+		*type = CKK_GENERIC_SECRET;
 		break;
 	default:
 		return (KMF_ERR_BAD_KEY_TYPE);
@@ -2462,6 +2473,9 @@ KMFPK11_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 						keys[n].keyalg = KMF_DES;
 					else if (keytype == CKK_DES3)
 						keys[n].keyalg = KMF_DES3;
+					else if (keytype == CKK_GENERIC_SECRET)
+						keys[n].keyalg =
+						    KMF_GENERIC_SECRET;
 
 				}
 				n++;
@@ -2474,6 +2488,7 @@ KMFPK11_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 		/* "numkeys" indicates the number that were actually found */
 		*numkeys = n;
 	}
+
 	if (ckrv == KMF_OK && keys != NULL && (*numkeys) > 0) {
 		if (parms->format == KMF_FORMAT_RAWKEY) {
 			/* Convert keys to "rawkey" format */
@@ -2784,6 +2799,22 @@ KMFPK11_CreateSymKey(KMF_HANDLE_T handle, KMF_CREATESYMKEY_PARAMS *params,
 	if (params == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
+	/*
+	 * For AES, RC4, DES and 3DES, call C_GenerateKey() to create a key.
+	 *
+	 * For a generic secret key, because it may not be supported in
+	 * C_GenerateKey() for some PKCS11 providers, we will handle it
+	 * differently.
+	 */
+	if (params->keytype == KMF_GENERIC_SECRET) {
+		rv = create_generic_secret_key(handle, params, &keyhandle);
+		if (rv != KMF_OK)
+			goto out;
+		else
+			goto setup;
+	}
+
+	/* Other keytypes */
 	keyGenMech.pParameter = NULL_PTR;
 	keyGenMech.ulParameterLen = 0;
 	switch (params->keytype) {
@@ -2868,6 +2899,7 @@ KMFPK11_CreateSymKey(KMF_HANDLE_T handle, KMF_CREATESYMKEY_PARAMS *params,
 		goto out;
 	}
 
+setup:
 	symkey->kstype = KMF_KEYSTORE_PK11TOKEN;
 	symkey->keyalg = params->keytype;
 	symkey->keyclass = KMF_SYMMETRIC;
@@ -3129,4 +3161,115 @@ cleanup:
 	}
 
 	return (ret);
+}
+
+static KMF_RETURN
+create_generic_secret_key(KMF_HANDLE_T handle,
+    KMF_CREATESYMKEY_PARAMS *params, CK_OBJECT_HANDLE *key)
+{
+	KMF_RETURN		rv = KMF_OK;
+	KMF_HANDLE		*kmfh = (KMF_HANDLE *)handle;
+	CK_RV			ckrv;
+	CK_SESSION_HANDLE	hSession = kmfh->pk11handle;
+	CK_OBJECT_CLASS		class = CKO_SECRET_KEY;
+	CK_ULONG		secKeyType = CKK_GENERIC_SECRET;
+	CK_ULONG		secKeyLen;
+	CK_BBOOL		true = TRUE;
+	CK_BBOOL		false = FALSE;
+	CK_ATTRIBUTE		templ[15];
+	int			i;
+	int			random_fd = -1;
+	int			nread;
+	char			*buf = NULL;
+
+	/*
+	 * Check the key size.
+	 */
+	if ((params->keylength % 8) != 0) {
+		return (KMF_ERR_BAD_KEY_SIZE);
+	} else {
+		secKeyLen = params->keylength/8;  /* in bytes */
+	}
+
+	/*
+	 * Generate a random number with the key size first.
+	 */
+	buf = malloc(secKeyLen);
+	if (buf == NULL)
+		return (KMF_ERR_MEMORY);
+
+	while ((random_fd = open(DEV_RANDOM, O_RDONLY)) < 0) {
+		if (errno != EINTR)
+			break;
+	}
+
+	if (random_fd < 0) {
+		rv = KMF_ERR_KEYGEN_FAILED;
+		goto out;
+	}
+
+	nread = read(random_fd, buf, secKeyLen);
+	if (nread <= 0 || nread != secKeyLen) {
+		rv = KMF_ERR_KEYGEN_FAILED;
+		goto out;
+	}
+
+	/*
+	 * Authenticate into the token and call C_CreateObject to generate
+	 * a generic secret token key.
+	 */
+	rv = pk11_authenticate(handle, &params->cred);
+	if (rv != KMF_OK) {
+		goto out;
+	}
+
+	i = 0;
+	SETATTR(templ, i, CKA_CLASS, &class, sizeof (class));
+	i++;
+	SETATTR(templ, i, CKA_KEY_TYPE, &secKeyType, sizeof (secKeyType));
+	i++;
+	SETATTR(templ, i, CKA_VALUE, buf, secKeyLen);
+	i++;
+
+	if (params->keylabel != NULL) {
+		SETATTR(templ, i, CKA_LABEL, params->keylabel,
+		    strlen(params->keylabel));
+		i++;
+	}
+
+	if (params->pkcs11parms.sensitive == B_TRUE) {
+		SETATTR(templ, i, CKA_SENSITIVE, &true, sizeof (true));
+	} else {
+		SETATTR(templ, i, CKA_SENSITIVE, &false, sizeof (false));
+	}
+	i++;
+
+	if (params->pkcs11parms.not_extractable == B_TRUE) {
+		SETATTR(templ, i, CKA_EXTRACTABLE, &false, sizeof (false));
+	} else {
+		SETATTR(templ, i, CKA_EXTRACTABLE, &true, sizeof (true));
+	}
+	i++;
+
+	SETATTR(templ, i, CKA_TOKEN, &true, sizeof (true));
+	i++;
+	SETATTR(templ, i, CKA_PRIVATE, &true, sizeof (true));
+	i++;
+	SETATTR(templ, i, CKA_SIGN, &true, sizeof (true));
+	i++;
+
+	ckrv = C_CreateObject(hSession, templ, i, key);
+	if (ckrv != CKR_OK) {
+		SET_ERROR(kmfh, ckrv);
+		rv = KMF_ERR_KEYGEN_FAILED;
+	}
+
+out:
+	if (buf != NULL)
+		free(buf);
+
+	if (random_fd != -1)
+		(void) close(random_fd);
+
+	return (rv);
 }

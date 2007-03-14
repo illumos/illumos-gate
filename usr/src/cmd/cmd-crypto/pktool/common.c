@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -493,6 +493,8 @@ Str2SymKeyType(char *algm, KMF_KEY_ALG *ktype)
 		*ktype = KMF_DES;
 	else if (strcasecmp(algm, "3des") == 0)
 		*ktype = KMF_DES3;
+	else if (strcasecmp(algm, "generic") == 0)
+		*ktype = KMF_GENERIC_SECRET;
 	else
 		return (-1);
 

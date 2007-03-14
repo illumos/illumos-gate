@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -359,11 +359,11 @@ pk_genkey(int argc, char *argv[])
 		keylen = 64;  /* fixed size; ignore input */
 	else if (keyAlg == KMF_DES3)
 		keylen = 192; /* fixed size; ignore input */
-	else /* AES or ARCFOUR */ {
+	else /* AES, ARCFOUR, or GENERIC SECRET */ {
 		if (keylenstr == NULL) {
 			cryptoerror(LOG_STDERR,
-				gettext("Key length must be specified "
-				"for AES and ARCFOUR symmetric keys.\n"));
+				gettext("Key length must be specified for "
+				"AES, ARCFOUR or GENERIC symmetric keys.\n"));
 			return (PK_ERR_USAGE);
 		}
 		if (sscanf(keylenstr, "%d", &keylen) != 1) {
