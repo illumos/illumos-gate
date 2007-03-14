@@ -825,6 +825,7 @@ atexit_fini()
 
 	lml = &lml_main;
 	lml->lm_flags |= LML_FLG_ATEXIT;
+	lml->lm_flags &= ~LML_FLG_INTRPOSETSORT;
 	lmp = (Rt_map *)lml->lm_head;
 
 	/*
@@ -876,6 +877,7 @@ atexit_fini()
 			continue;
 
 		lml->lm_flags |= LML_FLG_ATEXIT;
+		lml->lm_flags &= ~LML_FLG_INTRPOSETSORT;
 
 		/*
 		 * Reverse topologically sort the link-map for .fini execution.
@@ -893,6 +895,7 @@ atexit_fini()
 	 */
 	lml = &lml_rtld;
 	lml->lm_flags |= LML_FLG_ATEXIT;
+	lml->lm_flags &= ~LML_FLG_INTRPOSETSORT;
 	lmp = (Rt_map *)lml->lm_head;
 
 	if (((tobj = tsort(lmp, lml->lm_obj, RT_SORT_FWD)) != 0) &&

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -269,7 +269,11 @@ Dbg_util_edge_in(Lm_list *lml, Rt_map *clmp, uint_t flags, Rt_map *dlmp,
 	if ((clmp == 0) || (ectoggle == 0))
 		Dbg_util_nl(lml, DBG_NL_STD);
 	if (clmp == 0) {
-		dbg_print(lml, MSG_INTL(MSG_UTL_EDGE_TITLE), str);
+		if (flag & RT_SORT_INTPOSE)
+			dbg_print(lml, MSG_INTL(MSG_UTL_EDGE_TITLE_I), str);
+		else
+			dbg_print(lml, MSG_INTL(MSG_UTL_EDGE_TITLE_S), str);
+
 		dbg_print(lml, MSG_INTL(MSG_UTL_EDGE_START), ndx, NAME(dlmp));
 	} else
 		dbg_print(lml, MSG_INTL(MSG_UTL_EDGE_IN), ndx, NAME(dlmp),

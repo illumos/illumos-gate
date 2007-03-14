@@ -341,6 +341,7 @@ struct lm_list32 {
 						/*	tsort reevaluation */
 #define	LML_FLG_NOPENDGLBLAZY	0x00010000	/* no pending, global, lazy */
 						/*	dependencies remain */
+#define	LML_FLG_INTRPOSETSORT	0x00020000	/* interpose tsorting done */
 
 #define	LML_FLG_TRC_LDDSTUB	0x00100000	/* identify lddstub */
 #define	LML_FLG_TRC_ENABLE	0x00200000	/* tracing enabled (ldd) */
@@ -777,6 +778,8 @@ typedef struct rt_map32 {
 #define	RT_SORT_REV	0x02		/* reverse topological sort (.init) */
 #define	RT_SORT_DELETE	0x10		/* process FLG_RT_DELNEED objects */
 					/*	only (called via dlclose()) */
+#define	RT_SORT_INTPOSE	0x20		/* process interposer objects */
+
 /*
  * Flags for lookup_sym (and hence find_sym) routines.
  */

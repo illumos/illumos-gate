@@ -705,7 +705,8 @@
 @ MSG_UTL_INTOOLATE	"loading after relocation has started: interposition \
 			 request (DF_1_INTERPOSE) ignored: %s"
 
-@ MSG_UTL_EDGE_TITLE	"traversing %s dependency edge:"
+@ MSG_UTL_EDGE_TITLE_I	"traversing %s dependency edge for interposer:"
+@ MSG_UTL_EDGE_TITLE_S	"traversing %s dependency edge:"
 @ MSG_UTL_EDGE_START	"  node (%d): file=%s"
 @ MSG_UTL_EDGE_IN	"  node (%d): file=%s: referenced by %s  %s"
 @ MSG_UTL_EDGE_OUT	"  node (%d): file=%s; cyclic dependency on %s"

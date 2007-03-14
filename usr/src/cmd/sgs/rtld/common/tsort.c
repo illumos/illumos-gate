@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -688,6 +688,39 @@ f_initfirst(Sort * sort, int end)
 }
 
 /*
+ * Determine whether .init or .fini processing is required.
+ */
+static int
+initorfini(Lm_list *lml, Rt_map *lmp, int flag, Sort *sort)
+{
+	if (flag & RT_SORT_REV) {
+		/*
+		 * For .init processing, only collect objects that have been
+		 * relocated and haven't already been collected.
+		 */
+		if ((FLAGS(lmp) & (FLG_RT_RELOCED | FLG_RT_INITCLCT)) !=
+		    FLG_RT_RELOCED)
+			return (0);
+
+		if (dep_visit(lml, 0, 0, lmp, sort, flag) == -1)
+			return (1);
+
+	} else if (!(flag & RT_SORT_DELETE) || (FLAGS(lmp) & FLG_RT_DELETE)) {
+		/*
+		 * Only collect objects that have had their .init collected,
+		 * and haven't already been .fini collected.
+		 */
+		if (!((FLAGS(lmp) & (FLG_RT_INITCLCT | FLG_RT_FINICLCT)) ==
+		    (FLG_RT_INITCLCT)))
+			return (0);
+
+		if (dep_visit(lml, 0, 0, lmp, sort, flag) == -1)
+			return (1);
+	}
+	return (0);
+}
+
+/*
  * Sort the dependency
  */
 Rt_map **
@@ -750,7 +783,7 @@ tsort(Rt_map *lmp, int num, int flag)
 	 * to tsort() for .init processing is passed the link-map from which to
 	 * start searching.  However, if new objects have dependencies on
 	 * existing objects, or existing objects have been promoted (RTLD_LAZY
-	 * to RTLD_NOW), then start  searching at the head of the link-map list.
+	 * to RTLD_NOW), then start searching at the head of the link-map list.
 	 * These previously loaded objects will have been tagged for inclusion
 	 * in this tsort() pass.  They still remain on an existing tsort() list,
 	 * which must have been prempted for control to have arrived here.
@@ -766,33 +799,73 @@ tsort(Rt_map *lmp, int num, int flag)
 	lml->lm_flags &=
 	    ~(LML_FLG_OBJREEVAL | LML_FLG_OBJADDED | LML_FLG_OBJDELETED);
 
-	for (; _lmp; _lmp = (Rt_map *)NEXT(_lmp)) {
-		if (flag & RT_SORT_REV) {
-			/*
-			 * For .init processing, only collect objects that have
-			 * been relocated and haven't already been collected.
-			 */
-			if ((FLAGS(_lmp) & (FLG_RT_RELOCED |
-			    FLG_RT_INITCLCT)) != FLG_RT_RELOCED)
-				continue;
+	/*
+	 * If interposers exist, inspect these objects first.
+	 *
+	 * Interposers can provide implicit dependencies - for example, an
+	 * application that has a dependency on libumem will caused any other
+	 * dependencies of the application that use the malloc family, to
+	 * have an implicit dependency on libumem.  However, under the default
+	 * condition of lazy binding, these dependency relationships on libumem
+	 * are unknown to the tsorting process (ie. a call to one of the malloc
+	 * family has not occurred to establish the dependency).  This lack of
+	 * dependency information makes the interposer look "standalone",
+	 * whereas the interposers .init/.fini should be analyzed with respect
+	 * to the dependency relationship libumem will eventually create.
+	 *
+	 * By inspecting interposing objects first, we are able to trigger
+	 * their .init sections to be accounted for before any others.
+	 * Selecting these .init sections first is important for the malloc
+	 * libraries, as these libraries need to prepare for pthread_atfork().
+	 * However, handling interposer libraries in this generic fashion
+	 * should help provide for other dependency relationships that may
+	 * exist.
+	 */
+	if ((lml->lm_flags & (LML_FLG_INTRPOSE | LML_FLG_INTRPOSETSORT)) ==
+	    LML_FLG_INTRPOSE) {
+		Rt_map	*ilmp = _lmp;
 
-			if (dep_visit(lml, 0, 0, _lmp, &sort, flag) == -1)
-				return ((Rt_map **)S_ERROR);
+		/*
+		 * Unless the executable is tagged as an interposer, skip to
+		 * the next object.
+		 */
+		if ((FLAGS(ilmp) & MSK_RT_INTPOSE) == 0)
+			ilmp = (Rt_map *)NEXT(ilmp);
 
-		} else if (!(flag & RT_SORT_DELETE) ||
-		    (FLAGS(_lmp) & FLG_RT_DELETE)) {
-			/*
-			 * Only collect objects that have had their .init
-			 * collected, and haven't already been .fini collected.
-			 */
-			if (!((FLAGS(_lmp) &
-			    (FLG_RT_INITCLCT | FLG_RT_FINICLCT)) ==
-			    (FLG_RT_INITCLCT)))
-				continue;
+		for (; ilmp; ilmp = (Rt_map *)NEXT(ilmp)) {
+			if ((FLAGS(ilmp) & MSK_RT_INTPOSE) == 0)
+				break;
 
-			if (dep_visit(lml, 0, 0, _lmp, &sort, flag) == -1)
+			if (initorfini(lml, ilmp, (flag | RT_SORT_INTPOSE),
+			    &sort) != 0)
 				return ((Rt_map **)S_ERROR);
 		}
+
+		/*
+		 * Once all interposers are processed, there is no need to
+		 * look for interposers again.  An interposer can only
+		 * be introduced before any relocation takes place, thus
+		 * interposer .init's will be grabbed during the first tsort
+		 * starting at the head of the link-map list.
+		 *
+		 * Interposers can't be unloaded.  Thus interposer .fini's can
+		 * only be called during atexit() processing.  The interposer
+		 * tsort flag is removed from each link-map list during
+		 * atexit_fini() so that the interposers .fini sections are
+		 * processed appropriately.
+		 */
+		lml->lm_flags |= LML_FLG_INTRPOSETSORT;
+	}
+
+	/*
+	 * Inspect any standard objects.
+	 */
+	for (; _lmp; _lmp = (Rt_map *)NEXT(_lmp)) {
+		if (FLAGS(_lmp) & MSK_RT_INTPOSE)
+			continue;
+
+		if (initorfini(lml, _lmp, flag, &sort) != 0)
+			return ((Rt_map **)S_ERROR);
 	}
 
 	/*

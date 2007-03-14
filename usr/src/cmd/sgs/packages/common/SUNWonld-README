@@ -1199,3 +1199,5 @@ Bugid   Risk Synopsis
 6527318 dlopen(name, RTLD_NOLOAD) returns handle for unloaded library
 6518359 extern mapfiles references to _init/_fini can create INIT/FINI
 	addresses of 0
+6533587 ld.so.1: init/fini processing needs to compensate for interposer
+	expectations
