@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,6 +39,7 @@ i pkginfo
 i copyright
 i depend
 i postinstall
+i preremove
 i i.preserve
 i i.manifest
 i r.manifest
@@ -55,3 +56,7 @@ d none var/svc/manifest/application/print 755 root sys
 f manifest var/svc/manifest/application/print/rfc1179.xml 0444 root sys
 d none var/spool 755 root bin
 d none var/spool/print 0755 root lp
+d none var/lp 775 lp lp
+d none var/lp/ppd 755 root lp
+d none var/lp/ppd/caches 755 root lp
+f none var/lp/ppd/manufaliases 444 root lp

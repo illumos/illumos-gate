@@ -35,7 +35,6 @@
 i pkginfo
 i copyright
 i depend
-i preremove
 
 #
 # source locations relative to the prototype file
@@ -58,7 +57,7 @@ s none usr/sadm/admin/printmgr/lib/libpmgr.so=./libpmgr.so.1
 f none usr/sadm/admin/printmgr/classes/pmserver.jar 644 root lp
 f none usr/sadm/admin/printmgr/classes/pmclient.jar 644 root lp
 #
-# Scripts and files for ppdmgr
+# Scripts and files for printmgr and ppdmgr
 #
 d none usr/lib 755 root bin
 d none usr/lib/lp 755 root lp
@@ -73,9 +72,3 @@ f none usr/lib/lp/bin/printer-info 555 root lp
 d none usr/sbin 755 root bin
 f none usr/sbin/ppdmgr 0555 root lp
 s none usr/sbin/printmgr=../../usr/sadm/admin/bin/printmgr
-#
-d none var 755 root sys
-d none var/lp 775 lp lp
-d none var/lp/ppd 755 root lp
-d none var/lp/ppd/caches 755 root lp
-f none var/lp/ppd/manufaliases 444 root lp
