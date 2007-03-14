@@ -4730,7 +4730,7 @@ info_net(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 static void
 output_dev(FILE *fp, struct zone_devtab *devtab)
 {
-	(void) fprintf(fp, "%s\n", rt_to_str(RT_DEVICE));
+	(void) fprintf(fp, "%s:\n", rt_to_str(RT_DEVICE));
 	output_prop(fp, PT_MATCH, devtab->zone_dev_match, B_TRUE);
 }
 

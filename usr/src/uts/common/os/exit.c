@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -777,11 +777,22 @@ proc_exit(int why, int what)
 	}
 
 	/*
-	 * curthread's proc pointer is changed to point at p0 because
-	 * curthread's original proc pointer can be freed as soon as
-	 * the child sends a SIGCLD to its parent.
+	 * curthread's proc pointer is changed to point to the 'sched'
+	 * process for the corresponding zone, except in the case when
+	 * the exiting process is in fact a zsched instance, in which
+	 * case the proc pointer is set to p0.  We do so, so that the
+	 * process still points at the right zone when we call the VN_RELE()
+	 * below.
+	 *
+	 * This is because curthread's original proc pointer can be freed as
+	 * soon as the child sends a SIGCLD to its parent.  We use zsched so
+	 * that for user processes, even in the final moments of death, the
+	 * process is still associated with its zone.
 	 */
-	t->t_procp = &p0;
+	if (p != t->t_procp->p_zone->zone_zsched)
+		t->t_procp = t->t_procp->p_zone->zone_zsched;
+	else
+		t->t_procp = &p0;
 
 	mutex_exit(&p->p_lock);
 	if (!evaporate) {
@@ -797,11 +808,6 @@ proc_exit(int why, int what)
 	}
 	mutex_exit(&pidlock);
 
-	task_rele(tk);
-
-	kmem_free(lwpdir, lwpdir_sz * sizeof (lwpdir_t));
-	kmem_free(tidhash, tidhash_sz * sizeof (lwpdir_t *));
-
 	/*
 	 * We don't release u_cdir and u_rdir until SZOMB is set.
 	 * This protects us against dofusers().
@@ -811,6 +817,18 @@ proc_exit(int why, int what)
 		VN_RELE(rdir);
 	if (cwd)
 		refstr_rele(cwd);
+
+	/*
+	 * task_rele() may ultimately cause the zone to go away (or
+	 * may cause the last user process in a zone to go away, which
+	 * signals zsched to go away).  So prior to this call, we must
+	 * no longer point at zsched.
+	 */
+	t->t_procp = &p0;
+	task_rele(tk);
+
+	kmem_free(lwpdir, lwpdir_sz * sizeof (lwpdir_t));
+	kmem_free(tidhash, tidhash_sz * sizeof (lwpdir_t *));
 
 	lwp_pcb_exit();
 

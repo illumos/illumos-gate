@@ -128,6 +128,8 @@
 /* 0755 is the default directory mode. */
 #define	DEFAULT_DIR_MODE \
 	(S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH)
+#define	DEFAULT_DIR_USER -1	/* user ID for chown: -1 means don't change */
+#define	DEFAULT_DIR_GROUP -1	/* grp ID for chown: -1 means don't change */
 
 #define	IPD_DEFAULT_OPTS \
 	MNTOPT_RO "," MNTOPT_LOFS_NOSUB "," MNTOPT_NODEVICES
@@ -417,7 +419,8 @@ check_lofs_needed(zlog_t *zlogp, struct zone_fstab *fsptr)
 }
 
 static int
-make_one_dir(zlog_t *zlogp, const char *prefix, const char *subdir, mode_t mode)
+make_one_dir(zlog_t *zlogp, const char *prefix, const char *subdir, mode_t mode,
+    uid_t userid, gid_t groupid)
 {
 	char path[MAXPATHLEN];
 	struct stat st;
@@ -455,7 +458,10 @@ make_one_dir(zlog_t *zlogp, const char *prefix, const char *subdir, mode_t mode)
 				return (-1);
 			}
 		}
-	} else if (mkdirp(path, mode) != 0) {
+		return (0);
+	}
+
+	if (mkdirp(path, mode) != 0) {
 		if (errno == EROFS)
 			zerror(zlogp, B_FALSE, "Could not mkdir %s.\nIt is on "
 			    "a read-only file system in this local zone.\nMake "
@@ -464,6 +470,8 @@ make_one_dir(zlog_t *zlogp, const char *prefix, const char *subdir, mode_t mode)
 			zerror(zlogp, B_TRUE, "mkdirp of %s failed", path);
 		return (-1);
 	}
+
+	(void) chown(path, userid, groupid);
 	return (0);
 }
 
@@ -1114,7 +1122,7 @@ mount_one(zlog_t *zlogp, struct zone_fstab *fsptr, const char *rootpath)
 	}
 
 	if (make_one_dir(zlogp, rootpath, fsptr->zone_fs_dir,
-	    DEFAULT_DIR_MODE) != 0)
+	    DEFAULT_DIR_MODE, DEFAULT_DIR_USER, DEFAULT_DIR_GROUP) != 0)
 		return (-1);
 
 	(void) snprintf(path, sizeof (path), "%s%s", rootpath,
@@ -3203,7 +3211,7 @@ tsol_mounts(zlog_t *zlogp, char *zone_name, char *rootpath)
 
 	/* Make sure our zone has an /export/home dir */
 	(void) make_one_dir(zlogp, rootpath, "/export/home",
-	    DEFAULT_DIR_MODE);
+	    DEFAULT_DIR_MODE, DEFAULT_DIR_USER, DEFAULT_DIR_GROUP);
 
 	lower_fstab.zone_fs_raw[0] = '\0';
 	(void) strlcpy(lower_fstab.zone_fs_type, MNTTYPE_LOFS,
@@ -3313,7 +3321,8 @@ again:
 				char optstr[] = "indirect,ignore,nobrowse";
 
 				(void) make_one_dir(zlogp, "",
-				    autofs_fstab.zone_fs_dir, DEFAULT_DIR_MODE);
+				    autofs_fstab.zone_fs_dir, DEFAULT_DIR_MODE,
+				    DEFAULT_DIR_USER, DEFAULT_DIR_GROUP);
 
 				/*
 				 * Mount will fail if automounter has already
@@ -3381,8 +3390,9 @@ again:
 				 * Make sure the lower-level home exists
 				 */
 				if (make_one_dir(zlogp,
-				    lower_fstab.zone_fs_special,
-				    "/home", DEFAULT_DIR_MODE) != 0)
+				    lower_fstab.zone_fs_special, "/home",
+				    DEFAULT_DIR_MODE, DEFAULT_DIR_USER,
+				    DEFAULT_DIR_GROUP) != 0)
 					continue;
 
 				(void) strlcat(lower_fstab.zone_fs_special,
@@ -4240,9 +4250,11 @@ vplat_bringup(zlog_t *zlogp, boolean_t mount_cmd, zoneid_t zoneid)
 		lofs_discard_mnttab();
 		return (-1);
 	}
-
 	resolve_lofs(zlogp, zonepath, sizeof (zonepath));
-	if (make_one_dir(zlogp, zonepath, "/dev", DEFAULT_DIR_MODE) != 0) {
+
+	/* Make /dev directory owned by root, grouped sys */
+	if (make_one_dir(zlogp, zonepath, "/dev", DEFAULT_DIR_MODE,
+	    0, 3) != 0) {
 		lofs_discard_mnttab();
 		return (-1);
 	}

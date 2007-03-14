@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -85,7 +85,7 @@
 	<template>
 		<common_name>
 			<loctext xml:lang='C'>
-			Zones autoboot
+			Zones autoboot and graceful shutdown
 			</loctext>
 		</common_name>
 		<documentation>
