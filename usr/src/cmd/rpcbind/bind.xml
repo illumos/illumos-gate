@@ -21,7 +21,7 @@
    
     CDDL HEADER END
    
-    Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+    Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
 
     ident	"%Z%%M%	%I%	%E% SMI"
@@ -74,13 +74,19 @@
 			value='svc:/system/sysidtool:net' />
 	</dependency>
 
+	<!--
+		rpcbind(1M) depends on multicast routes installed by the
+		routing-setup service, and should be started after any IPsec
+		policy is configured and TCP ndd tunables are set (both
+		currently carried out by network/initial).
+	-->
 	<dependency
-		name='routing'
+		name='network_initial'
 		grouping='optional_all'
 		restart_on='none'
 		type='service'>
-		<service_fmri
-			value='svc:/network/initial:default' />
+		<service_fmri value='svc:/network/routing-setup:default' />
+		<service_fmri value='svc:/network/initial:default' />
 	</dependency>
 
 	<exec_method
