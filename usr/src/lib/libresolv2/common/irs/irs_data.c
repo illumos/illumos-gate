@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,10 +130,17 @@ net_data_init(const char *conf_file) {
 	struct net_data *net_data;
 
 	if (!once) {
-		pthread_mutex_lock(&keylock);
-		if (!once++)
-			pthread_key_create(&key, net_data_destroy);
-		pthread_mutex_unlock(&keylock);
+		if (pthread_mutex_lock(&keylock) != 0)
+			return (NULL);
+		if (!once) {
+			if (pthread_key_create(&key, net_data_destroy) != 0) {
+				pthread_mutex_unlock(&keylock);
+				return (NULL);
+			}
+			once = 1;
+		}
+		if (pthread_mutex_unlock(&keylock) != 0)
+			return (NULL);
 	}
 	net_data = pthread_getspecific(key);
 #endif
@@ -143,7 +150,10 @@ net_data_init(const char *conf_file) {
 		if (net_data == NULL)
 			return (NULL);
 #ifdef	DO_PTHREADS
-		pthread_setspecific(key, net_data);
+		if (pthread_setspecific(key, net_data) != 0) {
+			net_data_destroy(net_data);
+			return (NULL);
+		}
 #endif
 	}
 

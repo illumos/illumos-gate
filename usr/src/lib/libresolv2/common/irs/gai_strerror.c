@@ -1,5 +1,5 @@
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,20 +69,30 @@ gai_strerror(int ecode) {
 		return (gai_errlist[ecode]);
 
 #ifdef DO_PTHREADS
-        if (!once) {
-                pthread_mutex_lock(&lock);
-                if (!once++)
-                        pthread_key_create(&key, free);
-                pthread_mutex_unlock(&lock);
-        }
+	if (!once) {
+		if (pthread_mutex_lock(&lock) != 0)
+			goto unknown;
+		if (!once) {
+			if (pthread_key_create(&key, free) != 0) {
+				pthread_mutex_unlock(&lock);
+				goto unknown;
+			}
+			once = 1;
+		}
+		if (pthread_mutex_unlock(&lock) != 0)
+			goto unknown;
+	}
 
 	buf = pthread_getspecific(key);
-        if (buf == NULL) {
+	if (buf == NULL) {
 		buf = malloc(EAI_BUFSIZE);
-                if (buf == NULL)
-                        return ("unknown error");
-                pthread_setspecific(key, buf);
-        }
+		if (buf == NULL)
+			goto unknown;
+		if (pthread_setspecific(key, buf) != 0) {
+			free(buf);
+			goto unknown;
+		}
+	}
 #endif
 	/* 
 	 * XXX This really should be snprintf(buf, EAI_BUFSIZE, ...).
@@ -90,4 +100,9 @@ gai_strerror(int ecode) {
 	 */
 	sprintf(buf, "%s: %d", gai_errlist[gai_nerr - 1], ecode);
 	return (buf);
+
+#ifdef	DO_PTHREADS
+unknown:
+	return ("unknown error");
+#endif
 }
