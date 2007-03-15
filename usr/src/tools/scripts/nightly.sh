@@ -1673,7 +1673,7 @@ echo | tee -a $mail_msg_file >> $LOGFILE
 
 # nightly (will fail in year 2100 due to SCCS flaw)
 echo "$0 $@" | tee -a $mail_msg_file >> $LOGFILE
-echo "nightly.sh version 1.110 2007/03/09\n" | tee -a $mail_msg_file >> $LOGFILE
+echo "%M% version %I% 20%E%\n" | tee -a $mail_msg_file >> $LOGFILE
 
 # make
 whence $MAKE | tee -a $mail_msg_file >> $LOGFILE
