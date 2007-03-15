@@ -618,6 +618,40 @@ KMF_VerifyCertWithCert(KMF_HANDLE_T handle,
 	return (ret);
 }
 
+static KMF_RETURN
+plugin_verify_data_with_cert(KMF_HANDLE_T handle,
+	KMF_KEYSTORE_TYPE kstype,
+	KMF_ALGORITHM_INDEX algid,
+	KMF_DATA *indata,
+	KMF_DATA *insig,
+	const KMF_DATA *SignerCert)
+{
+	KMF_PLUGIN *plugin;
+	KMF_RETURN ret = KMF_OK;
+
+	/*
+	 * If NSS, use PKCS#11, we are not accessing the database(s),
+	 * we just prefer the "verify" operation from the crypto framework.
+	 * The OpenSSL version is unique in order to avoid a dependency loop
+	 * with the kcfd(1M) process.
+	 */
+	if (kstype == KMF_KEYSTORE_NSS)
+		kstype = KMF_KEYSTORE_PK11TOKEN;
+
+	plugin = FindPlugin(handle, kstype);
+	if (plugin == NULL)
+		return (KMF_ERR_PLUGIN_NOTFOUND);
+
+	if (plugin->funclist->VerifyDataWithCert == NULL)
+		return (KMF_ERR_FUNCTION_NOT_FOUND);
+
+	CLEAR_ERROR(handle, ret);
+	ret = (plugin->funclist->VerifyDataWithCert(handle,
+		algid, indata, insig, (KMF_DATA *)SignerCert));
+
+	return (ret);
+}
+
 /*
  *
  * Name: KMF_VerifyDataWithCert
@@ -649,7 +683,6 @@ KMF_VerifyDataWithCert(KMF_HANDLE_T handle,
 	const KMF_DATA *SignerCert)
 {
 	KMF_RETURN ret;
-	KMF_PLUGIN *plugin;
 
 	CLEAR_ERROR(handle, ret);
 	if (ret != KMF_OK)
@@ -664,25 +697,8 @@ KMF_VerifyDataWithCert(KMF_HANDLE_T handle,
 	if (ret != KMF_OK)
 		return (ret);
 
-	/*
-	 * If NSS, use PKCS#11, we are not accessing the database(s),
-	 * we just prefer the "verify" operation from the crypto framework.
-	 * The OpenSSL version is unique in order to avoid a dependency loop
-	 * with the kcfd(1M) process.
-	 */
-	if (kstype == KMF_KEYSTORE_NSS)
-		kstype = KMF_KEYSTORE_PK11TOKEN;
-
-	plugin = FindPlugin(handle, kstype);
-	if (plugin == NULL)
-		return (KMF_ERR_PLUGIN_NOTFOUND);
-
-	if (plugin->funclist->VerifyDataWithCert == NULL)
-		return (KMF_ERR_FUNCTION_NOT_FOUND);
-
-	CLEAR_ERROR(handle, ret);
-	ret = (plugin->funclist->VerifyDataWithCert(handle,
-		algid, indata, insig, (KMF_DATA *)SignerCert));
+	ret = plugin_verify_data_with_cert(handle, kstype,
+		algid, indata, insig, SignerCert);
 
 	return (ret);
 }
@@ -2622,7 +2638,6 @@ VerifyCertWithCert(KMF_HANDLE_T handle,
 	KMF_RETURN ret = KMF_OK;
 	KMF_X509_CERTIFICATE *SignerCert = NULL;
 	KMF_X509_CERTIFICATE *ToBeVerifiedCert = NULL;
-	KMF_X509_SPKI *pubkey;
 	KMF_DATA	data_to_verify = {0, NULL};
 	KMF_DATA	signed_data = {0, NULL};
 	KMF_DATA	signature;
@@ -2644,21 +2659,6 @@ VerifyCertWithCert(KMF_HANDLE_T handle,
 	if (ret != KMF_OK)
 		goto cleanup;
 
-	/* Decode the signer cert so we can get the SPKI data */
-	ret = DerDecodeSignedCertificate(SignerCertData, &SignerCert);
-	if (ret != KMF_OK)
-		goto cleanup;
-
-	/*
-	 * TODO !  Validate the SignerCert to make sure it is OK to be
-	 * used to verify other certs. Or - should this be done the calling
-	 * application?
-	 */
-	/* ValidateCert(SignerCert); */
-
-	/* Get the public key info from the signer certificate */
-	pubkey = &SignerCert->certificate.subjectPublicKeyInfo;
-
 	/* Decode the to-be-verified cert so we know what algorithm to use */
 	ret = DerDecodeSignedCertificate(CertToBeVerifiedData,
 	    &ToBeVerifiedCert);
@@ -2677,8 +2677,20 @@ VerifyCertWithCert(KMF_HANDLE_T handle,
 		signature.Length = signed_data.Length;
 	}
 
-	ret = PKCS_VerifyData(handle, algid, pubkey,
-		&data_to_verify, &signature);
+	/* Make sure the signer has proper key usage bits */
+	ret = check_key_usage(handle, SignerCertData, KMF_KU_SIGN_CERT);
+	if (ret != KMF_OK)
+		return (ret);
+
+	/*
+	 * To avoid recursion with kcfd consumer and libpkcs11,
+	 * do the data verification using the OpenSSL
+	 * plugin algorithms instead of the crypto framework.
+	 */
+	ret = plugin_verify_data_with_cert(handle,
+		KMF_KEYSTORE_OPENSSL,
+		algid, &data_to_verify, &signature,
+		SignerCertData);
 
 cleanup:
 	KMF_FreeData(&data_to_verify);

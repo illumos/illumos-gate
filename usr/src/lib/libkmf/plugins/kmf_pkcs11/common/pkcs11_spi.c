@@ -30,11 +30,12 @@
 #include <stdio.h> /* debugging only */
 #include <errno.h>
 #include <values.h>
-#include <fcntl.h>
 
 #include <kmfapiP.h>
 #include <ber_der.h>
 #include <algorithm.h>
+#include <fcntl.h>
+#include <sha1.h>
 
 #include <cryptoutil.h>
 #include <security/cryptoki.h>
@@ -1379,6 +1380,7 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle, KMF_CREATEKEYPAIR_PARAMS *params,
 	CK_ATTRIBUTE idattr[1];
 	char IDHashData[SHA1_HASH_LENGTH];
 	KMF_DATA IDInput, IDOutput;
+	SHA1_CTX ctx;
 
 #define	NUMBER_DSA_PRI_TEMPLATES (sizeof (ckDsaPriKeyTemplate) / \
 					sizeof (CK_ATTRIBUTE))
@@ -1607,7 +1609,12 @@ KMFPK11_CreateKeypair(KMF_HANDLE_T handle, KMF_CREATEKEYPAIR_PARAMS *params,
 	IDOutput.Data = (uchar_t *)IDHashData;
 	IDOutput.Length = sizeof (IDHashData);
 
-	rv = DigestData(hSession, &IDInput, &IDOutput);
+	SHA1Init(&ctx);
+	SHA1Update(&ctx, IDInput.Data, IDInput.Length);
+	SHA1Final(IDOutput.Data, &ctx);
+
+	IDOutput.Length = SHA1_DIGEST_LENGTH;
+
 	free(IDInput.Data);
 
 	if (rv != CKR_OK) {
@@ -2488,7 +2495,6 @@ KMFPK11_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 		/* "numkeys" indicates the number that were actually found */
 		*numkeys = n;
 	}
-
 	if (ckrv == KMF_OK && keys != NULL && (*numkeys) > 0) {
 		if (parms->format == KMF_FORMAT_RAWKEY) {
 			/* Convert keys to "rawkey" format */
@@ -2798,7 +2804,6 @@ KMFPK11_CreateSymKey(KMF_HANDLE_T handle, KMF_CREATESYMKEY_PARAMS *params,
 
 	if (params == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
-
 	/*
 	 * For AES, RC4, DES and 3DES, call C_GenerateKey() to create a key.
 	 *

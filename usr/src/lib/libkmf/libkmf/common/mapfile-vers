@@ -26,7 +26,6 @@
 
 SUNWprivate_1.1 {
     global:
-	DigestData;
 	GetIDFromSPKI;
 	KMF_AddCertEKU;
 	KMF_AddPolicyToDB;

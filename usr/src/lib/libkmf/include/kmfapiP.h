@@ -259,7 +259,6 @@ KMF_RETURN PKCS_AcquirePublicKeyHandle(CK_SESSION_HANDLE ckSession,
 	KMF_BOOL *);
 
 KMF_RETURN GetIDFromSPKI(KMF_X509_SPKI *, KMF_DATA *);
-CK_RV DigestData(CK_SESSION_HANDLE, KMF_DATA *, KMF_DATA *);
 
 KMF_RETURN KMF_SetAltName(KMF_X509_EXTENSIONS *,
 	KMF_OID *, int, KMF_GENERALNAMECHOICES, char *);
@@ -275,7 +274,7 @@ void free_dp_name(KMF_CRL_DIST_POINT *);
 void free_dp(KMF_CRL_DIST_POINT *);
 KMF_RETURN set_key_usage_extension(KMF_X509_EXTENSIONS *,
 	int, uint32_t);
-int is_pk11_ready();
+KMF_RETURN init_pk11();
 KMF_RETURN KMF_SelectToken(KMF_HANDLE_T, char *, int);
 
 

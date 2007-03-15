@@ -143,10 +143,22 @@ static kmf_error_map kmf_errcodes[] = {
 
 static void free_extensions(KMF_X509_EXTENSIONS *extns);
 
-int
-is_pk11_ready()
+KMF_RETURN
+init_pk11()
 {
-	return (pkcs11_initialized);
+	(void) mutex_lock(&init_lock);
+	if (!pkcs11_initialized) {
+		CK_RV rv = C_Initialize(NULL);
+		if ((rv != CKR_OK) &&
+		    (rv != CKR_CRYPTOKI_ALREADY_INITIALIZED)) {
+			(void) mutex_unlock(&init_lock);
+			return (KMF_ERR_UNINITIALIZED);
+		} else {
+			pkcs11_initialized = 1;
+		}
+	}
+	(void) mutex_unlock(&init_lock);
+	return (KMF_OK);
 }
 
 /*
@@ -311,19 +323,6 @@ KMF_Initialize(KMF_HANDLE_T *outhandle, char *policyfile, char *policyname)
 	(void) memset(handle, 0, sizeof (KMF_HANDLE));
 	handle->plugins = NULL;
 
-	(void) mutex_lock(&init_lock);
-	if (!pkcs11_initialized) {
-		CK_RV rv = C_Initialize(NULL);
-		if ((rv != CKR_OK) &&
-		    (rv != CKR_CRYPTOKI_ALREADY_INITIALIZED)) {
-			ret = KMF_ERR_UNINITIALIZED;
-			(void) mutex_unlock(&init_lock);
-			goto errout;
-		} else {
-			pkcs11_initialized = 1;
-		}
-	}
-	(void) mutex_unlock(&init_lock);
 
 	/* Initialize the handle with the policy */
 	ret = KMF_SetPolicy((void *)handle,
@@ -498,7 +497,10 @@ KMF_DN2Der(KMF_X509_NAME *dn, KMF_DATA *der)
 	return (rv);
 }
 
-#define	SET_SYS_ERROR(h, c) h->lasterr.kstype = -1; h->lasterr.errcode = c;
+#define	SET_SYS_ERROR(h, c) if (h) {\
+	h->lasterr.kstype = -1;\
+	h->lasterr.errcode = c;\
+}
 
 KMF_RETURN
 KMF_ReadInputFile(KMF_HANDLE_T handle, char *filename,  KMF_DATA *pdata)
@@ -509,10 +511,11 @@ KMF_ReadInputFile(KMF_HANDLE_T handle, char *filename,  KMF_DATA *pdata)
 	unsigned char *buf = NULL;
 	KMF_RETURN ret;
 
-	CLEAR_ERROR(handle, ret);
-	if (ret != KMF_OK)
-		return (ret);
-
+	if (handle) {
+		CLEAR_ERROR(handle, ret);
+		if (ret != KMF_OK)
+			return (ret);
+	}
 
 	if (filename == NULL || pdata == NULL) {
 		return (KMF_ERR_BAD_PARAMETER);
@@ -690,28 +693,24 @@ KMF_OID2String(KMF_OID *oid)
 static boolean_t
 check_for_pem(char *filename)
 {
-	char buf[BUFSIZ];
-	int len, f;
+	KMF_DATA filebuf;
+	KMF_RETURN rv;
+	char *p;
 
-	if ((f = open(filename, O_RDONLY | O_NONBLOCK)) < 0)
+	rv = KMF_ReadInputFile(NULL, filename, &filebuf);
+	if (rv != KMF_OK)
 		return (FALSE);
 
-	while ((len = read(f, buf, sizeof (buf))) > 0) {
-		/* Look for "-----BEGIN" right after a newline */
-		char *p;
-
-		p = strtok(buf, "\n");
-		while (p != NULL) {
-			if (p < (buf + len)) {
-				if (strstr(p, "-----BEGIN") != NULL) {
-					(void) close(f);
-					return (TRUE);
-				}
-			}
-			p = strtok(NULL, "\n");
+	/* Look for "-----BEGIN" right after a newline */
+	p = strtok((char *)filebuf.Data, "\n");
+	while (p != NULL) {
+		if (strstr(p, "-----BEGIN") != NULL) {
+			free(filebuf.Data);
+			return (TRUE);
 		}
+		p = strtok(NULL, "\n");
 	}
-	(void) close(f);
+	free(filebuf.Data);
 	return (FALSE);
 }
 

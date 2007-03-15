@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -58,8 +58,8 @@ LIBS=	$(DYNLIB) $(LINTLIB)
 
 $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 
-LDLIBS		+=	$(BERDERLIB) $(CRYPTOUTILLIB) -lpkcs11 -lnsl -lsocket -lc 
-LDLIBS64	+=	$(BERDERLIB64) $(CRYPTOUTILLIB64) -lpkcs11 -lnsl -lsocket -lc 
+LDLIBS		+=	$(BERDERLIB) $(CRYPTOUTILLIB) -lmd -lpkcs11 -lnsl -lsocket -lc 
+LDLIBS64	+=	$(BERDERLIB64) $(CRYPTOUTILLIB64) -lmd -lpkcs11 -lnsl -lsocket -lc 
 
 # DYNLIB libraries do not have lint libs and are not linted
 $(DYNLIB) :=    LDLIBS += -lxml2

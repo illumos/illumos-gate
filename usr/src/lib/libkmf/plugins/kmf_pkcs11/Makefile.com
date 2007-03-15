@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,7 +36,7 @@ include	$(SRC)/lib/Makefile.lib
 LIBLINKS=	$(DYNLIB:.so.1=.so)
 KMFINC=		-I../../../include -I../../../ber_der/inc
 
-PKCS11LIBS=	-lkmf -lkmfberder -lpkcs11 -lcryptoutil -lc
+PKCS11LIBS=	-lkmf -lkmfberder -lmd -lpkcs11 -lcryptoutil -lc
 
 SRCDIR=		../common
 INCDIR=		../../include

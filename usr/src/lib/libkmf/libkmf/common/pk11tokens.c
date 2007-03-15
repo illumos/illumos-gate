@@ -497,8 +497,9 @@ KMF_SelectToken(KMF_HANDLE_T handle, char *label,
 		return (KMF_ERR_BAD_PARAMETER);
 	}
 
-	if (!is_pk11_ready()) {
-		return (KMF_ERR_UNINITIALIZED);
+	kmf_rv = init_pk11();
+	if (kmf_rv != KMF_OK) {
+		return (kmf_rv);
 	}
 
 	/* Only one token can be active per thread */

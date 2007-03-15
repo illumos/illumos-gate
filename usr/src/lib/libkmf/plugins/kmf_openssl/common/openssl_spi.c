@@ -4379,6 +4379,7 @@ OpenSSL_CreateSymKey(KMF_HANDLE_T handle, KMF_CREATESYMKEY_PARAMS *params,
 		rkey->keydata.val = (uchar_t *)des3key;
 		rkey->keydata.len = DES3_KEY_SIZE;
 		symkey->keyalg = KMF_DES3;
+
 	} else if (params->keytype == KMF_AES || params->keytype == KMF_RC4 ||
 	    params->keytype == KMF_GENERIC_SECRET) {
 		int bytes;
@@ -4845,7 +4846,8 @@ OpenSSL_VerifyDataWithCert(KMF_HANDLE_T handle,
 			goto cleanup;
 		}
 	}
-	switch (EVP_MD_type(md)) {
+	if (md != NULL) {
+		switch (EVP_MD_type(md)) {
 		case NID_md2:
 		case NID_md2WithRSAEncryption:
 			pfxlen = ASN1_MD2_OID_PREFIX_LEN;
@@ -4865,6 +4867,7 @@ OpenSSL_VerifyDataWithCert(KMF_HANDLE_T handle,
 			pfxlen = 0;
 			pfx = NULL;
 			break;
+		}
 	}
 
 	/* RSA with no hash is a special case */

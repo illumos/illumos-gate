@@ -9,6 +9,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <kmfapiP.h>
+#include <sha1.h>
 #include <security/cryptoki.h>
 
 #include <algorithm.h>
@@ -23,20 +24,17 @@ create_pk11_session(CK_SESSION_HANDLE *sessionp, CK_MECHANISM_TYPE wanted_mech,
 	CK_FLAGS wanted_flags)
 {
 	CK_RV rv;
+	KMF_RETURN ret;
 	KMF_RETURN kmf_rv = KMF_OK;
 	CK_SLOT_ID_PTR pSlotList;
 	CK_ULONG pulCount;
 	CK_MECHANISM_INFO info;
 	int i;
 
-	if (!is_pk11_ready()) {
-		rv = C_Initialize(NULL);
-		if ((rv != CKR_OK) &&
-		    (rv != CKR_CRYPTOKI_ALREADY_INITIALIZED)) {
-			kmf_rv = KMF_ERR_UNINITIALIZED;
-			goto out;
-		}
-	}
+	ret = init_pk11();
+
+	if (ret != KMF_OK)
+		return (ret);
 
 	rv = C_GetSlotList(0, NULL, &pulCount);
 	if (rv != CKR_OK) {
@@ -633,33 +631,25 @@ PKCS_EncryptData(KMF_HANDLE_T kmfh,
 
 }
 
-CK_RV
-DigestData(CK_SESSION_HANDLE hSession,
-	KMF_DATA *IDInput, KMF_DATA *IDOutput)
+static void
+DigestData(KMF_DATA *IDInput, KMF_DATA *IDOutput)
 {
-	CK_RV rv = KMF_OK;
-	CK_MECHANISM mechanism = {CKM_SHA_1, NULL, 0};
+	SHA1_CTX ctx;
 
-	rv = C_DigestInit(hSession, &mechanism);
-	if (rv != CKR_OK)
-		return (rv);
+	SHA1Init(&ctx);
+	SHA1Update(&ctx, IDInput->Data, IDInput->Length);
+	SHA1Final(IDOutput->Data, &ctx);
 
-	rv = C_Digest(hSession,
-			IDInput->Data, IDInput->Length,
-			IDOutput->Data, (CK_ULONG *)&IDOutput->Length);
-
-	return (rv);
+	IDOutput->Length = SHA1_DIGEST_LENGTH;
 }
 
 KMF_RETURN
-GetIDFromSPKI(KMF_X509_SPKI *spki,
-	KMF_DATA *ID)
+GetIDFromSPKI(KMF_X509_SPKI *spki, KMF_DATA *ID)
 {
 	KMF_RETURN rv = KMF_OK;
 	KMF_DATA KeyParts[KMF_MAX_PUBLIC_KEY_PARTS];
 	uint32_t uNumKeyParts = KMF_MAX_PUBLIC_KEY_PARTS;
 	KMF_ALGORITHM_INDEX algId;
-	CK_SESSION_HANDLE hSession = NULL;
 	int i;
 
 	if (ID == NULL || spki == NULL)
@@ -677,20 +667,11 @@ GetIDFromSPKI(KMF_X509_SPKI *spki,
 	if (rv != KMF_OK)
 		return (rv);
 
-	rv = create_pk11_session(&hSession, CKM_SHA_1, CKF_DIGEST);
-
-	if (rv != KMF_OK)
-		return (rv);
-
 	/* Check the KEY algorithm */
 	if (algId == KMF_ALGID_RSA) {
-		rv = DigestData(hSession,
-				&KeyParts[KMF_RSA_MODULUS],
-				ID);
+		DigestData(&KeyParts[KMF_RSA_MODULUS], ID);
 	} else if (algId == KMF_ALGID_DSA) {
-		rv = DigestData(hSession,
-				&KeyParts[KMF_DSA_PUBLIC_VALUE],
-				ID);
+		DigestData(&KeyParts[KMF_DSA_PUBLIC_VALUE], ID);
 	} else {
 		/* We only support RSA and DSA keys for now */
 		rv = KMF_ERR_BAD_ALGORITHM;
@@ -708,6 +689,5 @@ GetIDFromSPKI(KMF_X509_SPKI *spki,
 		ID->Length = 0;
 	}
 
-	(void) C_CloseSession(hSession);
 	return (rv);
 }
