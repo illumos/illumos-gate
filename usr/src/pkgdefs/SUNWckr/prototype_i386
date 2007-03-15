@@ -170,7 +170,7 @@ f none kernel/misc/cardbus 755 root sys
 f none kernel/misc/cmlb 755 root sys
 f none kernel/misc/consconfig 755 root sys
 f none kernel/misc/ctf 755 root sys
-l none kernel/misc/des=../../kernel/crypto/des
+s none kernel/misc/des=../../kernel/crypto/des
 f none kernel/misc/dls 755 root sys
 f none kernel/misc/fssnap_if 755 root sys
 f none kernel/misc/gld 755 root sys
@@ -356,7 +356,7 @@ f none kernel/misc/amd64/cardbus 755 root sys
 f none kernel/misc/amd64/cmlb 755 root sys
 f none kernel/misc/amd64/consconfig 755 root sys
 f none kernel/misc/amd64/ctf 755 root sys
-l none kernel/misc/amd64/des=../../../kernel/crypto/amd64/des
+s none kernel/misc/amd64/des=../../../kernel/crypto/amd64/des
 f none kernel/misc/amd64/dls 755 root sys
 f none kernel/misc/amd64/fssnap_if 755 root sys
 f none kernel/misc/amd64/gld 755 root sys

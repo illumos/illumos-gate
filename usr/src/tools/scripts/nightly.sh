@@ -433,6 +433,24 @@ build() {
 	fi
 
 	#
+	#	Re-sign selected binaries using signing server
+	#	(gatekeeper builds only)
+	#
+	if [ -n "$CODESIGN_USER" ]; then
+		echo "\n==== Signing proto area at `date` ====\n" >> $LOGFILE
+		signing_file="${TMPDIR}/signing"
+		rm -f ${signing_file}
+		export CODESIGN_USER
+		signproto $SRC/tools/codesign/creds 2>&1 | \
+			tee -a ${signing_file} >> $LOGFILE
+		echo "\n==== Finished signing proto area at `date` ====\n" \
+		    >> $LOGFILE
+		echo "\n==== Crypto module signing errors ($LABEL) ====\n" \
+		    >> $mail_msg_file
+		egrep 'WARNING|ERROR' ${signing_file} >> $mail_msg_file
+	fi
+
+	#
 	#	Create cpio archives for preintegration testing (PIT)
 	#
 	if [ "$a_FLAG" = "y" -a "$this_build_ok" = "y" ]; then
@@ -1655,7 +1673,7 @@ echo | tee -a $mail_msg_file >> $LOGFILE
 
 # nightly (will fail in year 2100 due to SCCS flaw)
 echo "$0 $@" | tee -a $mail_msg_file >> $LOGFILE
-echo "%M% version %I% 20%E%\n" | tee -a $mail_msg_file >> $LOGFILE
+echo "nightly.sh version 1.110 2007/03/09\n" | tee -a $mail_msg_file >> $LOGFILE
 
 # make
 whence $MAKE | tee -a $mail_msg_file >> $LOGFILE

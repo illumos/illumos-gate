@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -486,7 +486,7 @@ f none platform/sun4u/kernel/misc/kgss/sparcv9/kmech_krb5 755 root sys
 d none platform/sun4u/kernel/misc/sparcv9 755 root sys
 f none platform/sun4u/kernel/misc/sparcv9/kmdbmod 755 root sys
 f none platform/sun4u/kernel/misc/sparcv9/bootdev 755 root sys
-l none platform/sun4u/kernel/misc/sparcv9/des=../../../kernel/crypto/sparcv9/des
+s none platform/sun4u/kernel/misc/sparcv9/des=../../../kernel/crypto/sparcv9/des
 f none platform/sun4u/kernel/misc/sparcv9/forthdebug 755 root sys
 f none platform/sun4u/kernel/misc/sparcv9/i2c_svc 755 root sys
 l none platform/sun4u/kernel/misc/sparcv9/md5=../../../kernel/crypto/sparcv9/md5

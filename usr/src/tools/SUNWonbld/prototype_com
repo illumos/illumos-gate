@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -87,6 +87,8 @@ f none opt/onbld/bin/sccscp 555 root bin
 f none opt/onbld/bin/sccshist 555 root bin
 f none opt/onbld/bin/sccsmv 555 root bin
 f none opt/onbld/bin/sccsrm 555 root bin
+f none opt/onbld/bin/signit 555 root bin
+f none opt/onbld/bin/signproto 555 root bin
 f none opt/onbld/bin/validate_flg 555 root bin
 f none opt/onbld/bin/validate_paths 555 root bin
 f none opt/onbld/bin/wdiff 555 root bin

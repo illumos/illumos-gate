@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -84,12 +84,10 @@ bldenv
 	to rebuild (because of different -I or -L paths).
 
 build_cscope
-
 	builds cscope databases in the uts, the platform subdirectories
 	of uts, and in usr/src. Uses cscope-fast.
 
 check_rtime
-
 	checks ELF attributes used by ELF dynamic objects in the proto area.
 	Used by 'nightly's -r option, to check a number of ELF runtime
 	attributes for consistency with common build rules.  nightly uses
@@ -99,15 +97,23 @@ check_rtime
 	sure objects don't have any strange runpaths like /opt/SUNWspro/lib.
 
 checkproto
-
 	Runs protocmp and protolist on a workspace (or uses the environment
 	variable CODEMGR_WS to determine the workspace). Checks the proto area
 	against the packages.
 
 codereview
-
 	Given two filenames, creates a postscript file with the file 
 	differences highlighted.
+
+codesign
+	Tools for signing cryptographic modules using the official
+	Sun release keys stored on a remote signing server. This
+	directory contains signit, a client program for signing
+	files with the signing server; signproto, a shell script
+	that finds crypto modules in $ROOT and signs them using
+	signit; and codesign_server.pl, the code that runs on the
+	server. The codesign_server code is not used on an ON
+	build machine but is kept here for source control purposes.
 
 cscope-fast
 	The fast version of cscope that we use internally. Seems to work,

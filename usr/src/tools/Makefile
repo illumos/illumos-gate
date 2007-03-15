@@ -36,6 +36,7 @@ COMMON_SUBDIRS= \
 	abi \
 	bfuld \
 	codereview \
+	codesign \
 	cscope-fast \
 	ctf \
 	depcheck \

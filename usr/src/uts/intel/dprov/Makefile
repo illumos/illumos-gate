@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,6 +43,9 @@ OBJECTS		= $(DPROV_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(DPROV_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 ROOTLINK	= $(ROOT_CRYPTO_DIR)/$(MODULE)
+TARGET_32	= ../../kernel/drv/$(MODULE)
+TARGET_64	= ../../../kernel/drv/$(SUBDIR64)/$(MODULE)
+LINK_TARGET	= $(TARGET_$(CLASS))
 CONF_SRCDIR	= $(UTSBASE)/common/crypto/io
 
 #
@@ -103,7 +106,7 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 install:	$(INSTALL_DEPS)
 
 $(ROOTLINK):	$(ROOT_CRYPTO_DIR) $(ROOTMODULE)
-	-$(RM) $@; ln $(ROOTMODULE) $@
+	-$(RM) $@; ln -s $(LINK_TARGET) $@
 
 #
 #	Include common targets.

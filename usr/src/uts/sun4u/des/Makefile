@@ -21,7 +21,7 @@
 #
 # uts/sun4u/des/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,6 +45,9 @@ OBJECTS		= $(DES_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(DES_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_CRYPTO_DIR)/$(MODULE)
 ROOTLINK	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
+TARGET_32	= ../../kernel/crypto/$(MODULE)
+TARGET_64	= ../../../kernel/crypto/$(SUBDIR64)/$(MODULE)
+LINK_TARGET	= $(TARGET_$(CLASS))
 
 #
 #	Include common rules.
@@ -104,7 +107,7 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 install:	$(INSTALL_DEPS)
 
 $(ROOTLINK):	$(ROOT_PSM_MISC_DIR) $(ROOTMODULE)
-	-$(RM) $@; ln $(ROOTMODULE) $@
+	-$(RM) $@; ln -s $(LINK_TARGET) $@
 
 #
 #	Include common targets.

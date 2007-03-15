@@ -166,7 +166,7 @@ f none kernel/misc/sparcv9/cmlb 755 root sys
 f none kernel/misc/sparcv9/consconfig 755 root sys
 f none kernel/misc/sparcv9/ctf 755 root sys
 f none kernel/misc/sparcv9/dada 755 root sys
-l none kernel/misc/sparcv9/des=../../../kernel/crypto/sparcv9/des
+s none kernel/misc/sparcv9/des=../../../kernel/crypto/sparcv9/des
 f none kernel/misc/sparcv9/dls 755 root sys
 f none kernel/misc/sparcv9/fssnap_if 755 root sys
 f none kernel/misc/sparcv9/gld 755 root sys
