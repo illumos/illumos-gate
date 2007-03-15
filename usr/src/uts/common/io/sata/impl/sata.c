@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3123,7 +3123,7 @@ sata_scsi_getcap(struct scsi_address *ap, char *cap, int whom)
 		/* invalid address */
 		mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
 		    sata_device.satadev_addr.cport)));
-		return (0);
+		return (-1);
 	}
 
 	switch (scsi_hba_lookup_capstr(cap)) {
@@ -3144,26 +3144,19 @@ sata_scsi_getcap(struct scsi_address *ap, char *cap, int whom)
 	 * the way sd operates.  Because of this reason we do not
 	 * use it when available.
 	 */
-#if defined(_UNTAGGED_QING_SUPPORTED)
 	case SCSI_CAP_UNTAGGED_QING:
-		if (SATA_QDEPTH(sata_hba_inst) > 1)
-			rval = 1;	/* Untagged queuing supported */
+		if (sdinfo->satadrv_features_enabled &
+		    SATA_DEV_F_E_UNTAGGED_QING)
+			rval = 1;	/* Untagged queuing available */
 		else
-			rval = -1;	/* Untagged queuing not supported */
+			rval = -1;	/* Untagged queuing not available */
 		break;
-#endif
 
 	case SCSI_CAP_TAGGED_QING:
-		/* This can TCQ or NCQ */
-		if (sata_func_enable & SATA_ENABLE_QUEUING &&
-		    ((sdinfo->satadrv_features_support & SATA_DEV_F_TCQ &&
-		    SATA_FEATURES(sata_hba_inst) & SATA_CTLF_QCMD) ||
-		    (sata_func_enable & SATA_ENABLE_NCQ &&
-		    sdinfo->satadrv_features_support & SATA_DEV_F_NCQ &&
-		    SATA_FEATURES(sata_hba_inst) & SATA_CTLF_NCQ)))
-			rval = 1;	/* Tagged queuing supported */
+		if (sdinfo->satadrv_features_enabled & SATA_DEV_F_E_TAGGED_QING)
+			rval = 1;	/* Tagged queuing available */
 		else
-			rval = -1;	/* Tagged queuing not supported */
+			rval = -1;	/* Tagged queuing not available */
 		break;
 
 	case SCSI_CAP_DMA_MAX:
@@ -3188,19 +3181,14 @@ sata_scsi_getcap(struct scsi_address *ap, char *cap, int whom)
 
 /*
  * Implementation of scsi tran_setcap
- *
- * All supported capabilities are fixed/unchangeable.
- * Returns 0 for all supported capabilities and valid device, -1 otherwise.
  */
 static int
 sata_scsi_setcap(struct scsi_address *ap, char *cap, int value, int whom)
 {
-#ifndef __lock_lint
-	_NOTE(ARGUNUSED(value))
-#endif
 	sata_hba_inst_t	*sata_hba_inst =
 	    (sata_hba_inst_t *)(ap->a_hba_tran->tran_hba_private);
 	sata_device_t	sata_device;
+	sata_drive_info_t	*sdinfo;
 	int		rval;
 
 	SATADBG2(SATA_DBG_SCSI_IF, sata_hba_inst,
@@ -3221,11 +3209,12 @@ sata_scsi_setcap(struct scsi_address *ap, char *cap, int value, int whom)
 	}
 	mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
 	    sata_device.satadev_addr.cport)));
-	if (sata_get_device_info(sata_hba_inst, &sata_device) == NULL) {
+	if ((sdinfo = sata_get_device_info(sata_hba_inst, &sata_device))
+		== NULL) {
 		/* invalid address */
 		mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
 		    sata_device.satadev_addr.cport)));
-		return (0);
+		return (-1);
 	}
 	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
 	    sata_device.satadev_addr.cport)));
@@ -3233,15 +3222,48 @@ sata_scsi_setcap(struct scsi_address *ap, char *cap, int value, int whom)
 	switch (scsi_hba_lookup_capstr(cap)) {
 	case SCSI_CAP_ARQ:
 	case SCSI_CAP_SECTOR_SIZE:
-	case SCSI_CAP_TAGGED_QING:
 	case SCSI_CAP_DMA_MAX:
 	case SCSI_CAP_INTERCONNECT_TYPE:
-#if defined(_UNTAGGED_QING_SUPPORTED)
-	case SCSI_CAP_UNTAGGED_QING:
-		rval = 0;		/* Capability cannot be changed */
+		rval = 0;
 		break;
-#endif
-
+	case SCSI_CAP_UNTAGGED_QING:
+		if (SATA_QDEPTH(sata_hba_inst) > 1) {
+			rval = 1;
+			if (value == 1) {
+				sdinfo->satadrv_features_enabled |=
+					SATA_DEV_F_E_UNTAGGED_QING;
+			} else if (value == 0) {
+				sdinfo->satadrv_features_enabled &=
+					~SATA_DEV_F_E_UNTAGGED_QING;
+			} else {
+				rval = -1;
+			}
+		} else {
+			rval = 0;
+		}
+		break;
+	case SCSI_CAP_TAGGED_QING:
+		/* This can TCQ or NCQ */
+		if (sata_func_enable & SATA_ENABLE_QUEUING &&
+		    ((sdinfo->satadrv_features_support & SATA_DEV_F_TCQ &&
+		    SATA_FEATURES(sata_hba_inst) & SATA_CTLF_QCMD) ||
+		    (sata_func_enable & SATA_ENABLE_NCQ &&
+		    sdinfo->satadrv_features_support & SATA_DEV_F_NCQ &&
+		    SATA_FEATURES(sata_hba_inst) & SATA_CTLF_NCQ))) {
+			rval = 1;
+			if (value == 1) {
+				sdinfo->satadrv_features_enabled |=
+					SATA_DEV_F_E_TAGGED_QING;
+			} else if (value == 0) {
+				sdinfo->satadrv_features_enabled &=
+					~SATA_DEV_F_E_TAGGED_QING;
+			} else {
+				rval = -1;
+			}
+		} else {
+			rval = 0;
+		}
+		break;
 	default:
 		rval = -1;
 		break;

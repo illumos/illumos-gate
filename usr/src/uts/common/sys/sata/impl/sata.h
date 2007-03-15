@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -210,7 +210,7 @@ struct sata_drive_info {
 	uint16_t	satadrv_features_support; /* drive features support */
 	uint16_t	satadrv_queue_depth;    /* drive queue depth */
 	uint16_t	satadrv_settings;	/* drive settings flags */
-	uint16_t	satadrv_pad2;		/* struct alignment pad */
+	uint16_t	satadrv_features_enabled; /* drive features enabled */
 	uint64_t	satadrv_capacity;	/* drive capacity */
 	sata_id_t	satadrv_id;		/* Device Identify Data */
 	struct sata_drive_stats satadrv_stats;	/* drive statistics */
@@ -325,6 +325,12 @@ typedef	struct sata_pmport_info sata_pmport_info_t;
 #define	SATA_DEV_F_SATA1		0x10
 #define	SATA_DEV_F_SATA2		0x20
 #define	SATA_DEV_F_TCQ			0x40	/* Non NCQ tagged queuing */
+
+/*
+ * Device features enabled (satadrv_features_enabled)
+ */
+#define	SATA_DEV_F_E_TAGGED_QING	0x01	/* Tagged queuing enabled */
+#define	SATA_DEV_F_E_UNTAGGED_QING	0x02	/* Untagged queuing enabled */
 
 /*
  * Drive settings flags (satdrv_settings)

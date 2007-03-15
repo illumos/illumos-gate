@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -356,6 +356,14 @@ typedef struct sata_id {
 
 /* SATA Features Enabled (word 79) - not used */
 
+/*
+ * Generic NCQ related defines
+ */
+
+#define	NQ			0x80	/* Not a queued cmd - tag not valid */
+#define	NCQ_TAG_MASK		0x1f	/* NCQ command tag mask */
+#define	FIS_TYPE_REG_H2D	0x27	/* Reg FIS - Host to Device */
+#define	FIS_CMD_UPDATE		0x80
 /*
  * Status bits from AT_STATUS register
  */
