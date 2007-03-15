@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -73,7 +73,7 @@ SOFTWARE.
 
 /***** LOCAL VARIABLES *****/
 
-static Session *first_session = NULL;
+Session *first_session = NULL;
 
 static u_long session_id = 0;
 
@@ -89,17 +89,17 @@ static void trace_session(Session *session);
 static void trace_request(Request *request);
 
 static Session *session_open(Address *address, SNMP_pdu *pdu);
-static void session_close(Session *session);
+void session_close(Session *session);
 
 static int session_build_request_list(Session *session, int index, SNMP_variable *variable, Subtree *subtree);
 static int session_build_local_sysUptime(Session *session, int index, SNMP_variable *variable);
 
 
-static void session_remove_from_list(Session *session);
+void session_remove_from_list(Session *session);
 
-static void session_free(Session *session);
-static void request_list_free(Request *request_list);
-static void request_free(Request *request);
+void session_free(Session *session);
+void request_list_free(Request *request_list);
+void request_free(Request *request);
 
 static void session_respond(Session *session);
 static void session_respond_error(Session *session, int status, int index);
@@ -805,7 +805,7 @@ static int session_build_request_list(Session *session, int index, SNMP_variable
 
 /************************************************************************/
 
-static void session_close(Session *session)
+void session_close(Session *session)
 {
 	Three_Phase *tp;
 
@@ -848,7 +848,7 @@ void session_list_delete()
 
 /************************************************************************/
 
-static void session_remove_from_list(Session *session)
+void session_remove_from_list(Session *session)
 {
 	Session *sp;
 	Session *osp;
@@ -887,7 +887,7 @@ static void session_remove_from_list(Session *session)
 
 /************************************************************************/
 
-static void session_free(Session *session)
+void session_free(Session *session)
 {
 	if(session == NULL)
 	{
@@ -907,7 +907,7 @@ static void session_free(Session *session)
 
 /************************************************************************/
 
-static void request_list_free(Request *request_list)
+void request_list_free(Request *request_list)
 {
 	Request *next_request;
 
@@ -1375,7 +1375,7 @@ failed\n");
 
 /************************************************************************/
 
-static void request_free(Request *request)
+void request_free(Request *request)
 {
 	if(request == NULL)
 	{

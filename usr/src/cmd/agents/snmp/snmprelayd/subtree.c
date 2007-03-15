@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -13,13 +12,16 @@
  *
  * When distributing Covered Code, include this CDDL HEADER in each
  * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
- * If applicable, add the following below this CDDL HEADER, with the 
+ * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
+ */
+
+/*
  *
- * Copyright 1998 Sun Microsystems, Inc.  All Rights Reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +51,7 @@
 #include "session.h"
 
 
-
+extern Session *first_session;
 Subtree *first_subtree = NULL;
 int sap_reg_tree_index=1;
 
@@ -409,7 +411,8 @@ void delete_all_subtree_from_agent(Agent* agent)
 {
 	Subtree *sp = first_subtree;
 	Subtree *next, *last=NULL;
-
+	Session *spp;
+	Request *rp;
 
 	while(sp)
 	{
@@ -421,6 +424,14 @@ void delete_all_subtree_from_agent(Agent* agent)
 			}else{
 			  last->next_subtree = next;
 			}
+
+			for (spp = first_session; spp; spp = spp->next_session) {
+				for (rp = spp->first_request; rp; rp = rp->next_request) {
+					if (rp->subtree->agent == sp->agent)
+						session_close(spp);
+				}
+			}
+
 			subtree_remove_from_agent_list(sp);
 			subtree_free(sp);
 		}else{
