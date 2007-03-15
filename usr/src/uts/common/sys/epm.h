@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -630,11 +630,15 @@ extern uint_t	pm_divertdebug;
 /*PRINTFLIKE1*/
 extern void	pm_log(const char *fmt, ...) __KPRINTFLIKE(1);
 
+#ifdef PMDDEBUG
 #define	PMD(level, arglist) { 			\
 	if (pm_debug & (level)) {		\
 		pm_log arglist;			\
 	}					\
 }
+#else
+#define	PMD(level, arglist)	((void)0);
+#endif
 
 #else
 #define	PMD(level, arglist)
