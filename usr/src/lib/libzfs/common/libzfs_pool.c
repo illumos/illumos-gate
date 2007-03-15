@@ -1552,9 +1552,10 @@ zpool_get_errlog(zpool_handle_t *zhp, nvlist_t **nverrlistp)
 		    &zc) != 0) {
 			free((void *)(uintptr_t)zc.zc_nvlist_dst);
 			if (errno == ENOMEM) {
+				count = zc.zc_nvlist_dst_size;
 				if ((zc.zc_nvlist_dst = (uintptr_t)
-				    zfs_alloc(zhp->zpool_hdl,
-				    zc.zc_nvlist_dst_size)) == (uintptr_t)NULL)
+				    zfs_alloc(zhp->zpool_hdl, count *
+				    sizeof (zbookmark_t))) == (uintptr_t)NULL)
 					return (-1);
 			} else {
 				return (-1);
