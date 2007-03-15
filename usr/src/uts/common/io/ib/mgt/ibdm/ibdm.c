@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -546,6 +546,7 @@ ibdm_event_hdlr(void *clnt_hdl,
 		hca_list->hl_nports_active--;
 		port_sa_hdl = port->pa_sa_hdl;
 		(void) ibdm_fini_port(port);
+		port->pa_state = IBT_PORT_DOWN;
 		mutex_exit(&ibdm.ibdm_hl_mutex);
 		ibdm_reset_all_dgids(port_sa_hdl);
 		break;
@@ -1692,7 +1693,7 @@ ibdm_get_reachable_ports(ibdm_port_attr_t *portinfo, ibdm_hca_list_t *hca)
 		precp = &result[ii];
 		if ((gid_info = ibdm_check_dgid(precp->DGID.gid_guid,
 		    precp->DGID.gid_prefix)) != NULL) {
-			IBTF_DPRINTF_L2("ibdm", "\tget_reachable_ports: "
+			IBTF_DPRINTF_L5("ibdm", "\tget_reachable_ports: "
 			    "Already exists nrecs %d, ii %d", nrecs, ii);
 			ibdm_addto_glhcalist(gid_info, hca);
 			continue;
@@ -3118,8 +3119,8 @@ ibdm_verify_mad_status(ib_mad_hdr_t *hdr)
 	else if ((b2h16(hdr->Status) & 0x1f) == MAD_STATUS_REDIRECT_REQUIRED)
 		ret = IBDM_SUCCESS;
 	else {
-		IBTF_DPRINTF_L4("ibdm",
-		    "\tverify_mad_status: Stauts : 0x%x", b2h16(hdr->Status));
+		IBTF_DPRINTF_L2("ibdm",
+		    "\tverify_mad_status: Status : 0x%x", b2h16(hdr->Status));
 		ret = IBDM_FAILURE;
 	}
 	return (ret);
@@ -3431,7 +3432,7 @@ ibdm_pkt_timeout_hdlr(void *arg)
 static int
 ibdm_retry_command(ibdm_timeout_cb_args_t *cb_args)
 {
-	int			ret, rval = IBDM_SUCCESS;
+	int			ret;
 	ibmf_msg_t		*msg;
 	ib_mad_hdr_t		*hdr;
 	ibdm_dp_gidinfo_t	*gid_info = cb_args->cb_gid_info;
@@ -3546,18 +3547,17 @@ ibdm_retry_command(ibdm_timeout_cb_args_t *cb_args)
 	    "timeout %x", cb_args->cb_req_type, cb_args->cb_ioc_num,
 	    cb_args->cb_srvents_start, *timeout_id);
 
-	if ((rval = ibmf_msg_transport(gid_info->gl_ibmf_hdl,
+	if (ibmf_msg_transport(gid_info->gl_ibmf_hdl,
 	    gid_info->gl_qp_hdl, msg, NULL, ibdm_ibmf_send_cb,
-	    cb_args, 0)) != IBMF_SUCCESS) {
+	    cb_args, 0) != IBMF_SUCCESS) {
 		IBTF_DPRINTF_L2("ibdm", "\tretry_command: send failed: %p "
 		    "rtype 0x%x iocidx 0x%x srvidx %d", cb_args->cb_gid_info,
 		    cb_args->cb_req_type, cb_args->cb_ioc_num,
 		    cb_args->cb_srvents_start);
 		ibdm_ibmf_send_cb(gid_info->gl_ibmf_hdl, msg, cb_args);
-		rval = IBDM_FAILURE;
 	}
 	mutex_enter(&gid_info->gl_mutex);
-	return (rval);
+	return (IBDM_SUCCESS);
 }
 
 
@@ -3647,7 +3647,7 @@ ibdm_probe_ioc(ib_guid_t nodeguid, ib_guid_t ioc_guid, int reprobe_flag)
 	ibdm_gid_t		*temp_gid;
 	sa_portinfo_record_t	*pi;
 
-	IBTF_DPRINTF_L4("ibdm", "\tprobe_ioc(%x, %x, %x): Begin",
+	IBTF_DPRINTF_L4("ibdm", "\tprobe_ioc(%llx, %llx, %x): Begin",
 	    nodeguid, ioc_guid, reprobe_flag);
 
 	/* Rescan the GID list for any removed GIDs for reprobe */
@@ -3812,11 +3812,7 @@ ibdm_probe_ioc(ib_guid_t nodeguid, ib_guid_t ioc_guid, int reprobe_flag)
 			ibdm_probe_gid(node_gid);
 
 			mutex_enter(&ibdm.ibdm_hl_mutex);
-		} else {
-			IBTF_DPRINTF_L2("ibdm", "\tibdm_probe_ioc "
-			    "Invalid state!");
 		}
-
 	}
 	mutex_exit(&ibdm.ibdm_hl_mutex);
 	IBTF_DPRINTF_L4("ibdm", "\tprobe_ioc : End\n");
@@ -5921,7 +5917,7 @@ ibdm_addto_glhcalist(ibdm_dp_gidinfo_t *gid_info,
 		if (head->hl_hca_guid == hca->hl_hca_guid) {
 			mutex_exit(&gid_info->gl_mutex);
 			IBTF_DPRINTF_L4(ibdm_string,
-			    "\taddto_glhcalist : gid %x hca %x dup",
+			    "\taddto_glhcalist : gid %p hca %p dup",
 			    gid_info, hca);
 			return;
 		}
@@ -6002,7 +5998,7 @@ ibdm_reset_all_dgids(ibmf_saa_handle_t port_sa_hdl)
 				 * going down. This is ensured by
 				 * setting gl_disconnected to 1.
 				 */
-				if (gid_info->gl_nodeguid != 0)
+				if (gid_info->gl_nodeguid == 0)
 					gid_info->gl_disconnected = 1;
 				else
 					ibdm_reset_gidinfo(gid_info);
@@ -6041,6 +6037,7 @@ ibdm_reset_gidinfo(ibdm_dp_gidinfo_t *gidinfo)
 	int	ret, ii, nrecords;
 	sa_path_record_t	*path;
 	uint8_t	npaths = 1;
+	ibdm_pkey_tbl_t		*pkey_tbl;
 
 	IBTF_DPRINTF_L4(ibdm_string, "\treset_gidinfo(%p)", gidinfo);
 
@@ -6107,16 +6104,32 @@ ibdm_reset_gidinfo(ibdm_dp_gidinfo_t *gidinfo)
 		gidinfo->gl_dgid_lo	= path->DGID.gid_guid;
 		gidinfo->gl_sgid_hi	= path->SGID.gid_prefix;
 		gidinfo->gl_sgid_lo	= path->SGID.gid_guid;
-		gidinfo->gl_p_key		= path->P_Key;
-		gidinfo->gl_sa_hdl		= port->pa_sa_hdl;
+		gidinfo->gl_p_key	= path->P_Key;
+		gidinfo->gl_sa_hdl	= port->pa_sa_hdl;
 		gidinfo->gl_ibmf_hdl	= port->pa_ibmf_hdl;
-		gidinfo->gl_slid		= path->SLID;
-		gidinfo->gl_dlid		= path->DLID;
-
+		gidinfo->gl_slid	= path->SLID;
+		gidinfo->gl_dlid	= path->DLID;
 		/* Reset redirect info, next MAD will set if redirected */
 		gidinfo->gl_redirected = 0;
 
-		gid_reinited = 1;
+		gidinfo->gl_qp_hdl = IBMF_QP_HANDLE_DEFAULT;
+		for (ii = 0; ii < port->pa_npkeys; ii++) {
+			if (port->pa_pkey_tbl == NULL)
+				break;
+
+			pkey_tbl = &port->pa_pkey_tbl[ii];
+			if ((gidinfo->gl_p_key == pkey_tbl->pt_pkey) &&
+			    (pkey_tbl->pt_qp_hdl != NULL)) {
+				gidinfo->gl_qp_hdl = pkey_tbl->pt_qp_hdl;
+				break;
+			}
+		}
+
+		if (gidinfo->gl_qp_hdl == NULL)
+			IBTF_DPRINTF_L2(ibdm_string,
+			    "\treset_gid_info: No matching Pkey");
+		else
+			gid_reinited = 1;
 
 		kmem_free(path, path_len);
 		kmem_free(pi, pi_len);

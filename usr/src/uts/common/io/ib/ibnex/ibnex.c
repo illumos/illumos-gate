@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1184,8 +1184,6 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 					ret = IBNEX_SUCCESS;
 				else
 					ret = IBNEX_FAILURE;
-				/* Allows enumeration under PHCI */
-				flag |= NDI_MDI_FALLBACK;
 			} else {
 				/*
 				 * if not IOC or PORT device then always
@@ -1216,6 +1214,11 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 				    caddr, parent);
 				mutex_exit(&ibnex.ibnex_mutex);
 			}
+		}
+
+		if (strncmp(cname, IBNEX_IBPORT_CNAME, 6) == 0) {
+			/* Allows enumeration under PHCI */
+			flag |= NDI_MDI_FALLBACK;
 		}
 		kmem_free(device_name, len);
 		break;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1712,13 +1712,12 @@ ibcm_get_multi_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 			    pr_resp[i].SGID.gid_guid, pr_resp[i].DGID.gid_guid);
 		}
 
-		if (p_arg->flags & IBT_PATH_APM) {
+		if (p_arg->flags & (IBT_PATH_APM | IBT_PATH_AVAIL)) {
 			sa_path_record_t *p_resp = NULL, *a_resp = NULL;
+			sa_path_record_t *p_tmp = NULL, *a_tmp = NULL;
 			int		p_found = 0, a_found = 0;
 			ib_gid_t	p_sg, a_sg, p_dg, a_dg;
-			int		s_spec;
-
-			s_spec = p_arg->attr.pa_sgid.gid_guid != 0 ? 1 : 0;
+			int		p_tmp_found = 0, a_tmp_found = 0;
 
 			p_sg = gid_s_ptr[0];
 			if (sgid_cnt > 1)
@@ -1756,8 +1755,8 @@ ibcm_get_multi_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 					IBTF_DPRINTF_L3(cmlog,
 					    "ibcm_get_multi_pathrec: "
 					    "Pri DGID Match.. ");
-					if ((s_spec == 0) || (p_sg.gid_guid ==
-					    pr_resp->SGID.gid_guid)) {
+					if (p_sg.gid_guid ==
+					    pr_resp->SGID.gid_guid) {
 						p_found = 1;
 						p_resp = pr_resp;
 						IBTF_DPRINTF_L3(cmlog,
@@ -1768,6 +1767,14 @@ ibcm_get_multi_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 							break;
 						else
 							continue;
+					} else if ((!p_tmp_found) &&
+					    (a_sg.gid_guid ==
+					    pr_resp->SGID.gid_guid)) {
+						p_tmp_found = 1;
+						p_tmp = pr_resp;
+						IBTF_DPRINTF_L3(cmlog,
+						    "ibcm_get_multi_pathrec: "
+						    "Tmp Pri Path Found");
 					}
 					IBTF_DPRINTF_L3(cmlog,
 					    "ibcm_get_multi_pathrec:"
@@ -1779,8 +1786,8 @@ ibcm_get_multi_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 					IBTF_DPRINTF_L3(cmlog,
 					    "ibcm_get_multi_pathrec:"
 					    "Alt DGID Match.. ");
-					if ((s_spec == 0) || (a_sg.gid_guid ==
-					    pr_resp->SGID.gid_guid)) {
+					if (a_sg.gid_guid ==
+					    pr_resp->SGID.gid_guid) {
 						a_found = 1;
 						a_resp = pr_resp;
 
@@ -1792,6 +1799,15 @@ ibcm_get_multi_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 							break;
 						else
 							continue;
+					} else if ((!a_tmp_found) &&
+					    (p_sg.gid_guid ==
+					    pr_resp->SGID.gid_guid)) {
+						a_tmp_found = 1;
+						a_tmp = pr_resp;
+
+						IBTF_DPRINTF_L3(cmlog,
+						    "ibcm_get_multi_pathrec:"
+						    "Tmp Alt Path Found ");
 					}
 					IBTF_DPRINTF_L3(cmlog,
 					    "ibcm_get_multi_pathrec:"
@@ -1799,42 +1815,87 @@ ibcm_get_multi_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 				}
 			}
 
-			if ((p_found == 0) && (a_found == 0)) {
-				IBTF_DPRINTF_L2(cmlog, "ibcm_get_multi_pathrec:"
+			if ((p_found == 0) && (a_found == 0) &&
+			    (p_tmp_found == 0) && (a_tmp_found == 0)) {
+				IBTF_DPRINTF_L3(cmlog, "ibcm_get_multi_pathrec:"
 				    " Path to desired node points NOT "
 				    "Available.");
 				retval = IBT_PATH_RECORDS_NOT_FOUND;
-				goto get_multi_pathrec_end;
+				goto get_mpr_end;
 			}
 
-			if ((p_resp == NULL) && (a_resp != NULL)) {
-				p_resp = a_resp;
-				a_resp = NULL;
+			if (p_resp == NULL) {
+				if (a_resp != NULL) {
+					p_resp = a_resp;
+					a_resp = NULL;
+				} else if (p_tmp != NULL) {
+					p_resp = p_tmp;
+					p_tmp = NULL;
+				} else if (a_tmp != NULL) {
+					p_resp = a_tmp;
+					a_tmp = NULL;
+				}
+			}
+			if (a_resp == NULL) {
+				if (a_tmp != NULL) {
+					a_resp = a_tmp;
+					a_tmp = NULL;
+				} else if (p_tmp != NULL) {
+					a_resp = p_tmp;
+					p_tmp = NULL;
+				}
 			}
 
 			/* Fill in Primary Path */
 			retval = ibcm_update_pri(p_resp, sl, dinfo,
 			    &paths[found]);
 			if (retval != IBT_SUCCESS)
-				goto get_multi_pathrec_end;
+				goto get_mpr_end;
 
-			/* Fill in Alternate Path */
-			if (a_resp != NULL) {
-				/* a_resp will point to AltPathInfo buffer. */
-				retval = ibcm_update_cep_info(a_resp, sl,
-				    NULL, &paths[found].pi_alt_cep_path);
-				if (retval != IBT_SUCCESS)
-					goto get_multi_pathrec_end;
+			if (p_arg->flags & IBT_PATH_APM) {
+				/* Fill in Alternate Path */
+				if (a_resp != NULL) {
+					/*
+					 * a_resp will point to AltPathInfo
+					 * buffer.
+					 */
+					retval = ibcm_update_cep_info(a_resp,
+					    sl, NULL,
+					    &paths[found].pi_alt_cep_path);
+					if (retval != IBT_SUCCESS)
+						goto get_mpr_end;
 
-				/* Update some leftovers */
-				paths[found].pi_alt_pkt_lt =
-				    a_resp->PacketLifeTime;
-			} else {
-				IBTF_DPRINTF_L3(cmlog, "ibcm_get_multi_pathrec:"
-				    " Alternate Path NOT Available.");
-				retval = IBT_INSUFF_DATA;
+					/* Update some leftovers */
+					paths[found].pi_alt_pkt_lt =
+					    a_resp->PacketLifeTime;
+				} else {
+					IBTF_DPRINTF_L3(cmlog,
+					    "ibcm_get_multi_pathrec:"
+					    " Alternate Path NOT Available.");
+					retval = IBT_INSUFF_DATA;
+				}
+				found++;
+			} else if (p_arg->flags & IBT_PATH_AVAIL) {
+				found++;
+
+				if (found < *num_path) {
+
+					/* Fill in second Path */
+					if (a_resp != NULL) {
+						retval = ibcm_update_pri(a_resp,
+						    sl, dinfo, &paths[found]);
+						if (retval != IBT_SUCCESS)
+							goto get_mpr_end;
+						else
+							found++;
+					} else {
+						IBTF_DPRINTF_L3(cmlog,
+						    "ibcm_get_multi_pathrec: "
+						    "SecondPath NOT Available");
+						retval = IBT_INSUFF_DATA;
+					}
+				}
 			}
-			found++;
 		} else {	/* If NOT APM */
 			boolean_t	check_pkey = B_FALSE;
 
@@ -1878,7 +1939,7 @@ ibcm_get_multi_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 					break;
 			}
 		}
-get_multi_pathrec_end:
+get_mpr_end:
 		kmem_free(results_p, length);
 	}
 	kmem_free(mpr_req, template_len);
@@ -2335,7 +2396,7 @@ ibcm_saa_service_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 
 		for (i = 0; i < num_req; i++, svcrec_resp++) {
 			ibt_status_t	ret;
-			boolean_t	local_node_check_done = B_FALSE;
+			boolean_t	is_this_on_local_node = B_FALSE;
 
 			/* Limited P_Key is NOT supported as of now!. */
 			if ((svcrec_resp->ServiceP_Key & 0x8000) == 0) {
@@ -2347,20 +2408,20 @@ ibcm_saa_service_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 
 			p_gid = svcrec_resp->ServiceGID;
 
-			IBTF_DPRINTF_L3(cmlog, "ibcm_saa_service_rec: "
-			    "Let DGID(%llX:%llX) be Primary",
-			    p_gid.gid_prefix, p_gid.gid_guid);
-
 			/* Let's avoid LoopBack Nodes. */
-			if (p_gid.gid_guid == sl->p_sgid.gid_guid) {
-				local_node_check_done = B_TRUE;
+			for (j = 0; j < sl->p_count; j++) {
+				if (p_gid.gid_guid == sl[j].p_sgid.gid_guid) {
+					is_this_on_local_node = B_TRUE;
 
-				IBTF_DPRINTF_L3(cmlog, "ibcm_saa_service_rec: "
-				    "Lets Avoid Local Node, "
-				    "search for remote node.");
+					IBTF_DPRINTF_L3(cmlog,
+					    "ibcm_saa_service_rec: ServiceGID "
+					    "%llX:%llX is on Local Node, "
+					    "search for remote.",
+					    p_gid.gid_prefix, p_gid.gid_guid);
+				}
 			}
 
-			if (local_node_check_done == B_TRUE) {
+			if (is_this_on_local_node == B_TRUE) {
 				if ((i + 1) < num_req) {
 					p_gid.gid_prefix = 0;
 					p_gid.gid_guid = 0;
@@ -2513,6 +2574,9 @@ ibcm_saa_service_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 			retval = IBT_INSUFF_DATA;
 	} else if (p_arg->flags & IBT_PATH_MULTI_SVC_DEST) {
 		for (i = 0; i < num_req; i++, svcrec_resp++) {
+			ib_gid_t	p_gid;
+			boolean_t	is_this_on_local_node = B_FALSE;
+
 			/* Limited P_Key is NOT supported as of now!. */
 			if ((svcrec_resp->ServiceP_Key & 0x8000) == 0) {
 				IBTF_DPRINTF_L3(cmlog, "ibcm_saa_service_rec: "
@@ -2520,6 +2584,29 @@ ibcm_saa_service_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 				    svcrec_resp->ServiceP_Key);
 				continue;
 			}
+
+			p_gid = svcrec_resp->ServiceGID;
+
+			/* Let's avoid LoopBack Nodes. */
+			for (j = 0; j < sl->p_count; j++) {
+				if (p_gid.gid_guid == sl[j].p_sgid.gid_guid) {
+					is_this_on_local_node = B_TRUE;
+					IBTF_DPRINTF_L3(cmlog,
+					    "ibcm_saa_service_rec: ServiceGID "
+					    "%llX:%llX is on Local Node, "
+					    "search for remote.",
+					    p_gid.gid_prefix, p_gid.gid_guid);
+				}
+			}
+
+			if (is_this_on_local_node == B_TRUE)
+				if ((i + 1) < num_req)
+					continue;
+
+			IBTF_DPRINTF_L4(cmlog, "ibcm_saa_service_rec: "
+			    "Found ServiceGID = %llX:%llX",
+			    p_gid.gid_prefix, p_gid.gid_guid);
+
 			ibcm_fill_svcinfo(svcrec_resp,
 			    &dinfo->dest[rec_found]);
 			rec_found++;
