@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -363,6 +364,7 @@ typedef struct _kthread {
 #define	T_PANIC		0x0800	/* thread initiated a system panic */
 #define	T_DFLTSTK	0x1000	/* stack is default size */
 #define	T_CAPTURING	0x2000	/* thread is in page capture logic */
+#define	T_VFPARENT	0x4000	/* thread is vfork parent, must call vfwait */
 
 /*
  * Flags in t_proc_flag.

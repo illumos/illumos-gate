@@ -603,10 +603,11 @@ post_syscall(long rval1, long rval2)
 	 * This code must be here and not in the bowels of the system
 	 * so that /proc can intercept exit from vfork in a timely way.
 	 */
-	if (p->p_flag & SVFPARENT) {
+	if (t->t_flag & T_VFPARENT) {
 		ASSERT(code == SYS_vfork || code == SYS_forksys);
 		ASSERT(rp->r_r1 == 0 && error == 0);
 		vfwait((pid_t)rval1);
+		t->t_flag &= ~T_VFPARENT;
 	}
 
 	/*

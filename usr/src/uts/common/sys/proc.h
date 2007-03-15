@@ -474,7 +474,6 @@ extern struct pid pid0;		/* p0's pid */
 #define	SVFWAIT	   0x00080000	/* parent of vfork waiting for child to exec */
 #define	SEXITLWPS  0x00100000	/* have lwps exit within the process */
 #define	SHOLDFORK  0x00200000	/* hold lwps where they're cloneable */
-#define	SVFPARENT  0x00400000	/* parent of vfork, must call vfwait() */
 #define	SHOLDFORK1 0x00800000	/* hold lwps in place (not cloning) */
 #define	SCOREDUMP  0x01000000	/* process is dumping core */
 #define	SMSACCT    0x02000000	/* process is keeping micro-state accounting */

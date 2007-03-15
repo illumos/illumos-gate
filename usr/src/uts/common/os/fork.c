@@ -560,7 +560,8 @@ cfork(int isvfork, int isfork1, int flags)
 	if (isvfork) {
 		CPU_STATS_ADDQ(CPU, sys, sysvfork, 1);
 		mutex_enter(&p->p_lock);
-		p->p_flag |= (SVFPARENT | SVFWAIT);
+		p->p_flag |= SVFWAIT;
+		curthread->t_flag |= T_VFPARENT;
 		DTRACE_PROC1(create, proc_t *, cp);
 		cv_broadcast(&pr_pid_cv[p->p_slot]);	/* inform /proc */
 		mutex_exit(&p->p_lock);
@@ -1352,7 +1353,6 @@ vfwait(pid_t pid)
 
 	mutex_enter(&pp->p_lock);
 	prbarrier(pp);	/* barrier against /proc locking */
-	pp->p_flag &= ~SVFPARENT;
 	continuelwps(pp);
 	mutex_exit(&pp->p_lock);
 }
