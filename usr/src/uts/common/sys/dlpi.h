@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -749,9 +749,7 @@ typedef struct dl_capab_dls_s {
 
 /* Soft_Ring fanout types (used by soft_ring_change_status) */
 #define	SOFT_RING_NONE			0x00
-#define	SOFT_RING_RANDOM		0x01
-#define	SOFT_RING_SRC_HASH		0x02
-#define	SOFT_RING_RND_ROBIN		0x03
+#define	SOFT_RING_FANOUT		0x01
 
 #endif /* _KERNEL */
 

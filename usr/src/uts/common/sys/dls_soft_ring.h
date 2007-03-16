@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,11 +83,9 @@ extern soft_ring_t *soft_ring_create(char *, processorid_t, clock_t,
 extern soft_ring_t **soft_ring_set_create(char *, processorid_t, clock_t,
     uint_t, pri_t, int);
 extern void soft_ring_set_destroy(soft_ring_t **, int);
-extern void soft_ring_process(soft_ring_t *, mblk_t *, uint8_t);
 extern void soft_ring_bind(void *, processorid_t);
 extern void soft_ring_unbind(void *);
-extern void dls_ether_soft_ring_fanout(void *, void *, mblk_t *,
-    mac_header_info_t *);
+extern void dls_soft_ring_fanout(void *, void *, mblk_t *, mac_header_info_t *);
 extern boolean_t dls_soft_ring_enable(dls_channel_t, dl_capab_dls_t *);
 extern void dls_soft_ring_disable(dls_channel_t);
 extern boolean_t dls_soft_ring_workers(dls_channel_t);

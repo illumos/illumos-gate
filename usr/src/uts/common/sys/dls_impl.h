@@ -106,7 +106,6 @@ struct dls_impl_s {
 	uint8_t				di_unicst_addr[MAXMACADDRLEN];
 	soft_ring_t			**di_soft_ring_list;
 	uint_t				di_soft_ring_size;
-	int				di_soft_ring_fanout_type;
 	zoneid_t			di_zid;
 	dls_impl_t			*di_next_impl;
 };

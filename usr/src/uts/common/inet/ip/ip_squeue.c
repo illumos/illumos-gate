@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -583,7 +583,7 @@ ip_squeue_soft_ring_affinity(void *arg)
 	mutex_exit(&ill->ill_lock);
 
 	ill_soft_ring->ill_dls_change_status(ill_soft_ring->ill_tx_handle,
-	    SOFT_RING_SRC_HASH);
+	    SOFT_RING_FANOUT);
 
 	mutex_enter(&ill->ill_lock);
 	ill->ill_state_flags &= ~ILL_SOFT_RING_ASSIGN;

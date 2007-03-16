@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1693,7 +1693,7 @@ proto_change_soft_ring_fanout(dld_str_t *dsp, int type)
 		rx = (dsp->ds_mode == DLD_FASTPATH) ?
 			    dld_str_rx_fastpath : dld_str_rx_unitdata;
 	} else {
-		rx = (dls_rx_t)dls_ether_soft_ring_fanout;
+		rx = (dls_rx_t)dls_soft_ring_fanout;
 	}
 	dls_soft_ring_rx_set(dsp->ds_dc, rx, dsp, type);
 }

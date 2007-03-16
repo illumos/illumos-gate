@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,9 +55,13 @@
 #include <sys/callb.h>
 #include <sys/sdt.h>
 #include <sys/ddi.h>
+#include <sys/strsun.h>
 #include <sys/strsubr.h>
 #include <inet/common.h>
 #include <inet/ip.h>
+#include <inet/ipsec_impl.h>
+#include <inet/sadb.h>
+#include <inet/ipsecah.h>
 
 #include <sys/dls_impl.h>
 #include <sys/dls_soft_ring.h>
@@ -326,26 +330,20 @@ soft_ring_unbind(void *arg)
  * appropriate places.
  */
 /* ARGSUSED */
-void
-soft_ring_process(soft_ring_t *ringp, mblk_t *mp_chain, uint8_t tag)
+static void
+soft_ring_process(soft_ring_t *ringp,
+    mblk_t *mp_chain, mblk_t *tail, uint_t count)
 {
 	void 		*arg1, *arg2;
 	s_ring_proc_t	proc;
-	mblk_t		*tail;
-	int		cnt = 1;
 
 	ASSERT(ringp != NULL);
 	ASSERT(mp_chain != NULL);
 	ASSERT(MUTEX_NOT_HELD(&ringp->s_ring_lock));
 
-	tail = mp_chain;
-	while (tail->b_next != NULL) {
-		tail = tail->b_next;
-		cnt++;
-	}
 	mutex_enter(&ringp->s_ring_lock);
 
-	ringp->s_ring_total_inpkt += cnt;
+	ringp->s_ring_total_inpkt += count;
 	if (!(ringp->s_ring_state & S_RING_PROC) &&
 	    !(ringp->s_ring_type == S_RING_WORKER_ONLY)) {
 		/*
@@ -353,7 +351,7 @@ soft_ring_process(soft_ring_t *ringp, mblk_t *mp_chain, uint8_t tag)
 		 * first packet, do inline processing else queue the
 		 * packet and do the drain.
 		 */
-		if (ringp->s_ring_first == NULL && cnt == 1) {
+		if (ringp->s_ring_first == NULL && count == 1) {
 			/*
 			 * Fast-path, ok to process and nothing queued.
 			 */
@@ -385,7 +383,7 @@ soft_ring_process(soft_ring_t *ringp, mblk_t *mp_chain, uint8_t tag)
 				return;
 			}
 		} else {
-			SOFT_RING_ENQUEUE_CHAIN(ringp, mp_chain, tail, cnt);
+			SOFT_RING_ENQUEUE_CHAIN(ringp, mp_chain, tail, count);
 		}
 
 		/*
@@ -409,9 +407,9 @@ soft_ring_process(soft_ring_t *ringp, mblk_t *mp_chain, uint8_t tag)
 		 */
 		if (ringp->s_ring_count > soft_ring_max_q_cnt) {
 			freemsgchain(mp_chain);
-			DLS_BUMP_STAT(dlss_soft_ring_pkt_drop, cnt);
+			DLS_BUMP_STAT(dlss_soft_ring_pkt_drop, count);
 		} else
-			SOFT_RING_ENQUEUE_CHAIN(ringp, mp_chain, tail, cnt);
+			SOFT_RING_ENQUEUE_CHAIN(ringp, mp_chain, tail, count);
 		if (!(ringp->s_ring_state & S_RING_PROC)) {
 			SOFT_RING_WORKER_WAKEUP(ringp);
 		} else {
@@ -530,7 +528,6 @@ dls_soft_ring_rx_set(dls_channel_t dc, dls_rx_t rx, void *arg, int type)
 	dls_impl_t  *dip = (dls_impl_t *)dc;
 
 	rw_enter(&(dip->di_lock), RW_WRITER);
-	dip->di_soft_ring_fanout_type = type;
 	dip->di_rx = rx;
 	if (type == SOFT_RING_NONE)
 		dip->di_rx_arg = arg;
@@ -626,41 +623,126 @@ dls_soft_ring_enable(dls_channel_t dc, dl_capab_dls_t *soft_ringp)
 	return (B_TRUE);
 }
 
-#define	COMPUTE_HASH(key, sz)	(key % sz)
+int dls_bad_ip_pkt = 0;
 
+static mblk_t *
+dls_skip_mblk(mblk_t *bp, mblk_t *mp, int *skip_lenp)
+{
+	while (MBLKL(bp) <= *skip_lenp) {
+		*skip_lenp -= MBLKL(bp);
+		bp = bp->b_cont;
+		if (bp == NULL) {
+			dls_bad_ip_pkt++;
+			freemsg(mp);
+			return (NULL);
+		}
+	}
+	return (bp);
+}
+
+#define	HASH32(x) (((x) >> 24) ^ ((x) >> 16) ^ ((x) >> 8) ^ (x))
+#define	COMPUTE_INDEX(key, sz)	(key % sz)
+
+/*
+ * dls_soft_ring_fanout():
+ */
 /* ARGSUSED */
 void
-dls_ether_soft_ring_fanout(void *rx_handle, void *rx_cookie, mblk_t *mp_chain,
+dls_soft_ring_fanout(void *rx_handle, void *rx_cookie, mblk_t *mp_chain,
     mac_header_info_t *mhip)
 {
-	ipha_t		*ipha = (ipha_t *)mp_chain->b_rptr;
+	mblk_t		*mp, *bp, *head, *tail;
+	ipha_t		*ipha;
 	dls_impl_t	*dip = (dls_impl_t *)rx_handle;
-	int		indx;
-	int		key;
-	int		hdr_len;
-	uint16_t	port1, port2;
+	int		indx, saved_indx;
+	int		hash = 0;
+	int		skip_len;
+	uint8_t		protocol;
+	int		count = 0;
 
-	switch (dip->di_soft_ring_fanout_type) {
-	case SOFT_RING_SRC_HASH:
-		/*
-		 * We get a chain of packets from the same remote. Make
-		 * sure the same remote goes to same ring.
-		 */
-		hdr_len = IPH_HDR_LENGTH(ipha);
-		port1 = *((uint16_t *)(&mp_chain->b_rptr[hdr_len]));
-		port2 = *((uint16_t *)(&mp_chain->b_rptr[hdr_len+2]));
-		key = port1 + port2;
-		indx = COMPUTE_HASH(key, dip->di_soft_ring_size);
-		soft_ring_process(dip->di_soft_ring_list[indx],
-		    mp_chain, 0);
-		break;
-	case SOFT_RING_RND_ROBIN:
-	case SOFT_RING_RANDOM:
-		/*
-		 * Just send it to any possible soft ring
-		 */
-		soft_ring_process(dip->di_soft_ring_list[
-			lbolt % dip->di_soft_ring_size], mp_chain, 0);
-		break;
+	head = tail = NULL;
+
+	while (mp_chain != NULL) {
+		bp = mp = mp_chain;
+		mp_chain = mp_chain->b_next;
+		mp->b_next = NULL;
+		if (MBLKL(mp) < sizeof (ipha_t)) {
+			if ((mp = msgpullup(mp, sizeof (ipha_t))) == NULL) {
+				/* Let's toss this away */
+				dls_bad_ip_pkt++;
+				freemsg(mp);
+				continue;
+			}
+			bp = mp;
+		}
+
+		ipha = (ipha_t *)mp->b_rptr;
+		skip_len = IPH_HDR_LENGTH(ipha);
+		protocol = ipha->ipha_protocol;
+	again:
+		switch (protocol) {
+		case IPPROTO_TCP:
+		case IPPROTO_UDP:
+		case IPPROTO_SCTP:
+		case IPPROTO_ESP:
+			/*
+			 * Note that for ESP, we fanout on SPI and it is at the
+			 * same offset as the 2x16-bit ports. So it is clumped
+			 * along with TCP, UDP and SCTP.
+			 */
+			if (MBLKL(bp) <= skip_len) {
+				bp = dls_skip_mblk(bp, mp, &skip_len);
+				if (bp == NULL)
+					continue;
+			}
+
+			hash = HASH32(*(uint32_t *)(bp->b_rptr + skip_len));
+			break;
+
+		case IPPROTO_AH: {
+			ah_t *ah;
+			uint_t ah_length;
+
+			if (MBLKL(bp) <= skip_len) {
+				bp = dls_skip_mblk(bp, mp, &skip_len);
+				if (bp == NULL)
+					continue;
+			}
+
+			ah = (ah_t *)(bp->b_rptr + skip_len);
+			protocol = ah->ah_nexthdr;
+			ah_length = AH_TOTAL_LEN(ah);
+			skip_len += ah_length;
+			goto again;
+		}
+
+		default:
+			/*
+			 * Send the packet to a ring based on src/dest addresses
+			 */
+			hash =
+			    (HASH32(ipha->ipha_src) ^ HASH32(ipha->ipha_dst));
+			break;
+		}
+
+		indx = COMPUTE_INDEX(hash, dip->di_soft_ring_size);
+		if (head == NULL) {
+			saved_indx = indx;
+			head = tail = mp;
+			count++;
+		} else if (indx == saved_indx) {
+			tail->b_next = mp;
+			tail = mp;
+			count++;
+		} else {
+			soft_ring_process(dip->di_soft_ring_list[saved_indx],
+			    head, tail, count);
+			head = tail = mp;
+			saved_indx = indx;
+			count = 1;
+		}
 	}
+	if (head != NULL)
+		soft_ring_process(dip->di_soft_ring_list[saved_indx],
+		    head, tail, count);
 }
