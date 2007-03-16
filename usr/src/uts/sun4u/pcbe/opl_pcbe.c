@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -281,7 +281,6 @@ static const struct nametable SPARC64_VI_names_l2[] = {
 	{0x16,	"trap_trap_inst"},
 	{0x18,	"ts_by_if"},
 	SPARC64_VI_EVENTS_comm_2,
-	{0x1d,	"cse_window_empty_sp_full"},
 	{0x1e,	"fl_comp_wait"},
 	{0x20,	"op_r_iu_req_mi_go"},
 	{0x30,	"sx_read_count_pf"},
@@ -320,7 +319,6 @@ static const struct nametable SPARC64_VI_names_l3[] = {
 	{0x19,	"ts_by_other"},
 	SPARC64_VI_EVENTS_comm_2,
 	{0x1b,	"decall_intlk"},
-	{0x1d,	"cse_window_empty_sp_full"},
 	{0x1e,	"2endop"},
 	{0x1f,	"op_stv_wait_sxmiss"},
 	{0x20,	"op_wait_all"},
@@ -337,7 +335,6 @@ static const struct nametable SPARC64_VI_names_u3[] = {
 	{0x15,	"rs1"},
 	{0x16,	"trap_IMMU_miss"},
 	SPARC64_VI_EVENTS_comm_2,
-	{0x1d,	"cse_window_empty_sp_full"},
 	{0x1e,	"1endop"},
 	{0x1f,	"op_stv_wait_sxmiss_ex"},
 	{0x20,	"if_wait_all"},
