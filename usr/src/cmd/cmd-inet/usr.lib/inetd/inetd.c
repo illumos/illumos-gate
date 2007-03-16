@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2886,6 +2886,27 @@ get_method_error_success(instance_method_t method)
 	/* NOTREACHED */
 }
 
+static int
+smf_kill_process(instance_t *instance, int sig)
+{
+	rep_val_t	*rv;
+	int		ret = IMRET_SUCCESS;
+
+	/* Carry out process assassination */
+	for (rv = uu_list_first(instance->start_pids);
+	    rv != NULL;
+	    rv = uu_list_next(instance->start_pids, rv)) {
+		if ((kill((pid_t)rv->val, sig) != 0) &&
+		    (errno != ESRCH)) {
+			ret = IMRET_FAILURE;
+			error_msg(gettext("Unable to kill "
+			"start process (%ld) of instance %s: %s"),
+			rv->val, instance->fmri, strerror(errno));
+		}
+	}
+	return (ret);
+}
+
 /*
  * Runs the specified method of the specified service instance.
  * If the method was never specified, we handle it the same as if the
@@ -2906,7 +2927,7 @@ run_method(instance_t *instance, instance_method_t method,
 	method_info_t		*mi;
 	struct method_context	*mthd_ctxt = NULL;
 	const char		*errstr;
-	int			sig;
+	int			sig = 0;
 	int			ret;
 	instance_cfg_t		*cfg = instance->config;
 	ctid_t			cid;
@@ -2927,13 +2948,22 @@ run_method(instance_t *instance, instance_method_t method,
 
 	if ((mi = cfg->methods[method]) == NULL) {
 		/*
-		 * An unspecified method. Since the absence of this method
-		 * must be valid (otherwise it would have been caught
-		 * during configuration validation), simply pretend the method
-		 * ran and returned success.
+		 * If the absent method is IM_OFFLINE, default action needs
+		 * to be taken to avoid lingering processes which can prevent
+		 * the upcoming rebinding from happening.
 		 */
-		process_non_start_term(instance, IMRET_SUCCESS);
-		return (0);
+		if ((method == IM_OFFLINE) && instance->config->basic->iswait) {
+			warn_msg(gettext("inetd_offline method for instance %s "
+			    "is unspecified.  Taking default action: kill."),
+			    instance->fmri);
+			(void) str2sig("TERM", &sig);
+			ret = smf_kill_process(instance, sig);
+			process_non_start_term(instance, ret);
+			return (0);
+		} else {
+			process_non_start_term(instance, IMRET_SUCCESS);
+			return (0);
+		}
 	}
 
 	/* Handle special method tokens, not allowed on start */
@@ -2960,22 +2990,7 @@ run_method(instance_t *instance, instance_method_t method,
 		}
 
 		if ((sig = restarter_is_kill_proc_method(mi->exec_path)) >= 0) {
-			/* Carry out process assassination */
-			rep_val_t	*rv;
-
-			ret = IMRET_SUCCESS;
-			for (rv = uu_list_first(instance->start_pids);
-			    rv != NULL;
-			    rv = uu_list_next(instance->start_pids, rv)) {
-				if ((kill((pid_t)rv->val, sig) != 0) &&
-				    (errno != ESRCH)) {
-					ret = IMRET_FAILURE;
-					error_msg(gettext("Unable to signal "
-					    "start process of instance %s: %s"),
-					    instance->fmri, strerror(errno));
-				}
-			}
-
+			ret = smf_kill_process(instance, sig);
 			process_non_start_term(instance, ret);
 			return (0);
 		}
