@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -605,6 +605,7 @@ struct scsi_failover_ops {
 #define	SCSI_SENSE_INACTIVE		4
 #define	SCSI_SENSE_UNKNOWN		5
 #define	SCSI_SENSE_STATE_CHANGED	6
+#define	SCSI_SENSE_NOT_READY		7
 
 /* vhci_intr action codes */
 #define	JUST_RETURN			0
