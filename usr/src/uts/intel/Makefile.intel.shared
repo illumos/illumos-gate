@@ -309,6 +309,7 @@ DRV_KMODS	+= wc
 DRV_KMODS	+= winlock
 DRV_KMODS	+= xge
 DRV_KMODS	+= zcons
+DRV_KMODS	+= chxge
 
 #
 # Don't build some of these for OpenSolaris, since they will be
@@ -321,7 +322,6 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= audiovia823x
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= bmc
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= bscbus
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= bscv
-$(CLOSED_BUILD)CLOSED_DRV_KMODS		+= chxge
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= elxl
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= glm
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= iprb
