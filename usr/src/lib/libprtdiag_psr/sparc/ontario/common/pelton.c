@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -237,7 +237,6 @@ pelton_pci_callback(picl_nodehdl_t pcih, void *args)
 		}
 
 		(void) strlcpy(pci_card.name, name, sizeof (pci_card.name));
-		free(name);
 
 		/* Get the model of this card */
 
