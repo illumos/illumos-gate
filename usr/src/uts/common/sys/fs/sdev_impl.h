@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -574,6 +574,7 @@ extern void sdev_node_cache_init(void);
 extern void sdev_node_cache_fini(void);
 extern struct sdev_node *sdev_mkroot(struct vfs *, dev_t, struct vnode *,
     struct vnode *, struct cred *);
+extern void sdev_filldir_dynamic(struct sdev_node *);
 extern int sdev_mknode(struct sdev_node *, char *, struct sdev_node **,
     struct vattr *, struct vnode *, void *, struct cred *, sdev_node_state_t);
 extern int sdev_nodeinit(struct sdev_node *, char *, struct sdev_node **,

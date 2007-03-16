@@ -370,10 +370,15 @@ static int
 sdev_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
     struct pathname *pnp, int flags, struct vnode *rdir, struct cred *cred)
 {
-	struct sdev_node	*parent;
+	struct sdev_node *parent;
+	int error;
 
 	parent = VTOSDEV(dvp);
 	ASSERT(parent);
+
+	/* execute access is required to search the directory */
+	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred)) != 0)
+		return (error);
 
 	if (!SDEV_IS_GLOBAL(parent))
 		return (prof_lookup(dvp, nm, vpp, cred));
@@ -414,7 +419,10 @@ sdev_create(struct vnode *dvp, char *nm, struct vattr *vap, vcexcl_t excl,
 	}
 	rw_exit(&parent->sdev_dotdot->sdev_contents);
 
-again:
+	/* execute access is required to search the directory */
+	if ((error = VOP_ACCESS(dvp, VEXEC|VWRITE, 0, cred)) != 0)
+		return (error);
+
 	/* check existing name */
 	error = VOP_LOOKUP(dvp, nm, &vp, NULL, 0, NULL, cred);
 
@@ -526,6 +534,12 @@ sdev_remove(struct vnode *dvp, char *nm, struct cred *cred)
 		return (ENOTSUP);
 	}
 
+	/* execute access is required to search the directory */
+	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred)) != 0) {
+		rw_exit(&parent->sdev_contents);
+		return (error);
+	}
+
 	/* check existence first */
 	dv = sdev_cache_lookup(parent, nm);
 	if (dv == NULL) {
@@ -539,6 +553,13 @@ sdev_remove(struct vnode *dvp, char *nm, struct cred *cred)
 		rw_exit(&parent->sdev_contents);
 		VN_RELE(vp);
 		return (ENOENT);
+	}
+
+	/* write access is required to remove an entry */
+	if ((error = VOP_ACCESS(dvp, VWRITE, 0, cred)) != 0) {
+		rw_exit(&parent->sdev_contents);
+		VN_RELE(vp);
+		return (error);
 	}
 
 	/* the module may record/reject removing a device node */
@@ -663,7 +684,7 @@ sdev_rename(struct vnode *odvp, char *onm, struct vnode *ndvp, char *nnm,
 	rw_exit(&toparent->sdev_dotdot->sdev_contents);
 
 	/*
-	 * grabbing the global lock to prevent
+	 * acquire the global lock to prevent
 	 * mount/unmount/other rename activities.
 	 */
 	mutex_enter(&sdev_lock);
@@ -885,6 +906,10 @@ sdev_symlink(struct vnode *dvp, char *lnm, struct vattr *tva,
 	}
 	rw_exit(&parent->sdev_dotdot->sdev_contents);
 
+	/* execute access is required to search a directory */
+	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred)) != 0)
+		return (error);
+
 	/* find existing name */
 	error = VOP_LOOKUP(dvp, lnm, &vp, NULL, 0, NULL, cred);
 	if (error == 0) {
@@ -893,10 +918,12 @@ sdev_symlink(struct vnode *dvp, char *lnm, struct vattr *tva,
 		sdcmn_err2(("sdev_symlink: node %s already exists\n", lnm));
 		return (EEXIST);
 	}
-
-	if (error != ENOENT) {
+	if (error != ENOENT)
 		return (error);
-	}
+
+	/* write access is required to create a symlink */
+	if ((error = VOP_ACCESS(dvp, VWRITE, 0, cred)) != 0)
+		return (error);
 
 	/* put it into memory cache */
 	rw_enter(&parent->sdev_contents, RW_WRITER);
@@ -951,15 +978,24 @@ sdev_mkdir(struct vnode *dvp, char *nm, struct vattr *va, struct vnode **vpp,
 	}
 	rw_exit(&parent->sdev_dotdot->sdev_contents);
 
+	/* execute access is required to search the directory */
+	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred)) != 0) {
+		return (error);
+	}
+
 	/* find existing name */
 	error = VOP_LOOKUP(dvp, nm, &vp, NULL, 0, NULL, cred);
 	if (error == 0) {
 		VN_RELE(vp);
 		return (EEXIST);
 	}
-
 	if (error != ENOENT)
 		return (error);
+
+	/* require write access to create a directory */
+	if ((error = VOP_ACCESS(dvp, VWRITE, 0, cred)) != 0) {
+		return (error);
+	}
 
 	/* put it into memory */
 	rw_enter(&parent->sdev_contents, RW_WRITER);
@@ -1016,6 +1052,10 @@ sdev_rmdir(struct vnode *dvp, char *nm, struct vnode *cdir, struct cred *cred)
 	}
 	rw_exit(&parent->sdev_dotdot->sdev_contents);
 
+	/* execute access is required to search the directory */
+	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred)) != 0)
+		return (error);
+
 	/* check existing name */
 	rw_enter(&parent->sdev_contents, RW_WRITER);
 	self = sdev_cache_lookup(parent, nm);
@@ -1030,6 +1070,13 @@ sdev_rmdir(struct vnode *dvp, char *nm, struct vnode *cdir, struct cred *cred)
 		rw_exit(&parent->sdev_contents);
 		VN_RELE(vp);
 		return (ENOENT);
+	}
+
+	/* write access is required to remove a directory */
+	if ((error = VOP_ACCESS(dvp, VWRITE, 0, cred)) != 0) {
+		rw_exit(&parent->sdev_contents);
+		VN_RELE(vp);
+		return (error);
 	}
 
 	/* some sanity checks */
@@ -1130,6 +1177,11 @@ static int
 sdev_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp)
 {
 	struct sdev_node *parent = VTOSDEV(dvp);
+	int error;
+
+	/* execute access is required to search the directory */
+	if ((error = VOP_ACCESS(dvp, VEXEC, 0, cred)) != 0)
+		return (error);
 
 	ASSERT(parent);
 	if (!SDEV_IS_GLOBAL(parent))

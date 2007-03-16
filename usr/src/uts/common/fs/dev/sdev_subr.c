@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1594,7 +1594,7 @@ done:
 	return (error);
 }
 
-static int
+void
 sdev_filldir_dynamic(struct sdev_node *ddv)
 {
 	int error;
@@ -1603,31 +1603,25 @@ sdev_filldir_dynamic(struct sdev_node *ddv)
 	char *nm = NULL;
 	struct sdev_node *dv = NULL;
 
-	if (!(ddv->sdev_flags & SDEV_BUILD)) {
-		return (0);
-	}
-
-	ASSERT(RW_READ_HELD(&ddv->sdev_contents));
-	if (!rw_tryupgrade(&ddv->sdev_contents)) {
-		rw_exit(&ddv->sdev_contents);
-		rw_enter(&ddv->sdev_contents, RW_WRITER);
-	}
+	ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
+	ASSERT((ddv->sdev_flags & SDEV_BUILD));
 
 	vap = sdev_getdefault_attr(VDIR);
 	for (i = 0; vtab[i].vt_name != NULL; i++) {
 		nm = vtab[i].vt_name;
 		ASSERT(RW_WRITE_HELD(&ddv->sdev_contents));
+		dv = NULL;
 		error = sdev_mknode(ddv, nm, &dv, vap, NULL,
 		    NULL, kcred, SDEV_READY);
-		if (error)
-			continue;
-		ASSERT(dv);
-		ASSERT(dv->sdev_state != SDEV_ZOMBIE);
-		SDEV_SIMPLE_RELE(dv);
-		dv = NULL;
+		if (error) {
+			cmn_err(CE_WARN, "%s/%s: error %d\n",
+			    ddv->sdev_name, nm, error);
+		} else {
+			ASSERT(dv);
+			ASSERT(dv->sdev_state != SDEV_ZOMBIE);
+			SDEV_SIMPLE_RELE(dv);
+		}
 	}
-	rw_downgrade(&ddv->sdev_contents);
-	return (0);
 }
 
 /*
@@ -2782,7 +2776,7 @@ devname_readdir_func(vnode_t *vp, uio_t *uiop, cred_t *cred, int *eofp,
 
 		/*
 		 * release the contents lock so that
-		 * the cache maybe updated by devfsadmd
+		 * the cache may be updated by devfsadmd
 		 */
 		rw_exit(&ddv->sdev_contents);
 		mutex_enter(&ddv->sdev_lookup_lock);
@@ -2793,22 +2787,12 @@ devname_readdir_func(vnode_t *vp, uio_t *uiop, cred_t *cred, int *eofp,
 
 		sdcmn_err4(("readdir of directory %s by %s\n",
 		    ddv->sdev_name, curproc->p_user.u_comm));
-		while (ddv->sdev_flags & SDEV_BUILD) {
+		if (ddv->sdev_flags & SDEV_BUILD) {
 			if (SDEV_IS_PERSIST(ddv)) {
 				error = sdev_filldir_from_store(ddv,
 				    alloc_count, cred);
 			}
-
-			/*
-			 * pre-creating the directories
-			 * defined in vtab
-			 */
-			if (SDEVTOV(ddv)->v_flag & VROOT) {
-				error = sdev_filldir_dynamic(ddv);
-			}
-
-			if (!error)
-				ddv->sdev_flags &= ~SDEV_BUILD;
+			ddv->sdev_flags &= ~SDEV_BUILD;
 		}
 	}
 

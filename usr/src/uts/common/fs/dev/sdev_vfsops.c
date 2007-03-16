@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -336,6 +336,9 @@ sdev_mount(struct vfs *vfsp, struct vnode *mvp, struct mounta *uap,
 		dv->sdev_origin = sdev_origins->sdev_root;
 	} else {
 		sdev_ncache_setup();
+		rw_enter(&dv->sdev_contents, RW_WRITER);
+		sdev_filldir_dynamic(dv);
+		rw_exit(&dv->sdev_contents);
 	}
 
 	sdev_update_timestamps(dv->sdev_attrvp,
