@@ -68,6 +68,7 @@ typedef struct objset_impl {
 	objset_t os;
 	uint8_t os_checksum;	/* can change, under dsl_dir's locks */
 	uint8_t os_compress;	/* can change, under dsl_dir's locks */
+	uint8_t os_copies;	/* can change, under dsl_dir's locks */
 	uint8_t os_md_checksum;
 	uint8_t os_md_compress;
 

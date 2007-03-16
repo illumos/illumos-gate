@@ -60,6 +60,7 @@ struct drr_end;
 struct zbookmark;
 struct spa;
 struct nvlist;
+struct objset_impl;
 
 typedef struct objset objset_t;
 typedef struct dmu_tx dmu_tx_t;
@@ -280,7 +281,7 @@ void dmu_object_set_compress(objset_t *os, uint64_t object, uint8_t compress,
  * Decide how many copies of a given block we should make.  Can be from
  * 1 to SPA_DVAS_PER_BP.
  */
-int dmu_get_replication_level(struct spa *spa, struct zbookmark *zb,
+int dmu_get_replication_level(struct objset_impl *, struct zbookmark *zb,
     dmu_object_type_t ot);
 /*
  * The bonus data is accessed more or less like a regular buffer.

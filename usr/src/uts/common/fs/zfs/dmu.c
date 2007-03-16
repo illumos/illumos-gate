@@ -797,7 +797,7 @@ dmu_sync(zio_t *pio, dmu_buf_t *db_fake,
 	zio = arc_write(pio, os->os_spa,
 	    zio_checksum_select(db->db_dnode->dn_checksum, os->os_checksum),
 	    zio_compress_select(db->db_dnode->dn_compress, os->os_compress),
-	    dmu_get_replication_level(os->os_spa, &zb, db->db_dnode->dn_type),
+	    dmu_get_replication_level(os, &zb, db->db_dnode->dn_type),
 	    txg, bp, dr->dt.dl.dr_data, NULL, dmu_sync_done, in,
 	    ZIO_PRIORITY_SYNC_WRITE, zio_flags, &zb);
 
@@ -854,22 +854,19 @@ dmu_object_set_compress(objset_t *os, uint64_t object, uint8_t compress,
 	dnode_rele(dn, FTAG);
 }
 
-/*
- * XXX - eventually, this should take into account per-dataset (or
- *       even per-object?) user requests for higher levels of replication.
- */
 int
-dmu_get_replication_level(spa_t *spa, zbookmark_t *zb, dmu_object_type_t ot)
+dmu_get_replication_level(objset_impl_t *os,
+    zbookmark_t *zb, dmu_object_type_t ot)
 {
-	int ncopies = 1;
+	int ncopies = os->os_copies;
 
-	if (dmu_ot[ot].ot_metadata)
+	/* If it's the mos, it should have max copies set. */
+	ASSERT(zb->zb_objset != 0 ||
+	    ncopies == spa_max_replication(os->os_spa));
+
+	if (dmu_ot[ot].ot_metadata || zb->zb_level != 0)
 		ncopies++;
-	if (zb->zb_level != 0)
-		ncopies++;
-	if (zb->zb_objset == 0 && zb->zb_object == 0)
-		ncopies++;
-	return (MIN(ncopies, spa_max_replication(spa)));
+	return (MIN(ncopies, spa_max_replication(os->os_spa)));
 }
 
 int

@@ -2094,7 +2094,7 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, int checksum,
 		    os->os_dsl_dataset, db->db_blkptr, zio, tx);
 
 	dr->dr_zio = arc_write(zio, os->os_spa, checksum, compress,
-	    dmu_get_replication_level(os->os_spa, &zb, dn->dn_type), txg,
+	    dmu_get_replication_level(os, &zb, dn->dn_type), txg,
 	    db->db_blkptr, data, dbuf_write_ready, dbuf_write_done, db,
 	    ZIO_PRIORITY_ASYNC_WRITE, zio_flags, &zb);
 }

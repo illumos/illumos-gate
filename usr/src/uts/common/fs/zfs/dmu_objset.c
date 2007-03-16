@@ -117,6 +117,20 @@ compression_changed_cb(void *arg, uint64_t newval)
 	osi->os_compress = zio_compress_select(newval, ZIO_COMPRESS_ON_VALUE);
 }
 
+static void
+copies_changed_cb(void *arg, uint64_t newval)
+{
+	objset_impl_t *osi = arg;
+
+	/*
+	 * Inheritance and range checking should have been done by now.
+	 */
+	ASSERT(newval > 0);
+	ASSERT(newval <= spa_max_replication(osi->os_spa));
+
+	osi->os_copies = newval;
+}
+
 void
 dmu_objset_byteswap(void *buf, size_t size)
 {
@@ -178,6 +192,9 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 		if (err == 0)
 			err = dsl_prop_register(ds, "compression",
 			    compression_changed_cb, osi);
+		if (err == 0)
+			err = dsl_prop_register(ds, "copies",
+			    copies_changed_cb, osi);
 		if (err) {
 			VERIFY(arc_buf_remove_ref(osi->os_phys_buf,
 			    &osi->os_phys_buf) == 1);
@@ -188,6 +205,7 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 		/* It's the meta-objset. */
 		osi->os_checksum = ZIO_CHECKSUM_FLETCHER_4;
 		osi->os_compress = ZIO_COMPRESS_LZJB;
+		osi->os_copies = spa_max_replication(spa);
 	}
 
 	osi->os_zil = zil_alloc(&osi->os, &osi->os_phys->os_zil_header);
@@ -348,6 +366,8 @@ dmu_objset_evict(dsl_dataset_t *ds, void *arg)
 		    checksum_changed_cb, osi));
 		VERIFY(0 == dsl_prop_unregister(ds, "compression",
 		    compression_changed_cb, osi));
+		VERIFY(0 == dsl_prop_unregister(ds, "copies",
+		    copies_changed_cb, osi));
 	}
 
 	/*
@@ -767,7 +787,7 @@ dmu_objset_sync(objset_impl_t *os, zio_t *pio, dmu_tx_t *tx)
 		    os->os_rootbp, pio, tx);
 	zio = arc_write(pio, os->os_spa, os->os_md_checksum,
 	    os->os_md_compress,
-	    dmu_get_replication_level(os->os_spa, &zb, DMU_OT_OBJSET),
+	    dmu_get_replication_level(os, &zb, DMU_OT_OBJSET),
 	    tx->tx_txg, os->os_rootbp, os->os_phys_buf, ready, killer, os,
 	    ZIO_PRIORITY_ASYNC_WRITE, zio_flags, &zb);
 

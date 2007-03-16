@@ -1537,6 +1537,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 	case ZFS_PROP_SNAPDIR:
 	case ZFS_PROP_ACLMODE:
 	case ZFS_PROP_ACLINHERIT:
+	case ZFS_PROP_COPIES:
 		val = getprop_uint64(zhp, prop, &source);
 		verify(zfs_prop_index_to_string(prop, val, &strval) == 0);
 		(void) strlcpy(propbuf, strval, proplen);

@@ -176,6 +176,9 @@ static prop_desc_t zfs_prop_table[] = {
 	    "on | off", "XATTR", B_TRUE, B_TRUE },
 	{ "numclones", prop_type_number,	0,	NULL,	prop_readonly,
 	    ZFS_TYPE_SNAPSHOT, NULL, NULL, B_FALSE, B_FALSE },
+	{ "copies",	prop_type_index,	1,	"1",	prop_inherit,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
+	    "1 | 2 | 3", "COPIES", B_TRUE, B_TRUE },
 };
 
 #define	ZFS_PROP_COUNT	((sizeof (zfs_prop_table))/(sizeof (prop_desc_t)))
@@ -361,6 +364,13 @@ static zfs_index_t acl_inherit_table[] = {
 	{ NULL }
 };
 
+static zfs_index_t copies_table[] = {
+	{ "1",	1 },
+	{ "2",	2 },
+	{ "3",	3 },
+	{ NULL }
+};
+
 static zfs_index_t *
 zfs_prop_index_table(zfs_prop_t prop)
 {
@@ -375,6 +385,8 @@ zfs_prop_index_table(zfs_prop_t prop)
 		return (acl_mode_table);
 	case ZFS_PROP_ACLINHERIT:
 		return (acl_inherit_table);
+	case ZFS_PROP_COPIES:
+		return (copies_table);
 	default:
 		return (NULL);
 	}

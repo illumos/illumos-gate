@@ -93,7 +93,8 @@ typedef enum {
 	ZFS_PROP_SHAREISCSI,
 	ZFS_PROP_ISCSIOPTIONS,		/* not exposed to the user */
 	ZFS_PROP_XATTR,
-	ZFS_PROP_NUMCLONES		/* not exposed to the user */
+	ZFS_PROP_NUMCLONES,		/* not exposed to the user */
+	ZFS_PROP_COPIES
 } zfs_prop_t;
 
 #define	ZFS_PROP_VALUE		"value"
