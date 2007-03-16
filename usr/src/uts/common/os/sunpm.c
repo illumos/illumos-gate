@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -508,7 +508,11 @@ typedef struct lock_loan {
 static lock_loan_t lock_loan_head;	/* list head is a dummy element */
 
 #ifdef	DEBUG
+#ifdef PMDDEBUG
 #define	PMD_FUNC(func, name)	char *(func) = (name);
+#else
+#define	PMD_FUNC(func, name)
+#endif
 #else
 #define	PMD_FUNC(func, name)
 #endif
@@ -1125,7 +1129,10 @@ pm_scan_dev(dev_info_t *dip)
 	pm_scan_t	*scanp;
 	time_t		*timestamp, idletime, now, thresh;
 	time_t		timeleft = 0;
-	int		i, nxtpwr, curpwr, pwrndx, unused;
+#ifdef PMDDEBUG
+	int		curpwr;
+#endif
+	int		i, nxtpwr, pwrndx, unused;
 	size_t		size;
 	pm_component_t	 *cp;
 	dev_info_t	*pdip = ddi_get_parent(dip);
@@ -1188,9 +1195,11 @@ pm_scan_dev(dev_info_t *dip)
 		 */
 		cp = PM_CP(dip, i);
 		pwrndx = cp->pmc_cur_pwr;
+#ifdef PMDDEBUG
 		curpwr = (pwrndx == PM_LEVEL_UNKNOWN) ?
 		    PM_LEVEL_UNKNOWN :
 		    cp->pmc_comp.pmc_lvals[pwrndx];
+#endif
 
 		if (pwrndx == 0) {
 			PMD(PMD_SCAN, ("%s: %s@%s(%s#%d) comp %d off or "
@@ -1433,12 +1442,14 @@ power_dev(dev_info_t *dip, int comp, int level, int old_level,
 	int		resume_needed = 0;
 	int		suspended = 0;
 	int		result;
+#ifdef PMDDEBUG
 	struct pm_component *cp = PM_CP(dip, comp);
+#endif
 	int		bc = PM_ISBC(dip);
 	int pm_all_components_off(dev_info_t *);
 	int		clearvolpmd = 0;
 	char		pathbuf[MAXNAMELEN];
-#ifdef DEBUG
+#ifdef PMDDEBUG
 	char *ppmname, *ppmaddr;
 #endif
 	/*
@@ -1464,7 +1475,7 @@ power_dev(dev_info_t *dip, int comp, int level, int old_level,
 	power_req.req.ppm_set_power_req.new_level = level;
 	power_req.req.ppm_set_power_req.canblock = canblock;
 	power_req.req.ppm_set_power_req.cookie = NULL;
-#ifdef DEBUG
+#ifdef PMDDEBUG
 	if (pm_ppm_claimed(dip)) {
 		ppmname = PM_NAME(PPM(dip));
 		ppmaddr = PM_ADDR(PPM(dip));
@@ -4698,7 +4709,7 @@ pm_default_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	int retval;
 	dev_info_t *target_dip;
 	int new_level, old_level, cmpt;
-#ifdef DEBUG
+#ifdef PMDDEBUG
 	char *format;
 #endif
 
@@ -4741,7 +4752,7 @@ pm_default_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		case PMR_PPM_PRE_RESUME:
 		case PMR_PPM_INIT_CHILD:
 		case PMR_PPM_UNINIT_CHILD:
-#ifdef DEBUG
+#ifdef PMDDEBUG
 			switch (reqp->request_type) {
 				case PMR_PPM_PRE_DETACH:
 					format = "%s: PMR_PPM_PRE_DETACH "
@@ -7389,8 +7400,10 @@ pm_reattach_noinvol(void)
 restart:
 	rw_enter(&pm_noinvol_rwlock, RW_READER);
 	for (ip = pm_noinvol_head; ip; ip = ip->ni_next) {
+#ifdef PMDDEBUG
 		major_t maj;
 		maj = ip->ni_major;
+#endif
 		path = ip->ni_path;
 		if (path != NULL && !(ip->ni_flags & PMC_DRIVER_REMOVED)) {
 			if (ip->ni_persistent) {
@@ -8481,7 +8494,9 @@ pm_busop_set_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 	int dodeps;
 	int direction = pspm->pspm_direction;
 	int *errnop = pspm->pspm_errnop;
+#ifdef PMDDEBUG
 	char *dir = pm_decode_direction(direction);
+#endif
 	int *iresp = (int *)resultp;
 	time_t	idletime, thresh;
 	pm_component_t *cp = PM_CP(dip, comp);
@@ -9038,7 +9053,8 @@ pm_desc_pwrchk_walk(dev_info_t *dip, void *arg)
 
 	PMD(PMD_SET, ("%s: %s@%s(%s#%d)\n", pmf, PM_DEVICE(dip)))
 	for (i = 0; i < PM_NUMCMPTS(dip); i++) {
-		if ((curpwr = PM_CURPOWER(dip, i)) == 0)
+		curpwr = PM_CURPOWER(dip, i);
+		if (curpwr == 0)
 			continue;
 		ce_level = (pdpchk->pdpc_par_involved == 0) ? CE_PANIC :
 		    CE_WARN;

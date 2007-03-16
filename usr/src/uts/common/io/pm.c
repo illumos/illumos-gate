@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -465,7 +465,9 @@ int
 pm_start_pm_walk(dev_info_t *dip, void *arg)
 {
 	int cmd = *((int *)arg);
+#ifdef PMDDEBUG
 	char *cmdstr = pm_decode_cmd(cmd);
+#endif
 
 	if (!PM_GET_PM_INFO(dip) || PM_ISBC(dip))
 		return (DDI_WALK_CONTINUE);
@@ -510,7 +512,9 @@ pm_stop_pm_walk(dev_info_t *dip, void *arg)
 {
 	pm_info_t *info = PM_GET_PM_INFO(dip);
 	int cmd = *((int *)arg);
+#ifdef PMDDEBUG
 	char *cmdstr = pm_decode_cmd(cmd);
+#endif
 
 	if (!info)
 		return (DDI_WALK_CONTINUE);
