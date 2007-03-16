@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,8 @@ typedef struct intr_info {
 	char		pathname[MAXNAMELEN];
 }
 intr_info_t;
+
+#define	PX_MAX_ENTRIES		32
 
 static void intr_print_elements(intr_info_t);
 static int detailed = 0; /* Print detailed view */
@@ -131,6 +133,7 @@ intr_px_walk_step(mdb_walk_state_t *wsp)
 	px_t		*px_state_p;
 	px_t		px_state;
 	uintptr_t	start_addr;
+	int		x;
 
 	/* Read start of state structure array */
 	if (mdb_vread(&px_state_p, sizeof (uintptr_t),
@@ -145,18 +148,20 @@ intr_px_walk_step(mdb_walk_state_t *wsp)
 
 	intr_print_banner();
 
-	while (mdb_vread(&px_state_p, sizeof (uintptr_t),
-	    (uintptr_t)start_addr) != -1) {
-		/* Read until nothing is left */
+	for (x = 0; x < PX_MAX_ENTRIES; x++) {
+		(void) mdb_vread(&px_state_p, sizeof (uintptr_t),
+		    (uintptr_t)start_addr);
+
+		start_addr += sizeof (uintptr_t);
+
+		/* Read if anything is there */
 		if (mdb_vread(&px_state, sizeof (px_t),
 		    (uintptr_t)px_state_p) == -1) {
-			return (WALK_DONE);
+			continue;
 		}
 
 		wsp->walk_addr = (uintptr_t)px_state.px_ib_p;
 		intr_px_print_items(wsp);
-
-		start_addr += sizeof (uintptr_t);
 	}
 
 	return (WALK_DONE);
@@ -271,8 +276,6 @@ intr_px_print_items(mdb_walk_state_t *wsp)
 	devinfo_intr_t	intr_p;
 
 	if (mdb_vread(&ib, sizeof (px_ib_t), wsp->walk_addr) == -1) {
-		mdb_warn("intr: failed to read px interrupt block "
-		    "structure\n");
 		return;
 	}
 
@@ -283,25 +286,21 @@ intr_px_print_items(mdb_walk_state_t *wsp)
 		return;
 	}
 
-	do {
+	do { /* ino_next_p loop */
 		if (mdb_vread(&ipil, sizeof (px_ino_pil_t),
 		    (uintptr_t)ino.ino_ipil_p) == -1) {
-			mdb_warn("intr: failed to read px interrupt "
-			    "px_ino_pil_t structure\n");
 			return;
 		}
 
-		do {
+		do { /* ipil_next_p loop */
 			if (mdb_vread(&ih, sizeof (px_ih_t),
 			    (uintptr_t)ipil.ipil_ih_start) == -1) {
-				mdb_warn("intr: failed to read px interrupt "
-				    "px_ih_t structure\n");
 				return;
 			}
 
 			count = 0;
 
-			do {
+			do { /* ipil_ih_size loop */
 				bzero((void *)&info, sizeof (intr_info_t));
 
 				(void) mdb_devinfo2driver((uintptr_t)ih.ih_dip,

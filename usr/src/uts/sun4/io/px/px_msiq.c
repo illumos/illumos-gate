@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,6 +168,8 @@ px_msiq_alloc(px_t *px_p, msiq_rec_type_t rec_type, msiqid_t *msiq_id_p)
 		if (msiq_state_p->msiq_p[i].msiq_state == MSIQ_STATE_FREE) {
 			msiq_state_p->msiq_p[i].msiq_state = MSIQ_STATE_INUSE;
 			msiq_state_p->msiq_p[i].msiq_refcnt = 1;
+			(void) px_lib_msiq_gethead(px_p->px_dip, i,
+			    &msiq_state_p->msiq_p[i].msiq_curr_head_index);
 			break;
 		}
 	}
