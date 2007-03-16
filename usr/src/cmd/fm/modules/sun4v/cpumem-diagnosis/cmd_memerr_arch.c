@@ -449,7 +449,7 @@ breakup_components(char *str, char *sep, nvlist_t **hc_nvl)
 nvlist_t *
 cmd_mem2hc(fmd_hdl_t *hdl, nvlist_t *mem_fmri) {
 
-	char *nac_name, *s, *p, **sa;
+	char *nac_name, *s, **sa;
 	const char *unum = cmd_fmri_get_unum(mem_fmri);
 	nvlist_t *fp, **hc_list;
 	int i, n;
@@ -512,8 +512,9 @@ cmd_mem2hc(fmd_hdl_t *hdl, nvlist_t *mem_fmri) {
 			return (NULL);
 		}
 	}
-	if (nvlist_lookup_string(mem_fmri, FM_FMRI_HC_PART, &p) == 0) {
-		if (nvlist_add_string(fp, FM_FMRI_HC_PART, p) != 0) {
+	if (nvlist_lookup_string_array(mem_fmri, FM_FMRI_HC_PART,
+	    &sa, &usi) == 0) {
+		if (nvlist_add_string(fp, FM_FMRI_HC_PART, *sa) != 0) {
 			nvlist_free(fp);
 			return (NULL);
 		}

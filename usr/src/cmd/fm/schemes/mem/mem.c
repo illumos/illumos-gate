@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -292,9 +292,88 @@ mem_get_serids_from_mdesc(const char *unum, char ***seridsp, size_t *nseridsp)
 	return (rc);
 }
 
+/*
+ * Returns 0 with part numbers if found, returns -1 for errors.
+ */
+static int
+mem_get_parts_from_mdesc(const char *unum, char ***partsp, size_t *npartsp)
+{
+	uint64_t drgen = fmd_fmri_get_drgen();
+	char **dimms, **parts;
+	size_t ndimms, nparts;
+	mem_dimm_map_t *dm;
+	int i, rc = 0;
+
+	if (mem_unum_burst(unum, &dimms, &ndimms) < 0)
+		return (-1); /* errno is set for us */
+
+	parts = fmd_fmri_zalloc(sizeof (char *) * ndimms);
+	nparts = ndimms;
+
+	/*
+	 * first go through dimms and see if dm_drgen entries are outdated
+	 */
+	for (i = 0; i < ndimms; i++) {
+		if ((dm = dm_lookup(dimms[i])) == NULL ||
+		    dm->dm_drgen != drgen)
+			break;
+	}
+
+	if (i < ndimms && mem_update_mdesc() != 0) {
+		mem_strarray_free(dimms, ndimms);
+		mem_strarray_free(parts, nparts);
+		return (-1);
+	}
+
+	/*
+	 * get to this point if an up-to-date mdesc (and corresponding
+	 * entries in the global mem list) exists
+	 */
+	for (i = 0; i < ndimms; i++) {
+		if ((dm = dm_lookup(dimms[i])) == NULL) {
+			rc = fmd_fmri_set_errno(EINVAL);
+			break;
+		}
+
+		if (dm->dm_drgen != drgen)
+			dm->dm_drgen = drgen;
+
+		/*
+		 * mdesc and dm entry was updated by an earlier call to
+		 * mem_update_mdesc, so we go ahead and dup the part
+		 */
+		if (dm->dm_part == NULL) {
+			rc = -1;
+			break;
+		}
+		parts[i] = fmd_fmri_strdup(dm->dm_part);
+	}
+
+	mem_strarray_free(dimms, ndimms);
+
+	if (rc == 0) {
+		*partsp = parts;
+		*npartsp = nparts;
+	} else {
+		mem_strarray_free(parts, nparts);
+	}
+
+	return (rc);
+}
+
+static int
+mem_get_parts_by_unum(const char *unum, char ***partp, size_t *npartp)
+{
+	if (mem.mem_dm == NULL)
+		return (-1);
+	else
+		return (mem_get_parts_from_mdesc(unum, partp, npartp));
+}
+
 #endif	/* sparc */
 
 /*ARGSUSED*/
+
 static int
 mem_get_serids_by_unum(const char *unum, char ***seridsp, size_t *nseridsp)
 {
@@ -413,6 +492,10 @@ fmd_fmri_expand(nvlist_t *nvl)
 	char *unum, **serids;
 	uint_t nnvlserids;
 	size_t nserids;
+#ifdef sparc
+	char **parts;
+	size_t nparts;
+#endif
 	int rc;
 
 	if (mem_fmri_get_unum(nvl, &unum) < 0)
@@ -440,6 +523,17 @@ fmd_fmri_expand(nvlist_t *nvl)
 	if (rc != 0)
 		return (fmd_fmri_set_errno(EINVAL));
 
+#ifdef sparc
+	/*
+	 * Continue with the process if there are no part numbers.
+	 */
+	if (mem_get_parts_by_unum(unum, &parts, &nparts) < 0)
+		return (0);
+
+	rc = nvlist_add_string_array(nvl, FM_FMRI_HC_PART, parts, nparts);
+
+	mem_strarray_free(parts, nparts);
+#endif
 	return (0);
 }
 
