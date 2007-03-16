@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # SUNWpd postinstall script
 
@@ -236,19 +235,24 @@ then
 fi
 }
 
-# modunload the driver if installing on running system
-if [ "${BASEDIR}" = "/" ]; then
-        modnum=`set -- \`modinfo | grep ecpp\`; echo $1`
-        if [ "$modnum" ]; then
-                modunload -i $modnum
-        fi
-fi
-
-# add_drv ecpp driver if not already installed
-modnum=`grep -c ecpp ${NAMEMAJOR}`
-if [ "$modnum" = "0" ]; then
-	# add new entries to name_to_major, minor_perm,  driver_classes files
-	/usr/sbin/add_drv -b ${BASEDIR} -i '"pnpALI,1533,3" "ns87317-ecpp"' -m '* 0666 root sys' -n ecpp || status=1
+# SUNWpd contains ecpp on SPARC only - run on SPARC only
+if [ "${ISA_TYPE}" = "${ISA_TYPE_SPARC}" ]; then
+	# modunload the driver if installing on running system
+	if [ "${BASEDIR}" = "/" ]; then
+	        modnum=`set -- \`modinfo | grep ecpp\`; echo $1`
+	        if [ "$modnum" ]; then
+	                modunload -i $modnum
+	        fi
+	fi
+	
+	# add_drv ecpp driver if not already installed
+	modnum=`grep -c ecpp ${NAMEMAJOR}`
+	if [ "$modnum" = "0" ]; then
+		# add new entries to
+		# name_to_major, minor_perm, driver_classes files
+		/usr/sbin/add_drv -b ${BASEDIR} -i '"pnpALI,1533,3" "ns87317-ecpp"' \
+			-m '* 0666 root sys' -n ecpp || status=1
+	fi
 fi
 
 rm -f /tmp/$$.*
