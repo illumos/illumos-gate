@@ -1226,6 +1226,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 				    sctp->sctp_mss);
 				sctp->sctp_rwnd = *i1;
 				sctp->sctp_irwnd = sctp->sctp_rwnd;
+				sctp->sctp_pd_point = sctp->sctp_rwnd;
 			}
 			/*
 			 * XXX should we return the rwnd here

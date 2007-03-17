@@ -423,7 +423,13 @@ typedef struct sctp_reass_s {
 	uint16_t	ssn;
 	uint16_t	needed;
 	uint16_t	got;
+	uint16_t	msglen;		/* len of consecutive fragments */
+					/* from the begining (B-bit) */
 	mblk_t		*tail;
+	boolean_t	hasBchunk;	/* If the fragment list begins with */
+					/* a B-bit set chunk */
+	uint32_t	nexttsn;	/* TSN of the next fragment we */
+					/* are expecting */
 	boolean_t	partial_delivered;
 } sctp_reass_t;
 
@@ -920,6 +926,8 @@ typedef struct sctp_s {
 	uint_t		sctp_v6label_len;	/* length of cached v6 label */
 	uint32_t	sctp_rxt_nxttsn;	/* Next TSN to be rexmitted */
 	uint32_t	sctp_rxt_maxtsn;	/* Max TSN sent at time out */
+
+	int		sctp_pd_point;		/* Partial delivery point */
 } sctp_t;
 
 #endif	/* (defined(_KERNEL) || defined(_KMEMUSER)) */

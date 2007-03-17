@@ -949,12 +949,14 @@ sctp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    "family\t\t%?u\tipversion\t%?hu\n"
 		    "hb_interval\t%?u\tautoclose\t%?d\n"
 		    "active\t\t%?ld\ttx_adaption_code%?x\n"
-		    "rx_adaption_code%?x\ttimer_mp\t%?p\n",
+		    "rx_adaption_code%?x\ttimer_mp\t%?p\n"
+		    "partial_delivery_point\t%?d\n",
 		    sctp.sctp_bound_if, sctp.sctp_heartbeat_mp,
 		    sctp.sctp_family, sctp.sctp_ipversion,
 		    sctp.sctp_hb_interval, sctp.sctp_autoclose,
 		    sctp.sctp_active, sctp.sctp_tx_adaption_code,
-		    sctp.sctp_rx_adaption_code, sctp.sctp_timer_mp);
+		    sctp.sctp_rx_adaption_code, sctp.sctp_timer_mp,
+		    sctp.sctp_pd_point);
 	}
 
 	if (opts & MDB_SCTP_SHOW_EXT) {
