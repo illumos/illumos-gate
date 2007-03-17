@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1039,9 +1039,14 @@ del_rtcmd_irep(rtcmd_irep_t *rcip)
 	free(rcip->ri_dest_str);
 	free(rcip->ri_gate_str);
 	free(rcip->ri_ifp_str);
-	if (rcip->ri_gate_hp != NULL) {
+	/*
+	 * IPv6 host entries come from getipnodebyname, which dynamically
+	 * allocates memory.  IPv4 host entries come from gethostbyname, which
+	 * returns static memory and cannot be freed with freehostent.
+	 */
+	if (rcip->ri_gate_hp != NULL &&
+	    rcip->ri_gate_hp->h_addrtype == AF_INET6)
 		freehostent(rcip->ri_gate_hp);
-	}
 	free(rcip);
 }
 
