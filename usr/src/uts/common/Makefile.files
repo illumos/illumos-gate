@@ -1316,6 +1316,10 @@ RGE_OBJS += rge_main.o rge_chip.o rge_ndd.o rge_kstats.o rge_log.o rge_rxtx.o
 
 ATH_OBJS += ath_aux.o ath_main.o ath_osdep.o ath_rate.o
 
+IPW_OBJS += ipw2100_hw.o ipw2100.o
+
+IWI_OBJS += ipw2200_hw.o ipw2200.o
+
 #
 #	Build up defines and paths.
 #
