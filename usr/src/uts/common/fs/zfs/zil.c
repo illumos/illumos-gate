@@ -700,7 +700,7 @@ zil_lwb_write_start(zilog_t *zilog, lwb_t *lwb)
 		 * hanging around on the zl_lwb_list.
 		 */
 		dsl_dataset_dirty(dmu_objset_ds(zilog->zl_os), tx);
-
+		dmu_tx_commit(tx);
 
 		/*
 		 * Since we've just experienced an allocation failure so we

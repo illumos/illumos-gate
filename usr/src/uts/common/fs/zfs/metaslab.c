@@ -670,6 +670,17 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t size, uint64_t txg,
 
 		mutex_enter(&msp->ms_lock);
 
+		/*
+		 * Ensure that the metaslab we have selected is still
+		 * capable of handling our request. It's possible that
+		 * another thread may have changed the weight while we
+		 * were blocked on the metaslab lock.
+		 */
+		if (msp->ms_weight < size) {
+			mutex_exit(&msp->ms_lock);
+			continue;
+		}
+
 		if ((msp->ms_weight & METASLAB_WEIGHT_SECONDARY) &&
 		    activation_weight == METASLAB_WEIGHT_PRIMARY) {
 			metaslab_passivate(msp,
