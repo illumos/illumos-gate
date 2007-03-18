@@ -1638,7 +1638,7 @@ vdc_recv(vdc_t *vdc, vio_msg_t *msgp, size_t *nbytesp)
 	 * Until we get a blocking ldc read we have to retry
 	 * until the entire LDC message has arrived before
 	 * ldc_read() will succeed. Note we also bail out if
-	 * the chanel is reset or goes away.
+	 * the channel is reset or goes away.
 	 */
 	delay_time = vdc_ldc_read_init_delay;
 loop:
@@ -2753,7 +2753,6 @@ vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx)
 	vd_dring_entry_t *dep = NULL;		/* Dring Entry Pointer */
 	vdc_local_desc_t *ldep = NULL;		/* Local Dring Entry Pointer */
 	int		status = ENXIO;
-	int		operation;
 	int		rv = 0;
 
 	ASSERT(vdc != NULL);
@@ -2773,11 +2772,16 @@ vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx)
 	ldep->is_free = B_TRUE;
 	DMSG(vdc, 2, ": is_free = %d\n", ldep->is_free);
 	status = dep->payload.status;
-	operation = dep->payload.operation;
 
-	/* the DKIO FLUSH operation never bind handles so we can return now */
-	if (operation == VD_OP_FLUSH)
+	/*
+	 * If no buffers were used to transfer information to the server when
+	 * populating the descriptor then no memory handles need to be unbound
+	 * and we can return now.
+	 */
+	if (ldep->nbytes == 0) {
+		cv_signal(&vdc->dring_free_cv);
 		return (status);
+	}
 
 	/*
 	 * If the upper layer passed in a misaligned address we copied the
@@ -3139,7 +3143,7 @@ vdc_resubmit_backup_dring(vdc_t *vdcp)
 
 		curr_ldep = &(vdcp->local_dring_backup[b_idx]);
 
-		/* only resubmit oustanding transactions */
+		/* only resubmit outstanding transactions */
 		if (!curr_ldep->is_free) {
 
 			DMSG(vdcp, 1, "resubmitting entry idx=%x\n", b_idx);
@@ -3721,7 +3725,7 @@ vdc_handle_ver_msg(vdc_t *vdc, vio_ver_msg_t *ver_msg)
 	case VIO_SUBTYPE_INFO:
 		/*
 		 * Handle the case where vds starts handshake
-		 * (for now only vdc is the instigatior)
+		 * (for now only vdc is the instigator)
 		 */
 		status = ENOTSUP;
 		break;
@@ -4095,7 +4099,7 @@ typedef struct vdc_dk_ioctl {
  * Subset of DKIO(7I) operations currently supported
  */
 static vdc_dk_ioctl_t	dk_ioctl[] = {
-	{VD_OP_FLUSH,		DKIOCFLUSHWRITECACHE,	sizeof (int),
+	{VD_OP_FLUSH,		DKIOCFLUSHWRITECACHE,	0,
 		vdc_null_copy_func},
 	{VD_OP_GET_WCE,		DKIOCGETWCE,		sizeof (int),
 		vdc_get_wce_convert},
@@ -4279,6 +4283,13 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 			if (dkc == NULL)
 				break;
 
+			/*
+			 * the asynchronous callback is only supported if
+			 * invoked from within the kernel
+			 */
+			if ((mode & FKIOCTL) == 0)
+				return (ENOTSUP);
+
 			dkarg = kmem_zalloc(sizeof (vdc_dk_arg_t), KM_SLEEP);
 
 			dkarg->mode = mode;
@@ -4312,8 +4323,9 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	DMSG(vdc, 1, "[%d] struct size %ld alloc %ld\n",
 	    instance, len, alloc_len);
 
-	ASSERT(alloc_len != 0);	/* sanity check */
-	mem_p = kmem_zalloc(alloc_len, KM_SLEEP);
+	ASSERT(alloc_len >= 0); /* sanity check */
+	if (alloc_len > 0)
+		mem_p = kmem_zalloc(alloc_len, KM_SLEEP);
 
 	if (cmd == DKIOCSVTOC) {
 		/*
@@ -4324,7 +4336,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	}
 
 	/*
-	 * Call the conversion function for this ioctl whhich if necessary
+	 * Call the conversion function for this ioctl which, if necessary,
 	 * converts from the Solaris format to the format ARC'ed
 	 * as part of the vDisk protocol (FWARC 2006/195)
 	 */
