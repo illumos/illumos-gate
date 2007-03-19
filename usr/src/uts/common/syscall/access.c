@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,9 @@
 #include <sys/uio.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
+#include <sys/file.h>
 #include <fs/fs_subr.h>
+#include <c2/audit.h>
 
 /*
  * Determine accessibility of file.
@@ -56,8 +58,8 @@
 #define	W_OK	002
 #define	X_OK	001
 
-int
-access(char *fname, int fmode)
+static int
+caccess(char *fname, int fmode, vnode_t *startvp)
 {
 	vnode_t *vp;
 	cred_t *tmpcr;
@@ -89,7 +91,8 @@ access(char *fname, int fmode)
 	}
 
 lookup:
-	if (error = lookupname(fname, UIO_USERSPACE, FOLLOW, NULLVPP, &vp)) {
+	if (error = lookupnameat(fname, UIO_USERSPACE, FOLLOW, NULLVPP, &vp,
+	    startvp)) {
 		if ((error == ESTALE) && fs_need_estale_retry(estale_retry++))
 			goto lookup;
 		if (!eok)
@@ -112,5 +115,55 @@ lookup:
 	if (!eok)
 		crfree(tmpcr);
 	VN_RELE(vp);
+	return (error);
+}
+
+int
+access(char *fname, int fmode)
+{
+	return (caccess(fname, fmode, NULL));
+}
+
+int
+accessat(int fd, char *fname, int fmode)
+{
+	file_t *dirfp;
+	vnode_t *dirvp;
+	int error;
+	char startchar;
+
+	if (fd == AT_FDCWD && fname == NULL)
+		return (set_errno(EFAULT));
+
+	if (fname != NULL) {
+		if (copyin(fname, &startchar, sizeof (char)))
+			return (set_errno(EFAULT));
+	} else
+		startchar = '\0';
+
+	if (fd == AT_FDCWD) {
+		dirvp = NULL;
+	} else {
+		if (startchar != '/') {
+			if ((dirfp = getf(fd)) == NULL) {
+				return (set_errno(EBADF));
+			}
+			dirvp = dirfp->f_vnode;
+			VN_HOLD(dirvp);
+			releasef(fd);
+		} else {
+			dirvp = NULL;
+		}
+	}
+
+#ifdef C2_AUDIT
+	if (audit_active)
+		audit_setfsat_path(1);
+#endif /* C2_AUDIT */
+
+	error = caccess(fname, fmode, dirvp);
+	if (dirvp != NULL)
+		VN_RELE(dirvp);
+
 	return (error);
 }

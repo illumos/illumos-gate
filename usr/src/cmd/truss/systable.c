@@ -719,8 +719,9 @@ static const	struct systable fsatsystable[] = {
 {"unlinkat",	4, DEC, NOV, HID, ATC, STG, HEX},		/* 5 */
 {"futimesat",	4, DEC, NOV, HID, ATC, STG, HEX},		/* 6 */
 {"renameat",	5, DEC, NOV, HID, ATC, STG, DEC, STG},		/* 7 */
-{"openat",	4, DEC, NOV, HID, ATC, STG, OPN},		/* 8 */
-{"openat64",	4, DEC, NOV, HID, ATC, STG, OPN},		/* 9 */
+{"__accessat",	5, DEC, NOV, HID, ATC, STG, ACC},		/* 8 */
+{"openat",	4, DEC, NOV, HID, ATC, STG, OPN},		/* N - 2 */
+{"openat64",	4, DEC, NOV, HID, ATC, STG, OPN},		/* N - 1 */
 };
 #define	NFSATSYSCODE	(sizeof (fsatsystable) / sizeof (struct systable))
 
@@ -944,6 +945,7 @@ const	struct sysalias sysalias[] = {
 	{ "unlinkat",		SYS_fsat	},
 	{ "futimesat",		SYS_fsat	},
 	{ "renameat",		SYS_fsat	},
+	{ "__accessat",		SYS_fsat	},
 	{ "lgrpsys",		SYS_lgrpsys	},
 	{ "getrusage",		SYS_rusagesys	},
 	{ "getrusage_chld",	SYS_rusagesys	},
@@ -1217,13 +1219,13 @@ getsubcode(private_t *pri)
 				if (nsysarg > 3)
 					subcode =
 					    (Lsp->pr_sysarg[3] & O_CREAT) ?
-					    0 : 8;
+					    0 : NFSATSYSCODE - 2;
 				break;
 			case 1: /* openat64 */
 				if (nsysarg > 3)
 					subcode =
 					    (Lsp->pr_sysarg[3] & O_CREAT) ?
-					    1 : 9;
+					    1 : NFSATSYSCODE - 1;
 				break;
 			case 2:
 			case 3:
@@ -1231,6 +1233,7 @@ getsubcode(private_t *pri)
 			case 5:
 			case 6:
 			case 7:
+			case 8:
 				subcode = arg0;
 			}
 			break;

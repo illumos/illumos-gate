@@ -1262,6 +1262,7 @@ SUNW_0.7 {		# SunOS 5.3 (Solaris 2.3)
 
 SUNWprivate_1.1 {
     global:
+	__accessat;
 	_a64l;
 	acctctl;
 	_acctctl;

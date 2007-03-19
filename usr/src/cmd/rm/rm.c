@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,86 +33,69 @@
  * rm [-fiRr] file ...
  */
 
-#include <stdio.h>
-#include <fcntl.h>
-#include <string.h>
-#include <sys/types.h>
+#include <sys/param.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <langinfo.h>
 #include <limits.h>
 #include <locale.h>
-#include <langinfo.h>
-#include <unistd.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
-#include <sys/resource.h>
-#include <sys/avl.h>
-#include <libcmdutils.h>
+#include <string.h>
+#include <unistd.h>
+#include <values.h>
 
-#define	ARGCNT		5		/* Number of arguments */
-#define	CHILD		0
-#define	DIRECTORY	((buffer.st_mode&S_IFMT) == S_IFDIR)
-#define	SYMLINK		((buffer.st_mode&S_IFMT) == S_IFLNK)
-#define	FAIL		-1
-#define	MAXFORK		100		/* Maximum number of forking attempts */
-#define	NAMESIZE	MAXNAMLEN + 1	/* "/" + (file name size) */
-#define	TRUE		1
-#define	FALSE		0
-#define	WRITE		02
-#define	SEARCH		07
+#define	E_OK	010		/* make __accessat() use effective ids */
 
-static	int	errcode;
-static	int interactive, recursive, silent; /* flags for command line options */
+#define	DIR_CANTCLOSE		1
 
-static	int	rm(char *, int);
-static	int	undir(char *, int, dev_t, ino_t);
-static	int	yes(void);
-static	int	mypath(dev_t, ino_t);
+static struct stat rootdir;
 
-static	char	yeschr[SCHAR_MAX + 2];
-static	char	nochr[SCHAR_MAX + 2];
-
-static char *fullpath;
-static int initdirfd;
-
-static void push_name(char *name, int first);
-static int pop_name(int first);
-static void force_chdir(char *);
-static void ch_dir(char *);
-static char *get_filename(char *name);
-static void chdir_init(void);
-static void check_initdir(void);
-static void cleanup(void);
-
-static char 	*cwd;		/* pathname of init dir, from getcwd() */
-static rlim_t	maxfiles;	/* maximum number of open files */
-static int	first_dir = 1;	/* flag set when first trying to remove a dir */
-	/* flag set when can't get dev/inode of a parent dir */
-static int	parent_err = 0;
-static avl_tree_t *tree;	/* tree to keep track of nodes visited */
-
-struct dir_id {
-	dev_t	dev;
-	ino_t	inode;
-	struct dir_id *next;
+struct dlist {
+	int fd;			/* Stores directory fd */
+	int flags;		/* DIR_* Flags */
+	DIR *dp;		/* Open directory (opened with fd) */
+	long diroff;		/* Saved directory offset when closing */
+	struct dlist *up;	/* Up one step in the tree (toward "/") */
+	struct dlist *down;	/* Down one step in the tree */
+	ino_t ino;		/* st_ino of directory */
+	dev_t dev;		/* st_dev of directory */
+	int pathend;		/* Offset of name end in the pathbuffer */
 };
 
-	/*
-	 * initdir is the first of a linked list of structures
-	 * containing unique identifying device and inode numbers for
-	 * each directory, from the initial dir up to the root.
-	 * current_dir is a pointer to the most recent directory pushed
-	 * on during a recursive rm() call.
-	 */
-static struct dir_id initdir, *current_dir;
+static struct dlist top = {
+	(int)AT_FDCWD,
+	DIR_CANTCLOSE,
+};
+
+static char yeschr[SCHAR_MAX + 2];
+static char nochr[SCHAR_MAX + 2];
+
+static struct dlist *cur, *rec;
+
+static int rm(const char *, struct dlist *);
+static int confirm(FILE *, const char *, ...);
+static void memerror(void);
+static int checkdir(struct dlist *, struct dlist *);
+static int errcnt;
+static boolean_t silent, interactive, recursive, ontty;
+
+static char *pathbuf;
+static size_t pathbuflen;
+
+static int maxfds = MAXINT;
+static int nfds;
+
+extern int __accessat(int, const char *, int);
 
 int
-main(int argc, char *argv[])
+main(int argc, char **argv)
 {
-	extern int	optind;
-	int	errflg = 0;
-	int	c;
-	struct rlimit rl;
+	int errflg = 0;
+	int c;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
@@ -126,20 +109,20 @@ main(int argc, char *argv[])
 	while ((c = getopt(argc, argv, "frRi")) != EOF)
 		switch (c) {
 		case 'f':
-			silent = TRUE;
+			silent = B_TRUE;
 #ifdef XPG4
-			interactive = FALSE;
+			interactive = B_FALSE;
 #endif
 			break;
 		case 'i':
-			interactive = TRUE;
+			interactive = B_TRUE;
 #ifdef XPG4
-			silent = FALSE;
+			silent = B_FALSE;
 #endif
 			break;
 		case 'r':
 		case 'R':
-			recursive = TRUE;
+			recursive = B_TRUE;
 			break;
 		case '?':
 			errflg = 1;
@@ -161,468 +144,426 @@ main(int argc, char *argv[])
 	argv = &argv[optind];
 
 	if ((argc < 1 && !silent) || errflg) {
+		(void) fprintf(stderr, gettext("usage: rm [-fiRr] file ...\n"));
+		exit(2);
+	}
+
+	ontty = isatty(STDIN_FILENO) != 0;
+
+	if (recursive && stat("/", &rootdir) != 0) {
 		(void) fprintf(stderr,
-			gettext("usage: rm [-fiRr] file ...\n"));
+		    gettext("rm: cannot stat root directory: %s\n"),
+		    strerror(errno));
 		exit(2);
 	}
 
-	if (getrlimit(RLIMIT_NOFILE, &rl)) {
-		perror("getrlimit");
-		exit(2);
-	} else
-		maxfiles = rl.rlim_cur - 2;
-
-	while (argc-- > 0) {
-		tree = NULL;
-		/* Retry if rm() fails due to bad chdir */
-		while (rm(*argv, 1) < 0)
+	for (; *argv != NULL; argv++) {
+		char *p = strrchr(*argv, '/');
+		if (p == NULL)
+			p = *argv;
+		else
+			p = p + 1;
+		if (strcmp(p, ".") == 0 || strcmp(p, "..") == 0) {
+			(void) fprintf(stderr,
+			    gettext("rm of %s is not allowed\n"), *argv);
+			errcnt++;
+			continue;
+		}
+		/* Retry when we can't walk back up. */
+		while (rm(*argv, rec = cur = &top) != 0)
 			;
-		argv++;
-		destroy_tree(tree);
 	}
 
-	cleanup();
-	return (errcode ? 2 : 0);
-	/* NOTREACHED */
+	return (errcnt != 0 ? 2 : 0);
+}
+
+static void
+pushfilename(const char *fname)
+{
+	char *p;
+	const char *q = fname;
+
+	if (cur == &top) {
+		p = pathbuf;
+	} else {
+		p = pathbuf + cur->up->pathend;
+		*p++ = '/';
+	}
+	while (*q != '\0') {
+		if (p - pathbuf + 2 >= pathbuflen) {
+			char *np;
+			pathbuflen += MAXPATHLEN;
+			np = realloc(pathbuf, pathbuflen);
+			if (np == NULL)
+				memerror();
+			p = np + (p - pathbuf);
+			pathbuf = np;
+		}
+		*p++ = *q++;
+	}
+	*p = '\0';
+	cur->pathend = p - pathbuf;
+}
+
+static void
+closeframe(struct dlist *frm)
+{
+	if (frm->dp != NULL) {
+		(void) closedir(frm->dp);
+		nfds--;
+		frm->dp = NULL;
+		frm->fd = -1;
+	}
 }
 
 static int
-rm(char *path, int first)
+reclaim(void)
 {
-	struct stat buffer;
-	char	*filepath;
-	char	*p;
-	char	resolved_path[PATH_MAX];
+	while (rec != NULL && (rec->flags & DIR_CANTCLOSE) != 0)
+		rec = rec->down;
+	if (rec == NULL || rec == cur || rec->dp == NULL)
+		return (-1);
+	rec->diroff = telldir(rec->dp);
+	closeframe(rec);
+	rec = rec->down;
+	return (0);
+}
+
+static void
+pushdir(struct dlist *frm)
+{
+	frm->up = cur;
+	frm->down = NULL;
+	cur->down = frm;
+	cur = frm;
+}
+
+static int
+opendirat(int dirfd, const char *entry, struct dlist *frm)
+{
+	int fd;
+
+	if (nfds >= maxfds)
+		(void) reclaim();
+
+	while ((fd = openat(dirfd, entry, O_RDONLY|O_NONBLOCK)) == -1 &&
+	    errno == EMFILE) {
+		if (nfds < maxfds)
+			maxfds = nfds;
+		if (reclaim() != 0)
+			return (-1);
+	}
+	if (fd < 0)
+		return (-1);
+	frm->fd = fd;
+	frm->dp = fdopendir(fd);
+	if (frm->dp == NULL) {
+		(void) close(fd);
+		return (-1);
+	}
+	nfds++;
+	return (0);
+}
+
+/*
+ * Since we never pop the top frame, cur->up can never be NULL.
+ * If we pop beyond a frame we closed, we try to reopen "..".
+ */
+static int
+popdir(boolean_t noerror)
+{
+	struct stat buf;
+	int ret = noerror ? 0 : -1;
+	pathbuf[cur->up->pathend] = '\0';
+
+	if (noerror && cur->up->fd == -1) {
+		rec = cur->up;
+		if (opendirat(cur->fd, "..", rec) != 0 ||
+		    fstat(rec->fd, &buf) != 0) {
+			(void) fprintf(stderr,
+			    gettext("rm: cannot reopen %s: %s\n"),
+			    pathbuf, strerror(errno));
+			exit(2);
+		}
+		if (rec->ino != buf.st_ino || rec->dev != buf.st_dev) {
+			(void) fprintf(stderr, gettext("rm: WARNING: "
+			    "The directory %s was moved or linked to "
+			    "another directory during the execution of rm\n"),
+			    pathbuf);
+			closeframe(rec);
+			ret = -1;
+		} else {
+			/* If telldir failed, we take it from the top. */
+			if (rec->diroff != -1)
+				seekdir(rec->dp, rec->diroff);
+		}
+	} else if (rec == cur)
+		rec = cur->up;
+	closeframe(cur);
+	cur = cur->up;
+	cur->down = NULL;
+	return (ret);
+}
+
+/*
+ * The stack frame of this function is minimized so that we can
+ * recurse quite a bit before we overflow the stack; around
+ * 30,000-40,000 nested directories can be removed with the default
+ * stack limit.
+ */
+static int
+rm(const char *entry, struct dlist *caller)
+{
+	struct dlist frame;
+	int flag;
+	struct stat temp;
+	struct dirent *dent;
+	int err;
 
 	/*
-	 * Check file to see if it exists.
+	 * Construct the pathname: note that the entry may live in memory
+	 * allocated by readdir and that after return from recursion
+	 * the memory is no longer valid.  So after the recursive rm()
+	 * call, we use the global pathbuf instead of the entry argument.
 	 */
-	if (lstat(path, &buffer) == FAIL) {
+	pushfilename(entry);
+
+	if (fstatat(caller->fd, entry, &temp, AT_SYMLINK_NOFOLLOW) != 0) {
 		if (!silent) {
-			perror(path);
-			++errcode;
+			(void) fprintf(stderr, "rm: %s: %s\n", pathbuf,
+			    strerror(errno));
+			errcnt++;
 		}
 		return (0);
 	}
 
-	/* prevent removal of / but allow removal of sym-links */
-	if (!S_ISLNK(buffer.st_mode) && realpath(path, resolved_path) != NULL &&
-	    strcmp(resolved_path, "/") == 0) {
-		(void) fprintf(stderr,
-		    gettext("rm of %s is not allowed\n"), resolved_path);
-		errcode++;
-		return (0);
-	}
-
-	/* prevent removal of . or .. (directly) */
-	if (p = strrchr(path, '/'))
-		p++;
-	else
-		p = path;
-	if (strcmp(".", p) == 0 || strcmp("..", p) == 0) {
-		(void) fprintf(stderr,
-			gettext("rm of %s is not allowed\n"), path);
-		errcode++;
-		return (0);
-	}
-	/*
-	 * If it's a directory, remove its contents.
-	 */
-	if (DIRECTORY) {
+	if (S_ISDIR(temp.st_mode)) {
 		/*
 		 * If "-r" wasn't specified, trying to remove directories
 		 * is an error.
 		 */
 		if (!recursive) {
 			(void) fprintf(stderr,
-			    gettext("rm: %s is a directory\n"), path);
-			++errcode;
+			    gettext("rm: %s is a directory\n"), pathbuf);
+			errcnt++;
 			return (0);
 		}
 
-		if (first_dir) {
-			check_initdir();
-			current_dir = NULL;
-			first_dir = 0;
+		if (temp.st_ino == rootdir.st_ino &&
+		    temp.st_dev == rootdir.st_dev) {
+			(void) fprintf(stderr,
+			    gettext("rm of %s is not allowed\n"), "/");
+			errcnt++;
+			return (0);
+		}
+		/*
+		 * TRANSLATION_NOTE - The following message will contain the
+		 * first character of the strings for "yes" and "no" defined
+		 * in the file "nl_langinfo.po".  After substitution, the
+		 * message will appear as follows:
+		 *	rm: examine files in directory <directoryname> (y/n)?
+		 * where <directoryname> is the directory to be removed
+		 *
+		 */
+		if (interactive && !confirm(stderr,
+		    gettext("rm: examine files in directory %s (%s/%s)? "),
+		    pathbuf, yeschr, nochr)) {
+			return (0);
 		}
 
-		return (undir(path, first, buffer.st_dev, buffer.st_ino));
+		frame.dev = temp.st_dev;
+		frame.ino = temp.st_ino;
+		frame.flags = 0;
+		flag = AT_REMOVEDIR;
+
+#ifdef XPG4
+		/*
+		 * XCU4 and POSIX.2: If not interactive, check to see whether
+		 * or not directory is readable or writable and if not,
+		 * prompt user for response.
+		 */
+		if (ontty && !interactive && !silent &&
+		    __accessat(caller->fd, entry, W_OK|X_OK|E_OK) != 0 &&
+		    !confirm(stderr,
+		    gettext("rm: examine files in directory %s (%s/%s)? "),
+		    pathbuf, yeschr, nochr)) {
+			return (0);
+		}
+#endif
+		if (opendirat(caller->fd, entry, &frame) == -1) {
+			err = errno;
+
+			if (interactive) {
+				/*
+				 * Print an error message that
+				 * we could not read the directory
+				 * as the user wanted to examine
+				 * files in the directory.  Only
+				 * affect the error status if
+				 * user doesn't want to remove the
+				 * directory as we still may be able
+				 * remove the directory successfully.
+				 */
+				(void) fprintf(stderr, gettext(
+				    "rm: cannot read directory %s: %s\n"),
+				    pathbuf, strerror(err));
+
+/*
+ * TRANSLATION_NOTE - The following message will contain the
+ * first character of the strings for "yes" and "no" defined
+ * in the file "nl_langinfo.po".  After substitution, the
+ * message will appear as follows:
+ *	rm: remove <filename> (y/n)?
+ * For example, in German, this will appear as
+ * 	rm: löschen <filename> (j/n)?
+ * where j=ja, n=nein, <filename>=the file to be removed
+ */
+				if (!confirm(stderr,
+				    gettext("rm: remove %s (%s/%s)? "),
+				    pathbuf, yeschr, nochr)) {
+					errcnt++;
+					return (0);
+				}
+			}
+			/* If it's empty we may still be able to rm it */
+			if (unlinkat(caller->fd, entry, flag) == 0)
+				return (0);
+			if (interactive)
+				err = errno;
+			(void) fprintf(stderr,
+			    interactive ?
+			    gettext("rm: Unable to remove directory %s: %s\n") :
+			    gettext("rm: cannot read directory %s: %s\n"),
+			    pathbuf, strerror(err));
+			errcnt++;
+			return (0);
+		}
+
+		/*
+		 * There is a race condition here too; if we open a directory
+		 * we have to make sure it's still the same directory we
+		 * stat'ed and checked against root earlier.  Let's check.
+		 */
+		if (fstat(frame.fd, &temp) != 0 ||
+		    frame.ino != temp.st_ino ||
+		    frame.dev != temp.st_dev) {
+			(void) fprintf(stderr,
+			    gettext("rm: %s: directory renamed\n"), pathbuf);
+			closeframe(&frame);
+			errcnt++;
+			return (0);
+		}
+
+		if (caller != &top) {
+			if (checkdir(caller, &frame) != 0) {
+				closeframe(&frame);
+				goto unlinkit;
+			}
+		}
+		pushdir(&frame);
+
+		/*
+		 * rm() only returns -1 if popdir failed at some point;
+		 * frame.dp is no longer reliable and we must drop out.
+		 */
+		while ((dent = readdir(frame.dp)) != NULL) {
+			if (strcmp(dent->d_name, ".") == 0 ||
+			    strcmp(dent->d_name, "..") == 0)
+				continue;
+
+			if (rm(dent->d_name, &frame) != 0)
+				break;
+		}
+
+		if (popdir(dent == NULL) != 0)
+			return (-1);
+
+		/*
+		 * We recursed and the subdirectory may have set the CANTCLOSE
+		 * flag; we need to clear it except for &top.
+		 * Recursion may have invalidated entry because of closedir().
+		 */
+		if (caller != &top) {
+			caller->flags &= ~DIR_CANTCLOSE;
+			entry = &pathbuf[caller->up->pathend + 1];
+		}
+	} else {
+		flag = 0;
 	}
-
-	filepath = get_filename(path);
-
+unlinkit:
 	/*
 	 * If interactive, ask for acknowledgement.
-	 *
-	 * TRANSLATION_NOTE - The following message will contain the
-	 * first character of the strings for "yes" and "no" defined
-	 * in the file "nl_langinfo.po".  After substitution, the
-	 * message will appear as follows:
-	 *	rm: remove <filename> (y/n)?
-	 * For example, in German, this will appear as
-	 *	rm: löschen <filename> (j/n)?
-	 * where j=ja, n=nein, <filename>=the file to be removed
-	 *
 	 */
-
-
 	if (interactive) {
-		(void) fprintf(stderr, gettext("rm: remove %s (%s/%s)? "),
-			filepath, yeschr, nochr);
-		if (!yes()) {
-			free(filepath);
+		if (!confirm(stderr, gettext("rm: remove %s (%s/%s)? "),
+		    pathbuf, yeschr, nochr)) {
 			return (0);
 		}
-	} else if (!silent) {
+	} else if (!silent && flag == 0) {
 		/*
 		 * If not silent, and stdin is a terminal, and there's
 		 * no write access, and the file isn't a symbolic link,
-		 * ask for permission.
+		 * ask for permission.  If flag is set, then we know it's
+		 * a directory so we skip this test as it was done above.
 		 *
 		 * TRANSLATION_NOTE - The following message will contain the
 		 * first character of the strings for "yes" and "no" defined
 		 * in the file "nl_langinfo.po".  After substitution, the
 		 * message will appear as follows:
-		 * 	rm: <filename>: override protection XXX (y/n)?
+		 *	rm: <filename>: override protection XXX (y/n)?
 		 * where XXX is the permission mode bits of the file in octal
 		 * and <filename> is the file to be removed
 		 *
 		 */
-		if (!SYMLINK && access(path, W_OK) == FAIL &&
-		    isatty(fileno(stdin))) {
-			(void) printf(
-			    gettext("rm: %s: override protection %o (%s/%s)? "),
-			    filepath, buffer.st_mode & 0777, yeschr, nochr);
-			/*
-			 * If permission isn't given, skip the file.
-			 */
-			if (!yes()) {
-				free(filepath);
-				return (0);
-			}
-		}
-	}
-
-	/*
-	 * If the unlink fails, inform the user. For /usr/bin/rm, only inform
-	 * the user if interactive or not silent.
-	 * If unlink fails with errno = ENOENT because file was removed
-	 * in between the lstat call and unlink don't inform the user and
-	 * don't change errcode.
-	 */
-
-	if (unlink(path) == FAIL) {
-		if (errno == ENOENT) {
-			free(filepath);
+		if (ontty && !S_ISLNK(temp.st_mode) &&
+		    __accessat(caller->fd, entry, W_OK|E_OK) != 0 &&
+		    !confirm(stdout,
+		    gettext("rm: %s: override protection %o (%s/%s)? "),
+		    pathbuf, temp.st_mode & 0777, yeschr, nochr)) {
 			return (0);
 		}
-#ifndef XPG4
-		if (!silent || interactive) {
-#endif
-			(void) fprintf(stderr,
-				    gettext("rm: %s not removed: "), filepath);
-				perror("");
-#ifndef XPG4
-		}
-#endif
-		++errcode;
 	}
 
-	free(filepath);
+	if (unlinkat(caller->fd, entry, flag) != 0) {
+		err = errno;
+		if (err == ENOENT)
+			return (0);
+
+		if (flag != 0) {
+			if (err == EINVAL) {
+				(void) fprintf(stderr, gettext(
+				    "rm: Cannot remove any directory in the "
+				    "path of the current working directory\n"
+				    "%s\n"), pathbuf);
+			} else {
+				if (err == EEXIST)
+					err = ENOTEMPTY;
+				(void) fprintf(stderr,
+				    gettext("rm: Unable to remove directory %s:"
+				    " %s\n"), pathbuf, strerror(err));
+			}
+		} else {
+#ifndef XPG4
+			if (!silent || interactive) {
+#endif
+
+				(void) fprintf(stderr,
+				    gettext("rm: %s not removed: %s\n"),
+				    pathbuf, strerror(err));
+#ifndef XPG4
+			}
+#endif
+		}
+		errcnt++;
+	}
 	return (0);
 }
 
 static int
-undir(char *path, int first, dev_t dev, ino_t ino)
-{
-	char	*newpath;
-	DIR	*name;
-	struct dirent *direct;
-	int	ismypath;
-	int	ret;
-	int	chdir_failed = 0;
-	int	bad_chdir = 0;
-	size_t	len;
-
-	push_name(path, first);
-
-	/*
-	 * If interactive and this file isn't in the path of the
-	 * current working directory, ask for acknowledgement.
-	 *
-	 * TRANSLATION_NOTE - The following message will contain the
-	 * first character of the strings for "yes" and "no" defined
-	 * in the file "nl_langinfo.po".  After substitution, the
-	 * message will appear as follows:
-	 *	rm: examine files in directory <directoryname> (y/n)?
-	 * where <directoryname> is the directory to be removed
-	 *
-	 */
-	ismypath = mypath(dev, ino);
-	if (interactive) {
-		(void) fprintf(stderr,
-		    gettext("rm: examine files in directory %s (%s/%s)? "),
-			fullpath, yeschr, nochr);
-		/*
-		 * If the answer is no, skip the directory.
-		 */
-		if (!yes())
-			return (pop_name(first));
-	}
-
-#ifdef XPG4
-	/*
-	 * XCU4 and POSIX.2: If not interactive and file is not in the
-	 * path of the current working directory, check to see whether
-	 * or not directory is readable or writable and if not,
-	 * prompt user for response.
-	 */
-	if (!interactive && !ismypath &&
-	    (access(path, W_OK|X_OK) == FAIL) && isatty(fileno(stdin))) {
-		if (!silent) {
-			(void) fprintf(stderr,
-			    gettext(
-				"rm: examine files in directory %s (%s/%s)? "),
-			    fullpath, yeschr, nochr);
-			/*
-			 * If the answer is no, skip the directory.
-			 */
-			if (!yes())
-				return (pop_name(first));
-		}
-	}
-#endif
-
-	/*
-	 * Add this node to the search tree so we don't
-	 * get into a endless loop. If the add fails then
-	 * we have visited this node before.
-	 */
-	ret = add_tnode(&tree, dev, ino);
-	if (ret != 1) {
-		if (ret == 0) {
-			(void) fprintf(stderr,
-			    gettext("rm: cycle detected for %s\n"),
-			    fullpath);
-		} else if (ret == -1) {
-			perror("rm");
-		}
-		errcode++;
-		return (pop_name(first));
-	}
-
-	/*
-	 * Open the directory for reading.
-	 */
-	if ((name = opendir(path)) == NULL) {
-		int	saveerrno = errno;
-
-		/*
-		 * If interactive, ask for acknowledgement.
-		 */
-		if (interactive) {
-			/*
-			 * Print an error message that
-			 * we could not read the directory
-			 * as the user wanted to examine
-			 * files in the directory.  Only
-			 * affect the error status if
-			 * user doesn't want to remove the
-			 * directory as we still may be able
-			 * remove the directory successfully.
-			 */
-			(void) fprintf(stderr, gettext(
-			    "rm: cannot read directory %s: "),
-			    fullpath);
-			errno = saveerrno;
-			perror("");
-			(void) fprintf(stderr, gettext(
-			    "rm: remove %s: (%s/%s)? "),
-			    fullpath, yeschr, nochr);
-			if (!yes()) {
-				++errcode;
-				return (pop_name(first));
-			}
-		}
-
-		/*
-		 * If the directory is empty, we may be able to
-		 * go ahead and remove it.
-		 */
-		if (rmdir(path) == FAIL) {
-			if (interactive) {
-				int	rmdirerr = errno;
-				(void) fprintf(stderr, gettext(
-				    "rm: Unable to remove directory %s: "),
-				    fullpath);
-				errno = rmdirerr;
-				perror("");
-			} else {
-				(void) fprintf(stderr, gettext(
-				    "rm: cannot read directory %s: "),
-				    fullpath);
-				errno = saveerrno;
-				perror("");
-			}
-			++errcode;
-		}
-
-		/* Continue to next file/directory rather than exit */
-		return (pop_name(first));
-	}
-
-	/*
-	 * XCU4 requires that rm -r descend the directory
-	 * hierarchy without regard to PATH_MAX.  If we can't
-	 * chdir() do not increment error counter and do not
-	 * print message.
-	 *
-	 * However, if we cannot chdir because someone has taken away
-	 * execute access we may still be able to delete the directory
-	 * if it's empty. The old rm could do this.
-	 */
-
-	if (chdir(path) == -1) {
-		chdir_failed = 1;
-	}
-
-	/*
-	 * Read every directory entry.
-	 */
-	while ((direct = readdir(name)) != NULL) {
-		/*
-		 * Ignore "." and ".." entries.
-		 */
-		if (strcmp(direct->d_name, ".") == 0 ||
-		    strcmp(direct->d_name, "..") == 0)
-			continue;
-		/*
-		 * Try to remove the file.
-		 */
-		len = strlen(direct->d_name) + 1;
-		if (chdir_failed) {
-			len += strlen(path) + 2;
-		}
-
-		newpath = malloc(len);
-		if (newpath == NULL) {
-			(void) fprintf(stderr,
-			    gettext("rm: Insufficient memory.\n"));
-			cleanup();
-			exit(1);
-		}
-
-		if (!chdir_failed) {
-			(void) strcpy(newpath, direct->d_name);
-		} else {
-			(void) snprintf(newpath, len, "%s/%s",
-			    path, direct->d_name);
-		}
-
-
-		/*
-		 * If a spare file descriptor is available, just call the
-		 * "rm" function with the file name; otherwise close the
-		 * directory and reopen it when the child is removed.
-		 */
-		if (name->dd_fd >= maxfiles) {
-			(void) closedir(name);
-			if (rm(newpath, 0) < 0)
-				bad_chdir = -1;
-			if (!chdir_failed)
-				name = opendir(".");
-			else
-				name = opendir(path);
-			if (name == NULL) {
-				(void) fprintf(stderr,
-				    gettext("rm: cannot read directory %s: "),
-				    fullpath);
-				perror("");
-				cleanup();
-				exit(2);
-			}
-		} else if (rm(newpath, 0) < 0)
-			bad_chdir = -1;
-
-		free(newpath);
-		if (bad_chdir)
-			break;
-	}
-
-	/*
-	 * Close the directory we just finished reading.
-	 */
-	(void) closedir(name);
-	if (bad_chdir)
-		return (-1);
-
-	/*
-	 * The contents of the directory have been removed.  If the
-	 * directory itself is in the path of the current working
-	 * directory, don't try to remove it.
-	 * When the directory itself is the current working directory, mypath()
-	 * has a return code == 2.
-	 *
-	 * XCU4: Because we've descended the directory hierarchy in order
-	 * to avoid PATH_MAX limitation, we must now start ascending
-	 * one level at a time and remove files/directories.
-	 */
-
-	if (!chdir_failed) {
-		if (first)
-			chdir_init();
-		else if (chdir("..") == -1) {
-			(void) fprintf(stderr,
-			    gettext("rm: cannot change to parent of "
-				    "directory %s: "),
-			    fullpath);
-			perror("");
-			cleanup();
-			exit(2);
-		}
-	}
-
-	switch (ismypath) {
-	case 3:
-		return (pop_name(first));
-	case 2:
-		(void) fprintf(stderr,
-		    gettext("rm: Cannot remove any directory in the path "
-			"of the current working directory\n%s\n"), fullpath);
-		++errcode;
-		return (pop_name(first));
-	case 1:
-		++errcode;
-		return (pop_name(first));
-	case 0:
-		break;
-	}
-
-	/*
-	 * If interactive, ask for acknowledgement.
-	 */
-	if (interactive) {
-		(void) fprintf(stderr, gettext("rm: remove %s: (%s/%s)? "),
-			fullpath, yeschr, nochr);
-		if (!yes())
-			return (pop_name(first));
-	}
-	if (rmdir(path) == FAIL) {
-		(void) fprintf(stderr,
-			gettext("rm: Unable to remove directory %s: "),
-			fullpath);
-		perror("");
-		++errcode;
-	}
-	return (pop_name(first));
-}
-
-
-static int
 yes(void)
 {
-	int	i, b;
-	char	ans[SCHAR_MAX + 1];
+	int i, b;
+	char ans[SCHAR_MAX + 1];
 
 	for (i = 0; ; i++) {
 		b = getchar();
@@ -631,7 +572,7 @@ yes(void)
 			break;
 		}
 		if (i < SCHAR_MAX)
-			ans[i] = b;
+			ans[i] = (char)b;
 	}
 	if (i >= SCHAR_MAX) {
 		i = SCHAR_MAX;
@@ -642,387 +583,54 @@ yes(void)
 	return (1);
 }
 
-
 static int
-mypath(dev_t dev, ino_t ino)
+confirm(FILE *fp, const char *q, ...)
 {
-	struct dir_id *curdir;
+	va_list ap;
 
-	/*
-	 * Check to see if this is our current directory
-	 * Indicated by return 2;
-	 */
-	if (dev == initdir.dev && ino == initdir.inode) {
-		return (2);
-	}
-
-	curdir = initdir.next;
-
-	while (curdir != NULL) {
-		/*
-		 * If we find a match, the directory (dev, ino) passed to
-		 * mypath() is an ancestor of ours. Indicated by return 3.
-		 */
-		if (curdir->dev == dev && curdir->inode == ino)
-			return (3);
-		curdir = curdir->next;
-	}
-	/*
-	 * parent_err indicates we couldn't stat or chdir to
-	 * one of our parent dirs, so the linked list of dir_id structs
-	 * is incomplete
-	 */
-	if (parent_err) {
-#ifndef XPG4
-		if (!silent || interactive) {
-#endif
-			(void) fprintf(stderr, gettext("rm: cannot determine "
-			    "if this is an ancestor of the current "
-			    "working directory\n%s\n"), fullpath);
-#ifndef XPG4
-		}
-#endif
-		/* assume it is. least dangerous */
-		return (1);
-	}
-	return (0);
-}
-
-static int maxlen;
-static int curlen;
-
-static char *
-get_filename(char *name)
-{
-	char *path;
-	size_t len;
-
-	if (fullpath == NULL || *fullpath == '\0') {
-		path = strdup(name);
-		if (path == NULL) {
-			(void) fprintf(stderr,
-			    gettext("rm: Insufficient memory.\n"));
-			cleanup();
-			exit(1);
-		}
-	} else {
-		len = strlen(fullpath) + strlen(name) + 2;
-		path = malloc(len);
-		if (path == NULL) {
-			(void) fprintf(stderr,
-			    gettext("rm: Insufficient memory.\n"));
-			cleanup();
-			exit(1);
-		}
-		(void) snprintf(path, len, "%s/%s", fullpath, name);
-	}
-	return (path);
+	va_start(ap, q);
+	(void) vfprintf(fp, q, ap);
+	va_end(ap);
+	return (yes());
 }
 
 static void
-push_name(char *name, int first)
+memerror(void)
 {
-	int	namelen;
-	struct	stat buffer;
-	struct	dir_id *newdir;
-
-	namelen = strlen(name) + 1; /* 1 for "/" */
-	if ((curlen + namelen) >= maxlen) {
-		maxlen += PATH_MAX;
-		fullpath = (char *)realloc(fullpath, (size_t)(maxlen + 1));
-	}
-	if (first) {
-		(void) strcpy(fullpath, name);
-	} else {
-		(void) strcat(fullpath, "/");
-		(void) strcat(fullpath, name);
-	}
-	curlen = strlen(fullpath);
-
-	if (stat(".", &buffer) == -1) {
-		(void) fprintf(stderr,
-		    gettext("rm: cannot stat current directory: "));
-		perror("");
-		exit(2);
-	}
-	if ((newdir = malloc(sizeof (struct dir_id))) == NULL) {
-		(void) fprintf(stderr,
-		    gettext("rm: Insufficient memory.\n"));
-		cleanup();
-		exit(1);
-	}
-
-	newdir->dev = buffer.st_dev;
-	newdir->inode = buffer.st_ino;
-	newdir->next = current_dir;
-	current_dir = newdir;
+	(void) fprintf(stderr, gettext("rm: Insufficient memory.\n"));
+	exit(1);
 }
 
+/*
+ * If we can't stat "..", it's either not there or we can't search
+ * the current directory; in that case we can't return back through
+ * "..", so we need to keep the parent open.
+ * Check that we came from "..", if not then this directory entry is an
+ * additional link and there is risk of a filesystem cycle and we also
+ * can't go back up through ".." and we keep the directory open.
+ */
 static int
-pop_name(int first)
+checkdir(struct dlist *caller, struct dlist *frmp)
 {
-	int	retval = 0;
-	char *slash;
-	struct	stat buffer;
-	struct	dir_id *remove_dir;
+	struct stat up;
+	struct dlist *ptr;
 
-	if (first) {
-		*fullpath = '\0';
+	if (fstatat(frmp->fd, "..", &up, 0) != 0) {
+		caller->flags |= DIR_CANTCLOSE;
+		return (0);
+	} else if (up.st_ino == caller->ino && up.st_dev == caller->dev) {
 		return (0);
 	}
-	slash = strrchr(fullpath, '/');
-	if (slash)
-		*slash = '\0';
-	else
-		*fullpath = '\0';
-	curlen = strlen(fullpath);
 
-	if (stat(".", &buffer) == -1) {
-		(void) fprintf(stderr,
-		    gettext("rm: cannot stat current directory: "));
-		perror("");
-		exit(2);
-	}
-
-	/*
-	 * For each pop operation, verify that the device and inode numbers
-	 * of "." match the numbers recorded before the chdir was done into
-	 * the directory. If they do not match, it is an indication of
-	 * possible malicious activity and rm has chdir to an unintended
-	 * directory
-	 */
-	if ((current_dir->inode != buffer.st_ino) || (current_dir->dev !=
-	    buffer.st_dev)) {
-		(void) fprintf(stderr, gettext("rm: WARNING: "
-		    "A subdirectory of %s was moved or linked to "
-		    "another directory during the execution of rm\n"),
-		    fullpath);
-		retval = -1;
-	}
-	remove_dir = current_dir;
-	current_dir = current_dir->next;
-	free(remove_dir);
-	return (retval);
-}
-
-static void
-force_chdir(char *dirname)
-{
-	char 	*pathname, *mp, *tp;
-
-	/* use pathname instead of dirname, so dirname won't be modified */
-	if ((pathname = strdup(dirname)) == NULL) {
-		(void) fprintf(stderr, gettext("rm: strdup: "));
-		perror("");
-		cleanup();
-		exit(2);
-	}
-
-	/* pathname is an absolute full path from getcwd() */
-	mp = pathname;
-	while (mp) {
-		tp = strchr(mp, '/');
-		if (strlen(mp) >= PATH_MAX) {
-			/*
-			 * after the first iteration through this
-			 * loop, the below will NULL out the '/'
-			 * which follows the first dir on pathname
-			 */
-			*tp = 0;
-			tp++;
-			if (*mp == NULL)
-				ch_dir("/");
-			else
-				/*
-				 * mp points to the start of a dirname,
-				 * terminated by NULL, so ch_dir()
-				 * here will move down one directory
-				 */
-				ch_dir(mp);
-			/*
-			 * reset mp to the start of the dirname
-			 * which follows the one we just chdir'd to
-			 */
-			mp = tp;
-			continue;	/* probably can remove this */
-		} else {
-			ch_dir(mp);
-			break;
-		}
-	}
-	free(pathname);
-}
-
-static void
-ch_dir(char *dirname)
-{
-	if (chdir(dirname) == -1) {
-		(void) fprintf(stderr,
-		gettext("rm: cannot change to %s directory: "), dirname);
-			perror("");
-			cleanup();
-			exit(2);
-	}
-}
-
-static void
-chdir_init(void)
-{
-	/*
-	 * Go back to init dir--the dir from where rm was executed--using
-	 * one of two methods, depending on which method works
-	 * for the given permissions of the init dir and its
-	 * parent directories.
-	 */
-	if (initdirfd != -1) {
-		if (fchdir(initdirfd) == -1) {
+	/* Directory hard link, check cycle */
+	for (ptr = caller; ptr != NULL; ptr = ptr->up) {
+		if (frmp->dev == ptr->dev && frmp->ino == ptr->ino) {
 			(void) fprintf(stderr,
-			    gettext("rm: cannot change to starting "
-			    "directory: "));
-			perror("");
-			cleanup();
-			exit(2);
-		}
-	} else {
-		if (strlen(cwd) < PATH_MAX)
-			ch_dir(cwd);
-		else
-			force_chdir(cwd);
-	}
-}
-
-/*
- * check_initdir -
- * is only called the first time rm tries to
- * remove a directory.  It saves the current directory, i.e.,
- * init dir, so we can go back to it after traversing elsewhere.
- * It also saves all the device and inode numbers of each
- * dir from the initial dir back to the root in a linked list, so we
- * can later check, via mypath(), if we are trying to remove our current
- * dir or an ancestor.
- */
-static void
-check_initdir(void)
-{
-	int	size;	/* size allocated for pathname of init dir (cwd) */
-	struct stat buffer;
-	struct dir_id *lastdir, *curdir;
-
-	/*
-	 * We need to save where we currently are (the "init dir") so
-	 * we can return after traversing down directories we're
-	 * removing.  Two methods are attempted:
-	 *
-	 * 1) open() the initial dir so we can use the fd
-	 *    to fchdir() back.  This requires read permission
-	 *    on the initial dir.
-	 *
-	 * 2) getcwd() so we can chdir() to go back.  This
-	 *    requires search (x) permission on the init dir,
-	 *    and read and search permission on all parent dirs.  Also,
-	 *    getcwd() will not work if the init dir is > 341
-	 *    directories deep (see open bugid 4033182 - getcwd needs
-	 *    to work for pathnames of any depth).
-	 *
-	 * If neither method works, we can't remove any directories
-	 * and rm will fail.
-	 *
-	 * For future enhancement, a possible 3rd option to use
-	 * would be to fork a process to remove a directory,
-	 * eliminating the need to chdir back to the initial directory
-	 * and eliminating the permission restrictions on the initial dir
-	 * or its parent dirs.
-	 */
-	initdirfd = open(".", O_RDONLY);
-	if (initdirfd == -1) {
-		size = PATH_MAX;
-		while ((cwd = getcwd(NULL, size)) == NULL) {
-			if (errno == ERANGE) {
-				size = PATH_MAX + size;
-				continue;
-			} else {
-				(void) fprintf(stderr,
-				    gettext("rm: cannot open starting "
-				    "directory: "));
-				perror("pwd");
-				exit(2);
-			}
+			    gettext("rm: cycle detected for %s\n"), pathbuf);
+			errcnt++;
+			return (-1);
 		}
 	}
-
-	/*
-	 * since we exit on error here, we're guaranteed to at least
-	 * have info in the first dir_id struct, initdir
-	 */
-	if (stat(".", &buffer) == -1) {
-		(void) fprintf(stderr,
-		    gettext("rm: cannot stat current directory: "));
-		perror("");
-		exit(2);
-	}
-	initdir.dev = buffer.st_dev;
-	initdir.inode = buffer.st_ino;
-	initdir.next = NULL;
-
-	lastdir = &initdir;
-	/*
-	 * Starting from current working directory, walk toward the
-	 * root, looking at each directory along the way.
-	 */
-	for (;;) {
-		if (chdir("..") == -1 || lstat(".", &buffer) == -1) {
-			parent_err = 1;
-			break;
-		}
-
-		if ((lastdir->next = malloc(sizeof (struct dir_id))) ==
-		    NULL) {
-			(void) fprintf(stderr,
-			    gettext("rm: Insufficient memory.\n"));
-			cleanup();
-			exit(1);
-		}
-
-		curdir = lastdir->next;
-		curdir->dev = buffer.st_dev;
-		curdir->inode = buffer.st_ino;
-		curdir->next = NULL;
-
-		/*
-		 * Stop when we reach the root; note that chdir("..")
-		 * at the root dir will stay in root. Get rid of
-		 * the redundant dir_id struct for root.
-		 */
-		if (curdir->dev == lastdir->dev && curdir->inode ==
-		    lastdir->inode) {
-			lastdir->next = NULL;
-			free(curdir);
-			break;
-		}
-
-			/* loop again to go back another level */
-		lastdir = curdir;
-	}
-		/* go back to init directory */
-	chdir_init();
-}
-
-/*
- * cleanup the dynamically-allocated list of device numbers and inodes,
- * if any.  If initdir was never used, it is external and static so
- * it is guaranteed initialized to zero, thus initdir.next would be NULL.
- */
-
-static void
-cleanup(void) {
-
-	struct dir_id *lastdir, *curdir;
-
-	curdir = initdir.next;
-
-	while (curdir != NULL) {
-		lastdir = curdir;
-		curdir = curdir->next;
-		free(lastdir);
-	}
+	caller->flags |= DIR_CANTCLOSE;
+	return (0);
 }

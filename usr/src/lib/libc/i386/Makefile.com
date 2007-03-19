@@ -824,6 +824,7 @@ PORTSYS=			\
 	execl.o			\
 	execle.o		\
 	execv.o			\
+	faccessat.o		\
 	fcntl.o			\
 	fsmisc.o		\
 	fstatat.o		\

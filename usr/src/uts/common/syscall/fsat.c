@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +41,7 @@ extern int unlinkat(int, char *, int);
 extern int fchownat(int, char *, uid_t, gid_t, int);
 extern int fstatat(int, char *, struct stat *, int);
 extern int futimesat(int, char *, struct timeval *);
+extern int accessat(int, char *, int);
 #if defined(_SYSCALL32_IMPL) || defined(_ILP32)
 extern int fstatat64_32(int, char *, struct stat64_32 *, int);
 extern int fstatat32(int, char *, struct stat32 *, int);
@@ -64,6 +64,7 @@ extern int fstatat64_32(int, char *, struct stat64_32 *, int);
  * 5 - unlinkat
  * 6 - futimesat
  * 7 - renameat
+ * 8 - accessat
  *
  * The code for handling the at functionality exists in the file where the
  * base syscall is defined.  For example openat is in open.c
@@ -115,6 +116,8 @@ fsat32(int code, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3,
 	case 7: /* renameat */
 		return (renameat((int)arg1, (char *)arg2, (int)arg3,
 			(char *)arg4));
+	case 8: /* accessat */
+		return (accessat((int)arg1, (char *)arg2, (int)arg3));
 	default:
 		return (set_errno(EINVAL));
 	}
@@ -155,6 +158,8 @@ fsat64(int code, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3,
 	case 7: /* renameat */
 		return (renameat((int)arg1, (char *)arg2, (int)arg3,
 			(char *)arg4));
+	case 8: /* accessat */
+		return (accessat((int)arg1, (char *)arg2, (int)arg3));
 	default:
 		return (set_errno(EINVAL));
 	}

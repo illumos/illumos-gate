@@ -1742,3 +1742,6 @@ int _autofssys(enum autofssys_op, void *);
 
 /* label.c */
 extern int is_system_labeled(void);
+
+/* until TOG resolves the name, keep this private */
+int __accessat(int, const char *, int);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2511,6 +2511,9 @@ fs_new_caller_id()
  * a safe manner.  If the vnode already has path information embedded, then the
  * cached path is left untouched.
  */
+
+size_t max_vnode_path = 4 * MAXPATHLEN;
+
 void
 vn_setpath(vnode_t *rootvp, struct vnode *startvp, struct vnode *vp,
     const char *path, size_t plen)
@@ -2552,6 +2555,10 @@ vn_setpath(vnode_t *rootvp, struct vnode *startvp, struct vnode *vp,
 	 * just give up since there is no real harm.
 	 */
 	mutex_exit(&base->v_lock);
+
+	/* Paths should stay within reason */
+	if (rpathalloc > max_vnode_path)
+		return;
 
 	rpath = kmem_alloc(rpathalloc, KM_SLEEP);
 
