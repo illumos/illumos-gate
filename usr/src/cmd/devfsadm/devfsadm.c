@@ -245,6 +245,12 @@ static int s_stat(const char *, struct stat *);
 
 static int is_blank(char *);
 
+/* sysevent queue related globals */
+static mutex_t  syseventq_mutex = DEFAULTMUTEX;
+static syseventq_t *syseventq_front;
+static syseventq_t *syseventq_back;
+static void process_syseventq();
+
 int
 main(int argc, char *argv[])
 {
@@ -966,7 +972,7 @@ devi_tree_walk(struct dca_impl *dcip, int flags, char *ev_subclass)
 	 * Log sysevent and notify RCM.
 	 */
 	if (ev_subclass)
-		build_and_log_event(EC_DEV_ADD, ev_subclass, dcip->dci_root,
+		build_and_enq_event(EC_DEV_ADD, ev_subclass, dcip->dci_root,
 		    node);
 
 	if ((dcip->dci_flags & DCA_NOTIFY_RCM) && rcm_hdl)
@@ -1324,6 +1330,9 @@ lock_dev(void)
 		invalidate_enumerate_cache();
 		rm_all_links_from_cache();
 		(void) di_devlink_close(&devlink_cache, DI_LINK_ERROR);
+
+		/* send any sysevents that were queued up. */
+		process_syseventq();
 	}
 
 	/*
@@ -1395,6 +1404,12 @@ unlock_dev(int flag)
 		if (update_database)
 			(void) di_devlink_update(devlink_cache);
 		(void) di_devlink_close(&devlink_cache, 0);
+
+		/*
+		 * now that the devlinks db cache has been flushed, it is safe
+		 * to send any sysevents that were queued up.
+		 */
+		process_syseventq();
 	}
 
 	exit_dev_lock();
@@ -1578,7 +1593,7 @@ event_handler(sysevent_t *ev)
 		if (strcmp(ESC_DEVFS_DEVI_ADD, subclass) == 0) {
 			add_minor_pathname(path, NULL, dev_ev_subclass);
 			if (branch_event) {
-				build_and_log_event(EC_DEV_BRANCH,
+				build_and_enq_event(EC_DEV_BRANCH,
 				    ESC_DEV_BRANCH_ADD, path, DI_NODE_NIL);
 			}
 
@@ -1592,7 +1607,7 @@ event_handler(sysevent_t *ev)
 			hot_cleanup(path, NULL, dev_ev_subclass,
 			    driver_name, instance);
 			if (branch_event) {
-				build_and_log_event(EC_DEV_BRANCH,
+				build_and_enq_event(EC_DEV_BRANCH,
 				    ESC_DEV_BRANCH_REMOVE, path, DI_NODE_NIL);
 			}
 		}
@@ -1612,7 +1627,7 @@ event_handler(sysevent_t *ev)
 			dev_ev_subclass = ESC_DEV_BRANCH_REMOVE;
 
 		lock_dev();
-		build_and_log_event(EC_DEV_BRANCH, dev_ev_subclass, path,
+		build_and_enq_event(EC_DEV_BRANCH, dev_ev_subclass, path,
 		    DI_NODE_NIL);
 		unlock_dev(CACHE_STATE);
 	} else
@@ -3826,6 +3841,10 @@ enter_dev_lock()
 			 * database code may hold.
 			 */
 			(void) di_devlink_close(&devlink_cache, 0);
+
+			/* send any sysevents that were queued up. */
+			process_syseventq();
+
 			if (fcntl(dev_lock_fd, F_SETLKW, &lock) == -1) {
 				err_print(LOCK_FAILED, dev_lockfile,
 						strerror(errno));
@@ -8046,11 +8065,68 @@ log_event(char *class, char *subclass, nvlist_t *nvl)
 	}
 }
 
+/*
+ * When devfsadmd needs to generate sysevents, they are queued for later
+ * delivery this allows them to be delivered after the devlinks db cache has
+ * been flushed guaranteeing that applications consuming these events have
+ * access to an accurate devlinks db.  The queue is a FIFO, sysevents to be
+ * inserted in the front of the queue and consumed off the back.
+ */
 static void
-build_and_log_event(char *class, char *subclass, char *node_path,
-    di_node_t node)
+enqueue_sysevent(char *class, char *subclass, nvlist_t *nvl)
+{
+	syseventq_t *tmp;
+
+	if ((tmp = s_zalloc(sizeof (*tmp))) == NULL)
+		return;
+
+	tmp->class = s_strdup(class);
+	tmp->subclass = s_strdup(subclass);
+	tmp->nvl = nvl;
+
+	(void) mutex_lock(&syseventq_mutex);
+	if (syseventq_front != NULL)
+		syseventq_front->next = tmp;
+	else
+		syseventq_back = tmp;
+	syseventq_front = tmp;
+	(void) mutex_unlock(&syseventq_mutex);
+}
+
+static void
+process_syseventq()
+{
+	(void) mutex_lock(&syseventq_mutex);
+	while (syseventq_back != NULL) {
+		syseventq_t *tmp = syseventq_back;
+
+		vprint(CHATTY_MID, "sending queued event: %s, %s\n",
+			tmp->class, tmp->subclass);
+
+		log_event(tmp->class, tmp->subclass, tmp->nvl);
+
+		if (tmp->class != NULL)
+			free(tmp->class);
+		if (tmp->subclass != NULL)
+			free(tmp->subclass);
+		if (tmp->nvl != NULL)
+			nvlist_free(tmp->nvl);
+		syseventq_back = syseventq_back->next;
+		if (syseventq_back == NULL)
+			syseventq_front = NULL;
+		free(tmp);
+	}
+	(void) mutex_unlock(&syseventq_mutex);
+}
+
+static void
+build_and_enq_event(char *class, char *subclass, char *node_path,
+	di_node_t node)
 {
 	nvlist_t *nvl;
+
+	vprint(CHATTY_MID, "build_and_enq_event(%s, %s, %s, 0x%8.8x)\n",
+		class, subclass, node_path, (int)node);
 
 	if (node != DI_NODE_NIL)
 		nvl = build_event_attributes(class, subclass, node_path, node,
@@ -8060,8 +8136,7 @@ build_and_log_event(char *class, char *subclass, char *node_path,
 		    NULL, -1);
 
 	if (nvl) {
-		log_event(class, subclass, nvl);
-		nvlist_free(nvl);
+		enqueue_sysevent(class, subclass, nvl);
 	}
 }
 

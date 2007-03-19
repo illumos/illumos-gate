@@ -109,7 +109,7 @@ extern "C" {
 
 #define	DEVFSADM_DEFAULT_FILE "/etc/default/devfsadm"
 
-#define	MINOR_FINI_TIMEOUT_DEFAULT 3
+#define	MINOR_FINI_TIMEOUT_DEFAULT 2
 
 #define	SYNCH_DOOR_PERMS	(S_IRUSR | S_IWUSR)
 
@@ -362,6 +362,14 @@ struct rcm_eventq {
 	struct rcm_eventq *next;
 };
 
+/* sysevent queue related */
+typedef struct syseventq_s {
+	struct syseventq_s *next;
+	char *class;
+	char *subclass;
+	nvlist_t *nvl;
+} syseventq_t;
+
 static int devfsadm_enumerate_int_start(char *devfs_path,
 	int index, char **buf, devfsadm_enumerate_t rules[],
 	int nrules, char *start);
@@ -493,7 +501,7 @@ static int (*librcm_notify_event)(rcm_handle_t *, char *, uint_t, nvlist_t *,
 static nvlist_t *build_event_attributes(char *, char *, char *,
     di_node_t, char *, int);
 static void log_event(char *, char *, nvlist_t *);
-static void build_and_log_event(char *, char *, char *, di_node_t);
+static void build_and_enq_event(char *, char *, char *, di_node_t);
 
 static void read_logindevperm_file(void);
 static void set_logindev_perms(char *devlink);
