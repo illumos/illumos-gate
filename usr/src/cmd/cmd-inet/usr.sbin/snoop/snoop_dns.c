@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,10 +74,7 @@ interpret_dns(int flags, int proto, const uchar_t *data, int len)
 	char *line;
 	ushort_t id, qdcount, ancount, nscount, arcount;
 	ushort_t count;
-	const uchar_t *questions;
-	const uchar_t *answers;
-	const uchar_t *nservers;
-	const uchar_t *additions;
+	const uchar_t *rrp;	/* Resource Record Pointer. */
 	const uchar_t *data_end;
 
 	if (proto == IPPROTO_TCP) {
@@ -110,19 +106,18 @@ interpret_dns(int flags, int proto, const uchar_t *data, int len)
 			/* answer */
 			if (header.rcode == 0) {
 				/* reply is OK */
-				questions = data + sizeof (dns_header);
+				rrp = data + sizeof (dns_header);
 				while (qdcount--) {
-					if (questions >= data_end) {
+					if (rrp >= data_end) {
 						return;
 					}
-					questions += skip_question(data,
-					    questions, data_end);
+					rrp += skip_question(data,
+					    rrp, data_end);
 				}
-				/* the answers are following the questions */
-				answers = questions;
+				/* the answers follow the questions */
 				if (ancount > 0) {
 					(void) print_answer(line,
-					    data, answers, data_end, FALSE);
+					    data, rrp, data_end, FALSE);
 				}
 			} else {
 				(void) sprintf(line, " Error: %d(%s)",
@@ -131,11 +126,11 @@ interpret_dns(int flags, int proto, const uchar_t *data, int len)
 			}
 		} else {
 			/* question */
-			questions = data + sizeof (dns_header);
-			if (questions >= data_end) {
+			rrp = data + sizeof (dns_header);
+			if (rrp >= data_end) {
 				return;
 			}
-			(void) print_question(line, data, questions, data_end,
+			(void) print_question(line, data, rrp, data_end,
 			    FALSE);
 		}
 	}
@@ -156,53 +151,6 @@ interpret_dns(int flags, int proto, const uchar_t *data, int len)
 			    header.rcode, dns_rcode_string(header.rcode));
 			(void) snprintf(get_line(0, 0), get_line_remain(),
 			    "Reply to %d question(s)", qdcount);
-			questions = data + sizeof (dns_header);
-			count = 0;
-			while (qdcount--) {
-				if (questions >= data_end) {
-					return;
-				}
-				count++;
-				questions += print_question(get_line(0, 0),
-				    data, questions, data_end, TRUE);
-				show_space();
-			}
-			(void) snprintf(get_line(0, 0), get_line_remain(),
-			    "%d answer(s)", ancount);
-			answers = questions;
-			count = 0;
-			while (ancount--) {
-				if (answers >= data_end) {
-					return;
-				}
-				count++;
-				answers += print_answer(get_line(0, 0),
-				    data, answers, data_end, TRUE);
-				show_space();
-			}
-			(void) snprintf(get_line(0, 0), get_line_remain(),
-			    "%d name server resource(s)", nscount);
-			nservers = answers;
-			count = 0;
-			while (nscount--) {
-				if (nservers >= data_end) {
-					return;
-				}
-				count++;
-				nservers += print_answer(get_line(0, 0), data,
-				    nservers, data_end, TRUE);
-				show_space();
-			}
-			(void) snprintf(get_line(0, 0), get_line_remain(),
-			    "%d additional record(s)", arcount);
-			additions = nservers;
-			count = 0;
-			while (arcount-- && additions < data_end) {
-				count++;
-				additions += print_answer(get_line(0, 0), data,
-				    additions, data_end, TRUE);
-				show_space();
-			}
 		} else {
 			/* question */
 			(void) snprintf(get_line(0, 0), get_line_remain(),
@@ -215,12 +163,57 @@ interpret_dns(int flags, int proto, const uchar_t *data, int len)
 			    header.rd ? "RD (Recursion Desired) " : "");
 			(void) snprintf(get_line(0, 0), get_line_remain(),
 			    "%d question(s)", qdcount);
-			questions = data + sizeof (dns_header);
+		}
+		rrp = data + sizeof (dns_header);
+		count = 0;
+		while (qdcount--) {
+			if (rrp >= data_end) {
+				return;
+			}
+			count++;
+			rrp += print_question(get_line(0, 0),
+			    data, rrp, data_end, TRUE);
+			show_space();
+		}
+		/* Only answers should hold answers, but just in case */
+		if (header.qr || ancount > 0) {
+			(void) snprintf(get_line(0, 0), get_line_remain(),
+			    "%d answer(s)", ancount);
 			count = 0;
-			while (qdcount-- && questions < data_end) {
+			while (ancount--) {
+				if (rrp >= data_end) {
+					return;
+				}
 				count++;
-				questions += print_question(get_line(0, 0),
-				    data, questions, data_end, TRUE);
+				rrp += print_answer(get_line(0, 0),
+				    data, rrp, data_end, TRUE);
+				show_space();
+			}
+		}
+		/* Likewise only answers should hold NS records */
+		if (header.qr || nscount > 0) {
+			(void) snprintf(get_line(0, 0), get_line_remain(),
+			    "%d name server resource(s)", nscount);
+			count = 0;
+			while (nscount--) {
+				if (rrp >= data_end) {
+					return;
+				}
+				count++;
+				rrp += print_answer(get_line(0, 0), data,
+				    rrp, data_end, TRUE);
+				show_space();
+			}
+		}
+		/* Additional section may hold an EDNS0 record. */
+		if (header.qr || arcount > 0) {
+			(void) snprintf(get_line(0, 0), get_line_remain(),
+			    "%d additional record(s)", arcount);
+			count = 0;
+			while (arcount-- && rrp < data_end) {
+				count++;
+				rrp += print_answer(get_line(0, 0), data,
+				    rrp, data_end, TRUE);
 				show_space();
 			}
 		}
@@ -254,6 +247,7 @@ dns_rcode_string(uint_t rcode)
 	case ns_r_nxdomain:	return ("Name Error");
 	case ns_r_notimpl:	return ("Unimplemented");
 	case ns_r_refused:	return ("Refused");
+	case ns_r_badvers:	return ("Bad Version"); /* EDNS rcode */
 	default:
 		(void) snprintf(buffer, sizeof (buffer), "Unknown (%u)", rcode);
 		return (buffer);
@@ -281,6 +275,7 @@ dns_type_string(uint_t type, int detail)
 	case ns_t_mx:	return (detail ? "Mail Exchange" : "MX");
 	case ns_t_txt:	return (detail ? "Text strings" : "TXT");
 	case ns_t_aaaa:	return (detail ? "IPv6 Address" : "AAAA");
+	case ns_t_opt:	return (detail ? "EDNS0 option" : "OPT");
 	case ns_t_axfr:	return (detail ? "Transfer of entire zone" : "AXFR");
 	case ns_t_mailb:
 		return (detail ? "Mailbox related records" : "MAILB");
@@ -368,6 +363,66 @@ print_question(char *line, const uchar_t *header, const uchar_t *data,
 	return (data - data_bak);
 }
 
+/*
+ * print_answer() is used to display the contents of a single resource
+ * record (RR) from either the answer, name server or additional
+ * section of the DNS packet.
+ *
+ * Input:
+ *	*line: snoops output buffer.
+ *	*header: start of the DNS packet, required for names and rcode.
+ *	*data: location within header from where the RR starts.
+ * 	*data_end: where DNS data ends.
+ * 	detail: simple or verbose output.
+ *
+ * Returns:
+ *	Pointer to next RR or data_end.
+ *
+ * Most RRs have the same top level format as defined in RFC 1035:
+ *
+ *                                     1  1  1  1  1  1
+ *       0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+ *    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *    |                                               |
+ *    /                      NAME                     /
+ *    |                                               |
+ *    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *    |                      TYPE                     |
+ *    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *    |                     CLASS                     |
+ *    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *    |                      TTL                      |
+ *    |                                               |
+ *    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *    |                   RDLENGTH                    |
+ *    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--|
+ *    /                     RDATA                     /
+ *    /                                               /
+ *    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *
+ * However RFC 2671 introduced an exception to this rule
+ * with the "Extension Mechanisms for DNS" (EDNS0).
+ * When the type is 41 the remaining resource record format
+ * is:
+ *
+ *                                     1  1  1  1  1  1
+ *       0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+ *    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *    |                    TYPE = 41                  |
+ *    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *    |           Sender's UDP payload size           |
+ *    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *    |    Extended-rcode     |        Version        |
+ *    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *    |                      Zero                     |
+ *    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *    |                   RDLENGTH                    |
+ *    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--|
+ *    /                     RDATA                     /
+ *    /                                               /
+ *    +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+ *
+ */
 static size_t
 print_answer(char *line, const uchar_t *header, const uchar_t *data,
     const uchar_t *data_end, int detail)
@@ -382,6 +437,15 @@ print_answer(char *line, const uchar_t *header, const uchar_t *data,
 	uint8_t protocol;
 	int linepos;
 	uint16_t preference;
+	/* declarations for EDNS follow */
+	uint16_t size;	/* Sender's UDP payload size */
+	uint8_t xrcode;	/* Extended-rcode */
+	uint8_t ver;	/* Version */
+	uint16_t rcode;	/* Extracted from the DNS header */
+	union {		/* DNS header overlay used for extraction */
+		HEADER		*head;
+		const uchar_t	*raw;
+	} headptr;
 
 	if (detail) {
 		line += snprintf(line, get_line_remain(),
@@ -390,15 +454,90 @@ print_answer(char *line, const uchar_t *header, const uchar_t *data,
 	data += print_domain_name(line, header, data, data_end);
 
 	/*
-	 * Make sure we don't run off the end of the packet by reading the
-	 * type, class, ttl, and length.
+	 * Next, get the record type, being careful to make sure we
+	 * don't run off the end of the packet.
 	 */
-	if ((data_end - data) <
-	    (ptrdiff_t)(3 * sizeof (uint16_t) + sizeof (uint32_t))) {
+	if ((data_end - data) < (ptrdiff_t)(sizeof (type))) {
 		return (data_end - data_bak);
 	}
 
 	GETINT16(type, data);
+
+	if (type == ns_t_opt) {
+		/*
+		 * Make sure we won't run off the end reading size,
+		 * xrcode, version, zero and rdlen.
+		 */
+		if ((data_end - data) <
+		    ((ptrdiff_t)(sizeof (size)
+			+ sizeof (xrcode)
+			+ sizeof (ver)
+			+ sizeof (cls)	/* zero */
+			+ sizeof (rdlen)))) {
+			return (data_end - data_bak);
+		}
+
+		GETINT16(size, data);
+		GETINT8(xrcode, data);
+		/*
+		 * The extended rcode represents the top half of the
+		 * rcode which must be added to the rcode in the header.
+		 */
+		rcode = 0xff & (xrcode << 4);
+		headptr.raw = header;		/* Overlay the header... */
+		rcode += headptr.head->rcode;	/* And pluck out the rcode. */
+
+		GETINT8(ver, data);
+		GETINT16(cls, data); /* zero */
+		GETINT16(rdlen, data);
+
+		if (detail) {
+			(void) snprintf(get_line(0, 0), get_line_remain(),
+			    DNS_INDENT "Type:  %u (%s)", type,
+			    dns_type_string(type, detail));
+			(void) snprintf(get_line(0, 0), get_line_remain(),
+			    DNS_INDENT "UDP payload size: %u (0x%.4x)",
+			    size, size);
+			(void) snprintf(get_line(0, 0), get_line_remain(),
+			    DNS_INDENT "Extended rcode: %u "
+			    "(translates to %u (%s))",
+			    xrcode, rcode, dns_rcode_string(rcode));
+			(void) snprintf(get_line(0, 0), get_line_remain(),
+			    DNS_INDENT "EDNS0 Version: %u", ver);
+			(void) snprintf(get_line(0, 0), get_line_remain(),
+			    DNS_INDENT "zero: %u", cls);
+			(void) snprintf(get_line(0, 0), get_line_remain(),
+			    DNS_INDENT "Data length: %u", rdlen);
+		} else {
+			line += strlen(line);
+			line += sprintf(line, " %s UDP %u rc %d ver %u len %u",
+			    dns_type_string(type, detail), size, rcode, ver,
+			    rdlen);
+		}
+
+		/*
+		 * Make sure that rdlen is within data boundary.
+		 */
+		if (rdlen > data_end - data)
+			return (data_end - data_bak);
+
+		/* Future OPT decode code goes here. */
+
+		data += rdlen;
+		return (data - data_bak);
+	}
+
+	/*
+	 * Make sure we don't run off the end of the packet by reading the
+	 * class, ttl, and length.
+	 */
+	if ((data_end - data) <
+	    ((ptrdiff_t)(sizeof (cls)
+		+ sizeof (ttl)
+		+ sizeof (rdlen)))) {
+		return (data_end - data_bak);
+	}
+
 	GETINT16(cls, data);
 
 	if (detail) {
