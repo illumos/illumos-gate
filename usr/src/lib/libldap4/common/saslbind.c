@@ -1,7 +1,7 @@
 /*
  *
- * Copyright %G% Sun Microsystems, Inc. 
- * All Rights Reserved
+ * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  *
  * Comments:   

@@ -1,7 +1,7 @@
 /*
  *
- * Portions Copyright %G% Sun Microsystems, Inc. 
- * All Rights Reserved
+ * Portions Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  */
 
