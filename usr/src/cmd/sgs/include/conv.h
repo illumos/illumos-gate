@@ -193,6 +193,7 @@ extern	const char	*conv_ver_flags(Half);
 #define	conv_ehdr_data		conv64_ehdr_data
 #define	conv_ehdr_flags		conv64_ehdr_flags
 #define	conv_ehdr_mach		conv64_ehdr_mach
+#define	conv_ehdr_osabi		conv64_ehdr_osabi
 #define	conv_ehdr_type		conv64_ehdr_type
 #define	conv_ehdr_vers		conv64_ehdr_vers
 #define	conv_expn_field		conv64_expn_field
@@ -229,6 +230,7 @@ extern	const char	*conv_ver_flags(Half);
 #define	conv_ehdr_data		conv32_ehdr_data
 #define	conv_ehdr_flags		conv32_ehdr_flags
 #define	conv_ehdr_mach		conv32_ehdr_mach
+#define	conv_ehdr_osabi		conv32_ehdr_osabi
 #define	conv_ehdr_type		conv32_ehdr_type
 #define	conv_ehdr_vers		conv32_ehdr_vers
 #define	conv_expn_field		conv32_expn_field
@@ -266,6 +268,7 @@ extern	const char	*conv_ehdr_class(uchar_t, int);
 extern	const char	*conv_ehdr_data(uchar_t, int);
 extern	const char	*conv_ehdr_flags(Half, Word);
 extern	const char	*conv_ehdr_mach(Half, int);
+extern	const char	*conv_ehdr_osabi(uchar_t, int);
 extern	const char	*conv_ehdr_type(Half, int);
 extern	const char	*conv_ehdr_vers(Word, int);
 extern	int		conv_expn_field(CONV_EXPN_FIELD_ARG *);

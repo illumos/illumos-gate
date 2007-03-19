@@ -153,6 +153,9 @@ typedef struct {
 #define	DT_SUNW_TLSSORT		0x60000016	/* tls sym ndx sort by offset */
 #define	DT_SUNW_TLSSORTSZ	0x60000017	/* size of SUNW_TLSSORT */
 
+#define	DT_SUNW_STRPAD		0x60000019	/* # of unused bytes at the */
+						/*	end of dynstr */
+
 /*
  * DT_* encoding rules do not apply between DT_HIOS and DT_LOPROC
  */
@@ -269,6 +272,8 @@ typedef struct {
 					/*	symbols via /dev/ksyms */
 #define	DF_1_NOHDR	0x00100000	/* mapfile ?N:1st segment mapping */
 					/*	omits ELF & program headers */
+#define	DF_1_EDITED	0x00200000	/* object has been modified since */
+					/*	being built by 'ld' */
 #define	DF_1_NORELOC	0x00400000	/* internal: unrelocated object */
 #define	DF_1_SYMINTPOSE	0x00800000	/* individual symbol interposers */
 					/*	exist */

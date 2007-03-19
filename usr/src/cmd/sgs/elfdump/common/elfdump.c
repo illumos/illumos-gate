@@ -1668,7 +1668,7 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 	for (cnt = 1; cnt < shnum; cnt++) {
 		Dyn	*dyn;
 		ulong_t	numdyn;
-		int	ndx;
+		int	ndx, end_ndx;
 		Cache	*_cache = &cache[cnt], *strsec;
 		Shdr	*shdr = _cache->c_shdr;
 
@@ -1704,32 +1704,61 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 			 * Print the information numerically, and if possible
 			 * as a string.
 			 */
-			if ((dyn->d_tag == DT_NEEDED) ||
-			    (dyn->d_tag == DT_SONAME) ||
-			    (dyn->d_tag == DT_FILTER) ||
-			    (dyn->d_tag == DT_AUXILIARY) ||
-			    (dyn->d_tag == DT_CONFIG) ||
-			    (dyn->d_tag == DT_RPATH) ||
-			    (dyn->d_tag == DT_RUNPATH) ||
-			    (dyn->d_tag == DT_USED) ||
-			    (dyn->d_tag == DT_DEPAUDIT) ||
-			    (dyn->d_tag == DT_AUDIT) ||
-			    (dyn->d_tag == DT_SUNW_AUXILIARY) ||
-			    (dyn->d_tag == DT_SUNW_FILTER))
+			switch (dyn->d_tag) {
+			case DT_NULL:
+				/*
+				 * Special case: DT_NULLs can come in groups
+				 * that we prefer to reduce to a single line.
+				 */
+				end_ndx = ndx;
+				while ((end_ndx < (numdyn - 1)) &&
+					((dyn + 1)->d_tag == DT_NULL)) {
+					dyn++;
+					end_ndx++;
+				}
+				Elf_dyn_null_entry(0, dyn, ndx, end_ndx);
+				ndx = end_ndx;
+				continue;
+
+			/*
+			 * Print the information numerically, and if possible
+			 * as a string.
+			 */
+			case DT_NEEDED:
+			case DT_SONAME:
+			case DT_FILTER:
+			case DT_AUXILIARY:
+			case DT_CONFIG:
+			case DT_RPATH:
+			case DT_RUNPATH:
+			case DT_USED:
+			case DT_DEPAUDIT:
+			case DT_AUDIT:
+			case DT_SUNW_AUXILIARY:
+			case DT_SUNW_FILTER:
 				name = string(_cache, ndx, strsec,
 				    file, dyn->d_un.d_ptr);
-			else if (dyn->d_tag == DT_FLAGS)
+				break;
+
+			case DT_FLAGS:
 				name = conv_dyn_flag(dyn->d_un.d_val, 0);
-			else if (dyn->d_tag == DT_FLAGS_1)
+				break;
+			case DT_FLAGS_1:
 				name = conv_dyn_flag1(dyn->d_un.d_val);
-			else if (dyn->d_tag == DT_POSFLAG_1)
+				break;
+			case DT_POSFLAG_1:
 				name = conv_dyn_posflag1(dyn->d_un.d_val, 0);
-			else if (dyn->d_tag == DT_FEATURE_1)
+				break;
+			case DT_FEATURE_1:
 				name = conv_dyn_feature1(dyn->d_un.d_val, 0);
-			else if (dyn->d_tag == DT_DEPRECATED_SPARC_REGISTER)
+				break;
+			case DT_DEPRECATED_SPARC_REGISTER:
 				name = MSG_INTL(MSG_STR_DEPRECATED);
-			else
+				break;
+			default:
 				name = MSG_ORIG(MSG_STR_EMPTY);
+				break;
+			}
 
 			Elf_dyn_entry(0, dyn, ndx, name, ehdr->e_machine);
 		}

@@ -1957,6 +1957,7 @@ update_odynamic(Ofl_desc *ofl)
 	Str_tbl		*dynstr;
 	uint_t		stoff;
 	Word		flags = ofl->ofl_flags;
+	Word		cnt;
 
 	dynstr = ofl->ofl_dynstrtab;
 	ofl->ofl_osdynamic->os_shdr->sh_link =
@@ -2361,10 +2362,16 @@ update_odynamic(Ofl_desc *ofl)
 	dyn->d_un.d_val = ofl->ofl_dtflags_1;
 	dyn++;
 
+	dyn->d_tag = DT_SUNW_STRPAD;
+	dyn->d_un.d_val = DYNSTR_EXTRA_PAD;
+	dyn++;
+
 	ld_mach_update_odynamic(ofl, &dyn);
 
-	dyn->d_tag = DT_NULL;
-	dyn->d_un.d_val = 0;
+	for (cnt = 1 + DYNAMIC_EXTRA_ELTS; cnt--; dyn++) {
+		dyn->d_tag = DT_NULL;
+		dyn->d_un.d_val = 0;
+	}
 
 	/*
 	 * Ensure that we wrote the right number of entries. If not,
@@ -2373,7 +2380,7 @@ update_odynamic(Ofl_desc *ofl)
 	 */
 	assert((ofl->ofl_osdynamic->os_shdr->sh_size /
 	    ofl->ofl_osdynamic->os_shdr->sh_entsize) ==
-	    ((uintptr_t)(dyn + 1) - (uintptr_t)_dyn) / sizeof (*dyn));
+	    ((uintptr_t)dyn - (uintptr_t)_dyn) / sizeof (*dyn));
 
 	return (1);
 }
@@ -3035,15 +3042,20 @@ update_ogroup(Ofl_desc * ofl)
 }
 
 static void
-update_ostrtab(Os_desc *osp, Str_tbl *stp)
+update_ostrtab(Os_desc *osp, Str_tbl *stp, uint_t extra)
 {
 	Elf_Data	*data;
+
 	if (osp == 0)
 		return;
 
 	data = osp->os_outdata;
-	assert(data->d_size == st_getstrtab_sz(stp));
-	(void) st_setstrbuf(stp, data->d_buf, (uint_t)data->d_size);
+	assert(data->d_size == (st_getstrtab_sz(stp) + extra));
+	(void) st_setstrbuf(stp, data->d_buf, (uint_t)data->d_size - extra);
+	/* If leaving an extra hole at the end, zero it */
+	if (extra > 0)
+		(void) memset((char *)data->d_buf + data->d_size - extra,
+		    0x0, extra);
 }
 
 /*
@@ -3590,9 +3602,9 @@ ld_update_outfile(Ofl_desc *ofl)
 	/*
 	 * Update the .shstrtab, .strtab and .dynstr sections.
 	 */
-	update_ostrtab(ofl->ofl_osshstrtab, ofl->ofl_shdrsttab);
-	update_ostrtab(ofl->ofl_osstrtab, ofl->ofl_strtab);
-	update_ostrtab(ofl->ofl_osdynstr, ofl->ofl_dynstrtab);
+	update_ostrtab(ofl->ofl_osshstrtab, ofl->ofl_shdrsttab, 0);
+	update_ostrtab(ofl->ofl_osstrtab, ofl->ofl_strtab, 0);
+	update_ostrtab(ofl->ofl_osdynstr, ofl->ofl_dynstrtab, DYNSTR_EXTRA_PAD);
 
 	/*
 	 * Build any output symbol tables, the symbols information is copied

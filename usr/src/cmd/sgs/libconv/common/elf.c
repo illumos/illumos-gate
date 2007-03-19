@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -87,7 +87,7 @@ static const Msg machines[EM_NUM] = {
 	MSG_EM_UNKNOWN27,	MSG_EM_UNKNOWN28,	MSG_EM_UNKNOWN29,
 	MSG_EM_UNKNOWN30,	MSG_EM_UNKNOWN31,	MSG_EM_UNKNOWN32,
 	MSG_EM_UNKNOWN33,	MSG_EM_UNKNOWN34,	MSG_EM_UNKNOWN35,
-	MSG_EM_Y800,		MSG_EM_FR20,		MSG_EM_RH32,
+	MSG_EM_V800,		MSG_EM_FR20,		MSG_EM_RH32,
 	MSG_EM_RCE,		MSG_EM_ARM,		MSG_EM_ALPHA,
 	MSG_EM_SH,		MSG_EM_SPARCV9,		MSG_EM_TRICORE,
 	MSG_EM_ARC,		MSG_EM_H8_300,		MSG_EM_H8_300H,
@@ -121,7 +121,7 @@ static const Msg machines_alt[EM_NUM] = {
 	MSG_EM_UNKNOWN27,	MSG_EM_UNKNOWN28,	MSG_EM_UNKNOWN29,
 	MSG_EM_UNKNOWN30,	MSG_EM_UNKNOWN31,	MSG_EM_UNKNOWN32,
 	MSG_EM_UNKNOWN33,	MSG_EM_UNKNOWN34,	MSG_EM_UNKNOWN35,
-	MSG_EM_Y800,		MSG_EM_FR20,		MSG_EM_RH32,
+	MSG_EM_V800,		MSG_EM_FR20,		MSG_EM_RH32,
 	MSG_EM_RCE,		MSG_EM_ARM_ALT,		MSG_EM_ALPHA_ALT,
 	MSG_EM_SH,		MSG_EM_SPARCV9_ALT,	MSG_EM_TRICORE,
 	MSG_EM_ARC,		MSG_EM_H8_300,		MSG_EM_H8_300H,
@@ -248,6 +248,58 @@ conv_ehdr_flags(Half mach, Word flags)
 		return (string);
 	}
 	return (conv_invalid_val(string, EFLAGSZ, flags, CONV_FMT_DECIMAL));
+}
+
+/*
+ * Make a string representation of the e_ident[EI_OSABI] field.
+ */
+const char *
+conv_ehdr_osabi(uchar_t osabi, int fmt_flags)
+{
+	static Conv_inv_buf_t	string;
+	static const Msg	osabi_arr[] = {
+		MSG_OSABI_NONE,		MSG_OSABI_HPUX,
+		MSG_OSABI_NETBSD,	MSG_OSABI_LINUX,
+		MSG_OSABI_UNKNOWN4,	MSG_OSABI_UNKNOWN5,
+		MSG_OSABI_SOLARIS,	MSG_OSABI_AIX,
+		MSG_OSABI_IRIX,		MSG_OSABI_FREEBSD,
+		MSG_OSABI_TRU64,	MSG_OSABI_MODESTO,
+		MSG_OSABI_OPENBSD,	MSG_OSABI_OPENVMS,
+		MSG_OSABI_NSK,		MSG_OSABI_AROS
+	};
+	static const Msg	osabi_arr_alt[] = {
+		MSG_OSABI_NONE_ALT,	MSG_OSABI_HPUX_ALT,
+		MSG_OSABI_NETBSD_ALT,	MSG_OSABI_LINUX_ALT,
+		MSG_OSABI_UNKNOWN4,	MSG_OSABI_UNKNOWN5,
+		MSG_OSABI_SOLARIS_ALT,	MSG_OSABI_AIX_ALT,
+		MSG_OSABI_IRIX_ALT,	MSG_OSABI_FREEBSD_ALT,
+		MSG_OSABI_TRU64_ALT,	MSG_OSABI_MODESTO_ALT,
+		MSG_OSABI_OPENBSD_ALT,	MSG_OSABI_OPENVMS_ALT,
+		MSG_OSABI_NSK_ALT,	MSG_OSABI_AROS_ALT
+	};
+
+	const char *str;
+
+	switch (osabi) {
+	case ELFOSABI_ARM:
+		str = (fmt_flags & CONV_FMTALTMASK) ?
+		    MSG_ORIG(MSG_OSABI_ARM_ALT) : MSG_ORIG(MSG_OSABI_ARM);
+		break;
+
+	case ELFOSABI_STANDALONE:
+		str = (fmt_flags & CONV_FMTALTMASK) ?
+		    MSG_ORIG(MSG_OSABI_STANDALONE_ALT) :
+		    MSG_ORIG(MSG_OSABI_STANDALONE);
+		break;
+
+	default:
+		str = conv_map2str(string, sizeof (string), osabi, fmt_flags,
+		    ARRAY_NELTS(osabi_arr), osabi_arr,
+		    osabi_arr_alt, osabi_arr_alt);
+		break;
+	}
+
+	return (str);
 }
 
 /*

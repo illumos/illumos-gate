@@ -160,12 +160,13 @@ conv_dyn_flag1(Xword flags)
 		{ DF_1_NODUMP,		MSG_ORIG(MSG_DF1_NODUMP) },
 		{ DF_1_CONFALT,		MSG_ORIG(MSG_DF1_CONFALT) },
 		{ DF_1_ENDFILTEE,	MSG_ORIG(MSG_DF1_ENDFILTEE) },
-		{ DF_1_DISPRELPND,	MSG_ORIG(MSG_DF1_DISPRELPND) },
 		{ DF_1_DISPRELDNE,	MSG_ORIG(MSG_DF1_DISPRELDNE) },
+		{ DF_1_DISPRELPND,	MSG_ORIG(MSG_DF1_DISPRELPND) },
 		{ DF_1_NODIRECT,	MSG_ORIG(MSG_DF1_NODIRECT) },
 		{ DF_1_IGNMULDEF,	MSG_ORIG(MSG_DF1_IGNMULDEF) },
 		{ DF_1_NOKSYMS,		MSG_ORIG(MSG_DF1_NOKSYMS) },
 		{ DF_1_NOHDR,		MSG_ORIG(MSG_DF1_NOHDR) },
+		{ DF_1_EDITED,		MSG_ORIG(MSG_DF1_EDITED) },
 		{ DF_1_NORELOC,		MSG_ORIG(MSG_DF1_NORELOC) },
 		{ DF_1_SYMINTPOSE,	MSG_ORIG(MSG_DF1_SYMINTPOSE) },
 		{ 0,			0 }
@@ -287,7 +288,8 @@ conv_dyn_tag(Xword tag, Half mach, int fmt_flags)
 	};
 
 	/*
-	 * SUNW: DT_LOOS -> DT_HIOS range.
+	 * SUNW: DT_LOOS -> DT_HIOS range. Note hole between DT_SUNW_TLSSORTSZ
+	 * and DT_SUNW_STRPAD. We handle DT_SUNW_STRPAD as a single value below.
 	 */
 	static const Msg	tags_sunw_auxiliary[] = {
 		MSG_DYN_SUNW_AUXILIARY,	MSG_DYN_SUNW_RTLDINF,
@@ -345,6 +347,8 @@ conv_dyn_tag(Xword tag, Half mach, int fmt_flags)
 			tags_null_alt, NULL));
 	DYN_RANGE(DT_PREINIT_ARRAY, tags_preinit_array);
 	DYN_RANGE(DT_SUNW_AUXILIARY, tags_sunw_auxiliary);
+	if (tag == DT_SUNW_STRPAD)
+		return (MSG_ORIG(MSG_DYN_SUNW_STRPAD));
 	DYN_RANGE(DT_CHECKSUM, tags_checksum);
 	DYN_RANGE(DT_CONFIG, tags_config);
 	if (tag == DT_VERSYM)

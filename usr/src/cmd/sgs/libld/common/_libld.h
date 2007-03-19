@@ -173,6 +173,15 @@ typedef enum {
 #endif
 
 /*
+ * We pad the end of the .dynstr section with a block of DYNSTR_EXTRA_PAD
+ * bytes, and we insert DYNAMIC_EXTRA_ELTS unused items into the
+ * .dynamic section (with value DT_NULL). This provides the resources needed
+ * to add and/or alter string items in the .dynamic section, such as runpath.
+ */
+#define	DYNSTR_EXTRA_PAD	512
+#define	DYNAMIC_EXTRA_ELTS	10
+
+/*
  * Relocation buckets are sized based on the number of input relocations and
  * the following constants.
  */

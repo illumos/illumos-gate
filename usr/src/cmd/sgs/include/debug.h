@@ -849,6 +849,7 @@ extern	void Elf_syminfo_title(Lm_list *);
 
 #define	Elf_demangle_name	Elf64_demangle_name
 #define	Elf_dyn_entry		Elf64_dyn_entry
+#define	Elf_dyn_null_entry	Elf64_dyn_null_entry
 #define	Elf_dyn_title		Elf64_dyn_title
 
 #define	Elf_ehdr		Elf64_ehdr
@@ -884,6 +885,7 @@ extern	void Elf_syminfo_title(Lm_list *);
 
 #define	Elf_demangle_name	Elf32_demangle_name
 #define	Elf_dyn_entry		Elf32_dyn_entry
+#define	Elf_dyn_null_entry	Elf32_dyn_null_entry
 #define	Elf_dyn_title		Elf32_dyn_title
 
 #define	Elf_ehdr		Elf32_ehdr
@@ -920,6 +922,7 @@ extern	void	Elf_cap_title(Lm_list *);
 extern	const char \
 		*Elf_demangle_name(const char *);
 extern	void	Elf_dyn_entry(Lm_list *, Dyn *, int, const char *, Half);
+extern	void	Elf_dyn_null_entry(Lm_list *, Dyn *, int, int);
 extern	void	Elf_dyn_title(Lm_list *);
 
 extern	void	Elf_ehdr(Lm_list *, Ehdr *, Shdr *);
@@ -954,6 +957,17 @@ extern	void	Elf_ver_line_3(Lm_list *, const char *, const char *,
 extern	void	Elf_ver_line_4(Lm_list *, const char *);
 extern	void	Elf_ver_line_5(Lm_list *, const char *, const char *);
 extern	void	Elf_ver_need_title(Lm_list *);
+
+
+/*
+ * Establish GElf_*() interfaces. These are wrappers around the
+ * Elf64*() versions of the above functions, callable from either
+ * 32 or 64-bit code. Note that they omit the Lm_list argument.
+ * It is not needed, since GElf is never used within the runtime loader
+ * itself, only in ELF applications.
+ */
+extern	void	GElf_dyn_entry(GElf_Dyn *, int, const char *, GElf_Half);
+
 
 #ifdef	__cplusplus
 }

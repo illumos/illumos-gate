@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,6 +28,10 @@
 
 include		$(SRC)/Makefile.master
 include		$(SRC)/cmd/sgs/Makefile.var
+
+EXTBUILD:sh=	if [ ! -h ../ext -a ! -d ../ext ]; \
+		then /bin/sh setup_pkg_ext .. ; \
+		fi
 
 BUILDLOG=	package_build.$(MACH).log
 
@@ -65,6 +69,11 @@ SUBDIRS2 =	../rtld \
 		../tools \
 		$(RDBDIRS)
 
+
+PKGDIRS_EXT:sh=	if [ -f ../ext/packages/pkgdirs ]; \
+				then cat ../ext/packages/pkgdirs; \
+			fi
+
 #
 # Package dirs are directories which specifically
 # have a 'package' target.  This target is used to key
@@ -83,7 +92,7 @@ PKGDIRS=	../libcrle \
 		../nm \
 		../mcs \
 		../moe \
-		../pvs
+		../pvs $(PKGDIRS_EXT)
 
 $(SUBDIRS1) $(SUBDIRS2) :=	TARGET = install
 $(PKGDIRS) :=	TARGET = package

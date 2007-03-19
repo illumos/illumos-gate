@@ -451,6 +451,8 @@ void Elf32_cap_title(Lm_list *);
 
 void Elf64_dyn_entry(Lm_list *, Elf64_Dyn *, int, const char *, Elf64_Half);
 void Elf32_dyn_entry(Lm_list *, Elf32_Dyn *, int, const char *, Elf32_Half);
+void Elf64_dyn_null_entry(Lm_list *, Elf64_Dyn *, int, int);
+void Elf32_dyn_null_entry(Lm_list *, Elf32_Dyn *, int, int);
 void Elf64_dyn_title(Lm_list *);
 void Elf32_dyn_title(Lm_list *);
 

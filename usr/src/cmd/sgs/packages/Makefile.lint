@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -55,6 +55,10 @@ LSUBDIRS2 =	../rtld \
 		../libldmake \
 		../rtld/mdbmod
 
+LINTLDIRS_EXT:sh=	if [ -f ../ext/packages/lintldirs ]; \
+				then cat ../ext/packages/lintldirs; \
+			fi
+
 LINTLDIRS=	../libld \
 		../sgsdemangler \
 		../elfdump \
@@ -65,7 +69,7 @@ LINTLDIRS=	../libld \
 		../nm \
 		../mcs \
 		../moe \
-		../pvs
+		../pvs $(LINTLDIRS_EXT)
 
 $(LSUBDIRS1) $(LSUBDIRS2) :=	TARGET = lint
 $(LINTLDIRS) :=	TARGET = lint

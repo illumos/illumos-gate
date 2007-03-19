@@ -1037,8 +1037,12 @@ make_dynamic(Ofl_desc *ofl)
 	 */
 	ld_mach_make_dynamic(ofl, &cnt);
 
-	cnt += 3;				/* DT_FLAGS, DT_FLAGS_1, */
-						/*   and DT_NULL */
+	/*
+	 * DT_FLAGS, DT_FLAGS_1, DT_SUNW_STRPAD, and DT_NULL. Also,
+	 * allow room for the unused extra DT_NULLs. These are included
+	 * to allow an ELF editor room to add items later.
+	 */
+	cnt += 4 + DYNAMIC_EXTRA_ELTS;
 
 	/*
 	 * Determine the size of the section from the number of entries.
@@ -1698,7 +1702,8 @@ make_dynstr(Ofl_desc *ofl)
 		shdr->sh_flags |= SHF_ALLOC;
 
 	/* Set the size of the data area */
-	data->d_size = size;
+	data->d_size = size + DYNSTR_EXTRA_PAD;
+
 	shdr->sh_size = (Xword)size;
 
 	ofl->ofl_osdynstr = ld_place_section(ofl, isec, M_ID_DYNSTR, 0);

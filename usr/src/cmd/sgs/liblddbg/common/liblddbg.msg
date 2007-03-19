@@ -1110,6 +1110,7 @@
 @ MSG_UTL_SCC_ENTRY	"    [%d]  %s"
 
 @ MSG_FMT_INDEX		" [%d]"
+@ MSG_FMT_INDEX_RANGE	" [%d-%d]"
 @ MSG_FMT_STR		"%s"
 @ MSG_FMT_PATH		"%s/%s"
 

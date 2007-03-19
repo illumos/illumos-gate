@@ -1201,3 +1201,5 @@ Bugid   Risk Synopsis
 	addresses of 0
 6533587 ld.so.1: init/fini processing needs to compensate for interposer
 	expectations
+6516118 Reserved space needed in ELF dynamic section and string table (D)
+	PSARC/2007/127 Reserved space for editing ELF dynamic sections

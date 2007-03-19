@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -63,6 +63,7 @@ s none $SGSDIR/lib/librtld_db.so=librtld_db.so.1
 f none $SGSDIR/lib/librtld_db.so.1=lib/librtld_db.so.1 755 root bin
 d none $SGSDIR/usr/bin 755 root bin
 f none $SGSDIR/usr/bin/crle=usr/bin/crle 555 root bin
+!include prototype_com_ext_usr_bin
 f none $SGSDIR/usr/bin/ldd=usr/bin/ldd 555 root bin
 f none $SGSDIR/usr/bin/moe=usr/bin/moe 555 root bin
 f none $SGSDIR/usr/bin/pvs=usr/bin/pvs 555 root bin
@@ -98,6 +99,7 @@ f none $SGSDIR/usr/lib/0@0.so.1=usr/lib/0@0.so.1 755 root bin
 f none $SGSDIR/usr/lib/lddstub=usr/lib/lddstub 555 root bin
 f none $SGSDIR/usr/lib/libcrle.so.1=usr/lib/libcrle.so.1 755 root bin
 f none $SGSDIR/usr/lib/libldstab.so.1=usr/lib/libldstab.so.1 755 root bin
+!include prototype_com_ext_usr_lib
 d none $SGSDIR/usr/lib/link_audit 755 root bin
 s none $SGSDIR/usr/lib/link_audit/32=.
 f none $SGSDIR/usr/lib/link_audit/ldprof.so.1=usr/lib/link_audit/ldprof.so.1 755 root bin

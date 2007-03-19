@@ -1209,6 +1209,7 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 			case DT_SUNW_SORTENT:
 			case DT_SUNW_SYMSORTSZ:
 			case DT_SUNW_TLSSORTSZ:
+			case DT_SUNW_STRPAD:
 				(void) printf(pdyn_Fmtptr,
 					EC_XWORD(p_dyn.d_un.d_val));
 				break;
