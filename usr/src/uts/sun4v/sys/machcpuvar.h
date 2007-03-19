@@ -112,6 +112,10 @@ struct	machcpu {
 	u_longlong_t	tmp1;		/* per-cpu tmps */
 	u_longlong_t	tmp2;		/*  used in trap processing */
 
+	label_t		*ofd[HIGH_LEVELS];	/* saved pil ofd */
+	uintptr_t	lfd[HIGH_LEVELS];	/* saved ret PC */
+	struct on_trap_data *otd[HIGH_LEVELS];	/* saved pil otd */
+
 	struct intr_vec	*intr_head[PIL_LEVELS];	/* intr queue heads per pil */
 	struct intr_vec	*intr_tail[PIL_LEVELS];	/* intr queue tails per pil */
 	boolean_t	poke_cpu_outstanding;

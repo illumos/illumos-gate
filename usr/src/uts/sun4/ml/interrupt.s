@@ -940,10 +940,35 @@ current_thread(struct regs *regs, uint64_t iv_p, uint_t pil)
 	
 	mov	%o7, %l0
 	ldn	[THREAD_REG + T_CPU], %o3
+
+	ldn	[THREAD_REG + T_ONFAULT], %l2
+	brz,pt	%l2, no_onfault		! branch if no onfault label set
+	nop
+	stn	%g0, [THREAD_REG + T_ONFAULT]! clear onfault label
+	ldn	[THREAD_REG + T_LOFAULT], %l3
+	stn	%g0, [THREAD_REG + T_LOFAULT]! clear lofault data
+
+	sub	%o2, LOCK_LEVEL + 1, %o5
+	sll	%o5, CPTRSHIFT, %o5
+	add	%o5, CPU_OFD, %o4	! %o4 has on_fault data offset
+	stn	%l2, [%o3 + %o4]	! save onfault label for pil %o2
+	add	%o5, CPU_LFD, %o4	! %o4 has lofault data offset
+	stn	%l3, [%o3 + %o4]	! save lofault data for pil %o2
+
+no_onfault:
+	ldn	[THREAD_REG + T_ONTRAP], %l2
+	brz,pt	%l2, 6f			! branch if no on_trap protection
+	nop
+	stn	%g0, [THREAD_REG + T_ONTRAP]! clear on_trap protection
+	sub	%o2, LOCK_LEVEL + 1, %o5
+	sll	%o5, CPTRSHIFT, %o5
+	add	%o5, CPU_OTD, %o4	! %o4 has on_trap data offset
+	stn	%l2, [%o3 + %o4]	! save on_trap label for pil %o2
+
 	!
 	! Set bit for this level in CPU's active interrupt bitmask.
 	!
-	ld	[%o3 + CPU_INTR_ACTV], %o5	! o5 has cpu_intr_actv b4 chng
+6:	ld	[%o3 + CPU_INTR_ACTV], %o5	! o5 has cpu_intr_actv b4 chng
 	mov	1, %o4
 	sll	%o4, %o2, %o4			! construct mask for level
 #ifdef DEBUG
@@ -1333,7 +1358,7 @@ current_thread_complete:
 	! Another high-level interrupt is active below this one, so
 	! there is no need to check for an interrupt thread. That will be
 	! done by the lowest priority high-level interrupt active.
-	ba,pt	%xcc, 1f
+	ba,pt	%xcc, 7f
 	stx	%o4, [%o3 + %o5]	! delay - store timestamp
 3:	
 	! If we haven't interrupted another high-level interrupt, we may have
@@ -1341,14 +1366,41 @@ current_thread_complete:
 	! timestamp in its thread structure.
 	lduh	[THREAD_REG + T_FLAGS], %o4
 	andcc	%o4, T_INTR_THREAD, %g0
-	bz,pt	%xcc, 1f
+	bz,pt	%xcc, 7f
 	nop
 
 	rdpr	%tick, %o4
 	sllx	%o4, 1, %o4
 	srlx	%o4, 1, %o4			! Shake off NPT bit
 	stx	%o4, [THREAD_REG + T_INTR_START]
-1:
+
+7:
+	sub	%o2, LOCK_LEVEL + 1, %o4
+	sll	%o4, CPTRSHIFT, %o5
+
+	! Check on_trap saved area and restore as needed
+	add	%o5, CPU_OTD, %o4	
+	ldn	[%o3 + %o4], %l2
+	brz,pt %l2, no_ontrp_restore
+	nop
+	stn	%l2, [THREAD_REG + T_ONTRAP] ! restore
+	stn	%g0, [%o3 + %o4]	! clear
+	
+no_ontrp_restore:
+	! Check on_fault saved area and restore as needed
+	add	%o5, CPU_OFD, %o4	
+	ldn	[%o3 + %o4], %l2
+	brz,pt %l2, 8f
+	nop
+	stn	%l2, [THREAD_REG + T_ONFAULT] ! restore
+	stn	%g0, [%o3 + %o4]	! clear
+	add	%o5, CPU_LFD, %o4	
+	ldn	[%o3 + %o4], %l2
+	stn	%l2, [THREAD_REG + T_LOFAULT] ! restore
+	stn	%g0, [%o3 + %o4]	! clear
+
+
+8:
 	! Enable interrupts and return	
 	jmp	%l0 + 8
 	wrpr	%g0, %o2, %pil			! enable interrupts
