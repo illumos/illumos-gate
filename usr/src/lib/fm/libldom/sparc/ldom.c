@@ -48,6 +48,8 @@
 #include "ldom.h"
 #include "ldmsvcs_utils.h"
 
+#define	MD_STR_PLATFORM		"platform"
+#define	MD_STR_DOM_ENABLE	"domaining-enabled"
 
 static ssize_t
 get_local_core_md(ldom_hdl_t *lhp, uint64_t **buf)
@@ -85,6 +87,40 @@ get_local_core_md(ldom_hdl_t *lhp, uint64_t **buf)
 
 
 static int
+get_local_md_prop_value(ldom_hdl_t *lhp, char *node, char *prop, uint64_t *val)
+{
+	int rc = 1;
+	uint64_t *bufp;
+	ssize_t bufsiz;
+
+	if ((bufsiz = get_local_core_md(lhp, &bufp)) > 0) {
+		md_t *mdp;
+
+		if (mdp = md_init_intern(bufp, lhp->allocp, lhp->freep)) {
+			int num_nodes;
+			mde_cookie_t *listp;
+
+			num_nodes = md_node_count(mdp);
+			listp = lhp->allocp(sizeof (mde_cookie_t) * num_nodes);
+
+			if (md_scan_dag(mdp, MDE_INVAL_ELEM_COOKIE,
+					md_find_name(mdp, node),
+					md_find_name(mdp, "fwd"),
+					listp) > 0 &&
+			    md_get_prop_val(mdp, listp[0], prop, val) >= 0) {
+				/* found the property */
+				rc = 0;
+			}
+
+			lhp->freep(listp, sizeof (mde_cookie_t) * num_nodes);
+			(void) md_fini(mdp);
+		}
+		lhp->freep(bufp, bufsiz);
+	}
+	return (rc);
+}
+
+static int
 ldom_getinfo(struct ldom_hdl *lhp)
 {
 	static pthread_mutex_t mt = PTHREAD_MUTEX_INITIALIZER;
@@ -94,6 +130,7 @@ ldom_getinfo(struct ldom_hdl *lhp)
 	static int busy_init = 0;
 
 	int ier, rc = 0;
+	uint64_t domain_enable;
 
 	(void) pthread_mutex_lock(&mt);
 
@@ -120,70 +157,33 @@ ldom_getinfo(struct ldom_hdl *lhp)
 	 * non-sun4v machines.
 	 */
 	major_version = 0;
-	service_ldom = 1;
+	service_ldom = 0;
+	domain_enable = 0;
 
-	/* figure out version */
-	if ((ier = ldmsvcs_check_channel()) == 0) {
+	if (get_local_md_prop_value(lhp, MD_STR_PLATFORM, MD_STR_DOM_ENABLE,
+				&domain_enable) == 0 &&
+	    domain_enable != 0) {
+
 		/*
-		 * get into this block if vldc exists.  LDOMS is available
-		 * and we are on the service LDOM.
+		 * Domaining is enable and ldmd is not in config mode
+		 * so this is a ldom env.
 		 */
 		major_version = 1;
-		service_ldom = 1;
-	} else if (ier == 1) {
-		/*
-		 * get into this block if vldc does not exist
-		 *
-		 * if we do not get into the following if() block [i.e.,
-		 * if (bufsiz <= 0)] then we are on a non-sun4v machine.
-		 */
-		uint64_t *bufp;
-		ssize_t bufsiz;
 
-		if ((bufsiz = get_local_core_md(lhp, &bufp)) > 0) {
-			md_t *mdp;
-
-			if ((mdp = md_init_intern(bufp, lhp->allocp,
-						    lhp->freep)) != NULL) {
-				mde_cookie_t *listp;
-				uint64_t dval;
-				int num_nodes;
-
-				num_nodes = md_node_count(mdp);
-				listp = lhp->allocp(sizeof (mde_cookie_t) *
-						    num_nodes);
-
-				/*
-				 * if we do not enter the following if block,
-				 * we conclude that LDOMS is not available
-				 */
-				if (md_scan_dag(mdp, MDE_INVAL_ELEM_COOKIE,
-					md_find_name(mdp, "platform"),
-					md_find_name(mdp, "fwd"),
-					listp) > 0 &&
-				    md_get_prop_val(mdp, listp[0],
-					"domaining-enabled", &dval) >= 0 &&
-				    dval == 1) {
-					/*
-					 * LDOMS is available.  an earlier
-					 * block detected the situation of
-					 * being on a service LDOM, so
-					 * we get to this point only if we
-					 * are not on a service LDOM.
-					 */
-					major_version = 1;
-					service_ldom = 0;
-				}
-
-				lhp->freep(listp, sizeof (mde_cookie_t) *
-					    num_nodes);
-				(void) md_fini(mdp);
-			}
-
-			lhp->freep(bufp, bufsiz);
+		if ((ier = ldmsvcs_check_channel()) == 0) {
+			/*
+			 * control ldom
+			 * ldmfma channel between FMA and ldmd only exists
+			 * on the control domain.
+			 */
+			service_ldom = 1;
+		} else if (ier == 1) {
+			/*
+			 * guest ldom
+			 * non-control ldom such as guest and io service ldom
+			 */
+			service_ldom = 0;
 		}
-	} else {
-		rc = 1;
 	}
 
 	(void) pthread_mutex_lock(&mt);
