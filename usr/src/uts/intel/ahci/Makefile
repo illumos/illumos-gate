@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -129,6 +129,7 @@ AHCI_FILES   = $(MODULE).ll
 SD_FILES = $(SD_OBJS:%.o=../sd/%.ll)
 SATA_FILES = $(SATA_OBJS:%.o=-l ../sata/%.ll)
 SCSI_FILES = $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
+CMLB_FILES = $(CMLB_OBJS:%.o=-l ../cmlb/%.ll)
  
 warlock: $(WARLOCK_OK)
 
@@ -137,10 +138,11 @@ warlock: $(WARLOCK_OK)
 
 
 $(WARLOCK_OK): ahci.wlcmd $(WARLOCK_OUT)  warlock_ddi.files \
-	sata.files scsi.files sd.files
+	sata.files scsi.files sd.files cmlb.files
 	$(WARLOCK) -c $(WLCMD_DIR)/ahci.wlcmd $(WARLOCK_OUT) \
 	$(SD_FILES) \
 	$(SCSI_FILES) \
+	$(CMLB_FILES) \
         $(SATA_FILES) \
 	-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@
@@ -156,6 +158,9 @@ scsi.files:
 
 sd.files: 
 	@cd ../sd; pwd; $(MAKE) warlock_alone
+
+cmlb.files:
+	@cd ../cmlb; pwd; $(MAKE) warlock
 
 warlock_ddi.files:
 	@cd ../warlock; pwd; $(MAKE) warlock

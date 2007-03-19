@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -124,6 +124,7 @@ TEST		= test
 SBP2_FILES = $(SBP2_OBJS:%.o= -l ../sbp2/%.ll)
 SD_FILES   = $(SD_OBJS:%.o=../sd/%.ll)
 SCSI_FILES = $(SCSI_OBJS:%.o= -l ../scsi/%.ll)
+CMLB_FILES = $(CMLB_OBJS:%.o=-l ../cmlb/%.ll)
 
 warlock: $(WARLOCK_OK)
 
@@ -131,9 +132,10 @@ warlock: $(WARLOCK_OK)
 	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
 $(WARLOCK_OK): $(WARLOCK_OUT) sbp2.files warlock_ddi.files scsa1394.wlcmd \
-	sd.files scsi.files
+	sd.files scsi.files cmlb.files
 	$(WARLOCK) -c $(WLCMD_DIR)/scsa1394.wlcmd $(WARLOCK_OUT) $(SD_FILES) \
 		$(SCSI_FILES) \
+		$(CMLB_FILES) \
 		$(SBP2_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@
@@ -152,5 +154,8 @@ sd.files:
 
 scsi.files:
 	@cd ../scsi; pwd; $(MAKE) warlock
+
+cmlb.files:
+	@cd ../cmlb; pwd; $(MAKE) warlock
 
 

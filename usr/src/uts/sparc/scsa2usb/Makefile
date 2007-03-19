@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sparc/scsa2usb/Makefile
@@ -123,6 +123,7 @@ EHCI_FILES = $(EHCI_OBJS:%.o=../ehci/%.ll)
 SD_FILES   = $(SD_OBJS:%.o=../sd/%.ll)
 ST_FILES   = $(ST_OBJS:%.o=../st/%.ll)
 SCSI_FILES = $(SCSI_OBJS:%.o= -l ../scsi/%.ll)
+CMLB_FILES = $(CMLB_OBJS:%.o=-l ../cmlb/%.ll)
 
 warlock: $(WARLOCK_OK) warlock_with_usba
 
@@ -145,12 +146,13 @@ $(WARLOCK_OK): $(WARLOCK_OUT) scsa2usb.wlcmd warlock_ddi.files \
 
 warlock_with_usba: scsa2usb_with_usba.wlcmd  $(WARLOCK_OUT) usba_files \
 	ohci_files ehci_files uhci_files warlock_ddi.files sd.files st.files \
-	scsi.files
+	scsi.files cmlb.files
 	$(WARLOCK) -c $(WLCMD_DIR)/scsa2usb_with_usba.wlcmd \
 		$(USBA_FILES) $(OHCI_FILES) $(EHCI_FILES) $(UHCI_FILES) \
 		$(SD_FILES) \
 		$(ST_FILES) \
 		$(SCSI_FILES) \
+		$(CMLB_FILES) \
 		$(WARLOCK_OUT) \
 		-l ../warlock/ddi_dki_impl.ll
 
@@ -174,6 +176,9 @@ scsi.files:
 
 sd.files:
 	@cd ../sd; pwd; $(MAKE) warlock_alone
+
+cmlb.files:
+	@cd ../cmlb; pwd; $(MAKE) warlock
 
 st.files:
 	@cd ../st; pwd; $(MAKE) warlock_alone
