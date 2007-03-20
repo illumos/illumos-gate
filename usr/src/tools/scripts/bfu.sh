@@ -6339,6 +6339,9 @@ mondo_loop() {
 	rm -f $root/kernel/drv/pfil.conf
 	rm -f $root/kernel/drv/sparcv9/pfil
 	rm -f $root/kernel/drv/amd64/pfil
+	rm -f $root/kernel/strmod/pfil
+	rm -f $root/kernel/strmod/sparcv9/pfil
+	rm -f $root/kernel/strmod/amd64/pfil
 	rm -f $root/usr/sbin/pfild
 
 	# Remove obsolete atomic_prim.h file.
