@@ -27,7 +27,9 @@
 
 include ../Makefile.com
 
-DATAFILES += depend i.renameold
+DATAFILES += depend  i.renameold
+
+
 
 .KEEP_STATE:
 

@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# uts/sun4v/nxge/Makefile
+# uts/sun4u/nxge/Makefile
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -26,12 +26,9 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the N2 NIU
-#	10G and SUN 10G/1G Ethernet leaf driver kernel module.
+#	This makefile drives the production of the Sun
+#	10G/1G Ethernet leaf driver kernel module.
 #
-#	sun4v implementation architecture dependent
-#
-
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
@@ -41,7 +38,7 @@ UTSBASE	= ../..
 #	Define the module and object file sets.
 #
 MODULE		= nxge
-NXGE_OBJECTS =	$(NXGE_OBJS) $(NXGE_NPI_OBJS) $(NXGE_HCALL_OBJS)
+NXGE_OBJECTS =	$(NXGE_OBJS) $(NXGE_NPI_OBJS)
 OBJECTS		=  $(NXGE_OBJECTS:%=$(OBJS_DIR)/%)
 LINTS		= $(NXGE_OBJECTS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
@@ -50,7 +47,7 @@ CONF_SRCDIR	= $(UTSBASE)/common/io/nxge
 #
 #	Include common rules.
 #
-include $(UTSBASE)/sun4v/Makefile.sun4v
+include $(UTSBASE)/sun4u/Makefile.sun4u
 
 #
 #	Override defaults to build a unique, local modstubs.o.
@@ -74,6 +71,7 @@ CFLAGS	+= -dalign
 #
 # Include nxge specific header files
 #
+INC_PATH	+= -I$(UTSBASE)/common
 INC_PATH	+= -I$(UTSBASE)/common/io/nxge/npi
 INC_PATH	+= -I$(UTSBASE)/common/sys/nxge
 #
@@ -81,30 +79,8 @@ INC_PATH	+= -I$(UTSBASE)/common/sys/nxge
 # lint pass one enforcement
 #
 CFLAGS += -DSOLARIS
-# NEMO
-#CFLAGS += -DNEMO
 #
-# Enable the following flags to run mac internal loopback under legion
-#CFLAGS += -DLEGION -DAXIS -DAXIS_DEBUG -DAXIS_DEBUG_LB -DSAM_DEBUG
-#
-# Enable the following flags to run mac internal loopback under AXIS
-# (NOTE: LEGION flag can be enabled too)
-#CFLAGS += -DAXIS_DEBUG -DAXIS -DAXIS_DEBUG_LB -DSAM_DEBUG -DLEGION
-#
-# Enable NXGE debug
-#CFLAGS += -DNXGE_DEBUG
-# Enable NPI debug
-#CFLAGS += -DNPI_DEBUG
-#CFLAGS += -DNXGE_FM
-#CFLAGS += -DUSE_RX_BUFF_ATTR
-
-#CFLAGS += -DNIU_PA_WORKAROUND
-#CFLAGS += -DNIU_HV_WORKAROUND
-CFLAGS += -DNIU_LP_WORKAROUND
-
 LINTFLAGS += -DSOLARIS
-LINTFLAGS += -DNXGE_FM
-LINTFLAGS += -DNIU_LP_WORKAROUND
 #
 # STREAMS, DDI API limitations and other ON header file definitions such as ethernet.h
 # force us to turn off these lint checks.
@@ -140,4 +116,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/sun4v/Makefile.targ
+include $(UTSBASE)/sun4u/Makefile.targ

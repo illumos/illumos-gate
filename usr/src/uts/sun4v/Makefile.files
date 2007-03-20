@@ -207,20 +207,3 @@ ASSYM_DEPS	+= mach_sfmmu_asm.o sfmmu_asm.o
 
 ARCFOUR_OBJS	+= arcfour.o arcfour_crypt.o
 
-#
-#	N2/NIU 10G driver module
-#
-NXGE_OBJS =	nxge_mac.o nxge_ipp.o nxge_rxdma.o 		\
-		nxge_txdma.o nxge_txc.o	nxge_main.o		\
-		nxge_hw.o nxge_fzc.o nxge_virtual.o		\
-		nxge_send.o nxge_classify.o nxge_fflp.o		\
-		nxge_fflp_hash.o nxge_ndd.o nxge_kstats.o	\
-		nxge_zcp.o nxge_fm.o nxge_espc.o nxge_hcall.o
-
-NXGE_NPI_OBJS =	\
-		npi.o npi_mac.o	npi_ipp.o			\
-		npi_txdma.o npi_rxdma.o	npi_txc.o		\
-		npi_zcp.o npi_espc.o npi_fflp.o			\
-		npi_vir.o
-
-#

@@ -78,6 +78,7 @@ sparc_SUBDIRS= \
 	SUNWn2cp.v \
 	SUNWn2cpact.v \
 	SUNWniumx.v \
+	SUNWnxge.u \
 	SUNWnxge.v \
 	SUNWonmtst.u \
 	SUNWonmtst.v \
@@ -127,6 +128,7 @@ i386_SUBDIRS= \
 	SUNWlxr \
 	SUNWlxu \
 	SUNWmv88sx \
+	SUNWnxge.i \
 	SUNWonmtst.i \
 	SUNWos86r  \
 	SUNWpsdcr  \

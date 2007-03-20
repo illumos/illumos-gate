@@ -403,6 +403,7 @@ DRV_KMODS	+= rmcadm
 DRV_KMODS	+= rmclomv
 DRV_KMODS	+= wrsmd
 DRV_KMODS	+= sf
+DRV_KMODS	+= nxge
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ctsmc
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= i2bsc 

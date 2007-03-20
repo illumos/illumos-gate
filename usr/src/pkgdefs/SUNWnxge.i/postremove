@@ -1,3 +1,4 @@
+#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -25,14 +26,13 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include ../Makefile.com
-
-DATAFILES += depend i.renameold
-
-.KEEP_STATE:
-
-all: $(FILES) postinstall postremove
-
-install: all pkg
-
-include ../Makefile.targ
+BD=${BASEDIR:-/}
+if grep -w nxge $BD/etc/name_to_major > /dev/null 2>&1
+then
+	rem_drv -b ${BD} nxge
+	if [ $? -ne 0 ]
+	then
+		exit 1 	
+	fi
+fi
+exit 0

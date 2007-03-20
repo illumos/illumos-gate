@@ -940,6 +940,29 @@ I2OHDRS=		\
 	i2omstr.h	\
 	i2outil.h
 
+NXGEHDRS=			\
+	nxge.h			\
+	nxge_common.h		\
+	nxge_common_impl.h	\
+	nxge_defs.h		\
+	nxge_hw.h		\
+	nxge_impl.h		\
+	nxge_ipp.h		\
+	nxge_ipp_hw.h		\
+	nxge_mac.h		\
+	nxge_mac_hw.h		\
+	nxge_fflp.h		\
+	nxge_fflp_hw.h		\
+	nxge_mii.h		\
+	nxge_rxdma.h		\
+	nxge_rxdma_hw.h		\
+	nxge_txc.h		\
+	nxge_txc_hw.h		\
+	nxge_txdma.h		\
+	nxge_txdma_hw.h		\
+	nxge_virtual.h		\
+	nxge_espc.h
+
 include Makefile.syshdrs
 
 dcam/%.check:	dcam/%.h
@@ -987,7 +1010,8 @@ CHECKHDRS=						\
 	$(USBHDRS:%.h=usb/%.check)                      \
 	$(I1394HDRS:%.h=1394/%.check)			\
 	$(RSMHDRS:%.h=rsm/%.check)			\
-	$(TSOLHDRS:%.h=tsol/%.check)
+	$(TSOLHDRS:%.h=tsol/%.check)			\
+	$(NXGEHDRS:%.h=nxge/%.check)
 
 
 .KEEP_STATE:
