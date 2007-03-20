@@ -1397,6 +1397,9 @@ unlock_dev(int flag)
 	if (build_dev == FALSE)
 		return;
 
+	if (devlink_cache == NULL) {
+		err_print(NO_DEVLINK_CACHE);
+	}
 	assert(devlink_cache);
 
 	if (flag == SYNC_STATE) {

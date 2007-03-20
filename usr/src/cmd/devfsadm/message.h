@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -272,6 +272,8 @@ major_number ]\n\t\t[ -n ]\n\t\t[ -r rootdir ]\n\t\t[ -v ]\n")
 #define	NVLIST_ERROR gettext("nvlist interface failed: %s\n")
 
 #define	NOT_DIR gettext("file is not a directory: %s\n")
+
+#define	NO_DEVLINK_CACHE gettext("devlink cache does not exist\n")
 
 #ifdef	__cplusplus
 }

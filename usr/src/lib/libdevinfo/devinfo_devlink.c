@@ -39,6 +39,7 @@
 #include <assert.h>
 
 static mutex_t update_mutex = DEFAULTMUTEX; /* Protects update record lock */
+static mutex_t temp_file_mutex = DEFAULTMUTEX; /* for file creation tests */
 
 static const size_t elem_sizes[DB_TYPES] = {
 	sizeof (struct db_node),
@@ -60,6 +61,8 @@ static const char *skip_files[] = {
 
 #define	N_SKIP_DIRS	(sizeof (skip_dirs) / sizeof (skip_dirs[0]))
 #define	N_SKIP_FILES	(sizeof (skip_files) / sizeof (skip_files[0]))
+
+#define	DI_TEST_DB	ETCDEV "di_test_db"
 
 /*
  *
@@ -311,6 +314,10 @@ handle_alloc(const char *root_dir, uint_t flags)
 {
 	char dev_dir[PATH_MAX], path[PATH_MAX], db_dir[PATH_MAX];
 	struct di_devlink_handle *hdp, proto = {0};
+	int install = 0;
+	int isroot = 0;
+	struct stat sb;
+	char can_path[PATH_MAX];
 
 	assert(flags == OPEN_RDWR || flags == OPEN_RDONLY);
 
@@ -335,6 +342,11 @@ handle_alloc(const char *root_dir, uint_t flags)
 		    (realpath(root_dir, db_dir) == NULL)) {
 			return (NULL);
 		}
+	} else {
+		/*
+		 * The dev dir is at /dev i.e. we are not doing a -r /altroot
+		 */
+		isroot = 1;
 	}
 
 	if (strcmp(dev_dir, "/") == 0) {
@@ -346,6 +358,53 @@ handle_alloc(const char *root_dir, uint_t flags)
 
 	(void) strlcat(dev_dir, DEV, sizeof (dev_dir));
 	(void) strlcat(db_dir, ETCDEV, sizeof (db_dir));
+
+	/*
+	 * The following code is for install. Readers and writers need
+	 * to be redirected to /tmp/etc/dev for the database file.
+	 * Note that we test for readonly /etc by actually creating a
+	 * file since statvfs is not a reliable method for determining
+	 * readonly filesystems.
+	 */
+	install = 0;
+	(void) snprintf(can_path, sizeof (can_path), "%s/%s", ETCDEV, DB_FILE);
+	if (flags == OPEN_RDWR && isroot) {
+		char di_test_db[PATH_MAX];
+		int fd;
+		(void) mutex_lock(&temp_file_mutex);
+		(void) snprintf(di_test_db, sizeof (di_test_db), "%s.%d",
+		    DI_TEST_DB, getpid());
+		fd = open(di_test_db, O_CREAT|O_RDWR|O_EXCL, 0644);
+		if (fd == -1 && errno == EROFS && stat(can_path, &sb) == -1)
+			install = 1;
+		if (fd != -1) {
+			(void) close(fd);
+			(void) unlink(di_test_db);
+		}
+		(void) mutex_unlock(&temp_file_mutex);
+	} else if (isroot) {
+		/*
+		 * Readers can be non-privileged so we cannot test by creating
+		 * a file in /etc/dev. Instead we check if the database
+		 * file is missing in /etc/dev and is present in /tmp/etc/dev
+		 * and is owned by root.
+		 */
+		char install_path[PATH_MAX];
+
+		(void) snprintf(install_path, sizeof (install_path),
+		    "/tmp%s/%s", ETCDEV, DB_FILE);
+		if (stat(can_path, &sb) == -1 && stat(install_path, &sb)
+		    != -1 && sb.st_uid == 0) {
+			install = 1;
+		}
+	}
+
+	/*
+	 * Check if we are in install. If we are, the database will be in
+	 * /tmp/etc/dev
+	 */
+	if (install)
+		(void) snprintf(db_dir, sizeof (db_dir), "/tmp%s", ETCDEV);
 
 	proto.dev_dir = dev_dir;
 	proto.db_dir = db_dir;
