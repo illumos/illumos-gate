@@ -488,6 +488,11 @@ zfs_ioc_pool_get_history(zfs_cmd_t *zc)
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
+	if (spa_version(spa) < ZFS_VERSION_ZPOOL_HISTORY) {
+		spa_close(spa, FTAG);
+		return (ENOTSUP);
+	}
+
 	hist_buf = kmem_alloc(size, KM_SLEEP);
 	if ((error = spa_history_get(spa, &zc->zc_history_offset,
 	    &zc->zc_history_len, hist_buf)) == 0) {
@@ -514,6 +519,11 @@ zfs_ioc_pool_log_history(zfs_cmd_t *zc)
 
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
+
+	if (spa_version(spa) < ZFS_VERSION_ZPOOL_HISTORY) {
+		spa_close(spa, FTAG);
+		return (ENOTSUP);
+	}
 
 	/* add one for the NULL delimiter */
 	size++;

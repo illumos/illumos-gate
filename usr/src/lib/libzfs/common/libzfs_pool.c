@@ -1712,6 +1712,10 @@ get_history(zpool_handle_t *zhp, char *buf, uint64_t *off, uint64_t *len)
 			return (zfs_error_fmt(hdl, EZFS_NOHISTORY,
 			    dgettext(TEXT_DOMAIN, "cannot get history for pool "
 			    "'%s'"), zhp->zpool_name));
+		case ENOTSUP:
+			return (zfs_error_fmt(hdl, EZFS_BADVERSION,
+			    dgettext(TEXT_DOMAIN, "cannot get history for pool "
+			    "'%s', pool must be upgraded"), zhp->zpool_name));
 		default:
 			return (zpool_standard_error_fmt(hdl, errno,
 			    dgettext(TEXT_DOMAIN,

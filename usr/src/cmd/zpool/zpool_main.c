@@ -3180,6 +3180,7 @@ zpool_do_upgrade(int argc, char **argv)
 		    "(replicated metadata)\n"));
 		(void) printf(gettext(" 3   Hot spares and double parity "
 		    "RAID-Z\n"));
+		(void) printf(gettext(" 4   zpool history\n"));
 		(void) printf(gettext("\nFor more information on a particular "
 		    "version, including supported releases, see:\n\n"));
 		(void) printf("http://www.opensolaris.org/os/community/zfs/"

@@ -125,8 +125,9 @@ extern zfs_prop_t zfs_prop_iter(zfs_prop_f, void *, boolean_t);
 #define	ZFS_VERSION_1			1ULL
 #define	ZFS_VERSION_2			2ULL
 #define	ZFS_VERSION_3			3ULL
-#define	ZFS_VERSION			ZFS_VERSION_3
-#define	ZFS_VERSION_STRING		"3"
+#define	ZFS_VERSION_4			4ULL
+#define	ZFS_VERSION			ZFS_VERSION_4
+#define	ZFS_VERSION_STRING		"4"
 
 /*
  * Symbolic names for the changes that caused a ZFS_VERSION switch.
@@ -146,6 +147,7 @@ extern zfs_prop_t zfs_prop_iter(zfs_prop_f, void *, boolean_t);
 #define	ZFS_VERSION_BPLIST_ACCOUNT	ZFS_VERSION_3
 #define	ZFS_VERSION_RAIDZ_DEFLATE	ZFS_VERSION_3
 #define	ZFS_VERSION_DNODE_BYTES		ZFS_VERSION_3
+#define	ZFS_VERSION_ZPOOL_HISTORY	ZFS_VERSION_4
 
 /*
  * The following are configuration names used in the nvlist describing a pool's
