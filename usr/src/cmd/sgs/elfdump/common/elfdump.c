@@ -271,27 +271,17 @@ sections(const char *file, Cache *cache, Word shnum, Ehdr *ehdr,
 		Shdr		*shdr = _cache->c_shdr;
 		const char	*secname = _cache->c_name;
 
-		if (name && strcmp(name, secname))
-			continue;
-
 		/*
 		 * Although numerous section header entries can be zero, it's
-		 * usually a sign of trouble if the name or type are zero.
+		 * usually a sign of trouble if the type is zero.
 		 */
 		if (shdr->sh_type == 0) {
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHTYPE),
 			    file, secname, EC_WORD(shdr->sh_type));
 		}
-		if (shdr->sh_name == 0) {
-			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHNAME),
-			    file, secname, EC_XWORD(shdr->sh_name));
 
-			/*
-			 * Use the empty string, rather than the fabricated
-			 * name for the section output.
-			 */
-			secname = MSG_ORIG(MSG_STR_EMPTY);
-		}
+		if (name && strcmp(name, secname))
+			continue;
 
 		/*
 		 * Identify any sections that are suspicious.  A .got section
@@ -2564,6 +2554,19 @@ checksum(Elf *elf)
 void
 regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 {
+	/*
+	 * Program header names that we can test for.
+	 */
+	static const char *pnames[PT_NUM] = {
+		MSG_ORIG(MSG_PT_NULL),		MSG_ORIG(MSG_PT_LOAD),
+		MSG_ORIG(MSG_PT_DYNAMIC),	MSG_ORIG(MSG_PT_INTERP),
+		MSG_ORIG(MSG_PT_NOTE),		MSG_ORIG(MSG_PT_SHLIB),
+		MSG_ORIG(MSG_PT_PHDR),		MSG_ORIG(MSG_PT_TLS)
+	};
+#if PT_NUM != (PT_TLS + 1)
+#error "P_NUM has grown. Update addr_symtype[]"
+#endif
+
 	Elf_Scn		*scn;
 	Ehdr		*ehdr;
 	Elf_Data	*data;
@@ -2620,12 +2623,16 @@ regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 		}
 
 		for (cnt = 0; cnt < phnum; phdr++, cnt++) {
+
+			if (Nname && ((phdr->p_type >= PT_NUM) ||
+			    (strcmp(Nname, pnames[phdr->p_type]) != 0)))
+				continue;
+
 			dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
 			dbg_print(0, MSG_INTL(MSG_ELF_PHDR), EC_WORD(cnt));
 			Elf_phdr(0, ehdr->e_machine, phdr);
 		}
 	}
-
 
 	/*
 	 * Return now if there are no section, if there's just one section to
@@ -2637,7 +2644,6 @@ regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 			note(0, shnum, 0, file);
 		return;
 	}
-
 
 	/*
 	 * Obtain the .shstrtab data buffer to provide the required section
@@ -2656,14 +2662,13 @@ regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 	} else if ((nameshdr = elf_getshdr(scn)) == NULL) {
 		failure(file, MSG_ORIG(MSG_ELF_GETSHDR));
 		(void) fprintf(stderr, MSG_INTL(MSG_ELF_ERR_SCN),
-		    /* LINTED */
-		    (int)elf_ndxscn(scn));
+		    EC_WORD(elf_ndxscn(scn)));
 
 	} else if ((names = data->d_buf) == 0)
 		(void) fprintf(stderr, MSG_INTL(MSG_ERR_SHSTRNULL), file);
 
 	/*
-	 * Fill in the cache descriptor with information for each section.
+	 * Allocate a cache to maintain a descriptor for each section.
 	 */
 	if ((cache = malloc(shnum * sizeof (Cache))) == 0) {
 		int err = errno;
@@ -2676,59 +2681,155 @@ regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 	_cache = cache;
 	_cache++;
 
+	/*
+	 * Traverse the sections of the file.  This gathering of data is
+	 * carried out in two passes.  First, the section headers are captured
+	 * and the section header names are evaluated.  A verification pass is
+	 * then carried out over the section information.  Files have been
+	 * known to exhibit overlapping (and hence erroneous) section header
+	 * information.
+	 *
+	 * Finally, the data for each section is obtained.  This processing is
+	 * carried out after section verification because should any section
+	 * header overlap occur, and a file needs translating (ie. xlate'ing
+	 * information from a non-native architecture file), then the process
+	 * of translation can corrupt the section header information.  Of
+	 * course, if there is any section overlap, the data related to the
+	 * sections is going to be compromised.  However, it is the translation
+	 * of this data that has caused problems with elfdump()'s ability to
+	 * extract the data.
+	 */
 	for (cnt = 1, scn = NULL; scn = elf_nextscn(elf, scn);
 	    cnt++, _cache++) {
+		char	scnndxnm[100];
+
+		_cache->c_scn = scn;
+
 		if ((_cache->c_shdr = elf_getshdr(scn)) == NULL) {
 			failure(file, MSG_ORIG(MSG_ELF_GETSHDR));
 			(void) fprintf(stderr, MSG_INTL(MSG_ELF_ERR_SCN),
-			    /* LINTED */
-			    (int)elf_ndxscn(scn));
+			    EC_WORD(elf_ndxscn(scn)));
 		}
 
-		if (names && _cache->c_shdr->sh_name &&
-		    /* LINTED */
-		    (nameshdr->sh_size > _cache->c_shdr->sh_name))
-			_cache->c_name = names + _cache->c_shdr->sh_name;
-		else {
-			/*
-			 * If there exists no shstrtab data, or a section header
-			 * has no name (an invalid index of 0), then compose a
-			 * name for each section.
-			 */
-			char	scnndxnm[100];
-
-			(void) snprintf(scnndxnm, 100, MSG_INTL(MSG_FMT_SCNNDX),
-			    cnt);
+		/*
+		 * If a shstrtab exists, assign the section name.
+		 */
+		if (names && _cache->c_shdr) {
+			if (_cache->c_shdr->sh_name &&
+			    /* LINTED */
+			    (nameshdr->sh_size > _cache->c_shdr->sh_name)) {
+				_cache->c_name =
+				    names + _cache->c_shdr->sh_name;
+				continue;
+			}
 
 			/*
-			 * Although we have a valid shstrtab section inform the
-			 * user if this section name index exceeds the shstrtab
-			 * data.
+			 * Generate an error if the section name index is zero
+			 * or exceeds the shstrtab data.  Fall through to
+			 * fabricate a section name.
 			 */
-			if (names &&
+			if ((_cache->c_shdr->sh_name == 0) ||
 			    /* LINTED */
 			    (nameshdr->sh_size <= _cache->c_shdr->sh_name)) {
 				(void) fprintf(stderr,
 				    MSG_INTL(MSG_ERR_BADSHNAME), file,
-				    _cache->c_name,
+				    EC_WORD(cnt),
 				    EC_XWORD(_cache->c_shdr->sh_name));
 			}
-
-			if ((_cache->c_name =
-			    malloc(strlen(scnndxnm) + 1)) == 0) {
-				int err = errno;
-				(void) fprintf(stderr, MSG_INTL(MSG_ERR_MALLOC),
-				    file, strerror(err));
-				return;
-			}
-			(void) strcpy(_cache->c_name, scnndxnm);
 		}
+
+		/*
+		 * If there exists no shstrtab data, or a section header has no
+		 * name (an invalid index of 0), then compose a name for the
+		 * section.
+		 */
+		(void) snprintf(scnndxnm, sizeof (scnndxnm),
+		    MSG_INTL(MSG_FMT_SCNNDX), cnt);
+
+		if ((_cache->c_name = malloc(strlen(scnndxnm) + 1)) == 0) {
+			int err = errno;
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_MALLOC),
+			    file, strerror(err));
+			return;
+		}
+		(void) strcpy(_cache->c_name, scnndxnm);
+	}
+
+	/*
+	 * Having collected all the sections, validate their address range.
+	 * Cases have existed where the section information has been invalid.
+	 * This can lead to all sorts of other, hard to diagnose errors, as
+	 * each section is processed individually (ie. with elf_getdata()).
+	 * Here, we carry out some address comparisons to catch a family of
+	 * overlapping memory issues we have observed (likely, there are others
+	 * that we have yet to discover).
+	 *
+	 * Note, should any memory overlap occur, obtaining any additional
+	 * data from the file is questionable.  However, it might still be
+	 * possible to inspect the ELF header, Programs headers, or individual
+	 * sections, so rather than bailing on an error condition, continue
+	 * processing to see if any data can be salvaged.
+	 */
+	for (cnt = 1; cnt < shnum; cnt++) {
+		Cache	*_cache = &cache[cnt];
+		Shdr	*shdr = _cache->c_shdr;
+		Off	bgn1, bgn = shdr->sh_offset;
+		Off	end1, end = shdr->sh_offset + shdr->sh_size;
+		int	cnt1;
+
+		if ((shdr->sh_size == 0) || (shdr->sh_type == SHT_NOBITS))
+			continue;
+
+		for (cnt1 = 1; cnt1 < shnum; cnt1++) {
+			Cache	*_cache1 = &cache[cnt1];
+			Shdr	*shdr1 = _cache1->c_shdr;
+
+			bgn1 = shdr1->sh_offset;
+			end1 = shdr1->sh_offset + shdr1->sh_size;
+
+			if ((cnt1 == cnt) || (shdr->sh_size == 0) ||
+			    (shdr1->sh_type == SHT_NOBITS))
+				continue;
+
+			if (((bgn1 <= bgn) && (end1 > bgn)) ||
+			    ((bgn1 < end) && (end1 >= end))) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_SECMEMOVER), file,
+				    EC_WORD(elf_ndxscn(_cache1->c_scn)),
+				    _cache1->c_name, EC_OFF(bgn1), EC_OFF(end1),
+				    EC_WORD(elf_ndxscn(_cache->c_scn)),
+				    _cache->c_name, EC_OFF(bgn), EC_OFF(end));
+			}
+		}
+
+		/*
+		 * And finally, make sure this section doesn't overlap the
+		 * section header itself.
+		 */
+		bgn1 = ehdr->e_shoff;
+		end1 = ehdr->e_shoff + (ehdr->e_shentsize * ehdr->e_shnum);
+
+		if (((bgn1 <= bgn) && (end1 > bgn)) ||
+		    ((bgn1 < end) && (end1 >= end))) {
+			(void) fprintf(stderr,
+			    MSG_INTL(MSG_ERR_SHDRMEMOVER), file, EC_OFF(bgn1),
+			    EC_OFF(end1),
+			    EC_WORD(elf_ndxscn(_cache->c_scn)),
+			    _cache->c_name, EC_OFF(bgn), EC_OFF(end));
+		}
+	}
+
+	/*
+	 * Finally, obtain the data for each section.
+	 */
+	for (cnt = 1; cnt < shnum; cnt++) {
+		Cache	*_cache = &cache[cnt];
+		Elf_Scn	*scn = _cache->c_scn;
 
 		if ((_cache->c_data = elf_getdata(scn, NULL)) == NULL) {
 			failure(file, MSG_ORIG(MSG_ELF_GETDATA));
 			(void) fprintf(stderr, MSG_INTL(MSG_ELF_ERR_SCNDATA),
-			    /* LINTED */
-			    (int)elf_ndxscn(scn));
+			    EC_WORD(elf_ndxscn(scn)));
 		}
 
 		/*

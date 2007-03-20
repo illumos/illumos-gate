@@ -1339,8 +1339,8 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 				    &ofl->ofl_name, 2);
 				break;
 			case 'u':
-				if (ld_sym_add_u(optarg, ofl) ==
-				    (Sym_desc *)S_ERROR)
+				if (ld_sym_add_u(optarg, ofl,
+				    MSG_STR_COMMAND) == (Sym_desc *)S_ERROR)
 					return (S_ERROR);
 				break;
 			case 'z':
@@ -1391,7 +1391,8 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 				    MSG_ORIG(MSG_ARG_INITARRAY),
 				    MSG_ARG_INITARRAY_SIZE) == 0) {
 					if (((sdp = ld_sym_add_u(optarg +
-					    MSG_ARG_INITARRAY_SIZE, ofl)) ==
+					    MSG_ARG_INITARRAY_SIZE, ofl,
+					    MSG_STR_COMMAND)) ==
 					    (Sym_desc *)S_ERROR) ||
 					    (list_appendc(&ofl->ofl_initarray,
 					    sdp) == 0))
@@ -1400,7 +1401,8 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 				    MSG_ORIG(MSG_ARG_FINIARRAY),
 				    MSG_ARG_FINIARRAY_SIZE) == 0) {
 					if (((sdp = ld_sym_add_u(optarg +
-					    MSG_ARG_FINIARRAY_SIZE, ofl)) ==
+					    MSG_ARG_FINIARRAY_SIZE, ofl,
+					    MSG_STR_COMMAND)) ==
 					    (Sym_desc *)S_ERROR) ||
 					    (list_appendc(&ofl->ofl_finiarray,
 					    sdp) == 0))
@@ -1409,7 +1411,8 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 				    MSG_ORIG(MSG_ARG_PREINITARRAY),
 				    MSG_ARG_PREINITARRAY_SIZE) == 0) {
 					if (((sdp = ld_sym_add_u(optarg +
-					    MSG_ARG_PREINITARRAY_SIZE, ofl)) ==
+					    MSG_ARG_PREINITARRAY_SIZE, ofl,
+					    MSG_STR_COMMAND)) ==
 					    (Sym_desc *)S_ERROR) ||
 					    (list_appendc(&ofl->ofl_preiarray,
 					    sdp) == 0))
@@ -1418,7 +1421,8 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 				    MSG_ORIG(MSG_ARG_RTLDINFO),
 				    MSG_ARG_RTLDINFO_SIZE) == 0) {
 					if (((sdp = ld_sym_add_u(optarg +
-					    MSG_ARG_RTLDINFO_SIZE, ofl)) ==
+					    MSG_ARG_RTLDINFO_SIZE, ofl,
+					    MSG_STR_COMMAND)) ==
 					    (Sym_desc *)S_ERROR) ||
 					    (list_appendc(&ofl->ofl_rtldinfo,
 					    sdp) == 0))
@@ -1427,7 +1431,8 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 				    MSG_ORIG(MSG_ARG_DTRACE),
 				    MSG_ARG_DTRACE_SIZE) == 0) {
 					if ((sdp = ld_sym_add_u(optarg +
-					    MSG_ARG_DTRACE_SIZE, ofl)) ==
+					    MSG_ARG_DTRACE_SIZE, ofl,
+					    MSG_STR_COMMAND)) ==
 					    (Sym_desc *)S_ERROR)
 						return (S_ERROR);
 					ofl->ofl_dtracesym = sdp;

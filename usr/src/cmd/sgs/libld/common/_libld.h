@@ -617,7 +617,7 @@ extern void		ld_sup_section(Ofl_desc *, const char *, Shdr *, Word,
 extern uintptr_t	ld_sup_input_section(Ofl_desc*, Ifl_desc *,
 			    const char *, Shdr **, Word, Elf_Scn *, Elf *);
 extern void		ld_sup_start(Ofl_desc *, const Half, const char *);
-extern Sym_desc		*ld_sym_add_u(const char *, Ofl_desc *);
+extern Sym_desc		*ld_sym_add_u(const char *, Ofl_desc *, Msg);
 extern void		ld_sym_adjust_vis(Sym_desc *, Ofl_desc *);
 extern int		ld_sym_avl_comp(const void *, const void *);
 extern uintptr_t	ld_sym_copy(Sym_desc *);

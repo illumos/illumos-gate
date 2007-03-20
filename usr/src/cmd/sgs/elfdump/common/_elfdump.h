@@ -64,6 +64,7 @@ extern "C" {
 #define	MAXNDXSIZE	10
 
 typedef struct cache {
+	Elf_Scn		*c_scn;
 	Shdr		*c_shdr;
 	Elf_Data	*c_data;
 	char		*c_name;

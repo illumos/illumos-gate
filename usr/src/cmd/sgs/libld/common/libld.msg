@@ -546,6 +546,7 @@
 
 @ MSG_STR_ALIGNMENTS	"alignments"
 @ MSG_STR_COMMAND	"(command line)"
+@ MSG_STR_TLSREL	"(internal TLS relocation requirement)"
 @ MSG_STR_SIZES		"sizes"
 @ MSG_STR_UNKNOWN       "<unknown>"
 

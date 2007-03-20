@@ -24,7 +24,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1315,10 +1315,10 @@ ld_reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	 * symbol now, and prepare for the PLT magic.
 	 */
 	if ((rtype == R_386_TLS_GD_PLT) || (rtype == R_386_TLS_LDM_PLT)) {
-		Sym_desc *	tlsgetsym;
+		Sym_desc	*tlsgetsym;
 
 		if ((tlsgetsym = ld_sym_add_u(MSG_ORIG(MSG_SYM_TLSGETADDR_UU),
-		    ofl)) == (Sym_desc *)S_ERROR)
+		    ofl, MSG_STR_TLSREL)) == (Sym_desc *)S_ERROR)
 			return (S_ERROR);
 
 		rsp->rel_sym = tlsgetsym;

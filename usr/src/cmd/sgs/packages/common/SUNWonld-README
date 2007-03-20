@@ -1029,6 +1029,8 @@ All the above changes are incorporated in the following patches:
 6301218 Matlab dumps core on startup when running on 112963-22  (D)
 --------------------------------------------------------------------------------
 All the above changes are incorporated in the following patches:
+    Solaris/SunOS 5.10_sparc	patch T117461-06
+    Solaris/SunOS 5.10_x86	patch T118345-08
     Solaris/SunOS 5.9_sparc	patch T112963-23
     Solaris/SunOS 5.9_x86	patch T113986-19
     Solaris/SunOS 5.8_sparc	patch T109147-38
@@ -1054,7 +1056,7 @@ PSARC 2005/514 - AMD64 - large section support
 --------------------------------------------------------------------------------
 All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.10_sparc	patch T117461-07
-    Solaris/SunOS 5.10_x86	patch T118345-11
+    Solaris/SunOS 5.10_x86	patch T118345-12
 --------------------------------------------------------------------------------
 6309061 link_audit should use __asm__ with gcc
 6310736 gcc and sgs/libld don't get along on SPARC
@@ -1070,6 +1072,13 @@ All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.8_sparc	patch T109147-40
     Solaris/SunOS 5.8_x86	patch T109148-40
 --------------------------------------------------------------------------------
+6445311 The sparc S8/S9/S10 linker patches which include the fix for the
+	CR6222525 are hit by the CR6439613.
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+    Solaris/SunOS 5.9_sparc	patch T112963-26
+    Solaris/SunOS 5.8_sparc	patch T109147-41
+--------------------------------------------------------------------------------
 
 -------------------------------------
 Solaris 10 607 (4th Q-update - s10u4)
@@ -1080,7 +1089,7 @@ Bugid   Risk Synopsis
 	from locale environment vars
 6487284 ld.so.1: buffer overflow in doprf() function
 --------------------------------------------------------------------------------
-All the above change is incorporated in the following patches:
+All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.10_sparc	patch T124922-01
     Solaris/SunOS 5.10_x86	patch T124923-01
     Solaris/SunOS 5.9_sparc	patch T112963-27
@@ -1090,18 +1099,12 @@ All the above change is incorporated in the following patches:
 --------------------------------------------------------------------------------
 6477132 ld.so.1: memory leak when running set*id application
 --------------------------------------------------------------------------------
-All the above change is incorporated in the following patches:
+All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.10_sparc	patch T124922-02
     Solaris/SunOS 5.10_x86	patch T124923-02
     Solaris/SunOS 5.9_sparc	patch T112963-30
     Solaris/SunOS 5.9_x86	patch T113986-24
 --------------------------------------------------------------------------------
-
---------------
-Solaris Nevada
---------------
-Bugid   Risk Synopsis
-================================================================================
 6340814 ld.so.1 core dump with HWCAP relocatable object + updated statistics
 6307274 crle bug with LD_LIBRARY_PATH
 6317969 elfheader limited to 65535 segments (link-editor components only)
@@ -1130,13 +1133,11 @@ Bugid   Risk Synopsis
 6382945 AMD64-GCC: dbx: internal error: dwarf reference attribute out of bounds
 6262333 init section of .so dlopened from audit interface not being called
 6409613 elf_outsync() should fsync()
-6174390 crle configuration files are inconsistent across platforms (D, P)
 6426048 C++ exceptions broken in Nevada for amd64
 6429418 ld.so.1: need work-around for Nvidia drivers use of static TLS
 6429504 crle(1) shows wrong defaults for non-existent 64-bit config file
 6431835 data corruption on x64 in 64-bit mode while LD_PROFILE is in effect
 6423051 static TLS support within the link-editors needs a major face lift (D)
-6432984 ld(1) output file removal - change default behavior (PSARC 2006/353) (D)
 6388946 attempting to dlopen a .o file mislabeled as .so fails
 6446740 allow mapfile symbol definitions to create backing storage (D)
 4986360 linker crash on exec of .so (as opposed to a.out) -- error preferred
@@ -1151,6 +1152,24 @@ Bugid   Risk Synopsis
 6465623 need a way of building unix without an interpreter
 6467925 ld: section deletion (-z ignore) requires improvement
 6357230 specfiles should be nuked (link-editor components only)
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+    Solaris/SunOS 5.10_sparc	patch T124922-03
+    Solaris/SunOS 5.10_x86	patch T124923-03
+
+These patches also include the framework changes for the following bug fixes.
+However, the associated feature has not been enabled in Solaris 10 or earlier
+releases:
+
+6174390 crle configuration files are inconsistent across platforms (D, P)
+6432984 ld(1) output file removal - change default behavior (PSARC 2006/353) (D)
+--------------------------------------------------------------------------------
+
+--------------
+Solaris Nevada
+--------------
+Bugid   Risk Synopsis
+================================================================================
 6409350 BrandZ project integration into Solaris (link-editor components only)
 6459189 UNIX03: *VSC* c99 compiler overwrites non-writable file
 6423746 add an option to relax the resolution of COMDAT relocs (D)
@@ -1203,3 +1222,4 @@ Bugid   Risk Synopsis
 	expectations
 6516118 Reserved space needed in ELF dynamic section and string table (D)
 	PSARC/2007/127 Reserved space for editing ELF dynamic sections
+6535688 elfdump could be more robust in the face of Purify (D)

@@ -73,7 +73,7 @@
 @ MSG_ERR_BADREL1       "%s: bad relocation entry: %s: relocation requires symbol\n"
 @ MSG_ERR_SHSTRNULL	"%s: zero size section header string table (shstrtab)\n"
 @ MSG_ERR_FAILURE	"%s: %s failed: %s\n"
-@ MSG_ERR_BADSHNAME	"%s: %s: invalid sh_name: %lld\n"
+@ MSG_ERR_BADSHNAME	"%s: section[%d]: invalid sh_name: %lld\n"
 @ MSG_ERR_BADSHLINK	"%s: %s: invalid sh_link: %d\n"
 @ MSG_ERR_BADSHINFO	"%s: %s: invalid sh_info: %d\n"
 @ MSG_ERR_BADSHTYPE	"%s: %s: invalid sh_type: %d\n"
@@ -107,9 +107,14 @@
 			 %d, should be bucket %ld\n"
 @ MSG_ERR_NODYNSYM	"%s: %s: associated SHT_DYNSYM section not found\n"
 @ MSG_ERR_BADNDXSEC	"%s: %s: unexpected section type associated with index section: %s\n"
+@ MSG_ERR_BADSORTNDX	"%s: %s: sort section has bad symbol index: %d\n"
+
 @ MSG_ERR_LDYNNOTADJ	"%s: bad dynamic symbol table layout: %s and %s \
 			 sections are not adjacent\n"
-@ MSG_ERR_BADSORTNDX	"%s: %s: sort section has bad symbol index: %d\n"
+@ MSG_ERR_SECMEMOVER	"%s: memory overlap between section[%d]: %s: %llx:%llx \
+			 and section[%d]: %s: %llx:%llx\n"
+@ MSG_ERR_SHDRMEMOVER	"%s: memory overlap between section header table: \
+			 %llx:%llx and section[%d]: %s: %llx:%llx\n"
 
 @ MSG_WARN_INVINTERP1	"%s: PT_INTERP header has no associated section\n"
 @ MSG_WARN_INVINTERP2	"%s: interp section: %s: and PT_INTERP program \
@@ -227,6 +232,15 @@
 @ MSG_ELF_ARSYM		"ARSYM"
 
 @ MSG_GOT_SYM		"_GLOBAL_OFFSET_TABLE_"
+
+@ MSG_PT_NULL		"PT_NULL"
+@ MSG_PT_LOAD		"PT_LOAD"
+@ MSG_PT_DYNAMIC	"PT_DYNAMIC"
+@ MSG_PT_INTERP		"PT_INTERP"
+@ MSG_PT_NOTE		"PT_NOTE"
+@ MSG_PT_SHLIB		"PT_SHLIB"
+@ MSG_PT_PHDR		"PT_PHDR"
+@ MSG_PT_TLS		"PT_TLS"
 
 @ MSG_STR_OPTIONS	"CcdeGgHhiklmN:nprSsuvw:y"
 

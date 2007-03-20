@@ -2289,10 +2289,14 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 }
 
 /*
- * Add an undefined symbol to the symbol table (ie. from -u name option)
+ * Add an undefined symbol to the symbol table.  The reference originates from
+ * the location identifed by the message id (mid).  These references can
+ * originate from command line options such as -e, -u, -initarray, etc.
+ * (identified with MSG_INTL(MSG_STR_COMMAND)), or from internally generated
+ * TLS relocation references (identified with MSG_INTL(MSG_STR_TLSREL)).
  */
 Sym_desc *
-ld_sym_add_u(const char *name, Ofl_desc *ofl)
+ld_sym_add_u(const char *name, Ofl_desc *ofl, Msg mid)
 {
 	Sym		*sym;
 	Ifl_desc	*ifl = 0, *_ifl;
@@ -2300,7 +2304,7 @@ ld_sym_add_u(const char *name, Ofl_desc *ofl)
 	Word		hash;
 	Listnode	*lnp;
 	avl_index_t	where;
-	const char	*cmdline = MSG_INTL(MSG_STR_COMMAND);
+	const char	*reference = MSG_INTL(mid);
 
 	/*
 	 * If the symbol reference already exists indicate that a reference
@@ -2321,7 +2325,7 @@ ld_sym_add_u(const char *name, Ofl_desc *ofl)
 	 * similar method for adding symbols from mapfiles).
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_objs, lnp, _ifl))
-		if (strcmp(_ifl->ifl_name, cmdline) == 0) {
+		if (strcmp(_ifl->ifl_name, reference) == 0) {
 			ifl = _ifl;
 			break;
 		}
@@ -2333,7 +2337,7 @@ ld_sym_add_u(const char *name, Ofl_desc *ofl)
 		if ((ifl = libld_calloc(sizeof (Ifl_desc), 1)) ==
 		    (Ifl_desc *)0)
 			return ((Sym_desc *)S_ERROR);
-		ifl->ifl_name = cmdline;
+		ifl->ifl_name = reference;
 		ifl->ifl_flags = FLG_IF_NEEDED | FLG_IF_FILEREF;
 		if ((ifl->ifl_ehdr = libld_calloc(sizeof (Ehdr),
 		    1)) == 0)
