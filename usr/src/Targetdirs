@@ -849,6 +849,8 @@ $(ROOT)/usr/lib/libdhcputil.so.1:=	REALPATH=../../lib/libdhcputil.so.1
 $(ROOT)/usr/lib/libdhcputil.so:=	REALPATH=../../lib/libdhcputil.so.1
 $(ROOT)/usr/lib/libdl.so.1:=		REALPATH=../../lib/libdl.so.1
 $(ROOT)/usr/lib/libdl.so:=		REALPATH=../../lib/libdl.so.1
+$(ROOT)/usr/lib/libdlpi.so.1:=		REALPATH=../../lib/libdlpi.so.1
+$(ROOT)/usr/lib/libdlpi.so:=		REALPATH=../../lib/libdlpi.so.1
 $(ROOT)/usr/lib/libdoor.so.1:=		REALPATH=../../lib/libdoor.so.1
 $(ROOT)/usr/lib/libdoor.so:=		REALPATH=../../lib/libdoor.so.1
 $(ROOT)/usr/lib/libefi.so.1:=		REALPATH=../../lib/libefi.so.1
@@ -1110,6 +1112,10 @@ $(ROOT)/usr/lib/$(MACH64)/libdl.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libdl.so.1
 $(ROOT)/usr/lib/$(MACH64)/libdl.so:= \
 	REALPATH=../../../lib/$(MACH64)/libdl.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdlpi.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libdlpi.so.1
+$(ROOT)/usr/lib/$(MACH64)/libdlpi.so:= \
+	REALPATH=../../../lib/$(MACH64)/libdlpi.so.1
 $(ROOT)/usr/lib/$(MACH64)/libdoor.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libdoor.so.1
 $(ROOT)/usr/lib/$(MACH64)/libdoor.so:= \
@@ -1433,6 +1439,8 @@ SYM.USRLIB= \
 	/usr/lib/libdhcputil.so.1 \
 	/usr/lib/libdl.so \
 	/usr/lib/libdl.so.1 \
+	/usr/lib/libdlpi.so \
+	/usr/lib/libdlpi.so.1 \
 	/usr/lib/libdoor.so \
 	/usr/lib/libdoor.so.1 \
 	/usr/lib/libefi.so \
@@ -1671,6 +1679,8 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libdevinfo.so.1 \
 	/usr/lib/$(MACH64)/libdl.so \
 	/usr/lib/$(MACH64)/libdl.so.1 \
+	/usr/lib/$(MACH64)/libdlpi.so \
+	/usr/lib/$(MACH64)/libdlpi.so.1 \
 	/usr/lib/$(MACH64)/libdoor.so \
 	/usr/lib/$(MACH64)/libdoor.so.1 \
 	/usr/lib/$(MACH64)/libefi.so \

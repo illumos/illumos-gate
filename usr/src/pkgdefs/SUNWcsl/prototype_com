@@ -115,6 +115,8 @@ f none usr/lib/libdisasm.so.1 755 root bin
 s none usr/lib/libdisasm.so=./libdisasm.so.1
 s none usr/lib/libdl.so=../../lib/libdl.so.1
 s none usr/lib/libdl.so.1=../../lib/libdl.so.1
+s none usr/lib/libdlpi.so=../../lib/libdlpi.so.1
+s none usr/lib/libdlpi.so.1=../../lib/libdlpi.so.1
 s none usr/lib/libdoor.so=../../lib/libdoor.so.1
 s none usr/lib/libdoor.so.1=../../lib/libdoor.so.1
 s none usr/lib/libefi.so=../../lib/libefi.so.1

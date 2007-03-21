@@ -239,6 +239,8 @@ f none usr/lib/amd64/libdisasm.so.1 755 root bin
 s none usr/lib/amd64/libdisasm.so=libdisasm.so.1
 s none usr/lib/amd64/libdl.so.1=../../../lib/amd64/libdl.so.1
 s none usr/lib/amd64/libdl.so=../../../lib/amd64/libdl.so.1
+s none usr/lib/amd64/libdlpi.so.1=../../../lib/amd64/libdlpi.so.1
+s none usr/lib/amd64/libdlpi.so=../../../lib/amd64/libdlpi.so.1
 s none usr/lib/amd64/libdoor.so.1=../../../lib/amd64/libdoor.so.1
 s none usr/lib/amd64/libdoor.so=../../../lib/amd64/libdoor.so.1
 s none usr/lib/amd64/libefi.so.1=../../../lib/amd64/libefi.so.1
