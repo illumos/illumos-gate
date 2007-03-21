@@ -335,6 +335,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_syms_entry		Dbg64_syms_entry
 #define	Dbg_syms_global		Dbg64_syms_global
 #define	Dbg_syms_ignore		Dbg64_syms_ignore
+#define	Dbg_syms_ignore_badver	Dbg64_syms_ignore_badver
 #define	Dbg_syms_lazy_rescan	Dbg64_syms_lazy_rescan
 #define	Dbg_syms_lookup		Dbg64_syms_lookup
 #define	Dbg_syms_new		Dbg64_syms_new
@@ -532,6 +533,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_syms_entry		Dbg32_syms_entry
 #define	Dbg_syms_global		Dbg32_syms_global
 #define	Dbg_syms_ignore		Dbg32_syms_ignore
+#define	Dbg_syms_ignore_badver	Dbg32_syms_ignore_badver
 #define	Dbg_syms_lazy_rescan	Dbg32_syms_lazy_rescan
 #define	Dbg_syms_lookup		Dbg32_syms_lookup
 #define	Dbg_syms_lookup_aout	Dbg32_syms_lookup_aout
@@ -767,6 +769,7 @@ extern	void	Dbg_syms_entered(Ofl_desc *, Sym *, Sym_desc *);
 extern	void	Dbg_syms_entry(Lm_list *, Word, Sym_desc *);
 extern	void	Dbg_syms_global(Lm_list *, Word, const char *);
 extern	void	Dbg_syms_ignore(Ofl_desc *, Sym_desc *);
+extern	void	Dbg_syms_ignore_badver(Rt_map *, const char *, Word, Versym);
 extern	void	Dbg_syms_lazy_rescan(Lm_list *, const char *);
 extern	void	Dbg_syms_lookup(Rt_map *, const char *, const char *);
 #if	!(defined(_ELF64))
@@ -945,7 +948,7 @@ extern	void	Elf_reloc_title(Lm_list *, int, Word);
 extern	void	Elf_shdr(Lm_list *, Half, Shdr *);
 
 extern	void	Elf_syms_table_entry(Lm_list *, int, const char *, Half, Sym *,
-		    Word, const char *, const char *);
+		    Versym, const char *, const char *);
 extern	void	Elf_syms_table_title(Lm_list *, int);
 
 extern	void	Elf_ver_def_title(Lm_list *);

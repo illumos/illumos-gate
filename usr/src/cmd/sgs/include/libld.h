@@ -933,6 +933,58 @@ struct	ver_index {
 
 
 /*
+ * Test to see if a symbol verson index is outside of the valid range
+ * of version indexes.
+ *
+ * entry:
+ *	_shndx - Symbol section index
+ *	_vercnt - # of versions defined by object containing symbol
+ *	_versym_arr - NULL, or pointer to versym array
+ *	_verndx - Version index of symbol. Note that this argument is
+ *		only evaluated if _versym_arr is non-NULL.
+ *
+ * note:
+ *	_vercnt and _verndx are evaluated more than once. Beware
+ *	of expensive computations, or computations with side effects.
+ *
+ * If we encounter a defined symbol with a version that is outside the
+ * range of the valid versions supplied by the file, then we quietly
+ * ignore that symbol. This can't  happen in a native Solaris object.
+ * However, the GNU 'ld' uses the top bit (0x8000) of the version as a
+ * flag to the system that says the symbol should be treated as if it
+ * doesn't exist. The Solaris linker does not support this mechanism,
+ * or the model of interface evolution that it allows. However, we do
+ * wish to be able to link against objects produced that way. Ignoring
+ * such symbols gives the desired GNU-compatible "ignore" behavior,
+ * without committing us to their model, while reserving the ability
+ * to adopt it or do something different at a later date.
+ *
+ * Note that it is possible to see "version 1" in a file that contains 0
+ * version definitions. This happens when a mapfile is used to reduce
+ * global symbols to local. For instance:
+ *
+ *	{
+ *		global:
+ *			main;
+ *			eprintf;
+ *		local:
+ *			*;
+ *	};
+ *
+ * In this case, there will be a versym section (containing version
+ * indexes 0 and 1). However, there are no versions defined, and
+ * hence no corresponding verdef section. We treat this case specially:
+ * If the versym section is present (_versym_arr is non-NULL)
+ * and the verdef section is not, we act as if _vercnt is 1.
+ */
+#define	VERNDX_INVALID(_shndx, _vercnt, _versym_arr, _verndx) \
+	(((_shndx) != SHN_UNDEF) && (_versym_arr != NULL) && \
+	((_verndx) > ((_vercnt == 0) ? 1 : _vercnt)) && \
+	((_verndx) < VER_NDX_LORESERVE))
+
+
+
+/*
  * isalist(1) descriptor - used to break an isalist string into its component
  * options.
  */

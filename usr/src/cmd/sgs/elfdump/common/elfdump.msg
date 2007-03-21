@@ -106,8 +106,11 @@
 @ MSG_ERR_BADHASH	"%s: %s: bad hash entry: symbol %s: exists in bucket \
 			 %d, should be bucket %ld\n"
 @ MSG_ERR_NODYNSYM	"%s: %s: associated SHT_DYNSYM section not found\n"
-@ MSG_ERR_BADNDXSEC	"%s: %s: unexpected section type associated with index section: %s\n"
+@ MSG_ERR_BADNDXSEC	"%s: %s: unexpected section type associated with \
+			 index section: %s\n"
 @ MSG_ERR_BADSORTNDX	"%s: %s: sort section has bad symbol index: %d\n"
+@ MSG_ERR_BADVER	"%s: %s: index[%d]: version %d is out of range: \
+			 version definitions available: 0-%d\n"
 
 @ MSG_ERR_LDYNNOTADJ	"%s: bad dynamic symbol table layout: %s and %s \
 			 sections are not adjacent\n"
@@ -124,6 +127,7 @@
 			 header\n"
 @ MSG_WARN_INVCAP3	"%s: capabilities section: %s: and PT_CAP program \
 			 header have conflicting size or offsets\n"
+@ MSG_WARN_GNUVER	"%s: %s: index[%d]: GNU hidden symbol with version %d\n"
 
 # Elf Output Messages
 
@@ -245,6 +249,8 @@
 @ MSG_STR_OPTIONS	"CcdeGgHhiklmN:nprSsuvw:y"
 
 @ MSG_STR_EMPTY		""
+
+@ MSG_GNU_VERNAMPREFIX	".gnu.version"
 
 @ MSG_FMT_INDENT	"	%s"
 @ MSG_FMT_INDEX		" [%lld]"

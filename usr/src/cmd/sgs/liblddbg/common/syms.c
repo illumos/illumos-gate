@@ -57,6 +57,19 @@ Dbg_syms_lookup(Rt_map *lmp, const char *name, const char *type)
 }
 
 void
+Dbg_syms_ignore_badver(Rt_map *lmp, const char *name, Word symndx,
+    Versym verndx)
+{
+	Lm_list	*lml = LIST(lmp);
+
+	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
+		return;
+
+	dbg_print(lml, MSG_INTL(MSG_SYM_IGNBADVER), Dbg_demangle_name(name),
+	    EC_WORD(symndx), EC_HALF(verndx), NAME(lmp));
+}
+
+void
 Dbg_syms_dlsym(Rt_map *clmp, const char *sym, const char *next, int flag)
 {
 	const char	*str, *from = NAME(clmp);
@@ -505,7 +518,7 @@ Elf_syms_table_title(Lm_list *lml, int caller)
 
 void
 Elf_syms_table_entry(Lm_list *lml, int caller, const char *prestr, Half mach,
-    Sym *sym, Word verndx, const char *sec, const char *poststr)
+    Sym *sym, Versym verndx, const char *sec, const char *poststr)
 {
 	uchar_t		type = ELF_ST_TYPE(sym->st_info);
 	uchar_t		bind = ELF_ST_BIND(sym->st_info);
@@ -522,7 +535,8 @@ Elf_syms_table_entry(Lm_list *lml, int caller, const char *prestr, Half mach,
 		    conv_sym_value(mach, type, sym->st_value), sym->st_size,
 		    conv_sym_info_type(mach, type, 0),
 		    conv_sym_info_bind(bind, 0), conv_sym_other(sym->st_other),
-		    verndx, sec ? sec : conv_sym_shndx(sym->st_shndx),
+		    conv_ver_index(verndx),
+		    sec ? sec : conv_sym_shndx(sym->st_shndx),
 		    Elf_demangle_name(poststr));
 	}
 }

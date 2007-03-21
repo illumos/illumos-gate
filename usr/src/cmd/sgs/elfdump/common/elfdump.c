@@ -41,6 +41,49 @@
 #include	<msg.h>
 #include	<_elfdump.h>
 
+
+
+/*
+ * VERSYM_STATE is used to maintain information about the VERSYM section
+ * in the object being analyzed. It is filled in by versions(), and used
+ * by init_symtbl_state() when displaying symbol information.
+ *
+ * Note that the value of the gnu field is a hueristic guess,
+ * based on the section names.
+ */
+typedef struct {
+	Cache	*cache;		/* Pointer to cache entry for VERSYM */
+	Versym	*data;		/* Pointer to versym array */
+	int	num_verdef;	/* # of versions defined in object */
+	int	gnu;		/* True if we think obj produced by GNU tools */
+} VERSYM_STATE;
+
+/*
+ * SYMTBL_STATE is used to maintain information about a single symbol
+ * table section, for use by the routines that display symbol information.
+ */
+typedef struct {
+	const char	*file;		/* Name of file */
+	Ehdr		*ehdr;		/* ELF header for file */
+	Cache		*cache;		/* Cache of all section headers */
+	Word		shnum;		/* # of sections in cache */
+	Cache		*seccache;	/* Cache of symbol table section hdr */
+	Word		secndx;		/* Index of symbol table section hdr */
+	const char	*secname;	/* Name of section */
+	uint_t		flags;		/* Command line option flags */
+	struct {			/* Extended section index data */
+		int	checked;	/* TRUE if already checked for shxndx */
+		Word	*data;		/* NULL, or extended section index */
+					/*	used for symbol table entries */
+		uint_t	n;		/* # items in shxndx.data */
+	} shxndx;
+	VERSYM_STATE	*versym;	/* NULL, or associated VERSYM section */
+	Sym 		*sym;		/* Array of symbols */
+	Word		symn;		/* # of symbols */
+} SYMTBL_STATE;
+
+
+
 /*
  * Focal point for verifying symbol names.
  */
@@ -978,15 +1021,27 @@ version_need(Verneed *vnd, Word shnum, Cache *vcache, Cache *scache,
 }
 
 /*
- * Search for any version sections - the Versym output is possibly used by the
- * symbols() printing.  If VERSYM is specified - then display the version
- * information.
+ * Display version section information if the flags require it.
+ * Return version information needed by other output.
+ *
+ * entry:
+ *	cache - Cache of all section headers
+ *	shnum - # of sections in cache
+ *	file - Name of file
+ *	flags - Command line option flags
+ *	versym - VERSYM_STATE block to be filled in.
  */
-static Cache *
-versions(Cache *cache, Word shnum, const char *file, uint_t flags)
+static void
+versions(Cache *cache, Word shnum, const char *file, uint_t flags,
+    VERSYM_STATE *versym)
 {
 	GElf_Word	cnt;
-	Cache		*versymcache = 0;
+	const char	*gnu_prefix;
+	size_t		gnu_prefix_len;
+
+	bzero(versym, sizeof (*versym));
+	gnu_prefix = MSG_ORIG(MSG_GNU_VERNAMPREFIX);
+	gnu_prefix_len = strlen(gnu_prefix);
 
 	for (cnt = 1; cnt < shnum; cnt++) {
 		void		*ver;
@@ -996,13 +1051,30 @@ versions(Cache *cache, Word shnum, const char *file, uint_t flags)
 		const char	*secname = _cache->c_name;
 
 		/*
-		 * If this is the version symbol table simply record its
-		 * data address for possible use in later symbol processing.
+		 * If the section names starts with the .gnu.version prefix,
+		 * then this object was almost certainly produced by the
+		 * GNU ld and not the native Solaris ld.
 		 */
-		if (shdr->sh_type == SHT_SUNW_versym) {
-			versymcache = _cache;
+		if (strncmp(gnu_prefix, secname, gnu_prefix_len) == 0)
+			versym->gnu = 1;
+
+		/*
+		 * If this is the version symbol table record its data
+		 * address for later symbol processing.
+		 */
+		if ((shdr->sh_type == SHT_SUNW_versym) &&
+		    (_cache->c_data != NULL)) {
+			versym->cache = _cache;
+			versym->data = _cache->c_data->d_buf;
 			continue;
 		}
+
+		/*
+		 * If this is a version definition section, retain # of
+		 * version definitions for later symbol processing.
+		 */
+		if (shdr->sh_type == SHT_SUNW_verdef)
+			versym->num_verdef = shdr->sh_info;
 
 		if ((flags & FLG_VERSIONS) == 0)
 			continue;
@@ -1046,32 +1118,7 @@ versions(Cache *cache, Word shnum, const char *file, uint_t flags)
 			    &cache[shdr->sh_link], file);
 		}
 	}
-	return (versymcache);
 }
-
-/*
- * SYMTBL_STATE is used to maintain information about a single symbol
- * table section, for use by the routines that display symbol information.
- */
-typedef struct {
-	const		char *file;	/* Name of file */
-	Ehdr		*ehdr;		/* ELF header for file */
-	Cache		*cache;		/* Cache of all section headers */
-	Word		shnum;		/* # of sections in cache */
-	Cache		*seccache;	/* Cache of symbol table section hdr */
-	Word		secndx;		/* Index of symbol table section hdr */
-	const char	*secname;	/* Name of section */
-	uint_t		flags;		/* Command line option flags */
-	struct {			/* Extended section index data */
-		int	checked;	/* TRUE if already checked for shxndx */
-		Word	*data;		/* NULL, or extended section index */
-					/*	used for symbol table entries */
-		uint_t	n;		/* # items in shxndx.data */
-	} shxndx;
-	Versym		*versym;	/* NULL, or versym array for symtbl */
-	Sym 		*sym;		/* Array of symbols */
-	Word		symn;		/* # of symbols */
-} SYMTBL_STATE;
 
 /*
  * Initialize a symbol table state structure
@@ -1082,13 +1129,13 @@ typedef struct {
  *	shnum - # of sections in cache
  *	secndx - Index of symbol table section
  *	ehdr - ELF header for file
- *	versymcache - NULL, or cache of versym section
+ *	versym - Information about versym section
  *	file - Name of file
  *	flags - Command line option flags
  */
 static int
 init_symtbl_state(SYMTBL_STATE *state, Cache *cache, Word shnum, Word secndx,
-    Ehdr *ehdr, Cache *versymcache, const char *file, uint_t flags)
+    Ehdr *ehdr, VERSYM_STATE *versym, const char *file, uint_t flags)
 {
 	Shdr *shdr;
 
@@ -1134,9 +1181,9 @@ init_symtbl_state(SYMTBL_STATE *state, Cache *cache, Word shnum, Word secndx,
 	 * Determine if there is a associated Versym section
 	 * with this Symbol Table.
 	 */
-	if (versymcache && (versymcache->c_shdr->sh_link == state->secndx) &&
-	    versymcache->c_data)
-		state->versym = versymcache->c_data->d_buf;
+	if (versym->cache &&
+	    (versym->cache->c_shdr->sh_link == state->secndx))
+		state->versym = versym;
 	else
 		state->versym = NULL;
 
@@ -1180,12 +1227,12 @@ symbols_getxindex(SYMTBL_STATE * state)
  * Produce a line of output for the given symbol
  *
  * entry:
+ *	state - Symbol table state
  *	symndx - Index of symbol within the table
  *	symndx_disp - Index to display. This may not be the same
  *		as symndx if the display is relative to the logical
  *		combination of the SUNW_ldynsym/dynsym tables.
  *	sym - Symbol to display
- *	state - Symbol table state
  */
 static void
 output_symbol(SYMTBL_STATE *state, Word symndx, Word disp_symndx, Sym *sym)
@@ -1209,7 +1256,7 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word disp_symndx, Sym *sym)
 
 	char		index[MAXNDXSIZE], *sec;
 	const char	*symname;
-	int		verndx;
+	Versym		verndx;
 	uchar_t		type;
 	Shdr		*tshdr;
 	Word		shndx;
@@ -1277,12 +1324,44 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word disp_symndx, Sym *sym)
 
 	/*
 	 * If versioning is available display the
-	 * version index.
+	 * version index. If not, then use 0.
 	 */
-	if (state->versym)
-		verndx = (int)state->versym[symndx];
-	else
+	if (state->versym) {
+		verndx = state->versym->data[symndx];
+
+		/*
+		 * Check to see if this is a defined symbol with a
+		 * version index that is outside the valid range for
+		 * the file. If so, then there are two possiblities:
+		 *
+		 *	- Files produced by the GNU ld use the top (16th) bit
+		 *		as a "hidden symbol" marker. If we have
+		 *		detected that this object comes from GNU ld,
+		 *		then check to see if this is the case and that
+		 *		the resulting masked version is in range. If so,
+		 *		issue a warning describing it.
+		 *	- If this is not a GNU "hidden bit" issue, then
+		 *		issue a generic "out of range" error.
+		 */
+		if (VERNDX_INVALID(sym->st_shndx, state->versym->num_verdef,
+		    state->versym->data, verndx)) {
+			if (state->versym->gnu && (verndx & 0x8000) &&
+			    ((verndx & ~0x8000) <=
+			    state->versym->num_verdef)) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_WARN_GNUVER), state->file,
+				    state->secname, EC_WORD(symndx),
+				    EC_HALF(verndx & ~0x8000));
+			} else {	/* Generic version range error */
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_BADVER), state->file,
+				    state->secname, EC_WORD(symndx),
+				    EC_HALF(verndx), state->versym->num_verdef);
+			}
+		}
+	} else {
 		verndx = 0;
+	}
 
 	/*
 	 * Error checking for TLS.
@@ -1345,7 +1424,7 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word disp_symndx, Sym *sym)
  */
 void
 symbols(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
-    Cache *versymcache, const char *file, uint_t flags)
+    VERSYM_STATE *versym, const char *file, uint_t flags)
 {
 	SYMTBL_STATE state;
 	Cache *_cache;
@@ -1366,7 +1445,7 @@ symbols(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
 			continue;
 
 		if (!init_symtbl_state(&state, cache, shnum, secndx, ehdr,
-		    versymcache, file, flags))
+		    versym, file, flags))
 			continue;
 		/*
 		 * Loop through the symbol tables entries.
@@ -1387,7 +1466,7 @@ symbols(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
  */
 static void
 sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
-    Cache *versymcache, const char *file, uint_t flags)
+    VERSYM_STATE *versym, const char *file, uint_t flags)
 {
 	SYMTBL_STATE	ldynsym_state,	dynsym_state;
 	Cache		*sortcache,	*symcache;
@@ -1429,7 +1508,7 @@ sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
 		switch (symshdr->sh_type) {
 		case SHT_SUNW_LDYNSYM:
 			if (!init_symtbl_state(&ldynsym_state, cache, shnum,
-			    symsecndx, ehdr, versymcache, file, flags))
+			    symsecndx, ehdr, versym, file, flags))
 				continue;
 			ldynsym_cnt = ldynsym_state.symn;
 			/*
@@ -1455,7 +1534,7 @@ sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
 			/*FALLTHROUGH*/
 		case SHT_DYNSYM:
 			if (!init_symtbl_state(&dynsym_state, cache, shnum,
-			    symsecndx, ehdr, versymcache, file, flags))
+			    symsecndx, ehdr, versym, file, flags))
 				continue;
 			break;
 		default:
@@ -2574,7 +2653,7 @@ regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 	Shdr		*nameshdr, *shdr;
 	char		*names = 0;
 	Cache		*cache, *_cache;
-	Cache		*versymcache = 0;
+	VERSYM_STATE	versym;
 
 	if ((ehdr = elf_getehdr(elf)) == NULL) {
 		failure(file, MSG_ORIG(MSG_ELF_GETEHDR));
@@ -2848,13 +2927,13 @@ regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 	if (flags & FLG_INTERP)
 		interp(file, cache, shnum, phnum, elf);
 
-	versymcache = versions(cache, shnum, file, flags);
+	versions(cache, shnum, file, flags, &versym);
 
 	if (flags & FLG_SYMBOLS)
-		symbols(cache, shnum, ehdr, Nname, versymcache, file, flags);
+		symbols(cache, shnum, ehdr, Nname, &versym, file, flags);
 
 	if (flags & FLG_SORT)
-		sunw_sort(cache, shnum, ehdr, Nname, versymcache, file, flags);
+		sunw_sort(cache, shnum, ehdr, Nname, &versym, file, flags);
 
 	if (flags & FLG_HASH)
 		hash(cache, shnum, Nname, file, flags);

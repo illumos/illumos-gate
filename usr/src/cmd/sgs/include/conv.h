@@ -173,6 +173,7 @@ extern	const char	*conv_seg_flags(Half);
 extern	int		conv_sys_eclass();
 extern	Uts_desc	*conv_uts(void);
 extern	const char	*conv_ver_flags(Half);
+extern	const char	*conv_ver_index(Versym);
 
 /*
  * Define all class specific routines.

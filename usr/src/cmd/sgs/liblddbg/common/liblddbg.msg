@@ -643,6 +643,9 @@
 @ MSG_SYM_DUPSORTADDR	"section %s: symbol `%s' and symbol `%s' have the \
 			 same address: %#llx"
 
+@ MSG_SYM_IGNBADVER	"symbol=%s;  hash index=%d;  version=%d;  skipping \
+			 symbol with out of range version in file=%s"
+
 # Syminfo string
 
 @ MSG_SYMINFO_INFO	"syminfo information"
@@ -820,7 +823,7 @@
 			 oth ver shndx          name"
 @ MSG_SYM_LDS_TITLE_32	"              value      size      type bind \
 			 oth ver shndx"
-@ MSG_SYM_EFS_ENTRY_32	"%10.10s  %10.10s 0x%8.8x  %4s %4s %2s %4d \
+@ MSG_SYM_EFS_ENTRY_32	"%10.10s  %10.10s 0x%8.8x  %4s %4s %2s %4s \
 			 %-14.14s %s"
 
 # TRANSLATION_NOTE - the following entries provide for a series of one or more
@@ -830,7 +833,7 @@
 			 oth ver shndx / name"
 @ MSG_SYM_LDL_TITLE_32	"              value      size      type bind \
 			 oth ver shndx"
-@ MSG_SYM_EFL_ENTRY_32	"%10.10s  %10.10s 0x%8.8x  %4s %4s %2s %4d \
+@ MSG_SYM_EFL_ENTRY_32	"%10.10s  %10.10s 0x%8.8x  %4s %4s %2s %4s \
 			 %-14s %s"
 
 # TRANSLATION_NOTE - the following entries provide for a series of one or more
@@ -840,7 +843,7 @@
 			 type bind oth ver shndx          name"
 @ MSG_SYM_LDS_TITLE_64	"              value              size              \
 			 type bind oth ver shndx"
-@ MSG_SYM_EFS_ENTRY_64	"%10.10s  %18.18s 0x%16.16llx  %4s %4s %2s %4d \
+@ MSG_SYM_EFS_ENTRY_64	"%10.10s  %18.18s 0x%16.16llx  %4s %4s %2s %4s \
 			 %-14.14s %s"
 
 # TRANSLATION_NOTE - the following entries provide for a series of one or more
@@ -850,7 +853,7 @@
 			 type bind oth ver shndx / name"
 @ MSG_SYM_LDL_TITLE_64	"              value              size              \
 			 type bind oth ver shndx"
-@ MSG_SYM_EFL_ENTRY_64	"%10.10s  %18.18s 0x%16.16llx  %4s %4s %2s %4d \
+@ MSG_SYM_EFL_ENTRY_64	"%10.10s  %18.18s 0x%16.16llx  %4s %4s %2s %4s \
 			 %-14s %s"
 
 

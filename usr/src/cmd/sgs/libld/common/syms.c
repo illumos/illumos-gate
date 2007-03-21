@@ -1144,7 +1144,7 @@ ld_sym_validate(Ofl_desc *ofl)
 
 		if (undef) {
 			/*
-			 * If an non-weak reference remains undefined, or if a
+			 * If a non-weak reference remains undefined, or if a
 			 * mapfile reference is not bound to the relocatable
 			 * objects that make up the object being built, we have
 			 * a fatal error.
@@ -2003,6 +2003,17 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			continue;
 		}
+
+		/*
+		 * To accomodate objects built with the GNU ld, we quietly
+		 * ignore symbols with a version that is outside the range
+		 * of the valid versions supplied by the file. See the
+		 * comment that accompanies the VERSYM_INVALID macro in libld.h
+		 * for additional details.
+		 */
+		if (VERNDX_INVALID(shndx, ifl->ifl_vercnt, ifl->ifl_versym,
+		    ifl->ifl_versym[ndx]))
+			continue;
 
 		/*
 		 * The linker itself will generate symbols for _end, _etext,

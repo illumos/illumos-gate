@@ -490,8 +490,8 @@ void Elf64_shdr(Lm_list *, Elf64_Half, Elf64_Shdr *);
 void Elf32_shdr(Lm_list *, Elf32_Half, Elf32_Shdr *);
 
 void Elf64_syms_table_entry(Lm_list *, int, const char *, Elf64_Half,
-    Elf64_Sym *, Elf64_Word, const char *, const char *);
+    Elf64_Sym *, Elf64_Versym, const char *, const char *);
 void Elf32_syms_table_entry(Lm_list *, int, const char *, Elf32_Half,
-    Elf32_Sym *, Elf32_Word, const char *, const char *);
+    Elf32_Sym *, Elf32_Versym, const char *, const char *);
 void Elf64_syms_table_title(Lm_list *, int);
 void Elf32_syms_table_title(Lm_list *, int);

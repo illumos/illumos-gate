@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -133,6 +133,7 @@ conv_sym_value(Half mach, uchar_t type, Addr value)
 	    (mach == EM_SPARCV9)) && (type == STT_SPARC_REGISTER))
 		return (conv_sym_SPARC_value(value, 0));
 
-	(void) sprintf(string, MSG_ORIG(MSG_SYM_FMT_VAL), EC_ADDR(value));
+	(void) snprintf(string, sizeof (string), MSG_ORIG(MSG_SYM_FMT_VAL),
+	    EC_ADDR(value));
 	return (string);
 }

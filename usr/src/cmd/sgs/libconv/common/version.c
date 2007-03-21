@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,4 +41,23 @@ conv_ver_flags(Half flags)
 		return (MSG_ORIG(MSG_VER_FLG_BASE));
 	else
 		return (MSG_ORIG(MSG_GBL_NULL));
+}
+
+
+/*
+ * Format a version index as contained in a VERSYM section
+ */
+const char *
+conv_ver_index(Versym verndx)
+{
+	static Conv_inv_buf_t	string;
+
+	/* Special case versions starting at VER_NDX_LORESERVE */
+	if (verndx == VER_NDX_ELIMINATE)
+		return (MSG_ORIG(MSG_VERSYM_ELIMINATE));
+
+	/* format as numeric */
+	(void) snprintf(string, sizeof (string), MSG_ORIG(MSG_VERSYM_FMT),
+	    EC_HALF(verndx));
+	return (string);
 }

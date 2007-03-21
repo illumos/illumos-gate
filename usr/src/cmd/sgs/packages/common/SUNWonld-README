@@ -1223,3 +1223,5 @@ Bugid   Risk Synopsis
 6516118 Reserved space needed in ELF dynamic section and string table (D)
 	PSARC/2007/127 Reserved space for editing ELF dynamic sections
 6535688 elfdump could be more robust in the face of Purify (D)
+6516665 The link-editors should be more resilient against gcc's symbol
+	versioning

@@ -114,6 +114,7 @@ typedef struct _rt_elf_private {
 	int		e_verneednum;	/*	their associated count */
 	Verdef		*e_verdef;	/* versions defined by this image and */
 	int		e_verdefnum;	/*	their associated count */
+	Versym 		*e_versym;	/* Per-symbol versions */
 	ulong_t		e_syminent;	/* syminfo entry size */
 	void		*e_pltpad;	/* PLTpad table */
 	void		*e_pltpadend;	/* end of PLTpad table */
@@ -147,6 +148,7 @@ typedef struct _rt_elf_private {
 #define	VERNEEDNUM(X)		(((Rt_elfp *)(X)->rt_priv)->e_verneednum)
 #define	VERDEF(X)		(((Rt_elfp *)(X)->rt_priv)->e_verdef)
 #define	VERDEFNUM(X)		(((Rt_elfp *)(X)->rt_priv)->e_verdefnum)
+#define	VERSYM(X)		(((Rt_elfp *)(X)->rt_priv)->e_versym)
 #define	SUNWBSS(X)		(((Rt_elfp *)(X)->rt_priv)->e_sunwbss)
 #define	SYMINENT(X)		(((Rt_elfp *)(X)->rt_priv)->e_syminent)
 #define	PLTPAD(X)		(((Rt_elfp *)(X)->rt_priv)->e_pltpad)

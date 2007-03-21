@@ -1846,6 +1846,22 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 		}
 
 		/*
+		 * To accomodate objects built with the GNU ld, we quietly
+		 * ignore symbols with a version that is outside the range
+		 * of the valid versions supplied by the file. See the
+		 * comment that accompanies the VERSYM_INVALID macro in libld.h
+		 * for additional details.
+		 */
+		if (VERNDX_INVALID(sym->st_shndx, VERDEFNUM(ilmp),
+		    VERSYM(ilmp), VERSYM(ilmp)[ndx])) {
+			DBG_CALL(Dbg_syms_ignore_badver(ilmp, name,
+			    ndx, VERSYM(ilmp)[ndx]));
+			if ((ndx = chainptr[ndx]) != 0)
+				continue;
+			return ((Sym *)0);
+		}
+
+		/*
 		 * If we're only here to establish a symbols index, we're done.
 		 */
 		if (slp->sl_flags & LKUP_SYMNDX)
@@ -2215,6 +2231,9 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 			case DT_VERDEFNUM:
 				/* LINTED */
 				VERDEFNUM(lmp) = (int)ld->d_un.d_val;
+				break;
+			case DT_VERSYM:
+				VERSYM(lmp) = (Versym *)(ld->d_un.d_ptr + base);
 				break;
 			case DT_BIND_NOW:
 				if ((ld->d_un.d_val & DF_BIND_NOW) &&
