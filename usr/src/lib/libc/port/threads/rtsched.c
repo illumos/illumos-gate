@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,10 +112,12 @@ _validate_rt_prio(int policy, int pri)
 		lmutex_lock(&prio_lock);
 		if (!initialized) {	/* do this only once */
 			_init_rt_prio_ranges();
+			_membar_producer();
 			initialized = 1;
 		}
 		lmutex_unlock(&prio_lock);
 	}
+	_membar_consumer();
 
 	switch (policy) {
 	case SCHED_FIFO:

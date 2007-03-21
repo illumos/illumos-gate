@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -145,10 +145,12 @@ _pthread_once(pthread_once_t *once_control, void (*init_routine)(void))
 			    &once->mlock);
 			(*init_routine)();
 			pthread_cleanup_pop(0);
+			_membar_producer();
 			once->once_flag = PTHREAD_ONCE_DONE;
 		}
 		(void) _private_mutex_unlock(&once->mlock);
 	}
+	_membar_consumer();
 
 	return (0);
 }

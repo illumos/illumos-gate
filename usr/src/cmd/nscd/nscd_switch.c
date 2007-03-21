@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +30,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <string.h>
+#include <pthread.h>
 #include <dlfcn.h>
 #include <nss_dbdefs.h>
 #include <exec_attr.h>
@@ -86,9 +88,7 @@ retry_test(nss_status_t res, int n, struct __nsw_lookup_v1 *lkp)
 	return (0);
 }
 
-static thread_key_t loopback_key;
-static mutex_t loopback_key_lock = DEFAULTMUTEX;
-static int loopback_key_created = 0;
+static thread_key_t loopback_key = THR_ONCE_KEY;
 typedef struct lb_key {
 	int		srci;
 	int		dbi;
@@ -99,25 +99,12 @@ typedef struct lb_key {
 static int
 set_loopback_key(lb_key_t *key) {
 
-	int		rc = 0;
-	lb_key_t	*k;
+	int		rc;
 
-	if (!loopback_key_created) {
-		(void) mutex_lock(&loopback_key_lock);
-		if (!loopback_key_created) {
-			if ((rc = thr_keycreate(&loopback_key,
-					NULL)) == 0)
-				loopback_key_created = 1;
-		}
-		(void) mutex_unlock(&loopback_key_lock);
-	}
-	if (rc == 0) {
-		/* set key if not already set */
-		if (thr_getspecific(loopback_key, (void **)&k) == 0 &&
-				k == NULL) {
-			rc = thr_setspecific(loopback_key, key);
-		}
-	}
+	rc = thr_keycreate_once(&loopback_key, NULL);
+	/* set key if not already set */
+	if (rc == 0 && pthread_getspecific(loopback_key) == NULL)
+		rc = thr_setspecific(loopback_key, key);
 
 	return (rc);
 }
@@ -126,21 +113,14 @@ static lb_key_t *
 get_loopback_key(void) {
 
 	char		*me = "get_loopback_key";
-	int 		rc = 0;
 	lb_key_t	*k = NULL;
 
-	if (!loopback_key_created)
-		return (NULL);
-
-	rc = thr_getspecific(loopback_key, (void **)&k);
+	k = pthread_getspecific(loopback_key);
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
-	(me, "get loopback key rc= %d, key = %p\n", rc, k);
+	(me, "get loopback key, key = %p\n", k);
 
-	if (rc == 0 && k != NULL)
-		return (k);
-
-	return (NULL);
+	return (k);
 }
 
 static void
@@ -148,7 +128,7 @@ clear_loopback_key(lb_key_t *key) {
 
 	char		*me = "clear_loopback_key";
 
-	if (loopback_key_created && key != 0) {
+	if (loopback_key != THR_ONCE_KEY && key != NULL) {
 		/*
 		 * key->lb_flagp points to the location of the
 		 * flag, check_flag, in the stack where it was
@@ -163,23 +143,14 @@ clear_loopback_key(lb_key_t *key) {
 	(me, "key %p cleared\n", key);
 }
 
-static thread_key_t initf_key;
-static mutex_t initf_key_lock = DEFAULTMUTEX;
-static int initf_key_created = 0;
+static thread_key_t initf_key = THR_ONCE_KEY;
 
 static int
 set_initf_key(void *pbuf) {
 
-	int		rc = 0;
+	int		rc;
 
-	if (!initf_key_created) {
-		(void) mutex_lock(&initf_key_lock);
-		if (!initf_key_created) {
-			if ((rc = thr_keycreate(&initf_key, NULL)) == 0)
-				initf_key_created = 1;
-		}
-		(void) mutex_unlock(&initf_key_lock);
-	}
+	rc = thr_keycreate_once(&initf_key, NULL);
 	if (rc == 0)
 		rc = thr_setspecific(initf_key, pbuf);
 
@@ -191,20 +162,13 @@ get_initf_key(void) {
 
 	char		*me = "get_initf_key";
 	void		*pbuf;
-	int 		rc = 0;
 
-	if (!initf_key_created)
-		return (NULL);
-
-	rc = thr_getspecific(initf_key, (void **)&pbuf);
+	pbuf = pthread_getspecific(initf_key);
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
-	(me, "got initf pbuf rc= %d, key = %p\n", rc, pbuf);
+	(me, "got initf pbuf, key = %p\n", pbuf);
 
-	if (rc == 0 && pbuf != NULL)
-		return (pbuf);
-
-	return (NULL);
+	return (pbuf);
 }
 
 static void
@@ -212,8 +176,7 @@ clear_initf_key(void) {
 
 	char		*me = "clear_initf_key";
 
-	if (initf_key_created)
-		(void) thr_setspecific(initf_key, NULL);
+	(void) thr_setspecific(initf_key, NULL);
 
 	_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
 	(me, "initf pbuf cleared\n");

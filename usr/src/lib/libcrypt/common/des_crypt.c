@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,13 +19,13 @@
  * CDDL HEADER END
  */
 
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*LINTLIBRARY*/
@@ -42,7 +41,7 @@
 
 #include <stdlib.h>
 #include <thread.h>
-#include <synch.h>
+#include <pthread.h>
 #include <sys/types.h>
 
 /* EXPORT DELETE START */
@@ -330,22 +329,18 @@ des_encrypt(char *block, int edflag)
 #define	IOBUF_SIZE	16
 
 static char *
-_get_iobuf(thread_key_t *key, unsigned size)
+_get_iobuf(thread_key_t *keyp, unsigned size)
 {
-	char *iobuf = NULL;
+	char *iobuf;
 
-	if (thr_getspecific(*key, (void **)&iobuf) != 0) {
-		if (thr_keycreate(key, free) != 0) {
-			return (NULL);
-		}
-	}
-
-	if (!iobuf) {
-		if (thr_setspecific(*key, (void *)(iobuf = malloc(size)))
-			!= 0) {
+	if (thr_keycreate_once(keyp, free) != 0)
+		return (NULL);
+	iobuf = pthread_getspecific(*keyp);
+	if (iobuf == NULL) {
+		if (thr_setspecific(*keyp, (iobuf = malloc(size))) != 0) {
 			if (iobuf)
 				(void) free(iobuf);
-			return (NULL);
+			iobuf = NULL;
 		}
 	}
 	return (iobuf);
@@ -357,8 +352,9 @@ des_crypt(const char *pw, const char *salt)
 /* EXPORT DELETE START */
 	int	i, j;
 	char	c, temp;
-	static thread_key_t key = 0;
-	char block[66], *iobuf = _get_iobuf(&key, IOBUF_SIZE);
+	char block[66];
+	static thread_key_t key = THR_ONCE_KEY;
+	char *iobuf = _get_iobuf(&key, IOBUF_SIZE);
 
 	(void) mutex_lock(&lock);
 	for (i = 0; i < 66; i++)

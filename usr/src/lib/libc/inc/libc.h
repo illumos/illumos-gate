@@ -80,6 +80,7 @@ extern int _sigwait(sigset_t *);
 extern int _thr_getspecific(thread_key_t key, void **valuep);
 extern int _thr_setspecific(unsigned int key, void *value);
 extern int _thr_keycreate(thread_key_t *pkey, void (*destructor)(void *));
+extern int _thr_keycreate_once(thread_key_t *pkey, void (*destructor)(void *));
 extern void *_pthread_getspecific(thread_key_t);
 extern int _pollsys(struct pollfd *, nfds_t, const timespec_t *,
 	const sigset_t *);

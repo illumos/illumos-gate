@@ -762,6 +762,7 @@ extern "C" {
 #define	pthread_getspecific		_pthread_getspecific
 #define	pthread_join			_pthread_join
 #define	pthread_key_create		_pthread_key_create
+#define	pthread_key_create_once_np	_pthread_key_create_once_np
 #define	pthread_key_delete		_pthread_key_delete
 #define	pthread_kill			_pthread_kill
 #define	pthread_mutexattr_destroy	_pthread_mutexattr_destroy
@@ -1038,6 +1039,7 @@ extern "C" {
 #define	thr_getstate		_thr_getstate
 #define	thr_join		_thr_join
 #define	thr_keycreate		_thr_keycreate
+#define	thr_keycreate_once	_thr_keycreate_once
 #define	thr_kill		_thr_kill
 #define	thr_main		_thr_main
 #define	thr_min_stack		_thr_min_stack

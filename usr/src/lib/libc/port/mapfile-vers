@@ -78,6 +78,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	mq_unlink;
 	nanosleep;
 	posix_fallocate;
+	pthread_key_create_once_np;
 	_renameat;
 	sched_getparam;
 	sched_get_priority_max;
@@ -104,6 +105,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	sigtimedwait;
 	sigwaitinfo;
 	strnlen;
+	thr_keycreate_once;
 	timer_create;
 	timer_delete;
 	timer_getoverrun;
@@ -1857,6 +1859,7 @@ SUNWprivate_1.1 {
 	_pthread_getspecific;
 	_pthread_join;
 	_pthread_key_create;
+	_pthread_key_create_once_np;
 	_pthread_key_delete;
 	_pthread_kill;
 	__pthread_min_stack;
@@ -2087,6 +2090,7 @@ SUNWprivate_1.1 {
 	_thr_getstate;
 	_thr_join;
 	_thr_keycreate;
+	_thr_keycreate_once;
 	_thr_key_delete;
 	_thr_kill;
 	_thr_main;

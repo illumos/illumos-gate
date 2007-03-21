@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +47,7 @@
 #include <fcntl.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <atomic.h>
 
 #include <crypt.h>
 #include <libc.h>
@@ -903,8 +905,10 @@ allocate_KS(void)
 	int failed;
 	int assigned;
 
-	if (KS != NULL)		/* already allocated */
+	if (KS != NULL) {		/* already allocated */
+		membar_consumer();
 		return (0);
+	}
 
 	ks = calloc(16, 48 * sizeof (char));
 	failed = 0;
@@ -913,6 +917,7 @@ allocate_KS(void)
 		assigned = 0;
 	} else {
 		assigned = 1;
+		membar_producer();
 		if ((KS = ks) == NULL)	/* calloc() failed */
 			failed = 1;
 	}

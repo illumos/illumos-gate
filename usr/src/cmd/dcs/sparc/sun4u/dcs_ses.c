@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 2000-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -59,6 +59,7 @@
 
 #ifdef DCS_MULTI_THREAD
 #include <thread.h>
+#include <pthread.h>
 #else /* DCS_MULTI_THREAD */
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -96,8 +97,7 @@ static void ses_thr_exit(void);
  * session information.
  */
 #ifdef DCS_MULTI_THREAD
-thread_key_t	ses_key;
-static int	thr_key_created = 0;
+thread_key_t	ses_key = THR_ONCE_KEY;
 #else /* DCS_MULTI_THREAD */
 session_t	*ses;
 #endif /* DCS_MULTI_THREAD */
@@ -499,13 +499,7 @@ curr_ses(void)
 {
 #ifdef DCS_MULTI_THREAD
 
-	session_t	*sp;
-	int		thr_err;
-
-
-	thr_err = thr_getspecific(ses_key, (void **)&sp);
-
-	return ((thr_err) ? NULL : sp);
+	return (pthread_getspecific(ses_key));
 
 #else /* DCS_MULTI_THREAD */
 
@@ -777,16 +771,9 @@ ses_alloc(void)
 
 	int		thr_err;
 
-
-	if (!thr_key_created) {
-		thr_err = thr_keycreate(&ses_key, NULL);
-
-		if (thr_err) {
-			return (-1);
-		}
-
-		thr_key_created = 1;
-	}
+	thr_err = thr_keycreate_once(&ses_key, NULL);
+	if (thr_err)
+		return (-1);
 
 #endif /* DCS_MULTI_THREAD */
 

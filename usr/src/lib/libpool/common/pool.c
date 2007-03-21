@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <thread.h>
+#include <pthread.h>
 #include <synch.h>
 #include <unistd.h>
 #include <stropts.h>
@@ -112,9 +113,7 @@ const char pool_info_location[] =  "/dev/pool";
  */
 static const char static_location[] = "/etc/pooladm.conf";
 static const char dynamic_location[] =  "/dev/poolctl";
-static mutex_t		keylock;
-static thread_key_t	errkey;
-static int		keyonce = 0;
+static thread_key_t	errkey = THR_ONCE_KEY;
 
 /*
  * libpool error code
@@ -611,14 +610,7 @@ pool_seterror(int errval)
 		pool_errval = errval;
 		return;
 	}
-	if (keyonce == 0) {
-		(void) mutex_lock(&keylock);
-		if (keyonce == 0) {
-			(void) thr_keycreate(&errkey, 0);
-			keyonce++;
-		}
-		(void) mutex_unlock(&keylock);
-	}
+	(void) thr_keycreate_once(&errkey, 0);
 	(void) thr_setspecific(errkey, (void *)(intptr_t)errval);
 }
 
@@ -629,14 +621,11 @@ pool_seterror(int errval)
 int
 pool_error(void)
 {
-	void *errval;
-
 	if (thr_main())
 		return (pool_errval);
-	if (keyonce == 0)
+	if (errkey == THR_ONCE_KEY)
 		return (POE_OK);
-	(void) thr_getspecific(errkey, &errval);
-	return ((intptr_t)errval);
+	return ((uintptr_t)pthread_getspecific(errkey));
 }
 
 /*

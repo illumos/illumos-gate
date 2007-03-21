@@ -59,9 +59,7 @@ gai_strerror(int ecode) {
 #ifndef DO_PTHREADS
 	static char buf[EAI_BUFSIZE];
 #else	/* DO_PTHREADS */
-	static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
-	static pthread_key_t key;
-	static int once = 0;
+	static pthread_key_t key = PTHREAD_ONCE_KEY_NP;
 	char *buf;
 #endif
 
@@ -69,20 +67,8 @@ gai_strerror(int ecode) {
 		return (gai_errlist[ecode]);
 
 #ifdef DO_PTHREADS
-	if (!once) {
-		if (pthread_mutex_lock(&lock) != 0)
-			goto unknown;
-		if (!once) {
-			if (pthread_key_create(&key, free) != 0) {
-				pthread_mutex_unlock(&lock);
-				goto unknown;
-			}
-			once = 1;
-		}
-		if (pthread_mutex_unlock(&lock) != 0)
-			goto unknown;
-	}
-
+	if (pthread_key_create_once_np(&key, free) != 0)
+		goto unknown;
 	buf = pthread_getspecific(key);
 	if (buf == NULL) {
 		buf = malloc(EAI_BUFSIZE);

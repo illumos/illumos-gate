@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,6 +87,7 @@ extern void thr_yield(void);
 extern int thr_setprio(thread_t, int);
 extern int thr_getprio(thread_t, int *);
 extern int thr_keycreate(thread_key_t *, void(*)(void *));
+extern int thr_keycreate_once(thread_key_t *, void(*)(void *));
 extern int thr_setspecific(thread_key_t, void *);
 extern int thr_getspecific(thread_key_t, void **);
 extern size_t thr_min_stack(void);
@@ -109,6 +110,7 @@ extern void thr_yield();
 extern int thr_setprio();
 extern int thr_getprio();
 extern int thr_keycreate();
+extern int thr_keycreate_once();
 extern int thr_setspecific();
 extern int thr_getspecific();
 extern size_t thr_min_stack();
@@ -131,6 +133,13 @@ extern size_t thr_min_stack();
 #define	THR_DETACHED		0x00000040	/* = PTHREAD_CREATE_DETACHED */
 #define	THR_SUSPENDED		0x00000080
 #define	THR_DAEMON		0x00000100
+
+/*
+ * The key to be created by thr_keycreate_once()
+ * must be statically initialized with THR_ONCE_KEY.
+ * This must be the same as PTHREAD_ONCE_KEY_NP in <pthread.h>
+ */
+#define	THR_ONCE_KEY	(thread_key_t)(-1)
 
 /*
  * The available register states returned by thr_getstate().

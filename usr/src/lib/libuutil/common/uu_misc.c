@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,9 +44,23 @@
 #define	TEXT_DOMAIN "SYS_TEST"
 #endif
 
+/*
+ * All of the old code under !defined(PTHREAD_ONCE_KEY_NP)
+ * is here to enable the building of a native version of
+ * libuutil.so when the build machine has not yet been upgraded
+ * to a version of libc that provides pthread_key_create_once_np().
+ * It should all be deleted when solaris_nevada ships.
+ * The code is not MT-safe in a relaxed memory model.
+ */
+
+#if defined(PTHREAD_ONCE_KEY_NP)
+static pthread_key_t	uu_error_key = PTHREAD_ONCE_KEY_NP;
+#else	/* PTHREAD_ONCE_KEY_NP */
+static pthread_key_t	uu_error_key = 0;
 static pthread_mutex_t	uu_key_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_key_t	uu_error_key;
-static int		uu_error_key_setup;
+#endif	/* PTHREAD_ONCE_KEY_NP */
+
+static int		uu_error_key_setup = 0;
 
 static pthread_mutex_t	uu_panic_lock = PTHREAD_MUTEX_INITIALIZER;
 /* LINTED static unused */
@@ -60,22 +74,27 @@ static uint32_t		_uu_main_error;
 void
 uu_set_error(uint_t code)
 {
-	int error;
 	if (thr_main() != 0) {
 		_uu_main_error = code;
 		return;
 	}
+#if defined(PTHREAD_ONCE_KEY_NP)
+	if (pthread_key_create_once_np(&uu_error_key, NULL) != 0)
+		uu_error_key_setup = -1;
+	else
+		uu_error_key_setup = 1;
+#else	/* PTHREAD_ONCE_KEY_NP */
 	if (uu_error_key_setup == 0) {
 		(void) pthread_mutex_lock(&uu_key_lock);
 		if (uu_error_key_setup == 0) {
-			error = pthread_key_create(&uu_error_key, NULL);
-			if (error != 0)
+			if (pthread_key_create(&uu_error_key, NULL) != 0)
 				uu_error_key_setup = -1;
 			else
 				uu_error_key_setup = 1;
 		}
 		(void) pthread_mutex_unlock(&uu_key_lock);
 	}
+#endif	/* PTHREAD_ONCE_KEY_NP */
 	if (uu_error_key_setup > 0)
 		(void) pthread_setspecific(uu_error_key,
 		    (void *)(uintptr_t)code);
@@ -87,12 +106,14 @@ uu_error(void)
 	if (thr_main() != 0)
 		return (_uu_main_error);
 
-	if (uu_error_key_setup < 0)
+	if (uu_error_key_setup < 0)	/* can't happen? */
 		return (UU_ERROR_UNKNOWN);
-	else if (uu_error_key_setup == 0)
-		return (UU_ERROR_NONE);
-	else
-		return ((uint32_t)(uintptr_t)pthread_getspecific(uu_error_key));
+
+	/*
+	 * Because UU_ERROR_NONE == 0, if uu_set_error() was
+	 * never called, then this will return UU_ERROR_NONE:
+	 */
+	return ((uint32_t)(uintptr_t)pthread_getspecific(uu_error_key));
 }
 
 const char *
@@ -199,7 +220,9 @@ static void
 uu_lockup(void)
 {
 	(void) pthread_mutex_lock(&uu_panic_lock);
+#if !defined(PTHREAD_ONCE_KEY_NP)
 	(void) pthread_mutex_lock(&uu_key_lock);
+#endif
 	uu_avl_lockup();
 	uu_list_lockup();
 }
@@ -208,7 +231,9 @@ static void
 uu_release(void)
 {
 	(void) pthread_mutex_unlock(&uu_panic_lock);
+#if !defined(PTHREAD_ONCE_KEY_NP)
 	(void) pthread_mutex_unlock(&uu_key_lock);
+#endif
 	uu_avl_release();
 	uu_list_release();
 }

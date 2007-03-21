@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +39,7 @@
 #include "synonyms.h"
 #include <mtlib.h>
 #include <dlfcn.h>
+#include <atomic.h>
 
 #define	__NSS_PRIVATE_INTERFACE
 #include "nsswitch_priv.h"
@@ -252,7 +254,7 @@ typedef struct nss_cfglist {
 
 #define	NSS_CFG_INCR	16
 
-static nss_cfglist_t *nss_cfg = (nss_cfglist_t *)NULL;
+static nss_cfglist_t *nss_cfg = NULL;
 static int nss_cfgcount = 0;
 static int nss_cfgmax = 0;
 static mutex_t nss_cfglock = DEFAULTMUTEX;
@@ -303,39 +305,47 @@ nss_cfgcn_cmp(const char *cfgname, const char *compname)
 static int
 nss_cfg_init()
 {
+	nss_cfglist_t *cfg;
 	int i;
 
 	/* First time caller? */
-	if (nss_cfg != NULL)
+	if (nss_cfg != NULL) {
+		membar_consumer();
 		return (0);
+	}
 
 	/* Initialize internal tables */
 	lmutex_lock(&nss_cfglock);
 	if (nss_cfg != NULL) {
 		lmutex_unlock(&nss_cfglock);
+		membar_consumer();
 		return (0);
 	}
-	nss_cfg = (nss_cfglist_t *)libc_malloc(NSS_CFG_INCR *
-					    sizeof (nss_cfglist_t));
-	if (nss_cfg == (nss_cfglist_t *)NULL) {
+	cfg = libc_malloc(NSS_CFG_INCR * sizeof (nss_cfglist_t));
+	if (cfg == NULL) {
 		errno = ENOMEM;
 		lmutex_unlock(&nss_cfglock);
 		return (-1);
 	}
-	nss_cfgmax = NSS_CFG_INCR;
-	for (i = 0; i < nss_cfgmax; i++) {
-		nss_cfg[i].list = (nss_cfgparam_t *)libc_malloc(NSS_CFG_INCR *
-					sizeof (nss_cfgparam_t));
-		if (nss_cfg[i].list == (nss_cfgparam_t *)NULL) {
+	for (i = 0; i < NSS_CFG_INCR; i++) {
+		cfg[i].list = libc_malloc(
+		    NSS_CFG_INCR * sizeof (nss_cfgparam_t));
+		if (cfg[i].list == NULL) {
+			while (--i >= 0)
+				libc_free(cfg[i].list);
+			libc_free(cfg);
 			errno = ENOMEM;
 			lmutex_unlock(&nss_cfglock);
 			return (-1);
 		}
-		nss_cfg[i].max = NSS_CFG_INCR;
+		cfg[i].max = NSS_CFG_INCR;
 	}
+	nss_cfgmax = NSS_CFG_INCR;
+	membar_producer();
+	nss_cfg = cfg;
+	lmutex_unlock(&nss_cfglock);
 
 	/* Initialize Policy Engine values */
-	lmutex_unlock(&nss_cfglock);
 	if (nss_cfg_policy_init() < 0) {
 		return (-1);
 	}
@@ -352,7 +362,7 @@ nss_cfgcomp_get(char *name, int add)
 	size_t	nsize;
 
 	/* Make sure system is init'd */
-	if (nss_cfg == NULL && nss_cfg_init() < 0)
+	if (nss_cfg_init() < 0)
 		return ((nss_cfglist_t *)NULL);
 
 	/* and check component:name validity */

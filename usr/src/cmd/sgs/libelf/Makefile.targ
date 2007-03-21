@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -131,6 +131,8 @@ wlocks/%.ll:	../common/%.c
 # to build a version of ld :-).
 
 native:		$(SGSPROTO)/$(DYNLIB)
+
+native :=	CPPFLAGS += -DNATIVE_BUILD
 
 $(SGSPROTO)/$(DYNLIB): \
 		pics .WAIT $$(PICS)

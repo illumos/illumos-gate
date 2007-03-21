@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,7 +103,7 @@ static int fieldnum = 0;		/* "owned" by fgetnetconfig() */
 static int *
 __nc_error(void)
 {
-	static pthread_key_t nc_error_key = 0;
+	static pthread_key_t nc_error_key = PTHREAD_ONCE_KEY_NP;
 	static int nc_error = NC_NOERROR;
 	int *ret;
 
@@ -815,7 +815,7 @@ char *
 nc_sperror(void)
 {
 	static char buf_main[BUFSIZ];
-	static pthread_key_t perror_key;
+	static pthread_key_t perror_key = PTHREAD_ONCE_KEY_NP;
 	char *retstr = thr_main()?
 		buf_main :
 		thr_get_storage(&perror_key, BUFSIZ, free);

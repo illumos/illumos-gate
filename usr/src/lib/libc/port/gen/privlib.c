@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +63,7 @@
 #include <strings.h>
 #include <synch.h>
 #include <alloca.h>
+#include <atomic.h>
 #include <sys/ucred.h>
 #include <sys/procfs.h>
 #include <sys/param.h>
@@ -233,7 +235,7 @@ __priv_free_info(priv_data_t *d)
 int
 lock_data(void)
 {
-	if (privdata == NULL && __priv_getdata() == NULL)
+	if (__priv_getdata() == NULL)
 		return (-1);
 
 	lmutex_lock(&pd_lock);
@@ -310,54 +312,59 @@ static priv_set_t *__priv_allocset(priv_data_t *);
 priv_data_t *
 __priv_getdata(void)
 {
-	lmutex_lock(&pd_lock);
 	if (privdata == NULL) {
-		priv_data_t *tmp;
-		priv_impl_info_t *ip;
-		size_t size = sizeof (priv_impl_info_t) + 2048;
-		size_t realsize;
-		priv_impl_info_t *aip = alloca(size);
+		lmutex_lock(&pd_lock);
+		if (privdata == NULL) {
+			priv_data_t *tmp;
+			priv_impl_info_t *ip;
+			size_t size = sizeof (priv_impl_info_t) + 2048;
+			size_t realsize;
+			priv_impl_info_t *aip = alloca(size);
 
-		if (getprivinfo(aip, size) != 0)
-			goto out;
+			if (getprivinfo(aip, size) != 0)
+				goto out;
 
-		realsize = PRIV_IMPL_INFO_SIZE(aip);
+			realsize = PRIV_IMPL_INFO_SIZE(aip);
 
-		ip = libc_malloc(realsize);
+			ip = libc_malloc(realsize);
 
-		if (ip == NULL)
-			goto out;
+			if (ip == NULL)
+				goto out;
 
-		if (realsize <= size) {
-			(void) memcpy(ip, aip, realsize);
-		} else if (getprivinfo(ip, realsize) != 0) {
-			libc_free(ip);
-			goto out;
-		}
+			if (realsize <= size) {
+				(void) memcpy(ip, aip, realsize);
+			} else if (getprivinfo(ip, realsize) != 0) {
+				libc_free(ip);
+				goto out;
+			}
 
-		if ((tmp = __priv_parse_info(ip)) == NULL) {
-			libc_free(ip);
-			goto out;
-		}
+			if ((tmp = __priv_parse_info(ip)) == NULL) {
+				libc_free(ip);
+				goto out;
+			}
 
-		/* Allocate the zoneset just once, here */
-		tmp->pd_zoneset = __priv_allocset(tmp);
-		if (tmp->pd_zoneset == NULL)
-			goto clean;
+			/* Allocate the zoneset just once, here */
+			tmp->pd_zoneset = __priv_allocset(tmp);
+			if (tmp->pd_zoneset == NULL)
+				goto clean;
 
-		if (zone_getattr(getzoneid(), ZONE_ATTR_PRIVSET,
-		    tmp->pd_zoneset, tmp->pd_setsize) == tmp->pd_setsize) {
-			privdata = tmp;
-			goto out;
-		}
+			if (zone_getattr(getzoneid(), ZONE_ATTR_PRIVSET,
+			    tmp->pd_zoneset, tmp->pd_setsize)
+			    == tmp->pd_setsize) {
+				membar_producer();
+				privdata = tmp;
+				goto out;
+			}
 
-		priv_freeset(tmp->pd_zoneset);
+			priv_freeset(tmp->pd_zoneset);
 clean:
-		__priv_free_info(tmp);
-		libc_free(ip);
-	}
+			__priv_free_info(tmp);
+			libc_free(ip);
+		}
 out:
-	lmutex_unlock(&pd_lock);
+		lmutex_unlock(&pd_lock);
+	}
+	membar_consumer();
 	return (privdata);
 }
 

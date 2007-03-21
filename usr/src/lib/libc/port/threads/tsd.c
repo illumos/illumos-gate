@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,6 +124,47 @@ _thr_keycreate(thread_key_t *pkey, void (*destructor)(void *))
 
 	if (old_data != NULL)
 		lfree(old_data, old_nkeys * sizeof (void *));
+
+	return (0);
+}
+
+/*
+ * Same as _thr_keycreate(), above, except that the key creation
+ * is performed only once.  This relies upon the fact that a key
+ * value of THR_ONCE_KEY is invalid, and requires that the key be
+ * allocated with a value of THR_ONCE_KEY before calling here.
+ * THR_ONCE_KEY and PTHREAD_ONCE_KEY_NP, defined in <thread.h>
+ * and <pthread.h> respectively, must have the same value.
+ * Example:
+ *
+ *	static pthread_key_t key = PTHREAD_ONCE_KEY_NP;
+ *	...
+ *	pthread_key_create_once_np(&key, destructor);
+ */
+#pragma weak pthread_key_create_once_np = _thr_keycreate_once
+#pragma weak _pthread_key_create_once_np = _thr_keycreate_once
+#pragma weak thr_keycreate_once = _thr_keycreate_once
+int
+_thr_keycreate_once(thread_key_t *keyp, void (*destructor)(void *))
+{
+	static mutex_t key_lock = DEFAULTMUTEX;
+	thread_key_t key;
+	int error;
+
+	if (*keyp == THR_ONCE_KEY) {
+		lmutex_lock(&key_lock);
+		if (*keyp == THR_ONCE_KEY) {
+			error = _thr_keycreate(&key, destructor);
+			if (error) {
+				lmutex_unlock(&key_lock);
+				return (error);
+			}
+			_membar_producer();
+			*keyp = key;
+		}
+		lmutex_unlock(&key_lock);
+	}
+	_membar_consumer();
 
 	return (0);
 }

@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +37,7 @@
 #include <dlfcn.h>
 #include <link.h>
 #include <thread.h>
+#include <atomic.h>
 /* headers for key2str/str2key routines */
 #include <sys/ethernet.h>
 #include <exec_attr.h>
@@ -319,10 +321,12 @@ nss_dbop_search(const char *name, uint32_t dbop)
 				}
 				getXbyYdbopHASH[hval] = i | DBOP_HASH_TAG;
 			}
+			membar_producer();
 			getXbyYdbop_hashed = 1;
 		}
 		lmutex_unlock(&getXbydbop_hash_lock);
 	}
+	membar_consumer();
 	cp = name;
 	hval = 0;
 	while (*cp) {

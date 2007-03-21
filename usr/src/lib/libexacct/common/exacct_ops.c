@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <thread.h>
+#include <pthread.h>
 
 #define	EXACCT_HDR_STR	"exacct"
 #define	EXACCT_HDR_LEN	7
@@ -45,9 +46,7 @@
 #define	DEFAULT_ENTRIES	4
 #define	SYSINFO_BUFSIZE	256
 
-static mutex_t		keylock;
-static thread_key_t	errkey;
-static int		keyonce = 0;
+static thread_key_t	errkey = THR_ONCE_KEY;
 static int		exacct_errval = 0;
 
 /*
@@ -298,29 +297,18 @@ exacct_seterr(int errval)
 		exacct_errval = errval;
 		return;
 	}
-	if (keyonce == 0) {
-		(void) mutex_lock(&keylock);
-		if (keyonce == 0) {
-			(void) thr_keycreate(&errkey, 0);
-			keyonce++;
-		}
-		(void) mutex_unlock(&keylock);
-	}
+	(void) thr_keycreate_once(&errkey, 0);
 	(void) thr_setspecific(errkey, (void *)(intptr_t)errval);
 }
 
 int
 ea_error(void)
 {
-	intptr_t errvalp;
-
 	if (thr_main())
 		return (exacct_errval);
-	if (keyonce == 0)
+	if (errkey == THR_ONCE_KEY)
 		return (EXR_OK);
-
-	(void) thr_getspecific(errkey, (void**)&errvalp);
-	return ((int)errvalp);
+	return ((int)(uintptr_t)pthread_getspecific(errkey));
 }
 
 /*

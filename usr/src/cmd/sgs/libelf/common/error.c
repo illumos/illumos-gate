@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,14 +30,15 @@
 #pragma weak	elf_errmsg = _elf_errmsg
 #pragma weak	elf_errno = _elf_errno
 
-#include	"syn.h"
-#include	<thread.h>
-#include	<stdlib.h>
-#include	<string.h>
-#include	<stdio.h>
-#include	<libelf.h>
-#include	"msg.h"
-#include	"decl.h"
+#include "syn.h"
+#include <thread.h>
+#include <pthread.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+#include <libelf.h>
+#include "msg.h"
+#include "decl.h"
 
 #define	ELFERRSHIFT	16
 #define	SYSERRMASK	0xffff
@@ -50,15 +51,48 @@
  */
 static int		_elf_err = 0;
 
-static mutex_t		keylock;
-static mutex_t		buflock;
-static thread_key_t	errkey;
-static thread_key_t	bufkey;
-static int		keyonce = 0;
-static int		bufonce = 0;
-NOTE(DATA_READABLE_WITHOUT_LOCK(keyonce))
-NOTE(DATA_READABLE_WITHOUT_LOCK(bufonce))
+#if !defined(NATIVE_BUILD)
 
+static thread_key_t	errkey = THR_ONCE_KEY;
+static thread_key_t	bufkey = THR_ONCE_KEY;
+
+#else	/* NATIVE_BUILD */
+
+/*
+ * This code is here to enable the building of a native version
+ * of libelf.so when the build machine has not yet been upgraded
+ * to a version of libc that provides thr_keycreate_once().
+ * It should be deleted when solaris_nevada ships.
+ * The code is not MT-safe in a relaxed memory model.
+ */
+
+static thread_key_t	errkey = 0;
+static thread_key_t	bufkey = 0;
+
+int
+thr_keycreate_once(thread_key_t *keyp, void (*destructor)(void *))
+{
+	static mutex_t key_lock = DEFAULTMUTEX;
+	thread_key_t key;
+	int error;
+
+	if (*keyp == 0) {
+		mutex_lock(&key_lock);
+		if (*keyp == 0) {
+			error = thr_keycreate(&key, destructor);
+			if (error) {
+				mutex_unlock(&key_lock);
+				return (error);
+			}
+			*keyp = key;
+		}
+		mutex_unlock(&key_lock);
+	}
+
+	return (0);
+}
+
+#endif	/* NATIVE_BUILD */
 
 extern char *_dgettext(const char *, const char *);
 
@@ -83,31 +117,17 @@ _elf_seterr(Msg lib_err, int sys_err)
 		return;
 	}
 #endif
-	if (keyonce == 0) {
-		(void) mutex_lock(&keylock);
-		if (keyonce == 0) {
-			(void) thr_keycreate(&errkey, 0);
-			keyonce++;
-		}
-		(void) mutex_unlock(&keylock);
-	}
-
+	(void) thr_keycreate_once(&errkey, 0);
 	(void) thr_setspecific(errkey, (void *)encerr);
 }
 
 int
 _elf_geterr() {
-	intptr_t	rc;
-
 #ifndef	__lock_lint
 	if (thr_main())
 		return (_elf_err);
 #endif
-	if (keyonce == 0)
-		return (0);
-
-	(void) thr_getspecific(errkey, (void **)(&rc));
-	return ((int)rc);
+	return ((uintptr_t)pthread_getspecific(errkey));
 }
 
 const char *
@@ -138,19 +158,9 @@ elf_errmsg(int err)
 		 *
 		 * Each thread has its own private buffer.
 		 */
-		if (bufonce == 0) {
-			(void) mutex_lock(&buflock);
-			if (bufonce == 0) {
-				if (thr_keycreate(&bufkey, free) != 0) {
-					(void) mutex_unlock(&buflock);
-					return (MSG_INTL(EBUG_THRDKEY));
-				}
-				bufonce++;
-			}
-			(void) mutex_unlock(&buflock);
-		}
-
-		(void) thr_getspecific(bufkey, (void **)&buffer);
+		if (thr_keycreate_once(&bufkey, free) != 0)
+			return (MSG_INTL(EBUG_THRDKEY));
+		buffer = pthread_getspecific(bufkey);
 
 		if (!buffer) {
 			if ((buffer = malloc(MAXELFERR)) == 0)

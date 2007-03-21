@@ -1,7 +1,8 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* common.c - Functions that are common to server and clinet
@@ -92,8 +93,7 @@ static void _sasl_dispose_context(_sasl_global_context_t *ctx);
 static int _sasl_getconf(void *context, const char **conf);
 
 #ifdef _INTEGRATED_SOLARIS_
-static int init_thread_set_specific = 0;
-static pthread_key_t errstring_key;
+static pthread_key_t errstring_key = PTHREAD_ONCE_KEY_NP;
 #endif /* _INTEGRATED_SOLARIS_ */
 #else
 static const char build_ident[] = "$Build: libsasl " PACKAGE "-" VERSION " $";
@@ -1110,8 +1110,6 @@ static int sasl_usererr(int saslerr)
 static void free_err_tsd(void *key)
 {
     free(key);
-
-    pthread_setspecific(errstring_key, NULL);
 }
 #endif /* _INTEGRATED_SOLARIS_ */
 
@@ -1216,21 +1214,13 @@ const char *sasl_errstring(int saslerr,
   if (s_utf8 == NULL)
     return s;
 
-  if (!init_thread_set_specific) {
-    LOCK_MUTEX(&global_mutex);
-    if (!init_thread_set_specific) {
-      if (pthread_key_create(&errstring_key, free_err_tsd) == 0)
-	init_thread_set_specific = 1;
-    }
-    UNLOCK_MUTEX(&global_mutex);
-  }
-  if (!init_thread_set_specific) {
+  if (pthread_key_create_once_np(&errstring_key, free_err_tsd) != 0) {
     free(s_utf8);
     return s;
   }
 
   tsd = pthread_getspecific(errstring_key);
-  if (tsd == NULL)
+  if (tsd != NULL)
     free(tsd);
   pthread_setspecific(errstring_key, s_utf8);
 

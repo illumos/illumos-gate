@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +29,7 @@
 #include "mt.h"
 #include "rpc_mt.h"
 #include <stdio.h>
+#include <atomic.h>
 #include <sys/errno.h>
 #include <dlfcn.h>
 #include <rpc/rpc.h>
@@ -64,13 +64,18 @@ static bool_t initialized = FALSE;
 static bool_t
 rpcgss_calls_init(void)
 {
-	void	*handle = NULL;
+	void	*handle;
 	bool_t	ret = FALSE;
 
+	if (initialized) {
+		membar_consumer();
+		return (TRUE);
+	}
 	(void) mutex_lock(&rpcgss_calls_mutex);
 	if (initialized) {
-		ret = TRUE;
-		goto done;
+		(void) mutex_unlock(&rpcgss_calls_mutex);
+		membar_consumer();
+		return (TRUE);
 	}
 
 	if ((handle = dlopen(RPCSEC, RTLD_LAZY)) == NULL)
@@ -137,6 +142,7 @@ done:
 		if (handle != NULL)
 			(void) dlclose(handle);
 	}
+	membar_producer();
 	initialized = ret;
 	(void) mutex_unlock(&rpcgss_calls_mutex);
 	return (ret);
@@ -152,7 +158,7 @@ rpc_gss_seccreate(
 	rpc_gss_options_req_t	*options_req,	/* requested options */
 	rpc_gss_options_ret_t	*options_ret)	/* returned options */
 {
-	if (!initialized && !rpcgss_calls_init())
+	if (!rpcgss_calls_init())
 		return (NULL);
 	return ((*calls.rpc_gss_seccreate)(clnt, principal, mechanism,
 				service_type, qop, options_req, options_ret));
@@ -161,7 +167,7 @@ rpc_gss_seccreate(
 bool_t
 rpc_gss_set_defaults(AUTH *auth, rpc_gss_service_t service, char *qop)
 {
-	if (!initialized && !rpcgss_calls_init())
+	if (!rpcgss_calls_init())
 		return (FALSE);
 	return ((*calls.rpc_gss_set_defaults)(auth, service, qop));
 }
@@ -174,7 +180,7 @@ rpc_gss_get_principal_name(
 	char			*node,
 	char			*secdomain)
 {
-	if (!initialized && !rpcgss_calls_init())
+	if (!rpcgss_calls_init())
 		return (FALSE);
 	return ((*calls.rpc_gss_get_principal_name)(principal, mechanism,
 					user_name, node, secdomain));
@@ -183,7 +189,7 @@ rpc_gss_get_principal_name(
 char **
 rpc_gss_get_mechanisms(void)
 {
-	if (!initialized && !rpcgss_calls_init())
+	if (!rpcgss_calls_init())
 		return (NULL);
 	return ((*calls.rpc_gss_get_mechanisms)());
 }
@@ -191,7 +197,7 @@ rpc_gss_get_mechanisms(void)
 char **
 rpc_gss_get_mech_info(char *mechanism, rpc_gss_service_t *service)
 {
-	if (!initialized && !rpcgss_calls_init())
+	if (!rpcgss_calls_init())
 		return (NULL);
 	return ((*calls.rpc_gss_get_mech_info)(mechanism, service));
 }
@@ -199,7 +205,7 @@ rpc_gss_get_mech_info(char *mechanism, rpc_gss_service_t *service)
 bool_t
 rpc_gss_get_versions(uint_t *vers_hi, uint_t *vers_lo)
 {
-	if (!initialized && !rpcgss_calls_init())
+	if (!rpcgss_calls_init())
 		return (FALSE);
 	return ((*calls.rpc_gss_get_versions)(vers_hi, vers_lo));
 }
@@ -207,7 +213,7 @@ rpc_gss_get_versions(uint_t *vers_hi, uint_t *vers_lo)
 bool_t
 rpc_gss_is_installed(char *mechanism)
 {
-	if (!initialized && !rpcgss_calls_init())
+	if (!rpcgss_calls_init())
 		return (FALSE);
 	return ((*calls.rpc_gss_is_installed)(mechanism));
 }
@@ -220,7 +226,7 @@ rpc_gss_set_svc_name(
 	uint_t			program,
 	uint_t			version)
 {
-	if (!initialized && !rpcgss_calls_init())
+	if (!rpcgss_calls_init())
 		return (FALSE);
 	return ((*calls.rpc_gss_set_svc_name)(principal, mechanism, req_time,
 						program, version));
@@ -229,7 +235,7 @@ rpc_gss_set_svc_name(
 bool_t
 rpc_gss_set_callback(rpc_gss_callback_t *cb)
 {
-	if (!initialized && !rpcgss_calls_init())
+	if (!rpcgss_calls_init())
 		return (FALSE);
 	return ((*calls.rpc_gss_set_callback)(cb));
 }
@@ -238,7 +244,7 @@ bool_t
 rpc_gss_getcred(struct svc_req *req, rpc_gss_rawcred_t **rcred,
 					rpc_gss_ucred_t **ucred, void **cookie)
 {
-	if (!initialized && !rpcgss_calls_init())
+	if (!rpcgss_calls_init())
 		return (FALSE);
 	return ((*calls.rpc_gss_getcred)(req, rcred, ucred, cookie));
 }
@@ -246,7 +252,7 @@ rpc_gss_getcred(struct svc_req *req, rpc_gss_rawcred_t **rcred,
 bool_t
 rpc_gss_mech_to_oid(char *mech, rpc_gss_OID *oid)
 {
-	if (!initialized && !rpcgss_calls_init())
+	if (!rpcgss_calls_init())
 		return (FALSE);
 	return ((*calls.rpc_gss_mech_to_oid)(mech, oid));
 }
@@ -254,7 +260,7 @@ rpc_gss_mech_to_oid(char *mech, rpc_gss_OID *oid)
 bool_t
 rpc_gss_qop_to_num(char *qop, char *mech, uint_t *num)
 {
-	if (!initialized && !rpcgss_calls_init())
+	if (!rpcgss_calls_init())
 		return (FALSE);
 	return ((*calls.rpc_gss_qop_to_num)(qop, mech, num));
 }
@@ -262,7 +268,7 @@ rpc_gss_qop_to_num(char *qop, char *mech, uint_t *num)
 enum auth_stat
 __svcrpcsec_gss(struct svc_req *rqst, struct rpc_msg *msg, bool_t *no_dispatch)
 {
-	if (!initialized && !rpcgss_calls_init())
+	if (!rpcgss_calls_init())
 		return (AUTH_FAILED);
 	return ((*calls.__svcrpcsec_gss)(rqst, msg, no_dispatch));
 }
@@ -271,7 +277,7 @@ bool_t
 __rpc_gss_wrap(AUTH *auth, char *buf, uint_t buflen, XDR *out_xdrs,
 					bool_t (*xdr_func)(), caddr_t xdr_ptr)
 {
-	if (!initialized && !rpcgss_calls_init())
+	if (!rpcgss_calls_init())
 		return (FALSE);
 	return ((*calls.__rpc_gss_wrap)(auth, buf, buflen, out_xdrs,
 							xdr_func, xdr_ptr));
@@ -281,7 +287,7 @@ bool_t
 __rpc_gss_unwrap(AUTH *auth, XDR *in_xdrs, bool_t (*xdr_func)(),
 								caddr_t xdr_ptr)
 {
-	if (!initialized && !rpcgss_calls_init())
+	if (!rpcgss_calls_init())
 		return (FALSE);
 	return ((*calls.__rpc_gss_unwrap)(auth, in_xdrs, xdr_func, xdr_ptr));
 }
@@ -289,7 +295,7 @@ __rpc_gss_unwrap(AUTH *auth, XDR *in_xdrs, bool_t (*xdr_func)(),
 int
 rpc_gss_max_data_length(AUTH *rpcgss_handle, int max_tp_unit_len)
 {
-	if (!initialized && !rpcgss_calls_init())
+	if (!rpcgss_calls_init())
 		return (0);
 	return ((*calls.rpc_gss_max_data_length)(rpcgss_handle,
 					max_tp_unit_len));
@@ -298,7 +304,7 @@ rpc_gss_max_data_length(AUTH *rpcgss_handle, int max_tp_unit_len)
 int
 rpc_gss_svc_max_data_length(struct svc_req *req, int max_tp_unit_len)
 {
-	if (!initialized && !rpcgss_calls_init())
+	if (!rpcgss_calls_init())
 		return (0);
 	return ((*calls.rpc_gss_svc_max_data_length)(req, max_tp_unit_len));
 }
@@ -306,7 +312,7 @@ rpc_gss_svc_max_data_length(struct svc_req *req, int max_tp_unit_len)
 void
 rpc_gss_get_error(rpc_gss_error_t *error)
 {
-	if (!initialized && !rpcgss_calls_init()) {
+	if (!rpcgss_calls_init()) {
 		error->rpc_gss_error = RPC_GSS_ER_SYSTEMERROR;
 		error->system_error = ENOTSUP;
 		return;

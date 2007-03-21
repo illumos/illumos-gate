@@ -1289,6 +1289,11 @@ extern	int	__rwlock_init(rwlock_t *, int, void *);
 extern	int	rw_read_is_held(rwlock_t *);
 extern	int	rw_write_is_held(rwlock_t *);
 
+extern	void	_membar_enter(void);
+extern	void	_membar_exit(void);
+extern	void	_membar_producer(void);
+extern	void	_membar_consumer(void);
+
 extern	int	_thr_continue(thread_t);
 extern	int	_thr_create(void *, size_t, void *(*)(void *), void *, long,
 			thread_t *);
@@ -1298,6 +1303,7 @@ extern	int	_thr_getprio(thread_t, int *);
 extern	int	_thr_getspecific(thread_key_t, void **);
 extern	int	_thr_join(thread_t, thread_t *, void **);
 extern	int	_thr_keycreate(thread_key_t *, PFrV);
+extern	int	_thr_keycreate_once(thread_key_t *, PFrV);
 extern	int	_thr_key_delete(thread_key_t);
 extern	int	_thr_main(void);
 extern	thread_t _thr_self(void);

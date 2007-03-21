@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,6 +104,7 @@ extern	int	_thr_kill(thread_t, int);
 extern	int	_thr_create(void *, size_t, void *(*)(void *), void *, long,
 			thread_t *);
 extern	int	_thr_keycreate(thread_key_t *, void (*)(void *));
+extern	int	_thr_keycreate_once(thread_key_t *, void (*)(void *));
 extern	int	_thr_setspecific(thread_key_t, void *);
 extern	int	_thr_getspecific(thread_key_t, void **);
 extern	void	*_pthread_getspecific(thread_key_t);

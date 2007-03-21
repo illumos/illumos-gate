@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,13 +19,13 @@
  * CDDL HEADER END
  */
 
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -48,6 +47,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <thread.h>
+#include <pthread.h>
 
 #ifndef _REENTRANT
 static char *bsplitchar = "\t\n";	/* characters that separate fields */
@@ -55,24 +55,23 @@ static char *bsplitchar = "\t\n";	/* characters that separate fields */
 
 #ifdef _REENTRANT
 static char **
-_get_bsplitchar(thread_key_t *key)
+_get_bsplitchar(thread_key_t *keyp)
 {
-	static char **strp = NULL;
 	static char *init_bsplitchar = "\t\n";
+	char **strp;
 
-	if (thr_getspecific(*key, (void **)&strp) != 0) {
-		if (thr_keycreate(key, free) != 0) {
-			return (NULL);
-		}
-	}
-	if (!strp) {
-		if (thr_setspecific(*key, (void *)(strp = malloc(
-			sizeof (char *)))) != 0) {
+	if (thr_keycreate_once(keyp, free) != 0)
+		return (NULL);
+	strp = pthread_getspecific(*keyp);
+	if (strp == NULL) {
+		strp = malloc(sizeof (char *));
+		if (thr_setspecific(*keyp, strp) != 0) {
 			if (strp)
 				(void) free(strp);
-			return (NULL);
+			strp = NULL;
 		}
-		*strp = init_bsplitchar;
+		if (strp != NULL)
+			*strp = init_bsplitchar;
 	}
 	return (strp);
 }
@@ -82,7 +81,7 @@ size_t
 bufsplit(char *buf, size_t dim, char **array)
 {
 #ifdef _REENTRANT
-	static thread_key_t key = 0;
+	static thread_key_t key = THR_ONCE_KEY;
 	char  **bsplitchar = _get_bsplitchar(&key);
 #define	bsplitchar (*bsplitchar)
 #endif /* _REENTRANT */

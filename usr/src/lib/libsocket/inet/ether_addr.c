@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <thread.h>
+#include <pthread.h>
 #include <sys/socket.h>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -240,27 +241,16 @@ typedef struct {
 static eabuf_t *
 ea_buf(void)
 {
-	static thread_key_t key;
-	static int key_once = 0;
-	static mutex_t tsd_lock = DEFAULTMUTEX;
+	static thread_key_t key = THR_ONCE_KEY;
 	static eabuf_t ea_main;
-	eabuf_t *eabuf = NULL;
+	eabuf_t *eabuf;
 
 	if (thr_main())
 		return (&ea_main);
 
-	if (key_once == 0) {
-		(void) mutex_lock(&tsd_lock);
-		if (key_once == 0) {
-			if (thr_keycreate(&key, free) != 0) {
-				(void) mutex_unlock(&tsd_lock);
-				return (NULL);
-			}
-			key_once = 1;
-		}
-		(void) mutex_unlock(&tsd_lock);
-	}
-	(void) thr_getspecific(key, (void **)&eabuf);
+	if (thr_keycreate_once(&key, free) != 0)
+		return (NULL);
+	eabuf = pthread_getspecific(key);
 	if (eabuf == NULL) {
 		eabuf = malloc(sizeof (eabuf_t));
 		(void) thr_setspecific(key, eabuf);

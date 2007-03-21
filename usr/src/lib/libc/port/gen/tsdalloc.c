@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,9 +65,7 @@ _free_tsdbuf(void *ptr)
 void *
 tsdalloc(__tsd_item_t n, size_t size, pfrv_t destructor)
 {
-	static int		once_key = 0;
-	static mutex_t		key_lock = DEFAULTMUTEX;
-	static thread_key_t	key;
+	static thread_key_t	key = THR_ONCE_KEY;
 	tsdent_t		*loc;
 	void			*p;
 	int			error;
@@ -77,17 +75,9 @@ tsdalloc(__tsd_item_t n, size_t size, pfrv_t destructor)
 		return (NULL);
 	}
 
-	if (once_key == 0) {
-		lmutex_lock(&key_lock);
-		if (once_key == 0) {
-			if ((error = _thr_keycreate(&key, _free_tsdbuf)) != 0) {
-				lmutex_unlock(&key_lock);
-				errno = error;
-				return (NULL);
-			}
-			once_key = 1;
-		}
-		lmutex_unlock(&key_lock);
+	if ((error = _thr_keycreate_once(&key, _free_tsdbuf)) != 0) {
+		errno = error;
+		return (NULL);
 	}
 
 	if ((loc = _pthread_getspecific(key)) != NULL) {

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -186,31 +185,21 @@ struct netconfig *
 __rpc_getconfip(char *nettype)
 {
 	char *netid;
-	char *netid_tcp = NULL;
-	char *netid_udp = NULL;
-	static char *netid_tcp_main;
-	static char *netid_udp_main;
-	static pthread_key_t tcp_key, udp_key;
+	char *netid_tcp;
+	char *netid_udp;
+	static char *netid_tcp_main = NULL;
+	static char *netid_udp_main = NULL;
+	static pthread_key_t tcp_key = PTHREAD_ONCE_KEY_NP;
+	static pthread_key_t udp_key = PTHREAD_ONCE_KEY_NP;
 	int main_thread;
-	extern mutex_t tsd_lock;
 
 	if ((main_thread = thr_main())) {
 		netid_udp = netid_udp_main;
 		netid_tcp = netid_tcp_main;
 	} else {
-		if (tcp_key == 0) {
-			(void) mutex_lock(&tsd_lock);
-			if (tcp_key == 0)
-				(void) pthread_key_create(&tcp_key, free);
-			(void) mutex_unlock(&tsd_lock);
-		}
+		(void) pthread_key_create_once_np(&tcp_key, free);
 		netid_tcp = pthread_getspecific(tcp_key);
-		if (udp_key == 0) {
-			(void) mutex_lock(&tsd_lock);
-			if (udp_key == 0)
-				(void) pthread_key_create(&udp_key, free);
-			(void) mutex_unlock(&tsd_lock);
-		}
+		(void) pthread_key_create_once_np(&udp_key, free);
 		netid_udp = pthread_getspecific(udp_key);
 	}
 	if (!netid_udp && !netid_tcp) {

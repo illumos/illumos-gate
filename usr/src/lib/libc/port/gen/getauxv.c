@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +37,7 @@
 #include <mtlib.h>
 #include <thread.h>
 #include <synch.h>
+#include <atomic.h>
 
 static mutex_t auxlock = DEFAULTMUTEX;
 
@@ -57,34 +57,37 @@ _getaux(int type)
 	 * passed to the process at exec(2).  Only do this once.
 	 */
 	if (auxb == NULL) {
-		struct stat statb;
-		int fd;
-
 		lmutex_lock(&auxlock);
-
 		if (auxb == NULL) {
+			struct stat statb;
+			auxv_t *buf = NULL;
+			int fd;
+
 			if ((fd = open("/proc/self/auxv", O_RDONLY)) != -1 &&
 			    fstat(fd, &statb) != -1)
-				auxb = libc_malloc(
+				buf = libc_malloc(
 				    statb.st_size + sizeof (auxv_t));
 
-			if (auxb != NULL) {
-				i = read(fd, auxb, statb.st_size);
+			if (buf != NULL) {
+				i = read(fd, buf, statb.st_size);
 				if (i != -1) {
 					nauxv = i / sizeof (auxv_t);
-					auxb[nauxv].a_type = AT_NULL;
+					buf[nauxv].a_type = AT_NULL;
 				} else {
-					libc_free(auxb);
-					auxb = NULL;
+					libc_free(buf);
+					buf = NULL;
 				}
 			}
 
 			if (fd != -1)
 				(void) close(fd);
-		}
 
+			membar_producer();
+			auxb = buf;
+		}
 		lmutex_unlock(&auxlock);
 	}
+	membar_consumer();
 
 	/*
 	 * Scan the auxiliary entries looking for the required type.

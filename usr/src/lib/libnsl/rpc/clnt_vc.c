@@ -20,9 +20,10 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -1117,7 +1118,7 @@ clnt_vc_destroy(CLIENT *cl)
 static int
 read_vc(void *ct_tmp, caddr_t buf, int len)
 {
-	static pthread_key_t pfdp_key;
+	static pthread_key_t pfdp_key = PTHREAD_ONCE_KEY_NP;
 	struct pollfd *pfdp;
 	int npfd;		/* total number of pfdp allocated */
 	struct ct_data *ct = ct_tmp;

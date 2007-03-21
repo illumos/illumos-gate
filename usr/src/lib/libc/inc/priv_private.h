@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,8 +41,8 @@
 extern "C" {
 #endif
 
-#define	LOADPRIVDATA(d)		if ((d = privdata) == NULL) d = __priv_getdata()
-#define	GETPRIVDATA()		(privdata == NULL ? __priv_getdata() : privdata)
+#define	LOADPRIVDATA(d)		d = __priv_getdata()
+#define	GETPRIVDATA()		__priv_getdata()
 #define	LOCKPRIVDATA()		{ \
 					/* Data already allocated */ \
 					(void) lock_data(); \

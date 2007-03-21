@@ -57,10 +57,9 @@ extern struct __res_state _res;
 extern int h_errno;
 
 #ifdef	DO_PTHREADS
-static pthread_key_t	key;
-static int		once = 0;
+static pthread_key_t	key = PTHREAD_ONCE_KEY_NP;
 #else
-static struct net_data	*net_data;
+static struct net_data	*net_data = NULL;
 #endif
 
 void
@@ -126,22 +125,10 @@ net_data_destroy(void *p) {
 struct net_data *
 net_data_init(const char *conf_file) {
 #ifdef	DO_PTHREADS
-	static pthread_mutex_t keylock = PTHREAD_MUTEX_INITIALIZER;
 	struct net_data *net_data;
 
-	if (!once) {
-		if (pthread_mutex_lock(&keylock) != 0)
-			return (NULL);
-		if (!once) {
-			if (pthread_key_create(&key, net_data_destroy) != 0) {
-				pthread_mutex_unlock(&keylock);
-				return (NULL);
-			}
-			once = 1;
-		}
-		if (pthread_mutex_unlock(&keylock) != 0)
-			return (NULL);
-	}
+	if (pthread_key_create_once_np(&key, net_data_destroy) != 0)
+		return (NULL);
 	net_data = pthread_getspecific(key);
 #endif
 

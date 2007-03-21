@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@
 #include <dirent.h>
 #include <limits.h>
 #include <signal.h>
+#include <atomic.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <sys/stat.h>
@@ -125,6 +126,7 @@ set_minfd(void)
 				fd = 256;
 			else if ((fd = rlim.rlim_cur / 2) < 3)
 				fd = 3;
+			membar_producer();
 			minfd = fd;
 		}
 		(void) mutex_unlock(&minfd_lock);

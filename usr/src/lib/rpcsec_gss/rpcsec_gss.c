@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1986-1995, 1997, 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -60,9 +60,9 @@ static bool_t	validate_seqwin();
  */
 extern bool_t	xdr_opaque_auth(XDR *, struct opaque_auth *);
 extern int	_thr_main(void);
-extern int	_thr_getspecific(thread_key_t key, void **valuep);
+extern void	*_pthread_getspecific(pthread_key_t key);
 typedef void	(*PFrV) (void *);
-extern int	_thr_keycreate(thread_key_t *pkey, PFrV destructor);
+extern int	_thr_keycreate_once(thread_key_t *pkey, PFrV destructor);
 extern int	_thr_setspecific(unsigned int key, void *value);
 
 
@@ -124,19 +124,15 @@ __rpc_gss_seccreate(clnt, server_name, mech, service, qop, options_req,
 	AUTH			*auth = NULL;
 	rpc_gss_data		*ap = NULL;
 	OM_uint32		qop_num;
-	rpc_gss_error_t		error;
-	void			__rpc_gss_get_error();
 
 	/*
 	 * convert ascii strings to GSS values
 	 */
 	if (!__rpc_gss_qop_to_num(qop, mech, &qop_num)) {
-		__rpc_gss_get_error(&error);
 		return (NULL);
 	}
 
 	if (!__rpc_gss_mech_to_oid(mech, &mech_type)) {
-		__rpc_gss_get_error(&error);
 		return (NULL);
 	}
 
@@ -900,46 +896,34 @@ __rpc_gss_max_data_length(auth, max_tp_unit_len)
 			max_tp_unit_len));
 }
 
+void
+__rpc_gss_get_error(rpc_gss_error_t *error)
+{
+	*error = rpc_gss_err;
+}
+
 #undef  rpc_gss_err
 
 rpc_gss_error_t	rpc_gss_err;
-static mutex_t	rge_lock;		/* protects TSD key creation */
 
 rpc_gss_error_t *
 __rpc_gss_err()
 {
-	static thread_key_t rpc_gss_err_key = 0;
-	rpc_gss_error_t *tsd = 0;
+	static thread_key_t rpc_gss_err_key = THR_ONCE_KEY;
+	rpc_gss_error_t *tsd;
 
 	if (_thr_main())
 		return (&rpc_gss_err);
-	if (_thr_getspecific(rpc_gss_err_key, (void **) &tsd) != 0) {
-		mutex_lock(&rge_lock);
-		if (_thr_keycreate(&rpc_gss_err_key, free) != 0) {
-			mutex_unlock(&rge_lock);
-			return (&rpc_gss_err);
-		}
-		mutex_unlock(&rge_lock);
-	}
-	if (!tsd) {
-		tsd = (rpc_gss_error_t *)
-			calloc(1, sizeof (rpc_gss_error_t));
-		if (_thr_setspecific(rpc_gss_err_key, (void *) tsd) != 0) {
+	if (_thr_keycreate_once(&rpc_gss_err_key, free) != 0)
+		return (&rpc_gss_err);
+	tsd = _pthread_getspecific(rpc_gss_err_key);
+	if (tsd == NULL) {
+		tsd = (rpc_gss_error_t *)calloc(1, sizeof (rpc_gss_error_t));
+		if (_thr_setspecific(rpc_gss_err_key, tsd) != 0) {
 			if (tsd)
 				free(tsd);
 			return (&rpc_gss_err);
 		}
-		memset(tsd, 0, sizeof (rpc_gss_error_t));
-		return (tsd);
 	}
 	return (tsd);
-}
-
-void
-__rpc_gss_get_error(error)
-	rpc_gss_error_t	*error;
-{
-
-	error->rpc_gss_error = rpc_gss_err.rpc_gss_error;
-	error->system_error = rpc_gss_err.system_error;
 }

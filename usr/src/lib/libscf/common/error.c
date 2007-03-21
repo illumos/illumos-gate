@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,36 +80,56 @@ static struct scf_error_info {
 	((e) >= scf_errors[0].ei_code && \
 	    (e) < scf_errors[SCF_NUM_ERRORS - 1].ei_code + 10)
 
-static pthread_mutex_t	scf_key_lock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_key_t	scf_error_key;
-static volatile int	scf_error_key_setup;
-
 static scf_error_t	_scf_fallback_error = SCF_ERROR_NONE;
+
+#if defined(PTHREAD_ONCE_KEY_NP)
+
+static pthread_key_t	scf_error_key = PTHREAD_ONCE_KEY_NP;
 
 int
 scf_setup_error(void)
 {
-	(void) pthread_mutex_lock(&scf_key_lock);
+	return (pthread_key_create_once_np(&scf_error_key, NULL) == 0);
+}
+
+#else	/* PTHREAD_ONCE_KEY_NP */
+
+/*
+ * This old code is here to enable the building of a native version
+ * of libscf.so when the build machine has not yet been upgraded
+ * to a version of libc that provides pthread_key_create_once_np().
+ * It should be deleted when solaris_nevada ships.
+ * This code is not MT-safe in a relaxed memory model.
+ */
+
+static pthread_key_t	scf_error_key = 0;
+
+int
+scf_setup_error(void)
+{
+	static pthread_mutex_t scf_key_lock = PTHREAD_MUTEX_INITIALIZER;
+	static volatile int scf_error_key_setup = 0;
+
 	if (scf_error_key_setup == 0) {
-		if (pthread_key_create(&scf_error_key, NULL) != 0)
-			scf_error_key_setup = -1;
-		else
-			scf_error_key_setup = 1;
+		(void) pthread_mutex_lock(&scf_key_lock);
+		if (scf_error_key_setup == 0) {
+			if (pthread_key_create(&scf_error_key, NULL) == 0)
+				scf_error_key_setup = 1;
+		}
+		(void) pthread_mutex_unlock(&scf_key_lock);
 	}
-	(void) pthread_mutex_unlock(&scf_key_lock);
 
 	return (scf_error_key_setup == 1);
 }
+
+#endif	/* PTHREAD_ONCE_KEY_NP */
 
 int
 scf_set_error(scf_error_t code)
 {
 	assert(LOOKS_VALID(code));
 
-	if (scf_error_key_setup == 0)
-		(void) scf_setup_error();
-
-	if (scf_error_key_setup > 0)
+	if (scf_setup_error())
 		(void) pthread_setspecific(scf_error_key, (void *)code);
 	else
 		_scf_fallback_error = code;
@@ -121,15 +141,9 @@ scf_error(void)
 {
 	scf_error_t ret;
 
-	if (scf_error_key_setup < 0)
-		return (_scf_fallback_error);
-
-	if (scf_error_key_setup == 0)
-		return (SCF_ERROR_NONE);
-
 	ret = (scf_error_t)pthread_getspecific(scf_error_key);
 	if (ret == 0)
-		return (SCF_ERROR_NONE);
+		return (_scf_fallback_error);
 	assert(LOOKS_VALID(ret));
 	return (ret);
 }

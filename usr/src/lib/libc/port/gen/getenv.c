@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -131,26 +131,29 @@ envsize(const char **e)
 static void
 initenv()
 {
-	lmutex_lock(&update_lock);
 	if ((my_environ != environ) || !initenv_done) {
-		if (!initenv_done) {
-			/* Call the NLSPATH janitor in. */
-			clean_env();
+		lmutex_lock(&update_lock);
+		if ((my_environ != environ) || !initenv_done) {
+			if (!initenv_done) {
+				/* Call the NLSPATH janitor in. */
+				clean_env();
 
-			/* Pacify leak detectors in normal operation. */
-			orig_environ = environ;
+				/* Pacify leak detectors in normal operation. */
+				orig_environ = environ;
 #ifdef __lint
-			my_environ = orig_environ;
+				my_environ = orig_environ;
 #endif
+			}
 
+			my_environ = environ;
+			environ_base = my_environ;
+			environ_size = envsize(environ_base);
+			membar_producer();
 			initenv_done = 1;
 		}
-
-		my_environ = environ;
-		environ_base = my_environ;
-		environ_size = envsize(environ_base);
+		lmutex_unlock(&update_lock);
 	}
-	lmutex_unlock(&update_lock);
+	membar_consumer();
 }
 
 /*
@@ -220,8 +223,7 @@ addtoenv(char *string, int overwrite)
 	int			new_size;
 	int			old_gen;
 
-	if ((my_environ != environ) || !initenv_done)
-		initenv();
+	initenv();
 
 	lmutex_lock(&update_lock);
 
@@ -419,8 +421,7 @@ unsetenv(const char *name)
 		return (-1);
 	}
 
-	if ((my_environ != environ) || !initenv_done)
-		initenv();
+	initenv();
 
 	lmutex_lock(&update_lock);
 
@@ -455,8 +456,7 @@ getenv(const char *name)
 {
 	char			*value;
 
-	if (!initenv_done)
-		initenv();
+	initenv();
 
 	if (findenv(environ, name, 1, &value) != NULL)
 		return (value);

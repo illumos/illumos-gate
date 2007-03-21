@@ -20,9 +20,10 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -457,7 +458,7 @@ registerrpc(rpcprog_t prognum, rpcvers_t versnum, rpcproc_t procnum,
  * All the following clnt_broadcast stuff is convulated; it supports
  * the earlier calling style of the callback function
  */
-static pthread_key_t	clnt_broadcast_key;
+static pthread_key_t	clnt_broadcast_key = PTHREAD_ONCE_KEY_NP;
 static resultproc_t	clnt_broadcast_result_main;
 
 /*
@@ -485,18 +486,10 @@ clnt_broadcast(rpcprog_t prog, rpcvers_t vers, rpcproc_t proc, xdrproc_t xargs,
 	caddr_t argsp, xdrproc_t xresults,
 	caddr_t resultsp, resultproc_t eachresult)
 {
-	extern mutex_t tsd_lock;
-
 	if (thr_main()) {
 		clnt_broadcast_result_main = eachresult;
 	} else {
-		if (clnt_broadcast_key == 0) {
-			(void) mutex_lock(&tsd_lock);
-			if (clnt_broadcast_key == 0)
-				(void) pthread_key_create(&clnt_broadcast_key,
-									NULL);
-			(void) mutex_unlock(&tsd_lock);
-		}
+		(void) pthread_key_create_once_np(&clnt_broadcast_key, NULL);
 		(void) pthread_setspecific(clnt_broadcast_key,
 							(void *)eachresult);
 	}

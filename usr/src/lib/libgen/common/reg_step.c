@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,13 +19,13 @@
  * CDDL HEADER END
  */
 
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -46,6 +45,7 @@
 #include <string.h>
 #include <synch.h>
 #include <thread.h>
+#include <pthread.h>
 #include <widec.h>
 #include "_regexp.h"
 
@@ -59,7 +59,7 @@ char	*braslist[_NBRA] = { (char *)0};
 char	*braelist[_NBRA] = { (char *)0};
 
 #ifdef  _REENTRANT
-static thread_key_t key = 0;
+static thread_key_t key = THR_ONCE_KEY;
 typedef struct _vars_storage {
 	char	*loc1, *loc2, *locs;
 	char    *braslist[_NBRA];
@@ -79,21 +79,19 @@ static char *start;
 static mutex_t lock = DEFAULTMUTEX;
 
 static vars_storage *
-_get_vars_storage(thread_key_t *key)
+_get_vars_storage(thread_key_t *keyp)
 {
-	vars_storage *vars = NULL;
+	vars_storage *vars;
 
-	if (thr_getspecific(*key, (void **)&vars) != 0) {
-		if (thr_keycreate(key, free) != 0) {
-			return (NULL);
-		}
-	}
-	if (!vars) {
-		if (thr_setspecific(*key, (void *)(vars =
-			calloc(1, sizeof (vars_storage)))) != 0) {
+	if (thr_keycreate_once(keyp, free) != 0)
+		return (NULL);
+	vars = pthread_getspecific(*keyp);
+	if (vars == NULL) {
+		vars = calloc(1, sizeof (vars_storage));
+		if (thr_setspecific(*keyp, vars) != 0) {
 			if (vars)
 				(void) free(vars);
-			return (NULL);
+			vars = NULL;
 		}
 	}
 	return (vars);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -468,7 +468,7 @@ nis_leaf_of_r(
 	return (buf);
 }
 
-static pthread_key_t buf_key;
+static pthread_key_t buf_key = PTHREAD_ONCE_KEY_NP;
 static char buf_main[LN_BUFSIZE];
 
 nis_name
@@ -840,7 +840,7 @@ nis_clone_object(
 	nis_object	*obj,	/* The object to clone */
 	nis_object	*dest)	/* Use this pointer if non-null */
 {
-	static pthread_key_t clone_buf_key;
+	static pthread_key_t clone_buf_key = PTHREAD_ONCE_KEY_NP;
 	static struct nis_sdata clone_buf_main;
 	struct nis_sdata *clone_buf_ptr;
 
@@ -2107,7 +2107,7 @@ nis_old_data_r(
 char *
 nis_old_data(char *s)
 {
-	static pthread_key_t 	bs_key;
+	static pthread_key_t 	bs_key = PTHREAD_ONCE_KEY_NP;
 	static struct nis_sdata	bs_main;
 	struct nis_sdata	*bs_ptr;
 
@@ -2161,7 +2161,7 @@ nis_data_r(char *s, struct nis_sdata *bs_ptr)
 char *
 nis_data(char *s)
 {
-	static pthread_key_t 	bs_key;
+	static pthread_key_t 	bs_key = PTHREAD_ONCE_KEY_NP;
 	static struct nis_sdata	bs_main;
 	struct nis_sdata	*bs_ptr;
 
