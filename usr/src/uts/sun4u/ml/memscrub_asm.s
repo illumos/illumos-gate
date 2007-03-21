@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996 by Sun Microsystems, Inc.
+ * Copyright (c) 2007 by Sun Microsystems, Inc.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -69,12 +69,16 @@ memscrub_read(caddr_t vaddr, u_int blks)
 	wr	%g0, FPRS_FEF, %fprs		! enable fp
 
 1:
+	prefetch [%o0 + 8*64], 0
 	ldda	[%o0]ASI_BLK_P, %d0
 	add	%o0, 64, %o0
+	prefetch [%o0 + 8*64], 0
 	ldda	[%o0]ASI_BLK_P, %d16
 	add	%o0, 64, %o0
+	prefetch [%o0 + 8*64], 0
 	ldda	[%o0]ASI_BLK_P, %d32
 	add	%o0, 64, %o0
+	prefetch [%o0 + 8*64], 0
 	ldda	[%o0]ASI_BLK_P, %d48
 	dec	%o1
 	brnz,a	%o1, 1b

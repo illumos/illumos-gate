@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,13 +46,13 @@
  *
  * It attempts to do this as unobtrusively as possible.  The thread
  * schedules itself to wake up at an interval such that if it reads
- * memscrub_span_pages (8MB) on each wakeup, it will read all of physical
+ * memscrub_span_pages (32MB) on each wakeup, it will read all of physical
  * memory in in memscrub_period_sec (12 hours).
  *
- * The scrubber uses the block load hardware to read memory @ 268MB/s,
- * so it reads spans of 8MB in 0.03 seconds.  Unlike the original sun4d
- * scrubber the sun4u scrubber does not read ahead if the system is idle
- * because we can read memory very efficently.
+ * The scrubber uses the block load and prefetch hardware to read memory
+ * @ 1300MB/s, so it reads spans of 32MB in 0.025 seconds.  Unlike the
+ * original sun4d scrubber the sun4u scrubber does not read ahead if the
+ * system is idle because we can read memory very efficently.
  *
  * The scrubber maintains a private copy of the phys_install memory list
  * to keep track of what memory should be scrubbed.
@@ -79,7 +79,7 @@
  *
  * If the scrubber's sleep time calculation drops to zero ticks,
  * memscrub_override_ticks will be used as the sleep time instead. The
- * sleep time should only drop to zero on a system with over 32.95
+ * sleep time should only drop to zero on a system with over 131.84
  * terabytes of memory, or where the default scrubber parameters have
  * been adjusted. For example, reducing memscrub_span_pages or
  * memscrub_period_sec causes the sleep time to drop to zero with less
@@ -106,7 +106,7 @@
  * MEMSCRUB_MIN_PAGES (32MB) is the minimum amount of memory a system
  * must have before we'll start the scrubber.
  *
- * MEMSCRUB_DFL_SPAN_PAGES (8MB) is based on the guess that 0.03 sec
+ * MEMSCRUB_DFL_SPAN_PAGES (32MB) is based on the guess that 0.025 sec
  * is a "good" amount of minimum time for the thread to run at a time.
  *
  * MEMSCRUB_DFL_PERIOD_SEC (12 hours) is nearly a total guess --
@@ -169,7 +169,7 @@ void memscrub_induced_error(void);
 /*
  * scan at least MEMSCRUB_DFL_SPAN_PAGES each iteration
  */
-#define	MEMSCRUB_DFL_SPAN_PAGES	((8 * 1024 * 1024) / PAGESIZE)
+#define	MEMSCRUB_DFL_SPAN_PAGES	((32 * 1024 * 1024) / PAGESIZE)
 
 /*
  * almost anything is higher priority than scrubbing
