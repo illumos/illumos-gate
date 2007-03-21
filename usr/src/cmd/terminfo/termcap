@@ -1,5 +1,5 @@
 #
-# Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -1079,6 +1079,32 @@ N1|aa|annarbor|4080|ann arbor 4080:\
 	:do=^J:pt:ct=^\^P^P:st=^]^P1:cm=^O%r%\066%.%>^S^L%+@:\
 	:co#80:li#40:le=^H:bs:cl=2^L:up=^N:nd=^_:ho=^K:am:\
 	:kb=^^:kd=^J:ku=^N:kl=^H:kr=^_:kh=^K:ma=^_ ^N^P:
+# ^L# --------------------------------
+#
+# S: SCREEN 
+#
+# Screen is a curses based virtual terminal multiplexor.
+SC|screen|VT 100/ANSI X3.64 virtual terminal:\
+	:am:xn:ms:mi:G0:km:\
+	:DO=\E[%dB:LE=\E[%dD:RI=\E[%dC:UP=\E[%dA:bs:bt=\E[Z:\
+	:cb=\E[1K:cd=\E[J:ce=\E[K:cl=\E[H\E[J:cm=\E[%i%d;%dH:ct=\E[3g:\
+	:do=^J:nd=\E[C:pt:rc=\E8:rs=\Ec:sc=\E7:st=\EH:up=\EM:\
+	:le=^H:bl=^G:cr=^M:it#8:ho=\E[H:nw=\EE:ta=^I:is=\E)0:\
+	:li#24:co#80:us=\E[4m:ue=\E[24m:so=\E[3m:se=\E[23m:\
+	:mb=\E[5m:md=\E[1m:mr=\E[7m:me=\E[m:sr=\EM:al=\E[L:\
+	:AL=\E[%dL:dl=\E[M:DL=\E[%dM:cs=\E[%i%d;%dr:dc=\E[P:\
+	:DC=\E[%dP:im=\E[4h:ei=\E[4l:IC=\E[%d@:\
+	:ks=\E[?1h\E=:ke=\E[?1l\E>:vb=\Eg:\
+	:ku=\EOA:kd=\EOB:kr=\EOC:kl=\EOD:kb=^H:\
+	:k1=\EOP:k2=\EOQ:k3=\EOR:k4=\EOS:k5=\E[15~:k6=\E[17~:\
+	:k7=\E[18~:k8=\E[19~:k9=\E[20~:k;=\E[21~:F1=\E[23~:F2=\E[24~:\
+	:kh=\E[1~:kI=\E[2~:kD=\E[3~:kH=\E[4~:@7=\E[4~:kP=\E[5~:\
+	:kN=\E[6~:eA=\E(B\E)0:as=^N:ae=^O:\
+	:vi=\E[?25l:ve=\E[34h\E[?25h:vs=\E[34l:\
+	:Co#8:pa#64:AF=\E[3%dm:AB=\E[4%dm:op=\E[39;49m:AX:\
+	:ac=``aaffggjjkkllmmnnooppqqrrssttuuvvwwxxyyzz{{||}}~~..--++,,hhII00:
+SW|screen-w|VT 100/ANSI X3.64 virtual terminal with 132 cols:\
+	:co#132:tc=screen:
 # # --------------------------------
 #
 # T: TELETYPE
@@ -1709,6 +1735,9 @@ x5|xpcterm|X PC-compatible terminal:\
 	:ko=nd,up,ho,ic:
 x6|xpcterms|X PC-compatible terminal (small):\
 	:co#80:li#25:tc=xpcterm:
+x7|xtermc|xterm-color|xterm terminal emulator (color):\
+	:Co#8:NC#7:pa#64:\
+	:AB=\E[4%dm:AF=\E[3%dm:ac=:op=\E[100m:tc=xterm:
 
 # # --------------------------------
 #

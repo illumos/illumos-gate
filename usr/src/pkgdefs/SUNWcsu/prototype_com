@@ -926,6 +926,8 @@ f none usr/share/lib/terminfo/a/ansi+tabs 644 root bin
 f none usr/share/lib/terminfo/a/at386 644 root bin
 f none usr/share/lib/terminfo/a/at386-m 644 root bin
 d none usr/share/lib/terminfo/s 755 root bin
+f none usr/share/lib/terminfo/s/screen 644 root bin 
+f none usr/share/lib/terminfo/s/screen-w 644 root bin
 f none usr/share/lib/terminfo/s/sun 644 root bin
 f none usr/share/lib/terminfo/s/sun-1 644 root bin
 f none usr/share/lib/terminfo/s/sun-12 644 root bin
@@ -973,6 +975,7 @@ f none usr/share/lib/terminfo/v/vt132 644 root bin
 f none usr/share/lib/terminfo/v/vt220 644 root bin
 d none usr/share/lib/terminfo/x 755 root bin
 l none usr/share/lib/terminfo/x/xterm=../../../../../usr/share/lib/terminfo/v/vs100
+l none usr/share/lib/terminfo/x/xterm-color=../../../../../usr/share/lib/terminfo/x/xtermc
 f none usr/share/lib/terminfo/x/xtermc 644 root bin
 f none usr/share/lib/terminfo/x/xtermm 644 root bin
 l none usr/share/lib/terminfo/x/xterms=../../../../../usr/share/lib/terminfo/v/vs100s
