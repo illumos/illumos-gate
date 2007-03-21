@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1107,15 +1107,15 @@ pci_intx_get_pending(dev_info_t *dip, int *pendingp)
 int
 pci_devclass_to_ipl(int class)
 {
-	int	base_cl;
 	int	ipl;
-
-	base_cl = (class & 0xff0000) >> 16;
+	int	base_class = (class & 0xff0000) >> 16;
+	int	sub_class = (class & 0xff00) >> 8;
 
 	/*
 	 * Use the class code values to construct an ipl for the device.
 	 */
-	switch (base_cl) {
+
+	switch (base_class) {
 	default:
 	case PCI_CLASS_NONE:
 		ipl = 1;
@@ -1128,6 +1128,9 @@ pci_devclass_to_ipl(int class)
 		break;
 	case PCI_CLASS_DISPLAY:
 		ipl = 0x9;
+		break;
+	case PCI_CLASS_SERIALBUS:
+		ipl = (sub_class == PCI_SERIAL_IB) ? 6 : 1;
 		break;
 	/*
 	 * for high priority interrupt handlers, use level 12
@@ -1143,6 +1146,7 @@ pci_devclass_to_ipl(int class)
 		ipl = 0xc;
 		break;
 	}
+
 	return (ipl);
 }
 
