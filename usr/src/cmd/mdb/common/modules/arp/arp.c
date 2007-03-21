@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,11 +80,86 @@ typedef struct ace_walk_data {
 	int awd_idx;
 } ace_walk_data_t;
 
+/*
+ * Given the kernel address of an arl_t, return the stackid
+ */
 static int
-arl_walk_init(mdb_walk_state_t *wsp)
+arl_to_stackid(uintptr_t addr)
 {
-	if (wsp->walk_addr == NULL &&
-	    mdb_readvar(&wsp->walk_addr, "arl_g_head") == -1) {
+	arl_t arl;
+	queue_t rq;
+	ar_t ar;
+	arp_stack_t ass;
+	netstack_t nss;
+
+	if (mdb_vread(&arl, sizeof (arl), addr) == -1) {
+		mdb_warn("failed to read arl_t %p", addr);
+		return (0);
+	}
+
+	addr = (uintptr_t)arl.arl_rq;
+	if (mdb_vread(&rq, sizeof (rq), addr) == -1) {
+		mdb_warn("failed to read queue_t %p", addr);
+		return (0);
+	}
+
+	addr = (uintptr_t)rq.q_ptr;
+	if (mdb_vread(&ar, sizeof (ar), addr) == -1) {
+		mdb_warn("failed to read ar_t %p", addr);
+		return (0);
+	}
+
+	addr = (uintptr_t)ar.ar_as;
+	if (mdb_vread(&ass, sizeof (ass), addr) == -1) {
+		mdb_warn("failed to read arp_stack_t %p", addr);
+		return (0);
+	}
+	addr = (uintptr_t)ass.as_netstack;
+	if (mdb_vread(&nss, sizeof (nss), addr) == -1) {
+		mdb_warn("failed to read netstack_t %p", addr);
+		return (0);
+	}
+	return (nss.netstack_stackid);
+}
+
+static int
+arp_stacks_walk_init(mdb_walk_state_t *wsp)
+{
+	if (mdb_layered_walk("netstack", wsp) == -1) {
+		mdb_warn("can't walk 'netstack'");
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
+}
+
+static int
+arp_stacks_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t addr;
+	netstack_t nss;
+
+	if (mdb_vread(&nss, sizeof (nss), wsp->walk_addr) == -1) {
+		mdb_warn("can't read netstack at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	addr = (uintptr_t)nss.netstack_modules[NS_ARP];
+
+	return (wsp->walk_callback(addr, wsp->walk_layer, wsp->walk_cbdata));
+}
+
+static int
+arl_stack_walk_init(mdb_walk_state_t *wsp)
+{
+	uintptr_t addr;
+
+	if (wsp->walk_addr == NULL) {
+		mdb_warn("arl_stack supports only local walks\n");
+		return (WALK_ERR);
+	}
+
+	addr = wsp->walk_addr + OFFSETOF(arp_stack_t, as_arl_head);
+	if (mdb_vread(&wsp->walk_addr, sizeof (wsp->walk_addr),
+	    addr) == -1) {
 		mdb_warn("failed to read 'arl_g_head'");
 		return (WALK_ERR);
 	}
@@ -92,7 +167,7 @@ arl_walk_init(mdb_walk_state_t *wsp)
 }
 
 static int
-arl_walk_step(mdb_walk_state_t *wsp)
+arl_stack_walk_step(mdb_walk_state_t *wsp)
 {
 	uintptr_t addr = wsp->walk_addr;
 	arl_t arl;
@@ -111,26 +186,55 @@ arl_walk_step(mdb_walk_state_t *wsp)
 }
 
 static int
-ace_walk_init(mdb_walk_state_t *wsp)
+arl_walk_init(mdb_walk_state_t *wsp)
+{
+	if (mdb_layered_walk("arp_stacks", wsp) == -1) {
+		mdb_warn("can't walk 'arp_stacks'");
+		return (WALK_ERR);
+	}
+
+	return (WALK_NEXT);
+}
+
+static int
+arl_walk_step(mdb_walk_state_t *wsp)
+{
+	if (mdb_pwalk("arl_stack", wsp->walk_callback,
+		wsp->walk_cbdata, wsp->walk_addr) == -1) {
+		mdb_warn("couldn't walk 'arl_stack' at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
+}
+
+/*
+ * Called with walk_addr being the address of arp_stack_t
+ */
+static int
+ace_stack_walk_init(mdb_walk_state_t *wsp)
 {
 	ace_walk_data_t *aw;
+	uintptr_t addr;
 
-	if (wsp->walk_addr != NULL) {
-		mdb_warn("ace supports only global walks\n");
+	if (wsp->walk_addr == NULL) {
+		mdb_warn("ace_stack supports only local walks\n");
 		return (WALK_ERR);
 	}
 
 	aw = mdb_alloc(sizeof (ace_walk_data_t), UM_SLEEP);
 
-	if (mdb_readsym(aw->awd_hash_tbl, sizeof (aw->awd_hash_tbl),
-	    "ar_ce_hash_tbl") == -1) {
-		mdb_warn("failed to read 'ar_ce_hash_tbl'");
+	addr = wsp->walk_addr + OFFSETOF(arp_stack_t, as_ce_hash_tbl);
+	if (mdb_vread(aw->awd_hash_tbl, sizeof (aw->awd_hash_tbl),
+	    addr) == -1) {
+		mdb_warn("failed to read 'as_ce_hash_tbl'");
 		mdb_free(aw, sizeof (ace_walk_data_t));
 		return (WALK_ERR);
 	}
 
-	if (mdb_readvar(&aw->awd_masks, "ar_ce_mask_entries") == -1) {
-		mdb_warn("failed to read 'ar_ce_mask_entries'");
+	addr = wsp->walk_addr + OFFSETOF(arp_stack_t, as_ce_mask_entries);
+	if (mdb_vread(&aw->awd_masks, sizeof (aw->awd_masks),
+	    addr) == -1) {
+		mdb_warn("failed to read 'as_ce_mask_entries'");
 		mdb_free(aw, sizeof (ace_walk_data_t));
 		return (WALK_ERR);
 	}
@@ -144,7 +248,7 @@ ace_walk_init(mdb_walk_state_t *wsp)
 }
 
 static int
-ace_walk_step(mdb_walk_state_t *wsp)
+ace_stack_walk_step(mdb_walk_state_t *wsp)
 {
 	uintptr_t addr;
 	ace_walk_data_t *aw = wsp->walk_data;
@@ -177,10 +281,33 @@ ace_walk_step(mdb_walk_state_t *wsp)
 }
 
 static void
-ace_walk_fini(mdb_walk_state_t *wsp)
+ace_stack_walk_fini(mdb_walk_state_t *wsp)
 {
 	mdb_free(wsp->walk_data, sizeof (ace_walk_data_t));
 }
+
+static int
+ace_walk_init(mdb_walk_state_t *wsp)
+{
+	if (mdb_layered_walk("arp_stacks", wsp) == -1) {
+		mdb_warn("can't walk 'arp_stacks'");
+		return (WALK_ERR);
+	}
+
+	return (WALK_NEXT);
+}
+
+static int
+ace_walk_step(mdb_walk_state_t *wsp)
+{
+	if (mdb_pwalk("ace_stack", wsp->walk_callback,
+		wsp->walk_cbdata, wsp->walk_addr) == -1) {
+		mdb_warn("couldn't walk 'ace_stack' at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+	return (WALK_NEXT);
+}
+
 
 /* Common routine to produce an 'ar' text description */
 static void
@@ -326,9 +453,9 @@ arl_cb(uintptr_t addr, const void *arlptr, void *dummy)
 		(void) strcat(flags, "?");
 		break;
 	}
-	mdb_printf("  %8d  %-3s  %-9s  %s\n",
+	mdb_printf("  %8d  %-3s  %-9s  %-17s %5d\n",
 	    mdb_mblk_count(arl->arl_dlpi_deferred), flags, arl->arl_name,
-	    macstr);
+	    macstr, arl_to_stackid((uintptr_t)addr));
 	return (WALK_NEXT);
 }
 
@@ -342,9 +469,9 @@ arl_cmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	arl_t arl;
 
 	if (DCMD_HDRSPEC(flags) && !(flags & DCMD_PIPE_OUT)) {
-		mdb_printf("%<u>%?s  %16s  %8s  %3s  %9s  %s%</u>\n",
+		mdb_printf("%<u>%?s  %16s  %8s  %3s  %9s  %-17s %5s%</u>\n",
 		    "ARL", "DLPI REQ", "DLPI CNT", "FLG", "INTERFACE",
-		    "HWADDR");
+		    "HWADDR", "STACK");
 	}
 
 	if (flags & DCMD_ADDRSPEC) {
@@ -425,7 +552,8 @@ ace_cb(uintptr_t addr, const void *aceptr, void *dummy)
 	} else {
 		(void) strcpy(addrstr, "?");
 	}
-	mdb_printf("%?p  %-18s  %-8s  %s\n", addr, addrstr, flags, macstr);
+	mdb_printf("%?p  %-18s  %-8s  %-17s %5d\n", addr, addrstr, flags,
+	    macstr, arl_to_stackid((uintptr_t)ace->ace_arl));
 	return (WALK_NEXT);
 }
 
@@ -439,8 +567,8 @@ ace_cmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	ace_t ace;
 
 	if (DCMD_HDRSPEC(flags) && !(flags & DCMD_PIPE_OUT)) {
-		mdb_printf("%<u>%?s  %-18s  %-8s  %s%</u>\n",
-		    "ACE", "PROTOADDR", "FLAGS", "HWADDR");
+		mdb_printf("%<u>%?s  %-18s  %-8s  %-17s %5s%</u>\n",
+		    "ACE", "PROTOADDR", "FLAGS", "HWADDR", "STACK");
 	}
 
 	if (flags & DCMD_ADDRSPEC) {
@@ -666,9 +794,11 @@ arp_wnext(const queue_t *q)
 }
 
 static const mdb_dcmd_t dcmds[] = {
-	{ "ar", "?", "display ARP client streams", ar_cmd, NULL },
-	{ "arl", "?", "display ARP link layers", arl_cmd, NULL },
-	{ "ace", "?", "display ARP cache entries", ace_cmd, NULL },
+	{ "ar", "?", "display ARP client streams for all stacks",
+	    ar_cmd, NULL },
+	{ "arl", "?", "display ARP link layers for all stacks", arl_cmd, NULL },
+	{ "ace", "?", "display ARP cache entries for all stacks",
+	    ace_cmd, NULL },
 	{ "arphdr", ":", "display an ARP header", arphdr_cmd, NULL },
 	{ "arpcmd", ":", "display an ARP command", arpcmd_cmd, NULL },
 	{ NULL }
@@ -676,10 +806,16 @@ static const mdb_dcmd_t dcmds[] = {
 
 /* Note: ar_t walker is in genunix.c and net.c; generic MI walker */
 static const mdb_walker_t walkers[] = {
-	{ "arl", "walk list of arl_t links",
+	{ "arl", "walk list of arl_t links for all stacks",
 	    arl_walk_init, arl_walk_step, NULL },
-	{ "ace", "walk list of ace_t entries",
-	    ace_walk_init, ace_walk_step, ace_walk_fini },
+	{ "arl_stack", "walk list of arl_t links",
+	    arl_stack_walk_init, arl_stack_walk_step, NULL },
+	{ "ace", "walk list of ace_t entries for all stacks",
+	    ace_walk_init, ace_walk_step, NULL },
+	{ "ace_stack", "walk list of ace_t entries",
+	    ace_stack_walk_init, ace_stack_walk_step, ace_stack_walk_fini },
+	{ "arp_stacks", "walk all the arp_stack_t",
+	    arp_stacks_walk_init, arp_stacks_walk_step, NULL },
 	{ NULL }
 };
 
