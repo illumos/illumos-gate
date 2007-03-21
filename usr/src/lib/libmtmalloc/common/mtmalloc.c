@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,18 +18,21 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <c_synonyms.h>
 #include <mtmalloc.h>
 #include "mtmalloc_impl.h"
 #include <unistd.h>
 #include <synch.h>
 #include <thread.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <limits.h>
 #include <errno.h>
@@ -116,7 +118,6 @@
 #endif
 
 static void * morecore(size_t);
-static int setup_caches(void);
 static void create_cache(cache_t *, size_t bufsize, uint_t hunks);
 static void * malloc_internal(size_t, percpu_t *);
 static void * oversize(size_t);
@@ -135,15 +136,6 @@ static oversize_t *oversize_header_alloc(uintptr_t, size_t);
 #define	NUM_BUCKETS	67	/* must be prime */
 #define	HASH_OVERSIZE(caddr)	((uintptr_t)(caddr) % NUM_BUCKETS)
 oversize_t *ovsz_hashtab[NUM_BUCKETS];
-
-/*
- * Gets a decent "current cpu identifier", to be used to reduce contention.
- * Eventually, this should be replaced by an interface to get the actual
- * CPU sequence number in libthread/liblwp.
- */
-extern uint_t _thr_self();
-#pragma weak _thr_self
-#define	get_curcpu_func() (curcpu_func)_thr_self
 
 #define	ALIGN(x, a)	((((uintptr_t)(x) + ((uintptr_t)(a) - 1)) \
 			& ~((uintptr_t)(a) - 1)))
@@ -195,9 +187,9 @@ static int32_t reinit;
 
 static percpu_t *cpu_list;
 static oversize_t oversize_list;
-static mutex_t oversize_lock;
+static mutex_t oversize_lock = DEFAULTMUTEX;
 
-static int ncpus;
+static int ncpus = 0;
 
 #define	MTMALLOC_OVERSIZE_MAGIC		((uintptr_t)&oversize_list)
 #define	MTMALLOC_MEMALIGN_MAGIC		((uintptr_t)&oversize_list + 1)
@@ -232,20 +224,6 @@ malloc(size_t bytes)
 {
 	percpu_t *list_rotor;
 	uint_t	list_index;
-
-	/*
-	 * this test is due to linking with libthread.
-	 * There are malloc calls prior to this library
-	 * being initialized.
-	 *
-	 * If setup_caches fails, we set ENOMEM and return NULL
-	 */
-	if (cpu_list == (percpu_t *)NULL) {
-		if (setup_caches() == 0) {
-			errno = ENOMEM;
-			return (NULL);
-		}
-	}
 
 	if (bytes > MAX_CACHED)
 		return (oversize(bytes));
@@ -332,7 +310,7 @@ calloc(size_t nelem, size_t bytes)
 	ptr = malloc(size);
 	if (ptr == NULL)
 		return (NULL);
-	bzero(ptr, size);
+	(void) memset(ptr, 0, size);
 
 	return (ptr);
 }
@@ -753,25 +731,13 @@ mallocctl(int cmd, long value)
 }
 
 /*
- * if this function is changed, update the fallback code in setup_caches to
- * set ncpus to the number of possible return values. (currently 1)
+ * Initialization function, called from the init section of the library.
+ * No locking is required here because we are single-threaded during
+ * library initialization.
  */
-static uint_t
-fallback_curcpu(void)
-{
-	return (0);
-}
-
-/*
- * Returns non-zero on success, zero on failure.
- *
- * This carefully doesn't set cpu_list until initialization is finished.
- */
-static int
+static void
 setup_caches(void)
 {
-	static mutex_t init_lock = DEFAULTMUTEX;
-
 	uintptr_t oldbrk;
 	uintptr_t newbrk;
 
@@ -785,21 +751,14 @@ setup_caches(void)
 	uint_t i, j;
 	uintptr_t list_addr;
 
-	(void) mutex_lock(&init_lock);
-	if (cpu_list != NULL) {
-		(void) mutex_unlock(&init_lock);
-		return (1); 		/* success -- already initialized */
-	}
-
-	new_curcpu = get_curcpu_func();
-	if (new_curcpu == NULL) {
-		new_curcpu = fallback_curcpu;
-		ncpus = 1;
-	} else {
-		if ((ncpus = 2 * sysconf(_SC_NPROCESSORS_CONF)) <= 0)
-			ncpus = 4; /* decent default value */
-	}
-	assert(ncpus > 0);
+	/*
+	 * Get a decent "current cpu identifier", to be used to reduce
+	 * contention.  Eventually, this should be replaced by an interface
+	 * to get the actual CPU sequence number in libthread/liblwp.
+	 */
+	new_curcpu = (curcpu_func)thr_self;
+	if ((ncpus = 2 * sysconf(_SC_NPROCESSORS_CONF)) <= 0)
+		ncpus = 4; /* decent default value */
 
 	/* round ncpus up to a power of 2 */
 	while (ncpus & (ncpus - 1))
@@ -817,10 +776,8 @@ setup_caches(void)
 	 * First, make sure sbrk is sane, and store the current brk in oldbrk.
 	 */
 	oldbrk = (uintptr_t)sbrk(0);
-	if ((void *)oldbrk == (void *)-1) {
-		(void) mutex_unlock(&init_lock);
-		return (0);	/* sbrk is broken -- we're doomed. */
-	}
+	if ((void *)oldbrk == (void *)-1)
+		abort();	/* sbrk is broken -- we're doomed. */
 
 	/*
 	 * Now, align the brk to a multiple of CACHE_COHERENCY_UNIT, so that
@@ -830,10 +787,8 @@ setup_caches(void)
 	 *	so they can be paged out individually.
 	 */
 	newbrk = ALIGN(oldbrk, CACHE_COHERENCY_UNIT);
-	if (newbrk != oldbrk && (uintptr_t)sbrk(newbrk - oldbrk) != oldbrk) {
-		(void) mutex_unlock(&init_lock);
-		return (0);	/* someone else sbrked */
-	}
+	if (newbrk != oldbrk && (uintptr_t)sbrk(newbrk - oldbrk) != oldbrk)
+		abort();	/* sbrk is broken -- we're doomed. */
 
 	/*
 	 * For each cpu, there is one percpu_t and a list of caches
@@ -843,10 +798,8 @@ setup_caches(void)
 	new_cpu_list = (percpu_t *)sbrk(cache_space_needed);
 
 	if (new_cpu_list == (percpu_t *)-1 ||
-	    (uintptr_t)new_cpu_list != newbrk) {
-		(void) mutex_unlock(&init_lock);
-		return (0);	/* someone else sbrked */
-	}
+	    (uintptr_t)new_cpu_list != newbrk)
+		abort();	/* sbrk is broken -- we're doomed. */
 
 	/*
 	 * Finally, align the brk to HUNKSIZE so that all hunks are
@@ -857,10 +810,8 @@ setup_caches(void)
 
 	padding = ALIGN(newbrk, HUNKSIZE) - newbrk;
 
-	if (padding > 0 && (uintptr_t)sbrk(padding) != newbrk) {
-		(void) mutex_unlock(&init_lock);
-		return (0);	/* someone else sbrked */
-	}
+	if (padding > 0 && (uintptr_t)sbrk(padding) != newbrk)
+		abort();	/* sbrk is broken -- we're doomed. */
 
 	list_addr = ((uintptr_t)new_cpu_list + (sizeof (percpu_t) * ncpus));
 
@@ -872,7 +823,8 @@ setup_caches(void)
 			new_cpu_list[i].mt_caches[j].mt_hint = NULL;
 		}
 
-		bzero(&new_cpu_list[i].mt_parent_lock, sizeof (mutex_t));
+		(void) mutex_init(&new_cpu_list[i].mt_parent_lock,
+		    USYNC_THREAD, NULL);
 
 		/* get the correct cache list alignment */
 		list_addr += CACHELIST_SIZE;
@@ -889,16 +841,11 @@ setup_caches(void)
 	oversize_list.size = 0;		/* sentinal */
 
 	/*
-	 * now install the global variables, leaving cpu_list for last, so that
-	 * there aren't any race conditions.
+	 * Now install the global variables.
 	 */
 	curcpu = new_curcpu;
 	cpu_mask = new_cpu_mask;
 	cpu_list = new_cpu_list;
-
-	(void) mutex_unlock(&init_lock);
-
-	return (1);
 }
 
 static void
@@ -906,7 +853,7 @@ create_cache(cache_t *cp, size_t size, uint_t chunksize)
 {
 	long nblocks;
 
-	bzero(&cp->mt_cache_lock, sizeof (mutex_t));
+	(void) mutex_init(&cp->mt_cache_lock, USYNC_THREAD, NULL);
 	cp->mt_size = size;
 	cp->mt_freelist = ((caddr_t)cp + sizeof (cache_t));
 	cp->mt_span = chunksize * HUNKSIZE - sizeof (cache_t);
@@ -957,11 +904,6 @@ reinit_cpu_list(void)
 	percpu_t *cpuptr;
 	cache_t *thiscache;
 	cache_head_t *cachehead;
-
-	if (wp == NULL || cpu_list == NULL) {
-		reinit = 0;
-		return;
-	}
 
 	/* Reinitialize free oversize blocks. */
 	(void) mutex_lock(&oversize_lock);
@@ -1515,4 +1457,71 @@ oversize_header_alloc(uintptr_t mem, size_t size)
 	assert(((uintptr_t)mem & 7) == 0); /* are we 8 byte aligned */
 	ovsz_hdr->addr = (caddr_t)mem;
 	return (ovsz_hdr);
+}
+
+static void
+malloc_prepare()
+{
+	percpu_t *cpuptr;
+	cache_head_t *cachehead;
+	cache_t *thiscache;
+
+	(void) mutex_lock(&oversize_lock);
+	for (cpuptr = &cpu_list[0]; cpuptr < &cpu_list[ncpus]; cpuptr++) {
+		(void) mutex_lock(&cpuptr->mt_parent_lock);
+		for (cachehead = &cpuptr->mt_caches[0];
+		    cachehead < &cpuptr->mt_caches[NUM_CACHES];
+		    cachehead++) {
+			for (thiscache = cachehead->mt_cache;
+			    thiscache != NULL;
+			    thiscache = thiscache->mt_next) {
+				(void) mutex_lock(
+				    &thiscache->mt_cache_lock);
+			}
+		}
+	}
+}
+
+static void
+malloc_release()
+{
+	percpu_t *cpuptr;
+	cache_head_t *cachehead;
+	cache_t *thiscache;
+
+	for (cpuptr = &cpu_list[ncpus - 1]; cpuptr >= &cpu_list[0]; cpuptr--) {
+		for (cachehead = &cpuptr->mt_caches[NUM_CACHES - 1];
+		    cachehead >= &cpuptr->mt_caches[0];
+		    cachehead--) {
+			for (thiscache = cachehead->mt_cache;
+			    thiscache != NULL;
+			    thiscache = thiscache->mt_next) {
+				(void) mutex_unlock(
+				    &thiscache->mt_cache_lock);
+			}
+		}
+		(void) mutex_unlock(&cpuptr->mt_parent_lock);
+	}
+	(void) mutex_unlock(&oversize_lock);
+}
+
+#pragma init(malloc_init)
+static void
+malloc_init(void)
+{
+	/*
+	 * This works in the init section for this library
+	 * because setup_caches() doesn't call anything in libc
+	 * that calls malloc().  If it did, disaster would ensue.
+	 *
+	 * For this to work properly, this library must be the first
+	 * one to have its init section called (after libc) by the
+	 * dynamic linker.  If some other library's init section
+	 * ran first and called malloc(), disaster would ensue.
+	 * Because this is an interposer library for malloc(), the
+	 * dynamic linker arranges for its init section to run first.
+	 */
+	(void) setup_caches();
+
+	(void) pthread_atfork(malloc_prepare, malloc_release, malloc_release);
 }

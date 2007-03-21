@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright (c) 1991-1997,2000-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVR4/MNLS 1.1.2.1 */
 
@@ -49,6 +48,7 @@
  * New memory chunks are allocated on a first-fit basis.
  * Freed blocks are joined in larger blocks. Free pages are unmapped.
  */
+#include <c_synonyms.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -56,13 +56,11 @@
 #include <errno.h>
 #include <unistd.h>
 #include <thread.h>
+#include <pthread.h>
 #include <synch.h>
 #include <string.h>
 
-
-#ifdef _REENTRANT
 static mutex_t lock = DEFAULTMUTEX;
-#endif /* _REENTRANT */
 
 struct block {
 	size_t size;		/* Space available for user */
@@ -279,4 +277,23 @@ defrag(struct page *page)
 		}
 		(void) munmap((caddr_t)page, page->size);
 	}
+}
+
+static void
+malloc_prepare()
+{
+	(void) mutex_lock(&lock);
+}
+
+static void
+malloc_release()
+{
+	(void) mutex_unlock(&lock);
+}
+
+#pragma init(malloc_init)
+static void
+malloc_init(void)
+{
+	(void) pthread_atfork(malloc_prepare, malloc_release, malloc_release);
 }

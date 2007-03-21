@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,7 +39,7 @@ LIBS = $(DYNLIB)
 LDLIBS += -lc
 CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
-CPPFLAGS += -D_REENTRANT -I../common
+CPPFLAGS += -I../common -I../../common/inc -D_REENTRANT
 DYNFLAGS += $(ZINTERPOSE)
 
 .KEEP_STATE:

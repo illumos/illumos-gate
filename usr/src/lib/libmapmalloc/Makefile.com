@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,7 +30,6 @@ VERS=		.1
 
 OBJECTS=  \
 	calloc.o \
-	malloc_debug.o \
 	textmem.o \
 	valloc.o
 
@@ -44,7 +43,7 @@ LIBS =		$(DYNLIB) $(LINTLIB)
 LINTSRC=	$(LINTLIB:%.ln=%)
 
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT
+CPPFLAGS +=	-I../../common/inc -D_REENTRANT
 DYNFLAGS +=	$(ZINTERPOSE)
 LDLIBS +=	-lc
 

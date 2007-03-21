@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,7 +42,7 @@ LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN
 LINTFLAGS64 +=	-erroff=E_BAD_PTR_CAST_ALIGN
 
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT
+CPPFLAGS +=	-I../../common/inc -D_REENTRANT
 DYNFLAGS +=	$(ZINTERPOSE)
 LDLIBS +=	-lc
 

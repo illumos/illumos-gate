@@ -19,16 +19,17 @@
  * CDDL HEADER END
  */
 
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
+#include <c_synonyms.h>
 #include <sys/types.h>
 
 #ifndef debug
@@ -41,6 +42,7 @@
 #include "malloc.h"
 #include "mallint.h"
 #include <thread.h>
+#include <pthread.h>
 #include <synch.h>
 #include <unistd.h>
 #include <limits.h>
@@ -1169,4 +1171,23 @@ void
 cfree(void *p, size_t num, size_t size)
 {
 	free(p);
+}
+
+static void
+malloc_prepare()
+{
+	(void) mutex_lock(&mlock);
+}
+
+static void
+malloc_release()
+{
+	(void) mutex_unlock(&mlock);
+}
+
+#pragma init(malloc_init)
+static void
+malloc_init(void)
+{
+	(void) pthread_atfork(malloc_prepare, malloc_release, malloc_release);
 }

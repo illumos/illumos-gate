@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,7 +40,7 @@ LINTSRC =        $(LINTLIB:%.ln=%)
 LIBS 		 = $(DYNLIB) $(LINTLIB)
 LDLIBS 		+= -lc
 CFLAGS 		+= $(CCVERBOSE) $(C_PICFLAGS)
-CPPFLAGS	+= -I../common -D_REENTRANT
+CPPFLAGS	+= -I../common -I../../common/inc -D_REENTRANT
 DYNFLAGS 	+= $(ZINTERPOSE)
 
 $(LINTLIB) lint :=	LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN

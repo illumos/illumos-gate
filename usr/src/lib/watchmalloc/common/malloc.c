@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +58,7 @@
  *			Otherwise, it is always 0.
  */
 
+#include <c_synonyms.h>
 #include "mallint.h"
 
 static	mutex_t	__watch_malloc_lock = DEFAULTMUTEX;
@@ -164,9 +165,9 @@ void *
 malloc(size_t size)
 {
 	void	*ret;
-	_mutex_lock(&__watch_malloc_lock);
+	(void) mutex_lock(&__watch_malloc_lock);
 	ret = malloc_unlocked(size);
-	_mutex_unlock(&__watch_malloc_lock);
+	(void) mutex_unlock(&__watch_malloc_lock);
 	return (ret);
 }
 
@@ -299,10 +300,10 @@ realloc(void *old, size_t size)
 	}
 
 	/* pointer to the block */
-	_mutex_lock(&__watch_malloc_lock);
+	(void) mutex_lock(&__watch_malloc_lock);
 	if (old == NULL) {
 		new = malloc_unlocked(size);
-		_mutex_unlock(&__watch_malloc_lock);
+		(void) mutex_unlock(&__watch_malloc_lock);
 		return (new);
 	}
 
@@ -318,7 +319,7 @@ realloc(void *old, size_t size)
 	if (!ISBIT0(ts)) {
 		/* XXX; complain here! */
 		protect(tp);
-		_mutex_unlock(&__watch_malloc_lock);
+		(void) mutex_unlock(&__watch_malloc_lock);
 		errno = EINVAL;
 		return (NULL);
 	}
@@ -327,7 +328,7 @@ realloc(void *old, size_t size)
 	if (size == SIZE(tp)) {	/* nothing to do */
 		SIZE(tp) = ts;
 		protect(tp);
-		_mutex_unlock(&__watch_malloc_lock);
+		(void) mutex_unlock(&__watch_malloc_lock);
 		return (old);
 	}
 
@@ -336,7 +337,7 @@ realloc(void *old, size_t size)
 		if (size == 0) {
 			SETOLD01(SIZE(tp), ts);
 			free_unlocked(old);
-			_mutex_unlock(&__watch_malloc_lock);
+			(void) mutex_unlock(&__watch_malloc_lock);
 			return (NULL);
 		}
 		goto call_malloc;
@@ -394,7 +395,7 @@ chop_big:
 		/* the previous block may be free */
 		SETOLD01(SIZE(tp), ts);
 		protect(tp);
-		_mutex_unlock(&__watch_malloc_lock);
+		(void) mutex_unlock(&__watch_malloc_lock);
 		return (old);
 	}
 
@@ -406,7 +407,7 @@ call_malloc:	/* call malloc to get a new block */
 			ts = size;
 		(void) memcpy(new, old, ts);
 		free_unlocked(old);
-		_mutex_unlock(&__watch_malloc_lock);
+		(void) mutex_unlock(&__watch_malloc_lock);
 		return (new);
 	}
 
@@ -432,7 +433,7 @@ call_malloc:	/* call malloc to get a new block */
 		if (size < SIZE(tp))		/* case 1. */ {
 			SETOLD01(SIZE(tp), ts);
 			protect(tp);
-			_mutex_unlock(&__watch_malloc_lock);
+			(void) mutex_unlock(&__watch_malloc_lock);
 			return (old);
 		} else if (size < MINSIZE)	/* case 2. */ {
 			size = MINSIZE;
@@ -461,7 +462,7 @@ call_malloc:	/* call malloc to get a new block */
 	}
 	SETOLD01(SIZE(tp), ts);
 	protect(tp);
-	_mutex_unlock(&__watch_malloc_lock);
+	(void) mutex_unlock(&__watch_malloc_lock);
 	/* malloc() sets errno */
 	return (NULL);
 }
@@ -1075,9 +1076,9 @@ t_splay(TREE *tp)
 void
 free(void *old)
 {
-	_mutex_lock(&__watch_malloc_lock);
+	(void) mutex_lock(&__watch_malloc_lock);
 	free_unlocked(old);
-	_mutex_unlock(&__watch_malloc_lock);
+	(void) mutex_unlock(&__watch_malloc_lock);
 }
 
 
@@ -1168,7 +1169,7 @@ memalign(size_t align, size_t nbytes)
 		/* malloc sets errno */
 		return (NULL);
 	}
-	_mutex_lock(&__watch_malloc_lock);
+	(void) mutex_lock(&__watch_malloc_lock);
 
 	/*
 	 * get size of the entire block (overhead and all)
@@ -1242,7 +1243,7 @@ memalign(size_t align, size_t nbytes)
 	}
 	copy_pattern(LIVEPAT, aligned_blk);
 	protect(aligned_blk);
-	_mutex_unlock(&__watch_malloc_lock);
+	(void) mutex_unlock(&__watch_malloc_lock);
 	return (DATA(aligned_blk));
 }
 
@@ -1439,4 +1440,23 @@ unprotect(TREE *tp)
 	ctl.prwatch.pr_size = WORDSIZE;		/* size is arbitrary */
 	ctl.prwatch.pr_wflags = 0;		/* clear the watched area */
 	(void) write(ctlfd, &ctl, sizeof (ctl));
+}
+
+static void
+malloc_prepare()
+{
+	(void) mutex_lock(&__watch_malloc_lock);
+}
+
+static void
+malloc_release()
+{
+	(void) mutex_unlock(&__watch_malloc_lock);
+}
+
+#pragma init(malloc_init)
+static void
+malloc_init(void)
+{
+	(void) pthread_atfork(malloc_prepare, malloc_release, malloc_release);
 }

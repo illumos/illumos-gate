@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,10 +29,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
 
-#ifndef	_REENTRANT
-#define	_REENTRANT
-#endif
-
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -40,6 +36,7 @@
 #include <errno.h>
 #include <memory.h>
 #include <thread.h>
+#include <pthread.h>
 #include <synch.h>
 #include <procfs.h>
 #include <limits.h>
@@ -140,7 +137,3 @@ typedef struct _t_ {
 #define	MAX_GETCORE (size_t)(SSIZE_MAX & ~(ALIGN - 1)) /* round down ALIGN */
 #define	MAX_MALLOC (size_t)(SIZE_MAX - CORESIZE - 3 * ALIGN) /* overflow chk */
 #define	MAX_ALIGN	(1 + (size_t)SSIZE_MAX)
-
-/* where are these *really* declared? */
-extern	int	_mutex_lock(mutex_t *mp);
-extern	int	_mutex_unlock(mutex_t *mp);
