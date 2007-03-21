@@ -92,10 +92,8 @@ s none lib/libintl.so=libintl.so.1
 f none lib/libintl.so.1 755 root bin
 s none lib/libkstat.so=libkstat.so.1
 f none lib/libkstat.so.1 755 root bin
-f none lib/liblaadm.so.1 755 root bin
 f none lib/libld.so.4 755 root bin
 f none lib/liblddbg.so.4 755 root bin
-f none lib/libmacadm.so.1 755 root bin
 s none lib/libmd.so=libmd.so.1
 f none lib/libmd.so.1 755 root bin
 s none lib/libmd5.so=libmd5.so.1
@@ -151,7 +149,6 @@ f none lib/libtsol.so.2 755 root bin
 s none lib/libtsol.so=libtsol.so.2
 s none lib/libw.so=libw.so.1
 f none lib/libw.so.1 755 root bin
-f none lib/libwladm.so.1 755 root bin
 s none lib/libumem.so=libumem.so.1
 f none lib/libumem.so.1 0755 root bin
 s none lib/libuuid.so=libuuid.so.1

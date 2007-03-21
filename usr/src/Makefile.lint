@@ -337,10 +337,8 @@ COMMON_SUBDIRS = \
 	lib/libiscsitgt \
 	lib/libkmf \
 	lib/libkstat \
-	lib/liblaadm \
 	lib/liblgrp \
 	lib/liblm \
-	lib/libmacadm \
 	lib/libmalloc \
 	lib/libmapmalloc \
 	lib/libmapid \
@@ -378,7 +376,6 @@ COMMON_SUBDIRS = \
 	lib/libuutil \
 	lib/libwanboot \
 	lib/libwanbootutil \
-	lib/libwladm \
 	lib/libxnet \
 	lib/libzfs \
 	lib/libzfs_jni \

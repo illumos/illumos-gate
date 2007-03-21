@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,8 @@
 #include <libintl.h>
 #include <net/if_types.h>
 #include <net/if_dl.h>
-#include <liblaadm.h>
+#include <libdlaggr.h>
+#include <libdladm_impl.h>
 
 /*
  * Link Aggregation Administration Library.
@@ -69,25 +70,23 @@
  * <lacp-timer>	::= 'short' | 'long'
  */
 
-#define	LAADM_DEV	"/devices/pseudo/aggr@0:" AGGR_DEVNAME_CTL
-#define	LAADM_DB	"/etc/dladm/aggregation.conf"
-#define	LAADM_DB_TMP	"/etc/dladm/aggregation.conf.new"
-#define	LAADM_DB_LOCK	"/tmp/aggregation.conf.lock"
+#define	DLADM_AGGR_DEV		"/devices/pseudo/aggr@0:" AGGR_DEVNAME_CTL
+#define	DLADM_AGGR_DB		"/etc/dladm/aggregation.conf"
+#define	DLADM_AGGR_DB_TMP	"/etc/dladm/aggregation.conf.new"
+#define	DLADM_AGGR_DB_LOCK	"/tmp/aggregation.conf.lock"
 
-#define	LAADM_DB_PERMS	S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
-#define	LAADM_DB_OWNER	15	/* "dladm" UID */
-#define	LAADM_DB_GROUP	3	/* "sys" GID */
+#define	DLADM_AGGR_DB_PERMS	S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
+#define	DLADM_AGGR_DB_OWNER	15	/* "dladm" UID */
+#define	DLADM_AGGR_DB_GROUP	3	/* "sys" GID */
 
 /*
  * The largest configurable aggregation key.  Because by default the key is
  * used as the DLPI device PPA and default VLAN PPA's are calculated as
  * ((1000 * vid) + PPA), the largest key can't be > 999.
  */
-#define	LAADM_MAX_KEY	999
+#define	DLADM_AGGR_MAX_KEY	999
 
 #define	BLANK_LINE(s)	((s[0] == '\0') || (s[0] == '#') || (s[0] == '\n'))
-
-#define	MAXLINELEN	1024
 
 /* Limits on buffer size for LAIOC_INFO request */
 #define	MIN_INFO_SIZE (4*1024)
@@ -98,35 +97,35 @@
 static uchar_t	zero_mac[] = {0, 0, 0, 0, 0, 0};
 
 /* configuration database entry */
-typedef struct laadm_grp_attr_db {
+typedef struct dladm_aggr_grp_attr_db {
 	uint32_t	lt_key;
 	uint32_t	lt_policy;
 	uint32_t	lt_nports;
-	laadm_port_attr_db_t *lt_ports;
+	dladm_aggr_port_attr_db_t *lt_ports;
 	boolean_t	lt_mac_fixed;
 	uchar_t		lt_mac[ETHERADDRL];
 	aggr_lacp_mode_t lt_lacp_mode;
 	aggr_lacp_timer_t lt_lacp_timer;
-} laadm_grp_attr_db_t;
+} dladm_aggr_grp_attr_db_t;
 
-typedef struct laadm_up {
+typedef struct dladm_aggr_up {
 	uint32_t	lu_key;
 	boolean_t	lu_found;
 	int		lu_fd;
-} laadm_up_t;
+} dladm_aggr_up_t;
 
-typedef struct laadm_down {
+typedef struct dladm_aggr_down {
 	uint32_t	ld_key;
 	boolean_t	ld_found;
-} laadm_down_t;
+} dladm_aggr_down_t;
 
-typedef struct laadm_modify_attr {
+typedef struct dladm_aggr_modify_attr {
 	uint32_t	ld_policy;
 	boolean_t	ld_mac_fixed;
 	uchar_t		ld_mac[ETHERADDRL];
 	aggr_lacp_mode_t ld_lacp_mode;
 	aggr_lacp_timer_t ld_lacp_timer;
-} laadm_modify_attr_t;
+} dladm_aggr_modify_attr_t;
 
 typedef struct policy_s {
 	char		*pol_name;
@@ -140,52 +139,64 @@ static policy_t policies[] = {
 
 #define	NPOLICIES	(sizeof (policies) / sizeof (policy_t))
 
-typedef struct laadm_lacp_mode_s {
+typedef struct dladm_aggr_lacpmode_s {
 	char		*mode_str;
 	aggr_lacp_mode_t mode_id;
-} laadm_lacp_mode_t;
+} dladm_aggr_lacpmode_t;
 
-static laadm_lacp_mode_t lacp_modes[] = {
+static dladm_aggr_lacpmode_t lacp_modes[] = {
 	{"off", AGGR_LACP_OFF},
 	{"active", AGGR_LACP_ACTIVE},
 	{"passive", AGGR_LACP_PASSIVE}};
 
-#define	NLACP_MODES	(sizeof (lacp_modes) / sizeof (laadm_lacp_mode_t))
+#define	NLACP_MODES	(sizeof (lacp_modes) / sizeof (dladm_aggr_lacpmode_t))
 
-typedef struct laadm_lacp_timer_s {
+typedef struct dladm_aggr_lacptimer_s {
 	char		*lt_str;
 	aggr_lacp_timer_t lt_id;
-} laadm_lacp_timer_t;
+} dladm_aggr_lacptimer_t;
 
-static laadm_lacp_timer_t lacp_timers[] = {
+static dladm_aggr_lacptimer_t lacp_timers[] = {
 	{"short", AGGR_LACP_TIMER_SHORT},
 	{"long", AGGR_LACP_TIMER_LONG}};
 
-#define	NLACP_TIMERS	(sizeof (lacp_timers) / sizeof (laadm_lacp_timer_t))
+#define	NLACP_TIMERS	(sizeof (lacp_timers) / sizeof (dladm_aggr_lacptimer_t))
+
+typedef struct dladm_aggr_port_state {
+	char			*state_str;
+	aggr_port_state_t	state_id;
+} dladm_aggr_port_state_t;
+
+static dladm_aggr_port_state_t port_states[] = {
+	{"standby", AGGR_PORT_STATE_STANDBY },
+	{"attached", AGGR_PORT_STATE_ATTACHED }
+};
+
+#define	NPORT_STATES	\
+	(sizeof (port_states) / sizeof (dladm_aggr_port_state_t))
 
 typedef struct delete_db_state {
 	uint32_t	ds_key;
 	boolean_t	ds_found;
 } delete_db_state_t;
 
-
 typedef struct modify_db_state {
-	uint32_t	us_key;
+	uint32_t		us_key;
 	uint32_t		us_mask;
-	laadm_modify_attr_t *us_attr_new;
-	laadm_modify_attr_t *us_attr_old;
-	boolean_t	us_found;
+	dladm_aggr_modify_attr_t *us_attr_new;
+	dladm_aggr_modify_attr_t *us_attr_old;
+	boolean_t		us_found;
 } modify_db_state_t;
 
 typedef struct add_db_state {
-	laadm_grp_attr_db_t *as_attr;
+	dladm_aggr_grp_attr_db_t *as_attr;
 	boolean_t	as_found;
 } add_db_state_t;
 
-static int i_laadm_fput_grp(FILE *, laadm_grp_attr_db_t *);
+static int i_dladm_aggr_fput_grp(FILE *, dladm_aggr_grp_attr_db_t *);
 
 static int
-i_laadm_strioctl(int fd, int cmd, void *ptr, int ilen)
+i_dladm_aggr_strioctl(int fd, int cmd, void *ptr, int ilen)
 {
 	struct strioctl str;
 
@@ -202,13 +213,14 @@ i_laadm_strioctl(int fd, int cmd, void *ptr, int ilen)
  * acquired as a reader (F_RDLCK) or writer (F_WRLCK).
  */
 static int
-i_laadm_lock_db(short type)
+i_dladm_aggr_lock_db(short type)
 {
 	int lock_fd;
 	struct flock lock;
+	int errno_save;
 
-	if ((lock_fd = open(LAADM_DB_LOCK, O_RDWR | O_CREAT | O_TRUNC,
-	    LAADM_DB_PERMS)) < 0)
+	if ((lock_fd = open(DLADM_AGGR_DB_LOCK, O_RDWR | O_CREAT | O_TRUNC,
+	    DLADM_AGGR_DB_PERMS)) < 0)
 		return (-1);
 
 	lock.l_type = type;
@@ -217,8 +229,10 @@ i_laadm_lock_db(short type)
 	lock.l_len = 0;
 
 	if (fcntl(lock_fd, F_SETLKW, &lock) < 0) {
+		errno_save = errno;
 		(void) close(lock_fd);
-		(void) unlink(LAADM_DB_LOCK);
+		(void) unlink(DLADM_AGGR_DB_LOCK);
+		errno = errno_save;
 		return (-1);
 	}
 	return (lock_fd);
@@ -228,7 +242,7 @@ i_laadm_lock_db(short type)
  * Unlock and close the specified file.
  */
 static void
-i_laadm_unlock_db(int fd)
+i_dladm_aggr_unlock_db(int fd)
 {
 	struct flock lock;
 
@@ -242,7 +256,7 @@ i_laadm_unlock_db(int fd)
 
 	(void) fcntl(fd, F_SETLKW, &lock);
 	(void) close(fd);
-	(void) unlink(LAADM_DB_LOCK);
+	(void) unlink(DLADM_AGGR_DB_LOCK);
 }
 
 /*
@@ -251,16 +265,16 @@ i_laadm_unlock_db(int fd)
  * Terminate the walk if at any time <fn> returns non-NULL value
  */
 int
-laadm_walk_sys(int (*fn)(void *, laadm_grp_attr_sys_t *), void *arg)
+dladm_aggr_walk(int (*fn)(void *, dladm_aggr_grp_attr_t *), void *arg)
 {
 	laioc_info_t *ioc;
 	laioc_info_group_t *grp;
 	laioc_info_port_t *port;
-	laadm_grp_attr_sys_t attr;
+	dladm_aggr_grp_attr_t attr;
 	int rc, i, j, bufsize, fd;
 	char *where;
 
-	if ((fd = open(LAADM_DEV, O_RDWR)) == -1)
+	if ((fd = open(DLADM_AGGR_DEV, O_RDWR)) == -1)
 		return (-1);
 
 	bufsize = MIN_INFO_SIZE;
@@ -272,7 +286,7 @@ laadm_walk_sys(int (*fn)(void *, laadm_grp_attr_sys_t *), void *arg)
 	}
 
 tryagain:
-	rc = i_laadm_strioctl(fd, LAIOC_INFO, ioc, bufsize);
+	rc = i_dladm_aggr_strioctl(fd, LAIOC_INFO, ioc, bufsize);
 
 	if (rc != 0) {
 		if (errno == ENOSPC) {
@@ -310,7 +324,7 @@ tryagain:
 		attr.lg_mac_fixed = grp->lg_mac_fixed;
 
 		attr.lg_ports = malloc(grp->lg_nports *
-		    sizeof (laadm_port_attr_sys_t));
+		    sizeof (dladm_aggr_port_attr_t));
 		if (attr.lg_ports == NULL) {
 			errno = ENOMEM;
 			goto bail;
@@ -356,7 +370,7 @@ bail:
  * Returns -1 on parsing failure, or 0 on success.
  */
 static int
-i_laadm_parse_db(char *line, laadm_grp_attr_db_t *attr)
+i_dladm_aggr_parse_db(char *line, dladm_aggr_grp_attr_db_t *attr)
 {
 	char	*token;
 	int	i;
@@ -379,7 +393,7 @@ i_laadm_parse_db(char *line, laadm_grp_attr_db_t *attr)
 
 	/* policy */
 	if ((token = strtok_r(NULL, " \t", &lasts)) == NULL ||
-	    !laadm_str_to_policy(token, &attr->lt_policy))
+	    !dladm_aggr_str2policy(token, &attr->lt_policy))
 		goto failed;
 
 	/* number of ports */
@@ -395,7 +409,7 @@ i_laadm_parse_db(char *line, laadm_grp_attr_db_t *attr)
 
 	/* ports */
 	if ((attr->lt_ports = malloc(attr->lt_nports *
-	    sizeof (laadm_port_attr_db_t))) == NULL)
+	    sizeof (dladm_aggr_port_attr_db_t))) == NULL)
 		goto failed;
 
 	for (i = 0; i < attr->lt_nports; i++) {
@@ -419,18 +433,18 @@ i_laadm_parse_db(char *line, laadm_grp_attr_db_t *attr)
 
 	/* unicast MAC address */
 	if ((token = strtok_r(NULL, " \t\n", &lasts)) == NULL ||
-	    !laadm_str_to_mac_addr(token, &attr->lt_mac_fixed,
+	    !dladm_aggr_str2macaddr(token, &attr->lt_mac_fixed,
 	    attr->lt_mac))
 		goto failed;
 
 	/* LACP mode */
 	if ((token = strtok_r(NULL, " \t\n", &lasts)) == NULL ||
-	    !laadm_str_to_lacp_mode(token, &attr->lt_lacp_mode))
+	    !dladm_aggr_str2lacpmode(token, &attr->lt_lacp_mode))
 		attr->lt_lacp_mode = AGGR_LACP_OFF;
 
 	/* LACP timer */
 	if ((token = strtok_r(NULL, " \t\n", &lasts)) == NULL ||
-	    !laadm_str_to_lacp_timer(token, &attr->lt_lacp_timer))
+	    !dladm_aggr_str2lacptimer(token, &attr->lt_lacp_timer))
 		attr->lt_lacp_timer = AGGR_LACP_TIMER_SHORT;
 
 	return (0);
@@ -445,31 +459,32 @@ failed:
  * Walk through the groups defined in the DB and for each group <grp>,
  * invoke <fn>(<arg>, <grp>);
  */
-static int
-i_laadm_walk_db(int (*fn)(void *, laadm_grp_attr_db_t *, laadm_diag_t *),
-    void *arg, const char *root, laadm_diag_t *diag)
+static dladm_status_t
+i_dladm_aggr_walk_db(dladm_status_t (*fn)(void *, dladm_aggr_grp_attr_db_t *),
+    void *arg, const char *root)
 {
 	FILE *fp;
 	char line[MAXLINELEN];
-	laadm_grp_attr_db_t attr;
+	dladm_aggr_grp_attr_db_t attr;
 	char *db_file;
 	char db_file_buf[MAXPATHLEN];
-	int lock_fd, retval = -1;
+	int lock_fd;
+	dladm_status_t status = DLADM_STATUS_OK;
 
 	if (root == NULL) {
-		db_file = LAADM_DB;
+		db_file = DLADM_AGGR_DB;
 	} else {
 		(void) snprintf(db_file_buf, MAXPATHLEN, "%s%s", root,
-		    LAADM_DB);
+		    DLADM_AGGR_DB);
 		db_file = db_file_buf;
 	}
 
-	lock_fd = i_laadm_lock_db(F_RDLCK);
+	lock_fd = i_dladm_aggr_lock_db(F_RDLCK);
 
 	if ((fp = fopen(db_file, "r")) == NULL) {
-		i_laadm_unlock_db(lock_fd);
-		*diag = LAADM_DIAG_REPOSITORY_OPENFAIL;
-		return (-1);
+		status = dladm_errno2status(errno);
+		i_dladm_aggr_unlock_db(lock_fd);
+		return (status);
 	}
 
 	bzero(&attr, sizeof (attr));
@@ -479,41 +494,42 @@ i_laadm_walk_db(int (*fn)(void *, laadm_grp_attr_db_t *, laadm_diag_t *),
 		if (BLANK_LINE(line))
 			continue;
 
-		if (i_laadm_parse_db(line, &attr) != 0) {
-			errno = EFAULT;
-			*diag = LAADM_DIAG_REPOSITORY_PARSEFAIL;
-			goto failed;
+		if (i_dladm_aggr_parse_db(line, &attr) != 0) {
+			status = DLADM_STATUS_REPOSITORYINVAL;
+			goto done;
 		}
 
-		if (fn(arg, &attr, diag) != 0)
-			goto failed;
+		if ((status = fn(arg, &attr)) != DLADM_STATUS_OK)
+			goto done;
 
 		free(attr.lt_ports);
 		attr.lt_ports = NULL;
 	}
-	retval = 0;
 
-failed:
+done:
 	free(attr.lt_ports);
 	(void) fclose(fp);
-	i_laadm_unlock_db(lock_fd);
-	return (retval);
+	i_dladm_aggr_unlock_db(lock_fd);
+	return (status);
 }
 
 /*
  * Send an add or remove command to the link aggregation driver.
  */
-static int
-i_laadm_add_rem_sys(laadm_grp_attr_db_t *attr, int cmd, laadm_diag_t *diag)
+static dladm_status_t
+i_dladm_aggr_add_rem_sys(dladm_aggr_grp_attr_db_t *attr, int cmd)
 {
 	int i, rc, fd, len;
 	laioc_add_rem_t *iocp;
 	laioc_port_t *ports;
+	dladm_status_t status = DLADM_STATUS_OK;
 
 	len = sizeof (*iocp) + attr->lt_nports * sizeof (laioc_port_t);
 	iocp = malloc(len);
-	if (iocp == NULL)
-		goto failed;
+	if (iocp == NULL) {
+		status = DLADM_STATUS_NOMEM;
+		goto done;
+	}
 
 	iocp->la_key = attr->lt_key;
 	iocp->la_nports = attr->lt_nports;
@@ -522,49 +538,53 @@ i_laadm_add_rem_sys(laadm_grp_attr_db_t *attr, int cmd, laadm_diag_t *diag)
 	for (i = 0; i < attr->lt_nports; i++) {
 		if (strlcpy(ports[i].lp_devname,
 		    attr->lt_ports[i].lp_devname,
-		    MAXNAMELEN) >= MAXNAMELEN)
-			goto failed;
+		    MAXNAMELEN) >= MAXNAMELEN) {
+			status = DLADM_STATUS_BADARG;
+			goto done;
+		}
 	}
 
-	if ((fd = open(LAADM_DEV, O_RDWR)) < 0) {
-		*diag = LAADM_DIAG_REPOSITORY_OPENFAIL;
-		goto failed;
+	if ((fd = open(DLADM_AGGR_DEV, O_RDWR)) < 0) {
+		status = dladm_errno2status(errno);
+		goto done;
 	}
 
-	rc = i_laadm_strioctl(fd, cmd, iocp, len);
-	if ((rc < 0) && (errno == EINVAL))
-		*diag = LAADM_DIAG_INVALID_INTFNAME;
+	rc = i_dladm_aggr_strioctl(fd, cmd, iocp, len);
+	if (rc < 0) {
+		if (errno == EINVAL)
+			status = DLADM_STATUS_LINKINVAL;
+		else
+			status = dladm_errno2status(errno);
+	}
 
 	(void) close(fd);
 
+done:
 	free(iocp);
-	return (rc);
-
-failed:
-	free(iocp);
-	return (-1);
+	return (status);
 }
 
 /*
  * Send a modify command to the link aggregation driver.
  */
-static int
-i_laadm_modify_sys(uint32_t key, uint32_t mask, laadm_modify_attr_t *attr,
-    laadm_diag_t *diag)
+static dladm_status_t
+i_dladm_aggr_modify_sys(uint32_t key, uint32_t mask,
+    dladm_aggr_modify_attr_t *attr)
 {
 	int rc, fd;
 	laioc_modify_t ioc;
+	dladm_status_t status = DLADM_STATUS_OK;
 
 	ioc.lu_key = key;
 
 	ioc.lu_modify_mask = 0;
-	if (mask & LAADM_MODIFY_POLICY)
+	if (mask & DLADM_AGGR_MODIFY_POLICY)
 		ioc.lu_modify_mask |= LAIOC_MODIFY_POLICY;
-	if (mask & LAADM_MODIFY_MAC)
+	if (mask & DLADM_AGGR_MODIFY_MAC)
 		ioc.lu_modify_mask |= LAIOC_MODIFY_MAC;
-	if (mask & LAADM_MODIFY_LACP_MODE)
+	if (mask & DLADM_AGGR_MODIFY_LACP_MODE)
 		ioc.lu_modify_mask |= LAIOC_MODIFY_LACP_MODE;
-	if (mask & LAADM_MODIFY_LACP_TIMER)
+	if (mask & DLADM_AGGR_MODIFY_LACP_TIMER)
 		ioc.lu_modify_mask |= LAIOC_MODIFY_LACP_TIMER;
 
 	ioc.lu_policy = attr->ld_policy;
@@ -573,34 +593,36 @@ i_laadm_modify_sys(uint32_t key, uint32_t mask, laadm_modify_attr_t *attr,
 	ioc.lu_lacp_mode = attr->ld_lacp_mode;
 	ioc.lu_lacp_timer = attr->ld_lacp_timer;
 
-	if ((fd = open(LAADM_DEV, O_RDWR)) < 0) {
-		*diag = LAADM_DIAG_REPOSITORY_OPENFAIL;
-		return (-1);
+	if ((fd = open(DLADM_AGGR_DEV, O_RDWR)) < 0)
+		return (dladm_errno2status(errno));
+
+	rc = i_dladm_aggr_strioctl(fd, LAIOC_MODIFY, &ioc, sizeof (ioc));
+	if (rc < 0) {
+		if (errno == EINVAL)
+			status = DLADM_STATUS_MACADDRINVAL;
+		else
+			status = dladm_errno2status(errno);
 	}
 
-	rc = i_laadm_strioctl(fd, LAIOC_MODIFY, &ioc, sizeof (ioc));
-	if ((rc < 0) && (errno == EINVAL))
-		*diag = LAADM_DIAG_INVALID_MACADDR;
-
 	(void) close(fd);
-
-	return (rc);
+	return (status);
 }
 
 /*
  * Send a create command to the link aggregation driver.
  */
-static int
-i_laadm_create_sys(int fd, laadm_grp_attr_db_t *attr, laadm_diag_t *diag)
+static dladm_status_t
+i_dladm_aggr_create_sys(int fd, dladm_aggr_grp_attr_db_t *attr)
 {
 	int i, rc, len;
 	laioc_create_t *iocp;
 	laioc_port_t *ports;
+	dladm_status_t status = DLADM_STATUS_OK;
 
 	len = sizeof (*iocp) + attr->lt_nports * sizeof (laioc_port_t);
 	iocp = malloc(len);
 	if (iocp == NULL)
-		return (-1);
+		return (DLADM_STATUS_NOMEM);
 
 	iocp->lc_key = attr->lt_key;
 	iocp->lc_nports = attr->lt_nports;
@@ -614,71 +636,70 @@ i_laadm_create_sys(int fd, laadm_grp_attr_db_t *attr, laadm_diag_t *diag)
 		if (strlcpy(ports[i].lp_devname,
 		    attr->lt_ports[i].lp_devname,
 		    MAXNAMELEN) >= MAXNAMELEN) {
-			errno = EINVAL;
 			free(iocp);
-			return (-1);
+			return (DLADM_STATUS_BADARG);
 		}
 	}
 
 	if (attr->lt_mac_fixed &&
 	    ((bcmp(zero_mac, attr->lt_mac, ETHERADDRL) == 0) ||
 	    (attr->lt_mac[0] & 0x01))) {
-		errno = EINVAL;
-		*diag = LAADM_DIAG_INVALID_MACADDR;
 		free(iocp);
-		return (-1);
+		return (DLADM_STATUS_MACADDRINVAL);
 	}
 
 	bcopy(attr->lt_mac, iocp->lc_mac, ETHERADDRL);
 	iocp->lc_mac_fixed = attr->lt_mac_fixed;
 
-	rc = i_laadm_strioctl(fd, LAIOC_CREATE, iocp, len);
+	rc = i_dladm_aggr_strioctl(fd, LAIOC_CREATE, iocp, len);
 	if (rc < 0)
-		*diag = LAADM_DIAG_INVALID_INTFNAME;
+		status = DLADM_STATUS_LINKINVAL;
 
 	free(iocp);
-	return (rc);
+	return (status);
 }
 
 /*
  * Invoked to bring up a link aggregation group.
  */
-static int
-i_laadm_up(void *arg, laadm_grp_attr_db_t *attr, laadm_diag_t *diag)
+static dladm_status_t
+i_dladm_aggr_up(void *arg, dladm_aggr_grp_attr_db_t *attr)
 {
-	laadm_up_t *up = (laadm_up_t *)arg;
+	dladm_aggr_up_t	*up = (dladm_aggr_up_t *)arg;
+	dladm_status_t	status;
 
 	if (up->lu_key != 0 && up->lu_key != attr->lt_key)
-		return (0);
+		return (DLADM_STATUS_OK);
 
 	up->lu_found = B_TRUE;
 
-	if (i_laadm_create_sys(up->lu_fd, attr, diag) < 0 &&
-	    up->lu_key != 0) {
-		return (-1);
-	}
+	status = i_dladm_aggr_create_sys(up->lu_fd, attr);
+	if (status != DLADM_STATUS_OK && up->lu_key != 0)
+		return (status);
 
-	return (0);
+	return (DLADM_STATUS_OK);
 }
 
 /*
  * Bring up a link aggregation group or all of them if the key is zero.
  * If key is 0, walk may terminate early if any of the links fail
  */
-int
-laadm_up(uint32_t key, const char *root, laadm_diag_t *diag)
+dladm_status_t
+dladm_aggr_up(uint32_t key, const char *root)
 {
-	laadm_up_t up;
+	dladm_aggr_up_t up;
+	dladm_status_t status;
 
-	if ((up.lu_fd = open(LAADM_DEV, O_RDWR)) < 0)
-		return (-1);
+	if ((up.lu_fd = open(DLADM_AGGR_DEV, O_RDWR)) < 0)
+		return (dladm_errno2status(errno));
 
 	up.lu_key = key;
 	up.lu_found = B_FALSE;
 
-	if (i_laadm_walk_db(i_laadm_up, &up, root, diag) < 0) {
+	status = i_dladm_aggr_walk_db(i_dladm_aggr_up, &up, root);
+	if (status != DLADM_STATUS_OK) {
 		(void) close(up.lu_fd);
-		return (-1);
+		return (status);
 	}
 	(void) close(up.lu_fd);
 
@@ -686,45 +707,45 @@ laadm_up(uint32_t key, const char *root, laadm_diag_t *diag)
 	 * only return error if user specified key and key was
 	 * not found
 	 */
-	if (!up.lu_found && key != 0) {
-		errno = ENOENT;
-		return (-1);
-	}
+	if (!up.lu_found && key != 0)
+		return (DLADM_STATUS_NOTFOUND);
 
-	return (0);
+	return (DLADM_STATUS_OK);
 }
 /*
  * Send a delete command to the link aggregation driver.
  */
 static int
-i_laadm_delete_sys(int fd, laadm_grp_attr_sys_t *attr)
+i_dladm_aggr_delete_sys(int fd, dladm_aggr_grp_attr_t *attr)
 {
 	laioc_delete_t ioc;
 
 	ioc.ld_key = attr->lg_key;
 
-	return (i_laadm_strioctl(fd, LAIOC_DELETE, &ioc, sizeof (ioc)));
+	return (i_dladm_aggr_strioctl(fd, LAIOC_DELETE, &ioc, sizeof (ioc)));
 }
 
 /*
  * Invoked to bring down a link aggregation group.
  */
 static int
-i_laadm_down(void *arg, laadm_grp_attr_sys_t *attr)
+i_dladm_aggr_down(void *arg, dladm_aggr_grp_attr_t *attr)
 {
-	laadm_down_t *down = (laadm_down_t *)arg;
-	int fd;
+	dladm_aggr_down_t *down = (dladm_aggr_down_t *)arg;
+	int fd, errno_save;
 
 	if (down->ld_key != 0 && down->ld_key != attr->lg_key)
 		return (0);
 
 	down->ld_found = B_TRUE;
 
-	if ((fd = open(LAADM_DEV, O_RDWR)) < 0)
+	if ((fd = open(DLADM_AGGR_DEV, O_RDWR)) < 0)
 		return (-1);
 
-	if (i_laadm_delete_sys(fd, attr) < 0 && down->ld_key != 0) {
+	if (i_dladm_aggr_delete_sys(fd, attr) < 0 && down->ld_key != 0) {
+		errno_save = errno;
 		(void) close(fd);
+		errno = errno_save;
 		return (-1);
 	}
 
@@ -736,27 +757,25 @@ i_laadm_down(void *arg, laadm_grp_attr_sys_t *attr)
  * Bring down a link aggregation group or all of them if the key is zero.
  * If key is 0, walk may terminate early if any of the links fail
  */
-int
-laadm_down(uint32_t key)
+dladm_status_t
+dladm_aggr_down(uint32_t key)
 {
-	laadm_down_t down;
+	dladm_aggr_down_t down;
 
 	down.ld_key = key;
 	down.ld_found = B_FALSE;
 
-	if (laadm_walk_sys(i_laadm_down, &down) < 0)
-		return (-1);
+	if (dladm_aggr_walk(i_dladm_aggr_down, &down) < 0)
+		return (dladm_errno2status(errno));
 
 	/*
 	 * only return error if user specified key and key was
 	 * not found
 	 */
-	if (!down.ld_found && key != 0) {
-		errno = ENOENT;
-		return (-1);
-	}
+	if (!down.ld_found && key != 0)
+		return (DLADM_STATUS_NOTFOUND);
 
-	return (0);
+	return (DLADM_STATUS_OK);
 }
 
 /*
@@ -775,55 +794,55 @@ laadm_down(uint32_t key)
  *     group attributes to the new DB, but should continue walking
  *     the entries found in the DB.
  */
-static int
-i_laadm_walk_rw_db(int (*fn)(void *, laadm_grp_attr_db_t *),
-    void *arg,
-    const char *root,
-    laadm_diag_t *diag)
+static dladm_status_t
+i_dladm_aggr_walk_rw_db(int (*fn)(void *, dladm_aggr_grp_attr_db_t *),
+    void *arg, const char *root)
 {
 	FILE *fp, *nfp;
 	int nfd, fn_rc, lock_fd;
 	char line[MAXLINELEN];
-	laadm_grp_attr_db_t attr;
+	dladm_aggr_grp_attr_db_t attr;
 	char *db_file, *tmp_db_file;
 	char db_file_buf[MAXPATHLEN];
 	char tmp_db_file_buf[MAXPATHLEN];
+	dladm_status_t status;
 
 	if (root == NULL) {
-		db_file = LAADM_DB;
-		tmp_db_file = LAADM_DB_TMP;
+		db_file = DLADM_AGGR_DB;
+		tmp_db_file = DLADM_AGGR_DB_TMP;
 	} else {
 		(void) snprintf(db_file_buf, MAXPATHLEN, "%s%s", root,
-		    LAADM_DB);
+		    DLADM_AGGR_DB);
 		(void) snprintf(tmp_db_file_buf, MAXPATHLEN, "%s%s", root,
-		    LAADM_DB_TMP);
+		    DLADM_AGGR_DB_TMP);
 		db_file = db_file_buf;
 		tmp_db_file = tmp_db_file_buf;
 	}
 
-	if ((lock_fd = i_laadm_lock_db(F_WRLCK)) < 0)
-		return (-1);
+	if ((lock_fd = i_dladm_aggr_lock_db(F_WRLCK)) < 0)
+		return (dladm_errno2status(errno));
 
 	if ((fp = fopen(db_file, "r")) == NULL) {
-		i_laadm_unlock_db(lock_fd);
-		*diag = LAADM_DIAG_REPOSITORY_OPENFAIL;
-		return (-1);
+		status = dladm_errno2status(errno);
+		i_dladm_aggr_unlock_db(lock_fd);
+		return (status);
 	}
 
 	if ((nfd = open(tmp_db_file, O_WRONLY|O_CREAT|O_TRUNC,
-	    LAADM_DB_PERMS)) == -1) {
+	    DLADM_AGGR_DB_PERMS)) == -1) {
+		status = dladm_errno2status(errno);
 		(void) fclose(fp);
-		i_laadm_unlock_db(lock_fd);
-		return (-1);
+		i_dladm_aggr_unlock_db(lock_fd);
+		return (status);
 	}
 
 	if ((nfp = fdopen(nfd, "w")) == NULL) {
+		status = dladm_errno2status(errno);
 		(void) close(nfd);
 		(void) fclose(fp);
 		(void) unlink(tmp_db_file);
-		i_laadm_unlock_db(lock_fd);
-		*diag = LAADM_DIAG_REPOSITORY_OPENFAIL;
-		return (-1);
+		i_dladm_aggr_unlock_db(lock_fd);
+		return (status);
 	}
 
 	attr.lt_ports = NULL;
@@ -832,14 +851,15 @@ i_laadm_walk_rw_db(int (*fn)(void *, laadm_grp_attr_db_t *),
 
 		/* skip comments */
 		if (BLANK_LINE(line)) {
-			if (fputs(line, nfp) == EOF)
+			if (fputs(line, nfp) == EOF) {
+				status = dladm_errno2status(errno);
 				goto failed;
+			}
 			continue;
 		}
 
-		if (i_laadm_parse_db(line, &attr) != 0) {
-			errno = EFAULT;
-			*diag = LAADM_DIAG_REPOSITORY_PARSEFAIL;
+		if (i_dladm_aggr_parse_db(line, &attr) != 0) {
+			status = DLADM_STATUS_REPOSITORYINVAL;
 			goto failed;
 		}
 
@@ -848,14 +868,17 @@ i_laadm_walk_rw_db(int (*fn)(void *, laadm_grp_attr_db_t *),
 		switch (fn_rc) {
 		case -1:
 			/* failure, stop walking */
+			status = dladm_errno2status(errno);
 			goto failed;
 		case 0:
 			/*
 			 * Success, write group attributes, which could
 			 * have been modified by fn().
 			 */
-			if (i_laadm_fput_grp(nfp, &attr) != 0)
+			if (i_dladm_aggr_fput_grp(nfp, &attr) != 0) {
+				status = dladm_errno2status(errno);
 				goto failed;
+			}
 			break;
 		case 1:
 			/* skip current group */
@@ -867,43 +890,51 @@ i_laadm_walk_rw_db(int (*fn)(void *, laadm_grp_attr_db_t *),
 	}
 
 	if (getuid() == 0 || geteuid() == 0) {
-		if (fchmod(nfd, LAADM_DB_PERMS) == -1)
+		if (fchmod(nfd, DLADM_AGGR_DB_PERMS) == -1) {
+			status = dladm_errno2status(errno);
 			goto failed;
+		}
 
-		if (fchown(nfd, LAADM_DB_OWNER, LAADM_DB_GROUP) == -1)
+		if (fchown(nfd, DLADM_AGGR_DB_OWNER,
+		    DLADM_AGGR_DB_GROUP) == -1) {
+			status = dladm_errno2status(errno);
 			goto failed;
+		}
 	}
 
-	if (fflush(nfp) == EOF)
+	if (fflush(nfp) == EOF) {
+		status = dladm_errno2status(errno);
 		goto failed;
+	}
 
 	(void) fclose(fp);
 	(void) fclose(nfp);
 
 	if (rename(tmp_db_file, db_file) == -1) {
+		status = dladm_errno2status(errno);
 		(void) unlink(tmp_db_file);
-		i_laadm_unlock_db(lock_fd);
-		return (-1);
+		i_dladm_aggr_unlock_db(lock_fd);
+		return (status);
 	}
 
-	i_laadm_unlock_db(lock_fd);
-	return (0);
+	i_dladm_aggr_unlock_db(lock_fd);
+	return (DLADM_STATUS_OK);
 
 failed:
 	free(attr.lt_ports);
 	(void) fclose(fp);
 	(void) fclose(nfp);
 	(void) unlink(tmp_db_file);
-	i_laadm_unlock_db(lock_fd);
+	i_dladm_aggr_unlock_db(lock_fd);
 
-	return (-1);
+	return (status);
 }
 
 /*
  * Remove an entry from the DB.
  */
 static int
-i_laadm_delete_db_fn(void *arg, laadm_grp_attr_db_t *grp)
+i_dladm_aggr_del_db_fn(void *arg, dladm_aggr_grp_attr_db_t *grp)
 {
 	delete_db_state_t *state = arg;
 
@@ -916,49 +947,47 @@ i_laadm_delete_db_fn(void *arg, laadm_grp_attr_db_t *grp)
 	return (1);
 }
 
-static int
-i_laadm_delete_db(laadm_grp_attr_db_t *attr, const char *root,
-    laadm_diag_t *diag)
+static dladm_status_t
+i_dladm_aggr_del_db(dladm_aggr_grp_attr_db_t *attr, const char *root)
 {
 	delete_db_state_t state;
+	dladm_status_t status;
 
 	state.ds_key = attr->lt_key;
 	state.ds_found = B_FALSE;
 
-	if (i_laadm_walk_rw_db(i_laadm_delete_db_fn, &state, root,
-	    diag) != 0)
-		return (-1);
+	status = i_dladm_aggr_walk_rw_db(i_dladm_aggr_del_db_fn, &state, root);
+	if (status != DLADM_STATUS_OK)
+		return (status);
 
-	if (!state.ds_found) {
-		errno = ENOENT;
-		return (-1);
-	}
+	if (!state.ds_found)
+		return (DLADM_STATUS_NOTFOUND);
 
-	return (0);
+	return (DLADM_STATUS_OK);
 }
 
 /*
  * Modify the properties of an existing group in the DB.
  */
 static int
-i_laadm_modify_db_fn(void *arg, laadm_grp_attr_db_t *grp)
+i_dladm_aggr_modify_db_fn(void *arg, dladm_aggr_grp_attr_db_t *grp)
 {
 	modify_db_state_t *state = arg;
-	laadm_modify_attr_t *new_attr = state->us_attr_new;
-	laadm_modify_attr_t *old_attr = state->us_attr_old;
+	dladm_aggr_modify_attr_t *new_attr = state->us_attr_new;
+	dladm_aggr_modify_attr_t *old_attr = state->us_attr_old;
 
 	if (grp->lt_key != state->us_key)
 		return (0);
 
 	state->us_found = B_TRUE;
 
-	if (state->us_mask & LAADM_MODIFY_POLICY) {
+	if (state->us_mask & DLADM_AGGR_MODIFY_POLICY) {
 		if (old_attr != NULL)
 			old_attr->ld_policy = grp->lt_policy;
 		grp->lt_policy = new_attr->ld_policy;
 	}
 
-	if (state->us_mask & LAADM_MODIFY_MAC) {
+	if (state->us_mask & DLADM_AGGR_MODIFY_MAC) {
 		if (old_attr != NULL) {
 			old_attr->ld_mac_fixed = grp->lt_mac_fixed;
 			bcopy(grp->lt_mac, old_attr->ld_mac, ETHERADDRL);
@@ -967,13 +996,13 @@ i_laadm_modify_db_fn(void *arg, laadm_grp_attr_db_t *grp)
 		bcopy(new_attr->ld_mac, grp->lt_mac, ETHERADDRL);
 	}
 
-	if (state->us_mask & LAADM_MODIFY_LACP_MODE) {
+	if (state->us_mask & DLADM_AGGR_MODIFY_LACP_MODE) {
 		if (old_attr != NULL)
 			old_attr->ld_lacp_mode = grp->lt_lacp_mode;
 		grp->lt_lacp_mode = new_attr->ld_lacp_mode;
 	}
 
-	if (state->us_mask & LAADM_MODIFY_LACP_TIMER) {
+	if (state->us_mask & DLADM_AGGR_MODIFY_LACP_TIMER) {
 		if (old_attr != NULL)
 			old_attr->ld_lacp_timer = grp->lt_lacp_timer;
 		grp->lt_lacp_timer = new_attr->ld_lacp_timer;
@@ -983,11 +1012,13 @@ i_laadm_modify_db_fn(void *arg, laadm_grp_attr_db_t *grp)
 	return (0);
 }
 
-static int
-i_laadm_modify_db(uint32_t key, uint32_t mask, laadm_modify_attr_t *new,
-    laadm_modify_attr_t *old, const char *root, laadm_diag_t *diag)
+static dladm_status_t
+i_dladm_aggr_modify_db(uint32_t key, uint32_t mask,
+    dladm_aggr_modify_attr_t *new, dladm_aggr_modify_attr_t *old,
+    const char *root)
 {
 	modify_db_state_t state;
+	dladm_status_t status;
 
 	state.us_key = key;
 	state.us_mask = mask;
@@ -995,26 +1026,25 @@ i_laadm_modify_db(uint32_t key, uint32_t mask, laadm_modify_attr_t *new,
 	state.us_attr_old = old;
 	state.us_found = B_FALSE;
 
-	if (i_laadm_walk_rw_db(i_laadm_modify_db_fn, &state, root,
-	    diag) != 0)
-		return (-1);
-
-	if (!state.us_found) {
-		errno = ENOENT;
-		return (-1);
+	if ((status = i_dladm_aggr_walk_rw_db(i_dladm_aggr_modify_db_fn,
+	    &state, root)) != DLADM_STATUS_OK) {
+		return (status);
 	}
 
-	return (0);
+	if (!state.us_found)
+		return (DLADM_STATUS_NOTFOUND);
+
+	return (DLADM_STATUS_OK);
 }
 
 /*
  * Add ports to an existing group in the DB.
  */
 static int
-i_laadm_add_db_fn(void *arg, laadm_grp_attr_db_t *grp)
+i_dladm_aggr_add_db_fn(void *arg, dladm_aggr_grp_attr_db_t *grp)
 {
 	add_db_state_t *state = arg;
-	laadm_grp_attr_db_t *attr = state->as_attr;
+	dladm_aggr_grp_attr_db_t *attr = state->as_attr;
 	void *ports;
 	int i, j;
 
@@ -1036,7 +1066,7 @@ i_laadm_add_db_fn(void *arg, laadm_grp_attr_db_t *grp)
 
 	/* add groups specified by attr to grp */
 	ports = realloc(grp->lt_ports, (grp->lt_nports +
-	    attr->lt_nports) * sizeof (laadm_port_attr_db_t));
+	    attr->lt_nports) * sizeof (dladm_aggr_port_attr_db_t));
 	if (ports == NULL)
 		return (-1);
 	grp->lt_ports = ports;
@@ -1054,25 +1084,23 @@ i_laadm_add_db_fn(void *arg, laadm_grp_attr_db_t *grp)
 	return (0);
 }
 
-static int
-i_laadm_add_db(laadm_grp_attr_db_t *attr, const char *root,
-    laadm_diag_t *diag)
+static dladm_status_t
+i_dladm_aggr_add_db(dladm_aggr_grp_attr_db_t *attr, const char *root)
 {
 	add_db_state_t state;
+	dladm_status_t status;
 
 	state.as_attr = attr;
 	state.as_found = B_FALSE;
 
-	if (i_laadm_walk_rw_db(i_laadm_add_db_fn, &state, root,
-	    diag) != 0)
-		return (-1);
+	status = i_dladm_aggr_walk_rw_db(i_dladm_aggr_add_db_fn, &state, root);
+	if (status != DLADM_STATUS_OK)
+		return (status);
 
-	if (!state.as_found) {
-		errno = ENOENT;
-		return (-1);
-	}
+	if (!state.as_found)
+		return (DLADM_STATUS_NOTFOUND);
 
-	return (0);
+	return (DLADM_STATUS_OK);
 }
 
 /*
@@ -1080,15 +1108,15 @@ i_laadm_add_db(laadm_grp_attr_db_t *attr, const char *root,
  */
 
 typedef struct remove_db_state {
-	laadm_grp_attr_db_t *rs_attr;
+	dladm_aggr_grp_attr_db_t *rs_attr;
 	boolean_t	rs_found;
 } remove_db_state_t;
 
 static int
-i_laadm_remove_db_fn(void *arg, laadm_grp_attr_db_t *grp)
+i_dladm_aggr_remove_db_fn(void *arg, dladm_aggr_grp_attr_db_t *grp)
 {
 	remove_db_state_t *state = (remove_db_state_t *)arg;
-	laadm_grp_attr_db_t *attr = state->rs_attr;
+	dladm_aggr_grp_attr_db_t *attr = state->rs_attr;
 	int i, j, k, nremoved;
 	boolean_t match;
 
@@ -1123,25 +1151,24 @@ i_laadm_remove_db_fn(void *arg, laadm_grp_attr_db_t *grp)
 	return (0);
 }
 
-static int
-i_laadm_remove_db(laadm_grp_attr_db_t *attr, const char *root,
-    laadm_diag_t *diag)
+static dladm_status_t
+i_dladm_aggr_remove_db(dladm_aggr_grp_attr_db_t *attr, const char *root)
 {
 	remove_db_state_t state;
+	dladm_status_t status;
 
 	state.rs_attr = attr;
 	state.rs_found = B_FALSE;
 
-	if (i_laadm_walk_rw_db(i_laadm_remove_db_fn, &state, root,
-	    diag) != 0)
-		return (-1);
+	status = i_dladm_aggr_walk_rw_db(i_dladm_aggr_remove_db_fn,
+	    &state, root);
+	if (status != DLADM_STATUS_OK)
+		return (status);
 
-	if (!state.rs_found) {
-		errno = ENOENT;
-		return (-1);
-	}
+	if (!state.rs_found)
+		return (DLADM_STATUS_NOTFOUND);
 
-	return (0);
+	return (DLADM_STATUS_OK);
 }
 
 /*
@@ -1149,7 +1176,7 @@ i_laadm_remove_db(laadm_grp_attr_db_t *attr, const char *root,
  * success, or B_FALSE if an error occured during parsing.
  */
 boolean_t
-laadm_str_to_policy(const char *str, uint32_t *policy)
+dladm_aggr_str2policy(const char *str, uint32_t *policy)
 {
 	int i;
 	policy_t *pol;
@@ -1180,7 +1207,7 @@ laadm_str_to_policy(const char *str, uint32_t *policy)
  * free the returned string after use.
  */
 char *
-laadm_policy_to_str(uint32_t policy, char *str)
+dladm_aggr_policy2str(uint32_t policy, char *str)
 {
 	int i, npolicies = 0;
 	policy_t *pol;
@@ -1207,7 +1234,7 @@ laadm_policy_to_str(uint32_t policy, char *str)
  * Return B_FALSE if a syntax error was encountered, B_FALSE otherwise.
  */
 boolean_t
-laadm_str_to_mac_addr(const char *str, boolean_t *mac_fixed, uchar_t *mac_addr)
+dladm_aggr_str2macaddr(const char *str, boolean_t *mac_fixed, uchar_t *mac_addr)
 {
 	uchar_t *conv_str;
 	int mac_len;
@@ -1243,7 +1270,7 @@ laadm_str_to_mac_addr(const char *str, boolean_t *mac_fixed, uchar_t *mac_addr)
  * Returns a string containing a printable representation of a MAC address.
  */
 const char *
-laadm_mac_addr_to_str(unsigned char *mac, char *buf)
+dladm_aggr_macaddr2str(unsigned char *mac, char *buf)
 {
 	static char unknown_mac[] = {0, 0, 0, 0, 0, 0};
 
@@ -1261,10 +1288,10 @@ laadm_mac_addr_to_str(unsigned char *mac, char *buf)
  * B_TRUE if a match was found, B_FALSE otherwise.
  */
 boolean_t
-laadm_str_to_lacp_mode(const char *str, aggr_lacp_mode_t *lacp_mode)
+dladm_aggr_str2lacpmode(const char *str, aggr_lacp_mode_t *lacp_mode)
 {
 	int i;
-	laadm_lacp_mode_t *mode;
+	dladm_aggr_lacpmode_t *mode;
 
 	for (i = 0; i < NLACP_MODES; i++) {
 		mode = &lacp_modes[i];
@@ -1283,18 +1310,22 @@ laadm_str_to_lacp_mode(const char *str, aggr_lacp_mode_t *lacp_mode)
  * LACP mode number is invalid.
  */
 const char *
-laadm_lacp_mode_to_str(aggr_lacp_mode_t mode_id)
+dladm_aggr_lacpmode2str(aggr_lacp_mode_t mode_id, char *buf)
 {
 	int i;
-	laadm_lacp_mode_t *mode;
+	dladm_aggr_lacpmode_t *mode;
 
 	for (i = 0; i < NLACP_MODES; i++) {
 		mode = &lacp_modes[i];
-		if (mode->mode_id == mode_id)
-			return (mode->mode_str);
+		if (mode->mode_id == mode_id) {
+			(void) snprintf(buf, DLADM_STRSIZE, "%s",
+			    mode->mode_str);
+			return (buf);
+		}
 	}
 
-	return (NULL);
+	(void) strlcpy(buf, "unknown", DLADM_STRSIZE);
+	return (buf);
 }
 
 /*
@@ -1302,10 +1333,10 @@ laadm_lacp_mode_to_str(aggr_lacp_mode_t mode_id)
  * B_TRUE if a match was found, B_FALSE otherwise.
  */
 boolean_t
-laadm_str_to_lacp_timer(const char *str, aggr_lacp_timer_t *lacp_timer)
+dladm_aggr_str2lacptimer(const char *str, aggr_lacp_timer_t *lacp_timer)
 {
 	int i;
-	laadm_lacp_timer_t *timer;
+	dladm_aggr_lacptimer_t *timer;
 
 	for (i = 0; i < NLACP_TIMERS; i++) {
 		timer = &lacp_timers[i];
@@ -1324,18 +1355,41 @@ laadm_str_to_lacp_timer(const char *str, aggr_lacp_timer_t *lacp_timer)
  * LACP timer number is invalid.
  */
 const char *
-laadm_lacp_timer_to_str(aggr_lacp_timer_t timer_id)
+dladm_aggr_lacptimer2str(aggr_lacp_timer_t timer_id, char *buf)
 {
 	int i;
-	laadm_lacp_timer_t *timer;
+	dladm_aggr_lacptimer_t *timer;
 
 	for (i = 0; i < NLACP_TIMERS; i++) {
 		timer = &lacp_timers[i];
-		if (timer->lt_id == timer_id)
-			return (timer->lt_str);
+		if (timer->lt_id == timer_id) {
+			(void) snprintf(buf, DLADM_STRSIZE, "%s",
+			    timer->lt_str);
+			return (buf);
+		}
 	}
 
-	return (NULL);
+	(void) strlcpy(buf, "unknown", DLADM_STRSIZE);
+	return (buf);
+}
+
+const char *
+dladm_aggr_portstate2str(aggr_port_state_t state_id, char *buf)
+{
+	int			i;
+	dladm_aggr_port_state_t	*state;
+
+	for (i = 0; i < NPORT_STATES; i++) {
+		state = &port_states[i];
+		if (state->state_id == state_id) {
+			(void) snprintf(buf, DLADM_STRSIZE, "%s",
+			    state->state_str);
+			return (buf);
+		}
+	}
+
+	(void) strlcpy(buf, "unknown", DLADM_STRSIZE);
+	return (buf);
 }
 
 #define	FPRINTF_ERR(fcall) if ((fcall) < 0) return (-1);
@@ -1345,15 +1399,15 @@ laadm_lacp_timer_to_str(aggr_lacp_timer_t timer_id)
  * success, -1 on failure.
  */
 static int
-i_laadm_fput_grp(FILE *fp, laadm_grp_attr_db_t *attr)
+i_dladm_aggr_fput_grp(FILE *fp, dladm_aggr_grp_attr_db_t *attr)
 {
 	int i;
 	char addr_str[ETHERADDRL * 3];
-	char policy_str[LAADM_POLICY_STR_LEN];
+	char buf[DLADM_STRSIZE];
 
 	/* key, policy */
 	FPRINTF_ERR(fprintf(fp, "%d\t%s\t", attr->lt_key,
-	    laadm_policy_to_str(attr->lt_policy, policy_str)));
+	    dladm_aggr_policy2str(attr->lt_policy, buf)));
 
 	/* number of ports, ports */
 	FPRINTF_ERR(fprintf(fp, "%d\t", attr->lt_nports));
@@ -1369,47 +1423,47 @@ i_laadm_fput_grp(FILE *fp, laadm_grp_attr_db_t *attr)
 		FPRINTF_ERR(fprintf(fp, "auto"));
 	} else {
 		FPRINTF_ERR(fprintf(fp, "%s",
-		    laadm_mac_addr_to_str(attr->lt_mac, addr_str)));
+		    dladm_aggr_macaddr2str(attr->lt_mac, addr_str)));
 	}
 	FPRINTF_ERR(fprintf(fp, "\t"));
 
 	FPRINTF_ERR(fprintf(fp, "%s\t",
-	    laadm_lacp_mode_to_str(attr->lt_lacp_mode)));
+	    dladm_aggr_lacpmode2str(attr->lt_lacp_mode, buf)));
 
 	FPRINTF_ERR(fprintf(fp, "%s\n",
-	    laadm_lacp_timer_to_str(attr->lt_lacp_timer)));
+	    dladm_aggr_lacptimer2str(attr->lt_lacp_timer, buf)));
 
 	return (0);
 }
 
-static int
-i_laadm_create_db(laadm_grp_attr_db_t *attr, const char *root,
-    laadm_diag_t *diag)
+static dladm_status_t
+i_dladm_aggr_create_db(dladm_aggr_grp_attr_db_t *attr, const char *root)
 {
-	FILE *fp;
-	char line[MAXLINELEN];
-	uint32_t key;
-	int 		lock_fd, retval = -1;
+	FILE		*fp;
+	char		line[MAXLINELEN];
+	uint32_t	key;
+	int 		lock_fd;
 	char 		*db_file;
 	char 		db_file_buf[MAXPATHLEN];
 	char 		*endp = NULL;
+	dladm_status_t	status;
 
 	if (root == NULL) {
-		db_file = LAADM_DB;
+		db_file = DLADM_AGGR_DB;
 	} else {
 		(void) snprintf(db_file_buf, MAXPATHLEN, "%s%s", root,
-		    LAADM_DB);
+		    DLADM_AGGR_DB);
 		db_file = db_file_buf;
 	}
 
-	if ((lock_fd = i_laadm_lock_db(F_WRLCK)) < 0)
-		return (-1);
+	if ((lock_fd = i_dladm_aggr_lock_db(F_WRLCK)) < 0)
+		return (dladm_errno2status(errno));
 
 	if ((fp = fopen(db_file, "r+")) == NULL &&
 	    (fp = fopen(db_file, "w")) == NULL) {
-		i_laadm_unlock_db(lock_fd);
-		*diag = LAADM_DIAG_REPOSITORY_OPENFAIL;
-		return (-1);
+		status = dladm_errno2status(errno);
+		i_dladm_aggr_unlock_db(lock_fd);
+		return (status);
 	}
 
 	/* look for existing group with same key */
@@ -1429,13 +1483,14 @@ i_laadm_create_db(laadm_grp_attr_db_t *attr, const char *root,
 		errno = 0;
 		key = (int)strtol(holder, &endp, 10);
 		if (errno != 0 || *endp != '\0') {
-			goto failed;
+			status = DLADM_STATUS_REPOSITORYINVAL;
+			goto done;
 		}
 
 		if (key == attr->lt_key) {
 			/* group with key already exists */
-			errno = EEXIST;
-			goto failed;
+			status = DLADM_STATUS_EXIST;
+			goto done;
 		}
 	}
 
@@ -1444,35 +1499,34 @@ i_laadm_create_db(laadm_grp_attr_db_t *attr, const char *root,
 	 * the same key already exists. It's now time to add the
 	 * new group to the DB.
 	 */
-	if (i_laadm_fput_grp(fp, attr) != 0)
-		goto failed;
+	if (i_dladm_aggr_fput_grp(fp, attr) != 0) {
+		status = dladm_errno2status(errno);
+		goto done;
+	}
 
-	retval = 0;
+	status = DLADM_STATUS_OK;
 
-failed:
+done:
 	(void) fclose(fp);
-	i_laadm_unlock_db(lock_fd);
-	return (retval);
+	i_dladm_aggr_unlock_db(lock_fd);
+	return (status);
 }
 
 /*
  * Create a new link aggregation group. Update the configuration
  * file and bring it up.
  */
-int
-laadm_create(uint32_t key, uint32_t nports, laadm_port_attr_db_t *ports,
-    uint32_t policy, boolean_t mac_addr_fixed, uchar_t *mac_addr,
-    aggr_lacp_mode_t lacp_mode, aggr_lacp_timer_t lacp_timer, boolean_t tempop,
-    const char *root, laadm_diag_t *diag)
+dladm_status_t
+dladm_aggr_create(uint32_t key, uint32_t nports,
+    dladm_aggr_port_attr_db_t *ports, uint32_t policy, boolean_t mac_addr_fixed,
+    uchar_t *mac_addr, aggr_lacp_mode_t lacp_mode, aggr_lacp_timer_t lacp_timer,
+    boolean_t tempop, const char *root)
 {
-	laadm_grp_attr_db_t attr;
-	int errno_sav;
+	dladm_aggr_grp_attr_db_t attr;
+	dladm_status_t status;
 
-	if (key == 0 || key > LAADM_MAX_KEY) {
-		errno = EINVAL;
-		*diag = LAADM_DIAG_INVALID_KEY;
-		return (-1);
-	}
+	if (key == 0 || key > DLADM_AGGR_MAX_KEY)
+		return (DLADM_STATUS_KEYINVAL);
 
 	attr.lt_key = key;
 	attr.lt_nports = nports;
@@ -1488,220 +1542,184 @@ laadm_create(uint32_t key, uint32_t nports, laadm_port_attr_db_t *ports,
 
 	/* add the link aggregation group to the DB */
 	if (!tempop) {
-		if (i_laadm_create_db(&attr, root, diag) < 0)
-			return (-1);
+		status = i_dladm_aggr_create_db(&attr, root);
+		if (status != DLADM_STATUS_OK)
+			return (status);
 	} else {
-		laadm_up_t up;
-		int rc;
+		dladm_aggr_up_t up;
 
 		up.lu_key = key;
 		up.lu_found = B_FALSE;
-		up.lu_fd = open(LAADM_DEV, O_RDWR);
+		up.lu_fd = open(DLADM_AGGR_DEV, O_RDWR);
 		if (up.lu_fd < 0)
-			return (-1);
+			return (dladm_errno2status(errno));
 
-		rc = i_laadm_up((void *)&up, &attr, diag);
+		status = i_dladm_aggr_up((void *)&up, &attr);
 		(void) close(up.lu_fd);
-		return (rc);
+		return (status);
 	}
 
 	/* bring up the link aggregation group */
-	if (laadm_up(key, root, diag) < 0) {
-		if (errno != EEXIST) {
-			errno_sav = errno;
-			if (!tempop) {
-				(void) i_laadm_delete_db(&attr, root,
-				    diag);
-			}
-			errno = errno_sav;
-		}
-		return (-1);
-	}
+	status = dladm_aggr_up(key, root);
+	/*
+	 * If the operation fails because the aggregation already exists,
+	 * then only update the persistent configuration repository and
+	 * return success.
+	 */
+	if (status == DLADM_STATUS_EXIST)
+		status = DLADM_STATUS_OK;
 
-	return (0);
+	if (status != DLADM_STATUS_OK && !tempop)
+		(void) i_dladm_aggr_del_db(&attr, root);
+
+	return (status);
 }
 
 /*
  * Modify the parameters of an existing link aggregation group. Update
  * the configuration file and pass the changes to the kernel.
  */
-int
-laadm_modify(uint32_t key, uint32_t modify_mask, uint32_t policy,
+dladm_status_t
+dladm_aggr_modify(uint32_t key, uint32_t modify_mask, uint32_t policy,
     boolean_t mac_fixed, uchar_t *mac_addr, aggr_lacp_mode_t lacp_mode,
-    aggr_lacp_timer_t lacp_timer, boolean_t tempop, const char *root,
-    laadm_diag_t *diag)
+    aggr_lacp_timer_t lacp_timer, boolean_t tempop, const char *root)
 {
-	laadm_modify_attr_t new_attr, old_attr;
-	int errno_save;
+	dladm_aggr_modify_attr_t new_attr, old_attr;
+	dladm_status_t status;
 
-	if (key == 0) {
-		errno = EINVAL;
-		*diag = LAADM_DIAG_INVALID_KEY;
-		return (-1);
-	}
+	if (key == 0)
+		return (DLADM_STATUS_KEYINVAL);
 
-	if (modify_mask & LAADM_MODIFY_POLICY)
+	if (modify_mask & DLADM_AGGR_MODIFY_POLICY)
 		new_attr.ld_policy = policy;
 
-	if (modify_mask & LAADM_MODIFY_MAC) {
+	if (modify_mask & DLADM_AGGR_MODIFY_MAC) {
 		new_attr.ld_mac_fixed = mac_fixed;
 		bcopy(mac_addr, new_attr.ld_mac, ETHERADDRL);
 	}
 
-	if (modify_mask & LAADM_MODIFY_LACP_MODE)
+	if (modify_mask & DLADM_AGGR_MODIFY_LACP_MODE)
 		new_attr.ld_lacp_mode = lacp_mode;
 
-	if (modify_mask & LAADM_MODIFY_LACP_TIMER)
+	if (modify_mask & DLADM_AGGR_MODIFY_LACP_TIMER)
 		new_attr.ld_lacp_timer = lacp_timer;
 
 	/* update the DB */
-	if (!tempop) {
-		if (i_laadm_modify_db(key, modify_mask, &new_attr,
-		    &old_attr, root, diag) < 0)
-			return (-1);
+	if (!tempop && ((status = i_dladm_aggr_modify_db(key, modify_mask,
+	    &new_attr, &old_attr, root)) != DLADM_STATUS_OK)) {
+		return (status);
 	}
 
-	if (i_laadm_modify_sys(key, modify_mask, &new_attr,
-	    diag) < 0) {
-		if (!tempop) {
-			errno_save = errno;
-			(void) i_laadm_modify_db(key, modify_mask,
-			    &old_attr, NULL, root, diag);
-			errno = errno_save;
-		}
-		return (-1);
+	status = i_dladm_aggr_modify_sys(key, modify_mask, &new_attr);
+	if (status != DLADM_STATUS_OK && !tempop) {
+		(void) i_dladm_aggr_modify_db(key, modify_mask, &old_attr,
+		    NULL, root);
 	}
 
-	return (0);
+	return (status);
 }
 
 /*
  * Delete a previously created link aggregation group.
  */
-int
-laadm_delete(uint32_t key, boolean_t tempop, const char *root,
-    laadm_diag_t *diag)
+dladm_status_t
+dladm_aggr_delete(uint32_t key, boolean_t tempop, const char *root)
 {
-	laadm_grp_attr_db_t db_attr;
+	dladm_aggr_grp_attr_db_t db_attr;
+	dladm_status_t status;
 
-	if (key == 0) {
-		errno = EINVAL;
-		*diag = LAADM_DIAG_INVALID_KEY;
-		return (-1);
-	}
+	if (key == 0)
+		return (DLADM_STATUS_KEYINVAL);
 
 	if (tempop) {
-		laadm_down_t down;
-		laadm_grp_attr_sys_t sys_attr;
+		dladm_aggr_down_t down;
+		dladm_aggr_grp_attr_t sys_attr;
 
 		down.ld_key = key;
 		down.ld_found = B_FALSE;
 		sys_attr.lg_key = key;
-		return (i_laadm_down((void *)&down, &sys_attr));
-	} else if ((laadm_down(key) < 0) && errno == EBUSY) {
-		return (-1);
+		if (i_dladm_aggr_down((void *)&down, &sys_attr) < 0)
+			return (dladm_errno2status(errno));
+		else
+			return (DLADM_STATUS_OK);
+	} else {
+		status = dladm_aggr_down(key);
+
+		/*
+		 * Only continue to delete the configuration repository
+		 * either if we successfully delete the active aggregation
+		 * or if the aggregation is not found.
+		 */
+		if (status != DLADM_STATUS_OK &&
+		    status != DLADM_STATUS_NOTFOUND) {
+			return (status);
+		}
 	}
 
-	db_attr.lt_key = key;
-
 	if (tempop)
-		return (0);
+		return (DLADM_STATUS_OK);
 
-	return (i_laadm_delete_db(&db_attr, root, diag));
+	db_attr.lt_key = key;
+	return (i_dladm_aggr_del_db(&db_attr, root));
 }
 
 /*
  * Add one or more ports to an existing link aggregation.
  */
-int
-laadm_add(uint32_t key, uint32_t nports, laadm_port_attr_db_t *ports,
-    boolean_t tempop, const char *root, laadm_diag_t *diag)
+dladm_status_t
+dladm_aggr_add(uint32_t key, uint32_t nports, dladm_aggr_port_attr_db_t *ports,
+    boolean_t tempop, const char *root)
 {
-	laadm_grp_attr_db_t attr;
-	int errno_save;
+	dladm_aggr_grp_attr_db_t attr;
+	dladm_status_t status;
 
-	if (key == 0) {
-		errno = EINVAL;
-		*diag = LAADM_DIAG_INVALID_KEY;
-		return (-1);
-	}
+	if (key == 0)
+		return (DLADM_STATUS_KEYINVAL);
 
 	bzero(&attr, sizeof (attr));
 	attr.lt_key = key;
 	attr.lt_nports = nports;
 	attr.lt_ports = ports;
 
-	if (!tempop) {
-		if (i_laadm_add_db(&attr, root, diag) < 0)
-			return (-1);
+	if (!tempop &&
+	    ((status = i_dladm_aggr_add_db(&attr, root)) != DLADM_STATUS_OK)) {
+		return (status);
 	}
 
-	if (i_laadm_add_rem_sys(&attr, LAIOC_ADD, diag) < 0) {
-		if (!tempop) {
-			errno_save = errno;
-			(void) i_laadm_remove_db(&attr, root, diag);
-			errno = errno_save;
-		}
-		return (-1);
-	}
+	status = i_dladm_aggr_add_rem_sys(&attr, LAIOC_ADD);
+	if (status != DLADM_STATUS_OK && !tempop)
+		(void) i_dladm_aggr_remove_db(&attr, root);
 
-	return (0);
+	return (status);
 }
 
 /*
  * Remove one or more ports from an existing link aggregation.
  */
-int
-laadm_remove(uint32_t key, uint32_t nports, laadm_port_attr_db_t *ports,
-    boolean_t tempop, const char *root, laadm_diag_t *diag)
+dladm_status_t
+dladm_aggr_remove(uint32_t key, uint32_t nports,
+    dladm_aggr_port_attr_db_t *ports, boolean_t tempop, const char *root)
 {
-	laadm_grp_attr_db_t attr;
-	int errno_save;
+	dladm_aggr_grp_attr_db_t attr;
+	dladm_status_t status;
 
-	if (key == 0) {
-		errno = EINVAL;
-		*diag = LAADM_DIAG_INVALID_KEY;
-		return (-1);
-	}
+	if (key == 0)
+		return (DLADM_STATUS_KEYINVAL);
 
 	bzero(&attr, sizeof (attr));
 	attr.lt_key = key;
 	attr.lt_nports = nports;
 	attr.lt_ports = ports;
 
-	if (!tempop) {
-		if (i_laadm_remove_db(&attr, root, diag) < 0)
-			return (-1);
+	if (!tempop &&
+	    ((status = i_dladm_aggr_remove_db(&attr, root)) !=
+	    DLADM_STATUS_OK)) {
+		return (status);
 	}
 
-	if (i_laadm_add_rem_sys(&attr, LAIOC_REMOVE, diag) < 0) {
-		if (!tempop) {
-			errno_save = errno;
-			(void) i_laadm_add_db(&attr, root, diag);
-			errno = errno_save;
-		}
-		return (-1);
-	}
+	status = i_dladm_aggr_add_rem_sys(&attr, LAIOC_REMOVE);
+	if (status != DLADM_STATUS_OK && !tempop)
+		(void) i_dladm_aggr_add_db(&attr, root);
 
-	return (0);
-}
-
-const char *
-laadm_diag(laadm_diag_t diag) {
-	switch (diag) {
-	case LAADM_DIAG_REPOSITORY_OPENFAIL:
-		return (gettext("configuration repository open failed"));
-	case LAADM_DIAG_REPOSITORY_PARSEFAIL:
-		return (gettext("parsing of configuration repository failed"));
-	case LAADM_DIAG_REPOSITORY_CLOSEFAIL:
-		return (gettext("configuration repository close failed"));
-	case LAADM_DIAG_INVALID_INTFNAME:
-		return (gettext("invalid interface name"));
-	case LAADM_DIAG_INVALID_MACADDR:
-		return (gettext("invalid MAC address"));
-	case LAADM_DIAG_INVALID_KEY:
-		return (gettext("invalid key"));
-	default:
-		return (gettext("unknown diagnostic"));
-	}
+	return (status);
 }

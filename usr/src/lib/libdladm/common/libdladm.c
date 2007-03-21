@@ -25,30 +25,16 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <ctype.h>
 #include <unistd.h>
 #include <stropts.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <strings.h>
 #include <dirent.h>
-#include <net/if.h>
 #include <sys/stat.h>
-#include <sys/dld.h>
-#include <libdlpi.h>
-#include <libdevinfo.h>
+#include <libdladm.h>
 #include <libdladm_impl.h>
 #include <libintl.h>
-#include <sys/vlan.h>
-
-typedef struct dladm_dev {
-	char			dd_name[IFNAMSIZ];
-	struct dladm_dev	*dd_next;
-} dladm_dev_t;
-
-typedef struct dladm_walk {
-	dladm_dev_t		*dw_dev_list;
-} dladm_walk_t;
 
 static char		dladm_rootdir[MAXPATHLEN] = "/";
 
@@ -67,239 +53,6 @@ i_dladm_ioctl(int fd, int ic_cmd, void *ic_dp, int ic_len)
 	iocb.ic_dp = (char *)ic_dp;
 
 	return (ioctl(fd, I_STR, &iocb));
-}
-
-/*
- * Return the attributes of the specified datalink from the DLD driver.
- */
-static int
-i_dladm_info(int fd, const char *name, dladm_attr_t *dap)
-{
-	dld_ioc_attr_t	dia;
-
-	if (strlen(name) >= IFNAMSIZ) {
-		errno = EINVAL;
-		return (-1);
-	}
-
-	(void) strlcpy(dia.dia_name, name, IFNAMSIZ);
-
-	if (i_dladm_ioctl(fd, DLDIOCATTR, &dia, sizeof (dia)) < 0)
-		return (-1);
-
-	(void) strlcpy(dap->da_dev, dia.dia_dev, MAXNAMELEN);
-	dap->da_max_sdu = dia.dia_max_sdu;
-	dap->da_vid = dia.dia_vid;
-
-	return (0);
-}
-
-/*
- * Adds a datalink to the array corresponding to arg.
- */
-static void
-i_dladm_nt_net_add(void *arg, char *name)
-{
-	dladm_walk_t	*dwp = arg;
-	dladm_dev_t	*ddp = dwp->dw_dev_list;
-	dladm_dev_t	**lastp = &dwp->dw_dev_list;
-
-	while (ddp) {
-		/*
-		 * Skip duplicates.
-		 */
-		if (strcmp(ddp->dd_name, name) == 0)
-			return;
-
-		lastp = &ddp->dd_next;
-		ddp = ddp->dd_next;
-	}
-
-	if ((ddp = malloc(sizeof (*ddp))) == NULL)
-		return;
-
-	(void) strlcpy(ddp->dd_name, name, IFNAMSIZ);
-	ddp->dd_next = NULL;
-	*lastp = ddp;
-}
-
-/*
- * Walker callback invoked for each DDI_NT_NET node.
- */
-static int
-i_dladm_nt_net_walk(di_node_t node, di_minor_t minor, void *arg)
-{
-	char		linkname[DLPI_LINKNAME_MAX];
-	dlpi_handle_t	dh;
-
-	if (dlpi_makelink(linkname, di_minor_name(minor),
-	    di_instance(node)) != DLPI_SUCCESS)
-		return (DI_WALK_CONTINUE);
-
-	if (dlpi_open(linkname, &dh, 0) == DLPI_SUCCESS) {
-		i_dladm_nt_net_add(arg, linkname);
-		dlpi_close(dh);
-	}
-	return (DI_WALK_CONTINUE);
-}
-
-/*
- * Hold a data-link.
- */
-static int
-i_dladm_hold_link(const char *name, zoneid_t zoneid, boolean_t docheck)
-{
-	int		fd;
-	dld_hold_vlan_t	dhv;
-
-	if (strlen(name) >= IFNAMSIZ) {
-		errno = EINVAL;
-		return (-1);
-	}
-
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (-1);
-
-	bzero(&dhv, sizeof (dld_hold_vlan_t));
-	(void) strlcpy(dhv.dhv_name, name, IFNAMSIZ);
-	dhv.dhv_zid = zoneid;
-	dhv.dhv_docheck = docheck;
-
-	if (i_dladm_ioctl(fd, DLDIOCHOLDVLAN, &dhv, sizeof (dhv)) < 0) {
-		int olderrno = errno;
-
-		(void) close(fd);
-		errno = olderrno;
-		return (-1);
-	}
-
-	(void) close(fd);
-	return (0);
-}
-
-/*
- * Release a data-link.
- */
-static int
-i_dladm_rele_link(const char *name, zoneid_t zoneid, boolean_t docheck)
-{
-	int		fd;
-	dld_hold_vlan_t	dhv;
-
-	if (strlen(name) >= IFNAMSIZ) {
-		errno = EINVAL;
-		return (-1);
-	}
-
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (-1);
-
-	bzero(&dhv, sizeof (dld_hold_vlan_t));
-	(void) strlcpy(dhv.dhv_name, name, IFNAMSIZ);
-	dhv.dhv_zid = zoneid;
-	dhv.dhv_docheck = docheck;
-
-	if (i_dladm_ioctl(fd, DLDIOCRELEVLAN, &dhv, sizeof (dhv)) < 0) {
-		int olderrno = errno;
-
-		(void) close(fd);
-		errno = olderrno;
-		return (-1);
-	}
-
-	(void) close(fd);
-	return (0);
-}
-
-/*
- * Invoke the specified callback function for each active DDI_NT_NET
- * node.
- */
-int
-dladm_walk(void (*fn)(void *, const char *), void *arg)
-{
-	di_node_t	root;
-	dladm_walk_t	dw;
-	dladm_dev_t	*ddp, *last_ddp;
-
-	if ((root = di_init("/", DINFOCACHE)) == DI_NODE_NIL) {
-		errno = EFAULT;
-		return (-1);
-	}
-	dw.dw_dev_list = NULL;
-
-	(void) di_walk_minor(root, DDI_NT_NET, DI_CHECK_ALIAS, &dw,
-	    i_dladm_nt_net_walk);
-
-	di_fini(root);
-
-	ddp = dw.dw_dev_list;
-	while (ddp) {
-		fn(arg, ddp->dd_name);
-		last_ddp = ddp;
-		ddp = ddp->dd_next;
-		free(last_ddp);
-	}
-
-	return (0);
-}
-
-/*
- * Invoke the specified callback function for each vlan managed by dld
- */
-int
-dladm_walk_vlan(void (*fn)(void *, const char *), void *arg, const char *name)
-{
-	int		fd, bufsize, i;
-	int		nvlan = 4094;
-	dld_ioc_vlan_t	*iocp = NULL;
-	dld_vlan_info_t	*dvip;
-
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (-1);
-
-	bufsize = sizeof (dld_ioc_vlan_t) + nvlan * sizeof (dld_vlan_info_t);
-
-	if ((iocp = (dld_ioc_vlan_t *)calloc(1, bufsize)) == NULL)
-		return (-1);
-
-	(void) strlcpy((char *)iocp->div_name, name, IFNAMSIZ);
-	if (i_dladm_ioctl(fd, DLDIOCVLAN, iocp, bufsize) == 0) {
-		dvip = (dld_vlan_info_t *)(iocp + 1);
-		for (i = 0; i < iocp->div_count; i++)
-			(*fn)(arg, dvip[i].dvi_name);
-	}
-	/*
-	 * Note: Callers of dladm_walk_vlan() ignore the return
-	 * value of this routine. So ignoring ioctl failure case
-	 * and just returning 0.
-	 */
-	free(iocp);
-	(void) close(fd);
-	return (0);
-}
-
-
-/*
- * Returns the current attributes of the specified datalink.
- */
-int
-dladm_info(const char *name, dladm_attr_t *dap)
-{
-	int		fd;
-
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (-1);
-
-	if (i_dladm_info(fd, name, dap) < 0)
-		goto failed;
-
-	(void) close(fd);
-	return (0);
-
-failed:
-	(void) close(fd);
-	return (-1);
 }
 
 const char *
@@ -355,6 +108,24 @@ dladm_status2str(dladm_status_t status, char *buf)
 		break;
 	case DLADM_STATUS_TEMPONLY:
 		s = "change cannot be persistent, specify -t please";
+		break;
+	case DLADM_STATUS_TIMEDOUT:
+		s = "operation timed out";
+		break;
+	case DLADM_STATUS_ISCONN:
+		s = "already connected";
+		break;
+	case DLADM_STATUS_NOTCONN:
+		s = "not connected";
+		break;
+	case DLADM_STATUS_REPOSITORYINVAL:
+		s = "invalid configuration repository";
+		break;
+	case DLADM_STATUS_MACADDRINVAL:
+		s = "invalid MAC address";
+		break;
+	case DLADM_STATUS_KEYINVAL:
+		s = "invalid key";
 		break;
 	default:
 		s = "<unknown error>";
@@ -557,22 +328,4 @@ dladm_set_rootdir(const char *rootdir)
 	(void) strncpy(dladm_rootdir, rootdir, MAXPATHLEN);
 	(void) closedir(dp);
 	return (DLADM_STATUS_OK);
-}
-
-/*
- * Do a "hold" operation to a link.
- */
-int
-dladm_hold_link(const char *name, zoneid_t zoneid, boolean_t docheck)
-{
-	return (i_dladm_hold_link(name, zoneid, docheck));
-}
-
-/*
- * Do a "release" operation to a link.
- */
-int
-dladm_rele_link(const char *name, zoneid_t zoneid, boolean_t docheck)
-{
-	return (i_dladm_rele_link(name, zoneid, docheck));
 }

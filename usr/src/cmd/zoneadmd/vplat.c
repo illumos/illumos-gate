@@ -76,7 +76,7 @@
 
 #include <sys/dlpi.h>
 #include <libdlpi.h>
-#include <libdladm.h>
+#include <libdllink.h>
 
 #include <inet/tcp.h>
 #include <arpa/inet.h>

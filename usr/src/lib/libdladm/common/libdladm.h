@@ -28,23 +28,17 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/types.h>
-#include <sys/param.h>
-#include <sys/dls.h>
+/*
+ * This file includes structures, macros and common routines shared by all
+ * data-link administration, and routines which do not directly administrate
+ * links. For example, dladm_status2str().
+ */
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-typedef struct dladm_attr {
-	char		da_dev[MAXNAMELEN];
-	uint_t		da_max_sdu;
-	uint16_t	da_vid;
-} dladm_attr_t;
-
 #define	DLADM_STRSIZE		256
-#define	DLADM_SECOBJ_VAL_MAX	256
-#define	DLADM_PROP_VAL_MAX	256
 #define	DLADM_OPT_TEMP		0x00000001
 #define	DLADM_OPT_CREATE	0x00000002
 #define	DLADM_OPT_PERSIST	0x00000004
@@ -65,7 +59,13 @@ typedef enum {
 	DLADM_STATUS_DBNOTFOUND,
 	DLADM_STATUS_DENIED,
 	DLADM_STATUS_IOERR,
-	DLADM_STATUS_TEMPONLY
+	DLADM_STATUS_TEMPONLY,
+	DLADM_STATUS_TIMEDOUT,
+	DLADM_STATUS_ISCONN,
+	DLADM_STATUS_NOTCONN,
+	DLADM_STATUS_REPOSITORYINVAL,
+	DLADM_STATUS_MACADDRINVAL,
+	DLADM_STATUS_KEYINVAL
 } dladm_status_t;
 
 typedef enum {
@@ -75,41 +75,8 @@ typedef enum {
 	DLADM_PROP_VAL_PERSISTENT
 } dladm_prop_type_t;
 
-#define		DLADM_SECOBJ_CLASS_WEP	0
-typedef int	dladm_secobj_class_t;
-
-typedef void (dladm_walkcb_t)(void *, const char *);
-
-extern int	dladm_walk(dladm_walkcb_t *, void *);
-extern int	dladm_walk_vlan(dladm_walkcb_t *, void *, const char *);
-extern int	dladm_info(const char *, dladm_attr_t *);
-extern int	dladm_hold_link(const char *, zoneid_t, boolean_t);
-extern int	dladm_rele_link(const char *, zoneid_t, boolean_t);
-
-extern dladm_status_t	dladm_set_prop(const char *, const char *,
-			    char **, uint_t, uint_t, char **);
-extern dladm_status_t	dladm_get_prop(const char *, dladm_prop_type_t,
-			    const char *, char **, uint_t *);
-extern dladm_status_t	dladm_walk_prop(const char *, void *,
-			    boolean_t (*)(void *, const char *));
-extern boolean_t	dladm_is_prop_temponly(const char *, char **);
-
-extern dladm_status_t	dladm_set_secobj(const char *, dladm_secobj_class_t,
-			    uint8_t *, uint_t, uint_t);
-extern dladm_status_t	dladm_get_secobj(const char *, dladm_secobj_class_t *,
-			    uint8_t *, uint_t *, uint_t);
-extern dladm_status_t	dladm_unset_secobj(const char *, uint_t);
-extern dladm_status_t	dladm_walk_secobj(void *,
-			    boolean_t (*)(void *, const char *), uint_t);
-
 extern const char	*dladm_status2str(dladm_status_t, char *);
-extern const char	*dladm_secobjclass2str(dladm_secobj_class_t, char *);
-extern dladm_status_t	dladm_str2secobjclass(const char *,
-			    dladm_secobj_class_t *);
-
-extern dladm_status_t	dladm_init_linkprop(void);
-extern dladm_status_t	dladm_init_secobj(void);
-extern dladm_status_t	dladm_set_rootdir(const char *rootdir);
+extern dladm_status_t	dladm_set_rootdir(const char *);
 
 #ifdef	__cplusplus
 }

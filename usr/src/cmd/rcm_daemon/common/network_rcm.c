@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,7 @@
 #include <libdevinfo.h>
 #include <sys/types.h>
 #include <net/if.h>
-#include <liblaadm.h>
+#include <libdlaggr.h>
 #include "rcm_module.h"
 
 /*
@@ -751,10 +751,10 @@ typedef struct aggr_walker_state_s {
 } aggr_walker_state_t;
 
 static int
-aggr_walker(void *arg, laadm_grp_attr_sys_t *grp)
+aggr_walker(void *arg, dladm_aggr_grp_attr_t *grp)
 {
 	aggr_walker_state_t *state = arg;
-	laadm_port_attr_sys_t *port;
+	dladm_aggr_port_attr_t *port;
 	int i;
 
 	for (i = 0; i < grp->lg_nports; i++) {
@@ -782,7 +782,7 @@ is_aggregated(char *driver, int ppa)
 	(void) snprintf(state.dev_name, sizeof (state.dev_name), "%s%d",
 	    driver, ppa);
 
-	if (laadm_walk_sys(aggr_walker, &state) != 0) {
+	if (dladm_aggr_walk(aggr_walker, &state) != 0) {
 		rcm_log_message(RCM_ERROR, gettext("NET: cannot walk "
 		    "aggregations (%s)\n"), strerror(errno));
 		return (B_FALSE);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 #include <sys/stat.h>
 #include <sys/dld.h>
 #include <libinetutil.h>
+#include <libdllink.h>
 #include <libdladm_impl.h>
 
 static dladm_status_t	i_dladm_set_secobj_db(const char *,

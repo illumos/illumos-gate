@@ -46,10 +46,9 @@
 #include <auth_list.h>
 #include <libintl.h>
 #include <libdlpi.h>
-#include <libdladm.h>
-#include <liblaadm.h>
-#include <libmacadm.h>
-#include <libwladm.h>
+#include <libdllink.h>
+#include <libdlaggr.h>
+#include <libdlwlan.h>
 #include <libinetutil.h>
 #include <bsm/adt.h>
 #include <bsm/adt_event.h>
@@ -93,18 +92,6 @@ typedef struct show_mac_state {
 	boolean_t	ms_parseable;
 } show_mac_state_t;
 
-typedef struct port_state {
-	char			*state_name;
-	aggr_port_state_t	state_num;
-} port_state_t;
-
-static port_state_t port_states[] = {
-	{"standby", AGGR_PORT_STATE_STANDBY },
-	{"attached", AGGR_PORT_STATE_ATTACHED }
-};
-
-#define	NPORTSTATES	(sizeof (port_states) / sizeof (port_state_t))
-
 typedef	void cmdfunc_t(int, char **);
 
 static cmdfunc_t do_show_link, do_show_dev, do_show_wifi;
@@ -124,20 +111,17 @@ static void	dev_stats(const char *dev, uint32_t);
 static void	get_mac_stats(const char *, pktsum_t *);
 static void	get_link_stats(const char *, pktsum_t *);
 static uint64_t	mac_ifspeed(const char *);
-static char	*mac_link_state(const char *);
-static char	*mac_link_duplex(const char *);
 static void	stats_total(pktsum_t *, pktsum_t *, pktsum_t *);
 static void	stats_diff(pktsum_t *, pktsum_t *, pktsum_t *);
+static const char	*mac_link_state(const char *);
+static const char	*mac_link_duplex(const char *);
 
 static boolean_t str2int(const char *, int *);
 static void	die(const char *, ...);
 static void	die_optdup(int);
 static void	die_opterr(int, int);
-static void	die_laerr(laadm_diag_t, const char *, ...);
-static void	die_wlerr(wladm_status_t, const char *, ...);
 static void	die_dlerr(dladm_status_t, const char *, ...);
 static void	warn(const char *, ...);
-static void	warn_wlerr(wladm_status_t, const char *, ...);
 static void	warn_dlerr(dladm_status_t, const char *, ...);
 
 typedef struct	cmd {
@@ -292,22 +276,22 @@ main(int argc, char *argv[])
 static void
 do_create_aggr(int argc, char *argv[])
 {
-	char			option;
-	int			key;
-	uint32_t		policy = AGGR_POLICY_L4;
-	aggr_lacp_mode_t	lacp_mode = AGGR_LACP_OFF;
-	aggr_lacp_timer_t	lacp_timer = AGGR_LACP_TIMER_SHORT;
-	laadm_port_attr_db_t	port[MAXPORT];
-	uint_t			nport = 0;
-	uint8_t			mac_addr[ETHERADDRL];
-	boolean_t		mac_addr_fixed = B_FALSE;
-	boolean_t		P_arg = B_FALSE;
-	boolean_t		l_arg = B_FALSE;
-	boolean_t		t_arg = B_FALSE;
-	boolean_t		u_arg = B_FALSE;
-	boolean_t		T_arg = B_FALSE;
-	char			*altroot = NULL;
-	laadm_diag_t		diag = 0;
+	char				option;
+	int				key;
+	uint32_t			policy = AGGR_POLICY_L4;
+	aggr_lacp_mode_t		lacp_mode = AGGR_LACP_OFF;
+	aggr_lacp_timer_t		lacp_timer = AGGR_LACP_TIMER_SHORT;
+	dladm_aggr_port_attr_db_t	port[MAXPORT];
+	uint_t				nport = 0;
+	uint8_t				mac_addr[ETHERADDRL];
+	boolean_t			mac_addr_fixed = B_FALSE;
+	boolean_t			P_arg = B_FALSE;
+	boolean_t			l_arg = B_FALSE;
+	boolean_t			t_arg = B_FALSE;
+	boolean_t			u_arg = B_FALSE;
+	boolean_t			T_arg = B_FALSE;
+	char				*altroot = NULL;
+	dladm_status_t			status;
 
 	opterr = 0;
 	while ((option = getopt_long(argc, argv, ":d:l:P:R:tu:T:",
@@ -328,7 +312,7 @@ do_create_aggr(int argc, char *argv[])
 				die_optdup(option);
 
 			P_arg = B_TRUE;
-			if (!laadm_str_to_policy(optarg, &policy))
+			if (!dladm_aggr_str2policy(optarg, &policy))
 				die("invalid policy '%s'", optarg);
 			break;
 		case 'u':
@@ -336,7 +320,7 @@ do_create_aggr(int argc, char *argv[])
 				die_optdup(option);
 
 			u_arg = B_TRUE;
-			if (!laadm_str_to_mac_addr(optarg, &mac_addr_fixed,
+			if (!dladm_aggr_str2macaddr(optarg, &mac_addr_fixed,
 			    mac_addr))
 				die("invalid MAC address '%s'", optarg);
 			break;
@@ -345,7 +329,7 @@ do_create_aggr(int argc, char *argv[])
 				die_optdup(option);
 
 			l_arg = B_TRUE;
-			if (!laadm_str_to_lacp_mode(optarg, &lacp_mode))
+			if (!dladm_aggr_str2lacpmode(optarg, &lacp_mode))
 				die("invalid LACP mode '%s'", optarg);
 			break;
 		case 'T':
@@ -353,7 +337,7 @@ do_create_aggr(int argc, char *argv[])
 				die_optdup(option);
 
 			T_arg = B_TRUE;
-			if (!laadm_str_to_lacp_timer(optarg, &lacp_timer))
+			if (!dladm_aggr_str2lacptimer(optarg, &lacp_timer))
 				die("invalid LACP timer value '%s'", optarg);
 			break;
 		case 't':
@@ -378,9 +362,10 @@ do_create_aggr(int argc, char *argv[])
 	if (!str2int(argv[optind], &key) || key < 1)
 		die("invalid key value '%s'", argv[optind]);
 
-	if (laadm_create(key, nport, port, policy, mac_addr_fixed,
-	    mac_addr, lacp_mode, lacp_timer, t_arg, altroot, &diag) < 0)
-		die_laerr(diag, "create operation failed");
+	status = dladm_aggr_create(key, nport, port, policy, mac_addr_fixed,
+	    mac_addr, lacp_mode, lacp_timer, t_arg, altroot);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "create operation failed");
 }
 
 static void
@@ -390,7 +375,7 @@ do_delete_aggr(int argc, char *argv[])
 	char			option;
 	boolean_t		t_arg = B_FALSE;
 	char			*altroot = NULL;
-	laadm_diag_t		diag = 0;
+	dladm_status_t		status;
 
 	opterr = 0;
 	while ((option = getopt_long(argc, argv, ":R:t", longopts,
@@ -415,20 +400,21 @@ do_delete_aggr(int argc, char *argv[])
 	if (!str2int(argv[optind], &key) || key < 1)
 		die("invalid key value '%s'", argv[optind]);
 
-	if (laadm_delete(key, t_arg, altroot, &diag) < 0)
-		die_laerr(diag, "delete operation failed");
+	status = dladm_aggr_delete(key, t_arg, altroot);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "delete operation failed");
 }
 
 static void
 do_add_aggr(int argc, char *argv[])
 {
-	char			option;
-	int			key;
-	laadm_port_attr_db_t	port[MAXPORT];
-	uint_t			nport = 0;
-	boolean_t		t_arg = B_FALSE;
-	char			*altroot = NULL;
-	laadm_diag_t		diag = 0;
+	char				option;
+	int				key;
+	dladm_aggr_port_attr_db_t	port[MAXPORT];
+	uint_t				nport = 0;
+	boolean_t			t_arg = B_FALSE;
+	char				*altroot = NULL;
+	dladm_status_t			status;
 
 	opterr = 0;
 	while ((option = getopt_long(argc, argv, ":d:R:t", longopts,
@@ -466,32 +452,33 @@ do_add_aggr(int argc, char *argv[])
 	if (!str2int(argv[optind], &key) || key < 1)
 		die("invalid key value '%s'", argv[optind]);
 
-	if (laadm_add(key, nport, port, t_arg, altroot, &diag) < 0) {
+	status = dladm_aggr_add(key, nport, port, t_arg, altroot);
+	if (status != DLADM_STATUS_OK) {
 		/*
-		 * checking ENOTSUP is a temporary workaround
+		 * checking DLADM_STATUS_NOTSUP is a temporary workaround
 		 * and should be removed once 6399681 is fixed.
 		 */
-		if (errno == ENOTSUP) {
+		if (status == DLADM_STATUS_NOTSUP) {
 			(void) fprintf(stderr,
 			    gettext("%s: add operation failed: %s\n"),
 			    progname,
 			    gettext("device capabilities don't match"));
 			exit(ENOTSUP);
 		}
-		die_laerr(diag, "add operation failed");
+		die_dlerr(status, "add operation failed");
 	}
 }
 
 static void
 do_remove_aggr(int argc, char *argv[])
 {
-	char			option;
-	int			key;
-	laadm_port_attr_db_t	port[MAXPORT];
-	uint_t			nport = 0;
-	boolean_t		t_arg = B_FALSE;
-	char			*altroot = NULL;
-	laadm_diag_t		diag = 0;
+	char				option;
+	int				key;
+	dladm_aggr_port_attr_db_t	port[MAXPORT];
+	uint_t				nport = 0;
+	boolean_t			t_arg = B_FALSE;
+	char				*altroot = NULL;
+	dladm_status_t			status;
 
 	opterr = 0;
 	while ((option = getopt_long(argc, argv, ":d:R:t",
@@ -529,8 +516,9 @@ do_remove_aggr(int argc, char *argv[])
 	if (!str2int(argv[optind], &key) || key < 1)
 		die("invalid key value '%s'", argv[optind]);
 
-	if (laadm_remove(key, nport, port, t_arg, altroot, &diag) < 0)
-		die_laerr(diag, "remove operation failed");
+	status = dladm_aggr_remove(key, nport, port, t_arg, altroot);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "remove operation failed");
 }
 
 static void
@@ -546,47 +534,47 @@ do_modify_aggr(int argc, char *argv[])
 	uint8_t			modify_mask = 0;
 	boolean_t		t_arg = B_FALSE;
 	char			*altroot = NULL;
-	laadm_diag_t		diag = 0;
+	dladm_status_t		status;
 
 	opterr = 0;
 	while ((option = getopt_long(argc, argv, ":l:P:R:tu:T:", longopts,
 	    NULL)) != -1) {
 		switch (option) {
 		case 'P':
-			if (modify_mask & LAADM_MODIFY_POLICY)
+			if (modify_mask & DLADM_AGGR_MODIFY_POLICY)
 				die_optdup(option);
 
-			modify_mask |= LAADM_MODIFY_POLICY;
+			modify_mask |= DLADM_AGGR_MODIFY_POLICY;
 
-			if (!laadm_str_to_policy(optarg, &policy))
+			if (!dladm_aggr_str2policy(optarg, &policy))
 				die("invalid policy '%s'", optarg);
 			break;
 		case 'u':
-			if (modify_mask & LAADM_MODIFY_MAC)
+			if (modify_mask & DLADM_AGGR_MODIFY_MAC)
 				die_optdup(option);
 
-			modify_mask |= LAADM_MODIFY_MAC;
+			modify_mask |= DLADM_AGGR_MODIFY_MAC;
 
-			if (!laadm_str_to_mac_addr(optarg, &mac_addr_fixed,
+			if (!dladm_aggr_str2macaddr(optarg, &mac_addr_fixed,
 			    mac_addr))
 				die("invalid MAC address '%s'", optarg);
 			break;
 		case 'l':
-			if (modify_mask & LAADM_MODIFY_LACP_MODE)
+			if (modify_mask & DLADM_AGGR_MODIFY_LACP_MODE)
 				die_optdup(option);
 
-			modify_mask |= LAADM_MODIFY_LACP_MODE;
+			modify_mask |= DLADM_AGGR_MODIFY_LACP_MODE;
 
-			if (!laadm_str_to_lacp_mode(optarg, &lacp_mode))
+			if (!dladm_aggr_str2lacpmode(optarg, &lacp_mode))
 				die("invalid LACP mode '%s'", optarg);
 			break;
 		case 'T':
-			if (modify_mask & LAADM_MODIFY_LACP_TIMER)
+			if (modify_mask & DLADM_AGGR_MODIFY_LACP_TIMER)
 				die_optdup(option);
 
-			modify_mask |= LAADM_MODIFY_LACP_TIMER;
+			modify_mask |= DLADM_AGGR_MODIFY_LACP_TIMER;
 
-			if (!laadm_str_to_lacp_timer(optarg, &lacp_timer))
+			if (!dladm_aggr_str2lacptimer(optarg, &lacp_timer))
 				die("invalid LACP timer value '%s'", optarg);
 			break;
 		case 't':
@@ -611,16 +599,17 @@ do_modify_aggr(int argc, char *argv[])
 	if (!str2int(argv[optind], &key) || key < 1)
 		die("invalid key value '%s'", argv[optind]);
 
-	if (laadm_modify(key, modify_mask, policy, mac_addr_fixed, mac_addr,
-	    lacp_mode, lacp_timer, t_arg, altroot, &diag) < 0)
-		die_laerr(diag, "modify operation failed");
+	status = dladm_aggr_modify(key, modify_mask, policy, mac_addr_fixed,
+	    mac_addr, lacp_mode, lacp_timer, t_arg, altroot);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "modify operation failed");
 }
 
 static void
 do_up_aggr(int argc, char *argv[])
 {
 	int		key = 0;
-	laadm_diag_t	diag = 0;
+	dladm_status_t	status;
 
 	/* get aggregation key (optional last argument) */
 	if (argc == 2) {
@@ -630,12 +619,12 @@ do_up_aggr(int argc, char *argv[])
 		usage();
 	}
 
-	if (laadm_up(key, NULL, &diag) < 0) {
+	if ((status = dladm_aggr_up(key, NULL)) != DLADM_STATUS_OK) {
 		if (key != 0) {
-			die_laerr(diag, "could not bring up aggregation '%u'",
+			die_dlerr(status, "could not bring up aggregation '%u'",
 			    key);
 		} else {
-			die_laerr(diag, "could not bring aggregations up");
+			die_dlerr(status, "could not bring aggregations up");
 		}
 	}
 }
@@ -643,7 +632,8 @@ do_up_aggr(int argc, char *argv[])
 static void
 do_down_aggr(int argc, char *argv[])
 {
-	int	key = 0;
+	dladm_status_t	status;
+	int		key = 0;
 
 	/* get aggregation key (optional last argument) */
 	if (argc == 2) {
@@ -653,13 +643,12 @@ do_down_aggr(int argc, char *argv[])
 		usage();
 	}
 
-	if (laadm_down(key) < 0) {
+	if ((status = dladm_aggr_down(key)) != DLADM_STATUS_OK) {
 		if (key != 0) {
-			die("could not bring down aggregation '%u': %s",
-			    key, strerror(errno));
+			die_dlerr(status,
+			    "could not bring down aggregation '%u'", key);
 		} else {
-			die("could not bring down aggregations: %s",
-			    strerror(errno));
+			die_dlerr(status, "could not bring down aggregations");
 		}
 	}
 }
@@ -819,9 +808,9 @@ show_link_stats(void *arg, const char *name)
 }
 
 static void
-dump_grp(laadm_grp_attr_sys_t	*grp, boolean_t parseable)
+dump_grp(dladm_aggr_grp_attr_t *grp, boolean_t parseable)
 {
-	char policy_str[LAADM_POLICY_STR_LEN];
+	char buf[DLADM_STRSIZE];
 	char addr_str[ETHERADDRL * 3];
 
 	if (!parseable) {
@@ -829,19 +818,19 @@ dump_grp(laadm_grp_attr_sys_t	*grp, boolean_t parseable)
 		    grp->lg_key, grp->lg_key);
 
 		(void) printf(gettext("\tpolicy: %s"),
-		    laadm_policy_to_str(grp->lg_policy, policy_str));
+		    dladm_aggr_policy2str(grp->lg_policy, buf));
 
 		(void) printf(gettext("\taddress: %s (%s)\n"),
-		    laadm_mac_addr_to_str(grp->lg_mac, addr_str),
+		    dladm_aggr_macaddr2str(grp->lg_mac, addr_str),
 		    (grp->lg_mac_fixed) ? gettext("fixed") : gettext("auto"));
 	} else {
 		(void) printf("aggr key=%d", grp->lg_key);
 
 		(void) printf(" policy=%s",
-		    laadm_policy_to_str(grp->lg_policy, policy_str));
+		    dladm_aggr_policy2str(grp->lg_policy, buf));
 
 		(void) printf(" address=%s",
-		    laadm_mac_addr_to_str(grp->lg_mac, addr_str));
+		    dladm_aggr_macaddr2str(grp->lg_mac, addr_str));
 
 		(void) printf(" address-type=%s\n",
 		    (grp->lg_mac_fixed) ? "fixed" : "auto");
@@ -849,11 +838,13 @@ dump_grp(laadm_grp_attr_sys_t	*grp, boolean_t parseable)
 }
 
 static void
-dump_grp_lacp(laadm_grp_attr_sys_t *grp, boolean_t parseable)
+dump_grp_lacp(dladm_aggr_grp_attr_t *grp, boolean_t parseable)
 {
-	const char *lacp_mode_str = laadm_lacp_mode_to_str(grp->lg_lacp_mode);
-	const char *lacp_timer_str =
-	    laadm_lacp_timer_to_str(grp->lg_lacp_timer);
+	char lacp_mode_str[DLADM_STRSIZE];
+	char lacp_timer_str[DLADM_STRSIZE];
+
+	(void) dladm_aggr_lacpmode2str(grp->lg_lacp_mode, lacp_mode_str);
+	(void) dladm_aggr_lacptimer2str(grp->lg_lacp_timer, lacp_timer_str);
 
 	if (!parseable) {
 		(void) printf(gettext("\t\tLACP mode: %s"), lacp_mode_str);
@@ -865,7 +856,7 @@ dump_grp_lacp(laadm_grp_attr_sys_t *grp, boolean_t parseable)
 }
 
 static void
-dump_grp_stats(laadm_grp_attr_sys_t *grp)
+dump_grp_stats(dladm_aggr_grp_attr_t *grp)
 {
 	(void) printf("key: %d", grp->lg_key);
 	(void) printf("\tipackets  rbytes      opackets	 obytes		 ");
@@ -888,49 +879,37 @@ dump_ports_head(void)
 	    "state\n"));
 }
 
-static char *
-port_state_to_str(aggr_port_state_t state_num)
-{
-	int			i;
-	port_state_t		*state;
-
-	for (i = 0; i < NPORTSTATES; i++) {
-		state = &port_states[i];
-		if (state->state_num == state_num)
-			return (state->state_name);
-	}
-
-	return ("unknown");
-}
-
 static void
-dump_port(laadm_port_attr_sys_t *port, boolean_t parseable)
+dump_port(dladm_aggr_port_attr_t *port, boolean_t parseable)
 {
 	char *dev = port->lp_devname;
-	char buf[ETHERADDRL * 3];
+	char mac_addr[ETHERADDRL * 3];
+	char buf[DLADM_STRSIZE];
 
 	if (!parseable) {
-		(void) printf("	   %-9s\t%s", dev, laadm_mac_addr_to_str(
-		    port->lp_mac, buf));
+		(void) printf("	   %-9s\t%s", dev, dladm_aggr_macaddr2str(
+		    port->lp_mac, mac_addr));
 		(void) printf("\t %5uMb", (int)(mac_ifspeed(dev) /
 		    1000000ull));
 		(void) printf("\t%s", mac_link_duplex(dev));
 		(void) printf("\t%s", mac_link_state(dev));
-		(void) printf("\t%s\n", port_state_to_str(port->lp_state));
+		(void) printf("\t%s\n",
+		    dladm_aggr_portstate2str(port->lp_state, buf));
 
 	} else {
 		(void) printf(" device=%s address=%s", dev,
-		    laadm_mac_addr_to_str(port->lp_mac, buf));
+		    dladm_aggr_macaddr2str(port->lp_mac, mac_addr));
 		(void) printf(" speed=%u", (int)(mac_ifspeed(dev) /
 		    1000000ull));
 		(void) printf(" duplex=%s", mac_link_duplex(dev));
 		(void) printf(" link=%s", mac_link_state(dev));
-		(void) printf(" port=%s", port_state_to_str(port->lp_state));
+		(void) printf(" port=%s",
+		    dladm_aggr_portstate2str(port->lp_state, buf));
 	}
 }
 
 static void
-dump_port_lacp(laadm_port_attr_sys_t *port)
+dump_port_lacp(dladm_aggr_port_attr_t *port)
 {
 	aggr_lacp_state_t *state = &port->lp_lacp_state;
 
@@ -977,7 +956,7 @@ dump_port_stat(int index, show_grp_state_t *state, pktsum_t *port_stats,
 }
 
 static int
-show_key(void *arg, laadm_grp_attr_sys_t *grp)
+show_key(void *arg, dladm_aggr_grp_attr_t *grp)
 {
 	show_grp_state_t	*state = (show_grp_state_t *)arg;
 	int			i;
@@ -1256,7 +1235,7 @@ do_show_aggr(int argc, char *argv[])
 	state.gs_key = key;
 	state.gs_found = B_FALSE;
 
-	(void) laadm_walk_sys(show_key, &state);
+	(void) dladm_aggr_walk(show_key, &state);
 
 	if (key != 0 && !state.gs_found)
 		die("non-existent aggregation key '%u'", key);
@@ -1332,7 +1311,7 @@ do_show_dev(int argc, char *argv[])
 	}
 
 	if (dev == NULL)
-		(void) macadm_walk(show_dev, &state, B_TRUE);
+		(void) dladm_mac_walk(show_dev, &state);
 	else
 		show_dev(&state, dev);
 }
@@ -1391,7 +1370,7 @@ aggr_stats(uint32_t key, uint_t interval)
 
 	for (;;) {
 		state.gs_found = B_FALSE;
-		(void) laadm_walk_sys(show_key, &state);
+		(void) dladm_aggr_walk(show_key, &state);
 		if (state.gs_key != 0 && !state.gs_found)
 			die("non-existent aggregation key '%u'", key);
 
@@ -1423,7 +1402,7 @@ dev_stats(const char *dev, uint32_t interval)
 
 		state.ms_donefirst = B_FALSE;
 		if (dev == NULL)
-			(void) macadm_walk(show_dev_stats, &state, B_TRUE);
+			(void) dladm_mac_walk(show_dev_stats, &state);
 		else
 			show_dev_stats(&state, dev);
 
@@ -1596,55 +1575,33 @@ mac_ifspeed(const char *dev)
 	return (ifspeed);
 }
 
-static char *
+static const char *
 mac_link_state(const char *dev)
 {
 	link_state_t	link_state;
-	char		*state_str = "unknown";
+	char		buf[DLADM_STRSIZE];
 
 	if (get_single_mac_stat(dev, "link_state", KSTAT_DATA_UINT32,
 	    &link_state) != 0) {
-		return (state_str);
+		return ("unknown");
 	}
 
-	switch (link_state) {
-	case LINK_STATE_UP:
-		state_str = "up";
-		break;
-	case LINK_STATE_DOWN:
-		state_str = "down";
-		break;
-	default:
-		break;
-	}
-
-	return (state_str);
+	return (dladm_linkstate2str(link_state, buf));
 }
 
 
-static char *
+static const char *
 mac_link_duplex(const char *dev)
 {
 	link_duplex_t	link_duplex;
-	char		*duplex_str = "unknown";
+	char		buf[DLADM_STRSIZE];
 
 	if (get_single_mac_stat(dev, "link_duplex", KSTAT_DATA_UINT32,
 	    &link_duplex) != 0) {
-		return (duplex_str);
+		return ("unknown");
 	}
 
-	switch (link_duplex) {
-	case LINK_DUPLEX_FULL:
-		duplex_str = "full";
-		break;
-	case LINK_DUPLEX_HALF:
-		duplex_str = "half";
-		break;
-	default:
-		break;
-	}
-
-	return (duplex_str);
+	return (dladm_linkduplex2str(link_duplex, buf));
 }
 
 #define	WIFI_CMD_SCAN	0x00000001
@@ -1659,17 +1616,17 @@ typedef struct wifi_field {
 } wifi_field_t;
 
 static wifi_field_t wifi_fields[] = {
-{ "link",	"LINK",		10,	0,			WIFI_CMD_ALL},
-{ "essid",	"ESSID",	19,	WLADM_WLAN_ATTR_ESSID,	WIFI_CMD_ALL},
-{ "bssid",	"BSSID/IBSSID", 17,	WLADM_WLAN_ATTR_BSSID,	WIFI_CMD_ALL},
-{ "ibssid",	"BSSID/IBSSID", 17,	WLADM_WLAN_ATTR_BSSID,	WIFI_CMD_ALL},
-{ "mode",	"MODE",		6,	WLADM_WLAN_ATTR_MODE,	WIFI_CMD_ALL},
-{ "speed",	"SPEED",	6,	WLADM_WLAN_ATTR_SPEED,	WIFI_CMD_ALL},
-{ "auth",	"AUTH",		8,	WLADM_WLAN_ATTR_AUTH,	WIFI_CMD_SHOW},
-{ "bsstype",	"BSSTYPE",	8,	WLADM_WLAN_ATTR_BSSTYPE, WIFI_CMD_ALL},
-{ "sec",	"SEC",		6,	WLADM_WLAN_ATTR_SECMODE, WIFI_CMD_ALL},
-{ "status",	"STATUS",	17,	WLADM_LINK_ATTR_STATUS, WIFI_CMD_SHOW},
-{ "strength",	"STRENGTH",	10,	WLADM_WLAN_ATTR_STRENGTH, WIFI_CMD_ALL}}
+{ "link",	"LINK",		10, 0,				WIFI_CMD_ALL},
+{ "essid",	"ESSID",	19, DLADM_WLAN_ATTR_ESSID,	WIFI_CMD_ALL},
+{ "bssid",	"BSSID/IBSSID", 17, DLADM_WLAN_ATTR_BSSID,	WIFI_CMD_ALL},
+{ "ibssid",	"BSSID/IBSSID", 17, DLADM_WLAN_ATTR_BSSID,	WIFI_CMD_ALL},
+{ "mode",	"MODE",		6,  DLADM_WLAN_ATTR_MODE,	WIFI_CMD_ALL},
+{ "speed",	"SPEED",	6,  DLADM_WLAN_ATTR_SPEED,	WIFI_CMD_ALL},
+{ "auth",	"AUTH",		8,  DLADM_WLAN_ATTR_AUTH,	WIFI_CMD_SHOW},
+{ "bsstype",	"BSSTYPE",	8,  DLADM_WLAN_ATTR_BSSTYPE,	WIFI_CMD_ALL},
+{ "sec",	"SEC",		6,  DLADM_WLAN_ATTR_SECMODE,	WIFI_CMD_ALL},
+{ "status",	"STATUS",	17, DLADM_WLAN_LINKATTR_STATUS,	WIFI_CMD_SHOW},
+{ "strength",	"STRENGTH",	10, DLADM_WLAN_ATTR_STRENGTH,	WIFI_CMD_ALL}}
 ;
 
 static char *all_scan_wifi_fields =
@@ -1853,9 +1810,9 @@ print_wifi_field(print_wifi_state_t *statep, wifi_field_t *wfp,
 
 static void
 print_wlan_attr(print_wifi_state_t *statep, wifi_field_t *wfp,
-    wladm_wlan_attr_t *attrp)
+    dladm_wlan_attr_t *attrp)
 {
-	char		buf[WLADM_STRSIZE];
+	char		buf[DLADM_STRSIZE];
 	const char	*str = "";
 
 	if (wfp->wf_mask == 0) {
@@ -1869,30 +1826,30 @@ print_wlan_attr(print_wifi_state_t *statep, wifi_field_t *wfp,
 	}
 
 	switch (wfp->wf_mask) {
-	case WLADM_WLAN_ATTR_ESSID:
-		str = wladm_essid2str(&attrp->wa_essid, buf);
+	case DLADM_WLAN_ATTR_ESSID:
+		str = dladm_wlan_essid2str(&attrp->wa_essid, buf);
 		break;
-	case WLADM_WLAN_ATTR_BSSID:
-		str = wladm_bssid2str(&attrp->wa_bssid, buf);
+	case DLADM_WLAN_ATTR_BSSID:
+		str = dladm_wlan_bssid2str(&attrp->wa_bssid, buf);
 		break;
-	case WLADM_WLAN_ATTR_SECMODE:
-		str = wladm_secmode2str(&attrp->wa_secmode, buf);
+	case DLADM_WLAN_ATTR_SECMODE:
+		str = dladm_wlan_secmode2str(&attrp->wa_secmode, buf);
 		break;
-	case WLADM_WLAN_ATTR_STRENGTH:
-		str = wladm_strength2str(&attrp->wa_strength, buf);
+	case DLADM_WLAN_ATTR_STRENGTH:
+		str = dladm_wlan_strength2str(&attrp->wa_strength, buf);
 		break;
-	case WLADM_WLAN_ATTR_MODE:
-		str = wladm_mode2str(&attrp->wa_mode, buf);
+	case DLADM_WLAN_ATTR_MODE:
+		str = dladm_wlan_mode2str(&attrp->wa_mode, buf);
 		break;
-	case WLADM_WLAN_ATTR_SPEED:
-		str = wladm_speed2str(&attrp->wa_speed, buf);
+	case DLADM_WLAN_ATTR_SPEED:
+		str = dladm_wlan_speed2str(&attrp->wa_speed, buf);
 		(void) strlcat(buf, "Mb", sizeof (buf));
 		break;
-	case WLADM_WLAN_ATTR_AUTH:
-		str = wladm_auth2str(&attrp->wa_auth, buf);
+	case DLADM_WLAN_ATTR_AUTH:
+		str = dladm_wlan_auth2str(&attrp->wa_auth, buf);
 		break;
-	case WLADM_WLAN_ATTR_BSSTYPE:
-		str = wladm_bsstype2str(&attrp->wa_bsstype, buf);
+	case DLADM_WLAN_ATTR_BSSTYPE:
+		str = dladm_wlan_bsstype2str(&attrp->wa_bsstype, buf);
 		break;
 	}
 
@@ -1900,7 +1857,7 @@ print_wlan_attr(print_wifi_state_t *statep, wifi_field_t *wfp,
 }
 
 static boolean_t
-print_scan_results(void *arg, wladm_wlan_attr_t *attrp)
+print_scan_results(void *arg, dladm_wlan_attr_t *attrp)
 {
 	print_wifi_state_t	*statep = arg;
 	int			i;
@@ -1924,26 +1881,26 @@ static boolean_t
 scan_wifi(void *arg, const char *link)
 {
 	print_wifi_state_t	*statep = arg;
-	wladm_status_t		status;
+	dladm_status_t		status;
 
 	statep->ws_link = link;
-	status = wladm_scan(link, statep, print_scan_results);
-	if (status != WLADM_STATUS_OK)
-		die_wlerr(status, "cannot scan link '%s'", link);
+	status = dladm_wlan_scan(link, statep, print_scan_results);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "cannot scan link '%s'", link);
 
 	return (B_TRUE);
 }
 
 static void
 print_link_attr(print_wifi_state_t *statep, wifi_field_t *wfp,
-    wladm_link_attr_t *attrp)
+    dladm_wlan_linkattr_t *attrp)
 {
-	char		buf[WLADM_STRSIZE];
+	char		buf[DLADM_STRSIZE];
 	const char	*str = "";
 
 	if (strcmp(wfp->wf_name, "status") == 0) {
 		if ((wfp->wf_mask & attrp->la_valid) != 0)
-			str = wladm_linkstatus2str(&attrp->la_status, buf);
+			str = dladm_wlan_linkstatus2str(&attrp->la_status, buf);
 		print_wifi_field(statep, wfp, str);
 		return;
 	}
@@ -1955,12 +1912,12 @@ show_wifi(void *arg, const char *link)
 {
 	int			i;
 	print_wifi_state_t	*statep = arg;
-	wladm_link_attr_t	attr;
-	wladm_status_t		status;
+	dladm_wlan_linkattr_t	attr;
+	dladm_status_t		status;
 
-	status = wladm_get_link_attr(link, &attr);
-	if (status != WLADM_STATUS_OK)
-		die_wlerr(status, "cannot get link attributes for '%s'", link);
+	status = dladm_wlan_get_linkattr(link, &attr);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "cannot get link attributes for '%s'", link);
 
 	if (statep->ws_header) {
 		statep->ws_header = B_FALSE;
@@ -1987,7 +1944,7 @@ do_display_wifi(int argc, char **argv, int cmd)
 	boolean_t		(*callback)(void *, const char *);
 	uint_t			nfields;
 	print_wifi_state_t	state;
-	wladm_status_t		status;
+	dladm_status_t		status;
 
 	if (cmd == WIFI_CMD_SCAN)
 		callback = scan_wifi;
@@ -2029,9 +1986,9 @@ do_display_wifi(int argc, char **argv, int cmd)
 	state.ws_nfields = nfields;
 
 	if (state.ws_link == NULL) {
-		status = wladm_walk(&state, callback);
-		if (status != WLADM_STATUS_OK)
-			die_wlerr(status, "cannot walk wifi links");
+		status = dladm_wlan_walk(&state, callback);
+		if (status != DLADM_STATUS_OK)
+			die_dlerr(status, "cannot walk wifi links");
 	} else {
 		(void) (*callback)(&state, state.ws_link);
 	}
@@ -2067,17 +2024,17 @@ do_count_wlan(void *arg, const char *link)
 }
 
 static int
-parse_wep_keys(char *str, wladm_wep_key_t **keys, uint_t *key_countp)
+parse_wep_keys(char *str, dladm_wlan_wepkey_t **keys, uint_t *key_countp)
 {
-	uint_t		i;
-	split_t		*sp;
-	wladm_wep_key_t	*wk;
+	uint_t			i;
+	split_t			*sp;
+	dladm_wlan_wepkey_t	*wk;
 
-	sp = split(str, WLADM_MAX_WEPKEYS, WLADM_MAX_WEPKEYNAME_LEN);
+	sp = split(str, DLADM_WLAN_MAX_WEPKEYS, DLADM_WLAN_MAX_WEPKEYNAME_LEN);
 	if (sp == NULL)
 		return (-1);
 
-	wk = malloc(sp->s_nfields * sizeof (wladm_wep_key_t));
+	wk = malloc(sp->s_nfields * sizeof (dladm_wlan_wepkey_t));
 	if (wk == NULL)
 		goto fail;
 
@@ -2087,7 +2044,7 @@ parse_wep_keys(char *str, wladm_wep_key_t **keys, uint_t *key_countp)
 		dladm_status_t		status;
 
 		(void) strlcpy(wk[i].wk_name, sp->s_fields[i],
-		    WLADM_MAX_WEPKEYNAME_LEN);
+		    DLADM_WLAN_MAX_WEPKEYNAME_LEN);
 
 		wk[i].wk_idx = 1;
 		if ((s = strrchr(wk[i].wk_name, ':')) != NULL) {
@@ -2097,7 +2054,7 @@ parse_wep_keys(char *str, wladm_wep_key_t **keys, uint_t *key_countp)
 			wk[i].wk_idx = (uint_t)(s[1] - '0');
 			*s = '\0';
 		}
-		wk[i].wk_len = WLADM_MAX_WEPKEY_LEN;
+		wk[i].wk_len = DLADM_WLAN_MAX_WEPKEY_LEN;
 
 		status = dladm_get_secobj(wk[i].wk_name, &class,
 		    wk[i].wk_val, &wk[i].wk_len, 0);
@@ -2125,14 +2082,14 @@ static void
 do_connect_wifi(int argc, char **argv)
 {
 	int			option;
-	wladm_wlan_attr_t	attr, *attrp;
-	wladm_status_t		status = WLADM_STATUS_OK;
-	int			timeout = WLADM_CONNECT_TIMEOUT_DEFAULT;
+	dladm_wlan_attr_t	attr, *attrp;
+	dladm_status_t		status = DLADM_STATUS_OK;
+	int			timeout = DLADM_WLAN_CONNECT_TIMEOUT_DEFAULT;
 	const char		*link = NULL;
-	wladm_wep_key_t		*keys = NULL;
+	dladm_wlan_wepkey_t	*keys = NULL;
 	uint_t			key_count = 0;
 	uint_t			flags = 0;
-	wladm_secmode_t		keysecmode = WLADM_SECMODE_NONE;
+	dladm_wlan_secmode_t	keysecmode = DLADM_WLAN_SECMODE_NONE;
 
 	opterr = 0;
 	(void) memset(&attr, 0, sizeof (attr));
@@ -2140,56 +2097,58 @@ do_connect_wifi(int argc, char **argv)
 	    wifi_longopts, NULL)) != -1) {
 		switch (option) {
 		case 'e':
-			status = wladm_str2essid(optarg, &attr.wa_essid);
-			if (status != WLADM_STATUS_OK)
+			status = dladm_wlan_str2essid(optarg, &attr.wa_essid);
+			if (status != DLADM_STATUS_OK)
 				die("invalid ESSID '%s'", optarg);
 
-			attr.wa_valid |= WLADM_WLAN_ATTR_ESSID;
+			attr.wa_valid |= DLADM_WLAN_ATTR_ESSID;
 			/*
 			 * Try to connect without doing a scan.
 			 */
-			flags |= WLADM_OPT_NOSCAN;
+			flags |= DLADM_WLAN_CONNECT_NOSCAN;
 			break;
 		case 'i':
-			status = wladm_str2bssid(optarg, &attr.wa_bssid);
-			if (status != WLADM_STATUS_OK)
+			status = dladm_wlan_str2bssid(optarg, &attr.wa_bssid);
+			if (status != DLADM_STATUS_OK)
 				die("invalid BSSID %s", optarg);
 
-			attr.wa_valid |= WLADM_WLAN_ATTR_BSSID;
+			attr.wa_valid |= DLADM_WLAN_ATTR_BSSID;
 			break;
 		case 'a':
-			status = wladm_str2auth(optarg, &attr.wa_auth);
-			if (status != WLADM_STATUS_OK)
+			status = dladm_wlan_str2auth(optarg, &attr.wa_auth);
+			if (status != DLADM_STATUS_OK)
 				die("invalid authentication mode '%s'", optarg);
 
-			attr.wa_valid |= WLADM_WLAN_ATTR_AUTH;
+			attr.wa_valid |= DLADM_WLAN_ATTR_AUTH;
 			break;
 		case 'm':
-			status = wladm_str2mode(optarg, &attr.wa_mode);
-			if (status != WLADM_STATUS_OK)
+			status = dladm_wlan_str2mode(optarg, &attr.wa_mode);
+			if (status != DLADM_STATUS_OK)
 				die("invalid mode '%s'", optarg);
 
-			attr.wa_valid |= WLADM_WLAN_ATTR_MODE;
+			attr.wa_valid |= DLADM_WLAN_ATTR_MODE;
 			break;
 		case 'b':
-			status = wladm_str2bsstype(optarg, &attr.wa_bsstype);
-			if (status != WLADM_STATUS_OK)
+			if ((status = dladm_wlan_str2bsstype(optarg,
+			    &attr.wa_bsstype)) != DLADM_STATUS_OK) {
 				die("invalid bsstype '%s'", optarg);
+			}
 
-			attr.wa_valid |= WLADM_WLAN_ATTR_BSSTYPE;
+			attr.wa_valid |= DLADM_WLAN_ATTR_BSSTYPE;
 			break;
 		case 's':
-			status = wladm_str2secmode(optarg, &attr.wa_secmode);
-			if (status != WLADM_STATUS_OK)
+			if ((status = dladm_wlan_str2secmode(optarg,
+			    &attr.wa_secmode)) != DLADM_STATUS_OK) {
 				die("invalid security mode '%s'", optarg);
+			}
 
-			attr.wa_valid |= WLADM_WLAN_ATTR_SECMODE;
+			attr.wa_valid |= DLADM_WLAN_ATTR_SECMODE;
 			break;
 		case 'k':
 			if (parse_wep_keys(optarg, &keys, &key_count) < 0)
 				die("invalid key(s) '%s'", optarg);
 
-			keysecmode = WLADM_SECMODE_WEP;
+			keysecmode = DLADM_WLAN_SECMODE_WEP;
 			break;
 		case 'T':
 			if (strcasecmp(optarg, "forever") == 0) {
@@ -2200,7 +2159,7 @@ do_connect_wifi(int argc, char **argv)
 				die("invalid timeout value '%s'", optarg);
 			break;
 		case 'c':
-			flags |= WLADM_OPT_CREATEIBSS;
+			flags |= DLADM_WLAN_CONNECT_CREATEIBSS;
 			break;
 		default:
 			die_opterr(optopt, option);
@@ -2208,17 +2167,17 @@ do_connect_wifi(int argc, char **argv)
 		}
 	}
 
-	if (keysecmode == WLADM_SECMODE_NONE) {
-		if ((attr.wa_valid & WLADM_WLAN_ATTR_SECMODE) != 0 &&
-		    attr.wa_secmode == WLADM_SECMODE_WEP)
+	if (keysecmode == DLADM_WLAN_SECMODE_NONE) {
+		if ((attr.wa_valid & DLADM_WLAN_ATTR_SECMODE) != 0 &&
+		    attr.wa_secmode == DLADM_WLAN_SECMODE_WEP)
 			die("key required for security mode 'wep'");
 	} else {
-		if ((attr.wa_valid & WLADM_WLAN_ATTR_SECMODE) != 0 &&
+		if ((attr.wa_valid & DLADM_WLAN_ATTR_SECMODE) != 0 &&
 		    attr.wa_secmode != keysecmode)
 			die("incompatible -s and -k options");
 	}
 	attr.wa_secmode = keysecmode;
-	attr.wa_valid |= WLADM_WLAN_ATTR_SECMODE;
+	attr.wa_valid |= DLADM_WLAN_ATTR_SECMODE;
 
 	if (optind == (argc - 1))
 		link = argv[optind];
@@ -2230,7 +2189,7 @@ do_connect_wifi(int argc, char **argv)
 
 		wcattr.wc_link = NULL;
 		wcattr.wc_count = 0;
-		(void) wladm_walk(&wcattr, do_count_wlan);
+		(void) dladm_wlan_walk(&wcattr, do_count_wlan);
 		if (wcattr.wc_count == 0) {
 			die("no wifi links are available");
 		} else if (wcattr.wc_count > 1) {
@@ -2241,17 +2200,17 @@ do_connect_wifi(int argc, char **argv)
 	}
 	attrp = (attr.wa_valid == 0) ? NULL : &attr;
 again:
-	status = wladm_connect(link, attrp, timeout, keys, key_count, flags);
-	if (status != WLADM_STATUS_OK) {
-		if ((flags & WLADM_OPT_NOSCAN) != 0) {
+	if ((status = dladm_wlan_connect(link, attrp, timeout, keys,
+	    key_count, flags)) != DLADM_STATUS_OK) {
+		if ((flags & DLADM_WLAN_CONNECT_NOSCAN) != 0) {
 			/*
 			 * Try again with scanning and filtering.
 			 */
-			flags &= ~WLADM_OPT_NOSCAN;
+			flags &= ~DLADM_WLAN_CONNECT_NOSCAN;
 			goto again;
 		}
 
-		if (status == WLADM_STATUS_NOTFOUND) {
+		if (status == DLADM_STATUS_NOTFOUND) {
 			if (attr.wa_valid == 0) {
 				die("no wifi networks are available");
 			} else {
@@ -2259,7 +2218,7 @@ again:
 				    "criteria are available");
 			}
 		}
-		die_wlerr(status, "cannot connect link '%s'", link);
+		die_dlerr(status, "cannot connect link '%s'", link);
 	}
 	free(keys);
 }
@@ -2268,11 +2227,11 @@ again:
 static boolean_t
 do_all_disconnect_wifi(void *arg, const char *link)
 {
-	wladm_status_t	status;
+	dladm_status_t	status;
 
-	status = wladm_disconnect(link);
-	if (status != WLADM_STATUS_OK)
-		warn_wlerr(status, "cannot disconnect link '%s'", link);
+	status = dladm_wlan_disconnect(link);
+	if (status != DLADM_STATUS_OK)
+		warn_dlerr(status, "cannot disconnect link '%s'", link);
 
 	return (B_TRUE);
 }
@@ -2283,7 +2242,7 @@ do_disconnect_wifi(int argc, char **argv)
 	int			option;
 	const char		*link = NULL;
 	boolean_t		all_links = B_FALSE;
-	wladm_status_t		status;
+	dladm_status_t		status;
 	wlan_count_attr_t	wcattr;
 
 	opterr = 0;
@@ -2308,7 +2267,7 @@ do_disconnect_wifi(int argc, char **argv)
 		if (!all_links) {
 			wcattr.wc_link = NULL;
 			wcattr.wc_count = 0;
-			(void) wladm_walk(&wcattr, do_count_wlan);
+			(void) dladm_wlan_walk(&wcattr, do_count_wlan);
 			if (wcattr.wc_count == 0) {
 				die("no wifi links are available");
 			} else if (wcattr.wc_count > 1) {
@@ -2317,13 +2276,14 @@ do_disconnect_wifi(int argc, char **argv)
 			}
 			link = wcattr.wc_link;
 		} else {
-			(void) wladm_walk(&all_links, do_all_disconnect_wifi);
+			(void) dladm_wlan_walk(&all_links,
+			    do_all_disconnect_wifi);
 			return;
 		}
 	}
-	status = wladm_disconnect(link);
-	if (status != WLADM_STATUS_OK)
-		die_wlerr(status, "cannot disconnect link '%s'", link);
+	status = dladm_wlan_disconnect(link);
+	if (status != DLADM_STATUS_OK)
+		die_dlerr(status, "cannot disconnect link '%s'", link);
 }
 
 #define	MAX_PROPS		32
@@ -2347,9 +2307,11 @@ typedef struct show_linkprop_state {
 	char		*ls_line;
 	char		**ls_propvals;
 	prop_list_t	*ls_proplist;
-	boolean_t	ls_parseable;
-	boolean_t	ls_persist;
-	boolean_t	ls_header;
+	uint32_t	ls_parseable : 1,
+			ls_persist : 1,
+			ls_header : 1,
+			ls_pad_bits : 29;
+	dladm_status_t	ls_status;
 } show_linkprop_state_t;
 
 static void
@@ -2447,15 +2409,22 @@ print_linkprop(show_linkprop_state_t *statep, const char *propname,
 	status = dladm_get_prop(statep->ls_link, type, propname,
 	    propvals, &valcnt);
 	if (status != DLADM_STATUS_OK) {
-		if (status == DLADM_STATUS_NOTSUP || statep->ls_persist) {
+		if (status == DLADM_STATUS_TEMPONLY) {
+			statep->ls_status = status;
+			return;
+		} else if (status == DLADM_STATUS_NOTSUP ||
+		    statep->ls_persist) {
 			valcnt = 1;
 			if (type == DLADM_PROP_VAL_CURRENT)
 				propvals = &unknown;
 			else
 				propvals = &notsup;
 		} else {
-			die_dlerr(status, "cannot get link property '%s'",
-			    propname);
+			statep->ls_status = status;
+			warn_dlerr(status,
+			    "cannot get link property '%s' for %s",
+			    propname, statep->ls_link);
+			return;
 		}
 	}
 
@@ -2488,9 +2457,6 @@ show_linkprop(void *arg, const char *propname)
 	char			*ptr = statep->ls_line;
 	char			*lim = ptr + MAX_PROP_LINE;
 
-	if (statep->ls_persist && dladm_is_prop_temponly(propname, NULL))
-		return (B_TRUE);
-
 	if (statep->ls_parseable)
 		ptr += snprintf(ptr, lim - ptr, "LINK=\"%s\" ",
 		    statep->ls_link);
@@ -2505,10 +2471,24 @@ show_linkprop(void *arg, const char *propname)
 	print_linkprop(statep, propname,
 	    statep->ls_persist ? DLADM_PROP_VAL_PERSISTENT :
 	    DLADM_PROP_VAL_CURRENT, "VALUE", "%-14s ", &ptr);
+
+	/*
+	 * If we failed to query the link property, for example, query
+	 * the persistent value of a non-persistable link property, simply
+	 * skip the output.
+	 */
+	if (statep->ls_status != DLADM_STATUS_OK)
+		return (B_TRUE);
+
 	print_linkprop(statep, propname, DLADM_PROP_VAL_DEFAULT,
 	    "DEFAULT", "%-14s ", &ptr);
+	if (statep->ls_status != DLADM_STATUS_OK)
+		return (B_TRUE);
+
 	print_linkprop(statep, propname, DLADM_PROP_VAL_MODIFIABLE,
 	    "POSSIBLE", "%-20s ", &ptr);
+	if (statep->ls_status != DLADM_STATUS_OK)
+		return (B_TRUE);
 
 	if (statep->ls_header) {
 		statep->ls_header = B_FALSE;
@@ -2558,6 +2538,7 @@ do_show_linkprop(int argc, char **argv)
 		usage();
 
 	state.ls_proplist = proplist;
+	state.ls_status = DLADM_STATUS_OK;
 
 	if (state.ls_link == NULL) {
 		(void) dladm_walk(show_linkprop_onelink, &state);
@@ -2565,6 +2546,9 @@ do_show_linkprop(int argc, char **argv)
 		show_linkprop_onelink(&state, state.ls_link);
 	}
 	free_props(proplist);
+
+	if (state.ls_status != DLADM_STATUS_OK)
+		exit(EXIT_FAILURE);
 }
 
 static void
@@ -2590,8 +2574,11 @@ show_linkprop_onelink(void *arg, const char *link)
 	 * (below) will proceed slowly unless we hold the link open.
 	 */
 	(void) snprintf(linkname, MAXPATHLEN, "/dev/%s", link);
-	if ((fd = open(linkname, O_RDWR)) < 0)
-		die("cannot open %s: %s", link, strerror(errno));
+	if ((fd = open(linkname, O_RDWR)) < 0) {
+		warn("cannot open %s: %s", link, strerror(errno));
+		statep->ls_status = DLADM_STATUS_NOTFOUND;
+		return;
+	}
 
 	buf = malloc((sizeof (char *) + DLADM_PROP_VAL_MAX) * MAX_PROP_VALS +
 	    MAX_PROP_LINE);
@@ -2607,15 +2594,13 @@ show_linkprop_onelink(void *arg, const char *link)
 	    (sizeof (char *) + DLADM_PROP_VAL_MAX) * MAX_PROP_VALS;
 
 	if (proplist != NULL) {
-		for (i = 0; i < proplist->pl_count; i++) {
-			if (!show_linkprop(statep,
-			    proplist->pl_info[i].pi_name))
-				break;
-		}
+		for (i = 0; i < proplist->pl_count; i++)
+			(void) show_linkprop(statep,
+			    proplist->pl_info[i].pi_name);
 	} else {
 		status = dladm_walk_prop(link, statep, show_linkprop);
 		if (status != DLADM_STATUS_OK)
-			die_dlerr(status, "show-linkprop");
+			warn_dlerr(status, "show-linkprop failed for %s", link);
 	}
 	(void) close(fd);
 	free(buf);
@@ -3354,22 +3339,6 @@ warn(const char *format, ...)
 
 /* PRINTFLIKE2 */
 static void
-warn_wlerr(wladm_status_t err, const char *format, ...)
-{
-	va_list alist;
-	char	errmsg[WLADM_STRSIZE];
-
-	format = gettext(format);
-	(void) fprintf(stderr, gettext("%s: warning: "), progname);
-
-	va_start(alist, format);
-	(void) vfprintf(stderr, format, alist);
-	va_end(alist);
-	(void) fprintf(stderr, ": %s\n", wladm_status2str(err, errmsg));
-}
-
-/* PRINTFLIKE2 */
-static void
 warn_dlerr(dladm_status_t err, const char *format, ...)
 {
 	va_list alist;
@@ -3382,46 +3351,6 @@ warn_dlerr(dladm_status_t err, const char *format, ...)
 	(void) vfprintf(stderr, format, alist);
 	va_end(alist);
 	(void) fprintf(stderr, ": %s\n", dladm_status2str(err, errmsg));
-}
-
-/* PRINTFLIKE2 */
-static void
-die_laerr(laadm_diag_t diag, const char *format, ...)
-{
-	va_list alist;
-	char	*errstr = strerror(errno);
-
-	format = gettext(format);
-	(void) fprintf(stderr, "%s: ", progname);
-
-	va_start(alist, format);
-	(void) vfprintf(stderr, format, alist);
-	va_end(alist);
-
-	if (diag == 0)
-		(void) fprintf(stderr, ": %s\n", errstr);
-	else
-		(void) fprintf(stderr, ": %s (%s)\n", errstr, laadm_diag(diag));
-
-	exit(EXIT_FAILURE);
-}
-
-/* PRINTFLIKE2 */
-static void
-die_wlerr(wladm_status_t err, const char *format, ...)
-{
-	va_list alist;
-	char	errmsg[WLADM_STRSIZE];
-
-	format = gettext(format);
-	(void) fprintf(stderr, "%s: ", progname);
-
-	va_start(alist, format);
-	(void) vfprintf(stderr, format, alist);
-	va_end(alist);
-	(void) fprintf(stderr, ": %s\n", wladm_status2str(err, errmsg));
-
-	exit(EXIT_FAILURE);
 }
 
 /* PRINTFLIKE2 */

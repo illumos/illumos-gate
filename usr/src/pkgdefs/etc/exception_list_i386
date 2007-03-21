@@ -93,22 +93,13 @@ usr/include/sys/mac_impl.h	i386
 #
 usr/include/libdladm.h		i386
 usr/include/libdladm_impl.h	i386
-usr/include/liblaadm.h		i386
-usr/include/libmacadm.h		i386
-usr/include/libwladm.h		i386
-usr/include/libwladm_impl.h	i386
+usr/include/libdllink.h		i386
+usr/include/libdlaggr.h		i386
+usr/include/libdlwlan.h		i386
+usr/include/libdlwlan_impl.h	i386
 lib/libdladm.so			i386
-lib/liblaadm.so			i386
-lib/libmacadm.so		i386
-lib/libwladm.so			i386
 lib/llib-ldladm.ln		i386
 lib/llib-ldladm			i386
-lib/llib-llaadm.ln		i386
-lib/llib-llaadm			i386
-lib/llib-lmacadm.ln		i386
-lib/llib-lmacadm		i386
-lib/llib-lwladm.ln		i386
-lib/llib-lwladm			i386
 #
 # Installed in the proto area for building utilties dependent on
 # it, but is not shipped.

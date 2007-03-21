@@ -6527,6 +6527,14 @@ mondo_loop() {
 	rm -f $usr/kernel/fs/amd64/xmemfs
 	rm -rf $usr/lib/fs/xmemfs
 
+	#
+	# Remove obsolete libmacadm, liblaadm and libwladm. If this is
+	# a backwards BFU, they will be extracted by cpio.
+	#
+	rm -f $root/lib/libmacadm.so.1
+	rm -f $root/lib/liblaadm.so.1
+	rm -f $root/lib/libwladm.so.1
+
 	# End of pre-archive extraction hacks.
 
 	if [ $diskless = no -a $zone = global ]; then

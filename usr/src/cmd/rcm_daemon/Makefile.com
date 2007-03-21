@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -106,7 +106,7 @@ LINTFLAGS += -u -erroff=E_FUNC_ARG_UNUSED
 LDLIBS_MODULES = 
 SUNW_pool_rcm.so := LDLIBS_MODULES += -L$(ROOT)/usr/lib -lpool
 SUNW_svm_rcm.so	:= LDLIBS_MODULES += -L$(ROOT)/usr/lib -lmeta
-SUNW_network_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -llaadm
+SUNW_network_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
 SUNW_ip_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil
 SUNW_ip_anon_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil
 

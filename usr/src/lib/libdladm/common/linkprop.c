@@ -37,9 +37,9 @@
 #include <unistd.h>
 #include <libdevinfo.h>
 #include <zone.h>
-#include <libwladm.h>
+#include <libdllink.h>
 #include <libdladm_impl.h>
-
+#include <libdlwlan.h>
 #include <dlfcn.h>
 #include <link.h>
 
@@ -90,45 +90,6 @@ static prop_desc_t	prop_table[] = {
 
 #define	MAX_PROPS	(sizeof (prop_table) / sizeof (prop_desc_t))
 
-/*
- * Convert a wladm_status_t to a dladm_status_t. This is used by wrappers
- * to libwladm routines (e.g. dladm_set_prop()). Note that the mapping is
- * not 1-1; whenever possible we try to look for an error code with a
- * similar meaning. Error codes with no suitable counterpart in libdladm
- * will be mapped to DLADM_STATUS_FAILED. Clients who require clearer error
- * reporting should use libwladm directly.
- */
-static dladm_status_t
-dladm_wladmstatus2status(wladm_status_t wstatus)
-{
-	switch (wstatus) {
-	case WLADM_STATUS_OK:
-		return (DLADM_STATUS_OK);
-	case WLADM_STATUS_FAILED:
-		return (DLADM_STATUS_FAILED);
-	case WLADM_STATUS_NOTSUP:
-		return (DLADM_STATUS_NOTSUP);
-	case WLADM_STATUS_BADARG:
-		return (DLADM_STATUS_BADARG);
-	case WLADM_STATUS_NOTFOUND:
-		return (DLADM_STATUS_NOTFOUND);
-	case WLADM_STATUS_BADVAL:
-		return (DLADM_STATUS_BADVAL);
-	case WLADM_STATUS_LINKINVAL:
-		return (DLADM_STATUS_LINKINVAL);
-	case WLADM_STATUS_NOMEM:
-		return (DLADM_STATUS_NOMEM);
-	case WLADM_STATUS_PROPRDONLY:
-		return (DLADM_STATUS_PROPRDONLY);
-	case WLADM_STATUS_TOOSMALL:
-		return (DLADM_STATUS_TOOSMALL);
-	case WLADM_STATUS_BADVALCNT:
-		return (DLADM_STATUS_BADVALCNT);
-	default:
-		return (DLADM_STATUS_FAILED);
-	}
-}
-
 dladm_status_t
 dladm_set_prop(const char *link, const char *prop_name, char **prop_val,
     uint_t val_cnt, uint_t flags, char **errprop)
@@ -148,10 +109,9 @@ dladm_set_prop(const char *link, const char *prop_name, char **prop_val,
 
 		if (status == DLADM_STATUS_NOTFOUND) {
 			status = DLADM_STATUS_BADARG;
-			if (wladm_is_valid(link)) {
-				status = dladm_wladmstatus2status(
-				    wladm_set_prop(link, prop_name,
-				    prop_val, val_cnt, errprop));
+			if (dladm_wlan_is_valid(link)) {
+				status = dladm_wlan_set_prop(link, prop_name,
+				    prop_val, val_cnt, errprop);
 			}
 		}
 		if (status != DLADM_STATUS_OK)
@@ -177,11 +137,10 @@ dladm_walk_prop(const char *link, void *arg,
 		return (DLADM_STATUS_BADARG);
 
 	/* For wifi links, show wifi properties first */
-	if (wladm_is_valid(link)) {
+	if (dladm_wlan_is_valid(link)) {
 		dladm_status_t	status;
 
-		status = dladm_wladmstatus2status(
-		    wladm_walk_prop(link, arg, func));
+		status = dladm_wlan_walk_prop(link, arg, func);
 		if (status != DLADM_STATUS_OK)
 			return (status);
 	}
@@ -205,6 +164,8 @@ dladm_get_prop(const char *link, dladm_prop_type_t type,
 		return (DLADM_STATUS_BADARG);
 
 	if (type == DLADM_PROP_VAL_PERSISTENT) {
+		if (i_dladm_is_prop_temponly(prop_name, NULL))
+			return (DLADM_STATUS_TEMPONLY);
 		return (i_dladm_get_prop_db(link, prop_name,
 		    prop_val, val_cntp));
 	}
@@ -214,26 +175,9 @@ dladm_get_prop(const char *link, dladm_prop_type_t type,
 	if (status != DLADM_STATUS_NOTFOUND)
 		return (status);
 
-	if (wladm_is_valid(link)) {
-		wladm_prop_type_t	wtype;
-
-		switch (type) {
-		case DLADM_PROP_VAL_CURRENT:
-			wtype = WLADM_PROP_VAL_CURRENT;
-			break;
-		case DLADM_PROP_VAL_DEFAULT:
-			wtype = WLADM_PROP_VAL_DEFAULT;
-			break;
-		case DLADM_PROP_VAL_MODIFIABLE:
-			wtype = WLADM_PROP_VAL_MODIFIABLE;
-			break;
-		default:
-			return (DLADM_STATUS_BADARG);
-		}
-
-		return (dladm_wladmstatus2status(
-		    wladm_get_prop(link, wtype, prop_name,
-		    prop_val, val_cntp)));
+	if (dladm_wlan_is_valid(link)) {
+		return (dladm_wlan_get_prop(link, type, prop_name,
+		    prop_val, val_cntp));
 	}
 	return (DLADM_STATUS_BADARG);
 }
@@ -1194,10 +1138,4 @@ i_dladm_is_prop_temponly(const char *prop_name, char **errprop)
 	}
 
 	return (B_FALSE);
-}
-
-boolean_t
-dladm_is_prop_temponly(const char *prop_name, char **errprop)
-{
-	return (i_dladm_is_prop_temponly(prop_name, errprop));
 }

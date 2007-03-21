@@ -513,10 +513,12 @@ drv_hold_vlan(dld_ctl_str_t *ctls, mblk_t *mp)
 	}
 
 	if ((err = dls_vlan_setzoneid(dhv->dhv_name, dhv->dhv_zid,
-	    dhv->dhv_docheck)) != 0)
+	    dhv->dhv_docheck)) != 0) {
+		dls_vlan_rele(dvp);
 		miocnak(q, mp, 0, err);
-	else
+	} else {
 		miocack(q, mp, 0, 0);
+	}
 }
 
 /*

@@ -1,0 +1,202 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef _LIBDLWLAN_H
+#define	_LIBDLWLAN_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * This file includes structures, macros and routines used by WLAN link
+ * administration.
+ */
+
+#include <sys/types.h>
+#include <libdladm.h>
+
+/*
+ * General libdlwlan definitions and functions.
+ *
+ * These interfaces are ON consolidation-private.
+ * For documentation, refer to PSARC/2006/623.
+ */
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
+
+#define	DLADM_WLAN_MAX_ESSID_LEN	32	/* per 802.11 spec */
+#define	DLADM_WLAN_BSSID_LEN		6	/* per 802.11 spec */
+
+#define	DLADM_WLAN_CONNECT_TIMEOUT_DEFAULT	10
+#define	DLADM_WLAN_CONNECT_CREATEIBSS		0x00000001
+#define	DLADM_WLAN_CONNECT_NOSCAN		0x00000002
+
+typedef struct dladm_wlan_essid {
+	char	we_bytes[DLADM_WLAN_MAX_ESSID_LEN];
+} dladm_wlan_essid_t;
+
+typedef struct dladm_wlan_bssid {
+	uint8_t	wb_bytes[DLADM_WLAN_BSSID_LEN];
+} dladm_wlan_bssid_t;
+
+typedef enum {
+	DLADM_WLAN_SECMODE_NONE = 1,
+	DLADM_WLAN_SECMODE_WEP
+} dladm_wlan_secmode_t;
+
+typedef enum {
+	DLADM_WLAN_STRENGTH_VERY_WEAK = 1,
+	DLADM_WLAN_STRENGTH_WEAK,
+	DLADM_WLAN_STRENGTH_GOOD,
+	DLADM_WLAN_STRENGTH_VERY_GOOD,
+	DLADM_WLAN_STRENGTH_EXCELLENT
+} dladm_wlan_strength_t;
+
+typedef enum {
+	DLADM_WLAN_MODE_NONE = 0,
+	DLADM_WLAN_MODE_80211A,
+	DLADM_WLAN_MODE_80211B,
+	DLADM_WLAN_MODE_80211G
+} dladm_wlan_mode_t;
+
+typedef enum {
+	DLADM_WLAN_AUTH_OPEN = 1,
+	DLADM_WLAN_AUTH_SHARED
+} dladm_wlan_auth_t;
+
+typedef enum {
+	DLADM_WLAN_BSSTYPE_BSS = 1,
+	DLADM_WLAN_BSSTYPE_IBSS,
+	DLADM_WLAN_BSSTYPE_ANY
+} dladm_wlan_bsstype_t;
+
+typedef enum {
+	DLADM_WLAN_LINKSTATUS_DISCONNECTED = 1,
+	DLADM_WLAN_LINKSTATUS_CONNECTED
+} dladm_wlan_linkstatus_t;
+
+typedef uint32_t dladm_wlan_speed_t;
+typedef	uint32_t dladm_wlan_channel_t;
+
+enum {
+	DLADM_WLAN_ATTR_ESSID	= 0x00000001,
+	DLADM_WLAN_ATTR_BSSID	= 0x00000002,
+	DLADM_WLAN_ATTR_SECMODE	= 0x00000004,
+	DLADM_WLAN_ATTR_STRENGTH = 0x00000008,
+	DLADM_WLAN_ATTR_MODE	= 0x00000010,
+	DLADM_WLAN_ATTR_SPEED	= 0x00000020,
+	DLADM_WLAN_ATTR_AUTH	= 0x00000040,
+	DLADM_WLAN_ATTR_BSSTYPE	= 0x00000080,
+	DLADM_WLAN_ATTR_CHANNEL	= 0x00000100
+};
+typedef struct dladm_wlan_attr {
+	uint_t			wa_valid;
+	dladm_wlan_essid_t	wa_essid;
+	dladm_wlan_bssid_t	wa_bssid;
+	dladm_wlan_secmode_t	wa_secmode;
+	dladm_wlan_strength_t	wa_strength;
+	dladm_wlan_mode_t	wa_mode;
+	dladm_wlan_speed_t	wa_speed;
+	dladm_wlan_auth_t	wa_auth;
+	dladm_wlan_bsstype_t	wa_bsstype;
+	dladm_wlan_channel_t	wa_channel;
+} dladm_wlan_attr_t;
+
+enum {
+	DLADM_WLAN_LINKATTR_STATUS	= 0x00000001,
+	DLADM_WLAN_LINKATTR_WLAN	= 0x00000002
+};
+typedef struct dladm_wlan_linkattr {
+	uint_t			la_valid;
+	dladm_wlan_linkstatus_t	la_status;
+	dladm_wlan_attr_t	la_wlan_attr;
+} dladm_wlan_linkattr_t;
+
+#define	DLADM_WLAN_WEPKEY64_LEN		5 	/* per WEP spec */
+#define	DLADM_WLAN_WEPKEY128_LEN	13 	/* per WEP spec */
+#define	DLADM_WLAN_MAX_WEPKEY_LEN	13	/* per WEP spec */
+#define	DLADM_WLAN_MAX_WEPKEYS		4 	/* MAX_NWEPKEYS */
+#define	DLADM_WLAN_MAX_WEPKEYNAME_LEN	64
+typedef struct dladm_wlan_wepkey {
+	uint_t		wk_idx;
+	uint_t		wk_len;
+	uint8_t		wk_val[DLADM_WLAN_MAX_WEPKEY_LEN];
+	char		wk_name[DLADM_WLAN_MAX_WEPKEYNAME_LEN];
+} dladm_wlan_wepkey_t;
+
+extern dladm_status_t	dladm_wlan_scan(const char *, void *,
+			    boolean_t (*)(void *, dladm_wlan_attr_t *));
+extern dladm_status_t	dladm_wlan_connect(const char *, dladm_wlan_attr_t *,
+			    int, void *, uint_t, uint_t);
+extern dladm_status_t	dladm_wlan_disconnect(const char *);
+extern dladm_status_t	dladm_wlan_get_linkattr(const char *,
+			    dladm_wlan_linkattr_t *);
+extern dladm_status_t	dladm_wlan_walk(void *,
+			    boolean_t (*)(void *, const char *));
+extern boolean_t	dladm_wlan_is_valid(const char *);
+extern dladm_status_t	dladm_wlan_set_prop(const char *, const char *,
+			    char **, uint_t, char **);
+extern dladm_status_t	dladm_wlan_walk_prop(const char *, void *,
+			    boolean_t (*)(void *, const char *));
+extern dladm_status_t	dladm_wlan_get_prop(const char *, dladm_prop_type_t,
+			    const char *, char **, uint_t *);
+
+extern const char	*dladm_wlan_essid2str(dladm_wlan_essid_t *, char *);
+extern const char	*dladm_wlan_bssid2str(dladm_wlan_bssid_t *, char *);
+extern const char	*dladm_wlan_secmode2str(dladm_wlan_secmode_t *, char *);
+extern const char	*dladm_wlan_strength2str(dladm_wlan_strength_t *,
+			    char *);
+extern const char	*dladm_wlan_mode2str(dladm_wlan_mode_t *, char *);
+extern const char	*dladm_wlan_speed2str(dladm_wlan_speed_t *, char *);
+extern const char	*dladm_wlan_auth2str(dladm_wlan_auth_t *, char *);
+extern const char	*dladm_wlan_bsstype2str(dladm_wlan_bsstype_t *, char *);
+extern const char	*dladm_wlan_linkstatus2str(dladm_wlan_linkstatus_t *,
+			    char *);
+
+extern dladm_status_t	dladm_wlan_str2essid(const char *,
+			    dladm_wlan_essid_t *);
+extern dladm_status_t	dladm_wlan_str2bssid(const char *,
+			    dladm_wlan_bssid_t *);
+extern dladm_status_t	dladm_wlan_str2secmode(const char *,
+			    dladm_wlan_secmode_t *);
+extern dladm_status_t	dladm_wlan_str2strength(const char *,
+			    dladm_wlan_strength_t *);
+extern dladm_status_t	dladm_wlan_str2mode(const char *,
+			    dladm_wlan_mode_t *);
+extern dladm_status_t	dladm_wlan_str2speed(const char *,
+			    dladm_wlan_speed_t *);
+extern dladm_status_t	dladm_wlan_str2auth(const char *,
+			    dladm_wlan_auth_t *);
+extern dladm_status_t	dladm_wlan_str2bsstype(const char *,
+			    dladm_wlan_bsstype_t *);
+extern dladm_status_t	dladm_wlan_str2linkstatus(const char *,
+			    dladm_wlan_linkstatus_t *);
+
+#ifdef	__cplusplus
+}
+#endif
+
+#endif	/* _LIBDLWLAN_H */

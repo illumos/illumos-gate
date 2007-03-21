@@ -112,9 +112,7 @@ SUBDIRS += \
 	libkmf		\
 	libkstat	\
 	libkvm		\
-        liblaadm        \
 	liblm		\
-	libmacadm	\
 	libmalloc	\
 	libmapmalloc	\
 	libmtmalloc	\
@@ -185,7 +183,6 @@ SUBDIRS += \
 	madv		\
 	mpss		\
 	libdisasm	\
-	libwladm	\
 	libwrap		\
 	libxcurses	\
 	libxcurses2	\
@@ -295,7 +292,6 @@ MSGSUBDIRS=		\
 	libuutil	\
 	libwanboot	\
 	libwanbootutil	\
-	libwladm	\
 	libzfs		\
 	libzonecfg	\
 	lvm		\
@@ -350,8 +346,6 @@ HDRSUBDIRS=		\
 	libiscsitgt	\
 	libkstat	\
 	libkvm		\
-        liblaadm        \
-	libmacadm	\
 	libmail		\
 	libmd		\
 	libmtmalloc	\
@@ -386,7 +380,6 @@ HDRSUBDIRS=		\
 	libvolmgt	\
 	libumem		\
 	libuutil	\
-	libwladm	\
 	libwrap		\
 	libxcurses2	\
 	libzfs		\
@@ -475,8 +468,8 @@ libdevinfo:	libnvpair libsec
 libdhcpagent:	libsocket libdhcputil libuuid libdlpi
 libdhcpsvc:	libinetutil
 libdhcputil:	libnsl libgen libinetutil libdlpi
+libdladm:	libdlpi libdevinfo libinetutil libsocket
 libdlpi:	libinetutil
-libdladm:	libdlpi libdevinfo libwladm libinetutil
 libdtrace:	libproc libgen libctf
 libdtrace_jni:	libuutil libdtrace
 libefi:		libuuid
@@ -487,7 +480,6 @@ libinetcfg:	libnsl libsocket libdevinfo
 libkmf:		libcryptoutil pkcs11 openssl
 libnsl:		libmd5 libscf
 libmapid:	libresolv
-libmacadm:	libdevinfo
 libuuid:	libsocket
 libinetutil:	libsocket
 libsecdb:	libnsl
@@ -508,7 +500,6 @@ libwrap:	libnsl libsocket
 libwanboot:	libnvpair libresolv libnsl libsocket libdevinfo libinetutil \
 		libdhcputil openssl
 libwanbootutil:	libnsl
-libwladm:	libdevinfo libsocket
 pam_modules:	libproject passwdutil $(SMARTCARD)
 libscf:		libuutil libmd
 libinetsvc:	libscf

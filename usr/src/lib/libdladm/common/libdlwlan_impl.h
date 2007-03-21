@@ -19,12 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _LIBWLADM_IMPL_H
-#define	_LIBWLADM_IMPL_H
+#ifndef _LIBDLWLAN_IMPL_H
+#define	_LIBDLWLAN_IMPL_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -44,39 +44,40 @@ extern "C" {
  * 5 strengths but 16 values, by convention the "middle" strength gets the
  * extra value.  Thus, the buckets are 0-2, 3-5, 6-9, 10-12, and 13-15.
  */
-#define	WLADM_SIGNAL2STRENGTH(signal)				\
-	    (((signal) > 12 ? WLADM_STRENGTH_EXCELLENT :	\
-	    ((signal) > 9 ? WLADM_STRENGTH_VERY_GOOD : 		\
-	    ((signal) > 5 ? WLADM_STRENGTH_GOOD :		\
-	    ((signal) > 2 ? WLADM_STRENGTH_WEAK : WLADM_STRENGTH_VERY_WEAK)))))
+#define	DLADM_WLAN_SIGNAL2STRENGTH(signal)			\
+	    (((signal) > 12 ? DLADM_WLAN_STRENGTH_EXCELLENT :	\
+	    ((signal) > 9 ? DLADM_WLAN_STRENGTH_VERY_GOOD : 	\
+	    ((signal) > 5 ? DLADM_WLAN_STRENGTH_GOOD :		\
+	    ((signal) > 2 ? DLADM_WLAN_STRENGTH_WEAK :		\
+	    DLADM_WLAN_STRENGTH_VERY_WEAK)))))
 
 /*
  * Convert between an OFDM MHz and a channel number.
  */
-#define	WLADM_OFDM2CHAN(mhz)		(((mhz) - 5000) / 5)
+#define	DLADM_WLAN_OFDM2CHAN(mhz)		(((mhz) - 5000) / 5)
 
-#define	WLADM_CONNECT_POLLRATE		200 /* milliseconds */
-#define	WLADM_CONNECT_DEFAULT_CHANNEL	1
+#define	DLADM_WLAN_CONNECT_POLLRATE		200 /* milliseconds */
+#define	DLADM_WLAN_CONNECT_DEFAULT_CHANNEL	1
 
-#define	WLADM_MAX_RATES	4
-typedef	struct wladm_rates {
-	uint8_t		wr_rates[WLADM_MAX_RATES];
+#define	DLADM_WLAN_MAX_RATES	4
+typedef	struct dladm_wlan_rates {
+	uint8_t		wr_rates[DLADM_WLAN_MAX_RATES];
 	int		wr_cnt;
-} wladm_rates_t;
+} dladm_wlan_rates_t;
 
 typedef enum {
-	WLADM_RADIO_ON = 1,
-	WLADM_RADIO_OFF
-} wladm_radio_t;
+	DLADM_WLAN_RADIO_ON = 1,
+	DLADM_WLAN_RADIO_OFF
+} dladm_wlan_radio_t;
 
 typedef	enum {
-	WLADM_PM_OFF = 1,
-	WLADM_PM_MAX,
-	WLADM_PM_FAST
-} wladm_powermode_t;
+	DLADM_WLAN_PM_OFF = 1,
+	DLADM_WLAN_PM_MAX,
+	DLADM_WLAN_PM_FAST
+} dladm_wlan_powermode_t;
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _LIBWLADM_IMPL_H */
+#endif	/* _LIBDLWLAN_IMPL_H */

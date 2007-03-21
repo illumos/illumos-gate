@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,8 +35,7 @@ ROOTCFGFILES=	$(CFGFILES:%=$(ROOTCFGDIR)/%)
 include ../Makefile.cmd
 
 XGETFLAGS += -a -x $(PROG).xcl
-LDLIBS += -ldladm -lmacadm -ldlpi -llaadm -lkstat -lwladm -lsecdb -lbsm \
-	  -linetutil
+LDLIBS += -ldladm -ldlpi -lkstat -lsecdb -lbsm -linetutil
 
 $(ROOTCFGFILES) := OWNER= dladm
 $(ROOTCFGFILES) := GROUP= sys
