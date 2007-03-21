@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -164,6 +164,35 @@ static char *bus_table[] = {
 };
 
 #define	NBUS	sizeof (bus_table) / sizeof (bus_table[0])
+
+/* prtdiag exit codes */
+#define	PD_SUCCESS		0
+#define	PD_SYSTEM_FAILURE	1
+#define	PD_INTERNAL_FAILURE	2
+
+/*
+ * Use of global assumes do_prominfo only called from main in prtdiag and
+ * access does not need to be multi-thread safe.
+ */
+static int	exit_code = PD_SUCCESS;
+
+/*
+ * This function is called from every location where a status value is output.
+ * It checks the status arg and sets exit_code if an error is detected.
+ * The status is typically returned from a PICL query. A case-insensitive
+ * string comparison is done to check for any status that starts with "fail"
+ * or "fault".
+ */
+static void
+set_exit_code(char *status)
+{
+	if (status == NULL)
+		return;
+
+	if (strncasecmp(status, "fail", 4) == 0 ||
+	    strncasecmp(status, "fault", 5) == 0)
+		exit_code = PD_SYSTEM_FAILURE;
+}
 
 /*
  * check if it is an IO deice
@@ -953,6 +982,7 @@ cpu_callback(picl_nodehdl_t nodeh, void *args)
 	err = picldiag_get_string_propval(nodeh, OBP_PROP_STATUS, &status);
 	if (err == PICL_SUCCESS) {
 		log_printf("%-12s", status);
+		set_exit_code(status);
 		free(status);
 	} else if (err != PICL_PROPNOTFOUND && err !=
 	    PICL_PROPVALUNAVAILABLE && err != PICL_ENDOFLIST) {
@@ -962,6 +992,7 @@ cpu_callback(picl_nodehdl_t nodeh, void *args)
 		    PICL_PROP_STATE, &status);
 		if (err == PICL_SUCCESS) {
 			log_printf("%-12s", status);
+			set_exit_code(status);
 			free(status);
 		} else if (err != PICL_PROPNOTFOUND && err !=
 		    PICL_PROPVALUNAVAILABLE && err !=
@@ -1299,6 +1330,7 @@ logprintf_memory_module_group_info(picl_nodehdl_t memgrph, uint64_t mcid)
 			    PICL_PROP_OPERATIONAL_STATUS, &status);
 			if (err == PICL_SUCCESS) {
 				log_printf("%s", status);
+				set_exit_code(status);
 				free(status);
 			} else if (err != PICL_PROPNOTFOUND)
 				return (err);
@@ -2407,6 +2439,7 @@ picldiag_display_io_cards(struct io_card *list)
 			log_printf("+", 0);
 		log_printf("\n", 0);
 		log_printf("            %10s  ", p->status, 0);
+		set_exit_code(p->status);
 		if (strlen(p->notes) > 0)
 			log_printf("%s", p->notes, 0);
 		log_printf("\n\n", 0);
@@ -2483,6 +2516,7 @@ logprintf_fan_info(picl_nodehdl_t fanh)
 				free(unit);
 			}
 			log_printf(")");
+			exit_code = PD_SYSTEM_FAILURE;
 		} else {
 			log_printf("okay");
 		}
@@ -2612,11 +2646,13 @@ logprintf_temp_info(picl_nodehdl_t temph)
 	err = picldiag_get_string_propval(temph, PICL_PROP_CONDITION, &status);
 	if (err == PICL_SUCCESS) {
 		log_printf("%s", status);
+		set_exit_code(status);
 		free(status);
 	} else if (err != PICL_PROPNOTFOUND && err != PICL_PROPVALUNAVAILABLE) {
 		return (err);
 	} else {
 		log_printf("%s ", status);
+		set_exit_code(status);
 		if (strcmp(status, "failed") == 0 ||
 		    strcmp(status, "warning") == 0)
 			log_printf("(%.2lldC)", temperature);
@@ -2746,11 +2782,13 @@ logprintf_current_info(picl_nodehdl_t currenth)
 	    PICL_PROP_CONDITION, &status);
 	if (err == PICL_SUCCESS) {
 		log_printf(" %s", status);
+		set_exit_code(status);
 		free(status);
 	} else if (err != PICL_PROPNOTFOUND && err != PICL_PROPVALUNAVAILABLE) {
 		return (err);
 	} else {
 		log_printf("%s ", status);
+		set_exit_code(status);
 		if (strcmp(status, "failed") == 0 ||
 		    strcmp(status, "warning") == 0)
 			log_printf("(%.2fA)", current);
@@ -2879,11 +2917,13 @@ logprintf_voltage_info(picl_nodehdl_t voltageh)
 	    PICL_PROP_CONDITION, &status);
 	if (err == PICL_SUCCESS) {
 		log_printf("%s", status);
+		set_exit_code(status);
 		free(status);
 	} else if (err != PICL_PROPNOTFOUND && err != PICL_PROPVALUNAVAILABLE) {
 		return (err);
 	} else {
 		log_printf("%s ", status);
+		set_exit_code(status);
 		if (strcmp(status, "warning") == 0 ||
 		    strcmp(status, "failed") == 0)
 			log_printf("(%.2fV)", voltage);
@@ -3166,6 +3206,7 @@ logprintf_fru_oper_status(picl_nodehdl_t fruh, int *countp)
 		log_printf("%-15s ", label);
 		free(label);
 		log_printf("%s\n", status);
+		set_exit_code(status);
 		free(status);
 	} else if (err != PICL_PROPNOTFOUND && err != PICL_PROPVALUNAVAILABLE) {
 		free(label);
@@ -3263,6 +3304,7 @@ asicrev_callback(picl_nodehdl_t nodeh, void *arg)
 		log_printf("%-15s  ", "okay");
 	else {
 		log_printf("%-15s  ", status);
+		set_exit_code(status);
 		free(status);
 	}
 	/* revision */
@@ -3333,6 +3375,7 @@ ebus_callback(picl_nodehdl_t ebush, void *arg)
 		log_printf("%-15s  ", "okay");
 	else {
 		log_printf("%-15s  ", status);
+		set_exit_code(status);
 		free(status);
 	}
 	/* revision */
@@ -3566,6 +3609,11 @@ display_system_info(int serrlog, int log_flag, picl_nodehdl_t rooth)
 	return (PICL_SUCCESS);
 }
 
+/*
+ * do_prominfo is called from main in prtdiag. It returns PD_SYSTEM_FAILURE if
+ * any system failure is detected, PD_INTERNAL_FAILURE for internal errors and
+ * PD_SUCCESS otherwise. main uses the return value as the exit code.
+ */
 /* ARGSUSED */
 int
 do_prominfo(int serrlog, char *pgname, int log_flag, int prt_flag)
@@ -3578,7 +3626,7 @@ do_prominfo(int serrlog, char *pgname, int log_flag, int prt_flag)
 	err = picl_initialize();
 	if (err != PICL_SUCCESS) {
 		fprintf(stderr, EM_INIT_FAIL, picl_strerror(err));
-		exit(1);
+		return (PD_INTERNAL_FAILURE);
 	}
 
 	do {
@@ -3586,7 +3634,7 @@ do_prominfo(int serrlog, char *pgname, int log_flag, int prt_flag)
 		err = picl_get_root(&rooth);
 		if (err != PICL_SUCCESS) {
 			fprintf(stderr, EM_GET_ROOT_FAIL, picl_strerror(err));
-			exit(1);
+			return (PD_INTERNAL_FAILURE);
 		}
 
 		err = display_system_info(serrlog, log_flag, rooth);
@@ -3599,9 +3647,10 @@ do_prominfo(int serrlog, char *pgname, int log_flag, int prt_flag)
 		errstr = picl_strerror(err);
 		fprintf(stderr, EM_PRTDIAG_FAIL);
 		fprintf(stderr, "%s\n", errstr? errstr : " ");
+		exit_code = PD_INTERNAL_FAILURE;
 	}
 
 	(void) picl_shutdown();
 
-	return (0);
+	return (exit_code);
 }
