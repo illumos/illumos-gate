@@ -1027,7 +1027,6 @@ sys_int80()
 	 * code and fake a GP fault.
 	 * 
 	 */
-	swapgs
 	subq	$2, (%rsp)	/* int insn 2-bytes */
 	pushq	$_CONST(_MUL(T_INT80, GATE_DESC_SIZE) + 2)
 	jmp	gptrap			/ GP fault

@@ -704,8 +704,6 @@ thread_free(kthread_t *t)
 		lwp_freeregs(t->t_lwp, 0);
 	if (t->t_ctx)
 		freectx(t, 0);
-	if (t->t_procp->p_pctx)
-		freepctx(t->t_procp, 0);
 	t->t_stk = NULL;
 	if (t->t_lwp)
 		lwp_stk_fini(t->t_lwp);
