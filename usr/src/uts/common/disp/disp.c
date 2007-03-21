@@ -1952,27 +1952,27 @@ disp_getwork(cpu_t *cp)
 				ASSERT(CPU_ACTIVE(ocp));
 
 				/*
-				 * End our stroll around the partition if:
+				 * End our stroll around this lpl if:
 				 *
 				 * - Something became runnable on the local
-				 *	queue
+				 *   queue...which also ends our stroll around
+				 *   the partition.
 				 *
-				 * - We're at the broadest level of locality and
-				 *   we happen across another idle CPU. At the
-				 *   highest level of locality, all CPUs will
-				 *   walk the partition's CPUs in the same
-				 *   order, so we can end our stroll taking
-				 *   comfort in knowing the other idle CPU is
-				 *   already covering the next portion of the
-				 *   list.
+				 * - We happen across another idle CPU.
+				 *   Since it is patrolling the next portion
+				 *   of the lpl's list (assuming it's not
+				 *   halted), move to the next higher level
+				 *   of locality.
 				 */
-				if (cp->cpu_disp->disp_nrunnable != 0)
-					break;
+				if (cp->cpu_disp->disp_nrunnable != 0) {
+					kpreempt_enable();
+					return (NULL);
+				}
 				if (ocp->cpu_dispatch_pri == -1) {
 					if (ocp->cpu_disp_flags &
 					    CPU_DISP_HALTED)
 						continue;
-					else if (lpl->lpl_parent == NULL)
+					else
 						break;
 				}
 
