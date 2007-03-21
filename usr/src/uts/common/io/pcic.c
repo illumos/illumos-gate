@@ -808,6 +808,8 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 				ddi_get_instance(dip));
 
 			kmem_free(pcic, sizeof (pcicdev_t));
+			ddi_soft_state_free(pcic_soft_state_p,
+				ddi_get_instance(dip));
 			return (DDI_FAILURE);
 		}
 	} /* ddi_prop_op("device_type") */
@@ -816,15 +818,13 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		strcmp(bus_type, DEVI_PCIEX_NEXNAME) == 0) {
 		pcic->pc_flags = PCF_PCIBUS;
 	} else {
-#if defined(__sparc)
-		cmn_err(CE_CONT, "pcic%d: unsupported parent bus type: [%s]\n",
+		cmn_err(CE_WARN, "!pcic%d: non-pci mode (%s) not supported, "
+			"set BIOS to yenta mode if applicable\n",
 			ddi_get_instance(dip), bus_type);
-
 		kmem_free(pcic, sizeof (pcicdev_t));
+		ddi_soft_state_free(pcic_soft_state_p,
+			ddi_get_instance(dip));
 		return (DDI_FAILURE);
-#else
-		pcic->pc_flags = 0;
-#endif
 	}
 
 	if ((pcic->bus_speed = ddi_getprop(DDI_DEV_T_ANY, ddi_get_parent(dip),
