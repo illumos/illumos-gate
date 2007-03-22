@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2709,17 +2709,6 @@ restarter_set_method_context(struct method_context *cip, const char **fp)
 		}
 	}
 
-	if (cip->working_dir != NULL) {
-		do
-			r = chdir(cip->working_dir);
-		while (r != 0 && errno == EINTR);
-		if (r != 0) {
-			*fp = "chdir";
-			ret = errno;
-			goto out;
-		}
-	}
-
 	if (cip->corefile_pattern != NULL) {
 		mypid = getpid();
 
@@ -2820,9 +2809,8 @@ restarter_set_method_context(struct method_context *cip, const char **fp)
 	}
 
 	/*
-	 * The last thing we must do is assume our ID.
-	 * If the UID is 0, we want it to be privilege-aware,
-	 * otherwise the limit set gets used instead of E/P.
+	 * Now, we have to assume our ID. If the UID is 0, we want it to be
+	 * privilege-aware, otherwise the limit set gets used instead of E/P.
 	 * We can do this by setting P as well, which keeps
 	 * PA status (see priv_can_clear_PA()).
 	 */
@@ -2839,6 +2827,22 @@ restarter_set_method_context(struct method_context *cip, const char **fp)
 		if (setppriv(PRIV_SET, PRIV_PERMITTED, cip->priv_set) != 0) {
 			ret = errno;
 			assert(ret == EFAULT || ret == EPERM);
+			goto out;
+		}
+	}
+
+	/*
+	 * The last thing to do is chdir to the specified working directory.
+	 * This should come after the uid switching as only the user might
+	 * have access to the specified directory.
+	 */
+	if (cip->working_dir != NULL) {
+		do
+			r = chdir(cip->working_dir);
+		while (r != 0 && errno == EINTR);
+		if (r != 0) {
+			*fp = "chdir";
+			ret = errno;
 			goto out;
 		}
 	}
