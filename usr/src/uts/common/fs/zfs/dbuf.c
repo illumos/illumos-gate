@@ -514,6 +514,7 @@ dbuf_read_impl(dmu_buf_impl_t *db, zio_t *zio, uint32_t *flags)
 
 	dbuf_add_ref(db, NULL);
 	/* ZIO_FLAG_CANFAIL callers have to check the parent zio's error */
+	ASSERT3U(db->db_dnode->dn_type, <, DMU_OT_NUMTYPES);
 	(void) arc_read(zio, db->db_dnode->dn_objset->os_spa, bp,
 	    db->db_level > 0 ? byteswap_uint64_array :
 	    dmu_ot[db->db_dnode->dn_type].ot_byteswap,

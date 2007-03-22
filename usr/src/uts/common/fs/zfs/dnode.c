@@ -206,6 +206,7 @@ dnode_byteswap(dnode_phys_t *dnp)
 		 */
 		int off = (dnp->dn_nblkptr-1) * sizeof (blkptr_t);
 		size_t len = DN_MAX_BONUSLEN - off;
+		ASSERT3U(dnp->dn_bonustype, <, DMU_OT_NUMTYPES);
 		dmu_ot[dnp->dn_bonustype].ot_byteswap(dnp->dn_bonus + off, len);
 	}
 }

@@ -772,6 +772,15 @@ dmu_objset_sync(objset_impl_t *os, zio_t *pio, dmu_tx_t *tx)
 	/* XXX the write_done callback should really give us the tx... */
 	os->os_synctx = tx;
 
+	if (os->os_dsl_dataset == NULL) {
+		/*
+		 * This is the MOS.  If we have upgraded,
+		 * spa_max_replication() could change, so reset
+		 * os_copies here.
+		 */
+		os->os_copies = spa_max_replication(os->os_spa);
+	}
+
 	/*
 	 * Create the root block IO
 	 */

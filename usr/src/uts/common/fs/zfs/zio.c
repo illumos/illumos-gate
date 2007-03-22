@@ -1004,10 +1004,8 @@ zio_write_compress(zio_t *zio)
 		BP_SET_COMPRESS(bp, compress);
 		zio->io_pipeline = ZIO_REWRITE_PIPELINE;
 	} else {
-		if (bp->blk_birth == zio->io_txg) {
-			ASSERT3U(BP_GET_LSIZE(bp), ==, lsize);
-			bzero(bp, sizeof (blkptr_t));
-		}
+		if (bp->blk_birth == zio->io_txg)
+			BP_ZERO(bp);
 		if (csize == 0) {
 			BP_ZERO(bp);
 			zio->io_pipeline = ZIO_WAIT_FOR_CHILDREN_PIPELINE;
