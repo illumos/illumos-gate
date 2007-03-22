@@ -900,15 +900,7 @@ kcpc_hw_overflow_intr(caddr_t arg1, caddr_t arg2)
 	if (pcbe_ops == NULL ||
 	    (bitmap = pcbe_ops->pcbe_overflow_bitmap()) == 0)
 		return (DDI_INTR_UNCLAIMED);
-#ifdef N2_1x_CPC_WORKAROUNDS
-	/*
-	 * Check if any of the supported counters overflowed. If
-	 * not, it's a spurious overflow trap (Niagara2 1.x silicon
-	 * bug). Ignore this trap.
-	 */
-	if ((bitmap & ((1 <<cpc_ncounters)-1)) == 0)
-		return (DDI_INTR_CLAIMED);
-#endif
+
 	/*
 	 * Prevent any further interrupts.
 	 */

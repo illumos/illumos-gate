@@ -66,10 +66,6 @@ extern uint64_t ultra_getpic(void);
 extern uint64_t ultra_gettick(void);
 extern char cpu_module_name[];
 
-#ifdef N2_1x_CPC_WORKAROUNDS
-extern uint64_t ni2_1x_perf_workarounds;
-#endif
-
 pcbe_ops_t ni2_pcbe_ops = {
 	PCBE_VER_1,
 	CPC_CAP_OVERFLOW_INTERRUPT | CPC_CAP_OVERFLOW_PRECISE,
@@ -113,50 +109,7 @@ static const uint64_t	allstopped = (ULTRA_PCR_PRIVPIC |
  */
 static boolean_t ni2_cpc_counting[NCPU];
 
-#ifdef N2_1x_CPC_WORKAROUNDS
-static ni2_event_t ni2_1x_events[] = {
-	{ "Idle_strands",			0x000, 0x00 },
-	{ "Br_completed",			0x201, 0x7f },
-	{ "Br_taken",				0x202, 0x7f },
-	{ "Instr_FGU_arithmetic",		0x204, 0x7f },
-	{ "Instr_ld",				0x208, 0x7f },
-	{ "Instr_st",				0x210, 0x7f },
-	{ "Instr_sw",				0x220, 0x7f },
-	{ "Instr_other",			0x240, 0x7f },
-	{ "Instr_cnt",				0x27d, 0x7f },
-	{ "IC_miss",				0x301, 0x3f },
-	{ "DC_miss",				0x302, 0x3f },
-	{ "ITLB_miss",				0x304, 0x3f },
-	{ "DTLB_miss",				0x308, 0x3f },
-	{ "L2_imiss",				0x310, 0x3f },
-	{ "L2_dmiss_ld",			0x320, 0x3f },
-	{ "ITLB_HWTW_ref_L2",			0x404, 0x3c },
-	{ "DTLB_HWTW_ref_L2",			0x408, 0x3c },
-	{ "ITLB_HWTW_miss_L2",			0x410, 0x3c },
-	{ "DTLB_HWTW_miss_L2",			0x420, 0x3c },
-	{ "Stream_ld_to_PCX",			0x501, 0x3f },
-	{ "Stream_st_to_PCX",			0x502, 0x3f },
-	{ "CPU_ld_to_PCX",			0x504, 0x3f },
-	{ "CPU_ifetch_to_PCX",			0x508, 0x3f },
-	{ "CPU_st_to_PCX",			0x510, 0x3f },
-	{ "MMU_ld_to_PCX",			0x520, 0x3f },
-	{ "DES_3DES_op",			0x601, 0x3f },
-	{ "AES_op",				0x602, 0x3f },
-	{ "RC4_op",				0x604, 0x3f },
-	{ "MD5_SHA-1_SHA-256_op",		0x608, 0x3f },
-	{ "MA_op",				0x610, 0x3f },
-	{ "CRC_TCPIP_cksum",			0x620, 0x3f },
-	{ "DES_3DES_busy_cycle",		0x701, 0x3f },
-	{ "AES_busy_cycle",			0x702, 0x3f },
-	{ "RC4_busy_cycle",			0x704, 0x3f },
-	{ "MD5_SHA-1_SHA-256_busy_cycle",	0x708, 0x3f },
-	{ "MA_busy_cycle",			0x710, 0x3f },
-	{ "CRC_MPA_cksum",			0x720, 0x3f },
-	EV_END
-};
-#endif
-
-static ni2_event_t ni2_2x_events[] = {
+static ni2_event_t ni2_events[] = {
 	{ "Idle_strands",			0x000, 0x00 },
 	{ "Br_completed",			0x201, 0xff },
 	{ "Br_taken",				0x202, 0xff },
@@ -199,7 +152,6 @@ static ni2_event_t ni2_2x_events[] = {
 	EV_END
 };
 
-static ni2_event_t	*ni2_events = ni2_2x_events;
 static const char	*ni2_impl_name = "UltraSPARC T2";
 static char		*evlist;
 static size_t		evlist_sz;
@@ -237,10 +189,7 @@ ni2_pcbe_init(void)
 		    niagara2_hsvc_major, niagara2_hsvc_minor, status);
 		niagara2_hsvc_available = B_FALSE;
 	}
-#ifdef N2_1x_CPC_WORKAROUNDS
-	if (ni2_1x_perf_workarounds)
-		ni2_events = ni2_1x_events;
-#endif
+
 	/*
 	 * Construct event list.
 	 *
@@ -324,11 +273,6 @@ ni2_pcbe_event_coverage(char *event)
 	return (0x3);
 }
 
-#ifdef N2_1x_CPC_WORKAROUNDS
-uint64_t	ni2_ov_tstamp[NCPU];	/* last overflow time stamp */
-uint64_t	ni2_ov_spurious_range = 1000000; /* 1 msec at 1GHz */
-#endif
-
 static uint64_t
 ni2_pcbe_overflow_bitmap(void)
 {
@@ -348,38 +292,6 @@ ni2_pcbe_overflow_bitmap(void)
 	pic = ultra_getpic();
 	pic0 = (uint32_t)(pic & PIC0_MASK);
 	pic1 = (uint32_t)((pic >> PIC1_SHIFT) & PIC0_MASK);
-
-#ifdef N2_1x_CPC_WORKAROUNDS
-	if (ni2_1x_perf_workarounds) {
-		uint64_t	tstamp;
-		processorid_t	cpun;
-
-		/*
-		 * Niagara2 1.x silicon can generate a duplicate overflow
-		 * trap per event. If we take an overflow trap with no
-		 * counters overflowing, return a non-zero bitmask with no
-		 * OV bit set for supported counter so that the framework
-		 * can ignore this trap.
-		 */
-		cpun = CPU->cpu_id;
-		tstamp = ultra_gettick();
-		if (overflow)
-			ni2_ov_tstamp[cpun] = tstamp;
-		else if (tstamp < (ni2_ov_tstamp[cpun] + ni2_ov_spurious_range))
-			overflow |= 1ULL << 63;
-
-		/*
-		 * In Niagara2 1.x silicon, PMU doesn't set OV bit for
-		 * precise events. So, if we take a trap with the counter
-		 * within the overflow range and the OV bit is not set, we
-		 * assume OV bit should have been set.
-		 */
-		if (PIC_IN_OV_RANGE(pic0))
-			overflow |= 0x1;
-		if (PIC_IN_OV_RANGE(pic1))
-			overflow |= 0x2;
-	}
-#endif
 
 	pcr |= (CPC_NIAGARA2_PCR_HOLDOV0 | CPC_NIAGARA2_PCR_HOLDOV1);
 
@@ -666,19 +578,13 @@ ni2_pcbe_sample(void *token)
 		 * events must have been revoked. Only perform this
 		 * check if counting is not stopped.
 		 */
-#ifdef N2_1x_CPC_WORKAROUNDS
-		if (!ni2_1x_perf_workarounds) {
-#endif
-			pcr = ultra_getpcr();
-			DTRACE_PROBE1(niagara2__getpcr, uint64_t, pcr);
-			if (ni2_cpc_counting[CPU->cpu_id] &&
-			    !(pcr & CPC_NIAGARA2_PCR_HT)) {
-				kcpc_invalidate_config(token);
-				return;
-			}
-#ifdef N2_1x_CPC_WORKAROUNDS
+		pcr = ultra_getpcr();
+		DTRACE_PROBE1(niagara2__getpcr, uint64_t, pcr);
+		if (ni2_cpc_counting[CPU->cpu_id] &&
+		    !(pcr & CPC_NIAGARA2_PCR_HT)) {
+			kcpc_invalidate_config(token);
+			return;
 		}
-#endif
 	}
 
 	diff = (curpic & PIC0_MASK) - (uint64_t)pic0->pcbe_pic;
