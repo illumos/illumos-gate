@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,19 +44,19 @@ physnm_t t200_pnms[] = {
 
 physnm_t t5120_pnms[] = {
 	/* Slot #, Label */
+	{   0, "MB/RISER0/PCIE0" },
 	{   1, "MB/RISER1/PCIE1" },
-	{   2, "MB/RISER2/PCIE2" },
-	{   3, "MB/RISER3/PCIE3" }
+	{   2, "MB/RISER2/PCIE2" }
 };
 
 physnm_t t5220_pnms[] = {
 	/* Slot #, Label */
+	{   0, "MB/RISER0/PCIE0" },
 	{   1, "MB/RISER1/PCIE1" },
 	{   2, "MB/RISER2/PCIE2" },
-	{   3, "MB/RISER3/PCIE3" },
+	{   3, "MB/RISER0/PCIE3" },
 	{   4, "MB/RISER1/PCIE4" },
-	{   5, "MB/RISER2/PCIE5" },
-	{   6, "MB/RISER3/PCIE6" }
+	{   5, "MB/RISER2/PCIE5" }
 };
 
 pphysnm_t plat_pnames[] = {
