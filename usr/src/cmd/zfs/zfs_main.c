@@ -796,6 +796,9 @@ zfs_do_destroy(int argc, char **argv)
 		if (ret) {
 			(void) fprintf(stderr,
 			    gettext("no snapshots destroyed\n"));
+		} else {
+			zpool_log_history(g_zfs, argc + optind, argv - optind,
+			    argv[0], B_FALSE, B_FALSE);
 		}
 		return (ret != 0);
 	}
