@@ -23,7 +23,7 @@
 /*	  All Rights Reserved					*/
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2733,6 +2733,29 @@ async_ioctl(struct asyncline *async, queue_t *wq, mblk_t *mp, boolean_t iswput)
 					mutex_exit(asy->asy_excl);
 					return;
 				}
+
+				/*
+				 * TCSETA, TCSETAW, and TCSETAF make use of
+				 * the termio structure and therefore have
+				 * no concept of any speed except what can
+				 * be represented by CBAUD. This is because
+				 * of legacy SVR4 code. Therefore, if we see
+				 * one of the aforementioned IOCTL commands
+				 * we should zero out CBAUDEXT, CIBAUD, and
+				 * CIBAUDEXT as to not break legacy
+				 * functionality. This is because CBAUDEXT,
+				 * CIBAUD, and CIBAUDEXT can't be stored in
+				 * an unsigned short. By zeroing out CBAUDEXT,
+				 * CIBAUD, and CIBAUDEXT in the t_cflag of the
+				 * termios structure asy_program() will set the
+				 * input baud rate to the output baud rate.
+				 */
+				if (iocp->ioc_cmd == TCSETA ||
+				    iocp->ioc_cmd == TCSETAW ||
+				    iocp->ioc_cmd == TCSETAF)
+					tp->t_cflag &= ~(CIBAUD |
+					    CIBAUDEXT | CBAUDEXT);
+
 				error = asy_program(asy, ASY_NOINIT);
 				mutex_exit(asy->asy_excl_hi);
 			}
