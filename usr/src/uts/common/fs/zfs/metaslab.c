@@ -592,7 +592,6 @@ metaslab_sync_done(metaslab_t *msp, uint64_t txg)
 	 * future allocations have synced.  (If we unloaded it now and then
 	 * loaded a moment later, the map wouldn't reflect those allocations.)
 	 */
-#ifndef ZFS_DEBUG
 	if (sm->sm_loaded && (msp->ms_weight & METASLAB_ACTIVE_MASK) == 0) {
 		int evictable = 1;
 
@@ -603,7 +602,6 @@ metaslab_sync_done(metaslab_t *msp, uint64_t txg)
 		if (evictable)
 			space_map_unload(sm);
 	}
-#endif
 
 	metaslab_group_sort(mg, msp, metaslab_weight(msp));
 
@@ -886,11 +884,6 @@ metaslab_free_dva(spa_t *spa, const dva_t *dva, uint64_t txg, boolean_t now)
 		 * verify that this region is actually allocated in
 		 * either a ms_allocmap or the ms_map
 		 */
-#ifdef ZFS_DEBUG
-		(void) space_map_load(&msp->ms_map, &metaslab_ff_ops,
-		    SM_FREE, &msp->ms_smo,
-		    msp->ms_group->mg_vd->vdev_spa->spa_meta_objset);
-#endif
 		if (msp->ms_map.sm_loaded) {
 			boolean_t allocd = B_FALSE;
 			int i;
