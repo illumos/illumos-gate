@@ -752,7 +752,6 @@ get_rdn(BerElement *asn1, KMF_X509_NAME *name)
 	/* Get the beginning of the RDN Set and a ptr to the end */
 	tag = kmfber_first_element(asn1, &size, &end);
 	if (tag != BER_CONSTRUCTED_SET) {
-		ret = KMF_ERR_BAD_CERT_FORMAT;
 		goto cleanup;
 	}
 
@@ -2122,7 +2121,7 @@ encode_tbs_csr(BerElement *asn1, KMF_TBS_CSR *tbscsr)
 	(void) memcpy(&version, tbscsr->version.Data,
 		tbscsr->version.Length);
 
-	if (kmfber_printf(asn1, "{i", &version) == -1) {
+	if (kmfber_printf(asn1, "{i", version) == -1) {
 		ret = KMF_ERR_BAD_CERT_FORMAT;
 		goto cleanup;
 	}
