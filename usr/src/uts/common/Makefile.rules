@@ -319,10 +319,6 @@ $(OBJS_DIR)/%.o:		$(KMECHKRB5_BASE)/crypto/raw/%.c
 	$(COMPILE.c) $(KGSSDFLAGS) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(KMECHKRB5_BASE)/crypto/crc32/%.c
-	$(COMPILE.c) $(KGSSDFLAGS) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(KMECHKRB5_BASE)/crypto/old/%.c
 	$(COMPILE.c) $(KGSSDFLAGS) -o $@ $<
 	$(CTFCONVERT_O)
@@ -638,10 +634,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ppp/spppasyn/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ppp/spppcomp/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ppp/sppptun/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -922,6 +914,11 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/zmod/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/zlib_obj.o:		$(ZLIB_OBJS:%=$(OBJS_DIR)/%)
+	$(LD) -r -Breduce -M$(UTSBASE)/common/zmod/mapfile -o $@ \
+	    $(ZLIB_OBJS:%=$(OBJS_DIR)/%)
+	$(CTFMERGE) -t -f -L VERSION -o $@ $(ZLIB_OBJS:%=$(OBJS_DIR)/%)
+
 #
 # SVM
 #
@@ -980,7 +977,7 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/c2/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/conf/%.c
-	@($(LHEAD) $(LINT.c)	$< $(LTAIL))
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/contract/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
@@ -1157,9 +1154,6 @@ $(LINTS_DIR)/%.ln:		$(KMECHKRB5_BASE)/crypto/keyhash_provider/%.c
 	@($(LHEAD) $(LINT.c) $(KGSSDFLAGS) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(KMECHKRB5_BASE)/crypto/raw/%.c
-	@($(LHEAD) $(LINT.c) $(KGSSDFLAGS) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(KMECHKRB5_BASE)/crypto/crc32/%.c
 	@($(LHEAD) $(LINT.c) $(KGSSDFLAGS) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(KMECHKRB5_BASE)/crypto/old/%.c
@@ -1391,9 +1385,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ppp/sppp/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ppp/spppasyn/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ppp/spppcomp/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ppp/sppptun/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -1607,6 +1598,12 @@ $(LINTS_DIR)/%.ln:		$(COMMONBASE)/util/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/vm/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/zmod/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+ZMODLINTFLAGS = -erroff=E_CONSTANT_CONDITION
 
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/zmod/%.c
+	@($(LHEAD) $(LINT.c) $(ZMODLINTFLAGS) $< $(LTAIL))
+
+$(LINTS_DIR)/zlib_obj.ln:	$(ZLIB_OBJS:%.o=$(LINTS_DIR)/%.ln) \
+				$(UTSBASE)/common/zmod/zlib_lint.c
+	@($(LHEAD) $(LINT.c) -C $(LINTS_DIR)/zlib_obj \
+	    $(UTSBASE)/common/zmod/zlib_lint.c $(LTAIL))

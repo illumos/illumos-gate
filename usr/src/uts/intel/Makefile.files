@@ -20,8 +20,6 @@
 #
 
 #
-# uts/intel/Makefile.files
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -112,8 +110,7 @@ LX_AUTOFS_OBJS +=	\
 #
 #	Decompression code
 #
-CORE_OBJS += decompress.o adler32.o infblock.o infcodes.o inffast.o \
-		inflate.o inftrees.o infutil.o zutil.o zmod.o
+CORE_OBJS += decompress.o
 
 #
 #	Driver modules

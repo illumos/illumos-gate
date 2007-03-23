@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,11 +37,20 @@
  */
 
 zio_compress_info_t zio_compress_table[ZIO_COMPRESS_FUNCTIONS] = {
-	{NULL,			NULL,			"inherit"},
-	{NULL,			NULL,			"on"},
-	{NULL,			NULL,			"uncompressed"},
-	{lzjb_compress,		lzjb_decompress,	"lzjb"},
-	{NULL,			NULL,			"empty"},
+	{NULL,			NULL,			0,	"inherit"},
+	{NULL,			NULL,			0,	"on"},
+	{NULL,			NULL,			0,	"uncompressed"},
+	{lzjb_compress,		lzjb_decompress,	0,	"lzjb"},
+	{NULL,			NULL,			0,	"empty"},
+	{gzip_compress,		gzip_decompress,	1,	"gzip-1"},
+	{gzip_compress,		gzip_decompress,	2,	"gzip-2"},
+	{gzip_compress,		gzip_decompress,	3,	"gzip-3"},
+	{gzip_compress,		gzip_decompress,	4,	"gzip-4"},
+	{gzip_compress,		gzip_decompress,	5,	"gzip-5"},
+	{gzip_compress,		gzip_decompress,	6,	"gzip-6"},
+	{gzip_compress,		gzip_decompress,	7,	"gzip-7"},
+	{gzip_compress,		gzip_decompress,	8,	"gzip-8"},
+	{gzip_compress,		gzip_decompress,	9,	"gzip-9"},
 };
 
 uint8_t
@@ -102,7 +112,7 @@ zio_compress_data(int cpfunc, void *src, uint64_t srcsize, void **destp,
 	dest = zio_buf_alloc(destbufsize);
 
 	ciosize = ci->ci_compress(src, dest, (size_t)srcsize,
-	    (size_t)destbufsize);
+	    (size_t)destbufsize, ci->ci_level);
 	if (ciosize > destbufsize) {
 		zio_buf_free(dest, destbufsize);
 		return (0);
@@ -130,8 +140,9 @@ int
 zio_decompress_data(int cpfunc, void *src, uint64_t srcsize,
 	void *dest, uint64_t destsize)
 {
+	zio_compress_info_t *ci = &zio_compress_table[cpfunc];
+
 	ASSERT((uint_t)cpfunc < ZIO_COMPRESS_FUNCTIONS);
 
-	return (zio_compress_table[cpfunc].ci_decompress(src, dest,
-	    srcsize, destsize));
+	return (ci->ci_decompress(src, dest, srcsize, destsize, ci->ci_level));
 }

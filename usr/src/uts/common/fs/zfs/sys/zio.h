@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -91,6 +92,15 @@ enum zio_compress {
 	ZIO_COMPRESS_OFF,
 	ZIO_COMPRESS_LZJB,
 	ZIO_COMPRESS_EMPTY,
+	ZIO_COMPRESS_GZIP_1,
+	ZIO_COMPRESS_GZIP_2,
+	ZIO_COMPRESS_GZIP_3,
+	ZIO_COMPRESS_GZIP_4,
+	ZIO_COMPRESS_GZIP_5,
+	ZIO_COMPRESS_GZIP_6,
+	ZIO_COMPRESS_GZIP_7,
+	ZIO_COMPRESS_GZIP_8,
+	ZIO_COMPRESS_GZIP_9,
 	ZIO_COMPRESS_FUNCTIONS
 };
 

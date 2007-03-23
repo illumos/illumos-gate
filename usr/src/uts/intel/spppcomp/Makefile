@@ -21,7 +21,7 @@
 #
 # uts/intel/spppcomp/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -96,6 +96,13 @@ modlintlib:	$(MODLINTLIB_DEPS)
 clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ppp/spppcomp/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ppp/spppcomp/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
 
 #
 #	Include common targets.

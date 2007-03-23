@@ -28,7 +28,6 @@
 
 #include <sys/modctl.h>
 #include <sys/zmod.h>
-#include <sys/systm.h>
 
 #include "zlib.h"
 
@@ -62,17 +61,38 @@ z_uncompress(void *dst, size_t *dstlen, const void *src, size_t srclen)
 	return (inflateEnd(&zs));
 }
 
-static const char *const z_errmsg[] = {
-	"need dictionary",	/* Z_NEED_DICT		2  */
-	"stream end",		/* Z_STREAM_END		1  */
-	"",			/* Z_OK			0  */
-	"file error",		/* Z_ERRNO		(-1) */
-	"stream error",		/* Z_STREAM_ERROR	(-2) */
-	"data error",		/* Z_DATA_ERROR		(-3) */
-	"insufficient memory",	/* Z_MEM_ERROR		(-4) */
-	"buffer error",		/* Z_BUF_ERROR		(-5) */
-	"incompatible version"	/* Z_VERSION_ERROR	(-6) */
-};
+int
+z_compress_level(void *dst, size_t *dstlen, const void *src, size_t srclen,
+    int level)
+{
+
+	z_stream zs;
+	int err;
+
+	bzero(&zs, sizeof (zs));
+	zs.next_in = (uchar_t *)src;
+	zs.avail_in = srclen;
+	zs.next_out = dst;
+	zs.avail_out = *dstlen;
+
+	if ((err = deflateInit(&zs, level)) != Z_OK)
+		return (err);
+
+	if ((err = deflate(&zs, Z_FINISH)) != Z_STREAM_END) {
+		(void) deflateEnd(&zs);
+		return (err == Z_OK ? Z_BUF_ERROR : err);
+	}
+
+	*dstlen = zs.total_out;
+	return (deflateEnd(&zs));
+}
+
+int
+z_compress(void *dst, size_t *dstlen, const void *src, size_t srclen)
+{
+	return (z_compress_level(dst, dstlen, src, srclen,
+	    Z_DEFAULT_COMPRESSION));
+}
 
 /*
  * Convert a zlib error code into a string error message.
@@ -82,8 +102,8 @@ z_strerror(int err)
 {
 	int i = Z_NEED_DICT - err;
 
-	if (i < 0 || i >= sizeof (z_errmsg) / sizeof (z_errmsg[0]))
+	if (i < 0 || i > Z_NEED_DICT - Z_VERSION_ERROR)
 		return ("unknown error");
 
-	return (z_errmsg[i]);
+	return (zError(err));
 }

@@ -858,6 +858,9 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 	zfs_prop_t prop;
 	uint64_t intval;
 	char *strval;
+	char buf[MAXNAMELEN];
+	const char *p;
+	spa_t *spa;
 
 	elem = NULL;
 	while ((elem = nvlist_next_nvpair(nvl, elem)) != NULL) {
@@ -916,6 +919,37 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 				if (dslen <= strlen(setpoint))
 					return (EPERM);
 			}
+			break;
+
+		case ZFS_PROP_COMPRESSION:
+			/*
+			 * If the user specified gzip compression, make sure
+			 * the SPA supports it. We ignore any errors here since
+			 * we'll catch them later.
+			 */
+			if (nvpair_type(elem) == DATA_TYPE_UINT64 &&
+			    nvpair_value_uint64(elem, &intval) == 0 &&
+			    intval >= ZIO_COMPRESS_GZIP_1 &&
+			    intval <= ZIO_COMPRESS_GZIP_9) {
+				if ((p = strchr(name, '/')) == NULL) {
+					p = name;
+				} else {
+					bcopy(name, buf, p - name);
+					buf[p - name] = '\0';
+					p = buf;
+				}
+
+				if (spa_open(p, &spa, FTAG) == 0) {
+					if (spa_version(spa) <
+					    ZFS_VERSION_GZIP_COMPRESSION) {
+						spa_close(spa, FTAG);
+						return (ENOTSUP);
+					}
+
+					spa_close(spa, FTAG);
+				}
+			}
+			break;
 		}
 
 		switch (prop) {

@@ -1107,6 +1107,12 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 			(void) zfs_error(hdl, EZFS_DSREADONLY, errbuf);
 			break;
 
+		case ENOTSUP:
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "pool must be upgraded to allow gzip compression"));
+			(void) zfs_error(hdl, EZFS_BADVERSION, errbuf);
+			break;
+
 		case EOVERFLOW:
 			/*
 			 * This platform can't address a volume this big.

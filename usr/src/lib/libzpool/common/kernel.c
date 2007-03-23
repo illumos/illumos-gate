@@ -26,16 +26,17 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <assert.h>
-#include <sys/zfs_context.h>
+#include <fcntl.h>
 #include <poll.h>
-#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <fcntl.h>
-#include <sys/stat.h>
+#include <string.h>
+#include <zlib.h>
 #include <sys/spa.h>
+#include <sys/stat.h>
 #include <sys/processor.h>
-
+#include <sys/zfs_context.h>
+#include <sys/zmod.h>
 
 /*
  * Emulation of kernel services in userland.
@@ -753,4 +754,29 @@ void
 kernel_fini(void)
 {
 	spa_fini();
+}
+
+int
+z_uncompress(void *dst, size_t *dstlen, const void *src, size_t srclen)
+{
+	int ret;
+	uLongf len = *dstlen;
+
+	if ((ret = uncompress(dst, &len, src, srclen)) == Z_OK)
+		*dstlen = (size_t)len;
+
+	return (ret);
+}
+
+int
+z_compress_level(void *dst, size_t *dstlen, const void *src, size_t srclen,
+    int level)
+{
+	int ret;
+	uLongf len = *dstlen;
+
+	if ((ret = compress2(dst, &len, src, srclen, level)) == Z_OK)
+		*dstlen = (size_t)len;
+
+	return (ret);
 }

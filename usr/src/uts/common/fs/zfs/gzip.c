@@ -24,45 +24,46 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_ZMOD_H
-#define	_ZMOD_H
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ifdef	__cplusplus
-extern "C" {
+#include <sys/debug.h>
+#include <sys/types.h>
+#include <sys/zmod.h>
+
+#ifdef _KERNEL
+#include <sys/systm.h>
+#else
+#include <strings.h>
 #endif
 
-/*
- * zmod - RFC-1950-compatible decompression routines
- *
- * This file provides the public interfaces to zmod, an in-kernel RFC 1950
- * decompression library.  More information about the implementation of these
- * interfaces can be found in the usr/src/uts/common/zmod/ directory.
- */
+size_t
+gzip_compress(void *s_start, void *d_start, size_t s_len, size_t d_len, int n)
+{
+	size_t dstlen = d_len;
 
-#define	Z_OK		0
-#define	Z_STREAM_END	1
-#define	Z_NEED_DICT	2
-#define	Z_ERRNO		(-1)
-#define	Z_STREAM_ERROR	(-2)
-#define	Z_DATA_ERROR	(-3)
-#define	Z_MEM_ERROR	(-4)
-#define	Z_BUF_ERROR	(-5)
-#define	Z_VERSION_ERROR	(-6)
+	ASSERT(d_len <= s_len);
 
-#define	Z_NO_COMPRESSION	0
-#define	Z_BEST_SPEED		1
-#define	Z_BEST_COMPRESSION	9
-#define	Z_DEFAULT_COMPRESSION	(-1)
+	if (z_compress_level(d_start, &dstlen, s_start, s_len, n) != Z_OK) {
+		if (d_len != s_len)
+			return (s_len);
 
-extern int z_uncompress(void *, size_t *, const void *, size_t);
-extern int z_compress(void *, size_t *, const void *, size_t);
-extern int z_compress_level(void *, size_t *, const void *, size_t, int);
-extern const char *z_strerror(int);
+		bcopy(s_start, d_start, s_len);
+		return (s_len);
+	}
 
-#ifdef	__cplusplus
+	return (dstlen);
 }
-#endif
 
-#endif	/* _ZMOD_H */
+/*ARGSUSED*/
+int
+gzip_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len, int n)
+{
+	size_t dstlen = d_len;
+
+	ASSERT(d_len >= s_len);
+
+	if (z_uncompress(d_start, &dstlen, s_start, s_len) != Z_OK)
+		return (-1);
+
+	return (0);
+}

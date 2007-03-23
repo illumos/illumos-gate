@@ -139,7 +139,8 @@ cf_check_compressed(fileid_t *filep)
 	zsp = bkmem_alloc(sizeof (*zsp));
 	filep->fi_dcstream = zsp;
 	/*
-	 * Initialize the decompression stream
+	 * Initialize the decompression stream. Adding 16 to the window size
+	 * indicates that zlib should expect a gzip header.
 	 */
 	bzero(zsp, sizeof (*zsp));
 	zsp->opaque = filep;
@@ -149,8 +150,10 @@ cf_check_compressed(fileid_t *filep)
 	zsp->next_in = NULL;
 	zsp->avail_out = 0;
 	zsp->next_out = NULL;
-	if (inflateInit2(zsp, -MAX_WBITS) != Z_OK)
+	if (inflateInit2(zsp, MAX_WBITS + 16) != Z_OK) {
+		dprintf("inflateInit2() failed\n");
 		return (-1);
+	}
 	return (0);
 }
 
@@ -193,32 +196,6 @@ cf_rewind(fileid_t *filep)
 #define	FLG_FCOMMENT	0x10	/* comment field present */
 
 /*
- * Calculate the header length of a gzip compressed file
- */
-static int
-cf_headerlen(unsigned char *hp)
-{
-	unsigned char flag;
-	int xlen, hlen = 0;
-
-	hlen += 3;	/* skip ID bytes and compression method */
-	flag = hp[hlen];
-	hlen += 7;	/* skip flag, mtime(4 bytes), xfl, and os */
-	if (flag & FLG_FEXTRA) {
-		xlen = hp[hlen++];
-		xlen += hp[hlen++] << 8;
-		hlen += xlen;	/* skip extra field */
-	}
-	if (flag & FLG_FNAME)
-		hlen += strlen((char *)&hp[hlen]) + 1;	/* skip file name */
-	if (flag & FLG_FCOMMENT)
-		hlen += strlen((char *)&hp[hlen]) + 1;	/* skip comment */
-	if (flag & FLG_FHCRC)
-		hlen += 2;	/* skip crc */
-	return (hlen);
-}
-
-/*
  * Read at the current uncompressed offset from the compressed file described
  * by *filep.  Will return decompressed data.
  */
@@ -228,7 +205,7 @@ cf_read(fileid_t *filep, caddr_t buf, size_t count)
 	z_stream *zsp;
 	struct inode *ip;
 	int err = Z_OK;
-	int hlen, infbytes;
+	int infbytes;
 	off_t soff;
 	caddr_t smemp;
 
@@ -255,15 +232,6 @@ cf_read(fileid_t *filep, caddr_t buf, size_t count)
 			zsp->next_in = (unsigned char *)filep->fi_memp;
 			zsp->avail_in = filep->fi_count;
 			filep->fi_memp = smemp;
-			/*
-			 * If we are reading the first block of the file, we
-			 * need to skip over the header bytes before inflating
-			 */
-			if (filep->fi_cfoff == 0) {
-				hlen = cf_headerlen(zsp->next_in);
-				zsp->next_in += hlen;
-				zsp->avail_in -= hlen;
-			}
 			filep->fi_cfoff += filep->fi_count;
 		}
 		infbytes = zsp->avail_out;

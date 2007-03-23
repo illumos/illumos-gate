@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,17 +39,18 @@ extern "C" {
  * Common signature for all zio compress/decompress functions.
  */
 typedef size_t zio_compress_func_t(void *src, void *dst,
-    size_t s_len, size_t d_len);
+    size_t s_len, size_t d_len, int);
 typedef int zio_decompress_func_t(void *src, void *dst,
-    size_t s_len, size_t d_len);
+    size_t s_len, size_t d_len, int);
 
 /*
  * Information about each compression function.
  */
 typedef struct zio_compress_info {
-	zio_compress_func_t	*ci_compress;
-	zio_decompress_func_t	*ci_decompress;
-	char			*ci_name;
+	zio_compress_func_t	*ci_compress;	/* compression function */
+	zio_decompress_func_t	*ci_decompress;	/* decompression function */
+	int			ci_level;	/* level parameter */
+	char			*ci_name;	/* algorithm name */
 } zio_compress_info_t;
 
 extern zio_compress_info_t zio_compress_table[ZIO_COMPRESS_FUNCTIONS];
@@ -57,8 +58,14 @@ extern zio_compress_info_t zio_compress_table[ZIO_COMPRESS_FUNCTIONS];
 /*
  * Compression routines.
  */
-extern size_t lzjb_compress(void *src, void *dst, size_t s_len, size_t d_len);
-extern int lzjb_decompress(void *src, void *dst, size_t s_len, size_t d_len);
+extern size_t lzjb_compress(void *src, void *dst, size_t s_len, size_t d_len,
+    int level);
+extern int lzjb_decompress(void *src, void *dst, size_t s_len, size_t d_len,
+    int level);
+extern size_t gzip_compress(void *src, void *dst, size_t s_len, size_t d_len,
+    int level);
+extern int gzip_decompress(void *src, void *dst, size_t s_len, size_t d_len,
+    int level);
 
 /*
  * Compress and decompress data if necessary.

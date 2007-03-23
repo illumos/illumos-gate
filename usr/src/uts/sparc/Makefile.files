@@ -36,12 +36,6 @@
 CORE_OBJS +=	ddi_arch.o	\
 		polled_io.o	\
 		sparc_ddi.o
-#
-#	decompression support
-#
-CORE_OBJS += adler32.o infblock.o infcodes.o inffast.o \
-		inflate.o inftrees.o infutil.o zutil.o zmod.o
-
 
 #
 #	generic-unix module

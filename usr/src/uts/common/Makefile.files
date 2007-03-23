@@ -64,9 +64,14 @@ COMMON_CORE_OBJS +=		\
 		string.o	\
 		thread_intr.o	\
 		vm_page.o	\
-		vm_pagelist.o
+		vm_pagelist.o	\
+		zlib_obj.o
 
 CORE_OBJS +=	$(COMMON_CORE_OBJS) $($(MACH)_CORE_OBJS)
+
+ZLIB_OBJS =	zutil.o zmod.o zmod_subr.o \
+		adler32.o crc32.o deflate.o inffast.o \
+		inflate.o inftrees.o trees.o
 
 GENUNIX_OBJS +=	\
 		access.o	\
@@ -921,6 +926,7 @@ ZFS_COMMON_OBJS +=		\
 	dmu_zfetch.o		\
 	dsl_prop.o		\
 	fletcher.o		\
+	gzip.o			\
 	lzjb.o			\
 	metaslab.o		\
 	refcount.o		\

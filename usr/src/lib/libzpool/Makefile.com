@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,7 +62,7 @@ C99LMODE=	-Xc99=%all
 
 CFLAGS +=	-g $(CCVERBOSE) $(CNOGLOBAL)
 CFLAGS64 +=	-g $(CCVERBOSE) $(CNOGLOBAL)
-LDLIBS +=	-lumem -lavl -lnvpair -lc
+LDLIBS +=	-lumem -lavl -lnvpair -lz -lc
 CPPFLAGS +=	$(INCS)
 
 .KEEP_STATE:

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,7 +103,7 @@ typedef unsigned short ush;
 typedef ush FAR ushf;
 typedef unsigned long  ulg;
 
-extern const char *z_errmsg[10]; /* indexed by 2-zlib_error */
+static const char *z_errmsg[10]; /* indexed by 2-zlib_error */
 /* (size given to avoid silly warnings with Visual C++) */
 
 #define	ERR_MSG(err) z_errmsg[Z_NEED_DICT-(err)]
@@ -5840,7 +5840,7 @@ struct internal_state	{int dummy; };	/* for buggy compilers */
 extern void exit OF((int));
 #endif
 
-const char *z_errmsg[10] = {
+static const char *z_errmsg[10] = {
 "need dictionary",	/* Z_NEED_DICT		2 */
 "stream end",		/* Z_STREAM_END		1 */
 "",			/* Z_OK			0 */

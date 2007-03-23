@@ -18,12 +18,14 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
+
 #	This makefile drives the production of the gl_kmech_krb5 kernel module.
 #
 #	sparc implementation architecture dependent
@@ -92,6 +94,13 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/sparc/Makefile.targ
+
+$(OBJS_DIR)/%.o:		$(KMECHKRB5_BASE)/crypto/crc32/%.c
+	$(COMPILE.c) $(KGSSDFLAGS) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(LINTS_DIR)/%.ln:		$(KMECHKRB5_BASE)/crypto/crc32/%.c
+	@($(LHEAD) $(LINT.c) $(KGSSDFLAGS) $< $(LTAIL))
 
 INC_PATH += \
 	-I$(UTSBASE)/common/gssapi \

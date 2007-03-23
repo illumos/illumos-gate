@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,8 +45,9 @@
 #define	OFFSET_MASK	((1 << (16 - MATCH_BITS)) - 1)
 #define	LEMPEL_SIZE	256
 
+/*ARGSUSED*/
 size_t
-lzjb_compress(void *s_start, void *d_start, size_t s_len, size_t d_len)
+lzjb_compress(void *s_start, void *d_start, size_t s_len, size_t d_len, int n)
 {
 	uchar_t *src = s_start;
 	uchar_t *dst = d_start;
@@ -97,7 +99,7 @@ lzjb_compress(void *s_start, void *d_start, size_t s_len, size_t d_len)
 
 /*ARGSUSED*/
 int
-lzjb_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len)
+lzjb_decompress(void *s_start, void *d_start, size_t s_len, size_t d_len, int n)
 {
 	uchar_t *src = s_start;
 	uchar_t *dst = d_start;
