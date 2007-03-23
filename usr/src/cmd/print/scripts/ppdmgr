@@ -1379,9 +1379,6 @@ usage()
 	gettext "-a <ppd_filename_path> [ -L <label> ]\n" 1>&2
 	gettext "\t\t[ -R <ppd_repository> ] [-w]\n" 1>&2
 	print -n "\t$myprog: " 1>&2
-	# gettext "-g <ppd_filename_path> [ -L <label> ]\n" 1>&2
-	# gettext "\t\t[ -R <ppd_repository> ]\n" 1>&2
-	print -n "\t$myprog: " 1>&2
 	gettext "-r [ -L <label> ] [ -R <ppd_repository> ]\n" 1>&2
 	print -n "\t$myprog: " 1>&2
 	gettext "-u [ -L <label> ] [ -R <ppd_repository> ]\n" 1>&2
