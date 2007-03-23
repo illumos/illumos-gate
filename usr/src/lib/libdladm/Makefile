@@ -35,7 +35,7 @@ SUBDIRS =	$(MACH)
 
 POFILE =	libdladm.po
 MSGFILES =	common/libdladm.c common/linkprop.c common/secobj.c	\
-		common/libdllink.c comon/libdlaggr.c common/libdlwlan.c
+		common/libdllink.c common/libdlaggr.c common/libdlwlan.c
 XGETFLAGS =     -a -x libdladm.xcl
 
 all :=		TARGET = all
