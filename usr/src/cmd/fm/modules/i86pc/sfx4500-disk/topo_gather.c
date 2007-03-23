@@ -242,15 +242,20 @@ transform_model_string(char *manuf, char *model, char **finalstring,
 		(void) snprintf(buf, buflen, "%s",
 		    manuf == NULL ? model : manuf);
 
-	do {
-		if (isspace(buf[i]))
-			finalmodelstring[j++] = '-';
-		else
-			finalmodelstring[j++] = buf[i];
+	while (buf[i] != 0) {
 
-		while (buf[i] != 0 && isspace(buf[i]))
-			i++;
-	} while (buf[i++] != 0);
+		if (isspace(buf[i])) {
+			finalmodelstring[j++] = '-';
+			/*
+			 * Advance past spaces, but not past the
+			 * end of the string (since isspace('\0')
+			 * returns FALSE).
+			 */
+			while (isspace(buf[i]))
+				i++;
+		} else
+			finalmodelstring[j++] = buf[i++];
+	}
 
 	finalmodelstring[j] = 0;
 
