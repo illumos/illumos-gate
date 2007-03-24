@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,7 @@ typedef struct dis_handle dis_handle_t;
 
 /* generic disassembler flags */
 #define	DIS_OCTAL		0x40
+#define	DIS_NOIMMSYM		0x80
 
 typedef int (*dis_lookup_f)(void *, uint64_t, char *, size_t, uint64_t *,
     size_t *);
@@ -62,6 +63,8 @@ extern void dis_handle_destroy(dis_handle_t *);
 extern int dis_disassemble(dis_handle_t *, uint64_t, char *, size_t);
 extern uint64_t dis_previnstr(dis_handle_t *, uint64_t, int n);
 extern void dis_set_data(dis_handle_t *, void *);
+extern void dis_flags_set(dis_handle_t *, int f);
+extern void dis_flags_clear(dis_handle_t *, int f);
 extern int dis_max_instrlen(dis_handle_t *);
 
 /* libdisasm errors */

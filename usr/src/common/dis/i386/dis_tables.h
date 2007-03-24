@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,6 +96,7 @@ typedef struct dis86 {
 extern int dtrace_disx86(dis86_t *x, uint_t cpu_mode);
 
 #define	DIS_F_OCTAL	0x1	/* Print all numbers in octal */
+#define	DIS_F_NOIMMSYM	0x2	/* Don't print symbols for immediates (.o) */
 
 #ifdef DIS_TEXT
 extern void dtrace_disx86_str(dis86_t *x, uint_t cpu_mode, uint64_t pc,

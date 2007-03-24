@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -307,6 +307,19 @@ libdisasm_ins2str(mdb_disasm_t *dp, mdb_tgt_t *t, mdb_tgt_as_t as,
 	db.db_as = as;
 
 	dis_set_data(dhp, &db);
+
+	if (strcmp(mdb_tgt_name(t), "proc") == 0) {
+		/* check for ELF ET_REL type; turn on NOIMMSYM if so */
+
+		GElf_Ehdr 	leh;
+
+		if (mdb_tgt_getxdata(t, "ehdr", &leh, sizeof (leh)) != -1 &&
+		    leh.e_type == ET_REL)  {
+			dis_flags_set(dhp, DIS_NOIMMSYM);
+		} else {
+			dis_flags_clear(dhp, DIS_NOIMMSYM);
+		}
+	}
 
 	/*
 	 * Attempt to disassemble the instruction.  If this fails because of an

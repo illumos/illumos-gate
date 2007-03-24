@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,6 +34,8 @@ SUNWprivate_1.1 {
 	dis_max_instrlen;
 	dis_previnstr;
 	dis_set_data;
+	dis_flags_set;
+	dis_flags_clear;
 	dis_strerror;
     local:
 	*;

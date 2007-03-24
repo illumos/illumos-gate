@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,7 +99,7 @@ dis_handle_create(int flags, void *data, dis_lookup_f lookup_func,
 	 * Validate architecture flags
 	 */
 	if (flags & ~(DIS_X86_SIZE16 | DIS_X86_SIZE32 | DIS_X86_SIZE64 |
-	    DIS_OCTAL)) {
+	    DIS_OCTAL | DIS_NOIMMSYM)) {
 		(void) dis_seterrno(E_DIS_INVALFLAG);
 		return (NULL);
 	}
@@ -145,6 +145,12 @@ dis_disassemble(dis_handle_t *dhp, uint64_t addr, char *buf, size_t buflen)
 {
 	dhp->dh_addr = addr;
 
+	/* DIS_NOIMMSYM might not be set until now, so update */
+	if (dhp->dh_flags & DIS_NOIMMSYM)
+		dhp->dh_dis.d86_flags |= DIS_F_NOIMMSYM;
+	else
+		dhp->dh_dis.d86_flags &= ~DIS_F_NOIMMSYM;
+
 	if (dtrace_disx86(&dhp->dh_dis, dhp->dh_mode) != 0)
 		return (-1);
 
@@ -166,6 +172,19 @@ dis_set_data(dis_handle_t *dhp, void *data)
 {
 	dhp->dh_data = data;
 }
+
+void
+dis_flags_set(dis_handle_t *dhp, int f)
+{
+	dhp->dh_flags |= f;
+}
+
+void
+dis_flags_clear(dis_handle_t *dhp, int f)
+{
+	dhp->dh_flags &= ~f;
+}
+
 
 /* ARGSUSED */
 int

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -513,6 +513,15 @@ dis_file(const char *filename)
 			die("%s: unsupported ELF machine 0x%x", filename,
 			    ehdr.e_machine);
 		}
+
+		/*
+		 * If ET_REL (.o), printing immediate symbols is likely to
+		 * result in garbage, as symbol lookups on unrelocated
+		 * immediates find false and useless matches.
+		 */
+
+		if (ehdr.e_type == ET_REL)
+			g_flags |= DIS_NOIMMSYM;
 
 		if (!g_quiet && dis_tgt_member(current) != NULL)
 			(void) printf("\narchive member %s\n",

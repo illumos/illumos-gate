@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3263,8 +3263,8 @@ dtrace_disx86_str(dis86_t *dis, uint_t mode, uint64_t pc, char *buf,
 
 	lookup = dis->d86_sym_lookup;
 	if (tgt != 0) {
-		/* Print symbol, if found, for tgt */
-		if (lookup(dis->d86_data, tgt, NULL, 0) == 0) {
+		if ((dis->d86_flags & DIS_F_NOIMMSYM) == 0 &&
+		    lookup(dis->d86_data, tgt, NULL, 0) == 0) {
 			(void) strlcat(buf, "\t<", buflen);
 			curlen = strlen(buf);
 			lookup(dis->d86_data, tgt, buf + curlen,
