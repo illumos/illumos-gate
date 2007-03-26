@@ -703,6 +703,7 @@ ipf_stack_t *ifs;
 
 		fr_resolvedest(&fr->fr_tif, fr->fr_v, ifs);
 		fr_resolvedest(&fr->fr_dif, fr->fr_v, ifs);
+		fr_resolvedest(&fr->fr_rif, fr->fr_v, ifs);
 
 		/*
 		 * send a copy back to userland of what we ended up

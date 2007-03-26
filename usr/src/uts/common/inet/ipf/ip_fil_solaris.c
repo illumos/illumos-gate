@@ -1754,20 +1754,14 @@ frdest_t *fdp;
 
 		saveifp = fin->fin_ifp;
 		fin->fin_ifp = (void *)inj_data.ni_physical;
+		fin->fin_flx &= ~FI_STATE;
 		fin->fin_out = 1;
 		(void) fr_acctpkt(fin, &pass);
 		fin->fin_fr = NULL;
 		if (!fr || !(fr->fr_flags & FR_RETMASK))
 			(void) fr_checkstate(fin, &pass);
-		switch (fr_checknatout(fin, NULL))
-		{
-		/* FALLTHROUGH */
-		case 0 :
-		case 1 :
-			break;
-		case -1 :
+		if (fr_checknatout(fin, NULL) == -1)
 			goto bad_fastroute;
-		}
 		fin->fin_out = 0;
 		fin->fin_ifp = saveifp;
 

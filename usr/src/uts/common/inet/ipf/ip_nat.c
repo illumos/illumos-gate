@@ -1044,7 +1044,7 @@ ipf_stack_t *ifs;
 		(void) strncpy(n->in_ifnames[1], n->in_ifnames[0], LIFNAMSIZ);
 		n->in_ifps[1] = n->in_ifps[0];
 	} else {
-		n->in_ifps[1] = fr_resolvenic(n->in_ifnames[0], 4, ifs);
+		n->in_ifps[1] = fr_resolvenic(n->in_ifnames[1], 4, ifs);
 	}
 
 	if (n->in_plabel[0] != '\0') {
@@ -3208,16 +3208,9 @@ struct in_addr src , dst;
 	int nflags;
 	void *ifp;
 	u_int hv;
-	frentry_t *fr;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
-	fr = fin->fin_fr;
-
-	if ((fr != NULL) && !(fr->fr_flags & FR_DUP) &&
-	    fr->fr_tif.fd_ifp && fr->fr_tif.fd_ifp != (void *)-1)
-		ifp = fr->fr_tif.fd_ifp;
-	else
-		ifp = fin->fin_ifp;
+	ifp = fin->fin_ifp;
 
 	srcip = src.s_addr;
 	sflags = flags & IPN_TCPUDPICMP;
@@ -3569,8 +3562,9 @@ u_32_t *passp;
 	fr = fin->fin_fr;
 	sifp = fin->fin_ifp;
 	if ((fr != NULL) && !(fr->fr_flags & FR_DUP) &&
-	    fr->fr_tif.fd_ifp && fr->fr_tif.fd_ifp != (void *)-1)
-		fin->fin_ifp = fr->fr_tif.fd_ifp;
+	    fr->fr_tifs[fin->fin_rev].fd_ifp &&
+	    fr->fr_tifs[fin->fin_rev].fd_ifp != (void *)-1)
+		fin->fin_ifp = fr->fr_tifs[fin->fin_rev].fd_ifp;
 	ifp = fin->fin_ifp;
 
 	if (!(fin->fin_flx & FI_SHORT) && (fin->fin_off == 0)) {
