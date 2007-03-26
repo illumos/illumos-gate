@@ -6535,6 +6535,12 @@ mondo_loop() {
 	rm -f $root/lib/liblaadm.so.1
 	rm -f $root/lib/libwladm.so.1
 
+	#
+	# Remove PCI hotplug devlinks.  Their format has changed,
+	# and the old devlinks will interfere with the new ones.
+	#
+	rm -f $root/dev/cfg/*pci*
+
 	# End of pre-archive extraction hacks.
 
 	if [ $diskless = no -a $zone = global ]; then
