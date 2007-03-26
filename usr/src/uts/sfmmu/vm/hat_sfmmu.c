@@ -9553,8 +9553,9 @@ sfmmu_get_free_hblk(struct hme_blk **hmeblkpp, uint_t critical)
 		mutex_enter(&freehblkp_lock);
 		if (freehblkp != NULL) {
 			/*
-			 * If the current thread is owning hblk_reserve,
-			 * let it succede even if freehblkcnt is really low.
+			 * If the current thread is owning hblk_reserve OR
+			 * critical request from sfmmu_hblk_steal()
+			 * let it succeed even if freehblkcnt is really low.
 			 */
 			if (freehblkcnt <= HBLK_RESERVE_MIN && !critical) {
 				SFMMU_STAT(sf_get_free_throttle);
@@ -10260,15 +10261,17 @@ sfmmu_hblks_list_purge(struct hme_blk **listp)
 }
 
 #define	BUCKETS_TO_SEARCH_BEFORE_UNLOAD	30
+#define	SFMMU_HBLK_STEAL_THRESHOLD 5
 
 static uint_t sfmmu_hblk_steal_twice;
 static uint_t sfmmu_hblk_steal_count, sfmmu_hblk_steal_unload_count;
 
 /*
- * Steal a hmeblk
- * Enough hmeblks were allocated at startup (nucleus hmeblks) and also
- * hmeblks were added dynamically. We should never ever not be able to
- * find one. Look for an unused/unlocked hmeblk in user hash table.
+ * Steal a hmeblk from user or kernel hme hash lists.
+ * For 8K tte grab one from reserve pool (freehblkp) before proceeding to
+ * steal and if we fail to steal after SFMMU_HBLK_STEAL_THRESHOLD attempts
+ * tap into critical reserve of freehblkp.
+ * Note: We remain looping in this routine until we find one.
  */
 static struct hme_blk *
 sfmmu_hblk_steal(int size)
@@ -10278,8 +10281,16 @@ sfmmu_hblk_steal(int size)
 	struct hme_blk *hmeblkp = NULL, *pr_hblk;
 	uint64_t hblkpa, prevpa;
 	int i;
+	uint_t loop_cnt = 0, critical;
 
 	for (;;) {
+		if (size == TTE8K) {
+			critical =
+			    (++loop_cnt > SFMMU_HBLK_STEAL_THRESHOLD) ? 1 : 0;
+			if (sfmmu_get_free_hblk(&hmeblkp, critical))
+				return (hmeblkp);
+		}
+
 		hmebp = (uhmehash_steal_hand == NULL) ? uhme_hash :
 			uhmehash_steal_hand;
 		ASSERT(hmebp >= uhme_hash && hmebp <= &uhme_hash[UHMEHASH_SZ]);
