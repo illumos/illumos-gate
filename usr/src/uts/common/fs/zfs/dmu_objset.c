@@ -750,9 +750,6 @@ killer(zio_t *zio, arc_buf_t *abuf, void *arg)
 		    os->os_synctx);
 	}
 	arc_release(os->os_phys_buf, &os->os_phys_buf);
-
-	if (os->os_dsl_dataset)
-		dmu_buf_rele(os->os_dsl_dataset->ds_dbuf, os->os_dsl_dataset);
 }
 
 /* called from dsl */

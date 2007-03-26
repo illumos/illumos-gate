@@ -100,10 +100,12 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
 	/*
 	 * Wait until there are no locks on this name.
 	 */
+	rw_enter(&dzp->z_name_lock, RW_READER);
 	mutex_enter(&dzp->z_lock);
 	for (;;) {
 		if (dzp->z_unlinked) {
 			mutex_exit(&dzp->z_lock);
+			rw_exit(&dzp->z_name_lock);
 			return (ENOENT);
 		}
 		for (dl = dzp->z_dirlocks; dl != NULL; dl = dl->dl_next)
@@ -208,6 +210,7 @@ zfs_dirent_unlock(zfs_dirlock_t *dl)
 	zfs_dirlock_t **prev_dl, *cur_dl;
 
 	mutex_enter(&dzp->z_lock);
+	rw_exit(&dzp->z_name_lock);
 	if (dl->dl_sharecnt > 1) {
 		dl->dl_sharecnt--;
 		mutex_exit(&dzp->z_lock);

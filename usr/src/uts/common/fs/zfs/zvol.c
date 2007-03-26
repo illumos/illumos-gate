@@ -961,9 +961,10 @@ int
 zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 {
 	zvol_state_t *zv;
-	struct dk_cinfo dkc;
+	struct dk_cinfo dki;
 	struct dk_minfo dkm;
 	dk_efi_t efi;
+	struct dk_callback *dkc;
 	struct uuid uuid = EFI_RESERVED;
 	uint32_t crc;
 	int error = 0;
@@ -980,13 +981,13 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 	switch (cmd) {
 
 	case DKIOCINFO:
-		bzero(&dkc, sizeof (dkc));
-		(void) strcpy(dkc.dki_cname, "zvol");
-		(void) strcpy(dkc.dki_dname, "zvol");
-		dkc.dki_ctype = DKC_UNKNOWN;
-		dkc.dki_maxtransfer = 1 << (SPA_MAXBLOCKSHIFT - zv->zv_min_bs);
+		bzero(&dki, sizeof (dki));
+		(void) strcpy(dki.dki_cname, "zvol");
+		(void) strcpy(dki.dki_dname, "zvol");
+		dki.dki_ctype = DKC_UNKNOWN;
+		dki.dki_maxtransfer = 1 << (SPA_MAXBLOCKSHIFT - zv->zv_min_bs);
 		mutex_exit(&zvol_state_lock);
-		if (ddi_copyout(&dkc, (void *)arg, sizeof (dkc), flag))
+		if (ddi_copyout(&dki, (void *)arg, sizeof (dki), flag))
 			error = EFAULT;
 		return (error);
 
@@ -1074,7 +1075,12 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 		return (error);
 
 	case DKIOCFLUSHWRITECACHE:
+		dkc = (struct dk_callback *)arg;
 		zil_commit(zv->zv_zilog, UINT64_MAX, ZVOL_OBJ);
+		if ((flag & FKIOCTL) && dkc != NULL && dkc->dkc_callback) {
+			(*dkc->dkc_callback)(dkc->dkc_cookie, error);
+			error = 0;
+		}
 		break;
 
 	case DKIOCGGEOM:

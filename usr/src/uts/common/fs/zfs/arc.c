@@ -2363,6 +2363,7 @@ arc_release(arc_buf_t *buf, void *tag)
 		while (*bufp != buf)
 			bufp = &(*bufp)->b_next;
 		*bufp = (*bufp)->b_next;
+		buf->b_next = NULL;
 
 		ASSERT3U(hdr->b_state->arcs_size, >=, hdr->b_size);
 		atomic_add_64(&hdr->b_state->arcs_size, -hdr->b_size);
@@ -2385,9 +2386,8 @@ arc_release(arc_buf_t *buf, void *tag)
 		nhdr->b_flags = 0;
 		nhdr->b_datacnt = 1;
 		nhdr->b_freeze_cksum = NULL;
-		buf->b_hdr = nhdr;
-		buf->b_next = NULL;
 		(void) refcount_add(&nhdr->b_refcnt, tag);
+		buf->b_hdr = nhdr;
 		atomic_add_64(&arc_anon->arcs_size, blksz);
 
 		hdr = nhdr;

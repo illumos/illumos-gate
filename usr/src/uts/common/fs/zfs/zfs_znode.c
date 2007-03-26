@@ -96,6 +96,7 @@ zfs_znode_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	mutex_init(&zp->z_lock, NULL, MUTEX_DEFAULT, NULL);
 	rw_init(&zp->z_map_lock, NULL, RW_DEFAULT, NULL);
 	rw_init(&zp->z_parent_lock, NULL, RW_DEFAULT, NULL);
+	rw_init(&zp->z_name_lock, NULL, RW_DEFAULT, NULL);
 	mutex_init(&zp->z_acl_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	mutex_init(&zp->z_range_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -117,6 +118,7 @@ zfs_znode_cache_destructor(void *buf, void *cdarg)
 	mutex_destroy(&zp->z_lock);
 	rw_destroy(&zp->z_map_lock);
 	rw_destroy(&zp->z_parent_lock);
+	rw_destroy(&zp->z_name_lock);
 	mutex_destroy(&zp->z_acl_lock);
 	avl_destroy(&zp->z_range_avl);
 

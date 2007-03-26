@@ -714,6 +714,7 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 		 * partial progress, update the znode and ZIL accordingly.
 		 */
 		if (tx_bytes == 0) {
+			dmu_tx_commit(tx);
 			ASSERT(error != 0);
 			break;
 		}
@@ -838,7 +839,6 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 	} else { /* indirect write */
 		uint64_t boff; /* block starting offset */
 
-		ASSERT3U(dlen, <=, zp->z_blksz);
 		/*
 		 * Have to lock the whole block to ensure when it's
 		 * written out and it's checksum is being calculated
@@ -872,6 +872,7 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 		lr->lr_blkoff = off - boff;
 		error = dmu_sync(zio, db, &lr->lr_blkptr,
 		    lr->lr_common.lrc_txg, zfs_get_done, zgd);
+		ASSERT(error == EEXIST || lr->lr_length <= zp->z_blksz);
 		if (error == 0) {
 			zil_add_vdev(zfsvfs->z_log,
 			    DVA_GET_VDEV(BP_IDENTITY(&lr->lr_blkptr)));
@@ -1512,7 +1513,13 @@ top:
 	vnevent_rmdir(vp);
 
 	/*
-	 * Grab a lock on the parent pointer make sure we play well
+	 * Grab a lock on the directory to make sure that noone is
+	 * trying to add (or lookup) entries while we are removing it.
+	 */
+	rw_enter(&zp->z_name_lock, RW_WRITER);
+
+	/*
+	 * Grab a lock on the parent pointer to make sure we play well
 	 * with the treewalk and directory rename code.
 	 */
 	rw_enter(&zp->z_parent_lock, RW_WRITER);
@@ -1524,6 +1531,7 @@ top:
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
 		rw_exit(&zp->z_parent_lock);
+		rw_exit(&zp->z_name_lock);
 		zfs_dirent_unlock(dl);
 		VN_RELE(vp);
 		if (error == ERESTART && zfsvfs->z_assign == TXG_NOWAIT) {
@@ -1544,6 +1552,7 @@ top:
 	dmu_tx_commit(tx);
 
 	rw_exit(&zp->z_parent_lock);
+	rw_exit(&zp->z_name_lock);
 out:
 	zfs_dirent_unlock(dl);
 

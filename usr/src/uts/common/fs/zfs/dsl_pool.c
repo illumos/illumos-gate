@@ -182,6 +182,8 @@ dsl_pool_sync(dsl_pool_t *dp, uint64_t txg)
 	while (ds = txg_list_remove(&dp->dp_dirty_datasets, txg)) {
 		if (!list_link_active(&ds->ds_synced_link))
 			list_insert_tail(&dp->dp_synced_objsets, ds);
+		else
+			dmu_buf_rele(ds->ds_dbuf, ds);
 		dsl_dataset_sync(ds, zio, tx);
 	}
 	err = zio_wait(zio);
@@ -214,6 +216,7 @@ dsl_pool_zil_clean(dsl_pool_t *dp)
 		list_remove(&dp->dp_synced_objsets, ds);
 		ASSERT(ds->ds_user_ptr != NULL);
 		zil_clean(((objset_impl_t *)ds->ds_user_ptr)->os_zil);
+		dmu_buf_rele(ds->ds_dbuf, ds);
 	}
 }
 

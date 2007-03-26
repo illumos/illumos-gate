@@ -1846,9 +1846,9 @@ dbuf_sync_indirect(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 	dbuf_check_blkptr(dn, db);
 
 	db->db_data_pending = dr;
-	mutex_exit(&db->db_mtx);
 
 	arc_release(db->db_buf, db);
+	mutex_exit(&db->db_mtx);
 
 	/*
 	 * XXX -- we should design a compression algorithm
