@@ -20,14 +20,13 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fm/topo_mod.h>
-
 /*
  * Including the following file gives us definitions of the three
  * global arrays used to adjust labels, Slot_Rewrites, Physlot_Names,
@@ -36,9 +35,18 @@
  */
 #include "pci_sun4v.h"
 
+#include "pci_sun4.h"
+
 int
 platform_pci_label(topo_mod_t *mod, tnode_t *node, nvlist_t *in,
     nvlist_t **out)
 {
 	return (pci_label_cmn(mod, node, in, out));
+}
+int
+platform_pci_fru(topo_mod_t *mod, tnode_t *node, nvlist_t *in,
+    nvlist_t **out)
+{
+	topo_mod_dprintf(mod, "entering platform_pci_fru\n");
+	return (pci_fru_compute(mod, node, in, out));
 }

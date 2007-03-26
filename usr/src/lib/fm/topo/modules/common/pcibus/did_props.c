@@ -42,7 +42,6 @@
 #include <pcibus.h>
 #include <did.h>
 #include <did_props.h>
-#include "topo_tree.h"
 #include <fm/libtopo.h>
 
 static int ASRU_set(tnode_t *, did_t *,
@@ -411,32 +410,20 @@ ASRU_set(tnode_t *tn, did_t *pd,
 }
 
 /*
- * Hopefully this hack routine goes away when fmdump can print the labels.
+ * Set the FRU property to the hc fmri of this tnode
  */
-static int
-FRU_fmri_hack(topo_mod_t *mp, tnode_t *tn, const char *label)
+int
+FRU_fmri_set(topo_mod_t *mp, tnode_t *tn)
 {
 	nvlist_t *fmri;
 	int err, e;
-	tnode_t *pnode, *cnode = tn;
-	char *plabel;
 
-	pnode = tn->tn_parent;
-	while (pnode != NULL) {
-		if (topo_node_label(pnode, &plabel, &err) < 0)
-			break;
-		if (strcmp(plabel, label) != 0) {
-			topo_mod_strfree(mp, plabel);
-			break;
-		}
-		topo_mod_strfree(mp, plabel);
-		cnode = pnode;
-		pnode = pnode->tn_parent;
-	}
-
-	if (topo_node_resource(cnode, &fmri, &err) < 0 ||
-	    fmri == NULL)
+	if (topo_node_resource(tn, &fmri, &err) < 0 ||
+	    fmri == NULL) {
+		topo_mod_dprintf(mp, "FRU_fmri_set error: %s\n",
+			topo_strerror(topo_mod_errno(mp)));
 		return (topo_mod_seterrno(mp, err));
+	}
 	e = topo_node_fru_set(tn, fmri, 0, &err);
 	nvlist_free(fmri);
 	if (e < 0)
@@ -450,12 +437,11 @@ FRU_set(tnode_t *tn, did_t *pd,
     const char *dpnm, const char *tpgrp, const char *tpnm)
 {
 	topo_mod_t *mp;
-	char *label, *nm;
-	int e;
+	char *nm;
+	int e = 0, err = 0;
 
 	nm = topo_node_name(tn);
 	mp = did_mod(pd);
-
 	/*
 	 * If this topology node represents something other than an
 	 * ioboard or a device that implements a slot, inherit the
@@ -463,22 +449,43 @@ FRU_set(tnode_t *tn, did_t *pd,
 	 * parent's FRU value.  Otherwise, munge up an fmri based on
 	 * the label.
 	 */
-	if (strcmp(nm, "ioboard") != 0 && strcmp(nm, PCI_DEVICE) != 0 &&
+	if (strcmp(nm, IOBOARD) != 0 && strcmp(nm, PCI_DEVICE) != 0 &&
 	    strcmp(nm, PCIEX_DEVICE) != 0) {
 		(void) topo_node_fru_set(tn, NULL, 0, &e);
 		return (0);
 	}
 
-	if (topo_prop_get_string(tn,
-	    TOPO_PGROUP_PROTOCOL, TOPO_PROP_LABEL, &label, &e) < 0) {
-		if (e != ETOPO_PROP_NOENT)
-			return (topo_mod_seterrno(mp, e));
-		(void) topo_node_fru_set(tn, NULL, 0, &e);
-		return (0);
-	}
-	e = FRU_fmri_hack(mp, tn, label);
-	topo_mod_strfree(mp, label);
-	return (e);
+	/*
+	 * If ioboard, set fru fmri to hc fmri
+	 */
+	if (strcmp(nm, IOBOARD) == 0) {
+		e = FRU_fmri_set(mp, tn);
+		return (e);
+	} else if (strcmp(nm, PCI_DEVICE) == 0 ||
+		strcmp(nm, PCIEX_DEVICE) == 0) {
+		nvlist_t *in, *out;
+
+		mp = did_mod(pd);
+		if (topo_mod_nvalloc(mp, &in, NV_UNIQUE_NAME) != 0)
+			return (topo_mod_seterrno(mp, EMOD_FMRI_NVL));
+		if (nvlist_add_uint64(in, "nv1", (uintptr_t)pd) != 0) {
+			nvlist_free(in);
+			return (topo_mod_seterrno(mp, EMOD_NOMEM));
+		}
+		if (topo_method_invoke(tn,
+			TOPO_METH_FRU_COMPUTE, TOPO_METH_FRU_COMPUTE_VERSION,
+			in, &out, &err) != 0) {
+			nvlist_free(in);
+			return (topo_mod_seterrno(mp, err));
+		}
+		nvlist_free(in);
+		(void) topo_node_fru_set(tn, out, 0, &err);
+		if (out != NULL)
+			nvlist_free(out);
+	} else
+		(void) topo_node_fru_set(tn, NULL, 0, &err);
+
+	return (0);
 }
 
 /*ARGSUSED*/

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,11 +56,14 @@ extern int Fn_propcnt;
 
 extern int platform_pci_label(topo_mod_t *mod, tnode_t *, nvlist_t *,
     nvlist_t **);
-
+extern int platform_pci_fru(topo_mod_t *mod, tnode_t *, nvlist_t *,
+    nvlist_t **);
 static void pci_release(topo_mod_t *, tnode_t *);
 static int pci_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
     topo_instance_t, void *, void *);
 static int pci_label(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
+    nvlist_t **);
+static int pci_fru(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
 
 static const topo_modops_t Pci_ops =
@@ -71,6 +74,8 @@ static const topo_modinfo_t Pci_info =
 static const topo_method_t Pci_methods[] = {
 	{ TOPO_METH_LABEL, TOPO_METH_LABEL_DESC,
 	    TOPO_METH_LABEL_VERSION, TOPO_STABILITY_INTERNAL, pci_label },
+	{ TOPO_METH_FRU_COMPUTE, TOPO_METH_FRU_COMPUTE_DESC,
+	    TOPO_METH_FRU_COMPUTE_VERSION, TOPO_STABILITY_INTERNAL, pci_fru },
 	{ NULL }
 };
 
@@ -107,7 +112,14 @@ pci_label(topo_mod_t *mp, tnode_t *node, topo_version_t version,
 		return (topo_mod_seterrno(mp, EMOD_VER_NEW));
 	return (platform_pci_label(mp, node, in, out));
 }
-
+static int
+pci_fru(topo_mod_t *mp, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	if (version > TOPO_METH_FRU_COMPUTE_VERSION)
+		return (topo_mod_seterrno(mp, EMOD_VER_NEW));
+	return (platform_pci_fru(mp, node, in, out));
+}
 static tnode_t *
 pci_tnode_create(topo_mod_t *mod, tnode_t *parent,
     const char *name, topo_instance_t i, void *priv)
@@ -181,6 +193,8 @@ pciexdev_declare(topo_mod_t *mod, tnode_t *parent, di_node_t dn,
 
 	if ((pd = did_find(mod, dn)) == NULL)
 		return (NULL);
+	did_settnode(pd, parent);
+
 	if ((ntn = pci_tnode_create(mod, parent, PCIEX_DEVICE, i, dn)) == NULL)
 		return (NULL);
 	if (did_props_set(ntn, pd, Dev_common_props, Dev_propcnt) < 0) {
@@ -266,6 +280,9 @@ pcidev_declare(topo_mod_t *mod, tnode_t *parent, di_node_t dn,
 		return (NULL);
 	if ((pd = did_find(mod, dn)) == NULL)
 		return (NULL);
+	/* remember parent tnode */
+	did_settnode(pd, parent);
+
 	if ((ntn = pci_tnode_create(mod, parent, PCI_DEVICE, i, dn)) == NULL)
 		return (NULL);
 	/*
@@ -273,6 +290,7 @@ pcidev_declare(topo_mod_t *mod, tnode_t *parent, di_node_t dn,
 	 * own, we may need/want to inherit the information available
 	 * from our parent node's private data.
 	 */
+
 	did_inherit(ppd, pd);
 	if (did_props_set(ntn, pd, Dev_common_props, Dev_propcnt) < 0) {
 		topo_node_unbind(ntn);
@@ -478,8 +496,9 @@ pciexbus_enum(topo_mod_t *mp, tnode_t *ptn, char *pnm, topo_instance_t min,
 		return (0);
 	}
 	did_hash_init(mp);
-	if (did_create(mp, pdn, 0, 0, rc, TRUST_BDF) == NULL)
+	if ((did_create(mp, pdn, 0, 0, rc, TRUST_BDF)) == NULL)
 		return (-1);	/* errno already set */
+
 	retval = pci_children_instantiate(mp, ptn, pdn, 0, 0, rc,
 	    (min == max) ? min : TRUST_BDF, 0);
 	did_hash_fini(mp);

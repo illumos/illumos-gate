@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,7 +69,8 @@ extern void did_hold(did_t *);
 extern void did_did_link_set(did_t *, did_t *);
 extern void did_did_chain_set(did_t *, did_t *);
 extern void did_rele(did_t *);
-
+extern void did_settnode(did_t *, tnode_t *);
+extern tnode_t *did_gettnode(did_t *);
 
 #ifdef __cplusplus
 }

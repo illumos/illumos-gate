@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,8 @@
 
 #include "pcibus.h"
 #include "pcibus_labels.h"
+#include <string.h>
+#include <strings.h>
 
 slotnm_rewrite_t *Slot_Rewrites = NULL;
 physlot_names_t *Physlot_Names = NULL;
@@ -40,4 +42,35 @@ platform_pci_label(topo_mod_t *mod, tnode_t *node, nvlist_t *in,
     nvlist_t **out)
 {
 	return (pci_label_cmn(mod, node, in, out));
+}
+/*ARGSUSED*/
+int
+platform_pci_fru(topo_mod_t *mod, tnode_t *node, nvlist_t *in,
+    nvlist_t **out)
+{
+	char *nm, *label;
+	char buf[PATH_MAX];
+	nvlist_t *fmri;
+	int e;
+
+	*out = NULL;
+	nm = topo_node_name(node);
+	if (strcmp(nm, PCI_DEVICE) != 0 && strcmp(nm, PCIEX_DEVICE) != 0 &&
+	    strcmp(nm, PCIEX_BUS) != 0)
+		return (0);
+
+	if (topo_prop_get_string(node,
+		TOPO_PGROUP_PROTOCOL, TOPO_PROP_LABEL, &label, &e) < 0) {
+		if (e != ETOPO_PROP_NOENT)
+			return (topo_mod_seterrno(mod, e));
+		return (0);
+	}
+
+	(void) snprintf(buf, PATH_MAX, "hc:///component=%s", label);
+	topo_mod_strfree(mod, label);
+	if (topo_mod_str2nvl(mod, buf, &fmri) < 0)
+		return (-1);
+
+	*out = fmri;
+	return (0);
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,6 +89,7 @@ struct did {
 	 */
 	int dp_nslots;		/* number of slots actually described */
 	slotnm_t *dp_slotnames; /* the slot names as labels */
+	tnode_t *dp_tnode;  /* the parent tnode */
 };
 
 struct did_hash {

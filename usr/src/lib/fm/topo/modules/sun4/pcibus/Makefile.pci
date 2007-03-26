@@ -24,8 +24,32 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-ARCH = sun4v
-include ../../sun4/pcibus/Makefile.pci
+MODULE = pcibus
+CLASS = arch
+SUN4DIR = ../../sun4/$(MODULE)
+UTILDIR = ../../common/pcibus
+HBDIR = ../../common/hostbridge
+UTILSRCS = did.c did_hash.c did_props.c util.c
+PCISRCS = pcibus.c pcibus_labels.c pci_sun4.c
 
+MODULESRCS = $(PCISRCS) $(UTILSRCS) pci_$(ARCH).c
+
+include ../../Makefile.plugin
+
+LDLIBS += -ldevinfo
+CPPFLAGS += -I$(SUN4DIR) -I$(UTILDIR) -I$(HBDIR)
+
+%.o: $(SUN4DIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.o: $(UTILDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.ln: $(SUN4DIR)/%.c
+	$(LINT.c) -c $<
+
+%.ln: $(UTILDIR)/%.c
+	$(LINT.c) -c $<

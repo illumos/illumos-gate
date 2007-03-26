@@ -24,29 +24,23 @@
  * Use is subject to license terms.
  */
 
+#ifndef _HB_SUN4_H
+#define	_HB_SUN4_H
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fm/topo_mod.h>
+#include <libnvpair.h>
 
-/*
- * Including the following file gives us definitions of the three
- * global arrays used to adjust labels, Slot_Rewrites, Physlot_Names,
- * and Missing_Names.  With those defined we can use the common labeling
- * routines for pci.
- */
-#include "pci_sun4u.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#include "pci_sun4.h"
+extern int
+pci_fru_compute(topo_mod_t *mod, tnode_t *node, nvlist_t *in, nvlist_t **out);
 
-int
-platform_pci_label(topo_mod_t *mod, tnode_t *node, nvlist_t *in,
-    nvlist_t **out)
-{
-	return (pci_label_cmn(mod, node, in, out));
+#ifdef __cplusplus
 }
-int
-platform_pci_fru(topo_mod_t *mod, tnode_t *node, nvlist_t *in,
-    nvlist_t **out)
-{
-	return (pci_fru_compute(mod, node, in, out));
-}
+#endif
+
+#endif	/* _HB_SUN4_H */

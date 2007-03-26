@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -131,7 +131,7 @@ pci_missing_match(topo_mod_t *mod, char *platform, did_t *dp)
 	return (rlabel);
 }
 
-static const char *
+const char *
 pci_slotname_lookup(topo_mod_t *mod, tnode_t *node, did_t *dp)
 {
 	const char *l;

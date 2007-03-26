@@ -20,24 +20,11 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-
-MODULE = pcibus
 ARCH = sun4u
-CLASS = arch
-UTILDIR = ../../common/pcibus
-HBDIR = ../../common/hostbridge
-UTILSRCS = did.c did_hash.c did_props.c util.c
-PCISRCS = pcibus.c pcibus_labels.c
+include ../../sun4/pcibus/Makefile.pci
 
-MODULESRCS = $(UTILSRCS) $(PCISRCS) pci_sun4u.c
-
-include ../../Makefile.plugin
-
-LDLIBS += -ldevinfo
-
-CPPFLAGS += -I$(UTILDIR) -I$(HBDIR)

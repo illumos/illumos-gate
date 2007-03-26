@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -231,6 +231,7 @@ did_create(topo_mod_t *mp, di_node_t src,
 	np->dp_mod = mp;
 	np->dp_src = src;
 	np->dp_hash = (did_hash_t *)topo_mod_getspecific(mp);
+	np->dp_tnode = NULL;
 
 	/*
 	 * We must have a reg prop and from it we extract the bus #,
@@ -543,4 +544,17 @@ did_setspecific(topo_mod_t *mp, void *data)
 
 	hbdid = (did_t *)data;
 	topo_mod_setspecific(mp, hbdid->dp_hash);
+}
+
+void
+did_settnode(did_t *pd, tnode_t *tn)
+{
+	assert(tn != NULL);
+	pd->dp_tnode = tn;
+}
+
+tnode_t *
+did_gettnode(did_t *pd)
+{
+	return (pd->dp_tnode);
 }

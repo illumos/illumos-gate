@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -64,7 +64,7 @@ MAPFILES =		# use APIMAP instead
 CFLAGS += $(CTF_FLAGS) $(CCVERBOSE) $(XSTRCONST) $(CC_PICFLAGS)
 CFLAGS += -G $(XREGSFLAG)
 
-CPPFLAGS += -I. -I../../../libtopo/common
+CPPFLAGS += -I.
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT
 LDFLAGS += $(ZIGNORE) -M$(APIMAP)
 LDLIBS += -L$(ROOTLIBDIR)/fm -R/usr/lib/fm -ltopo -lnvpair -lc

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,6 +79,7 @@ extern int pci_classcode_get(topo_mod_t *, di_node_t, uint_t *, uint_t *);
 extern int di_uintprop_get(topo_mod_t *, di_node_t, const char *, uint_t *);
 extern int di_bytes_get(topo_mod_t *, di_node_t, const char *, int *,
     uchar_t **);
+extern int FRU_fmri_set(topo_mod_t *, tnode_t *);
 
 #ifdef __cplusplus
 }
