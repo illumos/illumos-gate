@@ -42,6 +42,7 @@
 #include <sys/policy.h>
 #include <sys/ptms.h>
 #include <sys/stat.h>
+#include <sys/vfs_opreg.h>
 
 #define	DEVPTS_UID_DEFAULT	0
 #define	DEVPTS_GID_DEFAULT	3
@@ -408,14 +409,14 @@ devpts_setattr(struct vnode *vp, struct vattr *vap, int flags,
  * avoid persisting permissions.
  */
 const fs_operation_def_t devpts_vnodeops_tbl[] = {
-	VOPNAME_READDIR, devpts_readdir,
-	VOPNAME_LOOKUP, devpts_lookup,
-	VOPNAME_CREATE, devpts_create,
-	VOPNAME_SETATTR, devpts_setattr,
-	VOPNAME_REMOVE, fs_nosys,
-	VOPNAME_MKDIR, fs_nosys,
-	VOPNAME_RMDIR, fs_nosys,
-	VOPNAME_SYMLINK, fs_nosys,
-	VOPNAME_SETSECATTR, fs_nosys,
-	NULL, NULL
+	VOPNAME_READDIR,	{ .vop_readdir = devpts_readdir },
+	VOPNAME_LOOKUP,		{ .vop_lookup = devpts_lookup },
+	VOPNAME_CREATE,		{ .vop_create = devpts_create },
+	VOPNAME_SETATTR,	{ .vop_setattr = devpts_setattr },
+	VOPNAME_REMOVE,		{ .error = fs_nosys },
+	VOPNAME_MKDIR,		{ .error = fs_nosys },
+	VOPNAME_RMDIR,		{ .error = fs_nosys },
+	VOPNAME_SYMLINK,	{ .error = fs_nosys },
+	VOPNAME_SETSECATTR,	{ .error = fs_nosys },
+	NULL,			NULL
 };

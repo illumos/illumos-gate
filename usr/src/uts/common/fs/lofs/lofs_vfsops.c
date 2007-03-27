@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,7 @@
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/uio.h>
 #include <sys/pathname.h>
@@ -540,14 +541,14 @@ static int
 lofsinit(int fstyp, char *name)
 {
 	static const fs_operation_def_t lo_vfsops_template[] = {
-		VFSNAME_MOUNT, lo_mount,
-		VFSNAME_UNMOUNT, lo_unmount,
-		VFSNAME_ROOT, lo_root,
-		VFSNAME_STATVFS, lo_statvfs,
-		VFSNAME_SYNC, (fs_generic_func_p) lo_sync,
-		VFSNAME_VGET, lo_vget,
-		VFSNAME_FREEVFS, (fs_generic_func_p) lo_freevfs,
-		NULL, NULL
+		VFSNAME_MOUNT,		{ .vfs_mount = lo_mount },
+		VFSNAME_UNMOUNT,	{ .vfs_unmount = lo_unmount },
+		VFSNAME_ROOT,		{ .vfs_root = lo_root },
+		VFSNAME_STATVFS,	{ .vfs_statvfs = lo_statvfs },
+		VFSNAME_SYNC,		{ .vfs_sync = lo_sync },
+		VFSNAME_VGET,		{ .vfs_vget = lo_vget },
+		VFSNAME_FREEVFS,	{ .vfs_freevfs = lo_freevfs },
+		NULL,			NULL
 	};
 	int error;
 

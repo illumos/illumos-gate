@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,7 @@
 #include <sys/user.h>
 #include <sys/buf.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/proc.h>
 #include <sys/disp.h>
@@ -171,47 +172,48 @@ extern int as_map_locked(struct as *, caddr_t, size_t, int ((*)()), void *);
  */
 struct vnodeops *ufs_vnodeops;
 
+/* NOTE: "not blkd" below  means that the operation isn't blocked by lockfs */
 const fs_operation_def_t ufs_vnodeops_template[] = {
-	VOPNAME_OPEN, ufs_open,	/* will not be blocked by lockfs */
-	VOPNAME_CLOSE, ufs_close,	/* will not be blocked by lockfs */
-	VOPNAME_READ, ufs_read,
-	VOPNAME_WRITE, ufs_write,
-	VOPNAME_IOCTL, ufs_ioctl,
-	VOPNAME_GETATTR, ufs_getattr,
-	VOPNAME_SETATTR, ufs_setattr,
-	VOPNAME_ACCESS, ufs_access,
-	VOPNAME_LOOKUP, ufs_lookup,
-	VOPNAME_CREATE, ufs_create,
-	VOPNAME_REMOVE, ufs_remove,
-	VOPNAME_LINK, ufs_link,
-	VOPNAME_RENAME, ufs_rename,
-	VOPNAME_MKDIR, ufs_mkdir,
-	VOPNAME_RMDIR, ufs_rmdir,
-	VOPNAME_READDIR, ufs_readdir,
-	VOPNAME_SYMLINK, ufs_symlink,
-	VOPNAME_READLINK, ufs_readlink,
-	VOPNAME_FSYNC, ufs_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) ufs_inactive,  /* not blocked */
-	VOPNAME_FID, ufs_fid,
-	VOPNAME_RWLOCK, ufs_rwlock, /* not blocked */
-	VOPNAME_RWUNLOCK, (fs_generic_func_p) ufs_rwunlock,  /* not blocked */
-	VOPNAME_SEEK, ufs_seek,
-	VOPNAME_FRLOCK, ufs_frlock,
-	VOPNAME_SPACE, ufs_space,
-	VOPNAME_GETPAGE, ufs_getpage,
-	VOPNAME_PUTPAGE, ufs_putpage,
-	VOPNAME_MAP, (fs_generic_func_p) ufs_map,
-	VOPNAME_ADDMAP, (fs_generic_func_p) ufs_addmap,	/* not blocked */
-	VOPNAME_DELMAP, ufs_delmap,	/* will not be blocked by lockfs */
-	VOPNAME_POLL, (fs_generic_func_p) ufs_poll,	/* not blocked */
-	VOPNAME_DUMP, ufs_dump,
-	VOPNAME_PATHCONF, ufs_l_pathconf,
-	VOPNAME_PAGEIO, ufs_pageio,
-	VOPNAME_DUMPCTL, ufs_dumpctl,
-	VOPNAME_GETSECATTR, ufs_getsecattr,
-	VOPNAME_SETSECATTR, ufs_setsecattr,
-	VOPNAME_VNEVENT, fs_vnevent_support,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = ufs_open },	/* not blkd */
+	VOPNAME_CLOSE,		{ .vop_close = ufs_close },	/* not blkd */
+	VOPNAME_READ,		{ .vop_read = ufs_read },
+	VOPNAME_WRITE,		{ .vop_write = ufs_write },
+	VOPNAME_IOCTL,		{ .vop_ioctl = ufs_ioctl },
+	VOPNAME_GETATTR,	{ .vop_getattr = ufs_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = ufs_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = ufs_access },
+	VOPNAME_LOOKUP,		{ .vop_lookup = ufs_lookup },
+	VOPNAME_CREATE,		{ .vop_create = ufs_create },
+	VOPNAME_REMOVE,		{ .vop_remove = ufs_remove },
+	VOPNAME_LINK,		{ .vop_link = ufs_link },
+	VOPNAME_RENAME,		{ .vop_rename = ufs_rename },
+	VOPNAME_MKDIR,		{ .vop_mkdir = ufs_mkdir },
+	VOPNAME_RMDIR,		{ .vop_rmdir = ufs_rmdir },
+	VOPNAME_READDIR,	{ .vop_readdir = ufs_readdir },
+	VOPNAME_SYMLINK,	{ .vop_symlink = ufs_symlink },
+	VOPNAME_READLINK,	{ .vop_readlink = ufs_readlink },
+	VOPNAME_FSYNC,		{ .vop_fsync = ufs_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = ufs_inactive }, /* not blkd */
+	VOPNAME_FID,		{ .vop_fid = ufs_fid },
+	VOPNAME_RWLOCK,		{ .vop_rwlock = ufs_rwlock },	/* not blkd */
+	VOPNAME_RWUNLOCK,	{ .vop_rwunlock = ufs_rwunlock }, /* not blkd */
+	VOPNAME_SEEK,		{ .vop_seek = ufs_seek },
+	VOPNAME_FRLOCK,		{ .vop_frlock = ufs_frlock },
+	VOPNAME_SPACE,		{ .vop_space = ufs_space },
+	VOPNAME_GETPAGE,	{ .vop_getpage = ufs_getpage },
+	VOPNAME_PUTPAGE,	{ .vop_putpage = ufs_putpage },
+	VOPNAME_MAP,		{ .vop_map = ufs_map },
+	VOPNAME_ADDMAP,		{ .vop_addmap = ufs_addmap },	/* not blkd */
+	VOPNAME_DELMAP,		{ .vop_delmap = ufs_delmap },	/* not blkd */
+	VOPNAME_POLL,		{ .vop_poll = ufs_poll },	/* not blkd */
+	VOPNAME_DUMP,		{ .vop_dump = ufs_dump },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = ufs_l_pathconf },
+	VOPNAME_PAGEIO,		{ .vop_pageio = ufs_pageio },
+	VOPNAME_DUMPCTL,	{ .vop_dumpctl = ufs_dumpctl },
+	VOPNAME_GETSECATTR,	{ .vop_getsecattr = ufs_getsecattr },
+	VOPNAME_SETSECATTR,	{ .vop_setsecattr = ufs_setsecattr },
+	VOPNAME_VNEVENT,	{ .vop_vnevent = fs_vnevent_support },
+	NULL,			NULL
 };
 
 #define	MAX_BACKFILE_COUNT	9999

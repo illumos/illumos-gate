@@ -35,6 +35,7 @@ extern "C" {
 #include <rpc/rpc.h>
 #include <sys/dirent.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/list.h>
 #include <sys/nvpair.h>
 

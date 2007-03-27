@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@
 #include <sys/sysmacros.h>
 #include <sys/var.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/mode.h>
 #include <sys/pcb.h>
@@ -662,17 +663,17 @@ int
 nameinit(int fstype, char *name)
 {
 	static const fs_operation_def_t nm_vfsops_template[] = {
-		VFSNAME_MOUNT, nm_mount,
-		VFSNAME_UNMOUNT, nm_unmount,
-		VFSNAME_ROOT, nm_root,
-		VFSNAME_STATVFS, nm_statvfs,
-		VFSNAME_SYNC, (fs_generic_func_p) nm_sync,
-		NULL, NULL
+		VFSNAME_MOUNT,		{ .vfs_mount = nm_mount },
+		VFSNAME_UNMOUNT,	{ .vfs_unmount = nm_unmount },
+		VFSNAME_ROOT,		{ .vfs_root = nm_root },
+		VFSNAME_STATVFS,	{ .vfs_statvfs = nm_statvfs },
+		VFSNAME_SYNC,		{ .vfs_sync = nm_sync },
+		NULL,			NULL
 	};
 	static const fs_operation_def_t nm_dummy_vfsops_template[] = {
-		VFSNAME_STATVFS, nm_statvfs,
-		VFSNAME_SYNC, (fs_generic_func_p) nm_sync,
-		NULL, NULL
+		VFSNAME_STATVFS,	{ .vfs_statvfs = nm_statvfs },
+		VFSNAME_SYNC,		{ .vfs_sync = nm_sync },
+		NULL,			NULL
 	};
 	int error;
 	int dev;

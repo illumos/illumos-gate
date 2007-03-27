@@ -63,6 +63,7 @@
 #include <sys/sysmacros.h>
 #include <sys/uio.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/stat.h>
 #include <sys/poll.h>
@@ -155,33 +156,33 @@ static int spec_pathconf(struct	vnode *, int, ulong_t *, struct cred *);
 struct vnodeops *spec_vnodeops;
 
 const fs_operation_def_t spec_vnodeops_template[] = {
-	VOPNAME_OPEN, spec_open,
-	VOPNAME_CLOSE, spec_close,
-	VOPNAME_READ, spec_read,
-	VOPNAME_WRITE, spec_write,
-	VOPNAME_IOCTL, spec_ioctl,
-	VOPNAME_GETATTR, spec_getattr,
-	VOPNAME_SETATTR, spec_setattr,
-	VOPNAME_ACCESS, spec_access,
-	VOPNAME_CREATE, spec_create,
-	VOPNAME_FSYNC, spec_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) spec_inactive,
-	VOPNAME_FID, spec_fid,
-	VOPNAME_SEEK, spec_seek,
-	VOPNAME_PATHCONF, spec_pathconf,
-	VOPNAME_FRLOCK, spec_frlock,
-	VOPNAME_REALVP, spec_realvp,
-	VOPNAME_GETPAGE, spec_getpage,
-	VOPNAME_PUTPAGE, spec_putpage,
-	VOPNAME_MAP, (fs_generic_func_p) spec_map,
-	VOPNAME_ADDMAP, (fs_generic_func_p) spec_addmap,
-	VOPNAME_DELMAP, spec_delmap,
-	VOPNAME_POLL, (fs_generic_func_p) spec_poll,
-	VOPNAME_DUMP, spec_dump,
-	VOPNAME_PAGEIO, spec_pageio,
-	VOPNAME_SETSECATTR, spec_setsecattr,
-	VOPNAME_GETSECATTR, spec_getsecattr,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = spec_open },
+	VOPNAME_CLOSE,		{ .vop_close = spec_close },
+	VOPNAME_READ,		{ .vop_read = spec_read },
+	VOPNAME_WRITE,		{ .vop_write = spec_write },
+	VOPNAME_IOCTL,		{ .vop_ioctl = spec_ioctl },
+	VOPNAME_GETATTR,	{ .vop_getattr = spec_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = spec_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = spec_access },
+	VOPNAME_CREATE,		{ .vop_create = spec_create },
+	VOPNAME_FSYNC,		{ .vop_fsync = spec_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = spec_inactive },
+	VOPNAME_FID,		{ .vop_fid = spec_fid },
+	VOPNAME_SEEK,		{ .vop_seek = spec_seek },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = spec_pathconf },
+	VOPNAME_FRLOCK,		{ .vop_frlock = spec_frlock },
+	VOPNAME_REALVP,		{ .vop_realvp = spec_realvp },
+	VOPNAME_GETPAGE,	{ .vop_getpage = spec_getpage },
+	VOPNAME_PUTPAGE,	{ .vop_putpage = spec_putpage },
+	VOPNAME_MAP,		{ .vop_map = spec_map },
+	VOPNAME_ADDMAP,		{ .vop_addmap = spec_addmap },
+	VOPNAME_DELMAP,		{ .vop_delmap = spec_delmap },
+	VOPNAME_POLL,		{ .vop_poll = spec_poll },
+	VOPNAME_DUMP,		{ .vop_dump = spec_dump },
+	VOPNAME_PAGEIO,		{ .vop_pageio = spec_pageio },
+	VOPNAME_SETSECATTR,	{ .vop_setsecattr = spec_setsecattr },
+	VOPNAME_GETSECATTR,	{ .vop_getsecattr = spec_getsecattr },
+	NULL,			NULL
 };
 
 /*

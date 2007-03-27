@@ -37,6 +37,7 @@
 #include <sys/time.h>
 #include <sys/pathname.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/file.h>
 #include <sys/stat.h>
@@ -144,11 +145,11 @@ static int
 devinit(int fstype, char *name)
 {
 	static const fs_operation_def_t dev_vfsops_tbl[] = {
-		VFSNAME_MOUNT, sdev_mount,	/* mount file system */
-		VFSNAME_UNMOUNT, sdev_unmount,	/* unmount file system */
-		VFSNAME_ROOT, sdev_root,	/* get root vnode */
-		VFSNAME_STATVFS, sdev_statvfs,	/* get file system statistics */
-		NULL, NULL
+		VFSNAME_MOUNT,		{ .vfs_mount = sdev_mount },
+		VFSNAME_UNMOUNT,	{ .vfs_unmount = sdev_unmount },
+		VFSNAME_ROOT, 		{ .vfs_root = sdev_root },
+		VFSNAME_STATVFS,	{ .vfs_statvfs = sdev_statvfs },
+		NULL,			NULL
 	};
 
 	int	error;

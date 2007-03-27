@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 #include <sys/user.h>
 #include <sys/buf.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/stat.h>
 #include <sys/vnode.h>
 #include <sys/mode.h>
@@ -1897,14 +1898,14 @@ static int
 udfinit(int fstype, char *name)
 {
 	static const fs_operation_def_t udf_vfsops_template[] = {
-		VFSNAME_MOUNT, udf_mount,
-		VFSNAME_UNMOUNT, udf_unmount,
-		VFSNAME_ROOT, udf_root,
-		VFSNAME_STATVFS, udf_statvfs,
-		VFSNAME_SYNC, (fs_generic_func_p) udf_sync,
-		VFSNAME_VGET, udf_vget,
-		VFSNAME_MOUNTROOT, udf_mountroot,
-		NULL, NULL
+		VFSNAME_MOUNT,		{ .vfs_mount = udf_mount },
+		VFSNAME_UNMOUNT,	{ .vfs_unmount = udf_unmount },
+		VFSNAME_ROOT,		{ .vfs_root = udf_root },
+		VFSNAME_STATVFS,	{ .vfs_statvfs = udf_statvfs },
+		VFSNAME_SYNC,		{ .vfs_sync = udf_sync },
+		VFSNAME_VGET,		{ .vfs_vget = udf_vget },
+		VFSNAME_MOUNTROOT,	{ .vfs_mountroot = udf_mountroot },
+		NULL,			NULL
 	};
 	extern struct vnodeops *udf_vnodeops;
 	extern const fs_operation_def_t udf_vnodeops_template[];

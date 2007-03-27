@@ -479,7 +479,7 @@ CHKHDRS=			\
 	syscall.h		\
 	sysconf.h		\
 	sysconfig.h		\
-	sysevent.h	\
+	sysevent.h		\
 	sysevent_impl.h         \
 	sysinfo.h		\
 	syslog.h		\
@@ -546,6 +546,7 @@ CHKHDRS=			\
 	var.h			\
 	varargs.h		\
 	vfs.h			\
+	vfs_opreg.h		\
 	vfstab.h		\
 	vgareg.h		\
 	videodev2.h		\

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +37,7 @@
 #include <sys/stat.h>
 #include <sys/systm.h>
 #include <sys/sysmacros.h>
+#include <sys/vfs_opreg.h>
 
 /*
  * /system/object/<obj>/object
@@ -751,14 +751,14 @@ objfs_data_seek(vnode_t *vp, offset_t off, offset_t *offp)
 }
 
 const fs_operation_def_t objfs_tops_data[] = {
-	{ VOPNAME_OPEN,		objfs_data_open },
-	{ VOPNAME_CLOSE,	objfs_common_close },
-	{ VOPNAME_IOCTL,	fs_inval },
-	{ VOPNAME_GETATTR,	objfs_data_getattr },
-	{ VOPNAME_ACCESS,	objfs_data_access },
-	{ VOPNAME_INACTIVE,	(fs_generic_func_p) gfs_vop_inactive },
-	{ VOPNAME_READ,		objfs_data_read },
-	{ VOPNAME_SEEK,		objfs_data_seek },
-	{ VOPNAME_MAP,		(fs_generic_func_p) gfs_vop_map },
+	{ VOPNAME_OPEN,		{ .vop_open = objfs_data_open } },
+	{ VOPNAME_CLOSE,	{ .vop_close = objfs_common_close } },
+	{ VOPNAME_IOCTL,	{ .error = fs_inval } },
+	{ VOPNAME_GETATTR,	{ .vop_getattr = objfs_data_getattr } },
+	{ VOPNAME_ACCESS,	{ .vop_access = objfs_data_access } },
+	{ VOPNAME_INACTIVE,	{ .vop_inactive = gfs_vop_inactive } },
+	{ VOPNAME_READ,		{ .vop_read = objfs_data_read } },
+	{ VOPNAME_SEEK,		{ .vop_seek = objfs_data_seek } },
+	{ VOPNAME_MAP,		{ .vop_map = gfs_vop_map } },
 	{ NULL }
 };

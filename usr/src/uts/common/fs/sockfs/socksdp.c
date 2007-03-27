@@ -32,6 +32,7 @@
 #include <sys/systm.h>
 #include <sys/buf.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/errno.h>

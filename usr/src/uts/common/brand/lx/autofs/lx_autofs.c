@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@
 
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 
 #include <sys/lx_autofs_impl.h>
 
@@ -1205,10 +1206,10 @@ lx_autofs_statvfs(vfs_t *vfsp, statvfs64_t *sp)
 }
 
 static const fs_operation_def_t lx_autofs_vfstops[] = {
-	{ VFSNAME_MOUNT, lx_autofs_mount },
-	{ VFSNAME_UNMOUNT, lx_autofs_unmount },
-	{ VFSNAME_ROOT, lx_autofs_root },
-	{ VFSNAME_STATVFS, lx_autofs_statvfs },
+	{ VFSNAME_MOUNT,	{ .vfs_mount = lx_autofs_mount } },
+	{ VFSNAME_UNMOUNT,	{ .vfs_unmount = lx_autofs_unmount } },
+	{ VFSNAME_ROOT,		{ .vfs_root = lx_autofs_root } },
+	{ VFSNAME_STATVFS,	{ .vfs_statvfs = lx_autofs_statvfs } },
 	{ NULL, NULL }
 };
 
@@ -1427,18 +1428,18 @@ lx_autofs_ioctl(vnode_t *vp, int cmd, intptr_t arg, int mode, cred_t *cr,
  * VOP entry points definitions
  */
 static const fs_operation_def_t lx_autofs_tops_root[] = {
-	{ VOPNAME_OPEN,		lx_autofs_open },
-	{ VOPNAME_CLOSE,	lx_autofs_close },
-	{ VOPNAME_IOCTL,	lx_autofs_ioctl },
-	{ VOPNAME_RWLOCK,	lx_autofs_rwlock },
-	{ VOPNAME_RWUNLOCK,	(fs_generic_func_p)lx_autofs_rwunlock },
-	{ VOPNAME_GETATTR,	lx_autofs_getattr },
-	{ VOPNAME_ACCESS,	lx_autofs_access },
-	{ VOPNAME_READDIR,	lx_autofs_readdir },
-	{ VOPNAME_LOOKUP,	lx_autofs_lookup },
-	{ VOPNAME_INACTIVE,	(fs_generic_func_p)lx_autofs_inactive },
-	{ VOPNAME_MKDIR,	lx_autofs_mkdir },
-	{ VOPNAME_RMDIR,	lx_autofs_rmdir },
+	{ VOPNAME_OPEN,		{ .vop_open = lx_autofs_open } },
+	{ VOPNAME_CLOSE,	{ .vop_close = lx_autofs_close } },
+	{ VOPNAME_IOCTL,	{ .vop_ioctl = lx_autofs_ioctl } },
+	{ VOPNAME_RWLOCK,	{ .vop_rwlock = lx_autofs_rwlock } },
+	{ VOPNAME_RWUNLOCK,	{ .vop_rwunlock = lx_autofs_rwunlock } },
+	{ VOPNAME_GETATTR,	{ .vop_getattr = lx_autofs_getattr } },
+	{ VOPNAME_ACCESS,	{ .vop_access = lx_autofs_access } },
+	{ VOPNAME_READDIR,	{ .vop_readdir = lx_autofs_readdir } },
+	{ VOPNAME_LOOKUP,	{ .vop_lookup = lx_autofs_lookup } },
+	{ VOPNAME_INACTIVE,	{ .vop_inactive = lx_autofs_inactive } },
+	{ VOPNAME_MKDIR,	{ .vop_mkdir = lx_autofs_mkdir } },
+	{ VOPNAME_RMDIR,	{ .vop_rmdir = lx_autofs_rmdir } },
 	{ NULL }
 };
 

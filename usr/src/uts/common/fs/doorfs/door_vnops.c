@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,6 +27,7 @@
 
 #include <sys/types.h>
 #include <sys/vnode.h>
+#include <sys/vfs_opreg.h>
 #include <sys/door.h>
 #include <sys/proc.h>
 #include <sys/kmem.h>
@@ -52,19 +53,19 @@ struct vfs door_vfs;
 struct vnodeops *door_vnodeops;
 
 const fs_operation_def_t door_vnodeops_template[] = {
-	VOPNAME_OPEN, door_open,
-	VOPNAME_CLOSE, door_close,
-	VOPNAME_GETATTR, door_getattr,
-	VOPNAME_ACCESS, door_access,
-	VOPNAME_INACTIVE, (fs_generic_func_p) door_inactive,
-	VOPNAME_FRLOCK, fs_error,
-	VOPNAME_REALVP, door_realvp,
-	VOPNAME_POLL, fs_error,
-	VOPNAME_PATHCONF, fs_error,
-	VOPNAME_DISPOSE, fs_error,
-	VOPNAME_GETSECATTR, fs_error,
-	VOPNAME_SHRLOCK, fs_error,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = door_open },
+	VOPNAME_CLOSE,		{ .vop_close = door_close },
+	VOPNAME_GETATTR,	{ .vop_getattr = door_getattr },
+	VOPNAME_ACCESS,		{ .vop_access = door_access },
+	VOPNAME_INACTIVE,	{ .vop_inactive = door_inactive },
+	VOPNAME_FRLOCK,		{ .error = fs_error },
+	VOPNAME_REALVP,		{ .vop_realvp = door_realvp },
+	VOPNAME_POLL,		{ .error = fs_error },
+	VOPNAME_PATHCONF,	{ .error = fs_error },
+	VOPNAME_DISPOSE,	{ .error = fs_error },
+	VOPNAME_GETSECATTR,	{ .error = fs_error },
+	VOPNAME_SHRLOCK,	{ .error = fs_error },
+	NULL,			NULL
 };
 
 /* ARGSUSED */

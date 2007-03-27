@@ -130,6 +130,7 @@
 #include <sys/systm.h>
 #include <sys/mman.h>
 #include <sys/vnode.h>
+#include <sys/vfs_opreg.h>
 #include <sys/cmn_err.h>
 #include <sys/ksynch.h>
 #include <sys/thread.h>
@@ -851,7 +852,9 @@ page_retire_decr_pend_count(void)
 void
 page_retire_init(void)
 {
-	const fs_operation_def_t retired_vnodeops_template[] = {NULL, NULL};
+	const fs_operation_def_t retired_vnodeops_template[] = {
+		{ NULL, NULL }
+	};
 	struct vnodeops *vops;
 	kstat_t *ksp;
 

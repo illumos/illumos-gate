@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,7 @@
 #include <sys/buf.h>
 #include <sys/pathname.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/file.h>
 #include <sys/atomic.h>
@@ -2033,14 +2034,14 @@ static int
 ufsinit(int fstype, char *name)
 {
 	static const fs_operation_def_t ufs_vfsops_template[] = {
-		VFSNAME_MOUNT, ufs_mount,
-		VFSNAME_UNMOUNT, ufs_unmount,
-		VFSNAME_ROOT, ufs_root,
-		VFSNAME_STATVFS, ufs_statvfs,
-		VFSNAME_SYNC, (fs_generic_func_p) ufs_sync,
-		VFSNAME_VGET, ufs_vget,
-		VFSNAME_MOUNTROOT, ufs_mountroot,
-		NULL, NULL
+		VFSNAME_MOUNT,		{ .vfs_mount = ufs_mount },
+		VFSNAME_UNMOUNT,	{ .vfs_unmount = ufs_unmount },
+		VFSNAME_ROOT,		{ .vfs_root = ufs_root },
+		VFSNAME_STATVFS,	{ .vfs_statvfs = ufs_statvfs },
+		VFSNAME_SYNC,		{ .vfs_sync = ufs_sync },
+		VFSNAME_VGET,		{ .vfs_vget = ufs_vget },
+		VFSNAME_MOUNTROOT,	{ .vfs_mountroot = ufs_mountroot },
+		NULL,			NULL
 	};
 	int error;
 

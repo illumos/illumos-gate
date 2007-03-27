@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +33,7 @@
 #include <sys/modctl.h>
 #include <sys/objfs.h>
 #include <sys/objfs_impl.h>
+#include <sys/vfs_opreg.h>
 #include <sys/systm.h>
 
 extern int last_module_id;
@@ -156,14 +156,14 @@ objfs_root_readdir(vnode_t *vp, uio_t *uiop, cred_t *cr, int *eofp)
 }
 
 const fs_operation_def_t objfs_tops_root[] = {
-	{ VOPNAME_OPEN,		objfs_dir_open },
-	{ VOPNAME_CLOSE,	objfs_common_close },
-	{ VOPNAME_IOCTL,	fs_inval },
-	{ VOPNAME_GETATTR,	objfs_root_getattr },
-	{ VOPNAME_ACCESS,	objfs_dir_access },
-	{ VOPNAME_READDIR,	objfs_root_readdir },
-	{ VOPNAME_LOOKUP,	gfs_vop_lookup },
-	{ VOPNAME_SEEK,		fs_seek },
-	{ VOPNAME_INACTIVE,	(fs_generic_func_p)gfs_vop_inactive },
+	{ VOPNAME_OPEN,		{ .vop_open = objfs_dir_open } },
+	{ VOPNAME_CLOSE,	{ .vop_close = objfs_common_close } },
+	{ VOPNAME_IOCTL,	{ .error = fs_inval } },
+	{ VOPNAME_GETATTR,	{ .vop_getattr = objfs_root_getattr } },
+	{ VOPNAME_ACCESS,	{ .vop_access = objfs_dir_access } },
+	{ VOPNAME_READDIR,	{ .vop_readdir = objfs_root_readdir } },
+	{ VOPNAME_LOOKUP,	{ .vop_lookup = gfs_vop_lookup } },
+	{ VOPNAME_SEEK,		{ .vop_seek = fs_seek } },
+	{ VOPNAME_INACTIVE,	{ .vop_inactive = gfs_vop_inactive } },
 	{ NULL }
 };

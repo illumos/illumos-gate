@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +49,7 @@
 #include <sys/kmem.h>
 #include <sys/uio.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/pcb.h>
 #include <sys/signal.h>
@@ -461,24 +461,24 @@ nm_poll(vnode_t *vp, short events, int anyyet, short *reventsp,
 struct vnodeops *nm_vnodeops;
 
 const fs_operation_def_t nm_vnodeops_template[] = {
-	VOPNAME_OPEN, nm_open,
-	VOPNAME_CLOSE, nm_close,
-	VOPNAME_READ, nm_read,
-	VOPNAME_WRITE, nm_write,
-	VOPNAME_IOCTL, nm_ioctl,
-	VOPNAME_GETATTR, nm_getattr,
-	VOPNAME_SETATTR, nm_setattr,
-	VOPNAME_ACCESS, nm_access,
-	VOPNAME_CREATE, nm_create,
-	VOPNAME_LINK, nm_link,
-	VOPNAME_FSYNC, nm_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) nm_inactive,
-	VOPNAME_FID, nm_fid,
-	VOPNAME_RWLOCK, nm_rwlock,
-	VOPNAME_RWUNLOCK, (fs_generic_func_p) nm_rwunlock,
-	VOPNAME_SEEK, nm_seek,
-	VOPNAME_REALVP, nm_realvp,
-	VOPNAME_POLL, (fs_generic_func_p) nm_poll,
-	VOPNAME_DISPOSE, fs_error,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = nm_open },
+	VOPNAME_CLOSE,		{ .vop_close = nm_close },
+	VOPNAME_READ,		{ .vop_read = nm_read },
+	VOPNAME_WRITE,		{ .vop_write = nm_write },
+	VOPNAME_IOCTL,		{ .vop_ioctl = nm_ioctl },
+	VOPNAME_GETATTR,	{ .vop_getattr = nm_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = nm_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = nm_access },
+	VOPNAME_CREATE,		{ .vop_create = nm_create },
+	VOPNAME_LINK,		{ .vop_link = nm_link },
+	VOPNAME_FSYNC,		{ .vop_fsync = nm_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = nm_inactive },
+	VOPNAME_FID,		{ .vop_fid = nm_fid },
+	VOPNAME_RWLOCK,		{ .vop_rwlock = nm_rwlock },
+	VOPNAME_RWUNLOCK,	{ .vop_rwunlock = nm_rwunlock },
+	VOPNAME_SEEK,		{ .vop_seek = nm_seek },
+	VOPNAME_REALVP,		{ .vop_realvp = nm_realvp },
+	VOPNAME_POLL,		{ .vop_poll = nm_poll },
+	VOPNAME_DISPOSE,	{ .error = fs_error },
+	NULL,			NULL
 };

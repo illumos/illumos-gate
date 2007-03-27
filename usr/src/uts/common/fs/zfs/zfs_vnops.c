@@ -32,6 +32,7 @@
 #include <sys/sysmacros.h>
 #include <sys/resource.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/file.h>
 #include <sys/stat.h>
@@ -3662,31 +3663,31 @@ zfs_isdir()
  */
 vnodeops_t *zfs_dvnodeops;
 const fs_operation_def_t zfs_dvnodeops_template[] = {
-	VOPNAME_OPEN, zfs_open,
-	VOPNAME_CLOSE, zfs_close,
-	VOPNAME_READ, zfs_isdir,
-	VOPNAME_WRITE, zfs_isdir,
-	VOPNAME_IOCTL, zfs_ioctl,
-	VOPNAME_GETATTR, zfs_getattr,
-	VOPNAME_SETATTR, zfs_setattr,
-	VOPNAME_ACCESS, zfs_access,
-	VOPNAME_LOOKUP, zfs_lookup,
-	VOPNAME_CREATE, zfs_create,
-	VOPNAME_REMOVE, zfs_remove,
-	VOPNAME_LINK, zfs_link,
-	VOPNAME_RENAME, zfs_rename,
-	VOPNAME_MKDIR, zfs_mkdir,
-	VOPNAME_RMDIR, zfs_rmdir,
-	VOPNAME_READDIR, zfs_readdir,
-	VOPNAME_SYMLINK, zfs_symlink,
-	VOPNAME_FSYNC, zfs_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) zfs_inactive,
-	VOPNAME_FID, zfs_fid,
-	VOPNAME_SEEK, zfs_seek,
-	VOPNAME_PATHCONF, zfs_pathconf,
-	VOPNAME_GETSECATTR, zfs_getsecattr,
-	VOPNAME_SETSECATTR, zfs_setsecattr,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = zfs_open },
+	VOPNAME_CLOSE,		{ .vop_close = zfs_close },
+	VOPNAME_READ,		{ .error = zfs_isdir },
+	VOPNAME_WRITE,		{ .error = zfs_isdir },
+	VOPNAME_IOCTL,		{ .vop_ioctl = zfs_ioctl },
+	VOPNAME_GETATTR,	{ .vop_getattr = zfs_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = zfs_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = zfs_access },
+	VOPNAME_LOOKUP,		{ .vop_lookup = zfs_lookup },
+	VOPNAME_CREATE,		{ .vop_create = zfs_create },
+	VOPNAME_REMOVE,		{ .vop_remove = zfs_remove },
+	VOPNAME_LINK,		{ .vop_link = zfs_link },
+	VOPNAME_RENAME,		{ .vop_rename = zfs_rename },
+	VOPNAME_MKDIR,		{ .vop_mkdir = zfs_mkdir },
+	VOPNAME_RMDIR,		{ .vop_rmdir = zfs_rmdir },
+	VOPNAME_READDIR,	{ .vop_readdir = zfs_readdir },
+	VOPNAME_SYMLINK,	{ .vop_symlink = zfs_symlink },
+	VOPNAME_FSYNC,		{ .vop_fsync = zfs_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = zfs_inactive },
+	VOPNAME_FID,		{ .vop_fid = zfs_fid },
+	VOPNAME_SEEK,		{ .vop_seek = zfs_seek },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = zfs_pathconf },
+	VOPNAME_GETSECATTR,	{ .vop_getsecattr = zfs_getsecattr },
+	VOPNAME_SETSECATTR,	{ .vop_setsecattr = zfs_setsecattr },
+	NULL,			NULL
 };
 
 /*
@@ -3694,32 +3695,32 @@ const fs_operation_def_t zfs_dvnodeops_template[] = {
  */
 vnodeops_t *zfs_fvnodeops;
 const fs_operation_def_t zfs_fvnodeops_template[] = {
-	VOPNAME_OPEN, zfs_open,
-	VOPNAME_CLOSE, zfs_close,
-	VOPNAME_READ, zfs_read,
-	VOPNAME_WRITE, zfs_write,
-	VOPNAME_IOCTL, zfs_ioctl,
-	VOPNAME_GETATTR, zfs_getattr,
-	VOPNAME_SETATTR, zfs_setattr,
-	VOPNAME_ACCESS, zfs_access,
-	VOPNAME_LOOKUP, zfs_lookup,
-	VOPNAME_RENAME, zfs_rename,
-	VOPNAME_FSYNC, zfs_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p)zfs_inactive,
-	VOPNAME_FID, zfs_fid,
-	VOPNAME_SEEK, zfs_seek,
-	VOPNAME_FRLOCK, zfs_frlock,
-	VOPNAME_SPACE, zfs_space,
-	VOPNAME_GETPAGE, zfs_getpage,
-	VOPNAME_PUTPAGE, zfs_putpage,
-	VOPNAME_MAP, (fs_generic_func_p) zfs_map,
-	VOPNAME_ADDMAP, (fs_generic_func_p) zfs_addmap,
-	VOPNAME_DELMAP, zfs_delmap,
-	VOPNAME_PATHCONF, zfs_pathconf,
-	VOPNAME_GETSECATTR, zfs_getsecattr,
-	VOPNAME_SETSECATTR, zfs_setsecattr,
-	VOPNAME_VNEVENT, fs_vnevent_support,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = zfs_open },
+	VOPNAME_CLOSE,		{ .vop_close = zfs_close },
+	VOPNAME_READ,		{ .vop_read = zfs_read },
+	VOPNAME_WRITE,		{ .vop_write = zfs_write },
+	VOPNAME_IOCTL,		{ .vop_ioctl = zfs_ioctl },
+	VOPNAME_GETATTR,	{ .vop_getattr = zfs_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = zfs_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = zfs_access },
+	VOPNAME_LOOKUP,		{ .vop_lookup = zfs_lookup },
+	VOPNAME_RENAME,		{ .vop_rename = zfs_rename },
+	VOPNAME_FSYNC,		{ .vop_fsync = zfs_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = zfs_inactive },
+	VOPNAME_FID,		{ .vop_fid = zfs_fid },
+	VOPNAME_SEEK,		{ .vop_seek = zfs_seek },
+	VOPNAME_FRLOCK,		{ .vop_frlock = zfs_frlock },
+	VOPNAME_SPACE,		{ .vop_space = zfs_space },
+	VOPNAME_GETPAGE,	{ .vop_getpage = zfs_getpage },
+	VOPNAME_PUTPAGE,	{ .vop_putpage = zfs_putpage },
+	VOPNAME_MAP,		{ .vop_map = zfs_map },
+	VOPNAME_ADDMAP,		{ .vop_addmap = zfs_addmap },
+	VOPNAME_DELMAP,		{ .vop_delmap = zfs_delmap },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = zfs_pathconf },
+	VOPNAME_GETSECATTR,	{ .vop_getsecattr = zfs_getsecattr },
+	VOPNAME_SETSECATTR,	{ .vop_setsecattr = zfs_setsecattr },
+	VOPNAME_VNEVENT,	{ .vop_vnevent = fs_vnevent_support },
+	NULL,			NULL
 };
 
 /*
@@ -3727,16 +3728,16 @@ const fs_operation_def_t zfs_fvnodeops_template[] = {
  */
 vnodeops_t *zfs_symvnodeops;
 const fs_operation_def_t zfs_symvnodeops_template[] = {
-	VOPNAME_GETATTR, zfs_getattr,
-	VOPNAME_SETATTR, zfs_setattr,
-	VOPNAME_ACCESS, zfs_access,
-	VOPNAME_RENAME, zfs_rename,
-	VOPNAME_READLINK, zfs_readlink,
-	VOPNAME_INACTIVE, (fs_generic_func_p) zfs_inactive,
-	VOPNAME_FID, zfs_fid,
-	VOPNAME_PATHCONF, zfs_pathconf,
-	VOPNAME_VNEVENT, fs_vnevent_support,
-	NULL, NULL
+	VOPNAME_GETATTR,	{ .vop_getattr = zfs_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = zfs_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = zfs_access },
+	VOPNAME_RENAME,		{ .vop_rename = zfs_rename },
+	VOPNAME_READLINK,	{ .vop_readlink = zfs_readlink },
+	VOPNAME_INACTIVE,	{ .vop_inactive = zfs_inactive },
+	VOPNAME_FID,		{ .vop_fid = zfs_fid },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = zfs_pathconf },
+	VOPNAME_VNEVENT,	{ .vop_vnevent = fs_vnevent_support },
+	NULL,			NULL
 };
 
 /*
@@ -3752,30 +3753,30 @@ const fs_operation_def_t zfs_symvnodeops_template[] = {
  */
 vnodeops_t *zfs_xdvnodeops;
 const fs_operation_def_t zfs_xdvnodeops_template[] = {
-	VOPNAME_OPEN, zfs_open,
-	VOPNAME_CLOSE, zfs_close,
-	VOPNAME_IOCTL, zfs_ioctl,
-	VOPNAME_GETATTR, zfs_getattr,
-	VOPNAME_SETATTR, zfs_setattr,
-	VOPNAME_ACCESS, zfs_access,
-	VOPNAME_LOOKUP, zfs_lookup,
-	VOPNAME_CREATE, zfs_create,
-	VOPNAME_REMOVE, zfs_remove,
-	VOPNAME_LINK, zfs_link,
-	VOPNAME_RENAME, zfs_rename,
-	VOPNAME_MKDIR, zfs_inval,
-	VOPNAME_RMDIR, zfs_rmdir,
-	VOPNAME_READDIR, zfs_readdir,
-	VOPNAME_SYMLINK, zfs_inval,
-	VOPNAME_FSYNC, zfs_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) zfs_inactive,
-	VOPNAME_FID, zfs_fid,
-	VOPNAME_SEEK, zfs_seek,
-	VOPNAME_PATHCONF, zfs_pathconf,
-	VOPNAME_GETSECATTR, zfs_getsecattr,
-	VOPNAME_SETSECATTR, zfs_setsecattr,
-	VOPNAME_VNEVENT, fs_vnevent_support,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = zfs_open },
+	VOPNAME_CLOSE,		{ .vop_close = zfs_close },
+	VOPNAME_IOCTL,		{ .vop_ioctl = zfs_ioctl },
+	VOPNAME_GETATTR,	{ .vop_getattr = zfs_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = zfs_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = zfs_access },
+	VOPNAME_LOOKUP,		{ .vop_lookup = zfs_lookup },
+	VOPNAME_CREATE,		{ .vop_create = zfs_create },
+	VOPNAME_REMOVE,		{ .vop_remove = zfs_remove },
+	VOPNAME_LINK,		{ .vop_link = zfs_link },
+	VOPNAME_RENAME,		{ .vop_rename = zfs_rename },
+	VOPNAME_MKDIR,		{ .error = zfs_inval },
+	VOPNAME_RMDIR,		{ .vop_rmdir = zfs_rmdir },
+	VOPNAME_READDIR,	{ .vop_readdir = zfs_readdir },
+	VOPNAME_SYMLINK,	{ .error = zfs_inval },
+	VOPNAME_FSYNC,		{ .vop_fsync = zfs_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = zfs_inactive },
+	VOPNAME_FID,		{ .vop_fid = zfs_fid },
+	VOPNAME_SEEK,		{ .vop_seek = zfs_seek },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = zfs_pathconf },
+	VOPNAME_GETSECATTR,	{ .vop_getsecattr = zfs_getsecattr },
+	VOPNAME_SETSECATTR,	{ .vop_setsecattr = zfs_setsecattr },
+	VOPNAME_VNEVENT,	{ .vop_vnevent = fs_vnevent_support },
+	NULL,			NULL
 };
 
 /*
@@ -3783,7 +3784,7 @@ const fs_operation_def_t zfs_xdvnodeops_template[] = {
  */
 vnodeops_t *zfs_evnodeops;
 const fs_operation_def_t zfs_evnodeops_template[] = {
-	VOPNAME_INACTIVE, (fs_generic_func_p) zfs_inactive,
-	VOPNAME_PATHCONF, zfs_pathconf,
-	NULL, NULL
+	VOPNAME_INACTIVE,	{ .vop_inactive = zfs_inactive },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = zfs_pathconf },
+	NULL,			NULL
 };

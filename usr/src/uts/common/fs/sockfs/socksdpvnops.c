@@ -35,6 +35,7 @@
 #include <sys/errno.h>
 #include <sys/uio.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/stropts.h>
 #include <sys/cmn_err.h>
@@ -77,22 +78,22 @@ static int socksdpv_poll(struct vnode *, short, int, short *,
     struct pollhead **);
 
 const fs_operation_def_t socksdp_vnodeops_template[] = {
-	VOPNAME_OPEN, socksdpv_open,
-	VOPNAME_CLOSE, socksdpv_close,
-	VOPNAME_READ, socksdpv_read,
-	VOPNAME_WRITE, socksdpv_write,
-	VOPNAME_IOCTL, socksdpv_ioctl,
-	VOPNAME_SETFL, socksdp_setfl,
-	VOPNAME_GETATTR, socktpi_getattr,
-	VOPNAME_SETATTR, socktpi_setattr,
-	VOPNAME_ACCESS, socktpi_access,
-	VOPNAME_FSYNC, socktpi_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) socksdpv_inactive,
-	VOPNAME_FID, socktpi_fid,
-	VOPNAME_SEEK, socktpi_seek,
-	VOPNAME_POLL, (fs_generic_func_p) socksdpv_poll,
-	VOPNAME_DISPOSE, fs_error,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = socksdpv_open },
+	VOPNAME_CLOSE,		{ .vop_close = socksdpv_close },
+	VOPNAME_READ,		{ .vop_read = socksdpv_read },
+	VOPNAME_WRITE,		{ .vop_write = socksdpv_write },
+	VOPNAME_IOCTL,		{ .vop_ioctl = socksdpv_ioctl },
+	VOPNAME_SETFL,		{ .vop_setfl = socksdp_setfl },
+	VOPNAME_GETATTR,	{ .vop_getattr = socktpi_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = socktpi_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = socktpi_access },
+	VOPNAME_FSYNC,		{ .vop_fsync = socktpi_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = socksdpv_inactive },
+	VOPNAME_FID,		{ .vop_fid = socktpi_fid },
+	VOPNAME_SEEK,		{ .vop_seek = socktpi_seek },
+	VOPNAME_POLL,		{ .vop_poll = socksdpv_poll },
+	VOPNAME_DISPOSE,	{ .error = fs_error },
+	NULL,			NULL
 };
 struct vnodeops *socksdp_vnodeops;
 

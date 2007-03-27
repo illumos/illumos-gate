@@ -34,6 +34,7 @@
 #include <sys/acl.h>
 #include <sys/vnode.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/mntent.h>
 #include <sys/mount.h>
 #include <sys/cmn_err.h>
@@ -75,20 +76,20 @@ static void zfs_freevfs(vfs_t *vfsp);
 static void zfs_objset_close(zfsvfs_t *zfsvfs);
 
 static const fs_operation_def_t zfs_vfsops_template[] = {
-	VFSNAME_MOUNT, zfs_mount,
-	VFSNAME_MOUNTROOT, zfs_mountroot,
-	VFSNAME_UNMOUNT, zfs_umount,
-	VFSNAME_ROOT, zfs_root,
-	VFSNAME_STATVFS, zfs_statvfs,
-	VFSNAME_SYNC, (fs_generic_func_p) zfs_sync,
-	VFSNAME_VGET, zfs_vget,
-	VFSNAME_FREEVFS, (fs_generic_func_p) zfs_freevfs,
-	NULL, NULL
+	VFSNAME_MOUNT,		{ .vfs_mount = zfs_mount },
+	VFSNAME_MOUNTROOT,	{ .vfs_mountroot = zfs_mountroot },
+	VFSNAME_UNMOUNT,	{ .vfs_unmount = zfs_umount },
+	VFSNAME_ROOT,		{ .vfs_root = zfs_root },
+	VFSNAME_STATVFS,	{ .vfs_statvfs = zfs_statvfs },
+	VFSNAME_SYNC,		{ .vfs_sync = zfs_sync },
+	VFSNAME_VGET,		{ .vfs_vget = zfs_vget },
+	VFSNAME_FREEVFS,	{ .vfs_freevfs = zfs_freevfs },
+	NULL,			NULL
 };
 
 static const fs_operation_def_t zfs_vfsops_eio_template[] = {
-	VFSNAME_FREEVFS, (fs_generic_func_p) zfs_freevfs,
-	NULL, NULL
+	VFSNAME_FREEVFS,	{ .vfs_freevfs =  zfs_freevfs },
+	NULL,			NULL
 };
 
 /*

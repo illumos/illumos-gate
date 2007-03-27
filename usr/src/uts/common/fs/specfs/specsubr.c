@@ -49,6 +49,7 @@
 #include <sys/kmem.h>
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/fs/snode.h>
 #include <sys/fs/fifonode.h>
@@ -736,7 +737,7 @@ int
 specinit(int fstype, char *name)
 {
 	static const fs_operation_def_t spec_vfsops_template[] = {
-		VFSNAME_SYNC, (fs_generic_func_p) spec_sync,
+		VFSNAME_SYNC, { .vfs_sync = spec_sync },
 		NULL, NULL
 	};
 	extern struct vnodeops *spec_vnodeops;

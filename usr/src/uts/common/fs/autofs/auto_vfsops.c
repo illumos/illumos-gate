@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,7 @@
 #include <sys/proc.h>
 #include <sys/disp.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/uio.h>
 #include <sys/kmem.h>
@@ -250,11 +251,11 @@ int
 autofs_init(int fstype, char *name)
 {
 	static const fs_operation_def_t auto_vfsops_template[] = {
-		VFSNAME_MOUNT, auto_mount,
-		VFSNAME_UNMOUNT, auto_unmount,
-		VFSNAME_ROOT, auto_root,
-		VFSNAME_STATVFS, auto_statvfs,
-		NULL, NULL
+		VFSNAME_MOUNT,		{ .vfs_mount = auto_mount },
+		VFSNAME_UNMOUNT,	{ .vfs_unmount = auto_unmount },
+		VFSNAME_ROOT,		{ .vfs_root = auto_root },
+		VFSNAME_STATVFS,	{ .vfs_statvfs = auto_statvfs },
+		NULL,			NULL
 	};
 	int error;
 

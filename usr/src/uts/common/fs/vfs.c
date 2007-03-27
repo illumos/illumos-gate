@@ -50,6 +50,7 @@
 #include <sys/proc.h>
 #include <sys/mount.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/fem.h>
 #include <sys/mntent.h>
 #include <sys/stat.h>
@@ -3768,12 +3769,6 @@ vf_to_stf(uint_t vf)
 }
 
 /*
- * Use old-style function prototype for vfsstray() so
- * that we can use it anywhere in the vfsops structure.
- */
-int vfsstray();
-
-/*
  * Entries for (illegal) fstype 0.
  */
 /* ARGSUSED */
@@ -3783,17 +3778,6 @@ vfsstray_sync(struct vfs *vfsp, short arg, struct cred *cr)
 	cmn_err(CE_PANIC, "stray vfs operation");
 	return (0);
 }
-
-vfsops_t vfs_strayops = {
-	vfsstray,
-	vfsstray,
-	vfsstray,
-	vfsstray,
-	vfsstray_sync,
-	vfsstray,
-	vfsstray,
-	vfsstray
-};
 
 /*
  * Entries for (illegal) fstype 0.
@@ -3838,23 +3822,36 @@ void
 vfsinit(void)
 {
 	struct vfssw *vswp;
+	vfsops_t *stray_vfsops;
 	int error;
 	extern int vopstats_enabled;
 	extern void vopstats_startup();
 
 	static const fs_operation_def_t EIO_vfsops_template[] = {
-		VFSNAME_MOUNT,		vfs_EIO,
-		VFSNAME_UNMOUNT,	vfs_EIO,
-		VFSNAME_ROOT,		vfs_EIO,
-		VFSNAME_STATVFS,	vfs_EIO,
-		VFSNAME_SYNC, (fs_generic_func_p) vfs_EIO_sync,
-		VFSNAME_VGET,		vfs_EIO,
-		VFSNAME_MOUNTROOT,	vfs_EIO,
-		VFSNAME_FREEVFS,	vfs_EIO,
-		VFSNAME_VNSTATE,	vfs_EIO,
+		VFSNAME_MOUNT,		{ .error = vfs_EIO },
+		VFSNAME_UNMOUNT,	{ .error = vfs_EIO },
+		VFSNAME_ROOT,		{ .error = vfs_EIO },
+		VFSNAME_STATVFS,	{ .error = vfs_EIO },
+		VFSNAME_SYNC, 		{ .vfs_sync = vfs_EIO_sync },
+		VFSNAME_VGET,		{ .error = vfs_EIO },
+		VFSNAME_MOUNTROOT,	{ .error = vfs_EIO },
+		VFSNAME_FREEVFS,	{ .error = vfs_EIO },
+		VFSNAME_VNSTATE,	{ .error = vfs_EIO },
 		NULL, NULL
 	};
 
+	static const fs_operation_def_t stray_vfsops_template[] = {
+		VFSNAME_MOUNT,		{ .error = vfsstray },
+		VFSNAME_UNMOUNT,	{ .error = vfsstray },
+		VFSNAME_ROOT,		{ .error = vfsstray },
+		VFSNAME_STATVFS,	{ .error = vfsstray },
+		VFSNAME_SYNC, 		{ .vfs_sync = vfsstray_sync },
+		VFSNAME_VGET,		{ .error = vfsstray },
+		VFSNAME_MOUNTROOT,	{ .error = vfsstray },
+		VFSNAME_FREEVFS,	{ .error = vfsstray },
+		VFSNAME_VNSTATE,	{ .error = vfsstray },
+		NULL, NULL
+	};
 
 	/* Initialize the vnode cache (file systems may use it during init). */
 
@@ -3865,8 +3862,8 @@ vfsinit(void)
 	fem_init();
 
 	/* Initialize the dummy stray file system type. */
-
-	vfssw[0].vsw_vfsops = vfs_strayops;
+	error = vfs_makefsops(stray_vfsops_template, &stray_vfsops);
+	vfssw[0].vsw_vfsops = *stray_vfsops; /* structure copy */
 
 	/* Initialize the dummy EIO file system. */
 	error = vfs_makefsops(EIO_vfsops_template, &EIO_vfsops);
@@ -3970,8 +3967,10 @@ fs_build_vector(void *vector, int *unused_ops,
 {
 	int i, num_trans, num_ops, used;
 
-	/* Count the number of translations and the number of supplied */
-	/* operations. */
+	/*
+	 * Count the number of translations and the number of supplied
+	 * operations.
+	 */
 
 	{
 		const fs_operation_trans_def_t *p;
@@ -4017,13 +4016,15 @@ fs_build_vector(void *vector, int *unused_ops,
 			}
 		}
 
-		/* If the file system is using a "placeholder" for default */
-		/* or error functions, grab the appropriate function out of */
-		/* the translation table.  If the file system didn't supply */
-		/* this operation at all, use the default function. */
+		/*
+		 * If the file system is using a "placeholder" for default
+		 * or error functions, grab the appropriate function out of
+		 * the translation table.  If the file system didn't supply
+		 * this operation at all, use the default function.
+		 */
 
 		if (found) {
-			result = operations[j].func;
+			result = operations[j].func.fs_generic;
 			if (result == fs_default) {
 				result = translation[i].defaultFunc;
 			} else if (result == fs_error) {

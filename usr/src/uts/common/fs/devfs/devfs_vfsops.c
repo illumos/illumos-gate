@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,7 @@
 #include <sys/time.h>
 #include <sys/pathname.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/stat.h>
 #include <sys/uio.h>
@@ -129,13 +130,13 @@ static int
 devfsinit(int fstype, char *name)
 {
 	static const fs_operation_def_t devfs_vfsops_template[] = {
-		VFSNAME_MOUNT, devfs_mount,
-		VFSNAME_UNMOUNT, devfs_unmount,
-		VFSNAME_ROOT, devfs_root,
-		VFSNAME_STATVFS, devfs_statvfs,
-		VFSNAME_SYNC, (fs_generic_func_p) fs_sync,
-		VFSNAME_MOUNTROOT, devfs_mountroot,
-		NULL, NULL
+		VFSNAME_MOUNT,		{ .vfs_mount = devfs_mount },
+		VFSNAME_UNMOUNT,	{ .vfs_unmount = devfs_unmount },
+		VFSNAME_ROOT,		{ .vfs_root = devfs_root },
+		VFSNAME_STATVFS,	{ .vfs_statvfs = devfs_statvfs },
+		VFSNAME_SYNC,		{ .vfs_sync = fs_sync },
+		VFSNAME_MOUNTROOT,	{ .vfs_mountroot = devfs_mountroot },
+		NULL,			NULL
 	};
 	int error;
 	int dev;

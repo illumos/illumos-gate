@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
 #include <sys/param.h>
 #include <sys/vfs.h>
 #include <sys/t_lock.h>
-
-extern struct vfsops vfs_strayops;	/* XXX move here from vfs.c ? */
 
 extern int swapinit(int fstype, char *name);
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 #include <sys/sysmacros.h>
 
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 
 #include <sys/socket.h>
 #include <sys/socketvar.h>

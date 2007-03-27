@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +37,7 @@
 #include <sys/user.h>
 #include <sys/buf.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/stat.h>
 #include <sys/vnode.h>
 #include <sys/mode.h>
@@ -188,41 +188,41 @@ typedef struct mio_slave {
 struct vnodeops *udf_vnodeops;
 
 const fs_operation_def_t udf_vnodeops_template[] = {
-	VOPNAME_OPEN, udf_open,
-	VOPNAME_CLOSE, udf_close,
-	VOPNAME_READ, udf_read,
-	VOPNAME_WRITE, udf_write,
-	VOPNAME_IOCTL, udf_ioctl,
-	VOPNAME_GETATTR, udf_getattr,
-	VOPNAME_SETATTR, udf_setattr,
-	VOPNAME_ACCESS, udf_access,
-	VOPNAME_LOOKUP, udf_lookup,
-	VOPNAME_CREATE, udf_create,
-	VOPNAME_REMOVE, udf_remove,
-	VOPNAME_LINK, udf_link,
-	VOPNAME_RENAME, udf_rename,
-	VOPNAME_MKDIR, udf_mkdir,
-	VOPNAME_RMDIR, udf_rmdir,
-	VOPNAME_READDIR, udf_readdir,
-	VOPNAME_SYMLINK, udf_symlink,
-	VOPNAME_READLINK, udf_readlink,
-	VOPNAME_FSYNC, udf_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) udf_inactive,
-	VOPNAME_FID, udf_fid,
-	VOPNAME_RWLOCK, udf_rwlock,
-	VOPNAME_RWUNLOCK, (fs_generic_func_p) udf_rwunlock,
-	VOPNAME_SEEK, udf_seek,
-	VOPNAME_FRLOCK, udf_frlock,
-	VOPNAME_SPACE, udf_space,
-	VOPNAME_GETPAGE, udf_getpage,
-	VOPNAME_PUTPAGE, udf_putpage,
-	VOPNAME_MAP, (fs_generic_func_p) udf_map,
-	VOPNAME_ADDMAP, (fs_generic_func_p) udf_addmap,
-	VOPNAME_DELMAP, udf_delmap,
-	VOPNAME_PATHCONF, udf_l_pathconf,
-	VOPNAME_PAGEIO, udf_pageio,
-	VOPNAME_VNEVENT, fs_vnevent_support,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = udf_open },
+	VOPNAME_CLOSE,		{ .vop_close = udf_close },
+	VOPNAME_READ,		{ .vop_read = udf_read },
+	VOPNAME_WRITE,		{ .vop_write = udf_write },
+	VOPNAME_IOCTL,		{ .vop_ioctl = udf_ioctl },
+	VOPNAME_GETATTR,	{ .vop_getattr = udf_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = udf_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = udf_access },
+	VOPNAME_LOOKUP,		{ .vop_lookup = udf_lookup },
+	VOPNAME_CREATE,		{ .vop_create = udf_create },
+	VOPNAME_REMOVE,		{ .vop_remove = udf_remove },
+	VOPNAME_LINK,		{ .vop_link = udf_link },
+	VOPNAME_RENAME,		{ .vop_rename = udf_rename },
+	VOPNAME_MKDIR,		{ .vop_mkdir = udf_mkdir },
+	VOPNAME_RMDIR,		{ .vop_rmdir = udf_rmdir },
+	VOPNAME_READDIR,	{ .vop_readdir = udf_readdir },
+	VOPNAME_SYMLINK,	{ .vop_symlink = udf_symlink },
+	VOPNAME_READLINK,	{ .vop_readlink = udf_readlink },
+	VOPNAME_FSYNC,		{ .vop_fsync = udf_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = udf_inactive },
+	VOPNAME_FID,		{ .vop_fid = udf_fid },
+	VOPNAME_RWLOCK,		{ .vop_rwlock = udf_rwlock },
+	VOPNAME_RWUNLOCK,	{ .vop_rwunlock = udf_rwunlock },
+	VOPNAME_SEEK,		{ .vop_seek = udf_seek },
+	VOPNAME_FRLOCK,		{ .vop_frlock = udf_frlock },
+	VOPNAME_SPACE,		{ .vop_space = udf_space },
+	VOPNAME_GETPAGE,	{ .vop_getpage = udf_getpage },
+	VOPNAME_PUTPAGE,	{ .vop_putpage = udf_putpage },
+	VOPNAME_MAP,		{ .vop_map = udf_map },
+	VOPNAME_ADDMAP,		{ .vop_addmap = udf_addmap },
+	VOPNAME_DELMAP,		{ .vop_delmap = udf_delmap },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = udf_l_pathconf },
+	VOPNAME_PAGEIO,		{ .vop_pageio = udf_pageio },
+	VOPNAME_VNEVENT,	{ .vop_vnevent = fs_vnevent_support },
+	NULL,			NULL
 };
 
 /* ARGSUSED */

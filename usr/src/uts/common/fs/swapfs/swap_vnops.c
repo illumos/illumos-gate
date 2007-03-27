@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 #include <sys/cred.h>
 #include <sys/errno.h>
 #include <sys/vnode.h>
+#include <sys/vfs_opreg.h>
 #include <sys/cmn_err.h>
 #include <sys/swap.h>
 #include <sys/mman.h>
@@ -75,16 +76,16 @@ static int 	swap_putapage(struct vnode *vp, page_t *pp, u_offset_t *off,
     size_t *lenp, int flags, struct cred *cr);
 
 const fs_operation_def_t swap_vnodeops_template[] = {
-	VOPNAME_INACTIVE, (fs_generic_func_p) swap_inactive,
-	VOPNAME_GETPAGE, swap_getpage,
-	VOPNAME_PUTPAGE, swap_putpage,
-	VOPNAME_DISPOSE, (fs_generic_func_p) swap_dispose,
-	VOPNAME_SETFL, fs_error,
-	VOPNAME_POLL, fs_error,
-	VOPNAME_PATHCONF, fs_error,
-	VOPNAME_GETSECATTR, fs_error,
-	VOPNAME_SHRLOCK, fs_error,
-	NULL, NULL
+	VOPNAME_INACTIVE,	{ .vop_inactive = swap_inactive },
+	VOPNAME_GETPAGE,	{ .vop_getpage = swap_getpage },
+	VOPNAME_PUTPAGE,	{ .vop_putpage = swap_putpage },
+	VOPNAME_DISPOSE,	{ .vop_dispose = swap_dispose },
+	VOPNAME_SETFL,		{ .error = fs_error },
+	VOPNAME_POLL,		{ .error = fs_error },
+	VOPNAME_PATHCONF,	{ .error = fs_error },
+	VOPNAME_GETSECATTR,	{ .error = fs_error },
+	VOPNAME_SHRLOCK,	{ .error = fs_error },
+	NULL,			NULL
 };
 
 vnodeops_t *swap_vnodeops;

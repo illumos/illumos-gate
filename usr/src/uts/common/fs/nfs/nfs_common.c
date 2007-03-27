@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@
 #include <sys/time.h>
 #include <sys/utsname.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/pathname.h>
 #include <sys/bootconf.h>
@@ -336,7 +337,7 @@ static int
 nfsdyninit(int fstyp, char *name)
 {
 	static const fs_operation_def_t nfsdyn_vfsops_template[] = {
-		VFSNAME_MOUNTROOT, nfsdyn_mountroot,
+		VFSNAME_MOUNTROOT, { .vfs_mountroot = nfsdyn_mountroot },
 		NULL, NULL
 	};
 	int error;

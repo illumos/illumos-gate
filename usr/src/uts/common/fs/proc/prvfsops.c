@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 #include <sys/zone.h>
 #include <sys/var.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/mode.h>
 #include <sys/signal.h>
@@ -143,11 +144,11 @@ static int
 prinit(int fstype, char *name)
 {
 	static const fs_operation_def_t pr_vfsops_template[] = {
-		VFSNAME_MOUNT, prmount,
-		VFSNAME_UNMOUNT, prunmount,
-		VFSNAME_ROOT, prroot,
-		VFSNAME_STATVFS, prstatvfs,
-		NULL, NULL
+		VFSNAME_MOUNT,		{ .vfs_mount = prmount },
+		VFSNAME_UNMOUNT,	{ .vfs_unmount = prunmount },
+		VFSNAME_ROOT,		{ .vfs_root = prroot },
+		VFSNAME_STATVFS,	{ .vfs_statvfs = prstatvfs },
+		NULL,			NULL
 	};
 	extern const fs_operation_def_t pr_vnodeops_template[];
 	int error;

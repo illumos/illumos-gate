@@ -35,6 +35,7 @@
 #include <sys/systm.h>
 #include <sys/cred.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/pathname.h>
 #include <sys/sysmacros.h>
@@ -155,15 +156,15 @@ int
 nfs3init(int fstyp, char *name)
 {
 	static const fs_operation_def_t nfs3_vfsops_template[] = {
-		VFSNAME_MOUNT, nfs3_mount,
-		VFSNAME_UNMOUNT, nfs3_unmount,
-		VFSNAME_ROOT, nfs3_root,
-		VFSNAME_STATVFS, nfs3_statvfs,
-		VFSNAME_SYNC, (fs_generic_func_p) nfs3_sync,
-		VFSNAME_VGET, nfs3_vget,
-		VFSNAME_MOUNTROOT, nfs3_mountroot,
-		VFSNAME_FREEVFS, (fs_generic_func_p)nfs3_freevfs,
-		NULL, NULL
+		VFSNAME_MOUNT,		{ .vfs_mount = nfs3_mount },
+		VFSNAME_UNMOUNT,	{ .vfs_unmount = nfs3_unmount },
+		VFSNAME_ROOT,		{ .vfs_root = nfs3_root },
+		VFSNAME_STATVFS,	{ .vfs_statvfs = nfs3_statvfs },
+		VFSNAME_SYNC,		{ .vfs_sync = nfs3_sync },
+		VFSNAME_VGET,		{ .vfs_vget = nfs3_vget },
+		VFSNAME_MOUNTROOT,	{ .vfs_mountroot = nfs3_mountroot },
+		VFSNAME_FREEVFS,	{ .vfs_freevfs = nfs3_freevfs },
+		NULL,			NULL
 	};
 	int error;
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include <sys/systm.h>
 #include <sys/cred.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/pathname.h>
 #include <sys/sysmacros.h>
@@ -175,15 +176,15 @@ int
 nfs4init(int fstyp, char *name)
 {
 	static const fs_operation_def_t nfs4_vfsops_template[] = {
-		VFSNAME_MOUNT, nfs4_mount,
-		VFSNAME_UNMOUNT, nfs4_unmount,
-		VFSNAME_ROOT, nfs4_root,
-		VFSNAME_STATVFS, nfs4_statvfs,
-		VFSNAME_SYNC, (fs_generic_func_p) nfs4_sync,
-		VFSNAME_VGET, nfs4_vget,
-		VFSNAME_MOUNTROOT, nfs4_mountroot,
-		VFSNAME_FREEVFS, (fs_generic_func_p)nfs4_freevfs,
-		NULL, NULL
+		VFSNAME_MOUNT,		{ .vfs_mount = nfs4_mount },
+		VFSNAME_UNMOUNT,	{ .vfs_unmount = nfs4_unmount },
+		VFSNAME_ROOT,		{ .vfs_root = nfs4_root },
+		VFSNAME_STATVFS,	{ .vfs_statvfs = nfs4_statvfs },
+		VFSNAME_SYNC,		{ .vfs_sync = nfs4_sync },
+		VFSNAME_VGET,		{ .vfs_vget = nfs4_vget },
+		VFSNAME_MOUNTROOT,	{ .vfs_mountroot = nfs4_mountroot },
+		VFSNAME_FREEVFS,	{ .vfs_freevfs = nfs4_freevfs },
+		NULL,			NULL
 	};
 	int error;
 

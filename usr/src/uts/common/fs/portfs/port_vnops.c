@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,7 @@
 
 #include <sys/types.h>
 #include <sys/vnode.h>
+#include <sys/vfs_opreg.h>
 #include <sys/kmem.h>
 #include <fs/fs_subr.h>
 #include <sys/proc.h>
@@ -44,19 +45,19 @@ static int port_poll(vnode_t *, short, int, short *, struct pollhead **);
 static void port_inactive(struct vnode *, cred_t *);
 
 const fs_operation_def_t port_vnodeops_template[] = {
-	VOPNAME_OPEN, port_open,
-	VOPNAME_CLOSE, port_close,
-	VOPNAME_GETATTR, port_getattr,
-	VOPNAME_ACCESS, port_access,
-	VOPNAME_INACTIVE, (fs_generic_func_p) port_inactive,
-	VOPNAME_FRLOCK, fs_error,
-	VOPNAME_REALVP, port_realvp,
-	VOPNAME_POLL, (fs_generic_func_p) port_poll,
-	VOPNAME_PATHCONF, fs_error,
-	VOPNAME_DISPOSE, fs_error,
-	VOPNAME_GETSECATTR, fs_error,
-	VOPNAME_SHRLOCK, fs_error,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = port_open },
+	VOPNAME_CLOSE,		{ .vop_close = port_close },
+	VOPNAME_GETATTR,	{ .vop_getattr = port_getattr },
+	VOPNAME_ACCESS,		{ .vop_access = port_access },
+	VOPNAME_INACTIVE,	{ .vop_inactive = port_inactive },
+	VOPNAME_FRLOCK,		{ .error = fs_error },
+	VOPNAME_REALVP,		{ .vop_realvp = port_realvp },
+	VOPNAME_POLL,		{ .vop_poll = port_poll },
+	VOPNAME_PATHCONF,	{ .error = fs_error },
+	VOPNAME_DISPOSE,	{ .error = fs_error },
+	VOPNAME_GETSECATTR,	{ .error = fs_error },
+	VOPNAME_SHRLOCK,	{ .error = fs_error },
+	NULL,			NULL
 };
 
 /* ARGSUSED */

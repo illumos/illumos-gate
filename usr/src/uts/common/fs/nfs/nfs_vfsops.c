@@ -33,6 +33,7 @@
 #include <sys/systm.h>
 #include <sys/cred.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/pathname.h>
 #include <sys/sysmacros.h>
@@ -157,15 +158,15 @@ int
 nfsinit(int fstyp, char *name)
 {
 	static const fs_operation_def_t nfs_vfsops_template[] = {
-		VFSNAME_MOUNT, nfs_mount,
-		VFSNAME_UNMOUNT, nfs_unmount,
-		VFSNAME_ROOT, nfs_root,
-		VFSNAME_STATVFS, nfs_statvfs,
-		VFSNAME_SYNC, (fs_generic_func_p) nfs_sync,
-		VFSNAME_VGET, nfs_vget,
-		VFSNAME_MOUNTROOT, nfs_mountroot,
-		VFSNAME_FREEVFS, (fs_generic_func_p)nfs_freevfs,
-		NULL, NULL
+		VFSNAME_MOUNT,		{ .vfs_mount = nfs_mount },
+		VFSNAME_UNMOUNT,	{ .vfs_unmount = nfs_unmount },
+		VFSNAME_ROOT,		{ .vfs_root = nfs_root },
+		VFSNAME_STATVFS,	{ .vfs_statvfs = nfs_statvfs },
+		VFSNAME_SYNC,		{ .vfs_sync = nfs_sync },
+		VFSNAME_VGET,		{ .vfs_vget = nfs_vget },
+		VFSNAME_MOUNTROOT,	{ .vfs_mountroot = nfs_mountroot },
+		VFSNAME_FREEVFS,	{ .vfs_freevfs = nfs_freevfs },
+		NULL,			NULL
 	};
 	int error;
 

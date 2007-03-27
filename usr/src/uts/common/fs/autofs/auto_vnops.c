@@ -31,6 +31,7 @@
 #include <sys/proc.h>
 #include <sys/vnode.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/uio.h>
 #include <sys/cred.h>
 #include <sys/pathname.h>
@@ -81,30 +82,30 @@ static int auto_trigger_mount(vnode_t *, cred_t *, vnode_t **);
 vnodeops_t *auto_vnodeops;
 
 const fs_operation_def_t auto_vnodeops_template[] = {
-	VOPNAME_OPEN, auto_open,
-	VOPNAME_CLOSE, auto_close,
-	VOPNAME_GETATTR, auto_getattr,
-	VOPNAME_SETATTR, auto_setattr,
-	VOPNAME_ACCESS, auto_access,
-	VOPNAME_LOOKUP, auto_lookup,
-	VOPNAME_CREATE, auto_create,
-	VOPNAME_REMOVE, auto_remove,
-	VOPNAME_LINK, auto_link,
-	VOPNAME_RENAME, auto_rename,
-	VOPNAME_MKDIR, auto_mkdir,
-	VOPNAME_RMDIR, auto_rmdir,
-	VOPNAME_READDIR, auto_readdir,
-	VOPNAME_SYMLINK, auto_symlink,
-	VOPNAME_READLINK, auto_readlink,
-	VOPNAME_FSYNC, auto_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) auto_inactive,
-	VOPNAME_RWLOCK, auto_rwlock,
-	VOPNAME_RWUNLOCK, (fs_generic_func_p) auto_rwunlock,
-	VOPNAME_SEEK, auto_seek,
-	VOPNAME_FRLOCK, fs_error,
-	VOPNAME_DISPOSE, fs_error,
-	VOPNAME_SHRLOCK, fs_error,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = auto_open },
+	VOPNAME_CLOSE,		{ .vop_close = auto_close },
+	VOPNAME_GETATTR,	{ .vop_getattr = auto_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = auto_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = auto_access },
+	VOPNAME_LOOKUP,		{ .vop_lookup = auto_lookup },
+	VOPNAME_CREATE,		{ .vop_create = auto_create },
+	VOPNAME_REMOVE,		{ .vop_remove = auto_remove },
+	VOPNAME_LINK,		{ .vop_link = auto_link },
+	VOPNAME_RENAME,		{ .vop_rename = auto_rename },
+	VOPNAME_MKDIR,		{ .vop_mkdir = auto_mkdir },
+	VOPNAME_RMDIR,		{ .vop_rmdir = auto_rmdir },
+	VOPNAME_READDIR,	{ .vop_readdir = auto_readdir },
+	VOPNAME_SYMLINK,	{ .vop_symlink = auto_symlink },
+	VOPNAME_READLINK,	{ .vop_readlink = auto_readlink },
+	VOPNAME_FSYNC,		{ .vop_fsync = auto_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = auto_inactive },
+	VOPNAME_RWLOCK,		{ .vop_rwlock = auto_rwlock },
+	VOPNAME_RWUNLOCK,	{ .vop_rwunlock = auto_rwunlock },
+	VOPNAME_SEEK,		{ .vop_seek = auto_seek },
+	VOPNAME_FRLOCK,		{ .error = fs_error },
+	VOPNAME_DISPOSE,	{ .error = fs_error },
+	VOPNAME_SHRLOCK,	{ .error = fs_error },
+	NULL,			NULL
 };
 
 

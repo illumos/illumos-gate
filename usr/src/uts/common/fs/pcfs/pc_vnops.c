@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 #include <sys/buf.h>
 #include <sys/stat.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/dirent.h>
 #include <sys/vnode.h>
 #include <sys/proc.h>
@@ -123,48 +124,48 @@ struct vnodeops *pcfs_fvnodeops;
 struct vnodeops *pcfs_dvnodeops;
 
 const fs_operation_def_t pcfs_fvnodeops_template[] = {
-	VOPNAME_OPEN, pcfs_open,
-	VOPNAME_CLOSE, pcfs_close,
-	VOPNAME_READ, pcfs_read,
-	VOPNAME_WRITE, pcfs_write,
-	VOPNAME_GETATTR, pcfs_getattr,
-	VOPNAME_SETATTR, pcfs_setattr,
-	VOPNAME_ACCESS, pcfs_access,
-	VOPNAME_FSYNC, pcfs_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) pcfs_inactive,
-	VOPNAME_FID, pcfs_fid,
-	VOPNAME_SEEK, pcfs_seek,
-	VOPNAME_SPACE, pcfs_space,
-	VOPNAME_GETPAGE, pcfs_getpage,
-	VOPNAME_PUTPAGE, pcfs_putpage,
-	VOPNAME_MAP, (fs_generic_func_p) pcfs_map,
-	VOPNAME_ADDMAP, (fs_generic_func_p) pcfs_addmap,
-	VOPNAME_DELMAP, pcfs_delmap,
-	VOPNAME_PATHCONF, pcfs_pathconf,
-	VOPNAME_VNEVENT, fs_vnevent_support,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = pcfs_open },
+	VOPNAME_CLOSE,		{ .vop_close = pcfs_close },
+	VOPNAME_READ,		{ .vop_read = pcfs_read },
+	VOPNAME_WRITE,		{ .vop_write = pcfs_write },
+	VOPNAME_GETATTR,	{ .vop_getattr = pcfs_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = pcfs_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = pcfs_access },
+	VOPNAME_FSYNC,		{ .vop_fsync = pcfs_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = pcfs_inactive },
+	VOPNAME_FID,		{ .vop_fid = pcfs_fid },
+	VOPNAME_SEEK,		{ .vop_seek = pcfs_seek },
+	VOPNAME_SPACE,		{ .vop_space = pcfs_space },
+	VOPNAME_GETPAGE,	{ .vop_getpage = pcfs_getpage },
+	VOPNAME_PUTPAGE,	{ .vop_putpage = pcfs_putpage },
+	VOPNAME_MAP,		{ .vop_map = pcfs_map },
+	VOPNAME_ADDMAP,		{ .vop_addmap = pcfs_addmap },
+	VOPNAME_DELMAP,		{ .vop_delmap = pcfs_delmap },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = pcfs_pathconf },
+	VOPNAME_VNEVENT,	{ .vop_vnevent = fs_vnevent_support },
+	NULL,			NULL
 };
 
 const fs_operation_def_t pcfs_dvnodeops_template[] = {
-	VOPNAME_OPEN, pcfs_open,
-	VOPNAME_CLOSE, pcfs_close,
-	VOPNAME_GETATTR, pcfs_getattr,
-	VOPNAME_SETATTR, pcfs_setattr,
-	VOPNAME_ACCESS, pcfs_access,
-	VOPNAME_LOOKUP, pcfs_lookup,
-	VOPNAME_CREATE, pcfs_create,
-	VOPNAME_REMOVE, pcfs_remove,
-	VOPNAME_RENAME, pcfs_rename,
-	VOPNAME_MKDIR, pcfs_mkdir,
-	VOPNAME_RMDIR, pcfs_rmdir,
-	VOPNAME_READDIR, pcfs_readdir,
-	VOPNAME_FSYNC, pcfs_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) pcfs_inactive,
-	VOPNAME_FID, pcfs_fid,
-	VOPNAME_SEEK, pcfs_seek,
-	VOPNAME_PATHCONF, pcfs_pathconf,
-	VOPNAME_VNEVENT, fs_vnevent_support,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = pcfs_open },
+	VOPNAME_CLOSE,		{ .vop_close = pcfs_close },
+	VOPNAME_GETATTR,	{ .vop_getattr = pcfs_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = pcfs_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = pcfs_access },
+	VOPNAME_LOOKUP,		{ .vop_lookup = pcfs_lookup },
+	VOPNAME_CREATE,		{ .vop_create = pcfs_create },
+	VOPNAME_REMOVE,		{ .vop_remove = pcfs_remove },
+	VOPNAME_RENAME,		{ .vop_rename = pcfs_rename },
+	VOPNAME_MKDIR,		{ .vop_mkdir = pcfs_mkdir },
+	VOPNAME_RMDIR,		{ .vop_rmdir = pcfs_rmdir },
+	VOPNAME_READDIR,	{ .vop_readdir = pcfs_readdir },
+	VOPNAME_FSYNC,		{ .vop_fsync = pcfs_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = pcfs_inactive },
+	VOPNAME_FID,		{ .vop_fid = pcfs_fid },
+	VOPNAME_SEEK,		{ .vop_seek = pcfs_seek },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = pcfs_pathconf },
+	VOPNAME_VNEVENT,	{ .vop_vnevent = fs_vnevent_support },
+	NULL,			NULL
 };
 
 

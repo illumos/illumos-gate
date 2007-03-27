@@ -1189,6 +1189,7 @@ f none usr/include/sys/va_list.h 644 root bin
 f none usr/include/sys/var.h 644 root bin
 f none usr/include/sys/varargs.h 644 root bin
 f none usr/include/sys/vfs.h 644 root bin
+f none usr/include/sys/vfs_opreg.h 644 root bin
 f none usr/include/sys/vfstab.h 644 root bin
 f none usr/include/sys/videodev2.h 644 root bin
 f none usr/include/sys/vm.h 644 root bin

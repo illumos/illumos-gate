@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,41 +58,6 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-
-typedef int (*fs_generic_func_p) ();
-
-/*
- * File systems use arrays of fs_operation_def structures to form
- * name/value pairs of operations.  These arrays get passed to:
- *
- * 	- vn_make_ops() to create vnodeops
- * 	- vfs_makefsops()/vfs_setfsops() to create vfsops.
- */
-typedef struct fs_operation_def {
-	char *name;			/* name of operation (NULL at end) */
-	fs_generic_func_p func;		/* function implementing operation */
-} fs_operation_def_t;
-
-/*
- * The operation registration mechanism uses two master tables of operations:
- * one for vnode operations (vn_ops_table[]) and one for vfs operations
- * (vfs_ops_table[]).  These tables are arrays of fs_operation_trans_def
- * structures.  They contain all of the information necessary for the system
- * to populate an operations structure (e.g., vnodeops, vfsops).
- *
- * File systems call registration routines (vfs_setfsops(), vfs_makefsops(),
- * and vn_make_ops()) and pass in their operations specification tables
- * (arrays of fs_operation_def structures).  These routines use the master
- * table(s) of operations to build a vnodeops or vfsops structure.
- */
-typedef struct fs_operation_trans_def {
-	char *name;			/* name of operation (NULL at end) */
-	int offset;			/* byte offset within ops vector */
-	fs_generic_func_p defaultFunc;	/* default function */
-	fs_generic_func_p errorFunc; 	/* error function */
-} fs_operation_trans_def_t;
-
 
 /*
  * Statistics for all vnode operations.
@@ -562,74 +527,98 @@ struct seg;
 struct as;
 struct pollhead;
 
+#ifdef	_KERNEL
+
 /*
- * Operations on vnodes.  Note: File systems should never operate directly
+ * VNODE_OPS defines all the vnode operations.  It is used to define
+ * the vnodeops structure (below) and the fs_func_p union (vfs_opreg.h).
+ */
+#define	VNODE_OPS							\
+	int	(*vop_open)(vnode_t **, int, cred_t *);			\
+	int	(*vop_close)(vnode_t *, int, int, offset_t, cred_t *);	\
+	int	(*vop_read)(vnode_t *, uio_t *, int, cred_t *,		\
+				caller_context_t *);			\
+	int	(*vop_write)(vnode_t *, uio_t *, int, cred_t *,		\
+				caller_context_t *);			\
+	int	(*vop_ioctl)(vnode_t *, int, intptr_t, int, cred_t *,	\
+				int *);					\
+	int	(*vop_setfl)(vnode_t *, int, int, cred_t *);		\
+	int	(*vop_getattr)(vnode_t *, vattr_t *, int, cred_t *);	\
+	int	(*vop_setattr)(vnode_t *, vattr_t *, int, cred_t *,	\
+				caller_context_t *);			\
+	int	(*vop_access)(vnode_t *, int, int, cred_t *);		\
+	int	(*vop_lookup)(vnode_t *, char *, vnode_t **,		\
+				struct pathname *,			\
+				int, vnode_t *, cred_t *);		\
+	int	(*vop_create)(vnode_t *, char *, vattr_t *, vcexcl_t,	\
+				int, vnode_t **, cred_t *, int);	\
+	int	(*vop_remove)(vnode_t *, char *, cred_t *);		\
+	int	(*vop_link)(vnode_t *, vnode_t *, char *, cred_t *);	\
+	int	(*vop_rename)(vnode_t *, char *, vnode_t *, char *,	\
+				cred_t *);				\
+	int	(*vop_mkdir)(vnode_t *, char *, vattr_t *, vnode_t **,	\
+				cred_t *);				\
+	int	(*vop_rmdir)(vnode_t *, char *, vnode_t *, cred_t *);	\
+	int	(*vop_readdir)(vnode_t *, uio_t *, cred_t *, int *);	\
+	int	(*vop_symlink)(vnode_t *, char *, vattr_t *, char *,	\
+				cred_t *);				\
+	int	(*vop_readlink)(vnode_t *, uio_t *, cred_t *);		\
+	int	(*vop_fsync)(vnode_t *, int, cred_t *);			\
+	void	(*vop_inactive)(vnode_t *, cred_t *);			\
+	int	(*vop_fid)(vnode_t *, struct fid *);			\
+	int	(*vop_rwlock)(vnode_t *, int, caller_context_t *);	\
+	void	(*vop_rwunlock)(vnode_t *, int, caller_context_t *);	\
+	int	(*vop_seek)(vnode_t *, offset_t, offset_t *);		\
+	int	(*vop_cmp)(vnode_t *, vnode_t *);			\
+	int	(*vop_frlock)(vnode_t *, int, struct flock64 *,		\
+				int, offset_t,				\
+				struct flk_callback *, cred_t *);	\
+	int	(*vop_space)(vnode_t *, int, struct flock64 *,		\
+				int, offset_t,				\
+				cred_t *, caller_context_t *);		\
+	int	(*vop_realvp)(vnode_t *, vnode_t **);			\
+	int	(*vop_getpage)(vnode_t *, offset_t, size_t, uint_t *,	\
+				struct page **, size_t, struct seg *,	\
+				caddr_t, enum seg_rw, cred_t *);	\
+	int	(*vop_putpage)(vnode_t *, offset_t, size_t,		\
+				int, cred_t *);				\
+	int	(*vop_map)(vnode_t *, offset_t, struct as *,		\
+				caddr_t *, size_t,			\
+				uchar_t, uchar_t, uint_t, cred_t *);	\
+	int	(*vop_addmap)(vnode_t *, offset_t, struct as *,		\
+				caddr_t, size_t,			\
+				uchar_t, uchar_t, uint_t, cred_t *);	\
+	int	(*vop_delmap)(vnode_t *, offset_t, struct as *,		\
+				caddr_t, size_t,			\
+				uint_t, uint_t, uint_t, cred_t *);	\
+	int	(*vop_poll)(vnode_t *, short, int, short *,		\
+				struct pollhead **);			\
+	int	(*vop_dump)(vnode_t *, caddr_t, int, int);		\
+	int	(*vop_pathconf)(vnode_t *, int, ulong_t *, cred_t *);	\
+	int	(*vop_pageio)(vnode_t *, struct page *,			\
+				u_offset_t, size_t, int, cred_t *);	\
+	int	(*vop_dumpctl)(vnode_t *, int, int *);			\
+	void	(*vop_dispose)(vnode_t *, struct page *,		\
+				int, int, cred_t *);			\
+	int	(*vop_setsecattr)(vnode_t *, vsecattr_t *,		\
+				int, cred_t *);				\
+	int	(*vop_getsecattr)(vnode_t *, vsecattr_t *,		\
+				int, cred_t *);				\
+	int	(*vop_shrlock)(vnode_t *, int, struct shrlock *,	\
+				int, cred_t *);				\
+	int	(*vop_vnevent)(vnode_t *, vnevent_t)	/* NB: No ";" */
+
+/*
+ * Operations on vnodes.  Note: File systems must never operate directly
  * on a 'vnodeops' structure -- it WILL change in future releases!  They
- * should use vn_make_ops() to create the structure.
+ * must use vn_make_ops() to create the structure.
  */
 typedef struct vnodeops {
 	const char *vnop_name;
-	int	(*vop_open)(vnode_t **, int, cred_t *);
-	int	(*vop_close)(vnode_t *, int, int, offset_t, cred_t *);
-	int	(*vop_read)(vnode_t *, uio_t *, int, cred_t *,
-				caller_context_t *);
-	int	(*vop_write)(vnode_t *, uio_t *, int, cred_t *,
-				caller_context_t *);
-	int	(*vop_ioctl)(vnode_t *, int, intptr_t, int, cred_t *, int *);
-	int	(*vop_setfl)(vnode_t *, int, int, cred_t *);
-	int	(*vop_getattr)(vnode_t *, vattr_t *, int, cred_t *);
-	int	(*vop_setattr)(vnode_t *, vattr_t *, int, cred_t *,
-				caller_context_t *);
-	int	(*vop_access)(vnode_t *, int, int, cred_t *);
-	int	(*vop_lookup)(vnode_t *, char *, vnode_t **, struct pathname *,
-				int, vnode_t *, cred_t *);
-	int	(*vop_create)(vnode_t *, char *, vattr_t *, vcexcl_t, int,
-				vnode_t **, cred_t *, int);
-	int	(*vop_remove)(vnode_t *, char *, cred_t *);
-	int	(*vop_link)(vnode_t *, vnode_t *, char *, cred_t *);
-	int	(*vop_rename)(vnode_t *, char *, vnode_t *, char *, cred_t *);
-	int	(*vop_mkdir)(vnode_t *, char *, vattr_t *, vnode_t **,
-				cred_t *);
-	int	(*vop_rmdir)(vnode_t *, char *, vnode_t *, cred_t *);
-	int	(*vop_readdir)(vnode_t *, uio_t *, cred_t *, int *);
-	int	(*vop_symlink)(vnode_t *, char *, vattr_t *, char *, cred_t *);
-	int	(*vop_readlink)(vnode_t *, uio_t *, cred_t *);
-	int	(*vop_fsync)(vnode_t *, int, cred_t *);
-	void	(*vop_inactive)(vnode_t *, cred_t *);
-	int	(*vop_fid)(vnode_t *, struct fid *);
-	int	(*vop_rwlock)(vnode_t *, int, caller_context_t *);
-	void	(*vop_rwunlock)(vnode_t *, int, caller_context_t *);
-	int	(*vop_seek)(vnode_t *, offset_t, offset_t *);
-	int	(*vop_cmp)(vnode_t *, vnode_t *);
-	int	(*vop_frlock)(vnode_t *, int, struct flock64 *, int, offset_t,
-				struct flk_callback *, cred_t *);
-	int	(*vop_space)(vnode_t *, int, struct flock64 *, int, offset_t,
-				cred_t *, caller_context_t *);
-	int	(*vop_realvp)(vnode_t *, vnode_t **);
-	int	(*vop_getpage)(vnode_t *, offset_t, size_t, uint_t *,
-				struct page **, size_t, struct seg *,
-				caddr_t, enum seg_rw, cred_t *);
-	int	(*vop_putpage)(vnode_t *, offset_t, size_t, int, cred_t *);
-	int	(*vop_map)(vnode_t *, offset_t, struct as *, caddr_t *, size_t,
-				uchar_t, uchar_t, uint_t, cred_t *);
-	int	(*vop_addmap)(vnode_t *, offset_t, struct as *, caddr_t, size_t,
-				uchar_t, uchar_t, uint_t, cred_t *);
-	int	(*vop_delmap)(vnode_t *, offset_t, struct as *, caddr_t, size_t,
-				uint_t, uint_t, uint_t, cred_t *);
-	int	(*vop_poll)(vnode_t *, short, int, short *, struct pollhead **);
-	int	(*vop_dump)(vnode_t *, caddr_t, int, int);
-	int	(*vop_pathconf)(vnode_t *, int, ulong_t *, cred_t *);
-	int	(*vop_pageio)(vnode_t *, struct page *, u_offset_t, size_t,
-				int, cred_t *);
-	int	(*vop_dumpctl)(vnode_t *, int, int *);
-	void	(*vop_dispose)(vnode_t *, struct page *, int, int, cred_t *);
-	int	(*vop_setsecattr)(vnode_t *, vsecattr_t *, int, cred_t *);
-	int	(*vop_getsecattr)(vnode_t *, vsecattr_t *, int, cred_t *);
-	int	(*vop_shrlock)(vnode_t *, int, struct shrlock *, int, cred_t *);
-	int	(*vop_vnevent)(vnode_t *, vnevent_t);
+	VNODE_OPS;	/* Signatures of all vnode operations (vops) */
 } vnodeops_t;
 
-#ifdef	_KERNEL
+typedef int (*fs_generic_func_p) ();	/* Generic vop/vfsop/femop/fsemop ptr */
 
 extern int	fop_open(vnode_t **, int, cred_t *);
 extern int	fop_close(vnode_t *, int, int, offset_t, cred_t *);
@@ -876,7 +865,6 @@ struct vfs *vn_mountedvfs(vnode_t *);
 void	vn_create_cache(void);
 void	vn_destroy_cache(void);
 
-int	vn_make_ops(const char *, const fs_operation_def_t *, vnodeops_t **);
 void	vn_freevnodeops(vnodeops_t *);
 
 int	vn_open(char *pnamep, enum uio_seg seg, int filemode, int createmode,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 #include <sys/time.h>
 #include <sys/vnode.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/file.h>
 #include <sys/filio.h>
 #include <sys/uio.h>
@@ -216,46 +217,47 @@ static int	nfs3_shrlock(vnode_t *, int, struct shrlock *, int, cred_t *);
 struct vnodeops *nfs3_vnodeops;
 
 const fs_operation_def_t nfs3_vnodeops_template[] = {
-	VOPNAME_OPEN, nfs3_open,
-	VOPNAME_CLOSE, nfs3_close,
-	VOPNAME_READ, nfs3_read,
-	VOPNAME_WRITE, nfs3_write,
-	VOPNAME_IOCTL, nfs3_ioctl,
-	VOPNAME_GETATTR, nfs3_getattr,
-	VOPNAME_SETATTR, nfs3_setattr,
-	VOPNAME_ACCESS, nfs3_access,
-	VOPNAME_LOOKUP, nfs3_lookup,
-	VOPNAME_CREATE, nfs3_create,
-	VOPNAME_REMOVE, nfs3_remove,
-	VOPNAME_LINK, nfs3_link,
-	VOPNAME_RENAME, nfs3_rename,
-	VOPNAME_MKDIR, nfs3_mkdir,
-	VOPNAME_RMDIR, nfs3_rmdir,
-	VOPNAME_READDIR, nfs3_readdir,
-	VOPNAME_SYMLINK, nfs3_symlink,
-	VOPNAME_READLINK, nfs3_readlink,
-	VOPNAME_FSYNC, nfs3_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) nfs3_inactive,
-	VOPNAME_FID, nfs3_fid,
-	VOPNAME_RWLOCK, nfs3_rwlock,
-	VOPNAME_RWUNLOCK, (fs_generic_func_p) nfs3_rwunlock,
-	VOPNAME_SEEK, nfs3_seek,
-	VOPNAME_FRLOCK, nfs3_frlock,
-	VOPNAME_SPACE, nfs3_space,
-	VOPNAME_REALVP, nfs3_realvp,
-	VOPNAME_GETPAGE, nfs3_getpage,
-	VOPNAME_PUTPAGE, nfs3_putpage,
-	VOPNAME_MAP, (fs_generic_func_p) nfs3_map,
-	VOPNAME_ADDMAP, (fs_generic_func_p) nfs3_addmap,
-	VOPNAME_DELMAP, nfs3_delmap,
-	VOPNAME_DUMP, nfs_dump,		/* there is no separate nfs3_dump */
-	VOPNAME_PATHCONF, nfs3_pathconf,
-	VOPNAME_PAGEIO, nfs3_pageio,
-	VOPNAME_DISPOSE, (fs_generic_func_p) nfs3_dispose,
-	VOPNAME_SETSECATTR, nfs3_setsecattr,
-	VOPNAME_GETSECATTR, nfs3_getsecattr,
-	VOPNAME_SHRLOCK, nfs3_shrlock,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = nfs3_open },
+	VOPNAME_CLOSE,		{ .vop_close = nfs3_close },
+	VOPNAME_READ,		{ .vop_read = nfs3_read },
+	VOPNAME_WRITE,		{ .vop_write = nfs3_write },
+	VOPNAME_IOCTL,		{ .vop_ioctl = nfs3_ioctl },
+	VOPNAME_GETATTR,	{ .vop_getattr = nfs3_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = nfs3_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = nfs3_access },
+	VOPNAME_LOOKUP,		{ .vop_lookup = nfs3_lookup },
+	VOPNAME_CREATE,		{ .vop_create = nfs3_create },
+	VOPNAME_REMOVE,		{ .vop_remove = nfs3_remove },
+	VOPNAME_LINK,		{ .vop_link = nfs3_link },
+	VOPNAME_RENAME,		{ .vop_rename = nfs3_rename },
+	VOPNAME_MKDIR,		{ .vop_mkdir = nfs3_mkdir },
+	VOPNAME_RMDIR,		{ .vop_rmdir = nfs3_rmdir },
+	VOPNAME_READDIR,	{ .vop_readdir = nfs3_readdir },
+	VOPNAME_SYMLINK,	{ .vop_symlink = nfs3_symlink },
+	VOPNAME_READLINK,	{ .vop_readlink = nfs3_readlink },
+	VOPNAME_FSYNC,		{ .vop_fsync = nfs3_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = nfs3_inactive },
+	VOPNAME_FID,		{ .vop_fid = nfs3_fid },
+	VOPNAME_RWLOCK,		{ .vop_rwlock = nfs3_rwlock },
+	VOPNAME_RWUNLOCK,	{ .vop_rwunlock = nfs3_rwunlock },
+	VOPNAME_SEEK,		{ .vop_seek = nfs3_seek },
+	VOPNAME_FRLOCK,		{ .vop_frlock = nfs3_frlock },
+	VOPNAME_SPACE,		{ .vop_space = nfs3_space },
+	VOPNAME_REALVP,		{ .vop_realvp = nfs3_realvp },
+	VOPNAME_GETPAGE,	{ .vop_getpage = nfs3_getpage },
+	VOPNAME_PUTPAGE,	{ .vop_putpage = nfs3_putpage },
+	VOPNAME_MAP,		{ .vop_map = nfs3_map },
+	VOPNAME_ADDMAP,		{ .vop_addmap = nfs3_addmap },
+	VOPNAME_DELMAP,		{ .vop_delmap = nfs3_delmap },
+	/* no separate nfs3_dump */
+	VOPNAME_DUMP,		{ .vop_dump = nfs_dump },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = nfs3_pathconf },
+	VOPNAME_PAGEIO,		{ .vop_pageio = nfs3_pageio },
+	VOPNAME_DISPOSE,	{ .vop_dispose = nfs3_dispose },
+	VOPNAME_SETSECATTR,	{ .vop_setsecattr = nfs3_setsecattr },
+	VOPNAME_GETSECATTR,	{ .vop_getsecattr = nfs3_getsecattr },
+	VOPNAME_SHRLOCK,	{ .vop_shrlock = nfs3_shrlock },
+	NULL,			NULL
 };
 
 /*

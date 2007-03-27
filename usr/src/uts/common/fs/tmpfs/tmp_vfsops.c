@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 #include <sys/time.h>
 #include <sys/pathname.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/stat.h>
 #include <sys/uio.h>
@@ -173,12 +174,12 @@ static int
 tmpfsinit(int fstype, char *name)
 {
 	static const fs_operation_def_t tmp_vfsops_template[] = {
-		VFSNAME_MOUNT, tmp_mount,
-		VFSNAME_UNMOUNT, tmp_unmount,
-		VFSNAME_ROOT, tmp_root,
-		VFSNAME_STATVFS, tmp_statvfs,
-		VFSNAME_VGET, tmp_vget,
-		NULL, NULL
+		VFSNAME_MOUNT,		{ .vfs_mount = tmp_mount },
+		VFSNAME_UNMOUNT,	{ .vfs_unmount = tmp_unmount },
+		VFSNAME_ROOT,		{ .vfs_root = tmp_root },
+		VFSNAME_STATVFS,	{ .vfs_statvfs = tmp_statvfs },
+		VFSNAME_VGET,		{ .vfs_vget = tmp_vget },
+		NULL,			NULL
 	};
 	int error;
 	extern  void    tmpfs_hash_init();

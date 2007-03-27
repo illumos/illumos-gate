@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,7 @@
 #include <sys/uio.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
+#include <sys/vfs_opreg.h>
 #include <sys/pathname.h>
 #include <sys/signal.h>
 #include <sys/user.h>
@@ -110,28 +111,28 @@ struct  streamtab fifoinfo = { &fifo_strdata, &fifo_stwdata, NULL, NULL };
 struct vnodeops *fifo_vnodeops;
 
 const fs_operation_def_t fifo_vnodeops_template[] = {
-	VOPNAME_OPEN, fifo_open,
-	VOPNAME_CLOSE, fifo_close,
-	VOPNAME_READ, fifo_read,
-	VOPNAME_WRITE, fifo_write,
-	VOPNAME_IOCTL, fifo_ioctl,
-	VOPNAME_GETATTR, fifo_getattr,
-	VOPNAME_SETATTR, fifo_setattr,
-	VOPNAME_ACCESS, fifo_access,
-	VOPNAME_CREATE, fifo_create,
-	VOPNAME_FSYNC, fifo_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) fifo_inactive,
-	VOPNAME_FID, fifo_fid,
-	VOPNAME_RWLOCK, fifo_rwlock,
-	VOPNAME_RWUNLOCK, (fs_generic_func_p) fifo_rwunlock,
-	VOPNAME_SEEK, fifo_seek,
-	VOPNAME_REALVP, fifo_realvp,
-	VOPNAME_POLL, (fs_generic_func_p) fifo_poll,
-	VOPNAME_PATHCONF, fifo_pathconf,
-	VOPNAME_DISPOSE, fs_error,
-	VOPNAME_SETSECATTR, fifo_setsecattr,
-	VOPNAME_GETSECATTR, fifo_getsecattr,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = fifo_open },
+	VOPNAME_CLOSE,		{ .vop_close = fifo_close },
+	VOPNAME_READ,		{ .vop_read = fifo_read },
+	VOPNAME_WRITE,		{ .vop_write = fifo_write },
+	VOPNAME_IOCTL,		{ .vop_ioctl = fifo_ioctl },
+	VOPNAME_GETATTR,	{ .vop_getattr = fifo_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = fifo_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = fifo_access },
+	VOPNAME_CREATE,		{ .vop_create = fifo_create },
+	VOPNAME_FSYNC,		{ .vop_fsync = fifo_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = fifo_inactive },
+	VOPNAME_FID,		{ .vop_fid = fifo_fid },
+	VOPNAME_RWLOCK,		{ .vop_rwlock = fifo_rwlock },
+	VOPNAME_RWUNLOCK,	{ .vop_rwunlock = fifo_rwunlock },
+	VOPNAME_SEEK,		{ .vop_seek = fifo_seek },
+	VOPNAME_REALVP,		{ .vop_realvp = fifo_realvp },
+	VOPNAME_POLL,		{ .vop_poll = fifo_poll },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = fifo_pathconf },
+	VOPNAME_DISPOSE,	{ .error = fs_error },
+	VOPNAME_SETSECATTR,	{ .vop_setsecattr = fifo_setsecattr },
+	VOPNAME_GETSECATTR,	{ .vop_getsecattr = fifo_getsecattr },
+	NULL,			NULL
 };
 
 /*

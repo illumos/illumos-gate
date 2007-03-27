@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -310,20 +310,26 @@ enum vntrans {
 };
 typedef enum vntrans vntrans_t;
 
+/*
+ * VFS_OPS defines all the vfs operations.  It is used to define
+ * the vfsops structure (below) and the fs_func_p union (vfs_opreg.h).
+ */
+#define	VFS_OPS								\
+	int	(*vfs_mount)(vfs_t *, vnode_t *, struct mounta *, cred_t *); \
+	int	(*vfs_unmount)(vfs_t *, int, cred_t *);			\
+	int	(*vfs_root)(vfs_t *, vnode_t **);			\
+	int	(*vfs_statvfs)(vfs_t *, statvfs64_t *);			\
+	int	(*vfs_sync)(vfs_t *, short, cred_t *);			\
+	int	(*vfs_vget)(vfs_t *, vnode_t **, fid_t *);		\
+	int	(*vfs_mountroot)(vfs_t *, enum whymountroot);		\
+	void	(*vfs_freevfs)(vfs_t *);				\
+	int	(*vfs_vnstate)(vfs_t *, vnode_t *, vntrans_t)	/* NB: No ";" */
 
 /*
  * Operations supported on virtual file system.
  */
 struct vfsops {
-	int	(*vfs_mount)(vfs_t *, vnode_t *, struct mounta *, cred_t *);
-	int	(*vfs_unmount)(vfs_t *, int, cred_t *);
-	int	(*vfs_root)(vfs_t *, vnode_t **);
-	int	(*vfs_statvfs)(vfs_t *, statvfs64_t *);
-	int	(*vfs_sync)(vfs_t *, short, cred_t *);
-	int	(*vfs_vget)(vfs_t *, vnode_t **, fid_t *);
-	int	(*vfs_mountroot)(vfs_t *, enum whymountroot);
-	int	(*vfs_freevfs)(vfs_t *);
-	int	(*vfs_vnstate)(vfs_t *, vnode_t *, vntrans_t);
+	VFS_OPS;	/* Signature of all vfs operations (vfsops) */
 };
 
 extern int	fsop_mount(vfs_t *, vnode_t *, struct mounta *, cred_t *);
@@ -391,17 +397,6 @@ enum {
 };
 
 /*
- * Generic operations vector types (used for vfs/vnode ops registration).
- */
-
-extern int fs_default();		/* "default" function placeholder */
-extern int fs_error();			/* "error" function placeholder */
-
-int fs_build_vector(void *vector, int *unused_ops,
-    const fs_operation_trans_def_t *translation,
-    const fs_operation_def_t *operations);
-
-/*
  * flags for vfssw and vfsdef
  */
 #define	VSW_HASPROTO	0x01	/* struct has a mount options prototype */
@@ -421,8 +416,6 @@ struct umounta;
 struct statvfsa;
 struct fstatvfsa;
 
-int	vfs_setfsops(int, const fs_operation_def_t *, vfsops_t **);
-int	vfs_makefsops(const fs_operation_def_t *, vfsops_t **);
 void	vfs_freevfsops(vfsops_t *);
 int	vfs_freevfsops_by_type(int);
 void	vfs_setops(vfs_t *, vfsops_t *);

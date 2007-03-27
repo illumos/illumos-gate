@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@
 #include <sys/user.h>
 #include <sys/buf.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/stat.h>
 #include <sys/vnode.h>
 #include <sys/mode.h>
@@ -1331,26 +1332,26 @@ hsfs_pathconf(struct vnode *vp, int cmd, ulong_t *valp, struct cred *cr)
 
 
 const fs_operation_def_t hsfs_vnodeops_template[] = {
-	VOPNAME_OPEN, hsfs_open,
-	VOPNAME_CLOSE, hsfs_close,
-	VOPNAME_READ, hsfs_read,
-	VOPNAME_GETATTR, hsfs_getattr,
-	VOPNAME_ACCESS, hsfs_access,
-	VOPNAME_LOOKUP, hsfs_lookup,
-	VOPNAME_READDIR, hsfs_readdir,
-	VOPNAME_READLINK, hsfs_readlink,
-	VOPNAME_FSYNC, hsfs_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) hsfs_inactive,
-	VOPNAME_FID, hsfs_fid,
-	VOPNAME_SEEK, hsfs_seek,
-	VOPNAME_FRLOCK, hsfs_frlock,
-	VOPNAME_GETPAGE, hsfs_getpage,
-	VOPNAME_PUTPAGE, hsfs_putpage,
-	VOPNAME_MAP, (fs_generic_func_p) hsfs_map,
-	VOPNAME_ADDMAP, (fs_generic_func_p) hsfs_addmap,
-	VOPNAME_DELMAP, hsfs_delmap,
-	VOPNAME_PATHCONF, hsfs_pathconf,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = hsfs_open },
+	VOPNAME_CLOSE,		{ .vop_close = hsfs_close },
+	VOPNAME_READ,		{ .vop_read = hsfs_read },
+	VOPNAME_GETATTR,	{ .vop_getattr = hsfs_getattr },
+	VOPNAME_ACCESS,		{ .vop_access = hsfs_access },
+	VOPNAME_LOOKUP,		{ .vop_lookup = hsfs_lookup },
+	VOPNAME_READDIR,	{ .vop_readdir = hsfs_readdir },
+	VOPNAME_READLINK,	{ .vop_readlink = hsfs_readlink },
+	VOPNAME_FSYNC,		{ .vop_fsync = hsfs_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = hsfs_inactive },
+	VOPNAME_FID,		{ .vop_fid = hsfs_fid },
+	VOPNAME_SEEK,		{ .vop_seek = hsfs_seek },
+	VOPNAME_FRLOCK,		{ .vop_frlock = hsfs_frlock },
+	VOPNAME_GETPAGE,	{ .vop_getpage = hsfs_getpage },
+	VOPNAME_PUTPAGE,	{ .vop_putpage = hsfs_putpage },
+	VOPNAME_MAP,		{ .vop_map = hsfs_map },
+	VOPNAME_ADDMAP,		{ .vop_addmap = hsfs_addmap },
+	VOPNAME_DELMAP,		{ .vop_delmap = hsfs_delmap },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = hsfs_pathconf },
+	NULL,			NULL
 };
 
 struct vnodeops *hsfs_vnodeops;

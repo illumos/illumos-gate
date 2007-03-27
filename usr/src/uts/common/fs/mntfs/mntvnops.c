@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +35,7 @@
 #include <sys/sysmacros.h>
 #include <sys/systm.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/fs/mntdata.h>
 #include <fs/fs_subr.h>
 #include <sys/vmsystm.h>
@@ -1133,17 +1133,17 @@ mntioctl(struct vnode *vp, int cmd, intptr_t arg, int flag,
  * /mntfs vnode operations vector
  */
 const fs_operation_def_t mnt_vnodeops_template[] = {
-	VOPNAME_OPEN, mntopen,
-	VOPNAME_CLOSE, mntclose,
-	VOPNAME_READ, mntread,
-	VOPNAME_IOCTL, mntioctl,
-	VOPNAME_GETATTR, mntgetattr,
-	VOPNAME_ACCESS, mntaccess,
-	VOPNAME_FSYNC, mntfsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) mntinactive,
-	VOPNAME_SEEK, mntseek,
-	VOPNAME_POLL, (fs_generic_func_p) mntpoll,
-	VOPNAME_DISPOSE, fs_error,
-	VOPNAME_SHRLOCK, fs_error,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = mntopen },
+	VOPNAME_CLOSE,		{ .vop_close = mntclose },
+	VOPNAME_READ,		{ .vop_read = mntread },
+	VOPNAME_IOCTL,		{ .vop_ioctl = mntioctl },
+	VOPNAME_GETATTR,	{ .vop_getattr = mntgetattr },
+	VOPNAME_ACCESS,		{ .vop_access = mntaccess },
+	VOPNAME_FSYNC,		{ .vop_fsync = mntfsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = mntinactive },
+	VOPNAME_SEEK,		{ .vop_seek = mntseek },
+	VOPNAME_POLL,		{ .vop_poll = mntpoll },
+	VOPNAME_DISPOSE,	{ .error = fs_error },
+	VOPNAME_SHRLOCK,	{ .error = fs_error },
+	NULL,			NULL
 };

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 #include <sys/disp.h>
 #include <sys/buf.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/fdio.h>
 #include <sys/file.h>
@@ -225,14 +226,14 @@ static int
 pcfsinit(int fstype, char *name)
 {
 	static const fs_operation_def_t pcfs_vfsops_template[] = {
-		VFSNAME_MOUNT, pcfs_mount,
-		VFSNAME_UNMOUNT, pcfs_unmount,
-		VFSNAME_ROOT, pcfs_root,
-		VFSNAME_STATVFS, pcfs_statvfs,
-		VFSNAME_SYNC, (fs_generic_func_p) pcfs_sync,
-		VFSNAME_VGET, pcfs_vget,
-		VFSNAME_FREEVFS, (fs_generic_func_p) pcfs_freevfs,
-		NULL, NULL
+		VFSNAME_MOUNT,		{ .vfs_mount = pcfs_mount },
+		VFSNAME_UNMOUNT,	{ .vfs_unmount = pcfs_unmount },
+		VFSNAME_ROOT,		{ .vfs_root = pcfs_root },
+		VFSNAME_STATVFS,	{ .vfs_statvfs = pcfs_statvfs },
+		VFSNAME_SYNC,		{ .vfs_sync = pcfs_sync },
+		VFSNAME_VGET,		{ .vfs_vget = pcfs_vget },
+		VFSNAME_FREEVFS,	{ .vfs_freevfs = pcfs_freevfs },
+		NULL,			NULL
 	};
 	int error;
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,7 @@
 #include <sys/zfs_ctldir.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/zfs_vfsops.h>
+#include <sys/vfs_opreg.h>
 #include <sys/gfs.h>
 #include <sys/stat.h>
 #include <sys/dmu.h>
@@ -384,16 +385,16 @@ zfsctl_root_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, pathname_t *pnp,
 }
 
 static const fs_operation_def_t zfsctl_tops_root[] = {
-	{ VOPNAME_OPEN,		zfsctl_common_open			},
-	{ VOPNAME_CLOSE,	zfsctl_common_close			},
-	{ VOPNAME_IOCTL,	fs_inval				},
-	{ VOPNAME_GETATTR,	zfsctl_root_getattr			},
-	{ VOPNAME_ACCESS,	zfsctl_common_access			},
-	{ VOPNAME_READDIR,	gfs_vop_readdir				},
-	{ VOPNAME_LOOKUP,	zfsctl_root_lookup			},
-	{ VOPNAME_SEEK,		fs_seek					},
-	{ VOPNAME_INACTIVE,	(fs_generic_func_p) gfs_vop_inactive	},
-	{ VOPNAME_FID,		zfsctl_common_fid			},
+	{ VOPNAME_OPEN,		{ .vop_open = zfsctl_common_open }	},
+	{ VOPNAME_CLOSE,	{ .vop_close = zfsctl_common_close }	},
+	{ VOPNAME_IOCTL,	{ .error = fs_inval }			},
+	{ VOPNAME_GETATTR,	{ .vop_getattr = zfsctl_root_getattr }	},
+	{ VOPNAME_ACCESS,	{ .vop_access = zfsctl_common_access }	},
+	{ VOPNAME_READDIR,	{ .vop_readdir = gfs_vop_readdir } 	},
+	{ VOPNAME_LOOKUP,	{ .vop_lookup = zfsctl_root_lookup }	},
+	{ VOPNAME_SEEK,		{ .vop_seek = fs_seek }			},
+	{ VOPNAME_INACTIVE,	{ .vop_inactive = gfs_vop_inactive }	},
+	{ VOPNAME_FID,		{ .vop_fid = zfsctl_common_fid	}	},
 	{ NULL }
 };
 
@@ -788,18 +789,18 @@ zfsctl_snapdir_inactive(vnode_t *vp, cred_t *cr)
 }
 
 static const fs_operation_def_t zfsctl_tops_snapdir[] = {
-	{ VOPNAME_OPEN,		zfsctl_common_open			},
-	{ VOPNAME_CLOSE,	zfsctl_common_close			},
-	{ VOPNAME_IOCTL,	fs_inval				},
-	{ VOPNAME_GETATTR,	zfsctl_snapdir_getattr			},
-	{ VOPNAME_ACCESS,	zfsctl_common_access			},
-	{ VOPNAME_RENAME,	zfsctl_snapdir_rename			},
-	{ VOPNAME_RMDIR,	zfsctl_snapdir_remove			},
-	{ VOPNAME_READDIR,	gfs_vop_readdir				},
-	{ VOPNAME_LOOKUP,	zfsctl_snapdir_lookup			},
-	{ VOPNAME_SEEK,		fs_seek					},
-	{ VOPNAME_INACTIVE,	(fs_generic_func_p) zfsctl_snapdir_inactive },
-	{ VOPNAME_FID,		zfsctl_common_fid			},
+	{ VOPNAME_OPEN,		{ .vop_open = zfsctl_common_open }	},
+	{ VOPNAME_CLOSE,	{ .vop_close = zfsctl_common_close }	},
+	{ VOPNAME_IOCTL,	{ .error = fs_inval }			},
+	{ VOPNAME_GETATTR,	{ .vop_getattr = zfsctl_snapdir_getattr } },
+	{ VOPNAME_ACCESS,	{ .vop_access = zfsctl_common_access }	},
+	{ VOPNAME_RENAME,	{ .vop_rename = zfsctl_snapdir_rename }	},
+	{ VOPNAME_RMDIR,	{ .vop_rmdir = zfsctl_snapdir_remove }	},
+	{ VOPNAME_READDIR,	{ .vop_readdir = gfs_vop_readdir }	},
+	{ VOPNAME_LOOKUP,	{ .vop_lookup = zfsctl_snapdir_lookup }	},
+	{ VOPNAME_SEEK,		{ .vop_seek = fs_seek }			},
+	{ VOPNAME_INACTIVE,	{ .vop_inactive = zfsctl_snapdir_inactive } },
+	{ VOPNAME_FID,		{ .vop_fid = zfsctl_common_fid }	},
 	{ NULL }
 };
 
@@ -868,7 +869,7 @@ zfsctl_snapshot_inactive(vnode_t *vp, cred_t *cr)
  * be covered.
  */
 static const fs_operation_def_t zfsctl_tops_snapshot[] = {
-	VOPNAME_INACTIVE, (fs_generic_func_p) zfsctl_snapshot_inactive,
+	VOPNAME_INACTIVE, { .vop_inactive =  zfsctl_snapshot_inactive },
 	NULL, NULL
 };
 

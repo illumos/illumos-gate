@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +41,8 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#ifdef	_KERNEL
 
 struct fs_operation_def;	/* from vfs.h */
 
@@ -90,7 +91,6 @@ typedef struct fem fem_t;
 typedef struct fsem    fsem_t;
 
 typedef int femop_t();
-typedef int vop_t();
 
 /*
  * The following enumerations specify the conditions
@@ -141,107 +141,128 @@ struct fem_head {
 	struct fem_list *femh_list;
 };
 
+/*
+ * FEM_OPS defines all the FEM operations.  It is used to define
+ * the fem structure (below) and the fs_func_p union (vfs_opreg.h).
+ */
+#define	FEM_OPS								\
+	int (*femop_open)(femarg_t *vf, int mode, cred_t *cr);		\
+	int (*femop_close)(femarg_t *vf, int flag, int count,		\
+			offset_t offset, cred_t *cr);			\
+	int (*femop_read)(femarg_t *vf, uio_t *uiop, int ioflag,	\
+			cred_t *cr, struct caller_context *ct);		\
+	int (*femop_write)(femarg_t *vf, uio_t *uiop, int ioflag,	\
+			cred_t *cr, struct caller_context *ct);		\
+	int (*femop_ioctl)(femarg_t *vf, int cmd, intptr_t arg,		\
+			int flag, cred_t *cr, int *rvalp);		\
+	int (*femop_setfl)(femarg_t *vf, int oflags, int nflags,	\
+			cred_t *cr);					\
+	int (*femop_getattr)(femarg_t *vf, vattr_t *vap, int flags,	\
+			cred_t *cr);					\
+	int (*femop_setattr)(femarg_t *vf, vattr_t *vap, int flags,	\
+			cred_t *cr, caller_context_t *ct);		\
+	int (*femop_access)(femarg_t *vf, int mode, int flags,		\
+			cred_t *cr);					\
+	int (*femop_lookup)(femarg_t *vf, char *nm, vnode_t **vpp,	\
+			pathname_t *pnp, int flags, vnode_t *rdir,	\
+			cred_t *cr);					\
+	int (*femop_create)(femarg_t *vf, char *name, vattr_t *vap,	\
+			vcexcl_t excl, int mode, vnode_t **vpp,		\
+			cred_t *cr, int flag);				\
+	int (*femop_remove)(femarg_t *vf, char *nm, cred_t *cr);	\
+	int (*femop_link)(femarg_t *vf, vnode_t *svp, char *tnm,	\
+			cred_t *cr);					\
+	int (*femop_rename)(femarg_t *vf, char *snm, vnode_t *tdvp,	\
+			char *tnm, cred_t *cr);				\
+	int (*femop_mkdir)(femarg_t *vf, char *dirname, vattr_t *vap,	\
+			vnode_t **vpp, cred_t *cr);			\
+	int (*femop_rmdir)(femarg_t *vf, char *nm, vnode_t *cdir,	\
+			cred_t *cr);					\
+	int (*femop_readdir)(femarg_t *vf, uio_t *uiop, cred_t *cr,	\
+			int *eofp);					\
+	int (*femop_symlink)(femarg_t *vf, char *linkname,		\
+			vattr_t *vap, char *target, cred_t *cr);	\
+	int (*femop_readlink)(femarg_t *vf, uio_t *uiop, cred_t *cr);	\
+	int (*femop_fsync)(femarg_t *vf, int syncflag, cred_t *cr);	\
+	void (*femop_inactive)(femarg_t *vf, cred_t *cr);		\
+	int (*femop_fid)(femarg_t *vf, fid_t *fidp);			\
+	int (*femop_rwlock)(femarg_t *vf, int write_lock,		\
+			caller_context_t *ct);				\
+	void (*femop_rwunlock)(femarg_t *vf, int write_lock,		\
+			caller_context_t *ct);				\
+	int (*femop_seek)(femarg_t *vf, offset_t ooff,			\
+			offset_t *noffp);				\
+	int (*femop_cmp)(femarg_t *vf, vnode_t *vp2);			\
+	int (*femop_frlock)(femarg_t *vf, int cmd, struct flock64 *bfp,	\
+			int flag, offset_t offset,			\
+			struct flk_callback *flk_cbp, cred_t *cr);	\
+	int (*femop_space)(femarg_t *vf, int cmd, struct flock64 *bfp,	\
+			int flag, offset_t offset, cred_t *cr,		\
+			caller_context_t *ct);				\
+	int (*femop_realvp)(femarg_t *vf, vnode_t **vpp);		\
+	int (*femop_getpage)(femarg_t *vf, offset_t off, size_t len,	\
+			uint_t *protp, struct page **plarr,		\
+			size_t plsz, struct seg *seg, caddr_t addr,	\
+			enum seg_rw rw,	cred_t *cr);			\
+	int (*femop_putpage)(femarg_t *vf, offset_t off, size_t len,	\
+			int flags, cred_t *cr);				\
+	int (*femop_map)(femarg_t *vf, offset_t off, struct as *as,	\
+			caddr_t *addrp, size_t len, uchar_t prot,	\
+			uchar_t maxprot, uint_t flags, cred_t *cr);	\
+	int (*femop_addmap)(femarg_t *vf, offset_t off, struct as *as,	\
+			caddr_t addr, size_t len, uchar_t prot,		\
+			uchar_t maxprot, uint_t flags, cred_t *cr);	\
+	int (*femop_delmap)(femarg_t *vf, offset_t off, struct as *as,	\
+			caddr_t addr, size_t len, uint_t prot,		\
+			uint_t maxprot, uint_t flags, cred_t *cr);	\
+	int (*femop_poll)(femarg_t *vf, short events, int anyyet,	\
+			short *reventsp, struct pollhead **phpp);	\
+	int (*femop_dump)(femarg_t *vf, caddr_t addr, int lbdn,		\
+			int dblks); 					\
+	int (*femop_pathconf)(femarg_t *vf, int cmd, ulong_t *valp,	\
+			cred_t *cr);					\
+	int (*femop_pageio)(femarg_t *vf, struct page *pp,		\
+			u_offset_t io_off, size_t io_len, int flags,	\
+			cred_t *cr);					\
+	int (*femop_dumpctl)(femarg_t *vf, int action, int *blkp);	\
+	void (*femop_dispose)(femarg_t *vf, struct page *pp, int flag,	\
+			int dn, cred_t *cr);				\
+	int (*femop_setsecattr)(femarg_t *vf, vsecattr_t *vsap,		\
+			int flag, cred_t *cr);				\
+	int (*femop_getsecattr)(femarg_t *vf, vsecattr_t *vsap,		\
+			int flag, cred_t *cr);				\
+	int (*femop_shrlock)(femarg_t *vf, int cmd,			\
+			struct shrlock *shr, int flag, cred_t *cr);	\
+	int (*femop_vnevent)(femarg_t *vf, vnevent_t vnevent)	/* NB: No ";" */
+
 struct fem {
 	const char *name;
 	const struct fs_operation_def *templ;
-	int (*vsop_open)(femarg_t *vf, int mode, cred_t *cr);
-	int (*vsop_close)(femarg_t *vf, int flag, int count,
-			offset_t offset, cred_t *cr);
-	int (*vsop_read)(femarg_t *vf, uio_t *uiop, int ioflag, cred_t *cr,
-			struct caller_context *ct);
-	int (*vsop_write)(femarg_t *vf, uio_t *uiop, int ioflag,
-			cred_t *cr, struct caller_context *ct);
-	int (*vsop_ioctl)(femarg_t *vf, int cmd, intptr_t arg, int flag,
-			cred_t *cr, int *rvalp);
-	int (*vsop_setfl)(femarg_t *vf, int oflags, int nflags, cred_t *cr);
-	int (*vsop_getattr)(femarg_t *vf, vattr_t *vap, int flags,
-			cred_t *cr);
-	int (*vsop_setattr)(femarg_t *vf, vattr_t *vap, int flags,
-			cred_t *cr, caller_context_t *ct);
-	int (*vsop_access)(femarg_t *vf, int mode, int flags, cred_t *cr);
-	int (*vsop_lookup)(femarg_t *vf, char *nm, vnode_t **vpp,
-			pathname_t *pnp, int flags, vnode_t *rdir,
-			cred_t *cr);
-	int (*vsop_create)(femarg_t *vf, char *name, vattr_t *vap,
-			vcexcl_t excl, int mode, vnode_t **vpp, cred_t *cr,
-			int flag);
-	int (*vsop_remove)(femarg_t *vf, char *nm, cred_t *cr);
-	int (*vsop_link)(femarg_t *vf, vnode_t *svp, char *tnm, cred_t *cr);
-	int (*vsop_rename)(femarg_t *vf, char *snm, vnode_t *tdvp,
-			char *tnm, cred_t *cr);
-	int (*vsop_mkdir)(femarg_t *vf, char *dirname, vattr_t *vap,
-			vnode_t **vpp, cred_t *cr);
-	int (*vsop_rmdir)(femarg_t *vf, char *nm, vnode_t *cdir,
-			cred_t *cr);
-	int (*vsop_readdir)(femarg_t *vf, uio_t *uiop, cred_t *cr,
-			int *eofp);
-	int (*vsop_symlink)(femarg_t *vf, char *linkname, vattr_t *vap,
-			char *target, cred_t *cr);
-	int (*vsop_readlink)(femarg_t *vf, uio_t *uiop, cred_t *cr);
-	int (*vsop_fsync)(femarg_t *vf, int syncflag, cred_t *cr);
-	void (*vsop_inactive)(femarg_t *vf, cred_t *cr);
-	int (*vsop_fid)(femarg_t *vf, fid_t *fidp);
-	int (*vsop_rwlock)(femarg_t *vf, int write_lock,
-			caller_context_t *ct);
-	void (*vsop_rwunlock)(femarg_t *vf, int write_lock,
-			caller_context_t *ct);
-	int (*vsop_seek)(femarg_t *vf, offset_t ooff, offset_t *noffp);
-	int (*vsop_cmp)(femarg_t *vf, vnode_t *vp2);
-	int (*vsop_frlock)(femarg_t *vf, int cmd, struct flock64 *bfp,
-			int flag, offset_t offset,
-			struct flk_callback *flk_cbp, cred_t *cr);
-	int (*vsop_space)(femarg_t *vf, int cmd, struct flock64 *bfp,
-			int flag, offset_t offset, cred_t *cr,
-			caller_context_t *ct);
-	int (*vsop_realvp)(femarg_t *vf, vnode_t **vpp);
-	int (*vsop_getpage)(femarg_t *vf, offset_t off, size_t len,
-			uint_t *protp, struct page **plarr, size_t plsz,
-			struct seg *seg, caddr_t addr, enum seg_rw rw,
-			cred_t *cr);
-	int (*vsop_putpage)(femarg_t *vf, offset_t off, size_t len,
-			int flags, cred_t *cr);
-	int (*vsop_map)(femarg_t *vf, offset_t off, struct as *as,
-			caddr_t *addrp, size_t len, uchar_t prot,
-			uchar_t maxprot, uint_t flags, cred_t *cr);
-	int (*vsop_addmap)(femarg_t *vf, offset_t off, struct as *as,
-			caddr_t addr, size_t len, uchar_t prot,
-			uchar_t maxprot, uint_t flags, cred_t *cr);
-	int (*vsop_delmap)(femarg_t *vf, offset_t off, struct as *as,
-			caddr_t addr, size_t len, uint_t prot,
-			uint_t maxprot, uint_t flags, cred_t *cr);
-	int (*vsop_poll)(femarg_t *vf, short events, int anyyet,
-			short *reventsp, struct pollhead **phpp);
-	int (*vsop_dump)(femarg_t *vf, caddr_t addr, int lbdn, int dblks);
-	int (*vsop_pathconf)(femarg_t *vf, int cmd, ulong_t *valp,
-			cred_t *cr);
-	int (*vsop_pageio)(femarg_t *vf, struct page *pp,
-			u_offset_t io_off, size_t io_len, int flags,
-			cred_t *cr);
-	int (*vsop_dumpctl)(femarg_t *vf, int action, int *blkp);
-	void (*vsop_dispose)(femarg_t *vf, struct page *pp, int flag,
-			int dn, cred_t *cr);
-	int (*vsop_setsecattr)(femarg_t *vf, vsecattr_t *vsap, int flag,
-			cred_t *cr);
-	int (*vsop_getsecattr)(femarg_t *vf, vsecattr_t *vsap, int flag,
-			cred_t *cr);
-	int (*vsop_shrlock)(femarg_t *vf, int cmd, struct shrlock *shr,
-			int flag, cred_t *cr);
-	int (*vsop_vnevent)(femarg_t *vf, vnevent_t vnevent);
+	FEM_OPS;	/* Signatures of all FEM operations (femops) */
 };
+
+/*
+ * FSEM_OPS defines all the FSEM operations.  It is used to define
+ * the fsem structure (below) and the fs_func_p union (vfs_opreg.h).
+ */
+#define	FSEM_OPS							\
+	int (*fsemop_mount)(fsemarg_t *vf, vnode_t *mvp,		\
+			struct mounta *uap, cred_t *cr);		\
+	int (*fsemop_unmount)(fsemarg_t *vf, int flag, cred_t *cr);	\
+	int (*fsemop_root)(fsemarg_t *vf, vnode_t **vpp);		\
+	int (*fsemop_statvfs)(fsemarg_t *vf, statvfs64_t *sp);		\
+	int (*fsemop_sync)(fsemarg_t *vf, short flag, cred_t *cr);	\
+	int (*fsemop_vget)(fsemarg_t *vf, vnode_t **vpp, fid_t *fidp);	\
+	int (*fsemop_mountroot)(fsemarg_t *vf,				\
+			enum whymountroot reason);			\
+	void (*fsemop_freevfs)(fsemarg_t *vf);				\
+	int (*fsemop_vnstate)(fsemarg_t *vf, vnode_t *vp,		\
+			vntrans_t nstate)		/* NB: No ";" */
 
 struct fsem {
 	const char *name;
 	const struct fs_operation_def *templ;
-	int (*vfsop_mount)(fsemarg_t *vf, vnode_t *mvp, struct mounta *uap,
-			cred_t *cr);
-	int (*vfsop_unmount)(fsemarg_t *vf, int flag, cred_t *cr);
-	int (*vfsop_root)(fsemarg_t *vf, vnode_t **vpp);
-	int (*vfsop_statvfs)(fsemarg_t *vf, statvfs64_t *sp);
-	int (*vfsop_sync)(fsemarg_t *vf, short flag, cred_t *cr);
-	int (*vfsop_vget)(fsemarg_t *vf, vnode_t **vpp, fid_t *fidp);
-	int (*vfsop_mountroot)(fsemarg_t *vf, enum whymountroot reason);
-	void (*vfsop_freevfs)(fsemarg_t *vf);
-	int (*vfsop_vnstate)(fsemarg_t *vf, vnode_t *vp, vntrans_t nstate);
+	FSEM_OPS;	/* Signatures of all FSEM operations (fsemops) */
 };
 
 extern int vnext_open(femarg_t *vf, int mode, cred_t *cr);
@@ -357,6 +378,7 @@ extern int fsem_uninstall(struct vfs *v, fsem_t *mon, void *arg);
 extern vfsops_t *fsem_getvfsops(struct vfs *v);
 extern void fsem_setvfsops(struct vfs *v, struct vfsops *nops);
 
+#endif /* _KERNEL */
 
 #ifdef	__cplusplus
 }

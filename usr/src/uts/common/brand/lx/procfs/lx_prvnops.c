@@ -58,6 +58,7 @@
 #include <sys/pset.h>
 #include <sys/zone.h>
 #include <sys/pghw.h>
+#include <sys/vfs_opreg.h>
 
 /* Dependent on the Solaris procfs */
 extern kthread_t *prchoose(proc_t *);
@@ -82,7 +83,7 @@ static int lxpr_access(vnode_t *, int, int, cred_t *);
 static int lxpr_lookup(vnode_t *, char *, vnode_t **,
     pathname_t *, int, vnode_t *, cred_t *);
 static int lxpr_readdir(vnode_t *, uio_t *, cred_t *, int *);
-static int lxpr_readlink(vnode_t *, uio_t *);
+static int lxpr_readlink(vnode_t *, uio_t *, cred_t *);
 static int lxpr_cmp(vnode_t *, vnode_t *);
 static int lxpr_realvp(vnode_t *, vnode_t **);
 static int lxpr_sync(void);
@@ -149,20 +150,20 @@ static void lxpr_read_net_unix(lxpr_node_t *, lxpr_uiobuf_t *);
  * The lx /proc vnode operations vector
  */
 const fs_operation_def_t lxpr_vnodeops_template[] = {
-	VOPNAME_OPEN, lxpr_open,
-	VOPNAME_CLOSE, lxpr_close,
-	VOPNAME_READ, lxpr_read,
-	VOPNAME_GETATTR, lxpr_getattr,
-	VOPNAME_ACCESS, lxpr_access,
-	VOPNAME_LOOKUP, lxpr_lookup,
-	VOPNAME_READDIR, lxpr_readdir,
-	VOPNAME_READLINK, lxpr_readlink,
-	VOPNAME_FSYNC, lxpr_sync,
-	VOPNAME_SEEK, lxpr_sync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) lxpr_inactive,
-	VOPNAME_CMP, lxpr_cmp,
-	VOPNAME_REALVP, lxpr_realvp,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = lxpr_open },
+	VOPNAME_CLOSE,		{ .vop_close = lxpr_close },
+	VOPNAME_READ,		{ .vop_read = lxpr_read },
+	VOPNAME_GETATTR,	{ .vop_getattr = lxpr_getattr },
+	VOPNAME_ACCESS,		{ .vop_access = lxpr_access },
+	VOPNAME_LOOKUP,		{ .vop_lookup = lxpr_lookup },
+	VOPNAME_READDIR,	{ .vop_readdir = lxpr_readdir },
+	VOPNAME_READLINK,	{ .vop_readlink = lxpr_readlink },
+	VOPNAME_FSYNC,		{ .error = lxpr_sync },
+	VOPNAME_SEEK,		{ .error = lxpr_sync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = lxpr_inactive },
+	VOPNAME_CMP,		{ .vop_cmp = lxpr_cmp },
+	VOPNAME_REALVP,		{ .vop_realvp = lxpr_realvp },
+	NULL,			NULL
 };
 
 
@@ -2829,8 +2830,9 @@ out:
 /*
  * lxpr_readlink(): Vnode operation for VOP_READLINK()
  */
+/* ARGSUSED */
 static int
-lxpr_readlink(vnode_t *vp, uio_t *uiop)
+lxpr_readlink(vnode_t *vp, uio_t *uiop, cred_t *cr)
 {
 	char bp[MAXPATHLEN + 1];
 	size_t buflen = sizeof (bp);

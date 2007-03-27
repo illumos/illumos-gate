@@ -37,6 +37,7 @@
 #include <sys/sysmacros.h>
 
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 
 #include <sys/socket.h>
 #include <sys/socketvar.h>

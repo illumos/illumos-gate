@@ -44,6 +44,7 @@
 #include <sys/time.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
+#include <sys/vfs_opreg.h>
 #include <sys/file.h>
 #include <sys/fcntl.h>
 #include <sys/flock.h>
@@ -1347,34 +1348,34 @@ sdev_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
 vnodeops_t *sdev_vnodeops;
 
 const fs_operation_def_t sdev_vnodeops_tbl[] = {
-	VOPNAME_OPEN, sdev_open,
-	VOPNAME_CLOSE, sdev_close,
-	VOPNAME_READ, sdev_read,
-	VOPNAME_WRITE, sdev_write,
-	VOPNAME_IOCTL, sdev_ioctl,
-	VOPNAME_GETATTR, sdev_getattr,
-	VOPNAME_SETATTR, sdev_setattr,
-	VOPNAME_ACCESS, sdev_access,
-	VOPNAME_LOOKUP, sdev_lookup,
-	VOPNAME_CREATE, sdev_create,
-	VOPNAME_RENAME, sdev_rename,
-	VOPNAME_REMOVE, sdev_remove,
-	VOPNAME_MKDIR, sdev_mkdir,
-	VOPNAME_RMDIR, sdev_rmdir,
-	VOPNAME_READDIR, sdev_readdir,
-	VOPNAME_SYMLINK, sdev_symlink,
-	VOPNAME_READLINK, sdev_readlink, /* readlink */
-	VOPNAME_INACTIVE, (fs_generic_func_p)sdev_inactive,
-	VOPNAME_FID, sdev_fid,
-	VOPNAME_RWLOCK, (fs_generic_func_p)sdev_rwlock,
-	VOPNAME_RWUNLOCK, (fs_generic_func_p)sdev_rwunlock,
-	VOPNAME_SEEK, sdev_seek,
-	VOPNAME_FRLOCK, sdev_frlock,
-	VOPNAME_PATHCONF, sdev_pathconf,
-	VOPNAME_SETFL, sdev_setfl,
-	VOPNAME_SETSECATTR, sdev_setsecattr,	/* setsecattr */
-	VOPNAME_GETSECATTR, sdev_getsecattr,	/* getsecattr */
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = sdev_open },
+	VOPNAME_CLOSE,		{ .vop_close = sdev_close },
+	VOPNAME_READ,		{ .vop_read = sdev_read },
+	VOPNAME_WRITE,		{ .vop_write = sdev_write },
+	VOPNAME_IOCTL,		{ .vop_ioctl = sdev_ioctl },
+	VOPNAME_GETATTR,	{ .vop_getattr = sdev_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = sdev_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = sdev_access },
+	VOPNAME_LOOKUP,		{ .vop_lookup = sdev_lookup },
+	VOPNAME_CREATE,		{ .vop_create = sdev_create },
+	VOPNAME_RENAME,		{ .vop_rename = sdev_rename },
+	VOPNAME_REMOVE,		{ .vop_remove = sdev_remove },
+	VOPNAME_MKDIR,		{ .vop_mkdir = sdev_mkdir },
+	VOPNAME_RMDIR,		{ .vop_rmdir = sdev_rmdir },
+	VOPNAME_READDIR,	{ .vop_readdir = sdev_readdir },
+	VOPNAME_SYMLINK,	{ .vop_symlink = sdev_symlink },
+	VOPNAME_READLINK,	{ .vop_readlink = sdev_readlink },
+	VOPNAME_INACTIVE,	{ .vop_inactive = sdev_inactive },
+	VOPNAME_FID,		{ .vop_fid = sdev_fid },
+	VOPNAME_RWLOCK,		{ .vop_rwlock = sdev_rwlock },
+	VOPNAME_RWUNLOCK,	{ .vop_rwunlock = sdev_rwunlock },
+	VOPNAME_SEEK,		{ .vop_seek = sdev_seek },
+	VOPNAME_FRLOCK,		{ .vop_frlock = sdev_frlock },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = sdev_pathconf },
+	VOPNAME_SETFL,		{ .vop_setfl = sdev_setfl },
+	VOPNAME_SETSECATTR,	{ .vop_setsecattr = sdev_setsecattr },
+	VOPNAME_GETSECATTR,	{ .vop_getsecattr = sdev_getsecattr },
+	NULL,			NULL
 };
 
 int sdev_vnodeops_tbl_size = sizeof (sdev_vnodeops_tbl);

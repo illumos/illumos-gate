@@ -33,6 +33,7 @@
 #include <sys/user.h>
 #include <sys/time.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/file.h>
 #include <sys/fcntl.h>
@@ -2304,37 +2305,37 @@ tmp_pathconf(struct vnode *vp, int cmd, ulong_t *valp, cred_t *cr)
 struct vnodeops *tmp_vnodeops;
 
 const fs_operation_def_t tmp_vnodeops_template[] = {
-	VOPNAME_OPEN, tmp_open,
-	VOPNAME_CLOSE, tmp_close,
-	VOPNAME_READ, tmp_read,
-	VOPNAME_WRITE, tmp_write,
-	VOPNAME_IOCTL, tmp_ioctl,
-	VOPNAME_GETATTR, tmp_getattr,
-	VOPNAME_SETATTR, tmp_setattr,
-	VOPNAME_ACCESS, tmp_access,
-	VOPNAME_LOOKUP, tmp_lookup,
-	VOPNAME_CREATE, tmp_create,
-	VOPNAME_REMOVE, tmp_remove,
-	VOPNAME_LINK, tmp_link,
-	VOPNAME_RENAME, tmp_rename,
-	VOPNAME_MKDIR, tmp_mkdir,
-	VOPNAME_RMDIR, tmp_rmdir,
-	VOPNAME_READDIR, tmp_readdir,
-	VOPNAME_SYMLINK, tmp_symlink,
-	VOPNAME_READLINK, tmp_readlink,
-	VOPNAME_FSYNC, tmp_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) tmp_inactive,
-	VOPNAME_FID, tmp_fid,
-	VOPNAME_RWLOCK, tmp_rwlock,
-	VOPNAME_RWUNLOCK, (fs_generic_func_p) tmp_rwunlock,
-	VOPNAME_SEEK, tmp_seek,
-	VOPNAME_SPACE, tmp_space,
-	VOPNAME_GETPAGE, tmp_getpage,
-	VOPNAME_PUTPAGE, tmp_putpage,
-	VOPNAME_MAP, (fs_generic_func_p) tmp_map,
-	VOPNAME_ADDMAP, (fs_generic_func_p) tmp_addmap,
-	VOPNAME_DELMAP, tmp_delmap,
-	VOPNAME_PATHCONF, tmp_pathconf,
-	VOPNAME_VNEVENT, fs_vnevent_support,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = tmp_open },
+	VOPNAME_CLOSE,		{ .vop_close = tmp_close },
+	VOPNAME_READ,		{ .vop_read = tmp_read },
+	VOPNAME_WRITE,		{ .vop_write = tmp_write },
+	VOPNAME_IOCTL,		{ .vop_ioctl = tmp_ioctl },
+	VOPNAME_GETATTR,	{ .vop_getattr = tmp_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = tmp_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = tmp_access },
+	VOPNAME_LOOKUP,		{ .vop_lookup = tmp_lookup },
+	VOPNAME_CREATE,		{ .vop_create = tmp_create },
+	VOPNAME_REMOVE,		{ .vop_remove = tmp_remove },
+	VOPNAME_LINK,		{ .vop_link = tmp_link },
+	VOPNAME_RENAME,		{ .vop_rename = tmp_rename },
+	VOPNAME_MKDIR,		{ .vop_mkdir = tmp_mkdir },
+	VOPNAME_RMDIR,		{ .vop_rmdir = tmp_rmdir },
+	VOPNAME_READDIR,	{ .vop_readdir = tmp_readdir },
+	VOPNAME_SYMLINK,	{ .vop_symlink = tmp_symlink },
+	VOPNAME_READLINK,	{ .vop_readlink = tmp_readlink },
+	VOPNAME_FSYNC,		{ .vop_fsync = tmp_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = tmp_inactive },
+	VOPNAME_FID,		{ .vop_fid = tmp_fid },
+	VOPNAME_RWLOCK,		{ .vop_rwlock = tmp_rwlock },
+	VOPNAME_RWUNLOCK,	{ .vop_rwunlock = tmp_rwunlock },
+	VOPNAME_SEEK,		{ .vop_seek = tmp_seek },
+	VOPNAME_SPACE,		{ .vop_space = tmp_space },
+	VOPNAME_GETPAGE,	{ .vop_getpage = tmp_getpage },
+	VOPNAME_PUTPAGE,	{ .vop_putpage = tmp_putpage },
+	VOPNAME_MAP,		{ .vop_map = tmp_map },
+	VOPNAME_ADDMAP,		{ .vop_addmap = tmp_addmap },
+	VOPNAME_DELMAP,		{ .vop_delmap = tmp_delmap },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = tmp_pathconf },
+	VOPNAME_VNEVENT,	{ .vop_vnevent = fs_vnevent_support },
+	NULL,			NULL
 };

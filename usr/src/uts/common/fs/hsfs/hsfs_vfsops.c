@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,7 @@
 #include <sys/buf.h>
 #include <sys/pathname.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/file.h>
 #include <sys/uio.h>
@@ -234,13 +235,13 @@ static int
 hsfsinit(int fstype, char *name)
 {
 	static const fs_operation_def_t hsfs_vfsops_template[] = {
-		VFSNAME_MOUNT, hsfs_mount,
-		VFSNAME_UNMOUNT, hsfs_unmount,
-		VFSNAME_ROOT, hsfs_root,
-		VFSNAME_STATVFS, hsfs_statvfs,
-		VFSNAME_VGET, hsfs_vget,
-		VFSNAME_MOUNTROOT, hsfs_mountroot,
-		NULL, NULL
+		VFSNAME_MOUNT,		{ .vfs_mount = hsfs_mount },
+		VFSNAME_UNMOUNT,	{ .vfs_unmount = hsfs_unmount },
+		VFSNAME_ROOT,		{ .vfs_root = hsfs_root },
+		VFSNAME_STATVFS,	{ .vfs_statvfs = hsfs_statvfs },
+		VFSNAME_VGET,		{ .vfs_vget = hsfs_vget },
+		VFSNAME_MOUNTROOT,	{ .vfs_mountroot = hsfs_mountroot },
+		NULL,			NULL
 	};
 	int error;
 

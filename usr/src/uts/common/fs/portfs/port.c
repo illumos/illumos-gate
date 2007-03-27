@@ -31,6 +31,7 @@
 #include <sys/cred.h>
 #include <sys/modctl.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/sysmacros.h>
 #include <sys/cmn_err.h>
 #include <sys/stat.h>

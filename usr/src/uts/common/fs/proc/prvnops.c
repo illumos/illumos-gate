@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,7 @@
 #include <sys/poll.h>
 #include <sys/user.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/gfs.h>
 #include <sys/vnode.h>
 #include <sys/fault.h>
@@ -5927,25 +5928,25 @@ extern int prioctl(vnode_t *, int, intptr_t, int, cred_t *, int *);
  * /proc vnode operations vector
  */
 const fs_operation_def_t pr_vnodeops_template[] = {
-	VOPNAME_OPEN, propen,
-	VOPNAME_CLOSE, prclose,
-	VOPNAME_READ, prread,
-	VOPNAME_WRITE, prwrite,
-	VOPNAME_IOCTL, prioctl,
-	VOPNAME_GETATTR, prgetattr,
-	VOPNAME_ACCESS, praccess,
-	VOPNAME_LOOKUP, prlookup,
-	VOPNAME_CREATE, prcreate,
-	VOPNAME_READDIR, prreaddir,
-	VOPNAME_READLINK, prreadlink,
-	VOPNAME_FSYNC, prfsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) prinactive,
-	VOPNAME_SEEK, prseek,
-	VOPNAME_CMP, prcmp,
-	VOPNAME_FRLOCK, fs_error,
-	VOPNAME_REALVP, prrealvp,
-	VOPNAME_POLL, (fs_generic_func_p) prpoll,
-	VOPNAME_DISPOSE, fs_error,
-	VOPNAME_SHRLOCK, fs_error,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = propen },
+	VOPNAME_CLOSE,		{ .vop_close = prclose },
+	VOPNAME_READ,		{ .vop_read = prread },
+	VOPNAME_WRITE,		{ .vop_write = prwrite },
+	VOPNAME_IOCTL,		{ .vop_ioctl = prioctl },
+	VOPNAME_GETATTR,	{ .vop_getattr = prgetattr },
+	VOPNAME_ACCESS,		{ .vop_access = praccess },
+	VOPNAME_LOOKUP,		{ .vop_lookup = prlookup },
+	VOPNAME_CREATE,		{ .vop_create = prcreate },
+	VOPNAME_READDIR,	{ .vop_readdir = prreaddir },
+	VOPNAME_READLINK,	{ .vop_readlink = prreadlink },
+	VOPNAME_FSYNC,		{ .vop_fsync = prfsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = prinactive },
+	VOPNAME_SEEK,		{ .vop_seek = prseek },
+	VOPNAME_CMP,		{ .vop_cmp = prcmp },
+	VOPNAME_FRLOCK,		{ .error = fs_error },
+	VOPNAME_REALVP,		{ .vop_realvp = prrealvp },
+	VOPNAME_POLL,		{ .vop_poll = prpoll },
+	VOPNAME_DISPOSE,	{ .error = fs_error },
+	VOPNAME_SHRLOCK,	{ .error = fs_error },
+	NULL,			NULL
 };

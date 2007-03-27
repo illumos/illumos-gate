@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 #include <sys/time.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
+#include <sys/vfs_opreg.h>
 #include <sys/file.h>
 #include <sys/fcntl.h>
 #include <sys/flock.h>
@@ -1104,26 +1105,26 @@ devfs_seek(struct vnode *vp, offset_t ooff, offset_t *noffp)
 vnodeops_t *dv_vnodeops;
 
 const fs_operation_def_t dv_vnodeops_template[] = {
-	VOPNAME_OPEN, devfs_open,
-	VOPNAME_CLOSE, devfs_close,
-	VOPNAME_READ, devfs_read,
-	VOPNAME_WRITE, devfs_write,
-	VOPNAME_IOCTL, devfs_ioctl,
-	VOPNAME_GETATTR, devfs_getattr,
-	VOPNAME_SETATTR, devfs_setattr,
-	VOPNAME_ACCESS, devfs_access,
-	VOPNAME_LOOKUP, devfs_lookup,
-	VOPNAME_CREATE, devfs_create,
-	VOPNAME_READDIR, devfs_readdir,
-	VOPNAME_FSYNC, devfs_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) devfs_inactive,
-	VOPNAME_FID, devfs_fid,
-	VOPNAME_RWLOCK, devfs_rwlock,
-	VOPNAME_RWUNLOCK, (fs_generic_func_p) devfs_rwunlock,
-	VOPNAME_SEEK, devfs_seek,
-	VOPNAME_PATHCONF, devfs_pathconf,
-	VOPNAME_DISPOSE, fs_error,
-	VOPNAME_SETSECATTR, devfs_setsecattr,
-	VOPNAME_GETSECATTR, devfs_getsecattr,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = devfs_open },
+	VOPNAME_CLOSE,		{ .vop_close = devfs_close },
+	VOPNAME_READ,		{ .vop_read = devfs_read },
+	VOPNAME_WRITE,		{ .vop_write = devfs_write },
+	VOPNAME_IOCTL,		{ .vop_ioctl = devfs_ioctl },
+	VOPNAME_GETATTR,	{ .vop_getattr = devfs_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = devfs_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = devfs_access },
+	VOPNAME_LOOKUP,		{ .vop_lookup = devfs_lookup },
+	VOPNAME_CREATE,		{ .vop_create = devfs_create },
+	VOPNAME_READDIR,	{ .vop_readdir = devfs_readdir },
+	VOPNAME_FSYNC,		{ .vop_fsync = devfs_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = devfs_inactive },
+	VOPNAME_FID,		{ .vop_fid = devfs_fid },
+	VOPNAME_RWLOCK,		{ .vop_rwlock = devfs_rwlock },
+	VOPNAME_RWUNLOCK,	{ .vop_rwunlock = devfs_rwunlock },
+	VOPNAME_SEEK,		{ .vop_seek = devfs_seek },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = devfs_pathconf },
+	VOPNAME_DISPOSE,	{ .error = fs_error },
+	VOPNAME_SETSECATTR,	{ .vop_setsecattr = devfs_setsecattr },
+	VOPNAME_GETSECATTR,	{ .vop_getsecattr = devfs_getsecattr },
+	NULL,			NULL
 };

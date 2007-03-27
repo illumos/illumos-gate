@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +34,7 @@
 #include <sys/time.h>
 #include <sys/vnode.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/file.h>
 #include <sys/filio.h>
 #include <sys/uio.h>
@@ -246,45 +246,45 @@ static int	cachefs_space_backfs_nfsv4(struct vnode *vp, int cmd,
 struct vnodeops *cachefs_vnodeops;
 
 static const fs_operation_def_t cachefs_vnodeops_template[] = {
-	VOPNAME_OPEN, cachefs_open,
-	VOPNAME_CLOSE, cachefs_close,
-	VOPNAME_READ, cachefs_read,
-	VOPNAME_WRITE, cachefs_write,
-	VOPNAME_IOCTL, cachefs_ioctl,
-	VOPNAME_GETATTR, cachefs_getattr,
-	VOPNAME_SETATTR, cachefs_setattr,
-	VOPNAME_ACCESS, cachefs_access,
-	VOPNAME_LOOKUP, cachefs_lookup,
-	VOPNAME_CREATE, cachefs_create,
-	VOPNAME_REMOVE, cachefs_remove,
-	VOPNAME_LINK, cachefs_link,
-	VOPNAME_RENAME, cachefs_rename,
-	VOPNAME_MKDIR, cachefs_mkdir,
-	VOPNAME_RMDIR, cachefs_rmdir,
-	VOPNAME_READDIR, cachefs_readdir,
-	VOPNAME_SYMLINK, cachefs_symlink,
-	VOPNAME_READLINK, cachefs_readlink,
-	VOPNAME_FSYNC, cachefs_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) cachefs_inactive,
-	VOPNAME_FID, cachefs_fid,
-	VOPNAME_RWLOCK, cachefs_rwlock,
-	VOPNAME_RWUNLOCK, (fs_generic_func_p) cachefs_rwunlock,
-	VOPNAME_SEEK, cachefs_seek,
-	VOPNAME_FRLOCK, cachefs_frlock,
-	VOPNAME_SPACE, cachefs_space,
-	VOPNAME_REALVP, cachefs_realvp,
-	VOPNAME_GETPAGE, cachefs_getpage,
-	VOPNAME_PUTPAGE, cachefs_putpage,
-	VOPNAME_MAP, (fs_generic_func_p) cachefs_map,
-	VOPNAME_ADDMAP, (fs_generic_func_p) cachefs_addmap,
-	VOPNAME_DELMAP, cachefs_delmap,
-	VOPNAME_DUMP, cachefs_dump,
-	VOPNAME_PATHCONF, cachefs_pathconf,
-	VOPNAME_PAGEIO, cachefs_pageio,
-	VOPNAME_SETSECATTR, cachefs_setsecattr,
-	VOPNAME_GETSECATTR, cachefs_getsecattr,
-	VOPNAME_SHRLOCK, cachefs_shrlock,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = cachefs_open },
+	VOPNAME_CLOSE,		{ .vop_close = cachefs_close },
+	VOPNAME_READ,		{ .vop_read = cachefs_read },
+	VOPNAME_WRITE,		{ .vop_write = cachefs_write },
+	VOPNAME_IOCTL,		{ .vop_ioctl = cachefs_ioctl },
+	VOPNAME_GETATTR,	{ .vop_getattr = cachefs_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = cachefs_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = cachefs_access },
+	VOPNAME_LOOKUP,		{ .vop_lookup = cachefs_lookup },
+	VOPNAME_CREATE,		{ .vop_create = cachefs_create },
+	VOPNAME_REMOVE,		{ .vop_remove = cachefs_remove },
+	VOPNAME_LINK,		{ .vop_link = cachefs_link },
+	VOPNAME_RENAME,		{ .vop_rename = cachefs_rename },
+	VOPNAME_MKDIR,		{ .vop_mkdir = cachefs_mkdir },
+	VOPNAME_RMDIR,		{ .vop_rmdir = cachefs_rmdir },
+	VOPNAME_READDIR,	{ .vop_readdir = cachefs_readdir },
+	VOPNAME_SYMLINK,	{ .vop_symlink = cachefs_symlink },
+	VOPNAME_READLINK,	{ .vop_readlink = cachefs_readlink },
+	VOPNAME_FSYNC,		{ .vop_fsync = cachefs_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = cachefs_inactive },
+	VOPNAME_FID,		{ .vop_fid = cachefs_fid },
+	VOPNAME_RWLOCK,		{ .vop_rwlock = cachefs_rwlock },
+	VOPNAME_RWUNLOCK,	{ .vop_rwunlock = cachefs_rwunlock },
+	VOPNAME_SEEK,		{ .vop_seek = cachefs_seek },
+	VOPNAME_FRLOCK,		{ .vop_frlock = cachefs_frlock },
+	VOPNAME_SPACE,		{ .vop_space = cachefs_space },
+	VOPNAME_REALVP,		{ .vop_realvp = cachefs_realvp },
+	VOPNAME_GETPAGE,	{ .vop_getpage = cachefs_getpage },
+	VOPNAME_PUTPAGE,	{ .vop_putpage = cachefs_putpage },
+	VOPNAME_MAP,		{ .vop_map = cachefs_map },
+	VOPNAME_ADDMAP,		{ .vop_addmap = cachefs_addmap },
+	VOPNAME_DELMAP,		{ .vop_delmap = cachefs_delmap },
+	VOPNAME_DUMP,		{ .vop_dump = cachefs_dump },
+	VOPNAME_PATHCONF,	{ .vop_pathconf = cachefs_pathconf },
+	VOPNAME_PAGEIO,		{ .vop_pageio = cachefs_pageio },
+	VOPNAME_SETSECATTR,	{ .vop_setsecattr = cachefs_setsecattr },
+	VOPNAME_GETSECATTR,	{ .vop_getsecattr = cachefs_getsecattr },
+	VOPNAME_SHRLOCK,	{ .vop_shrlock = cachefs_shrlock },
+	NULL,			NULL
 };
 
 /* forward declarations of statics */

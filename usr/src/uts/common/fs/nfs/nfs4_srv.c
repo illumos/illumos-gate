@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 #include <sys/cred.h>
 #include <sys/buf.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/uio.h>
 #include <sys/errno.h>
@@ -475,25 +476,25 @@ extern size_t strlcpy(char *dst, const char *src, size_t dstsize);
 #define	nextdp(dp)	((struct dirent64 *)((char *)(dp) + (dp)->d_reclen))
 
 static const fs_operation_def_t nfs4_rd_deleg_tmpl[] = {
-	VOPNAME_OPEN, deleg_rdopen,
-	VOPNAME_WRITE, deleg_write,
-	VOPNAME_SETATTR, deleg_setattr,
-	VOPNAME_RWLOCK, deleg_rd_rwlock,
-	VOPNAME_SPACE, deleg_space,
-	VOPNAME_SETSECATTR, deleg_setsecattr,
-	VOPNAME_VNEVENT, deleg_vnevent,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .femop_open = deleg_rdopen },
+	VOPNAME_WRITE,		{ .femop_write = deleg_write },
+	VOPNAME_SETATTR,	{ .femop_setattr = deleg_setattr },
+	VOPNAME_RWLOCK,		{ .femop_rwlock = deleg_rd_rwlock },
+	VOPNAME_SPACE,		{ .femop_space = deleg_space },
+	VOPNAME_SETSECATTR,	{ .femop_setsecattr = deleg_setsecattr },
+	VOPNAME_VNEVENT,	{ .femop_vnevent = deleg_vnevent },
+	NULL,			NULL
 };
 static const fs_operation_def_t nfs4_wr_deleg_tmpl[] = {
-	VOPNAME_OPEN, deleg_wropen,
-	VOPNAME_READ, deleg_read,
-	VOPNAME_WRITE, deleg_write,
-	VOPNAME_SETATTR, deleg_setattr,
-	VOPNAME_RWLOCK, deleg_wr_rwlock,
-	VOPNAME_SPACE, deleg_space,
-	VOPNAME_SETSECATTR, deleg_setsecattr,
-	VOPNAME_VNEVENT, deleg_vnevent,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .femop_open = deleg_wropen },
+	VOPNAME_READ,		{ .femop_read = deleg_read },
+	VOPNAME_WRITE,		{ .femop_write = deleg_write },
+	VOPNAME_SETATTR,	{ .femop_setattr = deleg_setattr },
+	VOPNAME_RWLOCK,		{ .femop_rwlock = deleg_wr_rwlock },
+	VOPNAME_SPACE,		{ .femop_space = deleg_space },
+	VOPNAME_SETSECATTR,	{ .femop_setsecattr = deleg_setsecattr },
+	VOPNAME_VNEVENT,	{ .femop_vnevent = deleg_vnevent },
+	NULL,			NULL
 };
 
 int

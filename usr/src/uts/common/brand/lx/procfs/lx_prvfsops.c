@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,7 @@
 #include <sys/systm.h>
 #include <sys/var.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/mode.h>
 #include <sys/signal.h>
@@ -134,11 +135,11 @@ static int
 lxpr_init(int fstype, char *name)
 {
 	static const fs_operation_def_t lxpr_vfsops_template[] = {
-		VFSNAME_MOUNT, lxpr_mount,
-		VFSNAME_UNMOUNT, lxpr_unmount,
-		VFSNAME_ROOT, lxpr_root,
-		VFSNAME_STATVFS, lxpr_statvfs,
-		NULL, NULL
+		VFSNAME_MOUNT,		{ .vfs_mount = lxpr_mount },
+		VFSNAME_UNMOUNT,	{ .vfs_unmount = lxpr_unmount },
+		VFSNAME_ROOT,		{ .vfs_root = lxpr_root },
+		VFSNAME_STATVFS,	{ .vfs_statvfs = lxpr_statvfs },
+		NULL,			NULL
 	};
 	extern const fs_operation_def_t lxpr_vnodeops_template[];
 	int error;

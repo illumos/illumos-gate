@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@
 #include <sys/sysmacros.h>
 #include <sys/uio.h>
 #include <sys/vfs.h>
+#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/poll.h>
 #include <sys/stropts.h>
@@ -108,22 +109,22 @@ static int socktpi_poll(struct vnode *, short, int, short *,
 struct vnodeops *socktpi_vnodeops;
 
 const fs_operation_def_t socktpi_vnodeops_template[] = {
-	VOPNAME_OPEN, socktpi_open,
-	VOPNAME_CLOSE, socktpi_close,
-	VOPNAME_READ, socktpi_read,
-	VOPNAME_WRITE, socktpi_write,
-	VOPNAME_IOCTL, socktpi_ioctl,
-	VOPNAME_SETFL, socktpi_setfl,
-	VOPNAME_GETATTR, socktpi_getattr,
-	VOPNAME_SETATTR, socktpi_setattr,
-	VOPNAME_ACCESS, socktpi_access,
-	VOPNAME_FSYNC, socktpi_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) socktpi_inactive,
-	VOPNAME_FID, socktpi_fid,
-	VOPNAME_SEEK, socktpi_seek,
-	VOPNAME_POLL, (fs_generic_func_p) socktpi_poll,
-	VOPNAME_DISPOSE, fs_error,
-	NULL, NULL
+	VOPNAME_OPEN,		{ .vop_open = socktpi_open },
+	VOPNAME_CLOSE,		{ .vop_close = socktpi_close },
+	VOPNAME_READ,		{ .vop_read = socktpi_read },
+	VOPNAME_WRITE,		{ .vop_write = socktpi_write },
+	VOPNAME_IOCTL,		{ .vop_ioctl = socktpi_ioctl },
+	VOPNAME_SETFL,		{ .vop_setfl = socktpi_setfl },
+	VOPNAME_GETATTR,	{ .vop_getattr = socktpi_getattr },
+	VOPNAME_SETATTR,	{ .vop_setattr = socktpi_setattr },
+	VOPNAME_ACCESS,		{ .vop_access = socktpi_access },
+	VOPNAME_FSYNC,		{ .vop_fsync = socktpi_fsync },
+	VOPNAME_INACTIVE,	{ .vop_inactive = socktpi_inactive },
+	VOPNAME_FID,		{ .vop_fid = socktpi_fid },
+	VOPNAME_SEEK,		{ .vop_seek = socktpi_seek },
+	VOPNAME_POLL,		{ .vop_poll = socktpi_poll },
+	VOPNAME_DISPOSE,	{ .error = fs_error },
+	NULL,			NULL
 };
 
 /*

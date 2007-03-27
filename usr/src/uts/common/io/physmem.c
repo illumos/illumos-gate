@@ -44,6 +44,7 @@
 #include <sys/fcntl.h>
 #include <sys/vmsystm.h>
 #include <sys/physmem.h>
+#include <sys/vfs_opreg.h>
 
 static dev_info_t		*physmem_dip = NULL;
 
@@ -108,11 +109,11 @@ static int physmem_delmap(struct vnode *vp, offset_t off, struct as *as,
 static void physmem_inactive(vnode_t *vp, cred_t *crp);
 
 const fs_operation_def_t physmem_vnodeops_template[] = {
-	VOPNAME_GETPAGE, physmem_getpage,
-	VOPNAME_ADDMAP, (fs_generic_func_p) physmem_addmap,
-	VOPNAME_DELMAP, physmem_delmap,
-	VOPNAME_INACTIVE, (fs_generic_func_p) physmem_inactive,
-	NULL, NULL
+	VOPNAME_GETPAGE,	{ .vop_getpage = physmem_getpage },
+	VOPNAME_ADDMAP,		{ .vop_addmap = physmem_addmap },
+	VOPNAME_DELMAP,		{ .vop_delmap = physmem_delmap },
+	VOPNAME_INACTIVE,	{ .vop_inactive = physmem_inactive },
+	NULL,			NULL
 };
 
 vnodeops_t *physmem_vnodeops = NULL;
