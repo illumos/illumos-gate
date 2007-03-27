@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -165,8 +165,8 @@ extern struct filesignatures *elfsign_insert_dso(ELFsign_t ess,
     const uchar_t *sig, int sig_len, const char *oid, int oid_len);
 extern filesig_vers_t elfsign_extract_sig(ELFsign_t ess,
     struct filesignatures *fsp, uchar_t *sig, size_t *sig_len);
-extern ELFsign_status_t elfsign_begin(const char *filename,
-    const char *certpath, enum ES_ACTION action, ELFsign_t *essp);
+extern ELFsign_status_t elfsign_begin(const char *,
+    const char *, char *, enum ES_ACTION, ELFsign_t *);
 extern void elfsign_end(ELFsign_t ess);
 extern ELFsign_status_t elfsign_verify_signature(ELFsign_t ess,
     struct ELFsign_sig_info **esipp);
@@ -198,20 +198,21 @@ extern const char _PATH_ELFSIGN_CERTS[];
 
 typedef struct ELFCert_s *ELFCert_t;
 
-extern boolean_t elfcertlib_init(void);
+extern boolean_t elfcertlib_init(ELFsign_t, char *);
 
-extern boolean_t elfcertlib_loadcert(ELFCert_t *certp, const char *pathname);
-extern void elfcertlib_releasecert(ELFCert_t cert);
+extern boolean_t elfcertlib_loadcert(ELFsign_t, ELFCert_t *, const char *);
+extern void elfcertlib_releasecert(ELFsign_t, ELFCert_t);
 extern char *elfcertlib_getdn(ELFCert_t cert);
 extern char *elfcertlib_getissuer(ELFCert_t cert);
 
 extern boolean_t elfcertlib_loadprivatekey(ELFsign_t ess, ELFCert_t cert,
-    const char *path);
+	const char *path);
 extern boolean_t elfcertlib_loadtokenkey(ELFsign_t ess, ELFCert_t cert,
-    const char *token_id, const char *pin);
+	const char *token_id, const char *pin);
 
 extern boolean_t elfcertlib_sign(ELFsign_t ess, ELFCert_t cert,
-    const uchar_t *data, size_t data_len, uchar_t *sig, size_t *sig_len);
+	const uchar_t *data, size_t data_len, uchar_t *sig,
+	size_t *sig_len);
 
 #endif	/* _KERNEL */
 

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,15 +32,3 @@ VERS= .1
 
 include ../../Makefile.softtoken.com
 
-PICLIBRARY =	$(LIBRARY:%.a=%.pic.a)
-
-CLEANFILES +=	$(PICLIBRARY)
-
-all:		$(PICLIBRARY)
-
-#
-# Build archive library for libelfsign to link with staticly
-#
-$(PICLIBRARY):	$(PICS)
-		$(RM) $@
-		$(AR) -rc $@ $(PICS)

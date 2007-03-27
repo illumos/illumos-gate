@@ -251,7 +251,6 @@ EXPORT_SRC:
 	@cd lib/pam_modules/krb5;   pwd; $(MAKE) EXPORT_SRC
 	@cd lib/udapl; pwd; $(MAKE) EXPORT_SRC
 	@cd lib/libresolv2; pwd; $(MAKE) EXPORT_SRC
-	@cd $(CLOSED)/tools/elfsign; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/common/crypto/io; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/common/des; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/common/rpc; pwd; $(MAKE) EXPORT_SRC
@@ -317,7 +316,6 @@ CRYPT_SRC:
 	@cd lib/libresolv2;	 pwd; $(MAKE) CRYPT_SRC
 	@cd lib/sasl_plugins; pwd; $(MAKE) CRYPT_SRC
 	@cd lib/pam_modules/krb5;   pwd; $(MAKE) CRYPT_SRC
-	@cd $(CLOSED)/tools/elfsign; pwd; $(MAKE) CRYPT_SRC
 	@cd uts/common/gssapi;    pwd; $(MAKE) CRYPT_SRC
 	@cd uts/common/gssapi/include;    pwd; $(MAKE) CRYPT_SRC
 	@cd uts/common/gssapi/mechs/dummy;        pwd; $(MAKE) CRYPT_SRC
