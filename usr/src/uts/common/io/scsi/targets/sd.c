@@ -2599,21 +2599,25 @@ sd_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 	 * request is passed to ddi_prop_op. Size depends on valid geometry.
 	 */
 	un = ddi_get_soft_state(sd_state, instance);
-	if ((dev == DDI_DEV_T_ANY) || (un == NULL) ||
-	    !SD_IS_VALID_LABEL(un)) {
+	if ((dev == DDI_DEV_T_ANY) || (un == NULL)) {
 		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
 		    name, valuep, lengthp));
-	} else {
-		/* get nblocks value */
-		ASSERT(!mutex_owned(SD_MUTEX(un)));
-
-		(void) cmlb_partinfo(un->un_cmlbhandle, SDPART(dev),
-		    (diskaddr_t *)&nblocks64, NULL, NULL, NULL,
+	} else if (!SD_IS_VALID_LABEL(un)) {
+		(void) cmlb_validate(un->un_cmlbhandle, 0,
 		    (void *)SD_PATH_DIRECT);
-
-		return (ddi_prop_op_nblocks(dev, dip, prop_op, mod_flags,
-		    name, valuep, lengthp, nblocks64));
+		if (!SD_IS_VALID_LABEL(un))
+			return (ddi_prop_op(dev, dip, prop_op, mod_flags,
+			    name, valuep, lengthp));
 	}
+
+	/* get nblocks value */
+	ASSERT(!mutex_owned(SD_MUTEX(un)));
+
+	(void) cmlb_partinfo(un->un_cmlbhandle, SDPART(dev),
+	    (diskaddr_t *)&nblocks64, NULL, NULL, NULL, (void *)SD_PATH_DIRECT);
+
+	return (ddi_prop_op_nblocks(dev, dip, prop_op, mod_flags,
+	    name, valuep, lengthp, nblocks64));
 }
 
 /*
@@ -9194,11 +9198,6 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 					un->un_wm_cache = NULL;
 				}
 			}
-			mutex_exit(SD_MUTEX(un));
-			(void) cmlb_close(un->un_cmlbhandle,
-			    (void *)SD_PATH_DIRECT);
-			mutex_enter(SD_MUTEX(un));
-
 		}
 	}
 

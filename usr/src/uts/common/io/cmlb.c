@@ -956,7 +956,8 @@ cmlb_ioctl(cmlb_handle_t cmlbhandle, dev_t dev, int cmd, intptr_t arg,
 		case DKIOCSMBOOT:
 			break;
 		default:
-			status = cmlb_validate_geometry(cl, 0, 0, tg_cookie);
+			status = cmlb_validate_geometry(cl, 1, CMLB_SILENT,
+			    tg_cookie);
 
 			/*
 			 * VTOC related ioctls except SVTOC/SGEOM should
