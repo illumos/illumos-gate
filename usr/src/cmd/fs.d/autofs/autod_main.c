@@ -78,6 +78,7 @@ static void warn_hup(int);
 static void free_action_list();
 static int start_autofs_svcs();
 
+
 /*
  * Private autofs system call
  */
@@ -409,8 +410,9 @@ autofs_mntinfo_1_r(
 			m->path, m->isdirect);
 	}
 
+	bzero(res, sizeof (*res));
 	status = do_mount1(m->map, m->name, m->subdir, m->opts, m->path,
-			(uint_t)m->isdirect, m->uid, &alp, DOMOUNT_USER);
+			(uint_t)m->isdirect, m->uid, &alp, DOMOUNT_KERNEL);
 	if (status != 0) {
 		/*
 		 * An error occurred, free action list if allocated.
@@ -421,9 +423,6 @@ autofs_mntinfo_1_r(
 		}
 	}
 	if (alp != NULL) {
-		/*
-		 * Return action list to kernel.
-		 */
 		res->mr_type.status = AUTOFS_ACTION;
 		res->mr_type.mount_result_type_u.list = alp;
 	} else {
@@ -686,7 +685,7 @@ autofs_doorfunc(
 			failed_res.res_status = error;
 			failed_res.xdr_len = 0;
 			res = (caddr_t)&failed_res;
-			res_size = 0;
+			res_size = sizeof (autofs_door_res_t);
 			break;
 		}
 		bzero(&lookup_res, sizeof (autofs_lookupres));
@@ -695,14 +694,19 @@ autofs_doorfunc(
 
 		autofs_lookup_1_free_args(xdrargs);
 		free(xdrargs);
-
+		door_res = NULL;
 		if (!encode_res(xdr_autofs_lookupres, &door_res,
 					(caddr_t)&lookup_res, &res_size)) {
-			syslog(LOG_ERR, "error allocating lookup"
-			"results buffer");
-			failed_res.res_status = EINVAL;
-			failed_res.xdr_len = 0;
-			res = (caddr_t)&failed_res;
+			res_size = sizeof (autofs_door_res_t);
+			if (door_res == NULL) {
+				syslog(LOG_ERR, "error allocating lookup"
+				"results buffer");
+				failed_res.res_status = ENOMEM;
+				failed_res.xdr_len = 0;
+				res = (caddr_t)&failed_res;
+			} else {
+				res = (caddr_t)door_res;
+			}
 		} else {
 			door_res->res_status = 0;
 			res = (caddr_t)door_res;
@@ -718,11 +722,13 @@ autofs_doorfunc(
 			failed_res.res_status = error;
 			failed_res.xdr_len = 0;
 			res = (caddr_t)&failed_res;
-			res_size = 0;
+			res_size = sizeof (autofs_door_res_t);
 			break;
 		}
 
-		autofs_mntinfo_1_r((autofs_lookupargs *)xdrargs, &mount_res);
+		bzero(&mount_res, sizeof (struct autofs_mountres));
+		autofs_mntinfo_1_r((autofs_lookupargs *)xdrargs,
+					&mount_res);
 
 		autofs_lookup_1_free_args(xdrargs);
 		free(xdrargs);
@@ -730,20 +736,26 @@ autofs_doorfunc(
 		/*
 		 * Only reason we would get a NULL res is because
 		 * we could not allocate a results buffer.  Use
-		 * a local one to return the error EAGAIN as has
-		 * always been done when memory allocations fail.
+		 * a local result buffer to return ENOMEM.
 		 */
+		door_res = NULL;
 		if (!encode_res(xdr_autofs_mountres, &door_res,
 					(caddr_t)&mount_res, &res_size)) {
-			syslog(LOG_ERR, "error allocating mount"
-				"results buffer");
-			failed_res.res_status = EAGAIN;
-			failed_res.xdr_len = 0;
-			res = (caddr_t)&failed_res;
+			res_size = sizeof (autofs_door_res_t);
+			if (door_res == NULL) {
+				syslog(LOG_ERR, "error allocating mount"
+					"results buffer");
+				failed_res.res_status = ENOMEM;
+				failed_res.xdr_len = 0;
+				res = (caddr_t)&failed_res;
+			} else {
+				res = (caddr_t)door_res;
+			}
 		} else {
 			door_res->res_status = 0;
 			res = (caddr_t)door_res;
 		}
+
 		autofs_mount_1_free_r(&mount_res);
 		break;
 
@@ -766,15 +778,19 @@ autofs_doorfunc(
 
 		autofs_unmount_1_free_args(umnt_args);
 		free(umnt_args);
-
+		door_res = NULL;
 		if (!encode_res(xdr_umntres, &door_res, (caddr_t)&umount_res,
 				&res_size)) {
-			syslog(LOG_ERR, "error allocating unmount"
-			    "results buffer");
-			failed_res.res_status = EINVAL;
-			failed_res.xdr_len = 0;
-			res = (caddr_t)&failed_res;
 			res_size = sizeof (autofs_door_res_t);
+			if (door_res == NULL) {
+				syslog(LOG_ERR, "error allocating unmount"
+					"results buffer");
+				failed_res.res_status = ENOMEM;
+				failed_res.xdr_len = 0;
+				res = (caddr_t)&failed_res;
+			} else {
+				res = (caddr_t)door_res;
+			}
 		} else {
 			door_res->res_status = 0;
 			res = (caddr_t)door_res;
@@ -799,15 +815,19 @@ autofs_doorfunc(
 
 		free(rddir_args->rda_map);
 		free(rddir_args);
-
+		door_res = NULL;
 		if (!encode_res(xdr_autofs_rddirres, &door_res,
 		    (caddr_t)&rddir_res, &res_size)) {
-			syslog(LOG_ERR, "error allocating readdir"
-			    "results buffer");
-			failed_res.res_status = ENOMEM;
-			failed_res.xdr_len = 0;
-			res = (caddr_t)&failed_res;
 			res_size = sizeof (autofs_door_res_t);
+			if (door_res == NULL) {
+				syslog(LOG_ERR, "error allocating readdir"
+					"results buffer");
+				failed_res.res_status = ENOMEM;
+				failed_res.xdr_len = 0;
+				res = (caddr_t)&failed_res;
+			} else {
+				res = (caddr_t)door_res;
+			}
 		} else {
 			door_res->res_status = 0;
 			res = (caddr_t)door_res;
@@ -839,8 +859,11 @@ autofs_doorfunc(
 	/*
 	 * If we got here, door_return failed.
 	 */
-	syslog(LOG_ERR, "door_return failed %d, buffer %p, buffer size %d",
-		error, (void *)res, res_size);
+
+	syslog(LOG_ERR,
+		"door_return failed %d, errno: %d, proc: %d,"
+		"  buffer %p, buffer size %d",
+		error, errno, which, (void *)res, res_size);
 }
 
 static int
@@ -944,13 +967,13 @@ encode_res(
 	caddr_t resp,
 	int *size)
 {
-	XDR xdrs;
+	XDR 	xdrs;
+	int	status;
 
 	*size = xdr_sizeof((*xdrfunc), resp);
 	*results = autofs_get_buffer(
 	    sizeof (autofs_door_res_t) + *size);
 	if (*results == NULL) {
-		(*results)->res_status = ENOMEM;
 		return (FALSE);
 	}
 	(*results)->xdr_len = *size;
@@ -958,9 +981,10 @@ encode_res(
 	xdrmem_create(&xdrs, (caddr_t)((*results)->xdr_res),
 		(*results)->xdr_len,
 		XDR_ENCODE);
-	if (!(*xdrfunc)(&xdrs, resp)) {
-		(*results)->res_status = EINVAL;
-		syslog(LOG_ERR, "error encoding results");
+	status = (*xdrfunc)(&xdrs, resp);
+	if (!status) {
+		(*results)->res_status = status;
+		syslog(LOG_ERR, "error encoding results %p", xdrfunc);
 		return (FALSE);
 	}
 	(*results)->res_status = 0;
