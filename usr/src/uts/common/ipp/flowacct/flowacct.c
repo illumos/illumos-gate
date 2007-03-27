@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -394,6 +394,7 @@ flowacct_del_obj(list_head_t *tophdr, list_hdr_t *hdr, uint_t mode)
 			break;
 		}
 		kmem_free(hdr->objp, length);
+		hdr->objp = NULL;
 	}
 
 	kmem_free((void *)hdr, FLOWACCT_HDR_SZ);
@@ -478,6 +479,13 @@ flowacct_update_flows_tbl(header_t *header, flowacct_data_t *flowacct_data)
 		flow->dport = header->dport;
 		flow->back_ptr = fhead;
 		added_flow = B_TRUE;
+	} else {
+		/*
+		 * We need to make sure that this 'flow' is not deleted
+		 * either by a scheduled timeout or an explict call
+		 * to flowacct_timer() below.
+		 */
+		flow->inuse = B_TRUE;
 	}
 
 	ihead = &flow->items;
@@ -511,7 +519,7 @@ flowacct_update_flows_tbl(header_t *header, flowacct_data_t *flowacct_data)
 				goto try_again;
 			} else {
 				mutex_exit(&fhead->lock);
-				flowacct0dbg(("flowacct_update_flows_tbl: "\
+				flowacct1dbg(("flowacct_update_flows_tbl: "\
 				    "maximum active flows exceeded\n"));
 				if (added_flow) {
 					flowacct_del_obj(fhead, flow->hdr,
@@ -569,8 +577,13 @@ flowacct_update_flows_tbl(header_t *header, flowacct_data_t *flowacct_data)
 	flow->hdr->last_seen = item->hdr->last_seen = now;
 	mutex_exit(&fhead->lock);
 
-	/* Re-adjust the timeout list */
+	/*
+	 * Re-adjust the timeout list. The timer takes the thead lock
+	 * follwed by fhead lock(s), so we release fhead, take thead
+	 * and re-take fhead.
+	 */
 	mutex_enter(&thead->lock);
+	mutex_enter(&fhead->lock);
 	/* If the flow was added, append it to the tail of the timeout list */
 	if (added_flow) {
 		if (thead->head == NULL) {
@@ -603,10 +616,16 @@ flowacct_update_flows_tbl(header_t *header, flowacct_data_t *flowacct_data)
 			flow->hdr->timeout_prev = thead->tail;
 			thead->tail = flow->hdr;
 		}
+		/*
+		 * Unset this variable, now it is fine even if this
+		 * flow gets deleted (i.e. after timing out its
+		 * flow items) since we are done using it.
+		 */
+		flow->inuse = B_FALSE;
 	}
+	mutex_exit(&fhead->lock);
 	mutex_exit(&thead->lock);
 	atomic_add_64(&flowacct_data->tbytes, header->pktlen);
-
 	return (0);
 }
 
@@ -728,7 +747,8 @@ flowacct_timer(int type, flowacct_data_t *flowacct_data)
 	mutex_enter(&thead->lock);
 	fl_hdr = thead->head;
 	while (fl_hdr != NULL) {
-		uint32_t items_deleted = 0;
+		uint32_t	items_deleted = 0;
+
 		next_fl_hdr = fl_hdr->timeout_next;
 		flow = (flow_t *)fl_hdr->objp;
 		head = flow->back_ptr;
@@ -797,14 +817,20 @@ flowacct_timer(int type, flowacct_data_t *flowacct_data)
 		ASSERT(flow->items.nbr_items == 0);
 		atomic_add_32(&flowacct_data->nflows, (~items_deleted + 1));
 
-		if (fl_hdr == thead->tail) {
-			thead->head = thead->tail = NULL;
-		} else {
-			thead->head = fl_hdr->timeout_next;
-			thead->head->timeout_prev = NULL;
+		/*
+		 * Don't delete this flow if we are making place for
+		 * a new item for this flow.
+		 */
+		if (!flow->inuse) {
+			if (fl_hdr == thead->tail) {
+				thead->head = thead->tail = NULL;
+			} else {
+				thead->head = fl_hdr->timeout_next;
+				thead->head->timeout_prev = NULL;
+			}
+			flowacct_del_obj(head, fl_hdr, FLOWACCT_DEL_OBJ);
+			atomic_add_64(&flowacct_data->usedmem, flow_size);
 		}
-		flowacct_del_obj(head, fl_hdr, FLOWACCT_DEL_OBJ);
-		atomic_add_64(&flowacct_data->usedmem, flow_size);
 		mutex_exit(&head->lock);
 		if (type == FLOWACCT_JUST_ONE) {
 			mutex_exit(&thead->lock);
