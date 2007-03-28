@@ -33,6 +33,7 @@ SUNWprivate_1.1 {
 	libzfs_fini;
 	libzfs_init;
 	libzfs_print_on_error;
+	libzfs_print_one_property;
 	zfs_clone;
 	zfs_close;
 	zfs_create;
@@ -104,6 +105,7 @@ SUNWprivate_1.1 {
 	zpool_destroy;
 	zpool_disable_datasets;
 	zpool_enable_datasets;
+	zpool_expand_proplist;
 	zpool_export;
 	zpool_find_import;
 	zpool_find_vdev;
@@ -113,6 +115,8 @@ SUNWprivate_1.1 {
 	zpool_get_handle;
 	zpool_get_history;
 	zpool_get_name;
+	zpool_get_prop;
+	zpool_get_proplist;
 	zpool_get_root;
 	zpool_get_space_total;
 	zpool_get_space_used;
@@ -128,10 +132,14 @@ SUNWprivate_1.1 {
 	zpool_obj_to_path;
 	zpool_open;
 	zpool_open_canfail;
+	zpool_prop_iter;
+	zpool_prop_to_name;
+	zpool_prop_values;
 	zpool_read_label;
 	zpool_refresh_stats;
 	zpool_remove_zvol_links;
 	zpool_scrub;
+	zpool_set_prop;
 	zpool_unmount_datasets;
 	zpool_upgrade;
 	zpool_vdev_attach;

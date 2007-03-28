@@ -619,7 +619,7 @@ kobj_read_file(struct _buf *file, char *buf, unsigned size, unsigned off)
 	vn_rdwr(UIO_READ, (vnode_t *)file->_fd, buf, size, (offset_t)off,
 	    UIO_SYSSPACE, 0, 0, 0, &resid);
 
-	return (0);
+	return (size - resid);
 }
 
 void
@@ -630,15 +630,16 @@ kobj_close_file(struct _buf *file)
 }
 
 int
-kobj_fstat(intptr_t fd, struct bootstat *bst)
+kobj_get_filesize(struct _buf *file, uint64_t *size)
 {
 	struct stat64 st;
-	vnode_t *vp = (vnode_t *)fd;
+	vnode_t *vp = (vnode_t *)file->_fd;
+
 	if (fstat64(vp->v_fd, &st) == -1) {
 		vn_close(vp);
 		return (errno);
 	}
-	bst->st_size = (uint64_t)st.st_size;
+	*size = st.st_size;
 	return (0);
 }
 

@@ -1294,8 +1294,10 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, dmu_tx_t *tx)
 	if (ds_prev && ds->ds_prev != ds_prev)
 		dsl_dataset_close(ds_prev, DS_MODE_NONE, FTAG);
 
+	spa_clear_bootfs(dp->dp_spa, ds->ds_object, tx);
 	dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, tag);
 	VERIFY(0 == dmu_object_free(mos, obj, tx));
+
 }
 
 /* ARGSUSED */
@@ -1854,4 +1856,34 @@ dsl_dataset_promote(const char *name)
 	    dsl_dataset_promote_sync, ds, &pa, 2 + 2 * doi.doi_physical_blks);
 	dsl_dataset_close(ds, DS_MODE_NONE, FTAG);
 	return (err);
+}
+
+/*
+ * Given a pool name and a dataset object number in that pool,
+ * return the name of that dataset.
+ */
+int
+dsl_dsobj_to_dsname(char *pname, uint64_t obj, char *buf)
+{
+	spa_t *spa;
+	dsl_pool_t *dp;
+	dsl_dataset_t *ds = NULL;
+	int error;
+
+	if ((error = spa_open(pname, &spa, FTAG)) != 0)
+		return (error);
+	dp = spa_get_dsl(spa);
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
+	if ((error = dsl_dataset_open_obj(dp, obj,
+	    NULL, DS_MODE_NONE, FTAG, &ds)) != 0) {
+		rw_exit(&dp->dp_config_rwlock);
+		spa_close(spa, FTAG);
+		return (error);
+	}
+	dsl_dataset_name(ds, buf);
+	dsl_dataset_close(ds, DS_MODE_NONE, FTAG);
+	rw_exit(&dp->dp_config_rwlock);
+	spa_close(spa, FTAG);
+
+	return (0);
 }

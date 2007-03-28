@@ -163,6 +163,8 @@ uint64_t dsl_dataset_fsid_guid(dsl_dataset_t *ds);
 void dsl_dataset_create_root(struct dsl_pool *dp, uint64_t *ddobjp,
     dmu_tx_t *tx);
 
+int dsl_dsobj_to_dsname(char *pname, uint64_t obj, char *buf);
+
 #ifdef ZFS_DEBUG
 #define	dprintf_ds(ds, fmt, ...) do { \
 	if (zfs_flags & ZFS_DEBUG_DPRINTF) { \

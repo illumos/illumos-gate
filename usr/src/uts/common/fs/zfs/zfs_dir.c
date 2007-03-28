@@ -172,6 +172,7 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
 		} else {
 			error = zap_lookup(zfsvfs->z_os, dzp->z_id, name,
 			    8, 1, &zoid);
+			zoid = ZFS_DIRENT_OBJ(zoid);
 			if (error == ENOENT)
 				dnlc_update(ZTOV(dzp), name, DNLC_NO_VNODE);
 		}
@@ -398,7 +399,8 @@ zfs_purgedir(znode_t *dzp)
 	for (zap_cursor_init(&zc, zfsvfs->z_os, dzp->z_id);
 	    (error = zap_cursor_retrieve(&zc, &zap)) == 0;
 	    zap_cursor_advance(&zc)) {
-		error = zfs_zget(zfsvfs, zap.za_first_integer, &xzp);
+		error = zfs_zget(zfsvfs,
+		    ZFS_DIRENT_OBJ(zap.za_first_integer), &xzp);
 		ASSERT3U(error, ==, 0);
 
 		ASSERT((ZTOV(xzp)->v_type == VREG) ||
@@ -522,6 +524,7 @@ zfs_link_create(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag)
 {
 	znode_t *dzp = dl->dl_dzp;
 	vnode_t *vp = ZTOV(zp);
+	uint64_t value;
 	int zp_is_dir = (vp->v_type == VDIR);
 	int error;
 
@@ -549,8 +552,12 @@ zfs_link_create(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag)
 	zfs_time_stamper_locked(dzp, CONTENT_MODIFIED, tx);
 	mutex_exit(&dzp->z_lock);
 
+	/*
+	 * MacOS X will fill in the 4-bit object type here.
+	 */
+	value = ZFS_DIRENT_MAKE(0, zp->z_id);
 	error = zap_add(zp->z_zfsvfs->z_os, dzp->z_id, dl->dl_name,
-	    8, 1, &zp->z_id, tx);
+	    8, 1, &value, tx);
 	ASSERT(error == 0);
 
 	dnlc_update(ZTOV(dzp), dl->dl_name, vp);

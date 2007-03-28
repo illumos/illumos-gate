@@ -77,6 +77,9 @@ struct fsys_entry fsys_table[NUM_FSYS + 1] =
 # ifdef FSYS_UFS2
   {"ufs2", ufs2_mount, ufs2_read, ufs2_dir, 0, ufs2_embed},
 # endif
+# ifdef FSYS_ZFS
+  {"zfs", zfs_mount, zfs_read, zfs_open, 0, zfs_embed},
+# endif
 # ifdef FSYS_ISO9660
   {"iso9660", iso9660_mount, iso9660_read, iso9660_dir, 0, 0},
 # endif
@@ -120,6 +123,12 @@ unsigned long part_length;
 
 int current_slice;
 
+/* ZFS root filesystem for booting */
+char current_rootpool[MAXNAMELEN];
+char current_bootfs[MAXNAMELEN];
+uint64_t current_bootfs_obj;
+int is_zfs_mount;
+
 /* disk buffer parameters */
 int buf_drive = -1;
 int buf_track;
@@ -148,6 +157,7 @@ rawread (int drive, int sector, int byte_offset, int byte_len, char *buf)
   if (byte_len <= 0)
     return 1;
 
+  errnum = ERR_NONE;
   while (byte_len > 0 && !errnum)
     {
       int soff, num_sect, track, size = byte_len;
@@ -1002,6 +1012,12 @@ static enum
 }
 part_choice;
 #endif /* ! STAGE1_5 */
+
+int
+set_bootfs(char *fsname)
+{
+	grub_memmove(current_bootfs, fsname, MAXNAMELEN);
+}
 
 char *
 set_device (char *device)

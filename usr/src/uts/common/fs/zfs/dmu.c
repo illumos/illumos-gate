@@ -78,6 +78,7 @@ const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	zap_byteswap,		TRUE,	"persistent error log"	},
 	{	byteswap_uint8_array,	TRUE,	"SPA history"		},
 	{	byteswap_uint64_array,	TRUE,	"SPA history offsets"	},
+	{	zap_byteswap,	TRUE,	"Pool properties"	},
 };
 
 int
@@ -179,7 +180,7 @@ dmu_buf_hold_array_by_dnode(dnode_t *dn, uint64_t offset,
 	if (dn->dn_datablkshift) {
 		int blkshift = dn->dn_datablkshift;
 		nblks = (P2ROUNDUP(offset+length, 1ULL<<blkshift) -
-			P2ALIGN(offset, 1ULL<<blkshift)) >> blkshift;
+		    P2ALIGN(offset, 1ULL<<blkshift)) >> blkshift;
 	} else {
 		if (offset + length > dn->dn_datablksz) {
 			zfs_panic_recover("zfs: accessing past end of object "
@@ -329,7 +330,7 @@ dmu_prefetch(objset_t *os, uint64_t object, uint64_t offset, uint64_t len)
 	if (dn->dn_datablkshift) {
 		int blkshift = dn->dn_datablkshift;
 		nblks = (P2ROUNDUP(offset+len, 1<<blkshift) -
-			P2ALIGN(offset, 1<<blkshift)) >> blkshift;
+		    P2ALIGN(offset, 1<<blkshift)) >> blkshift;
 	} else {
 		nblks = (offset < dn->dn_datablksz);
 	}

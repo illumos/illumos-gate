@@ -918,6 +918,10 @@ const struct ioc {
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_OBJ_TO_PATH,		"ZFS_IOC_OBJ_TO_PATH",
 		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_POOL_SET_PROPS,	"ZFS_IOC_POOL_SET_PROPS",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_POOL_GET_PROPS,	"ZFS_IOC_POOL_GET_PROPS",
+		"zfs_cmd_t" },
 
 	/* kssl ioctls */
 	{ (uint_t)KSSL_ADD_ENTRY,		"KSSL_ADD_ENTRY",
@@ -988,7 +992,7 @@ ioctlname(private_t *pri, uint_t code)
 			    code & 0xff);
 		else if (isascii(c_lo_nm) && isprint(c_lo_nm))
 			(void) sprintf(pri->code_buf, "(('%c'<<8)|%d)",
-				c_lo_nm, code & 0xff);
+			    c_lo_nm, code & 0xff);
 		else if (code & (IOC_VOID|IOC_INOUT))
 			ioctl_ioccom(pri->code_buf, sizeof (pri->code_buf),
 			    code, c_mid, c_lo, code & 0xff);

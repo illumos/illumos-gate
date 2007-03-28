@@ -179,9 +179,66 @@ static prop_desc_t zfs_prop_table[] = {
 	{ "copies",	prop_type_index,	1,	"1",	prop_inherit,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
 	    "1 | 2 | 3", "COPIES", B_TRUE, B_TRUE },
+	{ "bootfs", prop_type_string,	0,	NULL,	prop_default,
+	    ZFS_TYPE_POOL, "<filesystem>", "BOOTFS", B_FALSE, B_TRUE },
 };
 
 #define	ZFS_PROP_COUNT	((sizeof (zfs_prop_table))/(sizeof (prop_desc_t)))
+
+/*
+ * Returns TRUE if the property applies to the given dataset types.
+ */
+int
+zfs_prop_valid_for_type(zfs_prop_t prop, int types)
+{
+	return ((zfs_prop_table[prop].pd_types & types) != 0);
+}
+
+/*
+ * Determine if the specified property is visible or not.
+ */
+boolean_t
+zfs_prop_is_visible(zfs_prop_t prop)
+{
+	if (prop < 0)
+		return (B_FALSE);
+
+	return (zfs_prop_table[prop].pd_visible);
+}
+
+/*
+ * Iterate over all properties, calling back into the specified function
+ * for each property. We will continue to iterate until we either
+ * reach the end or the callback function something other than
+ * ZFS_PROP_CONT.
+ */
+zfs_prop_t
+zfs_prop_iter_common(zfs_prop_f func, void *cb, zfs_type_t type,
+    boolean_t show_all)
+{
+	int i;
+
+	for (i = 0; i < ZFS_PROP_COUNT; i++) {
+		if (zfs_prop_valid_for_type(i, type) &&
+		    (zfs_prop_is_visible(i) || show_all)) {
+			if (func(i, cb) != ZFS_PROP_CONT)
+				return (i);
+		}
+	}
+	return (ZFS_PROP_CONT);
+}
+
+zfs_prop_t
+zfs_prop_iter(zfs_prop_f func, void *cb, boolean_t show_all)
+{
+	return (zfs_prop_iter_common(func, cb, ZFS_TYPE_ANY, show_all));
+}
+
+zpool_prop_t
+zpool_prop_iter(zpool_prop_f func, void *cb, boolean_t show_all)
+{
+	return (zfs_prop_iter_common(func, cb, ZFS_TYPE_POOL, show_all));
+}
 
 zfs_proptype_t
 zfs_prop_get_type(zfs_prop_t prop)
@@ -233,15 +290,34 @@ zfs_name_to_prop_cb(zfs_prop_t prop, void *cb_data)
 }
 
 /*
- * Given a property name, returns the corresponding property ID.
+ * Given a property name and its type, returns the corresponding property ID.
+ */
+zfs_prop_t
+zfs_name_to_prop_common(const char *propname, zfs_type_t type)
+{
+	zfs_prop_t prop;
+
+	prop = zfs_prop_iter_common(zfs_name_to_prop_cb, (void *)propname,
+	    type, B_TRUE);
+	return (prop == ZFS_PROP_CONT ? ZFS_PROP_INVAL : prop);
+}
+
+/*
+ * Given a zfs dataset property name, returns the corresponding property ID.
  */
 zfs_prop_t
 zfs_name_to_prop(const char *propname)
 {
-	zfs_prop_t prop;
+	return (zfs_name_to_prop_common(propname, ZFS_TYPE_ANY));
+}
 
-	prop = zfs_prop_iter(zfs_name_to_prop_cb, (void *)propname, B_TRUE);
-	return (prop == ZFS_PROP_CONT ? ZFS_PROP_INVAL : prop);
+/*
+ * Given a pool property name, returns the corresponding property ID.
+ */
+zpool_prop_t
+zpool_name_to_prop(const char *propname)
+{
+	return (zfs_name_to_prop_common(propname, ZFS_TYPE_POOL));
 }
 
 /*
@@ -305,10 +381,21 @@ zfs_prop_readonly(zfs_prop_t prop)
 }
 
 /*
- * Given a property ID, returns the corresponding name.
+ * Given a dataset property ID, returns the corresponding name.
+ * Assuming the zfs dataset propety ID is valid.
  */
 const char *
 zfs_prop_to_name(zfs_prop_t prop)
+{
+	return (zfs_prop_table[prop].pd_name);
+}
+
+/*
+ * Given a pool property ID, returns the corresponding name.
+ * Assuming the pool propety ID is valid.
+ */
+const char *
+zpool_prop_to_name(zpool_prop_t prop)
 {
 	return (zfs_prop_table[prop].pd_name);
 }
@@ -445,56 +532,31 @@ zfs_prop_index_to_string(zfs_prop_t prop, uint64_t index, const char **string)
 	return (-1);
 }
 
-/*
- * Determine if the specified property is visible or not.
- */
-boolean_t
-zfs_prop_is_visible(zfs_prop_t prop)
-{
-	if (prop < 0)
-		return (B_FALSE);
-
-	return (zfs_prop_table[prop].pd_visible);
-}
-
-/*
- * Iterate over all properties, calling back into the specified function
- * for each property. We will continue to iterate until we either
- * reach the end or the callback function something other than
- * ZFS_PROP_CONT.
- */
-zfs_prop_t
-zfs_prop_iter(zfs_prop_f func, void *cb, boolean_t show_all)
-{
-	int i;
-
-	for (i = 0; i < ZFS_PROP_COUNT; i++) {
-		if (zfs_prop_is_visible(i) || show_all) {
-			if (func(i, cb) != ZFS_PROP_CONT)
-				return (i);
-		}
-	}
-	return (ZFS_PROP_CONT);
-}
-
 #ifndef _KERNEL
 
 /*
- * Returns TRUE if the property applies to the given dataset types.
- */
-int
-zfs_prop_valid_for_type(zfs_prop_t prop, int types)
-{
-	return ((zfs_prop_table[prop].pd_types & types) != 0);
-}
-
-/*
  * Returns a string describing the set of acceptable values for the given
- * property, or NULL if it cannot be set.
+ * zfs property, or NULL if it cannot be set.
  */
 const char *
 zfs_prop_values(zfs_prop_t prop)
 {
+	if (zfs_prop_table[prop].pd_types == ZFS_TYPE_POOL)
+		return (NULL);
+
+	return (zfs_prop_table[prop].pd_values);
+}
+
+/*
+ * Returns a string describing the set of acceptable values for the given
+ * zpool property, or NULL if it cannot be set.
+ */
+const char *
+zpool_prop_values(zfs_prop_t prop)
+{
+	if (zfs_prop_table[prop].pd_types != ZFS_TYPE_POOL)
+		return (NULL);
+
 	return (zfs_prop_table[prop].pd_values);
 }
 

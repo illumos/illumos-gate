@@ -92,7 +92,9 @@ char *err_list[] =
   [ERR_UNRECOGNIZED] = "Unrecognized command",
   [ERR_WONT_FIT] = "Selected item cannot fit into memory",
   [ERR_WRITE] = "Disk write error",
-  [ERR_BAD_GZIP_CRC] = "Incorrect gunzip CRC checksum"
+  [ERR_BAD_GZIP_CRC] = "Incorrect gunzip CRC checksum",
+  [ERR_FILESYSTEM_NOT_FOUND] = "File System not found"
+    /* this zfs file system is not found in the pool of the device */
 };
 
 

@@ -64,7 +64,7 @@ int grub_stage2 (void);
 #include <term.h>
 
 /* Simulated memory sizes. */
-#define EXTENDED_MEMSIZE (3 * 1024 * 1024)	/* 3MB */
+#define EXTENDED_MEMSIZE (64 * 1024 * 1024)	/* 64MB */
 #define CONVENTIONAL_MEMSIZE (640 * 1024)	/* 640kB */
 
 unsigned long install_partition = 0x20000;

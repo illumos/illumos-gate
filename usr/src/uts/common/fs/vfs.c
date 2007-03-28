@@ -990,7 +990,7 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	int		addmip = 0;
 	int		splice = ((uap->flags & MS_NOSPLICE) == 0);
 	int		fromspace = (uap->flags & MS_SYSSPACE) ?
-				UIO_SYSSPACE : UIO_USERSPACE;
+	    UIO_SYSSPACE : UIO_USERSPACE;
 	char		*resource = NULL, *mountpt = NULL;
 	refstr_t	*oldresource, *oldmntpt;
 	struct pathname	pn, rpn;
@@ -1092,7 +1092,7 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 			inargs[0] = '\0';
 			if (optlen) {
 				error = copyinstr(opts, inargs, (size_t)optlen,
-					NULL);
+				    NULL);
 				if (error) {
 					goto errout;
 				}
@@ -1165,7 +1165,7 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 		 */
 		if ((uap->flags & MS_GLOBAL) == 0 &&
 		    lookupname(uap->spec, fromspace,
-			    FOLLOW, NULL, &bvp) == 0) {
+		    FOLLOW, NULL, &bvp) == 0) {
 			addmip = 1;
 		}
 
@@ -1359,8 +1359,8 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	 * wlock above. This case is for a non-spliced, non-global filesystem.
 	 */
 	if (!addmip) {
-	    if ((uap->flags & MS_GLOBAL) == 0 &&
-		lookupname(uap->spec, fromspace, FOLLOW, NULL, &bvp) == 0) {
+		if ((uap->flags & MS_GLOBAL) == 0 &&
+		    lookupname(uap->spec, fromspace, FOLLOW, NULL, &bvp) == 0) {
 			addmip = 1;
 		}
 	}
@@ -1447,11 +1447,11 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 			/* put back pre-remount options */
 			vfs_swapopttbl(&mnt_mntopts, &vfsp->vfs_mntopts);
 			vfs_setmntpoint(vfsp, (stripzonepath(
-					refstr_value(oldmntpt))));
+			    refstr_value(oldmntpt))));
 			if (oldmntpt)
 				refstr_rele(oldmntpt);
 			vfs_setresource(vfsp, (stripzonepath(
-					refstr_value(oldresource))));
+			    refstr_value(oldresource))));
 			if (oldresource)
 				refstr_rele(oldresource);
 			vfsp->vfs_flag = ovflags;
@@ -1533,7 +1533,7 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 		if (uap->flags & MS_OPTIONSTR) {
 			vfs_list_read_lock();
 			copyout_error = vfs_buildoptionstr(
-				&vfsp->vfs_mntopts, inargs, optlen);
+			    &vfsp->vfs_mntopts, inargs, optlen);
 			vfs_list_unlock();
 			if (copyout_error == 0 &&
 			    (uap->flags & MS_SYSSPACE) == 0) {
@@ -2746,7 +2746,7 @@ vfs_unmountall(void)
 		 */
 		vfs_list_lock();
 		for (vfsp = rootvfs->vfs_prev;
-			vfsp != rootvfs; vfsp = vfsp->vfs_prev)
+		    vfsp != rootvfs; vfsp = vfsp->vfs_prev)
 			if (vfsp == prev_vfsp)
 				break;
 		if (vfsp == rootvfs && prev_vfsp != rootvfs)
@@ -2788,7 +2788,7 @@ vfs_delmip(struct vfs *vfsp)
 	mutex_enter(&vfs_miplist_mutex);
 	mipprev = NULL;
 	for (mipp = vfs_miplist;
-		mipp && mipp->mip_vfsp != vfsp; mipp = mipp->mip_next) {
+	    mipp && mipp->mip_vfsp != vfsp; mipp = mipp->mip_next) {
 		mipprev = mipp;
 	}
 	if (mipp == NULL)
@@ -4161,6 +4161,16 @@ getrootfs(void)
 	    DDI_PROP_DONTPASS, "fstype", &propstr)
 	    == DDI_SUCCESS) {
 		(void) strncpy(rootfs.bo_fstype, propstr, BO_MAXFSNAME);
+		ddi_prop_free(propstr);
+
+	/*
+	 * if the boot property 'fstype' is not set, but 'zfs-bootfs' is set,
+	 * assume the type of this root filesystem is 'zfs'.
+	 */
+	} else if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
+	    DDI_PROP_DONTPASS, "zfs-bootfs", &propstr)
+	    == DDI_SUCCESS) {
+		(void) strncpy(rootfs.bo_fstype, "zfs", BO_MAXFSNAME);
 		ddi_prop_free(propstr);
 	}
 

@@ -113,6 +113,10 @@ init_config (void)
   fallback_entryno = -1;
   fallback_entries[0] = -1;
   grub_timeout = -1;
+  current_rootpool[0] = '\0';
+  current_bootfs[0] = '\0';
+  current_bootfs_obj = 0;
+  is_zfs_mount = 0;
 }
 
 /* Check a password for correctness.  Returns 0 if password was
@@ -2630,6 +2634,56 @@ static struct builtin builtin_ioprobe =
 };
 
 
+/*
+ * To boot from a ZFS root filesystem, the kernel$ or module$ commands
+ * must include "-B $ZFS-BOOTFS" to pass to the kernel:
+ *
+ * e.g.
+ * kernel$ /platform/i86pc/kernel/$ISADIR/unix -B $ZFS-BOOTFS,console=ttya
+ *
+ * The expand_dollar_bootfs routine expands $ZFS-BOOTFS to
+ * "pool-name/zfs-rootfilesystem-object-num", e.g. "rootpool/85"
+ * so that in the kernel zfs_mountroot would know which zfs root
+ * filesystem to be mounted.
+ */
+static int
+expand_dollar_bootfs(char *in, char *out)
+{
+	char *token, *tmpout = out;
+	int outlen, blen;
+
+	outlen = strlen(in);
+	blen = current_bootfs_obj == 0 ? strlen(current_rootpool) :
+	    strlen(current_rootpool) + 11;
+
+	out[0] = '\0';
+	while (token = strstr(in, "$ZFS-BOOTFS")) {
+
+		if ((outlen += blen) > MAX_CMDLINE) {
+			errnum = ERR_WONT_FIT;
+			return (1);
+		}
+
+		token[0] = '\0';	
+		grub_sprintf(tmpout, "%s", in);
+		token[0] = '$';
+		in = token + 11; /* move over $ZFS-BOOTFS */
+		tmpout = out + strlen(out);
+
+		/* Note: %u only fits 32 bit integer; */ 
+		if (current_bootfs_obj > 0)
+			grub_sprintf(tmpout, "zfs-bootfs=%s/%u",
+			    current_rootpool, current_bootfs_obj);
+		else
+			grub_sprintf(tmpout, "zfs-bootfs=%s",
+			    current_rootpool);
+		tmpout = out + strlen(out); 
+	}
+
+	strncat(out, in, MAX_CMDLINE);
+	return (0);
+}
+
 /* kernel */
 static int
 kernel_func (char *arg, int flags)
@@ -2699,7 +2753,7 @@ kernel_func (char *arg, int flags)
   if (kernel_type == KERNEL_TYPE_NONE)
     return 1;
 
-  mb_cmdline += len + 1;
+  mb_cmdline += grub_strlen(mb_cmdline) + 1;
   return 0;
 }
 
@@ -2949,10 +3003,9 @@ isamd64()
 	return (ret);
 }
 
-static int
-expand_arch (char *arg, int flags, int func())
+static void
+expand_arch (char *arg, char *newarg)
 {
-  char newarg[MAX_CMDLINE];	/* everything boils down to MAX_CMDLINE */
   char *index;
 
   newarg[0] = '\0';
@@ -2970,17 +3023,29 @@ expand_arch (char *arg, int flags, int func())
   }
 
   strncat(newarg, arg, MAX_CMDLINE);
-
-  grub_printf("loading %s\n", newarg);
-
-  return (func(newarg, flags));
+  return;
 }
 
 /* kernel$ */
 static int
 kernel_dollar_func (char *arg, int flags)
 {
-  return (expand_arch(arg, flags, (void *)&kernel_func));
+  char newarg[MAX_CMDLINE];	/* everything boils down to MAX_CMDLINE */
+
+  grub_printf("loading '%s' ...\n", arg);
+  expand_arch(arg, newarg);
+
+  if (kernel_func(newarg, flags))
+	return (1);
+
+  mb_cmdline = (char *)MB_CMDLINE_BUF;
+  if (expand_dollar_bootfs(newarg, mb_cmdline))
+	return (1);
+
+  grub_printf("'%s' is loaded\n", mb_cmdline);
+  mb_cmdline += grub_strlen(mb_cmdline) + 1;
+
+  return (0);
 }
 
 static struct builtin builtin_kernel_dollar =
@@ -3177,7 +3242,8 @@ module_func (char *arg, int flags)
       grub_memmove (mb_cmdline, arg, len + 1);
       if (! load_module (arg, mb_cmdline))
 	return 1;
-      mb_cmdline += len + 1;
+
+      mb_cmdline += grub_strlen(mb_cmdline) + 1;
       break;
 
     case KERNEL_TYPE_LINUX:
@@ -3211,7 +3277,23 @@ static struct builtin builtin_module =
 static int
 module_dollar_func (char *arg, int flags)
 {
-  return (expand_arch(arg, flags, (void *)&module_func));
+  char newarg[MAX_CMDLINE];	/* everything boils down to MAX_CMDLINE */
+  char *cmdline_sav;
+
+  grub_printf("loading '%s' ...\n", arg);
+  expand_arch(arg, newarg);
+
+  cmdline_sav = (char *)mb_cmdline;
+  if (module_func(newarg, flags))
+	return (1);
+
+  if (expand_dollar_bootfs(newarg, cmdline_sav))
+	return (1);
+
+  grub_printf("'%s' is loaded\n", (char *)cmdline_sav);
+  mb_cmdline += grub_strlen(cmdline_sav) + 1;
+
+  return (0);
 }
 
 static struct builtin builtin_module_dollar =
@@ -3770,6 +3852,7 @@ real_root_func (char *arg, int attempt_mount)
 static int
 root_func (char *arg, int flags)
 {
+  is_zfs_mount = 0;
   return real_root_func (arg, 1);
 }
 
@@ -3789,6 +3872,56 @@ static struct builtin builtin_root =
   " how many BIOS drive numbers are on controllers before the current"
   " one. For example, if there is an IDE disk and a SCSI disk, and your"
   " FreeBSD root partition is on the SCSI disk, then use a `1' for HDBIAS."
+};
+
+
+/*
+ * COMMAND to override the default root filesystem for ZFS
+ *	bootfs pool/fs
+ */
+static int
+bootfs_func (char *arg, int flags)
+{
+	int hdbias = 0;
+	char *biasptr;
+	char *next;
+
+	if (! *arg) {
+	    if (current_bootfs[0] != '\0')
+		grub_printf ("The zfs boot filesystem is set to '%s'.\n",
+				current_bootfs);
+	    else if (current_rootpool[0] != 0 && current_bootfs_obj != 0)
+		grub_printf("The zfs boot filesystem is <default: %s/%u>.",
+				current_rootpool, current_bootfs_obj);
+	    else if (current_rootpool[0] != 0 && current_bootfs_obj == 0)
+		grub_printf("The zfs boot pool is '%s'.", current_rootpool);
+	    else
+		grub_printf ("The zfs boot filesystem will be <default>.\n");
+
+	    return (1);
+	}
+
+	/* Verify the zfs filesystem name */
+	if (arg[0] == '/' || arg[0] == '\0') {
+		errnum = ERR_BAD_ARGUMENT;
+		return 0;
+	}
+
+	if (set_bootfs(arg) == 0) {
+		errnum = ERR_BAD_ARGUMENT;
+		return 0;
+	}
+
+	return (1);
+}
+
+static struct builtin builtin_bootfs =
+{
+  "bootfs",
+  bootfs_func,
+  BUILTIN_CMDLINE | BUILTIN_HELP_LIST,
+  "bootfs [ZFSBOOTFS]",
+  "Set the current zfs boot filesystem to ZFSBOOTFS (rootpool/rootfs)."
 };
 
 
@@ -3828,6 +3961,11 @@ savedefault_func (char *arg, int flags)
   int saved_sectors[2];
   int saved_offsets[2];
   int saved_lengths[2];
+
+  /* not supported for zfs root */
+  if (is_zfs_mount == 1) {
+	return (0); /* no-op */
+  }
 
   /* Save sector information about at most two sectors.  */
   auto void disk_read_savesect_func (int sector, int offset, int length);
@@ -5398,6 +5536,7 @@ struct builtin *builtin_table[] =
 #endif
   &builtin_blocklist,
   &builtin_boot,
+  &builtin_bootfs,
 #ifdef SUPPORT_NETBOOT
   &builtin_bootp,
 #endif /* SUPPORT_NETBOOT */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,7 @@ add_pool(zpool_handle_t *zhp, void *data)
 	} else {
 		zpool_close(zhp);
 		free(node);
+		return (-1);
 	}
 
 	return (0);
@@ -96,7 +97,7 @@ add_pool(zpool_handle_t *zhp, void *data)
  * line.
  */
 zpool_list_t *
-pool_list_get(int argc, char **argv, int *err)
+pool_list_get(int argc, char **argv, zpool_proplist_t **proplist, int *err)
 {
 	zpool_list_t *zlp;
 
@@ -121,9 +122,12 @@ pool_list_get(int argc, char **argv, int *err)
 		for (i = 0; i < argc; i++) {
 			zpool_handle_t *zhp;
 
-			if ((zhp = zpool_open_canfail(g_zfs, argv[i])) != NULL)
-				(void) add_pool(zhp, zlp);
-			else
+			if ((zhp = zpool_open_canfail(g_zfs,
+			    argv[i])) != NULL && add_pool(zhp, zlp) == 0) {
+				if (proplist &&
+				    zpool_expand_proplist(zhp, proplist) != 0)
+					*err = B_TRUE;
+			} else
 				*err = B_TRUE;
 		}
 	}
@@ -222,13 +226,13 @@ pool_list_count(zpool_list_t *zlp)
  * using the pool_list_* interfaces.
  */
 int
-for_each_pool(int argc, char **argv, boolean_t unavail, zpool_iter_f func,
-    void *data)
+for_each_pool(int argc, char **argv, boolean_t unavail,
+    zpool_proplist_t **proplist, zpool_iter_f func, void *data)
 {
 	zpool_list_t *list;
 	int ret = 0;
 
-	if ((list = pool_list_get(argc, argv, &ret)) == NULL)
+	if ((list = pool_list_get(argc, argv, proplist, &ret)) == NULL)
 		return (1);
 
 	if (pool_list_iter(list, unavail, func, data) != 0)

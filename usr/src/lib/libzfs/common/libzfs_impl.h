@@ -82,6 +82,7 @@ struct zpool_handle {
 	size_t zpool_config_size;
 	nvlist_t *zpool_config;
 	nvlist_t *zpool_old_config;
+	nvlist_t *zpool_props;
 };
 
 int zfs_error(libzfs_handle_t *, int, const char *);
@@ -99,6 +100,16 @@ int zpool_standard_error_fmt(libzfs_handle_t *, int, const char *, ...);
 
 int get_dependents(libzfs_handle_t *, boolean_t, const char *, char ***,
     size_t *);
+
+int zfs_expand_proplist_common(libzfs_handle_t *, zfs_proplist_t **,
+    zfs_type_t);
+int zfs_get_proplist_common(libzfs_handle_t *, char *, zfs_proplist_t **,
+    zfs_type_t);
+zfs_prop_t zfs_prop_iter_common(zfs_prop_f, void *, zfs_type_t, boolean_t);
+zfs_prop_t zfs_name_to_prop_common(const char *, zfs_type_t);
+
+nvlist_t *zfs_validate_properties(libzfs_handle_t *, zfs_type_t, char *,
+	nvlist_t *, uint64_t, zfs_handle_t *zhp, const char *errbuf);
 
 typedef struct prop_changelist prop_changelist_t;
 

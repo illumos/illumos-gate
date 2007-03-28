@@ -35,6 +35,7 @@
 		kobj_filbuf;
 		kobj_free;
 		kobj_fstat;
+		kobj_get_filesize;
 		kobj_getelfsym;
 		kobj_getmodinfo;
 		kobj_getpagesize;

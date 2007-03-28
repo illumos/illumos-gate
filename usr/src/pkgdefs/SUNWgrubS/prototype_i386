@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -154,6 +153,7 @@ f none usr/share/src/grub/stage2/fsys_minix.c 0644 root bin
 f none usr/share/src/grub/stage2/fsys_reiserfs.c 0644 root bin
 f none usr/share/src/grub/stage2/fsys_ufs.c 0644 root bin
 f none usr/share/src/grub/stage2/fsys_ufs2.c 0644 root bin
+f none usr/share/src/grub/stage2/fsys_zfs.c 0644 root bin
 f none usr/share/src/grub/stage2/fsys_vstafs.c 0644 root bin
 f none usr/share/src/grub/stage2/fsys_xfs.c 0644 root bin
 f none usr/share/src/grub/stage2/graphics.c 0644 root bin
@@ -189,10 +189,32 @@ f none usr/share/src/grub/stage2/terminfo.c 0644 root bin
 f none usr/share/src/grub/stage2/terminfo.h 0644 root bin
 f none usr/share/src/grub/stage2/tparm.c 0644 root bin
 f none usr/share/src/grub/stage2/tparm.h 0644 root bin
+f none usr/share/src/grub/stage2/fsys_zfs.h 0644 root bin
 f none usr/share/src/grub/stage2/ufs.h 0644 root bin
 f none usr/share/src/grub/stage2/ufs2.h 0644 root bin
 f none usr/share/src/grub/stage2/vstafs.h 0644 root bin
 f none usr/share/src/grub/stage2/xfs.h 0644 root bin
+f none usr/share/src/grub/stage2/zfs_sha256.c 0644 root bin
+f none usr/share/src/grub/stage2/zfs_lzjb.c 0644 root bin
+f none usr/share/src/grub/stage2/zfs_fletcher.c 0644 root bin
+
+d none usr/share/src/grub/stage2/zfs-include 0755 root bin
+f none usr/share/src/grub/stage2/zfs-include/dmu.h 0644 root bin
+f none usr/share/src/grub/stage2/zfs-include/dmu_objset.h 0644 root bin
+f none usr/share/src/grub/stage2/zfs-include/dnode.h 0644 root bin
+f none usr/share/src/grub/stage2/zfs-include/dsl_dataset.h 0644 root bin
+f none usr/share/src/grub/stage2/zfs-include/dsl_dir.h 0644 root bin
+f none usr/share/src/grub/stage2/zfs-include/spa.h 0644 root bin
+f none usr/share/src/grub/stage2/zfs-include/uberblock_impl.h 0644 root bin
+f none usr/share/src/grub/stage2/zfs-include/vdev_impl.h 0644 root bin
+f none usr/share/src/grub/stage2/zfs-include/zap_impl.h 0644 root bin
+f none usr/share/src/grub/stage2/zfs-include/zap_leaf.h 0644 root bin
+f none usr/share/src/grub/stage2/zfs-include/zfs.h 0644 root bin
+f none usr/share/src/grub/stage2/zfs-include/zfs_acl.h 0644 root bin
+f none usr/share/src/grub/stage2/zfs-include/zfs_znode.h 0644 root bin
+f none usr/share/src/grub/stage2/zfs-include/zil.h 0644 root bin
+f none usr/share/src/grub/stage2/zfs-include/zio.h 0644 root bin
+f none usr/share/src/grub/stage2/zfs-include/zio_checksum.h 0644 root bin
 
 d none usr/share/src/grub/stage1 0755 root bin
 f none usr/share/src/grub/stage1/Makefile.am 0644 root bin

@@ -669,7 +669,12 @@ load_image (char *kernel, char *arg, kernel_t suggested_type,
 	      tab_size = pu.elf->e_shentsize * pu.elf->e_shnum;
 	      
 	      grub_seek (pu.elf->e_shoff);
-	      if (grub_read ((char *) RAW_ADDR (cur_addr), tab_size)
+              /*
+	       * Should not need to call RAW_ADDR; cur_addr is already
+               * adjusted to account for grub_scratch_mem.
+	       * XXX Linux might calculate cur_addr differently.
+	       */
+	      if (grub_read ((char *) (cur_addr), tab_size)
 		  == tab_size)
 		{
 		  mbi.syms.e.addr = cur_addr;
@@ -697,8 +702,13 @@ load_image (char *kernel, char *arg, kernel_t suggested_type,
 		      
 		      sec_size = shdr[i].sh_size;
 
+		      /*
+		       * Should not need to call RAW_ADDR; cur_addr is already
+		       * adjusted to account for grub_scratch_mem.
+		       * XXX Linux might calculate cur_addr differently.
+		       */
 		      if (! (memcheck (cur_addr, sec_size)
-			     && (grub_read ((char *) RAW_ADDR (cur_addr),
+			     && (grub_read ((char *) (cur_addr),
 					    sec_size)
 				 == sec_size)))
 			{

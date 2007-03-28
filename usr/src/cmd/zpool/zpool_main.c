@@ -41,6 +41,7 @@
 #include <strings.h>
 #include <unistd.h>
 #include <priv.h>
+#include <sys/fs/zfs.h>
 
 #include <sys/stat.h>
 
@@ -74,6 +75,9 @@ static int zpool_do_export(int, char **);
 static int zpool_do_upgrade(int, char **);
 
 static int zpool_do_history(int, char **);
+
+static int zpool_do_get(int, char **);
+static int zpool_do_set(int, char **);
 
 /*
  * These libumem hooks provide a reasonable set of defaults for the allocator's
@@ -109,7 +113,9 @@ typedef enum {
 	HELP_REMOVE,
 	HELP_SCRUB,
 	HELP_STATUS,
-	HELP_UPGRADE
+	HELP_UPGRADE,
+	HELP_GET,
+	HELP_SET
 } zpool_help_t;
 
 
@@ -153,7 +159,9 @@ static zpool_command_t command_table[] = {
 	{ "export",	zpool_do_export,	HELP_EXPORT		},
 	{ "upgrade",	zpool_do_upgrade,	HELP_UPGRADE		},
 	{ NULL },
-	{ "history",	zpool_do_history,	HELP_HISTORY		}
+	{ "history",	zpool_do_history,	HELP_HISTORY		},
+	{ "get",	zpool_do_get,		HELP_GET		},
+	{ "set",	zpool_do_set,		HELP_SET		},
 };
 
 #define	NCOMMAND	(sizeof (command_table) / sizeof (command_table[0]))
@@ -209,6 +217,11 @@ get_usage(zpool_help_t idx) {
 		return (gettext("\tupgrade\n"
 		    "\tupgrade -v\n"
 		    "\tupgrade <-a | pool>\n"));
+	case HELP_GET:
+		return (gettext("\tget <all | property[,property]...> "
+		    "<pool> ...\n"));
+	case HELP_SET:
+		return (gettext("\tset <property=value> <pool> \n"));
 	}
 
 	abort();
@@ -261,6 +274,24 @@ static char *column_subopts[] = {
 };
 
 /*
+ * Callback routine that will print out a pool property value.
+ */
+static zpool_prop_t
+print_prop_cb(zpool_prop_t prop, void *cb)
+{
+	FILE *fp = cb;
+
+	(void) fprintf(fp, "\t%-13s  ", zpool_prop_to_name(prop));
+
+	if (zpool_prop_values(prop) == NULL)
+		(void) fprintf(fp, "-\n");
+	else
+		(void) fprintf(fp, "%s\n", zpool_prop_values(prop));
+
+	return (ZFS_PROP_CONT);
+}
+
+/*
  * Display usage message.  If we're inside a command, display only the usage for
  * that command.  Otherwise, iterate over the entire command table and display
  * a complete usage message.
@@ -296,6 +327,20 @@ usage(boolean_t requested)
 			for (i = 0; column_subopts[i] != NULL; i++)
 				(void) fprintf(fp, "\t%s\n", column_subopts[i]);
 		}
+	}
+
+	if (current_command != NULL &&
+	    ((strcmp(current_command->name, "set") == 0) ||
+	    (strcmp(current_command->name, "get") == 0))) {
+
+		(void) fprintf(fp,
+		    gettext("\nthe following properties are supported:\n"));
+
+		(void) fprintf(fp, "\n\t%-13s  %s\n\n",
+		    "PROPERTY", "VALUES");
+
+		/* Iterate over all properties */
+		(void) zpool_prop_iter(print_prop_cb, fp, B_FALSE);
 	}
 
 	/*
@@ -520,7 +565,7 @@ zpool_do_remove(int argc, char **argv)
  *      -m	Set default mountpoint for the root dataset.  By default it's
  *      	'/<pool>'
  *
- * Creates the the named pool according to the given vdev specification.  The
+ * Creates the named pool according to the given vdev specification.  The
  * bulk of the vdev processing is done in get_vdev_spec() in zpool_vdev.c.  Once
  * we get the nvlist back from get_vdev_spec(), we either print out the contents
  * (if '-n' was specified), or pass it to libzfs to do the creation.
@@ -787,7 +832,7 @@ zpool_do_destroy(int argc, char **argv)
  *
  *	-f	Forcefully unmount datasets
  *
- * Export the the given pools.  By default, the command will attempt to cleanly
+ * Export the given pools.  By default, the command will attempt to cleanly
  * unmount any active datasets within the pool.  If the '-f' flag is specified,
  * then the datasets will be forcefully unmounted.
  */
@@ -994,7 +1039,7 @@ show_import(nvlist_t *config)
 	(void) printf(gettext("    id: %llu\n"), (u_longlong_t)guid);
 	(void) printf(gettext(" state: %s"), health);
 	if (pool_state == POOL_STATE_DESTROYED)
-	    (void) printf(gettext(" (DESTROYED)"));
+		(void) printf(gettext(" (DESTROYED)"));
 	(void) printf("\n");
 
 	switch (reason) {
@@ -1705,7 +1750,7 @@ zpool_do_iostat(int argc, char **argv)
 	 * Construct the list of all interesting pools.
 	 */
 	ret = 0;
-	if ((list = pool_list_get(argc, argv, &ret)) == NULL)
+	if ((list = pool_list_get(argc, argv, NULL, &ret)) == NULL)
 		return (1);
 
 	if (pool_list_count(list) == 0 && argc != 0) {
@@ -2001,7 +2046,7 @@ zpool_do_list(int argc, char **argv)
 
 	cb.cb_first = B_TRUE;
 
-	ret = for_each_pool(argc, argv, B_TRUE, list_callback, &cb);
+	ret = for_each_pool(argc, argv, B_TRUE, NULL, list_callback, &cb);
 
 	if (argc == 0 && cb.cb_first) {
 		(void) printf(gettext("no pools available\n"));
@@ -2456,7 +2501,7 @@ zpool_do_scrub(int argc, char **argv)
 		usage(B_FALSE);
 	}
 
-	return (for_each_pool(argc, argv, B_TRUE, scrub_callback, &cb));
+	return (for_each_pool(argc, argv, B_TRUE, NULL, scrub_callback, &cb));
 }
 
 typedef struct status_cbdata {
@@ -2820,7 +2865,7 @@ status_callback(zpool_handle_t *zhp, void *data)
 
 	case ZPOOL_STATUS_CORRUPT_LABEL_NR:
 		(void) printf(gettext("status: One or more devices could not "
-		    "be used because the the label is missing \n\tor invalid.  "
+		    "be used because the label is missing \n\tor invalid.  "
 		    "There are insufficient replicas for the pool to "
 		    "continue\n\tfunctioning.\n"));
 		(void) printf(gettext("action: Destroy and re-create the pool "
@@ -3006,7 +3051,7 @@ zpool_do_status(int argc, char **argv)
 	if (argc == 0)
 		cb.cb_allpools = B_TRUE;
 
-	ret = for_each_pool(argc, argv, B_TRUE, status_callback, &cb);
+	ret = for_each_pool(argc, argv, B_TRUE, NULL, status_callback, &cb);
 
 	if (argc == 0 && cb.cb_count == 0)
 		(void) printf(gettext("no pools available\n"));
@@ -3183,6 +3228,7 @@ zpool_do_upgrade(int argc, char **argv)
 		(void) printf(gettext(" 4   zpool history\n"));
 		(void) printf(gettext(" 5   Compression using the gzip "
 		    "algorithm\n"));
+		(void) printf(gettext(" 6   bootfs pool property "));
 		(void) printf(gettext("\nFor more information on a particular "
 		    "version, including supported releases, see:\n\n"));
 		(void) printf("http://www.opensolaris.org/os/community/zfs/"
@@ -3216,7 +3262,8 @@ zpool_do_upgrade(int argc, char **argv)
 				    "their associated\nfeatures.\n"));
 		}
 	} else {
-		ret = for_each_pool(argc, argv, B_FALSE, upgrade_one, &cb);
+		ret = for_each_pool(argc, argv, B_FALSE, NULL,
+		    upgrade_one, &cb);
 	}
 
 	return (ret);
@@ -3278,7 +3325,8 @@ zpool_do_history(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	ret = for_each_pool(argc, argv, B_FALSE, get_history_one, &first);
+	ret = for_each_pool(argc, argv, B_FALSE,  NULL, get_history_one,
+	    &first);
 
 	if (argc == 0 && first == B_TRUE) {
 		(void) printf(gettext("no pools available\n"));
@@ -3288,12 +3336,165 @@ zpool_do_history(int argc, char **argv)
 	return (ret);
 }
 
+static int
+get_callback(zpool_handle_t *zhp, void *data)
+{
+	libzfs_get_cbdata_t *cbp = (libzfs_get_cbdata_t *)data;
+	char value[MAXNAMELEN];
+	zfs_source_t srctype;
+	zpool_proplist_t *pl;
+
+	for (pl = cbp->cb_proplist; pl != NULL; pl = pl->pl_next) {
+
+		/*
+		 * Skip the special fake placeholder.
+		 */
+		if (pl->pl_prop == ZFS_PROP_NAME &&
+		    pl == cbp->cb_proplist)
+			continue;
+
+		if (zpool_get_prop(zhp, pl->pl_prop,
+		    value, sizeof (value), &srctype) != 0)
+			continue;
+
+		libzfs_print_one_property(zpool_get_name(zhp), cbp,
+		    zpool_prop_to_name(pl->pl_prop), value, srctype, NULL);
+	}
+	return (0);
+}
+
+int
+zpool_do_get(int argc, char **argv)
+{
+	libzfs_get_cbdata_t cb = { 0 };
+	zpool_proplist_t fake_name = { 0 };
+	int ret;
+
+	if (argc < 3)
+		usage(B_FALSE);
+
+	cb.cb_first = B_TRUE;
+	cb.cb_sources = ZFS_SRC_ALL;
+	cb.cb_columns[0] = GET_COL_NAME;
+	cb.cb_columns[1] = GET_COL_PROPERTY;
+	cb.cb_columns[2] = GET_COL_VALUE;
+	cb.cb_columns[3] = GET_COL_SOURCE;
+
+	if (zpool_get_proplist(g_zfs, argv[1],  &cb.cb_proplist) != 0)
+		usage(B_FALSE);
+
+	if (cb.cb_proplist != NULL) {
+		fake_name.pl_prop = ZFS_PROP_NAME;
+		fake_name.pl_width = strlen(gettext("NAME"));
+		fake_name.pl_next = cb.cb_proplist;
+		cb.cb_proplist = &fake_name;
+	}
+
+	ret = for_each_pool(argc - 2, argv + 2, B_TRUE, &cb.cb_proplist,
+	    get_callback, &cb);
+
+	if (cb.cb_proplist == &fake_name)
+		zfs_free_proplist(fake_name.pl_next);
+	else
+		zfs_free_proplist(cb.cb_proplist);
+
+	return (ret);
+}
+
+typedef struct set_cbdata {
+	char *cb_propname;
+	char *cb_value;
+	boolean_t cb_any_successful;
+} set_cbdata_t;
+
+int
+set_callback(zpool_handle_t *zhp, void *data)
+{
+	int error;
+	set_cbdata_t *cb = (set_cbdata_t *)data;
+
+	error = zpool_set_prop(zhp, cb->cb_propname, cb->cb_value);
+
+	if (!error)
+		cb->cb_any_successful = B_TRUE;
+
+	return (error);
+}
+
+int
+zpool_do_set(int argc, char **argv)
+{
+	set_cbdata_t cb = { 0 };
+	int error;
+
+	if (argc > 1 && argv[1][0] == '-') {
+		(void) fprintf(stderr, gettext("invalid option '%c'\n"),
+		    argv[1][1]);
+		usage(B_FALSE);
+	}
+
+	if (argc < 2) {
+		(void) fprintf(stderr, gettext("missing property=value "
+		    "argument\n"));
+		usage(B_FALSE);
+	}
+
+	if (argc < 3) {
+		(void) fprintf(stderr, gettext("missing pool name\n"));
+		usage(B_FALSE);
+	}
+
+	if (argc > 3) {
+		(void) fprintf(stderr, gettext("too many pool names\n"));
+		usage(B_FALSE);
+	}
+
+	cb.cb_propname = argv[1];
+	cb.cb_value = strchr(cb.cb_propname, '=');
+	if (cb.cb_value == NULL) {
+		(void) fprintf(stderr, gettext("missing value in "
+		    "property=value argument\n"));
+		usage(B_FALSE);
+	}
+
+	*(cb.cb_value) = '\0';
+	cb.cb_value++;
+
+	error = for_each_pool(argc - 2, argv + 2, B_TRUE, NULL,
+	    set_callback, &cb);
+
+	if (cb.cb_any_successful) {
+		*(cb.cb_value - 1) = '=';
+		zpool_log_history(g_zfs, argc, argv, argv[2], B_FALSE, B_FALSE);
+	}
+
+	return (error);
+}
+
+static int
+find_command_idx(char *command, int *idx)
+{
+	int i;
+
+	for (i = 0; i < NCOMMAND; i++) {
+		if (command_table[i].name == NULL)
+			continue;
+
+		if (strcmp(command, command_table[i].name) == 0) {
+			*idx = i;
+			return (0);
+		}
+	}
+	return (1);
+}
+
 int
 main(int argc, char **argv)
 {
 	int ret;
 	int i;
 	char *cmdname;
+	int found = 0;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -3327,15 +3528,10 @@ main(int argc, char **argv)
 	/*
 	 * Run the appropriate command.
 	 */
-	for (i = 0; i < NCOMMAND; i++) {
-		if (command_table[i].name == NULL)
-			continue;
-
-		if (strcmp(cmdname, command_table[i].name) == 0) {
-			current_command = &command_table[i];
-			ret = command_table[i].func(argc - 1, argv + 1);
-			break;
-		}
+	if (find_command_idx(cmdname, &i) == 0) {
+		current_command = &command_table[i];
+		ret = command_table[i].func(argc - 1, argv + 1);
+		found++;
 	}
 
 	/*
@@ -3348,7 +3544,7 @@ main(int argc, char **argv)
 		return (!!ioctl(fd, ZFS_IOC_POOL_FREEZE, buf));
 	}
 
-	if (i == NCOMMAND) {
+	if (!found) {
 		(void) fprintf(stderr, gettext("unrecognized "
 		    "command '%s'\n"), cmdname);
 		usage(B_FALSE);

@@ -668,7 +668,7 @@ attr_val(val_t *bootaux)
 			    strlen(bootaux[libmacros[i].lmi_ba_index].ba_ptr) +
 			    1, KM_WAIT);
 			(void) strcpy(libmacros[i].lmi_list,
-				bootaux[libmacros[i].lmi_ba_index].ba_ptr);
+			    bootaux[libmacros[i].lmi_ba_index].ba_ptr);
 		}
 		libmacros[i].lmi_macrolen = strlen(libmacros[i].lmi_macroname);
 	}
@@ -916,12 +916,12 @@ load_linker(val_t *bootaux)
 	mp->nsyms = mp->symhdr->sh_size / mp->symhdr->sh_entsize;
 	mp->flags = KOBJ_INTERP|KOBJ_PRIM;
 	mp->strhdr = (Shdr *)
-		(mp->shdrs + mp->symhdr->sh_link * mp->hdr.e_shentsize);
+	    (mp->shdrs + mp->symhdr->sh_link * mp->hdr.e_shentsize);
 	mp->strings = (char *)mp->strhdr->sh_addr;
 	mp->hashsize = kobj_gethashsize(mp->nsyms);
 
 	mp->symsize = mp->symhdr->sh_size + mp->strhdr->sh_size + sizeof (int) +
-		(mp->hashsize + mp->nsyms) * sizeof (symid_t);
+	    (mp->hashsize + mp->nsyms) * sizeof (symid_t);
 
 	mp->chains = kobj_zalloc(mp->nsyms * sizeof (symid_t), KM_WAIT);
 	mp->buckets = kobj_zalloc(mp->hashsize * sizeof (symid_t), KM_WAIT);
@@ -1218,12 +1218,12 @@ bind_primary(val_t *bootaux, int lmid)
 				case DT_RELA:
 					shtype = SHT_RELA;
 					rela = (char *)(dyn->d_un.d_ptr +
-						dynseg);
+					    dynseg);
 					break;
 				case DT_REL:
 					shtype = SHT_REL;
 					rela = (char *)(dyn->d_un.d_ptr +
-						dynseg);
+					    dynseg);
 					break;
 				}
 			}
@@ -1828,7 +1828,7 @@ kobj_set_ctf(struct module *mp, caddr_t data, size_t size)
 	if (!standalone) {
 		if (mp->ctfdata != NULL) {
 			if (vmem_contains(ctf_arena, mp->ctfdata,
-				mp->ctfsize)) {
+			    mp->ctfsize)) {
 				vmem_free(ctf_arena, mp->ctfdata, mp->ctfsize);
 			} else {
 				kobj_free(mp->ctfdata, mp->ctfsize);
@@ -2303,14 +2303,14 @@ get_progbits(struct module *mp, struct _buf *file)
 			limit = _text + lg_pagesize;
 
 		mp->text = kobj_segbrk(&_etext, mp->text_size,
-			tp->align, limit);
+		    tp->align, limit);
 		/*
 		 * If we can't grow the text segment, try the
 		 * data segment before failing.
 		 */
 		if (mp->text == NULL) {
 			mp->text = kobj_segbrk(&_edata, mp->text_size,
-					tp->align, 0);
+			    tp->align, 0);
 		}
 
 		mp->data = kobj_segbrk(&_edata, mp->data_size, dp->align, 0);
@@ -2530,7 +2530,7 @@ get_syms(struct module *mp, struct _buf *file)
 		if (mp->flags & KOBJ_EXEC)
 			return (0);
 		_kobj_printf(ops, "krtld: get_syms: %s ",
-			mp->filename);
+		    mp->filename);
 		_kobj_printf(ops, "no SHT_SYMTAB symbol table found\n");
 		return (-1);
 	}
@@ -2541,7 +2541,7 @@ get_syms(struct module *mp, struct _buf *file)
 	if ((mp->symhdr == 0) || (mp->symhdr->sh_link >= mp->hdr.e_shnum))
 		return (-1);
 	mp->strhdr = (Shdr *)
-		(mp->shdrs + mp->symhdr->sh_link * mp->hdr.e_shentsize);
+	    (mp->shdrs + mp->symhdr->sh_link * mp->hdr.e_shentsize);
 
 	mp->nsyms = mp->symhdr->sh_size / mp->symhdr->sh_entsize;
 	mp->hashsize = kobj_gethashsize(mp->nsyms);
@@ -2719,7 +2719,7 @@ crypto_es_hash(struct module *mp, char *hash, char *shstrtab)
 			_kobj_printf(ops,
 			    "krtld: crypto_es_hash: updating hash with"
 			    " %s data size=%d\n", shstrtab + shp->sh_name,
-				shp->sh_size);
+			    shp->sh_size);
 #endif
 		ASSERT(shp->sh_addr != NULL);
 		SHA1Update(&ctx, (const uint8_t *)shp->sh_addr, shp->sh_size);
@@ -3006,9 +3006,9 @@ do_symbols(struct module *mp, Elf64_Addr bss_base)
 		if (ELF_ST_TYPE(sp->st_info) == STT_SPARC_REGISTER) {
 			if (*name != '\0') {
 				_kobj_printf(ops, "%s: named REGISTER symbol ",
-						mp->filename);
+				    mp->filename);
 				_kobj_printf(ops, "not supported '%s'\n",
-						name);
+				    name);
 				err = DOSYM_UNDEF;
 			}
 			continue;
@@ -3019,9 +3019,9 @@ do_symbols(struct module *mp, Elf64_Addr bss_base)
 		 */
 		if (ELF_ST_TYPE(sp->st_info) == STT_TLS) {
 			_kobj_printf(ops, "%s: TLS symbol ",
-					mp->filename);
+			    mp->filename);
 			_kobj_printf(ops, "not supported '%s'\n",
-					name);
+			    name);
 			err = DOSYM_UNDEF;
 			continue;
 		}
@@ -3389,7 +3389,7 @@ sym_insert(struct module *mp, char *name, symid_t index)
 				lastmp = mp;
 			}
 			sp = (Sym *)(mp->symtbl +
-				index * mp->symhdr->sh_entsize);
+			    index * mp->symhdr->sh_entsize);
 			_kobj_printf(ops, "krtld:\t[%3d]", index);
 			_kobj_printf(ops, "\t0x%lx", sp->st_value);
 			_kobj_printf(ops, "\t%s\n", name);
@@ -3596,7 +3596,7 @@ kobjopen_thread(struct kobjopen_tctl *ltp)
 	mutex_init(&cpr_lk, NULL, MUTEX_DEFAULT, NULL);
 	CALLB_CPR_INIT(&cpr_i, &cpr_lk, callb_generic_cpr, "kobjopen");
 	ltp->Errno = vn_open(ltp->name, UIO_SYSSPACE, FREAD, 0, &(ltp->vp),
-									0, 0);
+	    0, 0);
 	sema_v(&ltp->sema);
 	mutex_enter(&cpr_lk);
 	CALLB_CPR_EXIT(&cpr_i);
@@ -3808,7 +3808,7 @@ kobj_read_file(struct _buf *file, char *buf, unsigned size, unsigned off)
 			if (page_addr == off &&
 			    (c_size = F_PAGE(size)) && buf) {
 				c_size = kobj_read(file->_fd, buf, c_size,
-					page_addr);
+				    page_addr);
 				if (c_size < 0) {
 					count = -1;
 					break;
@@ -3826,7 +3826,7 @@ kobj_read_file(struct _buf *file, char *buf, unsigned size, unsigned off)
 			} else {
 				file->_off = page_addr;
 				c_size = kobj_read(file->_fd, file->_base,
-						MAXBSIZE, page_addr);
+				    MAXBSIZE, page_addr);
 				file->_ptr = file->_base;
 				file->_cnt = c_size;
 				file->_size = c_size;
@@ -3987,7 +3987,7 @@ kobj_segbrk(caddr_t *spp, size_t size, size_t align, caddr_t limit)
 		}
 
 		npva = (uintptr_t)BOP_ALLOC(ops, (caddr_t)pva,
-					alloc_size, alloc_align);
+		    alloc_size, alloc_align);
 
 		if (npva == NULL) {
 			_kobj_printf(ops, "BOP_ALLOC failed, 0x%lx bytes",
@@ -4019,6 +4019,45 @@ kobj_gethashsize(uint_t n)
 			hsize += f = 1;
 
 	return (hsize);
+}
+
+/*
+ * Get the file size.
+ *
+ * Before root is mounted, files are compressed in the boot_archive ramdisk
+ * (in the memory). kobj_fstat would return the compressed file size.
+ * In order to get the uncompressed file size, read the file to the end and
+ * count its size.
+ */
+int
+kobj_get_filesize(struct _buf *file, uint64_t *size)
+{
+	if (_modrootloaded) {
+		struct bootstat bst;
+
+		if (kobj_fstat(file->_fd, &bst) != 0)
+			return (EIO);
+		*size = bst.st_size;
+	} else {
+		char *buf;
+		int count;
+		uint64_t offset = 0;
+
+		buf = kmem_alloc(MAXBSIZE, KM_SLEEP);
+		do {
+			count = kobj_read_file(file, buf, MAXBSIZE, offset);
+			if (count < 0) {
+				kmem_free(buf, MAXBSIZE);
+				return (EIO);
+			}
+			offset += count;
+		} while (count == MAXBSIZE);
+		kmem_free(buf, MAXBSIZE);
+
+		*size = offset;
+	}
+
+	return (0);
 }
 
 static char *

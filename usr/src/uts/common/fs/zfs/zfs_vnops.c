@@ -1601,9 +1601,7 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp)
 	zap_cursor_t	zc;
 	zap_attribute_t	zap;
 	uint_t		bytes_wanted;
-	ushort_t	this_reclen;
 	uint64_t	offset; /* must be unsigned; checks for < 1 */
-	off64_t		*next;
 	int		local_eof;
 	int		outcount;
 	int		error;
@@ -1673,22 +1671,22 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp)
 	 */
 	outcount = 0;
 	while (outcount < bytes_wanted) {
+		ino64_t objnum;
+		ushort_t reclen;
+		off64_t *next;
+
 		/*
 		 * Special case `.', `..', and `.zfs'.
 		 */
 		if (offset == 0) {
 			(void) strcpy(zap.za_name, ".");
-			zap.za_first_integer = zp->z_id;
-			this_reclen = DIRENT64_RECLEN(1);
+			objnum = zp->z_id;
 		} else if (offset == 1) {
 			(void) strcpy(zap.za_name, "..");
-			zap.za_first_integer = zp->z_phys->zp_parent;
-			this_reclen = DIRENT64_RECLEN(2);
+			objnum = zp->z_phys->zp_parent;
 		} else if (offset == 2 && zfs_show_ctldir(zp)) {
 			(void) strcpy(zap.za_name, ZFS_CTLDIR_NAME);
-			zap.za_first_integer = ZFSCTL_INO_ROOT;
-			this_reclen =
-			    DIRENT64_RECLEN(sizeof (ZFS_CTLDIR_NAME) - 1);
+			objnum = ZFSCTL_INO_ROOT;
 		} else {
 			/*
 			 * Grab next entry.
@@ -1709,13 +1707,19 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp)
 				error = ENXIO;
 				goto update;
 			}
-			this_reclen = DIRENT64_RECLEN(strlen(zap.za_name));
+
+			objnum = ZFS_DIRENT_OBJ(zap.za_first_integer);
+			/*
+			 * MacOS X can extract the object type here such as:
+			 * uint8_t type = ZFS_DIRENT_TYPE(zap.za_first_integer);
+			 */
 		}
+		reclen = DIRENT64_RECLEN(strlen(zap.za_name));
 
 		/*
 		 * Will this entry fit in the buffer?
 		 */
-		if (outcount + this_reclen > bufsize) {
+		if (outcount + reclen > bufsize) {
 			/*
 			 * Did we manage to fit anything in the buffer?
 			 */
@@ -1728,20 +1732,20 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp)
 		/*
 		 * Add this entry:
 		 */
-		odp->d_ino = (ino64_t)zap.za_first_integer;
-		odp->d_reclen = (ushort_t)this_reclen;
+		odp->d_ino = objnum;
+		odp->d_reclen = reclen;
 		/* NOTE: d_off is the offset for the *next* entry */
 		next = &(odp->d_off);
 		(void) strncpy(odp->d_name, zap.za_name,
-		    DIRENT64_NAMELEN(this_reclen));
-		outcount += this_reclen;
-		odp = (dirent64_t *)((intptr_t)odp + this_reclen);
+		    DIRENT64_NAMELEN(reclen));
+		outcount += reclen;
+		odp = (dirent64_t *)((intptr_t)odp + reclen);
 
 		ASSERT(outcount <= bufsize);
 
 		/* Prefetch znode */
 		if (prefetch)
-			dmu_prefetch(os, zap.za_first_integer, 0, 0);
+			dmu_prefetch(os, objnum, 0, 0);
 
 		/*
 		 * Move to the next entry, fill in the previous offset.

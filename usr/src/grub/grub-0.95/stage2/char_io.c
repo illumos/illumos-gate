@@ -1056,7 +1056,10 @@ grub_strncat (char *s1, const char *s2, int n)
    a static library supporting minimal standard C functions and link
    each image with the library. Complicated things should be left to
    computer, definitely. -okuji  */
-#if !defined(STAGE1_5) || defined(FSYS_VSTAFS)
+
+/* Make some grub_str* routines available to ZFS plug-in as well */
+
+#if !defined(STAGE1_5) || defined(FSYS_VSTAFS) || defined(FSYS_ZFS)
 int
 grub_strcmp (const char *s1, const char *s2)
 {
@@ -1072,7 +1075,20 @@ grub_strcmp (const char *s1, const char *s2)
 
   return 0;
 }
-#endif /* ! STAGE1_5 || FSYS_VSTAFS */
+
+int
+grub_strncmp(const char *s1, const char *s2, int n)
+{
+        if (s1 == s2)
+                return (0);
+        n++;
+        while (--n != 0 && *s1 == *s2++)
+                if (*s1++ == '\0')
+                        return (0);
+        return ((n == 0) ? 0 : *(unsigned char *)s1 - *(unsigned char *)--s2);
+}
+
+#endif /* ! STAGE1_5 || FSYS_VSTAFS || defined(FSYS_ZFS) */
 
 #ifndef STAGE1_5
 /* Wait for a keypress and return its code.  */
@@ -1210,21 +1226,7 @@ substring (const char *s1, const char *s2)
   return 1;
 }
 
-#ifndef STAGE1_5
-/* Terminate the string STR with NUL.  */
-int
-nul_terminate (char *str)
-{
-  int ch;
-  
-  while (*str && ! grub_isspace (*str))
-    str++;
-
-  ch = *str;
-  *str = 0;
-  return ch;
-}
-
+#if !defined(STAGE1_5) || defined(FSYS_ZFS)
 char *
 grub_strstr (const char *s1, const char *s2)
 {
@@ -1245,6 +1247,22 @@ grub_strstr (const char *s1, const char *s2)
     }
 
   return 0;
+}
+#endif /* !defined(STAGE1_5) || defined(FSYS_ZFS) */
+
+#ifndef STAGE1_5
+/* Terminate the string STR with NUL.  */
+int
+nul_terminate (char *str)
+{
+  int ch;
+  
+  while (*str && ! grub_isspace (*str))
+    str++;
+
+  ch = *str;
+  *str = 0;
+  return ch;
 }
 
 int

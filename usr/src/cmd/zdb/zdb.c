@@ -887,6 +887,7 @@ static object_viewer_t *object_viewer[DMU_OT_NUMTYPES] = {
 	dump_zap,		/* persistent error log		*/
 	dump_uint8,		/* SPA history			*/
 	dump_uint64,		/* SPA history offsets		*/
+	dump_zap,		/* Pool properties		*/
 };
 
 static void
@@ -931,11 +932,11 @@ dump_object(objset_t *os, uint64_t object, int verbosity, int *print_header)
 
 	if (doi.doi_checksum != ZIO_CHECKSUM_INHERIT || verbosity >= 6)
 		(void) snprintf(aux + strlen(aux), sizeof (aux), " (K=%s)",
-		zio_checksum_table[doi.doi_checksum].ci_name);
+		    zio_checksum_table[doi.doi_checksum].ci_name);
 
 	if (doi.doi_compress != ZIO_COMPRESS_INHERIT || verbosity >= 6)
 		(void) snprintf(aux + strlen(aux), sizeof (aux), " (Z=%s)",
-		zio_compress_table[doi.doi_compress].ci_name);
+		    zio_compress_table[doi.doi_compress].ci_name);
 
 	(void) printf("%10lld  %3u  %5s  %5s  %5s  %5s  %s%s\n",
 	    (u_longlong_t)object, doi.doi_indirection, iblk, dblk, lsize,
@@ -1440,7 +1441,7 @@ zdb_blkptr_cb(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
 		    (u_longlong_t)zb->zb_objset,
 		    (u_longlong_t)zb->zb_object,
 		    (u_longlong_t)blkid2offset(bc->bc_dnode,
-			zb->zb_level, zb->zb_blkid),
+		    zb->zb_level, zb->zb_blkid),
 		    blkbuf);
 	}
 

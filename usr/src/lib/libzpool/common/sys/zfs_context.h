@@ -443,7 +443,6 @@ extern struct _buf *kobj_open_file(char *name);
 extern int kobj_read_file(struct _buf *file, char *buf, unsigned size,
     unsigned off);
 extern void kobj_close_file(struct _buf *file);
-extern int kobj_fstat(intptr_t, struct bootstat *);
-
+extern int kobj_get_filesize(struct _buf *file, uint64_t *size);
 
 #endif	/* _SYS_ZFS_CONTEXT_H */

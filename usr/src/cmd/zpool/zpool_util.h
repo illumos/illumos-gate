@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,11 +51,12 @@ nvlist_t *make_root_vdev(nvlist_t *poolconfig, int force, int check_rep,
 /*
  * Pool list functions
  */
-int for_each_pool(int, char **, boolean_t unavail, zpool_iter_f, void *);
+int for_each_pool(int, char **, boolean_t unavail, zpool_proplist_t **,
+    zpool_iter_f, void *);
 
 typedef struct zpool_list zpool_list_t;
 
-zpool_list_t *pool_list_get(int, char **, int *);
+zpool_list_t *pool_list_get(int, char **, zpool_proplist_t **, int *);
 void pool_list_update(zpool_list_t *);
 int pool_list_iter(zpool_list_t *, int unavail, zpool_iter_f, void *);
 void pool_list_free(zpool_list_t *);

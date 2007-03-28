@@ -867,6 +867,7 @@ Optional Features:
   --disable-vstafs        disable VSTa FS support in Stage 2
   --disable-jfs           disable IBM JFS support in Stage 2
   --disable-xfs           disable SGI XFS support in Stage 2
+  --disable-zfs           disable ZFS support in Stage 2
   --disable-iso9660       disable ISO9660 support in Stage 2
   --disable-gunzip        disable decompression in Stage 2
   --disable-md5-password  disable MD5 password support in Stage 2
@@ -5493,6 +5494,16 @@ fi;
 
 if test x"$enable_xfs" != xno; then
   FSYS_CFLAGS="$FSYS_CFLAGS -DFSYS_XFS=1"
+fi
+
+# Check whether --enable-zfs or --disable-zfs was given.
+if test "${enable_zfs+set}" = set; then
+  enableval="$enable_zfs"
+
+fi;
+
+if test x"$enable_zfs" != xno; then
+  FSYS_CFLAGS="$FSYS_CFLAGS -DFSYS_ZFS=1"
 fi
 
 # Check whether --enable-iso9660 or --disable-iso9660 was given.

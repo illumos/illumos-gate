@@ -1,3 +1,8 @@
+
+ZFS support added by Sun Microsystems.
+Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+Use is subject to license terms.
+
 VaX#n8 (real name unknown) wrote shared_src/fsys_ext2fs.c.
 
 Heiko Schroeder rewrote shared_src/stage1.S to be more readable.

@@ -44,6 +44,9 @@ extern char *grub_scratch_mem;
 # define RAW_SEG(x) (x)
 #endif
 
+#define	MAXNAMELEN	256
+#define MIN(x, y) ((x) < (y) ? (x) : (y))
+
 /*
  *  Integer sizes
  */
@@ -214,6 +217,7 @@ extern char *grub_scratch_mem;
 #define STAGE2_ID_ISO9660_STAGE1_5	9
 #define STAGE2_ID_UFS2_STAGE1_5		10
 #define STAGE2_ID_UFS_STAGE1_5		11
+#define STAGE2_ID_ZFS_STAGE1_5		12
 
 #ifndef STAGE1_5
 # define STAGE2_ID	STAGE2_ID_STAGE2
@@ -240,6 +244,8 @@ extern char *grub_scratch_mem;
 #  define STAGE2_ID	STAGE2_ID_UFS2_STAGE1_5
 # elif defined(FSYS_UFS)
 #  define STAGE2_ID	STAGE2_ID_UFS_STAGE1_5
+# elif defined(FSYS_ZFS)
+#  define STAGE2_ID	STAGE2_ID_ZFS_STAGE1_5
 # else
 #  error "unknown Stage 2"
 # endif
@@ -554,6 +560,7 @@ typedef enum
   ERR_NO_DISK_SPACE,
   ERR_NUMBER_OVERFLOW,
   ERR_BAD_GZIP_CRC,
+  ERR_FILESYSTEM_NOT_FOUND,
 
   MAX_ERR_NUM
 } grub_error_t;
@@ -640,6 +647,10 @@ extern int debug;
 
 extern unsigned long current_drive;
 extern unsigned long current_partition;
+extern char current_rootpool[MAXNAMELEN];
+extern char current_bootfs[MAXNAMELEN];
+extern unsigned long long current_bootfs_obj;
+extern int is_zfs_mount;
 
 extern int fsys_type;
 

@@ -291,6 +291,13 @@ if test x"$enable_xfs" != xno; then
   FSYS_CFLAGS="$FSYS_CFLAGS -DFSYS_XFS=1"
 fi
 
+AC_ARG_ENABLE(zfs,
+  [  --disable-zfs           disable ZFS support in Stage 2])
+
+if test x"$enable_zfs" != xno; then
+  FSYS_CFLAGS="$FSYS_CFLAGS -DFSYS_ZFS=1"
+fi
+
 AC_ARG_ENABLE(iso9660,
   [  --disable-iso9660       disable ISO9660 support in Stage 2])
 

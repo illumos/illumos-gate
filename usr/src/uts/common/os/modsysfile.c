@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,7 +72,6 @@ static vmem_t *mod_sysfile_arena;	/* parser memory */
 
 char obp_bootpath[BO_MAXOBJNAME];	/* bootpath from obp */
 char svm_bootpath[BO_MAXOBJNAME];	/* bootpath redirected via rootdev */
-char zfs_bootpath[BO_MAXOBJNAME];	/* zfs bootpath, set via zfsroot */
 
 #if defined(_PSM_MODULES)
 
@@ -135,7 +134,7 @@ parse_debug(struct _buf *file, char *fmt, ...)
 		vprintf(fmt, adx);
 		if (file)
 			printf(" on line %d of %s\n", kobj_linenum(file),
-				kobj_filename(file));
+			    kobj_filename(file));
 		va_end(adx);
 	}
 }
@@ -489,8 +488,6 @@ static struct modcmd modcmd[] = {
 	{ "set32",	MOD_SET32	},
 	{ "SET64",	MOD_SET64	},
 	{ "set64",	MOD_SET64	},
-	{ "ZFSROOT", 	MOD_ZFSROOT	},
-	{ "zfsroot", 	MOD_ZFSROOT	},
 	{ NULL,		MOD_UNKNOWN	}
 };
 
@@ -530,7 +527,6 @@ do_sysfile_cmd(struct _buf *file, const char *cmd)
 		 */
 	case MOD_ROOTFS:
 	case MOD_SWAPFS:
-	case MOD_ZFSROOT:
 		if ((token = kobj_lex(file, tok1, sizeof (tok1))) == COLON) {
 			token = kobj_lex(file, tok1, sizeof (tok1));
 		} else {
@@ -1182,9 +1178,9 @@ sys_set_var(int fcn, struct sysparam *sysp, void *p)
 		symaddr = kobj_getelfsym(sysp->sys_ptr, NULL, &size);
 	} else if (fcn == SYS_SET_MVAR) {
 		if (sysp->sys_modnam == (char *)NULL ||
-			strcmp(((struct modctl *)p)->mod_modname,
-			    sysp->sys_modnam) != 0)
-				return;
+		    strcmp(((struct modctl *)p)->mod_modname,
+		    sysp->sys_modnam) != 0)
+			return;
 		symaddr = kobj_getelfsym(sysp->sys_ptr,
 		    ((struct modctl *)p)->mod_mp, &size);
 	} else
@@ -1523,10 +1519,6 @@ setparams()
 			(void) copystr(sysp->sys_ptr, bootobjp->bo_fstype,
 			    BO_MAXOBJNAME, NULL);
 			break;
-		case MOD_ZFSROOT:
-			(void) copystr(sysp->sys_ptr, zfs_bootpath,
-			    BO_MAXOBJNAME, NULL);
-			break;
 		default:
 			break;
 		}
@@ -1636,13 +1628,13 @@ valid_prop_name(char *name)
 
 	for (i = 0; i < len; i++) {
 		if (name[i] < 0x21 ||
-			name[i] == '/' ||
-			name[i] == '\\' ||
-			name[i] == ':' ||
-			name[i] == '[' ||
-			name[i] == ']' ||
-			name[i] == '@')
-				return (0);
+		    name[i] == '/' ||
+		    name[i] == '\\' ||
+		    name[i] == ':' ||
+		    name[i] == '[' ||
+		    name[i] == ']' ||
+		    name[i] == '@')
+			return (0);
 	}
 	return (1);
 }
@@ -1817,12 +1809,12 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 				    strcmp(tokbuf, "class") == 0) {
 					state = drvclass;
 					prop_name = kmem_alloc(strlen(tokbuf) +
-						1, KM_SLEEP);
+					    1, KM_SLEEP);
 					(void) strcpy(prop_name, tokbuf);
 				} else {
 					state = prop;
 					prop_name = kmem_alloc(strlen(tokbuf) +
-						1, KM_SLEEP);
+					    1, KM_SLEEP);
 					(void) strcpy(prop_name, tokbuf);
 				}
 				break;
@@ -1853,7 +1845,7 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 			case name_equals:
 				if (ddi_get_name((dev_info_t *)devi)) {
 					kobj_file_err(CE_WARN, file, "%s %s",
-						nm_err, omit_err);
+					    nm_err, omit_err);
 					goto bad;
 				}
 				devi->devi_name = kmem_alloc(strlen(tokbuf) + 1,
@@ -1864,7 +1856,7 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 			case parent_equals:
 				if (hwcp->hwc_parent_name) {
 					kobj_file_err(CE_WARN, file, "%s %s",
-						prnt_err, omit_err);
+					    prnt_err, omit_err);
 					goto bad;
 				}
 				hwcp->hwc_parent_name = kmem_alloc(strlen
@@ -1940,7 +1932,7 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 	case prop_equals_string:
 	case prop_equals_integer:
 		make_prop(file, (dev_info_t *)devi,
-			prop_name, val_list);
+		    prop_name, val_list);
 		break;
 
 	case hwc_begin:
@@ -2769,7 +2761,7 @@ add_class(char *exporter, char *class)
 	 */
 	if (ddi_name_to_major(exporter) >= devcnt) {
 		cmn_err(CE_WARN, "No major number for driver %s"
-				" in class %s", exporter, class);
+		    " in class %s", exporter, class);
 		return;
 	}
 	hcl = kmem_zalloc(sizeof (struct hwc_class), KM_SLEEP);
@@ -3022,7 +3014,7 @@ close_mach_list(void)
 		machp = pmach_head;
 		pmach_head = machp->m_next;
 		kmem_free(machp, sizeof (struct psm_mach) +
-			strlen(machp->m_machname) + 1);
+		    strlen(machp->m_machname) + 1);
 	}
 }
 #endif	/* _PSM_MODULES */

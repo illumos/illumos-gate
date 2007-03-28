@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,7 +74,7 @@ spa_config_load(void)
 	spa_t *spa;
 	char pathname[128];
 	struct _buf *file;
-	struct bootstat bst;
+	uint64_t fsize;
 
 	/*
 	 * Open the configuration file.
@@ -86,21 +86,21 @@ spa_config_load(void)
 	if (file == (struct _buf *)-1)
 		return;
 
-	if (kobj_fstat(file->_fd, &bst) != 0)
+	if (kobj_get_filesize(file, &fsize) != 0)
 		goto out;
 
-	buf = kmem_alloc(bst.st_size, KM_SLEEP);
+	buf = kmem_alloc(fsize, KM_SLEEP);
 
 	/*
 	 * Read the nvlist from the file.
 	 */
-	if (kobj_read_file(file, buf, bst.st_size, 0) < 0)
+	if (kobj_read_file(file, buf, fsize, 0) < 0)
 		goto out;
 
 	/*
 	 * Unpack the nvlist.
 	 */
-	if (nvlist_unpack(buf, bst.st_size, &nvlist, KM_SLEEP) != 0)
+	if (nvlist_unpack(buf, fsize, &nvlist, KM_SLEEP) != 0)
 		goto out;
 
 	/*
@@ -132,7 +132,7 @@ spa_config_load(void)
 
 out:
 	if (buf != NULL)
-		kmem_free(buf, bst.st_size);
+		kmem_free(buf, fsize);
 
 	kobj_close_file(file);
 }

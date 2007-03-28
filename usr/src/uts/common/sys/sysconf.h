@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,7 +71,6 @@ struct modcmd {
 #define	MOD_UNKNOWN	9	/* unknown command */
 #define	MOD_SET32	10	/* like MOD_SET but -only- on 32-bit kernel */
 #define	MOD_SET64	11	/* like MOD_SET but -only- on 64-bit kernel */
-#define	MOD_ZFSROOT	12	/* use zfs as the root filesystem */
 
 /*
  * Commands for mod_sysctl()

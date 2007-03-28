@@ -85,6 +85,16 @@ extern "C" {
 #define	ZFS_MAXNAMELEN	(MAXNAMELEN - 1)
 
 /*
+ * The directory entry has the type (currently unused on Solaris) in the
+ * top 4 bits, and the object number in the low 48 bits.  The "middle"
+ * 12 bits are unused.
+ */
+#define	ZFS_DIRENT_TYPE(de) BF64_GET(de, 60, 4)
+#define	ZFS_DIRENT_OBJ(de) BF64_GET(de, 0, 48)
+#define	ZFS_DIRENT_MAKE(type, obj) (((uint64_t)type << 60) | obj)
+
+
+/*
  * This is the persistent portion of the znode.  It is stored
  * in the "bonus buffer" of the file.  Short symbolic links
  * are also stored in the bonus buffer.

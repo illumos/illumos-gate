@@ -48,10 +48,13 @@
 #include <sys/txg.h>
 #include <sys/avl.h>
 #include <sys/dmu_traverse.h>
+#include <sys/dmu_objset.h>
 #include <sys/unique.h>
 #include <sys/dsl_pool.h>
+#include <sys/dsl_dataset.h>
 #include <sys/dsl_dir.h>
 #include <sys/dsl_prop.h>
+#include <sys/dsl_synctask.h>
 #include <sys/fs/zfs.h>
 #include <sys/callb.h>
 
@@ -134,6 +137,7 @@ spa_activate(spa_t *spa)
 	mutex_init(&spa->spa_config_lock.scl_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_sync_bplist.bpl_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&spa->spa_history_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&spa->spa_props_lock, NULL, MUTEX_DEFAULT, NULL);
 
 	list_create(&spa->spa_dirty_list, sizeof (vdev_t),
 	    offsetof(vdev_t, vdev_dirty_node));
@@ -672,6 +676,23 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		spa_config_exit(spa, FTAG);
 	}
 
+	error = zap_lookup(spa->spa_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
+	    DMU_POOL_PROPS, sizeof (uint64_t), 1, &spa->spa_pool_props_object);
+
+	if (error && error != ENOENT) {
+		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_CORRUPT_DATA);
+		error = EIO;
+		goto out;
+	}
+
+	if (error == 0) {
+		(void) zap_lookup(spa->spa_meta_objset,
+		    spa->spa_pool_props_object,
+		    zpool_prop_to_name(ZFS_PROP_BOOTFS),
+		    sizeof (uint64_t), 1, &spa->spa_bootfs);
+	}
+
 	/*
 	 * Load the vdev state for all toplevel vdevs.
 	 */
@@ -1176,6 +1197,7 @@ spa_create(const char *pool, nvlist_t *nvroot, const char *altroot)
 
 	dmu_tx_commit(tx);
 
+	spa->spa_bootfs = zfs_prop_default_numeric(ZFS_PROP_BOOTFS);
 	spa->spa_sync_on = B_TRUE;
 	txg_sync_start(spa->spa_dsl_pool);
 
@@ -2815,6 +2837,43 @@ spa_sync_config_object(spa_t *spa, dmu_tx_t *tx)
 	spa_sync_nvlist(spa, spa->spa_config_object, config, tx);
 }
 
+static void
+spa_sync_props(void *arg1, void *arg2, dmu_tx_t *tx)
+{
+	spa_t *spa = arg1;
+	nvlist_t *nvp = arg2;
+	nvpair_t *nvpair;
+	objset_t *mos = spa->spa_meta_objset;
+	uint64_t zapobj;
+
+	mutex_enter(&spa->spa_props_lock);
+	if (spa->spa_pool_props_object == 0) {
+		zapobj = zap_create(mos, DMU_OT_POOL_PROPS, DMU_OT_NONE, 0, tx);
+		VERIFY(zapobj > 0);
+
+		spa->spa_pool_props_object = zapobj;
+
+		VERIFY(zap_update(mos, DMU_POOL_DIRECTORY_OBJECT,
+		    DMU_POOL_PROPS, 8, 1,
+		    &spa->spa_pool_props_object, tx) == 0);
+	}
+	mutex_exit(&spa->spa_props_lock);
+
+	nvpair = NULL;
+	while ((nvpair = nvlist_next_nvpair(nvp, nvpair))) {
+		switch (zpool_name_to_prop(nvpair_name(nvpair))) {
+		case ZFS_PROP_BOOTFS:
+			VERIFY(nvlist_lookup_uint64(nvp,
+			    nvpair_name(nvpair), &spa->spa_bootfs) == 0);
+			VERIFY(zap_update(mos,
+			    spa->spa_pool_props_object,
+			    zpool_prop_to_name(ZFS_PROP_BOOTFS), 8, 1,
+			    &spa->spa_bootfs, tx) == 0);
+			break;
+		}
+	}
+}
+
 /*
  * Sync the specified transaction group.  New blocks may be dirtied as
  * part of the process, so we iterate until it converges.
@@ -3092,4 +3151,106 @@ spa_has_spare(spa_t *spa, uint64_t guid)
 	}
 
 	return (B_FALSE);
+}
+
+int
+spa_set_props(spa_t *spa, nvlist_t *nvp)
+{
+	return (dsl_sync_task_do(spa_get_dsl(spa), NULL, spa_sync_props,
+	    spa, nvp, 3));
+}
+
+int
+spa_get_props(spa_t *spa, nvlist_t **nvp)
+{
+	zap_cursor_t zc;
+	zap_attribute_t za;
+	objset_t *mos = spa->spa_meta_objset;
+	zfs_source_t src;
+	zfs_prop_t prop;
+	nvlist_t *propval;
+	uint64_t value;
+	int err;
+
+	VERIFY(nvlist_alloc(nvp, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+
+	mutex_enter(&spa->spa_props_lock);
+	/* If no props object, then just return empty nvlist */
+	if (spa->spa_pool_props_object == 0) {
+		mutex_exit(&spa->spa_props_lock);
+		return (0);
+	}
+
+	for (zap_cursor_init(&zc, mos, spa->spa_pool_props_object);
+	    (err = zap_cursor_retrieve(&zc, &za)) == 0;
+	    zap_cursor_advance(&zc)) {
+
+		if ((prop = zpool_name_to_prop(za.za_name)) == ZFS_PROP_INVAL)
+			continue;
+
+		VERIFY(nvlist_alloc(&propval, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+		switch (za.za_integer_length) {
+		case 8:
+			if (zfs_prop_default_numeric(prop) ==
+			    za.za_first_integer)
+				src = ZFS_SRC_DEFAULT;
+			else
+				src = ZFS_SRC_LOCAL;
+			value = za.za_first_integer;
+
+			if (prop == ZFS_PROP_BOOTFS) {
+				dsl_pool_t *dp;
+				dsl_dataset_t *ds = NULL;
+				char strval[MAXPATHLEN];
+
+				dp = spa_get_dsl(spa);
+				rw_enter(&dp->dp_config_rwlock, RW_READER);
+				if ((err = dsl_dataset_open_obj(dp,
+				    za.za_first_integer, NULL, DS_MODE_NONE,
+				    FTAG, &ds)) != 0) {
+					rw_exit(&dp->dp_config_rwlock);
+					break;
+				}
+				dsl_dataset_name(ds, strval);
+				dsl_dataset_close(ds, DS_MODE_NONE, FTAG);
+				rw_exit(&dp->dp_config_rwlock);
+
+				VERIFY(nvlist_add_uint64(propval,
+				    ZFS_PROP_SOURCE, src) == 0);
+				VERIFY(nvlist_add_string(propval,
+				    ZFS_PROP_VALUE, strval) == 0);
+			} else {
+				VERIFY(nvlist_add_uint64(propval,
+				    ZFS_PROP_SOURCE, src) == 0);
+				VERIFY(nvlist_add_uint64(propval,
+				    ZFS_PROP_VALUE, value) == 0);
+			}
+			VERIFY(nvlist_add_nvlist(*nvp, za.za_name,
+			    propval) == 0);
+			break;
+		}
+		nvlist_free(propval);
+	}
+	zap_cursor_fini(&zc);
+	mutex_exit(&spa->spa_props_lock);
+	if (err && err != ENOENT) {
+		nvlist_free(*nvp);
+		return (err);
+	}
+
+	return (0);
+}
+
+/*
+ * If the bootfs property value is dsobj, clear it.
+ */
+void
+spa_clear_bootfs(spa_t *spa, uint64_t dsobj, dmu_tx_t *tx)
+{
+	if (spa->spa_bootfs == dsobj && spa->spa_pool_props_object != 0) {
+		VERIFY(zap_remove(spa->spa_meta_objset,
+		    spa->spa_pool_props_object,
+		    zpool_prop_to_name(ZFS_PROP_BOOTFS), tx) == 0);
+		spa->spa_bootfs = 0;
+	}
 }

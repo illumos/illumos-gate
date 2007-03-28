@@ -45,7 +45,8 @@ extern "C" {
 typedef enum {
 	ZFS_TYPE_FILESYSTEM	= 0x1,
 	ZFS_TYPE_SNAPSHOT	= 0x2,
-	ZFS_TYPE_VOLUME		= 0x4
+	ZFS_TYPE_VOLUME		= 0x4,
+	ZFS_TYPE_POOL		= 0x8
 } zfs_type_t;
 
 #define	ZFS_TYPE_ANY	\
@@ -94,20 +95,35 @@ typedef enum {
 	ZFS_PROP_ISCSIOPTIONS,		/* not exposed to the user */
 	ZFS_PROP_XATTR,
 	ZFS_PROP_NUMCLONES,		/* not exposed to the user */
-	ZFS_PROP_COPIES
+	ZFS_PROP_COPIES,
+	ZFS_PROP_BOOTFS
 } zfs_prop_t;
+
+typedef zfs_prop_t zpool_prop_t;
 
 #define	ZFS_PROP_VALUE		"value"
 #define	ZFS_PROP_SOURCE		"source"
+
+typedef enum {
+	ZFS_SRC_NONE = 0x1,
+	ZFS_SRC_DEFAULT = 0x2,
+	ZFS_SRC_TEMPORARY = 0x4,
+	ZFS_SRC_LOCAL = 0x8,
+	ZFS_SRC_INHERITED = 0x10
+} zfs_source_t;
+
+#define	ZFS_SRC_ALL	0x1f
 
 /*
  * The following functions are shared between libzfs and the kernel.
  */
 zfs_prop_t zfs_name_to_prop(const char *);
+zpool_prop_t zpool_name_to_prop(const char *);
 boolean_t zfs_prop_user(const char *);
 int zfs_prop_readonly(zfs_prop_t);
 const char *zfs_prop_default_string(zfs_prop_t);
 const char *zfs_prop_to_name(zfs_prop_t);
+const char *zpool_prop_to_name(zfs_prop_t);
 uint64_t zfs_prop_default_numeric(zfs_prop_t);
 int zfs_prop_inheritable(zfs_prop_t);
 int zfs_prop_string_to_index(zfs_prop_t, const char *, uint64_t *);
@@ -117,7 +133,9 @@ int zfs_prop_index_to_string(zfs_prop_t, uint64_t, const char **);
  * Property Iterator
  */
 typedef zfs_prop_t (*zfs_prop_f)(zfs_prop_t, void *);
+typedef zfs_prop_f zpool_prop_f;
 extern zfs_prop_t zfs_prop_iter(zfs_prop_f, void *, boolean_t);
+extern zpool_prop_t zpool_prop_iter(zpool_prop_f, void *, boolean_t);
 
 /*
  * On-disk version number.
@@ -127,8 +145,14 @@ extern zfs_prop_t zfs_prop_iter(zfs_prop_f, void *, boolean_t);
 #define	ZFS_VERSION_3			3ULL
 #define	ZFS_VERSION_4			4ULL
 #define	ZFS_VERSION_5			5ULL
-#define	ZFS_VERSION			ZFS_VERSION_5
-#define	ZFS_VERSION_STRING		"5"
+#define	ZFS_VERSION_6			6ULL
+/*
+ * When bumping up ZFS_VERSION, make sure GRUB ZFS understand the on-disk
+ * format change. Go to usr/src/grub/grub-0.95/stage2/{zfs-include/, fsys_zfs*},
+ * and do the appropriate changes.
+ */
+#define	ZFS_VERSION			ZFS_VERSION_6
+#define	ZFS_VERSION_STRING		"6"
 
 /*
  * Symbolic names for the changes that caused a ZFS_VERSION switch.
@@ -150,6 +174,7 @@ extern zfs_prop_t zfs_prop_iter(zfs_prop_f, void *, boolean_t);
 #define	ZFS_VERSION_DNODE_BYTES		ZFS_VERSION_3
 #define	ZFS_VERSION_ZPOOL_HISTORY	ZFS_VERSION_4
 #define	ZFS_VERSION_GZIP_COMPRESSION	ZFS_VERSION_5
+#define	ZFS_VERSION_BOOTFS		ZFS_VERSION_6
 
 /*
  * The following are configuration names used in the nvlist describing a pool's
@@ -367,7 +392,9 @@ typedef enum zfs_ioc {
 	ZFS_IOC_DESTROY_SNAPS,
 	ZFS_IOC_SNAPSHOT,
 	ZFS_IOC_DSOBJ_TO_DSNAME,
-	ZFS_IOC_OBJ_TO_PATH
+	ZFS_IOC_OBJ_TO_PATH,
+	ZFS_IOC_POOL_SET_PROPS,
+	ZFS_IOC_POOL_GET_PROPS
 } zfs_ioc_t;
 
 /*

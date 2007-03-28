@@ -680,13 +680,39 @@ prop_parse_index(libzfs_handle_t *hdl, nvpair_t *elem, zfs_prop_t prop,
 }
 
 /*
+ * Check if the bootfs name has the same pool name as it is set to.
+ * Assuming bootfs is a valid dataset name.
+ */
+static boolean_t
+bootfs_poolname_valid(char *pool, char *bootfs)
+{
+	char ch, *pname;
+
+	/* get the pool name from the bootfs name */
+	pname = bootfs;
+	while (*bootfs && !isspace(*bootfs) && *bootfs != '/')
+		bootfs++;
+
+	ch = *bootfs;
+	*bootfs = 0;
+
+	if (strcmp(pool, pname) == 0) {
+		*bootfs = ch;
+		return (B_TRUE);
+	}
+
+	*bootfs = ch;
+	return (B_FALSE);
+}
+
+/*
  * Given an nvlist of properties to set, validates that they are correct, and
  * parses any numeric properties (index, boolean, etc) if they are specified as
  * strings.
  */
-static nvlist_t *
-zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
-    uint64_t zoned, zfs_handle_t *zhp, const char *errbuf)
+nvlist_t *
+zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, char *pool_name,
+    nvlist_t *nvl, uint64_t zoned, zfs_handle_t *zhp, const char *errbuf)
 {
 	nvpair_t *elem;
 	const char *propname;
@@ -694,6 +720,7 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 	uint64_t intval;
 	char *strval;
 	nvlist_t *ret;
+	int isuser;
 
 	if (nvlist_alloc(&ret, NV_UNIQUE_NAME, 0) != 0) {
 		(void) no_memory(hdl);
@@ -714,8 +741,10 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 		/*
 		 * Make sure this property is valid and applies to this type.
 		 */
-		if ((prop = zfs_name_to_prop(propname)) == ZFS_PROP_INVAL) {
-			if (!zfs_prop_user(propname)) {
+		if ((prop = zfs_name_to_prop_common(propname, type))
+		    == ZFS_PROP_INVAL) {
+			isuser = zfs_prop_user(propname);
+			if (!isuser || (isuser && (type & ZFS_TYPE_POOL))) {
 				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 				    "invalid property '%s'"),
 				    propname);
@@ -927,6 +956,22 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, nvlist_t *nvl,
 			}
 
 			break;
+
+		case ZFS_PROP_BOOTFS:
+			/*
+			 * bootfs property value has to be a dataset name and
+			 * the dataset has to be in the same pool as it sets to.
+			 */
+			if (strval[0] != '\0' && (!zfs_name_valid(strval,
+			    ZFS_TYPE_FILESYSTEM) || !bootfs_poolname_valid(
+			    pool_name, strval))) {
+
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "'%s' "
+				    "is an invalid name"), strval);
+				(void) zfs_error(hdl, EZFS_INVALIDNAME, errbuf);
+				goto error;
+			}
+			break;
 		}
 
 		/*
@@ -1035,7 +1080,7 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 		goto error;
 	}
 
-	if ((realprops = zfs_validate_properties(hdl, zhp->zfs_type, nvl,
+	if ((realprops = zfs_validate_properties(hdl, zhp->zfs_type, NULL, nvl,
 	    zfs_prop_get_int(zhp, ZFS_PROP_ZONED), zhp, errbuf)) == NULL)
 		goto error;
 	nvlist_free(nvl);
@@ -1246,7 +1291,7 @@ error:
 	return (ret);
 }
 
-static void
+void
 nicebool(int value, char *buf, size_t buflen)
 {
 	if (value)
@@ -1533,7 +1578,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 			return (-1);
 		if (literal)
 			(void) snprintf(propbuf, proplen, "%llu",
-			(u_longlong_t)val);
+			    (u_longlong_t)val);
 		else
 			zfs_nicenum(val, propbuf, proplen);
 		break;
@@ -1644,7 +1689,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 		} else {
 			if (literal)
 				(void) snprintf(propbuf, proplen, "%llu",
-				(u_longlong_t)val);
+				    (u_longlong_t)val);
 			else
 				zfs_nicenum(val, propbuf, proplen);
 		}
@@ -1995,8 +2040,8 @@ zfs_create(libzfs_handle_t *hdl, const char *path, zfs_type_t type,
 	else
 		zc.zc_objset_type = DMU_OST_ZFS;
 
-	if (props && (props = zfs_validate_properties(hdl, type, props, zoned,
-	    NULL, errbuf)) == 0)
+	if (props && (props = zfs_validate_properties(hdl, type, NULL, props,
+	    zoned, NULL, errbuf)) == 0)
 		return (-1);
 
 	if (type == ZFS_TYPE_VOLUME) {
@@ -2053,8 +2098,17 @@ zfs_create(libzfs_handle_t *hdl, const char *path, zfs_type_t type,
 	/* create the dataset */
 	ret = ioctl(hdl->libzfs_fd, ZFS_IOC_CREATE, &zc);
 
-	if (ret == 0 && type == ZFS_TYPE_VOLUME)
+	if (ret == 0 && type == ZFS_TYPE_VOLUME) {
 		ret = zvol_create_link(hdl, path);
+		if (ret) {
+			(void) zfs_standard_error(hdl, errno,
+			    dgettext(TEXT_DOMAIN,
+			    "Volume successfully created, but device links "
+			    "were not created"));
+			zcmd_free_nvlists(&zc);
+			return (-1);
+		}
+	}
 
 	zcmd_free_nvlists(&zc);
 
@@ -2262,8 +2316,8 @@ zfs_clone(zfs_handle_t *zhp, const char *target, nvlist_t *props)
 	}
 
 	if (props) {
-		if ((props = zfs_validate_properties(hdl, type, props, zoned,
-		    zhp, errbuf)) == NULL)
+		if ((props = zfs_validate_properties(hdl, type, NULL, props,
+		    zoned, zhp, errbuf)) == NULL)
 			return (-1);
 
 		if (zcmd_write_src_nvlist(hdl, &zc, props, NULL) != 0) {
@@ -2724,7 +2778,7 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 
 	if (strchr(drr.drr_u.drr_begin.drr_toname, '@') == NULL) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "invalid "
-			    "stream (bad snapshot name)"));
+		    "stream (bad snapshot name)"));
 		return (zfs_error(hdl, EZFS_BADSTREAM, errbuf));
 	}
 	/*
@@ -3174,7 +3228,7 @@ zfs_rename(zfs_handle_t *zhp, const char *target)
 				    "snapshots must be part of same "
 				    "dataset"));
 				return (zfs_error(hdl, EZFS_CROSSTARGET,
-					    errbuf));
+				    errbuf));
 			}
 		}
 		if (!zfs_validate_name(hdl, target, zhp->zfs_type))
@@ -3201,7 +3255,7 @@ zfs_rename(zfs_handle_t *zhp, const char *target)
 
 		/* new name cannot be a child of the current dataset name */
 		if (strncmp(parent, zhp->zfs_name,
-			    strlen(zhp->zfs_name)) == 0) {
+		    strlen(zhp->zfs_name)) == 0) {
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "New dataset name cannot be a descendent of "
 			    "current dataset name"));
@@ -3352,7 +3406,8 @@ zfs_get_user_props(zfs_handle_t *zhp)
  * per-dataset basis by zfs_expand_proplist().
  */
 int
-zfs_get_proplist(libzfs_handle_t *hdl, char *fields, zfs_proplist_t **listp)
+zfs_get_proplist_common(libzfs_handle_t *hdl, char *fields,
+    zfs_proplist_t **listp, zfs_type_t type)
 {
 	size_t len;
 	char *s, *p;
@@ -3408,13 +3463,19 @@ zfs_get_proplist(libzfs_handle_t *hdl, char *fields, zfs_proplist_t **listp)
 		 */
 		c = s[len];
 		s[len] = '\0';
-		prop = zfs_name_to_prop(s);
+		prop = zfs_name_to_prop_common(s, type);
+
+		if (prop != ZFS_PROP_INVAL &&
+		    !zfs_prop_valid_for_type(prop, type))
+			prop = ZFS_PROP_INVAL;
 
 		/*
-		 * If no column is specified, and this isn't a user property,
-		 * return failure.
+		 * When no property table entry can be found, return failure if
+		 * this is a pool property or if this isn't a user-defined
+		 * dataset property,
 		 */
-		if (prop == ZFS_PROP_INVAL && !zfs_prop_user(s)) {
+		if (prop == ZFS_PROP_INVAL &&
+		    (type & ZFS_TYPE_POOL || !zfs_prop_user(s))) {
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "invalid property '%s'"), s);
 			return (zfs_error(hdl, EZFS_BADPROP,
@@ -3446,6 +3507,12 @@ zfs_get_proplist(libzfs_handle_t *hdl, char *fields, zfs_proplist_t **listp)
 	}
 
 	return (0);
+}
+
+int
+zfs_get_proplist(libzfs_handle_t *hdl, char *fields, zfs_proplist_t **listp)
+{
+	return (zfs_get_proplist_common(hdl, fields, listp, ZFS_TYPE_ANY));
 }
 
 void
@@ -3485,27 +3552,12 @@ zfs_expand_proplist_cb(zfs_prop_t prop, void *cb)
 	return (ZFS_PROP_CONT);
 }
 
-/*
- * This function is used by 'zfs list' to determine the exact set of columns to
- * display, and their maximum widths.  This does two main things:
- *
- * 	- If this is a list of all properties, then expand the list to include
- *	  all native properties, and set a flag so that for each dataset we look
- *	  for new unique user properties and add them to the list.
- *
- * 	- For non fixed-width properties, keep track of the maximum width seen
- *	  so that we can size the column appropriately.
- */
 int
-zfs_expand_proplist(zfs_handle_t *zhp, zfs_proplist_t **plp)
+zfs_expand_proplist_common(libzfs_handle_t *hdl, zfs_proplist_t **plp,
+	zfs_type_t type)
 {
-	libzfs_handle_t *hdl = zhp->zfs_hdl;
 	zfs_proplist_t *entry;
-	zfs_proplist_t **last, **start;
-	nvlist_t *userprops, *propval;
-	nvpair_t *elem;
-	char *strval;
-	char buf[ZFS_MAXPROPLEN];
+	zfs_proplist_t **last;
 	expand_data_t exp;
 
 	if (*plp == NULL) {
@@ -3519,7 +3571,7 @@ zfs_expand_proplist(zfs_handle_t *zhp, zfs_proplist_t **plp)
 		exp.last = last;
 		exp.hdl = hdl;
 
-		if (zfs_prop_iter(zfs_expand_proplist_cb, &exp,
+		if (zfs_prop_iter_common(zfs_expand_proplist_cb, &exp, type,
 		    B_FALSE) == ZFS_PROP_INVAL)
 			return (-1);
 
@@ -3538,6 +3590,33 @@ zfs_expand_proplist(zfs_handle_t *zhp, zfs_proplist_t **plp)
 		entry->pl_next = *plp;
 		*plp = entry;
 	}
+	return (0);
+}
+
+/*
+ * This function is used by 'zfs list' to determine the exact set of columns to
+ * display, and their maximum widths.  This does two main things:
+ *
+ *      - If this is a list of all properties, then expand the list to include
+ *        all native properties, and set a flag so that for each dataset we look
+ *        for new unique user properties and add them to the list.
+ *
+ *      - For non fixed-width properties, keep track of the maximum width seen
+ *        so that we can size the column appropriately.
+ */
+int
+zfs_expand_proplist(zfs_handle_t *zhp, zfs_proplist_t **plp)
+{
+	libzfs_handle_t *hdl = zhp->zfs_hdl;
+	zfs_proplist_t *entry;
+	zfs_proplist_t **last, **start;
+	nvlist_t *userprops, *propval;
+	nvpair_t *elem;
+	char *strval;
+	char buf[ZFS_MAXPROPLEN];
+
+	if (zfs_expand_proplist_common(hdl, plp, ZFS_TYPE_ANY) != 0)
+		return (-1);
 
 	userprops = zfs_get_user_props(zhp);
 

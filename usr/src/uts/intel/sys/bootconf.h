@@ -184,7 +184,6 @@ extern struct bootobj swapfile;
 
 extern char obp_bootpath[BO_MAXOBJNAME];
 extern char svm_bootpath[BO_MAXOBJNAME];
-extern char zfs_bootpath[BO_MAXOBJNAME];
 
 extern dev_t getrootdev(void);
 extern void getfsname(char *, char *, size_t);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -17,7 +17,6 @@
 #define	UFS_NIADDR	3	/* indirect blocks */
 #define	MAXMNTLEN	512
 #define	MAXCSBUFS	32
-#define	MAXNAMELEN	256
 
 /* file types */
 #define	IFMT		0xf000

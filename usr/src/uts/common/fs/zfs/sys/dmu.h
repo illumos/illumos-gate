@@ -107,6 +107,7 @@ typedef enum dmu_object_type {
 	DMU_OT_ERROR_LOG,		/* ZAP */
 	DMU_OT_SPA_HISTORY,		/* UINT8 */
 	DMU_OT_SPA_HISTORY_OFFSETS,	/* spa_his_phys_t */
+	DMU_OT_POOL_PROPS,		/* ZAP */
 
 	DMU_OT_NUMTYPES
 } dmu_object_type_t;
@@ -194,6 +195,7 @@ typedef void dmu_byteswap_func_t(void *buf, size_t size);
 #define	DMU_POOL_SPARES			"spares"
 #define	DMU_POOL_DEFLATE		"deflate"
 #define	DMU_POOL_HISTORY		"history"
+#define	DMU_POOL_PROPS			"pool_props"
 
 /*
  * Allocate an object from this objset.  The range of object numbers

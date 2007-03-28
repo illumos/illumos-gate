@@ -43,6 +43,7 @@
 #include <strings.h>
 
 #include "zfs_namecheck.h"
+#include "zfs_prop.h"
 #include "libzfs_impl.h"
 
 /*
@@ -129,6 +130,39 @@ zpool_name_valid(libzfs_handle_t *hdl, boolean_t isopen, const char *pool)
 	}
 
 	return (B_TRUE);
+}
+
+static int
+zpool_get_all_props(zpool_handle_t *zhp)
+{
+	zfs_cmd_t zc = { 0 };
+	libzfs_handle_t *hdl = zhp->zpool_hdl;
+
+	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
+
+	if (zcmd_alloc_dst_nvlist(hdl, &zc, 0) != 0)
+		return (-1);
+
+	while (ioctl(hdl->libzfs_fd, ZFS_IOC_POOL_GET_PROPS, &zc) != 0) {
+		if (errno == ENOMEM) {
+			if (zcmd_expand_dst_nvlist(hdl, &zc) != 0) {
+				zcmd_free_nvlists(&zc);
+				return (-1);
+			}
+		} else {
+			zcmd_free_nvlists(&zc);
+			return (-1);
+		}
+	}
+
+	if (zcmd_read_dst_nvlist(hdl, &zc, &zhp->zpool_props) != 0) {
+		zcmd_free_nvlists(&zc);
+		return (-1);
+	}
+
+	zcmd_free_nvlists(&zc);
+
+	return (0);
 }
 
 /*
@@ -238,6 +272,8 @@ zpool_close(zpool_handle_t *zhp)
 		nvlist_free(zhp->zpool_config);
 	if (zhp->zpool_old_config)
 		nvlist_free(zhp->zpool_old_config);
+	if (zhp->zpool_props)
+		nvlist_free(zhp->zpool_props);
 	free(zhp);
 }
 
@@ -547,6 +583,12 @@ zpool_add(zpool_handle_t *zhp, nvlist_t *nvroot)
 			(void) zfs_error(hdl, EZFS_BADVERSION, msg);
 			break;
 
+		case EDOM:
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "root pool can not have concatenated devices"));
+			(void) zfs_error(hdl, EZFS_POOL_NOTSUP, msg);
+			break;
+
 		default:
 			(void) zpool_standard_error(hdl, errno, msg);
 		}
@@ -579,7 +621,6 @@ zpool_export(zpool_handle_t *zhp)
 		return (zpool_standard_error_fmt(zhp->zpool_hdl, errno,
 		    dgettext(TEXT_DOMAIN, "cannot export '%s'"),
 		    zhp->zpool_name));
-
 	return (0);
 }
 
@@ -1646,7 +1687,7 @@ zpool_upgrade(zpool_handle_t *zhp)
  */
 void
 zpool_log_history(libzfs_handle_t *hdl, int argc, char **argv, const char *path,
-    boolean_t pool, boolean_t pool_create)
+	boolean_t pool, boolean_t pool_create)
 {
 	char cmd_buf[HIS_MAX_RECORD_LEN];
 	char *dspath;
@@ -1861,4 +1902,152 @@ zpool_obj_to_path(zpool_handle_t *zhp, uint64_t dsobj, uint64_t obj,
 		(void) snprintf(pathname, len, "%s:<0x%llx>", dsname, obj);
 	}
 	free(mntpnt);
+}
+
+int
+zpool_set_prop(zpool_handle_t *zhp, const char *propname, const char *propval)
+{
+	zfs_cmd_t zc = { 0 };
+	int ret = -1;
+	char errbuf[1024];
+	nvlist_t *nvl = NULL;
+	nvlist_t *realprops;
+
+	(void) snprintf(errbuf, sizeof (errbuf),
+	    dgettext(TEXT_DOMAIN, "cannot set property for '%s'"),
+	    zhp->zpool_name);
+
+	if (zpool_get_version(zhp) < ZFS_VERSION_BOOTFS) {
+		zfs_error_aux(zhp->zpool_hdl,
+		    dgettext(TEXT_DOMAIN, "pool must be "
+		    "upgraded to support pool properties"));
+		return (zfs_error(zhp->zpool_hdl, EZFS_BADVERSION, errbuf));
+	}
+
+	if (zhp->zpool_props == NULL && zpool_get_all_props(zhp))
+		return (zfs_error(zhp->zpool_hdl, EZFS_POOLPROPS, errbuf));
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0 ||
+	    nvlist_add_string(nvl, propname, propval) != 0) {
+		return (no_memory(zhp->zpool_hdl));
+	}
+
+	if ((realprops = zfs_validate_properties(zhp->zpool_hdl, ZFS_TYPE_POOL,
+	    zhp->zpool_name, nvl, 0, NULL, errbuf)) == NULL) {
+		nvlist_free(nvl);
+		return (-1);
+	}
+
+	nvlist_free(nvl);
+	nvl = realprops;
+
+	/*
+	 * Execute the corresponding ioctl() to set this property.
+	 */
+	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
+
+	if (zcmd_write_src_nvlist(zhp->zpool_hdl, &zc, nvl, NULL) != 0)
+		return (-1);
+
+	ret = ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_POOL_SET_PROPS, &zc);
+	zcmd_free_nvlists(&zc);
+
+	if (ret)
+		(void) zpool_standard_error(zhp->zpool_hdl, errno, errbuf);
+
+	return (ret);
+}
+
+int
+zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *propbuf,
+    size_t proplen, zfs_source_t *srctype)
+{
+	uint64_t value;
+	char msg[1024], *strvalue;
+	nvlist_t *nvp;
+	zfs_source_t src = ZFS_SRC_NONE;
+
+	(void) snprintf(msg, sizeof (msg), dgettext(TEXT_DOMAIN,
+	    "cannot get property '%s'"), zpool_prop_to_name(prop));
+
+	if (zpool_get_version(zhp) < ZFS_VERSION_BOOTFS) {
+		zfs_error_aux(zhp->zpool_hdl,
+		    dgettext(TEXT_DOMAIN, "pool must be "
+		    "upgraded to support pool properties"));
+		return (zfs_error(zhp->zpool_hdl, EZFS_BADVERSION, msg));
+	}
+
+	if (zhp->zpool_props == NULL && zpool_get_all_props(zhp))
+		return (zfs_error(zhp->zpool_hdl, EZFS_POOLPROPS, msg));
+
+	/*
+	 * the "name" property is special cased
+	 */
+	if (!zfs_prop_valid_for_type(prop, ZFS_TYPE_POOL) &&
+	    prop != ZFS_PROP_NAME)
+		return (-1);
+
+	switch (prop) {
+	case ZFS_PROP_NAME:
+		(void) strlcpy(propbuf, zhp->zpool_name, proplen);
+		break;
+
+	case ZFS_PROP_BOOTFS:
+		if (nvlist_lookup_nvlist(zhp->zpool_props,
+		    zpool_prop_to_name(prop), &nvp) != 0) {
+			strvalue = (char *)zfs_prop_default_string(prop);
+			if (strvalue == NULL)
+				strvalue = "-";
+			src = ZFS_SRC_DEFAULT;
+		} else {
+			VERIFY(nvlist_lookup_uint64(nvp,
+			    ZFS_PROP_SOURCE, &value) == 0);
+			src = value;
+			VERIFY(nvlist_lookup_string(nvp, ZFS_PROP_VALUE,
+			    &strvalue) == 0);
+			if (strlen(strvalue) >= proplen)
+				return (-1);
+		}
+		(void) strcpy(propbuf, strvalue);
+		break;
+
+	default:
+		return (-1);
+	}
+	if (srctype)
+		*srctype = src;
+	return (0);
+}
+
+int
+zpool_get_proplist(libzfs_handle_t *hdl, char *fields, zpool_proplist_t **listp)
+{
+	return (zfs_get_proplist_common(hdl, fields, listp, ZFS_TYPE_POOL));
+}
+
+
+int
+zpool_expand_proplist(zpool_handle_t *zhp, zpool_proplist_t **plp)
+{
+	libzfs_handle_t *hdl = zhp->zpool_hdl;
+	zpool_proplist_t *entry;
+	char buf[ZFS_MAXPROPLEN];
+
+	if (zfs_expand_proplist_common(hdl, plp, ZFS_TYPE_POOL) != 0)
+		return (-1);
+
+	for (entry = *plp; entry != NULL; entry = entry->pl_next) {
+
+		if (entry->pl_fixed)
+			continue;
+
+		if (entry->pl_prop != ZFS_PROP_INVAL &&
+		    zpool_get_prop(zhp, entry->pl_prop, buf, sizeof (buf),
+		    NULL) == 0) {
+			if (strlen(buf) > entry->pl_width)
+				entry->pl_width = strlen(buf);
+		}
+	}
+
+	return (0);
 }

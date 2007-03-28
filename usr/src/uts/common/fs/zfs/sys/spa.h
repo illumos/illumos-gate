@@ -463,6 +463,12 @@ extern void spa_get_errlists(spa_t *spa, avl_tree_t *last, avl_tree_t *scrub);
 extern void spa_init(int flags);
 extern void spa_fini(void);
 
+/* properties */
+extern int spa_set_props(spa_t *spa, nvlist_t *nvp);
+extern int spa_get_props(spa_t *spa, nvlist_t **nvp);
+extern void spa_clear_bootfs(spa_t *spa, uint64_t obj, dmu_tx_t *tx);
+extern boolean_t spa_has_bootfs(spa_t *spa);
+
 #ifdef ZFS_DEBUG
 #define	dprintf_bp(bp, fmt, ...) do {				\
 	if (zfs_flags & ZFS_DEBUG_DPRINTF) { 			\

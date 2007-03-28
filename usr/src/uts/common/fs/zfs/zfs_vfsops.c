@@ -45,6 +45,7 @@
 #include <sys/fs/zfs.h>
 #include <sys/dmu.h>
 #include <sys/dsl_prop.h>
+#include <sys/dsl_dataset.h>
 #include <sys/spa.h>
 #include <sys/zap.h>
 #include <sys/varargs.h>
@@ -63,8 +64,6 @@ vfsops_t *zfs_vfsops = NULL;
 static major_t zfs_major;
 static minor_t zfs_minor;
 static kmutex_t	zfs_dev_mtx;
-
-extern char zfs_bootpath[BO_MAXOBJNAME];
 
 static int zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr);
 static int zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr);
@@ -368,7 +367,7 @@ zfs_refresh_properties(vfs_t *vfsp)
 		if (!dmu_objset_is_snapshot(zfsvfs->z_os))
 			readonly_changed_cb(zfsvfs, B_FALSE);
 		else if (vfs_optionisset(vfsp, MNTOPT_RW, NULL))
-			    return (EROFS);
+			return (EROFS);
 	}
 
 	if (vfs_optionisset(vfsp, MNTOPT_NOSUID, NULL)) {
@@ -444,8 +443,7 @@ zfs_register_callbacks(vfs_t *vfsp)
 		if (vfs_optionisset(vfsp, MNTOPT_NODEVICES, NULL)) {
 			devices = B_FALSE;
 			do_devices = B_TRUE;
-		} else if (vfs_optionisset(vfsp,
-			    MNTOPT_DEVICES, NULL)) {
+		} else if (vfs_optionisset(vfsp, MNTOPT_DEVICES, NULL)) {
 			devices = B_TRUE;
 			do_devices = B_TRUE;
 		}
@@ -699,6 +697,59 @@ zfs_unregister_callbacks(zfsvfs_t *zfsvfs)
 	}
 }
 
+/*
+ * Convert a decimal digit string to a uint64_t integer.
+ */
+static int
+str_to_uint64(char *str, uint64_t *objnum)
+{
+	uint64_t num = 0;
+
+	while (*str) {
+		if (*str < '0' || *str > '9')
+			return (EINVAL);
+
+		num = num*10 + *str++ - '0';
+	}
+
+	*objnum = num;
+	return (0);
+}
+
+
+/*
+ * The boot path passed from the boot loader is in the form of
+ * "rootpool-name/root-filesystem-object-number'. Convert this
+ * string to a dataset name: "rootpool-name/root-filesystem-name".
+ */
+static int
+parse_bootpath(char *bpath, char *outpath)
+{
+	char *slashp;
+	uint64_t objnum;
+	int error;
+
+	if (*bpath == 0 || *bpath == '/')
+		return (EINVAL);
+
+	slashp = strchr(bpath, '/');
+
+	/* if no '/', just return the pool name */
+	if (slashp == NULL) {
+		(void) strcpy(outpath, bpath);
+		return (0);
+	}
+
+	if (error = str_to_uint64(slashp+1, &objnum))
+		return (error);
+
+	*slashp = '\0';
+	error = dsl_dsobj_to_dsname(bpath, objnum, outpath);
+	*slashp = '/';
+
+	return (error);
+}
+
 static int
 zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 {
@@ -708,31 +759,33 @@ zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
 	zfsvfs_t *zfsvfs = NULL;
 	znode_t *zp = NULL;
 	vnode_t *vp = NULL;
+	char *zfs_bootpath;
 
 	ASSERT(vfsp);
 
 	/*
-	 * The filesystem that we mount as root is defined in
-	 * /etc/system using the zfsroot variable.  The value defined
-	 * there is copied early in startup code to zfs_bootpath
-	 * (defined in modsysfile.c).
+	 * The filesystem that we mount as root is defined in the
+	 * "zfs-bootfs" property.
 	 */
 	if (why == ROOT_INIT) {
 		if (zfsrootdone++)
 			return (EBUSY);
 
-		/*
-		 * This needs to be done here, so that when we return from
-		 * mountroot, the vfs resource name will be set correctly.
-		 */
-		if (snprintf(rootfs.bo_name, BO_MAXOBJNAME, "%s", zfs_bootpath)
-		    >= BO_MAXOBJNAME)
-			return (ENAMETOOLONG);
+		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
+		    DDI_PROP_DONTPASS, "zfs-bootfs", &zfs_bootpath) !=
+		    DDI_SUCCESS)
+			return (EIO);
+
+		error = parse_bootpath(zfs_bootpath, rootfs.bo_name);
+		ddi_prop_free(zfs_bootpath);
+
+		if (error)
+			return (error);
 
 		if (error = vfs_lock(vfsp))
 			return (error);
 
-		if (error = zfs_domount(vfsp, zfs_bootpath, CRED()))
+		if (error = zfs_domount(vfsp, rootfs.bo_name, CRED()))
 			goto out;
 
 		zfsvfs = (zfsvfs_t *)vfsp->vfs_data;
@@ -791,7 +844,7 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	pathname_t	spn;
 	int		error = 0;
 	uio_seg_t	fromspace = (uap->flags & MS_SYSSPACE) ?
-				UIO_SYSSPACE : UIO_USERSPACE;
+	    UIO_SYSSPACE : UIO_USERSPACE;
 	int		canwrite;
 
 	if (mvp->v_type != VDIR)

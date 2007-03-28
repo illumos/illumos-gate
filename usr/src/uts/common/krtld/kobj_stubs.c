@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,6 +108,13 @@ kobj_close(intptr_t descr)
 /*ARGSUSED*/
 int
 kobj_fstat(intptr_t descr, struct bootstat *buf)
+{
+	return (-1);
+}
+
+/*ARGSUSED*/
+int
+kobj_get_filesize(struct _buf *file, uint64_t *size)
 {
 	return (-1);
 }

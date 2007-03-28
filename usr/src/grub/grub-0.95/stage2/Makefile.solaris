@@ -18,6 +18,7 @@ INCLUDES	= -I. -I.. -I../stage1 -I../netboot
 LIBS		=
 
 FSYS_CFLAGS	= -DFSYS_EXT2FS=1 -DFSYS_FAT=1 -DFSYS_FFS=1 -DFSYS_UFS=1 \
+		  -DFSYS_ZFS=1 \
 		  -DFSYS_UFS2=1 -DFSYS_REISERFS=1 -DFSYS_ISO9660=1 \
 		  -DUSE_MD5_PASSWORDS=1
 $(STAGE2_NETBOOT)TFTP_CFLAGS	= -DFSYS_TFTP=1
@@ -30,6 +31,7 @@ NETBOOT_CFLAGS	= -DSUPPORT_NETBOOT=1
 SERIAL_CFLAGS	= -DSUPPORT_SERIAL=1
 GRUB_CFLAGS	= -O2 -I../lib -DGRUB_UTIL=1 \
 		  -DFSYS_EXT2FS=1 -DFSYS_FAT=1 -DFSYS_FFS=1 -DFSYS_ISO9660=1 \
+		  -DFSYS_ZFS=1 \
 		  -DFSYS_REISERFS=1 -DFSYS_UFS=1 -DFSYS_UFS2=1 \
 		  -DUSE_MD5_PASSWORDS=1 -DSUPPORT_SERIAL=1
 $(OPTION_FS)GRUB_CFLAGS	+= -DFSYS_MINIX=1 -DFSYS_JFS=1 -DFSYS_XFS=1 \
@@ -71,6 +73,10 @@ LIBGRUB_OBJS	= libgrub_a-boot.o		\
 		  libgrub_a-fsys_jfs.o		\
 		  libgrub_a-fsys_minix.o	\
 		  libgrub_a-fsys_reiserfs.o	\
+		  libgrub_a-zfs_sha256.o	\
+		  libgrub_a-zfs_lzjb.o		\
+		  libgrub_a-zfs_fletcher.o	\
+		  libgrub_a-fsys_zfs.o		\
 		  libgrub_a-fsys_ufs.o		\
 		  libgrub_a-fsys_ufs2.o		\
 		  libgrub_a-fsys_vstafs.o	\
@@ -99,6 +105,7 @@ INSTALL_DATA	= $(E2FS_STAGE1_5_DATA)		\
 		  $(STAGE2_ELTORITO_DATA)	\
 		  $(UFS2_STAGE1_5_DATA)		\
 		  $(UFS_STAGE1_5_DATA)		\
+		  $(ZFS_STAGE1_5_DATA)		\
 		  $(VSTAFS_STAGE1_5_DATA)	\
 		  $(XFS_STAGE1_5_DATA)
 
@@ -123,11 +130,12 @@ PROGRAMS	= $(DISKLESS_EXEC)		\
 		  $(NBLOADER_EXEC)		\
 		  $(PRE_STAGE2_EXEC)		\
 		  $(PXELOADER_EXEC)		\
-		  $(REISERFS_STAGE1_5_EXEC)	\
+ 		  $(REISERFS_STAGE1_5_EXEC)	\
 		  $(START_EXEC)			\
 		  $(START_ELTORITO_EXEC)	\
 		  $(UFS2_STAGE1_5_EXEC)		\
 		  $(UFS_STAGE1_5_EXEC)		\
+		  $(ZFS_STAGE1_5_EXEC)		\
 		  $(VSTAFS_STAGE1_5_EXEC)	\
 		  $(XFS_STAGE1_5_EXEC)
 
@@ -154,6 +162,10 @@ DISKLESS_OBJS		= diskless_exec-bios.o		\
 			  diskless_exec-fsys_jfs.o	\
 			  diskless_exec-fsys_minix.o	\
 			  diskless_exec-fsys_reiserfs.o	\
+			  diskless_exec-zfs_sha256.o	\
+			  diskless_exec-zfs_lzjb.o	\
+			  diskless_exec-zfs_fletcher.o	\
+			  diskless_exec-fsys_zfs.o	\
 			  diskless_exec-fsys_ufs.o	\
 			  diskless_exec-fsys_ufs2.o	\
 			  diskless_exec-fsys_vstafs.o	\
@@ -361,6 +373,10 @@ PRE_STAGE2_OBJS		= pre_stage2_exec-bios.o \
 			  pre_stage2_exec-fsys_jfs.o \
 			  pre_stage2_exec-fsys_minix.o \
 			  pre_stage2_exec-fsys_reiserfs.o \
+			  pre_stage2_exec-zfs_sha256.o \
+			  pre_stage2_exec-zfs_lzjb.o \
+			  pre_stage2_exec-zfs_fletcher.o \
+			  pre_stage2_exec-fsys_zfs.o \
 			  pre_stage2_exec-fsys_ufs.o \
 			  pre_stage2_exec-fsys_ufs2.o \
 			  pre_stage2_exec-fsys_vstafs.o \
@@ -402,26 +418,26 @@ $(PXELOADER_ASMOBJS)	:= CCASFLAGS = $(BASE_CCASFLAGS) $(STAGE2_CFLAGS)
 #
 # ReiserFS stage 1.5
 #
-REISERFS_STAGE1_5_DATA	= reiserfs_stage1_5
-REISERFS_STAGE1_5_EXEC	= reiserfs_stage1_5.exec
+REISERFS_STAGE1_5_DATA  = reiserfs_stage1_5
+REISERFS_STAGE1_5_EXEC  = reiserfs_stage1_5.exec
 
 REISERFS_STAGE1_5_ASMOBJS = reiserfs_stage1_5_exec-asm.o \
 			    reiserfs_stage1_5_exec-start.o
 
-REISERFS_STAGE1_5_OBJS	= reiserfs_stage1_5_exec-bios.o \
+REISERFS_STAGE1_5_OBJS  = reiserfs_stage1_5_exec-bios.o \
 			  reiserfs_stage1_5_exec-char_io.o \
 			  reiserfs_stage1_5_exec-common.o \
 			  reiserfs_stage1_5_exec-disk_io.o \
 			  reiserfs_stage1_5_exec-fsys_reiserfs.o \
 			  reiserfs_stage1_5_exec-stage1_5.o
-
+ 
 $(REISERFS_STAGE1_5_EXEC) := LDFLAGS = $(BASE_LDFLAGS) $(STAGE1_5_LINK)
-
+ 
 $(REISERFS_STAGE1_5_ASMOBJS) := CCASFLAGS = $(BASE_CCASFLAGS) \
 				$(STAGE1_5_CFLAGS) \
 				-DFSYS_REISERFS=1 -DNO_BLOCK_FILES=1
-
-$(REISERFS_STAGE1_5_OBJS) := CFLAGS = $(BASE_CFLAGS) $(STAGE1_5_CFLAGS) \
+ 
+$(REISERFS_STAGE1_5_OBJS) := CFLAGS = $(BASE_CFLAGS) $(STAGE1_5_CFLAGS)	\
 				-DFSYS_REISERFS=1 -DNO_BLOCK_FILES=1
 
 #
@@ -503,6 +519,33 @@ $(UFS_STAGE1_5_OBJS)	:= CFLAGS = $(BASE_CFLAGS) $(STAGE1_5_CFLAGS) \
 				-DFSYS_UFS=1 -DNO_BLOCK_FILES=1
 
 #
+# ZFS stage 1.5
+#
+ZFS_STAGE1_5_DATA	= zfs_stage1_5
+ZFS_STAGE1_5_EXEC	= zfs_stage1_5.exec
+
+ZFS_STAGE1_5_ASMOBJS	= zfs_stage1_5_exec-asm.o \
+			  zfs_stage1_5_exec-start.o
+
+ZFS_STAGE1_5_OBJS	= zfs_stage1_5_exec-bios.o \
+			  zfs_stage1_5_exec-char_io.o \
+			  zfs_stage1_5_exec-common.o \
+			  zfs_stage1_5_exec-disk_io.o \
+			  zfs_stage1_5_exec-zfs_sha256.o \
+			  zfs_stage1_5_exec-zfs_lzjb.o \
+			  zfs_stage1_5_exec-zfs_fletcher.o \
+			  zfs_stage1_5_exec-fsys_zfs.o \
+			  zfs_stage1_5_exec-stage1_5.o
+
+$(ZFS_STAGE1_5_EXEC)	:= LDFLAGS = $(BASE_LDFLAGS) $(STAGE1_5_LINK)
+
+$(ZFS_STAGE1_5_ASMOBJS)	:= CCASFLAGS = $(BASE_CCASFLAGS) $(STAGE1_5_CFLAGS) \
+				-DFSYS_ZFS=1 -DNO_BLOCK_FILES=1
+
+$(ZFS_STAGE1_5_OBJS)	:= CFLAGS = $(BASE_CFLAGS) $(STAGE1_5_CFLAGS) \
+				-DFSYS_ZFS=1 -DNO_BLOCK_FILES=1
+
+#
 # VSTa FS
 #
 VSTAFS_STAGE1_5_DATA	= vstafs_stage1_5
@@ -551,17 +594,20 @@ $(XFS_STAGE1_5_OBJS)	:= CFLAGS = $(BASE_CFLAGS) $(STAGE1_5_CFLAGS) \
 				-DFSYS_XFS=1 -DNO_BLOCK_FILES=1
 
 
-INSTALL_TARGETS	= $(INSTALL_DATA:%=$(ROOT_BOOT_GRUB)/%)
+INSTALL_TARGETS	= $(INSTALL_DATA:%=$(ROOT_BOOT_GRUB)/%) \
+		$(SRC_ZFSINC_DIR)
 
 #
-# Source files to be installed in $(SRC_DIR).
+# Source files to be installed in $(ROOT_SRC).
 #
 SRC_DIR		= $(ROOT_SRC)/stage2
+SRC_ZFSINC_DIR	= $(SRC_DIR)/zfs-include
 SRC_FILES	= Makefile.am Makefile.in apic.h apm.S asm.S bios.c boot.c \
 		  builtins.c char_io.c cmdline.c common.c console.c defs.h \
 		  dir.h disk_inode.h disk_inode_ffs.h disk_io.c fat.h \
 		  filesys.h freebsd.h fs.h fsys_ext2fs.c fsys_fat.c \
 		  fsys_ffs.c fsys_iso9660.c fsys_jfs.c fsys_minix.c \
+		  zfs_sha256.c zfs_lzjb.c zfs_fletcher.c fsys_zfs.c \
 		  fsys_reiserfs.c fsys_ufs.c fsys_ufs2.c fsys_vstafs.c \
 		  fsys_xfs.c graphics.c graphics.h gunzip.c hercules.c \
 		  hercules.h i386-elf.h imgact_aout.h iso9660.h jfs.h \
@@ -569,9 +615,13 @@ SRC_FILES	= Makefile.am Makefile.in apic.h apm.S asm.S bios.c boot.c \
 		  pc_slice.h pxeloader.S serial.c serial.h setjmp.S shared.h \
 		  size_test smp-imps.c smp-imps.h stage1_5.c stage2.c \
 		  start.S start_eltorito.S term.h terminfo.c terminfo.h \
-		  tparm.c tparm.h ufs.h ufs2.h vstafs.h xfs.h
+		  tparm.c tparm.h fsys_zfs.h ufs.h ufs2.h vstafs.h xfs.h
+SRC_ZFSINC_FILES = dmu.h dmu_objset.h dnode.h dsl_dataset.h dsl_dir.h spa.h \
+		uberblock_impl.h vdev_impl.h zap_impl.h zap_leaf.h zfs.h \
+		zfs_acl.h zfs_znode.h zil.h zio.h zio_checksum.h
 
-INSTALL_TARGETS	+= $(SRC_FILES:%=$(SRC_DIR)/%)
+INSTALL_TARGETS	+= $(SRC_FILES:%=$(SRC_DIR)/%) \
+		$(SRC_ZFSINC_FILES:%=$(SRC_ZFSINC_DIR)/%)
 
 
 ###############################################################################
@@ -750,8 +800,8 @@ $(PXELOADER_OBJS): $$(@:pxeloader_exec-%.o=%.c)
 #
 # ReiserFS stage 1.5
 #
-$(REISERFS_STAGE1_5_EXEC): $(REISERFS_STAGE1_5_ASMOBJS) \
-    $(REISERFS_STAGE1_5_OBJS)
+$(REISERFS_STAGE1_5_EXEC): $(REISERFS_STAGE1_5_ASMOBJS)	\
+	$(REISERFS_STAGE1_5_OBJS)
 	$(RM) $@
 	$(LINK) -o $@ $(REISERFS_STAGE1_5_ASMOBJS) $(REISERFS_STAGE1_5_OBJS) \
 	    $(LIBS)
@@ -828,6 +878,19 @@ $(UFS_STAGE1_5_OBJS): $$(@:ufs_stage1_5_exec-%.o=%.c)
 	$(CC) $(CFLAGS) -c -o $@ $(@:ufs_stage1_5_exec-%.o=%.c)
 
 #
+# ZFS stage 1.5
+#
+$(ZFS_STAGE1_5_EXEC): $(ZFS_STAGE1_5_ASMOBJS) $(ZFS_STAGE1_5_OBJS)
+	$(RM) $@
+	$(LINK) -o $@ $(ZFS_STAGE1_5_ASMOBJS) $(ZFS_STAGE1_5_OBJS) $(LIBS)
+
+$(ZFS_STAGE1_5_ASMOBJS): $$(@:zfs_stage1_5_exec-%.o=%.S)
+	$(CCAS) $(CCASFLAGS) -c -o $@ $(@:zfs_stage1_5_exec-%.o=%.S)
+
+$(ZFS_STAGE1_5_OBJS): $$(@:zfs_stage1_5_exec-%.o=%.c)
+	$(CC) $(CFLAGS) -c -o $@ $(@:zfs_stage1_5_exec-%.o=%.c)
+
+#
 # VSTa stage 1.5
 #
 $(VSTAFS_STAGE1_5_EXEC): $(VSTAFS_STAGE1_5_ASMOBJS) $(VSTAFS_STAGE1_5_OBJS)
@@ -863,9 +926,11 @@ $(ROOT_BOOT_GRUB)/%: $(ROOT_BOOT_GRUB) %
 $(SRC_DIR)/%: $(SRC_DIR) %
 	$(INS.file)
 
-$(ROOT_BOOT_GRUB) $(SRC_DIR):
-	$(INS.dir)
+$(SRC_ZFSINC_DIR)/%: $(SRC_ZFSINC_DIR) %
+	$(INS.file)
 
+$(ROOT_BOOT_GRUB) $(SRC_DIR) $(SRC_ZFSINC_DIR):
+	$(INS.dir)
 
 clean: _FORCE
 	$(RM) *.o $(BUILT_SOURCES) $(LIBRARIES) $(PROGRAMS) $(NOINSTALL_DATA)
