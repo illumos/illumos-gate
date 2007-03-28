@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,8 +136,12 @@ done:
 	 */
 #ifdef USE_PAM
 	if (authenticated) {
+		authctxt->cuser = cuser;
 		if (!do_pam_non_initial_userauth(authctxt))
 			authenticated = 0;
+		/* Make sure nobody else will use this pointer since we are
+		 * going to free that string. */
+		authctxt->cuser = NULL;
 	}
 #endif /* USE_PAM */
 

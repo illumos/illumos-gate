@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -206,6 +206,13 @@ new_start_pam(Authctxt *authctxt, struct pam_conv *conv)
 		fatal("Could not set PAM_TTY item during %s userauth",
 			get_method_name(authctxt));
 	}
+
+	if (authctxt->cuser != NULL) 
+		if ((retval = pam_set_item(pamh, PAM_AUSER, authctxt->cuser)) != PAM_SUCCESS) {
+			(void) pam_end(pamh, retval);
+			fatal("Could not set PAM_AUSER item during %s userauth",
+				get_method_name(authctxt));
+		}
 
 	authctxt->pam->h = pamh;
 }
