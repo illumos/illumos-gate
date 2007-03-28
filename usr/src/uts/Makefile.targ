@@ -322,7 +322,8 @@ $(SISCHECK_DEPS):	$(DEF_DEPS)
 		$(GREP) -v '#' $(MODULE).global-objs.$$TARG |$(GREP) . | \
 		    $(SORT) -u > $$MODSYMS.tmp; \
 		$(NM) $$TARG/$(MODULE) |$(GREP) OBJT |$(GREP) -v UNDEF | \
-		    $(CUT) -d'|' -f8 |$(GREP) -v '^___const_' |$(SORT) -u \
+		    $(CUT) -d'|' -f8 |$(GREP) -v '^___const_' | \
+		    $(GREP) -v '\.[0-9]*$$' |$(SORT) -u \
 		    > $$MODSYMS.tmp.new; \
 		$(DIFF) $$MODSYMS.tmp $$MODSYMS.tmp.new > $$MODSYMS.diff || \
 		    ($(ECHO) "warning: $(MODULE) symbol checking:" \
