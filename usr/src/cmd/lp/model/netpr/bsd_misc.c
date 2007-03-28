@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,8 +20,8 @@
  */
 
 /*
- * Copyright (c) 1996 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -102,12 +101,10 @@ create_bsd_job(np_job_t * injob, int pr_order, int filesize)
 		job->np_host = strdup(injob->username);
 		*--id = '!';
 	} else {
-		(void) fprintf(stderr,
-		gettext("Netpr: username in unknown format:<%s>\n"),
+		syslog(LOG_DEBUG, "using localhost for user %s",
 			injob->username);
-		syslog(LOG_DEBUG, "username in unknown format: %s",
-			injob->username);
-		return (NULL);
+		job->np_username = strdup(injob->username);
+		job->np_host = strdup("localhost");
 	}
 
 	job->np_printer = injob->printer;
