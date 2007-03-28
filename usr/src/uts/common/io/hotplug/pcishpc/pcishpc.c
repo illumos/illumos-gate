@@ -2563,6 +2563,12 @@ pcishpc_set_slot_name(pcishpc_ctrl_t *ctrl_p, int slot)
 			p->phy_slot_num = ctrl_p->physStart + slot;
 		else
 			p->phy_slot_num = ctrl_p->physStart - slot;
+
+		if ((ndi_prop_update_int(DDI_DEV_T_NONE, ctrl_p->shpc_dip,
+			"physical-slot#", p->phy_slot_num)) != DDI_SUCCESS) {
+			pcishpc_debug("pcishpc_set_slot_name(): failed to "
+				"create phyical-slot#%d", p->phy_slot_num);
+			}
 	}
 
 	if (!p->phy_slot_num) { /* platform may not have initialized it */
