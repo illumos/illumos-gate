@@ -24600,9 +24600,6 @@ ill_set_phys_addr_tail(ipsq_t *ipsq, queue_t *q, mblk_t *addrmp, void *dummy)
 	uint_t		addrlen, addroff;
 
 	ASSERT(IAM_WRITER_IPSQ(ipsq));
-	mutex_enter(&ill->ill_lock);
-	ASSERT(ill_is_quiescent(ill));
-	mutex_exit(&ill->ill_lock);
 
 	addroff	= dlindp->dl_addr_offset;
 	addrlen = dlindp->dl_addr_length - ABS(ill->ill_sap_length);
