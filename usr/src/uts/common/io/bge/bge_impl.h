@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -924,6 +924,7 @@ typedef struct bge {
 	 */
 	uint64_t		chip_resets;	/* # of chip RESETs	*/
 	uint64_t		missed_dmas;	/* # of missed DMAs	*/
+	uint64_t		missed_updates;	/* # of missed updates	*/
 	enum bge_mac_state	bge_mac_state;	/* definitions above	*/
 	enum bge_chip_state	bge_chip_state;	/* definitions above	*/
 	boolean_t		send_hw_tcp_csum;
@@ -1234,6 +1235,8 @@ extern uint32_t bge_tx_ticks_norm;
 extern uint32_t bge_rx_count_norm;
 extern uint32_t bge_tx_count_norm;
 extern boolean_t bge_jumbo_enable;
+extern boolean_t bge_relaxed_ordering;
+
 void   bge_chip_msi_trig(bge_t *bgep);
 
 /* bge_kstats.c */

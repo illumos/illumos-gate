@@ -33,7 +33,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "Broadcom Gb Ethernet v0.55";
+static char bge_ident[] = "Broadcom Gb Ethernet v0.56";
 
 /*
  * Property names
@@ -1975,6 +1975,12 @@ bge_alloc_bufs(bge_t *bgep)
 	txdescsize += BGE_STATUS_PADDING;
 
 	/*
+	 * Enable PCI relaxed ordering only for RX/TX data buffers
+	 */
+	if (bge_relaxed_ordering)
+		dma_attr.dma_attr_flags |= DDI_DMA_RELAXED_ORDERING;
+
+	/*
 	 * Allocate memory & handles for RX buffers
 	 */
 	ASSERT((rxbuffsize % BGE_SPLIT) == 0);
@@ -1997,6 +2003,8 @@ bge_alloc_bufs(bge_t *bgep)
 		if (err != DDI_SUCCESS)
 			return (DDI_FAILURE);
 	}
+
+	dma_attr.dma_attr_flags &= ~DDI_DMA_RELAXED_ORDERING;
 
 	/*
 	 * Allocate memory & handles for receive return rings

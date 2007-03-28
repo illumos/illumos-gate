@@ -52,6 +52,11 @@ boolean_t bge_enable_msi = B_FALSE;
 #endif
 
 /*
+ * PCI-X/PCI-E relaxed ordering tunable for OS/Nexus driver
+ */
+boolean_t bge_relaxed_ordering = B_TRUE;
+
+/*
  * Property names
  */
 static char knownids_propname[] = "bge-known-subsystems";
@@ -3212,7 +3217,7 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	/* Enable MSI code */
 	if (bgep->intr_type == DDI_INTR_TYPE_MSI)
 		bge_reg_set32(bgep, MSI_MODE_REG,
-		    MSI_PRI_HIGHEST|MSI_MSI_ENABLE);
+		    MSI_PRI_HIGHEST|MSI_MSI_ENABLE|MSI_ERROR_ATTENTION);
 
 	/*
 	 * On the first time through, save the factory-set MAC address
@@ -3835,7 +3840,7 @@ bge_intr(caddr_t arg1, caddr_t arg2)
 	bge_t *bgep = (bge_t *)arg1;		/* private device info	*/
 	bge_status_t *bsp;
 	uint64_t flags;
-	uint32_t mlcr = 0;
+	uint32_t regval;
 	uint_t result;
 	int retval;
 
@@ -3848,156 +3853,167 @@ bge_intr(caddr_t arg1, caddr_t arg2)
 	 */
 	ASSERT(bgep->progress & PROGRESS_HWINT);
 
-	/*
-	 * Check whether chip's says it's asserting #INTA;
-	 * if not, don't process or claim the interrupt.
-	 *
-	 * Note that the PCI signal is active low, so the
-	 * bit is *zero* when the interrupt is asserted.
-	 */
 	result = DDI_INTR_UNCLAIMED;
 	mutex_enter(bgep->genlock);
 
-	if (bgep->intr_type == DDI_INTR_TYPE_FIXED)
-		mlcr = bge_reg_get32(bgep, MISC_LOCAL_CONTROL_REG);
+	if (bgep->intr_type == DDI_INTR_TYPE_FIXED) {
+		/*
+		 * Check whether chip's says it's asserting #INTA;
+		 * if not, don't process or claim the interrupt.
+		 *
+		 * Note that the PCI signal is active low, so the
+		 * bit is *zero* when the interrupt is asserted.
+		 */
+		regval = bge_reg_get32(bgep, MISC_LOCAL_CONTROL_REG);
+		if (regval & MLCR_INTA_STATE) {
+			if (bge_check_acc_handle(bgep, bgep->io_handle)
+			    != DDI_FM_OK)
+				goto chip_stop;
+			mutex_exit(bgep->genlock);
+			return (result);
+		}
 
-	BGE_DEBUG(("bge_intr($%p) ($%p) mlcr 0x%08x", arg1, arg2, mlcr));
-
-	if ((mlcr & MLCR_INTA_STATE) == 0) {
 		/*
 		 * Block further PCI interrupts ...
 		 */
-		result = DDI_INTR_CLAIMED;
+		bge_reg_set32(bgep, PCI_CONF_BGE_MHCR,
+		    MHCR_MASK_PCI_INT_OUTPUT);
 
-		if (bgep->intr_type == DDI_INTR_TYPE_FIXED) {
-			bge_reg_set32(bgep, PCI_CONF_BGE_MHCR,
-				MHCR_MASK_PCI_INT_OUTPUT);
-			if (bge_check_acc_handle(bgep, bgep->cfg_handle) !=
-			    DDI_FM_OK)
-				goto chip_stop;
-		}
-
+	} else {
 		/*
-		 * Sync the status block and grab the flags-n-tag from it.
-		 * We count the number of interrupts where there doesn't
-		 * seem to have been a DMA update of the status block; if
-		 * it *has* been updated, the counter will be cleared in
-		 * the while() loop below ...
+		 * Check MSI status
 		 */
-		bgep->missed_dmas += 1;
-		bsp = DMA_VPTR(bgep->status_block);
-		for (;;) {
-			if (bgep->bge_chip_state != BGE_CHIP_RUNNING) {
-				/*
-				 * bge_chip_stop() may have freed dma area etc
-				 * while we were in this interrupt handler -
-				 * better not call bge_status_sync()
-				 */
-				(void) bge_check_acc_handle(bgep,
-				    bgep->io_handle);
-				mutex_exit(bgep->genlock);
-				return (DDI_INTR_CLAIMED);
-			}
-			retval = bge_status_sync(bgep, STATUS_FLAG_UPDATED,
-			    &flags);
-			if (retval != DDI_FM_OK) {
-				bgep->bge_dma_error = B_TRUE;
-				goto chip_stop;
-			}
+		regval = bge_reg_get32(bgep, MSI_STATUS_REG);
+		if (regval & MSI_ERROR_ATTENTION) {
+			BGE_REPORT((bgep, "msi error attention,"
+			    " status=0x%x", regval));
+			bge_reg_put32(bgep, MSI_STATUS_REG, regval);
+		}
+	}
 
-			if (!(flags & STATUS_FLAG_UPDATED))
-				break;
+	result = DDI_INTR_CLAIMED;
 
+	BGE_DEBUG(("bge_intr($%p) ($%p) regval 0x%08x", arg1, arg2, regval));
+
+	/*
+	 * Sync the status block and grab the flags-n-tag from it.
+	 * We count the number of interrupts where there doesn't
+	 * seem to have been a DMA update of the status block; if
+	 * it *has* been updated, the counter will be cleared in
+	 * the while() loop below ...
+	 */
+	bgep->missed_dmas += 1;
+	bsp = DMA_VPTR(bgep->status_block);
+	for (;;) {
+		if (bgep->bge_chip_state != BGE_CHIP_RUNNING) {
 			/*
-			 * Tell the chip that we're processing the interrupt
+			 * bge_chip_stop() may have freed dma area etc
+			 * while we were in this interrupt handler -
+			 * better not call bge_status_sync()
 			 */
-			bge_mbx_put(bgep, INTERRUPT_MBOX_0_REG,
-				INTERRUPT_MBOX_DISABLE(flags));
-			if (bge_check_acc_handle(bgep, bgep->io_handle) !=
-			    DDI_FM_OK)
-				goto chip_stop;
-
-			/*
-			 * Drop the mutex while we:
-			 * 	Receive any newly-arrived packets
-			 *	Recycle any newly-finished send buffers
-			 */
-			bgep->bge_intr_running = B_TRUE;
+			(void) bge_check_acc_handle(bgep,
+			    bgep->io_handle);
 			mutex_exit(bgep->genlock);
-			bge_receive(bgep, bsp);
-			bge_recycle(bgep, bsp);
-			mutex_enter(bgep->genlock);
-			bgep->bge_intr_running = B_FALSE;
-
-			/*
-			 * Tell the chip we've finished processing, and
-			 * give it the tag that we got from the status
-			 * block earlier, so that it knows just how far
-			 * we've gone.  If it's got more for us to do,
-			 * it will now update the status block and try
-			 * to assert an interrupt (but we've got the
-			 * #INTA blocked at present).  If we see the
-			 * update, we'll loop around to do some more.
-			 * Eventually we'll get out of here ...
-			 */
-			bge_mbx_put(bgep, INTERRUPT_MBOX_0_REG,
-				INTERRUPT_MBOX_ENABLE(flags));
-			bgep->missed_dmas = 0;
+			return (DDI_INTR_CLAIMED);
 		}
+		retval = bge_status_sync(bgep, STATUS_FLAG_UPDATED,
+		    &flags);
+		if (retval != DDI_FM_OK) {
+			bgep->bge_dma_error = B_TRUE;
+			goto chip_stop;
+		}
+
+		if (!(flags & STATUS_FLAG_UPDATED))
+			break;
 
 		/*
-		 * Check for exceptional conditions that we need to handle
-		 *
-		 * Link status changed
-		 * Status block not updated
+		 * Tell the chip that we're processing the interrupt
 		 */
-		if (flags & STATUS_FLAG_LINK_CHANGED)
-			bge_wake_factotum(bgep);
-
-		if (bgep->missed_dmas) {
-			/*
-			 * Probably due to the internal status tag not
-			 * being reset.  Force a status block update now;
-			 * this should ensure that we get an update and
-			 * a new interrupt.  After that, we should be in
-			 * sync again ...
-			 */
-			BGE_REPORT((bgep, "interrupt: flags 0x%llx - "
-				"not updated?", flags));
-			bge_reg_set32(bgep, HOST_COALESCE_MODE_REG,
-				COALESCE_NOW);
-
-			if (bgep->missed_dmas >= bge_dma_miss_limit) {
-				/*
-				 * If this happens multiple times in a row,
-				 * it means DMA is just not working.  Maybe
-				 * the chip's failed, or maybe there's a
-				 * problem on the PCI bus or in the host-PCI
-				 * bridge (Tomatillo).
-				 *
-				 * At all events, we want to stop further
-				 * interrupts and let the recovery code take
-				 * over to see whether anything can be done
-				 * about it ...
-				 */
-				bge_fm_ereport(bgep,
-				    DDI_FM_DEVICE_BADINT_LIMIT);
-				goto chip_stop;
-			}
-		}
+		bge_mbx_put(bgep, INTERRUPT_MBOX_0_REG,
+		    INTERRUPT_MBOX_DISABLE(flags));
+		if (bge_check_acc_handle(bgep, bgep->io_handle) !=
+		    DDI_FM_OK)
+			goto chip_stop;
 
 		/*
-		 * Reenable assertion of #INTA, unless there's a DMA fault
+		 * Drop the mutex while we:
+		 * 	Receive any newly-arrived packets
+		 *	Recycle any newly-finished send buffers
 		 */
-		if (result == DDI_INTR_CLAIMED) {
-			if (bgep->intr_type == DDI_INTR_TYPE_FIXED) {
-				bge_reg_clr32(bgep, PCI_CONF_BGE_MHCR,
-					MHCR_MASK_PCI_INT_OUTPUT);
-				if (bge_check_acc_handle(bgep,
-				    bgep->cfg_handle) != DDI_FM_OK)
-					goto chip_stop;
-			}
+		bgep->bge_intr_running = B_TRUE;
+		mutex_exit(bgep->genlock);
+		bge_receive(bgep, bsp);
+		bge_recycle(bgep, bsp);
+		mutex_enter(bgep->genlock);
+		bgep->bge_intr_running = B_FALSE;
+
+		/*
+		 * Tell the chip we've finished processing, and
+		 * give it the tag that we got from the status
+		 * block earlier, so that it knows just how far
+		 * we've gone.  If it's got more for us to do,
+		 * it will now update the status block and try
+		 * to assert an interrupt (but we've got the
+		 * #INTA blocked at present).  If we see the
+		 * update, we'll loop around to do some more.
+		 * Eventually we'll get out of here ...
+		 */
+		bge_mbx_put(bgep, INTERRUPT_MBOX_0_REG,
+		    INTERRUPT_MBOX_ENABLE(flags));
+		bgep->missed_dmas = 0;
+	}
+
+	/*
+	 * Check for exceptional conditions that we need to handle
+	 *
+	 * Link status changed
+	 * Status block not updated
+	 */
+	if (flags & STATUS_FLAG_LINK_CHANGED)
+		bge_wake_factotum(bgep);
+
+	if (bgep->missed_dmas) {
+		/*
+		 * Probably due to the internal status tag not
+		 * being reset.  Force a status block update now;
+		 * this should ensure that we get an update and
+		 * a new interrupt.  After that, we should be in
+		 * sync again ...
+		 */
+		BGE_REPORT((bgep, "interrupt: flags 0x%llx - "
+		    "not updated?", flags));
+		bgep->missed_updates++;
+		bge_reg_set32(bgep, HOST_COALESCE_MODE_REG,
+		    COALESCE_NOW);
+
+		if (bgep->missed_dmas >= bge_dma_miss_limit) {
+			/*
+			 * If this happens multiple times in a row,
+			 * it means DMA is just not working.  Maybe
+			 * the chip's failed, or maybe there's a
+			 * problem on the PCI bus or in the host-PCI
+			 * bridge (Tomatillo).
+			 *
+			 * At all events, we want to stop further
+			 * interrupts and let the recovery code take
+			 * over to see whether anything can be done
+			 * about it ...
+			 */
+			bge_fm_ereport(bgep,
+			    DDI_FM_DEVICE_BADINT_LIMIT);
+			goto chip_stop;
 		}
+	}
+
+	/*
+	 * Reenable assertion of #INTA, unless there's a DMA fault
+	 */
+	if (bgep->intr_type == DDI_INTR_TYPE_FIXED) {
+		bge_reg_clr32(bgep, PCI_CONF_BGE_MHCR,
+		    MHCR_MASK_PCI_INT_OUTPUT);
+		if (bge_check_acc_handle(bgep, bgep->cfg_handle) !=
+		    DDI_FM_OK)
+			goto chip_stop;
 	}
 
 	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)

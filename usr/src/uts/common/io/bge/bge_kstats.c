@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -404,13 +404,14 @@ static const bge_ksindex_t bge_driverinfo[] = {
 	{ 18,				"watchdog"		},
 	{ 19,				"chip_resets"		},
 	{ 20,				"dma_misses"		},
+	{ 21,				"update_misses"		},
 
-	{ 21,				"misc_host_config"	},
-	{ 22,				"dma_rw_control"	},
-	{ 23,				"pci_bus_info"		},
+	{ 22,				"misc_host_config"	},
+	{ 23,				"dma_rw_control"	},
+	{ 24,				"pci_bus_info"		},
 
-	{ 24,				"buff_mgr_status"	},
-	{ 25,				"rcv_init_status"	},
+	{ 25,				"buff_mgr_status"	},
+	{ 26,				"rcv_init_status"	},
 
 	{ -1,				NULL 			}
 };
@@ -455,6 +456,7 @@ bge_driverinfo_update(kstat_t *ksp, int flag)
 	(knp++)->value.ui64 = bgep->watchdog;
 	(knp++)->value.ui64 = bgep->chip_resets;
 	(knp++)->value.ui64 = bgep->missed_dmas;
+	(knp++)->value.ui64 = bgep->missed_updates;
 
 	/*
 	 * Hold the mutex while accessing the chip registers
