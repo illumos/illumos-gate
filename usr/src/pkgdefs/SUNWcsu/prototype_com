@@ -861,7 +861,6 @@ f none usr/sbin/unlink 555 root bin
 f none usr/sbin/sharectl 555 root bin
 f none usr/sbin/sharemgr 555 root bin
 f none usr/lib/libshare.so.1 755 root bin
-s none usr/lib/libshare.so=./libshare.so.1
 l none usr/sbin/share=../../usr/sbin/sharemgr
 l none usr/sbin/unshare=../../usr/sbin/sharemgr
 f none usr/sbin/unshareall 555 root bin

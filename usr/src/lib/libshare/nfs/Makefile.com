@@ -25,6 +25,43 @@
 # Use is subject to license terms.
 #
 
-include ../Makefile.com
+LIBRARY =	libshare_nfs.a
+VERS =		.1
+NFSLIB_DIR	= $(SRC)/cmd/fs.d/nfs/lib
 
-install: all $(ROOTUSRSBINPROG32) $(ROOTLINKS)
+LIBOBJS =	libshare_nfs.o
+OTHOBJS =	nfs_sec.o nfslog_config.o nfslogtab.o
+OBJECTS =	$(LIBOBJS) $(OTHOBJS)
+
+include ../../../Makefile.lib
+
+ROOTLIBDIR =	$(ROOT)/usr/lib/fs/nfs
+ROOTLIBDIR64 =	$(ROOT)/usr/lib/fs/nfs/$(MACH64)
+
+LIBSRCS = $(LIBOBJS:%.o=$(SRCDIR)/%.c)
+# we don't want to lint the sources for OTHOBJS since they are pre-existing files
+# that are not lint free.
+lintcheck := SRCS = $(LIBSRCS)
+
+LIBS =		$(DYNLIB)
+LDLIBS +=	-lshare -lnsl -lscf -lumem -lc
+all install := LDLIBS += -lxml2
+
+#add nfs/lib directory as part of the include path
+CFLAGS +=	$(CCVERBOSE)
+CPPFLAGS +=	-D_REENTRANT -I$(NFSLIB_DIR) -I/usr/include/libxml2 \
+			-I$(SRCDIR)/../common
+
+.KEEP_STATE:
+
+all: $(LIBS)
+
+install: all
+
+lint: lintcheck
+
+pics/%.o:       $(NFSLIB_DIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+include ../../../Makefile.targ

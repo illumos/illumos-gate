@@ -379,7 +379,8 @@ amd64_ROOT.SYS64.2 =
 ROOT.SYS64.2 = \
 	$($(MACH64)_ROOT.SYS64.2) \
 	/usr/lib/mdb/kvm/$(MACH64) \
-	/usr/lib/mdb/proc/$(MACH64)
+	/usr/lib/mdb/proc/$(MACH64) \
+	/usr/lib/fs/nfs/$(MACH64)
 
 UUCP.UUCP= \
 	/var/spool/uucp \

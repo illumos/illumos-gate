@@ -27,9 +27,18 @@
 
 include ../Makefile.lib
 
-HDRS =		libshare.h
+HDRS =		libshare.h libshare_impl.h scfutil.h
 HDRDIR =	common
-SUBDIRS =	$(MACH)
+
+MACHS = $(MACH)
+$(BUILD64)MACHS += $(MACH64)
+
+# Add plugin module directories here. They need to build after the libshare
+# objects are built.
+PLUGINS =	nfs
+$(PLUGINS):	$(MACHS)
+
+SUBDIRS =	$(MACHS) $(PLUGINS)
 
 MSGFILES=	common/libshare.c common/libsharecore.c common/scfutil.c \
 		common/plugin.c common/parser.c common/libshare_zfs.c

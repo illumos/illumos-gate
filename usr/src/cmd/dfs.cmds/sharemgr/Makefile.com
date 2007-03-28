@@ -21,7 +21,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -30,10 +30,6 @@ include ../../../Makefile.cmd
 COMMON = ..
 
 PROG=		sharemgr
-
-LINK_SRCS = libshare_nfs.c
-LINK_OBJS = libshare_nfs.o
-LINK_MODS = libshare_nfs.so
 
 SHAREMGR_MOD	= sharemgr
 
@@ -51,6 +47,7 @@ CPPFLAGS += $(MYCPPFLAGS)
 LDLIBS += -lshare -lscf -lsecdb -lumem
 all install := LDLIBS += -lxml2
 LINTFLAGS	+= -u
+LINTFLAGS64	+= -u
 
 SRCS = $(SHAREMGR_SRC)
 OBJS = $(SHAREMGR_OBJ)
@@ -78,7 +75,7 @@ $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
 	$(POST_PROCESS)
 
-install: all $(ROOTUSRSBINPROG) $(ROOTLINKS)
+install: all
 
 $(ROOTLINKS): $(ROOTUSRSBINPROG)
 	$(RM) $@

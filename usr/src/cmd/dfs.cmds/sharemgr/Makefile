@@ -21,10 +21,9 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-DEFAULTFILES = 
 
 MANIFEST  = group.xml
 
@@ -33,7 +32,8 @@ include ../../Makefile.cmd
 #
 # One for each ISA.
 #
-SUBDIRS =	$(MACH) plugins
+SUBDIRS =	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
 ROOTMANIFESTDIR	= $(ROOTSVCNETWORKSHARES)
 $(ROOTMANIFEST)		:= FILEMODE= 444
@@ -49,9 +49,9 @@ lint	:=	TARGET= lint
 
 all clean clobber lint _msg:	$(SUBDIRS)
 
-install: $(SUBDIRS) $(ROOTETCDEFAULTFILES) $(ROOTMANIFEST)
+install: $(SUBDIRS) $(ROOTMANIFEST)
 
-$(SUBDIRS):	FRC
+$(SUBDIRS) $(TESTSUBS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

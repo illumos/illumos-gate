@@ -144,6 +144,9 @@ d none usr/lib/secure/amd64 755 root bin
 s none usr/lib/secure/64=amd64
 d none usr/lib/amd64 755 root bin
 s none usr/lib/amd64/ld.so.1=../../../lib/amd64/ld.so.1
+f none usr/lib/amd64/libshare.so.1 755 root bin
+d none usr/lib/fs/nfs 755 root sys
+d none usr/lib/fs/nfs/amd64 755 root sys
 d none usr/sbin/amd64 755 root bin
 f none usr/sbin/amd64/add_drv 555 root sys
 f none usr/sbin/amd64/modinfo 555 root sys

@@ -124,6 +124,7 @@ f none usr/lib/sparcv9/llib-lsctp.ln 644 root bin
 s none usr/lib/sparcv9/llib-lsec.ln=../../../lib/sparcv9/llib-lsec.ln
 s none usr/lib/sparcv9/llib-lsecdb.ln=../../../lib/sparcv9/llib-lsecdb.ln
 s none usr/lib/sparcv9/llib-lsendfile.ln=../../../lib/sparcv9/llib-lsendfile.ln
+f none usr/lib/sparcv9/llib-lshare.ln 644 root bin
 f none usr/lib/sparcv9/llib-lsip.ln 644 root bin
 f none usr/lib/sparcv9/llib-lsldap.ln 644 root bin
 f none usr/lib/sparcv9/llib-lsmbios.ln 644 root bin

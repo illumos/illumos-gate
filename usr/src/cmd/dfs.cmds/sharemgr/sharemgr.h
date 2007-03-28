@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+#include <libshare.h>
 
 /*
  * shareadm internal interfaces
@@ -68,7 +69,7 @@ typedef enum {
 typedef struct sa_command {
 	char	*cmdname;
 	int	flags;
-	int	(*cmdfunc)(int, int, char **);
+	int	(*cmdfunc)(sa_handle_t, int, int, char **);
 	int	cmdidx;
 	int	priv;	/* requires RBAC authorizations */
 } sa_command_t;
@@ -107,7 +108,7 @@ struct list {
 };
 
 /* shareutil entry points */
-    extern int add_opt(struct options **, char *, int);
+extern int add_opt(struct options **, char *, int);
 
 
 #ifdef	__cplusplus

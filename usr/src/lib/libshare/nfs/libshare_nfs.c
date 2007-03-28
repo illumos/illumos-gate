@@ -730,7 +730,8 @@ configlog(struct exportdata *exp, char *tag)
 	error = nfsl_getconfig_list(&configlist);
 	if (error) {
 		(void) fprintf(stderr,
-				gettext("Cannot get log configuration: %s\n"),
+				dgettext(TEXT_DOMAIN,
+					"Cannot get log configuration: %s\n"),
 				strerror(error));
 	}
 
@@ -739,7 +740,8 @@ configlog(struct exportdata *exp, char *tag)
 	if ((configp = nfsl_findconfig(configlist, tag, &error)) == NULL) {
 		nfsl_freeconfig_list(&configlist);
 		(void) fprintf(stderr,
-				gettext("No tags matching \"%s\"\n"), tag);
+				dgettext(TEXT_DOMAIN,
+					"No tags matching \"%s\"\n"), tag);
 		/* bad configuration */
 		error = ENOENT;
 		goto err;
@@ -767,7 +769,8 @@ err:
 		if (exp->ex_log_buffer != NULL)
 			free(exp->ex_log_buffer);
 		(void) fprintf(stderr,
-				gettext("Cannot set log configuration: %s\n"),
+				dgettext(TEXT_DOMAIN,
+					"Cannot set log configuration: %s\n"),
 				strerror(error));
 	}
 }
@@ -850,7 +853,8 @@ fill_export_from_optionset(struct exportdata *export, sa_optionset_t optionset)
 		if (value != NULL &&
 		    (strcmp(value, "..") == 0 || strchr(value, '/') != NULL)) {
 		    /* this is an error */
-		    (void) printf(gettext("NFS: index=\"%s\" not valid;"
+		    (void) printf(dgettext(TEXT_DOMAIN,
+					    "NFS: index=\"%s\" not valid;"
 					    "must be a filename.\n"),
 			    value);
 		    break;
@@ -864,7 +868,8 @@ fill_export_from_optionset(struct exportdata *export, sa_optionset_t optionset)
 		    }
 		    export->ex_index = strdup(value); /* remember to free */
 		    if (export->ex_index == NULL) {
-			(void) printf(gettext("NFS: out of memory setting "
+			(void) printf(dgettext(TEXT_DOMAIN,
+						"NFS: out of memory setting "
 						"index property\n"));
 			break;
 		    }
@@ -882,7 +887,8 @@ fill_export_from_optionset(struct exportdata *export, sa_optionset_t optionset)
 		break;
 	    default:
 		/* have a syntactic error */
-		(void) printf(gettext("NFS: unrecognized option %s=%s\n"),
+		(void) printf(dgettext(TEXT_DOMAIN,
+					"NFS: unrecognized option %s=%s\n"),
 			name, value != NULL ? value : "");
 		break;
 	    }
@@ -943,7 +949,8 @@ get_rootnames(seconfig_t *sec, char *list, int *count)
 
 	a = (caddr_t *)malloc(c * sizeof (char *));
 	if (a == NULL) {
-		(void) printf(gettext("get_rootnames: no memory\n"));
+		(void) printf(dgettext(TEXT_DOMAIN,
+					"get_rootnames: no memory\n"));
 	} else {
 	    for (i = 0; i < c; i++) {
 		host = strtok(list, ":");
@@ -1020,7 +1027,8 @@ fill_security_from_secopts(struct secinfo *sp, sa_security_t secopts)
 							&sp->s_rootcnt);
 		    if (sp->s_rootnames == NULL) {
 			err = SA_BAD_VALUE;
-			(void) fprintf(stderr, gettext("Bad root list\n"));
+			(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+							"Bad root list\n"));
 		    }
 		}
 		break;
@@ -1062,7 +1070,7 @@ printarg(char *path, struct exportdata *ep)
 	(void) printf("%s:\n", path);
 	(void) printf("\tex_version = %d\n", ep->ex_version);
 	(void) printf("\tex_path = %s\n", ep->ex_path);
-	(void) printf("\tex_pathlen = %d\n", ep->ex_pathlen);
+	(void) printf("\tex_pathlen = %ld\n", (ulong_t)ep->ex_pathlen);
 	(void) printf("\tex_flags: (0x%02x) ", ep->ex_flags);
 	if (ep->ex_flags & EX_NOSUID)
 		(void) printf("NOSUID ");
@@ -1358,7 +1366,7 @@ nfslogtab_add(dir, buffer, tag)
 	rewind(f);
 
 	if (lockf(fileno(f), F_LOCK, 0L) < 0) {
-		(void) fprintf(stderr, gettext(
+		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
 			"share complete, however failed to lock %s "
 			"for update: %s\n"), NFSLOGTAB, strerror(errno));
 		error = -1;
@@ -1366,7 +1374,7 @@ nfslogtab_add(dir, buffer, tag)
 	}
 
 	if (logtab_deactivate_after_boot(f) == -1) {
-		(void) fprintf(stderr, gettext(
+		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
 			"share complete, however could not deactivate "
 			"entries in %s\n"), NFSLOGTAB);
 		error = -1;
@@ -1378,7 +1386,7 @@ nfslogtab_add(dir, buffer, tag)
 	 * going to replace it with perhaps an entry with a new tag.
 	 */
 	if (logtab_rement(f, buffer, dir, NULL, -1)) {
-		(void) fprintf(stderr, gettext(
+		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
 			"share complete, however could not remove matching "
 			"entries in %s\n"), NFSLOGTAB);
 		error = -1;
@@ -1389,7 +1397,7 @@ nfslogtab_add(dir, buffer, tag)
 	 * Deactivate all active entries matching this sharepoint
 	 */
 	if (logtab_deactivate(f, NULL, dir, NULL)) {
-		(void) fprintf(stderr, gettext(
+		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
 			"share complete, however could not deactivate matching "
 			"entries in %s\n"), NFSLOGTAB);
 		error = -1;
@@ -1405,7 +1413,7 @@ nfslogtab_add(dir, buffer, tag)
 	 * Add new sharepoint / buffer location to nfslogtab
 	 */
 	if (logtab_putent(f, &lep) < 0) {
-		(void) fprintf(stderr, gettext(
+		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
 			"share complete, however could not add %s to %s\n"),
 			dir, NFSLOGTAB);
 		error = -1;
@@ -1434,7 +1442,7 @@ nfslogtab_deactivate(path)
 	}
 	if (lockf(fileno(f), F_LOCK, 0L) < 0) {
 		error = errno;
-		(void)  fprintf(stderr, gettext(
+		(void)  fprintf(stderr, dgettext(TEXT_DOMAIN,
 			"share complete, however could not lock %s for "
 			"update: %s\n"), NFSLOGTAB, strerror(error));
 		goto out;
@@ -1442,8 +1450,9 @@ nfslogtab_deactivate(path)
 	if (logtab_deactivate(f, NULL, path, NULL) == -1) {
 		error = -1;
 		(void) fprintf(stderr,
-			gettext("share complete, however could not "
-			"deactivate %s in %s\n"), path, NFSLOGTAB);
+			dgettext(TEXT_DOMAIN,
+				"share complete, however could not "
+				"deactivate %s in %s\n"), path, NFSLOGTAB);
 		goto out;
 	}
 
@@ -1467,8 +1476,17 @@ public_exists(sa_share_t skipshare)
 	sa_optionset_t opt;
 	sa_property_t prop;
 	int exists = 0;
+	sa_handle_t handle;
 
-	for (group = sa_get_group(NULL); group != NULL;
+	group = sa_get_parent_group(skipshare);
+	if (group == NULL)
+	    return (SA_NO_SUCH_GROUP);
+
+	handle = sa_find_group_handle(group);
+	if (handle == NULL)
+	    return (SA_SYSTEM_ERR);
+
+	for (group = sa_get_group(handle, NULL); group != NULL;
 	    group = sa_get_next_group(group)) {
 	    for (share = sa_get_share(group, NULL); share != NULL;
 		share = sa_get_next_share(share)) {
@@ -1562,7 +1580,8 @@ nfs_enable_share(sa_share_t share)
 	 */
 
 	if (export.ex_flags & EX_PUBLIC && public_exists(share)) {
-	    (void) printf(gettext("NFS: Cannot share more than one file "
+	    (void) printf(dgettext(TEXT_DOMAIN,
+					"NFS: Cannot share more than one file "
 			    "system with 'public' property\n"));
 	    err = SA_NOT_ALLOWED;
 	    goto out;
@@ -1588,8 +1607,9 @@ nfs_enable_share(sa_share_t share)
 	    sp[0].s_rootnames = NULL;
 	    /* setup a default in case no properties defined */
 	    if (nfs_getseconfig_default(&sp[0].s_secinfo)) {
-		(void) printf(gettext("NFS: nfs_getseconfig_default: failed to "
-				"get default security mode\n"));
+		(void) printf(dgettext(TEXT_DOMAIN,
+				    "NFS: nfs_getseconfig_default: failed to "
+				    "get default security mode\n"));
 		err = SA_CONFIG_ERR;
 	    }
 	    if (secoptlist != NULL) {
@@ -1633,13 +1653,15 @@ nfs_enable_share(sa_share_t share)
 		err = SA_SYSTEM_ERR;
 		switch (errno) {
 		case EREMOTE:
-		    (void) printf(gettext("NFS: Cannot share remote file"
+		    (void) printf(dgettext(TEXT_DOMAIN,
+						"NFS: Cannot share remote file"
 						"system: %s\n"),
 					path);
 		    break;
 		case EPERM:
 		    if (getzoneid() != GLOBAL_ZONEID) {
-			(void) printf(gettext("NFS: Cannot share file systems "
+			(void) printf(dgettext(TEXT_DOMAIN,
+					"NFS: Cannot share file systems "
 					"in non-global zones: %s\n"), path);
 			err = SA_NOT_SUPPORTED;
 			break;
@@ -1672,7 +1694,8 @@ nfs_enable_share(sa_share_t share)
 		if (nfslogtab_add(path, export.ex_log_buffer,
 		    export.ex_tag) != 0) {
 		    (void) fprintf(stderr,
-				gettext("Could not enable logging for %s\n"),
+				dgettext(TEXT_DOMAIN,
+					"Could not enable logging for %s\n"),
 				path);
 		}
 		_check_services(service_list_logging);
@@ -2166,7 +2189,8 @@ nfs_init()
 	int ret = SA_OK;
 
 	if (sa_plugin_ops.sa_init != nfs_init)
-	    (void) printf(gettext("NFS plugin not properly initialized\n"));
+	    (void) printf(dgettext(TEXT_DOMAIN,
+				    "NFS plugin not properly initialized\n"));
 
 	ret = initprotofromdefault();
 	add_defaults();
@@ -2465,7 +2489,8 @@ restart_service(uint32_t svcs)
 		 */
 		if (ret != 0) {
 		    (void) fprintf(stderr,
-				gettext("%s failed to restart: %s\n"),
+				dgettext(TEXT_DOMAIN,
+					"%s failed to restart: %s\n"),
 				scf_strerror(scf_error()));
 		} else {
 			/*
@@ -2475,7 +2500,8 @@ restart_service(uint32_t svcs)
 			 */
 		    if (service_in_state(service, SCF_STATE_STRING_MAINT)) {
 			(void) fprintf(stderr,
-					gettext("%s failed to restart\n"),
+					dgettext(TEXT_DOMAIN,
+						"%s failed to restart\n"),
 					service);
 		    }
 		}

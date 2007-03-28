@@ -118,9 +118,9 @@ typedef void *sa_handle_t;	/* opaque handle to access core functions */
 #define	SA_SVC_FMRI_BASE	"svc:/network/shares/group"
 
 /* initialization */
-extern void sa_init(int);
-extern void sa_fini(void);
-extern int sa_update_config(void);
+extern sa_handle_t sa_init(int);
+extern void sa_fini(sa_handle_t);
+extern int sa_update_config(sa_handle_t);
 extern char *sa_errorstr(int);
 
 /* protocol names */
@@ -128,9 +128,9 @@ extern int sa_get_protocols(char ***);
 extern int sa_valid_protocol(char *);
 
 /* group control (create, remove, etc) */
-extern sa_group_t sa_create_group(char *, int *);
+extern sa_group_t sa_create_group(sa_handle_t, char *, int *);
 extern int sa_remove_group(sa_group_t);
-extern sa_group_t sa_get_group(char *);
+extern sa_group_t sa_get_group(sa_handle_t, char *);
 extern sa_group_t sa_get_next_group(sa_group_t);
 extern char *sa_get_group_attr(sa_group_t, char *);
 extern int sa_set_group_attr(sa_group_t, char *, char *);
@@ -144,7 +144,7 @@ extern int sa_move_share(sa_group_t, sa_share_t);
 extern int sa_remove_share(sa_share_t);
 extern sa_share_t sa_get_share(sa_group_t, char *);
 extern sa_share_t sa_get_resource(sa_group_t, char *);
-extern sa_share_t sa_find_share(char *);
+extern sa_share_t sa_find_share(sa_handle_t, char *);
 extern sa_share_t sa_get_next_share(sa_share_t);
 extern char *sa_get_share_attr(sa_share_t, char *);
 extern char *sa_get_share_description(sa_share_t);
@@ -214,8 +214,13 @@ extern int sa_update_sharetab(sa_share_t, char *);
 extern int sa_delete_sharetab(char *, char *);
 
 /* ZFS functions */
-extern int sa_zfs_is_shared(char *);
+extern int sa_zfs_is_shared(sa_handle_t, char *);
 extern int sa_group_is_zfs(sa_group_t);
+
+
+/* SA Handle specific functions */
+extern sa_handle_t sa_find_group_handle(sa_group_t);
+
 #ifdef	__cplusplus
 }
 #endif

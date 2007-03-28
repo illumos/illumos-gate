@@ -40,7 +40,7 @@
 #include <libintl.h>
 #include <locale.h>
 
-static int run_command(char *, int, char **);
+static int run_command(char *, int, char **, sa_handle_t);
 static void sub_command_help(char *proto);
 
 static void
@@ -57,6 +57,7 @@ main(int argc, char *argv[])
 	int help = 0;
 	int rval;
 	char *command;
+	sa_handle_t handle;
 
 	/*
 	 * make sure locale and gettext domain is setup
@@ -64,7 +65,7 @@ main(int argc, char *argv[])
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	sa_init(SA_INIT_CONTROL_API);
+	handle = sa_init(SA_INIT_CONTROL_API);
 
 	while ((c = getopt(argc, argv, "h?")) != EOF) {
 	    switch (c) {
@@ -87,9 +88,9 @@ main(int argc, char *argv[])
 	 * now have enough to parse rest of command line
 	 */
 	command = argv[optind];
-	rval = run_command(command, argc - optind, argv + optind);
+	rval = run_command(command, argc - optind, argv + optind, handle);
 
-	sa_fini();
+	sa_fini(handle);
 	return (rval);
 }
 
@@ -112,16 +113,14 @@ sc_get_usage(sc_usage_t index)
 	return (ret);
 }
 
+/*ARGSUSED*/
 static int
-sc_get(int flags, int argc, char *argv[])
+sc_get(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	char *proto = NULL;
 	struct options *optlist = NULL;
 	int ret = SA_OK;
 	int c;
-#ifdef lint
-	flags = flags;
-#endif
 
 	while ((c = getopt(argc, argv, "?hp:")) != EOF) {
 	    switch (c) {
@@ -203,16 +202,14 @@ sc_get(int flags, int argc, char *argv[])
 	return (ret);
 }
 
+/*ARGSUSED*/
 static int
-sc_set(int flags, int argc, char *argv[])
+sc_set(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	char *proto = NULL;
 	struct options *optlist = NULL;
 	int ret = SA_OK;
 	int c;
-#ifdef lint
-	flags = flags;
-#endif
 
 	while ((c = getopt(argc, argv, "?hp:")) != EOF) {
 	    switch (c) {
@@ -316,8 +313,9 @@ valid_proto(char **protos, int num, char *proto)
 	return (0);
 }
 
+/*ARGSUSED*/
 static int
-sc_status(int flags, int argc, char *argv[])
+sc_status(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	char **protos;
 	int ret = SA_OK;
@@ -325,9 +323,6 @@ sc_status(int flags, int argc, char *argv[])
 	int i;
 	int num_proto;
 	int verbose = 0;
-#ifdef lint
-	flags = flags;
-#endif
 
 	while ((c = getopt(argc, argv, "?hv")) != EOF) {
 	    switch (c) {
@@ -374,13 +369,11 @@ static sa_command_t commands[] = {
 	{NULL, 0, NULL, 0},
 };
 
+/*ARGSUSED*/
 void
 sub_command_help(char *proto)
 {
 	int i;
-#ifdef lint
-	proto = proto;
-#endif
 
 	(void) printf("\tsub-commands:\n");
 	for (i = 0; commands[i].cmdname != NULL; i++) {
@@ -405,7 +398,7 @@ sa_lookup(char *cmd)
 }
 
 static int
-run_command(char *command, int argc, char *argv[])
+run_command(char *command, int argc, char *argv[], sa_handle_t handle)
 {
 	sa_command_t *cmdvec;
 	int ret;
@@ -435,6 +428,6 @@ run_command(char *command, int argc, char *argv[])
 	 * need to check priviledges and restrict what can be done
 	 * based on least priviledge and sub-command.
 	 */
-	ret = cmdvec->cmdfunc(NULL, argc, argv);
+	ret = cmdvec->cmdfunc(handle, NULL, argc, argv);
 	return (ret);
 }

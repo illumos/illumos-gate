@@ -129,6 +129,7 @@ f none usr/lib/amd64/llib-lsctp.ln 644 root bin
 s none usr/lib/amd64/llib-lsec.ln=../../../lib/amd64/llib-lsec.ln
 s none usr/lib/amd64/llib-lsecdb.ln=../../../lib/amd64/llib-lsecdb.ln
 s none usr/lib/amd64/llib-lsendfile.ln=../../../lib/amd64/llib-lsendfile.ln
+f none usr/lib/amd64/llib-lshare.ln 644 root bin
 f none usr/lib/amd64/llib-lsip.ln 644 root bin
 f none usr/lib/amd64/llib-lsldap.ln 644 root bin
 f none usr/lib/amd64/llib-lsmbios.ln 644 root bin

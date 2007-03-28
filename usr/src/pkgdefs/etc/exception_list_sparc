@@ -885,6 +885,17 @@ lib/llib-liscsitgt.ln			sparc
 lib/sparcv9/libiscsitgt.so		sparc
 lib/sparcv9/llib-liscsitgt.ln		sparc
 #
+# libshare is private and the 64-bit sharemg is not delivered.
+#
+usr/lib/libshare.so			sparc
+usr/lib/sparcv9/libshare.so		sparc
+usr/lib/fs/nfs/libshare_nfs.so		sparc
+usr/lib/fs/nfs/sparcv9/libshare_nfs.so	sparc
+usr/include/libshare_impl.h		sparc
+usr/include/scfutil.h			sparc
+usr/sbin/sparcv9/sharemgr		sparc
+usr/sbin/sparcv7/sharemgr		sparc
+#
 # These files are installed in the proto area by the build of libpri for
 # the benefit of the builds of FMA libldom, Zeus, picld plugins, and/or
 # other libpri consumers. However, the libpri interfaces are private to

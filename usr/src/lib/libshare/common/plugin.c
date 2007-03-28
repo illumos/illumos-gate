@@ -38,6 +38,9 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <libintl.h>
+#include <sys/systeminfo.h>
+
+#define	MAXISALEN	257	/* based on sysinfo(2) man page */
 
 /*
  * protocol plugin interface
@@ -85,14 +88,25 @@ proto_plugin_init()
 	if (dir != NULL) {
 	    while (ret == SA_OK && (dent = readdir(dir)) != NULL) {
 		char path[MAXPATHLEN];
+		char isa[MAXISALEN];
+
+#if defined(_LP64)
+		if (sysinfo(SI_ARCHITECTURE_64, isa, MAXISALEN) == -1)
+		    isa[0] = '\0';
+#else
+		isa[0] = '\0';
+#endif
 		(void) snprintf(path, MAXPATHLEN,
-				"%s/%s/libshare_%s.so",	SA_LIB_DIR,
-				dent->d_name, dent->d_name);
-		if (stat(path, &st) < 0) {
+				"%s/%s/%s/libshare_%s.so.1",
+				SA_LIB_DIR,
+				dent->d_name,
+				isa,
+				dent->d_name);
+			if (stat(path, &st) < 0) {
 		    /* file doesn't exist, so don't try to map it */
 		    continue;
 		}
-		dlhandle = dlopen(path, RTLD_NOW|RTLD_GLOBAL|RTLD_WORLD);
+		dlhandle = dlopen(path, RTLD_FIRST|RTLD_LAZY);
 		if (dlhandle != NULL) {
 		    plugin_ops = (struct sa_plugin_ops *)
 					dlsym(dlhandle,	"sa_plugin_ops");

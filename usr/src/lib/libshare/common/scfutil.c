@@ -42,6 +42,7 @@
 
 ssize_t scf_max_name_len;
 extern struct sa_proto_plugin *sap_proto_list;
+extern sa_handle_impl_t get_handle_for_root(xmlNodePtr);
 
 /*
  * The SMF facility uses some properties that must exist. We want to
@@ -93,7 +94,7 @@ sa_scf_fini(scfutilhandle_t *handle)
  */
 
 scfutilhandle_t *
-sa_scf_init()
+sa_scf_init(sa_handle_impl_t ihandle)
 {
 	scfutilhandle_t *handle;
 
@@ -103,6 +104,7 @@ sa_scf_init()
 
 	handle = calloc(1, sizeof (scfutilhandle_t));
 	if (handle != NULL) {
+	    ihandle->scfhandle = handle;
 	    handle->scf_state = SCH_STATE_INITIALIZING;
 	    handle->handle = scf_handle_create(SCF_VERSION);
 	    if (handle->handle != NULL) {
@@ -123,7 +125,8 @@ sa_scf_init()
 			    char **protolist;
 			    int numprotos, i;
 			    sa_group_t defgrp;
-			    defgrp = sa_create_group("default", NULL);
+			    defgrp = sa_create_group((sa_handle_t)ihandle,
+							"default", NULL);
 			    if (defgrp != NULL) {
 				numprotos = sa_get_protocols(&protolist);
 				for (i = 0; i < numprotos; i++) {
@@ -539,14 +542,14 @@ sa_share_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
  */
 
 static sa_share_t
-find_share_by_id(char *shareid)
+find_share_by_id(sa_handle_t handle, char *shareid)
 {
 	sa_group_t group;
 	sa_share_t share = NULL;
 	char *id = NULL;
 	int done = 0;
 
-	for (group = sa_get_group(NULL); group != NULL && !done;
+	for (group = sa_get_group(handle, NULL); group != NULL && !done;
 		group = sa_get_next_group(group)) {
 		for (share = sa_get_share(group, NULL); share != NULL;
 			share = sa_get_next_share(share)) {
@@ -577,7 +580,7 @@ find_share_by_id(char *shareid)
 
 static int
 sa_share_props_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
-			scf_propertygroup_t *pg, char *id)
+			scf_propertygroup_t *pg, char *id, sa_handle_t sahandle)
 {
 	xmlNodePtr node;
 	char *name;
@@ -638,7 +641,7 @@ sa_share_props_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
 	 * match.
 	 */
 
-	share = find_share_by_id(id);
+	share = find_share_by_id(sahandle, id);
 	if (share == NULL)
 	    return (SA_BAD_PATH);
 
@@ -717,7 +720,7 @@ sa_share_props_from_pgroup(xmlNodePtr root, scfutilhandle_t *handle,
 
 static int
 sa_extract_group(xmlNodePtr root, scfutilhandle_t *handle,
-			scf_instance_t *instance)
+			scf_instance_t *instance, sa_handle_t sahandle)
 {
 	char *buff;
 	xmlNodePtr node;
@@ -857,7 +860,7 @@ sa_extract_group(xmlNodePtr root, scfutilhandle_t *handle,
 					ret = sa_share_props_from_pgroup(node,
 								handle,
 								handle->pg,
-								buff);
+								buff, sahandle);
 				    }
 				}
 			    }
@@ -924,14 +927,15 @@ sa_extract_defaults(xmlNodePtr root, scfutilhandle_t *handle,
 
 
 /*
- * sa_get_config(handle, root, doc)
+ * sa_get_config(handle, root, doc, sahandlec)
  *
  * walk the SMF repository for /network/shares/group and find all the
  * instances. These become group names.  Then add the XML structure
  * below the groups based on property groups and properties.
  */
 int
-sa_get_config(scfutilhandle_t *handle, xmlNodePtr *root, xmlDocPtr *doc)
+sa_get_config(scfutilhandle_t *handle, xmlNodePtr *root, xmlDocPtr *doc,
+		sa_handle_t sahandle)
 {
 	int ret = SA_OK;
 	scf_instance_t *instance;
@@ -952,7 +956,8 @@ sa_get_config(scfutilhandle_t *handle, xmlNodePtr *root, xmlDocPtr *doc)
 						sizeof (buff)) > 0) {
 			if (strcmp(buff, "default") == 0)
 			    sa_extract_defaults(*root, handle, instance);
-			ret = sa_extract_group(*root, handle, instance);
+			ret = sa_extract_group(*root, handle, instance,
+						sahandle);
 		    }
 		}
 	    }

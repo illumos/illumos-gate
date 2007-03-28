@@ -21,10 +21,37 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-include ../Makefile.com
+include ../../Makefile.lib
 
-install: all
+SUBDIRS =	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
+
+MSGFILES = 	libshare_nfs.c
+POFILE  =	libshare_nfs.po
+
+all	:=	TARGET= all
+clean	:=	TARGET= clean
+clobber	:=	TARGET= clobber
+install	:=	TARGET= install
+lint	:=	TARGET= lint
+
+.KEEP_STATE:
+
+all clean clobber install lint:	$(SUBDIRS)
+
+$(POFILE): 	$(MSGFILES)
+	$(BUILDPO.msgfiles)
+
+_msg:	$(MSGDOMAINPOFILE)
+
+$(SUBDIRS):	FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:
+
+include ../../Makefile.targ
+include ../../../Makefile.msg.targ

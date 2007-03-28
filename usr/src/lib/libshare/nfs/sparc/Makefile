@@ -27,4 +27,4 @@
 
 include ../Makefile.com
 
-install: all $(ROOTUSRSBINPROG32) $(ROOTLINKS)
+install: all $(ROOTLIBS) $(ROOTLINKS)

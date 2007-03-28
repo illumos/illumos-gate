@@ -816,3 +816,14 @@ lib/llib-liscsitgt			i386
 lib/llib-liscsitgt.ln			i386
 lib/amd64/libiscsitgt.so		i386
 lib/amd64/llib-liscsitgt.ln		i386
+#
+# libshare is private and the 64-bit sharemgr is not delivered.
+#
+usr/lib/libshare.so			i386
+usr/lib/amd64/libshare.so		i386
+usr/lib/fs/nfs/libshare_nfs.so		i386
+usr/lib/fs/nfs/amd64/libshare_nfs.so	i386
+usr/include/libshare_impl.h		i386
+usr/include/scfutil.h			i386
+usr/sbin/i86/sharemgr			i386
+usr/sbin/amd64/sharemgr			i386

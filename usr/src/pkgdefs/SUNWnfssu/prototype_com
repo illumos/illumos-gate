@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -47,7 +47,7 @@ d none usr 755 root sys
 d none usr/lib 755 root bin
 d none usr/lib/fs 755 root sys
 d none usr/lib/fs/nfs 755 root sys
-f none usr/lib/fs/nfs/libshare_nfs.so 555 root bin
+f none usr/lib/fs/nfs/libshare_nfs.so.1 755 root bin
 d none usr/lib/nfs 755 root sys
 f none usr/lib/nfs/mountd 555 root bin
 f none usr/lib/nfs/nfsd 555 root bin

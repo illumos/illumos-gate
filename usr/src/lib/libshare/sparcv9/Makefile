@@ -26,5 +26,6 @@
 #
 
 include ../Makefile.com
+include ../../Makefile.lib.64
 
-install: all $(ROOTUSRSBINPROG32) $(ROOTLINKS)
+install: all $(ROOTLIBS64) $(ROOTLINKS64)

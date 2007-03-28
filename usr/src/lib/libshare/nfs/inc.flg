@@ -24,7 +24,6 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
-include ../Makefile.com
-
-install: all $(ROOTUSRSBINPROG32) $(ROOTLINKS)
+echo_file usr/src/cmd/fs.d/nfs/lib/nfs_sec.c
+echo_file usr/src/cmd/fs.d/nfs/lib/nfslog_config.c
+echo_file usr/src/cmd/fs.d/nfs/lib/nfslogtab.c

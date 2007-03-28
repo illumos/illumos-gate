@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,7 @@
 char *protocol = NULL;
 static int help = 0;
 
-static int run_command(char *, int, char **, char *);
+static int run_command(char *, int, char **, char *, sa_handle_t);
 extern sa_command_t *sa_lookup(char *, char *);
 extern void sub_command_help(char *proto);
 
@@ -59,6 +59,7 @@ main(int argc, char *argv[])
 	int c;
 	int rval;
 	char *command = NULL;
+	sa_handle_t handle;
 
 	/*
 	 * make sure locale and gettext domain is setup
@@ -109,21 +110,22 @@ main(int argc, char *argv[])
 	 */
 
 	optind = 1;
-	sa_init(SA_INIT_SHARE_API);
+	handle = sa_init(SA_INIT_SHARE_API);
 
 	/*
 	 * reset optind again since we will start parsing all over in
 	 * the sub-commands.
 	 */
 	optind = 1;
-	rval = run_command(command, argc, argv, protocol);
+	rval = run_command(command, argc, argv, protocol, handle);
 
-	sa_fini();
+	sa_fini(handle);
 	return (rval);
 }
 
 static int
-run_command(char *command, int argc, char *argv[], char *proto)
+run_command(char *command, int argc, char *argv[], char *proto,
+		sa_handle_t handle)
 {
 	sa_command_t *cmdvec;
 	int ret;
@@ -154,6 +156,6 @@ run_command(char *command, int argc, char *argv[], char *proto)
 	 * based on least priviledge and sub-command so pass this in
 	 * as a flag.
 	 */
-	ret = cmdvec->cmdfunc(cmdvec->priv, argc, argv);
+	ret = cmdvec->cmdfunc(handle, cmdvec->priv, argc, argv);
 	return (ret);
 }

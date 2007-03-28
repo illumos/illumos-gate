@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 #include <libshare.h>
 #include <libscf.h>
 #include <scfutil.h>
+#include <libzfs.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -114,11 +115,12 @@ extern int sa_create_pgroup(scfutilhandle_t *, char *);
 extern int sa_delete_pgroup(scfutilhandle_t *, char *);
 
 /* ZFS functions */
-extern int sa_get_zfs_shares(char *);
+extern int sa_get_zfs_shares(sa_handle_t, char *);
 extern int sa_zfs_update(sa_share_t);
 
 /* plugin specific functions */
 extern int proto_plugin_init();
+extern void proto_plugin_fini();
 extern int sa_proto_set_property(char *, sa_property_t);
 extern int sa_proto_delete_legacy(char *, sa_share_t);
 extern int sa_proto_update_legacy(char *, sa_share_t);
@@ -135,6 +137,17 @@ struct sa_proto_plugin {
 	struct sa_plugin_ops	*plugin_ops;
 	void			*plugin_handle;
 };
+
+/* internal version of sa_handle_t */
+typedef struct sa_handle_impl {
+	uint64_t	flags;
+	scfutilhandle_t	*scfhandle;
+	libzfs_handle_t *zfs_libhandle;
+	zfs_handle_t	**zfs_list;
+	size_t		zfs_list_count;
+	xmlNodePtr	tree;
+	xmlDocPtr	doc;
+} *sa_handle_impl_t;
 
 #ifdef	__cplusplus
 }

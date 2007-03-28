@@ -255,8 +255,8 @@ enable_group(sa_group_t group, char *updateproto)
  *	was passed in.
  */
 static int
-enable_all_groups(struct list *work, int setstate, int online,
-	char *updateproto)
+enable_all_groups(sa_handle_t handle, struct list *work, int setstate,
+	int online, char *updateproto)
 {
 	int ret = SA_OK;
 	char instance[SA_MAX_NAME_LEN + sizeof (SA_SVC_FMRI_BASE) + 1];
@@ -319,7 +319,7 @@ enable_all_groups(struct list *work, int setstate, int online,
 	    }
 	}
 	if (ret == SA_OK) {
-	    ret = sa_update_config();
+	    ret = sa_update_config(handle);
 	}
 	return (ret);
 }
@@ -517,7 +517,7 @@ add_optionset(sa_group_t group, struct options *optlist, char *proto, int *err)
  *	No protocol means "all" protocols in this case.
  */
 static int
-sa_create(int flags, int argc, char *argv[])
+sa_create(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	char *groupname;
 
@@ -612,7 +612,7 @@ sa_create(int flags, int argc, char *argv[])
 
 	auth = check_authorizations(groupname, flags);
 
-	group = sa_get_group(groupname);
+	group = sa_get_group(handle, groupname);
 	if (group != NULL) {
 	    /* group exists so must be a protocol add */
 	    if (protocol != NULL) {
@@ -647,7 +647,7 @@ sa_create(int flags, int argc, char *argv[])
 	}
 	if (ret == SA_OK && !dryrun) {
 	    if (group == NULL) {
-		group = sa_create_group((char *)groupname, &err);
+		group = sa_create_group(handle, (char *)groupname, &err);
 	    }
 	    if (group != NULL) {
 		sa_optionset_t optionset;
@@ -678,7 +678,7 @@ sa_create(int flags, int argc, char *argv[])
 			 * all protocols that implement the
 			 * appropriate plugin.
 			 */
-		    ret = sa_update_config();
+		    ret = sa_update_config(handle);
 		} else {
 		    if (group != NULL)
 			(void) sa_remove_group(group);
@@ -727,7 +727,7 @@ group_status(sa_group_t group)
  */
 
 static int
-sa_delete(int flags, int argc, char *argv[])
+sa_delete(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	char *groupname;
 	sa_group_t group;
@@ -803,7 +803,7 @@ sa_delete(int flags, int argc, char *argv[])
 	 */
 
 	groupname = argv[optind];
-	group = sa_get_group(groupname);
+	group = sa_get_group(handle, groupname);
 	if (group == NULL) {
 		ret = SA_NO_SUCH_GROUP;
 	} else {
@@ -832,7 +832,7 @@ sa_delete(int flags, int argc, char *argv[])
 		}
 		/* commit to configuration if not a dryrun */
 		if (!dryrun && ret == SA_OK) {
-		    ret = sa_update_config();
+		    ret = sa_update_config(handle);
 		}
 	    } else {
 		/* a protocol delete */
@@ -969,7 +969,7 @@ group_proto(sa_group_t group)
  */
 
 static int
-sa_list(int flags, int argc, char *argv[])
+sa_list(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	sa_group_t group;
 	int verbose = 0;
@@ -1001,7 +1001,7 @@ sa_list(int flags, int argc, char *argv[])
 	    }
 	}
 
-	for (group = sa_get_group(NULL); group != NULL;
+	for (group = sa_get_group(handle, NULL); group != NULL;
 	    group = sa_get_next_group(group)) {
 	    char *name;
 	    char *proto;
@@ -1302,7 +1302,7 @@ show_group_xml(xmlDocPtr doc, sa_group_t group)
  */
 
 int
-sa_show(int flags, int argc, char *argv[])
+sa_show(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	sa_group_t group;
 	int verbose = 0;
@@ -1351,7 +1351,7 @@ sa_show(int flags, int argc, char *argv[])
 
 	if (optind == argc) {
 	    /* no group specified so go through them all */
-	    for (group = sa_get_group(NULL); group != NULL;
+	    for (group = sa_get_group(handle, NULL); group != NULL;
 		group = sa_get_next_group(group)) {
 		/*
 		 * have a group so check if one we want and then list
@@ -1365,7 +1365,7 @@ sa_show(int flags, int argc, char *argv[])
 	} else {
 	    /* have a specified list of groups */
 	    for (; optind < argc; optind++) {
-		group = sa_get_group(argv[optind]);
+		group = sa_get_group(handle, argv[optind]);
 		if (group != NULL) {
 		    if (xml)
 			show_group_xml(doc, group);
@@ -1392,7 +1392,8 @@ sa_show(int flags, int argc, char *argv[])
  */
 
 static int
-enable_share(sa_group_t group, sa_share_t share, int update_legacy)
+enable_share(sa_handle_t handle, sa_group_t group, sa_share_t share,
+		int update_legacy)
 {
 	char *value;
 	int enabled;
@@ -1438,7 +1439,7 @@ enable_share(sa_group_t group, sa_share_t share, int update_legacy)
 	    }
 	}
 	if (ret == SA_OK)
-	    (void) sa_update_config();
+	    (void) sa_update_config(handle);
 	return (ret);
 }
 
@@ -1449,7 +1450,7 @@ enable_share(sa_group_t group, sa_share_t share, int update_legacy)
  */
 
 int
-sa_addshare(int flags, int argc, char *argv[])
+sa_addshare(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	int verbose = 0;
 	int dryrun = 0;
@@ -1539,10 +1540,10 @@ sa_addshare(int flags, int argc, char *argv[])
 		}
 	    }
 	    if (ret == SA_OK) {
-		group = sa_get_group(argv[optind]);
+		group = sa_get_group(handle, argv[optind]);
 		if (group != NULL) {
 		    auth = check_authorizations(argv[optind], flags);
-		    share = sa_find_share(sharepath);
+		    share = sa_find_share(handle, sharepath);
 		    if (share != NULL) {
 			group = sa_get_parent_group(share);
 			if (group != NULL) {
@@ -1596,8 +1597,8 @@ sa_addshare(int flags, int argc, char *argv[])
 				}
 				if (ret == SA_OK) {
 				    /* now enable the share(s) */
-				    ret = enable_share(group, share, 1);
-				    ret = sa_update_config();
+				    ret = enable_share(handle, group, share, 1);
+				    ret = sa_update_config(handle);
 				}
 				switch (ret) {
 				case SA_DUPLICATE_NAME:
@@ -1639,7 +1640,7 @@ sa_addshare(int flags, int argc, char *argv[])
  */
 
 int
-sa_moveshare(int flags, int argc, char *argv[])
+sa_moveshare(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	int verbose = 0;
 	int dryrun = 0;
@@ -1698,9 +1699,9 @@ sa_moveshare(int flags, int argc, char *argv[])
 				"the -s option\n"));
 		ret = SA_BAD_PATH;
 	    } else {
-		group = sa_get_group(argv[optind]);
+		group = sa_get_group(handle, argv[optind]);
 		if (group != NULL) {
-		    share = sa_find_share(sharepath);
+		    share = sa_find_share(handle, sharepath);
 		    authdst = check_authorizations(argv[optind], flags);
 		    if (share == NULL) {
 			(void) printf(gettext("Share not found: %s\n"),
@@ -1735,7 +1736,7 @@ sa_moveshare(int flags, int argc, char *argv[])
 			}
 			if (ret == SA_OK && parent != group && !dryrun) {
 			    char *oldstate;
-			    ret = sa_update_config();
+			    ret = sa_update_config(handle);
 				/*
 				 * note that the share may need to be
 				 * "unshared" if the new group is
@@ -1748,7 +1749,7 @@ sa_moveshare(int flags, int argc, char *argv[])
 			    if (strcmp(oldstate, "enabled") == 0) {
 				(void) sa_disable_share(share, NULL);
 			    }
-			    (void) enable_share(group, share, 1);
+			    (void) enable_share(handle, group, share, 1);
 			    if (oldstate != NULL)
 				sa_free_attr_string(oldstate);
 			}
@@ -1779,7 +1780,7 @@ sa_moveshare(int flags, int argc, char *argv[])
  */
 
 int
-sa_removeshare(int flags, int argc, char *argv[])
+sa_removeshare(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	int verbose = 0;
 	int dryrun = 0;
@@ -1841,7 +1842,7 @@ sa_removeshare(int flags, int argc, char *argv[])
 						"command\n"));
 		    ret = SA_SYNTAX_ERR;
 		} else {
-		    group = sa_get_group(argv[optind]);
+		    group = sa_get_group(handle, argv[optind]);
 		    if (group == NULL) {
 			(void) printf(gettext("Group \"%s\" not found\n"),
 					argv[optind]);
@@ -1862,7 +1863,7 @@ sa_removeshare(int flags, int argc, char *argv[])
 		if (group != NULL)
 		    share = sa_get_share(group, sharepath);
 		else
-		    share = sa_find_share(sharepath);
+		    share = sa_find_share(handle, sharepath);
 		/*
 		 * If we didn't find the share with the provided path,
 		 * it may be a symlink so attempt to resolve it using
@@ -1882,7 +1883,7 @@ sa_removeshare(int flags, int argc, char *argv[])
 			if (group != NULL)
 			    share = sa_get_share(group, dir);
 			else
-			    share = sa_find_share(dir);
+			    share = sa_find_share(handle, dir);
 		    }
 		}
 	    }
@@ -1923,7 +1924,7 @@ sa_removeshare(int flags, int argc, char *argv[])
 				ret = sa_remove_share(share);
 			    }
 			    if (ret == SA_OK)
-				ret = sa_update_config();
+				ret = sa_update_config(handle);
 			}
 			if (ret != SA_OK) {
 			    (void) printf(gettext("Could not remove share:"
@@ -1955,7 +1956,7 @@ sa_removeshare(int flags, int argc, char *argv[])
  */
 
 int
-sa_set_share(int flags, int argc, char *argv[])
+sa_set_share(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	int dryrun = 0;
 	int c;
@@ -2022,12 +2023,12 @@ sa_set_share(int flags, int argc, char *argv[])
 	    char *groupname;
 	    if (optind < argc) {
 		groupname = argv[optind];
-		group = sa_get_group(groupname);
+		group = sa_get_group(handle, groupname);
 	    } else {
 		group = NULL;
 		groupname = NULL;
 	    }
-	    share = sa_find_share(sharepath);
+	    share = sa_find_share(handle, sharepath);
 	    if (share != NULL) {
 		sharegroup = sa_get_parent_group(share);
 		if (group != NULL && group != sharegroup) {
@@ -2073,7 +2074,7 @@ sa_set_share(int flags, int argc, char *argv[])
 		    }
 		}
 		if (!dryrun && ret == SA_OK) {
-		    ret = sa_update_config();
+		    ret = sa_update_config(handle);
 		}
 		switch (ret) {
 		case SA_DUPLICATE_NAME:
@@ -2184,15 +2185,15 @@ add_security(sa_group_t group, char *sectype,
  */
 
 static int
-basic_set(char *groupname, struct options *optlist, char *protocol,
-		char *sharepath, int dryrun)
+basic_set(sa_handle_t handle, char *groupname, struct options *optlist,
+		char *protocol,	char *sharepath, int dryrun)
 {
 	sa_group_t group;
 	int ret = SA_OK;
 	int change = 0;
 	struct list *worklist = NULL;
 
-	group = sa_get_group(groupname);
+	group = sa_get_group(handle, groupname);
 	if (group != NULL) {
 	    sa_share_t share = NULL;
 	    if (sharepath != NULL) {
@@ -2232,7 +2233,7 @@ basic_set(char *groupname, struct options *optlist, char *protocol,
 	if (!dryrun && ret == SA_OK) {
 	    if (change && worklist != NULL) {
 		/* properties changed, so update all shares */
-		(void) enable_all_groups(worklist, 0, 0, protocol);
+		(void) enable_all_groups(handle, worklist, 0, 0, protocol);
 	    }
 	}
 	if (worklist != NULL)
@@ -2249,8 +2250,8 @@ basic_set(char *groupname, struct options *optlist, char *protocol,
  */
 
 static int
-space_set(char *groupname, struct options *optlist, char *protocol,
-		char *sharepath, int dryrun, char *sectype)
+space_set(sa_handle_t handle, char *groupname, struct options *optlist,
+		char *protocol,	char *sharepath, int dryrun, char *sectype)
 {
 	sa_group_t group;
 	int ret = SA_OK;
@@ -2268,7 +2269,7 @@ space_set(char *groupname, struct options *optlist, char *protocol,
 	    return (SA_INVALID_SECURITY);
 	}
 
-	group = sa_get_group(groupname);
+	group = sa_get_group(handle, groupname);
 	if (group != NULL) {
 	    sa_share_t share = NULL;
 	    if (sharepath != NULL) {
@@ -2312,9 +2313,9 @@ space_set(char *groupname, struct options *optlist, char *protocol,
 	if (!dryrun && ret == 0) {
 	    if (change && worklist != NULL) {
 		/* properties changed, so update all shares */
-		(void) enable_all_groups(worklist, 0, 0, protocol);
+		(void) enable_all_groups(handle, worklist, 0, 0, protocol);
 	    }
-	    ret = sa_update_config();
+	    ret = sa_update_config(handle);
 	}
 	if (worklist != NULL)
 	    free_list(worklist);
@@ -2329,7 +2330,7 @@ space_set(char *groupname, struct options *optlist, char *protocol,
  */
 
 int
-sa_set(int flags, int argc, char *argv[])
+sa_set(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	char *groupname;
 	int verbose = 0;
@@ -2422,10 +2423,10 @@ sa_set(int flags, int argc, char *argv[])
 	    groupname = argv[optind];
 	    auth = check_authorizations(groupname, flags);
 	    if (optset == NULL)
-		ret = basic_set(groupname, optlist, protocol,
+		ret = basic_set(handle, groupname, optlist, protocol,
 				sharepath, dryrun);
 	    else
-		ret = space_set(groupname, optlist, protocol,
+		ret = space_set(handle, groupname, optlist, protocol,
 				sharepath, dryrun, optset);
 	    if (dryrun && ret == SA_OK && !auth && verbose) {
 		(void) printf(gettext("Command would fail: %s\n"),
@@ -2594,15 +2595,15 @@ remove_security(sa_group_t group, char *sectype,
  */
 
 static int
-basic_unset(char *groupname, struct options *optlist, char *protocol,
-		char *sharepath, int dryrun)
+basic_unset(sa_handle_t handle, char *groupname, struct options *optlist,
+		char *protocol,	char *sharepath, int dryrun)
 {
 	sa_group_t group;
 	int ret = SA_OK;
 	int change = 0;
 	struct list *worklist = NULL;
 
-	group = sa_get_group(groupname);
+	group = sa_get_group(handle, groupname);
 	if (group != NULL) {
 	    sa_share_t share = NULL;
 	    if (sharepath != NULL) {
@@ -2656,7 +2657,7 @@ basic_unset(char *groupname, struct options *optlist, char *protocol,
 	if (!dryrun && ret == SA_OK) {
 	    if (change && worklist != NULL) {
 		/* properties changed, so update all shares */
-		(void) enable_all_groups(worklist, 0, 0, protocol);
+		(void) enable_all_groups(handle, worklist, 0, 0, protocol);
 	    }
 	}
 	if (worklist != NULL)
@@ -2670,15 +2671,15 @@ basic_unset(char *groupname, struct options *optlist, char *protocol,
  * unset named optionset properties.
  */
 static int
-space_unset(char *groupname, struct options *optlist, char *protocol,
-		char *sharepath, int dryrun, char *sectype)
+space_unset(sa_handle_t handle, char *groupname, struct options *optlist,
+		char *protocol, char *sharepath, int dryrun, char *sectype)
 {
 	sa_group_t group;
 	int ret = SA_OK;
 	int change = 0;
 	struct list *worklist = NULL;
 
-	group = sa_get_group(groupname);
+	group = sa_get_group(handle, groupname);
 	if (group != NULL) {
 	    sa_share_t share = NULL;
 	    if (sharepath != NULL) {
@@ -2750,9 +2751,9 @@ space_unset(char *groupname, struct options *optlist, char *protocol,
 	if (!dryrun && ret == 0) {
 	    if (change && worklist != NULL) {
 		/* properties changed, so update all shares */
-		(void) enable_all_groups(worklist, 0, 0, protocol);
+		(void) enable_all_groups(handle, worklist, 0, 0, protocol);
 	    }
-	    ret = sa_update_config();
+	    ret = sa_update_config(handle);
 	}
 	if (worklist != NULL)
 	    free_list(worklist);
@@ -2767,7 +2768,7 @@ space_unset(char *groupname, struct options *optlist, char *protocol,
  */
 
 int
-sa_unset(int flags, int argc, char *argv[])
+sa_unset(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	char *groupname;
 	int verbose = 0;
@@ -2862,10 +2863,10 @@ sa_unset(int flags, int argc, char *argv[])
 	    groupname = argv[optind];
 	    auth = check_authorizations(groupname, flags);
 	    if (optset == NULL)
-		ret = basic_unset(groupname, optlist, protocol,
+		ret = basic_unset(handle, groupname, optlist, protocol,
 					sharepath, dryrun);
 	    else
-		ret = space_unset(groupname, optlist, protocol,
+		ret = space_unset(handle, groupname, optlist, protocol,
 					sharepath, dryrun, optset);
 
 	    if (dryrun && ret == SA_OK && !auth && verbose) {
@@ -2883,7 +2884,7 @@ sa_unset(int flags, int argc, char *argv[])
  */
 
 int
-sa_enable_group(int flags, int argc, char *argv[])
+sa_enable_group(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	int verbose = 0;
 	int dryrun = 0;
@@ -2931,7 +2932,7 @@ sa_enable_group(int flags, int argc, char *argv[])
 	    sa_group_t group;
 	    if (!all) {
 		while (optind < argc) {
-		    group = sa_get_group(argv[optind]);
+		    group = sa_get_group(handle, argv[optind]);
 		    if (group != NULL) {
 			auth &= check_authorizations(argv[optind], flags);
 			state = sa_get_group_attr(group, "state");
@@ -2958,13 +2959,13 @@ sa_enable_group(int flags, int argc, char *argv[])
 		    optind++;
 		}
 	    } else {
-		for (group = sa_get_group(NULL); group != NULL;
+		for (group = sa_get_group(handle, NULL); group != NULL;
 		    group = sa_get_next_group(group)) {
 		    worklist = add_list(worklist, group, 0);
 		}
 	    }
 	    if (!dryrun && ret == SA_OK) {
-		ret = enable_all_groups(worklist, 1, 0, NULL);
+		ret = enable_all_groups(handle, worklist, 1, 0, NULL);
 	    }
 	    if (ret != SA_OK && ret != SA_BUSY)
 		(void) printf(gettext("Could not enable group: %s\n"),
@@ -3021,7 +3022,7 @@ disable_group(sa_group_t group)
  */
 
 static int
-disable_all_groups(struct list *work, int setstate)
+disable_all_groups(sa_handle_t handle, struct list *work, int setstate)
 {
 	int ret = SA_OK;
 	sa_group_t subgroup, group;
@@ -3052,7 +3053,7 @@ disable_all_groups(struct list *work, int setstate)
 	    work = work->next;
 	}
 	if (ret == SA_OK)
-	    ret = sa_update_config();
+	    ret = sa_update_config(handle);
 	return (ret);
 }
 
@@ -3063,7 +3064,7 @@ disable_all_groups(struct list *work, int setstate)
  */
 
 int
-sa_disable_group(int flags, int argc, char *argv[])
+sa_disable_group(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	int verbose = 0;
 	int dryrun = 0;
@@ -3112,7 +3113,7 @@ sa_disable_group(int flags, int argc, char *argv[])
 		sa_group_t group;
 		if (!all) {
 		    while (optind < argc) {
-			group = sa_get_group(argv[optind]);
+			group = sa_get_group(handle, argv[optind]);
 			if (group != NULL) {
 			    auth &= check_authorizations(argv[optind], flags);
 			    state = sa_get_group_attr(group, "state");
@@ -3139,13 +3140,13 @@ sa_disable_group(int flags, int argc, char *argv[])
 			optind++;
 		    }
 		} else {
-		    for (group = sa_get_group(NULL); group != NULL;
+		    for (group = sa_get_group(handle, NULL); group != NULL;
 			    group = sa_get_next_group(group)) {
 			worklist = add_list(worklist, group, 0);
 		    }
 		}
 		if (ret == SA_OK && !dryrun) {
-			ret = disable_all_groups(worklist, 1);
+			ret = disable_all_groups(handle, worklist, 1);
 		}
 		if (ret != SA_OK && ret != SA_BUSY)
 		    (void) printf(gettext("Could not disable group: %s\n"),
@@ -3206,7 +3207,7 @@ check_sharetab()
  */
 
 int
-sa_start_group(int flags, int argc, char *argv[])
+sa_start_group(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	int verbose = 0;
 	int all = 0;
@@ -3255,7 +3256,7 @@ sa_start_group(int flags, int argc, char *argv[])
 
 		if (!all) {
 		    while (optind < argc) {
-			group = sa_get_group(argv[optind]);
+			group = sa_get_group(handle, argv[optind]);
 			if (group != NULL) {
 			    state = sa_get_group_attr(group, "state");
 			    if (state == NULL ||
@@ -3282,7 +3283,7 @@ sa_start_group(int flags, int argc, char *argv[])
 			optind++;
 		    }
 		} else {
-		    for (group = sa_get_group(NULL); group != NULL;
+		    for (group = sa_get_group(handle, NULL); group != NULL;
 			    group = sa_get_next_group(group)) {
 			state = sa_get_group_attr(group, "state");
 			if (state == NULL || strcmp(state, "enabled") == 0)
@@ -3291,7 +3292,7 @@ sa_start_group(int flags, int argc, char *argv[])
 			    sa_free_attr_string(state);
 		    }
 		}
-		(void) enable_all_groups(worklist, 0, 1, NULL);
+		(void) enable_all_groups(handle, worklist, 0, 1, NULL);
 	}
 	if (worklist != NULL)
 	    free_list(worklist);
@@ -3308,7 +3309,7 @@ sa_start_group(int flags, int argc, char *argv[])
  */
 
 int
-sa_stop_group(int flags, int argc, char *argv[])
+sa_stop_group(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	int verbose = 0;
 	int all = 0;
@@ -3353,7 +3354,7 @@ sa_stop_group(int flags, int argc, char *argv[])
 		sa_group_t group;
 		if (!all) {
 		    while (optind < argc) {
-			group = sa_get_group(argv[optind]);
+			group = sa_get_group(handle, argv[optind]);
 			if (group != NULL) {
 			    state = sa_get_group_attr(group, "state");
 			    if (state == NULL ||
@@ -3372,7 +3373,7 @@ sa_stop_group(int flags, int argc, char *argv[])
 			optind++;
 		    }
 		} else {
-		    for (group = sa_get_group(NULL); group != NULL;
+		    for (group = sa_get_group(handle, NULL); group != NULL;
 			    group = sa_get_next_group(group)) {
 			state = sa_get_group_attr(group, "state");
 			if (state == NULL || strcmp(state, "enabled") == 0)
@@ -3381,8 +3382,8 @@ sa_stop_group(int flags, int argc, char *argv[])
 			    sa_free_attr_string(state);
 		    }
 		}
-		(void) disable_all_groups(worklist, 0);
-		ret = sa_update_config();
+		(void) disable_all_groups(handle, worklist, 0);
+		ret = sa_update_config(handle);
 	}
 	if (worklist != NULL)
 	    free_list(worklist);
@@ -3588,11 +3589,11 @@ out_share(FILE *out, sa_group_t group, char *proto)
  */
 
 static void
-output_legacy_file(FILE *out, char *proto)
+output_legacy_file(FILE *out, char *proto, sa_handle_t handle)
 {
 	sa_group_t group;
 
-	for (group = sa_get_group(NULL); group != NULL;
+	for (group = sa_get_group(handle, NULL); group != NULL;
 		group = sa_get_next_group(group)) {
 	    char *options;
 	    char *zfs;
@@ -3624,7 +3625,7 @@ output_legacy_file(FILE *out, char *proto)
 }
 
 int
-sa_legacy_share(int flags, int argc, char *argv[])
+sa_legacy_share(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	char *protocol = "nfs";
 	char *options = NULL;
@@ -3686,7 +3687,7 @@ sa_legacy_share(int flags, int argc, char *argv[])
 	/* have the info so construct what is needed */
 	if (!argsused && optind == argc) {
 	    /* display current info in share format */
-	    (void) output_legacy_file(stdout, "nfs");
+	    (void) output_legacy_file(stdout, "nfs", handle);
 	} else {
 	    sa_group_t group = NULL;
 	    sa_share_t share;
@@ -3717,7 +3718,7 @@ sa_legacy_share(int flags, int argc, char *argv[])
 	    else
 		sharepath = dir;
 	    if (ret == SA_OK) {
-		share = sa_find_share(sharepath);
+		share = sa_find_share(handle, sharepath);
 	    } else {
 		share = NULL;
 	    }
@@ -3738,7 +3739,7 @@ sa_legacy_share(int flags, int argc, char *argv[])
 		 */
 		    group = sa_get_parent_group(share);
 		} else {
-		    group = sa_get_group(legacygroup);
+		    group = sa_get_group(handle, legacygroup);
 		}
 		if (group != NULL) {
 		    groupstatus = group_status(group);
@@ -3746,9 +3747,9 @@ sa_legacy_share(int flags, int argc, char *argv[])
 			share = sa_add_share(group, sharepath, persist, &ret);
 			if (share == NULL && ret == SA_DUPLICATE_NAME) {
 			    /* could be a ZFS path being started */
-			    if (sa_zfs_is_shared(sharepath)) {
+			    if (sa_zfs_is_shared(handle, sharepath)) {
 				ret = SA_OK;
-				group = sa_get_group("zfs");
+				group = sa_get_group(handle, "zfs");
 				if (group == NULL) {
 				    /* this shouldn't happen */
 				    ret = SA_CONFIG_ERR;
@@ -3767,7 +3768,7 @@ sa_legacy_share(int flags, int argc, char *argv[])
 			 * need to change them regardless of the
 			 * source.
 			 */
-			if (sa_zfs_is_shared(sharepath)) {
+			if (sa_zfs_is_shared(handle, sharepath)) {
 			    zfs = 1;
 			}
 			remove_all_options(share, protocol);
@@ -3810,7 +3811,7 @@ sa_legacy_share(int flags, int argc, char *argv[])
 			    (void) sa_update_legacy(share, protocol);
 			}
 			if (ret == SA_OK)
-			    ret = sa_update_config();
+			    ret = sa_update_config(handle);
 		    }
 		} else {
 		    ret = SA_SYSTEM_ERR;
@@ -3833,7 +3834,7 @@ sa_legacy_share(int flags, int argc, char *argv[])
  */
 
 int
-sa_legacy_unshare(int flags, int argc, char *argv[])
+sa_legacy_unshare(sa_handle_t handle, int flags, int argc, char *argv[])
 {
 	char *protocol = "nfs"; /* for now */
 	char *options = NULL;
@@ -3899,12 +3900,12 @@ sa_legacy_unshare(int flags, int argc, char *argv[])
 		 * realpath() and try again.
 		 */
 	    sharepath = argv[optind++];
-	    share = sa_find_share(sharepath);
+	    share = sa_find_share(handle, sharepath);
 	    if (share == NULL) {
 		if (realpath(sharepath, dir) == NULL) {
 		    ret = SA_NO_SUCH_PATH;
 		} else {
-		    share = sa_find_share(dir);
+		    share = sa_find_share(handle, dir);
 		}
 	    }
 	    if (share != NULL) {
@@ -3920,7 +3921,7 @@ sa_legacy_unshare(int flags, int argc, char *argv[])
 		if (persist == SA_SHARE_PERMANENT) {
 		    ret = sa_remove_share(share);
 		    if (ret == SA_OK)
-			ret = sa_update_config();
+			ret = sa_update_config(handle);
 		}
 	    } else {
 		ret = SA_NOT_SHARED;

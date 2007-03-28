@@ -82,14 +82,13 @@ struct sharelist {
     char *origline;
     int lineno;
 } xfs_sharelist_t;
-static void parse_dfstab(char *, xmlNodePtr);
+static void parse_dfstab(sa_handle_t, char *, xmlNodePtr);
 extern char *get_token(char *);
 static void dfs_free_list(xfs_sharelist_t *);
 /* prototypes */
-void getlegacyconfig(char *, xmlNodePtr *);
+void getlegacyconfig(sa_handle_t, char *, xmlNodePtr *);
 extern sa_share_t _sa_add_share(sa_group_t, char *, int, int *);
-extern xmlNodePtr _sa_get_next_error(xmlNodePtr);
-extern sa_group_t _sa_create_group(char *);
+extern sa_group_t _sa_create_group(sa_handle_impl_t, char *);
 static void outdfstab(FILE *, xfs_sharelist_t *);
 extern int _sa_remove_optionset(sa_optionset_t);
 extern int set_node_share(void *, char *, char *);
@@ -915,7 +914,7 @@ dfs_free_list(xfs_sharelist_t *list)
  */
 
 static void
-parse_dfstab(char *dfstab, xmlNodePtr root)
+parse_dfstab(sa_handle_t handle, char *dfstab, xmlNodePtr root)
 {
 	sa_share_t share;
 	sa_group_t group;
@@ -934,7 +933,7 @@ parse_dfstab(char *dfstab, xmlNodePtr root)
 	    return;
 	}
 
-	defgroup = sa_get_group("default");
+	defgroup = sa_get_group(handle, "default");
 
 	for (head = list = getdfstab(dfs);
 		list != NULL;
@@ -974,8 +973,8 @@ parse_dfstab(char *dfstab, xmlNodePtr root)
 		continue;
 	    }
 	    if (list->path != NULL && strlen(list->path) > 0 &&
-		*list->path == '/') {
-		share = sa_find_share(list->path);
+		    *list->path == '/') {
+		share = sa_find_share(handle, list->path);
 		if (share != NULL)
 		    sgroup = sa_get_parent_group(share);
 		else
@@ -991,7 +990,7 @@ parse_dfstab(char *dfstab, xmlNodePtr root)
 		continue;
 	    }
 	    if (list->group != NULL && strlen(list->group) > 0) {
-		group = sa_get_group(list->group);
+		group = sa_get_group(handle, list->group);
 		defined_group = 1;
 	    } else {
 		group = defgroup;
@@ -1141,7 +1140,7 @@ retry:
  */
 
 void
-getlegacyconfig(char *path, xmlNodePtr *root)
+getlegacyconfig(sa_handle_t handle, char *path, xmlNodePtr *root)
 {
 	sa_group_t defgroup;
 
@@ -1157,12 +1156,12 @@ getlegacyconfig(char *path, xmlNodePtr *root)
 			 * code add/del via dfstab and we need to
 			 * cleanup SMF.
 			 */
-		    defgroup = sa_get_group("default");
+		    defgroup = sa_get_group(handle, "default");
 		    if (defgroup != NULL) {
 			legacy_removes(defgroup, path);
 		    }
 		    /* parse the dfstab and add anything new */
-		    parse_dfstab(path, *root);
+		    parse_dfstab(handle, path, *root);
 		}
 	    }
 	}
@@ -1244,7 +1243,7 @@ err:
 }
 
 /*
- * parse_sharetab(void)
+ * parse_sharetab(handle)
  *
  * Read the /etc/dfs/sharetab file and see which entries don't exist
  * in the repository. These shares are marked transient.  We also need
@@ -1253,7 +1252,7 @@ err:
  */
 
 int
-parse_sharetab(void)
+parse_sharetab(sa_handle_t handle)
 {
 	xfs_sharelist_t *list, *tmplist;
 	int err = 0;
@@ -1267,11 +1266,11 @@ parse_sharetab(void)
 	if (list == NULL)
 	    return (legacy);
 
-	lgroup = sa_get_group("default");
+	lgroup = sa_get_group(handle, "default");
 
 	for (tmplist = list; tmplist != NULL; tmplist = tmplist->next) {
 	    group = NULL;
-	    share = sa_find_share(tmplist->path);
+	    share = sa_find_share(handle, tmplist->path);
 	    if (share == NULL) {
 		/*
 		 * this share is transient so needs to be
@@ -1283,7 +1282,7 @@ parse_sharetab(void)
 		    (groupname = strchr(tmplist->resource, '@')) != NULL) {
 		    /* there is a defined group */
 		    *groupname++ = '\0';
-		    group = sa_get_group(groupname);
+		    group = sa_get_group(handle, groupname);
 		    if (group != NULL) {
 			share = _sa_add_share(group, tmplist->path,
 						SA_SHARE_TRANSIENT, &err);
@@ -1302,12 +1301,14 @@ parse_sharetab(void)
 						SA_SHARE_TRANSIENT, &err);
 		    }
 		} else {
-		    if (sa_zfs_is_shared(tmplist->path)) {
-			group = sa_get_group("zfs");
+		    if (sa_zfs_is_shared(handle, tmplist->path)) {
+			group = sa_get_group(handle, "zfs");
 			if (group == NULL) {
-			    group = sa_create_group("zfs", &err);
+			    group = sa_create_group(handle, "zfs", &err);
 			    if (group == NULL && err == SA_NO_PERMISSION) {
-				group = _sa_create_group("zfs");
+				group = _sa_create_group(
+						(sa_handle_impl_t)handle,
+						"zfs");
 			    }
 			    if (group != NULL) {
 				(void) sa_create_optionset(group,
@@ -1371,7 +1372,7 @@ parse_sharetab(void)
  * in a repository.
  */
 int
-gettransients(xmlNodePtr *root)
+gettransients(sa_handle_impl_t ihandle, xmlNodePtr *root)
 {
 	int legacy = 0;
 
@@ -1379,7 +1380,7 @@ gettransients(xmlNodePtr *root)
 	    if (*root == NULL)
 		*root = xmlNewNode(NULL, (xmlChar *)"sharecfg");
 	    if (*root != NULL) {
-		legacy = parse_sharetab();
+		legacy = parse_sharetab(ihandle);
 	    }
 	}
 	return (legacy);
@@ -1418,12 +1419,15 @@ sa_has_prop(sa_optionset_t optionset, sa_property_t prop)
  */
 
 void
-update_legacy_config(void)
+update_legacy_config(sa_handle_t handle)
 {
 	/*
 	 * no longer used -- this is a placeholder in case we need to
 	 * add it back later.
 	 */
+#ifdef lint
+	handle = handle;
+#endif
 }
 
 /*

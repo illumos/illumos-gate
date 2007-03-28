@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,7 +55,8 @@ typedef struct scfutilhandle {
 
 extern void sa_scf_fini(scfutilhandle_t *);
 extern scfutilhandle_t *sa_scf_init();
-extern int sa_get_config(scfutilhandle_t *, xmlNodePtr *, xmlDocPtr *);
+extern int sa_get_config(scfutilhandle_t *, xmlNodePtr *, xmlDocPtr *,
+				sa_handle_t);
 extern int sa_get_instance(scfutilhandle_t *, char *);
 extern int sa_create_instance(scfutilhandle_t *, char *);
 

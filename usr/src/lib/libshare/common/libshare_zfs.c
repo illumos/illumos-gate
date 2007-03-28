@@ -50,43 +50,42 @@ typedef struct get_all_cbdata {
 	size_t		cb_used;
 } get_all_cbdata_t;
 
-static libzfs_handle_t *zfs_libhandle = NULL;
-static zfs_handle_t **zfs_list = NULL;
-static size_t zfs_list_count = 0;
-
 /*
- * sa_zfs_init()
+ * sa_zfs_init(impl_handle)
  *
- * initialize an access handle into libzfs
+ * Initialize an access handle into libzfs.  The handle needs to stay
+ * around until sa_zfs_fini() in order to maintain the cache of
+ * mounts.
  */
 
 void
-sa_zfs_init()
+sa_zfs_init(sa_handle_impl_t impl_handle)
 {
-	zfs_libhandle = libzfs_init();
-	libzfs_print_on_error(zfs_libhandle, B_TRUE);
+	impl_handle->zfs_libhandle = libzfs_init();
+	libzfs_print_on_error(impl_handle->zfs_libhandle, B_TRUE);
 }
 
 /*
- * sa_zfs_fini()
+ * sa_zfs_fini(impl_handle)
  *
  * cleanup data structures and the libzfs handle used for accessing
  * zfs file share info.
  */
 
 void
-sa_zfs_fini()
+sa_zfs_fini(sa_handle_impl_t impl_handle)
 {
-	if (zfs_libhandle != NULL) {
-	    libzfs_fini(zfs_libhandle);
-	    zfs_libhandle = NULL;
-	    if (zfs_list != NULL) {
+	if (impl_handle->zfs_libhandle != NULL) {
+	    libzfs_fini(impl_handle->zfs_libhandle);
+	    impl_handle->zfs_libhandle = NULL;
+	    if (impl_handle->zfs_list != NULL) {
 		/*
 		 * contents of zfs_list were already freed by the call to
 		 * libzfs_fini().
 		 */
-		free(zfs_list);
-		zfs_list = NULL;
+		free(impl_handle->zfs_list);
+		impl_handle->zfs_list = NULL;
+		impl_handle->zfs_list_count = 0;
 	    }
 	}
 }
@@ -149,20 +148,22 @@ get_one_filesystem(zfs_handle_t *zhp, void *data)
  */
 
 static void
-get_all_filesystems(zfs_handle_t ***fslist, size_t *count)
+get_all_filesystems(sa_handle_impl_t impl_handle,
+			zfs_handle_t ***fslist, size_t *count)
 {
 	get_all_cbdata_t cb = { 0 };
 
-	if (zfs_list != NULL) {
-	    *fslist = zfs_list;
-	    *count = zfs_list_count;
+	if (impl_handle->zfs_list != NULL) {
+	    *fslist = impl_handle->zfs_list;
+	    *count = impl_handle->zfs_list_count;
 	    return;
 	}
 
-	(void) zfs_iter_root(zfs_libhandle, get_one_filesystem, &cb);
+	(void) zfs_iter_root(impl_handle->zfs_libhandle,
+				get_one_filesystem, &cb);
 
-	zfs_list = *fslist = cb.cb_handles;
-	zfs_list_count = *count = cb.cb_used;
+	impl_handle->zfs_list = *fslist = cb.cb_handles;
+	impl_handle->zfs_list_count = *count = cb.cb_used;
 }
 
 /*
@@ -189,7 +190,7 @@ mountpoint_compare(const void *a, const void *b)
 }
 
 /*
- * get_zfs_dataset(path)
+ * get_zfs_dataset(impl_handle, path)
  *
  * get the name of the ZFS dataset the path is equivalent to.  The
  * dataset name is used for get/set of ZFS properties since libzfs
@@ -197,14 +198,14 @@ mountpoint_compare(const void *a, const void *b)
  */
 
 static char *
-get_zfs_dataset(char *path)
+get_zfs_dataset(sa_handle_impl_t impl_handle, char *path)
 {
 	size_t i, count = 0;
 	char *dataset = NULL;
 	zfs_handle_t **zlist;
 	char mountpoint[ZFS_MAXPROPLEN];
 
-	get_all_filesystems(&zlist, &count);
+	get_all_filesystems(impl_handle, &zlist, &count);
 	qsort(zlist, count, sizeof (void *), mountpoint_compare);
 	for (i = 0; i < count; i++) {
 	    /* must have a mountpoint */
@@ -272,14 +273,14 @@ get_zfs_property(char *dataset, zfs_prop_t property)
 }
 
 /*
- * sa_zfs_is_shared(path)
+ * sa_zfs_is_shared(handle, path)
  *
  * Check to see if the ZFS path provided has the sharenfs option set
  * or not.
  */
 
 int
-sa_zfs_is_shared(char *path)
+sa_zfs_is_shared(sa_handle_t sahandle, char *path)
 {
 	int ret = 0;
 	char *dataset;
@@ -287,7 +288,7 @@ sa_zfs_is_shared(char *path)
 	char shareopts[ZFS_MAXPROPLEN];
 	libzfs_handle_t *libhandle;
 
-	dataset = get_zfs_dataset(path);
+	dataset = get_zfs_dataset((sa_handle_t)sahandle, path);
 	if (dataset != NULL) {
 	    libhandle = libzfs_init();
 	    if (libhandle != NULL) {
@@ -319,7 +320,7 @@ sa_zfs_is_shared(char *path)
  */
 
 static sa_group_t
-find_or_create_group(char *groupname, char *proto, int *err)
+find_or_create_group(sa_handle_t handle, char *groupname, char *proto, int *err)
 {
 	sa_group_t group;
 	sa_optionset_t optionset;
@@ -331,9 +332,9 @@ find_or_create_group(char *groupname, char *proto, int *err)
 	 * parent. This is to make sure the zfs group has been created
 	 * and to created if it hasn't been.
 	 */
-	group = sa_get_group(groupname);
+	group = sa_get_group(handle, groupname);
 	if (group == NULL) {
-	    group = sa_create_group(groupname, &ret);
+	    group = sa_create_group(handle, groupname, &ret);
 
 	    /* make sure this is flagged as a ZFS group */
 	    if (group != NULL)
@@ -374,7 +375,8 @@ find_or_create_group(char *groupname, char *proto, int *err)
  */
 
 static sa_group_t
-find_or_create_zfs_subgroup(char *groupname, char *optstring, int *err)
+find_or_create_zfs_subgroup(sa_handle_t handle, char *groupname,
+				char *optstring, int *err)
 {
 	sa_group_t group = NULL;
 	sa_group_t zfs;
@@ -382,7 +384,7 @@ find_or_create_zfs_subgroup(char *groupname, char *optstring, int *err)
 	char *options;
 
 	/* start with the top-level "zfs" group */
-	zfs = sa_get_group("zfs");
+	zfs = sa_get_group(handle, "zfs");
 	*err = SA_OK;
 	if (zfs != NULL) {
 	    for (group = sa_get_sub_group(zfs); group != NULL;
@@ -420,7 +422,7 @@ find_or_create_zfs_subgroup(char *groupname, char *optstring, int *err)
 }
 
 /*
- * sa_get_zfs_shares(groupname)
+ * sa_get_zfs_shares(handle, groupname)
  *
  * Walk the mnttab for all zfs mounts and determine which are
  * shared. Find or create the appropriate group/sub-group to contain
@@ -431,7 +433,7 @@ find_or_create_zfs_subgroup(char *groupname, char *optstring, int *err)
  */
 
 int
-sa_get_zfs_shares(char *groupname)
+sa_get_zfs_shares(sa_handle_t handle, char *groupname)
 {
 	sa_group_t group;
 	sa_group_t zfsgroup;
@@ -445,20 +447,22 @@ sa_get_zfs_shares(char *groupname)
 	char mountpoint[ZFS_MAXPROPLEN];
 	char *options;
 	size_t count = 0, i;
+	libzfs_handle_t *zfs_libhandle;
 
 	/*
-	 * if we can't access libzfs, don't bother doing anything.
+	 * If we can't access libzfs, don't bother doing anything.
 	 */
+	zfs_libhandle = ((sa_handle_impl_t)handle)->zfs_libhandle;
 	if (zfs_libhandle == NULL)
 	    return (SA_SYSTEM_ERR);
 
-	zfsgroup = find_or_create_group(groupname, "nfs", &err);
+	zfsgroup = find_or_create_group(handle, groupname, "nfs", &err);
 	if (zfsgroup != NULL) {
 		/*
 		 * need to walk the mounted ZFS pools and datasets to
 		 * find shares that are possible.
 		 */
-	    get_all_filesystems(&zlist, &count);
+	    get_all_filesystems((sa_handle_impl_t)handle, &zlist, &count);
 	    qsort(zlist, count, sizeof (void *), mountpoint_compare);
 
 	    group = zfsgroup;
@@ -494,7 +498,7 @@ sa_get_zfs_shares(char *groupname)
 					B_FALSE) == 0 &&
 			strcmp(shareopts, "off") != 0) {
 		    /* it is shared so add to list */
-		    share = sa_find_share(mountpoint);
+		    share = sa_find_share(handle, mountpoint);
 		    err = SA_OK;
 		    if (share != NULL) {
 			/*
@@ -520,7 +524,8 @@ sa_get_zfs_shares(char *groupname)
 			 * variable. The real parent not mounted can
 			 * occur if "canmount=off and sharenfs=on".
 			 */
-			    group = find_or_create_zfs_subgroup(sourcestr,
+			    group = find_or_create_zfs_subgroup(handle,
+							sourcestr,
 							shareopts, &doshopt);
 			    if (group != NULL) {
 				share = _sa_add_share(group, mountpoint,
@@ -633,8 +638,9 @@ sa_zfs_set_sharenfs(sa_group_t group, char *path, int on)
 	command = malloc(ZFS_MAXPROPLEN * 2);
 	if (command != NULL) {
 	    char *opts = NULL;
-	    char *dataset;
+	    char *dataset = NULL;
 	    FILE *pfile;
+	    sa_handle_impl_t impl_handle;
 	    /* for now, NFS is always available for "zfs" */
 	    if (on) {
 		opts = sa_proto_legacy_format("nfs", group, 1);
@@ -643,7 +649,13 @@ sa_zfs_set_sharenfs(sa_group_t group, char *path, int on)
 		    opts = strdup("on");
 		}
 	    }
-	    dataset = get_zfs_dataset(path);
+
+	    impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
+	    if (impl_handle != NULL)
+		dataset = get_zfs_dataset(impl_handle, path);
+	    else
+		ret = SA_SYSTEM_ERR;
+
 	    if (dataset != NULL) {
 		(void) snprintf(command, ZFS_MAXPROPLEN * 2,
 				"%s set sharenfs=\"%s\" %s", COMMAND,
@@ -704,7 +716,14 @@ sa_zfs_update(sa_group_t group)
 		if (sa_is_share(group)) {
 		    path = sa_get_share_attr((sa_share_t)group, "path");
 		    if (path != NULL) {
-			dataset = get_zfs_dataset(path);
+			sa_handle_impl_t impl_handle;
+
+			impl_handle = sa_find_group_handle(group);
+			if (impl_handle != NULL)
+			    dataset = get_zfs_dataset(impl_handle, path);
+			else
+			    ret = SA_SYSTEM_ERR;
+
 			sa_free_attr_string(path);
 		    }
 		} else {

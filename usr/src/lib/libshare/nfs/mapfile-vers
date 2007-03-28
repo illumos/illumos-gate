@@ -19,34 +19,16 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-DEFAULTFILES = 
-
-include ../../../Makefile.cmd
-
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
-# One for each ISA.
-#
-SUBDIRS =	$(MACH)
 
-all	:=	TARGET= all
-install	:=	TARGET= install
-clean	:=	TARGET= clean
-clobber	:=	TARGET= clobber
-_msg	:=	TARGET= _msg
-lint	:=	TARGET= lint
+SUNWprivate_1.1 {
+    global:
+	sa_plugin_ops;
+    local:
+	*;
+};
 
-.KEEP_STATE:
-
-all clean clobber lint _msg:	$(SUBDIRS)
-
-install: $(SUBDIRS) $(ROOTETCDEFAULTFILES)
-
-$(SUBDIRS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
