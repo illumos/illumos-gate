@@ -2289,6 +2289,7 @@ nce_xmit(ill_t *ill, uint32_t operation, ill_t *hwaddr_ill,
 	ip6i_t		*ip6i;
 	ipif_t		*src_ipif = NULL;
 	uint8_t		*hw_addr;
+	zoneid_t	zoneid = GLOBAL_ZONEID;
 
 	/*
 	 * If we have a unspecified source(sender) address, select a
@@ -2297,6 +2298,12 @@ nce_xmit(ill_t *ill, uint32_t operation, ill_t *hwaddr_ill,
 	 * needed for interface groups as source address can come from
 	 * the whole group and the h/w address initialized from ill will
 	 * be wrong if the source address comes from a different ill.
+	 *
+	 * If the sender is specified then we use this address in order
+	 * to lookup the zoneid before calling ip_output_v6(). This is to
+	 * enable unicast ND_NEIGHBOR_ADVERT packets to be routed correctly
+	 * by IP (we cannot guarantee that the global zone has an interface
+	 * route to the destination).
 	 *
 	 * Note that the NA never comes here with the unspecified source
 	 * address. The following asserts that whenever the source
@@ -2315,7 +2322,7 @@ nce_xmit(ill_t *ill, uint32_t operation, ill_t *hwaddr_ill,
 		 * source address had better be a valid neighbor.
 		 */
 		src_ipif = ipif_select_source_v6(ill, target, RESTRICT_TO_ILL,
-		    IPV6_PREFER_SRC_DEFAULT, GLOBAL_ZONEID);
+		    IPV6_PREFER_SRC_DEFAULT, ALL_ZONES);
 		if (src_ipif == NULL) {
 			char buf[INET6_ADDRSTRLEN];
 
@@ -2326,6 +2333,16 @@ nce_xmit(ill_t *ill, uint32_t operation, ill_t *hwaddr_ill,
 		}
 		sender = &src_ipif->ipif_v6src_addr;
 		hwaddr_ill = src_ipif->ipif_ill;
+	} else if (!(IN6_IS_ADDR_UNSPECIFIED(sender))) {
+		zoneid = ipif_lookup_addr_zoneid_v6(sender, ill, ill->ill_ipst);
+		/*
+		 * It's possible for ipif_lookup_addr_zoneid_v6() to return
+		 * ALL_ZONES if it cannot find a matching ipif for the address
+		 * we are trying to use. In this case we err on the side of
+		 * trying to send the packet by defaulting to the GLOBAL_ZONEID.
+		 */
+		if (zoneid == ALL_ZONES)
+			zoneid = GLOBAL_ZONEID;
 	}
 
 	/*
@@ -2424,12 +2441,9 @@ nce_xmit(ill_t *ill, uint32_t operation, ill_t *hwaddr_ill,
 
 	if (src_ipif != NULL)
 		ipif_refrele(src_ipif);
-	if (canput(ill->ill_wq)) {
-		put(ill->ill_wq, mp);
-		return (B_FALSE);
-	}
-	freemsg(mp);
-	return (B_TRUE);
+
+	ip_output_v6((void *)(uintptr_t)zoneid, mp, ill->ill_wq, IP_WPUT);
+	return (B_FALSE);
 }
 
 /*
