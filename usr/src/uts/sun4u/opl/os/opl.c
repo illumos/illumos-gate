@@ -46,6 +46,8 @@
 #include <sys/lgrp.h>
 #include <sys/memnode.h>
 #include <sys/sysmacros.h>
+#include <sys/time.h>
+#include <sys/cpu.h>
 #include <vm/vm_dep.h>
 
 int (*opl_get_mem_unum)(int, uint64_t, char *, int, int *);
@@ -87,6 +89,24 @@ static	int	opl_num_models = sizeof (opl_models)/sizeof (opl_model_info_t);
 static	opl_model_info_t *opl_cur_model = NULL;
 
 static struct memlist *opl_memlist_per_board(struct memlist *ml);
+
+/*
+ * Note FF/DC out-of-order instruction engine takes only a
+ * single cycle to execute each spin loop
+ * for comparison, Panther takes 6 cycles for same loop
+ * 1500 approx nsec for OPL sleep instruction
+ * if spin count = OPL_BOFF_SLEEP*OPL_BOFF_SPIN then
+ * spin time should be equal to OPL_BOFF_TM nsecs
+ * Listed values tuned for 2.15GHz to 2.4GHz systems
+ * Value may change for future systems
+ */
+#define	OPL_BOFF_SPIN 720
+#define	OPL_BOFF_BASE 1
+#define	OPL_BOFF_SLEEP 5
+#define	OPL_BOFF_CAP1 20
+#define	OPL_BOFF_CAP2 60
+#define	OPL_BOFF_MAX (40 * OPL_BOFF_SLEEP)
+#define	OPL_BOFF_TM 1500
 
 int
 set_platform_max_ncpus(void)
@@ -997,4 +1017,97 @@ plat_get_mem_addr(char *unum, char *sid, uint64_t offset, uint64_t *addrp)
 		return (ENOTSUP);
 	}
 	return (opl_get_mem_addr(unum, sid, offset, addrp));
+}
+
+void
+plat_lock_delay(int *backoff)
+{
+	int i;
+	int cnt;
+	int flag;
+	int ctr;
+	hrtime_t delay_start;
+	/*
+	 * Platform specific lock delay code for OPL
+	 *
+	 * Using staged linear increases in the delay.
+	 * The sleep instruction is the preferred method of delay,
+	 * but is too large of granularity for the initial backoff.
+	 */
+
+	if (*backoff == 0) *backoff = OPL_BOFF_BASE;
+
+	flag = !*backoff;
+
+	if (*backoff < OPL_BOFF_CAP1) {
+		/*
+		 * If desired backoff is long enough,
+		 * use sleep for most of it
+		 */
+		for (cnt = *backoff;
+			cnt >= OPL_BOFF_SLEEP;
+			cnt -= OPL_BOFF_SLEEP) {
+			cpu_smt_pause();
+		}
+		/*
+		 * spin for small remainder of backoff
+		 *
+		 * fake call to nulldev included to prevent
+		 * compiler from optimizing out the spin loop
+		 */
+		for (ctr = cnt * OPL_BOFF_SPIN; ctr; ctr--) {
+			if (flag) (void) nulldev();
+		}
+	} else {
+		/* backoff is very large.  Fill it by sleeping */
+		delay_start = gethrtime();
+		cnt = *backoff/OPL_BOFF_SLEEP;
+		/*
+		 * use sleep instructions for delay
+		 */
+		for (i = 0; i < cnt; i++) {
+			cpu_smt_pause();
+		}
+
+		/*
+		 * Note: if the other strand executes a sleep instruction,
+		 * then the sleep ends immediately with a minimum time of
+		 * 42 clocks.  We check gethrtime to insure we have
+		 * waited long enough.  And we include both a short
+		 * spin loop and a sleep for any final delay time.
+		 */
+
+		while ((gethrtime() - delay_start) < cnt * OPL_BOFF_TM) {
+			cpu_smt_pause();
+			for (ctr = OPL_BOFF_SPIN; ctr; ctr--) {
+				if (flag) (void) nulldev();
+			}
+		}
+	}
+
+	/*
+	 * We adjust the backoff in three linear stages
+	 * The initial stage has small increases as this phase is
+	 * usually handle locks with light contention.  We don't want
+	 * to have a long backoff on a lock that is available.
+	 *
+	 * In the second stage, we are in transition, unsure whether
+	 * the lock is under heavy contention.  As the failures to
+	 * obtain the lock increase, we back off further.
+	 *
+	 * For the final stage, we are in a heavily contended or
+	 * long held long so we want to reduce the number of tries.
+	 */
+	if (*backoff < OPL_BOFF_CAP1) {
+		*backoff += 1;
+	} else {
+		if (*backoff < OPL_BOFF_CAP2) {
+			*backoff += OPL_BOFF_SLEEP;
+		} else {
+			*backoff += 2 * OPL_BOFF_SLEEP;
+		}
+		if (*backoff > OPL_BOFF_MAX) {
+			*backoff = OPL_BOFF_MAX;
+		}
+	}
 }

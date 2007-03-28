@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,7 +212,13 @@
  * throughput was observed with the given values.  For cases where
  * more than 20 threads were waiting on the same lock, lock throughput
  * increased by a factor of 5 or more using the backoff algorithm.
+ *
+ * Some platforms may provide their own platform specific delay code,
+ * using plat_lock_delay(backoff).  If it is available, plat_lock_delay
+ * is executed instead of the default delay code.
  */
+
+#pragma weak plat_lock_delay
 
 #include <sys/param.h>
 #include <sys/time.h>
@@ -307,7 +313,11 @@ mutex_vector_enter(mutex_impl_t *lp)
 
 	CPU_STATS_ADDQ(cpup, sys, mutex_adenters, 1);
 
-	backoff = BACKOFF_BASE;
+	if (&plat_lock_delay) {
+		backoff = 0;
+	} else {
+		backoff = BACKOFF_BASE;
+	}
 
 	for (;;) {
 spin:
@@ -318,15 +328,19 @@ spin:
 		 * the spin_count test and call to nulldev are to prevent
 		 * the compiler optimizer from eliminating the delay loop.
 		 */
-		for (backctr = backoff; backctr; backctr--) {
-			if (!spin_count) (void) nulldev();
-		};    /* delay */
-		backoff = backoff << 1;			/* double it */
-		if (backoff > BACKOFF_CAP) {
-			backoff = BACKOFF_CAP;
-		}
+		if (&plat_lock_delay) {
+			plat_lock_delay(&backoff);
+		} else {
+			for (backctr = backoff; backctr; backctr--) {
+				if (!spin_count) (void) nulldev();
+			};    /* delay */
+			backoff = backoff << 1;			/* double it */
+			if (backoff > BACKOFF_CAP) {
+				backoff = BACKOFF_CAP;
+			}
 
-		SMT_PAUSE();
+			SMT_PAUSE();
+		}
 
 		if (panicstr)
 			return;
@@ -579,7 +593,12 @@ lock_set_spin(lock_t *lp)
 	if (ncpus == 1)
 		panic("lock_set: %p lock held and only one CPU", lp);
 
-	backoff = BACKOFF_BASE;
+	if (&plat_lock_delay) {
+		backoff = 0;
+	} else {
+		backoff = BACKOFF_BASE;
+	}
+
 	while (LOCK_HELD(lp) || !lock_spin_try(lp)) {
 		if (panicstr)
 			return;
@@ -590,15 +609,20 @@ lock_set_spin(lock_t *lp)
 		 * the spin_count test and call to nulldev are to prevent
 		 * the compiler optimizer from eliminating the delay loop.
 		 */
-		for (backctr = backoff; backctr; backctr--) {	/* delay */
-			if (!spin_count) (void) nulldev();
-		}
+		if (&plat_lock_delay) {
+			plat_lock_delay(&backoff);
+		} else {
+			/* delay */
+			for (backctr = backoff; backctr; backctr--) {
+				if (!spin_count) (void) nulldev();
+			}
 
-		backoff = backoff << 1;		/* double it */
-		if (backoff > BACKOFF_CAP) {
-			backoff = BACKOFF_CAP;
+			backoff = backoff << 1;		/* double it */
+			if (backoff > BACKOFF_CAP) {
+				backoff = BACKOFF_CAP;
+			}
+			SMT_PAUSE();
 		}
-		SMT_PAUSE();
 	}
 
 	if (spin_count) {
@@ -623,7 +647,11 @@ lock_set_spl_spin(lock_t *lp, int new_pil, ushort_t *old_pil_addr, int old_pil)
 
 	ASSERT(new_pil > LOCK_LEVEL);
 
-	backoff = BACKOFF_BASE;
+	if (&plat_lock_delay) {
+		backoff = 0;
+	} else {
+		backoff = BACKOFF_BASE;
+	}
 	do {
 		splx(old_pil);
 		while (LOCK_HELD(lp)) {
@@ -638,15 +666,19 @@ lock_set_spl_spin(lock_t *lp, int new_pil, ushort_t *old_pil_addr, int old_pil)
 			 * spin_count test and call to nulldev are to prevent
 			 * compiler optimizer from eliminating the delay loop.
 			 */
-			for (backctr = backoff; backctr; backctr--) {
-				if (!spin_count) (void) nulldev();
-			}
-			backoff = backoff << 1;		/* double it */
-			if (backoff > BACKOFF_CAP) {
-				backoff = BACKOFF_CAP;
-			}
+			if (&plat_lock_delay) {
+				plat_lock_delay(&backoff);
+			} else {
+				for (backctr = backoff; backctr; backctr--) {
+					if (!spin_count) (void) nulldev();
+				}
+				backoff = backoff << 1;		/* double it */
+				if (backoff > BACKOFF_CAP) {
+					backoff = BACKOFF_CAP;
+				}
 
-			SMT_PAUSE();
+				SMT_PAUSE();
+			}
 		}
 		old_pil = splr(new_pil);
 	} while (!lock_spin_try(lp));
