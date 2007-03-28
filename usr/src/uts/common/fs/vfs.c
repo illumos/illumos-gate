@@ -338,9 +338,11 @@ vfs_setfsops(int fstype, const fs_operation_def_t *template, vfsops_t **actual)
 	int error;
 	int unused_ops;
 
-	/* Verify that fstype refers to a loaded fs (and not fsid 0). */
-
-	if ((fstype <= 0) || (fstype >= nfstype))
+	/*
+	 * Verify that fstype refers to a valid fs.  Note that
+	 * 0 is valid since it's used to set "stray" ops.
+	 */
+	if ((fstype < 0) || (fstype >= nfstype))
 		return (EINVAL);
 
 	if (!ALLOCATED_VFSSW(&vfssw[fstype]))
@@ -3822,7 +3824,6 @@ void
 vfsinit(void)
 {
 	struct vfssw *vswp;
-	vfsops_t *stray_vfsops;
 	int error;
 	extern int vopstats_enabled;
 	extern void vopstats_startup();
@@ -3862,8 +3863,7 @@ vfsinit(void)
 	fem_init();
 
 	/* Initialize the dummy stray file system type. */
-	error = vfs_makefsops(stray_vfsops_template, &stray_vfsops);
-	vfssw[0].vsw_vfsops = *stray_vfsops; /* structure copy */
+	error = vfs_setfsops(0, stray_vfsops_template, NULL);
 
 	/* Initialize the dummy EIO file system. */
 	error = vfs_makefsops(EIO_vfsops_template, &EIO_vfsops);
