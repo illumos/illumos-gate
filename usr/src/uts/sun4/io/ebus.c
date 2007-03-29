@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -777,6 +776,10 @@ ebus_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	case DDI_INTROP_GETCAP:
 		*(int *)result = DDI_INTR_FLAG_LEVEL;
 		return (DDI_SUCCESS);
+	case DDI_INTROP_SUPPORTED_TYPES:
+		*(int *)result = i_ddi_get_intx_nintrs(rdip) ?
+		    DDI_INTR_TYPE_FIXED : 0;
+		return (DDI_SUCCESS);
 	case DDI_INTROP_SETCAP:
 	case DDI_INTROP_SETMASK:
 	case DDI_INTROP_CLRMASK:
@@ -786,7 +789,7 @@ ebus_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		break;
 	}
 
-	if ((intr_op == DDI_INTROP_SUPPORTED_TYPES) || hdlp->ih_pri)
+	if (hdlp->ih_pri)
 		goto done;
 
 	/*
