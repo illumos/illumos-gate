@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -125,8 +125,7 @@ populate_job_request(service_t *svc, papi_attribute_t ***request,
 	ipp_initialize_request(svc, request, type);
 
 	/* create an operational attributes group */
-	ipp_initialize_operational_attributes(svc, &operational, NULL);
-	ipp_add_printer_uri(svc, printer, &operational);
+	ipp_initialize_operational_attributes(svc, &operational, printer, -1);
 
 	/* split up the attributes into operational and job attributes */
 	split_and_copy_attributes(operational_names, attributes,
@@ -156,11 +155,8 @@ send_document_uri(service_t *svc, char *file, papi_attribute_t **attributes,
 	ipp_initialize_request(svc, &request, type);
 
 	/* create an operational attributes group */
-	ipp_initialize_operational_attributes(svc, &op, NULL);
-	ipp_add_printer_uri(svc, printer, &op);
+	ipp_initialize_operational_attributes(svc, &op, printer, id);
 
-	papiAttributeListAddInteger(&op, PAPI_ATTR_REPLACE, "job-id",
-				id);
 	papiAttributeListAddString(&op, PAPI_ATTR_REPLACE, "document-name",
 				file);
 	papiAttributeListAddBoolean(&op, PAPI_ATTR_REPLACE, "last-document",
@@ -445,10 +441,8 @@ papiJobQuery(papi_service_t handle, char *printer, int32_t job_id,
 
 	ipp_initialize_request(svc, &request, OPID_GET_JOB_ATTRIBUTES);
 
-	ipp_initialize_operational_attributes(svc, &op, NULL);
-	ipp_add_printer_uri(svc, printer, &op);
+	ipp_initialize_operational_attributes(svc, &op, printer, job_id);
 
-	papiAttributeListAddInteger(&op, PAPI_ATTR_REPLACE, "job-id", job_id);
 	if (requested_attrs != NULL) {
 		int i;
 
@@ -491,10 +485,8 @@ _job_cancel_hold_release_restart_promote(papi_service_t handle,
 
 	ipp_initialize_request(svc, &request, type);
 
-	ipp_initialize_operational_attributes(svc, &op, NULL);
-	ipp_add_printer_uri(svc, printer, &op);
+	ipp_initialize_operational_attributes(svc, &op, printer, job_id);
 
-	papiAttributeListAddInteger(&op, PAPI_ATTR_REPLACE, "job-id", job_id);
 	papiAttributeListAddCollection(&request, PAPI_ATTR_REPLACE,
 			"operational-attributes-group", op);
 	papiAttributeListFree(op);
@@ -560,10 +552,8 @@ papiJobMove(papi_service_t handle, char *printer, int32_t job_id,
 
 	ipp_initialize_request(svc, &request, OPID_CUPS_MOVE_JOB);
 
-	ipp_initialize_operational_attributes(svc, &op, NULL);
-	ipp_add_printer_uri(svc, printer, &op);
+	ipp_initialize_operational_attributes(svc, &op, printer, job_id);
 
-	papiAttributeListAddInteger(&op, PAPI_ATTR_REPLACE, "job-id", job_id);
 	papiAttributeListAddCollection(&request, PAPI_ATTR_REPLACE,
 			"operational-attributes-group", op);
 	papiAttributeListFree(op);
@@ -605,10 +595,8 @@ papiJobModify(papi_service_t handle, char *printer, int32_t job_id,
 
 	ipp_initialize_request(svc, &request, OPID_SET_JOB_ATTRIBUTES);
 
-	ipp_initialize_operational_attributes(svc, &op, NULL);
-	ipp_add_printer_uri(svc, printer, &op);
+	ipp_initialize_operational_attributes(svc, &op, printer, job_id);
 
-	papiAttributeListAddInteger(&op, PAPI_ATTR_REPLACE, "job-id", job_id);
 	papiAttributeListAddCollection(&request, PAPI_ATTR_REPLACE,
 			"operational-attributes-group", op);
 	papiAttributeListFree(op);

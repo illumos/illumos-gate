@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -96,12 +96,9 @@ extern void ipp_initialize_request(service_t *svc,
 				papi_attribute_t ***request, uint16_t type);
 extern void ipp_initialize_operational_attributes(service_t *svc,
 				papi_attribute_t ***op,
-				papi_attribute_t **attributes);
+				char *printer, int job_id);
 extern papi_status_t ipp_to_papi_status(uint16_t status);
 extern papi_status_t http_to_papi_status(http_status_t status);
-
-extern void ipp_add_printer_uri(service_t *svc, char *name,
-				papi_attribute_t ***op);
 
 /* service related interfaces */
 extern void detailed_error(service_t *svc, char *fmt, ...);

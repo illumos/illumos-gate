@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -41,6 +41,9 @@
 #include <config-site.h>
 
 #include <ipp.h>
+
+static void ipp_add_printer_uri(service_t *svc, char *name,
+		papi_attribute_t ***op);
 
 papi_status_t
 http_to_papi_status(http_status_t status)
@@ -163,7 +166,7 @@ ipp_initialize_request(service_t *svc, papi_attribute_t ***request,
 
 void
 ipp_initialize_operational_attributes(service_t *svc, papi_attribute_t ***op,
-		papi_attribute_t **attributes)
+		char *printer, int job_id)
 {
 	char *charset = "utf-8"; /* default to UTF-8 encoding */
 	char *language = setlocale(LC_ALL, "");
@@ -174,17 +177,21 @@ ipp_initialize_operational_attributes(service_t *svc, papi_attribute_t ***op,
 	 * All IPP requests must contain the following:
 	 * 	attributes-charset		(UTF-8)
 	 *	attributes-natural-language	(our current locale)
-	 *	requesting-user-name		(process user)
+	 *	(object identifier)		printer-uri/job-id or job-uri
+	 *	requesting-user-name		(process user or none)
 	 */
-	papiAttributeListGetString(attributes, NULL,
-			"attributes-charset", &charset);
 	papiAttributeListAddString(op, PAPI_ATTR_EXCL,
 			"attributes-charset", charset);
 
-	papiAttributeListGetString(attributes, NULL,
-			"attributes-natural-language", &language);
 	papiAttributeListAddString(op, PAPI_ATTR_EXCL,
 			"attributes-natural-language", language);
+
+	if (printer != NULL)
+		ipp_add_printer_uri(svc, printer, op);
+
+	if ((printer != NULL) && (job_id >= 0))
+		papiAttributeListAddInteger(op, PAPI_ATTR_EXCL,
+			"job-id", job_id);
 
 	if ((pw = getpwuid(getuid())) != NULL)
 		user = pw->pw_name;
@@ -195,8 +202,6 @@ ipp_initialize_operational_attributes(service_t *svc, papi_attribute_t ***op,
 	if (geteuid() == 0) {
 		if (svc->user != NULL)
 			user = svc->user;
-		papiAttributeListGetString(attributes, NULL,
-				"requesting-user-name", &user);
 	}
 	papiAttributeListAddString(op, PAPI_ATTR_REPLACE,
 			"requesting-user-name", user);
@@ -225,7 +230,7 @@ _default_destination(service_t *svc, char **uri)
 		return (PAPI_TEMPORARY_ERROR);
 
 	ipp_initialize_request(svc, &request, OPID_CUPS_GET_DEFAULT);
-	ipp_initialize_operational_attributes(svc, &op, NULL);
+	ipp_initialize_operational_attributes(svc, &op, NULL, -1);
 	papiAttributeListAddString(&op, PAPI_ATTR_APPEND,
 			"requested-attributes", "printer-uri-supported");
 	papiAttributeListAddCollection(&request, PAPI_ATTR_REPLACE,
@@ -253,7 +258,7 @@ _default_destination(service_t *svc, char **uri)
 	return (result);
 }
 
-void
+static void
 ipp_add_printer_uri(service_t *svc, char *name, papi_attribute_t ***op)
 {
 	char *uri = name;

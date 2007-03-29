@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -96,7 +96,7 @@ papiPrintersList(papi_service_t handle, char **requested_attrs,
 			return (result);
 	ipp_initialize_request(svc, &request, OPID_CUPS_GET_PRINTERS);
 
-	ipp_initialize_operational_attributes(svc, &op, NULL);
+	ipp_initialize_operational_attributes(svc, &op, NULL, -1);
 
 	if (requested_attrs != NULL) {
 		int i;
@@ -156,8 +156,7 @@ papiPrinterQuery(papi_service_t handle, char *name,
 
 	ipp_initialize_request(svc, &request, OPID_GET_PRINTER_ATTRIBUTES);
 
-	ipp_initialize_operational_attributes(svc, &op, NULL);
-	ipp_add_printer_uri(svc, name, &op);
+	ipp_initialize_operational_attributes(svc, &op, name, -1);
 
 	if (requested_attrs != NULL) {
 		int i;
@@ -200,8 +199,7 @@ _printer_enable_disable_pause_resume_delete(papi_service_t handle, char *name,
 
 	ipp_initialize_request(svc, &request, type);
 
-	ipp_initialize_operational_attributes(svc, &op, NULL);
-	ipp_add_printer_uri(svc, name, &op);
+	ipp_initialize_operational_attributes(svc, &op, name, -1);
 
 	switch (type) {
 	case OPID_DISABLE_PRINTER:
@@ -288,8 +286,7 @@ papiPrinterModify(papi_service_t handle, char *name,
 
 	ipp_initialize_request(svc, &request, OPID_SET_PRINTER_ATTRIBUTES);
 
-	ipp_initialize_operational_attributes(svc, &op, NULL);
-	ipp_add_printer_uri(svc, name, &op);
+	ipp_initialize_operational_attributes(svc, &op, name, -1);
 
 	papiAttributeListAddCollection(&request, PAPI_ATTR_REPLACE,
 			"operational-attributes-group", op);
@@ -336,8 +333,7 @@ papiPrinterPurgeJobs(papi_service_t handle, char *name,
 
 	ipp_initialize_request(svc, &request, OPID_PURGE_JOBS);
 
-	ipp_initialize_operational_attributes(svc, &op, NULL);
-	ipp_add_printer_uri(svc, name, &op);
+	ipp_initialize_operational_attributes(svc, &op, name, -1);
 
 	papiAttributeListAddCollection(&request, PAPI_ATTR_REPLACE,
 			"operational-attributes-group", op);
@@ -385,8 +381,7 @@ papiPrinterListJobs(papi_service_t handle, char *name,
 
 	ipp_initialize_request(svc, &request, OPID_GET_JOBS);
 
-	ipp_initialize_operational_attributes(svc, &op, NULL);
-	ipp_add_printer_uri(svc, name, &op);
+	ipp_initialize_operational_attributes(svc, &op, name, -1);
 
 	if (requested_attrs != NULL) {
 		int i;
