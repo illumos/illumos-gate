@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,3 +56,15 @@ d none platform/SUNW,A70/kernel/drv 755 root sys
 d none platform/SUNW,A70/kernel/drv/sparcv9 755 root sys
 f none platform/SUNW,A70/kernel/drv/fpc.conf 644 root sys
 f none platform/SUNW,A70/kernel/drv/sparcv9/fpc 755 root sys
+d none platform/SUNW,Sun-Fire-V445 755 root sys
+d none platform/SUNW,Sun-Fire-V445/kernel 755 root sys
+d none platform/SUNW,Sun-Fire-V445/kernel/drv 755 root sys
+d none platform/SUNW,Sun-Fire-V445/kernel/drv/sparcv9 755 root sys
+s none platform/SUNW,Sun-Fire-V445/kernel/drv/sparcv9/fpc=../../../../SUNW,A70/kernel/drv/sparcv9/fpc
+s none platform/SUNW,Sun-Fire-V445/kernel/drv/fpc.conf=../../../SUNW,A70/kernel/drv/fpc.conf
+d none platform/SUNW,Sun-Fire-V215 755 root sys
+d none platform/SUNW,Sun-Fire-V215/kernel 755 root sys
+d none platform/SUNW,Sun-Fire-V215/kernel/drv 755 root sys
+d none platform/SUNW,Sun-Fire-V215/kernel/drv/sparcv9 755 root sys
+s none platform/SUNW,Sun-Fire-V215/kernel/drv/sparcv9/fpc=../../../../SUNW,A70/kernel/drv/sparcv9/fpc
+s none platform/SUNW,Sun-Fire-V215/kernel/drv/fpc.conf=../../../SUNW,A70/kernel/drv/fpc.conf
