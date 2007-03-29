@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -506,7 +506,7 @@ lpd_submit_job(service_t *svc, char *metadata, papi_attribute_t ***attributes,
 	list[0] = path;
 	list[1] = NULL;
 
-	if (((fd = lpd_open(svc, 's', list, 3)) < 0) && (errno != EBADMSG)) {
+	if (((fd = lpd_open(svc, 's', list, 15)) < 0) && (errno != EBADMSG)) {
 		switch (errno) {
 		case ENOSPC:
 			status = PAPI_TEMPORARY_ERROR;

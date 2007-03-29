@@ -265,7 +265,7 @@ cache_update(service_t *svc)
 	if (svc == NULL)
 		return;
 
-	if ((fd = lpd_open(svc, 'q', NULL, 3)) < 0)
+	if ((fd = lpd_open(svc, 'q', NULL, 15)) < 0)
 		return;
 
 	parse_lpd_query(svc, fd);

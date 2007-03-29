@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -51,7 +51,7 @@ lpd_cancel_job(service_t *svc, int id)
 	list[0] = buf;
 	list[1] = NULL;
 
-	if ((fd = lpd_open(svc, 'c', list, 3)) < 0)
+	if ((fd = lpd_open(svc, 'c', list, 15)) < 0)
 		return (PAPI_INTERNAL_ERROR);
 
 	memset(buf, 0, sizeof (buf));
@@ -82,7 +82,7 @@ lpd_purge_jobs(service_t *svc, job_t ***jobs)
 	if (svc == NULL)
 		return (PAPI_BAD_ARGUMENT);
 
-	if ((fd = lpd_open(svc, 'c', NULL, 3)) < 0)
+	if ((fd = lpd_open(svc, 'c', NULL, 15)) < 0)
 		return (PAPI_INTERNAL_ERROR);
 
 	queue = queue_name_from_uri(svc->uri);
