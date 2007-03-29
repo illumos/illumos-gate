@@ -363,7 +363,7 @@ krb5_renew_tgt(
 {
 	krb5_error_code	retval;
 	krb5_creds	creds;
-	krb5_creds	*credsp = &creds;
+	krb5_creds	*renewed_cred = NULL;
 	char		*client_name = NULL;
 	typedef struct _cred_node {
 		krb5_creds		*creds;
@@ -383,9 +383,9 @@ krb5_renew_tgt(
 	if ((retval = krb5_unparse_name(kmd->kcontext, me, &client_name)) != 0)
 		return (retval);
 
-	(void) memset((char *)credsp, 0, sizeof (krb5_creds));
+	(void) memset(&creds, 0, sizeof (krb5_creds));
 	if ((retval = krb5_copy_principal(kmd->kcontext,
-				server, &credsp->server))) {
+				server, &creds.server))) {
 		if (kmd->debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
 				"PAM-KRB5 (setcred): krb5_copy_principal "
@@ -396,7 +396,7 @@ krb5_renew_tgt(
 
 	/* obtain ticket & session key */
 	retval = krb5_cc_get_principal(kmd->kcontext,
-				kmd->ccache, &credsp->client);
+				kmd->ccache, &creds.client);
 	if (retval && (kmd->debug))
 		__pam_log(LOG_AUTH | LOG_DEBUG,
 			"PAM-KRB5 (setcred): User not in cred "
@@ -445,7 +445,7 @@ krb5_renew_tgt(
 		creds.times.endtime = my_creds.times.endtime;
 		creds.times.renew_till = my_creds.times.renew_till;
 		if ((retval = krb5_get_credentials_renew(kmd->kcontext, 0,
-					kmd->ccache, &creds, &credsp))) {
+				kmd->ccache, &creds, &renewed_cred))) {
 			if (kmd->debug)
 			    __pam_log(LOG_AUTH | LOG_DEBUG,
 				"PAM-KRB5 (setcred): krb5_get_credentials",
@@ -543,7 +543,7 @@ krb5_renew_tgt(
 		 */
 		if (found &&
 		    (retval = krb5_get_credentials_renew(kmd->kcontext,
-				0, kmd->ccache, &creds, &credsp))) {
+				0, kmd->ccache, &creds, &renewed_cred))) {
 			if (kmd->debug)
 			    __pam_log(LOG_AUTH | LOG_DEBUG,
 				"PAM-KRB5 (setcred): krb5_get_credentials"
@@ -626,7 +626,8 @@ cleanup_creds:
 				    "PAM-KRB5 (setcred): Unable to "
 				    "find matching uid/gid pair for user `%s'",
 				    username);
-				return (KRB5KRB_ERR_GENERIC);
+				retval = KRB5KRB_ERR_GENERIC;
+				goto error;
 			}
 			if (!(filepath = strchr(kmd->env, ':')) ||
 			    !(filepath+1)) {
@@ -634,7 +635,8 @@ cleanup_creds:
 					"PAM-KRB5 (setcred): Invalid pathname "
 					"for credential cache of user `%s'",
 					username);
-				return (KRB5KRB_ERR_GENERIC);
+				retval = KRB5KRB_ERR_GENERIC;
+				goto error;
 			}
 			if (chown(filepath+1, uuid, ugid)) {
 				if (kmd->debug)
@@ -646,17 +648,32 @@ cleanup_creds:
 
 			free(username);
 		}
+	}
 
-		if (creds.times.endtime != 0) {
-			kwarn_del_warning(client_name);
-			if (kwarn_add_warning(client_name,
-			    creds.times.endtime) != 0) {
-				__pam_log(LOG_AUTH | LOG_NOTICE,
-					"PAM-KRB5 (auth): kwarn_add_warning"
-					" failed: ktkt_warnd(1M) down?");
-			}
+error:
+	if (retval == 0) {
+		krb5_timestamp endtime;
+
+		if (renewed_cred && renewed_cred->times.endtime != 0)
+			endtime = renewed_cred->times.endtime;
+		else
+			endtime = my_creds.times.endtime;
+
+		if (kmd->debug)
+			__pam_log(LOG_AUTH | LOG_DEBUG,
+				"PAM-KRB5 (setcred): delete/add warning");
+
+		kwarn_del_warning(client_name);
+		if (kwarn_add_warning(client_name, endtime) != 0) {
+			__pam_log(LOG_AUTH | LOG_NOTICE,
+				"PAM-KRB5 (setcred): kwarn_add_warning"
+				" failed: ktkt_warnd(1M) down?");
 		}
 	}
+
+	if (renewed_cred != NULL)
+		krb5_free_creds(kmd->kcontext, renewed_cred);
+
 	if (client_name != NULL)
 		free(client_name);
 
