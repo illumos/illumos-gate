@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1148,6 +1147,7 @@ ckopts(long mask)
 	uid_t	Euid = geteuid();	/* Effective uid of invoker */
 #ifdef SOLARIS_PRIVS
 	priv_set_t *privset;
+	priv_set_t *zones_privset;
 #endif	/* SOLARIS_PRIVS */
 
 	if (mask & OCi) {
@@ -1296,7 +1296,14 @@ ckopts(long mask)
 	} else if (getppriv(PRIV_EFFECTIVE, privset) != 0) {
 		msg(ERR, "Unable to obtain privilege set");
 	} else {
-		privileged = (priv_isfullset(privset) == B_TRUE);
+		zones_privset = priv_str_to_set("zone", "", NULL);
+		if (zones_privset != NULL) {
+			privileged = (priv_issubset(zones_privset,
+			    privset) == B_TRUE);
+			priv_freeset(zones_privset);
+		} else {
+			msg(ERR, "Unable to map privilege to privilege set");
+		}
 	}
 	if (privset != NULL) {
 		priv_freeset(privset);
