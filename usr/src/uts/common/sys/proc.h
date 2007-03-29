@@ -343,6 +343,8 @@ typedef struct	proc {
 	kmutex_t p_splock;
 	rctl_qty_t	p_locked_mem;	/* locked memory charged to proc */
 					/* protected by p_lock */
+	rctl_qty_t	p_crypto_mem;	/* /dev/crypto memory charged to proc */
+					/* protected by p_lock */
 } proc_t;
 
 #define	PROC_T				/* headers relying on proc_t are OK */

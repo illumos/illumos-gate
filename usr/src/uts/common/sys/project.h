@@ -53,7 +53,8 @@ typedef struct kproject_data {		/* Datum protected by: */
 	rctl_qty_t	kpd_locked_mem;	 /* zone_rctl_lock */
 	rctl_qty_t	kpd_locked_mem_ctl; /* kpj_rctls->rcs_lock */
 	rctl_qty_t	kpd_contract;	/* contract_lock */
-	rctl_qty_t	kpd_crypto_mem;	/* crypto_rctl_lock */
+	kmutex_t	kpd_crypto_lock;
+	rctl_qty_t	kpd_crypto_mem;	/* kpd_crypto_lock above */
 	rctl_qty_t	kpd_crypto_mem_ctl; /* kpj_rctls->rcs_lock */
 	kstat_t		*kpd_lockedmem_kstat; /* locked memory kstat */
 
@@ -103,6 +104,7 @@ extern kproject_t *proj0p;
 extern rctl_hndl_t rc_project_nlwps;
 extern rctl_hndl_t rc_project_ntasks;
 extern rctl_hndl_t rc_project_locked_mem;
+extern rctl_hndl_t rc_project_crypto_mem;
 #endif /* _KERNEL */
 
 #ifdef	__cplusplus

@@ -4616,6 +4616,10 @@ zone_enter(zoneid_t zoneid)
 	zone->zone_max_swap += swap;
 	mutex_exit(&zone->zone_mem_lock);
 
+	mutex_enter(&(zone_proj0->kpj_data.kpd_crypto_lock));
+	zone_proj0->kpj_data.kpd_crypto_mem += pp->p_crypto_mem;
+	mutex_exit(&(zone_proj0->kpj_data.kpd_crypto_lock));
+
 	/* remove lwps from proc's old zone and old project */
 	mutex_enter(&pp->p_zone->zone_nlwps_lock);
 	pp->p_zone->zone_nlwps -= pp->p_lwpcnt;
@@ -4627,6 +4631,10 @@ zone_enter(zoneid_t zoneid)
 	pp->p_task->tk_proj->kpj_data.kpd_locked_mem -= pp->p_locked_mem;
 	pp->p_zone->zone_max_swap -= swap;
 	mutex_exit(&pp->p_zone->zone_mem_lock);
+
+	mutex_enter(&(pp->p_task->tk_proj->kpj_data.kpd_crypto_lock));
+	pp->p_task->tk_proj->kpj_data.kpd_crypto_mem -= pp->p_crypto_mem;
+	mutex_exit(&(pp->p_task->tk_proj->kpj_data.kpd_crypto_lock));
 
 	mutex_exit(&pp->p_lock);
 	AS_LOCK_EXIT(pp->p_as, &pp->p_as->a_lock);

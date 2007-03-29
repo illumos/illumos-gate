@@ -496,7 +496,6 @@ typedef struct crypto_minor {
 	kcf_provider_desc_t		**cm_provider_array;
 	uint_t				cm_provider_count;
 	crypto_provider_session_t	*cm_provider_session;
-	kproject_t			*cm_projp;
 } crypto_minor_t;
 
 /* resource control framework handle used by /dev/crypto */

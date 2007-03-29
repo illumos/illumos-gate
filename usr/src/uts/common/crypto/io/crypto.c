@@ -100,7 +100,7 @@ static int sign_verify_update(dev_t dev, caddr_t arg, int mode,
 static void crypto_initialize_rctl(void);
 static void crypto_release_provider_session(crypto_minor_t *,
     crypto_provider_session_t *);
-static int crypto_buffer_check(size_t, kproject_t **);
+static int crypto_buffer_check(size_t);
 static int crypto_free_find_ctx(crypto_session_data_t *);
 static int crypto_get_provider_list(crypto_minor_t *, uint_t *,
     crypto_provider_entry_t **, boolean_t);
@@ -151,7 +151,6 @@ static minor_t crypto_minors_table_count = 0;
 static vmem_t *crypto_arena = NULL;	/* Arena for device minors */
 static minor_t crypto_minors_count = 0;
 static kmutex_t crypto_lock;
-static kmutex_t crypto_rctl_lock;
 static kcondvar_t crypto_cv;
 
 #define	RETURN_LIST			B_TRUE
@@ -200,10 +199,16 @@ static kcondvar_t crypto_cv;
 	}							\
 }
 
-#define	CRYPTO_DECREMENT_RCTL(val, projp) {				\
-	ASSERT(projp != NULL);						\
-	(projp)->kpj_data.kpd_crypto_mem -= (val);			\
-	project_rele(projp);						\
+#define	CRYPTO_DECREMENT_RCTL(val) {				\
+	kproject_t *projp;					\
+	mutex_enter(&curproc->p_lock);				\
+	projp = curproc->p_task->tk_proj;			\
+	ASSERT(projp != NULL);					\
+	mutex_enter(&(projp->kpj_data.kpd_crypto_lock));	\
+	projp->kpj_data.kpd_crypto_mem -= (val);		\
+	mutex_exit(&(projp->kpj_data.kpd_crypto_lock));		\
+	curproc->p_crypto_mem -= (val);				\
+	mutex_exit(&curproc->p_lock);				\
 }
 
 /*
@@ -322,7 +327,6 @@ crypto_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	mutex_init(&crypto_lock, NULL, MUTEX_DRIVER, NULL);
-	mutex_init(&crypto_rctl_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&crypto_cv, NULL, CV_DRIVER, NULL);
 	crypto_dip = dip;
 
@@ -363,7 +367,6 @@ crypto_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	crypto_minors = NULL;
 	crypto_minors_table_count = 0;
 	mutex_destroy(&crypto_lock);
-	mutex_destroy(&crypto_rctl_lock);
 	cv_destroy(&crypto_cv);
 	vmem_destroy(crypto_arena);
 	crypto_arena = NULL;
@@ -518,10 +521,8 @@ crypto_close(dev_t dev, int flag, int otyp, cred_t *credp)
 		    sizeof (void *));
 
 	if (cm->cm_session_table_count != 0) {
-		mutex_enter(&crypto_rctl_lock);
 		CRYPTO_DECREMENT_RCTL(cm->cm_session_table_count *
-		    sizeof (void *), cm->cm_projp);
-		mutex_exit(&crypto_rctl_lock);
+		    sizeof (void *));
 	}
 
 	kcf_free_provider_tab(cm->cm_provider_count,
@@ -1096,7 +1097,6 @@ static int
 get_provider_info(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_get_provider_info, get_info);
-	kproject_t *projp;
 	crypto_minor_t *cm;
 	crypto_provider_id_t provider_id;
 	kcf_provider_desc_t *provider, *real_provider;
@@ -1119,7 +1119,7 @@ get_provider_info(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 	need = sizeof (crypto_provider_ext_info_t);
-	if ((rv = crypto_buffer_check(need, &projp)) != CRYPTO_SUCCESS) {
+	if ((rv = crypto_buffer_check(need)) != CRYPTO_SUCCESS) {
 		need = 0;
 		goto release_minor;
 	}
@@ -1175,9 +1175,7 @@ get_provider_info(dev_t dev, caddr_t arg, int mode, int *rval)
 
 release_minor:
 	if (need != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(need, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(need);
 	}
 	crypto_release_minor(cm);
 
@@ -1524,6 +1522,7 @@ grow_session_table(crypto_minor_t *cm)
 	uint_t need;
 	size_t current_allocation;
 	size_t new_allocation;
+	int rv;
 
 	ASSERT(MUTEX_HELD(&cm->cm_lock));
 
@@ -1534,41 +1533,14 @@ grow_session_table(crypto_minor_t *cm)
 	current_allocation = session_table_count * sizeof (void *);
 	new_allocation = need * sizeof (void *);
 
-	mutex_enter(&curproc->p_lock);
-	mutex_enter(&crypto_rctl_lock);
-
-	/* give back the current allocation */
-	if (cm->cm_projp != NULL) {
-		cm->cm_projp->kpj_data.kpd_crypto_mem -= current_allocation;
-	}
-
 	/*
 	 * Memory needed to grow the session table is checked
 	 * against the project.max-crypto-memory resource control.
 	 */
-	if (rctl_test(rc_project_crypto_mem,
-	    curproc->p_task->tk_proj->kpj_rctls, curproc,
-	    new_allocation, 0) & RCT_DENY) {
-		/* restore the current allocation */
-		if (cm->cm_projp != NULL) {
-			cm->cm_projp->kpj_data.kpd_crypto_mem +=
-			    current_allocation;
-		}
-		mutex_exit(&crypto_rctl_lock);
-		mutex_exit(&curproc->p_lock);
-		return (CRYPTO_HOST_MEMORY);
+	if ((rv = crypto_buffer_check(new_allocation - current_allocation)) !=
+	    CRYPTO_SUCCESS) {
+		return (rv);
 	}
-	curproc->p_task->tk_proj->kpj_data.kpd_crypto_mem += new_allocation;
-
-	/* the process changed projects */
-	if (curproc->p_task->tk_proj != cm->cm_projp) {
-		if (cm->cm_projp != 0)
-			project_rele(cm->cm_projp);
-		(void) project_hold(curproc->p_task->tk_proj);
-		cm->cm_projp = curproc->p_task->tk_proj;
-	}
-	mutex_exit(&crypto_rctl_lock);
-	mutex_exit(&curproc->p_lock);
 
 	/* drop lock while we allocate memory */
 	mutex_exit(&cm->cm_lock);
@@ -1801,7 +1773,7 @@ close_session(dev_t dev, caddr_t arg, int mode, int *rval)
 static boolean_t
 copyin_mech(int mode, crypto_mechanism_t *in_mech,
     crypto_mechanism_t *out_mech, size_t *out_rctl_bytes, size_t *out_carry,
-    int *out_rv, int *out_error, kproject_t **projp)
+    int *out_rv, int *out_error)
 {
 	STRUCT_DECL(crypto_mechanism, mech);
 	caddr_t param;
@@ -1837,7 +1809,7 @@ copyin_mech(int mode, crypto_mechanism_t *in_mech,
 		 * the project.max-crypto-memory resource control.
 		 */
 		if ((param_len > CRYPTO_DEFERRED_LIMIT) || out_carry == NULL) {
-			rv = crypto_buffer_check(param_len, projp);
+			rv = crypto_buffer_check(param_len);
 			if (rv != CRYPTO_SUCCESS) {
 				goto out;
 			}
@@ -1937,7 +1909,7 @@ static boolean_t
 copyin_attributes(int mode, uint_t count, caddr_t oc_attributes,
     crypto_object_attribute_t **k_attrs_out, size_t *k_attrs_size_out,
     caddr_t *u_attrs_out, int *out_rv, int *out_error, size_t *out_rctl_bytes,
-    size_t carry, boolean_t copyin_value, kproject_t **projp)
+    size_t carry, boolean_t copyin_value)
 {
 	STRUCT_DECL(crypto_object_attribute, oa);
 	crypto_object_attribute_t *k_attrs = NULL;
@@ -1997,7 +1969,7 @@ copyin_attributes(int mode, uint_t count, caddr_t oc_attributes,
 	k_attrs_len = count * sizeof (crypto_object_attribute_t);
 	k_attrs_total_len = k_attrs_buf_len + k_attrs_len;
 	if ((k_attrs_total_len + carry) != 0) {
-		rv = crypto_buffer_check(k_attrs_total_len + carry, projp);
+		rv = crypto_buffer_check(k_attrs_total_len + carry);
 		if (rv != CRYPTO_SUCCESS) {
 			goto out;
 		}
@@ -2064,8 +2036,7 @@ out:
  */
 static boolean_t
 copyin_key(int mode, crypto_key_t *in_key, crypto_key_t *out_key,
-    size_t *out_rctl_bytes, int *out_rv, int *out_error, size_t carry,
-    kproject_t **projp)
+    size_t *out_rctl_bytes, int *out_rv, int *out_error, size_t carry)
 {
 	STRUCT_DECL(crypto_key, key);
 	crypto_object_attribute_t *k_attrs = NULL;
@@ -2092,7 +2063,7 @@ copyin_key(int mode, crypto_key_t *in_key, crypto_key_t *out_key,
 				goto out;
 			}
 
-			rv = crypto_buffer_check(key_bytes + carry, projp);
+			rv = crypto_buffer_check(key_bytes + carry);
 			if (rv != CRYPTO_SUCCESS) {
 				goto out;
 			}
@@ -2117,7 +2088,7 @@ copyin_key(int mode, crypto_key_t *in_key, crypto_key_t *out_key,
 
 		if (copyin_attributes(mode, count,
 		    (caddr_t)STRUCT_FGETP(key, ck_attrs), &k_attrs, NULL, NULL,
-		    &rv, &error, &rctl_bytes, carry, B_TRUE, projp)) {
+		    &rv, &error, &rctl_bytes, carry, B_TRUE)) {
 			out_key->ck_count = count;
 			out_key->ck_attrs = k_attrs;
 			k_attrs = NULL;
@@ -2314,7 +2285,6 @@ cipher_init(dev_t dev, caddr_t arg, int mode, int (*init)(crypto_provider_t,
     crypto_ctx_template_t, crypto_context_t *, crypto_call_req_t *))
 {
 	STRUCT_DECL(crypto_encrypt_init, encrypt_init);
-	kproject_t *mech_projp, *key_projp;
 	kcf_provider_desc_t *real_provider = NULL;
 	crypto_session_id_t session_id;
 	crypto_mechanism_t mech;
@@ -2375,8 +2345,7 @@ cipher_init(dev_t dev, caddr_t arg, int mode, int (*init)(crypto_provider_t,
 	if (rv == CRYPTO_NOT_SUPPORTED) {
 		allocated_by_crypto_module = B_TRUE;
 		if (!copyin_mech(mode, STRUCT_FADDR(encrypt_init, ei_mech),
-		    &mech, &mech_rctl_bytes, &carry, &rv, &error,
-		    &mech_projp)) {
+		    &mech, &mech_rctl_bytes, &carry, &rv, &error)) {
 			goto out;
 		}
 	} else {
@@ -2385,7 +2354,7 @@ cipher_init(dev_t dev, caddr_t arg, int mode, int (*init)(crypto_provider_t,
 	}
 
 	if (!copyin_key(mode, STRUCT_FADDR(encrypt_init, ei_key), &key,
-	    &key_rctl_bytes, &rv, &error, carry, &key_projp)) {
+	    &key_rctl_bytes, &rv, &error, carry)) {
 		goto out;
 	}
 
@@ -2407,12 +2376,8 @@ out:
 	CRYPTO_SESSION_RELE(sp);
 
 release_minor:
-	mutex_enter(&crypto_rctl_lock);
-	if (mech_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes, mech_projp);
-	if (key_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(key_rctl_bytes, key_projp);
-	mutex_exit(&crypto_rctl_lock);
+	if (mech_rctl_bytes + key_rctl_bytes != 0)
+		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + key_rctl_bytes);
 	crypto_release_minor(cm);
 
 	if (real_provider != NULL) {
@@ -2460,7 +2425,6 @@ cipher(dev_t dev, caddr_t arg, int mode,
     crypto_call_req_t *))
 {
 	STRUCT_DECL(crypto_encrypt, encrypt);
-	kproject_t *projp;
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
 	crypto_session_data_t *sp;
@@ -2507,7 +2471,7 @@ cipher(dev_t dev, caddr_t arg, int mode,
 	}
 
 	need = datalen + encrlen;
-	if ((rv = crypto_buffer_check(need, &projp)) != CRYPTO_SUCCESS) {
+	if ((rv = crypto_buffer_check(need)) != CRYPTO_SUCCESS) {
 		need = 0;
 		goto release_minor;
 	}
@@ -2561,9 +2525,7 @@ cipher(dev_t dev, caddr_t arg, int mode,
 
 release_minor:
 	if (need != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(need, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(need);
 	}
 	crypto_release_minor(cm);
 
@@ -2607,7 +2569,6 @@ cipher_update(dev_t dev, caddr_t arg, int mode,
     crypto_call_req_t *))
 {
 	STRUCT_DECL(crypto_encrypt_update, encrypt_update);
-	kproject_t *projp;
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
 	crypto_session_data_t *sp;
@@ -2655,7 +2616,7 @@ cipher_update(dev_t dev, caddr_t arg, int mode,
 	}
 
 	need = datalen + encrlen;
-	if ((rv = crypto_buffer_check(need, &projp)) != CRYPTO_SUCCESS) {
+	if ((rv = crypto_buffer_check(need)) != CRYPTO_SUCCESS) {
 		need = 0;
 		goto release_minor;
 	}
@@ -2709,9 +2670,7 @@ out:
 
 release_minor:
 	if (need != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(need, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(need);
 	}
 	crypto_release_minor(cm);
 
@@ -2755,7 +2714,6 @@ common_final(dev_t dev, caddr_t arg, int mode,
     int (*final)(crypto_context_t, crypto_data_t *, crypto_call_req_t *))
 {
 	STRUCT_DECL(crypto_encrypt_final, encrypt_final);
-	kproject_t *projp;
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
 	crypto_session_data_t *sp;
@@ -2800,7 +2758,7 @@ common_final(dev_t dev, caddr_t arg, int mode,
 		goto release_minor;
 	}
 
-	if ((rv = crypto_buffer_check(encrlen, &projp)) != CRYPTO_SUCCESS) {
+	if ((rv = crypto_buffer_check(encrlen)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 	need = encrlen;
@@ -2859,9 +2817,7 @@ common_final(dev_t dev, caddr_t arg, int mode,
 
 release_minor:
 	if (need != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(need, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(need);
 	}
 	crypto_release_minor(cm);
 
@@ -2884,7 +2840,6 @@ static int
 digest_init(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_digest_init, digest_init);
-	kproject_t *mech_projp;
 	kcf_provider_desc_t *real_provider = NULL;
 	crypto_session_id_t session_id;
 	crypto_mechanism_t mech;
@@ -2917,7 +2872,7 @@ digest_init(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 	if (!copyin_mech(mode, STRUCT_FADDR(digest_init, di_mech), &mech,
-	    &rctl_bytes, NULL, &rv, &error, &mech_projp)) {
+	    &rctl_bytes, NULL, &rv, &error)) {
 		goto out;
 	}
 
@@ -2942,9 +2897,7 @@ out:
 
 release_minor:
 	if (rctl_bytes != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(rctl_bytes, mech_projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(rctl_bytes);
 	}
 	crypto_release_minor(cm);
 
@@ -2970,7 +2923,6 @@ static int
 digest_update(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_digest_update, digest_update);
-	kproject_t *projp;
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
 	crypto_session_data_t *sp;
@@ -3003,7 +2955,7 @@ digest_update(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	if ((rv = crypto_buffer_check(datalen, &projp)) != CRYPTO_SUCCESS) {
+	if ((rv = crypto_buffer_check(datalen)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 	need = datalen;
@@ -3032,9 +2984,7 @@ digest_update(dev_t dev, caddr_t arg, int mode, int *rval)
 
 release_minor:
 	if (need != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(need, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(need);
 	}
 	crypto_release_minor(cm);
 
@@ -3057,7 +3007,6 @@ static int
 digest_key(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_digest_key, digest_key);
-	kproject_t *projp;
 	crypto_session_id_t session_id;
 	crypto_key_t key;
 	crypto_minor_t *cm;
@@ -3087,7 +3036,7 @@ digest_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 	if (!copyin_key(mode, STRUCT_FADDR(digest_key, dk_key), &key,
-	    &rctl_bytes, &rv, &error, 0, &projp)) {
+	    &rctl_bytes, &rv, &error, 0)) {
 		goto out;
 	}
 
@@ -3099,9 +3048,7 @@ out:
 
 release_minor:
 	if (rctl_bytes != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(rctl_bytes, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(rctl_bytes);
 	}
 	crypto_release_minor(cm);
 
@@ -3142,7 +3089,6 @@ common_digest(dev_t dev, caddr_t arg, int mode,
     crypto_call_req_t *))
 {
 	STRUCT_DECL(crypto_digest, crypto_digest);
-	kproject_t *projp;
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
 	crypto_session_data_t *sp;
@@ -3190,7 +3136,7 @@ common_digest(dev_t dev, caddr_t arg, int mode,
 	}
 
 	need = datalen + digestlen;
-	if ((rv = crypto_buffer_check(need, &projp)) != CRYPTO_SUCCESS) {
+	if ((rv = crypto_buffer_check(need)) != CRYPTO_SUCCESS) {
 		need = 0;
 		goto release_minor;
 	}
@@ -3254,9 +3200,7 @@ common_digest(dev_t dev, caddr_t arg, int mode,
 
 release_minor:
 	if (need != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(need, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(need);
 	}
 	crypto_release_minor(cm);
 
@@ -3569,7 +3513,6 @@ sign_verify_init(dev_t dev, caddr_t arg, int mode,
     crypto_context_t *, crypto_call_req_t *))
 {
 	STRUCT_DECL(crypto_sign_init, sign_init);
-	kproject_t *mech_projp, *key_projp;
 	kcf_provider_desc_t *real_provider = NULL;
 	crypto_session_id_t session_id;
 	crypto_mechanism_t mech;
@@ -3642,8 +3585,7 @@ sign_verify_init(dev_t dev, caddr_t arg, int mode,
 	if (rv == CRYPTO_NOT_SUPPORTED) {
 		allocated_by_crypto_module = B_TRUE;
 		if (!copyin_mech(mode, STRUCT_FADDR(sign_init, si_mech),
-		    &mech, &mech_rctl_bytes, &carry, &rv, &error,
-		    &mech_projp)) {
+		    &mech, &mech_rctl_bytes, &carry, &rv, &error)) {
 			goto out;
 		}
 	} else {
@@ -3652,7 +3594,7 @@ sign_verify_init(dev_t dev, caddr_t arg, int mode,
 	}
 
 	if (!copyin_key(mode, STRUCT_FADDR(sign_init, si_key), &key,
-	    &key_rctl_bytes, &rv, &error, carry, &key_projp)) {
+	    &key_rctl_bytes, &rv, &error, carry)) {
 		goto out;
 	}
 
@@ -3671,12 +3613,8 @@ out:
 	CRYPTO_SESSION_RELE(sp);
 
 release_minor:
-	mutex_enter(&crypto_rctl_lock);
-	if (mech_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes, mech_projp);
-	if (key_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(key_rctl_bytes, key_projp);
-	mutex_exit(&crypto_rctl_lock);
+	if (mech_rctl_bytes + key_rctl_bytes != 0)
+		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + key_rctl_bytes);
 	crypto_release_minor(cm);
 
 	if (real_provider != NULL) {
@@ -3716,7 +3654,6 @@ static int
 verify(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_verify, verify);
-	kproject_t *projp;
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
 	crypto_session_data_t *sp;
@@ -3751,7 +3688,7 @@ verify(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 	need = datalen + signlen;
-	if ((rv = crypto_buffer_check(need, &projp)) != CRYPTO_SUCCESS) {
+	if ((rv = crypto_buffer_check(need)) != CRYPTO_SUCCESS) {
 		need = 0;
 		goto release_minor;
 	}
@@ -3784,9 +3721,7 @@ verify(dev_t dev, caddr_t arg, int mode, int *rval)
 
 release_minor:
 	if (need != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(need, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(need);
 	}
 	crypto_release_minor(cm);
 
@@ -3836,7 +3771,6 @@ sign_verify_update(dev_t dev, caddr_t arg, int mode,
     int (*update)(crypto_context_t, crypto_data_t *, crypto_call_req_t *))
 {
 	STRUCT_DECL(crypto_sign_update, sign_update);
-	kproject_t *projp;
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
 	crypto_session_data_t *sp;
@@ -3869,7 +3803,7 @@ sign_verify_update(dev_t dev, caddr_t arg, int mode,
 		goto release_minor;
 	}
 
-	if ((rv = crypto_buffer_check(datalen, &projp)) != CRYPTO_SUCCESS) {
+	if ((rv = crypto_buffer_check(datalen)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 	need = datalen;
@@ -3898,9 +3832,7 @@ sign_verify_update(dev_t dev, caddr_t arg, int mode,
 
 release_minor:
 	if (need != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(need, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(need);
 	}
 	crypto_release_minor(cm);
 
@@ -3934,7 +3866,6 @@ static int
 verify_final(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_verify_final, verify_final);
-	kproject_t *projp;
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
 	crypto_session_data_t *sp;
@@ -3966,7 +3897,7 @@ verify_final(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	if ((rv = crypto_buffer_check(signlen, &projp)) != CRYPTO_SUCCESS) {
+	if ((rv = crypto_buffer_check(signlen)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 	need = signlen;
@@ -3993,9 +3924,7 @@ verify_final(dev_t dev, caddr_t arg, int mode, int *rval)
 
 release_minor:
 	if (need != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(need, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(need);
 	}
 	crypto_release_minor(cm);
 
@@ -4018,7 +3947,6 @@ static int
 seed_random(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_seed_random, seed_random);
-	kproject_t *projp;
 	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_session_id_t session_id;
@@ -4051,7 +3979,7 @@ seed_random(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	if ((rv = crypto_buffer_check(seed_len, &projp)) != CRYPTO_SUCCESS) {
+	if ((rv = crypto_buffer_check(seed_len)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 	need = seed_len;
@@ -4087,9 +4015,7 @@ out:
 
 release_minor:
 	if (need != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(need, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(need);
 	}
 	crypto_release_minor(cm);
 
@@ -4115,7 +4041,6 @@ static int
 generate_random(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_generate_random, generate_random);
-	kproject_t *projp;
 	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_session_id_t session_id;
@@ -4148,7 +4073,7 @@ generate_random(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	if ((rv = crypto_buffer_check(len, &projp)) != CRYPTO_SUCCESS) {
+	if ((rv = crypto_buffer_check(len)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 	need = len;
@@ -4184,9 +4109,7 @@ out:
 
 release_minor:
 	if (need != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(need, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(need);
 	}
 	crypto_release_minor(cm);
 
@@ -4266,7 +4189,6 @@ static int
 object_create(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_object_create, object_create);
-	kproject_t *projp;
 	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_object_attribute_t *k_attrs = NULL;
@@ -4297,7 +4219,7 @@ object_create(dev_t dev, caddr_t arg, int mode, int *rval)
 	count = STRUCT_FGET(object_create, oc_count);
 	oc_attributes = STRUCT_FGETP(object_create, oc_attributes);
 	if (!copyin_attributes(mode, count, oc_attributes, &k_attrs,
-	    &k_attrs_size, NULL, &rv, &error, &rctl_bytes, 0, B_TRUE, &projp)) {
+	    &k_attrs_size, NULL, &rv, &error, &rctl_bytes, 0, B_TRUE)) {
 		goto release_minor;
 	}
 
@@ -4326,9 +4248,7 @@ object_create(dev_t dev, caddr_t arg, int mode, int *rval)
 
 release_minor:
 	if (rctl_bytes != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(rctl_bytes, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(rctl_bytes);
 	}
 
 	if (k_attrs != NULL)
@@ -4366,7 +4286,6 @@ static int
 object_copy(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_object_copy, object_copy);
-	kproject_t *projp;
 	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_object_attribute_t *k_attrs = NULL;
@@ -4397,7 +4316,7 @@ object_copy(dev_t dev, caddr_t arg, int mode, int *rval)
 	count = STRUCT_FGET(object_copy, oc_count);
 	oc_new_attributes = STRUCT_FGETP(object_copy, oc_new_attributes);
 	if (!copyin_attributes(mode, count, oc_new_attributes, &k_attrs,
-	    &k_attrs_size, NULL, &rv, &error, &rctl_bytes, 0, B_TRUE, &projp)) {
+	    &k_attrs_size, NULL, &rv, &error, &rctl_bytes, 0, B_TRUE)) {
 		goto release_minor;
 	}
 
@@ -4426,9 +4345,7 @@ object_copy(dev_t dev, caddr_t arg, int mode, int *rval)
 
 release_minor:
 	if (rctl_bytes != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(rctl_bytes, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(rctl_bytes);
 	}
 
 	if (k_attrs != NULL)
@@ -4534,7 +4451,6 @@ object_get_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 	STRUCT_DECL(crypto_object_get_attribute_value, get_attribute_value);
 	/* LINTED E_FUNC_SET_NOT_USED */
 	STRUCT_DECL(crypto_object_attribute, oa);
-	kproject_t *projp;
 	kcf_provider_desc_t *real_provider;
 	kcf_req_params_t params;
 	crypto_object_attribute_t *k_attrs = NULL;
@@ -4568,8 +4484,7 @@ object_get_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 	count = STRUCT_FGET(get_attribute_value, og_count);
 	og_attributes = STRUCT_FGETP(get_attribute_value, og_attributes);
 	if (!copyin_attributes(mode, count, og_attributes, &k_attrs,
-	    &k_attrs_size, &u_attrs, &rv, &error, &rctl_bytes, 0, B_FALSE,
-	    &projp)) {
+	    &k_attrs_size, &u_attrs, &rv, &error, &rctl_bytes, 0, B_FALSE)) {
 		goto release_minor;
 	}
 
@@ -4608,9 +4523,7 @@ out:
 
 release_minor:
 	if (rctl_bytes != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(rctl_bytes, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(rctl_bytes);
 	}
 	crypto_release_minor(cm);
 
@@ -4705,7 +4618,6 @@ static int
 object_set_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_object_set_attribute_value, set_attribute_value);
-	kproject_t *projp;
 	kcf_provider_desc_t *real_provider;
 	kcf_req_params_t params;
 	crypto_object_attribute_t *k_attrs = NULL;
@@ -4737,7 +4649,7 @@ object_set_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 	count = STRUCT_FGET(set_attribute_value, sa_count);
 	sa_attributes = STRUCT_FGETP(set_attribute_value, sa_attributes);
 	if (!copyin_attributes(mode, count, sa_attributes, &k_attrs,
-	    &k_attrs_size, NULL, &rv, &error, &rctl_bytes, 0, B_TRUE, &projp)) {
+	    &k_attrs_size, NULL, &rv, &error, &rctl_bytes, 0, B_TRUE)) {
 		goto release_minor;
 	}
 
@@ -4768,9 +4680,7 @@ out:
 
 release_minor:
 	if (rctl_bytes != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(rctl_bytes, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(rctl_bytes);
 	}
 	crypto_release_minor(cm);
 
@@ -4793,7 +4703,6 @@ static int
 object_find_init(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_object_find_init, find_init);
-	kproject_t *projp;
 	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_object_attribute_t *k_attrs = NULL;
@@ -4823,7 +4732,7 @@ object_find_init(dev_t dev, caddr_t arg, int mode, int *rval)
 	count = STRUCT_FGET(find_init, fi_count);
 	attributes = STRUCT_FGETP(find_init, fi_attributes);
 	if (!copyin_attributes(mode, count, attributes, &k_attrs,
-	    &k_attrs_size, NULL, &rv, &error, &rctl_bytes, 0, B_TRUE, &projp)) {
+	    &k_attrs_size, NULL, &rv, &error, &rctl_bytes, 0, B_TRUE)) {
 		goto release_minor;
 	}
 
@@ -4869,9 +4778,7 @@ out:
 
 release_minor:
 	if (rctl_bytes != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(rctl_bytes, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(rctl_bytes);
 	}
 	crypto_release_minor(cm);
 
@@ -4896,7 +4803,6 @@ static int
 object_find_update(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_object_find_update, find_update);
-	kproject_t *projp;
 	kcf_provider_desc_t *real_provider;
 	kcf_req_params_t params;
 	crypto_minor_t *cm;
@@ -4928,7 +4834,7 @@ object_find_update(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 	len = max_count * sizeof (crypto_object_id_t);
-	if ((rv = crypto_buffer_check(len, &projp)) != CRYPTO_SUCCESS) {
+	if ((rv = crypto_buffer_check(len)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 	rctl_bytes = len;
@@ -4975,9 +4881,7 @@ out:
 
 release_minor:
 	if (rctl_bytes != 0) {
-		mutex_enter(&crypto_rctl_lock);
-		CRYPTO_DECREMENT_RCTL(rctl_bytes, projp);
-		mutex_exit(&crypto_rctl_lock);
+		CRYPTO_DECREMENT_RCTL(rctl_bytes);
 	}
 	crypto_release_minor(cm);
 
@@ -5078,7 +4982,6 @@ static int
 object_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_object_generate_key, generate_key);
-	kproject_t *mech_projp, *key_projp;
 	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_mechanism_t mech;
@@ -5131,8 +5034,7 @@ object_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	if (rv == CRYPTO_NOT_SUPPORTED) {
 		allocated_by_crypto_module = B_TRUE;
 		if (!copyin_mech(mode, STRUCT_FADDR(generate_key, gk_mechanism),
-		    &mech, &mech_rctl_bytes, &carry, &rv, &error,
-		    &mech_projp)) {
+		    &mech, &mech_rctl_bytes, &carry, &rv, &error)) {
 			goto release_minor;
 		}
 	} else {
@@ -5143,8 +5045,7 @@ object_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	count = STRUCT_FGET(generate_key, gk_count);
 	attributes = STRUCT_FGETP(generate_key, gk_attributes);
 	if (!copyin_attributes(mode, count, attributes, &k_attrs,
-	    &k_attrs_size, NULL, &rv, &error, &key_rctl_bytes, carry, B_TRUE,
-	    &key_projp)) {
+	    &k_attrs_size, NULL, &rv, &error, &key_rctl_bytes, carry, B_TRUE)) {
 		goto release_minor;
 	}
 
@@ -5158,12 +5059,8 @@ object_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		STRUCT_FSET(generate_key, gk_handle, key_handle);
 
 release_minor:
-	mutex_enter(&crypto_rctl_lock);
-	if (mech_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes, mech_projp);
-	if (key_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(key_rctl_bytes, key_projp);
-	mutex_exit(&crypto_rctl_lock);
+	if (mech_rctl_bytes + key_rctl_bytes != 0)
+		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + key_rctl_bytes);
 
 	if (k_attrs != NULL)
 		kmem_free(k_attrs, k_attrs_size);
@@ -5204,7 +5101,6 @@ static int
 object_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_object_generate_key_pair, generate_key_pair);
-	kproject_t *pub_projp, *pri_projp, *mech_projp;
 	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_mechanism_t mech;
@@ -5265,7 +5161,7 @@ object_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 		allocated_by_crypto_module = B_TRUE;
 		if (!copyin_mech(mode, STRUCT_FADDR(generate_key_pair,
 		    kp_mechanism), &mech, &mech_rctl_bytes, &carry, &rv,
-		    &error, &mech_projp)) {
+		    &error)) {
 			goto release_minor;
 		}
 	} else {
@@ -5279,14 +5175,14 @@ object_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 	pub_attributes = STRUCT_FGETP(generate_key_pair, kp_public_attributes);
 	if (!copyin_attributes(mode, pub_count, pub_attributes, &k_pub_attrs,
 	    &k_pub_attrs_size, NULL, &rv, &error, &pub_rctl_bytes, carry,
-	    B_TRUE, &pub_projp)) {
+	    B_TRUE)) {
 		goto release_minor;
 	}
 
 	pri_attributes = STRUCT_FGETP(generate_key_pair, kp_private_attributes);
 	if (!copyin_attributes(mode, pri_count, pri_attributes, &k_pri_attrs,
 	    &k_pri_attrs_size, NULL, &rv, &error, &pri_rctl_bytes, 0,
-	    B_TRUE, &pri_projp)) {
+	    B_TRUE)) {
 		goto release_minor;
 	}
 
@@ -5303,14 +5199,9 @@ object_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 release_minor:
-	mutex_enter(&crypto_rctl_lock);
-	if (mech_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes, mech_projp);
-	if (pub_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(pub_rctl_bytes, pub_projp);
-	if (pri_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(pri_rctl_bytes, pri_projp);
-	mutex_exit(&crypto_rctl_lock);
+	if (mech_rctl_bytes + pub_rctl_bytes + pri_rctl_bytes != 0)
+		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + pub_rctl_bytes +
+		    pri_rctl_bytes);
 
 	if (k_pub_attrs != NULL)
 		kmem_free(k_pub_attrs, k_pub_attrs_size);
@@ -5362,7 +5253,6 @@ static int
 object_wrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_object_wrap_key, wrap_key);
-	kproject_t *mech_projp, *key_projp, *wrapped_key_projp;
 	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_mechanism_t mech;
@@ -5417,8 +5307,7 @@ object_wrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	if (rv == CRYPTO_NOT_SUPPORTED) {
 		allocated_by_crypto_module = B_TRUE;
 		if (!copyin_mech(mode, STRUCT_FADDR(wrap_key, wk_mechanism),
-		    &mech, &mech_rctl_bytes, &carry, &rv, &error,
-		    &mech_projp)) {
+		    &mech, &mech_rctl_bytes, &carry, &rv, &error)) {
 			goto out;
 		}
 	} else {
@@ -5427,7 +5316,7 @@ object_wrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 	if (!copyin_key(mode, STRUCT_FADDR(wrap_key, wk_wrapping_key), &key,
-	    &key_rctl_bytes, &rv, &error, carry, &key_projp)) {
+	    &key_rctl_bytes, &rv, &error, carry)) {
 		goto out;
 	}
 
@@ -5449,8 +5338,7 @@ object_wrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto out;
 	}
 
-	if ((rv = crypto_buffer_check(wrapped_key_len,
-	    &wrapped_key_projp)) != CRYPTO_SUCCESS) {
+	if ((rv = crypto_buffer_check(wrapped_key_len)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -5487,15 +5375,9 @@ out:
 	CRYPTO_SESSION_RELE(sp);
 
 release_minor:
-	mutex_enter(&crypto_rctl_lock);
-	if (mech_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes, mech_projp);
-	if (key_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(key_rctl_bytes, key_projp);
-	if (wrapped_key_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(wrapped_key_rctl_bytes,
-		    wrapped_key_projp);
-	mutex_exit(&crypto_rctl_lock);
+	if (mech_rctl_bytes + key_rctl_bytes + wrapped_key_rctl_bytes != 0)
+		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + key_rctl_bytes +
+		    wrapped_key_rctl_bytes);
 	crypto_release_minor(cm);
 
 	if (real_provider != NULL) {
@@ -5524,8 +5406,6 @@ static int
 object_unwrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_object_unwrap_key, unwrap_key);
-	kproject_t *mech_projp, *unwrapping_key_projp, *wrapped_key_projp,
-	    *k_attrs_projp;
 	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_mechanism_t mech;
@@ -5583,8 +5463,7 @@ object_unwrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	if (rv == CRYPTO_NOT_SUPPORTED) {
 		allocated_by_crypto_module = B_TRUE;
 		if (!copyin_mech(mode, STRUCT_FADDR(unwrap_key, uk_mechanism),
-		    &mech, &mech_rctl_bytes, &carry, &rv, &error,
-		    &mech_projp)) {
+		    &mech, &mech_rctl_bytes, &carry, &rv, &error)) {
 			goto release_minor;
 		}
 	} else {
@@ -5593,16 +5472,14 @@ object_unwrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 	if (!copyin_key(mode, STRUCT_FADDR(unwrap_key, uk_unwrapping_key),
-	    &unwrapping_key, &unwrapping_key_rctl_bytes, &rv, &error, carry,
-	    &unwrapping_key_projp)) {
+	    &unwrapping_key, &unwrapping_key_rctl_bytes, &rv, &error, carry)) {
 		goto release_minor;
 	}
 
 	count = STRUCT_FGET(unwrap_key, uk_count);
 	uk_attributes = STRUCT_FGETP(unwrap_key, uk_attributes);
 	if (!copyin_attributes(mode, count, uk_attributes, &k_attrs,
-	    &k_attrs_size, NULL, &rv, &error, &k_attrs_rctl_bytes, 0, B_TRUE,
-	    &k_attrs_projp)) {
+	    &k_attrs_size, NULL, &rv, &error, &k_attrs_rctl_bytes, 0, B_TRUE)) {
 		goto release_minor;
 	}
 
@@ -5614,7 +5491,7 @@ object_unwrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	if ((rv = crypto_buffer_check(wrapped_key_len, &wrapped_key_projp))
+	if ((rv = crypto_buffer_check(wrapped_key_len))
 	    != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
@@ -5638,18 +5515,11 @@ object_unwrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		STRUCT_FSET(unwrap_key, uk_object_handle, handle);
 
 release_minor:
-	mutex_enter(&crypto_rctl_lock);
-	if (mech_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes, mech_projp);
-	if (unwrapping_key_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(unwrapping_key_rctl_bytes,
-		    unwrapping_key_projp);
-	if (wrapped_key_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(wrapped_key_rctl_bytes,
-		    wrapped_key_projp);
-	if (k_attrs_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(k_attrs_rctl_bytes, k_attrs_projp);
-	mutex_exit(&crypto_rctl_lock);
+	if (mech_rctl_bytes + unwrapping_key_rctl_bytes +
+	    wrapped_key_rctl_bytes + k_attrs_rctl_bytes != 0)
+		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes +
+		    unwrapping_key_rctl_bytes +
+		    wrapped_key_rctl_bytes + k_attrs_rctl_bytes);
 
 	if (k_attrs != NULL)
 		kmem_free(k_attrs, k_attrs_size);
@@ -5696,7 +5566,6 @@ static int
 object_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_derive_key, derive_key);
-	kproject_t *key_projp, *mech_projp, *attributes_projp;
 	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_object_attribute_t *k_attrs = NULL;
@@ -5753,8 +5622,7 @@ object_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	if (rv == CRYPTO_NOT_SUPPORTED) {
 		allocated_by_crypto_module = B_TRUE;
 		if (!copyin_mech(mode, STRUCT_FADDR(derive_key, dk_mechanism),
-		    &mech, &mech_rctl_bytes, &carry, &rv, &error,
-		    &mech_projp)) {
+		    &mech, &mech_rctl_bytes, &carry, &rv, &error)) {
 			goto release_minor;
 		}
 	} else {
@@ -5763,7 +5631,7 @@ object_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 	if (!copyin_key(mode, STRUCT_FADDR(derive_key, dk_base_key),
-	    &base_key, &key_rctl_bytes, &rv, &error, carry, &key_projp)) {
+	    &base_key, &key_rctl_bytes, &rv, &error, carry)) {
 		goto release_minor;
 	}
 
@@ -5771,8 +5639,8 @@ object_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	attributes = STRUCT_FGETP(derive_key, dk_attributes);
 	if (!copyin_attributes(mode, count, attributes, &k_attrs,
-	    &k_attrs_size, NULL, &rv, &error, &attributes_rctl_bytes, 0, B_TRUE,
-	    &attributes_projp)) {
+	    &k_attrs_size, NULL, &rv, &error,
+	    &attributes_rctl_bytes, 0, B_TRUE)) {
 		goto release_minor;
 	}
 
@@ -5799,14 +5667,9 @@ object_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	}
 
 release_minor:
-	mutex_enter(&crypto_rctl_lock);
-	if (mech_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes, mech_projp);
-	if (key_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(key_rctl_bytes, key_projp);
-	if (attributes_rctl_bytes != 0)
-		CRYPTO_DECREMENT_RCTL(attributes_rctl_bytes, attributes_projp);
-	mutex_exit(&crypto_rctl_lock);
+	if (mech_rctl_bytes + key_rctl_bytes + attributes_rctl_bytes != 0)
+		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + key_rctl_bytes +
+		    attributes_rctl_bytes);
 
 	if (k_attrs != NULL)
 		kmem_free(k_attrs, k_attrs_size);
@@ -6017,9 +5880,8 @@ crypto_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
  * Check for the project.max-crypto-memory resource control.
  */
 static int
-crypto_buffer_check(size_t need, kproject_t **projp)
+crypto_buffer_check(size_t need)
 {
-	ASSERT(projp != NULL);
 	kproject_t *kpj;
 
 	if (need == 0)
@@ -6027,22 +5889,22 @@ crypto_buffer_check(size_t need, kproject_t **projp)
 
 	mutex_enter(&curproc->p_lock);
 	kpj = curproc->p_task->tk_proj;
-	mutex_enter(&crypto_rctl_lock);
+	mutex_enter(&(kpj->kpj_data.kpd_crypto_lock));
 
 	if (kpj->kpj_data.kpd_crypto_mem + need >
 	    kpj->kpj_data.kpd_crypto_mem_ctl) {
 		if (rctl_test(rc_project_crypto_mem,
 		    kpj->kpj_rctls, curproc, need, 0) & RCT_DENY) {
-			mutex_exit(&crypto_rctl_lock);
+			mutex_exit(&(kpj->kpj_data.kpd_crypto_lock));
 			mutex_exit(&curproc->p_lock);
 			return (CRYPTO_HOST_MEMORY);
 		}
 	}
 
 	kpj->kpj_data.kpd_crypto_mem += need;
-	mutex_exit(&crypto_rctl_lock);
+	mutex_exit(&(kpj->kpj_data.kpd_crypto_lock));
 
-	*projp = project_hold(kpj);
+	curproc->p_crypto_mem += need;
 	mutex_exit(&curproc->p_lock);
 
 	return (CRYPTO_SUCCESS);
