@@ -34,7 +34,7 @@
  * Future features ... ?
  */
 #define	BGE_CFG_IO8	1	/* 8/16-bit cfg space BIS/BIC	*/
-#define	BGE_IND_IO32	0	/* indirect access code		*/
+#define	BGE_IND_IO32	1	/* indirect access code		*/
 #define	BGE_SEE_IO32	1	/* SEEPROM access code		*/
 #define	BGE_FLASH_IO32	1	/* FLASH access code		*/
 
@@ -158,6 +158,15 @@ static uint32_t bge_stop_start_on_sync	= 0;
 
 boolean_t bge_jumbo_enable		= B_TRUE;
 static uint32_t bge_default_jumbo_size	= BGE_JUMBO_BUFF_SIZE;
+
+/*
+ * bge_intr_max_loop controls the maximum loop number within bge_intr.
+ * When loading NIC with heavy network traffic, it is useful.
+ * Increasing this value could have positive effect to throughput,
+ * but it might also increase ticks of a bge ISR stick on CPU, which might
+ * lead to bad UI interactive experience. So tune this with caution.
+ */
+static int bge_intr_max_loop = 1;
 
 /*
  * ========== Low-level chip & ring buffer manipulation ==========
@@ -316,17 +325,15 @@ bge_cfg_clr32(bge_t *bgep, bge_regno_t regno, uint32_t bits)
  * it's been thoroughly tested for all access sizes on all supported
  * architectures (SPARC *and* x86!).
  */
-static uint32_t bge_ind_get32(bge_t *bgep, bge_regno_t regno);
+uint32_t bge_ind_get32(bge_t *bgep, bge_regno_t regno);
 #pragma	inline(bge_ind_get32)
 
-static uint32_t
+uint32_t
 bge_ind_get32(bge_t *bgep, bge_regno_t regno)
 {
 	uint32_t val;
 
 	BGE_TRACE(("bge_ind_get32($%p, 0x%lx)", (void *)bgep, regno));
-
-	ASSERT(mutex_owned(bgep->genlock));
 
 	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_RIAAR, regno);
 	val = pci_config_get32(bgep->cfg_handle, PCI_CONF_BGE_RIADR);
@@ -334,20 +341,21 @@ bge_ind_get32(bge_t *bgep, bge_regno_t regno)
 	BGE_DEBUG(("bge_ind_get32($%p, 0x%lx) => 0x%x",
 		(void *)bgep, regno, val));
 
+	val = LE_32(val);
+
 	return (val);
 }
 
-static void bge_ind_put32(bge_t *bgep, bge_regno_t regno, uint32_t val);
+void bge_ind_put32(bge_t *bgep, bge_regno_t regno, uint32_t val);
 #pragma	inline(bge_ind_put32)
 
-static void
+void
 bge_ind_put32(bge_t *bgep, bge_regno_t regno, uint32_t val)
 {
 	BGE_TRACE(("bge_ind_put32($%p, 0x%lx, 0x%x)",
 		(void *)bgep, regno, val));
 
-	ASSERT(mutex_owned(bgep->genlock));
-
+	val = LE_32(val);
 	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_RIAAR, regno);
 	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_RIADR, val);
 }
@@ -857,7 +865,6 @@ bge_nic_setwin(bge_t *bgep, bge_regno_t base)
 	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MWBAR, base);
 }
 
-
 static uint32_t bge_nic_get32(bge_t *bgep, bge_regno_t addr);
 #pragma	inline(bge_nic_get32)
 
@@ -866,7 +873,7 @@ bge_nic_get32(bge_t *bgep, bge_regno_t addr)
 {
 	uint32_t data;
 
-#ifdef BGE_IPMI_ASF
+#if defined(BGE_IPMI_ASF) && !defined(__sparc)
 	if (bgep->asf_enabled && !bgep->asf_wordswapped) {
 		/* workaround for word swap error */
 		if (addr & 4)
@@ -876,11 +883,15 @@ bge_nic_get32(bge_t *bgep, bge_regno_t addr)
 	}
 #endif
 
+#ifdef __sparc
+	data = bge_nic_read32(bgep, addr);
+#else
 	bge_nic_setwin(bgep, addr & ~MWBAR_GRANULE_MASK);
 	addr &= MWBAR_GRANULE_MASK;
 	addr += NIC_MEM_WINDOW_OFFSET;
 
 	data = ddi_get32(bgep->io_handle, PIO_ADDR(bgep, addr));
+#endif
 
 	BGE_TRACE(("bge_nic_get32($%p, 0x%lx) = 0x%08x",
 		(void *)bgep, addr, data));
@@ -897,7 +908,7 @@ bge_nic_put32(bge_t *bgep, bge_regno_t addr, uint32_t data)
 	BGE_TRACE(("bge_nic_put32($%p, 0x%lx, 0x%08x)",
 		(void *)bgep, addr, data));
 
-#ifdef BGE_IPMI_ASF
+#if defined(BGE_IPMI_ASF) && !defined(__sparc)
 	if (bgep->asf_enabled && !bgep->asf_wordswapped) {
 		/* workaround for word swap error */
 		if (addr & 4)
@@ -907,13 +918,19 @@ bge_nic_put32(bge_t *bgep, bge_regno_t addr, uint32_t data)
 	}
 #endif
 
+#ifdef __sparc
+	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MWBAR, addr);
+	data = LE_32(data);
+	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MWDAR, data);
+	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MWBAR, 0);
+#else
 	bge_nic_setwin(bgep, addr & ~MWBAR_GRANULE_MASK);
 	addr &= MWBAR_GRANULE_MASK;
 	addr += NIC_MEM_WINDOW_OFFSET;
 	ddi_put32(bgep->io_handle, PIO_ADDR(bgep, addr), data);
 	BGE_PCICHK(bgep);
+#endif
 }
-
 
 static uint64_t bge_nic_get64(bge_t *bgep, bge_regno_t addr);
 #pragma	inline(bge_nic_get64)
@@ -2512,6 +2529,15 @@ bge_chip_disable_engine(bge_t *bgep, bge_regno_t regno, uint32_t morebits)
 	switch (regno) {
 	case FTQ_RESET_REG:
 		/*
+		 * For Schumacher's bugfix CR6490108
+		 */
+#ifdef BGE_IPMI_ASF
+#ifdef BGE_NETCONSOLE
+		if (bgep->asf_enabled)
+			return (B_TRUE);
+#endif
+#endif
+		/*
 		 * Not quite like the others; it doesn't
 		 * have an <enable> bit, but instead we
 		 * have to set and then clear all the bits
@@ -2555,6 +2581,12 @@ bge_chip_enable_engine(bge_t *bgep, bge_regno_t regno, uint32_t morebits)
 
 	switch (regno) {
 	case FTQ_RESET_REG:
+#ifdef BGE_IPMI_ASF
+#ifdef BGE_NETCONSOLE
+		if (bgep->asf_enabled)
+			return (B_TRUE);
+#endif
+#endif
 		/*
 		 * Not quite like the others; it doesn't
 		 * have an <enable> bit, but instead we
@@ -3031,6 +3063,19 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 
 #ifdef BGE_IPMI_ASF
 	if (bgep->asf_enabled) {
+#ifdef __sparc
+		mhcr = MHCR_ENABLE_INDIRECT_ACCESS |
+			MHCR_ENABLE_TAGGED_STATUS_MODE |
+			MHCR_MASK_INTERRUPT_MODE |
+			MHCR_MASK_PCI_INT_OUTPUT |
+			MHCR_CLEAR_INTERRUPT_INTA |
+			MHCR_ENABLE_ENDIAN_WORD_SWAP |
+			MHCR_ENABLE_ENDIAN_BYTE_SWAP;
+		pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MHCR, mhcr);
+		bge_reg_put32(bgep, MEMORY_ARBITER_MODE_REG,
+			bge_reg_get32(bgep, MEMORY_ARBITER_MODE_REG) |
+			MEMORY_ARBITER_ENABLE);
+#endif
 		if (asf_mode == ASF_MODE_INIT) {
 			bge_asf_pre_reset_operations(bgep, BGE_INIT_RESET);
 		} else if (asf_mode == ASF_MODE_SHUTDOWN) {
@@ -3129,31 +3174,52 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 
 #ifdef BGE_IPMI_ASF
 	if (bgep->asf_enabled) {
-		if (asf_mode != ASF_MODE_NONE) {
-			/* Wait for NVRAM init */
-			i = 0;
-			drv_usecwait(5000);
-			mailbox = bge_nic_get32(bgep, BGE_FIRMWARE_MAILBOX);
-			while ((mailbox != (uint32_t)
-				~BGE_MAGIC_NUM_FIRMWARE_INIT_DONE) &&
-				(i < 10000)) {
-				drv_usecwait(100);
-				mailbox = bge_nic_get32(bgep,
-					BGE_FIRMWARE_MAILBOX);
-				i++;
-			}
-			if (!bgep->asf_newhandshake) {
-				if ((asf_mode == ASF_MODE_INIT) ||
-					(asf_mode == ASF_MODE_POST_INIT)) {
+#ifdef __sparc
+		bge_reg_put32(bgep, MEMORY_ARBITER_MODE_REG,
+			MEMORY_ARBITER_ENABLE |
+			bge_reg_get32(bgep, MEMORY_ARBITER_MODE_REG));
+#endif
 
-					bge_asf_post_reset_old_mode(bgep,
-						BGE_INIT_RESET);
-				} else {
-					bge_asf_post_reset_old_mode(bgep,
-						BGE_SHUTDOWN_RESET);
-				}
+#ifdef  BGE_NETCONSOLE
+		if (!bgep->asf_newhandshake) {
+			if ((asf_mode == ASF_MODE_INIT) ||
+			(asf_mode == ASF_MODE_POST_INIT)) {
+				bge_asf_post_reset_old_mode(bgep,
+					BGE_INIT_RESET);
+			} else {
+				bge_asf_post_reset_old_mode(bgep,
+					BGE_SHUTDOWN_RESET);
 			}
 		}
+#endif
+
+		/* Wait for NVRAM init */
+		i = 0;
+		drv_usecwait(5000);
+		mailbox = bge_nic_get32(bgep, BGE_FIRMWARE_MAILBOX);
+
+		while ((mailbox != (uint32_t)
+			~BGE_MAGIC_NUM_FIRMWARE_INIT_DONE) &&
+			(i < 10000)) {
+			drv_usecwait(100);
+			mailbox = bge_nic_get32(bgep,
+				BGE_FIRMWARE_MAILBOX);
+			i++;
+		}
+
+#ifndef BGE_NETCONSOLE
+		if (!bgep->asf_newhandshake) {
+			if ((asf_mode == ASF_MODE_INIT) ||
+				(asf_mode == ASF_MODE_POST_INIT)) {
+
+				bge_asf_post_reset_old_mode(bgep,
+					BGE_INIT_RESET);
+			} else {
+				bge_asf_post_reset_old_mode(bgep,
+					BGE_SHUTDOWN_RESET);
+			}
+		}
+#endif
 	}
 #endif
 	/*
@@ -3842,7 +3908,7 @@ bge_intr(caddr_t arg1, caddr_t arg2)
 	uint64_t flags;
 	uint32_t regval;
 	uint_t result;
-	int retval;
+	int retval, loop_cnt = 0;
 
 	BGE_TRACE(("bge_intr($%p) ($%p)", arg1, arg2));
 
@@ -3904,7 +3970,7 @@ bge_intr(caddr_t arg1, caddr_t arg2)
 	 */
 	bgep->missed_dmas += 1;
 	bsp = DMA_VPTR(bgep->status_block);
-	for (;;) {
+	for (loop_cnt = 0; loop_cnt < bge_intr_max_loop; loop_cnt++) {
 		if (bgep->bge_chip_state != BGE_CHIP_RUNNING) {
 			/*
 			 * bge_chip_stop() may have freed dma area etc
@@ -4257,7 +4323,9 @@ bge_factotum_stall_check(bge_t *bgep)
 	if (dogval < bge_watchdog_count)
 		return (B_FALSE);
 
+#if !defined(BGE_NETCONSOLE)
 	BGE_REPORT((bgep, "Tx stall detected, watchdog code 0x%x", dogval));
+#endif
 	bge_fm_ereport(bgep, DDI_FM_DEVICE_STALL);
 	return (B_TRUE);
 }
@@ -5087,6 +5155,8 @@ bge_diag_ioctl(bge_t *bgep, int cmd, mblk_t *mp, struct iocblk *iocp)
 		/*
 		 * Reset and reinitialise the 570x hardware
 		 */
+		bgep->bge_chip_state = BGE_CHIP_FAULT;
+		ddi_trigger_softintr(bgep->factotum_id);
 		(void) bge_restart(bgep, cmd == BGE_HARD_RESET);
 		return (IOC_ACK);
 	}
@@ -5299,6 +5369,7 @@ bge_nic_read32(bge_t *bgep, bge_regno_t addr)
 {
 	uint32_t data;
 
+#ifndef __sparc
 	if (!bgep->asf_wordswapped) {
 		/* a workaround word swap error */
 		if (addr & 4)
@@ -5306,14 +5377,15 @@ bge_nic_read32(bge_t *bgep, bge_regno_t addr)
 		else
 			addr = addr + 4;
 	}
+#endif
 
 	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MWBAR, addr);
 	data = pci_config_get32(bgep->cfg_handle, PCI_CONF_BGE_MWDAR);
 	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MWBAR, 0);
 
+	data = LE_32(data);
 	return (data);
 }
-
 
 void
 bge_asf_update_status(bge_t *bgep)
@@ -5380,6 +5452,7 @@ bge_asf_get_config(bge_t *bgep)
 	uint32_t nicsig;
 	uint32_t niccfg;
 
+	bgep->asf_enabled = B_FALSE;
 	nicsig = bge_nic_read32(bgep, BGE_NIC_DATA_SIG_ADDR);
 	if (nicsig == BGE_NIC_DATA_SIG) {
 		niccfg = bge_nic_read32(bgep, BGE_NIC_DATA_NIC_CFG_ADDR);

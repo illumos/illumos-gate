@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -284,6 +284,7 @@ bge_receive_ring(bge_t *bgep, recv_ring_t *rrp)
 	mblk_t *head;
 	mblk_t **tail;
 	mblk_t *mp;
+	int recv_cnt = 0;
 
 	ASSERT(mutex_owned(rrp->rx_lock));
 
@@ -310,10 +311,12 @@ bge_receive_ring(bge_t *bgep, recv_ring_t *rrp)
 	tail = &head;
 	slot = rrp->rx_next;
 
-	while (slot != *rrp->prod_index_p) {	/* Note: volatile	*/
+	while ((slot != *rrp->prod_index_p) && /* Note: volatile	*/
+		(recv_cnt < BGE_MAXPKT_RCVED)) {
 		if ((mp = bge_receive_packet(bgep, &hw_rbd_p[slot])) != NULL) {
 			*tail = mp;
 			tail = &mp->b_next;
+			recv_cnt++;
 		}
 		rrp->rx_next = slot = NEXT(slot, rrp->desc.nslots);
 	}

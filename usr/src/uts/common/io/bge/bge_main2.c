@@ -2509,6 +2509,12 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	int intr_types;
 #ifdef BGE_IPMI_ASF
 	uint32_t mhcrValue;
+#ifdef __sparc
+	uint16_t value16;
+#endif
+#ifdef BGE_NETCONSOLE
+	int retval;
+#endif
 #endif
 
 	instance = ddi_get_instance(devinfo);
@@ -2578,7 +2584,24 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 */
 	err = pci_config_setup(devinfo, &bgep->cfg_handle);
 #ifdef BGE_IPMI_ASF
+#ifdef __sparc
+	value16 = pci_config_get16(bgep->cfg_handle, PCI_CONF_COMM);
+	value16 = value16 | (PCI_COMM_MAE | PCI_COMM_ME);
+	pci_config_put16(bgep->cfg_handle, PCI_CONF_COMM, value16);
+	mhcrValue = MHCR_ENABLE_INDIRECT_ACCESS |
+		MHCR_ENABLE_TAGGED_STATUS_MODE |
+		MHCR_MASK_INTERRUPT_MODE |
+		MHCR_MASK_PCI_INT_OUTPUT |
+		MHCR_CLEAR_INTERRUPT_INTA |
+		MHCR_ENABLE_ENDIAN_WORD_SWAP |
+		MHCR_ENABLE_ENDIAN_BYTE_SWAP;
+	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MHCR, mhcrValue);
+	bge_ind_put32(bgep, MEMORY_ARBITER_MODE_REG,
+		bge_ind_get32(bgep, MEMORY_ARBITER_MODE_REG) |
+		MEMORY_ARBITER_ENABLE);
+#else
 	mhcrValue = pci_config_get32(bgep->cfg_handle, PCI_CONF_BGE_MHCR);
+#endif
 	if (mhcrValue & MHCR_ENABLE_ENDIAN_WORD_SWAP) {
 		bgep->asf_wordswapped = B_TRUE;
 	} else {
@@ -2776,7 +2799,11 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * filtering, promiscuity, loopback mode.
 	 */
 #ifdef BGE_IPMI_ASF
+#ifdef BGE_NETCONSOLE
+	if (bge_reset(bgep, ASF_MODE_INIT) != DDI_SUCCESS) {
+#else
 	if (bge_reset(bgep, ASF_MODE_SHUTDOWN) != DDI_SUCCESS) {
+#endif
 #else
 	if (bge_reset(bgep) != DDI_SUCCESS) {
 #endif
@@ -2875,6 +2902,17 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	bgep->progress |= PROGRESS_READY;
 	ASSERT(bgep->bge_guard == BGE_GUARD);
+#ifdef BGE_IPMI_ASF
+#ifdef BGE_NETCONSOLE
+	if (bgep->asf_enabled) {
+		mutex_enter(bgep->genlock);
+		retval = bge_chip_start(bgep, B_TRUE);
+		mutex_exit(bgep->genlock);
+		if (retval != DDI_SUCCESS)
+			goto attach_fail;
+	}
+#endif
+#endif
 	return (DDI_SUCCESS);
 
 attach_fail:

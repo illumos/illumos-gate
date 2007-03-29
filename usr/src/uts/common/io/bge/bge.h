@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,9 +130,16 @@ typedef struct {
 #define	BGE_PP_SPACE_SEEPROM	11		/* SEEPROM (if fitted)	*/
 #define	BGE_PP_SPACE_FLASH	12		/* FLASH (if fitted)    */
 
-#ifndef __sparc
 #define	BGE_IPMI_ASF
-#endif
+#define	BGE_NETCONSOLE
+
+/*
+ * BGE_MAXPKT_RCVED is defined to make sure bge does not stick
+ * in a receiving loop too long. This value is the tuning result
+ * of performance testing on sparc/x86 platforms, with regarding
+ * to throughput/latency/CPU utilization, TCP/UDP
+ */
+#define	BGE_MAXPKT_RCVED	32
 
 #ifdef __cplusplus
 }

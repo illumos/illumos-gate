@@ -545,6 +545,12 @@ extern "C" {
 #define	COALESCE_NOW			0x00000008
 
 /*
+ * Memory Arbiter Mode Register
+ * (MEMORY_ARBITER_MODE_REG, 0x4000)
+ */
+#define	MEMORY_ARBITER_ENABLE		0x00000002
+
+/*
  * Buffer Manager Mode Register
  * (BUFFER_MANAGER_MODE_REG, 0x4400)
  *
