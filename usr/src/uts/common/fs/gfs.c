@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+/* Portions Copyright 2007 Shivakumar GN */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,7 +51,7 @@
  * There are significant similarities between the implementation of certain file
  * system entry points across different filesystems.  While one could attempt to
  * "choke up on the bat" and incorporate common functionality into a VOP
- * preamable or postamble, such an approach is limited in the benefit it can
+ * preamble or postamble, such an approach is limited in the benefit it can
  * provide.  In this file we instead define a toolkit of routines which can be
  * called from a filesystem (with in-kernel pseudo-filesystems being the focus
  * of the exercise) in a more component-like fashion.
@@ -61,7 +61,7 @@
  * 1) Lowlevel support routines
  *
  *    These routines are designed to play a support role for existing
- *    pseudo-filesystems (such as procfs).  They simplif ycommon tasks,
+ *    pseudo-filesystems (such as procfs).  They simplify common tasks,
  *    without enforcing the filesystem to hand over management to GFS.  The
  *    routines covered are:
  *
@@ -77,7 +77,7 @@
  *    These routines take a more active role in management of the
  *    pseudo-filesystem.  They handle the relationship between vnode private
  *    data and VFS data, as well as the relationship between vnodes in the
- *    directory heirarchy.
+ *    directory hierarchy.
  *
  *    In order to use these interfaces, the first member of every private
  *    v_data must be a gfs_file_t or a gfs_dir_t.  This hands over all control
@@ -645,7 +645,7 @@ gfs_dir_lookup(vnode_t *dvp, const char *nm, vnode_t **vpp)
 			}
 
 			/*
-			 * We drop the directory lock, as the constuctor will
+			 * We drop the directory lock, as the constructor will
 			 * need to do KM_SLEEP allocations.  If we return from
 			 * the constructor only to find that a parallel
 			 * operation has completed, and GFS_CACHE_VNODE is set
