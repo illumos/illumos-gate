@@ -3041,18 +3041,20 @@ install_va_to_tte(void)
 	prom_interpret("' unix-tte is va>tte-data", 0, 0, 0, 0, 0);
 }
 
-
 /*
- * Because kmdb links prom_stdout_is_framebuffer into its own
- * module, we add "device-type=display" here for /os-io node, so that
- * prom_stdout_is_framebuffer still works corrrectly  after /os-io node
- * is registered into OBP.
+ * Here we add "device-type=console" for /os-io node, for currently
+ * our kernel console output only supports displaying text and
+ * performing cursor-positioning operations (through kernel framebuffer
+ * driver) and it doesn't support other functionalities required for a
+ * standard "display" device as specified in 1275 spec. The main missing
+ * interface defined by the 1275 spec is "draw-logo".
+ * also see the comments above prom_stdout_is_framebuffer().
  */
 static char *create_node =
 	"\" /\" find-device "
 	"new-device "
 	"\" os-io\" device-name "
-	"\" display\" device-type "
+	"\" "OBP_DISPLAY_CONSOLE"\" device-type "
 	": cb-r/w  ( adr,len method$ -- #read/#written ) "
 	"   2>r swap 2 2r> ['] $callback  catch  if "
 	"      2drop 3drop 0 "

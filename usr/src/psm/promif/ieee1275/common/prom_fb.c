@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,14 +29,28 @@
 #include <sys/promif.h>
 #include <sys/promimpl.h>
 
+/*
+ * Because kmdb links prom_stdout_is_framebuffer into its own
+ * module and coherent console adds "device-type=console" for
+ * /os-io node, we also check if the device-type is "console",
+ * (if not "display"), so that prom_stdout_is_framebuffer still
+ * works corrrectly after /os-io node is registered into OBP.
+ */
 int
 prom_stdout_is_framebuffer(void)
 {
 	static int remember = -1;
 
-	if (remember == -1)
+	if (remember != -1)
+		return (remember);
+
+	remember = prom_devicetype((pnode_t)prom_stdout_node(),
+		OBP_DISPLAY);
+
+	if (remember == 0)
 		remember = prom_devicetype((pnode_t)prom_stdout_node(),
-			OBP_DISPLAY);
+			OBP_DISPLAY_CONSOLE);
+
 	return (remember);
 }
 
