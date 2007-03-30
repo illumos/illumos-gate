@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,8 +99,14 @@ xdr_secattr(XDR *xdrs, vsecattr_t *objp)
 	if (!xdr_array(xdrs, (char **)&objp->vsa_aclentp, &count,
 	    NFS_ACL_MAX_ENTRIES, sizeof (aclent_t), (xdrproc_t)xdr_aclent))
 		return (FALSE);
-	if (count != 0 && count != (uint_t)objp->vsa_aclcnt)
+	if (count != 0 && count != (uint_t)objp->vsa_aclcnt) {
+		/*
+		 * Assign the actual array size to vsa_aclcnt before
+		 * aborting on error
+		 */
+		objp->vsa_aclcnt = (int)count;
 		return (FALSE);
+	}
 	if (!xdr_int(xdrs, &objp->vsa_dfaclcnt))
 		return (FALSE);
 	if (objp->vsa_dfaclentp != NULL)
@@ -110,8 +116,14 @@ xdr_secattr(XDR *xdrs, vsecattr_t *objp)
 	if (!xdr_array(xdrs, (char **)&objp->vsa_dfaclentp, &count,
 	    NFS_ACL_MAX_ENTRIES, sizeof (aclent_t), (xdrproc_t)xdr_aclent))
 		return (FALSE);
-	if (count != 0 && count != (uint_t)objp->vsa_dfaclcnt)
+	if (count != 0 && count != (uint_t)objp->vsa_dfaclcnt) {
+		/*
+		 * Assign the actual array size to vsa_dfaclcnt before
+		 * aborting on error
+		 */
+		objp->vsa_dfaclcnt = (int)count;
 		return (FALSE);
+	}
 	return (TRUE);
 }
 
