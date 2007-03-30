@@ -113,8 +113,8 @@ static void	get_link_stats(const char *, pktsum_t *);
 static uint64_t	mac_ifspeed(const char *);
 static void	stats_total(pktsum_t *, pktsum_t *, pktsum_t *);
 static void	stats_diff(pktsum_t *, pktsum_t *, pktsum_t *);
-static const char	*mac_link_state(const char *);
-static const char	*mac_link_duplex(const char *);
+static const char	*mac_link_state(const char *, char *);
+static const char	*mac_link_duplex(const char *, char *);
 
 static boolean_t str2int(const char *, int *);
 static void	die(const char *, ...);
@@ -891,8 +891,8 @@ dump_port(dladm_aggr_port_attr_t *port, boolean_t parseable)
 		    port->lp_mac, mac_addr));
 		(void) printf("\t %5uMb", (int)(mac_ifspeed(dev) /
 		    1000000ull));
-		(void) printf("\t%s", mac_link_duplex(dev));
-		(void) printf("\t%s", mac_link_state(dev));
+		(void) printf("\t%s", mac_link_duplex(dev, buf));
+		(void) printf("\t%s", mac_link_state(dev, buf));
 		(void) printf("\t%s\n",
 		    dladm_aggr_portstate2str(port->lp_state, buf));
 
@@ -901,8 +901,8 @@ dump_port(dladm_aggr_port_attr_t *port, boolean_t parseable)
 		    dladm_aggr_macaddr2str(port->lp_mac, mac_addr));
 		(void) printf(" speed=%u", (int)(mac_ifspeed(dev) /
 		    1000000ull));
-		(void) printf(" duplex=%s", mac_link_duplex(dev));
-		(void) printf(" link=%s", mac_link_state(dev));
+		(void) printf(" duplex=%s", mac_link_duplex(dev, buf));
+		(void) printf(" link=%s", mac_link_state(dev, buf));
 		(void) printf(" port=%s",
 		    dladm_aggr_portstate2str(port->lp_state, buf));
 	}
@@ -1048,21 +1048,22 @@ static void
 show_dev(void *arg, const char *dev)
 {
 	show_mac_state_t *state = (show_mac_state_t *)arg;
+	char buf[DLADM_STRSIZE];
 
 	(void) printf("%s", dev);
 
 	if (!state->ms_parseable) {
 		(void) printf(gettext("\t\tlink: %s"),
-		    mac_link_state(dev));
+		    mac_link_state(dev, buf));
 		(void) printf(gettext("\tspeed: %5uMb"),
 		    (unsigned int)(mac_ifspeed(dev) / 1000000ull));
 		(void) printf(gettext("\tduplex: %s\n"),
-		    mac_link_duplex(dev));
+		    mac_link_duplex(dev, buf));
 	} else {
-		(void) printf(" link=%s", mac_link_state(dev));
+		(void) printf(" link=%s", mac_link_state(dev, buf));
 		(void) printf(" speed=%u",
 		    (unsigned int)(mac_ifspeed(dev) / 1000000ull));
-		(void) printf(" duplex=%s\n", mac_link_duplex(dev));
+		(void) printf(" duplex=%s\n", mac_link_duplex(dev, buf));
 	}
 }
 
@@ -1576,29 +1577,28 @@ mac_ifspeed(const char *dev)
 }
 
 static const char *
-mac_link_state(const char *dev)
+mac_link_state(const char *dev, char *buf)
 {
 	link_state_t	link_state;
-	char		buf[DLADM_STRSIZE];
 
 	if (get_single_mac_stat(dev, "link_state", KSTAT_DATA_UINT32,
 	    &link_state) != 0) {
-		return ("unknown");
+		(void) strlcpy(buf, "unknown", DLADM_STRSIZE);
+		return (buf);
 	}
 
 	return (dladm_linkstate2str(link_state, buf));
 }
 
-
 static const char *
-mac_link_duplex(const char *dev)
+mac_link_duplex(const char *dev, char *buf)
 {
 	link_duplex_t	link_duplex;
-	char		buf[DLADM_STRSIZE];
 
 	if (get_single_mac_stat(dev, "link_duplex", KSTAT_DATA_UINT32,
 	    &link_duplex) != 0) {
-		return ("unknown");
+		(void) strlcpy(buf, "unknown", DLADM_STRSIZE);
+		return (buf);
 	}
 
 	return (dladm_linkduplex2str(link_duplex, buf));
