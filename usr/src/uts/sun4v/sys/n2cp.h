@@ -136,7 +136,7 @@ typedef	struct n2cp_hmac_ctx n2cp_hmac_ctx_t;
 #define	CWQ_QINDEX_INCR(i)		(((i) + 1) & CWQ_WRAPMASK)
 #define	CWQ_QINDEX_IS_VALID(i)		(((i) >= 0) && ((i) < CWQ_NENTRIES))
 
-#define	N2CP_QTIMEOUT_SECONDS		15
+#define	N2CP_QTIMEOUT_SECONDS		60
 
 typedef struct cwq_cwb {
 	cwq_cw_t	cb_cw;

@@ -298,7 +298,7 @@ struct ncp_stat {
 #define	NCP_QINDEX_INCR(i)		(((i) + 1) & NCP_MAQUEUE_WRAPMASK)
 #define	NCP_QINDEX_IS_VALID(i)		(((i) >= 0) && \
 						((i) < NCP_MAQUEUE_NENTRIES))
-#define	NCP_QTIMEOUT_SECONDS		15
+#define	NCP_QTIMEOUT_SECONDS		60
 
 typedef struct ncp_ma {
 	kmutex_t	nma_lock;
