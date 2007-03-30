@@ -4266,6 +4266,15 @@ sd_get_physical_geometry(struct sd_lun *un, cmlb_geom_t *pgeom_p,
 	}
 	pgeom_p->g_secsize = (unsigned short)lbasize;
 
+	/*
+	 * If the unit is a cd/dvd drive MODE SENSE page three
+	 * and MODE SENSE page four are reserved (see SBC spec
+	 * and MMC spec). To prevent soft errors just return
+	 * using the default LBA size.
+	 */
+	if (ISCD(un))
+		return (ret);
+
 	cdbsize = (un->un_f_cfg_is_atapi == TRUE) ? CDB_GROUP2 : CDB_GROUP0;
 
 	/*
@@ -4323,7 +4332,7 @@ sd_get_physical_geometry(struct sd_lun *un, cmlb_geom_t *pgeom_p,
 	 * 1243403: The NEC D38x7 drives do not support MODE SENSE sector size
 	 */
 	if (sector_size == 0) {
-		sector_size = (ISCD(un)) ? 2048 : un->un_sys_blocksize;
+		sector_size = un->un_sys_blocksize;
 	} else {
 		sector_size &= ~(un->un_sys_blocksize - 1);
 	}
@@ -7208,29 +7217,6 @@ sd_unit_attach(dev_info_t *devi)
 	mutex_exit(SD_MUTEX(un));
 
 	/*
-	 * Set the pstat and error stat values here, so data obtained during the
-	 * previous attach-time routines is available.
-	 *
-	 * Note: This is a critical sequence that needs to be maintained:
-	 *	1) Instantiate the kstats before any routines using the iopath
-	 *	   (i.e. sd_send_scsi_cmd).
-	 *	2) Initialize the error stats (sd_set_errstats) and partition
-	 *	   stats (sd_set_pstats)here, following
-	 *	   cmlb_validate_geometry(), sd_register_devid(), and
-	 *	   sd_cache_control().
-	 */
-
-	if (un->un_f_pkstats_enabled && geom_label_valid) {
-		sd_set_pstats(un);
-		SD_TRACE(SD_LOG_IO_PARTITION, un,
-		    "sd_unit_attach: un:0x%p pstats created and set\n", un);
-	}
-
-	sd_set_errstats(un);
-	SD_TRACE(SD_LOG_ATTACH_DETACH, un,
-	    "sd_unit_attach: un:0x%p errstats set\n", un);
-
-	/*
 	 * Find out what type of reservation this disk supports.
 	 */
 	switch (sd_send_scsi_PERSISTENT_RESERVE_IN(un, SD_READ_KEYS, 0, NULL)) {
@@ -7260,6 +7246,30 @@ sd_unit_attach(dev_info_t *devi)
 		un->un_reservation_type = SD_SCSI3_RESERVATION;
 		break;
 	}
+
+	/*
+	 * Set the pstat and error stat values here, so data obtained during the
+	 * previous attach-time routines is available.
+	 *
+	 * Note: This is a critical sequence that needs to be maintained:
+	 *	1) Instantiate the kstats before any routines using the iopath
+	 *	   (i.e. sd_send_scsi_cmd).
+	 *	2) Initialize the error stats (sd_set_errstats) and partition
+	 *	   stats (sd_set_pstats)here, following
+	 *	   cmlb_validate_geometry(), sd_register_devid(), and
+	 *	   sd_cache_control().
+	 */
+
+	if (un->un_f_pkstats_enabled && geom_label_valid) {
+		sd_set_pstats(un);
+		SD_TRACE(SD_LOG_IO_PARTITION, un,
+		    "sd_unit_attach: un:0x%p pstats created and set\n", un);
+	}
+
+	sd_set_errstats(un);
+	SD_TRACE(SD_LOG_ATTACH_DETACH, un,
+	    "sd_unit_attach: un:0x%p errstats set\n", un);
+
 
 	/*
 	 * After successfully attaching an instance, we record the information
