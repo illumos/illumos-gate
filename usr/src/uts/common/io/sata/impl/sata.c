@@ -155,6 +155,8 @@ static	void sata_process_device_detached(sata_hba_inst_t *, sata_address_t *);
 static	void sata_process_device_attached(sata_hba_inst_t *, sata_address_t *);
 static	void sata_process_port_pwr_change(sata_hba_inst_t *, sata_address_t *);
 static	void sata_process_cntrl_pwr_level_change(sata_hba_inst_t *);
+static	void sata_process_target_node_cleanup(sata_hba_inst_t *,
+    sata_address_t *);
 
 /* Local functions for ioctl */
 static	int32_t sata_get_port_num(sata_hba_inst_t *,  struct devctl_iocdata *);
@@ -185,6 +187,7 @@ static	int sata_txlt_lba_out_of_range(sata_pkt_txlate_t *);
 static 	void sata_txlt_rw_completion(sata_pkt_t *);
 static 	void sata_txlt_atapi_completion(sata_pkt_t *);
 static 	void sata_txlt_nodata_cmd_completion(sata_pkt_t *);
+static 	int sata_emul_rw_completion(sata_pkt_txlate_t *);
 
 static 	struct scsi_extended_sense *sata_immediate_error_response(
     sata_pkt_txlate_t *, int);
@@ -211,14 +214,14 @@ static	int sata_build_lsense_page_30(sata_drive_info_t *, uint8_t *,
 static	void sata_save_drive_settings(sata_drive_info_t *);
 static	void sata_show_drive_info(sata_hba_inst_t *, sata_drive_info_t *);
 static	void sata_log(sata_hba_inst_t *, uint_t, char *fmt, ...);
-static int sata_fetch_smart_return_status(sata_hba_inst_t *,
+static	int sata_fetch_smart_return_status(sata_hba_inst_t *,
     sata_drive_info_t *);
-static int sata_fetch_smart_data(sata_hba_inst_t *, sata_drive_info_t *,
+static	int sata_fetch_smart_data(sata_hba_inst_t *, sata_drive_info_t *,
     struct smart_data *);
-static int sata_smart_selftest_log(sata_hba_inst_t *,
+static	int sata_smart_selftest_log(sata_hba_inst_t *,
     sata_drive_info_t *,
     struct smart_selftest_log *);
-static int sata_ext_smart_selftest_read_log(sata_hba_inst_t *,
+static	int sata_ext_smart_selftest_read_log(sata_hba_inst_t *,
     sata_drive_info_t *, struct smart_ext_selftest_log *, uint16_t);
 static	int sata_smart_read_log(sata_hba_inst_t *, sata_drive_info_t *,
     uint8_t *, uint8_t, uint8_t);
@@ -226,6 +229,10 @@ static	int sata_read_log_ext_directory(sata_hba_inst_t *, sata_drive_info_t *,
     struct read_log_ext_directory *);
 static	void sata_gen_sysevent(sata_hba_inst_t *, sata_address_t *, int);
 static	void sata_xlate_errors(sata_pkt_txlate_t *);
+static	void sata_set_device_removed(dev_info_t *);
+static	boolean_t sata_check_device_removed(dev_info_t *);
+static	void sata_set_target_node_cleanup(sata_hba_inst_t *, int cport);
+
 
 /*
  * SATA Framework will ignore SATA HBA driver cb_ops structure and
@@ -259,7 +266,7 @@ extern uchar_t	scsi_cdb_size[];
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,			/* Type of module */
-	"Generic SATA Driver v%I%"	/* module name */
+	"SATA Module v%I%"		/* module name */
 };
 
 
@@ -1169,24 +1176,42 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
 				    cport)->cport_mutex);
 				tdip = sata_get_target_dip(dip, comp_port);
-				if (tdip != NULL) {
-					/* target node exist */
-					if (ndi_devi_offline(tdip,
-					    NDI_DEVI_REMOVE) != NDI_SUCCESS) {
-						/*
-						 * Problem
-						 * A target node remained
-						 * attached. This happens when
-						 * the file was open or a node
-						 * was waiting for resources.
-						 * Cannot do anything about it.
-						 */
-						SATA_LOG_D((sata_hba_inst,
-						    CE_WARN,
-						    "sata_hba_ioctl: "
-						    "disconnect: cannot "
-						    "remove target node!!!"));
-					}
+				if (tdip != NULL && ndi_devi_offline(tdip,
+				    NDI_DEVI_REMOVE) != NDI_SUCCESS) {
+					/*
+					 * Problem
+					 * A target node remained
+					 * attached. This happens when
+					 * the file was open or a node
+					 * was waiting for resources.
+					 * Cannot do anything about it.
+					 */
+					SATA_LOG_D((sata_hba_inst, CE_WARN,
+					    "sata_hba_ioctl: "
+					    "disconnect: could not "
+					    "unconfigure device before "
+					    "disconnecting the SATA "
+					    "port %d", cport));
+
+					/*
+					 * Set DEVICE REMOVED state
+					 * in the target node. It
+					 * will prevent access to
+					 * the device even when a
+					 * new device is attached,
+					 * until the old target node
+					 * is released, removed and
+					 * recreated for a new
+					 * device.
+					 */
+					sata_set_device_removed(tdip);
+					/*
+					 * Instruct event daemon to
+					 * try the target node cleanup
+					 * later.
+					 */
+					sata_set_target_node_cleanup(
+					    sata_hba_inst, cport);
 				}
 				mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
 				    cport)->cport_mutex);
@@ -1264,7 +1289,7 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 				SATA_LOG_D((sata_hba_inst, CE_WARN,
 				    "sata_hba_ioctl: unconfigure: "
 				    "failed to unconfigure "
-				    "device at cport %d", cport));
+				    "device at SATA port %d", cport));
 				rv = EIO;
 			}
 			/*
@@ -1283,7 +1308,7 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			SATA_LOG_D((sata_hba_inst, CE_WARN,
 			    "sata_hba_ioctl: unconfigure: "
 			    "attempt to unconfigure non-existing device "
-			    "at cport %d", cport));
+			    "at SATA port %d", cport));
 			rv = ENXIO;
 		}
 
@@ -1336,7 +1361,7 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 				    cport)->cport_mutex);
 				SATA_LOG_D((sata_hba_inst, CE_WARN,
 				    "sata_hba_ioctl: connect: "
-				    "failed to activate SATA cport %d",
+				    "failed to activate SATA port %d",
 				    cport));
 				rv = EIO;
 				break;
@@ -1443,7 +1468,7 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 					    sata_hba_inst, cport)->cport_mutex);
 					SATA_LOG_D((sata_hba_inst, CE_WARN,
 					    "sata_hba_ioctl: configure: "
-					    "failed to activate SATA cport %d",
+					    "failed to activate SATA port %d",
 					    cport));
 					rv = EIO;
 					break;
@@ -1516,26 +1541,55 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
 
 		if ((tdip = sata_get_target_dip(dip, comp_port)) != NULL) {
-			/* target node still exists */
-			if (ndi_devi_online(tdip, 0) != NDI_SUCCESS) {
-				SATA_LOG_D((sata_hba_inst, CE_WARN,
-				    "sata_hba_ioctl: configure: "
-				    "onlining device at cport %d failed",
-				    cport));
-				rv = EIO;
+			/*
+			 * Target node exists. Verify, that it belongs
+			 * to existing, attached device and not to
+			 * a removed device.
+			 */
+			if (sata_check_device_removed(tdip) == B_FALSE) {
+				if (ndi_devi_online(tdip, 0) != NDI_SUCCESS) {
+					SATA_LOG_D((sata_hba_inst, CE_WARN,
+					    "sata_hba_ioctl: configure: "
+					    "onlining device at SATA port %d "
+					    "failed", cport));
+					rv = EIO;
+					break;
+				} else {
+					mutex_enter(&SATA_CPORT_INFO(
+					    sata_hba_inst, cport)->cport_mutex);
+					SATA_CPORT_INFO(sata_hba_inst, cport)->
+					    cport_tgtnode_clean = B_TRUE;
+					mutex_exit(&SATA_CPORT_INFO(
+					    sata_hba_inst, cport)->cport_mutex);
+				}
+			} else {
+				sata_log(sata_hba_inst, CE_WARN,
+				    "SATA device at port %d cannot be "
+				    "configured. "
+				    "Application(s) accessing previously "
+				    "attached device "
+				    "have to release it before newly inserted "
+				    "device can be made accessible.",
+				    cport);
 				break;
 			}
 		} else {
 			/*
 			 * No target node - need to create a new target node.
 			 */
+			mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
+			    cport_mutex);
+			SATA_CPORT_INFO(sata_hba_inst, cport)->
+			    cport_tgtnode_clean = B_TRUE;
+			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
+			    cport_mutex);
 			tdip = sata_create_target_node(dip, sata_hba_inst,
 			    &sata_device.satadev_addr);
 			if (tdip == NULL) {
 				/* configure failed */
 				SATA_LOG_D((sata_hba_inst, CE_WARN,
 				    "sata_hba_ioctl: configure: "
-				    "configuring device at cport %d "
+				    "configuring SATA device at port %d "
 				    "failed", cport));
 				rv = EIO;
 				break;
@@ -1853,7 +1907,7 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 			/*
 			 * This operation returns EFAULT if either reset
-			 * controller failed or a re-probbing of any ports
+			 * controller failed or a re-probing of any ports
 			 * failed.
 			 * We return here, because common return is for
 			 * a single cport operation.
@@ -1909,7 +1963,7 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 						    NULL);
 
 						if (ndi_devi_offline(tdip,
-						    NDI_UNCONFIG) !=
+						    NDI_DEVI_REMOVE) !=
 						    NDI_SUCCESS) {
 							SATA_LOG_D((
 							    sata_hba_inst,
@@ -1918,29 +1972,32 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 							    "port deactivate: "
 							    "failed to "
 							    "unconfigure "
-							    "device at cport "
-							    "%d", cport));
+							    "device at port "
+							    "%d before "
+							    "deactivating "
+							    "the port", cport));
 						}
-						if (ndi_devi_offline(tdip,
-						    NDI_DEVI_REMOVE) !=
-						    NDI_SUCCESS) {
-							/*
-							 * Problem;
-							 * target node remained
-							 * attached.
-							 * Too bad...
-							 */
-							SATA_LOG_D((
-							    sata_hba_inst,
-							    CE_WARN,
-							    "sata_hba_ioctl: "
-							    "port deactivate: "
-							    "failed to "
-							    "unconfigure "
-							    "device at "
-							    "cport %d",
-							    cport));
-						}
+
+
+						/*
+						 * Set DEVICE REMOVED state
+						 * in the target node. It
+						 * will prevent access to
+						 * the device even when a
+						 * new device is attached,
+						 * until the old target node
+						 * is released, removed and
+						 * recreated for a new
+						 * device.
+						 */
+						sata_set_device_removed(tdip);
+						/*
+						 * Instruct event daemon to
+						 * try the target node cleanup
+						 * later.
+						 */
+						sata_set_target_node_cleanup(
+						    sata_hba_inst, cport);
 					}
 					mutex_enter(&SATA_CPORT_INFO(
 					    sata_hba_inst, cport)->cport_mutex);
@@ -1997,7 +2054,7 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 				}
 				SATA_LOG_D((sata_hba_inst, CE_WARN,
 				    "sata_hba_ioctl: port deactivate: "
-				    "cannot deactivate SATA cport %d",
+				    "cannot deactivate SATA port %d",
 				    cport));
 				rv = EIO;
 			} else {
@@ -2044,7 +2101,7 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 				    cport)->cport_mutex);
 				SATA_LOG_D((sata_hba_inst, CE_WARN,
 				    "sata_hba_ioctl: port activate: "
-				    "cannot activate SATA cport %d",
+				    "cannot activate SATA port %d",
 				    cport));
 				rv = EIO;
 				break;
@@ -2524,7 +2581,7 @@ sata_scsi_tgt_probe(struct scsi_device *sd, int (*callback)(void))
 		if ((ddi_prop_update_int(DDI_DEV_T_NONE, sd->sd_dev,
 		    "pm-capable", 1)) != DDI_PROP_SUCCESS) {
 			sata_log(sata_hba_inst, CE_WARN,
-			"device at port %d: will not be power-managed ",
+			"SATA device at port %d: will not be power-managed ",
 			SCSI_TO_SATA_CPORT(sd->sd_address.a_target));
 			SATA_LOG_D((sata_hba_inst, CE_WARN,
 			"failure updating pm-capable property"));
@@ -2699,7 +2756,12 @@ sata_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
 	    sata_device.satadev_addr.cport)));
 	/*
-	 * Allocate necessary DMA resources for the packet's buffer
+	 * Allocate necessary DMA resources for the packet's data buffer
+	 * NOTE:
+	 * In case of read/write commands, DMA resource allocation here is
+	 * based on the premise that the transfer length specified in
+	 * the read/write scsi cdb will match exactly DMA resources -
+	 * returning correct packet residue is crucial.
 	 */
 	if ((rval = sata_dma_buf_setup(spx, flags, callback, arg,
 	    &cur_dma_attr)) != DDI_SUCCESS) {
@@ -2794,19 +2856,33 @@ sata_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	ASSERT(spx != NULL &&
 	    spx->txlt_scsi_pkt == pkt && spx->txlt_sata_pkt != NULL);
 
-	/*
-	 * Mutex-protected section below is just to identify device type
-	 * and switch to ATAPI processing, if necessary
-	 */
 	cport = SCSI_TO_SATA_CPORT(ap->a_target);
 
 	mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
-
 	sdinfo = sata_get_device_info(sata_hba_inst,
 	    &spx->txlt_sata_pkt->satapkt_device);
-	if (sdinfo == NULL) {
+	if (sdinfo == NULL ||
+	    SATA_CPORT_INFO(sata_hba_inst, cport)->cport_tgtnode_clean ==
+	    B_FALSE) {
 		mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst, cport)));
-		spx->txlt_scsi_pkt->pkt_reason = CMD_DEV_GONE;
+		pkt->pkt_reason = CMD_DEV_GONE;
+		/*
+		 * The sd target driver is checking CMD_DEV_GONE pkt_reason
+		 * only in callback function (for normal requests) and
+		 * in the dump code path.
+		 * So, if the callback is available, we need to do
+		 * the callback rather than returning TRAN_FATAL_ERROR here.
+		 */
+		if (pkt->pkt_comp != NULL) {
+			/* scsi callback required */
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)pkt->pkt_comp,
+			    (void *)pkt, TQ_SLEEP) == NULL)
+				/* Scheduling the callback failed */
+				return (TRAN_BUSY);
+			return (TRAN_ACCEPT);
+		}
+		/* No callback available */
 		return (TRAN_FATAL_ERROR);
 	}
 
@@ -3297,8 +3373,12 @@ sata_scsi_destroy_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 		 * Free DMA resources - cookies and handles
 		 */
 		ASSERT(spx->txlt_dma_cookie_list != NULL);
-		(void) kmem_free(spx->txlt_dma_cookie_list,
-		    spx->txlt_dma_cookie_list_len * sizeof (ddi_dma_cookie_t));
+		if (spx->txlt_dma_cookie_list != &spx->txlt_dma_cookie) {
+			(void) kmem_free(spx->txlt_dma_cookie_list,
+			    spx->txlt_dma_cookie_list_len *
+			    sizeof (ddi_dma_cookie_t));
+			spx->txlt_dma_cookie_list = NULL;
+		}
 		(void) ddi_dma_unbind_handle(spx->txlt_buf_dma_handle);
 		(void) ddi_dma_free_handle(&spx->txlt_buf_dma_handle);
 	}
@@ -3329,8 +3409,12 @@ sata_scsi_dmafree(struct scsi_address *ap, struct scsi_pkt *pkt)
 		 * Free DMA resources - cookies and handles
 		 */
 		ASSERT(spx->txlt_dma_cookie_list != NULL);
-		(void) kmem_free(spx->txlt_dma_cookie_list,
-		    spx->txlt_dma_cookie_list_len * sizeof (ddi_dma_cookie_t));
+		if (spx->txlt_dma_cookie_list != &spx->txlt_dma_cookie) {
+			(void) kmem_free(spx->txlt_dma_cookie_list,
+			    spx->txlt_dma_cookie_list_len *
+			    sizeof (ddi_dma_cookie_t));
+			spx->txlt_dma_cookie_list = NULL;
+		}
 		(void) ddi_dma_unbind_handle(spx->txlt_buf_dma_handle);
 		(void) ddi_dma_free_handle(&spx->txlt_buf_dma_handle);
 	}
@@ -3423,6 +3507,24 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx)
 	case 1:
 		/* valid address but no device - it has disappeared ? */
 		spx->txlt_scsi_pkt->pkt_reason = CMD_DEV_GONE;
+		/*
+		 * The sd target driver is checking CMD_DEV_GONE pkt_reason
+		 * only in callback function (for normal requests) and
+		 * in the dump code path.
+		 * So, if the callback is available, we need to do
+		 * the callback rather than returning TRAN_FATAL_ERROR here.
+		 */
+		if (spx->txlt_scsi_pkt->pkt_comp != NULL) {
+			/* scsi callback required */
+			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+			    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
+			    (void *)spx->txlt_scsi_pkt,
+			    TQ_SLEEP) == NULL)
+				/* Scheduling the callback failed */
+				return (TRAN_BUSY);
+
+			return (TRAN_ACCEPT);
+		}
 		return (TRAN_FATAL_ERROR);
 	default:
 		/* all OK */
@@ -3433,16 +3535,27 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx)
 
 	/*
 	 * If device is in reset condition, reject the packet with
-	 * TRAN_BUSY
+	 * TRAN_BUSY, unless:
+	 * 1. system is panicking (dumping)
+	 * In such case only one thread is running and there is no way to
+	 * process reset.
+	 * 2. cfgadm operation is is progress (internal APCTL lock is set)
+	 * Some cfgadm operations involve drive commands, so reset condition
+	 * needs to be ignored for IOCTL operations.
 	 */
 	if ((sdinfo->satadrv_event_flags &
-	    (SATA_EVNT_DEVICE_RESET | SATA_EVNT_INPROC_DEVICE_RESET)) &&
-	    !ddi_in_panic()) {
-		spx->txlt_scsi_pkt->pkt_reason = CMD_INCOMPLETE;
-		SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
-		    "sata_scsi_start: rejecting command because "
-		    "of device reset state\n", NULL);
-		return (TRAN_BUSY);
+	    (SATA_EVNT_DEVICE_RESET | SATA_EVNT_INPROC_DEVICE_RESET)) != 0) {
+
+		if (!ddi_in_panic() &&
+		    ((SATA_CPORT_EVENT_FLAGS(spx->txlt_sata_hba_inst,
+		    sata_device.satadev_addr.cport) &
+		    SATA_APCTL_LOCK_PORT_BUSY) == 0)) {
+			spx->txlt_scsi_pkt->pkt_reason = CMD_INCOMPLETE;
+			SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
+			    "sata_scsi_start: rejecting command because "
+			    "of device reset state\n", NULL);
+			return (TRAN_BUSY);
+		}
 	}
 
 	/*
@@ -3455,6 +3568,12 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx)
 	spx->txlt_sata_pkt->satapkt_device.satadev_type = sdinfo->satadrv_type;
 
 	spx->txlt_sata_pkt->satapkt_cmd.satacmd_flags = sata_initial_cmd_flags;
+	if ((SATA_CPORT_INFO(spx->txlt_sata_hba_inst,
+	    sata_device.satadev_addr.cport)->cport_event_flags &
+	    SATA_APCTL_LOCK_PORT_BUSY) != 0) {
+		spx->txlt_sata_pkt->satapkt_cmd.satacmd_flags.
+		    sata_ignore_dev_reset = B_TRUE;
+	}
 
 	spx->txlt_scsi_pkt->pkt_reason = CMD_CMPLT;
 
@@ -3588,7 +3707,7 @@ sata_txlt_invalid_command(sata_pkt_txlate_t *spx)
 		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
 		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
 		    (void *)spx->txlt_scsi_pkt,
-		    TQ_SLEEP) == 0)
+		    TQ_SLEEP) == NULL)
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
 	return (TRAN_ACCEPT);
@@ -3628,7 +3747,7 @@ sata_txlt_nodata_cmd_immediate(sata_pkt_txlate_t *spx)
 		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
 		    (task_func_t *)spx->txlt_scsi_pkt->pkt_comp,
 		    (void *)spx->txlt_scsi_pkt,
-		    TQ_SLEEP) == 0)
+		    TQ_SLEEP) == NULL)
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
 	return (TRAN_ACCEPT);
@@ -3788,7 +3907,7 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 				 * identifiers are common for SATA devices
 				 * But not now.
 				 */
-				/*FALLTHRU*/
+				/*FALLTHROUGH*/
 
 			default:
 				/* Request for unsupported VPD page */
@@ -3816,7 +3935,7 @@ done:
 		/* scsi callback required */
 		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
 		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == 0)
+		    TQ_SLEEP) == NULL)
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
 	}
@@ -3875,7 +3994,7 @@ sata_txlt_request_sense(sata_pkt_txlate_t *spx)
 		/* scsi callback required */
 		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
 		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == 0)
+		    TQ_SLEEP) == NULL)
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
 	return (TRAN_ACCEPT);
@@ -3933,7 +4052,7 @@ sata_txlt_test_unit_ready(sata_pkt_txlate_t *spx)
 		/* scsi callback required */
 		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
 		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == 0)
+		    TQ_SLEEP) == NULL)
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
 
@@ -3991,7 +4110,7 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 			/* scsi callback required */
 			if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
 			    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-			    TQ_SLEEP) == 0)
+			    TQ_SLEEP) == NULL)
 				/* Scheduling the callback failed */
 				return (TRAN_BUSY);
 
@@ -4119,7 +4238,7 @@ sata_txlt_read_capacity(sata_pkt_txlate_t *spx)
 		/* scsi callback required */
 		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
 		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == 0)
+		    TQ_SLEEP) == NULL)
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
 
@@ -4373,7 +4492,7 @@ done:
 		/* scsi callback required */
 		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
 		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == 0)
+		    TQ_SLEEP) == NULL)
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
 
@@ -4632,7 +4751,7 @@ done:
 		/* scsi callback required */
 		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
 		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == 0)
+		    TQ_SLEEP) == NULL)
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
 
@@ -4845,7 +4964,7 @@ done:
 		/* scsi callback required */
 		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
 		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == 0)
+		    TQ_SLEEP) == NULL)
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
 
@@ -4913,9 +5032,7 @@ sata_txlt_read(sata_pkt_txlate_t *spx)
 
 	scmd->satacmd_flags.sata_data_direction = SATA_DIR_READ;
 	/*
-	 * Build cmd block depending on the device capability and
-	 * requested operation mode.
-	 * Do not bother with non-dma mode.
+	 * Extract LBA and sector count from scsi CDB.
 	 */
 	switch ((uint_t)scsipkt->pkt_cdbp[0]) {
 	case SCMD_READ:
@@ -4977,6 +5094,22 @@ sata_txlt_read(sata_pkt_txlate_t *spx)
 		return (sata_txlt_lba_out_of_range(spx));
 	}
 
+	/*
+	 * For zero-length transfer, emulate good completion of the command
+	 * (reasons for rejecting the command were already checked).
+	 * No DMA resources were allocated.
+	 */
+	if (spx->txlt_dma_cookie_list == NULL) {
+		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		return (sata_emul_rw_completion(spx));
+	}
+
+	/*
+	 * Build cmd block depending on the device capability and
+	 * requested operation mode.
+	 * Do not bother with non-dma mode - we are working only with
+	 * devices supporting DMA.
+	 */
 	scmd->satacmd_addr_type = ATA_ADDR_LBA;
 	scmd->satacmd_device_reg = SATA_ADH_LBA;
 	scmd->satacmd_cmd_reg = SATAC_READ_DMA;
@@ -5129,9 +5262,7 @@ sata_txlt_write(sata_pkt_txlate_t *spx)
 
 	scmd->satacmd_flags.sata_data_direction = SATA_DIR_WRITE;
 	/*
-	 * Build cmd block depending on the device capability and
-	 * requested operation mode.
-	 * Do not bother with non-dma mode.
+	 * Extract LBA and sector count from scsi CDB
 	 */
 	switch ((uint_t)scsipkt->pkt_cdbp[0]) {
 	case SCMD_WRITE:
@@ -5193,6 +5324,22 @@ sata_txlt_write(sata_pkt_txlate_t *spx)
 		return (sata_txlt_lba_out_of_range(spx));
 	}
 
+	/*
+	 * For zero-length transfer, emulate good completion of the command
+	 * (reasons for rejecting the command were already checked).
+	 * No DMA resources were allocated.
+	 */
+	if (spx->txlt_dma_cookie_list == NULL) {
+		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		return (sata_emul_rw_completion(spx));
+	}
+
+	/*
+	 * Build cmd block depending on the device capability and
+	 * requested operation mode.
+	 * Do not bother with non-dma mode- we are working only with
+	 * devices supporting DMA.
+	 */
 	scmd->satacmd_addr_type = ATA_ADDR_LBA;
 	scmd->satacmd_device_reg = SATA_ADH_LBA;
 	scmd->satacmd_cmd_reg = SATAC_WRITE_DMA;
@@ -5575,11 +5722,11 @@ sata_hba_start(sata_pkt_txlate_t *spx, int *rval)
 		    spx->txlt_sata_pkt->satapkt_device.satadev_addr.qual ==
 		    SATA_ADDR_DCPORT)
 			sata_log(sata_hba_inst, CE_CONT,
-			    "port %d error",
+			    "SATA port %d error",
 			    sata_device->satadev_addr.cport);
 		else
 			sata_log(sata_hba_inst, CE_CONT,
-			    "port %d pmport %d error\n",
+			    "SATA port %d pmport %d error\n",
 			    sata_device->satadev_addr.cport,
 			    sata_device->satadev_addr.pmport);
 
@@ -5702,7 +5849,7 @@ sata_txlt_lba_out_of_range(sata_pkt_txlate_t *spx)
 		/* scsi callback required */
 		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
 		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
-		    TQ_SLEEP) == 0)
+		    TQ_SLEEP) == NULL)
 			/* Scheduling the callback failed */
 			return (TRAN_BUSY);
 	return (TRAN_ACCEPT);
@@ -5820,6 +5967,33 @@ sata_arq_sense(sata_pkt_txlate_t *spx)
 	sense->es_add_code = 0;
 	sense->es_qual_code = 0;
 	return (sense);
+}
+
+
+/*
+ * Emulated SATA Read/Write command completion for zero-length requests.
+ * This request always succedes, so in synchronous mode it always returns
+ * TRAN_ACCEPT, and in non-synchronous mode it may return TRAN_BUSY if the
+ * callback cannot be scheduled.
+ */
+static int
+sata_emul_rw_completion(sata_pkt_txlate_t *spx)
+{
+	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
+
+	scsipkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
+	    STATE_SENT_CMD | STATE_GOT_STATUS;
+	scsipkt->pkt_reason = CMD_CMPLT;
+	*scsipkt->pkt_scbp = STATUS_GOOD;
+	if (!(spx->txlt_sata_pkt->satapkt_op_mode & SATA_OPMODE_SYNCH)) {
+		/* scsi callback required - have to schedule it */
+		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)scsipkt->pkt_comp,
+		    (void *)scsipkt, TQ_SLEEP) == NULL)
+			/* Scheduling the callback failed */
+			return (TRAN_BUSY);
+	}
+	return (TRAN_ACCEPT);
 }
 
 
@@ -5983,7 +6157,6 @@ sata_txlt_rw_completion(sata_pkt_t *sata_pkt)
 	    scsipkt->pkt_comp != NULL)
 		/* scsi callback required */
 		(*scsipkt->pkt_comp)(scsipkt);
-
 }
 
 /*
@@ -7211,7 +7384,7 @@ sata_probe_ports(sata_hba_inst_t *sata_hba_inst)
 		    minor_number, DDI_NT_SATA_ATTACHMENT_POINT, 0) !=
 		    DDI_SUCCESS) {
 			sata_log(sata_hba_inst, CE_WARN, "sata_hba_attach: "
-			    "cannot create sata attachment point for port %d",
+			    "cannot create SATA attachment point for port %d",
 			    ncport);
 		}
 
@@ -7323,7 +7496,7 @@ sata_probe_ports(sata_hba_inst_t *sata_hba_inst)
 				    0) != DDI_SUCCESS) {
 					sata_log(sata_hba_inst, CE_WARN,
 					    "sata_hba_attach: "
-					    "cannot create sata attachment "
+					    "cannot create SATA attachment "
 					    "point for port %d pmult port %d",
 					    ncport, npmport);
 				}
@@ -7491,6 +7664,7 @@ sata_add_device(dev_info_t *pdip, sata_hba_inst_t *sata_hba_inst, int cport,
 		mutex_enter(&cportinfo->cport_mutex);
 		sata_show_drive_info(sata_hba_inst,
 		    SATA_CPORTINFO_DRV_INFO(cportinfo));
+		cportinfo->cport_tgtnode_clean = B_TRUE;
 		mutex_exit(&cportinfo->cport_mutex);
 		cdip = sata_create_target_node(pdip, sata_hba_inst,
 		    &sata_device.satadev_addr);
@@ -7557,6 +7731,7 @@ sata_add_device(dev_info_t *pdip, sata_hba_inst_t *sata_hba_inst, int cport,
 		mutex_enter(&cportinfo->cport_mutex);
 		sata_show_drive_info(sata_hba_inst,
 		    pmportinfo->pmport_sata_drive);
+		pmportinfo->pmport_tgtnode_clean = B_TRUE;
 		mutex_exit(&cportinfo->cport_mutex);
 		cdip = sata_create_target_node(pdip, sata_hba_inst,
 		    &sata_device.satadev_addr);
@@ -7590,6 +7765,8 @@ sata_add_device(dev_info_t *pdip, sata_hba_inst_t *sata_hba_inst, int cport,
  *
  * A dev_info_t pointer is returned if operation is successful, NULL is
  * returned otherwise.
+ *
+ * No port multiplier support.
  */
 
 static dev_info_t *
@@ -7728,7 +7905,7 @@ fail:
 		    "node removal failed %d", rval));
 	}
 	sata_log(sata_hba_inst, CE_WARN, "sata_create_target_node: "
-	    "cannot create target node for device at port %d",
+	    "cannot create target node for SATA device at port %d",
 	    sata_addr->cport);
 	return (NULL);
 }
@@ -7795,8 +7972,9 @@ retry_probe:
 	if (rval != SATA_SUCCESS) {
 		cportinfo->cport_state = SATA_PSTATE_FAILED;
 		mutex_exit(&cportinfo->cport_mutex);
-		SATA_LOG_D((sata_hba_inst, CE_WARN, "sata_hba_ioctl: "
-		    "connect: port probbing failed"));
+		SATA_LOG_D((sata_hba_inst, CE_WARN, "sata_reprobe_port: "
+		    "SATA port %d probing failed",
+		    cportinfo->cport_addr.cport));
 		return (SATA_FAILURE);
 	}
 
@@ -8691,11 +8869,12 @@ sata_free_local_buffer(sata_pkt_txlate_t *spx)
 	ddi_dma_free_handle(&spx->txlt_buf_dma_handle);
 	spx->txlt_buf_dma_handle = 0;
 
-	kmem_free(spx->txlt_dma_cookie_list,
-	    spx->txlt_dma_cookie_list_len * sizeof (ddi_dma_cookie_t));
-	spx->txlt_dma_cookie_list = NULL;
-	spx->txlt_dma_cookie_list_len = 0;
-
+	if (spx->txlt_dma_cookie_list != &spx->txlt_dma_cookie) {
+		kmem_free(spx->txlt_dma_cookie_list,
+		    spx->txlt_dma_cookie_list_len * sizeof (ddi_dma_cookie_t));
+		spx->txlt_dma_cookie_list = NULL;
+		spx->txlt_dma_cookie_list_len = 0;
+	}
 	/* Free buffer */
 	scsi_free_consistent_buf(spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp);
 }
@@ -8819,9 +8998,13 @@ sata_adjust_dma_attr(sata_drive_info_t *sdinfo, ddi_dma_attr_t *dma_attr,
  * This function handles initial DMA resource allocation as well as
  * DMA window shift and may be called repeatedly for the same DMA window
  * until all DMA cookies in the DMA window are processed.
+ * To guarantee that there is always a coherent set of cookies to process
+ * by SATA HBA driver (observing alignment, device granularity, etc.),
+ * the number of slots for DMA cookies is equal to lesser of  a number of
+ * cookies in a DMA window and a max number of scatter/gather entries.
  *
- * Returns DDI_SUCCESS upon successful operation,
- * returns failure code returned by failing commands or DDI_FAILURE when
+ * Returns DDI_SUCCESS upon successful operation.
+ * Return failure code of a failing command or DDI_FAILURE when
  * internal cleanup failed.
  */
 static int
@@ -8829,15 +9012,13 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
     int (*callback)(caddr_t), caddr_t arg,
     ddi_dma_attr_t *cur_dma_attr)
 {
-	int			rval;
-	ddi_dma_cookie_t	cookie;
-	off_t			offset;
-	size_t			size;
-	int			max_sg_len, req_sg_len, i;
-	uint_t			dma_flags;
-	struct buf		*bp;
-	uint64_t		max_txfer_len;
-	uint64_t		cur_txfer_len;
+	int	rval;
+	off_t	offset;
+	size_t	size;
+	int	max_sg_len, req_len, i;
+	uint_t	dma_flags;
+	struct buf	*bp;
+	uint64_t	cur_txfer_len;
 
 
 	ASSERT(spx->txlt_sata_pkt != NULL);
@@ -8884,7 +9065,7 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 			rval = ddi_dma_buf_bind_handle(
 					spx->txlt_buf_dma_handle,
 					bp, dma_flags, callback, arg,
-					&cookie,
+					&spx->txlt_dma_cookie,
 					&spx->txlt_curwin_num_dma_cookies);
 		} else { /* Buffer is not aligned */
 
@@ -8967,7 +9148,8 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 				NULL,
 				spx->txlt_tmp_buf,
 				bufsz, dma_flags, ddicallback, 0,
-				&cookie, &spx->txlt_curwin_num_dma_cookies);
+				&spx->txlt_dma_cookie,
+				&spx->txlt_curwin_num_dma_cookies);
 		}
 
 		switch (rval) {
@@ -8994,6 +9176,11 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 				    "sata_dma_buf_setup: numwin failed\n"));
 				return (DDI_FAILURE);
 			}
+			SATADBG2(SATA_DBG_DMA_SETUP,
+			    spx->txlt_sata_hba_inst,
+			    "sata_dma_buf_setup: windows: %d, cookies: %d\n",
+			    spx->txlt_num_dma_win,
+			    spx->txlt_curwin_num_dma_cookies);
 			spx->txlt_cur_dma_win = 0;
 			break;
 
@@ -9001,6 +9188,10 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 			/* DMA fully mapped */
 			spx->txlt_num_dma_win = 1;
 			spx->txlt_cur_dma_win = 0;
+			SATADBG1(SATA_DBG_DMA_SETUP,
+			    spx->txlt_sata_hba_inst,
+			    "sata_dma_buf_setup: windows: 1 "
+			    "cookies: %d\n", spx->txlt_curwin_num_dma_cookies);
 			break;
 
 		default:
@@ -9038,10 +9229,9 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 			if (spx->txlt_cur_dma_win < spx->txlt_num_dma_win) {
 				(void) ddi_dma_getwin(spx->txlt_buf_dma_handle,
 				    spx->txlt_cur_dma_win, &offset, &size,
-				    &cookie,
+				    &spx->txlt_dma_cookie,
 				    &spx->txlt_curwin_num_dma_cookies);
 				spx->txlt_curwin_processed_dma_cookies = 0;
-
 			} else {
 				/* No more windows! End of request! */
 				/* What to do? - panic for now */
@@ -9056,10 +9246,16 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 			}
 		}
 	}
-	/* There better be at least one DMA cookie */
+	/* There better be at least one DMA cookie outstanding */
 	ASSERT((spx->txlt_curwin_num_dma_cookies -
 	    spx->txlt_curwin_processed_dma_cookies) > 0);
 
+	if (spx->txlt_dma_cookie_list == &spx->txlt_dma_cookie) {
+		/* The default cookie slot was used in previous run */
+		ASSERT(spx->txlt_curwin_processed_dma_cookies == 0);
+		spx->txlt_dma_cookie_list = NULL;
+		spx->txlt_dma_cookie_list_len = 0;
+	}
 	if (spx->txlt_curwin_processed_dma_cookies == 0) {
 		/*
 		 * Processing a new DMA window - set-up dma cookies list.
@@ -9081,23 +9277,65 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 			spx->txlt_dma_cookie_list_len = 0;
 		}
 		if (spx->txlt_dma_cookie_list == NULL) {
-			/* Allocate new dma cookie array */
-			spx->txlt_dma_cookie_list = kmem_zalloc(
-			    sizeof (ddi_dma_cookie_t) *
-			    spx->txlt_curwin_num_dma_cookies,
-			    callback == NULL_FUNC ? KM_NOSLEEP : KM_SLEEP);
-			spx->txlt_dma_cookie_list_len =
-			    spx->txlt_curwin_num_dma_cookies;
+			/*
+			 * Calculate lesser of number of cookies in this
+			 * DMA window and number of s/g entries.
+			 */
+			max_sg_len = cur_dma_attr->dma_attr_sgllen;
+			req_len = MIN(max_sg_len,
+			    spx->txlt_curwin_num_dma_cookies);
+
+			/* Allocate new dma cookie array if necessary */
+			if (req_len == 1) {
+				/* Only one cookie - no need for a list */
+				spx->txlt_dma_cookie_list =
+				    &spx->txlt_dma_cookie;
+				spx->txlt_dma_cookie_list_len = 1;
+			} else {
+				/*
+				 * More than one cookie - try to allocate space.
+				 */
+				spx->txlt_dma_cookie_list = kmem_zalloc(
+				    sizeof (ddi_dma_cookie_t) * req_len,
+				    callback == NULL_FUNC ? KM_NOSLEEP :
+				    KM_SLEEP);
+				if (spx->txlt_dma_cookie_list == NULL) {
+					SATADBG1(SATA_DBG_DMA_SETUP,
+					    spx->txlt_sata_hba_inst,
+					    "sata_dma_buf_setup: cookie list "
+					    "allocation failed\n", NULL);
+					/*
+					 * We could not allocate space for
+					 * neccessary number of dma cookies in
+					 * this window, so we fail this request.
+					 * Next invocation would try again to
+					 * allocate space for cookie list.
+					 * Note:Packet residue was not modified.
+					 */
+					return (DDI_DMA_NORESOURCES);
+				} else {
+					spx->txlt_dma_cookie_list_len = req_len;
+				}
+			}
 		}
 		/*
-		 * Copy all DMA cookies into local list, so we will know their
-		 * dma_size in advance of setting the sata_pkt.
-		 * One cookie was already fetched, so copy it.
+		 * Fetch DMA cookies into cookie list in sata_pkt_txlate.
+		 * First cookie was already fetched.
 		 */
-		*(&spx->txlt_dma_cookie_list[0]) = cookie;
-		for (i = 1; i < spx->txlt_curwin_num_dma_cookies; i++) {
-			ddi_dma_nextcookie(spx->txlt_buf_dma_handle, &cookie);
-			*(&spx->txlt_dma_cookie_list[i]) = cookie;
+		*(&spx->txlt_dma_cookie_list[0]) = spx->txlt_dma_cookie;
+		cur_txfer_len =
+		    (uint64_t)spx->txlt_dma_cookie_list[0].dmac_size;
+		spx->txlt_sata_pkt->satapkt_cmd.satacmd_num_dma_cookies = 1;
+		spx->txlt_curwin_processed_dma_cookies++;
+		for (i = 1; (i < spx->txlt_dma_cookie_list_len) &&
+		    (i < spx->txlt_curwin_num_dma_cookies); i++) {
+			ddi_dma_nextcookie(spx->txlt_buf_dma_handle,
+			&spx->txlt_dma_cookie_list[i]);
+			cur_txfer_len +=
+			    (uint64_t)spx->txlt_dma_cookie_list[i].dmac_size;
+			spx->txlt_curwin_processed_dma_cookies++;
+			spx->txlt_sata_pkt->
+			    satapkt_cmd.satacmd_num_dma_cookies += 1;
 		}
 	} else {
 		SATADBG2(SATA_DBG_DMA_SETUP, spx->txlt_sata_hba_inst,
@@ -9105,88 +9343,52 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 		    "cur cookie %d, total cookies %d\n",
 		    spx->txlt_curwin_processed_dma_cookies,
 		    spx->txlt_curwin_num_dma_cookies);
-	}
 
-	/*
-	 * Set-up sata_pkt cookie list.
-	 * No single cookie transfer size would exceed max transfer size of
-	 * an ATA command used for addressed device (tha adjustment of the dma
-	 * attributes took care of this). But there may be more
-	 * then one cookie, so the cmd cookie list has to be
-	 * constrained by both a maximum scatter gather list length and
-	 * a maximum transfer size restriction of an ATA command.
-	 */
+		/*
+		 * Not all cookies from the current dma window were used because
+		 * of s/g limitation.
+		 * There is no need to re-size the list - it was set at
+		 * optimal size, or only default entry is used (s/g = 1).
+		 */
+		if (spx->txlt_dma_cookie_list == NULL) {
+			spx->txlt_dma_cookie_list = &spx->txlt_dma_cookie;
+			spx->txlt_dma_cookie_list_len = 1;
+		}
+		/*
+		 * Since we are processing remaining cookies in a DMA window,
+		 * there may be less of them than the number of entries in the
+		 * current dma cookie list.
+		 */
+		req_len = MIN(spx->txlt_dma_cookie_list_len,
+		    (spx->txlt_curwin_num_dma_cookies -
+		    spx->txlt_curwin_processed_dma_cookies));
 
-	max_sg_len = cur_dma_attr->dma_attr_sgllen;
-	req_sg_len = MIN(max_sg_len,
-	    (spx->txlt_curwin_num_dma_cookies -
-	    spx->txlt_curwin_processed_dma_cookies));
-
-	ASSERT(req_sg_len > 0);
-
-	max_txfer_len = MAX((cur_dma_attr->dma_attr_granular * 0x100),
-	    cur_dma_attr->dma_attr_maxxfer);
-
-	/* One cookie should be always available */
-	spx->txlt_sata_pkt->satapkt_cmd.satacmd_dma_cookie_list =
-	    &spx->txlt_dma_cookie_list[spx->txlt_curwin_processed_dma_cookies];
-
-	spx->txlt_sata_pkt->satapkt_cmd.satacmd_num_dma_cookies = 1;
-
-	cur_txfer_len =
-	    (uint64_t)spx->txlt_dma_cookie_list[
-	    spx->txlt_curwin_processed_dma_cookies].dmac_size;
-
-	spx->txlt_curwin_processed_dma_cookies++;
-
-	ASSERT(cur_txfer_len <= max_txfer_len);
-
-	/* Add more cookies to the scatter-gather list */
-	for (i = 1; i < req_sg_len; i++) {
-		if (cur_txfer_len < max_txfer_len) {
-			/*
-			 * Check if the next cookie could be used by
-			 * this sata_pkt.
-			 */
-			if ((cur_txfer_len +
-			    spx->txlt_dma_cookie_list[
-			    spx->txlt_curwin_processed_dma_cookies].
-			    dmac_size) <= max_txfer_len) {
-				/* Yes, transfer lenght is within bounds */
-				spx->txlt_sata_pkt->
-				    satapkt_cmd.satacmd_num_dma_cookies++;
-				cur_txfer_len +=
-				    spx->txlt_dma_cookie_list[
-				    spx->txlt_curwin_processed_dma_cookies].
-				    dmac_size;
-				spx->txlt_curwin_processed_dma_cookies++;
-			} else {
-				/* No, transfer would exceed max lenght. */
-				SATADBG3(SATA_DBG_DMA_SETUP,
-				    spx->txlt_sata_hba_inst,
-				    "ncookies %d, size 0x%lx, "
-				    "max_size 0x%lx\n",
-				    spx->txlt_sata_pkt->
-				    satapkt_cmd.satacmd_num_dma_cookies,
-				    cur_txfer_len, max_txfer_len);
-				break;
-			}
-		} else {
-			/* Cmd max transfer length reached */
-			SATADBG3(SATA_DBG_DMA_SETUP, spx->txlt_sata_hba_inst,
-			    "Max transfer length? "
-			    "ncookies %d, size 0x%lx, max_size 0x%lx\n",
-			    spx->txlt_sata_pkt->
-			    satapkt_cmd.satacmd_num_dma_cookies,
-			    cur_txfer_len, max_txfer_len);
-			break;
+		/* Fetch the next batch of cookies */
+		for (i = 0, cur_txfer_len = 0; i < req_len; i++) {
+			ddi_dma_nextcookie(spx->txlt_buf_dma_handle,
+			&spx->txlt_dma_cookie_list[i]);
+			cur_txfer_len +=
+			    (uint64_t)spx->txlt_dma_cookie_list[i].dmac_size;
+			spx->txlt_sata_pkt->
+			    satapkt_cmd.satacmd_num_dma_cookies++;
+			spx->txlt_curwin_processed_dma_cookies++;
 		}
 	}
+
+	ASSERT(spx->txlt_sata_pkt->satapkt_cmd.satacmd_num_dma_cookies > 0);
+
+	/* Point sata_cmd to the cookie list */
+	spx->txlt_sata_pkt->satapkt_cmd.satacmd_dma_cookie_list =
+	    &spx->txlt_dma_cookie_list[0];
+
+	/* Remember number of DMA cookies passed in sata packet */
+	spx->txlt_num_dma_cookies =
+	    spx->txlt_sata_pkt->satapkt_cmd.satacmd_num_dma_cookies;
 
 	ASSERT(cur_txfer_len != 0);
 	if (cur_txfer_len <= bp->b_bcount)
 		spx->txlt_total_residue -= cur_txfer_len;
-	else
+	else {
 		/*
 		 * Temporary DMA buffer has been padded by
 		 * ddi_dma_mem_alloc()!
@@ -9197,6 +9399,7 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 		 * the requested number of bytes.
 		 */
 		spx->txlt_total_residue -= bp->b_bcount;
+	}
 
 	return (DDI_SUCCESS);
 }
@@ -9284,11 +9487,12 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 	rval = (*SATA_START_FUNC(sata_hba_inst))(SATA_DIP(sata_hba_inst), spkt);
 	if (rval == SATA_TRAN_ACCEPTED &&
 	    spkt->satapkt_reason == SATA_PKT_COMPLETED) {
-		if ((sdinfo->satadrv_id.ai_config & 4) == 1) {
-			sata_log(sata_hba_inst, CE_WARN,
+		if ((sdinfo->satadrv_id.ai_config & SATA_INCOMPLETE_DATA) ==
+		    SATA_INCOMPLETE_DATA) {
+			SATA_LOG_D((sata_hba_inst, CE_WARN,
 			    "SATA disk device at port %d - "
 			    "partial Identify Data",
-			    sdinfo->satadrv_addr.cport);
+			    sdinfo->satadrv_addr.cport));
 			rval = 1; /* may retry later */
 			goto fail;
 		}
@@ -9712,7 +9916,7 @@ sata_get_target_dip(dev_info_t *dip, int32_t port)
  * SCSI_TO_SATA_PMPORT extracts pmport number and
  * SCSI_TO_SATA_ADDR_QUAL extracts port mulitplier qualifier flag.
  *
- * For now, support is for cports only - no pmultiplier ports.
+ * For now, support is for cports only - no port multiplier device ports.
  */
 
 static void
@@ -9745,22 +9949,15 @@ sata_cfgadm_state(sata_hba_inst_t *sata_hba_inst, int32_t port,
 	switch (SATA_CPORT_DEV_TYPE(sata_hba_inst, cport)) {
 	case SATA_DTYPE_NONE:
 	{
-		/* No device attached */
-		ap_state->ap_rstate = AP_RSTATE_EMPTY;
 		ap_state->ap_ostate = AP_OSTATE_UNCONFIGURED;
 		ap_state->ap_condition = AP_COND_OK;
+		/* No device attached */
+		ap_state->ap_rstate = AP_RSTATE_EMPTY;
 		break;
 	}
 	case SATA_DTYPE_UNKNOWN:
 	case SATA_DTYPE_ATAPINONCD:
 	case SATA_DTYPE_PMULT:	/* Until PMult is supported */
-	{
-		/* Unknown device attached */
-		ap_state->ap_rstate = AP_RSTATE_CONNECTED;
-		ap_state->ap_ostate = AP_OSTATE_UNCONFIGURED;
-		ap_state->ap_condition = AP_COND_UNKNOWN;
-		break;
-	}
 	case SATA_DTYPE_ATADISK:
 	case SATA_DTYPE_ATAPICD:
 	{
@@ -9774,13 +9971,28 @@ sata_cfgadm_state(sata_hba_inst_t *sata_hba_inst, int32_t port,
 		if (tdip != NULL) {
 			ndi_devi_enter(dip, &circ);
 			mutex_enter(&(DEVI(tdip)->devi_lock));
+			if (DEVI_IS_DEVICE_REMOVED(tdip)) {
+				/*
+				 * There could be the case where previously
+				 * configured and opened device was removed
+				 * and unknown device was plugged.
+				 * In such case we want to show a device, and
+				 * its configured or unconfigured state but
+				 * indicate unusable condition untill the
+				 * old target node is released and removed.
+				 */
+				ap_state->ap_condition = AP_COND_UNUSABLE;
+			} else {
+				ap_state->ap_condition = AP_COND_OK;
+			}
 			if ((DEVI_IS_DEVICE_OFFLINE(tdip)) ||
 			    (DEVI_IS_DEVICE_DOWN(tdip))) {
-				ap_state->ap_ostate = AP_OSTATE_UNCONFIGURED;
+				ap_state->ap_ostate =
+				    AP_OSTATE_UNCONFIGURED;
 			} else {
-				ap_state->ap_ostate = AP_OSTATE_CONFIGURED;
+				ap_state->ap_ostate =
+				    AP_OSTATE_CONFIGURED;
 			}
-			ap_state->ap_condition = AP_COND_OK;
 			mutex_exit(&(DEVI(tdip)->devi_lock));
 			ndi_devi_exit(dip, circ);
 		} else {
@@ -9795,7 +10007,7 @@ sata_cfgadm_state(sata_hba_inst_t *sata_hba_inst, int32_t port,
 		ap_state->ap_condition = AP_COND_UNKNOWN;
 		/*
 		 * This is actually internal error condition (non fatal),
-		 * beacuse we already checked all defined device types.
+		 * because we have already checked all defined device types.
 		 */
 		SATA_LOG_D((sata_hba_inst, CE_WARN,
 		    "sata_cfgadm_state: Internal error: "
@@ -10424,6 +10636,10 @@ sata_process_controller_events(sata_hba_inst_t *sata_hba_inst)
 				sata_process_port_pwr_change(sata_hba_inst,
 				    saddr);
 			}
+			if (event_flags & SATA_EVNT_TARGET_NODE_CLEANUP) {
+				sata_process_target_node_cleanup(
+				    sata_hba_inst, saddr);
+			}
 		}
 		if (SATA_CPORT_DEV_TYPE(sata_hba_inst, ncport) !=
 		    SATA_DTYPE_NONE) {
@@ -10499,7 +10715,7 @@ sata_process_port_failed_event(sata_hba_inst_t *sata_hba_inst,
 	/* Fail the port */
 	cportinfo->cport_state = SATA_PSTATE_FAILED;
 	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
-	sata_log(sata_hba_inst, CE_WARN, "port %d failed", saddr->cport);
+	sata_log(sata_hba_inst, CE_WARN, "SATA port %d failed", saddr->cport);
 }
 
 /*
@@ -10545,25 +10761,24 @@ sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
 		return;
 	}
 
-	if ((sdinfo->satadrv_event_flags & SATA_EVNT_DEVICE_RESET) == 0) {
+	if ((sdinfo->satadrv_event_flags &
+	    (SATA_EVNT_DEVICE_RESET | SATA_EVNT_INPROC_DEVICE_RESET)) == 0) {
 		/* Nothing to do */
 		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->
 		    cport_mutex);
 		return;
 	}
-
-	SATADBG1(SATA_DBG_EVENTS_PROC, sata_hba_inst,
-	    "Processing port %d device reset", saddr->cport);
-
-	if (sdinfo->satadrv_event_flags & SATA_EVNT_INPROC_DEVICE_RESET) {
+#ifdef SATA_DEBUG
+	if ((sdinfo->satadrv_event_flags &
+	    (SATA_EVNT_DEVICE_RESET | SATA_EVNT_INPROC_DEVICE_RESET)) ==
+	    (SATA_EVNT_DEVICE_RESET | SATA_EVNT_INPROC_DEVICE_RESET)) {
 		/* Something is weird - new device reset event */
 		SATADBG1(SATA_DBG_EVENTS_PROC, sata_hba_inst,
 		    "Overlapping device reset events!", NULL);
-		/* Just leave */
-		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->
-		    cport_mutex);
-		return;
 	}
+#endif
+	SATADBG1(SATA_DBG_EVENTS_PROC, sata_hba_inst,
+	    "Processing port %d device reset", saddr->cport);
 
 	/* Clear event flag */
 	sdinfo->satadrv_event_flags &= ~SATA_EVNT_DEVICE_RESET;
@@ -10585,7 +10800,8 @@ sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
 		cportinfo->cport_state = SATA_PSTATE_FAILED;
 		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->
 		    cport_mutex);
-		SATA_LOG_D((sata_hba_inst, CE_WARN, "Port %d probing failed",
+		SATA_LOG_D((sata_hba_inst, CE_WARN,
+		    "SATA port %d probing failed",
 		    saddr->cport));
 		return;
 	}
@@ -10633,17 +10849,13 @@ sata_process_device_reset(sata_hba_inst_t *sata_hba_inst,
 		    SATA_PORT_DEVLINK_UP_MASK) == SATA_PORT_DEVLINK_UP &&
 		    (sata_device.satadev_type & SATA_DTYPE_ATADISK) != 0) {
 			/*
-			 * We may retry this a bit later - reinstate reset
-			 * condition
+			 * We may retry this a bit later - in-process reset
+			 * condition is already set.
 			 */
 			if ((cportinfo->cport_dev_type &
 			    SATA_VALID_DEV_TYPE) != 0 &&
 			    SATA_CPORTINFO_DRV_INFO(cportinfo) != NULL) {
 				sdinfo = SATA_CPORTINFO_DRV_INFO(cportinfo);
-				sdinfo->satadrv_event_flags |=
-				    SATA_EVNT_DEVICE_RESET;
-				sdinfo->satadrv_event_flags &=
-				    ~SATA_EVNT_INPROC_DEVICE_RESET;
 				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
 				    saddr->cport)->cport_mutex);
 				mutex_enter(&sata_hba_inst->satahba_mutex);
@@ -10760,7 +10972,8 @@ sata_process_port_link_events(sata_hba_inst_t *sata_hba_inst,
 		cportinfo->cport_state = SATA_PSTATE_FAILED;
 		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->
 		    cport_mutex);
-		SATA_LOG_D((sata_hba_inst, CE_WARN, "Port %d probing failed",
+		SATA_LOG_D((sata_hba_inst, CE_WARN,
+		    "SATA port %d probing failed",
 		    saddr->cport));
 		/*
 		 * We may want to release device info structure, but
@@ -10963,7 +11176,8 @@ sata_process_device_detached(sata_hba_inst_t *sata_hba_inst,
 		cportinfo->cport_state = SATA_PSTATE_FAILED;
 		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->
 		    cport_mutex);
-		SATA_LOG_D((sata_hba_inst, CE_WARN, "Port %d probing failed",
+		SATA_LOG_D((sata_hba_inst, CE_WARN,
+		    "SATA port %d probing failed",
 		    saddr->cport));
 		/*
 		 * We may want to release device info structure, but
@@ -11016,19 +11230,9 @@ sata_process_device_detached(sata_hba_inst_t *sata_hba_inst,
 	tdip = sata_get_target_dip(SATA_DIP(sata_hba_inst), saddr->cport);
 	if (tdip != NULL) {
 		/*
-		 * target node exist - unconfigure device first, then remove
-		 * the node
+		 * Target node exists.  Unconfigure device then remove
+		 * the target node (one ndi operation).
 		 */
-		if (ndi_devi_offline(tdip, NDI_UNCONFIG) != NDI_SUCCESS) {
-			/*
-			 * PROBLEM - no device, but target node remained
-			 * This happens when the file was open or node was
-			 * waiting for resources.
-			 */
-			SATA_LOG_D((sata_hba_inst, CE_WARN,
-			    "sata_process_device_detached: "
-			    "Failed to unconfigure removed device."));
-		}
 		if (ndi_devi_offline(tdip, NDI_DEVI_REMOVE) != NDI_SUCCESS) {
 			/*
 			 * PROBLEM - no device, but target node remained
@@ -11038,7 +11242,22 @@ sata_process_device_detached(sata_hba_inst_t *sata_hba_inst,
 			SATA_LOG_D((sata_hba_inst, CE_WARN,
 			    "sata_process_device_detached: "
 			    "Failed to remove target node for "
-			    "removed device."));
+			    "detached SATA device."));
+			/*
+			 * Set target node state to DEVI_DEVICE_REMOVED.
+			 * But re-check first that the node still exists.
+			 */
+			tdip = sata_get_target_dip(SATA_DIP(sata_hba_inst),
+			    saddr->cport);
+			if (tdip != NULL) {
+				sata_set_device_removed(tdip);
+				/*
+				 * Instruct event daemon to retry the
+				 * cleanup later.
+				 */
+				sata_set_target_node_cleanup(sata_hba_inst,
+				    saddr->cport);
+			}
 		}
 	}
 	/*
@@ -11081,8 +11300,9 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
 	cportinfo = SATA_CPORT_INFO(sata_hba_inst, saddr->cport);
 	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
 
-	/* Clear event flag first */
+	/* Clear attach event flag first */
 	cportinfo->cport_event_flags &= ~SATA_EVNT_DEVICE_ATTACHED;
+
 	/* If the port is in SHUTDOWN or FAILED state, ignore event. */
 	if ((cportinfo->cport_state &
 	    (SATA_PSTATE_SHUTDOWN | SATA_PSTATE_FAILED)) != 0) {
@@ -11094,9 +11314,9 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
 
 	/*
 	 * If the sata_drive_info structure is found attached to the port info,
-	 * something went wrong in the event reporting and processing sequence.
-	 * To recover, arbitrarily release device info structure and issue
-	 * a warning.
+	 * despite the fact the device was removed and now it is re-attached,
+	 * the old drive info structure was not removed.
+	 * Arbitrarily release device info structure.
 	 */
 	if (SATA_CPORTINFO_DRV_INFO(cportinfo) != NULL) {
 		sdevinfo = SATA_CPORTINFO_DRV_INFO(cportinfo);
@@ -11127,7 +11347,8 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
 		cportinfo->cport_dev_attach_time = 0;
 		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->
 		    cport_mutex);
-		SATA_LOG_D((sata_hba_inst, CE_WARN, "Port %d probing failed",
+		SATA_LOG_D((sata_hba_inst, CE_WARN,
+		    "SATA port %d probing failed",
 		    saddr->cport));
 		return;
 	} else {
@@ -11161,58 +11382,15 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
 	sata_gen_sysevent(sata_hba_inst, saddr, SE_HINT_INSERT);
 
 	/*
-	 * Make sure that there is no target node for that device.
-	 * If so, release it. It should not happen, unless we had problem
-	 * removing the node when device was detached.
-	 */
-	tdip = sata_get_target_dip(SATA_DIP(sata_hba_inst), saddr->cport);
-	if (tdip != NULL) {
-
-		SATA_LOG_D((sata_hba_inst, CE_WARN,
-		    "sata_process_device_attached: "
-		    "old device target node exists!!!"));
-		/*
-		 * target node exist - unconfigure device first, then remove
-		 * the node
-		 */
-		if (ndi_devi_offline(tdip, NDI_UNCONFIG) != NDI_SUCCESS) {
-			/*
-			 * PROBLEM - no device, but target node remained
-			 * This happens when the file was open or node was
-			 * waiting for resources.
-			 */
-			SATA_LOG_D((sata_hba_inst, CE_WARN,
-			    "sata_process_device_attached: "
-			    "Failed to unconfigure old target node!"));
-		}
-		/* Following call will retry node offlining and removing it */
-		if (ndi_devi_offline(tdip, NDI_DEVI_REMOVE) != NDI_SUCCESS) {
-			/* PROBLEM - no device, but target node remained */
-			SATA_LOG_D((sata_hba_inst, CE_WARN,
-			    "sata_process_device_attached: "
-			    "Failed to remove old target node!"));
-			/*
-			 * It is not clear, what should be done here.
-			 * For now, we will not attach a new device
-			 */
-			mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
-			    saddr->cport)->cport_mutex);
-			cportinfo->cport_dev_attach_time = 0;
-			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
-			    saddr->cport)->cport_mutex);
-			return;
-		}
-	}
-
-	/*
-	 * Port reprobing will take care of the creation of the device info
-	 * structure and determination of the device type.
+	 * Port reprobing will take care of the creation of the device
+	 * info structure and determination of the device type.
 	 */
 	sata_device.satadev_addr = *saddr;
-	rval = sata_reprobe_port(sata_hba_inst, &sata_device,
+	(void) sata_reprobe_port(sata_hba_inst, &sata_device,
 	    SATA_DEV_IDENTIFY_NORETRY);
 
-	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->
+	    cport_mutex);
 	if ((cportinfo->cport_state & SATA_STATE_READY) &&
 	    (cportinfo->cport_dev_type != SATA_DTYPE_NONE)) {
 		/* Some device is attached to the port */
@@ -11237,11 +11415,18 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
 				} else {
 					/* Timeout - cannot identify device */
 					cportinfo->cport_dev_attach_time = 0;
+					sata_log(sata_hba_inst,
+					    CE_WARN,
+					    "Cannot identify SATA device "
+					    "at port %d - device will not be "
+					    "attached.",
+					    saddr->cport);
 				}
 			} else {
 				/*
-				 * Start tracking time for dev identification.
-				 * save current time (lbolt value).
+				 * Start tracking time for device
+				 * identification.
+				 * Save current time (lbolt value).
 				 */
 				cportinfo->cport_dev_attach_time =
 				    ddi_get_lbolt();
@@ -11253,24 +11438,92 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
 			/*
 			 * If device was successfully attached, an explicit
 			 * 'configure' command will be needed to configure it.
+			 * Log the message indicating that a device
+			 * was attached.
 			 */
 			cportinfo->cport_dev_attach_time = 0;
 			sata_log(sata_hba_inst, CE_WARN,
-			    "SATA device attached at port %d", saddr->cport);
+			    "SATA device detected at port %d", saddr->cport);
 
 			if (SATA_CPORTINFO_DRV_INFO(cportinfo) != NULL) {
 				sata_drive_info_t new_sdinfo;
 
 				/* Log device info data */
-				new_sdinfo =
-				    *(SATA_CPORTINFO_DRV_INFO(cportinfo));
+				new_sdinfo = *(SATA_CPORTINFO_DRV_INFO(
+				    cportinfo));
 				sata_show_drive_info(sata_hba_inst,
 				    &new_sdinfo);
 			}
+
+			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+			    saddr->cport)->cport_mutex);
+
+			/*
+			 * Make sure that there is no target node for that
+			 * device. If so, release it. It should not happen,
+			 * unless we had problem removing the node when
+			 * device was detached.
+			 */
+			tdip = sata_get_target_dip(SATA_DIP(sata_hba_inst),
+			    saddr->cport);
+			mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
+			    saddr->cport)->cport_mutex);
+			if (tdip != NULL) {
+
+#ifdef SATA_DEBUG
+				if ((cportinfo->cport_event_flags &
+				    SATA_EVNT_TARGET_NODE_CLEANUP) == 0)
+					sata_log(sata_hba_inst, CE_WARN,
+					    "sata_process_device_attached: "
+					    "old device target node exists!");
+#endif
+				/*
+				 * target node exists - try to unconfigure
+				 * device and remove the node.
+				 */
+				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+				    saddr->cport)->cport_mutex);
+				rval = ndi_devi_offline(tdip,
+				    NDI_DEVI_REMOVE);
+				mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
+				    saddr->cport)->cport_mutex);
+
+				if (rval == NDI_SUCCESS) {
+					cportinfo->cport_event_flags &=
+					    ~SATA_EVNT_TARGET_NODE_CLEANUP;
+					cportinfo->cport_tgtnode_clean = B_TRUE;
+				} else {
+					/*
+					 * PROBLEM - the target node remained
+					 * and it belongs to a previously
+					 * attached device.
+					 * This happens when the file was open
+					 * or the node was waiting for
+					 * resources at the time the
+					 * associated device was removed.
+					 * Instruct event daemon to retry the
+					 * cleanup later.
+					 */
+					sata_log(sata_hba_inst,
+					    CE_WARN,
+					    "Application(s) accessing "
+					    "previously attached SATA "
+					    "device have to release "
+					    "it before newly inserted "
+					    "device can be made accessible.",
+					    saddr->cport);
+					cportinfo->cport_event_flags |=
+					    SATA_EVNT_TARGET_NODE_CLEANUP;
+					cportinfo->cport_tgtnode_clean =
+					    B_FALSE;
+				}
+			}
+
 		}
 	} else {
 		cportinfo->cport_dev_attach_time = 0;
 	}
+
 	event_flags = cportinfo->cport_event_flags;
 	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
 	if (event_flags != 0) {
@@ -11282,6 +11535,78 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
 		mutex_exit(&sata_mutex);
 	}
 }
+
+
+/*
+ * Device Target Node Cleanup Event processing.
+ * If the target node associated with a sata port device is in
+ * DEVI_DEVICE_REMOVED state, an attempt is made to remove it.
+ * If the target node cannot be removed, the event flag is left intact,
+ * so that event daemon may re-run this function later.
+ *
+ * This function cannot be called in interrupt context (it may sleep).
+ *
+ * NOTE: Processes cport events only, not port multiplier ports.
+ */
+static void
+sata_process_target_node_cleanup(sata_hba_inst_t *sata_hba_inst,
+    sata_address_t *saddr)
+{
+	sata_cport_info_t *cportinfo;
+	dev_info_t *tdip;
+
+	SATADBG1(SATA_DBG_EVENTS_PROC, sata_hba_inst,
+	    "Processing port %d device target node cleanup", saddr->cport);
+
+	cportinfo = SATA_CPORT_INFO(sata_hba_inst, saddr->cport);
+
+	/*
+	 * Check if there is target node for that device and it is in the
+	 * DEVI_DEVICE_REMOVED state. If so, release it.
+	 */
+	tdip = sata_get_target_dip(SATA_DIP(sata_hba_inst), saddr->cport);
+	if (tdip != NULL) {
+		/*
+		 * target node exists - check if it is target node of
+		 * a removed device.
+		 */
+		if (sata_check_device_removed(tdip) == B_TRUE) {
+			SATADBG1(SATA_DBG_EVENTS_PROC, sata_hba_inst,
+			    "sata_process_target_node_cleanup: "
+			    "old device target node exists!", NULL);
+			/*
+			 * Unconfigure and remove the target node
+			 */
+			if (ndi_devi_offline(tdip, NDI_DEVI_REMOVE) ==
+			    NDI_SUCCESS) {
+				mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
+				    saddr->cport)->cport_mutex);
+				cportinfo->cport_event_flags &=
+				    ~SATA_EVNT_TARGET_NODE_CLEANUP;
+				mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+				    saddr->cport)->cport_mutex);
+				return;
+			}
+			/*
+			 * Event daemon will retry the cleanup later.
+			 */
+			mutex_enter(&sata_hba_inst->satahba_mutex);
+			sata_hba_inst->satahba_event_flags |= SATA_EVNT_MAIN;
+			mutex_exit(&sata_hba_inst->satahba_mutex);
+			mutex_enter(&sata_mutex);
+			sata_event_pending |= SATA_EVNT_MAIN;
+			mutex_exit(&sata_mutex);
+		}
+	} else {
+		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst,
+		    saddr->cport)->cport_mutex);
+		cportinfo->cport_event_flags &=
+		    ~SATA_EVNT_TARGET_NODE_CLEANUP;
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst,
+		    saddr->cport)->cport_mutex);
+	}
+}
+
 
 
 /*
@@ -12148,4 +12473,66 @@ sata_xlate_errors(sata_pkt_txlate_t *spx)
 		scsipkt->pkt_reason = CMD_TRAN_ERR;
 		break;
 	}
+}
+
+
+
+/*
+ * Set DEVI_DEVICE_REMOVED state in the SATA device target node.
+ */
+static void
+sata_set_device_removed(dev_info_t *tdip)
+{
+	int circ;
+
+	ASSERT(tdip != NULL);
+
+	ndi_devi_enter(tdip, &circ);
+	mutex_enter(&DEVI(tdip)->devi_lock);
+	DEVI_SET_DEVICE_REMOVED(tdip);
+	mutex_exit(&DEVI(tdip)->devi_lock);
+	ndi_devi_exit(tdip, circ);
+}
+
+
+/*
+ * Set internal event instructing event daemon to try
+ * to perform the target node cleanup.
+ */
+static void
+sata_set_target_node_cleanup(sata_hba_inst_t *sata_hba_inst, int cport)
+{
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+	SATA_CPORT_EVENT_FLAGS(sata_hba_inst, cport) |=
+	    SATA_EVNT_TARGET_NODE_CLEANUP;
+	SATA_CPORT_INFO(sata_hba_inst, cport)->cport_tgtnode_clean = B_FALSE;
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
+	mutex_enter(&sata_hba_inst->satahba_mutex);
+	sata_hba_inst->satahba_event_flags |= SATA_EVNT_MAIN;
+	mutex_exit(&sata_hba_inst->satahba_mutex);
+	mutex_enter(&sata_mutex);
+	sata_event_pending |= SATA_EVNT_MAIN;
+	mutex_exit(&sata_mutex);
+}
+
+
+/*
+ * Check if the SATA device target node is in DEVI_DEVICE_REMOVED state,
+ * i.e. check if the target node state indicates that it belongs to a removed
+ * device.
+ *
+ * Returns B_TRUE if the target node is in DEVI_DEVICE_REMOVED state,
+ * B_FALSE otherwise.
+ *
+ * NOTE: No port multiplier support.
+ */
+static boolean_t
+sata_check_device_removed(dev_info_t *tdip)
+{
+	ASSERT(tdip != NULL);
+
+	if (DEVI_IS_DEVICE_REMOVED(tdip))
+		return (B_TRUE);
+	else
+		return (B_FALSE);
 }

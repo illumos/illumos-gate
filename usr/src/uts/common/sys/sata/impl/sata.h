@@ -166,6 +166,8 @@ struct sata_cport_info {
 	clock_t			cport_dev_attach_time;
 
 	struct sata_port_stats	cport_stats;	/* Port statistics */
+
+	boolean_t		cport_tgtnode_clean; /* Target node usable */
 };
 
 typedef struct sata_cport_info sata_cport_info_t;
@@ -292,6 +294,8 @@ struct sata_pmport_info {
 	clock_t		pmport_dev_attach_time;
 
 	struct sata_port_stats	pmport_stats;	/* Port statistics */
+
+	boolean_t	pmport_tgtnode_clean;	/* Target node usable */
 };
 
 typedef	struct sata_pmport_info sata_pmport_info_t;
@@ -351,6 +355,7 @@ typedef	struct sata_pmport_info sata_pmport_info_t;
 #define	SATA_EVNT_SKIP			0x40000000
 #define	SATA_EVNT_INPROC_DEVICE_RESET	0x08000000
 #define	SATA_EVNT_CLEAR_DEVICE_RESET	0x04000000
+#define	SATA_EVNT_TARGET_NODE_CLEANUP	0x00000100
 
 /*
  * Lock flags - used to serialize configuration operations
@@ -368,9 +373,11 @@ typedef	struct sata_pmport_info sata_pmport_info_t;
 					SATA_EVNT_DEVICE_DETACHED | \
 					SATA_EVNT_LINK_LOST | \
 					SATA_EVNT_LINK_ESTABLISHED | \
-					SATA_EVNT_PORT_FAILED)
+					SATA_EVNT_PORT_FAILED | \
+					SATA_EVNT_TARGET_NODE_CLEANUP)
 /* Mask for drive events */
-#define	SATA_EVNT_DRIVE_EVENTS		SATA_EVNT_DEVICE_RESET
+#define	SATA_EVNT_DRIVE_EVENTS		(SATA_EVNT_DEVICE_RESET | \
+					SATA_EVNT_INPROC_DEVICE_RESET)
 #define	SATA_EVNT_CONTROLLER_EVENTS	SATA_EVNT_PWR_LEVEL_CHANGED
 
 /* Delays and timeounts definitions */
@@ -413,9 +420,10 @@ typedef struct sata_pkt_txlate {
 				/* cookies in the current DMA window */
 	uint_t			txlt_curwin_num_dma_cookies;
 
-				/* procesed dma cookies in current DMA win */
+				/* processed dma cookies in current DMA win */
 	uint_t			txlt_curwin_processed_dma_cookies;
 	size_t			txlt_total_residue;
+	ddi_dma_cookie_t	txlt_dma_cookie; /* default dma cookie */
 	int			txlt_dma_cookie_list_len; /* alloc list len */
 	ddi_dma_cookie_t 	*txlt_dma_cookie_list; /* dma cookie list */
 	int			txlt_num_dma_cookies; /* dma cookies in list */
@@ -455,7 +463,6 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
 
 /*
  * Macros for accessing various structure fields
- *
  */
 
 #define	SATA_TRAN(sata_hba_inst) \
@@ -511,6 +518,9 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
 
 #define	SATA_CPORT_STATE(sata_hba_inst, cport) \
 	sata_hba_inst->satahba_dev_port[cport]->cport_state
+
+#define	SATA_CPORT_EVENT_FLAGS(sata_hba_inst, cport) \
+	sata_hba_inst->satahba_dev_port[cport]->cport_event_flags
 
 #define	SATA_CPORT_SCR(sata_hba_inst, cport) \
 	sata_hba_inst->satahba_dev_port[cport]->cport_scr
@@ -695,8 +705,6 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
 #define	SATA_DBG_EVENTS_DAEMON	0x100
 #define	SATA_DBG_DMA_SETUP	0x400
 #define	SATA_DBG_DEV_SETTINGS	0x800
-
-extern int sata_debug_flag;
 
 /* Debug macros */
 #define	SATADBG1(flag, sata, format, arg1) \
