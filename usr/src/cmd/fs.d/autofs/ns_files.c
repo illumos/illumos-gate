@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 /*
  *	ns_files.c
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,9 +45,12 @@
 #include <synch.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <strings.h>
 #include "automount.h"
 
 static int read_execout(char *key, char **lp, char *fname, char *line,
+			int linesz);
+static int call_read_execout(char *key, char **lp, char *fname, char *line,
 			int linesz);
 static FILE *file_open(char *, char *, char **, char ***);
 
@@ -114,14 +116,14 @@ getmapent_files(key, mapname, ml, stack, stkptr, iswildcard, isrestricted)
 				fname, key);
 		}
 
-		rc = read_execout(key, &lp, fname, ml->linebuf, LINESZ);
+		rc = call_read_execout(key, &lp, fname, ml->linebuf, LINESZ);
 
 		if (rc != 0) {
 			nserr = __NSW_UNAVAIL;
 			goto done;
 		}
 
-		if (lp == NULL || strlen(ml->linebuf) == 0) {
+		if (strlen(ml->linebuf) == 0) {
 			nserr = __NSW_NOTFOUND;
 			goto done;
 		}
@@ -642,4 +644,65 @@ read_execout(char *key, char **lp, char *fname, char *line, int linesz)
 
 		return (status);
 	}
+}
+
+void
+automountd_do_exec_map(void *cookie, char *argp, size_t arg_size,
+		door_desc_t *dfd, uint_t n_desc)
+{
+	command_t	*command;
+	char	line[LINESZ];
+	char	*lp;
+	int	rc;
+
+	command = (command_t *)argp;
+
+	if (sizeof (*command) != arg_size) {
+		rc = 0;
+		syslog(LOG_ERR, "read_execout: invalid door arguments");
+		door_return((char *)&rc, sizeof (rc), NULL, 0);
+	}
+
+	rc = read_execout(command->key, &lp, command->file, line, LINESZ);
+
+	if (rc != 0) {
+		/*
+		 * read_execout returned an error, return 0 to the door_client
+		 * to indicate failure
+		 */
+		rc = 0;
+		door_return((char *)&rc, sizeof (rc), NULL, 0);
+	} else {
+		door_return((char *)line, LINESZ, NULL, 0);
+	}
+	trace_prt(1, "automountd_do_exec_map, door return failed %s, %s\n",
+	    command->file, strerror(errno));
+	door_return(NULL, 0, NULL, 0);
+}
+
+int
+call_read_execout(char *key, char **lp, char *fname, char *line,
+			int linesz)
+{
+	command_t command;
+	door_arg_t darg;
+	int ret;
+
+	bzero(&command, sizeof (command));
+	(void) strlcpy(command.file, fname, MAXPATHLEN);
+	(void) strlcpy(command.key, key, MAXOPTSLEN);
+
+	if (trace >= 1)
+		trace_prt(1, "call_read_execout %s %s\n", fname, key);
+	darg.data_ptr = (char *)&command;
+	darg.data_size = sizeof (command);
+	darg.desc_ptr = NULL;
+	darg.desc_num = 0;
+	darg.rbuf = line;
+	darg.rsize = linesz;
+
+	ret = door_call(did_exec_map, &darg);
+
+	lp = &line;
+	return (ret);
 }

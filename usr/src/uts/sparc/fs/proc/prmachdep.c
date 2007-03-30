@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -881,11 +880,11 @@ prstop(int why, int what)
 	extern void fp_prsave(kfpu_t *);
 
 	/*
-	 * Make sure we don't deadlock on a recursive call to prstop().
-	 * stop() tests the lwp_nostop_r and lwp_nostop flags.
+	 * Make sure we don't deadlock on a recursive call
+	 * to prstop().  stop() tests the lwp_nostop flag.
 	 */
-	lwp->lwp_nostop_r++;
-	lwp->lwp_nostop++;
+	ASSERT(lwp->lwp_nostop == 0);
+	lwp->lwp_nostop = 1;
 	(void) flush_user_windows_to_stack(NULL);
 	if (lwp->lwp_pcb.pcb_step != STEP_NONE)
 		(void) prundostep();
@@ -968,8 +967,8 @@ prstop(int why, int what)
 	}
 
 	(void) save_syscall_args();
-	lwp->lwp_nostop--;
-	lwp->lwp_nostop_r--;
+	ASSERT(lwp->lwp_nostop == 1);
+	lwp->lwp_nostop = 0;
 }
 
 /*

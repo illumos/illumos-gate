@@ -433,11 +433,11 @@ prstop(int why, int what)
 	struct regs *r = lwptoregs(lwp);
 
 	/*
-	 * Make sure we don't deadlock on a recursive call to prstop().
-	 * stop() tests the lwp_nostop_r and lwp_nostop flags.
+	 * Make sure we don't deadlock on a recursive call
+	 * to prstop().  stop() tests the lwp_nostop flag.
 	 */
-	lwp->lwp_nostop_r++;
-	lwp->lwp_nostop++;
+	ASSERT(lwp->lwp_nostop == 0);
+	lwp->lwp_nostop = 1;
 
 	if (copyin_nowatch((caddr_t)r->r_pc, &lwp->lwp_pcb.pcb_instr,
 		    sizeof (lwp->lwp_pcb.pcb_instr)) == 0)
@@ -448,8 +448,8 @@ prstop(int why, int what)
 	}
 
 	(void) save_syscall_args();
-	lwp->lwp_nostop--;
-	lwp->lwp_nostop_r--;
+	ASSERT(lwp->lwp_nostop == 1);
+	lwp->lwp_nostop = 0;
 }
 
 /*

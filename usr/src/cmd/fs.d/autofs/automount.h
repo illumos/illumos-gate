@@ -36,6 +36,7 @@
 #include <rpc/rpc.h>
 #include <sys/fs/autofs.h>
 #include <netinet/in.h>		/* needed for sockaddr_in declaration */
+#include <door.h>
 
 #ifdef MALLOC_DEBUG
 #include <debug_alloc.h>
@@ -93,6 +94,8 @@ extern "C" {
 #define	INITDELAY	5
 #define	DELAY_BACKOFF	2
 #define	MAXDELAY	120
+#define	ARGV_MAX	16
+#define	VFS_PATH	"/usr/lib/fs"
 #define	DELAY(delay) { \
 	(void) sleep(delay); \
 	delay *= DELAY_BACKOFF; \
@@ -223,6 +226,23 @@ struct myaddrs {
 	struct sockaddr_in sin;
 	struct myaddrs *myaddrs_next;
 };
+
+/*
+ * structure used to pass commands to the door servers
+ */
+
+typedef struct command {
+	char file[MAXPATHLEN];
+	char argv[ARGV_MAX][MAXOPTSLEN];
+	char key[MAXOPTSLEN];
+	int console;
+} command_t;
+
+/*
+ * globally visible door_server file descriptor
+ */
+int did_exec_map;
+int did_fork_exec;
 
 extern time_t timenow;	/* set at start of processing of each RPC call */
 extern char self[];
@@ -374,6 +394,12 @@ extern int getnetmaskbynet(const struct in_addr, struct in_addr *);
  */
 extern int __nis_reset_state();
 extern int __rpc_negotiate_uid(int);
+
+/*
+ * door_server functions to handle fork activity within the automounter
+ */
+void automountd_do_fork_exec(void *, char *, size_t, door_desc_t *, uint_t);
+void automountd_do_exec_map(void *, char *, size_t, door_desc_t *, uint_t);
 
 #ifdef __cplusplus
 }

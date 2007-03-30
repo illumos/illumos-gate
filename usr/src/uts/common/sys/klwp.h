@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,34 +160,12 @@ typedef struct _klwp {
 	struct itimerval lwp_timer[3];
 
 	/*
-	 * There are a number of places where you do not wish an lwp to
-	 * be stopped due to some interaction with other lwps in the process.
-	 * In these cases the lwp_nostop value is incremented. At places where
-	 * the lwp would normally be stopped the stop is allowed if lwp_nostop
-	 * is zero. There are a very few cases where even if lwp_nostop is set
-	 * we need to allow the lwp to stop. In those cases the lwp is
-	 * stopped if lwp_nostop_r is not set regardless of the state of
-	 * lwp_nostop. These conditions are:
-	 *
-	 * 1. In issig_forreal() when another lwp is undergoing fork1()
-	 * or watchpoint activity (p_flag contains either SHOLDFORK1 or
-	 * SHOLDWATCH or t_proc_flag contains TP_HOLDLWP)
-	 *
-	 * 2. In stop() when the why argument is not PR_SUSPENDED or the what
-	 * argument is not SUSPEND_NORMAL.
-	 *
-	 * 3. In cv_wait_stop() when another lwp is undergoing fork1() or
-	 * watchpoint activity (p_flag contains either SHOLDFORK1 or
-	 * SHOLDWATCH or t_proc_flag contains TP_HOLDLWP)
-	 *
-	 * lwp_nostop_r is set in prstop(). ie we honour the presence of
-	 * SHOLDFORK1 or SHOLDWATCH or TP_HOLDLWP in the case of
-	 * stop(PR_SUSPENDED, SUSPEND_NORMAL)
+	 * used to stop/alert lwps
 	 */
 	char	lwp_unused;
 	char	lwp_state;	/* Running in User/Kernel mode (no lock req) */
-	ushort_t lwp_nostop;	/* Don't stop this lwp except SUSPEND_NORMAL */
-	ushort_t lwp_nostop_r;	/* Don't stop this lwp (avoid recursion) */
+	ushort_t lwp_nostop;	/* Don't stop this lwp (no lock required) */
+	ushort_t lwp_pad;	/* Reserved for future use */
 
 	/*
 	 * Last failed privilege.

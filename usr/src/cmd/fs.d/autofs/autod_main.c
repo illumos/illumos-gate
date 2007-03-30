@@ -60,6 +60,7 @@
 #include <sys/thread.h>
 #include <nfs/rnode.h>
 #include <nfs/nfs.h>
+#include <wait.h>
 
 static void autofs_doorfunc(void *, char *, size_t, door_desc_t *, uint_t);
 static void autofs_setdoor(int);
@@ -77,6 +78,7 @@ static void usage();
 static void warn_hup(int);
 static void free_action_list();
 static int start_autofs_svcs();
+static void automountd_wait_for_cleanup(pid_t);
 
 
 /*
@@ -188,6 +190,50 @@ main(argc, argv)
 	openlog("automountd", LOG_PID, LOG_DAEMON);
 	(void) setlocale(LC_ALL, "");
 
+	/*
+	 * Create the door_servers to manage fork/exec requests for
+	 * mounts and executable automount maps
+	 */
+	if ((did_fork_exec = door_create(automountd_do_fork_exec,
+	    NULL, NULL)) == -1) {
+		syslog(LOG_ERR, "door_create failed: %m, Exiting.");
+		exit(errno);
+	}
+	if ((did_exec_map = door_create(automountd_do_exec_map,
+	    NULL, NULL)) == -1) {
+		syslog(LOG_ERR, "door_create failed: %m, Exiting.");
+		if (door_revoke(did_fork_exec) == -1) {
+			syslog(LOG_ERR, "failed to door_revoke(%d) %m",
+			    did_fork_exec);
+		}
+		exit(errno);
+	}
+	/*
+	 * Before we become multithreaded we fork allowing the parent
+	 * to become a door server to handle all mount and unmount
+	 * requests. This works around a potential hang in using
+	 * fork1() within a multithreaded environment
+	 */
+
+	pid = fork1();
+	if (pid < 0) {
+		syslog(LOG_ERR,
+			"can't fork the automountd mount process %m");
+		if (door_revoke(did_fork_exec) == -1) {
+			syslog(LOG_ERR, "failed to door_revoke(%d) %m",
+				did_fork_exec);
+		}
+		if (door_revoke(did_exec_map) == -1) {
+			syslog(LOG_ERR, "failed to door_revoke(%d) %m",
+				did_exec_map);
+		}
+		exit(1);
+	} else if (pid > 0) {
+		/* this is the door server process */
+		automountd_wait_for_cleanup(pid);
+	}
+
+
 	(void) rwlock_init(&cache_lock, USYNC_THREAD, NULL);
 	(void) rwlock_init(&autofs_rddir_cache_lock, USYNC_THREAD, NULL);
 
@@ -220,8 +266,7 @@ main(argc, argv)
 	case 0:
 		break;
 	case -1:
-		syslog(LOG_ERR, "error locking for %s: %s", AUTOMOUNTD,
-		    strerror(errno));
+		syslog(LOG_ERR, "error locking for %s: %m", AUTOMOUNTD);
 		exit(2);
 	default:
 		/* daemon was already running */
@@ -989,4 +1034,32 @@ encode_res(
 	}
 	(*results)->res_status = 0;
 	return (TRUE);
+}
+
+static void
+automountd_wait_for_cleanup(pid_t pid)
+{
+	int status;
+	int child_exitval;
+
+	/*
+	 * Wait for the main automountd process to exit so we cleanup
+	 */
+	(void) waitpid(pid, &status, 0);
+
+	child_exitval = WEXITSTATUS(status);
+
+	/*
+	 * Shutdown the door server for mounting and unmounting
+	 * filesystems
+	 */
+	if (door_revoke(did_fork_exec) == -1) {
+		syslog(LOG_ERR, "failed to door_revoke(%d) %m",
+			did_fork_exec);
+	}
+	if (door_revoke(did_exec_map) == -1) {
+		syslog(LOG_ERR, "failed to door_revoke(%d) %m",
+			did_exec_map);
+	}
+	exit(child_exitval);
 }

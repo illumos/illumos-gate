@@ -52,12 +52,13 @@
 #include <limits.h>
 #include <assert.h>
 #include <fcntl.h>
+#include <strings.h>
 
 #include "automount.h"
 #include "replica.h"
 
 static int unmount_mntpnt(struct mnttab *);
-static int fork_exec(char *, char *, char **, int);
+static int call_fork_exec(char *, char *, char **, int);
 static void remove_browse_options(char *);
 static int inherit_options(char *, char **);
 
@@ -373,7 +374,7 @@ mount_generic(special, fstype, opts, mntpnt, overlay)
 	newargv[i++] = special;
 	newargv[i++] = mntpnt;
 	newargv[i] = NULL;
-	res = fork_exec(fstype, "mount", newargv, verbose);
+	res = call_fork_exec(fstype, "mount", newargv, verbose);
 	if (res == 0 && trace > 1) {
 		if (stat(mntpnt, &stbuf) == 0) {
 			trace_prt(1, "  mount of %s dev=%x rdev=%x OK\n",
@@ -385,57 +386,58 @@ mount_generic(special, fstype, opts, mntpnt, overlay)
 	return (res);
 }
 
-static int
-fork_exec(fstype, cmd, newargv, console)
-	char *fstype;
-	char *cmd;
-	char **newargv;
-	int console;
+void
+automountd_do_fork_exec(void *cookie, char *argp, size_t arg_size,
+		door_desc_t *dfd, uint_t n_desc)
 {
-	char path[MAXPATHLEN];
-	int i;
 	int stat_loc;
 	int fd = 0;
 	struct stat stbuf;
 	int res;
 	int child_pid;
+	command_t *command;
+	char *newargv[ARGV_MAX];
+	int i;
 
-	/* build the full path name of the fstype dependent command */
-	(void) sprintf(path, "%s/%s/%s", VFS_PATH, fstype, cmd);
 
-	if (stat(path, &stbuf) != 0) {
-		res = errno;
-		return (res);
+	command = (command_t *)argp;
+	if (sizeof (*command) != arg_size) {
+		res = EINVAL;
+		door_return((char *)&res, sizeof (res), NULL, 0);
 	}
 
-	if (trace > 1) {
-		trace_prt(1, "  fork_exec: %s ", path);
-		for (i = 2; newargv[i]; i++)
-			trace_prt(0, "%s ", newargv[i]);
-		trace_prt(0, "\n");
-	}
-
-
-	newargv[1] = cmd;
 	switch ((child_pid = fork1())) {
 	case -1:
 		syslog(LOG_ERR, "Cannot fork: %m");
-		return (errno);
+		res = errno;
+		break;
 	case 0:
 		/*
 		 * Child
 		 */
 		(void) setsid();
-		fd = open(console ? "/dev/console" : "/dev/null", O_WRONLY);
+		fd = open(command->console ? "/dev/console" : "/dev/null",
+			    O_WRONLY);
 		if (fd != -1) {
 			(void) dup2(fd, 1);
 			(void) dup2(fd, 2);
 			(void) close(fd);
 		}
 
-		(void) execv(path, &newargv[1]);
+		for (i = 0; *command->argv[i]; i++) {
+			newargv[i] = strdup(command->argv[i]);
+			if (newargv[i] == (char *)NULL) {
+				syslog(LOG_ERR, "failed to copy argument '%s'"
+				    " of %s: %m", command->argv[i],
+				    command->file);
+				_exit(errno);
+			}
+		}
+		newargv[i] = NULL;
+
+		(void) execv(command->file, newargv);
 		if (errno == EACCES)
-			syslog(LOG_ERR, "exec %s: %m", path);
+			syslog(LOG_ERR, "exec %s: %m", command->file);
 
 		_exit(errno);
 	default:
@@ -451,22 +453,25 @@ fork_exec(fstype, cmd, newargv, console)
 				    WEXITSTATUS(stat_loc));
 			}
 
-			return (WEXITSTATUS(stat_loc));
-		} else
-		if (WIFSIGNALED(stat_loc)) {
-			if (trace > 1) {
+			res = WEXITSTATUS(stat_loc);
+		} else if (WIFSIGNALED(stat_loc)) {
+			if (trace > 1)
 				trace_prt(1,
 				    "  fork_exec: returns signal status %d\n",
 				    WTERMSIG(stat_loc));
-			}
+			res = 1;
 		} else {
 			if (trace > 1)
 				trace_prt(1,
 				    "  fork_exec: returns unknown status\n");
+			res = 1;
 		}
 
-		return (1);
 	}
+	door_return((char *)&res, sizeof (res), NULL, 0);
+	trace_prt(1, "automountd_do_fork_exec, door return failed %s, %s\n",
+	    command->file, strerror(errno));
+	door_return(NULL, 0, NULL, 0);
 }
 
 int
@@ -551,7 +556,7 @@ unmount_mntpnt(mnt)
 		newargv[2] = mountp;
 		newargv[3] = NULL;
 
-		res = fork_exec(fstype, "umount", newargv, verbose);
+		res = call_fork_exec(fstype, "umount", newargv, verbose);
 		if (res == ENOENT) {
 			/*
 			 * filesystem specific unmount command not found
@@ -645,4 +650,58 @@ hasrestrictopt(char *opts)
 	mt.mnt_mntopts = opts;
 
 	return (hasmntopt(&mt, MNTOPT_RESTRICT) != NULL);
+}
+
+static int
+call_fork_exec(fstype, cmd, newargv, console)
+	char *fstype;
+	char *cmd;
+	char **newargv;
+	int console;
+{
+	command_t command;
+	door_arg_t darg;
+	char path[MAXPATHLEN];
+	struct stat stbuf;
+	int ret;
+	int sz;
+	int status;
+	int i;
+
+	bzero(&command, sizeof (command));
+	/* build the full path name of the fstype dependent command */
+	(void) snprintf(path, MAXPATHLEN, "%s/%s/%s", VFS_PATH, fstype, cmd);
+
+	if (stat(path, &stbuf) != 0) {
+		ret = errno;
+		return (ret);
+	}
+
+	strlcpy(command.file, path, MAXPATHLEN);
+	strlcpy(command.argv[0], path, MAXOPTSLEN);
+	for (i = 2; newargv[i]; i++) {
+		strlcpy(command.argv[i-1], newargv[i], MAXOPTSLEN);
+	}
+	if (trace > 1) {
+		trace_prt(1, "  call_fork_exec: %s ", command.file);
+		for (i = 0; *command.argv[i]; i++)
+			trace_prt(0, "%s ", command.argv[i]);
+		trace_prt(0, "\n");
+	}
+
+	command.console = console;
+
+	darg.data_ptr = (char *)&command;
+	darg.data_size = sizeof (command);
+	darg.desc_ptr = NULL;
+	darg.desc_num = 0;
+	darg.rbuf = (char *)&status;
+	darg.rsize = sizeof (status);
+
+	ret = door_call(did_fork_exec, &darg);
+	if (trace > 1) {
+		trace_prt(1, "  call_fork_exec: door_call failed %d\n", ret);
+	}
+
+	return (status);
 }

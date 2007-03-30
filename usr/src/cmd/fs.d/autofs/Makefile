@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -85,9 +85,9 @@ POFILE= autofs.po
 GREP= egrep
 SED= sed
 
-$(AUTO) := 	LDLIBS += -lnsl -lsldap
+$(AUTO) := 	LDLIBS += -lnsl -lsldap  -ldoor
 $(MOUNT):=	LDLIBS += -lnsl
-$(TYPEPROG) :=	LDLIBS += -lrpcsvc -lsocket -lnsl -lsldap -lkstat
+$(TYPEPROG) :=	LDLIBS += -lrpcsvc -lsocket -lnsl -lsldap -lkstat -ldoor
 $(TYPEPROG) :=	LDFLAGS += -R/usr/lib/fs/$(FSTYPE)
 
 CFLAGS +=	$(CCVERBOSE) -D_FILE_OFFSET_BITS=64
