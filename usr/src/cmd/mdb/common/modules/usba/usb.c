@@ -775,8 +775,9 @@ static const mdb_dcmd_t dcmds[] = {
 	    "print usba_debug_buf", usba_debug_buf, NULL},
 	{ "usba_clear_debug_buf", NULL,
 	    "clear usba_debug_buf", usba_clear_debug_buf, NULL},
-	{ "prtusb", ": [-t] [-v] [-i No.]",
-	    "Print usb tree and descriptors", prtusb, prt_usb_usage},
+	{ "prtusb", "?[-t] [-v] [-i index]",
+	    "print trees and descriptors for usba_device_t",
+	    prtusb, prt_usb_usage},
 	{ NULL }
 };
 

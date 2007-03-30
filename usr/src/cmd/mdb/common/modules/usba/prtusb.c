@@ -515,11 +515,9 @@ int prtusb(uintptr_t, uint_t, int, const mdb_arg_t *);
 void
 prt_usb_usage(void)
 {
-	mdb_printf("[addr]::prtusb [-v] [-t] [-i No.]\n\n");
-	mdb_printf("%-8s : %s\n", "addr", "address of usba_device_t");
 	mdb_printf("%-8s : %s\n", "-v", "print all descriptors");
 	mdb_printf("%-8s : %s\n", "-t", "print device trees");
-	mdb_printf("%-8s : %s\n", "-i No.", "print the device by No.");
+	mdb_printf("%-8s : %s\n", "-i index", "print the device by index");
 }
 
 /* the entry of ::prtusb */
@@ -548,8 +546,8 @@ prtusb(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	/* for the first device, print head */
 	if (DCMD_HDRSPEC(flags)) {
 		count = 1;
-		mdb_printf("%<u>%-6s%-12s%-6s%-16s%-12s%-20s%</u>\n",
-		    "No.", "DRIVER", "INST", "NODE", "VID.PID", "PRODUCT");
+		mdb_printf("%<u>%-8s%-12s%-6s%-16s%-12s%-20s%</u>\n",
+		    "INDEX", "DRIVER", "INST", "NODE", "VID.PID", "PRODUCT");
 	}
 
 	if (mdb_getopts(argc, argv,
@@ -580,8 +578,8 @@ prtusb(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 	}
 
-	/* print brief info */
-	mdb_printf("%-2x :  ", count++);
+	/* index number of device node  */
+	mdb_printf("%-8x", count++);
 
 	/* driver and instance */
 	mdb_devinfo2driver((uintptr_t)usb_dev.usb_dip, strbuf, STRLEN);
