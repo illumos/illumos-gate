@@ -331,6 +331,24 @@ struct kmem_cache *ciputctrl_cache = NULL;
 
 static linkinfo_t *linkinfo_list;
 
+/* global esballoc throttling queue */
+static esb_queue_t	system_esbq;
+
+/*
+ * esballoc tunable parameters.
+ */
+int		esbq_max_qlen = 0x16;	/* throttled queue length */
+clock_t		esbq_timeout = 0x8;	/* timeout to process esb queue */
+
+/*
+ * routines to handle esballoc queuing.
+ */
+static void esballoc_process_queue(esb_queue_t *);
+static void esballoc_enqueue_mblk(mblk_t *);
+static void esballoc_timer(void *);
+static void esballoc_set_timer(esb_queue_t *, clock_t);
+static void esballoc_mblk_free(mblk_t *);
+
 /*
  *  Qinit structure and Module_info structures
  *	for passthru read and write queues
@@ -3903,10 +3921,11 @@ sqenable(syncq_t *sq)
  * share the same fifolock_t).
  */
 
-/* ARGSUSED */
 void
 freebs_enqueue(mblk_t *mp, dblk_t *dbp)
 {
+	esb_queue_t *eqp = &system_esbq;
+
 	ASSERT(dbp->db_mblk == mp);
 
 	/*
@@ -3916,23 +3935,129 @@ freebs_enqueue(mblk_t *mp, dblk_t *dbp)
 	 */
 	if (dbp->db_frtnp->free_func == NULL) {
 		panic("freebs_enqueue: dblock %p has a NULL free callback",
-		    (void *) dbp);
+		    (void *)dbp);
 	}
 
-	STRSTAT(freebs);
-	if (taskq_dispatch(streams_taskq, (task_func_t *)mblk_free, mp,
+	mutex_enter(&eqp->eq_lock);
+	/* queue the new mblk on the esballoc queue */
+	if (eqp->eq_head == NULL) {
+		eqp->eq_head = eqp->eq_tail = mp;
+	} else {
+		eqp->eq_tail->b_next = mp;
+		eqp->eq_tail = mp;
+	}
+	eqp->eq_len++;
+
+	/* If we're the first thread to reach the threshold, process */
+	if (eqp->eq_len >= esbq_max_qlen &&
+	    !(eqp->eq_flags & ESBQ_PROCESSING))
+		esballoc_process_queue(eqp);
+
+	esballoc_set_timer(eqp, esbq_timeout);
+	mutex_exit(&eqp->eq_lock);
+}
+
+static void
+esballoc_process_queue(esb_queue_t *eqp)
+{
+	mblk_t	*mp;
+
+	ASSERT(MUTEX_HELD(&eqp->eq_lock));
+
+	eqp->eq_flags |= ESBQ_PROCESSING;
+
+	do {
+		/*
+		 * Detach the message chain for processing.
+		 */
+		mp = eqp->eq_head;
+		eqp->eq_tail->b_next = NULL;
+		eqp->eq_head = eqp->eq_tail = NULL;
+		eqp->eq_len = 0;
+		mutex_exit(&eqp->eq_lock);
+
+		/*
+		 * Process the message chain.
+		 */
+		esballoc_enqueue_mblk(mp);
+		mutex_enter(&eqp->eq_lock);
+	} while ((eqp->eq_len >= esbq_max_qlen) && (eqp->eq_len > 0));
+
+	eqp->eq_flags &= ~ESBQ_PROCESSING;
+}
+
+/*
+ * taskq callback routine to free esballoced mblk's
+ */
+static void
+esballoc_mblk_free(mblk_t *mp)
+{
+	mblk_t	*nextmp;
+
+	for (; mp != NULL; mp = nextmp) {
+		nextmp = mp->b_next;
+		mp->b_next = NULL;
+		mblk_free(mp);
+	}
+}
+
+static void
+esballoc_enqueue_mblk(mblk_t *mp)
+{
+
+	if (taskq_dispatch(system_taskq, (task_func_t *)esballoc_mblk_free, mp,
 	    TQ_NOSLEEP) == NULL) {
+		mblk_t *first_mp = mp;
 		/*
 		 * System is low on resources and can't perform a non-sleeping
 		 * dispatch. Schedule for a background thread.
 		 */
 		mutex_enter(&service_queue);
 		STRSTAT(taskqfails);
+
+		while (mp->b_next != NULL)
+			mp = mp->b_next;
+
 		mp->b_next = freebs_list;
-		freebs_list = mp;
+		freebs_list = first_mp;
 		cv_signal(&services_to_run);
 		mutex_exit(&service_queue);
 	}
+}
+
+static void
+esballoc_timer(void *arg)
+{
+	esb_queue_t *eqp = arg;
+
+	mutex_enter(&eqp->eq_lock);
+	eqp->eq_flags &= ~ESBQ_TIMER;
+
+	if (!(eqp->eq_flags & ESBQ_PROCESSING) &&
+	    eqp->eq_len > 0)
+		esballoc_process_queue(eqp);
+
+	esballoc_set_timer(eqp, esbq_timeout);
+	mutex_exit(&eqp->eq_lock);
+}
+
+static void
+esballoc_set_timer(esb_queue_t *eqp, clock_t eq_timeout)
+{
+	ASSERT(MUTEX_HELD(&eqp->eq_lock));
+
+	if (eqp->eq_len > 0 && !(eqp->eq_flags & ESBQ_TIMER)) {
+		(void) timeout(esballoc_timer, eqp, eq_timeout);
+		eqp->eq_flags |= ESBQ_TIMER;
+	}
+}
+
+void
+esballoc_queue_init(void)
+{
+	system_esbq.eq_len = 0;
+	system_esbq.eq_head = system_esbq.eq_tail = NULL;
+	system_esbq.eq_flags = 0;
 }
 
 /*

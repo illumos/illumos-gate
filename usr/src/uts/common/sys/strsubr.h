@@ -1268,6 +1268,26 @@ extern int max_n_ciputctrl;
 extern int min_n_ciputctrl;
 
 extern cdevsw_impl_t *devimpl;
+
+/*
+ * esballoc queue for throttling
+ */
+typedef struct esb_queue {
+	kmutex_t	eq_lock;
+	uint_t		eq_len;		/* number of queued messages */
+	mblk_t		*eq_head;	/* head of queue */
+	mblk_t		*eq_tail;	/* tail of queue */
+	uint_t		eq_flags;	/* esballoc queue flags */
+} esb_queue_t;
+
+/*
+ * esballoc flags for queue processing.
+ */
+#define	ESBQ_PROCESSING	0x01	/* queue is being processed */
+#define	ESBQ_TIMER	0x02	/* timer is active */
+
+extern void esballoc_queue_init(void);
+
 #endif	/* _KERNEL */
 
 /*

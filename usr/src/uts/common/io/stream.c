@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -367,6 +367,9 @@ streams_msg_init(void)
 
 	/* Initialize Multidata caches */
 	mmd_init();
+
+	/* initialize throttling queue for esballoc */
+	esballoc_queue_init();
 }
 
 /*ARGSUSED*/
