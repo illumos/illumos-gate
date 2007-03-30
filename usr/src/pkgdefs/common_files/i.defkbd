@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -18,64 +19,42 @@
 #
 # CDDL HEADER END
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-include ../Makefile.com
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
 
-DATAFILES += \
-	i.cronroot	\
-	i.definit	\
-	i.defkbd	\
-	i.deflogin	\
-	i.defpasswd	\
-	i.defsu		\
-	i.dhcpinittab	\
-	i.etcprofile	\
-	i.etcremote	\
-	i.etcrpc	\
-	i.fstypes	\
-	i.group		\
-	i.hosts		\
-	i.inetdconf	\
-	i.initd		\
-	i.inittab	\
-	i.locallogin	\
-	i.localprofile	\
-	i.logadmconf	\
-	i.logindevperm	\
-	i.mailxrc	\
-	i.manifest	\
-	r.manifest	\
-	i.netconfig	\
-	i.nscd		\
-	i.nsswitch	\
-	i.pamconf	\
-	i.passwd	\
-	i.pkcs11confbase \
-	i.policyconf	\
-	i.preserve	\
-	i.rbac		\
-	r.rbac		\
-	i.renamenew	\
-	i.renameold	\
-	i.services	\
-	i.shadow	\
-	i.syslogconf	\
-	i.tiservices	\
-	i.ttydefs	\
-	i.ttysrch	\
-	i.vfstab
+while read src dest
+do
+	if [ ! -f $dest ] ; then
+		cp $src $dest
+	else
+		merge=/tmp/sftmp.$$
+		cat /dev/null > $merge
 
-CHKINSTALLSRC=checkinstall.initd
+		for word in KEYBOARD_ABORT KEYCLICK REPEAT_DELAY REPEAT_RATE \
+		    LAYOUT KBD_BEEPER_FREQ CONSOLE_BEEPER_FREQ; do
 
-.KEEP_STATE:
+			dstline=`grep "^$word=" $dest | tail -1 2> /dev/null`
 
-all: $(FILES) preinstall postinstall
-install: all pkg
+			if [ -n "$dstline" ]; then
+				echo "s|^[# 	]*$word=.*|$dstline|" >> $merge
+			fi
 
-include ../Makefile.targ
+		done
+
+		sed -f $merge $src > $dest
+		rm -f $merge
+
+		# restore permissions if they changed
+		/usr/bin/chmod 0644 $dest
+		/usr/bin/chown root:sys $dest
+	fi
+
+done
+
+exit 0

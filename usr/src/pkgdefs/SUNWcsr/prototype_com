@@ -55,6 +55,7 @@ i i.etcremote
 i i.nsswitch
 i i.nscd
 i i.netconfig
+i i.defkbd
 i i.deflogin
 i i.defsu
 i i.syslogconf
@@ -122,7 +123,7 @@ e preserve etc/default/cron 644 root sys
 e preserve etc/default/devfsadm 644 root sys
 e preserve etc/default/fs 644 root sys
 e definit etc/default/init 644 root sys
-e preserve etc/default/kbd 644 root sys
+e defkbd etc/default/kbd 644 root sys
 e preserve etc/default/keyserv 644 root sys
 e deflogin etc/default/login 644 root sys
 e preserve etc/default/nss 644 root sys

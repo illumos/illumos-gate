@@ -150,6 +150,7 @@ struct	kbddata {
 	ushort_t compose_key;		/* first compose key */
 	ushort_t fltaccent_entry;	/* floating accent keymap entry */
 	char	led_state;		/* current state of LEDs */
+	unsigned char shiftkey;		/* used for the new abort keys */
 };
 
 #define	KBD_OPEN	0x00000001 /* keyboard is open for business */
@@ -1510,7 +1511,7 @@ kbdinput(register struct kbddata *kbdd, register unsigned key)
 			if ((key == k->k_curkeyboard->k_newabort1) ||
 			    (key == k->k_curkeyboard->k_newabort1a)) {
 				k->k_state = NEWABORT1;
-				break;
+				kbdd->shiftkey = key;
 			}
 		}
 #endif
@@ -1548,10 +1549,11 @@ kbdinput(register struct kbddata *kbdd, register unsigned key)
 				DELAY(100000);
 				abort_sequence_enter((char *)NULL);
 				k->k_state = NORMAL;
+				kbdd->shiftkey |= RELEASED;
+				kbduse(kbdd, kbdd->shiftkey);
 				kbduse(kbdd, IDLEKEY);	/* fake */
 				return;
 			} else {
-				kbduse(kbdd, k->k_curkeyboard->k_newabort1);
 				goto normalstate;
 			}
 		}
