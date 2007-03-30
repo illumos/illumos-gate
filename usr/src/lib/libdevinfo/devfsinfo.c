@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2205,7 +2205,7 @@ alias_to_prom_dev(char *alias, char *ret_buf)
 		return (ret);
 	}
 
-	(void) strlcpy(ret_buf, alias_def, strlen(ret_buf) + 1);
+	(void) strlcpy(ret_buf, alias_def, MAXPATHLEN);
 
 	/* override minor name information */
 	if (options_ptr != NULL) {
@@ -2251,7 +2251,7 @@ prom_srch_node(int fd, char *prop_name, char *ret_buf)
 
 	if (opp->oprom_size == 0)
 		return (-1);
-	(void) strlcpy(ret_buf, opp->oprom_array, strlen(ret_buf) + 1);
+	(void) strlcpy(ret_buf, opp->oprom_array, MAXPATHLEN);
 	return (0);
 }
 
@@ -2262,7 +2262,7 @@ static int
 prom_find_aliases_node(int fd)
 {
 	uint_t child_id;
-	char buf[MAXNAMELEN];
+	char buf[MAXPATHLEN];
 
 	if ((child_id = prom_next_node(fd, 0)) == 0)
 		return (-1);
