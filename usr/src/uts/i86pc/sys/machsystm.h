@@ -121,6 +121,8 @@ struct memlist;
 extern void memlist_add(uint64_t, uint64_t, struct memlist *,
     struct memlist **);
 extern page_t *page_get_physical(uintptr_t);
+extern int linear_pc(struct regs *rp, proc_t *p, caddr_t *linearp);
+extern int dtrace_linear_pc(struct regs *rp, proc_t *p, caddr_t *linearp);
 
 #endif /* _KERNEL */
 

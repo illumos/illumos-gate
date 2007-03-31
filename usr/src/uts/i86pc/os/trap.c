@@ -132,6 +132,9 @@ static const char *trap_type[] = {
 
 #define	TRAP_TYPES	(sizeof (trap_type) / sizeof (trap_type[0]))
 
+#define	SLOW_SCALL_SIZE	2
+#define	FAST_SCALL_SIZE	2
+
 int tudebug = 0;
 int tudebugbpt = 0;
 int tudebugfpe = 0;
@@ -206,8 +209,6 @@ die(uint_t type, struct regs *rp, caddr_t addr, processorid_t cpuid)
  * int <vector> is two bytes: 0xCD <vector>
  */
 
-#define	SLOW_SCALL_SIZE	2
-
 static int
 rewrite_syscall(caddr_t pc)
 {
@@ -227,26 +228,86 @@ rewrite_syscall(caddr_t pc)
  *
  * sysenter is two bytes: 0x0F 0x34
  * syscall is two bytes:  0x0F 0x05
+ * int $T_SYSCALLINT is two bytes: 0xCD 0x91
  */
 
-#define	FAST_SCALL_SIZE	2
-
 static int
-instr_is_fast_syscall(caddr_t pc, int which)
+instr_is_other_syscall(caddr_t pc, int which)
 {
 	uchar_t instr[FAST_SCALL_SIZE];
 
-	ASSERT(which == X86_SEP || which == X86_ASYSC);
+	ASSERT(which == X86_SEP || which == X86_ASYSC || which == 0xCD);
 
-	if (copyin_nowatch(pc, (caddr_t)instr, FAST_SCALL_SIZE) != 0 ||
-	    instr[0] != 0x0F)
+	if (copyin_nowatch(pc, (caddr_t)instr, FAST_SCALL_SIZE) != 0)
 		return (0);
 
-	if ((which == X86_SEP && instr[1] == 0x34) ||
-	    (which == X86_ASYSC && instr[1] == 0x05))
-		return (1);
+	switch (which) {
+	case X86_SEP:
+		if (instr[0] == 0x0F && instr[1] == 0x34)
+			return (1);
+		break;
+	case X86_ASYSC:
+		if (instr[0] == 0x0F && instr[1] == 0x05)
+			return (1);
+		break;
+	case 0xCD:
+		if (instr[0] == 0xCD && instr[1] == T_SYSCALLINT)
+			return (1);
+		break;
+	}
 
 	return (0);
+}
+
+static const char *
+syscall_insn_string(int syscall_insn)
+{
+	switch (syscall_insn) {
+	case X86_SEP:
+		return ("sysenter");
+	case X86_ASYSC:
+		return ("syscall");
+	case 0xCD:
+		return ("int");
+	default:
+		return ("Unknown");
+	}
+}
+
+static int
+ldt_rewrite_syscall(struct regs *rp, proc_t *p, int syscall_insn)
+{
+	caddr_t	linearpc;
+	int return_code = 0;
+
+	mutex_enter(&p->p_ldtlock);	/* Must be held across linear_pc() */
+
+	if (linear_pc(rp, p, &linearpc) == 0) {
+
+		/*
+		 * If another thread beat us here, it already changed
+		 * this site to the slower (int) syscall instruction.
+		 */
+		if (instr_is_other_syscall(linearpc, 0xCD)) {
+			return_code = 1;
+		} else if (instr_is_other_syscall(linearpc, syscall_insn)) {
+
+			if (rewrite_syscall(linearpc) == 0) {
+				return_code = 1;
+			}
+#ifdef DEBUG
+			else
+				cmn_err(CE_WARN, "failed to rewrite %s "
+				    "instruction in process %d",
+				    syscall_insn_string(syscall_insn),
+				    p->p_pid);
+#endif /* DEBUG */
+		}
+	}
+
+	mutex_exit(&p->p_ldtlock);	/* Must be held across linear_pc() */
+
+	return (return_code);
 }
 
 /*
@@ -260,7 +321,7 @@ instr_is_fast_syscall(caddr_t pc, int which)
 #define	LCALLSIZE	7
 
 static int
-instr_is_syscall(caddr_t pc)
+instr_is_lcall_syscall(caddr_t pc)
 {
 	uchar_t instr[LCALLSIZE];
 
@@ -704,7 +765,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		 * trap gate sequence.  We just have to adjust the pc.
 		 */
 		if (watchpage && addr == (caddr_t)rp->r_sp &&
-		    rw == S_READ && instr_is_syscall((caddr_t)rp->r_pc)) {
+		    rw == S_READ && instr_is_lcall_syscall((caddr_t)rp->r_pc)) {
 			extern void watch_syscall(void);
 
 			rp->r_pc += LCALLSIZE;
@@ -828,16 +889,8 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		 * be to emulate that particular instruction.
 		 */
 		if (p->p_ldt != NULL &&
-		    instr_is_fast_syscall((caddr_t)rp->r_pc, X86_ASYSC)) {
-			if (rewrite_syscall((caddr_t)rp->r_pc) == 0)
-				goto out;
-#ifdef DEBUG
-			else
-				cmn_err(CE_WARN, "failed to rewrite syscall "
-				    "instruction in process %d",
-				    curthread->t_procp->p_pid);
-#endif /* DEBUG */
-		}
+		    ldt_rewrite_syscall(rp, p, X86_ASYSC))
+			goto out;
 
 #ifdef __amd64
 		/*
@@ -1114,7 +1167,7 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 #ifdef _SYSCALL32_IMPL
 		if (p->p_model != DATAMODEL_NATIVE) {
 #endif /* _SYSCALL32_IMPL */
-		if (instr_is_syscall((caddr_t)rp->r_pc)) {
+		if (instr_is_lcall_syscall((caddr_t)rp->r_pc)) {
 			if (type == T_SEGFLT + USER)
 				ASSERT(p->p_ldt != NULL);
 
@@ -1161,16 +1214,9 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		 * this will be to emulate that particular instruction.
 		 */
 		if (p->p_ldt != NULL &&
-		    instr_is_fast_syscall((caddr_t)rp->r_pc, X86_SEP)) {
-			if (rewrite_syscall((caddr_t)rp->r_pc) == 0)
-				goto out;
-#ifdef DEBUG
-			else
-				cmn_err(CE_WARN, "failed to rewrite sysenter "
-				    "instruction in process %d",
-				    curthread->t_procp->p_pid);
-#endif /* DEBUG */
-		}
+		    ldt_rewrite_syscall(rp, p, X86_SEP))
+			goto out;
+
 		/*FALLTHROUGH*/
 
 	case T_BOUNDFLT + USER:	/* bound fault */

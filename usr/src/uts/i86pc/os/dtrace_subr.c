@@ -240,7 +240,8 @@ dtrace_user_probe(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		rp->r_pc = npc;
 
 	} else if (rp->r_trapno == T_BPTFLT) {
-		uint8_t instr;
+		uint8_t instr, instr2;
+		caddr_t linearpc;
 		rwp = &CPU->cpu_ft_lock;
 
 		/*
@@ -258,14 +259,25 @@ dtrace_user_probe(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		}
 		rw_exit(rwp);
 
+		if (dtrace_linear_pc(rp, p, &linearpc) != 0) {
+			trap(rp, addr, cpuid);
+			return;
+		}
+
 		/*
 		 * If the instruction that caused the breakpoint trap doesn't
 		 * look like an int 3 anymore, it may be that this tracepoint
 		 * was removed just after the user thread executed it. In
 		 * that case, return to user land to retry the instuction.
+		 * Note that we assume the length of the instruction to retry
+		 * is 1 byte because that's the length of FASTTRAP_INSTR.
+		 * We check for r_pc > 0 and > 2 so that we don't have to
+		 * deal with segment wraparound.
 		 */
-		if (fuword8((void *)(rp->r_pc - 1), &instr) == 0 &&
-		    instr != FASTTRAP_INSTR) {
+		if (rp->r_pc > 0 && fuword8(linearpc - 1, &instr) == 0 &&
+		    instr != FASTTRAP_INSTR &&
+		    (instr != 3 || (rp->r_pc >= 2 &&
+		    (fuword8(linearpc - 2, &instr2) != 0 || instr2 != 0xCD)))) {
 			rp->r_pc--;
 			return;
 		}

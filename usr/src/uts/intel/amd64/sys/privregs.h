@@ -78,15 +78,11 @@ struct regs {
 	greg_t	r_r15;		/* callee-saved */
 
 	/*
-	 * XX64
-	 * We used to sample fsbase and gsbase on every exception
-	 * with expensive rdmsr's. Yet this was only useful at
-	 * best for debugging during amd64 bringup. We should take
-	 * these away but for now simply rename them to avoid any
-	 * flag days.
+	 * fsbase and gsbase are sampled on every exception in DEBUG kernels
+	 * only.  They remain in the non-DEBUG kernel to avoid any flag days.
 	 */
-	greg_t	__r_fsbase;	/* XX64 no longer used by the kernel */
-	greg_t	__r_gsbase;	/* XX64 no longer used by the kernel */
+	greg_t	__r_fsbase;	/* no longer used in non-DEBUG builds */
+	greg_t	__r_gsbase;	/* no longer used in non-DEBUG builds */
 	greg_t	r_ds;
 	greg_t	r_es;
 	greg_t	r_fs;		/* %fs is *never* used by the kernel */
@@ -123,6 +119,20 @@ struct regs {
 #include <sys/machprivregs.h>
 #include <sys/pcb.h>
 
+#ifdef DEBUG
+#define	__SAVE_BASES				\
+	movl    $MSR_AMD_FSBASE, %ecx;          \
+	rdmsr;                                  \
+	movl    %eax, REGOFF_FSBASE(%rsp);      \
+	movl    %edx, REGOFF_FSBASE+4(%rsp);    \
+	movl    $MSR_AMD_GSBASE, %ecx;          \
+	rdmsr;                                  \
+	movl    %eax, REGOFF_GSBASE(%rsp);      \
+	movl    %edx, REGOFF_GSBASE+4(%rsp)
+#else
+#define	__SAVE_BASES
+#endif
+
 /*
  * Create a struct regs on the stack suitable for an
  * interrupt trap.
@@ -157,7 +167,8 @@ struct regs {
 	movw	%es, %cx;			\
 	movq	%rcx, REGOFF_ES(%rsp);		\
 	movw	%ds, %cx;			\
-	movq	%rcx, REGOFF_DS(%rsp)
+	movq	%rcx, REGOFF_DS(%rsp);		\
+	__SAVE_BASES
 
 #define	__RESTORE_REGS				\
 	movq	REGOFF_RDI(%rsp),	%rdi;	\

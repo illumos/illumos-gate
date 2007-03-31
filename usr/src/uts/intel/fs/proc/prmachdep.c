@@ -508,10 +508,9 @@ prnldt(proc_t *p)
 	ASSERT(MUTEX_HELD(&p->p_ldtlock));
 
 	/*
-	 * Currently 64 bit processes cannot have a private ldt.
+	 * Currently 64 bit processes cannot have private LDTs.
 	 */
-	ASSERT(get_udatamodel() != DATAMODEL_LP64 || p->p_ldt == NULL);
-
+	ASSERT(p->p_model != DATAMODEL_LP64 || p->p_ldt == NULL);
 
 	if (p->p_ldt == NULL)
 		return (0);

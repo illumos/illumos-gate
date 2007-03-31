@@ -104,10 +104,20 @@
 	movw	%fs, %ax;				\
 	movq	%rax, REG_OFF(KDIREG_FS)(base);		\
 	movw	%gs, %ax;				\
-	movq	%rax, REG_OFF(KDIREG_GS)(base)
+	movq	%rax, REG_OFF(KDIREG_GS)(base);		\
+	movl	$MSR_AMD_GSBASE, %ecx;			\
+	rdmsr;						\
+	shlq	$32, %rdx;				\
+	orq	%rax, %rdx;				\
+	movq	%rdx, REG_OFF(KDIREG_GSBASE)(base)
 
 #define	KDI_RESTORE_REGS(base) \
 	movq	base, %rdi;				\
+	movq	REG_OFF(KDIREG_GSBASE)(%rdi), %rdx;	\
+	movq	%rdx, %rax;				\
+	shrq	$32, %rdx;				\
+	movl	$MSR_AMD_GSBASE, %ecx;			\
+	wrmsr;						\
 	movq	REG_OFF(KDIREG_ES)(%rdi), %rax;		\
 	movw	%ax, %es;				\
 	movq	REG_OFF(KDIREG_DS)(%rdi), %rax;		\
@@ -193,7 +203,9 @@ kdi_cmnint(void)
 	 * Switch to the kernel's GSBASE.  Neither GSBASE nor the ill-named
 	 * KGSBASE can be trusted, as the kernel may or may not have already
 	 * done a swapgs.  All is not lost, as the kernel can divine the correct
-	 * value for us.
+	 * value for us.  Note that the previous GSBASE is saved in the
+	 * KDI_SAVE_REGS macro to prevent a usermode process's GSBASE from being
+	 * blown away.
 	 */
 	subq	$10, %rsp
 	sgdt	(%rsp)

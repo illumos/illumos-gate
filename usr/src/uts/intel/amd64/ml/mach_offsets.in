@@ -77,6 +77,10 @@ regs	REGSIZE
 	r_r13	REGOFF_R13
 	r_r14	REGOFF_R14
 	r_r15	REGOFF_R15
+\#if DEBUG
+	__r_fsbase	REGOFF_FSBASE
+	__r_gsbase	REGOFF_GSBASE
+\#endif
 	r_ds	REGOFF_DS
 	r_es	REGOFF_ES
 	r_fs	REGOFF_FS

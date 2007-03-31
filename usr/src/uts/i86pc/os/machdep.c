@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
+#include <sys/segments.h>
 #include <sys/sysmacros.h>
 #include <sys/signal.h>
 #include <sys/systm.h>
@@ -1017,5 +1018,102 @@ dump_plat_pfn()
 int
 dump_plat_data(void *dump_cbuf)
 {
+	return (0);
+}
+
+/*
+ * Calculates a linear address, given the CS selector and PC values
+ * by looking up the %cs selector process's LDT or the CPU's GDT.
+ * proc->p_ldtlock must be held across this call.
+ */
+int
+linear_pc(struct regs *rp, proc_t *p, caddr_t *linearp)
+{
+	user_desc_t	*descrp;
+	caddr_t		baseaddr;
+	uint16_t	idx = SELTOIDX(rp->r_cs);
+
+	ASSERT(rp->r_cs <= 0xFFFF);
+	ASSERT(MUTEX_HELD(&p->p_ldtlock));
+
+	if (SELISLDT(rp->r_cs)) {
+		/*
+		 * Currently 64 bit processes cannot have private LDTs.
+		 */
+		ASSERT(p->p_model != DATAMODEL_LP64);
+
+		if (p->p_ldt == NULL)
+			return (-1);
+
+		descrp = &p->p_ldt[idx];
+		baseaddr = (caddr_t)(uintptr_t)USEGD_GETBASE(descrp);
+
+		/*
+		 * Calculate the linear address (wraparound is not only ok,
+		 * it's expected behavior).  The cast to uint32_t is because
+		 * LDT selectors are only allowed in 32-bit processes.
+		 */
+		*linearp = (caddr_t)(uintptr_t)(uint32_t)((uintptr_t)baseaddr +
+		    rp->r_pc);
+	} else {
+#ifdef DEBUG
+		descrp = &CPU->cpu_gdt[idx];
+		baseaddr = (caddr_t)(uintptr_t)USEGD_GETBASE(descrp);
+		/* GDT-based descriptors' base addresses should always be 0 */
+		ASSERT(baseaddr == 0);
+#endif
+		*linearp = (caddr_t)(uintptr_t)rp->r_pc;
+	}
+
+	return (0);
+}
+
+/*
+ * The implementation of dtrace_linear_pc is similar to the that of
+ * linear_pc, above, but here we acquire p_ldtlock before accessing
+ * p_ldt.  This implementation is used by the pid provider; we prefix
+ * it with "dtrace_" to avoid inducing spurious tracing events.
+ */
+int
+dtrace_linear_pc(struct regs *rp, proc_t *p, caddr_t *linearp)
+{
+	user_desc_t	*descrp;
+	caddr_t		baseaddr;
+	uint16_t	idx = SELTOIDX(rp->r_cs);
+
+	ASSERT(rp->r_cs <= 0xFFFF);
+
+	if (SELISLDT(rp->r_cs)) {
+		/*
+		 * Currently 64 bit processes cannot have private LDTs.
+		 */
+		ASSERT(p->p_model != DATAMODEL_LP64);
+
+		mutex_enter(&p->p_ldtlock);
+		if (p->p_ldt == NULL) {
+			mutex_exit(&p->p_ldtlock);
+			return (-1);
+		}
+		descrp = &p->p_ldt[idx];
+		baseaddr = (caddr_t)(uintptr_t)USEGD_GETBASE(descrp);
+		mutex_exit(&p->p_ldtlock);
+
+		/*
+		 * Calculate the linear address (wraparound is not only ok,
+		 * it's expected behavior).  The cast to uint32_t is because
+		 * LDT selectors are only allowed in 32-bit processes.
+		 */
+		*linearp = (caddr_t)(uintptr_t)(uint32_t)((uintptr_t)baseaddr +
+		    rp->r_pc);
+	} else {
+#ifdef DEBUG
+		descrp = &CPU->cpu_gdt[idx];
+		baseaddr = (caddr_t)(uintptr_t)USEGD_GETBASE(descrp);
+		/* GDT-based descriptors' base addresses should always be 0 */
+		ASSERT(baseaddr == 0);
+#endif
+		*linearp = (caddr_t)(uintptr_t)rp->r_pc;
+	}
+
 	return (0);
 }
