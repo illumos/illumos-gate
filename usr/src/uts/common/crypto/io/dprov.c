@@ -8184,15 +8184,21 @@ dprov_destroy_object(dprov_state_t *softc, dprov_session_t *session,
 	if ((object = session->ds_objects[object_id]) == NULL)
 		return (CRYPTO_OBJECT_HANDLE_INVALID);
 
-	if (dprov_object_is_token(object)) {
-		object->do_destroyed = B_TRUE;
-		/* it's a token object, remove from per-instance table */
-		softc->ds_objects[object->do_token_idx] = NULL;
-		DPROV_OBJECT_REFRELE(object);
-	}
-
 	/* remove from session table */
 	session->ds_objects[object_id] = NULL;
+
+	if (dprov_object_is_token(object)) {
+		if (!object->do_destroyed) {
+			object->do_destroyed = B_TRUE;
+			/* remove from per-instance token table */
+			softc->ds_objects[object->do_token_idx] = NULL;
+			DPROV_OBJECT_REFRELE(object);
+		} else {
+			DPROV_DEBUG(D_OBJECT, ("dprov_destroy_object: "
+			    "object %p already destroyed\n", (void *)object));
+		}
+	}
+
 	DPROV_OBJECT_REFRELE(object);
 	return (CRYPTO_SUCCESS);
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -637,8 +636,9 @@ soft_ssl_key_and_mac_derive(soft_session_t *sp, CK_MECHANISM_PTR mech,
 	CK_ATTRIBUTE obj_tmpl[MAX_DEFAULT_ATTRS];
 	CK_ATTRIBUTE_PTR new_tmpl;
 	ulong_t newattrcount, mac_key_bytes, secret_key_bytes, iv_bytes;
+	ulong_t extra_attr_count;
 	uint_t size;
-	int rounds;
+	int rounds, n = 0;
 	boolean_t new_tmpl_allocated = B_FALSE, isExport;
 	CK_RV rv = CKR_OK;
 	uint_t ClientRandomLen, ServerRandomLen;
@@ -727,6 +727,8 @@ soft_ssl_key_and_mac_derive(soft_session_t *sp, CK_MECHANISM_PTR mech,
 			    random_data->pClientRandom, ClientRandomLen,
 			    random_data->pServerRandom, ServerRandomLen,
 			    iv_block, 16);
+			bcopy(iv_block, kmo->pIVClient, 8);
+			bcopy(iv_block + 8, kmo->pIVServer, 8);
 		}
 		/* so we won't allocate a key_block bigger than needed */
 		iv_bytes = 0;
@@ -808,37 +810,51 @@ soft_ssl_key_and_mac_derive(soft_session_t *sp, CK_MECHANISM_PTR mech,
 	}
 
 	/* Then the symmetric ciphers keys */
+
+	extra_attr_count = (secret_key_bytes == 0) ? 6 : 5;
+	newattrcount = ulAttributeCount + extra_attr_count;
+	if (newattrcount > MAX_DEFAULT_ATTRS) {
+		new_tmpl = malloc(sizeof (CK_ATTRIBUTE) * newattrcount);
+
+		if (new_tmpl == NULL)
+			return (CKR_HOST_MEMORY);
+
+		new_tmpl_allocated = B_TRUE;
+	} else
+		new_tmpl = obj_tmpl;
+
+	new_tmpl[n].type = CKA_CLASS;
+	new_tmpl[n].pValue = &class;	/* CKO_SECRET_KEY */
+	new_tmpl[n].ulValueLen = sizeof (class);
+	++n;
+	/*
+	 * The keyType comes from the application's template, and depends
+	 * on the ciphersuite. The only exception is authentication only
+	 * ciphersuites which do not use cipher keys.
+	 */
+	if (secret_key_bytes == 0) {
+		new_tmpl[n].type = CKA_KEY_TYPE;
+		new_tmpl[n].pValue = &keyType;	/* CKK_GENERIC_SECRET */
+		new_tmpl[n].ulValueLen = sizeof (keyType);
+		n++;
+	}
+	new_tmpl[n].type = CKA_DERIVE;
+	new_tmpl[n].pValue = &true;
+	new_tmpl[n].ulValueLen = sizeof (true);
+	n++;
+	new_tmpl[n].type = CKA_ENCRYPT;
+	new_tmpl[n].pValue = &true;
+	new_tmpl[n].ulValueLen = sizeof (true);
+	n++;
+	new_tmpl[n].type = CKA_DECRYPT;
+	new_tmpl[n].pValue = &true;
+	new_tmpl[n].ulValueLen = sizeof (true);
+	n++;
+	new_tmpl[n].type = CKA_VALUE;
+	new_tmpl[n].pValue = NULL;
+	new_tmpl[n].ulValueLen = 0;
+
 	if (secret_key_bytes > 0) {
-
-		newattrcount = ulAttributeCount + 5;
-		if (newattrcount > MAX_DEFAULT_ATTRS) {
-			new_tmpl = malloc(sizeof (CK_ATTRIBUTE) * newattrcount);
-
-			if (new_tmpl == NULL)
-				return (CKR_HOST_MEMORY);
-
-			new_tmpl_allocated = B_TRUE;
-		} else
-			new_tmpl = obj_tmpl;
-
-		new_tmpl[0].type = CKA_CLASS;
-		new_tmpl[0].pValue = &class;	/* CKO_SECRET_KEY */
-		new_tmpl[0].ulValueLen = sizeof (class);
-		/*
-		 * The keyType comes from the application's template, and
-		 * depends on the ciphersuite
-		 */
-		new_tmpl[1].type = CKA_DERIVE;
-		new_tmpl[1].pValue = &true;
-		new_tmpl[1].ulValueLen = sizeof (true);
-		new_tmpl[2].type = CKA_ENCRYPT;
-		new_tmpl[2].pValue = &true;
-		new_tmpl[2].ulValueLen = sizeof (true);
-		new_tmpl[3].type = CKA_DECRYPT;
-		new_tmpl[3].pValue = &true;
-		new_tmpl[3].ulValueLen = sizeof (true);
-		new_tmpl[4].type = CKA_VALUE;
-
 		if (isExport) {
 			if (secret_key_bytes > MD5_HASH_SIZE) {
 				rv = CKR_MECHANISM_PARAM_INVALID;
@@ -857,25 +873,27 @@ soft_ssl_key_and_mac_derive(soft_session_t *sp, CK_MECHANISM_PTR mech,
 			    random_data->pClientRandom, ClientRandomLen,
 			    random_data->pServerRandom, ServerRandomLen,
 			    export_keys, B_TRUE);
-			new_tmpl[4].pValue = export_keys;
-			new_tmpl[4].ulValueLen = MD5_HASH_SIZE;
+			new_tmpl[n].pValue = export_keys;
+			new_tmpl[n].ulValueLen = MD5_HASH_SIZE;
 		} else {
-			new_tmpl[4].pValue = kb;
-			new_tmpl[4].ulValueLen = secret_key_bytes;
+			new_tmpl[n].pValue = kb;
+			new_tmpl[n].ulValueLen = secret_key_bytes;
 		}
+	}
 
-		if (ulAttributeCount > 0)
-			bcopy(pTemplate, &new_tmpl[5],
-			    ulAttributeCount * sizeof (CK_ATTRIBUTE));
+	if (ulAttributeCount > 0)
+		bcopy(pTemplate, &new_tmpl[extra_attr_count],
+		    ulAttributeCount * sizeof (CK_ATTRIBUTE));
 
-		rv = soft_add_derived_key(new_tmpl, newattrcount,
-		    &(kmo->hClientKey), sp, basekey_p);
+	rv = soft_add_derived_key(new_tmpl, newattrcount,
+	    &(kmo->hClientKey), sp, basekey_p);
 
-		if (rv != CKR_OK)
-			goto out_err;
+	if (rv != CKR_OK)
+		goto out_err;
 
-		kb += secret_key_bytes;
+	kb += secret_key_bytes;
 
+	if (secret_key_bytes > 0) {
 		if (isExport) {
 #ifdef	__sparcv9
 			/* LINTED */
@@ -886,18 +904,18 @@ soft_ssl_key_and_mac_derive(soft_session_t *sp, CK_MECHANISM_PTR mech,
 			    random_data->pServerRandom, ServerRandomLen,
 			    random_data->pClientRandom, ClientRandomLen,
 			    export_keys + MD5_HASH_SIZE, B_FALSE);
-			    new_tmpl[4].pValue = export_keys + MD5_HASH_SIZE;
+			    new_tmpl[n].pValue = export_keys + MD5_HASH_SIZE;
 		} else
-			new_tmpl[4].pValue = kb;
-
-		rv = soft_add_derived_key(new_tmpl, newattrcount,
-		    &(kmo->hServerKey), sp, basekey_p);
-
-		if (rv != CKR_OK)
-			goto out_err;
-
-		kb += secret_key_bytes;
+			new_tmpl[n].pValue = kb;
 	}
+
+	rv = soft_add_derived_key(new_tmpl, newattrcount,
+	    &(kmo->hServerKey), sp, basekey_p);
+
+	if (rv != CKR_OK)
+		goto out_err;
+
+	kb += secret_key_bytes;
 
 	/* Finally, the IVs */
 	if (iv_bytes > 0) {
@@ -1053,11 +1071,13 @@ soft_ssl_weaken_key(CK_MECHANISM_PTR mech, uchar_t *secret, uint_t secretlen,
 		if (isclient) {
 			label = TLS_CLIENT_KEY_LABEL;
 			labellen = TLS_CLIENT_KEY_LABEL_LEN;
+			soft_tls_prf(secret, secretlen, label, labellen,
+			    rand1, rand1len, rand2, rand2len, result, 16);
 		} else {
 			label = TLS_SERVER_KEY_LABEL;
 			labellen = TLS_SERVER_KEY_LABEL_LEN;
+			soft_tls_prf(secret, secretlen, label, labellen,
+			    rand2, rand2len, rand1, rand1len, result, 16);
 		}
-		soft_tls_prf(secret, secretlen, label, labellen,
-		    rand1, rand1len, rand2, rand2len, result, 16);
 	}
 }
