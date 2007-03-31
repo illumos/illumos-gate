@@ -19,45 +19,33 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-include		../Makefile.cmd
+SUBDIRS=	nwamd
+MSGSUBDIRS=	nwamd
 
-SUBDIRS=	etc lib sbin usr.bin usr.sbin usr.lib usr.sadm
-MSGSUBDIRS=	lib usr.bin usr.sbin usr.lib usr.sadm
-POFILES=	lib/lib.po usr.bin/usr.bin.po usr.sbin/usr.sbin.po \
-		usr.sadm/usr.sadm.po
-POFILE=		cmd-inet.po
+include 	../../Makefile.cmd
+
+POFILES=	$(MSGSUBDIRS:%=%/%.po)
+POFILE=		lib.po
 
 all:=		TARGET= all
 install:=	TARGET= install
 clean:=		TARGET= clean
 clobber:=	TARGET= clobber
 lint:=		TARGET= lint
-_msg:=          TARGET= _msg
 
 .KEEP_STATE:
 
-.PARALLEL:	$(SUBDIRS)
-
-all clean install lint: $(SUBDIRS)
-
-clobber:	$(SUBDIRS) local_clobber
-
-local_clobber:
-	$(RM) $(CLOBBERFILES)
-
-_msg: $(MSGSUBDIRS)
-	$(RM) $(POFILE)
-	$(CAT) $(POFILES) > $(POFILE)
-	$(RM)  $(MSGDOMAIN)/$(POFILE)
-	$(CP) $(POFILE) $(MSGDOMAIN)
+all install clean clobber lint: $(SUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
+
+include		../Makefile.msg

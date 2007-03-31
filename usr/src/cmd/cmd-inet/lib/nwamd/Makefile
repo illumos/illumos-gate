@@ -18,46 +18,55 @@
 #
 # CDDL HEADER END
 #
+
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# usr/src/cmd/cmd-inet/lib/nwamd/Makefile
+#
 
-include		../Makefile.cmd
+# Needed for ROOTFS_LIBDIR definition
+include		../../../../lib/Makefile.lib
 
-SUBDIRS=	etc lib sbin usr.bin usr.sbin usr.lib usr.sadm
-MSGSUBDIRS=	lib usr.bin usr.sbin usr.lib usr.sadm
-POFILES=	lib/lib.po usr.bin/usr.bin.po usr.sbin/usr.sbin.po \
-		usr.sadm/usr.sadm.po
-POFILE=		cmd-inet.po
+PROG=		nwamd
+OBJS=		events.o interface.o llp.o main.o \
+		state_machine.o util.o wireless.o
+SRCS=		$(OBJS:%.o=%.c)
+HEADERS=	defines.h functions.h structures.h variables.h
 
-all:=		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-_msg:=          TARGET= _msg
+include		../../../Makefile.cmd
+
+POFILE=		$(PROG).po
+POFILES=	interface.po wireless.po
+
+ROOTCMDDIR=	$(ROOTFS_LIBDIR)/inet
+
+LDLIBS +=	-lsocket -lnsl -linetcfg -linetutil -lumem -lscf -ldladm
 
 .KEEP_STATE:
 
-.PARALLEL:	$(SUBDIRS)
+.PARALLEL:
 
-all clean install lint: $(SUBDIRS)
+all: $(PROG)
 
-clobber:	$(SUBDIRS) local_clobber
+$(PROG): $(OBJS)
+	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(POST_PROCESS)
 
-local_clobber:
-	$(RM) $(CLOBBERFILES)
+install: $(ROOTCMD)
 
-_msg: $(MSGSUBDIRS)
-	$(RM) $(POFILE)
-	$(CAT) $(POFILES) > $(POFILE)
-	$(RM)  $(MSGDOMAIN)/$(POFILE)
-	$(CP) $(POFILE) $(MSGDOMAIN)
+check:  $(SRCS) $(HEADERS)
+	$(CSTYLE) -cpP $(SRCS) $(HEADERS)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+$(ROOTCMD): all
 
-FRC:
+clean:
+	$(RM) $(OBJS)
+
+lint:	lint_SRCS
+
+include		../../../Makefile.targ
+include		../../Makefile.msg

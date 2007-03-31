@@ -53,31 +53,8 @@ SUNW_NO_MPATHD=; export SUNW_NO_MPATHD
 # in the boot process) and set forwarding flags.
 #
 
-# ipV4 loopback
+# IPv4 loopback
 /sbin/ifconfig lo0 plumb 127.0.0.1 up
 
-# Configure the v6 loopback if any IPv6 interfaces are configured.
-interface_names="`echo /etc/hostname6.*[0-9] 2>/dev/null`"
-if [ "$interface_names" != "/etc/hostname6.*[0-9]" ]; then
-        ORIGIFS="$IFS"
-        IFS="$IFS."
-        set -- $interface_names
-        IFS="$ORIGIFS"
-        while [ $# -ge 2 ]; do
-                shift
-                if [ $# -gt 1 -a "$2" != "/etc/hostname6" ]; then
-                        while [ $# -gt 1 -a "$1" != "/etc/hostname6" ]; do
-                                shift
-                        done
-                else
-                        inet6_list="$inet6_list $1"
-                        shift
-                fi
-        done
-fi
-
-if [ -n "$inet6_list" ]; then
-	/sbin/ifconfig lo0 inet6 plumb ::1 up
-else
-	exit $SMF_EXIT_OK
-fi
+# IPv6 loopback
+/sbin/ifconfig lo0 inet6 plumb ::1 up

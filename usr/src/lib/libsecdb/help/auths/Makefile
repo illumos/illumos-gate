@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -75,12 +75,14 @@ HTMLENTS = \
 	SmfModifyHeader.html \
 	SmfModifyMethod.html \
 	SmfNscdStates.html \
+	SmfNWAMStates.html \
 	SmfPowerStates.html \
 	SmfRoutingStates.html \
 	SmfSendmailStates.html \
 	SmfSshStates.html \
 	SmfSyslogStates.html \
 	SmfValueHeader.html \
+	SmfValueNWAM.html \
 	SmfValueRouting.html \
 	NetworkHeader.html \
 	WifiConfig.html \

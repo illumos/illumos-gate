@@ -25,39 +25,10 @@
 # Use is subject to license terms.
 #
 
-include		../Makefile.cmd
-
-SUBDIRS=	etc lib sbin usr.bin usr.sbin usr.lib usr.sadm
-MSGSUBDIRS=	lib usr.bin usr.sbin usr.lib usr.sadm
-POFILES=	lib/lib.po usr.bin/usr.bin.po usr.sbin/usr.sbin.po \
-		usr.sadm/usr.sadm.po
-POFILE=		cmd-inet.po
-
-all:=		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
 _msg:=          TARGET= _msg
 
-.KEEP_STATE:
+_msg: $(MSGSUBDIRS) .WAIT $(POFILE)
 
-.PARALLEL:	$(SUBDIRS)
-
-all clean install lint: $(SUBDIRS)
-
-clobber:	$(SUBDIRS) local_clobber
-
-local_clobber:
-	$(RM) $(CLOBBERFILES)
-
-_msg: $(MSGSUBDIRS)
+$(POFILE): $(POFILES)
 	$(RM) $(POFILE)
 	$(CAT) $(POFILES) > $(POFILE)
-	$(RM)  $(MSGDOMAIN)/$(POFILE)
-	$(CP) $(POFILE) $(MSGDOMAIN)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:

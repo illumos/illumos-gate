@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -65,14 +65,10 @@
 		<propval name='duration' type='astring' value='transient' />
 	</property_group>
 
-	</instance>
-
-	<stability value='Unstable' />
-
 	<template>
 		<common_name>
 			<loctext xml:lang='C'>
-				physical network interfaces
+				physical network interfaces			
 			</loctext>
 		</common_name>
 		<documentation>
@@ -80,6 +76,66 @@
 				manpath='/usr/share/man' />
 		</documentation>
 	</template>
+
+	</instance>
+
+	<instance name='nwam' enabled='false'>
+
+	<exec_method
+		type='method'
+		name='start'
+		exec='/lib/svc/method/net-nwam start'
+		timeout_seconds='600' />
+
+	<exec_method
+		type='method'
+		name='stop'
+		exec='/lib/svc/method/net-nwam stop'
+		timeout_seconds='60' />
+
+	<exec_method
+		type='method'
+		name='refresh'
+		exec='/lib/svc/method/net-nwam refresh'
+		timeout_seconds='60' />
+
+	<property_group name='general' type='framework'>
+		<!-- to start/stop NWAM services -->
+		<propval name='action_authorization' type='astring'
+			value='solaris.smf.manage.nwam' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.manage.nwam' />
+	</property_group>
+
+	<property_group name='nwamd' type='application'>
+		<stability value='Unstable' />
+		<propval name='debug' type='boolean' value='false' />
+		<propval name='use_net_svc' type='boolean' value='true' />
+		<propval name='popup_info' type='boolean' value='true' />
+		<propval name='popup_query' type='boolean' value='true' />
+		<propval name='autoconf' type='boolean' value='true' />
+		<propval name='dhcp_wait_time' type='count' value='60' />
+		<propval name='scan_interval' type='count' value='120' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.smf.value.nwam' />
+	</property_group>
+
+	<template>
+		<common_name>
+			<loctext xml:lang='C'>
+				physical network interface autoconfiguration
+			</loctext>
+		</common_name>
+		<documentation>
+			<manpage title='nwamd' section='1M'
+				manpath='/usr/share/man' />
+		</documentation>
+	</template>
+
+	</instance>
+
+	<stability value='Unstable' />
+
 </service>
 
 </service_bundle>

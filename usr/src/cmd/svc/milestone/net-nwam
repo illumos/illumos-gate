@@ -1,3 +1,4 @@
+#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -19,45 +20,47 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-include		../Makefile.cmd
+#ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS=	etc lib sbin usr.bin usr.sbin usr.lib usr.sadm
-MSGSUBDIRS=	lib usr.bin usr.sbin usr.lib usr.sadm
-POFILES=	lib/lib.po usr.bin/usr.bin.po usr.sbin/usr.sbin.po \
-		usr.sadm/usr.sadm.po
-POFILE=		cmd-inet.po
+. /lib/svc/share/smf_include.sh
 
-all:=		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-_msg:=          TARGET= _msg
+#
+# In a shared-IP zone we need this service to be up, but all of the work
+# it tries to do is irrelevant (and will actually lead to the service
+# failing if we try to do it), so just bail out.
+# In the global zone and exclusive-IP zones we proceed.
+#
+smf_configure_ip || exit $SMF_EXIT_OK
 
-.KEEP_STATE:
+case "$1" in
+'refresh')
+	/usr/bin/pkill -HUP -z `smf_zonename` nwamd
+	;;
 
-.PARALLEL:	$(SUBDIRS)
+'start')
+	if smf_is_globalzone; then
+		# Initialize security objects.
+		/sbin/dladm init-secobj
+	fi
+	# start nwamd in foreground; it will daemonize itself
+	if /lib/inet/nwamd ; then
+		exit $SMF_EXIT_OK
+	else
+		exit $SMF_EXIT_ERR_FATAL
+	fi
+	;;
 
-all clean install lint: $(SUBDIRS)
+'stop')
+	/usr/bin/pkill -z `smf_zonename` nwamd
+	;;
 
-clobber:	$(SUBDIRS) local_clobber
-
-local_clobber:
-	$(RM) $(CLOBBERFILES)
-
-_msg: $(MSGSUBDIRS)
-	$(RM) $(POFILE)
-	$(CAT) $(POFILES) > $(POFILE)
-	$(RM)  $(MSGDOMAIN)/$(POFILE)
-	$(CP) $(POFILE) $(MSGDOMAIN)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+*)
+	echo "Usage: $0 { start | stop | refresh }"
+	exit $SMF_EXIT_ERR_FATAL
+	;;
+esac
+exit $SMF_EXIT_OK

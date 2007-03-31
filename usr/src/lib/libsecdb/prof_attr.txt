@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -49,7 +49,7 @@ Mail Management:::Manage sendmail & queues:auths=solaris.smf.manage.sendmail;hel
 Maintenance and Repair:::Maintain and repair a system:auths=solaris.smf.manage.system-log;help=RtMaintAndRepair.html
 Media Backup:::Backup files and file systems:help=RtMediaBkup.html
 Media Restore:::Restore files and file systems from backups:help=RtMediaRestore.html
-Network Management:::Manage the host and network configuration:auths=solaris.smf.manage.name-service-cache,solaris.smf.manage.bind,solaris.smf.value.routing,solaris.smf.manage.routing;profiles=Network Wifi Management;help=RtNetMngmnt.html
+Network Management:::Manage the host and network configuration:auths=solaris.smf.manage.name-service-cache,solaris.smf.manage.bind,solaris.smf.value.routing,solaris.smf.manage.routing,solaris.smf.value.nwam,solaris.smf.manage.nwam;profiles=Network Wifi Management;help=RtNetMngmnt.html
 Network Security:::Manage network and host security:auths=solaris.smf.manage.ssh;profiles=Network Wifi Security,Network Link Security;help=RtNetSecure.html
 Network Wifi Management:::Manage wifi network configuration:auths=solaris.network.wifi.config;help=RtNetWifiMngmnt.html
 Network Wifi Security:::Manage wifi network security:auths=solaris.network.wifi.wep;help=RtNetWifiSecure.html

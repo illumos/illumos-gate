@@ -203,6 +203,7 @@ ROOT.BIN= \
 	/etc/sma \
 	/etc/sma/snmp \
 	/lib \
+	/lib/inet \
 	/lib/secure \
 	/lib/svc \
 	/lib/svc/bin \

@@ -54,6 +54,7 @@ case "$1" in
 	;;
 esac
 
+interface=$2
 
 # If boot variables are not set, set variables we use
 [ -z "$_INIT_UTS_NODENAME" ] && _INIT_UTS_NODENAME=`/usr/bin/uname -n`
@@ -134,72 +135,6 @@ update_nss ()
 }
 
 #
-# update_hosts_file
-# This routine updates the /etc/inet/hosts file with the hostname and IP
-# address that was obtained via DHCP.
-#
-update_hosts_file ()
-{
-	filename=hosts
-	# Delete any old lines added by dhcp.
-	/usr/bin/sed -e '/# Added by DHCP$/d' /etc/inet/${filename} \
-	    > /tmp/${filename}_clear.$$
-
-	shift $#	# Clear $0-9 first in case grep fails
-	set -- `/usr/bin/grep "^[ 	]*$ipaddr[ 	]" \
-	    /tmp/${filename}_clear.$$ 2>/dev/null`
-
-	if [ $# -gt 0 ]; then
-		#
-		# IP address is already in the file. Ensure the
-		# associated hostname is the same as the Hostname
-		# property returned by the DHCP server.
-		#
-		/usr/bin/sed -e "/^[ 	]*${ipaddr}[ 	]/d" \
-		    /tmp/${filename}_clear.$$ >/tmp/${filename}.$$
-		echo "${ipaddr}\t${hostname}\t# Added by DHCP" \
-		    >>/tmp/${filename}.$$
-	else
-		#
-		# IP address is missing from the respective file.  Now check
-		# to see if the hostname is present with a different IP.
-		#
-		shift $#	# Clear $0-9 in case grep fails
-		set -- `/usr/bin/grep -s -v '^#' /tmp/${filename}_clear.$$ | \
-		    /usr/bin/egrep "[	 ]${hostname}([	 ]|$)"`
-
-		if [ $# -gt 0 ]; then
-			#
-			# Hostname is present in the file. Rewrite this line
-			# to have the new IP address and the DHCP comment.
-			#
-			/usr/bin/sed -e "/^[ 	]*${1}[ 	]/d" \
-			    /tmp/${filename}_clear.$$ >/tmp/${filename}.$$
-
-			shift	# Shift off $1 (the old IP)
-
-			echo "$ipaddr $*\c" | /usr/bin/tr ' ' '\t' \
-			    >>/tmp/${filename}.$$
-
-			echo "\t# Added by DHCP" >>/tmp/${filename}.$$
-		else
-			#
-			# Hostname is not present in the named file.
-			# Add a new line for the host at the end of
-			# the new respective file.
-			#
-			/usr/bin/mv /tmp/${filename}_clear.$$ \
-			    /tmp/${filename}.$$
-			echo "${ipaddr}\t${hostname}\t# Added by DHCP" \
-			    >>/tmp/${filename}.$$
-		fi
-	fi
-
-	/usr/bin/rm -f /tmp/${filename}_clear.$$
-	mv_file /tmp/${filename}.$$ /etc/inet/${filename} 444
-}
-
-#
 # We now need to reset the netmask and broadcast address for our network
 # interfaces.  Since this may result in a name service lookup, we want to
 # now wait for NIS to come up if we previously started it.
@@ -224,7 +159,11 @@ domain=`/usr/bin/domainname 2>/dev/null`
 smf_netstrategy
 
 if [ "$_INIT_NET_STRATEGY" = "dhcp" ]; then
-	dnsservers=`/sbin/dhcpinfo DNSserv`
+	if [ -n "$interface" ]; then
+		dnsservers=`/sbin/dhcpinfo -i $interface DNSserv`
+	else
+		dnsservers=`/sbin/dhcpinfo DNSserv`
+	fi
 else
 	dnsservers=""
 fi
@@ -242,7 +181,11 @@ if [ -n "$dnsservers" ]; then
 	if [ ! -f /etc/resolv.conf ]; then
 		/usr/bin/touch /etc/resolv.conf
 	fi
-	dnsdomain=`/sbin/dhcpinfo DNSdmain`
+	if [ -n "$interface" ]; then
+		dnsdomain=`/sbin/dhcpinfo -i $interface DNSdmain`
+	else
+		dnsdomain=`/sbin/dhcpinfo DNSdmain`
+	fi
 	export dnsservers dnsdomain
 	/usr/bin/nawk </etc/resolv.conf >/tmp/resolv.conf.$$ '
 		function writedomain() {
@@ -283,22 +226,19 @@ elif /usr/bin/grep '# Added by DHCP$' /etc/nsswitch.conf >/dev/null 2>&1; then
 	mv_file /tmp/nsswitch.conf.$$ /etc/nsswitch.conf 644
 fi
 
-if [ "$_INIT_NET_STRATEGY" = "dhcp" ]; then
+# Clean up any old DHCP-added entries (except loopback) in the hosts file.
+if /usr/bin/grep '# Added by DHCP$' /etc/inet/hosts >/dev/null 2>&1; then
+	/usr/bin/nawk '{
+		if (index($0, "# Added by DHCP") == 0 ||
+		    $1 == "127.0.0.1" || $1 == "::1") {
+			print $0
+		}
+	}' /etc/inet/hosts > /tmp/hosts.$$
+	mv_file /tmp/hosts.$$ /etc/inet/hosts 444
+fi
 
-	hostname=`/usr/bin/uname -n`
-	ipaddr=`/sbin/dhcpinfo Yiaddr`
-	update_hosts_file
-
-else
-	# We're not using a dhcp strategy, so host entries added by
-	# DHCP should be removed from /etc/inet/hosts.
-
-	if /usr/bin/grep '# Added by DHCP$' /etc/inet/hosts >/dev/null 2>&1;
-	    then
-		/usr/bin/sed -e '/# Added by DHCP$/d' \
-		    /etc/inet/hosts > /tmp/hosts.$$
-		mv_file /tmp/hosts.$$ /etc/inet/hosts 444
-	fi
+if [ -z "$SMF_FMRI" ] || [ "$SMF_FMRI" = "svc:/network/physical:nwam" ]; then
+	exit 0
 fi
 
 #
