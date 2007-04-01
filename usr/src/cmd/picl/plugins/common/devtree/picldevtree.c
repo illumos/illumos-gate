@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3210,6 +3210,9 @@ picldevtree_init(void)
 	(void) strcpy(mach_name, utsname.machine);
 
 	if (strcmp(mach_name, "sun4u") == 0) {
+		builtin_map_ptr = sun4u_map;
+		builtin_map_size = sizeof (sun4u_map) / sizeof (builtin_map_t);
+	} else if (strcmp(mach_name, "sun4v") == 0) {
 		builtin_map_ptr = sun4u_map;
 		builtin_map_size = sizeof (sun4u_map) / sizeof (builtin_map_t);
 	} else if (strcmp(mach_name, "i86pc") == 0) {

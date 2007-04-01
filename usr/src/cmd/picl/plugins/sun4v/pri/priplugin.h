@@ -24,8 +24,18 @@
  * Use is subject to license terms.
  */
 
+#ifndef	_PRIPLUGIN_H
+#define	_PRIPLUGIN_H
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <picl.h>
+#include <picltree.h>
+#include <picldefs.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -38,75 +48,39 @@
 #include <mdesc.h>
 #include <string.h>
 #include <errno.h>
+#include <libnvpair.h>
+#include <syslog.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <config_admin.h>
+#include <sys/param.h>
+#include <libdevinfo.h>
+#include <sys/systeminfo.h>
+#include <sys/sysevent/dr.h>
+#include <syslog.h>
+#include <stdarg.h>
 
-#define	MDESC_PATH	"/devices/pseudo/mdesc@0:mdesc"
+#define	MAXSTRLEN 256
 
-static void mdesc_free(void *bufp, size_t size);
-uint64_t *md_bufp;
+#ifndef PRI_DEBUG
+#define	PRI_DEBUG 0
+#endif
 
-md_t *
-mdesc_devinit(void)
-{
-	int fd;
-	md_t *mdp;
-	size_t size;
+/* These 3 variable are defined and set in mdescplugin.c */
+extern picl_nodehdl_t	root_node;
+extern md_t		*mdp;
+extern mde_cookie_t	rootnode;
 
-	/*
-	 * We haven't finished using the previous MD/PRI info.
-	 */
-	if (md_bufp != NULL)
-		return (NULL);
+int add_mem_prop(picl_nodehdl_t node, void *args);
+md_t *pri_devinit(void);
+void pri_devfini(md_t *mdp);
+void pri_debug(int level, char *fmt, ...);
+void add_md_prop(picl_nodehdl_t node, int size, char *name, void* value,
+    int type);
+void io_dev_addlabel(void);
 
-	do {
-		if ((fd = open(MDESC_PATH, O_RDONLY, 0)) < 0)
-			break;
-
-		if (ioctl(fd, MDESCIOCGSZ, &size) < 0)
-			break;
-		if ((md_bufp = (uint64_t *)malloc(size)) == NULL) {
-			(void) close(fd);
-			break;
-		}
-
-		/*
-		 * A partial read is as bad as a failed read.
-		 */
-		if (read(fd, md_bufp, size) != size) {
-			free(md_bufp);
-			md_bufp = NULL;
-		}
-
-		(void) close(fd);
-	/*LINTED: E_CONSTANT_CONDITION */
-	} while (0);
-
-	if (md_bufp) {
-		mdp = md_init_intern(md_bufp, malloc, mdesc_free);
-		if (mdp == NULL) {
-			free(md_bufp);
-			md_bufp = NULL;
-		}
-	} else
-		mdp = NULL;
-
-	return (mdp);
+#ifdef __cplusplus
 }
+#endif
 
-/*ARGSUSED*/
-void
-mdesc_free(void *bufp, size_t size)
-{
-	if (bufp)
-		free(bufp);
-}
-
-void
-mdesc_devfini(md_t *mdp)
-{
-	if (mdp)
-		(void) md_fini(mdp);
-
-	if (md_bufp)
-		free(md_bufp);
-	md_bufp = NULL;
-}
+#endif	/* _PRIPLUGIN_H */

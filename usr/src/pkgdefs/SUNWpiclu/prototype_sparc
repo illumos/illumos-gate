@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,10 +62,16 @@ f none usr/platform/sun4u/lib/picl/plugins/libpiclenvmon.so.1 755 root sys
 s none usr/platform/sun4u/lib/picl/plugins/libpiclenvmon.so=./libpiclenvmon.so.1
 d none usr/platform/sun4v 755 root sys
 d none usr/platform/sun4v/lib 755 root bin
+f none usr/platform/sun4v/lib/libpiclsnmp.so.1 755 root sys
+s none usr/platform/sun4v/lib/libpiclsnmp.so=./libpiclsnmp.so.1 755 root sys
 d none usr/platform/sun4v/lib/picl 755 root sys
 d none usr/platform/sun4v/lib/picl/plugins 755 root sys
 f none usr/platform/sun4v/lib/picl/plugins/libmdescplugin.so.1 755 root sys
 s none usr/platform/sun4v/lib/picl/plugins/libmdescplugin.so=./libmdescplugin.so.1
+f none usr/platform/sun4v/lib/picl/plugins/libpriplugin.so.1 755 root sys
+s none usr/platform/sun4v/lib/picl/plugins/libpriplugin.so=./libpriplugin.so.1
+f none usr/platform/sun4v/lib/picl/plugins/libsnmpplugin.so.1 755 root sys
+s none usr/platform/sun4v/lib/picl/plugins/libsnmpplugin.so=./libsnmpplugin.so.1
 d none usr/platform/SUNW,Sun-Blade-100 755 root sys
 d none usr/platform/SUNW,Sun-Blade-100/lib 755 root bin
 d none usr/platform/SUNW,Sun-Blade-100/lib/picl 755 root sys

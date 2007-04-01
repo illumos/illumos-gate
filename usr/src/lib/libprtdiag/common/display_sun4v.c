@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,26 +43,87 @@
 #include <libintl.h>
 #include <syslog.h>
 #include <sys/dkio.h>
+#include <sys/systeminfo.h>
+#include <picldefs.h>
 #include "pdevinfo.h"
 #include "display.h"
 #include "display_sun4v.h"
 #include "libprtdiag.h"
 
-
 #if !defined(TEXT_DOMAIN)
 #define	TEXT_DOMAIN	"SYS_TEST"
 #endif
 
-extern	int sys_clk;
+#define	IOBOARD				"IOBD"
+#define	NETWORK				"network"
+#define	PCIE_COMPATIBLE_STR		"pciex"
+#define	PCIX_COMPATIBLE_STR		"pci"
+#define	SUN4V_MACHINE			"sun4v"
+#define	PARENT_NAMES			10
+
+/*
+ * Additional OBP properties
+ */
+#define	OBP_PROP_COMPATIBLE		"compatible"
+#define	OBP_PROP_MODEL			"model"
+#define	OBP_PROP_SLOT_NAMES		"slot-names"
+
+#define	PICL_NODE_PHYSICAL_PLATFORM	"physical-platform"
+#define	PICL_NODE_CHASSIS		"chassis"
+#define	MEMORY_SIZE_FIELD		11
+#define	INVALID_THRESHOLD		1000000
+
+/*
+ * Additional picl classes
+ */
+#ifndef	PICL_CLASS_SUN4V
+#define	PICL_CLASS_SUN4V		"sun4v"
+#endif
+
+#ifndef	PICL_PROP_NAC
+#define	PICL_PROP_NAC			"nac"
+#endif
+
+extern int sys_clk;
+extern picl_errno_t sun4v_get_node_by_name(picl_nodehdl_t, char *,
+	picl_nodehdl_t *);
+
+static picl_nodehdl_t rooth = 0, phyplatformh = 0;
+static picl_nodehdl_t chassish = 0;
+static int class_node_found;
+static int syserrlog;
+static int all_status_ok;
+
+/* local functions */
+static int sun4v_get_first_compatible_value(picl_nodehdl_t, char **);
+static void sun4v_display_memory_conf(picl_nodehdl_t);
+static void sun4v_disp_env_status();
+static void sun4v_env_print_fan_sensors();
+static void sun4v_env_print_fan_indicators();
+static void sun4v_env_print_temp_sensors();
+static void sun4v_env_print_temp_indicators();
+static void sun4v_env_print_current_sensors();
+static void sun4v_env_print_current_indicators();
+static void sun4v_env_print_voltage_sensors();
+static void sun4v_env_print_voltage_indicators();
+static void sun4v_env_print_LEDs();
+static void sun4v_print_fru_status();
+static void sun4v_print_fw_rev();
+static void sun4v_print_chassis_serial_no();
 
 int
-sun4v_display(Sys_tree *tree, Prom_node *root, int syserrlog,
-    picl_nodehdl_t plafh)
+sun4v_display(Sys_tree *tree, Prom_node *root, int log,
+	picl_nodehdl_t plafh)
 {
-	int exit_code = 0;	/* init to all OK */
 	void *value;		/* used for opaque PROM data */
 	struct mem_total memory_total;	/* Total memory in system */
 	struct grp_info grps;	/* Info on all groups in system */
+	char machine[MAXSTRLEN];
+
+	if (sysinfo(SI_MACHINE, machine, sizeof (machine)) == -1)
+		return (1);
+	if (strncmp(machine, SUN4V_MACHINE, strlen(SUN4V_MACHINE)) != 0)
+		return (1);
 
 	sys_clk = -1;  /* System clock freq. (in MHz) */
 
@@ -79,11 +139,9 @@ sun4v_display(Sys_tree *tree, Prom_node *root, int syserrlog,
 		 */
 		(void) uname(&uts_buf);
 
-		log_printf(
-			dgettext(TEXT_DOMAIN, "System Configuration:  "
-				"Sun Microsystems  %s %s\n"), uts_buf.machine,
-					get_prop_val(find_prop(root,
-					"banner-name")), 0);
+		log_printf(dgettext(TEXT_DOMAIN, "System Configuration:  "
+			"Sun Microsystems  %s %s\n"), uts_buf.machine,
+			get_prop_val(find_prop(root, "banner-name")), 0);
 
 		/* display system clock frequency */
 		value = get_prop_val(find_prop(root, "clock-frequency"));
@@ -100,15 +158,286 @@ sun4v_display(Sys_tree *tree, Prom_node *root, int syserrlog,
 		sun4v_display_cpu_devices(plafh);
 
 		/* Display the Memory configuration */
-		sun4v_display_memoryconf(plafh);
+		class_node_found = 0;
+		sun4v_display_memory_conf(plafh);
 
 		/* Display all the IO cards. */
 		(void) sun4v_display_pci(plafh);
+		sun4v_display_diaginfo((log || (logging)), root, plafh);
 
-		sun4v_display_diaginfo((syserrlog || (logging)), root, plafh);
+		if (picl_get_root(&rooth) != PICL_SUCCESS)
+			return (1);
+		if (sun4v_get_node_by_name(rooth, PICL_NODE_PHYSICAL_PLATFORM,
+			&phyplatformh) != PICL_SUCCESS)
+			return (1);
+
+		if (picl_find_node(phyplatformh, PICL_PROP_CLASSNAME,
+			PICL_PTYPE_CHARSTRING, (void *)PICL_CLASS_CHASSIS,
+			strlen(PICL_CLASS_CHASSIS), &chassish) != PICL_SUCCESS)
+			return (1);
+
+		syserrlog = log;
+		sun4v_disp_env_status();
+	}
+	return (0);
+}
+
+static void
+get_bus_type(picl_nodehdl_t nodeh, struct io_card *card)
+{
+	char *compatible;
+
+	(void) strcpy(card->bus_type, "PCIX");
+	if (sun4v_get_first_compatible_value(nodeh, &compatible)
+		== PICL_SUCCESS) {
+		if (strncmp(compatible, PCIE_COMPATIBLE_STR,
+			strlen(PCIE_COMPATIBLE_STR)) == 0)
+			(void) strcpy(card->bus_type, "PCIE");
+		free(compatible);
+	}
+}
+
+static picl_errno_t
+get_slot_label(picl_nodehdl_t nodeh, struct io_card *card)
+{
+	char val[PICL_PROPNAMELEN_MAX];
+	picl_errno_t err;
+
+	err = picl_get_propval_by_name(nodeh, PICL_PROP_LABEL, val,
+		sizeof (val));
+	if (err != PICL_SUCCESS)
+		return (err);
+
+	(void) strcpy(card->slot_str, val);
+	card->slot = -1;
+	return (PICL_SUCCESS);
+}
+
+static void
+get_slot_number(picl_nodehdl_t nodeh, struct io_card *card)
+{
+	picl_errno_t err;
+	picl_prophdl_t proph;
+	picl_propinfo_t pinfo;
+	picl_nodehdl_t pnodeh;
+	uint8_t *pval;
+	uint32_t dev_mask;
+	char uaddr[MAXSTRLEN];
+	int i;
+
+	if (get_slot_label(nodeh, card) == PICL_SUCCESS)
+		return;
+	err = PICL_SUCCESS;
+	while (err == PICL_SUCCESS) {
+		if (picl_get_propval_by_name(nodeh, PICL_PROP_PARENT, &pnodeh,
+			sizeof (pnodeh)) != PICL_SUCCESS) {
+			(void) strcpy(card->slot_str, IOBOARD);
+			card->slot = -1;
+			return;
+		}
+		if (picl_get_propinfo_by_name(pnodeh, OBP_PROP_SLOT_NAMES,
+			&pinfo, &proph) == PICL_SUCCESS) {
+			break;
+		}
+		nodeh = pnodeh;
+	}
+	if (picl_get_propval_by_name(nodeh, PICL_PROP_UNIT_ADDRESS, uaddr,
+		sizeof (uaddr)) != PICL_SUCCESS) {
+		(void) strcpy(card->slot_str, IOBOARD);
+		card->slot = -1;
+		return;
+	}
+	pval = (uint8_t *)malloc(pinfo.size);
+	if (!pval) {
+		(void) strcpy(card->slot_str, IOBOARD);
+		card->slot = -1;
+		return;
+	}
+	if (picl_get_propval(proph, pval, pinfo.size) != PICL_SUCCESS) {
+		(void) strcpy(card->slot_str, IOBOARD);
+		card->slot = -1;
+		free(pval);
+		return;
 	}
 
-	return (exit_code);
+	dev_mask = 0;
+	for (i = 0; i < sizeof (dev_mask); i++)
+		dev_mask |= (*(pval+i) << 8*(sizeof (dev_mask)-1-i));
+	for (i = 0; i < sizeof (uaddr) && uaddr[i] != '\0'; i++) {
+		if (uaddr[i] == ',') {
+			uaddr[i] = '\0';
+			break;
+		}
+	}
+	card->slot = atol(uaddr);
+	if (((1 << card->slot) & dev_mask) == 0) {
+		(void) strcpy(card->slot_str, IOBOARD);
+		card->slot = -1;
+	} else {
+		char *p = (char *)(pval+sizeof (dev_mask));
+		int shift = sizeof (uint32_t)*8-1-card->slot;
+		uint32_t x = (dev_mask << shift) >> shift;
+		int count = 0;	/* count # of 1's in x */
+		int i = 0;
+		while (x != 0) {
+			count++;
+			x &= x-1;
+		}
+		while (count > 1) {
+			while (p[i++] != '\0');
+			count--;
+		}
+		(void) strcpy(card->slot_str, (char *)(p+i));
+	}
+	free(pval);
+}
+
+/*
+ * add all io devices under pci in io list
+ */
+/* ARGSUSED */
+static int
+sun4v_pci_callback(picl_nodehdl_t pcih, void *args)
+{
+	char path[PICL_PROPNAMELEN_MAX];
+	char class[PICL_CLASSNAMELEN_MAX];
+	char name[PICL_PROPNAMELEN_MAX];
+	char model[PICL_PROPNAMELEN_MAX];
+	char binding_name[PICL_PROPNAMELEN_MAX];
+	char val[PICL_PROPNAMELEN_MAX];
+	char *compatible;
+	picl_errno_t err;
+	picl_nodehdl_t nodeh;
+	struct io_card pci_card;
+
+	/* Walk through the children */
+
+	err = picl_get_propval_by_name(pcih, PICL_PROP_CHILD, &nodeh,
+		sizeof (picl_nodehdl_t));
+
+	while (err == PICL_SUCCESS) {
+		err = picl_get_propval_by_name(nodeh, PICL_PROP_CLASSNAME,
+			class, sizeof (class));
+		if (err !=  PICL_SUCCESS)
+			return (err);
+
+		if (args) {
+			char *val = args;
+			if (strcmp(class, val) == 0) {
+				err = picl_get_propval_by_name(nodeh,
+					PICL_PROP_PEER, &nodeh,
+					sizeof (picl_nodehdl_t));
+				continue;
+			} else if (strcmp(val, PICL_CLASS_PCIEX) == 0 &&
+				strcmp(class, PICL_CLASS_PCI) == 0) {
+				err = picl_get_propval_by_name(nodeh,
+					PICL_PROP_PEER, &nodeh,
+					sizeof (picl_nodehdl_t));
+				continue;
+			} else if (strcmp(val, PICL_CLASS_PCI) == 0 &&
+				strcmp(class, PICL_CLASS_PCIEX) == 0) {
+				err = picl_get_propval_by_name(nodeh,
+					PICL_PROP_PEER, &nodeh,
+					sizeof (picl_nodehdl_t));
+				continue;
+			}
+		}
+
+		err = picl_get_propval_by_name(nodeh, PICL_PROP_DEVFS_PATH,
+			path, sizeof (path));
+		if (err != PICL_SUCCESS)
+			return (err);
+
+		(void) strlcpy(pci_card.notes, path, sizeof (pci_card.notes));
+
+		get_bus_type(nodeh, &pci_card);
+		get_slot_number(nodeh, &pci_card);
+
+		err = picl_get_propval_by_name(nodeh, PICL_PROP_NAME, name,
+			sizeof (name));
+		if (err == PICL_PROPNOTFOUND)
+			(void) strcpy(name, "");
+		else if (err != PICL_SUCCESS)
+			return (err);
+
+		err = picl_get_propval_by_name(nodeh, PICL_PROP_STATUS, val,
+			sizeof (val));
+		if (err == PICL_PROPNOTFOUND)
+			(void) strcpy(val, "");
+		else if (err != PICL_SUCCESS)
+			return (err);
+
+		/* Figure NAC name */
+		if (pci_card.slot != -1)
+			(void) snprintf(pci_card.status,
+					sizeof (pci_card.status),
+					"%s%d", pci_card.slot_str,
+					pci_card.slot);
+		else
+			(void) snprintf(pci_card.status,
+					sizeof (pci_card.status),
+					"%s", pci_card.slot_str);
+
+		/*
+		 * Get the name of this card. If binding_name is found,
+		 * name will be <nodename>-<binding_name>.
+		 */
+		err = picl_get_propval_by_name(nodeh, PICL_PROP_BINDING_NAME,
+			binding_name, sizeof (binding_name));
+		if (err == PICL_SUCCESS) {
+			if (strcmp(name, binding_name) != 0) {
+				(void) strlcat(name, "-", sizeof (name));
+				(void) strlcat(name, binding_name,
+					sizeof (name));
+			}
+		} else if (err == PICL_PROPNOTFOUND) {
+			/*
+			 * if compatible prop is not found, name will be
+			 * <nodename>-<compatible>
+			 */
+			err = sun4v_get_first_compatible_value(nodeh,
+				&compatible);
+			if (err == PICL_SUCCESS) {
+				(void) strlcat(name, "-", sizeof (name));
+				(void) strlcat(name, compatible, sizeof (name));
+				free(compatible);
+			}
+		} else
+			return (err);
+
+		(void) strlcpy(pci_card.name, name, sizeof (pci_card.name));
+
+		/* Get the model of this card */
+
+		err = picl_get_propval_by_name(nodeh, OBP_PROP_MODEL,
+			model, sizeof (model));
+		if (err == PICL_PROPNOTFOUND)
+			(void) strcpy(model, "");
+		else if (err != PICL_SUCCESS)
+			return (err);
+		(void) strlcpy(pci_card.model, model, sizeof (pci_card.model));
+
+		/* Print NAC name */
+		log_printf("%-12s", pci_card.status);
+		/* Print IO Type */
+		log_printf("%-6s", pci_card.bus_type);
+		/* Printf Card Name */
+		log_printf("%-46s", pci_card.name);
+		/* Print Card Model */
+		log_printf("%-8s", pci_card.model);
+		log_printf("\n");
+		/* Print Status */
+		log_printf("%-12s", val);
+		/* Print IO Type */
+		log_printf("%-6s", "");
+		/* Print Parent Path */
+		log_printf("%-46s", pci_card.notes);
+		log_printf("\n");
+
+		err = picl_get_propval_by_name(nodeh, PICL_PROP_PEER, &nodeh,
+			sizeof (picl_nodehdl_t));
+	}
+	return (PICL_WALK_CONTINUE);
 }
 
 /*
@@ -118,29 +447,229 @@ sun4v_display(Sys_tree *tree, Prom_node *root, int syserrlog,
 void
 sun4v_display_pci(picl_nodehdl_t plafh)
 {
-#ifdef	lint
-	plafh = plafh;
-#endif
-	/*
-	 * This function is intentionally empty
-	 */
+	char *fmt = "%-11s %-5s %-45s %-8s";
+	/* Have we printed the column headings? */
+	static int banner = FALSE;
+
+	if (banner == FALSE) {
+		log_printf("\n");
+		log_printf("============================");
+		log_printf(" IO Devices ");
+		log_printf("============================");
+		log_printf("\n");
+		log_printf(fmt, "Slot +", "Bus", "Name +", "Model", 0);
+		log_printf("\n");
+		log_printf(fmt, "Status", "Type", "Path", "", 0);
+		log_printf("\n");
+		log_printf("---------------------------------"
+			"------------------------------------\n");
+		banner = TRUE;
+	}
+
+	(void) picl_walk_tree_by_class(plafh, PICL_CLASS_PCIEX,
+		PICL_CLASS_PCIEX, sun4v_pci_callback);
+	(void) picl_walk_tree_by_class(plafh, PICL_CLASS_PCI,
+		PICL_CLASS_PCI, sun4v_pci_callback);
+	(void) picl_walk_tree_by_class(plafh, PICL_CLASS_SUN4V,
+		PICL_CLASS_SUN4V, sun4v_pci_callback);
 }
 
-void
-sun4v_display_memoryconf(picl_nodehdl_t plafh)
+/*
+ * return the first compatible value
+ */
+static int
+sun4v_get_first_compatible_value(picl_nodehdl_t nodeh, char **outbuf)
 {
-#ifdef	lint
-	plafh = plafh;
-#endif
-	/*
-	 * This function is intentionally empty
-	 */
+	picl_errno_t err;
+	picl_prophdl_t proph;
+	picl_propinfo_t pinfo;
+	picl_prophdl_t tblh;
+	picl_prophdl_t rowproph;
+	char *pval;
+
+	err = picl_get_propinfo_by_name(nodeh, OBP_PROP_COMPATIBLE,
+		&pinfo, &proph);
+	if (err != PICL_SUCCESS)
+		return (err);
+
+	if (pinfo.type == PICL_PTYPE_CHARSTRING) {
+		pval = malloc(pinfo.size);
+		if (pval == NULL)
+			return (PICL_FAILURE);
+		err = picl_get_propval(proph, pval, pinfo.size);
+		if (err != PICL_SUCCESS) {
+			free(pval);
+			return (err);
+		}
+		*outbuf = pval;
+		return (PICL_SUCCESS);
+	}
+
+	if (pinfo.type != PICL_PTYPE_TABLE)
+		return (PICL_FAILURE);
+
+	/* get first string from table */
+	err = picl_get_propval(proph, &tblh, pinfo.size);
+	if (err != PICL_SUCCESS)
+		return (err);
+
+	err = picl_get_next_by_row(tblh, &rowproph);
+	if (err != PICL_SUCCESS)
+		return (err);
+
+	err = picl_get_propinfo(rowproph, &pinfo);
+	if (err != PICL_SUCCESS)
+		return (err);
+
+	pval = malloc(pinfo.size);
+	if (pval == NULL)
+		return (PICL_FAILURE);
+
+	err = picl_get_propval(rowproph, pval, pinfo.size);
+	if (err != PICL_SUCCESS) {
+		free(pval);
+		return (err);
+	}
+
+	*outbuf = pval;
+	return (PICL_SUCCESS);
+}
+
+/*
+ * print size of a memory segment
+ */
+static void
+print_memory_segment_size(uint64_t size)
+{
+	uint64_t kbyte = 1024;
+	uint64_t mbyte = kbyte * kbyte;
+	uint64_t gbyte = kbyte * mbyte;
+	char buf[MEMORY_SIZE_FIELD];
+
+	if (size >= gbyte) {
+		if (size % gbyte == 0)
+			(void) snprintf(buf, sizeof (buf), "%d GB",
+				(int)(size / gbyte));
+		else
+			(void) snprintf(buf, sizeof (buf), "%.2f GB",
+				(float)size / gbyte);
+	} else if (size >= mbyte) {
+		if (size % mbyte == 0)
+			(void) snprintf(buf, sizeof (buf), "%d MB",
+				(int)(size / mbyte));
+		else
+			(void) snprintf(buf, sizeof (buf), "%.2f MB",
+				(float)size / mbyte);
+	} else {
+		if (size % kbyte == 0)
+			(void) snprintf(buf, sizeof (buf), "%d KB",
+				(int)(size / kbyte));
+		else
+			(void) snprintf(buf, sizeof (buf), "%.2f KB",
+				(float)size / kbyte);
+	}
+	log_printf("%-7s ", buf);
+}
+
+/*
+ * print bank IDs of a memory segment
+ */
+static void
+print_memory_segment_contain(picl_nodehdl_t nodeh)
+{
+	char val[PICL_PROPNAMELEN_MAX];
+	picl_errno_t err = picl_get_propval_by_name(nodeh,
+		PICL_PROP_NAC, val, sizeof (val));
+	if (err != PICL_SUCCESS)
+		return;
+	log_printf("%-30s", val);
+	while ((err = picl_get_propval_by_name(nodeh,
+			PICL_PROP_PEER, &nodeh,
+			sizeof (nodeh))) == PICL_SUCCESS) {
+		err = picl_get_propval_by_name(nodeh,
+			PICL_PROP_NAC, val, sizeof (val));
+		if (err == PICL_SUCCESS) {
+			log_printf("\n");
+			log_printf("%-30s", val);
+		}
+	}
+}
+
+/*
+ * Search node where _class=="memory-segment"
+ * print "Base Address", "Size", etc
+ */
+/*ARGSUSED*/
+static int
+sun4v_memory_conf_callback(picl_nodehdl_t nodeh, void *args)
+{
+	uint64_t base;
+	uint64_t size;
+	uint64_t ifactor;
+	picl_errno_t err = PICL_SUCCESS;
+
+	if (class_node_found == 0) {
+		class_node_found = 1;
+		return (PICL_WALK_TERMINATE);
+	}
+	while (err == PICL_SUCCESS) {
+		err = picl_get_propval_by_name(nodeh, PICL_PROP_BASEADDRESS,
+			&base, sizeof (base));
+		if (err !=  PICL_SUCCESS)
+			break;
+		err = picl_get_propval_by_name(nodeh, PICL_PROP_SIZE,
+			&size, sizeof (size));
+		if (err !=  PICL_SUCCESS)
+			break;
+		err = picl_get_propval_by_name(nodeh,
+			PICL_PROP_INTERLEAVE_FACTOR, &ifactor,
+			sizeof (ifactor));
+		if (err !=  PICL_SUCCESS)
+			break;
+		err = picl_get_propval_by_name(nodeh, PICL_PROP_CHILD,
+			&nodeh, sizeof (nodeh));
+		if (err !=  PICL_SUCCESS)
+			break;
+		log_printf("%-13llx", base);
+		print_memory_segment_size(size);
+		log_printf("%-18d", ifactor);
+		print_memory_segment_contain(nodeh);
+		log_printf("\n");
+		err = picl_get_propval_by_name(nodeh, PICL_PROP_PEER, &nodeh,
+			sizeof (picl_nodehdl_t));
+	}
+
+	return (PICL_WALK_CONTINUE);
+}
+
+/*ARGSUSED*/
+void
+sun4v_display_memory_conf(picl_nodehdl_t plafh)
+{
+	char *fmt = "%-12s %-7s %-9s %-20s";
+	(void) picl_walk_tree_by_class(plafh, PICL_CLASS_MEMORY_SEGMENT,
+		NULL, sun4v_memory_conf_callback);
+	if (class_node_found == 0)
+		return;
+	log_printf("\n");
+	log_printf("============================");
+	log_printf(" Memory Configuration ");
+	log_printf("============================");
+	log_printf("\n");
+	log_printf("Segment Table:\n");
+	log_printf("-----------------------------------------------\n");
+	log_printf(fmt, "Base Address", "Size", "Interleave Factor",
+		"Contains", 0);
+	log_printf("\n");
+	log_printf("-----------------------------------------------\n");
+	(void) picl_walk_tree_by_class(plafh, PICL_CLASS_MEMORY_SEGMENT,
+		NULL, sun4v_memory_conf_callback);
 }
 
 void
 sun4v_display_cpu_devices(picl_nodehdl_t plafh)
 {
-	char	*fmt = "%-12s %-5s %-8s %-19s %-5s";
+	char *fmt = "%-12s %-5s %-8s %-19s %-5s";
 
 	/*
 	 * Display the table header for CPUs . Then display the CPU
@@ -156,15 +685,13 @@ sun4v_display_cpu_devices(picl_nodehdl_t plafh)
 	log_printf(fmt, "", "", "", "CPU", "CPU", 0);
 	log_printf("\n");
 	log_printf(fmt, "Location", "CPU", "Freq",
-	    "Implementation", "Mask", 0);
+		"Implementation", "Mask", 0);
 	log_printf("\n");
 	log_printf(fmt, "------------", "-----", "--------",
-	    "-------------------", "-----", 0);
+		"-------------------", "-----", 0);
 	log_printf("\n");
 
 	(void) picl_walk_tree_by_class(plafh, "cpu", "cpu", sun4v_display_cpus);
-
-	log_printf("\n");
 }
 
 /*
@@ -175,16 +702,16 @@ int
 sun4v_display_cpus(picl_nodehdl_t cpuh, void* args)
 {
 	int status;
-	picl_prophdl_t	proph;
-	picl_prophdl_t	tblh;
-	picl_prophdl_t	rowproph;
+	picl_prophdl_t proph;
+	picl_prophdl_t tblh;
+	picl_prophdl_t rowproph;
 	picl_propinfo_t propinfo;
-	int		*int_value;
-	uint64_t	cpuid, mask_no;
-	char		*comp_value;
-	char		*no_prop_value = "   ";
-	char		freq_str[MAXSTRLEN];
-	char		fru_name[MAXSTRLEN];
+	int *int_value;
+	uint64_t cpuid, mask_no;
+	char *comp_value;
+	char *no_prop_value = "   ";
+	char freq_str[MAXSTRLEN];
+	char fru_name[MAXSTRLEN];
 
 	/*
 	 * Get cpuid property and print it and the NAC name
@@ -193,44 +720,44 @@ sun4v_display_cpus(picl_nodehdl_t cpuh, void* args)
 	if (status == PICL_SUCCESS) {
 		status = picl_get_propval(proph, &cpuid, sizeof (cpuid));
 		if (status != PICL_SUCCESS) {
-			log_printf("%-12s", no_prop_value);
-			log_printf("%6s", no_prop_value);
+			log_printf("%-13s", no_prop_value);
+			log_printf("%-6s", no_prop_value);
 		} else {
 			(void) snprintf(fru_name, sizeof (fru_name), "%s%d",
 			    CPU_STRAND_NAC, (int)cpuid);
-			log_printf("%-12s", fru_name);
-			log_printf("%6d", (int)cpuid);
+			log_printf("%-13s", fru_name);
+			log_printf("%-6d", (int)cpuid);
 		}
 	} else {
-		log_printf("%-12s", no_prop_value);
-		log_printf("%6s", no_prop_value);
+		log_printf("%-13s", no_prop_value);
+		log_printf("%-6s", no_prop_value);
 	}
 
 clock_freq:
 	status = picl_get_propinfo_by_name(cpuh, "clock-frequency", &propinfo,
-	    &proph);
+		&proph);
 	if (status == PICL_SUCCESS) {
 		int_value = malloc(propinfo.size);
 		if (int_value == NULL) {
-			log_printf("%9s", no_prop_value);
+			log_printf("%-9s", no_prop_value);
 			goto compatible;
 		}
 		status = picl_get_propval(proph, int_value, propinfo.size);
 		if (status != PICL_SUCCESS) {
-			log_printf("%9s", no_prop_value);
+			log_printf("%-9s", no_prop_value);
 		} else {
 			/* Running frequency */
 			(void) snprintf(freq_str, sizeof (freq_str), "%d MHz",
 			    CLK_FREQ_TO_MHZ(*int_value));
-			log_printf("%9s", freq_str);
+			log_printf("%-9s", freq_str);
 		}
 		free(int_value);
 	} else
-		log_printf("%9s", no_prop_value);
+		log_printf("%-9s", no_prop_value);
 
 compatible:
 	status = picl_get_propinfo_by_name(cpuh, "compatible", &propinfo,
-	    &proph);
+		&proph);
 	if (status == PICL_SUCCESS) {
 		if (propinfo.type == PICL_PTYPE_CHARSTRING) {
 			/*
@@ -238,72 +765,65 @@ compatible:
 			 */
 			comp_value = malloc(propinfo.size);
 			if (comp_value == NULL) {
-				log_printf("%20s", no_prop_value, 0);
+				log_printf("%-20s", no_prop_value, 0);
 				goto mask;
 			}
 			status = picl_get_propval(proph, comp_value,
-			    propinfo.size);
-			if (status == PICL_SUCCESS) {
-				log_printf("%20s", no_prop_value, 0);
-				free(comp_value);
-			}
+				propinfo.size);
+			if (status != PICL_SUCCESS)
+				log_printf("%-20s", no_prop_value, 0);
+			else
+				log_printf("%-20s", comp_value, 0);
+			free(comp_value);
 		} else if (propinfo.type == PICL_PTYPE_TABLE) {
 			/*
 			 * Compatible Property has multiple values
 			 */
 			status = picl_get_propval(proph, &tblh, propinfo.size);
 			if (status != PICL_SUCCESS) {
-				printf("Failed getting tblh\n");
-				log_printf("%20s", no_prop_value, 0);
+				log_printf("%-20s", no_prop_value, 0);
 				goto mask;
 			}
 			status = picl_get_next_by_row(tblh, &rowproph);
 			if (status != PICL_SUCCESS) {
-				printf("Failed getting next by row\n");
-				log_printf("%20s", no_prop_value, 0);
+				log_printf("%-20s", no_prop_value, 0);
 				goto mask;
 			}
 
 			status = picl_get_propinfo(rowproph, &propinfo);
 			if (status != PICL_SUCCESS) {
-				printf("Failed getting prop for rowproph\n");
-				log_printf("%20s", no_prop_value, 0);
+				log_printf("%-20s", no_prop_value, 0);
 				goto mask;
 			}
 
 			comp_value = malloc(propinfo.size);
 			if (comp_value == NULL) {
-				printf("Failed to get malloc value?\n");
-				log_printf("%20s", no_prop_value, 0);
+				log_printf("%-20s", no_prop_value, 0);
 				goto mask;
 			}
-
 			status = picl_get_propval(rowproph, comp_value,
-			    propinfo.size);
-			if (status != PICL_SUCCESS) {
-				printf("Failed geting rowproph\n");
-				log_printf("%20s", no_prop_value, 0);
-				free(comp_value);
-				goto mask;
-			} else
-				log_printf("%20s", comp_value, 0);
+				propinfo.size);
+			if (status != PICL_SUCCESS)
+				log_printf("%-20s", no_prop_value, 0);
+			else
+				log_printf("%-20s", comp_value, 0);
 			free(comp_value);
 		}
 	} else
-		log_printf("%20s", no_prop_value, 0);
+		log_printf("%-20s", no_prop_value, 0);
 
 mask:
 	status = picl_get_propinfo_by_name(cpuh, "mask#", &propinfo, &proph);
 	if (status == PICL_SUCCESS) {
 		status = picl_get_propval(proph, &mask_no, sizeof (mask_no));
 		if (status != PICL_SUCCESS) {
-			log_printf("%9s", no_prop_value);
+			log_printf("%-9s", no_prop_value);
 		} else {
 			log_printf(dgettext(TEXT_DOMAIN, " %2d.%d"),
-			    (mask_no>> 4) & 0xf, mask_no & 0xf);
+				(mask_no>> 4) & 0xf, mask_no & 0xf);
 		}
 	} else
-		log_printf("%9s", no_prop_value);
+		log_printf("%-9s", no_prop_value);
 
 done:
 	log_printf("\n");
@@ -327,4 +847,702 @@ void
 display_boardnum(int num)
 {
 	log_printf("%2d   ", num, 0);
+}
+
+static void
+sun4v_disp_env_status()
+{
+	if (phyplatformh == 0)
+		return;
+	log_printf("\n");
+	log_printf("============================");
+	log_printf(" Environmental Status ");
+	log_printf("============================");
+	log_printf("\n");
+
+	class_node_found = 0;
+	all_status_ok = 1;
+	sun4v_env_print_fan_sensors();
+
+	class_node_found = 0;
+	all_status_ok = 1;
+	sun4v_env_print_fan_indicators();
+
+	class_node_found = 0;
+	all_status_ok = 1;
+	sun4v_env_print_temp_sensors();
+
+	class_node_found = 0;
+	all_status_ok = 1;
+	sun4v_env_print_temp_indicators();
+
+	class_node_found = 0;
+	all_status_ok = 1;
+	sun4v_env_print_current_sensors();
+
+	class_node_found = 0;
+	all_status_ok = 1;
+	sun4v_env_print_current_indicators();
+
+	class_node_found = 0;
+	all_status_ok = 1;
+	sun4v_env_print_voltage_sensors();
+
+	class_node_found = 0;
+	all_status_ok = 1;
+	sun4v_env_print_voltage_indicators();
+
+	class_node_found = 0;
+	sun4v_env_print_LEDs();
+
+	class_node_found = 0;
+	all_status_ok = 1;
+	sun4v_print_fru_status();
+
+	class_node_found = 0;
+	sun4v_print_fw_rev();
+
+	sun4v_print_chassis_serial_no();
+}
+
+/*ARGSUSED*/
+static int
+sun4v_env_print_sensor_callback(picl_nodehdl_t nodeh, void *args)
+{
+	char val[PICL_PROPNAMELEN_MAX];
+	picl_nodehdl_t parenth;
+	char *names[PARENT_NAMES];
+	char *loc;
+	int i;
+	char *prop;
+	picl_errno_t err;
+	int32_t lo_warning, lo_shutdown;
+	int32_t hi_warning, hi_shutdown;
+	int32_t current_val;
+
+	if (class_node_found == 0) {
+		class_node_found = 1;
+		return (PICL_WALK_TERMINATE);
+	}
+
+	if (syserrlog == 0) {
+		err = picl_get_propval_by_name(nodeh,
+			PICL_PROP_OPERATIONAL_STATUS, val,
+			sizeof (val));
+		if (err == PICL_SUCCESS) {
+			if (strcmp(val, "disabled") == 0) {
+				if (all_status_ok) {
+					all_status_ok = 0;
+					return (PICL_WALK_TERMINATE);
+				}
+			} else
+				return (PICL_WALK_CONTINUE);
+		} else {
+			all_status_ok = 0;
+			return (PICL_WALK_TERMINATE);
+		}
+	}
+	err = picl_get_propval_by_name(nodeh, PICL_PROP_PARENT, &parenth,
+		sizeof (parenth));
+	if (err != PICL_SUCCESS) {
+		log_printf("\n");
+		return (PICL_WALK_CONTINUE);
+	}
+	if ((loc = (char *)malloc(PICL_PROPNAMELEN_MAX*PARENT_NAMES)) == NULL)
+		return (PICL_WALK_TERMINATE);
+	for (i = 0; i < PARENT_NAMES; i++)
+		if ((names[i] = (char *)malloc(PICL_PROPNAMELEN_MAX)) == NULL) {
+			while (--i > -1)
+				free(names[i]);
+			free(loc);
+			return (PICL_WALK_TERMINATE);
+		}
+	i = 0;
+	while (err == PICL_SUCCESS) {
+		if (parenth == chassish || parenth == phyplatformh)
+			break;
+		err = picl_get_propval_by_name(parenth, PICL_PROP_NAME,
+			names[i++], PICL_PROPNAMELEN_MAX);
+		if (err != PICL_SUCCESS) {
+			i--;
+			break;
+		}
+		if (i == PARENT_NAMES)
+			break;
+		err = picl_get_propval_by_name(parenth, PICL_PROP_PARENT,
+			&parenth, sizeof (parenth));
+	}
+	loc[0] = '\0';
+	if (--i > -1)
+		loc = strncat(loc, names[i], strlen(names[i]));
+	while (--i > -1) {
+		loc = strncat(loc, "/", 1);
+		loc = strncat(loc, names[i], strlen(names[i]));
+	}
+	log_printf("%-12s", loc);
+	for (i = 0; i < PARENT_NAMES; i++)
+		free(names[i]);
+	free(loc);
+	err = picl_get_propval_by_name(nodeh, PICL_PROP_LABEL, val,
+		sizeof (val));
+	if (err == PICL_SUCCESS)
+		log_printf("%-15s", val);
+
+	prop = (char *)args;
+	if (!prop) {
+		log_printf("\n");
+		return (PICL_WALK_CONTINUE);
+	}
+	if (picl_get_propval_by_name(nodeh, prop, &current_val,
+		sizeof (current_val)) != PICL_SUCCESS) {
+		log_printf("\n");
+		return (PICL_WALK_CONTINUE);
+	}
+	if (picl_get_propval_by_name(nodeh, PICL_PROP_LOW_WARNING,
+		&lo_warning, sizeof (lo_warning)) != PICL_SUCCESS)
+		lo_warning = INVALID_THRESHOLD;
+	if (picl_get_propval_by_name(nodeh, PICL_PROP_LOW_SHUTDOWN,
+		&lo_shutdown, sizeof (lo_shutdown)) != PICL_SUCCESS)
+		lo_shutdown = INVALID_THRESHOLD;
+	if (picl_get_propval_by_name(nodeh, PICL_PROP_HIGH_WARNING,
+		&hi_warning, sizeof (hi_warning)) != PICL_SUCCESS)
+		hi_warning = INVALID_THRESHOLD;
+	if (picl_get_propval_by_name(nodeh, PICL_PROP_HIGH_SHUTDOWN,
+		&hi_shutdown, sizeof (hi_shutdown)) != PICL_SUCCESS)
+		hi_shutdown = INVALID_THRESHOLD;
+
+	if ((lo_shutdown != INVALID_THRESHOLD &&
+		current_val <= lo_shutdown) ||
+		(hi_shutdown != INVALID_THRESHOLD &&
+		current_val >= hi_shutdown)) {
+		log_printf("%-s", "failed (");
+		log_printf("%-d", current_val);
+		log_printf("%-s", ")");
+	} else if ((lo_warning != INVALID_THRESHOLD &&
+		current_val <= lo_warning) ||
+		(hi_warning != INVALID_THRESHOLD &&
+		current_val >= hi_warning)) {
+		log_printf("%-s", "warning (");
+		log_printf("%-d", current_val);
+		log_printf("%-s", ")");
+	} else
+		log_printf("%-s", "ok");
+
+	log_printf("\n");
+	return (PICL_WALK_CONTINUE);
+}
+
+/*ARGSUSED*/
+static int
+sun4v_env_print_indicator_callback(picl_nodehdl_t nodeh, void *args)
+{
+	char val[PICL_PROPNAMELEN_MAX];
+	char status[PICL_PROPNAMELEN_MAX];
+	picl_nodehdl_t parenth;
+	char *names[PARENT_NAMES];
+	char *loc;
+	int i = 0;
+	char *prop = (char *)args;
+	picl_errno_t err = PICL_SUCCESS;
+
+	if (class_node_found == 0) {
+		class_node_found = 1;
+		return (PICL_WALK_TERMINATE);
+	}
+	if (syserrlog == 0) {
+		err = picl_get_propval_by_name(nodeh,
+			PICL_PROP_OPERATIONAL_STATUS, status,
+			sizeof (status));
+		if (err == PICL_SUCCESS) {
+			if (strcmp(status, "disabled") == 0) {
+				if (all_status_ok) {
+					all_status_ok = 0;
+					return (PICL_WALK_TERMINATE);
+				}
+			} else
+				return (PICL_WALK_CONTINUE);
+		} else {
+			all_status_ok = 0;
+			return (PICL_WALK_TERMINATE);
+		}
+	}
+	err = picl_get_propval_by_name(nodeh, PICL_PROP_PARENT, &parenth,
+		sizeof (parenth));
+	if (err != PICL_SUCCESS) {
+		log_printf("\n");
+		return (PICL_WALK_CONTINUE);
+	}
+	if ((loc = (char *)malloc(PICL_PROPNAMELEN_MAX*PARENT_NAMES)) == NULL)
+		return (PICL_WALK_TERMINATE);
+	for (i = 0; i < PARENT_NAMES; i++)
+		if ((names[i] = (char *)malloc(PICL_PROPNAMELEN_MAX)) == NULL) {
+			while (--i > -1)
+				free(names[i]);
+			free(loc);
+			return (PICL_WALK_TERMINATE);
+		}
+	i = 0;
+	while (err == PICL_SUCCESS) {
+		if (parenth == chassish || parenth == phyplatformh)
+			break;
+		err = picl_get_propval_by_name(parenth, PICL_PROP_NAME,
+			names[i++], PICL_PROPNAMELEN_MAX);
+		if (err != PICL_SUCCESS) {
+			i--;
+			break;
+		}
+		if (i == PARENT_NAMES)
+			break;
+		err = picl_get_propval_by_name(parenth, PICL_PROP_PARENT,
+			&parenth, sizeof (parenth));
+	}
+	loc[0] = '\0';
+	if (--i > -1)
+		loc = strncat(loc, names[i], strlen(names[i]));
+	while (--i > -1) {
+		loc = strncat(loc, "/", 1);
+		loc = strncat(loc, names[i], strlen(names[i]));
+	}
+	log_printf("%-12s", loc);
+	for (i = 0; i < PARENT_NAMES; i++)
+		free(names[i]);
+	free(loc);
+	err = picl_get_propval_by_name(nodeh, PICL_PROP_LABEL, val,
+		sizeof (val));
+	if (err == PICL_SUCCESS)
+		log_printf("%-15s", val);
+	if (syserrlog == 0) {
+		log_printf("%-8s", status);
+		return (PICL_WALK_CONTINUE);
+	}
+	err = picl_get_propval_by_name(nodeh, prop, val,
+		sizeof (val));
+	if (err == PICL_SUCCESS)
+		log_printf("%-8s", val);
+	log_printf("\n");
+	return (PICL_WALK_CONTINUE);
+}
+
+static void
+sun4v_env_print_fan_sensors()
+{
+	char *fmt = "%-11s %-14s %-10s\n";
+	/*
+	 * If there isn't any fan sensor node, return now.
+	 */
+	(void) picl_walk_tree_by_class(phyplatformh,
+		PICL_CLASS_RPM_SENSOR, (void *)PICL_CLASS_RPM_SENSOR,
+		sun4v_env_print_sensor_callback);
+	if (!class_node_found)
+		return;
+	log_printf("Fan sensors:\n");
+	if (syserrlog == 0) {
+		(void) picl_walk_tree_by_class(phyplatformh,
+			PICL_CLASS_RPM_SENSOR,
+			NULL, sun4v_env_print_sensor_callback);
+		if (all_status_ok) {
+			log_printf("All fan sensors are OK.\n");
+			return;
+		}
+	}
+	log_printf("---------------------------------\n");
+	log_printf(fmt, "Location", "Sensor", "Status", 0);
+	log_printf("---------------------------------\n");
+	(void) picl_walk_tree_by_class(phyplatformh, PICL_CLASS_RPM_SENSOR,
+		PICL_PROP_SPEED, sun4v_env_print_sensor_callback);
+}
+
+static void
+sun4v_env_print_fan_indicators()
+{
+	char *fmt = "%-11s %-14s %-10s\n";
+	(void) picl_walk_tree_by_class(phyplatformh,
+		PICL_CLASS_RPM_INDICATOR, (void *)PICL_CLASS_RPM_INDICATOR,
+		sun4v_env_print_indicator_callback);
+	if (!class_node_found)
+		return;
+	log_printf("\nFan indicators:\n");
+	if (syserrlog == 0) {
+		(void) picl_walk_tree_by_class(phyplatformh,
+			PICL_CLASS_RPM_INDICATOR,
+			NULL, sun4v_env_print_indicator_callback);
+		if (all_status_ok) {
+			log_printf("All fan indicators are OK.\n");
+			return;
+		}
+	}
+	log_printf("------------------------------------\n");
+	log_printf(fmt, "Location", "Sensor", "Condition", 0);
+	log_printf("------------------------------------\n");
+	(void) picl_walk_tree_by_class(phyplatformh, PICL_CLASS_RPM_INDICATOR,
+		PICL_CLASS_RPM_INDICATOR, sun4v_env_print_indicator_callback);
+}
+
+static void
+sun4v_env_print_temp_sensors()
+{
+	char *fmt = "%-11s %-14s %-10s\n";
+	(void) picl_walk_tree_by_class(phyplatformh,
+		PICL_CLASS_TEMPERATURE_SENSOR,
+		(void *)PICL_PROP_TEMPERATURE,
+		sun4v_env_print_sensor_callback);
+	if (!class_node_found)
+		return;
+
+	log_printf("\nTemperature sensors:\n");
+	if (syserrlog == 0) {
+		(void) picl_walk_tree_by_class(phyplatformh,
+			PICL_CLASS_TEMPERATURE_SENSOR,
+			NULL, sun4v_env_print_sensor_callback);
+		if (all_status_ok) {
+			log_printf("All temperature sensors are OK.\n");
+			return;
+		}
+	}
+	log_printf("---------------------------------\n");
+	log_printf(fmt, "Location", "Sensor", "Status", 0);
+	log_printf("---------------------------------\n");
+	(void) picl_walk_tree_by_class(phyplatformh,
+		PICL_CLASS_TEMPERATURE_SENSOR,
+		(void *)PICL_PROP_TEMPERATURE, sun4v_env_print_sensor_callback);
+}
+
+static void
+sun4v_env_print_temp_indicators()
+{
+	char *fmt = "%-11s %-14s %-8s\n";
+	(void) picl_walk_tree_by_class(phyplatformh,
+		PICL_CLASS_TEMPERATURE_INDICATOR, (void *)PICL_PROP_CONDITION,
+		sun4v_env_print_indicator_callback);
+	if (!class_node_found)
+		return;
+	log_printf("\nTemperature indicators:\n");
+	if (syserrlog == 0) {
+		(void) picl_walk_tree_by_class(phyplatformh,
+			PICL_CLASS_TEMPERATURE_INDICATOR, NULL,
+			sun4v_env_print_indicator_callback);
+		if (all_status_ok) {
+			log_printf("All temperature indicators are OK.\n");
+			return;
+		}
+	}
+	log_printf("------------------------------\n");
+	log_printf(fmt, "Location", "Indicator", "Condition", 0);
+	log_printf("------------------------------\n");
+	(void) picl_walk_tree_by_class(phyplatformh,
+		PICL_CLASS_TEMPERATURE_INDICATOR,
+		(void *)PICL_PROP_CONDITION,
+		sun4v_env_print_indicator_callback);
+}
+
+static void
+sun4v_env_print_current_sensors()
+{
+	char *fmt = "%-11s %-14s %-10s\n";
+	(void) picl_walk_tree_by_class(phyplatformh, PICL_CLASS_CURRENT_SENSOR,
+		(void *)PICL_PROP_CURRENT, sun4v_env_print_sensor_callback);
+	if (!class_node_found)
+		return;
+	log_printf("\nCurrent sensors:\n");
+	if (syserrlog == 0) {
+		(void) picl_walk_tree_by_class(phyplatformh,
+			PICL_CLASS_CURRENT_SENSOR,
+			NULL, sun4v_env_print_sensor_callback);
+		if (all_status_ok) {
+			log_printf("All current sensors are OK.\n");
+			return;
+		}
+	}
+	log_printf("---------------------------------\n");
+	log_printf(fmt, "Location", "Sensor", "Status", 0);
+	log_printf("---------------------------------\n");
+	(void) picl_walk_tree_by_class(phyplatformh,
+		PICL_CLASS_CURRENT_SENSOR, (void *)PICL_PROP_CURRENT,
+		sun4v_env_print_sensor_callback);
+}
+
+static void
+sun4v_env_print_current_indicators()
+{
+	char *fmt = "%-11s %-14s %-8s\n";
+	(void) picl_walk_tree_by_class(phyplatformh,
+		PICL_CLASS_CURRENT_INDICATOR,
+		(void *)PICL_PROP_CONDITION,
+		sun4v_env_print_indicator_callback);
+	if (!class_node_found)
+		return;
+	log_printf("\nCurrent indicators:\n");
+	if (syserrlog == 0) {
+		(void) picl_walk_tree_by_class(phyplatformh,
+			PICL_CLASS_CURRENT_INDICATOR, NULL,
+			sun4v_env_print_indicator_callback);
+		if (all_status_ok) {
+			log_printf("All current indicators are OK.\n");
+			return;
+		}
+	}
+	log_printf("------------------------------------\n");
+	log_printf(fmt, "Location", "Indicator", "Condition", 0);
+	log_printf("------------------------------------\n");
+	(void) picl_walk_tree_by_class(phyplatformh,
+		PICL_CLASS_CURRENT_INDICATOR,
+		(void *)PICL_PROP_CONDITION,
+		sun4v_env_print_indicator_callback);
+}
+
+static void
+sun4v_env_print_voltage_sensors()
+{
+	char *fmt = "%-11s %-14s %-10s\n";
+	(void) picl_walk_tree_by_class(phyplatformh,
+		PICL_CLASS_VOLTAGE_SENSOR,
+		PICL_PROP_VOLTAGE,
+		sun4v_env_print_sensor_callback);
+	if (!class_node_found)
+		return;
+	log_printf("\nVoltage sensors:\n");
+	if (syserrlog == 0) {
+		(void) picl_walk_tree_by_class(phyplatformh,
+			PICL_CLASS_VOLTAGE_SENSOR,
+			NULL, sun4v_env_print_sensor_callback);
+		if (all_status_ok) {
+			log_printf("All voltage sensors are OK.\n");
+			return;
+		}
+	}
+	log_printf("---------------------------------\n");
+	log_printf(fmt, "Location", "Sensor", "Status", 0);
+	log_printf("---------------------------------\n");
+	(void) picl_walk_tree_by_class(phyplatformh,
+		PICL_CLASS_VOLTAGE_SENSOR,
+		(void *)PICL_PROP_VOLTAGE,
+		sun4v_env_print_sensor_callback);
+}
+
+static void
+sun4v_env_print_voltage_indicators()
+{
+	char *fmt = "%-11s %-14s %-8s\n";
+	(void) picl_walk_tree_by_class(phyplatformh,
+		PICL_CLASS_VOLTAGE_INDICATOR,
+		(void *)PICL_PROP_CONDITION,
+		sun4v_env_print_indicator_callback);
+	if (!class_node_found)
+		return;
+	log_printf("\nVoltage indicators:\n");
+	if (syserrlog == 0) {
+		(void) picl_walk_tree_by_class(phyplatformh,
+			PICL_CLASS_VOLTAGE_INDICATOR, NULL,
+			sun4v_env_print_indicator_callback);
+		if (all_status_ok) {
+			log_printf("All voltage indicators are OK.\n");
+			return;
+		}
+	}
+	log_printf("------------------------------------\n");
+	log_printf(fmt, "Location", "Indicator", "Condition", 0);
+	log_printf("------------------------------------\n");
+	(void) picl_walk_tree_by_class(phyplatformh,
+		PICL_CLASS_VOLTAGE_INDICATOR,
+		(void *)PICL_PROP_CONDITION,
+		sun4v_env_print_indicator_callback);
+}
+
+static void
+sun4v_env_print_LEDs()
+{
+	char *fmt = "%-11s %-14s %-8s\n";
+	if (syserrlog == 0)
+		return;
+	(void) picl_walk_tree_by_class(phyplatformh, PICL_CLASS_LED,
+		(void *)PICL_PROP_STATE, sun4v_env_print_indicator_callback);
+	if (!class_node_found)
+		return;
+	log_printf("\nLEDs:\n");
+	log_printf("--------------------------------\n");
+	log_printf(fmt, "Location", "LED", "State", 0);
+	log_printf("--------------------------------\n");
+	(void) picl_walk_tree_by_class(phyplatformh, PICL_CLASS_LED,
+		(void *)PICL_PROP_STATE, sun4v_env_print_indicator_callback);
+}
+
+/*ARGSUSED*/
+static int
+sun4v_print_fru_status_callback(picl_nodehdl_t nodeh, void *args)
+{
+	char label[PICL_PROPNAMELEN_MAX];
+	char status[PICL_PROPNAMELEN_MAX];
+	picl_errno_t err;
+	picl_prophdl_t proph;
+	picl_nodehdl_t parenth;
+	char *names[PARENT_NAMES];
+	char *loc;
+	int i;
+
+	if (!class_node_found) {
+		class_node_found = 1;
+		return (PICL_WALK_TERMINATE);
+	}
+	err = picl_get_prop_by_name(nodeh, PICL_PROP_IS_FRU, &proph);
+	if (err != PICL_SUCCESS)
+		return (PICL_WALK_CONTINUE);
+	err = picl_get_propval_by_name(nodeh, PICL_PROP_LABEL, label,
+		sizeof (label));
+	if (err != PICL_SUCCESS)
+		return (PICL_WALK_CONTINUE);
+	err = picl_get_propval_by_name(nodeh, PICL_PROP_OPERATIONAL_STATUS,
+		status, sizeof (status));
+	if (err != PICL_SUCCESS)
+		return (PICL_WALK_CONTINUE);
+	if (syserrlog == 0) {
+		if (strcmp(status, "disabled") == 0) {
+			if (all_status_ok) {
+				all_status_ok = 0;
+				return (PICL_WALK_TERMINATE);
+			}
+		} else
+			return (PICL_WALK_CONTINUE);
+	}
+	err = picl_get_propval_by_name(nodeh, PICL_PROP_PARENT, &parenth,
+		sizeof (parenth));
+	if (err != PICL_SUCCESS) {
+		log_printf("\n");
+		return (PICL_WALK_CONTINUE);
+	}
+	if ((loc = (char *)malloc(PICL_PROPNAMELEN_MAX*PARENT_NAMES)) == NULL)
+		return (PICL_WALK_TERMINATE);
+	for (i = 0; i < PARENT_NAMES; i++)
+		if ((names[i] = (char *)malloc(PICL_PROPNAMELEN_MAX)) == NULL) {
+			while (--i > -1)
+				free(names[i]);
+			free(loc);
+			return (PICL_WALK_TERMINATE);
+		}
+	i = 0;
+	while (err == PICL_SUCCESS) {
+		if (parenth == chassish || parenth == phyplatformh)
+			break;
+		err = picl_get_propval_by_name(parenth, PICL_PROP_NAME,
+			names[i++], PICL_PROPNAMELEN_MAX);
+		if (err != PICL_SUCCESS) {
+			i--;
+			break;
+		}
+		if (i == PARENT_NAMES)
+			break;
+		err = picl_get_propval_by_name(parenth, PICL_PROP_PARENT,
+			&parenth, sizeof (parenth));
+	}
+	loc[0] = '\0';
+	if (--i > -1)
+		loc = strncat(loc, names[i], strlen(names[i]));
+	while (--i > -1) {
+		loc = strncat(loc, "/", 1);
+		loc = strncat(loc, names[i], strlen(names[i]));
+	}
+	log_printf("%-21s", loc);
+	for (i = 0; i < PARENT_NAMES; i++)
+		free(names[i]);
+	free(loc);
+	log_printf("%-10s", label);
+	log_printf("%-9s", status);
+	log_printf("\n");
+	return (PICL_WALK_CONTINUE);
+}
+
+static void
+sun4v_print_fru_status()
+{
+	char *fmt = "%-20s %-9s %-8s\n";
+	(void) picl_walk_tree_by_class(phyplatformh, NULL, NULL,
+		sun4v_print_fru_status_callback);
+	if (!class_node_found)
+		return;
+	log_printf("\n");
+	log_printf("============================");
+	log_printf(" FRU Status ");
+	log_printf("============================");
+	log_printf("\n");
+
+	if (syserrlog == 0) {
+		(void) picl_walk_tree_by_class(phyplatformh,
+			PICL_CLASS_MODULE, NULL,
+			sun4v_print_fru_status_callback);
+		if (all_status_ok) {
+			log_printf("All FRUs are enabled.\n");
+			return;
+		}
+	}
+	log_printf(fmt, "Location", "Name", "Status", 0);
+	log_printf("-------------------------------------\n");
+	(void) picl_walk_tree_by_class(phyplatformh, PICL_CLASS_MODULE, NULL,
+		sun4v_print_fru_status_callback);
+}
+
+/*ARGSUSED*/
+static int
+sun4v_print_fw_rev_callback(picl_nodehdl_t nodeh, void *args)
+{
+	char label[PICL_PROPNAMELEN_MAX];
+	char rev[PICL_PROPNAMELEN_MAX];
+	picl_errno_t err;
+
+	if (!class_node_found) {
+		class_node_found = 1;
+		return (PICL_WALK_TERMINATE);
+	}
+	err = picl_get_propval_by_name(nodeh, PICL_PROP_LABEL, label,
+		sizeof (label));
+	if (err != PICL_SUCCESS)
+		return (PICL_WALK_CONTINUE);
+	err = picl_get_propval_by_name(nodeh, PICL_PROP_FW_REVISION, rev,
+		sizeof (rev));
+	if (err != PICL_SUCCESS)
+		return (PICL_WALK_CONTINUE);
+	if (strlen(rev) == 0)
+		return (PICL_WALK_CONTINUE);
+	log_printf("%-21s", label);
+	log_printf("%-40s", rev);
+	log_printf("\n");
+	return (PICL_WALK_CONTINUE);
+}
+
+static void
+sun4v_print_fw_rev()
+{
+	char *fmt = "%-20s %-10s\n";
+	if (syserrlog == 0)
+		return;
+	(void) picl_walk_tree_by_class(phyplatformh, NULL, NULL,
+		sun4v_print_fw_rev_callback);
+	if (!class_node_found)
+		return;
+	log_printf("\n");
+	log_printf("============================");
+	log_printf(" FW Version ");
+	log_printf("============================");
+	log_printf("\n");
+	log_printf(fmt, "Name", "Version", 0);
+	log_printf("----------------------------\n");
+	(void) picl_walk_tree_by_class(phyplatformh, NULL, NULL,
+		sun4v_print_fw_rev_callback);
+}
+
+static void
+sun4v_print_chassis_serial_no()
+{
+	char val[PICL_PROPNAMELEN_MAX];
+	picl_errno_t err;
+	if (syserrlog == 0 || chassish == 0)
+		return;
+
+	log_printf("\n");
+	log_printf("Chassis Serial Number");
+	log_printf("\n");
+	log_printf("---------------------\n");
+	err = picl_get_propval_by_name(chassish, PICL_PROP_SERIAL_NUMBER,
+		val, sizeof (val));
+	if (err == PICL_SUCCESS)
+		log_printf("%s", val);
+	log_printf("\n");
 }

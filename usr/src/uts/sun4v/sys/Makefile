@@ -72,6 +72,7 @@ CLOSED_SUN4_HDRS=			\
 
 HDRS=	\
 	ds_pri.h		\
+	ds_snmp.h		\
 	hypervisor_api.h	\
 	hsvc.h			\
 	machasi.h		\

@@ -278,6 +278,7 @@ f none usr/platform/sun4v/include/sys/cpc_ultra.h 644 root bin
 f none usr/platform/sun4v/include/sys/cpu_sgnblk_defs.h 644 root bin
 f none usr/platform/sun4v/include/sys/ddi_subrdefs.h 644 root bin
 f none usr/platform/sun4v/include/sys/ds_pri.h 644 root bin
+f none usr/platform/sun4v/include/sys/ds_snmp.h 644 root bin
 f none usr/platform/sun4v/include/sys/dvma.h 644 root bin
 f none usr/platform/sun4v/include/sys/eeprom.h 644 root bin
 f none usr/platform/sun4v/include/sys/fcode.h 644 root bin

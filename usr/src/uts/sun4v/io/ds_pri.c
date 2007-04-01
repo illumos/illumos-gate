@@ -110,6 +110,7 @@ struct ds_pri_state {
 	size_t		ds_pri_len;
 	uint64_t	req_id;
 	uint64_t	last_req_id;
+	int		num_opens;
 };
 
 typedef struct ds_pri_state ds_pri_state_t;
@@ -329,6 +330,7 @@ ds_pri_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	sp->ds_pri = NULL;
 	sp->ds_pri_len = 0;
 	sp->req_id = 0;
+	sp->num_opens = 0;
 
 	if ((rv = ds_cap_init(&ds_pri_cap, &ds_pri_ops)) != 0) {
 		cmn_err(CE_NOTE, "ds_cap_init failed: %d", rv);
@@ -403,6 +405,25 @@ ds_pri_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	if (sp == NULL)
 		return (ENXIO);
 
+	mutex_enter(&sp->lock);
+
+	/*
+	 * If we're here and the state is DS_PRI_NO_SERVICE then this
+	 * means that ds hasn't yet called the registration callback.
+	 * Wait here and the callback will signal us when it has completed
+	 * its work.
+	 */
+	if (sp->state == DS_PRI_NO_SERVICE) {
+		if (cv_wait_sig(&sp->cv, &sp->lock) == 0) {
+			mutex_exit(&sp->lock);
+			return (EINTR);
+		}
+	}
+
+	sp->num_opens++;
+
+	mutex_exit(&sp->lock);
+
 	/*
 	 * On open we dont fetch the PRI even if we have a valid service
 	 * handle. PRI fetch is essentially lazy and on-demand.
@@ -419,6 +440,7 @@ static int
 ds_pri_close(dev_t dev, int flag, int otyp, cred_t *credp)
 {
 	int instance;
+	ds_pri_state_t *sp;
 
 	if (otyp != OTYP_CHR)
 		return (EINVAL);
@@ -426,9 +448,35 @@ ds_pri_close(dev_t dev, int flag, int otyp, cred_t *credp)
 	DS_PRI_DBG("ds_pri_close\n");
 
 	instance = getminor(dev);
-	if (ddi_get_soft_state(ds_pri_statep, instance) == NULL)
+	if ((sp = ddi_get_soft_state(ds_pri_statep, instance)) == NULL)
 		return (ENXIO);
 
+	mutex_enter(&sp->lock);
+	if (!(sp->state & DS_PRI_HAS_SERVICE)) {
+		mutex_exit(&sp->lock);
+		return (0);
+	}
+
+	if (--sp->num_opens > 0) {
+		mutex_exit(&sp->lock);
+		return (0);
+	}
+
+	/* If we have an old PRI - remove it */
+	if (sp->state & DS_PRI_HAS_PRI) {
+		if (sp->ds_pri != NULL && sp->ds_pri_len > 0) {
+			/*
+			 * remove the old data if we have an
+			 * outstanding request
+			 */
+			kmem_free(sp->ds_pri, sp->ds_pri_len);
+			sp->ds_pri_len = 0;
+			sp->ds_pri = NULL;
+		}
+		sp->state &= ~DS_PRI_HAS_PRI;
+	}
+	sp->state &= ~DS_PRI_REQUESTED;
+	mutex_exit(&sp->lock);
 	return (0);
 }
 
@@ -674,10 +722,14 @@ ds_pri_reg_handler(ds_cb_arg_t arg, ds_ver_t *ver, ds_svc_hdl_t hdl)
 	/* have service, but no PRI */
 	sp->state |= DS_PRI_HAS_SERVICE;
 
-		/*
-		 * Cannot request a PRI here, because the reg handler cannot
-		 * do a DS send operation - we take care of this later.
-		 */
+	/*
+	 * Cannot request a PRI here, because the reg handler cannot
+	 * do a DS send operation - we take care of this later.
+	 */
+
+	/* Wake up anyone waiting in open() */
+	cv_broadcast(&sp->cv);
+
 	mutex_exit(&sp->lock);
 }
 

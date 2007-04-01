@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,6 +40,7 @@ include $(SRC)/Makefile.psm
 
 LIBS		= $(DYNLIB) $(LINTLIB)
 IFLAGS		= -I ../../inc -I $(USR_PSM_INCL_DIR)
+IFLAGS		+= -I $(SRC)/cmd/picl/plugins/inc
 IFLAGS		+= -I $(UTSBASE)/sun4u 
 IFLAGS		+= -I $(UTSBASE)/sun4u/sunfire
 IFLAGS		+= -I $(UTSBASE)/sun4u/serengeti

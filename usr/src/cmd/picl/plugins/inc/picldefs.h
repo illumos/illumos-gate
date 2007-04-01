@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,6 +108,27 @@ extern "C" {
 #define	PICL_CLASS_WATCHDOG_CONTROLLER	"watchdog-controller"
 #define	PICL_CLASS_WATCHDOG_TIMER	"watchdog-timer"
 #define	PICL_CLASS_CHASSIS_SERIAL_NUM	"chassis-serial-number"
+
+/*
+ * Sun4v platforms do not create /frutree; instead they create
+ * the /physical-platform subtree. The following is the list of
+ * additional PICL classes that may be present in /physical-platform
+ */
+#define	PICL_CLASS_ALARM		"alarm"
+#define	PICL_CLASS_BACKPLANE		"backplane"
+#define	PICL_CLASS_BATTERY		"battery"
+#define	PICL_CLASS_CHASSIS		"chassis"
+#define	PICL_CLASS_CONTAINER		"container"
+#define	PICL_CLASS_MODULE		"module"
+#define	PICL_CLASS_OTHER		"other"
+#define	PICL_CLASS_POWERSUPPLY		"power-supply"
+#define	PICL_CLASS_RPM_INDICATOR	"rpm-indicator"
+#define	PICL_CLASS_RPM_SENSOR		"rpm-sensor"
+#define	PICL_CLASS_PRESENCE_INDICATOR	"presence-indicator"
+#define	PICL_CLASS_INDICATOR		"indicator"
+#define	PICL_CLASS_SENSOR		"sensor"
+#define	PICL_CLASS_STACK		"stack"
+#define	PICL_CLASS_UNKNOWN		"unknown"
 
 /*
  * Solaris driver property names
@@ -201,6 +222,25 @@ extern "C" {
 #define	PICL_PROP_SERIAL_NUMBER			"SerialNumber"
 
 #define	PICL_UNITADDR_LEN_MAX		256
+
+/*
+ * Additional PICL properties for Sun4v platforms
+ */
+#define	PICL_PROP_BATTERY_STATUS		"BatteryStatus"
+#define	PICL_PROP_EXPECTED			"Expected"
+#define	PICL_PROP_FW_REVISION			"FW-version"
+#define	PICL_PROP_HW_REVISION			"HW-version"
+#define	PICL_PROP_IS_REPLACEABLE		"Replaceable"
+#define	PICL_PROP_IS_HOT_SWAPPABLE		"HotSwappable"
+#define	PICL_PROP_IS_FRU			"FRU"
+#define	PICL_PROP_PHYS_DESCRIPTION		"Description"
+#define	PICL_PROP_SPEED				"Speed"
+#define	PICL_PROP_MFG_NAME			"MfgName"
+#define	PICL_PROP_MODEL_NAME			"ModelName"
+#define	PICL_PROP_SENSOR_VALUE			"SensorValue"
+#define	PICL_PROP_BASE_UNITS			"BaseUnits"
+#define	PICL_PROP_EXPONENT			"Exponent"
+#define	PICL_PROP_RATE_UNITS			"RateUnits"
 
 /*
  * Various threshold property names

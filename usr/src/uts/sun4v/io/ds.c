@@ -121,6 +121,15 @@ static boolean_t ds_enabled;	/* enable/disable taskq processing */
 #define	DS_DISPATCH(fn, arg)	taskq_dispatch(ds_taskq, fn, arg, TQ_SLEEP)
 
 /*
+ * Retry count and delay for LDC reads and writes
+ */
+#define	DS_DEFAULT_RETRIES	10000	/* number of times to retry */
+#define	DS_DEFAULT_DELAY	1000	/* usecs to wait between retries */
+
+static int ds_retries = DS_DEFAULT_RETRIES;
+static clock_t ds_delay = DS_DEFAULT_DELAY;
+
+/*
  * Supported versions of the DS message protocol
  *
  * The version array must be sorted in order from the highest
@@ -205,22 +214,24 @@ static ds_log_entry_t ds_log_entry_pool[DS_LOG_NPOOL];
 
 #define	DS_DBG_FLAG_LDC			0x1
 #define	DS_DBG_FLAG_LOG			0x2
+#define	DS_DBG_FLAG_MSG			0x4
 #define	DS_DBG_FLAG_ALL			0xf
 
 #define	DS_DBG				if (ds_debug) printf
 #define	DS_DBG_LDC			if (ds_debug & DS_DBG_FLAG_LDC) printf
 #define	DS_DBG_LOG			if (ds_debug & DS_DBG_FLAG_LOG) printf
-#define	DS_DUMP_LDC_MSG(buf, len)	ds_dump_ldc_msg(buf, len)
+#define	DS_DBG_MSG			if (ds_debug & DS_DBG_FLAG_MSG) printf
+#define	DS_DUMP_MSG(buf, len)		ds_dump_msg(buf, len)
 
 uint_t ds_debug = 0;
-static void ds_dump_ldc_msg(void *buf, size_t len);
+static void ds_dump_msg(void *buf, size_t len);
 
 #else /* DEBUG */
 
 #define	DS_DBG				_NOTE(CONSTCOND) if (0) printf
 #define	DS_DBG_LDC			DS_DBG
 #define	DS_DBG_LOG			DS_DBG
-#define	DS_DUMP_LDC_MSG(buf, len)
+#define	DS_DUMP_MSG(buf, len)
 
 #endif /* DEBUG */
 
@@ -236,7 +247,7 @@ static int ds_ldc_fini(ds_port_t *port);
 /* event processing functions */
 static uint_t ds_ldc_cb(uint64_t event, caddr_t arg);
 static void ds_dispatch_event(void *arg);
-static int ds_recv_msg(ldc_handle_t ldc_hdl, caddr_t msgp, size_t *sizep);
+static int ds_recv_msg(ds_port_t *port, caddr_t msgp, size_t *sizep);
 static void ds_handle_recv(void *arg);
 
 /* message sending functions */
@@ -764,42 +775,64 @@ done:
  * in the size parameter.
  */
 static int
-ds_recv_msg(ldc_handle_t ldc_hdl, caddr_t msgp, size_t *sizep)
+ds_recv_msg(ds_port_t *port, caddr_t msgp, size_t *sizep)
 {
 	int	rv = 0;
-	size_t	msglen = *sizep;
-	size_t	amt_left = msglen;
-	int	loopcnt = 0;
+	size_t	bytes_req = *sizep;
+	size_t	bytes_left = bytes_req;
+	size_t	nbytes;
+	int	retry_count = 0;
 
 	*sizep = 0;
 
-	while (msglen > 0) {
-		if ((rv = ldc_read(ldc_hdl, msgp, &amt_left)) != 0) {
-			if ((rv == EAGAIN) && (loopcnt++ < 1000)) {
-				/*
-				 * Try again, but don't try for more than
-				 * one second.  Something is wrong with
-				 * the channel.
-				 */
-				delay(drv_usectohz(10000)); /* 1/1000 sec */
-			} else {
-				/* fail */
-				return (rv);
-			}
-		} else {
-			/*
-			 * Check for a zero length read. This
-			 * indicates that there is no more data
-			 * to read from the channel.
-			 */
-			if (amt_left == 0)
-				break;
+	DS_DBG_LDC("ds@%lx: attempting to read %ld bytes\n", port->id,
+	    bytes_req);
 
-			*sizep += amt_left;
-			msgp += amt_left;
-			msglen -= amt_left;
-			amt_left = msglen;
+	while (bytes_left > 0) {
+
+		nbytes = bytes_left;
+
+		if ((rv = ldc_read(port->ldc.hdl, msgp, &nbytes)) != 0) {
+			if (rv != EAGAIN)
+				break;
+		} else {
+			if (nbytes != 0) {
+				DS_DBG_LDC("ds@%lx: read %ld bytes, %d "
+				    "retries\n", port->id, nbytes, retry_count);
+
+				*sizep += nbytes;
+				msgp += nbytes;
+				bytes_left -= nbytes;
+
+				/* reset counter on a successful read */
+				retry_count = 0;
+				continue;
+			}
+
+			/*
+			 * No data was read. Check if this is the
+			 * first attempt. If so, just return since
+			 * nothing has been read yet.
+			 */
+			if (bytes_left == bytes_req) {
+				DS_DBG_LDC("ds@%lx: read zero bytes, no data "
+				    "available\n", port->id);
+				break;
+			}
 		}
+
+		/*
+		 * A retry is necessary because the read returned
+		 * EAGAIN, or a zero length read occurred after
+		 * reading a partial message.
+		 */
+		if (retry_count++ >= ds_retries) {
+			DS_DBG_LDC("ds@%lx: timed out waiting for "
+			    "message\n", port->id);
+			break;
+		}
+
+		drv_usecwait(ds_delay);
 	}
 
 	return (rv);
@@ -845,7 +878,7 @@ ds_handle_recv(void *arg)
 		currp = hbuf;
 
 		/* read in the message header */
-		if ((rv = ds_recv_msg(ldc_hdl, currp, &read_size)) != 0) {
+		if ((rv = ds_recv_msg(port, currp, &read_size)) != 0) {
 			cmn_err(CE_NOTE, "ds@%lx: ldc_read returned %d",
 			    port->id, rv);
 			continue;
@@ -874,7 +907,7 @@ ds_handle_recv(void *arg)
 		currp = (char *)(msg) + DS_HDR_SZ;
 
 		/* read in the message body */
-		if ((rv = ds_recv_msg(ldc_hdl, currp, &read_size)) != 0) {
+		if ((rv = ds_recv_msg(port, currp, &read_size)) != 0) {
 			cmn_err(CE_NOTE, "ds@%lx: ldc_read returned %d",
 			    port->id, rv);
 			kmem_free(msg, msglen);
@@ -890,7 +923,7 @@ ds_handle_recv(void *arg)
 			continue;
 		}
 
-		DS_DUMP_LDC_MSG(msg, msglen);
+		DS_DUMP_MSG(msg, msglen);
 
 		/*
 		 * Send the message for processing, and store it
@@ -1555,7 +1588,8 @@ ds_send_msg(ds_port_t *port, caddr_t msg, size_t msglen)
 	size_t	amt_left = msglen;
 	int	loopcnt = 0;
 
-	DS_DUMP_LDC_MSG(msg, msglen);
+	DS_DUMP_MSG(msg, msglen);
+
 	(void) ds_log_add_msg(DS_LOG_OUT(port->id), (uint8_t *)msg, msglen);
 
 	/*
@@ -1568,12 +1602,8 @@ ds_send_msg(ds_port_t *port, caddr_t msg, size_t msglen)
 	/* send the message */
 	do {
 		if ((rv = ldc_write(port->ldc.hdl, currp, &msglen)) != 0) {
-			if ((rv == EWOULDBLOCK) && (loopcnt++ < 1000)) {
-				/*
-				 * don't try for more than a sec.  Something
-				 * is wrong with the channel.
-				 */
-				delay(drv_usectohz(10000)); /* 1/1000 sec */
+			if ((rv == EWOULDBLOCK) && (loopcnt++ < ds_retries)) {
+				drv_usecwait(ds_delay);
 			} else {
 				cmn_err(CE_WARN,
 				    "ds@%lx: send_msg: ldc_write failed (%d)",
@@ -1879,7 +1909,7 @@ ds_send_data_nack(ds_port_t *port, ds_svc_hdl_t bad_hdl)
  * and '.' otherwise.
  */
 static void
-ds_dump_ldc_msg(void *vbuf, size_t len)
+ds_dump_msg(void *vbuf, size_t len)
 {
 	int	i, j;
 	char	*curr;
@@ -1888,7 +1918,7 @@ ds_dump_ldc_msg(void *vbuf, size_t len)
 	uint8_t	*buf = vbuf;
 
 	/* abort if not debugging ldc */
-	if (!(ds_debug & DS_DBG_FLAG_LDC)) {
+	if (!(ds_debug & DS_DBG_FLAG_MSG)) {
 		return;
 	}
 
@@ -1923,7 +1953,7 @@ ds_dump_ldc_msg(void *vbuf, size_t len)
 		while (curr != (line + ASCIIOFFSET))
 			*curr++ = ' ';
 
-		DS_DBG_LDC("%s\n", line);
+		DS_DBG_MSG("%s\n", line);
 	}
 }
 #endif /* DEBUG */

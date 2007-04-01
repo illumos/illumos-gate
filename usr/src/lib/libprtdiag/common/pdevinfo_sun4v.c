@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,8 +67,8 @@ extern int get_id(Prom_node *);
 
 /* Function prototypes */
 Prom_node *sun4v_walk(Sys_tree *, Prom_node *, int);
-int sun4v_get_node_by_name(picl_nodehdl_t rooth, char *name,
-    picl_nodehdl_t *nodeh);
+picl_errno_t sun4v_get_node_by_name(picl_nodehdl_t, char *, picl_nodehdl_t *);
+
 /*
  * do_prominfo() is called from main() in usr/src/cmd/prtdiag/main.c
  *
@@ -86,7 +85,7 @@ do_prominfo(int syserrlog, char *pgname, int log_flag, int prt_flag)
 	picl_nodehdl_t	rooth;		/* root PICL node for IO display */
 	picl_nodehdl_t plafh;		/* Platform PICL node for IO display */
 
-	int err;
+	picl_errno_t err;
 
 	err = picl_initialize();
 	if (err != PICL_SUCCESS) {
@@ -238,7 +237,7 @@ sun4v_walk(Sys_tree *tree, Prom_node *root, int id)
 /*
  * search children to get the node by the nodename
  */
-int
+picl_errno_t
 sun4v_get_node_by_name(picl_nodehdl_t rooth, char *name,
     picl_nodehdl_t *nodeh)
 {

@@ -147,6 +147,7 @@ VSW_OBJS	= vsw.o
 VDC_OBJS	= vdc.o
 VDS_OBJS	= vds.o
 DS_PRI_OBJS	= ds_pri.o
+DS_SNMP_OBJS	= ds_snmp.o
 
 #
 #			Misc modules

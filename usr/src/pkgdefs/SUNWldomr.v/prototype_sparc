@@ -59,10 +59,12 @@ d none platform/sun4v/kernel 755 root sys
 d none platform/sun4v/kernel/drv 755 root sys
 f none platform/sun4v/kernel/drv/drctl.conf 0644 root sys
 f none platform/sun4v/kernel/drv/ds_pri.conf 644 root sys
+f none platform/sun4v/kernel/drv/ds_snmp.conf 644 root sys
 d none platform/sun4v/kernel/drv/sparcv9 755 root sys
 f none platform/sun4v/kernel/drv/sparcv9/cnex 755 root sys
 f none platform/sun4v/kernel/drv/sparcv9/drctl 755 root sys
 f none platform/sun4v/kernel/drv/sparcv9/ds_pri 755 root sys
+f none platform/sun4v/kernel/drv/sparcv9/ds_snmp 755 root sys
 f none platform/sun4v/kernel/drv/sparcv9/vcc 755 root sys
 f none platform/sun4v/kernel/drv/sparcv9/vdc 755 root sys
 f none platform/sun4v/kernel/drv/sparcv9/vds 755 root sys

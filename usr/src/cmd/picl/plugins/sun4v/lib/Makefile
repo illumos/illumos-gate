@@ -23,29 +23,24 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
-# cmd/picl/plugins/sun4v/Makefile
+# cmd/picl/plugins/sun4v/lib/Makefile
 #
 
-SUBDIRS= lib .WAIT snmp .WAIT mdesc pri ontario
-
-MSGSUBDIRS=	snmp
+SUBDIRS=	snmp .WAIT
 
 all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
 lint :=		TARGET= lint
-_msg :=		TARGET= _msg
 
 .KEEP_STATE:
 
 all install clean clobber lint : $(SUBDIRS)
-
-_msg:	$(MSGSUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

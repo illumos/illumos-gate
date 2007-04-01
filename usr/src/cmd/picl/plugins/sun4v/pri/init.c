@@ -26,82 +26,75 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <stdio.h>
-#include <unistd.h>
-#include <stdlib.h>
 #include <sys/types.h>
-#include <alloca.h>
-#include <sys/stat.h>
-#include <malloc.h>
-#include <fcntl.h>
-#include <syslog.h>
-#include <mdesc.h>
-#include <string.h>
 #include <errno.h>
+#include <malloc.h>
+#include <mdesc.h>
+#include <pri.h>
+#include "priplugin.h"
 
-#define	MDESC_PATH	"/devices/pseudo/mdesc@0:mdesc"
-
-static void mdesc_free(void *bufp, size_t size);
+static void pri_free(void *bufp, size_t size);
 uint64_t *md_bufp;
 
 md_t *
-mdesc_devinit(void)
+pri_devinit(void)
 {
-	int fd;
 	md_t *mdp;
-	size_t size;
+	uint64_t tok;
+
+	md_bufp = NULL;
+	tok = 0;
+
+	if (pri_init() != -1) {
+		if (pri_get(PRI_GET, &tok, &md_bufp, malloc, pri_free) ==
+		    (ssize_t)-1) {
+			pri_debug(LOG_NOTICE, "pri_devinit: can'r read from "
+			    "the PRI: %d\n", errno);
+		}
+		if (md_bufp == NULL) {
+			pri_debug(LOG_NOTICE, "pri_devinit: pri_get returned"
+			    "NULL buffer!\n");
+		}
+	} else {
+		pri_debug(LOG_NOTICE, "pri_devinit: pri_init failed!\n");
+	}
+	pri_fini();
+
+	pri_debug(LOG_NOTICE, "pri_devinit: done reading PRI\n");
 
 	/*
-	 * We haven't finished using the previous MD/PRI info.
+	 * The PRI and the MD use the same data format so they can be
+	 * parsed by the same functions.
 	 */
-	if (md_bufp != NULL)
-		return (NULL);
-
-	do {
-		if ((fd = open(MDESC_PATH, O_RDONLY, 0)) < 0)
-			break;
-
-		if (ioctl(fd, MDESCIOCGSZ, &size) < 0)
-			break;
-		if ((md_bufp = (uint64_t *)malloc(size)) == NULL) {
-			(void) close(fd);
-			break;
-		}
-
-		/*
-		 * A partial read is as bad as a failed read.
-		 */
-		if (read(fd, md_bufp, size) != size) {
-			free(md_bufp);
-			md_bufp = NULL;
-		}
-
-		(void) close(fd);
-	/*LINTED: E_CONSTANT_CONDITION */
-	} while (0);
-
 	if (md_bufp) {
-		mdp = md_init_intern(md_bufp, malloc, mdesc_free);
+		mdp = md_init_intern(md_bufp, malloc, pri_free);
 		if (mdp == NULL) {
+			pri_debug(LOG_NOTICE, "pri_devinit: md_init_intern "
+			"failed\n");
 			free(md_bufp);
 			md_bufp = NULL;
+		} else {
+			pri_debug(LOG_NOTICE, "pri_devinit: mdi_init_intern "
+			    "completed successfully\n");
 		}
 	} else
 		mdp = NULL;
+
+	pri_debug(LOG_NOTICE, "pri_devinit: returning\n");
 
 	return (mdp);
 }
 
 /*ARGSUSED*/
-void
-mdesc_free(void *bufp, size_t size)
+static void
+pri_free(void *bufp, size_t size)
 {
 	if (bufp)
 		free(bufp);
 }
 
 void
-mdesc_devfini(md_t *mdp)
+pri_devfini(md_t *mdp)
 {
 	if (mdp)
 		(void) md_fini(mdp);
