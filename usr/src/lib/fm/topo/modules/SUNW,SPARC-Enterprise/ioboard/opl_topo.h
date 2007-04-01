@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,7 +61,7 @@ extern "C" {
 
 /* Macros for manipulating px driver bus address. */
 #define	OPL_PX_DRV	"px"			/* Oberon driver name */
-#define	OPL_PX_STR2BA(s) strtol(s, NULL, 10)	/* Convert ba string to int */
+#define	OPL_PX_STR2BA(s) strtol(s, NULL, 16)	/* Convert ba string to int */
 #define	OPL_PX_LSB(a)	(((a) >> 4) & 0x1f)	/* Extract board from ba */
 #define	OPL_PX_HB(a)	(((a) >> 1) & 0x07)	/* Extract hb from ba */
 #define	OPL_PX_RC(a)	((a) & 0x01)		/* Extract rc from ba */

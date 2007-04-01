@@ -28,6 +28,7 @@
 
 !include prototype_com
 
+f none usr/lib/fm/dict/SCF.dict 444 root bin
 f none usr/lib/fm/dict/SUN4.dict 444 root bin
 f none usr/lib/fm/dict/SUN4U.dict 444 root bin
 f none usr/lib/fm/dict/SUN4V.dict 444 root bin
@@ -74,6 +75,7 @@ f none usr/lib/fm/sparcv9/llib-lfmd_snmp.ln 644 root bin
 f none usr/lib/fm/sparcv9/libtopo.so.1 755 root bin
 s none usr/lib/fm/sparcv9/libtopo.so=libtopo.so.1
 f none usr/lib/fm/sparcv9/llib-ltopo.ln 644 root bin
+f none usr/lib/locale/C/LC_MESSAGES/SCF.mo 444 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4.mo 444 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4U.mo 444 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4V.mo 444 root bin
