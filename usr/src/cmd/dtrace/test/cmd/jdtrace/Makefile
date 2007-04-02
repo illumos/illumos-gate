@@ -20,12 +20,15 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
-include $(SRC)/Makefile.master
+PROG = jdtrace
+SRCS = jdtrace.c
+
+include $(SRC)/cmd/Makefile.cmd
 
 ROOTOPTPKG = $(ROOT)/opt/SUNWdtrt
 ROOTBIN = $(ROOTOPTPKG)/bin
@@ -41,7 +44,6 @@ PROTO_DTRACE_JAR=$(ROOT)/$(DTRACE_JAR)
 INSTALLED_DTRACE_JAR=/$(DTRACE_JAR)
 CLASSPATH=$(PROTO_DTRACE_JAR):$(INSTALLED_DTRACE_JAR)
 DTEST_DIR=$(SRC)/cmd/dtrace/test
-SRCDIR=src
 CLASSDIR=classes
 LIBDIR=lib
 MANIFESTDIR=manifest
@@ -52,30 +54,31 @@ PROTO_JDTRACE_JAR=$(ROOTLIBJAVA)/jdtrace.jar
 CMD = $(ROOTBIN)/jdtrace
 XLIST = $(ROOTBIN)/exception.lst
 
+$(PROTO_JDTRACE_JAR) := FILEMODE = 0644
 $(CMD) := FILEMODE = 0555
+$(XLIST) := FILEMODE = 0444
 
-default: $(JDTRACE_JAR) jdtrace.exe
+all: $(JDTRACE_JAR) $(PROG)
 
 clean:
-	$(RM) $(CLASSDIR)/*.class
+	-$(RM) $(CLASSDIR)/*.class
 
 clobber: clean
-	$(RM) $(JDTRACE_JAR)
-	$(RM) jdtrace.exe
-
-all: default
+	-$(RM) $(JDTRACE_JAR)
+	-$(RM) $(PROG)
 
 lint:
 
 install: all $(PROTO_JDTRACE_JAR) $(CMD) $(XLIST)
 
-jdtrace.exe: $(SRCDIR)/jdtrace.c
-	$(CC) -I/usr/include $(SRCDIR)/jdtrace.c -o jdtrace.exe
+$(PROG): $(SRCS)
+	$(LINK.c) -o $@ $(SRCS) $(LDLIBS)
+	$(POST_PROCESS) ; $(STRIP_STABS)
 
-$(JDTRACE_JAR): $(SRCDIR)/JDTrace.java $(SRCDIR)/Getopt.java
+$(JDTRACE_JAR): JDTrace.java Getopt.java
 	@mkdir -p $(CLASSDIR)
 	@mkdir -p $(LIBDIR)
-	$(JAVAC) -cp $(CLASSPATH) -d $(CLASSDIR) $(SRCDIR)/*.java
+	$(JAVAC) -cp $(CLASSPATH) -d $(CLASSDIR) *.java
 	$(JAR) -cmf $(MANIFEST) $(JDTRACE_JAR) -C $(CLASSDIR) .
 
 $(PROTO_JDTRACE_JAR): $(ROOTLIBJAVA)
@@ -96,8 +99,5 @@ $(ROOTLIBJAVA): $(ROOTLIB)
 $(ROOTLIBJAVA)/%.jar: $(LIBDIR)/%.jar
 	$(INS.file)
 
-$(ROOTBIN)/%.lst: %.lst
+$(ROOTBIN)/%: %
 	$(INS.file)
-
-$(ROOTBIN)/%: %.exe
-	$(INS.rename)

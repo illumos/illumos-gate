@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -715,12 +715,13 @@ dump_elf64(dtrace_hdl_t *dtp, const dof_hdr_t *dof, int fd)
 }
 
 static int
-dt_symtab_lookup(Elf_Data *data_sym, uintptr_t addr, uint_t shn, GElf_Sym *sym)
+dt_symtab_lookup(Elf_Data *data_sym, int nsym, uintptr_t addr, uint_t shn,
+    GElf_Sym *sym)
 {
 	int i, ret = -1;
 	GElf_Sym s;
 
-	for (i = 0; gelf_getsym(data_sym, i, sym) != NULL; i++) {
+	for (i = 0; i < nsym && gelf_getsym(data_sym, i, sym) != NULL; i++) {
 		if (GELF_ST_TYPE(sym->st_info) == STT_FUNC &&
 		    shn == sym->st_shndx &&
 		    sym->st_value <= addr &&
@@ -1136,6 +1137,8 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 		 */
 		strtab = dt_strtab_create(1);
 		nsym = 0;
+		isym = data_sym->d_size / symsize;
+		istr = data_str->d_size;
 
 		for (i = 0; i < shdr_rel.sh_size / shdr_rel.sh_entsize; i++) {
 
@@ -1162,7 +1165,7 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 			if (strncmp(s, dt_prefix, sizeof (dt_prefix) - 1) != 0)
 				continue;
 
-			if (dt_symtab_lookup(data_sym, rela.r_offset,
+			if (dt_symtab_lookup(data_sym, isym, rela.r_offset,
 			    shdr_rel.sh_info, &fsym) != 0) {
 				dt_strtab_destroy(strtab);
 				goto err;
@@ -1244,9 +1247,6 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 			pair->dlp_next = bufs;
 			bufs = pair;
 
-			istr = data_str->d_size;
-			isym = data_sym->d_size / symsize;
-
 			bcopy(data_str->d_buf, pair->dlp_str, data_str->d_size);
 			data_str->d_buf = pair->dlp_str;
 			data_str->d_size += len;
@@ -1265,8 +1265,6 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 
 			nsym += isym;
 		} else {
-			istr = 0;
-			isym = 0;
 			dt_strtab_destroy(strtab);
 		}
 
@@ -1328,7 +1326,7 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 
 			p = strhyphenate(p + 3); /* strlen("___") */
 
-			if (dt_symtab_lookup(data_sym, rela.r_offset,
+			if (dt_symtab_lookup(data_sym, isym, rela.r_offset,
 			    shdr_rel.sh_info, &fsym) != 0)
 				goto err;
 

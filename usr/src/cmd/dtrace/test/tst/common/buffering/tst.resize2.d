@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,18 +36,12 @@
  *	Options and Tunables/bufresize
  *
  * NOTES:
- *	On some small memory machines, this test may consume so much memory
- *	that it induces memory allocation failure in the dtrace library.  This
- *	will manifest itself as an error like one of the following:
- *
- *	    dtrace: processing aborted: Memory allocation failure
- *	    dtrace: could not enable tracing: Memory allocation failure
- *
- *	These actually indicate that the test performed as expected; failures
- *	of the above nature should therefore be ignored.
- *
+ *	We use the undocumented "preallocate" option to make sure dtrace(1M)
+ *	has enough space in its heap to allocate a buffer as large as the
+ *	kernel's trace buffer.
  */
 
+#pragma D option preallocate=100t
 #pragma D option bufresize=auto
 #pragma D option aggsize=100t
 

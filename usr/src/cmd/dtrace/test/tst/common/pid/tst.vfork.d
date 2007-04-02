@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,16 +41,16 @@ pid$1:a.out:waiting:entry
 	copyout(this->value, arg0, sizeof (int));
 }
 
-syscall::vfork:return
-/curpsinfo->pr_ppid == $1/
+proc:::create
+/pid == $1/
 {
-	self->pid = pid;
+	child = args[0]->pr_pid;
 }
 
 pid$1:a.out:go:
-/self->pid != pid/
+/child != pid/
 {
-	trace("wrong pid");
+	printf("wrong pid (%d %d)", pid, child);
 	exit(1);
 }
 

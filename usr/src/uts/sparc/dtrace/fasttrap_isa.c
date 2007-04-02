@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -776,7 +776,7 @@ fasttrap_pid_probe(struct regs *rp)
 
 	case FASTTRAP_T_REG:
 	{
-		uint64_t value;
+		int64_t value;
 		uint_t taken;
 		uint_t reg = RS1(tp->ftt_instr);
 
@@ -789,7 +789,7 @@ fasttrap_pid_probe(struct regs *rp)
 		 */
 		ASSERT(p->p_model == DATAMODEL_LP64 || reg < 16);
 
-		value = fasttrap_getreg(rp, reg);
+		value = (int64_t)fasttrap_getreg(rp, reg);
 
 		switch (tp->ftt_code) {
 		case 0x1:	/* BRZ */
@@ -803,7 +803,7 @@ fasttrap_pid_probe(struct regs *rp)
 		case 0x6:	/* BRGZ */
 			taken = (value > 0);	break;
 		case 0x7:	/* BRGEZ */
-			taken = (value <= 0);	break;
+			taken = (value >= 0);	break;
 		default:
 		case 0x0:
 		case 0x4:
@@ -1380,6 +1380,7 @@ fasttrap_getreg(struct regs *rp, uint_t reg)
 	 * in the register window we're looking for; if we haven't, (and
 	 * we probably haven't) try to copy in the value of the register.
 	 */
+	/* LINTED - alignment */
 	mpcb = (struct machpcb *)((caddr_t)rp - REGOFF);
 
 	if (get_udatamodel() == DATAMODEL_NATIVE) {
@@ -1478,10 +1479,12 @@ fasttrap_putreg(struct regs *rp, uint_t reg, ulong_t value)
 	 * code that all of the user's data have been flushed out of the
 	 * register file (since %otherwin is 0).
 	 */
+	/* LINTED - alignment */
 	mpcb = (struct machpcb *)((caddr_t)rp - REGOFF);
 
 	if (get_udatamodel() == DATAMODEL_NATIVE) {
 		struct frame *fr = (struct frame *)(rp->r_sp + STACK_BIAS);
+		/* LINTED - alignment */
 		struct rwindow *rwin = (struct rwindow *)mpcb->mpcb_wbuf;
 
 		if (mpcb->mpcb_wbcnt > 0) {
@@ -1511,6 +1514,7 @@ fasttrap_putreg(struct regs *rp, uint_t reg, ulong_t value)
 	} else {
 		struct frame32 *fr =
 		    (struct frame32 *)(uintptr_t)(caddr32_t)rp->r_sp;
+		/* LINTED - alignment */
 		struct rwindow32 *rwin = (struct rwindow32 *)mpcb->mpcb_wbuf;
 		uint32_t v32 = (uint32_t)value;
 

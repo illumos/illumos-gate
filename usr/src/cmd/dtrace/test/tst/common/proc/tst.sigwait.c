@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,7 @@
 #include <errno.h>
 #include <string.h>
 
-void
+int
 main(int argc, char **argv)
 {
 	struct sigevent ev;
@@ -69,4 +69,7 @@ main(int argc, char **argv)
 	for (;;) {
 		(void) sigwait(&set);
 	}
+
+	/*NOTREACHED*/
+	return (0);
 }

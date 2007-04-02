@@ -1,4 +1,3 @@
-#!/bin/ksh -p
 #
 # CDDL HEADER START
 #
@@ -21,31 +20,18 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
-##
-# 
+#
 # ASSERTION:
 # The trace buffer size can include any of the size suffixes k, m, g or t
 #
 # SECTION: dtrace Utility/-b Option
 #
-##
-
-script()
-{
-	$dtrace -b 1k -b 2k -s /dev/stdin <<EOF
-	BEGIN
-	{
-		printf("This test should compile.\n");
-		exit(0);
-	}
-EOF
-}
 
 if [ $# != 1 ]; then
 	echo expected one argument: '<'dtrace-path'>'
@@ -54,11 +40,6 @@ fi
 
 dtrace=$1
 
-script
-status=$?
+$dtrace -b 1k -b 2k -e
 
-if [ "$status" -ne 0 ]; then
-	echo $tst: dtrace failed
-fi
-
-exit $status
+exit $?

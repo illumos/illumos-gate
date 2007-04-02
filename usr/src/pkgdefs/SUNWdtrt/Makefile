@@ -23,23 +23,15 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
 # ident	"%Z%%M%	%I%	%E% SMI"
-
-#
-# ASSERTION:
-# The trace buffer size can include any of the size suffixes k, m, g or t
-#
-# SECTION: dtrace Utility/-b Option
 #
 
-if [ $# != 1 ]; then
-	echo expected one argument: '<'dtrace-path'>'
-	exit 2
-fi
+include ../Makefile.com
 
-dtrace=$1
+.KEEP_STATE:
 
-$dtrace -b 1t -b 2t -e
+all: $(FILES) depend
 
-exit $?
+install: all optpkg
+
+include ../Makefile.targ

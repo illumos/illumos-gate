@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,17 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/types.h>
 #include <sys/resource.h>
+#include <sys/mman.h>
+#include <sys/types.h>
 
 #include <strings.h>
 #include <signal.h>
@@ -453,7 +454,6 @@ dt_opt_xlate(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
 }
 
 /*ARGSUSED*/
-
 static int
 dt_opt_cflags(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
 {
@@ -561,44 +561,53 @@ out:
 }
 
 static int
+dt_optval_parse(const char *arg, dtrace_optval_t *rval)
+{
+	dtrace_optval_t mul = 1;
+	size_t len;
+	char *end;
+
+	len = strlen(arg);
+	errno = 0;
+
+	switch (arg[len - 1]) {
+	case 't':
+	case 'T':
+		mul *= 1024;
+		/*FALLTHRU*/
+	case 'g':
+	case 'G':
+		mul *= 1024;
+		/*FALLTHRU*/
+	case 'm':
+	case 'M':
+		mul *= 1024;
+		/*FALLTHRU*/
+	case 'k':
+	case 'K':
+		mul *= 1024;
+		/*FALLTHRU*/
+	default:
+		break;
+	}
+
+	errno = 0;
+	*rval = strtoull(arg, &end, 0) * mul;
+
+	if ((mul > 1 && end != &arg[len - 1]) || (mul == 1 && *end != '\0') ||
+	    *rval < 0 || errno != 0)
+		return (-1);
+
+	return (0);
+}
+
+static int
 dt_opt_size(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
 {
-	char *end;
-	int len;
-	dtrace_optval_t mul = 1, val = 0;
+	dtrace_optval_t val = 0;
 
-	if (arg != NULL) {
-		len = strlen(arg);
-		errno = 0;
-
-		switch (arg[len - 1]) {
-		case 't':
-		case 'T':
-			mul *= 1024;
-			/*FALLTHRU*/
-		case 'g':
-		case 'G':
-			mul *= 1024;
-			/*FALLTHRU*/
-		case 'm':
-		case 'M':
-			mul *= 1024;
-			/*FALLTHRU*/
-		case 'k':
-		case 'K':
-			mul *= 1024;
-			/*FALLTHRU*/
-		default:
-			break;
-		}
-
-		val = strtoull(arg, &end, 0) * mul;
-
-		if ((mul > 1 && end != &arg[len - 1]) ||
-		    (mul == 1 && *end != '\0') || val < 0 ||
-		    errno != 0 || val == DTRACEOPT_UNSET)
-			return (dt_set_errno(dtp, EDT_BADOPTVAL));
-	}
+	if (arg != NULL && dt_optval_parse(arg, &val) != 0)
+		return (dt_set_errno(dtp, EDT_BADOPTVAL));
 
 	dtp->dt_options[option] = val;
 	return (0);
@@ -828,6 +837,30 @@ dt_options_load(dtrace_hdl_t *dtp)
 	return (0);
 }
 
+/*ARGSUSED*/
+static int
+dt_opt_preallocate(dtrace_hdl_t *dtp, const char *arg, uintptr_t option)
+{
+	dtrace_optval_t size;
+	void *p;
+
+	if (arg == NULL || dt_optval_parse(arg, &size) != 0)
+		return (dt_set_errno(dtp, EDT_BADOPTVAL));
+
+	if (size > SIZE_MAX)
+		size = SIZE_MAX;
+
+	if ((p = dt_zalloc(dtp, size)) == NULL) {
+		do {
+			size /= 2;
+		} while ((p = dt_zalloc(dtp, size)) == NULL);
+	}
+
+	dt_free(dtp, p);
+
+	return (0);
+}
+
 typedef struct dt_option {
 	const char *o_name;
 	int (*o_func)(dtrace_hdl_t *, const char *, uintptr_t);
@@ -866,6 +899,7 @@ static const dt_option_t _dtrace_ctoptions[] = {
 	{ "linktype", dt_opt_linktype },
 	{ "nolibs", dt_opt_cflags, DTRACE_C_NOLIBS },
 	{ "pgmax", dt_opt_pgmax },
+	{ "preallocate", dt_opt_preallocate },
 	{ "pspec", dt_opt_cflags, DTRACE_C_PSPEC },
 	{ "stdc", dt_opt_stdc },
 	{ "strip", dt_opt_dflags, DTRACE_D_STRIP },

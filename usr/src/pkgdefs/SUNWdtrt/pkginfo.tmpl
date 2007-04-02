@@ -23,23 +23,21 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
 # ident	"%Z%%M%	%I%	%E% SMI"
-
-#
-# ASSERTION:
-# The trace buffer size can include any of the size suffixes k, m, g or t
-#
-# SECTION: dtrace Utility/-b Option
 #
 
-if [ $# != 1 ]; then
-	echo expected one argument: '<'dtrace-path'>'
-	exit 2
-fi
-
-dtrace=$1
-
-$dtrace -b 1t -b 2t -e
-
-exit $?
+PKG="SUNWdtrt"
+NAME="DTrace Test Suite"
+ARCH="ISA"
+VERSION="ONVERS,REV=0.0.0"
+SUNW_PRODNAME="SunOS"
+SUNW_PRODVERS="RELEASE/VERSION"
+MAXINST="1000"
+CATEGORY="internal"
+DESC="DTrace Test Suite Internal Distribution"
+VENDOR="Sun Microsystems, Inc."
+HOTLINE="Contact the DTrace discussion forum"
+EMAIL="dtrace-discuss@opensolaris.org"
+CLASSES="none"
+BASEDIR=/opt
+SUNW_PKGVERS="1.0"

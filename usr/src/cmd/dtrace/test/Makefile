@@ -20,12 +20,28 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 include $(SRC)/Makefile.master
 
-SUBDIRS = cmd tst pkg
-include $(SRC)/cmd/dtrace/test/Makefile.subdirs
+SUBDIRS = cmd tst
+
+ROOTOPTPKG = $(ROOT)/opt/SUNWdtrt
+
+include Makefile.subdirs
+
+install: $(ROOTOPTPKG)/README $(SUBDIRS)
+
+pkg: install
+	@cd $(PKGDEFS) pwd; $(MAKE) awk_pkginfo
+	@cd $(PKGDEFS)/SUNWdtrt; pwd; $(MAKE) install
+
+$(ROOTOPTPKG):
+	$(INS.dir)
+
+$(ROOTOPTPKG)/%: ./% $(ROOTOPTPKG)
+	$(RM) $@
+	$(CP) $< $@

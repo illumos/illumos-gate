@@ -28,6 +28,9 @@
 
 #include <sys/asm_linkage.h>
 
+	DGDEF(__fsr_init_value)
+	.word 0
+
 	ENTRY(main)
 	save	%sp, -SA(MINFRAME), %sp
 	mov	%sp, %fp

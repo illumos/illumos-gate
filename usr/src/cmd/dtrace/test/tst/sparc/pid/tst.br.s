@@ -26,68 +26,56 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-typedef void f(char *);
+#include <sys/asm_linkage.h>
 
-static void
-f_a(char *a)
-{
-}
+	DGDEF(__fsr_init_value)
+	.word 0
 
-static void
-f_b(char *a)
-{
-}
+	ENTRY(waiting)
+	retl
+	ldub	[%o0], %o0
+	SET_SIZE(waiting)
 
-static void
-f_c(char *a)
-{
-}
+	ENTRY(test)
+	mov	1, %g1
 
-static void
-f_d(char *a)
-{
-}
+	brz	%g1, 1f
+	nop
+	brlez	%g1, 1f
+	nop
+	brlz	%g0, 1f
+	nop
+	brlz	%g1, 1f
+	nop
+	brnz	%g0, 1f
+	sub	%g0, 2, %g1
+	brgz	%g1, 1f
+	nop
+	brgz	%g0, 1f
+	nop
+	brgez	%g1, 1f
+	nop
 
-static void
-f_e(char *a)
-{
-}
+	mov	%g1, %o0
 
-static void
-fN(f func, char *a, int i)
-{
-	func(a);
-}
+1:
+	retl
+	nop
+	SET_SIZE(test)
 
-static void
-fN2(f func, char *a, int i)
-{
-	func(a);
-}
+	ENTRY(main)
+	save	%sp, -SA(MINFRAME + 4), %sp
+	stb	%g0, [%fp - 4]
+1:
+	call	waiting
+	sub	%fp, 4, %o0
+	tst	%o0
+	bz	1b
+	nop
 
-int
-main()
-{
-	/*
-	 * Avoid length of 1, 2, 4, or 8 bytes so DTrace will treat the data as
-	 * a byte array.
-	 */
-	char a[] = {(char)-7, (char)201, (char)0, (char)0, (char)28, (char)1};
-	char b[] = {(char)84, (char)69, (char)0, (char)0, (char)28, (char)0};
-	char c[] = {(char)84, (char)69, (char)0, (char)0, (char)28, (char)1};
-	char d[] = {(char)-7, (char)201, (char)0, (char)0, (char)29, (char)0};
-	char e[] = {(char)84, (char)69, (char)0, (char)0, (char)28, (char)0};
+	call	test
+	nop
 
-	fN(f_a, a, 1);
-	fN(f_b, b, 0);
-	fN(f_d, d, 102);
-	fN2(f_e, e, -2);
-	fN(f_c, c, 0);
-	fN(f_a, a, -1);
-	fN(f_d, d, 101);
-	fN(f_e, e, -2);
-	fN(f_e, e, 2);
-	fN2(f_e, e, 2);
-
-	return (0);
-}
+	ret
+	restore	%g0, %g0, %o0
+	SET_SIZE(main)

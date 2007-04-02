@@ -56,4 +56,6 @@ int
 main(int argc, char *argv[])
 {
 	grow(1);
+
+	return (0);
 }

@@ -20,24 +20,37 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
-PKG="SUNWdtrt"
-NAME="DTrace Test Suite"
-ARCH="ISA"
-VERSION="1.0.0,REV=0.0.0"
-SUNW_PRODNAME="SunOS"
-SUNW_PRODVERS="RELEASE/VERSION"
-SUNW_PKGTYPE="usr"
-MAXINST="1000"
-CATEGORY="internal"
-DESC="DTrace Test Suite Internal Distribution"
-VENDOR="Sun Microsystems, Inc."
-HOTLINE="Please contact the DTrace project team (dtrace-core@kiowa.eng)"
-EMAIL="dtrace-core@kiowa.eng"
-CLASSES="none"
-BASEDIR=/
-SUNW_PKGVERS="1.0"
+if [ $# != 1 ]; then
+	echo expected one argument: '<'dtrace-path'>'
+	exit 2
+fi
+
+dtrace=$1
+
+# The output files assumes the timezone is US/Pacific
+TZ=US/Pacific
+
+$dtrace -s /dev/stdin <<EOF
+#pragma D option quiet
+
+inline uint64_t NANOSEC = 1000000000;
+
+BEGIN
+{
+	printf("%Y\n%Y\n%Y", (uint64_t)0, (uint64_t)1062609821 * NANOSEC,
+	    (uint64_t)0x7fffffff * NANOSEC);
+	exit(0);
+}
+EOF
+
+if [ $? -ne 0 ]; then
+	print -u2 "dtrace failed"
+	exit 1
+fi
+
+exit 0

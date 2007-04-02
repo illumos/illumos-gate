@@ -20,10 +20,10 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 if [ $# != 1 ]; then
 	echo expected one argument: '<'dtrace-path'>'
@@ -87,7 +87,9 @@ files=/usr/include/sys/*.h
 # becomes a problem, kindly fix it by reducing the number of bad files!  (That
 # is, fix it by fixing the broken file, not the broken script.)
 #
-badfiles="ctype.h eri_msg.h ser_sync.h sbpro.h"
+badfiles="ctype.h eri_msg.h ser_sync.h sbpro.h neti.h hook_event.h \
+    bootconf.h bootstat.h dtrace.h dumphdr.h exacct_impl.h fasttrap.h \
+    kobj.h kobj_impl.h ksyms.h lockstat.h smedia.h stat.h utsname.h"
 
 for inc in $files; do
 	file=`basename $inc`

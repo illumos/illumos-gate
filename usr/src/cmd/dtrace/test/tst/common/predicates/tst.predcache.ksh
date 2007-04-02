@@ -20,26 +20,54 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 unload()
 {
-	svcadm disable -s svc:/network/nfs/mapid:default
+	#
+	# Get the list of services whose processes have USDT probes.  Ideally
+	# it would be possible to unload the fasttrap provider while USDT
+	# probes exist -- once that fix is integrated, this hack can go away
+	#
+	pids=$(dtrace -l | \
+	    perl -ne 'print "$1\n" if (/^\s*\S+\s+\S*\D(\d+)\s+/);' | \
+	    sort | uniq | tr '\n' ',')
+
+	ctids=$(ps -p $pids -o ctid | tail +2 | sort | uniq)
+	svcs=
+
+	for ct in $ctids
+	do
+		line=$(svcs -o fmri,ctid | grep " $ct\$")
+		svc=$(echo $line | cut -d' ' -f1)
+		svcs="$svcs $svc"
+	done
+
+	for svc in $svcs
+	do
+		svcadm disable -ts $svc
+	done
 
 	modunload -i 0
 	modunload -i 0
 	modunload -i 0
 
 	if ( modinfo | grep dtrace ); then
-		svcadm enable svc:/network/nfs/mapid:default
+		for svc in $svcs
+		do
+			svcadm enable -ts $svc
+		done
 		echo $tst: could not unload dtrace
 		exit 1
 	fi
 
-	svcadm enable svc:/network/nfs/mapid:default
+	for svc in $svcs
+	do
+		svcadm enable -ts $svc
+	done
 }
 
 script1()

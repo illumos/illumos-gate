@@ -20,13 +20,15 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdint.h>
+#include <stdlib.h>
+#include <strings.h>
 
 int
 baz(void)
@@ -48,10 +50,24 @@ foo(void)
 	    0x81c7e008,		/* ret			*/
 	    0x81e80000		/* restore		*/
 	};
+	uint32_t *fp = malloc(sizeof (instr));
 
-	instr[1] |= ((uintptr_t)baz - (uintptr_t)&instr[1]) >> 2;
+	/*
+	 * Do our little relocation dance.
+	 */
+	instr[1] |= ((uintptr_t)baz - (uintptr_t)&fp[1]) >> 2;
 
-	return ((*(int(*)(void))instr)() + 3);
+	/*
+	 * Copy the code to the heap (it's a pain to build in ON with an
+	 * executable stack).
+	 */
+	bcopy(instr, fp, sizeof (instr));
+
+	(*(int (*)(void))fp)();
+
+	free(fp);
+
+	return (0);
 }
 
 int

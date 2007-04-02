@@ -20,10 +20,12 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+include $(SRC)/cmd/Makefile.cmd
 
 .KEEP_STATE:
 
@@ -51,6 +53,7 @@ clobber:
 
 $(PROG): ../$(PROG).c
 	$(LINK.c) -o $@ ../$(PROG).c $(LDLIBS)
+	$(POST_PROCESS) ; $(STRIP_STABS)
 
 $(ROOTPROG32): $(ROOTBIN32) $(PROG)
 

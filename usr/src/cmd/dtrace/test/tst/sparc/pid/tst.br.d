@@ -26,68 +26,45 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-typedef void f(char *);
+/*
+ * ASSERTION: Trace all instructions in the function 'test' to verify that
+ * the branches are emulated correctly.
+ */
 
-static void
-f_a(char *a)
+#pragma D option destructive
+#pragma D option quiet
+
+pid$1:a.out:waiting:entry
 {
+	this->a = (char *)alloca(1);
+	*this->a = 1;
+	copyout(this->a, arg0, 1);
 }
 
-static void
-f_b(char *a)
+pid$1:a.out:test:
 {
+	printf("%s:%s\n", probefunc, probename);
 }
 
-static void
-f_c(char *a)
+syscall::rexit:entry
+/pid == $1/
 {
+	exit(0);
 }
 
-static void
-f_d(char *a)
-{
-}
 
-static void
-f_e(char *a)
-{
-}
-
-static void
-fN(f func, char *a, int i)
-{
-	func(a);
-}
-
-static void
-fN2(f func, char *a, int i)
-{
-	func(a);
-}
-
-int
-main()
+BEGIN
 {
 	/*
-	 * Avoid length of 1, 2, 4, or 8 bytes so DTrace will treat the data as
-	 * a byte array.
+	 * Let's just do this for 5 seconds.
 	 */
-	char a[] = {(char)-7, (char)201, (char)0, (char)0, (char)28, (char)1};
-	char b[] = {(char)84, (char)69, (char)0, (char)0, (char)28, (char)0};
-	char c[] = {(char)84, (char)69, (char)0, (char)0, (char)28, (char)1};
-	char d[] = {(char)-7, (char)201, (char)0, (char)0, (char)29, (char)0};
-	char e[] = {(char)84, (char)69, (char)0, (char)0, (char)28, (char)0};
-
-	fN(f_a, a, 1);
-	fN(f_b, b, 0);
-	fN(f_d, d, 102);
-	fN2(f_e, e, -2);
-	fN(f_c, c, 0);
-	fN(f_a, a, -1);
-	fN(f_d, d, 101);
-	fN(f_e, e, -2);
-	fN(f_e, e, 2);
-	fN2(f_e, e, 2);
-
-	return (0);
+	timeout = timestamp + 5000000000;
 }
+
+profile:::tick-4
+/timestamp > timeout/
+{
+	trace("test timed out");
+	exit(1);
+}
+

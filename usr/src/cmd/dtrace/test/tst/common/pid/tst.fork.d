@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,10 +41,10 @@ pid$1:a.out:waiting:entry
 	copyout(this->value, arg0, sizeof (int));
 }
 
-syscall::forkall:return
-/curpsinfo->pr_ppid == $1/
+proc:::create
+/pid == $1/
 {
-	child = pid;
+	child = args[0]->pr_pid;
 	trace(pid);
 }
 
@@ -55,14 +55,14 @@ pid$1:a.out:go:
 	exit(1);
 }
 
-syscall::rexit:entry
+proc:::exit
 /pid == $1 || pid == child/
 {
 	out++;
 	trace(pid);
 }
 
-syscall::rexit:entry
+proc:::exit
 /out == 2/
 {
 	exit(0);

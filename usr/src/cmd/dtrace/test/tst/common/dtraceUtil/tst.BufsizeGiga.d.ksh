@@ -1,5 +1,3 @@
-#!/bin/ksh -p
-
 #
 # CDDL HEADER START
 #
@@ -22,11 +20,11 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # ASSERTION:
@@ -35,18 +33,6 @@
 # SECTION: dtrace Utility/-b Option
 #
 
-script()
-{
-	$dtrace -b 1g -s /dev/stdin <<EOF
-	BEGIN
-	{
-		printf("This test should compile.\n");
-		exit(0);
-	}
-
-EOF
-}
-
 if [ $# != 1 ]; then
 	echo expected one argument: '<'dtrace-path'>'
 	exit 2
@@ -54,11 +40,6 @@ fi
 
 dtrace=$1
 
-script
-status=$?
+$dtrace -b 1g -b 2g -e
 
-if [ "$status" -ne 0 ]; then
-	echo $tst: dtrace failed
-fi
-
-exit $status
+exit $?

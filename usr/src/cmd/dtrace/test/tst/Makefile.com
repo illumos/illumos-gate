@@ -20,12 +20,13 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-include $(SRC)/Makefile.master
+include $(SRC)/cmd/Makefile.cmd
 
 .KEEP_STATE:
 
@@ -58,9 +59,9 @@ all: $(EXES)
 clean lint:
 
 clobber: FRC
-	rm -f $(CSRCS:%.c=%.exe) $(CSRCS:%.c=%.o)
-	rm -f $(SSRCS:%.s=%.exe) $(SSRCS:%.s=%.o)
-	rm -f $(DSRC:%.d=%.o)
+	-$(RM) $(CSRCS:%.c=%.exe) $(CSRCS:%.c=%.o)
+	-$(RM) $(SSRCS:%.s=%.exe) $(SSRCS:%.s=%.o)
+	-$(RM) $(DSRCS:%.d=%.o)
 
 install: $(ROOT_TSTS) $(ROOT_EXES)
 
@@ -76,16 +77,20 @@ $(TSTDIR)/%: %
 	$(INS.file)
 
 %.exe: %.c
-	$(LINK.c) -o $@ $< $(LIBS)
+	$(LINK.c) -o $@ $< $(LDLIBS)
+	$(POST_PROCESS) ; $(STRIP_STABS)
 
 %.exe: %.o
-	$(CC) -o $@ $< $(LIBS)
+	$(LINK.c) -o $@ $< $(LDLIBS)
+	$(POST_PROCESS) ; $(STRIP_STABS)
 
 %.o: %.c
-	$(COMPILE.c) -o $@ $< $(LIBS)
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 %.o: %.s
-	$(AS) $(ASFLAGS) -o $@ $< $(LIBS)
+	$(COMPILE.s) -o $@ $<
+	$(POST_PROCESS_O)
 
 scripts: FRC
 	@cd ../cmd/scripts; pwd; $(MAKE) install

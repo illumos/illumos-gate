@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,21 +43,10 @@
 #include <sys/dtrace.h>
 #include <sys/dtrace_impl.h>
 #include <sys/sysmacros.h>
-#include <sys/frame.h>
-#include <sys/stack.h>
 #include <sys/proc.h>
 #include <sys/priv.h>
 #include <sys/policy.h>
-#include <sys/ontrap.h>
-#include <sys/vmsystm.h>
-#include <sys/prsystm.h>
-
-#include <vm/as.h>
-#include <vm/seg.h>
-#include <vm/seg_dev.h>
-#include <vm/seg_vn.h>
-#include <vm/seg_spt.h>
-#include <vm/seg_kmem.h>
+#include <util/qsort.h>
 
 /*
  * User-Land Trap-Based Tracing
@@ -738,10 +727,12 @@ fasttrap_tracepoint_disable(proc_t *p, fasttrap_probe_t *probe, uint_t index)
 
 			if (tp->ftt_ids != NULL) {
 				tmp_probe = tp->ftt_ids->fti_probe;
+				/* LINTED - alignment */
 				tmp_index = FASTTRAP_ID_INDEX(tp->ftt_ids);
 				tmp_tp = &tmp_probe->ftp_tps[tmp_index].fit_tp;
 			} else {
 				tmp_probe = tp->ftt_retids->fti_probe;
+				/* LINTED - alignment */
 				tmp_index = FASTTRAP_ID_INDEX(tp->ftt_retids);
 				tmp_tp = &tmp_probe->ftp_tps[tmp_index].fit_tp;
 			}
@@ -753,7 +744,6 @@ fasttrap_tracepoint_disable(proc_t *p, fasttrap_probe_t *probe, uint_t index)
 
 			probe->ftp_tps[index].fit_tp = *tmp_tp;
 			*tmp_tp = tp;
-
 		}
 
 		mutex_exit(&bucket->ftb_mtx);
@@ -989,14 +979,6 @@ fasttrap_pid_disable(void *arg, dtrace_id_t id, void *parg)
 	proc_t *p;
 	int i, whack = 0;
 
-	if (!probe->ftp_enabled) {
-		mutex_enter(&provider->ftp_mtx);
-		provider->ftp_rcount--;
-		ASSERT(provider->ftp_rcount >= 0);
-		mutex_exit(&provider->ftp_mtx);
-		return;
-	}
-
 	ASSERT(id == probe->ftp_id);
 
 	/*
@@ -1013,10 +995,12 @@ fasttrap_pid_disable(void *arg, dtrace_id_t id, void *parg)
 	mutex_enter(&provider->ftp_mtx);
 
 	/*
-	 * Disable all the associated tracepoints.
+	 * Disable all the associated tracepoints (for fully enabled probes).
 	 */
-	for (i = 0; i < probe->ftp_ntps; i++) {
-		fasttrap_tracepoint_disable(p, probe, i);
+	if (probe->ftp_enabled) {
+		for (i = 0; i < probe->ftp_ntps; i++) {
+			fasttrap_tracepoint_disable(p, probe, i);
+		}
 	}
 
 	ASSERT(provider->ftp_rcount > 0);
@@ -1046,6 +1030,9 @@ fasttrap_pid_disable(void *arg, dtrace_id_t id, void *parg)
 
 	if (whack)
 		fasttrap_pid_cleanup();
+
+	if (!probe->ftp_enabled)
+		return;
 
 	probe->ftp_enabled = 0;
 
@@ -1487,6 +1474,18 @@ fasttrap_provider_retire(pid_t pid, const char *name, int mprov)
 }
 
 static int
+fasttrap_uint32_cmp(const void *ap, const void *bp)
+{
+	return (*(const uint32_t *)ap - *(const uint32_t *)bp);
+}
+
+static int
+fasttrap_uint64_cmp(const void *ap, const void *bp)
+{
+	return (*(const uint64_t *)ap - *(const uint64_t *)bp);
+}
+
+static int
 fasttrap_add_probe(fasttrap_probe_spec_t *pdata)
 {
 	fasttrap_provider_t *provider;
@@ -1494,6 +1493,12 @@ fasttrap_add_probe(fasttrap_probe_spec_t *pdata)
 	fasttrap_tracepoint_t *tp;
 	char *name;
 	int i, aframes, whack;
+
+	/*
+	 * There needs to be at least one desired trace point.
+	 */
+	if (pdata->ftps_noffs == 0)
+		return (EINVAL);
 
 	switch (pdata->ftps_type) {
 	case DTFTP_ENTRY:
@@ -1580,6 +1585,21 @@ fasttrap_add_probe(fasttrap_probe_spec_t *pdata)
 		atomic_add_32(&fasttrap_total, pdata->ftps_noffs);
 
 		if (fasttrap_total > fasttrap_max) {
+			atomic_add_32(&fasttrap_total, -pdata->ftps_noffs);
+			goto no_mem;
+		}
+
+		/*
+		 * Make sure all tracepoint program counter values are unique.
+		 * We later assume that each probe has exactly one tracepoint
+		 * for a given pc.
+		 */
+		qsort(pdata->ftps_offs, pdata->ftps_noffs,
+		    sizeof (uint64_t), fasttrap_uint64_cmp);
+		for (i = 1; i < pdata->ftps_noffs; i++) {
+			if (pdata->ftps_offs[i] > pdata->ftps_offs[i - 1])
+				continue;
+
 			atomic_add_32(&fasttrap_total, -pdata->ftps_noffs);
 			goto no_mem;
 		}
@@ -1724,6 +1744,25 @@ fasttrap_meta_create_probe(void *arg, void *parg,
 	 * about this provider disappearing.
 	 */
 	ASSERT(provider->ftp_mcount > 0);
+
+	/*
+	 * The offsets must be unique.
+	 */
+	qsort(dhpb->dthpb_offs, dhpb->dthpb_noffs, sizeof (uint32_t),
+	    fasttrap_uint32_cmp);
+	for (i = 1; i < dhpb->dthpb_noffs; i++) {
+		if (dhpb->dthpb_base + dhpb->dthpb_offs[i] <=
+		    dhpb->dthpb_base + dhpb->dthpb_offs[i - 1])
+			return;
+	}
+
+	qsort(dhpb->dthpb_enoffs, dhpb->dthpb_nenoffs, sizeof (uint32_t),
+	    fasttrap_uint32_cmp);
+	for (i = 1; i < dhpb->dthpb_nenoffs; i++) {
+		if (dhpb->dthpb_base + dhpb->dthpb_enoffs[i] <=
+		    dhpb->dthpb_base + dhpb->dthpb_enoffs[i - 1])
+			return;
+	}
 
 	/*
 	 * Grab the creation lock to ensure consistency between calls to
@@ -2070,7 +2109,7 @@ fasttrap_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	nent = ddi_getprop(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
 	    "fasttrap-hash-size", FASTTRAP_TPOINTS_DEFAULT_SIZE);
 
-	if (nent <= 0 || nent > 0x1000000)
+	if (nent == 0 || nent > 0x1000000)
 		nent = FASTTRAP_TPOINTS_DEFAULT_SIZE;
 
 	if ((nent & (nent - 1)) == 0)

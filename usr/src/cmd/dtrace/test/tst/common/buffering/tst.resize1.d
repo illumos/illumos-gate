@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,27 +36,14 @@
  *	Options and Tunables/bufresize
  *
  * NOTES:
- *	On some small memory machines, this test may consume so much memory
- *	that it induces memory allocation failure in the dtrace library.  This
- *	will manifest itself as an error like one of the following:
- *
- *	    dtrace: processing aborted: Memory allocation failure
- *	    dtrace: could not enable tracing: Memory allocation failure
- *
- *	These actually indicate that the test performed as expected; failures
- *	of the above nature should therefore be ignored.  If 32-bit libdtrace
- *      is used to execute this test on a 64-bit kernel, the failure mode
- *      becomes exceedingly likely because the kernel may be able to allocate
- *      a huge hunk of memory that then requires the client to match it with
- *      a malloc that exhausts the remainder of its 4GB address space.  For
- *      this reason, we no-op the test for 32-bit clients using an ifdef.
+ *	We use the undocumented "preallocate" option to make sure dtrace(1M)
+ *	has enough space in its heap to allocate a buffer as large as the
+ *	kernel's trace buffer.
  */
 
+#pragma D option preallocate=100t
 #pragma D option bufresize=auto
-
-#ifdef __SUNW_D_64
 #pragma D option bufsize=100t
-#endif
 
 BEGIN
 {

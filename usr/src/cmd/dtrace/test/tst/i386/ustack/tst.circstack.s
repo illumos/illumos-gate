@@ -28,6 +28,9 @@
 
 #include <sys/asm_linkage.h>
 
+	DGDEF(__fsr_init_value)
+	.long 0
+
 	ENTRY(main)
 	pushl	%ebp
 	movl	%esp, %ebp

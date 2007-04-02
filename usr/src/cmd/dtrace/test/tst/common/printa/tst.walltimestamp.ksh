@@ -23,15 +23,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
 # ident	"%Z%%M%	%I%	%E% SMI"
-
-#
-# ASSERTION:
-# The trace buffer size can include any of the size suffixes k, m, g or t
-#
-# SECTION: dtrace Utility/-b Option
-#
 
 if [ $# != 1 ]; then
 	echo expected one argument: '<'dtrace-path'>'
@@ -40,6 +32,31 @@ fi
 
 dtrace=$1
 
-$dtrace -b 1t -b 2t -e
+# The output files assumes the timezone is US/Pacific
+TZ=US/Pacific
 
-exit $?
+$dtrace -s /dev/stdin <<EOF
+#pragma D option quiet
+#pragma D option destructive
+
+BEGIN
+{
+	@foo = min(1075064400 * (hrtime_t)1000000000);
+	@bar = max(walltimestamp);
+	printa("%@T\n", @foo);
+	printa("%@Y\n", @foo);
+
+	freopen("/dev/null");
+	printa("%@T\n", @bar);
+	printa("%@Y\n", @bar);
+
+	exit(0);
+}
+EOF
+
+if [ $? -ne 0 ]; then
+	print -u2 "dtrace failed"
+	exit 1
+fi
+
+exit 0

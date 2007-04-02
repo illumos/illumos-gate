@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,4 +73,6 @@ main()
 	fN(f_a, 101);
 	fN(f_c, 103);
 	fN(f_c, 1003);
+
+	return (0);
 }

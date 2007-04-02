@@ -358,6 +358,7 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 			tp->ftt_type = FASTTRAP_T_JCC;
 			tp->ftt_code = (instr[start + 1] & 0x0f) | FASTTRAP_JO;
 			tp->ftt_dest = pc + tp->ftt_size +
+			    /* LINTED - alignment */
 			    *(int32_t *)&instr[start + 2];
 			break;
 		}
@@ -428,12 +429,14 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 				i = 2;
 			}
 
-			if (sz == 1)
+			if (sz == 1) {
 				tp->ftt_dest = *(int8_t *)&instr[start + i];
-			else if (sz == 4)
+			} else if (sz == 4) {
+				/* LINTED - alignment */
 				tp->ftt_dest = *(int32_t *)&instr[start + i];
-			else
+			} else {
 				tp->ftt_dest = 0;
+			}
 		}
 	} else {
 		switch (instr[start]) {
@@ -443,6 +446,7 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 
 		case FASTTRAP_RET16:
 			tp->ftt_type = FASTTRAP_T_RET16;
+			/* LINTED - alignment */
 			tp->ftt_dest = *(uint16_t *)&instr[start + 1];
 			break;
 
@@ -486,6 +490,7 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 		case FASTTRAP_CALL:
 			tp->ftt_type = FASTTRAP_T_CALL;
 			tp->ftt_dest = pc + tp->ftt_size +
+			    /* LINTED - alignment */
 			    *(int32_t *)&instr[start + 1];
 			tp->ftt_code = 0;
 			break;
@@ -493,6 +498,7 @@ fasttrap_tracepoint_init(proc_t *p, fasttrap_tracepoint_t *tp, uintptr_t pc,
 		case FASTTRAP_JMP32:
 			tp->ftt_type = FASTTRAP_T_JMP;
 			tp->ftt_dest = pc + tp->ftt_size +
+			    /* LINTED - alignment */
 			    *(int32_t *)&instr[start + 1];
 			break;
 		case FASTTRAP_JMP8:
@@ -625,6 +631,7 @@ fasttrap_tracepoint_remove(proc_t *p, fasttrap_tracepoint_t *tp)
 	return (0);
 }
 
+#ifdef __amd64
 static uintptr_t
 fasttrap_fulword_noerr(const void *uaddr)
 {
@@ -635,6 +642,7 @@ fasttrap_fulword_noerr(const void *uaddr)
 
 	return (0);
 }
+#endif
 
 static uint32_t
 fasttrap_fuword32_noerr(const void *uaddr)
@@ -1527,6 +1535,7 @@ fasttrap_pid_probe(struct regs *rp)
 				break;
 			}
 
+			/* LINTED - alignment */
 			*(uint64_t *)&scratch[i] = *reg;
 			curthread->t_dtrace_regv = *reg;
 			*reg = pc + tp->ftt_size;
@@ -1545,8 +1554,10 @@ fasttrap_pid_probe(struct regs *rp)
 		if (p->p_model == DATAMODEL_LP64) {
 			scratch[i++] = FASTTRAP_GROUP5_OP;
 			scratch[i++] = FASTTRAP_MODRM(0, 4, 5);
+			/* LINTED - alignment */
 			*(uint32_t *)&scratch[i] = 0;
 			i += sizeof (uint32_t);
+			/* LINTED - alignment */
 			*(uint64_t *)&scratch[i] = pc + tp->ftt_size;
 			i += sizeof (uint64_t);
 		} else {
@@ -1556,6 +1567,7 @@ fasttrap_pid_probe(struct regs *rp)
 			 * the size of the traced instruction cancels out.
 			 */
 			scratch[i++] = FASTTRAP_JMP32;
+			/* LINTED - alignment */
 			*(uint32_t *)&scratch[i] = pc - addr - 5;
 			i += sizeof (uint32_t);
 #ifdef __amd64

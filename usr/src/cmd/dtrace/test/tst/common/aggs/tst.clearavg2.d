@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,7 +50,7 @@ tick-100ms
 }
 
 tick-100ms
-/x <= 20/
+/x > 5 && x <= 20/
 {
 	printa(" %@d\n", @time);
 	clear(@time);

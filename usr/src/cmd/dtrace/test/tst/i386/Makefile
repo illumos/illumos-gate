@@ -20,32 +20,32 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 include ../Makefile.com
 
-ASFLAGS += -D_ASM -K PIC -P
+ASFLAGS += -D_ASM -P $(CPPFLAGS)
+CLOBBER_FILES += helper_helper.o annotated_helper.o
 
-clobber := DSRC += ustack/tst.helper_helper.d ustack/tst.annotated_helper.d
+# For the helper test we require an executable data section.
+ustack/tst.helper.exe := LDFLAGS = -M$(SRC)/cmd/mapfile_noexstk
 
-all:	ustack/tst.helper.exe ustack/tst.annotated.exe
+ustack/tst.helper.exe: ustack/tst.helper.o ustack/helper_helper.o
+	$(LINK.c) -o ustack/tst.helper.exe \
+		 ustack/tst.helper.o ustack/helper_helper.o $(LDLIBS)
+	$(POST_PROCESS) ; $(STRIP_STABS)
 
-ustack/tst.helper.exe: ustack/tst.helper.o ustack/tst.helper_helper.o
-	$(CC) -o ustack/tst.helper.exe \
-		 ustack/tst.helper.o ustack/tst.helper_helper.o
-	$(STRIP) ustack/tst.helper.exe
+ustack/helper_helper.o: ustack/helper_helper.d
+	$(COMPILE.d) -o ustack/helper_helper.o -s ustack/helper_helper.d
 
-ustack/tst.helper_helper.o: ustack/tst.helper_helper.d
-	/usr/sbin/dtrace -G -o ustack/tst.helper_helper.o \
-		-s ustack/tst.helper_helper.d
+ustack/tst.annotated.exe: ustack/tst.annotated.o ustack/annotated_helper.o
+	$(LINK.c) -o ustack/tst.annotated.exe  \
+		 ustack/tst.annotated.o ustack/annotated_helper.o $(LDLIBS)
+	$(POST_PROCESS) ; $(STRIP_STABS)
 
-ustack/tst.annotated.exe: ustack/tst.annotated.o ustack/tst.annotated_helper.o
-	$(CC) -o ustack/tst.annotated.exe \
-		 ustack/tst.annotated.o ustack/tst.annotated_helper.o
-
-ustack/tst.annotated_helper.o: ustack/tst.annotated_helper.d
-	/usr/sbin/dtrace -G -o ustack/tst.annotated_helper.o \
-		-s ustack/tst.annotated_helper.d
+ustack/annotated_helper.o: ustack/annotated_helper.d
+	$(COMPILE.d) -o ustack/annotated_helper.o -s ustack/annotated_helper.d
