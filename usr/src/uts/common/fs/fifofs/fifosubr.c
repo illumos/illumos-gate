@@ -394,6 +394,7 @@ fifovp(vnode_t *vp, cred_t *crp)
 	fifodata_t *fdp;
 	vnode_t *newvp;
 	struct vattr va;
+	vnode_t	*rvp;
 
 	ASSERT(vp != NULL);
 
@@ -403,18 +404,14 @@ fifovp(vnode_t *vp, cred_t *crp)
 	fnp = &fdp->fifo_fnode[0];
 
 	/*
-	 * In Trusted Extensions cross-zone named pipes
-	 * are supported subject to the MAC policy. Since
-	 * cross-zone access is done using lofs mounts,
-	 * it is necessary to use the real vnode so that
-	 * matching ends of the fifo can find each other.
+	 * Its possible that fifo nodes on different lofs mountpoints
+	 * shadow the same real filesystem fifo node.
+	 * In this case its necessary to get and store the realvp.
+	 * This way different fifo nodes sharing the same real vnode
+	 * can use realvp for communication.
 	 */
-	if (is_system_labeled()) {
-		vnode_t	*rvp;
-
-		if (VOP_REALVP(vp, &rvp) == 0)
-			vp = rvp;
-	}
+	if (VOP_REALVP(vp, &rvp) == 0)
+		vp = rvp;
 
 	fnp->fn_realvp	= vp;
 	fnp->fn_wcnt	= 0;
