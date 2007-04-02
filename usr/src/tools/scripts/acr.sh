@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -91,7 +91,7 @@ processedscript=$tmpdir/processedscript
 # This file is left over (on purpose) by BFU so that in a post-BFU environment
 # we know which zones BFU processed.
 #
-local_zone_info_file=$root/.bfu_local_zone_info
+bfu_zone_list=$root/.bfu_zone_list
 
 get_cr_archive() {
 	compressed_archive=$archivedir/conflict_resolution.gz
@@ -321,16 +321,17 @@ acr_a_root() {
 }
 
 #
-# If we're post-BFU, then BFU should have left us a file listing
-# which zones it processed.  If we're not post-BFU, just process
-# all installed zones.
+# If we're post-BFU, then BFU should have left us a file listing which zones it
+# processed.  If we're not post-BFU, just process all installed native and
+# Sn-1 zones.
 #
 if [ $bfu_alt_reality = "false" ]; then
 	zoneadm list -pi | nawk -F: '{
-		if ($3 == "installed" && $6 != "lx") {
+		if ($3 == "installed" &&
+		    ($6 == "native" || $6 == "" || $6 == "sn1")) {
 			printf "%s %s\n", $2, $4
 		}
-	}' > $local_zone_info_file
+	}' > $bfu_zone_list
 fi
 
 #
@@ -341,8 +342,8 @@ need_resolve=false
 if [ -s $root/bfu.conflicts/NEW ]; then
 	need_resolve=true
 else
-	if [ -s $local_zone_info_file ]; then
-		cat $local_zone_info_file | while read zone zonepath; do
+	if [ -s $bfu_zone_list ]; then
+		cat $bfu_zone_list | while read zone zonepath; do
 			if [ -s $zonepath/root/bfu.conflicts/NEW ] ; then
 				need_resolve=true
 			fi
@@ -363,8 +364,8 @@ acr_a_root $root "global"
 if [ $root != "/" ]; then
 	printf "\nSkipping non-global zones (root is not /)"
 else
-	if [ -s $local_zone_info_file ]; then
-		cat $local_zone_info_file | while read zone zonepath; do
+	if [ -s $bfu_zone_list ]; then
+		cat $bfu_zone_list | while read zone zonepath; do
 			printf "\nProcessing zone $zone:\t"
 			acr_a_root $zonepath/root $zone
 		done

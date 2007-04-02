@@ -227,13 +227,13 @@ global_zone_only_files="
 
 #
 # Third list: files extracted from generic.root but which belong in the global
-# zone only: they are superfluous (and some even harmful) in local zones.
+# zone only: they are superfluous (and some even harmful) in nonglobal zones.
 #
 # (note: as /etc/init.d scripts are converted to smf(5) "Greenline" services,
 # they (and their /etc/rc?.d hardlinks) should be removed from this list when
 # they are added to smf_obsolete_rc_files, below)
 #
-superfluous_local_zone_files="
+superfluous_nonglobal_zone_files="
 	dev/dsk
 	dev/fd
 	dev/pts
@@ -403,7 +403,7 @@ realmode_files="
 fail() {
 	print "$*" >& 2
 	print "bfu aborting" >& 2
-	rm -f "$local_zone_info_file"
+	rm -f "$bfu_zone_list"
 	exit 1
 }
 
@@ -1950,7 +1950,7 @@ test $# -ge 1 || usage
 
 if [ -x /usr/bin/ppriv ]; then
 	# We prefer to use ppriv, as it is a more accurate test, and also
-	# has the benefit of preventing use from within a local zone.
+	# has the benefit of preventing use from within a nonglobal zone.
 	ppriv $$ | grep -w "E: all" > /dev/null 2>&1 || \
 	    fail "bfu requires all privileges"
 else
@@ -2012,7 +2012,7 @@ if [ $diskless = no ]; then
 	rootlist=$root
 
 	[[ -f $root/etc/system ]] || \
-	    fail "$root/etc/system not found; local zone target not allowed"
+	    fail "$root/etc/system not found; nonglobal zone target not allowed"
 
 	if [ -f $root/boot/platform/i86pc/kernel/unix ]; then
 		failsafe_type=directboot
@@ -3975,14 +3975,15 @@ then
 		# the zone configuration to become unreadable (e.g., via a
 		# DTD flag day).
 		#
-		local_zone_info_file=$root/.bfu_local_zone_info
-		rm -f $local_zone_info_file
+		bfu_zone_list=$root/.bfu_zone_list
+		rm -f $bfu_zone_list
 
 		zoneadm list -pi | nawk -F: '{
-			if ($3 == "installed") {
+			if ($3 == "installed" &&
+			    ($6 == "native" || $6 == "" || $6 == "sn1")) {
 				printf "%s %s\n", $2, $4
 			}
-		}' > $local_zone_info_file
+		}' > $bfu_zone_list
 	fi
 
 	#
@@ -6431,7 +6432,7 @@ mondo_loop() {
 
 	#
 	# Nuke the nfsauth headers when we're working with the 'global'
-	# or a fully populated local zone. The cpio archive will lay the
+	# or a fully populated nonglobal zone. The cpio archive will lay the
 	# right one to match mountd(1m)'s comm method w/the kernel (via
 	# kRPC or Doors/XDR).
 	#
@@ -6944,7 +6945,7 @@ mondo_loop() {
 	update_policy_conf
 
 	if [ $zone != global ]; then
-		rm -rf $global_zone_only_files $superfluous_local_zone_files
+		rm -rf $global_zone_only_files $superfluous_nonglobal_zone_files
 	fi
 
 	print "bfu'ed from $cpiodir on `date +%Y-%m-%d`" >>etc/motd
@@ -7002,21 +7003,15 @@ do
 	lastroot=$root
 done
 
-if [ -s "$local_zone_info_file" ]; then
-	cat "$local_zone_info_file" | while read zone zonepath; do
-		#
-		# Ignore linux zones
-		#
-		if [ -z `grep "brand=\"lx\"" /etc/zones/$zone.xml` ]; then
-			print "\nNow for zone $zone..."
-			mondo_loop $zonepath/root $zone
-		fi
+if [ -s "$bfu_zone_list" ]; then
+	cat "$bfu_zone_list" | while read zone zonepath; do
+		print "\nNow for zone $zone..."
+		mondo_loop $zonepath/root $zone
 	done
 
 	#
-	# Normally we would clean up $local_zone_info_file but instead
-	# we leave it behind for ACR to locate and use inside the BFU
-	# alternate reality environment.
+	# Normally we would clean up $bfu_zone_list but instead we leave it
+	# behind for ACR to locate and use inside the BFU alternate reality.
 	#
 fi
 
