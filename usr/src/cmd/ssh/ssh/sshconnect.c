@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -227,6 +227,76 @@ ssh_create_socket(int privileged, int family)
 }
 
 /*
+ * Connect with timeout. Implements ConnectTimeout option.
+ */
+static int
+timeout_connect(int sockfd, const struct sockaddr *serv_addr,
+    socklen_t addrlen, int timeout)
+{
+	fd_set *fdset;
+	struct timeval tv;
+	socklen_t optlen;
+	int optval, rc, result = -1;
+
+	if (timeout <= 0)
+		return (connect(sockfd, serv_addr, addrlen));
+
+	set_nonblock(sockfd);
+	rc = connect(sockfd, serv_addr, addrlen);
+	if (rc == 0) {
+		unset_nonblock(sockfd);
+		return (0);
+	}
+	if (errno != EINPROGRESS)
+		return (-1);
+
+	fdset = (fd_set *)xcalloc(howmany(sockfd + 1, NFDBITS),
+	    sizeof(fd_mask));
+	FD_SET(sockfd, fdset);
+	tv.tv_sec = timeout;
+	tv.tv_usec = 0;
+
+	for (;;) {
+		rc = select(sockfd + 1, NULL, fdset, NULL, &tv);
+		if (rc != -1 || errno != EINTR)
+			break;
+	}
+
+	switch (rc) {
+	case 0:
+		/* Timed out */
+		errno = ETIMEDOUT;
+		break;
+	case -1:
+		/* Select error */
+		debug("select: %s", strerror(errno));
+		break;
+	case 1:
+		/* Completed or failed */
+		optval = 0;
+		optlen = sizeof(optval);
+		if (getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &optval,
+		    &optlen) == -1) {
+			debug("getsockopt: %s", strerror(errno));
+			break;
+		}
+		if (optval != 0) {
+			errno = optval;
+			break;
+		}
+		result = 0;
+		unset_nonblock(sockfd);
+		break;
+	default:
+		/* Should not occur */
+		fatal("Bogus return (%d) from select()", rc);
+	}
+
+	xfree(fdset);
+	return (result);
+}
+
+/*
  * Opens a TCP/IP connection to the remote server on the given host.
  * The address of the remote host will be returned in hostaddr.
  * If port is 0, the default port will be used.  If needpriv is true,
@@ -314,7 +384,8 @@ ssh_connect(const char *host, struct sockaddr_storage * hostaddr,
 				/* Any error is already output */
 				continue;
 
-			if (connect(sock, ai->ai_addr, ai->ai_addrlen) >= 0) {
+			if (timeout_connect(sock, ai->ai_addr, ai->ai_addrlen,
+			    options.connection_timeout) >= 0) {
 				/* Successful connection. */
 				memcpy(hostaddr, ai->ai_addr, ai->ai_addrlen);
 				break;

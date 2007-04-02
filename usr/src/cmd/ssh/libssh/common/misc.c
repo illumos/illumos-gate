@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,7 +119,15 @@ set_nodelay(int fd)
 /* Characters considered whitespace in strsep calls. */
 #define WHITESPACE " \t\r\n"
 
-/* return next token in configuration line */
+/*
+ * Function returns a pointer to the 1st token on the line. Such a token can
+ * be an empty string in the case of '*s' equal to " value". It changes the
+ * first whitespace token or '=' character after the 1st token to '\0'. Upon
+ * return it changes '*s' to point to the first character of the next token.
+ * That token may be an empty string if the 1st token was followed only by
+ * whitespace or it could be a NULL pointer if the line contained one token
+ * only.
+ */
 char *
 strdelim(char **s)
 {

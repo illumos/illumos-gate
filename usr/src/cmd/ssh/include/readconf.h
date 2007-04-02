@@ -23,7 +23,7 @@ extern "C" {
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,6 +89,8 @@ typedef struct {
 	int     port;		/* Port to connect. */
 	int     connection_attempts;	/* Max attempts (seconds) before
 					 * giving up */
+	int     connection_timeout;	/* Max time (seconds) before
+					 * aborting connection attempt */
 	int     number_of_password_prompts;	/* Max number of password
 						 * prompts. */
 	int     cipher;		/* Cipher to use. */

@@ -11,7 +11,7 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,7 +126,7 @@ typedef enum {
 	oDynamicForward, oPreferredAuthentications, oHostbasedAuthentication,
 	oHostKeyAlgorithms, oBindAddress, oSmartcardDevice,
 	oClearAllForwardings, oNoHostAuthenticationForLocalhost,
-	oFallBackToRsh, oUseRsh,
+	oFallBackToRsh, oUseRsh, oConnectTimeout,
 	oDeprecated
 } OpCodes;
 
@@ -212,6 +212,7 @@ static struct {
 	{ "smartcarddevice", oSmartcardDevice },
 	{ "clearallforwardings", oClearAllForwardings },
 	{ "nohostauthenticationforlocalhost", oNoHostAuthenticationForLocalhost },
+	{ "connecttimeout", oConnectTimeout },
 	{ NULL, oBadOption }
 };
 
@@ -319,6 +320,20 @@ process_config_line(Options *options, const char *host,
 		/* don't panic, but count bad options */
 		return -1;
 		/* NOTREACHED */
+	case oConnectTimeout:
+		intptr = &options->connection_timeout;
+parse_time:
+		arg = strdelim(&s);
+		if (!arg || *arg == '\0')
+			fatal("%s line %d: missing time value.",
+			    filename, linenum);
+		if ((value = convtime(arg)) == -1)
+			fatal("%s line %d: invalid time value.",
+			    filename, linenum);
+		if (*intptr == -1)
+			*intptr = value;
+		break;
+
 	case oForwardAgent:
 		intptr = &options->forward_agent;
 parse_flag:
@@ -833,6 +848,7 @@ initialize_options(Options * options)
 	options->compression_level = -1;
 	options->port = -1;
 	options->connection_attempts = -1;
+	options->connection_timeout = -1;
 	options->number_of_password_prompts = -1;
 	options->cipher = -1;
 	options->ciphers = NULL;
