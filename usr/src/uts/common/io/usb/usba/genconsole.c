@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,8 +48,21 @@ usb_console_input_init(dev_info_t		*dip,
 {
 	int			ret;
 	usba_device_t		*usba_device;
-	usb_console_info_impl_t	*usb_console_input = kmem_zalloc(
-			sizeof (struct usb_console_info_impl), KM_SLEEP);
+	usba_pipe_handle_data_t	*ph_data;
+	usb_console_info_impl_t	*usb_console_input;
+
+	if (dip == NULL) {
+
+		return (USB_INVALID_ARGS);
+	}
+
+	if (DEVI_IS_DEVICE_REMOVED(dip)) {
+
+		return (USB_FAILURE);
+	}
+
+	usb_console_input = kmem_zalloc(
+	    sizeof (struct usb_console_info_impl), KM_SLEEP);
 
 	/*
 	 * Save the dip
@@ -62,17 +75,29 @@ usb_console_input_init(dev_info_t		*dip,
 	usba_device = usba_get_usba_device(dip);
 
 	/*
+	 * Get ph_data from pipe handle and hold the data
+	 */
+	if ((ph_data = usba_hold_ph_data(pipe_handle)) == NULL) {
+		kmem_free(usb_console_input,
+		    sizeof (struct usb_console_info_impl));
+
+		return (USB_INVALID_PIPE);
+	}
+
+	/*
 	 * Call the lower layer to initialize any state information
 	 */
 	ret = usba_device->usb_hcdi_ops->usba_hcdi_console_input_init(
-		usba_get_ph_data(pipe_handle), state_buf, usb_console_input);
+	    ph_data, state_buf, usb_console_input);
 
 	if (ret != USB_SUCCESS) {
 		kmem_free(usb_console_input,
-			sizeof (struct usb_console_info_impl));
+		    sizeof (struct usb_console_info_impl));
 	} else {
 		*console_input_info = (usb_console_info_t)usb_console_input;
 	}
+
+	usba_release_ph_data((usba_ph_impl_t *)pipe_handle);
 
 	return (ret);
 }
