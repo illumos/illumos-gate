@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -473,7 +473,7 @@ fsck_bread(int fd, caddr_t buf, diskaddr_t blk, size_t size)
 		return (1);
 	}
 
-	if (llseek(fd, offset, 0) < 0) {
+	if (llseek(fd, offset, SEEK_SET) < 0) {
 		rwerror("SEEK", blk, -1);
 	}
 
@@ -481,7 +481,7 @@ fsck_bread(int fd, caddr_t buf, diskaddr_t blk, size_t size)
 		return (0);
 	}
 	rwerror("READ", blk, i);
-	if (llseek(fd, offset, 0) < 0) {
+	if (llseek(fd, offset, SEEK_SET) < 0) {
 		rwerror("SEEK", blk, -1);
 	}
 	errs = 0;
@@ -489,7 +489,7 @@ fsck_bread(int fd, caddr_t buf, diskaddr_t blk, size_t size)
 	pwarn("THE FOLLOWING SECTORS COULD NOT BE READ:");
 	for (cp = buf, i = 0; i < btodb(size); i++, cp += DEV_BSIZE) {
 		addr = ldbtob(blk + i);
-		if (llseek(fd, addr, SEEK_CUR) < 0 ||
+		if (llseek(fd, addr, SEEK_SET) < 0 ||
 		    read(fd, cp, (int)secsize) < 0) {
 			iscorrupt = 1;
 			(void) printf(" %llu", blk + (u_longlong_t)i);
@@ -518,7 +518,7 @@ bwrite(int fd, caddr_t buf, diskaddr_t blk, int64_t size)
 			    (longlong_t)blk, devname);
 		return;
 	}
-	if (llseek(fd, offset, 0) < 0) {
+	if (llseek(fd, offset, SEEK_SET) < 0) {
 		rwerror("SEEK", blk, -1);
 	}
 	if ((i = write(fd, buf, (int)size)) == size) {
@@ -526,14 +526,14 @@ bwrite(int fd, caddr_t buf, diskaddr_t blk, int64_t size)
 		return;
 	}
 	rwerror("WRITE", blk, i);
-	if (llseek(fd, offset, 0) < 0) {
+	if (llseek(fd, offset, SEEK_SET) < 0) {
 		rwerror("SEEK", blk, -1);
 	}
 	pwarn("THE FOLLOWING SECTORS COULD NOT BE WRITTEN:");
 	for (cp = buf, i = 0; i < btodb(size); i++, cp += DEV_BSIZE) {
 		n = 0;
 		addr = ldbtob(blk + i);
-		if (llseek(fd, addr, SEEK_CUR) < 0 ||
+		if (llseek(fd, addr, SEEK_SET) < 0 ||
 		    (n = write(fd, cp, DEV_BSIZE)) < 0) {
 			iscorrupt = 1;
 			(void) printf(" %llu", blk + (u_longlong_t)i);
@@ -1315,7 +1315,7 @@ updateclean(void)
 
 	if ((cleanbuf.b_un.b_buf = malloc(size)) == NULL)
 		errexit("out of memory");
-	if (llseek(fsreadfd, sblkoff, 0) == -1) {
+	if (llseek(fsreadfd, sblkoff, SEEK_SET) == -1) {
 		(void) printf("COULD NOT SEEK TO SUPERBLOCK AT %lld: %s\n",
 		    (longlong_t)bno, strerror(errno));
 		goto out;
@@ -1333,7 +1333,7 @@ updateclean(void)
 	cleanbuf.b_un.b_fs->fs_reclaim = sblock.fs_reclaim;
 	cleanbuf.b_un.b_fs->fs_flags   = sblock.fs_flags;
 
-	if (llseek(fswritefd, sblkoff, 0) == -1) {
+	if (llseek(fswritefd, sblkoff, SEEK_SET) == -1) {
 		(void) printf("COULD NOT SEEK TO SUPERBLOCK AT %lld: %s\n",
 		    (longlong_t)bno, strerror(errno));
 		goto out;
