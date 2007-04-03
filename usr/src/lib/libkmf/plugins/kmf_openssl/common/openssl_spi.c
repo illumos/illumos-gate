@@ -3682,7 +3682,7 @@ extract_objects(KMF_HANDLE *kmfh, KMF_FINDCERT_PARAMS *params,
 
 	/*LINTED*/
 	while ((info = sk_X509_INFO_pop(x509_info_stack)) != NULL &&
-		ncerts < MAX_CHAIN_LENGTH) {
+		info->x509 != NULL && ncerts < MAX_CHAIN_LENGTH) {
 		cert_infos[ncerts] = info;
 		ncerts++;
 	}
