@@ -288,7 +288,8 @@ static int pcicfg_program_ap(dev_info_t *);
 static int pcicfg_device_assign(dev_info_t *);
 static int pcicfg_bridge_assign(dev_info_t *, void *);
 static int pcicfg_free_resources(dev_info_t *);
-static void pcicfg_setup_bridge(pcicfg_phdl_t *, ddi_acc_handle_t);
+static void pcicfg_setup_bridge(pcicfg_phdl_t *, ddi_acc_handle_t,
+    dev_info_t *);
 static void pcicfg_update_bridge(pcicfg_phdl_t *, ddi_acc_handle_t);
 static void pcicfg_enable_bridge_probe_err(dev_info_t *dip,
 				ddi_acc_handle_t h, pcicfg_err_regs_t *regs);
@@ -297,7 +298,7 @@ static void pcicfg_disable_bridge_probe_err(dev_info_t *dip,
 static int pcicfg_update_assigned_prop(dev_info_t *, pci_regspec_t *);
 static void pcicfg_device_on(ddi_acc_handle_t);
 static void pcicfg_device_off(ddi_acc_handle_t);
-static int pcicfg_set_busnode_props(dev_info_t *, uint8_t);
+static int pcicfg_set_busnode_props(dev_info_t *, uint8_t, int, int);
 static int pcicfg_free_bridge_resources(dev_info_t *);
 static int pcicfg_free_device_resources(dev_info_t *);
 static int pcicfg_teardown_device(dev_info_t *);
@@ -837,8 +838,8 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 	pci_config_teardown(&config_handle);
 
 	/* create Bus node properties for ntbridge. */
-	if (pcicfg_set_busnode_props(new_device, pcie_device_type) !=
-						PCICFG_SUCCESS) {
+	if (pcicfg_set_busnode_props(new_device, pcie_device_type, -1, -1) !=
+	    PCICFG_SUCCESS) {
 		DEBUG0("Failed to set busnode props\n");
 		return (rc);
 	}
@@ -882,7 +883,8 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 	rc = ndi_devi_online(new_device, NDI_NO_EVENT|NDI_CONFIG);
 	if (rc != NDI_SUCCESS) {
 		cmn_err(CE_WARN,
-		"pcicfg: Fail:cant load nontransparent bridgd driver..\n");
+		    "pcicfg: Fail: can\'t load non-transparent bridge \
+		    driver.\n");
 		rc = PCICFG_FAILURE;
 		return (rc);
 	}
@@ -1016,7 +1018,7 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 	DEBUG1("pcicfg: now unloading the ntbridge driver. rc1=%d\n", rc1);
 	if (rc1 != NDI_SUCCESS) {
 		cmn_err(CE_WARN,
-		"pcicfg: cant unload ntbridge driver..children.\n");
+		    "pcicfg: can\'t unload ntbridge driver children.\n");
 		rc = PCICFG_FAILURE;
 	}
 
@@ -1738,7 +1740,7 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 		bzero((caddr_t)range,
 			sizeof (pcicfg_range_t) * PCICFG_RANGE_LEN);
 
-		(void) pcicfg_setup_bridge(entry, handle);
+		(void) pcicfg_setup_bridge(entry, handle, dip);
 
 		range[0].child_hi = range[0].parent_hi |=
 			(PCI_REG_REL_M | PCI_ADDR_IO);
@@ -3191,7 +3193,8 @@ pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 	return (PCICFG_SUCCESS);
 }
 static int
-pcicfg_set_busnode_props(dev_info_t *dip, uint8_t pcie_device_type)
+pcicfg_set_busnode_props(dev_info_t *dip, uint8_t pcie_device_type,
+    int pbus, int sbus)
 {
 	int ret;
 	char device_type[8];
@@ -3212,6 +3215,21 @@ pcicfg_set_busnode_props(dev_info_t *dip, uint8_t pcie_device_type)
 	if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
 				"#size-cells", 2)) != DDI_SUCCESS) {
 		return (ret);
+	}
+
+	/*
+	 * Create primary-bus and secondary-bus properties to be used
+	 * to restore bus numbers in the pcicfg_setup_bridge() routine.
+	 */
+	if (pbus != -1 && sbus != -1) {
+		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
+		    "primary-bus", pbus)) != DDI_SUCCESS) {
+				return (ret);
+		}
+		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
+		    "secondary-bus", sbus)) != DDI_SUCCESS) {
+				return (ret);
+		}
 	}
 	return (PCICFG_SUCCESS);
 }
@@ -3419,12 +3437,38 @@ uint_t primary, uint_t secondary, uint_t subordinate)
  */
 static void
 pcicfg_setup_bridge(pcicfg_phdl_t *entry,
-	ddi_acc_handle_t handle)
+    ddi_acc_handle_t handle, dev_info_t *dip)
 {
+	int pbus, sbus;
+
 	/*
 	 * The highest bus seen during probing is the max-subordinate bus
 	 */
 	pci_config_put8(handle, PCI_BCNF_SUBBUS, entry->highest_bus);
+
+
+	/*
+	 * If there exists more than 1 downstream bridge, it
+	 * will be reset by the below secondary bus reset which
+	 * will clear the bus numbers assumed to be programmed in
+	 * the pcicfg_probe_children() routine.  We therefore restore
+	 * them here.
+	 */
+	if (pci_config_get8(handle, PCI_BCNF_SECBUS) == 0) {
+		pbus = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+		    DDI_PROP_DONTPASS, "primary-bus", -1);
+		sbus = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+		    DDI_PROP_DONTPASS, "secondary-bus", -1);
+		if (pbus != -1 && sbus != -1) {
+			pci_config_put8(handle, PCI_BCNF_PRIBUS, (uint_t)pbus);
+			pci_config_put8(handle, PCI_BCNF_SECBUS, (uint_t)sbus);
+		} else {
+			cmn_err(CE_WARN, "Invalid Bridge number detected: \
+			    %s%d: pbus = 0x%x, sbus = 0x%x",
+			    ddi_get_name(dip), ddi_get_instance(dip), pbus,
+			    sbus);
+		}
+	}
 
 	/*
 	 * Reset the secondary bus
@@ -4534,8 +4578,8 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	/*
 	 * Set bus properties
 	 */
-	if (pcicfg_set_busnode_props(new_child, pcie_device_type)
-				!= PCICFG_SUCCESS) {
+	if (pcicfg_set_busnode_props(new_child, pcie_device_type,
+	    (int)bus, (int)new_bus) != PCICFG_SUCCESS) {
 		DEBUG0("Failed to set busnode props\n");
 		return (PCICFG_FAILURE);
 	}
