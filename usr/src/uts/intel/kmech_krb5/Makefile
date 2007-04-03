@@ -85,10 +85,9 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-#
-#	Include common targets.
-#
-include $(UTSBASE)/intel/Makefile.targ
+KMECHKRB5_BASE=$(UTSBASE)/common/gssapi/mechs/krb5
+KGSSDFLAGS=-I $(UTSBASE)/common/gssapi/include
+KGSSDFLAGS += $(KRB5_DEFS)
 
 $(OBJS_DIR)/%.o:		$(KMECHKRB5_BASE)/crypto/crc32/%.c
 	$(COMPILE.c) $(KGSSDFLAGS) -o $@ $<
@@ -96,6 +95,11 @@ $(OBJS_DIR)/%.o:		$(KMECHKRB5_BASE)/crypto/crc32/%.c
 
 $(LINTS_DIR)/%.ln:		$(KMECHKRB5_BASE)/crypto/crc32/%.c
 	@($(LHEAD) $(LINT.c) $(KGSSDFLAGS) $< $(LTAIL))
+
+#
+#	Include common targets.
+#
+include $(UTSBASE)/intel/Makefile.targ
 
 INC_PATH += \
 	-I$(UTSBASE)/common/gssapi \
