@@ -51,6 +51,8 @@ extern ddi_device_acc_attr_t nxge_dev_buf_dma_acc_attr;
 extern ddi_dma_attr_t nxge_desc_dma_attr;
 extern ddi_dma_attr_t nxge_tx_dma_attr;
 
+extern int nxge_serial_tx(mblk_t *mp, void *arg);
+
 static nxge_status_t nxge_map_txdma(p_nxge_t);
 static void nxge_unmap_txdma(p_nxge_t);
 
@@ -2251,6 +2253,10 @@ nxge_map_txdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 		KMEM_ZALLOC(sizeof (tx_ring_t), KM_SLEEP);
 	MUTEX_INIT(&tx_ring_p->lock, NULL, MUTEX_DRIVER,
 		(void *)nxgep->interrupt_cookie);
+
+	tx_ring_p->nxgep = nxgep;
+	tx_ring_p->serial = nxge_serialize_create(nmsgs,
+				nxge_serial_tx, tx_ring_p);
 	/*
 	 * Allocate transmit message rings and handles for packets
 	 * not to be copied to premapped buffers.
@@ -2334,6 +2340,11 @@ nxge_map_txdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 	goto nxge_map_txdma_channel_buf_ring_exit;
 
 nxge_map_txdma_channel_buf_ring_fail1:
+	if (tx_ring_p->serial) {
+		nxge_serialize_destroy(tx_ring_p->serial);
+		tx_ring_p->serial = NULL;
+	}
+
 	index--;
 	for (; index >= 0; index--) {
 		if (tx_msg_ring[i].dma_handle != NULL) {
@@ -2407,6 +2418,11 @@ nxge_unmap_txdma_channel_buf_ring(p_nxge_t nxgep, p_tx_ring_t tx_ring_p)
 		if (tx_msg_ring[i].dma_handle != NULL) {
 			ddi_dma_free_handle(&tx_msg_ring[i].dma_handle);
 		}
+	}
+
+	if (tx_ring_p->serial) {
+		nxge_serialize_destroy(tx_ring_p->serial);
+		tx_ring_p->serial = NULL;
 	}
 
 	MUTEX_DESTROY(&tx_ring_p->lock);

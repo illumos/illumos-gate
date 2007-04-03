@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@ extern "C" {
 
 #include <sys/nxge/nxge_txdma_hw.h>
 #include <npi_txdma.h>
+#include <sys/nxge/nxge_serialize.h>
 
 #define	TXDMA_PORT_BITMAP(nxgep)		(nxgep->pt_config.tx_dma_map)
 
@@ -66,6 +67,11 @@ extern "C" {
 			((index + entries) & wrap_mask)
 
 #define	TXDMA_DRR_WEIGHT_DEFAULT	0x001f
+
+typedef enum {
+	NXGE_USE_SERIAL	= 0,
+	NXGE_USE_START,
+} nxge_tx_mode_t;
 
 typedef struct _tx_msg_t {
 	nxge_os_block_mv_t 	flags;		/* DMA, BCOPY, DVMA (?) */
@@ -163,7 +169,7 @@ typedef struct _tx_ring_t {
 	boolean_t 		queueing;
 
 	nxge_os_mutex_t		sq_lock;
-
+	nxge_serialize_t 	*serial;
 	p_mblk_t 		head;
 	p_mblk_t 		tail;
 

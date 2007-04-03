@@ -56,6 +56,7 @@ uint32_t	nxge_jumbo_mtu	= TX_JUMBO_MTU;
 boolean_t	nxge_jumbo_enable = B_FALSE;
 uint16_t	nxge_rcr_timeout = NXGE_RDC_RCR_TIMEOUT;
 uint16_t	nxge_rcr_threshold = NXGE_RDC_RCR_THRESHOLD;
+nxge_tx_mode_t	nxge_tx_scheme = NXGE_USE_SERIAL;
 
 /*
  * Debugging flags:
@@ -2282,6 +2283,7 @@ nxge_alloc_tx_mem_pool(p_nxge_t nxgep)
 	size_t			tx_buf_alloc_size;
 	size_t			tx_cntl_alloc_size;
 	uint32_t		*num_chunks; /* per dma */
+	uint32_t		bcopy_thresh;
 
 	NXGE_DEBUG_MSG((nxgep, MEM_CTL, "==> nxge_alloc_tx_mem_pool"));
 
@@ -2330,7 +2332,12 @@ nxge_alloc_tx_mem_pool(p_nxge_t nxgep)
 	 * (For packet payload over this limit, packets will not be
 	 *  copied.)
 	 */
-	tx_buf_alloc_size = (nxge_bcopy_thresh * nxge_tx_ring_size);
+	if (nxgep->niu_type == N2_NIU) {
+		bcopy_thresh = TX_BCOPY_SIZE;
+	} else {
+		bcopy_thresh = nxge_bcopy_thresh;
+	}
+	tx_buf_alloc_size = (bcopy_thresh * nxge_tx_ring_size);
 
 	/*
 	 * Addresses of transmit descriptor ring and the
@@ -2378,7 +2385,7 @@ nxge_alloc_tx_mem_pool(p_nxge_t nxgep)
 		num_chunks[i] = 0;
 		status = nxge_alloc_tx_buf_dma(nxgep, st_tdc, &dma_buf_p[i],
 					tx_buf_alloc_size,
-					nxge_bcopy_thresh, &num_chunks[i]);
+					bcopy_thresh, &num_chunks[i]);
 		if (status != NXGE_OK) {
 			break;
 		}

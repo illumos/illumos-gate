@@ -38,6 +38,7 @@ extern uint32_t		nxge_tx_tiny_pack;
 extern uint32_t		nxge_tx_use_bcopy;
 extern uint32_t		nxge_tx_lb_policy;
 extern uint32_t		nxge_no_tx_lb;
+extern nxge_tx_mode_t	nxge_tx_scheme;
 
 typedef struct _mac_tx_hint {
 	uint16_t	sap;
@@ -223,7 +224,7 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 	 * for header. No padding will be used.
 	 */
 	pkt_len = pack_len = boff = TX_PKT_HEADER_SIZE;
-	if (nxge_tx_use_bcopy) {
+	if (nxge_tx_use_bcopy && (nxgep->niu_type != N2_NIU)) {
 		bcopy_thresh = (nxge_bcopy_thresh - TX_PKT_HEADER_SIZE);
 	} else {
 		bcopy_thresh = (TX_BCOPY_SIZE - TX_PKT_HEADER_SIZE);
@@ -841,11 +842,21 @@ nxge_start_fail1:
 	return (status);
 }
 
+int
+nxge_serial_tx(mblk_t *mp, void *arg)
+{
+	p_tx_ring_t		tx_ring_p = (p_tx_ring_t)arg;
+	p_nxge_t		nxgep = tx_ring_p->nxgep;
+
+	return (nxge_start(nxgep, tx_ring_p, mp));
+}
+
 boolean_t
 nxge_send(p_nxge_t nxgep, mblk_t *mp, p_mac_tx_hint_t hp)
 {
 	p_tx_ring_t 		*tx_rings;
 	uint8_t			ring_index;
+	p_tx_ring_t		tx_ring_p;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_send"));
 
@@ -858,10 +869,20 @@ nxge_send(p_nxge_t nxgep, mblk_t *mp, p_mac_tx_hint_t hp)
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_tx_msg: max_tdcs %d "
 		"ring_index %d", nxgep->max_tdcs, ring_index));
 
-	if (nxge_start(nxgep, tx_rings[ring_index], mp)) {
-		NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_send: failed "
-			"ring index %d", ring_index));
-		return (B_FALSE);
+	switch (nxge_tx_scheme) {
+	case NXGE_USE_START:
+		if (nxge_start(nxgep, tx_rings[ring_index], mp)) {
+			NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_send: failed "
+				"ring index %d", ring_index));
+			return (B_FALSE);
+		}
+		break;
+
+	case NXGE_USE_SERIAL:
+	default:
+		tx_ring_p = tx_rings[ring_index];
+		nxge_serialize_enter(tx_ring_p->serial, mp);
+		break;
 	}
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_send: ring index %d",
