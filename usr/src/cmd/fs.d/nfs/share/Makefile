@@ -21,19 +21,30 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 
 FSTYPE=		nfs
-OTHERINSTALL=	$(ROOTETC)/dfs/fstypes
+OTHERINSTALL=	$(ROOTETC)/dfs/fstypes $(ROOTETC)/dfs/sharetab
+SHARETAB=	sharetab
 
 include		../../Makefile.fstype
 
 $(ROOTETC)/dfs/fstypes :=	FILEMODE= 644
 $(ROOTETC)/dfs/fstypes :=	OWNER= root
 $(ROOTETC)/dfs/fstypes :=	GROUP= root
+
+$(ROOTETC)/dfs/sharetab :=	FILEMODE= 444
+$(ROOTETC)/dfs/sharetab :=	OWNER= root
+$(ROOTETC)/dfs/sharetab :=	GROUP= root
+
+$(SHARETAB):
+	touch $(SHARETAB)
+
+clean:
+	$(RM) $(SHARETAB)
 
 $(ROOTETC)/dfs/%: %
 	$(INS.file)

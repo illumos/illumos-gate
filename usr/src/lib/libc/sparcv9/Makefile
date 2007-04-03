@@ -822,6 +822,7 @@ PORTSYS=			\
 	sbrk.o			\
 	semsys.o		\
 	set_errno.o		\
+	sharefs.o		\
 	shmsys.o		\
 	siginterrupt.o		\
 	signal.o		\

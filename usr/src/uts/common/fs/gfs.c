@@ -96,6 +96,17 @@
  * 	gfs_vop_lookup()
  * 	gfs_vop_readdir()
  * 	gfs_vop_map()
+ *
+ * 3) Single File pseudo-filesystems
+ *
+ *    This routine creates a rooted file to be overlayed ontop of another
+ *    file in the physical filespace.
+ *
+ *    Note that the parent is NULL (actually the vfs), but there is nothing
+ *    technically keeping such a file from utilizing the "Complete GFS
+ *    management" set of routines.
+ *
+ * 	gfs_root_create_file()
  */
 
 /*
@@ -483,6 +494,26 @@ gfs_root_create(size_t size, vfs_t *vfsp, vnodeops_t *ops, ino64_t ino,
 
 	VFS_HOLD(vfsp);
 	VN_SET_VFS_TYPE_DEV(vp, vfsp, VDIR, 0);
+	vp->v_flag |= VROOT | VNOCACHE | VNOMAP | VNOSWAP | VNOMOUNT;
+
+	return (vp);
+}
+
+/*
+ * gfs_root_create_file(): create a root vnode for a GFS file as a filesystem
+ *
+ * Similar to gfs_root_create(), this creates a root vnode for a file to
+ * be the pseudo-filesystem.
+ */
+vnode_t *
+gfs_root_create_file(size_t size, vfs_t *vfsp, vnodeops_t *ops, ino64_t ino)
+{
+	vnode_t	*vp = gfs_file_create(size, NULL, ops);
+
+	((gfs_file_t *)vp->v_data)->gfs_ino = ino;
+
+	VFS_HOLD(vfsp);
+	VN_SET_VFS_TYPE_DEV(vp, vfsp, VREG, 0);
 	vp->v_flag |= VROOT | VNOCACHE | VNOMAP | VNOSWAP | VNOMOUNT;
 
 	return (vp);

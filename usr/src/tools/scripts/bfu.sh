@@ -4143,6 +4143,7 @@ extract_archives() {
 		test -h platform/$archive && rm platform/$archive
 		if [ $base = root ]; then
 			exclude="-f dev/fd home proc etc/mnttab"
+			exclude="$exclude etc/dfs/sharetab"
 			[ -d system/contract ] &&
 				exclude="$exclude system/contract"
 			[ -d system/object ] &&

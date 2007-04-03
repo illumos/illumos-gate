@@ -492,6 +492,10 @@ f none usr/include/sgtty.h 644 root bin
 f none usr/include/sha1.h 644 root bin
 f none usr/include/sha2.h 644 root bin
 f none usr/include/shadow.h 644 root bin
+d none usr/include/sharefs 755 root bin
+f none usr/include/sharefs/share.h 644 root bin
+f none usr/include/sharefs/sharetab.h 644 root bin
+f none usr/include/sharefs/sharefs.h 644 root bin
 f none usr/include/siginfo.h 644 root bin
 f none usr/include/signal.h 644 root bin
 f none usr/include/smbios.h 644 root bin

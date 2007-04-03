@@ -1,4 +1,3 @@
-#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -19,49 +18,15 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+#ident	"%Z%%M%	%I%	%E% SMI"
 
-PATH="/usr/bin:/usr/sbin:${PATH}"
-export PATH
+FSTYPE=		sharefs
+LIBPROG=	mount
 
-FLD='[^ 	]\{1,\}[ 	]\{1,\}'
-LN_DEVFS="/devices	-	/devices	devfs	-	no	-"
-LN_CTFS="ctfs\t\t-	/system/contract	ctfs	-	no	-"
-LN_OBJFS="objfs\t\t-	/system/object	objfs	-	no	-"
-LN_SHAREFS="sharefs\t\t-	/etc/dfs/sharetab	sharefs	-	no	-"
-
-missing()
-{
-	grep "$FLD$FLD$2" $1 > /dev/null 2>&1
-	if [ $? = 0 ]; then
-		return 1
-	else
-		return 0
-	fi
-}
-
-while read src dst; do
-	if [ ! -f $dst ]; then
-		cp $src $dst
-	else
-		if missing $dst /devices; then
-			echo "$LN_DEVFS" >> $dst
-		fi
-		if missing $dst /system/contract; then
-			echo "$LN_CTFS" >> $dst
-		fi
-		if missing $dst /system/object; then
-			echo "$LN_OBJFS" >> $dst
-		fi
-		if missing $dst /etc/dfs/sharetab; then
-			echo "$LN_SHAREFS" >> $dst
-		fi
-	fi
-done
-exit 0
+include		../Makefile.fstype
+include		../Makefile.mount
+include		../Makefile.mount.targ

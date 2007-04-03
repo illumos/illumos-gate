@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,9 +38,11 @@
 #include <sys/signal.h>
 #include <sys/stat.h>
 #include <fslib.h>
+#include <locale.h>
 
 #define	RET_OK		0
 #define	RET_ERR		33
+#define	EXIT_MAGIC	2
 
 static void usage(void);
 
@@ -64,20 +65,39 @@ main(int argc, char *argv[])
 	char *mountp;		/* Entity being mounted on */
 	char *savedoptbuf;
 	char *myname;
-	char typename[64];
+	char *typename;
 	int flags = 0;
-	int errflag = 0;
-	int qflg = 0;
+	int error_flag = 0;
+	int q_flag = 0;
+
+	int len;
+
+	(void) setlocale(LC_ALL, "");
+
+#if !defined(TEXT_DOMAIN)
+#define	TEXT_DOMAIN "SYS_TEST"
+#endif
+	(void) textdomain(TEXT_DOMAIN);
+
 
 	myname = strrchr(argv[0], '/');
-	myname = myname ? myname+1 : argv[0];
-	(void) snprintf(typename, sizeof (typename), "%s %s", fstype, myname);
+	myname = myname ? myname + 1 : argv[0];
+
+	len = strlen(fstype) + 1 + strlen(myname);
+	typename = malloc(len + 1);
+	if (!typename) {
+		(void) fprintf(stderr, gettext("%s: out of memory\n"),
+		    myname);
+		return (EXIT_MAGIC);
+	}
+
+	(void) snprintf(typename, len, "%s %s", fstype, myname);
 	argv[0] = typename;
 
 	while ((c = getopt(argc, argv, "o:rmOq")) != EOF) {
 		switch (c) {
 		case '?':
-			errflag++;
+			error_flag = 1;
 			break;
 
 		case 'o':
@@ -86,7 +106,8 @@ main(int argc, char *argv[])
 				(void) fprintf(stderr,
 				    gettext("%s: Invalid argument: %s\n"),
 				    myname, optarg);
-				return (2);
+				free(typename);
+				return (EXIT_MAGIC);
 			}
 			optsize = strlen(optbuf);
 			break;
@@ -102,14 +123,14 @@ main(int argc, char *argv[])
 			break;
 
 		case 'q':
-			qflg = 1;
+			q_flag = 1;
 			break;
 
 		default:
 			usage();
 		}
 	}
-	if ((argc - optind != 2) || errflag) {
+	if ((argc - optind != 2) || error_flag) {
 		usage();
 	}
 	special = argv[argc - 2];
@@ -118,24 +139,27 @@ main(int argc, char *argv[])
 	if ((savedoptbuf = strdup(optbuf)) == NULL) {
 		(void) fprintf(stderr, gettext("%s: out of memory\n"),
 		    myname);
-		exit(2);
+		free(typename);
+		exit(EXIT_MAGIC);
 	}
 	if (mount(special, mountp, flags | MS_OPTIONSTR, fstype, NULL, 0,
 	    optbuf, MAX_MNTOPT_STR)) {
 		(void) fprintf(stderr, "mount: ");
 		perror(special);
+		free(typename);
 		exit(RET_ERR);
 	}
-	if (optsize && !qflg)
+	if (optsize && !q_flag)
 		cmp_requested_to_actual_options(savedoptbuf, optbuf,
 		    special, mountp);
-	return (0);
+	free(typename);
+	return (RET_OK);
 }
 
-void
+static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "Usage: mount [-Ormq] [-o options] special mountpoint\n");
+	    gettext("Usage: mount [-Ormq] [-o options] special mountpoint\n"));
 	exit(RET_ERR);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +52,7 @@
 #include	<sys/mount.h>
 #include	<sys/objfs.h>
 #include	"fslib.h"
+#include	<sharefs/share.h>
 
 #define	FS_PATH		"/usr/lib/fs"
 #define	ALT_PATH	"/etc/fs"
@@ -132,6 +133,7 @@ static const char   *keeplist[] = {
 	"/var",
 	"/var/adm",
 	"/var/run",
+	SHARETAB,
 	NULL
 };
 

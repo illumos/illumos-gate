@@ -3164,40 +3164,6 @@ sa_disable_group(sa_handle_t handle, int flags, int argc, char *argv[])
 }
 
 /*
- * check_sharetab()
- *
- * Checks to see if the /etc/dfs/sharetab file is stale (exists from
- * before the current boot). If it is, truncate it since nothing is
- * really shared.
- */
-
-static void
-check_sharetab()
-{
-	int fd;
-	struct utmpx *utmpxp;
-	struct stat st;
-
-	fd = open(SA_LEGACY_SHARETAB, O_RDWR);
-	if (fd >= 0) {
-		/*
-		 * Attempt to get a lock on the file. Whgen we get
-		 * one, then check to see if it is older than the boot
-		 * time. Truncate if older than boot.
-		 */
-	    (void) lockf(fd, F_LOCK, 0);
-	    if ((fstat(fd, &st) == 0) && /* does sharetab exist? */
-		(utmpxp = getutxent()) != NULL && /* does utmpx exist? */
-			(utmpxp->ut_xtime > st.st_mtime)) /* sharetab older? */
-		(void) ftruncate(fd, 0);
-
-	    (void) lockf(fd, F_ULOCK, 0);
-	    (void) close(fd);
-	    endutxent();
-	}
-}
-
-/*
  * sa_start_group(flags, argc, argv)
  *
  * Implements the start command.
@@ -3251,8 +3217,6 @@ sa_start_group(sa_handle_t handle, int flags, int argc, char *argv[])
 		ret = SMF_EXIT_ERR_FATAL;
 	} else {
 		sa_group_t group;
-
-		check_sharetab();
 
 		if (!all) {
 		    while (optind < argc) {

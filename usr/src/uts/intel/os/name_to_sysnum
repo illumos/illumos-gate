@@ -124,6 +124,7 @@ setegid			136
 sysconfig		137
 adjtime			138
 systeminfo		139
+sharefs			140
 seteuid			141
 forksys			142
 fork1			143

@@ -150,6 +150,7 @@ f none kernel/fs/sparcv9/mntfs 755 root sys
 f none kernel/fs/sparcv9/namefs 755 root sys
 f none kernel/fs/sparcv9/objfs 755 root sys
 f none kernel/fs/sparcv9/procfs 755 root sys
+f none kernel/fs/sparcv9/sharefs 755 root sys
 f none kernel/fs/sparcv9/sockfs 755 root sys
 f none kernel/fs/sparcv9/specfs 755 root sys
 f none kernel/fs/sparcv9/tmpfs 755 root sys

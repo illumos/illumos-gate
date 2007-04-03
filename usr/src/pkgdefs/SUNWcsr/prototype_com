@@ -136,6 +136,7 @@ e preserve etc/device.tab 444 root root
 d none etc/devices 755 root sys
 d none etc/dfs 755 root sys
 e preserve etc/dfs/dfstab 644 root sys
+v preserve etc/dfs/sharetab 444 root root
 e preserve etc/dgroup.tab 444 root sys
 d none etc/dhcp 755 root sys
 e dhcpinittab etc/dhcp/inittab 644 root sys

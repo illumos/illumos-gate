@@ -99,6 +99,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	sem_trywait;
 	sem_unlink;
 	sem_wait;
+	sharefs;
 	shm_open;
 	shm_unlink;
 	sigqueue;

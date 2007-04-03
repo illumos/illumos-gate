@@ -859,6 +859,8 @@ PROC_OBJS +=	prcontrol.o	prioctl.o	prsubr.o	prusrio.o \
 
 MNTFS_OBJS +=	mntvfsops.o	mntvnops.o
 
+SHAREFS_OBJS +=	sharetab.o	sharefs_vfsops.o	sharefs_vnops.o
+
 SPEC_OBJS +=	specsubr.o	specvfsops.o	specvnops.o
 
 SOCK_OBJS +=	socksubr.o	sockvfsops.o	sockvnops.o	\

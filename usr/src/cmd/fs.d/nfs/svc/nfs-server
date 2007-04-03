@@ -62,10 +62,6 @@ case "$1" in
 		startnfsd=1
 	fi
 
-	# When the system comes up umask is not set; so set the mode now
-
-	[ -f /etc/dfs/sharetab ] && /usr/bin/chmod 644 /etc/dfs/sharetab
-
 	# Options for nfsd are now set in /etc/default/nfs
 	if [ $startnfsd -ne 0 ]; then
 		/usr/lib/nfs/mountd

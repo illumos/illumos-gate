@@ -852,7 +852,7 @@ vfs_mountroot(void)
 
 	/*
 	 * Mount /devices, /dev instance 1, /system/contract, /etc/mnttab,
-	 * /etc/svc/volatile, /system/object, and /proc.
+	 * /etc/svc/volatile, /etc/dfs/sharetab, /system/object, and /proc.
 	 */
 	vfs_mountdevices();
 	vfs_mountdev1();
@@ -862,6 +862,10 @@ vfs_mountroot(void)
 	vfs_mountfs("mntfs", "/etc/mnttab", "/etc/mnttab");
 	vfs_mountfs("tmpfs", "/etc/svc/volatile", "/etc/svc/volatile");
 	vfs_mountfs("objfs", "objfs", OBJFS_ROOT);
+
+	if (getzoneid() == GLOBAL_ZONEID) {
+		vfs_mountfs("sharefs", "sharefs", "/etc/dfs/sharetab");
+	}
 
 #ifdef __sparc
 	/*

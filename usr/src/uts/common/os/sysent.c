@@ -21,7 +21,7 @@
 
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -617,7 +617,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 137 */ SYSENT_CL("sysconfig",	sysconfig,	1),
 	/* 138 */ SYSENT_CI("adjtime",		adjtime,	2),
 	/* 139 */ SYSENT_CL("systeminfo",	systeminfo,	3),
-	/* 140 */ SYSENT_LOADABLE(),		/* reserved */
+	/* 140 */ SYSENT_LOADABLE(),		/* sharefs */
 	/* 141 */ SYSENT_CI("seteuid",		seteuid,	1),
 	/* 142 */ SYSENT_2CI("forksys",		forksys,	2),
 	/* 143 */ SYSENT_2CI("fork1",		fork1,		0),
@@ -1001,7 +1001,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 137 */ SYSENT_CI("sysconfig",	sysconfig,	1),
 	/* 138 */ SYSENT_CI("adjtime",		adjtime,	2),
 	/* 139 */ SYSENT_CI("systeminfo",	systeminfo,	3),
-	/* 140 */ SYSENT_LOADABLE32(),		/* reserved */
+	/* 140 */ SYSENT_LOADABLE32(),		/* sharefs */
 	/* 141 */ SYSENT_CI("seteuid",		seteuid,	1),
 	/* 142 */ SYSENT_2CI("forksys",		forksys,	2),
 	/* 143 */ SYSENT_2CI("fork1",		fork1,		0),

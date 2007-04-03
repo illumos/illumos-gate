@@ -363,7 +363,7 @@ const struct systable systable[] = {
 {"sysconfig",	1, DEC, NOV, CNF},				/* 137 */
 {"adjtime",	2, DEC, NOV, HEX, HEX},				/* 138 */
 {"sysinfo",	3, DEC, NOV, INF, RST, DEC},			/* 139 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"sharefs",	3, DEC, NOV, DEC, HEX, DEC},			/* 140 */
 {"seteuid",	1, DEC, NOV, DEC},				/* 141 */
 {"forksys",	2, DEC, NOV, DEC, HHX},				/* 142 */
 {"fork1",	0, DEC, NOV},					/* 143 */

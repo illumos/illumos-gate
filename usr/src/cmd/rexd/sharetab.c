@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,14 +32,17 @@
  * under license from the Regents of the University of California.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/types32.h>
+#include <sharefs/share.h>
 #include "sharetab.h"
 
-static struct share *	sharedup();
-static void		sharefree();
+static share_t	*sharedup();
+static void	sharefree();
 
 /*
  * Get an entry from the share table.
@@ -55,22 +58,20 @@ static void		sharefree();
  *	< 0  error
  */
 int
-getshare(fd, shp)
-	FILE *fd;
-	struct share **shp;
+getshare(FILE *fd, share_t **shp)
 {
 	static char *line = NULL;
-	static struct share *sh = NULL;
+	static share_t *sh = NULL;
 	register char *p;
 	char *w = " \t";
 
 	if (line == NULL) {
-		line = (char *) malloc(BUFSIZ+1);
+		line = (char *)malloc(BUFSIZ+1);
 		if (line == NULL)
 			return (-1);
 	}
 	if (sh == NULL) {
-		sh = (struct share *) malloc(sizeof(*sh));
+		sh = (share_t *)malloc(sizeof (*sh));
 		if (sh == NULL)
 			return (-1);
 	}
@@ -100,110 +101,15 @@ getshare(fd, shp)
 	return (1);
 }
 
-/*
- * Append an entry to the sharetab file.
- */
-int
-putshare(fd, sh)
-	FILE *fd;
-	struct share *sh;
+static share_t *
+sharedup(share_t *sh)
 {
-	int r;
+	share_t *nsh;
 
-	if (fseek(fd, 0L, 2) < 0)
-		return (-1);
-
-	r = fprintf(fd, "%s\t%s\t%s\t%s\t%s\n",
-		sh->sh_path,
-		sh->sh_res,
-		sh->sh_fstype,
-		sh->sh_opts,
-		sh->sh_descr);
-	return (r);
-}
-
-/*
- * The entry corresponding to path is removed from the
- * sharetab file.  The file is assumed to be locked.
- * Read the entries into a linked list of share structures
- * minus the entry to be removed.  Then truncate the sharetab
- * file and write almost all of it back to the file from the
- * linked list.
- * Note: The file is assumed to be locked.
- */
-int
-remshare(fd, path)
-	FILE *fd;
-	char *path;
-{
-	struct share *sh_tmp;
-	struct shl {			/* the linked list */
-		struct shl   *shl_next;
-		struct share *shl_sh;
-	};
-	struct shl *shl_head = NULL;
-	struct shl *shl, *prev, *next;
-	int res, remcnt;
-
-	rewind(fd);
-	remcnt = 0;
-	while ((res = getshare(fd, &sh_tmp)) > 0) {
-		if (strcmp(path, sh_tmp->sh_path) == 0 ||
-		    strcmp(path, sh_tmp->sh_res)  == 0) {
-			remcnt++;
-		} else {
-			prev = shl;
-			shl = (struct shl *) malloc(sizeof(*shl));
-			if (shl == NULL) {
-				res = -1;
-				goto dealloc;
-			}
-			if (shl_head == NULL)
-				shl_head = shl;
-			else
-				prev->shl_next = shl;
-			shl->shl_next = NULL;
-			shl->shl_sh = sharedup(sh_tmp);
-			if (shl->shl_sh == NULL) {
-				res = -1;
-				goto dealloc;
-			}
-		}
-	}
-	if (res < 0)
-		goto dealloc;
-	if (remcnt == 0) {
-		res = 1;	/* nothing removed */
-		goto dealloc;
-	}
-
-	if (ftruncate(fileno(fd), 0) < 0) {
-		res = -1;
-		goto dealloc;
-	}
-
-	for (shl = shl_head ; shl ; shl = shl->shl_next)
-		putshare(fd, shl->shl_sh);
-	res = 1;
-
-dealloc:
-	for (shl = shl_head ; shl ; shl = next) {
-		sharefree(shl->shl_sh);
-		next = shl->shl_next;
-		free(shl);
-	}
-	return (res);
-}
-
-static struct share *
-sharedup(sh)
-	struct share *sh;
-{
-	struct share *nsh;
-	
-	nsh = (struct share *) malloc(sizeof(*nsh));
+	nsh = (share_t *)calloc(1, sizeof (*nsh));
 	if (nsh == NULL)
 		return (NULL);
+
 	nsh->sh_path = strdup(sh->sh_path);
 	if (nsh->sh_path == NULL)
 		goto alloc_failed;
@@ -227,8 +133,7 @@ alloc_failed:
 }
 
 static void
-sharefree(sh)
-	struct share *sh;
+sharefree(share_t *sh)
 {
 	if (sh == NULL)
 		return;
@@ -250,8 +155,7 @@ sharefree(sh)
  * in option string "optlist".
  */
 char *
-getshareopt(optlist, opt)
-	char *optlist, *opt;
+getshareopt(char *optlist, char *opt)
 {
 	char *p, *pe;
 	char *b;

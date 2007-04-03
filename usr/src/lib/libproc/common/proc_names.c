@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -258,7 +258,7 @@ static const char *const systable[] = {
 	"sysconfig",		/* 137 */
 	"adjtime",		/* 138 */
 	"systeminfo",		/* 139 */
-	NULL,			/* 140 */
+	"sharefs",		/* 140 */
 	"seteuid",		/* 141 */
 	NULL,			/* 142 */
 	"fork1",		/* 143 */

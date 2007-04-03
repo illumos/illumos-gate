@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -96,6 +97,8 @@ extern vnode_t *gfs_dir_create(size_t, vnode_t *, vnodeops_t *,
     gfs_dirent_t *, gfs_inode_cb, int, gfs_readdir_cb, gfs_lookup_cb);
 extern vnode_t *gfs_root_create(size_t, struct vfs *, vnodeops_t *, ino64_t,
     gfs_dirent_t *, gfs_inode_cb, int, gfs_readdir_cb, gfs_lookup_cb);
+extern vnode_t *gfs_root_create_file(size_t, struct vfs *, vnodeops_t *,
+    ino64_t);
 
 extern void *gfs_file_inactive(vnode_t *);
 extern void *gfs_dir_inactive(vnode_t *);

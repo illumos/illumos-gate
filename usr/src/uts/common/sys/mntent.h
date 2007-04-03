@@ -57,6 +57,8 @@ extern "C" {
 #define	MNTTYPE_DEV	"dev"		/* /dev file system */
 #define	MNTTYPE_CTFS	"ctfs"		/* Contract file system */
 #define	MNTTYPE_OBJFS	"objfs"		/* Kernel object file system */
+#define	MNTTYPE_SHAREFS	"sharefs"	/* Kernel sharetab file system */
+
 
 #define	MNTOPT_RO	"ro"		/* Read only */
 #define	MNTOPT_RW	"rw"		/* Read/write */

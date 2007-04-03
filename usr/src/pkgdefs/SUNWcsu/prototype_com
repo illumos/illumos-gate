@@ -402,6 +402,8 @@ d none usr/lib/fs/objfs 755 root sys
 f none usr/lib/fs/objfs/mount 555 root bin
 d none usr/lib/fs/proc 755 root sys
 f none usr/lib/fs/proc/mount 555 root bin
+d none usr/lib/fs/sharefs 755 root sys
+f none usr/lib/fs/sharefs/mount 555 root bin
 d none usr/lib/fs/tmpfs 755 root sys
 f none usr/lib/fs/tmpfs/mount 555 root bin
 d none usr/lib/fs/ufs 755 root sys

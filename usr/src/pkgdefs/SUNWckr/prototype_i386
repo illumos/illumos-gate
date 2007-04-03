@@ -152,6 +152,7 @@ f none kernel/fs/mntfs 755 root sys
 f none kernel/fs/namefs 755 root sys
 f none kernel/fs/objfs 755 root sys
 f none kernel/fs/procfs 755 root sys
+f none kernel/fs/sharefs 755 root sys
 f none kernel/fs/sockfs 755 root sys
 f none kernel/fs/specfs 755 root sys
 f none kernel/fs/tmpfs 755 root sys
@@ -338,6 +339,7 @@ f none kernel/fs/amd64/mntfs 755 root sys
 f none kernel/fs/amd64/namefs 755 root sys
 f none kernel/fs/amd64/objfs 755 root sys
 f none kernel/fs/amd64/procfs 755 root sys
+f none kernel/fs/amd64/sharefs 755 root sys
 f none kernel/fs/amd64/sockfs 755 root sys
 f none kernel/fs/amd64/specfs 755 root sys
 f none kernel/fs/amd64/tmpfs 755 root sys

@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -69,6 +70,8 @@
 #include <rpcsvc/daemon_utils.h>
 #include <deflt.h>
 #include "../../fslib.h"
+#include <sharefs/share.h>
+#include <sharefs/sharetab.h>
 #include "../lib/sharetab.h"
 #include "mountd.h"
 
@@ -1946,21 +1949,15 @@ check_sharetab()
 		return;
 	}
 
-	f = fopen(SHARETAB, "r+");
+	/*
+	 * Note that since the sharetab is now in memory
+	 * and a snapshot is taken, we no longer have to
+	 * lock the file.
+	 */
+	f = fopen(SHARETAB, "r");
 	if (f == NULL) {
 		syslog(LOG_ERR, "Cannot open %s: %m", SHARETAB);
 		(void) rw_unlock(&sharetab_lock);
-		return;
-	}
-
-	/*
-	 * Lock the file so that unshare can't
-	 * truncate it while we're reading
-	 */
-	if (lockf(fileno(f), F_LOCK, 0L) < 0) {
-		syslog(LOG_ERR, "Cannot lock %s: %m", SHARETAB);
-		(void) rw_unlock(&sharetab_lock);
-		(void) fclose(f);
 		return;
 	}
 

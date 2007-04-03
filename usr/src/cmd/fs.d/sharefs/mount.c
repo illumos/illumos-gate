@@ -49,12 +49,12 @@ static void usage(void);
 static char  optbuf[MAX_MNTOPT_STR] = { '\0', };
 static int   optsize = 0;
 
-static char fstype[] = "objfs";
+static char fstype[] = "sharefs";
 
 /*
  * usage: mount [-Ormq] [-o options] special mountp
  *
- * This mount program is exec'ed by /usr/sbin/mount if '-F objfs' is
+ * This mount program is exec'ed by /usr/sbin/mount if '-F sharefs' is
  * specified.
  */
 int

@@ -319,6 +319,7 @@ extern "C" {
 #define	SYS_sysconfig	137
 #define	SYS_adjtime	138
 #define	SYS_systeminfo	139
+#define	SYS_sharefs	140
 #define	SYS_seteuid	141
 #define	SYS_forksys	142
 	/*

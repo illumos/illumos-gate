@@ -52,6 +52,7 @@
 #include <signal.h>
 #include <libintl.h>
 
+#include <sharefs/share.h>
 #include "sharetab.h"
 
 #define	DFSTAB_NOTICE_LINES	5
@@ -1187,7 +1188,6 @@ get_share_list(int *errp)
 
 	if ((fp = fopen(SHARETAB, "r")) != NULL) {
 		struct share	*sharetab_entry;
-		(void) lockf(fileno(fp), F_LOCK, 0);
 
 		while (getshare(fp, &sharetab_entry) > 0) {
 		    newp = alloc_sharelist();
@@ -1828,50 +1828,6 @@ emptyshare(struct share *sh)
 }
 
 /*
- * checkshare(struct share *)
- *
- * If the share to write to sharetab is not present, need to add.  If
- * the share is present, replace if options are different else we want
- * to keep it.
- * Return values:
- *	1 - keep
- *	2 - replace
- * The CHK_NEW value isn't currently returned.
- */
-#define	CHK_NEW		0
-#define	CHK_KEEP	1
-#define	CHK_REPLACE	2
-static int
-checkshare(struct share *sh)
-{
-	xfs_sharelist_t *list, *head;
-	int err;
-	int ret = CHK_NEW;
-
-	head = list = get_share_list(&err);
-	while (list != NULL && ret == CHK_NEW) {
-	    if (strcmp(sh->sh_path, list->path) == 0) {
-		/* Have the same path so check if replace or keep */
-		if (strcmp(sh->sh_opts, list->options) == 0)
-		    ret = CHK_KEEP;
-		else
-		    ret = CHK_REPLACE;
-	    }
-	    list = list->next;
-	}
-	if (head != NULL) {
-	    dfs_free_list(head);
-	}
-	/*
-	 * Just in case it was added by another process after our
-	 * scan, we always replace even if we think it is new.
-	 */
-	if (ret == CHK_NEW)
-	    ret = CHK_REPLACE;
-	return (ret);
-}
-
-/*
  * sa_update_sharetab(share, proto)
  *
  * Update the sharetab file with info from the specified share.
@@ -1881,59 +1837,23 @@ checkshare(struct share *sh)
 int
 sa_update_sharetab(sa_share_t share, char *proto)
 {
-	int ret = SA_OK;
-	struct share shtab;
-	char *path;
-	int logging = 0;
-	FILE *sharetab;
-	sigset_t old;
-	int action;
+	int	ret = SA_OK;
+	share_t	sh;
+	char	*path;
 
 	path = sa_get_share_attr(share, "path");
 	if (path != NULL) {
-	    (void) memset(&shtab, '\0', sizeof (shtab));
-	    sharetab = fopen(SA_LEGACY_SHARETAB, "r+");
-	    if (sharetab == NULL) {
-		sharetab = fopen(SA_LEGACY_SHARETAB, "w+");
-	    }
-	    if (sharetab != NULL) {
-		(void) setvbuf(sharetab, NULL, _IOLBF, BUFSIZ * 8);
-		sablocksigs(&old);
+		(void) memset(&sh, '\0', sizeof (sh));
+
 		/*
-		 * Fill in share structure and write it out if the
-		 * share isn't already shared with the same options.
+		 * Fill in share structure and send it to the kernel.
 		 */
-		(void) fillshare(share, proto, &shtab);
-		/*
-		 * If share is new or changed, remove the old,
-		 * otherwise keep it in place since it hasn't changed.
-		 */
-		action = checkshare(&shtab);
-		(void) lockf(fileno(sharetab), F_LOCK, 0);
-		switch (action) {
-		case CHK_REPLACE:
-		    (void) remshare(sharetab, path, &logging);
-		    (void) putshare(sharetab, &shtab);
-		    break;
-		case CHK_KEEP:
-		    /* Don't do anything */
-		    break;
-		}
-		emptyshare(&shtab);
-		(void) fflush(sharetab);
-		(void) lockf(fileno(sharetab), F_ULOCK, 0);
-		(void) fsync(fileno(sharetab));
-		saunblocksigs(&old);
-		(void) fclose(sharetab);
-	    } else {
-		if (errno == EACCES || errno == EPERM) {
-		    ret = SA_NO_PERMISSION;
-		} else {
-		    ret = SA_CONFIG_ERR;
-		}
-	    }
-	    sa_free_attr_string(path);
+		(void) fillshare(share, proto, &sh);
+		(void) sharefs(SHAREFS_ADD, &sh);
+		emptyshare(&sh);
+		sa_free_attr_string(path);
 	}
+
 	return (ret);
 }
 
@@ -1946,36 +1866,21 @@ sa_update_sharetab(sa_share_t share, char *proto)
 int
 sa_delete_sharetab(char *path, char *proto)
 {
-	int ret = SA_OK;
-	int logging = 0;
-	FILE *sharetab;
-	sigset_t old;
-#ifdef lint
-	proto = proto;
-#endif
+	int	ret = SA_OK;
 
-	if (path != NULL) {
-	    sharetab = fopen(SA_LEGACY_SHARETAB, "r+");
-	    if (sharetab == NULL) {
-		sharetab = fopen(SA_LEGACY_SHARETAB, "w+");
-	    }
-	    if (sharetab != NULL) {
-		/* should block keyboard level signals around the lock */
-		sablocksigs(&old);
-		(void) lockf(fileno(sharetab), F_LOCK, 0);
-		ret = remshare(sharetab, path, &logging);
-		(void) fflush(sharetab);
-		(void) lockf(fileno(sharetab), F_ULOCK, 0);
-		(void) fsync(fileno(sharetab));
-		saunblocksigs(&old);
-		(void) fclose(sharetab);
-	    } else {
-		if (errno == EACCES || errno == EPERM) {
-		    ret = SA_NO_PERMISSION;
-		} else {
-		    ret = SA_CONFIG_ERR;
-		}
-	    }
+	share_t	sh;
+
+	/*
+	 * Both the path and the proto are
+	 * keys into the sharetab.
+	 */
+	if (path != NULL && proto != NULL) {
+		(void) memset(&sh, '\0', sizeof (sh));
+		sh.sh_path = path;
+		sh.sh_fstype = proto;
+
+		ret = sharefs(SHAREFS_REMOVE, &sh);
 	}
+
 	return (ret);
 }

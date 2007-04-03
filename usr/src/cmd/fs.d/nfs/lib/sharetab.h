@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,10 @@
  * under license from the Regents of the University of California.
  */
 
+/*
+ * Note: <sharefs/share.h> must be included before this file.
+ */
+
 #ifndef _SHARETAB_H
 #define	_SHARETAB_H
 
@@ -40,22 +44,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-struct share {
-	char *sh_path;
-	char *sh_res;
-	char *sh_fstype;
-	char *sh_opts;
-	char *sh_descr;
-};
-
-struct sh_list {		/* cached share list */
-	struct sh_list *shl_next;
-	struct share   *shl_sh;
-};
-
-#define	SHARETAB	"/etc/dfs/sharetab"
-#define	MAXBUFSIZE	65536
 
 #define	SHOPT_RO	"ro"
 #define	SHOPT_RW	"rw"
@@ -77,12 +65,10 @@ struct sh_list {		/* cached share list */
 #define	SHOPT_VOLFH	"volfh"
 #endif /* VOLATILE_FH_TEST */
 
-int		getshare(FILE *, struct share **);
-int		putshare(FILE *, struct share *);
-int		remshare(FILE *, char *, int *);
-char 		*getshareopt(char *, char *);
-struct share	*sharedup(struct share *);
-void		sharefree(struct share *);
+int		getshare(FILE *, share_t **);
+char		*getshareopt(char *, char *);
+share_t		*sharedup(share_t *);
+void		sharefree(share_t *);
 
 #ifdef __cplusplus
 }

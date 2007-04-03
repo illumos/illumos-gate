@@ -45,7 +45,8 @@ DEFAULTFILES=	fs.dfl
 include ../Makefile.cmd
 
 SUBDIR1= lofs zfs
-SUBDIR2= dev fd pcfs nfs hsfs proc ctfs udfs ufs tmpfs cachefs autofs mntfs objfs
+SUBDIR2= dev fd pcfs nfs hsfs proc ctfs udfs ufs tmpfs cachefs \
+		autofs mntfs objfs sharefs
 SUBDIRS= $(SUBDIR1) $(SUBDIR2)
 I18NDIRS= $(SUBDIR2)
 
