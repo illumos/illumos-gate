@@ -93,11 +93,9 @@ static int pxb_bus_map(dev_info_t *, dev_info_t *, ddi_map_req_t *,
 static int pxb_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 	ddi_dma_attr_t *attr_p, int (*waitfp)(caddr_t), caddr_t arg,
 	ddi_dma_handle_t *handlep);
-#ifdef	BCM_SW_WORKAROUNDS
 static int pxb_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
 	ddi_dma_handle_t handle, enum ddi_dma_ctlops cmd, off_t *offp,
 	size_t *lenp, caddr_t *objp, uint_t cache_flags);
-#endif	/* BCM_SW_WORKAROUNDS */
 static int pxb_ctlops(dev_info_t *, dev_info_t *, ddi_ctl_enum_t,
 	void *, void *);
 static int pxb_intr_ops(dev_info_t *dip, dev_info_t *rdip,
@@ -134,11 +132,7 @@ static struct bus_ops pxb_bus_ops = {
 	ddi_dma_unbindhdl,
 	ddi_dma_flush,
 	ddi_dma_win,
-#ifdef	BCM_SW_WORKAROUNDS
 	pxb_dma_mctl,
-#else
-	ddi_dma_mctl,
-#endif	/* BCM_SW_WORKAROUNDS */
 	pxb_ctlops,
 	ddi_bus_prop_op,
 	ndi_busop_get_eventcookie,	/* (*bus_get_eventcookie)();	*/
@@ -402,14 +396,14 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	if ((PCI_CAP_LOCATE(pxb->pxb_config_handle, PCI_CAP_ID_PCI_E,
 		&cap_ptr)) != DDI_FAILURE)
 		pxb->pxb_port_type = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
-			PX_CAP_REG) & PX_CAP_REG_DEV_TYPE_MASK;
+			PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
 	else
-		pxb->pxb_port_type = PX_CAP_REG_DEV_TYPE_PCIE_DEV;
+		pxb->pxb_port_type = PCIE_PCIECAP_DEV_TYPE_PCIE_DEV;
 
-	if ((pxb->pxb_port_type != PX_CAP_REG_DEV_TYPE_UP) &&
-	    (pxb->pxb_port_type != PX_CAP_REG_DEV_TYPE_DOWN) &&
-	    (pxb->pxb_port_type != PX_CAP_REG_DEV_TYPE_PCIE2PCI) &&
-	    (pxb->pxb_port_type != PX_CAP_REG_DEV_TYPE_PCI2PCIE)) {
+	if ((pxb->pxb_port_type != PCIE_PCIECAP_DEV_TYPE_UP) &&
+	    (pxb->pxb_port_type != PCIE_PCIECAP_DEV_TYPE_DOWN) &&
+	    (pxb->pxb_port_type != PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) &&
+	    (pxb->pxb_port_type != PCIE_PCIECAP_DEV_TYPE_PCI2PCIE)) {
 		DBG(DBG_ATTACH, devi, "This is not a switch or bridge\n");
 		goto fail;
 	}
@@ -440,7 +434,7 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * PCI and PCI-X device driver's parent private data structure
 	 * as part of their init child function.
 	 */
-	if (pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_PCIE2PCI) {
+	if (pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) {
 		if (ndi_prop_update_int(DDI_DEV_T_NONE, pxb->pxb_dip,
 		    "pcie2pci-sec-bus", pci_config_get8(config_handle,
 		    PCI_BCNF_SECBUS)) != DDI_PROP_SUCCESS) {
@@ -488,9 +482,9 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		goto hotplug_done;
 #endif /* PX_PLX */
 
-	if ((pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_DOWN) ||
-	    (pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_PCIE2PCI) ||
-	    (pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_PCI2PCIE)) {
+	if ((pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_DOWN) ||
+	    (pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) ||
+	    (pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE)) {
 #ifdef PX_PLX
 		/*
 		 * Workaround for a race condition between hotplug
@@ -1027,7 +1021,7 @@ pxb_initchild(dev_info_t *child)
 	for (i = 0; i < pxb_tlp_count; i += 1)
 		reg |= pci_config_get16(config_handle, PCI_CONF_VENID);
 
-	if (pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_PCIE2PCI)
+	if (pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI)
 		pxb_set_pci_perf_parameters(child, config_handle);
 
 	pci_config_teardown(&config_handle);
@@ -1313,14 +1307,14 @@ pxb_init_hotplug(pxb_devstate_t *pxb)
 
 	pxb->pxb_hpc_type = HPC_NONE;
 
-	if (((pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_DOWN) ||
-	    (pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_PCI2PCIE)) &&
+	if (((pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_DOWN) ||
+	    (pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE)) &&
 	    (pxb_pciehpc_probe(pxb->pxb_dip,
 	    pxb->pxb_config_handle) == DDI_SUCCESS)) {
 		rv = pciehpc_init(pxb->pxb_dip, NULL);
 		if (rv == DDI_SUCCESS)
 			pxb->pxb_hpc_type = HPC_PCIE;
-	} else if ((pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_PCIE2PCI) &&
+	} else if ((pxb->pxb_port_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) &&
 		    (pxb_pcishpc_probe(pxb->pxb_dip,
 		    pxb->pxb_config_handle) == DDI_SUCCESS)) {
 		rv = pcishpc_init(pxb->pxb_dip);
@@ -2064,7 +2058,6 @@ pxb_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 	return (ret);
 }
 
-#ifdef	BCM_SW_WORKAROUNDS
 /*
  * FDVMA feature is not supported for any child device of Broadcom 5714/5715
  * PCIe-PCI bridge due to prefetch bug. Return failure immediately, so that
@@ -2076,13 +2069,27 @@ pxb_dma_mctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	enum ddi_dma_ctlops cmd, off_t *offp, size_t *lenp, caddr_t *objp,
 	uint_t cache_flags)
 {
+	int	ret;
+
+#ifdef	BCM_SW_WORKAROUNDS
 	if (cmd == DDI_DMA_RESERVE)
 		return (DDI_FAILURE);
-
-	return (ddi_dma_mctl(dip, rdip, handle, cmd, offp, lenp, objp,
-	    cache_flags));
-}
 #endif	/* BCM_SW_WORKAROUNDS */
+
+	if (((ret = ddi_dma_mctl(dip, rdip, handle, cmd, offp, lenp, objp,
+	    cache_flags)) == DDI_SUCCESS) && (cmd == DDI_DMA_RESERVE)) {
+		ddi_dma_impl_t	*mp = (ddi_dma_impl_t *)*objp;
+
+		/*
+		 * For a given rdip, update mp->dmai_bdf with the bdf value
+		 * of px_pci's immediate child or secondary bus-id of the
+		 * PCIe2PCI bridge.
+		 */
+		mp->dmai_minxfer = pcie_get_bdf_for_dma_xfer(dip, rdip);
+	}
+
+	return (ret);
+}
 
 #ifdef DEBUG
 static void

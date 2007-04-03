@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -204,6 +204,14 @@ px_fdvma_reserve(dev_info_t *dip, dev_info_t *rdip, px_t *px_p,
 	mp->dmai_size = npages * MMU_PAGE_SIZE;
 	mp->dmai_nwin = 0;
 	mp->dmai_fdvma = (caddr_t)fdvma_p;
+
+	/*
+	 * For a given rdip, set mp->dmai_bdf with the bdf value of px's
+	 * immediate child. As we move down the PCIe fabric, this field
+	 * may be modified by switch and bridge drivers.
+	 */
+	mp->dmai_bdf = pcie_get_bdf_for_dma_xfer(dip, rdip);
+
 	DBG(DBG_DMA_CTL, dip,
 		"DDI_DMA_RESERVE: mp=%p dvma=%x npages=%x private=%p\n",
 		mp, mp->dmai_mapping, npages, fdvma_p);

@@ -109,10 +109,10 @@ typedef struct pcie_ppd {
 	uint8_t		ppd_hdr_type;		/* pci header type, see pci.h */
 	uint8_t		ppd_dev_type;		/* PCI-E dev type, see pcie.h */
 	uint8_t		ppd_bdg_secbus;		/* Bridge secondary bus num */
+	pcie_req_id_t	ppd_pcie2pci_secbus;	/* PCIe2PCI Bridge secbus num */
 	uint16_t	ppd_pcie_off;		/* PCIe Capability Offset */
 	uint16_t	ppd_aer_off;		/* PCIe Advanced Error Offset */
 	uint16_t	ppd_pcix_off;		/* PCIx Capability Offset */
-	uint8_t		ppd_pcie_phfun;		/* Phantom funs for pcix/pcie */
 	pci_bus_range_t	ppd_bus_range;		/* pci bus-range property */
 	ppb_ranges_t	*ppd_addr_ranges;	/* pci range property */
 	int		ppd_addr_entries;	/* number of range prop */
@@ -122,10 +122,10 @@ typedef struct pcie_ppd {
 
 #define	PCI_GET_BDF(dip)	\
 	((pcie_ppd_t *)pcie_get_ppd(dip))->ppd_bdf
-#define	PCI_GET_SEC_BUS(dip)	\
+#define	PCI_GET_BDG_SECBUS(dip)	\
 	((pcie_ppd_t *)pcie_get_ppd(dip))->ppd_bdg_secbus
-#define	PCI_GET_PHFUN(dip)	\
-	((pcie_ppd_t *)pcie_get_ppd(dip))->ppd_pcie_phfun
+#define	PCI_GET_PCIE2PCI_SECBUS(dip)	\
+	((pcie_ppd_t *)pcie_get_ppd(dip))->ppd_pcie2pci_secbus
 
 /*
  * The following flag is used for Broadcom 5714/5715 bridge prefetch issue.

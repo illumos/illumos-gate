@@ -39,29 +39,8 @@ extern "C" {
 #define	PXB_BRIDGE_CONF		0x40
 
 /*
- * Generic - PCI Express Capability List Structure
- * XXX - Should be moved to a more PCI generic location
- */
-#define	PX_CAP_REG	0x2
-
-/*
- * Generic - PCI Express Capabilities Register
- * XXX - Should be moved to a more PCI generic location
- */
-#define	PX_CAP_REG_DEV_TYPE_PCIE_DEV	0x0000	/* PCI-E Endpont Device */
-#define	PX_CAP_REG_DEV_TYPE_PCI_DEV	0x0010	/* Leg PCI Endpont Device */
-#define	PX_CAP_REG_DEV_TYPE_ROOT	0x0040	/* Root Port of Root Complex */
-#define	PX_CAP_REG_DEV_TYPE_UP		0x0050	/* Upstream Port of Switch */
-#define	PX_CAP_REG_DEV_TYPE_DOWN	0x0060	/* Downstream Port of Switch */
-#define	PX_CAP_REG_DEV_TYPE_PCIE2PCI	0x0070	/* PCI-E to PCI Bridge */
-#define	PX_CAP_REG_DEV_TYPE_PCI2PCIE	0x0080	/* PCI to PCI-E Bridge */
-#define	PX_CAP_REG_DEV_TYPE_MASK	0x00F0	/* Device/Port Type Mask */
-
-/*
  * PCI/PCI-E Configuration register specific values.
  */
-
-
 #define	PX_PMODE	0x4000		/* PCI/PCIX Mode */
 #define	PX_PFREQ_66	0x200		/* PCI clock frequency */
 #define	PX_PFREQ_100	0x400

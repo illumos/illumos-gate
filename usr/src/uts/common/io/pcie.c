@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -202,6 +202,8 @@ pcie_init_ppd(dev_info_t *cdip)
 	/* Save the Header Type */
 	ppd_p->ppd_hdr_type = pci_config_get8(eh, PCI_CONF_HEADER);
 	ppd_p->ppd_hdr_type &= PCI_HEADER_TYPE_M;
+	ppd_p->ppd_pcie2pci_secbus = ddi_prop_get_int(DDI_DEV_T_ANY, cdip, 0,
+	    "pcie2pci-sec-bus", 0);
 
 	/* Save the Range information if device is a switch/bridge */
 	if (ppd_p->ppd_hdr_type == PCI_HEADER_ONE) {
@@ -237,16 +239,11 @@ pcie_init_ppd(dev_info_t *cdip)
 		    ppd_p->ppd_pcie_off, PCIE_PCIECAP) &
 		    PCIE_PCIECAP_DEV_TYPE_MASK;
 
-		ppd_p->ppd_pcie_phfun = (pci_config_get8(eh,
-		    ppd_p->ppd_pcie_off + PCIE_DEVCAP) &
-		    PCIE_DEVCAP_PHTM_FUNC_MASK) >> 3;
-
 		if (PCI_CAP_LOCATE(eh, PCI_CAP_XCFG_SPC(PCIE_EXT_CAP_ID_AER),
 			&ppd_p->ppd_aer_off) != DDI_SUCCESS)
 			ppd_p->ppd_aer_off = NULL;
 	} else {
 		ppd_p->ppd_pcie_off = NULL;
-		ppd_p->ppd_pcie_phfun = NULL;
 		ppd_p->ppd_dev_type = PCIE_PCIECAP_DEV_TYPE_PCI_DEV;
 	}
 
@@ -626,9 +623,11 @@ pcie_get_bdf_for_dma_xfer(dev_info_t *dip, dev_info_t *rdip)
 	/*
 	 * For a given rdip, return the bdf value of dip's (px or px_pci)
 	 * immediate child or secondary bus-id if dip is a PCIe2PCI bridge.
+	 *
+	 * XXX - For now, return bdf value of zero for all PCI and PCI-X devices
+	 * since this needs more work.
 	 */
-	return (PCI_GET_SEC_BUS(cdip) ?
-	    PCI_GET_SEC_BUS(cdip) : PCI_GET_BDF(cdip));
+	return (PCI_GET_PCIE2PCI_SECBUS(cdip) ? 0 : PCI_GET_BDF(cdip));
 }
 
 /*
