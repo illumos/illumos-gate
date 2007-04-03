@@ -691,76 +691,156 @@ KMF_OID2String(KMF_OID *oid)
 }
 
 static boolean_t
-check_for_pem(char *filename)
+check_for_pem(uchar_t *buf, KMF_ENCODE_FORMAT *fmt)
 {
-	KMF_DATA filebuf;
-	KMF_RETURN rv;
 	char *p;
 
-	rv = KMF_ReadInputFile(NULL, filename, &filebuf);
-	if (rv != KMF_OK)
+	if (buf == NULL)
 		return (FALSE);
 
+	if (memcmp(buf, "Bag Attr", 8) == 0) {
+		*fmt = KMF_FORMAT_PEM_KEYPAIR;
+		return (TRUE);
+	}
+
 	/* Look for "-----BEGIN" right after a newline */
-	p = strtok((char *)filebuf.Data, "\n");
+	p = strtok((char *)buf, "\n");
 	while (p != NULL) {
 		if (strstr(p, "-----BEGIN") != NULL) {
-			free(filebuf.Data);
+			*fmt = KMF_FORMAT_PEM;
 			return (TRUE);
 		}
 		p = strtok(NULL, "\n");
 	}
-	free(filebuf.Data);
 	return (FALSE);
+}
+
+
+static unsigned char pkcs12_version[3] = {0x02, 0x01, 0x03};
+static unsigned char pkcs12_oid[11] =
+{0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x07, 0x01};
+
+/*
+ * This function takes a BER encoded string as input and checks the version
+ * and the oid in the the top-level ASN.1 structure to see if it complies to
+ * the PKCS#12 Syntax.
+ */
+static boolean_t
+check_for_pkcs12(uchar_t *buf, int buf_len)
+{
+	int index = 0;
+	int length_octets;
+
+	if (buf == NULL || buf_len <= 0)
+		return (FALSE);
+
+	/*
+	 * The top level structure for a PKCS12 string:
+	 *
+	 * PFX ::= SEQUENCE {
+	 *	version		INTEGER {v3(3)}(v3,...)
+	 *	authSafe	ContentInfo
+	 *	macData		MacData OPTIONAL
+	 * }
+	 *
+	 * ContentInfo
+	 *	FROM PKCS-7 {iso(1) member-body(2) us(840) rsadsi(113549)
+	 *		pkcs(1) pkcs-7(7) modules(0) pkcs-7(1)}
+	 *
+	 * Therefore, the BER/DER dump of a PKCS#12 file for the first 2
+	 * sequences up to the oid part is as following:
+	 *
+	 *	SEQUENCE {
+	 *	    INTEGER 3
+	 *	    SEQUENCE {
+	 *		OBJECT IDENTIFIER data (1 2 840 113549 1 7 1)
+	 */
+
+	/*
+	 * Check the first sequence and calculate the number of bytes used
+	 * to store the length.
+	 */
+	if (buf[index++] != 0x30)
+		return (FALSE);
+
+	if (buf[index] & 0x80) {
+		length_octets = buf[index++] & 0x0F;  /* long form */
+	} else {
+		length_octets = 1; /* short form */
+	}
+
+	index += length_octets;
+	if (index  >= buf_len)
+		return (FALSE);
+
+	/* Skip the length octets and check the pkcs12 version */
+	if (memcmp(buf + index, pkcs12_version, sizeof (pkcs12_version)) != 0)
+		return (FALSE);
+
+	index += sizeof (pkcs12_version);
+	if (index  >= buf_len)
+		return (FALSE);
+
+	/*
+	 * Check the 2nd sequence and calculate the number of bytes used
+	 * to store the length.
+	 */
+	if ((buf[index++] & 0xFF) != 0x30)
+		return (FALSE);
+
+	if (buf[index] & 0x80) {
+		length_octets = buf[index++] & 0x0F;
+	} else {
+		length_octets = 1;
+	}
+
+	index += length_octets;
+	if (index + sizeof (pkcs12_oid) >= buf_len)
+		return (FALSE);
+
+	/* Skip the length octets and check the oid */
+	if (memcmp(buf + index, pkcs12_oid, sizeof (pkcs12_oid)) != 0)
+		return (FALSE);
+	else
+		return (TRUE);
 }
 
 KMF_RETURN
 KMF_GetFileFormat(char *filename, KMF_ENCODE_FORMAT *fmt)
 {
-	int f;
 	KMF_RETURN ret = KMF_OK;
-	uchar_t buf[16];
+	KMF_DATA filebuf = {NULL, 0};
+	uchar_t *buf;
 
 	if (filename == NULL || !strlen(filename) || fmt == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	*fmt = 0;
-	if ((f = open(filename, O_RDONLY)) == -1) {
-		return (KMF_ERR_OPEN_FILE);
-	}
+	ret = KMF_ReadInputFile(NULL, filename, &filebuf);
+	if (ret != KMF_OK)
+		return (ret);
 
-	if (read(f, buf, 8) != 8) {
-		ret = KMF_ERR_OPEN_FILE;
+	if (filebuf.Length < 8) {
+		ret = KMF_ERR_ENCODING; /* too small */
 		goto end;
 	}
 
-	(void) close(f);
-	if (buf[0] == 0x30 && (buf[1] & 0x80)) {
-		if ((buf[1] & 0xFF) == 0x80 &&
-		    (buf[2] & 0xFF) == 0x02 &&
-		    (buf[5] & 0xFF) == 0x30) {
-			*fmt = KMF_FORMAT_PKCS12;
-		} else if ((buf[1] & 0xFF) == 0x82 &&
-			(buf[4] & 0xFF) == 0x02 &&
-			(buf[7] & 0xFF) == 0x30) {
-			*fmt = KMF_FORMAT_PKCS12;
+	buf = filebuf.Data;
+	if (check_for_pkcs12(buf, filebuf.Length) == TRUE) {
+		*fmt = KMF_FORMAT_PKCS12;
+	} else if (buf[0] == 0x30 && (buf[1] & 0x80)) {
 		/* It is most likely a generic ASN.1 encoded file */
-		} else {
-			*fmt = KMF_FORMAT_ASN1;
-		}
-	} else if (memcmp(buf, "Bag Attr", 8) == 0) {
-		*fmt = KMF_FORMAT_PEM_KEYPAIR;
+		*fmt = KMF_FORMAT_ASN1;
+	} else if (check_for_pem(buf, fmt) == TRUE) {
+		goto end;
 	} else {
-		/* Try PEM */
-		if (check_for_pem(filename) == TRUE) {
-			*fmt = KMF_FORMAT_PEM;
-		} else {
-			/* Cannot determine this file format */
-			*fmt = 0;
-			ret = KMF_ERR_ENCODING;
-		}
+		/* Cannot determine this file format */
+		*fmt = 0;
+		ret = KMF_ERR_ENCODING;
 	}
+
 end:
+	KMF_FreeData(&filebuf);
 	return (ret);
 }
 
