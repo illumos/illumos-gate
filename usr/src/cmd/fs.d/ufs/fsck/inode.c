@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1386,7 +1386,14 @@ freeino(fsck_ino_t ino, int update_parent)
 
 	n_files--;
 	dp = ginode(ino);
-	if (dp->di_size > (u_offset_t)MAXOFF_T) {
+	/*
+	 * We need to make sure that the file is really a large file.
+	 * Everything bigger than UFS_MAXOFFSET_T is treated as a file with
+	 * negative size, which shall be cleared. (see verify_inode() in
+	 * pass1.c)
+	 */
+	if (dp->di_size > (u_offset_t)MAXOFF_T &&
+	    dp->di_size <= (u_offset_t)UFS_MAXOFFSET_T) {
 		largefile_count--;
 	}
 	truncino(ino, 0, update_parent);
