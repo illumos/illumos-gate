@@ -1792,7 +1792,7 @@ udp_connect(queue_t *q, mblk_t *mp)
 	}
 
 	/*
-	 * Verify that the src/port/dst/port is unique for all
+	 * Verify that the src/port/dst/port and zoneid is unique for all
 	 * connections in TS_DATA_XFER
 	 */
 	mutex_enter(&udpf->uf_lock);
@@ -1803,7 +1803,8 @@ udp_connect(queue_t *q, mblk_t *mp)
 		    udp->udp_ipversion != udp1->udp_ipversion ||
 		    dstport != udp1->udp_dstport ||
 		    !IN6_ARE_ADDR_EQUAL(&udp->udp_v6src, &udp1->udp_v6src) ||
-		    !IN6_ARE_ADDR_EQUAL(&v6dst, &udp1->udp_v6dst))
+		    !IN6_ARE_ADDR_EQUAL(&v6dst, &udp1->udp_v6dst) ||
+		    udp->udp_connp->conn_zoneid != udp1->udp_connp->conn_zoneid)
 			continue;
 		mutex_exit(&udpf->uf_lock);
 		udp_err_ack(q, mp, TBADADDR, 0);
