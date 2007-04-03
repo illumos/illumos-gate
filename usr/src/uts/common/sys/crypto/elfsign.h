@@ -187,6 +187,7 @@ extern boolean_t elfsign_sig_info(struct filesignatures *fssp,
     struct ELFsign_sig_info **esipp);
 extern void elfsign_sig_info_free(struct ELFsign_sig_info *);
 
+extern ELFsign_t elfsign_new_ess(void);
 
 /*
  * ELF "Certificate Library"
