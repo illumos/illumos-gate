@@ -2519,6 +2519,9 @@ px_lib_hotplug_init(dev_info_t *dip, void *arg)
 
 		VERIFY(add_ivintr(sysino, PX_PCIEHP_PIL,
 		    (intrfunc)px_hp_intr, (caddr_t)px_p, NULL, NULL) == 0);
+
+		px_ib_intr_enable(px_p, intr_dist_cpuid(),
+		    px_p->px_inos[PX_INTR_HOTPLUG]);
 	}
 
 	return (ret);
@@ -2542,7 +2545,22 @@ px_lib_hotplug_uninit(dev_info_t *dip)
 			return;
 		}
 
+		px_ib_intr_disable(px_p->px_ib_p,
+		    px_p->px_inos[PX_INTR_HOTPLUG], IB_INTR_WAIT);
+
 		VERIFY(rem_ivintr(sysino, PX_PCIEHP_PIL) == 0);
+	}
+}
+
+/*
+ * px_hp_intr_redist() - sun4u only, HP interrupt redistribution
+ */
+void
+px_hp_intr_redist(px_t *px_p)
+{
+	if (px_p && (px_p->px_dev_caps & PX_HOTPLUG_CAPABLE)) {
+		px_ib_intr_dist_en(px_p->px_dip, intr_dist_cpuid(),
+		    px_p->px_inos[PX_INTR_HOTPLUG], B_FALSE);
 	}
 }
 

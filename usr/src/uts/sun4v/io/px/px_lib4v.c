@@ -1908,6 +1908,12 @@ px_lib_hotplug_uninit(dev_info_t *dip)
 {
 }
 
+/*ARGSUSED*/
+void
+px_hp_intr_redist(px_t *px_p)
+{
+}
+
 /* Dummy cpr add callback */
 /*ARGSUSED*/
 void

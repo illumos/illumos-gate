@@ -206,6 +206,7 @@ extern void px_cpr_rem_callb(px_t *);
  */
 extern int px_lib_hotplug_init(dev_info_t *dip, void *regops);
 extern void px_lib_hotplug_uninit(dev_info_t *dip);
+extern void px_hp_intr_redist(px_t *px_p);
 
 extern boolean_t px_lib_is_in_drain_state(px_t *px_p);
 extern pcie_req_id_t px_lib_get_bdf(px_t *px_p);

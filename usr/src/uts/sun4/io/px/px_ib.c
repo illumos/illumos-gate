@@ -305,6 +305,8 @@ px_ib_intr_redist(void *arg, int32_t weight_max, int32_t weight)
 		px_ib_intr_dist_en(dip, intr_dist_cpuid(),
 		    px_p->px_inos[PX_INTR_PEC], B_FALSE);
 		mutex_exit(&ib_p->ib_intr_lock);
+
+		px_hp_intr_redist(px_p);
 	}
 
 	/* Redistribute device interrupts */
