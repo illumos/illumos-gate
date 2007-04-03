@@ -1759,7 +1759,9 @@ opl_vtop(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 	for (resp = rp->head; resp != NULL; resp = resp->next) {
 		if (resp->type != RT_CONTIGIOUS)
 			continue;
-		if (resp->fc_contig_virt == (void *)(uintptr_t)vaddr)
+		if (((uint64_t)resp->fc_contig_virt <= vaddr) &&
+		    (vaddr < (uint64_t)resp->fc_contig_virt +
+		    resp->fc_contig_len))
 			break;
 	}
 	fc_unlock_resource_list(rp);
