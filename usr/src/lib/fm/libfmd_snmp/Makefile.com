@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,7 +56,7 @@ SNMPLIBS = -L$(SFWLIBDIR) -lnetsnmp -lnetsnmphelpers -lnetsnmpagent
 lint := SNMPLIBS=
 
 LDLIBS += $(MACH_LDLIBS)
-LDLIBS += -lfmd_adm -luutil -lnvpair
+LDLIBS += -lfmd_adm -luutil -lnvpair -ltopo
 LDLIBS += $(SNMPLIBS)
 LDLIBS += -lc
 DYNFLAGS += -R$(SFWLIBDIR)

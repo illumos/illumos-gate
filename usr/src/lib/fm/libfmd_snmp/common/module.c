@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -154,10 +154,8 @@ module_lookup_index_nextvalid(const ulong_t index)
 
 	data = uu_avl_nearest_next(mod_index_avl, idx);
 
-	while (data != NULL && !MODULE_DATA_VALID(data)) {
-		(void) uu_avl_find(mod_index_avl, data, NULL, &idx);
-		data = uu_avl_nearest_next(mod_index_avl, idx);
-	}
+	while (data != NULL && !MODULE_DATA_VALID(data))
+		data = uu_avl_next(mod_index_avl, data);
 
 	return (data);
 }
@@ -528,7 +526,7 @@ sunFmModuleTable_nextmod(netsnmp_handler_registration *reginfo,
 		return (NULL);
 	}
 
-	*var->val.integer = index;
+	*var->val.integer = data->d_index;
 	table_info->indexes = var;
 	table_info->number_indexes = 1;
 

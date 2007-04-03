@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,8 +62,6 @@ static uu_avl_t		*problem_uuid_avl;
 #define	UCT_INDEX	0x1
 #define	UCT_ALL		0x2
 #define	UCT_FLAGS	0x3
-
-#define	MODULE_DATA_VALID(d)	((d)->d_valid == valid_stamp)
 
 /*
  * Locking strategy is described in module.c.

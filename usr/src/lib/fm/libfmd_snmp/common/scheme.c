@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,7 @@
 #include <sys/types.h>
 #include <sys/systeminfo.h>
 #include <fm/fmd_snmp.h>
+#include <fm/libtopo.h>
 #include <net-snmp/net-snmp-config.h>
 #include <net-snmp/net-snmp-includes.h>
 #include <net-snmp/agent/net-snmp-agent-includes.h>
@@ -72,6 +73,7 @@ typedef struct fmd_scheme {
 
 static fmd_scheme_t *sch_list;		/* list of cached schemes */
 static char *g_root;			/* fmd root dir */
+static struct topo_hdl *g_thp;
 
 static long
 fmd_scheme_notsup(void)
@@ -295,4 +297,21 @@ fmd_fmri_set_errno(int err)
 void
 fmd_fmri_warn(const char *format, ...)
 {
+}
+
+/*ARGSUSED*/
+struct topo_hdl *
+fmd_fmri_topology(int version)
+{
+	int err;
+
+	if (g_thp == NULL) {
+		if ((g_thp = topo_open(TOPO_VERSION, "/", &err)) == NULL) {
+			DEBUGMSGTL((MODNAME_STR, "topo_open failed: %s\n",
+			    topo_strerror(err)));
+			return (NULL);
+		}
+	}
+
+	return (g_thp);
 }
