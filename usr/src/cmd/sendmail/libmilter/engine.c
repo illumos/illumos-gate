@@ -11,7 +11,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sm/gen.h>
-SM_RCSID("@(#)$Id: engine.c,v 8.155 2006/12/19 22:18:55 ca Exp $")
+SM_RCSID("@(#)$Id: engine.c,v 8.157 2007/03/26 18:10:04 ca Exp $")
 
 #include "libmilter.h"
 
@@ -736,6 +736,7 @@ sendreply(r, sd, timeout_ptr, ctx)
 **	Returns:
 **		None.
 */
+
 void
 mi_clr_macros(ctx, m)
 	SMFICTX_PTR ctx;
@@ -1192,6 +1193,7 @@ st_data(g)
 **	Returns:
 **		continue or filter-specified value
 */
+
 static int
 st_helo(g)
 	genarg *g;
@@ -1211,6 +1213,7 @@ st_helo(g)
 	}
 	return SMFIS_CONTINUE;
 }
+
 /*
 **  ST_HEADER -- header line
 **
@@ -1308,7 +1311,6 @@ st_unknown(g)
 
 	if (g == NULL)
 		return _SMFIS_ABORT;
-	mi_clr_macros(g->a_ctx, g->a_idx + 1);
 	if (g->a_ctx->ctx_smfi != NULL &&
 	    (fi_unknown = g->a_ctx->ctx_smfi->xxfi_unknown) != NULL)
 		return (*fi_unknown)(g->a_ctx, (const char *) g->a_buf);
@@ -1374,6 +1376,7 @@ st_macros(g)
 	g->a_ctx->ctx_mac_buf[i] = g->a_buf;
 	return _SMFIS_KEEP;
 }
+
 /*
 **  ST_QUIT -- quit command
 **
@@ -1399,6 +1402,7 @@ st_quit(g)
 	mi_clr_macros(g->a_ctx, 0);
 	return _SMFIS_NOREPLY;
 }
+
 /*
 **  ST_BODYCHUNK -- deal with a piece of the mail body
 **
@@ -1423,6 +1427,7 @@ st_bodychunk(g)
 				  g->a_len);
 	return SMFIS_CONTINUE;
 }
+
 /*
 **  ST_BODYEND -- deal with the last piece of the mail body
 **
@@ -1470,6 +1475,7 @@ st_bodyend(g)
 		return (*fi_eom)(g->a_ctx);
 	return r;
 }
+
 /*
 **  ST_ABORTFCT -- deal with aborts
 **
@@ -1493,6 +1499,7 @@ st_abortfct(g)
 		(void) (*fi_abort)(g->a_ctx);
 	return _SMFIS_NOREPLY;
 }
+
 /*
 **  TRANS_OK -- is the state transition ok?
 **
@@ -1542,6 +1549,7 @@ trans_ok(old, new)
 	} while (s < SIZE_NEXT_STATES);
 	return false;
 }
+
 /*
 **  FIX_STM -- add "skip" bits to the state transition table
 **
@@ -1634,6 +1642,7 @@ dec_argv(buf, len)
 	s[elem] = NULL;
 	return s;
 }
+
 /*
 **  DEC_ARG2 -- split a buffer into two strings
 **
@@ -1666,6 +1675,7 @@ dec_arg2(buf, len, s1, s2)
 	*s2 = buf + i + 1;
 	return MI_SUCCESS;
 }
+
 /*
 **  SENDOK -- is it ok for the filter to send stuff to the MTA?
 **

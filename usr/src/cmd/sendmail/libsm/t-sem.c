@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2001, 2005-2006 Sendmail, Inc. and its suppliers.
+ * Copyright (c) 2000-2001, 2005-2007 Sendmail, Inc. and its suppliers.
  *      All rights reserved.
  *
  * By using this file, you agree to the terms and conditions set
@@ -10,7 +10,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sm/gen.h>
-SM_RCSID("@(#)$Id: t-sem.c,v 1.15 2006/03/13 20:40:43 msk Exp $")
+SM_RCSID("@(#)$Id: t-sem.c,v 1.16 2007/03/21 23:22:10 ca Exp $")
 
 #include <stdio.h>
 
@@ -23,6 +23,8 @@ SM_RCSID("@(#)$Id: t-sem.c,v 1.15 2006/03/13 20:40:43 msk Exp $")
 # include <sm/signal.h>
 # include <sm/test.h>
 # include <sm/sem.h>
+
+# define T_SM_SEM_KEY (4321L)
 
 static void
 delay(t, s)
@@ -60,7 +62,7 @@ seminter(owner)
 	int semid;
 	int t;
 
-	semid = sm_sem_start(SM_SEM_KEY, SM_NSEM, 0, owner);
+	semid = sm_sem_start(T_SM_SEM_KEY, SM_NSEM, 0, owner);
 	if (semid < 0)
 	{
 		perror("sm_sem_start failed");
@@ -147,7 +149,7 @@ semtest(owner)
 	int semid, r;
 	int cnt = 0;
 
-	semid = sm_sem_start(SM_SEM_KEY, 1, 0, owner);
+	semid = sm_sem_start(T_SM_SEM_KEY, 1, 0, owner);
 	if (semid < 0)
 	{
 		perror("sm_sem_start failed");

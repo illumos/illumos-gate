@@ -16,7 +16,7 @@
 #include <sendmail.h>
 #include <sm/sendmail.h>
 
-SM_RCSID("@(#)$Id: headers.c,v 8.309 2007/01/08 23:53:25 ca Exp $")
+SM_RCSID("@(#)$Id: headers.c,v 8.310 2007/02/07 22:44:35 ca Exp $")
 
 static HDR	*allocheader __P((char *, char *, int, SM_RPOOL_T *, bool));
 static size_t	fix_mime_header __P((HDR *, ENVELOPE *));
@@ -851,7 +851,8 @@ eatheader(e, full, log)
 				sm_dprintf(") ");
 			}
 			expand(h->h_value, buf, sizeof(buf), e);
-			if (buf[0] != '\0')
+			if (buf[0] != '\0' &&
+			    (buf[0] != ' ' || buf[1] != '\0'))
 			{
 				if (bitset(H_FROM, h->h_flags))
 					expand(crackaddr(buf, e),
