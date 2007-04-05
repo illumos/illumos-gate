@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 CLEANUP_FILE=/tmp/CLEANUP
@@ -32,20 +31,9 @@ KERB_ENTRIES=$PAM_TMP/scr.$$
 PPP_ENTRIES=$PAM_TMP/scp.$$
 CRON_ENTRIES=$PAM_TMP/scc.$$
 mkdir $PAM_TMP  || exit 1
-KRB5_CONF_FILE=$BASEDIR/etc/krb5/krb5.conf
-COMMENT_PREFIX="#"
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
-
-kerberos_configured() {
-	if [ -f $KRB5_CONF_FILE ]; then
-		grep "___default_realm___" $KRB5_CONF_FILE > /dev/null 2>&1
-		if [ $? = 1 ]; then
-			COMMENT_PREFIX=""
-		fi
-	fi
-}
 
 setup_kerb_changes() {
 #
@@ -53,14 +41,11 @@ setup_kerb_changes() {
 #
 cat > ${KERB_ENTRIES} << EOF
 krlogin		auth		required	pam_unix_cred.so.1
-krlogin		auth		binding		pam_krb5.so.1
-krlogin		auth		required	pam_unix_auth.so.1
+krlogin		auth		required	pam_krb5.so.1
 krsh		auth		required	pam_unix_cred.so.1
-krsh		auth		binding		pam_krb5.so.1
-krsh		auth		required	pam_unix_auth.so.1
+krsh		auth		required	pam_krb5.so.1
 ktelnet		auth		required	pam_unix_cred.so.1
-ktelnet		auth		binding		pam_krb5.so.1
-ktelnet		auth		required	pam_unix_auth.so.1
+ktelnet		auth		required	pam_krb5.so.1
 EOF
 }
 
@@ -86,7 +71,6 @@ cron		account		required	pam_unix_account.so.1
 EOF
 }
 #
-kerberos_configured
 setup_kerb_changes
 setup_ppp_changes
 setup_cron_changes
@@ -279,6 +263,59 @@ do
 		    >> ${CLEANUP_FILE}
     		rm -f /tmp/pamconf.$$
     	fi
+
+#
+# update pam.conf to remove the rlogin entry that uses pam_krb5.so.1
+#
+	rm -f /tmp/pamconf.$$
+	sed -e "/^[# 	]*rlogin.*pam_krb5.so.1/d" \
+			$dest > /tmp/pamconf.$$
+	if [ $? -ne 0 ]; then
+		echo "Couldn't edit /tmp/pamconf.$$, rlogin lines have not been \
+			updated to remove pam_krb5.so.1." \
+			 >> ${CLEANUP_FILE}
+	else
+		cp /tmp/pamconf.$$ $dest
+	fi
+
+#
+# update pam.conf to remove obsolete flags used with pam_krb5.so.1
+#
+	rm -f /tmp/pamconf.$$
+	sed -e "s/\(pam_krb5.so.1.*\)acceptor/\1/g" \
+		-e "s/\(pam_krb5.so.1.*\)use_first_pass/\1/g" \
+		-e "s/\(pam_krb5.so.1.*\)try_first_pass/\1/g" \
+		-e "s/\(pam_krb5.so.1.*\)use_xfn_pass/\1/g" \
+		-e "s/\(pam_krb5.so.1.*\)try_xfn_pass/\1/g" \
+			$dest > /tmp/pamconf.$$
+	if [ $? -ne 0 ]; then
+		echo "Couldn't edit /tmp/pamconf.$$ to remove obsolete flags: \
+		acceptor, use_first_pass, try_first_pass, use_xfn_pass, try_xfn_pass." \
+			 >> ${CLEANUP_FILE}
+	else
+		cp /tmp/pamconf.$$ $dest
+	fi
+
+#
+# update pam.conf to remove the unnecessary unix_auth entries for the
+# kerberized services. 
+#
+	rm -f /tmp/pamconf.$$
+	sed -e "/^[# 	]*krlogin[ 	]*auth[ 	]*.*[ 	]*pam_unix_auth.so.1/d" \
+	 -e "/^[# 	]*krsh[ 	]*auth[ 	]*.*[ 	]*pam_unix_auth.so.1/d" \
+	 -e "/^[# 	]*ktelnet[ 	]*auth[ 	]*.*[ 	]*pam_unix_auth.so.1/d" \
+	 -e "s/^\([# 	]*krlogin[ 	]*auth[ 	]*\)binding/\1required/" \
+	 -e "s/^\([# 	]*krsh[ 	]*auth[ 	]*\)binding/\1required/" \
+	 -e "s/^\([# 	]*ktelnet[ 	]*auth[ 	]*\)binding/\1required/" \
+			$dest > /tmp/pamconf.$$
+	if [ $? -ne 0 ]; then
+		echo "Couldn't edit /tmp/pamconf.$$, krlogin, krsh, ktelnet may \
+				still have pam_unix_auth in their stacks." \
+			 >> ${CLEANUP_FILE}
+	else
+		cp /tmp/pamconf.$$ $dest
+	fi
+
 #
 # update pam.conf to append kerberos entries if not already present
 #
@@ -296,13 +333,21 @@ do
 			if [ $e1 = "dtlogin" ]; then
 				if grep "^[# 	]*$e1[ 	][ 	]*$e2[ 	]" \
 					$dest >/dev/null 2>&1; then
-					echo "$COMMENT_PREFIX$e1\t$e2 $e3\t\t$e4 $e5" >> /tmp/pamconf.$$ 
+					echo "$e1\t$e2 $e3\t\t$e4 $e5" >> /tmp/pamconf.$$ 
 				fi
 			else
 			# Doesn't exist, enter into pam.conf
-			echo "$COMMENT_PREFIX$e1\t$e2 $e3\t\t$e4 $e5" >> \
+			echo "$e1\t$e2 $e3\t\t$e4 $e5" >> \
 				/tmp/pamconf.$$
 			fi
+		else
+			# Does exist. To maintain proper stacking order: remove it
+			# and append it to the bottom of the conf file.
+			grep "^[# 	]*$e1[ 	][ 	]*$e2[ 	][ 	]*$e3[ 	][ 	]*$e4" \
+				$dest >> /tmp/pamconf.$$ 2>/dev/null
+			sed -e "/^[# 	]*$e1[ 	][ 	]*$e2[ 	][ 	]*$e3[ 	][ 	]*$e4/d" \
+				$dest > /tmp/pamconf2.$$
+			mv /tmp/pamconf2.$$ $dest
 		fi
 	done)
 	# Append kerberos lines if any were not present already.
