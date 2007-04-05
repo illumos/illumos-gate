@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -402,7 +402,8 @@ ddi_dmareq_mapin(struct ddi_dma_req *dmareqp, caddr_t *mapaddrp,
  * ddi_dmareq_mapin()
  */
 static void
-ddi_dmareq_mapout(caddr_t addr, offset_t len)
+ddi_dmareq_mapout(caddr_t addr, offset_t len, int map_flags, page_t *pp,
+    page_t **pplist)
 {
 	struct buf buf;
 
@@ -411,9 +412,11 @@ ddi_dmareq_mapout(caddr_t addr, offset_t len)
 	/*
 	 * mock up a buf structure
 	 */
-	buf.b_flags = B_REMAPPED;
+	buf.b_flags = B_REMAPPED | map_flags;
 	buf.b_un.b_addr = addr;
 	buf.b_bcount = (size_t)len;
+	buf.b_pages = pp;
+	buf.b_shadow = pplist;
 	bp_mapout(&buf);
 }
 
@@ -3364,6 +3367,15 @@ bofi_dma_map(dev_info_t *dip, dev_info_t *rdip,
 	hp->instance = ddi_get_instance(rdip);
 	hp->dip = rdip;
 	hp->flags = dmareqp->dmar_flags;
+	if (dmareqp->dmar_object.dmao_type == DMA_OTYP_PAGES) {
+		hp->map_flags = B_PAGEIO;
+		hp->map_pp = dmareqp->dmar_object.dmao_obj.pp_obj.pp_pp;
+	} else if (dmareqp->dmar_object.dmao_obj.virt_obj.v_priv != NULL) {
+		hp->map_flags = B_SHADOW;
+		hp->map_pplist = dmareqp->dmar_object.dmao_obj.virt_obj.v_priv;
+	} else {
+		hp->map_flags = 0;
+	}
 	hp->link = NULL;
 	hp->type = BOFI_DMA_HDL;
 	/*
@@ -3479,7 +3491,8 @@ error:
 	}
 error2:
 	if (hp) {
-		ddi_dmareq_mapout(hp->mapaddr, hp->len);
+		ddi_dmareq_mapout(hp->mapaddr, hp->len, hp->map_flags,
+		    hp->map_pp, hp->map_pplist);
 		if (bofi_sync_check && hp->allocaddr)
 			ddi_umem_free(hp->umem_cookie);
 		kmem_free(hp, sizeof (struct bofi_shadow));
@@ -3693,6 +3706,15 @@ bofi_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 		return (DDI_DMA_INUSE);
 
 	hp->flags = dmareqp->dmar_flags;
+	if (dmareqp->dmar_object.dmao_type == DMA_OTYP_PAGES) {
+		hp->map_flags = B_PAGEIO;
+		hp->map_pp = dmareqp->dmar_object.dmao_obj.pp_obj.pp_pp;
+	} else if (dmareqp->dmar_object.dmao_obj.virt_obj.v_priv != NULL) {
+		hp->map_flags = B_SHADOW;
+		hp->map_pplist = dmareqp->dmar_object.dmao_obj.virt_obj.v_priv;
+	} else {
+		hp->map_flags = 0;
+	}
 	/*
 	 * get a kernel virtual mapping
 	 */
@@ -3760,7 +3782,8 @@ error:
 	}
 error2:
 	if (hp) {
-		ddi_dmareq_mapout(hp->mapaddr, hp->len);
+		ddi_dmareq_mapout(hp->mapaddr, hp->len, hp->map_flags,
+		    hp->map_pp, hp->map_pplist);
 		if (bofi_sync_check && hp->allocaddr)
 			ddi_umem_free(hp->umem_cookie);
 		hp->mapaddr = NULL;
@@ -3839,7 +3862,8 @@ bofi_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 		 */
 		if (hp->allocaddr)
 			xbcopy(hp->addr, hp->origaddr, hp->len);
-	ddi_dmareq_mapout(hp->mapaddr, hp->len);
+	ddi_dmareq_mapout(hp->mapaddr, hp->len, hp->map_flags,
+	    hp->map_pp, hp->map_pplist);
 	if (bofi_sync_check && hp->allocaddr)
 		ddi_umem_free(hp->umem_cookie);
 	hp->mapaddr = NULL;
@@ -4103,7 +4127,8 @@ bofi_dma_ctl(dev_info_t *dip, dev_info_t *rdip,
 		if (bofi_sync_check && (hp->flags & DDI_DMA_READ))
 			if (hp->allocaddr)
 				xbcopy(hp->addr, hp->origaddr, hp->len);
-		ddi_dmareq_mapout(hp->mapaddr, hp->len);
+		ddi_dmareq_mapout(hp->mapaddr, hp->len, hp->map_flags,
+		    hp->map_pp, hp->map_pplist);
 		if (bofi_sync_check && hp->allocaddr)
 			ddi_umem_free(hp->umem_cookie);
 		kmem_free(hp, sizeof (struct bofi_shadow));

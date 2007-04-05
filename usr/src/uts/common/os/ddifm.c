@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -772,7 +772,11 @@ ddi_fm_fini(dev_info_t *dip)
 	}
 
 	if (dip != ddi_root_node()) {
-		ddi_fm_handler_unregister(dip);
+		if (DDI_FM_ERRCB_CAP(fmhdl->fh_cap)) {
+			ddi_fm_handler_unregister(dip);
+			(void) ddi_prop_remove(DDI_DEV_T_NONE, dip,
+			    "fm-errcb-capable");
+		}
 
 		if (DDI_FM_DMA_ERR_CAP(fmhdl->fh_cap) ||
 		    DDI_FM_ACC_ERR_CAP(fmhdl->fh_cap)) {
