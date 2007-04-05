@@ -2120,6 +2120,13 @@ else
 	done
 fi
 
+if grep '^[ 	]*zfsroot:' $root/etc/system >/dev/null ; then
+	echo "Cannot BFU a system with the mountroot version"\
+		"of zfs boot support."
+	echo "See http://www.opensolaris.org/os/community/on/flag-days/pages/2007032801"
+	fail ""
+fi
+
 nss_lib="$usr/lib/mps/libnss3.so"
 nss_lib64="$usr/lib/mps/64/libnss3.so"
 valid_rpath="\$ORIGIN:/usr/lib/mps/secv1:/usr/lib/mps"
