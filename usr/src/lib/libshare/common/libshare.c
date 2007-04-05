@@ -735,18 +735,42 @@ sa_init(int init_service)
 			(void) lockf(lockfd, F_ULOCK, 0);
 			(void) close(lockfd);
 		    }
-		    (void) sa_get_config(handle->scfhandle, &handle->tree,
-				    &handle->doc, handle);
-		    /* need to setup for later searchs when using group/share */
-		    err = add_handle_for_root(handle->tree, handle);
+
+		/*
+		 * It is essential that the document tree and
+		 * the internal list of roots to handles be
+		 * setup before anything that might try to
+		 * create a new object is called. The document
+		 * tree is the combination of handle->doc and
+		 * handle->tree. This allows searches,
+		 * etc. when all you have is an object in the
+		 * tree.
+		 */
+		    handle->doc = xmlNewDoc((xmlChar *)"1.0");
+		    handle->tree = xmlNewNode(NULL, (xmlChar *)"sharecfg");
+		    if (handle->doc != NULL && handle->tree != NULL) {
+			xmlDocSetRootElement(handle->doc, handle->tree);
+			err = add_handle_for_root(handle->tree, handle);
+			if (err == SA_OK)
+			    err = sa_get_config(handle->scfhandle,
+						    handle->tree, handle);
+		    } else {
+			if (handle->doc != NULL)
+			    xmlFreeDoc(handle->doc);
+			if (handle->tree != NULL)
+			    xmlFreeNode(handle->tree);
+			err = SA_NO_MEMORY;
+		    }
+
 		    saunblocksigs(&old);
 
 		    if (err != SA_OK) {
 			/*
-			 * If we couldn't add the tree handle to the
-			 * list, then things are going to fail
-			 * badly. Might as well undo everything now
-			 * and fail the sa_init().
+			 * If we couldn't add the tree handle
+			 * to the list, then things are going
+			 * to fail badly. Might as well undo
+			 * everything now and fail the
+			 * sa_init().
 			 */
 			sa_fini(handle);
 			return (NULL);
@@ -764,6 +788,7 @@ sa_init(int init_service)
 				opt = sa_create_optionset(defgrp, "nfs");
 			}
 		    }
+
 		    if (updatelegacy == B_TRUE) {
 			sablocksigs(&old);
 			getlegacyconfig((sa_handle_t)handle,

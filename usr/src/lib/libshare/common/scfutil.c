@@ -934,20 +934,16 @@ sa_extract_defaults(xmlNodePtr root, scfutilhandle_t *handle,
  * below the groups based on property groups and properties.
  */
 int
-sa_get_config(scfutilhandle_t *handle, xmlNodePtr *root, xmlDocPtr *doc,
-		sa_handle_t sahandle)
+sa_get_config(scfutilhandle_t *handle, xmlNodePtr root, sa_handle_t sahandle)
 {
 	int ret = SA_OK;
 	scf_instance_t *instance;
 	scf_iter_t *iter;
 	char buff[BUFSIZ * 2];
 
-	*doc = xmlNewDoc((xmlChar *)"1.0");
-	*root = xmlNewNode(NULL, (xmlChar *)"sharecfg");
 	instance = scf_instance_create(handle->handle);
 	iter = scf_iter_create(handle->handle);
-	if (*doc != NULL && *root != NULL && instance != NULL && iter != NULL) {
-	    xmlDocSetRootElement(*doc, *root);
+	if (instance != NULL && iter != NULL) {
 	    if ((ret = scf_iter_service_instances(iter,
 						    handle->service)) == 0) {
 		while ((ret = scf_iter_next_instance(iter,
@@ -955,21 +951,14 @@ sa_get_config(scfutilhandle_t *handle, xmlNodePtr *root, xmlDocPtr *doc,
 		    if (scf_instance_get_name(instance, buff,
 						sizeof (buff)) > 0) {
 			if (strcmp(buff, "default") == 0)
-			    sa_extract_defaults(*root, handle, instance);
-			ret = sa_extract_group(*root, handle, instance,
+			    sa_extract_defaults(root, handle, instance);
+			ret = sa_extract_group(root, handle, instance,
 						sahandle);
 		    }
 		}
 	    }
-	} else {
-	    /* if we can't create the document, cleanup */
-	    if (*doc != NULL)
-		xmlFreeDoc(*doc);
-	    if (*root != NULL)
-		xmlFreeNode(*root);
-	    *doc = NULL;
-	    *root = NULL;
 	}
+
 	/* always cleanup these */
 	if (instance != NULL)
 	    scf_instance_destroy(instance);
