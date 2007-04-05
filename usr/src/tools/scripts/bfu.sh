@@ -4143,7 +4143,18 @@ extract_archives() {
 		test -h platform/$archive && rm platform/$archive
 		if [ $base = root ]; then
 			exclude="-f dev/fd home proc etc/mnttab"
-			exclude="$exclude etc/dfs/sharetab"
+
+			#
+			# We don't want to overwrite the sharetab if
+			# it is a mount-point. We assume it is a
+			# mount-point if it is not writable.
+			#
+			if [ -f etc/dfs/sharetab ]; then
+				if [ ! -w etc/dfs/sharetab ]; then
+					exclude="$exclude etc/dfs/sharetab"
+				fi
+			fi
+
 			[ -d system/contract ] &&
 				exclude="$exclude system/contract"
 			[ -d system/object ] &&
