@@ -2499,6 +2499,7 @@ else
 		/lib/libm.so.2
 		/lib/libdoor.so.1
 		/lib/libm.so.2
+		/lib/libmd.so.1
 		/lib/libmd5.so.1
 		/lib/libnvpair.so.1
 		/lib/libscf.so.1
@@ -5225,6 +5226,12 @@ mondo_loop() {
 	rm -f $usr/platform/*/lib/sparcv9/libmd5_psr.so.1
 	rmdir $usr/platform/*/lib/sparcv9 2>/dev/null
 	rmdir $usr/platform/*/lib 2>/dev/null
+
+	#
+	# libmd5_psr.so.1 and symlinks to it have been replaced 
+	# by libmd_psr.so.1 and thus need to be removed
+	rm -f $root/platform/*/lib/libmd5_psr.so.1
+	rm -f $root/platform/*/lib/sparcv9/libmd5_psr.so.1
 
 	#
 	# Remove obsolete profile libc symlinks
