@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -217,3 +217,19 @@ msgid "ZFS-8000-D3.impact"
 msgstr "Fault tolerance of the pool may be compromised."
 msgid "ZFS-8000-D3.action"
 msgstr "Run 'zpool status -x' and replace the bad device."
+#
+# code: ZFS-8000-EY
+# keys: ereport.fs.zfs.pool.hostname_mismatch
+#
+msgid "ZFS-8000-EY.type"
+msgstr "Error"
+msgid "ZFS-8000-EY.severity"
+msgstr "Major"
+msgid "ZFS-8000-EY.description"
+msgstr "The ZFS pool was last accessed by another system  Refer to %s for more information."
+msgid "ZFS-8000-EY.response"
+msgstr "No automated response will be taken."
+msgid "ZFS-8000-EY.impact"
+msgstr "ZFS filesystems are not available"
+msgid "ZFS-8000-EY.action"
+msgstr "\nTo determine which system last accessed the pool, run the 'zpool import'\ncommand:\n\n\n# zpool import\n  pool: test\n    id: 14702934086626715962\nstate: ONLINE\nstatus: The pool was last accessed by another system.\naction: The pool can be imported using its name or numeric identifier and\n        the '-f' flag.\n   see: http://www.sun.com/msg/ZFS-XXXXXXX\nconfig:\n\n        test              ONLINE\n          c0t0d0          ONLINE\n\n# zpool import test\ncannot import 'test': pool may be in use from other system, it was last\naccessed by 'tank' (hostid: 0x1435718c) on Fri Mar  9 15:42:47 2007\nuse '-f' to import anyway\n#\n\n\nIf you are certain that the pool is not being actively accessed by another\nsystem, then you can use the '-f' option to 'zpool import' to forcible\nimport the pool.\n "

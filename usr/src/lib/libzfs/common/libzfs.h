@@ -191,6 +191,7 @@ typedef enum {
 	ZPOOL_STATUS_CORRUPT_DATA,	/* data errors in user (meta)data */
 	ZPOOL_STATUS_FAILING_DEV,	/* device experiencing errors */
 	ZPOOL_STATUS_VERSION_NEWER,	/* newer on-disk version */
+	ZPOOL_STATUS_HOSTID_MISMATCH,	/* last accessed by another system */
 
 	/*
 	 * The following are not faults per se, but still an error possibly
