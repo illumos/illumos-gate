@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -61,7 +61,7 @@
 # Define all global variables (required for strict)
 use vars  qw($SkipDirs $SkipFiles $SkipTextrelFiles);
 use vars  qw($SkipUndefDirs $SkipUndefFiles $SkipUnusedDirs $SkipUnusedFiles);
-use vars  qw($SkipStabFiles $SkipNoExStkFiles);
+use vars  qw($SkipStabFiles $SkipNoExStkFiles $SkipCrleConf);
 use vars  qw($UnusedNoise $Prog $Mach $Isalist $Env $Ena64 $Tmpdir $Error);
 use vars  qw($UnusedFiles $UnusedPaths $LddNoU $Crle32 $Crle64 $Conf32 $Conf64);
 use vars  qw($SkipInterps $OldDeps %opt);
@@ -176,6 +176,13 @@ $SkipNoExStkFiles = qr{ ^(?:
 	unix |
 	multiboot
 	)$
+}x;
+
+# Identify any files that should be skipped when building a crle(1)
+# configuration file.  As the hwcap libraries can be loop-back mounted onto
+# libc, these can confuse crle(1) because of their identical dev/inode.
+$SkipCrleConf = qr{
+	lib/libc/libc_hwcap
 }x;
 
 # Define any files that should only have unused (ldd -u) processing.
@@ -320,7 +327,7 @@ if ((getopts('ad:imos', \%opt) == 0) || ($#ARGV == -1)) {
 	if ($Proto) {
 		# To support alternative dependency mapping we'll need ldd(1)'s
 		# -e option.  This is relatively new (s81_30), so make sure
-		# ldd(1)is capable before gathering any dependency information.
+		# ldd(1) is capable before gathering any dependency information.
 		if (system('ldd -e /usr/lib/lddstub 2> /dev/null')) {
 			print "ldd: does not support -e, unable to ";
 			print "create alternative dependency mappingings.\n";
@@ -397,7 +404,7 @@ if ((getopts('ad:imos', \%opt) == 0) || ($#ARGV == -1)) {
 
 $Error = 0;
 
-# Clean up and temporary files.
+# Clean up any temporary files.
 sub CleanUp {
 	if ($Crle64) {
 		unlink $Crle64;
@@ -595,7 +602,7 @@ DYN:
 	}
 
 	# Only use ldd unless we've encountered an interpreter that should
-	# ne skipped.
+	# be skipped.
 	if (!$SkipLdd && $Interp) {
 		if ($Secure) {
 			# The execution of a secure application over an nfs file
@@ -1023,6 +1030,12 @@ sub GetDeps {
 				next;
 			}
 
+			if (!$opt{a}) {
+				if ($NewFull =~ $SkipCrleConf) {
+					next;
+				}
+			}
+				
 			# If this is a directory descend into it.
 			if (-d _) {
 				my($NewRel);
