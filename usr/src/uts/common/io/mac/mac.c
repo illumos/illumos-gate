@@ -1050,10 +1050,9 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 {
 	mac_impl_t	*mip;
 	mactype_t	*mtype;
-	int		err;
+	int		err = EINVAL;
 	struct devnames *dnp;
 	minor_t		minor;
-	mod_hash_val_t	val;
 	boolean_t	style1_created = B_FALSE, style2_created = B_FALSE;
 
 	/* Find the required MAC-Type plugin. */
@@ -1082,25 +1081,14 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	(void) snprintf(mip->mi_name, sizeof (mip->mi_name), "%s%d",
 	    mip->mi_drvname, mip->mi_instance);
 
-	rw_enter(&i_mac_impl_lock, RW_WRITER);
-	if (mod_hash_insert(i_mac_impl_hash,
-	    (mod_hash_key_t)mip->mi_name, (mod_hash_val_t)mip) != 0) {
-		kmem_cache_free(i_mac_impl_cachep, mip);
-		rw_exit(&i_mac_impl_lock);
-		return (EEXIST);
-	}
-	atomic_inc_32(&i_mac_impl_count);
-
 	mip->mi_driver = mregp->m_driver;
 
 	mip->mi_type = mtype;
 	mip->mi_info.mi_media = mtype->mt_type;
 	mip->mi_info.mi_nativemedia = mtype->mt_nativetype;
 	mip->mi_info.mi_sdu_min = mregp->m_min_sdu;
-	if (mregp->m_max_sdu <= mregp->m_min_sdu) {
-		err = EINVAL;
+	if (mregp->m_max_sdu <= mregp->m_min_sdu)
 		goto fail;
-	}
 	mip->mi_info.mi_sdu_max = mregp->m_max_sdu;
 	mip->mi_info.mi_addr_length = mip->mi_type->mt_addr_length;
 	/*
@@ -1116,10 +1104,8 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	 * (point-to-point protocol MACs for example).
 	 */
 	if (mip->mi_type->mt_addr_length > 0) {
-		if (mregp->m_src_addr == NULL) {
-			err = EINVAL;
+		if (mregp->m_src_addr == NULL)
 			goto fail;
-		}
 		mip->mi_info.mi_unicst_addr =
 		    kmem_alloc(mip->mi_type->mt_addr_length, KM_SLEEP);
 		bcopy(mregp->m_src_addr, mip->mi_info.mi_unicst_addr,
@@ -1138,7 +1124,6 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 			    mip->mi_type->mt_addr_length);
 		}
 	} else if (mregp->m_src_addr != NULL) {
-		err = EINVAL;
 		goto fail;
 	}
 
@@ -1153,13 +1138,10 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 		 * Verify that the plugin supports MAC plugin data and that
 		 * the supplied data is valid.
 		 */
-		if (!(mip->mi_type->mt_ops.mtops_ops & MTOPS_PDATA_VERIFY)) {
-			err = EINVAL;
+		if (!(mip->mi_type->mt_ops.mtops_ops & MTOPS_PDATA_VERIFY))
 			goto fail;
-		}
 		if (!mip->mi_type->mt_ops.mtops_pdata_verify(mregp->m_pdata,
 		    mregp->m_pdata_size)) {
-			err = EINVAL;
 			goto fail;
 		}
 		mip->mi_pdata = kmem_alloc(mregp->m_pdata_size, KM_SLEEP);
@@ -1178,7 +1160,6 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	    mregp->m_callbacks->mc_multicst == NULL ||
 	    mregp->m_callbacks->mc_unicst == NULL ||
 	    mregp->m_callbacks->mc_tx == NULL) {
-		err = EINVAL;
 		goto fail;
 	}
 	mip->mi_callbacks = mregp->m_callbacks;
@@ -1227,22 +1208,29 @@ mac_register(mac_register_t *mregp, mac_handle_t *mhp)
 	dnp->dn_flags |= DN_GLDV3_DRIVER;
 	UNLOCK_DEV_OPS(&dnp->dn_lock);
 
+	rw_enter(&i_mac_impl_lock, RW_WRITER);
+	if (mod_hash_insert(i_mac_impl_hash,
+	    (mod_hash_key_t)mip->mi_name, (mod_hash_val_t)mip) != 0) {
+		rw_exit(&i_mac_impl_lock);
+		VERIFY(dls_destroy(mip->mi_name) == 0);
+		err = EEXIST;
+		goto fail;
+	}
+
 	/*
 	 * Mark the MAC to be ready for open.
 	 */
 	mip->mi_disabled = B_FALSE;
 
 	cmn_err(CE_NOTE, "!%s registered", mip->mi_name);
+
 	rw_exit(&i_mac_impl_lock);
+
+	atomic_inc_32(&i_mac_impl_count);
 	*mhp = (mac_handle_t)mip;
 	return (0);
 
 fail:
-	(void) mod_hash_remove(i_mac_impl_hash, (mod_hash_key_t)mip->mi_name,
-	    &val);
-	ASSERT(mip == (mac_impl_t *)val);
-	atomic_dec_32(&i_mac_impl_count);
-
 	if (mip->mi_info.mi_unicst_addr != NULL) {
 		kmem_free(mip->mi_info.mi_unicst_addr,
 		    mip->mi_type->mt_addr_length);
@@ -1267,7 +1255,6 @@ fail:
 	}
 
 	kmem_cache_free(i_mac_impl_cachep, mip);
-	rw_exit(&i_mac_impl_lock);
 	return (err);
 }
 
