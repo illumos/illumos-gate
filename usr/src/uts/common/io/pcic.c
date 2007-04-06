@@ -85,7 +85,6 @@
 #endif
 
 #include <sys/hotplug/hpcsvc.h>
-#include <sys/syshw.h>
 #include "cardbus/cardbus.h"
 
 #define	SOFTC_SIZE	(sizeof (anp_t))
@@ -283,12 +282,6 @@ struct debounce {
 	struct debounce *next;
 };
 
-static syshw_t pcic_syshw = {
-	0, "PC Card Socket 0", SH_CONNECTION,
-	SYSHW_CAN_SIGNAL_CHANGE|SYSHW_STATE_VALID|SYSHW_VAL0_VALID,
-	B_FALSE, {2, 0, 0, 0}
-};
-
 static struct debounce *pcic_deb_queue = NULL;
 static kmutex_t pcic_deb_mtx;
 static kcondvar_t pcic_deb_cv;
@@ -359,44 +352,10 @@ static cb_nexus_cb_t pcic_cbnexus_ops = {
 static int pcic_exca_powerctl(pcicdev_t *pcic, int socket, int powerlevel);
 static int pcic_cbus_powerctl(pcicdev_t *pcic, int socket);
 
-static void pcic_syshw_cardstate(syshw_t *, void *);
-
 #if defined(__sparc)
 static int pcic_fault(enum pci_fault_ops op, void *arg);
 #endif
 
-/*
- * Default to support for Voyager IIi if sparc is defined.
- * Appart from the PCI base addresses this only effect the TI1250.
- */
-#if defined(sparc)
-#define	VOYAGER
-#endif
-
-
-/*
- * pcmcia_attach() uses 0 and 128 upwards for the initpcmcia and devctl
- * interfaces so we use 254.
- */
-#define	SYSHW_MINOR	254
-
-/*
- * Forward declarations for syshw interface (See end of file).
- */
-static void syshw_attach(pcicdev_t *);
-static void syshw_detach(pcicdev_t *);
-static void syshw_resume(pcicdev_t *);
-
-#ifdef VOYAGER
-static uint_t syshw_intr(caddr_t);
-static uint_t syshw_intr_hi(pcicdev_t *);
-#endif
-
-static int syshw_open(dev_t *, int, int, cred_t *);
-static int syshw_close(dev_t, int, int, cred_t *);
-static int syshw_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
-static uint32_t syshw_add2map(syshw_t *, void (*)(syshw_t *, void *), void *);
-static void syshw_send_signal(int);
 
 /*
  * pcmcia interface operations structure
@@ -511,10 +470,7 @@ pcic_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 	switch (cmd) {
 	    case DDI_INFO_DEVT2DEVINFO:
 		minor = getminor((dev_t)arg);
-		if (minor == SYSHW_MINOR)
-			minor = 0;
-		else
-			minor &= 0x7f;
+		minor &= 0x7f;
 		if (!(anp = ddi_get_soft_state(pcic_soft_state_p, minor)))
 			*result = NULL;
 		else
@@ -522,10 +478,7 @@ pcic_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 		break;
 	    case DDI_INFO_DEVT2INSTANCE:
 		minor = getminor((dev_t)arg);
-		if (minor == SYSHW_MINOR)
-			minor = 0;
-		else
-			minor &= 0x7f;
+		minor &= 0x7f;
 		*result = (void *)((long)minor);
 		break;
 	    default:
@@ -676,7 +629,6 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ddi_device_acc_attr_t attr;
 	anp_t *anp = ddi_get_driver_private(dip);
 	uint_t	pri;
-	syshw_t *shwp;
 
 #if defined(PCIC_DEBUG)
 	if (pcic_debug) {
@@ -696,7 +648,6 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			mutex_enter(&pcic->pc_lock);
 			/* should probe for new sockets showing up */
 			pcic_setup_adapter(pcic);
-			syshw_resume(pcic);
 			pcic->pc_flags &= ~PCF_SUSPENDED;
 			mutex_exit(&pcic->pc_lock);
 			(void) pcmcia_begin_resume(dip);
@@ -1619,7 +1570,6 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if ((i = pcmcia_attach(dip, pcic_nexus)) != DDI_SUCCESS)
 		goto pci_exit2;
 
-	syshw_attach(pcic);
 	if (pcic_maxinst == -1) {
 		/* This assumes that all instances run at the same IPL. */
 		mutex_init(&pcic_deb_mtx, NULL, MUTEX_DRIVER, NULL);
@@ -1634,14 +1584,6 @@ pcic_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * and enable interrupts.
 	 */
 	for (j = 0; j < pcic->pc_numsockets; j++) {
-		shwp = kmem_alloc(sizeof (syshw_t), KM_SLEEP);
-		if (shwp) {
-			bcopy(&pcic_syshw, shwp, sizeof (pcic_syshw));
-			pcic_syshw.id_string[15]++;
-			pcic->pc_sockets[j].pcs_syshwsig =
-			    syshw_add2map(shwp, pcic_syshw_cardstate,
-				&pcic->pc_sockets[j]);
-		}
 		pcic->pc_sockets[j].pcs_debounce_id =
 		    pcic_add_debqueue(&pcic->pc_sockets[j],
 			drv_usectohz(pcic_debounce_time));
@@ -1693,7 +1635,6 @@ pcic_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		/* don't detach if the nexus still talks to us */
 		if (pcic->pc_callback != NULL)
 			return (DDI_FAILURE);
-		syshw_detach(pcic);
 
 		/* kill off the pm simulation */
 		if (pcic->pc_pmtimer)
@@ -2248,9 +2189,6 @@ pcic_intr(caddr_t arg1, caddr_t arg2)
 	 * what might have happened, so step through the list
 	 * of them
 	 */
-#ifdef VOYAGER
-	ret = syshw_intr_hi(pcic);
-#endif
 
 	/*
 	 * Set the bitmask for IO interrupts to initially include all sockets
@@ -5535,7 +5473,6 @@ pcic_handle_cd_change(pcicdev_t *pcic, pcic_socket_t *sockp, uint8_t status)
 				"Unsupported PCMCIA card inserted\n");
 			}
 		    }
-		    syshw_send_signal(sockp->pcs_syshwsig);
 		} else {
 		    do_debounce = B_TRUE;
 		}
@@ -5615,7 +5552,6 @@ pcic_handle_cd_change(pcicdev_t *pcic, pcic_socket_t *sockp, uint8_t status)
 #endif
 		    sockp->pcs_flags &= ~PCS_CARD_CBREM;
 		}
-		syshw_send_signal(sockp->pcs_syshwsig);
 		sockp->pcs_flags &= ~PCS_CARD_REMOVED;
 	    }
 	    break;
@@ -6037,8 +5973,6 @@ pcic_apply_avail_ranges(dev_info_t *dip, pcm_regs_t *pcic_p,
 static int
 pcic_open(dev_t *dev, int flag, int otyp, cred_t *cred)
 {
-	if (getminor(*dev) == SYSHW_MINOR)
-		return (syshw_open(dev, flag, otyp, cred));
 #ifdef CARDBUS
 	if (cardbus_is_cb_minor(*dev))
 		return (cardbus_open(dev, flag, otyp, cred));
@@ -6049,8 +5983,6 @@ pcic_open(dev_t *dev, int flag, int otyp, cred_t *cred)
 static int
 pcic_close(dev_t dev, int flag, int otyp, cred_t *cred)
 {
-	if (getminor(dev) == SYSHW_MINOR)
-		return (syshw_close(dev, flag, otyp, cred));
 #ifdef CARDBUS
 	if (cardbus_is_cb_minor(dev))
 		return (cardbus_close(dev, flag, otyp, cred));
@@ -6062,8 +5994,6 @@ static int
 pcic_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred,
 	int *rval)
 {
-	if (getminor(dev) == SYSHW_MINOR)
-		return (syshw_ioctl(dev, cmd, arg, mode, cred, rval));
 #ifdef CARDBUS
 	if (cardbus_is_cb_minor(dev))
 		return (cardbus_ioctl(dev, cmd, arg, mode, cred, rval));
@@ -6834,558 +6764,4 @@ pcic_err(dev_info_t *dip, int level, const char *fmt, ...)
 			cmn_err(ce, qmark ? "?%s" : buf, buf);
 #endif
 	}
-}
-
-
-static void
-pcic_syshw_cardstate(syshw_t *item, void *arg)
-{
-	pcic_socket_t *pcs = (pcic_socket_t *)arg;
-
-	if (pcs->pcs_flags & PCS_CARD_PRESENT) {
-		item->state = B_TRUE;
-		if (pcs->pcs_flags & PCS_CARD_IS16BIT)
-			item->values[0] = 1;
-		else if (pcs->pcs_flags & PCS_CARD_ISCARDBUS)
-			item->values[0] = 2;
-		else
-			item->values[0] = 0;
-	} else {
-		item->state = B_FALSE;
-		item->values[0] = 0;
-	}
-}
-
-/*
- * Tadpole additional for the syshw interface used to control the
- * start/stop switch which is physically linked to the GPIO1 pin
- * on the 1250a.
- */
-
-#define	CLIENT_CALLED	0x8000000
-#define	NCE_EVENT_MASK	0xffff
-
-typedef struct _client {
-	pid_t	pid;		/* set by kernel */
-	int	flags;		/* NCE_REGISTER...  */
-	int	priority;	/* >100 unless root */
-	int	events;		/* pending event flags */
-	int	event_sig;	/* SIG... etc */
-	struct _client *next;	/* set by kernel */
-	struct _client *prev;	/* set by kernel */
-} client_data;
-
-static client_data	*cl_data;
-static int	n_clients;
-static kmutex_t	client_mtx, intr_mtx;
-
-static void	delete_client(int);
-
-#ifdef VOYAGER
-static uint32_t	runstop_sig;
-static ddi_softintr_t	softint_id;
-static uchar_t	softint_flag;
-static int	switch_debounce_time = 100;	/* in milliseconds */
-static timeout_id_t	switch_to_id;
-
-static syshw_t syshw_run_stop = {
-	    0, "Run/Stop", SH_SWITCH,
-	    SYSHW_CAN_SIGNAL_CHANGE|SYSHW_STATE_VALID,
-	    B_FALSE, { 0 } };
-
-static void
-syshw_get_run_stop(syshw_t *item, void *arg)
-{
-	pcicdev_t *pcic = (pcicdev_t *)arg;
-
-	if (ddi_get8(pcic->cfg_handle,
-	    pcic->cfgaddr + PCIC_GPIO1_REG) & PCIC_GPIO_DIN)
-		item->state = B_TRUE;
-	else
-		item->state = B_FALSE;
-}
-
-
-#endif
-
-static void
-syshw_attach(pcicdev_t *pcic)
-{
-	if (ddi_get_instance(pcic->dip) != 0)
-		return;
-
-#ifdef VOYAGER
-	if (pcic->pc_type == PCIC_TI_PCI1250) {
-
-		/*
-		 * Only setup run/stop on a Voyager.
-		 * This is currently defined as
-		 * a TI1250 on a SPARC architecture. May have to make this a
-		 * property definition in the future.
-		 */
-		if (ddi_add_softintr(pcic->dip,
-		    DDI_SOFTINT_LOW, &softint_id,
-		    NULL, NULL, syshw_intr,
-		    (caddr_t)pcic) == DDI_SUCCESS) {
-			runstop_sig = syshw_add2map(&syshw_run_stop,
-			    syshw_get_run_stop, pcic);
-			mutex_init(&intr_mtx, NULL, MUTEX_DRIVER,
-			    pcic->pc_pri);
-			ddi_put8(pcic->cfg_handle,
-			    pcic->cfgaddr + PCIC_GPIO1_REG,
-			    PCIC_GPIO_FINPUT | PCIC_GPIO_INTENBL |
-			    PCIC_GPIO_DELTA);
-		}
-	}
-#endif
-	mutex_init(&client_mtx, "syshw client", MUTEX_DRIVER, NULL);
-	(void) ddi_create_minor_node(pcic->dip, "syshw", S_IFCHR,
-	    SYSHW_MINOR, NULL, NULL);
-}
-
-static void
-syshw_detach(pcicdev_t *pcic)
-{
-#ifdef VOYAGER
-	if (pcic->pc_type == PCIC_TI_PCI1250) {
-		pcic_mutex_enter(&intr_mtx);
-
-		/*
-		 * Turn off this interrupt.
-		 */
-		ddi_put8(pcic->cfg_handle, pcic->cfgaddr + PCIC_GPIO1_REG,
-		    PCIC_GPIO_FINPUT);
-
-		if (switch_to_id)
-			(void) untimeout(switch_to_id);
-		switch_to_id = 0;
-		softint_flag = 0;
-
-		pcic_mutex_exit(&intr_mtx);
-		ddi_remove_softintr(softint_id);
-		mutex_destroy(&intr_mtx);
-	}
-#endif
-
-	ddi_remove_minor_node(pcic->dip, NULL);
-	mutex_destroy(&client_mtx);
-}
-
-static void
-syshw_resume(pcicdev_t *pcic)
-{
-#ifdef VOYAGER
-	if (pcic->pc_type == PCIC_TI_PCI1250) {
-		ddi_put8(pcic->cfg_handle, pcic->cfgaddr + PCIC_GPIO1_REG,
-		    PCIC_GPIO_FINPUT | PCIC_GPIO_INTENBL | PCIC_GPIO_DELTA);
-	}
-#else
-	_NOTE(ARGUNUSED(pcic))
-#endif
-}
-
-#ifdef VOYAGER
-static uint_t
-syshw_intr_hi(pcicdev_t *pcic)
-{
-	uchar_t regval;
-
-	if (pcic->pc_type != PCIC_TI_PCI1250)
-		return (DDI_INTR_UNCLAIMED);
-
-	regval = ddi_get8(pcic->cfg_handle, pcic->cfgaddr + PCIC_GPIO1_REG);
-	if (regval & PCIC_GPIO_DELTA) {
-		pcic_mutex_enter(&intr_mtx);
-		if (softint_flag == 0 && switch_to_id == 0) {
-			softint_flag = 1;
-			ddi_trigger_softintr(softint_id);
-		}
-		ddi_put8(pcic->cfg_handle, pcic->cfgaddr + PCIC_GPIO1_REG,
-		    regval);
-		pcic_mutex_exit(&intr_mtx);
-		return (DDI_INTR_CLAIMED);
-	}
-
-	return (DDI_INTR_UNCLAIMED);
-}
-
-/*
- * Don't deliver the signal until the debounce period has expired.
- * Unfortuately this means it end up as a three tier interrupt just
- * to indicate a bit change.
- */
-static void
-syshw_debounce_to(void *arg)
-{
-	_NOTE(ARGUNUSED(arg))
-
-	if (switch_to_id) {
-		pcic_mutex_enter(&intr_mtx);
-		switch_to_id = 0;
-		pcic_mutex_exit(&intr_mtx);
-		syshw_send_signal(runstop_sig);
-		return;
-	}
-}
-
-static uint_t
-syshw_intr(caddr_t arg)
-{
-	_NOTE(ARGUNUSED(arg))
-
-	if (softint_flag) {
-		pcic_mutex_enter(&intr_mtx);
-		softint_flag = 0;
-		if (!switch_to_id)
-			switch_to_id = timeout(syshw_debounce_to, arg,
-			    drv_usectohz(switch_debounce_time * 1000));
-		pcic_mutex_exit(&intr_mtx);
-		return (DDI_INTR_CLAIMED);
-	}
-	return (DDI_INTR_UNCLAIMED);
-}
-#endif
-
-/*
- * Send signals to the registered clients
- */
-static void
-syshw_send_signal(int events)
-{
-	client_data *ptr;
-	proc_t	*pr;
-	int	done_flag;
-
-	ptr = cl_data;
-	while (ptr != NULL) {
-		done_flag = CLIENT_CALLED;
-
-		if ((ptr->flags & events) &&
-		    (ptr->event_sig != 0) &&
-		    ((ptr->flags & done_flag) == 0)) {
-
-			/*
-			 * only call the process if:
-			 * it has not already received the nce signal
-			 * its signal was not zero (just in case)
-			 * and it is registered to receive this signal
-			 */
-			pcic_mutex_enter(&pidlock);
-			pr = prfind(ptr->pid);
-			pcic_mutex_exit(&pidlock);
-			if (pr == NULL) {
-				/*
-				 * This process has died,
-				 * so we free its memory and move on
-				 * start at the begining again:
-				 * a waste of cycles but it makes things easy..
-				 */
-				delete_client(ptr->pid);
-				ptr = cl_data;
-			} else {
-				ptr->events |= (events & ptr->flags &
-				    NCE_EVENT_MASK);
-				psignal(pr, ptr->event_sig);
-				ptr->flags |= done_flag;
-				ptr = ptr->next;
-			}
-		} else {
-			ptr = ptr->next;
-		}
-	}
-
-	ptr = cl_data;
-	while (ptr != NULL) {
-		ptr->flags &= ~done_flag;
-		ptr = ptr->next;
-	}
-}
-
-static int
-syshw_open(dev_t *dev, int flag, int otyp, cred_t *cred)
-{
-	_NOTE(ARGUNUSED(dev, flag, cred))
-
-	if (otyp != OTYP_CHR)
-		return (EINVAL);
-
-	return (0);
-}
-
-static int
-syshw_close(dev_t dev, int flag, int otyp, cred_t *cred)
-{
-	_NOTE(ARGUNUSED(dev, flag, otyp, cred))
-
-	return (0);
-}
-
-/*
- * Add a client to the list of interested processes
- */
-static void
-add_client(client_data *new)
-{
-	client_data * ptr;
-
-	n_clients++;
-	if (cl_data == NULL) {
-		cl_data = new;
-		return;
-	}
-
-	ptr = cl_data;
-	while ((ptr->next != NULL) && (ptr->priority <= new->priority))
-		ptr = ptr->next;
-
-	if (ptr == cl_data) {
-		/* at head of the list */
-		cl_data = new;
-		new->next = ptr;
-		new->prev = NULL;
-		if (ptr != NULL)
-			ptr->prev = new;
-	} else {
-		/* somewhere else in the list - insert after */
-		new->next = ptr->next;
-		ptr->next = new;
-		new->prev = ptr;
-		if (new->next != NULL)
-			(new->next)->prev = new;
-	}
-}
-
-/*
- * Locate a client data structure in the client list by looking for a PID match.
- */
-static client_data *
-locate_client(pid_t pid)
-{
-	client_data * ptr = cl_data;
-
-	while ((ptr != NULL) && (ptr->pid != pid))
-		ptr = ptr->next;
-
-	return (ptr);
-}
-
-/*
- * Remove a client record from the client list
- */
-static void
-delete_client(pid_t pid)
-{
-	client_data * ptr;
-
-	ptr = locate_client(pid);
-	if (ptr == NULL)
-		return;	/* hmmm!! */
-
-	n_clients--;
-
-	if (ptr == cl_data) {
-		/* remove the head of the list */
-		cl_data = ptr->next;
-	}
-	if (ptr->prev != NULL)
-		(ptr->prev)->next = ptr->next;
-	if (ptr->next != NULL)
-		(ptr->next)->prev = ptr->prev;
-
-	kmem_free(ptr, sizeof (client_data));
-}
-
-static void
-unregister_event_client()
-{
-	pcic_mutex_enter(&client_mtx);
-	delete_client(ddi_get_pid());
-	pcic_mutex_exit(&client_mtx);
-}
-
-static int
-register_event_client(client_data *u_client)
-{
-	int	error;
-	client_data * client;
-
-	pcic_mutex_enter(&client_mtx);
-	client = locate_client(ddi_get_pid());
-	if (client) {
-		/*
-		 * we are re-registering ourself
-		 * so we delete the previous entry
-		 */
-		delete_client(ddi_get_pid());
-	}
-
-	client = (client_data *)kmem_alloc(sizeof (client_data), KM_SLEEP);
-
-	if (client) {
-		client->pid = ddi_get_pid();
-		client->priority = u_client->priority;
-		client->flags = u_client->flags & NCE_EVENT_MASK;
-		client->events = 0;
-		client->event_sig = u_client->event_sig;
-		client->next = NULL;
-		client->prev = NULL;
-		add_client(client);
-		error = 0;
-	} else
-		error = EIO;
-
-	pcic_mutex_exit(&client_mtx);
-	return (error);
-}
-
-/*
- * Read the currently pending event flags for the process in question
- */
-static int
-check_events_pending(caddr_t data)
-{
-	client_data * client;
-	int	error = 0;
-
-	pcic_mutex_enter(&client_mtx);
-	client = locate_client(ddi_get_pid());
-	if (client) {
-		if (copyout((caddr_t)&client->events, data, sizeof (int)))
-			error = EFAULT;
-		else
-			client->events = 0;
-	} else
-		error = EINVAL;
-
-	pcic_mutex_exit(&client_mtx);
-	return (error);
-}
-
-
-#define	MAXITEMS	8
-static syshw_t *syshw_map[MAXITEMS];
-static void	(*syshw_getfuncs[MAXITEMS])(syshw_t *, void *);
-static void	*syshw_getfunc_args[MAXITEMS];
-static int	nsyshw_items = 0;
-#define	NSYSHW_ITEMS	nsyshw_items
-
-static uint32_t
-syshw_add2map(syshw_t *item, void (*getfunc)(syshw_t *, void *), void *getarg)
-{
-	uint32_t rval = (1 << nsyshw_items);
-	if (nsyshw_items == MAXITEMS)
-		return (0);
-	item->hw_id = nsyshw_items;
-	syshw_map[nsyshw_items] = item;
-	syshw_getfuncs[nsyshw_items] = getfunc;
-	syshw_getfunc_args[nsyshw_items] = getarg;
-	nsyshw_items++;
-	return (rval);
-}
-
-static int
-syshw_ioctl(dev_t dev, int cmd, intptr_t ioctldata, int mode,
-cred_t *cred, int *rval)
-{
-	caddr_t data = (caddr_t)ioctldata;
-	syshw_t sh;
-	hwev_t hwev;
-	client_data dummy_client;
-	int	rc = 0, i;
-
-	_NOTE(ARGUNUSED(dev, mode, cred, rval))
-
-	switch (cmd) {
-	default:
-		rc = EINVAL;
-		break;
-
-	case SYSHW_GET_ITEM:
-	case SYSHW_GET_ITEM_MAXVALUES:
-		if (copyin(data, (caddr_t)&sh, sizeof (sh))) {
-			rc = EFAULT;
-			break;
-		}
-
-		if (sh.hw_id >= NSYSHW_ITEMS) {
-			rc = EINVAL;
-			break;
-		}
-
-		sh = *syshw_map[sh.hw_id];
-		if (!sh.id_string[0]) {
-			rc = ENOTTY;
-			break;
-		}
-		if (cmd == SYSHW_GET_ITEM) {
-			if (syshw_getfuncs[sh.hw_id])
-				syshw_getfuncs[sh.hw_id](&sh,
-				    syshw_getfunc_args[sh.hw_id]);
-			else
-				rc = ENOTTY;
-		}
-
-		if (copyout((caddr_t)&sh, data, sizeof (sh))) {
-			rc = EFAULT;
-			break;
-		}
-		break;
-
-	case SYSHW_SET_ITEM:
-		if (copyin(data, (caddr_t)&sh, sizeof (sh))) {
-			rc = EFAULT;
-			break;
-		}
-
-		if (sh.hw_id >= NSYSHW_ITEMS ||
-		    !syshw_map[sh.hw_id]->id_string[0] ||
-		    !(syshw_map[sh.hw_id]->capabilities &
-		    (SYSHW_STATE_MODIFY | SYSHW_VAL0_MODIFY |
-		    SYSHW_VAL1_MODIFY | SYSHW_VAL2_MODIFY |
-		    SYSHW_VAL3_MODIFY))) {
-			rc = EINVAL;
-			break;
-		}
-
-		switch (sh.hw_id) {
-		default:
-			rc = EINVAL;
-			break;
-		}
-		break;
-
-	case SYSHW_EVREG:
-		if (copyin(data, (caddr_t)&hwev, sizeof (hwev))) {
-			rc = EFAULT;
-			break;
-		}
-
-		for (i = 0; i < NSYSHW_ITEMS; i++) {
-			if (hwev.events & (1 << i) &&
-			    !(syshw_map[i]->capabilities &
-			    SYSHW_CAN_SIGNAL_CHANGE)) {
-				rc = EINVAL;
-				break;
-			}
-		}
-		if (hwev.event_sig != SIGUSR1 && hwev.event_sig != SIGUSR2)
-			rc = EINVAL;
-
-		if (!rc) {
-			dummy_client.priority = 100;
-			dummy_client.flags = hwev.events;
-			dummy_client.event_sig = hwev.event_sig;
-			rc = register_event_client(&dummy_client);
-		}
-		break;
-
-	case SYSHW_EVUNREG:
-		unregister_event_client();
-		break;
-
-	case SYSHW_CHKEV:
-		rc = check_events_pending(data);
-		break;
-	}
-	return (rc);
 }

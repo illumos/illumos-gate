@@ -109,7 +109,6 @@ struct pcic_socket {
 	timeout_id_t pcs_debounce_id;	/* timeout for CD debounce */
 	ddi_softint_handle_t pcs_cd_softint_hdl; /* Debounce softint id */
 	struct pcicdev_t *pcs_pcic;
-	uint32_t pcs_syshwsig;
 	caddr_t pcs_phys;
 	int	pcs_iobase;
 	int	pcs_iolen;
