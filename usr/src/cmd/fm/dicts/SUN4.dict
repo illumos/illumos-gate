@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -44,3 +44,7 @@ fault.io.fire.asic fault.io.fire.pci.device fault.io.fire.pciex.device=12
 fault.io.fire.asic fault.io.fire.pci.device=13
 fault.io.fire.hbus=14
 fault.io.fire.datapath fault.io.fire.hbus=15
+fault.io.fire.hb.sw-config=16
+fault.io.fire.dmc.sw-algorithm=17
+fault.io.fire.dmc.sw-state=18
+fault.io.fire.pec.sw-algorithm=19

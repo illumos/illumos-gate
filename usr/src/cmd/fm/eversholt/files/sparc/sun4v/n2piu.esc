@@ -82,12 +82,6 @@ event fault.io.n2.siu@hostbridge/pciexrc,
 event fault.io.n2.niu@hostbridge/pciexrc, 
     FITrate=HB_FIT, FRU=hostbridge/pciexrc, ASRU=hostbridge/pciexrc; 
 
-/* PCI/PCIe SW driver defects */
-event defect.io.fire.pci.driver@pcibus/pcidev/pcifn;
-event defect.io.fire.pciex.driver@pciexbus/pciexdev/pciexfn;
-/* Fire/N2 driver defects */
-event defect.io.fire.pciex.driver@hostbridge/pciexrc;
-
 /* No diagnosis */
 event upset.io.fire.nodiag@hostbridge;
 

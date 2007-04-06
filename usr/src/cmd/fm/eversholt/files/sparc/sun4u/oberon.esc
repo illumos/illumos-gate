@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /* 
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved. 
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved. 
  * Use is subject to license terms. 
  */ 
 
@@ -109,9 +109,11 @@ prop fault.io.oberon@hostbridge/pciexrc (0)->
  * - msg received to unenabled queue
  */
 
-event defect.io.fire.pciex.driver@hostbridge/pciexrc; 
+#define SW_FIT			5000	/* No real fit rate, SW */
+event fault.io.fire.hb.sw-config@hostbridge/pciexrc,
+    FITrate=SW_FIT;
  
-prop defect.io.fire.pciex.driver@hostbridge/pciexrc (0)-> 
+prop fault.io.fire.hb.sw-config@hostbridge/pciexrc (0)-> 
     ereport.io.oberon.ubc.memrdaxa@hostbridge/pciexrc,
     ereport.io.oberon.ubc.memrdaxb@hostbridge/pciexrc,
     ereport.io.oberon.ubc.memwtaxa@hostbridge/pciexrc,
