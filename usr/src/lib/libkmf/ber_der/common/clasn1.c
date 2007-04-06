@@ -258,7 +258,7 @@ CopyData(KMF_DATA *src, KMF_DATA *dst)
 {
 	if (src && dst && src->Data != NULL && src->Length > 0) {
 		dst->Length = src->Length;
-		dst->Data = malloc(sizeof (dst->Length));
+		dst->Data = malloc(dst->Length);
 		if (dst->Data == NULL)
 			return (KMF_ERR_MEMORY);
 		(void) memcpy(dst->Data, src->Data, src->Length);

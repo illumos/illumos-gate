@@ -1844,12 +1844,19 @@ KMF_RETURN
 KMF_SetCertSubjectName(KMF_X509_CERTIFICATE *CertData,
 	KMF_X509_NAME *subject_name_ptr)
 {
-	if (CertData != NULL && subject_name_ptr != NULL)
-		CertData->certificate.subject = *subject_name_ptr;
-	else
-		return (KMF_ERR_BAD_PARAMETER);
 
-	return (KMF_OK);
+	KMF_RETURN rv = KMF_OK;
+	KMF_X509_NAME *temp_name_ptr = NULL;
+
+	if (CertData != NULL && subject_name_ptr != NULL) {
+		rv = CopyRDN(subject_name_ptr, &temp_name_ptr);
+		if (rv == KMF_OK) {
+			CertData->certificate.subject = *temp_name_ptr;
+		}
+	} else {
+		return (KMF_ERR_BAD_PARAMETER);
+	}
+	return (rv);
 }
 
 KMF_RETURN
@@ -1926,12 +1933,20 @@ KMF_RETURN
 KMF_SetCertIssuerName(KMF_X509_CERTIFICATE *CertData,
 	KMF_X509_NAME *issuer_name_ptr)
 {
-	if (CertData != NULL && issuer_name_ptr != NULL)
-		CertData->certificate.issuer = *issuer_name_ptr;
-	else
-		return (KMF_ERR_BAD_PARAMETER);
 
-	return (KMF_OK);
+	KMF_RETURN rv = KMF_OK;
+	KMF_X509_NAME *temp_name_ptr = NULL;
+
+	if (CertData != NULL && issuer_name_ptr != NULL) {
+		rv = CopyRDN(issuer_name_ptr, &temp_name_ptr);
+		if (rv == KMF_OK) {
+			CertData->certificate.issuer = *temp_name_ptr;
+		}
+	} else {
+		return (KMF_ERR_BAD_PARAMETER);
+	}
+
+	return (rv);
 }
 
 KMF_RETURN

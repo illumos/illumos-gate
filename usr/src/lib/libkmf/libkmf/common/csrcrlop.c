@@ -119,12 +119,18 @@ KMF_RETURN
 KMF_SetCSRSubjectName(KMF_CSR_DATA *CsrData,
 	KMF_X509_NAME *subject_name_ptr)
 {
-	if (CsrData != NULL && subject_name_ptr != NULL)
-		CsrData->csr.subject = *subject_name_ptr;
-	else
-		return (KMF_ERR_BAD_PARAMETER);
+	KMF_RETURN rv = KMF_OK;
+	KMF_X509_NAME *temp_name_ptr = NULL;
 
-	return (KMF_OK);
+	if (CsrData != NULL && subject_name_ptr != NULL) {
+		rv = CopyRDN(subject_name_ptr, &temp_name_ptr);
+		if (rv == KMF_OK) {
+			CsrData->csr.subject = *temp_name_ptr;
+		}
+	} else {
+		return (KMF_ERR_BAD_PARAMETER);
+	}
+	return (rv);
 }
 
 KMF_RETURN
