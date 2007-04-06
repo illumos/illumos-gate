@@ -78,5 +78,6 @@ d none platform/sun4v 755 root sys
 d none platform/sun4v/kernel 755 root sys
 d none platform/sun4v/kernel/kmdb 755 root sys
 d none platform/sun4v/kernel/kmdb/sparcv9 755 root sys
+f none platform/sun4v/kernel/kmdb/sparcv9/ldc 555 root sys
 f none platform/sun4v/kernel/kmdb/sparcv9/unix 555 root sys
 f none platform/sun4v/kernel/kmdb/sparcv9/vdsk 555 root sys

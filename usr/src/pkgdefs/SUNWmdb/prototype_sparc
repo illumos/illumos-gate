@@ -95,5 +95,6 @@ d none usr/platform/sun4v/lib 755 root bin
 d none usr/platform/sun4v/lib/mdb 755 root sys
 d none usr/platform/sun4v/lib/mdb/kvm 755 root sys
 d none usr/platform/sun4v/lib/mdb/kvm/sparcv9 755 root sys
+f none usr/platform/sun4v/lib/mdb/kvm/sparcv9/ldc.so 555 root sys
 f none usr/platform/sun4v/lib/mdb/kvm/sparcv9/unix.so 555 root sys
 f none usr/platform/sun4v/lib/mdb/kvm/sparcv9/vdsk.so 555 root sys
