@@ -294,8 +294,7 @@ i_cpr_mp_setup(void)
 	 */
 	i_cpr_cif_setup(CIF_UNLINK);
 
-	if (!cpr_reusable_mode)
-		(void) i_cpr_prom_pages(CPR_PROM_RESTORE);
+	(void) i_cpr_prom_pages(CPR_PROM_RESTORE);
 
 	/* allow setting page size codes in MMU primary context register */
 	kcontextreg = kctx;

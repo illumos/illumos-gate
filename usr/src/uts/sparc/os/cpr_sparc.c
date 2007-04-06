@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -204,13 +203,10 @@ cpr_prop_setup(void)
 
 	/*
 	 * create a new boot-file value; flags get appended when
-	 * reusable is true or when the statefile is a block device
+	 * not reusable and when the statefile is a block device
 	 */
 	(void) strcpy(bootfile, CPRBOOT);
-	if (cpr_reusable_mode) {
-		ASSERT(cpr_statefile_is_spec());
-		sp = " -R -S ";
-	} else if (cpr_statefile_is_spec())
+	if (!cpr_reusable_mode && cpr_statefile_is_spec())
 		sp = " -S ";
 	else
 		sp = NULL;
@@ -236,7 +232,9 @@ cpr_prop_setup(void)
 		file_idx = CPR_DF_IDX;
 	}
 	cpr_prop_update(dev_idx,  bootdev);
-	cpr_prop_update(file_idx, bootfile);
+
+	if (!cpr_reusable_mode)
+		cpr_prop_update(file_idx, bootfile);
 
 	/*
 	 * check/set auto-boot?
