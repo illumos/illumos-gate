@@ -1735,7 +1735,7 @@ list_func(int argc, char *argv[])
 		sub_usage(SHELP_LIST, CMD_LIST);
 		return (Z_USAGE);
 	}
-	if (zone_id != GLOBAL_ZONEID) {
+	if (zone_id != GLOBAL_ZONEID && !is_system_labeled()) {
 		fake_up_local_zone(zone_id, &zent);
 		/*
 		 * main() will issue a Z_NO_ZONE error if it cannot get an

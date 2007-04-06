@@ -2514,8 +2514,25 @@ add_datalink(zlog_t *zlogp, zoneid_t zoneid, char *dlname)
 
 	/* Hold the link for this zone */
 	if (dladm_hold_link(dlname, zoneid, B_FALSE) < 0) {
-		zerror(zlogp, B_TRUE, "WARNING: unable to hold network "
-		    "interface '%s'.", dlname);
+		int res, old_errno;
+		dladm_attr_t da;
+
+		/*
+		 * The following check is similar to 'dladm show-link'
+		 * to determine if this is a legacy interface.
+		 */
+		old_errno = errno;
+		res = dladm_info(dlname, &da);
+		if (res < 0 && errno == ENODEV) {
+			zerror(zlogp, B_FALSE, "WARNING: legacy network "
+			    "interface '%s'\nunsupported with an "
+			    "ip-type=exclusive configuration.", dlname);
+		} else {
+			errno = old_errno;
+			zerror(zlogp, B_TRUE, "WARNING: unable to hold network "
+			    "interface '%s'.", dlname);
+		}
+
 		(void) zone_remove_datalink(zoneid, dlname);
 		return (-1);
 	}
