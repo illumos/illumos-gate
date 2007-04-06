@@ -111,6 +111,7 @@ f none usr/include/euc.h 644 root bin
 f none usr/include/exacct.h 644 root bin
 f none usr/include/exacct_impl.h 644 root bin
 f none usr/include/exec_attr.h 644 root bin
+f none usr/include/execinfo.h 644 root bin
 f none usr/include/fatal.h 644 root bin
 f none usr/include/fcntl.h 644 root bin
 f none usr/include/float.h 644 root bin

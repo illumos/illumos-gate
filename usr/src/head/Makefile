@@ -65,6 +65,7 @@ HDRS=   $($(MACH)_HDRS)  $(ATTRDB_HDRS) \
 	euc.h		\
 	exacct.h	\
 	exacct_impl.h	\
+	execinfo.h	\
 	fatal.h		\
 	fcntl.h		\
 	float.h		\

@@ -27,6 +27,7 @@
 
 SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
     global:
+	addrtosymstr;
 	aio_cancel;
 	aiocancel;
 	aio_error;
@@ -40,6 +41,9 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	aio_write;
 	aiowrite;
 	assfail;
+	backtrace;
+	backtrace_symbols;
+	backtrace_symbols_fd;
 	clock_getres;
 	clock_gettime;
 	clock_nanosleep;

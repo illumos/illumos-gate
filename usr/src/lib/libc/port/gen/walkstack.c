@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,8 +104,8 @@
  *
  */
 
-#pragma weak walkcontext = _walkcontext
-#pragma weak printstack = _printstack
+#pragma weak walkcontext		= _walkcontext
+#pragma weak printstack			= _printstack
 
 #include "synonyms.h"
 #include <assert.h>
@@ -129,6 +128,7 @@
 #include <stdio.h>
 #include <alloca.h>
 #include <limits.h>
+#include <stdlib.h>
 
 #ifdef _LP64
 #define	_ELF64
@@ -160,6 +160,7 @@
 #error no arch defined
 #endif
 
+#define	MAX_LINE 2048 /* arbitrary large value */
 
 /*
  * use /proc/self/as to safely dereference pointers so we don't
@@ -347,178 +348,57 @@ walkcontext(const ucontext_t *uptr, int (*operate_func)(uintptr_t, int, void *),
 	return (0);
 }
 
-static size_t
-ulongtos(char *buffer, unsigned long x, int base)
-{
-	char local[80];
-	static const char digits[] = "0123456789abcdef";
-
-	unsigned int n = sizeof (local) - 1;
-	unsigned long rem;
-	unsigned int  mod;
-
-	local[n] = 0;
-
-	rem = x;
-
-	do {
-		switch (base) {
-		case 10:
-			mod = rem % 10;
-			rem = rem / 10;
-			break;
-
-		case 16:
-			mod = rem & 15;
-			rem = rem >> 4;
-			break;
-		default:
-			return (0);
-		}
-		local[--n] = digits[mod];
-	} while (rem != 0);
-
-	(void) strcpy(buffer, local + n);
-
-	return (sizeof (local) - n - 1);
-}
+/*
+ * async safe version of fprintf
+ */
 
 static void
 async_filenoprintf(int filenum, const char *format, ...)
 {
-	const char *src = format;
 	va_list ap;
-	long i;
-	struct iovec *iov;
-	int cnt;
-	int iter = 0;
-
-	/*
-	 * count # of %'s.. max # of iovs is 2n + 1
-	 */
-
-	for (cnt = i = 0; src[i] != '\0'; i++)
-		if (src[i] == '%')
-			cnt++;
-
-	iov = alloca((2 * cnt + 1) * sizeof (struct iovec));
+	char buffer[MAX_LINE];
 
 	va_start(ap, format);
-
-
-	while (*src) {
-
-		iov[iter].iov_base = (char *)src;
-		iov[iter].iov_len = 0;
-
-		while (*src && *src != '%') {
-			iov[iter].iov_len++;
-			src++;
-		}
-
-		if (iov[iter].iov_len != 0)
-			iter++;
-
-		if (*src == '%') {
-			switch (*++src) {
-			case 's':
-				iov[iter].iov_base = va_arg(ap, char *);
-				iov[iter].iov_len = strlen(iov[iter].iov_base);
-				iter++;
-				break;
-			case 'd':
-				iov[iter].iov_base = alloca(24);
-
-				i = va_arg(ap, long);
-				if (i < 0) {
-					*iov[iter].iov_base = '-';
-					iov[iter].iov_len =
-					    ulongtos(iov[iter].iov_base + 1,
-					    -i, 10) + 1;
-				} else
-					iov[iter].iov_len =
-					    ulongtos(iov[iter].iov_base,
-					    i, 10);
-				iter++;
-				break;
-			case 'x':
-				iov[iter].iov_base = alloca(24);
-				iov[iter].iov_len = ulongtos(iov[iter].iov_base,
-				    va_arg(ap, unsigned long), 16);
-				iter++;
-				break;
-
-			case '%':
-				iov[iter].iov_base = (char *)src;
-				iov[iter].iov_len = 1;
-				iter++;
-				break;
-			}
-			src++;
-		}
-	}
+	(void) vsnprintf(buffer, sizeof (buffer), format, ap);
 	va_end(ap);
 
-	(void) writev(filenum, iov, iter);
+	(void) write(filenum, buffer, strlen(buffer));
 
 }
+
+/*
+ *  print out stack frame info
+ */
 
 static int
 display_stack_info(uintptr_t pc, int signo, void *arg)
 {
-	Dl_info info;
 
+	char buffer[MAX_LINE];
 	char sigbuf[SIG2STR_MAX];
 
-	Sym *sym;
 
 	int filenum = (intptr_t)arg;
 
+	(void) addrtosymstr((void *)pc, buffer, sizeof (buffer));
+
 	if (signo) {
-		if (sig2str(signo, sigbuf) != 0)
-			(void) strcpy(sigbuf, "?");
-	}
+		sigbuf[0] = '?';
+		sigbuf[1] = 0;
 
-	if (dladdr1((void *) pc, &info, (void**) &sym, RTLD_DL_SYMENT) == 0) {
-		/* no info at all */
-		if (signo == 0)
-			async_filenoprintf(filenum, "0x%x\n", pc);
-		else
-			async_filenoprintf(filenum,
-			    "0x%x [ Signal %d (%s)]\n", pc,
-			    (ulong_t)signo, sigbuf);
+		(void) sig2str(signo, sigbuf);
 
-	} else if ((pc - (unsigned long)info.dli_saddr) <
-	    sym->st_size) {
-		/* found a global symbol */
-		if (signo == 0)
-			async_filenoprintf(filenum, "%s:%s+0x%x\n",
-			    info.dli_fname,
-			    info.dli_sname,
-			    pc - (unsigned long)info.dli_saddr);
-		else
-			async_filenoprintf(filenum,
-			    "%s:%s+0x%x [ Signal %d (%s)]\n",
-			    info.dli_fname,
-			    info.dli_sname,
-			    pc - (unsigned long)info.dli_saddr,
-			    (ulong_t)signo, sigbuf);
-	} else {
-		/* found a static symbol */
-		if (signo == 0)
-			async_filenoprintf(filenum, "%s:0x%x\n",
-			    info.dli_fname,
-			    pc - (unsigned long)info.dli_fbase);
-		else
-			async_filenoprintf(filenum,
-			    "%s:0x%x [ Signal %d (%s)]\n",
-			    info.dli_fname,
-			    pc - (unsigned long)info.dli_fbase,
-			    (ulong_t)signo, sigbuf);
-	}
+		async_filenoprintf(filenum, "%s [Signal %d (%s)]\n",
+			buffer, (ulong_t)signo, sigbuf);
+	} else
+		async_filenoprintf(filenum, "%s\n", buffer);
 
 	return (0);
 }
+
+/*
+ * walk current thread stack, writing symbolic stack trace to specified fd
+ */
 
 int
 printstack(int dofd)
@@ -529,4 +409,154 @@ printstack(int dofd)
 		return (-1);
 
 	return (walkcontext(&u, display_stack_info, (void*)(intptr_t)dofd));
+}
+
+/*
+ * Some routines for better opensource compatibility w/ glibc.
+ */
+
+typedef struct backtrace {
+	void	**bt_buffer;
+	int	bt_maxcount;
+	int	bt_actcount;
+} backtrace_t;
+
+/* ARGSUSED */
+static int
+callback(uintptr_t pc, int signo, void *arg)
+{
+	backtrace_t *bt = (backtrace_t *)arg;
+
+	if (bt->bt_actcount >= bt->bt_maxcount)
+		return (-1);
+
+	bt->bt_buffer[bt->bt_actcount++] = (void *)pc;
+
+	return (0);
+}
+
+/*
+ * dump stack trace up to length count into buffer
+ */
+
+int
+backtrace(void **buffer, int count)
+{
+	backtrace_t 	bt;
+	ucontext_t 	u;
+
+	bt.bt_buffer = buffer;
+	bt.bt_maxcount = count;
+	bt.bt_actcount = 0;
+
+	if (getcontext(&u) < 0)
+		return (0);
+
+	(void) walkcontext(&u, callback, &bt);
+
+	return (bt.bt_actcount);
+}
+
+/*
+ * format backtrace string
+ */
+
+int
+addrtosymstr(void *pc, char *buffer, int size)
+{
+	Dl_info info;
+	Sym *sym;
+
+	if (dladdr1(pc, &info, (void **)&sym,
+	    RTLD_DL_SYMENT) == 0) {
+		return (snprintf(buffer, size, "[0x%p]", pc));
+	}
+
+	if ((info.dli_fname != NULL && info.dli_sname != NULL) &&
+	    ((uintptr_t)pc - (uintptr_t)info.dli_saddr < sym->st_size)) {
+		/*
+		 * we have containing symbol info
+		 */
+		return (snprintf(buffer, size, "%s'%s+0x%x [0x%p]",
+		    info.dli_fname,
+		    info.dli_sname,
+		    (unsigned long)pc - (unsigned long)info.dli_saddr,
+		    pc));
+	} else {
+		/*
+		 * no local symbol info
+		 */
+		return (snprintf(buffer, size, "%s'0x%p [0x%p]",
+		    info.dli_fname,
+		    (unsigned long)pc - (unsigned long)info.dli_fbase,
+		    pc));
+	}
+}
+
+/*
+ * This function returns the symbolic representation of stack trace; calls
+ * malloc so it is NOT async safe!  A rather mis-designed and certainly misused
+ * interface.
+ */
+
+char **
+backtrace_symbols(void *const *array, int size)
+{
+	int bufferlen, len;
+	char **ret_buffer;
+	char **ret;
+	char linebuffer[MAX_LINE];
+	int i;
+
+	bufferlen = size * sizeof (char *);
+
+	/*
+	 *  tmp buffer to hold strings while finding all symbol names
+	 */
+
+	ret_buffer = (char **)alloca(bufferlen);
+
+	for (i = 0; i < size; i++) {
+		(void) addrtosymstr(array[i], linebuffer, sizeof (linebuffer));
+		ret_buffer[i] = strcpy(alloca(len = strlen(linebuffer) + 1),
+		    linebuffer);
+		bufferlen += len;
+	}
+
+	/*
+	 * allocate total amount of storage required and copy strings
+	 */
+
+	if ((ret = (char **)malloc(bufferlen)) == NULL)
+		return (NULL);
+
+
+	for (len = i = 0; i < size; i++) {
+		ret[i] = (char *)ret + size * sizeof (char *) + len;
+		strcpy(ret[i], ret_buffer[i]);
+		len += strlen(ret_buffer[i]) + 1;
+	}
+
+	return (ret);
+}
+
+/*
+ * Write out symbolic stack trace in an async-safe way.
+ */
+
+void
+backtrace_symbols_fd(void *const *array, int size, int fd)
+{
+	char linebuffer[MAX_LINE];
+	int i;
+	int len;
+
+	for (i = 0; i < size; i++) {
+		len = addrtosymstr(array[i], linebuffer,
+		    sizeof (linebuffer) - 1);
+		if (len >= sizeof (linebuffer))
+			len = sizeof (linebuffer) - 1;
+		linebuffer[len] = '\n';
+		(void) write(fd, linebuffer, len + 1);
+	}
 }

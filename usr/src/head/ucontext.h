@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +36,7 @@
 
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 #include <sys/siginfo.h>
+#include <execinfo.h>
 #endif
 
 #ifdef	__cplusplus
@@ -63,7 +63,7 @@ extern void makecontext(ucontext_t *, void(*)(), int, ...);
 extern int walkcontext(const ucontext_t *, int (*)(uintptr_t, int, void *),
     void *);
 extern int printstack(int);
-
+extern int addrtosymstr(void *, char *, int);
 extern int getustack(stack_t **);
 extern int setustack(stack_t *);
 
@@ -84,7 +84,7 @@ extern void makecontext();
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 extern int walkcontext();
 extern int printstack();
-
+extern int addrtosymstr();
 extern int getustack();
 extern int setustack();
 
