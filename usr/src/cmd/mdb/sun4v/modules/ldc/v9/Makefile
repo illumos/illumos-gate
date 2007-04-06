@@ -23,8 +23,22 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-SUBDIRS = unix vdsk ldc
-include ../../Makefile.subdirs
+MODULE = ldc.so
+MDBTGT = kvm
+
+MODSRCS = ldc.c
+
+include ../../../../../Makefile.cmd
+include ../../../../../Makefile.cmd.64
+include ../../../../sparc/Makefile.sparcv9
+include ../../../Makefile.sun4v
+include ../../../../Makefile.module
+
+MODSRCS_DIR = ../
+
+CPPFLAGS += -DMP -D_MACHDEP
+CPPFLAGS += -Dsun4v
+CPPFLAGS += -I$(SRC)/uts/sun4v
