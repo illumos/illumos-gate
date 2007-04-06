@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -217,4 +217,10 @@ gfxp_munlock_user_memory(caddr_t address, size_t length)
 		(void) set_errno(error);
 
 	return (error);
+}
+
+gfx_maddr_t
+gfxp_convert_addr(paddr_t paddr)
+{
+	return ((gfx_maddr_t)paddr);
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,4 +109,58 @@ gfxp_devmap_umem_setup(devmap_cookie_t dhc, dev_info_t *dip,
 	e = devmap_umem_setup(dhc, dip, callbackops, cookie, off, len, maxprot,
 	    l_flags, accattrp);
 	return (e);
+}
+
+/*
+ * Replacement for devmap_devmem_setup() which will map a machine address
+ * instead of a register set/offset.
+ */
+void
+gfxp_map_devmem(devmap_cookie_t dhc, gfx_maddr_t maddr, size_t length,
+    ddi_device_acc_attr_t *attrp)
+{
+	devmap_handle_t *dhp = (devmap_handle_t *)dhc;
+	pfn_t pfn;
+
+
+	pfn = mmu_btop(maddr);
+
+	dhp->dh_pfn = pfn;
+	dhp->dh_len = mmu_ptob(mmu_btopr(length));
+	dhp->dh_roff = 0;
+
+#ifndef DEVMAP_DEVMEM_COOKIE
+#define	DEVMAP_DEVMEM_COOKIE	((ddi_umem_cookie_t)0x1) /* XXPV */
+#endif /* DEVMAP_DEVMEM_COOKIE */
+	dhp->dh_cookie = DEVMAP_DEVMEM_COOKIE;
+	/*LINTED: E_EXPR_NULL_EFFECT*/
+	dhp->dh_flags |= DEVMAP_DEFAULTS;
+	dhp->dh_maxprot = PROT_ALL & dhp->dh_orig_maxprot;
+
+	/* no callbacks needed */
+	bzero(&dhp->dh_callbackops, sizeof (struct devmap_callback_ctl));
+
+	switch (attrp->devacc_attr_dataorder) {
+	case DDI_UNORDERED_OK_ACC:
+		dhp->dh_hat_attr = HAT_UNORDERED_OK;
+		break;
+	case DDI_MERGING_OK_ACC:
+		dhp->dh_hat_attr = HAT_MERGING_OK;
+		break;
+	case DDI_LOADCACHING_OK_ACC:
+		dhp->dh_hat_attr = HAT_LOADCACHING_OK;
+		break;
+	case DDI_STORECACHING_OK_ACC:
+		dhp->dh_hat_attr = HAT_STORECACHING_OK;
+		break;
+	case DDI_STRICTORDER_ACC:
+	default:
+		dhp->dh_hat_attr = HAT_STRICTORDER;
+	}
+
+	/* don't use large pages */
+	dhp->dh_mmulevel = 0;
+	dhp->dh_flags &= ~DEVMAP_FLAG_LARGE;
+
+	dhp->dh_flags |= DEVMAP_SETUP_DONE;
 }

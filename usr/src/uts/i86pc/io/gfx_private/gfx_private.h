@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,8 @@ extern "C" {
 #define	GFXP_MEMORY_UNCACHED		1
 #define	GFXP_MEMORY_WRITECOMBINED	2
 
+typedef uint64_t gfx_maddr_t;
+
 extern int gfxp_ddi_segmap_setup(dev_t dev, off_t offset, struct as *as,
 	caddr_t *addrp, off_t len, uint_t prot, uint_t maxprot, uint_t flags,
 	cred_t *cred, ddi_device_acc_attr_t *accattrp, uint_t rnumber);
@@ -47,6 +49,9 @@ extern int gfxp_devmap_umem_setup(devmap_cookie_t dhc, dev_info_t *dip,
 	struct devmap_callback_ctl *callbackops, ddi_umem_cookie_t cookie,
 	offset_t off, size_t len, uint_t maxprot, uint_t flags,
 	ddi_device_acc_attr_t *accattrp);
+extern void gfxp_map_devmem(devmap_cookie_t dhc, gfx_maddr_t maddr,
+	size_t length, ddi_device_acc_attr_t *attrp);
+
 
 typedef char *gfxp_acc_handle_t;
 extern gfxp_acc_handle_t gfxp_pci_init_handle(uint8_t bus, uint8_t slot,
@@ -69,6 +74,7 @@ extern void gfxp_unmap_kernel_space(gfxp_kva_t address, size_t size);
 extern int gfxp_va2pa(struct as *as, caddr_t addr, uint64_t *pa);
 extern void gfxp_fix_mem_cache_attrs(caddr_t kva_start, size_t length,
 	int cache_attr);
+extern gfx_maddr_t gfxp_convert_addr(paddr_t paddr);
 
 typedef char *gfxp_vgatext_softc_ptr_t;
 
