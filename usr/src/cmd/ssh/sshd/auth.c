@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -477,6 +477,7 @@ secure_filename(FILE *f, const char *file, struct passwd *pw,
 	uid_t uid;
 	char buf[MAXPATHLEN], homedir[MAXPATHLEN];
 	char *cp;
+	int comparehome = 0;
 	struct stat st;
 
 	if (pw == NULL)
@@ -489,11 +490,16 @@ secure_filename(FILE *f, const char *file, struct passwd *pw,
 		    strerror(errno));
 		return -1;
 	}
-	if (realpath(pw->pw_dir, homedir) == NULL) {
-		snprintf(err, errlen, "realpath %s failed: %s", pw->pw_dir,
-		    strerror(errno));
-		return -1;
-	}
+
+	/*
+	 * A user is not required to have all the files that are subject to
+	 * the strict mode checking in his/her home directory. If the
+	 * directory is not present at the moment, which might be the case if
+	 * the directory is not mounted until the user is authenticated, do
+	 * not perform the home directory check below.
+	 */
+	if (realpath(pw->pw_dir, homedir) != NULL)
+		comparehome = 1;
 
 	/* check the open file to avoid races */
 	if (fstat(fileno(f), &st) < 0 ||
@@ -521,8 +527,8 @@ secure_filename(FILE *f, const char *file, struct passwd *pw,
 			return -1;
 		}
 
-		/* If are passed the homedir then we can stop */
-		if (strcmp(homedir, buf) == 0) {
+		/* If we passed the homedir then we can stop. */
+		if (comparehome && strcmp(homedir, buf) == 0) {
 			debug3("secure_filename: terminating check at '%s'",
 			    buf);
 			break;
