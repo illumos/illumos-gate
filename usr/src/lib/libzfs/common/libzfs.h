@@ -97,6 +97,7 @@ enum {
 	EZFS_POOLPROPS,		/* couldn't retrieve pool props */
 	EZFS_POOL_NOTSUP,	/* ops not supported for this type of pool */
 	EZFS_POOL_INVALARG,	/* invalid argument for this pool operation */
+	EZFS_NAMETOOLONG,	/* dataset name is too long */
 	EZFS_UNKNOWN
 };
 
