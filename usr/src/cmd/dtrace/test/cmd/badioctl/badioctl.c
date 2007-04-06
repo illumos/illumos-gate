@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,7 +111,7 @@ badioctl(pid_t parent)
 	}
 }
 
-void
+int
 main()
 {
 	pid_t child, parent = getpid();
@@ -139,4 +139,7 @@ main()
 		    WTERMSIG(status));
 		fflush(stdout);
 	}
+
+	/* NOTREACHED */
+	return (0);
 }

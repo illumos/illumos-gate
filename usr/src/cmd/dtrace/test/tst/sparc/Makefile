@@ -28,7 +28,7 @@
 
 include ../Makefile.com
 
-ASFLAGS += -D_ASM -P
+ASFLAGS += -P -D_ASM
 
 pid/tst.br.o := ASFLAGS += -xarch=v8plus
 

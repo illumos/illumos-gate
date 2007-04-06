@@ -152,7 +152,7 @@ again:
 	}
 }
 
-void
+int
 main(int argc, char **argv)
 {
 	char *filename = argv[1];
@@ -203,4 +203,7 @@ main(int argc, char **argv)
 		corrupt(fd, copy, len);
 		close(fd);
 	}
+
+	/* NOTREACHED */
+	return (0);
 }

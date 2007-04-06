@@ -28,7 +28,7 @@
 
 include ../Makefile.com
 
-ASFLAGS += -D_ASM -P $(CPPFLAGS)
+ASFLAGS += -P -D_ASM $(CPPFLAGS)
 CLOBBER_FILES += helper_helper.o annotated_helper.o
 
 # For the helper test we require an executable data section.
