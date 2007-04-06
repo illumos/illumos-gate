@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 while read src dest
@@ -31,6 +30,8 @@ do
 	if [ ! -f $dest ] ; then
 		# Initial installation
 		cp $src $dest
+		# Enable pci-renumber-buses property for initial install
+		echo setprop pci-renumber-buses 1 >> $dest
 	else
 		#
 		# Preserve the installed version of
@@ -92,7 +93,34 @@ do
 				echo $line >> $merge
 			fi
 		done
-		
+
+		#
+		# Make sure the merged file has a pci-renumber-buses property.
+		# If $dest doesn't already have the property, add it to the
+		# merged file using the following rule:
+		# - if on a Sun Blade x8400, add "pci-renumber-buses=1"
+		# - on all other systems, add "pci-renumber-buses=0"
+		#
+		/usr/bin/nawk '{print $2}' $dest | \
+		    grep -w pci-renumber-buses > /dev/null
+		if [ $? != 0 ] ; then
+			# smbios parameters
+			smtype=SMB_TYPE_BASEBOARD
+			name="Sun Blade x8400 Server Module"
+			#
+			# if smbios fails, we're not on an x8400, so it's
+			# the same as grep not finding the x8400 ID
+			#
+			(/usr/sbin/smbios -t $smtype | \
+			    grep "$name") > /dev/null 2>&1
+			if [ $? != 0 ] ; then
+				val="0"
+			else
+				val="1"
+			fi
+			echo setprop pci-renumber-buses $val >> $merge
+		fi
+
 		#
 		# copy the merged file to $dest
 		#
