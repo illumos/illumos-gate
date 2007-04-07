@@ -69,6 +69,7 @@ ROOT.SYS= \
 	/dev/pts \
 	/dev/sad \
 	/dev/swap \
+	/dev/zcons \
 	/devices \
 	/devices/pseudo \
 	/etc \
