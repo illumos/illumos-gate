@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -590,6 +590,14 @@ ieee80211_end_scan(ieee80211com_t *ic)
 			 */
 			in = list_next(&nt->nt_node, tmpin);
 			ieee80211_node_reclaim(nt, tmpin);
+			continue;
+		}
+		/*
+		 * It's possible at some special moments, the in_chan will
+		 * be none. Need to skip the null node.
+		 */
+		if (in->in_chan == IEEE80211_CHAN_ANYC) {
+			in = list_next(&nt->nt_node, in);
 			continue;
 		}
 		if (ieee80211_match_bss(ic, in) == 0) {
