@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +67,8 @@ process_chpw_request(krb5_context context, void *server_handle,
 	int numresult;
 	char strresult[1024];
 	char *clientstr;
+	size_t clen;
+	char *cdots;
 
 	ret = 0;
 	rep->length = 0;
@@ -379,9 +381,11 @@ process_chpw_request(krb5_context context, void *server_handle,
 	free(ptr);
 	clear.length = 0;
 
-	krb5_klog_syslog(LOG_NOTICE, "chpw request from %s for %s: %s",
+	clen = strlen(clientstr);
+	trunc_name(&clen, &cdots);
+	krb5_klog_syslog(LOG_NOTICE, "chpw request from %s for %.*s%s: %s",
 		inet_ntoa(((struct sockaddr_in *)&remote_addr)->sin_addr),
-		clientstr, ret ? error_message(ret) : "success");
+		clen, clientstr, cdots, ret ? error_message(ret) : "success");
 	krb5_free_unparsed_name(context, clientstr);
 
 	if (ret) {

@@ -18,8 +18,7 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -145,6 +144,7 @@ SUNWprivate_1.1 {
 	osa_free_policy_ent;
 	osa_free_princ_ent;
 	passwd_check;
+	trunc_name;
 	xdr_chpass3_arg;
 	xdr_chpass_arg;
 	xdr_chrand3_arg;

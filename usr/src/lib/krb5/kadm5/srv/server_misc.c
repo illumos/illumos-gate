@@ -205,3 +205,10 @@ passwd_check(kadm5_server_handle_t handle,
     }
     return KADM5_OK;    
 }
+
+void
+trunc_name(size_t *len, char **dots)
+{
+    *dots = *len > MAXPRINCLEN ? "..." : "";
+    *len = *len > MAXPRINCLEN ? MAXPRINCLEN : *len;
+}

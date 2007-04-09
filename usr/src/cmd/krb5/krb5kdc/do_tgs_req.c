@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -519,27 +519,37 @@ tgt_again:
 	newtransited = 1;
     }
     if (!isflagset (request->kdc_options, KDC_OPT_DISABLE_TRANSITED_CHECK)) {
+	unsigned int tlen;
+	char *tdots;
+
 	errcode = krb5_check_transited_list (kdc_context,
 					     &enc_tkt_reply.transited.tr_contents,
 					     krb5_princ_realm (kdc_context, header_ticket->enc_part2->client),
 					     krb5_princ_realm (kdc_context, request->server));
+	tlen = enc_tkt_reply.transited.tr_contents.length;
+	tdots = tlen > 125 ? "..." : "";
+	tlen = tlen > 125 ? 125 : tlen;
+
 	if (errcode == 0) {
 	    setflag (enc_tkt_reply.flags, TKT_FLG_TRANSIT_POLICY_CHECKED);
 	} else if (errcode == KRB5KRB_AP_ERR_ILL_CR_TKT)
 	    krb5_klog_syslog (LOG_INFO,
-			      "bad realm transit path from '%s' to '%s' via '%.*s'",
+			      "bad realm transit path from '%s' to '%s' "
+			      "via '%.*s%s'",
 			      cname ? cname : "<unknown client>",
 			      sname ? sname : "<unknown server>",
-			      enc_tkt_reply.transited.tr_contents.length,
-			      enc_tkt_reply.transited.tr_contents.data);
+			      tlen,
+			      enc_tkt_reply.transited.tr_contents.data,
+			      tdots);
 	else
 	    krb5_klog_syslog (LOG_ERR,
-			      "unexpected error checking transit from '%s' to '%s' via '%.*s': %s",
+			      "unexpected error checking transit from "
+			      "'%s' to '%s' via '%.*s%s': %s",
 			      cname ? cname : "<unknown client>",
 			      sname ? sname : "<unknown server>",
-			      enc_tkt_reply.transited.tr_contents.length,
+			      tlen,
 			      enc_tkt_reply.transited.tr_contents.data,
-			      error_message (errcode));
+			      tdots, error_message (errcode));
     } else
 	krb5_klog_syslog (LOG_INFO, "not checking transit path");
     if (reject_bad_transit
@@ -567,6 +577,8 @@ tgt_again:
 	if (!krb5_principal_compare(kdc_context, request->server, client2)) {
 		if ((errcode = krb5_unparse_name(kdc_context, client2, &tmp)))
 			tmp = 0;
+		if (tmp != NULL)
+			limit_string(tmp);
 		audit_krb5kdc_tgs_req_2ndtktmm(
 			(struct in_addr *)from->address->contents,
 			(in_port_t)from->port,
@@ -850,6 +862,7 @@ find_alternate_tgs(krb5_kdc_req *request, krb5_db_entry *server,
 		krb5_klog_syslog(LOG_INFO,
 		       "TGS_REQ: issuing alternate <un-unparseable> TGT");
 	    } else {
+		limit_string(sname);
 		audit_krb5kdc_tgs_req_alt_tgt(
 			(struct in_addr *)from->address->contents,
 			(in_port_t)from->port,

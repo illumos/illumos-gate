@@ -407,6 +407,7 @@ kdc_get_server_key(krb5_ticket *ticket, krb5_keyblock **key, krb5_kvno *kvno)
 
 	krb5_db_free_principal(kdc_context, &server, nprincs);
 	if (!krb5_unparse_name(kdc_context, ticket->server, &sname)) {
+	    limit_string(sname);
 	    krb5_klog_syslog(LOG_ERR,"TGS_REQ: UNKNOWN SERVER: server='%s'",
 			     sname);
 	    free(sname);

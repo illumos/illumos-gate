@@ -23,7 +23,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,7 @@
 #include <stdarg.h>
 #include <libintl.h>
 
-#define	KRB5_KLOG_MAX_ERRMSG_SIZE	1024
+#define	KRB5_KLOG_MAX_ERRMSG_SIZE	2048
 #ifndef	MAXHOSTNAMELEN
 #define	MAXHOSTNAMELEN	256
 #endif	/* MAXHOSTNAMELEN */
@@ -371,8 +371,11 @@ klog_com_err_proc(whoami, code, format, ap)
 
     /* If reporting an error message, separate it. */
     if (code) {
-	strcat(outbuf, error_message(code));
-	strcat(outbuf, " - ");
+	outbuf[sizeof(outbuf) - 1] = '\0';
+
+	strncat(outbuf, error_message(code),
+		sizeof(outbuf) - 1 - strlen(outbuf));
+	strncat(outbuf, " - ", sizeof(outbuf) - 1 - strlen(outbuf));
     }
     cp = &outbuf[strlen(outbuf)];
     
@@ -417,7 +420,7 @@ klog_com_err_proc(whoami, code, format, ap)
     } 
 
     /* Now format the actual message */
-    vsprintf(cp, actual_format, ap);
+    vsnprintf(cp, sizeof (outbuf) - (cp - outbuf), actual_format, ap);
     
     /*
      * Now that we have the message formatted, perform the output to each
@@ -992,7 +995,7 @@ klog_vsyslog(priority, format, arglist)
     syslogp = &outbuf[strlen(outbuf)];
 
     /* Now format the actual message */
-    vsprintf(syslogp, format, arglist);
+    vsnprintf(syslogp, sizeof (outbuf) - (syslogp - outbuf), format, arglist);
 
     /*
      * Now that we have the message formatted, perform the output to each

@@ -444,6 +444,61 @@ gss_name_to_string(gss_name_t gss_name, gss_buffer_desc *str)
      return 0;
 }
 
+static int
+log_unauth(
+    char *op,
+    char *target,
+    char *client,
+    char *server,
+    char *addr)
+{
+    size_t tlen, clen, slen;
+    char *tdots, *cdots, *sdots;
+
+    tlen = strlen(target);
+    trunc_name(&tlen, &tdots);
+    clen = strlen(client);
+    trunc_name(&clen, &cdots);
+    slen = strlen(server);
+    trunc_name(&slen, &sdots);
+
+    return krb5_klog_syslog(LOG_NOTICE,
+			"Unauthorized request: %s, %.*s%s, "
+			"client=%.*s%s, service=%.*s%s, addr=%s",
+			op, tlen, target, tdots,
+			clen, client, cdots,
+			slen, server, sdots,
+			addr);
+}
+
+static int
+log_done(
+    char *op,
+    char *target,
+    const char *errmsg,
+    char *client,
+    char *server,
+    char *addr)
+{
+    size_t tlen, clen, slen;
+    char *tdots, *cdots, *sdots;
+
+    tlen = strlen(target);
+    trunc_name(&tlen, &tdots);
+    clen = strlen(client);
+    trunc_name(&clen, &cdots);
+    slen = strlen(server);
+    trunc_name(&slen, &sdots);
+
+    return krb5_klog_syslog(LOG_NOTICE,
+			"Request: %s, %.*s%s, %s, "
+			"client=%.*s%s, service=%.*s%s, addr=%s",
+			op, tlen, target, tdots, errmsg,
+			clen, client, cdots,
+			slen, server, sdots,
+			addr);
+}
+
 generic_ret *
 create_principal_1_svc(cprinc_arg *arg, struct svc_req *rqstp)
 {
@@ -497,9 +552,8 @@ create_principal_1_svc(cprinc_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_unauth(rqstp->rq_xprt, l_port,
 				    "kadm5_create_principal",
 				    prime_arg, client_name);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, "kadm5_create_principal",
-		prime_arg, client_name,
-			service_name, client_addr(rqstp, buf));
+	 log_unauth("kadm5_create_principal", prime_arg,
+		client_name, service_name, client_addr(rqstp, buf));
     } else {
 	 ret.code = kadm5_create_principal((void *)handle,
 						&arg->rec, arg->mask,
@@ -508,10 +562,9 @@ create_principal_1_svc(cprinc_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_auth(rqstp->rq_xprt, l_port,
 				"kadm5_create_principal",
 				prime_arg, client_name, ret.code);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_DONE, "kadm5_create_principal",
-		prime_arg,((ret.code == 0) ? "success" :
-			   error_message(ret.code)), 
-		client_name, service_name, client_addr(rqstp, buf));
+	 log_done("kadm5_create_principal", prime_arg,
+	    ((ret.code == 0) ? "success" : error_message(ret.code)), 
+	    client_name, service_name, client_addr(rqstp, buf));
 
 		if (policy_migrate && (ret.code == 0)) {
 			arg->rec.policy = strdup("default");
@@ -526,8 +579,7 @@ create_principal_1_svc(cprinc_arg *arg, struct svc_req *rqstp)
 
 			retval = kadm5_modify_principal((void *)handle,
 					&arg->rec, arg->mask);
-			krb5_klog_syslog(LOG_NOTICE, LOG_DONE,
-				"kadm5_modify_principal",
+			log_done("kadm5_modify_principal",
 				prime_arg, ((retval == 0) ? "success" :
 				error_message(retval)), client_name,
 				service_name, client_addr(rqstp, buf));
@@ -596,20 +648,17 @@ create_principal3_1_svc(cprinc3_arg *arg, struct svc_req *rqstp)
 	|| kadm5int_acl_impose_restrictions(handle->context,
 				   &arg->rec, &arg->mask, rp)) {
 	 ret.code = KADM5_AUTH_ADD;
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, "kadm5_create_principal",
-		prime_arg, client_name, service_name,
-		client_addr(rqstp, buf));
+	 log_unauth("kadm5_create_principal", prime_arg,
+		client_name, service_name, client_addr(rqstp, buf));
     } else {
 	 ret.code = kadm5_create_principal_3((void *)handle,
 					     &arg->rec, arg->mask,
 					     arg->n_ks_tuple,
 					     arg->ks_tuple,
 					     arg->passwd);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_DONE, "kadm5_create_principal",
-		prime_arg,((ret.code == 0) ? "success" :
-			   error_message(ret.code)), 
-			  client_name, service_name,
-			  client_addr(rqstp, buf));
+	 log_done("kadm5_create_principal", prime_arg,
+		((ret.code == 0) ? "success" : error_message(ret.code)), 
+		client_name, service_name, client_addr(rqstp, buf));
 
 	 if (policy_migrate && (ret.code == 0)) {
 	 	arg->rec.policy = strdup("default");
@@ -624,11 +673,9 @@ create_principal3_1_svc(cprinc3_arg *arg, struct svc_req *rqstp)
 
 		retval = kadm5_modify_principal((void *)handle,
 					   &arg->rec, arg->mask);
-		krb5_klog_syslog(LOG_NOTICE, LOG_DONE,
-			    "kadm5_modify_principal",
-			    prime_arg, ((retval == 0) ? "success" :
-					error_message(retval)), client_name,
-			    service_name, client_addr(rqstp, buf));
+		log_done("kadm5_modify_principal", prime_arg,
+			((retval == 0) ? "success" : error_message(retval)),
+			client_name, service_name, client_addr(rqstp, buf));
 	 }
     }
 
@@ -685,8 +732,7 @@ delete_principal_1_svc(dprinc_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_unauth(rqstp->rq_xprt, l_port,
 				    "kadm5_delete_principal",
 				    prime_arg, client_name);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, "kadm5_delete_principal",
-		prime_arg, client_name,
+	 log_unauth("kadm5_delete_principal", prime_arg, client_name,
 			service_name, client_addr(rqstp, buf));
     } else {
 	 ret.code = kadm5_delete_principal((void *)handle, arg->princ);
@@ -694,7 +740,7 @@ delete_principal_1_svc(dprinc_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_auth(rqstp->rq_xprt, l_port,
 				"kadm5_delete_principal",
 				prime_arg, client_name, ret.code);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_DONE, "kadm5_delete_principal", prime_arg, 
+	 log_done("kadm5_delete_principal", prime_arg, 
 		((ret.code == 0) ? "success" : error_message(ret.code)), 
 		client_name, service_name, client_addr(rqstp, buf));
     }
@@ -753,8 +799,7 @@ modify_principal_1_svc(mprinc_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_unauth(rqstp->rq_xprt, l_port,
 				    "kadm5_modify_principal",
 				    prime_arg, client_name);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, "kadm5_modify_principal",
-		prime_arg, client_name,
+	 log_unauth("kadm5_modify_principal", prime_arg, client_name,
 		    service_name, client_addr(rqstp, buf));
     } else {
 	 ret.code = kadm5_modify_principal((void *)handle, &arg->rec,
@@ -763,9 +808,8 @@ modify_principal_1_svc(mprinc_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_auth(rqstp->rq_xprt, l_port,
 				"kadm5_modify_principal",
 				prime_arg, client_name, ret.code);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_DONE, "kadm5_modify_principal",
-		prime_arg, ((ret.code == 0) ? "success" :
-			    error_message(ret.code)), 
+	 log_done("kadm5_modify_principal", prime_arg,
+		((ret.code == 0) ? "success" : error_message(ret.code)), 
 		client_name, service_name, client_addr(rqstp, buf));
     }
 
@@ -838,8 +882,7 @@ rename_principal_1_svc(rprinc_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_unauth(rqstp->rq_xprt, l_port,
 				    "kadm5_rename_principal",
 				    prime_arg, client_name);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, "kadm5_rename_principal",
-		prime_arg, client_name,
+	 log_unauth("kadm5_rename_principal", prime_arg, client_name,
 		    service_name, client_addr(rqstp, buf));
     } else {
 	 ret.code = kadm5_rename_principal((void *)handle, arg->src,
@@ -848,9 +891,8 @@ rename_principal_1_svc(rprinc_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_auth(rqstp->rq_xprt, l_port,
 				"kadm5_rename_principal",
 				prime_arg, client_name, ret.code);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_DONE, "kadm5_rename_principal",
-		prime_arg, ((ret.code == 0) ? "success" :
-			    error_message(ret.code)), 
+	 log_done("kadm5_rename_principal", prime_arg,
+		((ret.code == 0) ? "success" : error_message(ret.code)), 
 		client_name, service_name, client_addr(rqstp, buf));
     }
 
@@ -916,8 +958,7 @@ get_principal_1_svc(gprinc_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_unauth(rqstp->rq_xprt, l_port,
 				    funcname,
 				    prime_arg, client_name);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, funcname,
-		prime_arg, client_name, service_name,
+	 log_unauth(funcname, prime_arg, client_name, service_name,
 		    client_addr(rqstp, buf));
     } else {
 	 if (handle->api_version == KADM5_API_VERSION_1) {
@@ -936,8 +977,7 @@ get_principal_1_svc(gprinc_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_auth(rqstp->rq_xprt, l_port,
 				funcname,
 				prime_arg, client_name, ret.code);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_DONE, funcname,
-		prime_arg,  
+	 log_done(funcname, prime_arg,  
 		((ret.code == 0) ? "success" : error_message(ret.code)), 
 		client_name, service_name, client_addr(rqstp, buf));
     }
@@ -997,8 +1037,7 @@ get_princs_1_svc(gprincs_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_unauth(rqstp->rq_xprt, l_port,
 				    "kadm5_get_principals",
 				    prime_arg, client_name);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, "kadm5_get_principals",
-		prime_arg, client_name,
+	 log_unauth("kadm5_get_principals", prime_arg, client_name,
 		    service_name, client_addr(rqstp, buf));
     } else {
 	 ret.code  = kadm5_get_principals((void *)handle,
@@ -1008,8 +1047,7 @@ get_princs_1_svc(gprincs_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_auth(rqstp->rq_xprt, l_port,
 				"kadm5_get_principals",
 				prime_arg, client_name, ret.code);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_DONE, "kadm5_get_principals",
-		prime_arg,  
+	 log_done("kadm5_get_principals", prime_arg,  
 		((ret.code == 0) ? "success" : error_message(ret.code)), 
 		client_name, service_name, client_addr(rqstp, buf));
 	}
@@ -1069,8 +1107,7 @@ chpass_principal_1_svc(chpass_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_unauth(rqstp->rq_xprt, l_port,
 				    "kadm5_chpass_principal",
 				    prime_arg, client_name);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, "kadm5_chpass_principal",
-		prime_arg, client_name,
+	 log_unauth("kadm5_chpass_principal", prime_arg, client_name,
 		    service_name, client_addr(rqstp, buf));
 	 ret.code = KADM5_AUTH_CHANGEPW;
     }
@@ -1079,10 +1116,9 @@ chpass_principal_1_svc(chpass_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_auth(rqstp->rq_xprt, l_port,
 				"kadm5_chpass_principal",
 				prime_arg, client_name, ret.code);
-	krb5_klog_syslog(LOG_NOTICE, LOG_DONE, "kadm5_chpass_principal", 
-	       prime_arg, ((ret.code == 0) ? "success" :
-			   error_message(ret.code)), 
-	       client_name, service_name, client_addr(rqstp, buf));
+	log_done("kadm5_chpass_principal", prime_arg,
+		((ret.code == 0) ? "success" : error_message(ret.code)), 
+		client_name, service_name, client_addr(rqstp, buf));
     }
 
 error:
@@ -1146,18 +1182,15 @@ chpass_principal3_1_svc(chpass3_arg *arg, struct svc_req *rqstp)
 					     arg->ks_tuple,
 					     arg->pass);
     } else {
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, "kadm5_chpass_principal",
-		prime_arg, client_name, service_name,
-		client_addr(rqstp, buf));
+	 log_unauth("kadm5_chpass_principal", prime_arg,
+		client_name, service_name, client_addr(rqstp, buf));
 	 ret.code = KADM5_AUTH_CHANGEPW;
     }
 
     if(ret.code != KADM5_AUTH_CHANGEPW) {
-	krb5_klog_syslog(LOG_NOTICE, LOG_DONE, "kadm5_chpass_principal", 
-	       prime_arg, ((ret.code == 0) ? "success" :
-				    error_message(ret.code)), 
-			client_name, service_name,
-			client_addr(rqstp, buf));
+	log_done("kadm5_chpass_principal", prime_arg,
+		((ret.code == 0) ? "success" : error_message(ret.code)), 
+		client_name, service_name, client_addr(rqstp, buf));
     }
 
 error:
@@ -1213,18 +1246,15 @@ setv4key_principal_1_svc(setv4key_arg *arg, struct svc_req *rqstp)
 	 ret.code = kadm5_setv4key_principal((void *)handle, arg->princ,
 					     arg->keyblock);
     } else {
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, "kadm5_setv4key_principal",
-		prime_arg, client_name, service_name,
-		client_addr(rqstp, buf));
+	 log_unauth("kadm5_setv4key_principal", prime_arg,
+		client_name, service_name, client_addr(rqstp, buf));
 	 ret.code = KADM5_AUTH_SETKEY;
     }
 
     if(ret.code != KADM5_AUTH_SETKEY) {
-	krb5_klog_syslog(LOG_NOTICE, LOG_DONE, "kadm5_setv4key_principal", 
-	       prime_arg, ((ret.code == 0) ? "success" :
-			   error_message(ret.code)), 
-	       client_name, service_name,
-		    client_addr(rqstp, buf));
+	log_done("kadm5_setv4key_principal", prime_arg,
+		((ret.code == 0) ? "success" : error_message(ret.code)), 
+		client_name, service_name, client_addr(rqstp, buf));
     }
 
 error:
@@ -1279,18 +1309,15 @@ setkey_principal_1_svc(setkey_arg *arg, struct svc_req *rqstp)
 	 ret.code = kadm5_setkey_principal((void *)handle, arg->princ,
 					   arg->keyblocks, arg->n_keys);
     } else {
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, "kadm5_setkey_principal",
-		prime_arg, client_name, service_name,
-		    client_addr(rqstp, buf));
+	 log_unauth("kadm5_setkey_principal", prime_arg,
+		client_name, service_name, client_addr(rqstp, buf));
 	 ret.code = KADM5_AUTH_SETKEY;
     }
 
     if(ret.code != KADM5_AUTH_SETKEY) {
-	krb5_klog_syslog(LOG_NOTICE, LOG_DONE, "kadm5_setkey_principal", 
-	       prime_arg, ((ret.code == 0) ? "success" :
-			   error_message(ret.code)), 
-	       client_name, service_name,
-		    client_addr(rqstp, buf));
+	log_done("kadm5_setkey_principal", prime_arg,
+		((ret.code == 0) ? "success" : error_message(ret.code)), 
+		client_name, service_name, client_addr(rqstp, buf));
     }
 
 error:
@@ -1348,18 +1375,15 @@ setkey_principal3_1_svc(setkey3_arg *arg, struct svc_req *rqstp)
 					     arg->ks_tuple,
 					     arg->keyblocks, arg->n_keys);
     } else {
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, "kadm5_setkey_principal",
-		prime_arg, client_name, service_name,
-		    client_addr(rqstp, buf));
+	 log_unauth("kadm5_setkey_principal", prime_arg,
+		client_name, service_name, client_addr(rqstp, buf));
 	 ret.code = KADM5_AUTH_SETKEY;
     }
 
     if(ret.code != KADM5_AUTH_SETKEY) {
-	krb5_klog_syslog(LOG_NOTICE, LOG_DONE, "kadm5_setkey_principal", 
-	       prime_arg, ((ret.code == 0) ? "success" :
-			   error_message(ret.code)), 
-	       client_name, service_name,
-	       client_addr(rqstp, buf));
+	log_done("kadm5_setkey_principal", prime_arg,
+		((ret.code == 0) ? "success" : error_message(ret.code)), 
+		client_name, service_name, client_addr(rqstp, buf));
     }
 
 error:
@@ -1424,9 +1448,8 @@ chrand_principal_1_svc(chrand_arg *arg, struct svc_req *rqstp)
     } else {
 		audit_kadmind_unauth(rqstp->rq_xprt, l_port,
 				    funcname, prime_arg, client_name);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, funcname,
-		prime_arg, client_name, service_name,
-		client_addr(rqstp, buf));
+	 log_unauth(funcname, prime_arg,
+		client_name, service_name, client_addr(rqstp, buf));
 	 ret.code = KADM5_AUTH_CHANGEPW;
     }
 
@@ -1443,10 +1466,9 @@ chrand_principal_1_svc(chrand_arg *arg, struct svc_req *rqstp)
     if(ret.code != KADM5_AUTH_CHANGEPW) {
 		audit_kadmind_auth(rqstp->rq_xprt, l_port,
 				funcname, prime_arg, client_name, ret.code);
-	krb5_klog_syslog(LOG_NOTICE, LOG_DONE, funcname,
-	       prime_arg, ((ret.code == 0) ? "success" :
-			   error_message(ret.code)), 
-	       client_name, service_name, client_addr(rqstp, buf));
+	log_done(funcname, prime_arg,
+		((ret.code == 0) ? "success" : error_message(ret.code)), 
+		client_name, service_name, client_addr(rqstp, buf));
      }
 
 error:
@@ -1515,9 +1537,8 @@ chrand_principal3_1_svc(chrand3_arg *arg, struct svc_req *rqstp)
 					      arg->ks_tuple,
 					      &k, &nkeys);
     } else {
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, funcname,
-		prime_arg, client_name, service_name,
-		client_addr(rqstp, buf));
+	 log_unauth(funcname, prime_arg,
+		client_name, service_name, client_addr(rqstp, buf));
 	 ret.code = KADM5_AUTH_CHANGEPW;
     }
 
@@ -1532,11 +1553,9 @@ chrand_principal3_1_svc(chrand3_arg *arg, struct svc_req *rqstp)
     }
 
     if(ret.code != KADM5_AUTH_CHANGEPW) {
-	krb5_klog_syslog(LOG_NOTICE, LOG_DONE, funcname,
-	       prime_arg, ((ret.code == 0) ? "success" :
-			   error_message(ret.code)), 
-	       client_name, service_name,
-	       client_addr(rqstp, buf));
+	log_done(funcname, prime_arg,
+		((ret.code == 0) ? "success" : error_message(ret.code)), 
+		client_name, service_name, client_addr(rqstp, buf));
     }
 
 error:
@@ -1591,9 +1610,8 @@ create_policy_1_svc(cpol_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_unauth(rqstp->rq_xprt, l_port,
 				    "kadm5_create_policy",
 				    prime_arg, client_name);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, "kadm5_create_policy",
-		prime_arg, client_name,
-		service_name, client_addr(rqstp, buf));
+	 log_unauth("kadm5_create_policy", prime_arg,
+		client_name, service_name, client_addr(rqstp, buf));
 	 
     } else {
 	 ret.code = kadm5_create_policy((void *)handle, &arg->rec,
@@ -1602,7 +1620,7 @@ create_policy_1_svc(cpol_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_auth(rqstp->rq_xprt, l_port,
 				"kadm5_create_policy",
 				prime_arg, client_name, ret.code);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_DONE, "kadm5_create_policy",
+	 log_done("kadm5_create_policy",
 		((prime_arg == NULL) ? "(null)" : prime_arg),
 		((ret.code == 0) ? "success" : error_message(ret.code)), 
 		client_name, service_name, client_addr(rqstp, buf));
@@ -1656,9 +1674,8 @@ delete_policy_1_svc(dpol_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_unauth(rqstp->rq_xprt, l_port,
 				    "kadm5_delete_policy",
 				    prime_arg, client_name);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, "kadm5_delete_policy",
-		prime_arg, client_name, service_name,
-		client_addr(rqstp, buf));
+	 log_unauth("kadm5_delete_policy", prime_arg,
+		client_name, service_name, client_addr(rqstp, buf));
 	 ret.code = KADM5_AUTH_DELETE;
     } else {
 	 ret.code = kadm5_delete_policy((void *)handle, arg->name);
@@ -1666,7 +1683,7 @@ delete_policy_1_svc(dpol_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_auth(rqstp->rq_xprt, l_port,
 				"kadm5_delete_policy",
 				prime_arg, client_name, ret.code);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_DONE, "kadm5_delete_policy",
+	 log_done("kadm5_delete_policy",
 		((prime_arg == NULL) ? "(null)" : prime_arg),
 		((ret.code == 0) ? "success" : error_message(ret.code)), 
 		client_name, service_name, client_addr(rqstp, buf));
@@ -1720,9 +1737,8 @@ modify_policy_1_svc(mpol_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_unauth(rqstp->rq_xprt, l_port,
 				    "kadm5_modify_policy",
 				    prime_arg, client_name);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, "kadm5_modify_policy",
-		prime_arg, client_name,
-		service_name, client_addr(rqstp, buf));
+	 log_unauth("kadm5_modify_policy", prime_arg,
+		client_name, service_name, client_addr(rqstp, buf));
 	 ret.code = KADM5_AUTH_MODIFY;
     } else {
 	 ret.code = kadm5_modify_policy((void *)handle, &arg->rec,
@@ -1731,7 +1747,7 @@ modify_policy_1_svc(mpol_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_auth(rqstp->rq_xprt, l_port,
 				"kadm5_modify_policy",
 				prime_arg, client_name, ret.code);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_DONE, "kadm5_modify_policy",
+	 log_done("kadm5_modify_policy",
 		((prime_arg == NULL) ? "(null)" : prime_arg),	    
 		((ret.code == 0) ? "success" : error_message(ret.code)), 
 		client_name, service_name, client_addr(rqstp, buf));
@@ -1821,15 +1837,13 @@ get_policy_1_svc(gpol_arg *arg, struct svc_req *rqstp)
 	 
 		audit_kadmind_auth(rqstp->rq_xprt, l_port,
 				funcname, prime_arg, client_name, ret.code);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_DONE, funcname,
-		((prime_arg == NULL) ? "(null)" : prime_arg),
+	 log_done(funcname, ((prime_arg == NULL) ? "(null)" : prime_arg),
 		((ret.code == 0) ? "success" : error_message(ret.code)), 
 		client_name, service_name, client_addr(rqstp, buf));
 	} else {
 		audit_kadmind_unauth(rqstp->rq_xprt, l_port,
 				    funcname, prime_arg, client_name);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, funcname,
-		prime_arg, client_name,
+	 log_unauth(funcname, prime_arg, client_name,
 		service_name, client_addr(rqstp, buf));
     }
 
@@ -1886,9 +1900,8 @@ get_pols_1_svc(gpols_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_unauth(rqstp->rq_xprt, l_port,
 				    "kadm5_get_policies",
 				    prime_arg, client_name);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_UNAUTH, "kadm5_get_policies",
-		prime_arg, client_name, service_name,
-		client_addr(rqstp, buf));
+	 log_unauth("kadm5_get_policies", prime_arg,
+		client_name, service_name, client_addr(rqstp, buf));
     } else {
 	 ret.code  = kadm5_get_policies((void *)handle,
 		    arg->exp, &ret.pols,
@@ -1897,8 +1910,7 @@ get_pols_1_svc(gpols_arg *arg, struct svc_req *rqstp)
 		audit_kadmind_auth(rqstp->rq_xprt, l_port,
 				"kadm5_get_policies",
 				prime_arg, client_name, ret.code);
-	 krb5_klog_syslog(LOG_NOTICE, LOG_DONE, "kadm5_get_policies",
-		prime_arg,  
+	 log_done("kadm5_get_policies", prime_arg,  
 		((ret.code == 0) ? "success" : error_message(ret.code)), 
 		client_name, service_name, client_addr(rqstp, buf));
     }
@@ -1946,8 +1958,7 @@ getprivs_ret * get_privs_1_svc(krb5_ui_4 *arg, struct svc_req *rqstp)
 	audit_kadmind_auth(rqstp->rq_xprt, l_port,
 			"kadm5_get_privs", NULL, client_name,
 			ret.code);
-	krb5_klog_syslog(LOG_NOTICE, LOG_DONE, "kadm5_get_privs",
-	    client_name,
+	log_done("kadm5_get_privs", client_name,
 	    ((ret.code == 0) ? "success" : error_message(ret.code)),
 	    client_name, service_name, client_addr(rqstp, buf));
 
@@ -1965,8 +1976,10 @@ error:
 generic_ret *init_1_svc(krb5_ui_4 *arg, struct svc_req *rqstp)
 {
      static generic_ret		ret;
-	char *client_name, *service_name;
-	kadm5_server_handle_t handle;
+     char *client_name, *service_name;
+     kadm5_server_handle_t handle;
+     size_t clen, slen;
+     char *cdots, *sdots;
 
      xdr_free(xdr_generic_ret, (char *) &ret);
 
@@ -1987,12 +2000,21 @@ generic_ret *init_1_svc(krb5_ui_4 *arg, struct svc_req *rqstp)
 			(ret.api_version == KADM5_API_VERSION_1 ?
 			"kadm5_init (V1)" : "kadm5_init"),
 			NULL, client_name, ret.code);
-	krb5_klog_syslog(LOG_NOTICE, LOG_DONE,
+
+	clen = strlen(client_name);
+	trunc_name(&clen, &cdots);
+	slen = strlen(service_name);
+	trunc_name(&slen, &sdots);
+	krb5_klog_syslog(LOG_NOTICE, "Request %s, %.*s%s, %s, "
+	    "client=%.*s%s, service=%.*s%s, addr=%s, flavor=%d",
 	    (ret.api_version == KADM5_API_VERSION_1 ?
-	     "kadm5_init (V1)" : "kadm5_init"),
-	    client_name,
+	    "kadm5_init (V1)" : "kadm5_init"),
+	    clen, client_name, cdots,
 	    (ret.code == 0) ? "success" : error_message(ret.code),
-	    client_name, service_name, client_addr(rqstp, buf));
+	    clen, client_name, cdots,
+	    slen, service_name, sdots,
+	    client_addr(rqstp, buf),
+	    rqstp->rq_cred.oa_flavor);
 	free(client_name);
 	free(service_name);
 

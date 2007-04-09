@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -816,6 +816,10 @@ ovsec_kadm_ret_t    ovsec_kadm_get_policies(void *server_handle,
 #define OVSEC_KADM_NO_RENAME_SALT KADM5_NO_RENAME_SALT
 
 #endif /* USE_KADM5_API_VERSION == 1 */
+
+#define MAXPRINCLEN 125
+
+void trunc_name(size_t *len, char **dots);
 
 krb5_chgpwd_prot _kadm5_get_kpasswd_protocol(void *server_handle);
 kadm5_ret_t	kadm5_chpass_principal_v2(void *server_handle,
