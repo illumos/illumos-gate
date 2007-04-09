@@ -46,7 +46,8 @@ pci_physslot_name_lookup(char *platform, did_t *dp)
 	const char *rlabel = NULL;
 	int n, p, i;
 
-	if ((n = did_physslot(dp)) < 0 || Physlot_Names == NULL)
+	if ((n = did_physslot(dp)) < 0 || Physlot_Names == NULL ||
+	    platform == NULL)
 		return (NULL);
 
 	for (p = 0; p < Physlot_Names->psn_nplats; p++) {
@@ -149,7 +150,10 @@ pci_slotname_lookup(topo_mod_t *mod, tnode_t *node, did_t *dp)
 	 * Trim SUNW, from the platform name
 	 */
 	pp = strchr(plat, ',');
-	++pp;
+	if (pp == NULL)
+		pp = plat;
+	else
+		++pp;
 
 	did_BDF(dp, NULL, &d, NULL);
 	if ((l = pci_physslot_name_lookup(pp, dp)) == NULL)
