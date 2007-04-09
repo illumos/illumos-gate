@@ -68,10 +68,6 @@
 #include <sys/task.h>
 #include <sys/sdt.h>
 
-#ifdef __sparc
-#include <sys/wdt.h>
-#endif
-
 /*
  * for NTP support
  */
@@ -1821,10 +1817,6 @@ deadman(void)
 		 */
 		lbolt += hz;
 		lbolt64 += hz;
-
-#ifdef __sparc
-		watchdog_pat();
-#endif
 
 		if (!deadman_panic_timers)
 			return; /* allow all timers to be manually disabled */

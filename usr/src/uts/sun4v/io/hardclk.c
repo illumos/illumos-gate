@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -150,11 +150,6 @@ tod_get(void)
 	int i;
 	unsigned int spl_old;
 	uint64_t ret;
-
-	/*
-	 * Pat the watchdog timer regularly.
-	 */
-	watchdog_pat();
 
 	/*
 	 * Make sure we don't get preempted

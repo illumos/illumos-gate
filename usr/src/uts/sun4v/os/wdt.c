@@ -29,6 +29,7 @@
 #include <sys/hsvc.h>
 #include <sys/wdt.h>
 #include <sys/cmn_err.h>
+#include <sys/cyclic.h>
 #include <sys/kmem.h>
 #include <sys/systm.h>
 #include <sys/sysmacros.h>
@@ -38,36 +39,41 @@
 
 #define	WDT_ON			1
 #define	WDT_OFF			0
-#define	WDT_DEFAULT_RESOLUTION	10		/* 10 milliseconds */
+
 /*
  * MILLISEC defines the number of milliseconds in a second.
  */
-#define	WDT_MAX_RESOLUTION	(1 * MILLISEC)	/* 1 second */
-#define	WDT_REGULAR_TIMEOUT	(10 * MILLISEC)	/* 10 seconds */
-#define	WDT_LONG_TIMEOUT	(60 * MILLISEC)	/* 60 seconds */
+#define	WDT_DEFAULT_RESOLUTION	(1 * MILLISEC)	/* Default resolution = 1s */
+#define	WDT_MIN_TIMEOUT		(1 * MILLISEC)	/* Minimum timeout = 1s */
+#define	WDT_REGULAR_TIMEOUT	(10 * MILLISEC)	/* Default timeout = 10s */
+#define	WDT_LONG_TIMEOUT	(60 * MILLISEC)	/* Long timeout = 60s */
+
 #define	WDT_MIN_COREAPI_MAJOR	1
 #define	WDT_MIN_COREAPI_MINOR	1
-/*
- * The ratio to calculate the watchdog timer pat interval.
- */
-#define	WDT_PAT_INTERVAL(x)	((x) / 2)
 
-int watchdog_enabled = 1;
-
-static void set_watchdog_pat_intervals(void);
 static void config_watchdog(uint64_t, int);
+static void watchdog_cyclic_init(hrtime_t);
 
 /*
  * Flag used to pat/suspend/resume the watchdog timer.
  */
 int watchdog_activated = WDT_OFF;
-static uint64_t watchdog_regular_timeout = WDT_REGULAR_TIMEOUT;
-static uint64_t watchdog_long_timeout = 0;
+
+/*
+ * Tuneable to control watchdog functionality. Watchdog can be
+ * disabled via /etc/system.
+ */
+int watchdog_enabled = 1;
+
+/*
+ * The following tuneable can be set via /etc/system to control
+ * watchdog pat frequency, which is set to approximately 44% of
+ * the timeout value.
+ */
+static uint64_t watchdog_timeout = WDT_REGULAR_TIMEOUT;
+
+static uint64_t watchdog_long_timeout = WDT_LONG_TIMEOUT;
 static uint64_t watchdog_resolution = WDT_DEFAULT_RESOLUTION;
-static int64_t watchdog_last_pat = 0;	/* The time of last pat. */
-static int64_t last_pat_interval = 0;	/* The pat interval of last pat. */
-static int64_t watchdog_long_pat_interval = 0;
-static int64_t watchdog_regular_pat_interval = 0;
 
 void
 watchdog_init(void)
@@ -80,6 +86,7 @@ watchdog_init(void)
 	uint64_t major;
 	uint64_t minor;
 	uint64_t watchdog_max_timeout;
+	hrtime_t cyclic_interval;
 
 	if (!watchdog_enabled) {
 		return;
@@ -89,7 +96,7 @@ watchdog_init(void)
 		major != WDT_MIN_COREAPI_MAJOR ||
 		minor < WDT_MIN_COREAPI_MINOR) {
 		cmn_err(CE_NOTE, "Disabling watchdog as watchdog services are "
-			"not available\n");
+		    "not available\n");
 		watchdog_enabled = 0;
 		return;
 	}
@@ -99,7 +106,7 @@ watchdog_init(void)
 	 */
 	if ((mdp = md_get_handle()) == NULL) {
 		cmn_err(CE_WARN, "Unable to initialize machine description, "
-			"watchdog is disabled.");
+		    "watchdog is disabled.");
 		watchdog_enabled = 0;
 		return;
 	}
@@ -111,33 +118,38 @@ watchdog_init(void)
 	listp = kmem_zalloc(listsz, KM_SLEEP);
 
 	nplat = md_scan_dag(mdp, md_root_node(mdp),
-		md_find_name(mdp, "platform"), md_find_name(mdp, "fwd"), listp);
+	    md_find_name(mdp, "platform"), md_find_name(mdp, "fwd"), listp);
 
 	ASSERT(nplat == 1);
 
 	if (md_get_prop_val(mdp, listp[0], "watchdog-max-timeout",
-		&watchdog_max_timeout)) {
-		cmn_err(CE_WARN, "Cannot read watchdog-max-timeout, watchdog "
-			"is disabled.");
+	    &watchdog_max_timeout) || watchdog_max_timeout < WDT_MIN_TIMEOUT) {
+		cmn_err(CE_WARN, "Invalid watchdog-max-timeout, watchdog "
+		    "is disabled.");
 		watchdog_enabled = 0;
 		kmem_free(listp, listsz);
 		(void) md_fini_handle(mdp);
 		return;
 	}
 
-	if (watchdog_max_timeout < WDT_REGULAR_TIMEOUT) {
-		cmn_err(CE_WARN, "Invalid watchdog-max-timeout value, watchdog "
-			"is disabled.");
-		watchdog_enabled = 0;
-		kmem_free(listp, listsz);
-		(void) md_fini_handle(mdp);
-		return;
-	}
+	/*
+	 * Make sure that watchdog timeout value is within limits.
+	 */
+	if (watchdog_timeout < WDT_MIN_TIMEOUT)
+		watchdog_timeout = WDT_MIN_TIMEOUT;
+	else if (watchdog_timeout > WDT_LONG_TIMEOUT)
+		watchdog_timeout = WDT_LONG_TIMEOUT;
+
+	if (watchdog_timeout > watchdog_max_timeout)
+		watchdog_timeout = watchdog_max_timeout;
+
+	if (watchdog_long_timeout > watchdog_max_timeout)
+		watchdog_long_timeout = watchdog_max_timeout;
 
 	if (md_get_prop_val(mdp, listp[0], "watchdog-resolution",
-		&watchdog_resolution)) {
+	    &watchdog_resolution)) {
 		cmn_err(CE_WARN, "Cannot read watchdog-resolution, watchdog "
-			"is disabled.");
+		    "is disabled.");
 		watchdog_enabled = 0;
 		kmem_free(listp, listsz);
 		(void) md_fini_handle(mdp);
@@ -145,61 +157,51 @@ watchdog_init(void)
 	}
 
 	if (watchdog_resolution == 0 ||
-		watchdog_resolution > WDT_MAX_RESOLUTION) {
+	    watchdog_resolution > WDT_DEFAULT_RESOLUTION)
 		watchdog_resolution = WDT_DEFAULT_RESOLUTION;
-	}
+
 	kmem_free(listp, listsz);
 	(void) md_fini_handle(mdp);
-
-	watchdog_long_timeout = MIN(WDT_LONG_TIMEOUT, watchdog_max_timeout);
 
 	/*
 	 * round the timeout to the nearest smaller value.
 	 */
 	watchdog_long_timeout -=
-		watchdog_long_timeout % watchdog_resolution;
-	watchdog_regular_timeout -=
-		watchdog_regular_timeout % watchdog_resolution;
-	set_watchdog_pat_intervals();
+	    watchdog_long_timeout % watchdog_resolution;
+	watchdog_timeout -=
+	    watchdog_timeout % watchdog_resolution;
 
-	config_watchdog(watchdog_regular_timeout, WDT_ON);
+	config_watchdog(watchdog_timeout, WDT_ON);
+
+	/*
+	 * Cyclic need to be fired twice the frequency of regular
+	 * watchdog timeout. Pedantic here and setting cyclic
+	 * frequency to approximately 44% of watchdog_timeout.
+	 */
+	cyclic_interval = (watchdog_timeout >> 1) - (watchdog_timeout >> 4);
+	/*
+	 * Note that regular timeout interval is in millisecond,
+	 * therefore to get cyclic interval in nanosecond need to
+	 * multiply by MICROSEC.
+	 */
+	cyclic_interval *= MICROSEC;
+
+	watchdog_cyclic_init(cyclic_interval);
 }
 
 /*
- * Pat the watchdog timer periodically, for regular pat in tod_get when
- * the kernel runs normally and long pat in deadman when panicking.
+ * Pat the watchdog timer periodically using the hypervisor API.
+ * Regular pat occurs when the system runs normally.
+ * Long pat is when system panics.
  */
 void
 watchdog_pat()
 {
-	int64_t pat_interval;
-	int64_t current_lbolt64;
-	uint64_t timeout;
-
 	if (watchdog_enabled && watchdog_activated) {
-		if (panicstr) {
-			/*
-			 * long timeout is only used while panicking.
-			 */
-			timeout = watchdog_long_timeout;
-			pat_interval = watchdog_long_pat_interval;
-		} else {
-			timeout = watchdog_regular_timeout;
-			pat_interval = watchdog_regular_pat_interval;
-		}
-
-		current_lbolt64 = lbolt64;
-
-		if ((current_lbolt64 - watchdog_last_pat)
-			>= last_pat_interval) {
-			/*
-			 * Pat the watchdog via hv api:
-			 */
-			config_watchdog(timeout, WDT_ON);
-
-			last_pat_interval = pat_interval;
-			watchdog_last_pat = current_lbolt64;
-		}
+		if (panicstr)
+			config_watchdog(watchdog_long_timeout, WDT_ON);
+		else
+			config_watchdog(watchdog_timeout, WDT_ON);
 	}
 }
 
@@ -224,7 +226,7 @@ watchdog_resume()
 		if (panicstr) {
 			config_watchdog(watchdog_long_timeout, WDT_ON);
 		} else {
-			config_watchdog(watchdog_regular_timeout, WDT_ON);
+			config_watchdog(watchdog_timeout, WDT_ON);
 		}
 	}
 }
@@ -237,19 +239,6 @@ watchdog_clear()
 	}
 }
 
-/*
- * Set the pat intervals for both regular (when Solaris is running),
- * and long timeout (i.e., when panicking) cases.
- */
-static void
-set_watchdog_pat_intervals(void)
-{
-	watchdog_regular_pat_interval =
-		MSEC_TO_TICK(WDT_PAT_INTERVAL(watchdog_regular_timeout));
-	watchdog_long_pat_interval =
-		MSEC_TO_TICK(WDT_PAT_INTERVAL(watchdog_long_timeout));
-}
-
 static void
 config_watchdog(uint64_t timeout, int new_state)
 {
@@ -260,7 +249,30 @@ config_watchdog(uint64_t timeout, int new_state)
 	ret = hv_mach_set_watchdog(timeout, &time_remaining);
 	if (ret != H_EOK) {
 		cmn_err(CE_WARN, "Failed to operate on the watchdog. "
-			"Error = 0x%lx", ret);
+		    "Error = 0x%lx", ret);
 		watchdog_enabled = 0;
 	}
+}
+
+/*
+ * Once the watchdog cyclic is initialized, it won't be removed.
+ * The only way to not add the watchdog cyclic is to disable the watchdog
+ * by setting the watchdog_enabled to 0 in /etc/system file.
+ */
+static void
+watchdog_cyclic_init(hrtime_t wdt_cyclic_interval)
+{
+	cyc_handler_t hdlr;
+	cyc_time_t when;
+
+	hdlr.cyh_func = (cyc_func_t)watchdog_pat;
+	hdlr.cyh_level = CY_HIGH_LEVEL;
+	hdlr.cyh_arg = NULL;
+
+	when.cyt_when = 0;
+	when.cyt_interval = wdt_cyclic_interval;
+
+	mutex_enter(&cpu_lock);
+	(void) cyclic_add(&hdlr, &when);
+	mutex_exit(&cpu_lock);
 }

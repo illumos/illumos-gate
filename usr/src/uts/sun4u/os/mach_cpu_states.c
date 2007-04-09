@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -460,46 +460,6 @@ kdi_watchdog_restore(void)
 		(void) tod_ops.tod_set_watchdog_timer(watchdog_timeout_seconds);
 		mutex_exit(&tod_lock);
 	}
-}
-
-/*
- * This null routine is only used by sun4v watchdog timer support.
- */
-void
-watchdog_init(void)
-{
-}
-
-/*
- * This null routine is only used by sun4v watchdog timer support.
- */
-void
-watchdog_pat(void)
-{
-}
-
-/*
- * This null routine is only used by sun4v watchdog timer support.
- */
-void
-watchdog_suspend(void)
-{
-}
-
-/*
- * This null routine is only used by sun4v watchdog timer support.
- */
-void
-watchdog_resume(void)
-{
-}
-
-/*
- * This null routine is only used by sun4v watchdog timer support.
- */
-void
-watchdog_clear(void)
-{
 }
 
 /*ARGSUSED*/
