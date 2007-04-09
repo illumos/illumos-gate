@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,18 @@
  *
  * CDDL HEADER END
  */
-#ident	"%Z%%M%	%I%	%E% SMI"
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright (c) 1994, by Sun Microsystems, Inc.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include <stdio.h>
 #include <pwd.h>
 #include <stdlib.h>
+#include <errno.h>
 #include "getent.h"
 
 /*
@@ -47,11 +49,23 @@ dogetpw(const char **list)
 			(void) putpwent(pwp, stdout);
 	} else {
 		for (; *list != NULL; list++) {
+			errno = 0;
+
+			/*
+			 * Here we assume that the argument passed is
+			 * a uid, if it can be completely transformed
+			 * to a long integer. So we check for uid in
+			 * the database and if we fail then we check
+			 * for the user name.
+			 * If the argument passed is not numeric, then
+			 * we take it as the user name and proceed.
+			 */
 			uid = strtol(*list, &ptr, 10);
-			if (ptr == *list)
+			if (!(*ptr == '\0' && errno == 0) ||
+			    ((pwp = getpwuid(uid)) == NULL)) {
 				pwp = getpwnam(*list);
-			else
-				pwp = getpwuid(uid);
+			}
+
 			if (pwp == NULL)
 				rc = EXC_NAME_NOT_FOUND;
 			else
