@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -158,6 +158,7 @@ extern	int		prom_stdin_is_keyboard(void);
 extern	int		prom_stdout_is_framebuffer(void);
 extern	int		prom_stdin_stdout_equivalence(void);
 
+extern void		prom_get_tem_inverses(int *, int *);
 extern void		prom_get_tem_size(size_t *, size_t *);
 extern void		prom_get_tem_pos(uint32_t *, uint32_t *);
 extern void		prom_get_term_font_size(int *, int *);

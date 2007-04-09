@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,9 +90,26 @@ extern "C" {
 #define	TEM_DEFAULT_ROWS	34
 #define	TEM_DEFAULT_COLS	80
 
+/*
+ * Default foreground/background color
+ */
+#ifdef _HAVE_TEM_FIRMWARE
+#define	DEFAULT_ANSI_FOREGROUND	ANSI_COLOR_BLACK
+#define	DEFAULT_ANSI_BACKGROUND	ANSI_COLOR_WHITE
+#else /* _HAVE_TEM_FIRMWARE */
+#define	DEFAULT_ANSI_FOREGROUND	ANSI_COLOR_WHITE
+#define	DEFAULT_ANSI_BACKGROUND	ANSI_COLOR_BLACK
+#endif
+
 #define	BUF_LEN		160 /* Two lines of data can be processed at a time */
 
 typedef uint8_t text_color_t;
+
+typedef struct tem_color {
+	text_color_t	fg_color;
+	text_color_t	bg_color;
+	unsigned short	a_flags;
+} tem_color_t;
 
 struct tem_pix_pos {
 	screen_pos_t	x;
@@ -186,13 +203,15 @@ typedef struct tem {
 	tem_state_t		*state;
 	tem_modechg_cb_t	modechg_cb;
 	tem_modechg_cb_arg_t	modechg_arg;
+	tem_color_t		init_color; /* initial color and attributes */
 } tem_t;
 
 void	tem_check_first_time(tem_t *tem, cred_t *, enum called_from);
 void	tem_reset_colormap(tem_t *, cred_t *, enum called_from);
 void	tem_align_cursor(tem_t *);
-void	tem_reset_emulator(tem_t *, cred_t *, enum called_from);
-void	tem_reset_display(tem_t *, cred_t *, enum called_from, int);
+void	tem_reset_emulator(tem_t *, cred_t *, enum called_from, tem_color_t *);
+void	tem_reset_display(tem_t *, cred_t *, enum called_from, int,
+			tem_color_t *);
 void	tem_display_layered(tem_t *, struct vis_consdisplay *, cred_t *);
 void	tem_copy_layered(tem_t *, struct vis_conscopy *, cred_t *);
 void	tem_cursor_layered(tem_t *, struct vis_conscursor *, cred_t *);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -245,6 +245,13 @@ plat_stdoutpath(void)
  * functions should be re-considered. Now these functions are
  * unused on x86.
  */
+void
+plat_tem_get_inverses(int *inverse, int *inverse_screen)
+{
+	*inverse = 0;
+	*inverse_screen = 0;
+}
+
 void
 plat_tem_get_prom_font_size(int *charheight, int *windowtop)
 {

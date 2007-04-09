@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,6 +124,7 @@ extern char	*plat_mousepath(void);
 extern int	plat_stdout_is_framebuffer(void);
 extern int	plat_stdin_is_keyboard(void);
 
+extern void	plat_tem_get_inverses(int *, int *);
 extern void	plat_tem_get_prom_font_size(int *, int *);
 extern void	plat_tem_get_prom_size(size_t *, size_t *);
 extern void	plat_tem_hide_prom_cursor(void);

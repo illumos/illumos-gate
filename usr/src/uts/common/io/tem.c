@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,7 +67,8 @@ static int	tem_setup_terminal(struct vis_devinit *, tem_t *,
 			size_t, size_t);
 static void	tem_modechange_callback(tem_t *, struct vis_devinit *);
 static void	tem_free(tem_t *);
-
+static void	tem_get_inverses(boolean_t *, boolean_t *);
+static void	tem_get_initial_color(tem_t *);
 static int	tem_adjust_row(tem_t *, int, cred_t *);
 
 /*
@@ -308,6 +309,11 @@ tem_init(tem_t **ptem, char *pathname, cred_t *credp)
 	}
 
 	/*
+	 * make our kernel console keep compatibility with OBP.
+	 */
+	tem_get_initial_color(tem);
+
+	/*
 	 * On SPARC don't clear the screen if the console is the framebuffer.
 	 * Otherwise it needs to be cleared to get rid of junk that may be
 	 * in frameuffer memory, since the screen isn't cleared when
@@ -318,11 +324,11 @@ tem_init(tem_t **ptem, char *pathname, cred_t *credp)
 		 * The old getting current cursor position code, which
 		 * is not needed here, has been in tem_write/tem_polled_write.
 		 */
-		tem_reset_display(tem, credp, CALLED_FROM_NORMAL, 0);
+		tem_reset_display(tem, credp, CALLED_FROM_NORMAL, 0, NULL);
 	} else if (plat_stdout_is_framebuffer()) {
 		ASSERT(devinit.mode == VIS_PIXEL);
 		plat_tem_hide_prom_cursor();
-		tem_reset_display(tem, credp, CALLED_FROM_NORMAL, 0);
+		tem_reset_display(tem, credp, CALLED_FROM_NORMAL, 0, NULL);
 
 		/*
 		 * We are getting the current cursor position in pixel
@@ -346,7 +352,7 @@ tem_init(tem_t **ptem, char *pathname, cred_t *credp)
 		tem->state->a_c_cursor.col = 0;
 		tem_align_cursor(tem);
 	} else {
-		tem_reset_display(tem, credp, CALLED_FROM_NORMAL, 1);
+		tem_reset_display(tem, credp, CALLED_FROM_NORMAL, 1, NULL);
 	}
 
 #ifdef _HAVE_TEM_FIRMWARE
@@ -375,19 +381,30 @@ tem_init(tem_t **ptem, char *pathname, cred_t *credp)
  * the underlying frame buffer driver to reconfigure the terminal
  * emulator to a new screen size and depth in conjunction with
  * framebuffer videomode changes.
+ * Here we keep the foreground/background color and attributes,
+ * which may be different with the initial settings, so that
+ * the color won't change while the framebuffer videomode changes.
+ * And we also reset the kernel terminal emulator and clear the
+ * whole screen.
  */
 void
 tem_modechange_callback(tem_t *tem, struct vis_devinit *devinit)
 {
+	tem_color_t tc;
+
 	mutex_enter(&tem->lock);
 
 	ASSERT(tem->hdl != NULL);
+
+	tc.fg_color = tem->state->fg_color;
+	tc.bg_color = tem->state->bg_color;
+	tc.a_flags = tem->state->a_flags;
 
 	(void) tem_setup_terminal(devinit, tem,
 	    tem->state->a_c_dimension.height,
 	    tem->state->a_c_dimension.width);
 
-	tem_reset_display(tem, kcred, CALLED_FROM_NORMAL, 1);
+	tem_reset_display(tem, kcred, CALLED_FROM_NORMAL, 1, &tc);
 
 	mutex_exit(&tem->lock);
 
@@ -703,4 +720,42 @@ tem_adjust_row(tem_t *tem, int prom_row, cred_t *credp)
 	}
 
 	return (tem_row);
+}
+
+static void
+tem_get_inverses(boolean_t *p_inverse, boolean_t *p_inverse_screen)
+{
+	int i_inverse = 0;
+	int i_inverse_screen = 0;
+
+	plat_tem_get_inverses(&i_inverse, &i_inverse_screen);
+
+	*p_inverse = (i_inverse == 0) ? B_FALSE : B_TRUE;
+	*p_inverse_screen = (i_inverse_screen == 0) ? B_FALSE : B_TRUE;
+}
+
+/*
+ * Get the foreground/background color and attributes from the initial
+ * PROM, so that our kernel console can keep the same visual behaviour.
+ */
+static void
+tem_get_initial_color(tem_t *tem)
+{
+	boolean_t inverse, inverse_screen;
+	unsigned short  flags = 0;
+
+	tem->init_color.fg_color = DEFAULT_ANSI_FOREGROUND;
+	tem->init_color.bg_color = DEFAULT_ANSI_BACKGROUND;
+
+	if (plat_stdout_is_framebuffer()) {
+		tem_get_inverses(&inverse, &inverse_screen);
+		if (inverse)
+			flags |= TEM_ATTR_REVERSE;
+		if (inverse_screen)
+			flags |= TEM_ATTR_SCREEN_REVERSE;
+		if (flags != 0)
+			flags |= TEM_ATTR_BOLD;
+	}
+
+	tem->init_color.a_flags = flags;
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,6 +212,12 @@ void
 kadb_uses_kernel()
 {
 	/* only used on intel */
+}
+
+void
+plat_tem_get_inverses(int *inverse, int *inverse_screen)
+{
+	prom_get_tem_inverses(inverse, inverse_screen);
 }
 
 void

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,15 +117,6 @@ static void	tem_get_color(struct tem *tem,
 			text_color_t *fg, text_color_t *bg);
 static void	tem_pix_clear_prom_output(struct tem *tem,
 			cred_t *credp, enum called_from called_from);
-
-#ifdef _HAVE_TEM_FIRMWARE
-#define	DEFAULT_ANSI_FOREGROUND	ANSI_COLOR_BLACK
-#define	DEFAULT_ANSI_BACKGROUND	ANSI_COLOR_WHITE
-#else /* _HAVE_TEM_FIRMWARE */
-#define	DEFAULT_ANSI_FOREGROUND	ANSI_COLOR_WHITE
-#define	DEFAULT_ANSI_BACKGROUND	ANSI_COLOR_BLACK
-#endif
-
 
 /* BEGIN CSTYLED */
 /*                                      Bk  Rd  Gr  Br  Bl  Mg  Cy  Wh */
@@ -442,14 +433,17 @@ tem_selgraph(struct tem *tem)
 			} else {
 				tems->a_flags &= ~TEM_ATTR_REVERSE;
 			}
-			tems->a_flags &= ~TEM_ATTR_BOLD;
-			tems->a_flags &= ~TEM_ATTR_BLINK;
-			tems->fg_color = DEFAULT_ANSI_FOREGROUND;
-			tems->bg_color = DEFAULT_ANSI_BACKGROUND;
+			tems->a_flags = tem->init_color.a_flags;
+			tems->fg_color = tem->init_color.fg_color;
+			tems->bg_color = tem->init_color.bg_color;
 			break;
 
 		case 1: /* Bold Intense */
 			tems->a_flags |= TEM_ATTR_BOLD;
+			break;
+
+		case 2: /* Faint Intense */
+			tems->a_flags &= ~TEM_ATTR_BOLD;
 			break;
 
 		case 5: /* Blink */
@@ -1100,7 +1094,7 @@ tem_parse(struct tem *tem, uchar_t ch,
 		tems->a_state = A_STATE_START;
 		if (ch == 'c')
 			/* ESC c resets display */
-			tem_reset_display(tem, credp, called_from, 1);
+			tem_reset_display(tem, credp, called_from, 1, NULL);
 		else if (ch == 'H')
 			/* ESC H sets a tab */
 			tem_set_tab(tem);
@@ -1667,7 +1661,8 @@ tem_mv_cursor(struct tem *tem, int row, int col,
 /* ARGSUSED */
 void
 tem_reset_emulator(struct tem *tem,
-    cred_t *credp, enum called_from called_from)
+    cred_t *credp, enum called_from called_from,
+    tem_color_t *pcolor)
 {
 	struct tem_state *tems = tem->state;
 	int j;
@@ -1686,10 +1681,19 @@ tem_reset_emulator(struct tem *tem,
 	tems->a_gotparam = B_FALSE;
 	tems->a_curparam = 0;
 	tems->a_paramval = 0;
-	tems->a_flags = 0;
 	tems->a_nscroll = 1;
-	tems->fg_color = DEFAULT_ANSI_FOREGROUND;
-	tems->bg_color = DEFAULT_ANSI_BACKGROUND;
+
+	if (pcolor != NULL) {
+		/* use customized settings */
+		tems->fg_color = pcolor->fg_color;
+		tems->bg_color = pcolor->bg_color;
+		tems->a_flags = pcolor->a_flags;
+	} else {
+		/* use initial settings */
+		tems->fg_color = tem->init_color.fg_color;
+		tems->bg_color = tem->init_color.bg_color;
+		tems->a_flags = tem->init_color.a_flags;
+	}
 
 	/*
 	 * set up the initial tab stops
@@ -1704,14 +1708,15 @@ tem_reset_emulator(struct tem *tem,
 
 void
 tem_reset_display(struct tem *tem,
-    cred_t *credp, enum called_from called_from, int clear_txt)
+    cred_t *credp, enum called_from called_from, int clear_txt,
+    tem_color_t *pcolor)
 {
 	struct tem_state *tems = tem->state;
 
 	ASSERT((called_from == CALLED_FROM_STANDALONE) ||
 	    MUTEX_HELD(&tem->lock));
 
-	tem_reset_emulator(tem, credp, called_from);
+	tem_reset_emulator(tem, credp, called_from, pcolor);
 	tem_reset_colormap(tem, credp, called_from);
 
 	if (clear_txt) {

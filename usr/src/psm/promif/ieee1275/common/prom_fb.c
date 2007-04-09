@@ -55,6 +55,20 @@ prom_stdout_is_framebuffer(void)
 }
 
 /*
+ * get inverse? and inverse-screen? property,
+ * -1 is returned if true, 0 is returned if false.
+ */
+void
+prom_get_tem_inverses(int *inverse, int *inverse_screen)
+{
+	prom_interpret(
+	    "my-self >r stdout @ is my-self "
+	    "inverse? swap l! inverse-screen? swap l! "
+	    "r> is my-self",
+	    (uintptr_t)inverse, (uintptr_t)inverse_screen, 0, 0, 0);
+}
+
+/*
  * get current cursor position from the stdout handle, which
  * containing the instance handle of the OBP console output device.
  */
