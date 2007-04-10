@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -324,13 +324,15 @@ MD5Update(MD5_CTX *ctx, const void *inpp, unsigned int input_len)
  *
  * purpose: ends an md5 digest operation, finalizing the message digest and
  *          zeroing the context.
- *   input: uint8_t *	: a buffer to store the digest in
+ *   input: uchar_t *	: a buffer to store the digest in
+ *			: The function actually uses void* because many
+ *			: callers pass things other than uchar_t here.
  *          MD5_CTX *   : the context to finalize, save, and zero
  *  output: void
  */
 
 void
-MD5Final(unsigned char *digest, MD5_CTX *ctx)
+MD5Final(void *digest, MD5_CTX *ctx)
 {
 	uint8_t		bitcount_le[sizeof (ctx->count)];
 	uint32_t	index = (ctx->count[0] >> 3) & 0x3f;

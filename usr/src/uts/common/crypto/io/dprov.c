@@ -194,6 +194,8 @@ static struct modlinkage modlinkage = {
  */
 
 typedef enum dprov_mech_type {
+	MD4_MECH_INFO_TYPE,		/* SUN_CKM_MD4 */
+
 	MD5_MECH_INFO_TYPE,		/* SUN_CKM_MD5 */
 	MD5_HMAC_MECH_INFO_TYPE,	/* SUN_CKM_MD5_HMAC */
 	MD5_HMAC_GEN_MECH_INFO_TYPE,	/* SUN_CKM_MD5_HMAC_GENERAL */
@@ -287,6 +289,10 @@ typedef enum dprov_mech_type {
 #define	DPROV_CKM_RSA_PKCS_KEY_PAIR_GEN	"CKM_RSA_PKCS_KEY_PAIR_GEN"
 
 static crypto_mech_info_t dprov_mech_info_tab[] = {
+	/* MD4 */
+	{SUN_CKM_MD4, MD4_MECH_INFO_TYPE,
+	    CRYPTO_FG_DIGEST | CRYPTO_FG_DIGEST_ATOMIC, 0, 0,
+	    CRYPTO_KEYSIZE_UNIT_IN_BITS},
 	/* MD5 */
 	{SUN_CKM_MD5, MD5_MECH_INFO_TYPE,
 	    CRYPTO_FG_DIGEST | CRYPTO_FG_DIGEST_ATOMIC, 0, 0,
@@ -1746,7 +1752,8 @@ dprov_digest_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 	DPROV_DEBUG(D_DIGEST, ("(%d) dprov_digest_init: started\n", instance));
 
 	/* check mechanism */
-	if (mechanism->cm_type != MD5_MECH_INFO_TYPE &&
+	if (mechanism->cm_type != MD4_MECH_INFO_TYPE &&
+	    mechanism->cm_type != MD5_MECH_INFO_TYPE &&
 	    mechanism->cm_type != SHA1_MECH_INFO_TYPE &&
 	    mechanism->cm_type != SHA256_MECH_INFO_TYPE &&
 	    mechanism->cm_type != SHA384_MECH_INFO_TYPE &&
@@ -1875,7 +1882,8 @@ dprov_digest_atomic(crypto_provider_handle_t provider,
 	    instance));
 
 	/* check mechanism */
-	if (mechanism->cm_type != MD5_MECH_INFO_TYPE &&
+	if (mechanism->cm_type != MD4_MECH_INFO_TYPE &&
+	    mechanism->cm_type != MD5_MECH_INFO_TYPE &&
 	    mechanism->cm_type != SHA1_MECH_INFO_TYPE &&
 	    mechanism->cm_type != SHA256_MECH_INFO_TYPE &&
 	    mechanism->cm_type != SHA384_MECH_INFO_TYPE &&

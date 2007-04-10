@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,10 +31,14 @@
  * documentation and/or software.
  */
 
-#include	<strings.h>
-#include	<sys/types.h>
+#include <sys/types.h>
+#ifdef _KERNEL
+#include <sys/sunddi.h>
+#else
+#include <strings.h>
+#endif /* _KERNEL */
 
-#include	"md4.h"
+#include <sys/md4.h>
 
 /*
  * Constants for MD4Transform routine.
@@ -52,9 +56,9 @@
 #define	S33 11
 #define	S34 15
 
-static void MD4Transform(ulong_t [4], unsigned char [64]);
-static void Encode(unsigned char *, ulong_t *, unsigned int);
-static void Decode(ulong_t *, unsigned char *, unsigned int);
+static void MD4Transform(uint32_t [4], unsigned char [64]);
+static void Encode(unsigned char *, uint32_t *, unsigned int);
+static void Decode(uint32_t *, unsigned char *, unsigned int);
 
 static unsigned char PADDING[64] = {
 	0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -82,11 +86,11 @@ static unsigned char PADDING[64] = {
 		(a) = ROTATE_LEFT((a), (s)); \
 	}
 #define	GG(a, b, c, d, x, s) { \
-		(a) += G((b), (c), (d)) + (x) + (ulong_t)0x5a827999; \
+		(a) += G((b), (c), (d)) + (x) + (uint32_t)0x5a827999; \
 		(a) = ROTATE_LEFT((a), (s)); \
 	}
 #define	HH(a, b, c, d, x, s) { \
-		(a) += H((b), (c), (d)) + (x) + (ulong_t)0x6ed9eba1; \
+		(a) += H((b), (c), (d)) + (x) + (uint32_t)0x6ed9eba1; \
 		(a) = ROTATE_LEFT((a), (s)); \
 	}
 
@@ -94,8 +98,7 @@ static unsigned char PADDING[64] = {
  * MD4 initialization. Begins an MD4 operation, writing a new context.
  */
 void
-MD4Init(context)
-	MD4_CTX *context;			/* context */
+MD4Init(MD4_CTX *context)
 {
 	context->count[0] = context->count[1] = 0;
 
@@ -123,10 +126,10 @@ MD4Update(MD4_CTX *context, const void *_RESTRICT_KYWD inptr, size_t inputLen)
 	/* Compute number of bytes mod 64 */
 	index = (unsigned int)((context->count[0] >> 3) & 0x3F);
 	/* Update number of bits */
-	if ((context->count[0] += ((ulong_t)inputLen << 3))
-	    < ((ulong_t)inputLen << 3))
+	if ((context->count[0] += ((uint32_t)inputLen << 3))
+	    < ((uint32_t)inputLen << 3))
 		context->count[1]++;
-	context->count[1] += ((ulong_t)inputLen >> 29);
+	context->count[1] += ((uint32_t)inputLen >> 29);
 
 	partLen = 64 - index;
 
@@ -183,9 +186,9 @@ MD4Final(void *digest, MD4_CTX *context)
  * MD4 basic transformation. Transforms state based on block.
  */
 static void
-MD4Transform(ulong_t state[4], unsigned char block[64])
+MD4Transform(uint32_t state[4], unsigned char block[64])
 {
-	ulong_t a = state[0], b = state[1], c = state[2], d = state[3], x[16];
+	uint32_t a = state[0], b = state[1], c = state[2], d = state[3], x[16];
 
 
 	Decode(x, block, 64);
@@ -255,13 +258,13 @@ MD4Transform(ulong_t state[4], unsigned char block[64])
 }
 
 /*
- * Encodes input (ulong_t) into output (unsigned char). Assumes len is
+ * Encodes input (uint32_t) into output (unsigned char). Assumes len is
  * a multiple of 4.
  */
 static void
 Encode(output, input, len)
 	unsigned char *output;
-	ulong_t *input;
+	uint32_t *input;
 	unsigned int len;
 {
 	unsigned int i, j;
@@ -275,20 +278,20 @@ Encode(output, input, len)
 }
 
 /*
- * Decodes input (unsigned char) into output (ulong_t). Assumes len is
+ * Decodes input (unsigned char) into output (uint32_t). Assumes len is
  * a multiple of 4.
  */
 static void
 Decode(output, input, len)
-	ulong_t *output;
+	uint32_t *output;
 	unsigned char *input;
 	unsigned int len;
 {
 	unsigned int i, j;
 
 	for (i = 0, j = 0; j < len; i++, j += 4)
-		output[i] = ((ulong_t)input[j]) |
-			(((ulong_t)input[j+1]) << 8) |
-			(((ulong_t)input[j+2]) << 16) |
-			(((ulong_t)input[j+3]) << 24);
+		output[i] = ((uint32_t)input[j]) |
+			(((uint32_t)input[j+1]) << 8) |
+			(((uint32_t)input[j+2]) << 16) |
+			(((uint32_t)input[j+3]) << 24);
 }

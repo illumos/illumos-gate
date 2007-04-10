@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -391,7 +391,9 @@ SHA1Update(SHA1_CTX *ctx, const void *inptr, size_t input_len)
  *
  * purpose: ends an sha1 digest operation, finalizing the message digest and
  *          zeroing the context.
- *   input: uint8_t *	: a buffer to store the digest in
+ *   input: uchar_t *	: a buffer to store the digest in
+ *			: The function actually uses void* because many
+ *			: callers pass things other than uchar_t here.
  *          SHA1_CTX *  : the context to finalize, save, and zero
  *  output: void
  */

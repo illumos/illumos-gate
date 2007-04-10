@@ -885,6 +885,7 @@ f none usr/include/sys/mdi_impldefs.h 644 root bin
 f none usr/include/sys/mem.h 644 root bin
 f none usr/include/sys/mem_config.h 644 root bin
 f none usr/include/sys/memlist.h 644 root bin
+f none usr/include/sys/md4.h 644 root bin
 f none usr/include/sys/md5.h 644 root bin
 f none usr/include/sys/md5_consts.h 644 root bin
 f none usr/include/sys/mkdev.h 644 root bin

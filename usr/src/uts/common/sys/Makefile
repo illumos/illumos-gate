@@ -313,6 +313,7 @@ CHKHDRS=			\
 	mac.h			\
 	mac_impl.h		\
 	map.h			\
+	md4.h			\
 	md5.h			\
 	md5_consts.h		\
 	mdi_impldefs.h		\

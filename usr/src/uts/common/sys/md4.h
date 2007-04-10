@@ -3,26 +3,27 @@
  * Use is subject to license terms.
  */
 
+#ifndef	__MD4_H
+#define	__MD4_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+
 /*
- * Cleaned up version of the md5.h header file from RFC 1321.
+ * MD4C.C - RSA Data Security, Inc., MD4 message-digest algorithm
  */
 
 /*
- * MD5.H - header file for MD5C.C
- */
-
-/*
- * Copyright (C) 1991-2, RSA Data Security, Inc. Created 1991. All
- * rights reserved.
+ * Copyright (C) 1990-2, RSA Data Security, Inc. All rights reserved.
  *
  * License to copy and use this software is granted provided that it
- * is identified as the "RSA Data Security, Inc. MD5 Message-Digest
+ * is identified as the "RSA Data Security, Inc. MD4 Message-Digest
  * Algorithm" in all material mentioning or referencing this software
  * or this function.
  *
  * License is also granted to make and use derivative works provided
  * that such works are identified as "derived from the RSA Data
- * Security, Inc. MD5 Message-Digest Algorithm" in all material
+ * Security, Inc. MD4 Message-Digest Algorithm" in all material
  * mentioning or referencing the derived work.
  *
  * RSA Data Security, Inc. makes no representations concerning either
@@ -34,39 +35,27 @@
  * documentation and/or software.
  */
 
-#ifndef _SYS_MD5_H
-#define	_SYS_MD5_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <sys/types.h>		/* for uint_* */
-
-/*
- * Definitions for MD5 hashing functions, conformant to RFC 1321
- */
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-#define	MD5_DIGEST_LENGTH	16
+#include <sys/types.h>
 
-/* MD5 context. */
-typedef struct	{
+#define	MD4_DIGEST_LENGTH	16
+
+/* MD4 context. */
+typedef struct {
 	uint32_t state[4];	/* state (ABCD) */
 	uint32_t count[2];	/* number of bits, modulo 2^64 (lsb first) */
-	union	{
-		uint8_t		buf8[64];	/* undigested input */
-		uint32_t	buf32[16];	/* realigned input */
-	} buf_un;
-} MD5_CTX;
+	unsigned char buffer[64];	/* input buffer */
+} MD4_CTX;
 
-void MD5Init(MD5_CTX *);
-void MD5Update(MD5_CTX *, const void *, unsigned int);
-void MD5Final(void *, MD5_CTX *);
+void MD4Init(MD4_CTX *);
+void MD4Update(MD4_CTX *, const void *_RESTRICT_KYWD, size_t);
+void MD4Final(void *, MD4_CTX *);
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif /* _SYS_MD5_H */
+#endif	/* __MD4_H */

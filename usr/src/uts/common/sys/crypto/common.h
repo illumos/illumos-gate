@@ -85,6 +85,7 @@ typedef uint32_t crypto_keysize_unit_t;
 
 
 /* Mechanisms supported out-of-the-box */
+#define	SUN_CKM_MD4			"CKM_MD4"
 #define	SUN_CKM_MD5			"CKM_MD5"
 #define	SUN_CKM_MD5_HMAC		"CKM_MD5_HMAC"
 #define	SUN_CKM_MD5_HMAC_GENERAL	"CKM_MD5_HMAC_GENERAL"
