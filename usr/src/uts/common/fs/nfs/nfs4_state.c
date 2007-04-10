@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3648,9 +3648,14 @@ rfs4_lo_state_walk_callout(rfs4_entry_t u_entry, void *e)
 {
 	rfs4_lo_state_t *lsp = (rfs4_lo_state_t *)u_entry;
 	struct exportinfo *exi = (struct exportinfo *)e;
-	nfs_fh4_fmt_t	*exi_fhp, *finfo_fhp;
+	nfs_fh4_fmt_t   fhfmt4, *exi_fhp, *finfo_fhp;
+	fhandle_t *efhp;
 
-	exi_fhp = (nfs_fh4_fmt_t *)&exi->exi_fh;
+	efhp = (fhandle_t *)&exi->exi_fh;
+	exi_fhp = (nfs_fh4_fmt_t *)&fhfmt4;
+
+	FH_TO_FMT4(efhp, exi_fhp);
+
 	finfo_fhp =
 		(nfs_fh4_fmt_t *)lsp->state->finfo->filehandle.nfs_fh4_val;
 
@@ -3677,9 +3682,14 @@ rfs4_state_walk_callout(rfs4_entry_t u_entry, void *e)
 {
 	rfs4_state_t *sp = (rfs4_state_t *)u_entry;
 	struct exportinfo *exi = (struct exportinfo *)e;
-	nfs_fh4_fmt_t	*exi_fhp, *finfo_fhp;
+	nfs_fh4_fmt_t   fhfmt4, *exi_fhp, *finfo_fhp;
+	fhandle_t *efhp;
 
-	exi_fhp = (nfs_fh4_fmt_t *)&exi->exi_fh;
+	efhp = (fhandle_t *)&exi->exi_fh;
+	exi_fhp = (nfs_fh4_fmt_t *)&fhfmt4;
+
+	FH_TO_FMT4(efhp, exi_fhp);
+
 	finfo_fhp =
 		(nfs_fh4_fmt_t *)sp->finfo->filehandle.nfs_fh4_val;
 
@@ -3705,9 +3715,14 @@ rfs4_deleg_state_walk_callout(rfs4_entry_t u_entry, void *e)
 {
 	rfs4_deleg_state_t *dsp = (rfs4_deleg_state_t *)u_entry;
 	struct exportinfo *exi = (struct exportinfo *)e;
-	nfs_fh4_fmt_t	*exi_fhp, *finfo_fhp;
+	nfs_fh4_fmt_t   fhfmt4, *exi_fhp, *finfo_fhp;
+	fhandle_t *efhp;
 
-	exi_fhp = (nfs_fh4_fmt_t *)&exi->exi_fh;
+	efhp = (fhandle_t *)&exi->exi_fh;
+	exi_fhp = (nfs_fh4_fmt_t *)&fhfmt4;
+
+	FH_TO_FMT4(efhp, exi_fhp);
+
 	finfo_fhp =
 		(nfs_fh4_fmt_t *)dsp->finfo->filehandle.nfs_fh4_val;
 
@@ -3731,9 +3746,14 @@ rfs4_file_walk_callout(rfs4_entry_t u_entry, void *e)
 {
 	rfs4_file_t *fp = (rfs4_file_t *)u_entry;
 	struct exportinfo *exi = (struct exportinfo *)e;
-	nfs_fh4_fmt_t *exi_fhp, *finfo_fhp;
+	nfs_fh4_fmt_t   fhfmt4, *exi_fhp, *finfo_fhp;
+	fhandle_t *efhp;
 
-	exi_fhp = (nfs_fh4_fmt_t *)&exi->exi_fh;
+	efhp = (fhandle_t *)&exi->exi_fh;
+	exi_fhp = (nfs_fh4_fmt_t *)&fhfmt4;
+
+	FH_TO_FMT4(efhp, exi_fhp);
+
 	finfo_fhp = (nfs_fh4_fmt_t *)fp->filehandle.nfs_fh4_val;
 
 	if (EQFSID(&finfo_fhp->fh4_fsid, &exi_fhp->fh4_fsid) &&

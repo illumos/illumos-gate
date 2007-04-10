@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1005,6 +1005,22 @@ typedef struct nfs_fh4_fmt nfs_fh4_fmt_t;
 
 #define	NFS_FH4_LEN	sizeof (nfs_fh4_fmt_t)
 
+/*
+ * Copy fields from external (fhandle_t) to in-memory (nfs_fh4_fmt_t)
+ * format to support export info checking.  It does not copy over
+ * the complete filehandle, just the fsid, xlen and xdata.  It may
+ * need to be changed to be used in other places.
+ *
+ * NOTE: The macro expects the space to be  pre-allocated for
+ * the contents of nfs_fh4_fmt_t.
+ */
+#define	FH_TO_FMT4(exifh, nfs_fmt) {				\
+	bzero((nfs_fmt), NFS_FH4_LEN);				\
+	(nfs_fmt)->fh4_fsid = (exifh)->fh_fsid;			\
+	(nfs_fmt)->fh4_xlen = (exifh)->fh_xlen;			\
+	bcopy((exifh)->fh_xdata, (nfs_fmt)->fh4_xdata,		\
+	    (exifh)->fh_xlen);					\
+}
 
 /*
  * A few definitions of repeatedly used constructs for nfsv4
