@@ -701,7 +701,9 @@ pxb_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			if (as->cmd == DDI_ATTACH && as->result != DDI_SUCCESS)
 				pcie_pm_release(dip);
 
-			pf_init(rdip, (void *)pxb_p->pxb_fm_ibc, as->cmd);
+			if (as->result == DDI_SUCCESS)
+				pf_init(rdip, (void *)pxb_p->pxb_fm_ibc,
+				    as->cmd);
 
 			/*
 			 * For hotplug-capable slots, we should explicitly

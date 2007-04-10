@@ -1255,7 +1255,8 @@ px_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			if (as->cmd == DDI_ATTACH && as->result != DDI_SUCCESS)
 				pcie_pm_release(dip);
 
-			pf_init(rdip, (void *)px_p->px_fm_ibc, as->cmd);
+			if (as->result == DDI_SUCCESS)
+				pf_init(rdip, (void *)px_p->px_fm_ibc, as->cmd);
 
 			(void) pcie_postattach_child(rdip);
 
