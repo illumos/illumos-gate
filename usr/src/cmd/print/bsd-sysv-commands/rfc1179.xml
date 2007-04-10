@@ -80,6 +80,14 @@
 		<propval name='proto' type='astring' value='tcp6' />
 	</property_group>
 
+	<property_group name='general' type='framework'>
+		<!-- to start/stop rfc1179 listening -->
+		<propval name='action_authorization' type='astring'
+			value='solaris.print.admin' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.print.admin' />
+	</property_group>
+
 	<stability value='Unstable' />
 
 	<template>

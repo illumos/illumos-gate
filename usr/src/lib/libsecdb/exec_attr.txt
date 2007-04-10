@@ -1,7 +1,4 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -20,6 +17,9 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # /etc/security/exec_attr
 #
@@ -224,22 +224,11 @@ Object Access Management:suser:cmd:::/usr/bin/chmod:euid=0
 Object Access Management:suser:cmd:::/usr/bin/chown:euid=0
 Object Access Management:suser:cmd:::/usr/bin/getfacl:euid=0
 Object Access Management:suser:cmd:::/usr/bin/setfacl:euid=0
-Printer Management:suser:cmd:::/usr/bin/cancel:euid=lp;uid=lp
-Printer Management:suser:cmd:::/usr/bin/lpset:egid=14
-Printer Management:suser:cmd:::/usr/bin/lpstat:euid=0
-Printer Management:suser:cmd:::/usr/lib/lp/local/accept:uid=lp
-Printer Management:suser:cmd:::/usr/lib/lp/local/lpadmin:uid=lp;gid=8 
-Printer Management:suser:cmd:::/usr/lib/lp/lpsched:uid=0
-Printer Management:suser:cmd:::/usr/sbin/accept:euid=lp;uid=lp
-Printer Management:suser:cmd:::/usr/sbin/lpadmin:egid=14;uid=lp;gid=8 
+Printer Management:suser:cmd:::/usr/lib/lp/local/lpadmin:uid=lp;gid=lp 
 Printer Management:suser:cmd:::/usr/sbin/lpfilter:euid=lp;uid=lp
 Printer Management:suser:cmd:::/usr/sbin/lpforms:euid=lp
-Printer Management:suser:cmd:::/usr/sbin/lpmove:euid=lp
-Printer Management:suser:cmd:::/usr/sbin/lpshut:euid=lp
 Printer Management:suser:cmd:::/usr/sbin/lpusers:euid=lp
 Printer Management:suser:cmd:::/usr/sbin/ppdmgr:euid=0
-Printer Management:suser:cmd:::/usr/ucb/lpq:euid=0
-Printer Management:suser:cmd:::/usr/ucb/lprm:euid=0
 Process Management:solaris:cmd:::/usr/bin/kill:privs=proc_owner
 Process Management:solaris:cmd:::/usr/bin/nice:privs=proc_owner,proc_priocntl
 Process Management:solaris:cmd:::/usr/bin/pcred:privs=proc_owner

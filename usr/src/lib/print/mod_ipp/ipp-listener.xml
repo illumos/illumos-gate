@@ -34,6 +34,8 @@ CDDL HEADER END
     type='service'
     version='1'>
 
+	<create_default_instance enabled='false' />
+
 	<dependency name='print-service'
 	    grouping='require_any'
 	    restart_on='refresh'
@@ -53,7 +55,13 @@ CDDL HEADER END
 	    exec='/bin/pkill -f httpd-standalone-ipp.conf'
 	    timeout_seconds='5' />
 
-	<instance name='default' enabled='false' />
+	<property_group name='general' type='framework'>
+		<!-- to start/stop IPP listening service-->
+		<propval name='action_authorization' type='astring'
+			value='solaris.print.admin' />
+		<propval name='value_authorization' type='astring'
+			value='solaris.print.admin' />
+	</property_group>
 
 	<stability value='Unstable' />
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,34 @@ extern int optind, opterr, optopt;
 extern char *getenv(const char *);
 
 static void _decode_ldapResult(int result, char *printerName);
+
+static int
+authorized()
+{
+	struct passwd *pw;
+	uid_t uid;
+	gid_t list[NGROUPS_MAX];
+	int len;
+
+	if ((uid = getuid()) == 0)
+		return (1);	/* "root" is authorized */
+
+	if (((pw = getpwnam("lp")) != NULL) && (uid == pw->pw_uid))
+		return (1);	/* "lp" is authorized */
+
+	if ((pw = getpwuid(uid)) == NULL)
+		return (0);	/* intruders are not authorized */
+
+	if (chkauthattr("solaris.print.admin", pw->pw_name) == 1)
+		return (1);	/* "solaris.print.admin" is authorized */
+
+	if ((len = getgroups(sizeof (list), list)) != -1)
+		for (; len >= 0; len--)
+			if (list[len] == 14)
+				return (1);	/* group 14 is authorized */
+
+	return (0);	/* nobody else is authorized */
+}
 
 static void
 Usage(char *name)
@@ -162,33 +190,10 @@ main(int ac, char *av[])
 		(void) setuid(getuid());
 		ons = "user";
 	} else if (strcasecmp("files", ons) == 0) {
-		struct passwd *pw = getpwnam("lp");
-		uid_t uid, lpuid = 0;
-
-		if (pw != NULL)
-			lpuid = pw->pw_uid;
-		uid = getuid();
-		if ((uid != 0) && (uid != lpuid)) {
-			int len;
-			gid_t list[NGROUPS_MAX];
-
-			len = getgroups(sizeof (list), list);
-			if (len == -1) {
-				(void) fprintf(stderr, gettext(
-					"Call to getgroups failed with "
-					"errno %d\n"), errno);
-				return (1);
-			}
-
-			for (; len >= 0; len--)
-				if (list[len] == 14)
-					break;
-
-			if (len == -1) {
-				(void) fprintf(stderr, gettext(
-				    "Permission denied: not in group 14\n"));
-				return (1);
-			}
+		if (authorized() == 0) {
+			(void) fprintf(stderr, gettext(
+				"Permission denied: not authorized\n"));
+			return (1);
 		}
 		ons = "files";
 	} else if (strcasecmp("nisplus", ons) == 0) {

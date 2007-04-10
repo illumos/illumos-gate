@@ -32,10 +32,12 @@ PATH=/bin:/usr/bin:/usr/sbin export PATH
 TEXTDOMAIN="SUNW_OST_OSCMD"
 export TEXTDOMAIN
 
+PFEXEC=/usr/bin/pfexec
 LPSET=/usr/bin/lpset
 LPGET=/usr/bin/lpget
 LPSTAT=/usr/bin/lpstat
 LPADMIN=/usr/lib/lp/local/lpadmin
+LPFILTER=/usr/sbin/lpfilter
 COMM=/usr/bin/comm
 PPDMGR=/usr/sbin/ppdmgr
 
@@ -58,7 +60,7 @@ usage() {
 lp_config_filters() {
 	if [[ ! -f /etc/lp/filter.table ]] ; then
 		cd /etc/lp/fd ; for filter in *.fd ; do
-			/usr/sbin/lpfilter \
+			${PFEXEC} ${LPFILTER} \
 				-f $(/usr/bin/basename $filter .fd) \
 				-F $filter
 		done
@@ -107,7 +109,7 @@ delete_all() {
 # $2  - label name (optional)
 add_new_ppd_file() {
 	# Add new ppd file and echo full path it was actually saved to
-	ppdmgrcmd="${PPDMGR} -a ${1} -w"
+	ppdmgrcmd="${PFEXEC} ${PPDMGR} -a ${1} -w"
 
 	ppderrfile=/tmp/lpadminerror.$$
 	ppd_file=$(${ppdmgrcmd} 2>${ppderrfile})
@@ -308,7 +310,7 @@ if [[ -x ${LPADMIN} && -n "${local}" ]] ; then
 	fi
 
 	# modify LP destination(s)
-	CMD=${LPADMIN}
+	CMD="${PFEXEC} ${LPADMIN}"
 	while [[ -n "$*" ]] ; do	# to deal with multi-word arguments
 		CMD="$CMD \"$1\""
 		# replace the ppd_file originally specified with the -n option
