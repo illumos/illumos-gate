@@ -187,12 +187,13 @@ get_bus_type(picl_nodehdl_t nodeh, struct io_card *card)
 {
 	char *compatible;
 
-	(void) strcpy(card->bus_type, "PCIX");
+	(void) strlcpy(card->bus_type, "PCIX", sizeof (card->bus_type));
 	if (sun4v_get_first_compatible_value(nodeh, &compatible)
 		== PICL_SUCCESS) {
 		if (strncmp(compatible, PCIE_COMPATIBLE_STR,
 			strlen(PCIE_COMPATIBLE_STR)) == 0)
-			(void) strcpy(card->bus_type, "PCIE");
+			(void) strlcpy(card->bus_type, "PCIE",
+				sizeof (card->bus_type));
 		free(compatible);
 	}
 }
@@ -208,7 +209,7 @@ get_slot_label(picl_nodehdl_t nodeh, struct io_card *card)
 	if (err != PICL_SUCCESS)
 		return (err);
 
-	(void) strcpy(card->slot_str, val);
+	(void) strlcpy(card->slot_str, val, sizeof (card->slot_str));
 	card->slot = -1;
 	return (PICL_SUCCESS);
 }
@@ -231,7 +232,8 @@ get_slot_number(picl_nodehdl_t nodeh, struct io_card *card)
 	while (err == PICL_SUCCESS) {
 		if (picl_get_propval_by_name(nodeh, PICL_PROP_PARENT, &pnodeh,
 			sizeof (pnodeh)) != PICL_SUCCESS) {
-			(void) strcpy(card->slot_str, IOBOARD);
+			(void) strlcpy(card->slot_str, IOBOARD,
+				sizeof (card->slot_str));
 			card->slot = -1;
 			return;
 		}
@@ -243,18 +245,21 @@ get_slot_number(picl_nodehdl_t nodeh, struct io_card *card)
 	}
 	if (picl_get_propval_by_name(nodeh, PICL_PROP_UNIT_ADDRESS, uaddr,
 		sizeof (uaddr)) != PICL_SUCCESS) {
-		(void) strcpy(card->slot_str, IOBOARD);
+		(void) strlcpy(card->slot_str, IOBOARD,
+			sizeof (card->slot_str));
 		card->slot = -1;
 		return;
 	}
 	pval = (uint8_t *)malloc(pinfo.size);
 	if (!pval) {
-		(void) strcpy(card->slot_str, IOBOARD);
+		(void) strlcpy(card->slot_str, IOBOARD,
+			sizeof (card->slot_str));
 		card->slot = -1;
 		return;
 	}
 	if (picl_get_propval(proph, pval, pinfo.size) != PICL_SUCCESS) {
-		(void) strcpy(card->slot_str, IOBOARD);
+		(void) strlcpy(card->slot_str, IOBOARD,
+			sizeof (card->slot_str));
 		card->slot = -1;
 		free(pval);
 		return;
@@ -271,7 +276,8 @@ get_slot_number(picl_nodehdl_t nodeh, struct io_card *card)
 	}
 	card->slot = atol(uaddr);
 	if (((1 << card->slot) & dev_mask) == 0) {
-		(void) strcpy(card->slot_str, IOBOARD);
+		(void) strlcpy(card->slot_str, IOBOARD,
+			sizeof (card->slot_str));
 		card->slot = -1;
 	} else {
 		char *p = (char *)(pval+sizeof (dev_mask));
@@ -287,7 +293,8 @@ get_slot_number(picl_nodehdl_t nodeh, struct io_card *card)
 			while (p[i++] != '\0');
 			count--;
 		}
-		(void) strcpy(card->slot_str, (char *)(p+i));
+		(void) strlcpy(card->slot_str, (char *)(p+i),
+			sizeof (card->slot_str));
 	}
 	free(pval);
 }
@@ -356,14 +363,14 @@ sun4v_pci_callback(picl_nodehdl_t pcih, void *args)
 		err = picl_get_propval_by_name(nodeh, PICL_PROP_NAME, name,
 			sizeof (name));
 		if (err == PICL_PROPNOTFOUND)
-			(void) strcpy(name, "");
+			(void) strlcpy(name, "", sizeof (name));
 		else if (err != PICL_SUCCESS)
 			return (err);
 
 		err = picl_get_propval_by_name(nodeh, PICL_PROP_STATUS, val,
 			sizeof (val));
 		if (err == PICL_PROPNOTFOUND)
-			(void) strcpy(val, "");
+			(void) strlcpy(val, "", sizeof (val));
 		else if (err != PICL_SUCCESS)
 			return (err);
 
@@ -399,7 +406,8 @@ sun4v_pci_callback(picl_nodehdl_t pcih, void *args)
 				&compatible);
 			if (err == PICL_SUCCESS) {
 				(void) strlcat(name, "-", sizeof (name));
-				(void) strlcat(name, compatible, sizeof (name));
+				(void) strlcat(name, compatible,
+					sizeof (name));
 				free(compatible);
 			}
 		} else
@@ -412,7 +420,7 @@ sun4v_pci_callback(picl_nodehdl_t pcih, void *args)
 		err = picl_get_propval_by_name(nodeh, OBP_PROP_MODEL,
 			model, sizeof (model));
 		if (err == PICL_PROPNOTFOUND)
-			(void) strcpy(model, "");
+			(void) strlcpy(model, "", sizeof (model));
 		else if (err != PICL_SUCCESS)
 			return (err);
 		(void) strlcpy(pci_card.model, model, sizeof (pci_card.model));
@@ -948,6 +956,7 @@ sun4v_env_print_sensor_callback(picl_nodehdl_t nodeh, void *args)
 		log_printf("\n");
 		return (PICL_WALK_CONTINUE);
 	}
+
 	if ((loc = (char *)malloc(PICL_PROPNAMELEN_MAX*PARENT_NAMES)) == NULL)
 		return (PICL_WALK_TERMINATE);
 	for (i = 0; i < PARENT_NAMES; i++)
@@ -973,11 +982,14 @@ sun4v_env_print_sensor_callback(picl_nodehdl_t nodeh, void *args)
 			&parenth, sizeof (parenth));
 	}
 	loc[0] = '\0';
-	if (--i > -1)
-		loc = strncat(loc, names[i], strlen(names[i]));
+	if (--i > -1) {
+		(void) strlcat(loc, names[i],
+			PICL_PROPNAMELEN_MAX * PARENT_NAMES);
+	}
 	while (--i > -1) {
-		loc = strncat(loc, "/", 1);
-		loc = strncat(loc, names[i], strlen(names[i]));
+		(void) strlcat(loc, "/", PICL_PROPNAMELEN_MAX*PARENT_NAMES);
+		(void) strlcat(loc, names[i],
+			PICL_PROPNAMELEN_MAX * PARENT_NAMES);
 	}
 	log_printf("%-12s", loc);
 	for (i = 0; i < PARENT_NAMES; i++)
@@ -1097,11 +1109,14 @@ sun4v_env_print_indicator_callback(picl_nodehdl_t nodeh, void *args)
 			&parenth, sizeof (parenth));
 	}
 	loc[0] = '\0';
-	if (--i > -1)
-		loc = strncat(loc, names[i], strlen(names[i]));
+	if (--i > -1) {
+		(void) strlcat(loc, names[i],
+			PICL_PROPNAMELEN_MAX * PARENT_NAMES);
+	}
 	while (--i > -1) {
-		loc = strncat(loc, "/", 1);
-		loc = strncat(loc, names[i], strlen(names[i]));
+		(void) strlcat(loc, "/", PICL_PROPNAMELEN_MAX * PARENT_NAMES);
+		(void) strlcat(loc, names[i],
+			PICL_PROPNAMELEN_MAX * PARENT_NAMES);
 	}
 	log_printf("%-12s", loc);
 	for (i = 0; i < PARENT_NAMES; i++)
@@ -1434,11 +1449,14 @@ sun4v_print_fru_status_callback(picl_nodehdl_t nodeh, void *args)
 			&parenth, sizeof (parenth));
 	}
 	loc[0] = '\0';
-	if (--i > -1)
-		loc = strncat(loc, names[i], strlen(names[i]));
+	if (--i > -1) {
+		(void) strlcat(loc, names[i],
+			PICL_PROPNAMELEN_MAX * PARENT_NAMES);
+	}
 	while (--i > -1) {
-		loc = strncat(loc, "/", 1);
-		loc = strncat(loc, names[i], strlen(names[i]));
+		(void) strlcat(loc, "/", PICL_PROPNAMELEN_MAX * PARENT_NAMES);
+		(void) strlcat(loc, names[i],
+			PICL_PROPNAMELEN_MAX * PARENT_NAMES);
 	}
 	log_printf("%-21s", loc);
 	for (i = 0; i < PARENT_NAMES; i++)

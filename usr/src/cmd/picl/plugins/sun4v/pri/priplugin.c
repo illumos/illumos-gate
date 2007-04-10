@@ -54,7 +54,7 @@ set_prop_info(ptree_propinfo_t *propinfo, int size, char *name, int type)
 	propinfo->piclinfo.type = type;
 	propinfo->piclinfo.accessmode = PICL_READ;
 	propinfo->piclinfo.size = size;
-	(void) strncpy(propinfo->piclinfo.name, name,
+	(void) strlcpy(propinfo->piclinfo.name, name,
 	    sizeof (propinfo->piclinfo.name));
 }
 

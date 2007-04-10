@@ -1224,21 +1224,24 @@ oid_to_oidstr(oid *objid, size_t n_subids)
 	char	*oidstr;
 	char	subid_str[MAX_INT_LEN];
 	int	i, isize;
+	size_t	oidstr_sz;
 
 	/*
 	 * ugly, but for now this will have to do.
 	 */
-	oidstr = (char *)calloc(1, MAX_INT_LEN * n_subids);
+	oidstr_sz = sizeof (subid_str) * n_subids;
+	oidstr = calloc(1, oidstr_sz);
 
 	for (i = 0; i < n_subids; i++) {
-		(void) memset(subid_str, 0, MAX_INT_LEN);
-		isize = snprintf(subid_str, MAX_INT_LEN, "%d", objid[i]);
-		if (isize >= MAX_INT_LEN)
+		(void) memset(subid_str, 0, sizeof (subid_str));
+		isize = snprintf(subid_str, sizeof (subid_str), "%d",
+			objid[i]);
+		if (isize >= sizeof (subid_str))
 			return (NULL);
 
-		(void) strcat(oidstr, subid_str);
+		(void) strlcat(oidstr, subid_str, oidstr_sz);
 		if (i < (n_subids - 1))
-			(void) strcat(oidstr, ".");
+			(void) strlcat(oidstr, ".", oidstr_sz);
 	}
 
 	return (oidstr);
