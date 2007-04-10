@@ -185,9 +185,8 @@ extern void hat_mempte_release(caddr_t addr, hat_mempte_t);
  */
 extern uint_t can_steal_post_boot;
 extern uint_t use_boot_reserve;
-extern kthread_t *hat_reserves_thread;
-#define	USE_HAT_RESERVES()						\
-	(use_boot_reserve || curthread == hat_reserves_thread ||	\
+#define	USE_HAT_RESERVES()					\
+	(use_boot_reserve || curthread->t_hatdepth > 1 ||	\
 	panicstr != NULL || vmem_is_populator())
 
 /*

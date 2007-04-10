@@ -78,7 +78,6 @@ uint_t hment_reserve_amount = HMENT_RESERVE_AMOUNT;
 kmutex_t hment_reserve_mutex;
 uint_t	hment_reserve_count;
 hment_t	*hment_reserve_pool;
-extern  kthread_t *hat_reserves_thread;
 
 /*
  * Possible performance RFE: we might need to make this dynamic, perhaps
@@ -241,10 +240,12 @@ hment_free(hment_t *hm)
 #endif
 	HATSTAT_INC(hs_hm_free);
 	if (USE_HAT_RESERVES() ||
-	    hment_reserve_count < hment_reserve_amount)
+	    hment_reserve_count < hment_reserve_amount) {
 		hment_put_reserve(hm);
-	else
+	} else {
 		kmem_cache_free(hment_cache, hm);
+		hment_adjust_reserve();
+	}
 }
 
 int
@@ -587,12 +588,12 @@ hment_adjust_reserve()
 	/*
 	 * Free up any excess reserves
 	 */
-	while (hment_reserve_count > hment_reserve_amount) {
-		ASSERT(curthread != hat_reserves_thread);
+	while (hment_reserve_count > hment_reserve_amount &&
+	    !USE_HAT_RESERVES()) {
 		hm = hment_get_reserve();
 		if (hm == NULL)
 			return;
-		hment_free(hm);
+		kmem_cache_free(hment_cache, hm);
 	}
 }
 

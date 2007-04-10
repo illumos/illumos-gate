@@ -2393,11 +2393,7 @@ get_system_configuration(void)
 		segmapfreelists = (int)lvalue;
 	}
 
-	if ((BOP_GETPROPLEN(bootops, "physmem") <= sizeof (prop)) &&
-	    (BOP_GETPROP(bootops, "physmem", prop) >= 0) &&
-	    (kobj_getvalue(prop, &lvalue) != -1)) {
-		physmem = (uintptr_t)lvalue;
-	}
+	/* physmem used to be here, but moved much earlier to fakebop.c */
 }
 
 /*

@@ -139,13 +139,6 @@ static uint_t	khat_pae32_entries;
 
 #endif
 
-/*
- * Locks, etc. to control use of the hat reserves when recursively
- * allocating pagetables for the hat data structures.
- */
-static kmutex_t hat_reserves_lock;
-static kcondvar_t hat_reserves_cv;
-kthread_t *hat_reserves_thread;
 uint_t use_boot_reserve = 1;	/* cleared after early boot process */
 uint_t can_steal_post_boot = 0;	/* set late in boot to enable stealing */
 
@@ -1287,115 +1280,6 @@ done:
 }
 
 /*
- * The t_hatdepth field is an 8-bit counter.  We use the lower seven bits
- * to track exactly how deep we are in the memload->kmem_alloc recursion.
- * If the depth is greater than 1, that indicates that we are performing a
- * hat operation to satisfy another hat operation.  To prevent infinite
- * recursion, we switch over to using pre-allocated "reserves" of htables
- * and hments.
- *
- * The uppermost bit is used to indicate that we are transitioning away
- * from being the reserves thread.  See hati_reserves_exit() for the
- * details.
- */
-#define	EXITING_FLAG		(1 << 7)
-#define	DEPTH_MASK		(~EXITING_FLAG)
-#define	HAT_DEPTH(t)		((t)->t_hatdepth & DEPTH_MASK)
-#define	EXITING_RESERVES(t)	((t)->t_hatdepth & EXITING_FLAG)
-
-/*
- * Access to reserves for HAT_NO_KALLOC is single threaded.
- * If someone else is in the reserves, we'll politely wait for them
- * to finish. This keeps normal hat_memload()s from eating up
- * the mappings needed to replenish the reserve.
- */
-static void
-hati_reserves_enter(uint_t kmem_for_hat)
-{
-	/*
-	 * 64 is an arbitrary number to catch serious problems.  I'm not
-	 * sure what the absolute maximum depth is, but it should be
-	 * substantially less than this.
-	 */
-	ASSERT(HAT_DEPTH(curthread) < 64);
-
-	/*
-	 * If we are doing a memload to satisfy a kmem operation, we enter
-	 * the reserves immediately; we don't wait to recurse to a second
-	 * level of memload.
-	 */
-	ASSERT(kmem_for_hat < 2);
-	curthread->t_hatdepth += (1 + kmem_for_hat);
-
-	if (hat_reserves_thread == curthread || use_boot_reserve)
-		return;
-
-	if (HAT_DEPTH(curthread) > 1 || hat_reserves_thread != NULL) {
-		mutex_enter(&hat_reserves_lock);
-		while (hat_reserves_thread != NULL)
-			cv_wait(&hat_reserves_cv, &hat_reserves_lock);
-
-		if (HAT_DEPTH(curthread) > 1)
-			hat_reserves_thread = curthread;
-
-		mutex_exit(&hat_reserves_lock);
-	}
-}
-
-/*
- * If we are the reserves_thread and we've finally finished with all our
- * memloads (ie. no longer doing hat slabs), we can release our use of the
- * reserve.
- */
-static void
-hati_reserves_exit(uint_t kmem_for_hat)
-{
-	ASSERT(kmem_for_hat < 2);
-	curthread->t_hatdepth -= (1 + kmem_for_hat);
-
-	/*
-	 * Simple case: either we are not the reserves thread, or we are
-	 * the reserves thread and we are nested deeply enough that we
-	 * should still be the reserves thread.
-	 *
-	 * Note: we may not become the reserves thread after we recursively
-	 * enter our second HAT routine, but we don't stop being the
-	 * reserves thread until we exit the toplevel HAT routine.  This is
-	 * to work around vmem's inability to determine when an allocation
-	 * should be satisfied from the hat_memload arena, which can lead
-	 * to an infinite loop of memload->vmem_populate->memload->.
-	 */
-	if (curthread != hat_reserves_thread || HAT_DEPTH(curthread) > 0 ||
-	    use_boot_reserve)
-		return;
-
-	mutex_enter(&hat_reserves_lock);
-	ASSERT(hat_reserves_thread == curthread);
-	hat_reserves_thread = NULL;
-	cv_broadcast(&hat_reserves_cv);
-	mutex_exit(&hat_reserves_lock);
-
-	/*
-	 * As we leave the reserves, we want to be sure the reserve lists
-	 * aren't overstocked.  Freeing excess reserves requires that we
-	 * call kmem_free(), which may require additional allocations,
-	 * causing us to re-enter the reserves.  To avoid infinite
-	 * recursion, we only try to adjust reserves at the very top level.
-	 */
-	if (!kmem_for_hat && !EXITING_RESERVES(curthread)) {
-		curthread->t_hatdepth |= EXITING_FLAG;
-		htable_adjust_reserve();
-		hment_adjust_reserve();
-		curthread->t_hatdepth &= (~EXITING_FLAG);
-	}
-
-	/*
-	 * just in case something went wrong in doing adjust reserves
-	 */
-	ASSERT(hat_reserves_thread != curthread);
-}
-
-/*
  * Internal routine to load a single page table entry. This only fails if
  * we attempt to overwrite a page table link with a large page.
  */
@@ -1412,8 +1296,14 @@ hati_load_common(
 	htable_t	*ht;
 	uint_t		entry;
 	x86pte_t	pte;
-	uint_t		kmem_for_hat = (flags & HAT_NO_KALLOC) ? 1 : 0;
 	int		rv = 0;
+
+	/*
+	 * The number 16 is arbitrary and here to catch a recursion problem
+	 * early before we blow out the kernel stack.
+	 */
+	++curthread->t_hatdepth;
+	ASSERT(curthread->t_hatdepth < 16);
 
 	ASSERT(hat == kas.a_hat ||
 	    AS_LOCK_HELD(hat->hat_as, &hat->hat_as->a_lock));
@@ -1427,23 +1317,9 @@ hati_load_common(
 	ht = htable_lookup(hat, va, level);
 
 	/*
-	 * All threads go through hati_reserves_enter() to at least wait
-	 * for any existing reserves user to finish. This helps reduce
-	 * pressure on the reserves. In addition, if this thread needs
-	 * to become the new reserve user it will.
+	 * We must have HAT_LOAD_NOCONSIST if page_t is NULL.
 	 */
-	hati_reserves_enter(kmem_for_hat);
-
-	ASSERT(HAT_DEPTH(curthread) == 1 || va >= kernelbase);
-
-	/*
-	 * Kernel memloads for HAT data should never use hments!
-	 * If it did that would seriously complicate the reserves system, since
-	 * hment_alloc() would need to know about HAT_NO_KALLOC.
-	 *
-	 * We also must have HAT_LOAD_NOCONSIST if page_t is NULL.
-	 */
-	if (HAT_DEPTH(curthread) > 1 || pp == NULL)
+	if (pp == NULL)
 		flags |= HAT_LOAD_NOCONSIST;
 
 	if (ht == NULL) {
@@ -1478,7 +1354,7 @@ hati_load_common(
 	 * release the htable and any reserves
 	 */
 	htable_release(ht);
-	hati_reserves_exit(kmem_for_hat);
+	--curthread->t_hatdepth;
 	return (rv);
 }
 
@@ -1518,7 +1394,10 @@ hat_kmap_load(
 	ht = mmu.kmap_htables[(va - mmu.kmap_htables[0]->ht_vaddr) >>
 	    LEVEL_SHIFT(1)];
 	entry = htable_va2entry(va, ht);
+	++curthread->t_hatdepth;
+	ASSERT(curthread->t_hatdepth < 16);
 	(void) hati_pte_map(ht, entry, pp, pte, flags, pte_ptr);
+	--curthread->t_hatdepth;
 }
 
 /*
@@ -3568,17 +3447,16 @@ hat_mempte_setup(caddr_t addr)
 	uint_t		entry;
 	x86pte_t	oldpte;
 	hat_mempte_t	p;
-	uint_t		created = 0;
 
 	ASSERT(IS_PAGEALIGNED(va));
 	ASSERT(!IN_VA_HOLE(va));
+	++curthread->t_hatdepth;
 	ht = htable_getpte(kas.a_hat, va, &entry, &oldpte, 0);
 	if (ht == NULL) {
 		ht = htable_create(kas.a_hat, va, 0, NULL);
 		entry = htable_va2entry(va, ht);
 		ASSERT(ht->ht_level == 0);
 		oldpte = x86pte_get(ht, entry);
-		created = 1;
 	}
 	if (PTE_ISVALID(oldpte))
 		panic("hat_mempte_setup(): address already mapped"
@@ -3594,8 +3472,7 @@ hat_mempte_setup(caddr_t addr)
 	 */
 	htable_release(ht);
 	p = PT_INDEX_PHYSADDR(pfn_to_pa(ht->ht_pfn), entry);
-	if (created)
-		hati_reserves_exit(0);
+	--curthread->t_hatdepth;
 	return (p);
 }
 

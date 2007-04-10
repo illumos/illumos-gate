@@ -276,12 +276,11 @@ htable_adjust_reserve()
 {
 	htable_t *ht;
 
-	ASSERT(curthread != hat_reserves_thread);
-
 	/*
 	 * Free any excess htables in the reserve list
 	 */
-	while (htable_reserve_cnt > htable_reserve_amount) {
+	while (htable_reserve_cnt > htable_reserve_amount &&
+	    !USE_HAT_RESERVES()) {
 		ht = htable_get_reserve();
 		if (ht == NULL)
 			return;
@@ -627,7 +626,6 @@ htable_alloc(
 			 * Donate successful htable allocations to the reserve.
 			 */
 			for (;;) {
-				ASSERT(curthread != hat_reserves_thread);
 				ht = kmem_cache_alloc(htable_cache, kmflags);
 				if (ht == NULL)
 					break;
@@ -777,10 +775,12 @@ htable_free(htable_t *ht)
 	/*
 	 * Free htables or put into reserves.
 	 */
-	if (USE_HAT_RESERVES() || htable_reserve_cnt < htable_reserve_amount)
+	if (USE_HAT_RESERVES() || htable_reserve_cnt < htable_reserve_amount) {
 		htable_put_reserve(ht);
-	else
+	} else {
 		kmem_cache_free(htable_cache, ht);
+		htable_adjust_reserve();
+	}
 }
 
 

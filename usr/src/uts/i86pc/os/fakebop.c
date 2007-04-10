@@ -110,6 +110,8 @@ static ulong_t total_bop_alloc_kernel = 0;
 
 static void build_firmware_properties(void);
 
+static int early_allocation = 1;
+
 /*
  * Allocate aligned physical memory at boot time. This allocator allocates
  * from the highest possible addresses. This avoids exhausting memory that
@@ -129,19 +131,18 @@ do_bop_phys_alloc(uint64_t size, uint64_t align)
 	 * space we can treat physmem as a pfn (not just a pgcnt) and
 	 * get a conservative upper limit.
 	 */
-	extern pgcnt_t physmem;
 	if (physmem != 0 && high_phys > pfn_to_pa(physmem))
 		high_phys = pfn_to_pa(physmem);
 
 	/*
-	 * find the highest available memory in physinstalled
+	 * find the lowest or highest available memory in physinstalled
 	 */
 	size = P2ROUNDUP(size, align);
 	for (; ml; ml = ml->next) {
-		start = ml->address;
-		end = P2ALIGN(start + ml->size, align);
+		start = P2ROUNDUP(ml->address, align);
+		end = P2ALIGN(ml->address + ml->size, align);
 		if (start < next_phys)
-			start = next_phys;
+			start = P2ROUNDUP(next_phys, align);
 		if (end > high_phys)
 			end = P2ALIGN(high_phys, align);
 
@@ -150,11 +151,23 @@ do_bop_phys_alloc(uint64_t size, uint64_t align)
 		if (end - start < size)
 			continue;
 
-		if (end - size > pa)
-			pa = end - size;
+		/*
+		 * Early allocations need to use low memory, since
+		 * physmem might be further limited by bootenv.rc
+		 */
+		if (early_allocation) {
+			if (pa == 0 || start < pa)
+				pa = start;
+		} else {
+			if (end - size > pa)
+				pa = end - size;
+		}
 	}
 	if (pa != 0) {
-		high_phys = pa;
+		if (early_allocation)
+			next_phys = pa + size;
+		else
+			high_phys = pa;
 		return (pa);
 	}
 	panic("do_bop_phys_alloc(0x%" PRIx64 ", 0x%" PRIx64 ") Out of memory\n",
@@ -412,6 +425,55 @@ do_bsys_nextprop(bootops_t *bop, char *name)
 }
 
 /*
+ * Parse numeric value from a string. Understands decimal, hex, octal, - and ~
+ */
+static int
+parse_value(char *p, uint64_t *retval)
+{
+	int adjust = 0;
+	uint64_t tmp = 0;
+	int digit;
+	int radix = 10;
+
+	*retval = 0;
+	if (*p == '-' || *p == '~')
+		adjust = *p++;
+
+	if (*p == '0') {
+		++p;
+		if (*p == 0)
+			return (0);
+		if (*p == 'x' || *p == 'X') {
+			radix = 16;
+			++p;
+		} else {
+			radix = 8;
+			++p;
+		}
+	}
+	while (*p) {
+		if ('0' <= *p && *p <= '9')
+			digit = *p - '0';
+		else if ('a' <= *p && *p <= 'f')
+			digit = 10 + *p - 'a';
+		else if ('A' <= *p && *p <= 'F')
+			digit = 10 + *p - 'A';
+		else
+			return (-1);
+		if (digit >= radix)
+			return (-1);
+		tmp = tmp * radix + digit;
+		++p;
+	}
+	if (adjust == '-')
+		tmp = -tmp;
+	else if (adjust == '~')
+		tmp = ~tmp;
+	*retval = tmp;
+	return (0);
+}
+
+/*
  * 2nd part of building the table of boot properties. This includes:
  * - values from /boot/solaris/bootenv.rc (ie. eeprom(1m) values)
  *
@@ -438,6 +500,7 @@ boot_prop_finish(void)
 	char *inputdev;	/* these override the comand line if serial ports */
 	char *outputdev;
 	char *consoledev;
+	uint64_t lvalue;
 
 	DBG_MSG("Opening /boot/solaris/bootenv.rc\n");
 	fd = BRD_OPEN(bfs_ops, "/boot/solaris/bootenv.rc", 0);
@@ -536,6 +599,19 @@ boot_prop_finish(void)
 done:
 	if (fd >= 0)
 		BRD_CLOSE(bfs_ops, fd);
+
+	/*
+	 * Check if we have to limit the boot time allocator
+	 */
+	if (do_bsys_getproplen(NULL, "physmem") != -1 &&
+	    do_bsys_getprop(NULL, "physmem", line) >= 0 &&
+	    parse_value(line, &lvalue) != -1) {
+		if (0 < lvalue && (lvalue < physmem || physmem == 0)) {
+			physmem = (pgcnt_t)lvalue;
+			DBG(physmem);
+		}
+	}
+	early_allocation = 0;
 
 	/*
 	 * check to see if we have to override the default value of the console
@@ -799,7 +875,7 @@ build_boot_properties(void)
 	}
 
 	/*
-	 * Values forcibly set boot propertiex on the command line via -B.
+	 * Values forcibly set boot properties on the command line via -B.
 	 * Allow use of quotes in values. Other stuff goes on kernel
 	 * command line.
 	 */
