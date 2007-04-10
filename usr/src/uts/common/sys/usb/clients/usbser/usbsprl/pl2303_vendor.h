@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@ extern "C" {
 #define	PROLIFIC_REV_H				0x0202
 #define	PROLIFIC_REV_X				0x0300
 #define	PROLIFIC_REV_HX_CHIP_D			0x0400
+#define	PROLIFIC_REV_1				0x0001
 
 /*
  * Vendor-specific Requests

@@ -1736,14 +1736,12 @@ usb_ac_handle_descriptors(usb_ac_state_t *uacp)
 
 	USB_DPRINTF_L3(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
 	    "header: type=0x%x subtype=0x%x bcdADC=0x%x\n\t"
-	    "total=0x%x InCol=0x%x interfaceno: 0x%x 0x%x 0x%x 0x%x",
+	    "total=0x%x InCol=0x%x",
 	    descr.bDescriptorType,
 	    descr.bDescriptorSubType,
 	    descr.bcdADC,
 	    descr.wTotalLength,
-	    descr.blnCollection,
-	    descr.baInterfaceNr[0], descr.baInterfaceNr[1],
-	    descr.baInterfaceNr[2], descr.baInterfaceNr[3]);
+	    descr.blnCollection);
 
 	/*
 	 * we read descriptors by index and store them in ID array.
@@ -2189,13 +2187,9 @@ usb_ac_add_unit_descriptor(usb_ac_state_t *uacp, uchar_t *buffer,
 		USB_DPRINTF_L3(PRINT_MASK_ATTA,
 		    uacp->usb_ac_log_handle,
 		    "feature unit: type=0x%x sub=0x%x unitid=0x%x\n\t"
-		    "sourceid=0x%x size=0x%x "
-		    "controls=0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x",
+		    "sourceid=0x%x size=0x%x",
 		    d->bDescriptorType, d->bDescriptorSubType,
-		    d->bUnitID, d->bSourceID,
-		    d->bControlSize, d->bmaControls[0],
-		    d->bmaControls[1], d->bmaControls[2], d->bmaControls[3],
-		    d->bmaControls[4], d->bmaControls[5], d->bmaControls[6]);
+		    d->bUnitID, d->bSourceID, d->bControlSize);
 
 		usb_ac_alloc_unit(uacp, d->bUnitID);
 		uacp->usb_ac_units[d->bUnitID].acu_descriptor = descr;

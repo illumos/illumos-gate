@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2596,15 +2595,6 @@ usb_as_handle_descriptors(usb_as_state_t *uasp)
 		    format->bSubFrameSize,
 		    format->bBitResolution,
 		    format->bSamFreqType);
-		USB_DPRINTF_L3(PRINT_MASK_ATTA, uasp->usb_as_log_handle,
-		    "0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x "
-		    "0x%x 0x%x 0x%x 0x%x",
-		    format->bSamFreqs[0], format->bSamFreqs[1],
-		    format->bSamFreqs[2], format->bSamFreqs[3],
-		    format->bSamFreqs[4], format->bSamFreqs[5],
-		    format->bSamFreqs[6], format->bSamFreqs[7],
-		    format->bSamFreqs[8], format->bSamFreqs[9],
-		    format->bSamFreqs[10], format->bSamFreqs[11]);
 
 		if (format->bSamFreqType == 0) {
 			/* continuous sample rate limits */

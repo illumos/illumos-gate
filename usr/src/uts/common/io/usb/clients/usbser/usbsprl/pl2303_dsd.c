@@ -241,7 +241,7 @@ pl2303_attach(ds_attach_info_t *aip)
 	}
 
 	mutex_init(&plp->pl_mutex, NULL, MUTEX_DRIVER,
-			plp->pl_dev_data->dev_iblock_cookie);
+	    plp->pl_dev_data->dev_iblock_cookie);
 
 	cv_init(&plp->pl_tx_cv, NULL, CV_DRIVER, NULL);
 
@@ -258,7 +258,7 @@ pl2303_attach(ds_attach_info_t *aip)
 		plp->pl_chiptype = pl2303_H;
 		mutex_exit(&plp->pl_mutex);
 		USB_DPRINTF_L3(DPRINT_ATTACH, plp->pl_lh,
-			"Chip Type: pl2303_H");
+		    "Chip Type: pl2303_H");
 	} else if (plp->pl_dev_data->dev_descr->bcdDevice == PROLIFIC_REV_X) {
 		/*
 		 * pl2303_HX(Chip A)and pl2303_X devices have different
@@ -272,20 +272,27 @@ pl2303_attach(ds_attach_info_t *aip)
 		plp->pl_chiptype = pl2303_X;
 		mutex_exit(&plp->pl_mutex);
 		USB_DPRINTF_L3(DPRINT_ATTACH, plp->pl_lh,
-			"Chip Type: pl2303_HX(Chip A) or pl2303_X");
+		    "Chip Type: pl2303_HX(Chip A) or pl2303_X");
 	} else if (plp->pl_dev_data->dev_descr->bcdDevice ==
-			PROLIFIC_REV_HX_CHIP_D) {
+	    PROLIFIC_REV_HX_CHIP_D) {
 		mutex_enter(&plp->pl_mutex);
 		plp->pl_chiptype = pl2303_HX_CHIP_D;
 		mutex_exit(&plp->pl_mutex);
 		USB_DPRINTF_L3(DPRINT_ATTACH, plp->pl_lh,
-			"Chip Type: pl2303_HX(Chip D)");
+		    "Chip Type: pl2303_HX(Chip D)");
+	} else if (plp->pl_dev_data->dev_descr->bcdDevice == PROLIFIC_REV_1) {
+		/* IO DATA USB-RSAQ3(usb67b,aaa2) uses pl2303_X chip */
+		mutex_enter(&plp->pl_mutex);
+		plp->pl_chiptype = pl2303_X;
+		mutex_exit(&plp->pl_mutex);
+		USB_DPRINTF_L3(DPRINT_ATTACH, plp->pl_lh,
+		    "Chip Type: pl2303_X with revison number=1");
 	} else {
 		mutex_enter(&plp->pl_mutex);
 		plp->pl_chiptype = pl2303_UNKNOWN;
 		mutex_exit(&plp->pl_mutex);
 		USB_DPRINTF_L3(DPRINT_ATTACH, plp->pl_lh,
-			"Chip Type: Unknown");
+		    "Chip Type: Unknown");
 	}
 
 	plp->pl_def_ph = plp->pl_dev_data->dev_default_ph;
