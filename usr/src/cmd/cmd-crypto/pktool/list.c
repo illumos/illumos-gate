@@ -132,28 +132,6 @@ describeKey(KMF_KEY_HANDLE *key)
 
 }
 
-static char *
-keybitstr(KMF_KEY_HANDLE *key)
-{
-	KMF_RAW_SYM_KEY *rkey;
-	char keystr[256];
-	char *p;
-
-	if (key == NULL || (key->keyclass != KMF_SYMMETRIC))
-		return ("");
-
-	rkey = (KMF_RAW_SYM_KEY *)key->keyp;
-	(void) memset(keystr, 0, sizeof (keystr));
-	if (rkey != NULL) {
-		(void) snprintf(keystr, sizeof (keystr),
-			" (%d bits)", rkey->keydata.len * 8);
-		p = keystr;
-	} else {
-		return ("");
-	}
-
-	return (p);
-}
 
 static void
 pk_show_keys(void *handle, KMF_KEY_HANDLE *keys, int numkeys)
@@ -161,20 +139,19 @@ pk_show_keys(void *handle, KMF_KEY_HANDLE *keys, int numkeys)
 	int i;
 
 	for (i = 0; i < numkeys; i++) {
-		(void) fprintf(stdout, gettext("Key #%d - %s:  %s%s"),
+		(void) fprintf(stdout, gettext("Key #%d - %s:  %s"),
 			i+1, describeKey(&keys[i]),
 			keys[i].keylabel ? keys[i].keylabel :
-			gettext("No label"),
-			(keys[i].keyclass == KMF_SYMMETRIC ?
-			keybitstr(&keys[i]) : ""));
+			gettext("No label"));
 
 		if (keys[i].keyclass == KMF_SYMMETRIC) {
 			KMF_RETURN rv;
 			KMF_RAW_SYM_KEY rkey;
+
 			rv = KMF_GetSymKeyValue(handle, &keys[i],
 				&rkey);
 			if (rv == KMF_OK) {
-				(void) fprintf(stdout, "\t %d bits",
+				(void) fprintf(stdout, " (%d bits)",
 					rkey.keydata.len * 8);
 				KMF_FreeRawSymKey(&rkey);
 			}

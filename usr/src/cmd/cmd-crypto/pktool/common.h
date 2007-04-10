@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -122,7 +122,7 @@ KMF_RETURN verify_file(char *);
 int get_token_password(KMF_KEYSTORE_TYPE, char *, KMF_CREDENTIAL *);
 void display_error(void *, KMF_RETURN, char *);
 #define	DEFAULT_NSS_TOKEN	"internal"
-#define	DEFAULT_TOKEN_PROMPT	"Enter pin for %s: "
+#define	DEFAULT_TOKEN_PROMPT	"Enter PIN for %s: "
 
 #define	EMPTYSTRING(s) (s == NULL || !strlen((char *)s))
 
