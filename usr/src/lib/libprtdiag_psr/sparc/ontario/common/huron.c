@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,6 +76,10 @@ huron_get_slot_number(char *path, struct io_card *card)
 	} else if (strcmp(path, HURON_N2_XAUI1) == 0) {
 		(void) strcpy(card->slot_str, "1");
 		card->slot = 1;
+	} else if (strncmp(path, HURON_PCIE_SLOT0,
+		strlen(HURON_PCIE_SLOT0)) == 0) {
+		(void) strcpy(card->slot_str, "0");
+		card->slot = 0;
 	} else if (strncmp(path, HURON_PCIE_SLOT1,
 		strlen(HURON_PCIE_SLOT1)) == 0) {
 		(void) strcpy(card->slot_str, "1");
@@ -96,10 +100,6 @@ huron_get_slot_number(char *path, struct io_card *card)
 		strlen(HURON_PCIE_SLOT5)) == 0) {
 		(void) strcpy(card->slot_str, "5");
 		card->slot = 5;
-	} else if (strncmp(path, HURON_PCIE_SLOT6,
-		strlen(HURON_PCIE_SLOT6)) == 0) {
-		(void) strcpy(card->slot_str, "6");
-		card->slot = 6;
 	} else {
 		(void) strcpy(card->slot_str, MOTHERBOARD);
 		card->slot = NO_SLOT;
