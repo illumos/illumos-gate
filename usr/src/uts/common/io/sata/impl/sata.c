@@ -3482,8 +3482,13 @@ sata_scsi_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
  * Checks if a device exists and can be access and translates common
  * scsi_pkt data to sata_pkt data.
  *
- * Returns TRAN_ACCEPT if device exists and sata_pkt was set-up.
- * Returns other TRAN_XXXXX values when error occured.
+ * Returns TRAN_ACCEPT and scsi pkt_reason CMD_CMPLT if device exists and
+ * sata_pkt was set-up.
+ * Returns TRAN_ACCEPT and scsi pkt_reason CMD_DEV_GONE if device does not
+ * exist and pkt_comp callback was scheduled.
+
+ * Returns other TRAN_XXXXX values when error occured and command should be
+ * rejected with the returned TRAN_XXXXX value.
  *
  * This function should be called with port mutex held.
  */
@@ -3496,6 +3501,16 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx)
 		SATA_DIR_NODATA_XFER,
 		/* all other values to 0/FALSE */
 	};
+	/*
+	 * Pkt_reason has to be set if the pkt_comp callback is invoked,
+	 * and that implies TRAN_ACCEPT return value. Any other returned value
+	 * indicates that the scsi packet was not accepted (the reason will not
+	 * be checked by the scsi traget driver).
+	 * To make debugging easier, we set pkt_reason to know value here.
+	 * It may be changed later when different completion reason is
+	 * determined.
+	 */
+	spx->txlt_scsi_pkt->pkt_reason = CMD_TRAN_ERR;
 
 	/* Validate address */
 	switch (sata_validate_scsi_address(spx->txlt_sata_hba_inst,
@@ -3574,7 +3589,11 @@ sata_txlt_generic_pkt_info(sata_pkt_txlate_t *spx)
 		spx->txlt_sata_pkt->satapkt_cmd.satacmd_flags.
 		    sata_ignore_dev_reset = B_TRUE;
 	}
-
+	/*
+	 * At this point the generic translation routine determined that the
+	 * scsi packet should be accepted. Packet completion reason may be
+	 * changed later when a different completion reason is determined.
+	 */
 	spx->txlt_scsi_pkt->pkt_reason = CMD_CMPLT;
 
 	if ((spx->txlt_scsi_pkt->pkt_flags & FLAG_NOINTR) != 0) {
@@ -3726,7 +3745,8 @@ sata_txlt_nodata_cmd_immediate(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if ((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) {
+	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
+	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -3788,7 +3808,8 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if ((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) {
+	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
+	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -3959,7 +3980,8 @@ sata_txlt_request_sense(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if ((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) {
+	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
+	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -4017,7 +4039,8 @@ sata_txlt_test_unit_ready(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if ((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) {
+	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
+	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -4089,7 +4112,8 @@ sata_txlt_start_stop_unit(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&SATA_CPORT_MUTEX(shi, cport));
 
-	if ((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) {
+	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
+	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -4194,7 +4218,8 @@ sata_txlt_read_capacity(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if ((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) {
+	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
+	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -4277,7 +4302,8 @@ sata_txlt_mode_sense(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if ((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) {
+	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
+	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		kmem_free(buf, 1024);
 		return (rval);
@@ -4539,7 +4565,8 @@ sata_txlt_mode_select(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if ((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) {
+	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
+	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -4786,7 +4813,8 @@ sata_txlt_log_sense(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if ((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) {
+	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
+	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		kmem_free(buf, MAX_LOG_SENSE_PAGE_SIZE);
 		return (rval);
@@ -5022,7 +5050,8 @@ sata_txlt_read(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if ((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) {
+	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
+	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -5252,7 +5281,8 @@ sata_txlt_write(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if ((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) {
+	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
+	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -5473,7 +5503,8 @@ sata_txlt_atapi(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if ((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) {
+	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
+	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
@@ -5568,7 +5599,8 @@ sata_txlt_synchronize_cache(sata_pkt_txlate_t *spx)
 
 	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
 
-	if ((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) {
+	if (((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) ||
+	    (spx->txlt_scsi_pkt->pkt_reason == CMD_DEV_GONE)) {
 		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
 		return (rval);
 	}
