@@ -3486,7 +3486,6 @@ sata_scsi_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
  * sata_pkt was set-up.
  * Returns TRAN_ACCEPT and scsi pkt_reason CMD_DEV_GONE if device does not
  * exist and pkt_comp callback was scheduled.
-
  * Returns other TRAN_XXXXX values when error occured and command should be
  * rejected with the returned TRAN_XXXXX value.
  *
