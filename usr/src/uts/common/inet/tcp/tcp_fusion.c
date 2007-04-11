@@ -496,7 +496,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 {
 	tcp_t *peer_tcp = tcp->tcp_loopback_peer;
 	uint_t max_unread;
-	boolean_t flow_stopped;
+	boolean_t flow_stopped, peer_data_queued = B_FALSE;
 	boolean_t urgent = (DB_TYPE(mp) != M_DATA);
 	mblk_t *mp1 = mp;
 	ill_t *ilp, *olp;
@@ -697,20 +697,24 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 		mutex_enter(&tcp->tcp_non_sq_lock);
 	}
 	flow_stopped = tcp->tcp_flow_stopped;
-	if (!flow_stopped &&
-	    (((peer_tcp->tcp_direct_sockfs || TCP_IS_DETACHED(peer_tcp)) &&
+	if (((peer_tcp->tcp_direct_sockfs || TCP_IS_DETACHED(peer_tcp)) &&
 	    (peer_tcp->tcp_rcv_cnt >= peer_tcp->tcp_fuse_rcv_hiwater ||
 	    ++peer_tcp->tcp_fuse_rcv_unread_cnt >= max_unread)) ||
 	    (!peer_tcp->tcp_direct_sockfs &&
-	    !TCP_IS_DETACHED(peer_tcp) && !canputnext(peer_tcp->tcp_rq)))) {
+	    !TCP_IS_DETACHED(peer_tcp) && !canputnext(peer_tcp->tcp_rq))) {
+		peer_data_queued = B_TRUE;
+	}
+
+	if (!flow_stopped && (peer_data_queued ||
+	    (TCP_UNSENT_BYTES(tcp) >= tcp->tcp_xmit_hiwater))) {
 		tcp_setqfull(tcp);
 		flow_stopped = B_TRUE;
 		TCP_STAT(tcps, tcp_fusion_flowctl);
 		DTRACE_PROBE4(tcp__fuse__output__flowctl, tcp_t *, tcp,
 		    uint_t, send_size, uint_t, peer_tcp->tcp_rcv_cnt,
 		    uint_t, peer_tcp->tcp_fuse_rcv_unread_cnt);
-	} else if (flow_stopped &&
-	    TCP_UNSENT_BYTES(tcp) <= tcp->tcp_xmit_lowater) {
+	} else if (flow_stopped && !peer_data_queued &&
+	    (TCP_UNSENT_BYTES(tcp) <= tcp->tcp_xmit_lowater)) {
 		tcp_clrqfull(tcp);
 		flow_stopped = B_FALSE;
 	}
@@ -976,7 +980,9 @@ plugged:
 		tcp->tcp_rcv_cnt = 0;
 		tcp->tcp_fuse_rcv_unread_cnt = 0;
 
-		if (peer_tcp->tcp_flow_stopped) {
+		if (peer_tcp->tcp_flow_stopped &&
+		    (TCP_UNSENT_BYTES(peer_tcp) <=
+		    peer_tcp->tcp_xmit_lowater)) {
 			tcp_clrqfull(peer_tcp);
 			TCP_STAT(tcps, tcp_fusion_backenabled);
 		}

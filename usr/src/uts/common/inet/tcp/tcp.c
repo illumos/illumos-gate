@@ -15929,7 +15929,22 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 		if (tcp->tcp_rcv_list != NULL)
 			(void) tcp_rcv_drain(tcp->tcp_rq, tcp);
 
-		tcp_clrqfull(peer_tcp);
+		if (peer_tcp > tcp) {
+			mutex_enter(&peer_tcp->tcp_non_sq_lock);
+			mutex_enter(&tcp->tcp_non_sq_lock);
+		} else {
+			mutex_enter(&tcp->tcp_non_sq_lock);
+			mutex_enter(&peer_tcp->tcp_non_sq_lock);
+		}
+
+		if (peer_tcp->tcp_flow_stopped &&
+		    (TCP_UNSENT_BYTES(peer_tcp) <=
+		    peer_tcp->tcp_xmit_lowater)) {
+			tcp_clrqfull(peer_tcp);
+		}
+		mutex_exit(&peer_tcp->tcp_non_sq_lock);
+		mutex_exit(&tcp->tcp_non_sq_lock);
+
 		TCP_FUSE_SYNCSTR_UNPLUG_DRAIN(tcp);
 		TCP_STAT(tcps, tcp_fusion_backenabled);
 		return;
