@@ -1594,7 +1594,6 @@ dsl_snapshot_rename_one(char *name, void *arg)
 {
 	struct renamearg *ra = arg;
 	dsl_dataset_t *ds = NULL;
-	objset_t *os;
 	char *cp;
 	int err;
 
@@ -1673,8 +1672,8 @@ dsl_recursive_rename(char *oldname, const char *newname)
 		dsl_dataset_t *ds = dst->dst_arg1;
 		if (dst->dst_err) {
 			dsl_dir_name(ds->ds_dir, ra->failed);
-			strcat(ra->failed, "@");
-			strcat(ra->failed, ra->newsnap);
+			(void) strcat(ra->failed, "@");
+			(void) strcat(ra->failed, ra->newsnap);
 		}
 		dsl_dataset_close(ds, DS_MODE_STANDARD, ra->dstg);
 	}
