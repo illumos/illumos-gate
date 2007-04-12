@@ -2120,10 +2120,13 @@ else
 	done
 fi
 
-if grep '^[ 	]*zfsroot:' $root/etc/system >/dev/null ; then
+if grep '^[ 	]*zfsroot:' $root/etc/system >/dev/null && \
+	    archive_file_exists i86pc.boot boot/grub/zfs_stage1_5; then
 	echo "Cannot BFU a system with the mountroot version"\
 		"of zfs boot support."
-	echo "See http://www.opensolaris.org/os/community/on/flag-days/pages/2007032801"
+	echo "For information on how to transition this system to the new"
+	echo "zfs boot support, see:"
+	echo "http://www.opensolaris.org/os/community/zfs/boot/zfsboot-manual/mntroot-transition/"
 	fail ""
 fi
 
