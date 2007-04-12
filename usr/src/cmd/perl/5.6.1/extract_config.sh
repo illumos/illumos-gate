@@ -1,7 +1,7 @@
 #!/bin/ksh -p
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -76,7 +76,7 @@ printf 'PERL_VENDOR_DIR = $(ROOT)%s\n' $vendorarchexp
 printf 'PERL_POD_DIR = $(ROOT)%s/pod\n' $privlibexp
 
 # Compilation environment flags
-printf 'KEEP_STATE_OFF = unset KEEP_STATE SUNPRO_DEPENDENCIES\n'
+printf 'KEEP_STATE_OFF = unset KEEP_STATE SUNPRO_DEPENDENCIES || true\n'
 printf 'PERL_COREFLAGS = -DPERL_CORE\n'
 printf 'PERL_LFFLAGS = %s\n' "$ccflags_uselargefiles"
 printf 'PERL_LDLIBS = %s\n' "$perllibs"

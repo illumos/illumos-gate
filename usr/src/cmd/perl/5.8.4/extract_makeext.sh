@@ -1,6 +1,6 @@
 #!/bin/ksh -p
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -122,7 +122,7 @@ done
 for ext in $nonxs_ext
 do
 	printf '%s: %s/Makefile FRC\n' $ext $ext
-	printf '\t@ cd $@; pwd '
+	printf '\t@ cd $@; pwd; '
 	printf '$(PERL_MM_ENV); $(MAKE) all\n\n'
 done
 
