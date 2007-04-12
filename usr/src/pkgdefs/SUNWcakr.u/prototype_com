@@ -387,6 +387,11 @@ d none platform/SUNW,UltraAX-i2/kernel 755 root sys
 d none platform/SUNW,UltraAX-i2/kernel/misc 755 root sys
 d none platform/SUNW,UltraAX-i2/kernel/misc/sparcv9 755 root sys
 f none platform/SUNW,UltraAX-i2/kernel/misc/sparcv9/platmod 755 root sys
+d none platform/TAD,SPARCLE 755 root sys
+d none platform/TAD,SPARCLE/kernel 755 root sys
+d none platform/TAD,SPARCLE/kernel/misc 755 root sys
+d none platform/TAD,SPARCLE/kernel/misc/sparcv9 755 root sys
+f none platform/TAD,SPARCLE/kernel/misc/sparcv9/platmod 755 root sys
 d none platform/sun4u 755 root sys
 d none platform/sun4u-us3 755 root sys
 d none platform/sun4u-us3/kernel 755 root sys

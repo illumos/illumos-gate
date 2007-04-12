@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,6 +62,7 @@ PLATLINKS	+= SUNW,Netra-T4
 PLATLINKS	+= SUNW,Netra-CP2300
 PLATLINKS	+= SUNW,Netra-CP3010
 PLATLINKS	+= SUNW,SPARC-Enterprise
+PLATLINKS	+= TAD,SPARCLE
 
 LINKED_DIRS	= $(PLATLINKS:%=$(USR_PLAT_DIR)/%)
 LINKED_LIB_DIRS	= $(PLATLINKS:%=$(USR_PLAT_DIR)/%/lib)

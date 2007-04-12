@@ -21,7 +21,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # lib/libmd/Makefile.sun4u.links
@@ -64,3 +64,4 @@ LINKED_PLATFORMS	+= SUNW,Netra-T12
 LINKED_PLATFORMS	+= SUNW,Netra-T4
 LINKED_PLATFORMS	+= SUNW,Netra-CP2300
 LINKED_PLATFORMS	+= SUNW,Netra-CP3010
+LINKED_PLATFORMS	+= TAD,SPARCLE

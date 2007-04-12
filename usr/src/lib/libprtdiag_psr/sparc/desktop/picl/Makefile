@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -57,6 +57,7 @@ LINKED_PLATFORMS	+= SUNW,Serverblade1
 LINKED_PLATFORMS	+= SUNW,Sun-Fire-V240
 LINKED_PLATFORMS	+= SUNW,Sun-Fire-V250
 LINKED_PLATFORMS	+= SUNW,Sun-Fire-V440
+LINKED_PLATFORMS	+= TAD,SPARCLE
 
 LINKED_DIRS		= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%)
 LINKED_LIB_DIRS		= $(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/lib)

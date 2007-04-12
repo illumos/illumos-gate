@@ -21,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # psm/stand/bootblks/ufs/sparc/sun4u/Makefile
@@ -61,6 +61,7 @@ PLATLINKS	+= SUNW,Serverblade1
 PLATLINKS	+= SUNW,Netra-T12
 PLATLINKS	+= SUNW,Netra-T4
 PLATLINKS	+= SUNW,SPARC-Enterprise
+PLATLINKS	+= TAD,SPARCLE
 
 LINKED_DIRS             = $(PLATLINKS:%=$(USR_PLAT_DIR)/%)
 LINKED_LIB_DIRS         = $(PLATLINKS:%=$(USR_PLAT_DIR)/%/lib)
