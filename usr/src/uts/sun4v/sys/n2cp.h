@@ -64,9 +64,29 @@ typedef	struct n2cp_block_ctx n2cp_block_ctx_t;
 typedef	struct n2cp_hash_ctx n2cp_hash_ctx_t;
 typedef	struct n2cp_hmac_ctx n2cp_hmac_ctx_t;
 
-#define	N2CP_MAX_NCWQS		8
+/*
+ * Linked-list linkage.
+ */
+struct n2cp_listnode {
+	n2cp_listnode_t *nl_next;
+	n2cp_listnode_t *nl_prev;
+};
+
+#define	N2CP_MODE_STRING	"n2cp-mode"
+
+typedef enum {
+	N_ASYNC,
+	N_SYNC
+} n2cp_mode_t;
+
+
+#define	N2CP_MAX_NCWQS		32
 #define	N2CP_MAX_CPUS_PER_CWQ	8
 #define	N2CP_MAX_HELPERTHREADS	(N2CP_MAX_NCWQS * N2CP_MAX_CPUS_PER_CWQ)
+#define	N2CP_MAX_BUF_CNT	1024
+
+/* numbers of completion theads */
+#define	NUM_COMPLETE_THREADS	1
 
 /*
  * Device flags (n2cp_t.n_flags)
@@ -124,7 +144,7 @@ typedef	struct n2cp_hmac_ctx n2cp_hmac_ctx_t;
 
 #define	CW_ENC_TYPE(a, c)	((((a) & 7) << 2) | ((c) & 3))
 
-#define	CWQ_NENTRIES		(1 << 9)	/* 512 */
+#define	CWQ_NENTRIES		(1 << 5)	/* 32 */
 #define	CWQ_WRAPMASK		(CWQ_NENTRIES - 1)
 
 /* CWS_ALIGNMENT is used as an alignment parameter to contig_mem_alloc */
@@ -138,21 +158,10 @@ typedef	struct n2cp_hmac_ctx n2cp_hmac_ctx_t;
 
 #define	N2CP_QTIMEOUT_SECONDS		60
 
-typedef struct cwq_cwb {
-	cwq_cw_t	cb_cw;
-	struct cwq_cwb	*cb_next;
-} cwq_cwb_t;
+/* needs up to 9 pages for 64KB buffers */
+#define	N2CP_MAX_CHAIN			9
 
-typedef struct cwq_cwjob {
-	int			cj_id;
-	kcondvar_t		cj_cv;
-	boolean_t		cj_pending;	/* awaiting CWQ */
-	cwq_cwb_t		*cj_cwb;
-	struct cwq_cwjob	*cj_prev;
-	struct cwq_cwjob	*cj_next;
-	void			*cj_ctx;	/* ptr to n2cp_request */
-	int			cj_error;
-} cwq_cwjob_t;
+#define	N2CP_JOB_DONE	0xDEADBEEF
 
 typedef struct {
 	uint64_t		cq_handle;
@@ -163,7 +172,19 @@ typedef struct {
 	int			cq_init;
 	int			cq_busy_wait;
 	kcondvar_t		cq_busy_cv;
-	cwq_cwjob_t		**cq_jobs;
+
+	n2cp_t			*cq_n2cp;
+	n2cp_listnode_t		cq_joblist;	/* runq */
+
+	ddi_taskq_t		*cq_cworker;
+	kmutex_t		cq_complete_lock;
+	kcondvar_t		cq_complete_cv;
+	kcondvar_t		cq_wait_complete_cv;
+
+	/* head of completed job linked list */
+	n2cp_request_t		 *cq_rdylist;
+
+	n2cp_request_t		**cq_jobs;
 	size_t			cq_jobs_size;
 	void			*cq_mem;
 	int			cq_memsize;
@@ -171,8 +192,7 @@ typedef struct {
 	cwq_cw_t		*cq_last;
 	cwq_cw_t		*cq_head;
 	cwq_cw_t		*cq_tail;
-	cwq_cwjob_t		*cq_joblist;
-	int			cq_joblistcnt;
+
 	struct {
 		uint64_t	qks_njobs;
 		uint64_t	qks_ncws;
@@ -182,12 +202,18 @@ typedef struct {
 		uint64_t	qks_nintr;
 		uint64_t	qks_nintr_err;
 		uint64_t	qks_nintr_jobs;
+		uint64_t	qks_nsync_jobs;
+		uint64_t	qks_nsync_err;
 	} cq_ks;
+	kmutex_t		cq_sync_lock;
+	n2cp_request_t		*cq_sync_req;
+	kcondvar_t		cq_sync_cv;
 } cwq_t;
 
 #define	CWQ_STATE_ERROR		(-1)
 #define	CWQ_STATE_OFFLINE	0
 #define	CWQ_STATE_ONLINE	1
+#define	CWQ_STATE_DETACHING	2
 
 typedef struct {
 	int		mm_cwqid;
@@ -311,6 +337,8 @@ typedef struct fixed_iv {
  */
 #define	N2CP_SCATTER		0x01
 #define	N2CP_GATHER		0x02
+#define	N2CP_SYNC		0x04
+#define	N2CP_FREEREQ		0x08
 
 /* define	the mechanisms strings not defined in <sys/crypto/common.h> */
 #define	SUN_CKM_SSL3_MD5_MAC		"CKM_SSL3_MD5_MAC"
@@ -330,10 +358,11 @@ typedef struct fixed_iv {
 /*
  * Scatter/gather checks.
  */
-#define	N2CP_SG_CONTIG		0x1	/* contiguous buffer */
-#define	N2CP_SG_WALIGN		0x2	/* word aligned */
-#define	N2CP_SG_PALIGN		0x4	/* page aligned */
-#define	N2CP_SG_PCONTIG		0x8	/* physically contiguous buffer */
+#define	N2CP_SG_CONTIG		0x01	/* contiguous buffer */
+#define	N2CP_SG_WALIGN		0x02	/* word aligned */
+#define	N2CP_SG_PALIGN		0x04	/* page aligned */
+#define	N2CP_SG_PCONTIG		0x08	/* physically contiguous buffer */
+#define	N2CP_SG_ALIGN16		0x10	/* page aligned */
 
 
 /*
@@ -369,17 +398,11 @@ struct n2cp_stat {
 		kstat_named_t	ns_nintr;
 		kstat_named_t	ns_nintr_err;
 		kstat_named_t	ns_nintr_jobs;
+		kstat_named_t	ns_nsync_jobs;
+		kstat_named_t	ns_nsync_err;
 	} ns_cwq[N2CP_MAX_NCWQS];
 };
 
-
-/*
- * Linked-list linkage.
- */
-struct n2cp_listnode {
-	n2cp_listnode_t	*nl_next;
-	n2cp_listnode_t	*nl_prev;
-};
 
 typedef enum n2cp_mech_type {
 	DES_CBC_MECH_INFO_TYPE,			/* CKM_DES_CBC */
@@ -489,8 +512,25 @@ typedef union {
 		n2cp_hmac_ctx_t		hmacctx;
 } nr_ctx_t;
 
+#define	N2CP_OP_PATTERN		"BROKE HW"
+#define	N2CP_OP_PATTERN_SZ	8
+
+/* n2cp_request.nr_job_state */
+#define	N2CP_JOBSTATE_FREED		0	/* in freed list */
+#define	N2CP_JOBSTATE_WAITQ		1	/* in waitq */
+#define	N2CP_JOBSTATE_PENDING		2	/* in runq */
+#define	N2CP_JOBSTATE_SOLO		3	/* not linked */
+
+typedef struct n2cp_buf_struct {
+	n2cp_listnode_t		link;
+	uchar_t			*buf;
+	uint64_t		buf_paddr;
+} n2cp_buf_struct_t;
+
+
 struct n2cp_request {
 	n2cp_listnode_t		nr_linkage;	/* must be at the top */
+	n2cp_listnode_t		nr_activectx;	/* must be at the top */
 	uint32_t		nr_cmd;	/* N2CP_OP | MECH_INFO_TYPE */
 	uint16_t		nr_pkt_length;
 	crypto_req_handle_t	nr_kcfreq;
@@ -507,13 +547,19 @@ struct n2cp_request {
 	/*
 	 * CWB
 	 */
-	cwq_cwb_t		*nr_cwb;
+	int			nr_cwq_id;	/* Associated CWQ ID */
+	int			nr_id;		/* job id */
+	int			nr_job_state;
+	cwq_cw_t		nr_cws[N2CP_MAX_CHAIN];
+	cwq_cw_t		*nr_cwb;
 	int			nr_cwcnt;
 
 	nr_ctx_t		*nr_context;
 	int			nr_context_sz;
 	int			nr_blocksz;
 	uint64_t		nr_context_paddr;
+
+	n2cp_request_t		*nr_rdylink;
 
 	/*
 	 * Callback.
@@ -525,8 +571,10 @@ struct n2cp_request {
 	/* pre-allocated buffers */
 	uchar_t			*nr_in_buf;
 	uint64_t		nr_in_buf_paddr;
+	n2cp_buf_struct_t	*nr_in_buf_struct;
 	uchar_t			*nr_out_buf;
 	uint64_t		nr_out_buf_paddr;
+	n2cp_buf_struct_t	*nr_out_buf_struct;
 
 	uint32_t		nr_flags;
 	int			nr_resultlen;
@@ -541,9 +589,6 @@ struct n2cp {
 	int				n_hvapi_minor_version;
 	dev_info_t			*n_dip;
 
-	ddi_taskq_t			*n_taskq;
-	ddi_taskq_t			*n_intrtaskq;
-
 	unsigned			n_flags;	/* dev state flags */
 
 	kstat_t				*n_ksp;
@@ -556,14 +601,16 @@ struct n2cp {
 	uint_t				n_intr_pri;
 
 	size_t				n_reqctx_sz;
-	ulong_t				n_pagesize;
 	crypto_kcf_provider_handle_t	n_prov;
 
 	kmutex_t			n_freereqslock;
-	n2cp_listnode_t			n_freereqs;	/* available requests */
+	n2cp_listnode_t			n_freereqs; /* available requests */
+	n2cp_listnode_t			n_ctx_list; /* list of all requests */
 
-	kmutex_t			n_ctx_list_lock;
-	n2cp_listnode_t			n_ctx_list;
+	/* pool of 64KB contig buffer used for scatter-gather */
+	n2cp_listnode_t			n_buf_pool;
+	uint32_t			n_buf_cnt;
+	kmutex_t			n_buf_pool_lock;
 
 	md_t				*n_mdp;
 	n2cp_cwq2cpu_map_t		n_cwqmap;
@@ -571,6 +618,8 @@ struct n2cp {
 	kmutex_t			n_timeout_lock;
 	n2cp_timeout_t			n_timeout;
 	n2cp_job_info_t			n_job[N2CP_MAX_NCWQS];
+	n2cp_mode_t			n_mode;
+	int				n_spins_per_usec;
 };
 
 /* CK_AES_CTR_PARAMS provides the parameters to the CKM_AES_CTR mechanism */
@@ -644,8 +693,6 @@ int	n2cp_dflagset(int);
 /*
  * n2cp.c
  */
-cwq_cwb_t *n2cp_cwb_allocate();
-void	n2cp_cwb_free(cwq_cwb_t *);
 int	n2cp_start(n2cp_t *, n2cp_request_t *);
 void	*n2_contig_alloc(int);
 void	n2_contig_free(void *, int);
@@ -658,6 +705,7 @@ void	n2cp_error(n2cp_t *, const char *, ...);
 void	n2cp_diperror(dev_info_t *, const char *, ...);
 void	n2cp_dipverror(dev_info_t *, const char *, va_list);
 void	n2cp_dump_cwb(cwq_cw_t *cw);
+void	n2cp_dumphex(void *, int);
 void	n2cp_offline_cwq(n2cp_t *n2cp, int cwq_id);
 
 /*
@@ -671,7 +719,9 @@ void	n2cp_ksdeinit(n2cp_t *);
  */
 int	n2cp_init(n2cp_t *);
 int	n2cp_uninit(n2cp_t *);
-void	n2cp_rmqueue(n2cp_listnode_t *);
+int	n2cp_get_inbuf(n2cp_t *, n2cp_request_t *);
+int	n2cp_get_outbuf(n2cp_t *, n2cp_request_t *);
+void	n2cp_free_buf(n2cp_t *, n2cp_request_t *);
 n2cp_request_t *n2cp_getreq(n2cp_t *, int);
 void	n2cp_freereq(n2cp_request_t *);
 void	n2cp_destroyreq(n2cp_request_t *);
@@ -679,17 +729,27 @@ caddr_t	n2cp_bufdaddr(crypto_data_t *);
 int	n2cp_gather(crypto_data_t *, char *, int);
 int	n2cp_gather_zero_pad(crypto_data_t *, caddr_t, size_t, int);
 int	n2cp_scatter(const char *, crypto_data_t *, int);
-int	n2cp_sgcheck(n2cp_t *, crypto_data_t *, int);
-
+int	n2cp_sgcheck(crypto_data_t *, int);
+int	n2cp_construct_chain(cwq_cw_t *, crypto_data_t *, int, int *chaincnt);
 int	n2cp_attr_lookup_uint8_array(crypto_object_attribute_t *, uint_t,
 			uint64_t, void **, unsigned int *);
 crypto_object_attribute_t *
 	n2cp_find_attribute(crypto_object_attribute_t *, uint_t, uint64_t);
-char	*n2cp_get_dataaddr(crypto_data_t *);
+char	*n2cp_get_dataaddr(crypto_data_t *, off_t);
 void	n2cp_setresid(crypto_data_t *, int);
 void	n2cp_getbufbytes(crypto_data_t *, int, int, char *);
 uint16_t n2cp_padhalf(int);
 uint16_t n2cp_padfull(int);
+
+void n2cp_initq(n2cp_listnode_t *);
+void n2cp_enqueue(n2cp_listnode_t *, n2cp_listnode_t *);
+n2cp_listnode_t *n2cp_dequeue(n2cp_listnode_t *);
+void    n2cp_rmqueue(n2cp_listnode_t *);
+int	n2cp_is_emptyqueue(n2cp_listnode_t *);
+void    n2cp_mvqueue(n2cp_listnode_t *, n2cp_listnode_t *);
+void n2cp_enqueue_ctx(n2cp_t *, n2cp_listnode_t *);
+void n2cp_dequeue_ctx(n2cp_t *, n2cp_listnode_t *);
+
 
 /*
  * n2cp_hash.c
@@ -750,6 +810,11 @@ void	n2cp_offline_cwq(n2cp_t *, int cwq_id);
 void	n2cp_online_cpu(n2cp_t *, int cpu_id);
 void	n2cp_offline_cpu(n2cp_t *, int cpu_id);
 
+/*
+ * n2cp_asm.s
+ */
+void n2cp_delay(void);
+
 #ifdef N2_ERRATUM_175
 
 typedef struct noncache_info {
@@ -792,7 +857,6 @@ extern noncache_info_t	n2cp_nc;
 #define	n2cp_setcpuregistered(n2cp)	((n2cp)->n_flags |= N2CP_CPU_REGISTERED)
 #define	n2cp_clrcpuregistered(n2cp) ((n2cp)->n_flags &= ~N2CP_CPU_REGISTERED)
 #define	n2cp_iscpuregistered(n2cp)	((n2cp)->n_flags & N2CP_CPU_REGISTERED)
-
 
 #endif /* _KERNEL */
 
