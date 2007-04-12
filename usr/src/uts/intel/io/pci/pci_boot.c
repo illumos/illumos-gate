@@ -98,7 +98,7 @@ static void create_ioapic_node(int bus, int dev, int fn, ushort_t vendorid,
 
 extern int pci_slot_names_prop(int, char *, int);
 
-/* set to 1 to force PCI peer-bus renumbering, -1 to prevent it */
+/* set non-zero to force PCI peer-bus renumbering */
 int pci_bus_always_renumber = 0;
 
 /* get the subordinate bus # for a root/peer bus */
@@ -289,35 +289,21 @@ pci_roots_have_bbn(void)
 static int
 pci_bus_renumber()
 {
-	char *bus_prop;
-	long val;
+	ACPI_TABLE_HEADER *fadt;
 
-	/* allow over-ride via patchable variable */
-	if (pci_bus_always_renumber > 0)
+	if (pci_bus_always_renumber)
 		return (1);
-	else if (pci_bus_always_renumber < 0)
+
+	/* get the FADT */
+	if (AcpiGetFirmwareTable(FADT_SIG, 1, ACPI_LOGICAL_ADDRESSING,
+	    (ACPI_TABLE_HEADER **)&fadt) != AE_OK)
 		return (0);
 
-	/*
-	 * Get the "pci-renumber-buses" boot property
-	 * This property is set-up during installation;
-	 * upgraded systems disable re-numbering to avoid the
-	 * complication of changing physical device paths.
-	 *
-	 * If the "pci-renumber-buses" property is not found,
-	 * this suggests an incomplete BFU or failure during
-	 * upgrade.  In either case, default to "don't renumber"
-	 * so that a botched BFU/upgrade doesn't render a system
-	 * unbootable.
-	 */
-	val = 0;
-	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
-	    DDI_PROP_DONTPASS, "pci-renumber-buses", &bus_prop) ==
-	    DDI_PROP_SUCCESS) {
-		(void) ddi_strtol(bus_prop, NULL, 0, &val);
-		ddi_prop_free(bus_prop);
-	}
-	return (val);
+	/* compare OEM Table ID to "SUNm31" */
+	if (strncmp("SUNm31", fadt->OemId, 6))
+		return (0);
+	else
+		return (1);
 }
 
 /*
@@ -335,6 +321,11 @@ pci_renumber_root_busses(void)
 	int pci_regs[] = {0, 0, 0};
 	int	i, root_addr = 0;
 
+	/*
+	 * Currently, we only enable the re-numbering on specific
+	 * Sun machines; this is a work-around for the more complicated
+	 * issue of upgrade changing physical device paths
+	 */
 	if (!pci_bus_renumber())
 		return;
 
