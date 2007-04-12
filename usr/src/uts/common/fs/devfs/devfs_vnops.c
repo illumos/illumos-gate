@@ -62,6 +62,7 @@
 
 #include <fs/fs_subr.h>
 #include <sys/fs/dv_node.h>
+#include <sys/sunndi.h>
 
 extern struct vattr	dv_vattr_dir, dv_vattr_file;
 extern dev_t rconsdev;
@@ -861,6 +862,7 @@ devfs_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp)
 	int error;
 	struct vattr va;
 	size_t bufsz;
+	int circ;
 
 	ddv = VTODV(dvp);
 	dcmn_err2(("devfs_readdir %s: offset %lld len %ld\n",
@@ -882,6 +884,8 @@ devfs_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp)
 
 	/* Load the initial contents */
 	if (ddv->dv_flags & DV_BUILD) {
+		/* Lock the underlying devi structure */
+		ndi_devi_enter(ddv->dv_devi, &circ);
 		if (!rw_tryupgrade(&ddv->dv_contents)) {
 			rw_exit(&ddv->dv_contents);
 			rw_enter(&ddv->dv_contents, RW_WRITER);
@@ -892,6 +896,7 @@ devfs_readdir(struct vnode *dvp, struct uio *uiop, struct cred *cred, int *eofp)
 			dv_filldir(ddv);
 
 		rw_downgrade(&ddv->dv_contents);
+		ndi_devi_exit(ddv->dv_devi, circ);
 	}
 
 	soff = uiop->uio_loffset;
