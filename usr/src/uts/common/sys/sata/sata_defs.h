@@ -50,6 +50,7 @@ extern "C" {
  * ATA/ATAPI disk commands (subset)
  */
 #define	SATAC_DEVICE_RESET	0x08    /* ATAPI device reset */
+#define	SATAC_DOWNLOAD_MICROCODE 0x92   /* Download microcode */
 #define	SATAC_EJECT		0xed	/* media eject */
 #define	SATAC_FLUSH_CACHE	0xe7	/* flush write-cache */
 #define	SATAC_ID_DEVICE		0xec    /* IDENTIFY DEVICE */
@@ -127,6 +128,13 @@ extern "C" {
 #define	SATAC_TRANSFER_MODE_PIO_FLOW_CONTROL	0x08
 #define	SATAC_TRANSFER_MODE_MULTI_WORD_DMA	0x20
 #define	SATAC_TRANSFER_MODE_ULTRA_DMA		0x40
+
+/*
+ * Download microcode subcommands
+ */
+#define	SATA_DOWNLOAD_MCODE_TEMP	1	/* Revert on/ reset/pwr cycle */
+#define	SATA_DOWNLOAD_MCODE_SAVE	7	/* No offset, keep mcode */
+
 
 /* Generic ATA definitions */
 

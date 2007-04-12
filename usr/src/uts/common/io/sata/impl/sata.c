@@ -179,6 +179,7 @@ static 	int sata_txlt_log_select(sata_pkt_txlate_t *);
 static 	int sata_txlt_mode_sense(sata_pkt_txlate_t *);
 static 	int sata_txlt_mode_select(sata_pkt_txlate_t *);
 static 	int sata_txlt_synchronize_cache(sata_pkt_txlate_t *);
+static 	int sata_txlt_write_buffer(sata_pkt_txlate_t *);
 static 	int sata_txlt_nodata_cmd_immediate(sata_pkt_txlate_t *);
 
 static 	int sata_hba_start(sata_pkt_txlate_t *, int *);
@@ -187,6 +188,7 @@ static	int sata_txlt_lba_out_of_range(sata_pkt_txlate_t *);
 static 	void sata_txlt_rw_completion(sata_pkt_t *);
 static 	void sata_txlt_atapi_completion(sata_pkt_t *);
 static 	void sata_txlt_nodata_cmd_completion(sata_pkt_t *);
+static 	void sata_txlt_download_mcode_cmd_completion(sata_pkt_t *);
 static 	int sata_emul_rw_completion(sata_pkt_txlate_t *);
 
 static 	struct scsi_extended_sense *sata_immediate_error_response(
@@ -229,6 +231,8 @@ static	int sata_read_log_ext_directory(sata_hba_inst_t *, sata_drive_info_t *,
     struct read_log_ext_directory *);
 static	void sata_gen_sysevent(sata_hba_inst_t *, sata_address_t *, int);
 static	void sata_xlate_errors(sata_pkt_txlate_t *);
+static	void sata_decode_device_error(sata_pkt_txlate_t *,
+    struct scsi_extended_sense *);
 static	void sata_set_device_removed(dev_info_t *);
 static	boolean_t sata_check_device_removed(dev_info_t *);
 static	void sata_set_target_node_cleanup(sata_hba_inst_t *, int cport);
@@ -2821,6 +2825,7 @@ sata_scsi_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
  * SCMD_READ_G4
  * SCMD_READ_G5
  * SCMD_WRITE
+ * SCMD_WRITE_BUFFER
  * SCMD_WRITE_G1
  * SCMD_WRITE_G4
  * SCMD_WRITE_G5
@@ -2973,6 +2978,11 @@ sata_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	case SCMD_READ_G4:
 	case SCMD_READ_G5:
 		rval = sata_txlt_read(spx);
+		break;
+	case SCMD_WRITE_BUFFER:
+		if (bp != NULL && (bp->b_flags & (B_PHYS | B_PAGEIO)))
+			bp_mapin(bp);
+		rval = sata_txlt_write_buffer(spx);
 		break;
 
 	case SCMD_WRITE:
@@ -5477,6 +5487,302 @@ sata_txlt_write(sata_pkt_txlate_t *spx)
 		sata_txlt_rw_completion(spx->txlt_sata_pkt);
 	}
 	return (TRAN_ACCEPT);
+}
+
+
+/*
+ * Implements SCSI SBC WRITE BUFFER command download microcode option
+ */
+static int
+sata_txlt_write_buffer(sata_pkt_txlate_t *spx)
+{
+#define	WB_DOWNLOAD_MICROCODE_AND_REVERT_MODE			4
+#define	WB_DOWNLOAD_MICROCODE_AND_SAVE_MODE			5
+
+	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
+	sata_cmd_t *scmd = &spx->txlt_sata_pkt->satapkt_cmd;
+	struct buf *bp = spx->txlt_sata_pkt->satapkt_cmd.satacmd_bp;
+	struct scsi_extended_sense *sense;
+	int rval, mode, sector_count;
+	sata_hba_inst_t *shi = SATA_TXLT_HBA_INST(spx);
+	int cport = SATA_TXLT_CPORT(spx);
+	boolean_t synch;
+
+	synch = (spx->txlt_sata_pkt->satapkt_op_mode & SATA_OPMODE_SYNCH) != 0;
+	mode = scsipkt->pkt_cdbp[1] & 0x1f;
+
+	SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
+	    "sata_txlt_write_buffer, mode 0x%x\n", mode);
+
+	mutex_enter(&(SATA_TXLT_CPORT_MUTEX(spx)));
+
+	if ((rval = sata_txlt_generic_pkt_info(spx)) != TRAN_ACCEPT) {
+		mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+		return (rval);
+	}
+
+	scmd->satacmd_flags.sata_data_direction = SATA_DIR_WRITE;
+
+	scsipkt->pkt_reason = CMD_CMPLT;
+	scsipkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
+	    STATE_SENT_CMD | STATE_GOT_STATUS;
+
+	/*
+	 * The SCSI to ATA translation specification only calls
+	 * for WB_DOWNLOAD_MICROCODE_AND_SAVE_MODE.
+	 * WB_DOWNLOAD_MICROC_AND_REVERT_MODE is implemented, but
+	 * ATA 8 (draft) got rid of download microcode for temp
+	 * and it is even optional for ATA 7, so it may be aborted.
+	 * WB_DOWNLOAD_MICROCODE_WITH_OFFSET is not implemented as
+	 * it is not specified and the buffer offset for SCSI is a 16-bit
+	 * value in bytes, but for ATA it is a 16-bit offset in 512 byte
+	 * sectors.  Thus the offset really doesn't buy us anything.
+	 * If and when ATA 8 is stabilized and the SCSI to ATA specification
+	 * is revised, this can be revisisted.
+	 */
+	/* Reject not supported request */
+	switch (mode) {
+	case WB_DOWNLOAD_MICROCODE_AND_REVERT_MODE:
+		scmd->satacmd_features_reg = SATA_DOWNLOAD_MCODE_TEMP;
+		break;
+	case WB_DOWNLOAD_MICROCODE_AND_SAVE_MODE:
+		scmd->satacmd_features_reg = SATA_DOWNLOAD_MCODE_SAVE;
+		break;
+	default:
+		goto bad_param;
+	}
+
+	*scsipkt->pkt_scbp = STATUS_GOOD;	/* Presumed outcome */
+
+	scmd->satacmd_cmd_reg = SATAC_DOWNLOAD_MICROCODE;
+	if ((bp->b_bcount % SATA_DISK_SECTOR_SIZE) != 0)
+		goto bad_param;
+	sector_count = bp->b_bcount / SATA_DISK_SECTOR_SIZE;
+	scmd->satacmd_sec_count_lsb = (uint8_t)sector_count;
+	scmd->satacmd_lba_low_lsb = ((uint16_t)sector_count) >> 8;
+	scmd->satacmd_lba_mid_lsb = 0;
+	scmd->satacmd_lba_high_lsb = 0;
+	scmd->satacmd_device_reg = 0;
+	spx->txlt_sata_pkt->satapkt_comp =
+	    sata_txlt_download_mcode_cmd_completion;
+	scmd->satacmd_addr_type = 0;
+
+	/* Transfer command to HBA */
+	if (sata_hba_start(spx, &rval) != 0) {
+		/* Pkt not accepted for execution */
+		mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+		return (rval);
+	}
+
+	mutex_exit(&SATA_CPORT_MUTEX(shi, cport));
+	/*
+	 * If execution is non-synchronous,
+	 * a callback function will handle potential errors, translate
+	 * the response and will do a callback to a target driver.
+	 * If it was synchronous, check execution status using the same
+	 * framework callback.
+	 */
+	if (synch) {
+		SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
+		    "synchronous execution\n", NULL);
+		/* Calling pre-set completion routine */
+		(*spx->txlt_sata_pkt->satapkt_comp)(spx->txlt_sata_pkt);
+	}
+	return (TRAN_ACCEPT);
+
+bad_param:
+	mutex_exit(&(SATA_TXLT_CPORT_MUTEX(spx)));
+	*scsipkt->pkt_scbp = STATUS_CHECK;
+	sense = sata_arq_sense(spx);
+	sense->es_key = KEY_ILLEGAL_REQUEST;
+	sense->es_add_code = SD_SCSI_INVALID_FIELD_IN_CDB;
+	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
+	    scsipkt->pkt_comp != NULL) {
+		/* scsi callback required */
+		if (taskq_dispatch(SATA_TXLT_TASKQ(spx),
+		    (task_func_t *)scsipkt->pkt_comp, (void *) scsipkt,
+		    TQ_SLEEP) == 0) {
+			/* Scheduling the callback failed */
+			rval = TRAN_BUSY;
+		}
+	}
+	return (rval);
+}
+
+
+/*
+ * Retry identify device when command returns SATA_INCOMPLETE_DATA
+ * after doing a firmware download.
+ */
+static void
+sata_retry_identify_device(void *arg)
+{
+#define	DOWNLOAD_WAIT_TIME_SECS	60
+#define	DOWNLOAD_WAIT_INTERVAL_SECS	1
+	int rval;
+	int retry_cnt;
+	sata_pkt_t *sata_pkt = (sata_pkt_t *)arg;
+	sata_pkt_txlate_t *spx =
+	    (sata_pkt_txlate_t *)sata_pkt->satapkt_framework_private;
+	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
+	sata_hba_inst_t *sata_hba_inst = spx->txlt_sata_hba_inst;
+	sata_device_t sata_device = spx->txlt_sata_pkt->satapkt_device;
+	sata_drive_info_t *sdinfo;
+
+	/*
+	 * Before returning good status, probe device.
+	 * Device probing will get IDENTIFY DEVICE data, if possible.
+	 * The assumption is that the new microcode is applied by the
+	 * device. It is a caller responsibility to verify this.
+	 */
+	for (retry_cnt = 0;
+	    retry_cnt < DOWNLOAD_WAIT_TIME_SECS / DOWNLOAD_WAIT_INTERVAL_SECS;
+	    retry_cnt++) {
+		rval = sata_probe_device(sata_hba_inst, &sata_device);
+
+		if (rval == SATA_SUCCESS) { /* Set default features */
+			sdinfo = sata_get_device_info(sata_hba_inst,
+			    &sata_device);
+			if (sata_initialize_device(sata_hba_inst, sdinfo) !=
+			    SATA_SUCCESS) {
+				/* retry */
+				(void) sata_initialize_device(sata_hba_inst,
+				    sdinfo);
+			}
+			if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
+			    scsipkt->pkt_comp != NULL)
+				(*scsipkt->pkt_comp)(scsipkt);
+			return;
+		} else if (rval == SATA_RETRY) {
+			delay(drv_usectohz(1000000 *
+			    DOWNLOAD_WAIT_INTERVAL_SECS));
+			continue;
+		} else	/* failed - no reason to retry */
+			break;
+	}
+
+	/*
+	 * Something went wrong, device probing failed.
+	 */
+	SATA_LOG_D((sata_hba_inst, CE_WARN,
+	    "Cannot probe device after downloading microcode\n"));
+
+	/* Reset device to force retrying the probe. */
+	(void) (*SATA_RESET_DPORT_FUNC(sata_hba_inst))
+	    (SATA_DIP(sata_hba_inst), &sata_device);
+
+	if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
+	    scsipkt->pkt_comp != NULL)
+		(*scsipkt->pkt_comp)(scsipkt);
+}
+
+/*
+ * Translate completion status of download microcode command.
+ * pkt completion_reason is checked to determine the completion status.
+ * Do scsi callback if necessary (FLAG_NOINTR == 0)
+ *
+ * Note: this function may be called also for synchronously executed
+ * command.
+ * This function may be used only if scsi_pkt is non-NULL.
+ */
+static void
+sata_txlt_download_mcode_cmd_completion(sata_pkt_t *sata_pkt)
+{
+	sata_pkt_txlate_t *spx =
+	    (sata_pkt_txlate_t *)sata_pkt->satapkt_framework_private;
+	struct scsi_pkt *scsipkt = spx->txlt_scsi_pkt;
+	struct scsi_extended_sense *sense;
+	sata_drive_info_t *sdinfo;
+	sata_hba_inst_t *sata_hba_inst = spx->txlt_sata_hba_inst;
+	sata_device_t sata_device = spx->txlt_sata_pkt->satapkt_device;
+	int rval;
+
+	scsipkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
+	    STATE_SENT_CMD | STATE_XFERRED_DATA | STATE_GOT_STATUS;
+	if (sata_pkt->satapkt_reason == SATA_PKT_COMPLETED) {
+		scsipkt->pkt_reason = CMD_CMPLT;
+
+		rval = sata_probe_device(sata_hba_inst, &sata_device);
+
+		if (rval == SATA_SUCCESS) { /* Set default features */
+			sdinfo = sata_get_device_info(sata_hba_inst,
+			    &sata_device);
+			if (sata_initialize_device(sata_hba_inst, sdinfo) !=
+			    SATA_SUCCESS) {
+				/* retry */
+				(void) sata_initialize_device(sata_hba_inst,
+				    sdinfo);
+			}
+			if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
+			    scsipkt->pkt_comp != NULL)
+				(*scsipkt->pkt_comp)(scsipkt);
+		} else {
+			(void) ddi_taskq_dispatch(
+			    (ddi_taskq_t *)SATA_TXLT_TASKQ(spx),
+			    sata_retry_identify_device,
+			    (void *)sata_pkt, TQ_NOSLEEP);
+		}
+
+
+	} else {
+		/* Something went wrong, microcode download command failed */
+		scsipkt->pkt_reason = CMD_INCOMPLETE;
+		*scsipkt->pkt_scbp = STATUS_CHECK;
+		sense = sata_arq_sense(spx);
+		switch (sata_pkt->satapkt_reason) {
+		case SATA_PKT_PORT_ERROR:
+			/*
+			 * We have no device data. Assume no data transfered.
+			 */
+			sense->es_key = KEY_HARDWARE_ERROR;
+			break;
+
+		case SATA_PKT_DEV_ERROR:
+		    if (sata_pkt->satapkt_cmd.satacmd_status_reg &
+			SATA_STATUS_ERR) {
+			/*
+			 * determine dev error reason from error
+			 * reg content
+			 */
+			sata_decode_device_error(spx, sense);
+			break;
+		    }
+		    /* No extended sense key - no info available */
+		    break;
+
+		case SATA_PKT_TIMEOUT:
+			/* scsipkt->pkt_reason = CMD_TIMEOUT; */
+			scsipkt->pkt_reason = CMD_INCOMPLETE;
+			/* No extended sense key ? */
+			break;
+
+		case SATA_PKT_ABORTED:
+			scsipkt->pkt_reason = CMD_ABORTED;
+			/* No extended sense key ? */
+			break;
+
+		case SATA_PKT_RESET:
+			/* pkt aborted by an explicit reset from a host */
+			scsipkt->pkt_reason = CMD_RESET;
+			break;
+
+		default:
+			SATA_LOG_D((spx->txlt_sata_hba_inst, CE_WARN,
+			    "sata_txlt_nodata_cmd_completion: "
+			    "invalid packet completion reason %d",
+			    sata_pkt->satapkt_reason));
+			scsipkt->pkt_reason = CMD_TRAN_ERR;
+			break;
+		}
+
+		SATADBG1(SATA_DBG_SCSI_IF, spx->txlt_sata_hba_inst,
+		    "scsi_pkt completion reason %x\n", scsipkt->pkt_reason);
+
+		if ((scsipkt->pkt_flags & FLAG_NOINTR) == 0 &&
+		    scsipkt->pkt_comp != NULL)
+			/* scsi callback required */
+			(*scsipkt->pkt_comp)(scsipkt);
+	}
 }
 
 
@@ -8013,7 +8319,7 @@ retry_probe:
 	 * update sata port state and set device type
 	 */
 	sata_update_port_info(sata_hba_inst, sata_device);
-	cportinfo->cport_state |= SATA_STATE_PROBED;
+	cportinfo->cport_state &= ~SATA_STATE_PROBING;
 
 	/*
 	 * Sanity check - Port is active? Is the link active?
@@ -8363,10 +8669,12 @@ sata_devt_to_devinfo(dev_t dev)
  * sata_device has to refer to the valid sata port(s) for HBA described
  * by sata_hba_inst structure.
  *
- * Returns: SATA_SUCCESS if device type was successfully probed and port-linked
- *	drive info structure was updated;
+ * Returns:
+ *	SATA_SUCCESS if device type was successfully probed and port-linked
+ *		drive info structure was updated;
  * 	SATA_FAILURE if there is no device, or device was not probed
- *	successully.
+ *		successully;
+ *	SATA_RETRY if device probe can be retried later.
  * If a device cannot be identified, sata_device's dev_state and dev_type
  * fields are set to unknown.
  * There are no retries in this function. Any retries should be managed by
@@ -8415,7 +8723,7 @@ sata_probe_device(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 	    sata_device->satadev_addr.cport)));
 	new_sdinfo.satadrv_type = SATA_DTYPE_ATADISK;
 	rval = sata_identify_device(sata_hba_inst, &new_sdinfo);
-	if (rval == 1) {
+	if (rval == SATA_RETRY) {
 		/* We may try to check for ATAPI device */
 		if (SATA_FEATURES(sata_hba_inst) & SATA_CTLF_ATAPI) {
 			/*
@@ -8425,10 +8733,9 @@ sata_probe_device(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 			new_sdinfo.satadrv_type = SATA_DTYPE_ATAPICD;
 			rval = sata_identify_device(sata_hba_inst, &new_sdinfo);
 		}
-	}
-	if (rval == -1)
+	} else if (rval == SATA_FAILURE)
 		goto failure;
-	if (rval == 0) {
+	else /* if (rval == SATA_SUCCESS) */ {
 		/*
 		 * Got something responding to ATA Identify Device or to
 		 * Identify Packet Device cmd.
@@ -8495,7 +8802,7 @@ failure:
 	}
 	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
 	    sata_device->satadev_addr.cport)));
-	return (SATA_FAILURE);
+	return (rval);
 }
 
 
@@ -8563,9 +8870,10 @@ sata_get_device_info(sata_hba_inst_t *sata_hba_inst,
  * Cannot be called from interrupt level.
  *
  * Returns:
- * 0 if device was identified as a supported device,
- * 1 if device was not idenitfied but identify attempt could be retried,
- * -1if device was not idenitfied and identify attempt should not be retried.
+ * SATA_SUCCESS if the device was identified as a supported device,
+ * SATA_RETRY if the device was not identified but could be retried,
+ * SATA_FAILURE if the device was not identified and identify attempt
+ *	should not be retried.
  */
 static int
 sata_identify_device(sata_hba_inst_t *sata_hba_inst,
@@ -8609,7 +8917,7 @@ sata_identify_device(sata_hba_inst_t *sata_hba_inst,
 			sata_log(sata_hba_inst, CE_WARN,
 			    "SATA disk device at port %d does not support LBA",
 			    sdinfo->satadrv_addr.cport);
-			rval = -1;
+			rval = SATA_FAILURE;
 			goto fail_unknown;
 		}
 	}
@@ -8630,11 +8938,11 @@ sata_identify_device(sata_hba_inst_t *sata_hba_inst,
 		    "mode 4 or higher", sdinfo->satadrv_addr.cport);
 		SATA_LOG_D((sata_hba_inst, CE_WARN,
 		    "mode 4 or higher required, %d supported", i));
-		rval = -1;
+		rval = SATA_FAILURE;
 		goto fail_unknown;
 	}
 
-	return (0);
+	return (SATA_SUCCESS);
 
 fail_unknown:
 	/* Invalidate sata_drive_info ? */
@@ -9443,9 +9751,9 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
  * device identify command).
  *
  * Returns:
- * 0 if cmd succeeded
- * 1 if cmd was rejected and could be retried,
- * -1if cmd failed and should not be retried (port error)
+ * SATA_SUCCESS if cmd succeeded
+ * SATA_RETRY if cmd was rejected and could be retried,
+ * SATA_FAILURE if cmd failed and should not be retried (port error)
  *
  * Cannot be called in an interrupt context.
  */
@@ -9466,7 +9774,7 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 	spkt = sata_pkt_alloc(spx, SLEEP_FUNC);
 	if (spkt == NULL) {
 		kmem_free(spx, sizeof (sata_pkt_txlate_t));
-		return (1); /* may retry later */
+		return (SATA_RETRY); /* may retry later */
 	}
 	/* address is needed now */
 	spkt->satapkt_device.satadev_addr = sdinfo->satadrv_addr;
@@ -9481,7 +9789,7 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 		SATA_LOG_D((sata_hba_inst, CE_WARN,
 		    "sata_fetch_device_identify_data: "
 		    "cannot allocate buffer for ID"));
-		return (1); /* may retry later */
+		return (SATA_RETRY); /* may retry later */
 	}
 
 	/* Fill sata_pkt */
@@ -9524,7 +9832,7 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 			    "SATA disk device at port %d - "
 			    "partial Identify Data",
 			    sdinfo->satadrv_addr.cport));
-			rval = 1; /* may retry later */
+			rval = SATA_RETRY; /* may retry later */
 			goto fail;
 		}
 		/* Update sata_drive_info */
@@ -9581,23 +9889,23 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 		if ((sdinfo->satadrv_features_support & SATA_DEV_F_NCQ) ||
 			(sdinfo->satadrv_features_support & SATA_DEV_F_TCQ))
 			++sdinfo->satadrv_queue_depth;
-		rval = 0;
+		rval = SATA_SUCCESS;
 	} else {
 		/*
 		 * Woops, no Identify Data.
 		 */
 		if (rval == SATA_TRAN_BUSY || rval == SATA_TRAN_QUEUE_FULL) {
-		    rval = 1; /* may retry later */
+		    rval = SATA_RETRY; /* may retry later */
 		} else if (rval == SATA_TRAN_ACCEPTED) {
 			if (spkt->satapkt_reason == SATA_PKT_DEV_ERROR ||
 			    spkt->satapkt_reason == SATA_PKT_ABORTED ||
 			    spkt->satapkt_reason == SATA_PKT_TIMEOUT ||
 			    spkt->satapkt_reason == SATA_PKT_RESET)
-				rval = 1; /* may retry later */
+				rval = SATA_RETRY; /* may retry later */
 			else
-				rval = -1;
+				rval = SATA_FAILURE;
 		} else {
-			rval = -1;
+			rval = SATA_FAILURE;
 		}
 	}
 fail:

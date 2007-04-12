@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@ extern "C" {
 #endif
 
 #define	SATA_SUCCESS	0
+#define	SATA_RETRY	1
 #define	SATA_FAILURE	-1
 
 
