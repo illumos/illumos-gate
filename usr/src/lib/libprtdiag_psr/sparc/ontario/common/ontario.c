@@ -88,7 +88,7 @@ get_bus_type(char *path, struct io_card *card)
 }
 
 static void
-get_slot_number(char *path, struct io_card *card)
+get_slot_number(picl_nodehdl_t nodeh, char *path, struct io_card *card)
 {
 	if (strncmp(path, PCIE_SLOT0, PCIE_COMP_NUM) == 0) {
 		(void) strcpy(card->slot_str, "0");
@@ -99,12 +99,29 @@ get_slot_number(char *path, struct io_card *card)
 	} else if (strncmp(path, PCIE_SLOT2, PCIE_COMP_NUM) == 0) {
 		(void) strcpy(card->slot_str, "2");
 		card->slot = 2;
-	} else if (strncmp(path, PCIX_SLOT1, strlen(PCIX_SLOT1)) == 0) {
+	} else if ((strncmp(path, PCIX_SLOT1, strlen(PCIX_SLOT1)) == 0) ||
+	    (strncmp(path, PCIX_SLOT0, strlen(PCIX_SLOT0)) == 0)) {
+		char	ua[MAXSTRLEN];
+		int	err;
+
 		(void) strcpy(card->slot_str, "PCIX");
 		card->slot = -1;
-	} else if (strncmp(path, PCIX_SLOT0, strlen(PCIX_SLOT0)) == 0) {
-		(void) strcpy(card->slot_str, "PCIX");
-		card->slot = -1;
+
+		/*
+		 * PCIX_SLOT0 and PCIX_SLOT1 are actually the same path so
+		 * use the unit address to distinguish the slot number.
+		 */
+		err = picl_get_propval_by_name(nodeh, PICL_PROP_UNIT_ADDRESS,
+		    ua, sizeof (ua));
+		if (err == PICL_SUCCESS) {
+			if (ua[0] == '2') {
+				card->slot = 0;
+				(void) strcpy(card->slot_str, "0");
+			} else if (ua[0] == '1') {
+				card->slot = 1;
+				(void) strcpy(card->slot_str, "1");
+			}
+		}
 	} else {
 		(void) strcpy(card->slot_str, IOBOARD);
 		card->slot = -1;
@@ -162,14 +179,13 @@ ontario_pci_callback(picl_nodehdl_t pcih, void *args)
 		if (err !=  PICL_SUCCESS)
 			return (err);
 
-		if (strcmp(piclclass, "pciex") == 0) {
+		/*
+		 * Skip PCI and PCIEX devices because they will be processed
+		 * later in the picl tree walk.
+		 */
+		if ((strcmp(piclclass, "pci") == 0) ||
+		    (strcmp(piclclass, "pciex") == 0)) {
 			err = picl_get_propval_by_name(nodeh, PICL_PROP_PEER,
-			    &nodeh, sizeof (picl_nodehdl_t));
-			continue;
-		}
-
-		if (strcmp(piclclass, PICL_CLASS_PCI) == 0) {
-			err = picl_get_propval_by_name(nodeh, PICL_PROP_CHILD,
 			    &nodeh, sizeof (picl_nodehdl_t));
 			continue;
 		}
@@ -184,7 +200,7 @@ ontario_pci_callback(picl_nodehdl_t pcih, void *args)
 
 		get_bus_type(parent_path, &pci_card);
 
-		get_slot_number(parent_path, &pci_card);
+		get_slot_number(nodeh, parent_path, &pci_card);
 
 		err = picl_get_propval_by_name(nodeh, PICL_PROP_NAME, &name,
 		    sizeof (name));
@@ -324,6 +340,8 @@ sun4v_display_pci(picl_nodehdl_t plafh)
 		strlen(ONTARIO_PLATFORM2)) == 0)) {
 		(void) picl_walk_tree_by_class(plafh, "pciex",
 			"pciex", ontario_pci_callback);
+		(void) picl_walk_tree_by_class(plafh, "pci",
+			"pci", ontario_pci_callback);
 	} else if ((strncmp(platbuf, PELTON_PLATFORM,
 		strlen(PELTON_PLATFORM))) == 0) {
 		(void) picl_walk_tree_by_class(plafh, "pciex",
