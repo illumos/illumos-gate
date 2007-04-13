@@ -543,3 +543,7 @@
 >7	byte		x		.%u
 0	byte		0x11		Solaris Audit File
 0	byte		0x78		Solaris Audit File 
+# ZFS send stream entries
+8	ullong		0x00000002f5bacbac	ZFS snapshot stream
+# little endian stream
+8	ullong		0xaccbbaf502000000	ZFS snapshot stream
