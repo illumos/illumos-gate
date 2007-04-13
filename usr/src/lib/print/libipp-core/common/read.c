@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -623,7 +623,7 @@ ipp_read_header(ipp_reader_t iread, void *fd, papi_attribute_t ***message,
 	(void) papiAttributeListAddInteger(message, PAPI_ATTR_REPLACE,
 				attr_name, s);
 
-	memcpy(&s, &buf[4], 4);
+	memcpy(&i, &buf[4], 4);
 	i = (uint32_t)ntohl(i);
 	(void) papiAttributeListAddInteger(message, PAPI_ATTR_REPLACE,
 				"request-id", i);
