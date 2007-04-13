@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,7 +28,7 @@
 include ../Makefile.com
 
 DATAFILES +=	i.etcsystem i.kcfconfbase i.manifest i.preserve i.renameold \
-		i.scsivhciconf
+		i.scsivhciconf i.mptconf
 
 MACHDATAFILES += i.sdconf
 CLOBBERFILES += $(MACHDATAFILES)

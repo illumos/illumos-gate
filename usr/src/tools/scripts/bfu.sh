@@ -219,6 +219,7 @@ global_zone_only_files="
 	kernel/drv/scsa2usb.conf
 	kernel/drv/scsi_vhci.conf
 	kernel/drv/sd.conf
+	kernel/drv/mpt.conf
 	platform/*/kernel/drv/*ppm.conf
 	platform/i86pc/kernel/drv/aha.conf
 	platform/i86pc/kernel/drv/asy.conf
@@ -596,6 +597,18 @@ inetd_conf_svm_hack() {
 		fi
 
 		rm -f $inettmp $inetnew
+	fi
+}
+
+# update x86 version mpt.conf for property tape
+mpttapeprop='[ 	]*tape[ 	]*=[ 	]*"sctp"[ 	]*;'
+update_mptconf_i386()
+{
+	conffile=$rootprefix/kernel/drv/mpt.conf
+	test -f $conffile || return
+	egrep -s "$mpttapeprop" $conffile
+	if [ $? -ne 0 ] ; then
+	    echo 'tape="sctp";' >> $conffile
 	fi
 }
 
@@ -6972,6 +6985,10 @@ mondo_loop() {
 	smf_apply_conf
 
 	update_policy_conf
+
+	if [ $target_isa = i386 ]; then
+	    update_mptconf_i386
+	fi
 
 	if [ $zone != global ]; then
 		rm -rf $global_zone_only_files $superfluous_nonglobal_zone_files

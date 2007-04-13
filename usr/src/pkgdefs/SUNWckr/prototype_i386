@@ -40,6 +40,7 @@
 # Include ISA independent files (prototype_com)
 #
 !include prototype_com
+i i.mptconf	
 #
 # List files which are i386 specific here
 #
@@ -98,7 +99,7 @@ f none kernel/drv/lofi 755 root sys
 f none kernel/drv/log 755 root sys
 f none kernel/drv/mm 755 root sys
 f none kernel/drv/mpt 755 root sys
-f none kernel/drv/mpt.conf 644 root sys
+e mptconf kernel/drv/mpt.conf 644 root sys
 f none kernel/drv/mouse8042 755 root sys
 f none kernel/drv/openeepr 755 root sys
 f none kernel/drv/options 755 root sys

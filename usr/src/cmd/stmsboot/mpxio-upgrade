@@ -38,6 +38,8 @@ DEVFSADM=/usr/sbin/devfsadm
 METADEVADM=/usr/sbin/metadevadm
 usrmounted=0
 MACH=`/usr/bin/uname -p`
+EGREP=/usr/bin/egrep
+SED=/usr$SED
 
 # map $special and $fsckdev
 mpxio_mapdev()
@@ -169,11 +171,11 @@ update_dumpconf()
 	NOINUSE_CHECK=1
 	export NOINUSE_CHECK
 
-	set -- `dumpadm -u 2>&1 | egrep 'cannot use /dev.* as dump device'`
+	set -- `dumpadm -u 2>&1 | $EGREP 'cannot use /dev.* as dump device'`
 	if [ "x$4" != x ]; then
 		newname=`$STMSBOOTUTIL -M $4`
 		if [ $? -eq 0 ]; then
-			if dumpadm -d $newname > /dev/null; then
+			if /usr/sbin/dumpadm -d $newname > /dev/msglog 2> /dev/console; then
 				cecho "stmsboot: dump configuration has been \
 updated."
 			else
@@ -189,16 +191,17 @@ the dump device.\nold dump device name: $4"
 # Update bootpath for x86 here when we are enabling mpxio on root
 update_bootpath()
 {
-	cur_bootpath=`eeprom bootpath | sed 's/bootpath=[ 	]*//g' | sed 's/[ 	].*//'`
+	cur_bootpath=`/usr/sbin/eeprom bootpath | $SED 's/bootpath=[ 	]*//g' | $SED 's/[ 	].*//'`
 	# only take care of phci-based path here 
-	echo $cur_bootpath | egrep -s "/fp@.*/disk@.*"
+	PHCIOPT=`$STMSBOOTUTIL -D mpt -n`
+	echo $cur_bootpath | $EGREP -s "/fp@.*/disk|$PHCIOPT"
 
 	if [ $? -eq 0 ]; then
 		new_bootpath=`$STMSBOOTUTIL -m /devices$cur_bootpath`
 		if [ $? -eq 0 -a "x$new_bootpath" != "x" ]; then
 			# stmsboot_util -m phci-based path got mapped path back means
 			# mpxio is enabled on bootpath
-			new_bootpath=`echo $new_bootpath|sed "s/.*\/devices//"`
+			new_bootpath=`echo $new_bootpath|$SED "s/.*\/devices//"`
 			/usr/sbin/eeprom bootpath=$new_bootpath
 			cecho "stmsboot: bootpath has been updated"
 

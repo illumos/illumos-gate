@@ -58,16 +58,16 @@
 #define	DISK_NODE_NAME	"ssd"
 #define	DISK_DRV_NAME	"ssd"
 #define	SLASH_DISK_AT	"/ssd@"
-#define	DISK_AT_G	"ssd@g"
 #else	/* sparc */
 #define	DISK_NODE_NAME	"disk"
 #define	DISK_DRV_NAME	"sd"
 #define	SLASH_DISK_AT	"/disk@"
-#define	DISK_AT_G	"disk@g"
 #endif
 
+#define	DISK_AT_G	"disk@g"
 #define	SLASH_FP_AT	"/fp@"
 #define	SLASH_SCSI_VHCI	"/scsi_vhci"
+#define	SLASH_SD_AT	"/sd@"
 #define	DEV_DSK		"/dev/dsk/"
 #define	DEV_RDSK	"/dev/rdsk/"
 #define	SYS_FILENAME_LEN	256
@@ -81,6 +81,14 @@
 
 /* fcp driver publishes this property */
 #define	NODE_WWN_PROP	"node-wwn"
+
+/*
+ * For SAS, we look for "sas-$drivername", eg sas-mpt, but
+ * we strncat the driver name later once we've parsed the
+ * args passed in from the shell.
+ */
+#define	SASPROP	 "sas-"
+
 
 typedef enum {
 	CLIENT_TYPE_UNKNOWN,
@@ -102,12 +110,20 @@ static char *mapdev = "";
 static char *map_vhciname = "";
 static char *stmsboot = "stmsboot";
 
+char *drvname = (char *)NULL; /* "fp" or "mpt" or ... */
+/* "node-wwn" if drvname=fp, or "sas-$drivername" otherwise */
+char *drvprop = (char *)NULL;
+static int parent = 0; /* for "-n" usage */
+
 static int make_temp(char *, char *, char *, size_t);
 static void commit_change(char *, char *, char *, int);
 static int map_devname(char *, char *, size_t, int);
 static int update_vfstab(char *, char *);
 static int list_mappings(int, int);
 static int canopen(char *);
+static client_type_t client_by_props(char *path);
+static void list_nodes(char *drivername);
+
 static void logerr(char *, ...);
 static void logdmsg(char *, ...);
 static void *s_malloc(const size_t);
@@ -152,9 +168,17 @@ usage(char *argv0)
 	 *	if devname is vhci based name and open-able, get the first
 	 *	onlined phci based name without /devices prefix.
 	 *	Used in stmsboot to update the phci based bootpath.
+	 * -D drvname
+	 *	if supplied, indicates that we're going to operate on
+	 *	devices attached to this driver
+	 * -n
+	 *	if supplied, returns name of the node containing "fp" or
+	 *	"sas-$driver", appends "sd@" or "ssd@" or "disk@". Can only
+	 *	be used if -D drv is specified as well
 	 */
 	(void) fprintf(stderr, gettext("usage: %s -u | -m devname | "
-	    "-M devname | -l controller | -L | -p devname\n"), progname);
+	    "-M devname | -l controller | -L | \n"
+	    "\t\t-p devname | -D { fp | mpt } | -n\n"), progname);
 	exit(2);
 }
 
@@ -172,7 +196,7 @@ parse_args(int argc, char *argv[])
 		/*NOTREACHED*/
 	}
 
-	while ((opt = getopt(argc, argv, "udm:M:Ll:gp:")) != EOF) {
+	while ((opt = getopt(argc, argv, "udm:M:Ll:gp:D:n")) != EOF) {
 		switch (opt) {
 		case 'u':
 			patch_vfstab = 1;
@@ -216,13 +240,45 @@ parse_args(int argc, char *argv[])
 			 * to GUID mappings.
 			 */
 			list_guid_mappings = 1;
-			n++;
 			break;
+
 		case 'p':
 			/*
 			 * map openable vhci based name to phci base name
 			 */
 			map_vhciname = s_strdup(optarg);
+			n++;
+			break;
+
+		case 'D':
+			/*
+			 * Grab the driver name we need to look for. Each
+			 * time we add support for a new SAS or FC driver
+			 * to this utility, make sure that its driver name
+			 * is checked here.
+			 */
+			drvname = s_malloc(sizeof (optarg) + 1);
+			drvname = s_strdup(optarg);
+			if (strcmp(drvname, "fp") == 0) {
+				drvprop = s_malloc(sizeof (NODE_WWN_PROP));
+				(void) snprintf(drvprop, sizeof (NODE_WWN_PROP),
+				    NODE_WWN_PROP);
+			} else if (strcmp(drvname, "mpt") == 0) {
+				drvprop = s_malloc(sizeof (SASPROP) +
+				    sizeof (drvname) + 1);
+				(void) snprintf(drvprop, sizeof (SASPROP) +
+				    sizeof (drvname), "%s%s",
+				    SASPROP, drvname);
+			} else {
+				logerr(gettext("Driver %s is not supported\n"),
+				    drvname);
+				clean_exit(1);
+			}
+
+			break;
+
+		case 'n':
+			++parent;
 			n++;
 			break;
 
@@ -232,9 +288,10 @@ parse_args(int argc, char *argv[])
 		}
 	}
 
-	if (n != 1)
+	if (n != 1) {
 		usage(argv[0]);
 		/*NOTREACHED*/
+	}
 }
 
 int
@@ -284,6 +341,16 @@ main(int argc, char *argv[])
 		if (list_mappings(list_controllernum, list_guid_mappings) == 0)
 			clean_exit(0);
 		clean_exit(1);
+	}
+
+	if (parent > 0) {
+		if (strcmp(drvname, "") == 0) {
+			usage(argv[0]);
+			clean_exit(1);
+		} else {
+			list_nodes(drvname);
+			clean_exit(0);
+		}
 	}
 
 	/* create a directory where a copy of the system files are saved */
@@ -383,7 +450,7 @@ commit_change(char *filename, char *save_filename, char *tmp_filename,
  *		component.
  * guid		caller supplied buffer where the GUID will be placed on return
  * guid_len	length of the caller supplied guid buffer.
- * no_dealy_flag if set open the device with O_NDELAY
+ * no_delay_flag if set open the device with O_NDELAY
  * node		di_node corresponding to physpath if already available,
  *		otherwise pass DI_NODE_NIL.
  *
@@ -436,12 +503,21 @@ get_guid(char *physpath, char *guid, int guid_len, int no_delay_flag,
 			devid_free_guid(i_guid);
 			rv = 0;
 			goto out;
-		} else
+		} else {
 			logdmsg("get_guid: devid_to_guid() failed\n");
+			logdmsg("Unable to get a GUID for device "
+			    "%s\n", physpath_raw);
+		}
+
 	} else
 		logdmsg("get_guid: devid_get() failed: %s\n", strerror(errno));
 
-	/* fallback to node name as the guid as this is what fcp driver does */
+	/*
+	 * Unless we're looking at an fp-attached device, we now
+	 * fallback to node name as the guid as this is what the
+	 * fcp driver does. A sas-attached device will have the
+	 * client-guid property set.
+	 */
 	if (node == DI_NODE_NIL) {
 		if ((node = di_init(physpath, DINFOCPYALL | DINFOFORCE))
 		    == DI_NODE_NIL) {
@@ -450,6 +526,16 @@ get_guid(char *physpath, char *guid, int guid_len, int no_delay_flag,
 			goto out;
 		}
 		snapshot_taken = 1;
+	}
+
+	/* non-fp fallout */
+	if (strstr(physpath, "fp") == (char *)NULL) {
+		if (di_prop_lookup_strings(DDI_DEV_T_ANY, node,
+		    "client-guid", &guid) < 0) {
+			logdmsg("get_guid: non-fp-attached device, "
+			    "bailing out\n");
+			goto out;
+		}
 	}
 
 	if ((n = di_prop_lookup_bytes(DDI_DEV_T_ANY, node, NODE_WWN_PROP,
@@ -482,42 +568,194 @@ out:
  * Given client_name return whether it is a phci or vhci based name.
  * client_name is /devices name of a client without the /devices prefix.
  *
- * client_name			Return value
+ * client_name				Return value
  * on sparc:
- * .../fp@xxx/ssd@yyy		CLIENT_TYPE_PHCI
- * .../scsi_vhci/ssd@yyy	CLIENT_TYPE_VHCI
- * other			CLIENT_TYPE_UNKNOWN
+ * .../fp@xxx/ssd@yyy			CLIENT_TYPE_PHCI (fc)
+ * .../LSILogic,sas@xxx/sd@yyy		CLIENT_TYPE_PHCI (sas)
+ * .../scsi_vhci/ssd@yyy		CLIENT_TYPE_VHCI (fc)
+ * .../scsi_vhci/disk@yyy		CLIENT_TYPE_VHCI (sas)
+ * other				CLIENT_TYPE_UNKNOWN
  * on x86:
- * .../fp@xxx/disk@yyy		CLIENT_TYPE_PHCI
- * .../scsi_vhci/disk@yyy	CLIENT_TYPE_VHCI
- * other			CLIENT_TYPE_UNKNOWN
+ * .../fp@xxx/disk@yyy			CLIENT_TYPE_PHCI (fc)
+ * .../pci1000,????@xxx/sd@yyy		CLIENT_TYPE_PHCI (sas)
+ * .../scsi_vhci/disk@yyy		CLIENT_TYPE_VHCI
+ * other				CLIENT_TYPE_UNKNOWN
  */
 static client_type_t
 client_name_type(char *client_name)
 {
 	client_type_t client_type = CLIENT_TYPE_UNKNOWN;
-	char *p1, *p2;
+	char *p1;
+	char *client_path;
+
+	client_path = s_strdup(client_name);
+	logdmsg("client_name_type: client is %s\n", client_path);
 
 	if (*client_name != '/')
 		return (CLIENT_TYPE_UNKNOWN);
 
 	if ((p1 = strrchr(client_name, '/')) == NULL ||
-	    strncmp(p1, SLASH_DISK_AT, sizeof (SLASH_DISK_AT) - 1) != 0)
+	    ((strncmp(p1, "/ssd@", sizeof ("/ssd@") - 1) != 0) &&
+	    (strncmp(p1, "/sd@", sizeof ("/sd@") - 1) != 0) &&
+	    (strncmp(p1, "/disk@", sizeof ("/disk@") - 1) != 0))) {
+		logdmsg("client_name_type: p1 = %s\n", p1);
 		return (CLIENT_TYPE_UNKNOWN);
+	}
 
 	*p1 = '\0';
 
-	if ((p2 = strrchr(client_name, '/')) != NULL) {
-		if (strncmp(p2, SLASH_FP_AT, sizeof (SLASH_FP_AT) - 1) == 0)
-			client_type = CLIENT_TYPE_PHCI;
-		else if (strncmp(p2, SLASH_SCSI_VHCI,
-		    sizeof (SLASH_SCSI_VHCI) - 1) == 0)
-			client_type = CLIENT_TYPE_VHCI;
-	}
+	/*
+	 * Courtesy of the if (..) block above, we know that any
+	 * device path we have now is either PHCI or VHCI
+	 */
+	client_type = client_by_props(client_path);
+
+	logdmsg("client_name_type: client_type = %d\n", client_type);
 
 	*p1 = '/';
 	return (client_type);
 }
+
+/*
+ * client_by_props() is called to determine what the client type
+ * is, based on properties in the device tree:
+ *
+ * drivername	property	type
+ * -------------------------------------
+ *  fp		node-wwn	CLIENT_TYPE_PHCI
+ *  mpt		sas-mpt		CLIENT_TYPE_PHCI
+ *  mpt		client-guid	CLIENT_TYPE_PHCI (corner case)
+ *
+ * Normally, the "client-guid" property only shows up for a node
+ * if we've enumerated that node under scsi_vhci. During testing
+ * of this function, one particular corner case was found which
+ * requires an exception handler.
+ */
+
+static client_type_t
+client_by_props(char *path) {
+
+	di_node_t clientnode = DI_NODE_NIL;
+	di_node_t parentnode = DI_NODE_NIL;
+	unsigned int rval = CLIENT_TYPE_UNKNOWN;
+	uchar_t *byteprop[32];
+	char *charprop = NULL;
+	char *physpath;
+	char *parentpath;
+
+	physpath = s_malloc(MAXPATHLEN);
+	bzero(physpath, MAXPATHLEN);
+
+	physpath = s_strdup(path);
+
+	logdmsg("client_by_props: physpath = (%s)\n", physpath);
+
+	/* easy short-circuits */
+	if (strstr(physpath, "scsi_vhci") != (char *)NULL) {
+		logdmsg("client_by_props: found "
+		    "'scsi_vhci' on path (%s)\n", physpath);
+		rval = CLIENT_TYPE_VHCI;
+		goto out;
+	} else if ((strstr(physpath, "ide") != (char *)NULL) ||
+	    (strstr(physpath, "storage") != (char *)NULL)) {
+		logdmsg("client_by_props: ignoring this device\n");
+		goto out;
+	}
+
+	parentpath = s_malloc(MAXPATHLEN);
+	bzero(parentpath, MAXPATHLEN);
+
+	(void) strncpy(parentpath, physpath, strlen(physpath) -
+	    strlen(strrchr(physpath, '/')));
+
+	if ((parentnode = di_init(parentpath, DINFOCPYALL |
+	    DINFOFORCE)) == DI_NODE_NIL) {
+		logdmsg("client_by_props: unable to di_init(%s)\n",
+		    parentpath);
+		goto out;
+	}
+
+	if (strstr(physpath, "fp") != (char *)NULL) {
+		if (drvprop == (char *)NULL) {
+			drvprop = s_malloc(strlen(NODE_WWN_PROP) + 1);
+		}
+		logdmsg("NODE_WWN_PROP\n");
+		(void) snprintf(drvprop, strlen(NODE_WWN_PROP) + 1,
+		    NODE_WWN_PROP);
+	} else {
+		if (drvname == (char *)NULL) {
+			drvname = di_driver_name(parentnode);
+			logdmsg("client_by_props: drvname = %s\n", drvname);
+		}
+
+		if (drvprop == (char *)NULL) {
+			drvprop = s_malloc(sizeof (SASPROP) +
+			    sizeof (drvname) + 1);
+		}
+		(void) snprintf(drvprop, sizeof (SASPROP) +
+		    sizeof (drvname), "%s%s", SASPROP, drvname);
+
+		logdmsg("parentpath: %s\nphyspath: %s\n"
+		    "length %d, strrchr: %d\n",
+		    parentpath, physpath, strlen(physpath),
+		    strlen(strrchr(physpath, '/')));
+	}
+
+	logdmsg("client_by_props: searching for property '%s'\n", drvprop);
+
+	if ((clientnode = di_init(physpath, DINFOCPYALL | DINFOFORCE)) ==
+	    DI_NODE_NIL) {
+		logdmsg("client_by_props: unable to di_init(%s)\n",
+		    physpath);
+
+		/*
+		 * On x86/x64 systems, we won't be able to di_init() the
+		 * node we want in the device tree, however the parent
+		 * node will still have 'mpxio-disable' set, so we can
+		 * check for that property and make our decision on type
+		 */
+
+		if (di_prop_lookup_strings(DDI_DEV_T_ANY, parentnode,
+		    "mpxio-disable", &charprop) > -1) {
+			rval = CLIENT_TYPE_PHCI;
+			di_fini(parentnode);
+			logdmsg("client_by_props: device %s is PHCI\n",
+			    physpath);
+		}
+		goto out;
+	}
+
+	if (di_prop_lookup_bytes(DDI_DEV_T_ANY,
+	    clientnode, drvprop, byteprop) > -1) {
+		logdmsg("client_by_props: found prop %s on "
+		    "path %s\n", drvprop, physpath);
+		rval = CLIENT_TYPE_PHCI;
+	} else if (di_prop_lookup_strings(DDI_DEV_T_ANY,
+	    clientnode, "client-guid", &charprop) > -1) {
+			/*
+			 * A corner case was seen during testing where
+			 * scsi_vhci was loaded, but not all applicable
+			 * devices were enumerated under it. That left
+			 * the phci mapping along with the "client-guid"
+			 * property.
+			 */
+			logdmsg("client_by_props: weird... \n");
+			rval = CLIENT_TYPE_PHCI;
+	} else {
+		logdmsg("client_by_props: unable to find "
+		    "property 'client-guid', 'mpxio-disable' "
+		    "or '%s' anywhere on path (%s)\n",
+		    drvprop, physpath);
+		logdmsg("client_by_props: this node is unknown\n");
+	}
+
+	di_fini(parentnode);
+	di_fini(clientnode);
+out:
+	free(physpath);
+	return (rval);
+}
+
 
 /*
  * Map phci based client name to vhci based client name.
@@ -526,15 +764,26 @@ client_name_type(char *client_name)
  *	phci based client /devices name without the /devices prefix and
  *	minor name component.
  *	ex:
+ *
+ *	(FC)
  *	for sparc: /pci@8,600000/SUNW,qlc@4/fp@0,0/ssd@w2100002037cd9f72,0
  *	for x86: /pci@8,600000/SUNW,qlc@4/fp@0,0/disk@w2100002037cd9f72,0
+ *
+ *	(SAS)
+ *	for sparc: /pci@0,2/LSILogic,sas@1/disk@6,0
+ *	for x86: /pci1000,3060@3/sd@0,0
  *
  * vhci_name
  *	Caller supplied buffer where vhci /devices name will be placed on
  *	return (without the /devices prefix and minor name component).
  *	ex:
+ *
+ *	(FC)
  *	for sparc: /scsi_vhci/ssd@g2000002037cd9f72
  *	for x86: /scsi_vhci/disk@g2000002037cd9f72
+ *
+ *	(SAS)
+ *	both: /scsi_vhci/disk@g600a0b8000254d3e00000284453ed8ac
  *
  * vhci_name_len
  *	Length of the caller supplied vhci_name buffer.
@@ -545,7 +794,7 @@ static int
 phci_to_vhci(char *phci_name, char *vhci_name, size_t vhci_name_len)
 {
 	sv_iocdata_t ioc;
-	char *slash;
+	char *slash, *at;
 	char vhci_name_buf[MAXPATHLEN];
 	char phci_name_buf[MAXPATHLEN];
 	char addr_buf[MAXNAMELEN];
@@ -556,7 +805,9 @@ phci_to_vhci(char *phci_name, char *vhci_name, size_t vhci_name_len)
 
 	if (client_name_type(phci_name_buf) != CLIENT_TYPE_PHCI ||
 	    (slash = strrchr(phci_name_buf, '/')) == NULL ||
-	    strncmp(slash, SLASH_DISK_AT, sizeof (SLASH_DISK_AT) - 1) != 0) {
+	    ((strncmp(slash, "/ssd@", sizeof ("/ssd@") - 1) != 0) &&
+	    (strncmp(slash, "/sd@", sizeof ("/sd@") - 1) != 0) &&
+	    (strncmp(slash, "/disk@", sizeof ("/disk@") - 1) != 0))) {
 		logdmsg("phci_to_vhci: %s is not of CLIENT_TYPE_PHCI\n",
 		    phci_name);
 		return (-1);
@@ -568,7 +819,9 @@ phci_to_vhci(char *phci_name, char *vhci_name, size_t vhci_name_len)
 	}
 
 	*slash = '\0';
-	s_strlcpy(addr_buf, slash + sizeof (SLASH_DISK_AT) - 1, MAXNAMELEN);
+
+	at = strchr(slash + 1, '@');
+	s_strlcpy(addr_buf, at + 1, MAXNAMELEN);
 
 	bzero(&ioc, sizeof (sv_iocdata_t));
 	ioc.client = vhci_name_buf;
@@ -614,10 +867,10 @@ phci_to_vhci(char *phci_name, char *vhci_name, size_t vhci_name_len)
 static int
 vhci_to_phci(char *vhci_name, char *phci_name, size_t phci_name_len)
 {
-	di_node_t node, parent;
+	di_node_t node = DI_NODE_NIL;
 	char *vhci_guid, *devfspath;
 	char phci_guid[MAXPATHLEN];
-	char *parent_name, *node_name;
+	char *node_name;
 
 	logdmsg("vhci_to_phci: client = %s\n", vhci_name);
 
@@ -626,6 +879,7 @@ vhci_to_phci(char *vhci_name, char *phci_name, size_t phci_name_len)
 		    vhci_name);
 		return (-1);
 	}
+
 
 	if ((vhci_guid = strrchr(vhci_name, '@')) == NULL ||
 	    *(++vhci_guid) != 'g') {
@@ -651,14 +905,27 @@ vhci_to_phci(char *vhci_name, char *phci_name, size_t phci_name_len)
 		logdmsg("vhci_to_phci: done taking devinfo snapshot\n");
 	}
 
-	for (node = di_drv_first_node(DISK_DRV_NAME, devinfo_root);
+
+	/*
+	 * When we finally get a unified "sd" driver for all
+	 * architectures that Solaris runs on, we can remove this
+	 * first loop around for "ssd"
+	 */
+	for (node = di_drv_first_node("ssd", devinfo_root);
 	    node != DI_NODE_NIL; node = di_drv_next_node(node)) {
-		if ((node_name = di_node_name(node)) == NULL ||
-		    strcmp(node_name, DISK_NODE_NAME) != 0 ||
-		    (parent = di_parent_node(node)) == DI_NODE_NIL ||
-		    (parent_name = di_node_name(parent)) == NULL ||
-		    strcmp(parent_name, "fp") != 0 ||
-		    (devfspath = di_devfs_path(node)) == NULL)
+
+		if ((node_name = di_node_name(node)) == NULL)
+			continue;
+
+		if ((strcmp(node_name, "disk") != 0) &&
+		    (strcmp(node_name, "sd") != 0) &&
+		    (strcmp(node_name, "ssd") != 0))
+			continue;
+
+		if (di_parent_node(node) == DI_NODE_NIL)
+			continue;
+
+		if ((devfspath = di_devfs_path(node)) == NULL)
 			continue;
 
 		/*
@@ -666,8 +933,46 @@ vhci_to_phci(char *vhci_name, char *phci_name, size_t phci_name_len)
 		 * standby paths of T3. So we'll find the preferred paths.
 		 */
 		if (get_guid(devfspath, phci_guid,
-		    sizeof (phci_guid), 0, node) == 0 &&
-		    strcmp(phci_guid, vhci_guid) == 0) {
+		    sizeof (phci_guid), 0, node) != 0)
+			continue;
+
+		if (strcmp(phci_guid, vhci_guid) == 0) {
+			s_strlcpy(phci_name, devfspath, phci_name_len);
+			di_devfs_path_free(devfspath);
+			logdmsg("vhci_to_phci: %s maps to %s\n", vhci_name,
+			    phci_name);
+			return (0);
+		}
+
+		di_devfs_path_free(devfspath);
+	}
+
+	for (node = di_drv_first_node("sd", devinfo_root);
+	    node != DI_NODE_NIL; node = di_drv_next_node(node)) {
+
+		if ((node_name = di_node_name(node)) == NULL)
+			continue;
+
+		if ((strcmp(node_name, "disk") != 0) &&
+		    (strcmp(node_name, "sd") != 0) &&
+		    (strcmp(node_name, "ssd") != 0))
+			continue;
+
+		if (di_parent_node(node) == DI_NODE_NIL)
+			continue;
+
+		if ((devfspath = di_devfs_path(node)) == NULL)
+			continue;
+
+		/*
+		 * Don't set no_delay_flag to have get_guid() fail on
+		 * standby paths of T3. So we'll find the preferred paths.
+		 */
+		if (get_guid(devfspath, phci_guid,
+		    sizeof (phci_guid), 0, node) != 0)
+			continue;
+
+		if (strcmp(phci_guid, vhci_guid) == 0) {
 			s_strlcpy(phci_name, devfspath, phci_name_len);
 			di_devfs_path_free(devfspath);
 			logdmsg("vhci_to_phci: %s maps to %s\n", vhci_name,
@@ -764,6 +1069,15 @@ vhci_to_phci_by_ioctl(char *vhci_name, char *phci_name, size_t phci_name_len)
 	node_name++;
 	*at = '\0';
 
+	logdmsg("vhci_to_phci_by_ioctl: node_name is %s\n", node_name);
+#ifndef sparc
+	/*
+	 * We need to use a libdevinfo call to get this info
+	 * in an architecturally-neutral fashion. Phase-II for sure!
+	 */
+	node_name = "sd";
+#endif
+
 	/*
 	 * return the first online paths as non-online paths may
 	 * not be accessible in the target environment.
@@ -812,13 +1126,18 @@ map_physname(char *physname, char *new_physname, size_t len)
 	int type;
 	int rv;
 
-	if ((type = client_name_type(physname)) == CLIENT_TYPE_VHCI)
+	type = client_name_type(physname);
+	logdmsg("map_physname: type (%d) physname = %s\n",
+	    type, physname);
+
+	if (type == CLIENT_TYPE_VHCI)
 		rv = vhci_to_phci(physname, new_physname, len);
 	else if (type == CLIENT_TYPE_PHCI)
 		rv = phci_to_vhci(physname, new_physname, len);
 	else
 		rv = -1;
 
+	logdmsg("map_physname: returning %d\n", rv);
 	return (rv);
 }
 
@@ -1011,10 +1330,14 @@ map_devname(char *devname, char *new_devname, size_t len, int devlink_flag)
 	char minor[MAXNAMELEN];
 	char new_physname[MAXPATHLEN];
 
-	if (get_physname_minor(devname, physname, sizeof (physname),
-	    minor, sizeof (minor)) == 0 &&
-	    canopen(devname) == 0 &&
-	    map_physname(physname, new_physname, sizeof (new_physname)) == 0) {
+	logdmsg("map_devname: checking devname %s\n", devname);
+	if ((get_physname_minor(devname, physname, sizeof (physname),
+	    minor, sizeof (minor)) == 0) &&
+	    (canopen(devname) == 0) &&
+	    (map_physname(physname, new_physname,
+	    sizeof (new_physname)) == 0)) {
+
+		logdmsg("map_devname: now looking up devlink\n");
 
 		if (devlink_flag) {
 			if (lookup_devlink(new_physname, minor, new_devname,
@@ -1027,6 +1350,7 @@ map_devname(char *devname, char *new_devname, size_t len, int devlink_flag)
 		}
 	}
 
+	logdmsg("map_devname: failed to find mapping for %s\n", devname);
 	return (-1);
 }
 
@@ -1261,8 +1585,10 @@ list_mappings(int controller, int guidmap)
 
 		if (get_physname_minor(devname, physname, sizeof (physname),
 		    minor, sizeof (minor)) != 0 ||
-		    client_name_type(physname) != CLIENT_TYPE_PHCI)
+		    client_name_type(physname) != CLIENT_TYPE_PHCI) {
+			logdmsg("list_mappings: continuing\n");
 			continue;
+		}
 
 		/*
 		 * First try phci_to_vhci() mapping. It will work if the
@@ -1306,11 +1632,16 @@ list_mappings(int controller, int guidmap)
 			(void) printf("%s\t\t%s\n", devname, new_devname);
 		} else {
 			/* extract guid part */
-			if ((p1 = strstr(new_physname, DISK_AT_G)) == NULL) {
+			/* we should be using a getguid() call instead */
+			if ((p1 = strstr(new_physname, "@"))
+			    == NULL) {
 				logdmsg("invalid vhci: %s\n", new_physname);
 				continue;
 			}
-			p1 += sizeof (DISK_AT_G) - 1;
+
+			logdmsg("\tp1 = %s\n", p1);
+
+			p1 += 2; /* "@" + [nwg] */
 			if ((p2 = strrchr(p1, ':')) != NULL)
 				*p2 = '\0';
 
@@ -1342,8 +1673,105 @@ canopen(char *filename)
 	if ((fd = open(filename, O_RDONLY)) == -1)
 		return (0);
 
+	logdmsg("canopen: was able to open %s\n", filename);
 	(void) close(fd);
 	return (1);
+}
+
+
+/*
+ * This function traverses the device tree looking for nodes
+ * which have "drivername" as a property. We return a list of
+ * these nodes, with SLASH_DISK_AT appended.
+ * Since there can be many different pci/pcie devices that all
+ * share the same driver but which have different pci vid/did
+ * combinations, we have to be smart about returning only those
+ * pci vid/dids which have the "sas-*" property unless the
+ * drivername is "fp", in which case we're searching for "node-wwn"
+ */
+static void
+list_nodes(char *drivername)
+{
+	char *aliaslist;
+	char *mpxprop = NULL;
+	di_node_t devroot = DI_NODE_NIL;
+	di_node_t thisnode = DI_NODE_NIL;
+	int *intprop = NULL;
+	int i = 1; /* fencepost */
+
+	/*
+	 * Since the "fp" driver enumerates with its own name,
+	 * we can special-case its handling.
+	 */
+	if (strcmp(drvname, "fp") == 0) {
+		(void) fprintf(stdout, "fp\n");
+	} else {
+
+		if ((devroot = di_init("/", DINFOCPYALL | DINFOFORCE))
+		    == DI_NODE_NIL) {
+			logerr(gettext("list_nodes: di_init failed: "
+			"%s\n"), strerror(errno));
+		}
+
+		if ((thisnode = di_drv_first_node(drivername, devroot))
+		    != NULL) {
+			logdmsg("list_nodes: searching for property "
+			    "%s\n", drvprop);
+
+			aliaslist = s_malloc(1024 * sizeof (char));
+			bzero(aliaslist, 1024);
+			while (thisnode != DI_NODE_NIL) {
+				logdmsg("devfs-name %s driver-name %s "
+				    "node-name %s\n",
+				    di_devfs_path(thisnode),
+				    di_driver_name(thisnode),
+				    di_node_name(thisnode));
+
+			/* We check the child node for drvprop */
+			if ((di_prop_lookup_ints(DDI_DEV_T_ANY,
+			    di_child_node(thisnode), drvprop,
+			    &intprop) > -1) ||
+			    (((di_prop_lookup_strings(DDI_DEV_T_ANY,
+			    thisnode, "mpxio-disable", &mpxprop) > -1) &&
+			    strcmp(di_driver_name(thisnode),
+			    drivername)) == 0)) {
+
+				if (strstr(aliaslist,
+				    di_node_name(thisnode))
+				    == (char *)NULL) {
+					char *nname;
+
+					nname = di_node_name(thisnode);
+
+					if (i) {
+					(void) snprintf(aliaslist,
+					    strlen(nname), "%s", nname);
+						--i;
+					} else {
+					if (strstr(aliaslist,
+					    di_node_name(thisnode)) ==
+					    (char *)NULL) {
+						(void) snprintf(aliaslist,
+						    strlen(nname) +
+						    strlen(aliaslist),
+						    "%s|%s", aliaslist,
+						    nname);
+						}
+					}
+				}
+			} else {
+				logdmsg("unable to lookup property %s "
+				    "for node %s. Error %d: %s\n",
+				    drvprop, di_devfs_path(thisnode),
+				    errno, strerror(errno));
+			}
+			thisnode = di_drv_next_node(thisnode);
+		}
+		(void) fprintf(stdout, "%s\n", aliaslist);
+		}
+
+		di_fini(devroot);
+	}
 }
 
 static void

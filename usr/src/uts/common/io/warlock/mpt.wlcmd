@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -25,6 +25,8 @@ add notify_entry::callback target warlock_dummy
 root mpt_kmem_cache_constructor mpt_kmem_cache_destructor
 root mpt_do_dma
 root mpt_handle_event
+root mpt_handle_dr
+root mpt_name_child
 
 for ptr in `funcptrs | grep '^scsi_hba_tran::'`
 do

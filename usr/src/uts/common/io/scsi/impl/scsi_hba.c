@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1978,6 +1978,16 @@ scsi_hba_nodename_compatible_get(struct scsi_inquiry *inq, char *binding_set,
 		{"esi",			"scsa,0d.busb"},
 #endif	/* notdef */
 
+	/*
+	 * mapping nodenames for mpt based on scsi dtype
+	 * for being compatible with the original node names
+	 * under mpt controller
+	 */
+		{"sd",			"scsa,00.bmpt"},
+		{"sd",			"scsa,05.bmpt"},
+		{"sd",			"scsa,07.bmpt"},
+		{"st",			"scsa,01.bmpt"},
+		{"ses",			"scsa,0d.bmpt"},
 		{NULL,		NULL}
 	};
 	struct nodename_aliases *nap;
