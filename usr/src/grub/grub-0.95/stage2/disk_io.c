@@ -157,7 +157,6 @@ rawread (int drive, int sector, int byte_offset, int byte_len, char *buf)
   if (byte_len <= 0)
     return 1;
 
-  errnum = ERR_NONE;
   while (byte_len > 0 && !errnum)
     {
       int soff, num_sect, track, size = byte_len;
