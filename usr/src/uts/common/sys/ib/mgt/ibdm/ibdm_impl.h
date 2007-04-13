@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -196,6 +196,7 @@ typedef struct ibdm_dp_gidinfo_s {
 	int			gl_disconnected;
 	uint64_t		gl_min_transactionID;
 	uint64_t		gl_max_transactionID;
+	ibdm_iou_info_t		*gl_prev_iou;
 } ibdm_dp_gidinfo_t;
 _NOTE(MUTEX_PROTECTS_DATA(ibdm_dp_gidinfo_s::gl_mutex,
 	ibdm_dp_gidinfo_s::{gl_state gl_timeout_id gl_pending_cmds}))
@@ -241,6 +242,9 @@ typedef struct ibdm_s {
 	 * the arrival/removal of HCA and IOC's
 	 */
 	ibdm_callback_t		ibdm_ibnex_callback;
+
+	/* Flag indicating - prev_iou during sweep */
+	int			ibdm_prev_iou;
 } ibdm_t;
 _NOTE(MUTEX_PROTECTS_DATA(ibdm_s::ibdm_mutex, ibdm_s::{ibdm_ibt_clnt_hdl
 	ibdm_busy ibdm_state}))

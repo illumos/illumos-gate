@@ -45,7 +45,7 @@
 #include <sys/modctl.h>
 
 /* Function Prototype declarations */
-static int	ibdm_free_iou_info(ibdm_dp_gidinfo_t *);
+static int	ibdm_free_iou_info(ibdm_dp_gidinfo_t *, ibdm_iou_info_t **);
 static int	ibdm_fini(void);
 static int	ibdm_init(void);
 static int	ibdm_get_reachable_ports(ibdm_port_attr_t *,
@@ -139,6 +139,9 @@ static void ibdm_reset_gidinfo(ibdm_dp_gidinfo_t *);
 static void ibdm_delete_gidinfo(ibdm_dp_gidinfo_t *);
 static void ibdm_fill_srv_attr_mod(ib_mad_hdr_t *, ibdm_timeout_cb_args_t *);
 static void ibdm_bump_transactionID(ibdm_dp_gidinfo_t *);
+static ibdm_ioc_info_t	*ibdm_handle_prev_iou();
+static int ibdm_serv_cmp(ibdm_srvents_info_t *, ibdm_srvents_info_t *,
+    int);
 
 int	ibdm_dft_timeout	= IBDM_DFT_TIMEOUT;
 int	ibdm_dft_retry_cnt	= IBDM_DFT_NRETRIES;
@@ -288,26 +291,27 @@ ibdm_init(void)
 
 
 static int
-ibdm_free_iou_info(ibdm_dp_gidinfo_t *gid_info)
+ibdm_free_iou_info(ibdm_dp_gidinfo_t *gid_info, ibdm_iou_info_t **ioup)
 {
 	int			ii, k, niocs;
 	size_t			size;
 	ibdm_gid_t		*delete, *head;
 	timeout_id_t		timeout_id;
 	ibdm_ioc_info_t		*ioc;
+	ibdm_iou_info_t		*gl_iou = *ioup;
 
 	ASSERT(mutex_owned(&gid_info->gl_mutex));
-	if (gid_info->gl_iou == NULL) {
+	if (gl_iou == NULL) {
 		IBTF_DPRINTF_L4("ibdm", "\tibdm_free_iou_info: No IOU");
 		return (0);
 	}
 
-	niocs = gid_info->gl_iou->iou_info.iou_num_ctrl_slots;
+	niocs = gl_iou->iou_info.iou_num_ctrl_slots;
 	IBTF_DPRINTF_L4("ibdm", "\tfree_iou_info: gid_info = %p, niocs %d",
 	    gid_info, niocs);
 
 	for (ii = 0; ii < niocs; ii++) {
-		ioc = IBDM_GIDINFO2IOCINFO(gid_info, ii);
+		ioc = (ibdm_ioc_info_t *)&gl_iou->iou_ioc_info[ii];
 
 		/* handle the case where an ioc_timeout_id is scheduled */
 		if (ioc->ioc_timeout_id) {
@@ -360,7 +364,7 @@ ibdm_free_iou_info(ibdm_dp_gidinfo_t *gid_info)
 			}
 		}
 
-		/* delete GID list */
+		/* delete GID list in IOC */
 		head = ioc->ioc_gid_list;
 		while (head) {
 			IBTF_DPRINTF_L4("ibdm", "\tibdm_free_iou_info: "
@@ -382,8 +386,8 @@ ibdm_free_iou_info(ibdm_dp_gidinfo_t *gid_info)
 
 	IBTF_DPRINTF_L4("ibdm", "\tibdm_free_iou_info: deleting IOU & IOC");
 	size = sizeof (ibdm_iou_info_t) + niocs * sizeof (ibdm_ioc_info_t);
-	kmem_free(gid_info->gl_iou, size);
-	gid_info->gl_iou = NULL;
+	kmem_free(gl_iou, size);
+	*ioup = NULL;
 	return (0);
 }
 
@@ -436,7 +440,7 @@ ibdm_fini()
 	gid_info = ibdm.ibdm_dp_gidlist_head;
 	while (gid_info) {
 		mutex_enter(&gid_info->gl_mutex);
-		(void) ibdm_free_iou_info(gid_info);
+		(void) ibdm_free_iou_info(gid_info, &gid_info->gl_iou);
 		mutex_exit(&gid_info->gl_mutex);
 		ibdm_delete_glhca_list(gid_info);
 
@@ -1306,7 +1310,24 @@ ibdm_sweep_fabric(int reprobe_flag)
 					    gid_info);
 			}
 		}
+	} else if (ibdm.ibdm_prev_iou) {
+		ibdm_ioc_info_t	*ioc_list;
+
+		/*
+		 * Get the list of IOCs which have changed.
+		 * If any IOCs have changed, Notify IBNexus
+		 */
+		ibdm.ibdm_prev_iou = 0;
+		ioc_list = ibdm_handle_prev_iou();
+		if (ioc_list) {
+			if (ibdm.ibdm_ibnex_callback != NULL) {
+				(*ibdm.ibdm_ibnex_callback)(
+				    (void *)ioc_list,
+				    IBDM_EVENT_IOC_PROP_UPDATE);
+			}
+		}
 	}
+
 	ibdm_dump_sweep_fabric_timestamp(1);
 
 	ibdm.ibdm_busy &= ~IBDM_BUSY;
@@ -2156,20 +2177,26 @@ ibdm_handle_iounitinfo(ibmf_handle_t ibmf_hdl,
 	 */
 	if (gid_info->gl_iou) {
 		giou_info = &gid_info->gl_iou->iou_info;
-		if (iou_info->iou_changeid == giou_info->iou_changeid) {
+		if (b2h16(iou_info->iou_changeid) ==
+		    giou_info->iou_changeid) {
 			IBTF_DPRINTF_L3("ibdm",
 			    "\thandle_iounitinfo: no IOCs changed");
 			gid_info->gl_state = IBDM_GID_PROBING_COMPLETE;
 			mutex_exit(&gid_info->gl_mutex);
 			return;
 		}
-		if (ibdm_free_iou_info(gid_info)) {
-			IBTF_DPRINTF_L3("ibdm",
-			    "\thandle_iounitinfo: failed to cleanup resources");
-			gid_info->gl_state = IBDM_GID_PROBING_COMPLETE;
-			mutex_exit(&gid_info->gl_mutex);
-			return;
-		}
+
+		/*
+		 * Store the iou info as prev_iou to be used after
+		 * sweep is done.
+		 */
+		ASSERT(gid_info->gl_prev_iou == NULL);
+		IBTF_DPRINTF_L4(ibdm_string,
+		    "\thandle_iounitinfo: setting gl_prev_iou %p",
+		    gid_info->gl_prev_iou);
+		gid_info->gl_prev_iou = gid_info->gl_iou;
+		ibdm.ibdm_prev_iou = 1;
+		gid_info->gl_iou = NULL;
 	}
 
 	size = sizeof (ibdm_iou_info_t) + num_iocs * sizeof (ibdm_ioc_info_t);
@@ -5378,7 +5405,7 @@ ibdm_saa_event_taskq(void *arg)
 	mutex_enter(&ibdm.ibdm_mutex);
 	if (gid_info->gl_iou != NULL && gid_info->gl_ngids == 0) {
 		mutex_enter(&gid_info->gl_mutex);
-		(void) ibdm_free_iou_info(gid_info);
+		(void) ibdm_free_iou_info(gid_info, &gid_info->gl_iou);
 		mutex_exit(&gid_info->gl_mutex);
 	}
 	if (gid_info->gl_prev != NULL)
@@ -5468,11 +5495,10 @@ ibdm_reprobe_update_port_srv(ibdm_ioc_info_t *ioc, ibdm_dp_gidinfo_t *gidinfo)
 	cur_gid_list = gidinfo->gl_gid;
 	cur_nportgids = gidinfo->gl_ngids;
 
-	/*
-	 * Service entry names and IDs are not compared currently.
-	 * This may require change.
-	 */
-	if (ioc->ioc_prev_serv_cnt != ioc->ioc_profile.ioc_service_entries)
+	if (ioc->ioc_prev_serv_cnt !=
+	    ioc->ioc_profile.ioc_service_entries ||
+	    ibdm_serv_cmp(&ioc->ioc_serv[0], &ioc->ioc_prev_serv[0],
+	    ioc->ioc_prev_serv_cnt))
 		ioc->ioc_info_updated.ib_srv_prop_updated = 1;
 
 	if (ioc->ioc_prev_nportgids != cur_nportgids ||
@@ -5726,7 +5752,7 @@ ibdm_rescan_gidlist(ib_guid_t *ioc_guidp)
 		mutex_enter(&ibdm.ibdm_mutex);
 		if (gid_info->gl_iou != NULL && gid_info->gl_ngids == 0) {
 			mutex_enter(&gid_info->gl_mutex);
-			(void) ibdm_free_iou_info(gid_info);
+			(void) ibdm_free_iou_info(gid_info, &gid_info->gl_iou);
 			mutex_exit(&gid_info->gl_mutex);
 		}
 		tmp = gid_info->gl_next;
@@ -6168,7 +6194,7 @@ ibdm_delete_gidinfo(ibdm_dp_gidinfo_t *gidinfo)
 	mutex_enter(&ibdm.ibdm_mutex);
 	if (gidinfo->gl_iou != NULL && gidinfo->gl_ngids == 0) {
 		mutex_enter(&gidinfo->gl_mutex);
-		(void) ibdm_free_iou_info(gidinfo);
+		(void) ibdm_free_iou_info(gidinfo, &gidinfo->gl_iou);
 		mutex_exit(&gidinfo->gl_mutex);
 	}
 
@@ -6231,6 +6257,105 @@ ibdm_bump_transactionID(ibdm_dp_gidinfo_t *gid_info)
 		    "\tbump_transactionID(%p), wrapup", gid_info);
 		gid_info->gl_transactionID = gid_info->gl_min_transactionID;
 	}
+}
+
+/*
+ * gl_prev_iou is set for *non-reprobe* sweeep requests, which
+ * detected that ChangeID in IOU info has changed. The service
+ * entry also may have changed. Check if service entry in IOC
+ * has changed wrt the prev iou, if so notify to IB Nexus.
+ */
+static ibdm_ioc_info_t *
+ibdm_handle_prev_iou()
+{
+	ibdm_dp_gidinfo_t *gid_info;
+	ibdm_ioc_info_t	*ioc_list_head = NULL, *ioc_list;
+	ibdm_ioc_info_t	*prev_ioc, *ioc;
+	int		ii, jj, niocs, prev_niocs;
+
+	ASSERT(MUTEX_HELD(&ibdm.ibdm_mutex));
+
+	IBTF_DPRINTF_L4(ibdm_string, "\thandle_prev_iou enter");
+	for (gid_info = ibdm.ibdm_dp_gidlist_head; gid_info;
+	    gid_info = gid_info->gl_next) {
+		if (gid_info->gl_prev_iou == NULL)
+			continue;
+
+		IBTF_DPRINTF_L4(ibdm_string, "\thandle_prev_iou gid %p",
+		    gid_info);
+		niocs = gid_info->gl_iou->iou_info.iou_num_ctrl_slots;
+		prev_niocs =
+		    gid_info->gl_prev_iou->iou_info.iou_num_ctrl_slots;
+		for (ii = 0; ii < niocs; ii++) {
+			ioc = IBDM_GIDINFO2IOCINFO(gid_info, ii);
+
+			/* Find matching IOC */
+			for (jj = 0; jj < prev_niocs; jj++) {
+				prev_ioc = (ibdm_ioc_info_t *)
+				    &gid_info->gl_prev_iou->iou_ioc_info[jj];
+				if (prev_ioc->ioc_profile.ioc_guid ==
+				    ioc->ioc_profile.ioc_guid)
+					break;
+			}
+			if (jj == prev_niocs)
+				prev_ioc = NULL;
+			if (ioc == NULL || prev_ioc == NULL)
+				continue;
+			if ((ioc->ioc_profile.ioc_service_entries !=
+			    prev_ioc->ioc_profile.ioc_service_entries) ||
+			    ibdm_serv_cmp(&ioc->ioc_serv[0],
+			    &prev_ioc->ioc_serv[0],
+			    ioc->ioc_profile.ioc_service_entries) != 0) {
+				IBTF_DPRINTF_L4(ibdm_string,
+				    "/thandle_prev_iou modified IOC: "
+				    "current ioc %p, old ioc %p",
+				    ioc, prev_ioc);
+				ioc_list = ibdm_dup_ioc_info(ioc, gid_info);
+				ioc_list->ioc_info_updated.ib_prop_updated
+				    = 0;
+				ioc_list->ioc_info_updated.ib_srv_prop_updated
+				    = 1;
+
+				if (ioc_list_head == NULL)
+					ioc_list_head = ioc_list;
+				else {
+					ioc_list_head->ioc_next = ioc_list;
+					ioc_list_head = ioc_list;
+				}
+			}
+		}
+
+		mutex_enter(&gid_info->gl_mutex);
+		(void) ibdm_free_iou_info(gid_info, &gid_info->gl_prev_iou);
+		mutex_exit(&gid_info->gl_mutex);
+	}
+	IBTF_DPRINTF_L4(ibdm_string, "\thandle_prev_iouret %p",
+	    ioc_list_head);
+	return (ioc_list_head);
+}
+
+/*
+ * Compares two service entries lists, returns 0 if same, returns 1
+ * if no match.
+ */
+static int
+ibdm_serv_cmp(ibdm_srvents_info_t *serv1, ibdm_srvents_info_t *serv2,
+    int nserv)
+{
+	int	ii;
+
+	IBTF_DPRINTF_L4(ibdm_string, "\tserv_cmp: enter");
+	for (ii = 0; ii < nserv; ii++, serv1++, serv2++) {
+		if (serv1->se_attr.srv_id != serv2->se_attr.srv_id ||
+			bcmp(serv1->se_attr.srv_name,
+			    serv2->se_attr.srv_name,
+			    IB_DM_MAX_SVC_NAME_LEN) != 0) {
+			IBTF_DPRINTF_L4(ibdm_string, "\tserv_cmp: ret 1");
+			return (1);
+		}
+	}
+	IBTF_DPRINTF_L4(ibdm_string, "\tserv_cmp: ret 0");
+	return (0);
 }
 
 /* For debugging purpose only */
