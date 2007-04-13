@@ -131,7 +131,13 @@ typedef struct {
 #define	BGE_PP_SPACE_FLASH	12		/* FLASH (if fitted)    */
 
 #define	BGE_IPMI_ASF
+
+/*
+ * Enable BGE_NETCONSOLE only with SPARC
+ */
+#ifdef __sparc
 #define	BGE_NETCONSOLE
+#endif
 
 /*
  * BGE_MAXPKT_RCVED is defined to make sure bge does not stick
