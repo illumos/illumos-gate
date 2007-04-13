@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +63,12 @@
 
 struct aexec ahdr;
 
+/* used to maintain a list of program sections to look in */
+typedef struct sec_name {
+	char	*name;
+	struct	sec_name *next;
+} sec_name_t;
+
 /*
  * function prototypes
  */
@@ -96,6 +101,77 @@ static	char	*tbuf = NULL;
 static	size_t	buf_size = 0;
 static	int	rc = 0; /* exit code */
 
+/*
+ * Returns 0 when sections have been successfully looked through,
+ * otherwise returns 1.
+ */
+static int
+look_in_sections(char *file, sec_name_t *seclistptr)
+{
+	int		fd = fileno(stdin);
+	int		found_sec;
+	int		rc = 0;
+	Elf		*elf;
+	GElf_Ehdr	ehdr;
+	Elf_Scn		*scn;
+	GElf_Shdr	shdr;
+
+	(void) lseek(fd, 0L, 0);
+	elf = elf_begin(fd, ELF_C_READ, NULL);
+	if (gelf_getehdr(elf, &ehdr) == (GElf_Ehdr *)NULL) {
+		(void) fprintf(stderr, "%s: %s\n", file, elf_errmsg(-1));
+		(void) elf_end(elf);
+		return (1);
+	}
+	scn = 0;
+	while ((scn = elf_nextscn(elf, scn)) != 0) {
+		found_sec = 0;
+		if (gelf_getshdr(scn, &shdr) == (GElf_Shdr *)0) {
+			(void) fprintf(stderr, "%s: %s\n", file,
+			    elf_errmsg(-1));
+			rc = 1;
+			continue;
+		}
+
+		if (seclistptr != NULL) {
+			char	*scn_name;
+
+			/* Only look in the specified section(s). */
+			if ((scn_name = elf_strptr(elf, ehdr.e_shstrndx,
+			    (size_t)shdr.sh_name)) == (char *)NULL) {
+				(void) fprintf(stderr, "%s: %s\n", file,
+				    elf_errmsg(-1));
+				rc = 1;
+				continue;
+			} else {
+				sec_name_t	*sptr;
+
+				for (sptr = seclistptr; sptr != NULL;
+				    sptr = sptr->next) {
+					if (strcmp(scn_name, sptr->name) == 0) {
+						found_sec = 1;
+						break;
+					}
+				}
+			}
+		} else {
+			/*
+			 * Look through program sections that are
+			 * loaded in memory.
+			 */
+			if ((shdr.sh_flags & SHF_ALLOC) &&
+			    (shdr.sh_type == SHT_PROGBITS)) {
+				found_sec = 1;
+			}
+		}
+		if (found_sec == 1) {
+			(void) fseek(stdin, (long)shdr.sh_offset, 0);
+			find((long)shdr.sh_size);
+		}
+	}
+	return (rc);
+}
+
 int
 main(argc, argv)
 	int argc;
@@ -103,15 +179,12 @@ main(argc, argv)
 {
 	int		hsize;
 	int		htype;
-	int		fd;
-	Elf		*elf;
-	GElf_Ehdr	ehdr;
-	Elf_Scn		*scn;
-	GElf_Shdr	shdr;
-	char		*scn_name;
-	char	*locale;
+	char		*locale;
 	int		opt;
 	int		i;
+	sec_name_t	*seclistptr = NULL;
+	sec_name_t	*seclistendptr;
+	sec_name_t	*sptr;
 
 	(void) setlocale(LC_ALL, "");
 
@@ -139,7 +212,7 @@ main(argc, argv)
 	}
 
 	/* get options */
-	while ((opt = getopt(argc, argv, "1234567890an:ot:")) != -1) {
+	while ((opt = getopt(argc, argv, "1234567890an:N:ot:")) != -1) {
 		switch (opt) {
 			case 'a':
 				aflg++;
@@ -148,6 +221,25 @@ main(argc, argv)
 			case 'n':
 				minlength = (int)strtol(optarg, (char **)NULL,
 				    10);
+				break;
+
+			case 'N':
+				if (((sptr = malloc(sizeof (sec_name_t)))
+				    == NULL) || ((sptr->name = strdup(optarg))
+				    == NULL)) {
+					(void) fprintf(stderr, gettext(
+					    "Cannot allocate memory: "
+					    "%s\n"), strerror(errno));
+					exit(1);
+				}
+				if (seclistptr == NULL) {
+					seclistptr = sptr;
+					seclistptr->next = NULL;
+					seclistendptr = sptr;
+				} else {
+					seclistendptr->next = sptr;
+					seclistendptr = sptr;
+				}
 				break;
 
 			case 'o':
@@ -228,61 +320,13 @@ main(argc, argv)
 				continue;
 
 			case ELF:
-			/*
-			 * Will take care of COFF M32 and i386 also
-			 * As well as ELF M32, i386 and Sparc (32- and 64-bit)
-			 */
-
-				fd = fileno(stdin);
-				(void) lseek(fd, 0L, 0);
-				elf = elf_begin(fd, ELF_C_READ, NULL);
-				if (gelf_getehdr(elf, &ehdr) ==
-				    (GElf_Ehdr *)NULL) {
-					(void) fprintf(stderr, "%s: %s\n",
-					    argv[optind-1], elf_errmsg(-1));
-					(void) elf_end(elf);
-					rc = 1;
-					continue;
-				}
-				scn = 0;
-				while ((scn = elf_nextscn(elf, scn)) != 0)
-				{
-					if (gelf_getshdr(scn, &shdr) ==
-					    (GElf_Shdr *)0) {
-						(void) fprintf(stderr,
-						"%s: %s\n", argv[optind-1],
-						elf_errmsg(-1));
-						rc = 1;
-						continue;
-					}
-					if ((scn_name = elf_strptr(elf,
-					    ehdr.e_shstrndx,
-					    (size_t)shdr.sh_name))
-					    == (char *)NULL) {
-						(void) fprintf(stderr,
-						"%s: %s\n", argv[optind-1],
-						elf_errmsg(-1));
-						rc = 1;
-						continue;
-					}
-					/*
-					 * There is more than one .data section
-					 */
-
-					if ((strcmp(scn_name, ".rodata")
-					    == 0) ||
-					    (strcmp(scn_name, ".rodata1")
-					    == 0) ||
-					    (strcmp(scn_name, ".data")
-					    == 0) ||
-					    (strcmp(scn_name, ".data1")
-					    == 0))
-					{
-						(void) fseek(stdin,
-						    (long)shdr.sh_offset, 0);
-						find((long)shdr.sh_size);
-					}
-				}
+				/*
+				 * Will take care of COFF M32 and i386 also
+				 * As well as ELF M32, i386 and Sparc (32-
+				 * and 64-bit)
+				 */
+				rc = look_in_sections(argv[optind - 1],
+				    seclistptr);
 				continue;
 
 			case NOTOUT:
@@ -296,7 +340,6 @@ main(argc, argv)
 
 	return (rc);
 }
-
 
 static void
 find(cnt)
@@ -508,7 +551,7 @@ static void
 Usage()
 {
 	(void) fprintf(stderr, gettext(
-	    "Usage: strings [-|-a] [-t format] [-n #] [file ...]\n"
-	    "       strings [-|-a] [-o] [-#] [file ...]\n"));
+	    "Usage: strings [-a | -] [-t format | -o] [-n number | -number]"
+	    "\n\t[-N name] [file]...\n"));
 	exit(1);
 }
