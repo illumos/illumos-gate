@@ -290,6 +290,9 @@ KMF_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 	if (parms == NULL || numkeys == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
+	if (keys != NULL && *numkeys == 0)
+		return (KMF_ERR_BAD_PARAMETER);
+
 	plugin = FindPlugin(handle, parms->kstype);
 
 	if (plugin != NULL && plugin->funclist->FindKey != NULL) {

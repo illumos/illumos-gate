@@ -997,11 +997,15 @@ OpenSSL_FindCert(KMF_HANDLE_T handle,
 	KMF_RETURN rv = KMF_OK;
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
 	char *fullpath;
-	int i;
+	int i, n;
+	uint32_t maxcerts = 0;
 
 	if (num_certs == NULL || params == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
+	maxcerts = *num_certs;
+	if (maxcerts == 0)
+		maxcerts = 0xFFFFFFFF;
 	*num_certs = 0;
 
 	fullpath = get_fullpath(params->sslparms.dirpath,
@@ -1013,8 +1017,8 @@ OpenSSL_FindCert(KMF_HANDLE_T handle,
 	if (isdir(fullpath)) {
 		DIR *dirp;
 		struct dirent *dp;
-		int n = 0;
 
+		n = 0;
 		/* open all files in the directory and attempt to read them */
 		if ((dirp = opendir(fullpath)) == NULL) {
 			return (KMF_ERR_BAD_PARAMETER);
@@ -1022,7 +1026,7 @@ OpenSSL_FindCert(KMF_HANDLE_T handle,
 		while ((dp = readdir(dirp)) != NULL) {
 			char *fname;
 			KMF_DATA *certlist = NULL;
-			uint32_t numcerts = 0;
+			uint32_t loaded_certs = 0;
 
 			if (strcmp(dp->d_name, ".") == 0 ||
 			    strcmp(dp->d_name, "..") == 0)
@@ -1032,12 +1036,12 @@ OpenSSL_FindCert(KMF_HANDLE_T handle,
 				(char *)&dp->d_name);
 
 			rv = load_certs(kmfh, params, fname, &certlist,
-				&numcerts);
+				&loaded_certs);
 
 			if (rv != KMF_OK) {
 				free(fname);
 				if (certlist != NULL) {
-					for (i = 0; i < numcerts; i++)
+					for (i = 0; i < loaded_certs; i++)
 						KMF_FreeData(&certlist[i]);
 					free(certlist);
 				}
@@ -1046,7 +1050,8 @@ OpenSSL_FindCert(KMF_HANDLE_T handle,
 
 			/* If load succeeds, add certdata to the list */
 			if (kmf_cert != NULL) {
-				for (i = 0; i < numcerts; i++) {
+				for (i = 0; i < loaded_certs &&
+				    i < maxcerts; i++) {
 					kmf_cert[n].certificate.Data =
 						certlist[i].Data;
 					kmf_cert[n].certificate.Length =
@@ -1060,54 +1065,62 @@ OpenSSL_FindCert(KMF_HANDLE_T handle,
 						strdup(fname);
 					n++;
 				}
-				free(certlist);
-			} else {
-				for (i = 0; i < numcerts; i++)
+				/* If maxcerts < loaded_certs, clean up */
+				for (; i < loaded_certs; i++)
 					KMF_FreeData(&certlist[i]);
-				free(certlist);
-				n += numcerts;
+			} else {
+				for (i = 0; i < loaded_certs; i++)
+					KMF_FreeData(&certlist[i]);
+				n += loaded_certs;
 			}
+			free(certlist);
 			free(fname);
 		}
 		(*num_certs) = n;
 		if (*num_certs == 0)
 			rv = KMF_ERR_CERT_NOT_FOUND;
-		if (*num_certs > 0)
+		else
 			rv = KMF_OK;
 exit:
 		(void) closedir(dirp);
 	} else {
 		KMF_DATA *certlist = NULL;
-		uint32_t numcerts = 0;
+		uint32_t loaded_certs = 0;
 
-		rv = load_certs(kmfh, params, fullpath, &certlist, &numcerts);
+		rv = load_certs(kmfh, params, fullpath,
+			&certlist, &loaded_certs);
 		if (rv != KMF_OK) {
 			free(fullpath);
 			return (rv);
 		}
 
+		n = 0;
 		if (kmf_cert != NULL && certlist != NULL) {
-			for (i = 0; i < numcerts; i++) {
-				kmf_cert[i].certificate.Data =
+			for (i = 0; i < loaded_certs && i < maxcerts; i++) {
+				kmf_cert[n].certificate.Data =
 					certlist[i].Data;
-				kmf_cert[i].certificate.Length =
+				kmf_cert[n].certificate.Length =
 					certlist[i].Length;
-				kmf_cert[i].kmf_private.keystore_type =
+				kmf_cert[n].kmf_private.keystore_type =
 					KMF_KEYSTORE_OPENSSL;
-				kmf_cert[i].kmf_private.flags =
+				kmf_cert[n].kmf_private.flags =
 					KMF_FLAG_CERT_VALID;
-				kmf_cert[i].kmf_private.label =
+				kmf_cert[n].kmf_private.label =
 					strdup(fullpath);
+				n++;
 			}
-			free(certlist);
-		} else {
-			if (certlist != NULL) {
-				for (i = 0; i < numcerts; i++)
-					KMF_FreeData(&certlist[i]);
-				free(certlist);
-			}
+			/* If maxcerts < loaded_certs, clean up */
+			for (; i < loaded_certs; i++)
+				KMF_FreeData(&certlist[i]);
+		} else if (certlist != NULL) {
+			for (i = 0; i < loaded_certs; i++)
+				KMF_FreeData(&certlist[i]);
+			n = loaded_certs;
 		}
-		*num_certs = numcerts;
+		if (certlist)
+			free(certlist);
+
+		*num_certs = n;
 	}
 
 	free(fullpath);
@@ -3078,6 +3091,7 @@ OpenSSL_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *params,
 {
 	KMF_RETURN rv = KMF_OK;
 	char *fullpath = NULL;
+	uint32_t maxkeys;
 
 	if (handle == NULL || params == NULL || numkeys == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -3093,6 +3107,10 @@ OpenSSL_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *params,
 	if (fullpath == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
+	maxkeys = *numkeys;
+	if (maxkeys == 0)
+		maxkeys = 0xFFFFFFFF;
+
 	*numkeys = 0;
 
 	if (isdir(fullpath)) {
@@ -3105,7 +3123,7 @@ OpenSSL_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *params,
 			return (KMF_ERR_BAD_PARAMETER);
 		}
 		rewinddir(dirp);
-		while ((dp = readdir(dirp)) != NULL) {
+		while ((dp = readdir(dirp)) != NULL && n < maxkeys) {
 			if (strcmp(dp->d_name, ".") &&
 			    strcmp(dp->d_name, "..")) {
 				char *fname;
@@ -3136,7 +3154,7 @@ OpenSSL_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *params,
 			free(fullpath);
 	}
 
-	if ((*numkeys) == 0)
+	if (rv == KMF_OK && (*numkeys) == 0)
 		rv = KMF_ERR_KEY_NOT_FOUND;
 
 	return (rv);

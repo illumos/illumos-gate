@@ -557,11 +557,13 @@ convertCertList(void *kmfhandle,
 {
 	KMF_RETURN rv = KMF_OK;
 	CERTCertListNode *node;
+	uint32_t maxcerts = *numcerts;
 
 	*numcerts = 0;
 
 	for (node = CERT_LIST_HEAD(nsscerts);
-		!CERT_LIST_END(node, nsscerts) && rv == KMF_OK;
+		!CERT_LIST_END(node, nsscerts) && rv == KMF_OK &&
+		(*numcerts) < maxcerts;
 		node = CERT_LIST_NEXT(node), (*numcerts)++) {
 		if (kmfcerts != NULL)
 			rv = nss2kmf_cert(node->cert, &kmfcerts[*numcerts]);
@@ -574,6 +576,7 @@ convertCertList(void *kmfhandle,
 		int i;
 		for (i = 0; i < *numcerts; i++)
 			KMF_FreeKMFCert(kmfhandle, &kmfcerts[i]);
+		*numcerts = 0;
 	}
 	return (rv);
 }
@@ -587,6 +590,7 @@ NSS_FindCert(KMF_HANDLE_T handle, KMF_FINDCERT_PARAMS *params,
 	KMF_HANDLE *kmfh = (KMF_HANDLE *)handle;
 	PK11SlotInfo *nss_slot = NULL;
 	CERTCertList *certlist = NULL;
+	uint32_t maxcerts;
 
 	rv = Do_NSS_Init(handle,
 		params->ks_opt_u.nss_opts, FALSE, &nss_slot);
@@ -594,20 +598,36 @@ NSS_FindCert(KMF_HANDLE_T handle, KMF_FINDCERT_PARAMS *params,
 		return (rv);
 	}
 
+	if (*num_certs == 0)
+		maxcerts = 0xFFFFFFFF;
+	else
+		maxcerts = *num_certs;
+
 	*num_certs = 0;
 	if (params->certLabel) {
+		/* This will only find 1 certificate */
 		rv = nss_getcert_by_label(kmfh,
 			params->certLabel,
 			kmfcerts, num_certs, params->find_cert_validity);
 	} else {
+		/*
+		 * Build a list of matching certs.
+		 */
 		rv = nss_find_matching_certs(nss_slot,
 			params->issuer, params->subject, params->serial,
 			&certlist, params->find_cert_validity);
 
+		/*
+		 * If the caller supplied a pointer to storage for
+		 * a list of certs, convert up to 'maxcerts' of the
+		 * matching certs.
+		 */
 		if (rv == KMF_OK && certlist != NULL) {
 			rv = convertCertList(handle,
-				certlist, kmfcerts, num_certs);
+				certlist, kmfcerts, &maxcerts);
 			CERT_DestroyCertList(certlist);
+			if (rv == KMF_OK)
+				*num_certs = maxcerts;
 		}
 	}
 
@@ -1801,11 +1821,9 @@ NSS_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 	SECKEYPublicKeyList *publist;
 	SECKEYPublicKeyListNode *pubnode;
 	PK11SlotInfo *nss_slot = NULL;
-	PK11SymKey *symlist;
+	PK11SymKey *symlist = NULL;
 	int count;
-
-	if (handle == NULL || parms == NULL || numkeys == NULL)
-		return (KMF_ERR_BAD_PARAMETER);
+	uint32_t maxkeys;
 
 	rv = Do_NSS_Init(handle,
 		parms->ks_opt_u.nss_opts, FALSE, &nss_slot);
@@ -1817,6 +1835,10 @@ NSS_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 	if (rv != KMF_OK) {
 		return (rv);
 	}
+
+	maxkeys = *numkeys;
+	if (maxkeys == 0)
+		maxkeys = 0xFFFFFFFF;
 
 	*numkeys = 0;
 	if (parms->keyclass == KMF_ASYM_PUB) {
@@ -1846,7 +1868,8 @@ NSS_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 
 	if (parms->keyclass == KMF_ASYM_PUB) {
 		for (count = 0, pubnode = PUBKEY_LIST_HEAD(publist);
-			!PUBKEY_LIST_END(pubnode, publist);
+			!PUBKEY_LIST_END(pubnode, publist) &&
+			count < maxkeys;
 			pubnode = PUBKEY_LIST_NEXT(pubnode), count++) {
 			if (keys != NULL) {
 				keys[count].kstype = KMF_KEYSTORE_NSS;
@@ -1865,7 +1888,8 @@ NSS_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 		*numkeys = count;
 	} else if (parms->keyclass == KMF_ASYM_PRI) {
 		for (count = 0, prinode = PRIVKEY_LIST_HEAD(prilist);
-			!PRIVKEY_LIST_END(prinode, prilist);
+			!PRIVKEY_LIST_END(prinode, prilist) &&
+			count < maxkeys;
 			prinode = PRIVKEY_LIST_NEXT(prinode), count++) {
 			if (keys != NULL) {
 				keys[count].kstype = KMF_KEYSTORE_NSS;
@@ -1884,7 +1908,7 @@ NSS_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 		*numkeys = count;
 	} else if (parms->keyclass == KMF_SYMMETRIC) {
 		count = 0;
-		while (symlist) {
+		while (symlist && count < maxkeys) {
 			PK11SymKey *symkey = symlist;
 			CK_KEY_TYPE type;
 			KMF_KEY_ALG keyalg;
@@ -1900,6 +1924,8 @@ NSS_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 			symlist = PK11_GetNextSymKey(symkey);
 			if (parms->keytype != KMF_KEYALG_NONE &&
 			    parms->keytype != keyalg) {
+				/* free that key since we aren't using it */
+				PK11_FreeSymKey(symkey);
 				continue;
 			}
 
@@ -1915,9 +1941,17 @@ NSS_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *parms,
 			}
 			count++;
 		}
-		*numkeys = count;
+		/*
+		 * Cleanup memory for unused keys.
+		 */
+		while (symlist != NULL) {
+			PK11SymKey *symkey = symlist;
+			PK11_FreeSymKey(symkey);
+			symlist = PK11_GetNextSymKey(symkey);
+		}
 	}
 
+	*numkeys = count;
 cleanup:
 	if (nss_slot != NULL) {
 		PK11_FreeSlot(nss_slot);
