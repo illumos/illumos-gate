@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1413,12 +1413,14 @@ do_cc(cw_ictx_t *ctx)
 			break;
 		case 'c':
 		case 'S':
-			op = CW_O_COMPILE;
+			if (strlen(arg) == 2)
+				op = CW_O_COMPILE;
 			newae(ctx->i_ae, arg);
 			break;
 		case 'E':
 		case 'P':
-			op = CW_O_PREPROCESS;
+			if (strlen(arg) == 2)
+				op = CW_O_PREPROCESS;
 		/*FALLTHROUGH*/
 		default:
 			newae(ctx->i_ae, arg);
