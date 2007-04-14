@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1621,18 +1621,17 @@ nfs4delegreturn_impl(rnode4_t *rp, int flags, struct nfs4_callback_globals *ncg)
 	}
 
 	/*
-	 * Take r_deleg_recall_lock to verify we still have a delegation
-	 * and to crhold the credential.  We have to release the lock
-	 * before we call VOP_PUTPAGE or else we'll deadlock.
+	 * Verify we still have a delegation and crhold the credential.
 	 */
-	(void) nfs_rw_enter_sig(&rp->r_deleg_recall_lock, RW_WRITER, FALSE);
-	rw_entered = TRUE;
-	if (rp->r_deleg_type == OPEN_DELEGATE_NONE)
+	mutex_enter(&rp->r_statev4_lock);
+	if (rp->r_deleg_type == OPEN_DELEGATE_NONE) {
+		mutex_exit(&rp->r_statev4_lock);
 		goto out;
+	}
 	cr = rp->r_deleg_cred;
+	ASSERT(cr != NULL);
 	crhold(cr);
-	nfs_rw_exit(&rp->r_deleg_recall_lock);
-	rw_entered = FALSE;
+	mutex_exit(&rp->r_statev4_lock);
 
 	/*
 	 * Push the modified data back to the server synchronously
