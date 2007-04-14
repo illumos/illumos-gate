@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,28 +33,53 @@
 #include	<_conv.h>
 #include	<phdr_msg.h>
 
-static const Msg uphdrs[] = {
-	MSG_PT_SUNWBSS,		MSG_PT_SUNWSTACK,	MSG_PT_SUNWDTRACE,
-	MSG_PT_SUNWCAP
-};
+/* Instantiate a local copy of conv_map2str() from _conv.h */
+DEFINE_conv_map2str
 
 const char *
-conv_phdr_type(Half mach, Word type)
+conv_phdr_type(Half mach, Word type, int fmt_flags)
 {
 	static Conv_inv_buf_t	string;
 	static const Msg	phdrs[] = {
-		MSG_PT_NULL,		MSG_PT_LOAD,		MSG_PT_DYNAMIC,
-		MSG_PT_INTERP,		MSG_PT_NOTE,		MSG_PT_SHLIB,
+		MSG_PT_NULL,		MSG_PT_LOAD,
+		MSG_PT_DYNAMIC,		MSG_PT_INTERP,
+		MSG_PT_NOTE,		MSG_PT_SHLIB,
 		MSG_PT_PHDR,		MSG_PT_TLS
 	};
+	static const Msg	phdrs_alt[] = {
+		MSG_PT_NULL_ALT,	MSG_PT_LOAD_ALT,
+		MSG_PT_DYNAMIC_ALT,	MSG_PT_INTERP_ALT,
+		MSG_PT_NOTE_ALT,	MSG_PT_SHLIB_ALT,
+		MSG_PT_PHDR_ALT,	MSG_PT_TLS_ALT
+	};
+#if PT_NUM != (PT_TLS + 1)
+error "PT_NUM has grown. Update phdrs[]"
+#endif
+	static const Msg uphdrs[] = {
+		MSG_PT_SUNWBSS,		MSG_PT_SUNWSTACK,
+		MSG_PT_SUNWDTRACE,	MSG_PT_SUNWCAP
+	};
+	static const Msg uphdrs_alt[] = {
+		MSG_PT_SUNWBSS_ALT,	MSG_PT_SUNWSTACK_ALT,
+		MSG_PT_SUNWDTRACE_ALT,	MSG_PT_SUNWCAP_ALT
+	};
+#if PT_LOSUNW != PT_SUNWBSS
+#error "PT_LOSUNW has grown. Update uphdrs[]"
+#endif
 
-	if (type < PT_NUM)
-		return (MSG_ORIG(phdrs[type]));
-	else if ((type >= PT_SUNWBSS) && (type <= PT_HISUNW))
-		return (MSG_ORIG(uphdrs[type - PT_SUNWBSS]));
-	else if ((type == PT_SUNW_UNWIND) && (mach == EM_AMD64))
-		return (MSG_ORIG(MSG_PT_SUNW_UNWIND));
-	else
+	if (type < PT_NUM) {
+		return (conv_map2str(string, sizeof (string),
+		    type, fmt_flags, ARRAY_NELTS(phdrs),
+		    phdrs, phdrs_alt, phdrs_alt));
+	} else if ((type >= PT_SUNWBSS) && (type <= PT_HISUNW)) {
+		return (conv_map2str(string, sizeof (string),
+		    (type - PT_SUNWBSS), fmt_flags, ARRAY_NELTS(uphdrs),
+		    uphdrs, uphdrs_alt, uphdrs_alt));
+	} else if ((type == PT_SUNW_UNWIND) && (mach == EM_AMD64)) {
+		return ((fmt_flags & CONV_FMTALTMASK) ?
+		    MSG_ORIG(MSG_PT_SUNW_UNWIND_ALT) :
+		    MSG_ORIG(MSG_PT_SUNW_UNWIND));
+	} else
 		return (conv_invalid_val(string, CONV_INV_STRSIZE, type, 0));
 }
 

@@ -132,7 +132,7 @@ typedef enum {
 #define	AL_CNT_ALIAS	2		/* ALIAS() initial alist count */
 #define	AL_CNT_DEPENDS	10		/* DEPENDS() initial alist count */
 #define	AL_CNT_CALLERS	10		/* CALLERS() initial alist count */
-#define	AL_CNT_GROUPS	1		/* GROUPS() initial alist count */
+#define	AL_CNT_GROUPS	4		/* GROUPS() initial alist count */
 #define	AL_CNT_COPYREL	10		/* COPY() initial alist count */
 #define	AL_CNT_LAZYFIND	10		/* elf_lazy_find_sym() initial alist */
 					/*	count */

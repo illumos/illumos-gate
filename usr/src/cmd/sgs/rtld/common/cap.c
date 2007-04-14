@@ -31,6 +31,7 @@
 #include	<sys/mman.h>
 #include	<dirent.h>
 #include	<stdio.h>
+#include	<stdlib.h>
 #include	<string.h>
 #include	<limits.h>
 #include	<debug.h>
@@ -177,7 +178,7 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
 	 */
 	while ((dirent = readdir(dir)) != NULL) {
 		const char	*file = dirent->d_name;
-		char		*_dst;
+		char		*_dst, *_name;
 		Fdesc		fdesc = { 0 };
 		Rej_desc	_rej = { 0 };
 
@@ -195,34 +196,46 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
 			*_dst = *src;
 		*_dst = '\0';
 
-		if ((name = strdup(path)) == 0) {
+		if ((_name = strdup(path)) == NULL) {
 			error = 1;
 			break;
 		}
-		if ((name = load_trace(lml, name, clmp)) == 0)
+
+		if ((name = load_trace(lml, _name, clmp)) == 0) {
+			free((void *)_name);
 			continue;
+		}
 
-		if (find_path(lml, name, clmp, flags, &fdesc, &_rej) == 0)
+		/*
+		 * Note, all directory entries are processed by find_path(),
+		 * even entries that are directories themselves.  This single
+		 * point for control keeps the number of stat()'s down, and
+		 * provides a single point for error diagnostics.
+		 */
+		if (find_path(lml, name, clmp, flags, &fdesc, &_rej) == 0) {
 			rejection_inherit(rej, &_rej, &fdesc);
-		else {
-			DBG_CALL(Dbg_cap_hw_candidate(lml, name));
+			if ((rej->rej_name != _rej.rej_name) &&
+			    (_rej.rej_name == name))
+				free((void *)name);
+			continue;
+		}
 
-			/*
-			 * If this object has already been loaded, obtain the
-			 * hardware capabilities for later sorting.  Otherwise
-			 * we have a new candidate.
-			 */
-			if (fdesc.fd_lmp)
-				fdesc.fd_fmap.fm_hwptr = HWCAP(fdesc.fd_lmp);
-			else
-				fdesc.fd_fmap = *fmap;
+		DBG_CALL(Dbg_cap_hw_candidate(lml, name));
 
-			if (alist_append(&fdalp, &fdesc,
-			    sizeof (Fdesc), 10) == 0) {
-				remove_fdesc(&fdesc);
-				error = 1;
-				break;
-			}
+		/*
+		 * If this object has already been loaded, obtain the hardware
+		 * capabilities for later sorting.  Otherwise we have a new
+		 * candidate.
+		 */
+		if (fdesc.fd_lmp)
+			fdesc.fd_fmap.fm_hwptr = HWCAP(fdesc.fd_lmp);
+		else
+			fdesc.fd_fmap = *fmap;
+
+		if (alist_append(&fdalp, &fdesc, sizeof (Fdesc), 10) == 0) {
+			remove_fdesc(&fdesc);
+			error = 1;
+			break;
 		}
 
 		/*
@@ -233,7 +246,6 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
 		fmap->fm_maddr = 0;
 		fmap->fm_msize = syspagsz;
 		fmap->fm_hwptr = 0;
-
 	}
 	(void) closedir(dir);
 
@@ -323,7 +335,7 @@ _hwcap_filtees(Pnode **pnpp, Aliste nlmco, Lm_cntl *nlmc, Rt_map *flmp,
 			}
 			return (0);
 		}
-		if ((pnp->p_name = strdup(NAME(nlmp))) == 0) {
+		if ((pnp->p_name = strdup(NAME(nlmp))) == NULL) {
 			if (ghp) {
 				remove_lmc(lml, flmp, nlmc, nlmco,
 				    fdp->fd_nname);

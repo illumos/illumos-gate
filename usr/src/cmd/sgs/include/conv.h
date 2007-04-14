@@ -275,7 +275,7 @@ extern	const char	*conv_ehdr_vers(Word, int);
 extern	int		conv_expn_field(CONV_EXPN_FIELD_ARG *);
 extern	const char	*conv_invalid_val(char *, size_t, Xword, int);
 extern	const char	*conv_phdr_flags(Word);
-extern	const char	*conv_phdr_type(Half, Word);
+extern	const char	*conv_phdr_type(Half, Word, int);
 extern	const char	*conv_reject_desc(Rej_desc *);
 extern	const char	*conv_reloc_type(Half, Word, int);
 extern	const char	*conv_reloc_386_type(Word, int);

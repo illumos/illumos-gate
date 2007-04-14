@@ -1225,3 +1225,4 @@ Bugid   Risk Synopsis
 6535688 elfdump could be more robust in the face of Purify (D)
 6516665 The link-editors should be more resilient against gcc's symbol
 	versioning
+6541004 hwcap filter processing can leak memory

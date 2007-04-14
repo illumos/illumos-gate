@@ -569,7 +569,7 @@ dcmd_Rtmaps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf(MSG_ORIG(MSG_LMLIST_TITLE1), MSG_ORIG(MSG_STR_DYNLMLIST),
-	    &gsym);
+	    gsym.st_value);
 	mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
 	flags |= (DCMD_LOOP | DCMD_LOOPFIRST);
@@ -1025,7 +1025,7 @@ dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf(MSG_ORIG(MSG_LMLIST_TITLE1), MSG_ORIG(MSG_STR_DYNLMLIST),
-	    &gsym);
+	    gsym.st_value);
 	mdb_printf(MSG_ORIG(MSG_STR_DASHES));
 
 	flags |= (DCMD_LOOP | DCMD_LOOPFIRST);
@@ -1498,7 +1498,7 @@ dcmd_ElfPhdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE1), phdr.p_vaddr,
 	    conv_phdr_flags(phdr.p_flags));
 	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE2), phdr.p_paddr,
-	    conv_phdr_type(M_MACH, phdr.p_type));
+	    conv_phdr_type(M_MACH, phdr.p_type, 0));
 	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE3), phdr.p_filesz, phdr.p_memsz);
 	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE4), phdr.p_offset, phdr.p_align);
 

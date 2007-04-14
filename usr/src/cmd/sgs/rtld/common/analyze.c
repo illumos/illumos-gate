@@ -531,7 +531,7 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *clmp, Rt_map *nlmp)
 		plmc = (Lm_cntl *)((char *)lml->lm_lists + plmco);
 		if ((nlmco != ALO_DATA) && nlmc->lc_head)
 			lm_move(lml, nlmco, plmco, nlmc, plmc);
-		(void) free(alp);
+		free(alp);
 	}
 
 	/*
@@ -572,9 +572,6 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *clmp, Rt_map *nlmp)
  * Note that the name, and rejection string must be duplicated, as the name
  * buffer and error string buffer (see conv_ routines) may be reused for
  * additional processing or rejection messages.
- *
- * As this routine is called to clean up after a failed open, remove any
- * resolved pathname that might have been allocated as the file was processed.
  */
 void
 rejection_inherit(Rej_desc *rej1, Rej_desc *rej2, Fdesc *fdp)
@@ -586,14 +583,9 @@ rejection_inherit(Rej_desc *rej1, Rej_desc *rej2, Fdesc *fdp)
 		if (rej2->rej_name)
 			rej1->rej_name = strdup(rej2->rej_name);
 		if (rej2->rej_str) {
-			if ((rej1->rej_str = strdup(rej2->rej_str)) == 0)
+			if ((rej1->rej_str = strdup(rej2->rej_str)) == NULL)
 				rej1->rej_str = MSG_ORIG(MSG_EMG_ENOMEM);
 		}
-	}
-	if (fdp && fdp->fd_nname && fdp->fd_pname &&
-	    (fdp->fd_pname != fdp->fd_nname)) {
-		free((void *)fdp->fd_pname);
-		fdp->fd_pname = 0;
 	}
 }
 
@@ -1046,7 +1038,7 @@ append_alias(Rt_map *lmp, const char *str, int *added)
 	/*
 	 * This is a new alias, append it to the alias list.
 	 */
-	if ((cp = strdup(str)) == 0)
+	if ((cp = strdup(str)) == NULL)
 		return (0);
 
 	if (alist_append(&ALIAS(lmp), &cp, sizeof (char *),
@@ -1176,10 +1168,11 @@ file_notfound(Lm_list *lml, const char *name, Rt_map *clmp, uint_t flags,
 
 static int
 file_open(int err, Lm_list *lml, const char *oname, const char *nname,
-    Rt_map *clmp, uint_t flags, Fdesc * fdesc, Rej_desc *rej)
+    Rt_map *clmp, uint_t flags, Fdesc *fdesc, Rej_desc *rej)
 {
 	struct stat	status;
 	Rt_map		*nlmp;
+	int		resolved = 0;
 
 	fdesc->fd_oname = oname;
 
@@ -1207,13 +1200,17 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 
 		/*
 		 * If this path has been constructed as part of expanding a
-		 * HWCAP directory, ignore any subdirectories.  For any other
-		 * reference that expands to a directory, fall through to
-		 * contruct a meaningful rejection message.
+		 * HWCAP directory, ignore any subdirectories.  As this is a
+		 * silent failure, where no rejection message is created, free
+		 * the original name to simplify the life of the caller.  For
+		 * any other reference that expands to a directory, fall through
+		 * to contruct a meaningful rejection message.
 		 */
 		if ((flags & FLG_RT_HWCAP) &&
-		    ((status.st_mode & S_IFMT) == S_IFDIR))
+		    ((status.st_mode & S_IFMT) == S_IFDIR)) {
+			free((void *)nname);
 			return (0);
+		}
 
 		/*
 		 * Resolve the filename and determine whether the resolved name
@@ -1252,8 +1249,9 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 				 * have to be recomputed as part of fullpath()
 				 * processing.
 				 */
-				if ((fdesc->fd_pname = strdup(path)) == 0)
+				if ((fdesc->fd_pname = strdup(path)) == NULL)
 					return (0);
+				resolved = 1;
 			} else {
 				/*
 				 * If the resolved name doesn't differ from the
@@ -1346,6 +1344,14 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 	 * Indicate any rejection.
 	 */
 	if (rej->rej_type) {
+		/*
+		 * If this pathname was resolved and duplicated, remove the
+		 * allocated name to simplify the cleanup of the callers.
+		 */
+		if (resolved) {
+			free((void *)fdesc->fd_pname);
+			fdesc->fd_pname = NULL;
+		}
 		rej->rej_name = nname;
 		rej->rej_flag = (fdesc->fd_flags & FLG_FD_ALTER);
 		DBG_CALL(Dbg_file_rejected(lml, rej));
@@ -1358,7 +1364,7 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
  */
 int
 find_path(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
-    Fdesc * fdesc, Rej_desc *rej)
+    Fdesc *fdesc, Rej_desc *rej)
 {
 	int	err = 0;
 
@@ -1414,7 +1420,7 @@ find_path(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
  */
 static int
 _find_file(Lm_list *lml, const char *oname, const char *nname, Rt_map *clmp,
-    uint_t flags, Fdesc * fdesc, Rej_desc *rej, Pnode * dir, int aflag)
+    uint_t flags, Fdesc *fdesc, Rej_desc *rej, Pnode *dir, int aflag)
 {
 	DBG_CALL(Dbg_libs_found(lml, nname, aflag));
 	if ((lml->lm_flags & LML_FLG_TRC_SEARCH) &&
@@ -1440,7 +1446,7 @@ _find_file(Lm_list *lml, const char *oname, const char *nname, Rt_map *clmp,
 
 static int
 find_file(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
-    Fdesc * fdesc, Rej_desc *rej, Pnode * dir, Word * strhash, size_t olen)
+    Fdesc *fdesc, Rej_desc *rej, Pnode *dir, Word * strhash, size_t olen)
 {
 	static Rtc_obj	Obj = { 0 };
 	Rtc_obj *	dobj;
@@ -1749,7 +1755,7 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 		if (nfdp->fd_pname && (nfdp->fd_nname != nfdp->fd_pname)) {
 			char	*pname;
 
-			if ((pname = strdup(nfdp->fd_pname)) == 0)
+			if ((pname = strdup(nfdp->fd_pname)) == NULL)
 				return (0);
 			nfdp->fd_pname = pname;
 		}
@@ -1827,7 +1833,7 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 		 * (i.e., a file might have a dependency on foo.so.1 which has
 		 * already been opened using its full pathname).
 		 */
-		if (nfdp->fd_nname == 0)
+		if (nfdp->fd_nname == NULL)
 			return (is_so_loaded(lml, oname));
 	}
 
@@ -1837,7 +1843,7 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 	 * they get duplicated once more to insure consistent cleanup in the
 	 * event of an error condition.
 	 */
-	if ((name = strdup(nfdp->fd_nname)) == 0)
+	if ((name = strdup(nfdp->fd_nname)) == NULL)
 		return (0);
 
 	if (nfdp->fd_nname == nfdp->fd_pname)
@@ -1890,11 +1896,15 @@ load_trace(Lm_list *lml, const char *name, Rt_map *clmp)
 		}
 
 		/*
-		 * The auditor can provide an alternative name.
+		 * The auditor can provide an alternative name.  Provided we
+		 * can duplicate the name, return the new name and free the
+		 * old.  Otherwise, leave the old name for the caller to use
+		 * in any error diagnostic.
 		 */
 		if (_name != name) {
-			free((void *)name);
-			name = strdup(_name);
+			if ((_name = strdup(_name)) != NULL)
+				free((void *)name);
+			name = _name;
 		}
 	}
 	return (name);

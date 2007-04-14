@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,7 +36,7 @@ Elf_phdr(Lm_list *lml, Half mach, Phdr *phdr)
 	dbg_print(lml, MSG_ORIG(MSG_PHD_VADDR), EC_ADDR(phdr->p_vaddr),
 	    conv_phdr_flags(phdr->p_flags));
 	dbg_print(lml, MSG_ORIG(MSG_PHD_PADDR), EC_ADDR(phdr->p_paddr),
-	    conv_phdr_type(mach, phdr->p_type));
+	    conv_phdr_type(mach, phdr->p_type, 0));
 	dbg_print(lml, MSG_ORIG(MSG_PHD_FILESZ), EC_XWORD(phdr->p_filesz),
 	    EC_XWORD(phdr->p_memsz));
 	dbg_print(lml, MSG_ORIG(MSG_PHD_OFFSET), EC_OFF(phdr->p_offset),

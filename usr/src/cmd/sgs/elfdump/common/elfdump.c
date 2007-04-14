@@ -2633,19 +2633,6 @@ checksum(Elf *elf)
 void
 regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 {
-	/*
-	 * Program header names that we can test for.
-	 */
-	static const char *pnames[PT_NUM] = {
-		MSG_ORIG(MSG_PT_NULL),		MSG_ORIG(MSG_PT_LOAD),
-		MSG_ORIG(MSG_PT_DYNAMIC),	MSG_ORIG(MSG_PT_INTERP),
-		MSG_ORIG(MSG_PT_NOTE),		MSG_ORIG(MSG_PT_SHLIB),
-		MSG_ORIG(MSG_PT_PHDR),		MSG_ORIG(MSG_PT_TLS)
-	};
-#if PT_NUM != (PT_TLS + 1)
-#error "P_NUM has grown. Update addr_symtype[]"
-#endif
-
 	Elf_Scn		*scn;
 	Ehdr		*ehdr;
 	Elf_Data	*data;
@@ -2703,8 +2690,9 @@ regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 
 		for (cnt = 0; cnt < phnum; phdr++, cnt++) {
 
-			if (Nname && ((phdr->p_type >= PT_NUM) ||
-			    (strcmp(Nname, pnames[phdr->p_type]) != 0)))
+			if (Nname &&
+			    (strcmp(Nname, conv_phdr_type(ehdr->e_machine,
+			    phdr->p_type, CONV_FMT_ALTFILE)) != 0))
 				continue;
 
 			dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
