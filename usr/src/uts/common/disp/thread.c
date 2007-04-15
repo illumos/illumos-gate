@@ -123,6 +123,8 @@ static zone_key_t zone_thread_key;
  */
 static void *tsd_realloc(void *, size_t, size_t);
 
+void thread_reaper(void);
+
 /*ARGSUSED*/
 static int
 turnstile_constructor(void *buf, void *cdrarg, int kmflags)
@@ -266,6 +268,13 @@ thread_init(void)
 	 * restarts its idle thread.
 	 */
 	CALLB_CPR_INIT_SAFE(tp, "idle");
+
+	/*
+	 * Create the thread_reaper daemon. From this point on, exited
+	 * threads will get reaped.
+	 */
+	(void) thread_create(NULL, 0, (void (*)())thread_reaper,
+	    NULL, 0, &p0, TS_RUN, minclsyspri);
 
 	/*
 	 * Finish initializing the kernel memory allocator now that

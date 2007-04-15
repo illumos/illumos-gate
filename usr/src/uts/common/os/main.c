@@ -352,7 +352,6 @@ main(void)
 	int		(**initptr)();
 	extern void	sched();
 	extern void	fsflush();
-	extern void	thread_reaper();
 	extern int	(*init_tbl[])();
 	extern int	(*mp_init_tbl[])();
 	extern id_t	syscid, defaultcid;
@@ -386,6 +385,11 @@ main(void)
 	 */
 	lgrp_setup();
 
+	/*
+	 * Once 'startup()' completes, the thread_reaper() daemon would be
+	 * created(in thread_init()). After that, it is safe to create threads
+	 * that could exit. These exited threads will get reaped.
+	 */
 	startup();
 	segkmem_gc();
 	callb_init();
@@ -571,10 +575,6 @@ main(void)
 	/*
 	 * Create system threads (threads are associated with p0)
 	 */
-
-	/* create thread_reaper daemon */
-	(void) thread_create(NULL, 0, (void (*)())thread_reaper,
-	    NULL, 0, &p0, TS_RUN, minclsyspri);
 
 	/* create module uninstall daemon */
 	/* BugID 1132273. If swapping over NFS need a bigger stack */
