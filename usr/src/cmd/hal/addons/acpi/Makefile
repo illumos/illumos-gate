@@ -25,36 +25,49 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-OBJS =		devinfo.o devinfo_ieee1394.o devinfo_misc.o devinfo_pci.o \
-		devinfo_storage.o devinfo_usb.o hotplug.o osspec.o sysevent.o \
-		devinfo_acpi.o
-
-SRCS =		$(OBJS:%.o=%.c)
-
-MANIFEST =	hal.xml
-SVCMETHOD =	svc-hal
+PROG =		hald-addon-acpi
+OBJS =		addon-acpi.o logger.o util_helper.o battery.o util_pm.o
+SRCS =		addon-acpi.c ../../hald/logger.c ../../hald/util_helper.c
 
 include ../../../Makefile.cmd
 include ../../Makefile.hal
 
-ROOTMANIFESTDIR =	$(ROOTSVCSYSTEM)
-$(ROOTMANIFEST) :=	FILEMODE = 444
-$(ROOTLIBSVCMETHOD)/svc-hal:= FILEMODE = 555
+ROOTCMDDIR =	$(ROOTLIB_HAL)
 
-CPPFLAGS += $(HAL_DBUS_CPPFLAGS) $(HAL_GLIB_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
-CPPFLAGS += -I/usr/sfw/include
+LDLIBS +=	-lc -ldbus-1 -lhal -lglib-2.0
+
+CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_GLIB_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
+CPPFLAGS +=	-I$(ROOT)/usr/include/hal -I../../hald
 C99MODE =	$(C99_ENABLE)
 
 .KEEP_STATE:
 
-all: $(OBJS)
+all: $(PROG)
 
-install: all $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+battery.o: ../../utils/battery.c
+	$(COMPILE.c) -o $@ ../../utils/battery.c
+	$(POST_PROCESS_O)
 
-check: $(CHKMANIFEST)
+logger.o: ../../hald/logger.c
+	$(COMPILE.c) -o $@ ../../hald/logger.c
+	$(POST_PROCESS_O)
+
+util_helper.o: ../../hald/util_helper.c
+	$(COMPILE.c) -o $@ ../../hald/util_helper.c
+	$(POST_PROCESS_O)
+
+util_pm.o: ../../hald/util_pm.c
+	$(COMPILE.c) -o $@ ../../hald/util_pm.c
+	$(POST_PROCESS_O)
+
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
+install: all $(ROOTCMD)
 
 clean:
-	$(RM) $(OBJS)
+	$(RM) $(OBJS) $(PROG)
 
 FRC:
 

@@ -204,6 +204,16 @@ extern "C" {
 /* Service processor subclass definitions */
 #define	ESC_PLATFORM_SP_RESET	"ESC_platform_sp_reset"
 
+/*
+ * EC_ACPIEV subclass definitions
+ */
+#define	EC_ACPIEV			"EC_acpiev"
+#define	ESC_ACPIEV_ADD			"ESC_acpiev_add"
+#define	ESC_ACPIEV_REMOVE		"ESC_acpiev_remove"
+#define	ESC_ACPIEV_WARN			"ESC_acpiev_warn"
+#define	ESC_ACPIEV_LOW			"ESC_acpiev_low"
+#define	ESC_ACPIEV_STATE_CHANGE		"ESC_acpiev_state_change"
+
 #ifdef	__cplusplus
 }
 #endif

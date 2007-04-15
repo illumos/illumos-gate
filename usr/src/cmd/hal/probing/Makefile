@@ -25,7 +25,7 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-SUBDIRS = storage volume printer
+SUBDIRS = storage volume printer battery
 
 all :=		TARGET= all
 install :=	TARGET= install

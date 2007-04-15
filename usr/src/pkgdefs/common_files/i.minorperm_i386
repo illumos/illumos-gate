@@ -273,6 +273,7 @@ lx_systrace:*
 physmem:*
 asy:*
 asy:*,cu
+battery:*
 EOF
 }
 

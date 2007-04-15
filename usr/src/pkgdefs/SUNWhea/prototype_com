@@ -1113,6 +1113,7 @@ f none usr/include/sys/sysconf.h 644 root bin
 f none usr/include/sys/sysconfig.h 644 root bin
 f none usr/include/sys/sysconfig_impl.h 644 root bin
 d none usr/include/sys/sysevent 755 root bin
+f none usr/include/sys/sysevent/acpiev.h 644 root bin
 f none usr/include/sys/sysevent/ap_driver.h 644 root bin
 f none usr/include/sys/sysevent/domain.h 644 root bin
 f none usr/include/sys/sysevent/dr.h 644 root bin

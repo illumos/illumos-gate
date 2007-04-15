@@ -821,6 +821,7 @@ SATAGENHDRS=		\
 	sata_cfgadm.h
 
 SYSEVENTHDRS=		\
+	acpiev.h	\
 	ap_driver.h     \
 	dev.h		\
 	domain.h        \

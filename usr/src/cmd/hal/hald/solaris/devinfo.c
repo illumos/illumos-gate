@@ -34,6 +34,7 @@
 #include "devinfo_ieee1394.h"
 #include "devinfo_usb.h"
 #include "devinfo_misc.h"
+#include "devinfo_acpi.h"
 
 void devinfo_add_subtree(HalDevice *parent, di_node_t node, gboolean is_root);
 HalDevice *devinfo_add_node(HalDevice *parent, di_node_t node);
@@ -138,6 +139,8 @@ static DevinfoDevHandler *devinfo_handlers[] = {
 	&devinfo_ieee1394_handler,
 	&devinfo_pci_handler,
 	&devinfo_lofi_handler,
+	&devinfo_acpi_handler,
+	&devinfo_battery_handler,
 	&devinfo_default_handler,
 	NULL
 };
@@ -375,7 +378,7 @@ devinfo_device_rescan (HalDevice *d)
 {
 	if (hal_device_has_capability (d, "block")) {
 		return (devinfo_storage_device_rescan (d));
-	} else {
+        } else { 
 		return (FALSE);
 	}
 }

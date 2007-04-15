@@ -2,7 +2,7 @@
  *
  * devinfo_misc : misc devices
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -80,6 +80,12 @@ devinfo_computer_add(HalDevice *parent, di_node_t node, char *devfs_path, char *
 		hal_device_property_set_string (d, "system.kernel.version", un.release);
 		hal_device_property_set_string (d, "system.kernel.machine", un.machine);
 	}
+
+	/*
+	 * Let computer be in TDL while synthesizing all other events
+	 * because some may write to the object
+	 */
+        hal_device_store_add (hald_get_tdl (), d);
 
 	devinfo_add_enqueue (d, devfs_path, &devinfo_computer_handler);
 

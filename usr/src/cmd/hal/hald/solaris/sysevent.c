@@ -26,6 +26,7 @@
 #include <libdevinfo.h>
 #include <libsysevent.h>
 #include <sys/sysevent/dev.h>
+#include <sys/sysevent/acpiev.h>
 #include <glib.h>
 
 #include "../osspec.h"
@@ -38,6 +39,7 @@
 #include "hotplug.h"
 #include "devinfo.h"
 #include "devinfo_storage.h"
+#include "devinfo_acpi.h"
 #include "sysevent.h"
 
 #ifndef ESC_LOFI
@@ -107,6 +109,15 @@ sysevent_init(void)
 		return (FALSE);
 	}
 
+	subcl[0] = ESC_ACPIEV_ADD;
+        subcl[1] = ESC_ACPIEV_REMOVE;
+        subcl[2] = ESC_ACPIEV_STATE_CHANGE;
+	if (sysevent_subscribe_event(shp, EC_ACPIEV, subcl, 3) != 0) {
+                HAL_INFO(("subscribe(dev_add) failed %d", errno));
+                sysevent_unbind_handle(shp);
+                return (FALSE);
+        }
+
 	return (B_TRUE);
 }
 
@@ -125,6 +136,9 @@ sysevent_dev_handler(sysevent_t *ev)
 	nvlist_t	*attr_list;
 	char		*phys_path;
 	char		*dev_name;
+	char		*dev_hid;
+	char		*dev_uid;
+	uint_t		dev_index;
 	char		s[1024];
 	ssize_t		nwritten;
 
@@ -137,14 +151,37 @@ sysevent_dev_handler(sysevent_t *ev)
 	if (sysevent_get_attr_list(ev, &attr_list) != 0)
 		return;
 
-	if (nvlist_lookup_string(attr_list, DEV_PHYS_PATH, &phys_path) != 0)
+	if (strcmp(class, EC_ACPIEV) == 0) {		
+		if (nvlist_lookup_string(attr_list, ACPIEV_DEV_PHYS_PATH,
+		    &phys_path) != 0) {
+			goto out;
+		}
+	} else if (nvlist_lookup_string(attr_list, DEV_PHYS_PATH, &phys_path)
+	    != 0) {
 		goto out;
+	}
 
-	if (nvlist_lookup_string(attr_list, DEV_NAME, &dev_name) != 0)
-		dev_name = "";
+	if (nvlist_lookup_string(attr_list, DEV_NAME, &dev_name) != 0) {
+		if (strcmp(class, EC_ACPIEV) == 0) {
+			dev_name = "noname";
+		} else {
+			dev_name = "";
+		}
+	}
 
-	snprintf(s, sizeof (s), "%s %s %s %s\n",
-		class, subclass, phys_path, dev_name);
+	if (nvlist_lookup_string(attr_list, ACPIEV_DEV_HID, &dev_hid) != 0) {
+                dev_hid = "";
+	}
+        if (nvlist_lookup_string(attr_list, ACPIEV_DEV_UID, &dev_uid) != 0) {
+                dev_uid = "";
+	}
+        if (nvlist_lookup_uint32(attr_list, ACPIEV_DEV_INDEX, &dev_index)
+	    != 0) {
+                dev_index = 0;
+	}
+
+	snprintf(s, sizeof (s), "%s %s %s %s %s %s %d\n",
+	    class, subclass, phys_path, dev_name, dev_hid, dev_uid, dev_index);
 	nwritten = write(sysevent_pipe_fds[1], s, strlen(s) + 1);
 
 	HAL_INFO (("sysevent_dev_handler: wrote %d bytes", nwritten));
@@ -166,6 +203,10 @@ sysevent_iochannel_data (GIOChannel *source,
 	gchar subclass[1024];
 	gchar phys_path[1024];
 	gchar dev_name[1024];
+        gchar dev_uid[1024];
+        gchar dev_hid[1024];
+        gchar udi[1024];
+	uint_t dev_index;
 
 	HAL_INFO (("sysevent_iochannel_data"));
 
@@ -175,8 +216,10 @@ sysevent_iochannel_data (GIOChannel *source,
 			break;
 		}
 
-		class[0] = subclass[0] = phys_path[0] = dev_name[0] = '\0';
-		matches = sscanf(s, "%s %s %s %s", class, subclass, phys_path, dev_name);
+		class[0] = subclass[0] = phys_path[0] = dev_name[0] =
+		    dev_hid[0] = dev_uid[0] = '\0';
+		matches = sscanf(s, "%s %s %s %s %s %s %d", class, subclass,
+		    phys_path, dev_name, dev_hid, dev_uid, &dev_index);
 		g_free (s);
 		s = NULL;
 		if (matches < 3) {
@@ -200,7 +243,21 @@ sysevent_iochannel_data (GIOChannel *source,
 			}
 		} else if (strcmp(class, EC_DEV_BRANCH) == 0) {
 			sysevent_dev_branch(phys_path);
-		}
+		} else if (strcmp(class, EC_ACPIEV) == 0) {
+			if (strcmp(dev_hid, "PNP0C0A") == 0) {
+				snprintf(udi, sizeof(udi),
+				    "/org/freedesktop/Hal/devices/pseudo/"
+				    "battery_0_battery%d_0", dev_index);
+			} else if (strcmp(dev_hid, "ACPI0003") == 0) {
+				snprintf(udi, sizeof(udi),
+				    "/org/freedesktop/Hal/devices/pseudo/"
+				    "battery_0_ac%d_0", dev_index);
+                        } else {
+				HAL_INFO(("dev_hid %s unknown", dev_hid));
+				continue;
+			}
+			devinfo_battery_device_rescan(phys_path, udi);
+                }
 	}
 
 	if (err) {

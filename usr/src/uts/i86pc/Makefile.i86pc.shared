@@ -251,6 +251,7 @@ DRV_KMODS	+= pci-ide
 DRV_KMODS	+= xsvc
 DRV_KMODS	+= mc-amd
 DRV_KMODS	+= tzmon
+DRV_KMODS	+= battery
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS		+= memtest
 
