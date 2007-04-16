@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,8 +82,18 @@ _nss_ldap_shadow2str(ldap_backend_ptr be, nss_XbyY_args_t *argp)
 	len += strlen(uid[0]);
 
 	passwd = __ns_ldap_getAttr(result->entry, _S_USERPASSWORD);
-	if (passwd == NULL || passwd[0] == NULL || strlen(passwd[0]) < 1) {
-		pw_passwd = _NO_VALUE;
+	if (passwd == NULL || passwd[0] == NULL) {
+		/*
+		 * ACL does not allow userpassword to return or
+		 * userpassword is not defined
+		 */
+		pw_passwd = np;
+	} else if (strcmp(passwd[0], "") == 0) {
+		/*
+		 * An empty password is not supported
+		 */
+		nss_result = NSS_STR_PARSE_PARSE;
+		goto result_spd2str;
 	} else {
 		if ((tmp = strstr(passwd[0], "{crypt}")) != NULL ||
 			(tmp = strstr(passwd[0], "{CRYPT}")) != NULL) {

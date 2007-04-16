@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -456,7 +456,7 @@ __ns_ldap_check_dns_preq(int foreground,
 			CLIENT_FPRINTF(stdout, "start: %s\n",
 					gettext("DNS client is enabled"));
 		} else {
-			syslog(LOG_INFO, "%s",
+			syslog(LOG_INFO, "libsldap: %s",
 					gettext("DNS client is enabled"));
 		}
 		return (NS_LDAP_SUCCESS);
@@ -530,7 +530,7 @@ __ns_ldap_check_gssapi_preq(int foreground,
 			CLIENT_FPRINTF(stdout, "start: %s\n",
 					gettext("sasl/GSSAPI bind works"));
 		} else {
-			syslog(LOG_INFO, "%s",
+			syslog(LOG_INFO, "libsldap: %s",
 					gettext("sasl/GSSAPI bind works"));
 		}
 		return (NS_LDAP_SUCCESS);

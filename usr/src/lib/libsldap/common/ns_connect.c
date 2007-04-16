@@ -55,6 +55,8 @@ extern int ldapssl_install_gethostbyaddr(LDAP *ld, const char *skip);
 
 static int openConnection(LDAP **, const char *, const ns_cred_t *,
 		int, ns_ldap_error_t **, int, int);
+static void
+_DropConnection(ConnectionID cID, int flag, int fini);
 /*
  * sessionLock, wait4session, sessionTid
  * are variables to synchronize the creation/retrieval of a connection.
@@ -859,9 +861,13 @@ findConnection(int flags, const char *serverAddr,
 	const ns_cred_t *auth, Connection **conp)
 {
 	Connection *cp;
-	int i;
+	int i, j, conn_server_index, up_server_index, drop_conn;
 	int rc;
 	int try;
+	ns_server_info_t sinfo;
+	ns_ldap_error_t *errorp = NULL;
+	char **servers, *addrType;
+	void **paramVal = NULL;
 #ifdef DEBUG
 	thread_t t = thr_self();
 #endif /* DEBUG */
@@ -882,7 +888,7 @@ findConnection(int flags, const char *serverAddr,
 			t, serverAddr);
 	else
 		(void) fprintf(stderr, "tid= %d: serverAddr=NULL\n", t);
-	printCred(stderr, auth);
+	printCred(LOG_DEBUG, auth);
 	fflush(stderr);
 #endif /* DEBUG */
 
@@ -954,7 +960,7 @@ findConnection(int flags, const char *serverAddr,
 #ifdef DEBUG
 		(void) fprintf(stderr, "tid= %d: checking connection "
 			"[%d] ....\n", t, i);
-		printConnection(stderr, cp);
+		printConnection(LOG_DEBUG, cp);
 #endif /* DEBUG */
 		if ((cp->usedBit) || (cp->notAvail) ||
 		    (cp->auth->auth.type != auth->auth.type) ||
@@ -975,6 +981,198 @@ findConnection(int flags, const char *serverAddr,
 		    ((strcmp(cp->auth->cred.unix_cred.passwd,
 			    auth->cred.unix_cred.passwd) != 0))))
 				continue;
+		if (!(serverAddr && *serverAddr)) {
+			/*
+			 * Get preferred server list.
+			 * When preferred servers are merged with default
+			 * servers (S_LDAP_SERVER_P) by __s_api_getServer,
+			 * preferred servers are copied sequencially.
+			 * The order should be the same as the order retrieved
+			 * by __ns_ldap_getParam.
+			 */
+			if ((rc = __ns_ldap_getParam(NS_LDAP_SERVER_PREF_P,
+				&paramVal, &errorp)) != NS_LDAP_SUCCESS) {
+				(void) __ns_ldap_freeError(&errorp);
+				(void) __ns_ldap_freeParam(&paramVal);
+				(void) rw_unlock(&sessionPoolLock);
+				return (-1);
+			}
+			servers = (char **)paramVal;
+			/*
+			 * Do fallback only if preferred servers are defined.
+			 */
+			if (servers != NULL) {
+				if (cp->auth->auth.saslmech ==
+					NS_LDAP_SASL_GSSAPI)
+					addrType = NS_CACHE_ADDR_HOSTNAME;
+				else
+					addrType = NS_CACHE_ADDR_IP;
+				/*
+				 * Find the 1st available server
+				 */
+				rc = __s_api_requestServer(NS_CACHE_NEW, NULL,
+					&sinfo, &errorp, addrType);
+				if (rc != NS_LDAP_SUCCESS) {
+					/*
+					 * Drop the connection.
+					 * Pass 1 to fini so it won't be locked
+					 * inside _DropConnection
+					 */
+					_DropConnection(
+						cp->connectionId,
+						NS_LDAP_NEW_CONN, 1);
+					(void) rw_unlock(
+					    &sessionPoolLock);
+					(void) __ns_ldap_freeParam(
+						(void ***)&servers);
+					return (-1);
+				}
+
+				if (sinfo.server) {
+					/*
+					 * Test if cp->serverAddr is a
+					 * preferred server.
+					 */
+					conn_server_index = -1;
+					for (j = 0; servers[j] != NULL; j++) {
+						if (strcasecmp(servers[j],
+							cp->serverAddr) == 0) {
+							conn_server_index = j;
+							break;
+						}
+					}
+					/*
+					 * Test if sinfo.server is a preferred
+					 * server.
+					 */
+					up_server_index = -1;
+					for (j = 0; servers[j] != NULL; j++) {
+						if (strcasecmp(sinfo.server,
+							servers[j]) == 0) {
+							up_server_index = j;
+							break;
+						}
+					}
+
+					/*
+					 * The following code is to fall back
+					 * to preferred servers if servers
+					 * are previously down but are up now.
+					 * If cp->serverAddr is a preferred
+					 * server, it falls back to the servers
+					 * ahead of it. If cp->serverAddr is
+					 * not a preferred server, it falls
+					 * back to any of preferred servers
+					 * returned by ldap_cachemgr.
+					 */
+					if (conn_server_index >= 0 &&
+						up_server_index >= 0) {
+						/*
+						 * cp->serverAddr and
+						 * sinfo.server are preferred
+						 * servers.
+						 */
+						if (up_server_index ==
+							conn_server_index)
+							/*
+							 * sinfo.server is the
+							 * same as
+							 * cp->serverAddr.
+							 * Keep the connection.
+							 */
+							drop_conn = 0;
+						else
+							/*
+							 * 1.
+							 * up_server_index <
+							 * conn_server_index
+							 *
+							 * sinfo is ahead of
+							 * cp->serverAddr in
+							 * Need to fall back.
+							 * 2.
+							 * up_server_index >
+							 * conn_server_index
+							 * cp->serverAddr is
+							 * down. Drop it.
+							 */
+							drop_conn = 1;
+					} else if (conn_server_index >= 0 &&
+						up_server_index == -1) {
+						/*
+						 * cp->serverAddr is a preferred
+						 * server but sinfo.server is
+						 * not. Preferred servers are
+						 * ahead of default servers.
+						 * This means cp->serverAddr is
+						 * down. Drop it.
+						 */
+						drop_conn = 1;
+					} else if (conn_server_index == -1 &&
+						up_server_index >= 0) {
+						/*
+						 * cp->serverAddr is not a
+						 * preferred server but
+						 * sinfo.server is.
+						 * Fall back.
+						 */
+						drop_conn = 1;
+					} else {
+						/*
+						 * Both index are -1
+						 * cp->serverAddr and
+						 * sinfo.server are not
+						 * preferred servers.
+						 * No fallback.
+						 */
+						drop_conn = 0;
+					}
+					if (drop_conn) {
+						/*
+						 * Drop the connection so the
+						 * new conection can fall back
+						 * to a new server later.
+						 * Pass 1 to fini so it won't
+						 * be locked inside
+						 * _DropConnection
+						 */
+						_DropConnection(
+							cp->connectionId,
+							NS_LDAP_NEW_CONN, 1);
+						(void) rw_unlock(
+						    &sessionPoolLock);
+						(void) __ns_ldap_freeParam(
+							(void ***)&servers);
+						free(sinfo.server);
+						__s_api_free2dArray(
+						sinfo.saslMechanisms);
+						__s_api_free2dArray(
+							sinfo.controls);
+						return (-1);
+					} else {
+						/*
+						 * Keep the connection
+						 */
+						(void) __ns_ldap_freeParam(
+							(void ***)&servers);
+						free(sinfo.server);
+						__s_api_free2dArray(
+						sinfo.saslMechanisms);
+						__s_api_free2dArray(
+							sinfo.controls);
+					}
+				} else {
+					(void) rw_unlock(&sessionPoolLock);
+					syslog(LOG_WARNING, "libsldap: Null "
+						"sinfo.server from "
+						"__s_api_requestServer");
+					(void) __ns_ldap_freeParam(
+						(void ***)&servers);
+					return (-1);
+				}
+			}
+		}
+
 		/* found an available connection */
 		if (MTperConn == 0)
 			cp->usedBit = B_TRUE;
@@ -1132,7 +1330,8 @@ makeConnection(Connection **conp, const char *serverAddr,
 	sinfo.controls = NULL;
 	sinfo.saslMechanisms = NULL;
 
-	if ((id = findConnection(flags, serverAddr, auth, &con)) != -1) {
+	if ((wait4session == 0 || sessionTid != thr_self()) &&
+		(id = findConnection(flags, serverAddr, auth, &con)) != -1) {
 		/* connection found in cache */
 #ifdef DEBUG
 		(void) fprintf(stderr, "tid= %d: connection found in "
@@ -1417,8 +1616,7 @@ _DropConnection(ConnectionID cID, int flag, int fini)
 
 	cp = sessionPool[id];
 	/* sanity check before removing */
-	if (!cp || (!fini && !cp->shared && (!cp->usedBit ||
-		cp->threadID != thr_self()))) {
+	if (!cp || (!fini && !cp->shared && !cp->usedBit)) {
 #ifdef DEBUG
 		if (cp == NULL)
 			(void) fprintf(stderr, "tid= %d: no "
