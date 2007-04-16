@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -122,15 +122,6 @@ _nscd_init(
 	if ((rc = _nscd_init_all_nsw_config()) != NSCD_SUCCESS) {
 		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_ERROR)
 		(me, "_nscd_init_all_nsw_config failed (rc = %d)\n", rc);
-		return (rc);
-	}
-
-	/*
-	 * populate the backend info databases
-	 */
-	if ((rc = _nscd_populate_nsw_backend_info()) != NSCD_SUCCESS) {
-		_NSCD_LOG(NSCD_LOG_NSW_STATE, NSCD_LOG_LEVEL_ERROR)
-		(me, "_nscd_init_all_nsw_be_info_db failed (rc = %d)\n", rc);
 		return (rc);
 	}
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1211,6 +1211,12 @@ _nscd_is_self_cred_on(int recheck, char **dblist)
 		free(selfcred_dbs);
 	selfcred_dbs = _nscd_srcs_in_db_nsw_policy(1, &srcs);
 
+	if (selfcred_dbs == NULL) {
+		is_on =  0;
+		checked = 1;
+		return (0);
+	}
+
 	/*
 	 * also check the ldap backend to see if
 	 * the configuration there is good for
@@ -1224,8 +1230,7 @@ _nscd_is_self_cred_on(int recheck, char **dblist)
 			ldap_on = 1;
 	}
 
-	is_on = pu_nscd_enabled == nscd_true &&
-			ldap_on && selfcred_dbs != NULL;
+	is_on = (pu_nscd_enabled == nscd_true) && ldap_on;
 
 	checked = 1;
 

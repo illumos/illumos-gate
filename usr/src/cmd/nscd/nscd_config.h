@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -260,6 +260,18 @@ typedef int		nscd_cfg_bitmap_t;
  * to a set of data used for preliminary check of a parameter
  * value (range, length, null checking etc).
  */
+typedef	nscd_rc_t	(*nscd_cfg_func_notify_t)(void *,
+			struct nscd_cfg_param_desc *,
+			nscd_cfg_id_t *,
+			nscd_cfg_flag_t,
+			nscd_cfg_error_t **,
+			void *);
+typedef	nscd_rc_t	(*nscd_cfg_func_verify_t)(void *,
+			struct	nscd_cfg_param_desc *,
+			nscd_cfg_id_t *,
+			nscd_cfg_flag_t,
+			nscd_cfg_error_t **,
+			void **);
 typedef struct nscd_cfg_param_desc {
 	nscd_cfg_id_t		id;
 	nscd_cfg_data_type_t	type;
@@ -271,20 +283,8 @@ typedef struct nscd_cfg_param_desc {
 	size_t	g_offset;
 	int	g_index;
 	void	*p_check;
-	char	*nfunc_name;
-	char	*vfunc_name;
-	nscd_rc_t	(*notify)(void			*data,
-			struct nscd_cfg_param_desc	*pdesc,
-			nscd_cfg_id_t			*nswdb,
-			nscd_cfg_flag_t			dflag,
-			nscd_cfg_error_t		**errorp,
-			void				*cookie);
-	nscd_rc_t	(*verify)(void			*data,
-			struct	nscd_cfg_param_desc	*pdesc,
-			nscd_cfg_id_t			*nswdb,
-			nscd_cfg_flag_t			dflag,
-			nscd_cfg_error_t		**errorp,
-			void				**cookie);
+	nscd_cfg_func_notify_t	notify;
+	nscd_cfg_func_verify_t	verify;
 } nscd_cfg_param_desc_t;
 
 /*
@@ -465,6 +465,13 @@ typedef struct {
  * the stat data if the NSCD_CFG_DFLAG_STATIC_DATA bit is
  * not set in dflag.
  */
+struct nscd_cfg_stat_desc;
+typedef	nscd_rc_t	(*nscd_cfg_func_get_stat_t)(void **,
+			struct nscd_cfg_stat_desc *,
+			nscd_cfg_id_t *,
+			nscd_cfg_flag_t *,
+			void (**) (void *),
+			nscd_cfg_error_t **);
 typedef struct nscd_cfg_stat_desc {
 	nscd_cfg_id_t		id;
 	nscd_cfg_data_type_t	type;
@@ -476,14 +483,7 @@ typedef struct nscd_cfg_stat_desc {
 	int	g_size;
 	size_t	g_offset;
 	int	g_index;
-	char	*gsfunc_name;
-	nscd_rc_t	(*get_stat)(void		**stat,
-			struct nscd_cfg_stat_desc	*sdesc,
-			nscd_cfg_id_t			*nswdb,
-			nscd_cfg_flag_t			*dflag,
-			void				(**free_stat)
-							(void *stat),
-			nscd_cfg_error_t		**errorp);
+	nscd_cfg_func_get_stat_t get_stat;
 } nscd_cfg_stat_desc_t;
 
 /*

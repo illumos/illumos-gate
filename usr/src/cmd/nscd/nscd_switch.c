@@ -377,7 +377,8 @@ trace_result(
 
 /*
  * Determine if a request should be done locally in the getXbyY caller's
- * process. Return none zero if yes, 0 otherwise.
+ * process. Return none zero if yes, 0 otherwise. This should be called
+ * before the switch engine steps through the backends/sources.
  * This function returnis 1 if:
  *   -- the database is exec_attr and the search_flag is GET_ALL
  */
@@ -405,6 +406,37 @@ try_local(
 
 	return (rc);
 }
+
+/*
+ * Determine if a request should be done locally in the getXbyY caller's
+ * process. Return none zero if yes, 0 otherwise. This should be called
+ * before the switch engine invokes any backend.
+ * This function returnis 1 if:
+ *   -- the database is shadow and the source is nisplus
+ */
+static int
+try_local2(
+	int	dbi,
+	int	srci)
+{
+	int	rc = 0;
+	char	*me = "try_local2";
+
+	if (*NSCD_NSW_DB_NAME(dbi) == 's' &&
+		strcmp(NSCD_NSW_DB_NAME(dbi), NSS_DBNAM_SHADOW) == 0) {
+		if (strcmp(NSCD_NSW_SRC_NAME(srci), "nisplus") == 0)
+			rc = 1;
+	}
+
+	if (rc != 0) {
+
+		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
+		(me, "TRYLOCAL: database: shadow, source: nisplus\n");
+	}
+
+	return (rc);
+}
+
 
 static nscd_rc_t
 get_gss_func(void **func_p)
@@ -714,7 +746,8 @@ nss_search(nss_db_root_t *rootp, nss_db_initf_t initf, int search_fnum,
 		smf_state = _nscd_get_smf_state(srci, dbi, 0);
 
 		/* stop if the source is one that should be TRYLOCAL */
-		if (smf_state == NSCD_SVC_STATE_UNKNOWN_SRC) {
+		if (smf_state == NSCD_SVC_STATE_UNKNOWN_SRC ||
+			(params.privdb && try_local2(dbi, srci) == 1)) {
 			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,
 					NSCD_LOG_LEVEL_DEBUG)
 			(me, "returning TRYLOCAL ... \n");
@@ -1058,7 +1091,8 @@ nss_setent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 		srci = (*s->nsw_cfg_p)->src_idx[i];
 		st = _nscd_get_smf_state(srci, params.dbi, 1);
 		if (st == NSCD_SVC_STATE_UNKNOWN_SRC ||
-				st == NSCD_SVC_STATE_UNINITED) {
+			st == NSCD_SVC_STATE_UNINITED || (params.privdb &&
+			try_local2(params.dbi, srci) == 1)) {
 			nss_endent_u(rootp, initf, contextpp);
 
 			_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE,

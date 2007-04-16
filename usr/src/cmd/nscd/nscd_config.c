@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -170,63 +170,6 @@ _nscd_cfg_get_param_desc_list(
 	return (_nscd_cfg_get_list((nscd_cfg_list_t **)list,
 		NSCD_CFG_LIST_PARAM));
 }
-
-/* find function pointer in the executable via dlopen(0) */
-static nscd_rc_t
-_nscd_cfg_init_funcs(
-	char			*name,
-	void			**func_p,
-	nscd_cfg_error_t	**errorp)
-{
-	char			*me = "_nscd_cfg_init_funcs";
-	char			msg[NSCD_CFG_MAX_ERR_MSG_LEN];
-	static void		*handle = NULL;
-	void			*sym;
-	nscd_rc_t		rc = NSCD_SUCCESS;
-
-	if (name == NULL && handle != NULL) {
-		(void) dlclose(handle);
-		return (rc);
-	}
-	if (name == NULL)
-		return (rc);
-
-	if (handle == NULL) {
-		handle = dlopen((const char *)0, RTLD_LAZY);
-		if (handle == NULL) {
-
-			rc = NSCD_CFG_DLOPEN_ERROR;
-			(void) snprintf(msg, sizeof (msg),
-			gettext("unable to dlopen the nscd executable: %s"),
-				dlerror());
-			goto error_exit;
-		}
-	}
-
-	if (func_p) {
-		if ((sym = dlsym(handle, name)) == NULL) {
-
-			rc = NSCD_CFG_DLSYM_ERROR;
-			(void) snprintf(msg, sizeof (msg),
-gettext("unable to get the address of a symbol in the nscd executable: %s"),
-				dlerror());
-			goto error_exit;
-		} else
-			(void) memcpy(func_p, &sym, sizeof (void *));
-	}
-
-	return (rc);
-
-	error_exit:
-
-	_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_ERROR)
-	(me, "%s\n", msg);
-	if (errorp != NULL)
-		*errorp = _nscd_cfg_make_error(rc, msg);
-
-	return (rc);
-}
-
 
 /*
  * FUNCTION: _nscd_cfg_create_paramDB
@@ -426,37 +369,6 @@ _nscd_cfg_init_nsw()
 	return (NSCD_SUCCESS);
 }
 
-/*
- * get the address of a function in the nscd executable
- * and store it in where 'dest_p' points to
- */
-static nscd_rc_t
-_nscd_cfg_get_funcp(
-	char			*name,
-	void			*dest_p,
-	void			**gfunc_a,
-	nscd_cfg_error_t	**errorp)
-{
-
-	void			*func;
-	nscd_rc_t		rc;
-
-	if (gfunc_a != NULL) {
-
-		if (strcmp(name, NSCD_CFG_FUNC_NAME_AS_GROUP) == 0)
-			(void) memcpy(dest_p, gfunc_a, sizeof (void *));
-
-		return (NSCD_SUCCESS);
-	}
-
-	rc = _nscd_cfg_init_funcs(name, &func, errorp);
-	if (rc != NSCD_SUCCESS)
-		return (rc);
-	(void) memcpy(dest_p, &func, sizeof (func));
-
-	return (NSCD_SUCCESS);
-}
-
 static nscd_rc_t
 _nscd_cfg_init_param()
 {
@@ -501,26 +413,12 @@ _nscd_cfg_init_param()
 			fn = 0;
 			gdesc = desc;
 			g_info.bitmap = NSCD_CFG_BITMAP_ZERO;
-			nfunc = NULL;
-			vfunc = NULL;
 
 			/*
 			 * set the notify/verify functions
 			 */
-			if (gdesc->nfunc_name != NULL) {
-				rc = _nscd_cfg_get_funcp(gdesc->nfunc_name,
-					&gdesc->notify, NULL, NULL);
-				if (rc != NSCD_SUCCESS)
-					return (rc);
-				nfunc = (void *)gdesc->notify;
-			}
-			if (gdesc->vfunc_name != NULL) {
-				rc = _nscd_cfg_get_funcp(gdesc->vfunc_name,
-					&gdesc->verify, NULL, NULL);
-				if (rc != NSCD_SUCCESS)
-					return (rc);
-				vfunc = (void *)gdesc->verify;
-			}
+			nfunc = (void *)gdesc->notify;
+			vfunc = (void *)gdesc->verify;
 		} else {
 			if (i == 0) {
 
@@ -545,17 +443,13 @@ _nscd_cfg_init_param()
 			/*
 			 * set the notify/verify functions
 			 */
-			if (desc->nfunc_name != NULL) {
-				rc = _nscd_cfg_get_funcp(desc->nfunc_name,
-					&desc->notify, &nfunc, NULL);
-				if (rc != NSCD_SUCCESS)
-					return (rc);
+			if (desc->notify == NSCD_CFG_FUNC_NOTIFY_AS_GROUP) {
+				(void) memcpy(&desc->notify, &nfunc,
+					sizeof (void *));
 			}
-			if (desc->vfunc_name != NULL) {
-				rc = _nscd_cfg_get_funcp(desc->vfunc_name,
-					&desc->verify, &vfunc, NULL);
-				if (rc != NSCD_SUCCESS)
-					return (rc);
+			if (desc->verify == NSCD_CFG_FUNC_VERIFY_AS_GROUP) {
+				(void) memcpy(&desc->verify, &vfunc,
+					sizeof (void *));
 			}
 		}
 
@@ -645,18 +539,11 @@ _nscd_cfg_init_stat()
 			fn = 0;
 			gdesc = desc;
 			g_info.bitmap = NSCD_CFG_BITMAP_ZERO;
-			gsfunc = NULL;
 
 			/*
 			 * set the get_stat function
 			 */
-			if (gdesc->gsfunc_name != NULL) {
-				rc = _nscd_cfg_get_funcp(gdesc->gsfunc_name,
-					&gdesc->get_stat, NULL, NULL);
-				if (rc != NSCD_SUCCESS)
-					return (rc);
-				gsfunc = (void *)gdesc->get_stat;
-			}
+			gsfunc = (void *)gdesc->get_stat;
 		} else {
 			if (i == 0) {
 
@@ -681,11 +568,9 @@ _nscd_cfg_init_stat()
 			/*
 			 * set the get_stat function
 			 */
-			if (desc->gsfunc_name != NULL) {
-				rc = _nscd_cfg_get_funcp(desc->gsfunc_name,
-					&desc->get_stat, &gsfunc, NULL);
-				if (rc != NSCD_SUCCESS)
-					return (rc);
+			if (desc->get_stat == NSCD_CFG_FUNC_GET_STAT_AS_GROUP) {
+				(void) memcpy(&desc->get_stat, &gsfunc,
+					sizeof (void *));
 			}
 		}
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,7 @@
 #include "nisplus_common.h"
 #include "nisplus_tables.h"
 
-static int nettoa(int anet, char *buf, int buflen);
+static int nettoa(int anet, char *buf, int buflen, char **pnull);
 
 static nss_status_t
 getbyname(be, a)
@@ -57,13 +57,24 @@ getbyaddr(be, a)
 	nisplus_backend_ptr_t	be;
 	void			*a;
 {
-	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
+	nss_XbyY_args_t	*argp = (nss_XbyY_args_t *)a;
 	char		addrstr[16];
+	char		*pnull;
+	nss_status_t	rc;
 
-	if (nettoa((int)argp->key.netaddr.net, addrstr, 16) != 0)
+	if (nettoa((int)argp->key.netaddr.net, addrstr, 16, &pnull) != 0)
 		return (NSS_UNAVAIL);   /* it's really ENOMEM */
+	rc = _nss_nisplus_lookup(be, argp, NET_TAG_ADDR, addrstr);
 
-	return (_nss_nisplus_lookup(be, argp, NET_TAG_ADDR, addrstr));
+	/*
+	 * if not found, try again with the untruncated address string
+	 * that has the trailing zero(s)
+	 */
+	if (rc == NSS_NOTFOUND && pnull != NULL) {
+		*pnull = '.';
+		rc = _nss_nisplus_lookup(be, argp, NET_TAG_ADDR, addrstr);
+	}
+	return (rc);
 }
 
 
@@ -155,18 +166,17 @@ _nss_nisplus_networks_constr(dummy1, dummy2, dummy3)
 /*
  * Takes an unsigned integer in host order, and returns a printable
  * string for it as a network number.  To allow for the possibility of
- * naming subnets, only trailing dot-zeros are truncated.
+ * naming subnets, only trailing dot-zeros are truncated. The location
+ * where the string is truncated (or set to '\0') is returned in *pnull.
  */
 static int
-nettoa(anet, buf, buflen)
-	int		anet;
-	char		*buf;
-	int		buflen;
+nettoa(int anet, char *buf, int buflen, char **pnull)
 {
 	char		*p;
 	struct in_addr	in;
 	int		addr;
 
+	*pnull = NULL;
 	if (buf == 0)
 		return (1);
 	in = inet_makeaddr(anet, INADDR_ANY);
@@ -177,6 +187,7 @@ nettoa(anet, buf, buflen)
 		if (p == NULL)
 			return (1);
 		*p = 0;
+		*pnull = p;
 	} else if ((IN_CLASSB_HOST & htonl(addr)) == 0) {
 		p = strchr(buf, '.');
 		if (p == NULL)
@@ -185,11 +196,13 @@ nettoa(anet, buf, buflen)
 		if (p == NULL)
 			return (1);
 		*p = 0;
+		*pnull = p;
 	} else if ((IN_CLASSC_HOST & htonl(addr)) == 0) {
 		p = strrchr(buf, '.');
 		if (p == NULL)
 			return (1);
 		*p = 0;
+		*pnull = p;
 	}
 	return (0);
 }

@@ -19,11 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <nss_common.h>
+#include <dlfcn.h>
+#include <alloca.h>
 
 #include <stdlib.h>
 #include <libscf_priv.h>
@@ -34,12 +38,30 @@
 #include "nscd_db.h"
 
 /*
+ * _nscd_nss_finders is used to replace the nss_default_finders in libc
+ * to allow nscd to have more control over the dl handles when using
+ * dlsym to get the address of the nss backend instance constructors
+ */
+static nss_backend_constr_t _nscd_per_src_lookup(void *,
+	const char *, const char *, void **);
+static void _nscd_per_src_delete(void *, nss_backend_constr_t);
+
+static nss_backend_finder_t _nscd_per_src = {
+	_nscd_per_src_lookup,
+	_nscd_per_src_delete,
+	0,
+	0 };
+
+nss_backend_finder_t *_nscd_nss_finders = &_nscd_per_src;
+
+/*
  * nscd database for each source. It contains backend
  * info (nscd_be_info_t) for each naming database.
  * Protected by nscd_src_backend_db_lock.
  */
 nscd_db_t	***nscd_src_backend_db;
-static rwlock_t nscd_src_backend_db_lock = DEFAULTRWLOCK;
+int		*nscd_src_backend_db_loaded;
+static		rwlock_t nscd_src_backend_db_lock = DEFAULTRWLOCK;
 
 /*
  * nsswitch config monitored by nscd. Protected by
@@ -149,6 +171,7 @@ _nscd_free_all_nsw_backend_info_db()
 
 		nscd_src_backend_db[i] = (nscd_db_t **)_nscd_set(
 			(nscd_acc_data_t *)db, NULL);
+		nscd_src_backend_db_loaded[i] = 0;
 	}
 	(void) rw_unlock(&nscd_src_backend_db_lock);
 }
@@ -169,6 +192,7 @@ _nscd_populate_nsw_backend_info_db(int srci)
 	char			*src = NSCD_NSW_SRC_NAME(srci);
 	const char		*dbn;
 	char			*me = "_nscd_populate_nsw_backend_info_db";
+	void			*handle = NULL;
 
 	for (i = 0; i < NSCD_NUM_DB; i++) {
 
@@ -186,12 +210,12 @@ _nscd_populate_nsw_backend_info_db(int srci)
 				bf = bf->next) {
 			nss_backend_constr_t c;
 
-			c = (*bf->lookup)(bf->lookup_priv, dbn, src,
-				&be_info.finder_priv);
+			c = (*bf->lookup)(handle, dbn, src, &handle);
 
 			if (c != 0) {
 				be_info.be_constr = c;
 				be_info.finder = bf;
+				be_info.finder_priv = handle;
 				break;
 			}
 		}
@@ -226,8 +250,9 @@ _nscd_populate_nsw_backend_info_db(int srci)
 		bi = (nscd_be_info_t *)*(db_entry->data_array);
 		*bi = be_info;
 
-		(void) _nscd_rdlock((nscd_acc_data_t *)
+		(void) _nscd_wrlock((nscd_acc_data_t *)
 				nscd_src_backend_db[srci]);
+		nscd_src_backend_db_loaded[srci] = 1;
 		(void) _nscd_add_db_entry(*nscd_src_backend_db[srci],
 			dbn, db_entry, NSCD_ADD_DB_ENTRY_LAST);
 		(void) _nscd_rw_unlock((nscd_acc_data_t *)
@@ -327,7 +352,8 @@ _nscd_create_sw_struct(
 			strcmp(lkp->service_name,
 			NSCD_NSW_SRC_NAME(k)) != 0; k++);
 
-		if (k < NSCD_NUM_SRC && NSCD_NSW_SRC_NAME(k) == NULL) {
+		if (k < NSCD_NUM_SRC &&
+			nscd_src_backend_db_loaded[k] == 0) {
 			_NSCD_LOG(NSCD_LOG_CONFIG, NSCD_LOG_LEVEL_DEBUG)
 			(me, "unknown nsw source name %s\n",
 			lkp->service_name);
@@ -412,7 +438,7 @@ _nscd_create_sw_struct(
 	 */
 	nsw_cfg->fe_params.max_active_per_src = 10;
 	nsw_cfg->fe_params.max_dormant_per_src = 1;
-	nsw_cfg->fe_params.finders = nss_default_finders;
+	nsw_cfg->fe_params.finders = _nscd_nss_finders;
 	if (params != NULL) {
 		nsw_cfg->fe_params = params->p;
 
@@ -545,7 +571,7 @@ create_nsw_config(int dbi)
 	 */
 	nsw_cfg->fe_params.max_active_per_src = 10;
 	nsw_cfg->fe_params.max_dormant_per_src = 1;
-	nsw_cfg->fe_params.finders = nss_default_finders;
+	nsw_cfg->fe_params.finders = _nscd_nss_finders;
 	(void) (nscd_nss_db_initf[dbi])(&nsw_cfg->fe_params);
 
 	/*
@@ -658,6 +684,11 @@ _nscd_alloc_nsw_be_info_db()
 	nscd_src_backend_db = calloc(NSCD_NUM_SRC, sizeof (nscd_db_t **));
 	if (nscd_src_backend_db == NULL)
 		return (NSCD_NO_MEMORY);
+	nscd_src_backend_db_loaded = calloc(NSCD_NUM_SRC, sizeof (int));
+	if (nscd_src_backend_db_loaded == NULL) {
+		free(nscd_src_backend_db);
+		return (NSCD_NO_MEMORY);
+	}
 
 	/* also allocate/init the nsswitch source index/name array */
 	_nscd_cfg_nsw_src_all = (nscd_cfg_id_t *)calloc(
@@ -685,4 +716,61 @@ _nscd_populate_nsw_backend_info()
 	}
 
 	return (NSCD_SUCCESS);
+}
+
+/*
+ * The following defines nscd's own lookup and delete functions
+ * that are to be stored in nss_backend_finder_t which is used
+ * by _nscd_populate_nsw_backend_info_db() to initialize the
+ * various nss backend instances
+ */
+
+static const int  dlopen_version  = 1;
+#ifndef NSS_DLOPEN_FORMAT
+#define	NSS_DLOPEN_FORMAT "nss_%s.so.%d"
+#endif
+#ifndef NSS_DLSYM_FORMAT
+#define	NSS_DLSYM_FORMAT "_nss_%s_%s_constr"
+#endif
+static const char dlopen_format[] = NSS_DLOPEN_FORMAT;
+static const char dlsym_format [] = NSS_DLSYM_FORMAT;
+static const size_t  format_maxlen   = sizeof (dlsym_format) - 4;
+
+/*ARGSUSED*/
+static nss_backend_constr_t
+_nscd_per_src_lookup(void *handle, const char *db_name, const char *src_name,
+	void **delete_privp)
+{
+	char			*name;
+	void			*dlhandle;
+	void			*sym;
+	size_t			len;
+	nss_backend_constr_t	res = NULL;
+
+	len = format_maxlen + strlen(db_name) + strlen(src_name);
+	name = alloca(len);
+	dlhandle = handle;
+	if ((dlhandle = handle) == NULL) {
+		(void) sprintf(name, dlopen_format, src_name, dlopen_version);
+		dlhandle = dlopen(name, RTLD_LAZY);
+	}
+
+	if (dlhandle != NULL) {
+		(void) sprintf(name, dlsym_format, src_name, db_name);
+		if ((sym = dlsym(dlhandle, name)) == 0) {
+			if (handle == NULL)
+				(void) dlclose(dlhandle);
+		} else {
+			*delete_privp = dlhandle;
+			res = (nss_backend_constr_t)sym;
+		}
+	}
+	return (res);
+}
+
+/*ARGSUSED*/
+static void
+_nscd_per_src_delete(void *delete_priv, nss_backend_constr_t dummy)
+{
+	(void) dlclose(delete_priv);
 }

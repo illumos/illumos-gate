@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -220,7 +220,7 @@ static nscd_cfg_str_check_t	NSCD_CFG_NSWCFGSTR_PCHECK =
 		{-1, pn}, type, (NSCD_CFG_PFLAG_GROUP | pflag), \
 		0, 0, 0,\
 		NSCD_SIZEOF(g_in_t, gf), offsetof(g_in_t, gf), -1, \
-		pcheck_p, nfunc_name, vfunc_name, NULL, NULL \
+		pcheck_p, nfunc_name, vfunc_name \
 	}
 
 #define	NSCD_CFG_PARAM_DESC(pn, type, pflag, pf, p_in_t, \
@@ -229,7 +229,7 @@ static nscd_cfg_str_check_t	NSCD_CFG_NSWCFGSTR_PCHECK =
 		{-1, pn}, type, pflag, \
 		NSCD_SIZEOF(p_in_t, pf), offsetof(p_in_t, pf), -1, \
 		NSCD_SIZEOF(g_in_t, gf), offsetof(g_in_t, gf), -1, \
-		pcheck_p, nfunc_name, vfunc_name, NULL, NULL \
+		pcheck_p, nfunc_name, vfunc_name \
 	}
 
 #define	NSCD_CFG_PGROUP_DESC_NULL \
@@ -237,9 +237,32 @@ static nscd_cfg_str_check_t	NSCD_CFG_NSWCFGSTR_PCHECK =
 		{-1, NULL}, -1, NSCD_CFG_PFLAG_GROUP, \
 		0, 0, 0, \
 		0, 0, 0, \
-		NULL, NULL, NULL, NULL, NULL \
+		NULL, NULL, NULL \
 	}
-#define	NSCD_CFG_FUNC_NAME_AS_GROUP	"(as_group)"
+
+/* nscd internal cfg_*_notify() cfg_*_verify() and cfg_*_get_stat()  */
+extern	nscd_rc_t	_nscd_cfg_log_notify();
+extern	nscd_rc_t	_nscd_cfg_log_verify();
+extern	nscd_rc_t	_nscd_cfg_frontend_notify();
+extern	nscd_rc_t	_nscd_cfg_frontend_verify();
+extern	nscd_rc_t	_nscd_cfg_selfcred_notify();
+extern	nscd_rc_t	_nscd_cfg_selfcred_verify();
+extern	nscd_rc_t	_nscd_cfg_switch_notify();
+extern	nscd_rc_t	_nscd_cfg_switch_verify();
+extern	nscd_rc_t	_nscd_cfg_cache_notify();
+extern	nscd_rc_t	_nscd_cfg_cache_verify();
+extern	nscd_rc_t	_nscd_cfg_log_get_stat();
+extern	nscd_rc_t	_nscd_cfg_switch_get_stat();
+extern	nscd_rc_t	_nscd_cfg_cache_get_stat();
+
+/*
+ * the following macros are used to indicate a parameter's
+ * notify/verify/get_stat functions are the same as those
+ * of the group
+ */
+#define	NSCD_CFG_FUNC_NOTIFY_AS_GROUP	((nscd_cfg_func_notify_t)-1)
+#define	NSCD_CFG_FUNC_VERIFY_AS_GROUP	((nscd_cfg_func_verify_t)-1)
+#define	NSCD_CFG_FUNC_GET_STAT_AS_GROUP	((nscd_cfg_func_get_stat_t)-1)
 
 /*
  * the static config parameter description table
@@ -254,8 +277,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		log,
 		nscd_cfg_global_data_t,
 		NULL,
-		"_nscd_cfg_log_notify",
-		"_nscd_cfg_log_verify"),
+		_nscd_cfg_log_notify,
+		_nscd_cfg_log_verify),
 
 	NSCD_CFG_PARAM_DESC(
 		"logfile",
@@ -267,8 +290,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		log,
 		nscd_cfg_global_data_t,
 		&NSCD_CFG_LOGFILE_PCHECK,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"debug-level",
@@ -279,8 +302,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		log,
 		nscd_cfg_global_data_t,
 		&NSCD_CFG_LOGLEVEL_PCHECK,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"debug-components",
@@ -291,8 +314,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		log,
 		nscd_cfg_global_data_t,
 		&NSCD_CFG_LOGCOMP_PCHECK,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PGROUP_DESC(
 		"param-group-global-frontend",
@@ -302,8 +325,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		fe,
 		nscd_cfg_global_data_t,
 		NULL,
-		"_nscd_cfg_frontend_notify",
-		"_nscd_cfg_frontend_verify"),
+		_nscd_cfg_frontend_notify,
+		_nscd_cfg_frontend_verify),
 
 	NSCD_CFG_PARAM_DESC(
 		"common-worker-threads",
@@ -315,8 +338,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		fe,
 		nscd_cfg_global_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"cache-hit-threads",
@@ -328,8 +351,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		fe,
 		nscd_cfg_global_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PGROUP_DESC(
 		"param-group-global-selfcred",
@@ -339,8 +362,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		sc,
 		nscd_cfg_global_data_t,
 		NULL,
-		"_nscd_cfg_selfcred_notify",
-		"_nscd_cfg_selfcred_verify"),
+		_nscd_cfg_selfcred_notify,
+		_nscd_cfg_selfcred_verify),
 
 	NSCD_CFG_PARAM_DESC(
 		"enable-selfcred",
@@ -351,8 +374,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		sc,
 		nscd_cfg_global_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"max-per-user-nscd",
@@ -363,8 +386,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		sc,
 		nscd_cfg_global_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"per-user-nscd-ttl",
@@ -375,8 +398,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		sc,
 		nscd_cfg_global_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PGROUP_DESC(
 		"param-group-global-switch",
@@ -386,8 +409,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		sw,
 		nscd_cfg_global_data_t,
 		NULL,
-		"_nscd_cfg_switch_notify",
-		"_nscd_cfg_switch_verify"),
+		_nscd_cfg_switch_notify,
+		_nscd_cfg_switch_verify),
 
 	NSCD_CFG_PARAM_DESC(
 		"global-enable-lookup",
@@ -398,8 +421,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		sw,
 		nscd_cfg_global_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"global-enable-loopback-checking",
@@ -410,8 +433,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		sw,
 		nscd_cfg_global_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"global-check-smf-state-interval",
@@ -422,8 +445,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		sw,
 		nscd_cfg_global_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PGROUP_DESC(
 		"param-group-global-cache",
@@ -434,8 +457,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		cache,
 		nscd_cfg_global_data_t,
 		NULL,
-		"_nscd_cfg_cache_notify",
-		"_nscd_cfg_cache_verify"),
+		_nscd_cfg_cache_notify,
+		_nscd_cfg_cache_verify),
 
 	NSCD_CFG_PARAM_DESC(
 		"global-enable-cache",
@@ -446,8 +469,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		cache,
 		nscd_cfg_global_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	/* non-global config param from this point on */
 
@@ -458,8 +481,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		fe,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		"_nscd_cfg_frontend_notify",
-		"_nscd_cfg_frontend_verify"),
+		_nscd_cfg_frontend_notify,
+		_nscd_cfg_frontend_verify),
 
 	NSCD_CFG_PARAM_DESC(
 		"worker-thread-per-nsw-db",
@@ -470,8 +493,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		fe,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PGROUP_DESC(
 		"param-group-switch",
@@ -481,8 +504,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		sw,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		"_nscd_cfg_switch_notify",
-		"_nscd_cfg_switch_verify"),
+		_nscd_cfg_switch_notify,
+		_nscd_cfg_switch_verify),
 
 	NSCD_CFG_PARAM_DESC(
 		"nsw-config-string",
@@ -494,8 +517,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		sw,
 		nscd_cfg_nsw_db_data_t,
 		&NSCD_CFG_NSWCFGSTR_PCHECK,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"nsw-config-database",
@@ -507,8 +530,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		sw,
 		nscd_cfg_nsw_db_data_t,
 		&NSCD_CFG_NSWCFGSTR_PCHECK,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"enable-lookup",
@@ -519,8 +542,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		sw,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"enable-loopback-checking",
@@ -531,8 +554,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		sw,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"max-nsw-state-per-db",
@@ -543,8 +566,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		sw,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"max-nsw-state-per-thread",
@@ -555,8 +578,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		sw,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"max-getent-ctx-per-db",
@@ -567,8 +590,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		sw,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PGROUP_DESC(
 		"param-group-cache",
@@ -577,8 +600,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		cache,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		"_nscd_cfg_cache_notify",
-		"_nscd_cfg_cache_verify"),
+		_nscd_cfg_cache_notify,
+		_nscd_cfg_cache_verify),
 
 	NSCD_CFG_PARAM_DESC(
 		"enable-cache",
@@ -589,8 +612,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		cache,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"enable-per-user-cache",
@@ -601,8 +624,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		cache,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"avoid-nameservice",
@@ -613,8 +636,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		cache,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"check-files",
@@ -625,8 +648,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		cache,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"check-file-interval",
@@ -637,8 +660,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		cache,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"positive-time-to-live",
@@ -649,8 +672,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		cache,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"negative-time-to-live",
@@ -661,8 +684,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		cache,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"keep-hot-count",
@@ -673,8 +696,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		cache,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"hint-size",
@@ -685,8 +708,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		cache,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"maximum-entries-allowed",
@@ -697,8 +720,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		cache,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"suggested-size",
@@ -709,8 +732,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		cache,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PARAM_DESC(
 		"old-data-ok",
@@ -721,8 +744,8 @@ static	nscd_cfg_param_desc_t	_nscd_cfg_param_desc[] = {
 		cache,
 		nscd_cfg_nsw_db_data_t,
 		NULL,
-		NSCD_CFG_FUNC_NAME_AS_GROUP,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_NOTIFY_AS_GROUP,
+		NSCD_CFG_FUNC_VERIFY_AS_GROUP),
 
 	NSCD_CFG_PGROUP_DESC_NULL
 };
@@ -739,7 +762,7 @@ static nscd_cfg_global_data_t nscd_cfg_global_default = {
 
 	NSCD_CFG_GROUP_INFO_GLOBAL_LOG,
 	NULL,
-	NSCD_LOG_LEVEL_ERROR,	/* debug_level */
+	NSCD_LOG_LEVEL_NONE,	/* debug_level */
 	NSCD_LOG_CACHE,		/* debug_comp */
 
 	},
@@ -983,7 +1006,7 @@ nscd_cfg_nsw_spc_default_t	_nscd_cfg_nsw_link_default[] = {
 		{-1, sn}, type, NSCD_CFG_SFLAG_GROUP | sflag, gi, \
 		0, 0, 0,\
 		NSCD_SIZEOF(g_in_t, gf), offsetof(g_in_t, gf), -1, \
-		gsfunc_name, NULL \
+		gsfunc_name \
 	}
 
 #define	NSCD_CFG_STAT_DESC(sn, type, sflag, sf, s_in_t, \
@@ -992,7 +1015,7 @@ nscd_cfg_nsw_spc_default_t	_nscd_cfg_nsw_link_default[] = {
 		{-1, sn}, type, sflag, NSCD_CFG_GROUP_INFO_NULL, \
 		NSCD_SIZEOF(s_in_t, sf), offsetof(s_in_t, sf), -1, \
 		NSCD_SIZEOF(g_in_t, gf), offsetof(g_in_t, gf), -1, \
-		gsfunc_name, NULL \
+		gsfunc_name \
 	}
 
 #define	NSCD_CFG_SGROUP_DESC_NULL \
@@ -1000,7 +1023,7 @@ nscd_cfg_nsw_spc_default_t	_nscd_cfg_nsw_link_default[] = {
 		{-1, NULL}, -1, NSCD_CFG_SFLAG_GROUP, NULL, \
 		0, 0, 0, \
 		0, 0, 0, \
-		NULL, NULL \
+		NULL \
 	}
 
 /*
@@ -1015,7 +1038,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		NSCD_CFG_STAT_GROUP_INFO_GLOBAL_LOG,
 		log,
 		nscd_cfg_stat_global_data_t,
-		"_nscd_cfg_log_get_stat"),
+		_nscd_cfg_log_get_stat),
 
 	NSCD_CFG_STAT_DESC(
 		"entries-logged",
@@ -1025,7 +1048,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_global_log_t,
 		log,
 		nscd_cfg_stat_global_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_SGROUP_DESC(
 		"stat-group-global-switch",
@@ -1034,7 +1057,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		NSCD_CFG_STAT_GROUP_INFO_GLOBAL_SWITCH,
 		sw,
 		nscd_cfg_stat_global_data_t,
-		"_nscd_cfg_switch_get_stat"),
+		_nscd_cfg_switch_get_stat),
 
 	NSCD_CFG_STAT_DESC(
 		"global-lookup-request-received",
@@ -1044,7 +1067,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_global_switch_t,
 		sw,
 		nscd_cfg_stat_global_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"global-lookup-request-queued",
@@ -1054,7 +1077,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_global_switch_t,
 		sw,
 		nscd_cfg_stat_global_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"global-lookup-request-in-progress",
@@ -1064,7 +1087,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_global_switch_t,
 		sw,
 		nscd_cfg_stat_global_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"global-lookup-request-succeeded",
@@ -1074,7 +1097,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_global_switch_t,
 		sw,
 		nscd_cfg_stat_global_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"global-lookup-request-failed",
@@ -1084,7 +1107,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_global_switch_t,
 		sw,
 		nscd_cfg_stat_global_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"global-loopback-nsw-db-skipped",
@@ -1094,7 +1117,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_global_switch_t,
 		sw,
 		nscd_cfg_stat_global_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_SGROUP_DESC(
 		"stat-group-global-cache",
@@ -1103,7 +1126,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		NSCD_CFG_STAT_GROUP_INFO_CACHE,
 		cache,
 		nscd_cfg_stat_global_data_t,
-		"_nscd_cfg_cache_get_stat"),
+		_nscd_cfg_cache_get_stat),
 
 	NSCD_CFG_STAT_DESC(
 		"global-cache-hits-on-positive",
@@ -1113,7 +1136,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_global_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"global-cache-hits-on-negative",
@@ -1123,7 +1146,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_global_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"global-cache-misses-on-positive",
@@ -1133,7 +1156,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_global_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"global-cache-misses-on-negative",
@@ -1143,7 +1166,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_global_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"global-cache-queries-queued",
@@ -1153,7 +1176,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_global_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"global-total-cache-entries",
@@ -1163,7 +1186,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_global_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"global-complete-cache-invalidations",
@@ -1173,7 +1196,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_global_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"global-cache-queries-dropped",
@@ -1183,7 +1206,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_global_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"global-cache-hit-rate",
@@ -1193,7 +1216,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_global_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	/* non-global stat from this point on */
 
@@ -1204,7 +1227,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		NSCD_CFG_STAT_GROUP_INFO_SWITCH,
 		cache,
 		nscd_cfg_stat_nsw_db_data_t,
-		"_nscd_cfg_switch_get_stat"),
+		_nscd_cfg_switch_get_stat),
 
 	NSCD_CFG_STAT_DESC(
 		"lookup-request-received",
@@ -1214,7 +1237,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_switch_t,
 		sw,
 		nscd_cfg_stat_nsw_db_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"lookup-request-queued",
@@ -1224,7 +1247,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_switch_t,
 		sw,
 		nscd_cfg_stat_nsw_db_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"lookup-request-in-progress",
@@ -1234,7 +1257,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_switch_t,
 		sw,
 		nscd_cfg_stat_nsw_db_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"lookup-request-succeeded",
@@ -1244,7 +1267,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_switch_t,
 		sw,
 		nscd_cfg_stat_nsw_db_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"lookup-request-failed",
@@ -1254,7 +1277,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_switch_t,
 		sw,
 		nscd_cfg_stat_nsw_db_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"loopback-nsw-db-skipped",
@@ -1264,7 +1287,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_switch_t,
 		sw,
 		nscd_cfg_stat_nsw_db_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_SGROUP_DESC(
 		"stat-group-cache",
@@ -1273,7 +1296,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		NSCD_CFG_STAT_GROUP_INFO_CACHE,
 		cache,
 		nscd_cfg_stat_nsw_db_data_t,
-		"_nscd_cfg_cache_get_stat"),
+		_nscd_cfg_cache_get_stat),
 
 	NSCD_CFG_STAT_DESC(
 		"cache-hits-on-positive",
@@ -1283,7 +1306,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_nsw_db_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"cache-hits-on-negative",
@@ -1293,7 +1316,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_nsw_db_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"cache-misses-on-positive",
@@ -1303,7 +1326,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_nsw_db_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"cache-misses-on-negative",
@@ -1313,7 +1336,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_nsw_db_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"cache-queries-queued",
@@ -1323,7 +1346,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_nsw_db_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"total-cache-entries",
@@ -1333,7 +1356,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_nsw_db_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"complete-cache-invalidations",
@@ -1343,7 +1366,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_nsw_db_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"cache-hit-rate",
@@ -1353,7 +1376,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_nsw_db_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 	NSCD_CFG_STAT_DESC(
 		"cache-queries-dropped",
@@ -1363,7 +1386,7 @@ static	nscd_cfg_stat_desc_t	_nscd_cfg_stat_desc[] = {
 		nscd_cfg_stat_cache_t,
 		cache,
 		nscd_cfg_stat_nsw_db_data_t,
-		NSCD_CFG_FUNC_NAME_AS_GROUP),
+		NSCD_CFG_FUNC_GET_STAT_AS_GROUP),
 
 
 	NSCD_CFG_SGROUP_DESC_NULL

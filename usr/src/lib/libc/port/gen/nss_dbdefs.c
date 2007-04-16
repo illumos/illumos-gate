@@ -197,33 +197,35 @@ typedef struct {
 	const char	*initfn;	/* init function name */
 	const char	*strfn;		/* str2X function name */
 	const char	*cstrfn;	/* cstr2X function name */
+	void		*initfnp;	/* init function pointer */
+	void		*strfnp;	/* str2X function pointer */
 	uint32_t	dbop;		/* NSS_DBOP_* */
 	const char	*tostr;		/* key2str cvt str */
 } getXbyY_to_dbop_t;
 
 #define	NSS_MK_GETXYDBOP(x, y, f, e)	\
 	{ NSS_DBNAM_##x, NSS_DEFCONF_##x, "_nss_initf_" f, "str2" f, \
-		NULL, NSS_DBOP_##x##_##y, (e) }
+		NULL, NULL, NULL, NSS_DBOP_##x##_##y, (e) }
 
 #define	NSS_MK_GETXYDBOPA(x, a, f, e)	\
 	{ NSS_DBNAM_##x, NSS_DEFCONF_##x, "_nss_initf_" f, "str2" f, \
-		NULL, NSS_DBOP_##a, (e) }
+		NULL, NULL, NULL, NSS_DBOP_##a, (e) }
 
 #define	NSS_MK_GETXYDBOPB(x, b, a, f, s, e)	\
 	{ NSS_DBNAM_##x, NSS_DEFCONF_##b, "_nss_initf_" f, s,  \
-		NULL, NSS_DBOP_##a, (e) }
+		NULL, NULL, NULL, NSS_DBOP_##a, (e) }
 
 #define	NSS_MK_GETXYDBOPC(x, a, f, s, e)	\
 	{ NSS_DBNAM_##x, NSS_DEFCONF_##x, "_nss_initf_" f, s, \
-		NULL, NSS_DBOP_##x##_##a, (e) }
+		NULL, NULL, NULL, NSS_DBOP_##x##_##a, (e) }
 
 #define	NSS_MK_GETXYDBOPD(x, y, i, f, e)	\
 	{ NSS_DBNAM_##x, NSS_DEFCONF_##x, "_nss_initf_" i, "str2" f, \
-		NULL, NSS_DBOP_##x##_##y, (e) }
+		NULL, NULL, NULL, NSS_DBOP_##x##_##y, (e) }
 
 #define	NSS_MK_GETXYDBOPCSTR(x, a, f, s, e)	\
 	{ NSS_DBNAM_##x, NSS_DEFCONF_##x, "_nss_initf_" f, s, \
-		"process_cstr", NSS_DBOP_##x##_##a, (e) }
+		"process_cstr", NULL, NULL, NSS_DBOP_##x##_##a, (e) }
 
 /*
  * The getXbyY_to_dbop structure is hashed on first call in order to
@@ -1037,29 +1039,68 @@ static nss_status_t
 nss_pinit_funcs(int index, nss_db_initf_t *initf, nss_str2ent_t *s2e)
 {
 	const char	*name;
-	void	*handle;
-	void	*sym;
+	void		*htmp = NULL;
+	void		*sym;
+	static void	*handle = NULL;
+	static mutex_t	handle_lock = DEFAULTMUTEX;
+	static mutex_t	initf_lock = DEFAULTMUTEX;
+	static mutex_t	s2e_lock = DEFAULTMUTEX;
 
-	if ((handle = dlopen((const char *)0, RTLD_LAZY)) != NULL) {
-		if (initf) {
-			name = getXbyY_to_dbop[index].initfn;
-			if ((sym = dlsym(handle, name)) == 0) {
-				(void) dlclose(handle);
+	if (handle == NULL) {
+		lmutex_lock(&handle_lock);
+		if (handle == NULL) {
+			htmp = dlopen((const char *)0, RTLD_LAZY);
+			if (htmp == NULL) {
+				lmutex_unlock(&handle_lock);
 				return (NSS_ERROR);
 			} else {
-				*initf = (nss_db_initf_t)sym;
+				membar_producer();
+				handle = htmp;
 			}
 		}
-		if (s2e) {
-			name = getXbyY_to_dbop[index].strfn;
-			if ((sym = dlsym(handle, name)) == 0) {
-				(void) dlclose(handle);
-				return (NSS_ERROR);
-			} else {
-				*s2e = (nss_str2ent_t)sym;
+		lmutex_unlock(&handle_lock);
+	}
+	membar_consumer();
+
+	if (initf) {
+		if (getXbyY_to_dbop[index].initfnp != NULL) {
+			membar_consumer();
+			*initf = (nss_db_initf_t)getXbyY_to_dbop[index].initfnp;
+		} else {
+			lmutex_lock(&initf_lock);
+			if (getXbyY_to_dbop[index].initfnp == NULL) {
+				name = getXbyY_to_dbop[index].initfn;
+				if ((sym = dlsym(handle, name)) == 0) {
+					lmutex_unlock(&initf_lock);
+					return (NSS_ERROR);
+				}
+				getXbyY_to_dbop[index].initfnp = sym;
 			}
+			membar_producer();
+			*initf = (nss_db_initf_t)getXbyY_to_dbop[index].initfnp;
+			lmutex_unlock(&initf_lock);
 		}
 	}
+	if (s2e) {
+		if (getXbyY_to_dbop[index].strfnp != NULL) {
+			membar_consumer();
+			*s2e = (nss_str2ent_t)getXbyY_to_dbop[index].strfnp;
+		} else {
+			lmutex_lock(&s2e_lock);
+			if (getXbyY_to_dbop[index].strfnp == NULL) {
+				name = getXbyY_to_dbop[index].strfn;
+				if ((sym = dlsym(handle, name)) == 0) {
+					lmutex_unlock(&s2e_lock);
+					return (NSS_ERROR);
+				}
+				getXbyY_to_dbop[index].strfnp = sym;
+			}
+			membar_producer();
+			*s2e = (nss_str2ent_t)getXbyY_to_dbop[index].strfnp;
+			lmutex_unlock(&s2e_lock);
+		}
+	}
+
 	return (NSS_SUCCESS);
 }
 

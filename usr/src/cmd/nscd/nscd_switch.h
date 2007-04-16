@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -410,7 +410,6 @@ nss_pdelete(void *buffer, size_t length);
 nscd_rc_t _nscd_alloc_switch_cfg();
 nscd_rc_t _nscd_alloc_switch_stats();
 nscd_db_t *_nscd_create_getent_ctx_addrDB();
-nscd_rc_t _nscd_populate_nsw_backend_info();
 nscd_db_t *_nscd_create_getent_ctxDB();
 
 #ifdef	__cplusplus
