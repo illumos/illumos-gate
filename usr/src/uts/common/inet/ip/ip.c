@@ -751,6 +751,8 @@ static int	ip_input_proc_set(queue_t *q, mblk_t *mp, char *value,
     caddr_t cp, cred_t *cr);
 static int	ip_int_set(queue_t *, mblk_t *, char *, caddr_t,
     cred_t *);
+static int	ipmp_hook_emulation_set(queue_t *, mblk_t *, char *, caddr_t,
+    cred_t *);
 static squeue_func_t ip_squeue_switch(int);
 
 static void	*ip_kstat_init(netstackid_t, ip_stack_t *);
@@ -934,6 +936,9 @@ static ipndp_t	lcl_ndp_arr[] = {
 	    "ip_cgtp_filter" },
 	{ ip_param_generic_get, ip_int_set,
 	    (caddr_t)&ip_soft_rings_cnt, "ip_soft_rings_cnt" },
+#define	IPNDP_IPMP_HOOK_OFFSET	18
+	{  ip_param_generic_get, ipmp_hook_emulation_set, NULL,
+	    "ipmp_hook_emulation" },
 };
 
 /*
@@ -5361,7 +5366,6 @@ ip_modclose(ill_t *ill)
 	ipsq_t	*ipsq;
 	ipif_t	*ipif;
 	queue_t	*q = ill->ill_rq;
-	hook_nic_event_t *info;
 	ip_stack_t	*ipst = ill->ill_ipst;
 	clock_t timeout;
 
@@ -5496,21 +5500,9 @@ ip_modclose(ill_t *ill)
 	if (ill->ill_credp != NULL)
 		crfree(ill->ill_credp);
 
-	/*
-	 * Unhook the nic event message from the ill and enqueue it into the nic
-	 * event taskq.
-	 */
-	if ((info = ill->ill_nic_event_info) != NULL) {
-		if (ddi_taskq_dispatch(eventq_queue_nic,
-		    ip_ne_queue_func,
-		    (void *)info, DDI_SLEEP) == DDI_FAILURE) {
-			ip2dbg(("ip_ioctl_finish:ddi_taskq_dispatch failed\n"));
-			if (info->hne_data != NULL)
-				kmem_free(info->hne_data, info->hne_datalen);
-			kmem_free(info, sizeof (hook_nic_event_t));
-		}
-		ill->ill_nic_event_info = NULL;
-	}
+	mutex_enter(&ill->ill_lock);
+	ill_nic_info_dispatch(ill);
+	mutex_exit(&ill->ill_lock);
 
 	/*
 	 * Now we are done with the module close pieces that
@@ -6046,6 +6038,10 @@ ip_stack_init(netstackid_t stackid, netstack_t *ns)
 		"ip_cgtp_filter") == 0);
 	ipst->ips_ndp_arr[IPNDP_CGTP_FILTER_OFFSET].ip_ndp_data =
 	    (caddr_t)&ip_cgtp_filter;
+	ASSERT(strcmp(ipst->ips_ndp_arr[IPNDP_IPMP_HOOK_OFFSET].ip_ndp_name,
+		"ipmp_hook_emulation") == 0);
+	ipst->ips_ndp_arr[IPNDP_IPMP_HOOK_OFFSET].ip_ndp_data =
+	    (caddr_t)&ipst->ips_ipmp_hook_emulation;
 
 	(void) ip_param_register(&ipst->ips_ip_g_nd,
 	    ipst->ips_param_arr, A_CNT(lcl_param_arr),
@@ -15992,7 +15988,7 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 
 		info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP);
 		if (info != NULL) {
-			info->hne_nic = ill->ill_phyint->phyint_ifindex;
+			info->hne_nic = ill->ill_phyint->phyint_hook_ifindex;
 			info->hne_lif = 0;
 			info->hne_event = NE_UP;
 			info->hne_data = NULL;
@@ -29424,6 +29420,128 @@ ip_int_set(queue_t *q, mblk_t *mp, char *value,
 		return (EINVAL);
 
 	*v = new_value;
+	return (0);
+}
+
+/*
+ * Handle changes to ipmp_hook_emulation ndd variable.
+ * Need to update phyint_hook_ifindex.
+ * Also generate a nic plumb event should a new ifidex be assigned to a group.
+ */
+static void
+ipmp_hook_emulation_changed(ip_stack_t *ipst)
+{
+	phyint_t *phyi;
+	phyint_t *phyi_tmp;
+	char *groupname;
+	int namelen;
+	ill_t	*ill;
+	boolean_t new_group;
+
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	/*
+	 * Group indicies are stored in the phyint - a common structure
+	 * to both IPv4 and IPv6.
+	 */
+	phyi = avl_first(&ipst->ips_phyint_g_list->phyint_list_avl_by_index);
+	for (; phyi != NULL;
+	    phyi = avl_walk(&ipst->ips_phyint_g_list->phyint_list_avl_by_index,
+	    phyi, AVL_AFTER)) {
+		/* Ignore the ones that do not have a group */
+		if (phyi->phyint_groupname_len == 0)
+			continue;
+
+		/*
+		 * Look for other phyint in group.
+		 * Clear name/namelen so the lookup doesn't find ourselves.
+		 */
+		namelen = phyi->phyint_groupname_len;
+		groupname = phyi->phyint_groupname;
+		phyi->phyint_groupname_len = 0;
+		phyi->phyint_groupname = NULL;
+
+		phyi_tmp = phyint_lookup_group(groupname, B_FALSE, ipst);
+		/* Restore */
+		phyi->phyint_groupname_len = namelen;
+		phyi->phyint_groupname = groupname;
+
+		new_group = B_FALSE;
+		if (ipst->ips_ipmp_hook_emulation) {
+			/*
+			 * If the group already exists and has already
+			 * been assigned a group ifindex, we use the existing
+			 * group_ifindex, otherwise we pick a new group_ifindex
+			 * here.
+			 */
+			if (phyi_tmp != NULL &&
+			    phyi_tmp->phyint_group_ifindex != 0) {
+				phyi->phyint_group_ifindex =
+				    phyi_tmp->phyint_group_ifindex;
+			} else {
+				/* XXX We need a recovery strategy here. */
+				if (!ip_assign_ifindex(
+				    &phyi->phyint_group_ifindex, ipst))
+					cmn_err(CE_PANIC,
+					    "ip_assign_ifindex() failed");
+				new_group = B_TRUE;
+			}
+		} else {
+			phyi->phyint_group_ifindex = 0;
+		}
+		if (ipst->ips_ipmp_hook_emulation)
+			phyi->phyint_hook_ifindex = phyi->phyint_group_ifindex;
+		else
+			phyi->phyint_hook_ifindex = phyi->phyint_ifindex;
+
+		/*
+		 * For IP Filter to find out the relationship between
+		 * names and interface indicies, we need to generate
+		 * a NE_PLUMB event when a new group can appear.
+		 * We always generate events when a new interface appears
+		 * (even when ipmp_hook_emulation is set) so there
+		 * is no need to generate NE_PLUMB events when
+		 * ipmp_hook_emulation is turned off.
+		 * And since it isn't critical for IP Filter to get
+		 * the NE_UNPLUMB events we skip those here.
+		 */
+		if (new_group) {
+			/*
+			 * First phyint in group - generate group PLUMB event.
+			 * Since we are not running inside the ipsq we do
+			 * the dispatch immediately.
+			 */
+			if (phyi->phyint_illv4 != NULL)
+				ill = phyi->phyint_illv4;
+			else
+				ill = phyi->phyint_illv6;
+
+			if (ill != NULL) {
+				mutex_enter(&ill->ill_lock);
+				ill_nic_info_plumb(ill, B_TRUE);
+				ill_nic_info_dispatch(ill);
+				mutex_exit(&ill->ill_lock);
+			}
+		}
+	}
+	rw_exit(&ipst->ips_ill_g_lock);
+}
+
+/* ARGSUSED */
+static int
+ipmp_hook_emulation_set(queue_t *q, mblk_t *mp, char *value,
+    caddr_t addr, cred_t *cr)
+{
+	int *v = (int *)addr;
+	long new_value;
+	ip_stack_t	*ipst = CONNQ_TO_IPST(q);
+
+	if (ddi_strtol(value, NULL, 10, &new_value) != 0)
+		return (EINVAL);
+
+	if (*v != new_value) {
+		*v = new_value;
+		ipmp_hook_emulation_changed(ipst);
+	}
 	return (0);
 }
 

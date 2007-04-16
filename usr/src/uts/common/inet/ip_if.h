@@ -160,6 +160,8 @@ extern	mblk_t	*ill_ared_alloc(ill_t *, ipaddr_t);
 extern	void	ill_dlpi_done(ill_t *, t_uscalar_t);
 extern	void	ill_dlpi_send(ill_t *, mblk_t *);
 extern	mblk_t	*ill_dlur_gen(uchar_t *, uint_t, t_uscalar_t, t_scalar_t);
+extern  ill_t	*ill_group_lookup_on_ifindex(uint_t, boolean_t, ip_stack_t *);
+extern	ill_t	*ill_group_lookup_on_name(char *, boolean_t, ip_stack_t *);
 /* NOTE: Keep unmodified ill_lookup_on_ifindex for ipp for now */
 extern  ill_t	*ill_lookup_on_ifindex_global_instance(uint_t, boolean_t,
     queue_t *, mblk_t *, ipsq_func_t, int *);

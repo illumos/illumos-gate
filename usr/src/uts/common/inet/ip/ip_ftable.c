@@ -1305,27 +1305,35 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 		ipif_t *supplied_ipif;
 		ill_t *ill;
 
+		match_flags = (MATCH_IRE_DSTONLY | MATCH_IRE_DEFAULT |
+		    MATCH_IRE_RECURSIVE| MATCH_IRE_RJ_BHOLE|
+		    MATCH_IRE_SECATTR);
+
 		/*
 		 * If supplied ifindex is non-null, the only valid
-		 * nexthop is one off of the interface corresponding
+		 * nexthop is one off of the interface or group corresponding
 		 * to the specified ifindex.
 		 */
-
 		ill = ill_lookup_on_ifindex(ifindex, B_FALSE,
 		    NULL, NULL, NULL, NULL, ipst);
 		if (ill != NULL) {
-			supplied_ipif = ipif_get_next_ipif(NULL, ill);
+			match_flags |= MATCH_IRE_ILL;
 		} else {
-			ip1dbg(("ipfil_sendpkt: Could not find"
-			    " route to dst\n"));
-			value = ECOMM;
-			freemsg(mp);
-			goto discard;
+			/* Fallback to group names if hook_emulation set */
+			if (ipst->ips_ipmp_hook_emulation) {
+				ill = ill_group_lookup_on_ifindex(ifindex,
+				    B_FALSE, ipst);
+			}
+			if (ill == NULL) {
+				ip1dbg(("ipfil_sendpkt: Could not find"
+				    " route to dst\n"));
+				value = ECOMM;
+				freemsg(mp);
+				goto discard;
+			}
+			match_flags |= MATCH_IRE_ILL_GROUP;
 		}
-
-		match_flags = (MATCH_IRE_DSTONLY | MATCH_IRE_DEFAULT |
-		    MATCH_IRE_IPIF | MATCH_IRE_RECURSIVE| MATCH_IRE_RJ_BHOLE|
-		    MATCH_IRE_SECATTR);
+		supplied_ipif = ipif_get_next_ipif(NULL, ill);
 
 		ire = ire_route_lookup(dst, 0, 0, 0, supplied_ipif,
 		    &sire, zoneid, MBLK_GETLABEL(mp), match_flags, ipst);

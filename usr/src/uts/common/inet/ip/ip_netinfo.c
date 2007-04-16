@@ -475,16 +475,26 @@ ip_getifname_impl(phy_if_t phy_ifdata,
     char *buffer, const size_t buflen, boolean_t isv6, ip_stack_t *ipst)
 {
 	ill_t *ill;
+	char *name;
 
 	ASSERT(buffer != NULL);
 
 	ill = ill_lookup_on_ifindex((uint_t)phy_ifdata, isv6, NULL, NULL,
 	    NULL, NULL, ipst);
-	if (ill == NULL)
-		return (1);
-
-	if (ill->ill_name != NULL) {
-		(void) strlcpy(buffer, ill->ill_name, buflen);
+	if (ill != NULL) {
+		name = ill->ill_name;
+	} else {
+		/* Fallback to group names only if hook_emulation is set */
+		if (ipst->ips_ipmp_hook_emulation) {
+			ill = ill_group_lookup_on_ifindex((uint_t)phy_ifdata,
+			    isv6, ipst);
+		}
+		if (ill == NULL)
+			return (1);
+		name = ill->ill_phyint->phyint_groupname;
+	}
+	if (name != NULL) {
+		(void) strlcpy(buffer, name, buflen);
 		ill_refrele(ill);
 		return (0);
 	} else {
@@ -516,6 +526,9 @@ ipv6_getmtu(phy_if_t phy_ifdata, lif_if_t ifdata, netstack_t *ns)
 
 /*
  * Shared implementation to determine the MTU of a network interface
+ *
+ * Note: this does not handle a non-zero ifdata when ipmp_hook_emulation is set.
+ * But IP Filter only uses a zero ifdata.
  */
 /* ARGSUSED */
 static int
@@ -541,7 +554,16 @@ ip_getmtu_impl(phy_if_t phy_ifdata, lif_if_t ifdata, boolean_t isv6,
 
 		if ((ill = ill_lookup_on_ifindex((uint_t)phy_ifdata, isv6,
 		    NULL, NULL, NULL, NULL, ipst)) == NULL) {
-			return (0);
+			/*
+			 * Fallback to group names only if hook_emulation
+			 * is set
+			 */
+			if (ipst->ips_ipmp_hook_emulation) {
+				ill = ill_group_lookup_on_ifindex(
+				    (uint_t)phy_ifdata, isv6, ipst);
+			}
+			if (ill == NULL)
+				return (0);
 		}
 		mtu = ill->ill_max_frag;
 		ill_refrele(ill);
@@ -562,6 +584,9 @@ ip_getpmtuenabled(netstack_t *ns)
 
 /*
  * Get next interface from the current list of IPv4 physical network interfaces
+ *
+ * Note: this does not handle the case when ipmp_hook_emulation is set.
+ * But IP Filter does not use this function.
  */
 static phy_if_t
 ip_phygetnext(phy_if_t phy_ifdata, netstack_t *ns)
@@ -614,10 +639,14 @@ ip_phylookup_impl(const char *name, boolean_t isv6, ip_stack_t *ipst)
 	ill = ill_lookup_on_name((char *)name, B_FALSE, isv6, NULL, NULL,
 	    NULL, NULL, NULL, ipst);
 
+	/* Fallback to group names only if hook_emulation is set */
+	if (ill == NULL && ipst->ips_ipmp_hook_emulation) {
+		ill = ill_group_lookup_on_name((char *)name, isv6, ipst);
+	}
 	if (ill == NULL)
 		return (0);
 
-	phy = ill->ill_phyint->phyint_ifindex;
+	phy = ill->ill_phyint->phyint_hook_ifindex;
 
 	ill_refrele(ill);
 
@@ -649,6 +678,9 @@ ipv6_lifgetnext(phy_if_t phy_ifdata, lif_if_t ifdata, netstack_t *ns)
 /*
  * Shared implementation to get next interface from the current list of
  * logical network interfaces
+ *
+ * Note: this does not handle the case when ipmp_hook_emulation is set.
+ * But IP Filter does not use this function.
  */
 static lif_if_t
 ip_lifgetnext_impl(phy_if_t phy_ifdata, lif_if_t ifdata, boolean_t isv6,
@@ -960,11 +992,13 @@ ip_routeto_impl(struct sockaddr *address, ip_stack_t *ipst)
 		return (0);
 
 	ill = ire_to_ill(ire);
-	if (ill == NULL)
+	if (ill == NULL) {
+		ire_refrele(ire);
 		return (0);
+	}
 
 	ASSERT(ill != NULL);
-	phy_if = (phy_if_t)ill->ill_phyint->phyint_ifindex;
+	phy_if = (phy_if_t)ill->ill_phyint->phyint_hook_ifindex;
 	ire_refrele(ire);
 
 	return (phy_if);
@@ -1089,6 +1123,9 @@ ipv6_getlifaddr(phy_if_t phy_ifdata, lif_if_t ifdata, size_t nelem,
 
 /*
  * Shared implementation to determine the network addresses for an interface
+ *
+ * Note: this does not handle a non-zero ifdata when ipmp_hook_emulation is set.
+ * But IP Filter only uses a zero ifdata.
  */
 /* ARGSUSED */
 static int
@@ -1236,8 +1273,15 @@ ip_ni_queue_func_impl(injection_t *inject,  boolean_t out)
 	packet = &inject->inj_data;
 	ASSERT(packet->ni_packet != NULL);
 
-	if ((ill = ill_lookup_on_ifindex((uint_t)packet->ni_physical,
-	    B_FALSE, NULL, NULL, NULL, NULL, ipst)) == NULL) {
+	ill = ill_lookup_on_ifindex((uint_t)packet->ni_physical,
+	    B_FALSE, NULL, NULL, NULL, NULL, ipst);
+
+	/* Fallback to group names only if hook_emulation is set */
+	if (ill == NULL && ipst->ips_ipmp_hook_emulation) {
+		ill = ill_group_lookup_on_ifindex((uint_t)packet->ni_physical,
+		    B_FALSE, ipst);
+	}
+	if (ill == NULL) {
 		kmem_free(inject, sizeof (*inject));
 		return;
 	}
@@ -1301,4 +1345,64 @@ ip_ne_queue_func(void *arg)
 	if (info->hne_data != NULL)
 		kmem_free(info->hne_data, info->hne_datalen);
 	kmem_free(arg, sizeof (hook_nic_event_t));
+}
+
+/*
+ * Temporary function to support IPMP emulation for IP Filter.
+ * Lookup an ill based on the ifindex assigned to the group.
+ * Skips unusable ones i.e. where any of these flags are set:
+ * (PHYI_FAILED|PHYI_STANDBY|PHYI_OFFLINE|PHYI_INACTIVE)
+ */
+ill_t *
+ill_group_lookup_on_ifindex(uint_t index, boolean_t isv6, ip_stack_t *ipst)
+{
+	ill_t	*ill;
+	phyint_t *phyi;
+
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	phyi = phyint_lookup_group_ifindex(index, ipst);
+	if (phyi != NULL) {
+		ill = isv6 ? phyi->phyint_illv6: phyi->phyint_illv4;
+		if (ill != NULL) {
+			mutex_enter(&ill->ill_lock);
+			if (ILL_CAN_LOOKUP(ill)) {
+				ill_refhold_locked(ill);
+				mutex_exit(&ill->ill_lock);
+				rw_exit(&ipst->ips_ill_g_lock);
+				return (ill);
+			}
+		}
+	}
+	rw_exit(&ipst->ips_ill_g_lock);
+	return (NULL);
+}
+
+/*
+ * Temporary function to support IPMP emulation for IP Filter.
+ * Lookup an ill based on the group name.
+ * Skips unusable ones i.e. where any of these flags are set:
+ * (PHYI_FAILED|PHYI_STANDBY|PHYI_OFFLINE|PHYI_INACTIVE)
+ */
+ill_t *
+ill_group_lookup_on_name(char *name, boolean_t isv6, ip_stack_t *ipst)
+{
+	ill_t	*ill;
+	phyint_t *phyi;
+
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	phyi = phyint_lookup_group(name, B_TRUE, ipst);
+	if (phyi != NULL) {
+		ill = isv6 ? phyi->phyint_illv6: phyi->phyint_illv4;
+		if (ill != NULL) {
+			mutex_enter(&ill->ill_lock);
+			if (ILL_CAN_LOOKUP(ill)) {
+				ill_refhold_locked(ill);
+				mutex_exit(&ill->ill_lock);
+				rw_exit(&ipst->ips_ill_g_lock);
+				return (ill);
+			}
+		}
+	}
+	rw_exit(&ipst->ips_ill_g_lock);
+	return (NULL);
 }

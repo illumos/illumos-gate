@@ -1521,6 +1521,9 @@ typedef struct phyint {
 	kmutex_t	phyint_lock;
 	struct ipsq_s	*phyint_ipsq;		/* back pointer to ipsq */
 	struct phyint	*phyint_ipsq_next;	/* phyint list on this ipsq */
+	/* Once Clearview IPMP is added the follow two fields can be removed */
+	uint_t		phyint_group_ifindex;	/* index assigned to group */
+	uint_t		phyint_hook_ifindex;	/* index used with neti/hook */
 } phyint_t;
 
 #define	CACHE_ALIGN_SIZE 64
@@ -3008,7 +3011,7 @@ extern struct module_info ip_mod_info;
 		if ((_ilp != NULL) &&					\
 		    (((ill_t *)(_ilp))->ill_phyint != NULL))		\
 			info.hpe_ifp = (phy_if_t)((ill_t *)		\
-			    (_ilp))->ill_phyint->phyint_ifindex;	\
+			    (_ilp))->ill_phyint->phyint_hook_ifindex;	\
 		else							\
 			info.hpe_ifp = 0;				\
 									\
@@ -3016,7 +3019,7 @@ extern struct module_info ip_mod_info;
 		if ((_olp != NULL) &&					\
 		    (((ill_t *)(_olp))->ill_phyint != NULL))		\
 			info.hpe_ofp = (phy_if_t)((ill_t *)		\
-			    (_olp))->ill_phyint->phyint_ifindex;	\
+			    (_olp))->ill_phyint->phyint_hook_ifindex;	\
 		else							\
 			info.hpe_ofp = 0;				\
 		info.hpe_hdr = _iph;					\
@@ -3050,7 +3053,7 @@ extern struct module_info ip_mod_info;
 		if ((_ilp != NULL) &&					\
 		    (((ill_t *)(_ilp))->ill_phyint != NULL))		\
 			info.hpe_ifp = (phy_if_t)((ill_t *)		\
-			    (_ilp))->ill_phyint->phyint_ifindex;	\
+			    (_ilp))->ill_phyint->phyint_hook_ifindex;	\
 		else							\
 			info.hpe_ifp = 0;				\
 									\
@@ -3058,7 +3061,7 @@ extern struct module_info ip_mod_info;
 		if ((_olp != NULL) &&					\
 		    (((ill_t *)(_olp))->ill_phyint != NULL))		\
 			info.hpe_ofp = (phy_if_t)((ill_t *)		\
-			    (_olp))->ill_phyint->phyint_ifindex;	\
+			    (_olp))->ill_phyint->phyint_hook_ifindex;	\
 		else							\
 			info.hpe_ofp = 0;				\
 		info.hpe_hdr = _iph;					\
@@ -3137,12 +3140,15 @@ struct	ipsec_out_s;
 
 struct	mac_header_info_s;
 
+extern boolean_t ip_assign_ifindex(uint_t *, ip_stack_t *);
 extern const char *dlpi_prim_str(int);
 extern const char *dlpi_err_str(int);
 extern void	ill_frag_timer(void *);
 extern ill_t	*ill_first(int, int, ill_walk_context_t *, ip_stack_t *);
 extern ill_t	*ill_next(ill_walk_context_t *, ill_t *);
 extern void	ill_frag_timer_start(ill_t *);
+extern void	ill_nic_info_dispatch(ill_t *);
+extern void	ill_nic_info_plumb(ill_t *, boolean_t);
 extern mblk_t	*ip_carve_mp(mblk_t **, ssize_t);
 extern mblk_t	*ip_dlpi_alloc(size_t, t_uscalar_t);
 extern char	*ip_dot_addr(ipaddr_t, char *);
@@ -3303,6 +3309,9 @@ extern boolean_t ip_md_hcksum_attr(struct multidata_s *, struct pdesc_s *,
 extern boolean_t ip_md_zcopy_attr(struct multidata_s *, struct pdesc_s *,
 			uint_t);
 extern mblk_t	*ip_unbind(queue_t *, mblk_t *);
+
+extern phyint_t *phyint_lookup_group(char *, boolean_t, ip_stack_t *);
+extern phyint_t *phyint_lookup_group_ifindex(uint_t, ip_stack_t *);
 
 extern void tnet_init(void);
 extern void tnet_fini(void);

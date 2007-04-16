@@ -2785,12 +2785,12 @@ ill_ring_add(void *arg, mac_resource_t *mrp)
 			rx_ring->rr_min_pkt_cnt =
 			    normal_pkt_cnt * rr_min_pkt_cnt_ratio;
 
-	rx_ring->rr_ring_state = ILL_RING_INUSE;
-	mutex_exit(&ill->ill_lock);
+			rx_ring->rr_ring_state = ILL_RING_INUSE;
+			mutex_exit(&ill->ill_lock);
 
 			DTRACE_PROBE2(ill__ring__add, (void *), ill,
 			    (int), ip_rx_index);
-	return ((mac_resource_handle_t)rx_ring);
+			return ((mac_resource_handle_t)rx_ring);
 		}
 	}
 
@@ -4484,6 +4484,7 @@ ill_glist_delete(ill_t *ill)
 		}
 	}
 
+	/* Generate NE_UNPLUMB event for ill_name. */
 	info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP);
 	if (info != NULL) {
 		info->hne_nic = ill->ill_phyint->phyint_ifindex;
@@ -4956,33 +4957,38 @@ loopback_kstat_update(kstat_t *ksp, int rw)
 
 /*
  * Has ifindex been plumbed already.
+ * Compares both phyint_ifindex and phyint_group_ifindex.
  */
 static boolean_t
 phyint_exists(uint_t index, ip_stack_t *ipst)
 {
 	phyint_t *phyi;
 
+	ASSERT(index != 0);
 	ASSERT(RW_LOCK_HELD(&ipst->ips_ill_g_lock));
 	/*
 	 * Indexes are stored in the phyint - a common structure
 	 * to both IPv4 and IPv6.
 	 */
-	phyi = avl_find(&ipst->ips_phyint_g_list->phyint_list_avl_by_index,
-	    (void *) &index, NULL);
-	return (phyi != NULL);
+	phyi = avl_first(&ipst->ips_phyint_g_list->phyint_list_avl_by_index);
+	for (; phyi != NULL;
+	    phyi = avl_walk(&ipst->ips_phyint_g_list->phyint_list_avl_by_index,
+	    phyi, AVL_AFTER)) {
+		if (phyi->phyint_ifindex == index ||
+		    phyi->phyint_group_ifindex == index)
+			return (B_TRUE);
+	}
+	return (B_FALSE);
 }
 
-/*
- * Assign a unique interface index for the phyint.
- */
-static boolean_t
-phyint_assign_ifindex(phyint_t *phyi, ip_stack_t *ipst)
+/* Pick a unique ifindex */
+boolean_t
+ip_assign_ifindex(uint_t *indexp, ip_stack_t *ipst)
 {
 	uint_t starting_index;
 
-	ASSERT(phyi->phyint_ifindex == 0);
 	if (!ipst->ips_ill_index_wrap) {
-		phyi->phyint_ifindex = ipst->ips_ill_index++;
+		*indexp = ipst->ips_ill_index++;
 		if (ipst->ips_ill_index == 0) {
 			/* Reached the uint_t limit Next time wrap  */
 			ipst->ips_ill_index_wrap = B_TRUE;
@@ -5000,7 +5006,7 @@ phyint_assign_ifindex(phyint_t *phyi, ip_stack_t *ipst)
 		if (ipst->ips_ill_index != 0 &&
 		    !phyint_exists(ipst->ips_ill_index, ipst)) {
 			/* found unused index - use it */
-			phyi->phyint_ifindex = ipst->ips_ill_index;
+			*indexp = ipst->ips_ill_index;
 			return (B_TRUE);
 		}
 	}
@@ -5009,6 +5015,16 @@ phyint_assign_ifindex(phyint_t *phyi, ip_stack_t *ipst)
 	 * all interface indicies are inuse.
 	 */
 	return (B_FALSE);
+}
+
+/*
+ * Assign a unique interface index for the phyint.
+ */
+static boolean_t
+phyint_assign_ifindex(phyint_t *phyi, ip_stack_t *ipst)
+{
+	ASSERT(phyi->phyint_ifindex == 0);
+	return (ip_assign_ifindex(&phyi->phyint_ifindex, ipst));
 }
 
 /*
@@ -8059,7 +8075,6 @@ void
 ipsq_current_finish(ipsq_t *ipsq)
 {
 	ipif_t *ipif = ipsq->ipsq_current_ipif;
-	hook_nic_event_t *info;
 
 	ASSERT(IAM_WRITER_IPSQ(ipsq));
 
@@ -8070,22 +8085,9 @@ ipsq_current_finish(ipsq_t *ipsq)
 	if (ipsq->ipsq_current_ioctl != SIOCLIFREMOVEIF) {
 		mutex_enter(&ipif->ipif_ill->ill_lock);
 		ipif->ipif_state_flags &= ~IPIF_CHANGING;
-		/*
-		 * Unhook the nic event message from the ill and enqueue it
-		 * into the nic event taskq.
-		 */
-		if ((info = ipif->ipif_ill->ill_nic_event_info) != NULL) {
-			if (ddi_taskq_dispatch(eventq_queue_nic,
-			    ip_ne_queue_func, info, DDI_SLEEP) == DDI_FAILURE) {
-				ip2dbg(("ipsq_current_finish: "
-				    "ddi_taskq_dispatch failed\n"));
-				if (info->hne_data != NULL)
-					kmem_free(info->hne_data,
-					    info->hne_datalen);
-				kmem_free(info, sizeof (hook_nic_event_t));
-			}
-			ipif->ipif_ill->ill_nic_event_info = NULL;
-		}
+
+		/* Send any queued event */
+		ill_nic_info_dispatch(ipif->ipif_ill);
 		mutex_exit(&ipif->ipif_ill->ill_lock);
 	}
 
@@ -11510,7 +11512,7 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 			ip_stack_t	*ipst = ill->ill_ipst;
 
 			info->hne_nic =
-			    ipif->ipif_ill->ill_phyint->phyint_ifindex;
+			    ipif->ipif_ill->ill_phyint->phyint_hook_ifindex;
 			info->hne_lif = MAP_IPIF_ID(ipif->ipif_id);
 			info->hne_event = NE_ADDRESS_CHANGE;
 			info->hne_family = ipif->ipif_isv6 ?
@@ -14499,7 +14501,7 @@ ipsq_delete(ipsq_t *ipsq)
 	 * messages can land up, since the ipsq_refs is zero.
 	 * i.e. this ipsq is unnamed and no phyint or phyint group
 	 * is associated with this ipsq. (Lookups are based on ill_name
-	 * or phyint_group_name)
+	 * or phyint_groupname)
 	 */
 	ASSERT(ipsq->ipsq_refs == 0);
 	ASSERT(ipsq->ipsq_xopq_mphead == NULL && ipsq->ipsq_mphead == NULL);
@@ -16397,10 +16399,13 @@ illgrp_insert(ill_group_t **illgrp_head, ill_t *ill, char *groupname,
  * Return the first phyint matching the groupname. There could
  * be more than one when there are ill groups.
  *
- * Needs work: called only from ip_sioctl_groupname
+ * If 'usable' is set, then we exclude ones that are marked with any of
+ * (PHYI_FAILED|PHYI_STANDBY|PHYI_OFFLINE|PHYI_INACTIVE).
+ * Needs work: called only from ip_sioctl_groupname and from the ipmp/netinfo
+ * emulation of ipmp.
  */
-static phyint_t *
-phyint_lookup_group(char *groupname, ip_stack_t *ipst)
+phyint_t *
+phyint_lookup_group(char *groupname, boolean_t usable, ip_stack_t *ipst)
 {
 	phyint_t *phyi;
 
@@ -16415,6 +16420,14 @@ phyint_lookup_group(char *groupname, ip_stack_t *ipst)
 	    phyi, AVL_AFTER)) {
 		if (phyi->phyint_groupname_len == 0)
 			continue;
+		/*
+		 * Skip the ones that should not be used since the callers
+		 * sometime use this for sending packets.
+		 */
+		if (usable && (phyi->phyint_flags &
+		    (PHYI_FAILED|PHYI_STANDBY|PHYI_OFFLINE|PHYI_INACTIVE)))
+			continue;
+
 		ASSERT(phyi->phyint_groupname != NULL);
 		if (mi_strcmp(groupname, phyi->phyint_groupname) == 0)
 			return (phyi);
@@ -16422,6 +16435,49 @@ phyint_lookup_group(char *groupname, ip_stack_t *ipst)
 	return (NULL);
 }
 
+
+/*
+ * Return the first usable phyint matching the group index. By 'usable'
+ * we exclude ones that are marked ununsable with any of
+ * (PHYI_FAILED|PHYI_STANDBY|PHYI_OFFLINE|PHYI_INACTIVE).
+ *
+ * Used only for the ipmp/netinfo emulation of ipmp.
+ */
+phyint_t *
+phyint_lookup_group_ifindex(uint_t group_ifindex, ip_stack_t *ipst)
+{
+	phyint_t *phyi;
+
+	ASSERT(RW_LOCK_HELD(&ipst->ips_ill_g_lock));
+
+	if (!ipst->ips_ipmp_hook_emulation)
+		return (NULL);
+
+	/*
+	 * Group indicies are stored in the phyint - a common structure
+	 * to both IPv4 and IPv6.
+	 */
+	phyi = avl_first(&ipst->ips_phyint_g_list->phyint_list_avl_by_index);
+	for (; phyi != NULL;
+	    phyi = avl_walk(&ipst->ips_phyint_g_list->phyint_list_avl_by_index,
+	    phyi, AVL_AFTER)) {
+		/* Ignore the ones that do not have a group */
+		if (phyi->phyint_groupname_len == 0)
+			continue;
+
+		ASSERT(phyi->phyint_group_ifindex != 0);
+		/*
+		 * Skip the ones that should not be used since the callers
+		 * sometime use this for sending packets.
+		 */
+		if (phyi->phyint_flags &
+		    (PHYI_FAILED|PHYI_STANDBY|PHYI_OFFLINE|PHYI_INACTIVE))
+			continue;
+		if (phyi->phyint_group_ifindex == group_ifindex)
+			return (phyi);
+	}
+	return (NULL);
+}
 
 
 /*
@@ -16589,6 +16645,10 @@ ip_sioctl_groupname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		mi_free(phyi->phyint_groupname);
 		phyi->phyint_groupname = NULL;
 		phyi->phyint_groupname_len = 0;
+
+		/* Restore the ifindex used to be the per interface one */
+		phyi->phyint_group_ifindex = 0;
+		phyi->phyint_hook_ifindex = phyi->phyint_ifindex;
 		mutex_exit(&phyi->phyint_lock);
 		RELEASE_ILL_LOCKS(ill_v4, ill_v6);
 		rw_exit(&ipst->ips_ill_g_lock);
@@ -16641,7 +16701,7 @@ ip_sioctl_groupname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		 * packets across the group because of potential link-level
 		 * header differences.
 		 */
-		phyi_tmp = phyint_lookup_group(groupname, ipst);
+		phyi_tmp = phyint_lookup_group(groupname, B_FALSE, ipst);
 		if (phyi_tmp != NULL) {
 			if ((ill_v4 != NULL &&
 			    phyi_tmp->phyint_illv4 != NULL) &&
@@ -16736,6 +16796,37 @@ ip_sioctl_groupname(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		phyi->phyint_groupname = tmp;
 		bcopy(groupname, phyi->phyint_groupname, namelen + 1);
 		phyi->phyint_groupname_len = namelen + 1;
+
+		if (ipst->ips_ipmp_hook_emulation) {
+			/*
+			 * If the group already exists we use the existing
+			 * group_ifindex, otherwise we pick a new index here.
+			 */
+			if (phyi_tmp != NULL) {
+				phyi->phyint_group_ifindex =
+				    phyi_tmp->phyint_group_ifindex;
+			} else {
+				/* XXX We need a recovery strategy here. */
+				if (!ip_assign_ifindex(
+				    &phyi->phyint_group_ifindex, ipst))
+					cmn_err(CE_PANIC,
+					    "ip_assign_ifindex() failed");
+			}
+		}
+		/*
+		 * Select whether the netinfo and hook use the per-interface
+		 * or per-group ifindex.
+		 */
+		if (ipst->ips_ipmp_hook_emulation)
+			phyi->phyint_hook_ifindex = phyi->phyint_group_ifindex;
+		else
+			phyi->phyint_hook_ifindex = phyi->phyint_ifindex;
+
+		if (ipst->ips_ipmp_hook_emulation &&
+		    phyi_tmp != NULL) {
+			/* First phyint in group - group PLUMB event */
+			ill_nic_info_plumb(ill, B_TRUE);
+		}
 		mutex_exit(&phyi->phyint_lock);
 		RELEASE_ILL_LOCKS(ill_v4, ill_v6);
 		rw_exit(&ipst->ips_ill_g_lock);
@@ -18414,7 +18505,7 @@ ill_dl_down(ill_t *ill)
 	if (info != NULL) {
 		ip_stack_t	*ipst = ill->ill_ipst;
 
-		info->hne_nic = ill->ill_phyint->phyint_ifindex;
+		info->hne_nic = ill->ill_phyint->phyint_hook_ifindex;
 		info->hne_lif = 0;
 		info->hne_event = NE_DOWN;
 		info->hne_data = NULL;
@@ -22891,6 +22982,9 @@ ill_phyint_reinit(ill_t *ill)
 		if (!phyint_assign_ifindex(phyi, ipst))
 			cmn_err(CE_PANIC, "phyint_assign_ifindex() failed");
 
+		/* No IPMP group yet, thus the hook uses the ifindex */
+		phyi->phyint_hook_ifindex = phyi->phyint_ifindex;
+
 		avl_insert(&ipst->ips_phyint_g_list->phyint_list_avl_by_name,
 		    (void *)phyi, where);
 
@@ -22940,45 +23034,103 @@ ill_phyint_reinit(ill_t *ill)
 	 */
 	if (ill->ill_name_length <= 2 ||
 	    ill->ill_name[0] != 'l' || ill->ill_name[1] != 'o') {
-		hook_nic_event_t *info;
-		if ((info = ill->ill_nic_event_info) != NULL) {
-			ip2dbg(("ill_phyint_reinit: unexpected nic event %d "
-			    "attached for %s\n", info->hne_event,
-			    ill->ill_name));
+		/*
+		 * Generate nic plumb event for ill_name even if
+		 * ipmp_hook_emulation is set. That avoids generating events
+		 * for the ill_names should ipmp_hook_emulation be turned on
+		 * later.
+		 */
+		ill_nic_info_plumb(ill, B_FALSE);
+	}
+	RELEASE_ILL_LOCKS(ill, ill_other);
+	mutex_exit(&phyi->phyint_lock);
+}
+
+/*
+ * Allocate a NE_PLUMB nic info event and store in the ill.
+ * If 'group' is set we do it for the group name, otherwise the ill name.
+ * It will be sent when we leave the ipsq.
+ */
+void
+ill_nic_info_plumb(ill_t *ill, boolean_t group)
+{
+	phyint_t	*phyi = ill->ill_phyint;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	hook_nic_event_t *info;
+	char		*name;
+	int		namelen;
+
+	ASSERT(MUTEX_HELD(&ill->ill_lock));
+
+	if ((info = ill->ill_nic_event_info) != NULL) {
+		ip2dbg(("ill_nic_info_plumb: unexpected nic event %d "
+		    "attached for %s\n", info->hne_event,
+		    ill->ill_name));
+		if (info->hne_data != NULL)
+			kmem_free(info->hne_data, info->hne_datalen);
+		kmem_free(info, sizeof (hook_nic_event_t));
+		ill->ill_nic_event_info = NULL;
+	}
+
+	info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP);
+	if (info == NULL) {
+		ip2dbg(("ill_nic_info_plumb: could not attach PLUMB nic "
+		    "event information for %s (ENOMEM)\n",
+		    ill->ill_name));
+		return;
+	}
+
+	if (group) {
+		ASSERT(phyi->phyint_groupname_len != 0);
+		namelen = phyi->phyint_groupname_len;
+		name = phyi->phyint_groupname;
+	} else {
+		namelen = ill->ill_name_length;
+		name = ill->ill_name;
+	}
+
+	info->hne_nic = phyi->phyint_hook_ifindex;
+	info->hne_lif = 0;
+	info->hne_event = NE_PLUMB;
+	info->hne_family = ill->ill_isv6 ?
+	    ipst->ips_ipv6_net_data : ipst->ips_ipv4_net_data;
+
+	info->hne_data = kmem_alloc(namelen, KM_NOSLEEP);
+	if (info->hne_data != NULL) {
+		info->hne_datalen = namelen;
+		bcopy(name, info->hne_data, info->hne_datalen);
+	} else {
+		ip2dbg(("ill_nic_info_plumb: could not attach "
+		    "name information for PLUMB nic event "
+		    "of %s (ENOMEM)\n", name));
+		kmem_free(info, sizeof (hook_nic_event_t));
+		info = NULL;
+	}
+	ill->ill_nic_event_info = info;
+}
+
+/*
+ * Unhook the nic event message from the ill and enqueue it
+ * into the nic event taskq.
+ */
+void
+ill_nic_info_dispatch(ill_t *ill)
+{
+	hook_nic_event_t *info;
+
+	ASSERT(MUTEX_HELD(&ill->ill_lock));
+
+	if ((info = ill->ill_nic_event_info) != NULL) {
+		if (ddi_taskq_dispatch(eventq_queue_nic,
+		    ip_ne_queue_func, info, DDI_SLEEP) == DDI_FAILURE) {
+			ip2dbg(("ill_nic_info_dispatch: "
+			    "ddi_taskq_dispatch failed\n"));
 			if (info->hne_data != NULL)
 				kmem_free(info->hne_data, info->hne_datalen);
 			kmem_free(info, sizeof (hook_nic_event_t));
 		}
-
-		info = kmem_alloc(sizeof (hook_nic_event_t), KM_NOSLEEP);
-		if (info != NULL) {
-			info->hne_nic = ill->ill_phyint->phyint_ifindex;
-			info->hne_lif = 0;
-			info->hne_event = NE_PLUMB;
-			info->hne_family = ill->ill_isv6 ?
-			    ipst->ips_ipv6_net_data : ipst->ips_ipv4_net_data;
-			info->hne_data = kmem_alloc(ill->ill_name_length,
-			    KM_NOSLEEP);
-			if (info->hne_data != NULL) {
-				info->hne_datalen = ill->ill_name_length;
-				bcopy(ill->ill_name, info->hne_data,
-				    info->hne_datalen);
-			} else {
-				ip2dbg(("ill_phyint_reinit: could not attach "
-				    "ill_name information for PLUMB nic event "
-				    "of %s (ENOMEM)\n", ill->ill_name));
-				kmem_free(info, sizeof (hook_nic_event_t));
-			}
-		} else
-			ip2dbg(("ill_phyint_reinit: could not attach PLUMB nic "
-			    "event information for %s (ENOMEM)\n",
-			    ill->ill_name));
-
-		ill->ill_nic_event_info = info;
+		ill->ill_nic_event_info = NULL;
 	}
-
-	RELEASE_ILL_LOCKS(ill, ill_other);
-	mutex_exit(&phyi->phyint_lock);
 }
 
 /*
@@ -24478,6 +24630,11 @@ ill_is_probeonly(ill_t *ill)
  * Return a pointer to an ipif_t given a combination of (ill_idx,ipif_id)
  * If a pointer to an ipif_t is returned then the caller will need to do
  * an ill_refrele().
+ *
+ * If there is no real interface which matches the ifindex, then it looks
+ * for a group that has a matching index. In the case of a group match the
+ * lifidx must be zero. We don't need emulate the logical interfaces
+ * since IP Filter's use of netinfo doesn't use that.
  */
 ipif_t *
 ipif_getby_indexes(uint_t ifindex, uint_t lifidx, boolean_t isv6,
@@ -24489,8 +24646,17 @@ ipif_getby_indexes(uint_t ifindex, uint_t lifidx, boolean_t isv6,
 	ill = ill_lookup_on_ifindex(ifindex, isv6, NULL, NULL, NULL, NULL,
 	    ipst);
 
-	if (ill == NULL)
-		return (NULL);
+	if (ill == NULL) {
+		/* Fallback to group names only if hook_emulation set */
+		if (!ipst->ips_ipmp_hook_emulation)
+			return (NULL);
+
+		if (lifidx != 0)
+			return (NULL);
+		ill = ill_group_lookup_on_ifindex(ifindex, isv6, ipst);
+		if (ill == NULL)
+			return (NULL);
+	}
 
 	mutex_enter(&ill->ill_lock);
 	if (ill->ill_state_flags & ILL_CONDEMNED) {

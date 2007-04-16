@@ -297,6 +297,8 @@ struct ip_stack {
 	int		ips_ip_g_forward;
 	int		ips_ipv6_forward;
 
+	int		ips_ipmp_hook_emulation; /* ndd variable */
+
 	time_t		ips_ip_g_frag_timeout;
 	clock_t		ips_ip_g_frag_timo_ms;
 
