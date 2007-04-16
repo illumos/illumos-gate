@@ -1231,9 +1231,9 @@ int use_hw_bzero = 1;
 
 /*
  * hwblkclr - clears block-aligned, block-multiple-sized regions that are
- * longer than 256 bytes in length using load/stores.  If
- * the criteria for using this routine are not met then it calls bzero
- * and returns 1.  Otherwise 0 is returned indicating success.
+ * longer than 256 bytes in length using load/stores. For the generic
+ * module, we will return 1 to ensure that the pages in cache should be
+ * flushed to ensure integrity.
  * Caller is responsible for ensuring use_hw_bzero is true and that
  * kpreempt_disable() has been called.
  */
@@ -1340,7 +1340,7 @@ hwblkclr(void *addr, size_t len)
 .pz_finish:
 	membar	#Sync
 	ret
-	restore	%g0, 0, %o0		! return (bzero or not)
+	restore	%g0, 1, %o0	! return (1) - did not use block operations	
 	SET_SIZE(hwblkclr)
 #endif	/* lint */
 
