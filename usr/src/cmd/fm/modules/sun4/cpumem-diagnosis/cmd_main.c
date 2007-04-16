@@ -506,8 +506,6 @@ static const fmd_prop_t fmd_props[] = {
 	{ "thresh_abs_sysmem", FMD_TYPE_UINT64, "0" },
 	{ "thresh_abs_badrw", FMD_TYPE_UINT64, "128" },
 	{ "max_perm_ce_dimm", FMD_TYPE_UINT32, "128" },
-	{ "int_ce_n", FMD_TYPE_UINT32, "10" },
-	{ "int_ce_t", FMD_TYPE_TIME, "1h" },
 	{ NULL, 0, NULL }
 };
 

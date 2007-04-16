@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -320,11 +320,13 @@ mq_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 				    dimm->dimm_case.cc_cp,
 				    upos_array[j].mq2->mq_ep);
 			}
+			dimm->dimm_flags |= CMD_MEM_F_FAULTING;
+			cmd_dimm_dirty(hdl, dimm);
 			fmd_case_add_suspect(hdl, dimm->dimm_case.cc_cp, flt);
 			fmd_case_solve(hdl, dimm->dimm_case.cc_cp);
 			return;
 		}
-		upos_pairs += i;
+		upos_pairs = i;
 	}
 
 	if (upos_pairs  < 3)
@@ -366,6 +368,8 @@ mq_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 					    dimm->dimm_case.cc_cp, flt);
 					fmd_case_solve(hdl,
 					    dimm->dimm_case.cc_cp);
+					dimm->dimm_flags |= CMD_MEM_F_FAULTING;
+					cmd_dimm_dirty(hdl, dimm);
 					return;
 				}
 			}
@@ -379,7 +383,7 @@ cmd_ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
     const char *class, uint64_t afar, uint8_t afar_status, uint16_t synd,
     uint8_t synd_status, ce_dispact_t type, uint64_t disp, nvlist_t *asru)
 {
-	cmd_dimm_t *dimm, *d;
+	cmd_dimm_t *dimm;
 	cmd_page_t *page;
 	const char *uuid;
 
@@ -417,7 +421,7 @@ cmd_ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	 * Add to MQSC correlation lists all CEs which pass validity
 	 * checks above.
 	 */
-	{
+	if (!(dimm->dimm_flags & CMD_MEM_F_FAULTING)) {
 		uint64_t *now;
 		uint_t nelem;
 		if (nvlist_lookup_uint64_array(nvl,
@@ -432,48 +436,10 @@ cmd_ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	switch (type) {
 	case CE_DISP_UNKNOWN:
 		CMD_STAT_BUMP(ce_unknown);
-		break;
+		return (CMD_EVD_UNUSED);
 	case CE_DISP_INTERMITTENT:
 		CMD_STAT_BUMP(ce_interm);
-		fmd_hdl_debug(hdl,
-		    "adding intermittent event to CE serd engine\n");
-
-		if (dimm->dimm_case.cc_serdnm == NULL) {
-			dimm->dimm_case.cc_serdnm = cmd_mem_serdnm_create(hdl,
-			    "dimm", dimm->dimm_unum);
-
-			fmd_serd_create(hdl, dimm->dimm_case.cc_serdnm,
-			    fmd_prop_get_int32(hdl, "int_ce_n"),
-			    fmd_prop_get_int64(hdl, "int_ce_t"));
-		}
-
-		/*
-		 * At most one such SERD engine for intermittent events is
-		 * allowed at any time.  Destroy SERD engines on other DIMMs.
-		 */
-
-		for (d = cmd_list_next(&cmd.cmd_dimms); d != NULL;
-		    d = cmd_list_next(d)) {
-			if (d == dimm) continue; /* skip current dimm */
-			else if (d->dimm_case.cc_serdnm != NULL) {
-				fmd_serd_destroy(hdl, d->dimm_case.cc_serdnm);
-				d->dimm_case.cc_serdnm = NULL;
-			}
-		}
-
-		if (fmd_serd_record(hdl, dimm->dimm_case.cc_serdnm, ep) ==
-		    FMD_B_FALSE)
-			return (CMD_EVD_OK); /* engine hasn't fired */
-
-		fmd_hdl_debug(hdl, "ce int serd fired\n");
-		fmd_case_add_serd(hdl, dimm->dimm_case.cc_cp,
-		    dimm->dimm_case.cc_serdnm);
-		fmd_case_add_suspect(hdl, dimm->dimm_case.cc_cp,
-		    cmd_dimm_create_fault(hdl, dimm, "fault.memory.dimm", 100));
-		fmd_case_solve(hdl, dimm->dimm_case.cc_cp);
-		dimm->dimm_flags |= CMD_MEM_F_FAULTING;
-		fmd_serd_reset(hdl, dimm->dimm_case.cc_serdnm);
-		return (CMD_EVD_OK);
+		return (CMD_EVD_UNUSED);
 	case CE_DISP_POSS_PERS:
 		CMD_STAT_BUMP(ce_ppersis);
 		break;
