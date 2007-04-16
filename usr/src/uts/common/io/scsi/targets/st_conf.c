@@ -1103,6 +1103,47 @@ const struct st_drivetype st_drivetypes[] =
   },
 
   /*
+   * HP Ultrium LTO Gen 4
+   * [1] This drive supports two densites at this time.
+   *     In reality the type of media GEN 3 or GEN 4 selects the density.
+   *     ST_MODE_SEL_COMP controls compression.
+   * [2] The Ultrium LTO has one speed.
+   * [3] max_rretries and max_wretries are not used but kept for
+   *     backward compatibility.
+   */
+  {                           /* Structure member Description                 */
+                              /* ---------------- -----------                 */
+    "HP Ultrium LTO 4",       /* .name            Display ("pretty") name     */
+    17,                       /* .length          Length of next item...      */
+    "HP      Ultrium 4*",     /* .vid             handles SCSI or FC          */
+    MT_LTO,                   /* .type            Numeric type (cf. mtio.h)   */
+    0,                        /* .bsize           Block size (0 = variable)   */
+                              /* .options         Drive option flags:         */
+    ST_VARIABLE         |     /*  0000001           Supports variable length  */
+    ST_BSF              |     /*  0000008           Supports SPACE block fwd  */
+    ST_BSR              |     /*  0000010           Supports SPACE block rev  */
+    ST_KNOWS_EOD        |     /*  0000200           Recognizes end-of-data    */
+    ST_UNLOADABLE       |     /*  0000400           Driver can be unloaded    */
+    ST_NO_RECSIZE_LIMIT |     /*  0008000           Supports blocks > 64KB    */
+    ST_MODE_SEL_COMP    |     /*  0010000           Mode select compression   */
+    ST_WORMABLE,              /*  1000000           Drive is WORM capable     */
+                              /*  -------                                     */
+                              /*  1018619                                     */
+    -1,                       /* .max_rretries    [Note 3]                    */
+    -1,                       /* .max_wretries    [Note 3]                    */
+    {0x44, 0x44, 0x46, 0x46}, /* .densities       Density codes [Note 1]      */
+    MT_DENSITY4,              /* .default_density (.densities[x])             */
+    {0, 0, 0, 0},             /* .speeds          Speed codes [Note 2]        */
+    MINUTES(1),               /* .non_motion_timeout                          */
+    MINUTES(20),              /* .io_timeout                                  */
+    MINUTES(10),              /* .rewind_timeout                              */
+    MINUTES(20),              /* .space_timeout                               */
+    MINUTES(10),              /* .load_timeout                                */
+    MINUTES(10),              /* .unload_timeout                              */
+    MINUTES(300)              /* .erase_timeout      Five Hours               */
+  },
+
+  /*
    * HP Ultrium LTO Gen 3
    * [1] This drive supports two densites at this time.
    *     In reality the type of media GEN 2 or GEN 3 selects the density.

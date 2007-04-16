@@ -9119,6 +9119,22 @@ st_decode_sense(struct scsi_tape *un, struct buf *bp,  int amt,
 	switch (un->un_status = sensep->es_key) {
 	case KEY_NO_SENSE:
 		severity = SCSI_ERR_INFO;
+
+		/*
+		 * Erase, locate or rewind operation in progress, retry
+		 * ASC  ASCQ
+		 *  00   18    Erase operation in progress
+		 *  00   19    Locate operation in progress
+		 *  00   1A    Rewind operation in progress
+		 */
+		if (sensep->es_add_code == 0 &&
+		    ((sensep->es_qual_code == 0x18) ||
+		    (sensep->es_qual_code == 0x19) ||
+		    (sensep->es_qual_code == 0x1a))) {
+			rval = QUE_COMMAND;
+			break;
+		}
+
 		goto common;
 
 	case KEY_RECOVERABLE_ERROR:
@@ -11521,6 +11537,10 @@ st_is_hp_lto_tape_worm(struct scsi_tape *un)
 		case 0x44:
 			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
 			    "Drive has standard Gen III media loaded\n");
+			break;
+		case 0x46:
+			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
+			    "Drive has standard Gen IV media loaded\n");
 			break;
 		default:
 			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
