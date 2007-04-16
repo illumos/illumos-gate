@@ -179,7 +179,8 @@ hment_alloc()
 	if (!USE_HAT_RESERVES()) {
 		for (;;) {
 			hm = kmem_cache_alloc(hment_cache, km_flag);
-			if (USE_HAT_RESERVES() ||
+			if (hm == NULL ||
+			    USE_HAT_RESERVES() ||
 			    hment_reserve_count >= hment_reserve_amount)
 				break;
 			hment_put_reserve(hm);
