@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1442,13 +1442,35 @@ void
 ibcm_open_done(ibcm_state_data_t *statep)
 {
 	int run;
+	ibcm_state_data_t **linkp, *tmp;
 
 	ASSERT(MUTEX_HELD(&statep->state_mutex));
 	if (statep->open_flow == 1) {
 		statep->open_flow = 0;
 		mutex_enter(&ibcm_open.mutex);
-		ibcm_open.in_progress--;
-		run = ibcm_ok_to_start(&ibcm_open);
+		if (statep->open_link == NULL) {
+			ibcm_open.in_progress--;
+			run = ibcm_ok_to_start(&ibcm_open);
+		} else {
+			ibcm_open.queued--;
+			linkp = &ibcm_open.head.open_link;
+			while (*linkp != statep)
+				linkp = &((*linkp)->open_link);
+			*linkp = statep->open_link;
+			statep->open_link = NULL;
+			/*
+			 * If we remove what tail pointed to, we need
+			 * to reassign tail (it is never NULL).
+			 * tail points to head for the empty list.
+			 */
+			if (ibcm_open.tail == statep) {
+				tmp = &ibcm_open.head;
+				while (tmp->open_link != &ibcm_open.head)
+					tmp = tmp->open_link;
+				ibcm_open.tail = tmp;
+			}
+			run = 0;
+		}
 		mutex_exit(&ibcm_open.mutex);
 		if (run)
 			ibcm_run_tlist_thread();
@@ -1495,7 +1517,7 @@ ibcm_open_enqueue(ibcm_state_data_t *statep)
 		ibcm_open_start(statep);
 	} else {
 		ibcm_open.queued++;
-		statep->open_link = NULL;
+		statep->open_link = &ibcm_open.head;
 		ibcm_open.tail->open_link = statep;
 		ibcm_open.tail = statep;
 		run = ibcm_ok_to_start(&ibcm_open);
@@ -1516,6 +1538,11 @@ ibcm_open_dequeue(void)
 	statep = ibcm_open.head.open_link;
 	ibcm_open.head.open_link = statep->open_link;
 	statep->open_link = NULL;
+	/*
+	 * If we remove what tail pointed to, we need
+	 * to reassign tail (it is never NULL).
+	 * tail points to head for the empty list.
+	 */
 	if (ibcm_open.tail == statep)
 		ibcm_open.tail = &ibcm_open.head;
 	return (statep);
