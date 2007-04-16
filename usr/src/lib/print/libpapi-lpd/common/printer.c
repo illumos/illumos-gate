@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -83,6 +83,12 @@ papiPrinterQuery(papi_service_t handle, char *name,
 					PAPI_ATTR_APPEND,
 					"printer-uri-supported", buf);
 		}
+		/* Set printer accepting: mimic prepapi behavior */
+		if ((p = *printer) != NULL)
+			papiAttributeListAddBoolean(&(p->attributes),
+				PAPI_ATTR_REPLACE,
+				"printer-is-accepting-jobs", PAPI_TRUE);
+
 	}
 
 	return (status);
