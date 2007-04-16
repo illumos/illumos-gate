@@ -231,8 +231,6 @@ getparams(
 				params->dnsi = 1;
 			else if (strcmp(n, NSS_DBNAM_SHADOW) == 0)
 				params->privdb = 1;
-			else if (strcmp(n, NSS_DBNAM_AUDITUSER) == 0)
-				params->privdb = 1;
 			break;
 		}
 	}
