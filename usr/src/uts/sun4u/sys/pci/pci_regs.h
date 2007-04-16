@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,9 +112,6 @@ extern "C" {
 #define	COMMON_ECC_UE_AFSR_PE_SHIFT		61
 #define	COMMON_ECC_UE_AFSR_SE_SHIFT		58
 #define	COMMON_ECC_UE_AFSR_E_MASK		0x0000000000000007ull
-#define	COMMON_ECC_UE_AFSR_E_PIO		0x0000000000000004ull
-#define	COMMON_ECC_UE_AFSR_E_DRD		0x0000000000000002ull
-#define	COMMON_ECC_UE_AFSR_E_DWR		0x0000000000000001ull
 
 /*
  * psycho and schizo ECC CE AFSR bit definitions:
@@ -123,9 +119,13 @@ extern "C" {
 #define	COMMON_ECC_CE_AFSR_PE_SHIFT		61
 #define	COMMON_ECC_CE_AFSR_SE_SHIFT		58
 #define	COMMON_ECC_CE_AFSR_E_MASK		0x0000000000000007ull
-#define	COMMON_ECC_CE_AFSR_E_PIO		0x0000000000000004ull
-#define	COMMON_ECC_CE_AFSR_E_DRD		0x0000000000000002ull
-#define	COMMON_ECC_CE_AFSR_E_DWR		0x0000000000000001ull
+
+/*
+ * psycho and schizo ECC CE/UE AFSR bit definitions for error types:
+ */
+#define	COMMON_ECC_AFSR_E_PIO			0x0000000000000004ull
+#define	COMMON_ECC_AFSR_E_DRD			0x0000000000000002ull
+#define	COMMON_ECC_AFSR_E_DWR			0x0000000000000001ull
 
 /*
  * psycho and schizo pci control register bits:

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1608,7 +1608,7 @@ pci_ecc_classify(uint64_t err, ecc_errstate_t *ecc_err_p)
 	/*
 	 * Determine the primary error type.
 	 */
-	if (err & COMMON_ECC_UE_AFSR_E_PIO) {
+	if (err & COMMON_ECC_AFSR_E_PIO) {
 		if (ecc_err_p->ecc_ii_p.ecc_type == CBNINTR_UE) {
 			if (ecc_err_p->ecc_pri) {
 				ecc->flt_erpt_class = PCI_ECC_PIO_UE;
@@ -1621,7 +1621,7 @@ pci_ecc_classify(uint64_t err, ecc_errstate_t *ecc_err_p)
 				PCI_ECC_PIO_CE : PCI_ECC_SEC_PIO_CE;
 			return;
 		}
-	} else if (err & COMMON_ECC_UE_AFSR_E_DRD) {
+	} else if (err & COMMON_ECC_AFSR_E_DRD) {
 		if (ecc_err_p->ecc_ii_p.ecc_type == CBNINTR_UE) {
 			if (ecc_err_p->ecc_pri) {
 				ecc->flt_erpt_class = PCI_ECC_DRD_UE;
@@ -1634,7 +1634,7 @@ pci_ecc_classify(uint64_t err, ecc_errstate_t *ecc_err_p)
 				PCI_ECC_DRD_CE : PCI_ECC_SEC_DRD_CE;
 			return;
 		}
-	} else if (err & COMMON_ECC_UE_AFSR_E_DWR) {
+	} else if (err & COMMON_ECC_AFSR_E_DWR) {
 		if (ecc_err_p->ecc_ii_p.ecc_type == CBNINTR_UE) {
 			if (ecc_err_p->ecc_pri) {
 				ecc->flt_erpt_class = PCI_ECC_DWR_UE;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -416,6 +415,13 @@ ecc_err_handler(ecc_errstate_t *ecc_err_p)
 	cb_t *cb_p;
 	int fatal = 0;
 	int nonfatal = 0;
+	ecc_errstate_t ecc_sec_err;
+	uint64_t sec_tmp;
+	int i;
+	uint64_t afsr_err[] = { COMMON_ECC_AFSR_E_PIO,
+				COMMON_ECC_AFSR_E_DRD,
+				COMMON_ECC_AFSR_E_DWR };
+
 
 	ASSERT(MUTEX_HELD(&ecc_p->ecc_pci_cmn_p->pci_fm_mutex));
 
@@ -444,17 +450,10 @@ ecc_err_handler(ecc_errstate_t *ecc_err_p)
 				ecc_err_p->ecc_aflt.flt_panic);
 		}
 		if (sec_err) {
-			ecc_errstate_t ecc_sec_err;
-			uint64_t sec_tmp;
-			int i;
-			uint64_t afsr_err[] = {COMMON_ECC_UE_AFSR_E_PIO,
-				COMMON_ECC_UE_AFSR_E_DRD,
-				COMMON_ECC_UE_AFSR_E_DWR};
-
 			ecc_sec_err = *ecc_err_p;
 			ecc_sec_err.ecc_pri = 0;
 			/*
-			 * Secondary errors are cummulative so we need to loop
+			 * Secondary errors are cumulative so we need to loop
 			 * through to capture them all.
 			 */
 			for (i = 0; i < 3; i++) {
@@ -500,12 +499,20 @@ ecc_err_handler(ecc_errstate_t *ecc_err_p)
 			nonfatal++;
 		}
 		if (sec_err) {
-			ecc_errstate_t ecc_sec_err;
-
 			ecc_sec_err = *ecc_err_p;
 			ecc_sec_err.ecc_pri = 0;
-			pci_ecc_classify(sec_err, &ecc_sec_err);
-			ecc_ereport_post(pci_p->pci_dip, &ecc_sec_err);
+			/*
+			 * Secondary errors are cumulative so we need to loop
+			 * through to capture them all.
+			 */
+			for (i = 0; i < 3; i++) {
+				sec_tmp = sec_err & afsr_err[i];
+				if (sec_tmp) {
+					pci_ecc_classify(sec_tmp, &ecc_sec_err);
+					ecc_ereport_post(pci_p->pci_dip,
+					    &ecc_sec_err);
+				}
+			}
 			nonfatal++;
 		}
 		break;
