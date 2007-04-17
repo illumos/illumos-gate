@@ -84,7 +84,7 @@ static int errcnt;
 static boolean_t silent, interactive, recursive, ontty;
 
 static char *pathbuf;
-static size_t pathbuflen;
+static size_t pathbuflen = MAXPATHLEN;
 
 static int maxfds = MAXINT;
 static int nfds;
@@ -156,6 +156,10 @@ main(int argc, char **argv)
 		    strerror(errno));
 		exit(2);
 	}
+
+	pathbuf = malloc(pathbuflen);
+	if (pathbuf == NULL)
+		memerror();
 
 	for (; *argv != NULL; argv++) {
 		char *p = strrchr(*argv, '/');
