@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -347,7 +347,6 @@ cpu_sgn_update(ushort_t sig, uchar_t state, uchar_t sub_state, int cpuid)
 {
 	dp_cpu_signature_t signature;
 	rmc_comm_msg_t	req;	/* request */
-	int (*rmc_req_res)(rmc_comm_msg_t *, rmc_comm_msg_t *, time_t) = NULL;
 	int (*rmc_req_now)(rmc_comm_msg_t *, uint8_t) = NULL;
 
 
@@ -387,15 +386,6 @@ cpu_sgn_update(ushort_t sig, uchar_t state, uchar_t sub_state, int cpuid)
 	/*
 	 * find the symbol for the mailbox routine
 	 */
-	rmc_req_res = (int (*)(rmc_comm_msg_t *, rmc_comm_msg_t *, time_t))
-		modgetsymvalue("rmc_comm_request_response", 0);
-	if (rmc_req_res == NULL) {
-		return;
-	}
-
-	/*
-	 * find the symbol for the mailbox routine
-	 */
 	rmc_req_now = (int (*)(rmc_comm_msg_t *, uint8_t))
 		modgetsymvalue("rmc_comm_request_nowait", 0);
 	if (rmc_req_now == NULL) {
@@ -412,8 +402,18 @@ cpu_sgn_update(ushort_t sig, uchar_t state, uchar_t sub_state, int cpuid)
 	req.msg_buf = (caddr_t)&signature;
 
 	/*
-	 * ship it
-	 * - note that for panic or reboot need to send with nowait/urgent
+	 * We need to tell the SP that the host is about to stop running.  The
+	 * SP will then allow the date to be set at its console, it will change
+	 * state of the activity indicator, it will display the correct host
+	 * status, and it will stop sending console messages and alerts to the
+	 * host communication channel.
+	 *
+	 * This requires the RMC_COMM_DREQ_URGENT as we want to
+	 * be sure activity indicators will reflect the correct status.
+	 *
+	 * When sub_state SIGSUBST_DUMP is sent, the urgent flag
+	 * (RMC_COMM_DREQ_URGENT) is not required as SIGSUBST_PANIC_REBOOT
+	 * has already been sent and changed activity indicators.
 	 */
 	if (state == SIGST_EXIT && (sub_state == SIGSUBST_HALT ||
 	    sub_state == SIGSUBST_REBOOT || sub_state == SIGSUBST_ENVIRON ||
