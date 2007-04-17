@@ -84,6 +84,7 @@ zio_sync_pass_t zio_sync_pass = {
  * I/O kmem caches
  * ==========================================================================
  */
+kmem_cache_t *zio_cache;
 kmem_cache_t *zio_buf_cache[SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT];
 kmem_cache_t *zio_data_buf_cache[SPA_MAXBLOCKSIZE >> SPA_MINBLOCKSHIFT];
 
@@ -100,6 +101,9 @@ zio_init(void)
 #ifdef _KERNEL
 	data_alloc_arena = zio_alloc_arena;
 #endif
+
+	zio_cache = kmem_cache_create("zio_cache", sizeof (zio_t), 0,
+	    NULL, NULL, NULL, NULL, NULL, 0);
 
 	/*
 	 * For small buffers, we want a cache for each multiple of
@@ -172,6 +176,8 @@ zio_fini(void)
 		}
 		zio_data_buf_cache[c] = NULL;
 	}
+
+	kmem_cache_destroy(zio_cache);
 
 	zio_inject_fini();
 }
@@ -303,7 +309,8 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 	ASSERT3U(size, <=, SPA_MAXBLOCKSIZE);
 	ASSERT(P2PHASE(size, SPA_MINBLOCKSIZE) == 0);
 
-	zio = kmem_zalloc(sizeof (zio_t), KM_SLEEP);
+	zio = kmem_cache_alloc(zio_cache, KM_SLEEP);
+	bzero(zio, sizeof (zio_t));
 	zio->io_parent = pio;
 	zio->io_spa = spa;
 	zio->io_txg = txg;
@@ -749,7 +756,7 @@ zio_wait(zio_t *zio)
 
 	error = zio->io_error;
 	mutex_destroy(&zio->io_lock);
-	kmem_free(zio, sizeof (zio_t));
+	kmem_cache_free(zio_cache, zio);
 
 	return (error);
 }
@@ -929,9 +936,8 @@ zio_done(zio_t *zio)
 	}
 
 	/*
-	 * Note: this I/O is now done, and will shortly be
-	 * kmem_free()'d, so there is no need to clear this (or any
-	 * other) flag.
+	 * Note: this I/O is now done, and will shortly be freed, so there is no
+	 * need to clear this (or any other) flag.
 	 */
 	if (zio->io_flags & ZIO_FLAG_CONFIG_GRABBED)
 		spa_config_exit(spa, zio);
@@ -943,7 +949,7 @@ zio_done(zio_t *zio)
 		cv_broadcast(&zio->io_cv);
 		mutex_exit(&zio->io_lock);
 	} else {
-		kmem_free(zio, sizeof (zio_t));
+		kmem_cache_free(zio_cache, zio);
 	}
 }
 

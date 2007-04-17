@@ -220,7 +220,7 @@ add_config(libzfs_handle_t *hdl, pool_list_t *pl, const char *path,
 	    &state) == 0 && state == POOL_STATE_SPARE &&
 	    nvlist_lookup_uint64(config, ZPOOL_CONFIG_GUID, &vdev_guid) == 0) {
 		if ((ne = zfs_alloc(hdl, sizeof (name_entry_t))) == NULL)
-		    return (-1);
+			return (-1);
 
 		if ((ne->ne_name = zfs_strdup(hdl, path)) == NULL) {
 			free(ne);
@@ -748,7 +748,7 @@ nvlist_t *
 zpool_find_import(libzfs_handle_t *hdl, int argc, char **argv)
 {
 	int i;
-	DIR *dirp;
+	DIR *dirp = NULL;
 	struct dirent64 *dp;
 	char path[MAXPATHLEN];
 	struct stat64 statbuf;
@@ -816,6 +816,7 @@ zpool_find_import(libzfs_handle_t *hdl, int argc, char **argv)
 				continue;
 
 			if ((zpool_read_label(fd, &config)) != 0) {
+				(void) close(fd);
 				(void) no_memory(hdl);
 				goto error;
 			}
@@ -826,6 +827,9 @@ zpool_find_import(libzfs_handle_t *hdl, int argc, char **argv)
 				if (add_config(hdl, &pools, path, config) != 0)
 					goto error;
 		}
+
+		(void) closedir(dirp);
+		dirp = NULL;
 	}
 
 	ret = get_configs(hdl, &pools);
@@ -853,6 +857,8 @@ error:
 		free(ne);
 	}
 
+	if (dirp)
+		(void) closedir(dirp);
 
 	return (ret);
 }

@@ -639,7 +639,7 @@ dbufs_cb(uintptr_t addr, const void *unknown, void *arg)
 
 	if ((data->objset == DBUFS_UNSET || data->objset == objset) &&
 	    (data->osname == NULL || (objset_name(objset, osname) == 0 &&
-		strcmp(data->osname, osname) == 0)) &&
+	    strcmp(data->osname, osname) == 0)) &&
 	    (data->object == DBUFS_UNSET || data->object == db.db_object) &&
 	    (data->level == DBUFS_UNSET || data->level == level) &&
 	    (data->blkid == DBUFS_UNSET || data->blkid == blkid)) {
@@ -1039,8 +1039,8 @@ void
 vdev_help(void)
 {
 	mdb_printf("[vdev_t*]::vdev [-er]\n"
-		"\t-> -e display vdev stats\n"
-		"\t-> -r recursive (visit all children)\n");
+	    "\t-> -e display vdev stats\n"
+	    "\t-> -r recursive (visit all children)\n");
 }
 
 /*
@@ -1103,23 +1103,23 @@ do_print_vdev(uintptr_t addr, int flags, int depth, int stats,
 
 		switch (vdev.vdev_state) {
 		case VDEV_STATE_CLOSED:
-		    state = "CLOSED";
-		    break;
+			state = "CLOSED";
+			break;
 		case VDEV_STATE_OFFLINE:
-		    state = "OFFLINE";
-		    break;
+			state = "OFFLINE";
+			break;
 		case VDEV_STATE_CANT_OPEN:
-		    state = "CANT_OPEN";
-		    break;
+			state = "CANT_OPEN";
+			break;
 		case VDEV_STATE_DEGRADED:
-		    state = "DEGRADED";
-		    break;
+			state = "DEGRADED";
+			break;
 		case VDEV_STATE_HEALTHY:
-		    state = "HEALTHY";
-		    break;
+			state = "HEALTHY";
+			break;
 		default:
-		    state = "UNKNOWN";
-		    break;
+			state = "UNKNOWN";
+			break;
 		}
 
 		switch (vdev.vdev_stat.vs_aux) {
@@ -1552,6 +1552,113 @@ spa_vdevs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    flags, 1, &v));
 }
 
+/*
+ * ::zio
+ *
+ * Print a summary of zio_t and all its children.  This is intended to display a
+ * zio tree, and hence we only pick the most important pieces of information for
+ * the main summary.  More detailed information can always be found by doing a
+ * '::print zio' on the underlying zio_t.  The columns we display are:
+ *
+ *	ADDRESS		TYPE	STAGE		WAITER
+ *
+ * The 'address' column is indented by one space for each depth level as we
+ * descend down the tree.
+ */
+static int
+zio_print_cb(uintptr_t addr, const void *data, void *priv)
+{
+	const zio_t *zio = data;
+	uintptr_t depth = (uintptr_t)priv;
+	mdb_ctf_id_t type_enum, stage_enum;
+	const char *type, *stage;
+	int maxdepth;
+
+	/*
+	 * Allow enough space for a pointer and up to a 16-deep tree.
+	 */
+	maxdepth = sizeof (uintptr_t) * 2 + 16;
+	if (depth > 16)
+		depth = 16;
+
+	if (depth == 0)
+		mdb_printf("%<u>%-*s %-5s %-22s %-?s%</u>\n", maxdepth,
+		    "ADDRESS", "TYPE", "STAGE", "WAITER");
+
+	if (mdb_ctf_lookup_by_name("enum zio_type", &type_enum) == -1 ||
+	    mdb_ctf_lookup_by_name("enum zio_stage", &stage_enum) == -1) {
+		mdb_warn("failed to lookup zio enums");
+		return (WALK_ERR);
+	}
+
+	if ((type = mdb_ctf_enum_name(type_enum, zio->io_type)) != NULL)
+		type += sizeof ("ZIO_TYPE_") - 1;
+	else
+		type = "?";
+
+	if ((stage = mdb_ctf_enum_name(stage_enum, zio->io_stage)) != NULL)
+		stage += sizeof ("ZIO_STAGE_") - 1;
+	else
+		stage = "?";
+
+
+	mdb_printf("%*s%-*p %-5s %-22s ",
+	    depth, "", maxdepth - depth, addr, type, stage);
+	if (zio->io_waiter)
+		mdb_printf("%?p\n", zio->io_waiter);
+	else
+		mdb_printf("-\n");
+
+	if (mdb_pwalk("zio_child", zio_print_cb, (void *)(depth + 1),
+	    addr) !=  0) {
+		mdb_warn("failed to walk zio_t children at %p\n", addr);
+		return (WALK_ERR);
+	}
+
+	return (WALK_NEXT);
+}
+
+/*ARGSUSED*/
+static int
+zio_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	zio_t zio;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_vread(&zio, sizeof (zio_t), addr) == -1) {
+		mdb_warn("failed to read zio_t at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	if (zio_print_cb(addr, &zio, NULL) != WALK_NEXT)
+		return (DCMD_ERR);
+
+	return (DCMD_OK);
+}
+
+/*
+ * [addr]::zio_state
+ *
+ * Print a summary of all zio_t structures on the system, or for a particular
+ * pool.  This is equivalent to '::walk zio_root | ::zio'.
+ */
+/*ARGSUSED*/
+static int
+zio_state(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	/*
+	 * MDB will remember the last address of the pipeline, so if we don't
+	 * zero this we'll end up trying to walk zio structures for a
+	 * non-existent spa_t.
+	 */
+	if (!(flags & DCMD_ADDRSPEC))
+		addr = 0;
+
+	return (mdb_pwalk_dcmd("zio_root", "zio", argc, argv, addr));
+}
+
 typedef struct txg_list_walk_data {
 	uintptr_t lw_head[TXG_SIZE];
 	int	lw_txgoff;
@@ -1693,6 +1800,110 @@ spa_walk_step(mdb_walk_state_t *wsp)
 }
 
 /*
+ * [addr]::walk zio
+ *
+ * Walk all active zio_t structures on the system.  This is simply a layered
+ * walk on top of ::walk zio_cache, with the optional ability to limit the
+ * structures to a particular pool.
+ */
+static int
+zio_walk_init(mdb_walk_state_t *wsp)
+{
+	wsp->walk_data = (void *)wsp->walk_addr;
+
+	if (mdb_layered_walk("zio_cache", wsp) == -1) {
+		mdb_warn("failed to walk 'zio_cache'\n");
+		return (WALK_ERR);
+	}
+
+	return (WALK_NEXT);
+}
+
+static int
+zio_walk_step(mdb_walk_state_t *wsp)
+{
+	zio_t zio;
+
+	if (mdb_vread(&zio, sizeof (zio), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read zio_t at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	if (wsp->walk_data != NULL && wsp->walk_data != zio.io_spa)
+		return (WALK_NEXT);
+
+	return (wsp->walk_callback(wsp->walk_addr, &zio, wsp->walk_cbdata));
+}
+
+/*
+ * ::walk zio_child
+ *
+ * Walk the children of a zio_t structure.
+ */
+static int
+zio_child_walk_init(mdb_walk_state_t *wsp)
+{
+	zio_t zio;
+
+	if (wsp->walk_addr == 0) {
+		mdb_warn("::walk zio_child doesn't support global walks\n");
+		return (WALK_ERR);
+	}
+
+	if (mdb_vread(&zio, sizeof (zio), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read zio_t at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	wsp->walk_addr = (uintptr_t)zio.io_child;
+	return (WALK_NEXT);
+}
+
+static int
+zio_sibling_walk_step(mdb_walk_state_t *wsp)
+{
+	zio_t zio;
+	int status;
+
+	if (wsp->walk_addr == NULL)
+		return (WALK_DONE);
+
+	if (mdb_vread(&zio, sizeof (zio), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read zio_t at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	status = wsp->walk_callback(wsp->walk_addr, &zio, wsp->walk_cbdata);
+
+	wsp->walk_addr = (uintptr_t)zio.io_sibling_next;
+	return (status);
+}
+
+/*
+ * [addr]::walk zio_root
+ *
+ * Walk only root zio_t structures, optionally for a particular spa_t.
+ */
+static int
+zio_walk_root_step(mdb_walk_state_t *wsp)
+{
+	zio_t zio;
+
+	if (mdb_vread(&zio, sizeof (zio), wsp->walk_addr) == -1) {
+		mdb_warn("failed to read zio_t at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	if (wsp->walk_data != NULL && wsp->walk_data != zio.io_spa)
+		return (WALK_NEXT);
+
+	if ((uintptr_t)zio.io_root != wsp->walk_addr)
+		return (WALK_NEXT);
+
+	return (wsp->walk_callback(wsp->walk_addr, &zio, wsp->walk_cbdata));
+}
+
+/*
  * MDB module linkage information:
  *
  * We declare a list of structures describing our dcmds, and a function
@@ -1717,6 +1928,9 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "spa_space", ":[-b]", "print spa_t on-disk space usage", spa_space },
 	{ "spa_vdevs", ":", "given a spa_t, print vdev summary", spa_vdevs },
 	{ "vdev", ":[-re]", "vdev_t summary", vdev_print },
+	{ "zio", ":", "zio_t summary", zio_print },
+	{ "zio_state", "?", "print out all zio_t structures on system or "
+	    "for a particular pool", zio_state },
 	{ "zio_pipeline", ":", "decode a zio pipeline", zio_pipeline },
 	{ "zfs_params", "", "print zfs tunable parameters", zfs_params },
 	{ NULL }
@@ -1743,6 +1957,13 @@ static const mdb_walker_t walkers[] = {
 		txg_list2_walk_init, txg_list_walk_step, NULL },
 	{ "txg_list3", "given any txg_list_t *, walk all entries in txg 3",
 		txg_list3_walk_init, txg_list_walk_step, NULL },
+	{ "zio", "walk all zio structures, optionally for a particular spa_t",
+		zio_walk_init, zio_walk_step, NULL },
+	{ "zio_child", "walk children of a zio_t structure",
+		zio_child_walk_init, zio_sibling_walk_step, NULL },
+	{ "zio_root", "walk all root zio_t structures, optionally for a "
+	    "particular spa_t",
+		zio_walk_init, zio_walk_root_step, NULL },
 	{ "spa", "walk all spa_t entries in the namespace",
 		spa_walk_init, spa_walk_step, NULL },
 	{ "metaslab", "given a spa_t *, walk all metaslab_t structures",
