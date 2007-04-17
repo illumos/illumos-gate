@@ -67,7 +67,7 @@
 #include <sys/mmu.h>
 
 extern void setup_trap_table(void);
-extern void cpu_intrq_setup(struct cpu *);
+extern int cpu_intrq_setup(struct cpu *);
 extern void cpu_intrq_register(struct cpu *);
 extern void contig_mem_init(void);
 extern void mach_dump_buffer_init(void);
@@ -2320,7 +2320,10 @@ startup_end(void)
 	 */
 	contig_mem_init();
 	mach_descrip_init();
-	cpu_intrq_setup(CPU);
+
+	if (cpu_intrq_setup(CPU)) {
+		cmn_err(CE_PANIC, "cpu%d: setup failed", CPU->cpu_id);
+	}
 	cpu_intrq_register(CPU);
 	mach_htraptrace_setup(CPU->cpu_id);
 	mach_htraptrace_configure(CPU->cpu_id);

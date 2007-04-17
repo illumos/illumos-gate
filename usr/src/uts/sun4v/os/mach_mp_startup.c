@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,7 +166,8 @@ int
 mp_cpu_configure(int cpuid)
 {
 	extern void fill_cpu(md_t *, mde_cookie_t);
-	extern void setup_cpu_common(int);
+	extern int setup_cpu_common(int);
+	extern int cleanup_cpu_common(int);
 	extern void setup_exec_unit_mappings(md_t *);
 	md_t *mdp;
 	mde_cookie_t rootnode, cpunode = MDE_INVAL_ELEM_COOKIE;
@@ -226,8 +227,10 @@ mp_cpu_configure(int cpuid)
 
 	(void) md_fini_handle(mdp);
 
-	setup_cpu_common(cpuid);
-
+	if ((i = setup_cpu_common(cpuid)) != 0) {
+		(void) cleanup_cpu_common(cpuid);
+		return (i);
+	}
 	return (0);
 }
 

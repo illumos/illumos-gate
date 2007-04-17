@@ -46,7 +46,7 @@
 #endif /* TRAPTRACE */
 #include <sys/cpu_sgnblk_defs.h>
 
-extern void cpu_intrq_setup(struct cpu *);
+extern int cpu_intrq_setup(struct cpu *);
 extern void cpu_intrq_cleanup(struct cpu *);
 extern void cpu_intrq_register(struct cpu *);
 
@@ -280,7 +280,7 @@ int trap_trace_inuse[NCPU];
 /*
  * Routine to set up a CPU to prepare for starting it up.
  */
-void
+int
 setup_cpu_common(int cpuid)
 {
 	struct cpu *cp = NULL;
@@ -292,6 +292,7 @@ setup_cpu_common(int cpuid)
 #endif /* TRAPTRACE */
 
 	extern void idle();
+	int	rval;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT(cpu[cpuid] == NULL);
@@ -419,13 +420,16 @@ setup_cpu_common(int cpuid)
 	if (nosteal_nsec == -1)
 		cmp_set_nosteal_interval();
 
-	cpu_intrq_setup(cp);
+	if ((rval = cpu_intrq_setup(cp)) != 0) {
+		return (rval);
+	}
 
 	/*
 	 * Initialize MMU context domain information.
 	 */
 	sfmmu_cpu_init(cp);
 
+	return (0);
 }
 
 /*
@@ -450,8 +454,10 @@ cleanup_cpu_common(int cpuid)
 	cpu_uninit_private(cp);
 
 	/* Free cpu ID string and brand string. */
-	kmem_free(cp->cpu_idstr, strlen(cp->cpu_idstr) + 1);
-	kmem_free(cp->cpu_brandstr, strlen(cp->cpu_brandstr) + 1);
+	if (cp->cpu_idstr)
+		kmem_free(cp->cpu_idstr, strlen(cp->cpu_idstr) + 1);
+	if (cp->cpu_brandstr)
+		kmem_free(cp->cpu_brandstr, strlen(cp->cpu_brandstr) + 1);
 
 	cpu_vm_data_destroy(cp);
 
@@ -512,7 +518,8 @@ cleanup_cpu_common(int cpuid)
 	 */
 	disp_cpu_fini(cp);
 	cpu_pa[cpuid] = 0;
-	sfmmu_cpu_cleanup(cp);
+	if (CPU_MMU_CTXP(cp))
+		sfmmu_cpu_cleanup(cp);
 	bzero(cp, sizeof (*cp));
 
 	/*
@@ -651,11 +658,6 @@ slave_startup(void)
 
 extern struct cpu	*cpu[NCPU];	/* pointers to all CPUs */
 
-extern void setup_cpu_common(int);
-extern void common_startup_init(cpu_t *, int);
-extern void start_cpu(int, void(*func)(int));
-extern void cold_flag_set(int cpuid);
-
 /*
  * cpu_bringup_set is a tunable (via /etc/system, debugger, etc.) that
  * can be used during debugging to control which processors are brought
@@ -752,7 +754,9 @@ start_other_cpus(int flag)
 
 		ASSERT(cpu[cpuid] == NULL);
 
-		setup_cpu_common(cpuid);
+		if (setup_cpu_common(cpuid)) {
+			cmn_err(CE_PANIC, "cpu%d: setup failed", cpuid);
+		}
 
 		common_startup_init(cpu[cpuid], cpuid);
 

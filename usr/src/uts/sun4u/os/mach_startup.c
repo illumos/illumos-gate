@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -394,10 +394,11 @@ mach_cpu_halt_idle()
 }
 
 /*ARGSUSED*/
-void
+int
 cpu_intrq_setup(struct cpu *cp)
 {
 	/* Interrupt mondo queues not applicable to sun4u */
+	return (0);
 }
 
 /*ARGSUSED*/
