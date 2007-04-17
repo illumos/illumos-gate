@@ -390,12 +390,14 @@ SUNWprivate_1.1 {
 	krb5_cc_dfl_ops;
 	krb5_cc_end_seq_get;
 	krb5_cc_file_ops;
+	krb5_cc_gen_new;
 	krb5_cc_get_name;
 	krb5_cc_get_principal;
 	krb5_cc_get_type;
 	krb5_cc_initialize;
 	krb5_cc_next_cred;
 	krb5_cc_register;
+	krb5_cc_remove_cred;
 	krb5_cc_resolve;
 	krb5_cc_retrieve_cred;
 	krb5_cc_set_default_name;
@@ -473,6 +475,7 @@ SUNWprivate_1.1 {
 	krb5_free_kdc_req;
 	krb5_free_keyblock;
 	krb5_free_keyblock_contents;
+	krb5_free_keytab_entry_contents;
 	krb5_free_krbhst;
 	krb5_free_ktypes;
 	krb5_free_last_req;
@@ -555,6 +558,7 @@ SUNWprivate_1.1 {
 	krb5_init_secure_context;
 	krb5_internalize_opaque;
 	krb5_is_permitted_enctype;
+	krb5_is_thread_safe;
 	krb5_kdc_rep_decrypt_proc;
 	krb5_kt_add_entry;
 	krb5_kt_close;
@@ -565,6 +569,7 @@ SUNWprivate_1.1 {
 	krb5_kt_free_entry;
 	krb5_kt_get_entry;
 	krb5_kt_get_name;
+	krb5_kt_get_type;
 	krb5_kt_next_entry;
 	krb5_kt_read_service_key;
 	krb5_kt_register;
@@ -712,11 +717,13 @@ SUNWprivate_1.1 {
 	krb5_set_debugging_time;
 	krb5_set_default_in_tkt_ktypes;
 	krb5_set_default_realm;
+	krb5_set_default_tgs_enctypes;
 	krb5_set_default_tgs_ktypes;
 	krb5_set_key_data;
 	krb5_set_key_enctype;
 	krb5_set_key_length;
 	krb5_set_password;
+	krb5_set_password_using_ccache;
 	krb5_set_principal_realm;
 	krb5_set_real_time;
 	krb5_set_time_offsets;
