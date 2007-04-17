@@ -871,8 +871,6 @@ do_set_zone(const char *link, val_desc_t *vdp, uint_t val_cnt)
 {
 	dladm_status_t	status;
 	zoneid_t	zid_old, zid_new;
-	char		buff[IF_NAMESIZE + 1];
-	struct stat	st;
 
 	if (val_cnt != 1)
 		return (DLADM_STATUS_BADVALCNT);
@@ -885,11 +883,6 @@ do_set_zone(const char *link, val_desc_t *vdp, uint_t val_cnt)
 	zid_new = (zoneid_t)vdp->vd_val;
 	if (zid_new == zid_old)
 		return (DLADM_STATUS_OK);
-
-	/* Do a stat to get the vlan created by MAC, if it's not there */
-	(void) strcpy(buff, "/dev/");
-	(void) strlcat(buff, link, IF_NAMESIZE);
-	(void) stat(buff, &st);
 
 	if (zid_old != GLOBAL_ZONEID) {
 		if (dladm_rele_link(link, GLOBAL_ZONEID, B_TRUE) < 0)

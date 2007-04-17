@@ -496,29 +496,55 @@ drv_hold_vlan(dld_ctl_str_t *ctls, mblk_t *mp)
 	queue_t		*q = ctls->cs_wq;
 	dld_hold_vlan_t	*dhv;
 	mblk_t		*nmp;
-	int		err;
+	int		err = EINVAL;
 	dls_vlan_t	*dvp;
+	char		mac[MAXNAMELEN];
+	dev_info_t	*dip = NULL;
+	major_t		major;
+	uint_t		index;
 
 	nmp = mp->b_cont;
-	if (nmp == NULL || MBLKL(nmp) < sizeof (dld_hold_vlan_t)) {
-		err = EINVAL;
-		miocnak(q, mp, 0, err);
-		return;
-	}
+	if (nmp == NULL || MBLKL(nmp) < sizeof (dld_hold_vlan_t))
+		goto failed;
+
 	dhv = (dld_hold_vlan_t *)nmp->b_rptr;
 
-	if ((err = dls_vlan_hold(dhv->dhv_name, &dvp, B_TRUE)) != 0) {
-		miocnak(q, mp, 0, err);
-		return;
+	/*
+	 * When a device instance without opens is detached, its
+	 * dls_vlan_t will be destroyed. A subsequent DLDIOCHOLDVLAN
+	 * invoked on this device instance will fail because
+	 * dls_vlan_hold() does not create non-tagged vlans on demand.
+	 * To handle this problem, we must force the creation of the
+	 * dls_vlan_t (if it doesn't already exist) by calling
+	 * ddi_hold_devi_by_instance() before calling dls_vlan_hold().
+	 */
+	if (ddi_parse(dhv->dhv_name, mac, &index) != DDI_SUCCESS)
+		goto failed;
+
+	if (DLS_PPA2VID(index) == VLAN_ID_NONE && strcmp(mac, "aggr") != 0) {
+		if ((major = ddi_name_to_major(mac)) == (major_t)-1 ||
+		    (dip = ddi_hold_devi_by_instance(major,
+		    DLS_PPA2INST(index), 0)) == NULL)
+			goto failed;
 	}
+
+	err = dls_vlan_hold(dhv->dhv_name, &dvp, B_TRUE);
+	if (dip != NULL)
+		ddi_release_devi(dip);
+
+	if (err != 0)
+		goto failed;
 
 	if ((err = dls_vlan_setzoneid(dhv->dhv_name, dhv->dhv_zid,
 	    dhv->dhv_docheck)) != 0) {
 		dls_vlan_rele(dvp);
-		miocnak(q, mp, 0, err);
+		goto failed;
 	} else {
 		miocack(q, mp, 0, 0);
+		return;
 	}
+failed:
+	miocnak(q, mp, 0, err);
 }
 
 /*

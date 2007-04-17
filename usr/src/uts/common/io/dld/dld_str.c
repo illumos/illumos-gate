@@ -288,7 +288,7 @@ dld_open(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
 		 */
 		t_uscalar_t ppa;
 
-		if ((dls_ppa_from_minor(minor, &ppa)) != 0)
+		if ((err = dls_ppa_from_minor(minor, &ppa)) != 0)
 			goto failed;
 
 		if ((err = dld_str_attach(dsp, ppa)) != 0)
