@@ -161,6 +161,7 @@ COMMON_SUBDIRS= \
 	SUNWatfsr  \
 	SUNWatfsu  \
 	SUNWarc  \
+	SUNWarbel  \
 	SUNWarcr  \
 	SUNWav1394 \
 	SUNWbart  \
@@ -215,9 +216,9 @@ COMMON_SUBDIRS= \
 	SUNWhal \
 	SUNWhalr \
 	SUNWhea  \
+	SUNWhermon  \
 	SUNWhwdata \
 	SUNWib \
-	SUNWibhca \
 	SUNWibsdpu \
 	SUNWibsdp \
 	SUNWintgige \
