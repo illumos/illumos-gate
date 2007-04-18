@@ -18,20 +18,19 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T */
+/*	All Rights Reserved	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/times.h>
+#include <sys/time.h>
 #include <sys/param.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -43,14 +42,15 @@
 #include <errno.h>
 #include <pwd.h>
 
+#define	NSEC_TO_TICK(nsec)	((nsec) / nsec_per_tick)
+#define	NSEC_TO_TICK_ROUNDUP(nsec) NSEC_TO_TICK((nsec) + \
+	nsec_per_tick/2)
+
 char	fname[20];
+static int hz;
+static int nsec_per_tick;
 
-/*
- * Quant[0] will get set to HZ/10 later.
- */
-int quant[] = { 10, 10, 10, 6, 10, 6, 10, 10, 10, 10, 10 };
-
-void printt(char *, time_t);
+void printt(char *, hrtime_t);
 void hmstime(char[]);
 void diag(char *);
 
@@ -61,7 +61,7 @@ main(int argc, char **argv)
 	int	status;
 	register pid_t	p;
 	int	c;
-	time_t	before, after;
+	hrtime_t before, after, timediff;
 	char	stime[9], etime[9];
 	char	cmd[80];
 	int	pflg = 0, sflg = 0, oflg = 0;
@@ -74,10 +74,11 @@ main(int argc, char **argv)
 	int	ichar, iblok;
 	long	chars = 0, bloks = 0;
 
-	/* initalize quant array using the sysconf()	*/
-	quant[0] = ((int)sysconf(_SC_CLK_TCK))/10;
+	aopt[0] = '\0';
 
-	aopt[0] = '\0';			/* terminate the string #1245107 */
+	hz = sysconf(_SC_CLK_TCK);
+	nsec_per_tick = NANOSEC / hz;
+
 	/* check options; */
 	while ((c = getopt(argc, argv, "sopfhkmrt")) != EOF)
 		switch (c)  {
@@ -116,13 +117,18 @@ main(int argc, char **argv)
 		system(cmd);
 	}
 	if (pflg + oflg) hmstime(stime);
-	before = times(&obuffer);
-	if ((p = fork()) == (pid_t)-1) diag("Try again.\n");
+	before = gethrtime();
+	(void) times(&obuffer);
+	if ((p = fork()) == (pid_t)-1) {
+		perror("Fork Failed");
+		(void) unlink(fname);
+		exit(EXIT_FAILURE);
+	}
 	if (p == 0) {
 		setgid(getgid());
 		execvp(*(argv+optind), (argv+optind));
 		fprintf(stderr, "%s: %s\n", *(argv+optind), strerror(errno));
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	signal(SIGINT, SIG_IGN);
 	signal(SIGQUIT, SIG_IGN);
@@ -132,12 +138,14 @@ main(int argc, char **argv)
 		fprintf(stderr, "Command terminated abnormally.\n");
 	signal(SIGINT, SIG_DFL);
 	signal(SIGQUIT, SIG_DFL);
-	after = times(&buffer);
+	(void) times(&buffer);
+	after = gethrtime();
+	timediff = after - before;
 	if (pflg + oflg) hmstime(etime);
 	if (sflg) system(cmd);
 
 	fprintf(stderr, "\n");
-	printt("real", (after-before));
+	printt("real", NSEC_TO_TICK_ROUNDUP(timediff));
 	printt("user", buffer.tms_cutime - obuffer.tms_cutime);
 	printt("sys ", buffer.tms_cstime - obuffer.tms_cstime);
 	fprintf(stderr, "\n");
@@ -191,38 +199,58 @@ main(int argc, char **argv)
 		system(cmd);
 		unlink(fname);
 	}
-	exit(status>>8);
+	exit(WEXITSTATUS(status));
 }
 
-char *pad  = "000        ";
-char *sep  = "\0\0.\0:\0:\0\0";
-char *nsep = "\0\0.\0 \0 \0\0";
-
 void
-printt(char *s, time_t a)
+printt(char *label, hrtime_t ticks)
 {
-	int digit[11];
-	int	i;
-	char	c;
-	int	nonzero;
+	long tk;	/* number of leftover ticks   */
+	long ss;	/* number of seconds */
+	long mm;	/* number of minutes */
+	long hh;	/* number of hours   */
+	longlong_t total = ticks;
 
-	for (i = 0; i < 11; i++) {
-		digit[i] = a % quant[i];
-		a /= quant[i];
+	tk	= total % hz;	/* ticks % hz		*/
+	total	/= hz;
+	ss	= total % 60;	/* ticks / hz % 60	*/
+	total	/= 60;
+	mm	= total % 60;	/* ticks / hz / 60 % 60 */
+	hh	= total / 60;	/* ticks / hz / 60 / 60 */
+
+	(void) fprintf(stderr, "%s ", label);
+
+	/* Display either padding or the elapsed hours */
+	if (hh == 0L) {
+		(void) fprintf(stderr, "%6c", ' ');
+	} else {
+		(void) fprintf(stderr, "%5ld:", hh);
 	}
-	fprintf(stderr, s);
-	nonzero = 0;
-	while (--i > 0) {
-		c = digit[i] != 0 ? digit[i] + '0':
-		    nonzero ? '0':
-		    pad[i];
-		if (c != '\0') putc(c, stderr);
-		nonzero |= digit[i];
-		c = nonzero?sep[i]:nsep[i];
-		if (c != '\0') putc(c, stderr);
+
+	/*
+	 * Display either nothing or the elapsed minutes, zero
+	 * padding (if hours > 0) or space padding (if not).
+	 */
+	if (mm == 0L && hh == 0L) {
+		(void) fprintf(stderr, "%3c", ' ');
+	} else if (mm != 0L && hh == 0L) {
+		(void) fprintf(stderr, "%2ld:", mm);
+	} else {
+		(void) fprintf(stderr, "%02ld:", mm);
 	}
-	fprintf(stderr, "%c", digit[0] * 100/HZ + '0');
-	fprintf(stderr, "\n");
+
+	/*
+	 * Display the elapsed seconds; seconds are always
+	 * zero padded.
+	 */
+	if (hh == 0L && mm == 0L) {
+		(void) fprintf(stderr, "%2ld.", ss);
+	} else {
+		(void) fprintf(stderr, "%02ld.", ss);
+	}
+
+	/* Display hundredths of a second. */
+	(void) fprintf(stderr, "%02ld\n", tk * 100/hz);
 }
 
 /*
@@ -246,5 +274,5 @@ diag(char *s)
 {
 	fprintf(stderr, "%s\n", s);
 	unlink(fname);
-	exit(1);
+	exit(EXIT_FAILURE);
 }
