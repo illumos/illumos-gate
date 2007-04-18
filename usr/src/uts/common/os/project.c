@@ -953,10 +953,6 @@ project_init(void)
 	    RCTL_GLOBAL_DENY_ALWAYS | RCTL_GLOBAL_NOBASIC | RCTL_GLOBAL_BYTES,
 	    UINT64_MAX, UINT64_MAX, &project_locked_mem_ops);
 
-	/* Default value equals that of max-shm-memory. */
-	rctl_add_default_limit("project.max-locked-memory", qty,
-	    RCPRIV_PRIVILEGED, RCTL_LOCAL_DENY);
-
 	/*
 	 * Per project limit on contracts.
 	 */
