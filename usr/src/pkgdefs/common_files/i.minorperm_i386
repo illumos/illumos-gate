@@ -159,6 +159,7 @@ cmtp:*
 profile:profile
 asy:[a-z]
 asy:[a-z],cu
+i2o_bs:*
 EOF
 }
 
@@ -180,7 +181,6 @@ tnf:tnfmap
 st:*
 pm:*
 devinfo:devinfo
-i2o_bs:*
 openeepr:openprom
 wc:*
 ip:ip

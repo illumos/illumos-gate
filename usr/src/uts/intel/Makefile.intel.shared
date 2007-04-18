@@ -379,11 +379,6 @@ $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pcelx
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= pcser
 
 #
-#	I2O specific module(s)
-#
-DRV_KMODS_32	+= pci_to_i2o i2o_bs i2o_scsi
-
-#
 #	SCSI Enclosure Services driver
 #
 DRV_KMODS	+= ses
@@ -517,7 +512,6 @@ MISC_KMODS	+= gld
 MISC_KMODS	+= hidparser
 MISC_KMODS	+= hook
 MISC_KMODS	+= hpcsvc
-MISC_KMODS_32	+= i2o_msg
 MISC_KMODS	+= ibcm
 MISC_KMODS	+= ibdm
 MISC_KMODS	+= ibmf

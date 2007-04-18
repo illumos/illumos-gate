@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -159,7 +159,9 @@ obsolete_i386() {
 	    -e '/^[ 	]*smartii[ 	][ 	]*"pcie11,4030"$/d' \
 	    -e '/^[ 	]*smartii[ 	][ 	]*"pcie11,4030"[ 	#].*$/d' \
 	    -e '/^[ 	]*smartii[ 	][ 	]*"pcie11,4031"$/d' \
-	    -e '/^[ 	]*smartii[ 	][ 	]*"pcie11,4031"[ 	#].*$/d'
+	    -e '/^[ 	]*smartii[ 	][ 	]*"pcie11,4031"[ 	#].*$/d' \
+	    -e '/^[ 	]*pci_to_i2o[ 	][ 	]*"pciclass,0e0001"$/d' \
+	    -e '/^[ 	]*pci_to_i2o[ 	][ 	]*"pciclass,0e0001"[ 	#].*$/d'
 }
 
 #

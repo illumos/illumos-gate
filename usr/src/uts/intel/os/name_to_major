@@ -65,9 +65,6 @@ tnf 128
 st 129
 mscsi 130
 pm 131
-pci_to_i2o 132
-i2o_scsi 133
-i2o_bs 134
 poll 135
 keysock 136
 ipsecah 137

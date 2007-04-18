@@ -85,13 +85,6 @@ f none usr/include/sys/dktp/dadkio.h 644 root bin
 f none usr/include/sys/dktp/fdisk.h 644 root bin
 f none usr/include/sys/dma_engine.h 644 root bin
 f none usr/include/sys/fp.h 644 root bin
-d none usr/include/sys/i2o 755 root bin
-f none usr/include/sys/i2o/i2omsg.h 644 root bin
-f none usr/include/sys/i2o/i2outil.h 644 root bin
-f none usr/include/sys/i2o/i2oexec.h 644 root bin
-f none usr/include/sys/i2o/i2oadptr.h 644 root bin
-f none usr/include/sys/i2o/i2obscsi.h 644 root bin
-f none usr/include/sys/i2o/i2omstr.h 644 root bin
 f none usr/include/sys/i8272A.h 644 root bin
 f none usr/include/sys/kd.h 644 root bin
 f none usr/include/sys/mc.h 644 root bin

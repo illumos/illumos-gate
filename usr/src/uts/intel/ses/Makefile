@@ -21,13 +21,13 @@
 #
 # uts/intel/ses/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the i2o_bs (I2O BS-OSM)
-#	driver kernel module.
+#	This makefile drives the production of the ses (SCSI enclosure
+#	services) driver kernel module.
 #
 #	intel implementation architecture dependent
 #

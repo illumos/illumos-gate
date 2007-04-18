@@ -6584,6 +6584,19 @@ mondo_loop() {
 	#
 	rm -f $root/dev/cfg/*pci*
 
+	#
+	# Remove I2O.
+	#
+	rm -f $root/kernel/drv/i2o_bs
+	rm -f $root/kernel/drv/i2o_bs.conf
+	rm -f $root/kernel/drv/i2o_scsi
+	rm -f $root/kernel/drv/i2o_scsi.conf
+	rm -f $root/kernel/drv/pci_to_i2o
+	rm -f $root/kernel/drv/pci_to_i2o.conf
+	rm -f $root/kernel/misc/i2o_msg
+	rm -f $root/usr/include/sys/i2o/*
+	rmdir $root/usr/include/sys/i2o/ 2>/dev/null
+
 	# End of pre-archive extraction hacks.
 
 	if [ $diskless = no -a $zone = global ]; then

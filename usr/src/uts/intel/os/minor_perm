@@ -89,7 +89,6 @@ vol:volctl 0666 root sys
 tnf:tnfctl 0600 root sys
 tnf:tnfmap 0600 root sys
 pm:* 0666 root sys
-i2o_bs:* 0640 root sys
 wc:* 0600 root sys
 poll:* 0666 root sys
 cpc:shared 0666 root sys

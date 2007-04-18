@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -175,6 +175,9 @@ obsolete_i386()
 		obs["tiqmouse"] = 1;
 		obs["tr"] = 1;
 		obs["trantor"] = 1;
+		obs["pci_to_i2o"] = 1;
+		obs["i2o_scsi"] = 1;
+		obs["i2o_bs"] = 1;
 	} !($1 in obs) { print $0 }'
 }
 

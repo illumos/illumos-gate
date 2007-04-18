@@ -1273,14 +1273,6 @@ PCWL_OBJS += pcwl.o
 
 PSET_OBJS +=	pset.o
 
-PCI_I2ONEXUS_OBJS += pci_to_i2o.o
-
-I2OMSG_OBJS += i2o_msg.o
-
-I2O_SCSI_OBJS += i2o_scsi.o
-
-I2O_BS_OBJS += i2o_bs.o label.o
-
 OHCI_OBJS += ohci.o ohci_hub.o ohci_polled.o
 
 UHCI_OBJS += uhci.o uhciutil.o uhcitgt.o uhcihub.o uhcipolled.o

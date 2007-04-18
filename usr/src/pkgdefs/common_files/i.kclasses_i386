@@ -66,6 +66,8 @@ do
 		    -e '/^trantor[	].*scsi/d' \
 		    -e '/^corvette[	].*scsi/d' \
 		    -e '/^mpt[	].*scsi/d' \
+		    -e '/^pci_to_i2o[	].*i2o/d' \
+		    -e '/^i2o_scsi[	].*scsi/d' \
 		$dest > /tmp/c.$$
 		if cmp -s /tmp/c.$$ $dest  > /dev/null 2>&1
 		then
@@ -88,14 +90,6 @@ do
 		grep '^mscsi[ 	].*scsi' $dest > /dev/null 2>&1
 		if [ $? != 0 ] ; then
 			echo 'mscsi scsi' >> $dest
-		fi
-		grep '^pci_to_i2o[ 	].*i2o' $dest > /dev/null 2>&1
-		if [ $? != 0 ] ; then
-			echo 'pci_to_i2o i2o' >> $dest
-		fi
-		grep '^i2o_scsi[ 	].*scsi' $dest > /dev/null 2>&1
-		if [ $? != 0 ] ; then
-			echo 'i2o_scsi scsi' >> $dest
 		fi
 	fi
 done

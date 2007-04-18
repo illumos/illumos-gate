@@ -934,15 +934,6 @@ PCHDRS=			\
 	pit.h		\
 	rtc.h
 
-# I2O header files (currently used only on i386)
-I2OHDRS=		\
-	i2oadptr.h	\
-	i2obscsi.h	\
-	i2oexec.h	\
-	i2omsg.h	\
-	i2omstr.h	\
-	i2outil.h
-
 NXGEHDRS=			\
 	nxge.h			\
 	nxge_common.h		\

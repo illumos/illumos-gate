@@ -79,10 +79,6 @@ f none kernel/drv/crypto 755 root sys
 f none kernel/drv/cryptoadm 755 root sys
 f none kernel/drv/devinfo 755 root sys
 f none kernel/drv/dld 755 root sys
-f none kernel/drv/i2o_bs 755 root sys
-f none kernel/drv/i2o_bs.conf 644 root sys
-f none kernel/drv/i2o_scsi 755 root sys
-f none kernel/drv/i2o_scsi.conf 644 root sys
 f none kernel/drv/i8042 755 root sys
 f none kernel/drv/icmp 755 root sys
 f none kernel/drv/icmp6 755 root sys
@@ -106,8 +102,6 @@ f none kernel/drv/mouse8042 755 root sys
 f none kernel/drv/openeepr 755 root sys
 f none kernel/drv/options 755 root sys
 f none kernel/drv/pci_pci 755 root sys
-f none kernel/drv/pci_to_i2o 755 root sys
-f none kernel/drv/pci_to_i2o.conf 644 root sys
 f none kernel/drv/pcie_pci 755 root sys
 f none kernel/drv/pcie_pci.conf 644 root sys
 f none kernel/drv/physmem 755 root sys
@@ -181,7 +175,6 @@ f none kernel/misc/fssnap_if 755 root sys
 f none kernel/misc/gld 755 root sys
 f none kernel/misc/hook 755 root sys
 f none kernel/misc/hpcsvc 755 root sys
-f none kernel/misc/i2o_msg 755 root sys
 f none kernel/misc/ipc 755 root sys
 f none kernel/misc/kbtrans 755 root sys
 f none kernel/misc/kcf 755 root sys
