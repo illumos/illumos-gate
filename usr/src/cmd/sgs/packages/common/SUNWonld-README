@@ -1228,3 +1228,4 @@ Bugid   Risk Synopsis
 	versioning
 6541004 hwcap filter processing can leak memory
 5108874 elfdump SEGVs on bad object file
+6547441 Uninitialized variable causes ld.so.1 to crash on object cleanup

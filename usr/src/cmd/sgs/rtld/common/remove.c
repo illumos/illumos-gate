@@ -859,6 +859,8 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Lm_cntl *lmc, Aliste lmco,
 		if (((ghp = hdl_create(lml, lmc->lc_head, 0, 0)) == 0) ||
 		    (hdl_initialize(ghp, lmc->lc_head, 0, 0) == 0))
 			lmc->lc_flags &= ~LMC_FLG_RELOCATING;
+	} else {
+		ghp = 0;
 	}
 
 	/*
@@ -874,6 +876,8 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Lm_cntl *lmc, Aliste lmco,
 		}
 		return;
 	}
+
+	ASSERT(ghp != 0);
 
 	/*
 	 * As the objects of this handle are being forcibly removed, first
