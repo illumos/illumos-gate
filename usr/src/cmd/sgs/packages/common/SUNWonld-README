@@ -41,7 +41,8 @@ SUNWonld - link-editors development package.
 
   General link-editor information can be found:
 
-    http://linkers.eng/
+    http://linkers.central/
+    http://linkers.sfbay/	(also known as linkers.eng)
 
   Comments and Questions:
 
@@ -1226,3 +1227,4 @@ Bugid   Risk Synopsis
 6516665 The link-editors should be more resilient against gcc's symbol
 	versioning
 6541004 hwcap filter processing can leak memory
+5108874 elfdump SEGVs on bad object file

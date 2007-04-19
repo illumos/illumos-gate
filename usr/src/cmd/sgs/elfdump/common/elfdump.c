@@ -90,8 +90,16 @@ typedef struct {
 static const char *
 string(Cache *refsec, Word ndx, Cache *strsec, const char *file, Word name)
 {
-	static Cache	*osec = 0;
-	static int	nostr;
+	/*
+	 * If an error in this routine is due to a property of the string
+	 * section, as opposed to a bad offset into the section (a property of
+	 * the referencing section), then we will detect the same error on
+	 * every call involving those sections. We use these static variables
+	 * to retain the information needed to only issue each such error once.
+	 */
+	static Cache	*last_refsec;	/* Last referencing section seen */
+	static int	strsec_err;	/* True if error issued */
+
 	const char	*strs;
 	Word		strn;
 
@@ -102,12 +110,23 @@ string(Cache *refsec, Word ndx, Cache *strsec, const char *file, Word name)
 	strn = strsec->c_data->d_size;
 
 	/*
-	 * Only print a diagnostic regarding an empty string table once per
-	 * input section being processed.
+	 * We only print a diagnostic regarding a bad string table once per
+	 * input section being processed. If the refsec has changed, reset
+	 * our retained error state.
 	 */
-	if (osec != refsec) {
-		osec = refsec;
-		nostr = 0;
+	if (last_refsec != refsec) {
+		last_refsec = refsec;
+		strsec_err = 0;
+	}
+
+	/* Verify that strsec really is a string table */
+	if (strsec->c_shdr->sh_type != SHT_STRTAB) {
+		if (!strsec_err) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_NOTSTRTAB),
+			    file, strsec->c_ndx, refsec->c_ndx);
+			strsec_err = 1;
+		}
+		return (MSG_INTL(MSG_STR_UNKNOWN));
 	}
 
 	/*
@@ -118,10 +137,10 @@ string(Cache *refsec, Word ndx, Cache *strsec, const char *file, Word name)
 		 * Do we have a empty string table?
 		 */
 		if (strs == 0) {
-			if (nostr == 0) {
+			if (!strsec_err) {
 				(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
 				    file, strsec->c_name);
-				nostr++;
+				strsec_err = 1;
 			}
 		} else {
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSTOFF),
@@ -2770,6 +2789,7 @@ regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 	    cnt++, _cache++) {
 		char	scnndxnm[100];
 
+		_cache->c_ndx = cnt;
 		_cache->c_scn = scn;
 
 		if ((_cache->c_shdr = elf_getshdr(scn)) == NULL) {

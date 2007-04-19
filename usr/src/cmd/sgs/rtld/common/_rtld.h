@@ -596,7 +596,7 @@ extern int		pr_open(Lm_list *);
 extern void		rd_event(Lm_list *, rd_event_e, r_state_e);
 extern int		readenv_user(const char **, Word *, Word *, int);
 extern int		readenv_config(Rtc_env *, Addr, int);
-extern void		rejection_inherit(Rej_desc *, Rej_desc *, Fdesc *);
+extern void		rejection_inherit(Rej_desc *, Rej_desc *);
 extern int		relocate_lmc(Lm_list *, Aliste, Rt_map *, Rt_map *);
 extern int		relocate_finish(Rt_map *, Alist *, int, int);
 extern void		remove_cntl(Lm_list *, Aliste);

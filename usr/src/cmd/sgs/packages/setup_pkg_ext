@@ -44,7 +44,14 @@ if [ -h $SGSDIR/ext -o -d $SGSDIR/ext ]; then
 	exit 0;
 fi
 
-TEST_EXT=/net/linkers.eng/linkers/ws/ld_tests/bin/setup_ext
+# There are two linkers servers (central and sfbay). If we are in
+# one of those domains, use the local server. Otherwise .central.
+TEST_EXT=/net/linkers/export/ws/ld_tests/bin/setup_ext
+if [ -f $TEST_EXT ]; then
+	/bin/sh $TEST_EXT $SGSDIR
+	exit $?
+fi
+TEST_EXT=/net/linkers.central/export/ws/ld_tests/bin/setup_ext
 if [ -f $TEST_EXT ]; then
 	/bin/sh $TEST_EXT $SGSDIR
 	exit $?

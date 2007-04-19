@@ -111,6 +111,8 @@
 @ MSG_ERR_BADSORTNDX	"%s: %s: sort section has bad symbol index: %d\n"
 @ MSG_ERR_BADVER	"%s: %s: index[%d]: version %d is out of range: \
 			 version definitions available: 0-%d\n"
+@ MSG_ERR_NOTSTRTAB	"%s: section[%d] is not a string table as expected \
+			 by section[%d]\n";
 
 @ MSG_ERR_LDYNNOTADJ	"%s: bad dynamic symbol table layout: %s and %s \
 			 sections are not adjacent\n"

@@ -68,6 +68,7 @@ typedef struct cache {
 	Shdr		*c_shdr;
 	Elf_Data	*c_data;
 	char		*c_name;
+	int		c_ndx;		/* Section index */
 } Cache;
 
 typedef struct got_info {

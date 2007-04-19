@@ -45,7 +45,7 @@
 #include	<msg.h>
 #include	<_elfdump.h>
 
-const Cache	cache_init = {NULL, NULL, NULL};
+const Cache	cache_init = {NULL, NULL, NULL, NULL, 0};
 
 const char *
 _elfdump_msg(Msg mid)

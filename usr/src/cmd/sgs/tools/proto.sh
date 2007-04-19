@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -124,11 +124,18 @@ case $RELEASE in
 	exit 1;;
 esac
 
+
 # We need a local copy of libc_pic.a (we should get this from the parent
 # workspace, but as we can't be sure how the proto area is constructed there
-# simply take it from a stashed copy on linkers.eng)
+# simply take it from a stashed copy on linkers.central or linkers.eng.)
+#
+# We try for the linkers server in the current domain. Failing that,
+# we fall over to linkers.central.
+LIBC_PICDIR=/net/linkers/export/big/libc_pic/$RELEASE
+if [ ! -d $LIBC_PICDIR ]; then
+    LIBC_PICDIR=/net/linkers.central/export/big/libc_pic/$RELEASE
+fi
 
-LIBC_PICDIR=/net/linkers.eng/linkers/ftp/pub/linkers/libc_pic/$RELEASE
 
 if [ $MACH = "sparc" ]; then
 	PLATS="sparc sparcv9"

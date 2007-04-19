@@ -164,7 +164,7 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
 		_rej.rej_name = name;
 		_rej.rej_str = strerror(errno);
 		DBG_CALL(Dbg_file_rejected(lml, &_rej));
-		rejection_inherit(rej, &_rej, 0);
+		rejection_inherit(rej, &_rej);
 		return (0);
 	}
 
@@ -213,7 +213,7 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
 		 * provides a single point for error diagnostics.
 		 */
 		if (find_path(lml, name, clmp, flags, &fdesc, &_rej) == 0) {
-			rejection_inherit(rej, &_rej, &fdesc);
+			rejection_inherit(rej, &_rej);
 			if ((rej->rej_name != _rej.rej_name) &&
 			    (_rej.rej_name == name))
 				free((void *)name);

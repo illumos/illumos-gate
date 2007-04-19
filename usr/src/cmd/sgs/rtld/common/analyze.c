@@ -574,7 +574,7 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *clmp, Rt_map *nlmp)
  * additional processing or rejection messages.
  */
 void
-rejection_inherit(Rej_desc *rej1, Rej_desc *rej2, Fdesc *fdp)
+rejection_inherit(Rej_desc *rej1, Rej_desc *rej2)
 {
 	if (rej2->rej_type && (rej1->rej_type == 0)) {
 		rej1->rej_type = rej2->rej_type;
@@ -1766,7 +1766,7 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 		nfdp->fd_flags = FLG_FD_SLASH;
 
 		if (find_path(lml, oname, clmp, flags, nfdp, &_rej) == 0) {
-			rejection_inherit(rej, &_rej, nfdp);
+			rejection_inherit(rej, &_rej);
 			return (0);
 		}
 
@@ -1811,7 +1811,7 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 			 */
 			if (find_file(lml, oname, clmp, flags, nfdp, &_rej,
 			    dir, &strhash, olen) == 0) {
-				rejection_inherit(rej, &_rej, nfdp);
+				rejection_inherit(rej, &_rej);
 				continue;
 			}
 
@@ -2171,7 +2171,7 @@ _load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
 			_rej.rej_type = SGS_REJ_STR;
 			_rej.rej_str = MSG_INTL(MSG_GEN_NOOPEN);
 			DBG_CALL(Dbg_file_rejected(lml, &_rej));
-			rejection_inherit(rej, &_rej, nfdp);
+			rejection_inherit(rej, &_rej);
 			remove_so(lml, nlmp);
 			return (0);
 		}
@@ -2203,7 +2203,7 @@ _load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
 			_rej.rej_type = SGS_REJ_STR;
 			_rej.rej_str = strerror(ENOENT);
 			DBG_CALL(Dbg_file_rejected(lml, &_rej));
-			rejection_inherit(rej, &_rej, nfdp);
+			rejection_inherit(rej, &_rej);
 			return (0);
 		}
 	}
