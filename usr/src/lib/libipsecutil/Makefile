@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,15 +37,24 @@ clobber :=	TARGET = clobber
 install	:=	TARGET = install
 lint :=		TARGET = lint
 
+#
+# Definitions for message catalog
+#
+MSGFILES =	`$(GREP) -l gettext common/*.[ch]`
+POFILE =	libipsecutil.po
 .KEEP_STATE:
 
 all clean clobber install lint: $(SUBDIRS)
+
+$(POFILE):	pofile_MSGFILES
 
 install_h:	$(ROOTHDRS)
 
 check:		$(CHECKHDRS)
 
-_msg:
+_msg:		$(MSGDOMAINPOFILE)
+
+include ../../Makefile.msg.targ
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,9 +95,10 @@ typedef struct keywdtab {
 extern void bail(char *);
 
 /*
- * Localization macro...
+ * Localization macro - Only to be used from usr/src/cmd because Macros
+ * are not expanded in usr/src/lib when message catalogs are built.
  */
-#define	Bail(s)	bail(gettext(s))
+#define	Bail(s)	bail(dgettext(TEXT_DOMAIN, s))
 
 /*
  * Print caller-supplied, variable-arg error message, then exit if cmdline

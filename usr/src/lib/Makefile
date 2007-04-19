@@ -272,6 +272,7 @@ MSGSUBDIRS=		\
 	libcurses	\
 	libdhcpsvc 	\
 	libdhcputil	\
+	libipsecutil	\
 	libdladm	\
 	libgss		\
 	libinetcfg	\

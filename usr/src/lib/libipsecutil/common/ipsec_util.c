@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +64,7 @@ jmp_buf	env;		/* for error recovery in interactive/readfile modes */
 
 /*
  * Print errno and exit if cmdline or readfile, reset state if interactive
+ * The error string *what should be dgettext()'d before calling bail().
  */
 void
 bail(char *what)
@@ -71,9 +72,10 @@ bail(char *what)
 	if (errno != 0)
 		warn(what);
 	else
-		warnx(gettext("Error: %s"), what);
+		warnx("Error: %s", what);
 	if (readfile) {
-		warnx(gettext("System error on line %u."), lineno);
+		warnx(dgettext(TEXT_DOMAIN,
+		    "System error on line %u."), lineno);
 	}
 	if (interactive && !readfile)
 		longjmp(env, 2);
@@ -95,9 +97,10 @@ bail_msg(char *fmt, ...)
 	(void) vsnprintf(msgbuf, BUFSIZ, fmt, ap);
 	va_end(ap);
 	if (readfile)
-		warnx(gettext("ERROR on line %u:\n%s\n"), lineno,  msgbuf);
+		warnx(dgettext(TEXT_DOMAIN,
+		    "ERROR on line %u:\n%s\n"), lineno,  msgbuf);
 	else
-		warnx(gettext("ERROR: %s\n"), msgbuf);
+		warnx(dgettext(TEXT_DOMAIN, "ERROR: %s\n"), msgbuf);
 
 	if (interactive && !readfile)
 		longjmp(env, 1);
@@ -156,7 +159,7 @@ dump_sockaddr(struct sockaddr *sa, uint8_t prefixlen, boolean_t addr_only,
 
 	if (inet_ntop(sa->sa_family, addrptr, storage, INET6_ADDRSTRLEN) ==
 	    NULL) {
-		printable_addr = gettext("<inet_ntop() failed>");
+		printable_addr = dgettext(TEXT_DOMAIN, "Invalid IP address.");
 	} else {
 		char prefix[5];	/* "/nnn" with terminator. */
 
@@ -171,7 +174,8 @@ dump_sockaddr(struct sockaddr *sa, uint8_t prefixlen, boolean_t addr_only,
 		if (fprintf(where, "%s", printable_addr) < 0)
 			return (-1);
 	} else {
-		if (fprintf(where, gettext("%s: port %d, %s"), protocol,
+		if (fprintf(where, dgettext(TEXT_DOMAIN,
+		    "%s: port %d, %s"), protocol,
 		    ntohs(port), printable_addr) < 0)
 			return (-1);
 		if (!nflag) {
@@ -180,7 +184,8 @@ dump_sockaddr(struct sockaddr *sa, uint8_t prefixlen, boolean_t addr_only,
 			 */
 			if (unspec) {
 				if (fprintf(where,
-				    gettext(" <unspecified>")) < 0)
+				    dgettext(TEXT_DOMAIN,
+				    " <unspecified>")) < 0)
 					return (-1);
 			} else {
 				hp = getipnodebyaddr((char *)addrptr, addrlen,
@@ -192,7 +197,8 @@ dump_sockaddr(struct sockaddr *sa, uint8_t prefixlen, boolean_t addr_only,
 					freehostent(hp);
 				} else {
 					if (fprintf(where,
-					    gettext(" <unknown>")) < 0)
+					    dgettext(TEXT_DOMAIN,
+					    " <unknown>")) < 0)
 						return (-1);
 				}
 			}
@@ -240,7 +246,8 @@ dump_generic_alg(uint8_t alg_num, int proto_num, FILE *where)
 
 	alg = getipsecalgbynum(alg_num, proto_num, NULL);
 	if (alg == NULL) {
-		if (fprintf(where, gettext("<unknown %u>"), alg_num) < 0)
+		if (fprintf(where, dgettext(TEXT_DOMAIN,
+		    "<unknown %u>"), alg_num) < 0)
 			return (-1);
 		return (0);
 	}
@@ -250,7 +257,8 @@ dump_generic_alg(uint8_t alg_num, int proto_num, FILE *where)
 	 * Assume that SADB_AALG_NONE == SADB_EALG_NONE.
 	 */
 	if (alg_num == SADB_AALG_NONE) {
-		if (fputs(gettext("<none>"), where) == EOF)
+		if (fputs(dgettext(TEXT_DOMAIN,
+		    "<none>"), where) == EOF)
 			return (-1);
 	} else {
 		if (fputs(alg->a_names[0], where) == EOF)
@@ -289,38 +297,42 @@ dump_sadb_idtype(uint8_t idtype, FILE *where, int *rc)
 
 	switch (idtype) {
 	case SADB_IDENTTYPE_PREFIX:
-		if (fputs(gettext("prefix"), where) == EOF)
+		if (fputs(dgettext(TEXT_DOMAIN, "prefix"), where) == EOF)
 			rc_val = -1;
 		break;
 	case SADB_IDENTTYPE_FQDN:
-		if (fputs(gettext("FQDN"), where) == EOF)
+		if (fputs(dgettext(TEXT_DOMAIN, "FQDN"), where) == EOF)
 			rc_val = -1;
 		break;
 	case SADB_IDENTTYPE_USER_FQDN:
-		if (fputs(gettext("user-FQDN (mbox)"), where) == EOF)
+		if (fputs(dgettext(TEXT_DOMAIN,
+		    "user-FQDN (mbox)"), where) == EOF)
 			rc_val = -1;
 		break;
 	case SADB_X_IDENTTYPE_DN:
-		if (fputs(gettext("ASN.1 DER Distinguished Name"),
+		if (fputs(dgettext(TEXT_DOMAIN, "ASN.1 DER Distinguished Name"),
 		    where) == EOF)
 			rc_val = -1;
 		canprint = B_FALSE;
 		break;
 	case SADB_X_IDENTTYPE_GN:
-		if (fputs(gettext("ASN.1 DER Generic Name"), where) == EOF)
+		if (fputs(dgettext(TEXT_DOMAIN, "ASN.1 DER Generic Name"),
+		    where) == EOF)
 			rc_val = -1;
 		canprint = B_FALSE;
 		break;
 	case SADB_X_IDENTTYPE_KEY_ID:
-		if (fputs(gettext("Generic key id"), where) == EOF)
+		if (fputs(dgettext(TEXT_DOMAIN, "Generic key id"),
+		    where) == EOF)
 			rc_val = -1;
 		break;
 	case SADB_X_IDENTTYPE_ADDR_RANGE:
-		if (fputs(gettext("Address range"), where) == EOF)
+		if (fputs(dgettext(TEXT_DOMAIN, "Address range"), where) == EOF)
 			rc_val = -1;
 		break;
 	default:
-		if (fprintf(where, gettext("<unknown %u>"), idtype) < 0)
+		if (fprintf(where, dgettext(TEXT_DOMAIN,
+		    "<unknown %u>"), idtype) < 0)
 			rc_val = -1;
 		break;
 	}
@@ -453,7 +465,8 @@ do_interactive(FILE *infile, char *promptstring, parse_cmdln_fn parseit)
 		 */
 		if (ibuf[IBUF_SIZE - 2] != '\0') {
 			(void) fprintf(stderr,
-			    gettext("Line %d too big.\n"), lineno);
+			    dgettext(TEXT_DOMAIN,
+			    "Line %d too big.\n"), lineno);
 			exit(1);
 		}
 
@@ -480,7 +493,8 @@ do_interactive(FILE *infile, char *promptstring, parse_cmdln_fn parseit)
 			    (size_t)(&(holder[IBUF_SIZE]) - hptr));
 			if (holder[IBUF_SIZE - 1] != '\0') {
 				(void) fprintf(stderr,
-				    gettext("Command buffer overrun.\n"));
+				    dgettext(TEXT_DOMAIN,
+				    "Command buffer overrun.\n"));
 				exit(1);
 			}
 			/* Use - 2 because of \n from fgets. */
@@ -504,12 +518,13 @@ do_interactive(FILE *infile, char *promptstring, parse_cmdln_fn parseit)
 		switch (create_argv(ibuf, &thisargc, &thisargv)) {
 		case TOO_MANY_TOKENS:
 			(void) fprintf(stderr,
-			    gettext("Too many input tokens.\n"));
+			    dgettext(TEXT_DOMAIN, "Too many input tokens.\n"));
 			exit(1);
 			break;
 		case MEMORY_ALLOCATION:
 			(void) fprintf(stderr,
-			    gettext("Memory allocation error.\n"));
+			    dgettext(TEXT_DOMAIN,
+			    "Memory allocation error.\n"));
 			exit(1);
 			break;
 		case COMMENT_LINE:
@@ -910,93 +925,101 @@ spdsock_diag(int diagnostic)
 {
 	switch (diagnostic) {
 	case SPD_DIAGNOSTIC_NONE:
-		return (gettext("no error"));
+		return (dgettext(TEXT_DOMAIN, "no error"));
 	case SPD_DIAGNOSTIC_UNKNOWN_EXT:
-		return (gettext("unknown extension"));
+		return (dgettext(TEXT_DOMAIN, "unknown extension"));
 	case SPD_DIAGNOSTIC_BAD_EXTLEN:
-		return (gettext("bad extension length"));
+		return (dgettext(TEXT_DOMAIN, "bad extension length"));
 	case SPD_DIAGNOSTIC_NO_RULE_EXT:
-		return (gettext("no rule extension"));
+		return (dgettext(TEXT_DOMAIN, "no rule extension"));
 	case SPD_DIAGNOSTIC_BAD_ADDR_LEN:
-		return (gettext("bad address len"));
+		return (dgettext(TEXT_DOMAIN, "bad address len"));
 	case SPD_DIAGNOSTIC_MIXED_AF:
-		return (gettext("mixed address family"));
+		return (dgettext(TEXT_DOMAIN, "mixed address family"));
 	case SPD_DIAGNOSTIC_ADD_NO_MEM:
-		return (gettext("add: no memory"));
+		return (dgettext(TEXT_DOMAIN, "add: no memory"));
 	case SPD_DIAGNOSTIC_ADD_WRONG_ACT_COUNT:
-		return (gettext("add: wrong action count"));
+		return (dgettext(TEXT_DOMAIN, "add: wrong action count"));
 	case SPD_DIAGNOSTIC_ADD_BAD_TYPE:
-		return (gettext("add: bad type"));
+		return (dgettext(TEXT_DOMAIN, "add: bad type"));
 	case SPD_DIAGNOSTIC_ADD_BAD_FLAGS:
-		return (gettext("add: bad flags"));
+		return (dgettext(TEXT_DOMAIN, "add: bad flags"));
 	case SPD_DIAGNOSTIC_ADD_INCON_FLAGS:
-		return (gettext("add: inconsistent flags"));
+		return (dgettext(TEXT_DOMAIN, "add: inconsistent flags"));
 	case SPD_DIAGNOSTIC_MALFORMED_LCLPORT:
-		return (gettext("malformed local port"));
+		return (dgettext(TEXT_DOMAIN, "malformed local port"));
 	case SPD_DIAGNOSTIC_DUPLICATE_LCLPORT:
-		return (gettext("duplicate local port"));
+		return (dgettext(TEXT_DOMAIN, "duplicate local port"));
 	case SPD_DIAGNOSTIC_MALFORMED_REMPORT:
-		return (gettext("malformed remote port"));
+		return (dgettext(TEXT_DOMAIN, "malformed remote port"));
 	case SPD_DIAGNOSTIC_DUPLICATE_REMPORT:
-		return (gettext("duplicate remote port"));
+		return (dgettext(TEXT_DOMAIN, "duplicate remote port"));
 	case SPD_DIAGNOSTIC_MALFORMED_PROTO:
-		return (gettext("malformed proto"));
+		return (dgettext(TEXT_DOMAIN, "malformed proto"));
 	case SPD_DIAGNOSTIC_DUPLICATE_PROTO:
-		return (gettext("duplicate proto"));
+		return (dgettext(TEXT_DOMAIN, "duplicate proto"));
 	case SPD_DIAGNOSTIC_MALFORMED_LCLADDR:
-		return (gettext("malformed local address"));
+		return (dgettext(TEXT_DOMAIN, "malformed local address"));
 	case SPD_DIAGNOSTIC_DUPLICATE_LCLADDR:
-		return (gettext("duplicate local address"));
+		return (dgettext(TEXT_DOMAIN, "duplicate local address"));
 	case SPD_DIAGNOSTIC_MALFORMED_REMADDR:
-		return (gettext("malformed remote address"));
+		return (dgettext(TEXT_DOMAIN, "malformed remote address"));
 	case SPD_DIAGNOSTIC_DUPLICATE_REMADDR:
-		return (gettext("duplicate remote address"));
+		return (dgettext(TEXT_DOMAIN, "duplicate remote address"));
 	case SPD_DIAGNOSTIC_MALFORMED_ACTION:
-		return (gettext("malformed action"));
+		return (dgettext(TEXT_DOMAIN, "malformed action"));
 	case SPD_DIAGNOSTIC_DUPLICATE_ACTION:
-		return (gettext("duplicate action"));
+		return (dgettext(TEXT_DOMAIN, "duplicate action"));
 	case SPD_DIAGNOSTIC_MALFORMED_RULE:
-		return (gettext("malformed rule"));
+		return (dgettext(TEXT_DOMAIN, "malformed rule"));
 	case SPD_DIAGNOSTIC_DUPLICATE_RULE:
-		return (gettext("duplicate rule"));
+		return (dgettext(TEXT_DOMAIN, "duplicate rule"));
 	case SPD_DIAGNOSTIC_MALFORMED_RULESET:
-		return (gettext("malformed ruleset"));
+		return (dgettext(TEXT_DOMAIN, "malformed ruleset"));
 	case SPD_DIAGNOSTIC_DUPLICATE_RULESET:
-		return (gettext("duplicate ruleset"));
+		return (dgettext(TEXT_DOMAIN, "duplicate ruleset"));
 	case SPD_DIAGNOSTIC_INVALID_RULE_INDEX:
-		return (gettext("invalid rule index"));
+		return (dgettext(TEXT_DOMAIN, "invalid rule index"));
 	case SPD_DIAGNOSTIC_BAD_SPDID:
-		return (gettext("bad spdid"));
+		return (dgettext(TEXT_DOMAIN, "bad spdid"));
 	case SPD_DIAGNOSTIC_BAD_MSG_TYPE:
-		return (gettext("bad message type"));
+		return (dgettext(TEXT_DOMAIN, "bad message type"));
 	case SPD_DIAGNOSTIC_UNSUPP_AH_ALG:
-		return (gettext("unsupported AH algorithm"));
+		return (dgettext(TEXT_DOMAIN, "unsupported AH algorithm"));
 	case SPD_DIAGNOSTIC_UNSUPP_ESP_ENCR_ALG:
-		return (gettext("unsupported ESP encryption algorithm"));
+		return (dgettext(TEXT_DOMAIN,
+		    "unsupported ESP encryption algorithm"));
 	case SPD_DIAGNOSTIC_UNSUPP_ESP_AUTH_ALG:
-		return (gettext("unsupported ESP authentication algorithm"));
+		return (dgettext(TEXT_DOMAIN,
+		    "unsupported ESP authentication algorithm"));
 	case SPD_DIAGNOSTIC_UNSUPP_AH_KEYSIZE:
-		return (gettext("unsupported AH key size"));
+		return (dgettext(TEXT_DOMAIN, "unsupported AH key size"));
 	case SPD_DIAGNOSTIC_UNSUPP_ESP_ENCR_KEYSIZE:
-		return (gettext("unsupported ESP encryption key size"));
+		return (dgettext(TEXT_DOMAIN,
+		    "unsupported ESP encryption key size"));
 	case SPD_DIAGNOSTIC_UNSUPP_ESP_AUTH_KEYSIZE:
-		return (gettext("unsupported ESP authentication key size"));
+		return (dgettext(TEXT_DOMAIN,
+		    "unsupported ESP authentication key size"));
 	case SPD_DIAGNOSTIC_NO_ACTION_EXT:
-		return (gettext("No ACTION extension"));
+		return (dgettext(TEXT_DOMAIN, "No ACTION extension"));
 	case SPD_DIAGNOSTIC_ALG_ID_RANGE:
-		return (gettext("invalid algorithm identifer"));
+		return (dgettext(TEXT_DOMAIN, "invalid algorithm identifer"));
 	case SPD_DIAGNOSTIC_ALG_NUM_KEY_SIZES:
-		return (gettext("number of key sizes inconsistent"));
+		return (dgettext(TEXT_DOMAIN,
+		    "number of key sizes inconsistent"));
 	case SPD_DIAGNOSTIC_ALG_NUM_BLOCK_SIZES:
-		return (gettext("number of block sizes inconsistent"));
+		return (dgettext(TEXT_DOMAIN,
+		    "number of block sizes inconsistent"));
 	case SPD_DIAGNOSTIC_ALG_MECH_NAME_LEN:
-		return (gettext("invalid mechanism name length"));
+		return (dgettext(TEXT_DOMAIN, "invalid mechanism name length"));
 	case SPD_DIAGNOSTIC_NOT_GLOBAL_OP:
-		return (gettext("operation not applicable to all policies"));
+		return (dgettext(TEXT_DOMAIN,
+		    "operation not applicable to all policies"));
 	case SPD_DIAGNOSTIC_NO_TUNNEL_SELECTORS:
-		return (gettext("using selectors on a transport-mode tunnel"));
+		return (dgettext(TEXT_DOMAIN,
+		    "using selectors on a transport-mode tunnel"));
 	default:
-		return (gettext("unknown diagnostic"));
+		return (dgettext(TEXT_DOMAIN, "unknown diagnostic"));
 	}
 }
 
@@ -1012,156 +1035,188 @@ keysock_diag(int diagnostic)
 {
 	switch (diagnostic) {
 	case SADB_X_DIAGNOSTIC_NONE:
-		return (gettext("No diagnostic"));
+		return (dgettext(TEXT_DOMAIN, "No diagnostic"));
 	case SADB_X_DIAGNOSTIC_UNKNOWN_MSG:
-		return (gettext("Unknown message type"));
+		return (dgettext(TEXT_DOMAIN, "Unknown message type"));
 	case SADB_X_DIAGNOSTIC_UNKNOWN_EXT:
-		return (gettext("Unknown extension type"));
+		return (dgettext(TEXT_DOMAIN, "Unknown extension type"));
 	case SADB_X_DIAGNOSTIC_BAD_EXTLEN:
-		return (gettext("Bad extension length"));
+		return (dgettext(TEXT_DOMAIN, "Bad extension length"));
 	case SADB_X_DIAGNOSTIC_UNKNOWN_SATYPE:
-		return (gettext("Unknown Security Association type"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Unknown Security Association type"));
 	case SADB_X_DIAGNOSTIC_SATYPE_NEEDED:
-		return (gettext("Specific Security Association type needed"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Specific Security Association type needed"));
 	case SADB_X_DIAGNOSTIC_NO_SADBS:
-		return (gettext("No Security Association Databases present"));
+		return (dgettext(TEXT_DOMAIN,
+		    "No Security Association Databases present"));
 	case SADB_X_DIAGNOSTIC_NO_EXT:
-		return (gettext("No extensions needed for message"));
+		return (dgettext(TEXT_DOMAIN,
+		    "No extensions needed for message"));
 	case SADB_X_DIAGNOSTIC_BAD_SRC_AF:
-		return (gettext("Bad source address family"));
+		return (dgettext(TEXT_DOMAIN, "Bad source address family"));
 	case SADB_X_DIAGNOSTIC_BAD_DST_AF:
-		return (gettext("Bad destination address family"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Bad destination address family"));
 	case SADB_X_DIAGNOSTIC_BAD_PROXY_AF:
-		return (gettext("Bad inner-source address family"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Bad inner-source address family"));
 	case SADB_X_DIAGNOSTIC_AF_MISMATCH:
-		return (gettext("Source/destination address family mismatch"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Source/destination address family mismatch"));
 	case SADB_X_DIAGNOSTIC_BAD_SRC:
-		return (gettext("Bad source address value"));
+		return (dgettext(TEXT_DOMAIN, "Bad source address value"));
 	case SADB_X_DIAGNOSTIC_BAD_DST:
-		return (gettext("Bad destination address value"));
+		return (dgettext(TEXT_DOMAIN, "Bad destination address value"));
 	case SADB_X_DIAGNOSTIC_ALLOC_HSERR:
-		return (gettext("Soft allocations limit more than hard limit"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Soft allocations limit more than hard limit"));
 	case SADB_X_DIAGNOSTIC_BYTES_HSERR:
-		return (gettext("Soft bytes limit more than hard limit"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Soft bytes limit more than hard limit"));
 	case SADB_X_DIAGNOSTIC_ADDTIME_HSERR:
-		return (gettext("Soft add expiration time later "
+		return (dgettext(TEXT_DOMAIN, "Soft add expiration time later "
 		    "than hard expiration time"));
 	case SADB_X_DIAGNOSTIC_USETIME_HSERR:
-		return (gettext("Soft use expiration time later "
+		return (dgettext(TEXT_DOMAIN, "Soft use expiration time later "
 		    "than hard expiration time"));
 	case SADB_X_DIAGNOSTIC_MISSING_SRC:
-		return (gettext("Missing source address"));
+		return (dgettext(TEXT_DOMAIN, "Missing source address"));
 	case SADB_X_DIAGNOSTIC_MISSING_DST:
-		return (gettext("Missing destination address"));
+		return (dgettext(TEXT_DOMAIN, "Missing destination address"));
 	case SADB_X_DIAGNOSTIC_MISSING_SA:
-		return (gettext("Missing SA extension"));
+		return (dgettext(TEXT_DOMAIN, "Missing SA extension"));
 	case SADB_X_DIAGNOSTIC_MISSING_EKEY:
-		return (gettext("Missing encryption key"));
+		return (dgettext(TEXT_DOMAIN, "Missing encryption key"));
 	case SADB_X_DIAGNOSTIC_MISSING_AKEY:
-		return (gettext("Missing authentication key"));
+		return (dgettext(TEXT_DOMAIN, "Missing authentication key"));
 	case SADB_X_DIAGNOSTIC_MISSING_RANGE:
-		return (gettext("Missing SPI range"));
+		return (dgettext(TEXT_DOMAIN, "Missing SPI range"));
 	case SADB_X_DIAGNOSTIC_DUPLICATE_SRC:
-		return (gettext("Duplicate source address"));
+		return (dgettext(TEXT_DOMAIN, "Duplicate source address"));
 	case SADB_X_DIAGNOSTIC_DUPLICATE_DST:
-		return (gettext("Duplicate destination address"));
+		return (dgettext(TEXT_DOMAIN, "Duplicate destination address"));
 	case SADB_X_DIAGNOSTIC_DUPLICATE_SA:
-		return (gettext("Duplicate SA extension"));
+		return (dgettext(TEXT_DOMAIN, "Duplicate SA extension"));
 	case SADB_X_DIAGNOSTIC_DUPLICATE_EKEY:
-		return (gettext("Duplicate encryption key"));
+		return (dgettext(TEXT_DOMAIN, "Duplicate encryption key"));
 	case SADB_X_DIAGNOSTIC_DUPLICATE_AKEY:
-		return (gettext("Duplicate authentication key"));
+		return (dgettext(TEXT_DOMAIN, "Duplicate authentication key"));
 	case SADB_X_DIAGNOSTIC_DUPLICATE_RANGE:
-		return (gettext("Duplicate SPI range"));
+		return (dgettext(TEXT_DOMAIN, "Duplicate SPI range"));
 	case SADB_X_DIAGNOSTIC_MALFORMED_SRC:
-		return (gettext("Malformed source address"));
+		return (dgettext(TEXT_DOMAIN, "Malformed source address"));
 	case SADB_X_DIAGNOSTIC_MALFORMED_DST:
-		return (gettext("Malformed destination address"));
+		return (dgettext(TEXT_DOMAIN, "Malformed destination address"));
 	case SADB_X_DIAGNOSTIC_MALFORMED_SA:
-		return (gettext("Malformed SA extension"));
+		return (dgettext(TEXT_DOMAIN, "Malformed SA extension"));
 	case SADB_X_DIAGNOSTIC_MALFORMED_EKEY:
-		return (gettext("Malformed encryption key"));
+		return (dgettext(TEXT_DOMAIN, "Malformed encryption key"));
 	case SADB_X_DIAGNOSTIC_MALFORMED_AKEY:
-		return (gettext("Malformed authentication key"));
+		return (dgettext(TEXT_DOMAIN, "Malformed authentication key"));
 	case SADB_X_DIAGNOSTIC_MALFORMED_RANGE:
-		return (gettext("Malformed SPI range"));
+		return (dgettext(TEXT_DOMAIN, "Malformed SPI range"));
 	case SADB_X_DIAGNOSTIC_AKEY_PRESENT:
-		return (gettext("Authentication key not needed"));
+		return (dgettext(TEXT_DOMAIN, "Authentication key not needed"));
 	case SADB_X_DIAGNOSTIC_EKEY_PRESENT:
-		return (gettext("Encryption key not needed"));
+		return (dgettext(TEXT_DOMAIN, "Encryption key not needed"));
 	case SADB_X_DIAGNOSTIC_PROP_PRESENT:
-		return (gettext("Proposal extension not needed"));
+		return (dgettext(TEXT_DOMAIN, "Proposal extension not needed"));
 	case SADB_X_DIAGNOSTIC_SUPP_PRESENT:
-		return (gettext("Supported algorithms extension not needed"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Supported algorithms extension not needed"));
 	case SADB_X_DIAGNOSTIC_BAD_AALG:
-		return (gettext("Unsupported authentication algorithm"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Unsupported authentication algorithm"));
 	case SADB_X_DIAGNOSTIC_BAD_EALG:
-		return (gettext("Unsupported encryption algorithm"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Unsupported encryption algorithm"));
 	case SADB_X_DIAGNOSTIC_BAD_SAFLAGS:
-		return (gettext("Invalid SA flags"));
+		return (dgettext(TEXT_DOMAIN, "Invalid SA flags"));
 	case SADB_X_DIAGNOSTIC_BAD_SASTATE:
-		return (gettext("Invalid SA state"));
+		return (dgettext(TEXT_DOMAIN, "Invalid SA state"));
 	case SADB_X_DIAGNOSTIC_BAD_AKEYBITS:
-		return (gettext("Bad number of authentication bits"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Bad number of authentication bits"));
 	case SADB_X_DIAGNOSTIC_BAD_EKEYBITS:
-		return (gettext("Bad number of encryption bits"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Bad number of encryption bits"));
 	case SADB_X_DIAGNOSTIC_ENCR_NOTSUPP:
-		return (gettext("Encryption not supported for this SA type"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Encryption not supported for this SA type"));
 	case SADB_X_DIAGNOSTIC_WEAK_EKEY:
-		return (gettext("Weak encryption key"));
+		return (dgettext(TEXT_DOMAIN, "Weak encryption key"));
 	case SADB_X_DIAGNOSTIC_WEAK_AKEY:
-		return (gettext("Weak authentication key"));
+		return (dgettext(TEXT_DOMAIN, "Weak authentication key"));
 	case SADB_X_DIAGNOSTIC_DUPLICATE_KMP:
-		return (gettext("Duplicate key management protocol"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Duplicate key management protocol"));
 	case SADB_X_DIAGNOSTIC_DUPLICATE_KMC:
-		return (gettext("Duplicate key management cookie"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Duplicate key management cookie"));
 	case SADB_X_DIAGNOSTIC_MISSING_NATT_LOC:
-		return (gettext("Missing NAT-T local address"));
+		return (dgettext(TEXT_DOMAIN, "Missing NAT-T local address"));
 	case SADB_X_DIAGNOSTIC_MISSING_NATT_REM:
-		return (gettext("Missing NAT-T remote address"));
+		return (dgettext(TEXT_DOMAIN, "Missing NAT-T remote address"));
 	case SADB_X_DIAGNOSTIC_DUPLICATE_NATT_LOC:
-		return (gettext("Duplicate NAT-T local address"));
+		return (dgettext(TEXT_DOMAIN, "Duplicate NAT-T local address"));
 	case SADB_X_DIAGNOSTIC_DUPLICATE_NATT_REM:
-		return (gettext("Duplicate NAT-T remote address"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Duplicate NAT-T remote address"));
 	case SADB_X_DIAGNOSTIC_MALFORMED_NATT_LOC:
-		return (gettext("Malformed NAT-T local address"));
+		return (dgettext(TEXT_DOMAIN, "Malformed NAT-T local address"));
 	case SADB_X_DIAGNOSTIC_MALFORMED_NATT_REM:
-		return (gettext("Malformed NAT-T remote address"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Malformed NAT-T remote address"));
 	case SADB_X_DIAGNOSTIC_DUPLICATE_NATT_PORTS:
-		return (gettext("Duplicate NAT-T ports"));
+		return (dgettext(TEXT_DOMAIN, "Duplicate NAT-T ports"));
 	case SADB_X_DIAGNOSTIC_MISSING_INNER_SRC:
-		return (gettext("Missing inner source address"));
+		return (dgettext(TEXT_DOMAIN, "Missing inner source address"));
 	case SADB_X_DIAGNOSTIC_MISSING_INNER_DST:
-		return (gettext("Missing inner destination address"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Missing inner destination address"));
 	case SADB_X_DIAGNOSTIC_DUPLICATE_INNER_SRC:
-		return (gettext("Duplicate inner source address"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Duplicate inner source address"));
 	case SADB_X_DIAGNOSTIC_DUPLICATE_INNER_DST:
-		return (gettext("Duplicate inner destination address"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Duplicate inner destination address"));
 	case SADB_X_DIAGNOSTIC_MALFORMED_INNER_SRC:
-		return (gettext("Malformed inner source address"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Malformed inner source address"));
 	case SADB_X_DIAGNOSTIC_MALFORMED_INNER_DST:
-		return (gettext("Malformed inner destination address"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Malformed inner destination address"));
 	case SADB_X_DIAGNOSTIC_PREFIX_INNER_SRC:
-		return (gettext("Invalid inner-source prefix length "));
+		return (dgettext(TEXT_DOMAIN,
+		    "Invalid inner-source prefix length "));
 	case SADB_X_DIAGNOSTIC_PREFIX_INNER_DST:
-		return (gettext("Invalid inner-destination prefix length"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Invalid inner-destination prefix length"));
 	case SADB_X_DIAGNOSTIC_BAD_INNER_DST_AF:
-		return (gettext("Bad inner-destination address family"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Bad inner-destination address family"));
 	case SADB_X_DIAGNOSTIC_INNER_AF_MISMATCH:
-		return (gettext(
+		return (dgettext(TEXT_DOMAIN,
 		    "Inner source/destination address family mismatch"));
 	case SADB_X_DIAGNOSTIC_BAD_NATT_REM_AF:
-		return (gettext("Bad NAT-T remote address family"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Bad NAT-T remote address family"));
 	case SADB_X_DIAGNOSTIC_BAD_NATT_LOC_AF:
-		return (gettext("Bad NAT-T local address family"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Bad NAT-T local address family"));
 	case SADB_X_DIAGNOSTIC_PROTO_MISMATCH:
-		return (gettext("Source/desination protocol mismatch"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Source/desination protocol mismatch"));
 	case SADB_X_DIAGNOSTIC_INNER_PROTO_MISMATCH:
-		return (gettext("Inner source/desination protocol mismatch"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Inner source/desination protocol mismatch"));
 	case SADB_X_DIAGNOSTIC_DUAL_PORT_SETS:
-		return (gettext("Both inner ports and outer ports are set"));
+		return (dgettext(TEXT_DOMAIN,
+		    "Both inner ports and outer ports are set"));
 	default:
-		return (gettext("Unknown diagnostic code"));
+		return (dgettext(TEXT_DOMAIN, "Unknown diagnostic code"));
 	}
 }
 
@@ -1204,7 +1259,8 @@ void
 print_diagnostic(FILE *file, uint16_t diagnostic)
 {
 	/* Use two spaces so above strings can fit on the line. */
-	(void) fprintf(file, gettext("  Diagnostic code %u:  %s.\n"),
+	(void) fprintf(file, dgettext(TEXT_DOMAIN,
+	    "  Diagnostic code %u:  %s.\n"),
 	    diagnostic, keysock_diag(diagnostic));
 }
 
@@ -1215,14 +1271,16 @@ void
 print_sadb_msg(struct sadb_msg *samsg, time_t wallclock, boolean_t vflag)
 {
 	if (wallclock != 0)
-		printsatime(wallclock, gettext("%sTimestamp: %s\n"), "", NULL,
+		printsatime(wallclock, dgettext(TEXT_DOMAIN,
+		    "%sTimestamp: %s\n"), "", NULL,
 		    vflag);
 
-	(void) printf(gettext("Base message (version %u) type "),
+	(void) printf(dgettext(TEXT_DOMAIN, "Base message (version %u) type "),
 	    samsg->sadb_msg_version);
 	switch (samsg->sadb_msg_type) {
 	case SADB_RESERVED:
-		(void) printf(gettext("RESERVED (warning: set to 0)"));
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "RESERVED (warning: set to 0)"));
 		break;
 	case SADB_GETSPI:
 		(void) printf("GETSPI");
@@ -1261,14 +1319,15 @@ print_sadb_msg(struct sadb_msg *samsg, time_t wallclock, boolean_t vflag)
 		(void) printf("X_INVERSE_ACQUIRE");
 		break;
 	default:
-		(void) printf(gettext("Unknown (%u)"), samsg->sadb_msg_type);
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "Unknown (%u)"), samsg->sadb_msg_type);
 		break;
 	}
-	(void) printf(gettext(", SA type "));
+	(void) printf(dgettext(TEXT_DOMAIN, ", SA type "));
 
 	switch (samsg->sadb_msg_satype) {
 	case SADB_SATYPE_UNSPEC:
-		(void) printf(gettext("<unspecified/all>"));
+		(void) printf(dgettext(TEXT_DOMAIN, "<unspecified/all>"));
 		break;
 	case SADB_SATYPE_AH:
 		(void) printf("AH");
@@ -1286,22 +1345,24 @@ print_sadb_msg(struct sadb_msg *samsg, time_t wallclock, boolean_t vflag)
 		(void) printf("RIPv2");
 		break;
 	case SADB_SATYPE_MIP:
-		(void) printf(gettext("Mobile IP"));
+		(void) printf(dgettext(TEXT_DOMAIN, "Mobile IP"));
 		break;
 	default:
-		(void) printf(gettext("<unknown %u>"), samsg->sadb_msg_satype);
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "<unknown %u>"), samsg->sadb_msg_satype);
 		break;
 	}
 
 	(void) printf(".\n");
 
 	if (samsg->sadb_msg_errno != 0) {
-		(void) printf(gettext("Error %s from PF_KEY.\n"),
+		(void) printf(dgettext(TEXT_DOMAIN, "Error %s from PF_KEY.\n"),
 		    strerror(samsg->sadb_msg_errno));
 		print_diagnostic(stdout, samsg->sadb_x_msg_diagnostic);
 	}
 
-	(void) printf(gettext("Message length %u bytes, seq=%u, pid=%u.\n"),
+	(void) printf(dgettext(TEXT_DOMAIN,
+	    "Message length %u bytes, seq=%u, pid=%u.\n"),
 	    SADB_64TO8(samsg->sadb_msg_len), samsg->sadb_msg_seq,
 	    samsg->sadb_msg_pid);
 }
@@ -1313,41 +1374,46 @@ void
 print_sa(char *prefix, struct sadb_sa *assoc)
 {
 	if (assoc->sadb_sa_len != SADB_8TO64(sizeof (*assoc))) {
-		warnx(gettext("WARNING: SA info extension length (%u) is bad."),
+		warnx(dgettext(TEXT_DOMAIN,
+		    "WARNING: SA info extension length (%u) is bad."),
 		    SADB_64TO8(assoc->sadb_sa_len));
 	}
 
-	(void) printf(gettext("%sSADB_ASSOC spi=0x%x, replay=%u, state="),
+	(void) printf(dgettext(TEXT_DOMAIN,
+	    "%sSADB_ASSOC spi=0x%x, replay=%u, state="),
 	    prefix, ntohl(assoc->sadb_sa_spi), assoc->sadb_sa_replay);
 	switch (assoc->sadb_sa_state) {
 	case SADB_SASTATE_LARVAL:
-		(void) printf(gettext("LARVAL"));
+		(void) printf(dgettext(TEXT_DOMAIN, "LARVAL"));
 		break;
 	case SADB_SASTATE_MATURE:
-		(void) printf(gettext("MATURE"));
+		(void) printf(dgettext(TEXT_DOMAIN, "MATURE"));
 		break;
 	case SADB_SASTATE_DYING:
-		(void) printf(gettext("DYING"));
+		(void) printf(dgettext(TEXT_DOMAIN, "DYING"));
 		break;
 	case SADB_SASTATE_DEAD:
-		(void) printf(gettext("DEAD"));
+		(void) printf(dgettext(TEXT_DOMAIN, "DEAD"));
 		break;
 	default:
-		(void) printf(gettext("<unknown %u>"), assoc->sadb_sa_state);
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "<unknown %u>"), assoc->sadb_sa_state);
 	}
 
 	if (assoc->sadb_sa_auth != SADB_AALG_NONE) {
-		(void) printf(gettext("\n%sAuthentication algorithm = "),
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "\n%sAuthentication algorithm = "),
 		    prefix);
 		(void) dump_aalg(assoc->sadb_sa_auth, stdout);
 	}
 
 	if (assoc->sadb_sa_encrypt != SADB_EALG_NONE) {
-		(void) printf(gettext("\n%sEncryption algorithm = "), prefix);
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "\n%sEncryption algorithm = "), prefix);
 		(void) dump_ealg(assoc->sadb_sa_encrypt, stdout);
 	}
 
-	(void) printf(gettext("\n%sflags=0x%x < "), prefix,
+	(void) printf(dgettext(TEXT_DOMAIN, "\n%sflags=0x%x < "), prefix,
 	    assoc->sadb_sa_flags);
 	if (assoc->sadb_sa_flags & SADB_SAFLAGS_PFS)
 		(void) printf("PFS ");
@@ -1395,10 +1461,11 @@ printsatime(int64_t lt, const char *msg, const char *pfx, const char *pfx2,
 	}
 
 	if (strftime(tbuf, TBUF_SIZE, NULL, localtime_r(&t, &res)) == 0)
-		tp = gettext("<time conversion failed>");
+		tp = dgettext(TEXT_DOMAIN, "<time conversion failed>");
 	(void) printf(msg, pfx, tp);
 	if (vflag && (pfx2 != NULL))
-		(void) printf(gettext("%s\t(raw time value %llu)\n"), pfx2, lt);
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "%s\t(raw time value %llu)\n"), pfx2, lt);
 }
 
 /*
@@ -1409,27 +1476,27 @@ print_lifetimes(time_t wallclock, struct sadb_lifetime *current,
     struct sadb_lifetime *hard, struct sadb_lifetime *soft, boolean_t vflag)
 {
 	int64_t scratch;
-	char *soft_prefix = gettext("SLT: ");
-	char *hard_prefix = gettext("HLT: ");
-	char *current_prefix = gettext("CLT: ");
+	char *soft_prefix = dgettext(TEXT_DOMAIN, "SLT: ");
+	char *hard_prefix = dgettext(TEXT_DOMAIN, "HLT: ");
+	char *current_prefix = dgettext(TEXT_DOMAIN, "CLT: ");
 
 	if (current != NULL &&
 	    current->sadb_lifetime_len != SADB_8TO64(sizeof (*current))) {
-		warnx(gettext("WARNING: CURRENT lifetime extension length "
-			"(%u) is bad."),
+		warnx(dgettext(TEXT_DOMAIN,
+		    "WARNING: CURRENT lifetime extension length (%u) is bad."),
 		    SADB_64TO8(current->sadb_lifetime_len));
 	}
 
 	if (hard != NULL &&
 	    hard->sadb_lifetime_len != SADB_8TO64(sizeof (*hard))) {
-		warnx(gettext("WARNING: HARD lifetime "
+		warnx(dgettext(TEXT_DOMAIN, "WARNING: HARD lifetime "
 			"extension length (%u) is bad."),
 		    SADB_64TO8(hard->sadb_lifetime_len));
 	}
 
 	if (soft != NULL &&
 	    soft->sadb_lifetime_len != SADB_8TO64(sizeof (*soft))) {
-		warnx(gettext("WARNING: SOFT lifetime "
+		warnx(dgettext(TEXT_DOMAIN, "WARNING: SOFT lifetime "
 		    "extension length (%u) is bad."),
 		    SADB_64TO8(soft->sadb_lifetime_len));
 	}
@@ -1438,36 +1505,42 @@ print_lifetimes(time_t wallclock, struct sadb_lifetime *current,
 
 	if (current != NULL) {
 		/* Express values as current values. */
-		(void) printf(gettext(
+		(void) printf(dgettext(TEXT_DOMAIN,
 		    "%s%llu bytes protected, %u allocations used.\n"),
 		    current_prefix, current->sadb_lifetime_bytes,
 		    current->sadb_lifetime_allocations);
 		printsatime(current->sadb_lifetime_addtime,
-		    gettext("%sSA added at time %s\n"),
+		    dgettext(TEXT_DOMAIN, "%sSA added at time %s\n"),
 		    current_prefix, current_prefix, vflag);
 		if (current->sadb_lifetime_usetime != 0) {
 			printsatime(current->sadb_lifetime_usetime,
-			    gettext("%sSA first used at time %s\n"),
+			    dgettext(TEXT_DOMAIN,
+			    "%sSA first used at time %s\n"),
 			    current_prefix, current_prefix, vflag);
 		}
-		printsatime(wallclock, gettext("%sTime now is %s\n"),
-		    current_prefix, current_prefix, vflag);
+		printsatime(wallclock, dgettext(TEXT_DOMAIN,
+		    "%sTime now is %s\n"), current_prefix, current_prefix,
+		    vflag);
 	}
 
 	if (soft != NULL) {
-		(void) printf(gettext("%sSoft lifetime information:  "),
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "%sSoft lifetime information:  "),
 		    soft_prefix);
-		(void) printf(gettext("%llu bytes of lifetime, %u "
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "%llu bytes of lifetime, %u "
 		    "allocations.\n"), soft->sadb_lifetime_bytes,
 		    soft->sadb_lifetime_allocations);
-		(void) printf(gettext("%s%llu seconds of post-add lifetime.\n"),
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "%s%llu seconds of post-add lifetime.\n"),
 		    soft_prefix, soft->sadb_lifetime_addtime);
-		(void) printf(gettext("%s%llu seconds of post-use lifetime.\n"),
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "%s%llu seconds of post-use lifetime.\n"),
 		    soft_prefix, soft->sadb_lifetime_usetime);
 		/* If possible, express values as time remaining. */
 		if (current != NULL) {
 			if (soft->sadb_lifetime_bytes != 0)
-				(void) printf(gettext(
+				(void) printf(dgettext(TEXT_DOMAIN,
 				    "%s%llu more bytes can be protected.\n"),
 				    soft_prefix,
 				    (soft->sadb_lifetime_bytes >
@@ -1500,34 +1573,36 @@ print_lifetimes(time_t wallclock, struct sadb_lifetime *current,
 				(void) printf("%s", soft_prefix);
 				scratch = MIN(adddelta, usedelta);
 				if (scratch >= 0) {
-					(void) printf(gettext("Soft expiration "
-					    "occurs in %lld seconds, "),
-					    scratch);
+					(void) printf(dgettext(TEXT_DOMAIN,
+					    "Soft expiration occurs in %lld "
+					    "seconds, "), scratch);
 				} else {
-					(void) printf(gettext(
+					(void) printf(dgettext(TEXT_DOMAIN,
 					    "Soft expiration occurred "));
 				}
 				scratch += wallclock;
-				printsatime(scratch, gettext("%sat %s.\n"), "",
-				    soft_prefix, vflag);
+				printsatime(scratch, dgettext(TEXT_DOMAIN,
+				    "%sat %s.\n"), "", soft_prefix, vflag);
 			}
 		}
 	}
 
 	if (hard != NULL) {
-		(void) printf(gettext("%sHard lifetime information:  "),
-		    hard_prefix);
-		(void) printf(gettext("%llu bytes of lifetime, "
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "%sHard lifetime information:  "), hard_prefix);
+		(void) printf(dgettext(TEXT_DOMAIN, "%llu bytes of lifetime, "
 		    "%u allocations.\n"), hard->sadb_lifetime_bytes,
 		    hard->sadb_lifetime_allocations);
-		(void) printf(gettext("%s%llu seconds of post-add lifetime.\n"),
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "%s%llu seconds of post-add lifetime.\n"),
 		    hard_prefix, hard->sadb_lifetime_addtime);
-		(void) printf(gettext("%s%llu seconds of post-use lifetime.\n"),
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "%s%llu seconds of post-use lifetime.\n"),
 		    hard_prefix, hard->sadb_lifetime_usetime);
 		/* If possible, express values as time remaining. */
 		if (current != NULL) {
 			if (hard->sadb_lifetime_bytes != 0)
-				(void) printf(gettext(
+				(void) printf(dgettext(TEXT_DOMAIN,
 				    "%s%llu more bytes can be protected.\n"),
 				    hard_prefix,
 				    (hard->sadb_lifetime_bytes >
@@ -1560,16 +1635,16 @@ print_lifetimes(time_t wallclock, struct sadb_lifetime *current,
 				(void) printf("%s", hard_prefix);
 				scratch = MIN(adddelta, usedelta);
 				if (scratch >= 0) {
-					(void) printf(gettext("Hard expiration "
-					    "occurs in %lld seconds, "),
-					    scratch);
+					(void) printf(dgettext(TEXT_DOMAIN,
+					    "Hard expiration occurs in %lld "
+					    "seconds, "), scratch);
 				} else {
-					(void) printf(gettext(
+					(void) printf(dgettext(TEXT_DOMAIN,
 					    "Hard expiration occured "));
 				}
 				scratch += wallclock;
-				printsatime(scratch, gettext("%sat %s.\n"), "",
-				    hard_prefix, vflag);
+				printsatime(scratch, dgettext(TEXT_DOMAIN,
+				    "%sat %s.\n"), "", hard_prefix, vflag);
 			}
 		}
 	}
@@ -1586,37 +1661,39 @@ print_address(char *prefix, struct sadb_address *addr)
 	(void) printf("%s", prefix);
 	switch (addr->sadb_address_exttype) {
 	case SADB_EXT_ADDRESS_SRC:
-		(void) printf(gettext("Source address "));
+		(void) printf(dgettext(TEXT_DOMAIN, "Source address "));
 		break;
 	case SADB_X_EXT_ADDRESS_INNER_SRC:
-		(void) printf(gettext("Inner source address "));
+		(void) printf(dgettext(TEXT_DOMAIN, "Inner source address "));
 		break;
 	case SADB_EXT_ADDRESS_DST:
-		(void) printf(gettext("Destination address "));
+		(void) printf(dgettext(TEXT_DOMAIN, "Destination address "));
 		break;
 	case SADB_X_EXT_ADDRESS_INNER_DST:
-		(void) printf(gettext("Inner destination address "));
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "Inner destination address "));
 		break;
 	case SADB_X_EXT_ADDRESS_NATT_LOC:
-		(void) printf(gettext("NATT local address "));
+		(void) printf(dgettext(TEXT_DOMAIN, "NAT-T local address "));
 		break;
 	case SADB_X_EXT_ADDRESS_NATT_REM:
-		(void) printf(gettext("NATT remote address "));
+		(void) printf(dgettext(TEXT_DOMAIN, "NAT-T remote address "));
 		break;
 	}
 
-	(void) printf(gettext("(proto=%d"), addr->sadb_address_proto);
+	(void) printf(dgettext(TEXT_DOMAIN,
+	    "(proto=%d"), addr->sadb_address_proto);
 	if (!nflag) {
 		if (addr->sadb_address_proto == 0) {
-			(void) printf(gettext("/<unspecified>"));
+			(void) printf(dgettext(TEXT_DOMAIN, "/<unspecified>"));
 		} else if ((pe = getprotobynumber(addr->sadb_address_proto))
 		    != NULL) {
 			(void) printf("/%s", pe->p_name);
 		} else {
-			(void) printf(gettext("/<unknown>"));
+			(void) printf(dgettext(TEXT_DOMAIN, "/<unknown>"));
 		}
 	}
-	(void) printf(gettext(")\n%s"), prefix);
+	(void) printf(dgettext(TEXT_DOMAIN, ")\n%s"), prefix);
 	(void) dump_sockaddr((struct sockaddr *)(addr + 1),
 	    addr->sadb_address_prefixlen, B_FALSE, stdout);
 }
@@ -1631,14 +1708,14 @@ print_key(char *prefix, struct sadb_key *key)
 
 	switch (key->sadb_key_exttype) {
 	case SADB_EXT_KEY_AUTH:
-		(void) printf(gettext("Authentication"));
+		(void) printf(dgettext(TEXT_DOMAIN, "Authentication"));
 		break;
 	case SADB_EXT_KEY_ENCRYPT:
-		(void) printf(gettext("Encryption"));
+		(void) printf(dgettext(TEXT_DOMAIN, "Encryption"));
 		break;
 	}
 
-	(void) printf(gettext(" key.\n%s"), prefix);
+	(void) printf(dgettext(TEXT_DOMAIN, " key.\n%s"), prefix);
 	(void) dump_key((uint8_t *)(key + 1), key->sadb_key_bits, stdout);
 	(void) putchar('\n');
 }
@@ -1654,20 +1731,21 @@ print_ident(char *prefix, struct sadb_ident *id)
 	(void) printf("%s", prefix);
 	switch (id->sadb_ident_exttype) {
 	case SADB_EXT_IDENTITY_SRC:
-		(void) printf(gettext("Source"));
+		(void) printf(dgettext(TEXT_DOMAIN, "Source"));
 		break;
 	case SADB_EXT_IDENTITY_DST:
-		(void) printf(gettext("Destination"));
+		(void) printf(dgettext(TEXT_DOMAIN, "Destination"));
 		break;
 	}
 
-	(void) printf(gettext(" identity, uid=%d, type "), id->sadb_ident_id);
+	(void) printf(dgettext(TEXT_DOMAIN,
+	    " identity, uid=%d, type "), id->sadb_ident_id);
 	canprint = dump_sadb_idtype(id->sadb_ident_type, stdout, NULL);
 	(void) printf("\n%s", prefix);
 	if (canprint)
 		(void) printf("%s\n", (char *)(id + 1));
 	else
-		(void) printf(gettext("<cannot print>\n"));
+		(void) printf(dgettext(TEXT_DOMAIN, "<cannot print>\n"));
 }
 
 /*
@@ -1680,17 +1758,18 @@ print_sens(char *prefix, struct sadb_sens *sens)
 	int i;
 
 	(void) printf(
-	    gettext("%sSensitivity DPD %d, sens level=%d, integ level=%d\n"),
+	    dgettext(TEXT_DOMAIN,
+	    "%sSensitivity DPD %d, sens level=%d, integ level=%d\n"),
 	    prefix, sens->sadb_sens_dpd, sens->sadb_sens_sens_level,
 	    sens->sadb_sens_integ_level);
 	for (i = 0; sens->sadb_sens_sens_len-- > 0; i++, bitmap++)
 		(void) printf(
-		    gettext("%s Sensitivity BM extended word %d 0x%llx\n"),
-		    i, *bitmap);
+		    dgettext(TEXT_DOMAIN,
+		    "%s Sensitivity BM extended word %d 0x%llx\n"), i, *bitmap);
 	for (i = 0; sens->sadb_sens_integ_len-- > 0; i++, bitmap++)
 		(void) printf(
-		    gettext("%s Integrity BM extended word %d 0x%llx\n"),
-		    i, *bitmap);
+		    dgettext(TEXT_DOMAIN,
+		    "%s Integrity BM extended word %d 0x%llx\n"), i, *bitmap);
 }
 
 /*
@@ -1702,7 +1781,8 @@ print_prop(char *prefix, struct sadb_prop *prop)
 	struct sadb_comb *combs;
 	int i, numcombs;
 
-	(void) printf(gettext("%sProposal, replay counter = %u.\n"), prefix,
+	(void) printf(dgettext(TEXT_DOMAIN,
+	    "%sProposal, replay counter = %u.\n"), prefix,
 	    prop->sadb_prop_replay);
 
 	numcombs = prop->sadb_prop_len - SADB_8TO64(sizeof (*prop));
@@ -1711,49 +1791,57 @@ print_prop(char *prefix, struct sadb_prop *prop)
 	combs = (struct sadb_comb *)(prop + 1);
 
 	for (i = 0; i < numcombs; i++) {
-		(void) printf(gettext("%s Combination #%u "), prefix, i + 1);
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "%s Combination #%u "), prefix, i + 1);
 		if (combs[i].sadb_comb_auth != SADB_AALG_NONE) {
-			(void) printf(gettext("Authentication = "));
+			(void) printf(dgettext(TEXT_DOMAIN,
+			    "Authentication = "));
 			(void) dump_aalg(combs[i].sadb_comb_auth, stdout);
-			(void) printf(gettext("  minbits=%u, maxbits=%u.\n%s "),
+			(void) printf(dgettext(TEXT_DOMAIN,
+			    "  minbits=%u, maxbits=%u.\n%s "),
 			    combs[i].sadb_comb_auth_minbits,
 			    combs[i].sadb_comb_auth_maxbits, prefix);
 		}
 
 		if (combs[i].sadb_comb_encrypt != SADB_EALG_NONE) {
-			(void) printf(gettext("Encryption = "));
+			(void) printf(dgettext(TEXT_DOMAIN, "Encryption = "));
 			(void) dump_ealg(combs[i].sadb_comb_encrypt, stdout);
-			(void) printf(gettext("  minbits=%u, maxbits=%u.\n%s "),
+			(void) printf(dgettext(TEXT_DOMAIN,
+			    "  minbits=%u, maxbits=%u.\n%s "),
 			    combs[i].sadb_comb_encrypt_minbits,
 			    combs[i].sadb_comb_encrypt_maxbits, prefix);
 		}
 
-		(void) printf(gettext("HARD: "));
+		(void) printf(dgettext(TEXT_DOMAIN, "HARD: "));
 		if (combs[i].sadb_comb_hard_allocations)
-			(void) printf(gettext("alloc=%u "),
+			(void) printf(dgettext(TEXT_DOMAIN, "alloc=%u "),
 			    combs[i].sadb_comb_hard_allocations);
 		if (combs[i].sadb_comb_hard_bytes)
-			(void) printf(gettext("bytes=%llu "),
+			(void) printf(dgettext(TEXT_DOMAIN, "bytes=%llu "),
 			    combs[i].sadb_comb_hard_bytes);
 		if (combs[i].sadb_comb_hard_addtime)
-			(void) printf(gettext("post-add secs=%llu "),
+			(void) printf(dgettext(TEXT_DOMAIN,
+			    "post-add secs=%llu "),
 			    combs[i].sadb_comb_hard_addtime);
 		if (combs[i].sadb_comb_hard_usetime)
-			(void) printf(gettext("post-use secs=%llu"),
+			(void) printf(dgettext(TEXT_DOMAIN,
+			    "post-use secs=%llu"),
 			    combs[i].sadb_comb_hard_usetime);
 
-		(void) printf(gettext("\n%s SOFT: "), prefix);
+		(void) printf(dgettext(TEXT_DOMAIN, "\n%s SOFT: "), prefix);
 		if (combs[i].sadb_comb_soft_allocations)
-			(void) printf(gettext("alloc=%u "),
+			(void) printf(dgettext(TEXT_DOMAIN, "alloc=%u "),
 			    combs[i].sadb_comb_soft_allocations);
 		if (combs[i].sadb_comb_soft_bytes)
-			(void) printf(gettext("bytes=%llu "),
+			(void) printf(dgettext(TEXT_DOMAIN, "bytes=%llu "),
 			    combs[i].sadb_comb_soft_bytes);
 		if (combs[i].sadb_comb_soft_addtime)
-			(void) printf(gettext("post-add secs=%llu "),
+			(void) printf(dgettext(TEXT_DOMAIN,
+			    "post-add secs=%llu "),
 			    combs[i].sadb_comb_soft_addtime);
 		if (combs[i].sadb_comb_soft_usetime)
-			(void) printf(gettext("post-use secs=%llu"),
+			(void) printf(dgettext(TEXT_DOMAIN,
+			    "post-use secs=%llu"),
 			    combs[i].sadb_comb_soft_usetime);
 		(void) putchar('\n');
 	}
@@ -1770,73 +1858,81 @@ print_eprop(char *prefix, struct sadb_prop *eprop)
 	struct sadb_x_algdesc *algdesc;
 	int i, j;
 
-	(void) printf(gettext("%sExtended Proposal, replay counter = %u, "),
-	    prefix, eprop->sadb_prop_replay);
-	(void) printf(gettext("number of combinations = %u.\n"),
+	(void) printf(dgettext(TEXT_DOMAIN,
+	    "%sExtended Proposal, replay counter = %u, "), prefix,
+	    eprop->sadb_prop_replay);
+	(void) printf(dgettext(TEXT_DOMAIN, "number of combinations = %u.\n"),
 	    eprop->sadb_x_prop_numecombs);
 
 	sofar = (uint64_t *)(eprop + 1);
 	ecomb = (struct sadb_x_ecomb *)sofar;
 
 	for (i = 0; i < eprop->sadb_x_prop_numecombs; ) {
-		(void) printf(gettext("%s Extended combination #%u:\n"),
-		    prefix, ++i);
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "%s Extended combination #%u:\n"), prefix, ++i);
 
-		(void) printf(gettext("%s HARD: "), prefix);
-		(void) printf(gettext("alloc=%u, "),
+		(void) printf(dgettext(TEXT_DOMAIN, "%s HARD: "), prefix);
+		(void) printf(dgettext(TEXT_DOMAIN, "alloc=%u, "),
 		    ecomb->sadb_x_ecomb_hard_allocations);
-		(void) printf(gettext("bytes=%llu, "),
+		(void) printf(dgettext(TEXT_DOMAIN, "bytes=%llu, "),
 		    ecomb->sadb_x_ecomb_hard_bytes);
-		(void) printf(gettext("post-add secs=%llu, "),
+		(void) printf(dgettext(TEXT_DOMAIN, "post-add secs=%llu, "),
 		    ecomb->sadb_x_ecomb_hard_addtime);
-		(void) printf(gettext("post-use secs=%llu\n"),
+		(void) printf(dgettext(TEXT_DOMAIN, "post-use secs=%llu\n"),
 		    ecomb->sadb_x_ecomb_hard_usetime);
 
-		(void) printf(gettext("%s SOFT: "), prefix);
-		(void) printf(gettext("alloc=%u, "),
+		(void) printf(dgettext(TEXT_DOMAIN, "%s SOFT: "), prefix);
+		(void) printf(dgettext(TEXT_DOMAIN, "alloc=%u, "),
 		    ecomb->sadb_x_ecomb_soft_allocations);
-		(void) printf(gettext("bytes=%llu, "),
+		(void) printf(dgettext(TEXT_DOMAIN, "bytes=%llu, "),
 		    ecomb->sadb_x_ecomb_soft_bytes);
-		(void) printf(gettext("post-add secs=%llu, "),
+		(void) printf(dgettext(TEXT_DOMAIN, "post-add secs=%llu, "),
 		    ecomb->sadb_x_ecomb_soft_addtime);
-		(void) printf(gettext("post-use secs=%llu\n"),
+		(void) printf(dgettext(TEXT_DOMAIN, "post-use secs=%llu\n"),
 		    ecomb->sadb_x_ecomb_soft_usetime);
 
 		sofar = (uint64_t *)(ecomb + 1);
 		algdesc = (struct sadb_x_algdesc *)sofar;
 
 		for (j = 0; j < ecomb->sadb_x_ecomb_numalgs; ) {
-			(void) printf(gettext("%s Alg #%u "), prefix, ++j);
+			(void) printf(dgettext(TEXT_DOMAIN,
+			    "%s Alg #%u "), prefix, ++j);
 			switch (algdesc->sadb_x_algdesc_satype) {
 			case SADB_SATYPE_ESP:
-				(void) printf(gettext("for ESP "));
+				(void) printf(dgettext(TEXT_DOMAIN,
+				    "for ESP "));
 				break;
 			case SADB_SATYPE_AH:
-				(void) printf(gettext("for AH "));
+				(void) printf(dgettext(TEXT_DOMAIN, "for AH "));
 				break;
 			default:
-				(void) printf(gettext("for satype=%d "),
+				(void) printf(dgettext(TEXT_DOMAIN,
+				    "for satype=%d "),
 				    algdesc->sadb_x_algdesc_satype);
 			}
 			switch (algdesc->sadb_x_algdesc_algtype) {
 			case SADB_X_ALGTYPE_CRYPT:
-				(void) printf(gettext("Encryption = "));
+				(void) printf(dgettext(TEXT_DOMAIN,
+				    "Encryption = "));
 				(void) dump_ealg(algdesc->sadb_x_algdesc_alg,
 				    stdout);
 				break;
 			case SADB_X_ALGTYPE_AUTH:
-				(void) printf(gettext("Authentication = "));
+				(void) printf(dgettext(TEXT_DOMAIN,
+				    "Authentication = "));
 				(void) dump_aalg(algdesc->sadb_x_algdesc_alg,
 				    stdout);
 				break;
 			default:
-				(void) printf(gettext("algtype(%d) = alg(%d)"),
+				(void) printf(dgettext(TEXT_DOMAIN,
+				    "algtype(%d) = alg(%d)"),
 				    algdesc->sadb_x_algdesc_algtype,
 				    algdesc->sadb_x_algdesc_alg);
 				break;
 			}
 
-			(void) printf(gettext("  minbits=%u, maxbits=%u.\n"),
+			(void) printf(dgettext(TEXT_DOMAIN,
+			    "  minbits=%u, maxbits=%u.\n"),
 			    algdesc->sadb_x_algdesc_minbits,
 			    algdesc->sadb_x_algdesc_maxbits);
 
@@ -1855,16 +1951,16 @@ print_supp(char *prefix, struct sadb_supported *supp)
 	struct sadb_alg *algs;
 	int i, numalgs;
 
-	(void) printf(gettext("%sSupported "), prefix);
+	(void) printf(dgettext(TEXT_DOMAIN, "%sSupported "), prefix);
 	switch (supp->sadb_supported_exttype) {
 	case SADB_EXT_SUPPORTED_AUTH:
-		(void) printf(gettext("authentication"));
+		(void) printf(dgettext(TEXT_DOMAIN, "authentication"));
 		break;
 	case SADB_EXT_SUPPORTED_ENCRYPT:
-		(void) printf(gettext("encryption"));
+		(void) printf(dgettext(TEXT_DOMAIN, "encryption"));
 		break;
 	}
-	(void) printf(gettext(" algorithms.\n"));
+	(void) printf(dgettext(TEXT_DOMAIN, " algorithms.\n"));
 
 	algs = (struct sadb_alg *)(supp + 1);
 	numalgs = supp->sadb_supported_len - SADB_8TO64(sizeof (*supp));
@@ -1879,7 +1975,8 @@ print_supp(char *prefix, struct sadb_supported *supp)
 			(void) dump_ealg(algs[i].sadb_alg_id, stdout);
 			break;
 		}
-		(void) printf(gettext(" minbits=%u, maxbits=%u, ivlen=%u.\n"),
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    " minbits=%u, maxbits=%u, ivlen=%u.\n"),
 		    algs[i].sadb_alg_minbits, algs[i].sadb_alg_maxbits,
 		    algs[i].sadb_alg_ivlen);
 	}
@@ -1891,7 +1988,8 @@ print_supp(char *prefix, struct sadb_supported *supp)
 void
 print_spirange(char *prefix, struct sadb_spirange *range)
 {
-	(void) printf(gettext("%sSPI Range, min=0x%x, max=0x%x\n"), prefix,
+	(void) printf(dgettext(TEXT_DOMAIN,
+	    "%sSPI Range, min=0x%x, max=0x%x\n"), prefix,
 	    htonl(range->sadb_spirange_min),
 	    htonl(range->sadb_spirange_max));
 }
@@ -1907,9 +2005,10 @@ print_kmc(char *prefix, struct sadb_x_kmc *kmc)
 
 	if ((cookie_label = kmc_lookup_by_cookie(kmc->sadb_x_kmc_cookie)) ==
 	    NULL)
-		cookie_label = gettext("<Label not found.>");
+		cookie_label = dgettext(TEXT_DOMAIN, "<Label not found.>");
 
-	(void) printf(gettext("%sProtocol %u, cookie=\"%s\" (%u)\n"), prefix,
+	(void) printf(dgettext(TEXT_DOMAIN,
+	    "%sProtocol %u, cookie=\"%s\" (%u)\n"), prefix,
 	    kmc->sadb_x_kmc_proto, cookie_label, kmc->sadb_x_kmc_cookie);
 }
 
@@ -1938,7 +2037,8 @@ print_samsg(uint64_t *buffer, boolean_t want_timestamp, boolean_t vflag)
 		lenbytes = SADB_64TO8(ext->sadb_ext_len);
 		switch (ext->sadb_ext_type) {
 		case SADB_EXT_SA:
-			print_sa(gettext("SA: "), (struct sadb_sa *)current);
+			print_sa(dgettext(TEXT_DOMAIN,
+			    "SA: "), (struct sadb_sa *)current);
 			break;
 		/*
 		 * Pluck out lifetimes and print them at the end.  This is
@@ -1955,78 +2055,80 @@ print_samsg(uint64_t *buffer, boolean_t want_timestamp, boolean_t vflag)
 			break;
 
 		case SADB_EXT_ADDRESS_SRC:
-			print_address(gettext("SRC: "),
+			print_address(dgettext(TEXT_DOMAIN, "SRC: "),
 			    (struct sadb_address *)current);
 			break;
 		case SADB_X_EXT_ADDRESS_INNER_SRC:
-			print_address(gettext("INS: "),
+			print_address(dgettext(TEXT_DOMAIN, "INS: "),
 			    (struct sadb_address *)current);
 			break;
 		case SADB_EXT_ADDRESS_DST:
-			print_address(gettext("DST: "),
+			print_address(dgettext(TEXT_DOMAIN, "DST: "),
 			    (struct sadb_address *)current);
 			break;
 		case SADB_X_EXT_ADDRESS_INNER_DST:
-			print_address(gettext("IND: "),
+			print_address(dgettext(TEXT_DOMAIN, "IND: "),
 			    (struct sadb_address *)current);
 			break;
 		case SADB_EXT_KEY_AUTH:
-			print_key(gettext("AKY: "), (struct sadb_key *)current);
+			print_key(dgettext(TEXT_DOMAIN,
+			    "AKY: "), (struct sadb_key *)current);
 			break;
 		case SADB_EXT_KEY_ENCRYPT:
-			print_key(gettext("EKY: "), (struct sadb_key *)current);
+			print_key(dgettext(TEXT_DOMAIN,
+			    "EKY: "), (struct sadb_key *)current);
 			break;
 		case SADB_EXT_IDENTITY_SRC:
-			print_ident(gettext("SID: "),
+			print_ident(dgettext(TEXT_DOMAIN, "SID: "),
 			    (struct sadb_ident *)current);
 			break;
 		case SADB_EXT_IDENTITY_DST:
-			print_ident(gettext("DID: "),
+			print_ident(dgettext(TEXT_DOMAIN, "DID: "),
 			    (struct sadb_ident *)current);
 			break;
 		case SADB_EXT_SENSITIVITY:
-			print_sens(gettext("SNS: "),
+			print_sens(dgettext(TEXT_DOMAIN, "SNS: "),
 			    (struct sadb_sens *)current);
 			break;
 		case SADB_EXT_PROPOSAL:
-			print_prop(gettext("PRP: "),
+			print_prop(dgettext(TEXT_DOMAIN, "PRP: "),
 			    (struct sadb_prop *)current);
 			break;
 		case SADB_EXT_SUPPORTED_AUTH:
-			print_supp(gettext("SUA: "),
+			print_supp(dgettext(TEXT_DOMAIN, "SUA: "),
 			    (struct sadb_supported *)current);
 			break;
 		case SADB_EXT_SUPPORTED_ENCRYPT:
-			print_supp(gettext("SUE: "),
+			print_supp(dgettext(TEXT_DOMAIN, "SUE: "),
 			    (struct sadb_supported *)current);
 			break;
 		case SADB_EXT_SPIRANGE:
-			print_spirange(gettext("SPR: "),
+			print_spirange(dgettext(TEXT_DOMAIN, "SPR: "),
 			    (struct sadb_spirange *)current);
 			break;
 		case SADB_X_EXT_EPROP:
-			print_eprop(gettext("EPR: "),
+			print_eprop(dgettext(TEXT_DOMAIN, "EPR: "),
 			    (struct sadb_prop *)current);
 			break;
 		case SADB_X_EXT_KM_COOKIE:
-			print_kmc(gettext("KMC: "),
+			print_kmc(dgettext(TEXT_DOMAIN, "KMC: "),
 			    (struct sadb_x_kmc *)current);
 			break;
 		case SADB_X_EXT_ADDRESS_NATT_REM:
-			print_address(gettext("NRM: "),
+			print_address(dgettext(TEXT_DOMAIN, "NRM: "),
 			    (struct sadb_address *)current);
 			break;
 		case SADB_X_EXT_ADDRESS_NATT_LOC:
-			print_address(gettext("NLC: "),
+			print_address(dgettext(TEXT_DOMAIN, "NLC: "),
 			    (struct sadb_address *)current);
 			break;
 		default:
-			(void) printf(gettext(
+			(void) printf(dgettext(TEXT_DOMAIN,
 			    "UNK: Unknown ext. %d, len %d.\n"),
 			    ext->sadb_ext_type, lenbytes);
 			for (i = 0; i < ext->sadb_ext_len; i++)
-				(void) printf(gettext("UNK: 0x%llx\n"),
-				    ((uint64_t *)ext)[i]);
+				(void) printf(dgettext(TEXT_DOMAIN,
+				    "UNK: 0x%llx\n"), ((uint64_t *)ext)[i]);
 			break;
 		}
 		current += (lenbytes == 0) ?
@@ -2039,7 +2141,7 @@ print_samsg(uint64_t *buffer, boolean_t want_timestamp, boolean_t vflag)
 		print_lifetimes(wallclock, currentlt, hardlt, softlt, vflag);
 
 	if (current - buffer != samsg->sadb_msg_len) {
-		warnx(gettext("WARNING: insufficient buffer "
+		warnx(dgettext(TEXT_DOMAIN, "WARNING: insufficient buffer "
 			"space or corrupt message."));
 	}
 
@@ -2145,7 +2247,7 @@ save_address(struct sadb_address *addr, FILE *ofile)
 	    (af == AF_INET) ? (char *)&sin->sin_addr : (char *)&sin6->sin6_addr,
 	    buf, sizeof (buf));
 	if (printable_addr == NULL)
-		printable_addr = "<inet_ntop() failed>";
+		printable_addr = "Invalid IP address.";
 	if (fprintf(ofile, "%s", printable_addr) < 0)
 		return (B_FALSE);
 	if (addr->sadb_address_prefixlen != 0 &&
@@ -2208,7 +2310,8 @@ save_ident(struct sadb_ident *ident, FILE *ofile)
 
 	if (ident->sadb_ident_type == SADB_X_IDENTTYPE_DN ||
 	    ident->sadb_ident_type == SADB_X_IDENTTYPE_GN) {
-		if (fprintf(ofile, gettext("<can-not-print>")) < 0)
+		if (fprintf(ofile, dgettext(TEXT_DOMAIN,
+		    "<can-not-print>")) < 0)
 			return (B_FALSE);
 	} else {
 		if (fprintf(ofile, "%s", (char *)(ident + 1)) < 0)
@@ -2221,33 +2324,32 @@ save_ident(struct sadb_ident *ident, FILE *ofile)
 /*
  * "Save" a security association to an output file.
  *
- * NOTE the lack of calls to gettext() because I'm outputting parseable stuff.
+ * NOTE the lack of calls to dgettext() because I'm outputting parseable stuff.
  * ALSO NOTE that if you change keywords (see parsecmd()), you'll have to
  * change them here as well.
  */
 void
 save_assoc(uint64_t *buffer, FILE *ofile)
 {
+	int terrno;
 	int seen_proto = 0;
 	uint64_t *current;
 	struct sadb_address *addr;
 	struct sadb_msg *samsg = (struct sadb_msg *)buffer;
 	struct sadb_ext *ext;
-#define	bail2(s)	do { \
-				int t = errno; \
-				(void) fclose(ofile); \
-				errno = t; \
-				interactive = B_FALSE;	/* Guarantees exit. */ \
-				Bail(s); \
-			} while (B_FALSE)	/* How do I lint-clean this? */
 
-#define	savenl() if (fputs(" \\\n", ofile) == EOF) { bail2("savenl"); }
+#define	tidyup() \
+	terrno = errno; (void) fclose(ofile); errno = terrno; \
+	interactive = B_FALSE
+
+#define	savenl() if (fputs(" \\\n", ofile) == EOF) \
+	{ bail(dgettext(TEXT_DOMAIN, "savenl")); }
 
 	if (fputs("# begin assoc\n", ofile) == EOF)
-		Bail("save_assoc: Opening comment of SA");
+		bail(dgettext(TEXT_DOMAIN,
+		    "save_assoc: Opening comment of SA"));
 	if (fprintf(ofile, "add %s ", rparsesatype(samsg->sadb_msg_satype)) < 0)
-		Bail("save_assoc: First line of SA");
-	/* LINTED E_CONST_COND */
+		bail(dgettext(TEXT_DOMAIN, "save_assoc: First line of SA"));
 	savenl();
 
 	current = (uint64_t *)(samsg + 1);
@@ -2261,47 +2363,58 @@ save_assoc(uint64_t *buffer, FILE *ofile)
 			if (assoc->sadb_sa_state != SADB_SASTATE_MATURE) {
 				if (fprintf(ofile, "# WARNING: SA was dying "
 				    "or dead.\n") < 0) {
-					/* LINTED E_CONST_COND */
-					bail2("save_assoc: fprintf not mature");
+					tidyup();
+					bail(dgettext(TEXT_DOMAIN,
+					    "save_assoc: fprintf not mature"));
 				}
 			}
 			if (fprintf(ofile, "    spi 0x%x ",
-			    ntohl(assoc->sadb_sa_spi)) < 0)
-				/* LINTED E_CONST_COND */
-				bail2("save_assoc: fprintf spi");
+			    ntohl(assoc->sadb_sa_spi)) < 0) {
+				tidyup();
+				bail(dgettext(TEXT_DOMAIN,
+				    "save_assoc: fprintf spi"));
+			}
 			if (assoc->sadb_sa_encrypt != SADB_EALG_NONE) {
 				if (fprintf(ofile, "encr_alg %s ",
 				    rparsealg(assoc->sadb_sa_encrypt,
-					IPSEC_PROTO_ESP)) < 0)
-					/* LINTED E_CONST_COND */
-					bail2("save_assoc: fprintf encrypt");
+					IPSEC_PROTO_ESP)) < 0) {
+					tidyup();
+					bail(dgettext(TEXT_DOMAIN,
+					    "save_assoc: fprintf encrypt"));
+				}
 			}
 			if (assoc->sadb_sa_auth != SADB_AALG_NONE) {
 				if (fprintf(ofile, "auth_alg %s ",
 				    rparsealg(assoc->sadb_sa_auth,
-					IPSEC_PROTO_AH)) < 0)
-					/* LINTED E_CONST_COND */
-					bail2("save_assoc: fprintf auth");
+					IPSEC_PROTO_AH)) < 0) {
+					tidyup();
+					bail(dgettext(TEXT_DOMAIN,
+					    "save_assoc: fprintf auth"));
+				}
 			}
 			if (fprintf(ofile, "replay %d ",
-			    assoc->sadb_sa_replay) < 0)
-				/* LINTED E_CONST_COND */
-				bail2("save_assoc: fprintf replay");
+			    assoc->sadb_sa_replay) < 0) {
+				tidyup();
+				bail(dgettext(TEXT_DOMAIN,
+				    "save_assoc: fprintf replay"));
+			}
 			if (assoc->sadb_sa_flags & (SADB_X_SAFLAGS_NATT_LOC |
 			    SADB_X_SAFLAGS_NATT_REM)) {
-				if (fprintf(ofile, "encap udp") < 0)
-					/* LINTED E_CONST_COND */
-					bail2("save_assoc: fprintf encap");
+				if (fprintf(ofile, "encap udp") < 0) {
+					tidyup();
+					bail(dgettext(TEXT_DOMAIN,
+					    "save_assoc: fprintf encap"));
+				}
 			}
-			/* LINTED E_CONST_COND */
 			savenl();
 			break;
 		case SADB_EXT_LIFETIME_HARD:
 		case SADB_EXT_LIFETIME_SOFT:
-			if (!save_lifetime((struct sadb_lifetime *)ext, ofile))
-				/* LINTED E_CONST_COND */
-				bail2("save_lifetime");
-			/* LINTED E_CONST_COND */
+			if (!save_lifetime((struct sadb_lifetime *)ext,
+			    ofile)) {
+				tidyup();
+				bail(dgettext(TEXT_DOMAIN, "save_lifetime"));
+			}
 			savenl();
 			break;
 		case SADB_EXT_ADDRESS_SRC:
@@ -2314,30 +2427,29 @@ save_assoc(uint64_t *buffer, FILE *ofile)
 			if (!seen_proto && addr->sadb_address_proto) {
 				(void) fprintf(ofile, "    proto %d",
 				    addr->sadb_address_proto);
-				/* LINTED E_CONST_COND */
 				savenl();
 				seen_proto = 1;
 			}
-			if (!save_address(addr, ofile))
-				/* LINTED E_CONST_COND */
-				bail2("save_address");
-			/* LINTED E_CONST_COND */
+			if (!save_address(addr, ofile)) {
+				tidyup();
+				bail(dgettext(TEXT_DOMAIN, "save_address"));
+			}
 			savenl();
 			break;
 		case SADB_EXT_KEY_AUTH:
 		case SADB_EXT_KEY_ENCRYPT:
-			if (!save_key((struct sadb_key *)ext, ofile))
-				/* LINTED E_CONST_COND */
-				bail2("save_address");
-			/* LINTED E_CONST_COND */
+			if (!save_key((struct sadb_key *)ext, ofile)) {
+				tidyup();
+				bail(dgettext(TEXT_DOMAIN, "save_address"));
+			}
 			savenl();
 			break;
 		case SADB_EXT_IDENTITY_SRC:
 		case SADB_EXT_IDENTITY_DST:
-			if (!save_ident((struct sadb_ident *)ext, ofile))
-				/* LINTED E_CONST_COND */
-				bail2("save_address");
-			/* LINTED E_CONST_COND */
+			if (!save_ident((struct sadb_ident *)ext, ofile)) {
+				tidyup();
+				bail(dgettext(TEXT_DOMAIN, "save_address"));
+			}
 			savenl();
 			break;
 		case SADB_EXT_SENSITIVITY:
@@ -2348,9 +2460,10 @@ save_assoc(uint64_t *buffer, FILE *ofile)
 		current += ext->sadb_ext_len;
 	}
 
-	if (fputs(gettext("\n# end assoc\n\n"), ofile) == EOF)
-		/* LINTED E_CONST_COND */
-		bail2("save_assoc: last fputs");
+	if (fputs(dgettext(TEXT_DOMAIN, "\n# end assoc\n\n"), ofile) == EOF) {
+		tidyup();
+		bail(dgettext(TEXT_DOMAIN, "save_assoc: last fputs"));
+	}
 }
 
 /*
@@ -2379,22 +2492,25 @@ opensavefile(char *filename)
 	fd = open(filename, O_WRONLY | O_EXCL | O_CREAT | O_TRUNC, S_IRUSR);
 	if (fd == -1) {
 		if (errno != EEXIST)
-			bail_msg("%s %s: %s", filename, gettext("open error"),
+			bail_msg("%s %s: %s", filename, dgettext(TEXT_DOMAIN,
+			    "open error"),
 			    strerror(errno));
 		fd = open(filename, O_WRONLY | O_TRUNC, 0);
 		if (fd == -1)
-			bail_msg("%s %s: %s", filename, gettext("open error"),
-			    strerror(errno));
+			bail_msg("%s %s: %s", filename, dgettext(TEXT_DOMAIN,
+			    "open error"), strerror(errno));
 		if (fstat(fd, &buf) == -1) {
 			(void) close(fd);
 			bail_msg("%s fstat: %s", filename, strerror(errno));
 		}
 		if (S_ISREG(buf.st_mode) &&
 		    ((buf.st_mode & S_IAMB) != S_IRUSR)) {
-			warnx(gettext("WARNING: Save file already exists with "
-				"permission %o."), buf.st_mode & S_IAMB);
-			warnx(gettext("Normal users may be able to read IPsec "
-				"keying material."));
+			warnx(dgettext(TEXT_DOMAIN,
+			    "WARNING: Save file already exists with "
+			    "permission %o."), buf.st_mode & S_IAMB);
+			warnx(dgettext(TEXT_DOMAIN,
+			    "Normal users may be able to read IPsec "
+			    "keying material."));
 		}
 	}
 
@@ -2402,8 +2518,8 @@ opensavefile(char *filename)
 	retval = fdopen(fd, "w");
 	if (retval == NULL) {
 		(void) close(fd);
-		bail_msg("%s %s: %s", filename, gettext("fdopen error"),
-		    strerror(errno));
+		bail_msg("%s %s: %s", filename, dgettext(TEXT_DOMAIN,
+		    "fdopen error"), strerror(errno));
 	}
 	return (retval);
 }

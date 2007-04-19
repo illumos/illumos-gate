@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -741,33 +741,33 @@ ipsecalgs_diag(int diag)
 {
 	switch (diag) {
 	case LIBIPSEC_ALGS_DIAG_ALG_EXISTS:
-		return (gettext("Algorithm already exists"));
+		return (dgettext(TEXT_DOMAIN, "Algorithm already exists"));
 	case LIBIPSEC_ALGS_DIAG_PROTO_EXISTS:
-		return (gettext("Protocol already exists"));
+		return (dgettext(TEXT_DOMAIN, "Protocol already exists"));
 	case LIBIPSEC_ALGS_DIAG_UNKN_PROTO:
-		return (gettext("Unknown protocol"));
+		return (dgettext(TEXT_DOMAIN, "Unknown protocol"));
 	case LIBIPSEC_ALGS_DIAG_UNKN_ALG:
-		return (gettext("Unknown algorithm"));
+		return (dgettext(TEXT_DOMAIN, "Unknown algorithm"));
 	case LIBIPSEC_ALGS_DIAG_NOMEM:
-		return (gettext("Out of memory"));
+		return (dgettext(TEXT_DOMAIN, "Out of memory"));
 	case LIBIPSEC_ALGS_DIAG_ALGSFILEOPEN:
-		return (gettext("open() failed"));
+		return (dgettext(TEXT_DOMAIN, "open() failed"));
 	case LIBIPSEC_ALGS_DIAG_ALGSFILEFDOPEN:
-		return (gettext("fdopen() failed"));
+		return (dgettext(TEXT_DOMAIN, "fdopen() failed"));
 	case LIBIPSEC_ALGS_DIAG_ALGSFILELOCK:
-		return (gettext("lockf() failed"));
+		return (dgettext(TEXT_DOMAIN, "lockf() failed"));
 	case LIBIPSEC_ALGS_DIAG_ALGSFILERENAME:
-		return (gettext("rename() failed"));
+		return (dgettext(TEXT_DOMAIN, "rename() failed"));
 	case LIBIPSEC_ALGS_DIAG_ALGSFILEWRITE:
-		return (gettext("write to file failed"));
+		return (dgettext(TEXT_DOMAIN, "write to file failed"));
 	case LIBIPSEC_ALGS_DIAG_ALGSFILECHMOD:
-		return (gettext("chmod() failed"));
+		return (dgettext(TEXT_DOMAIN, "chmod() failed"));
 	case LIBIPSEC_ALGS_DIAG_ALGSFILECHOWN:
-		return (gettext("chown() failed"));
+		return (dgettext(TEXT_DOMAIN, "chown() failed"));
 	case LIBIPSEC_ALGS_DIAG_ALGSFILECLOSE:
-		return (gettext("close() failed"));
+		return (dgettext(TEXT_DOMAIN, "close() failed"));
 	default:
-		return (gettext("failed"));
+		return (dgettext(TEXT_DOMAIN, "failed"));
 	}
 }
 
