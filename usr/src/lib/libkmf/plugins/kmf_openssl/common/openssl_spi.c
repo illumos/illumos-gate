@@ -4069,31 +4069,17 @@ openssl_read_pkcs12(KMF_HANDLE *kmfh,
 	*keylist = NULL;
 	*ncerts = 0;
 	*nkeys = 0;
-	while (rv == KMF_OK) {
-		rv = extract_pkcs12(bio,
-			(uchar_t *)cred->cred,
-			(uint32_t)cred->credlen,
-			&privkey, &cert, &cacerts);
 
-		/* Reached end of import file? */
-		if (rv == KMF_OK && privkey == NULL &&
-			cert == NULL && cacerts == NULL)
-			break;
+	rv = extract_pkcs12(bio,
+		(uchar_t *)cred->cred,
+		(uint32_t)cred->credlen,
+		&privkey, &cert, &cacerts);
 
-		if (rv == KMF_OK)
-			/* Convert keys and certs to exportable format */
-			rv = convertPK12Objects(kmfh, privkey, cert, cacerts,
-				keylist, nkeys, certlist, ncerts);
+	if (rv == KMF_OK)
+		/* Convert keys and certs to exportable format */
+		rv = convertPK12Objects(kmfh, privkey, cert, cacerts,
+			keylist, nkeys, certlist, ncerts);
 
-		if (privkey)
-			EVP_PKEY_free(privkey);
-
-		if (cert)
-			X509_free(cert);
-
-		if (cacerts)
-			sk_X509_free(cacerts);
-	}
 end:
 	if (bio != NULL)
 		(void) BIO_free(bio);

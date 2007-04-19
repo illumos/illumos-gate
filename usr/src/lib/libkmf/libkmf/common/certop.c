@@ -453,6 +453,10 @@ KMF_SignDataWithCert(KMF_HANDLE_T handle,
 
 	/* check the keyUsage of signer's certificate */
 	ret = check_key_usage(handle, SignerCertData, KMF_KU_SIGN_DATA);
+
+	/* Signing generic data does not require the KeyUsage extension. */
+	if (ret == KMF_ERR_EXTENSION_NOT_FOUND)
+		ret = KMF_OK;
 	if (ret != KMF_OK)
 		return (ret);
 
@@ -694,6 +698,11 @@ KMF_VerifyDataWithCert(KMF_HANDLE_T handle,
 
 	/* check the keyUsage of signer's certificate */
 	ret = check_key_usage(handle, SignerCert, KMF_KU_SIGN_DATA);
+
+	/* For this operation, it is OK if KeyUsage is not present */
+	if (ret == KMF_ERR_EXTENSION_NOT_FOUND)
+		ret = KMF_OK;
+
 	if (ret != KMF_OK)
 		return (ret);
 
@@ -747,6 +756,8 @@ KMF_EncryptWithCert(KMF_HANDLE_T handle,
 
 	/* check the keyUsage of the certificate */
 	ret = check_key_usage(handle, cert, KMF_KU_ENCRYPT_DATA);
+	if (ret == KMF_ERR_EXTENSION_NOT_FOUND)
+		ret = KMF_OK;
 	if (ret != KMF_OK)
 		return (ret);
 
@@ -826,6 +837,8 @@ KMF_DecryptWithCert(KMF_HANDLE_T handle,
 
 	/* check the keyUsage of the certificate */
 	ret = check_key_usage(handle, cert, KMF_KU_ENCRYPT_DATA);
+	if (ret == KMF_ERR_EXTENSION_NOT_FOUND)
+		ret = KMF_OK;
 	if (ret != KMF_OK)
 		return (ret);
 
