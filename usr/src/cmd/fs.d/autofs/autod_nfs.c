@@ -279,14 +279,6 @@ mount_nfs(
 			trace_prt(1, "	Couldn't mount %s:%s, err=%d\n",
 				mfs->mfs_host, mfs->mfs_dir, err);
 		}
-		/*
-		 * Free Action list as it is not needed here if cached
-		 * because nfsmount would have done the mount.
-		 */
-		if (cached && (alp)) {
-			free(alp);
-			*alpp = NULL;
-		}
 	}
 	free_mfs(mfs);
 	return (err);

@@ -775,6 +775,56 @@ auto_perform_link(fnnode_t *fnp, struct linka *linkp, cred_t *cred)
 	return (0);
 }
 
+static void
+auto_free_autofs_args(struct mounta *m)
+{
+	autofs_args	*aargs = (autofs_args *)m->dataptr;
+
+	if (aargs->addr.buf)
+		kmem_free(aargs->addr.buf, aargs->addr.len);
+	if (aargs->path)
+		kmem_free(aargs->path, strlen(aargs->path) + 1);
+	if (aargs->opts)
+		kmem_free(aargs->opts, strlen(aargs->opts) + 1);
+	if (aargs->map)
+		kmem_free(aargs->map, strlen(aargs->map) + 1);
+	if (aargs->subdir)
+		kmem_free(aargs->subdir, strlen(aargs->subdir) + 1);
+	if (aargs->key)
+		kmem_free(aargs->key, strlen(aargs->key) + 1);
+	kmem_free(aargs, sizeof (*aargs));
+}
+
+static void
+auto_free_action_list(action_list *alp)
+{
+	struct	mounta	*m;
+	action_list	*lastalp;
+	char		*fstype;
+
+	m = &alp->action.action_list_entry_u.mounta;
+	while (alp != NULL) {
+		fstype = alp->action.action_list_entry_u.mounta.fstype;
+		m = &alp->action.action_list_entry_u.mounta;
+		if (m->dataptr) {
+			if (strcmp(fstype, "autofs") == 0) {
+				auto_free_autofs_args(m);
+			}
+		}
+		if (m->spec)
+			kmem_free(m->spec, strlen(m->spec) + 1);
+		if (m->dir)
+			kmem_free(m->dir, strlen(m->dir) + 1);
+		if (m->fstype)
+			kmem_free(m->fstype, strlen(m->fstype) + 1);
+		if (m->optptr)
+			kmem_free(m->optptr, m->optlen);
+		lastalp = alp;
+		alp = alp->next;
+		kmem_free(lastalp, sizeof (*lastalp));
+	}
+}
+
 static boolean_t
 auto_invalid_autofs(fninfo_t *dfnip, fnnode_t *dfnp, action_list *p)
 {
@@ -784,6 +834,7 @@ auto_invalid_autofs(fninfo_t *dfnip, fnnode_t *dfnp, action_list *p)
 	char buff[AUTOFS_MAXPATHLEN];
 	size_t len;
 	struct autofs_globals *fngp;
+
 	fngp = dfnp->fn_globals;
 	dvp = fntovn(dfnp);
 
@@ -795,10 +846,10 @@ auto_invalid_autofs(fninfo_t *dfnip, fnnode_t *dfnp, action_list *p)
 	 * We also only want to perform autofs mounts, so make sure
 	 * no-one is trying to trick us into doing anything else.
 	 */
-	if (m->dir[0] != '.' ||
+	if (m->spec == NULL || m->dir == NULL || m->dir[0] != '.' ||
 	    (m->dir[1] != '/' && m->dir[1] != '\0') ||
-	    strcmp(m->fstype, "autofs") != 0 ||
-	    m->datalen != sizeof (struct autofs_args) ||
+	    m->fstype == NULL || strcmp(m->fstype, "autofs") != 0 ||
+	    m->dataptr == NULL || m->datalen != sizeof (struct autofs_args) ||
 	    m->optptr == NULL)
 		return (B_TRUE);
 	/*
@@ -853,47 +904,19 @@ auto_invalid_autofs(fninfo_t *dfnip, fnnode_t *dfnp, action_list *p)
 
 /*
  * auto_invalid_action will validate the action_list received.  If all is good
- * this function returns FALSE, if there is a problem it returned TRUE.
- * Based on the mount type, autofs or nfs, it dispatchs to auto_invalid_autofs
- * or validates the fstype is nfs.  For nfs mounts, the spec, dir, datalen
- * etc should all either be good here, or have already been checked.
+ * this function returns FALSE, if there is a problem it returns TRUE.
  */
-
 static boolean_t
 auto_invalid_action(fninfo_t *dfnip, fnnode_t *dfnp, action_list *alistpp)
 {
-	struct mounta	*m;
 
 	/*
 	 * Before we go any further, this better be a mount request.
 	 */
 	if (alistpp->action.action != AUTOFS_MOUNT_RQ)
 		return (B_TRUE);
+	return (auto_invalid_autofs(dfnip, dfnp, alistpp));
 
-	m = &alistpp->action.action_list_entry_u.mounta;
-	/*
-	 * Make sure we aren't geting passed NULL values or a "dir" that
-	 * isn't "." and doesn't begin with "./".
-	 *
-	 * We also only want to perform autofs mounts, so make sure
-	 * no-one is trying to trick us into doing anything else.
-	 */
-	if (m->spec == NULL || m->dir == NULL ||
-	    m->fstype == NULL || m->dataptr == NULL)
-		return (B_TRUE);
-
-	/*
-	 * Dispatch to the appropriate validation routine based
-	 * on the filesystem type.
-	 */
-	if (strncmp(alistpp->action.action_list_entry_u.mounta.fstype,
-		"autofs", 6) == 0) {
-		return (auto_invalid_autofs(dfnip, dfnp, alistpp));
-	} else if (strncmp(alistpp->action.action_list_entry_u.mounta.fstype,
-		"nfs", 3) == 0) {
-		return (B_FALSE);
-	}
-	return (B_TRUE);
 }
 
 static int
@@ -946,28 +969,12 @@ auto_perform_actions(
 			 * This conversation is over.
 			 */
 			xdr_free(xdr_action_list, (char *)alp);
-			kmem_free(alp, sizeof (*alp));
 			return (EINVAL);
 		}
 	}
 
 	zcred = zone_get_kcred(getzoneid());
 	ASSERT(zcred != NULL);
-
-	/*
-	 * Clear MF_MOUNTPOINT, if the NFS mount is required and
-	 * completes successfully, we will then set MF_MOUNTPOINT.
-	 */
-	mutex_enter(&dfnp->fn_lock);
-	if (dfnp->fn_flags & MF_MOUNTPOINT) {
-		AUTOFS_DPRINT((10, "autofs: clearing mountpoint "
-			"flag on %s.", dfnp->fn_name));
-		ASSERT(dfnp->fn_dirents == NULL);
-		ASSERT(dfnp->fn_trigger == NULL);
-	}
-	dfnp->fn_flags &= ~MF_MOUNTPOINT;
-	mutex_exit(&dfnp->fn_lock);
-
 
 	if (vn_mountedvfs(dvp) != NULL) {
 		/*
@@ -1003,300 +1010,261 @@ auto_perform_actions(
 
 		m = &p->action.action_list_entry_u.mounta;
 		argsp = (struct autofs_args *)m->dataptr;
-		if (strncmp(m->fstype, "nfs", 3) == 0) {
-			if (vn_mountedvfs(dvp) != NULL) {
+		ASSERT(strcmp(m->fstype, "autofs") == 0);
+		/*
+		 * use the parent directory's timeout since it's the
+		 * one specified/inherited by automount.
+		 */
+		argsp->mount_to = dfnip->fi_mount_to;
+		/*
+		 * The mountpoint is relative, and it is guaranteed to
+		 * begin with "."
+		 *
+		 */
+		ASSERT(m->dir[0] == '.');
+		if (m->dir[0] == '.' && m->dir[1] == '\0') {
+			/*
+			 * mounting on the trigger node
+			 */
+			mvp = dvp;
+			VN_HOLD(mvp);
+			goto mount;
+		}
+		/*
+		 * ignore "./" in front of mountpoint
+		 */
+		ASSERT(m->dir[1] == '/');
+		mntpnt = m->dir + 2;
+
+		AUTOFS_DPRINT((10, "\tdfnip->fi_path=%s\n", dfnip->fi_path));
+		AUTOFS_DPRINT((10, "\tdfnip->fi_flags=%x\n", dfnip->fi_flags));
+		AUTOFS_DPRINT((10, "\tmntpnt=%s\n", mntpnt));
+
+		if (dfnip->fi_flags & MF_DIRECT) {
+			AUTOFS_DPRINT((10, "\tDIRECT\n"));
+			(void) sprintf(buff, "%s/%s", dfnip->fi_path,
+				mntpnt);
+		} else {
+			AUTOFS_DPRINT((10, "\tINDIRECT\n"));
+			(void) sprintf(buff, "%s/%s/%s",
+				dfnip->fi_path,
+				dfnp->fn_name, mntpnt);
+		}
+
+		if (vn_mountedvfs(dvp) == NULL) {
+			/*
+			 * Daemon didn't mount anything on the root
+			 * We have to create the mountpoint if it
+			 * doesn't exist already
+			 *
+			 * We use the caller's credentials in case a
+			 * UID-match is required
+			 * (MF_THISUID_MATCH_RQD).
+			 */
+			rw_enter(&dfnp->fn_rwlock, RW_WRITER);
+			error = auto_search(dfnp, mntpnt, &mfnp, cred);
+			if (error == 0) {
 				/*
-				 * Its possible that the filesystem is
-				 * already mounted if nfs because we are
-				 * being called from unmount_tree when
-				 * if failed to unmount a node from a
-				 * trigger point, and is remounting again and
-				 * this particular filesystem was not
-				 * unmounted.
+				 * AUTOFS mountpoint exists
 				 */
-				mutex_enter(&dfnp->fn_lock);
-				dfnp->fn_flags |= MF_MOUNTPOINT;
-				mutex_exit(&dfnp->fn_lock);
-			} else {
-				m->flags |= MS_SYSSPACE;
-				VN_HOLD(dvp);
-				error = domount(NULL, m, dvp, zcred, &vfsp);
-				if (!error) {
-					VFS_RELE(vfsp);
-					mutex_enter(&dfnp->fn_lock);
-					dfnp->fn_flags |= MF_MOUNTPOINT;
-					ASSERT(dfnp->fn_dirents == NULL);
-					mutex_exit(&dfnp->fn_lock);
-					success++;
+				if (vn_mountedvfs(fntovn(mfnp)) != NULL) {
+					cmn_err(CE_PANIC,
+						"auto_perform_actions:"
+						" mfnp=%p covered",
+						(void *)mfnp);
 				}
-				VN_RELE(dvp);
+			} else {
+				/*
+				 * Create AUTOFS mountpoint
+				 */
+				ASSERT((dfnp->fn_flags & MF_MOUNTPOINT) == 0);
+				error = auto_enter(dfnp, mntpnt, &mfnp, cred);
+				ASSERT(mfnp->fn_linkcnt == 1);
+				mfnp->fn_linkcnt++;
+			}
+			if (!error)
+				update_times = 1;
+			rw_exit(&dfnp->fn_rwlock);
+			ASSERT(error != EEXIST);
+			if (!error) {
+				/*
+				 * mfnp is already held.
+				 */
+				mvp = fntovn(mfnp);
+			} else {
+				auto_log(fngp->fng_verbose, fngp->fng_zoneid,
+					CE_WARN, "autofs: mount of %s "
+					"failed - can't create"
+					" mountpoint.", buff);
+					continue;
 			}
 		} else {
-			ASSERT(strcmp(m->fstype, "autofs") == 0);
 			/*
-			 * use the parent directory's timeout since it's the
-			 * one specified/inherited by automount.
+			 * Find mountpoint in VFS mounted here. If not
+			 * found, fail the submount, though the overall
+			 * mount has succeeded since the root is
+			 * mounted.
 			 */
-			argsp->mount_to = dfnip->fi_mount_to;
-			/*
-			 * The mountpoint is relative, and it is guaranteed to
-			 * begin with "."
-			 *
-			 */
-			ASSERT(m->dir[0] == '.');
-			if (m->dir[0] == '.' && m->dir[1] == '\0') {
-				/*
-				 * mounting on the trigger node
-				 */
-				mvp = dvp;
-				VN_HOLD(mvp);
-				goto mount;
-			}
-			/*
-			 * ignore "./" in front of mountpoint
-			 */
-			ASSERT(m->dir[1] == '/');
-			mntpnt = m->dir + 2;
-
-			AUTOFS_DPRINT((10, "\tdfnip->fi_path=%s\n",
-				dfnip->fi_path));
-			AUTOFS_DPRINT((10, "\tdfnip->fi_flags=%x\n",
-				dfnip->fi_flags));
-			AUTOFS_DPRINT((10, "\tmntpnt=%s\n", mntpnt));
-
-			if (dfnip->fi_flags & MF_DIRECT) {
-				AUTOFS_DPRINT((10, "\tDIRECT\n"));
-				(void) sprintf(buff, "%s/%s", dfnip->fi_path,
-					mntpnt);
-			} else {
-				AUTOFS_DPRINT((10, "\tINDIRECT\n"));
-				(void) sprintf(buff, "%s/%s/%s",
-					dfnip->fi_path,
-					dfnp->fn_name, mntpnt);
-			}
-
-			if (vn_mountedvfs(dvp) == NULL) {
-				/*
-				 * Daemon didn't mount anything on the root
-				 * We have to create the mountpoint if it
-				 * doesn't exist already
-				 *
-				 * We use the caller's credentials in case a
-				 * UID-match is required
-				 * (MF_THISUID_MATCH_RQD).
-				 */
-				rw_enter(&dfnp->fn_rwlock, RW_WRITER);
-				error = auto_search(dfnp, mntpnt, &mfnp, cred);
-				if (error == 0) {
-					/*
-					 * AUTOFS mountpoint exists
-					 */
-					if (vn_mountedvfs(fntovn(mfnp))
-						!= NULL) {
-						cmn_err(CE_PANIC,
-							"auto_perform_actions:"
-							" mfnp=%p covered",
-							(void *)mfnp);
-					}
-				} else {
-					/*
-					 * Create AUTOFS mountpoint
-					 */
-					ASSERT((dfnp->fn_flags &
-						MF_MOUNTPOINT) == 0);
-					error = auto_enter(dfnp, mntpnt,
-						&mfnp, cred);
-					ASSERT(mfnp->fn_linkcnt == 1);
-					mfnp->fn_linkcnt++;
-				}
-				if (!error)
-					update_times = 1;
-				rw_exit(&dfnp->fn_rwlock);
-				ASSERT(error != EEXIST);
-				if (!error) {
-					/*
-					 * mfnp is already held.
-					 */
-					mvp = fntovn(mfnp);
-				} else {
-					auto_log(fngp->fng_verbose,
-						fngp->fng_zoneid,
-						CE_WARN, "autofs: mount of %s "
-						"failed - can't create"
-						" mountpoint.", buff);
-					continue;
-				}
-			} else {
-				/*
-				 * Find mountpoint in VFS mounted here. If not
-				 * found, fail the submount, though the overall
-				 * mount has succeeded since the root is
-				 * mounted.
-				 */
-				if (error = auto_getmntpnt(dvp, mntpnt, &mvp,
-					kcred)) {
-					auto_log(fngp->fng_verbose,
-						fngp->fng_zoneid,
-						CE_WARN, "autofs: mount of %s "
-						"failed - mountpoint doesn't"
-						" exist.", buff);
-					continue;
-				}
-				if (mvp->v_type == VLNK) {
-					auto_log(fngp->fng_verbose,
-						fngp->fng_zoneid,
-						CE_WARN, "autofs: %s symbolic "
-						"link: not a valid mountpoint "
-						"- mount failed", buff);
-					VN_RELE(mvp);
-					error = ENOENT;
-					continue;
-				}
-			}
-mount:
-			m->flags |= MS_SYSSPACE | MS_OPTIONSTR;
-
-			/*
-			 * Copy mounta struct here so we can substitute a
-			 * buffer that is large enough to hold the returned
-			 * option string, if that string is longer than the
-			 * input option string.
-			 * This can happen if there are default options enabled
-			 * that were not in the input option string.
-			 */
-			bcopy(m, &margs, sizeof (*m));
-			margs.optptr = kmem_alloc(MAX_MNTOPT_STR, KM_SLEEP);
-			margs.optlen = MAX_MNTOPT_STR;
-			(void) strcpy(margs.optptr, m->optptr);
-			margs.dir = argsp->path;
-
-			/*
-			 * We use the zone's kcred because we don't want the
-			 * zone to be able to thus do something it wouldn't
-			 * normally be able to.
-			 */
-			error = domount(NULL, &margs, mvp, zcred, &vfsp);
-			kmem_free(margs.optptr, MAX_MNTOPT_STR);
-			if (error != 0) {
-				auto_log(fngp->fng_verbose, fngp->fng_zoneid,
-					CE_WARN,
-					"autofs: domount of %s failed "
-					"error=%d", buff, error);
-				VN_RELE(mvp);
+			if (error = auto_getmntpnt(dvp, mntpnt, &mvp,
+				kcred)) {
+				auto_log(fngp->fng_verbose,
+					fngp->fng_zoneid,
+					CE_WARN, "autofs: mount of %s "
+					"failed - mountpoint doesn't"
+					" exist.", buff);
 				continue;
 			}
-			VFS_RELE(vfsp);
-
-			/*
-			 * If mountpoint is an AUTOFS node, then I'm going to
-			 * flag it that the Filesystem mounted on top was
-			 * mounted in the kernel so that the unmount can be
-			 * done inside the kernel as well.
-			 * I don't care to flag non-AUTOFS mountpoints when an
-			 * AUTOFS in-kernel mount was done on top, because the
-			 * unmount routine already knows that such case was
-			 * done in the kernel.
-			 */
-			if (vfs_matchops(dvp->v_vfsp,
-				vfs_getops(mvp->v_vfsp))) {
-				mfnp = vntofn(mvp);
-				mutex_enter(&mfnp->fn_lock);
-				mfnp->fn_flags |= MF_IK_MOUNT;
-				mutex_exit(&mfnp->fn_lock);
-			}
-
-			(void) vn_vfswlock_wait(mvp);
-			mvfsp = vn_mountedvfs(mvp);
-			if (mvfsp != NULL) {
-				vfs_lock_wait(mvfsp);
-				vn_vfsunlock(mvp);
-				error = VFS_ROOT(mvfsp, &newvp);
-				vfs_unlock(mvfsp);
-				if (error) {
-					/*
-					 * We've dropped the locks, so let's
-					 * get the mounted vfs again in case
-					 * it changed.
-					 */
-					(void) vn_vfswlock_wait(mvp);
-					mvfsp = vn_mountedvfs(mvp);
-					if (mvfsp != NULL) {
-						error = dounmount(mvfsp, 0,
-							CRED());
-						if (error) {
-							cmn_err(CE_WARN,
-								"autofs: could"
-								" not unmount"
-								" vfs=%p",
-								(void *)mvfsp);
-						}
-					} else
-						vn_vfsunlock(mvp);
-					VN_RELE(mvp);
-					continue;
-				}
-			} else {
-				vn_vfsunlock(mvp);
+			if (mvp->v_type == VLNK) {
+				auto_log(fngp->fng_verbose,
+					fngp->fng_zoneid,
+					CE_WARN, "autofs: %s symbolic "
+					"link: not a valid mountpoint "
+					"- mount failed", buff);
 				VN_RELE(mvp);
+				error = ENOENT;
 				continue;
 			}
-
-			auto_mount = vfs_matchops(dvp->v_vfsp,
-				vfs_getops(newvp->v_vfsp));
-			newfnp = vntofn(newvp);
-			newfnp->fn_parent = dfnp;
-
-			/*
-			 * At this time we want to save the AUTOFS filesystem
-			 * as a trigger node. (We only do this if the mount
-			 * occurred on a node different from the root.
-			 * We look at the trigger nodes during
-			 * the automatic unmounting to make sure we remove them
-			 * as a unit and remount them as a unit if the
-			 * filesystem mounted at the root could not be
-			 * unmounted.
-			 */
-			if (auto_mount && (error == 0) && (mvp != dvp)) {
-				save_triggers++;
-				/*
-				 * Add AUTOFS mount to hierarchy
-				 */
-				newfnp->fn_flags |= MF_TRIGGER;
-				rw_enter(&newfnp->fn_rwlock, RW_WRITER);
-				newfnp->fn_next = dfnp->fn_trigger;
-				rw_exit(&newfnp->fn_rwlock);
-				rw_enter(&dfnp->fn_rwlock, RW_WRITER);
-				dfnp->fn_trigger = newfnp;
-				rw_exit(&dfnp->fn_rwlock);
-				/*
-				 * Don't VN_RELE(newvp) here since dfnp now
-				 * holds reference to it as its trigger node.
-				 */
-				AUTOFS_DPRINT((10,
-					"\tadding trigger %s to %s\n",
-				newfnp->fn_name, dfnp->fn_name));
-				AUTOFS_DPRINT((10, "\tfirst trigger is %s\n",
-					dfnp->fn_trigger->fn_name));
-				if (newfnp->fn_next != NULL)
-					AUTOFS_DPRINT((10,
-						"\tnext trigger is %s\n",
-						newfnp->fn_next->fn_name));
-				else
-					AUTOFS_DPRINT((10,
-						"\tno next trigger\n"));
-			} else
-				VN_RELE(newvp);
-
-			if (!error)
-				success++;
-
-			if (update_times) {
-				gethrestime(&now);
-				dfnp->fn_atime = dfnp->fn_mtime = now;
-			}
-
-			VN_RELE(mvp);
 		}
+mount:
+		m->flags |= MS_SYSSPACE | MS_OPTIONSTR;
+
+		/*
+		 * Copy mounta struct here so we can substitute a
+		 * buffer that is large enough to hold the returned
+		 * option string, if that string is longer than the
+		 * input option string.
+		 * This can happen if there are default options enabled
+		 * that were not in the input option string.
+		 */
+		bcopy(m, &margs, sizeof (*m));
+		margs.optptr = kmem_alloc(MAX_MNTOPT_STR, KM_SLEEP);
+		margs.optlen = MAX_MNTOPT_STR;
+		(void) strcpy(margs.optptr, m->optptr);
+		margs.dir = argsp->path;
+
+		/*
+		 * We use the zone's kcred because we don't want the
+		 * zone to be able to thus do something it wouldn't
+		 * normally be able to.
+		 */
+		error = domount(NULL, &margs, mvp, zcred, &vfsp);
+		kmem_free(margs.optptr, MAX_MNTOPT_STR);
+		if (error != 0) {
+			auto_log(fngp->fng_verbose, fngp->fng_zoneid,
+				CE_WARN, "autofs: domount of %s failed "
+				"error=%d", buff, error);
+			VN_RELE(mvp);
+			continue;
+		}
+		VFS_RELE(vfsp);
+
+		/*
+		 * If mountpoint is an AUTOFS node, then I'm going to
+		 * flag it that the Filesystem mounted on top was
+		 * mounted in the kernel so that the unmount can be
+		 * done inside the kernel as well.
+		 * I don't care to flag non-AUTOFS mountpoints when an
+		 * AUTOFS in-kernel mount was done on top, because the
+		 * unmount routine already knows that such case was
+		 * done in the kernel.
+		 */
+		if (vfs_matchops(dvp->v_vfsp,
+			vfs_getops(mvp->v_vfsp))) {
+			mfnp = vntofn(mvp);
+			mutex_enter(&mfnp->fn_lock);
+			mfnp->fn_flags |= MF_IK_MOUNT;
+			mutex_exit(&mfnp->fn_lock);
+		}
+
+		(void) vn_vfswlock_wait(mvp);
+		mvfsp = vn_mountedvfs(mvp);
+		if (mvfsp != NULL) {
+			vfs_lock_wait(mvfsp);
+			vn_vfsunlock(mvp);
+			error = VFS_ROOT(mvfsp, &newvp);
+			vfs_unlock(mvfsp);
+			if (error) {
+				/*
+				 * We've dropped the locks, so let's
+				 * get the mounted vfs again in case
+				 * it changed.
+				 */
+				(void) vn_vfswlock_wait(mvp);
+				mvfsp = vn_mountedvfs(mvp);
+				if (mvfsp != NULL) {
+					error = dounmount(mvfsp, 0, CRED());
+					if (error) {
+						cmn_err(CE_WARN,
+							"autofs: could"
+							" not unmount"
+							" vfs=%p",
+							(void *)mvfsp);
+					}
+				} else
+					vn_vfsunlock(mvp);
+				VN_RELE(mvp);
+				continue;
+			}
+		} else {
+			vn_vfsunlock(mvp);
+			VN_RELE(mvp);
+			continue;
+		}
+
+		auto_mount = vfs_matchops(dvp->v_vfsp,
+			vfs_getops(newvp->v_vfsp));
+		newfnp = vntofn(newvp);
+		newfnp->fn_parent = dfnp;
+
+		/*
+		 * At this time we want to save the AUTOFS filesystem
+		 * as a trigger node. (We only do this if the mount
+		 * occurred on a node different from the root.
+		 * We look at the trigger nodes during
+		 * the automatic unmounting to make sure we remove them
+		 * as a unit and remount them as a unit if the
+		 * filesystem mounted at the root could not be
+		 * unmounted.
+		 */
+		if (auto_mount && (error == 0) && (mvp != dvp)) {
+			save_triggers++;
+			/*
+			 * Add AUTOFS mount to hierarchy
+			 */
+			newfnp->fn_flags |= MF_TRIGGER;
+			rw_enter(&newfnp->fn_rwlock, RW_WRITER);
+			newfnp->fn_next = dfnp->fn_trigger;
+			rw_exit(&newfnp->fn_rwlock);
+			rw_enter(&dfnp->fn_rwlock, RW_WRITER);
+			dfnp->fn_trigger = newfnp;
+			rw_exit(&dfnp->fn_rwlock);
+			/*
+			 * Don't VN_RELE(newvp) here since dfnp now
+			 * holds reference to it as its trigger node.
+			 */
+			AUTOFS_DPRINT((10, "\tadding trigger %s to %s\n",
+				newfnp->fn_name, dfnp->fn_name));
+			AUTOFS_DPRINT((10, "\tfirst trigger is %s\n",
+				dfnp->fn_trigger->fn_name));
+			if (newfnp->fn_next != NULL)
+				AUTOFS_DPRINT((10,
+					"\tnext trigger is %s\n",
+					newfnp->fn_next->fn_name));
+			else
+				AUTOFS_DPRINT((10,
+					"\tno next trigger\n"));
+		} else
+			VN_RELE(newvp);
+
+		if (!error)
+			success++;
+
+		if (update_times) {
+			gethrestime(&now);
+			dfnp->fn_atime = dfnp->fn_mtime = now;
+		}
+
+		VN_RELE(mvp);
 	}
 
 	if (save_triggers) {
@@ -1333,7 +1301,6 @@ done:
 			 * free the action list now,
 			 */
 			xdr_free(xdr_action_list, (char *)alp);
-			kmem_free(alp, sizeof (*alp));
 		}
 	}
 	AUTOFS_DPRINT((5, "auto_perform_actions: error=%d\n", error));
@@ -2471,7 +2438,6 @@ top:
 		 */
 		if (alp != NULL) {
 			xdr_free(xdr_action_list, (char *)alp);
-			kmem_free(alp, sizeof (*alp));
 			alp = NULL;
 		}
 	}

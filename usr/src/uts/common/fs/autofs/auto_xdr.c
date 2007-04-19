@@ -45,7 +45,6 @@
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/systm.h>
-#include <sys/utsname.h>
 #include <rpc/types.h>
 #include <rpc/xdr.h>
 #include <rpc/auth.h>
@@ -55,31 +54,9 @@
 #include <sys/sysmacros.h>
 #include <fs/fs_subr.h>
 #include <sys/fs/autofs.h>
-#include <sys/pathconf.h>
-#include <rpc/auth.h>
-#include <rpc/rpcsec_gss.h>
-#include <nfs/mount.h>
-#include <sys/thread.h>
-#include <nfs/rnode.h>
-
-#define	FS_NFS2	2
-#define	FS_NFS3	3
-#define	FS_NFS4	4
-#define	FS_AUTOFS	1
-
-#define	NFS4_FHSIZE 128
 
 bool_t xdr_autofs_netbuf(XDR *, struct netbuf *);
 bool_t xdr_mounta(XDR *, struct mounta *);
-
-bool_t
-xdr_nfs2_args(XDR *xdrs, struct nfs_args *objp);
-
-bool_t
-xdr_nfs3_args(XDR *xdrs, struct nfs_args *objp);
-
-bool_t
-xdr_nfs4_args(XDR *xdrs, struct nfs_args *objp);
 
 bool_t
 xdr_umntrequest(XDR *xdrs, umntrequest *objp)
@@ -143,452 +120,6 @@ xdr_linka(XDR *xdrs, linka *objp)
 	return (TRUE);
 }
 
-
-
-bool_t
-xdr_knetconfig(XDR *xdrs, struct knetconfig *objp)
-{
-
-	rpc_inline_t *buf;
-	char	*knstring;
-	uint_t	d;
-
-	int i;
-
-	if (xdrs->x_op == XDR_DECODE) {
-		if (!xdr_u_int(xdrs, &objp->knc_semantics))
-			return (FALSE);
-		/*
-		 * The knc_protofmly and knc_proto strings will
-		 * be freed as a size of KNC_STRSIZE, make sure the
-		 * buffer allocated is also this size, and not just
-		 * the string size.
-		 */
-		if (!xdr_string(xdrs, &objp->knc_protofmly, KNC_STRSIZE))
-			return (FALSE);
-		knstring = kmem_zalloc(KNC_STRSIZE, KM_SLEEP);
-		bcopy(objp->knc_protofmly, knstring,
-			strlen(objp->knc_protofmly));
-		kmem_free(objp->knc_protofmly, strlen(objp->knc_protofmly) + 1);
-		objp->knc_protofmly = knstring;
-
-		if (!xdr_string(xdrs, &objp->knc_proto, KNC_STRSIZE))
-			return (FALSE);
-		knstring = kmem_zalloc(KNC_STRSIZE, KM_SLEEP);
-		bcopy(objp->knc_proto, knstring, strlen(objp->knc_proto));
-		kmem_free(objp->knc_proto, strlen(objp->knc_proto) + 1);
-		objp->knc_proto = knstring;
-
-		if (!xdr_u_int(xdrs, &d))
-			return (FALSE);
-		objp->knc_rdev = expldev(d);
-
-		buf = XDR_INLINE(xdrs, (8) * BYTES_PER_XDR_UNIT);
-		if (buf == NULL) {
-			if (!xdr_opaque(xdrs, (char *)&objp->knc_unused,
-				sizeof (objp->knc_unused)))
-				return (FALSE);
-		} else {
-			uint_t *genp;
-
-				for (i = 0, genp = objp->knc_unused; i < 8;
-				    i++) {
-					*genp++ = IXDR_GET_U_INT32(buf);
-				}
-		}
-		return (TRUE);
-	}
-
-	if (!xdr_u_int(xdrs, &objp->knc_semantics))
-		return (FALSE);
-	if (xdrs->x_op == XDR_FREE) {
-		kmem_free(objp->knc_protofmly, KNC_STRSIZE);
-		kmem_free(objp->knc_proto, KNC_STRSIZE);
-	} else {
-		if (!xdr_string(xdrs, &objp->knc_protofmly, KNC_STRSIZE))
-			return (FALSE);
-		if (!xdr_string(xdrs, &objp->knc_proto, KNC_STRSIZE))
-			return (FALSE);
-	}
-	if (!xdr_u_int(xdrs, (uint_t *)&objp->knc_rdev))
-		return (FALSE);
-	if (!xdr_opaque(xdrs, (char *)&objp->knc_unused,
-		sizeof (objp->knc_unused)))
-		return (FALSE);
-	return (TRUE);
-}
-
-
-bool_t
-xdr_pathcnf(XDR *xdrs, struct pathcnf *objp)
-{
-
-	rpc_inline_t *buf;
-
-	int i;
-
-
-	if (xdrs->x_op == XDR_DECODE) {
-		buf = XDR_INLINE(xdrs, 6 * BYTES_PER_XDR_UNIT);
-		if (buf == NULL) {
-			if (!xdr_int(xdrs, &objp->pc_link_max))
-				return (FALSE);
-			if (!xdr_short(xdrs, &objp->pc_max_canon))
-				return (FALSE);
-			if (!xdr_short(xdrs, &objp->pc_max_input))
-				return (FALSE);
-			if (!xdr_short(xdrs, &objp->pc_name_max))
-				return (FALSE);
-			if (!xdr_short(xdrs, &objp->pc_path_max))
-				return (FALSE);
-			if (!xdr_short(xdrs, &objp->pc_pipe_buf))
-				return (FALSE);
-		} else {
-			objp->pc_link_max = IXDR_GET_INT32(buf);
-			objp->pc_max_canon = IXDR_GET_SHORT(buf);
-			objp->pc_max_input = IXDR_GET_SHORT(buf);
-			objp->pc_name_max = IXDR_GET_SHORT(buf);
-			objp->pc_path_max = IXDR_GET_SHORT(buf);
-			objp->pc_pipe_buf = IXDR_GET_SHORT(buf);
-		}
-		if (!xdr_char(xdrs, (char *)&objp->pc_vdisable))
-			return (FALSE);
-		if (!xdr_char(xdrs, &objp->pc_xxx))
-			return (FALSE);
-		buf = XDR_INLINE(xdrs, (_PC_N) * BYTES_PER_XDR_UNIT);
-		if (buf == NULL) {
-			if (!xdr_opaque(xdrs, (char *)objp->pc_mask,
-				sizeof (objp->pc_mask)))
-				return (FALSE);
-		} else {
-			{
-				short *genp;
-
-				for (i = 0, genp = objp->pc_mask; i < _PC_N;
-				    i++) {
-					*genp++ = IXDR_GET_SHORT(buf);
-				}
-			}
-
-		}
-		return (TRUE);
-	}
-
-	if (!xdr_int(xdrs, &objp->pc_link_max))
-		return (FALSE);
-	if (!xdr_short(xdrs, &objp->pc_max_canon))
-		return (FALSE);
-	if (!xdr_short(xdrs, &objp->pc_max_input))
-		return (FALSE);
-	if (!xdr_short(xdrs, &objp->pc_name_max))
-		return (FALSE);
-	if (!xdr_short(xdrs, &objp->pc_path_max))
-		return (FALSE);
-	if (!xdr_short(xdrs, &objp->pc_pipe_buf))
-		return (FALSE);
-	if (!xdr_char(xdrs, (char *)&objp->pc_vdisable))
-		return (FALSE);
-	if (!xdr_char(xdrs, &objp->pc_xxx))
-		return (FALSE);
-	if (!xdr_opaque(xdrs, (char *)objp->pc_mask,
-		sizeof (objp->pc_mask)))
-		return (FALSE);
-	return (TRUE);
-}
-
-
-bool_t
-xdr_des_clnt_data(XDR *xdrs, dh_k4_clntdata_t *objp)
-{
-	if (!xdr_autofs_netbuf(xdrs, &objp->syncaddr))
-		return (FALSE);
-	if (!xdr_pointer(xdrs, (char **)&objp->knconf,
-		sizeof (struct knetconfig), (xdrproc_t)xdr_knetconfig))
-		return (FALSE);
-	if (!xdr_string(xdrs, &objp->netname, SYS_NMLN))
-		return (FALSE);
-	if (!xdr_int(xdrs, &objp->netnamelen))
-		return (FALSE);
-	objp->netnamelen = strlen(objp->netname) + 1;
-	return (TRUE);
-}
-
-bool_t
-xdr_gss_clnt_data(XDR *xdrs, struct gss_clnt_data *objp)
-{
-	if (!xdr_u_int(xdrs, &objp->mechanism.length))
-		return (FALSE);
-	if (!xdr_enum(xdrs, (enum_t *)&objp->service))
-		return (FALSE);
-	if (!xdr_opaque(xdrs, objp->mechanism.elements,
-		objp->mechanism.length))
-		return (FALSE);
-	if (!xdr_opaque(xdrs, (char *)&objp->uname, MAX_NAME_LEN))
-		return (FALSE);
-	if (!xdr_opaque(xdrs, (char *)&objp->inst, MAX_NAME_LEN))
-		return (FALSE);
-	if (!xdr_opaque(xdrs, (char *)&objp->realm, MAX_NAME_LEN))
-		return (FALSE);
-	if (!xdr_u_int(xdrs, &objp->qop))
-		return (FALSE);
-	return (TRUE);
-}
-
-bool_t
-xdr_sec_data(XDR *xdrs, struct sec_data *objp)
-{
-	if (!xdr_u_int(xdrs, &objp->secmod))
-		return (FALSE);
-	if (!xdr_u_int(xdrs, &objp->rpcflavor))
-		return (FALSE);
-	if (!xdr_int(xdrs, &objp->flags))
-		return (FALSE);
-	if (!xdr_uid_t(xdrs, &objp->uid))
-		return (FALSE);
-
-	switch (objp->rpcflavor) {
-	case AUTH_NONE:
-	case AUTH_UNIX:
-	case AUTH_LOOPBACK:
-		break;
-	case AUTH_DES:
-		if (!xdr_pointer(xdrs, (char **)&objp->data,
-			sizeof (dh_k4_clntdata_t),
-			(xdrproc_t)xdr_des_clnt_data))
-			return (FALSE);
-		break;
-	case RPCSEC_GSS:
-		if (!xdr_pointer(xdrs, (char **)&objp->data,
-			sizeof (gss_clntdata_t),
-			(xdrproc_t)xdr_gss_clnt_data))
-			return (FALSE);
-		break;
-	default:
-		return (FALSE);
-	}
-
-	return (TRUE);
-}
-
-bool_t
-xdr_nfs2_fh(XDR *xdrs, nfs_fhandle *objp)
-{
-	objp->fh_len = NFS_FHSIZE;
-	if (!xdr_opaque(xdrs, (char *)&objp->fh_buf, NFS_FHSIZE))
-		return (B_FALSE);
-	return (B_TRUE);
-}
-
-bool_t
-xdr_nfs3_fhandle(XDR *xdrs, nfs_fhandle *objp)
-{
-	if (!xdr_int(xdrs, &objp->fh_len))
-		return (B_FALSE);
-	if (!xdr_opaque(xdrs, (char *)&objp->fh_buf, objp->fh_len))
-		return (B_FALSE);
-	return (B_TRUE);
-}
-
-bool_t
-xdr_nfs(XDR *xdrs, struct nfs_args *objp, int nfsv)
-{
-
-	rpc_inline_t *buf;
-
-	if (objp == NULL)
-		return (TRUE);
-
-	if (xdrs->x_op == XDR_DECODE) {
-		if (!xdr_pointer(xdrs, (char **)&objp->addr,
-			sizeof (struct netbuf), (xdrproc_t)xdr_autofs_netbuf))
-			return (FALSE);
-		if (!xdr_pointer(xdrs, (char **)&objp->syncaddr,
-			sizeof (struct netbuf), (xdrproc_t)xdr_autofs_netbuf))
-			return (FALSE);
-		if (!xdr_pointer(xdrs, (char **)&objp->knconf,
-			sizeof (struct knetconfig), (xdrproc_t)xdr_knetconfig))
-			return (FALSE);
-		if (!xdr_string(xdrs, &objp->hostname, SYS_NMLN))
-			return (FALSE);
-		if (!xdr_string(xdrs, &objp->netname, SYS_NMLN))
-			return (FALSE);
-		if (nfsv == FS_NFS4) {
-			if (!xdr_string(xdrs, &objp->fh, NFS4_FHSIZE))
-				return (B_FALSE);
-		} else if (nfsv == FS_NFS3) {
-			if (!xdr_pointer(xdrs, (char **)&objp->fh,
-				sizeof (nfs_fhandle),
-				(xdrproc_t)xdr_nfs3_fhandle))
-				return (B_FALSE);
-		} else {
-			if (!xdr_pointer(xdrs, (char **)&objp->fh,
-				sizeof (nfs_fhandle),
-				(xdrproc_t)xdr_nfs2_fh))
-				return (B_FALSE);
-		}
-		buf = XDR_INLINE(xdrs, 9 * BYTES_PER_XDR_UNIT);
-		if (buf == NULL) {
-			if (!xdr_int(xdrs, &objp->flags))
-				return (FALSE);
-			if (!xdr_int(xdrs, &objp->wsize))
-				return (FALSE);
-			if (!xdr_int(xdrs, &objp->rsize))
-				return (FALSE);
-			if (!xdr_int(xdrs, &objp->timeo))
-				return (FALSE);
-			if (!xdr_int(xdrs, &objp->retrans))
-				return (FALSE);
-			if (!xdr_int(xdrs, &objp->acregmin))
-				return (FALSE);
-			if (!xdr_int(xdrs, &objp->acregmax))
-				return (FALSE);
-			if (!xdr_int(xdrs, &objp->acdirmin))
-				return (FALSE);
-			if (!xdr_int(xdrs, &objp->acdirmax))
-				return (FALSE);
-		} else {
-			objp->flags = IXDR_GET_INT32(buf);
-			objp->wsize = IXDR_GET_INT32(buf);
-			objp->rsize = IXDR_GET_INT32(buf);
-			objp->timeo = IXDR_GET_INT32(buf);
-			objp->retrans = IXDR_GET_INT32(buf);
-			objp->acregmin = IXDR_GET_INT32(buf);
-			objp->acregmax = IXDR_GET_INT32(buf);
-			objp->acdirmin = IXDR_GET_INT32(buf);
-			objp->acdirmax = IXDR_GET_INT32(buf);
-		}
-		if (!xdr_pointer(xdrs, (char **)&objp->pathconf,
-			sizeof (struct pathcnf), (xdrproc_t)xdr_pathcnf))
-			return (FALSE);
-		if (!xdr_int(xdrs, &objp->nfs_args_ext))
-			return (FALSE);
-		if (!xdr_pointer(xdrs,
-			(char **)&objp->nfs_ext_u.nfs_extA.secdata,
-			sizeof (struct sec_data), (xdrproc_t)xdr_sec_data))
-			return (FALSE);
-		if (objp->nfs_args_ext == NFS_ARGS_EXTB) {
-			if (nfsv == FS_NFS4) {
-				if (!xdr_pointer(xdrs,
-					(char **)&objp->nfs_ext_u.nfs_extB.next,
-					sizeof (struct nfs_args),
-					(xdrproc_t)xdr_nfs4_args))
-					return (FALSE);
-			} else if (nfsv == FS_NFS3) {
-				if (!xdr_pointer(xdrs,
-					(char **)&objp->nfs_ext_u.nfs_extB.next,
-					sizeof (struct nfs_args),
-					(xdrproc_t)xdr_nfs3_args))
-					return (FALSE);
-			} else {
-				if (!xdr_pointer(xdrs,
-					(char **)&objp->nfs_ext_u.nfs_extB.next,
-					sizeof (struct nfs_args),
-					(xdrproc_t)xdr_nfs2_args))
-					return (FALSE);
-			}
-		}
-		return (TRUE);
-	}
-
-	ASSERT(xdrs->x_op != XDR_DECODE);
-	if (!xdr_pointer(xdrs, (char **)&objp->addr,
-		sizeof (struct netbuf), (xdrproc_t)xdr_autofs_netbuf))
-		return (FALSE);
-	if (!xdr_pointer(xdrs, (char **)&objp->syncaddr,
-		sizeof (struct netbuf), (xdrproc_t)xdr_autofs_netbuf))
-		return (FALSE);
-	if (!xdr_pointer(xdrs, (char **)&objp->knconf,
-		sizeof (struct knetconfig), (xdrproc_t)xdr_knetconfig))
-		return (FALSE);
-	if (!xdr_string(xdrs, &objp->hostname, SYS_NMLN))
-		return (FALSE);
-	if (!xdr_string(xdrs, &objp->netname, SYS_NMLN))
-		return (FALSE);
-	if (nfsv == FS_NFS4) {
-		if (!xdr_string(xdrs, &objp->fh, NFS4_FHSIZE))
-			return (B_FALSE);
-	} else if (nfsv == FS_NFS3) {
-		if (!xdr_pointer(xdrs, (char **)&objp->fh,
-			sizeof (nfs_fhandle),
-			(xdrproc_t)xdr_nfs3_fhandle))
-			return (B_FALSE);
-	} else {
-		if (!xdr_pointer(xdrs, (char **)&objp->fh,
-			sizeof (nfs_fhandle),
-			(xdrproc_t)xdr_nfs2_fh))
-			return (B_FALSE);
-	}
-
-	if (!xdr_int(xdrs, &objp->flags))
-		return (FALSE);
-	if (!xdr_int(xdrs, &objp->wsize))
-		return (FALSE);
-	if (!xdr_int(xdrs, &objp->rsize))
-		return (FALSE);
-	if (!xdr_int(xdrs, &objp->timeo))
-		return (FALSE);
-	if (!xdr_int(xdrs, &objp->retrans))
-		return (FALSE);
-	if (!xdr_int(xdrs, &objp->acregmin))
-		return (FALSE);
-	if (!xdr_int(xdrs, &objp->acregmax))
-		return (FALSE);
-	if (!xdr_int(xdrs, &objp->acdirmin))
-		return (FALSE);
-	if (!xdr_int(xdrs, &objp->acdirmax))
-		return (FALSE);
-	if (!xdr_pointer(xdrs, (char **)&objp->pathconf,
-		sizeof (struct pathcnf), (xdrproc_t)xdr_pathcnf))
-		return (FALSE);
-	if (!xdr_int(xdrs, &objp->nfs_args_ext))
-		return (FALSE);
-	if (!xdr_pointer(xdrs, (char **)&objp->nfs_ext_u.nfs_extA.secdata,
-		sizeof (struct sec_data), (xdrproc_t)xdr_sec_data))
-		return (FALSE);
-	if (objp->nfs_args_ext == NFS_ARGS_EXTB) {
-		if (nfsv == FS_NFS4) {
-			if (!xdr_pointer(xdrs,
-				(char **)&objp->nfs_ext_u.nfs_extB.next,
-				sizeof (struct nfs_args),
-				(xdrproc_t)xdr_nfs4_args))
-				return (FALSE);
-		} else if (nfsv == FS_NFS3) {
-			if (!xdr_pointer(xdrs,
-				(char **)&objp->nfs_ext_u.nfs_extB.next,
-				sizeof (struct nfs_args),
-				(xdrproc_t)xdr_nfs3_args))
-				return (FALSE);
-		} else {
-			if (!xdr_pointer(xdrs,
-				(char **)&objp->nfs_ext_u.nfs_extB.next,
-				sizeof (struct nfs_args),
-				(xdrproc_t)xdr_nfs2_args))
-				return (FALSE);
-		}
-	}
-	return (TRUE);
-}
-
-bool_t
-xdr_nfs4_args(XDR *xdrs, struct nfs_args *objp)
-{
-	return (xdr_nfs(xdrs, objp, FS_NFS4));
-}
-
-bool_t
-xdr_nfs3_args(XDR *xdrs, struct nfs_args *objp)
-{
-	return (xdr_nfs(xdrs, objp, FS_NFS3));
-}
-
-bool_t
-xdr_nfs2_args(XDR *xdrs, struct nfs_args *objp)
-{
-	return (xdr_nfs(xdrs, objp, FS_NFS2));
-}
-
-
-
 bool_t
 xdr_autofs_args(XDR *xdrs, autofs_args *objp)
 {
@@ -638,53 +169,47 @@ xdr_action_list(XDR *xdrs, action_list *objp)
 {
 	bool_t more_data = TRUE;
 	bool_t status = TRUE;
-	action_list *p, *last;
+	action_list *p;
 
 	ASSERT((xdrs->x_op == XDR_DECODE) || (xdrs->x_op == XDR_FREE));
 
 	more_data = (objp != NULL);
 	p = objp;
 
-	if (xdrs->x_op == XDR_FREE) {
-		while (p != NULL) {
-			if (!xdr_action_list_entry(xdrs, &p->action))
-				cmn_err(CE_WARN, "xdr_action_list: "
-					"action_list_entry free failed %p\n",
-					(void *)&p->action);
-			last = p;
-			p = p->next;
-			/*
-			 * Don't need this kmem_free the first action_list
-			 * as xdr_reference using xdr_action_list will free
-			 * it when called with the XDR_FREE op.
-			 */
-			if (last != objp)
-				kmem_free(last, sizeof (*last));
-		}
-		return (status);
-	}
+	if (xdrs->x_op == XDR_FREE)
+		goto free;
 
 	while (more_data) {
-		if (!xdr_action_list_entry(xdrs, &p->action)) {
-			status = FALSE;
-			break;
-		}
+		if (!xdr_action_list_entry(xdrs, &p->action))
+			goto free;
 
-		if (!xdr_bool(xdrs, &more_data)) {
-			status = FALSE;
-			break;
-		}
+		if (!xdr_bool(xdrs, &more_data))
+			goto free;
 
 		if (more_data) {
 			p->next = kmem_zalloc(sizeof (action_list), KM_SLEEP);
 			p = p->next;
 			if (p == NULL) {
 				status = FALSE;
-				break;
+				goto free;
 			}
 		} else
 			p->next = NULL;
 	}
+	return (TRUE);
+
+free:
+	for (p = objp; p != NULL; ) {
+		if (!xdr_action_list_entry(xdrs, &objp->action))
+			cmn_err(CE_WARN, "xdr_action_list: "
+			    "action_list_entry free failed %p\n",
+			    (void *)&objp->action);
+		p = p->next;
+		kmem_free(objp, sizeof (*objp));
+		objp = p;
+	}
+	objp = NULL;
+
 	return (status);
 }
 
@@ -703,50 +228,17 @@ xdr_autofs_netbuf(XDR *xdrs, struct netbuf *objp)
 bool_t
 xdr_mounta(XDR *xdrs, struct mounta *objp)
 {
-	int	fstype = 0;
 	if (!xdr_string(xdrs, &objp->spec, AUTOFS_MAXPATHLEN))
 		return (FALSE);
 	if (!xdr_string(xdrs, &objp->dir, AUTOFS_MAXPATHLEN))
 		return (FALSE);
 	if (!xdr_int(xdrs, &objp->flags))
 		return (FALSE);
-	/*
-	 * For a free we must first determine the fstype before calling
-	 * xdr_string on it, as the xdr_string will free it.  For a
-	 * decode we must first call xdr_string to get the value to
-	 * determine the fstype.
-	 */
-	if (xdrs->x_op == XDR_FREE) {
-		if (strncmp(objp->fstype, "autofs", sizeof ("autofs")) == 0) {
-			fstype = FS_AUTOFS;
-		} else if (strncmp(objp->fstype, "nfs4",
-				sizeof ("nfs4")) == 0) {
-			fstype = FS_NFS4;
-		} else if (strncmp(objp->fstype, "nfs3",
-			sizeof ("nfs3")) == 0) {
-			fstype = FS_NFS3;
-		} else {
-			fstype = FS_NFS2;
-		}
-	}
-
 	if (!xdr_string(xdrs, &objp->fstype, AUTOFS_MAXCOMPONENTLEN))
 		return (FALSE);
-
-	if (xdrs->x_op == XDR_DECODE) {
-		if (strncmp(objp->fstype, "autofs", sizeof ("autofs")) == 0) {
-			fstype = FS_AUTOFS;
-		} else if (strncmp(objp->fstype, "nfs4",
-			sizeof ("nfs4")) == 0) {
-			fstype = FS_NFS4;
-		} else if (strncmp(objp->fstype, "nfs3",
-			sizeof ("nfs3")) == 0) {
-			fstype = FS_NFS3;
-		} else {
-			fstype = FS_NFS2;
-		}
-	}
-
+	if (!xdr_pointer(xdrs, (char **)&objp->dataptr, sizeof (autofs_args),
+	    (xdrproc_t)xdr_autofs_args))
+		return (FALSE);
 	/*
 	 * The length is the original user-land length, not the
 	 * length of the native kernel autofs_args structure provided
@@ -754,61 +246,15 @@ xdr_mounta(XDR *xdrs, struct mounta *objp)
 	 * the length is wrong and we need to stuff the length field with
 	 * the length of the native structure.
 	 */
-	if (fstype == FS_AUTOFS) {
-		if (!xdr_pointer(xdrs, (char **)&objp->dataptr,
-			sizeof (autofs_args),
-			(xdrproc_t)xdr_autofs_args))
-			return (FALSE);
-		if (!xdr_int(xdrs, &objp->datalen))
-			return (FALSE);
-		if (xdrs->x_op == XDR_DECODE)
-			objp->datalen = sizeof (struct autofs_args);
-	} else if (fstype == FS_NFS4) {
-		if (!xdr_pointer(xdrs, (char **)&objp->dataptr,
-			sizeof (struct nfs_args),
-			(xdrproc_t)xdr_nfs4_args))
-			return (FALSE);
-		if (!xdr_int(xdrs, &objp->datalen))
-			return (FALSE);
-		if (xdrs->x_op == XDR_DECODE)
-			objp->datalen = sizeof (struct nfs_args);
-	} else if (fstype == FS_NFS3) {
-		if (!xdr_pointer(xdrs, (char **)&objp->dataptr,
-			sizeof (struct nfs_args),
-			(xdrproc_t)xdr_nfs3_args))
-			return (FALSE);
-		if (!xdr_int(xdrs, &objp->datalen))
-			return (FALSE);
-		if (xdrs->x_op == XDR_DECODE)
-			objp->datalen = sizeof (struct nfs_args);
-	} else if (fstype == FS_NFS2) {
-		if (!xdr_pointer(xdrs, (char **)&objp->dataptr,
-			sizeof (struct nfs_args),
-			(xdrproc_t)xdr_nfs2_args))
-			return (FALSE);
-		if (!xdr_int(xdrs, &objp->datalen))
-			return (FALSE);
-		if (xdrs->x_op == XDR_DECODE)
-			objp->datalen = sizeof (struct nfs_args);
-	}
-
-	/*
-	 * domount's call to vfs_buildoptionstr() can alter the contents
-	 * of the options string, resulting in a shorter string
-	 * length.  Thus, xdr_string can not be used to free this
-	 * string as it may be freed using a different size than allocated.
-	 */
-	if (xdrs->x_op == XDR_DECODE) {
-		if (!xdr_string(xdrs, &objp->optptr, AUTOFS_MAXOPTSLEN))
-			return (FALSE);
-	} else {
-		ASSERT(xdrs->x_op == XDR_FREE);
-		kmem_free(objp->optptr, objp->optlen);
-	}
-	if (!xdr_int(xdrs, &objp->optlen))
+	if (!xdr_int(xdrs, &objp->datalen))
 		return (FALSE);
 	if (xdrs->x_op == XDR_DECODE)
-		ASSERT((strlen(objp->optptr) + 1) == objp->optlen);
+		objp->datalen = sizeof (struct autofs_args);
+	if (!xdr_string(xdrs, &objp->optptr, AUTOFS_MAXOPTSLEN))
+		return (FALSE);
+	if (!xdr_int(xdrs, &objp->optlen))
+		return (FALSE);
+	ASSERT((xdrs->x_op == XDR_DECODE) || (xdrs->x_op == XDR_FREE));
 	return (TRUE);
 }
 
