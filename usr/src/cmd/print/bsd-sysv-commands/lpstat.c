@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -533,10 +533,14 @@ printer_query(char *name, int (*report)(papi_service_t, char *, papi_printer_t,
 	status = papiServiceCreate(&svc, name, NULL, NULL, cli_auth_callback,
 					encryption, NULL);
 	if (status != PAPI_OK) {
-		fprintf(stderr, gettext(
-			"Failed to contact service for %s: %s\n"),
-			name ? name : "(NULL)",
-			verbose_papi_message(svc, status));
+		if (status == PAPI_NOT_FOUND)
+			fprintf(stderr, gettext("%s: unknown printer\n"),
+				name ? name : "(NULL)");
+		else
+			fprintf(stderr, gettext(
+				"Failed to contact service for %s: %s\n"),
+				name ? name : "(NULL)",
+				verbose_papi_message(svc, status));
 		papiServiceDestroy(svc);
 		return (-1);
 	}

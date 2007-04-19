@@ -38,18 +38,18 @@
 
 static int job_primitive(np_bsdjob_t *, char, char *);
 static int create_cfA_file(np_bsdjob_t *);
-static char * create_cfname(np_bsdjob_t *);
-static char * create_dfname(np_bsdjob_t *);
+static char *create_cfname(np_bsdjob_t *);
+static char *create_dfname(np_bsdjob_t *);
 extern char data_file_type;
 
 np_bsdjob_t *
-create_bsd_job(np_job_t * injob, int pr_order, int filesize)
+create_bsd_job(np_job_t *injob, int pr_order, int filesize)
 {
 
 	np_bsdjob_t *job;
 	char *id;
 	int x;
-	np_data_t * jobdata;
+	np_data_t *jobdata;
 
 	if ((injob->request_id == NULL) || (injob->username == NULL) ||
 	    (injob->dest == NULL) || (injob->printer ==  NULL)) {
@@ -59,6 +59,7 @@ create_bsd_job(np_job_t * injob, int pr_order, int filesize)
 	job = (np_bsdjob_t *)malloc(sizeof (np_bsdjob_t));
 	ASSERT(job, MALLOC_ERR);
 	(void) memset(job, 0, sizeof (np_bsdjob_t));
+	job->np_printer = "auto";	/* default "queue" */
 	/*
 	 * request-id comes in as printer-number
 	 * pull apart to create number
@@ -86,7 +87,7 @@ create_bsd_job(np_job_t * injob, int pr_order, int filesize)
 	if ((errno != 0) || (x < 0)) {
 		x = 0;
 	}
-	(void) snprintf(job->np_request_id, (size_t) 4,
+	(void) snprintf(job->np_request_id, (size_t)4,
 	    "%.3d", x % 1000);
 
 	/* seperate the user/host from host!user or user@host */
@@ -192,7 +193,7 @@ create_bsd_job(np_job_t * injob, int pr_order, int filesize)
 static char *
 create_dfname(np_bsdjob_t *job)
 {
-	char * dfname;
+	char *dfname;
 
 	if (job == NULL)
 		return (NULL);
@@ -218,9 +219,9 @@ create_dfname(np_bsdjob_t *job)
 }
 
 static char *
-create_cfname(np_bsdjob_t * job)
+create_cfname(np_bsdjob_t *job)
 {
-	char * cfname;
+	char *cfname;
 
 	if (job == NULL)
 		return (NULL);
@@ -252,7 +253,7 @@ create_cfA_file(np_bsdjob_t *job)
 }
 
 static int
-job_primitive(np_bsdjob_t * job, char option, char *value)
+job_primitive(np_bsdjob_t *job, char option, char *value)
 {
 	char buf[BUFSIZ];
 
