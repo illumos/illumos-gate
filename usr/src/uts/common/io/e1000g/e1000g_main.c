@@ -53,9 +53,9 @@
 #define	E1000_RX_INTPT_TIME	128
 #define	E1000_RX_PKT_CNT	8
 
-static char ident[] = "Intel PRO/1000 Ethernet 5.1.6";
+static char ident[] = "Intel PRO/1000 Ethernet 5.1.7";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.1.6";
+static char e1000g_version[] = "Driver Ver. 5.1.7";
 
 /*
  * Proto types for DDI entry points
@@ -75,7 +75,6 @@ static void e1000g_intr_work(struct e1000g *, uint32_t);
 static int e1000g_init(struct e1000g *);
 static int e1000g_start(struct e1000g *);
 static void e1000g_stop(struct e1000g *);
-static boolean_t e1000g_reset(struct e1000g *);
 static int e1000g_m_start(void *);
 static void e1000g_m_stop(void *);
 static int e1000g_m_promisc(void *, boolean_t);
@@ -101,8 +100,10 @@ static int e1000g_unicst_set(struct e1000g *, const uint8_t *, mac_addr_slot_t);
 /*
  * Local routines
  */
+static void e1000g_tx_drop(struct e1000g *Adapter);
+static void e1000g_link_timer(void *);
 static void e1000g_LocalTimer(void *);
-static boolean_t e1000g_LocalTimerWork(struct e1000g *);
+static boolean_t e1000g_link_check(struct e1000g *);
 static boolean_t e1000g_stall_check(struct e1000g *);
 static void e1000g_smartspeed(struct e1000g *);
 static void e1000g_getparam(struct e1000g *Adapter);
@@ -560,12 +561,6 @@ e1000gattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	cmn_err(CE_CONT, "!%s, %s\n", e1000g_string, e1000g_version);
 
-	/*
-	 * Tell the world about the link state of e1000g
-	 */
-	mac_link_update(Adapter->mh,
-	    (Adapter->LinkIsActive) ? LINK_STATE_UP : LINK_STATE_DOWN);
-
 	return (DDI_SUCCESS);
 
 attach_fail:
@@ -686,6 +681,8 @@ e1000g_set_driver_params(struct e1000g *Adapter)
 	/* Get conf file properties */
 	e1000g_getparam(Adapter);
 
+	hw->forced_speed_duplex = e1000_100_full;
+	hw->autoneg_advertised = AUTONEG_ADVERTISE_SPEED_DEFAULT;
 	e1000g_force_speed_duplex(Adapter);
 
 	e1000g_get_max_frame_size(Adapter);
@@ -778,6 +775,8 @@ e1000g_set_driver_params(struct e1000g *Adapter)
 		hw->disable_polarity_correction = B_FALSE;
 		hw->master_slave = e1000_ms_hw_default;	/* E1000_MASTER_SLAVE */
 	}
+
+	Adapter->link_state = LINK_STATE_UNKNOWN;
 
 	return (DDI_SUCCESS);
 }
@@ -1006,10 +1005,10 @@ e1000g_suspend(dev_info_t *devinfo)
 static int
 e1000g_init(struct e1000g *Adapter)
 {
-	UINT16 LineSpeed, Duplex;
 	uint32_t pba;
 	uint32_t ctrl;
 	struct e1000_hw *hw;
+	clock_t link_timeout;
 
 	hw = &Adapter->Shared;
 
@@ -1027,8 +1026,17 @@ e1000g_init(struct e1000g *Adapter)
 	(void) e1000_init_eeprom_params(hw);
 
 	if (e1000_validate_eeprom_checksum(hw) < 0) {
-		e1000g_log(Adapter, CE_WARN, "Eeprom checksum failed");
-		goto init_fail;
+		/*
+		 * Some PCI-E parts fail the first check due to
+		 * the link being in sleep state.  Call it again,
+		 * if it fails a second time its a real issue.
+		 */
+		if (e1000_validate_eeprom_checksum(hw) < 0) {
+			e1000g_log(Adapter, CE_WARN,
+			    "Invalid EEPROM checksum. Please contact "
+			    "the vendor to update the EEPROM.");
+			goto init_fail;
+		}
 	}
 
 #ifdef __sparc
@@ -1172,19 +1180,21 @@ e1000g_init(struct e1000g *Adapter)
 	/* Setup Interrupt Throttling Register */
 	E1000_WRITE_REG(hw, ITR, Adapter->intr_throttling_rate);
 
-	/*
-	 * Check for link status
-	 */
-	if (e1000g_link_up(Adapter)) {
-		e1000_get_speed_and_duplex(hw, &LineSpeed, &Duplex);
-		Adapter->link_speed = LineSpeed;
-		Adapter->link_duplex = Duplex;
-		Adapter->LinkIsActive = B_TRUE;
+	/* Start the timer for link setup */
+	if (hw->autoneg)
+		link_timeout = PHY_AUTO_NEG_TIME * drv_usectohz(100000);
+	else
+		link_timeout = PHY_FORCE_TIME * drv_usectohz(100000);
+
+	mutex_enter(&Adapter->e1000g_linklock);
+	if (hw->wait_autoneg_complete) {
+		Adapter->link_complete = B_TRUE;
 	} else {
-		Adapter->link_speed = 0;
-		Adapter->link_duplex = 0;
-		Adapter->LinkIsActive = B_FALSE;
+		Adapter->link_complete = B_FALSE;
+		Adapter->link_tid = timeout(e1000g_link_timer,
+		    (void *)Adapter, link_timeout);
 	}
+	mutex_exit(&Adapter->e1000g_linklock);
 
 	/* Enable PCI-Ex master */
 	if (hw->bus_type == e1000_bus_type_pci_express) {
@@ -1359,12 +1369,6 @@ e1000g_m_start(void *arg)
 static int
 e1000g_start(struct e1000g *Adapter)
 {
-	/*
-	 * We set Adapter->PseudoLinkChanged here, so that e1000g_LocalTimer
-	 * will tell the upper network modules about the link state of e1000g
-	 */
-	Adapter->PseudoLinkChanged = B_TRUE;
-
 	if (!(Adapter->attach_progress & ATTACH_PROGRESS_INIT)) {
 		if (e1000g_init(Adapter) != DDI_SUCCESS) {
 			e1000g_log(Adapter, CE_WARN,
@@ -1400,12 +1404,9 @@ e1000g_m_stop(void *arg)
 static void
 e1000g_stop(struct e1000g *Adapter)
 {
-	PTX_SW_PACKET packet;
 	timeout_id_t tid;
 	e1000g_tx_ring_t *tx_ring;
-	e1000g_msg_chain_t *msg_chain;
-	mblk_t *mp;
-	mblk_t *nmp;
+	boolean_t link_changed;
 
 	tx_ring = Adapter->tx_ring;
 
@@ -1423,13 +1424,21 @@ e1000g_stop(struct e1000g *Adapter)
 	/* Disable timers */
 	disable_timeout(Adapter);
 
+	/* Disable the tx timer for 82547 chipset */
 	mutex_enter(&tx_ring->tx_lock);
-
 	tx_ring->timer_enable_82547 = B_FALSE;
 	tid = tx_ring->timer_id_82547;
 	tx_ring->timer_id_82547 = 0;
-
 	mutex_exit(&tx_ring->tx_lock);
+
+	if (tid != 0)
+		(void) untimeout(tid);
+
+	/* Disable the link timer */
+	mutex_enter(&Adapter->e1000g_linklock);
+	tid = Adapter->link_tid;
+	Adapter->link_tid = 0;
+	mutex_exit(&Adapter->e1000g_linklock);
 
 	if (tid != 0)
 		(void) untimeout(tid);
@@ -1442,6 +1451,31 @@ e1000g_stop(struct e1000g *Adapter)
 	e1000_reset_hw(&Adapter->Shared);
 
 	/* Release resources still held by the TX descriptors */
+	e1000g_tx_drop(Adapter);
+
+	/* Clean the pending rx jumbo packet fragment */
+	if (Adapter->rx_mblk != NULL) {
+		freemsg(Adapter->rx_mblk);
+		Adapter->rx_mblk = NULL;
+		Adapter->rx_mblk_tail = NULL;
+		Adapter->rx_packet_len = 0;
+	}
+
+	rw_exit(&Adapter->chip_lock);
+}
+
+static void
+e1000g_tx_drop(struct e1000g *Adapter)
+{
+	e1000g_tx_ring_t *tx_ring;
+	e1000g_msg_chain_t *msg_chain;
+	PTX_SW_PACKET packet;
+	mblk_t *mp;
+	mblk_t *nmp;
+	uint32_t packet_count;
+
+	tx_ring = Adapter->tx_ring;
+
 	/*
 	 * Here we don't need to protect the lists using
 	 * the usedlist_lock and freelist_lock, for they
@@ -1449,6 +1483,7 @@ e1000g_stop(struct e1000g *Adapter)
 	 */
 	mp = NULL;
 	nmp = NULL;
+	packet_count = 0;
 	packet = (PTX_SW_PACKET) QUEUE_GET_HEAD(&tx_ring->used_list);
 	while (packet != NULL) {
 		if (packet->mp != NULL) {
@@ -1465,6 +1500,7 @@ e1000g_stop(struct e1000g *Adapter)
 		}
 
 		FreeTxSwPacket(packet);
+		packet_count++;
 
 		packet = (PTX_SW_PACKET)
 		    QUEUE_GET_NEXT(&tx_ring->used_list, &packet->Link);
@@ -1483,20 +1519,20 @@ e1000g_stop(struct e1000g *Adapter)
 		mutex_exit(&msg_chain->lock);
 	}
 
-	QUEUE_APPEND(&tx_ring->free_list, &tx_ring->used_list);
-	QUEUE_INIT_LIST(&tx_ring->used_list);
+	ddi_intr_trigger_softint(Adapter->tx_softint_handle, NULL);
 
-	/* Clean the pending rx jumbo packet fragment */
-	if (Adapter->rx_mblk != NULL) {
-		freemsg(Adapter->rx_mblk);
-		Adapter->rx_mblk = NULL;
-		Adapter->rx_mblk_tail = NULL;
-		Adapter->rx_packet_len = 0;
+	if (packet_count > 0) {
+		QUEUE_APPEND(&tx_ring->free_list, &tx_ring->used_list);
+		QUEUE_INIT_LIST(&tx_ring->used_list);
+
+		/* Setup TX descriptor pointers */
+		tx_ring->tbd_next = tx_ring->tbd_first;
+		tx_ring->tbd_oldest = tx_ring->tbd_first;
+
+		/* Setup our HW Tx Head & Tail descriptor pointers */
+		E1000_WRITE_REG(&Adapter->Shared, TDH, 0);
+		E1000_WRITE_REG(&Adapter->Shared, TDT, 0);
 	}
-
-	rw_exit(&Adapter->chip_lock);
-
-	(void) e1000g_tx_freemsg((caddr_t)Adapter, NULL);
 }
 
 static boolean_t
@@ -1535,7 +1571,7 @@ e1000g_rx_drain(struct e1000g *Adapter)
 	return (done);
 }
 
-static boolean_t
+boolean_t
 e1000g_reset(struct e1000g *Adapter)
 {
 	e1000g_stop(Adapter);
@@ -1650,8 +1686,9 @@ e1000g_intr(caddr_t arg)
  * Return Value:							*
  *									*
  * Functions called:							*
- *	ProcessRxInterruptArray						*
- *	e1000g_LocalTimerWork						*
+ *	e1000g_receive							*
+ *	e1000g_link_check						*
+ *	e1000g_recycle							*
  *									*
  * **********************************************************************
  */
@@ -1690,7 +1727,8 @@ e1000g_intr_work(struct e1000g *Adapter, uint32_t ICRContents)
 	if ((ICRContents & E1000_ICR_RXSEQ) ||
 	    (ICRContents & E1000_ICR_LSC) ||
 	    (ICRContents & E1000_ICR_GPI_EN1)) {
-		boolean_t linkstate_changed;
+		boolean_t link_changed;
+		timeout_id_t tid = 0;
 
 		/*
 		 * Encountered RX Sequence Error!!! Link maybe forced and
@@ -1703,14 +1741,29 @@ e1000g_intr_work(struct e1000g *Adapter, uint32_t ICRContents)
 		stop_timeout(Adapter);
 
 		mutex_enter(&Adapter->e1000g_linklock);
-		/* e1000g_LocalTimerWork takes care of link status change */
-		linkstate_changed = e1000g_LocalTimerWork(Adapter);
+		/* e1000g_link_check takes care of link status change */
+		link_changed = e1000g_link_check(Adapter);
+		/*
+		 * If the link timer has not timed out, we'll not notify
+		 * the upper layer with any link state until the link
+		 * is up.
+		 */
+		if (link_changed && !Adapter->link_complete) {
+			if (Adapter->link_state == LINK_STATE_UP) {
+				Adapter->link_complete = B_TRUE;
+				tid = Adapter->link_tid;
+				Adapter->link_tid = 0;
+			} else {
+				link_changed = B_FALSE;
+			}
+		}
 		mutex_exit(&Adapter->e1000g_linklock);
 
-		if (linkstate_changed) {
-			mac_link_update(Adapter->mh,
-			    (Adapter->LinkIsActive) ?
-				LINK_STATE_UP : LINK_STATE_DOWN);
+		if (link_changed) {
+			if (tid != 0)
+				(void) untimeout(tid);
+
+			mac_link_update(Adapter->mh, Adapter->link_state);
 		}
 
 		start_timeout(Adapter);
@@ -2425,12 +2478,11 @@ e1000g_getprop(struct e1000g *Adapter,	/* point to per-adapter structure */
 }
 
 static boolean_t
-e1000g_LocalTimerWork(struct e1000g *Adapter)
+e1000g_link_check(struct e1000g *Adapter)
 {
-	UINT16 LineSpeed, Duplex, phydata;
-	boolean_t linkstate_changed = B_FALSE;
+	uint16_t speed, duplex, phydata;
+	boolean_t link_changed = B_FALSE;
 	struct e1000_hw *hw;
-	e1000g_ether_addr_t ether_addr;
 	uint32_t reg_tarc;
 
 	hw = &Adapter->Shared;
@@ -2439,51 +2491,45 @@ e1000g_LocalTimerWork(struct e1000g *Adapter)
 		/*
 		 * The Link is up, check whether it was marked as down earlier
 		 */
-		if (!Adapter->LinkIsActive) {
-			e1000_get_speed_and_duplex(hw, &LineSpeed, &Duplex);
-			Adapter->link_speed = LineSpeed;
-			Adapter->link_duplex = Duplex;
+		if (Adapter->link_state != LINK_STATE_UP) {
+			e1000_get_speed_and_duplex(hw, &speed, &duplex);
+			Adapter->link_speed = speed;
+			Adapter->link_duplex = duplex;
+			Adapter->link_state = LINK_STATE_UP;
+			link_changed = B_TRUE;
 
-			if (!Adapter->PseudoLinkChanged) {
-				if ((hw->mac_type == e1000_82571) ||
-				    (hw->mac_type == e1000_82572)) {
-					reg_tarc = E1000_READ_REG(hw, TARC0);
-					if (LineSpeed == SPEED_1000)
-						reg_tarc |= (1 << 21);
-					else
-						reg_tarc &= ~(1 << 21);
-					E1000_WRITE_REG(hw, TARC0, reg_tarc);
-				}
+			Adapter->tx_link_down_timeout = 0;
 
-				e1000g_log(Adapter, CE_NOTE,
-				    "Adapter %dMbps %s %s link is up.",
-				    LineSpeed,
-				    ((Duplex == FULL_DUPLEX) ?
-					"full duplex" : "half duplex"),
-				    ((hw->media_type ==
-					e1000_media_type_copper) ?
-					"copper" : "fiber"));
+			if ((hw->mac_type == e1000_82571) ||
+			    (hw->mac_type == e1000_82572)) {
+				reg_tarc = E1000_READ_REG(hw, TARC0);
+				if (speed == SPEED_1000)
+					reg_tarc |= (1 << 21);
+				else
+					reg_tarc &= ~(1 << 21);
+				E1000_WRITE_REG(hw, TARC0, reg_tarc);
 			}
 
-			Adapter->LinkIsActive = B_TRUE;
-			linkstate_changed = B_TRUE;
+			e1000g_log(Adapter, CE_NOTE,
+			    "Adapter %dMbps %s %s link is up.", speed,
+			    ((duplex == FULL_DUPLEX) ?
+				"full duplex" : "half duplex"),
+			    ((hw->media_type == e1000_media_type_copper) ?
+				"copper" : "fiber"));
 		}
 		Adapter->smartspeed = 0;
 	} else {
-		if (Adapter->LinkIsActive) {
+		if (Adapter->link_state != LINK_STATE_DOWN) {
 			Adapter->link_speed = 0;
 			Adapter->link_duplex = 0;
+			Adapter->link_state = LINK_STATE_DOWN;
+			link_changed = B_TRUE;
 
-			if (!Adapter->PseudoLinkChanged) {
-				e1000g_log(Adapter, CE_NOTE,
-				    "Adapter %s link is down.",
-				    ((hw->media_type ==
-					e1000_media_type_copper) ?
-					"copper" : "fiber"));
-			}
+			e1000g_log(Adapter, CE_NOTE,
+			    "Adapter %s link is down.",
+			    ((hw->media_type == e1000_media_type_copper) ?
+				"copper" : "fiber"));
 
-			Adapter->LinkIsActive = B_FALSE;
-			linkstate_changed = B_TRUE;
 			/*
 			 * SmartSpeed workaround for Tabor/TanaX, When the
 			 * driver loses link disable auto master/slave
@@ -2506,7 +2552,53 @@ e1000g_LocalTimerWork(struct e1000g *Adapter)
 		} else {
 			e1000g_smartspeed(Adapter);
 		}
+
+		if (Adapter->started) {
+			if (Adapter->tx_link_down_timeout <
+			    MAX_TX_LINK_DOWN_TIMEOUT) {
+				Adapter->tx_link_down_timeout++;
+			} else if (Adapter->tx_link_down_timeout ==
+			    MAX_TX_LINK_DOWN_TIMEOUT) {
+				rw_enter(&Adapter->chip_lock, RW_WRITER);
+				e1000g_tx_drop(Adapter);
+				rw_exit(&Adapter->chip_lock);
+				Adapter->tx_link_down_timeout++;
+			}
+		}
 	}
+
+	return (link_changed);
+}
+
+static void
+e1000g_LocalTimer(void *ws)
+{
+	struct e1000g *Adapter = (struct e1000g *)ws;
+	struct e1000_hw *hw;
+	e1000g_ether_addr_t ether_addr;
+	boolean_t link_changed;
+
+	hw = &Adapter->Shared;
+
+	(void) e1000g_tx_freemsg((caddr_t)Adapter, NULL);
+
+	if (e1000g_stall_check(Adapter)) {
+		e1000g_DEBUGLOG_0(Adapter, e1000g_INFO_LEVEL,
+		    "Tx stall detected. Activate automatic recovery.\n");
+		Adapter->StallWatchdog = 0;
+		Adapter->tx_recycle_fail = 0;
+		Adapter->reset_count++;
+		(void) e1000g_reset(Adapter);
+	}
+
+	link_changed = B_FALSE;
+	mutex_enter(&Adapter->e1000g_linklock);
+	if (Adapter->link_complete)
+		link_changed = e1000g_link_check(Adapter);
+	mutex_exit(&Adapter->e1000g_linklock);
+
+	if (link_changed)
+		mac_link_update(Adapter->mh, Adapter->link_state);
 
 	/*
 	 * With 82571 controllers, any locally administered address will
@@ -2541,7 +2633,8 @@ e1000g_LocalTimerWork(struct e1000g *Adapter)
 	 * These properties should only be set for 10/100
 	 */
 	if ((hw->media_type == e1000_media_type_copper) &&
-	    (Adapter->link_speed != SPEED_1000)) {
+	    ((Adapter->link_speed == SPEED_100) ||
+	    (Adapter->link_speed == SPEED_10))) {
 		e1000_update_adaptive(hw);
 	}
 	/*
@@ -2549,38 +2642,26 @@ e1000g_LocalTimerWork(struct e1000g *Adapter)
 	 */
 	E1000_WRITE_REG(hw, ICS, E1000_IMS_RXT0);
 
-	return (linkstate_changed);
+	restart_timeout(Adapter);
 }
 
+/*
+ * The function e1000g_link_timer() is called when the timer for link setup
+ * is expired, which indicates the completion of the link setup. The link
+ * state will not be updated until the link setup is completed. And the
+ * link state will not be sent to the upper layer through mac_link_update()
+ * in this function. It will be updated in the local timer routine or the
+ * interrupt service routine after the interface is started (plumbed).
+ */
 static void
-e1000g_LocalTimer(void *ws)
+e1000g_link_timer(void *arg)
 {
-	struct e1000g *Adapter = (struct e1000g *)ws;
-	boolean_t linkstate_changed;
-
-	(void) e1000g_tx_freemsg((caddr_t)Adapter, NULL);
-
-	if (e1000g_stall_check(Adapter)) {
-		e1000g_DEBUGLOG_0(Adapter, e1000g_INFO_LEVEL,
-		    "Tx stall detected. Activate automatic recovery.\n");
-		Adapter->StallWatchdog = 0;
-		Adapter->tx_recycle_fail = 0;
-		Adapter->reset_count++;
-		(void) e1000g_reset(Adapter);
-	}
+	struct e1000g *Adapter = (struct e1000g *)arg;
 
 	mutex_enter(&Adapter->e1000g_linklock);
-	linkstate_changed = e1000g_LocalTimerWork(Adapter);
+	Adapter->link_complete = B_TRUE;
+	Adapter->link_tid = 0;
 	mutex_exit(&Adapter->e1000g_linklock);
-
-	if (linkstate_changed || Adapter->PseudoLinkChanged) {
-		mac_link_update(Adapter->mh,
-		    (Adapter->LinkIsActive) ?
-			LINK_STATE_UP : LINK_STATE_DOWN);
-		Adapter->PseudoLinkChanged = B_FALSE;
-	}
-
-	restart_timeout(Adapter);
 }
 
 /*
@@ -3033,7 +3114,7 @@ is_valid_mac_addr(uint8_t *mac_addr)
 static boolean_t
 e1000g_stall_check(struct e1000g *Adapter)
 {
-	if (!Adapter->LinkIsActive)
+	if (Adapter->link_state != LINK_STATE_UP)
 		return (B_FALSE);
 
 	if (Adapter->tx_recycle_fail > 0)
@@ -3360,7 +3441,6 @@ e1000g_loopback_ioctl(struct e1000g *Adapter, struct iocblk *iocp, mblk_t *mp)
 		if (iocp->ioc_count != sizeof (uint32_t))
 			return (IOC_INVAL);
 
-		Adapter->PseudoLinkChanged = B_TRUE;
 		lbmp = (uint32_t *)mp->b_cont->b_rptr;
 		if (!e1000g_set_loopback_mode(Adapter, *lbmp))
 			return (IOC_INVAL);

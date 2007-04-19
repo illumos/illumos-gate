@@ -203,14 +203,12 @@ extern "C" {
 #define	E1000G_RX_SW_SENDUP		0x1
 #define	E1000G_RX_SW_DETACHED		0x2
 
-#ifdef e1000g_DEBUG
-#define	DEFAULTDEBUGLEVEL		0x004
-#define	DEFAULTDISPLAYONLY		1
-#define	DEFAULTPRINTONLY		1
 /*
- * By default it will do both i.e. print as well as log
+ * By default it will print only to log
  */
-#endif
+#define	DEFAULTDEBUGLEVEL		0x004
+#define	DEFAULTDISPLAYONLY		0
+#define	DEFAULTPRINTONLY		1
 
 /*
  * definitions for smartspeed workaround
@@ -287,6 +285,8 @@ extern "C" {
 
 /* Defines for Tx stall check */
 #define	E1000G_STALL_WATCHDOG_COUNT	8
+
+#define	MAX_TX_LINK_DOWN_TIMEOUT	8
 
 /* Defines for DVMA */
 #ifdef __sparc
@@ -673,6 +673,13 @@ typedef struct _e1000g_msg_chain {
 	kmutex_t lock;
 } e1000g_msg_chain_t;
 
+typedef struct _cksum_data {
+	uint32_t ether_header_size;
+	uint32_t cksum_flags;
+	uint32_t cksum_start;
+	uint32_t cksum_stuff;
+} cksum_data_t;
+
 /*
  * MultiCast Command Block (MULTICAST_CB) The multicast
  * structure contains an array of multicast addresses and
@@ -698,7 +705,6 @@ typedef union _e1000g_ether_addr {
 
 typedef struct _e1000gstat {
 
-	kstat_named_t link_up;		/* Link Status */
 	kstat_named_t link_speed;	/* Link Speed */
 	kstat_named_t rx_none;		/* Rx No Incoming Data */
 	kstat_named_t rx_error;		/* Rx Error in Packet */
@@ -825,10 +831,7 @@ typedef struct _e1000g_tx_ring {
 	/*
 	 * TCP/UDP checksum offload
 	 */
-	uint_t cksum_start;
-	uint_t cksum_stuff;
-	uint_t cksum_flags;
-	uint8_t ether_header_size;
+	cksum_data_t cksum_data;
 	/*
 	 * Timer definitions for 82547
 	 */
@@ -874,10 +877,9 @@ typedef struct e1000g {
 	struct e1000_hw Shared;
 	struct e1000g_osdep osdep;
 
-	UINT LinkIsActive;
+	link_state_t link_state;
 	UINT link_speed;
 	UINT link_duplex;
-	timeout_id_t WatchDogTimer_id;
 	UINT NumRxDescriptors;
 	UINT NumRxFreeList;
 	UINT NumTxDescriptors;
@@ -898,6 +900,9 @@ typedef struct e1000g {
 	size_t RxBufferSize;
 	boolean_t intr_adaptive;
 	uint32_t intr_throttling_rate;
+	timeout_id_t WatchDogTimer_id;
+	timeout_id_t link_tid;
+	boolean_t link_complete;
 
 	/*
 	 * The e1000g_timeout_lock must be held when updateing the
@@ -906,9 +911,9 @@ typedef struct e1000g {
 	 */
 	kmutex_t e1000g_timeout_lock;
 	/*
-	 * link notification order ??? I think it protects the
-	 * link field in struct e1000g (such as LinkIsActive,
-	 * FullDuplex etc) and struct e1000_hw.
+	 * The e1000g_linklock protects the link fields in struct e1000g,
+	 * such as link_state, link_speed, link_duplex, link_complete, and
+	 * link_tid.
 	 */
 	kmutex_t e1000g_linklock;
 	kmutex_t TbiCntrMutex;
@@ -928,6 +933,7 @@ typedef struct e1000g {
 	uint32_t tx_recycle_low_water;
 	uint32_t tx_recycle_num;
 	uint32_t tx_frags_limit;
+	uint32_t tx_link_down_timeout;
 
 	boolean_t tx_intr_enable;
 	ddi_softint_handle_t tx_softint_handle;
@@ -1006,8 +1012,6 @@ typedef struct e1000g {
 	 */
 	boolean_t resched_needed;
 
-	boolean_t PseudoLinkChanged;
-
 #ifdef __sparc
 	ulong_t sys_page_sz;
 	uint_t dvma_page_num;
@@ -1084,6 +1088,7 @@ void e1000g_free_rx_sw_packet(PRX_SW_PACKET packet);
 void SetupTransmitStructures(struct e1000g *Adapter);
 void SetupReceiveStructures(struct e1000g *Adapter);
 void SetupMulticastTable(struct e1000g *Adapter);
+boolean_t e1000g_reset(struct e1000g *Adapter);
 
 int e1000g_recycle(e1000g_tx_ring_t *tx_ring);
 void FreeTxSwPacket(PTX_SW_PACKET packet);

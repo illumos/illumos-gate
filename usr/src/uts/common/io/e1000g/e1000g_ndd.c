@@ -100,7 +100,8 @@ static const nd_param_t nd_template[] = {
 { PARAM_LP_10HDX_CAP,	    0, 1, 0,	NULL,	"-lp_10hdx_cap"		},
 
 /* Force Speed and Duplex */
-{ PARAM_FORCE_SPEED_DUPLEX, 1, 4, 4,	NULL,	"?force_speed_duplex"	},
+{ PARAM_FORCE_SPEED_DUPLEX, GDIAG_10_HALF, GDIAG_100_FULL, GDIAG_100_FULL,
+					NULL,	"?force_speed_duplex"	},
 
 /* Current operating modes */
 { PARAM_LINK_STATUS,	    0, 1, 0,	NULL,	"-link_status"		},
@@ -444,10 +445,24 @@ e1000g_nd_get_param_val(nd_param_t *ndp)
 
 	/* Force Speed and Duplex Parameter */
 	case PARAM_FORCE_SPEED_DUPLEX:
+		switch (Adapter->Shared.forced_speed_duplex) {
+		case e1000_10_half:
+			ndp->ndp_val = GDIAG_10_HALF;
+			break;
+		case e1000_10_full:
+			ndp->ndp_val = GDIAG_10_FULL;
+			break;
+		case e1000_100_half:
+			ndp->ndp_val = GDIAG_100_HALF;
+			break;
+		case e1000_100_full:
+			ndp->ndp_val = GDIAG_100_FULL;
+			break;
+		}
 		break;
 	/* Link States */
 	case PARAM_LINK_STATUS:
-		ndp->ndp_val = Adapter->LinkIsActive;
+		ndp->ndp_val = (Adapter->link_state == LINK_STATE_UP) ? 1 : 0;
 		break;
 	case PARAM_LINK_SPEED:
 		ndp->ndp_val = Adapter->link_speed;
@@ -512,6 +527,7 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 	struct e1000g *Adapter;
 	uint16_t autoneg_advertised;
 	uint8_t forced_speed_duplex;
+	boolean_t autoneg_enable;
 	boolean_t link_change;
 
 	Adapter = ndp->ndp_instance;
@@ -519,6 +535,7 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 
 	autoneg_advertised = 0;
 	forced_speed_duplex = 0;
+	autoneg_enable = B_FALSE;
 	link_change = B_FALSE;
 
 	rw_enter(&Adapter->chip_lock, RW_WRITER);
@@ -599,16 +616,16 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 	}
 
 	switch (Adapter->param_force_speed_duplex) {
-	case 1:
+	case GDIAG_10_HALF:
 		forced_speed_duplex = e1000_10_half;
 		break;
-	case 2:
+	case GDIAG_10_FULL:
 		forced_speed_duplex = e1000_10_full;
 		break;
-	case 3:
+	case GDIAG_100_HALF:
 		forced_speed_duplex = e1000_100_half;
 		break;
-	case 4:
+	case GDIAG_100_FULL:
 		forced_speed_duplex = e1000_100_full;
 		break;
 	default:
@@ -620,6 +637,7 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 	/* Auto-Negotiation Advertisement Capabilities */
 	case PARAM_ADV_AUTONEG_CAP:
 		if (value != ndp->ndp_val) {
+			autoneg_enable = (value == 1) ? B_TRUE : B_FALSE;
 			link_change = B_TRUE;
 		}
 		break;
@@ -631,6 +649,7 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 				    "adv_autoneg_cap enabled");
 				goto finished;
 			}
+			autoneg_enable = B_TRUE;
 			link_change = B_TRUE;
 			if (value == 1) {
 				autoneg_advertised |= ADVERTISE_1000_FULL;
@@ -647,6 +666,7 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 				    "adv_autoneg_cap enabled");
 				goto finished;
 			}
+			autoneg_enable = B_TRUE;
 			link_change = B_TRUE;
 			if (value == 1) {
 				autoneg_advertised |= ADVERTISE_100_FULL;
@@ -663,6 +683,7 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 				    "adv_autoneg_cap enabled");
 				goto finished;
 			}
+			autoneg_enable = B_TRUE;
 			link_change = B_TRUE;
 			if (value == 1) {
 				autoneg_advertised |= ADVERTISE_100_HALF;
@@ -679,6 +700,7 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 				    "adv_autoneg_cap enabled");
 				goto finished;
 			}
+			autoneg_enable = B_TRUE;
 			link_change = B_TRUE;
 			if (value == 1) {
 				autoneg_advertised |= ADVERTISE_10_FULL;
@@ -695,6 +717,7 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 				    "adv_autoneg_cap enabled");
 				goto finished;
 			}
+			autoneg_enable = B_TRUE;
 			link_change = B_TRUE;
 			if (value == 1) {
 				autoneg_advertised |= ADVERTISE_10_HALF;
@@ -711,18 +734,19 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 				    "adv_autoneg_cap disabled");
 				goto finished;
 			}
+			autoneg_enable = B_FALSE;
 			link_change = B_TRUE;
 			switch (value) {
-			case 1:
+			case GDIAG_10_HALF:
 				forced_speed_duplex = e1000_10_half;
 				break;
-			case 2:
+			case GDIAG_10_FULL:
 				forced_speed_duplex = e1000_10_full;
 				break;
-			case 3:
+			case GDIAG_100_HALF:
 				forced_speed_duplex = e1000_100_half;
 				break;
-			case 4:
+			case GDIAG_100_FULL:
 				forced_speed_duplex = e1000_100_full;
 				break;
 			default:
@@ -736,9 +760,14 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 	}
 
 	if (link_change) {
-		ndp->ndp_val = value;
+		if (autoneg_enable) {
+			if (autoneg_advertised == 0) {
+				e1000g_log(Adapter, CE_WARN,
+				    "ndd set: there must be at least one "
+				    "advertised capability enabled");
+				goto finished;
+			}
 
-		if (Adapter->param_adv_autoneg == 1) {
 			Adapter->Shared.autoneg = B_TRUE;
 			Adapter->Shared.autoneg_advertised =
 				autoneg_advertised;
@@ -748,11 +777,11 @@ e1000g_nd_set_param_val(nd_param_t *ndp, uint32_t value)
 				forced_speed_duplex;
 		}
 
-		if (e1000_setup_link(&Adapter->Shared) != E1000_SUCCESS) {
-			e1000g_log(Adapter, CE_WARN,
-			    "ndd set: update link failed");
-			goto finished;
-		}
+		ndp->ndp_val = value;
+
+		rw_exit(&Adapter->chip_lock);
+		(void) e1000g_reset(Adapter);
+		return;
 	}
 
 finished:

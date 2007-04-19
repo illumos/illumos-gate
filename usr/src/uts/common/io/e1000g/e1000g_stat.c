@@ -202,7 +202,6 @@ UpdateStatsCounters(IN kstat_t *ksp, int rw)
 	e1000g_ksp = (e1000gstat *)ksp->ks_data;
 	ASSERT(e1000g_ksp != NULL);
 
-	e1000g_ksp->link_up.value.ul = Adapter->LinkIsActive;
 	e1000g_ksp->link_speed.value.ul = Adapter->link_speed;
 	e1000g_ksp->rx_none.value.ul = Adapter->rx_none;
 	e1000g_ksp->rx_error.value.ul = Adapter->rx_error;
@@ -870,9 +869,6 @@ InitStatsCounters(IN struct e1000g *Adapter)
 	/*
 	 * Initialize all the statistics
 	 */
-	kstat_named_init(&e1000g_ksp->link_up, "link_up",
-	    KSTAT_DATA_ULONG);
-
 	kstat_named_init(&e1000g_ksp->link_speed, "link_speed",
 	    KSTAT_DATA_ULONG);
 

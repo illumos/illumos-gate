@@ -58,9 +58,10 @@
 static boolean_t e1000g_send(struct e1000g *, mblk_t *);
 static int e1000g_tx_copy(struct e1000g *, PTX_SW_PACKET, mblk_t *, uint32_t);
 static int e1000g_tx_bind(struct e1000g *, PTX_SW_PACKET, mblk_t *);
+static boolean_t check_cksum_context(e1000g_tx_ring_t *, cksum_data_t *);
 static int e1000g_fill_tx_ring(e1000g_tx_ring_t *, LIST_DESCRIBER *,
-    uint_t, boolean_t);
-static void e1000g_fill_context_descriptor(e1000g_tx_ring_t *,
+    cksum_data_t *);
+static void e1000g_fill_context_descriptor(cksum_data_t *,
     struct e1000_context_desc *);
 static int e1000g_fill_tx_desc(struct e1000g *,
     PTX_SW_PACKET, uint64_t, size_t);
@@ -78,6 +79,7 @@ static void e1000g_82547_tx_move_tail_work(e1000g_tx_ring_t *);
 #ifndef e1000g_DEBUG
 #pragma inline(e1000g_tx_copy)
 #pragma inline(e1000g_tx_bind)
+#pragma inline(check_cksum_context)
 #pragma inline(e1000g_fill_tx_ring)
 #pragma inline(e1000g_fill_context_descriptor)
 #pragma inline(e1000g_fill_tx_desc)
@@ -182,7 +184,7 @@ e1000g_m_tx(void *arg, mblk_t *mp)
 
 	rw_enter(&Adapter->chip_lock, RW_READER);
 
-	if (!Adapter->started) {
+	if (!Adapter->started || (Adapter->link_state != LINK_STATE_UP)) {
 		freemsgchain(mp);
 		mp = NULL;
 	}
@@ -238,12 +240,7 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	mblk_t *nmp;
 	mblk_t *tmp;
 	e1000g_tx_ring_t *tx_ring;
-	/* IP Head/TCP/UDP checksum offload */
-	uint_t cksum_start;
-	uint_t cksum_stuff;
-	uint_t cksum_flags;
-	boolean_t cksum_load;
-	uint8_t ether_header_size;
+	cksum_data_t cksum;
 
 	/* Get the total size and frags number of the message */
 	force_bcopy = 0;
@@ -303,7 +300,8 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	 * If there are many frags of the message, then bcopy them
 	 * into one tx descriptor buffer will get better performance.
 	 */
-	if (frag_count >= Adapter->tx_frags_limit) {
+	if ((frag_count >= Adapter->tx_frags_limit) &&
+	    (msg_size <= Adapter->TxBufferSize)) {
 		Adapter->tx_exceed_frags++;
 		force_bcopy |= FORCE_BCOPY_EXCEED_FRAGS;
 	}
@@ -323,30 +321,14 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	QUEUE_INIT_LIST(&pending_list);
 
 	/* Retrieve checksum info */
-	hcksum_retrieve(mp, NULL, NULL, &cksum_start, &cksum_stuff,
-	    NULL, NULL, &cksum_flags);
+	hcksum_retrieve(mp, NULL, NULL, &cksum.cksum_start, &cksum.cksum_stuff,
+	    NULL, NULL, &cksum.cksum_flags);
 
-	cksum_load = B_FALSE;
-	if (cksum_flags) {
-		if (((struct ether_vlan_header *)mp->b_rptr)->ether_tpid ==
-		    htons(ETHERTYPE_VLAN))
-			ether_header_size = sizeof (struct ether_vlan_header);
-		else
-			ether_header_size = sizeof (struct ether_header);
-
-		if ((ether_header_size != tx_ring->ether_header_size) ||
-		    (cksum_flags != tx_ring->cksum_flags) ||
-		    (cksum_stuff != tx_ring->cksum_stuff) ||
-		    (cksum_start != tx_ring->cksum_start)) {
-
-			tx_ring->ether_header_size = ether_header_size;
-			tx_ring->cksum_flags = cksum_flags;
-			tx_ring->cksum_start = cksum_start;
-			tx_ring->cksum_stuff = cksum_stuff;
-
-			cksum_load = B_TRUE;
-		}
-	}
+	if (((struct ether_vlan_header *)mp->b_rptr)->ether_tpid ==
+	    htons(ETHERTYPE_VLAN))
+		cksum.ether_header_size = sizeof (struct ether_vlan_header);
+	else
+		cksum.ether_header_size = sizeof (struct ether_header);
 
 	/* Process each mblk fragment and fill tx descriptors */
 	packet = NULL;
@@ -440,8 +422,7 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 		goto tx_send_failed;
 	}
 
-	desc_count = e1000g_fill_tx_ring(tx_ring, &pending_list,
-	    cksum_flags, cksum_load);
+	desc_count = e1000g_fill_tx_ring(tx_ring, &pending_list, &cksum);
 
 	mutex_exit(&tx_ring->tx_lock);
 
@@ -500,14 +481,36 @@ tx_no_resource:
 	return (B_FALSE);
 }
 
+static boolean_t
+check_cksum_context(e1000g_tx_ring_t *tx_ring, cksum_data_t *cksum)
+{
+	boolean_t cksum_load;
+	cksum_data_t *last;
+
+	cksum_load = B_FALSE;
+	last = &tx_ring->cksum_data;
+
+	if (cksum->cksum_flags != 0) {
+		if ((cksum->ether_header_size != last->ether_header_size) ||
+		    (cksum->cksum_flags != last->cksum_flags) ||
+		    (cksum->cksum_stuff != last->cksum_stuff) ||
+		    (cksum->cksum_start != last->cksum_start)) {
+
+			cksum_load = B_TRUE;
+		}
+	}
+
+	return (cksum_load);
+}
+
 static int
 e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
-    uint_t cksum_flags, boolean_t cksum_load)
+    cksum_data_t *cksum)
 {
 	struct e1000g *Adapter;
 	PTX_SW_PACKET first_packet;
 	PTX_SW_PACKET packet;
-	struct e1000_context_desc *cksum_desc;
+	boolean_t cksum_load;
 	struct e1000_tx_desc *first_data_desc;
 	struct e1000_tx_desc *next_desc;
 	struct e1000_tx_desc *descriptor;
@@ -519,22 +522,22 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 	Adapter = tx_ring->adapter;
 
 	desc_count = 0;
-	cksum_desc = NULL;
+	first_packet = NULL;
 	first_data_desc = NULL;
 	descriptor = NULL;
-
-	first_packet = (PTX_SW_PACKET) QUEUE_GET_HEAD(pending_list);
-	ASSERT(first_packet);
 
 	next_desc = tx_ring->tbd_next;
 
 	/* IP Head/TCP/UDP checksum offload */
+	cksum_load = check_cksum_context(tx_ring, cksum);
+
 	if (cksum_load) {
+		first_packet = (PTX_SW_PACKET) QUEUE_GET_HEAD(pending_list);
+
 		descriptor = next_desc;
 
-		cksum_desc = (struct e1000_context_desc *)descriptor;
-
-		e1000g_fill_context_descriptor(tx_ring, cksum_desc);
+		e1000g_fill_context_descriptor(cksum,
+		    (struct e1000_context_desc *)descriptor);
 
 		/* Check the wrap-around case */
 		if (descriptor == tx_ring->tbd_last)
@@ -544,9 +547,6 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 
 		desc_count++;
 	}
-
-	if (cksum_desc == NULL)
-		first_packet = NULL;
 
 	first_data_desc = next_desc;
 
@@ -601,11 +601,11 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 
 	ASSERT(descriptor);
 
-	if (cksum_flags) {
-		if (cksum_flags & HCK_IPV4_HDRCKSUM)
+	if (cksum->cksum_flags) {
+		if (cksum->cksum_flags & HCK_IPV4_HDRCKSUM)
 			((struct e1000_data_desc *)first_data_desc)->
 				upper.fields.popts |= E1000_TXD_POPTS_IXSM;
-		if (cksum_flags & HCK_PARTIALCKSUM)
+		if (cksum->cksum_flags & HCK_PARTIALCKSUM)
 			((struct e1000_data_desc *)first_data_desc)->
 				upper.fields.popts |= E1000_TXD_POPTS_TXSM;
 	}
@@ -661,6 +661,10 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 	mutex_enter(&tx_ring->usedlist_lock);
 	QUEUE_APPEND(&tx_ring->used_list, pending_list);
 	mutex_exit(&tx_ring->usedlist_lock);
+
+	/* Store the cksum data */
+	if (cksum_load)
+		tx_ring->cksum_data = *cksum;
 
 	return (desc_count);
 }
@@ -823,9 +827,10 @@ SetupTransmitStructures(struct e1000g *Adapter)
 	}
 
 	/* For TCP/UDP checksum offload */
-	tx_ring->cksum_stuff = 0;
-	tx_ring->cksum_start = 0;
-	tx_ring->cksum_flags = 0;
+	tx_ring->cksum_data.cksum_stuff = 0;
+	tx_ring->cksum_data.cksum_start = 0;
+	tx_ring->cksum_data.cksum_flags = 0;
+	tx_ring->cksum_data.ether_header_size = 0;
 
 	/* Initialize tx parameters */
 	Adapter->tx_bcopy_thresh = DEFAULTTXBCOPYTHRESHOLD;
@@ -1323,22 +1328,22 @@ e1000g_tx_bind(struct e1000g *Adapter, PTX_SW_PACKET packet, mblk_t *mp)
 }
 
 static void
-e1000g_fill_context_descriptor(e1000g_tx_ring_t *tx_ring,
+e1000g_fill_context_descriptor(cksum_data_t *cksum,
     struct e1000_context_desc *cksum_desc)
 {
-	if (tx_ring->cksum_flags & HCK_IPV4_HDRCKSUM) {
+	if (cksum->cksum_flags & HCK_IPV4_HDRCKSUM) {
 		cksum_desc->lower_setup.ip_fields.ipcss =
-		    tx_ring->ether_header_size;
+		    cksum->ether_header_size;
 		cksum_desc->lower_setup.ip_fields.ipcso =
-		    tx_ring->ether_header_size +
+		    cksum->ether_header_size +
 		    offsetof(struct ip, ip_sum);
 		cksum_desc->lower_setup.ip_fields.ipcse =
-		    tx_ring->ether_header_size +
+		    cksum->ether_header_size +
 		    sizeof (struct ip) - 1;
 	} else
 		cksum_desc->lower_setup.ip_config = 0;
 
-	if (tx_ring->cksum_flags & HCK_PARTIALCKSUM) {
+	if (cksum->cksum_flags & HCK_PARTIALCKSUM) {
 		/*
 		 * The packet with same protocol has the following
 		 * stuff and start offset:
@@ -1350,9 +1355,9 @@ e1000g_fill_context_descriptor(e1000g_tx_ring_t *tx_ring,
 		 * | IPv6 + UDP |  0x14  |  0x10  |  No
 		 */
 		cksum_desc->upper_setup.tcp_fields.tucss =
-		    tx_ring->cksum_start + tx_ring->ether_header_size;
+		    cksum->cksum_start + cksum->ether_header_size;
 		cksum_desc->upper_setup.tcp_fields.tucso =
-		    tx_ring->cksum_stuff + tx_ring->ether_header_size;
+		    cksum->cksum_stuff + cksum->ether_header_size;
 		cksum_desc->upper_setup.tcp_fields.tucse = 0;
 	} else
 		cksum_desc->upper_setup.tcp_config = 0;

@@ -81,8 +81,6 @@ extern "C" {
 #ifdef e1000g_DEBUG
 
 static int e1000g_debug = DEFAULTDEBUGLEVEL;
-static int e1000g_display_only = DEFAULTDISPLAYONLY;
-static int e1000g_print_only = DEFAULTPRINTONLY;
 static int e1000g_debug_hw = 1;
 
 #define	e1000g_ERRS_LEVEL	0x001	/* (1)	Errors */
@@ -122,10 +120,6 @@ static int e1000g_debug_hw = 1;
 #else
 
 static int e1000g_debug = 0;
-static int e1000g_display_only = 1;	/* 1 - Yes Display, */
-					/* 0 - Don't Display */
-static int e1000g_print_only = 1;	/* 1 - Yes Print to Msg Log, */
-					/* 0 - Don't Print to Msg Log */
 static int e1000g_debug_hw = 0;
 
 #define	e1000g_DEBUGLOG_0(Adapter, Level, fmt)
@@ -143,6 +137,9 @@ static int e1000g_debug_hw = 0;
 
 void e1000g_log(struct e1000g *Adapter, int level, char *fmt, ...);
 void e1000g_log_hw(char *msg, void *cptr, int length);
+
+static int e1000g_display_only = DEFAULTDISPLAYONLY;
+static int e1000g_print_only = DEFAULTPRINTONLY;
 
 #ifdef __cplusplus
 }

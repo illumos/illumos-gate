@@ -485,3 +485,16 @@ Notes on packaging:
    6502458 e1000g is open source, move the source from usr/closed to use/src
    6505360 e1000g Makefile should not include "-N drv/dld" in the LDFLAGS
 
+5.1.7
+======
+  This version has the following fix:
+   6454375 e1000g link flaps at initialization, triggering failovers
+   6472255 e1000g can't restore to 1000M with ndd setting
+   6496763 e1000g should free packets when link is down
+   6501294 "eeprom checksum failed" with pci8086,108c device
+   6504688 e1000g.conf settings are inconsistent with ndd output
+   6505445 e1000g : when all advertised capabilities are set to 0, ndd puts all of them 1
+   6519690 e1000g should not print the link up/down messages to console
+   6531474 Fatal PCIe Fabric Error panics on T2000 when using jumbo frames on e1000g interfaces
+   6535712 e1000g: the processing of the checksum flags should be protected by tx_lock
+
