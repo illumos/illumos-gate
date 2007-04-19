@@ -1461,7 +1461,7 @@ pf_analyse_error(dev_info_t *rpdip, ddi_fm_error_t *derr, pf_data_t *dq_p,
 			break;
 		case PCIE_PCIECAP_DEV_TYPE_ROOT:
 			/* Do not analyse RC info as it has already been done */
-			pfd_err |= PF_MATCHED_RC;
+			pfd_err |= PF_NO_ERROR;
 			break;
 		case PCIE_PCIECAP_DEV_TYPE_PCIE2PCI:
 			if (PCIE_DEVSTS_CE_DETECTED & pf_data_p->dev_status)

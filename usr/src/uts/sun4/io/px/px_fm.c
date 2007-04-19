@@ -670,8 +670,9 @@ px_err_panic(int err, int msg, int fab_err)
 fabric:
 	if (fab_err & PF_PANIC)
 		ferr = PX_PANIC;
-	if (fab_err & ~(PF_PANIC | PF_NO_ERROR))
+	else if (fab_err & ~(PF_PANIC | PF_NO_ERROR))
 		ferr = PX_NO_PANIC;
+
 	if (ferr & px_die) {
 		if (strlen(fm_msg))
 			(void) strncat(fm_msg, " and", MSZ);
