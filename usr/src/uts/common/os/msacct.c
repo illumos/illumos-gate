@@ -543,7 +543,14 @@ new_mstate(kthread_t *t, int new_state)
 	ASSERT((unsigned)new_state < NMSTATES);
 	ASSERT(t == curthread || THREAD_LOCK_HELD(t));
 
-	if ((lwp = ttolwp(t)) == NULL)
+	/*
+	 * Don't do microstate processing for threads without a lwp (kernel
+	 * threads).  Also, if we're an interrupt thread that is pinning another
+	 * thread, our t_mstate hasn't been initialized.  We'd be modifying the
+	 * microstate of the underlying lwp which doesn't realize that it's
+	 * pinned.  In this case, also don't change the microstate.
+	 */
+	if (((lwp = ttolwp(t)) == NULL) || t->t_intr)
 		return (LMS_SYSTEM);
 
 	curtime = gethrtime_unscaled();
@@ -614,6 +621,14 @@ restore_mstate(kthread_t *t)
 	hrtime_t waitrq;
 	hrtime_t newtime;
 	hrtime_t oldtime;
+
+	/*
+	 * Don't call restore mstate of threads without lwps.  (Kernel threads)
+	 *
+	 * threads with t_intr set shouldn't be in the dispatcher, so assert
+	 * that nobody here has t_intr.
+	 */
+	ASSERT(t->t_intr == NULL);
 
 	if ((lwp = ttolwp(t)) == NULL)
 		return;
