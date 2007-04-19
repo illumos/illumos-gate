@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -414,19 +414,16 @@ merge_ipnodes() {
 
 }
 
-# main
-exit_status=0
-saved_ipnodes_file=$BASEDIR/etc/inet/ipnodes.hostsmerge
-temp_ipnodes_file=/tmp/ipnodes.hostsmerge
-temp_merged_file=/tmp/hosts.hostsmerged
-
-# Unlike regular class action scripts do not process 
-# all files assigned to the class. Merge should 
-# only happen for the /etc/inet/hosts file, hence 
-# read the src and dest arguments just once.
-
-if read src dest; then
-
+#
+# deliver_hosts: This function merges /etc/inet/hosts and /etc/inet/ipnodes
+# into a single hosts file (/etc/inet/hosts) only when ipnodes file exists in
+# the system.  /etc/inet/ipnodes is now a symlink to /etc/inet/hosts.
+#
+deliver_hosts() {
+	saved_ipnodes_file=$BASEDIR/etc/inet/ipnodes.hostsmerge
+	temp_ipnodes_file=/tmp/ipnodes.hostsmerge
+	temp_merged_file=/tmp/hosts.hostsmerged
+	
 	# if /etc/inet/hosts doesn't exist (fresh install)
 	# then same action as 'i.preserve' i.e
 	# copy default /etc/inet/hosts in place.
@@ -471,7 +468,19 @@ if read src dest; then
 			continue
 		fi
 	fi
-fi
+}
+	
+# main
+exit_status=0
+
+while read src dest; do
+	dest_name=`basename "$dest"`
+
+	case "${dest_name}" in 
+		"hosts") deliver_hosts ;;
+		*) ;;
+	esac
+done
 
 exit $exit_status 
 
