@@ -85,6 +85,9 @@
 /* Flags for opening/closing backing devices via LDI */
 #define	VD_OPEN_FLAGS		(FEXCL | FREAD | FWRITE)
 
+/* Flags for writing to a vdisk which is a file */
+#define	VD_FILE_WRITE_FLAGS	SM_ASYNC
+
 /*
  * By Solaris convention, slice/partition 2 represents the entire disk;
  * unfortunately, this convention does not appear to be codified.
@@ -369,6 +372,8 @@ static uint64_t	vds_operations;	/* see vds_operation[] definition below */
 
 static int	vd_open_flags = VD_OPEN_FLAGS;
 
+static uint_t	vd_file_write_flags = VD_FILE_WRITE_FLAGS;
+
 /*
  * Supported protocol version pairs, from highest (newest) to lowest (oldest)
  *
@@ -459,7 +464,8 @@ vd_file_rw(vd_t *vd, int slice, int operation, caddr_t data, size_t blk,
 	}
 
 	srw = (operation == VD_OP_BREAD)? S_READ : S_WRITE;
-	smflags = (operation == VD_OP_BREAD)? 0 : SM_WRITE;
+	smflags = (operation == VD_OP_BREAD)? 0 :
+	    (SM_WRITE | vd_file_write_flags);
 	n = len;
 
 	do {
