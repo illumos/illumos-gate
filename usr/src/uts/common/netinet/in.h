@@ -174,7 +174,9 @@ typedef	uint16_t	sa_family_t;
 #define	IPPROTO_RAW		255		/* raw IP packet */
 #define	IPPROTO_MAX		256
 
+#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 #define	PROTO_SDP		257		/* Sockets Direct Protocol */
+#endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
 
 /*
  * Port/socket numbers: network standard functions
