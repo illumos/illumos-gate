@@ -25,28 +25,31 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-LIBRARY		= libc_psr_hwcap1.a
-VERS		= .1
+include ../../Makefile.lib
 
-include $(SRC)/lib/Makefile.lib
-include $(SRC)/Makefile.psm
+PLATFORM=	sun4v
 
-#
-# Since libc_psr is strictly assembly, deactivate the CTF build logic.
-#
-CTFCONVERT_POST	= :
-CTFMERGE_LIB	= :
+SUBDIRS=	$(MACH)
+SUBDIRS64=	$(MACH64)
 
-LIBS		= $(DYNLIB)
-IFLAGS		= -I$(SRC)/lib/libc/inc -I$(SRC)/uts/sun4v \
-		  -I$(ROOT)/usr/include/v9
-CPPFLAGS	= -D_REENTRANT -D$(MACH) -DNIAGARA_IMPL $(IFLAGS) $(CPPFLAGS.master)
-ASDEFS		= -D__STDC__ -D_ASM $(CPPFLAGS)
-ASFLAGS		= -P $(ASDEFS)
+all		:=	TARGET= all
+install		:=	TARGET= install
+clean		:=	TARGET= clean
+clobber		:=	TARGET= clobber
 
-#
-# build rules
-#
-pics/%.o: ../../$(PLATFORM)/common/%.s
-	$(AS) $(ASFLAGS) $< -o $@
-	$(POST_PROCESS_O)
+.KEEP_STATE:
+
+all install clean clobber : lib32 \
+				$(BUILD64) lib64
+
+lint:
+	@ $(ECHO) "Nothing to lint here: skipping"
+
+lib32: $(SUBDIRS)
+
+lib64: $(SUBDIRS64)
+
+$(SUBDIRS) $(SUBDIRS64): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:

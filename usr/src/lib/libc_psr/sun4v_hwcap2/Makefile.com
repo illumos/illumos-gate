@@ -25,7 +25,7 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-LIBRARY		= libc_psr_hwcap1.a
+LIBRARY		= libc_psr_hwcap2.a
 VERS		= .1
 
 include $(SRC)/lib/Makefile.lib
@@ -39,8 +39,8 @@ CTFMERGE_LIB	= :
 
 LIBS		= $(DYNLIB)
 IFLAGS		= -I$(SRC)/lib/libc/inc -I$(SRC)/uts/sun4v \
-		  -I$(ROOT)/usr/include/v9
-CPPFLAGS	= -D_REENTRANT -D$(MACH) -DNIAGARA_IMPL $(IFLAGS) $(CPPFLAGS.master)
+		  -I$(ROOT)/usr/platform/sun4v/include -I$(ROOT)/usr/include/v9
+CPPFLAGS	= -D_REENTRANT -D$(MACH) -DNIAGARA2_IMPL $(IFLAGS) $(CPPFLAGS.master)
 ASDEFS		= -D__STDC__ -D_ASM $(CPPFLAGS)
 ASFLAGS		= -P $(ASDEFS)
 

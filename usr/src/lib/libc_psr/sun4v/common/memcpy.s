@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,6 +82,90 @@
 #include <sys/asi.h>
 #include <sys/trap.h>
 
+#ifdef	NIAGARA2_IMPL
+#include <sys/sun4asi.h>
+
+#define	ALIGN_OFF_1_7			\
+	faligndata %d0, %d2, %d48	;\
+	faligndata %d2, %d4, %d50	;\
+	faligndata %d4, %d6, %d52	;\
+	faligndata %d6, %d8, %d54	;\
+	faligndata %d8, %d10, %d56	;\
+	faligndata %d10, %d12, %d58	;\
+	faligndata %d12, %d14, %d60	;\
+	faligndata %d14, %d16, %d62
+
+#define	ALIGN_OFF_8_15			\
+	faligndata %d2, %d4, %d48	;\
+	faligndata %d4, %d6, %d50	;\
+	faligndata %d6, %d8, %d52	;\
+	faligndata %d8, %d10, %d54	;\
+	faligndata %d10, %d12, %d56	;\
+	faligndata %d12, %d14, %d58	;\
+	faligndata %d14, %d16, %d60	;\
+	faligndata %d16, %d18, %d62
+
+#define	ALIGN_OFF_16_23			\
+	faligndata %d4, %d6, %d48	;\
+	faligndata %d6, %d8, %d50	;\
+	faligndata %d8, %d10, %d52	;\
+	faligndata %d10, %d12, %d54	;\
+	faligndata %d12, %d14, %d56	;\
+	faligndata %d14, %d16, %d58	;\
+	faligndata %d16, %d18, %d60	;\
+	faligndata %d18, %d20, %d62
+
+#define	ALIGN_OFF_24_31			\
+	faligndata %d6, %d8, %d48	;\
+	faligndata %d8, %d10, %d50	;\
+	faligndata %d10, %d12, %d52	;\
+	faligndata %d12, %d14, %d54	;\
+	faligndata %d14, %d16, %d56	;\
+	faligndata %d16, %d18, %d58	;\
+	faligndata %d18, %d20, %d60	;\
+	faligndata %d20, %d22, %d62
+
+#define	ALIGN_OFF_32_39			\
+	faligndata %d8, %d10, %d48	;\
+	faligndata %d10, %d12, %d50	;\
+	faligndata %d12, %d14, %d52	;\
+	faligndata %d14, %d16, %d54	;\
+	faligndata %d16, %d18, %d56	;\
+	faligndata %d18, %d20, %d58	;\
+	faligndata %d20, %d22, %d60	;\
+	faligndata %d22, %d24, %d62
+
+#define	ALIGN_OFF_40_47			\
+	faligndata %d10, %d12, %d48	;\
+	faligndata %d12, %d14, %d50	;\
+	faligndata %d14, %d16, %d52	;\
+	faligndata %d16, %d18, %d54	;\
+	faligndata %d18, %d20, %d56	;\
+	faligndata %d20, %d22, %d58	;\
+	faligndata %d22, %d24, %d60	;\
+	faligndata %d24, %d26, %d62
+
+#define	ALIGN_OFF_48_55			\
+	faligndata %d12, %d14, %d48	;\
+	faligndata %d14, %d16, %d50	;\
+	faligndata %d16, %d18, %d52	;\
+	faligndata %d18, %d20, %d54	;\
+	faligndata %d20, %d22, %d56	;\
+	faligndata %d22, %d24, %d58	;\
+	faligndata %d24, %d26, %d60	;\
+	faligndata %d26, %d28, %d62
+
+#define	ALIGN_OFF_56_63			\
+	faligndata %d14, %d16, %d48	;\
+	faligndata %d16, %d18, %d50	;\
+	faligndata %d18, %d20, %d52	;\
+	faligndata %d20, %d22, %d54	;\
+	faligndata %d22, %d24, %d56	;\
+	faligndata %d24, %d26, %d58	;\
+	faligndata %d26, %d28, %d60	;\
+	faligndata %d28, %d30, %d62
+
+#else	/* NIAGARA2_IMPL */
 /*
  * This define is to align data for the unaligned source cases.
  * The data1, data2 and data3 is merged into data1 and data2.
@@ -102,6 +185,8 @@
 	sllx	data1, lshift, data1				;\
 	srlx	data2, rshift, tmp				;\
 	or	data1, tmp, data1
+#endif	/* NIAGARA2_IMPL */
+
 /*
  * Align the data in case of backward copy.
  */
@@ -370,22 +455,83 @@ forcpy:
 .blkalgndst:
 	save	%sp, -SA(MINFRAME), %sp
 	
-	! Block (64 bytes) align the destination.
-	! Do not know the alignement of src at this time.
-	! Therefore using byte copy.
+#ifdef	NIAGARA2_IMPL
+	rd	 %fprs, %l7		! save orig %fprs into %l7
+         
+        ! if fprs.fef == 0, set it. Checking it, reqires 2 instructions.
+        ! So set it anyway, without checking.
+        wr      %g0, 0x4, %fprs         ! fprs.fef = 1
+#endif	/* NIAGARA2_IMPL */
 
+	! Block (64 bytes) align the destination.
 	andcc	%i0, 0x3f, %i3		! is dst block aligned
 	bz	%ncc, .chksrc		! dst already block aligned
 	sub	%i3, 0x40, %i3
 	neg	%i3			! bytes till dst 64 bytes aligned
 	sub	%i2, %i3, %i2		! update i2 with new count
 
-1:	ldub	[%i1], %i4
-	stb	%i4, [%i0]
+	! Based on source and destination alignment do
+	! either 8 bytes, 4 bytes, 2 bytes or byte copy.
+
+	! Is dst & src 8B aligned
+	or	%i0, %i1, %o2
+	andcc	%o2, 0x7, %g0
+	bz	%ncc, .alewdcp
+	nop
+
+	! Is dst & src 4B aligned
+	andcc	%o2, 0x3, %g0
+	bz	%ncc, .alwdcp
+	nop
+
+	! Is dst & src 2B aligned
+	andcc	%o2, 0x1, %g0
+	bz	%ncc, .alhlfwdcp
+	nop
+
+	! 1B aligned
+1:	ldub	[%i1], %o2
+	stb	%o2, [%i0]
 	inc	%i1
 	deccc	%i3
 	bgu,pt	%ncc, 1b
 	inc	%i0
+
+	ba	.chksrc
+	nop
+
+	! dst & src 4B aligned
+.alwdcp:
+	ld	[%i1], %o2
+	st	%o2, [%i0]
+	add	%i1, 0x4, %i1
+	subcc	%i3, 0x4, %i3
+	bgu,pt	%ncc, .alwdcp
+	add	%i0, 0x4, %i0
+
+	ba	.chksrc
+	nop
+
+	! dst & src 2B aligned
+.alhlfwdcp:
+	lduh	[%i1], %o2
+	stuh	%o2, [%i0]
+	add	%i1, 0x2, %i1
+	subcc	%i3, 0x2, %i3
+	bgu,pt	%ncc, .alhlfwdcp
+	add	%i0, 0x2, %i0
+
+	ba	.chksrc
+	nop
+
+	! dst & src 8B aligned
+.alewdcp:
+	ldx	[%i1], %o2
+	stx	%o2, [%i0]
+	add	%i1, 0x8, %i1
+	subcc	%i3, 0x8, %i3
+	bgu,pt	%ncc, .alewdcp
+	add	%i0, 0x8, %i0
 
 	! Now Destination is block (64 bytes) aligned
 .chksrc:
@@ -394,6 +540,277 @@ forcpy:
 
 	mov	ASI_BLK_INIT_ST_QUAD_LDD_P, %asi
 
+#ifdef	NIAGARA2_IMPL
+	andn	%i1, 0x3f, %l0		! %l0 has block aligned src address
+	prefetch [%l0+0x0], #one_read
+	andcc	%i1, 0x3f, %g0		! is src 64B aligned
+	bz,pn	%ncc, .blkcpy
+	nop
+
+	! handle misaligned source cases
+	alignaddr %i1, %g0, %g0		! generate %gsr
+
+	srl	%i1, 0x3, %l1		! src add bits 3, 4, 5 are now least
+					! significant in %l1
+	andcc	%l1, 0x7, %l2		! mask everything except bits 1, 2, 3
+	add	%i1, %i3, %i1
+
+	! switch statement to get to right 8 byte block within
+	! 64 byte block
+	cmp	 %l2, 0x4
+	bgeu,a	 hlf
+	cmp	 %l2, 0x6
+	cmp	 %l2, 0x2
+	bgeu,a	 sqtr
+	nop
+	cmp	 %l2, 0x1
+	be,a	 off15
+	nop
+	ba	 off7
+	nop
+sqtr:
+	be,a	 off23
+	nop
+	ba,a	 off31
+	nop
+
+hlf:
+	bgeu,a	 fqtr
+	nop	 
+	cmp	 %l2, 0x5
+	be,a	 off47
+	nop
+	ba	 off39
+	nop
+fqtr:
+	be,a	 off55
+	nop
+
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+7:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_56_63
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 7b
+	prefetch [%l0+0x80], #one_read
+	ba	.blkdone
+	membar	#Sync
+
+off7:
+	ldda	[%l0]ASI_BLK_P, %d0
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+0:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_1_7
+	fmovd	%d16, %d0
+	fmovd	%d18, %d2
+	fmovd	%d20, %d4
+	fmovd	%d22, %d6
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 0b
+	prefetch [%l0+0x80], #one_read
+	ba	.blkdone
+	membar	#Sync
+
+off15:
+	ldd	[%l0+0x8], %d2
+	ldd	[%l0+0x10], %d4
+	ldd	[%l0+0x18], %d6
+	ldd	[%l0+0x20], %d8
+	ldd	[%l0+0x28], %d10
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+1:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_8_15
+	fmovd	%d18, %d2
+	fmovd	%d20, %d4
+	fmovd	%d22, %d6
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 1b
+	prefetch [%l0+0x80], #one_read
+	ba	.blkdone
+	membar	#Sync
+
+off23:
+	ldd	[%l0+0x10], %d4
+	ldd	[%l0+0x18], %d6
+	ldd	[%l0+0x20], %d8
+	ldd	[%l0+0x28], %d10
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+2:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_16_23
+	fmovd	%d20, %d4
+	fmovd	%d22, %d6
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 2b
+	prefetch [%l0+0x80], #one_read
+	ba	.blkdone
+	membar	#Sync
+
+off31:
+	ldd	[%l0+0x18], %d6
+	ldd	[%l0+0x20], %d8
+	ldd	[%l0+0x28], %d10
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+3:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_24_31
+	fmovd	%d22, %d6
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 3b
+	prefetch [%l0+0x80], #one_read
+	ba	.blkdone
+	membar	#Sync
+
+off39:
+	ldd	[%l0+0x20], %d8
+	ldd	[%l0+0x28], %d10
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+4:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_32_39
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 4b
+	prefetch [%l0+0x80], #one_read
+	ba	.blkdone
+	membar	#Sync
+
+off47:
+	ldd	[%l0+0x28], %d10
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+5:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_40_47
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 5b
+	prefetch [%l0+0x80], #one_read
+	ba	.blkdone
+	membar	#Sync
+
+off55:
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+6:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_48_55
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 6b
+	prefetch [%l0+0x80], #one_read
+	ba	.blkdone
+	membar	#Sync
+
+.blkcpy:
+	prefetch [%i1+0x40], #one_read
+	prefetch [%i1+0x80], #one_read
+8:
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+	ldda	[%i1]ASI_BLK_P, %d0
+	stda	%d0, [%i0]ASI_BLK_P
+
+	add	%i1, 0x40, %i1
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 8b
+	prefetch [%i1+0x80], #one_read
+	membar	#Sync
+
+.blkdone:
+#else	/* NIAGARA2_IMPL */
 	andcc	%i1, 0xf, %l1		! is src quadword aligned
 	bz,pn	%ncc, .blkcpy		! src offset in %l1
 	nop
@@ -556,63 +973,95 @@ loop2:
 
 .blkdone:
 	membar	#Sync
+#endif	/* NIAGARA2_IMPL */
+
 	mov	ASI_PNF, %asi		! restore %asi to default
 					! ASI_PRIMARY_NOFAULT value
-
-	! Copy as much rest of the data as double word copy.
-.cpy_wd:
-	cmp	%i2, 0x8
-	blu	%ncc, .dbdone		! Not enough bytes to copy as double
-	nop
-
-	andn	%i2, 0x7, %i3		! %i3 count is multiple of 8 bytes size
-	sub	%i2, %i3, %i2		! Residue bytes in %i2
-
-	andcc	%i1, 7, %l1		! is src aligned on a 8 bytes
-	bz	%ncc, .dbcopy
-	nop
-
-	sll	%l1, 3, %l2		! left shift
-	mov	0x40, %l3
-	sub	%l3, %l2, %l3		! right shift = (64 - left shift)
-
-.copy_wd:
-	sub	%i1, %l1, %i1		! align the src at 8 bytes.
-	ldx	[%i1], %o2
-2:
-	ldx	[%i1+8], %o4
-	ALIGN_DATA_EW(%o2, %o4, %l2, %l3, %o3)
-	stx	%o2, [%i0]
-	mov	%o4, %o2
-	add	%i1, 0x8, %i1
-	subcc	%i3, 0x8, %i3
-	bgu,pt	%ncc, 2b
-	add	%i0, 0x8, %i0
-	ba	.dbdone
-	add	%i1, %l1, %i1
-
-.dbcopy:
-	ldx	[%i1], %o2
-	stx	%o2, [%i0]
-	add	%i1, 0x8, %i1
-	subcc	%i3, 0x8, %i3
-	bgu,pt	%ncc, .dbcopy
-	add	%i0, 0x8, %i0
-
-.dbdone:
 	tst	%i2
 	bz,pt	%ncc, .blkexit
 	nop
 
+	! Handle trailing bytes
+	cmp	%i2, 0x8
+	blu,pt	%ncc, .residue
+	nop
+
+	! Can we do some 8B ops
+	or	%i1, %i0, %o2
+	andcc	%o2, 0x7, %g0
+	bnz	%ncc, .last4
+	nop
+
+	! Do 8byte ops as long as possible
+.last8:
+	ldx	[%i1], %o2
+	stx	%o2, [%i0]
+	add	%i1, 0x8, %i1
+	sub	%i2, 0x8, %i2
+	cmp	%i2, 0x8
+	bgu,pt	%ncc, .last8
+	add	%i0, 0x8, %i0
+
+	tst	%i2
+	bz,pt	%ncc, .blkexit
+	nop
+
+	ba	.residue
+	nop
+
+.last4:
+	! Can we do 4B ops
+	andcc	%o2, 0x3, %g0
+	bnz	%ncc, .last2
+	nop
+1:
+	ld	[%i1], %o2
+	st	%o2, [%i0]
+	add	%i1, 0x4, %i1
+	sub	%i2, 0x4, %i2
+	cmp	%i2, 0x4
+	bgu,pt	%ncc, 1b
+	add	%i0, 0x4, %i0
+
+	cmp	%i2, 0
+	bz,pt	%ncc, .blkexit
+	nop
+
+	ba	.residue
+	nop
+
+.last2:
+	! Can we do 2B ops
+	andcc	%o2, 0x1, %g0
+	bnz	%ncc, .residue
+	nop
+
+1:
+	lduh	[%i1], %o2
+	stuh	%o2, [%i0]
+	add	%i1, 0x2, %i1
+	sub	%i2, 0x2, %i2
+	cmp	%i2, 0x2
+	bgu,pt	%ncc, 1b
+	add	%i0, 0x2, %i0
+
+	cmp	%i2, 0
+	bz,pt	%ncc, .blkexit
+	nop
+
 .residue:
-	ldub	[%i1], %i4
-	stb	%i4, [%i0]
+	ldub	[%i1], %o2
+	stb	%o2, [%i0]
 	inc	%i1
 	deccc	%i2
 	bgu,pt	%ncc, .residue
 	inc	%i0
 
 .blkexit:
+#ifdef	NIAGARA2_IMPL
+	and	%l7, 0x4, %l7		! fprs.du = fprs.dl = 0
+	wr	%l7, %g0, %fprs		! fprs = %l7 - restore fprs.fef
+#endif	/* NIAGARA2_IMPL */
 	ret
 	restore	%g5, %g0, %o0
 	SET_SIZE(memcpy)

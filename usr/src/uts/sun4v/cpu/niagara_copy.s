@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,13 +108,191 @@
 	srlx	data2, rshift, tmp				;\
 	or	data1, tmp, data1
 
+#if !defined(NIAGARA_IMPL)
+/*
+ * Flags set in the lower bits of the t_lofault address:
+ * FPUSED_FLAG: The FP registers were in use and must be restored
+ * BCOPY_FLAG: Set for bcopy calls, cleared for kcopy calls
+ * COPY_FLAGS: Both of the above
+ *
+ * Other flags:
+ * KPREEMPT_FLAG: kpreempt needs to be called
+ */
+#define	FPUSED_FLAG	1
+#define	BCOPY_FLAG	2
+#define	COPY_FLAGS	(FPUSED_FLAG | BCOPY_FLAG)
+#define	KPREEMPT_FLAG	4
+
+#define	ALIGN_OFF_1_7			\
+	faligndata %d0, %d2, %d48	;\
+	faligndata %d2, %d4, %d50	;\
+	faligndata %d4, %d6, %d52	;\
+	faligndata %d6, %d8, %d54	;\
+	faligndata %d8, %d10, %d56	;\
+	faligndata %d10, %d12, %d58	;\
+	faligndata %d12, %d14, %d60	;\
+	faligndata %d14, %d16, %d62
+
+#define	ALIGN_OFF_8_15			\
+	faligndata %d2, %d4, %d48	;\
+	faligndata %d4, %d6, %d50	;\
+	faligndata %d6, %d8, %d52	;\
+	faligndata %d8, %d10, %d54	;\
+	faligndata %d10, %d12, %d56	;\
+	faligndata %d12, %d14, %d58	;\
+	faligndata %d14, %d16, %d60	;\
+	faligndata %d16, %d18, %d62
+
+#define	ALIGN_OFF_16_23			\
+	faligndata %d4, %d6, %d48	;\
+	faligndata %d6, %d8, %d50	;\
+	faligndata %d8, %d10, %d52	;\
+	faligndata %d10, %d12, %d54	;\
+	faligndata %d12, %d14, %d56	;\
+	faligndata %d14, %d16, %d58	;\
+	faligndata %d16, %d18, %d60	;\
+	faligndata %d18, %d20, %d62
+
+#define	ALIGN_OFF_24_31			\
+	faligndata %d6, %d8, %d48	;\
+	faligndata %d8, %d10, %d50	;\
+	faligndata %d10, %d12, %d52	;\
+	faligndata %d12, %d14, %d54	;\
+	faligndata %d14, %d16, %d56	;\
+	faligndata %d16, %d18, %d58	;\
+	faligndata %d18, %d20, %d60	;\
+	faligndata %d20, %d22, %d62
+
+#define	ALIGN_OFF_32_39			\
+	faligndata %d8, %d10, %d48	;\
+	faligndata %d10, %d12, %d50	;\
+	faligndata %d12, %d14, %d52	;\
+	faligndata %d14, %d16, %d54	;\
+	faligndata %d16, %d18, %d56	;\
+	faligndata %d18, %d20, %d58	;\
+	faligndata %d20, %d22, %d60	;\
+	faligndata %d22, %d24, %d62
+
+#define	ALIGN_OFF_40_47			\
+	faligndata %d10, %d12, %d48	;\
+	faligndata %d12, %d14, %d50	;\
+	faligndata %d14, %d16, %d52	;\
+	faligndata %d16, %d18, %d54	;\
+	faligndata %d18, %d20, %d56	;\
+	faligndata %d20, %d22, %d58	;\
+	faligndata %d22, %d24, %d60	;\
+	faligndata %d24, %d26, %d62
+
+#define	ALIGN_OFF_48_55			\
+	faligndata %d12, %d14, %d48	;\
+	faligndata %d14, %d16, %d50	;\
+	faligndata %d16, %d18, %d52	;\
+	faligndata %d18, %d20, %d54	;\
+	faligndata %d20, %d22, %d56	;\
+	faligndata %d22, %d24, %d58	;\
+	faligndata %d24, %d26, %d60	;\
+	faligndata %d26, %d28, %d62
+
+#define	ALIGN_OFF_56_63			\
+	faligndata %d14, %d16, %d48	;\
+	faligndata %d16, %d18, %d50	;\
+	faligndata %d18, %d20, %d52	;\
+	faligndata %d20, %d22, %d54	;\
+	faligndata %d22, %d24, %d56	;\
+	faligndata %d24, %d26, %d58	;\
+	faligndata %d26, %d28, %d60	;\
+	faligndata %d28, %d30, %d62
+
+#define	VIS_BLOCKSIZE		64
+
+/*
+ * Size of stack frame in order to accomodate a 64-byte aligned
+ * floating-point register save area and 2 64-bit temp locations.
+ * All copy functions use three quadrants of fp registers; to assure a
+ * block-aligned three block buffer in which to save we must reserve
+ * four blocks on stack.
+ *
+ *    _______________________________________ <-- %fp + STACK_BIAS
+ *    | We may need to preserve 3 quadrants |
+ *    | of fp regs, but since we do so with |
+ *    | BST/BLD we need room in which to    |
+ *    | align to VIS_BLOCKSIZE bytes.  So   |
+ *    | this area is 4 * VIS_BLOCKSIZE.     | <--  - SAVED_FPREGS_OFFSET
+ *    |-------------------------------------|
+ *    | 8 bytes to save %fprs               | <--  - SAVED_FPRS_OFFSET
+ *    |-------------------------------------|
+ *    | 8 bytes to save %gsr                | <--  - SAVED_GSR_OFFSET
+ *    ---------------------------------------
+ */
+#define HWCOPYFRAMESIZE         ((VIS_BLOCKSIZE * (3 + 1)) + (2 * 8))
+#define SAVED_FPREGS_OFFSET     (VIS_BLOCKSIZE * 4)
+#define SAVED_FPREGS_ADJUST     ((VIS_BLOCKSIZE * 3) + 1)
+#define SAVED_FPRS_OFFSET       (SAVED_FPREGS_OFFSET + 8)
+#define SAVED_GSR_OFFSET        (SAVED_FPRS_OFFSET + 8)
+
+/*
+ * In FP copies if we do not have preserved data to restore over
+ * the fp regs we used then we must zero those regs to avoid
+ * exposing portions of the data to later threads (data security).
+ */
+#define	FZERO				\
+	fzero	%f0			;\
+	fzero	%f2			;\
+	faddd	%f0, %f2, %f4		;\
+	fmuld	%f0, %f2, %f6		;\
+	faddd	%f0, %f2, %f8		;\
+	fmuld	%f0, %f2, %f10		;\
+	faddd	%f0, %f2, %f12		;\
+	fmuld	%f0, %f2, %f14		;\
+	faddd	%f0, %f2, %f16		;\
+	fmuld	%f0, %f2, %f18		;\
+	faddd	%f0, %f2, %f20		;\
+	fmuld	%f0, %f2, %f22		;\
+	faddd	%f0, %f2, %f24		;\
+	fmuld	%f0, %f2, %f26		;\
+	faddd	%f0, %f2, %f28		;\
+	fmuld	%f0, %f2, %f30		;\
+	faddd	%f0, %f2, %f48		;\
+	fmuld	%f0, %f2, %f50		;\
+	faddd	%f0, %f2, %f52		;\
+	fmuld	%f0, %f2, %f54		;\
+	faddd	%f0, %f2, %f56		;\
+	fmuld	%f0, %f2, %f58		;\
+	faddd	%f0, %f2, %f60		;\
+	fmuld	%f0, %f2, %f62
+
+/*
+ * Macros to save and restore fp registers to/from the stack.
+ * Used to save and restore in-use fp registers when we want to use FP.
+ */
+#define BST_FP_TOSTACK(tmp1)					\
+	/* membar #Sync	*/					;\
+	add	%fp, STACK_BIAS - SAVED_FPREGS_ADJUST, tmp1	;\
+	and	tmp1, -VIS_BLOCKSIZE, tmp1 /* block align */	;\
+	stda	%f0, [tmp1]ASI_BLK_P				;\
+	add	tmp1, VIS_BLOCKSIZE, tmp1			;\
+	stda	%f16, [tmp1]ASI_BLK_P				;\
+	add	tmp1, VIS_BLOCKSIZE, tmp1			;\
+	stda	%f48, [tmp1]ASI_BLK_P				;\
+	membar	#Sync
+
+#define	BLD_FP_FROMSTACK(tmp1)					\
+	/* membar #Sync - provided at copy completion */	;\
+	add	%fp, STACK_BIAS - SAVED_FPREGS_ADJUST, tmp1	;\
+	and	tmp1, -VIS_BLOCKSIZE, tmp1 /* block align */	;\
+	ldda	[tmp1]ASI_BLK_P, %f0				;\
+	add	tmp1, VIS_BLOCKSIZE, tmp1			;\
+	ldda	[tmp1]ASI_BLK_P, %f16				;\
+	add	tmp1, VIS_BLOCKSIZE, tmp1			;\
+	ldda	[tmp1]ASI_BLK_P, %f48				;\
+	membar	#Sync
+#endif	/* NIAGARA_IMPL */
+
 /*
  * Copy a block of storage, returning an error code if `from' or
  * `to' takes a kernel pagefault which cannot be resolved.
  * Returns errno value on pagefault error, 0 if all ok
  */
-
-
 
 #if defined(lint)
 
@@ -131,6 +308,113 @@ kcopy(const void *from, void *to, size_t count)
 
 	ENTRY(kcopy)
 
+#if !defined(NIAGARA_IMPL)
+	save	%sp, -SA(MINFRAME + HWCOPYFRAMESIZE), %sp
+	sethi	%hi(.copyerr), %l7		! copyerr is lofault value
+	or	%l7, %lo(.copyerr), %l7
+	ldn	[THREAD_REG + T_LOFAULT], %o5	! save existing handler
+	! Note that we carefully do *not* flag the setting of
+	! t_lofault.
+	membar	#Sync				! sync error barrier
+	b	.do_copy			! common code
+	stn	%l7, [THREAD_REG + T_LOFAULT]	! set t_lofault
+
+/*
+ * We got here because of a fault during kcopy or bcopy if a fault
+ * handler existed when bcopy was called.
+ * Errno value is in %g1.
+ */
+.copyerr:
+	sethi	%hi(.copyerr2), %l1
+	or	%l1, %lo(.copyerr2), %l1
+	membar	#Sync				! sync error barrier
+	stn	%l1, [THREAD_REG + T_LOFAULT]	! set t_lofault
+	btst	FPUSED_FLAG, %o5
+	bz,pt	%xcc, 1f
+	and	%o5, BCOPY_FLAG, %l1	! copy flag to %l1
+
+	membar	#Sync				! sync error barrier
+	ldx	[%fp + STACK_BIAS - SAVED_GSR_OFFSET], %o2      ! restore gsr
+	wr	%o2, 0, %gsr
+
+	ld	[%fp + STACK_BIAS - SAVED_FPRS_OFFSET], %o3
+	btst	FPRS_FEF, %o3
+	bz,pt	%icc, 4f
+	  nop
+
+	! restore fpregs from stack
+	BLD_FP_FROMSTACK(%o2)
+
+	ba,pt	%ncc, 2f
+	  wr	%o3, 0, %fprs		! restore fprs
+
+4:
+	FZERO
+	wr	%o3, 0, %fprs		! restore fprs
+
+2:
+	ldn	[THREAD_REG + T_LWP], %o2
+	brnz,pt	%o2, 1f
+	  nop
+
+	ldsb	[THREAD_REG + T_PREEMPT], %l0
+	deccc	%l0
+	bnz,pn	%ncc, 1f
+	  stb	%l0, [THREAD_REG + T_PREEMPT]
+
+	ldsb	[THREAD_REG + T_PREEMPT], %l0
+	dec	%l0
+	stb	%l0, [THREAD_REG + T_PREEMPT]
+
+	! Check for a kernel preemption request
+	ldn	[THREAD_REG + T_CPU], %l0
+	ldub	[%l0 + CPU_KPRUNRUN], %l0
+	brnz,a,pt	%l0, 1f	! Need to call kpreempt?
+	  or	%l1, KPREEMPT_FLAG, %l1	! If so, set the flag
+
+	! The kcopy will always set a t_lofault handler. If it fires,
+	! we're expected to just return the error code and not to
+	! invoke any existing error handler. As far as bcopy is concerned,
+	! we only set t_lofault if there was an existing lofault handler.
+	! In that case we're expected to invoke the previously existing
+	! handler after restting the t_lofault value.
+1:
+	andn	%o5, COPY_FLAGS, %o5	! remove flags from lofault address
+	membar	#Sync				! sync error barrier
+	stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
+
+	! call kpreempt if necessary
+	btst	KPREEMPT_FLAG, %l1
+	bz,pt	%icc, 2f
+	  nop
+	call	kpreempt
+	  rdpr	%pil, %o0	! pass %pil
+2:
+	btst	BCOPY_FLAG, %l1
+	bnz,pn	%ncc, 3f
+	nop
+	ret
+	restore	%g1, 0, %o0
+
+3:
+	! We're here via bcopy. There must have been an error handler
+	! in place otherwise we would have died a nasty death already.
+	jmp	%o5				! goto real handler
+	restore	%g0, 0, %o0			! dispose of copy window
+
+/*
+ * We got here because of a fault in .copyerr.  We can't safely restore fp
+ * state, so we panic.
+ */
+fp_panic_msg:
+	.asciz	"Unable to restore fp state after copy operation"
+
+	.align	4
+.copyerr2:
+	set	fp_panic_msg, %o0
+	call	panic
+	  nop
+#else	/* NIAGARA_IMPL */
 	save	%sp, -SA(MINFRAME), %sp
 	set	.copyerr, %l7			! copyerr is lofault value
 	ldn	[THREAD_REG + T_LOFAULT], %o5	! save existing handler
@@ -152,6 +436,7 @@ kcopy(const void *from, void *to, size_t count)
 	stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
 	ret
 	restore	%g1, 0, %o0
+#endif	/* NIAGARA_IMPL */
 
 	SET_SIZE(kcopy)
 #endif	/* lint */
@@ -171,8 +456,25 @@ bcopy(const void *from, void *to, size_t count)
 
 	ENTRY(bcopy)
 
+#if !defined(NIAGARA_IMPL)
+	save	%sp, -SA(MINFRAME + HWCOPYFRAMESIZE), %sp
+	ldn	[THREAD_REG + T_LOFAULT], %o5	! save existing handler
+	brz,pt	%o5, .do_copy
+	  nop
+	sethi	%hi(.copyerr), %l7		! copyerr is lofault value
+	or	%l7, %lo(.copyerr), %l7
+	membar	#Sync				! sync error barrier
+	stn	%l7, [THREAD_REG + T_LOFAULT]	! set t_lofault
+	! We've already captured whether t_lofault was zero on entry.
+	! We need to mark ourselves as being from bcopy since both
+	! kcopy and bcopy use the same code path. If BCOPY_FLAG is
+	! set and the saved lofault was zero, we won't reset lofault on
+	! returning.
+	or	%o5, BCOPY_FLAG, %o5
+#else	/* NIAGARA_IMPL */
 	save	%sp, -SA(MINFRAME), %sp
 	clr	%o5			! flag LOFAULT_SET is not set for bcopy
+#endif	/* NIAGARA_IMPL */
 
 .do_copy:
 	cmp	%i2, 12			! for small counts
@@ -185,8 +487,7 @@ bcopy(const void *from, void *to, size_t count)
 
 	set	use_hw_bcopy, %o2
 	ld	[%o2], %o2
-	tst	%o2
-	bz	.bcb_punt
+	brz,pn	%o2, .bcb_punt
 	  nop
 
 	subcc	%i1, %i0, %i3
@@ -205,25 +506,110 @@ bcopy(const void *from, void *to, size_t count)
 	/*
 	 * Copy that reach here have at least 2 blocks of data to copy.
 	 */
+#if !defined(NIAGARA_IMPL)
+	ldn	[THREAD_REG + T_LWP], %o3
+	brnz,pt	%o3, 1f
+	  nop
+
+	! kpreempt_disable();
+	ldsb	[THREAD_REG + T_PREEMPT], %o2
+	inc	%o2
+	stb	%o2, [THREAD_REG + T_PREEMPT]
+
+1:
+	rd	%fprs, %o2              ! check for unused fp
+	st	%o2, [%fp + STACK_BIAS - SAVED_FPRS_OFFSET] ! save orig %fprs
+	btst	FPRS_FEF, %o2
+	bz,a,pt	%icc, .do_blockcopy
+	wr	%g0, FPRS_FEF, %fprs
+
+	! save in-use fpregs on stack
+	BST_FP_TOSTACK(%o2)
+#endif	/* NIAGARA_IMPL */
+	
 .do_blockcopy:
+
+#if !defined(NIAGARA_IMPL)
+	rd	%gsr, %o2
+	stx	%o2, [%fp + STACK_BIAS - SAVED_GSR_OFFSET]      ! save gsr
+	or	%o5, FPUSED_FLAG, %o5		! fp regs are in use
+#endif	/* NIAGARA_IMPL */
+
 	! Swap src/dst since the code below is memcpy code
 	! and memcpy/bcopy have different calling sequences
 	mov	%i1, %i5
 	mov	%i0, %i1
 	mov	%i5, %i0
 
+	! Block (64 bytes) align the destination.
 	andcc	%i0, 0x3f, %i3		! is dst aligned on a 64 bytes
 	bz	%xcc, .chksrc		! dst is already double aligned
 	sub	%i3, 0x40, %i3
 	neg	%i3			! bytes till dst 64 bytes aligned
 	sub	%i2, %i3, %i2		! update i2 with new count
 
-1:	ldub	[%i1], %i4
-	stb	%i4, [%i0]
+	! Based on source and destination alignment do
+	! either 8 bytes, 4 bytes, 2 bytes or byte copy.
+
+	! Is dst & src 8B aligned
+	or	%i0, %i1, %o2
+	andcc	%o2, 0x7, %g0
+	bz	%ncc, .alewdcp
+	nop
+
+	! Is dst & src 4B aligned
+	andcc	%o2, 0x3, %g0
+	bz	%ncc, .alwdcp
+	nop
+
+	! Is dst & src 2B aligned
+	andcc	%o2, 0x1, %g0
+	bz	%ncc, .alhlfwdcp
+	nop
+
+	! 1B aligned
+1:	ldub	[%i1], %o2
+	stb	%o2, [%i0]
 	inc	%i1
 	deccc	%i3
-	bgu	%xcc, 1b
+	bgu,pt	%ncc, 1b
 	inc	%i0
+
+	ba	.chksrc
+	nop
+
+	! dst & src 4B aligned
+.alwdcp:
+	ld	[%i1], %o2
+	st	%o2, [%i0]
+	add	%i1, 0x4, %i1
+	subcc	%i3, 0x4, %i3
+	bgu,pt	%ncc, .alwdcp
+	add	%i0, 0x4, %i0
+
+	ba	.chksrc
+	nop
+
+	! dst & src 2B aligned
+.alhlfwdcp:
+	lduh	[%i1], %o2
+	stuh	%o2, [%i0]
+	add	%i1, 0x2, %i1
+	subcc	%i3, 0x2, %i3
+	bgu,pt	%ncc, .alhlfwdcp
+	add	%i0, 0x2, %i0
+
+	ba	.chksrc
+	nop
+
+	! dst & src 8B aligned
+.alewdcp:
+	ldx	[%i1], %o2
+	stx	%o2, [%i0]
+	add	%i1, 0x8, %i1
+	subcc	%i3, 0x8, %i3
+	bgu,pt	%ncc, .alewdcp
+	add	%i0, 0x8, %i0
 
 	! Now Destination is block (64 bytes) aligned
 .chksrc:
@@ -232,6 +618,286 @@ bcopy(const void *from, void *to, size_t count)
 
 	mov	ASI_BLK_INIT_ST_QUAD_LDD_P, %asi
 
+#if !defined(NIAGARA_IMPL)
+	andn	%i1, 0x3f, %l0		! %l0 has block aligned src address
+	prefetch [%l0+0x0], #one_read
+	andcc	%i1, 0x3f, %g0		! is src 64B aligned
+	bz,pn	%ncc, .blkcpy
+	nop
+
+	! handle misaligned source cases
+	alignaddr %i1, %g0, %g0		! generate %gsr
+
+	srl	%i1, 0x3, %l1		! src add bits 3, 4, 5 are now least
+					! significant in %l1
+	andcc	%l1, 0x7, %l2		! mask everything except bits 1, 2, 3
+	add	%i1, %i3, %i1
+
+	! switch statement to get to right 8 byte block within
+	! 64 byte block
+	cmp	 %l2, 0x4
+	bgeu,a	 hlf
+	cmp	 %l2, 0x6
+	cmp	 %l2, 0x2
+	bgeu,a	 sqtr
+	nop
+	cmp	 %l2, 0x1
+	be,a	 off15
+	nop
+	ba	 off7
+	nop
+sqtr:
+	be,a	 off23
+	nop
+	ba,a	 off31
+	nop
+
+hlf:
+	bgeu,a	 fqtr
+	nop	 
+	cmp	 %l2, 0x5
+	be,a	 off47
+	nop
+	ba	 off39
+	nop
+fqtr:
+	be,a	 off55
+	nop
+
+	! Falls through when the source offset is greater than 56 
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+7:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_56_63
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 7b
+	prefetch [%l0+0x80], #one_read
+	ba	.blkdone
+	membar	#Sync
+
+	! This copy case for source offset between 1 and 7
+off7:
+	ldda	[%l0]ASI_BLK_P, %d0
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+0:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_1_7
+	fmovd	%d16, %d0
+	fmovd	%d18, %d2
+	fmovd	%d20, %d4
+	fmovd	%d22, %d6
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 0b
+	prefetch [%l0+0x80], #one_read
+	ba	.blkdone
+	membar	#Sync
+
+	! This copy case for source offset between 8 and 15
+off15:
+	ldd	[%l0+0x8], %d2
+	ldd	[%l0+0x10], %d4
+	ldd	[%l0+0x18], %d6
+	ldd	[%l0+0x20], %d8
+	ldd	[%l0+0x28], %d10
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+1:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_8_15
+	fmovd	%d18, %d2
+	fmovd	%d20, %d4
+	fmovd	%d22, %d6
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 1b
+	prefetch [%l0+0x80], #one_read
+	ba	.blkdone
+	membar	#Sync
+
+	! This copy case for source offset between 16 and 23
+off23:
+	ldd	[%l0+0x10], %d4
+	ldd	[%l0+0x18], %d6
+	ldd	[%l0+0x20], %d8
+	ldd	[%l0+0x28], %d10
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+2:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_16_23
+	fmovd	%d20, %d4
+	fmovd	%d22, %d6
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 2b
+	prefetch [%l0+0x80], #one_read
+	ba	.blkdone
+	membar	#Sync
+
+	! This copy case for source offset between 24 and 31
+off31:
+	ldd	[%l0+0x18], %d6
+	ldd	[%l0+0x20], %d8
+	ldd	[%l0+0x28], %d10
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+3:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_24_31
+	fmovd	%d22, %d6
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 3b
+	prefetch [%l0+0x80], #one_read
+	ba	.blkdone
+	membar	#Sync
+
+	! This copy case for source offset between 32 and 39
+off39:
+	ldd	[%l0+0x20], %d8
+	ldd	[%l0+0x28], %d10
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+4:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_32_39
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 4b
+	prefetch [%l0+0x80], #one_read
+	ba	.blkdone
+	membar	#Sync
+
+	! This copy case for source offset between 40 and 47
+off47:
+	ldd	[%l0+0x28], %d10
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+5:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_40_47
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 5b
+	prefetch [%l0+0x80], #one_read
+	ba	.blkdone
+	membar	#Sync
+
+	! This copy case for source offset between 48 and 55
+off55:
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+6:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_48_55
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 6b
+	prefetch [%l0+0x80], #one_read
+	ba	.blkdone
+	membar	#Sync
+
+	! Both source and destination are block aligned.
+.blkcpy:
+	prefetch [%i1+0x40], #one_read
+	prefetch [%i1+0x80], #one_read
+8:
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+	ldda	[%i1]ASI_BLK_P, %d0
+	stda	%d0, [%i0]ASI_BLK_P
+
+	add	%i1, 0x40, %i1
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 8b
+	prefetch [%i1+0x80], #one_read
+	membar	#Sync
+
+.blkdone:
+#else	/* NIAGARA_IMPL */
 	andcc	%i1, 0xf, %o2		! is src quadword aligned
 	bz,pn	%xcc, .blkcpy		! src offset in %o2
 	nop
@@ -393,19 +1059,167 @@ loop2:
 	add	%i0, 0x40, %i0
 
 .blkdone:
-	tst	%i2
-	bz,pt	%xcc, .blkexit
+	membar	#Sync
+#endif	/* NIAGARA_IMPL */
+
+	brz,pt	%i2, .blkexit
+	nop
+
+	! Handle trailing bytes
+	cmp	%i2, 0x8
+	blu,pt	%ncc, .residue
+	nop
+
+	! Can we do some 8B ops
+	or	%i1, %i0, %o2
+	andcc	%o2, 0x7, %g0
+	bnz	%ncc, .last4
+	nop
+
+	! Do 8byte ops as long as possible
+.last8:
+	ldx	[%i1], %o2
+	stx	%o2, [%i0]
+	add	%i1, 0x8, %i1
+	sub	%i2, 0x8, %i2
+	cmp	%i2, 0x8
+	bgu,pt	%ncc, .last8
+	add	%i0, 0x8, %i0
+
+	brz,pt	%i2, .blkexit
+	nop
+
+	ba	.residue
+	nop
+
+.last4:
+	! Can we do 4B ops
+	andcc	%o2, 0x3, %g0
+	bnz	%ncc, .last2
+	nop
+1:
+	ld	[%i1], %o2
+	st	%o2, [%i0]
+	add	%i1, 0x4, %i1
+	sub	%i2, 0x4, %i2
+	cmp	%i2, 0x4
+	bgu,pt	%ncc, 1b
+	add	%i0, 0x4, %i0
+
+	brz,pt	%i2, .blkexit
+	nop
+
+	ba	.residue
+	nop
+
+.last2:
+	! Can we do 2B ops
+	andcc	%o2, 0x1, %g0
+	bnz	%ncc, .residue
+	nop
+
+1:
+	lduh	[%i1], %o2
+	stuh	%o2, [%i0]
+	add	%i1, 0x2, %i1
+	sub	%i2, 0x2, %i2
+	cmp	%i2, 0x2
+	bgu,pt	%ncc, 1b
+	add	%i0, 0x2, %i0
+
+	brz,pt	%i2, .blkexit
 	nop
 
 .residue:
-	ldub	[%i1], %i4
-	stb	%i4, [%i0]
+	ldub	[%i1], %o2
+	stb	%o2, [%i0]
 	inc	%i1
 	deccc	%i2
-	bgu	%xcc, .residue
+	bgu,pt	%ncc, .residue
 	inc	%i0
 
 .blkexit:
+#if !defined(NIAGARA_IMPL)
+	btst	FPUSED_FLAG, %o5
+	bz	%icc, 1f
+	  and	%o5,  COPY_FLAGS, %l1	! Store flags in %l1
+					! We can't clear the flags from %o5 yet
+					! If there's an error, .copyerr will
+					! need them
+
+	ldx	[%fp + STACK_BIAS - SAVED_GSR_OFFSET], %o2      ! restore gsr
+	wr	%o2, 0, %gsr
+
+	ld	[%fp + STACK_BIAS - SAVED_FPRS_OFFSET], %o3
+	btst	FPRS_FEF, %o3
+	bz,pt	%icc, 4f
+	  nop
+
+	! restore fpregs from stack
+	BLD_FP_FROMSTACK(%o2)
+
+	ba,pt	%ncc, 2f
+	  wr	%o3, 0, %fprs		! restore fprs
+
+4:
+	FZERO
+	wr	%o3, 0, %fprs		! restore fprs
+
+2:
+	ldn	[THREAD_REG + T_LWP], %o2
+	brnz,pt	%o2, 1f
+	  nop
+
+	ldsb	[THREAD_REG + T_PREEMPT], %l0
+	deccc	%l0
+	bnz,pn	%ncc, 1f
+	  stb	%l0, [THREAD_REG + T_PREEMPT]
+
+	! Check for a kernel preemption request
+	ldn	[THREAD_REG + T_CPU], %l0
+	ldub	[%l0 + CPU_KPRUNRUN], %l0
+	brnz,a,pt	%l0, 1f	! Need to call kpreempt?
+	  or	%l1, KPREEMPT_FLAG, %l1	! If so, set the flag
+
+	ldsb	[THREAD_REG + T_PREEMPT], %l0
+	dec	%l0
+	stb	%l0, [THREAD_REG + T_PREEMPT]
+1:
+	btst	BCOPY_FLAG, %l1
+	bz,pn	%icc, 3f
+	andncc	%o5, COPY_FLAGS, %o5
+
+	! Here via bcopy. Check to see if the handler was NULL.
+	! If so, just return quietly. Otherwise, reset the
+	! handler and go home.
+	bnz,pn	%ncc, 3f
+	nop
+
+	! Null handler.
+	btst	KPREEMPT_FLAG, %l1
+	bz,pt	%icc, 2f
+	  nop
+	call	kpreempt
+	  rdpr	%pil, %o0	! pass %pil
+2:
+	
+	ret
+	restore	%g0, 0, %o0
+
+	! Here via kcopy or bcopy with a handler.
+	! Reset the fault handler.
+3:
+	membar	#Sync
+	stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
+
+	! call kpreempt if necessary
+	btst	KPREEMPT_FLAG, %l1
+	bz,pt	%icc, 4f
+	  nop
+	call	kpreempt
+	  rdpr	%pil, %o0
+4:
+#else	/* NIAGARA_IMPL */
 	membar	#Sync				! sync error barrier
 	! Restore t_lofault handler, if came here from kcopy().
 	tst	%o5
@@ -413,6 +1227,7 @@ loop2:
 	andn	%o5, LOFAULT_SET, %o5
 	stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
 1:
+#endif	/* NIAGARA_IMPL */
 	ret
 	restore	%g0, 0, %o0
 
@@ -634,6 +1449,28 @@ loop2:
 	bgeu,a	%ncc, 1b		! loop till done
 	ldub	[%i0+%i1], %o4		! read from address
 .cpdone:
+#if !defined(NIAGARA_IMPL)
+	! FPUSED_FLAG will not have been set in any path leading to
+	! this point. No need to deal with it.
+	btst	BCOPY_FLAG, %o5
+	bz,pn	%icc, 2f
+	andcc	%o5, BCOPY_FLAG, %o5
+	! Here via bcopy. Check to see if the handler was NULL.
+	! If so, just return quietly. Otherwise, reset the
+	! handler and go home.
+	bnz,pn	%ncc, 2f
+	nop
+	!
+	! Null handler.
+	!
+	ret
+	restore %g0, 0, %o0
+	! Here via kcopy or bcopy with a handler.
+	! Reset the fault handler.
+2:
+	membar	#Sync
+	stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
+#else	/* NIAGARA_IMPL */
 	membar	#Sync				! sync error barrier
 	! Restore t_lofault handler, if came here from kcopy().
 	tst	%o5
@@ -641,6 +1478,7 @@ loop2:
 	andn	%o5, LOFAULT_SET, %o5
 	stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
 1:
+#endif	/* NIAGARA_IMPL */
 	ret
 	restore %g0, 0, %o0		! return (0)
 
@@ -736,7 +1574,7 @@ hwblkpagecopy(const void *src, void *dst)
 { }
 #else /* lint */
 	ENTRY(hwblkpagecopy)
-	save	%sp, -SA(MINFRAME + 4*64), %sp
+	save	%sp, -SA(MINFRAME), %sp
 
 	! %i0 - source address (arg)
 	! %i1 - destination address (arg)
@@ -915,8 +1753,34 @@ copyout(const void *kaddr, void *uaddr, size_t count)
  * member of the t_copyop structure, if needed.
  */
 	ENTRY(copyio_fault)
+#if !defined(NIAGARA_IMPL)
+	btst	FPUSED_FLAG, SAVED_LOFAULT
+	bz	1f
+	andn	SAVED_LOFAULT, FPUSED_FLAG, SAVED_LOFAULT
+
+	ld	[%fp + STACK_BIAS - SAVED_GSR_OFFSET], %o2
+	wr	%o2, 0, %gsr		! restore gsr
+
+	ld	[%fp + STACK_BIAS - SAVED_FPRS_OFFSET], %o3
+	btst	FPRS_FEF, %o3
+	bz	%icc, 4f
+	  nop
+
+	! restore fpregs from stack
+	BLD_FP_FROMSTACK(%o2)
+
+	ba,pt	%ncc, 1f
+	  wr	%o3, 0, %fprs		! restore fprs
+
+4:
+	FZERO				! zero all of the fpregs
+	wr	%o3, 0, %fprs		! restore fprs
+
+1:
+#else	/* NIAGARA_IMPL */
 	membar	#Sync
 	stn	SAVED_LOFAULT, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
+#endif	/* NIAGARA_IMPL */
 
 	restore
 
@@ -1237,19 +2101,39 @@ copyout(const void *kaddr, void *uaddr, size_t count)
 	clr	%o0
 
 .big_copyout:
-	!
 	! We're going to go off and do a block copy.
 	! Switch fault handlers and grab a window. We
 	! don't do a membar #Sync since we've done only
 	! kernel data to this point.
-	!
 	stn	%o4, [THREAD_REG + T_LOFAULT]
-	save	%sp, -SA(MINFRAME), %sp
 
 	! Copy out that reach here are larger than 256 bytes. The
 	! hw_copy_limit_1 is set to 256. Never set this limit less
 	! 128 bytes.
+#if !defined(NIAGARA_IMPL)
+	save	%sp, -SA(MINFRAME + HWCOPYFRAMESIZE), %sp
+
+	rd	%fprs, %o2			! check for unused fp
+	st	%o2, [%fp + STACK_BIAS - SAVED_FPRS_OFFSET]	! save %fprs
+	btst	FPRS_FEF, %o2
+	bz,a,pt	%icc, .do_block_copyout
+	wr	%g0, FPRS_FEF, %fprs
+
+	! save in-use fpregs on stack
+	BST_FP_TOSTACK(%o2)
+#else	/* NIAGARA_IMPL */
+	save	%sp, -SA(MINFRAME), %sp
+#endif	/* NIAGARA_IMPL */
+
 .do_block_copyout:
+
+#if !defined(NIAGARA_IMPL)
+	rd	%gsr, %o2
+	stx	%o2, [%fp + STACK_BIAS - SAVED_GSR_OFFSET]	! save gsr
+	! set the lower bit saved t_lofault to indicate that we need
+	! clear %fprs register on the way out
+	or	SAVED_LOFAULT, FPUSED_FLAG, SAVED_LOFAULT
+#endif	/* NIAGARA_IMPL */
 
 	! Swap src/dst since the code below is memcpy code
 	! and memcpy/bcopy have different calling sequences
@@ -1257,69 +2141,354 @@ copyout(const void *kaddr, void *uaddr, size_t count)
 	mov	%i0, %i1
 	mov	%i5, %i0
 
-	andcc	%i0, 7, %i3		! is dst double aligned
-	bz	%ncc, copyout_blkcpy
-	sub	%i3, 8, %i3
-	neg	%i3			! bytes till double aligned
-	sub	%i2, %i3, %i2		! update %i2 with new count
+	! Block (64 bytes) align the destination.
+	andcc	%i0, 0x3f, %i3		! is dst block aligned
+	bz	%ncc, copyout_blalign	! dst already block aligned
+	sub	%i3, 0x40, %i3
+	neg	%i3			! bytes till dst 64 bytes aligned
+	sub	%i2, %i3, %i2		! update i2 with new count
 
-	! Align Destination on double-word boundary
+	! Based on source and destination alignment do
+	! either 8 bytes, 4 bytes, 2 bytes or byte copy.
 
-1:	ldub	[%i1], %i4
+	! Is dst & src 8B aligned
+	or	%i0, %i1, %o2
+	andcc	%o2, 0x7, %g0
+	bz	%ncc, .co_alewdcp
+	nop
+
+	! Is dst & src 4B aligned
+	andcc	%o2, 0x3, %g0
+	bz	%ncc, .co_alwdcp
+	nop
+
+	! Is dst & src 2B aligned
+	andcc	%o2, 0x1, %g0
+	bz	%ncc, .co_alhlfwdcp
+	nop
+
+	! 1B aligned
+1:	ldub	[%i1], %o2
+	stba	%o2, [%i0]ASI_USER
 	inc	%i1
-	stba	%i4, [%i0]ASI_USER
 	deccc	%i3
-	bgu	%ncc, 1b
-	  inc	%i0
+	bgu,pt	%ncc, 1b
+	inc	%i0
 
-copyout_blkcpy:
-	andcc	%i0, 63, %i3
-	bz,pn	%ncc, copyout_blalign	! now block aligned
-	sub	%i3, 64, %i3
-	neg	%i3			! bytes till block aligned
-	sub	%i2, %i3, %i2		! update %i2 with new count
-
-	! Copy %i3 bytes till dst is block (64 byte) aligned. use
-	! double word copies.
-
-	andcc	%i1, 7, %g1		! is src aligned on a 8 bytes
-	bz	%ncc, .co_dbcopy	! %g1 has source offset (last 3-bits)
-	sll	%g1, 3, %l1		! left shift
-	mov	0x40, %l2
-	sub	%l2, %l1, %l2		! right shift = (64 - left shift)
-
-	! Now use double word copies to align destination.
-.co_double:
-	sub	%i1, %g1, %i1		! align the src at 8 bytes.
-	ldx	[%i1], %o2
-2:
-	ldx	[%i1+8], %o4
-	ALIGN_DATA_EW(%o2, %o4, %l1, %l2, %o3)
-	stxa	%o2, [%i0]ASI_USER
-	mov	%o4, %o2
-	add	%i1, 0x8, %i1
-	subcc	%i3, 0x8, %i3
-	bgu,pt	%ncc, 2b
-	add	%i0, 0x8, %i0
 	ba	copyout_blalign
-	add	%i1, %g1, %i1
+	nop
 
-	! Both source and destination are double aligned.
-	! No shift and merge of data required in this case.
-.co_dbcopy:
+	! dst & src 4B aligned
+.co_alwdcp:
+	ld	[%i1], %o2
+	sta	%o2, [%i0]ASI_USER
+	add	%i1, 0x4, %i1
+	subcc	%i3, 0x4, %i3
+	bgu,pt	%ncc, .co_alwdcp
+	add	%i0, 0x4, %i0
+
+	ba	copyout_blalign
+	nop
+
+	! dst & src 2B aligned
+.co_alhlfwdcp:
+	lduh	[%i1], %o2
+	stuha	%o2, [%i0]ASI_USER
+	add	%i1, 0x2, %i1
+	subcc	%i3, 0x2, %i3
+	bgu,pt	%ncc, .co_alhlfwdcp
+	add	%i0, 0x2, %i0
+
+	ba	copyout_blalign
+	nop
+
+	! dst & src 8B aligned
+.co_alewdcp:
 	ldx	[%i1], %o2
 	stxa	%o2, [%i0]ASI_USER
 	add	%i1, 0x8, %i1
 	subcc	%i3, 0x8, %i3
-	bgu,pt	%ncc, .co_dbcopy
+	bgu,pt	%ncc, .co_alewdcp
 	add	%i0, 0x8, %i0
 
+	! Now Destination is block (64 bytes) aligned
 copyout_blalign:
 	andn	%i2, 0x3f, %i3		! %i3 count is multiple of block size
 	sub	%i2, %i3, %i2		! Residue bytes in %i2
 
 	mov	ASI_BLK_INIT_QUAD_LDD_AIUS, %asi
 
+#if !defined(NIAGARA_IMPL)
+	andn	%i1, 0x3f, %l0		! %l0 has block aligned src address
+	prefetch [%l0+0x0], #one_read
+	andcc	%i1, 0x3f, %g0		! is src 64B aligned
+	bz,pn	%ncc, .co_blkcpy
+	nop
+
+	! handle misaligned source cases
+	alignaddr %i1, %g0, %g0		! generate %gsr
+
+	srl	%i1, 0x3, %l1		! src add bits 3, 4, 5 are now least
+					! significant in %l1
+	andcc	%l1, 0x7, %l2		! mask everything except bits 1, 2, 3
+	add	%i1, %i3, %i1
+
+	! switch statement to get to right 8 byte block within
+	! 64 byte block
+	cmp	 %l2, 0x4
+	bgeu,a	 co_hlf
+	cmp	 %l2, 0x6
+	cmp	 %l2, 0x2
+	bgeu,a	 co_sqtr
+	nop
+	cmp	 %l2, 0x1
+	be,a	 co_off15
+	nop
+	ba	 co_off7
+	nop
+co_sqtr:
+	be,a	 co_off23
+	nop
+	ba,a	 co_off31
+	nop
+
+co_hlf:
+	bgeu,a	 co_fqtr
+	nop	 
+	cmp	 %l2, 0x5
+	be,a	 co_off47
+	nop
+	ba	 co_off39
+	nop
+co_fqtr:
+	be,a	 co_off55
+	nop
+
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+7:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_56_63
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_AIUS
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 7b
+	prefetch [%l0+0x80], #one_read
+	ba	.co_blkdone
+	membar	#Sync
+
+co_off7:
+	ldda	[%l0]ASI_BLK_P, %d0
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+0:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_1_7
+	fmovd	%d16, %d0
+	fmovd	%d18, %d2
+	fmovd	%d20, %d4
+	fmovd	%d22, %d6
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_AIUS
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 0b
+	prefetch [%l0+0x80], #one_read
+	ba	.co_blkdone
+	membar	#Sync
+
+co_off15:
+	ldd	[%l0+0x8], %d2
+	ldd	[%l0+0x10], %d4
+	ldd	[%l0+0x18], %d6
+	ldd	[%l0+0x20], %d8
+	ldd	[%l0+0x28], %d10
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+1:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_8_15
+	fmovd	%d18, %d2
+	fmovd	%d20, %d4
+	fmovd	%d22, %d6
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_AIUS
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 1b
+	prefetch [%l0+0x80], #one_read
+	ba	.co_blkdone
+	membar	#Sync
+
+co_off23:
+	ldd	[%l0+0x10], %d4
+	ldd	[%l0+0x18], %d6
+	ldd	[%l0+0x20], %d8
+	ldd	[%l0+0x28], %d10
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+2:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_16_23
+	fmovd	%d20, %d4
+	fmovd	%d22, %d6
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_AIUS
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 2b
+	prefetch [%l0+0x80], #one_read
+	ba	.co_blkdone
+	membar	#Sync
+
+co_off31:
+	ldd	[%l0+0x18], %d6
+	ldd	[%l0+0x20], %d8
+	ldd	[%l0+0x28], %d10
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+3:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_24_31
+	fmovd	%d22, %d6
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_AIUS
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 3b
+	prefetch [%l0+0x80], #one_read
+	ba	.co_blkdone
+	membar	#Sync
+
+co_off39:
+	ldd	[%l0+0x20], %d8
+	ldd	[%l0+0x28], %d10
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+4:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_32_39
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_AIUS
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 4b
+	prefetch [%l0+0x80], #one_read
+	ba	.co_blkdone
+	membar	#Sync
+
+co_off47:
+	ldd	[%l0+0x28], %d10
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+5:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_40_47
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_AIUS
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 5b
+	prefetch [%l0+0x80], #one_read
+	ba	.co_blkdone
+	membar	#Sync
+
+co_off55:
+	ldd	[%l0+0x30], %d12
+	ldd	[%l0+0x38], %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+6:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_P, %d16
+	ALIGN_OFF_48_55
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_AIUS
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 6b
+	prefetch [%l0+0x80], #one_read
+	ba	.co_blkdone
+	membar	#Sync
+
+.co_blkcpy:
+	prefetch [%i1+0x40], #one_read
+	prefetch [%i1+0x80], #one_read
+8:
+	stxa	%g0, [%i0]%asi		! initialize the cache line
+	ldda	[%i1]ASI_BLK_P, %d0
+	stda	%d0, [%i0]ASI_BLK_AIUS
+
+	add	%i1, 0x40, %i1
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 8b
+	prefetch [%i1+0x80], #one_read
+	membar	#Sync
+
+.co_blkdone:
+#else	/* NIAGARA_IMPL */
 	andcc	%i1, 0xf, %o2		! is src quadword aligned
 	bz,pn	%xcc, .co_blkcpy	! src offset in %o2 (last 4-bits)
 	nop
@@ -1516,50 +2685,74 @@ copyout_blalign:
 
 .co_blkdone:
 	membar	#Sync
+#endif	/* NIAGARA_IMPL */
 
-	! Copy as much rest of the data as double word copy.
-.co_dwcp:
-	cmp	%i2, 0x8		! Not enough bytes to copy as double
-	blu	%ncc, .co_dbdone
+	brz,pt	%i2, .copyout_exit
 	nop
 
-	andn	%i2, 0x7, %i3		! %i3 count is multiple of 8 bytes size
-	sub	%i2, %i3, %i2		! Residue bytes in %i2
-
-	andcc	%i1, 7, %g1		! is src aligned on a 8 bytes
-	bz	%ncc, .co_cpy_db
+	! Handle trailing bytes
+	cmp	%i2, 0x8
+	blu,pt	%ncc, .co_residue
 	nop
 
-	sll	%g1, 3, %l0		! left shift
-	mov	0x40, %l1
-	sub	%l1, %l0, %l1		! right shift = (64 - left shift)
+	! Can we do some 8B ops
+	or	%i1, %i0, %o2
+	andcc	%o2, 0x7, %g0
+	bnz	%ncc, .co_last4
+	nop
 
-.co_cpy_wd:
-	sub	%i1, %g1, %i1		! align the src at 8 bytes.
-	ldx	[%i1], %o2
-3:
-	ldx	[%i1+8], %o4
-	ALIGN_DATA_EW(%o2, %o4, %l0, %l1, %o3)
-	stxa	%o2, [%i0]ASI_USER
-	mov	%o4, %o2
-	add	%i1, 0x8, %i1
-	subcc	%i3, 0x8, %i3
-	bgu,pt	%ncc, 3b
-	add	%i0, 0x8, %i0
-	ba	.co_dbdone
-	add	%i1, %g1, %i1
-
-.co_cpy_db:
+	! Do 8byte ops as long as possible
+.co_last8:
 	ldx	[%i1], %o2
 	stxa	%o2, [%i0]ASI_USER
 	add	%i1, 0x8, %i1
-	subcc	%i3, 0x8, %i3
-	bgu,pt	%ncc, .co_cpy_db
+	sub	%i2, 0x8, %i2
+	cmp	%i2, 0x8
+	bgu,pt	%ncc, .co_last8
 	add	%i0, 0x8, %i0
 
-.co_dbdone:
-	tst	%i2
-	bz,pt	%xcc, .copyout_exit
+	brz,pt	%i2, .copyout_exit
+	nop
+
+	ba	.co_residue
+	nop
+
+.co_last4:
+	! Can we do 4B ops
+	andcc	%o2, 0x3, %g0
+	bnz	%ncc, .co_last2
+	nop
+1:
+	ld	[%i1], %o2
+	sta	%o2, [%i0]ASI_USER
+	add	%i1, 0x4, %i1
+	sub	%i2, 0x4, %i2
+	cmp	%i2, 0x4
+	bgu,pt	%ncc, 1b
+	add	%i0, 0x4, %i0
+
+	brz,pt	%i2, .copyout_exit
+	nop
+
+	ba	.co_residue
+	nop
+
+.co_last2:
+	! Can we do 2B ops
+	andcc	%o2, 0x1, %g0
+	bnz	%ncc, .co_residue
+	nop
+
+1:
+	lduh	[%i1], %o2
+	stuha	%o2, [%i0]ASI_USER
+	add	%i1, 0x2, %i1
+	sub	%i2, 0x2, %i2
+	cmp	%i2, 0x2
+	bgu,pt	%ncc, 1b
+	add	%i0, 0x2, %i0
+
+	brz,pt	%i2, .copyout_exit
 	nop
 
 	! Copy the residue as byte copy
@@ -1568,11 +2761,35 @@ copyout_blalign:
 	stba	%i4, [%i0]ASI_USER
 	inc	%i1
 	deccc	%i2
-	bgu	%xcc, .co_residue
+	bgu,pt	%xcc, .co_residue
 	inc	%i0
 
 .copyout_exit:
+#if !defined(NIAGARA_IMPL)
+	ld	[%fp + STACK_BIAS - SAVED_GSR_OFFSET], %o2
+	wr	%o2, 0, %gsr		! restore gsr
+
+	ld	[%fp + STACK_BIAS - SAVED_FPRS_OFFSET], %o3
+	btst	FPRS_FEF, %o3
+	bz	%icc, 4f
+	  nop
+
+	! restore fpregs from stack
+	BLD_FP_FROMSTACK(%o2)
+
+	ba,pt	%ncc, 2f
+	  wr	%o3, 0, %fprs		! restore fprs
+
+4:
+	FZERO				! zero all of the fpregs
+	wr	%o3, 0, %fprs		! restore fprs
+
+2:
 	membar	#Sync
+	andn	SAVED_LOFAULT, FPUSED_FLAG, SAVED_LOFAULT
+#else	/* NIAGARA_IMPL */
+	membar	#Sync
+#endif	/* NIAGARA_IMPL */
 	stn	SAVED_LOFAULT, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
 	ret
 	restore	%g0, 0, %o0
@@ -1956,19 +3173,39 @@ copyin(const void *uaddr, void *kaddr, size_t count)
 	clr	%o0
 
 .big_copyin:
-	!
 	! We're going off to do a block copy.
 	! Switch fault hendlers and grab a window. We
 	! don't do a membar #Sync since we've done only
 	! kernel data to this point.
-	!
 	stn	%o4, [THREAD_REG + T_LOFAULT]
-	save	%sp, -SA(MINFRAME), %sp
 
 	! Copy in that reach here are larger than 256 bytes. The
 	! hw_copy_limit_1 is set to 256. Never set this limit less
 	! 128 bytes.
+#if !defined(NIAGARA_IMPL)
+	save	%sp, -SA(MINFRAME + HWCOPYFRAMESIZE), %sp
+
+	rd	%fprs, %o2			! check for unused fp
+	st	%o2, [%fp + STACK_BIAS - SAVED_FPRS_OFFSET]	! save %fprs
+	btst	FPRS_FEF, %o2
+	bz,a,pt	%icc, .do_blockcopyin
+	wr	%g0, FPRS_FEF, %fprs
+
+	! save in-use fpregs on stack
+	BST_FP_TOSTACK(%o2)
+#else	/* NIAGARA_IMPL */
+	save	%sp, -SA(MINFRAME), %sp
+#endif	/* NIAGARA_IMPL */
+
 .do_blockcopyin:
+
+#if !defined(NIAGARA_IMPL)
+	rd	%gsr, %o2
+	stx	%o2, [%fp + STACK_BIAS - SAVED_GSR_OFFSET]	! save gsr
+	! set the lower bit saved t_lofault to indicate that we need
+	! clear %fprs register on the way out
+	or	SAVED_LOFAULT, FPUSED_FLAG, SAVED_LOFAULT
+#endif	/* NIAGARA_IMPL */
 
 	! Swap src/dst since the code below is memcpy code
 	! and memcpy/bcopy have different calling sequences
@@ -1976,67 +3213,353 @@ copyin(const void *uaddr, void *kaddr, size_t count)
 	mov	%i0, %i1
 	mov	%i5, %i0
 
-	andcc	%i0, 7, %i3		! is dst double aligned
-	bz	%ncc, copyin_blkcpy
-	sub	%i3, 8, %i3
-	neg	%i3			! bytes till double aligned
-	sub	%i2, %i3, %i2		! update %i2 with new count
+	! Block (64 bytes) align the destination.
+	andcc	%i0, 0x3f, %i3		! is dst block aligned
+	bz	%ncc, copyin_blalign	! dst already block aligned
+	sub	%i3, 0x40, %i3
+	neg	%i3			! bytes till dst 64 bytes aligned
+	sub	%i2, %i3, %i2		! update i2 with new count
 
-	! Align Destination on double-word boundary
+	! Based on source and destination alignment do
+	! either 8 bytes, 4 bytes, 2 bytes or byte copy.
 
-1:	lduba	[%i1]ASI_USER, %i4
+	! Is dst & src 8B aligned
+	or	%i0, %i1, %o2
+	andcc	%o2, 0x7, %g0
+	bz	%ncc, .ci_alewdcp
+	nop
+
+	! Is dst & src 4B aligned
+	andcc	%o2, 0x3, %g0
+	bz	%ncc, .ci_alwdcp
+	nop
+
+	! Is dst & src 2B aligned
+	andcc	%o2, 0x1, %g0
+	bz	%ncc, .ci_alhlfwdcp
+	nop
+
+	! 1B aligned
+1:	lduba	[%i1]ASI_USER, %o2
+	stb	%o2, [%i0]
 	inc	%i1
-	stb	%i4, [%i0]
 	deccc	%i3
-	bgu	%ncc, 1b
-	  inc	%i0
+	bgu,pt	%ncc, 1b
+	inc	%i0
 
-copyin_blkcpy:
-	andcc	%i0, 63, %i3
-	bz,pn	%ncc, copyin_blalign	! now block aligned
-	sub	%i3, 64, %i3
-	neg	%i3			! bytes till block aligned
-	sub	%i2, %i3, %i2		! update %i2 with new count
-
-	! Copy %i3 bytes till dst is block (64 byte) aligned. use
-	! double word copies.
-
-	andcc	%i1, 7, %g1		! is src aligned on a 8 bytes
-	bz	%ncc, .ci_dbcopy	! %g1 has source offset (last 3-bits)
-	sll	%g1, 3, %l1		! left shift
-	mov	0x40, %l2
-	sub	%l2, %l1, %l2		! right shift = (64 - left shift)
-
-	! Now use double word copies to align destination.
-.ci_double:
-	sub	%i1, %g1, %i1		! align the src at 8 bytes.
-	ldxa	[%i1]ASI_USER, %o2
-2:
-	add	%i1, 0x8, %i1
-	ldxa	[%i1]ASI_USER, %o4
-	ALIGN_DATA_EW(%o2, %o4, %l1, %l2, %o3)
-	stx	%o2, [%i0]
-	mov	%o4, %o2
-	subcc	%i3, 0x8, %i3
-	bgu,pt	%ncc, 2b
-	add	%i0, 0x8, %i0
 	ba	copyin_blalign
-	add	%i1, %g1, %i1
+	nop
 
-	! Both source and destination are double aligned.
-	! No shift and merge of data required in this case.
-.ci_dbcopy:
+	! dst & src 4B aligned
+.ci_alwdcp:
+	lda	[%i1]ASI_USER, %o2
+	st	%o2, [%i0]
+	add	%i1, 0x4, %i1
+	subcc	%i3, 0x4, %i3
+	bgu,pt	%ncc, .ci_alwdcp
+	add	%i0, 0x4, %i0
+
+	ba	copyin_blalign
+	nop
+
+	! dst & src 2B aligned
+.ci_alhlfwdcp:
+	lduha	[%i1]ASI_USER, %o2
+	stuh	%o2, [%i0]
+	add	%i1, 0x2, %i1
+	subcc	%i3, 0x2, %i3
+	bgu,pt	%ncc, .ci_alhlfwdcp
+	add	%i0, 0x2, %i0
+
+	ba	copyin_blalign
+	nop
+
+	! dst & src 8B aligned
+.ci_alewdcp:
 	ldxa	[%i1]ASI_USER, %o2
 	stx	%o2, [%i0]
 	add	%i1, 0x8, %i1
 	subcc	%i3, 0x8, %i3
-	bgu,pt	%ncc, .ci_dbcopy
+	bgu,pt	%ncc, .ci_alewdcp
 	add	%i0, 0x8, %i0
 
 copyin_blalign:
 	andn	%i2, 0x3f, %i3		! %i3 count is multiple of block size
 	sub	%i2, %i3, %i2		! Residue bytes in %i2
 
+#if !defined(NIAGARA_IMPL)
+	mov	ASI_USER, %asi
+
+	andn	%i1, 0x3f, %l0		! %l0 has block aligned src address
+	prefetch [%l0+0x0], #one_read
+	andcc	%i1, 0x3f, %g0		! is src 64B aligned
+	bz,pn	%ncc, .ci_blkcpy
+	nop
+
+	! handle misaligned source cases
+	alignaddr %i1, %g0, %g0		! generate %gsr
+
+	srl	%i1, 0x3, %l1		! src add bits 3, 4, 5 are now least
+					! significant in %l1
+	andcc	%l1, 0x7, %l2		! mask everything except bits 1, 2, 3
+	add	%i1, %i3, %i1
+
+	! switch statement to get to right 8 byte block within
+	! 64 byte block
+	cmp	 %l2, 0x4
+	bgeu,a	 ci_hlf
+	cmp	 %l2, 0x6
+	cmp	 %l2, 0x2
+	bgeu,a	 ci_sqtr
+	nop
+	cmp	 %l2, 0x1
+	be,a	 ci_off15
+	nop
+	ba	 ci_off7
+	nop
+ci_sqtr:
+	be,a	 ci_off23
+	nop
+	ba,a	 ci_off31
+	nop
+
+ci_hlf:
+	bgeu,a	 ci_fqtr
+	nop	 
+	cmp	 %l2, 0x5
+	be,a	 ci_off47
+	nop
+	ba	 ci_off39
+	nop
+ci_fqtr:
+	be,a	 ci_off55
+	nop
+
+	ldda	[%l0+0x38]%asi, %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+7:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_AIUS, %d16
+	ALIGN_OFF_56_63
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 7b
+	prefetch [%l0+0x80], #one_read
+	ba	.ci_blkdone
+	membar	#Sync
+
+ci_off7:
+	ldda	[%l0]ASI_BLK_AIUS, %d0
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+0:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_AIUS, %d16
+	ALIGN_OFF_1_7
+	fmovd	%d16, %d0
+	fmovd	%d18, %d2
+	fmovd	%d20, %d4
+	fmovd	%d22, %d6
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 0b
+	prefetch [%l0+0x80], #one_read
+	ba	.ci_blkdone
+	membar	#Sync
+
+ci_off15:
+	ldda	[%l0+0x8]%asi, %d2
+	ldda	[%l0+0x10]%asi, %d4
+	ldda	[%l0+0x18]%asi, %d6
+	ldda	[%l0+0x20]%asi, %d8
+	ldda	[%l0+0x28]%asi, %d10
+	ldda	[%l0+0x30]%asi, %d12
+	ldda	[%l0+0x38]%asi, %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+1:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_AIUS, %d16
+	ALIGN_OFF_8_15
+	fmovd	%d18, %d2
+	fmovd	%d20, %d4
+	fmovd	%d22, %d6
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 1b
+	prefetch [%l0+0x80], #one_read
+	ba	.ci_blkdone
+	membar	#Sync
+
+ci_off23:
+	ldda	[%l0+0x10]%asi, %d4
+	ldda	[%l0+0x18]%asi, %d6
+	ldda	[%l0+0x20]%asi, %d8
+	ldda	[%l0+0x28]%asi, %d10
+	ldda	[%l0+0x30]%asi, %d12
+	ldda	[%l0+0x38]%asi, %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+2:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_AIUS, %d16
+	ALIGN_OFF_16_23
+	fmovd	%d20, %d4
+	fmovd	%d22, %d6
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 2b
+	prefetch [%l0+0x80], #one_read
+	ba	.ci_blkdone
+	membar	#Sync
+
+ci_off31:
+	ldda	[%l0+0x18]%asi, %d6
+	ldda	[%l0+0x20]%asi, %d8
+	ldda	[%l0+0x28]%asi, %d10
+	ldda	[%l0+0x30]%asi, %d12
+	ldda	[%l0+0x38]%asi, %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+3:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_AIUS, %d16
+	ALIGN_OFF_24_31
+	fmovd	%d22, %d6
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 3b
+	prefetch [%l0+0x80], #one_read
+	ba	.ci_blkdone
+	membar	#Sync
+
+ci_off39:
+	ldda	[%l0+0x20]%asi, %d8
+	ldda	[%l0+0x28]%asi, %d10
+	ldda	[%l0+0x30]%asi, %d12
+	ldda	[%l0+0x38]%asi, %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+4:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_AIUS, %d16
+	ALIGN_OFF_32_39
+	fmovd	%d24, %d8
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 4b
+	prefetch [%l0+0x80], #one_read
+	ba	.ci_blkdone
+	membar	#Sync
+
+ci_off47:
+	ldda	[%l0+0x28]%asi, %d10
+	ldda	[%l0+0x30]%asi, %d12
+	ldda	[%l0+0x38]%asi, %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+5:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_AIUS, %d16
+	ALIGN_OFF_40_47
+	fmovd	%d26, %d10
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 5b
+	prefetch [%l0+0x80], #one_read
+	ba	.ci_blkdone
+	membar	#Sync
+
+ci_off55:
+	ldda	[%l0+0x30]%asi, %d12
+	ldda	[%l0+0x38]%asi, %d14
+	prefetch [%l0+0x40], #one_read
+	prefetch [%l0+0x80], #one_read
+6:
+	add	%l0, 0x40, %l0
+	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
+
+	ldda	[%l0]ASI_BLK_AIUS, %d16
+	ALIGN_OFF_48_55
+	fmovd	%d28, %d12
+	fmovd	%d30, %d14
+
+	stda	%d48, [%i0]ASI_BLK_P
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 6b
+	prefetch [%l0+0x80], #one_read
+	ba	.ci_blkdone
+	membar	#Sync
+
+.ci_blkcpy:
+	prefetch [%i1+0x40], #one_read
+	prefetch [%i1+0x80], #one_read
+8:
+	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
+	ldda	[%i1]ASI_BLK_AIUS, %d0
+	stda	%d0, [%i0]ASI_BLK_P
+
+	add	%i1, 0x40, %i1
+	subcc	%i3, 0x40, %i3
+	add	%i0, 0x40, %i0
+	bgu,pt	%ncc, 8b
+	prefetch [%i1+0x80], #one_read
+	membar	#Sync
+
+.ci_blkdone:
+#else	/* NIAGARA_IMPL */
 	mov	ASI_BLK_INIT_ST_QUAD_LDD_P, %asi
 
 	andcc	%i1, 0xf, %o2		! is src quadword aligned
@@ -2238,50 +3761,74 @@ copyin_blalign:
 
 .ci_blkdone:
 	membar	#Sync
+#endif	/* NIAGARA_IMPL */
 
-	! Copy as much rest of the data as double word copy.
-.ci_dwcp:
-	cmp	%i2, 0x8		! Not enough bytes to copy as double
-	blu	%ncc, .ci_dbdone
+	brz,pt	%i2, .copyin_exit
 	nop
 
-	andn	%i2, 0x7, %i3		! %i3 count is multiple of 8 bytes size
-	sub	%i2, %i3, %i2		! Residue bytes in %i2
-
-	andcc	%i1, 7, %g1		! is src aligned on a 8 bytes
-	bz	%ncc, .ci_cpy_db
+	! Handle trailing bytes
+	cmp	%i2, 0x8
+	blu,pt	%ncc, .ci_residue
 	nop
 
-	sll	%g1, 3, %l0		! left shift
-	mov	0x40, %l1
-	sub	%l1, %l0, %l1		! right shift = (64 - left shift)
+	! Can we do some 8B ops
+	or	%i1, %i0, %o2
+	andcc	%o2, 0x7, %g0
+	bnz	%ncc, .ci_last4
+	nop
 
-.ci_cpy_dbwd:
-	sub	%i1, %g1, %i1		! align the src at 8 bytes.
-	ldxa	[%i1]ASI_USER, %o2
-3:
-	add	%i1, 0x8, %i1
-	ldxa	[%i1]ASI_USER, %o4
-	ALIGN_DATA_EW(%o2, %o4, %l0, %l1, %o3)
-	stx	%o2, [%i0]
-	mov	%o4, %o2
-	subcc	%i3, 0x8, %i3
-	bgu,pt	%ncc, 3b
-	add	%i0, 0x8, %i0
-	ba	.ci_dbdone
-	add	%i1, %g1, %i1
-
-.ci_cpy_db:
+	! Do 8byte ops as long as possible
+.ci_last8:
 	ldxa	[%i1]ASI_USER, %o2
 	stx	%o2, [%i0]
 	add	%i1, 0x8, %i1
-	subcc	%i3, 0x8, %i3
-	bgu,pt	%ncc, .ci_cpy_db
+	sub	%i2, 0x8, %i2
+	cmp	%i2, 0x8
+	bgu,pt	%ncc, .ci_last8
 	add	%i0, 0x8, %i0
 
-.ci_dbdone:
-	tst	%i2
-	bz,pt	%xcc, .copyin_exit
+	brz,pt	%i2, .copyin_exit
+	nop
+
+	ba	.ci_residue
+	nop
+
+.ci_last4:
+	! Can we do 4B ops
+	andcc	%o2, 0x3, %g0
+	bnz	%ncc, .ci_last2
+	nop
+1:
+	lda	[%i1]ASI_USER, %o2
+	st	%o2, [%i0]
+	add	%i1, 0x4, %i1
+	sub	%i2, 0x4, %i2
+	cmp	%i2, 0x4
+	bgu,pt	%ncc, 1b
+	add	%i0, 0x4, %i0
+
+	brz,pt	%i2, .copyin_exit
+	nop
+
+	ba	.ci_residue
+	nop
+
+.ci_last2:
+	! Can we do 2B ops
+	andcc	%o2, 0x1, %g0
+	bnz	%ncc, .ci_residue
+	nop
+
+1:
+	lduha	[%i1]ASI_USER, %o2
+	stuh	%o2, [%i0]
+	add	%i1, 0x2, %i1
+	sub	%i2, 0x2, %i2
+	cmp	%i2, 0x2
+	bgu,pt	%ncc, 1b
+	add	%i0, 0x2, %i0
+
+	brz,pt	%i2, .copyin_exit
 	nop
 
 	! Copy the residue as byte copy
@@ -2290,11 +3837,35 @@ copyin_blalign:
 	stb	%i4, [%i0]
 	inc	%i1
 	deccc	%i2
-	bgu	%xcc, .ci_residue
+	bgu,pt	%xcc, .ci_residue
 	inc	%i0
 
 .copyin_exit:
+#if !defined(NIAGARA_IMPL)
+	ld	[%fp + STACK_BIAS - SAVED_GSR_OFFSET], %o2
+	wr	%o2, 0, %gsr		! restore gsr
+
+	ld	[%fp + STACK_BIAS - SAVED_FPRS_OFFSET], %o3
+	btst	FPRS_FEF, %o3
+	bz	%icc, 4f
+	  nop
+
+	! restore fpregs from stack
+	BLD_FP_FROMSTACK(%o2)
+
+	ba,pt	%ncc, 2f
+	  wr	%o3, 0, %fprs		! restore fprs
+
+4:
+	FZERO				! zero all of the fpregs
+	wr	%o3, 0, %fprs		! restore fprs
+
+2:
+	membar	#Sync			! sync error barrier
+	andn	SAVED_LOFAULT, FPUSED_FLAG, SAVED_LOFAULT
+#else	/* NIAGARA_IMPL */
 	membar	#Sync
+#endif	/* NIAGARA_IMPL */
 	stn	SAVED_LOFAULT, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
 	ret
 	restore	%g0, 0, %o0

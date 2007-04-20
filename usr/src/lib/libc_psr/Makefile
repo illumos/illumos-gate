@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,7 +27,8 @@
 
 include ../Makefile.lib
 
-SUBDIRS=	sun4u sun4u-opl sun4u-us3 sun4u_hwcap1 sun4u_hwcap2 sun4v sun4v_hwcap1 etc
+SUBDIRS = etc sun4u sun4u-opl sun4u-us3 sun4u_hwcap1 sun4u_hwcap2 \
+	sun4v sun4v_hwcap1 sun4v_hwcap2
 
 all :=		TARGET= all
 install :=	TARGET= install

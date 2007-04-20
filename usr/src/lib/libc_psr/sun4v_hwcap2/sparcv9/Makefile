@@ -25,28 +25,44 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-LIBRARY		= libc_psr_hwcap1.a
-VERS		= .1
-
-include $(SRC)/lib/Makefile.lib
-include $(SRC)/Makefile.psm
-
 #
-# Since libc_psr is strictly assembly, deactivate the CTF build logic.
+# Platform specific Makefile for libc_psr.
 #
-CTFCONVERT_POST	= :
-CTFMERGE_LIB	= :
 
-LIBS		= $(DYNLIB)
-IFLAGS		= -I$(SRC)/lib/libc/inc -I$(SRC)/uts/sun4v \
-		  -I$(ROOT)/usr/include/v9
-CPPFLAGS	= -D_REENTRANT -D$(MACH) -DNIAGARA_IMPL $(IFLAGS) $(CPPFLAGS.master)
-ASDEFS		= -D__STDC__ -D_ASM $(CPPFLAGS)
-ASFLAGS		= -P $(ASDEFS)
+PLATFORM	= sun4v
+CLASS		= 64
 
-#
-# build rules
-#
-pics/%.o: ../../$(PLATFORM)/common/%.s
-	$(AS) $(ASFLAGS) $< -o $@
-	$(POST_PROCESS_O)
+OBJECTS		= memcpy.o memset.o
+
+include ../Makefile.com
+
+MAPFILES	= ../../sun4v/mapfile-vers ../mapfile $(MAPFILE-FLTR)
+
+ASDEFS		+= -D__sparcv9
+ASFLAGS		+= -xarch=v9a
+
+include $(SRC)/Makefile.master.64
+
+# Redefine shared object build rule to use $(LD) directly (this avoids .init
+# and .fini sections being added).
+
+BUILD.SO	= $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(LDLIBS)
+
+.KEEP_STATE:
+
+MODULE		= libc_psr_hwcap2.so.1
+LIBC_PSR64_DIR	= $(ROOT_PSM_LIB_DIR)/$(MACH64)/libc_psr
+LIBC_PSR64_LIB	= $(LIBC_PSR64_DIR)/$(MODULE)
+INS.libc.64	= $(RM) -r $@; $(INS) -m $(FILEMODE) -f $(@D) $(MODULE)
+
+$(LIBC_PSR64_DIR):
+	-$(INS.dir.root.bin)
+
+$(LIBC_PSR64_LIB): $(LIBC_PSR64_DIR) $(MODULE)
+	-$(INS.libc.64)
+
+all:		$(LIBS)
+
+install:	all $(LIBC_PSR64_LIB)
+
+include ../../Makefile.targ
