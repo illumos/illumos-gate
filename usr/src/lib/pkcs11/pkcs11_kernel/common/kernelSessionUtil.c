@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 
 #include <pthread.h>
 #include <syslog.h>
@@ -36,6 +36,7 @@
 #include "kernelGlobal.h"
 #include "kernelSession.h"
 #include "kernelSlot.h"
+#include "kernelEmulate.h"
 
 static pthread_mutex_t delete_sessions_mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -286,8 +287,16 @@ kernel_delete_session(CK_SLOT_ID slotID, kernel_session_t *session_p,
 	kernel_delete_all_objects_in_session(session_p, wrapper_only);
 
 	/* In case application did not call Final */
-	if (session_p->digest.context != NULL)
-		free(session_p->digest.context);
+	if (session_p->digest.context != NULL) {
+		digest_buf_t *bufp = session_p->digest.context;
+
+		if (bufp->buf != NULL) {
+			free_soft_ctx(get_sp(&session_p->digest), OP_DIGEST);
+			bzero(bufp->buf, bufp->indata_len);
+			free(bufp->buf);
+		}
+		free(bufp);
+	}
 
 	if (session_p->encrypt.context != NULL)
 		free(session_p->encrypt.context);
@@ -295,11 +304,27 @@ kernel_delete_session(CK_SLOT_ID slotID, kernel_session_t *session_p,
 	if (session_p->decrypt.context != NULL)
 		free(session_p->decrypt.context);
 
-	if (session_p->sign.context != NULL)
-		free(session_p->sign.context);
+	if (session_p->sign.context != NULL) {
+		digest_buf_t *bufp = session_p->sign.context;
 
-	if (session_p->verify.context != NULL)
-		free(session_p->verify.context);
+		if (bufp->buf != NULL) {
+			free_soft_ctx(get_sp(&session_p->sign), OP_SIGN);
+			bzero(bufp->buf, bufp->indata_len);
+			free(bufp->buf);
+		}
+		free(bufp);
+	}
+
+	if (session_p->verify.context != NULL) {
+		digest_buf_t *bufp = session_p->verify.context;
+
+		if (bufp->buf != NULL) {
+			free_soft_ctx(get_sp(&session_p->verify), OP_VERIFY);
+			bzero(bufp->buf, bufp->indata_len);
+			free(bufp->buf);
+		}
+		free(bufp);
+	}
 
 	k_session = session_p->k_session;
 

@@ -181,11 +181,23 @@ retry:
 		    mac, spi_ctx_tmpl, KCF_SWFP_RHNDL(crq));
 		KCF_PROV_INCRSTATS(pd, error);
 	} else {
-		KCF_WRAP_MAC_OPS_PARAMS(&params, KCF_OP_ATOMIC, pd->pd_sid,
-		    mech, key, data, mac, spi_ctx_tmpl);
+		if (pd->pd_prov_type == CRYPTO_HW_PROVIDER &&
+		    (pd->pd_flags & CRYPTO_HASH_NO_UPDATE) &&
+		    (data->cd_length > pd->pd_hash_limit)) {
+			/*
+			 * XXX - We need a check to see if this is indeed
+			 * a HMAC. So far, all kernel clients use
+			 * this interface only for HMAC. So, this is fine
+			 * for now.
+			 */
+			error = CRYPTO_BUFFER_TOO_BIG;
+		} else {
+			KCF_WRAP_MAC_OPS_PARAMS(&params, KCF_OP_ATOMIC,
+			    pd->pd_sid, mech, key, data, mac, spi_ctx_tmpl);
 
-		error = kcf_submit_request(pd, NULL, crq, &params,
-		    KCF_ISDUALREQ(crq));
+			error = kcf_submit_request(pd, NULL, crq, &params,
+			    KCF_ISDUALREQ(crq));
+		}
 	}
 
 	if (error != CRYPTO_SUCCESS && error != CRYPTO_QUEUED &&
@@ -294,11 +306,19 @@ retry:
 		    data, mac, spi_ctx_tmpl, KCF_SWFP_RHNDL(crq));
 		KCF_PROV_INCRSTATS(pd, error);
 	} else {
-		KCF_WRAP_MAC_OPS_PARAMS(&params, KCF_OP_MAC_VERIFY_ATOMIC,
-		    pd->pd_sid, mech, key, data, mac, spi_ctx_tmpl);
+		if (pd->pd_prov_type == CRYPTO_HW_PROVIDER &&
+		    (pd->pd_flags & CRYPTO_HASH_NO_UPDATE) &&
+		    (data->cd_length > pd->pd_hash_limit)) {
+			/* see comments in crypto_mac() */
+			error = CRYPTO_BUFFER_TOO_BIG;
+		} else {
+			KCF_WRAP_MAC_OPS_PARAMS(&params,
+			    KCF_OP_MAC_VERIFY_ATOMIC, pd->pd_sid, mech,
+			    key, data, mac, spi_ctx_tmpl);
 
-		error = kcf_submit_request(pd, NULL, crq, &params,
-		    KCF_ISDUALREQ(crq));
+			error = kcf_submit_request(pd, NULL, crq, &params,
+			    KCF_ISDUALREQ(crq));
+		}
 	}
 
 	if (error != CRYPTO_SUCCESS && error != CRYPTO_QUEUED &&
@@ -456,8 +476,21 @@ retry:
 		}
 	}
 
-	error = crypto_mac_init_prov(pd, pd->pd_sid, mech, key, spi_ctx_tmpl,
-	    ctxp, crq);
+	if (pd->pd_prov_type == CRYPTO_HW_PROVIDER &&
+	    (pd->pd_flags & CRYPTO_HASH_NO_UPDATE)) {
+		/*
+		 * The hardware provider has limited HMAC support.
+		 * So, we fallback early here to using a software provider.
+		 *
+		 * XXX - need to enhance to do the fallback later in
+		 * crypto_mac_update() if the size of accumulated input data
+		 * exceeds the maximum size digestable by hardware provider.
+		 */
+		error = CRYPTO_BUFFER_TOO_BIG;
+	} else {
+		error = crypto_mac_init_prov(pd, pd->pd_sid, mech, key,
+		    spi_ctx_tmpl, ctxp, crq);
+	}
 	if (error != CRYPTO_SUCCESS && error != CRYPTO_QUEUED &&
 	    IS_RECOVERABLE(error)) {
 		/* Add pd to the linked list of providers tried. */

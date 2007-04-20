@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -968,6 +968,7 @@ sha2_mac_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 	if (ctx->cc_provider_private == NULL)
 		return (CRYPTO_HOST_MEMORY);
 
+	PROV_SHA2_HMAC_CTX(ctx)->hc_mech_type = mechanism->cm_type;
 	if (ctx_template != NULL) {
 		/* reuse context template */
 		bcopy(ctx_template, PROV_SHA2_HMAC_CTX(ctx),
@@ -997,7 +998,6 @@ sha2_mac_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 	/*
 	 * Get the mechanism parameters, if applicable.
 	 */
-	PROV_SHA2_HMAC_CTX(ctx)->hc_mech_type = mechanism->cm_type;
 	if (mechanism->cm_type % 3 == 2) {
 		if (mechanism->cm_param == NULL ||
 		    mechanism->cm_param_len != sizeof (ulong_t))
@@ -1067,6 +1067,8 @@ sha2_mac_final(crypto_ctx_t *ctx, crypto_data_t *mac, crypto_req_handle_t req)
 		sha_digest_len = digest_len = SHA256_DIGEST_LENGTH;
 		break;
 	case SHA384_HMAC_MECH_INFO_TYPE:
+		sha_digest_len = digest_len = SHA384_DIGEST_LENGTH;
+		break;
 	case SHA512_HMAC_MECH_INFO_TYPE:
 		sha_digest_len = digest_len = SHA512_DIGEST_LENGTH;
 		break;
@@ -1143,7 +1145,7 @@ sha2_mac_final(crypto_ctx_t *ctx, crypto_data_t *mac, crypto_req_handle_t req)
 	else
 		mac->cd_length = 0;
 
-	bzero(&PROV_SHA2_HMAC_CTX(ctx)->hc_ocontext, sizeof (sha2_hmac_ctx_t));
+	bzero(ctx->cc_provider_private, sizeof (sha2_hmac_ctx_t));
 	kmem_free(ctx->cc_provider_private, sizeof (sha2_hmac_ctx_t));
 	ctx->cc_provider_private = NULL;
 

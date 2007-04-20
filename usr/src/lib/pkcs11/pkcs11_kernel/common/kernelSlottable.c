@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,6 +159,13 @@ kernel_get_func_list(kernel_slot_t *pslot)
 	pslot->sl_func_list.fl_init_token = fl.fl_list.fl_init_token;
 	pslot->sl_func_list.fl_init_pin = fl.fl_list.fl_init_pin;
 	pslot->sl_func_list.fl_set_pin = fl.fl_list.fl_set_pin;
+
+	pslot->sl_flags = 0;
+	if (fl.fl_list.prov_is_limited) {
+		pslot->sl_flags = CRYPTO_LIMITED_HASH_SUPPORT;
+		pslot->sl_threshold = fl.fl_list.prov_hash_threshold;
+		pslot->sl_max_inlen = fl.fl_list.prov_hash_limit;
+	}
 
 	return (CKR_OK);
 }

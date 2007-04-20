@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,7 +28,7 @@
 LIBRARY= pkcs11_kernel.a
 VERS= .1
 
-OBJECTS= \
+CORE_OBJECTS= \
 	kernelGeneral.o 	\
 	kernelSlottable.o 	\
 	kernelSlotToken.o 	\
@@ -45,16 +45,28 @@ OBJECTS= \
 	kernelEncrypt.o		\
 	kernelDecrypt.o		\
 	kernelObjectUtil.o	\
-	kernelAttributeUtil.o
+	kernelAttributeUtil.o	\
+	kernelEmulate.o
+
+OTHER_OBJECTS = kernelSoftCommon.o
+ST_OBJECTS = softDigestUtil.o softMAC.o
+
+OBJECTS= \
+	$(CORE_OBJECTS)		\
+	$(OTHER_OBJECTS)	\
+	$(ST_OBJECTS)
 
 AESDIR=		$(SRC)/common/crypto/aes
 BLOWFISHDIR=	$(SRC)/common/crypto/blowfish
 ARCFOURDIR=	$(SRC)/common/crypto/arcfour
 DESDIR=		$(SRC)/common/crypto/des
+ST_DIR=		$(SRC)/lib/pkcs11/pkcs11_softtoken/common
 
 lint \
 pics/kernelAttributeUtil.o := \
 	CPPFLAGS += -I$(AESDIR) -I$(BLOWFISHDIR) -I$(ARCFOURDIR) -I$(DESDIR)
+pics/kernelSoftCommon.o := \
+	CPPFLAGS = -I$(ST_DIR) $(CPPFLAGS.master)
 
 include $(SRC)/lib/Makefile.lib
 
@@ -62,11 +74,13 @@ include $(SRC)/lib/Makefile.lib
 POST_PROCESS_SO	+=	; $(ELFSIGN_CRYPTO)
 
 SRCDIR=		../common
+CORESRCS =  \
+	$(CORE_OBJECTS:%.o=$(SRCDIR)/%.c)
 
 LIBS	=	$(DYNLIB)
-LDLIBS  +=      -lc -lcryptoutil
+LDLIBS  +=      -lc -lcryptoutil -lmd
 
-CFLAGS  +=      $(CCVERBOSE)  
+CFLAGS  +=      $(CCVERBOSE)
 
 ROOTLIBDIR=     $(ROOT)/usr/lib/security
 ROOTLIBDIR64=   $(ROOT)/usr/lib/security/$(MACH64)
@@ -75,6 +89,18 @@ ROOTLIBDIR64=   $(ROOT)/usr/lib/security/$(MACH64)
 
 all:    $(LIBS)
 
-lint: lintcheck
+# we don't need to lint ST_OBJECTS since they are linted elsewhere.
+lintcheck := SRCS = $(CORESRCS)
+lintother := OSRCS = ../common/kernelSoftCommon.c
+lintother := CPPFLAGS = -I$(ST_DIR) $(CPPFLAGS.master)
+
+lintother: $$(OSRCS)
+	$(LINT.c) $(LINTCHECKFLAGS) $(OSRCS) $(LDLIBS)
+
+lint: lintcheck lintother
+
+pics/%.o:	$(ST_DIR)/%.c
+	$(COMPILE.c) -o $@ $< -I$(ST_DIR)
+	$(POST_PROCESS_O)
 
 include $(SRC)/lib/Makefile.targ

@@ -126,6 +126,9 @@ static uint32_t dprov_debug = 0;
 #define	DPROV_CALL(f, r, x)
 #endif /* DEBUG */
 
+static boolean_t dprov_no_multipart = B_FALSE;
+static int dprov_max_digestsz = INT_MAX;
+
 /*
  * DDI entry points.
  */
@@ -1078,7 +1081,8 @@ static crypto_provider_info_t dprov_prov_info = {
 	sizeof (dprov_mech_info_tab)/sizeof (crypto_mech_info_t),
 	dprov_mech_info_tab,
 	0,				/* pi_logical_provider_count */
-	NULL				/* pi_logical_providers */
+	NULL,				/* pi_logical_providers */
+	0				/* pi_flags */
 };
 
 /*
@@ -1215,8 +1219,8 @@ typedef struct dprov_digest_req {
 typedef struct dprov_mac_req {
 	crypto_mechanism_t *dr_mechanism;
 	crypto_ctx_t *dr_ctx;
-	crypto_data_t *dr_data;
 	crypto_key_t *dr_key;
+	crypto_data_t *dr_data;
 	crypto_data_t *dr_mac;
 	crypto_session_id_t dr_session_id;
 } dprov_mac_req_t;
@@ -1494,6 +1498,7 @@ typedef enum dprov_ctx_type {
 typedef struct dprov_ctx_single {
 	dprov_ctx_type_t dc_type;
 	crypto_context_t dc_ctx;
+	boolean_t dc_svrfy_to_mac;
 } dprov_ctx_single_t;
 
 /*
@@ -1513,8 +1518,10 @@ typedef struct dprov_ctx_dual {
  * single and dual cipher/mac operations.
  */
 
-#define	DPROV_CTX_SINGLE(_ctx) \
-	(((dprov_ctx_single_t *)(_ctx)->cc_provider_private)->dc_ctx)
+#define	DPROV_CTX_P(_ctx) \
+	((dprov_ctx_single_t *)(_ctx)->cc_provider_private)
+
+#define	DPROV_CTX_SINGLE(_ctx)	((DPROV_CTX_P(_ctx))->dc_ctx)
 
 #define	DPROV_CTX_DUAL_CIPHER(_ctx) \
 	(((dprov_ctx_dual_t *)(_ctx)->cc_provider_private)->cd_cipher_ctx)
@@ -1625,6 +1632,27 @@ dprov_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
+	dprov_max_digestsz = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "max_digest_sz", INT_MAX);
+	if (dprov_max_digestsz != INT_MAX && dprov_max_digestsz != 0 &&
+	    dprov_max_digestsz != DDI_PROP_NOT_FOUND) {
+		int i, nmechs;
+
+		dprov_no_multipart = B_TRUE;
+		dprov_prov_info.pi_flags |= CRYPTO_HASH_NO_UPDATE;
+
+		/* Set cm_max_input_length for all hash mechs */
+		nmechs = sizeof (dprov_mech_info_tab) /
+		    sizeof (crypto_mech_info_t);
+		for (i = 0; i < nmechs; i++) {
+			if (dprov_mech_info_tab[i].cm_func_group_mask &
+			    CRYPTO_FG_DIGEST) {
+				dprov_mech_info_tab[i].cm_max_input_length =
+				    dprov_max_digestsz;
+			}
+		}
+	}
+
 	/* create taskq */
 	softc->ds_taskq = taskq_create(devname, 1, minclsyspri,
 	    crypto_taskq_minalloc, crypto_taskq_maxalloc, TASKQ_PREPOPULATE);
@@ -1648,6 +1676,14 @@ dprov_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* register with the crypto framework */
 	dprov_prov_info.pi_provider_dev.pd_hw = dip;
 	dprov_prov_info.pi_provider_handle = softc;
+
+	if (dprov_no_multipart) { /* Export only single part */
+		dprov_digest_ops.digest_update = NULL;
+		dprov_digest_ops.digest_key = NULL;
+		dprov_digest_ops.digest_final = NULL;
+		dprov_object_ops.object_create = NULL;
+	}
+
 	if ((ret = crypto_register_provider(&dprov_prov_info,
 	    &softc->ds_prov_handle)) != CRYPTO_SUCCESS) {
 		cmn_err(CE_WARN,
@@ -1782,6 +1818,9 @@ dprov_digest(crypto_ctx_t *ctx, crypto_data_t *data, crypto_data_t *digest,
 	/* LINTED E_FUNC_SET_NOT_USED */
 	int instance;
 
+	if (dprov_no_multipart && data->cd_length > dprov_max_digestsz)
+		return (CRYPTO_BUFFER_TOO_BIG);
+
 	/* extract softc and instance number from context */
 	DPROV_SOFTC_FROM_CTX(ctx, softc, instance);
 	DPROV_DEBUG(D_DIGEST, ("(%d) dprov_digest: started\n", instance));
@@ -1876,6 +1915,9 @@ dprov_digest_atomic(crypto_provider_handle_t provider,
 	dprov_state_t *softc = (dprov_state_t *)provider;
 	/* LINTED E_FUNC_SET_NOT_USED */
 	int instance;
+
+	if (dprov_no_multipart && data->cd_length > dprov_max_digestsz)
+		return (CRYPTO_BUFFER_TOO_BIG);
 
 	instance = ddi_get_instance(softc->ds_dip);
 	DPROV_DEBUG(D_DIGEST, ("(%d) dprov_digest_atomic: started\n",
@@ -2436,6 +2478,14 @@ dprov_valid_sign_verif_mech(crypto_mech_type_t mech_type)
 {
 	return (mech_type == MD5_HMAC_MECH_INFO_TYPE ||
 		mech_type == MD5_HMAC_GEN_MECH_INFO_TYPE ||
+		mech_type == SHA1_HMAC_MECH_INFO_TYPE ||
+		mech_type == SHA1_HMAC_GEN_MECH_INFO_TYPE ||
+		mech_type == SHA256_HMAC_MECH_INFO_TYPE ||
+		mech_type == SHA256_HMAC_GEN_MECH_INFO_TYPE ||
+		mech_type == SHA384_HMAC_MECH_INFO_TYPE ||
+		mech_type == SHA384_HMAC_GEN_MECH_INFO_TYPE ||
+		mech_type == SHA512_HMAC_MECH_INFO_TYPE ||
+		mech_type == SHA512_HMAC_GEN_MECH_INFO_TYPE ||
 		mech_type == RSA_PKCS_MECH_INFO_TYPE ||
 		mech_type == RSA_X_509_MECH_INFO_TYPE ||
 		mech_type == MD5_RSA_PKCS_MECH_INFO_TYPE ||
@@ -4030,6 +4080,7 @@ dprov_alloc_context(dprov_req_type_t req_type, crypto_ctx_t *spi_ctx)
 		if (dprov_private == NULL)
 			return (CRYPTO_HOST_MEMORY);
 		dprov_private->dc_type = DPROV_CTX_SINGLE;
+		dprov_private->dc_svrfy_to_mac = B_FALSE;
 		break;
 	}
 
@@ -4947,7 +4998,7 @@ dprov_sign_task(dprov_req_t *taskq_req)
 	/* LINTED E_FUNC_SET_NOT_USED */
 	int instance;
 	int error = CRYPTO_NOT_SUPPORTED;
-	crypto_ctx_t *ctx = taskq_req->dr_mac_req.dr_ctx;
+	crypto_ctx_t *ctx = taskq_req->dr_sign_req.sr_ctx;
 	crypto_key_t key, *keyp;
 	crypto_mechanism_t mech;
 
@@ -4965,6 +5016,9 @@ dprov_sign_task(dprov_req_t *taskq_req)
 
 		/* structure assignment */
 		mech = *taskq_req->dr_sign_req.sr_mechanism;
+		if (dprov_valid_mac_mech(mech.cm_type)) {
+			DPROV_CTX_P(ctx)->dc_svrfy_to_mac = B_TRUE;
+		}
 
 		mutex_enter(&softc->ds_lock);
 		/* get key value for secret key algorithms */
@@ -4995,6 +5049,15 @@ dprov_sign_task(dprov_req_t *taskq_req)
 		    &mech.cm_type)) != CRYPTO_SUCCESS)
 			break;
 
+		if (DPROV_CTX_P(ctx)->dc_svrfy_to_mac) {
+			error = crypto_mac_init_prov(pd, 0, &mech, keyp, NULL,
+			    &DPROV_CTX_SINGLE(ctx), NULL);
+
+			/* release provider reference */
+			KCF_PROV_REFRELE(pd);
+			break;
+		}
+
 		/* Use a session id of zero since we use a software provider */
 		if (taskq_req->dr_type == DPROV_REQ_SIGN_INIT)
 			error = crypto_sign_init_prov(pd, 0, &mech, keyp,
@@ -5009,9 +5072,19 @@ dprov_sign_task(dprov_req_t *taskq_req)
 		break;
 
 	case DPROV_REQ_SIGN:
-		error = crypto_sign_single(DPROV_CTX_SINGLE(ctx),
-		    taskq_req->dr_sign_req.sr_data,
-		    taskq_req->dr_sign_req.sr_signature, NULL);
+		if (DPROV_CTX_P(ctx)->dc_svrfy_to_mac) {
+			/* Emulate using update and final */
+			error = crypto_mac_update(DPROV_CTX_SINGLE(ctx),
+			    taskq_req->dr_mac_req.dr_data, NULL);
+			if (error == CRYPTO_SUCCESS) {
+				error = crypto_mac_final(DPROV_CTX_SINGLE(ctx),
+				    taskq_req->dr_mac_req.dr_mac, NULL);
+			}
+		} else {
+			error = crypto_sign_single(DPROV_CTX_SINGLE(ctx),
+			    taskq_req->dr_sign_req.sr_data,
+			    taskq_req->dr_sign_req.sr_signature, NULL);
+		}
 
 		if (error != CRYPTO_BUFFER_TOO_SMALL) {
 			DPROV_CTX_SINGLE(ctx) = NULL;
@@ -5020,13 +5093,23 @@ dprov_sign_task(dprov_req_t *taskq_req)
 		break;
 
 	case DPROV_REQ_SIGN_UPDATE:
-		error = crypto_sign_update(DPROV_CTX_SINGLE(ctx),
-		    taskq_req->dr_sign_req.sr_data, NULL);
+		if (DPROV_CTX_P(ctx)->dc_svrfy_to_mac) {
+			error = crypto_mac_update(DPROV_CTX_SINGLE(ctx),
+			    taskq_req->dr_mac_req.dr_data, NULL);
+		} else {
+			error = crypto_sign_update(DPROV_CTX_SINGLE(ctx),
+			    taskq_req->dr_sign_req.sr_data, NULL);
+		}
 		break;
 
 	case DPROV_REQ_SIGN_FINAL:
-		error = crypto_sign_final(DPROV_CTX_SINGLE(ctx),
-		    taskq_req->dr_sign_req.sr_signature, NULL);
+		if (DPROV_CTX_P(ctx)->dc_svrfy_to_mac) {
+			error = crypto_mac_final(DPROV_CTX_SINGLE(ctx),
+			    taskq_req->dr_mac_req.dr_mac, NULL);
+		} else {
+			error = crypto_sign_final(DPROV_CTX_SINGLE(ctx),
+			    taskq_req->dr_sign_req.sr_signature, NULL);
+		}
 
 		if (error != CRYPTO_BUFFER_TOO_SMALL) {
 			DPROV_CTX_SINGLE(ctx) = NULL;
@@ -5100,6 +5183,31 @@ dprov_sign_task(dprov_req_t *taskq_req)
 	DPROV_DEBUG(D_SIGN, ("(%d) dprov_sign_task: end\n", instance));
 }
 
+static int
+emulate_verify_with_mac(crypto_ctx_t *ctx, crypto_data_t *in_mac)
+{
+	int error;
+	crypto_data_t tmpd;
+	crypto_data_t *out_mac;
+	char digest[SHA512_DIGEST_LENGTH];
+
+	bzero(&tmpd, sizeof (crypto_data_t));
+	tmpd.cd_format = CRYPTO_DATA_RAW;
+	tmpd.cd_length = SHA512_DIGEST_LENGTH;
+	tmpd.cd_raw.iov_base = digest;
+	tmpd.cd_raw.iov_len = SHA512_DIGEST_LENGTH;
+	out_mac = &tmpd;
+
+	error = crypto_mac_final(DPROV_CTX_SINGLE(ctx), out_mac, NULL);
+	if (in_mac->cd_length != out_mac->cd_length ||
+	    (bcmp(digest, (unsigned char *)in_mac->cd_raw.iov_base +
+	    in_mac->cd_offset, out_mac->cd_length) != 0)) {
+		error = CRYPTO_INVALID_MAC;
+	}
+
+	return (error);
+}
+
 /*
  * taskq dispatcher function for verify operations.
  */
@@ -5129,6 +5237,9 @@ dprov_verify_task(dprov_req_t *taskq_req)
 
 		/* structure assignment */
 		mech = *taskq_req->dr_verify_req.vr_mechanism;
+		if (dprov_valid_mac_mech(mech.cm_type)) {
+			DPROV_CTX_P(ctx)->dc_svrfy_to_mac = B_TRUE;
+		}
 
 		mutex_enter(&softc->ds_lock);
 		/* get key value for secret key algorithms */
@@ -5159,6 +5270,16 @@ dprov_verify_task(dprov_req_t *taskq_req)
 		    &mech.cm_type)) != CRYPTO_SUCCESS)
 			break;
 
+
+		if (DPROV_CTX_P(ctx)->dc_svrfy_to_mac) {
+			error = crypto_mac_init_prov(pd, 0, &mech, keyp, NULL,
+			    &DPROV_CTX_SINGLE(ctx), NULL);
+
+			/* release provider reference */
+			KCF_PROV_REFRELE(pd);
+			break;
+		}
+
 		/* Use a session id of zero since we use a software provider */
 		if (taskq_req->dr_type == DPROV_REQ_VERIFY_INIT)
 			error = crypto_verify_init_prov(pd, 0, &mech, keyp,
@@ -5173,9 +5294,19 @@ dprov_verify_task(dprov_req_t *taskq_req)
 		break;
 
 	case DPROV_REQ_VERIFY:
-		error = crypto_verify_single(DPROV_CTX_SINGLE(ctx),
-		    taskq_req->dr_verify_req.vr_data,
-		    taskq_req->dr_verify_req.vr_signature, NULL);
+		if (DPROV_CTX_P(ctx)->dc_svrfy_to_mac) {
+			/* Emulate using update and final */
+			error = crypto_mac_update(DPROV_CTX_SINGLE(ctx),
+			    taskq_req->dr_mac_req.dr_data, NULL);
+			if (error == CRYPTO_SUCCESS) {
+				error = emulate_verify_with_mac(ctx,
+				    taskq_req->dr_mac_req.dr_mac);
+			}
+		} else {
+			error = crypto_verify_single(DPROV_CTX_SINGLE(ctx),
+			    taskq_req->dr_verify_req.vr_data,
+			    taskq_req->dr_verify_req.vr_signature, NULL);
+		}
 
 		ASSERT(error != CRYPTO_BUFFER_TOO_SMALL);
 		DPROV_CTX_SINGLE(ctx) = NULL;
@@ -5183,13 +5314,23 @@ dprov_verify_task(dprov_req_t *taskq_req)
 		break;
 
 	case DPROV_REQ_VERIFY_UPDATE:
-		error = crypto_verify_update(DPROV_CTX_SINGLE(ctx),
-		    taskq_req->dr_verify_req.vr_data, NULL);
+		if (DPROV_CTX_P(ctx)->dc_svrfy_to_mac) {
+			error = crypto_mac_update(DPROV_CTX_SINGLE(ctx),
+			    taskq_req->dr_mac_req.dr_data, NULL);
+		} else {
+			error = crypto_verify_update(DPROV_CTX_SINGLE(ctx),
+			    taskq_req->dr_verify_req.vr_data, NULL);
+		}
 		break;
 
 	case DPROV_REQ_VERIFY_FINAL:
-		error = crypto_verify_final(DPROV_CTX_SINGLE(ctx),
-		    taskq_req->dr_verify_req.vr_signature, NULL);
+		if (DPROV_CTX_P(ctx)->dc_svrfy_to_mac) {
+			error = emulate_verify_with_mac(ctx,
+			    taskq_req->dr_mac_req.dr_mac);
+		} else {
+			error = crypto_verify_final(DPROV_CTX_SINGLE(ctx),
+			    taskq_req->dr_verify_req.vr_signature, NULL);
+		}
 
 		ASSERT(error != CRYPTO_BUFFER_TOO_SMALL);
 		DPROV_CTX_SINGLE(ctx) = NULL;

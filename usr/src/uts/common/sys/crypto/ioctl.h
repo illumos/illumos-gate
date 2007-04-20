@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,6 +115,10 @@ typedef struct crypto_function_list {
 	boolean_t fl_init_token;
 	boolean_t fl_init_pin;
 	boolean_t fl_set_pin;
+
+	boolean_t prov_is_limited;
+	uint32_t prov_hash_threshold;
+	uint32_t prov_hash_limit;
 } crypto_function_list_t;
 
 typedef struct crypto_get_function_list {

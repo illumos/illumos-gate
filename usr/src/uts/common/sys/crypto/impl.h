@@ -189,8 +189,10 @@ typedef enum {
  * pd_mctlp:		Pointer to modctl structure for this provider
  * pd_remove_cv:	cv to wait on while the provider queue drains
  * pd_description:	Provider description string
- * pd_flags		Could be CRYPTO_HIDE_PROVIDER from pi_flags
- *			or KCF_LPROV_MEMBER, KCF_PROV_RESTRICTED set internally.
+ * pd_flags		bitwise OR of pi_flags from crypto_provider_info_t
+ *			and other internal flags defined above.
+ * pd_hash_limit	Maximum data size that hash mechanisms of this provider
+ * 			can support.
  * pd_kcf_prov_handle:	KCF-private handle assigned by KCF
  * pd_prov_id:		Identification # assigned by KCF to provider
  * pd_kstat:		kstat associated with the provider
@@ -219,6 +221,7 @@ typedef struct kcf_provider_desc {
 	kcondvar_t			pd_remove_cv;
 	char				*pd_description;
 	uint_t				pd_flags;
+	uint_t				pd_hash_limit;
 	crypto_kcf_provider_handle_t	pd_kcf_prov_handle;
 	crypto_provider_id_t		pd_prov_id;
 	kstat_t				*pd_kstat;

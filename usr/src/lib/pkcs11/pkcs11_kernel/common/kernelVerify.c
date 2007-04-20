@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,12 +33,12 @@
 #include "kernelGlobal.h"
 #include "kernelObject.h"
 #include "kernelSession.h"
+#include "kernelEmulate.h"
 
 CK_RV
 C_VerifyInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
     CK_OBJECT_HANDLE hKey)
 {
-
 	CK_RV rv;
 	kernel_session_t *session_p;
 	kernel_object_t	*key_p;
@@ -135,6 +136,19 @@ C_VerifyInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		rv = crypto2pkcs11_error_number(verify_init.vi_return_value);
 	}
 
+	if (rv == CKR_OK && SLOT_HAS_LIMITED_HASH(session_p) &&
+	    is_hmac(pMechanism->mechanism)) {
+		if (key_p->is_lib_obj && key_p->class == CKO_SECRET_KEY) {
+			(void) pthread_mutex_lock(&session_p->session_mutex);
+			session_p->verify.flags |= CRYPTO_EMULATE;
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			rv = emulate_init(session_p, pMechanism,
+			    &(verify_init.vi_key), OP_VERIFY);
+		} else {
+			rv = CKR_FUNCTION_FAILED;
+		}
+	}
+
 	/* free the memory allocated for verify_init.vi_key */
 	if (key_p->is_lib_obj) {
 		if (key_p->class == CKO_SECRET_KEY) {
@@ -200,6 +214,21 @@ C_Verify(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 		return (CKR_FUNCTION_FAILED);
 	}
 
+	if (session_p->verify.flags & CRYPTO_EMULATE) {
+		if ((ulDataLen < SLOT_THRESHOLD(session_p)) ||
+		    (ulDataLen > SLOT_MAX_INDATA_LEN(session_p))) {
+			session_p->verify.flags |= CRYPTO_EMULATE_USING_SW;
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+
+			rv = do_soft_hmac_verify(get_spp(&session_p->verify),
+			    pData, ulDataLen,
+			    pSignature, ulSignatureLen, OP_SINGLE);
+			goto clean_exit;
+		} else {
+			free_soft_ctx(get_sp(&session_p->verify), OP_VERIFY);
+		}
+	}
+
 	verify.cv_session = session_p->k_session;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 	ses_lock_held = B_FALSE;
@@ -225,6 +254,8 @@ clean_exit:
 	 * verify operation.
 	 */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+
+	REINIT_OPBUF(&session_p->verify);
 	session_p->verify.flags = 0;
 	ses_lock_held = B_TRUE;
 	REFRELE(session_p, ses_lock_held);
@@ -271,6 +302,12 @@ C_VerifyUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart,
 
 	session_p->verify.flags |= CRYPTO_OPERATION_UPDATE;
 
+	if (session_p->verify.flags & CRYPTO_EMULATE) {
+		(void) pthread_mutex_unlock(&session_p->session_mutex);
+		rv = emulate_update(session_p, pPart, ulPartLen, OP_VERIFY);
+		goto done;
+	}
+
 	verify_update.vu_session = session_p->k_session;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 	ses_lock_held = B_FALSE;
@@ -289,6 +326,7 @@ C_VerifyUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart,
 		rv = crypto2pkcs11_error_number(verify_update.vu_return_value);
 	}
 
+done:
 	if (rv == CKR_OK) {
 		REFRELE(session_p, ses_lock_held);
 		return (rv);
@@ -300,6 +338,7 @@ clean_exit:
 	 * operation by resetting the active and update flags.
 	 */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	REINIT_OPBUF(&session_p->verify);
 	session_p->verify.flags = 0;
 	ses_lock_held = B_TRUE;
 	REFRELE(session_p, ses_lock_held);
@@ -339,6 +378,40 @@ C_VerifyFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSignature,
 		return (CKR_OPERATION_NOT_INITIALIZED);
 	}
 
+	/* The order of checks is important here */
+	if (session_p->verify.flags & CRYPTO_EMULATE_USING_SW) {
+		if (session_p->verify.flags & CRYPTO_EMULATE_UPDATE_DONE) {
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			rv = do_soft_hmac_verify(get_spp(&session_p->verify),
+			    NULL, 0, pSignature, ulSignatureLen,
+			    OP_FINAL);
+		} else {
+			/*
+			 * We should not end up here even if an earlier
+			 * C_VerifyFinal() call took the C_Verify() path as
+			 * it never returns CKR_BUFFER_TOO_SMALL.
+			 */
+			rv = CKR_ARGUMENTS_BAD;
+		}
+		goto clean_exit;
+	} else if (session_p->verify.flags & CRYPTO_EMULATE) {
+		digest_buf_t *bufp = session_p->verify.context;
+
+		/*
+		 * We are emulating a single-part operation now.
+		 * So, clear the flag.
+		 */
+		session_p->verify.flags &= ~CRYPTO_OPERATION_UPDATE;
+		if (bufp == NULL || bufp->buf == NULL) {
+			rv = CKR_ARGUMENTS_BAD;
+			goto clean_exit;
+		}
+		REFRELE(session_p, ses_lock_held);
+		rv = C_Verify(hSession, bufp->buf, bufp->indata_len,
+		    pSignature, ulSignatureLen);
+		return (rv);
+	}
+
 	verify_final.vf_session = session_p->k_session;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 	ses_lock_held = B_FALSE;
@@ -359,6 +432,7 @@ C_VerifyFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSignature,
 clean_exit:
 	/* Always terminate the active verify operation */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	REINIT_OPBUF(&session_p->verify);
 	session_p->verify.flags = 0;
 	ses_lock_held = B_TRUE;
 	REFRELE(session_p, ses_lock_held);

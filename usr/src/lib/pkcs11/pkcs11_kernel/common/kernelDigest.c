@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,12 +32,11 @@
 #include <security/cryptoki.h>
 #include "kernelGlobal.h"
 #include "kernelSession.h"
-
+#include "kernelEmulate.h"
 
 CK_RV
 C_DigestInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism)
 {
-
 	CK_RV rv;
 	kernel_session_t *session_p;
 	boolean_t ses_lock_held = B_TRUE;
@@ -99,6 +98,13 @@ C_DigestInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism)
 		rv = crypto2pkcs11_error_number(digest_init.di_return_value);
 	}
 
+	if (rv == CKR_OK && SLOT_HAS_LIMITED_HASH(session_p)) {
+		(void) pthread_mutex_lock(&session_p->session_mutex);
+		session_p->digest.flags |= CRYPTO_EMULATE;
+		(void) pthread_mutex_unlock(&session_p->session_mutex);
+		rv = emulate_init(session_p, pMechanism, NULL, OP_DIGEST);
+	}
+
 	if (rv != CKR_OK) {
 		(void) pthread_mutex_lock(&session_p->session_mutex);
 		session_p->digest.flags &= ~CRYPTO_OPERATION_ACTIVE;
@@ -120,12 +126,10 @@ C_DigestInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism)
 	return (rv);
 }
 
-
 CK_RV
 C_Digest(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
     CK_BYTE_PTR pDigest, CK_ULONG_PTR pulDigestLen)
 {
-
 	CK_RV rv;
 	kernel_session_t *session_p;
 	boolean_t ses_lock_held = B_TRUE;
@@ -181,6 +185,20 @@ C_Digest(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 		return (CKR_FUNCTION_FAILED);
 	}
 
+	if (session_p->digest.flags & CRYPTO_EMULATE) {
+		if ((ulDataLen < SLOT_THRESHOLD(session_p)) ||
+		    (ulDataLen > SLOT_MAX_INDATA_LEN(session_p))) {
+			session_p->digest.flags |= CRYPTO_EMULATE_USING_SW;
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+
+			rv = do_soft_digest(get_spp(&session_p->digest), NULL,
+			    pData, ulDataLen, pDigest, pulDigestLen, OP_SINGLE);
+			goto done;
+		} else {
+			free_soft_ctx(get_sp(&session_p->digest), OP_DIGEST);
+		}
+	}
+
 	digest.cd_session = session_p->k_session;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 	digest.cd_datalen =  ulDataLen;
@@ -201,6 +219,7 @@ C_Digest(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 	if ((rv == CKR_OK) || (rv == CKR_BUFFER_TOO_SMALL))
 		*pulDigestLen = digest.cd_digestlen;
 
+done:
 	if ((rv == CKR_BUFFER_TOO_SMALL) ||
 	    (rv == CKR_OK && pDigest == NULL)) {
 		/*
@@ -224,6 +243,8 @@ clean_exit:
 	 * digest operation.
 	 */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+
+	REINIT_OPBUF(&session_p->digest);
 	session_p->digest.flags = 0;
 
 	/*
@@ -235,7 +256,6 @@ clean_exit:
 
 	return (rv);
 }
-
 
 CK_RV
 C_DigestUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart,
@@ -284,6 +304,12 @@ C_DigestUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart,
 	/* Set update flag to protect C_Digest */
 	session_p->digest.flags |= CRYPTO_OPERATION_UPDATE;
 
+	if (session_p->digest.flags & CRYPTO_EMULATE) {
+		(void) pthread_mutex_unlock(&session_p->session_mutex);
+		rv = emulate_update(session_p, pPart, ulPartLen, OP_DIGEST);
+		goto done;
+	}
+
 	digest_update.du_session = session_p->k_session;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 	digest_update.du_datalen =  ulPartLen;
@@ -300,6 +326,7 @@ C_DigestUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart,
 		rv = crypto2pkcs11_error_number(digest_update.du_return_value);
 	}
 
+done:
 	if (rv == CKR_OK) {
 		/*
 		 * Decrement the session reference count.
@@ -316,6 +343,7 @@ clean_exit:
 	 * operation by resetting the active and update flags.
 	 */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	REINIT_OPBUF(&session_p->digest);
 	session_p->digest.flags = 0;
 
 	/*
@@ -358,6 +386,7 @@ C_DigestKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hKey)
 	HANDLE2OBJECT(hKey, key_p, rv);
 	if (rv != CKR_OK) {
 		(void) pthread_mutex_lock(&session_p->session_mutex);
+		REINIT_OPBUF(&session_p->digest);
 		session_p->digest.flags = 0;
 		REFRELE(session_p, ses_lock_held);
 		return (rv);
@@ -399,6 +428,10 @@ C_DigestKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hKey)
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 
 	if (!key_p->is_lib_obj) {
+		if (session_p->digest.flags & CRYPTO_EMULATE) {
+			rv = CKR_FUNCTION_NOT_SUPPORTED;
+			goto clean_exit;
+		}
 		digest_key.dk_key.ck_format = CRYPTO_KEY_REFERENCE;
 		digest_key.dk_key.ck_obj_id = key_p->k_handle;
 		while ((r = ioctl(kernel_fd, CRYPTO_DIGEST_KEY,
@@ -425,6 +458,15 @@ C_DigestKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hKey)
 			goto clean_exit;
 		}
 
+		(void) pthread_mutex_lock(&session_p->session_mutex);
+		if (session_p->digest.flags & CRYPTO_EMULATE) {
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			rv = emulate_update(session_p, pPart,
+			    ulPartLen, OP_DIGEST);
+			goto done;
+		}
+		(void) pthread_mutex_unlock(&session_p->session_mutex);
+
 		digest_update.du_datalen = ulPartLen;
 		digest_update.du_databuf = (char *)pPart;
 
@@ -441,6 +483,7 @@ C_DigestKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hKey)
 		}
 	}
 
+done:
 	if (rv == CKR_OK) {
 		/*
 		 * Decrement the session reference count.
@@ -459,6 +502,7 @@ clean_exit:
 	 * operation by resetting the active and update flags.
 	 */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	REINIT_OPBUF(&session_p->digest);
 	session_p->digest.flags = 0;
 
 	/*
@@ -515,6 +559,47 @@ C_DigestFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pDigest,
 		return (CKR_OPERATION_NOT_INITIALIZED);
 	}
 
+	/* The order of checks is important here */
+	if (session_p->digest.flags & CRYPTO_EMULATE_USING_SW) {
+		if (session_p->digest.flags & CRYPTO_EMULATE_UPDATE_DONE) {
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			rv = do_soft_digest(get_spp(&session_p->digest),
+			    NULL, NULL, NULL, pDigest, pulDigestLen, OP_FINAL);
+		} else {
+			/*
+			 * We end up here if an earlier C_DigestFinal() call
+			 * took the C_Digest() path and it had returned
+			 * CKR_BUFFER_TOO_SMALL.
+			 */
+			digest_buf_t *bufp = session_p->digest.context;
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			if (bufp == NULL || bufp->buf == NULL) {
+				rv = CKR_ARGUMENTS_BAD;
+				goto clean_exit;
+			}
+			rv = do_soft_digest(get_spp(&session_p->digest),
+			    NULL, bufp->buf, bufp->indata_len,
+			    pDigest, pulDigestLen, OP_SINGLE);
+		}
+		goto done;
+	} else if (session_p->digest.flags & CRYPTO_EMULATE) {
+		digest_buf_t *bufp = session_p->digest.context;
+
+		/*
+		 * We are emulating a single-part operation now.
+		 * So, clear the flag.
+		 */
+		session_p->digest.flags &= ~CRYPTO_OPERATION_UPDATE;
+		if (bufp == NULL || bufp->buf == NULL) {
+			rv = CKR_ARGUMENTS_BAD;
+			goto clean_exit;
+		}
+		REFRELE(session_p, ses_lock_held);
+		rv = C_Digest(hSession, bufp->buf, bufp->indata_len,
+		    pDigest, pulDigestLen);
+		return (rv);
+	}
+
 	digest_final.df_session = session_p->k_session;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 	digest_final.df_digestlen = *pulDigestLen;
@@ -533,6 +618,7 @@ C_DigestFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pDigest,
 	if ((rv == CKR_OK) || (rv == CKR_BUFFER_TOO_SMALL))
 		*pulDigestLen = digest_final.df_digestlen;
 
+done:
 	if ((rv == CKR_BUFFER_TOO_SMALL) ||
 	    (rv == CKR_OK && pDigest == NULL)) {
 		/*
@@ -552,6 +638,7 @@ C_DigestFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pDigest,
 clean_exit:
 	/* Terminates the active digest operation */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	REINIT_OPBUF(&session_p->digest);
 	session_p->digest.flags = 0;
 
 	/*

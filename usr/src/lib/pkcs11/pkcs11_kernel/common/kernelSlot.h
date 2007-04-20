@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +37,13 @@ extern "C" {
 
 #define	CKU_PUBLIC	2	/* default session auth. state */
 
+/*
+ * This slot has limited hash support. It can not do multi-part
+ * hashing (updates) and it can not hash input data of size
+ * greater than sl_max_inlen.
+ */
+#define	CRYPTO_LIMITED_HASH_SUPPORT	0x00000001
+
 typedef struct kernel_slot {
 	CK_SLOT_ID		sl_provider_id;	/* kernel provider ID */
 	crypto_function_list_t	sl_func_list;	/* function list */
@@ -45,6 +51,23 @@ typedef struct kernel_slot {
 	CK_USER_TYPE		sl_state;	/* session's auth. state */
 	struct object 		*sl_tobj_list; 	/* token object list */
 	pthread_mutex_t		sl_mutex;
+	/*
+	 * The valid values are defined above.
+	 */
+	uint32_t		sl_flags;
+
+	/*
+	 * The maximum input data that can be digested by this slot.
+	 * Used only if CRYPTO_LIMITED_HASH_SUPPORT is set in sl_flags.
+	 */
+	int			sl_max_inlen;
+
+	/*
+	 * The threshold for input data size. We use this slot
+	 * only if data size is at or above this value. Used only if
+	 * CRYPTO_LIMITED_HASH_SUPPORT is set.
+	 */
+	int			sl_threshold;
 } kernel_slot_t;
 
 extern CK_ULONG slot_count;

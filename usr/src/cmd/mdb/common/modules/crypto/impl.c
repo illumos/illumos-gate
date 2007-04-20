@@ -216,13 +216,17 @@ kcf_provider_desc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_printf("pd_resume_cv:\t\t%hd\n", desc.pd_resume_cv._opaque);
 	mdb_printf("pd_remove_cv:\t\t%hd\n", desc.pd_remove_cv._opaque);
-	mdb_printf("pd_flags:\t\t%s %s %s\n",
+	mdb_printf("pd_flags:\t\t%s %s %s %s\n",
 	    (desc.pd_flags & CRYPTO_HIDE_PROVIDER) ?
 		"CRYPTO_HIDE_PROVIDER" : " ",
+	    (desc.pd_flags & CRYPTO_HASH_NO_UPDATE) ?
+		"CRYPTO_HASH_NO_UPDATE" : " ",
 	    (desc.pd_flags & KCF_LPROV_MEMBER) ?
 		"KCF_LPROV_MEMBER" : " ",
 	    (desc.pd_flags & KCF_PROV_RESTRICTED) ?
 		"KCF_PROV_RESTRICTED" : " ");
+	if (desc.pd_flags & CRYPTO_HASH_NO_UPDATE)
+		mdb_printf("pd_hash_limit:\t\t%u\n", desc.pd_hash_limit);
 	mdb_printf("pd_provider_list:\t%p\n", desc.pd_provider_list);
 	return (DCMD_OK);
 }

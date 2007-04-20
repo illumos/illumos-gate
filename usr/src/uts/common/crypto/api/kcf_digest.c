@@ -158,11 +158,18 @@ retry:
 		    digest, KCF_SWFP_RHNDL(crq));
 		KCF_PROV_INCRSTATS(pd, error);
 	} else {
-		KCF_WRAP_DIGEST_OPS_PARAMS(&params, KCF_OP_ATOMIC, pd->pd_sid,
-		    mech, NULL, data, digest);
+		if (pd->pd_prov_type == CRYPTO_HW_PROVIDER &&
+		    (pd->pd_flags & CRYPTO_HASH_NO_UPDATE) &&
+		    (data->cd_length > pd->pd_hash_limit)) {
+			error = CRYPTO_BUFFER_TOO_BIG;
+		} else {
+			KCF_WRAP_DIGEST_OPS_PARAMS(&params, KCF_OP_ATOMIC,
+			    pd->pd_sid, mech, NULL, data, digest);
 
-		/* no crypto context to carry between multiple parts. */
-		error = kcf_submit_request(pd, NULL, crq, &params, B_FALSE);
+			/* no crypto context to carry between multiple parts. */
+			error = kcf_submit_request(pd, NULL, crq, &params,
+			    B_FALSE);
+		}
 	}
 
 	if (error != CRYPTO_SUCCESS && error != CRYPTO_QUEUED &&
@@ -282,7 +289,21 @@ retry:
 		return (error);
 	}
 
-	error = crypto_digest_init_prov(pd, pd->pd_sid, mech, ctxp, crq);
+	if (pd->pd_prov_type == CRYPTO_HW_PROVIDER &&
+	    (pd->pd_flags & CRYPTO_HASH_NO_UPDATE)) {
+		/*
+		 * The hardware provider has limited digest support.
+		 * So, we fallback early here to using a software provider.
+		 *
+		 * XXX - need to enhance to do the fallback later in
+		 * crypto_digest_update() if the size of accumulated input data
+		 * exceeds the maximum size digestable by hardware provider.
+		 */
+		error = CRYPTO_BUFFER_TOO_BIG;
+	} else {
+		error = crypto_digest_init_prov(pd, pd->pd_sid,
+		    mech, ctxp, crq);
+	}
 
 	if (error != CRYPTO_SUCCESS && error != CRYPTO_QUEUED &&
 	    IS_RECOVERABLE(error)) {

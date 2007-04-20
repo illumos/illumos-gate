@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,12 +45,30 @@ typedef struct crypto_active_op {
 	uint32_t	flags;
 } crypto_active_op_t;
 
+#define	EDIGEST_LENGTH  1024
+
+/* Used for emulating digest and HMAC mechs */
+typedef struct digest_buf {
+	uint8_t		*buf;
+	int		buf_len;
+	int		indata_len;
+	void		*soft_sp;
+} digest_buf_t;
 
 /*
  * Definition for flags in crypto_active_op_t
+ *
+ * CRYPTO_EMULATE flag is set for a digest or sign/verify with a HMAC
+ * mechanism, if the session slot has a CRYPTO_LIMITED_HASH_SUPPORT flag set.
+ * CRYPTO_EMULATE_USING_SW flag is meaningful only when CRYPTO_EMULATE flag
+ * is set. And CRYPTO_EMULATE_UPDATE_DONE flag is meaningful only when
+ * CRYPTO_EMULATE_USING_SW flag is set.
  */
-#define	CRYPTO_OPERATION_ACTIVE		1 /* Cryptoki operation is active */
-#define	CRYPTO_OPERATION_UPDATE		2 /* Cryptoki multi-part op active */
+#define	CRYPTO_OPERATION_ACTIVE	0x00000001 /* Cryptoki operation is active */
+#define	CRYPTO_OPERATION_UPDATE	0x00000002 /* Cryptoki multi-part op active */
+#define	CRYPTO_EMULATE		0x00000004 /* op needs emulation */
+#define	CRYPTO_EMULATE_USING_SW	0x00000008 /* ... use software */
+#define	CRYPTO_EMULATE_UPDATE_DONE 0x00000010 /* did at least one update */
 
 typedef struct session {
 	CK_ULONG	magic_marker;	/* magic # be validated for integrity */

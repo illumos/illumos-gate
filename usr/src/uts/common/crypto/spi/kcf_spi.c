@@ -736,6 +736,24 @@ init_prov_mechs(crypto_provider_info_t *info, kcf_provider_desc_t *desc)
 			break;
 		}
 
+		if (desc->pd_flags & CRYPTO_HASH_NO_UPDATE &&
+		    mi->cm_func_group_mask & CRYPTO_FG_DIGEST) {
+			/*
+			 * We ask the provider to specify the limit
+			 * per hash mechanism. But, in practice, a
+			 * hardware limitation means all hash mechanisms
+			 * will have the same maximum size allowed for
+			 * input data. So, we make it a per provider
+			 * limit to keep it simple.
+			 */
+			if (mi->cm_max_input_length == 0) {
+				err = CRYPTO_ARGUMENTS_BAD;
+				break;
+			} else {
+				desc->pd_hash_limit = mi->cm_max_input_length;
+			}
+		}
+
 		if (kcf_add_mech_provider(mech_idx, desc, &pmd) != KCF_SUCCESS)
 			break;
 

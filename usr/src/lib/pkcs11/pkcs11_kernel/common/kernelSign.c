@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,12 +32,12 @@
 #include "kernelGlobal.h"
 #include "kernelObject.h"
 #include "kernelSession.h"
+#include "kernelEmulate.h"
 
 CK_RV
 C_SignInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
     CK_OBJECT_HANDLE hKey)
 {
-
 	CK_RV rv;
 	kernel_session_t *session_p;
 	kernel_object_t *key_p;
@@ -133,6 +134,19 @@ C_SignInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		rv = crypto2pkcs11_error_number(sign_init.si_return_value);
 	}
 
+	if (rv == CKR_OK && SLOT_HAS_LIMITED_HASH(session_p) &&
+	    is_hmac(pMechanism->mechanism)) {
+		if (key_p->is_lib_obj && key_p->class == CKO_SECRET_KEY) {
+			(void) pthread_mutex_lock(&session_p->session_mutex);
+			session_p->sign.flags |= CRYPTO_EMULATE;
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			rv = emulate_init(session_p, pMechanism,
+			    &(sign_init.si_key), OP_SIGN);
+		} else {
+			rv = CKR_ARGUMENTS_BAD;
+		}
+	}
+
 	if (key_p->is_lib_obj) {
 		if (key_p->class == CKO_SECRET_KEY) {
 			free(sign_init.si_key.ck_data);
@@ -202,6 +216,21 @@ C_Sign(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 		return (CKR_FUNCTION_FAILED);
 	}
 
+	if (session_p->sign.flags & CRYPTO_EMULATE) {
+		if ((ulDataLen < SLOT_THRESHOLD(session_p)) ||
+		    (ulDataLen > SLOT_MAX_INDATA_LEN(session_p))) {
+			session_p->sign.flags |= CRYPTO_EMULATE_USING_SW;
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+
+			rv = do_soft_hmac_sign(get_spp(&session_p->sign),
+			    pData, ulDataLen,
+			    pSignature, pulSignatureLen, OP_SINGLE);
+			goto done;
+		} else {
+			free_soft_ctx(get_sp(&session_p->sign), OP_SIGN);
+		}
+	}
+
 	sign.cs_session = session_p->k_session;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 	ses_lock_held = B_FALSE;
@@ -224,6 +253,7 @@ C_Sign(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 	if (rv == CKR_OK || rv == CKR_BUFFER_TOO_SMALL)
 		*pulSignatureLen = sign.cs_signlen;
 
+done:
 	if ((rv == CKR_BUFFER_TOO_SMALL) ||
 	    (rv == CKR_OK && pSignature == NULL)) {
 		/*
@@ -243,6 +273,8 @@ clean_exit:
 	 * sign operation.
 	 */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+
+	REINIT_OPBUF(&session_p->sign);
 	session_p->sign.flags = 0;
 	ses_lock_held = B_TRUE;
 	REFRELE(session_p, ses_lock_held);
@@ -289,6 +321,12 @@ C_SignUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart,
 
 	session_p->sign.flags |= CRYPTO_OPERATION_UPDATE;
 
+	if (session_p->sign.flags & CRYPTO_EMULATE) {
+		(void) pthread_mutex_unlock(&session_p->session_mutex);
+		rv = emulate_update(session_p, pPart, ulPartLen, OP_SIGN);
+		goto done;
+	}
+
 	sign_update.su_session = session_p->k_session;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 	ses_lock_held = B_FALSE;
@@ -306,6 +344,7 @@ C_SignUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart,
 		rv = crypto2pkcs11_error_number(sign_update.su_return_value);
 	}
 
+done:
 	if (rv == CKR_OK) {
 		REFRELE(session_p, ses_lock_held);
 		return (rv);
@@ -317,6 +356,7 @@ clean_exit:
 	 * operation by resetting the active and update flags.
 	 */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	REINIT_OPBUF(&session_p->sign);
 	session_p->sign.flags = 0;
 	ses_lock_held = B_TRUE;
 	REFRELE(session_p, ses_lock_held);
@@ -361,6 +401,47 @@ C_SignFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSignature,
 		return (CKR_OPERATION_NOT_INITIALIZED);
 	}
 
+	/* The order of checks is important here */
+	if (session_p->sign.flags & CRYPTO_EMULATE_USING_SW) {
+		if (session_p->sign.flags & CRYPTO_EMULATE_UPDATE_DONE) {
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			rv = do_soft_hmac_sign(get_spp(&session_p->sign),
+			    NULL, 0, pSignature, pulSignatureLen, OP_FINAL);
+		} else {
+			/*
+			 * We end up here if an earlier C_SignFinal() call
+			 * took the C_Sign() path and it had returned
+			 * CKR_BUFFER_TOO_SMALL.
+			 */
+			digest_buf_t *bufp = session_p->sign.context;
+			(void) pthread_mutex_unlock(&session_p->session_mutex);
+			if (bufp == NULL || bufp->buf == NULL) {
+				rv = CKR_ARGUMENTS_BAD;
+				goto clean_exit;
+			}
+			rv = do_soft_hmac_sign(get_spp(&session_p->sign),
+			    bufp->buf, bufp->indata_len,
+			    pSignature, pulSignatureLen, OP_SINGLE);
+		}
+		goto done;
+	} else if (session_p->sign.flags & CRYPTO_EMULATE) {
+		digest_buf_t *bufp = session_p->sign.context;
+
+		/*
+		 * We are emulating a single-part operation now.
+		 * So, clear the flag.
+		 */
+		session_p->sign.flags &= ~CRYPTO_OPERATION_UPDATE;
+		if (bufp == NULL || bufp->buf == NULL) {
+			rv = CKR_ARGUMENTS_BAD;
+			goto clean_exit;
+		}
+		REFRELE(session_p, ses_lock_held);
+		rv = C_Sign(hSession, bufp->buf, bufp->indata_len,
+		    pSignature, pulSignatureLen);
+		return (rv);
+	}
+
 	sign_final.sf_session = session_p->k_session;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 	ses_lock_held = B_FALSE;
@@ -381,6 +462,7 @@ C_SignFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSignature,
 	if (rv == CKR_OK || rv == CKR_BUFFER_TOO_SMALL)
 		*pulSignatureLen = sign_final.sf_signlen;
 
+done:
 	if ((rv == CKR_BUFFER_TOO_SMALL) ||
 	    (rv == CKR_OK && pSignature == NULL)) {
 		/*
@@ -396,6 +478,7 @@ C_SignFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSignature,
 clean_exit:
 	/* Terminates the active sign operation */
 	(void) pthread_mutex_lock(&session_p->session_mutex);
+	REINIT_OPBUF(&session_p->sign);
 	session_p->sign.flags = 0;
 	ses_lock_held = B_TRUE;
 	REFRELE(session_p, ses_lock_held);
