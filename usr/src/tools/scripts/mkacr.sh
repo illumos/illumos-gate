@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,6 +41,15 @@ parse_pkginfo() {
 
 	nawk -v matchisa=$isa -v pkginst=$dir -F= '
 
+	# This clause matches architecture specific entries. e.g. CLASSES_i386=
+	# It has a different format to the other ERE entries as this allows
+	# the variable substition.
+
+	$1 ~ "CLASSES_"matchisa"[\t ]*$" {
+		gsub(/"/, "", $2);
+		numisaclasses = split($2, isaclasses, " ");
+		next;
+	}
 	/^CLASSES *=/ {
 	  	gsub(/"/, "", $2);
 		numclasses = split($2, classes, " ");
@@ -71,9 +79,16 @@ parse_pkginfo() {
 		next;
 	}
 	END {
-		if (numclasses == 0)
+		if (numclasses == 0 && numisaclasses == 0)
 			exit 0;
 
+		for (i in isaclasses) {
+		    	if (isaclasses[i] == "none") 
+			    	continue;
+
+			printf("%s %s %s %s %s\n", pkg, pkginst, pkgisa, mach, 
+				isaclasses[i]);
+		}
 		for (i in classes) {
 		    	if (classes[i] == "none") 
 			    	continue;
