@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -264,11 +264,19 @@ ufs_delete(struct ufsvfs *ufsvfsp, struct inode *ip, int dolockfs)
 	 * Ignore if deletes are not allowed (wlock/hlock)
 	 */
 	if (ULOCKFS_IS_NOIDEL(ITOUL(ip))) {
+		mutex_enter(&delq->uq_mutex);
+		delq_info->delq_unreclaimed_blocks -= ip->i_blocks;
+		delq_info->delq_unreclaimed_files--;
+		mutex_exit(&delq->uq_mutex);
 		VN_RELE(vp);
 		return;
 	}
 
 	if ((vp->v_count > 1) || (ip->i_mode == 0)) {
+		mutex_enter(&delq->uq_mutex);
+		delq_info->delq_unreclaimed_blocks -= ip->i_blocks;
+		delq_info->delq_unreclaimed_files--;
+		mutex_exit(&delq->uq_mutex);
 		VN_RELE(vp);
 		return;
 	}
