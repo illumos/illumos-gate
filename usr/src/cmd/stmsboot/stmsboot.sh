@@ -24,6 +24,7 @@
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 PATH=/usr/bin:/usr/sbin:$PATH; export PATH
 STMSBOOTUTIL=/lib/mpxio/stmsboot_util
@@ -52,6 +53,11 @@ AWK=/usr/bin/awk
 SORT=/usr/bin/sort
 UNIQ=/usr/bin/uniq
 EXPR=/usr/bin/expr
+SED=/usr/bin/sed
+SVCPROP=/usr/bin/svcprop
+SVCCFG=/usr/sbin/svccfg
+SVCS=/usr/bin/svcs
+SVCADM=/usr/sbin/svcadm
 
 MACH=`/usr/bin/uname -p`
 BOOTENV_FILE=/boot/solaris/bootenv.rc
@@ -139,7 +145,7 @@ build_recover()
 		echo "\tcp /mnt${SAVEDIR}/$DRVCONF /mnt$KDRVCONF" >> $RECOVERFILE
 	fi
 
-	if [ $1 -ne 0 ]; then
+	if [ $1 -eq 1 ]; then
 		echo "\tcp /mnt${SAVEDIR}/vfstab /mnt$VFSTAB" >> $RECOVERFILE
 
 		echo "repository /mnt/etc/svc/repository.db" > $SVCCFG_RECOVERY
@@ -147,7 +153,7 @@ build_recover()
 		echo "setprop general/enabled=false" >> $SVCCFG_RECOVERY
 		echo "exit" >> $SVCCFG_RECOVERY
 
-		echo "\t/usr/sbin/svccfg -f /mnt$SVCCFG_RECOVERY" >> $RECOVERFILE
+		echo "\t$SVCCFG -f /mnt$SVCCFG_RECOVERY" >> $RECOVERFILE
 
 		if [ "x$MACH" = "xi386" -a "x$new_bootpath" != "x" ]; then
 			echo "\tcp /mnt${SAVEDIR}/bootenv.rc /mnt$BOOTENV_FILE" >> $RECOVERFILE
@@ -181,7 +187,9 @@ update_sysfiles()
 		return 0;
 	fi
 
-	need_bootscript=""
+	# set need_bootscript to the number of drivers that
+	# we support.
+	need_bootscript=`echo $SUPPORTED_DRIVERS|$AWK -F"|" '{print NF}'`
 
 	if [ "x$cmd" = xenable -o "x$cmd" = xdisable ]; then
 
@@ -191,8 +199,14 @@ update_sysfiles()
 			TMPDRVCONF=/var/run/tmp.$d.conf.$$
 
 			cp $KDRVCONF $SAVEDIR
-			cp $TMPDRVCONF $KDRVCONF
-			rm -f $TMPDRVCONF  > /dev/null 2>&1
+			if [ -f $TMPDRVCONF ]; then
+				cp $TMPDRVCONF $KDRVCONF
+				rm -f $TMPDRVCONF
+			else
+				# if $TMPDRVCONF doesn't exist, then we
+				# haven't made any changes to it
+				continue;
+			fi
 
 			#
 			# there is no need to update the system files in the following
@@ -203,7 +217,13 @@ update_sysfiles()
 			#   disks accessible by vhci paths.
 			#
 
-			build_parent_list $d;
+			# Function to setup the CLIENT_TYPE_PHCI string based on
+			# the list of drivers that we're operating on. The variable
+			# depends upon the pathname of the parent node in the 
+			# device tree, which can be different on x86/x64 and sparc.
+
+			CLIENT_TYPE_PHCI=`$STMSBOOTUTIL -D $d -n`;
+
 			if [ "x$CLIENT_TYPE_PHCI" = "x" ]; then
 				continue;
 			fi
@@ -217,7 +237,7 @@ update_sysfiles()
 			fi
 
 			if [ $? -ne 0 ]; then
-				need_bootscript="$need_bootscript $d"
+				need_bootscript=`$EXPR $need_bootscript - 1`
 			fi
 		done
 	fi
@@ -239,7 +259,6 @@ update_sysfiles()
 			# in /kernel/drv/fp.conf.
 
 			EXISTP=`$GREP "^name.*$NNEWP" /kernel/drv/fp.conf`
-#			if [ -z "$EXISTP" ]; then
 			if [ $? != 0 ]; then
 				cat >>/kernel/drv/fp.conf << EOF
 # This entry must be the last one in the fp.conf file
@@ -251,8 +270,8 @@ EOF
 		fi
 	fi
 
-	if [ -z "$need_bootscript" ]; then
-		need_bootscript=0
+	if [ $need_bootscript -gt 0 ]; then
+		need_bootscript=1
 		if [ "x$MACH" = "xi386" -a "x$new_bootpath" != "x" ]; then
 			#only update bootpath for x86.
 			cp $BOOTENV_FILE $SAVEDIR
@@ -263,11 +282,13 @@ EOF
 		# The service will run during the next reboot and will do
 		# the actual job of modifying the system files.
 		#
-		svcadm disable -t $STMSINSTANCE
-		svccfg -f - << EOF
+		$SVCADM disable -t $STMSINSTANCE
+		$SVCCFG -f - << EOF
 select $STMSINSTANCE
 setprop general/enabled = true
 EOF
+	else
+		need_bootscript=0
 	fi
 
 	build_recover $need_bootscript
@@ -411,11 +432,14 @@ emit_driver_warning_msg() {
 	# for each driver that we support, grab the list
 	# of controllers attached to the system.
 
+	echo ""
 	echo "WARNING: stmsboot operates on each supported multipath-capable controller"
 	echo "         detected in a host. In your system, these controllers are"
 
-	for WARNDRV in fp mpt; do
-		$GREP "$WARNDRV.$" /etc/path_to_inst | $AWK -F"\"" '{print "/devices"$2}'
+	for WARNDRV in `echo $SUPPORTED_DRIVERS| $SED -e"s,|, ,g"`; do
+		for i in `$STMSBOOTUTIL -D $WARNDRV -n | $SED -e"s,|, ,g"`; do
+			$GREP "$i.*$WARNDRV.$" /etc/path_to_inst | $AWK -F"\"" '{print "/devices"$2}'
+		done;
 	done;
 	
 	echo ""
@@ -423,37 +447,15 @@ emit_driver_warning_msg() {
 	echo "and re-invoke with -D { fp | mpt } to specify which controllers you wish"
 	echo "to modify your multipathing configuration for."
 
-	echo
+	echo ""
 	gettext "Do you wish to continue? [y/n] (default: y) " 1>&2
 	read response
 
-	if [ "x$response" -ne "xY" -a "x$response" -ne "xy" ]; then
+	if [ "x$response" != "xY" -a "x$response" != "xy" ]; then
 		exit
 	fi
 
 }
-
-# Function to setup the CLIENT_TYPE_PHCI string based on
-# the list of drivers that we're operating on. The variable
-# depends upon the pathname of the parent node in the 
-# device tree, which can be different on x86/x64 and sparc.
-# Oh, if we only had OBP on x86/x64!
-build_parent_list() {
-
-	# stmsboot_util -n provides us with the name of the
-	# node containing "fp" or "sas-$d", and helpfully
-	# appends "/[ssd|sd]@" as appropriate
-
-	d=$1;
-
-	TLIST=`$STMSBOOTUTIL -D $d -n`
-	if [ "x$TLIST" != "x" ]; then
-		CLIENT_TYPE_PHCI="$TLIST|$CLIENT_TYPE_PHCI"
-	else
-		CLIENT_TYPE_PHCI="$CLIENT_TYPE_PHCI"
-	fi
-}
-
 
 cmd=none
 
@@ -501,16 +503,16 @@ if [ ! -f $STMSBOOTUTIL -o ! -f $STMSMETHODSCRIPT ]; then
 fi
 
 # If the old sun4u-specific SMF method is found, remove it
-/usr/sbin/svccfg -s "platform/sun4u/mpxio-upgrade:default" < /dev/null > /dev/null 2>&1
-if [ $? -ne 0 ]; then
-	/usr/sbin/svccfg delete "platform/sun4u/mpxio-upgrade:default" > /dev/null 2>&1
+$SVCCFG -s "platform/sun4u/mpxio-upgrade:default" < /dev/null > /dev/null 2>&1
+if [ $? -eq 0 ]; then
+	$SVCCFG delete "platform/sun4u/mpxio-upgrade:default" > /dev/null 2>&1
 fi
 
 # now import the new service, if necessary
-/usr/bin/svcprop -q $STMSINSTANCE < /dev/null > /dev/null 2>&1
+$SVCPROP -q $STMSINSTANCE < /dev/null > /dev/null 2>&1
 if [ $? -ne 0 ]; then
 	if [ -f /var/svc/manifest/system/device/mpxio-upgrade.xml ]; then
-		/usr/sbin/svccfg import /var/svc/manifest/system/device/mpxio-upgrade.xml
+		$SVCCFG import /var/svc/manifest/system/device/mpxio-upgrade.xml
 		if [ $? -ne 0 ]; then
 			fmt=`gettext "Unable to import %s service"`
 			printf "$fmt\n" "$STMSINSTANCE" 1>&2
@@ -534,6 +536,31 @@ if [ "x$cmd" = xenable -o "x$cmd" = xdisable -o "x$cmd" = xupdate ]; then
 	if $MOUNT -v | $EGREP -s " on / type (nfs|cachefs) "; then
 		gettext "This command option is not supported on systems with nfs or cachefs mounted root filesystem.\n" 1>&2
 		exit 1
+	fi
+
+	# if the user has left the system with the mpxio-upgrade service
+	# in a temporarily disabled state (ie, service is armed for the next
+	# reboot), then let them know. We need to ensure that the system is
+	# is in a sane state before allowing any further invocations, so 
+	# try to get the system admin to do so
+
+	ISARMED=`$SVCS -l $STMSINSTANCE |$GREP "enabled.*temporary"`
+	if [ $? -eq 0 ]; then
+		echo ""
+		echo "You need the reboot the system in order to complete"
+		echo "the previous invocation of stmsboot."
+		echo ""
+		echo "Do you wish to reboot the system now? (y/n, default y) \c"
+		read response
+
+		if [ "x$response" = "xY" -o "x$response" = "xy" ]; then
+			/usr/sbin/reboot
+		else
+			/bin/echo ""
+			/bin/echo "Please reboot this system before continuing"
+			/bin/echo ""
+			exit 1
+		fi
 	fi
 
 	if [ -d $SAVEDIR ]; then

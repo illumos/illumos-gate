@@ -57,17 +57,14 @@
 #ifdef	sparc
 #define	DISK_NODE_NAME	"ssd"
 #define	DISK_DRV_NAME	"ssd"
-#define	SLASH_DISK_AT	"/ssd@"
 #else	/* sparc */
 #define	DISK_NODE_NAME	"disk"
 #define	DISK_DRV_NAME	"sd"
-#define	SLASH_DISK_AT	"/disk@"
 #endif
 
 #define	DISK_AT_G	"disk@g"
 #define	SLASH_FP_AT	"/fp@"
 #define	SLASH_SCSI_VHCI	"/scsi_vhci"
-#define	SLASH_SD_AT	"/sd@"
 #define	DEV_DSK		"/dev/dsk/"
 #define	DEV_RDSK	"/dev/rdsk/"
 #define	SYS_FILENAME_LEN	256
@@ -376,6 +373,7 @@ main(int argc, char *argv[])
 	}
 
 	clean_exit(0);
+	/*NOTREACHED*/
 }
 
 /*
@@ -1682,7 +1680,7 @@ canopen(char *filename)
 /*
  * This function traverses the device tree looking for nodes
  * which have "drivername" as a property. We return a list of
- * these nodes, with SLASH_DISK_AT appended.
+ * these nodes, without duplicate entries.
  * Since there can be many different pci/pcie devices that all
  * share the same driver but which have different pci vid/did
  * combinations, we have to be smart about returning only those
@@ -1692,12 +1690,14 @@ canopen(char *filename)
 static void
 list_nodes(char *drivername)
 {
-	char *aliaslist;
-	char *mpxprop = NULL;
 	di_node_t devroot = DI_NODE_NIL;
 	di_node_t thisnode = DI_NODE_NIL;
+	char *aliaslist;
+	char *iitype = NULL; /* the "initiator-interconnect-type" property */
 	int *intprop = NULL;
 	int i = 1; /* fencepost */
+	int irval = 0;
+	int crval = 0;
 
 	/*
 	 * Since the "fp" driver enumerates with its own name,
@@ -1728,31 +1728,36 @@ list_nodes(char *drivername)
 				    di_node_name(thisnode));
 
 			/* We check the child node for drvprop */
-			if ((di_prop_lookup_ints(DDI_DEV_T_ANY,
-			    di_child_node(thisnode), drvprop,
-			    &intprop) > -1) ||
-			    (((di_prop_lookup_strings(DDI_DEV_T_ANY,
-			    thisnode, "mpxio-disable", &mpxprop) > -1) &&
-			    strcmp(di_driver_name(thisnode),
-			    drivername)) == 0)) {
+			irval = di_prop_lookup_ints(DDI_DEV_T_ANY,
+			    di_child_node(thisnode), drvprop, &intprop);
+			/* and this node for the correct initiator type */
+			crval = di_prop_lookup_strings(DDI_DEV_T_ANY,
+			    thisnode, "initiator-interconnect-type", &iitype);
+
+			/*
+			 * examine the return codes from di_prop_lookup*()
+			 * functions to guard against library errors
+			 */
+			if ((irval > -1) || ((crval > -1) &&
+			    (strncmp(iitype, "SATA", 4) == 0))) {
 
 				if (strstr(aliaslist,
-				    di_node_name(thisnode))
-				    == (char *)NULL) {
+				    di_node_name(thisnode)) == (char *)NULL) {
 					char *nname;
 
 					nname = di_node_name(thisnode);
 
 					if (i) {
 					(void) snprintf(aliaslist,
-					    strlen(nname), "%s", nname);
+					    strlen(nname) + 1, "%s", nname);
 						--i;
 					} else {
 					if (strstr(aliaslist,
 					    di_node_name(thisnode)) ==
 					    (char *)NULL) {
+						/* add 2 for the n-1 + "|" */
 						(void) snprintf(aliaslist,
-						    strlen(nname) +
+						    strlen(nname) + 2 +
 						    strlen(aliaslist),
 						    "%s|%s", aliaslist,
 						    nname);
