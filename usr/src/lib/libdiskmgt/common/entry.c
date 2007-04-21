@@ -36,13 +36,20 @@
 #include <libintl.h>
 #include <locale.h>
 #include <sys/debug.h>
+#include <strings.h>
+#include <sys/stat.h>
+#include <sys/swap.h>
 
 #include "libdiskmgt.h"
 #include "disks_private.h"
 #include "partition.h"
 
-extern	char	*getfullblkname();
+#define	ANY_ZPOOL_USE(who) \
+	(((who) == DM_WHO_ZPOOL_FORCE) || \
+	((who) == DM_WHO_ZPOOL) || \
+	((who) == DM_WHO_ZPOOL_SPARE))
 
+extern	char	*getfullblkname();
 
 extern dm_desc_type_t drive_assoc_types[];
 extern dm_desc_type_t bus_assoc_types[];
@@ -727,6 +734,113 @@ out:
 }
 
 /*
+ * Get the full list of swap entries.  Returns -1 on error, or >= 0 to
+ * indicate the number of entries in the list.  Callers are responsible
+ * for calling dm_free_swapentries() to deallocate memory.  If this
+ * returns 0, the swaptbl_t still needs to be freed.
+ */
+int
+dm_get_swapentries(swaptbl_t **stp, int *errp)
+{
+	int count, i;
+	swaptbl_t *tbl;
+	char *ptr;
+
+	*stp = NULL;
+
+	/* get number of swap entries */
+	if ((count = swapctl(SC_GETNSWP, NULL)) < 0) {
+		*errp = errno;
+		return (-1);
+	}
+
+	if (count == 0) {
+		return (0);
+	}
+
+	/* allocate space */
+	tbl = calloc(1, sizeof (int) + count * sizeof (swapent_t));
+	if (tbl == NULL) {
+		*errp = ENOMEM;
+		return (-1);
+	}
+
+	ptr = calloc(1, count * MAXPATHLEN);
+	if (ptr == NULL) {
+		*errp = ENOMEM;
+		free(tbl);
+		return (-1);
+	}
+
+	/* set up pointers to the pathnames */
+	tbl->swt_n = count;
+	for (i = 0; i < count; i++) {
+		tbl->swt_ent[i].ste_path = ptr;
+		ptr += MAXPATHLEN;
+	}
+
+	/* get list of swap paths */
+	count = swapctl(SC_LIST, tbl);
+	if (count < 0) {
+		*errp = errno;
+		free(ptr);
+		free(tbl);
+		return (-1);
+	}
+
+	*stp = tbl;
+	return (count);
+}
+
+/* ARGSUSED */
+void
+dm_free_swapentries(swaptbl_t *stp)
+{
+	ASSERT(stp != NULL);
+
+	free(stp->swt_ent[0].ste_path);
+	free(stp);
+}
+
+/*
+ * Check a slice to see if it's being used by swap.
+ */
+int
+dm_inuse_swap(const char *dev_name, int *errp)
+{
+	int count;
+	int found;
+	swaptbl_t *tbl = NULL;
+
+	*errp = 0;
+
+	count = dm_get_swapentries(&tbl, errp);
+	if (count < 0 || *errp) {
+		if (tbl)
+			dm_free_swapentries(tbl);
+		return (-1);
+	}
+
+	/* if there are no swap entries, we're done */
+	if (!count) {
+		return (0);
+	}
+
+	ASSERT(tbl != NULL);
+
+	found = 0;
+	while (count--) {
+		if (strcmp(dev_name, tbl->swt_ent[count].ste_path) == 0) {
+			found = 1;
+			break;
+		}
+	}
+
+	dm_free_swapentries(tbl);
+	return (found);
+}
+
+/*
  * Returns 'in use' details, if found, about a specific dev_name,
  * based on the caller(who). It is important to note that it is possible
  * for there to be more than one 'in use' statistic regarding a dev_name.
@@ -741,6 +855,7 @@ dm_inuse(char *dev_name, char **msg, dm_who_type_t who, int *errp)
 	nvpair_t *nvwhat = NULL;
 	nvpair_t *nvdesc = NULL;
 	int	found = 0;
+	int	err;
 	char	*dname = NULL;
 
 	*errp = 0;
@@ -759,6 +874,31 @@ dm_inuse(char *dev_name, char **msg, dm_who_type_t who, int *errp)
 	 * for in use statistics. So, return found, which is == 0.
 	 */
 	if (dname == NULL || *dname == '\0') {
+		return (found);
+	}
+
+	/*
+	 * Slice stats for swap devices are only returned if mounted
+	 * (e.g. /tmp).  Other devices or files being used for swap
+	 * are ignored, so we add a special check here to use swapctl(2)
+	 * to perform in-use checking.
+	 */
+	if (ANY_ZPOOL_USE(who) && (err = dm_inuse_swap(dname, errp))) {
+
+		/* on error, dm_inuse_swap sets errp */
+		if (err < 0) {
+			free(dname);
+			return (err);
+		}
+
+		/* simulate a mounted swap device */
+		(void) build_usage_string(dname, DM_USE_MOUNT, "swap", msg,
+		    &found, errp);
+
+		/* if this fails, dm_get_usage_string changed */
+		ASSERT(found == 1);
+
+		free(dname);
 		return (found);
 	}
 

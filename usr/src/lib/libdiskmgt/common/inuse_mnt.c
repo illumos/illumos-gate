@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -207,6 +206,10 @@ load_mnttab(int send_event)
 	struct mntpnt_list	*headp;
 	int			num;
 	struct mntpnt_list	*prevp;
+	struct swaptable	*st;
+	struct swapent		*swapent;
+	int			err;
+	int			i;
 
 	headp = NULL;
 	prevp = NULL;
@@ -276,94 +279,61 @@ load_mnttab(int send_event)
 	}
 
 	/* get the swap entries */
-	if ((num = swapctl(SC_GETNSWP, NULL)) > -1) {
-
-	    struct swaptable 	*st;
-	    struct swapent	*swapent;
-	    int			i;
-	    char		*path;
-	    char		*pathstart;
-	    char		fullpath[MAXPATHLEN+1];
-
-	    st = malloc((size_t)((num * sizeof (swapent_t)) + sizeof (int)));
-	    if (st == NULL) {
-		/* out of memory, free what we have and return */
+	num = dm_get_swapentries(&st, &err);
+	if (num < 0) {
 		free_mnttab(headp);
 		return (ENOMEM);
-	    }
+	}
 
-	    path = malloc(num * MAXPATHLEN);
-	    if (path == NULL) {
-		/* out of memory, free what we have and return */
-		free(st);
-		free_mnttab(headp);
-		return (ENOMEM);
-	    }
-	    pathstart = path;
+	for (i = 0, swapent = st->swt_ent; i < num; i++, swapent++) {
+		char		fullpath[MAXPATHLEN+1];
 
-	    swapent = st->swt_ent;
-	    for (i = 0; i < num; i++, swapent++) {
-		swapent->ste_path = path;
-		path += MAXPATHLEN;
-	    }
+		currp = (struct mntpnt_list *)
+		    calloc((size_t)1, (size_t)sizeof (struct mntpnt_list));
 
-	    st->swt_n = num;
-	    if ((num = swapctl(SC_LIST, st)) >= 0) {
-		swapent = st->swt_ent;
-		for (i = 0; i < num; i++, swapent++) {
-
-		    currp = (struct mntpnt_list *)
-			calloc((size_t)1, (size_t)sizeof (struct mntpnt_list));
-
-		    if (currp == NULL) {
+		if (currp == NULL) {
 			/* out of memory, free what we have and return */
-			free((void *)st);
-			free((void *)pathstart);
+			dm_free_swapentries(st);
 			free_mnttab(headp);
 			return (ENOMEM);
-		    }
+		}
 
-		    if (headp == NULL) {
+		if (headp == NULL) {
 			headp = currp;
-		    } else {
+		} else {
 			prevp->next = currp;
-		    }
+		}
 
-		    currp->next = NULL;
+		currp->next = NULL;
 
-		    if (*swapent->ste_path != '/') {
+		if (*swapent->ste_path != '/') {
 			(void) snprintf(fullpath, sizeof (fullpath), "/dev/%s",
 			    swapent->ste_path);
-		    } else {
+		} else {
 			(void) strlcpy(fullpath, swapent->ste_path,
 			    sizeof (fullpath));
-		    }
-
-		    currp->special = strdup(fullpath);
-		    if (currp->special == NULL) {
-			/* out of memory, free what we have and return */
-			free(st);
-			free(pathstart);
-			free_mnttab(headp);
-			return (ENOMEM);
-		    }
-
-		    currp->mountp = strdup("swap");
-		    if (currp->mountp == NULL) {
-			/* out of memory, free what we have and return */
-			free(st);
-			free(pathstart);
-			free_mnttab(headp);
-			return (ENOMEM);
-		    }
-
-		    prevp = currp;
 		}
-	    }
 
-	    free(st);
-	    free(pathstart);
+		currp->special = strdup(fullpath);
+		if (currp->special == NULL) {
+			/* out of memory, free what we have and return */
+			dm_free_swapentries(st);
+			free_mnttab(headp);
+			return (ENOMEM);
+		}
+
+		currp->mountp = strdup("swap");
+		if (currp->mountp == NULL) {
+			/* out of memory, free what we have and return */
+			dm_free_swapentries(st);
+			free_mnttab(headp);
+			return (ENOMEM);
+		}
+
+		prevp = currp;
 	}
+	if (num)
+		dm_free_swapentries(st);
 
 	/* note that we unlock the mutex in both paths of this if statement */
 	(void) rw_wrlock(&mntpoint_lock);

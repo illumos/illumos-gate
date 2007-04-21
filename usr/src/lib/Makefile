@@ -273,6 +273,7 @@ MSGSUBDIRS=		\
 	libdhcpsvc 	\
 	libdhcputil	\
 	libipsecutil	\
+	libdiskmgt	\
 	libdladm	\
 	libgss		\
 	libinetcfg	\

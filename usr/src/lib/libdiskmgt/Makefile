@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,15 +46,20 @@ install	:=	TARGET = install
 lint :=		TARGET = lint
 install_h:=	TARGET = install_h
 
+POFILE =        libdiskmgt.po
+MSGFILES =      `$(GREP) -l gettext common/*.[ch]`
+
 .KEEP_STATE:
 
 all clean clobber install lint: $(SUBDIRS)
+
+$(POFILE):      pofile_MSGFILES
 
 install_h: $(ROOTHDRS)
 
 check:		$(CHECKHDRS)
 
-$(POFILE):
+_msg: $(MSGDOMAINPOFILE)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
@@ -62,3 +67,4 @@ $(SUBDIRS):	FRC
 FRC:
 
 include ../Makefile.targ
+include ../../Makefile.msg.targ

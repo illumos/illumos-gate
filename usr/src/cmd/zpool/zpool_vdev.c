@@ -137,7 +137,6 @@ check_slice(const char *path, int force, boolean_t wholedisk, boolean_t isspare)
 {
 	char *msg;
 	int error = 0;
-	int ret = 0;
 
 	if (dm_inuse((char *)path, &msg, isspare ? DM_WHO_ZPOOL_SPARE :
 	    (force ? DM_WHO_ZPOOL_FORCE : DM_WHO_ZPOOL), &error) || error) {
@@ -147,9 +146,8 @@ check_slice(const char *path, int force, boolean_t wholedisk, boolean_t isspare)
 		} else {
 			vdev_error("%s", msg);
 			free(msg);
-			ret = -1;
+			return (-1);
 		}
-
 	}
 
 	/*
@@ -159,18 +157,19 @@ check_slice(const char *path, int force, boolean_t wholedisk, boolean_t isspare)
 	error = 0;
 	if (!wholedisk && !force &&
 	    (dm_isoverlapping((char *)path, &msg, &error) || error)) {
-		if (error != 0) {
+		if (error == 0) {
+			/* dm_isoverlapping returned -1 */
+			vdev_error(gettext("%s overlaps with %s\n"), path, msg);
+			free(msg);
+			return (-1);
+		} else if (error != ENODEV) {
+			/* libdiskmgt's devcache only handles physical drives */
 			libdiskmgt_error(error);
 			return (0);
-		} else {
-			vdev_error("%s overlaps with %s\n", path, msg);
-			free(msg);
 		}
-
-		ret = -1;
 	}
 
-	return (ret);
+	return (0);
 }
 
 /*
@@ -273,7 +272,7 @@ check_device(const char *path, boolean_t force, boolean_t isspare)
 
 /*
  * Check that a file is valid.  All we can do in this case is check that it's
- * not in use by another pool.
+ * not in use by another pool, and not in use by swap.
  */
 int
 check_file(const char *file, boolean_t force, boolean_t isspare)
@@ -281,8 +280,18 @@ check_file(const char *file, boolean_t force, boolean_t isspare)
 	char  *name;
 	int fd;
 	int ret = 0;
+	int err;
 	pool_state_t state;
 	boolean_t inuse;
+
+	if (dm_inuse_swap(file, &err)) {
+		if (err)
+			libdiskmgt_error(err);
+		else
+			vdev_error(gettext("%s is currently used by swap. "
+			    "Please see swap(1M).\n"), file);
+		return (-1);
+	}
 
 	if ((fd = open(file, O_RDONLY)) < 0)
 		return (0);

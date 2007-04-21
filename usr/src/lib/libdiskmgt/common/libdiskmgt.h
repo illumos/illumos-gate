@@ -33,7 +33,7 @@ extern "C" {
 #endif
 
 #include <libnvpair.h>
-
+#include <sys/swap.h>
 
 
 /*
@@ -235,6 +235,7 @@ typedef enum {
 void			dm_free_descriptors(dm_descriptor_t *desc_list);
 void			dm_free_descriptor(dm_descriptor_t desc);
 void			dm_free_name(char *name);
+void			dm_free_swapentries(swaptbl_t *);
 
 dm_descriptor_t		*dm_get_descriptors(dm_desc_type_t type, int filter[],
 			    int *errp);
@@ -255,9 +256,11 @@ void			dm_get_slices(char *drive, dm_descriptor_t **slices,
 			    int *errp);
 void			dm_get_slice_stats(char *slice, nvlist_t **dev_stats,
 			    int *errp);
+int			dm_get_swapentries(swaptbl_t **, int *);
 void			dm_get_usage_string(char *who, char *data, char **msg);
 int			dm_inuse(char *dev_name, char **msg, dm_who_type_t who,
 			    int *errp);
+int			dm_inuse_swap(const char *dev_name, int *errp);
 int			dm_isoverlapping(char *dev_name, char **msg, int *errp);
 
 #ifdef __cplusplus

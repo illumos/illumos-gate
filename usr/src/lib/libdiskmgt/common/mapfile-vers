@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,6 +30,7 @@ SUNWprivate_1.1 {
 	dm_free_descriptor;
 	dm_free_descriptors;
 	dm_free_name;
+	dm_free_swapentries;
 	dm_get_associated_descriptors;
 	dm_get_associated_types;
 	dm_get_attributes;
@@ -40,9 +41,11 @@ SUNWprivate_1.1 {
 	dm_get_slices;
 	dm_get_slice_stats;
 	dm_get_stats;
+	dm_get_swapentries;
 	dm_get_type;
 	dm_init_event_queue;
 	dm_inuse;
+	dm_inuse_swap;
 	dm_isoverlapping;
     local:
 	*;
