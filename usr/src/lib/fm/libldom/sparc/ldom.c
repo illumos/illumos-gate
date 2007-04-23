@@ -33,6 +33,8 @@
 #include <pthread.h>
 #include <errno.h>
 #include <libnvpair.h>
+#include <dlfcn.h>
+#include <link.h>
 
 #include <sys/processor.h>
 #include <sys/stat.h>
@@ -51,6 +53,51 @@
 #define	MD_STR_PLATFORM		"platform"
 #define	MD_STR_DOM_ENABLE	"domaining-enabled"
 
+static void *ldom_dl_hp = (void *)NULL;
+static const char *ldom_dl_path = "libpri.so.1";
+static int ldom_dl_mode = (RTLD_NOW | RTLD_LOCAL);
+
+static int (*ldom_pri_init)(void) = (int (*)(void))NULL;
+static void (*ldom_pri_fini)(void) = (void (*)(void))NULL;
+static ssize_t (*ldom_pri_get)(uint8_t wait, uint64_t *token, uint64_t **buf,
+	void *(*allocp)(size_t), void (*freep)(void *, size_t)) =
+	(ssize_t (*)(uint8_t wait, uint64_t *token, uint64_t **buf,
+	void *(*allocp)(size_t), void (*freep)(void *, size_t)))NULL;
+
+static void
+ldom_pri_config(void)
+{
+	char isa[MAXNAMELEN];	/* used to see if machine is sun4v */
+
+	if (sysinfo(SI_MACHINE, isa, MAXNAMELEN) < 0)
+		return;
+	if (strcmp(isa, "sun4v") != 0)
+		return;
+	if ((ldom_dl_hp = dlopen(ldom_dl_path, ldom_dl_mode)) == NULL)
+		return;
+
+	ldom_pri_init = (int (*)(void))dlsym(ldom_dl_hp, "pri_init");
+	ldom_pri_fini = (void (*)(void))dlsym(ldom_dl_hp, "pri_fini");
+	ldom_pri_get = (ssize_t (*)(uint8_t wait, uint64_t *token,
+	    uint64_t **buf, void *(*allocp)(size_t),
+	    void (*freep)(void *, size_t)))dlsym(ldom_dl_hp, "pri_get");
+}
+
+static void
+ldom_pri_unconfig(void)
+{
+	if (ldom_dl_hp == NULL)
+		return;
+
+	ldom_pri_init = (int (*)(void))NULL;
+	ldom_pri_fini = (void (*)(void))NULL;
+	ldom_pri_get = (ssize_t (*)(uint8_t wait, uint64_t *token,
+	    uint64_t **buf, void *(*allocp)(size_t),
+	    void (*freep)(void *, size_t)))NULL;
+	(void) dlclose(ldom_dl_hp);
+	ldom_dl_hp = (void *)NULL;
+}
+
 static ssize_t
 get_local_core_md(ldom_hdl_t *lhp, uint64_t **buf)
 {
@@ -60,8 +107,10 @@ get_local_core_md(ldom_hdl_t *lhp, uint64_t **buf)
 	uint64_t tok;
 	uint64_t *bufp;
 
-	if ((ssize = pri_get(PRI_GET, &tok, buf, lhp->allocp, lhp->freep)) >= 0)
-		return (ssize);
+	if (ldom_pri_get != NULL)
+		if ((ssize = (*ldom_pri_get)(PRI_GET, &tok, buf,
+		    lhp->allocp, lhp->freep)) >= 0)
+			return (ssize);
 
 	if ((fh = open("/devices/pseudo/mdesc@0:mdesc", O_RDONLY, 0)) < 0)
 		return (-1);
@@ -557,11 +606,14 @@ ldom_init(void *(*allocp)(size_t size),
 {
 	struct ldom_hdl *lhp;
 
-	if (pri_init() < 0)
-		return (NULL);
+	ldom_pri_config();
+	if (ldom_pri_init != NULL)
+		if ((*ldom_pri_init)() < 0)
+			return (NULL);
 
 	if ((lhp = allocp(sizeof (struct ldom_hdl))) == NULL) {
-		pri_fini();
+		if (ldom_pri_fini != NULL)
+			(*ldom_pri_fini)();
 		return (NULL);
 	}
 
@@ -584,7 +636,9 @@ ldom_fini(ldom_hdl_t *lhp)
 	ldmsvcs_fini(lhp);
 	lhp->freep(lhp, sizeof (struct ldom_hdl));
 
-	pri_fini();
+	if (ldom_pri_fini != NULL)
+		(*ldom_pri_fini)();
+	ldom_pri_unconfig();
 }
 
 /* end file */
