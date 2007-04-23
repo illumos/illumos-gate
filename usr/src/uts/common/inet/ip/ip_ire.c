@@ -77,7 +77,6 @@
 
 struct kmem_cache *rt_entry_cache;
 
-
 /*
  * Synchronization notes:
  *
@@ -2893,8 +2892,8 @@ done:
  * that has prohibited the addition of incomplete ire's. If this
  * parameter is set, and we find an nce that is in a state other
  * than ND_REACHABLE, we fail the add. Note that nce_state could be
- * something other than ND_REACHABLE if nce_reinit has just
- * kicked in and reset the nce.
+ * something other than ND_REACHABLE if the nce had just expired and
+ * the ire_create preceding the ire_add added a new ND_INITIAL nce.
  */
 int
 ire_add(ire_t **irep, queue_t *q, mblk_t *mp, ipsq_func_t func,
@@ -3396,15 +3395,18 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 		 * if the nce is NCE_F_CONDEMNED, or if it is not ND_REACHABLE
 		 * and the caller has prohibited the addition of incomplete
 		 * ire's, we fail the add. Note that nce_state could be
-		 * something other than ND_REACHABLE if nce_reinit has just
-		 * kicked in and reset the nce.
+		 * something other than ND_REACHABLE if the nce had
+		 * just expired and the ire_create preceding the
+		 * ire_add added a new ND_INITIAL nce.
 		 */
 		if ((nce == NULL) ||
 		    (nce->nce_flags & NCE_F_CONDEMNED) ||
 		    (!allow_unresolved &&
 		    (nce->nce_state != ND_REACHABLE))) {
-			if (nce != NULL)
+			if (nce != NULL) {
+				DTRACE_PROBE1(ire__bad__nce, nce_t *, nce);
 				mutex_exit(&nce->nce_lock);
+			}
 			ire_atomic_end(irb_ptr, ire);
 			mutex_exit(&ipst->ips_ndp4->ndp_g_lock);
 			if (nce != NULL)
@@ -6808,16 +6810,29 @@ ire_nce_init(ire_t *ire, mblk_t *fp_mp, mblk_t *res_mp)
 			nce_state = ND_REACHABLE;
 		} else {
 			nce_state = ND_INITIAL;
-			if (fp_mp)
-				freemsg(fp_mp);
-			fp_mp = NULL;
+			ASSERT(fp_mp == NULL);
 		}
 		nce_flags = 0;
 	}
 
+retry_nce:
 	err = ndp_lookup_then_add(ire_ill, NULL,
 	    &addr4, &mask4, NULL, 0, nce_flags, nce_state, &arpce,
 	    fp_mp, res_mp);
+
+	if (err == EEXIST && NCE_EXPIRED(arpce, ipst)) {
+		/*
+		 * We looked up an expired nce.
+		 * Go back and try to create one again.
+		 * The res_mp should be intact for the EEXIST case,
+		 * i.e., there are no new references to it, and there
+		 * is no need to copyb it.
+		 */
+		ndp_delete(arpce);
+		NCE_REFRELE(arpce);
+		arpce = NULL;
+		goto retry_nce;
+	}
 
 	ip1dbg(("ire 0x%p addr 0x%lx mask 0x%lx type 0x%x; "
 	    "found nce 0x%p err %d\n", (void *)ire, (ulong_t)addr4,
@@ -6885,18 +6900,11 @@ ire_nce_init(ire_t *ire, mblk_t *fp_mp, mblk_t *res_mp)
 		 */
 		NCE_REFHOLD_TO_REFHOLD_NOTR(ire->ire_nce);
 	} else {
-		if (NCE_EXPIRED(arpce, ipst))
-			arpce = nce_reinit(arpce);
-		if (arpce != NULL) {
-			/*
-			 * We are not using this nce_t just yet so release
-			 * the ref taken in ndp_lookup_then_add_v4()
-			 */
-			NCE_REFRELE(arpce);
-		} else {
-			ip0dbg(("can't reinit arpce for ill 0x%p;\n",
-			    (void *)ire_ill));
-		}
+		/*
+		 * We are not using this nce_t just yet so release
+		 * the ref taken in ndp_lookup_then_add_v4()
+		 */
+		NCE_REFRELE(arpce);
 	}
 	return (0);
 }

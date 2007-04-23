@@ -2511,6 +2511,7 @@ nce_report1(nce_t *nce, uchar_t *mp_arg)
 	uchar_t		*h;
 	uchar_t		*m = flags_buf;
 	in6_addr_t	v6addr;
+	uint64_t	now;
 
 	/*
 	 * Lock the nce to protect nce_res_mp from being changed
@@ -2521,9 +2522,21 @@ nce_report1(nce_t *nce, uchar_t *mp_arg)
 	 * In addition, make sure that the mblk has enough space
 	 * before writing to it. If is doesn't, allocate a new one.
 	 */
-	if (nce->nce_ipversion == IPV4_VERSION)
-		/* Don't include v4 nce_ts in NDP cache entry report */
+	if (nce->nce_ipversion == IPV4_VERSION) {
+		/*
+		 * Don't include v4 NCEs in NDP cache entry report.
+		 * But sanity check for lingering ND_INITIAL entries
+		 * when we do 'ndd -get /dev/ip ip_ndp_cache_report'
+		 */
+		if (nce->nce_state == ND_INITIAL) {
+
+			now = TICK_TO_MSEC(lbolt64);
+			if (now - nce->nce_init_time > 120000) {
+				DTRACE_PROBE1(nce__stuck, nce_t *, nce);
+			}
+		}
 		return;
+	}
 
 	ASSERT(ill != NULL);
 	v6addr = nce->nce_mask;
@@ -3695,8 +3708,16 @@ int
 nce_thread_exit(nce_t *nce, caddr_t arg)
 {
 	th_trace_t	*th_trace;
+	uint64_t	now;
 
 	mutex_enter(&nce->nce_lock);
+	if (nce->nce_state == ND_INITIAL) {
+
+		now = TICK_TO_MSEC(lbolt64);
+		if (now - nce->nce_init_time > 120000) {
+			DTRACE_PROBE1(nce__stuck, nce_t *, nce);
+		}
+	}
 	th_trace = th_trace_nce_lookup(nce);
 
 	if (th_trace == NULL) {
@@ -3865,10 +3886,13 @@ ndp_add_v4(ill_t *ill, uchar_t *hw_addr, const in_addr_t *addr,
 	nce->nce_ll_extract_start = hw_extract_start;
 	nce->nce_fp_mp = (fp_mp? fp_mp : NULL);
 	nce->nce_res_mp = template;
-	if (state == ND_REACHABLE)
+	if (state == ND_REACHABLE) {
 		nce->nce_last = TICK_TO_MSEC(lbolt64);
-	else
+	} else {
 		nce->nce_last = 0;
+		if (state == ND_INITIAL)
+			nce->nce_init_time = TICK_TO_MSEC(lbolt64);
+	}
 	nce->nce_qd_mp = NULL;
 	nce->nce_mp = mp;
 	if (hw_addr != NULL)
@@ -3928,33 +3952,6 @@ ndp_flush_qd_mp(nce_t *nce)
 	}
 }
 
-nce_t *
-nce_reinit(nce_t *nce)
-{
-	nce_t *newnce = NULL;
-	in_addr_t nce_addr, nce_mask;
-	ip_stack_t *ipst = nce->nce_ill->ill_ipst;
-
-	IN6_V4MAPPED_TO_IPADDR(&nce->nce_addr, nce_addr);
-	IN6_V4MAPPED_TO_IPADDR(&nce->nce_mask, nce_mask);
-	/*
-	 * delete the old one. this will get rid of any ire's pointing
-	 * at this nce.
-	 */
-	ndp_delete(nce);
-	/*
-	 * create a new nce with the same addr and mask.
-	 */
-	mutex_enter(&ipst->ips_ndp4->ndp_g_lock);
-	(void) ndp_add_v4(nce->nce_ill, NULL, &nce_addr, &nce_mask, NULL, 0, 0,
-	    ND_INITIAL, &newnce, NULL, NULL);
-	mutex_exit(&ipst->ips_ndp4->ndp_g_lock);
-	/*
-	 * refrele the old nce.
-	 */
-	NCE_REFRELE(nce);
-	return (newnce);
-}
 
 /*
  * ndp_walk routine to delete all entries that have a given destination or

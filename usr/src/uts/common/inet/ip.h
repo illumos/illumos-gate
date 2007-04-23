@@ -433,19 +433,22 @@ typedef enum {
 /*
  * NCE_EXPIRED is TRUE when we have a non-permanent nce that was
  * found to be REACHABLE more than ip_ire_arp_interval ms ago.
- * This macro is used to trigger re-arp of existing nce_t entries
- * so that they can be updated with the latest information.
- * nce's will get cleaned up (or updated with new info) in the following
- * circumstances:
+ * This macro is used to age existing nce_t entries. The
+ * nce's will get cleaned up in the following circumstances:
  * - ip_ire_trash_reclaim will free nce's using ndp_cache_reclaim
  *    when memory is low,
  * - ip_arp_news, when updates are received.
- * - if the nce is NCE_EXPIRED(), it will be re-initialized to ND_INITIAL,
- *   so that a new arp request will be triggered.
+ * - if the nce is NCE_EXPIRED(), it will deleted, so that a new
+ *   arp request will need to be triggered from an ND_INITIAL nce.
+ *
+ * Note that the nce state transition follows the pattern:
+ *	ND_INITIAL -> ND_INCOMPLETE -> ND_REACHABLE
+ * after which the nce is deleted when it has expired.
+ *
  * nce_last is the timestamp that indicates when the nce_res_mp in the
  * nce_t was last updated to a valid link-layer address.  nce_last gets
  * modified/updated :
- *  - when the nce is created  or reinit-ed
+ *  - when the nce is created
  *  - every time we get a sane arp response for the nce.
  */
 #define	NCE_EXPIRED(nce, ipst)	(nce->nce_last > 0 &&	\

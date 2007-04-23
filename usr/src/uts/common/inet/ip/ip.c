@@ -771,9 +771,6 @@ static mblk_t	*ip_tcp_input(mblk_t *, ipha_t *, ill_t *, boolean_t,
 
 static void	ip_rput_process_forward(queue_t *, mblk_t *, ire_t *,
     ipha_t *, ill_t *, boolean_t);
-
-static void	ip_rput_process_forward(queue_t *, mblk_t *, ire_t *,
-    ipha_t *, ill_t *, boolean_t);
 ipaddr_t	ip_g_all_ones = IP_HOST_MASK;
 
 /* How long, in seconds, we allow frags to hang around. */
@@ -8556,14 +8553,6 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 			 */
 			res_mp = save_ire->ire_nce->nce_res_mp;
 			ire_fp_mp = NULL;
-			/*
-			 * save_ire's nce_fp_mp can't change since it is
-			 * not an IRE_MIPRTUN or IRE_BROADCAST
-			 * LOCK_IRE_FP_MP does not do any useful work in
-			 * the case of IRE_CACHE. So we don't use it below.
-			 */
-			if (save_ire->ire_stq == dst_ill->ill_wq)
-				ire_fp_mp = save_ire->ire_nce->nce_fp_mp;
 
 			/*
 			 * Check cached gateway IRE for any security
@@ -28119,17 +28108,15 @@ nak:
 			    &fake_ire->ire_gateway_addr : &fake_ire->ire_addr),
 			    B_FALSE)) != NULL) {
 				/*
-				 * cleanup: just reset nce.
+				 * cleanup:
 				 * We check for refcnt 2 (one for the nce
 				 * hash list + 1 for the ref taken by
-				 * ndp_lookup_v4) to ensure that there are
+				 * ndp_lookup_v4) to check that there are
 				 * no ire's pointing at the nce.
 				 */
-				if (nce->nce_refcnt == 2) {
-					nce = nce_reinit(nce);
-				}
-				if (nce != NULL)
-					NCE_REFRELE(nce);
+				if (nce->nce_refcnt == 2)
+					ndp_delete(nce);
+				NCE_REFRELE(nce);
 			}
 			freeb(mp1);  /* dl_unitdata response */
 			freemsg(mp); /* fake ire */

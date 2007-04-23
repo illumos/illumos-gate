@@ -77,6 +77,7 @@ typedef struct nce_s {
 	uchar_t		nce_ipversion;	/* IPv4(ARP)/IPv6(NDP) version */
 	uint_t		nce_defense_count;	/* number of NDP conflicts */
 	uint_t		nce_defense_time;	/* last time defended (secs) */
+	uint64_t	nce_init_time;  /* time when it was set to ND_INITIAL */
 #ifdef NCE_DEBUG
 	th_trace_t	*nce_trace[IP_TR_HASH_MAX];
 	boolean_t	nce_trace_disable;	/* True when alloc fails */
@@ -331,7 +332,6 @@ extern	void	nce_fastpath_list_dispatch(ill_t *,
     boolean_t (*)(nce_t *, void  *), void *);
 extern	void	nce_queue_mp_common(nce_t *, mblk_t *, boolean_t);
 extern	void	ndp_flush_qd_mp(nce_t *);
-extern	nce_t	*nce_reinit(nce_t *);
 extern	void	nce_delete_hw_changed(nce_t *, void *);
 extern	void	nce_fastpath(nce_t *);
 
