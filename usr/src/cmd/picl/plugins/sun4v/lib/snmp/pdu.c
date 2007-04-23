@@ -48,6 +48,9 @@ static uchar_t	*snmp_build_variable(uchar_t *, size_t *, oid *, size_t,
 		    uchar_t, void *, size_t);
 static uchar_t	*snmp_parse_pdu(int, uchar_t *, size_t *, snmp_pdu_t *);
 static uchar_t	*snmp_parse_variable(uchar_t *, size_t *, pdu_varlist_t *);
+static void	snmp_free_null_vars(pdu_varlist_t *);
+
+static uchar_t *snmp_def_community = (uchar_t *)SNMP_DEF_COMMUNITY;
 
 /*
  * Allocates and creates a PDU for the specified SNMP command. Currently
@@ -80,7 +83,7 @@ snmp_create_pdu(int cmd, int max_reps, char *oidstrs, int n_oids, int row)
 
 	pdu->command = cmd;
 	pdu->reqid = snmp_get_reqid();
-	pdu->community = (uchar_t *)SNMP_DEF_COMMUNITY;
+	pdu->community = snmp_def_community;
 	pdu->community_len = SNMP_DEF_COMMUNITY_LEN;
 
 	if (snmp_add_null_vars(pdu, oidstrs, n_oids, row) < 0) {
@@ -246,40 +249,38 @@ static int
 snmp_add_null_vars(snmp_pdu_t *pdu, char *oidstrs, int n_oids, int row)
 {
 	pdu_varlist_t	*vp, *prev;
-	pdu_varlist_t	*varblock_p;
+	pdu_varlist_t	*varblock_p = NULL;
 	char	*p;
 	int	i;
 
-	/*
-	 * It's much easier to allocate for all variables in one go,
-	 * so we can release it quickly if there's any failure.
-	 */
-	varblock_p = (pdu_varlist_t *)calloc(n_oids, sizeof (pdu_varlist_t));
-	if (varblock_p == NULL)
-		return (-1);
-
 	prev = NULL;
 	p = oidstrs;
-	vp = varblock_p;
 	for (i = 0; i < n_oids; i++) {
+		if ((vp = calloc(1, sizeof (pdu_varlist_t))) == NULL) {
+			snmp_free_null_vars(varblock_p);
+			return (-1);
+		} else if (i == 0) {
+			varblock_p = vp;
+		} else {
+			prev->nextvar = vp;
+		}
+
 		vp->name = snmp_oidstr_to_oid(pdu->command,
 		    p, row, &vp->name_len);
 		if (vp->name == NULL) {
-			free((void *) varblock_p);
+			snmp_free_null_vars(varblock_p);
 			return (-1);
 		}
 		vp->val.str = NULL;
 		vp->val_len = 0;
 		vp->type = ASN_NULL;
-		vp->nextvar = vp + 1;
+		vp->nextvar = NULL;
 
 		LOGVAR(TAG_NULL_VAR, vp);
 
 		prev = vp;
 		p += strlen(p) + 1;
-		vp++;
 	}
-	prev->nextvar = NULL;
 
 	/*
 	 * append the varlist to the PDU
@@ -294,6 +295,7 @@ snmp_add_null_vars(snmp_pdu_t *pdu, char *oidstrs, int n_oids, int row)
 
 	return (0);
 }
+
 /*
  * Some assumptions are in place here to eliminate unnecessary complexity.
  * All OID strings passed are assumed to be in the numeric string form, have
@@ -644,7 +646,7 @@ snmp_free_pdu(snmp_pdu_t *pdu)
 	pdu_varlist_t *vp, *nxt;
 
 	if (pdu) {
-		if (pdu->community)
+		if ((pdu->community) && (pdu->community != snmp_def_community))
 			free((void *) pdu->community);
 
 		for (vp = pdu->vars; vp; vp = nxt) {
@@ -664,5 +666,19 @@ snmp_free_pdu(snmp_pdu_t *pdu)
 			free((void *) pdu->reply_pkt);
 
 		free((void *) pdu);
+	}
+}
+
+static void
+snmp_free_null_vars(pdu_varlist_t *varblock_p)
+{
+	pdu_varlist_t	*vp, *nxt;
+
+	for (vp = varblock_p; vp; vp = nxt) {
+		nxt = vp->nextvar;
+
+		if (vp->name)
+			free(vp->name);
+		free(vp);
 	}
 }
