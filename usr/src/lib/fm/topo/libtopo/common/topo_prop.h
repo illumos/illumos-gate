@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,12 @@ typedef struct topo_pgroup {
 	topo_list_t tpg_pvals;		/* property values */
 } topo_pgroup_t;
 
+typedef struct topo_propmethod {
+	char *tpm_name;			/* property method name */
+	topo_version_t tpm_version;	/* method version */
+	nvlist_t *tpm_args;		/* in args for method */
+} topo_propmethod_t;
+
 typedef struct topo_propval {
 	char *tp_name;			/* prop name */
 	topo_type_t tp_type;		/* prop type */
@@ -57,6 +63,7 @@ typedef struct topo_propval {
 	topo_hdl_t *tp_hdl;		/* handle pointer for allocations */
 	void (*tp_free)(struct topo_propval *); /* prop value destructor */
 	nvlist_t *tp_val;
+	topo_propmethod_t *tp_method;	/* Method for accessing dynamic prop */
 } topo_propval_t;
 
 typedef struct topo_proplist {
@@ -67,6 +74,8 @@ typedef struct topo_proplist {
 extern void topo_prop_hold(topo_propval_t *);
 extern void topo_prop_rele(topo_propval_t *);
 extern void topo_pgroup_destroy_all(tnode_t *);
+extern nvlist_t *topo_prop_get(tnode_t *, const char *, const char *,
+    topo_type_t, nvlist_t *, int *err);
 
 #ifdef __cplusplus
 }

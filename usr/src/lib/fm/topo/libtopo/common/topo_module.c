@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -223,6 +223,8 @@ topo_mod_create(topo_hdl_t *thp, const char *name, const char *path,
 	if ((mod = topo_hdl_zalloc(thp, sizeof (topo_mod_t))) == NULL)
 		return (set_create_error(thp, mod, path, ETOPO_NOMEM));
 
+	mod->tm_hdl = thp;
+
 	(void) pthread_mutex_init(&mod->tm_lock, NULL);
 
 	mod->tm_name = topo_hdl_strdup(thp, name);
@@ -233,7 +235,6 @@ topo_mod_create(topo_hdl_t *thp, const char *name, const char *path,
 		return (set_create_error(thp, mod, path, ETOPO_NOMEM));
 
 	mod->tm_mops = (topo_imodops_t *)ops;
-	mod->tm_hdl = thp;
 	mod->tm_alloc = thp->th_alloc;
 
 	/*
@@ -375,6 +376,9 @@ topo_modhash_unload_all(topo_hdl_t *thp)
 	int i;
 	topo_modhash_t *mhp = thp->th_modhash;
 	topo_mod_t *mp, **pp;
+
+	if (mhp == NULL)
+		return;
 
 	topo_modhash_lock(mhp);
 	for (i = 0; i < TOPO_HASH_BUCKETS; ++i) {

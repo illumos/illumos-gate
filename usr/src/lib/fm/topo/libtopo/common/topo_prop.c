@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,47 @@
 #include <topo_string.h>
 #include <topo_alloc.h>
 #include <topo_error.h>
+#include <topo_method.h>
+
+/*
+ * Topology nodes are permitted to contain property information.
+ * Property information is organized according to property grouping.
+ * Each property group defines a name, a stability level for that name,
+ * a stability level for all underlying property data (name, type, values),
+ * a version for the property group definition and and a list of uniquely
+ * defined properties.  Property group versions are incremented when one of
+ * the following changes occurs:
+ *	- a property name changes
+ *	- a property type changes
+ *	- a property definition is removed from the group
+ * Compatible changes such as new property definitions in the group do
+ * not require version changes.
+ *
+ * Each property defines a unique (within the group) name, a type and
+ * a value.  Properties may be statically defined as int32, uint32, int64,
+ * uint64, fmri, string or arrays of each type.  Properties may also be
+ * dynamically exported via module registered methods.  For example, a module
+ * may register a method to export an ASRU property that is dynamically
+ * contructed when a call to topo_node_fmri() is invoked for a particular
+ * topology node.
+ *
+ * Static properties are persistently attached to topology nodes during
+ * enumeration by an enumeration module or as part of XML statements in a
+ * toplogy map file using the topo_prop_set* family of routines.  Similarly,
+ * property methods are registered during enumeration or as part of
+ * statements in topololgy map files.  Set-up of property methods is performed
+ * by calling topo_prop_method_register().
+ *
+ * All properties, whether statically persisted in a snapshot or dynamically
+ * obtained, may be read via the topo_prop_get* family of interfaces.
+ * Callers wishing to receive all property groups and properties for a given
+ * node may use topo_prop_getall().  This routine returns a nested nvlist
+ * of all groupings and property (name, type, value) sets.  Groupings
+ * are defined by TOPO_PROP_GROUP (name, data stability, name stability and
+ * version) and a nested nvlist of properties (TOPO_PROP_VAL).  Each property
+ * value is defined by its name, type and value.
+ */
+static void topo_propval_destroy(topo_propval_t *);
 
 static topo_pgroup_t *
 pgroup_get(tnode_t *node, const char *pgname)
@@ -55,6 +96,9 @@ propval_get(topo_pgroup_t *pg, const char *pname)
 {
 	topo_proplist_t *pvl;
 
+	if (pg == NULL)
+		return (NULL);
+
 	for (pvl = topo_list_next(&pg->tpg_pvals); pvl != NULL;
 	    pvl = topo_list_next(pvl)) {
 		if (strcmp(pvl->tp_pval->tp_name, pname) == 0)
@@ -64,254 +108,79 @@ propval_get(topo_pgroup_t *pg, const char *pname)
 	return (NULL);
 }
 
-static topo_propval_t *
-topo_prop_get(tnode_t *node, const char *pgname, const char *pname, int *err)
+static int
+method_geterror(nvlist_t *nvl, int err, int *errp)
 {
-	topo_pgroup_t *pg = NULL;
+	if (nvl != NULL)
+		nvlist_free(nvl);
+
+	*errp = err;
+
+	return (-1);
+}
+
+static int
+prop_method_get(tnode_t *node, topo_propval_t *pv, topo_propmethod_t *pm,
+    nvlist_t *pargs, int *err)
+{
+	int ret;
+	nvlist_t *args, *nvl;
+	char *name;
+	topo_type_t type;
+
+	if (topo_hdl_nvalloc(pv->tp_hdl, &args, NV_UNIQUE_NAME) < 0 ||
+	    nvlist_add_nvlist(args, TOPO_PROP_ARGS, pm->tpm_args) != 0)
+		return (method_geterror(NULL, ETOPO_PROP_NVL, err));
+
+	if (pargs != NULL)
+		if (nvlist_add_nvlist(args, TOPO_PROP_PARGS, pargs) != 0)
+			return (method_geterror(args, ETOPO_PROP_NVL, err));
+
+	/* Now, get the latest value */
+	if (topo_method_call(node, pm->tpm_name, pm->tpm_version,
+	    args, &nvl, err) < 0)
+		return (method_geterror(args, *err, err));
+
+	nvlist_free(args);
+
+	/* Verify the property contents */
+	ret = nvlist_lookup_string(nvl, TOPO_PROP_VAL_NAME, &name);
+	if (ret != 0 || strcmp(name, pv->tp_name) != 0)
+		return (method_geterror(nvl, ETOPO_PROP_NAME, err));
+
+	ret = nvlist_lookup_uint32(nvl, TOPO_PROP_VAL_TYPE, (uint32_t *)&type);
+	if (ret != 0 || type != pv->tp_type)
+		return (method_geterror(nvl, ETOPO_PROP_TYPE, err));
+
+	/* Release the last value and re-assign to the new value */
+	if (pv->tp_val != NULL)
+		nvlist_free(pv->tp_val);
+	pv->tp_val = nvl;
+
+	return (0);
+}
+
+static topo_propval_t *
+prop_get(tnode_t *node, const char *pgname, const char *pname, nvlist_t *pargs,
+    int *err)
+{
 	topo_propval_t *pv = NULL;
 
-	if ((pg = pgroup_get(node, pgname)) == NULL) {
+	if ((pv = propval_get(pgroup_get(node, pgname), pname)) == NULL) {
 		*err = ETOPO_PROP_NOENT;
 		return (NULL);
 	}
 
-	if ((pv = propval_get(pg, pname)) == NULL) {
-		*err = ETOPO_PROP_NOENT;
-		return (NULL);
+	if (pv->tp_method != NULL) {
+		if (prop_method_get(node, pv, pv->tp_method, pargs, err) < 0)
+			return (NULL);
 	}
 
 	return (pv);
 }
 
 static int
-prop_val_add(nvlist_t *nvl, topo_propval_t *pv, int *err)
-{
-	int ret = 0;
-	uint_t nelems;
-
-	if (nvlist_add_int32(nvl, TOPO_PROP_VAL_TYPE, pv->tp_type) != 0)
-		return (-1);
-
-	switch (pv->tp_type) {
-		case TOPO_TYPE_INT32:
-		{
-			int32_t val;
-			if ((ret = nvlist_lookup_int32(pv->tp_val,
-			    TOPO_PROP_VAL_VAL, &val)) < 0)
-				break;
-			ret = nvlist_add_int32(nvl, TOPO_PROP_VAL_VAL, val);
-		}
-		break;
-		case TOPO_TYPE_UINT32:
-		{
-			uint32_t val;
-			if ((ret = nvlist_lookup_uint32(pv->tp_val,
-			    TOPO_PROP_VAL_VAL, &val)) < 0)
-				break;
-			ret = nvlist_add_uint32(nvl, TOPO_PROP_VAL_VAL, val);
-		}
-		break;
-		case TOPO_TYPE_INT64:
-		{
-			int64_t val;
-			if ((ret = nvlist_lookup_int64(pv->tp_val,
-			    TOPO_PROP_VAL_VAL, &val)) < 0)
-				break;
-			ret = nvlist_add_int64(nvl, TOPO_PROP_VAL_VAL, val);
-		}
-		break;
-		case TOPO_TYPE_UINT64:
-		{
-			uint64_t val;
-			if ((ret = nvlist_lookup_uint64(pv->tp_val,
-			    TOPO_PROP_VAL_VAL, &val)) < 0)
-				break;
-			ret = nvlist_add_uint64(nvl, TOPO_PROP_VAL_VAL, val);
-		}
-		break;
-		case TOPO_TYPE_STRING:
-		{
-			char *val;
-			if ((ret = nvlist_lookup_string(pv->tp_val,
-			    TOPO_PROP_VAL_VAL, &val)) < 0)
-				break;
-			ret = nvlist_add_string(nvl, TOPO_PROP_VAL_VAL, val);
-		}
-		break;
-		case TOPO_TYPE_FMRI:
-		{
-			nvlist_t *val;
-			if ((ret = nvlist_lookup_nvlist(pv->tp_val,
-			    TOPO_PROP_VAL_VAL, &val)) < 0)
-				break;
-			ret =  nvlist_add_nvlist(nvl, TOPO_PROP_VAL_VAL, val);
-		}
-		break;
-		case TOPO_TYPE_INT32_ARRAY:
-		{
-			int32_t *val;
-			if ((ret = nvlist_lookup_int32_array(pv->tp_val,
-			    TOPO_PROP_VAL_VAL, &val, &nelems)) < 0)
-				break;
-			ret = nvlist_add_int32_array(nvl, TOPO_PROP_VAL_VAL,
-			    val, nelems);
-		}
-		break;
-		case TOPO_TYPE_UINT32_ARRAY:
-		{
-			uint32_t *val;
-			if ((ret = nvlist_lookup_uint32_array(pv->tp_val,
-			    TOPO_PROP_VAL_VAL, &val, &nelems)) < 0)
-				break;
-			ret = nvlist_add_uint32_array(nvl, TOPO_PROP_VAL_VAL,
-			    val, nelems);
-		}
-		break;
-		case TOPO_TYPE_INT64_ARRAY:
-		{
-			int64_t *val;
-			if ((ret = nvlist_lookup_int64_array(pv->tp_val,
-			    TOPO_PROP_VAL_VAL, &val, &nelems)) < 0)
-				break;
-			ret = nvlist_add_int64_array(nvl, TOPO_PROP_VAL_VAL,
-			    val, nelems);
-		}
-		break;
-		case TOPO_TYPE_UINT64_ARRAY:
-		{
-			uint64_t *val;
-			if ((ret = nvlist_lookup_uint64_array(pv->tp_val,
-			    TOPO_PROP_VAL_VAL, &val, &nelems)) < 0)
-				break;
-			ret = nvlist_add_uint64_array(nvl, TOPO_PROP_VAL_VAL,
-			    val, nelems);
-		}
-		break;
-		case TOPO_TYPE_STRING_ARRAY:
-		{
-			char **val;
-			if ((ret = nvlist_lookup_string_array(pv->tp_val,
-			    TOPO_PROP_VAL_VAL, &val, &nelems)) < 0)
-				break;
-			ret = nvlist_add_string_array(nvl, TOPO_PROP_VAL_VAL,
-			    val, nelems);
-		}
-		break;
-		case TOPO_TYPE_FMRI_ARRAY:
-		{
-			nvlist_t **val;
-			if ((ret = nvlist_lookup_nvlist_array(pv->tp_val,
-			    TOPO_PROP_VAL_VAL, &val, &nelems)) < 0)
-				break;
-			ret = nvlist_add_nvlist_array(nvl, TOPO_PROP_VAL_VAL,
-			    val, nelems);
-		}
-		break;
-		default:
-			ret = ETOPO_PROP_TYPE;
-	}
-
-	if (ret != 0) {
-		if (ret == ENOMEM)
-			*err = ETOPO_NOMEM;
-		else
-			*err = ETOPO_PROP_NVL;
-		return (-1);
-	}
-
-	return (0);
-}
-
-nvlist_t *
-get_all_seterror(tnode_t *node, nvlist_t *nvl, int *errp, int err)
-{
-	topo_node_unlock(node);
-
-	if (nvl != NULL)
-		nvlist_free(nvl);
-
-	*errp = err;
-
-	return (NULL);
-}
-
-nvlist_t *
-topo_prop_getprops(tnode_t *node, int *err)
-{
-	int ret;
-	topo_hdl_t *thp = node->tn_hdl;
-	nvlist_t *nvl, *pgnvl, *pvnvl;
-	topo_pgroup_t *pg;
-	topo_propval_t *pv;
-	topo_proplist_t *pvl;
-
-	if (topo_hdl_nvalloc(thp, &nvl, 0) != 0) {
-		return (get_all_seterror(node, NULL, err, ETOPO_NOMEM));
-	}
-
-	topo_node_lock(node);
-	for (pg = topo_list_next(&node->tn_pgroups); pg != NULL;
-	    pg = topo_list_next(pg)) {
-		if (topo_hdl_nvalloc(thp, &pgnvl, 0) != 0)
-			return (get_all_seterror(node, nvl, err, ETOPO_NOMEM));
-
-		if (nvlist_add_string(pgnvl, TOPO_PROP_GROUP_NAME,
-		    pg->tpg_info->tpi_name) != 0 ||
-		    nvlist_add_string(pgnvl, TOPO_PROP_GROUP_NSTAB,
-		    topo_stability2name(pg->tpg_info->tpi_namestab)) != 0 ||
-		    nvlist_add_string(pgnvl, TOPO_PROP_GROUP_DSTAB,
-		    topo_stability2name(pg->tpg_info->tpi_datastab)) != 0 ||
-		    nvlist_add_int32(pgnvl, TOPO_PROP_GROUP_VERSION,
-		    pg->tpg_info->tpi_version) != 0)
-			return (get_all_seterror(node, nvl, err,
-			    ETOPO_PROP_NVL));
-
-		for (pvl = topo_list_next(&pg->tpg_pvals); pvl != NULL;
-		    pvl = topo_list_next(pvl)) {
-
-			pv = pvl->tp_pval;
-			if (topo_hdl_nvalloc(thp, &pvnvl, 0)
-			    != 0) {
-				nvlist_free(pgnvl);
-				return (get_all_seterror(node, nvl, err,
-				    ETOPO_NOMEM));
-			}
-			if ((ret = nvlist_add_string(pvnvl, TOPO_PROP_VAL_NAME,
-			    pv->tp_name)) != 0) {
-				nvlist_free(pgnvl);
-				nvlist_free(pvnvl);
-				return (get_all_seterror(node, nvl, err, ret));
-			}
-			if (prop_val_add(pvnvl, pv, err) < 0) {
-				nvlist_free(pgnvl);
-				nvlist_free(pvnvl);
-				return (get_all_seterror(node, nvl, err, ret));
-			}
-			if ((ret = nvlist_add_nvlist(pgnvl, TOPO_PROP_VAL,
-			    pvnvl)) != 0) {
-				nvlist_free(pgnvl);
-				nvlist_free(pvnvl);
-				return (get_all_seterror(node, nvl, err, ret));
-			}
-
-			nvlist_free(pvnvl);
-		}
-		if ((ret = nvlist_add_nvlist(nvl, TOPO_PROP_GROUP, pgnvl))
-		    != 0) {
-			nvlist_free(pgnvl);
-			return (get_all_seterror(node, nvl, err, ret));
-		}
-
-		nvlist_free(pgnvl);
-	}
-
-	topo_node_unlock(node);
-
-	return (nvl);
-}
-
-static int
-get_seterror(tnode_t *node, int *errp, int err)
+get_properror(tnode_t *node, int *errp, int err)
 {
 	topo_node_unlock(node);
 	*errp = err;
@@ -327,12 +196,12 @@ prop_getval(tnode_t *node, const char *pgname, const char *pname, void *val,
 	topo_propval_t *pv;
 
 	topo_node_lock(node);
-	if ((pv = topo_prop_get(node, pgname, pname, err))
+	if ((pv = prop_get(node, pgname, pname, NULL, err))
 	    == NULL)
-		return (get_seterror(node, err, *err));
+		return (get_properror(node, err, *err));
 
 	if (pv->tp_type != type)
-		return (get_seterror(node, err, ETOPO_PROP_TYPE));
+		return (get_properror(node, err, ETOPO_PROP_TYPE));
 
 	switch (type) {
 		case TOPO_TYPE_INT32:
@@ -356,8 +225,13 @@ prop_getval(tnode_t *node, const char *pgname, const char *pname, void *val,
 
 			ret = nvlist_lookup_string(pv->tp_val,
 			    TOPO_PROP_VAL_VAL, &str);
-			if (ret == 0)
-				*(char **)val = topo_hdl_strdup(thp, str);
+			if (ret == 0) {
+				char *s2;
+				if ((s2 = topo_hdl_strdup(thp, str)) == NULL)
+					ret = -1;
+				else
+					*(char **)val = s2;
+			}
 			break;
 		}
 		case TOPO_TYPE_FMRI: {
@@ -488,11 +362,11 @@ prop_getval(tnode_t *node, const char *pgname, const char *pname, void *val,
 
 	if (ret != 0)
 		if (ret == ENOENT)
-			return (get_seterror(node, err, ETOPO_PROP_NOENT));
+			return (get_properror(node, err, ETOPO_PROP_NOENT));
 		else if (ret < ETOPO_UNKNOWN)
-			return (get_seterror(node, err, ETOPO_PROP_NVL));
+			return (get_properror(node, err, ETOPO_PROP_NVL));
 		else
-			return (get_seterror(node, err, ret));
+			return (get_properror(node, err, ret));
 
 	topo_node_unlock(node);
 	return (0);
@@ -594,7 +468,7 @@ topo_prop_get_fmri_array(tnode_t *node, const char *pgname, const char *pname,
 	    TOPO_TYPE_FMRI_ARRAY, nelem, err));
 }
 
-static int
+static topo_propval_t *
 set_seterror(tnode_t *node, topo_proplist_t *pvl, int *errp, int err)
 {
 	topo_hdl_t *thp = node->tn_hdl;
@@ -602,52 +476,40 @@ set_seterror(tnode_t *node, topo_proplist_t *pvl, int *errp, int err)
 
 	if (pvl != NULL) {
 		pv = pvl->tp_pval;
-		if (pv != NULL) {
-			if (pv->tp_name != NULL)
-				topo_hdl_strfree(thp, pv->tp_name);
-			if (pv->tp_val != NULL)
-				nvlist_free(pv->tp_val);
-			topo_hdl_free(thp, pv, sizeof (topo_propval_t));
-		}
+		topo_propval_destroy(pv);
 		topo_hdl_free(thp, pvl, sizeof (topo_proplist_t));
 	}
 
 	topo_node_unlock(node);
 	*errp = err;
 
-	return (-1);
+	return (NULL);
 }
 
-static int
-topo_prop_set(tnode_t *node, const char *pgname, const char *pname,
-    topo_type_t type, int flag, void *val, int nelems, int *err)
+static topo_propval_t *
+prop_create(tnode_t *node, const char *pgname, const char *pname,
+    topo_type_t type, int flag, int *err)
 {
-	int ret, new_prop = 0;
 	topo_hdl_t *thp = node->tn_hdl;
 	topo_pgroup_t *pg;
 	topo_propval_t *pv;
 	topo_proplist_t *pvl;
 
-	topo_node_lock(node);
-	if ((pg = pgroup_get(node, pgname)) == NULL)
-		return (set_seterror(node, NULL, err, ETOPO_PROP_NOENT));
-
 	/*
 	 * Replace existing prop value with new one
 	 */
+	if ((pg = pgroup_get(node, pgname)) == NULL)
+		return (NULL);
+
 	if ((pv = propval_get(pg, pname)) != NULL) {
 		if (pv->tp_type != type)
 			return (set_seterror(node, NULL, err, ETOPO_PROP_TYPE));
 		else if (pv->tp_flag == TOPO_PROP_IMMUTABLE)
 			return (set_seterror(node, NULL, err, ETOPO_PROP_DEFD));
+
 		nvlist_free(pv->tp_val);
 		pv->tp_val = NULL;
 	} else {
-		/*
-		 * Property values may be a shared resources among
-		 * different nodes.  We will allocate resources
-		 * on a per-handle basis.
-		 */
 		if ((pvl = topo_hdl_zalloc(thp, sizeof (topo_proplist_t)))
 		    == NULL)
 			return (set_seterror(node, NULL, err, ETOPO_NOMEM));
@@ -664,79 +526,104 @@ topo_prop_set(tnode_t *node, const char *pgname, const char *pname,
 		pv->tp_type = type;
 		pv->tp_hdl = thp;
 		topo_prop_hold(pv);
-		new_prop++;
+		topo_list_append(&pg->tpg_pvals, pvl);
 	}
 
-	if (topo_hdl_nvalloc(thp, &pv->tp_val, NV_UNIQUE_NAME) < 0)
-		return (set_seterror(node, pvl, err, ETOPO_PROP_NVL));
+	return (pv);
+}
 
-	ret = 0;
+static int
+topo_prop_set(tnode_t *node, const char *pgname, const char *pname,
+    topo_type_t type, int flag, void *val, int nelems, int *err)
+{
+	int ret;
+	topo_hdl_t *thp = node->tn_hdl;
+	nvlist_t *nvl;
+	topo_propval_t *pv;
+
+	if (topo_hdl_nvalloc(thp, &nvl, NV_UNIQUE_NAME) < 0) {
+		*err = ETOPO_PROP_NVL;
+		return (-1);
+	}
+
+	ret = nvlist_add_string(nvl, TOPO_PROP_VAL_NAME, pname);
+	ret |= nvlist_add_uint32(nvl, TOPO_PROP_VAL_TYPE, type);
 	switch (type) {
 		case TOPO_TYPE_INT32:
-			ret = nvlist_add_int32(pv->tp_val, TOPO_PROP_VAL_VAL,
+			ret |= nvlist_add_int32(nvl, TOPO_PROP_VAL_VAL,
 			    *(int32_t *)val);
 			break;
 		case TOPO_TYPE_UINT32:
-			ret = nvlist_add_uint32(pv->tp_val, TOPO_PROP_VAL_VAL,
+			ret |= nvlist_add_uint32(nvl, TOPO_PROP_VAL_VAL,
 			    *(uint32_t *)val);
 			break;
 		case TOPO_TYPE_INT64:
-			ret = nvlist_add_int64(pv->tp_val, TOPO_PROP_VAL_VAL,
+			ret |= nvlist_add_int64(nvl, TOPO_PROP_VAL_VAL,
 			    *(int64_t *)val);
 			break;
 		case TOPO_TYPE_UINT64:
-			ret = nvlist_add_uint64(pv->tp_val, TOPO_PROP_VAL_VAL,
+			ret |= nvlist_add_uint64(nvl, TOPO_PROP_VAL_VAL,
 			    *(uint64_t *)val);
 			break;
 		case TOPO_TYPE_STRING:
-			ret = nvlist_add_string(pv->tp_val, TOPO_PROP_VAL_VAL,
+			ret |= nvlist_add_string(nvl, TOPO_PROP_VAL_VAL,
 			    (char *)val);
 			break;
 		case TOPO_TYPE_FMRI:
-			ret = nvlist_add_nvlist(pv->tp_val, TOPO_PROP_VAL_VAL,
+			ret |= nvlist_add_nvlist(nvl, TOPO_PROP_VAL_VAL,
 			    (nvlist_t *)val);
 			break;
 		case TOPO_TYPE_INT32_ARRAY:
-			ret = nvlist_add_int32_array(pv->tp_val,
+			ret |= nvlist_add_int32_array(nvl,
 			    TOPO_PROP_VAL_VAL, (int32_t *)val, nelems);
 			break;
 		case TOPO_TYPE_UINT32_ARRAY:
-			ret = nvlist_add_uint32_array(pv->tp_val,
+			ret |= nvlist_add_uint32_array(nvl,
 			    TOPO_PROP_VAL_VAL, (uint32_t *)val, nelems);
 			break;
 		case TOPO_TYPE_INT64_ARRAY:
-			ret = nvlist_add_int64_array(pv->tp_val,
+			ret |= nvlist_add_int64_array(nvl,
 			    TOPO_PROP_VAL_VAL, (int64_t *)val, nelems);
 			break;
 		case TOPO_TYPE_UINT64_ARRAY:
-			ret = nvlist_add_uint64_array(pv->tp_val,
+			ret |= nvlist_add_uint64_array(nvl,
 			    TOPO_PROP_VAL_VAL, (uint64_t *)val, nelems);
 			break;
 		case TOPO_TYPE_STRING_ARRAY:
-			ret = nvlist_add_string_array(pv->tp_val,
+			ret |= nvlist_add_string_array(nvl,
 			    TOPO_PROP_VAL_VAL, (char **)val, nelems);
 			break;
 		case TOPO_TYPE_FMRI_ARRAY:
-			ret = nvlist_add_nvlist_array(pv->tp_val,
+			ret |= nvlist_add_nvlist_array(nvl,
 			    TOPO_PROP_VAL_VAL, (nvlist_t **)val, nelems);
 			break;
 		default:
-			return (set_seterror(node, pvl, err, ETOPO_PROP_TYPE));
+			*err = ETOPO_PROP_TYPE;
+			return (-1);
 	}
 
 	if (ret != 0) {
-		if (ret == ENOMEM)
-			return (set_seterror(node, pvl, err, ETOPO_NOMEM));
-		else
-			return (set_seterror(node, pvl, err, ETOPO_PROP_NVL));
+		nvlist_free(nvl);
+		if (ret == ENOMEM) {
+			*err = ETOPO_PROP_NOMEM;
+			return (-1);
+		} else {
+			*err = ETOPO_PROP_NVL;
+			return (-1);
+		}
 	}
 
-	if (new_prop > 0)
-		topo_list_append(&pg->tpg_pvals, pvl);
+	topo_node_lock(node);
+	if ((pv = prop_create(node, pgname, pname, type, flag, err)) == NULL) {
+		nvlist_free(nvl);
+		return (-1); /* unlocked and err set */
+	}
+
+	pv->tp_val = nvl;
 
 	topo_node_unlock(node);
 
-	return (0);
+	return (ret);
 }
 
 int
@@ -835,6 +722,218 @@ topo_prop_set_fmri_array(tnode_t *node, const char *pgname, const char *pname,
 	    (void *)fmri, nelems, err));
 }
 
+/*
+ * topo_prop_setprop() is a private project function for fmtopo
+ */
+int
+topo_prop_setprop(tnode_t *node, const char *pgname, nvlist_t *prop,
+    int flag, nvlist_t *pargs, int *err)
+{
+	int ret;
+	topo_hdl_t *thp = node->tn_hdl;
+	topo_propval_t *pv;
+	nvlist_t *nvl, *args;
+	char *name;
+	topo_type_t type;
+
+	if (nvlist_lookup_string(prop, TOPO_PROP_VAL_NAME, &name) != 0) {
+		*err = ETOPO_PROP_NAME;
+		return (-1);
+	}
+	if (nvlist_lookup_uint32(prop, TOPO_PROP_VAL_TYPE, (uint32_t *)&type)
+	    != 0) {
+		*err = ETOPO_PROP_TYPE;
+		return (-1);
+	}
+
+	topo_node_lock(node);
+	if ((pv = prop_create(node, pgname, name, type, flag, err)) == NULL)
+		return (-1); /* unlocked and err set */
+
+	/*
+	 * Set by method or set to new prop value.  If we fail, leave
+	 * property in list with old value.
+	 */
+	if (pv->tp_method != NULL) {
+		topo_propmethod_t *pm = pv->tp_method;
+
+		if (topo_hdl_nvalloc(pv->tp_hdl, &args, NV_UNIQUE_NAME) < 0) {
+			topo_node_unlock(node);
+			*err = ETOPO_PROP_NOMEM;
+			return (-1);
+		}
+		ret = nvlist_add_nvlist(args, TOPO_PROP_ARGS, pm->tpm_args);
+		if (pargs != NULL)
+			ret |= nvlist_add_nvlist(args, TOPO_PROP_PARGS, pargs);
+
+		if (ret != 0) {
+			topo_node_unlock(node);
+			nvlist_free(args);
+			*err = ETOPO_PROP_NVL;
+			return (-1);
+		}
+
+		ret = topo_method_call(node, pm->tpm_name, pm->tpm_version,
+		    args, &nvl, err);
+		nvlist_free(args);
+	} else {
+		if ((ret = topo_hdl_nvdup(thp, prop, &nvl)) != 0)
+			*err = ETOPO_PROP_NOMEM;
+	}
+
+	if (ret != 0) {
+		topo_node_unlock(node);
+		return (-1);
+	}
+
+	pv->tp_val = nvl;
+	topo_node_unlock(node);
+	return (0);
+}
+
+static int
+register_methoderror(tnode_t *node, topo_propmethod_t *pm, int *errp, int l,
+    int err)
+{
+	topo_hdl_t *thp = node->tn_hdl;
+
+	if (pm != NULL) {
+		if (pm->tpm_name != NULL)
+			topo_hdl_strfree(thp, pm->tpm_name);
+		if (pm->tpm_args != NULL)
+			nvlist_free(pm->tpm_args);
+		topo_hdl_free(thp, pm, sizeof (topo_propmethod_t));
+	}
+
+	*errp = err;
+
+	if (l != 0)
+		topo_node_unlock(node);
+
+	return (-1);
+}
+
+int
+prop_method_register(tnode_t *node, const char *pgname, const char *pname,
+    topo_type_t ptype, const char *mname, topo_version_t version,
+    const nvlist_t *args, int *err)
+{
+	topo_hdl_t *thp = node->tn_hdl;
+	topo_propmethod_t *pm = NULL;
+	topo_propval_t *pv = NULL;
+
+	if ((pm = topo_hdl_zalloc(thp, sizeof (topo_propmethod_t))) == NULL)
+		return (register_methoderror(node, pm, err, 1,
+		    ETOPO_PROP_NOMEM));
+
+	if ((pm->tpm_name = topo_hdl_strdup(thp, mname)) == NULL)
+		return (register_methoderror(node, pm, err, 1,
+		    ETOPO_PROP_NOMEM));
+
+	pm->tpm_version = version;
+
+	if (topo_hdl_nvdup(thp, (nvlist_t *)args, &pm->tpm_args) != 0)
+		return (register_methoderror(node, pm, err, 1,
+		    ETOPO_PROP_NOMEM));
+
+	if ((pv = prop_create(node, pgname, pname, ptype, TOPO_PROP_MUTABLE,
+	    err)) == NULL) {
+		/* node unlocked */
+		return (register_methoderror(node, pm, err, 0, *err));
+	}
+
+	if (pv->tp_method != NULL) {
+		topo_node_unlock(node);
+		return (register_methoderror(node, pm, err, 1,
+		    ETOPO_METHOD_DEFD));
+	}
+
+	pv->tp_val = NULL;
+	pv->tp_method = pm;
+
+	topo_node_unlock(node);
+
+	return (0);
+}
+
+int
+topo_prop_method_register(tnode_t *node, const char *pgname, const char *pname,
+    topo_type_t ptype, const char *mname, const nvlist_t *args, int *err)
+{
+	topo_imethod_t *mp;
+
+	topo_node_lock(node);
+
+	if ((mp = topo_method_lookup(node, mname)) == NULL)
+		return (register_methoderror(node, NULL, err, 1,
+		    ETOPO_METHOD_NOTSUP));
+
+	return (prop_method_register(node, pgname, pname, ptype, mname,
+	    mp->tim_version, args, err)); /* err set and node unlocked */
+}
+
+int
+topo_prop_method_version_register(tnode_t *node, const char *pgname,
+    const char *pname, topo_type_t ptype, const char *mname,
+    topo_version_t version, const nvlist_t *args, int *err)
+{
+	topo_imethod_t *mp;
+
+	topo_node_lock(node);
+
+	if ((mp = topo_method_lookup(node, mname)) == NULL)
+		return (register_methoderror(node, NULL, err, 1,
+		    ETOPO_METHOD_NOTSUP));
+
+	if (version < mp->tim_version)
+		return (register_methoderror(node, NULL, err, 1,
+		    ETOPO_METHOD_VEROLD));
+	if (version > mp->tim_version)
+		return (register_methoderror(node, NULL, err, 1,
+		    ETOPO_METHOD_VERNEW));
+
+	return (prop_method_register(node, pgname, pname, ptype, mname,
+	    version, args, err)); /* err set and node unlocked */
+}
+
+void
+topo_prop_method_unregister(tnode_t *node, const char *pgname,
+    const char *pname)
+{
+	topo_propval_t *pv;
+	topo_pgroup_t *pg;
+	topo_proplist_t *pvl;
+	topo_hdl_t *thp = node->tn_hdl;
+
+	topo_node_lock(node);
+
+	for (pg = topo_list_next(&node->tn_pgroups); pg != NULL;
+	    pg = topo_list_next(pg)) {
+		if (strcmp(pg->tpg_info->tpi_name, pgname) == 0) {
+			break;
+		}
+	}
+
+	if (pg == NULL) {
+		topo_node_unlock(node);
+		return;
+	}
+
+	for (pvl = topo_list_next(&pg->tpg_list); pvl != NULL;
+	    pvl = topo_list_next(pvl)) {
+		pv = pvl->tp_pval;
+		if (strcmp(pv->tp_name, pname) == 0) {
+			topo_list_delete(&pg->tpg_pvals, pvl);
+			assert(pv->tp_refs == 1);
+			topo_prop_rele(pv);
+			topo_hdl_free(thp, pvl, sizeof (topo_proplist_t));
+			break;
+		}
+	}
+
+	topo_node_unlock(node);
+}
+
 static int
 inherit_seterror(tnode_t *node, int *errp, int err)
 {
@@ -860,10 +959,7 @@ topo_prop_inherit(tnode_t *node, const char *pgname, const char *name, int *err)
 	/*
 	 * Check for an existing property group and prop val
 	 */
-	if ((pg = pgroup_get(pnode, pgname)) == NULL)
-		return (inherit_seterror(node, err, ETOPO_PROP_NOENT));
-
-	if ((pv = propval_get(pg, name)) == NULL)
+	if ((pv = propval_get(pgroup_get(pnode, pgname), name)) == NULL)
 		return (inherit_seterror(node, err, ETOPO_PROP_NOENT));
 
 	/*
@@ -1068,16 +1164,40 @@ topo_pgroup_destroy_all(tnode_t *node)
 	}
 	topo_node_unlock(node);
 }
+
+static void
+propmethod_destroy(topo_hdl_t *thp, topo_propval_t *pv)
+{
+	topo_propmethod_t *pm;
+
+	pm = pv->tp_method;
+	if (pm != NULL) {
+		if (pm->tpm_name != NULL)
+			topo_hdl_strfree(thp, pm->tpm_name);
+		if (pm->tpm_args != NULL)
+			nvlist_free(pm->tpm_args);
+		topo_hdl_free(thp, pm, sizeof (topo_propmethod_t));
+		pv->tp_method = NULL;
+	}
+}
+
 static void
 topo_propval_destroy(topo_propval_t *pv)
 {
-	topo_hdl_t *thp = pv->tp_hdl;
+	topo_hdl_t *thp;
+
+	if (pv == NULL)
+		return;
+
+	thp = pv->tp_hdl;
 
 	if (pv->tp_name != NULL)
 		topo_hdl_strfree(thp, pv->tp_name);
 
 	if (pv->tp_val != NULL)
 		nvlist_free(pv->tp_val);
+
+	propmethod_destroy(thp, pv);
 
 	topo_hdl_free(thp, pv, sizeof (topo_propval_t));
 }
@@ -1097,4 +1217,200 @@ topo_prop_rele(topo_propval_t *pv)
 
 	if (pv->tp_refs == 0)
 		topo_propval_destroy(pv);
+}
+
+/*
+ * topo_prop_getprop() and topo_prop_getprops() are private project functions
+ * for fmtopo
+ */
+int
+topo_prop_getprop(tnode_t *node, const char *pgname, const char *pname,
+    nvlist_t *args, nvlist_t **prop, int *err)
+{
+	topo_hdl_t *thp = node->tn_hdl;
+	topo_propval_t *pv;
+
+	topo_node_lock(node);
+	if ((pv = prop_get(node, pgname, pname, args, err)) == NULL) {
+		topo_node_unlock(node);
+		(void) get_properror(node, err, *err);
+		return (-1);
+	}
+
+	if (topo_hdl_nvdup(thp, pv->tp_val, prop) != 0) {
+		topo_node_unlock(node);
+		(void) get_properror(node, err, ETOPO_NOMEM);
+		return (-1);
+	}
+	topo_node_unlock(node);
+
+	return (0);
+}
+
+static int
+prop_val_add(tnode_t *node, nvlist_t **nvl, topo_propval_t *pv, int *err)
+{
+	if (pv->tp_method != NULL)
+		if (prop_method_get(node, pv, pv->tp_method, NULL, err) < 0)
+			return (-1);
+
+	if (pv->tp_val == NULL) {
+		*err = ETOPO_PROP_NOENT;
+		return (-1);
+	}
+
+	if (topo_hdl_nvdup(pv->tp_hdl, pv->tp_val, nvl) != 0) {
+		*err = ETOPO_PROP_NOMEM;
+		return (-1);
+	}
+
+	return (0);
+}
+
+static int
+get_pgrp_seterror(tnode_t *node, nvlist_t *nvl, int *errp, int err)
+{
+	topo_node_unlock(node);
+
+	if (nvl != NULL)
+		nvlist_free(nvl);
+
+	*errp = err;
+
+	return (-1);
+}
+
+int
+topo_prop_getpgrp(tnode_t *node, const char *pgname, nvlist_t **pgrp,
+    int *err)
+{
+	int ret;
+	topo_hdl_t *thp = node->tn_hdl;
+	nvlist_t *nvl, *pvnvl;
+	topo_pgroup_t *pg;
+	topo_propval_t *pv;
+	topo_proplist_t *pvl;
+
+	if (topo_hdl_nvalloc(thp, &nvl, 0) != 0) {
+		*err = ETOPO_NOMEM;
+		return (-1);
+	}
+
+	topo_node_lock(node);
+	for (pg = topo_list_next(&node->tn_pgroups); pg != NULL;
+	    pg = topo_list_next(pg)) {
+
+		if (strcmp(pgname, pg->tpg_info->tpi_name) != 0)
+			continue;
+
+		if (nvlist_add_string(nvl, TOPO_PROP_GROUP_NAME,
+		    pg->tpg_info->tpi_name) != 0 ||
+		    nvlist_add_string(nvl, TOPO_PROP_GROUP_NSTAB,
+		    topo_stability2name(pg->tpg_info->tpi_namestab)) != 0 ||
+		    nvlist_add_string(nvl, TOPO_PROP_GROUP_DSTAB,
+		    topo_stability2name(pg->tpg_info->tpi_datastab)) != 0 ||
+		    nvlist_add_int32(nvl, TOPO_PROP_GROUP_VERSION,
+		    pg->tpg_info->tpi_version) != 0)
+			return (get_pgrp_seterror(node, nvl, err,
+			    ETOPO_PROP_NVL));
+
+		for (pvl = topo_list_next(&pg->tpg_pvals); pvl != NULL;
+		    pvl = topo_list_next(pvl)) {
+
+			pv = pvl->tp_pval;
+			if (prop_val_add(node, &pvnvl, pv, err) < 0) {
+				return (get_pgrp_seterror(node, nvl, err,
+				    *err));
+			}
+			if ((ret = nvlist_add_nvlist(nvl, TOPO_PROP_VAL,
+			    pvnvl)) != 0) {
+				nvlist_free(pvnvl);
+				return (get_pgrp_seterror(node, nvl, err, ret));
+			}
+
+			nvlist_free(pvnvl);
+		}
+		topo_node_unlock(node);
+		*pgrp = nvl;
+		return (0);
+	}
+
+	topo_node_unlock(node);
+	*err = ETOPO_PROP_NOENT;
+	return (-1);
+}
+
+static nvlist_t *
+get_all_seterror(tnode_t *node, nvlist_t *nvl, int *errp, int err)
+{
+	topo_node_unlock(node);
+
+	if (nvl != NULL)
+		nvlist_free(nvl);
+
+	*errp = err;
+
+	return (NULL);
+}
+
+nvlist_t *
+topo_prop_getprops(tnode_t *node, int *err)
+{
+	int ret;
+	topo_hdl_t *thp = node->tn_hdl;
+	nvlist_t *nvl, *pgnvl, *pvnvl;
+	topo_pgroup_t *pg;
+	topo_propval_t *pv;
+	topo_proplist_t *pvl;
+
+	topo_node_lock(node);
+	if (topo_hdl_nvalloc(thp, &nvl, 0) != 0) {
+		return (get_all_seterror(node, NULL, err, ETOPO_NOMEM));
+	}
+
+	for (pg = topo_list_next(&node->tn_pgroups); pg != NULL;
+	    pg = topo_list_next(pg)) {
+		if (topo_hdl_nvalloc(thp, &pgnvl, 0) != 0)
+			return (get_all_seterror(node, nvl, err, ETOPO_NOMEM));
+
+		if (nvlist_add_string(pgnvl, TOPO_PROP_GROUP_NAME,
+		    pg->tpg_info->tpi_name) != 0 ||
+		    nvlist_add_string(pgnvl, TOPO_PROP_GROUP_NSTAB,
+		    topo_stability2name(pg->tpg_info->tpi_namestab)) != 0 ||
+		    nvlist_add_string(pgnvl, TOPO_PROP_GROUP_DSTAB,
+		    topo_stability2name(pg->tpg_info->tpi_datastab)) != 0 ||
+		    nvlist_add_int32(pgnvl, TOPO_PROP_GROUP_VERSION,
+		    pg->tpg_info->tpi_version) != 0)
+			return (get_all_seterror(node, nvl, err,
+			    ETOPO_PROP_NVL));
+
+		for (pvl = topo_list_next(&pg->tpg_pvals); pvl != NULL;
+		    pvl = topo_list_next(pvl)) {
+
+			pv = pvl->tp_pval;
+			if (prop_val_add(node, &pvnvl, pv, err) < 0) {
+				nvlist_free(pgnvl);
+				return (get_all_seterror(node, nvl, err, *err));
+			}
+			if ((ret = nvlist_add_nvlist(pgnvl, TOPO_PROP_VAL,
+			    pvnvl)) != 0) {
+				nvlist_free(pgnvl);
+				nvlist_free(pvnvl);
+				return (get_all_seterror(node, nvl, err, ret));
+			}
+
+			nvlist_free(pvnvl);
+		}
+		if ((ret = nvlist_add_nvlist(nvl, TOPO_PROP_GROUP, pgnvl))
+		    != 0) {
+			nvlist_free(pgnvl);
+			return (get_all_seterror(node, nvl, err, ret));
+		}
+
+		nvlist_free(pgnvl);
+	}
+
+	topo_node_unlock(node);
+
+	return (nvl);
 }

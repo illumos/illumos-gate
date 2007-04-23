@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,7 @@
 
 #include <topo_method.h>
 #include <topo_subr.h>
+#include <topo_prop.h>
 #include <hc.h>
 
 static int hc_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
@@ -56,7 +57,17 @@ static int hc_fmri_str2nvl(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 static int hc_compare(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
+static int hc_fmri_present(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
+    nvlist_t **);
+static int hc_fmri_unusable(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
+    nvlist_t **);
 static int hc_fmri_create_meth(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+static int hc_fmri_prop_get(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+static int hc_fmri_prop_set(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+static int hc_fmri_pgrp_get(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 
 static nvlist_t *hc_fmri_create(topo_mod_t *, nvlist_t *, int, const char *,
@@ -70,8 +81,22 @@ const topo_method_t hc_methods[] = {
 	    TOPO_STABILITY_INTERNAL, hc_fmri_str2nvl },
 	{ TOPO_METH_COMPARE, TOPO_METH_COMPARE_DESC, TOPO_METH_COMPARE_VERSION,
 	    TOPO_STABILITY_INTERNAL, hc_compare },
+	{ TOPO_METH_PRESENT, TOPO_METH_PRESENT_DESC, TOPO_METH_PRESENT_VERSION,
+	    TOPO_STABILITY_INTERNAL, hc_fmri_present },
+	{ TOPO_METH_UNUSABLE, TOPO_METH_UNUSABLE_DESC,
+	    TOPO_METH_UNUSABLE_VERSION, TOPO_STABILITY_INTERNAL,
+	    hc_fmri_unusable },
 	{ TOPO_METH_FMRI, TOPO_METH_FMRI_DESC, TOPO_METH_FMRI_VERSION,
 	    TOPO_STABILITY_INTERNAL, hc_fmri_create_meth },
+	{ TOPO_METH_PROP_GET, TOPO_METH_PROP_GET_DESC,
+	    TOPO_METH_PROP_GET_VERSION, TOPO_STABILITY_INTERNAL,
+	    hc_fmri_prop_get },
+	{ TOPO_METH_PROP_SET, TOPO_METH_PROP_SET_DESC,
+	    TOPO_METH_PROP_SET_VERSION, TOPO_STABILITY_INTERNAL,
+	    hc_fmri_prop_set },
+	{ TOPO_METH_PGRP_GET, TOPO_METH_PGRP_GET_DESC,
+	    TOPO_METH_PGRP_GET_VERSION, TOPO_STABILITY_INTERNAL,
+	    hc_fmri_pgrp_get },
 	{ NULL }
 };
 
@@ -272,23 +297,13 @@ hc_release(topo_mod_t *mp, tnode_t *node)
 	topo_method_unregister_all(mp, node);
 }
 
-/*ARGSUSED*/
 static int
-hc_compare(topo_mod_t *mod, tnode_t *node, topo_version_t version,
-    nvlist_t *in, nvlist_t **out)
+fmri_compare(topo_mod_t *mod, nvlist_t *nv1, nvlist_t *nv2)
 {
 	uint8_t v1, v2;
-	nvlist_t *nv1, *nv2;
 	nvlist_t **hcp1, **hcp2;
 	int err, i;
 	uint_t nhcp1, nhcp2;
-
-	if (version > TOPO_METH_COMPARE_VERSION)
-		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
-
-	if (nvlist_lookup_nvlist(in, "nv1", &nv1) != 0 ||
-	    nvlist_lookup_nvlist(in, "nv2", &nv2) != 0)
-		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
 
 	if (nvlist_lookup_uint8(nv1, FM_VERSION, &v1) != 0 ||
 	    nvlist_lookup_uint8(nv2, FM_VERSION, &v2) != 0 ||
@@ -323,6 +338,38 @@ hc_compare(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	}
 
 	return (1);
+}
+
+/*ARGSUSED*/
+static int
+hc_compare(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	int ret;
+	uint32_t compare;
+	nvlist_t *nv1, *nv2;
+
+	if (version > TOPO_METH_COMPARE_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+
+	if (nvlist_lookup_nvlist(in, TOPO_METH_FMRI_ARG_NV1, &nv1) != 0 ||
+	    nvlist_lookup_nvlist(in, TOPO_METH_FMRI_ARG_NV1, &nv2) != 0)
+		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
+
+	ret = fmri_compare(mod, nv1, nv2);
+	if (ret < 0)
+		return (-1);
+
+	compare = ret;
+	if (topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) == 0) {
+		if (nvlist_add_uint32(*out, TOPO_METH_COMPARE_RET,
+		    compare) == 0)
+			return (0);
+		else
+			nvlist_free(*out);
+	}
+
+	return (-1);
 }
 
 static ssize_t
@@ -518,12 +565,12 @@ make_hc_pairs(topo_mod_t *mod, char *fmri, int *num)
 	char *hc, *fromstr;
 	char *starti, *startn, *endi, *endi2;
 	char *ne, *ns;
-	char *cname;
+	char *cname = NULL;
 	char *find;
-	char *cid;
+	char *cid = NULL;
 	int nslashes = 0;
 	int npairs = 0;
-	int i, e;
+	int i;
 
 	if ((hc = topo_mod_strdup(mod, fmri + 5)) == NULL)
 		return (NULL);
@@ -561,7 +608,11 @@ make_hc_pairs(topo_mod_t *mod, char *fmri, int *num)
 
 	find = fromstr;
 
-	pa = topo_mod_alloc(mod, npairs * sizeof (nvlist_t *));
+	if ((pa = topo_mod_alloc(mod, npairs * sizeof (nvlist_t *))) == NULL) {
+		topo_mod_strfree(mod, hc);
+		return (NULL);
+	}
+
 	/*
 	 * We go through a pretty complicated procedure to find the
 	 * name and id for each pair.  That's because, unfortunately,
@@ -581,7 +632,8 @@ make_hc_pairs(topo_mod_t *mod, char *fmri, int *num)
 		if (starti == NULL)
 			break;
 		*starti = '\0';
-		cname = topo_mod_strdup(mod, startn);
+		if ((cname = topo_mod_strdup(mod, startn)) == NULL)
+			break;
 		*starti++ = '=';
 		endi = strchr(starti, '=');
 		if (endi != NULL) {
@@ -591,33 +643,34 @@ make_hc_pairs(topo_mod_t *mod, char *fmri, int *num)
 				break;
 			*endi = '=';
 			*endi2 = '\0';
-			cid = topo_mod_strdup(mod, starti);
+			if ((cid = topo_mod_strdup(mod, starti)) == NULL)
+				break;
 			*endi2 = '/';
 			find = endi2;
 		} else {
-			cid = topo_mod_strdup(mod, starti);
+			if ((cid = topo_mod_strdup(mod, starti)) == NULL)
+				break;
 			find = starti + strlen(starti);
 		}
-		if ((e = topo_mod_nvalloc(mod, &pa[i], NV_UNIQUE_NAME)) != 0) {
-			topo_mod_strfree(mod, cname);
-			topo_mod_strfree(mod, cid);
+		if (topo_mod_nvalloc(mod, &pa[i], NV_UNIQUE_NAME) < 0)
 			break;
-		}
 
-		e = nvlist_add_string(pa[i], FM_FMRI_HC_NAME, cname);
-		e |= nvlist_add_string(pa[i], FM_FMRI_HC_ID, cid);
+		if (nvlist_add_string(pa[i], FM_FMRI_HC_NAME, cname) ||
+		    nvlist_add_string(pa[i], FM_FMRI_HC_ID, cid))
+			break;
 
 		topo_mod_strfree(mod, cname);
 		topo_mod_strfree(mod, cid);
-
-		if (e != 0) {
-			break;
-		}
+		cname = NULL;
+		cid = NULL;
 	}
+
+	topo_mod_strfree(mod, cname);
+	topo_mod_strfree(mod, cid);
+
 	if (i < npairs) {
 		while (i >= 0)
-			if (pa[i--] != NULL)
-				nvlist_free(pa[i + 1]);
+			nvlist_free(pa[i + 1]);
 		topo_mod_free(mod, pa, npairs * sizeof (nvlist_t *));
 		topo_mod_strfree(mod, hc);
 		return (NULL);
@@ -965,4 +1018,466 @@ hc_fmri_create_meth(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	if (*out == NULL)
 		return (-1);
 	return (0);
+}
+
+struct hc_walk {
+	topo_mod_walk_cb_t hcw_cb;
+	void *hcw_priv;
+	topo_walk_t *hcw_wp;
+	nvlist_t **hcw_list;
+	uint_t hcw_index;
+	uint_t hcw_end;
+};
+
+/*
+ * Generic walker for the hc-scheme topo tree.  This function uses the
+ * hierachical nature of the hc-scheme to step through efficiently through
+ * the topo hc tree.  Node lookups are done by topo_walk_byid() at each
+ * component level to avoid unnecessary traversal of the tree.
+ *
+ */
+static int
+hc_walker(topo_mod_t *mod, tnode_t *node, void *pdata)
+{
+	int i, err;
+	struct hc_walk *hwp = (struct hc_walk *)pdata;
+	char *name, *id;
+	topo_instance_t inst;
+
+	i = hwp->hcw_index;
+	if (i > hwp->hcw_end) {
+		(void) topo_mod_seterrno(mod, ETOPO_PROP_NOENT);
+		return (TOPO_WALK_TERMINATE);
+	}
+
+	err = nvlist_lookup_string(hwp->hcw_list[i], FM_FMRI_HC_NAME, &name);
+	err |= nvlist_lookup_string(hwp->hcw_list[i], FM_FMRI_HC_ID, &id);
+
+	if (err != 0) {
+		(void) topo_mod_seterrno(mod, EMOD_NVL_INVAL);
+		return (TOPO_WALK_ERR);
+	}
+
+	inst = atoi(id);
+	topo_mod_dprintf(mod, "hc_walker: walking node:%s=%d for hc:"
+	    "%s=%d at %d, end at %d \n", topo_node_name(node),
+	    topo_node_instance(node), name, inst, i, hwp->hcw_end);
+	if (i == hwp->hcw_end) {
+		/*
+		 * We are at the end of the hc-list.  Verify that
+		 * the last node contains the name/instance we are looking for.
+		 */
+		if (strcmp(topo_node_name(node), name) == 0 &&
+		    inst == topo_node_instance(node)) {
+			if ((err = hwp->hcw_cb(mod, node, hwp->hcw_priv))
+			    != 0) {
+				(void) topo_mod_seterrno(mod, err);
+				topo_mod_dprintf(mod, "hc_walker: callback "
+				    "failed: %s\n ", topo_mod_errmsg(mod));
+				return (TOPO_WALK_ERR);
+			}
+			topo_mod_dprintf(mod, "hc_walker: callback "
+			    "complete: terminate walk\n");
+			return (TOPO_WALK_TERMINATE);
+		} else {
+			topo_mod_dprintf(mod, "hc_walker: %s=%d\n "
+			    "not found\n", name, inst);
+			return (TOPO_WALK_TERMINATE);
+		}
+	}
+
+	hwp->hcw_index = ++i;
+	err = nvlist_lookup_string(hwp->hcw_list[i], FM_FMRI_HC_NAME, &name);
+	err |= nvlist_lookup_string(hwp->hcw_list[i], FM_FMRI_HC_ID, &id);
+	if (err != 0) {
+		(void) topo_mod_seterrno(mod, err);
+		return (TOPO_WALK_ERR);
+	}
+	inst = atoi(id);
+
+	topo_mod_dprintf(mod, "hc_walker: walk byid of %s=%d \n", name,
+	    inst);
+	return (topo_walk_byid(hwp->hcw_wp, name, inst));
+
+}
+
+static struct hc_walk *
+hc_walk_init(topo_mod_t *mod, tnode_t *node, nvlist_t *rsrc,
+    topo_mod_walk_cb_t cb, void *pdata)
+{
+	int err;
+	uint_t sz;
+	struct hc_walk *hwp;
+	topo_walk_t *wp;
+
+	if ((hwp = topo_mod_alloc(mod, sizeof (struct hc_walk))) == NULL)
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
+
+	if (nvlist_lookup_nvlist_array(rsrc, FM_FMRI_HC_LIST, &hwp->hcw_list,
+	    &sz) != 0) {
+		topo_mod_free(mod, hwp, sizeof (struct hc_walk));
+		(void) topo_mod_seterrno(mod, EMOD_METHOD_INVAL);
+		return (NULL);
+	}
+
+	hwp->hcw_end = sz - 1;
+	hwp->hcw_index = 0;
+	hwp->hcw_priv = pdata;
+	hwp->hcw_cb = cb;
+	if ((wp = topo_mod_walk_init(mod, node, hc_walker, (void *)hwp, &err))
+	    == NULL) {
+		topo_mod_free(mod, hwp, sizeof (struct hc_walk));
+		(void) topo_mod_seterrno(mod, err);
+		return (NULL);
+	}
+
+	hwp->hcw_wp = wp;
+
+	return (hwp);
+}
+
+struct prop_lookup {
+	const char *pl_pgroup;
+	const char *pl_pname;
+	int pl_flag;
+	nvlist_t *pl_args;
+	nvlist_t *pl_rsrc;
+	nvlist_t *pl_prop;
+};
+
+/*ARGSUSED*/
+static int
+hc_prop_get(topo_mod_t *mod, tnode_t *node, void *pdata)
+{
+	int err = 0;
+
+	struct prop_lookup *plp = (struct prop_lookup *)pdata;
+
+	(void) topo_prop_getprop(node, plp->pl_pgroup, plp->pl_pname,
+	    plp->pl_args, &plp->pl_prop, &err);
+
+	return (err);
+}
+
+static int
+hc_fmri_prop_get(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	int err;
+	struct hc_walk *hwp;
+	struct prop_lookup *plp;
+
+	if (version > TOPO_METH_PROP_GET_VERSION)
+		return (topo_mod_seterrno(mod, ETOPO_METHOD_VERNEW));
+
+	if ((plp = topo_mod_alloc(mod, sizeof (struct prop_lookup))) == NULL)
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+
+	err = nvlist_lookup_string(in, TOPO_PROP_GROUP,
+	    (char **)&plp->pl_pgroup);
+	err |= nvlist_lookup_string(in, TOPO_PROP_VAL_NAME,
+	    (char **)&plp->pl_pname);
+	err |= nvlist_lookup_nvlist(in, TOPO_PROP_RESOURCE, &plp->pl_rsrc);
+	if (err != 0) {
+		topo_mod_free(mod, plp, sizeof (struct prop_lookup));
+		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
+	}
+
+	/*
+	 * Private args to prop method are optional
+	 */
+	if ((err = nvlist_lookup_nvlist(in, TOPO_PROP_PARGS, &plp->pl_args))
+	    != 0) {
+		if (err != ENOENT) {
+			topo_mod_free(mod, plp, sizeof (struct prop_lookup));
+			return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
+		} else {
+			plp->pl_args = NULL;
+		}
+	}
+
+	plp->pl_prop = NULL;
+	if ((hwp = hc_walk_init(mod, node, plp->pl_rsrc, hc_prop_get,
+	    (void *)plp)) != NULL) {
+		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
+		    TOPO_WALK_ERR)
+			err = -1;
+		else
+			err = 0;
+		topo_walk_fini(hwp->hcw_wp);
+	} else {
+		err = -1;
+	}
+
+	topo_mod_free(mod, hwp, sizeof (struct hc_walk));
+
+	if (plp->pl_prop != NULL)
+		*out = plp->pl_prop;
+
+	topo_mod_free(mod, plp, sizeof (struct prop_lookup));
+
+	return (err);
+}
+
+/*ARGSUSED*/
+static int
+hc_pgrp_get(topo_mod_t *mod, tnode_t *node, void *pdata)
+{
+	int err = 0;
+
+	struct prop_lookup *plp = (struct prop_lookup *)pdata;
+
+	(void) topo_prop_getpgrp(node, plp->pl_pgroup, &plp->pl_prop, &err);
+
+	return (err);
+}
+
+static int
+hc_fmri_pgrp_get(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	int err;
+	struct hc_walk *hwp;
+	struct prop_lookup *plp;
+
+	if (version > TOPO_METH_PGRP_GET_VERSION)
+		return (topo_mod_seterrno(mod, ETOPO_METHOD_VERNEW));
+
+	if ((plp = topo_mod_alloc(mod, sizeof (struct prop_lookup))) == NULL)
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+
+	err = nvlist_lookup_string(in, TOPO_PROP_GROUP,
+	    (char **)&plp->pl_pgroup);
+	err |= nvlist_lookup_nvlist(in, TOPO_PROP_RESOURCE, &plp->pl_rsrc);
+	if (err != 0) {
+		topo_mod_free(mod, plp, sizeof (struct prop_lookup));
+		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
+	}
+
+	plp->pl_prop = NULL;
+	if ((hwp = hc_walk_init(mod, node, plp->pl_rsrc, hc_pgrp_get,
+	    (void *)plp)) != NULL) {
+		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
+		    TOPO_WALK_ERR)
+			err = -1;
+		else
+			err = 0;
+		topo_walk_fini(hwp->hcw_wp);
+	} else {
+		err = -1;
+	}
+
+	topo_mod_free(mod, hwp, sizeof (struct hc_walk));
+
+	if (plp->pl_prop != NULL)
+		*out = plp->pl_prop;
+
+	topo_mod_free(mod, plp, sizeof (struct prop_lookup));
+
+	return (err);
+}
+
+/*ARGSUSED*/
+static int
+hc_prop_setprop(topo_mod_t *mod, tnode_t *node, void *pdata)
+{
+	int err = 0;
+
+	struct prop_lookup *plp = (struct prop_lookup *)pdata;
+
+	(void) topo_prop_setprop(node, plp->pl_pgroup, plp->pl_prop,
+	    plp->pl_flag, plp->pl_args, &err);
+
+	return (err);
+}
+
+/*ARGSUSED*/
+static int
+hc_fmri_prop_set(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	int err;
+	struct hc_walk *hwp;
+	struct prop_lookup *plp;
+
+	if (version > TOPO_METH_PROP_SET_VERSION)
+		return (topo_mod_seterrno(mod, ETOPO_METHOD_VERNEW));
+
+	if ((plp = topo_mod_alloc(mod, sizeof (struct prop_lookup))) == NULL)
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+
+	err = nvlist_lookup_string(in, TOPO_PROP_GROUP,
+	    (char **)&plp->pl_pgroup);
+	err |= nvlist_lookup_nvlist(in, TOPO_PROP_RESOURCE, &plp->pl_rsrc);
+	err |= nvlist_lookup_nvlist(in, TOPO_PROP_VAL, &plp->pl_prop);
+	err |= nvlist_lookup_int32(in, TOPO_PROP_FLAG, &plp->pl_flag);
+	if (err != 0) {
+		topo_mod_free(mod, plp, sizeof (struct prop_lookup));
+		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
+	}
+
+	/*
+	 * Private args to prop method are optional
+	 */
+	if ((err = nvlist_lookup_nvlist(in, TOPO_PROP_PARGS, &plp->pl_args))
+	    != 0) {
+		if (err != ENOENT)
+			return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
+		else
+			plp->pl_args = NULL;
+	}
+
+	if ((hwp = hc_walk_init(mod, node, plp->pl_rsrc, hc_prop_setprop,
+	    (void *)plp)) != NULL) {
+		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
+		    TOPO_WALK_ERR)
+			err = -1;
+		else
+			err = 0;
+		topo_walk_fini(hwp->hcw_wp);
+	} else {
+		err = -1;
+	}
+
+	topo_mod_free(mod, hwp, sizeof (struct hc_walk));
+	topo_mod_free(mod, plp, sizeof (struct prop_lookup));
+
+	return (err);
+}
+
+struct hc_args {
+	nvlist_t *ha_fmri;
+	nvlist_t *ha_nvl;
+};
+
+static int
+hc_is_present(topo_mod_t *mod, tnode_t *node, void *pdata)
+{
+	int err;
+	struct hc_args *hap = (struct hc_args *)pdata;
+
+	/*
+	 * check with the enumerator that created this FMRI
+	 * (topo node)
+	 */
+	if (topo_method_invoke(node, TOPO_METH_PRESENT,
+	    TOPO_METH_PRESENT_VERSION, hap->ha_fmri, &hap->ha_nvl,
+	    &err) < 0) {
+
+		/*
+		 * Err on the side of caution and return present
+		 */
+		if (topo_mod_nvalloc(mod, &hap->ha_nvl, NV_UNIQUE_NAME) == 0)
+			if (nvlist_add_uint32(hap->ha_nvl,
+			    TOPO_METH_PRESENT_RET, 1) == 0)
+				return (0);
+
+		return (ETOPO_PROP_NVL);
+	}
+
+	return (err);
+}
+
+static int
+hc_fmri_present(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	int err;
+	struct hc_walk *hwp;
+	struct hc_args *hap;
+
+	if (version > TOPO_METH_PRESENT_VERSION)
+		return (topo_mod_seterrno(mod, ETOPO_METHOD_VERNEW));
+
+	if ((hap = topo_mod_alloc(mod, sizeof (struct hc_args))) == NULL)
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+
+	hap->ha_fmri = in;
+	hap->ha_nvl = NULL;
+	if ((hwp = hc_walk_init(mod, node, hap->ha_fmri, hc_is_present,
+	    (void *)hap)) != NULL) {
+		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
+		    TOPO_WALK_ERR)
+			err = -1;
+		else
+			err = 0;
+		topo_walk_fini(hwp->hcw_wp);
+	} else {
+		err = -1;
+	}
+
+	topo_mod_free(mod, hwp, sizeof (struct hc_walk));
+
+	if (hap->ha_nvl != NULL)
+		*out = hap->ha_nvl;
+
+	topo_mod_free(mod, hap, sizeof (struct hc_args));
+
+	return (err);
+}
+
+static int
+hc_unusable(topo_mod_t *mod, tnode_t *node, void *pdata)
+{
+	int err;
+	struct hc_args *hap = (struct hc_args *)pdata;
+
+	/*
+	 * check with the enumerator that created this FMRI
+	 * (topo node)
+	 */
+	if (topo_method_invoke(node, TOPO_METH_UNUSABLE,
+	    TOPO_METH_UNUSABLE_VERSION, hap->ha_fmri, &hap->ha_nvl,
+	    &err) < 0) {
+
+		/*
+		 * Err on the side of caution and return usable
+		 */
+		if (topo_mod_nvalloc(mod, &hap->ha_nvl, NV_UNIQUE_NAME) == 0)
+			if (nvlist_add_uint32(hap->ha_nvl,
+			    TOPO_METH_UNUSABLE_RET, 0) == 0)
+				return (0);
+
+		return (ETOPO_PROP_NVL);
+	}
+
+	return (err);
+}
+
+static int
+hc_fmri_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	int err;
+	struct hc_walk *hwp;
+	struct hc_args *hap;
+
+	if (version > TOPO_METH_UNUSABLE_VERSION)
+		return (topo_mod_seterrno(mod, ETOPO_METHOD_VERNEW));
+
+	if ((hap = topo_mod_alloc(mod, sizeof (struct hc_args))) == NULL)
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+
+	hap->ha_fmri = in;
+	hap->ha_nvl = NULL;
+	if ((hwp = hc_walk_init(mod, node, hap->ha_fmri, hc_unusable,
+	    (void *)hap)) != NULL) {
+		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
+		    TOPO_WALK_ERR)
+			err = -1;
+		else
+			err = 0;
+		topo_walk_fini(hwp->hcw_wp);
+	} else {
+		err = -1;
+	}
+
+	topo_mod_free(mod, hwp, sizeof (struct hc_walk));
+
+	if (hap->ha_nvl != NULL)
+		*out = hap->ha_nvl;
+
+	topo_mod_free(mod, hap, sizeof (struct hc_args));
+
+	return (err);
 }

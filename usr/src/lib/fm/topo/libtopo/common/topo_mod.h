@@ -97,6 +97,14 @@ extern int topo_mod_nvl2str(topo_mod_t *, nvlist_t *, char **);
 extern int topo_mod_str2nvl(topo_mod_t *, const char *,  nvlist_t **);
 
 /*
+ * Snapshot walker support
+ */
+typedef int (*topo_mod_walk_cb_t)(topo_mod_t *, tnode_t *, void *);
+
+extern topo_walk_t *topo_mod_walk_init(topo_mod_t *, tnode_t *,
+    topo_mod_walk_cb_t, void *, int *);
+
+/*
  * Flags for topo_mod_memfmri
  */
 #define	TOPO_MEMFMRI_PA		0x0001	/* Valid physical address */
@@ -114,20 +122,20 @@ extern nvlist_t *topo_mod_auth(topo_mod_t *, tnode_t *);
  * FMRI methods
  */
 #define	TOPO_METH_LABEL			"topo_label"
-#define	TOPO_METH_LABEL_DESC		"Dynamic label discovery"
+#define	TOPO_METH_LABEL_DESC		"label constructor"
 #define	TOPO_METH_LABEL_VERSION0	0
 #define	TOPO_METH_LABEL_VERSION		TOPO_METH_LABEL_VERSION0
 #define	TOPO_METH_LABEL_ARG_NVL	"label-specific"
 #define	TOPO_METH_LABEL_RET_STR	"label-string"
 
 #define	TOPO_METH_PRESENT		"topo_present"
-#define	TOPO_METH_PRESENT_DESC		"Dynamic label discovery"
+#define	TOPO_METH_PRESENT_DESC		"presence indicator"
 #define	TOPO_METH_PRESENT_VERSION0	0
 #define	TOPO_METH_PRESENT_VERSION	TOPO_METH_PRESENT_VERSION0
 #define	TOPO_METH_PRESENT_RET		"present-ret"
 
 #define	TOPO_METH_UNUSABLE		"topo_unusable"
-#define	TOPO_METH_UNUSABLE_DESC		"FMRI is unusable"
+#define	TOPO_METH_UNUSABLE_DESC		"unusable indicator"
 #define	TOPO_METH_UNUSABLE_VERSION0	0
 #define	TOPO_METH_UNUSABLE_VERSION	TOPO_METH_UNUSABLE_VERSION0
 #define	TOPO_METH_UNUSABLE_RET		"unusable-ret"
@@ -176,6 +184,43 @@ extern int topo_node_label_set(tnode_t *node, char *, int *);
 
 #define	TOPO_ASRU_COMPUTE	0x0001	/* Compute ASRU dynamically */
 #define	TOPO_FRU_COMPUTE	0x0002	/* Compute FRU dynamically */
+
+/*
+ * Topo property set functions
+ */
+extern int topo_prop_set_int32(tnode_t *, const char *, const char *, int,
+    int32_t, int *);
+extern int topo_prop_set_uint32(tnode_t *, const char *, const char *, int,
+    uint32_t, int *);
+extern int topo_prop_set_int64(tnode_t *, const char *, const char *,
+    int, int64_t, int *);
+extern int topo_prop_set_uint64(tnode_t *, const char *, const char *,
+    int, uint64_t, int *);
+extern int topo_prop_set_string(tnode_t *, const char *, const char *,
+    int, const char *, int *);
+extern int topo_prop_set_fmri(tnode_t *, const char *, const char *,
+    int, const nvlist_t *, int *);
+extern int topo_prop_set_int32_array(tnode_t *, const char *, const char *, int,
+    int32_t *, uint_t, int *);
+extern int topo_prop_set_uint32_array(tnode_t *, const char *, const char *,
+    int, uint32_t *, uint_t, int *);
+extern int topo_prop_set_int64_array(tnode_t *, const char *, const char *,
+    int, int64_t *, uint_t, int *);
+extern int topo_prop_set_uint64_array(tnode_t *, const char *, const char *,
+    int, uint64_t *, uint_t, int *);
+extern int topo_prop_set_string_array(tnode_t *, const char *, const char *,
+    int, const char **, uint_t, int *);
+extern int topo_prop_set_fmri_array(tnode_t *, const char *, const char *,
+    int, const nvlist_t **, uint_t, int *);
+extern int topo_prop_inherit(tnode_t *, const char *, const char *, int *);
+extern int topo_pgroup_create(tnode_t *, const topo_pgroup_info_t *, int *);
+
+/*
+ * Topo property method registration
+ */
+extern int topo_prop_method_register(tnode_t *, const char *, const char *,
+    topo_type_t, const char *, const nvlist_t *, int *);
+extern void topo_prop_method_unregister(tnode_t *, const char *, const char *);
 
 /*
  * This enum definition is used to define a set of error tags associated with

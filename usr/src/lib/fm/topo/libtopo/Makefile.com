@@ -105,6 +105,8 @@ pics/%.o: ../$(MACH)/%.c
 	sh ../common/mkerror.sh liberrors < ../common/topo_error.h > $@
 	sh ../common/mkerror.sh properrors < ../common/libtopo.h >> $@
 	sh ../common/mkerror.sh methoderrors < ../common/libtopo.h >> $@
+	sh ../common/mkerror.sh fmrierrors < ../common/libtopo.h >> $@
+	sh ../common/mkerror.sh hdlerrors < ../common/libtopo.h >> $@
 	sh ../common/mkerror.sh moderrors < ../common/topo_mod.h >> $@
 
 include ../../../../Makefile.targ

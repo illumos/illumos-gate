@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,91 +33,52 @@
 #include <topo_alloc.h>
 #include <topo_error.h>
 #include <topo_method.h>
+#include <topo_prop.h>
 #include <topo_protocol.h>
 #include <topo_subr.h>
 
 #include <libtopo.h>
 
-static int
-topo_compute(tnode_t *node, nvlist_t *stub, const char *method,
-    topo_version_t version, nvlist_t *rsrc, nvlist_t **asru, int *err)
+int
+topo_node_asru(tnode_t *node, nvlist_t **asru, nvlist_t *priv, int *err)
 {
-	int rc;
-	char *scheme;
-	topo_hdl_t *thp = node->tn_hdl;
-	tnode_t *rnode;
+	nvlist_t *prop, *ap;
 
-	/*
-	 * First try the originating enumerator for
-	 * a compute method.  If none is supported, try the
-	 * node's scheme-specific enumerator.
-	 */
-	if (topo_method_invoke(node, method, version, rsrc, asru, err) == 0)
-		return (0);
-
-	if (*err != ETOPO_METHOD_NOTSUP)
+	if (topo_prop_getprop(node, TOPO_PGROUP_PROTOCOL,
+	    TOPO_PROP_ASRU, priv, &prop, err) < 0)
 		return (-1);
 
-	if ((rc = nvlist_lookup_string(stub, FM_FMRI_SCHEME, &scheme)) != 0) {
-		if (rc == ENOENT) {
-			*err = ETOPO_FMRI_MALFORM;
-		} else {
-			*err = ETOPO_FMRI_NVL;
-		}
+	if (nvlist_lookup_nvlist(prop, TOPO_PROP_VAL_VAL, &ap) != 0 ||
+	    topo_hdl_nvdup(node->tn_hdl, ap, asru) < 0) {
+		*err = ETOPO_PROP_NVL;
+		nvlist_free(prop);
 		return (-1);
 	}
 
-	if ((rnode = topo_hdl_root(thp, scheme)) == NULL) {
-		*err = ETOPO_METHOD_NOTSUP;
-		return (-1);
-	}
-
-	if (topo_method_invoke(rnode, method, version, rsrc, asru, err) != 0)
-		return (-1);
+	nvlist_free(prop);
 
 	return (0);
 }
 
 int
-topo_node_asru(tnode_t *node, nvlist_t **asru, nvlist_t *priv, int *err)
-{
-	int rc;
-	nvlist_t *ap;
-
-	if (topo_prop_get_fmri(node, TOPO_PGROUP_PROTOCOL, TOPO_PROP_ASRU, &ap,
-	    err) != 0)
-		return (-1);
-
-	if (node->tn_fflags & TOPO_ASRU_COMPUTE) {
-		rc = topo_compute(node, ap, TOPO_METH_ASRU_COMPUTE,
-		    TOPO_METH_ASRU_COMPUTE_VERSION, priv, asru, err);
-		nvlist_free(ap);
-		return (rc);
-	} else {
-		*asru = ap;
-		return (0);
-	}
-}
-
-int
 topo_node_fru(tnode_t *node, nvlist_t **fru, nvlist_t *priv, int *err)
 {
-	int rc;
-	nvlist_t *fp;
+	nvlist_t *prop, *fp;
 
-	if (topo_prop_get_fmri(node, TOPO_PGROUP_PROTOCOL, TOPO_PROP_FRU, &fp,
-	    err) != 0)
+	if (topo_prop_getprop(node, TOPO_PGROUP_PROTOCOL, TOPO_PROP_FRU,
+	    priv, &prop, err) < 0)
 		return (-1);
 
-	if (node->tn_fflags & TOPO_FRU_COMPUTE) {
-		rc = topo_compute(node, fp, TOPO_METH_FRU_COMPUTE,
-		    TOPO_METH_FRU_COMPUTE_VERSION, priv, fru, err);
-		nvlist_free(fp);
-		return (rc);
-	} else {
-		*fru = fp;
-		return (0);
+	if (nvlist_lookup_nvlist(prop, TOPO_PROP_VAL_VAL, &fp) != 0 ||
+	    topo_hdl_nvdup(node->tn_hdl, fp, fru) < 0) {
+		*err = ETOPO_PROP_NVL;
+		nvlist_free(prop);
+		return (-1);
 	}
+
+	nvlist_free(prop);
+
+	return (0);
 }
 
 int
@@ -139,24 +100,24 @@ topo_node_label(tnode_t *node, char **label, int *err)
 int
 topo_node_asru_set(tnode_t *node, nvlist_t *asru, int flag, int *err)
 {
-
 	/*
-	 * Inherit ASRU property from our parent if not specified
+	 * Inherit ASRU property from our parent if asru not specified
 	 */
 	if (asru == NULL) {
 		if (topo_prop_inherit(node, TOPO_PGROUP_PROTOCOL,
 		    TOPO_PROP_ASRU, err) < 0) {
 			return (-1);
 		}
-	} else {
-		/*
-		 * ASRU must be computed on the fly.  asru will
-		 * contain the scheme module to call for the
-		 * computation
-		 */
-		if (flag & TOPO_ASRU_COMPUTE)
-			node->tn_fflags |= TOPO_ASRU_COMPUTE;
 
+		return (0);
+	}
+
+	if (flag & TOPO_ASRU_COMPUTE) {
+		if (topo_prop_method_register(node, TOPO_PGROUP_PROTOCOL,
+		    TOPO_PROP_ASRU, TOPO_TYPE_FMRI, TOPO_METH_ASRU_COMPUTE,
+		    asru, err) < 0)
+			return (-1);
+	} else {
 		if (topo_prop_set_fmri(node, TOPO_PGROUP_PROTOCOL,
 		    TOPO_PROP_ASRU, TOPO_PROP_IMMUTABLE, asru, err) < 0)
 			return (-1);
@@ -177,17 +138,19 @@ topo_node_fru_set(tnode_t *node, nvlist_t *fru, int flag, int *err)
 		    err) < 0) {
 			return (-1);
 		}
-	} else {
-		/*
-		 * FRU must be computed on the fly
-		 */
-		if (flag & TOPO_FRU_COMPUTE)
-			node->tn_fflags |= TOPO_FRU_COMPUTE;
+	}
 
+	if (flag & TOPO_FRU_COMPUTE) {
+		if (topo_prop_method_register(node, TOPO_PGROUP_PROTOCOL,
+		    TOPO_PROP_FRU, TOPO_TYPE_FMRI, TOPO_METH_FRU_COMPUTE,
+		    fru, err) < 0)
+			return (-1);
+	} else {
 		if (topo_prop_set_fmri(node, TOPO_PGROUP_PROTOCOL,
 		    TOPO_PROP_FRU, TOPO_PROP_IMMUTABLE, fru, err) < 0)
 			return (-1);
 	}
+
 
 	return (0);
 }

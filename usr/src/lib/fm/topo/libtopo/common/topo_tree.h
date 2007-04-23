@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 
 #include <topo_list.h>
 #include <topo_prop.h>
+#include <topo_method.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,19 +54,6 @@ typedef struct topo_nodehash {
 	topo_mod_t *th_enum;		/* enumerator module */
 	topo_range_t th_range;		/* instance ranges for nodes */
 } topo_nodehash_t;
-
-typedef struct topo_imethod {
-	topo_list_t tim_list;		/* next/prev pointers */
-	pthread_mutex_t tim_lock;	/* method entry lock */
-	pthread_cond_t	tim_cv;		/* method entry cv */
-	uint_t tim_busy;		/* method entry busy indicator */
-	char *tim_name;			/* Method name */
-	topo_version_t tim_version;	/* Method version */
-	topo_stability_t tim_stability;	/* SMI stability of method */
-	char *tim_desc;			/* Method description */
-	topo_method_f *tim_func;	/* Method function */
-	struct topo_mod *tim_mod;	/* Ptr to controlling module */
-} topo_imethod_t;
 
 struct topo_node {
 	pthread_mutex_t	tn_lock;	/* lock protecting members */
@@ -101,8 +89,9 @@ struct topo_walk {
 	struct topo_hdl *tw_thp;	/* Topo handle pointer */
 	struct topo_node *tw_root;	/* Root node of current walk */
 	struct topo_node *tw_node;	/* Current walker node */
-	topo_walk_cb_t tw_cb;		/* Walker callback function */
+	int (*tw_cb)();			/* Walker callback function */
 	void *tw_pdata;			/* Private callback data */
+	topo_mod_t *tw_mod;		/* module if walking from plugin */
 };
 
 typedef struct topo_alloc {
@@ -148,6 +137,8 @@ extern tnode_t *topo_node_lookup(tnode_t *, const char *, topo_instance_t);
 extern int topo_node_hash(topo_nodehash_t *, topo_instance_t);
 
 extern int topo_walk_bottomup(topo_walk_t *, int);
+extern topo_walk_t *topo_node_walk_init(topo_hdl_t *, topo_mod_t *, tnode_t *,
+    topo_walk_cb_t, void *, int *);
 
 #ifdef __cplusplus
 }

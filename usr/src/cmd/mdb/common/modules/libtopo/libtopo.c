@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -332,6 +332,19 @@ find_tree_root(uintptr_t addr, const void *data, void *arg)
 	return (WALK_NEXT);
 }
 
+static void
+dump_propmethod(uintptr_t addr)
+{
+	topo_propmethod_t pm;
+
+	if (mdb_vread(&pm, sizeof (pm), addr) != sizeof (pm)) {
+		mdb_warn("failed to read topo_propmethod at %p", addr);
+		return;
+	}
+
+	mdb_printf("       method: %-32s version: %-16s args: %p\n",
+	    pm.tpm_name, pm.tpm_version, pm.tpm_args);
+}
 
 /*
  * Dump the given property value. For the actual property values
@@ -373,6 +386,10 @@ dump_propval(uintptr_t addr, const void *data, void *arg)
 		default: type = "unknown type";
 	}
 	mdb_printf("    %-32s %-16s value: %p\n", name, type, pval.tp_val);
+
+	if (pval.tp_method != NULL)
+		dump_propmethod((uintptr_t)pval.tp_method);
+
 	return (WALK_NEXT);
 }
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,17 +39,23 @@
  * may change at anytime and are protected by a per-property locking
  * strategy.
  *
- * Enumerator plugin modules may also safely access node data.  Enumeration
- * occurs only during topo_snap_hold() where a per-topo_hdl_t lock prevents
- * multi-threaded access to the topology trees.
+ * Enumerator plugin modules may also safely access topology nodes within their
+ * scope of operation: the parent node passed into the enumeration op or those
+ * nodes created by the enumerator.  Enumeration occurs only during
+ * topo_snap_hold() where a per-topo_hdl_t lock prevents multi-threaded access
+ * to the topology trees.
  *
- * Like tree walking functions, method plugin modules have access to read-only
- * node data but may make changes to property information.
+ * Enumerator method operation functions may safely access and change topology
+ * node property data, and contruct or destroy child nodes for the node
+ * on which the operation applies.  The method may also be called to destroy
+ * the node for which the method operation is called.  This permits
+ * dynamic topology tree snapshots and partial enumerations for branches that
+ * may not be needed right away.
  *
  * Node Interfaces
  *
- * Nodes are created when an enumerator calls topo_node_bind().  Prior to the
- * call to topo_node_bind(), the caller should have reserved a range of
+ * Nodes are created when an enumerator calls topo_node_bind().  Prior to
+ * calling topo_node_bind(), the enumerator should have reserved a range of
  * node instances with topo_node_range_create().  topo_node_range_create()
  * does not allocate any node resources but creates the infrastruture
  * required for a fully populated topology level.  This allows enumerators
@@ -58,19 +64,36 @@
  * plugin.  Only when the resource has been confirmed to exist should
  * the node be bound.
  *
- * Node range and node linkage is only performed during enumeration when it
- * is safe to change node hash lists and next pointers. Nodes and node ranges
- * are deallocated when all references to the node have been released:
+ * Node range and node linkage and unlinkage is performed during enumeration and
+ * method operations when it is safe to change node hash lists. Nodes and node
+ * ranges are deallocated when all references to the node have been released:
  * last walk completes and topo_snap_rele() is called.
  *
  * Node Hash/Ranges
  *
  * Each parent node may have one or more ranges of child nodes.  Each range
- * serves as a hash list of like sibling nodes all with the same name but
+ * is uniquely named and serves as a hash list of like sibling nodes with
  * different instance numbers.  A parent may have more than one node hash
  * (child range). If that is the case, the hash lists are strung together to
  * form sibling relationships between ranges.  Hash/Ranges are sparsely
  * populated with only nodes that have represented resources in the system.
+ *
+ *	_________________
+ *	|		|
+ *      |   tnode_t	|    -----------------------------
+ *      |      tn_phash ---> |  topo_nodehash_t          |
+ *      |     (children)|    |     th_nodearr (instances)|
+ *      -----------------    |     -------------------   |
+ *                           |  ---| 0 | 1  | ...| N |   |
+ *                           |  |  -------------------   |  -------------------
+ *                           |  |  th_list (siblings) ----->| topo_nodehash_t |
+ *                           |  |                        |  -------------------
+ *                           ---|-------------------------
+ *                              |
+ *                              v
+ *                           -----------
+ *                           | tnode_t |
+ *                           -----------
  */
 
 #include <assert.h>
@@ -515,4 +538,50 @@ int
 topo_node_unusable(tnode_t *node)
 {
 	return (0);
+}
+
+topo_walk_t *
+topo_node_walk_init(topo_hdl_t *thp, topo_mod_t *mod, tnode_t *node,
+    int (*cb_f)(), void *pdata, int *errp)
+{
+	tnode_t *child;
+	topo_walk_t *wp;
+
+	topo_node_hold(node);
+
+	if ((wp = topo_hdl_zalloc(thp, sizeof (topo_walk_t))) == NULL) {
+		*errp = ETOPO_NOMEM;
+		topo_node_rele(node);
+		return (NULL);
+	}
+
+	/*
+	 * If this is the root of the scheme tree, start with the first
+	 * child
+	 */
+	topo_node_lock(node);
+	if (node->tn_state & TOPO_NODE_ROOT) {
+		if ((child = topo_child_first(node)) == NULL) {
+			/* Nothing to walk */
+			*errp = ETOPO_WALK_EMPTY;
+			topo_node_unlock(node);
+			topo_node_rele(node);
+			return (NULL);
+		}
+		topo_node_unlock(node);
+		topo_node_hold(child);
+		wp->tw_node = child;
+	} else {
+		topo_node_unlock(node);
+		topo_node_hold(child);
+		wp->tw_node = node;
+	}
+
+	wp->tw_root = node;
+	wp->tw_cb = cb_f;
+	wp->tw_pdata = pdata;
+	wp->tw_thp = thp;
+	wp->tw_mod = mod;
+
+	return (wp);
 }

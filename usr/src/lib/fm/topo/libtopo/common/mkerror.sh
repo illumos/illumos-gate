@@ -34,7 +34,7 @@ input="`cat`"
 if [ $1 = "liberrors" ] ; then
 echo "\
 /*\n\
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.\n\
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.\n\
  * Use is subject to license terms.\n\
  */\n\
 \n\
@@ -111,6 +111,41 @@ echo "\
 \n\
 static const int _topo_nmethoderrstrs =\n\
     sizeof (_topo_methoderrstrs) / sizeof (_topo_methoderrstrs[0]);"
+
+elif [ $1 = "fmrierrors" ] ; then
+
+echo "\
+\n\
+static const char *const _topo_fmrierrstrs[] = {"
+
+pattern='^[ ]*ETOPO_FMRI_[A-Z0-9_]*.*\* \(.*\) \*.*'
+replace='	"\1",'
+
+echo "$input" | sed -n "s/$pattern/$replace/p" || exit 1
+
+echo "\
+};\n\
+\n\
+static const int _topo_nfmrierrstrs =\n\
+    sizeof (_topo_fmrierrstrs) / sizeof (_topo_fmrierrstrs[0]);"
+
+elif [ $1 = "hdlerrors" ] ; then
+
+echo "\
+\n\
+static const char *const _topo_hdlerrstrs[] = {"
+
+pattern='^[ ]*ETOPO_HDL_[A-Z0-9_]*.*\* \(.*\) \*.*'
+replace='	"\1",'
+
+echo "$input" | sed -n "s/$pattern/$replace/p" || exit 1
+
+echo "\
+};\n\
+\n\
+static const int _topo_nhdlerrstrs =\n\
+    sizeof (_topo_hdlerrstrs) / sizeof (_topo_hdlerrstrs[0]);"
+
 else
 
 echo "\
@@ -162,7 +197,13 @@ topo_strerror(int err)
 		s = _topo_properrstrs[err - ETOPO_PROP_UNKNOWN];
 	else if (err >= ETOPO_METHOD_UNKNOWN && (err - ETOPO_METHOD_UNKNOWN) <
 	    _topo_nmethoderrstrs)
-		s = _topo_methoderrstrs[err - ETOPO_METHOD_UNKNOWN];
+		s = _topo_methoderrstrs[err - ETOPO_PROP_UNKNOWN];
+	else if (err >= ETOPO_HDL_UNKNOWN && (err - ETOPO_HDL_UNKNOWN) <
+	    _topo_nhdlerrstrs)
+		s = _topo_hdlerrstrs[err - ETOPO_PROP_UNKNOWN];
+	else if (err >= ETOPO_FMRI_UNKNOWN && (err - ETOPO_FMRI_UNKNOWN) <
+	    _topo_nfmrierrstrs)
+		s = _topo_fmrierrstrs[err - ETOPO_PROP_UNKNOWN];
 	else
 		s = _topo_errstrs[0];
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,6 +87,8 @@ extern char *topo_search_path(topo_mod_t *, const char *, const char *);
 
 extern void topo_fmristr_build(ssize_t *, char *, size_t, char *, char *,
     char *);
+
+extern int topo_walk_byid(topo_walk_t *wp, const char *name, topo_instance_t);
 
 #ifdef __cplusplus
 }

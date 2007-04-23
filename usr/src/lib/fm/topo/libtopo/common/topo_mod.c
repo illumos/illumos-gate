@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,11 +29,15 @@
  * Topology Plugin Modules
  *
  * Topology plugin modules are shared libraries that are dlopen'd and
- * used to enumerate resources in the system.
- * They are loaded by our builtin scheme-specific plugins or other modules
- * to enumerate and create nodes for resources that are present in the system.
- * They may also export a set of resource (node) specific methods that can be
- * called on node-by-node basis.
+ * used to enumerate resources in the system and export per-node method
+ * operations.
+ *
+ * They are loaded by our builtin scheme-specific plugins, other modules or
+ * by processing a topo map XML file to enumerate and create nodes for
+ * resources that are present in the system.  They may also export a set of
+ * topology node specific methods that can be invoked directly via
+ * topo_method_invoke() or indirectly via the
+ * topo_prop_get* family of functions to access dynamic property data.
  *
  * Module Plugin API
  *
@@ -45,20 +49,39 @@
  *
  * In its enumeration callback routine, the module should search for resources
  * within its realm of resposibility and create any node ranges,
- * topo_node_range_create() or nodes, topo_node_bind().  The Enumerator
+ * topo_node_range_create() and nodes, topo_node_bind().  The Enumerator
  * module is handed a node to which it may begin attaching additional
- * topology nodes.
+ * topology nodes.  The enumerator may only access those nodes within its
+ * current scope of operation: the node passed into its enumeration op and
+ * any nodes it creates during enumeration.  If the enumerator requires walker-
+ * style access to these nodes, it must use
+ * topo_mod_walk_init()/topo_walk_step()/topo_walk_fini().
  *
  * If additional helper modules need to be loaded to complete the enumeration
  * the module may do so by calling topo_mod_load().  Enumeration may then
  * continue with the module handing off enumeration to its helper module
- * by calling topo_mod_enumerate().
+ * by calling topo_mod_enumerate().  Similarly, a module may call
+ * topo_mod_enummap() to kick-off enumeration according to a given XML
+ * topology map file.  A module *may* not cause re-entrance to itself
+ * via either of these interfaces.  If re-entry is detected an error
+ * will be returned (ETOPO_ENUM_RECURS).
  *
  * If the module registers a release callback, it will be called on a node
  * by node basis during topo_snap_rele().  Any private node data may be
  * deallocated or methods unregistered at that time.  Global module data
- * should be clean-up before or at the time that the module _topo_fini
+ * should be cleaned up before or at the time that the module _topo_fini
  * entry point is called.
+ *
+ * Module entry points and method invocations are guaranteed to be
+ * single-threaded for a given snapshot handle.  Applications may have
+ * more than one topology snapshot open at a time.  This means that the
+ * module operations and methods may be called for different module handles
+ * (topo_mod_t) asynchronously.  The enumerator should not use static or
+ * global data structures that may become inconsistent in this situation.
+ * Method operations may be re-entrant if the module invokes one of its own
+ * methods directly or via dynamic property access.  Caution should be
+ * exercised with method operations to insure that data remains consistent
+ * within the module and that deadlocks can not occur.
  */
 
 #include <pthread.h>
@@ -157,7 +180,7 @@ topo_mod_register(topo_mod_t *mod, const topo_modinfo_t *mip,
 	if (version != TOPO_VERSION)
 		return (set_register_error(mod, EMOD_VER_ABI));
 
-	if ((mod->tm_info = topo_mod_alloc(mod, sizeof (topo_imodinfo_t)))
+	if ((mod->tm_info = topo_mod_zalloc(mod, sizeof (topo_imodinfo_t)))
 	    == NULL)
 		return (set_register_error(mod, EMOD_NOMEM));
 	if ((mod->tm_info->tmi_ops = topo_mod_alloc(mod,
@@ -724,4 +747,18 @@ topo_mod_auth(topo_mod_t *mod, tnode_t *pnode)
 	}
 
 	return (auth);
+}
+
+topo_walk_t *
+topo_mod_walk_init(topo_mod_t *mod, tnode_t *node, topo_mod_walk_cb_t cb_f,
+    void *pdata, int *errp)
+{
+	topo_walk_t *wp;
+	topo_hdl_t *thp = mod->tm_hdl;
+
+	if ((wp = topo_node_walk_init(thp, mod, node, (int (*)())cb_f, pdata,
+	    errp)) == NULL)
+		return (NULL);
+
+	return (wp);
 }

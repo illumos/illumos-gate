@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,10 +35,12 @@ SUNWprivate {
 	topo_fmri_create;
 	topo_fmri_expand;
 	topo_fmri_fru;
-	topo_fmri_invoke;
+	topo_fmri_getpgrp;
+	topo_fmri_getprop;
 	topo_fmri_label;
 	topo_fmri_nvl2str;
 	topo_fmri_present;
+	topo_fmri_setprop;
 	topo_fmri_str2nvl;
 	topo_fmri_unusable;
 	topo_hdl_alloc;
@@ -104,6 +106,7 @@ SUNWprivate {
 	topo_open;
 	topo_pgroup_create;
 	topo_pgroup_destroy;
+	topo_pgroup_info;
 	topo_prop_get_fmri;
 	topo_prop_get_int32;
 	topo_prop_get_int64;
@@ -116,8 +119,11 @@ SUNWprivate {
 	topo_prop_get_uint64_array;
 	topo_prop_get_string_array;
 	topo_prop_get_fmri_array;
+	topo_prop_getprop;
 	topo_prop_getprops;
 	topo_prop_inherit;
+	topo_prop_method_register;
+	topo_prop_method_unregister;
 	topo_prop_set_fmri;
 	topo_prop_set_int32;
 	topo_prop_set_int64;
@@ -130,6 +136,7 @@ SUNWprivate {
 	topo_prop_set_uint64_array;
 	topo_prop_set_string_array;
 	topo_prop_set_fmri_array;
+	topo_prop_setprop;
 	topo_name2stability;
 	topo_stability2name;
 	topo_snap_hold;

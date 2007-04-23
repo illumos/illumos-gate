@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -69,5 +69,22 @@
 	topo_method_unregister = FUNCTION extern;
 	topo_method_unregister_all = FUNCTION extern;
 	topo_method_invoke = FUNCTION extern;
+
+	topo_prop_method_register = FUNCTION extern;
+	topo_prop_method_unregister = FUNCTION extern;
+	topo_prop_set_int32 = FUNCTION extern;
+	topo_prop_set_uint32 = FUNCTION extern;
+	topo_prop_set_int64 = FUNCTION extern;
+	topo_prop_set_uint64 = FUNCTION extern;
+	topo_prop_set_string = FUNCTION extern;
+	topo_prop_set_fmri = FUNCTION extern;
+	topo_prop_set_int32_array = FUNCTION extern;
+	topo_prop_set_uint32_array = FUNCTION extern;
+	topo_prop_set_int64_array = FUNCTION extern;
+	topo_prop_set_uint64_array = FUNCTION extern;
+	topo_prop_set_string_array = FUNCTION extern;
+	topo_prop_set_fmri_array = FUNCTION extern;
+	topo_prop_inherit = FUNCTION extern;
+	topo_pgroup_create = FUNCTION extern;
 
 };

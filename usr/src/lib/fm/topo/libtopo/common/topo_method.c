@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,12 +42,11 @@
 #include <topo_subr.h>
 #include <topo_tree.h>
 
-static topo_imethod_t *
+topo_imethod_t *
 topo_method_lookup(tnode_t *node, const char *name)
 {
 	topo_imethod_t *mp;
 
-	topo_node_lock(node);
 	for (mp = topo_list_next(&node->tn_methods); mp != NULL;
 	    mp = topo_list_next(mp)) {
 		if (strcmp(name, mp->tim_name) == 0) {
@@ -55,7 +54,6 @@ topo_method_lookup(tnode_t *node, const char *name)
 			return (mp);
 		}
 	}
-	topo_node_unlock(node);
 
 	return (NULL);
 }
@@ -99,6 +97,8 @@ set_methregister_error(topo_mod_t *mod, tnode_t *node, topo_imethod_t *mp,
 		topo_mod_free(mod, mp, sizeof (topo_imethod_t));
 	}
 
+	topo_node_unlock(node);
+
 	topo_dprintf(mod->tm_hdl, TOPO_DBG_ERR,
 	    "method registration failed for %s: %s\n",
 	    mod->tm_name, topo_strerror(err));
@@ -117,8 +117,11 @@ topo_method_register(topo_mod_t *mod, tnode_t *node, const topo_method_t *mp)
 	 */
 	for (meth = &mp[0]; meth->tm_name != NULL; meth++) {
 
-		if (topo_method_lookup(node, meth->tm_name) != NULL)
+		topo_node_lock(node);
+		if (topo_method_lookup(node, meth->tm_name) != NULL) {
+			topo_node_unlock(node);
 			continue;
+		}
 
 		if (meth->tm_stability < TOPO_STABILITY_INTERNAL ||
 		    meth->tm_stability > TOPO_STABILITY_MAX ||
@@ -129,17 +132,17 @@ topo_method_register(topo_mod_t *mod, tnode_t *node, const topo_method_t *mp)
 		imp = topo_mod_zalloc(mod, sizeof (topo_imethod_t));
 		if (imp == NULL)
 			return (set_methregister_error(mod, node, imp,
-			    ETOPO_NOMEM));
+			    ETOPO_METHOD_NOMEM));
 
 		if ((imp->tim_name = topo_mod_strdup(mod, meth->tm_name))
 		    == NULL)
 			return (set_methregister_error(mod, node, imp,
-			    ETOPO_NOMEM));
+			    ETOPO_METHOD_NOMEM));
 
 		if ((imp->tim_desc = topo_mod_strdup(mod, meth->tm_desc))
 		    == NULL)
 			return (set_methregister_error(mod, node, imp,
-			    ETOPO_NOMEM));
+			    ETOPO_METHOD_NOMEM));
 
 
 		imp->tim_stability = meth->tm_stability;
@@ -147,7 +150,6 @@ topo_method_register(topo_mod_t *mod, tnode_t *node, const topo_method_t *mp)
 		imp->tim_func = meth->tm_func;
 		imp->tim_mod = mod;
 
-		topo_node_lock(node);
 		topo_list_append(&node->tn_methods, imp);
 		topo_node_unlock(node);
 
@@ -208,25 +210,22 @@ topo_method_unregister_all(topo_mod_t *mod, tnode_t *node)
 
 
 int
-topo_method_invoke(tnode_t *node, const char *method,
+topo_method_call(tnode_t *node, const char *method,
     topo_version_t version, nvlist_t *in, nvlist_t **out, int *err)
 {
 	int rc;
 	topo_imethod_t *mp;
 
-	topo_node_hold(node);
 	for (mp = topo_list_next(&node->tn_methods); mp != NULL;
 	    mp = topo_list_next(mp)) {
 		if (strcmp(method, mp->tim_name) != 0)
 			continue;
 
 		if (version < mp->tim_version) {
-			*err = ETOPO_VER_NEW;
-			topo_node_rele(node);
+			*err = ETOPO_METHOD_VERNEW;
 			return (-1);
 		} else if (version > mp->tim_version) {
-			*err = ETOPO_VER_OLD;
-			topo_node_rele(node);
+			*err = ETOPO_METHOD_VEROLD;
 			return (-1);
 		}
 
@@ -240,14 +239,23 @@ topo_method_invoke(tnode_t *node, const char *method,
 		}
 		topo_method_exit(mp);
 
-		topo_node_rele(node);
-
 		return (rc);
 
 	}
-	topo_node_rele(node);
 
 	*err = ETOPO_METHOD_NOTSUP;
-
 	return (-1);
+}
+
+int
+topo_method_invoke(tnode_t *node, const char *method,
+    topo_version_t version, nvlist_t *in, nvlist_t **out, int *err)
+{
+	int rc;
+
+	topo_node_hold(node);
+	rc = topo_method_call(node, method, version, in, out, err);
+	topo_node_rele(node);
+
+	return (rc);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,14 +54,13 @@
  * which our current walk falls.  The callback function is passed in during
  * calls to topo_walk_init() and used throughout the walk_step of the
  * scheme tree.  At any time, the callback may terminate the walk by returning
- * TOPO_WALK_TERMINATE or TOPO_WALK_ERR.  TOPO_WALK_NEXT will continue the
- * walk.
+ * TOPO_WALK_TERMINATE or TOPO_WALK_ERR.  TOPO_WALK_NEXT will continue the walk.
  *
- * Walks through the tree may be breadth first or depth first by
+ * The type of walk through the tree may be breadth first or depth first by
  * respectively passing in TOPO_WALK_SIBLING or TOPO_WALK_CHILD to
- * the topo_walk_step() function.  Topology nodes associated with an
- * outstanding walk are held in place and will not be deallocated until
- * the walk through that node completes.
+ * the topo_walk_step() function.  Topology nodes
+ * associated with an outstanding walk are held in place and will not be
+ * deallocated until the walk through that node completes.
  *
  * Once the walk has terminated, the walking process should call
  * topo_walk_fini() to clean-up resources created in topo_walk_init()
@@ -163,10 +162,8 @@ topo_open(int version, const char *rootdir, int *errp)
 
 	(void) pthread_mutex_init(&thp->th_lock, NULL);
 
-	if ((tap = topo_zalloc(sizeof (topo_alloc_t), 0)) == NULL) {
-		topo_close(thp);
+	if ((tap = topo_zalloc(sizeof (topo_alloc_t), 0)) == NULL)
 		return (set_open_errno(thp, errp, ETOPO_NOMEM));
-	}
 
 	/*
 	 * Install default allocators
@@ -230,10 +227,8 @@ topo_open(int version, const char *rootdir, int *errp)
 		thp->th_product = topo_hdl_strdup(thp, thp->th_platform);
 	}
 
-	if (thp->th_rootdir == NULL) {
-		topo_close(thp);
+	if (thp->th_rootdir == NULL)
 		return (set_open_errno(thp, errp, ETOPO_NOMEM));
-	}
 
 	dbflags	 = getenv("TOPO_DEBUG");
 	dbout = getenv("TOPO_DEBUG_OUT");
@@ -445,7 +440,6 @@ topo_walk_t *
 topo_walk_init(topo_hdl_t *thp, const char *scheme, topo_walk_cb_t cb_f,
     void *pdata, int *errp)
 {
-	tnode_t *child;
 	ttree_t *tp;
 	topo_walk_t *wp;
 
@@ -459,31 +453,9 @@ topo_walk_init(topo_hdl_t *thp, const char *scheme, topo_walk_cb_t cb_f,
 			 */
 			assert(tp->tt_root != NULL);
 
-			topo_node_hold(tp->tt_root);
-
-			/*
-			 * Nothing to walk
-			 */
-			if ((child = topo_child_first(tp->tt_root)) == NULL) {
-				*errp = ETOPO_WALK_EMPTY;
-				topo_node_rele(tp->tt_root);
+			if ((wp = topo_node_walk_init(thp, NULL, tp->tt_root,
+			    cb_f, pdata, errp)) == NULL) /* errp set */
 				return (NULL);
-			}
-
-			if ((wp	= topo_hdl_zalloc(thp, sizeof (topo_walk_t)))
-			    == NULL) {
-				*errp = ETOPO_NOMEM;
-				topo_node_rele(tp->tt_root);
-				return (NULL);
-			}
-
-			topo_node_hold(child);
-
-			wp->tw_root = tp->tt_root;
-			wp->tw_node = child;
-			wp->tw_cb = cb_f;
-			wp->tw_pdata = pdata;
-			wp->tw_thp = thp;
 
 			return (wp);
 		}
@@ -501,12 +473,16 @@ step_child(tnode_t *cnp, topo_walk_t *wp, int bottomup)
 
 	nnp = topo_child_first(cnp);
 
-	if (nnp == NULL)
+	if (nnp == NULL) {
+		topo_dprintf(wp->tw_thp, TOPO_DBG_WALK,
+		    "step_child: TOPO_WALK_TERMINATE for %s=%d\n",
+		    cnp->tn_name, cnp->tn_instance);
 		return (TOPO_WALK_TERMINATE);
+	}
 
 	topo_dprintf(wp->tw_thp, TOPO_DBG_WALK,
-	    "walk through child node %s=%d\n",
-	    nnp->tn_name, nnp->tn_instance);
+	    "step_child: walk through node %s=%d to %s=%d\n",
+	    cnp->tn_name, cnp->tn_instance, nnp->tn_name, nnp->tn_instance);
 
 	topo_node_hold(nnp); /* released on return from walk_step */
 	wp->tw_node = nnp;
@@ -526,12 +502,16 @@ step_sibling(tnode_t *cnp, topo_walk_t *wp, int bottomup)
 
 	nnp = topo_child_next(cnp->tn_parent, cnp);
 
-	if (nnp == NULL)
+	if (nnp == NULL) {
+		topo_dprintf(wp->tw_thp, TOPO_DBG_WALK,
+		    "step_sibling: TOPO_WALK_TERMINATE for %s=%d\n",
+		    cnp->tn_name, cnp->tn_instance);
 		return (TOPO_WALK_TERMINATE);
+	}
 
 	topo_dprintf(wp->tw_thp, TOPO_DBG_WALK,
-	    "walk through sibling node %s=%d\n",
-	    nnp->tn_name, nnp->tn_instance);
+	    "step_sibling: through sibling node %s=%d to %s=%d\n",
+	    cnp->tn_name, cnp->tn_instance, nnp->tn_name, nnp->tn_instance);
 
 	topo_node_hold(nnp); /* released on return from walk_step */
 	wp->tw_node = nnp;
@@ -539,6 +519,29 @@ step_sibling(tnode_t *cnp, topo_walk_t *wp, int bottomup)
 		status = topo_walk_bottomup(wp, TOPO_WALK_CHILD);
 	else
 		status = topo_walk_step(wp, TOPO_WALK_CHILD);
+
+	return (status);
+}
+
+int
+topo_walk_byid(topo_walk_t *wp, const char *name, topo_instance_t inst)
+{
+	int status;
+	tnode_t *nnp, *cnp;
+
+	cnp = wp->tw_node;
+	nnp = topo_node_lookup(cnp, name, inst);
+	if (nnp == NULL)
+		return (TOPO_WALK_TERMINATE);
+
+	topo_node_hold(nnp);
+	wp->tw_node = nnp;
+	if (wp->tw_mod != NULL)
+		status = wp->tw_cb(wp->tw_mod, nnp, wp->tw_pdata);
+	else
+		status = wp->tw_cb(wp->tw_thp, nnp, wp->tw_pdata);
+	topo_node_rele(nnp);
+	wp->tw_node = cnp;
 
 	return (status);
 }
@@ -555,7 +558,7 @@ topo_walk_step(topo_walk_t *wp, int flag)
 	}
 
 	/*
-	 * End of the line
+	 * No more nodes to walk
 	 */
 	if (cnp == NULL) {
 		topo_dprintf(wp->tw_thp, TOPO_DBG_WALK,
@@ -564,30 +567,32 @@ topo_walk_step(topo_walk_t *wp, int flag)
 		return (TOPO_WALK_TERMINATE);
 	}
 
-	topo_dprintf(wp->tw_thp, TOPO_DBG_WALK,
-	    "%s walk_step through node %s=%d\n",
-	    (flag == TOPO_WALK_CHILD ? "TOPO_WALK_CHILD" : "TOPO_WALK_SIBLING"),
-	    cnp->tn_name, cnp->tn_instance);
 
-	if ((status = wp->tw_cb(wp->tw_thp, cnp, wp->tw_pdata))
-	    != TOPO_WALK_NEXT) {
+	if (wp->tw_mod != NULL)
+		status = wp->tw_cb(wp->tw_mod, cnp, wp->tw_pdata);
+	else
+		status = wp->tw_cb(wp->tw_thp, cnp, wp->tw_pdata);
+
+	/*
+	 * Walker callback says we're done
+	 */
+	if (status != TOPO_WALK_NEXT) {
 		topo_node_rele(cnp);
 		return (status);
 	}
 
-	if (flag == TOPO_WALK_CHILD)
-		status = step_child(cnp, wp, 0);
-	else
-		status = step_sibling(cnp, wp, 0);
+	flag == TOPO_WALK_CHILD ? (status = step_child(cnp, wp, 0)) :
+	    (status = step_sibling(cnp, wp, 0));
 
 	/*
-	 * End of the walk, try next child or sibling
+	 * No more nodes in this hash, skip to next node hash by stepping
+	 * to next sibling (depth-first walk) or next child (breadth-first
+	 * walk).
 	 */
 	if (status == TOPO_WALK_TERMINATE) {
-		if (flag == TOPO_WALK_CHILD)
-			status = step_sibling(cnp, wp, 0);
-		else
-			status = step_child(cnp, wp, 0);
+
+		flag == TOPO_WALK_CHILD ? (status = step_sibling(cnp, wp, 0)) :
+		    (status = step_child(cnp, wp, 0));
 	}
 
 	topo_node_rele(cnp); /* done with current node */

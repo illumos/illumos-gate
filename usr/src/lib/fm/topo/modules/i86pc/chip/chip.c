@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -578,34 +578,20 @@ cs_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *mc,
  *   asru-physaddr or asru-offset then these are includes in the "mem" scheme
  *   asru as additional membersl physaddr and offset
  */
-/*ARGSUSED*/
 static int
-mem_asru_compute(topo_mod_t *mod, tnode_t *node, topo_version_t version,
-    nvlist_t *in, nvlist_t **out)
+mem_asru_create(topo_mod_t *mod, nvlist_t *fmri, nvlist_t **asru)
 {
 	int incl_pa = 0, incl_offset = 0;
-	nvlist_t *hcsp, *asru;
+	nvlist_t *hcsp, *ap;
+	char *unum, *scheme;
 	uint64_t pa, offset;
-	char *scheme, *unum;
 	int err;
 
-	if (strcmp(topo_node_name(node), RANK_NODE_NAME) != 0 &&
-	    strcmp(topo_node_name(node), DIMM_NODE_NAME) != 0)
+	if (nvlist_lookup_string(fmri, FM_FMRI_SCHEME, &scheme) != 0 ||
+	    strcmp(scheme, FM_FMRI_SCHEME_HC) != 0)
 		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
 
-	if (in == NULL) {
-		if (topo_prop_get_fmri(node, TOPO_PGROUP_PROTOCOL,
-		    TOPO_PROP_ASRU, out, &err) == 0)
-			return (0);
-		else
-			return (topo_mod_seterrno(mod, err));
-	} else {
-		if (nvlist_lookup_string(in, FM_FMRI_SCHEME, &scheme) != 0 ||
-		    strcmp(scheme, FM_FMRI_SCHEME_HC) != 0)
-			return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
-	}
-
-	if (nvlist_lookup_nvlist(in, FM_FMRI_HC_SPECIFIC, &hcsp) == 0) {
+	if (nvlist_lookup_nvlist(fmri, FM_FMRI_HC_SPECIFIC, &hcsp) == 0) {
 		if (nvlist_lookup_uint64(hcsp, "asru-"FM_FMRI_MEM_PHYSADDR,
 		    &pa) == 0)
 			incl_pa = 1;
@@ -615,28 +601,75 @@ mem_asru_compute(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 			incl_offset = 1;
 	}
 
-	/* use 'in' to obtain resource path;  could use node resource */
-	if (topo_mod_nvl2str(mod, in, &unum) < 0)
-		return (topo_mod_seterrno(mod, err));
+	/* use 'fmri' to obtain resource path;  could use node resource */
+	if (topo_mod_nvl2str(mod, fmri, &unum) < 0)
+		return (-1);  /* mod errno set */
 
-	if ((asru = mem_fmri_create(mod)) == NULL) {
+	if ((ap = mem_fmri_create(mod)) == NULL) {
 		topo_mod_strfree(mod, unum);
 		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
 	}
 
-	err = nvlist_add_string(asru, FM_FMRI_MEM_UNUM, unum);
+	err = nvlist_add_string(ap, FM_FMRI_MEM_UNUM, unum);
 	if (incl_pa)
-		err |= nvlist_add_uint64(asru, FM_FMRI_MEM_PHYSADDR, pa);
+		err |= nvlist_add_uint64(ap, FM_FMRI_MEM_PHYSADDR, pa);
 	if (incl_offset)
-		err |= nvlist_add_uint64(asru, FM_FMRI_MEM_OFFSET, offset);
+		err |= nvlist_add_uint64(ap, FM_FMRI_MEM_OFFSET, offset);
 
 	topo_mod_strfree(mod, unum);
 	if (err != 0) {
-		nvlist_free(asru);
+		nvlist_free(ap);
 		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
 	}
 
-	*out = asru;
+	*asru = ap;
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+mem_asru_compute(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	nvlist_t *asru;
+	nvlist_t *args, *pargs;
+	int err;
+
+	if (strcmp(topo_node_name(node), RANK_NODE_NAME) != 0 &&
+	    strcmp(topo_node_name(node), DIMM_NODE_NAME) != 0)
+		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
+
+	if (nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &args) != 0)
+		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
+
+	if ((err = nvlist_lookup_nvlist(in, TOPO_PROP_PARGS, &pargs)) != 0) {
+		if (err == ENOENT) {
+			if (topo_mod_nvdup(mod, args, &asru) < 0)
+				return (topo_mod_seterrno(mod, EMOD_NOMEM));
+		} else {
+			return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
+		}
+	} else if (mem_asru_create(mod, pargs, &asru) != 0) {
+		return (-1); /* mod errno already set */
+	}
+
+	if (topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) < 0) {
+		nvlist_free(asru);
+		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+	}
+
+	err = nvlist_add_string(*out, TOPO_PROP_VAL_NAME, TOPO_PROP_ASRU);
+	err |= nvlist_add_uint32(*out, TOPO_PROP_VAL_TYPE, TOPO_TYPE_FMRI);
+	err |= nvlist_add_nvlist(*out, TOPO_PROP_VAL_VAL, asru);
+	if (err != 0) {
+		nvlist_free(asru);
+		nvlist_free(*out);
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+
+	nvlist_free(asru);
+
 	return (0);
 }
 
@@ -705,12 +738,12 @@ rank_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *dimmnvl, nvlist_t *auth)
 		 * the asru is just that page.  Hence the dual preconstructed
 		 * and computed ASRU.
 		 */
-		(void) topo_node_asru_set(ranknode, cs_fmri[csnumarr[i]],
-			    TOPO_ASRU_COMPUTE, &err);
-
 		if (topo_method_register(mod, ranknode, rank_methods) < 0)
 			whinge(mod, &nerr, "rank_create: "
 			    "topo_method_register failed");
+
+		(void) topo_node_asru_set(ranknode, cs_fmri[csnumarr[i]],
+			    TOPO_ASRU_COMPUTE, &err);
 
 		(void) topo_pgroup_create(ranknode, &rank_pgroup, &err);
 
@@ -774,12 +807,10 @@ dimm_create(topo_mod_t *mod, tnode_t *pnode, const char *name, nvlist_t *mc,
 		}
 
 		/*
-		 * The asru is static but we prefer to publish it in the
-		 * "mem" scheme so call the compute method directly to
-		 * perform the conversion.
+		 * Use the mem computation method directly to publish the asru
+		 * in the "mem" scheme.
 		 */
-		if (mem_asru_compute(mod, dimmnode,
-		    TOPO_METH_ASRU_COMPUTE_VERSION, fmri, &asru) == 0) {
+		if (mem_asru_create(mod, fmri, &asru) == 0) {
 			(void) topo_node_asru_set(dimmnode, asru, 0, &err);
 			nvlist_free(asru);
 		} else {
@@ -820,7 +851,7 @@ mc_lookup_by_mcid(topo_mod_t *mod, topo_instance_t id)
 	void *buf = NULL;
 	uint8_t ver;
 
-	nvlist_t *nvl;
+	nvlist_t *nvl = NULL;
 	char path[64];
 	int fd, err;
 
@@ -860,6 +891,7 @@ mc_lookup_by_mcid(topo_mod_t *mod, topo_instance_t id)
 	(void) close(fd);
 	err = nvlist_unpack(buf, mcs.mcs_size, &nvl, 0);
 	topo_mod_free(mod, buf, mcs.mcs_size);
+
 
 	if (nvlist_lookup_uint8(nvl, MC_NVLIST_VERSTR, &ver) != 0) {
 		whinge(mod, NULL, "mc nvlist is not versioned\n");

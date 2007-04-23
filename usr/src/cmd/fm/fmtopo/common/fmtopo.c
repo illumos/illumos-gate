@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,10 +29,12 @@
 #include <sys/fm/protocol.h>
 #include <fm/libtopo.h>
 #include <ctype.h>
+#include <fnmatch.h>
 #include <limits.h>
 #include <strings.h>
 #include <stdio.h>
 #include <errno.h>
+#include <umem.h>
 #include <sys/param.h>
 
 #define	FMTOPO_EXIT_SUCCESS	0
@@ -44,63 +46,88 @@
 #define	ALL	"all"
 
 static const char *g_pname;
+static const char *g_fmri = NULL;
 
 static const char *opt_R = "/";
-static const char *opt_P = NULL;
 static const char *opt_s = FM_FMRI_SCHEME_HC;
+static const char optstr[] = "aCdeP:pR:s:StvVx";
 
 static int opt_e = 0;
 static int opt_d = 0;
 static int opt_V = 0;
 static int opt_p = 0;
+static int opt_S = 0;
+static int opt_t = 0;
 static int opt_x = 0;
+static int opt_all = 0;
+
+struct prop_args {
+	const char *group;
+	const char *prop;
+	const char *type;
+	const char *value;
+};
+
+static struct prop_args **pargs = NULL;
+static int pcnt = 0;
 
 static int
 usage(FILE *fp)
 {
 	(void) fprintf(fp,
-	    "Usage: %s [-edpvVx] [-Cdev] [-P properties] [-R root] "
-		    "[-s scheme]\n", g_pname);
+	    "Usage: %s [-CedpSVx] [-P group.property[=type:value]] "
+	    "[-R root] [-s scheme] [fmri]\n", g_pname);
 
 	(void) fprintf(fp,
 	    "\t-C  dump core after completing execution\n"
 	    "\t-d  set debug mode for libtopo modules\n"
 	    "\t-e  display FMRIs as paths using esc/eft notation\n"
-	    "\t-P  display of FMRI with the specified properties\n"
+	    "\t-P  get/set specified properties\n"
 	    "\t-p  display of FMRI protocol properties\n"
 	    "\t-R  set root directory for libtopo plug-ins and other files\n"
 	    "\t-s  display topology for the specified FMRI scheme\n"
+	    "\t-S  display FMRI status (present/usable)\n"
 	    "\t-V  set verbose mode\n"
 	    "\t-x  display a xml formatted topology\n");
 
 	return (FMTOPO_EXIT_USAGE);
 }
 
-static void
-print_fmri(topo_hdl_t *thp, tnode_t *node)
+static topo_type_t
+str2type(const char *tstr)
 {
-	int err;
-	char *name;
-	nvlist_t *fmri;
+	topo_type_t type;
 
-	if (topo_node_resource(node, &fmri, &err) < 0) {
-		(void) fprintf(stderr, "%s: failed to get fmri for %s=%d: %s\n",
-		    g_pname, topo_node_name(node),
-		    topo_node_instance(node), topo_strerror(err));
-		return;
+	if (tstr == NULL)
+		return (TOPO_TYPE_INVALID);
+
+	if (strcmp(tstr, "int32") == 0)
+		type = TOPO_TYPE_INT32;
+	else if (strcmp(tstr, "uint32") == 0)
+		type = TOPO_TYPE_UINT32;
+	else if (strcmp(tstr, "int64") == 0)
+		type = TOPO_TYPE_INT64;
+	else if (strcmp(tstr, "uint64") == 0)
+		type = TOPO_TYPE_UINT64;
+	else if (strcmp(tstr, "string") == 0)
+		type = TOPO_TYPE_STRING;
+	else if (strcmp(tstr, "fmri") == 0)
+		type = TOPO_TYPE_FMRI;
+	else {
+		type = TOPO_TYPE_INVALID;
 	}
 
-	if (topo_fmri_nvl2str(thp, fmri, &name, &err) < 0) {
-		(void) fprintf(stderr, "%s: failed to convert fmri for %s=%d "
-		    "to a string: %s\n", g_pname, topo_node_name(node),
-		    topo_node_instance(node), topo_strerror(err));
-		nvlist_free(fmri);
-		return;
-	}
+	return (type);
+}
 
-	(void) printf("%s\n", name);
+static void
+print_node(topo_hdl_t *thp, tnode_t *node, nvlist_t *nvl, const char *fmri)
+{
+	int err, ret;
 
-	if (opt_p) {
+	(void) printf("%s\n", (char *)fmri);
+
+	if (opt_p && !(pcnt > 0 || opt_V || opt_all)) {
 		char *aname = NULL, *fname = NULL, *lname = NULL;
 		nvlist_t *asru = NULL;
 		nvlist_t *fru = NULL;
@@ -131,9 +158,20 @@ print_fmri(topo_hdl_t *thp, tnode_t *node)
 			(void) printf("\tLabel: -\n");
 		}
 	}
-	nvlist_free(fmri);
 
-	topo_hdl_strfree(thp, name);
+	if (opt_S) {
+		if ((ret = topo_fmri_present(thp, nvl, &err)) < 0)
+			(void) printf("\tPresent: -\n");
+		else
+			(void) printf("\tPresent: %s\n",
+			    ret ? "true" : "false");
+
+		if ((ret = topo_fmri_unusable(thp, nvl, &err)) < 0)
+			(void) printf("\tUnusable: -\n");
+		else
+			(void) printf("\tUnusable: %s\n",
+			    ret ? "true" : "false");
+	}
 }
 
 static void
@@ -191,7 +229,7 @@ print_everstyle(tnode_t *node)
 }
 
 static void
-print_prop_nameval(topo_hdl_t *thp, nvlist_t *nvl, int skip)
+print_prop_nameval(topo_hdl_t *thp, nvlist_t *nvl)
 {
 	int err;
 	topo_type_t type;
@@ -217,12 +255,12 @@ print_prop_nameval(topo_hdl_t *thp, nvlist_t *nvl, int skip)
 	if ((pv_nvp = nvlist_next_nvpair(nvl, pv_nvp)) == NULL ||
 	    nvpair_name(pv_nvp) == NULL ||
 	    strcmp(nvpair_name(pv_nvp), TOPO_PROP_VAL_TYPE) != 0 ||
-	    nvpair_type(pv_nvp) != DATA_TYPE_INT32)  {
+	    nvpair_type(pv_nvp) != DATA_TYPE_UINT32)  {
 		(void) fprintf(stderr, "%s: malformed property type for %s\n",
 		    g_pname, propn);
 		return;
 	} else {
-		(void) nvpair_value_int32(pv_nvp, (int32_t *)&type);
+		(void) nvpair_value_uint32(pv_nvp, (uint32_t *)&type);
 	}
 
 	switch (type) {
@@ -242,8 +280,7 @@ print_prop_nameval(topo_hdl_t *thp, nvlist_t *nvl, int skip)
 		default: tstr = "unknown type";
 	}
 
-	if (!skip)
-		printf("    %-17s %-8s ", propn, tstr);
+	printf("    %-17s %-8s ", propn, tstr);
 
 	/*
 	 * Get property value
@@ -254,9 +291,6 @@ print_prop_nameval(topo_hdl_t *thp, nvlist_t *nvl, int skip)
 		    g_pname);
 		return;
 	}
-
-	if (skip)
-		return;
 
 	switch (nvpair_type(pv_nvp)) {
 		case DATA_TYPE_INT32: {
@@ -334,14 +368,27 @@ print_prop_nameval(topo_hdl_t *thp, nvlist_t *nvl, int skip)
 }
 
 static void
-print_pgroup(char *pgn, char *dstab, char *nstab, int32_t version, int skip)
+print_pgroup(topo_hdl_t *thp, tnode_t *node, const char *pgn, char *dstab,
+    char *nstab, int32_t version)
 {
+	int err;
 	char buf[30];
+	topo_pgroup_info_t *pgi = NULL;
 
-	if (skip)
+	if (pgn == NULL)
 		return;
 
-	if (!opt_V && strlen(pgn) > 30) {
+	if (node != NULL && (dstab == NULL || nstab == NULL || version == -1)) {
+		if ((pgi = topo_pgroup_info(node, pgn, &err)) != NULL) {
+			dstab = (char *)topo_stability2name(pgi->tpi_datastab);
+			nstab = (char *)topo_stability2name(pgi->tpi_namestab);
+			version = pgi->tpi_version;
+		}
+	}
+
+	if (dstab == NULL || nstab == NULL || version == -1) {
+		printf("  group: %-30s version: - stability: -/-\n", pgn);
+	} else if (!opt_V && strlen(pgn) > 30) {
 		(void) snprintf(buf, 26, "%s", pgn);
 		(void) snprintf(&buf[27], 4, "%s", DOTS);
 		printf("  group: %-30s version: %-3d stability: %s/%s\n",
@@ -350,70 +397,22 @@ print_pgroup(char *pgn, char *dstab, char *nstab, int32_t version, int skip)
 		printf("  group: %-30s version: %-3d stability: %s/%s\n",
 		    pgn, version, nstab, dstab);
 	}
-}
 
-static int
-cmp_name(const char *props, char *pgn)
-{
-	char buf[MAXNAMELEN];
-	size_t count;
-	char *begin, *end, *value, *next;
-	char *np;
-
-	if (props == NULL)
-		return (0);
-
-	if (strcmp(props, ALL) == 0)
-		return (0);
-
-
-	value = np = strdup(props);
-
-	for (end = np; *end != '\0'; value = next) {
-		end = strchr(value, ',');
-		if (end != NULL)
-			next = end + 1; /* skip the comma */
-		else
-			next = end = value + strlen(value);
-
-		/*
-		 * Eat up white space at beginning or end of the
-		 * property group name
-		 */
-		begin = value;
-		while (begin < end && isspace(*begin))
-			begin++;
-		while (begin < end && isspace(*(end - 1)))
-			end--;
-
-		if (begin >= end)
-			return (1);
-
-		count = end - begin;
-		count += 1;
-
-		if (count > sizeof (buf))
-			return (1);
-
-		(void) snprintf(buf, count, "%s", begin);
-		if (strcmp(pgn, buf) == 0) {
-			free(np);
-			return (0);
-		}
+	if (pgi != NULL) {
+		topo_hdl_strfree(thp, (char *)pgi->tpi_name);
+		topo_hdl_free(thp, pgi, sizeof (topo_pgroup_info_t));
 	}
-
-	free(np);
-	return (1);
 }
 
 static void
-print_props(topo_hdl_t *thp, nvlist_t *p_nv, const char *props)
+print_all_props(topo_hdl_t *thp, tnode_t *node, nvlist_t *p_nv,
+    const char *group)
 {
 	char *pgn = NULL, *dstab = NULL, *nstab = NULL;
-	int32_t version = 0;
+	int32_t version;
 	nvlist_t *pg_nv, *pv_nv;
 	nvpair_t *nvp, *pg_nvp;
-	int pg_done = 0, skip = 0;
+	int pg_done, match, all = strcmp(group, ALL) == 0;
 
 	for (nvp = nvlist_next_nvpair(p_nv, NULL); nvp != NULL;
 	    nvp = nvlist_next_nvpair(p_nv, nvp)) {
@@ -421,6 +420,10 @@ print_props(topo_hdl_t *thp, nvlist_t *p_nv, const char *props)
 		    nvpair_type(nvp) != DATA_TYPE_NVLIST)
 			continue;
 
+		nstab = NULL;
+		dstab = NULL;
+		version = -1;
+		pg_done = match = 0;
 		(void) nvpair_value_nvlist(nvp, &pg_nv);
 		for (pg_nvp = nvlist_next_nvpair(pg_nv, NULL); pg_nvp != NULL;
 		    pg_nvp = nvlist_next_nvpair(pg_nv, pg_nvp)) {
@@ -430,70 +433,325 @@ print_props(topo_hdl_t *thp, nvlist_t *p_nv, const char *props)
 			if (strcmp(TOPO_PROP_GROUP_NAME, nvpair_name(pg_nvp))
 			    == 0 && nvpair_type(pg_nvp) == DATA_TYPE_STRING) {
 				(void) nvpair_value_string(pg_nvp, &pgn);
+				match = strcmp(group, pgn) == 0;
+				continue;
+			}
 
-				skip = cmp_name(props, pgn);
-
-			} else if (strcmp(TOPO_PROP_GROUP_NSTAB,
+			if (strcmp(TOPO_PROP_GROUP_NSTAB,
 			    nvpair_name(pg_nvp)) == 0 &&
 			    nvpair_type(pg_nvp) == DATA_TYPE_STRING) {
 				(void) nvpair_value_string(pg_nvp, &nstab);
-			} else if (strcmp(TOPO_PROP_GROUP_DSTAB,
+				continue;
+			}
+
+			if (strcmp(TOPO_PROP_GROUP_DSTAB,
 			    nvpair_name(pg_nvp)) == 0 &&
 			    nvpair_type(pg_nvp) == DATA_TYPE_STRING) {
 				(void) nvpair_value_string(pg_nvp, &dstab);
-			} else if (strcmp(TOPO_PROP_GROUP_VERSION,
+				continue;
+			}
+
+			if (strcmp(TOPO_PROP_GROUP_VERSION,
 			    nvpair_name(pg_nvp)) == 0 &&
 			    nvpair_type(pg_nvp) == DATA_TYPE_INT32) {
 				(void) nvpair_value_int32(pg_nvp, &version);
+				continue;
 			}
 
-			if (!pg_done) {
-				if (pgn && dstab && nstab && version) {
-					print_pgroup(pgn, dstab, nstab,
-					    version, skip);
-					pg_done++;
-				} else {
-					continue;
-				}
+			if ((match || all) && !pg_done) {
+				print_pgroup(thp, node, pgn, dstab, nstab,
+				    version);
+				pg_done++;
+			}
+
 			/*
-			 * Print property name-value pair
+			 * Print property group and property name-value pair
 			 */
-			} else if (strcmp(TOPO_PROP_VAL, nvpair_name(pg_nvp))
+			if (strcmp(TOPO_PROP_VAL, nvpair_name(pg_nvp))
 			    == 0 && nvpair_type(pg_nvp) == DATA_TYPE_NVLIST) {
 				(void) nvpair_value_nvlist(pg_nvp, &pv_nv);
-				print_prop_nameval(thp, pv_nv, skip);
+				if ((match || all) && pg_done) {
+					print_prop_nameval(thp, pv_nv);
+				}
 
 			}
+
 		}
-		pg_done = 0;
-		skip = 0;
+		if (match && !all)
+			return;
+	}
+}
+
+static void
+set_prop(topo_hdl_t *thp, tnode_t *node, nvlist_t *fmri, struct prop_args *pp)
+{
+	int ret, err = 0;
+	topo_type_t type;
+	nvlist_t *nvl, *f = NULL;
+	char *end;
+
+	if (pp->prop == NULL || pp->type == NULL || pp->value == NULL)
+		return;
+
+	if ((type = str2type(pp->type)) == TOPO_TYPE_INVALID) {
+		(void) fprintf(stderr, "%s: invalid property type %s for %s\n",
+		    g_pname, pp->type, pp->prop);
+		return;
+	}
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0) {
+		(void) fprintf(stderr, "%s: nvlist allocation failed for "
+		    "%s=%s:%s\n", g_pname, pp->prop, pp->type, pp->value);
+		return;
+	}
+	ret = nvlist_add_string(nvl, TOPO_PROP_VAL_NAME, pp->prop);
+	ret |= nvlist_add_uint32(nvl, TOPO_PROP_VAL_TYPE, type);
+	if (ret != 0) {
+		(void) fprintf(stderr, "%s: invalid property type %s for %s\n",
+		    g_pname, pp->type, pp->prop);
+		nvlist_free(nvl);
+		return;
+	}
+
+	errno = 0;
+	switch (type) {
+		case TOPO_TYPE_INT32:
+		{
+			int32_t val;
+
+			val = strtol(pp->value, &end, 0);
+			if (errno == ERANGE) {
+				ret = -1;
+				break;
+			}
+			ret = nvlist_add_int32(nvl, TOPO_PROP_VAL_VAL, val);
+			break;
+		}
+		case TOPO_TYPE_UINT32:
+		{
+			uint32_t val;
+
+			val = strtoul(pp->value, &end, 0);
+			if (errno == ERANGE) {
+				ret = -1;
+				break;
+			}
+			ret = nvlist_add_uint32(nvl, TOPO_PROP_VAL_VAL, val);
+			break;
+		}
+		case TOPO_TYPE_INT64:
+		{
+			int64_t val;
+
+			val = strtoll(pp->value, &end, 0);
+			if (errno == ERANGE) {
+				ret = -1;
+				break;
+			}
+			ret = nvlist_add_int64(nvl, TOPO_PROP_VAL_VAL, val);
+			break;
+		}
+		case TOPO_TYPE_UINT64:
+		{
+			uint64_t val;
+
+			val = strtoull(pp->value, &end, 0);
+			if (errno == ERANGE) {
+				ret = -1;
+				break;
+			}
+			ret = nvlist_add_uint64(nvl, TOPO_PROP_VAL_VAL, val);
+			break;
+		}
+		case TOPO_TYPE_STRING:
+		{
+			ret = nvlist_add_string(nvl, TOPO_PROP_VAL_VAL,
+			    pp->value);
+			break;
+		}
+		case TOPO_TYPE_FMRI:
+		{
+			if ((ret = topo_fmri_str2nvl(thp, pp->value, &f, &err))
+			    < 0)
+				break;
+
+			if ((ret = nvlist_add_nvlist(nvl, TOPO_PROP_VAL_VAL,
+			    f)) != 0)
+				err = ETOPO_PROP_NVL;
+			break;
+		}
+		default:
+			ret = -1;
+	}
+
+	if (ret != 0) {
+		(void) fprintf(stderr, "%s: unable to set property value for "
+		    "%s: %s\n", g_pname, pp->prop,  topo_strerror(err));
+		nvlist_free(nvl);
+		return;
+	}
+
+	if (node != NULL) {
+		if (topo_prop_setprop(node, pp->group, nvl, TOPO_PROP_MUTABLE,
+		    f, &ret) < 0) {
+			(void) fprintf(stderr, "%s: unable to set property "
+			    "value for " "%s=%s:%s: %s\n", g_pname, pp->prop,
+			    pp->type, pp->value, topo_strerror(ret));
+			nvlist_free(nvl);
+			nvlist_free(f);
+			return;
+		}
+	} else {
+		if (topo_fmri_setprop(thp, fmri,  pp->group, nvl,
+		    TOPO_PROP_MUTABLE, f, &ret) < 0) {
+			(void) fprintf(stderr, "%s: unable to set property "
+			    "value for " "%s=%s:%s: %s\n", g_pname, pp->prop,
+			    pp->type, pp->value, topo_strerror(ret));
+			nvlist_free(nvl);
+			nvlist_free(f);
+			return;
+		}
+	}
+
+	nvlist_free(nvl);
+
+	/*
+	 * Now, get the property back for printing
+	 */
+	if (node != NULL) {
+		if (topo_prop_getprop(node, pp->group, pp->prop, f, &nvl,
+		    &err) < 0) {
+			(void) fprintf(stderr, "%s: failed to get %s.%s: %s\n",
+			    g_pname, pp->group, pp->prop, topo_strerror(err));
+			nvlist_free(f);
+			return;
+		}
+	} else {
+		if (topo_fmri_getprop(thp, fmri, pp->group, pp->prop,
+		    f, &nvl, &err) < 0) {
+			(void) fprintf(stderr, "%s: failed to get %s.%s: %s\n",
+			    g_pname, pp->group, pp->prop, topo_strerror(err));
+			nvlist_free(f);
+			return;
+		}
+	}
+
+	print_pgroup(thp, node, pp->group, NULL, NULL, 0);
+	print_prop_nameval(thp, nvl);
+	nvlist_free(nvl);
+
+	nvlist_free(f);
+}
+
+static void
+print_props(topo_hdl_t *thp, tnode_t *node)
+{
+	int i, err;
+	nvlist_t *nvl;
+	struct prop_args *pp;
+
+	if (pcnt == 0)
+		return;
+
+	for (i = 0; i < pcnt; ++i) {
+		pp = pargs[i];
+
+		if (pp->group == NULL)
+			continue;
+
+		/*
+		 * If we have a valid value, this is a request to
+		 * set a property.  Otherwise, just print the property
+		 * group and any specified properties.
+		 */
+		if (pp->value == NULL) {
+			if (pp->prop == NULL) {
+
+				/*
+				 * Print all properties in this group
+				 */
+				if ((nvl = topo_prop_getprops(node, &err))
+				    == NULL) {
+					(void) fprintf(stderr, "%s: failed to "
+					    "get %s: %s\n", g_pname,
+					    pp->group,
+					    topo_strerror(err));
+					continue;
+				} else {
+					print_all_props(thp, node, nvl,
+					    pp->group);
+					nvlist_free(nvl);
+					continue;
+				}
+			}
+			if (topo_prop_getprop(node, pp->group, pp->prop,
+			    NULL, &nvl, &err) < 0) {
+				(void) fprintf(stderr, "%s: failed to get "
+				    "%s.%s: %s\n", g_pname,
+				    pp->group, pp->prop,
+				    topo_strerror(err));
+				continue;
+			} else {
+				print_pgroup(thp, node, pp->group, NULL,
+				    NULL, 0);
+				print_prop_nameval(thp, nvl);
+				nvlist_free(nvl);
+			}
+		} else {
+			set_prop(thp, node, NULL, pp);
+		}
 	}
 }
 
 /*ARGSUSED*/
 static int
-print_tnode(topo_hdl_t *thp, tnode_t *node, void *arg)
+walk_node(topo_hdl_t *thp, tnode_t *node, void *arg)
 {
 	int err;
 	nvlist_t *nvl;
+	nvlist_t *rsrc;
+	char *s;
 
 	if (opt_e && strcmp(opt_s, FM_FMRI_SCHEME_HC) == 0) {
 		print_everstyle(node);
 		return (TOPO_WALK_NEXT);
 	}
 
-	print_fmri(thp, node);
+	if (topo_node_resource(node, &rsrc, &err) < 0) {
+		(void) fprintf(stderr, "%s: failed to get resource: "
+		    "%s", g_pname, topo_strerror(err));
+		return (TOPO_WALK_NEXT);
+	}
+	if (topo_fmri_nvl2str(thp, rsrc, &s, &err) < 0) {
+		(void) fprintf(stderr, "%s: failed to convert "
+		    "resource to FMRI string: %s", g_pname,
+		    topo_strerror(err));
+		nvlist_free(rsrc);
+		return (TOPO_WALK_NEXT);
+	}
 
-	if (opt_V || opt_P) {
+	if (g_fmri != NULL && fnmatch(g_fmri, s, 0) != 0) {
+			nvlist_free(rsrc);
+			topo_hdl_strfree(thp, s);
+			return (TOPO_WALK_NEXT);
+	}
+
+	print_node(thp, node, rsrc, s);
+	topo_hdl_strfree(thp, s);
+	nvlist_free(rsrc);
+
+	if (opt_V || opt_all) {
 		if ((nvl = topo_prop_getprops(node, &err)) == NULL) {
 			(void) fprintf(stderr, "%s: failed to get "
 			    "properties for %s=%d: %s\n", g_pname,
 			    topo_node_name(node), topo_node_instance(node),
 			    topo_strerror(err));
 		} else {
-			print_props(thp, nvl, opt_P);
+			print_all_props(thp, node, nvl, ALL);
 			nvlist_free(nvl);
 		}
+	} else if (pcnt > 0) {
+		print_props(thp, node);
 	}
 
 	printf("\n");
@@ -501,100 +759,93 @@ print_tnode(topo_hdl_t *thp, tnode_t *node, void *arg)
 	return (TOPO_WALK_NEXT);
 }
 
-int
-main(int argc, char *argv[])
+static void
+get_pargs(int argc, char *argv[])
 {
-	topo_hdl_t *thp;
-	topo_walk_t *twp;
-	char *uuid;
-	int c, err = 0;
+	struct prop_args *pp;
+	char c, *s, *p;
+	int i = 0;
 
-	g_pname = argv[0];
+	if ((pargs = malloc(sizeof (struct prop_args *) * pcnt)) == NULL) {
+		(void) fprintf(stderr, "%s: failed to allocate property "
+		    "arguments\n", g_pname);
+		return;
+	}
 
-	while (optind < argc) {
-		while ((c = getopt(argc, argv, "aCdeP:pR:s:vVx")) != -1) {
-			switch (c) {
-			case 'C':
-				atexit(abort);
+	for (optind = 1; (c = getopt(argc, argv, optstr)) != EOF; ) {
+		if (c == 'P') {
+
+			if (strcmp(optarg, ALL) == 0) {
+				opt_all++;
 				break;
-			case 'd':
-				opt_d++;
-				break;
-			case 'e':
-				opt_e++;
-				break;
-			case 'P':
-				opt_P = optarg;
-				break;
-			case 'p':
-				opt_p++;
-				break;
-			case 'V':
-				opt_V++;
-				break;
-			case 'R':
-				opt_R = optarg;
-				break;
-			case 's':
-				opt_s = optarg;
-				break;
-			case 'x':
-				opt_x++;
-				break;
-			default:
-				return (usage(stderr));
 			}
+
+			if ((pp = pargs[i] = malloc(sizeof (struct prop_args)))
+			    == NULL) {
+				(void) fprintf(stderr, "%s: failed to "
+				    "allocate propertyarguments\n", g_pname);
+				return;
+			}
+			++i;
+			pp->group = NULL;
+			pp->prop = NULL;
+			pp->type = NULL;
+			pp->value = NULL;
+
+			p = optarg;
+			if ((s = strchr(p, '.')) != NULL) {
+				*s++ = '\0'; /* strike out delimiter */
+				pp->group = p;
+				p = s;
+				if ((s = strchr(p, '=')) != NULL) {
+					*s++ = '\0'; /* strike out delimiter */
+					pp->prop = p;
+					p = s;
+					if ((s = strchr(p, ':')) != NULL) {
+						*s++ = '\0';
+						pp->type = p;
+						pp->value = s;
+					} else {
+						(void) fprintf(stderr, "%s: "
+						    "property type not "
+						    "specified for assignment "
+						    " of %s.%s\n", g_pname,
+						    pp->group, pp->prop);
+						break;
+					}
+				} else {
+					pp->prop = p;
+				}
+			} else {
+				pp->group = p;
+			}
+			if (i >= pcnt)
+				break;
 		}
-
-		if (optind < argc) {
-			(void) fprintf(stderr, "%s: illegal argument -- %s\n",
-			    g_pname, argv[optind]);
-			return (FMTOPO_EXIT_USAGE);
-		}
 	}
 
-	if ((thp = topo_open(TOPO_VERSION, opt_R, &err)) == NULL) {
-		(void) fprintf(stderr, "%s: failed to open topology tree: %s\n",
-		    g_pname, topo_strerror(err));
-		return (FMTOPO_EXIT_ERROR);
+	if (opt_all > 0) {
+		int j;
+
+		for (j = 0; j < i; ++j)
+			free(pargs[i]);
+		free(pargs);
+		pargs = NULL;
 	}
+}
 
-	if (opt_d)
-		topo_debug_set(thp, "module", "stderr");
+static int
+walk_topo(topo_hdl_t *thp, char *uuid)
+{
+	int err;
+	topo_walk_t *twp;
 
-	if ((uuid = topo_snap_hold(thp, NULL, &err)) == NULL) {
-		(void) fprintf(stderr, "%s: failed to snapshot topology: %s\n",
-		    g_pname, topo_strerror(err));
-		topo_close(thp);
-		return (FMTOPO_EXIT_ERROR);
-	} else if (err != 0) {
-		(void) fprintf(stderr, "%s: topology snapshot incomplete\n",
-		    g_pname);
-	}
-
-
-	if (opt_x) {
-		err = 0;
-		if (topo_xml_print(thp, stdout, opt_s, &err) < 0)
-			(void) fprintf(stderr, "%s: failed to print xml "
-			    "formatted topology:%s",  g_pname,
-			    topo_strerror(err));
-
-		topo_hdl_strfree(thp, uuid);
-		topo_snap_release(thp);
-		topo_close(thp);
-		return (err ? FMTOPO_EXIT_ERROR : FMTOPO_EXIT_SUCCESS);
-	}
-	if ((twp = topo_walk_init(thp, opt_s, print_tnode, NULL, &err))
+	if ((twp = topo_walk_init(thp, opt_s, walk_node, NULL, &err))
 	    == NULL) {
 		(void) fprintf(stderr, "%s: failed to walk %s topology:"
 		    " %s\n", g_pname, opt_s, topo_strerror(err));
 
-		topo_hdl_strfree(thp, uuid);
-		topo_snap_release(thp);
-		topo_close(thp);
-
-		return (err ? FMTOPO_EXIT_ERROR : FMTOPO_EXIT_SUCCESS);
+		return (-1);
 	}
 
 	/*
@@ -610,20 +861,311 @@ main(int argc, char *argv[])
 		(void) printf("\n");
 	}
 
-	topo_hdl_strfree(thp, uuid);
-
 	if (topo_walk_step(twp, TOPO_WALK_CHILD) == TOPO_WALK_ERR) {
 		(void) fprintf(stderr, "%s: failed to walk topology\n",
 		    g_pname);
 		topo_walk_fini(twp);
-		topo_snap_release(thp);
-		topo_close(thp);
-		return (FMTOPO_EXIT_ERROR);
+		return (-1);
 	}
 
 	topo_walk_fini(twp);
-	topo_snap_release(thp);
-	topo_close(thp);
+
+	return (0);
+}
+
+static void
+print_fmri_pgroup(topo_hdl_t *thp, const char *pgn, nvlist_t *nvl)
+{
+	char *dstab = NULL, *nstab = NULL;
+	int32_t version = -1;
+	nvlist_t *pnvl;
+	nvpair_t *pnvp;
+
+	(void) nvlist_lookup_string(nvl, TOPO_PROP_GROUP_NSTAB, &nstab);
+	(void) nvlist_lookup_string(nvl, TOPO_PROP_GROUP_DSTAB, &dstab);
+	(void) nvlist_lookup_int32(nvl, TOPO_PROP_GROUP_VERSION, &version);
+
+	print_pgroup(thp, NULL, pgn, dstab, nstab, version);
+
+	for (pnvp = nvlist_next_nvpair(nvl, NULL); pnvp != NULL;
+	    pnvp = nvlist_next_nvpair(nvl, pnvp)) {
+
+		/*
+		 * Print property group and property name-value pair
+		 */
+		if (strcmp(TOPO_PROP_VAL, nvpair_name(pnvp))
+		    == 0 && nvpair_type(pnvp) == DATA_TYPE_NVLIST) {
+			(void) nvpair_value_nvlist(pnvp, &pnvl);
+				print_prop_nameval(thp, pnvl);
+
+		}
+
+	}
+}
+
+static void
+print_fmri_props(topo_hdl_t *thp, nvlist_t *nvl)
+{
+	int i, err;
+	struct prop_args *pp;
+	nvlist_t *pnvl;
+
+	for (i = 0; i < pcnt; ++i) {
+		pp = pargs[i];
+
+		if (pp->group == NULL)
+			continue;
+
+		pnvl = NULL;
+
+		/*
+		 * If we have a valid value, this is a request to
+		 * set a property.  Otherwise, just print the property
+		 * group and any specified properties.
+		 */
+		if (pp->value == NULL) {
+			if (pp->prop == NULL) {
+
+				/*
+				 * Print all properties in this group
+				 */
+				if (topo_fmri_getpgrp(thp, nvl, pp->group,
+				    &pnvl, &err) < 0) {
+					(void) fprintf(stderr, "%s: failed to "
+					    "get group %s: %s\n", g_pname,
+					    pp->group, topo_strerror(err));
+					continue;
+				} else {
+					print_fmri_pgroup(thp, pp->group, pnvl);
+					nvlist_free(pnvl);
+					continue;
+				}
+			}
+			if (topo_fmri_getprop(thp, nvl, pp->group, pp->prop,
+			    NULL, &pnvl, &err) < 0) {
+				(void) fprintf(stderr, "%s: failed to get "
+				    "%s.%s: %s\n", g_pname,
+				    pp->group, pp->prop,
+				    topo_strerror(err));
+				continue;
+			} else {
+				print_fmri_pgroup(thp, pp->group, pnvl);
+				print_prop_nameval(thp, pnvl);
+				nvlist_free(nvl);
+			}
+		} else {
+			set_prop(thp, NULL, nvl, pp);
+		}
+	}
+}
+
+void
+print_fmri(topo_hdl_t *thp, char *uuid)
+{
+	int ret, err;
+	nvlist_t *nvl;
+	char buf[32];
+	time_t tod = time(NULL);
+
+	if (topo_fmri_str2nvl(thp, g_fmri, &nvl, &err) < 0) {
+		(void) fprintf(stderr, "%s: failed to convert %s to nvlist: "
+		    "%s\n", g_pname, g_fmri, topo_strerror(err));
+		return;
+	}
+
+	printf("TIME                 UUID\n");
+	(void) strftime(buf, sizeof (buf), "%b %d %T", localtime(&tod));
+	(void) printf("%-15s %-32s\n", buf, uuid);
+	(void) printf("\n");
+
+	(void) printf("%s\n", (char *)g_fmri);
+
+	if (opt_p && !(pcnt > 0 || opt_V || opt_all)) {
+		char *aname = NULL, *fname = NULL, *lname = NULL;
+		nvlist_t *asru = NULL;
+		nvlist_t *fru = NULL;
+
+		if (topo_fmri_asru(thp, nvl, &asru, &err) == 0)
+		    (void) topo_fmri_nvl2str(thp, asru, &aname, &err);
+		if (topo_fmri_fru(thp, nvl, &fru, &err) == 0)
+		    (void) topo_fmri_nvl2str(thp, fru, &fname, &err);
+		(void) topo_fmri_label(thp, nvl, &lname, &err);
+
+		nvlist_free(fru);
+		nvlist_free(asru);
+
+		if (aname != NULL) {
+			(void) printf("\tASRU: %s\n", aname);
+			topo_hdl_strfree(thp, aname);
+		} else {
+			(void) printf("\tASRU: -\n");
+		}
+		if (fname != NULL) {
+			(void) printf("\tFRU: %s\n", fname);
+			topo_hdl_strfree(thp, fname);
+		} else {
+			(void) printf("\tFRU: -\n");
+		}
+		if (lname != NULL) {
+			(void) printf("\tLabel: %s\n", lname);
+			topo_hdl_strfree(thp, lname);
+		} else {
+			(void) printf("\tLabel: -\n");
+		}
+	}
+
+	if (opt_S) {
+		if (topo_fmri_str2nvl(thp, g_fmri, &nvl, &err) < 0) {
+			(void) printf("\tPresent: -\n");
+			(void) printf("\tUnusable: -\n");
+			return;
+		}
+
+		if ((ret = topo_fmri_present(thp, nvl, &err)) < 0)
+			(void) printf("\tPresent: -\n");
+		else
+			(void) printf("\tPresent: %s\n",
+			    ret ? "true" : "false");
+
+		if ((ret = topo_fmri_unusable(thp, nvl, &err)) < 0)
+			(void) printf("\tUnusable: -\n");
+		else
+			(void) printf("\tUnusable: %s\n",
+			    ret ? "true" : "false");
+
+		nvlist_free(nvl);
+	}
+
+	if (pcnt > 0)
+		print_fmri_props(thp, nvl);
+}
+
+int
+fmtopo_exit(topo_hdl_t *thp, char *uuid, int err)
+{
+	if (uuid != NULL)
+		topo_hdl_strfree(thp, uuid);
+
+	if (thp != NULL) {
+		topo_snap_release(thp);
+		topo_close(thp);
+	}
+
+	if (pargs) {
+		int i;
+		for (i = 0; i < pcnt; ++i)
+			free(pargs[i]);
+		free(pargs);
+	}
+
+	return (err);
+}
+
+int
+main(int argc, char *argv[])
+{
+	topo_hdl_t *thp = NULL;
+	char *uuid = NULL;
+	int c, err = 0;
+
+	g_pname = argv[0];
+
+	while (optind < argc) {
+		while ((c = getopt(argc, argv, optstr)) != -1) {
+			switch (c) {
+			case 'C':
+				atexit(abort);
+				break;
+			case 'd':
+				opt_d++;
+				break;
+			case 'e':
+				opt_e++;
+				break;
+			case 'P':
+				pcnt++;
+				break;
+			case 'p':
+				opt_p++;
+				break;
+			case 'V':
+				opt_V++;
+				break;
+			case 'R':
+				opt_R = optarg;
+				break;
+			case 's':
+				opt_s = optarg;
+				break;
+			case 'S':
+				opt_S++;
+				break;
+			case 't':
+				opt_t++;
+				break;
+			case 'x':
+				opt_x++;
+				break;
+			default:
+				return (usage(stderr));
+			}
+		}
+
+		if (optind < argc) {
+			if (g_fmri != NULL) {
+				(void) fprintf(stderr, "%s: illegal argument "
+				    "-- %s\n", g_pname, argv[optind]);
+				return (FMTOPO_EXIT_USAGE);
+			} else {
+				g_fmri = argv[optind++];
+			}
+		}
+	}
+
+	if (pcnt > 0)
+		get_pargs(argc, argv);
+
+	if ((thp = topo_open(TOPO_VERSION, opt_R, &err)) == NULL) {
+		(void) fprintf(stderr, "%s: failed to open topology tree: %s\n",
+		    g_pname, topo_strerror(err));
+		return (fmtopo_exit(thp, uuid, FMTOPO_EXIT_ERROR));
+	}
+
+	if (opt_d)
+		topo_debug_set(thp, "module", "stderr");
+
+	if ((uuid = topo_snap_hold(thp, NULL, &err)) == NULL) {
+		(void) fprintf(stderr, "%s: failed to snapshot topology: %s\n",
+		    g_pname, topo_strerror(err));
+		return (fmtopo_exit(thp, uuid, FMTOPO_EXIT_ERROR));
+	} else if (err != 0) {
+		(void) fprintf(stderr, "%s: topology snapshot incomplete\n",
+		    g_pname);
+	}
+
+
+	if (opt_x) {
+		err = 0;
+		if (topo_xml_print(thp, stdout, opt_s, &err) < 0)
+			(void) fprintf(stderr, "%s: failed to print xml "
+			    "formatted topology:%s",  g_pname,
+			    topo_strerror(err));
+
+		return (fmtopo_exit(thp, uuid, err ? FMTOPO_EXIT_ERROR :
+		    FMTOPO_EXIT_SUCCESS));
+	}
+
+	if (opt_t || walk_topo(thp, uuid) < 0) {
+		if (g_fmri != NULL)
+			/*
+			 * Try getting some useful information
+			 */
+			print_fmri(thp, uuid);
+
+		return (fmtopo_exit(thp, uuid, FMTOPO_EXIT_ERROR));
+	}
+
+	topo_hdl_strfree(thp, uuid);
 
 	return (FMTOPO_EXIT_SUCCESS);
 }

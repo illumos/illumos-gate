@@ -46,10 +46,6 @@ typedef enum topo_errno {
     ETOPO_UNKNOWN = 1000, /* unknown libtopo error */
     ETOPO_NOMEM,	/* memory limit exceeded */
     ETOPO_MODULE,	/* module detected or caused an error */
-    ETOPO_HDL_ABIVER,	/* handle opened with invalid ABI version */
-    ETOPO_HDL_SNAP,	/* snapshot already taken */
-    ETOPO_HDL_INVAL,	/* invalid argument specified */
-    ETOPO_HDL_UUID,	/* uuid already set */
     ETOPO_MOD_INIT,	/* failed to initialize module */
     ETOPO_MOD_FINI,	/* failed to uninitialize module */
     ETOPO_MOD_LOADED,	/* specified module is already loaded */
@@ -81,9 +77,6 @@ typedef enum topo_errno {
     ETOPO_ENUM_NOMAP,	/* no topology map file for enumeration */
     ETOPO_ENUM_FATAL,	/* fatal enumeration error */
     ETOPO_ENUM_RECURS,	/* recursive enumertation detected */
-    ETOPO_FMRI_NVL,	/* nvlist allocation failure for FMRI */
-    ETOPO_FMRI_VERSION, /* invalid FMRI scheme version */
-    ETOPO_FMRI_MALFORM,	/* malformed FMRI */
     ETOPO_NVL_INVAL,	/* invalid nvlist function argument */
     ETOPO_FILE_NOENT,	/* no topology file found */
     ETOPO_PRSR_BADGRP,	/* unrecognized grouping */

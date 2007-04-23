@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -838,7 +838,7 @@ topo_xml_range_process(topo_mod_t *mp, xmlNodePtr rn, tf_rdata_t *rd)
 	 */
 	xmlNodePtr cn;
 	tnode_t *ct;
-	int e;
+	int e, ccnt = 0;
 
 	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "process %s range beneath %s\n",
 	    rd->rd_name, topo_node_name(rd->rd_pn));
@@ -889,7 +889,16 @@ topo_xml_range_process(topo_mod_t *mp, xmlNodePtr rn, tf_rdata_t *rd)
 		if (pad_process(mp, rd->rd_finfo, rn, ct, &rd->rd_pad) < 0)
 			return (-1);
 		ct = topo_child_next(rd->rd_pn, ct);
+		ccnt++;
 	}
+
+	if (ccnt == 0) {
+		topo_node_range_destroy(rd->rd_pn, rd->rd_name);
+		topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "no nodes processed for "
+		    "range %s\n", rd->rd_name);
+		return (-1);
+	}
+
 	topo_dprintf(mp->tm_hdl, TOPO_DBG_XML, "end range process %s\n",
 	    rd->rd_name);
 	return (0);
@@ -922,7 +931,10 @@ topo_xml_walk(topo_mod_t *mp,
 		}
 		if ((rdp = tf_rdata_new(mp, xinfo, curr, troot)) == NULL) {
 			tf_rdata_free(mp, rr);
-			return (NULL);
+			/*
+			 * Range processing error, continue walk
+			 */
+			continue;
 		}
 		if (pr == NULL) {
 			rr = pr = rdp;
@@ -1008,12 +1020,14 @@ txml_file_parse(topo_mod_t *tmp,
 	if ((dtd = xmlGetIntSubset(document)) == NULL) {
 		topo_dprintf(tmp->tm_hdl, TOPO_DBG_ERR,
 		    "document has no DTD.\n");
+		xmlFreeDoc(document);
 		return (NULL);
 	}
 
 	if (strcmp((const char *)dtd->SystemID, TOPO_DTD_PATH) != 0) {
 		topo_dprintf(tmp->tm_hdl, TOPO_DBG_ERR,
 		    "document DTD unknown; bad topology file\n");
+		xmlFreeDoc(document);
 		return (NULL);
 	}
 
@@ -1056,6 +1070,8 @@ txml_file_parse(topo_mod_t *tmp,
 			topo_dprintf(tmp->tm_hdl, TOPO_DBG_ERR,
 			    "Could not parse DTD \"%s\".\n",
 			    dtdpath);
+			xmlFree(scheme);
+			xmlFreeDoc(document);
 			return (NULL);
 		}
 
@@ -1066,6 +1082,8 @@ txml_file_parse(topo_mod_t *tmp,
 	}
 
 	if (xmlXIncludeProcessFlags(document, XML_PARSE_XINCLUDE) == -1) {;
+		xmlFree(scheme);
+		xmlFreeDoc(document);
 		topo_dprintf(tmp->tm_hdl, TOPO_DBG_ERR,
 		    "couldn't handle XInclude statements in document\n");
 		return (NULL);
@@ -1074,7 +1092,7 @@ txml_file_parse(topo_mod_t *tmp,
 	if (validate) {
 		if ((vcp = xmlNewValidCtxt()) == NULL) {
 			xmlFree(scheme);
-			scheme = NULL;
+			xmlFreeDoc(document);
 			return (NULL);
 		}
 		vcp->warning = xmlParserValidityWarning;
@@ -1089,8 +1107,11 @@ txml_file_parse(topo_mod_t *tmp,
 			    "Document is not valid.\n");
 	}
 
-	if ((r = tf_info_new(tmp, document, scheme)) == NULL)
+	if ((r = tf_info_new(tmp, document, scheme)) == NULL) {
+		xmlFree(scheme);
+		xmlFreeDoc(document);
 		return (NULL);
+	}
 
 	xmlFree(scheme);
 	scheme = NULL;
