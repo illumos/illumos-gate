@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -306,9 +306,8 @@ pass5(void)
 		}
 
 		if (bad_csum_cg && (update_csums == 1)) {
-			(void) memmove((void *)&cg->cg_cs,
-				    (void *)&newcg->cg_cs,
-				    sizeof (struct csum));
+			(void) memmove((void *)cg, (void *)newcg,
+			    (size_t)basesize);
 			/* LINTED per cg_sanity() */
 			(void) memmove((void *)&cg_blktot(cg)[0],
 			    /* LINTED macro aligned as above */
