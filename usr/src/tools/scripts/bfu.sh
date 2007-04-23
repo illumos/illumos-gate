@@ -1887,6 +1887,21 @@ EOF
 	smf_fix_i86pc_profile
 }
 
+#
+# The directboot putback moved the console property from
+# /boot/solaris/bootenv.rc to /boot/grub/menu.lst.  It should be kept in both.
+#
+cleanup_eeprom_console()
+{
+	bootenvrc="$root/boot/solaris/bootenv.rc"
+	menu_console=`eeprom console 2>/dev/null | \
+	    grep -v 'data not available' | cut -d= -f2-`
+	bootenv_console=`grep '^setprop[ 	]\{1,\}console\>' $bootenvrc`
+	if [ -n "$menu_console" ] && [ -z "$bootenv_console" ]; then
+		echo "setprop console '$menu_console'" >> $bootenvrc
+	fi
+}
+
 EXTRACT_LOG=/tmp/bfu-extract-log.$$
 
 rm -f $EXTRACT_LOG
@@ -2026,12 +2041,6 @@ if [ $diskless = no ]; then
 
 	[[ -f $root/etc/system ]] || \
 	    fail "$root/etc/system not found; nonglobal zone target not allowed"
-
-	if [ -f $root/boot/platform/i86pc/kernel/unix ]; then
-		failsafe_type=directboot
-	elif [ -f $root/boot/multiboot ]; then
-		failsafe_type=multiboot
-	fi
 
 	# Make sure we extract the sun4u-us3 libc_psr.so.1
 	if [ -d $root/platform/sun4u -a \
@@ -2477,6 +2486,9 @@ if [ $multi_or_direct = yes ]; then
 			[ -x /$cmd ] && cp /$cmd /tmp/bfubin
 		fi
 	done
+	if [ $archive_type = directboot ] && [ $root_is_directboot = yes ]; then
+		cleanup_eeprom_console
+	fi
 fi
 
 multiboot_cmds="
@@ -2641,6 +2653,40 @@ if [ $multi_or_direct = yes ]; then
 		    < /tmp/bfubin/${file}- > /tmp/bfubin/${file}
 		chmod +x /tmp/bfubin/${file}
 	done
+fi
+
+#
+# For directboot archives, /boot/platform/i86pc/kernel/unix will be
+# overwritten, which could cause a mis-match with the failsafe
+# miniroot.  Extract unix from the miniroot and save it off for now.
+#
+if [ $archive_type = directboot ] && [ $diskless = no ]; then
+	if gunzip -c "$root/boot/x86.miniroot-safe" \
+	    >/tmp/bfubin/miniroot-unzipped; then
+		lofifile=/tmp/bfubin/miniroot-unzipped
+	else
+		# Shouldn't happen?  See if someone already unzipped it.
+		lofifile="$root/boot/x86.miniroot-safe"
+	fi
+	lofidev=`lofiadm -a $lofifile 2>/dev/null`
+	if [ -n "$lofidev" ]; then
+		mkdir /tmp/bfubin/mnt
+		mount -r $lofidev /tmp/bfubin/mnt
+
+		unix=/tmp/bfubin/mnt/boot/platform/i86pc/kernel/unix
+		if [ -f $unix ]; then
+			cp $unix /tmp/bfubin/unix
+			failsafe_type=directboot
+		elif [ -f /tmp/bfubin/mnt/platform/i86pc/multiboot ]
+		then
+			failsafe_type=multiboot
+		fi
+
+		umount /tmp/bfubin/mnt
+		rmdir /tmp/bfubin/mnt
+		lofiadm -d $lofidev
+	fi
+	rm -f /tmp/bfubin/miniroot-unzipped
 fi
 
 create_datalink_conf()
@@ -4565,7 +4611,7 @@ update_bootenv()
 	fi
 
 	if [ $bootenvrc_updated = 1 ]; then
-		egrep -v '^setprop[ 	]+(console|boot-file|boot-args|input-device)[ 	]' $bootenvrc > ${bootenvrc}.new
+		egrep -v '^setprop[ 	]+(boot-file|boot-args)[ 	]' $bootenvrc > ${bootenvrc}.new
 		[ -s ${bootenvrc}.new ] && mv ${bootenvrc}.new $bootenvrc
 	fi
 }
@@ -4674,6 +4720,9 @@ install_failsafe()
 		# 
 		if [ $failsafe_type = multiboot ]; then
 			rm -f $rootprefix/boot/platform/i86pc/kernel/unix
+		elif [ $failsafe_type = directboot ]; then
+			cp /tmp/bfubin/unix \
+			    $rootprefix/boot/platform/i86pc/kernel/unix
 		fi
 	else
 		echo "Updating failsafe archives"
@@ -4841,6 +4890,9 @@ EOF
 			fi
 		elif [ $failsafe_type = multiboot ]; then
 			rm -f $rootprefix/boot/platform/i86pc/kernel/unix
+		elif [ $failsafe_type = directboot ]; then
+			cp /tmp/bfubin/unix \
+			    $rootprefix/boot/platform/i86pc/kernel/unix
 		fi
 		build_boot_archive
 	else

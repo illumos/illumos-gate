@@ -364,7 +364,7 @@ bsetpropsi(char *name, int value)
  * to find the size of the buffer to allocate
  */
 /*ARGSUSED*/
-static int
+int
 do_bsys_getproplen(bootops_t *bop, char *name)
 {
 	bootprop_t *b;
@@ -381,7 +381,7 @@ do_bsys_getproplen(bootops_t *bop, char *name)
  * get the value associated with this name
  */
 /*ARGSUSED*/
-static int
+int
 do_bsys_getprop(bootops_t *bop, char *name, void *value)
 {
 	bootprop_t *b;
@@ -587,11 +587,10 @@ boot_prop_finish(void)
 			continue;
 
 		/*
-		 * If console was explicitly set on the command line it will
-		 * override a setting in bootenv.rc
+		 * If a property was explicitly set on the command line
+		 * it will override a setting in bootenv.rc
 		 */
-		if (strcmp(name, "console") == 0 &&
-		    do_bsys_getproplen(NULL, "console") > 0)
+		if (do_bsys_getproplen(NULL, name) > 0)
 			continue;
 
 		bsetprop(name, n_len, value, v_len + 1);

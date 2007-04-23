@@ -29,13 +29,13 @@
 #include <sys/systm.h>
 #include <sys/archsystm.h>
 #include <sys/boot_console.h>
+#include <sys/ctype.h>
 
 #include "boot_serial.h"
 #include "boot_vga.h"
 
 #if defined(_BOOT)
-#include "../dboot/dboot_xboot.h"
-#include <util/string.h>
+#include <dboot/dboot_xboot.h>
 #else
 #include <sys/bootconf.h>
 static char *usbser_buf;
@@ -51,6 +51,9 @@ static void serial_putchar(int);
 static void serial_adjust_prop(void);
 
 static char *boot_line = NULL;
+
+/* Set if the console or mode are expressed in the boot line */
+static int console_set, console_mode_set;
 
 /* Clear the screen and initialize VIDEO, XPOS and YPOS. */
 static void
@@ -171,6 +174,117 @@ serial_init(void)
 #endif
 }
 
+/* Advance str pointer past white space */
+#define	EAT_WHITE_SPACE(str)	{			\
+	while ((*str != '\0') && ISSPACE(*str))		\
+		str++;					\
+}
+
+/*
+ * boot_line is set when we call here.  Search it for the argument name,
+ * and if found, return a pointer to it.
+ */
+static char *
+find_boot_line_prop(const char *name)
+{
+	char *ptr;
+	char end_char;
+	size_t len;
+
+	if (boot_line == NULL)
+		return (NULL);
+
+	len = strlen(name);
+
+	/*
+	 * We have two nested loops here: the outer loop discards all options
+	 * except -B, and the inner loop parses the -B options looking for
+	 * the one we're interested in.
+	 */
+	for (ptr = boot_line; *ptr != '\0'; ptr++) {
+		EAT_WHITE_SPACE(ptr);
+
+		if (*ptr == '-') {
+			ptr++;
+			while ((*ptr != '\0') && (*ptr != 'B') &&
+			    !ISSPACE(*ptr))
+				ptr++;
+			if (*ptr == '\0')
+				return (NULL);
+			else if (*ptr != 'B')
+				continue;
+		} else {
+			while ((*ptr != '\0') && !ISSPACE(*ptr))
+				ptr++;
+			if (*ptr == '\0')
+				return (NULL);
+			continue;
+		}
+
+		do {
+			ptr++;
+			EAT_WHITE_SPACE(ptr);
+
+			if ((strncmp(ptr, name, len) == 0) &&
+			    (ptr[len] == '=')) {
+				ptr += len + 1;
+				if ((*ptr == '\'') || (*ptr == '"'))
+					return (ptr + 1);
+				else
+					return (ptr);
+			}
+
+			/*
+			 * We have a property, and it's not the one we're
+			 * interested in.  Skip the property name.  A name
+			 * can end with '=', a comma, or white space.
+			 */
+			while ((*ptr != '\0') && (*ptr != '=') &&
+			    (*ptr != ',') && (!ISSPACE(*ptr)))
+				ptr++;
+
+			/*
+			 * We only want to go through the rest of the inner
+			 * loop if we have a comma.  If we have a property
+			 * name without a value, either continue or break.
+			 */
+			if (*ptr == '\0')
+				return (NULL);
+			else if (*ptr == ',')
+				continue;
+			else if (ISSPACE(*ptr))
+				break;
+			ptr++;
+
+			/*
+			 * Is the property quoted?
+			 */
+			if ((*ptr == '\'') || (*ptr == '"')) {
+				end_char = *ptr;
+			} else {
+				/*
+				 * Not quoted, so the string ends at a comma
+				 * or at white space.  Deal with white space
+				 * later.
+				 */
+				end_char = ',';
+			}
+
+			/*
+			 * Now, we can ignore any characters until we find
+			 * end_char.
+			 */
+			for (; (*ptr != '\0') && (*ptr != end_char); ptr++) {
+				if ((end_char == ',') && ISSPACE(*ptr))
+					break;
+			}
+			if (*ptr && (*ptr != ','))
+				ptr++;
+		} while (*ptr == ',');
+	}
+	return (NULL);
+}
+
 
 #define	MATCHES(p, pat)	\
 	(strncmp(p, pat, strlen(pat)) == 0 ? (p += strlen(pat), 1) : 0)
@@ -187,17 +301,11 @@ serial_init(void)
 static char *
 get_mode_value(char *name)
 {
-	char *p;
-
 	/*
 	 * when specified on boot line it looks like "name" "="....
 	 */
 	if (boot_line != NULL) {
-		p = strstr(boot_line, name);
-		if (p == NULL)
-			return (NULL);
-		SKIP(p, '=');
-		return (p);
+		return (find_boot_line_prop(name));
 	}
 
 #if defined(_BOOT)
@@ -210,9 +318,9 @@ get_mode_value(char *name)
 		static char propval[20];
 
 		propval[0] = 0;
-		if (bootops == NULL || BOP_GETPROPLEN(bootops, name) == 0)
+		if (do_bsys_getproplen(NULL, name) <= 0)
 			return (NULL);
-		(void) BOP_GETPROP(bootops, name, propval);
+		(void) do_bsys_getprop(NULL, name, propval);
 		return (propval);
 	}
 #endif
@@ -237,6 +345,8 @@ serial_adjust_prop(void)
 	propval = get_mode_value(propname);
 	if (propval == NULL)
 		propval = "9600,8,n,1,-";
+	else
+		console_mode_set = 1;
 
 	/* property is of the form: "9600,8,n,1,-" */
 	p = propval;
@@ -334,18 +444,57 @@ serial_adjust_prop(void)
 	outb(port + MCR, mcr | OUT2);
 }
 
+/*
+ * A structure to map console names to values.
+ */
+typedef struct {
+	char *name;
+	int value;
+} console_value_t;
+
+console_value_t console_devices[] = {
+	{ "ttya", CONS_TTYA },
+	{ "ttyb", CONS_TTYB },
+	{ "text", CONS_SCREEN_TEXT },
+#if !defined(_BOOT)
+	{ "usb-serial", CONS_USBSER },
+#endif
+	{ "", CONS_INVALID }
+};
+
 void
 bcons_init(char *bootstr)
 {
+	console_value_t *consolep;
+	size_t len, cons_len;
+	char *cons_str;
+
 	boot_line = bootstr;
 	console = CONS_INVALID;
 
-	if (strstr(bootstr, "console=ttya") != 0)
-		console = CONS_TTYA;
-	else if (strstr(bootstr, "console=ttyb") != 0)
-		console = CONS_TTYB;
-	else if (strstr(bootstr, "console=text") != 0)
-		console = CONS_SCREEN_TEXT;
+	cons_str = find_boot_line_prop("console");
+	if (cons_str == NULL)
+		cons_str = find_boot_line_prop("output-device");
+
+	/*
+	 * Go through the console_devices array trying to match the string
+	 * we were given.  The string on the command line must end with
+	 * a comma or white space.
+	 */
+	if (cons_str != NULL) {
+		cons_len = strlen(cons_str);
+		consolep = console_devices;
+		for (; consolep->name[0] != '\0'; consolep++) {
+			len = strlen(consolep->name);
+			if ((len <= cons_len) && ((cons_str[len] == '\0') ||
+			    (cons_str[len] == ',') || (cons_str[len] == '\'') ||
+			    (cons_str[len] == '"') || ISSPACE(cons_str[len])) &&
+			    (strncmp(cons_str, consolep->name, len) == 0)) {
+				console = consolep->value;
+				break;
+			}
+		}
+	}
 
 	/*
 	 * If no console device specified, default to text.
@@ -353,6 +502,8 @@ bcons_init(char *bootstr)
 	 */
 	if (console == CONS_INVALID)
 		console = CONS_SCREEN_TEXT;
+	else
+		console_set = 1;
 
 	switch (console) {
 	case CONS_TTYA:
@@ -360,6 +511,14 @@ bcons_init(char *bootstr)
 		serial_init();
 		break;
 
+#if !defined(_BOOT)
+	case CONS_USBSER:
+		/*
+		 * We can't do anything with the usb serial
+		 * until we have memory management.
+		 */
+		break;
+#endif
 	case CONS_SCREEN_TEXT:
 	default:
 #if defined(_BOOT)
@@ -383,49 +542,50 @@ bcons_init2(char *inputdev, char *outputdev, char *consoledev)
 {
 #if !defined(_BOOT)
 	int cons = CONS_INVALID;
+	char *devnames[] = { consoledev, outputdev, inputdev, NULL };
+	console_value_t *consolep;
+	int i;
 
-	if (consoledev) {
-		if (strstr(consoledev, "ttya") != 0)
-			cons = CONS_TTYA;
-		else if (strstr(consoledev, "ttyb") != 0)
-			cons = CONS_TTYB;
-		else if (strstr(consoledev, "usb-serial") != 0)
-			cons = CONS_USBSER;
-	}
+	if (console != CONS_USBSER) {
+		if (console_set) {
+			/*
+			 * If the console was set on the command line,
+			 * but the ttyX-mode was not, we only need to
+			 * check bootenv.rc for that setting.
+			 */
+			if ((!console_mode_set) &&
+			    (console == CONS_TTYA || console == CONS_TTYB))
+				serial_init();
+			return;
+		}
 
-	if (cons == CONS_INVALID && inputdev) {
-		if (strstr(inputdev, "ttya") != 0)
-			cons = CONS_TTYA;
-		else if (strstr(inputdev, "ttyb") != 0)
-			cons = CONS_TTYB;
-		else if (strstr(inputdev, "usb-serial") != 0)
-			cons = CONS_USBSER;
-	}
+		for (i = 0; devnames[i] != NULL; i++) {
+			consolep = console_devices;
+			for (; consolep->name[0] != '\0'; consolep++) {
+				if (strcmp(devnames[i], consolep->name) == 0) {
+					cons = consolep->value;
+				}
+			}
+			if (cons != CONS_INVALID)
+				break;
+		}
 
-	if (cons == CONS_INVALID && outputdev) {
-		if (strstr(outputdev, "ttya") != 0)
-			cons = CONS_TTYA;
-		else if (strstr(outputdev, "ttyb") != 0)
-			cons = CONS_TTYB;
-		else if (strstr(outputdev, "usb-serial") != 0)
-			cons = CONS_USBSER;
-	}
+		if (cons == CONS_INVALID)
+			return;
+		if (cons == console)
+			return;
 
-	if (cons == CONS_INVALID)
-		return;
-	if (cons == console)
-		return;
-
-	console = cons;
-	if (cons == CONS_TTYA || cons == CONS_TTYB) {
-		serial_init();
-		return;
+		console = cons;
+		if (cons == CONS_TTYA || cons == CONS_TTYB) {
+			serial_init();
+			return;
+		}
 	}
 
 	/*
 	 * USB serial -- we just collect data into a buffer
 	 */
-	if (cons == CONS_USBSER) {
+	if (console == CONS_USBSER) {
 		extern void *usbser_init(size_t);
 		usbser_buf = usbser_cur = usbser_init(MMU_PAGESIZE);
 	}

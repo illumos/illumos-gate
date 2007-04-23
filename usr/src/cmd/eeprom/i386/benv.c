@@ -415,21 +415,24 @@ get_bootadm_value(char *name, const int quiet)
 
 /*
  * If quiet is 1, print nothing if there is no value.  If quiet is 0, print
- * a message.
+ * a message.  Return 1 if the value is printed, 0 otherwise.
  */
-static void
+static int
 print_bootadm_value(char *name, const int quiet)
 {
+	int rv = 0;
 	char *value = get_bootadm_value(name, quiet);
 
 	if ((value != NULL) && (value[0] != '\0')) {
 		(void) printf("%s=%s\n", name, value);
+		rv = 1;
 	} else if (quiet == 0) {
 		(void) printf("%s: data not available.\n", name);
 	}
 
 	if (value != NULL)
 		free(value);
+	return (rv);
 }
 
 static void
@@ -437,10 +440,23 @@ print_var(char *name, eplist_t *list)
 {
 	benv_ent_t *p;
 
-	if ((strcmp(name, "boot-file") == 0) ||
-	    (strcmp(name, "boot-args") == 0) ||
-	    (strcmp(name, "console") == 0)) {
-		print_bootadm_value(name, 0);
+	/*
+	 * The console property is kept in both menu.lst and bootenv.rc.  The
+	 * menu.lst value takes precedence.
+	 */
+	if (strcmp(name, "console") == 0) {
+		if (print_bootadm_value(name, 1) == 0) {
+			if ((p = get_var(name, list)) != NULL) {
+				(void) printf("%s=%s\n", name, p->val ?
+				    p->val : "");
+			} else {
+				(void) printf("%s: data not available.\n",
+				    name);
+			}
+		}
+	} else if ((strcmp(name, "boot-file") == 0) ||
+	    (strcmp(name, "boot-args") == 0)) {
+		(void) print_bootadm_value(name, 0);
 	} else if ((p = get_var(name, list)) == NULL)
 		(void) printf("%s: data not available.\n", name);
 	else
@@ -452,22 +468,30 @@ print_vars(eplist_t *list)
 {
 	eplist_t *e;
 	benv_ent_t *p;
+	int console_printed = 0;
+
+	/*
+	 * The console property is kept both in menu.lst and bootenv.rc.
+	 * The menu.lst value takes precedence, so try printing that one
+	 * first.
+	 */
+	console_printed = print_bootadm_value("console", 1);
 
 	for (e = list->next; e != list; e = e->next) {
 		p = (benv_ent_t *)e->item;
 		if (p->name != NULL) {
-			if ((strcmp(p->name, "boot-file") == 0) ||
-			    (strcmp(p->name, "boot-args") == 0) ||
-			    (strcmp(p->name, "console") == 0)) {
+			if (((strcmp(p->name, "console") == 0) &&
+			    (console_printed == 1)) ||
+			    ((strcmp(p->name, "boot-file") == 0) ||
+			    (strcmp(p->name, "boot-args") == 0))) {
 				/* handle these separately */
 				continue;
 			}
 			(void) printf("%s=%s\n", p->name, p->val ? p->val : "");
 		}
 	}
-	print_bootadm_value("boot-file", 1);
-	print_bootadm_value("boot-args", 1);
-	print_bootadm_value("console", 1);
+	(void) print_bootadm_value("boot-file", 1);
+	(void) print_bootadm_value("boot-args", 1);
 }
 
 /*
@@ -504,7 +528,7 @@ set_bootadm_var(char *name, char *value)
 
 	if (verbose) {
 		(void) printf("old:");
-		print_bootadm_value(name, 0);
+		(void) print_bootadm_value(name, 0);
 	}
 
 	/*
@@ -561,7 +585,7 @@ set_bootadm_var(char *name, char *value)
 
 	if (verbose) {
 		(void) printf("new:");
-		print_bootadm_value(name, 0);
+		(void) print_bootadm_value(name, 0);
 	}
 }
 
@@ -569,12 +593,23 @@ static void
 set_var(char *name, char *val, eplist_t *list)
 {
 	benv_ent_t *p;
+	int old_verbose;
 
 	if ((strcmp(name, "boot-file") == 0) ||
-	    (strcmp(name, "boot-args") == 0) ||
-	    (strcmp(name, "console") == 0)) {
+	    (strcmp(name, "boot-args") == 0)) {
 		set_bootadm_var(name, val);
 		return;
+	}
+
+	/*
+	 * The console property is kept in two places: menu.lst and bootenv.rc.
+	 * Update them both.  We clear verbose to prevent duplicate messages.
+	 */
+	if (strcmp(name, "console") == 0) {
+		old_verbose = verbose;
+		verbose = 0;
+		set_bootadm_var(name, val);
+		verbose = old_verbose;
 	}
 
 	if (verbose) {

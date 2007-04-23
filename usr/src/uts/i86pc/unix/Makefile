@@ -75,6 +75,7 @@ DBOOT_O		= $(OBJS_DIR)/$(DBOOT).o
 DBOOT_S		= $(DBOOT_O:%.o=%.s)
 DBOOT_LINTS	= $(DBOOT_OBJS:%.o=$(DBOOT_OBJS_DIR)/%.ln)
 DBOOT_LINT	= $(i386_LINT)
+DBOOT_LINTTAGS	= -erroff=E_STATIC_UNUSED
 
 #
 #	Include common rules.

@@ -153,7 +153,7 @@ dboot_elfload64(uintptr_t file_image)
 		src = (uintptr_t)PGETBYTES(phdr->p_offset);
 		dst = ktext_phys + phdr->p_paddr - FOUR_MEG;
 		if (prom_debug)
-			dboot_printf("copying %lu bytes from ELF offset 0x%lx "
+			dboot_printf("copying %ld bytes from ELF offset 0x%lx "
 			    "to physaddr 0x%lx (va=0x%lx)\n",
 			    (ulong_t)phdr->p_filesz, (ulong_t)phdr->p_offset,
 			    (ulong_t)dst, (ulong_t)phdr->p_vaddr);

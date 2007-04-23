@@ -240,6 +240,8 @@ extern void boot_prop_finish(void);
  */
 extern paddr_t do_bop_phys_alloc(uint64_t, uint64_t);
 
+extern int do_bsys_getproplen(bootops_t *, char *);
+extern int do_bsys_getprop(bootops_t *, char *, void *);
 
 #endif /* _KERNEL && !_BOOT */
 
