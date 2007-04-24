@@ -1051,7 +1051,7 @@ OpenSSL_FindCert(KMF_HANDLE_T handle,
 			/* If load succeeds, add certdata to the list */
 			if (kmf_cert != NULL) {
 				for (i = 0; i < loaded_certs &&
-				    i < maxcerts; i++) {
+				    n < maxcerts; i++) {
 					kmf_cert[n].certificate.Data =
 						certlist[i].Data;
 					kmf_cert[n].certificate.Length =
@@ -1065,7 +1065,10 @@ OpenSSL_FindCert(KMF_HANDLE_T handle,
 						strdup(fname);
 					n++;
 				}
-				/* If maxcerts < loaded_certs, clean up */
+				/*
+				 * If maxcerts < loaded_certs, clean up the
+				 * certs that were not used.
+				 */
 				for (; i < loaded_certs; i++)
 					KMF_FreeData(&certlist[i]);
 			} else {
