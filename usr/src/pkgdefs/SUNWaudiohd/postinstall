@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,19 +36,36 @@ not_installed() {
 	return $?
 }
 
+update_driver() {
+	driver=$1
+	aliases=$2
+	for alias in ${aliases}
+	do
+		egrep "^${driver}[  ]+${alias}" ${BASEDIR}/etc/driver_aliases>/dev/null 2>&1
+		if [ $? -ne 0 ]
+		then
+			update_drv -b "${BASEDIR}" -a -i "${alias}" ${driver}
+		fi
+	done
+}
+
 EXIT=0
 
 AUDIOHD_ALIASES="\
 	\"pci8086,2668\" \
 	\"pci10de,371\" \
+	\"pciclass,0403\" \
 	"
 	
 case "${ARCH}" in
 	i386)
-		not_installed audiohd || \
-		add_drv -b "${BASEDIR}" -i "${AUDIOHD_ALIASES}" -n audiohd || \
-		EXIT=1
-
+		not_installed audiohd
+		if [ $? -ne 0 ]
+		then
+			add_drv -b "${BASEDIR}" -i "${AUDIOHD_ALIASES}" -n audiohd || EXIT=1
+		else
+			update_driver audiohd "${AUDIOHD_ALIASES}" || EXIT=1
+		fi
 	;;
 esac
 

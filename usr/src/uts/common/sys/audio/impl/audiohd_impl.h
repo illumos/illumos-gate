@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _SYS_AUDIOHD_IMPL_H_
@@ -58,6 +58,14 @@ extern "C" {
 #define	AUDIOHD_VID_AD1986A	0x11d41986
 #define	AUDIOHD_VID_AD1988A	0x11d41988
 #define	AUDIOHD_VID_AD1988B	0x11d4198b
+
+#define	AUDIOHD_VID_INTEL	0x8086
+
+/*
+ * Only for Intel hardware:
+ * PCI Express traffic class select register in PCI configure space
+ */
+#define	AUDIOHD_INTEL_PCI_TCSEL 0x44
 
 /* vendor-id and device-id for ATI SB450 */
 #define	AUDIOHD_ATI_SB450	0x437d1002
@@ -123,7 +131,7 @@ extern "C" {
 #define	AUDIOHD_INTSTS_BIT_SINTS	(0x3fffffff)
 
 #define	AUDIOHD_REG_WALCLK		0x30
-#define	AUDIOHD_REG_SYNC		0x34
+#define	AUDIOHD_REG_SYNC		0x38
 
 #define	AUDIOHD_REG_CORBLBASE		0x40
 #define	AUDIOHD_REG_CORBUBASE		0x44
@@ -387,8 +395,8 @@ typedef struct {
 typedef struct {
 	ddi_dma_handle_t	ad_dmahdl;
 	ddi_acc_handle_t	ad_acchdl;
-	uintptr_t	ad_vaddr;	/* virtual addr */
-	uintptr_t	ad_paddr;	/* physical addr */
+	caddr_t		ad_vaddr;	/* virtual addr */
+	uint64_t	ad_paddr;	/* physical addr */
 	size_t		ad_req_sz;	/* required size of memory */
 	size_t		ad_real_sz;	/* real size of memory */
 } audiohd_dma_t;

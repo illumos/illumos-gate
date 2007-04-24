@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -770,7 +770,7 @@ static int
 audiohd_ad_start_play(audiohdl_t ahandle, int stream)
 {
 	audiohd_state_t	*statep;
-	uintptr_t	sbd_phys_addr;
+	uint64_t	sbd_phys_addr;
 	uint8_t		cTmp;
 	uint_t	regbase;
 
@@ -806,16 +806,16 @@ audiohd_ad_start_play(audiohdl_t ahandle, int stream)
 	statep->hda_flags |= AUDIOHD_PLAY_STARTED;
 
 	if (audiohd_fill_pbuf(statep) != AUDIO_SUCCESS) {
-		audio_sup_log(statep->hda_ahandle, CE_WARN,
-		    "!start_play() failed to get play sample");
-		statep->hda_flags &= ~AUDIOHD_PLAY_STARTED;
 		mutex_exit(&statep->hda_mutex);
 		am_play_shutdown(statep->hda_ahandle, NULL);
 		return (AUDIO_FAILURE);
 	}
 
 	sbd_phys_addr = statep->hda_dma_play_bd.ad_paddr;
-	AUDIOHD_REG_SET64(regbase + AUDIOHD_SDREG_OFFSET_BDLPL, sbd_phys_addr);
+	AUDIOHD_REG_SET32(regbase + AUDIOHD_SDREG_OFFSET_BDLPL,
+	    (uint32_t)sbd_phys_addr);
+	AUDIOHD_REG_SET32(regbase + AUDIOHD_SDREG_OFFSET_BDLPU,
+	    (uint32_t)(sbd_phys_addr >> 32));
 	AUDIOHD_REG_SET16(regbase + AUDIOHD_SDREG_OFFSET_LVI,
 	    AUDIOHD_BDLE_NUMS - 1);
 	AUDIOHD_REG_SET32(regbase + AUDIOHD_SDREG_OFFSET_CBL,
@@ -1072,7 +1072,10 @@ audiohd_ad_start_record(audiohdl_t ahandle, int stream)
 
 	regbase = statep->hda_record_regbase;
 	sbd_phys_addr = statep->hda_dma_record_bd.ad_paddr;
-	AUDIOHD_REG_SET64(regbase + AUDIOHD_SDREG_OFFSET_BDLPL, sbd_phys_addr);
+	AUDIOHD_REG_SET32(regbase + AUDIOHD_SDREG_OFFSET_BDLPL,
+	    (uint32_t)sbd_phys_addr);
+	AUDIOHD_REG_SET32(regbase + AUDIOHD_SDREG_OFFSET_BDLPU,
+	    (uint32_t)(sbd_phys_addr >> 32));
 	AUDIOHD_REG_SET16(regbase + AUDIOHD_SDREG_OFFSET_FORMAT,
 	    statep->hda_record_format);
 	AUDIOHD_REG_SET16(regbase + AUDIOHD_SDREG_OFFSET_LVI,
@@ -1298,6 +1301,8 @@ static int
 audiohd_init_pci(audiohd_state_t *statep, ddi_device_acc_attr_t *acc_attr)
 {
 	uint16_t	cmdreg;
+	uint16_t	vid;
+	uint8_t		cTmp;
 	dev_info_t	*dip = statep->hda_dip;
 	audiohdl_t	ahandle = statep->hda_ahandle;
 
@@ -1322,8 +1327,26 @@ audiohd_init_pci(audiohd_state_t *statep, ddi_device_acc_attr_t *acc_attr)
 	pci_config_put16(statep->hda_pci_handle, PCI_CONF_COMM,
 	    cmdreg | PCI_COMM_MAE | PCI_COMM_ME);
 
-	/* set TCSEL to TC0 */
-	pci_config_put8(statep->hda_pci_handle, 0x44, 0);
+	/*
+	 * Currently, Intel (G)MCH and ICHx chipsets support PCI Express
+	 * QoS. It implemenets two VCs(virtual channels) and allows OS
+	 * software to map 8 traffic classes to the two VCs. Some BIOSes
+	 * initialize HD audio hardware to use TC7 (traffic class 7) and
+	 * map TC7 to VC1 as Intel recommended. However, solaris doesn't
+	 * PCI express QoS yet. As a result, this driver can not work for
+	 * those hardware without touching PCI express control registers.
+	 * So, here, we set TCSEL to 0 so as to use TC0/VC0 (VC0 is always
+	 * enabled and TC0 is always mapped to VC0) for All Intel Hd audio
+	 * controllers.
+	 */
+	vid = pci_config_get16(statep->hda_pci_handle, PCI_CONF_VENID);
+	if (vid == AUDIOHD_VID_INTEL) {
+		cTmp = pci_config_get8(statep->hda_pci_handle,
+		    AUDIOHD_INTEL_PCI_TCSEL);
+		pci_config_put8(statep->hda_pci_handle,
+		    AUDIOHD_INTEL_PCI_TCSEL, (cTmp & 0xf8));
+	}
+
 
 	return (AUDIO_SUCCESS);
 
@@ -1499,7 +1522,7 @@ audiohd_alloc_dma_mem(audiohd_state_t *statep, audiohd_dma_t *pdma,
 		    "!map_regs() addr_bind_handle failed, cookies > 1");
 		goto error_alloc_dma_exit3;
 	}
-	pdma->ad_paddr = (uintptr_t)(cookie.dmac_laddress);
+	pdma->ad_paddr = (uint64_t)(cookie.dmac_laddress);
 	pdma->ad_req_sz = memsize;
 
 	return (AUDIO_SUCCESS);
@@ -1554,15 +1577,15 @@ audiohd_release_dma_mem(audiohd_dma_t *pdma)
 static int
 audiohd_init_controller(audiohd_state_t *statep)
 {
-	uintptr_t	addr;
+	uint64_t	addr;
 	uint16_t	gcap;
 	int		retval;
 
 	ddi_dma_attr_t	dma_attr = {
 		DMA_ATTR_V0,		/* version */
 		0,			/* addr_lo */
-		0xffffffffffffffff,	/* addr_hi */
-		0x00000000ffffffff,	/* count_max */
+		0xffffffffffffffffULL,	/* addr_hi */
+		0x00000000ffffffffULL,	/* count_max */
 		128,			/* 128-byte alignment as HD spec */
 		0xfff,			/* burstsize */
 		1,			/* minxfer */
@@ -1574,6 +1597,14 @@ audiohd_init_controller(audiohd_state_t *statep)
 	};
 
 	gcap = AUDIOHD_REG_GET16(AUDIOHD_REG_GCAP);
+
+	/*
+	 * If the device doesn't support 64-bit DMA, we should not
+	 * allocate DMA memory from 4G above
+	 */
+	if ((gcap & AUDIOHDR_GCAP_64OK) == 0)
+		dma_attr.dma_attr_addr_hi = 0xffffffffUL;
+
 	statep->hda_input_streams = (gcap & AUDIOHDR_GCAP_INSTREAMS) >> 8;
 	statep->hda_output_streams = (gcap & AUDIOHDR_GCAP_OUTSTREAMS) >> 12;
 	statep->hda_streams_nums = statep->hda_input_streams +
@@ -1663,7 +1694,9 @@ audiohd_init_controller(audiohd_state_t *statep)
 
 	/* Initialize RIRB */
 	addr = statep->hda_dma_rirb.ad_paddr;
-	AUDIOHD_REG_SET64(AUDIOHD_REG_RIRBLBASE, addr);
+	AUDIOHD_REG_SET32(AUDIOHD_REG_RIRBLBASE, (uint32_t)addr);
+	AUDIOHD_REG_SET32(AUDIOHD_REG_RIRBUBASE,
+	    (uint32_t)(addr >> 32));
 	AUDIOHD_REG_SET16(AUDIOHD_REG_RIRBWP, AUDIOHDR_RIRBWP_RESET);
 	AUDIOHD_REG_SET8(AUDIOHD_REG_RIRBSIZE, AUDIOHDR_RIRBSZ_256);
 	AUDIOHD_REG_SET8(AUDIOHD_REG_RIRBCTL, AUDIOHDR_RIRBCTL_DMARUN);
@@ -1671,7 +1704,9 @@ audiohd_init_controller(audiohd_state_t *statep)
 	/* initialize CORB */
 	addr = statep->hda_dma_corb.ad_paddr;
 	AUDIOHD_REG_SET16(AUDIOHD_REG_CORBRP, AUDIOHDR_CORBRP_RESET);
-	AUDIOHD_REG_SET64(AUDIOHD_REG_CORBLBASE, addr);
+	AUDIOHD_REG_SET32(AUDIOHD_REG_CORBLBASE, (uint32_t)addr);
+	AUDIOHD_REG_SET32(AUDIOHD_REG_CORBUBASE,
+	    (uint32_t)(addr >> 32));
 	AUDIOHD_REG_SET8(AUDIOHD_REG_CORBSIZE, AUDIOHDR_CORBSZ_256);
 	AUDIOHD_REG_SET16(AUDIOHD_REG_CORBWP, 0);
 	AUDIOHD_REG_SET16(AUDIOHD_REG_CORBRP, 0);
@@ -1984,8 +2019,11 @@ audiohd_preset_rbuf(audiohd_state_t *statep)
  * audiohd_fill_pbuf()
  *
  * Description:
- *	Get pending audio data, and fill out entries of stream
- *	descriptor list for playback.
+ *	Get pending audio data, and fill out entries of stream	descriptor
+ *	list for playback. This routine returns	AUDIO_FAILURE if it doesn't
+ *	fill any audio samples to DMA buffers. This can happen:
+ *		1) when mixer cannot provide any samples;
+ *		2) playback has been stopped during fetching samples;
  */
 static int
 audiohd_fill_pbuf(audiohd_state_t *statep)
@@ -2008,12 +2046,23 @@ audiohd_fill_pbuf(audiohd_state_t *statep)
 	rs = am_get_audio(statep->hda_ahandle, buf, AUDIO_NO_CHANNEL, samples);
 	mutex_enter(&statep->hda_mutex);
 
-	/*
-	 * If we cannot get sample or playback already stopped before
-	 * we re-grab mutex
-	 */
-	if ((rs <= 0) || ((statep->hda_flags & AUDIOHD_PLAY_STARTED) == 0))
+	/* If we cannot get sample */
+	if (rs <= 0) {
+		audio_sup_log(statep->hda_ahandle, CE_WARN,
+		    "!fill_pbuf() failed to get play sample");
+		statep->hda_flags &= ~AUDIOHD_PLAY_STARTED;
 		return (AUDIO_FAILURE);
+	}
+
+	/*
+	 * Because users can quickly start and stop audio streams, it
+	 * is possible that playback already stopped before we re-grab
+	 * mutex. In this case, we dispose fetched samples, and return
+	 * AUDIO_FAILURE as we didn't get samples.
+	 */
+	if ((statep->hda_flags & AUDIOHD_PLAY_STARTED) == 0) {
+		return (AUDIO_FAILURE);
+	}
 
 	for (i = 0; i < AUDIOHD_BDLE_NUMS; i++) {
 		entry->sbde_addr = buf_phys_addr;

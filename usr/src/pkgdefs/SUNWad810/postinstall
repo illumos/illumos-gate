@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,9 +36,29 @@ not_installed() {
 	return $?
 }
 
+
+#
+# Audio810(7d) driver had been released before solaris had
+# update_drv(1M) command so that we have to manually add
+# aliases via echo(1).
+#
+update_driver() {
+	driver=$1
+	aliases=$2
+	for alias in ${aliases}
+	do
+		egrep "^${driver}[ 	]+${alias}" ${BASEDIR}/etc/driver_aliases>/dev/null 2>&1
+		if [ $? -ne 0 ]
+		then
+			 echo "${driver} ${alias}" >> ${BASEDIR}/etc/driver_aliases
+		fi
+	done
+}
+
 EXIT=0
 
 I810_ALIASES="\
+	\"pci1022,7445\" \
 	\"pci1022,746d\" \
 	\"pci8086,2485\" \
 	\"pci8086,24c5\" \
@@ -50,14 +70,18 @@ I810_ALIASES="\
 	\"pci10de,ea\" \
 	\"pci10de,59\" \
 	\"pci10de,3a\" \
+	\"pci10de,26b\" \
 	"
 	
 case "${ARCH}" in
 	i386)
-		not_installed audio810 || \
-		add_drv -b "${BASEDIR}" -i "${I810_ALIASES}" -n audio810 || \
-		EXIT=1
-
+		not_installed audio810
+		if [ $? -ne 0 ] 
+		then 
+			add_drv -b "${BASEDIR}" -i "${I810_ALIASES}" -n audio810 || EXIT=1
+		else
+			update_driver  audio810 "${I810_ALIASES}" || EXIT=1
+		fi
 	;;
 esac
 
