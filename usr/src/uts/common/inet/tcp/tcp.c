@@ -26479,6 +26479,10 @@ tcp_kstat2_init(netstackid_t stackid, tcp_stat_t *tcps_statisticsp)
 		{ "tcp_fusion_rrw_plugged",	KSTAT_DATA_UINT64 },
 		{ "tcp_in_ack_unsent_drop",	KSTAT_DATA_UINT64 },
 		{ "tcp_sock_fallback",		KSTAT_DATA_UINT64 },
+		{ "tcp_lso_enabled",		KSTAT_DATA_UINT64 },
+		{ "tcp_lso_disabled",		KSTAT_DATA_UINT64 },
+		{ "tcp_lso_times",		KSTAT_DATA_UINT64 },
+		{ "tcp_lso_pkt_out",		KSTAT_DATA_UINT64 },
 	};
 
 	ksp = kstat_create_netstack(TCP_MOD_NAME, 0, "tcpstat", "net",
