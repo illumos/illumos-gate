@@ -88,8 +88,6 @@ static int auto_lookup_request(fninfo_t *, char *, struct linka *,
 static int auto_mount_request(fninfo_t *, char *, action_list **, cred_t *,
     bool_t);
 
-extern struct autofs_globals *autofs_zone_init(void);
-
 /*
  * Clears the MF_INPROG flag, and wakes up those threads sleeping on
  * fn_cv_mount if MF_WAITING is set.
@@ -314,7 +312,6 @@ auto_new_mount_thread(fnnode_t *fnp, char *name, cred_t *cred)
 	autofs_thr_success++;
 }
 
-
 int
 auto_calldaemon(
 	zoneid_t 		zoneid,
@@ -337,6 +334,8 @@ auto_calldaemon(
 	int			orig_reslen = reslen;
 	autofs_door_args_t	*xdr_argsp;
 	int			xdr_len = 0;
+	int			printed_not_running_msg = 0;
+	klwp_t			*lwp = ttolwp(curthread);
 
 	/*
 	 * We know that the current thread is doing work on
@@ -354,10 +353,37 @@ auto_calldaemon(
 		return (ECONNREFUSED);
 	}
 
-	if ((fngp = zone_getspecific(autofs_key, curproc->p_zone)) ==
-	    NULL) {
-		fngp = autofs_zone_init();
-		(void) zone_setspecific(autofs_key, curproc->p_zone, fngp);
+	do {
+		retry = 0;
+		mutex_enter(&autofs_minor_lock);
+		fngp = zone_getspecific(autofs_key, curproc->p_zone);
+		mutex_exit(&autofs_minor_lock);
+		if (fngp == NULL) {
+			if (hard) {
+				AUTOFS_DPRINT((5,
+				    "auto_calldaemon: "\
+				    "failed to get door handle\n"));
+				if (!printed_not_running_msg) {
+					printed_not_running_msg = 1;
+					zprintf(zoneid, "automountd not "\
+					    "running, retrying\n");
+				}
+				delay(hz);
+				retry = 1;
+			} else {
+				/*
+				 * There is no global data so no door.
+				 * There's no point in attempting to talk
+				 * to automountd if we can't get the door
+				 * handle.
+				 */
+				return (ECONNREFUSED);
+			}
+		}
+	} while (retry);
+
+	if (printed_not_running_msg) {
+		fngp->fng_printed_not_running_msg = printed_not_running_msg;
 	}
 
 	ASSERT(fngp != NULL);
@@ -434,8 +460,19 @@ auto_calldaemon(
 		case EINTR:
 			/*
 			 * interrupts should be handled properly by the
-			 * door upcall.
-			 *
+			 * door upcall. If the door doesn't handle the
+			 * interupt completely then we need to bail out.
+			 */
+			if (lwp && (ISSIG(curthread,
+			    JUSTLOOKING) || MUSTRETURN(curproc, curthread))) {
+				if (ISSIG(curthread, FORREAL) ||
+				    lwp->lwp_sysabort ||
+				    MUSTRETURN(curproc, curthread)) {
+					lwp->lwp_sysabort = 0;
+					return (EINTR);
+				}
+			}
+			/*
 			 * We may have gotten EINTR for other reasons
 			 * like the door being revoked on us. Instead
 			 * of trying to extract this out of the door
@@ -443,6 +480,7 @@ auto_calldaemon(
 			 * revoked we will get EBADF next time
 			 * through.
 			 */
+			/* FALLTHROUGH */
 		case EAGAIN:    /* process may be forking */
 			/*
 			 * Back off for a bit

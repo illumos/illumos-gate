@@ -57,8 +57,8 @@ static int autofs_init(int, char *);
 
 static major_t autofs_major;
 static minor_t autofs_minor;
-static kmutex_t autofs_minor_lock;
 
+kmutex_t autofs_minor_lock;
 zone_key_t autofs_key;
 
 static mntopts_t auto_mntopts;

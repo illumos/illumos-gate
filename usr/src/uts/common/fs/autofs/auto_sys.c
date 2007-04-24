@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,14 +53,17 @@ autofssys(enum autofssys_op opcode, uintptr_t arg)
 			return (set_errno(EPERM));
 		if ((zone = zone_find_by_id(zoneid)) == NULL)
 			return (set_errno(EINVAL));
+		mutex_enter(&autofs_minor_lock);
 		fngp = zone_getspecific(autofs_key, zone);
 		if (fngp == NULL) {
+			mutex_exit(&autofs_minor_lock);
 			zone_rele(zone);
 			/*
 			 * There were no mounts, so no work to do. Success.
 			 */
 			return (0);
 		}
+		mutex_exit(&autofs_minor_lock);
 		unmount_tree(fngp, 1);
 		zone_rele(zone);
 		break;
@@ -69,12 +72,17 @@ autofssys(enum autofssys_op opcode, uintptr_t arg)
 		uint_t did;
 		struct autofs_globals *fngp;
 
+		/*
+		 * We need to use the minor_lock to serialize setting this.
+		 */
+		mutex_enter(&autofs_minor_lock);
 		fngp = zone_getspecific(autofs_key, curproc->p_zone);
 		if (fngp == NULL) {
 			fngp = autofs_zone_init();
 			(void) zone_setspecific(autofs_key,
 						curproc->p_zone, fngp);
 		}
+		mutex_exit(&autofs_minor_lock);
 		ASSERT(fngp != NULL);
 
 		if (copyin((uint_t *)arg, &did, sizeof (uint_t)))

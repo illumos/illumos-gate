@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -232,6 +232,7 @@ struct autofs_globals {
 	door_handle_t		fng_autofs_daemon_dh;
 };
 
+extern kmutex_t autofs_minor_lock;
 extern zone_key_t autofs_key;
 
 /*
