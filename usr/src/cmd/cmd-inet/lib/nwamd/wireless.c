@@ -130,7 +130,7 @@ static uint_t wireless_lan_count = 0; /* allocated */
 static uint_t wireless_lan_used = 0; /* used entries */
 
 static int wepkey_string_to_secobj_value(char *, uint8_t *, uint_t *);
-static int store_wepkey(char *, char *, char *);
+static int store_wepkey(struct wireless_lan *);
 static dladm_wlan_wepkey_t *retrieve_wepkey(const char *, const char *);
 
 static boolean_t add_wlan_entry(struct interface *, char *, char *, char *,
@@ -209,8 +209,7 @@ get_user_wepkey(struct wireless_lan *wlan)
 			wlan->raw_wepkey = strdup(buf);
 			if (wlan->raw_wepkey != NULL) {
 				/* Store WEP key persistently */
-				if (store_wepkey(wlan->essid, wlan->bssid,
-				    wlan->raw_wepkey) != 0) {
+				if (store_wepkey(wlan) != 0) {
 					syslog(LOG_ERR,
 					    "get_user_wepkey: failed to store"
 					    " user specified WEP key");
@@ -605,22 +604,23 @@ wepkey_string_to_secobj_value(char *buf, uint8_t *obj_val, uint_t *obj_lenp)
 static void
 set_key_name(const char *essid, const char *bssid, char *name, size_t nsz)
 {
-	int i;
+	int i, rtn, len;
 
 	if (bssid == NULL)
-		(void) snprintf(name, nsz, "nwam-%s", essid);
+		rtn = snprintf(name, nsz, "nwam-%s", essid);
 	else
-		(void) snprintf(name, nsz, "nwam-%s-%s", essid, bssid);
-	for (i = 0; i < strlen(name); i++)
+		rtn = snprintf(name, nsz, "nwam-%s-%s", essid, bssid);
+	len = (rtn < nsz) ? rtn : nsz - 1;
+	for (i = 0; i < len; i++)
 		if (name[i] == ':')
 			name[i] = '.';
 }
 
 static int
-store_wepkey(char *essid, char *bssid, char *raw_wepkey)
+store_wepkey(struct wireless_lan *wlan)
 {
 	uint8_t obj_val[DLADM_SECOBJ_VAL_MAX];
-	uint_t obj_len;
+	uint_t obj_len = sizeof (obj_val);
 	char obj_name[DLADM_SECOBJ_NAME_MAX];
 	dladm_status_t status;
 	char errmsg[DLADM_STRSIZE];
@@ -629,10 +629,11 @@ store_wepkey(char *essid, char *bssid, char *raw_wepkey)
 	 * Name wepkey object for this WLAN so it can be later retrieved
 	 * (name is unique for each ESSID/BSSID combination).
 	 */
-	set_key_name(essid, bssid, obj_name, sizeof (obj_name));
+	set_key_name(wlan->essid, wlan->bssid, obj_name, sizeof (obj_name));
 	dprintf("store_wepkey: obj_name is %s", obj_name);
 
-	if (wepkey_string_to_secobj_value(raw_wepkey, obj_val, &obj_len) != 0) {
+	if (wepkey_string_to_secobj_value(wlan->raw_wepkey, obj_val, &obj_len)
+	    != 0) {
 		/* above function logs internally on failure */
 		return (-1);
 	}
@@ -646,6 +647,20 @@ store_wepkey(char *essid, char *bssid, char *raw_wepkey)
 		    dladm_status2str(status, errmsg));
 		return (-1);
 	}
+	/*
+	 * We don't really need to retrieve the key we just stored, but
+	 * we do need to set the cooked key, and the function below takes
+	 * care of allocating memory and setting the length and slot ID
+	 * besides just copying the value, so it is simpler just to call
+	 * the retrieve function instead of doing it all here.
+	 *
+	 * Since we just stored the key, retrieve_wepkey() "shouldn't"
+	 * fail.  If it does fail, it's not the end of the world; a NULL
+	 * value for wlan->cooked_wepkey simply means this particular
+	 * attempt to connect will fail, and alternative connection
+	 * options will be used.
+	 */
+	wlan->cooked_wepkey = retrieve_wepkey(wlan->essid, wlan->bssid);
 	return (0);
 }
 
