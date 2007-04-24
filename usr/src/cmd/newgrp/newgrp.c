@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -203,17 +203,11 @@ error(char *s)
 	exit(1);
 }
 
-gid_t
-chkgrp(gname, p)
-char	*gname;
-struct	passwd *p;
+void
+put_event(char *gname, int sorf)
 {
-	char **t;
-	struct group *g;
-	gid_t	gid;
 	adt_session_data_t	*ah;
 	adt_event_data_t	*event;
-	int			sorf = ADT_SUCCESS;
 
 	if (adt_start_session(&ah, NULL, ADT_USE_PROC_DATA) != 0) {
 		syslog(LOG_AUTH | LOG_ALERT,
@@ -226,40 +220,53 @@ struct	passwd *p;
 		event->adt_newgrp_login.groupname = gname;
 	}
 
-	g = getgrnam(gname);
-	endgrent();
-	if (g == NULL) {
-		warn(UG);
-		gid = getgid();
-		goto audit;
-	}
-	gid = g->gr_gid;
-	if (p->pw_gid == g->gr_gid || getuid() == 0)
-		goto audit;
-	for (t = g->gr_mem; *t; ++t) {
-		if (strcmp(p->pw_name, *t) == 0)
-			goto audit;
-	}
-	if (*g->gr_passwd) {
-		if (!isatty(fileno(stdin))) {
-			error(PD);
-		}
-		if (strcmp(g->gr_passwd,
-		    crypt(getpassphrase(PW), g->gr_passwd)) == 0) {
-			goto audit;
-		}
-		sorf = ADT_FAILURE;
-	}
-	warn(NG);
-audit:
 	if (adt_put_event(event, sorf, sorf) != 0) {
 		syslog(LOG_AUTH | LOG_ALERT,
 		    "adt_put_event(ADT_newgrp, %d): %m", sorf);
 	}
 	adt_free_event(event);
 	(void) adt_end_session(ah);
+}
 
-	return (gid);
+gid_t
+chkgrp(gname, p)
+char	*gname;
+struct	passwd *p;
+{
+	char **t;
+	struct group *g;
+
+	g = getgrnam(gname);
+	endgrent();
+	if (g == NULL) {
+		warn(UG);
+		put_event(gname, ADT_FAILURE);
+		return (getgid());
+	}
+	if (p->pw_gid == g->gr_gid || getuid() == 0) {
+		put_event(gname, ADT_SUCCESS);
+		return (g->gr_gid);
+	}
+	for (t = g->gr_mem; *t; ++t) {
+		if (strcmp(p->pw_name, *t) == 0) {
+			put_event(gname, ADT_SUCCESS);
+			return (g->gr_gid);
+		}
+	}
+	if (*g->gr_passwd) {
+		if (!isatty(fileno(stdin))) {
+			put_event(gname, ADT_FAILURE);
+			error(PD);
+		}
+		if (strcmp(g->gr_passwd,
+		    crypt(getpassphrase(PW), g->gr_passwd)) == 0) {
+			put_event(gname, ADT_SUCCESS);
+			return (g->gr_gid);
+		}
+	}
+	put_event(gname, ADT_FAILURE);
+	warn(NG);
+	return (getgid());
 }
 
 void
