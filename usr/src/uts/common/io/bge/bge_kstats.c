@@ -1169,6 +1169,13 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 			*val = pstats->dot3StatsFrameTooLongs;
 		break;
 
+	case ETHER_STAT_TOOSHORT_ERRORS:
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			*val = bstp->s.etherStatsUndersizePkts;
+		else
+			*val = pstats->etherStatsUndersizePkts;
+		break;
+
 	case ETHER_STAT_XCVR_ADDR:
 		*val = bgep->phy_mii_addr;
 		break;
@@ -1225,6 +1232,10 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = 1;
 		break;
 
+	case ETHER_STAT_CAP_REMFAULT:
+		*val = 1;
+		break;
+
 	case ETHER_STAT_ADV_CAP_1000FDX:
 		*val = bgep->param_adv_1000fdx;
 		break;
@@ -1261,6 +1272,17 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = bgep->param_adv_autoneg;
 		break;
 
+	case ETHER_STAT_ADV_REMFAULT:
+		mutex_enter(bgep->genlock);
+		*val = bge_mii_get16(bgep, MII_AN_ADVERT) &
+		    MII_AN_ADVERT_REMFAULT ? 1 : 0;
+		if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
+			ddi_fm_service_impact(bgep->devinfo,
+			    DDI_SERVICE_UNAFFECTED);
+		}
+		mutex_exit(bgep->genlock);
+		break;
+
 	case ETHER_STAT_LP_CAP_1000FDX:
 		*val = bgep->param_lp_1000fdx;
 		break;
@@ -1295,6 +1317,17 @@ bge_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 	case ETHER_STAT_LP_CAP_AUTONEG:
 		*val = bgep->param_lp_autoneg;
+		break;
+
+	case ETHER_STAT_LP_REMFAULT:
+		mutex_enter(bgep->genlock);
+		*val = bge_mii_get16(bgep, MII_AN_LPABLE) &
+		    MII_AN_ADVERT_REMFAULT ? 1 : 0;
+		if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
+			ddi_fm_service_impact(bgep->devinfo,
+			    DDI_SERVICE_UNAFFECTED);
+		}
+		mutex_exit(bgep->genlock);
 		break;
 
 	case ETHER_STAT_LINK_ASMPAUSE:

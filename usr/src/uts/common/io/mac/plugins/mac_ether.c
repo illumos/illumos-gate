@@ -59,6 +59,7 @@ static mac_stat_info_t ether_stats[] = {
 	{ ETHER_STAT_CARRIER_ERRORS, "carrier_errors", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_TOOLONG_ERRORS, "toolong_errors", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_MACRCV_ERRORS, "macrcv_errors", KSTAT_DATA_UINT32, 0 },
+	{ ETHER_STAT_TOOSHORT_ERRORS, "runt_errors", KSTAT_DATA_UINT32,	0 },
 
 	/* Statistics described in the ieee802.3(5) man page */
 	{ ETHER_STAT_XCVR_ADDR, "xcvr_addr", KSTAT_DATA_UINT32,		0 },
@@ -73,6 +74,7 @@ static mac_stat_info_t ether_stats[] = {
 	{ ETHER_STAT_CAP_ASMPAUSE, "cap_asmpause", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_CAP_PAUSE, "cap_pause", KSTAT_DATA_UINT32,		0 },
 	{ ETHER_STAT_CAP_AUTONEG, "cap_autoneg", KSTAT_DATA_UINT32,	0 },
+	{ ETHER_STAT_CAP_REMFAULT, "cap_rem_fault", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_ADV_CAP_1000FDX, "adv_cap_1000fdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_ADV_CAP_1000HDX, "adv_cap_1000hdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_ADV_CAP_100FDX, "adv_cap_100fdx", KSTAT_DATA_UINT32, 0},
@@ -83,6 +85,7 @@ static mac_stat_info_t ether_stats[] = {
 	    0 },
 	{ ETHER_STAT_ADV_CAP_PAUSE, "adv_cap_pause", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_ADV_CAP_AUTONEG, "adv_cap_autoneg", KSTAT_DATA_UINT32, 0 },
+	{ ETHER_STAT_ADV_REMFAULT, "adv_rem_fault", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_LP_CAP_1000FDX, "lp_cap_1000fdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_LP_CAP_1000HDX, "lp_cap_1000hdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_LP_CAP_100FDX, "lp_cap_100fdx", KSTAT_DATA_UINT32,	0 },
@@ -92,6 +95,7 @@ static mac_stat_info_t ether_stats[] = {
 	{ ETHER_STAT_LP_CAP_ASMPAUSE, "lp_cap_asmpause", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_LP_CAP_PAUSE, "lp_cap_pause", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_LP_CAP_AUTONEG, "lp_cap_autoneg", KSTAT_DATA_UINT32, 0 },
+	{ ETHER_STAT_LP_REMFAULT, "lp_rem_fault", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_LINK_ASMPAUSE, "link_asmpause", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_LINK_PAUSE, "link_pause", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_LINK_AUTONEG, "link_autoneg", KSTAT_DATA_UINT32,	0 },

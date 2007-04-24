@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,8 @@ static mac_stat_info_t	i_mac_si[] = {
 	{ MAC_STAT_NOXMTBUF,	"noxmtbuf",	KSTAT_DATA_UINT32,	0 },
 	{ MAC_STAT_OERRORS,	"oerrors",	KSTAT_DATA_UINT32,	0 },
 	{ MAC_STAT_COLLISIONS,	"collisions",	KSTAT_DATA_UINT32,	0 },
+	{ MAC_STAT_UNDERFLOWS,	"uflo",		KSTAT_DATA_UINT32,	0 },
+	{ MAC_STAT_OVERFLOWS,	"oflo",		KSTAT_DATA_UINT32,	0 },
 	{ MAC_STAT_RBYTES,	"rbytes",	KSTAT_DATA_UINT32,	0 },
 	{ MAC_STAT_IPACKETS,	"ipackets",	KSTAT_DATA_UINT32,	0 },
 	{ MAC_STAT_OBYTES,	"obytes",	KSTAT_DATA_UINT32,	0 },

@@ -107,6 +107,9 @@ typedef struct mac_stat_info_s {
 	(stat >= MAC_STAT_MIN && stat < MACTYPE_STAT_MIN)
 #define	IS_MACTYPE_STAT(stat)	(stat >= MACTYPE_STAT_MIN)
 
+/*
+ * Do not reorder, and add only to the end of this list.
+ */
 enum mac_driver_stat {
 	/* MIB-II stats (RFC 1213 and RFC 1573) */
 	MAC_STAT_IFSPEED = MAC_STAT_MIN,
@@ -123,10 +126,12 @@ enum mac_driver_stat {
 	MAC_STAT_RBYTES,
 	MAC_STAT_IPACKETS,
 	MAC_STAT_OBYTES,
-	MAC_STAT_OPACKETS
+	MAC_STAT_OPACKETS,
+	MAC_STAT_UNDERFLOWS,
+	MAC_STAT_OVERFLOWS
 };
 
-#define	MAC_NSTAT	(MAC_STAT_OPACKETS - MAC_STAT_IFSPEED + 1)
+#define	MAC_NSTAT	(MAC_STAT_OVERFLOWS - MAC_STAT_IFSPEED + 1)
 
 #define	MAC_STAT_ISACOUNTER(_stat) (		\
 	    (_stat) == MAC_STAT_MULTIRCV ||	\
@@ -142,7 +147,9 @@ enum mac_driver_stat {
 	    (_stat) == MAC_STAT_RBYTES ||	\
 	    (_stat) == MAC_STAT_IPACKETS ||	\
 	    (_stat) == MAC_STAT_OBYTES ||	\
-	    (_stat) == MAC_STAT_OPACKETS)
+	    (_stat) == MAC_STAT_OPACKETS ||	\
+	    (_stat) == MAC_STAT_UNDERFLOWS ||	\
+	    (_stat) == MAC_STAT_OVERFLOWS)
 
 /*
  * Maximum MAC address length
