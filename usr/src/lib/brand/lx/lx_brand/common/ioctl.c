@@ -1242,17 +1242,17 @@ static int
 ict_tcgets_emulate(int fd, struct stat *stat,
     int cmd, char *cmd_str, intptr_t arg)
 {
-	struct lx_termios	l_tio, *l_tiop = (struct lx_termios *)arg;
-	struct termios		s_tio;
+	struct lx_termios	l_tios, *l_tiosp = (struct lx_termios *)arg;
+	struct termios		s_tios;
 
 	assert(cmd == LX_TCGETS);
 
-	if (syscall(SYS_brand, B_TTYMODES, &s_tio) < 0)
+	if (syscall(SYS_brand, B_TTYMODES, &s_tios) < 0)
 		return (-errno);
 
 	/* Now munge the data to how Linux wants it. */
-	s2l_termios(&s_tio, &l_tio);
-	if (uucopy(&l_tio, l_tiop, sizeof (l_tio)) != 0)
+	s2l_termios(&s_tios, &l_tios);
+	if (uucopy(&l_tios, l_tiosp, sizeof (l_tios)) != 0)
 		return (-errno);
 
 	return (0);
@@ -1263,8 +1263,8 @@ static int
 ict_tcgets_native(int fd, struct stat *stat,
     int cmd, char *cmd_str, intptr_t arg)
 {
-	struct lx_termios	l_tio, *l_tiop = (struct lx_termios *)arg;
-	struct termios		s_tio;
+	struct lx_termios	l_tios, *l_tiosp = (struct lx_termios *)arg;
+	struct termios		s_tios;
 	struct lx_cc		lio;
 	int			ldlinux;
 
@@ -1275,34 +1275,30 @@ ict_tcgets_native(int fd, struct stat *stat,
 
 	lx_debug("\tioctl(%d, 0x%x - %s, ...)",
 	    fd, TCGETS, "TCGETS");
-	if (ioctl(fd, TCGETS, (intptr_t)&s_tio) < 0)
+	if (ioctl(fd, TCGETS, (intptr_t)&s_tios) < 0)
 		return (-errno);
 
 	/* Now munge the data to how Linux wants it. */
-	s2l_termios(&s_tio, &l_tio);
-
-	/* Copy out the data. */
-	if (uucopy(&l_tio, l_tiop, sizeof (l_tio)) != 0)
-		return (-errno);
+	s2l_termios(&s_tios, &l_tios);
 
 	/*
 	 * The TIOCSETLD/TIOCGETLD ioctls are only supported by the
 	 * ldlinux strmod.  So make sure the module exists on the
 	 * target stream before we invoke the ioctl.
 	 */
-	if (ldlinux == 0)
-		return (0);
+	if (ldlinux != 0) {
+		if (ioctl_istr(fd, TIOCGETLD, "TIOCGETLD",
+		    &lio, sizeof (lio)) < 0)
+			return (-errno);
 
-	if (ioctl_istr(fd, TIOCGETLD, "TIOCGETLD", &lio, sizeof (lio)) < 0)
-		return (-errno);
-
-	l_tio.c_cc[LX_VEOF] = lio.veof;
-	l_tio.c_cc[LX_VEOL] = lio.veol;
-	l_tio.c_cc[LX_VMIN] = lio.vmin;
-	l_tio.c_cc[LX_VTIME] = lio.vtime;
+		l_tios.c_cc[LX_VEOF] = lio.veof;
+		l_tios.c_cc[LX_VEOL] = lio.veol;
+		l_tios.c_cc[LX_VMIN] = lio.vmin;
+		l_tios.c_cc[LX_VTIME] = lio.vtime;
+	}
 
 	/* Copy out the data. */
-	if (uucopy(&l_tio, l_tiop, sizeof (l_tio)) != 0)
+	if (uucopy(&l_tios, l_tiosp, sizeof (l_tios)) != 0)
 		return (-errno);
 
 	return (0);
@@ -1330,25 +1326,20 @@ ict_tcgeta(int fd, struct stat *stat, int cmd, char *cmd_str, intptr_t arg)
 	/* Now munge the data to how Linux wants it. */
 	s2l_termio(&s_tio, &l_tio);
 
-	/* Copy out the data. */
-	if (uucopy(&l_tio, l_tiop, sizeof (l_tio)) != 0)
-		return (-errno);
-
 	/*
 	 * The TIOCSETLD/TIOCGETLD ioctls are only supported by the
 	 * ldlinux strmod.  So make sure the module exists on the
 	 * target stream before we invoke the ioctl.
 	 */
-	if (ldlinux == 0)
-		return (0);
+	if (ldlinux != 0) {
+		if (ioctl_istr(fd, TIOCGETLD, "TIOCGETLD",
+		    &lio, sizeof (lio)) < 0)
+			return (-errno);
 
-	if (ioctl_istr(fd, TIOCGETLD, "TIOCGETLD", &lio, sizeof (lio)) < 0)
-		return (-errno);
-
-	l_tio.c_cc[LX_VEOF] = lio.veof;
-	l_tio.c_cc[LX_VEOL] = lio.veol;
-	l_tio.c_cc[LX_VMIN] = lio.vmin;
-	l_tio.c_cc[LX_VTIME] = lio.vtime;
+		l_tio.c_cc[LX_VEOF] = lio.veof;
+		l_tio.c_cc[LX_VMIN] = lio.vmin;
+		l_tio.c_cc[LX_VTIME] = lio.vtime;
+	}
 
 	/* Copy out the data. */
 	if (uucopy(&l_tio, l_tiop, sizeof (l_tio)) != 0)

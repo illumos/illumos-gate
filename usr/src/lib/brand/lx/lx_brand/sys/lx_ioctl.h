@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +34,14 @@ extern "C" {
 
 extern int lx_ioctl_init(void);
 
+/*
+ * LX_NCC must be different from LX_NCCS since while the termio and termios
+ * structures may look similar they are fundamentally different sizes and
+ * have different members.
+ */
 #define	LX_NCC	8
+#define	LX_NCCS	19
+
 struct lx_termio {
 	unsigned short c_iflag;		/* input mode flags */
 	unsigned short c_oflag;		/* output mode flags */
@@ -44,7 +51,6 @@ struct lx_termio {
 	unsigned char c_cc[LX_NCC];	/* control characters */
 };
 
-#define	LX_NCCS 19
 struct lx_termios {
 	uint32_t c_iflag;		/* input mode flags */
 	uint32_t c_oflag;		/* output mode flags */
@@ -54,7 +60,9 @@ struct lx_termios {
 	unsigned char c_cc[LX_NCCS];	/* control characters */
 };
 
-/* c_cc characters */
+/*
+ * c_cc characters which are valid for lx_termio and lx_termios
+ */
 #define	LX_VINTR	0
 #define	LX_VQUIT	1
 #define	LX_VERASE	2
@@ -63,6 +71,10 @@ struct lx_termios {
 #define	LX_VTIME	5
 #define	LX_VMIN		6
 #define	LX_VSWTC	7
+
+/*
+ * c_cc characters which are valid for lx_termios
+ */
 #define	LX_VSTART	8
 #define	LX_VSTOP	9
 #define	LX_VSUSP	10
