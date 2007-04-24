@@ -103,6 +103,17 @@ cat >> $BASEDIR/var/svc/profile/upgrade <<\_DEL_BIND8
 _DEL_BIND8
 
 #
+# Get rid of obsolete DARPA trivial name server (Death to IEN-116!)
+#
+cat >> $BASEDIR/var/svc/profile/upgrade <<\_DEL_TNAME
+	svcs svc:/network/tname > /dev/null 2>&1
+	if [ "$?" = 0 ]; then
+		svcadm disable -s svc:/network/tname
+		svccfg delete svc:/network/tname
+	fi
+_DEL_TNAME
+
+#
 # Remove stale GLD services
 #
 SVCCFG_REPOSITORY=$PKG_INSTALL_ROOT/etc/svc/repository.db

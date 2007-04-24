@@ -1052,6 +1052,7 @@ smf_obsolete_manifests="
 	var/svc/manifest/system/filesystem/volfs.xml
 	var/svc/manifest/network/pfil.xml
 	var/svc/manifest/platform/sun4u/mpxio-upgrade.xml
+	var/svc/manifest/network/tname.xml
 "
 
 # smf services whose manifests have been renamed

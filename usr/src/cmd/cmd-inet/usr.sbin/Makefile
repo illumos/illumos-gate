@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,12 +34,12 @@ XMODPROG=	wanbootutil
 
 PROG=		6to4relay arp gettable if_mpadm ikeadm ikecert \
 		in.comsat in.fingerd in.rarpd in.rexecd in.rlogind \
-		in.rshd in.rwhod in.telnetd in.tftpd in.tnamed ipaddrsel \
+		in.rshd in.rwhod in.telnetd in.tftpd ipaddrsel \
 		ipsecalgs ipsecconf ipseckey ndd $(SYNCPROG) $(DHCPPROG) \
 		$(XMODPROG)
 
 MANIFEST=	rarp.xml telnet.xml comsat.xml finger.xml \
-		login.xml shell.xml rexec.xml tname.xml
+		login.xml shell.xml rexec.xml 
 
 ROOTFS_PROG=	hostconfig route soconfig
 SBINLINKS=	hostconfig route
@@ -49,11 +49,11 @@ AUDITPROG=	in.rexecd in.rlogind in.rshd in.telnetd
 PAMPROG=	in.rexecd in.rlogind in.rshd in.telnetd
 SOCKETPROG=	6to4relay arp gettable hostconfig if_mpadm in.comsat \
 		in.fingerd in.rarpd in.rexecd in.rlogind in.rshd \
-		in.rwhod in.telnetd in.tftpd in.tnamed ipaddrsel \
+		in.rwhod in.telnetd in.tftpd ipaddrsel \
 		ipsecalgs ipsecconf ipseckey route
 NSLPROG=	6to4relay arp gettable hostconfig ikeadm in.comsat in.rarpd \
 		in.rexecd in.rlogind in.rshd in.rwhod in.telnetd \
-		in.tftpd in.tnamed ipaddrsel ipsecalgs ipsecconf ipseckey route
+		in.tftpd ipaddrsel ipsecalgs ipsecconf ipseckey route
 CMDPROG=	in.telnetd
 IPSECUTILPROG=	ikeadm ipsecalgs ipsecconf ipseckey
 K5PROGS=	in.telnetd in.rlogind in.rshd

@@ -359,8 +359,6 @@ COMMON_SUBDIRS= \
 	SUNWter  \
 	SUNWtftpr  \
 	SUNWtftp  \
-	SUNWtnamr \
-	SUNWtnamd \
 	SUNWtnetc \
 	SUNWtnetr \
 	SUNWtnetd \
