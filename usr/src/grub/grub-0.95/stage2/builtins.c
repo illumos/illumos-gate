@@ -3893,10 +3893,9 @@ bootfs_func (char *arg, int flags)
 	    else if (current_rootpool[0] != 0 && current_bootfs_obj != 0)
 		grub_printf("The zfs boot filesystem is <default: %s/%u>.",
 				current_rootpool, current_bootfs_obj);
-	    else if (current_rootpool[0] != 0 && current_bootfs_obj == 0)
-		grub_printf("The zfs boot pool is '%s'.", current_rootpool);
 	    else
-		grub_printf ("The zfs boot filesystem will be <default>.\n");
+		grub_printf ("The zfs boot filesystem will be derived from "
+			"the default bootfs pool property.\n");
 
 	    return (1);
 	}
