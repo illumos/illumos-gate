@@ -105,5 +105,10 @@ atabl_t	ata_drive_blacklist[] = {
 		ATA_BL_BOGUS |
 		ATA_BL_BMSTATREG_PIO_BROKEN)
 	},
+
+	/* Known drives that have DMA problems */
+	{ "SAMSUNG CD-ROM SN-124",	ATA_BL_NODMA },
+	{ "SAMSUNG CDRW/DVD SM-352F",	ATA_BL_NODMA },
+
 	NULL
 };
