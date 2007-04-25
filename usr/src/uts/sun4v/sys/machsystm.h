@@ -275,11 +275,6 @@ extern int use_page_coloring;
 extern int use_virtual_coloring;
 extern uint_t vac_colors_mask;
 
-extern void ndata_alloc_init(struct memlist *, uintptr_t, uintptr_t);
-extern void *ndata_alloc(struct memlist *, size_t, size_t);
-extern void *ndata_extra_base(struct memlist *, size_t);
-extern size_t ndata_maxsize(struct memlist *);
-extern size_t ndata_spare(struct memlist *, size_t, size_t);
 extern caddr_t get_mmfsa_scratchpad(void);
 extern void set_mmfsa_scratchpad(caddr_t);
 extern int ndata_alloc_mmfsa(struct memlist *);

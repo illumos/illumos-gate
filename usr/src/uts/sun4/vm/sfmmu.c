@@ -98,6 +98,10 @@ int	sfmmu_kern_mapped = 0;
  */
 uint64_t kcontextreg = KCONTEXT;
 
+#ifdef DEBUG
+static int ndata_middle_hole_detected = 0;
+#endif
+
 /* Extern Global Data */
 
 extern int page_relocate_ready;
@@ -539,7 +543,7 @@ ndata_spare(struct memlist *ndata, size_t wanted, size_t alignment)
  * of the nucleus can be added to the phys_avail list.
  */
 void *
-ndata_extra_base(struct memlist *ndata, size_t alignment)
+ndata_extra_base(struct memlist *ndata, size_t alignment, caddr_t endaddr)
 {
 	uintptr_t base;
 	size_t wasteage = 0;
@@ -564,6 +568,13 @@ ndata_extra_base(struct memlist *ndata, size_t alignment)
 
 	if (base >= ndata->address + ndata->size)
 		return (NULL);
+
+	if ((caddr_t)(ndata->address + ndata->size) != endaddr) {
+#ifdef DEBUG
+		ndata_middle_hole_detected = 1;	/* see if we hit this again */
+#endif
+		return (NULL);
+	}
 
 	if (base == ndata->address) {
 		if (ndata->prev != NULL)

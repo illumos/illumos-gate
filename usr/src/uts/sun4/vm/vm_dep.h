@@ -693,6 +693,15 @@ extern void mmu_init_kernel_pgsz(struct hat *hat);
 extern void mmu_init_kcontext();
 extern uint64_t kcontextreg;
 
+/*
+ * Nucleus data page allocator routines
+ */
+extern void ndata_alloc_init(struct memlist *, uintptr_t, uintptr_t);
+extern void *ndata_alloc(struct memlist *, size_t, size_t);
+extern void *ndata_extra_base(struct memlist *, size_t, caddr_t);
+extern size_t ndata_maxsize(struct memlist *);
+extern size_t ndata_spare(struct memlist *, size_t, size_t);
+
 #ifdef	__cplusplus
 }
 #endif

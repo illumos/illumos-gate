@@ -5763,6 +5763,7 @@ segvn_clrszc(struct seg *seg)
 	page_t *anon_pl[1 + 1], *pp;
 	struct anon *ap, *oldap;
 	uint_t prot = svd->prot, vpprot;
+	int pageflag = 0;
 
 	ASSERT(AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock) ||
 	    SEGVN_WRITE_HELD(seg->s_as, &svd->lock));
@@ -5796,10 +5797,11 @@ segvn_clrszc(struct seg *seg)
 
 	for (; a < ea; a += pgsz, an_idx += pages) {
 		if ((oldap = anon_get_ptr(amp->ahp, an_idx)) != NULL) {
-			if (svd->pageprot != 0) {
-				ASSERT(vpage != NULL);
-				prot = VPP_PROT(vpage);
+			ASSERT(vpage != NULL || svd->pageprot == 0);
+			if (vpage != NULL) {
 				ASSERT(sameprot(seg, a, pgsz));
+				prot = VPP_PROT(vpage);
+				pageflag = VPP_ISPPLOCK(vpage) ? LOCK_PAGE : 0;
 			}
 			if (seg->s_szc != 0) {
 				ASSERT(vp == NULL || anon_pages(amp->ahp,
@@ -5818,7 +5820,7 @@ segvn_clrszc(struct seg *seg)
 					goto out;
 				}
 				if ((pp = anon_private(&ap, seg, a, prot,
-				    anon_pl[0], 0, svd->cred)) == NULL) {
+				    anon_pl[0], pageflag, svd->cred)) == NULL) {
 					err = ENOMEM;
 					goto out;
 				}

@@ -39,6 +39,7 @@
 #include <sys/traptrace.h>
 #include <sys/modctl.h>
 #include <sys/ldoms.h>
+#include <vm/vm_dep.h>
 
 #ifdef TRAPTRACE
 int mach_htraptrace_enable = 1;

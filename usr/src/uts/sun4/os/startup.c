@@ -1597,12 +1597,12 @@ kmem64_alloced:
 		    &memlist, &phys_avail);
 
 	/*
-	 * Add any extra memory after e_data to the phys_avail list as long
-	 * as there's at least a page to add.  Usually, there isn't any,
-	 * since extra HME blocks typically get allocated there first before
-	 * using RAM elsewhere.
+	 * Add any extra memory at the end of the ndata region if there's at
+	 * least a page to add.  There might be a few more pages available in
+	 * the middle of the ndata region, but for now they are ignored.
 	 */
-	if ((nalloc_base = ndata_extra_base(&ndata, MMU_PAGESIZE)) == NULL)
+	nalloc_base = ndata_extra_base(&ndata, MMU_PAGESIZE, nalloc_end);
+	if (nalloc_base == NULL)
 		nalloc_base = nalloc_end;
 	ndata_remain_sz = nalloc_end - nalloc_base;
 
