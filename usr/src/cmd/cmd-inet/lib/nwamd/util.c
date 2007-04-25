@@ -270,11 +270,15 @@ valid_graphical_user(boolean_t query)
 	/*
 	 * Look for someone logged into the console from host ":0" (i.e.,
 	 * the X display.  Down the road, we should generalize this so
-	 * ":0" is not hard-coded.
+	 * ":0" is not hard-coded.  Note that the entry we want is usually
+	 * an ordinary user process but sometimes if a session leader has
+	 * exited, it can come from a DEAD_PROCESS, as is known to happen
+	 * when the user logs in via gdm(1m).
 	 */
 	setutxent();
 	while ((utp = getutxent()) != NULL) {
-		if ((utp->ut_type == USER_PROCESS) &&
+		if (((utp->ut_type == USER_PROCESS) ||
+		    (utp->ut_type == DEAD_PROCESS)) &&
 		    (strcmp(utp->ut_line, "console") == 0) &&
 		    (strcmp(utp->ut_host, ":0") == 0)) {
 			user = strdup(utp->ut_user);
