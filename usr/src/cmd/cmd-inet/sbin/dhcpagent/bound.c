@@ -327,6 +327,7 @@ dhcp_bound_complete(dhcp_smach_t *dsmp)
 	DHCP_OPT	*router_list;
 	int		i;
 	DHCPSTATE	oldstate;
+	dhcp_lif_t	*lif;
 
 	/*
 	 * Do bound state entry processing only if running IPv4.  There's no
@@ -344,13 +345,19 @@ dhcp_bound_complete(dhcp_smach_t *dsmp)
 	}
 
 	/*
-	 * add each provided router; we'll clean them up when the
+	 * Add each provided router; we'll clean them up when the
 	 * state machine goes away or when our lease expires.
+	 *
+	 * Note that we do not handle default routers on IPv4 logicals;
+	 * see README for details.
 	 */
 
 	ack = dsmp->dsm_ack;
 	router_list = ack->opts[CD_ROUTER];
-	if (router_list && (router_list->len % sizeof (ipaddr_t)) == 0) {
+	lif = dsmp->dsm_lif;
+	if (router_list != NULL &&
+	    (router_list->len % sizeof (ipaddr_t)) == 0 &&
+	    strchr(lif->lif_name, ':') == NULL) {
 
 		dsmp->dsm_nrouters = router_list->len / sizeof (ipaddr_t);
 		dsmp->dsm_routers  = malloc(router_list->len);
@@ -366,7 +373,7 @@ dhcp_bound_complete(dhcp_smach_t *dsmp)
 			    router_list->value + (i * sizeof (ipaddr_t)),
 			    sizeof (ipaddr_t));
 
-			if (!add_default_route(dsmp->dsm_name,
+			if (!add_default_route(lif->lif_pif->pif_index,
 			    &dsmp->dsm_routers[i])) {
 				dhcpmsg(MSG_ERR, "configure_bound: cannot add "
 				    "default router %s on %s", inet_ntoa(

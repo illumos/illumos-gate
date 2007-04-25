@@ -1090,8 +1090,11 @@ solicit_event(struct phyint *pi, enum solicit_events event, uint_t elapsed)
 	case INIT_SOLICIT:
 		solicit(&v6allrouters, pi);
 		if (--pi->pi_sol_count == 0) {
-			logmsg(LOG_DEBUG, "solicit_event: giving up on %s\n",
-			    pi->pi_name);
+			if (debug & D_STATE) {
+				logmsg(LOG_DEBUG, "solicit_event: no routers "
+				    "found on %s; assuming default flags\n",
+				    pi->pi_name);
+			}
 			if (pi->pi_StatefulAddrConf) {
 				pi->pi_ra_flags |= ND_RA_FLAG_MANAGED |
 				    ND_RA_FLAG_OTHER;

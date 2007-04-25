@@ -76,6 +76,12 @@ static int	dhcp_ipc_timed_read(int, void *, unsigned int, int *);
 static int	getinfo_ifnames(const char *, dhcp_optnum_t *, DHCP_OPT **);
 static char	*get_ifnames(int, int);
 
+/* must be kept in sync with enum in dhcpagent_ipc.h */
+static const char *ipc_typestr[] = {
+	"drop", "extend", "ping", "release", "start", "status",
+	"inform", "get_tag"
+};
+
 /*
  * dhcp_ipc_alloc_request(): allocates a dhcp_ipc_request_t of the given type
  *			     and interface, with a timeout of 0.
@@ -636,6 +642,25 @@ dhcp_ipc_strerror(int error)
 }
 
 /*
+ * dhcp_string_to_request(): maps a string into a request code
+ *
+ *    input: const char *: the string to map
+ *   output: dhcp_ipc_type_t: the request code, or -1 if unknown
+ */
+
+dhcp_ipc_type_t
+dhcp_string_to_request(const char *request)
+{
+	unsigned int	i;
+
+	for (i = 0; i < DHCP_NIPC; i++)
+		if (strcmp(ipc_typestr[i], request) == 0)
+			return ((dhcp_ipc_type_t)i);
+
+	return ((dhcp_ipc_type_t)-1);
+}
+
+/*
  * dhcp_ipc_type_to_string(): maps an ipc command code into a human-readable
  *			      string
  *
@@ -646,15 +671,10 @@ dhcp_ipc_strerror(int error)
 const char *
 dhcp_ipc_type_to_string(dhcp_ipc_type_t type)
 {
-	static const char *typestr[] = {
-		"drop", "extend", "ping", "release", "start", "status",
-		"inform", "get_tag"
-	};
-
 	if (type < 0 || type >= DHCP_NIPC)
 		return ("unknown");
 	else
-		return (typestr[(int)type]);
+		return (ipc_typestr[(int)type]);
 }
 
 /*

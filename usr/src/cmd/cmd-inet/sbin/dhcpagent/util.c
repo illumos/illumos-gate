@@ -314,7 +314,7 @@ daemonize(void)
  */
 
 static boolean_t
-update_default_route(const char *ifname, int type, struct in_addr *gateway_nbo,
+update_default_route(uint32_t ifindex, int type, struct in_addr *gateway_nbo,
     int flags)
 {
 	struct {
@@ -343,7 +343,7 @@ update_default_route(const char *ifname, int type, struct in_addr *gateway_nbo,
 	rtmsg.rm_mask.sin_addr.s_addr = htonl(0);
 
 	rtmsg.rm_ifp.sdl_family	= AF_LINK;
-	rtmsg.rm_ifp.sdl_index	= if_nametoindex(ifname);
+	rtmsg.rm_ifp.sdl_index	= ifindex;
 
 	return (write(rtsock_fd, &rtmsg, sizeof (rtmsg)) == sizeof (rtmsg));
 }
@@ -357,12 +357,9 @@ update_default_route(const char *ifname, int type, struct in_addr *gateway_nbo,
  */
 
 boolean_t
-add_default_route(const char *ifname, struct in_addr *gateway_nbo)
+add_default_route(uint32_t ifindex, struct in_addr *gateway_nbo)
 {
-	if (strchr(ifname, ':') != NULL)	/* see README */
-		return (B_TRUE);
-
-	return (update_default_route(ifname, RTM_ADD, gateway_nbo, RTF_UP));
+	return (update_default_route(ifindex, RTM_ADD, gateway_nbo, RTF_UP));
 }
 
 /*
@@ -374,15 +371,12 @@ add_default_route(const char *ifname, struct in_addr *gateway_nbo)
  */
 
 boolean_t
-del_default_route(const char *ifname, struct in_addr *gateway_nbo)
+del_default_route(uint32_t ifindex, struct in_addr *gateway_nbo)
 {
-	if (strchr(ifname, ':') != NULL)
-		return (B_TRUE);
-
 	if (gateway_nbo->s_addr == htonl(INADDR_ANY)) /* no router */
 		return (B_TRUE);
 
-	return (update_default_route(ifname, RTM_DELETE, gateway_nbo, 0));
+	return (update_default_route(ifindex, RTM_DELETE, gateway_nbo, 0));
 }
 
 /*

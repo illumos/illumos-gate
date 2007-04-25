@@ -941,17 +941,14 @@ load_option:
 		 * going into SELECTING.
 		 */
 
-		if (debug_level == 0 &&
-		    iu_schedule_timer_ms(tq, lrand48() % DHCP_SELECT_WAIT,
-		    dhcp_start, dsmp) != -1) {
-			hold_smach(dsmp);
+		if (debug_level == 0 && set_start_timer(dsmp)) {
 			/* next destination: dhcp_start() */
 			break;
+		} else {
+			dhcp_selecting(dsmp);
+			/* next destination: dhcp_requesting() */
+			break;
 		}
-
-		dhcp_selecting(dsmp);
-		/* next destination: dhcp_requesting() */
-		break;
 	}
 
 	case DHCP_STATUS: {
@@ -1147,6 +1144,8 @@ check_lif(dhcp_lif_t *lif, const struct ifa_msghdr *ifam, int msglen)
 			lif->lif_plumbed = B_FALSE;
 			dhcpmsg(MSG_INFO, "%s has been removed; abandoning",
 			    lif->lif_name);
+			if (!isv6)
+				discard_default_routes(lif->lif_smachs);
 		} else {
 			dhcpmsg(MSG_ERR,
 			    "unable to retrieve interface flags on %s",

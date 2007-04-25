@@ -29,6 +29,7 @@
 
 #include <sys/types.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <strings.h>
 #include <time.h>
 #include <limits.h>
@@ -59,15 +60,39 @@ static stop_func_t	stop_selecting;
  */
 
 /* ARGSUSED */
-void
+static void
 dhcp_start(iu_tq_t *tqp, void *arg)
 {
 	dhcp_smach_t	*dsmp = arg;
 
-	release_smach(dsmp);
+	dsmp->dsm_start_timer = -1;
+	(void) set_smach_state(dsmp, INIT);
+	if (verify_smach(dsmp)) {
+		dhcpmsg(MSG_VERBOSE, "starting DHCP on %s", dsmp->dsm_name);
+		dhcp_selecting(dsmp);
+	}
+}
 
-	dhcpmsg(MSG_VERBOSE, "starting DHCP on %s", dsmp->dsm_name);
-	dhcp_selecting(dsmp);
+/*
+ * set_start_timer(): sets a random timer to start a DHCP state machine
+ *
+ *   input: dhcp_smach_t *: the state machine on which to start DHCP
+ *  output: boolean_t: B_TRUE if a timer is now running
+ */
+
+boolean_t
+set_start_timer(dhcp_smach_t *dsmp)
+{
+	if (dsmp->dsm_start_timer != -1)
+		return (B_TRUE);
+
+	dsmp->dsm_start_timer = iu_schedule_timer_ms(tq,
+	    lrand48() % DHCP_SELECT_WAIT, dhcp_start, dsmp);
+	if (dsmp->dsm_start_timer == -1)
+		return (B_FALSE);
+
+	hold_smach(dsmp);
+	return (B_TRUE);
 }
 
 /*

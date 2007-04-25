@@ -50,6 +50,9 @@ static boolean_t stop_informing(dhcp_smach_t *, unsigned int);
  *  output: void
  *    note: the INFORM cannot be sent successfully if the interface
  *	    does not have an IP address (this is mostly an issue for IPv4).
+ *	    We switch into INFORM_SENT state before sending the packet so
+ *	    that the packet-sending subsystem uses regular sockets and sets
+ *	    the source address.  (See set_smach_state.)
  */
 
 void
@@ -57,7 +60,7 @@ dhcp_inform(dhcp_smach_t *dsmp)
 {
 	dhcp_pkt_t		*dpkt;
 
-	if (!set_smach_state(dsmp, INIT))
+	if (!set_smach_state(dsmp, INFORM_SENT))
 		goto failed;
 
 	if (dsmp->dsm_isv6) {
@@ -101,14 +104,12 @@ dhcp_inform(dhcp_smach_t *dsmp)
 		}
 	}
 
-	if (!set_smach_state(dsmp, INFORM_SENT))
-		goto failed;
-
 	return;
 
 failed:
 	dsmp->dsm_dflags |= DHCP_IF_FAILED;
 	ipc_action_finish(dsmp, DHCP_IPC_E_INT);
+	(void) set_smach_state(dsmp, INIT);
 }
 
 /*

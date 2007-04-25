@@ -85,7 +85,7 @@ typedef enum {
  * code in dhcpagent relies on the numeric values of these
  * requests -- but there's no sane reason to change them anyway.
  *
- * If any commands are changed, added, or removed, see the typestr[]
+ * If any commands are changed, added, or removed, see the ipc_typestr[]
  * array in dhcpagent_ipc.c.
  */
 

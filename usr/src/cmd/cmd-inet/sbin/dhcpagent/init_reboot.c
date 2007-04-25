@@ -29,7 +29,6 @@
 
 #include <sys/types.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <limits.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -191,10 +190,7 @@ dhcp_init_reboot_v6(dhcp_smach_t *dsmp)
 	return;
 
 failure:
-	if (iu_schedule_timer_ms(tq, lrand48() % DHCP_SELECT_WAIT, dhcp_start,
-	    dsmp) != -1)
-		hold_smach(dsmp);
-	else
+	if (!set_start_timer(dsmp))
 		dhcp_selecting(dsmp);
 }
 

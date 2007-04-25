@@ -169,6 +169,7 @@ insert_smach(dhcp_lif_t *lif, int *error)
 	dsmp->dsm_script_pid		= -1;
 	dsmp->dsm_script_helper_pid	= -1;
 	dsmp->dsm_script_event_id	= -1;
+	dsmp->dsm_start_timer		= -1;
 
 	ipc_action_init(&dsmp->dsm_ia);
 
@@ -575,6 +576,8 @@ cancel_offer_timer(dhcp_smach_t *dsmp)
  *
  *   input: dhcp_smach_t *: state machine to cancel
  *  output: none
+ *    note: this function assumes that the iu timer functions are synchronous
+ *	    and thus don't require any protection or ordering on cancellation.
  */
 
 static void
@@ -594,6 +597,11 @@ cancel_smach_timers(dhcp_smach_t *dsmp)
 
 	cancel_offer_timer(dsmp);
 	stop_pkt_retransmission(dsmp);
+	if (dsmp->dsm_start_timer != -1) {
+		(void) iu_cancel_timer(tq, dsmp->dsm_start_timer, NULL);
+		dsmp->dsm_start_timer = -1;
+		release_smach(dsmp);
+	}
 }
 
 /*
@@ -675,7 +683,8 @@ set_smach_state(dhcp_smach_t *dsmp, DHCPSTATE state)
 			 * For IPv6, no such change is necessary.
 			 */
 			is_bound = (state == BOUND || state == REBINDING ||
-			    state == RENEWING || state == RELEASING);
+			    state == RENEWING || state == RELEASING ||
+			    state == INFORM_SENT || state == INFORMATION);
 			if (dsmp->dsm_using_dlpi && is_bound) {
 				if (!open_ip_lif(dsmp->dsm_lif))
 					return (B_FALSE);
@@ -1026,7 +1035,24 @@ smach_count(void)
 }
 
 /*
- * remove_default_routes(): removes a state machine's default routes
+ * discard_default_routes(): removes a state machine's default routes alone.
+ *
+ *   input: dhcp_smach_t *: the state machine whose default routes need to be
+ *			    discarded
+ *  output: void
+ */
+
+void
+discard_default_routes(dhcp_smach_t *dsmp)
+{
+	free(dsmp->dsm_routers);
+	dsmp->dsm_routers = NULL;
+	dsmp->dsm_nrouters = 0;
+}
+
+/*
+ * remove_default_routes(): removes a state machine's default routes from the
+ *			    kernel and from the state machine.
  *
  *   input: dhcp_smach_t *: the state machine whose default routes need to be
  *			    removed
@@ -1037,10 +1063,12 @@ void
 remove_default_routes(dhcp_smach_t *dsmp)
 {
 	int idx;
+	uint32_t ifindex;
 
 	if (dsmp->dsm_routers != NULL) {
+		ifindex = dsmp->dsm_lif->lif_pif->pif_index;
 		for (idx = dsmp->dsm_nrouters - 1; idx >= 0; idx--) {
-			if (del_default_route(dsmp->dsm_name,
+			if (del_default_route(ifindex,
 			    &dsmp->dsm_routers[idx])) {
 				dhcpmsg(MSG_DEBUG, "remove_default_routes: "
 				    "removed %s from %s",
@@ -1053,9 +1081,7 @@ remove_default_routes(dhcp_smach_t *dsmp)
 				    dsmp->dsm_name);
 			}
 		}
-		free(dsmp->dsm_routers);
-		dsmp->dsm_routers = NULL;
-		dsmp->dsm_nrouters = 0;
+		discard_default_routes(dsmp);
 	}
 }
 
@@ -1114,10 +1140,13 @@ void
 refresh_smach(dhcp_smach_t *dsmp)
 {
 	if (dsmp->dsm_state == BOUND || dsmp->dsm_state == RENEWING ||
-	    dsmp->dsm_state == REBINDING) {
-		dhcpmsg(MSG_WARNING, "refreshing lease on %s", dsmp->dsm_name);
+	    dsmp->dsm_state == REBINDING || dsmp->dsm_state == INFORMATION) {
+		dhcpmsg(MSG_WARNING, "refreshing state on %s", dsmp->dsm_name);
 		cancel_smach_timers(dsmp);
-		dhcp_init_reboot(dsmp);
+		if (dsmp->dsm_state == INFORMATION)
+			dhcp_inform(dsmp);
+		else
+			dhcp_init_reboot(dsmp);
 	}
 }
 

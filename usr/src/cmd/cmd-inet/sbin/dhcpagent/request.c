@@ -608,8 +608,10 @@ static void
 accept_v4_acknak(dhcp_smach_t *dsmp, PKT_LIST *plp)
 {
 	if (*plp->opts[CD_DHCP_TYPE]->value == ACK) {
-		if (plp->opts[CD_LEASE_TIME] == NULL ||
-		    plp->opts[CD_LEASE_TIME]->len != sizeof (lease_t)) {
+		if (dsmp->dsm_state != INFORM_SENT &&
+		    dsmp->dsm_state != INFORMATION &&
+		    (plp->opts[CD_LEASE_TIME] == NULL ||
+		    plp->opts[CD_LEASE_TIME]->len != sizeof (lease_t))) {
 			dhcpmsg(MSG_WARNING, "accept_v4_acknak: ACK packet on "
 			    "%s missing mandatory lease option, ignored",
 			    dsmp->dsm_name);
@@ -1133,15 +1135,13 @@ dhcp_restart(dhcp_smach_t *dsmp)
 	 */
 	deprecate_leases(dsmp);
 
-	if (iu_schedule_timer(tq, DHCP_RESTART_WAIT, dhcp_start, dsmp) == -1) {
+	if (!set_start_timer(dsmp)) {
 		dhcpmsg(MSG_ERROR, "dhcp_restart: cannot schedule dhcp_start, "
 		    "reverting to INIT state on %s", dsmp->dsm_name);
 
 		(void) set_smach_state(dsmp, INIT);
 		dsmp->dsm_dflags |= DHCP_IF_FAILED;
 		ipc_action_finish(dsmp, DHCP_IPC_E_MEMORY);
-	} else {
-		hold_smach(dsmp);
 	}
 }
 

@@ -57,22 +57,22 @@ extern "C" {
  * day allowed per interface, this will need to become a list.
  */
 struct dhcp_smach_s {
-	dhcp_smach_t		*dsm_next;	/* Note: must be first */
-	dhcp_smach_t		*dsm_prev;
+	dhcp_smach_t	*dsm_next;	/* Note: must be first */
+	dhcp_smach_t	*dsm_prev;
 
 	/*
 	 * The name of the state machine.  This is currently just a pointer to
 	 * the controlling LIF's name, but could be otherwise.
 	 */
-	const char		*dsm_name;
-	dhcp_lif_t		*dsm_lif;	/* Controlling LIF */
-	uint_t			dsm_hold_count;	/* reference count */
+	const char	*dsm_name;
+	dhcp_lif_t	*dsm_lif;	/* Controlling LIF */
+	uint_t		dsm_hold_count;	/* reference count */
 
-	dhcp_lease_t		*dsm_leases;	/* List of leases */
-	uint_t			dsm_lif_wait;	/* LIFs waiting on DAD */
-	uint_t			dsm_lif_down;	/* LIFs failed */
+	dhcp_lease_t	*dsm_leases;	/* List of leases */
+	uint_t		dsm_lif_wait;	/* LIFs waiting on DAD */
+	uint_t		dsm_lif_down;	/* LIFs failed */
 
-	boolean_t		dsm_using_dlpi;
+	boolean_t	dsm_using_dlpi;
 
 	/*
 	 * each state machine can have at most one pending asynchronous
@@ -85,8 +85,8 @@ struct dhcp_smach_s {
 	 * to maintain them.
 	 */
 
-	ipc_action_t		dsm_ia;
-	async_action_t		dsm_async;
+	ipc_action_t	dsm_ia;
+	async_action_t	dsm_async;
 
 	uchar_t		*dsm_cid;	/* client id */
 	uchar_t		dsm_cidlen;	/* client id len */
@@ -95,7 +95,7 @@ struct dhcp_smach_s {
 	 * current state of the machine
 	 */
 
-	DHCPSTATE		dsm_state;
+	DHCPSTATE	dsm_state;
 
 	uint16_t	dsm_dflags;	/* DHCP_IF_* (shared with IPC) */
 
@@ -138,7 +138,7 @@ struct dhcp_smach_s {
 	 * REQUEST can have the same pkt->secs.
 	 */
 
-	uint16_t		dsm_disc_secs;
+	uint16_t	dsm_disc_secs;
 
 	/*
 	 * this is a chain of packets which have been received on this
@@ -147,7 +147,7 @@ struct dhcp_smach_s {
 	 * general, packets are put on this list through recv_pkt()
 	 */
 
-	PKT_LIST		*dsm_recv_pkt_list;
+	PKT_LIST	*dsm_recv_pkt_list;
 
 	/*
 	 * these three fields are initially zero, and get incremented
@@ -160,9 +160,9 @@ struct dhcp_smach_s {
 	 * (if any other state).
 	 */
 
-	uint32_t		dsm_sent;
-	uint32_t		dsm_received;
-	uint32_t		dsm_bad_offers;
+	uint32_t	dsm_sent;
+	uint32_t	dsm_received;
+	uint32_t	dsm_bad_offers;
 
 	/*
 	 * dsm_send_pkt.pkt is dynamically allocated to be as big a
@@ -174,7 +174,7 @@ struct dhcp_smach_s {
 	 * other functions.
 	 */
 
-	dhcp_pkt_t		dsm_send_pkt;
+	dhcp_pkt_t	dsm_send_pkt;
 	union {
 		struct sockaddr_in v4;
 		struct sockaddr_in6 v6;
@@ -189,11 +189,11 @@ struct dhcp_smach_s {
 	 * value, and dsm_send_timeout must be set to the IRT (initial
 	 * retransmit timer) value by the sender.
 	 */
-	uint_t			dsm_send_timeout;
-	uint_t			dsm_send_tcenter;
-	stop_func_t		*dsm_send_stop_func;
-	uint32_t		dsm_packet_sent;
-	iu_timer_id_t		dsm_retrans_timer;
+	uint_t		dsm_send_timeout;
+	uint_t		dsm_send_tcenter;
+	stop_func_t	*dsm_send_stop_func;
+	uint32_t	dsm_packet_sent;
+	iu_timer_id_t	dsm_retrans_timer;
 
 	/*
 	 * The host name we've been asked to request is remembered
@@ -218,17 +218,19 @@ struct dhcp_smach_s {
 	 * When the lease time actually begins (and thus becomes current),
 	 * `dsm_curstart_monosec' is set to `dsm_newstart_monosec'.
 	 */
-	hrtime_t		dsm_neg_hrtime;
-	monosec_t		dsm_newstart_monosec;
-	monosec_t		dsm_curstart_monosec;
+	hrtime_t	dsm_neg_hrtime;
+	monosec_t	dsm_newstart_monosec;
+	monosec_t	dsm_curstart_monosec;
 
-	int			dsm_script_fd;
-	pid_t			dsm_script_pid;
-	pid_t			dsm_script_helper_pid;
-	const char		*dsm_script_event;
-	iu_event_id_t		dsm_script_event_id;
-	void			*dsm_callback_arg;
-	script_callback_t	*dsm_script_callback;
+	int		dsm_script_fd;
+	pid_t		dsm_script_pid;
+	pid_t		dsm_script_helper_pid;
+	const char	*dsm_script_event;
+	iu_event_id_t	dsm_script_event_id;
+	void		*dsm_callback_arg;
+	script_callback_t *dsm_script_callback;
+
+	iu_timer_id_t	dsm_start_timer;
 };
 
 #define	dsm_isv6	dsm_lif->lif_pif->pif_isv6
@@ -277,7 +279,7 @@ void		dhcp_renew(iu_tq_t *, void *);
 void		dhcp_requesting(iu_tq_t *, void *);
 void		dhcp_restart(dhcp_smach_t *);
 void		dhcp_selecting(dhcp_smach_t *);
-void		dhcp_start(iu_tq_t *, void *);
+boolean_t	set_start_timer(dhcp_smach_t *);
 void		send_declines(dhcp_smach_t *);
 void		send_v6_request(dhcp_smach_t *);
 boolean_t	save_server_id(dhcp_smach_t *, PKT_LIST *);
@@ -307,6 +309,7 @@ void		nuke_smach_list(void);
 boolean_t	schedule_smach_timer(dhcp_smach_t *, int, uint32_t,
 		    iu_tq_callback_t *);
 void		cancel_offer_timer(dhcp_smach_t *);
+void		discard_default_routes(dhcp_smach_t *);
 void		remove_default_routes(dhcp_smach_t *);
 
 /* Lease-related support functions in states.c */

@@ -36,6 +36,7 @@
 #include <netinet/dhcp6.h>
 #include <dhcpmsg.h>
 #include <dhcp_hostconf.h>
+#include <dhcpagent_util.h>
 
 #include "agent.h"
 #include "packet.h"
@@ -237,18 +238,27 @@ dhcp_drop(dhcp_smach_t *dsmp, void *arg)
 			    dsmp->dsm_name);
 		} else {
 			PKT_LIST *plp[2];
+			const char *hcfile;
 
+			hcfile = ifname_to_hostconf(dsmp->dsm_name,
+			    dsmp->dsm_isv6);
 			plp[0] = dsmp->dsm_ack;
 			plp[1] = dsmp->dsm_orig_ack;
 			if (write_hostconf(dsmp->dsm_name, plp, 2,
 			    monosec_to_time(dsmp->dsm_curstart_monosec),
-			    dsmp->dsm_isv6) == -1) {
+			    dsmp->dsm_isv6) != -1) {
+				dhcpmsg(MSG_DEBUG, "wrote lease to %s", hcfile);
+			} else if (errno == EROFS) {
+				dhcpmsg(MSG_DEBUG, "%s is on a read-only file "
+				    "system; not saving lease", hcfile);
+			} else {
 				dhcpmsg(MSG_ERR, "cannot write %s (reboot will "
-				    "not use cached configuration)",
-				    ifname_to_hostconf(dsmp->dsm_name,
-				    dsmp->dsm_isv6));
+				    "not use cached configuration)", hcfile);
 			}
 		}
+	} else {
+		dhcpmsg(MSG_DEBUG, "%s in state %s; not saving lease",
+		    dsmp->dsm_name, dhcp_state_to_string(dsmp->dsm_state));
 	}
 	deprecate_leases(dsmp);
 	finished_smach(dsmp, DHCP_IPC_SUCCESS);

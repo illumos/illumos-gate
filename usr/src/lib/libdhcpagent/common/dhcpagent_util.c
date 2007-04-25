@@ -79,38 +79,6 @@ dhcp_state_to_string(DHCPSTATE state)
 }
 
 /*
- * dhcp_string_to_request(): maps a string into a request code
- *
- *    input: const char *: the string to map
- *   output: dhcp_ipc_type_t: the request code, or -1 if unknown
- */
-
-dhcp_ipc_type_t
-dhcp_string_to_request(const char *request)
-{
-	static struct {
-		const char	*string;
-		dhcp_ipc_type_t  type;
-	} types[] = {
-		{ "drop",	DHCP_DROP	},
-		{ "extend",	DHCP_EXTEND	},
-		{ "inform",	DHCP_INFORM	},
-		{ "ping",	DHCP_PING	},
-		{ "release",	DHCP_RELEASE	},
-		{ "start",	DHCP_START	},
-		{ "status",	DHCP_STATUS	}
-	};
-
-	unsigned int	i;
-
-	for (i = 0; i < (sizeof (types) / sizeof (*types)); i++)
-		if (strcmp(types[i].string, request) == 0)
-			return (types[i].type);
-
-	return (-1);
-}
-
-/*
  * dhcp_start_agent(): starts the agent if not already running
  *
  *   input: int: number of seconds to wait for agent to start (-1 is forever)

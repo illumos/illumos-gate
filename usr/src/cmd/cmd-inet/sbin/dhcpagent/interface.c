@@ -779,8 +779,11 @@ verify_lif(const dhcp_lif_t *lif)
 	fd = isv6 ? v6_sock_fd : v4_sock_fd;
 
 	if (ioctl(fd, SIOCGLIFFLAGS, &lifr) == -1) {
-		dhcpmsg(MSG_ERR, "verify_lif: SIOCGLIFFLAGS failed on %s",
-		    lif->lif_name);
+		if (errno != ENXIO) {
+			dhcpmsg(MSG_ERR,
+			    "verify_lif: SIOCGLIFFLAGS failed on %s",
+			    lif->lif_name);
+		}
 		return (B_FALSE);
 	}
 
@@ -901,8 +904,10 @@ canonize_lif(dhcp_lif_t *lif)
 	fd = isv6 ? v6_sock_fd : v4_sock_fd;
 
 	if (ioctl(fd, SIOCGLIFFLAGS, &lifr) == -1) {
-		dhcpmsg(MSG_ERR, "canonize_lif: can't get flags for %s",
-		    lif->lif_name);
+		if (errno != ENXIO) {
+			dhcpmsg(MSG_ERR, "canonize_lif: can't get flags for %s",
+			    lif->lif_name);
+		}
 		return;
 	}
 
@@ -1222,9 +1227,6 @@ clear_lif_dhcp(dhcp_lif_t *lif)
 	fd = lif->lif_pif->pif_isv6 ? v6_sock_fd : v4_sock_fd;
 
 	(void) strlcpy(lifr.lifr_name, lif->lif_name, LIFNAMSIZ);
-
-	if (!(lif->lif_flags & IFF_DHCPRUNNING))
-		return;
 
 	if (ioctl(fd, SIOCGLIFFLAGS, &lifr) == -1)
 		return;
