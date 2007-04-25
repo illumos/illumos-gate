@@ -432,10 +432,6 @@ extern char hw_serial[];
 extern int ddi_strtoul(const char *str, char **nptr, int base,
     unsigned long *result);
 
-#ifdef	__cplusplus
-}
-#endif
-
 /* ZFS Boot Related stuff. */
 
 struct _buf {
@@ -451,5 +447,9 @@ extern int kobj_read_file(struct _buf *file, char *buf, unsigned size,
     unsigned off);
 extern void kobj_close_file(struct _buf *file);
 extern int kobj_get_filesize(struct _buf *file, uint64_t *size);
+
+#ifdef	__cplusplus
+}
+#endif
 
 #endif	/* _SYS_ZFS_CONTEXT_H */
