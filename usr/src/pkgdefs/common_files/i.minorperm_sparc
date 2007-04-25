@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -103,6 +103,8 @@ clone:e1000g			0666 root root 0666 root sys	/dev/e1000g
 clone:chxge			0600 root sys 0666 root sys	/dev/chxge
 clone:vsw			0600 root sys 0666 root sys	/dev/vsw
 clone:vnet			0600 root sys 0666 root sys	/dev/vnet
+clone:pcwl                      0600 root sys 0666 root sys     /dev/pcwl
+clone:pcan                      0600 root sys 0666 root sys     /dev/pcan
 bge:*				0600 root sys 0666 root sys	/dev/bge*
 rge:*				0600 root sys 0666 root sys	/dev/rge*
 xge:*				0600 root sys 0666 root sys	/dev/xge*
@@ -111,6 +113,8 @@ e1000g:*			0666 root root 0666 root sys	/dev/e1000g*
 chxge:*				0600 root sys 0666 root sys	/dev/chxge*
 vsw:*				0600 root sys 0666 root sys	/dev/vsw*
 vnet:*				0600 root sys 0666 root sys	/dev/vnet*
+pcwl:*                          0600 root sys 0666 root sys     /dev/pcwl*
+pcan:*                          0600 root sys 0666 root sys     /dev/pcan*
 clone:dmfe			0600 root sys 0666 root sys	/dev/dmfe
 dmfe:*				0600 root sys 0666 root sys	/dev/dmfe*
 clone:pcelx			0600 root sys 0666 root sys	/dev/pcelx
@@ -272,6 +276,8 @@ clone:e1000g
 clone:chxge
 clone:vsw
 clone:vnet
+clone:pcwl
+clone:pcan
 bge:*
 rge:*
 xge:*
@@ -280,6 +286,8 @@ e1000g:*
 chxge:*
 vsw:*
 vnet:*
+pcwl:*
+pcan:*
 clone:dmfe
 dmfe:*
 clone:pcelx

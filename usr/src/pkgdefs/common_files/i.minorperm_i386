@@ -112,6 +112,10 @@ clone:chxge		0600 root sys 0666 root sys	/dev/chxge
 clone:pcn		0600 root sys 0666 root sys	/dev/pcn
 clone:rtls		0600 root sys 0666 root sys	/dev/rtls
 clone:ath		0600 root sys 0666 root sys	/dev/ath
+clone:ipw               0600 root sys 0666 root sys     /dev/ipw
+clone:iwi               0600 root sys 0666 root sys     /dev/iwi
+clone:pcwl              0600 root sys 0666 root sys     /dev/pcwl
+clone:pcan              0600 root sys 0666 root sys     /dev/pcan
 bge:*			0600 root sys 0666 root sys	/dev/bge*
 rge:*			0600 root sys 0666 root sys	/dev/rge*
 xge:*			0600 root sys 0666 root sys	/dev/xge*
@@ -121,6 +125,10 @@ chxge:*			0600 root sys 0666 root sys	/dev/chxge*
 pcn:*			0600 root sys 0666 root sys	/dev/pcn*
 rtls:*			0600 root sys 0666 root sys	/dev/rtls*
 ath:*			0600 root sys 0666 root sys	/dev/ath*
+ipw:*                   0600 root sys 0666 root sys     /dev/ipw*
+iwi:*                   0600 root sys 0666 root sys     /dev/iwi*
+pcwl:*                  0600 root sys 0666 root sys     /dev/pcwl*
+pcan:*                  0600 root sys 0666 root sys     /dev/pcan*
 EOF
 }
 
@@ -247,6 +255,10 @@ clone:chxge
 clone:pcn
 clone:rtls
 clone:ath
+clone:ipw
+clone:iwi
+clone:pcwl
+clone:pcan
 bge:*
 rge:*
 xge:*
@@ -256,6 +268,10 @@ chxge:*
 pcn:*
 rtls:*
 ath:*
+ipw:*
+iwi:*
+pcwl:*
+pcan:*
 bmc:bmc
 dld:*
 aggr:*
