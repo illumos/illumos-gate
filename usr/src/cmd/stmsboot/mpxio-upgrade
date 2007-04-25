@@ -31,7 +31,6 @@
 # Make sure that the essential libraries can be found.
 LD_LIBRARY_PATH=/lib; export LD_LIBRARY_PATH
 STMSBOOTUTIL=/lib/mpxio/stmsboot_util
-FPCONF=/kernel/drv/fp.conf
 SAVEDIR=/etc/mpxio
 RECOVERFILE=$SAVEDIR/recover_instructions
 DEVFSADM=/usr/sbin/devfsadm
@@ -39,7 +38,7 @@ METADEVADM=/usr/sbin/metadevadm
 usrmounted=0
 MACH=`/usr/bin/uname -p`
 EGREP=/usr/bin/egrep
-SED=/usr$SED
+SED=/usr/bin/sed
 
 # map $special and $fsckdev
 mpxio_mapdev()
