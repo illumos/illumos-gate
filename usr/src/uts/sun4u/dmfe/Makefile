@@ -20,7 +20,7 @@
 #
 #
 # uts/sun4u/dmfe/Makefile
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -72,7 +72,7 @@ CFLAGS += $(CCVERBOSE)
 #
 # extra link arguments
 #
-LDFLAGS += -dy -N misc/gld -N drv/ip
+LDFLAGS += -dy -N misc/mac -N drv/ip
 
 #
 # For now, disable these lint checks; maintainers should endeavor

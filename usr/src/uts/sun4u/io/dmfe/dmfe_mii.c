@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -311,13 +310,6 @@ dmfe_find_phy(dmfe_t *dmfep)
 
 	DMFE_DEBUG(("PHY at address %d, id 0x%x", mii_addr, dmfep->phy_id));
 
-	/*
-	 * DM9102A has an integrated MII interface, therefore we set
-	 * the transceiver address kstat (KS_MII_XCVR_ADDR) to -1
-	 */
-	MII_KS_SET(dmfep, KS_MII_XCVR_ADDR, dmfep->phy_addr);
-	MII_KS_SET(dmfep, KS_MII_XCVR_ID, dmfep->phy_id);
-
 	switch (PHY_MANUFACTURER(dmfep->phy_id)) {
 	case OUI_DAVICOM:
 		return (B_TRUE);
@@ -527,7 +519,7 @@ dmfe_check_link(dmfe_t *dmfep)
 {
 	if (dmfe_check_bmsr(dmfep))
 		return (B_TRUE);
-	return (dmfep->link_state == LINK_UNKNOWN);
+	return (dmfep->link_state == LINK_STATE_UNKNOWN);
 }
 
 
@@ -543,7 +535,6 @@ dmfe_media_update(dmfe_t *dmfep, link_state_t newstate, int speed, int duplex)
 	const char *duplex_msg;
 	const char *link_msg;
 	boolean_t report;
-	int phy_inuse;
 	int ks_id;
 
 	ASSERT(mutex_owned(dmfep->milock));
@@ -551,7 +542,7 @@ dmfe_media_update(dmfe_t *dmfep, link_state_t newstate, int speed, int duplex)
 	ASSERT(newstate != dmfep->link_state);
 
 	switch (newstate) {
-	case LINK_UP:
+	case LINK_STATE_UP:
 		dmfep->param_linkup = 1;
 		state_msg = "up";
 		link_msg = dmfep->link_up_msg;
@@ -569,37 +560,32 @@ dmfe_media_update(dmfe_t *dmfep, link_state_t newstate, int speed, int duplex)
 
 	switch (speed) {
 	case 100:
-		dmfep->op_stats_media = GLDM_100BTX;
 		dmfep->op_stats_speed = 100000000;
 		dmfep->param_speed = speed;
-		phy_inuse = XCVR_TYPE_100BASE_X;
+		dmfep->phy_inuse = XCVR_100X;
 		speed_msg = " 100 Mbps";
 		break;
 
 	case 10:
-		dmfep->op_stats_media = GLDM_10BT;
 		dmfep->op_stats_speed = 10000000;
 		dmfep->param_speed = speed;
-		phy_inuse = XCVR_TYPE_10BASE_T;
+		dmfep->phy_inuse = XCVR_10;
 		speed_msg = " 10 Mbps";
 		break;
 
 	default:
-		dmfep->op_stats_media = GLDM_TP;
 		dmfep->op_stats_speed = 0;
-		phy_inuse = XCVR_TYPE_UNDEFINED;
+		dmfep->phy_inuse = XCVR_UNDEFINED;
 		speed_msg = "";
 		break;
 	}
 
-	MII_KS_SET(dmfep, KS_MII_XCVR_INUSE, phy_inuse);
-
 	switch (duplex) {
-	case GLD_DUPLEX_FULL:
+	case LINK_DUPLEX_FULL:
 		duplex_msg = " Full-Duplex";
 		break;
 
-	case GLD_DUPLEX_HALF:
+	case LINK_DUPLEX_HALF:
 		duplex_msg = " Half-Duplex";
 		break;
 
@@ -617,7 +603,7 @@ dmfe_media_update(dmfe_t *dmfep, link_state_t newstate, int speed, int duplex)
 	 * just log it.
 	 */
 	report = link_msg[0] == '\0';
-	if (newstate == LINK_UP)
+	if (newstate == LINK_STATE_UP)
 		ks_id = report ? KS_LINK_UP_CNT : KS_LINK_CYCLE_UP_CNT;
 	else
 		ks_id = report ? KS_LINK_DROP_CNT : KS_LINK_CYCLE_DOWN_CNT;
@@ -646,36 +632,32 @@ dmfe_link_change(dmfe_t *dmfep, link_state_t newstate)
 	ASSERT(newstate != dmfep->link_state);
 
 	switch (newstate) {
-	case LINK_UP:
-		MII_KS_SET(dmfep, KS_MII_LINK_UP, 1);
+	case LINK_STATE_UP:
 		gpsr = dmfe_chip_get32(dmfep, PHY_STATUS_REG);
 		speed = gpsr & GPS_LINK_100 ? 100 : 10;
-		duplex =
-		    (gpsr & GPS_FULL_DUPLEX) ? GLD_DUPLEX_FULL: GLD_DUPLEX_HALF;
+		duplex = (gpsr & GPS_FULL_DUPLEX) ?
+		    LINK_DUPLEX_FULL: LINK_DUPLEX_HALF;
 		report = B_TRUE;
 		break;
 
 	default:
 		speed = 0;
-		duplex = GLD_DUPLEX_UNKNOWN;
-		MII_KS_SET(dmfep, KS_MII_LINK_UP, 0);
+		duplex = LINK_DUPLEX_UNKNOWN;
 		switch (dmfep->link_state) {
-		case LINK_DOWN:		/* DOWN->UNKNOWN	*/
+		case LINK_STATE_DOWN:		/* DOWN->UNKNOWN	*/
 			report = dmfep->link_down_msg[0] != '\0';
 			break;
 
-		case LINK_UNKNOWN:	/* UNKNOWN->DOWN	*/
+		case LINK_STATE_UNKNOWN:	/* UNKNOWN->DOWN	*/
 			report = B_FALSE;
 			break;
 
-		case LINK_UP:		/* UP->DOWN/UNKNOWN	*/
+		case LINK_STATE_UP:		/* UP->DOWN/UNKNOWN	*/
 			report = B_TRUE;
 			break;
 		}
 		break;
 	}
-
-	MII_KS_SET(dmfep, KS_MII_LINK_DUPLEX, duplex);
 
 	/*
 	 * Update status & report new link state if required ...
@@ -739,28 +721,11 @@ dmfe_process_bmsr(dmfe_t *dmfep, clock_t time)
 	dmfep->param_bmsr_remfault = 1;
 	dmfep->param_bmsr_autoneg  = BIS(bmsr, MII_STATUS_CANAUTONEG);
 
-	MII_KS_SET(dmfep, KS_MII_CAP_100FDX, dmfep->param_bmsr_100fdx);
-	MII_KS_SET(dmfep, KS_MII_CAP_100HDX, dmfep->param_bmsr_100hdx);
-	MII_KS_SET(dmfep, KS_MII_CAP_10FDX, dmfep->param_bmsr_10fdx);
-	MII_KS_SET(dmfep, KS_MII_CAP_10HDX, dmfep->param_bmsr_10hdx);
-	MII_KS_SET(dmfep, KS_MII_CAP_REMFAULT, dmfep->param_bmsr_remfault);
-	MII_KS_SET(dmfep, KS_MII_CAP_AUTONEG, dmfep->param_bmsr_autoneg);
-
 	/*
 	 * Advertised abilities of DM9102A
 	 */
 	anar = dmfep->phy_anar_r;
-	MII_KS_SET(dmfep, KS_MII_ADV_CAP_AUTONEG, dmfep->param_autoneg);
-	MII_KS_SET(dmfep, KS_MII_ADV_CAP_100FDX,
-			BIS(anar, MII_ABILITY_100BASE_TX_FD));
-	MII_KS_SET(dmfep, KS_MII_ADV_CAP_100HDX,
-			BIS(anar, MII_ABILITY_100BASE_TX));
-	MII_KS_SET(dmfep, KS_MII_ADV_CAP_10FDX,
-			BIS(anar, MII_ABILITY_10BASE_T_FD));
-	MII_KS_SET(dmfep, KS_MII_ADV_CAP_10HDX,
-			BIS(anar, MII_ABILITY_10BASE_T));
-	MII_KS_SET(dmfep, KS_MII_ADV_CAP_REMFAULT,
-			BIS(anar, MII_AN_ADVERT_REMFAULT));
+	dmfep->param_anar_remfault = BIS(anar, MII_AN_ADVERT_REMFAULT);
 
 	/*
 	 * Link Partners advertised abilities
@@ -780,17 +745,11 @@ dmfe_process_bmsr(dmfe_t *dmfep, clock_t time)
 	dmfep->param_lp_10hdx    = BIS(anlpar, MII_ABILITY_10BASE_T);
 	dmfep->param_lp_remfault = BIS(anlpar, MII_AN_ADVERT_REMFAULT);
 
-	MII_KS_SET(dmfep, KS_MII_LP_CAP_100FDX, dmfep->param_lp_100fdx);
-	MII_KS_SET(dmfep, KS_MII_LP_CAP_100HDX, dmfep->param_lp_100hdx);
-	MII_KS_SET(dmfep, KS_MII_LP_CAP_10FDX, dmfep->param_lp_10fdx);
-	MII_KS_SET(dmfep, KS_MII_LP_CAP_10HDX, dmfep->param_lp_10hdx);
-	MII_KS_SET(dmfep, KS_MII_LP_CAP_AUTONEG, dmfep->param_lp_autoneg);
-	MII_KS_SET(dmfep, KS_MII_LP_CAP_REMFAULT, dmfep->param_lp_remfault);
-
 	/*
 	 * Derive new state & time since last change
 	 */
-	newstate = (dmfep->phy_bmsr & MII_STATUS_LINKUP) ? LINK_UP : LINK_DOWN;
+	newstate = (dmfep->phy_bmsr & MII_STATUS_LINKUP) ?
+	    LINK_STATE_UP : LINK_STATE_DOWN;
 	time -= dmfep->phy_bmsr_lbolt;
 
 	/*
@@ -798,17 +757,18 @@ dmfe_process_bmsr(dmfe_t *dmfep, clock_t time)
 	 * for all sorts of special cases before we decide :(
 	 */
 	if (dmfep->phy_bmsr == MII_STATUS_INVAL)
-		newstate = LINK_DOWN;
-	else if (dmfep->link_state == LINK_UP && newstate == LINK_DOWN)
+		newstate = LINK_STATE_DOWN;
+	else if ((dmfep->link_state == LINK_STATE_UP) &&
+	    (newstate == LINK_STATE_DOWN))
 		/*EMPTY*/;
 	else if (time < drv_usectohz(dmfe_mii_settle_time))
-		newstate = LINK_UNKNOWN;
+		newstate = LINK_STATE_UNKNOWN;
 	else if (dmfep->phy_bmsr & MII_STATUS_ANDONE)
 		/*EMPTY*/;
 	else if (dmfep->phy_control & MII_CONTROL_ANE)
-		newstate = LINK_UNKNOWN;
+		newstate = LINK_STATE_UNKNOWN;
 
-	if (newstate == LINK_UP) {
+	if (newstate == LINK_STATE_UP) {
 		/*
 		 * Link apparently UP - but get the PHY status register
 		 * (GPSR) and make sure it also shows a consistent value.
@@ -824,7 +784,7 @@ dmfe_process_bmsr(dmfe_t *dmfep, clock_t time)
 		case GPS_LINK_STATUS|GPS_UTP_SIG:
 			break;
 		default:
-			newstate = LINK_UNKNOWN;
+			newstate = LINK_STATE_UNKNOWN;
 			break;
 		}
 
@@ -833,7 +793,7 @@ dmfe_process_bmsr(dmfe_t *dmfep, clock_t time)
 		case GPS_LINK_10:
 			break;
 		default:
-			newstate = LINK_UNKNOWN;
+			newstate = LINK_STATE_UNKNOWN;
 			break;
 		}
 	}
@@ -889,7 +849,7 @@ dmfe_recheck_link(dmfe_t *dmfep, boolean_t ioctl)
 		ASSERT(dmfep->link_state == newstate);
 		if (again)
 			continue;
-		if (newstate == LINK_UP) {
+		if (newstate == LINK_STATE_UP) {
 			dmfep->update_phy = B_TRUE;
 			break;
 		}

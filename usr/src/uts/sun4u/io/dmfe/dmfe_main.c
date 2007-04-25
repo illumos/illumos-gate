@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,9 +29,8 @@
 
 /*
  * This is the string displayed by modinfo, etc.
- * Make sure you keep the version ID up to date!
  */
-static char dmfe_ident[] = "Davicom DM9102 v2.4";
+static char dmfe_ident[] = "Davicom DM9102 Ethernet";
 
 
 /*
@@ -195,23 +194,36 @@ static uint32_t factotum_fast_tix;
 static uint32_t factotum_start_tix;
 
 /*
- * Versions of the O/S up to Solaris 8 didn't support network booting
- * from any network interface except the first (NET0).  Patching this
- * flag to a non-zero value will tell the driver to work around this
- * limitation by creating an extra (internal) pathname node.  To do
- * this, just add a line like the following to the CLIENT'S etc/system
- * file ON THE ROOT FILESYSTEM SERVER before booting the client:
- *
- *	set dmfe:dmfe_net1_boot_support = 1;
- */
-static uint32_t dmfe_net1_boot_support = 0;
-
-/*
  * Property names
  */
 static char localmac_propname[] = "local-mac-address";
 static char opmode_propname[] = "opmode-reg-value";
 static char debug_propname[] = "dmfe-debug-flags";
+
+static int		dmfe_m_start(void *);
+static void		dmfe_m_stop(void *);
+static int		dmfe_m_promisc(void *, boolean_t);
+static int		dmfe_m_multicst(void *, boolean_t, const uint8_t *);
+static int		dmfe_m_unicst(void *, const uint8_t *);
+static void		dmfe_m_ioctl(void *, queue_t *, mblk_t *);
+static boolean_t	dmfe_m_getcapab(void *, mac_capab_t, void *);
+static mblk_t		*dmfe_m_tx(void *, mblk_t *);
+static int 		dmfe_m_stat(void *, uint_t, uint64_t *);
+
+static mac_callbacks_t dmfe_m_callbacks = {
+	(MC_IOCTL | MC_GETCAPAB),
+	dmfe_m_stat,
+	dmfe_m_start,
+	dmfe_m_stop,
+	dmfe_m_promisc,
+	dmfe_m_multicst,
+	dmfe_m_unicst,
+	dmfe_m_tx,
+	NULL,
+	dmfe_m_ioctl,
+	dmfe_m_getcapab,
+};
+
 
 /*
  * Describes the chip's DMA engine
@@ -348,8 +360,6 @@ dmfe_set_opmode(dmfe_t *dmfep)
 static void
 dmfe_stop_chip(dmfe_t *dmfep, enum chip_state newstate)
 {
-	DMFE_TRACE(("dmfe_stop_chip($%p, %d)", (void *)dmfep, newstate));
-
 	ASSERT(mutex_owned(dmfep->oplock));
 
 	/*
@@ -481,21 +491,17 @@ dmfe_init_rings(dmfe_t *dmfep)
 static void
 dmfe_start_chip(dmfe_t *dmfep, int mode)
 {
-	DMFE_TRACE(("dmfe_start_chip($%p, %d)", (void *)dmfep, mode));
-
 	ASSERT(mutex_owned(dmfep->oplock));
 
 	dmfep->opmode |= mode;
 	dmfe_set_opmode(dmfep);
 
 	dmfe_chip_put32(dmfep, W_J_TIMER_REG, 0);
-#if	defined(VLAN_VID_NONE)
 	/*
 	 * Enable VLAN length mode (allows packets to be 4 bytes Longer).
 	 */
-	if (gld_recv_tagged != NULL)
-		dmfe_chip_put32(dmfep, W_J_TIMER_REG, VLAN_ENABLE);
-#endif
+	dmfe_chip_put32(dmfep, W_J_TIMER_REG, VLAN_ENABLE);
+
 	/*
 	 * Clear any pending process-stopped interrupts
 	 */
@@ -572,11 +578,11 @@ dmfe_update_rx_stats(dmfe_t *dmfep, uint32_t desc0)
 	 * the last-fragment and error summary bits are set.
 	 */
 	if (((RX_LAST_DESC | RX_ERR_SUMMARY) & ~desc0) == 0) {
-		dmfep->rx_stats_errrcv += 1;
+		dmfep->rx_stats_ierrors += 1;
 
 		/*
 		 * There are some other error bits in the descriptor for
-		 * which there don't seem to be appropriate GLD statistics,
+		 * which there don't seem to be appropriate MAC statistics,
 		 * notably RX_COLLISION and perhaps RX_DESC_ERR.  The
 		 * latter may not be possible if it is supposed to indicate
 		 * that one buffer has been filled with a partial packet
@@ -585,16 +591,17 @@ dmfe_update_rx_stats(dmfe_t *dmfep, uint32_t desc0)
 		 * enough for a whole packet without fragmenting.
 		 */
 
-		if (desc0 & RX_OVERFLOW)
+		if (desc0 & RX_OVERFLOW) {
 			dmfep->rx_stats_overflow += 1;
-		else if (desc0 & RX_RUNT_FRAME)
+
+		} else if (desc0 & RX_RUNT_FRAME)
 			dmfep->rx_stats_short += 1;
 
 		if (desc0 & RX_CRC)
-			dmfep->rx_stats_crc += 1;
+			dmfep->rx_stats_fcs += 1;
 
 		if (desc0 & RX_FRAME2LONG)
-			dmfep->rx_stats_frame_too_long += 1;
+			dmfep->rx_stats_toolong += 1;
 	}
 
 	/*
@@ -603,37 +610,14 @@ dmfe_update_rx_stats(dmfe_t *dmfep, uint32_t desc0)
 	 * according to the chip data sheet :-?
 	 */
 	if (desc0 & RX_RCV_WD_TO)
-		dmfep->rx_stats_mac_rcv_error += 1;
+		dmfep->rx_stats_macrcv_errors += 1;
 
 	if (desc0 & RX_DRIBBLING)
-		dmfep->rx_stats_frame += 1;
+		dmfep->rx_stats_align += 1;
+
 	if (desc0 & RX_MII_ERR)
-		dmfep->rx_stats_mac_rcv_error += 1;
+		dmfep->rx_stats_macrcv_errors += 1;
 }
-
-/*
- * Ethernet packet-checking macros used in the receive code below.
- * The <eap> parameter should be a pointer to the destination address found
- * at the start of a received packet (an array of 6 (ETHERADDRL) bytes).
- *
- * A packet is intended for this station if the destination address exactly
- * matches our own physical (unicast) address.
- *
- * A packet is a multicast (including broadcast) packet if the low-order bit
- * of the first byte of the destination address is set (unicast addresses
- * always have a zero in this bit).
- *
- * A packet should be passed up to GLD if it's multicast OR addressed to us
- * OR if the device is in promiscuous mode, when all packets are passed up
- * anyway.
- */
-#define	PKT_IS_MINE(eap, dmfep)	(ether_cmp(eap,	dmfep->curr_addr) == 0)
-#define	PKT_IS_MULTICAST(eap)	(eap[0] & 1)
-#define	DEV_IS_PROMISC(dmfep)	((dmfep->opmode & PROMISC_MODE) != 0)
-
-#define	PKT_WANTED(eap, dmfep)	(PKT_IS_MULTICAST(eap) 		||	\
-				    PKT_IS_MINE(eap, dmfep)	||	\
-				    DEV_IS_PROMISC(dmfep))
 
 /*
  * Receive incoming packet(s) and pass them up ...
@@ -641,7 +625,6 @@ dmfe_update_rx_stats(dmfe_t *dmfep, uint32_t desc0)
 static mblk_t *
 dmfe_getp(dmfe_t *dmfep)
 {
-	struct ether_header *ehp;
 	dma_area_t *descp;
 	mblk_t **tail;
 	mblk_t *head;
@@ -653,15 +636,13 @@ dmfe_getp(dmfe_t *dmfep)
 	int packet_length;
 	int index;
 
-	DMFE_TRACE(("dmfe_getp($%p)", (void *)dmfep));
-
 	mutex_enter(dmfep->rxlock);
 
 	/*
 	 * Update the missed frame statistic from the on-chip counter.
 	 */
 	misses = dmfe_chip_get32(dmfep, MISSED_FRAME_REG);
-	dmfep->rx_stats_missed += (misses & MISSED_FRAME_MASK);
+	dmfep->rx_stats_norcvbuf += (misses & MISSED_FRAME_MASK);
 
 	/*
 	 * sync (all) receive descriptors before inspecting them
@@ -713,6 +694,14 @@ dmfe_getp(dmfe_t *dmfep)
 				"length %d", packet_length));
 			goto skip;
 		} else if (packet_length < ETHERMIN) {
+			/*
+			 * Note that VLAN packet would be even larger,
+			 * but we don't worry about dropping runt VLAN
+			 * frames.
+			 *
+			 * This check is probably redundant, as well,
+			 * since the hardware should drop RUNT frames.
+			 */
 			DMFE_DEBUG(("dmfe_getp: dropping undersize packet, "
 				"length %d", packet_length));
 			goto skip;
@@ -730,11 +719,14 @@ dmfe_getp(dmfe_t *dmfep)
 			index*DMFE_BUF_SIZE, DMFE_BUF_SIZE,
 			DDI_DMA_SYNC_FORKERNEL);
 		rxb = &dmfep->rx_buff.mem_va[index*DMFE_BUF_SIZE];
-		ehp = (struct ether_header *)rxb;
-		if (!PKT_WANTED(ehp->ether_dhost.ether_addr_octet, dmfep)) {
-			DMFE_DEBUG(("dmfe_getp: dropping aliased packet"));
-			goto skip;
-		}
+
+
+		/*
+		 * We do not bother to check that the packet is really for
+		 * us, we let the MAC framework make that check instead.
+		 * This is especially important if we ever want to support
+		 * multiple MAC addresses.
+		 */
 
 		/*
 		 * Packet looks good; get a buffer to copy it into.  We
@@ -752,46 +744,29 @@ dmfe_getp(dmfe_t *dmfep)
 		}
 
 		/*
+		 * Account for statistics of good packets.
+		 */
+		dmfep->rx_stats_ipackets += 1;
+		dmfep->rx_stats_rbytes += packet_length;
+		if (desc0 & RX_MULTI_FRAME) {
+			if (bcmp(rxb, dmfe_broadcast_addr, ETHERADDRL)) {
+				dmfep->rx_stats_multi += 1;
+			} else {
+				dmfep->rx_stats_bcast += 1;
+			}
+		}
+
+		/*
 		 * Copy the packet into the STREAMS buffer
 		 */
 		dp = mp->b_rptr += DMFE_HEADROOM;
 		mp->b_cont = mp->b_next = NULL;
-#if	!defined(VLAN_VID_NONE)
+
+		/*
+		 * Don't worry about stripping the vlan tag, the MAC
+		 * layer will take care of that for us.
+		 */
 		bcopy(rxb, dp, packet_length);
-#else
-		if (ehp->ether_type != ETHERTYPE_VLAN ||
-		    gld_recv_tagged == NULL) {
-			/*
-			 * An untagged packet (or, there's no runtime support
-			 * for tagging so we treat all packets as untagged).
-			 * Just copy the contents verbatim.
-			 */
-			bcopy(rxb, dp, packet_length);
-		} else {
-			/*
-			 * A tagged packet. Extract the vtag & stash it in
-			 * the b_cont field (we know that it's safe to grab
-			 * the vtag directly because the way buffers are
-			 * allocated guarantees their alignment). Copy the
-			 * rest of the packet data to the mblk, dropping the
-			 * vtag in the process.
-			 *
-			 * The magic number (2*ETHERADDRL) appears quite a
-			 * lot here, because the vtag comes immediately after
-			 * the destination & source Ethernet addresses in
-			 * the packet header ...
-			 */
-			bcopy(rxb, dp, 2*ETHERADDRL);
-			rxb += 2*ETHERADDRL;
-			dp += 2*ETHERADDRL;
-
-			mp->b_cont = U32TOPTR(*(uint32_t *)rxb);
-			rxb += VTAG_SIZE;
-			packet_length -= VTAG_SIZE;
-
-			bcopy(rxb, dp, packet_length - 2*ETHERADDRL);
-		}
-#endif	/* defined(VLAN_VID_NONE) */
 
 		/*
 		 * Fix up the packet length, and link it to the chain
@@ -824,40 +799,6 @@ dmfe_getp(dmfe_t *dmfep)
 
 	mutex_exit(dmfep->rxlock);
 	return (head);
-}
-
-/*
- * Take a chain of mblks (as returned by dmfe_getp() above) and pass
- * them up to gld_recv() one at a time. This function should be called
- * with *no* driver-defined locks held.
- *
- * If the driver is compiled with VLAN support enabled, this function
- * also deals with routing vlan-tagged packets to the appropriate GLD
- * entry point (gld_recv_tagged()).
- */
-static void
-dmfe_passup_chain(gld_mac_info_t  *macinfo, mblk_t *mp)
-{
-	mblk_t *next;
-	uint32_t vtag;
-
-	ASSERT(mp != NULL);
-
-	do {
-		next = mp->b_next;
-		mp->b_next = NULL;
-#if	!defined(VLAN_VID_NONE)
-		gld_recv(macinfo, mp);
-#else
-		vtag = PTRTOU32(mp->b_cont);
-		mp->b_cont = NULL;
-		if (vtag != VLAN_VTAG_NONE && gld_recv_tagged != NULL)
-			gld_recv_tagged(macinfo, mp, vtag);
-		else
-			gld_recv(macinfo, mp);
-#endif	/* defined(VLAN_VID_NONE) */
-		mp = next;
-	} while (mp != NULL);
 }
 
 #undef	DMFE_DBG
@@ -936,7 +877,7 @@ dmfe_passup_chain(gld_mac_info_t  *macinfo, mblk_t *mp)
  * Function to update transmit statistics on various errors
  */
 static void
-dmfe_update_tx_stats(dmfe_t *dmfep, uint32_t desc0)
+dmfe_update_tx_stats(dmfe_t *dmfep, int index, uint32_t desc0, uint32_t desc1)
 {
 	uint32_t collisions;
 	uint32_t errbits;
@@ -954,7 +895,7 @@ dmfe_update_tx_stats(dmfe_t *dmfep, uint32_t desc0)
 	}
 
 	if (desc0 & TX_ERR_SUMMARY) {
-		dmfep->tx_stats_errxmt += 1;
+		dmfep->tx_stats_oerrors += 1;
 
 		/*
 		 * If we ever see a transmit jabber timeout, we count it
@@ -963,7 +904,7 @@ dmfe_update_tx_stats(dmfe_t *dmfep, uint32_t desc0)
 		 * the chip in order to recover
 		 */
 		if (desc0 & TX_JABBER_TO)
-			dmfep->tx_stats_mac_xmt_error += 1;
+			dmfep->tx_stats_macxmt_errors += 1;
 
 		if (desc0 & TX_UNDERFLOW)
 			dmfep->tx_stats_underflow += 1;
@@ -977,6 +918,21 @@ dmfe_update_tx_stats(dmfe_t *dmfep, uint32_t desc0)
 			dmfep->tx_stats_excoll += 1;
 			collisions = 16;
 		}
+	} else {
+		int	bit = index % NBBY;
+		int	byt = index / NBBY;
+
+		if (dmfep->tx_mcast[byt] & bit) {
+			dmfep->tx_mcast[byt] &= ~bit;
+			dmfep->tx_stats_multi += 1;
+
+		} else if (dmfep->tx_bcast[byt] & bit) {
+			dmfep->tx_bcast[byt] &= ~bit;
+			dmfep->tx_stats_bcast += 1;
+		}
+
+		dmfep->tx_stats_opackets += 1;
+		dmfep->tx_stats_obytes += desc1 & TX_BUFFER_SIZE1;
 	}
 
 	if (collisions == 1)
@@ -1003,8 +959,6 @@ dmfe_reclaim_tx_desc(dmfe_t *dmfep)
 	uint32_t desc1;
 	int nfree;
 	int i;
-
-	DMFE_TRACE(("dmfe_reclaim_tx_desc($%p)", (void *)dmfep));
 
 	ASSERT(mutex_owned(dmfep->txlock));
 
@@ -1061,7 +1015,7 @@ dmfe_reclaim_tx_desc(dmfe_t *dmfep)
 			 */
 			ASSERT(dmfe_ring_get32(descp, i, BUFFER1) ==
 			    dmfep->tx_buff.mem_dvma + i*DMFE_BUF_SIZE);
-			dmfe_update_tx_stats(dmfep, desc0);
+			dmfe_update_tx_stats(dmfep, i, desc0, desc1);
 		}
 
 #if	DMFEDEBUG
@@ -1102,8 +1056,8 @@ dmfe_reclaim_tx_desc(dmfe_t *dmfep)
  * Send the message in the message block chain <mp>.
  *
  * The message is freed if and only if its contents are successfully copied
- * and queued for transmission (so that the return value is GLD_SUCCESS).
- * If we can't queue the message, the return value is GLD_NORESOURCES and
+ * and queued for transmission (so that the return value is B_TRUE).
+ * If we can't queue the message, the return value is B_FALSE and
  * the message is *not* freed.
  *
  * This routine handles the special case of <mp> == NULL, which indicates
@@ -1112,8 +1066,8 @@ dmfe_reclaim_tx_desc(dmfe_t *dmfep)
  * to say its a setup packet (from the global <dmfe_setup_desc1>), and the
  * setup packet *isn't* freed after use.
  */
-static int
-dmfe_send_msg(dmfe_t *dmfep, mblk_t *mp, uint32_t vtag)
+static boolean_t
+dmfe_send_msg(dmfe_t *dmfep, mblk_t *mp)
 {
 	dma_area_t *descp;
 	mblk_t *bp;
@@ -1122,9 +1076,6 @@ dmfe_send_msg(dmfe_t *dmfep, mblk_t *mp, uint32_t vtag)
 	uint32_t index;
 	size_t totlen;
 	size_t mblen;
-
-	DMFE_TRACE(("dmfe_send_msg($%p, $%p, 0x%x)",
-		(void *)dmfep, (void *)mp, vtag));
 
 	/*
 	 * If the number of free slots is below the reclaim threshold
@@ -1137,13 +1088,13 @@ dmfe_send_msg(dmfe_t *dmfep, mblk_t *mp, uint32_t vtag)
 	    dmfe_reclaim_tx_desc(dmfep) == B_FALSE &&
 	    dmfep->tx.n_free <= dmfe_tx_min_free) {
 		/*
-		 * Resource shortage - return the proper GLD code,
-		 * so the packet will be queued for retry after the
-		 * next TX-done interrupt.
+		 * Resource shortage - return B_FALSE so the packet
+		 * will be queued for retry after the next TX-done
+		 * interrupt.
 		 */
 		mutex_exit(dmfep->txlock);
 		DMFE_DEBUG(("dmfe_send_msg: no free descriptors"));
-		return (GLD_NORESOURCES);
+		return (B_FALSE);
 	}
 
 	/*
@@ -1202,51 +1153,6 @@ dmfe_send_msg(dmfe_t *dmfep, mblk_t *mp, uint32_t vtag)
 		totlen = 0;
 		bp = mp;
 
-#if	defined(VLAN_VID_NONE)
-		if (vtag != VLAN_VTAG_NONE) {
-			/*
-			 * A tagged packet.  While copying the data from
-			 * the first mblk into the Tx buffer, insert the
-			 * vtag.  IP and/or GLD have already guaranteed
-			 * that the entire struct ether_header (14 bytes)
-			 * at the start of the packet can be found in the
-			 * first mblk, so we don't have to worry about it
-			 * being split into multiple fragments.
-			 *
-			 * The magic number (2*ETHERADDRL) appears quite a
-			 * lot here, because the vtag comes immediately after
-			 * the destination & source Ethernet addresses in
-			 * the packet header.
-			 *
-			 * The way we allocated the buffers guarantees
-			 * their alignment, so it's safe to stash the vtag
-			 * directly into the buffer at the proper offset
-			 * (4 bytes, 12 bytes into the frame).
-			 *
-			 * Once we have copied the data from the first mblk,
-			 * we can fall through to the untagged packet code
-			 * to handle the rest of the chain, if any.
-			 */
-			mblen = bp->b_wptr - bp->b_rptr;
-			ASSERT(mblen >= sizeof (struct ether_header));
-
-			bcopy(bp->b_rptr, txb, 2*ETHERADDRL);
-			txb += 2*ETHERADDRL;
-			totlen += 2*ETHERADDRL;
-			mblen -= 2*ETHERADDRL;
-
-			*(uint32_t *)txb = vtag;
-			txb += VTAG_SIZE;
-			totlen += VTAG_SIZE;
-
-			bcopy(bp->b_rptr + 2*ETHERADDRL, txb, mblen);
-			txb += mblen;
-			totlen += mblen;
-
-			bp = bp->b_cont;
-		}
-#endif	/* defined(VLAN_VID_NONE) */
-
 		/*
 		 * Copy all (remaining) mblks in the message ...
 		 */
@@ -1255,6 +1161,22 @@ dmfe_send_msg(dmfe_t *dmfep, mblk_t *mp, uint32_t vtag)
 			if ((totlen += mblen) <= DMFE_MAX_PKT_SIZE) {
 				bcopy(bp->b_rptr, txb, mblen);
 				txb += mblen;
+			}
+		}
+
+		/*
+		 * Is this a multicast or broadcast packet?  We do
+		 * this so that we can track statistics accurately
+		 * when we reclaim it.
+		 */
+		txb = &dmfep->tx_buff.mem_va[index*DMFE_BUF_SIZE];
+		if (txb[0] & 0x1) {
+			if (bcmp(txb, dmfe_broadcast_addr, ETHERADDRL) == 0) {
+				dmfep->tx_bcast[index / NBBY] |=
+				    (1 << (index % NBBY));
+			} else {
+				dmfep->tx_mcast[index / NBBY] |=
+				    (1 << (index % NBBY));
 			}
 		}
 
@@ -1272,6 +1194,7 @@ dmfe_send_msg(dmfe_t *dmfep, mblk_t *mp, uint32_t vtag)
 		(void) ddi_dma_sync(dmfep->tx_buff.dma_hdl,
 			index*DMFE_BUF_SIZE, DMFE_BUF_SIZE,
 			DDI_DMA_SYNC_FORDEV);
+
 	}
 
 	/*
@@ -1291,65 +1214,44 @@ dmfe_send_msg(dmfe_t *dmfep, mblk_t *mp, uint32_t vtag)
 	 */
 	if (mp)
 		freemsg(mp);
-	return (GLD_SUCCESS);
+	return (B_TRUE);
 }
 
 /*
- *	dmfe_gld_send() -- send a packet
+ *	dmfe_m_tx() -- send a chain of packets
  *
- *	Called when a packet is ready to be transmitted. A pointer to an
+ *	Called when packet(s) are ready to be transmitted. A pointer to an
  *	M_DATA message that contains the packet is passed to this routine.
  *	The complete LLC header is contained in the message's first message
  *	block, and the remainder of the packet is contained within
  *	additional M_DATA message blocks linked to the first message block.
- */
-static int
-dmfe_gld_send(gld_mac_info_t *macinfo, mblk_t *mp)
-{
-	dmfe_t *dmfep;			/* private device info	*/
-
-	dmfep = DMFE_STATE(macinfo);
-	DMFE_TRACE(("dmfe_gld_send($%p, $%p)",
-		(void *)macinfo, (void *)mp));
-
-	ASSERT(mp != NULL);
-	ASSERT(dmfep->gld_state == GLD_STARTED);
-
-	if (dmfep->chip_state != CHIP_RUNNING)
-		return (GLD_NORESOURCES);
-
-	return (dmfe_send_msg(dmfep, mp, VLAN_VTAG_NONE));
-}
-
-#if	defined(VLAN_VID_NONE)
-/*
- *	dmfe_gld_send_tagged() -- send a tagged packet
  *
- *	Called when a packet is ready to be transmitted. A pointer to an
- *	M_DATA message that contains the packet is passed to this routine.
- *	The complete LLC header is contained in the message's first message
- *	block, and the remainder of the packet is contained within
- *	additional M_DATA message blocks linked to the first message block.
+ *	Additional messages may be passed by linking with b_next.
  */
-static int
-dmfe_gld_send_tagged(gld_mac_info_t *macinfo, mblk_t *mp, uint32_t vtag)
+static mblk_t *
+dmfe_m_tx(void *arg, mblk_t *mp)
 {
-	dmfe_t *dmfep;			/* private device info	*/
-
-	dmfep = DMFE_STATE(macinfo);
-	DMFE_TRACE(("dmfe_gld_send_vtag($%p, $%p, $%x)",
-		(void *)macinfo, (void *)mp, vtag));
+	dmfe_t *dmfep = arg;			/* private device info	*/
+	mblk_t *next;
 
 	ASSERT(mp != NULL);
-	ASSERT(dmfep->gld_state == GLD_STARTED);
+	ASSERT(dmfep->mac_state == DMFE_MAC_STARTED);
 
 	if (dmfep->chip_state != CHIP_RUNNING)
-		return (GLD_NORESOURCES);
+		return (mp);
 
-	return (dmfe_send_msg(dmfep, mp, vtag));
+	while (mp != NULL) {
+		next = mp->b_next;
+		mp->b_next = NULL;
+		if (!dmfe_send_msg(dmfep, mp)) {
+			mp->b_next = next;
+			break;
+		}
+		mp = next;
+	}
+
+	return (mp);
 }
-#endif	/* defined(VLAN_VID_NONE) */
-
 
 #undef	DMFE_DBG
 
@@ -1365,7 +1267,7 @@ dmfe_gld_send_tagged(gld_mac_info_t *macinfo, mblk_t *mp, uint32_t vtag)
  * This must mirror the way the hardware will actually calculate it!
  */
 static uint32_t
-dmfe_hash_index(uchar_t *address)
+dmfe_hash_index(const uint8_t *address)
 {
 	uint32_t const POLY = HASH_POLY;
 	uint32_t crc = HASH_CRC;
@@ -1424,21 +1326,15 @@ dmfe_update_hash(dmfe_t *dmfep, uint32_t index, boolean_t val)
  * changed), return B_FALSE
  */
 static boolean_t
-dmfe_update_mcast(dmfe_t *dmfep, uchar_t *mca, boolean_t val, const char *what)
+dmfe_update_mcast(dmfe_t *dmfep, const uint8_t *mca, boolean_t val)
 {
 	uint32_t index;
 	uint8_t *refp;
-	uint8_t oldref;
 	boolean_t change;
 
 	index = dmfe_hash_index(mca);
 	refp = &dmfep->mcast_refs[index];
-	oldref = *refp;
 	change = (val ? (*refp)++ : --(*refp)) == 0;
-
-	DMFE_DEBUG(("dmfe_update_mcast: %s %s %s index %d ref %d->%d%s",
-		ether_sprintf((void *)mca), val ? "ON" : "OFF", what,
-		index, oldref, *refp, change ? " (CHANGED)" : ""));
 
 	if (change)
 		dmfe_update_hash(dmfep, index, val);
@@ -1454,21 +1350,15 @@ dmfe_send_setup(dmfe_t *dmfep)
 {
 	int status;
 
-	DMFE_TRACE(("dmfe_send_setup($%p)", (void *)dmfep));
-
 	ASSERT(mutex_owned(dmfep->oplock));
 
 	/*
 	 * If the chip isn't running, we can't really send the setup frame
 	 * now but it doesn't matter, 'cos it will be sent when the transmit
-	 * process is restarted (see dmfe_start()).  It isn't an error; in
-	 * fact, GLD v2 will always call dmfe_gld_set_mac_addr() after a
-	 * reset, so that the address can be set up before the chip is
-	 * started.  In this context, the return code GLD_NOTSUPPORTED is
-	 * taken as success!
+	 * process is restarted (see dmfe_start()).
 	 */
 	if ((dmfep->opmode & START_TRANSMIT) == 0)
-		return (GLD_NOTSUPPORTED);
+		return (0);
 
 	/*
 	 * "Send" the setup frame.  If it fails (e.g. no resources),
@@ -1477,24 +1367,20 @@ dmfe_send_setup(dmfe_t *dmfep)
 	 * had previously failed.  We tell the caller that it worked
 	 * whether it did or not; after all, it *will* work eventually.
 	 */
-	status = dmfe_send_msg(dmfep, NULL, VLAN_VTAG_NONE);
-	dmfep->need_setup = status != GLD_SUCCESS;
-	return (GLD_SUCCESS);
+	status = dmfe_send_msg(dmfep, NULL);
+	dmfep->need_setup = status ? B_FALSE : B_TRUE;
+	return (0);
 }
 
 /*
- *	dmfe_gld_set_mac_addr() -- set the physical network address
+ *	dmfe_m_unicst() -- set the physical network address
  */
 static int
-dmfe_gld_set_mac_addr(gld_mac_info_t *macinfo, uchar_t *macaddr)
+dmfe_m_unicst(void *arg, const uint8_t *macaddr)
 {
-	dmfe_t *dmfep;			/* private device info	*/
+	dmfe_t *dmfep = arg;
 	int status;
 	int index;
-
-	dmfep = DMFE_STATE(macinfo);
-	DMFE_TRACE(("dmfe_gld_set_mac_addr($%p, %s)",
-		(void *)macinfo, ether_sprintf((void *)macaddr)));
 
 	/*
 	 * Update our current address and send out a new setup packet
@@ -1533,13 +1419,11 @@ dmfe_gld_set_mac_addr(gld_mac_info_t *macinfo, uchar_t *macaddr)
 	mutex_enter(dmfep->oplock);
 
 	if (dmfep->addr_set && dmfe_setup_desc1 & TX_FILTER_TYPE1)
-		(void) dmfe_update_mcast(dmfep, dmfep->curr_addr, B_FALSE,
-			    "xaddr");
+		(void) dmfe_update_mcast(dmfep, dmfep->curr_addr, B_FALSE);
 	if (dmfe_setup_desc1 & TX_FILTER_TYPE1)
-		(void) dmfe_update_mcast(dmfep, macaddr, B_TRUE, "saddr");
+		(void) dmfe_update_mcast(dmfep, macaddr, B_TRUE);
 	if (!dmfep->addr_set)
-		(void) dmfe_update_mcast(dmfep, dmfe_broadcast_addr, B_TRUE,
-			    "bcast");
+		(void) dmfe_update_mcast(dmfep, dmfe_broadcast_addr, B_TRUE);
 
 	/*
 	 * Remember the new current address
@@ -1567,28 +1451,23 @@ dmfe_gld_set_mac_addr(gld_mac_info_t *macinfo, uchar_t *macaddr)
 }
 
 /*
- *	dmfe_gld_set_multicast() -- enable or disable a multicast address
+ *	dmfe_m_multicst() -- enable or disable a multicast address
  *
  *	Program the hardware to enable/disable the multicast address
- *	in "mca" (enable if "flag" is GLD_MULTI_ENABLE, otherwise disable).
+ *	in "mca" (enable if add is true, otherwise disable it.)
  *	We keep a refcount for each bit in the map, so that it still
  *	works out properly if multiple addresses hash to the same bit.
  *	dmfe_update_mcast() tells us whether the map actually changed;
  *	if so, we have to re-"transmit" the magic setup packet.
  */
 static int
-dmfe_gld_set_multicast(gld_mac_info_t *macinfo, uchar_t *mca, int flag)
+dmfe_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 {
-	dmfe_t *dmfep;			/* private device info	*/
-	int status;
+	dmfe_t *dmfep = arg;			/* private device info	*/
+	int status = 0;
 
-	dmfep = DMFE_STATE(macinfo);
-	DMFE_TRACE(("dmfe_gld_set_multicast($%p, %s, %d)",
-		(void *)macinfo, ether_sprintf((void *)mca), flag));
-
-	status = GLD_SUCCESS;
 	mutex_enter(dmfep->oplock);
-	if (dmfe_update_mcast(dmfep, mca, flag == GLD_MULTI_ENABLE, "mcast"))
+	if (dmfe_update_mcast(dmfep, mca, add))
 		status = dmfe_send_setup(dmfep);
 	mutex_exit(dmfep->oplock);
 
@@ -1606,9 +1485,9 @@ dmfe_gld_set_multicast(gld_mac_info_t *macinfo, uchar_t *mca, int flag)
 
 /*
  * These routines provide all the functionality required by the
- * corresponding GLD entry points, but don't update the GLD state
+ * corresponding MAC layer entry points, but don't update the MAC layer state
  * so they can be called internally without disturbing our record
- * of what GLD thinks we should be doing ...
+ * of what MAC layer thinks we should be doing ...
  */
 
 /*
@@ -1617,8 +1496,6 @@ dmfe_gld_set_multicast(gld_mac_info_t *macinfo, uchar_t *mca, int flag)
 static void
 dmfe_stop(dmfe_t *dmfep)
 {
-	DMFE_TRACE(("dmfe_stop($%p)", (void *)dmfep));
-
 	ASSERT(mutex_owned(dmfep->oplock));
 
 	dmfe_stop_chip(dmfep, CHIP_STOPPED);
@@ -1630,8 +1507,6 @@ dmfe_stop(dmfe_t *dmfep)
 static void
 dmfe_reset(dmfe_t *dmfep)
 {
-	DMFE_TRACE(("dmfe_reset($%p)", (void *)dmfep));
-
 	ASSERT(mutex_owned(dmfep->oplock));
 	ASSERT(mutex_owned(dmfep->rxlock));
 	ASSERT(mutex_owned(dmfep->txlock));
@@ -1647,8 +1522,6 @@ static void
 dmfe_start(dmfe_t *dmfep)
 {
 	uint32_t gpsr;
-
-	DMFE_TRACE(("dmfe_start($%p)", (void *)dmfep));
 
 	ASSERT(mutex_owned(dmfep->oplock));
 
@@ -1695,95 +1568,53 @@ dmfe_restart(dmfe_t *dmfep)
 	dmfe_reset(dmfep);
 	mutex_exit(dmfep->txlock);
 	mutex_exit(dmfep->rxlock);
-	if (dmfep->gld_state == GLD_STARTED)
+	if (dmfep->mac_state == DMFE_MAC_STARTED)
 		dmfe_start(dmfep);
 }
 
 
 /*
- * ========== GLD-required management entry points ==========
+ * ========== MAC-required management entry points ==========
  */
 
 /*
- *	dmfe_gld_reset() -- reset to initial state
+ *	dmfe_m_stop() -- stop transmitting/receiving
  */
-static int
-dmfe_gld_reset(gld_mac_info_t *macinfo)
+static void
+dmfe_m_stop(void *arg)
 {
-	dmfe_t *dmfep;			/* private device info	*/
-
-	dmfep = DMFE_STATE(macinfo);
-	DMFE_TRACE(("dmfe_gld_reset($%p)", (void *)macinfo));
+	dmfe_t *dmfep = arg;			/* private device info	*/
 
 	/*
-	 * Reset chip & rings to initial state; also reset address
-	 * filtering & record new GLD state.  You need *all* the locks
-	 * in order to stop all other activity while doing this!
-	 */
-	mutex_enter(dmfep->oplock);
-	mutex_enter(dmfep->rxlock);
-	mutex_enter(dmfep->txlock);
-
-	dmfe_reset(dmfep);
-	bzero(dmfep->tx_desc.setup_va, SETUPBUF_SIZE);
-	bzero(dmfep->mcast_refs, MCASTBUF_SIZE);
-	dmfep->addr_set = B_FALSE;
-	dmfep->opmode &= ~(PROMISC_MODE | PASS_MULTICAST);
-	dmfep->gld_state = GLD_RESET;
-
-	mutex_exit(dmfep->txlock);
-	mutex_exit(dmfep->rxlock);
-	mutex_exit(dmfep->oplock);
-
-	return (0);
-}
-
-/*
- *	dmfe_gld_stop() -- stop transmitting/receiving
- */
-static int
-dmfe_gld_stop(gld_mac_info_t *macinfo)
-{
-	dmfe_t *dmfep;			/* private device info	*/
-
-	dmfep = DMFE_STATE(macinfo);
-	DMFE_TRACE(("dmfe_gld_stop($%p)", (void *)macinfo));
-
-	/*
-	 * Just stop processing, then record new GLD state
+	 * Just stop processing, then record new MAC state
 	 */
 	mutex_enter(dmfep->oplock);
 	dmfe_stop(dmfep);
-	dmfep->gld_state = GLD_STOPPED;
+	dmfep->mac_state = DMFE_MAC_STOPPED;
 	mutex_exit(dmfep->oplock);
-
-	return (0);
 }
 
 /*
- *	dmfe_gld_start() -- start transmitting/receiving
+ *	dmfe_m_start() -- start transmitting/receiving
  */
 static int
-dmfe_gld_start(gld_mac_info_t *macinfo)
+dmfe_m_start(void *arg)
 {
-	dmfe_t *dmfep;			/* private device info	*/
-
-	dmfep = DMFE_STATE(macinfo);
-	DMFE_TRACE(("dmfe_gld_start($%p)", (void *)macinfo));
+	dmfe_t *dmfep = arg;			/* private device info	*/
 
 	/*
-	 * Start processing and record new GLD state
+	 * Start processing and record new MAC state
 	 */
 	mutex_enter(dmfep->oplock);
 	dmfe_start(dmfep);
-	dmfep->gld_state = GLD_STARTED;
+	dmfep->mac_state = DMFE_MAC_STARTED;
 	mutex_exit(dmfep->oplock);
 
 	return (0);
 }
 
 /*
- * dmfe_gld_set_promiscuous() -- set or reset promiscuous mode on the board
+ * dmfe_m_promisc() -- set or reset promiscuous mode on the board
  *
  *	Program the hardware to enable/disable promiscuous and/or
  *	receive-all-multicast modes.  Davicom don't document this
@@ -1791,47 +1622,59 @@ dmfe_gld_start(gld_mac_info_t *macinfo)
  *	without stopping & restarting the TX/RX processes).
  */
 static int
-dmfe_gld_set_promiscuous(gld_mac_info_t *macinfo, int mode)
+dmfe_m_promisc(void *arg, boolean_t on)
 {
-	dmfe_t *dmfep;
-	uint32_t pmode;
-
-	dmfep = DMFE_STATE(macinfo);
-	DMFE_TRACE(("dmfe_gld_set_promiscuous($%p, %d)",
-		(void *)macinfo, mode));
-
-	/*
-	 * Convert GLD-specified mode to DMFE opmode setting
-	 */
-	switch (mode) {
-	case GLD_MAC_PROMISC_NONE:
-		pmode = 0;
-		break;
-
-	case GLD_MAC_PROMISC_MULTI:
-		pmode = PASS_MULTICAST;
-		break;
-
-	case GLD_MAC_PROMISC_PHYS:
-		pmode = PROMISC_MODE;
-		break;
-
-	default:
-		return (GLD_NOTSUPPORTED);
-	}
+	dmfe_t *dmfep = arg;
 
 	mutex_enter(dmfep->oplock);
 	dmfep->opmode &= ~(PROMISC_MODE | PASS_MULTICAST);
-	dmfep->opmode |= pmode;
+	if (on)
+		dmfep->opmode |= PROMISC_MODE;
 	dmfe_set_opmode(dmfep);
-	pmode = dmfep->opmode;
 	mutex_exit(dmfep->oplock);
 
-	DMFE_DEBUG(("dmfe_gld_set_promiscuous: mode %d => opmode 0x%x",
-		mode, pmode));
-
-	return (GLD_SUCCESS);
+	return (0);
 }
+
+/*ARGSUSED*/
+static boolean_t
+dmfe_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
+{
+	/*
+	 * Note that the chip could support some form of polling and
+	 * multiaddress support.  We should look into adding polling
+	 * support later, once Solaris is better positioned to take
+	 * advantage of it, although it may be of little use since
+	 * even a lowly 500MHz US-IIe should be able to keep up with
+	 * 100Mbps.  (Esp. if the packets are not unreasonably sized.)
+	 *
+	 * Multiaddress support, however, is likely to be of more
+	 * utility with crossbow and virtualized NICs.  Although, the
+	 * fact that dmfe is only supported on low-end US-IIe hardware
+	 * makes one wonder whether VNICs are likely to be used on
+	 * such platforms.  The chip certainly supports the notion,
+	 * since it can be run in HASH-ONLY mode.  (Though this would
+	 * require software to drop unicast packets that are
+	 * incorrectly received due to hash collision of the
+	 * destination mac address.)
+	 *
+	 * Interestingly enough, modern Davicom chips (the 9102D)
+	 * support full IP checksum offload, though its unclear
+	 * whether any of these chips are used on any systems that can
+	 * run Solaris.
+	 *
+	 * If this driver is ever supported on x86 hardware, then
+	 * these assumptions should be revisited.
+	 */
+	switch (cap) {
+	case MAC_CAPAB_POLL:
+	case MAC_CAPAB_MULTIADDRESS:
+	case MAC_CAPAB_HCKSUM:
+	default:
+		return (B_FALSE);
+	}
+}
+
 
 #undef	DMFE_DBG
 
@@ -1903,19 +1746,16 @@ dmfe_factotum(caddr_t arg)
 			dmfep->update_phy = B_FALSE;
 		}
 		dmfe_recheck_link(dmfep, B_FALSE);
-		if (dmfep->gld_state == GLD_STARTED)
+		if (dmfep->mac_state == DMFE_MAC_STARTED)
 			dmfe_start(dmfep);
 		mutex_exit(dmfep->oplock);
 	}
 	mutex_exit(dmfep->milock);
 
 	/*
-	 * Keep GLD up-to-date about the state of the link ...
+	 * Keep MAC up-to-date about the state of the link ...
 	 */
-	if (gld_linkstate != NULL)
-		gld_linkstate(DMFE_MACINFO(dmfep),
-			dmfep->link_state == LINK_UP ?
-				GLD_LINKSTATE_UP : GLD_LINKSTATE_DOWN);
+	mac_link_update(dmfep->mh, dmfep->link_state);
 
 	return (DDI_INTR_CLAIMED);
 }
@@ -1976,11 +1816,12 @@ dmfe_tick_link_check(dmfe_t *dmfep, uint32_t gpsr, uint32_t istat)
 	 * Has the link status changed?  If so, we might want to wake
 	 * the factotum to deal with it.
 	 */
-	phy_state = (gpsr & GPS_LINK_STATUS) ? LINK_UP : LINK_DOWN;
-	utp_state = (gpsr & GPS_UTP_SIG) ? LINK_UP : LINK_DOWN;
+	phy_state = (gpsr & GPS_LINK_STATUS) ? LINK_STATE_UP : LINK_STATE_DOWN;
+	utp_state = (gpsr & GPS_UTP_SIG) ? LINK_STATE_UP : LINK_STATE_DOWN;
 	if (phy_state != utp_state)
 		why = "tick (phy <> utp)";
-	else if (dmfep->link_state == LINK_UP && phy_state == LINK_DOWN)
+	else if ((dmfep->link_state == LINK_STATE_UP) &&
+	    (phy_state == LINK_STATE_DOWN))
 		why = "tick (UP -> DOWN)";
 	else if (phy_state != dmfep->link_state) {
 		if (dmfep->link_poll_tix > factotum_fast_tix)
@@ -2149,7 +1990,7 @@ dmfe_interrupt(caddr_t arg)
 	 * need to get the lock before going any further ...
 	 */
 	mutex_enter(dmfep->oplock);
-	dmfep->op_stats_intr += 1;
+	DRV_KS_INC(dmfep, KS_INTERRUPT);
 
 	/*
 	 * Identify bits that represent enabled interrupts ...
@@ -2269,12 +2110,12 @@ dmfe_interrupt(caddr_t arg)
 
 	if (interrupts & RX_PKTDONE_INT)
 		if ((mp = dmfe_getp(dmfep)) != NULL)
-			dmfe_passup_chain(DMFE_MACINFO(dmfep), mp);
+			mac_rx(dmfep->mh, NULL, mp);
 
 	if (interrupts & TX_PKTDONE_INT) {
 		/*
 		 * The only reason for taking this interrupt is to give
-		 * GLD a chance to schedule queued packets after a
+		 * MAC a chance to schedule queued packets after a
 		 * ring-full condition.  To minimise the number of
 		 * redundant TX-Done interrupts, we only mark two of the
 		 * ring descriptors as 'interrupt-on-complete' - all the
@@ -2284,7 +2125,7 @@ dmfe_interrupt(caddr_t arg)
 			(void) dmfe_reclaim_tx_desc(dmfep);
 			mutex_exit(dmfep->txlock);
 		}
-		gld_sched(DMFE_MACINFO(dmfep));
+		mac_tx_update(dmfep->mh);
 	}
 
 	return (DDI_INTR_CLAIMED);
@@ -2300,47 +2141,226 @@ dmfe_interrupt(caddr_t arg)
 #define	DMFE_DBG	DMFE_DBG_STATS	/* debug flag for this code	*/
 
 static int
-dmfe_gld_get_stats(gld_mac_info_t *macinfo, struct gld_stats *sp)
+dmfe_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
-	dmfe_t *dmfep;
+	dmfe_t *dmfep = arg;
+	int rv = 0;
 
-	dmfep = DMFE_STATE(macinfo);
-
+	mutex_enter(dmfep->milock);
 	mutex_enter(dmfep->oplock);
 	mutex_enter(dmfep->rxlock);
 	mutex_enter(dmfep->txlock);
 
-	sp->glds_speed = dmfep->op_stats_speed;
-	sp->glds_duplex = dmfep->op_stats_duplex;
-	sp->glds_media = dmfep->op_stats_media;
-	sp->glds_intr = dmfep->op_stats_intr;
+	/* make sure we have all the stats collected */
+	(void) dmfe_reclaim_tx_desc(dmfep);
 
-	sp->glds_errrcv = dmfep->rx_stats_errrcv;
-	sp->glds_overflow = dmfep->rx_stats_overflow;
-	sp->glds_short = dmfep->rx_stats_short;
-	sp->glds_crc = dmfep->rx_stats_crc;
-	sp->glds_dot3_frame_too_long = dmfep->rx_stats_frame_too_long;
-	sp->glds_dot3_mac_rcv_error = dmfep->rx_stats_mac_rcv_error;
-	sp->glds_frame = dmfep->rx_stats_frame;
-	sp->glds_missed = dmfep->rx_stats_missed;
-	sp->glds_norcvbuf = dmfep->rx_stats_norcvbuf;
+	switch (stat) {
+	case MAC_STAT_IFSPEED:
+		*val = dmfep->op_stats_speed;
+		break;
 
-	sp->glds_errxmt = dmfep->tx_stats_errxmt;
-	sp->glds_dot3_mac_xmt_error = dmfep->tx_stats_mac_xmt_error;
-	sp->glds_underflow = dmfep->tx_stats_underflow;
-	sp->glds_xmtlatecoll = dmfep->tx_stats_xmtlatecoll;
-	sp->glds_nocarrier = dmfep->tx_stats_nocarrier;
-	sp->glds_excoll = dmfep->tx_stats_excoll;
-	sp->glds_dot3_first_coll = dmfep->tx_stats_first_coll;
-	sp->glds_dot3_multi_coll = dmfep->tx_stats_multi_coll;
-	sp->glds_collisions = dmfep->tx_stats_collisions;
-	sp->glds_defer = dmfep->tx_stats_defer;
+	case MAC_STAT_IPACKETS:
+		*val = dmfep->rx_stats_ipackets;
+		break;
+
+	case MAC_STAT_MULTIRCV:
+		*val = dmfep->rx_stats_multi;
+		break;
+
+	case MAC_STAT_BRDCSTRCV:
+		*val = dmfep->rx_stats_bcast;
+		break;
+
+	case MAC_STAT_RBYTES:
+		*val = dmfep->rx_stats_rbytes;
+		break;
+
+	case MAC_STAT_IERRORS:
+		*val = dmfep->rx_stats_ierrors;
+		break;
+
+	case MAC_STAT_NORCVBUF:
+		*val = dmfep->rx_stats_norcvbuf;
+		break;
+
+	case MAC_STAT_COLLISIONS:
+		*val = dmfep->tx_stats_collisions;
+		break;
+
+	case MAC_STAT_OERRORS:
+		*val = dmfep->tx_stats_oerrors;
+		break;
+
+	case MAC_STAT_OPACKETS:
+		*val = dmfep->tx_stats_opackets;
+		break;
+
+	case MAC_STAT_MULTIXMT:
+		*val = dmfep->tx_stats_multi;
+		break;
+
+	case MAC_STAT_BRDCSTXMT:
+		*val = dmfep->tx_stats_bcast;
+		break;
+
+	case MAC_STAT_OBYTES:
+		*val = dmfep->tx_stats_obytes;
+		break;
+
+	case MAC_STAT_OVERFLOWS:
+		*val = dmfep->rx_stats_overflow;
+		break;
+
+	case MAC_STAT_UNDERFLOWS:
+		*val = dmfep->tx_stats_underflow;
+		break;
+
+	case ETHER_STAT_ALIGN_ERRORS:
+		*val = dmfep->rx_stats_align;
+		break;
+
+	case ETHER_STAT_FCS_ERRORS:
+		*val = dmfep->rx_stats_fcs;
+		break;
+
+	case ETHER_STAT_TOOLONG_ERRORS:
+		*val = dmfep->rx_stats_toolong;
+		break;
+
+	case ETHER_STAT_TOOSHORT_ERRORS:
+		*val = dmfep->rx_stats_short;
+		break;
+
+	case ETHER_STAT_MACRCV_ERRORS:
+		*val = dmfep->rx_stats_macrcv_errors;
+		break;
+
+	case ETHER_STAT_MACXMT_ERRORS:
+		*val = dmfep->tx_stats_macxmt_errors;
+		break;
+
+	case ETHER_STAT_CARRIER_ERRORS:
+		*val = dmfep->tx_stats_nocarrier;
+		break;
+
+	case ETHER_STAT_TX_LATE_COLLISIONS:
+		*val = dmfep->tx_stats_xmtlatecoll;
+		break;
+
+	case ETHER_STAT_EX_COLLISIONS:
+		*val = dmfep->tx_stats_excoll;
+		break;
+
+	case ETHER_STAT_DEFER_XMTS:
+		*val = dmfep->tx_stats_defer;
+		break;
+
+	case ETHER_STAT_FIRST_COLLISIONS:
+		*val = dmfep->tx_stats_first_coll;
+		break;
+
+	case ETHER_STAT_MULTI_COLLISIONS:
+		*val = dmfep->tx_stats_multi_coll;
+		break;
+
+	case ETHER_STAT_XCVR_INUSE:
+		*val = dmfep->phy_inuse;
+		break;
+
+	case ETHER_STAT_XCVR_ID:
+		*val = dmfep->phy_id;
+		break;
+
+	case ETHER_STAT_XCVR_ADDR:
+		*val = dmfep->phy_addr;
+		break;
+
+	case ETHER_STAT_LINK_DUPLEX:
+		*val = dmfep->op_stats_duplex;
+		break;
+
+	case ETHER_STAT_CAP_100FDX:
+		*val = dmfep->param_bmsr_100fdx;
+		break;
+
+	case ETHER_STAT_CAP_100HDX:
+		*val = dmfep->param_bmsr_100hdx;
+		break;
+
+	case ETHER_STAT_CAP_10FDX:
+		*val = dmfep->param_bmsr_10fdx;
+		break;
+
+	case ETHER_STAT_CAP_10HDX:
+		*val = dmfep->param_bmsr_10hdx;
+		break;
+
+	case ETHER_STAT_CAP_AUTONEG:
+		*val = dmfep->param_bmsr_autoneg;
+		break;
+
+	case ETHER_STAT_CAP_REMFAULT:
+		*val = dmfep->param_bmsr_remfault;
+		break;
+
+	case ETHER_STAT_ADV_CAP_AUTONEG:
+		*val = dmfep->param_autoneg;
+		break;
+
+	case ETHER_STAT_ADV_CAP_100FDX:
+		*val = dmfep->param_anar_100fdx;
+		break;
+
+	case ETHER_STAT_ADV_CAP_100HDX:
+		*val = dmfep->param_anar_100hdx;
+		break;
+
+	case ETHER_STAT_ADV_CAP_10FDX:
+		*val = dmfep->param_anar_10fdx;
+		break;
+
+	case ETHER_STAT_ADV_CAP_10HDX:
+		*val = dmfep->param_anar_10hdx;
+		break;
+
+	case ETHER_STAT_ADV_REMFAULT:
+		*val = dmfep->param_anar_remfault;
+		break;
+
+	case ETHER_STAT_LP_CAP_AUTONEG:
+		*val = dmfep->param_lp_autoneg;
+		break;
+
+	case ETHER_STAT_LP_CAP_100FDX:
+		*val = dmfep->param_lp_100fdx;
+		break;
+
+	case ETHER_STAT_LP_CAP_100HDX:
+		*val = dmfep->param_lp_100hdx;
+		break;
+
+	case ETHER_STAT_LP_CAP_10FDX:
+		*val = dmfep->param_lp_10fdx;
+		break;
+
+	case ETHER_STAT_LP_CAP_10HDX:
+		*val = dmfep->param_lp_10hdx;
+		break;
+
+	case ETHER_STAT_LP_REMFAULT:
+		*val = dmfep->param_lp_remfault;
+		break;
+
+	default:
+		rv = ENOTSUP;
+	}
 
 	mutex_exit(dmfep->txlock);
 	mutex_exit(dmfep->rxlock);
 	mutex_exit(dmfep->oplock);
+	mutex_exit(dmfep->milock);
 
-	return (GLD_SUCCESS);
+	return (rv);
 }
 
 #undef	DMFE_DBG
@@ -2360,6 +2380,9 @@ dmfe_gld_get_stats(gld_mac_info_t *macinfo, struct gld_stats *sp)
  * These will be used by netlbtest (see BugId 4370609)
  *
  * Note that changing the loopback mode causes a stop/restart cycle
+ *
+ * It would be nice to evolve this to support the ioctls in sys/netlb.h,
+ * but then it would be even better to use Brussels to configure this.
  */
 static enum ioc_reply
 dmfe_loop_ioctl(dmfe_t *dmfep, queue_t *wq, mblk_t *mp, int cmd)
@@ -2433,20 +2456,15 @@ dmfe_loop_ioctl(dmfe_t *dmfep, queue_t *wq, mblk_t *mp, int cmd)
 }
 
 /*
- * Specific dmfe IOCTLs, the gld module handles the generic ones.
+ * Specific dmfe IOCTLs, the mac module handles the generic ones.
  */
-static int
-dmfe_gld_ioctl(gld_mac_info_t *macinfo, queue_t *wq, mblk_t *mp)
+static void
+dmfe_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 {
-	dmfe_t *dmfep;
+	dmfe_t *dmfep = arg;
 	struct iocblk *iocp;
 	enum ioc_reply status;
 	int cmd;
-
-	dmfep = DMFE_STATE(macinfo);
-
-	DMFE_TRACE(("dmfe_gld_ioctl($%p, $%p, $%p)",
-		(void *)macinfo, (void *)wq, (void *)mp));
 
 	/*
 	 * Validate the command before bothering with the mutexen ...
@@ -2455,14 +2473,14 @@ dmfe_gld_ioctl(gld_mac_info_t *macinfo, queue_t *wq, mblk_t *mp)
 	cmd = iocp->ioc_cmd;
 	switch (cmd) {
 	default:
-		DMFE_DEBUG(("dmfe_gld_ioctl: unknown cmd 0x%x", cmd));
+		DMFE_DEBUG(("dmfe_m_ioctl: unknown cmd 0x%x", cmd));
 		miocnak(wq, mp, 0, EINVAL);
-		return (GLD_SUCCESS);
+		return;
 
 	case DMFE_SET_LOOP_MODE:
 	case DMFE_GET_LOOP_MODE:
-	case DMFE_ND_GET:
-	case DMFE_ND_SET:
+	case ND_GET:
+	case ND_SET:
 		break;
 	}
 
@@ -2480,8 +2498,8 @@ dmfe_gld_ioctl(gld_mac_info_t *macinfo, queue_t *wq, mblk_t *mp)
 		status = dmfe_loop_ioctl(dmfep, wq, mp, cmd);
 		break;
 
-	case DMFE_ND_GET:
-	case DMFE_ND_SET:
+	case ND_GET:
+	case ND_SET:
 		status = dmfe_nd_ioctl(dmfep, wq, mp, cmd);
 		break;
 	}
@@ -2518,7 +2536,7 @@ dmfe_gld_ioctl(gld_mac_info_t *macinfo, queue_t *wq, mblk_t *mp)
 			dmfe_wake_factotum(dmfep, KS_LINK_CHECK, "ioctl");
 		}
 
-		if (dmfep->gld_state == GLD_STARTED)
+		if (dmfep->mac_state == DMFE_MAC_STARTED)
 			dmfe_start(dmfep);
 		break;
 	}
@@ -2563,8 +2581,6 @@ dmfe_gld_ioctl(gld_mac_info_t *macinfo, queue_t *wq, mblk_t *mp)
 		 */
 		break;
 	}
-
-	return (GLD_SUCCESS);
 }
 
 #undef	DMFE_DBG
@@ -2591,17 +2607,17 @@ dmfe_find_mac_address(dmfe_t *dmfep)
 	 * the value of the property "local-mac-address", as set by OBP
 	 * (or a .conf file!)
 	 */
-	bzero(dmfep->vendor_addr, sizeof (dmfep->vendor_addr));
+	bzero(dmfep->curr_addr, sizeof (dmfep->curr_addr));
 	err = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dmfep->devinfo,
 		DDI_PROP_DONTPASS, localmac_propname, &prop, &propsize);
 	if (err == DDI_PROP_SUCCESS) {
 		if (propsize == ETHERADDRL)
-			ethaddr_copy(prop, dmfep->vendor_addr);
+			ethaddr_copy(prop, dmfep->curr_addr);
 		ddi_prop_free(prop);
 	}
 
 	DMFE_DEBUG(("dmfe_setup_mac_address: factory %s",
-		ether_sprintf((void *)dmfep->vendor_addr)));
+		ether_sprintf((void *)dmfep->curr_addr)));
 }
 
 static int
@@ -2703,6 +2719,12 @@ dmfe_alloc_bufs(dmfe_t *dmfep)
 	if (err != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
+	/*
+	 * Allocate bitmasks for tx packet type tracking
+	 */
+	dmfep->tx_mcast = kmem_zalloc(dmfep->tx.n_desc / NBBY, KM_SLEEP);
+	dmfep->tx_bcast = kmem_zalloc(dmfep->tx.n_desc / NBBY, KM_SLEEP);
+
 	return (DDI_SUCCESS);
 }
 
@@ -2739,6 +2761,8 @@ dmfe_free_bufs(dmfe_t *dmfep)
 	dmfe_free_dma_mem(&dmfep->rx_desc);
 	dmfe_free_dma_mem(&dmfep->tx_buff);
 	dmfe_free_dma_mem(&dmfep->tx_desc);
+	kmem_free(dmfep->tx_mcast, dmfep->tx.n_desc / NBBY);
+	kmem_free(dmfep->tx_bcast, dmfep->tx.n_desc / NBBY);
 }
 
 static void
@@ -2753,8 +2777,6 @@ dmfe_unattach(dmfe_t *dmfep)
 		mutex_exit(&cpu_lock);
 		dmfep->cycid = CYCLIC_NONE;
 	}
-	if (dmfep->ksp_mii != NULL)
-		kstat_delete(dmfep->ksp_mii);
 	if (dmfep->ksp_drv != NULL)
 		kstat_delete(dmfep->ksp_drv);
 	if (dmfep->progress & PROGRESS_HWINT) {
@@ -2772,7 +2794,6 @@ dmfe_unattach(dmfe_t *dmfep)
 	if (dmfep->progress & PROGRESS_NDD)
 		dmfe_nd_cleanup(dmfep);
 
-	gld_mac_free(DMFE_MACINFO(dmfep));
 	kmem_free(dmfep, sizeof (*dmfep));
 }
 
@@ -2812,44 +2833,12 @@ struct ks_index {
 	char *name;
 };
 
-static const struct ks_index ks_mii_names[] = {
-	{	KS_MII_XCVR_ADDR,		"xcvr_addr"		},
-	{	KS_MII_XCVR_ID,			"xcvr_id"		},
-	{	KS_MII_XCVR_INUSE,		"xcvr_inuse"		},
-
-	{	KS_MII_LINK_UP,			"link_up"		},
-	{	KS_MII_LINK_DUPLEX,		"link_duplex"		},
-
-	{	KS_MII_CAP_100FDX,		"cap_100fdx"		},
-	{	KS_MII_CAP_100HDX,		"cap_100hdx"		},
-	{	KS_MII_CAP_10FDX,		"cap_10fdx"		},
-	{	KS_MII_CAP_10HDX,		"cap_10hdx"		},
-	{	KS_MII_CAP_REMFAULT,		"cap_rem_fault"		},
-	{	KS_MII_CAP_AUTONEG,		"cap_autoneg"		},
-
-	{	KS_MII_ADV_CAP_100FDX,		"adv_cap_100fdx"	},
-	{	KS_MII_ADV_CAP_100HDX,		"adv_cap_100hdx"	},
-	{	KS_MII_ADV_CAP_10FDX,		"adv_cap_10fdx"		},
-	{	KS_MII_ADV_CAP_10HDX,		"adv_cap_10hdx"		},
-	{	KS_MII_ADV_CAP_REMFAULT,	"adv_rem_fault"		},
-	{	KS_MII_ADV_CAP_AUTONEG,		"adv_cap_autoneg"	},
-
-	{	KS_MII_LP_CAP_100FDX,		"lp_cap_100fdx"		},
-	{	KS_MII_LP_CAP_100HDX,		"lp_cap_100hdx"		},
-	{	KS_MII_LP_CAP_10FDX,		"lp_cap_10fdx"		},
-	{	KS_MII_LP_CAP_10HDX,		"lp_cap_10hdx"		},
-	{	KS_MII_LP_CAP_REMFAULT,		"lp_cap_rem_fault"	},
-	{	KS_MII_LP_CAP_AUTONEG,		"lp_cap_autoneg"	},
-
-	{	-1,				NULL			}
-};
-
 static const struct ks_index ks_drv_names[] = {
+	{	KS_INTERRUPT,			"intr"			},
 	{	KS_CYCLIC_RUN,			"cyclic_run"		},
 
 	{	KS_TICK_LINK_STATE,		"link_state_change"	},
 	{	KS_TICK_LINK_POLL,		"link_state_poll"	},
-	{	KS_LINK_INTERRUPT,		"link_state_interrupt"	},
 	{	KS_TX_STALL,			"tx_stall_detect"	},
 	{	KS_CHIP_ERROR,			"chip_error_interrupt"	},
 
@@ -2878,21 +2867,7 @@ dmfe_init_kstats(dmfe_t *dmfep, int instance)
 	kstat_named_t *knp;
 	const struct ks_index *ksip;
 
-	/* Create and initialise standard "mii" kstats */
-	ksp = kstat_create(DRIVER_NAME, instance, "mii", "net",
-		KSTAT_TYPE_NAMED, KS_MII_COUNT, KSTAT_FLAG_PERSISTENT);
-	if (ksp != NULL) {
-		for (knp = ksp->ks_data, ksip = ks_mii_names;
-			ksip->name != NULL; ++ksip) {
-			kstat_named_init(&knp[ksip->index], ksip->name,
-				KSTAT_DATA_UINT32);
-		}
-		dmfep->ksp_mii = ksp;
-		dmfep->knp_mii = knp;
-		kstat_install(ksp);
-	} else {
-		dmfe_error(dmfep, "kstat_create() for mii failed");
-	}
+	/* no need to create MII stats, the mac module already does it */
 
 	/* Create and initialise driver-defined kstats */
 	ksp = kstat_create(DRIVER_NAME, instance, "dmfe_events", "net",
@@ -2914,19 +2889,17 @@ dmfe_init_kstats(dmfe_t *dmfep, int instance)
 static int
 dmfe_resume(dev_info_t *devinfo)
 {
-	gld_mac_info_t *macinfo;		/* GLD structure	*/
 	dmfe_t *dmfep;				/* Our private data	*/
 	chip_id_t chipid;
 
-	macinfo = (gld_mac_info_t *)ddi_get_driver_private(devinfo);
-	if (macinfo == NULL)
+	dmfep = ddi_get_driver_private(devinfo);
+	if (dmfep == NULL)
 		return (DDI_FAILURE);
 
 	/*
 	 * Refuse to resume if the data structures aren't consistent
 	 */
-	dmfep = DMFE_STATE(macinfo);
-	if (dmfep->devinfo != devinfo || dmfep->macinfo != macinfo)
+	if (dmfep->devinfo != devinfo)
 		return (DDI_FAILURE);
 
 	/*
@@ -2942,12 +2915,12 @@ dmfe_resume(dev_info_t *devinfo)
 		return (DDI_FAILURE);
 
 	/*
-	 * All OK, reinitialise h/w & kick off GLD scheduling
+	 * All OK, reinitialise h/w & kick off MAC scheduling
 	 */
 	mutex_enter(dmfep->oplock);
 	dmfe_restart(dmfep);
 	mutex_exit(dmfep->oplock);
-	gld_sched(macinfo);
+	mac_tx_update(dmfep->mh);
 	return (DDI_SUCCESS);
 }
 
@@ -2959,7 +2932,7 @@ dmfe_resume(dev_info_t *devinfo)
 static int
 dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 {
-	gld_mac_info_t *macinfo;		/* GLD structure	*/
+	mac_register_t *macp;
 	cyc_handler_t cychand;
 	cyc_time_t cyctime;
 	dmfe_t *dmfep;				/* Our private data	*/
@@ -2968,9 +2941,6 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	int err;
 
 	instance = ddi_get_instance(devinfo);
-
-	DMFE_GTRACE(("dmfe_attach($%p, %d) instance %d",
-		(void *)devinfo, cmd, instance));
 
 	switch (cmd) {
 	default:
@@ -2983,21 +2953,10 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		break;
 	}
 
-	/*
-	 * Allocate GLD macinfo and DMFE private structures, and
-	 * cross-link them so that given either one of these or
-	 * the devinfo the others can be derived.
-	 */
-	macinfo = gld_mac_alloc(devinfo);
-	ddi_set_driver_private(devinfo, (caddr_t)macinfo);
-	if (macinfo == NULL)
-		return (DDI_FAILURE);
-
 	dmfep = kmem_zalloc(sizeof (*dmfep), KM_SLEEP);
-	dmfep->dmfe_guard = DMFE_GUARD;
+	ddi_set_driver_private(devinfo, dmfep);
 	dmfep->devinfo = devinfo;
-	dmfep->macinfo = macinfo;
-	macinfo->gldm_private = (caddr_t)dmfep;
+	dmfep->dmfe_guard = DMFE_GUARD;
 
 	/*
 	 * Initialize more fields in DMFE private data
@@ -3095,92 +3054,58 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Reset & initialise the chip and the ring buffers
 	 * Initialise the (internal) PHY
 	 */
-	(void) dmfe_gld_reset(macinfo);
-	dmfep->link_state = LINK_UNKNOWN;
+	mutex_enter(dmfep->oplock);
+	mutex_enter(dmfep->rxlock);
+	mutex_enter(dmfep->txlock);
+
+	dmfe_reset(dmfep);
+
+	/*
+	 * Prepare the setup packet
+	 */
+	bzero(dmfep->tx_desc.setup_va, SETUPBUF_SIZE);
+	bzero(dmfep->mcast_refs, MCASTBUF_SIZE);
+	dmfep->addr_set = B_FALSE;
+	dmfep->opmode &= ~(PROMISC_MODE | PASS_MULTICAST);
+	dmfep->mac_state = DMFE_MAC_RESET;
+
+	mutex_exit(dmfep->txlock);
+	mutex_exit(dmfep->rxlock);
+	mutex_exit(dmfep->oplock);
+
+	dmfep->link_state = LINK_STATE_UNKNOWN;
 	dmfep->link_up_msg = dmfep->link_down_msg = " (initialised)";
 	if (dmfe_init_phy(dmfep) != B_TRUE)
 		goto attach_fail;
 	dmfep->update_phy = B_TRUE;
 
 	/*
+	 * Send a reasonable setup frame.  This configures our starting
+	 * address and the broadcast address.
+	 */
+	dmfe_m_unicst(dmfep, dmfep->curr_addr);
+
+	/*
 	 * Initialize pointers to device specific functions which
 	 * will be used by the generic layer.
 	 */
-	macinfo->gldm_reset		= dmfe_gld_reset;
-	macinfo->gldm_start		= dmfe_gld_start;
-	macinfo->gldm_stop		= dmfe_gld_stop;
-	macinfo->gldm_set_mac_addr	= dmfe_gld_set_mac_addr;
-	macinfo->gldm_set_multicast 	= dmfe_gld_set_multicast;
-	macinfo->gldm_set_promiscuous	= dmfe_gld_set_promiscuous;
-	macinfo->gldm_ioctl		= dmfe_gld_ioctl;
-	macinfo->gldm_get_stats		= dmfe_gld_get_stats;
-	macinfo->gldm_intr		= NULL;
-	macinfo->gldm_send		= dmfe_gld_send;
-#if	defined(VLAN_VID_NONE)
-	/*
-	 * This assignment wouldn't be safe if running a new DMFE binary
-	 * against an old GLD, because <gldm_send_tagged> extends the
-	 * macinfo structure.  So we need a runtime test as well as the
-	 * compile-time one if we want full compatibility ...
-	 */
-	if (gld_recv_tagged != NULL)
-		macinfo->gldm_send_tagged = dmfe_gld_send_tagged;
-#endif	/* defined(VLAN_VID_NONE) */
+	if ((macp = mac_alloc(MAC_VERSION)) == NULL)
+		goto attach_fail;
+	macp->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
+	macp->m_driver = dmfep;
+	macp->m_dip = devinfo;
+	macp->m_src_addr = dmfep->curr_addr;
+	macp->m_callbacks = &dmfe_m_callbacks;
+	macp->m_min_sdu = 0;
+	macp->m_max_sdu = ETHERMTU;
 
 	/*
-	 * Initialize board characteristics needed by the generic layer.
-	 */
-	macinfo->gldm_ident		= dmfe_ident;
-	macinfo->gldm_type		= DL_ETHER;
-	macinfo->gldm_minpkt		= 0;	/* no padding required	*/
-	macinfo->gldm_maxpkt		= ETHERMTU;
-	macinfo->gldm_addrlen		= ETHERADDRL;
-	macinfo->gldm_saplen		= -2;
-	macinfo->gldm_broadcast_addr	= dmfe_broadcast_addr;
-	macinfo->gldm_vendor_addr	= dmfep->vendor_addr;
-	macinfo->gldm_ppa		= instance;
-	macinfo->gldm_devinfo		= devinfo;
-	macinfo->gldm_cookie		= dmfep->iblk;
-#if	defined(GLD_CAP_LINKSTATE)
-	/*
-	 * This is safe even when running a new DMFE binary against an
-	 * old GLD, because <gldm_capabilities> replaces a reserved
-	 * field, rather than extending the macinfo structure
-	 */
-	macinfo->gldm_capabilities	= GLD_CAP_LINKSTATE;
-#endif	/* defined(GLD_CAP_LINKSTATE) */
-
-	/*
-	 * Workaround for booting from NET1 on early versions of Solaris,
-	 * enabled by patching the global variable (dmfe_net1_boot_support)
-	 * to non-zero.
-	 *
-	 * Up to Solaris 8, strplumb() assumed that PPA == minor number,
-	 * which is not (and never has been) true for any GLD-based driver.
-	 * In later versions, strplumb() and GLD have been made to cooperate
-	 * so this isn't necessary; specifically, strplumb() has been changed
-	 * to assume PPA == instance (rather than minor number), which *is*
-	 * true for GLD v2 drivers, and GLD also specifically tells it the
-	 * PPA for legacy (v0) drivers.
-	 *
-	 * The workaround creates an internal minor node with a minor number
-	 * equal to the PPA; this node shouldn't ever appear under /devices
-	 * in userland, but can be found internally when setting up the root
-	 * (NFS) filesystem.
-	 */
-	if (dmfe_net1_boot_support) {
-		extern int ddi_create_internal_pathname(dev_info_t *dip,
-			char *name, int spec_type, minor_t minor_num);
-
-		(void) ddi_create_internal_pathname(devinfo, DRIVER_NAME,
-			S_IFCHR, macinfo->gldm_ppa);
-	}
-
-	/*
-	 * Finally, we're ready to register ourselves with the GLD
+	 * Finally, we're ready to register ourselves with the MAC layer
 	 * interface; if this succeeds, we're all ready to start()
 	 */
-	if (gld_register(devinfo, DRIVER_NAME, macinfo) != DDI_SUCCESS)
+	err = mac_register(macp, &dmfep->mh);
+	mac_free(macp);
+	if (err != 0)
 		goto attach_fail;
 	ASSERT(dmfep->dmfe_guard == DMFE_GUARD);
 
@@ -3228,17 +3153,9 @@ dmfe_suspend(dmfe_t *dmfep)
 static int
 dmfe_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 {
-	gld_mac_info_t *macinfo;	/* GLD structure */
 	dmfe_t *dmfep;
 
-	DMFE_GTRACE(("dmfe_detach($%p, %d)", (void *)devinfo, cmd));
-
-	/*
-	 * Get the GLD (macinfo) data from the devinfo and
-	 * derive the driver's own state structure from that
-	 */
-	macinfo = (gld_mac_info_t *)ddi_get_driver_private(devinfo);
-	dmfep = DMFE_STATE(macinfo);
+	dmfep = ddi_get_driver_private(devinfo);
 
 	switch (cmd) {
 	default:
@@ -3252,12 +3169,12 @@ dmfe_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	}
 
 	/*
-	 * Unregister from the GLD subsystem.  This can fail, in
+	 * Unregister from the MAC subsystem.  This can fail, in
 	 * particular if there are DLPI style-2 streams still open -
 	 * in which case we just return failure without shutting
 	 * down chip operations.
 	 */
-	if (gld_unregister(macinfo) != DDI_SUCCESS)
+	if (mac_unregister(dmfep->mh) != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
 	/*
@@ -3272,76 +3189,8 @@ dmfe_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
  * ========== Module Loading Data & Entry Points ==========
  */
 
-static struct module_info dmfe_module_info = {
-	DMFEIDNUM,
-	DRIVER_NAME,
-	0,
-	INFPSZ,
-	DMFEHIWAT,
-	DMFELOWAT
-};
-
-static struct qinit dmfe_r_qinit = {	/* read queues */
-	NULL,
-	gld_rsrv,
-	gld_open,
-	gld_close,
-	NULL,
-	&dmfe_module_info,
-	NULL
-};
-
-static struct qinit dmfe_w_qinit = {	/* write queues */
-	gld_wput,
-	gld_wsrv,
-	NULL,
-	NULL,
-	NULL,
-	&dmfe_module_info,
-	NULL
-};
-
-static struct streamtab dmfe_streamtab = {
-	&dmfe_r_qinit,
-	&dmfe_w_qinit,
-	NULL,
-	NULL
-};
-
-static struct cb_ops dmfe_cb_ops = {
-	nulldev,		/* cb_open */
-	nulldev,		/* cb_close */
-	nodev,			/* cb_strategy */
-	nodev,			/* cb_print */
-	nodev,			/* cb_dump */
-	nodev,			/* cb_read */
-	nodev,			/* cb_write */
-	nodev,			/* cb_ioctl */
-	nodev,			/* cb_devmap */
-	nodev,			/* cb_mmap */
-	nodev,			/* cb_segmap */
-	nochpoll,		/* cb_chpoll */
-	ddi_prop_op,		/* cb_prop_op */
-	&dmfe_streamtab,	/* cb_stream */
-	D_MP,			/* cb_flag */
-	CB_REV,			/* cb_rev */
-	nodev,			/* cb_aread */
-	nodev			/* cb_awrite */
-};
-
-static struct dev_ops dmfe_dev_ops = {
-	DEVO_REV,		/* devo_rev */
-	0,			/* devo_refcnt */
-	gld_getinfo,		/* devo_getinfo */
-	nulldev,		/* devo_identify */
-	nulldev,		/* devo_probe */
-	dmfe_attach,		/* devo_attach */
-	dmfe_detach,		/* devo_detach */
-	nodev,			/* devo_reset */
-	&dmfe_cb_ops,		/* devo_cb_ops */
-	(struct bus_ops *)NULL,	/* devo_bus_ops */
-	NULL			/* devo_power */
-};
+DDI_DEFINE_STREAM_OPS(dmfe_dev_ops, nulldev, nulldev, dmfe_attach, dmfe_detach,
+	nodev, NULL, D_MP, NULL);
 
 static struct modldrv dmfe_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
@@ -3356,8 +3205,6 @@ static struct modlinkage modlinkage = {
 int
 _info(struct modinfo *modinfop)
 {
-	DMFE_GTRACE(("_info called"));
-
 	return (mod_info(&modlinkage, modinfop));
 }
 
@@ -3368,8 +3215,6 @@ _init(void)
 	uint32_t tmp10;
 	int i;
 	int status;
-
-	DMFE_GTRACE(("_init called"));
 
 	/* Calculate global timing parameters */
 	tmp100 = (dmfe_tx100_stall_us+dmfe_tick_us-1)/dmfe_tick_us;
@@ -3406,8 +3251,9 @@ _init(void)
 	factotum_fast_tix = 1+(factotum_tix/5);
 	factotum_start_tix = 1+(factotum_tix*2);
 
+	mac_init_ops(&dmfe_dev_ops, "dmfe");
 	status = mod_install(&modlinkage);
-	if (status == 0)
+	if (status == DDI_SUCCESS)
 		dmfe_log_init();
 
 	return (status);
@@ -3418,11 +3264,11 @@ _fini(void)
 {
 	int status;
 
-	DMFE_GTRACE(("_fini called"));
-
 	status = mod_remove(&modlinkage);
-	if (status == 0)
+	if (status == DDI_SUCCESS) {
+		mac_fini_ops(&dmfe_dev_ops);
 		dmfe_log_fini();
+	}
 
 	return (status);
 }

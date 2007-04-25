@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +41,6 @@ extern "C" {
 #include <sys/modctl.h>
 #include <sys/kstat.h>
 #include <sys/ethernet.h>
-#include <sys/dlpi.h>
 #include <sys/devops.h>
 #include <sys/debug.h>
 #include <sys/cyclic.h>
@@ -52,46 +50,18 @@ extern "C" {
 #include <inet/nd.h>
 #include <inet/mi.h>
 
+#include <sys/vlan.h>
+
 #include <sys/dditypes.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
 #include <sys/miiregs.h>
 #include <sys/dmfe.h>
+#include <sys/mac.h>
+#include <sys/mac_ether.h>
 
-/*
- * The following function *may* be defined in <sys/gld.h>.
- * If so, the full definitions there will supplement these minimal
- * versions; otherwise, these will suffice to allow the code to
- * compile and then we'll test for them at runtime.
- */
-extern void gld_linkstate();
-extern void gld_recv_tagged();
-#pragma weak    gld_linkstate
-#pragma weak    gld_recv_tagged
-
-#include <sys/gld.h>
-
-/*
- * Define these symbols if they're not already in <sys/gld.h>
- */
-#ifndef	GLD_LINKSTATE_UP
-#define	GLD_LINKSTATE_UP	1
-#define	GLD_LINKSTATE_UNKNOWN	0
-#define	GLD_LINKSTATE_DOWN	-1
-#endif	/* GLD_LINKSTATE_UP */
-
-/*
- * This driver can be compiled with VLAN support (if VLAN_VID_NONE
- * is defined in <sys/gld.h>).  If not, the definitions is the 'else'
- * clause will allow the code to compile anyway.
- */
-#ifdef	VLAN_VID_NONE
-#define	DMFE_MAX_PKT_SIZE	(VTAG_SIZE + ETHERMAX + ETHERFCSL)
-#else
-#define	DMFE_MAX_PKT_SIZE	(ETHERMAX + ETHERFCSL)
-#define	VLAN_VTAG_NONE		0		/* implies "untagged"	*/
-#endif	/* VLAN_VID_NONE */
+#define	DMFE_MAX_PKT_SIZE	(VLAN_TAGSZ + ETHERMAX + ETHERFCSL)
 
 
 #define	DRIVER_NAME		"dmfe"
@@ -166,6 +136,7 @@ enum {
 	PARAM_ADV_100HDX_CAP,
 	PARAM_ADV_10FDX_CAP,
 	PARAM_ADV_10HDX_CAP,
+	PARAM_ADV_REMFAULT,
 
 	PARAM_BMSR_AUTONEG_CAP,
 	PARAM_BMSR_100T4_CAP,
@@ -187,47 +158,6 @@ enum {
 };
 
 /*
- * Indexes into standard "mii" kstats, divided into:
- *
- *      MII transceiver info
- *      MII link state
- *      MII device capabilities
- *      MII advertised capabilities
- *      MII link partner capabilities
- */
-enum {
-	KS_MII_XCVR_ADDR,
-	KS_MII_XCVR_ID,
-	KS_MII_XCVR_INUSE,
-
-	KS_MII_LINK_UP,
-	KS_MII_LINK_DUPLEX,
-
-	KS_MII_CAP_100FDX,
-	KS_MII_CAP_100HDX,
-	KS_MII_CAP_10FDX,
-	KS_MII_CAP_10HDX,
-	KS_MII_CAP_REMFAULT,
-	KS_MII_CAP_AUTONEG,
-
-	KS_MII_ADV_CAP_100FDX,
-	KS_MII_ADV_CAP_100HDX,
-	KS_MII_ADV_CAP_10FDX,
-	KS_MII_ADV_CAP_10HDX,
-	KS_MII_ADV_CAP_REMFAULT,
-	KS_MII_ADV_CAP_AUTONEG,
-
-	KS_MII_LP_CAP_100FDX,
-	KS_MII_LP_CAP_100HDX,
-	KS_MII_LP_CAP_10FDX,
-	KS_MII_LP_CAP_10HDX,
-	KS_MII_LP_CAP_REMFAULT,
-	KS_MII_LP_CAP_AUTONEG,
-
-	KS_MII_COUNT
-};
-
-/*
  * Indexes into the driver-specific kstats, divided into:
  *
  *	cyclic activity
@@ -241,7 +171,7 @@ enum {
 
 	KS_TICK_LINK_STATE,
 	KS_TICK_LINK_POLL,
-	KS_LINK_INTERRUPT,
+	KS_INTERRUPT,
 	KS_TX_STALL,
 	KS_CHIP_ERROR,
 
@@ -277,27 +207,14 @@ enum chip_state {
 };
 
 /*
- * Required state according to GLD
+ * Required state according to MAC
  */
-enum gld_state {
-	GLD_UNKNOWN,
-	GLD_RESET,
-	GLD_STOPPED,
-	GLD_STARTED
+enum mac_state {
+	DMFE_MAC_UNKNOWN,
+	DMFE_MAC_RESET,
+	DMFE_MAC_STOPPED,
+	DMFE_MAC_STARTED
 };
-
-/*
- * Current state of the physical link
- *
- *	DOWN		No link established.
- *	UNKNOWN		Initial state, also indicates "autonegotiating".
- *	UP		Link established, commuication should be possible.
- */
-typedef enum {
-	LINK_DOWN = -1,
-	LINK_UNKNOWN = 0,
-	LINK_UP
-} link_state_t;
 
 /*
  * (Internal) return values from ioctl subroutines
@@ -319,7 +236,7 @@ typedef struct {
 	 * These fields are set by attach() and unchanged thereafter ...
 	 */
 	dev_info_t		*devinfo;	/* device instance	*/
-	gld_mac_info_t		*macinfo;	/* GLD instance data	*/
+	mac_handle_t		mh;		/* MAC instance data	*/
 	ddi_acc_handle_t	io_handle;	/* DDI I/O handle	*/
 	caddr_t			io_reg;		/* mapped registers	*/
 
@@ -368,8 +285,8 @@ typedef struct {
 	 *	milock >>> oplock >>> rxlock >>> txlock.
 	 *
 	 * *None* of these locks may be held across calls out to the
-	 * GLD routines gld_recv() or gld_sched(); GLD's <maclock> must
-	 * be regarded as an *outermost* lock in all cases, as it will
+	 * MAC routines mac_rx() or mac_tx_notify(); MAC locks must
+	 * be regarded as *outermost* locks in all cases, as they will
 	 * already be held before calling the ioctl() or get_stats()
 	 * entry points - which then have to acquire multiple locks, in
 	 * the order described here.
@@ -382,8 +299,6 @@ typedef struct {
 	/*
 	 * DMFE Extended kstats, protected by <oplock>
 	 */
-	kstat_t			*ksp_mii;
-	kstat_named_t		*knp_mii;
 	kstat_t			*ksp_drv;
 	kstat_named_t		*knp_drv;
 
@@ -391,30 +306,36 @@ typedef struct {
 	 * GLD statistics; the prefix tells which lock each is protected by.
 	 */
 	uint64_t		op_stats_speed;
-	uint32_t		op_stats_duplex;
-	uint32_t		op_stats_media;
-	uint32_t		op_stats_intr;
+	uint64_t		op_stats_duplex;
 
-	uint32_t		rx_stats_errrcv;
-	uint32_t		rx_stats_overflow;
-	uint32_t		rx_stats_short;
-	uint32_t		rx_stats_crc;
-	uint32_t		rx_stats_frame_too_long;
-	uint32_t		rx_stats_mac_rcv_error;
-	uint32_t		rx_stats_frame;
-	uint32_t		rx_stats_missed;
-	uint32_t		rx_stats_norcvbuf;
+	uint64_t		rx_stats_ipackets;
+	uint64_t		rx_stats_multi;
+	uint64_t		rx_stats_bcast;
+	uint64_t		rx_stats_ierrors;
+	uint64_t		rx_stats_norcvbuf;
+	uint64_t		rx_stats_rbytes;
+	uint64_t		rx_stats_missed;
+	uint64_t		rx_stats_align;
+	uint64_t		rx_stats_fcs;
+	uint64_t		rx_stats_toolong;
+	uint64_t		rx_stats_macrcv_errors;
+	uint64_t		rx_stats_overflow;
+	uint64_t		rx_stats_short;
 
-	uint32_t		tx_stats_errxmt;
-	uint32_t		tx_stats_mac_xmt_error;
-	uint32_t		tx_stats_underflow;
-	uint32_t		tx_stats_xmtlatecoll;
-	uint32_t		tx_stats_nocarrier;
-	uint32_t		tx_stats_excoll;
-	uint32_t		tx_stats_first_coll;
-	uint32_t		tx_stats_multi_coll;
-	uint32_t		tx_stats_collisions;
-	uint32_t		tx_stats_defer;
+	uint64_t		tx_stats_oerrors;
+	uint64_t		tx_stats_opackets;
+	uint64_t		tx_stats_multi;
+	uint64_t		tx_stats_bcast;
+	uint64_t		tx_stats_obytes;
+	uint64_t		tx_stats_collisions;
+	uint64_t		tx_stats_nocarrier;
+	uint64_t		tx_stats_xmtlatecoll;
+	uint64_t		tx_stats_excoll;
+	uint64_t		tx_stats_macxmt_errors;
+	uint64_t		tx_stats_defer;
+	uint64_t		tx_stats_first_coll;
+	uint64_t		tx_stats_multi_coll;
+	uint64_t		tx_stats_underflow;
 
 	/*
 	 * These two sets of desciptors are manipulated during
@@ -427,6 +348,8 @@ typedef struct {
 	 * Miscellaneous Tx-side variables (protected by txlock)
 	 */
 	uint32_t		tx_pending_tix;	/* tix since reclaim	*/
+	uint8_t			*tx_mcast;	/* bitmask: pkt is mcast */
+	uint8_t			*tx_bcast;	/* bitmask: pkt is bcast */
 
 	/*
 	 * Miscellaneous operating variables (protected by oplock)
@@ -436,7 +359,7 @@ typedef struct {
 	uint16_t		need_setup;	/* send-setup pending	 */
 	uint32_t		opmode;		/* operating mode shadow */
 	uint32_t		imask;		/* interrupt mask shadow */
-	enum gld_state		gld_state;	/* RESET/STOPPED/STARTED */
+	enum mac_state		mac_state;	/* RESET/STOPPED/STARTED */
 	enum chip_state		chip_state;	/* see above		 */
 
 	/*
@@ -449,6 +372,7 @@ typedef struct {
 	/*
 	 * PHYceiver state data (protected by milock)
 	 */
+	int			phy_inuse;
 	int			phy_addr;	/* should be -1!	*/
 	uint16_t		phy_control;	/* last value written	*/
 	uint16_t		phy_anar_w;	/* last value written	*/
@@ -510,6 +434,7 @@ typedef struct {
 #define	param_anar_100hdx	nd_params[PARAM_ADV_100HDX_CAP].ndp_val
 #define	param_anar_10fdx	nd_params[PARAM_ADV_10FDX_CAP].ndp_val
 #define	param_anar_10hdx	nd_params[PARAM_ADV_10HDX_CAP].ndp_val
+#define	param_anar_remfault	nd_params[PARAM_ADV_REMFAULT].ndp_val
 #define	param_bmsr_autoneg	nd_params[PARAM_BMSR_AUTONEG_CAP].ndp_val
 #define	param_bmsr_100T4	nd_params[PARAM_BMSR_100T4_CAP].ndp_val
 #define	param_bmsr_100fdx	nd_params[PARAM_BMSR_100FDX_CAP].ndp_val
@@ -524,12 +449,6 @@ typedef struct {
 #define	param_lp_10fdx		nd_params[PARAM_LP_10FDX_CAP].ndp_val
 #define	param_lp_10hdx		nd_params[PARAM_LP_10HDX_CAP].ndp_val
 #define	param_lp_remfault	nd_params[PARAM_LP_REMFAULT].ndp_val
-
-/*
- * Derive DMFE state from GLD's macinfo or vice versa
- */
-#define	DMFE_STATE(macinfo)	((dmfe_t *)((macinfo)->gldm_private))
-#define	DMFE_MACINFO(dmfep)	((dmfep)->macinfo)
 
 /*
  * Sync a DMA area described by a dma_area_t
@@ -619,7 +538,7 @@ typedef struct {
 /*
  * Debugging ...
  */
-#ifdef	DEBUG
+#if defined(DEBUG) || defined(lint)
 #define	DMFEDEBUG		1
 #else
 #define	DMFEDEBUG		0
