@@ -903,9 +903,17 @@ zvol_minphys(struct buf *bp)
 int
 zvol_read(dev_t dev, uio_t *uio, cred_t *cr)
 {
-	zvol_state_t *zv = ddi_get_soft_state(zvol_state, getminor(dev));
+	minor_t minor = getminor(dev);
+	zvol_state_t *zv;
 	rl_t *rl;
 	int error = 0;
+
+	if (minor == 0)			/* This is the control device */
+		return (ENXIO);
+
+	zv = ddi_get_soft_state(zvol_state, minor);
+	if (zv == NULL)
+		return (ENXIO);
 
 	rl = zfs_range_lock(&zv->zv_znode, uio->uio_loffset, uio->uio_resid,
 	    RL_READER);
@@ -924,9 +932,17 @@ zvol_read(dev_t dev, uio_t *uio, cred_t *cr)
 int
 zvol_write(dev_t dev, uio_t *uio, cred_t *cr)
 {
-	zvol_state_t *zv = ddi_get_soft_state(zvol_state, getminor(dev));
+	minor_t minor = getminor(dev);
+	zvol_state_t *zv;
 	rl_t *rl;
 	int error = 0;
+
+	if (minor == 0)			/* This is the control device */
+		return (ENXIO);
+
+	zv = ddi_get_soft_state(zvol_state, minor);
+	if (zv == NULL)
+		return (ENXIO);
 
 	rl = zfs_range_lock(&zv->zv_znode, uio->uio_loffset, uio->uio_resid,
 	    RL_WRITER);
