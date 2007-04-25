@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2152,6 +2152,17 @@ usbvc_parse_ctrl_if(usbvc_state_t *usbvcp)
 
 			break;
 		}
+	}
+
+	/*
+	 * For webcam which is not compliant to video class specification
+	 * and no header descriptor in VC interface, return USB_FAILURE.
+	 */
+	if (!usbvcp->usbvc_vc_header) {
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, usbvcp->usbvc_log_handle,
+		    "usbvc_parse_ctrl_if: no header descriptor");
+
+		return (USB_FAILURE);
 	}
 
 	return (USB_SUCCESS);
