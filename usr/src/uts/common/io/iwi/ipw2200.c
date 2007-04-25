@@ -1452,6 +1452,7 @@ ipw2200_start_scan(struct ipw2200_softc *sc)
 		}
 	}
 	*(ch - cnt) = IPW2200_CHAN_5GHZ | (uint8_t)cnt;
+	ch = (cnt > 0) ? (ch + 1) : (scan.channels);
 
 	/*
 	 * Compact supported channel number(2G) into a single buffer
