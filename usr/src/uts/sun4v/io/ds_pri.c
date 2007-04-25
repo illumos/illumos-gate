@@ -410,10 +410,12 @@ ds_pri_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	/*
 	 * If we're here and the state is DS_PRI_NO_SERVICE then this
 	 * means that ds hasn't yet called the registration callback.
+	 * A while loop is necessary as we might have been woken up
+	 * prematurely, e.g., due to a debugger or "pstack" etc.
 	 * Wait here and the callback will signal us when it has completed
 	 * its work.
 	 */
-	if (sp->state == DS_PRI_NO_SERVICE) {
+	while (sp->state == DS_PRI_NO_SERVICE) {
 		if (cv_wait_sig(&sp->cv, &sp->lock) == 0) {
 			mutex_exit(&sp->lock);
 			return (EINTR);
@@ -421,7 +423,6 @@ ds_pri_open(dev_t *devp, int flag, int otyp, cred_t *credp)
 	}
 
 	sp->num_opens++;
-
 	mutex_exit(&sp->lock);
 
 	/*
@@ -628,6 +629,8 @@ loop:;
 
 		while ((sp->state & DS_PRI_HAS_PRI) == 0 ||
 			gencount == sp->gencount) {
+			if ((sp->state & DS_PRI_HAS_PRI) == 0)
+				request_pri(sp);
 			if (cv_wait_sig(&sp->cv, &sp->lock) == 0) {
 				mutex_exit(&sp->lock);
 				return (EINTR);

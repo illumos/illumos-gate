@@ -290,7 +290,7 @@ static void ds_log_purge(void *arg);
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,
-	"Domain Services %I%"
+	"Domain Services 1.8"
 };
 
 static struct modlinkage modlinkage = {
@@ -310,6 +310,9 @@ _init(void)
 	 * processed as soon as the port comes up.
 	 */
 	ds_init();
+
+	/* force attach channel nexus */
+	(void) i_ddi_attach_hw_nodes("cnex");
 
 	if ((rv = ds_ports_init()) != 0) {
 		cmn_err(CE_WARN, "Domain Services initialization failed");

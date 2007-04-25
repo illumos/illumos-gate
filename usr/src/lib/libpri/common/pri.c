@@ -36,23 +36,43 @@
 #include "sys/ds_pri.h"
 #include "pri.h"
 
+static int pri_fd = -1;
+
+
+
 /*
- * Library init function - currently no-op.
+ * Library init function
  * Returns: Success (0), Failure (-1)
  */
 int
 pri_init(void)
 {
+	int fd;
+
+	if (pri_fd != -1)
+		return (-1);
+
+	fd = open(DS_PRI_DRIVER, O_RDONLY);
+	if (fd < 0)
+		return (-1);
+
+	pri_fd = fd;
+
 	return (0);
 }
 
 /*
- * Library fini function - currently no-op.
+ * Library fini function
  * Returns: N/A
  */
 void
 pri_fini(void)
 {
+	if (pri_fd < 0)
+		return;
+
+	(void) close(pri_fd);
+	pri_fd = -1;
 }
 
 /*
@@ -106,34 +126,34 @@ pri_fini(void)
  * Returns:
  *	>0 if PRI is returned successfully (size of PRI buffer)
  *	0 if no PRI is available
- *	-1 if there is an error (errno contains the error code)
+ *	-1 if there is an error (errno contains the error code
+ *	provided)
  *
  */
 ssize_t
 pri_get(uint8_t wait, uint64_t *token, uint64_t **buf,
 		void *(*allocp)(size_t), void (*freep)(void *, size_t))
 {
-	int			fd;		/* for device open */
 	uint64_t		*bufp;		/* buf holding PRI */
 	size_t			size;		/* sizeof PRI */
 	struct dspri_info	pri_info;	/* info about PRI */
 	struct dspri_info	pri_info2;	/* for PRI delta check */
 
-	if ((fd = open(DS_PRI_DRIVER, O_RDONLY)) < 0)
+	if (pri_fd < 0) {
+		errno = EBADF;
 		return (-1);
+	}
 
 	if (wait == PRI_WAITGET) {
 		/* wait until have new PRI with different token */
-		if (ioctl(fd, DSPRI_WAIT, token) < 0) {
-			(void) close(fd);
+		if (ioctl(pri_fd, DSPRI_WAIT, token) < 0) {
 			return (-1);
 		}
 	}
 
 	do {
 		/* get info on current PRI */
-		if (ioctl(fd, DSPRI_GETINFO, &pri_info) < 0) {
-			(void) close(fd);
+		if (ioctl(pri_fd, DSPRI_GETINFO, &pri_info) < 0) {
 			return (-1);
 		}
 
@@ -142,18 +162,17 @@ pri_get(uint8_t wait, uint64_t *token, uint64_t **buf,
 		/* check to see if no PRI available yet */
 		if (size == 0) {
 			*token = pri_info.token;
-			(void) close(fd);
 			return (0);
 		}
 
 		/* allocate a buffer and read the PRI into it */
 		if ((bufp = (uint64_t *)allocp(size)) == NULL) {
-			(void) close(fd);
+			if (errno == 0)
+				errno = ENOMEM;
 			return (-1);
 		}
-		if (read(fd, bufp, size) < 0) {
+		if (read(pri_fd, bufp, size) < 0) {
 			freep(bufp, size);
-			(void) close(fd);
 			return (-1);
 		}
 
@@ -164,9 +183,8 @@ pri_get(uint8_t wait, uint64_t *token, uint64_t **buf,
 		 * tries to catch the above race condition; be sure
 		 * to not leak memory on retries.
 		 */
-		if (ioctl(fd, DSPRI_GETINFO, &pri_info2) < 0) {
+		if (ioctl(pri_fd, DSPRI_GETINFO, &pri_info2) < 0) {
 			freep(bufp, size);
-			(void) close(fd);
 			return (-1);
 		}
 		if (pri_info2.token != pri_info.token)
@@ -177,6 +195,5 @@ pri_get(uint8_t wait, uint64_t *token, uint64_t **buf,
 	/* return the PRI, its token, and its size to the caller */
 	*buf = bufp;
 	*token = pri_info.token;
-	(void) close(fd);
 	return ((ssize_t)size);
 }
