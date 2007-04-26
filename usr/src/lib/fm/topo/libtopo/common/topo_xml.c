@@ -930,7 +930,6 @@ topo_xml_walk(topo_mod_t *mp,
 			continue;
 		}
 		if ((rdp = tf_rdata_new(mp, xinfo, curr, troot)) == NULL) {
-			tf_rdata_free(mp, rr);
 			/*
 			 * Range processing error, continue walk
 			 */

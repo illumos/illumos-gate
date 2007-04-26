@@ -197,13 +197,13 @@ topo_strerror(int err)
 		s = _topo_properrstrs[err - ETOPO_PROP_UNKNOWN];
 	else if (err >= ETOPO_METHOD_UNKNOWN && (err - ETOPO_METHOD_UNKNOWN) <
 	    _topo_nmethoderrstrs)
-		s = _topo_methoderrstrs[err - ETOPO_PROP_UNKNOWN];
+		s = _topo_methoderrstrs[err - ETOPO_METHOD_UNKNOWN];
 	else if (err >= ETOPO_HDL_UNKNOWN && (err - ETOPO_HDL_UNKNOWN) <
 	    _topo_nhdlerrstrs)
-		s = _topo_hdlerrstrs[err - ETOPO_PROP_UNKNOWN];
+		s = _topo_hdlerrstrs[err - ETOPO_HDL_UNKNOWN];
 	else if (err >= ETOPO_FMRI_UNKNOWN && (err - ETOPO_FMRI_UNKNOWN) <
 	    _topo_nfmrierrstrs)
-		s = _topo_fmrierrstrs[err - ETOPO_PROP_UNKNOWN];
+		s = _topo_fmrierrstrs[err - ETOPO_FMRI_UNKNOWN];
 	else
 		s = _topo_errstrs[0];
 
