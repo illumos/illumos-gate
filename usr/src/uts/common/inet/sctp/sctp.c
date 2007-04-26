@@ -624,6 +624,7 @@ sctp_instream_cleanup(sctp_t *sctp, boolean_t free)
 				mp = mp1;
 			}
 			sctp->sctp_instr[i].istr_msgs = NULL;
+			sctp->sctp_instr[i].istr_nmsgs = 0;
 			sctp_free_reass((sctp->sctp_instr) + i);
 			sctp->sctp_instr[i].nextseq = 0;
 		}
