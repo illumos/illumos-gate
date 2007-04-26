@@ -1943,7 +1943,8 @@ int ipf_nic_event_v4(hook_event_token_t event, hook_data_t info,
 	switch (hn->hne_event)
 	{
 	case NE_PLUMB :
-		frsync(IPFSYNC_NEWIFP, 4, (void *)hn->hne_nic, hn->hne_data, ifs);
+		frsync(IPFSYNC_NEWIFP, 4, (void *)hn->hne_nic, hn->hne_data,
+		    ifs);
 		fr_natifpsync(IPFSYNC_NEWIFP, (void *)hn->hne_nic,
 			      hn->hne_data, ifs);
 		fr_statesync(IPFSYNC_NEWIFP, 4, (void *)hn->hne_nic,
@@ -1957,8 +1958,20 @@ int ipf_nic_event_v4(hook_event_token_t event, hook_data_t info,
 		break;
 
 	case NE_ADDRESS_CHANGE :
-		sin = hn->hne_data;
-		fr_nataddrsync((void *)hn->hne_nic, &sin->sin_addr, ifs);
+		/*
+		 * We only respond to events for logical interface 0 because
+		 * IPFilter only uses the first address given to a network
+		 * interface.  We check for hne_lif==1 because the netinfo
+		 * code maps adds 1 to the lif number so that it can return
+		 * 0 to indicate "no more lifs" when walking them.
+		 */
+		if (hn->hne_lif == 1) {
+			frsync(IPFSYNC_RESYNC, 4, (void *)hn->hne_nic, NULL,
+			    ifs);
+			sin = hn->hne_data;
+			fr_nataddrsync((void *)hn->hne_nic, &sin->sin_addr,
+			    ifs);
+		}
 		break;
 
 	default :

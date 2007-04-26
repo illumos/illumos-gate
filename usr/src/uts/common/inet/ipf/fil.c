@@ -3706,7 +3706,7 @@ ipf_stack_t *ifs;
 					   ifp, fdp->fd_ifp, ifs);
 
 		if (action != IPFSYNC_RESYNC)
-			return;
+			continue;
 
 		if (fr->fr_type == FR_T_IPF) {
 			if (fr->fr_satype != FRI_NORMAL &&
