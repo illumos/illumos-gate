@@ -3083,7 +3083,7 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Send a reasonable setup frame.  This configures our starting
 	 * address and the broadcast address.
 	 */
-	dmfe_m_unicst(dmfep, dmfep->curr_addr);
+	(void) dmfe_m_unicst(dmfep, dmfep->curr_addr);
 
 	/*
 	 * Initialize pointers to device specific functions which
