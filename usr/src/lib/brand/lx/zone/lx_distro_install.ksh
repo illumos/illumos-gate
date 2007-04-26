@@ -333,20 +333,21 @@ find_packages()
 	if [[ -z $archs ]]; then
 		procinfo=$(LC_ALL=C psrinfo -vp | grep family)
 
-		if [[ $procinfo = *AuthenticAMD* ]]; then
-			#
-			# Check for AMD athlon compatibility.  The decision to
-			# have athlon files checked for before i686 files is
-			# what Linux does.
-			#
-			[[ $procinfo = *" family 6 "* ||
-			    $procinfo = *" family 15 "* ]] &&
+		#
+		# Check for additional processor capabilities
+		#
+		if [[ "$procinfo" = *" family 6 "* ||
+		    "$procinfo" = *" family 15 "* ]]; then
+			if [[ "$procinfo" = *AuthenticAMD* ]]; then
+				#
+				# Linux gives "athlon" packages precedence
+				# over "i686" packages, so duplicate that
+				# here.
+				#
 				archs="athlon i686"
-		elif [[ "$procinfo" = *GenuineIntel* ]]; then
-			#
-			# Check for i686 compatibility
-			#
-			[[ "$procinfo" = *" family 15 "* ]] && archs="i686"
+			else
+				archs="i686"
+			fi
 		fi
 
 		archs="$archs i586 i486 i386 noarch"

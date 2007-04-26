@@ -26,8 +26,9 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-# Restrict executables to /bin, /usr/bin and /usr/sfw/bin
-PATH=/bin:/usr/bin:/usr/sfw/bin
+# Restrict executables to /bin, /usr/bin, /usr/sbin and /usr/sfw/bin
+PATH=/bin:/usr/bin:/usr/sbin:/usr/sfw/bin
+
 export PATH
 
 # Setup i18n output
@@ -59,6 +60,9 @@ verbose()
 	[[ -n $verbose_mode ]] && echo "$@"
 	[[ -n $logfile ]] && [[ -n $verbose_mode ]] && echo "$@" >&2
 }
+
+unsupported_cpu=\
+$(gettext "ERROR: Cannot install branded zone: processor must be %s-compatible")
 
 cmd_not_found=$(gettext "Required command '%s' cannot be found!")
 cmd_not_exec=$(gettext "Required command '%s' not executable!")
@@ -337,6 +341,21 @@ if [[ -n $silent_mode && -n $verbose_mode ]]; then
 	exit $int_code
 fi
 
+#
+# Validate that we're running on a i686-compatible CPU; abort the zone
+# installation now if we're not.
+#
+procinfo=$(LC_ALL=C psrinfo -vp | grep family)
+
+#
+# All x86 processors in CPUID families 6 or 15 should be i686-compatible,
+# assuming third party processor vendors follow AMD and Intel's lead.
+#
+if [[ "$procinfo" != *" x86 "* ]] ||
+    [[ "$procinfo" != *" family 6 "* && "$procinfo" != *" family 15 "* ]] ; then
+	screenlog "$unsupported_cpu" "i686"
+	exit $ZONE_SUBPROC_NOTCOMPLETE
+fi
 
 if [[ -n $install_src ]]; then
 	#
