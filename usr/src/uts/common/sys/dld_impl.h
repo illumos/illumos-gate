@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -251,6 +251,7 @@ extern void		dld_finish_pending_ops(dld_str_t *);
 #define	DLD_OPT_NO_FASTPATH	0x00000001
 #define	DLD_OPT_NO_POLL		0x00000002
 #define	DLD_OPT_NO_ZEROCOPY	0x00000004
+#define	DLD_OPT_NO_SOFTRING	0x00000008
 
 extern uint32_t		dld_opt;
 

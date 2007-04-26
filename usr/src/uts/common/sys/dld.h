@@ -71,6 +71,11 @@ extern "C" {
 #define	DLD_PROP_NO_ZEROCOPY	"no-zerocopy"
 
 /*
+ * Prevent advertising of the DL_CAPAB_SOFTRING capability.
+ */
+#define	DLD_PROP_NO_SOFTRING	"no-softring"
+
+/*
  * The name of the driver.
  */
 #define	DLD_DRIVER_NAME		"dld"

@@ -244,6 +244,11 @@ drv_set_opt(dev_info_t *dip)
 	    DLD_PROP_NO_ZEROCOPY, 0) != 0) {
 		dld_opt |= DLD_OPT_NO_ZEROCOPY;
 	}
+
+	if (ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    DLD_PROP_NO_SOFTRING, 0) != 0) {
+		dld_opt |= DLD_OPT_NO_SOFTRING;
+	}
 }
 
 /*

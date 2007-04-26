@@ -1324,6 +1324,7 @@ proto_capability_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 				break;
 
 			case SOFT_RING_ENABLE:
+				ASSERT(!(dld_opt & DLD_OPT_NO_SOFTRING));
 				/*
 				 * Make sure soft_ring is disabled.
 				 */
@@ -1728,12 +1729,13 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	subsize = 0;
 
 	/*
-	 * Advertize soft ring capability if
-	 * VLAN_ID_NONE for GLDv3 drivers
+	 * Advertize soft ring capability unless it has been explicitly
+	 * disabled.
 	 */
-	if (dsp->ds_vid == VLAN_ID_NONE)
+	if (!(dld_opt & DLD_OPT_NO_SOFTRING)) {
 		subsize += sizeof (dl_capability_sub_t) +
 				    sizeof (dl_capab_dls_t);
+	}
 
 	/*
 	 * Check if polling can be enabled on this interface.
@@ -1852,7 +1854,7 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 
 	ASSERT(RW_READ_HELD(&dsp->ds_lock));
 
-	if (dsp->ds_vid == VLAN_ID_NONE) {
+	if (!(dld_opt & DLD_OPT_NO_SOFTRING)) {
 		dlsp = (dl_capability_sub_t *)ptr;
 
 		dlsp->dl_cap = DL_CAPAB_SOFT_RING;
