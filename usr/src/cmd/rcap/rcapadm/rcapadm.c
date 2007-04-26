@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,8 +46,6 @@
 #include "rcapd.h"
 #include "rcapd_conf.h"
 #include "rcapd_stat.h"
-
-#define	RCAP_FMRI		"system/rcap:default"
 
 static void
 usage()
@@ -78,7 +76,6 @@ static int scan_interval = -1;
 static int report_interval = -1;
 static int config_interval = -1;
 static int sample_interval = -1;
-static char *fname = RCAPD_DEFAULT_CONF_FILE;
 
 static char *subopt_v[] = {
 	"scan",
@@ -133,6 +130,17 @@ out:
 		(void) printf(gettext("                                      "
 		    "state: %s\n"), *persistent ? gettext("enabled") :
 			gettext("disabled"));
+
+	(void) printf(gettext("           memory cap enforcement"
+	    " threshold: %d%%\n"), conf.rcfg_memory_cap_enforcement_pressure);
+	(void) printf(gettext("                    process scan rate"
+	    " (sec): %d\n"), conf.rcfg_proc_walk_interval);
+	(void) printf(gettext("                 reconfiguration rate"
+	    " (sec): %d\n"), conf.rcfg_reconfiguration_interval);
+	(void) printf(gettext("                          report rate"
+	    " (sec): %d\n"), conf.rcfg_report_interval);
+	(void) printf(gettext("                    RSS sampling rate"
+	    " (sec): %d\n"), conf.rcfg_rss_sample_interval);
 
 	scf_simple_prop_free(temporary_prop);
 	scf_simple_prop_free(persistent_prop);
@@ -201,12 +209,10 @@ main(int argc, char *argv[])
 		case 'E':
 			enable = 1;
 			disable = 0;
-			modified++;
 			break;
 		case 'D':
 			disable = 1;
 			enable = 0;
-			modified++;
 			break;
 		case 'i':
 			subopts = optarg;
@@ -263,19 +269,37 @@ main(int argc, char *argv[])
 	if (refresh && (no_starting_stopping > 0 || modified))
 		usage();
 
-	if (rcfg_read(fname, -1, &conf, NULL) < 0) {
-		if (!(errno == ENOENT && modified)) {
-			die(gettext("resource caps not configured\n"));
-			return (E_ERROR);
-		}
-		rcfg_init(&conf);
-		conf.rcfg_mode_name = "project";
-	} else {
+	/*
+	 * disable/enable before reading configuration from the repository
+	 * which may fail and prevents the disabling/enabling to complete.
+	 */
+	if (disable > 0) {
+		if (smf_disable_instance(RCAP_FMRI, no_starting_stopping > 0
+		    ? SMF_AT_NEXT_BOOT : 0) != 0)
+			die(gettext("cannot disable service: %s\n"),
+			    scf_strerror(scf_error()));
+	}
+
+	if (enable > 0) {
+		if (smf_enable_instance(RCAP_FMRI, no_starting_stopping > 0
+		    ? SMF_AT_NEXT_BOOT : 0) != 0)
+			die(gettext("cannot enable service: %s\n"),
+			    scf_strerror(scf_error()));
+	}
+
+	if (rcfg_read(&conf, NULL) != E_SUCCESS) {
 		/*
-		 * The configuration file has been read.  Warn that any lnode
-		 * (or non-project) mode specification (by an SRM
-		 * 1.3 configuration file, for example) is ignored.
+		 * If instance is enabled, put it in maintenance since we
+		 * failed to read configuration from the repository or
+		 * create statistics file.
 		 */
+		if (strcmp(smf_get_state(RCAP_FMRI),
+		    SCF_STATE_STRING_DISABLED) != 0)
+			(void) smf_maintain_instance(RCAP_FMRI, 0);
+
+		die(gettext("resource caps not configured\n"));
+	} else {
+		/* Done reading configuration */
 		if (strcmp(conf.rcfg_mode_name, "project") != 0) {
 			warn(gettext("%s mode specification ignored -- using"
 			    " project mode\n"), conf.rcfg_mode_name);
@@ -300,37 +324,20 @@ main(int argc, char *argv[])
 			conf.rcfg_rss_sample_interval = sample_interval;
 
 		/*
-		 * Create config file with the new parameter(s). The
-		 * create_config_file will exit if it fails.
+		 * Modify configuration with the new parameter(s). The
+		 * function will exit if it fails.
 		 */
-		create_config_file(&conf);
+		if ((modify_config(&conf)) != 0)
+			die(gettext("Error updating repository \n"));
 
-		if (enable > 0 && smf_enable_instance(RCAP_FMRI,
-		    no_starting_stopping > 0 ? SMF_AT_NEXT_BOOT : 0) != 0)
-			die(gettext("cannot enable service: %s\n"),
+		if (smf_refresh_instance(RCAP_FMRI) != 0)
+			die(gettext("cannot refresh service: %s\n"),
 			    scf_strerror(scf_error()));
-		else if (disable > 0 && smf_disable_instance(RCAP_FMRI,
-		    no_starting_stopping > 0 ? SMF_AT_NEXT_BOOT : 0) != 0)
-			die(gettext("cannot disable service: %s\n"),
-			    scf_strerror(scf_error()));
-
-		return (E_SUCCESS);
 	}
 
 	/*
 	 * Display current configuration
 	 */
 	print_state();
-	(void) printf(gettext("           memory cap enforcement"
-	    " threshold: %d%%\n"), conf.rcfg_memory_cap_enforcement_pressure);
-	(void) printf(gettext("                    process scan rate"
-	    " (sec): %d\n"), conf.rcfg_proc_walk_interval);
-	(void) printf(gettext("                 reconfiguration rate"
-	    " (sec): %d\n"), conf.rcfg_reconfiguration_interval);
-	(void) printf(gettext("                          report rate"
-	    " (sec): %d\n"), conf.rcfg_report_interval);
-	(void) printf(gettext("                    RSS sampling rate"
-	    " (sec): %d\n"), conf.rcfg_rss_sample_interval);
-
 	return (E_SUCCESS);
 }

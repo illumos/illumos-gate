@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,9 +85,9 @@ typedef enum {
 	RCT_INVALID
 } rctoken_t;
 
-extern int rcfg_read(char *, int, rcfg_t *, int(*)(void));
+extern int rcfg_read(rcfg_t *, int(*)(void));
 extern void rcfg_init(rcfg_t *);
-extern void create_config_file(rcfg_t *);
+extern int modify_config(rcfg_t *);
 
 #ifdef	__cplusplus
 }

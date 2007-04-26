@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,13 @@ extern "C" {
 #include "rcapd_conf.h"
 
 #define	LC_NAME_LEN			32
-#define	RCAPD_DEFAULT_CONF_FILE		"/etc/rcap.conf"
+#define	RCAP_FMRI			"svc:/system/rcap:default"
+#define	CONFIG_PG			"config"
+#define	PRESSURE			"pressure"
+#define	RECONFIG_INT			"reconfig_interval"
+#define	REPORT_INT			"report_interval"
+#define	RSS_SAMPLE_INT			"rss_sample_interval"
+#define	WALK_INT			"walk_interval"
 #define	RCAPD_IGNORED_SET_FLUSH_IVAL	10	/* number of scans between */
 						/* flushes of the ignored set */
 

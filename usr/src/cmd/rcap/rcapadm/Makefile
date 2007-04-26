@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,7 +40,7 @@ LINTSRCS =	$(COMMON_DIR)/utils.c \
 
 $(NOT_RELEASE_BUILD)CPPFLAGS 	+= -DDEBUG
 CPPFLAGS 			+= -I$(COMMON_DIR)
-LDLIBS 				+= -lumem -ll -lscf -lzonecfg
+LDLIBS 				+= -lumem -lscf -lzonecfg
 
 LINTFLAGS 			+= $(LDLIBS) -mnu
 

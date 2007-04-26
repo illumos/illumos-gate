@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -38,8 +38,6 @@
 	type='service'
 	version='1'>
 
-	<create_default_instance enabled='false' />
-
 	<single_instance />
 
 	<dependency
@@ -50,12 +48,22 @@
 		<service_fmri value='svc:/system/filesystem/minimal' />
 	</dependency>
 
+	<dependency
+		name='manifest'
+		type='service'
+		grouping='optional_all'
+		restart_on='none'>
+			<service_fmri value='svc:/system/manifest-import' />
+	</dependency>
+
 	<dependent
 		name='rcap_multi-user'
 		grouping='optional_all'
 		restart_on='none'>
 			<service_fmri value='svc:/milestone/multi-user' />
 	</dependent>
+
+	<instance name='default' enabled='false'>
 
 	<exec_method
 		type='method'
@@ -78,6 +86,16 @@
 		name='stop'
 		exec=':kill'
 		timeout_seconds='60' />
+
+	<property_group name='config' type='application'>
+		<propval name='pressure' type='count' value='0' />
+		<propval name='reconfig_interval' type='count' value='60' />
+		<propval name='walk_interval' type='count' value='15' />
+		<propval name='report_interval' type='count' value='5' />
+		<propval name='rss_sample_interval' type='count' value='5' />
+        </property_group>
+
+	</instance>
 
 	<stability value='Unstable' />
 

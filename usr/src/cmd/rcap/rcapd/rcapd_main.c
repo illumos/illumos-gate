@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,7 @@
 #include <stdio.h>
 #include <stdio_ext.h>
 #include <stdlib.h>
+#include <libscf.h>
 #include <strings.h>
 #include <time.h>
 #include <unistd.h>
@@ -937,24 +938,19 @@ finish_configuration(void)
 }
 
 /*
- * Cause the configuration file to be reread and applied.
+ * Cause the configuration to be reread and applied.
  */
 static void
-reread_configuration_file(void)
+reread_configuration(void)
 {
 	rcfg_t rcfg_new;
-	struct stat st;
 
-	if (stat(rcfg.rcfg_filename, &st) == 0 && st.st_mtime ==
-	    rcfg.rcfg_last_modification)
-		return;
-
-	if (rcfg_read(rcfg.rcfg_filename, rcfg.rcfg_fd, &rcfg_new,
-	    update_statistics) != 0)
-		warn(gettext("can't reread configuration"));
-	else {
+	if (rcfg_read(&rcfg_new, update_statistics) != E_SUCCESS) {
+		warn(gettext("can't reread configuration \n"));
+		exit(SMF_EXIT_ERR_CONFIG);
+	} else {
 		/*
-		 * The configuration file has been read.  Remove existing
+		 * Done reading configuration.  Remove existing
 		 * collections in case there is a change in collection type.
 		 */
 		if (rcfg.rcfg_mode != rcfg_new.rcfg_mode) {
@@ -972,19 +968,14 @@ reread_configuration_file(void)
 }
 
 /*
- * Reread the configuration filex, then examine changes, additions, and
- * deletions to cap definitions.
+ * First, examine changes, additions, and deletions to cap definitions.
+ * Then, set the next event time.
  */
 static void
 reconfigure(hrtime_t now, hrtime_t *next_configuration,
     hrtime_t *next_proc_walk, hrtime_t *next_rss_sample)
 {
 	debug("reconfigure...\n");
-
-	/*
-	 * Reread the configuration data.
-	 */
-	reread_configuration_file();
 
 	/*
 	 * Walk the lcollection, marking active collections so inactive ones
@@ -1021,7 +1012,7 @@ reconfigure(hrtime_t now, hrtime_t *next_configuration,
 }
 
 /*
- * Respond to SIGHUP by triggering the rereading the configuration file and cap
+ * Respond to SIGHUP by triggering the rereading the configuration and cap
  * definitions.
  */
 /*ARGSUSED*/
@@ -1488,6 +1479,14 @@ main(int argc, char *argv[])
 		}
 
 	/*
+	 * Read the configuration.
+	 */
+	if (rcfg_read(&rcfg, verify_statistics) != E_SUCCESS) {
+		warn(gettext("resource caps not configured\n"));
+		return (SMF_EXIT_ERR_CONFIG);
+	}
+
+	/*
 	 * If not debugging, fork and continue operating, changing the
 	 * destination of messages to syslog().
 	 */
@@ -1514,27 +1513,6 @@ main(int argc, char *argv[])
 			    "terminal"));
 	}
 
-	/*
-	 * Read the configuration file.
-	 */
-	if (rcfg_read(RCAPD_DEFAULT_CONF_FILE, -1, &rcfg, verify_statistics)
-	    != 0) {
-		/*
-		 * A configuration file may not exist if rcapd is started
-		 * by enabling the smf rcap service, so attempt to create
-		 * a default file.
-		 */
-		create_config_file(NULL);
-
-		/*
-		 * A real failure if still can't read the
-		 * configuration file
-		 */
-		if (rcfg_read(RCAPD_DEFAULT_CONF_FILE, -1, &rcfg,
-		    verify_statistics) != 0)
-			die(gettext("resource caps not configured %s"),
-			    RCAPD_DEFAULT_CONF_FILE);
-	}
 	finish_configuration();
 	should_reconfigure = 0;
 
@@ -1636,14 +1614,20 @@ main(int argc, char *argv[])
 		now = gethrtime();
 
 		/*
-		 * Detect configuration and cap changes at every
-		 * reconfiguration_interval, or when SIGHUP has been received.
+		 * Detect configuration and cap changes only when SIGHUP
+		 * is received. Call reconfigure to apply new configuration
+		 * parameters.
 		 */
-		if (EVENT_TIME(now, next_configuration) ||
-		    should_reconfigure == 1) {
+		if (should_reconfigure == 1) {
+			reread_configuration();
+			should_reconfigure = 0;
 			reconfigure(now, &next_configuration, &next_proc_walk,
 			    &next_rss_sample);
-			should_reconfigure = 0;
+		}
+
+		if (EVENT_TIME(now, next_configuration)) {
+			reconfigure(now, &next_configuration, &next_proc_walk,
+			    &next_rss_sample);
 		}
 
 		/*

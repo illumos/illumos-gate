@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 #include <errno.h>
 #include <libgen.h>
 #include "midlevel_impl.h"
+#include "lowlevel_impl.h"
 
 #ifndef NDEBUG
 #define	bad_error(func, err)	{					\
@@ -67,6 +68,20 @@ handle_create(void)
 		return (NULL);
 	}
 	return (h);
+}
+
+void
+scf_simple_handle_destroy(scf_simple_handle_t *simple_h)
+{
+	if (simple_h == NULL)
+		return;
+
+	scf_pg_destroy(simple_h->running_pg);
+	scf_pg_destroy(simple_h->editing_pg);
+	scf_snapshot_destroy(simple_h->snap);
+	scf_instance_destroy(simple_h->inst);
+	scf_handle_destroy(simple_h->h);
+	uu_free(simple_h);
 }
 
 /*
@@ -1075,6 +1090,52 @@ out:
 	return (ret);
 }
 
+/*
+ * Create and return a pg from the instance associated with the given handle.
+ * This function is only called in scf_transaction_setup and
+ * scf_transaction_restart where the h->rh_instance pointer is properly filled
+ * in by scf_general_setup_pg().
+ */
+static scf_propertygroup_t *
+get_instance_pg(scf_simple_handle_t *simple_h)
+{
+	scf_propertygroup_t	*ret_pg = scf_pg_create(simple_h->h);
+	char			*pg_name;
+	ssize_t			namelen;
+
+	if (ret_pg == NULL) {
+		return (NULL);
+	}
+
+	if ((namelen = scf_limit(SCF_LIMIT_MAX_NAME_LENGTH)) == -1) {
+		if (scf_error() == SCF_ERROR_NOT_SET) {
+			(void) scf_set_error(SCF_ERROR_INTERNAL);
+		}
+		return (NULL);
+	}
+
+	if ((pg_name = malloc(namelen)) == NULL) {
+		if (scf_error() == SCF_ERROR_NOT_SET) {
+			(void) scf_set_error(SCF_ERROR_NO_MEMORY);
+		}
+		return (NULL);
+	}
+
+	if (scf_pg_get_name(simple_h->running_pg, pg_name, namelen) < 0) {
+		if (scf_error() == SCF_ERROR_NOT_SET) {
+			(void) scf_set_error(SCF_ERROR_INTERNAL);
+		}
+		return (NULL);
+	}
+
+	/* Get pg from instance */
+	if (scf_instance_get_pg(simple_h->inst, pg_name, ret_pg) == -1) {
+		return (NULL);
+	}
+
+	return (ret_pg);
+}
+
 int
 smf_enable_instance(const char *fmri, int flags)
 {
@@ -1197,6 +1258,268 @@ smf_get_state(const char *instance)
 
 	scf_simple_prop_free(prop);
 	return (ret);
+}
+
+/*
+ * scf_general_pg_setup(fmri, pg_name)
+ * Create a scf_simple_handle_t and fill in the instance, snapshot, and
+ * property group fields associated with the given fmri and property group
+ * name.
+ * Returns:
+ *      Handle  on success
+ *      Null  on error with scf_error set to:
+ *              SCF_ERROR_HANDLE_MISMATCH,
+ *              SCF_ERROR_INVALID_ARGUMENT,
+ *              SCF_ERROR_CONSTRAINT_VIOLATED,
+ *              SCF_ERROR_NOT_FOUND,
+ *              SCF_ERROR_NOT_SET,
+ *              SCF_ERROR_DELETED,
+ *              SCF_ERROR_NOT_BOUND,
+ *              SCF_ERROR_CONNECTION_BROKEN,
+ *              SCF_ERROR_INTERNAL,
+ *              SCF_ERROR_NO_RESOURCES,
+ *              SCF_ERROR_BACKEND_ACCESS
+ */
+scf_simple_handle_t *
+scf_general_pg_setup(const char *fmri, const char *pg_name)
+{
+	scf_simple_handle_t	*ret;
+
+	ret = uu_zalloc(sizeof (*ret));
+	if (ret == NULL) {
+		(void) scf_set_error(SCF_ERROR_NO_MEMORY);
+		return (NULL);
+	} else {
+
+		ret->h = handle_create();
+		ret->inst = scf_instance_create(ret->h);
+		ret->snap = scf_snapshot_create(ret->h);
+		ret->running_pg = scf_pg_create(ret->h);
+	}
+
+	if ((ret->h == NULL) || (ret->inst == NULL) ||
+	    (ret->snap == NULL) || (ret->running_pg == NULL)) {
+		goto out;
+	}
+
+	if (scf_handle_decode_fmri(ret->h, fmri, NULL, NULL, ret->inst,
+	    NULL, NULL, NULL) == -1) {
+		goto out;
+	}
+
+	if ((scf_instance_get_snapshot(ret->inst, "running", ret->snap))
+	    != 0) {
+		goto out;
+	}
+
+	if (scf_instance_get_pg_composed(ret->inst, ret->snap, pg_name,
+	    ret->running_pg) != 0) {
+		goto out;
+	}
+
+	return (ret);
+
+out:
+	scf_simple_handle_destroy(ret);
+	return (NULL);
+}
+
+/*
+ * scf_transaction_setup(h)
+ * creates and starts the transaction
+ * Returns:
+ *      transaction  on success
+ *      NULL on failure with scf_error set to:
+ *      SCF_ERROR_NO_MEMORY,
+ *	SCF_ERROR_INVALID_ARGUMENT,
+ *      SCF_ERROR_HANDLE_DESTROYED,
+ *	SCF_ERROR_INTERNAL,
+ *	SCF_ERROR_NO_RESOURCES,
+ *      SCF_ERROR_NOT_BOUND,
+ *	SCF_ERROR_CONNECTION_BROKEN,
+ *      SCF_ERROR_NOT_SET,
+ *	SCF_ERROR_DELETED,
+ *	SCF_ERROR_CONSTRAINT_VIOLATED,
+ *      SCF_ERROR_HANDLE_MISMATCH,
+ *	SCF_ERROR_BACKEND_ACCESS,
+ *	SCF_ERROR_IN_USE
+ */
+scf_transaction_t *
+scf_transaction_setup(scf_simple_handle_t *simple_h)
+{
+	scf_transaction_t	*tx = NULL;
+
+	if ((tx = scf_transaction_create(simple_h->h)) == NULL) {
+		return (NULL);
+	}
+
+	if ((simple_h->editing_pg = get_instance_pg(simple_h)) == NULL) {
+		return (NULL);
+	}
+
+	if (scf_transaction_start(tx, simple_h->editing_pg) == -1) {
+		scf_pg_destroy(simple_h->editing_pg);
+		simple_h->editing_pg = NULL;
+		return (NULL);
+	}
+
+	return (tx);
+}
+
+int
+scf_transaction_restart(scf_simple_handle_t *simple_h, scf_transaction_t *tx)
+{
+	scf_transaction_reset(tx);
+
+	if (scf_pg_update(simple_h->editing_pg) == -1) {
+		return (SCF_FAILED);
+	}
+
+	if (scf_transaction_start(tx, simple_h->editing_pg) == -1) {
+		return (SCF_FAILED);
+	}
+
+	return (SCF_SUCCESS);
+}
+
+/*
+ * scf_read_count_property(scf_simple_handle_t *simple_h, char *prop_name,
+ * uint64_t *ret_count)
+ *
+ * For the given property name, return the count value.
+ * RETURNS:
+ *	SCF_SUCCESS
+ *	SCF_FAILED on failure with scf_error() set to:
+ *		SCF_ERROR_HANDLE_DESTROYED
+ *		SCF_ERROR_INTERNAL
+ *		SCF_ERROR_NO_RESOURCES
+ *		SCF_ERROR_NO_MEMORY
+ *		SCF_ERROR_HANDLE_MISMATCH
+ *		SCF_ERROR_INVALID_ARGUMENT
+ *		SCF_ERROR_NOT_BOUND
+ *		SCF_ERROR_CONNECTION_BROKEN
+ *		SCF_ERROR_NOT_SET
+ *		SCF_ERROR_DELETED
+ *		SCF_ERROR_BACKEND_ACCESS
+ *		SCF_ERROR_CONSTRAINT_VIOLATED
+ *		SCF_ERROR_TYPE_MISMATCH
+ */
+int
+scf_read_count_property(
+	scf_simple_handle_t	*simple_h,
+	char			*prop_name,
+	uint64_t		*ret_count)
+{
+	scf_property_t		*prop = scf_property_create(simple_h->h);
+	scf_value_t		*val = scf_value_create(simple_h->h);
+	int			ret = SCF_FAILED;
+
+	if ((val == NULL) || (prop == NULL)) {
+		goto out;
+	}
+
+	/*
+	 * Get the property struct that goes with this property group and
+	 * property name.
+	 */
+	if (scf_pg_get_property(simple_h->running_pg, prop_name, prop) != 0) {
+		goto out;
+	}
+
+	/* Get the value structure */
+	if (scf_property_get_value(prop, val) == -1) {
+		goto out;
+	}
+
+	/*
+	 * Now get the count value.
+	 */
+	if (scf_value_get_count(val, ret_count) == -1) {
+		goto out;
+	}
+
+	ret = SCF_SUCCESS;
+
+out:
+	scf_property_destroy(prop);
+	scf_value_destroy(val);
+	return (ret);
+}
+
+/*
+ * scf_trans_add_count_property(trans, propname, count, create_flag)
+ *
+ * Set a count property transaction entry into the pending SMF transaction.
+ * The transaction is created and committed outside of this function.
+ * Returns:
+ *	SCF_SUCCESS
+ *	SCF_FAILED on failure with scf_error() set to:
+ *			SCF_ERROR_HANDLE_DESTROYED,
+ *			SCF_ERROR_INVALID_ARGUMENT,
+ *			SCF_ERROR_NO_MEMORY,
+ *			SCF_ERROR_HANDLE_MISMATCH,
+ *			SCF_ERROR_NOT_SET,
+ *			SCF_ERROR_IN_USE,
+ *			SCF_ERROR_NOT_FOUND,
+ *			SCF_ERROR_EXISTS,
+ *			SCF_ERROR_TYPE_MISMATCH,
+ *			SCF_ERROR_NOT_BOUND,
+ *			SCF_ERROR_CONNECTION_BROKEN,
+ *			SCF_ERROR_INTERNAL,
+ *			SCF_ERROR_DELETED,
+ *			SCF_ERROR_NO_RESOURCES,
+ *			SCF_ERROR_BACKEND_ACCESS
+ */
+int
+scf_set_count_property(
+	scf_transaction_t	*trans,
+	char			*propname,
+	uint64_t		count,
+	boolean_t		create_flag)
+{
+	scf_handle_t		*handle = scf_transaction_handle(trans);
+	scf_value_t		*value = scf_value_create(handle);
+	scf_transaction_entry_t	*entry = scf_entry_create(handle);
+
+	if ((value == NULL) || (entry == NULL)) {
+		return (SCF_FAILED);
+	}
+
+	/*
+	 * Property must be set in transaction and won't take
+	 * effect until the transaction is committed.
+	 *
+	 * Attempt to change the current value. However, create new property
+	 * if it doesn't exist and the create flag is set.
+	 */
+	if (scf_transaction_property_change(trans, entry, propname,
+	    SCF_TYPE_COUNT) == 0) {
+		scf_value_set_count(value, count);
+		if (scf_entry_add_value(entry, value) == 0) {
+			return (SCF_SUCCESS);
+		}
+	} else {
+		if ((create_flag == B_TRUE) &&
+		    (scf_error() == SCF_ERROR_NOT_FOUND)) {
+			if (scf_transaction_property_new(trans, entry, propname,
+			    SCF_TYPE_COUNT) == 0) {
+				scf_value_set_count(value, count);
+				if (scf_entry_add_value(entry, value) == 0) {
+					return (SCF_SUCCESS);
+				}
+			}
+		}
+	}
+
+	/*
+	 * cleanup if there were any errors that didn't leave these
+	 * values where they would be cleaned up later.
+	 */
+	if (value != NULL)
+		scf_value_destroy(value);
+	if (entry != NULL)
+		scf_entry_destroy(entry);
+	return (SCF_FAILED);
 }
 
 int

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -192,6 +192,21 @@ const char *scf_type_to_string(scf_type_t);
 scf_type_t scf_string_to_type(const char *);
 
 int _smf_refresh_instance_i(scf_instance_t *);
+
+typedef struct scf_simple_handle {
+	scf_handle_t		*h;
+	scf_snapshot_t		*snap;
+	scf_instance_t		*inst;
+	scf_propertygroup_t	*running_pg;
+	scf_propertygroup_t	*editing_pg;
+} scf_simple_handle_t;
+
+void scf_simple_handle_destroy(scf_simple_handle_t *);
+scf_simple_handle_t *scf_general_pg_setup(const char *, const char *);
+scf_transaction_t *scf_transaction_setup(scf_simple_handle_t *);
+int scf_transaction_restart(scf_simple_handle_t *, scf_transaction_t *);
+int scf_read_count_property(scf_simple_handle_t *, char *, uint64_t *);
+int scf_set_count_property(scf_transaction_t *, char *, uint64_t, boolean_t);
 
 /*
  * Walks all the instances matching a given fmri list.  Each fmri in the array

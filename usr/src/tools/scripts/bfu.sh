@@ -840,6 +840,64 @@ add_devid_destroy() {
 }
 
 #
+# Reads existing configuration values in /etc/rcap.conf and puts 
+# them in repository upon reboot(via /var/svc/profile/upgrade).
+#
+migrate_rcap_conf() {
+	RCAP_CONF="${rootprefix}/etc/rcap.conf"
+	PROFILE_UPGRADE="${rootprefix}/var/svc/profile/upgrade"
+	SVCCFG="/usr/sbin/svccfg"
+	RCAP_FMRI="svc:/system/rcap:default"
+	PG="config"
+
+	pressure=`awk '$1 == "RCAPD_MEMORY_CAP_ENFORCEMENT_PRESSURE" \
+	    && NF == 3 {print $3}' $RCAP_CONF`
+
+	reconfig_int=`awk '$1 == "RCAPD_RECONFIGURATION_INTERVAL" \
+	    && NF == 3 {print $3}' $RCAP_CONF`
+
+	walk_int=`awk '$1 == "RCAPD_PROC_WALK_INTERVAL" && \
+	    NF == 3 {print $3}' $RCAP_CONF`
+
+	report_int=`awk '$1 == "RCAPD_REPORT_INTERVAL" && \
+	    NF == 3 {print $3}' $RCAP_CONF`
+
+	rss_sample_int=`awk '$1 == "RCAPD_RSS_SAMPLE_INTERVAL" && \
+	    NF == 3 {print $3}' $RCAP_CONF`
+
+	# Blindly update default configuration values with
+	# pre-existing values
+	#
+	echo "# Migrating pre-existing rcap configuration" >> \
+	    $PROFILE_UPGRADE
+
+	echo "$SVCCFG -s $RCAP_FMRI setprop ${PG}/pressure = " \
+	    "$pressure" >> $PROFILE_UPGRADE
+
+	echo "$SVCCFG -s $RCAP_FMRI " \
+	    "setprop ${PG}/reconfig_interval = $reconfig_int" >> \
+	    $PROFILE_UPGRADE
+
+	echo "$SVCCFG -s $RCAP_FMRI " \
+	    "setprop ${PG}/walk_interval = $walk_int" >> \
+	    $PROFILE_UPGRADE
+
+	echo "$SVCCFG -s $RCAP_FMRI " \
+	    "setprop ${PG}/report_interval = $report_int" >> \
+	    $PROFILE_UPGRADE
+
+	echo "$SVCCFG -s $RCAP_FMRI " \
+	    "setprop ${PG}/rss_sample_interval = $rss_sample_int" >> \
+	    $PROFILE_UPGRADE
+
+	echo "/usr/sbin/svcadm refresh $RCAP_FMRI" >> \
+	    $PROFILE_UPGRADE
+
+	echo "rm /etc/rcap.conf" >> \
+	    $PROFILE_UPGRADE
+}
+
+#
 # smf(5) "Greenline" doesn't install the init.d or rc*.d scripts for
 # converted services.  Clean up previous scripts for such services.
 #
@@ -1525,9 +1583,15 @@ smf_apply_conf () {
 	print "Marking converted services as enabled ..."
 
 	[ -f $rootprefix/etc/resolv.conf ] && smf_enable network/dns/client
-	[ -f $rootprefix/etc/rcap.conf ] && smf_enable system/rcap
 	[ -f $rootprefix/etc/inet/dhcpsvc.conf ] && \
 	    smf_enable network/dhcp-server
+
+	# Not concerned about enabling/disabling rcap but will migrate
+	# configuration parameters if rcap.conf exists
+	#
+	if [ -f $rootprefix/etc/rcap.conf ]; then
+		migrate_rcap_conf
+	fi
 
 	if [ $zone = global ]; then
 		if [ -f $rootprefix/etc/dfs/dfstab ] &&
