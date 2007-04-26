@@ -3293,7 +3293,6 @@ as_clearwatchprot(struct as *as, caddr_t addr, size_t size)
 	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
 
 	while (pwp != NULL && pwp->wp_vaddr < eaddr) {
-		ASSERT(addr >= pwp->wp_vaddr);
 
 		if ((prot = pwp->wp_oprot) != 0) {
 			retrycnt = 0;
