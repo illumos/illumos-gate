@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,7 +33,14 @@
 !include prototype_com
 
 # the kernel brand module
-d none kernel 0755 root sys
-d none kernel/brand 0755 root sys
-d none kernel/brand/sparcv9 0755 root sys
-f none kernel/brand/sparcv9/sn1_brand 0755 root sys
+d none platform 0755 root sys
+d none platform/sun4u 0755 root sys
+d none platform/sun4u/kernel 0755 root sys
+d none platform/sun4u/kernel/brand 0755 root sys
+d none platform/sun4u/kernel/brand/sparcv9 0755 root sys
+f none platform/sun4u/kernel/brand/sparcv9/sn1_brand 0755 root sys
+d none platform/sun4v 0755 root sys
+d none platform/sun4v/kernel 0755 root sys
+d none platform/sun4v/kernel/brand 0755 root sys
+d none platform/sun4v/kernel/brand/sparcv9 0755 root sys
+f none platform/sun4v/kernel/brand/sparcv9/sn1_brand 0755 root sys

@@ -373,6 +373,8 @@ cpu	CPUSIZE
 	cpu_m.intrcnt			CPU_INTRCNT
 	cpu_m.tmp1			CPU_TMP1
 	cpu_m.tmp2			CPU_TMP2
+	cpu_m.tmp3			CPU_TMP3
+	cpu_m.tmp4			CPU_TMP4
 	cpu_m.ofd			CPU_OFD
 	cpu_m.lfd			CPU_LFD
 	cpu_m.otd			CPU_OTD

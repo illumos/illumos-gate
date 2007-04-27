@@ -104,6 +104,8 @@ struct	machcpu {
 	uint8_t		intrcnt;	/* number of back-to-back interrupts */
 	u_longlong_t	tmp1;		/* per-cpu tmps */
 	u_longlong_t	tmp2;		/*  used in trap processing */
+	u_longlong_t	tmp3;
+	u_longlong_t	tmp4;
 
 	label_t		*ofd[HIGH_LEVELS];	/* saved pil ofd */
 	uintptr_t	lfd[HIGH_LEVELS];	/* saved ret PC */

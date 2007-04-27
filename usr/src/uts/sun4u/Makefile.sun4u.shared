@@ -452,7 +452,7 @@ MISC_KMODS	+= zuluvm
 #
 #	Brand modules
 #
-MISC_KMODS	+= sn1_brand
+BRAND_KMODS	+= sn1_brand
 
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= gptwo_cpu gptwocfg
 

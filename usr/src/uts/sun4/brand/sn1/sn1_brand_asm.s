@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,32 +47,69 @@ sn1_brand_syscall_callback(void)
 
 #else	/* lint */
 
+#ifdef sun4v
+
+#define GLOBALS_SWAP(reg)				\
+	rdpr	%gl, reg				;\
+	wrpr	reg, 1, %gl
+
+#define GLOBALS_RESTORE(reg)				\
+	wrpr	reg, 0, %gl
+
+#else /* !sun4v */
+
+#define GLOBALS_SWAP(reg)				\
+	rdpr	%pstate, reg				;\
+	wrpr	reg, PSTATE_AG, %pstate
+
+#define GLOBALS_RESTORE(reg)				\
+	wrpr	reg, %g0, %pstate
+
+#endif /* !sun4v */
+
+	/*
+	 * Input parameters:
+	 * %g1: return point
+	 * %g2: pointer to our cpu structure
+	 */
 	ENTRY(sn1_brand_syscall_callback)
 
 	/*
 	 * save some locals in the CPU tmp area to give us a little
 	 * room to work.
 	 */
-	CPU_ADDR(%g2, %g3)		! load CPU struct addr to %g2 using %g3
 	stn	%l0, [%g2 + CPU_TMP1]
 	stn	%l1, [%g2 + CPU_TMP2]
+
+#ifdef sun4v
+	/*
+	 * On sun4v save our input parameters (which are stored in the
+	 * alternate globals) since we'll need to switch between alternate
+	 * globals and normal globals, and on sun4v the alternate globals
+	 * are not preserved across these types of switches.
+	 */
+	stn	%l2, [%g2 + CPU_TMP3]
+	stn	%l3, [%g2 + CPU_TMP4]
+	mov	%g1, %l2
+	mov	%g2, %l3
+#endif /* sun4v */
 
 	/*
 	 * Switch from the alternate to user globals to grab the syscall
 	 * number, then switch back to the alternate globals.
-	 * 
+	 *
 	 * If the system call number is >= 1024, then it is coming from the
 	 * emulation support library and should not be emulated.
 	 */
-	rdpr	%pstate, %l0
-	wrpr	%l0, PSTATE_AG, %pstate	! switch to normal globals
+	GLOBALS_SWAP(%l0)		! switch to normal globals
 	cmp	%g1, 1024		! is this call from the library?
 	bl,a	1f
 	mov	%g1, %l1		! delay slot - grab syscall number
 	sub	%g1, 1024, %g1		! convert magic num to real syscall
 	ba	2f			! jump back into syscall path
 1:
-	wrpr	%l0, %g0, %pstate	! switch back to alternate globals
+	GLOBALS_RESTORE(%l0)		! delay slot -
+					! switch back to alternate globals
 
 	/*
 	 * Check to see if we want to interpose on this system call.  If
@@ -90,6 +127,10 @@ sn1_brand_syscall_callback(void)
 	 * Find the address of the userspace handler.
 	 * cpu->cpu_thread->t_procp->p_brandhdlr.
 	 */
+#ifdef sun4v
+	! restore the alternate global registers after incrementing %gl
+	mov	%l3, %g2
+#endif /* sun4v */
 	ldn	[%g2 + CPU_THREAD], %g3		! load thread pointer
 	ldn	[%g3 + T_PROCP], %g3		! get proc pointer
 	ldn	[%g3 + P_BRAND_DATA], %g3	! get brand handler
@@ -108,18 +149,37 @@ sn1_brand_syscall_callback(void)
 	 */
 	rdpr	%tnpc, %l1		! save old tnpc
 	wrpr	%g0, %g3, %tnpc		! setup tnpc
-	rdpr	%pstate, %l0
-	wrpr	%l0, PSTATE_AG, %pstate	! switch to normal globals
+	GLOBALS_SWAP(%l0)		! switch to normal globals
 	mov	%l1, %g6		! pass tnpc to user code in %g6
-	wrpr	%l0, %g0, %pstate	! switch back to alternate globals
+	GLOBALS_RESTORE(%l0)		! switch back to alternate globals
+
+	/* Update the address we're going to return to */
+#ifdef sun4v
+	set	fast_trap_done_chk_intr, %l2
+#else /* !sun4v */
 	set	fast_trap_done_chk_intr, %g1
+#endif /* !sun4v */
 
 2:
-	! Note that %g2 still contains CPU struct addr
+	/*
+	 * Restore registers before returning.
+	 *
+	 * Note that %g2 should be loaded with the CPU struct addr and
+	 * %g1 should be loaded the address we're going to return to.
+	 */
+#ifdef sun4v
+	! restore the alternate global registers after incrementing %gl
+	mov	%l3, %g2
+	mov	%l2, %g1
+
+	ldn	[%g2 + CPU_TMP4], %l3	! restore locals
+	ldn	[%g2 + CPU_TMP3], %l2
+#endif /* sun4v */
+
 	ldn	[%g2 + CPU_TMP2], %l1	! restore locals
 	ldn	[%g2 + CPU_TMP1], %l0
+
 	jmp	%g1
 	nop
 	SET_SIZE(sn1_brand_syscall_callback)
 #endif	/* lint */
-

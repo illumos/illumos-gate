@@ -6702,6 +6702,12 @@ mondo_loop() {
 	rm -f $root/dev/cfg/*pci*
 
 	#
+	# remove the architecture-specific sn1_brand module since it's being
+	# replaced with platform-specific modules.
+	#
+	rm -f $root/kernel/brand/sparcv9/sn1_brand
+
+	#
 	# Remove I2O.
 	#
 	rm -f $root/kernel/drv/i2o_bs

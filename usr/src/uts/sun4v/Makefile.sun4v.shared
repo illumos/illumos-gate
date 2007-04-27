@@ -72,7 +72,7 @@ UNAME_M		= $(PLATFORM)
 # This list should be empty.  A platform without platform modules
 # is a plain, generic sun4v platform.
 #
-#IMPLEMENTED_PLATFORM	= 
+#IMPLEMENTED_PLATFORM	=
 #PLATFORMS                = $(IMPLEMENTED_PLATFORM)
 
 IMPLEMENTATIONS		= ontario montoya
@@ -100,7 +100,7 @@ MODSTUBS_DIR	 = $(UNIX_DIR)
 DSF_DIR		 = $(UTSBASE)/$(PLATFORM)/genassym
 LINTS_DIR	 = $(OBJS_DIR)
 LINT_LIB_DIR	 = $(UTSBASE)/$(PLATFORM)/lint-libs/$(OBJS_DIR)
- 
+
 DTRACESTUBS_O	 = $(OBJS_DIR)/dtracestubs.o
 DTRACESTUBS	 = $(OBJS_DIR)/libdtracestubs.so
 
@@ -239,7 +239,7 @@ DEBUG_DEFS_DBG64	= -DDEBUG
 DEBUG_DEFS		= $(DEBUG_DEFS_$(BUILD_TYPE))
 
 DEBUG_COND_OBJ64	:sh = echo \\043
-DEBUG_COND_DBG64	= 
+DEBUG_COND_DBG64	=
 IF_DEBUG_OBJ		= $(DEBUG_COND_$(BUILD_TYPE))$(OBJS_DIR)/
 
 $(IF_DEBUG_OBJ)trap.o		:=	DEBUG_DEFS	+= -DTRAPDEBUG
@@ -275,7 +275,7 @@ $(IF_TRAPTRACE_OBJ)x_call.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
 #$(IF_DEBUG_OBJ)lock_prim.o	:= DEBUG_DEFS	+= -DDISP_LOCK_STATS
 #$(IF_DEBUG_OBJ)disp.o		:= DEBUG_DEFS	+= -DDISP_LOCK_STATS
 
-# Comment these out if you don't want dispatcher debugging 
+# Comment these out if you don't want dispatcher debugging
 
 #$(IF_DEBUG_OBJ)lock_prim.o	:= DEBUG_DEFS	+= -DDISP_DEBUG
 
@@ -341,7 +341,7 @@ DRV_KMODS	+= qcn
 DRV_KMODS	+= rootnex
 DRV_KMODS       += su
 DRV_KMODS	+= trapstat
-DRV_KMODS	+= vcc 
+DRV_KMODS	+= vcc
 DRV_KMODS	+= vdc
 DRV_KMODS	+= vds
 DRV_KMODS	+= vldc
@@ -382,19 +382,24 @@ SYS_KMODS	+=
 #
 #	'User' Modules (/kernel/misc):
 #
-MISC_KMODS	+= bootdev 
-MISC_KMODS	+= dr_cpu 
+MISC_KMODS	+= bootdev
+MISC_KMODS	+= dr_cpu
 MISC_KMODS	+= ds
 MISC_KMODS	+= fault_iso
-MISC_KMODS	+= ldc 
-MISC_KMODS	+= obpsym 
-MISC_KMODS	+= platmod 
-MISC_KMODS	+= platsvc 
-MISC_KMODS	+= vis 
- 
+MISC_KMODS	+= ldc
+MISC_KMODS	+= obpsym
+MISC_KMODS	+= platmod
+MISC_KMODS	+= platsvc
+MISC_KMODS	+= vis
+
 #	md5 optimized for Niagara
 #
 MISC_KMODS	+= md5
+
+#
+#	Brand modules
+#
+BRAND_KMODS	+= sn1_brand
 
 #
 #	Software Cryptographic Providers (/kernel/crypto):

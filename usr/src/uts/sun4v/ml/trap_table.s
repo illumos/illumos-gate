@@ -36,6 +36,7 @@
 #include <sys/hypervisor_api.h>
 #include <sys/machtrap.h>
 #include <sys/machthread.h>
+#include <sys/machbrand.h>
 #include <sys/pcb.h>
 #include <sys/pte.h>
 #include <sys/mmu.h>
@@ -187,6 +188,9 @@
  */
 #define	SYSCALL(which)			\
 	TT_TRACE(trace_gen)		;\
+	SYSCALL_NOTT(which)
+
+#define	SYSCALL_NOTT(which)		\
 	set	(which), %g1		;\
 	ba,pt	%xcc, sys_trap		;\
 	sub	%g0, 1, %g4		;\
@@ -544,7 +548,7 @@
  * FILL_64bit_asi fills a 64-bit-wide register window from a 64-bit
  * wide address space via the designated asi.  It is used to fill
  * non-kernel windows.  The stack pointer is required to be eight-byte
- * aligned. 
+ * aligned.
  */
 #define	FILL_64bit_asi(asi_num, tail)				\
 	mov	V9BIAS64 + 0, %g1				;\
@@ -827,7 +831,7 @@ tt_pil/**/level:			;\
 	ba,a,pt	%xcc, .watchdog_trap	;\
 	.align	32
 
-	
+
 /*
  * MMU Trap Handlers.
  */
@@ -882,7 +886,7 @@ tt_pil/**/level:			;\
 	.align	32
 /*
  * SPARC V9 IMPL. DEP. #109(1) and (2) and #110(1) and (2)
- */	 
+ */
 
 /*
  * synthesize for trap(): SFAR in %g2, SFSR in %g3
@@ -1226,7 +1230,11 @@ trap_table0:
 	BAD;				/* 105	range check ?? */
 	GOTO(.fix_alignment);		/* 106	do unaligned references */
 	BAD;				/* 107	unused */
+#ifndef DEBUG
 	SYSCALL(syscall_trap32);	/* 108	ILP32 system call on LP64 */
+#else /* DEBUG */
+	GOTO(syscall_wrapper32);	/* 108	ILP32 system call on LP64 */
+#endif /* DEBUG */
 	GOTO(set_trap0_addr);		/* 109	set trap0 address */
 	BAD; BAD; BAD4;			/* 10A - 10F unused */
 	TRP4; TRP4; TRP4; TRP4;		/* 110 - 11F V9 user trap handlers */
@@ -1246,7 +1254,11 @@ trap_table0:
 	BAD;				/* 139  unused */
 	DTRACE_RETURN;			/* 13A	dtrace pid return probe */
 	BAD; BAD4;			/* 13B - 13F unused */
-	SYSCALL(syscall_trap)		/* 140  LP64 system call */
+#ifndef DEBUG
+	SYSCALL(syscall_trap);		/* 140  LP64 system call */
+#else /* DEBUG */
+	GOTO(syscall_wrapper);		/* 140  LP64 system call */
+#endif /* DEBUG */
 	SYSCALL(nosys);			/* 141  unused system call trap */
 #ifdef DEBUG_USER_TRAPTRACECTL
 	GOTO(.traptrace_freeze);	/* 142  freeze traptrace */
@@ -1569,7 +1581,7 @@ etrap_table:
 
 	brz,pt %g5, 3f			! if p_utraps == NULL goto trap()
 	  rdpr	%tt, %g3		! delay - get actual hw trap type
-	
+
 	sub	%g3, 254, %g1		! UT_TRAP_INSTRUCTION_16 = p_utraps[18]
 	ba,pt	%icc, 2f
 	  smul	%g1, CPTRSIZE, %g2
@@ -1583,7 +1595,7 @@ etrap_table:
 
 	mov	1, %g1
 	st	%g1, [%g4 + CPU_TL1_HDLR] ! set CPU_TL1_HDLR
-	rdpr	%tpc, %g1		! ld trapping instruction using 
+	rdpr	%tpc, %g1		! ld trapping instruction using
 	lduwa	[%g1]ASI_AIUP, %g1	! "AS IF USER" ASI which could fault
 	st	%g0, [%g4 + CPU_TL1_HDLR] ! clr CPU_TL1_HDLR
 
@@ -1591,7 +1603,7 @@ etrap_table:
 	andcc	%g1, %g4, %g4		! and instruction with mask
 	bnz,a,pt %icc, 3f		! if %g4 == zero, %g1 is an ILLTRAP
 	  nop				! fall thru to setup
-2:		
+2:
 	ldn	[%g5 + %g2], %g5
 	brnz,a,pt %g5, .setup_v9utrap
 	  nop
@@ -1698,7 +1710,7 @@ etrap_table:
 	srl	%g2, FSR_FTT_SHIFT, %g7		! extract ftt from %fsr
 	and	%g7, (FSR_FTT>>FSR_FTT_SHIFT), %g7
 	cmp	%g7, FTT_UNFIN
-	set	FSR_TEM_NX, %g5	
+	set	FSR_TEM_NX, %g5
 	bne,pn	%xcc, .fp_exception_cont	! branch if NOT unfinished_FPop
 	  andcc	%g2, %g5, %g0
 	bne,pn	%xcc, .fp_exception_cont	! branch if FSR_TEM_NX enabled
@@ -1833,7 +1845,7 @@ _fitos_fdtos_done:
 	ldx	[%g7], %g5
 1:
 	add	%g5, 1, %g6
-	
+
 	casxa	[%g7] ASI_N, %g5, %g6
 	cmp	%g5, %g6
 	bne,a,pn %xcc, 1b
@@ -2848,5 +2860,53 @@ fast_trap_done_chk_intr:
 fast_trap_dummy_call:
 	retl
 	nop
+
+#ifdef	DEBUG
+/*
+ * Currently we only support syscall interposition for branded zones on
+ * DEBUG kernels.  The only brand that makes use of this functionality is
+ * the fake Solaris 10 brand.  Since this brand is only used for exercising
+ * the framework, we don't want this overhead incurred on production
+ * systems.
+ */
+#define	BRAND_CALLBACK(callback_id)					    \
+	CPU_ADDR(%g2, %g1)		/* load CPU struct addr to %g2	*/ ;\
+	ldn	[%g2 + CPU_THREAD], %g3	/* load thread pointer		*/ ;\
+	ldn	[%g3 + T_PROCP], %g3	/* get proc pointer		*/ ;\
+	ldn	[%g3 + P_BRAND], %g3	/* get brand pointer		*/ ;\
+	brz	%g3, 1f			/* No brand?  No callback. 	*/ ;\
+	nop 								   ;\
+	ldn	[%g3 + B_MACHOPS], %g3	/* get machops list		*/ ;\
+	ldn	[%g3 + (callback_id << 3)], %g3 			   ;\
+	brz	%g3, 1f							   ;\
+	/*								    \
+	 * This isn't pretty.  We want a low-latency way for the callback   \
+	 * routine to decline to do anything.  We just pass in an address   \
+	 * the routine can directly jmp back to, pretending that nothing    \
+	 * has happened.						    \
+	 * 								    \
+	 * %g1: return address (where the brand handler jumps back to)	    \
+	 * %g2: address of CPU structure				    \
+	 * %g3: address of brand handler (where we will jump to)	    \
+	 */								    \
+	mov	%pc, %g1						   ;\
+	add	%g1, 16, %g1						   ;\
+	jmp	%g3							   ;\
+	nop								   ;\
+1:
+
+	ENTRY_NP(syscall_wrapper32)
+	TT_TRACE(trace_gen)
+	BRAND_CALLBACK(BRAND_CB_SYSCALL32)
+	SYSCALL_NOTT(syscall_trap32)
+	SET_SIZE(syscall_wrapper32)
+
+	ENTRY_NP(syscall_wrapper)
+	TT_TRACE(trace_gen)
+	BRAND_CALLBACK(BRAND_CB_SYSCALL)
+	SYSCALL_NOTT(syscall_trap)
+	SET_SIZE(syscall_wrapper)
+
+#endif	/* DEBUG */
 
 #endif	/* lint */

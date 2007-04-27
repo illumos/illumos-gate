@@ -44,7 +44,7 @@ ROOTMODULE	= $(ROOT_PSM_BRAND_DIR)/$(MODULE)
 #
 #	Include common rules.
 #
-include $(UTSBASE)/sun4u/Makefile.sun4u
+include $(UTSBASE)/sun4v/Makefile.sun4v
 
 #
 #	Define targets
@@ -80,4 +80,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/sun4u/Makefile.targ
+include $(UTSBASE)/sun4v/Makefile.targ

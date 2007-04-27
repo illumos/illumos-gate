@@ -161,6 +161,11 @@ OBPSYM_OBJS	+= obpsym.o obpsym_1275.o
 PLATSVC_OBJS	= platsvc.o mdeg.o
 
 #
+#			Brand modules
+#
+SN1_BRAND_OBJS		= sn1_brand.o sn1_brand_asm.o
+
+#
 #			Performance Counter BackEnd (PCBE) Modules
 #
 NI_PCBE_OBJS	= niagara_pcbe.o

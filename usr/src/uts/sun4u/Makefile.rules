@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -113,7 +113,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/pcbe/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/brand/sn1/%.s
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4/brand/sn1/%.s
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/vm/%.c
@@ -242,7 +242,7 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/os/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/pcbe/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/brand/sn1/%.s
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4/brand/sn1/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/vm/%.c
