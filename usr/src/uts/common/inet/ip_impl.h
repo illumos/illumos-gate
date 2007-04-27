@@ -206,7 +206,8 @@ extern "C" {
 		    IP_UDP_CSUM_COMP : IP_TCP_CSUM_COMP;		\
 		_sum += (pseudo);					\
 		_sum = IP_CSUM(mp, start, _sum);			\
-		*(up) = (uint16_t)(_sum ? _sum : ~_sum);		\
+		*(up) = (uint16_t)(((proto) == IPPROTO_UDP) ?		\
+		    (_sum ? _sum : ~_sum) : _sum);			\
 	}								\
 	/*								\
 	 * Hardware supports IP header checksum offload; clear the	\

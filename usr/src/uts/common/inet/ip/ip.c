@@ -1930,8 +1930,6 @@ icmp_inbound(queue_t *q, mblk_t *mp, boolean_t broadcast, ill_t *ill,
 	/* Send out an ICMP packet */
 	icmph->icmph_checksum = 0;
 	icmph->icmph_checksum = IP_CSUM(mp, iph_hdr_length, 0);
-	if (icmph->icmph_checksum == 0)
-		icmph->icmph_checksum = 0xFFFF;
 	if (broadcast || CLASSD(ipha->ipha_dst)) {
 		ipif_t	*ipif_chosen;
 		/*
@@ -3466,8 +3464,6 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 	bcopy(stuff, icmph, len);
 	icmph->icmph_checksum = 0;
 	icmph->icmph_checksum = IP_CSUM(mp, (int32_t)sizeof (ipha_t), 0);
-	if (icmph->icmph_checksum == 0)
-		icmph->icmph_checksum = 0xFFFF;
 	BUMP_MIB(&ipst->ips_icmp_mib, icmpOutMsgs);
 	put(q, ipsec_mp);
 }
@@ -23092,8 +23088,6 @@ broadcast:
 			IP_STAT_UPDATE(ipst, ip_tcp_out_sw_cksum_bytes,
 			    LENGTH - hlen);
 			*up = IP_CSUM(mp, hlen, cksum + IP_TCP_CSUM_COMP);
-			if (*up == 0)
-				*up = 0xFFFF;
 		} else if (PROTO == IPPROTO_SCTP &&
 		    (ip_hdr_included != IP_HDR_INCLUDED)) {
 			sctp_hdr_t	*sctph;
@@ -26280,8 +26274,7 @@ send:
 		    iphs[9] + ntohs(htons(ipha->ipha_length) -
 		    IP_SIMPLE_HDR_LENGTH);
 #undef iphs
-		if ((cksum = IP_CSUM(mp, IP_SIMPLE_HDR_LENGTH, cksum)) == 0)
-			cksum = 0xFFFF;
+		cksum = IP_CSUM(mp, IP_SIMPLE_HDR_LENGTH, cksum);
 		for (mp1 = mp; mp1 != NULL; mp1 = mp1->b_cont)
 			if (mp1->b_wptr - mp1->b_rptr >=
 			    offset + sizeof (uint16_t)) {

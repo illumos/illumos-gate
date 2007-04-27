@@ -19638,8 +19638,6 @@ ipif_mask_reply(ipif_t *ipif)
 	icmph->icmph_type = ICMP_ADDRESS_MASK_REPLY;
 	bcopy(&ipif->ipif_net_mask, &icmph[1], IP_ADDR_LEN);
 	icmph->icmph_checksum = IP_CSUM(mp, sizeof (ipha_t), 0);
-	if (icmph->icmph_checksum == 0)
-		icmph->icmph_checksum = 0xffff;
 
 	put(ipif->ipif_wq, mp);
 

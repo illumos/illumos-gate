@@ -1913,8 +1913,6 @@ igmp_sendpkt(ilm_t *ilm, uchar_t type, ipaddr_t addr)
 	igmpa->igmpa_group  = ilm->ilm_addr;
 	igmpa->igmpa_cksum  = 0;
 	igmpa->igmpa_cksum  = IP_CSUM(mp, hdrlen, 0);
-	if (igmpa->igmpa_cksum == 0)
-		igmpa->igmpa_cksum = 0xffff;
 
 	rtralert[0] = IPOPT_COPY | IPOPT_RTRALERT;
 	rtralert[1] = RTRALERT_LEN;

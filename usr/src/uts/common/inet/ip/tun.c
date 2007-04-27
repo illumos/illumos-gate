@@ -4346,8 +4346,6 @@ tun_icmp_message_v4(queue_t *q, ipha_t *ipha, icmph_t *icmp, mblk_t *mp)
 	*nicmp = *icmp;
 	nicmp->icmph_checksum = 0;
 	nicmp->icmph_checksum = IP_CSUM(send_mp, sizeof (ipha_t), 0);
-	if (nicmp->icmph_checksum == 0)
-		nicmp->icmph_checksum = 0xffff;
 
 	/* let ip know we are an icmp message */
 	atomic_add_64(&atp->tun_HCInOctets,
@@ -4412,8 +4410,6 @@ tun_icmp_message_v6(queue_t *q, ip6_t *ip6h, icmp6_t *icmp6, uint8_t hoplim,
 	    up[12] + up[13] + up[14] + up[15];
 	sum = (sum & 0xffff) + (sum >> 16);
 	nicmp6->icmp6_cksum = IP_CSUM(send_mp, IPV6_HDR_LEN, sum);
-	if (nicmp6->icmp6_cksum == 0)
-		nicmp6->icmp6_cksum = 0xffff;
 
 	/* let ip know we are an icmp message */
 	atomic_add_64(&atp->tun_HCInOctets,

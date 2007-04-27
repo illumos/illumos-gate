@@ -11196,8 +11196,6 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 			    up[12] + up[13] + up[14] + up[15];
 			sum = (sum & 0xffff) + (sum >> 16);
 			*insp = IP_CSUM(mp, hdr_length, sum);
-			if (*insp == 0)
-				*insp = 0xFFFF;
 		} else if (nexthdr == IPPROTO_TCP) {
 			uint16_t	*up;
 
@@ -11325,8 +11323,6 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 			    up[12] + up[13] + up[14] + up[15];
 			sum = (sum & 0xffff) + (sum >> 16);
 			icmp6->icmp6_cksum = IP_CSUM(mp, hdr_length, sum);
-			if (icmp6->icmp6_cksum == 0)
-				icmp6->icmp6_cksum = 0xFFFF;
 
 			/* Update output mib stats */
 			icmp_update_out_mib_v6(ill, icmp6);
