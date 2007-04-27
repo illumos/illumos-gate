@@ -140,6 +140,17 @@ static kmf_error_map kmf_errcodes[] = {
 	{KMF_ERR_KEY_MISMATCH,		"KMF_ERR_KEY_MISMATCH"}
 };
 
+typedef struct {
+	KMF_KEYSTORE_TYPE	kstype;
+	char			*path;
+	boolean_t		critical;
+} KMF_PLUGIN_ITEM;
+
+KMF_PLUGIN_ITEM plugin_list[] = {
+	{KMF_KEYSTORE_OPENSSL,	KMF_PLUGIN_PATH "kmf_openssl.so.1",  TRUE},
+	{KMF_KEYSTORE_PK11TOKEN, KMF_PLUGIN_PATH "kmf_pkcs11.so.1",  TRUE},
+	{KMF_KEYSTORE_NSS,	KMF_PLUGIN_PATH "kmf_nss.so.1",  FALSE}
+};
 
 static void free_extensions(KMF_X509_EXTENSIONS *extns);
 
@@ -311,6 +322,7 @@ KMF_Initialize(KMF_HANDLE_T *outhandle, char *policyfile, char *policyname)
 	KMF_RETURN ret = KMF_OK;
 	KMF_HANDLE *handle = NULL;
 	KMF_PLUGIN *pluginrec = NULL;
+	int i, numitems;
 
 	if (outhandle == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -323,7 +335,6 @@ KMF_Initialize(KMF_HANDLE_T *outhandle, char *policyfile, char *policyname)
 	(void) memset(handle, 0, sizeof (KMF_HANDLE));
 	handle->plugins = NULL;
 
-
 	/* Initialize the handle with the policy */
 	ret = KMF_SetPolicy((void *)handle,
 	    policyfile == NULL ? KMF_DEFAULT_POLICY_FILE : policyfile,
@@ -331,33 +342,27 @@ KMF_Initialize(KMF_HANDLE_T *outhandle, char *policyfile, char *policyname)
 	if (ret != KMF_OK)
 		goto errout;
 
-	/* Create a record for the plugin */
-	if ((ret = InitializePlugin(KMF_KEYSTORE_NSS,
-		KMF_PLUGIN_PATH "kmf_nss.so.1", &pluginrec)) != KMF_OK)
-		goto errout;
+	numitems = sizeof (plugin_list)/sizeof (KMF_PLUGIN_ITEM);
+	for (i = 0; i < numitems; i++) {
+		ret = InitializePlugin(plugin_list[i].kstype,
+			plugin_list[i].path, &pluginrec);
+		if (ret != KMF_OK) {
+			cryptoerror(
+			    plugin_list[i].critical ? LOG_WARNING : LOG_DEBUG,
+			    "KMF was unable to load %s plugin module %s\n",
+			    plugin_list[i].critical ? "critical" : "optional",
+			    plugin_list[i].path);
 
-	/* Add it to the handle */
-	if (pluginrec != NULL) {
-		if ((ret = AddPlugin(handle, pluginrec)))
-			goto errout;
+			if (plugin_list[i].critical == FALSE)
+				ret = KMF_OK;
+			else
+				goto errout;
+		}
+		if (pluginrec != NULL) {
+			if ((ret = AddPlugin(handle, pluginrec)))
+				goto errout;
+		}
 	}
-	if ((ret = InitializePlugin(KMF_KEYSTORE_OPENSSL,
-		KMF_PLUGIN_PATH "kmf_openssl.so.1", &pluginrec)) != KMF_OK)
-		goto errout;
-
-	/* Add it to the handle */
-	if (pluginrec != NULL)
-		if ((ret = AddPlugin(handle, pluginrec)))
-			goto errout;
-
-	if ((ret = InitializePlugin(KMF_KEYSTORE_PK11TOKEN,
-		KMF_PLUGIN_PATH "kmf_pkcs11.so.1", &pluginrec)) != KMF_OK)
-		goto errout;
-
-	/* Add it to the handle */
-	if (pluginrec != NULL)
-		if ((ret = AddPlugin(handle, pluginrec)))
-			goto errout;
 
 	CLEAR_ERROR(handle, ret);
 errout:
