@@ -353,6 +353,11 @@ routing_events(void *arg)
 			if ((addr_dl = (struct sockaddr_dl *)getaddr
 			    (RTA_IFP, ifa->ifam_addrs, addrs)) == NULL)
 				break;
+			/*
+			 * We don't use the lladdr in this structure so we can
+			 * run over it.
+			 */
+			addr_dl->sdl_data[addr_dl->sdl_nlen] = 0;
 			if_name = addr_dl->sdl_data;
 			ifp = get_interface(if_name);
 			if (ifp == NULL) {
@@ -386,6 +391,11 @@ routing_events(void *arg)
 			if ((addr_dl = (struct sockaddr_dl *)getaddr(RTA_IFP,
 			    ifm->ifm_addrs, addrs)) == NULL)
 				break;
+			/*
+			 * We don't use the lladdr in this structure so we can
+			 * run over it.
+			 */
+			addr_dl->sdl_data[addr_dl->sdl_nlen] = 0;
 			if_name = addr_dl->sdl_data;
 			ifp = get_interface(if_name);
 			if (ifp == NULL) {
@@ -545,8 +555,8 @@ printaddr(void **address)
 			*address = (char *)*address + sizeof (*s6);
 			break;
 		case AF_LINK:
-			(void) snprintf(buffer, sizeof (buffer), "link %s",
-			    dl->sdl_data);
+			(void) snprintf(buffer, sizeof (buffer), "link %.*s",
+			    dl->sdl_nlen, dl->sdl_data);
 			*address = (char *)*address + sizeof (*dl);
 			break;
 		default:

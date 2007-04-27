@@ -32,6 +32,7 @@
 #
 
 . /lib/svc/share/smf_include.sh
+. /lib/svc/share/net_include.sh
 
 case "$1" in
 'start')
@@ -237,20 +238,6 @@ if /usr/bin/grep '# Added by DHCP$' /etc/inet/hosts >/dev/null 2>&1; then
 	mv_file /tmp/hosts.$$ /etc/inet/hosts 444
 fi
 
-if [ -z "$SMF_FMRI" ] || [ "$SMF_FMRI" = "svc:/network/physical:nwam" ]; then
-	exit 0
-fi
-
-#
-# Load the IPQoS configuration.
-# This is backgrounded so that any remote hostname lookups it performs
-# don't unduely delay startup. Any messages go via syslog.
-#
-
-if [ -f /usr/sbin/ipqosconf -a -f /etc/inet/ipqosinit.conf ]; then
-	/usr/sbin/ipqosconf -s -a /etc/inet/ipqosinit.conf &
-fi
-
 #
 # Add a static route for multicast packets out our default interface.
 # The default interface is the interface that corresponds to the node name.
@@ -269,3 +256,23 @@ echo "Setting default IPv4 interface for multicast:" \
 
 /usr/sbin/route -n add -interface 224.0/4 -gateway "$mcastif" >/dev/null
 ) &
+
+#
+# NWAM-triggered interface changes may necessitate updating IPv6 multicast
+# route.
+#
+update_v6_multicast_route
+
+if [ -z "$SMF_FMRI" ] || [ "$SMF_FMRI" = "svc:/network/physical:nwam" ]; then
+        exit 0
+fi
+
+#
+# Load the IPQoS configuration.
+# This is backgrounded so that any remote hostname lookups it performs
+# don't unduely delay startup. Any messages go via syslog.
+#
+
+if [ -f /usr/sbin/ipqosconf -a -f /etc/inet/ipqosinit.conf ]; then
+        /usr/sbin/ipqosconf -s -a /etc/inet/ipqosinit.conf &
+fi

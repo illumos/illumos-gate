@@ -28,6 +28,7 @@
 # This script configures IP routing.
 
 . /lib/svc/share/smf_include.sh
+. /lib/svc/share/net_include.sh
 
 #
 # In a shared-IP zone we need this service to be up, but all of the work
@@ -61,28 +62,10 @@ if [ -n "$dynamic_routing_test" ]; then
 	dynamic_routing="true"
 fi
 
-/usr/sbin/ifconfig -a6u >/etc/svc/volatile/ifconfig.$$
-numv6ifs=`/usr/bin/grep -c inet6 /etc/svc/volatile/ifconfig.$$`
-
-if  [ $numv6ifs -gt 1 ]; then
-	#
-	# Add a static route for multicast packets out of a link-local
-	# interface, although would like to specify multicast interface using
-	# an interface name!
-	#
-	set -- `/usr/bin/awk '
-		/inet6 fe80:/ {
-			print substr($2, 1, index($2, "/") - 1)
-		}' /etc/svc/volatile/ifconfig.$$`
-
-	if [ -n "$1" ]; then
-		echo "Setting default IPv6 interface for multicast:" \
-			"add net ff00::/8: gateway $1"
-		/usr/sbin/route -n add -interface -inet6 "ff00::/8" "$1" \
-			>/dev/null
-	fi
-fi
-/usr/bin/rm -f /etc/svc/volatile/ifconfig.$$
+#
+# Add a static route for IPv6 multicast packets.
+#
+update_v6_multicast_route
 
 #
 # Configure default IPv4 routers using the local "/etc/defaultrouter"
