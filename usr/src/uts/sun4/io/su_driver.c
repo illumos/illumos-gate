@@ -340,7 +340,6 @@ asyprobe(dev_info_t *devi)
 	attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
 	attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
 	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
-
 	if (ddi_regs_map_setup(devi, SU_REGISTER_FILE_NO, (caddr_t *)&addr,
 	    SU_REGOFFSET, SU_REGISTER_LEN, &attr, &handle) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "asyprobe regs map setup failed");
@@ -356,8 +355,11 @@ asyprobe(dev_info_t *devi)
 	 * 	Ser. int. uses bits 0,1,2; FIFO uses 3,6,7; 4,5 wired low.
 	 * 	If bit 4 or 5 appears on inb() ISR, board is not there.
 	 */
-	if (ddi_get8(handle, addr+ISR) & 0x30)
+	if (ddi_get8(handle, addr+ISR) & 0x30) {
+	    ddi_regs_map_free(&handle);
 	    return (DDI_PROBE_FAILURE);
+	}
+
 	instance = ddi_get_instance(devi);
 	if (max_asy_instance < instance)
 	    max_asy_instance = instance;
