@@ -37,9 +37,10 @@
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
+#include <libscf.h>
 #include <libdlwlan.h>
 #include <libdlwlan_impl.h>
-#include <inet/wifi_ioctl.h>
+#include <net/wpa.h>
 
 typedef struct val_desc {
 	char		*vd_name;
@@ -63,6 +64,9 @@ typedef struct prop_desc {
 	wl_pd_checkf_t	*pd_check;
 } prop_desc_t;
 
+static int	wpa_instance_create(const char *, void *);
+static int	wpa_instance_delete(const char *);
+
 static int 	do_get_bsstype(int, wldp_t *);
 static int 	do_get_essid(int, wldp_t *);
 static int 	do_get_bssid(int, wldp_t *);
@@ -76,13 +80,15 @@ static int	do_get_phyconf(int, wldp_t *);
 static int	do_get_powermode(int, wldp_t *);
 static int	do_get_radio(int, wldp_t *);
 static int	do_get_mode(int, wldp_t *);
+static int	do_get_capability(int, wldp_t *);
+static int	do_get_wpamode(int, wldp_t *);
 
 static int	do_set_bsstype(int, wldp_t *, dladm_wlan_bsstype_t *);
 static int	do_set_authmode(int, wldp_t *, dladm_wlan_auth_t *);
 static int	do_set_encryption(int, wldp_t *, dladm_wlan_secmode_t *);
 static int	do_set_essid(int, wldp_t *, dladm_wlan_essid_t *);
 static int	do_set_createibss(int, wldp_t *, boolean_t *);
-static int	do_set_wepkey(int, wldp_t *, dladm_wlan_wepkey_t *, uint_t);
+static int	do_set_key(int, wldp_t *, dladm_wlan_key_t *, uint_t);
 static int	do_set_rate(int, wldp_t *, dladm_wlan_rates_t *);
 static int	do_set_powermode(int, wldp_t *, dladm_wlan_powermode_t *);
 static int	do_set_radio(int, wldp_t *, dladm_wlan_radio_t *);
@@ -90,7 +96,7 @@ static int	do_set_channel(int, wldp_t *, dladm_wlan_channel_t *);
 
 static int	open_link(const char *);
 static int	do_scan(int, wldp_t *);
-static int	do_disconnect(int, wldp_t *);
+static int	do_disconnect(const char *, int, wldp_t *);
 static boolean_t find_val_by_name(const char *, val_desc_t *, uint_t, uint_t *);
 static boolean_t find_name_by_val(uint_t, val_desc_t *, uint_t, char **);
 static void	generate_essid(dladm_wlan_essid_t *);
@@ -110,7 +116,8 @@ static val_desc_t	linkstatus_vals[] = {
 
 static val_desc_t 	secmode_vals[] = {
 	{ "none",	DLADM_WLAN_SECMODE_NONE		},
-	{ "wep",	DLADM_WLAN_SECMODE_WEP		}
+	{ "wep",	DLADM_WLAN_SECMODE_WEP		},
+	{ "wpa",	DLADM_WLAN_SECMODE_WPA		}
 };
 
 static val_desc_t 	strength_vals[] = {
@@ -293,6 +300,8 @@ fill_wlan_attr(wl_ess_conf_t *wlp, dladm_wlan_attr_t *attrp)
 
 	attrp->wa_secmode = (wlp->wl_ess_conf_wepenabled ==
 	    WL_ENC_WEP ? DLADM_WLAN_SECMODE_WEP : DLADM_WLAN_SECMODE_NONE);
+	if (wlp->wl_ess_conf_reserved[0] > 0)
+		attrp->wa_secmode = DLADM_WLAN_SECMODE_WPA;
 	attrp->wa_valid |= DLADM_WLAN_ATTR_SECMODE;
 
 	attrp->wa_bsstype = (wlp->wl_ess_conf_bsstype == WL_BSS_BSS ?
@@ -353,6 +362,11 @@ dladm_wlan_scan(const char *link, void *arg,
 		goto done;
 	}
 
+	if (func == NULL) {
+		status = DLADM_STATUS_OK;
+		goto done;
+	}
+
 	if (do_get_esslist(fd, gbuf) < 0) {
 		status = DLADM_STATUS_FAILED;
 		goto done;
@@ -373,7 +387,7 @@ dladm_wlan_scan(const char *link, void *arg,
 			goto done;
 		}
 		if (IS_CONNECTED(gbuf))
-			(void) do_disconnect(fd, gbuf);
+			(void) do_disconnect(link, fd, gbuf);
 	}
 
 	status = DLADM_STATUS_OK;
@@ -490,17 +504,20 @@ append:
 	return (B_TRUE);
 }
 
+#define	IEEE80211_C_WPA		0x01800000
+
 static dladm_status_t
-do_connect(int fd, wldp_t *gbuf, dladm_wlan_attr_t *attrp,
+do_connect(const char *link, int fd, wldp_t *gbuf, dladm_wlan_attr_t *attrp,
     boolean_t create_ibss, void *keys, uint_t key_count, int timeout)
 {
 	dladm_wlan_secmode_t		secmode;
 	dladm_wlan_auth_t		authmode;
 	dladm_wlan_bsstype_t		bsstype;
 	dladm_wlan_essid_t		essid;
-	boolean_t		essid_valid = B_FALSE;
+	boolean_t			essid_valid = B_FALSE;
 	dladm_wlan_channel_t		channel;
-	hrtime_t		start;
+	hrtime_t			start;
+	wl_capability_t			*caps;
 
 	if ((attrp->wa_valid & DLADM_WLAN_ATTR_CHANNEL) != 0) {
 		channel = attrp->wa_channel;
@@ -529,8 +546,16 @@ do_connect(int fd, wldp_t *gbuf, dladm_wlan_attr_t *attrp,
 	if (secmode == DLADM_WLAN_SECMODE_WEP) {
 		if (keys == NULL || key_count == 0 || key_count > MAX_NWEPKEYS)
 			return (DLADM_STATUS_BADARG);
-		if (do_set_wepkey(fd, gbuf, keys, key_count) < 0)
+		if (do_set_key(fd, gbuf, keys, key_count) < 0)
 			goto fail;
+	} else if (secmode == DLADM_WLAN_SECMODE_WPA) {
+		if (keys == NULL || key_count == 0 || key_count > MAX_NWEPKEYS)
+			return (DLADM_STATUS_BADARG);
+		if (do_get_capability(fd, gbuf) < 0)
+			goto fail;
+		caps = (wl_capability_t *)(gbuf->wldp_buf);
+		if ((caps->caps & IEEE80211_C_WPA) == 0)
+			return (DLADM_STATUS_NOTSUP);
 	}
 
 	if (create_ibss) {
@@ -555,6 +580,13 @@ do_connect(int fd, wldp_t *gbuf, dladm_wlan_attr_t *attrp,
 		return (DLADM_STATUS_FAILED);
 	if (do_set_essid(fd, gbuf, &essid) < 0)
 		goto fail;
+
+	/*
+	 * Because wpa daemon needs getting essid from driver,
+	 * we need call do_set_essid() first, then call wpa_instance_create().
+	 */
+	if (secmode == DLADM_WLAN_SECMODE_WPA && keys != NULL)
+		(void) wpa_instance_create(link, keys);
 
 	start = gethrtime();
 	for (;;) {
@@ -614,7 +646,7 @@ dladm_wlan_connect(const char *link, dladm_wlan_attr_t *attrp,
 	if ((flags & DLADM_WLAN_CONNECT_NOSCAN) != 0 ||
 	    (create_ibss && attrp != NULL &&
 	    (attrp->wa_valid & DLADM_WLAN_ATTR_ESSID) == 0)) {
-		status = do_connect(fd, gbuf, attrp,
+		status = do_connect(link, fd, gbuf, attrp,
 		    create_ibss, keys, key_count, timeout);
 		goto done;
 	}
@@ -632,7 +664,7 @@ dladm_wlan_connect(const char *link, dladm_wlan_attr_t *attrp,
 			status = DLADM_STATUS_NOTFOUND;
 			goto done;
 		}
-		status = do_connect(fd, gbuf, attrp, create_ibss,
+		status = do_connect(link, fd, gbuf, attrp, create_ibss,
 		    keys, key_count, timeout);
 		goto done;
 	}
@@ -654,7 +686,7 @@ dladm_wlan_connect(const char *link, dladm_wlan_attr_t *attrp,
 	for (i = 0; i < state.cs_count; i++) {
 		dladm_wlan_attr_t	*ap = wl_list[i];
 
-		status = do_connect(fd, gbuf, ap, create_ibss, keys,
+		status = do_connect(link, fd, gbuf, ap, create_ibss, keys,
 		    key_count, timeout);
 		if (status == DLADM_STATUS_OK)
 			break;
@@ -662,15 +694,15 @@ dladm_wlan_connect(const char *link, dladm_wlan_attr_t *attrp,
 		if (!set_authmode) {
 			ap->wa_auth = DLADM_WLAN_AUTH_SHARED;
 			ap->wa_valid |= DLADM_WLAN_ATTR_AUTH;
-			status = do_connect(fd, gbuf, ap, create_ibss, keys,
-			    key_count, timeout);
+			status = do_connect(link, fd, gbuf, ap, create_ibss,
+			    keys, key_count, timeout);
 			if (status == DLADM_STATUS_OK)
 				break;
 		}
 	}
 done:
 	if ((status != DLADM_STATUS_OK) && (status != DLADM_STATUS_ISCONN))
-		(void) do_disconnect(fd, gbuf);
+		(void) do_disconnect(link, fd, gbuf);
 
 	while (state.cs_list != NULL) {
 		nodep = state.cs_list;
@@ -708,7 +740,7 @@ dladm_wlan_disconnect(const char *link)
 		goto done;
 	}
 
-	if (do_disconnect(fd, gbuf) < 0) {
+	if (do_disconnect(link, fd, gbuf) < 0) {
 		status = DLADM_STATUS_FAILED;
 		goto done;
 	}
@@ -834,10 +866,9 @@ dladm_wlan_get_linkattr(const char *link, dladm_wlan_linkattr_t *attrp)
 	attrp->la_valid |= DLADM_WLAN_LINKATTR_STATUS;
 	if (!IS_CONNECTED(gbuf)) {
 		attrp->la_status = DLADM_WLAN_LINKSTATUS_DISCONNECTED;
-		status = DLADM_STATUS_OK;
-		goto done;
+	} else {
+		attrp->la_status = DLADM_WLAN_LINKSTATUS_CONNECTED;
 	}
-	attrp->la_status = DLADM_WLAN_LINKSTATUS_CONNECTED;
 
 	if (do_get_essid(fd, gbuf) < 0)
 		goto done;
@@ -856,6 +887,12 @@ dladm_wlan_get_linkattr(const char *link, dladm_wlan_linkattr_t *attrp)
 
 	wl_attrp->wa_valid |= DLADM_WLAN_ATTR_BSSID;
 
+	if (attrp->la_status == DLADM_WLAN_LINKSTATUS_DISCONNECTED) {
+		attrp->la_valid |= DLADM_WLAN_LINKATTR_WLAN;
+		status = DLADM_STATUS_OK;
+		goto done;
+	}
+
 	if (do_get_encryption(fd, gbuf) < 0)
 		goto done;
 
@@ -868,6 +905,9 @@ dladm_wlan_get_linkattr(const char *link, dladm_wlan_linkattr_t *attrp)
 		break;
 	case WL_ENC_WEP:
 		wl_attrp->wa_secmode = DLADM_WLAN_SECMODE_WEP;
+		break;
+	case WL_ENC_WPA:
+		wl_attrp->wa_secmode = DLADM_WLAN_SECMODE_WPA;
 		break;
 	default:
 		wl_attrp->wa_valid &= ~DLADM_WLAN_ATTR_SECMODE;
@@ -1445,8 +1485,12 @@ do_scan(int fd, wldp_t *gbuf)
 }
 
 static int
-do_disconnect(int fd, wldp_t *gbuf)
+do_disconnect(const char *link, int fd, wldp_t *gbuf)
 {
+	if (do_get_wpamode(fd, gbuf) == 0 && ((wl_wpa_t *)(gbuf->
+	    wldp_buf))->wpa_flag > 0)
+		(void) wpa_instance_delete(link);
+
 	return (do_cmd_ioctl(fd, gbuf, WL_DISASSOCIATE));
 }
 
@@ -1695,6 +1739,8 @@ do_set_encryption(int fd, wldp_t *gbuf, dladm_wlan_secmode_t *secmode)
 	case DLADM_WLAN_SECMODE_WEP:
 		encryption = WL_ENC_WEP;
 		break;
+	case DLADM_WLAN_SECMODE_WPA:
+		return (0);
 	default:
 		return (-1);
 	}
@@ -1703,13 +1749,13 @@ do_set_encryption(int fd, wldp_t *gbuf, dladm_wlan_secmode_t *secmode)
 }
 
 static int
-do_set_wepkey(int fd, wldp_t *gbuf, dladm_wlan_wepkey_t *keys,
+do_set_key(int fd, wldp_t *gbuf, dladm_wlan_key_t *keys,
     uint_t key_count)
 {
 	int			i;
 	wl_wep_key_t		*wkp;
 	wl_wep_key_tab_t	wepkey_tab;
-	dladm_wlan_wepkey_t	*kp;
+	dladm_wlan_key_t	*kp;
 
 	if (key_count == 0 || key_count > MAX_NWEPKEYS || keys == NULL)
 		return (-1);
@@ -1934,4 +1980,588 @@ generate_essid(dladm_wlan_essid_t *essid)
 	srandom(gethrtime());
 	(void) snprintf(essid->we_bytes, DLADM_WLAN_MAX_ESSID_LEN, "%d",
 	    random());
+}
+
+static int
+do_get_capability(int fd, wldp_t *gbuf)
+{
+	return (do_get_ioctl(fd, gbuf, WL_CAPABILITY));
+}
+
+static int
+do_get_wpamode(int fd, wldp_t *gbuf)
+{
+	return (do_get_ioctl(fd, gbuf, WL_WPA));
+}
+
+static dladm_status_t
+ioctl_get(const char *link, int id, void *gbuf)
+{
+	int		fd;
+
+	if ((fd = open_link(link)) < 0)
+		return (DLADM_STATUS_LINKINVAL);
+	(void) do_get_ioctl(fd, gbuf, id);
+
+	(void) close(fd);
+	return (dladm_wlan_wlresult2status(gbuf));
+}
+
+static dladm_status_t
+ioctl_set(const char *link, int id, void *buf, uint_t buflen)
+{
+	int		fd;
+	wldp_t 		*gbuf;
+	dladm_status_t	status;
+
+	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL)
+		return (DLADM_STATUS_NOMEM);
+
+	if ((fd = open_link(link)) < 0)
+		return (DLADM_STATUS_LINKINVAL);
+	(void) do_set_ioctl(fd, gbuf, id, buf, buflen);
+
+	(void) close(fd);
+	status = dladm_wlan_wlresult2status(gbuf);
+	free(gbuf);
+
+	return (status);
+}
+
+dladm_status_t
+dladm_wlan_wpa_get_sr(const char *link, dladm_wlan_ess_t *sr, uint_t escnt,
+    uint_t *estot)
+{
+	int		i, n;
+	wldp_t 		*gbuf;
+	wl_wpa_ess_t	*es;
+	dladm_status_t	status;
+
+	if ((gbuf = malloc(MAX_BUF_LEN)) == NULL)
+		return (DLADM_STATUS_NOMEM);
+
+	status = ioctl_get(link, WL_SCANRESULTS, gbuf);
+
+	if (status == DLADM_STATUS_OK) {
+		es = (wl_wpa_ess_t *)(gbuf->wldp_buf);
+		n = (es->count > escnt) ? escnt : es->count;
+		for (i = 0; i < n; i ++) {
+			(void) memcpy(sr[i].we_bssid.wb_bytes, es->ess[i].bssid,
+			    DLADM_WLAN_BSSID_LEN);
+			sr[i].we_ssid_len = es->ess[i].ssid_len;
+			(void) memcpy(sr[i].we_ssid.we_bytes, es->ess[i].ssid,
+			    es->ess[i].ssid_len);
+			sr[i].we_wpa_ie_len = es->ess[i].wpa_ie_len;
+			(void) memcpy(sr[i].we_wpa_ie, es->ess[i].wpa_ie,
+			    es->ess[i].wpa_ie_len);
+			sr[i].we_freq = es->ess[i].freq;
+		}
+		*estot = n;
+	}
+
+	free(gbuf);
+	return (status);
+}
+
+dladm_status_t
+dladm_wlan_wpa_set_ie(const char *link, uint8_t *wpa_ie,
+    uint_t wpa_ie_len)
+{
+	wl_wpa_ie_t *ie;
+	uint_t len;
+	dladm_status_t	status;
+
+	if (wpa_ie_len > DLADM_WLAN_MAX_WPA_IE_LEN)
+		return (DLADM_STATUS_BADARG);
+	len = sizeof (wl_wpa_ie_t) + wpa_ie_len;
+	ie = malloc(len);
+	if (ie == NULL)
+		return (DLADM_STATUS_NOMEM);
+
+	(void) memset(ie, 0, len);
+	ie->wpa_ie_len = wpa_ie_len;
+	(void) memcpy(ie->wpa_ie, wpa_ie, wpa_ie_len);
+
+	status = ioctl_set(link, WL_SETOPTIE, ie, len);
+	free(ie);
+
+	return (status);
+}
+
+dladm_status_t
+dladm_wlan_wpa_set_wpa(const char *link, boolean_t flag)
+{
+	wl_wpa_t wpa;
+
+	wpa.wpa_flag = flag;
+	return (ioctl_set(link, WL_WPA, &wpa, sizeof (wl_wpa_t)));
+}
+
+dladm_status_t
+dladm_wlan_wpa_del_key(const char *link, uint_t key_idx,
+    const dladm_wlan_bssid_t *addr)
+{
+	wl_del_key_t wk;
+
+	wk.idk_keyix = key_idx;
+	if (addr != NULL)
+		(void) memcpy((char *)wk.idk_macaddr, addr->wb_bytes,
+		    DLADM_WLAN_BSSID_LEN);
+
+	return (ioctl_set(link, WL_DELKEY, &wk, sizeof (wl_del_key_t)));
+}
+
+dladm_status_t
+dladm_wlan_wpa_set_key(const char *link, dladm_wlan_cipher_t cipher,
+    const dladm_wlan_bssid_t *addr, boolean_t set_tx, uint64_t seq,
+    uint_t key_idx, uint8_t *key, uint_t key_len)
+{
+	wl_key_t wk;
+
+	(void) memset(&wk, 0, sizeof (wl_key_t));
+	switch (cipher) {
+	case DLADM_WLAN_CIPHER_WEP:
+		wk.ik_type = IEEE80211_CIPHER_WEP;
+		break;
+	case DLADM_WLAN_CIPHER_TKIP:
+		wk.ik_type = IEEE80211_CIPHER_TKIP;
+		break;
+	case DLADM_WLAN_CIPHER_AES_OCB:
+		wk.ik_type = IEEE80211_CIPHER_AES_OCB;
+		break;
+	case DLADM_WLAN_CIPHER_AES_CCM:
+		wk.ik_type = IEEE80211_CIPHER_AES_CCM;
+		break;
+	case DLADM_WLAN_CIPHER_CKIP:
+		wk.ik_type = IEEE80211_CIPHER_CKIP;
+		break;
+	case DLADM_WLAN_CIPHER_NONE:
+		wk.ik_type = IEEE80211_CIPHER_NONE;
+		break;
+	default:
+		return (DLADM_STATUS_BADARG);
+	}
+	wk.ik_flags = IEEE80211_KEY_RECV;
+	if (set_tx) {
+		wk.ik_flags |= IEEE80211_KEY_XMIT | IEEE80211_KEY_DEFAULT;
+		(void) memcpy(wk.ik_macaddr, addr->wb_bytes,
+		    DLADM_WLAN_BSSID_LEN);
+	} else
+		(void) memset(wk.ik_macaddr, 0, DLADM_WLAN_BSSID_LEN);
+	wk.ik_keyix = key_idx;
+	wk.ik_keylen = key_len;
+	(void) memcpy(&wk.ik_keyrsc, &seq, 6);	/* only use 48-bit of seq */
+	(void) memcpy(wk.ik_keydata, key, key_len);
+
+	return (ioctl_set(link, WL_KEY, &wk, sizeof (wl_key_t)));
+}
+
+dladm_status_t
+dladm_wlan_wpa_set_mlme(const char *link, dladm_wlan_mlme_op_t op,
+    dladm_wlan_reason_t reason, dladm_wlan_bssid_t *bssid)
+{
+	wl_mlme_t mlme;
+
+	(void) memset(&mlme, 0, sizeof (wl_mlme_t));
+	switch (op) {
+	case DLADM_WLAN_MLME_ASSOC:
+		mlme.im_op = IEEE80211_MLME_ASSOC;
+		break;
+	case DLADM_WLAN_MLME_DISASSOC:
+		mlme.im_op = IEEE80211_MLME_DISASSOC;
+		break;
+	default:
+		return (DLADM_STATUS_BADARG);
+	}
+	mlme.im_reason = reason;
+	if (bssid != NULL)
+		(void) memcpy(mlme.im_macaddr, bssid->wb_bytes,
+		    DLADM_WLAN_BSSID_LEN);
+
+	return (ioctl_set(link, WL_MLME, &mlme, sizeof (wl_mlme_t)));
+}
+
+/*
+ * routines of create instance
+ */
+static scf_propertygroup_t *
+add_property_group_to_instance(scf_handle_t *handle, scf_instance_t *instance,
+    const char *pg_name, const char *pg_type)
+{
+	scf_propertygroup_t *pg;
+
+	pg = scf_pg_create(handle);
+	if (pg == NULL)
+		return (NULL);
+
+	if (scf_instance_add_pg(instance, pg_name, pg_type, 0, pg) != 0) {
+		scf_pg_destroy(pg);
+		return (NULL);
+	}
+
+	return (pg);
+}
+
+static int
+add_new_property(scf_handle_t *handle, const char *prop_name,
+    scf_type_t type, const char *val, scf_transaction_t *tx)
+{
+	scf_value_t *value = NULL;
+	scf_transaction_entry_t *entry = NULL;
+
+	entry = scf_entry_create(handle);
+	if (entry == NULL)
+		goto out;
+
+	value = scf_value_create(handle);
+	if (value == NULL)
+		goto out;
+
+	if (scf_transaction_property_new(tx, entry, prop_name, type) != 0)
+		goto out;
+
+	if (scf_value_set_from_string(value, type, val) != 0)
+		goto out;
+
+	if (scf_entry_add_value(entry, value) != 0)
+		goto out;
+
+	return (DLADM_WLAN_SVC_SUCCESS);
+
+out:
+	if (value != NULL)
+		scf_value_destroy(value);
+	if (entry != NULL)
+		scf_entry_destroy(entry);
+
+	return (DLADM_WLAN_SVC_FAILURE);
+}
+
+/*
+ * DLADM_WLAN_SVC_APP_FAILURE means allocate buffer failed.
+ */
+static int
+add_pg_method(scf_handle_t *handle, scf_instance_t *instance,
+    const char *pg_name, const char *flags)
+{
+	int			rv, size;
+	int			status = DLADM_WLAN_SVC_FAILURE;
+	char			*command = NULL;
+	scf_transaction_t	*tran = NULL;
+	scf_propertygroup_t	*pg;
+
+	pg = add_property_group_to_instance(handle, instance,
+	    pg_name, SCF_GROUP_METHOD);
+	if (pg == NULL)
+		goto out;
+
+	tran = scf_transaction_create(handle);
+	if (tran == NULL)
+		goto out;
+
+	size = strlen(SVC_METHOD) + strlen("  ") + strlen(flags) + 1;
+	command = malloc(size);
+	if (command == NULL) {
+		status = DLADM_WLAN_SVC_APP_FAILURE;
+		goto out;
+	}
+	(void) snprintf(command, size, "%s %s", SVC_METHOD, flags);
+
+	do {
+		if (scf_transaction_start(tran, pg) != 0)
+			goto out;
+
+		if (add_new_property(handle, SCF_PROPERTY_EXEC,
+		    SCF_TYPE_ASTRING, command, tran) !=
+		    DLADM_WLAN_SVC_SUCCESS) {
+			goto out;
+		}
+
+		rv = scf_transaction_commit(tran);
+		switch (rv) {
+		case 1:
+			status = DLADM_WLAN_SVC_SUCCESS;
+			goto out;
+		case 0:
+			scf_transaction_destroy_children(tran);
+			if (scf_pg_update(pg) == -1) {
+				goto out;
+			}
+			break;
+		case -1:
+		default:
+			goto out;
+		}
+	} while (rv == 0);
+
+out:
+	if (tran != NULL) {
+		scf_transaction_destroy_children(tran);
+		scf_transaction_destroy(tran);
+	}
+
+	if (pg != NULL)
+		scf_pg_destroy(pg);
+
+	if (command != NULL)
+		free(command);
+
+	return (status);
+}
+
+static int
+do_create_instance(scf_handle_t *handle, scf_service_t *svc,
+    const char *instance_name, const char *command)
+{
+	int status = DLADM_WLAN_SVC_FAILURE;
+	char *buf;
+	ssize_t max_fmri_len;
+	scf_instance_t *instance;
+
+	instance = scf_instance_create(handle);
+	if (instance == NULL)
+		goto out;
+
+	if (scf_service_add_instance(svc, instance_name, instance) != 0) {
+		if (scf_error() == SCF_ERROR_EXISTS)
+			/* Let the caller deal with the duplicate instance */
+			status = DLADM_WLAN_SVC_INSTANCE_EXISTS;
+		goto out;
+	}
+
+	if (add_pg_method(handle, instance, "start",
+	    command) != DLADM_WLAN_SVC_SUCCESS) {
+		goto out;
+	}
+
+	/* enabling the instance */
+	max_fmri_len = scf_limit(SCF_LIMIT_MAX_FMRI_LENGTH);
+	if ((buf = malloc(max_fmri_len + 1)) == NULL)
+		goto out;
+
+	if (scf_instance_to_fmri(instance, buf, max_fmri_len + 1) > 0) {
+		if ((smf_disable_instance(buf, 0) != 0) ||
+		    (smf_enable_instance(buf, SMF_TEMPORARY) != 0)) {
+			goto out;
+		}
+		status = DLADM_WLAN_SVC_SUCCESS;
+	}
+
+out:
+	if (instance != NULL)
+		scf_instance_destroy(instance);
+	return (status);
+}
+
+static int
+create_instance(const char *instance_name, const char *command)
+{
+	int status = DLADM_WLAN_SVC_FAILURE;
+	scf_service_t *svc = NULL;
+	scf_handle_t *handle = NULL;
+
+	handle = scf_handle_create(SCF_VERSION);
+	if (handle == NULL)
+		goto out;
+
+	if (scf_handle_bind(handle) == -1)
+		goto out;
+
+	if ((svc = scf_service_create(handle)) == NULL)
+		goto out;
+
+	if (scf_handle_decode_fmri(handle, SERVICE_NAME, NULL, svc,
+	    NULL, NULL, NULL, SCF_DECODE_FMRI_EXACT) != 0)
+		goto out;
+
+	status = do_create_instance(handle, svc, instance_name, command);
+
+out:
+	if (svc != NULL)
+		scf_service_destroy(svc);
+
+	if (handle != NULL) {
+		(void) scf_handle_unbind(handle);
+		scf_handle_destroy(handle);
+	}
+
+	return (status);
+}
+
+/*
+ * routines of delete instance
+ */
+#define	DEFAULT_TIMEOUT	60000000
+#define	INIT_WAIT_USECS	50000
+
+static void
+wait_until_disabled(scf_handle_t *handle, char *fmri)
+{
+	char		*state;
+	useconds_t	max;
+	useconds_t	usecs;
+	uint64_t	*cp = NULL;
+	scf_simple_prop_t *sp = NULL;
+
+	max = DEFAULT_TIMEOUT;
+
+	if (((sp = scf_simple_prop_get(handle, fmri, "stop",
+	    SCF_PROPERTY_TIMEOUT)) != NULL) &&
+	    ((cp = scf_simple_prop_next_count(sp)) != NULL) && (*cp != 0))
+		max = (*cp) * 1000000;	/* convert to usecs */
+
+	if (sp != NULL)
+		scf_simple_prop_free(sp);
+
+	for (usecs = INIT_WAIT_USECS; max > 0; max -= usecs) {
+		/* incremental wait */
+		usecs *= 2;
+		usecs = (usecs > max) ? max : usecs;
+
+		(void) usleep(usecs);
+
+		/* Check state after the wait */
+		if ((state = smf_get_state(fmri)) != NULL) {
+			if (strcmp(state, "disabled") == 0)
+				return;
+		}
+	}
+}
+
+static int
+delete_instance(const char *instance_name)
+{
+	int		status = DLADM_WLAN_SVC_FAILURE;
+	char		*buf;
+	ssize_t		max_fmri_len;
+	scf_scope_t	*scope = NULL;
+	scf_service_t	*svc = NULL;
+	scf_handle_t	*handle = NULL;
+	scf_instance_t	*instance;
+
+	handle = scf_handle_create(SCF_VERSION);
+	if (handle == NULL)
+		goto out;
+
+	if (scf_handle_bind(handle) == -1)
+		goto out;
+
+	if ((scope = scf_scope_create(handle)) == NULL)
+		goto out;
+
+	if ((svc = scf_service_create(handle)) == NULL)
+		goto out;
+
+	if (scf_handle_get_scope(handle, SCF_SCOPE_LOCAL, scope) == -1)
+		goto out;
+
+	if (scf_scope_get_service(scope, SERVICE_NAME, svc) < 0)
+		goto out;
+
+	instance = scf_instance_create(handle);
+	if (instance == NULL)
+		goto out;
+
+	if (scf_service_get_instance(svc, instance_name, instance) != 0) {
+		scf_error_t scf_errnum = scf_error();
+
+		if (scf_errnum == SCF_ERROR_NOT_FOUND)
+			status = DLADM_WLAN_SVC_SUCCESS;
+
+		scf_instance_destroy(instance);
+		goto out;
+	}
+
+	max_fmri_len = scf_limit(SCF_LIMIT_MAX_FMRI_LENGTH);
+	if ((buf = malloc(max_fmri_len + 1)) == NULL) {
+		scf_instance_destroy(instance);
+		goto out;
+	}
+
+	if (scf_instance_to_fmri(instance, buf, max_fmri_len + 1) > 0) {
+		char *state;
+
+		state = smf_get_state(buf);
+		if (state && (strcmp(state, SCF_STATE_STRING_ONLINE) == 0 ||
+		    strcmp(state, SCF_STATE_STRING_DEGRADED) == 0)) {
+			if (smf_disable_instance(buf, 0) == 0) {
+				/*
+				 * Wait for some time till timeout to avoid
+				 * a race with scf_instance_delete() below.
+				 */
+				wait_until_disabled(handle, buf);
+			}
+		}
+	}
+
+	if (scf_instance_delete(instance) != 0) {
+		scf_instance_destroy(instance);
+		goto out;
+	}
+
+	scf_instance_destroy(instance);
+
+	status = DLADM_WLAN_SVC_SUCCESS;
+
+out:
+	if (svc != NULL)
+		scf_service_destroy(svc);
+
+	if (scope != NULL)
+		scf_scope_destroy(scope);
+
+	if (handle != NULL) {
+		(void) scf_handle_unbind(handle);
+		scf_handle_destroy(handle);
+	}
+
+	return (status);
+}
+
+/*
+ * DLADM_WLAN_SVC_APP_FAILURE means allocate buffer failed.
+ */
+static int
+wpa_instance_create(const char *instance_name, void *key)
+{
+	int		status = DLADM_WLAN_SVC_FAILURE;
+	char		*command = NULL;
+	char		*wk_name = ((dladm_wlan_key_t *)key)->wk_name;
+	int		size;
+
+	size = strlen(instance_name) + strlen(" -i  -k ") + strlen(wk_name) + 1;
+	command = malloc(size);
+	if (command == NULL) {
+		status = DLADM_WLAN_SVC_APP_FAILURE;
+		goto out;
+	}
+	(void) snprintf(command, size, "-i %s -k %s", instance_name, wk_name);
+
+	status = create_instance(instance_name, command);
+	if (status == DLADM_WLAN_SVC_INSTANCE_EXISTS) {
+		/*
+		 * Delete the existing instance and create a new instance
+		 * with the supplied arguments.
+		 */
+		if ((status = delete_instance(instance_name)) ==
+		    DLADM_WLAN_SVC_SUCCESS) {
+			status = create_instance(instance_name, command);
+		}
+	}
+
+out:
+	if (command != NULL)
+		free(command);
+
+	return (status);
+}
+
+static int
+wpa_instance_delete(const char *instance_name)
+{
+	int status;
+
+	status = delete_instance(instance_name);
+
+	return (status);
 }

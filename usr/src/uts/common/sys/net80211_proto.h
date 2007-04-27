@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -385,6 +385,10 @@ enum {
 	IEEE80211_ELEMID_VENDOR			= 221	/* vendor private */
 };
 
+#define	WPA_OUI			0xf25000
+#define	WPA_OUI_TYPE		0x01
+#define	WPA_VERSION		1		/* current supported version */
+
 #define	IEEE80211_CHALLENGE_LEN			128
 
 #define	IEEE80211_RATE_BASIC			0x80
@@ -465,6 +469,17 @@ enum {
 #define	IEEE80211_WEP_KIDLEN		1	/* 1 octet */
 #define	IEEE80211_WEP_CRCLEN		4	/* CRC-32 */
 #define	IEEE80211_WEP_NKID		4	/* number of key ids */
+
+/*
+ * 802.11i defines an extended IV for use with non-WEP ciphers.
+ * When the EXTIV bit is set in the key id byte an additional
+ * 4 bytes immediately follow the IV for TKIP.  For CCMP the
+ * EXTIV bit is likewise set but the 8 bytes represent the
+ * CCMP header rather than IV+extended-IV.
+ */
+#define	IEEE80211_WEP_EXTIV		0x20
+#define	IEEE80211_WEP_EXTIVLEN		4	/* extended IV length */
+#define	IEEE80211_WEP_MICLEN		8	/* trailing MIC */
 
 #define	IEEE80211_CRC_LEN		4
 

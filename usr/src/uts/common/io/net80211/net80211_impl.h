@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -353,6 +353,11 @@ extern const char *ieee80211_phymode_name[];
 void ieee80211_err(const int8_t *, ...);
 void ieee80211_dbg(uint32_t, const int8_t *, ...);
 int ieee80211_hdrspace(const void *);
+
+void ieee80211_notify(ieee80211com_t *, wpa_event_type);
+void ieee80211_mac_update(ieee80211com_t *);
+
+uint64_t ieee80211_read_6(uint8_t, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t);
 
 /* node */
 void ieee80211_node_attach(ieee80211com_t *);

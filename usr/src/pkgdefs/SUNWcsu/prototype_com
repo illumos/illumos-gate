@@ -490,6 +490,7 @@ f none usr/lib/help/auths/locale/C/SmfSyslogStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueNWAM.html 444 root bin
 f none usr/lib/help/auths/locale/C/SmfValueRouting.html 444 root bin
+f none usr/lib/help/auths/locale/C/SmfWpaStates.html 444 root bin
 f none usr/lib/help/auths/locale/C/SysDate.html 444 root bin
 f none usr/lib/help/auths/locale/C/SysHeader.html 444 root bin
 f none usr/lib/help/auths/locale/C/SysShutdown.html 444 root bin

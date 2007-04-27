@@ -51,7 +51,8 @@ typedef struct secobj_class_info {
 } secobj_class_info_t;
 
 static secobj_class_info_t secobj_class_table[] = {
-	{"wep",	DLD_SECOBJ_CLASS_WEP}
+	{"wep",	DLD_SECOBJ_CLASS_WEP},
+	{"wpa",	DLD_SECOBJ_CLASS_WPA}
 };
 
 #define	NSECOBJCLASS \
@@ -154,10 +155,12 @@ dladm_set_secobj(const char *obj_name, dladm_secobj_class_t class,
 		return (dladm_errno2status(errno));
 
 	if (i_dladm_ioctl(fd, DLDIOCSECOBJSET, &secobj_set,
-	    sizeof (secobj_set)) < 0)
+	    sizeof (secobj_set)) < 0) {
 		status = dladm_errno2status(errno);
+	}
 
 	(void) close(fd);
+
 	if (status != DLADM_STATUS_OK)
 		return (status);
 

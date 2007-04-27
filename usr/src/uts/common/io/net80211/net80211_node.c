@@ -382,7 +382,7 @@ ieee80211_create_ibss(ieee80211com_t *ic, struct ieee80211_channel *chan)
 	 */
 	ieee80211_setbasicrates(&in->in_rates, ic->ic_curmode);
 	IEEE80211_UNLOCK(ic);
-	ieee80211_sta_join(ic, in);
+	ieee80211_sta_join(ic, ieee80211_ref_node(in));
 	IEEE80211_LOCK(ic);
 }
 
@@ -539,6 +539,8 @@ ieee80211_end_scan(ieee80211com_t *ic)
 	ieee80211_node_t *selbs;
 
 	ieee80211_cancel_scan(ic);
+	/* notify SCAN done */
+	ieee80211_notify(ic, EVENT_SCAN_RESULTS);
 	IEEE80211_LOCK(ic);
 
 	/*
@@ -547,7 +549,7 @@ ieee80211_end_scan(ieee80211com_t *ic)
 	 */
 	/* NB: unlocked read should be ok */
 	in = list_head(&nt->nt_node);
-	if (in == NULL) {
+	if (in == NULL && (ic->ic_flags & IEEE80211_F_WPA) == 0) {
 		ieee80211_dbg(IEEE80211_MSG_SCAN, "ieee80211_end_scan: "
 			"no scan candidate\n");
 	notfound:
@@ -570,7 +572,8 @@ ieee80211_end_scan(ieee80211com_t *ic)
 		return;
 	}
 
-	if (ic->ic_flags & IEEE80211_F_SCANONLY) {	/* scan only */
+	if (ic->ic_flags & IEEE80211_F_SCANONLY ||
+	    ic->ic_flags & IEEE80211_F_WPA) {	/* scan only */
 		ic->ic_flags &= ~IEEE80211_F_SCANONLY;
 		IEEE80211_UNLOCK(ic);
 		ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
@@ -608,6 +611,8 @@ ieee80211_end_scan(ieee80211com_t *ic)
 		}
 		in = list_next(&nt->nt_node, in);
 	}
+	if (selbs != NULL)	/* grab ref while dropping lock */
+		(void) ieee80211_ref_node(selbs);
 	IEEE80211_NODE_UNLOCK(nt);
 	if (selbs == NULL)
 		goto notfound;
@@ -648,7 +653,7 @@ ieee80211_ibss_merge(ieee80211_node_t *in)
 		(ic->ic_flags & IEEE80211_F_SHPREAMBLE) ? "short" : "long",
 		(ic->ic_flags & IEEE80211_F_SHSLOT) ? "short" : "long",
 		(ic->ic_flags&IEEE80211_F_USEPROT) ? ", protection" : "");
-	ieee80211_sta_join(ic, in);
+	ieee80211_sta_join(ic, ieee80211_ref_node(in));
 	return (B_TRUE);
 }
 
@@ -685,7 +690,7 @@ ieee80211_sta_join(ieee80211com_t *ic, ieee80211_node_t *selbs)
 	 * Committed to selbs, setup state.
 	 */
 	obss = ic->ic_bss;
-	ic->ic_bss = ieee80211_ref_node(selbs);	/* Grab reference */
+	ic->ic_bss = selbs;	/* caller assumed to bump refcnt */
 	if (obss != NULL) {
 		ieee80211_copy_bss(selbs, obss);
 		ieee80211_free_node(obss);
@@ -763,6 +768,8 @@ ieee80211_node_free(ieee80211_node_t *in)
 	ieee80211com_t *ic = in->in_ic;
 
 	ic->ic_node_cleanup(in);
+	if (in->in_wpa_ie != NULL)
+		ieee80211_free(in->in_wpa_ie);
 	kmem_free(in, sizeof (ieee80211_node_t));
 }
 
@@ -944,6 +951,35 @@ ieee80211_find_node(ieee80211_node_table_t *nt, const uint8_t *macaddr)
 }
 
 /*
+ * Like find but search based on the ssid too.
+ */
+ieee80211_node_t *
+ieee80211_find_node_with_ssid(ieee80211_node_table_t *nt,
+	const uint8_t *macaddr, uint32_t ssidlen, const uint8_t *ssid)
+{
+	ieee80211_node_t *in;
+	int hash;
+
+	IEEE80211_NODE_LOCK(nt);
+
+	hash = ieee80211_node_hash(macaddr);
+	in = list_head(&nt->nt_hash[hash]);
+	while (in != NULL) {
+		if (IEEE80211_ADDR_EQ(in->in_macaddr, macaddr) &&
+		    in->in_esslen == ssidlen &&
+		    memcmp(in->in_essid, ssid, ssidlen) == 0)
+			break;
+		in = list_next(&nt->nt_hash[hash], in);
+	}
+	if (in != NULL) {
+		(void) ieee80211_ref_node(in); /* mark referenced */
+	}
+	IEEE80211_NODE_UNLOCK(nt);
+
+	return (in);
+}
+
+/*
  * Fake up a node; this handles node discovery in adhoc mode.
  * Note that for the driver's benefit we treat this like an
  * association so the driver has an opportunity to setup it's
@@ -966,6 +1002,31 @@ ieee80211_fakeup_adhoc_node(ieee80211_node_table_t *nt, const uint8_t *macaddr)
 		ieee80211_node_authorize(in);
 	}
 	return (in);
+}
+
+static void
+ieee80211_saveie(uint8_t **iep, const uint8_t *ie)
+{
+	uint_t ielen = ie[1]+2;
+	/*
+	 * Record information element for later use.
+	 */
+	if (*iep == NULL || (*iep)[1] != ie[1]) {
+		if (*iep != NULL)
+			ieee80211_free(*iep);
+		*iep = ieee80211_malloc(ielen);
+	}
+	if (*iep != NULL)
+		(void) memcpy(*iep, ie, ielen);
+}
+
+static void
+saveie(uint8_t **iep, const uint8_t *ie)
+{
+	if (ie == NULL)
+		*iep = NULL;
+	else
+		ieee80211_saveie(iep, ie);
 }
 
 /*
@@ -1037,6 +1098,11 @@ ieee80211_add_scan(ieee80211com_t *ic, const struct ieee80211_scanparams *sp,
 	 * processing of beacon frames.
 	 */
 	in->in_tim_off = sp->timoff;
+	/*
+	 * Record optional information elements that might be
+	 * used by applications or drivers.
+	 */
+	saveie(&in->in_wpa_ie, sp->wpa);
 
 	/* NB: must be after in_chan is setup */
 	(void) ieee80211_setup_rates(in, sp->rates, sp->xrates,

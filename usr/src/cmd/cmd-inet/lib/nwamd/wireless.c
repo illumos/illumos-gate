@@ -36,7 +36,7 @@
  * finish and if one of the WiFi interfaces is chosen to be active, the
  * code will pop up a window showing the scan results and wait for the
  * user's input on which AP to connect to and then complete the AP
- * connection and IP interface set up.  WEP is supported to connect to
+ * connection and IP interface set up.  WEP/WPA is supported to connect to
  * those APs which require it.  The code also maintains a list of known
  * WiFi APs in the file KNOWN_WIFI_NETS.  Whenever the code successfully
  * connects to an AP, the AP's ESSID/BSSID will be added to that file.
@@ -104,6 +104,13 @@
 #include "functions.h"
 #include "variables.h"
 
+#define	WLAN_ENC(sec)						\
+	((sec == DLADM_WLAN_SECMODE_WPA ? "WPA" : 		\
+	(sec == DLADM_WLAN_SECMODE_WEP ? "WEP" : "none")))
+
+#define	NEED_ENC(sec)						\
+	(sec == DLADM_WLAN_SECMODE_WPA || sec == DLADM_WLAN_SECMODE_WEP)
+
 static pthread_mutex_t wifi_mutex;
 static pthread_mutexattr_t wifi_mutex_attr;
 static pthread_mutex_t wifi_init_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -129,12 +136,14 @@ static struct wireless_lan *wlans = NULL;
 static uint_t wireless_lan_count = 0; /* allocated */
 static uint_t wireless_lan_used = 0; /* used entries */
 
-static int wepkey_string_to_secobj_value(char *, uint8_t *, uint_t *);
-static int store_wepkey(struct wireless_lan *);
-static dladm_wlan_wepkey_t *retrieve_wepkey(const char *, const char *);
+static int key_string_to_secobj_value(char *, uint8_t *, uint_t *,
+    dladm_secobj_class_t);
+static int store_key(struct wireless_lan *);
+static dladm_wlan_key_t *retrieve_key(const char *, const char *,
+    dladm_secobj_class_t);
 
 static boolean_t add_wlan_entry(struct interface *, char *, char *, char *,
-    boolean_t);
+    dladm_wlan_secmode_t);
 static boolean_t already_in_visited_wlan_list(const struct wireless_lan *);
 static boolean_t check_wlan(const char *, const char *);
 static boolean_t connect_or_autoconf(struct wireless_lan *, const char *);
@@ -143,7 +152,7 @@ static return_vals_t connect_to_new_wlan(const struct wireless_lan *, int,
 static boolean_t find_wlan_entry(struct interface *, char *, char *);
 static void free_wireless_lan(struct wireless_lan *);
 static struct wireless_lan *get_specific_lan(void);
-static void get_user_wepkey(struct wireless_lan *);
+static void get_user_key(struct wireless_lan *);
 static char *get_zenity_response(const char *);
 static boolean_t wlan_autoconf(const char *ifname);
 static int zenity_height(int);
@@ -178,27 +187,30 @@ init_mutexes(void)
  * wlan is expected to be non-NULL.
  */
 static void
-get_user_wepkey(struct wireless_lan *wlan)
+get_user_key(struct wireless_lan *wlan)
 {
 	char zenity_cmd[1024];
 	char buf[1024];
 	FILE *zcptr;
+	dladm_secobj_class_t class;
 
 	/*
-	 * First, test if we have wepkey stored as secobj. If so,
+	 * First, test if we have key stored as secobj. If so,
 	 * no need to prompt for it.
 	 */
-	wlan->cooked_wepkey = retrieve_wepkey(wlan->essid, wlan->bssid);
-	if (wlan->cooked_wepkey != NULL) {
-		dprintf("get_user_wepkey: retrieve_wepkey() returns non NULL");
+	class = (wlan->sec_mode == DLADM_WLAN_SECMODE_WEP ?
+	    DLADM_SECOBJ_CLASS_WEP : DLADM_SECOBJ_CLASS_WPA);
+	wlan->cooked_key = retrieve_key(wlan->essid, wlan->bssid, class);
+	if (wlan->cooked_key != NULL) {
+		dprintf("get_user_key: retrieve_key() returns non NULL");
 		return;
 	}
 
 	(void) snprintf(zenity_cmd, sizeof (zenity_cmd),
 	    "%s --entry --text=\"%s %s\""
 	    " --title=\"%s\" --hide-text", ZENITY,
-	    gettext("Enter WEP key for WiFi network"), wlan->essid,
-	    gettext("Enter WEP key"));
+	    gettext("Enter key for WiFi network"), wlan->essid,
+	    gettext("Enter key"));
 
 	if (!valid_graphical_user(B_TRUE))
 		return;
@@ -206,17 +218,17 @@ get_user_wepkey(struct wireless_lan *wlan)
 	zcptr = popen(zenity_cmd, "r");
 	if (zcptr != NULL) {
 		if (fgets(buf, sizeof (buf), zcptr) != NULL) {
-			wlan->raw_wepkey = strdup(buf);
-			if (wlan->raw_wepkey != NULL) {
-				/* Store WEP key persistently */
-				if (store_wepkey(wlan) != 0) {
+			wlan->raw_key = strdup(buf);
+			if (wlan->raw_key != NULL) {
+				/* Store key persistently */
+				if (store_key(wlan) != 0) {
 					syslog(LOG_ERR,
-					    "get_user_wepkey: failed to store"
-					    " user specified WEP key");
+					    "get_user_key: failed to store"
+					    " user specified key");
 				}
 			} else {
 				syslog(LOG_ERR,
-				    "get_user_wepkey: strdup failed");
+				    "get_user_key: strdup failed");
 			}
 		}
 		(void) pclose(zcptr);
@@ -261,17 +273,17 @@ free_wireless_lan(struct wireless_lan *wlp)
 	wlp->bssid = NULL;
 	free(wlp->signal_strength);
 	wlp->signal_strength = NULL;
-	free(wlp->raw_wepkey);
-	wlp->raw_wepkey = NULL;
-	free(wlp->cooked_wepkey);
-	wlp->cooked_wepkey = NULL;
+	free(wlp->raw_key);
+	wlp->raw_key = NULL;
+	free(wlp->cooked_key);
+	wlp->cooked_key = NULL;
 	free(wlp->wl_if_name);
 	wlp->wl_if_name = NULL;
 }
 
 static boolean_t
 add_wlan_entry(struct interface *intf, char *essid, char *bssid,
-    char *signal_strength, boolean_t wep)
+    char *signal_strength, dladm_wlan_secmode_t sec)
 {
 	int n;
 
@@ -300,9 +312,9 @@ add_wlan_entry(struct interface *intf, char *essid, char *bssid,
 	wlans[n].bssid = strdup(bssid);
 	wlans[n].signal_strength = strdup(signal_strength);
 	wlans[n].wl_if_name = strdup(intf->if_name);
-	wlans[n].need_wepkey = wep;
-	wlans[n].raw_wepkey = NULL;
-	wlans[n].cooked_wepkey = NULL;
+	wlans[n].sec_mode = sec;
+	wlans[n].raw_key = NULL;
+	wlans[n].cooked_key = NULL;
 	if (wlans[n].essid == NULL || wlans[n].bssid == NULL ||
 	    wlans[n].signal_strength == NULL || wlans[n].wl_if_name == NULL) {
 		syslog(LOG_ERR, "add_wlan_entry: strdup failed");
@@ -435,8 +447,7 @@ wireless_scan(struct interface *ifp, void *arg)
 static boolean_t
 get_scan_results(void *arg, dladm_wlan_attr_t *attrp)
 {
-
-	boolean_t 	wep;
+	dladm_wlan_secmode_t	sec;
 	char		essid_name[DLADM_STRSIZE];
 	char		bssid_name[DLADM_STRSIZE];
 	char		strength[DLADM_STRSIZE];
@@ -445,10 +456,10 @@ get_scan_results(void *arg, dladm_wlan_attr_t *attrp)
 	(void) dladm_wlan_bssid2str(&attrp->wa_bssid, bssid_name);
 	(void) dladm_wlan_strength2str(&attrp->wa_strength, strength);
 
-	wep = (attrp->wa_secmode == DLADM_WLAN_SECMODE_WEP);
+	sec = attrp->wa_secmode;
 
 	if (!find_wlan_entry(arg, essid_name, bssid_name) &&
-	    add_wlan_entry(arg, essid_name, bssid_name, strength, wep)) {
+	    add_wlan_entry(arg, essid_name, bssid_name, strength, sec)) {
 		return (B_TRUE);
 	}
 	return (B_FALSE);
@@ -536,32 +547,50 @@ periodic_wireless_scan(void *arg)
 }
 
 /*
- * Below are functions used to handle storage/retrieval of WEP keys
+ * Below are functions used to handle storage/retrieval of keys
  * for a given WLAN. The keys are stored/retrieved using dladm_set_secobj()
  * and dladm_get_secobj().
  */
 
 /*
- * Convert wepkey hexascii string to raw secobj value. This
+ * Convert key hexascii string to raw secobj value. This
  * code is very similar to convert_secobj() in dladm.c, it would
  * be good to have a libdladm function to convert values.
  */
 static int
-wepkey_string_to_secobj_value(char *buf, uint8_t *obj_val, uint_t *obj_lenp)
+key_string_to_secobj_value(char *buf, uint8_t *obj_val, uint_t *obj_lenp,
+    dladm_secobj_class_t class)
 {
 	size_t buf_len = strlen(buf);
 
-	dprintf("before: wepkey_string_to_secobj_value: buf_len = %d", buf_len);
+	dprintf("before: key_string_to_secobj_value: buf_len = %d", buf_len);
 	if (buf_len == 0) {
 		syslog(LOG_ERR,
-		    "wepkey_string_to_secobj_value: empty WEP key");
+		    "key_string_to_secobj_value: empty key");
 		return (-1);
 	}
 
 	if (buf[buf_len - 1] == '\n')
 		buf[--buf_len] = '\0';
 
-	dprintf("after: wepkey_string_to_secobj_value: buf_len = %d", buf_len);
+	dprintf("after: key_string_to_secobj_value: buf_len = %d", buf_len);
+
+	if (class == DLADM_SECOBJ_CLASS_WPA) {
+		/*
+		 * Per IEEE802.11i spec, the Pre-shared key (PSK) length should
+		 * be between 8 and 63.
+		 */
+		if (buf_len < 8 || buf_len > 63) {
+			syslog(LOG_ERR,
+			    "key_string_to_secobj_value:"
+			    " invalid WPA key length: buf_len = %d", buf_len);
+			return (-1);
+		}
+		(void) memcpy(obj_val, buf, (uint_t)buf_len);
+		*obj_lenp = buf_len;
+		return (0);
+	}
+
 	switch (buf_len) {
 	case 5:		/* ASCII key sizes */
 	case 13:
@@ -573,7 +602,7 @@ wepkey_string_to_secobj_value(char *buf, uint8_t *obj_val, uint_t *obj_lenp)
 		if (hexascii_to_octet(buf, (uint_t)buf_len, obj_val, obj_lenp)
 		    != 0) {
 			syslog(LOG_ERR,
-			    "wepkey_string_to_secobj_value: invalid WEP key");
+			    "key_string_to_secobj_value: invalid WEP key");
 			return (-1);
 		}
 		break;
@@ -583,13 +612,13 @@ wepkey_string_to_secobj_value(char *buf, uint8_t *obj_val, uint_t *obj_lenp)
 		    hexascii_to_octet(buf + 2, (uint_t)buf_len - 2, obj_val,
 		    obj_lenp) != 0) {
 			syslog(LOG_ERR,
-			    "wepkey_string_to_secobj_value: invalid WEP key");
+			    "key_string_to_secobj_value: invalid WEP key");
 			return (-1);
 		}
 		break;
 	default:
 		syslog(LOG_ERR,
-		    "wepkey_string_to_secobj_value: invalid WEP key length");
+		    "key_string_to_secobj_value: invalid WEP key length");
 		return (-1);
 	}
 	return (0);
@@ -617,33 +646,36 @@ set_key_name(const char *essid, const char *bssid, char *name, size_t nsz)
 }
 
 static int
-store_wepkey(struct wireless_lan *wlan)
+store_key(struct wireless_lan *wlan)
 {
 	uint8_t obj_val[DLADM_SECOBJ_VAL_MAX];
 	uint_t obj_len = sizeof (obj_val);
 	char obj_name[DLADM_SECOBJ_NAME_MAX];
 	dladm_status_t status;
 	char errmsg[DLADM_STRSIZE];
+	dladm_secobj_class_t class;
 
 	/*
-	 * Name wepkey object for this WLAN so it can be later retrieved
+	 * Name key object for this WLAN so it can be later retrieved
 	 * (name is unique for each ESSID/BSSID combination).
 	 */
 	set_key_name(wlan->essid, wlan->bssid, obj_name, sizeof (obj_name));
-	dprintf("store_wepkey: obj_name is %s", obj_name);
+	dprintf("store_key: obj_name is %s", obj_name);
 
-	if (wepkey_string_to_secobj_value(wlan->raw_wepkey, obj_val, &obj_len)
-	    != 0) {
+	class = (wlan->sec_mode == DLADM_WLAN_SECMODE_WEP ?
+	    DLADM_SECOBJ_CLASS_WEP : DLADM_SECOBJ_CLASS_WPA);
+	if (key_string_to_secobj_value(wlan->raw_key, obj_val, &obj_len,
+	    class) != 0) {
 		/* above function logs internally on failure */
 		return (-1);
 	}
 
-	status = dladm_set_secobj(obj_name, DLADM_SECOBJ_CLASS_WEP,
+	status = dladm_set_secobj(obj_name, class,
 	    obj_val, obj_len,
 	    DLADM_OPT_CREATE | DLADM_OPT_PERSIST | DLADM_OPT_TEMP);
 	if (status != DLADM_STATUS_OK) {
-		syslog(LOG_ERR, "store_wepkey: could not create secure object "
-		    "'%s' for wepkey: %s", obj_name,
+		syslog(LOG_ERR, "store_key: could not create secure object "
+		    "'%s' for key: %s", obj_name,
 		    dladm_status2str(status, errmsg));
 		return (-1);
 	}
@@ -654,77 +686,84 @@ store_wepkey(struct wireless_lan *wlan)
 	 * besides just copying the value, so it is simpler just to call
 	 * the retrieve function instead of doing it all here.
 	 *
-	 * Since we just stored the key, retrieve_wepkey() "shouldn't"
+	 * Since we just stored the key, retrieve_key() "shouldn't"
 	 * fail.  If it does fail, it's not the end of the world; a NULL
-	 * value for wlan->cooked_wepkey simply means this particular
+	 * value for wlan->cooked_key simply means this particular
 	 * attempt to connect will fail, and alternative connection
 	 * options will be used.
 	 */
-	wlan->cooked_wepkey = retrieve_wepkey(wlan->essid, wlan->bssid);
+	wlan->cooked_key = retrieve_key(wlan->essid, wlan->bssid, class);
 	return (0);
 }
 
 /*
- * retrieve_wepkey returns NULL if no wepkey was recovered from dladm
+ * retrieve_key returns NULL if no key was recovered from libdladm
  */
-static dladm_wlan_wepkey_t *
-retrieve_wepkey(const char *essid, const char *bssid)
+static dladm_wlan_key_t *
+retrieve_key(const char *essid, const char *bssid, dladm_secobj_class_t req)
 {
 	dladm_status_t status;
 	char errmsg[DLADM_STRSIZE];
-	dladm_wlan_wepkey_t *cooked_wepkey;
+	dladm_wlan_key_t *cooked_key;
 	dladm_secobj_class_t class;
 
 	/*
-	 * Newly-allocated wepkey must be freed by caller, or by
-	 * subsequent call to retrieve_wepkey().
+	 * Newly-allocated key must be freed by caller, or by
+	 * subsequent call to retrieve_key().
 	 */
-	if ((cooked_wepkey = malloc(sizeof (dladm_wlan_wepkey_t))) == NULL) {
-		syslog(LOG_ERR, "retrieve_wepkey: malloc failed");
+	if ((cooked_key = malloc(sizeof (dladm_wlan_key_t))) == NULL) {
+		syslog(LOG_ERR, "retrieve_key: malloc failed");
 		return (NULL);
 	}
 
-	/* Set name appropriately to retrieve wepkey for this WLAN */
-	set_key_name(essid, bssid, cooked_wepkey->wk_name,
+	/* Set name appropriately to retrieve key for this WLAN */
+	set_key_name(essid, bssid, cooked_key->wk_name,
 	    DLADM_SECOBJ_NAME_MAX);
-	dprintf("retrieve_wepkey: len = %d, object = %s\n",
-	    strlen(cooked_wepkey->wk_name), cooked_wepkey->wk_name);
-	cooked_wepkey->wk_len = DLADM_SECOBJ_NAME_MAX;
-	cooked_wepkey->wk_idx = 1;
+	dprintf("retrieve_key: len = %d, object = %s\n",
+	    strlen(cooked_key->wk_name), cooked_key->wk_name);
+	cooked_key->wk_len = DLADM_SECOBJ_NAME_MAX;
+	cooked_key->wk_idx = 1;
 
 	/* Try the kernel first, then fall back to persistent storage. */
-	status = dladm_get_secobj(cooked_wepkey->wk_name, &class,
-	    cooked_wepkey->wk_val, &cooked_wepkey->wk_len,
+	status = dladm_get_secobj(cooked_key->wk_name, &class,
+	    cooked_key->wk_val, &cooked_key->wk_len,
 	    DLADM_OPT_TEMP);
 	if (status != DLADM_STATUS_OK) {
-		dprintf("retrieve_wepkey: dladm_get_secobj(TEMP) failed: %s",
+		dprintf("retrieve_key: dladm_get_secobj(TEMP) failed: %s",
 		    dladm_status2str(status, errmsg));
-		status = dladm_get_secobj(cooked_wepkey->wk_name, &class,
-		    cooked_wepkey->wk_val, &cooked_wepkey->wk_len,
+		status = dladm_get_secobj(cooked_key->wk_name, &class,
+		    cooked_key->wk_val, &cooked_key->wk_len,
 		    DLADM_OPT_PERSIST);
 	}
 
 	switch (status) {
 	case DLADM_STATUS_OK:
-		dprintf("retrieve_wepkey: dladm_get_secobj succeeded: len %d",
-		    cooked_wepkey->wk_len);
+		dprintf("retrieve_key: dladm_get_secobj succeeded: len %d",
+		    cooked_key->wk_len);
 		break;
 	case DLADM_STATUS_NOTFOUND:
 		/*
 		 * We do not want an error in the case that the secobj
 		 * is not found, since we then prompt for it.
 		 */
-		free(cooked_wepkey);
+		free(cooked_key);
 		return (NULL);
 	default:
-		syslog(LOG_ERR, "retrieve_wepkey: could not get wepkey "
-		    "from secure object '%s': %s", cooked_wepkey->wk_name,
+		syslog(LOG_ERR, "retrieve_key: could not get key "
+		    "from secure object '%s': %s", cooked_key->wk_name,
 		    dladm_status2str(status, errmsg));
-		free(cooked_wepkey);
+		free(cooked_key);
 		return (NULL);
 	}
 
-	return (cooked_wepkey);
+	if (class != req) {	/* the key mismatch */
+		syslog(LOG_ERR, "retrieve_key: key type mismatch"
+		    " from secure object '%s'", cooked_key->wk_name);
+		free(cooked_key);
+		return (NULL);
+	}
+
+	return (cooked_key);
 }
 
 /* Create the KNOWN_WIFI_NETS using info from the interface list.  */
@@ -860,7 +899,7 @@ boolean_t
 connect_chosen_lan(struct wireless_lan *reqlan, const char *ifname)
 {
 	uint_t	keycount;
-	dladm_wlan_wepkey_t *key;
+	dladm_wlan_key_t *key;
 	dladm_wlan_attr_t attr;
 	dladm_status_t status;
 	uint_t flags = DLADM_WLAN_CONNECT_NOSCAN;
@@ -897,14 +936,14 @@ connect_chosen_lan(struct wireless_lan *reqlan, const char *ifname)
 		attr.wa_valid |= DLADM_WLAN_ATTR_BSSID;
 	}
 
-	/* First check for the wepkey */
-	if (reqlan->need_wepkey) {
-		get_user_wepkey(reqlan);
-		if (reqlan->cooked_wepkey == NULL)
+	/* First check for the key */
+	if (NEED_ENC(reqlan->sec_mode)) {
+		get_user_key(reqlan);
+		if (reqlan->cooked_key == NULL)
 			return (B_FALSE);
 		attr.wa_valid |= DLADM_WLAN_ATTR_SECMODE;
-		attr.wa_secmode = DLADM_WLAN_SECMODE_WEP;
-		key = reqlan->cooked_wepkey;
+		attr.wa_secmode = reqlan->sec_mode;
+		key = reqlan->cooked_key;
 		keycount = 1;
 		dprintf("connect_chosen_lan: retrieved key");
 	} else {
@@ -1023,7 +1062,7 @@ connect_to_new_wlan(const struct wireless_lan *lanlist, int num,
 			buflen += snprintf(endbuf, sizeof (buf) - buflen,
 			    "%d '%s' %s %s '%s' ", j,
 			    lanlist[i].essid, lanlist[i].bssid,
-			    lanlist[i].need_wepkey ? "WEP" : "none",
+			    WLAN_ENC(lanlist[i].sec_mode),
 			    lanlist[i].signal_strength);
 			endbuf = buf + buflen;
 		}
@@ -1072,12 +1111,12 @@ connect_to_new_wlan(const struct wireless_lan *lanlist, int num,
 	}
 	dprintf("get_user_preference() returned essid %s, bssid %s, encr %s",
 	    reqlan->essid, STRING(reqlan->bssid),
-	    reqlan->need_wepkey ? "WEP" : "none");
+	    WLAN_ENC(reqlan->sec_mode));
 
-	/* set wepkey before first time connection */
-	if (reqlan->need_wepkey && reqlan->raw_wepkey == NULL &&
-	    reqlan->cooked_wepkey == NULL)
-		get_user_wepkey(reqlan);
+	/* set key before first time connection */
+	if (NEED_ENC(reqlan->sec_mode) && reqlan->raw_key == NULL &&
+	    reqlan->cooked_key == NULL)
+		get_user_key(reqlan);
 
 	/*
 	 * now attempt to connect to selection, backing
@@ -1137,15 +1176,15 @@ prompt_for_visited(void)
 				    sizeof (buf) - buflen,
 				    "%d '%s' %s %s '%s' ",
 				    i, wlp->essid, wlp->bssid,
-				    wlp->need_wepkey ? "WEP" : gettext("none"),
+				    WLAN_ENC(wlp->sec_mode),
 				    wlp->signal_strength);
 				endbuf = buf + buflen;
 			}
 			list[i-1].essid = wlp->essid;
 			list[i-1].bssid = wlp->bssid;
-			list[i-1].need_wepkey = wlp->need_wepkey;
-			list[i-1].raw_wepkey = wlp->raw_wepkey;
-			list[i-1].cooked_wepkey = wlp->cooked_wepkey;
+			list[i-1].sec_mode = wlp->sec_mode;
+			list[i-1].raw_key = wlp->raw_key;
+			list[i-1].cooked_key = wlp->cooked_key;
 			list[i-1].signal_strength = wlp->signal_strength;
 			list[i-1].wl_if_name = wlp->wl_if_name;
 		}
@@ -1343,17 +1382,17 @@ get_user_preference(const char *cmd, const char *compare_other,
 	if ((sel->bssid != NULL) && ((wlp->bssid = strdup(sel->bssid)) == NULL))
 		goto dup_error;
 
-	wlp->need_wepkey = sel->need_wepkey;
+	wlp->sec_mode = sel->sec_mode;
 
-	if ((sel->raw_wepkey != NULL) &&
-	    ((wlp->raw_wepkey = strdup(sel->raw_wepkey)) == NULL))
+	if ((sel->raw_key != NULL) &&
+	    ((wlp->raw_key = strdup(sel->raw_key)) == NULL))
 		goto dup_error;
 
-	if (sel->cooked_wepkey != NULL) {
-		wlp->cooked_wepkey = malloc(sizeof (dladm_wlan_wepkey_t));
-		if (wlp->cooked_wepkey == NULL)
+	if (sel->cooked_key != NULL) {
+		wlp->cooked_key = malloc(sizeof (dladm_wlan_key_t));
+		if (wlp->cooked_key == NULL)
 			goto dup_error;
-		*(wlp->cooked_wepkey) = *(sel->cooked_wepkey);
+		*(wlp->cooked_key) = *(sel->cooked_key);
 	}
 
 	if ((sel->signal_strength != NULL) &&
@@ -1365,7 +1404,7 @@ get_user_preference(const char *cmd, const char *compare_other,
 		goto dup_error;
 
 	dprintf("selected: %s, %s, %s, '%s', %s", wlp->essid,
-	    STRING(wlp->bssid), wlp->need_wepkey ? "WEP" : "none",
+	    STRING(wlp->bssid), WLAN_ENC(wlp->sec_mode),
 	    STRING(wlp->signal_strength), STRING(wlp->wl_if_name));
 
 	free(response);
@@ -1414,13 +1453,18 @@ get_specific_lan(void)
 	wlp->essid = response;
 
 	(void) snprintf(specify_str, sizeof (specify_str), ZENITY
-	    " --list --title=\"%s\" --text=\"%s\" --column=\"%s\" none wep",
+	    " --list --title=\"%s\" --text=\"%s\" --column=\"%s\" none wep wpa",
 	    gettext("Security"), gettext("Enter security"),
 	    gettext("Type"));
 
 	response = get_zenity_response(specify_str);
-	if (response != NULL && strcmp(response, "wep") == 0)
-		wlp->need_wepkey = B_TRUE;
+	wlp->sec_mode = DLADM_WLAN_SECMODE_NONE;
+	if (response != NULL) {
+		if (strcmp(response, "wep") == 0)
+			wlp->sec_mode = DLADM_WLAN_SECMODE_WEP;
+		else if (strcmp(response, "wpa") == 0)
+			wlp->sec_mode = DLADM_WLAN_SECMODE_WPA;
+	}
 
 	free(response);
 	return (wlp);
@@ -1513,9 +1557,9 @@ start_over:
 		}
 		new_wlan->wifi_net->essid = strdup(cur_wlans[i].essid);
 		new_wlan->wifi_net->bssid = strdup(cur_wlans[i].bssid);
-		new_wlan->wifi_net->raw_wepkey = NULL;
-		new_wlan->wifi_net->cooked_wepkey = NULL;
-		new_wlan->wifi_net->need_wepkey = cur_wlans[i].need_wepkey;
+		new_wlan->wifi_net->raw_key = NULL;
+		new_wlan->wifi_net->cooked_key = NULL;
+		new_wlan->wifi_net->sec_mode = cur_wlans[i].sec_mode;
 		new_wlan->wifi_net->signal_strength =
 		    strdup(cur_wlans[i].signal_strength);
 		new_wlan->wifi_net->wl_if_name =

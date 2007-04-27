@@ -219,7 +219,7 @@ usage(void)
 	    "\n"
 	    "\tscan-wifi       [-p] [-o <field>,...] [<name>]\n"
 	    "\tconnect-wifi    [-e <essid>] [-i <bssid>] [-k <key>,...]"
-	    " [-s wep]\n"
+	    " [-s wep|wpa]\n"
 	    "\t                [-a open|shared] [-b bss|ibss] [-c] [-m a|b|g]\n"
 	    "\t                [-T <time>] [<name>]\n"
 	    "\tdisconnect-wifi [-a] [<name>]\n"
@@ -2024,17 +2024,17 @@ do_count_wlan(void *arg, const char *link)
 }
 
 static int
-parse_wep_keys(char *str, dladm_wlan_wepkey_t **keys, uint_t *key_countp)
+parse_wlan_keys(char *str, dladm_wlan_key_t **keys, uint_t *key_countp)
 {
 	uint_t			i;
 	split_t			*sp;
-	dladm_wlan_wepkey_t	*wk;
+	dladm_wlan_key_t	*wk;
 
-	sp = split(str, DLADM_WLAN_MAX_WEPKEYS, DLADM_WLAN_MAX_WEPKEYNAME_LEN);
+	sp = split(str, DLADM_WLAN_MAX_WEPKEYS, DLADM_WLAN_MAX_KEYNAME_LEN);
 	if (sp == NULL)
 		return (-1);
 
-	wk = malloc(sp->s_nfields * sizeof (dladm_wlan_wepkey_t));
+	wk = malloc(sp->s_nfields * sizeof (dladm_wlan_key_t));
 	if (wk == NULL)
 		goto fail;
 
@@ -2044,7 +2044,7 @@ parse_wep_keys(char *str, dladm_wlan_wepkey_t **keys, uint_t *key_countp)
 		dladm_status_t		status;
 
 		(void) strlcpy(wk[i].wk_name, sp->s_fields[i],
-		    DLADM_WLAN_MAX_WEPKEYNAME_LEN);
+		    DLADM_WLAN_MAX_KEYNAME_LEN);
 
 		wk[i].wk_idx = 1;
 		if ((s = strrchr(wk[i].wk_name, ':')) != NULL) {
@@ -2054,7 +2054,7 @@ parse_wep_keys(char *str, dladm_wlan_wepkey_t **keys, uint_t *key_countp)
 			wk[i].wk_idx = (uint_t)(s[1] - '0');
 			*s = '\0';
 		}
-		wk[i].wk_len = DLADM_WLAN_MAX_WEPKEY_LEN;
+		wk[i].wk_len = DLADM_WLAN_MAX_KEY_LEN;
 
 		status = dladm_get_secobj(wk[i].wk_name, &class,
 		    wk[i].wk_val, &wk[i].wk_len, 0);
@@ -2067,6 +2067,7 @@ parse_wep_keys(char *str, dladm_wlan_wepkey_t **keys, uint_t *key_countp)
 			if (status != DLADM_STATUS_OK)
 				goto fail;
 		}
+		wk[i].wk_class = class;
 	}
 	*keys = wk;
 	*key_countp = i;
@@ -2086,10 +2087,11 @@ do_connect_wifi(int argc, char **argv)
 	dladm_status_t		status = DLADM_STATUS_OK;
 	int			timeout = DLADM_WLAN_CONNECT_TIMEOUT_DEFAULT;
 	const char		*link = NULL;
-	dladm_wlan_wepkey_t	*keys = NULL;
+	dladm_wlan_key_t	*keys = NULL;
 	uint_t			key_count = 0;
 	uint_t			flags = 0;
 	dladm_wlan_secmode_t	keysecmode = DLADM_WLAN_SECMODE_NONE;
+	char			buf[DLADM_STRSIZE];
 
 	opterr = 0;
 	(void) memset(&attr, 0, sizeof (attr));
@@ -2145,10 +2147,13 @@ do_connect_wifi(int argc, char **argv)
 			attr.wa_valid |= DLADM_WLAN_ATTR_SECMODE;
 			break;
 		case 'k':
-			if (parse_wep_keys(optarg, &keys, &key_count) < 0)
+			if (parse_wlan_keys(optarg, &keys, &key_count) < 0)
 				die("invalid key(s) '%s'", optarg);
 
-			keysecmode = DLADM_WLAN_SECMODE_WEP;
+			if (keys[0].wk_class == DLADM_SECOBJ_CLASS_WEP)
+				keysecmode = DLADM_WLAN_SECMODE_WEP;
+			else
+				keysecmode = DLADM_WLAN_SECMODE_WPA;
 			break;
 		case 'T':
 			if (strcasecmp(optarg, "forever") == 0) {
@@ -2160,6 +2165,7 @@ do_connect_wifi(int argc, char **argv)
 			break;
 		case 'c':
 			flags |= DLADM_WLAN_CONNECT_CREATEIBSS;
+			flags |= DLADM_WLAN_CONNECT_CREATEIBSS;
 			break;
 		default:
 			die_opterr(optopt, option);
@@ -2168,16 +2174,17 @@ do_connect_wifi(int argc, char **argv)
 	}
 
 	if (keysecmode == DLADM_WLAN_SECMODE_NONE) {
-		if ((attr.wa_valid & DLADM_WLAN_ATTR_SECMODE) != 0 &&
-		    attr.wa_secmode == DLADM_WLAN_SECMODE_WEP)
-			die("key required for security mode 'wep'");
+		if ((attr.wa_valid & DLADM_WLAN_ATTR_SECMODE) != 0) {
+			die("key required for security mode '%s'",
+			    dladm_wlan_secmode2str(&attr.wa_secmode, buf));
+		}
 	} else {
 		if ((attr.wa_valid & DLADM_WLAN_ATTR_SECMODE) != 0 &&
 		    attr.wa_secmode != keysecmode)
 			die("incompatible -s and -k options");
+		attr.wa_valid |= DLADM_WLAN_ATTR_SECMODE;
+		attr.wa_secmode = keysecmode;
 	}
-	attr.wa_secmode = keysecmode;
-	attr.wa_valid |= DLADM_WLAN_ATTR_SECMODE;
 
 	if (optind == (argc - 1))
 		link = argv[optind];
@@ -2803,29 +2810,39 @@ convert_secobj(char *buf, uint_t len, uint8_t *obj_val, uint_t *obj_lenp,
 {
 	int error = 0;
 
-	if (class != DLADM_SECOBJ_CLASS_WEP)
-		return (ENOENT);
-
-	switch (len) {
-	case 5:			/* ASCII key sizes */
-	case 13:
+	if (class == DLADM_SECOBJ_CLASS_WPA) {
+		if (len < 8 || len > 63)
+			return (EINVAL);
 		(void) memcpy(obj_val, buf, len);
 		*obj_lenp = len;
-		break;
-	case 10:		/* Hex key sizes, not preceded by 0x */
-	case 26:
-		error = hexascii_to_octet(buf, len, obj_val, obj_lenp);
-		break;
-	case 12:		/* Hex key sizes, preceded by 0x */
-	case 28:
-		if (strncmp(buf, "0x", 2) != 0)
-			return (EINVAL);
-		error = hexascii_to_octet(buf + 2, len - 2, obj_val, obj_lenp);
-		break;
-	default:
-		return (EINVAL);
+		return (error);
 	}
-	return (error);
+
+	if (class == DLADM_SECOBJ_CLASS_WEP) {
+		switch (len) {
+		case 5:			/* ASCII key sizes */
+		case 13:
+			(void) memcpy(obj_val, buf, len);
+			*obj_lenp = len;
+			break;
+		case 10:		/* Hex key sizes, not preceded by 0x */
+		case 26:
+			error = hexascii_to_octet(buf, len, obj_val, obj_lenp);
+			break;
+		case 12:		/* Hex key sizes, preceded by 0x */
+		case 28:
+			if (strncmp(buf, "0x", 2) != 0)
+				return (EINVAL);
+			error = hexascii_to_octet(buf + 2, len - 2,
+			    obj_val, obj_lenp);
+			break;
+		default:
+			return (EINVAL);
+		}
+		return (error);
+	}
+
+	return (ENOENT);
 }
 
 /* ARGSUSED */
@@ -3026,7 +3043,7 @@ do_create_secobj(int argc, char **argv)
 			status = dladm_str2secobjclass(optarg, &class);
 			if (status != DLADM_STATUS_OK) {
 				die("invalid secure object class '%s', "
-				    "valid values are: wep", optarg);
+				    "valid values are: wep, wpa", optarg);
 			}
 			break;
 		case 't':
@@ -3139,7 +3156,7 @@ do_delete_secobj(int argc, char **argv)
 		die("secure object name required");
 
 	success = check_auth(LINK_SEC_AUTH);
-	audit_secobj(LINK_SEC_AUTH, "wep", argv[optind], success, B_FALSE);
+	audit_secobj(LINK_SEC_AUTH, "unknown", argv[optind], success, B_FALSE);
 	if (!success)
 		die("authorization '%s' is required", LINK_SEC_AUTH);
 

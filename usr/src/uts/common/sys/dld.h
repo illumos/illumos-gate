@@ -123,7 +123,8 @@ typedef struct dld_hold_vlan {
  * Secure objects ioctls
  */
 typedef enum {
-	DLD_SECOBJ_CLASS_WEP = 1
+	DLD_SECOBJ_CLASS_WEP = 1,
+	DLD_SECOBJ_CLASS_WPA
 } dld_secobj_class_t;
 
 #define	DLD_SECOBJ_OPT_CREATE	0x00000001

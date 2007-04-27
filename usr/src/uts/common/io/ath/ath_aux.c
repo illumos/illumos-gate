@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -573,6 +573,84 @@ ath_beacon_config(ath_t *asc)
 }
 
 /*
+ * Allocate tx/rx key slots for TKIP.  We allocate two slots for
+ * each key, one for decrypt/encrypt and the other for the MIC.
+ */
+static int
+key_alloc_2pair(ath_t *asc, ieee80211_keyix *txkeyix, ieee80211_keyix *rxkeyix)
+{
+	uint16_t i, keyix;
+
+	ASSERT(asc->asc_splitmic);
+	for (i = 0; i < ATH_N(asc->asc_keymap)/4; i++) {
+		uint8_t b = asc->asc_keymap[i];
+		if (b != 0xff) {
+			/*
+			 * One or more slots in this byte are free.
+			 */
+			keyix = i*NBBY;
+			while (b & 1) {
+		again:
+				keyix++;
+				b >>= 1;
+			}
+			/* XXX IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV */
+			if (isset(asc->asc_keymap, keyix+32) ||
+			    isset(asc->asc_keymap, keyix+64) ||
+			    isset(asc->asc_keymap, keyix+32+64)) {
+				/* full pair unavailable */
+				if (keyix == (i+1)*NBBY) {
+					/* no slots were appropriate, advance */
+					continue;
+				}
+				goto again;
+			}
+			setbit(asc->asc_keymap, keyix);
+			setbit(asc->asc_keymap, keyix+64);
+			setbit(asc->asc_keymap, keyix+32);
+			setbit(asc->asc_keymap, keyix+32+64);
+			ATH_DEBUG((ATH_DBG_AUX,
+			    "key_alloc_2pair: key pair %u,%u %u,%u\n",
+			    keyix, keyix+64,
+			    keyix+32, keyix+32+64));
+			*txkeyix = *rxkeyix = keyix;
+			return (1);
+		}
+	}
+	ATH_DEBUG((ATH_DBG_AUX, "key_alloc_2pair:"
+	    " out of pair space\n"));
+	return (0);
+}
+/*
+ * Allocate a single key cache slot.
+ */
+static int
+key_alloc_single(ath_t *asc, ieee80211_keyix *txkeyix, ieee80211_keyix *rxkeyix)
+{
+	uint16_t i, keyix;
+
+	/* try i,i+32,i+64,i+32+64 to minimize key pair conflicts */
+	for (i = 0; i < ATH_N(asc->asc_keymap); i++) {
+		uint8_t b = asc->asc_keymap[i];
+
+		if (b != 0xff) {
+			/*
+			 * One or more slots are free.
+			 */
+			keyix = i*NBBY;
+			while (b & 1)
+				keyix++, b >>= 1;
+			setbit(asc->asc_keymap, keyix);
+			ATH_DEBUG((ATH_DBG_AUX, "key_alloc_single:"
+			    " key %u\n", keyix));
+			*txkeyix = *rxkeyix = keyix;
+			return (1);
+		}
+	}
+	return (0);
+}
+
+/*
  * Allocate one or more key cache slots for a unicast key.  The
  * key itself is needed only to identify the cipher.  For hardware
  * TKIP with split cipher+MIC keys we allocate two key cache slot
@@ -586,17 +664,140 @@ int
 ath_key_alloc(ieee80211com_t *ic, const struct ieee80211_key *k,
     ieee80211_keyix *keyix, ieee80211_keyix *rxkeyix)
 {
-	*keyix = *rxkeyix = 0;
-	return (1);
+	ath_t *asc = (ath_t *)ic;
+
+	/*
+	 * We allocate two pair for TKIP when using the h/w to do
+	 * the MIC.  For everything else, including software crypto,
+	 * we allocate a single entry.  Note that s/w crypto requires
+	 * a pass-through slot on the 5211 and 5212.  The 5210 does
+	 * not support pass-through cache entries and we map all
+	 * those requests to slot 0.
+	 */
+	if (k->wk_flags & IEEE80211_KEY_SWCRYPT) {
+		return (key_alloc_single(asc, keyix, rxkeyix));
+	} else if (k->wk_cipher->ic_cipher == IEEE80211_CIPHER_TKIP &&
+	    (k->wk_flags & IEEE80211_KEY_SWMIC) == 0 && asc->asc_splitmic) {
+		return (key_alloc_2pair(asc, keyix, rxkeyix));
+	} else {
+		return (key_alloc_single(asc, keyix, rxkeyix));
+	}
 }
 
+/*
+ * Delete an entry in the key cache allocated by ath_key_alloc.
+ */
 int
 ath_key_delete(ieee80211com_t *ic, const struct ieee80211_key *k)
 {
-	struct ath_hal *ah = ((ath_t *)ic)->asc_ah;
+	ath_t *asc = (ath_t *)ic;
+	struct ath_hal *ah = asc->asc_ah;
+	const struct ieee80211_cipher *cip = k->wk_cipher;
+	ieee80211_keyix keyix = k->wk_keyix;
 
-	ATH_HAL_KEYRESET(ah, k->wk_keyix);
+	ATH_DEBUG((ATH_DBG_AUX, "ath_key_delete:"
+	    " delete key %u ic_cipher=0x%x\n", keyix, cip->ic_cipher));
+
+	ATH_HAL_KEYRESET(ah, keyix);
+	/*
+	 * Handle split tx/rx keying required for TKIP with h/w MIC.
+	 */
+	if (cip->ic_cipher == IEEE80211_CIPHER_TKIP &&
+	    (k->wk_flags & IEEE80211_KEY_SWMIC) == 0 && asc->asc_splitmic)
+		ATH_HAL_KEYRESET(ah, keyix+32);		/* RX key */
+
+	if (keyix >= IEEE80211_WEP_NKID) {
+		/*
+		 * Don't touch keymap entries for global keys so
+		 * they are never considered for dynamic allocation.
+		 */
+		clrbit(asc->asc_keymap, keyix);
+		if (cip->ic_cipher == IEEE80211_CIPHER_TKIP &&
+		    (k->wk_flags & IEEE80211_KEY_SWMIC) == 0 &&
+		    asc->asc_splitmic) {
+			clrbit(asc->asc_keymap, keyix+64);	/* TX key MIC */
+			clrbit(asc->asc_keymap, keyix+32);	/* RX key */
+			clrbit(asc->asc_keymap, keyix+32+64);	/* RX key MIC */
+		}
+	}
 	return (1);
+}
+
+static void
+ath_keyprint(const char *tag, uint_t ix,
+    const HAL_KEYVAL *hk, const uint8_t mac[IEEE80211_ADDR_LEN])
+{
+	static const char *ciphers[] = {
+		"WEP",
+		"AES-OCB",
+		"AES-CCM",
+		"CKIP",
+		"TKIP",
+		"CLR",
+	};
+	int i, n;
+	char buf[MAX_IEEE80211STR], buft[32];
+
+	(void) snprintf(buf, sizeof (buf), "%s: [%02u] %s ",
+	    tag, ix, ciphers[hk->kv_type]);
+	for (i = 0, n = hk->kv_len; i < n; i++) {
+		(void) snprintf(buft, sizeof (buft), "%02x", hk->kv_val[i]);
+		(void) strlcat(buf, buft, sizeof (buf));
+	}
+	(void) snprintf(buft, sizeof (buft), " mac %s",
+	    ieee80211_macaddr_sprintf(mac));
+	(void) strlcat(buf, buft, sizeof (buf));
+	if (hk->kv_type == HAL_CIPHER_TKIP) {
+		(void) snprintf(buft, sizeof (buft), " mic ");
+		(void) strlcat(buf, buft, sizeof (buf));
+		for (i = 0; i < sizeof (hk->kv_mic); i++) {
+			(void) snprintf(buft, sizeof (buft), "%02x",
+			    hk->kv_mic[i]);
+			(void) strlcat(buf, buft, sizeof (buf));
+		}
+	}
+	ATH_DEBUG((ATH_DBG_AUX, "%s", buf));
+}
+
+/*
+ * Set a TKIP key into the hardware.  This handles the
+ * potential distribution of key state to multiple key
+ * cache slots for TKIP.
+ */
+static int
+ath_keyset_tkip(ath_t *asc, const struct ieee80211_key *k,
+	HAL_KEYVAL *hk, const uint8_t mac[IEEE80211_ADDR_LEN])
+{
+#define	IEEE80211_KEY_XR	(IEEE80211_KEY_XMIT | IEEE80211_KEY_RECV)
+	static const uint8_t zerobssid[IEEE80211_ADDR_LEN] = {0, 0, 0, 0, 0, 0};
+	struct ath_hal *ah = asc->asc_ah;
+
+	ASSERT(k->wk_cipher->ic_cipher == IEEE80211_CIPHER_TKIP);
+	if ((k->wk_flags & IEEE80211_KEY_XR) == IEEE80211_KEY_XR) {
+		/*
+		 * TX key goes at first index, RX key at +32.
+		 * The hal handles the MIC keys at index+64.
+		 */
+		(void) memcpy(hk->kv_mic, k->wk_txmic, sizeof (hk->kv_mic));
+		ath_keyprint("ath_keyset_tkip:", k->wk_keyix, hk, zerobssid);
+		if (!ATH_HAL_KEYSET(ah, k->wk_keyix, hk, zerobssid))
+			return (0);
+
+		(void) memcpy(hk->kv_mic, k->wk_rxmic, sizeof (hk->kv_mic));
+		ath_keyprint("ath_keyset_tkip:", k->wk_keyix+32, hk, mac);
+		return (ATH_HAL_KEYSET(ah, k->wk_keyix+32, hk, mac));
+	} else if (k->wk_flags & IEEE80211_KEY_XR) {
+		/*
+		 * TX/RX key goes at first index.
+		 * The hal handles the MIC keys are index+64.
+		 */
+		(void) memcpy(hk->kv_mic, k->wk_flags & IEEE80211_KEY_XMIT ?
+		    k->wk_txmic : k->wk_rxmic, sizeof (hk->kv_mic));
+		ath_keyprint("ath_keyset_tkip:", k->wk_keyix, hk, zerobssid);
+		return (ATH_HAL_KEYSET(ah, k->wk_keyix, hk, zerobssid));
+	}
+	return (0);
+#undef IEEE80211_KEY_XR
 }
 
 /*
@@ -612,7 +813,6 @@ ath_key_set(ieee80211com_t *ic, const struct ieee80211_key *k,
 		HAL_CIPHER_TKIP,	/* IEEE80211_CIPHER_TKIP */
 		HAL_CIPHER_AES_OCB,	/* IEEE80211_CIPHER_AES_OCB */
 		HAL_CIPHER_AES_CCM,	/* IEEE80211_CIPHER_AES_CCM */
-		(uint8_t)-1,		/* 4 is not allocated */
 		HAL_CIPHER_CKIP,	/* IEEE80211_CIPHER_CKIP */
 		HAL_CIPHER_CLR,		/* IEEE80211_CIPHER_NONE */
 	};
@@ -636,7 +836,14 @@ ath_key_set(ieee80211com_t *ic, const struct ieee80211_key *k,
 		hk.kv_type = HAL_CIPHER_CLR;
 	}
 
-	return (ATH_HAL_KEYSET(ah, k->wk_keyix, &hk, mac));
+	if (hk.kv_type == HAL_CIPHER_TKIP &&
+	    (k->wk_flags & IEEE80211_KEY_SWMIC) == 0 &&
+	    asc->asc_splitmic) {
+		return (ath_keyset_tkip(asc, k, &hk, mac));
+	} else {
+		ath_keyprint("ath_keyset:", k->wk_keyix, &hk, mac);
+		return (ATH_HAL_KEYSET(ah, k->wk_keyix, &hk, mac));
+	}
 }
 
 /*

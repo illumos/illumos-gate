@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,8 @@
 #include "net80211_impl.h"
 
 extern const struct ieee80211_cipher wep;
+extern const struct ieee80211_cipher tkip;
+extern const struct ieee80211_cipher ccmp;
 
 /*
  * Table of registered cipher modules.
@@ -159,6 +161,17 @@ ieee80211_crypto_newkey(ieee80211com_t *ic, int cipher, int flags,
 			"no h/w support for cipher %s, falling back to s/w\n",
 			cip->ic_name);
 		flags |= IEEE80211_KEY_SWCRYPT;
+	}
+	/*
+	 * Hardware TKIP with software MIC is an important
+	 * combination; we handle it by flagging each key,
+	 * the cipher modules honor it.
+	 */
+	if (cipher == IEEE80211_CIPHER_TKIP &&
+	    (ic->ic_caps & IEEE80211_C_TKIPMIC) == 0) {
+		ieee80211_dbg(IEEE80211_MSG_CRYPTO,
+		    "no h/w support for TKIP MIC, falling back to s/w\n");
+		flags |= IEEE80211_KEY_SWMIC;
 	}
 
 	/*
@@ -345,10 +358,9 @@ ieee80211_crypto_getciphertype(ieee80211com_t *ic)
 	uint32_t cipher;
 	static const uint8_t ciphermap[] = {
 		WIFI_SEC_WEP,	/* IEEE80211_CIPHER_WEP */
-		(uint8_t)-1,	/* IEEE80211_CIPHER_TKIP */
+		WIFI_SEC_WPA,	/* IEEE80211_CIPHER_TKIP */
 		(uint8_t)-1,	/* IEEE80211_CIPHER_AES_OCB */
-		(uint8_t)-1,	/* IEEE80211_CIPHER_AES_CCM */
-		(uint8_t)-1,	/* 4 is not allocated */
+		WIFI_SEC_WPA,	/* IEEE80211_CIPHER_AES_CCM */
 		(uint8_t)-1,	/* IEEE80211_CIPHER_CKIP */
 		WIFI_SEC_NONE,	/* IEEE80211_CIPHER_NONE */
 	};
@@ -453,6 +465,8 @@ ieee80211_crypto_attach(ieee80211com_t *ic)
 	cs->cs_key_update_end = nulldev_key_update;
 
 	ieee80211_crypto_register(&wep);
+	ieee80211_crypto_register(&tkip);
+	ieee80211_crypto_register(&ccmp);
 }
 
 /*
@@ -464,6 +478,8 @@ ieee80211_crypto_detach(ieee80211com_t *ic)
 	ieee80211_crypto_delglobalkeys(ic);
 
 	ieee80211_crypto_unregister(&wep);
+	ieee80211_crypto_unregister(&tkip);
+	ieee80211_crypto_unregister(&ccmp);
 }
 
 /*

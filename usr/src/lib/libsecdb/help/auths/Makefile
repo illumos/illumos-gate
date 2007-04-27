@@ -84,6 +84,7 @@ HTMLENTS = \
 	SmfValueHeader.html \
 	SmfValueNWAM.html \
 	SmfValueRouting.html \
+	SmfWpaStates.html \
 	NetworkHeader.html \
 	WifiConfig.html \
 	WifiWep.html \

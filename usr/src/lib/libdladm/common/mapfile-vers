@@ -91,6 +91,12 @@ SUNWprivate_1.1 {
 	dladm_wlan_str2auth;
 	dladm_wlan_str2bsstype;
 	dladm_wlan_str2linkstatus;
+	dladm_wlan_wpa_get_sr;
+	dladm_wlan_wpa_set_ie;
+	dladm_wlan_wpa_set_wpa;
+	dladm_wlan_wpa_del_key;
+	dladm_wlan_wpa_set_key;
+	dladm_wlan_wpa_set_mlme;
 
     local:
 	*;

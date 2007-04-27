@@ -78,6 +78,7 @@ COMMON_SUBDIRS = \
 	cmd/cmd-inet/usr.lib/mipagent \
 	cmd/cmd-inet/usr.lib/pppoe \
 	cmd/cmd-inet/usr.lib/slpd \
+	cmd/cmd-inet/usr.lib/wpad \
 	cmd/cmd-inet/usr.lib/wanboot \
 	cmd/cmd-inet/usr.sadm \
 	cmd/cmd-inet/usr.sbin \

@@ -726,7 +726,8 @@ drv_ioc_secobj_set(dld_ctl_str_t *ctls, mblk_t *mp)
 	ssp = (dld_ioc_secobj_set_t *)mp->b_cont->b_rptr;
 	sobjp = &ssp->ss_obj;
 
-	if (sobjp->so_class != DLD_SECOBJ_CLASS_WEP)
+	if (sobjp->so_class != DLD_SECOBJ_CLASS_WEP &&
+	    sobjp->so_class != DLD_SECOBJ_CLASS_WPA)
 		goto failed;
 
 	if (sobjp->so_name[DLD_SECOBJ_NAME_MAX - 1] != '\0' ||
@@ -767,7 +768,6 @@ drv_ioc_secobj_set(dld_ctl_str_t *ctls, mblk_t *mp)
 failed:
 	ASSERT(err != 0);
 	miocnak(q, mp, 0, err);
-
 }
 
 typedef struct dld_secobj_state {

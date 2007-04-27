@@ -613,6 +613,7 @@ usr/include/sys/1394/id1394.h		i386
 # PPPoE files not delivered to customers.
 usr/include/net/pppoe.h			i386
 usr/include/net/sppptun.h		i386
+usr/include/net/wpa.h			i386
 #
 # The ses driver is not currently delivered on Intel
 #

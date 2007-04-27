@@ -49,6 +49,8 @@ extern "C" {
 
 #define	DLADM_WLAN_MAX_ESSID_LEN	32	/* per 802.11 spec */
 #define	DLADM_WLAN_BSSID_LEN		6	/* per 802.11 spec */
+#define	DLADM_WLAN_WPA_KEY_LEN		32	/* per 802.11i spec */
+#define	DLADM_WLAN_MAX_WPA_IE_LEN	40	/* per 802.11i spec */
 
 #define	DLADM_WLAN_CONNECT_TIMEOUT_DEFAULT	10
 #define	DLADM_WLAN_CONNECT_CREATEIBSS		0x00000001
@@ -62,9 +64,38 @@ typedef struct dladm_wlan_bssid {
 	uint8_t	wb_bytes[DLADM_WLAN_BSSID_LEN];
 } dladm_wlan_bssid_t;
 
+typedef struct dladm_wlan_ess {
+	dladm_wlan_bssid_t	we_bssid;
+	dladm_wlan_essid_t	we_ssid;
+	uint_t			we_ssid_len;
+	uint8_t			we_wpa_ie[DLADM_WLAN_MAX_WPA_IE_LEN];
+	uint_t			we_wpa_ie_len;
+	int			we_freq;
+} dladm_wlan_ess_t;
+
+typedef enum {
+	DLADM_WLAN_CIPHER_WEP		= 0,
+	DLADM_WLAN_CIPHER_TKIP,
+	DLADM_WLAN_CIPHER_AES_OCB,
+	DLADM_WLAN_CIPHER_AES_CCM,
+	DLADM_WLAN_CIPHER_CKIP,
+	DLADM_WLAN_CIPHER_NONE
+} dladm_wlan_cipher_t;
+
+typedef enum {
+	DLADM_WLAN_MLME_ASSOC		= 1,	/* associate station */
+	DLADM_WLAN_MLME_DISASSOC	= 2	/* disassociate station */
+} dladm_wlan_mlme_op_t;
+
+typedef enum {
+	DLADM_WLAN_REASON_UNSPECIFIED	= 1,
+	DLADM_WLAN_REASON_DISASSOC_LEAVING	= 5
+} dladm_wlan_reason_t;
+
 typedef enum {
 	DLADM_WLAN_SECMODE_NONE = 1,
-	DLADM_WLAN_SECMODE_WEP
+	DLADM_WLAN_SECMODE_WEP,
+	DLADM_WLAN_SECMODE_WPA
 } dladm_wlan_secmode_t;
 
 typedef enum {
@@ -100,6 +131,13 @@ typedef enum {
 
 typedef uint32_t dladm_wlan_speed_t;
 typedef	uint32_t dladm_wlan_channel_t;
+
+typedef enum {
+	DLADM_WLAN_SVC_SUCCESS,
+	DLADM_WLAN_SVC_FAILURE,
+	DLADM_WLAN_SVC_APP_FAILURE,
+	DLADM_WLAN_SVC_INSTANCE_EXISTS
+} dladm_wlan_svc_status_t;
 
 enum {
 	DLADM_WLAN_ATTR_ESSID	= 0x00000001,
@@ -137,15 +175,16 @@ typedef struct dladm_wlan_linkattr {
 
 #define	DLADM_WLAN_WEPKEY64_LEN		5 	/* per WEP spec */
 #define	DLADM_WLAN_WEPKEY128_LEN	13 	/* per WEP spec */
-#define	DLADM_WLAN_MAX_WEPKEY_LEN	13	/* per WEP spec */
+#define	DLADM_WLAN_MAX_KEY_LEN		64	/* per WEP/WPA spec */
 #define	DLADM_WLAN_MAX_WEPKEYS		4 	/* MAX_NWEPKEYS */
-#define	DLADM_WLAN_MAX_WEPKEYNAME_LEN	64
-typedef struct dladm_wlan_wepkey {
+#define	DLADM_WLAN_MAX_KEYNAME_LEN	64
+typedef struct dladm_wlan_key {
 	uint_t		wk_idx;
 	uint_t		wk_len;
-	uint8_t		wk_val[DLADM_WLAN_MAX_WEPKEY_LEN];
-	char		wk_name[DLADM_WLAN_MAX_WEPKEYNAME_LEN];
-} dladm_wlan_wepkey_t;
+	uint8_t		wk_val[DLADM_WLAN_MAX_KEY_LEN];
+	char		wk_name[DLADM_WLAN_MAX_KEYNAME_LEN];
+	uint_t		wk_class;
+} dladm_wlan_key_t;
 
 extern dladm_status_t	dladm_wlan_scan(const char *, void *,
 			    boolean_t (*)(void *, dladm_wlan_attr_t *));
@@ -163,6 +202,19 @@ extern dladm_status_t	dladm_wlan_walk_prop(const char *, void *,
 			    boolean_t (*)(void *, const char *));
 extern dladm_status_t	dladm_wlan_get_prop(const char *, dladm_prop_type_t,
 			    const char *, char **, uint_t *);
+/* WPA support routines */
+extern dladm_status_t	dladm_wlan_wpa_get_sr(const char *,
+			    dladm_wlan_ess_t *, uint_t, uint_t *);
+extern dladm_status_t	dladm_wlan_wpa_set_ie(const char *, uint8_t *, uint_t);
+extern dladm_status_t	dladm_wlan_wpa_set_wpa(const char *, boolean_t);
+extern dladm_status_t	dladm_wlan_wpa_del_key(const char *,
+			    uint_t, const dladm_wlan_bssid_t *);
+extern dladm_status_t	dladm_wlan_wpa_set_key(const char *,
+			    dladm_wlan_cipher_t, const dladm_wlan_bssid_t *,
+			    boolean_t, uint64_t, uint_t, uint8_t *, uint_t);
+extern dladm_status_t	dladm_wlan_wpa_set_mlme(const char *,
+			    dladm_wlan_mlme_op_t,
+			    dladm_wlan_reason_t, dladm_wlan_bssid_t *);
 
 extern const char	*dladm_wlan_essid2str(dladm_wlan_essid_t *, char *);
 extern const char	*dladm_wlan_bssid2str(dladm_wlan_bssid_t *, char *);

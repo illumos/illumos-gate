@@ -98,6 +98,7 @@ solaris.smf.manage.rpc.bind:::Manage RPC Program number mapper::help=SmfRPCBind.
 solaris.smf.manage.sendmail:::Manage Sendmail Service States::help=SmfSendmailStates.html
 solaris.smf.manage.ssh:::Manage Secure Shell Service States::help=SmfSshStates.html
 solaris.smf.manage.system-log:::Manage Syslog Service States::help=SmfSyslogStates.html
+solaris.smf.manage.wpa:::Manage WPA Service States::help=SmfWpaStates.html
 solaris.smf.value.:::Change Values of SMF Service Properties::help=SmfValueHeader.html
 solaris.smf.value.nwam:::Change Values of SMF Network Auto-Magic Properties::help=SmfValueNWAM.html
 solaris.smf.value.routing:::Change Values of SMF Routing Properties::help=SmfValueRouting.html

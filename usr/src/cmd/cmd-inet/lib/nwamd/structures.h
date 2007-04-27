@@ -160,9 +160,9 @@ struct wireless_lan {
 	char *essid;
 	char *bssid;
 	char *signal_strength;
-	char *raw_wepkey;
-	dladm_wlan_wepkey_t *cooked_wepkey;
-	boolean_t need_wepkey;
+	char *raw_key;
+	dladm_wlan_key_t *cooked_key;
+	dladm_wlan_secmode_t sec_mode;
 	char *wl_if_name;
 };
 

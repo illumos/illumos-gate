@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -230,10 +230,11 @@ mac_wifi_header(const void *saddr, const void *daddr, uint32_t sap,
 		break;
 	}
 
-	/*
-	 * Fill in the fixed parts of the WEP-portion of the frame.
-	 */
-	if (wdp->wd_secalloc == WIFI_SEC_WEP) {
+	switch (wdp->wd_secalloc) {
+	case WIFI_SEC_WEP:
+		/*
+		 * Fill in the fixed parts of the WEP-portion of the frame.
+		 */
 		wh->i_fc[1] |= IEEE80211_FC1_WEP;
 		/*
 		 * The actual contents of the WEP-portion of the packet
@@ -241,6 +242,16 @@ mac_wifi_header(const void *saddr, const void *daddr, uint32_t sap,
 		 * just need to account for the size.
 		 */
 		mp->b_wptr += IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN;
+		break;
+
+	case WIFI_SEC_WPA:
+		wh->i_fc[1] |= IEEE80211_FC1_WEP;
+		mp->b_wptr += IEEE80211_WEP_IVLEN +
+		    IEEE80211_WEP_KIDLEN + IEEE80211_WEP_EXTIVLEN;
+		break;
+
+	default:
+		break;
 	}
 
 	/*
@@ -265,6 +276,7 @@ mac_wifi_header_info(mblk_t *mp, void *pdata, mac_header_info_t *mhp)
 	struct ieee80211_frame	*wh;
 	struct ieee80211_llc	*llc;
 	uchar_t			*llcp;
+	wifi_data_t		*wdp = pdata;
 
 	if (MBLKL(mp) < sizeof (struct ieee80211_frame))
 		return (EINVAL);
@@ -279,8 +291,11 @@ mac_wifi_header_info(mblk_t *mp, void *pdata, mac_header_info_t *mhp)
 	 * packets, it will still have a WEP portion.  Skip past it to get to
 	 * the LLC header.
 	 */
-	if (wh->i_fc[1] & IEEE80211_FC1_WEP)
+	if (wh->i_fc[1] & IEEE80211_FC1_WEP) {
 		llcp += IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN;
+		if (wdp->wd_secalloc == WIFI_SEC_WPA)
+			llcp += IEEE80211_WEP_EXTIVLEN;
+	}
 
 	if (mp->b_wptr - llcp < sizeof (struct ieee80211_llc))
 		return (EINVAL);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -645,6 +645,13 @@ bad:
 	}
 }
 
+static int
+iswpaoui(const uint8_t *frm)
+{
+	uint32_t c = *(uint32_t *)(frm + 2);
+	return (frm[1] > 3 && c == ((WPA_OUI_TYPE << 24) | WPA_OUI));
+}
+
 /*
  * Process a beacon/probe response frame.
  * When the device is in station mode, create a node and add it
@@ -761,6 +768,10 @@ ieee80211_recv_beacon(ieee80211com_t *ic, mblk_t *mp, struct ieee80211_node *in,
 			break;
 		case IEEE80211_ELEMID_RSN:
 			scan.wpa = frm;
+			break;
+		case IEEE80211_ELEMID_VENDOR:
+			if (iswpaoui(frm))
+				scan.wpa = frm;		/* IEEE802.11i D3.0 */
 			break;
 		default:
 			ieee80211_dbg(IEEE80211_MSG_ELEMID,

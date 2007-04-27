@@ -21,7 +21,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/common/net/Makefile
@@ -30,7 +30,8 @@
 include ../../../Makefile.master
 
 HDRS=	af.h if.h if_arp.h if_dl.h if_types.h route.h pfkeyv2.h pfpolicy.h \
-	ppp-comp.h ppp_defs.h pppio.h vjcompress.h sppptun.h pppoe.h radix.h
+	ppp-comp.h ppp_defs.h pppio.h vjcompress.h sppptun.h pppoe.h radix.h \
+	wpa.h
 
 ROOTDIRS= $(ROOT)/usr/include/net
 

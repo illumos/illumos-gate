@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -175,6 +175,7 @@ mblk_t *
 ieee80211_encap(ieee80211com_t *ic, mblk_t *mp, ieee80211_node_t *in)
 {
 	struct ieee80211_frame	*wh;
+	struct ieee80211_key *key;
 
 	ASSERT(mp != NULL && MBLKL(mp) >= sizeof (struct ieee80211_frame));
 	wh = (struct ieee80211_frame *)mp->b_rptr;
@@ -182,6 +183,22 @@ ieee80211_encap(ieee80211com_t *ic, mblk_t *mp, ieee80211_node_t *in)
 	*(uint16_t *)wh->i_seq =
 		LE_16(in->in_txseqs[0] << IEEE80211_SEQ_SEQ_SHIFT);
 	in->in_txseqs[0]++;
+
+	if (ic->ic_flags & IEEE80211_F_PRIVACY)
+		key = ieee80211_crypto_getkey(ic);
+	else
+		key = NULL;
+
+	/*
+	 * IEEE 802.1X: send EAPOL frames always in the clear.
+	 * WPA/WPA2: encrypt EAPOL keys when pairwise keys are set.
+	 */
+	if (key != NULL && (ic->ic_flags & IEEE80211_F_WPA)) {
+		wh->i_fc[1] |= IEEE80211_FC1_WEP;
+		if (!ieee80211_crypto_enmic(isc, key, mp, 0)) {
+			ieee80211_err("ieee80211_crypto_enmic failed.\n");
+		}
+	}
 
 	return (mp);
 }

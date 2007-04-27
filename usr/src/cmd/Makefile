@@ -808,6 +808,7 @@ MANIFEST_SUBDIRS=			\
 	cmd-inet/usr.lib/in.timed	\
 	cmd-inet/usr.lib/inetd		\
 	cmd-inet/usr.lib/slpd		\
+	cmd-inet/usr.lib/wpad		\
 	cmd-inet/usr.sbin		\
 	cmd-inet/usr.sbin/in.ftpd	\
 	cmd-inet/usr.sbin/in.rdisc	\

@@ -668,7 +668,7 @@ ath_tx_start(ath_t *asc, struct ieee80211_node *in, struct ath_buf *bf,
 		 * packet length.
 		 */
 		hdrlen += cip->ic_header;
-		pktlen += cip->ic_header + cip->ic_trailer;
+		pktlen += cip->ic_trailer;
 		if ((k->wk_flags & IEEE80211_KEY_SWMIC) == 0)
 			pktlen += cip->ic_miclen;
 		keyix = k->wk_keyix;
@@ -992,6 +992,7 @@ ath_m_tx(void *arg, mblk_t *mp)
 	ath_t *asc = arg;
 	ieee80211com_t *ic = (ieee80211com_t *)asc;
 	mblk_t *next;
+	int error = 0;
 
 	/*
 	 * No data frames go out unless we're associated; this
@@ -1009,10 +1010,15 @@ ath_m_tx(void *arg, mblk_t *mp)
 	while (mp != NULL) {
 		next = mp->b_next;
 		mp->b_next = NULL;
-
-		if (ath_xmit(ic, mp, IEEE80211_FC0_TYPE_DATA) != 0) {
+		error = ath_xmit(ic, mp, IEEE80211_FC0_TYPE_DATA);
+		if (error != 0) {
 			mp->b_next = next;
-			break;
+			if (error == ENOMEM) {
+				break;
+			} else {
+				freemsgchain(mp);	/* CR6501759 issues */
+				return (NULL);
+			}
 		}
 		mp = next;
 	}
@@ -1173,6 +1179,8 @@ ath_node_free(struct ieee80211_node *in)
 		}
 	}
 	ic->ic_node_cleanup(in);
+	if (in->in_wpa_ie != NULL)
+		ieee80211_free(in->in_wpa_ie);
 	kmem_free(in, sizeof (struct ath_node));
 }
 
@@ -1898,6 +1906,30 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	    "multi rate retry support=%x\n",
 	    asc->asc_mrretry));
 
+	/*
+	 * Get the hardware key cache size.
+	 */
+	asc->asc_keymax = ATH_HAL_KEYCACHESIZE(ah);
+	if (asc->asc_keymax > sizeof (asc->asc_keymap) * NBBY) {
+		ATH_DEBUG((ATH_DBG_ATTACH, "ath_attach:"
+		    " Warning, using only %u entries in %u key cache\n",
+		    sizeof (asc->asc_keymap) * NBBY, asc->asc_keymax));
+		asc->asc_keymax = sizeof (asc->asc_keymap) * NBBY;
+	}
+	/*
+	 * Reset the key cache since some parts do not
+	 * reset the contents on initial power up.
+	 */
+	for (i = 0; i < asc->asc_keymax; i++)
+		ATH_HAL_KEYRESET(ah, i);
+
+	for (i = 0; i < IEEE80211_WEP_NKID; i++) {
+		setbit(asc->asc_keymap, i);
+		setbit(asc->asc_keymap, i+32);
+		setbit(asc->asc_keymap, i+64);
+		setbit(asc->asc_keymap, i+32+64);
+	}
+
 	ATH_HAL_GETREGDOMAIN(ah, (uint32_t *)&ath_regdomain);
 	ATH_HAL_GETCOUNTRYCODE(ah, &ath_countrycode);
 	/*
@@ -1951,20 +1983,29 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		ic->ic_caps |= IEEE80211_C_WEP;
 	if (ATH_HAL_CIPHERSUPPORTED(ah, HAL_CIPHER_AES_OCB))
 		ic->ic_caps |= IEEE80211_C_AES;
-	if (ATH_HAL_CIPHERSUPPORTED(ah, HAL_CIPHER_AES_CCM))
+	if (ATH_HAL_CIPHERSUPPORTED(ah, HAL_CIPHER_AES_CCM)) {
+		ATH_DEBUG((ATH_DBG_ATTACH, "Atheros support H/W CCMP\n"));
 		ic->ic_caps |= IEEE80211_C_AES_CCM;
-	if (ATH_HAL_CIPHERSUPPORTED(ah, HAL_CIPHER_CKIP)) {
+	}
+	if (ATH_HAL_CIPHERSUPPORTED(ah, HAL_CIPHER_CKIP))
 		ic->ic_caps |= IEEE80211_C_CKIP;
+	if (ATH_HAL_CIPHERSUPPORTED(ah, HAL_CIPHER_TKIP)) {
+		ATH_DEBUG((ATH_DBG_ATTACH, "Atheros support H/W TKIP\n"));
+		ic->ic_caps |= IEEE80211_C_TKIP;
 		/*
 		 * Check if h/w does the MIC and/or whether the
 		 * separate key cache entries are required to
 		 * handle both tx+rx MIC keys.
 		 */
-		if (ATH_HAL_CIPHERSUPPORTED(ah, HAL_CIPHER_MIC))
+		if (ATH_HAL_CIPHERSUPPORTED(ah, HAL_CIPHER_MIC)) {
+			ATH_DEBUG((ATH_DBG_ATTACH, "Support H/W TKIP MIC\n"));
 			ic->ic_caps |= IEEE80211_C_TKIPMIC;
+		}
 		if (ATH_HAL_TKIPSPLIT(ah))
 			asc->asc_splitmic = 1;
 	}
+	ic->ic_caps |= IEEE80211_C_WPA;	/* Support WPA/WPA2 */
+
 	asc->asc_hasclrkey = ATH_HAL_CIPHERSUPPORTED(ah, HAL_CIPHER_CLR);
 	ic->ic_phytype = IEEE80211_T_OFDM;
 	ic->ic_opmode = IEEE80211_M_STA;
@@ -1973,6 +2014,11 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	ic->ic_set_shortslot = ath_set_shortslot;
 	ic->ic_xmit = ath_xmit;
 	ieee80211_attach(ic);
+
+	/* different instance has different WPA door */
+	(void) snprintf(ic->ic_wpadoor, MAX_IEEE80211STR, "%s_%s%d", WPA_DOOR,
+		ddi_driver_name(devinfo),
+		ddi_get_instance(devinfo));
 
 	/* Override 80211 default routines */
 	ic->ic_reset = ath_reset;
@@ -2147,7 +2193,7 @@ DDI_DEFINE_STREAM_OPS(ath_dev_ops, nulldev, nulldev, ath_attach, ath_detach,
 
 static struct modldrv ath_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"ath driver 1.2/HAL 0.9.17.2",	/* short description */
+	"ath driver 1.3/HAL 0.9.17.2",	/* short description */
 	&ath_dev_ops		/* driver specific ops */
 };
 

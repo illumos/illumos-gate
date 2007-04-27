@@ -562,7 +562,8 @@ AGGR_OBJS +=	aggr_dev.o aggr_ctl.o aggr_grp.o aggr_port.o \
 
 NET80211_OBJS += net80211.o net80211_proto.o net80211_input.o \
 		 net80211_output.o net80211_node.o net80211_crypto.o \
-		 net80211_crypto_none.o net80211_crypto_wep.o net80211_ioctl.o
+		 net80211_crypto_none.o net80211_crypto_wep.o net80211_ioctl.o \
+		 net80211_crypto_tkip.o net80211_crypto_ccmp.o
 
 IB_OBJS +=	ibnex.o ibnex_ioctl.o
 

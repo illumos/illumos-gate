@@ -64,6 +64,7 @@ typedef struct dladm_attr {
 #define	DLADM_PROP_VAL_MAX	25
 
 #define		DLADM_SECOBJ_CLASS_WEP	0
+#define		DLADM_SECOBJ_CLASS_WPA	1
 typedef int	dladm_secobj_class_t;
 
 typedef void (dladm_walkcb_t)(void *, const char *);

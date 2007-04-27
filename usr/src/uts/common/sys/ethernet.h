@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,6 +92,8 @@ struct ether_vlan_extinfo {
 #define	ETHERTYPE_SLOW		(0x8809)	/* Slow Protocol */
 #define	ETHERTYPE_PPPOED	(0x8863)	/* PPPoE Discovery Stage */
 #define	ETHERTYPE_PPPOES	(0x8864)	/* PPPoE Session Stage */
+#define	ETHERTYPE_EAPOL		(0x888e)	/* EAPOL protocol */
+#define	ETHERTYPE_RSN_PREAUTH	(0x88c7)	/* RSN PRE-Authentication */
 #define	ETHERTYPE_MAX		(0xffff)	/* Max valid ethernet type */
 
 /*

@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,8 @@
 #include <sys/types.h>
 #include <sys/cmn_err.h>
 #include <sys/modctl.h>
+#include <sys/stropts.h>
+#include <sys/door.h>
 #include "net80211_impl.h"
 
 uint32_t ieee80211_debug = 0x0;	/* debug msg flags */
@@ -85,6 +87,111 @@ ieee80211_dbg(uint32_t flag, const int8_t *fmt, ...)
 {
 	if (flag & ieee80211_debug)
 		IEEE80211_DPRINT(CE_CONT, fmt);
+}
+
+/*
+ * Alloc memory, and save the size
+ */
+void *
+ieee80211_malloc(size_t size)
+{
+	void *p = kmem_zalloc((size + 4), KM_SLEEP);
+	*(int *)p = size;
+	p = (char *)p + 4;
+
+	return (p);
+}
+
+void
+ieee80211_free(void *p)
+{
+	void *tp = (char *)p - 4;
+	kmem_free((char *)p - 4, *(int *)tp + 4);
+}
+
+void
+ieee80211_mac_update(ieee80211com_t *ic)
+{
+	wifi_data_t wd = { 0 };
+	ieee80211_node_t *in;
+
+	/*
+	 * We can send data now; update the fastpath with our
+	 * current associated BSSID and other relevant settings.
+	 */
+	in = ic->ic_bss;
+	wd.wd_secalloc = ieee80211_crypto_getciphertype(ic);
+	wd.wd_opmode = ic->ic_opmode;
+	IEEE80211_ADDR_COPY(wd.wd_bssid, in->in_bssid);
+	(void) mac_pdata_update(ic->ic_mach, &wd, sizeof (wd));
+	mac_tx_update(ic->ic_mach);
+	ieee80211_dbg(IEEE80211_MSG_ANY, "ieee80211_mac_update"
+	    "(cipher = %d)\n", wd.wd_secalloc);
+}
+
+/*
+ * ieee80211_event_thread
+ * open door of wpa, send event to wpad service
+ */
+static void
+ieee80211_event_thread(void *arg)
+{
+	ieee80211com_t *ic = arg;
+	door_handle_t event_door = NULL;	/* Door for upcalls */
+	wl_events_t ev;
+	door_arg_t darg;
+
+	mutex_enter(&ic->ic_doorlock);
+
+	ev.event = ic->ic_eventq[ic->ic_evq_head];
+	ic->ic_evq_head ++;
+	if (ic->ic_evq_head >= MAX_EVENT)
+		ic->ic_evq_head = 0;
+
+	ieee80211_dbg(IEEE80211_MSG_DEBUG, "ieee80211_event(%d)\n", ev.event);
+	/*
+	 * Locate the door used for upcalls
+	 */
+	if (door_ki_open(ic->ic_wpadoor, &event_door) != 0) {
+		ieee80211_err("ieee80211_event: door_ki_open(%s) failed\n",
+		    ic->ic_wpadoor);
+		goto out;
+	}
+
+	darg.data_ptr = (char *)&ev;
+	darg.data_size = sizeof (wl_events_t);
+	darg.desc_ptr = NULL;
+	darg.desc_num = 0;
+	darg.rbuf = NULL;
+	darg.rsize = 0;
+
+	if (door_ki_upcall(event_door, &darg) != 0) {
+		ieee80211_err("ieee80211_event: door_ki_upcall() failed\n");
+	}
+
+	if (event_door) {	/* release our hold (if any) */
+		door_ki_rele(event_door);
+	}
+
+out:
+	mutex_exit(&ic->ic_doorlock);
+}
+
+/*
+ * Notify state transition event message to WPA daemon
+ */
+void
+ieee80211_notify(ieee80211com_t *ic, wpa_event_type event)
+{
+	if ((ic->ic_flags & IEEE80211_F_WPA) == 0)
+		return;		/* Not running on WPA mode */
+
+	ic->ic_eventq[ic->ic_evq_tail] = event;
+	ic->ic_evq_tail ++;
+	if (ic->ic_evq_tail >= MAX_EVENT) ic->ic_evq_tail = 0;
+
+	/* async */
+	(void) timeout(ieee80211_event_thread, (void *)ic, 0);
 }
 
 /*
@@ -435,6 +542,7 @@ ieee80211_notify_node_join(ieee80211com_t *ic, ieee80211_node_t *in)
 {
 	if (in == ic->ic_bss)
 		mac_link_update(ic->ic_mach, LINK_STATE_UP);
+	ieee80211_notify(ic, EVENT_ASSOC);	/* notify WPA service */
 }
 
 /*
@@ -447,6 +555,7 @@ ieee80211_notify_node_leave(ieee80211com_t *ic, ieee80211_node_t *in)
 {
 	if (in == ic->ic_bss)
 		mac_link_update(ic->ic_mach, LINK_STATE_DOWN);
+	ieee80211_notify(ic, EVENT_DISASSOC);	/* notify WPA service */
 }
 
 /*
@@ -518,6 +627,7 @@ ieee80211_attach(ieee80211com_t *ic)
 	ASSERT(ic->ic_xmit != NULL);
 
 	mutex_init(&ic->ic_genlock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&ic->ic_doorlock, NULL, MUTEX_DRIVER, NULL);
 
 	im = kmem_alloc(sizeof (ieee80211_impl_t), KM_SLEEP);
 	ic->ic_private = im;
@@ -599,11 +709,12 @@ ieee80211_detach(ieee80211com_t *ic)
 	ieee80211_crypto_detach(ic);
 
 	mutex_destroy(&ic->ic_genlock);
+	mutex_destroy(&ic->ic_doorlock);
 }
 
 static struct modlmisc	i_wifi_modlmisc = {
 	&mod_miscops,
-	"IEEE80211 Kernel Misc Module"
+	"IEEE80211 Kernel Module v1.2"
 };
 
 static struct modlinkage	i_wifi_modlinkage = {

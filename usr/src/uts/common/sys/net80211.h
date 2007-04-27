@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 #include <sys/ethernet.h>
 #include <sys/net80211_proto.h>
 #include <sys/net80211_crypto.h>
+#include <net/wpa.h>
 
 /*
  * IEEE802.11 kernel support module
@@ -166,6 +167,9 @@ extern "C" {
 #define	WME_AC_BK		1	/* background */
 #define	WME_AC_VI		2	/* video */
 #define	WME_AC_VO		3	/* voice */
+
+#define	MAX_EVENT		16
+#define	MAX_IEEE80211STR	256
 
 /*
  * Authentication mode.
@@ -308,6 +312,7 @@ struct ieee80211_node {
 
 	uint32_t		*in_challenge;	/* shared-key challenge */
 	struct ieee80211_key	in_ucastkey;	/* unicast key */
+	uint8_t			*in_wpa_ie;	/* captured WPA/RSN ie */
 
 	/* others */
 	int32_t			in_fails;	/* failure count to associate */
@@ -359,6 +364,12 @@ struct ieee80211com {
 	timeout_id_t		ic_watchdog_timer;	/* watchdog timer */
 	/* Cipher state/configuration. */
 	struct ieee80211_crypto_state	ic_crypto;
+
+	kmutex_t		ic_doorlock;
+	char			ic_wpadoor[MAX_IEEE80211STR];
+
+	wpa_event_type		ic_eventq[MAX_EVENT];
+	uint32_t		ic_evq_head, ic_evq_tail;
 
 	/* Runtime states */
 	uint32_t		ic_flags;	/* state/conf flags */
@@ -493,6 +504,8 @@ void ieee80211_iterate_nodes(ieee80211_node_table_t *, ieee80211_iter_func *,
 	void *);
 ieee80211_node_t *ieee80211_find_node(ieee80211_node_table_t *,
 	const uint8_t *);
+ieee80211_node_t *ieee80211_find_node_with_ssid(ieee80211_node_table_t *,
+	const uint8_t *, uint32_t, const uint8_t *);
 ieee80211_node_t *ieee80211_find_txnode(ieee80211com_t *,
 	const uint8_t daddr[IEEE80211_ADDR_LEN]);
 ieee80211_node_t *ieee80211_find_rxnode(ieee80211com_t *,
@@ -520,6 +533,9 @@ void ieee80211_dump_pkt(const uint8_t *, int32_t, int32_t, int32_t);
 void ieee80211_watchdog(void *);
 void ieee80211_start_watchdog(ieee80211com_t *, uint32_t);
 void ieee80211_stop_watchdog(ieee80211com_t *);
+
+void *ieee80211_malloc(size_t);
+void ieee80211_free(void *);
 
 #ifdef	__cplusplus
 }

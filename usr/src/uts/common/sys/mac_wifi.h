@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +48,8 @@ extern "C" {
  * May change in the future as new features are added.
  */
 #define	WIFI_HDRSIZE (sizeof (struct ieee80211_frame) + \
-    IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN + sizeof (struct ieee80211_llc))
+    IEEE80211_WEP_IVLEN + IEEE80211_WEP_KIDLEN + IEEE80211_WEP_EXTIVLEN + \
+    sizeof (struct ieee80211_llc))
 
 enum wifi_stat {
 	/* statistics described in ieee802.11(5) */
@@ -72,7 +73,8 @@ enum wifi_stat {
  */
 enum wifi_secmode {
 	WIFI_SEC_NONE,
-	WIFI_SEC_WEP
+	WIFI_SEC_WEP,
+	WIFI_SEC_WPA
 };
 
 /*

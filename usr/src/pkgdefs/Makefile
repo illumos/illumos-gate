@@ -381,6 +381,8 @@ COMMON_SUBDIRS= \
 	SUNWxcu4  \
 	SUNWwlanr  \
 	SUNWwlanu  \
+	SUNWwpar  \
+	SUNWwpau  \
 	SUNWxcu6  \
 	SUNWxwdv \
 	SUNWpmr \

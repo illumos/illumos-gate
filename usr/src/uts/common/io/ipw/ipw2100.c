@@ -1530,7 +1530,6 @@ ipw2100_newstate(struct ieee80211com *ic, enum ieee80211_state state, int arg)
 			wd.wd_secalloc = WIFI_SEC_NONE;
 		wd.wd_opmode = ic->ic_opmode;
 		IEEE80211_ADDR_COPY(wd.wd_bssid, ic->ic_bss->in_bssid);
-		ieee80211_free_node(in);
 		(void) mac_pdata_update(ic->ic_mach, &wd, sizeof (wd));
 
 		break;

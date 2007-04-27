@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,12 @@ extern "C" {
 #include <sys/list.h>
 #include <sys/net80211.h>
 #include "ath_hal.h"
+
+/* Bit map related macros. */
+#define	setbit(a, i)		((a)[(i)/NBBY] |= (1 << ((i)%NBBY)))
+#define	clrbit(a, i)		((a)[(i)/NBBY] &= ~(1 << ((i)%NBBY)))
+#define	isset(a, i)		((a)[(i)/NBBY] & (1 << ((i)%NBBY)))
+#define	isclr(a, i)		(!((a)[(i)/NBBY] & (1 << ((i)%NBBY))))
 
 /*
  * Bit flags in the ath_dbg_flags
@@ -297,6 +303,9 @@ typedef struct ath {
 
 	boolean_t		asc_resched_needed;
 	kmutex_t		asc_resched_lock;
+
+	uint32_t		asc_keymax;	/* size of key cache */
+	uint8_t			asc_keymap[16];	/* bit map of key cache use */
 
 	timeout_id_t		asc_scan_timer;
 	int			(*asc_newstate)(ieee80211com_t *,
