@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,6 +102,7 @@ sigtimedwait(sigset_t *setp, siginfo_t *siginfop, timespec_t *timeoutp)
 	proc_t *p = ttoproc(t);
 	timespec_t sig_timeout;
 	timespec_t *rqtp = NULL;
+	int timecheck = 0;
 	int ret;
 	int error = 0;
 	k_siginfo_t info, *infop;
@@ -110,6 +111,7 @@ sigtimedwait(sigset_t *setp, siginfo_t *siginfop, timespec_t *timeoutp)
 	if (timeoutp) {
 		timespec_t now;
 
+		timecheck = timechanged;
 		gethrestime(&now);
 		if (datamodel == DATAMODEL_NATIVE) {
 			if (copyin(timeoutp, &sig_timeout,
@@ -151,7 +153,7 @@ sigtimedwait(sigset_t *setp, siginfo_t *siginfop, timespec_t *timeoutp)
 	 * the absolute future time is passed.
 	 */
 	while ((ret = cv_waituntil_sig(&t->t_delay_cv, &p->p_lock,
-	    rqtp)) > 0)
+	    rqtp, timecheck)) > 0)
 		continue;
 	if (ret == -1)
 		error = EAGAIN;

@@ -272,7 +272,7 @@ typedef struct todinfo {
 } todinfo_t;
 
 extern	int64_t		timedelta;
-extern	int		hrestime_isvalid;
+extern	int		timechanged;
 extern	int		tod_needsync;
 extern	kmutex_t	tod_lock;
 extern	timestruc_t	hrestime;

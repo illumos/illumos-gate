@@ -2,8 +2,9 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,49 +79,6 @@ static callout_table_t *callout_table[CALLOUT_TABLES];
 	CALLOUT_HASH_##INSDEL(ct->ct_lbhash[CALLOUT_LBHASH(runtime)],	\
 	cp, c_lbnext, c_lbprev)
 
-#define	CALLOUT_HRES_INSERT(ct, cp, cnext, cprev, hresms)		\
-{									\
-	callout_t *nextp = ct->ct_hresq;				\
-	callout_t *prevp;						\
-									\
-	if (nextp == NULL || hresms <= nextp->c_hresms) {		\
-		cp->cnext = ct->ct_hresq;				\
-		ct->ct_hresq = cp;					\
-		cp->cprev = NULL;					\
-		if (cp->cnext != NULL)					\
-			cp->cnext->cprev = cp;				\
-	} else {							\
-		do {							\
-			prevp = nextp;					\
-			nextp = nextp->cnext;				\
-		} while (nextp != NULL && hresms > nextp->c_hresms);	\
-		prevp->cnext = cp;					\
-		cp->cprev = prevp;					\
-		cp->cnext = nextp;					\
-		if (nextp != NULL) 					\
-			nextp->cprev = cp;				\
-	}								\
-}
-
-#define	CALLOUT_HRES_DELETE(ct, cp, cnext, cprev, hresms)	\
-{								\
-	if (cp == ct->ct_hresq) {				\
-		ct->ct_hresq = cp->cnext;			\
-		if (cp->cnext != NULL)				\
-			cp->cnext->cprev = NULL;		\
-	} else {						\
-		cp->cprev->cnext = cp->cnext;			\
-		if (cp->cnext != NULL)				\
-			cp->cnext->cprev = cp->cprev;		\
-	}							\
-}
-
-#define	CALLOUT_HRES_UPDATE(INSDEL, ct, cp, id, hresms)		\
-	ASSERT(MUTEX_HELD(&ct->ct_lock));			\
-	ASSERT(cp->c_xid == id);				\
-	CALLOUT_HRES_##INSDEL(ct, cp, c_hrnext,			\
-	c_hrprev, hresms)
-
 /*
  * Allocate a callout structure.  We try quite hard because we
  * can't sleep, and if we can't do the allocation, we're toast.
@@ -148,13 +106,9 @@ static timeout_id_t
 timeout_common(void (*func)(void *), void *arg, clock_t delta,
     callout_table_t *ct)
 {
-	callout_t	*cp;
-	callout_id_t	id;
-	clock_t		runtime;
-	timestruc_t	now;
-	int64_t		hresms;
-
-	gethrestime(&now);
+	callout_t *cp;
+	callout_id_t id;
+	clock_t runtime;
 
 	mutex_enter(&ct->ct_lock);
 
@@ -174,16 +128,6 @@ timeout_common(void (*func)(void *), void *arg, clock_t delta,
 	cp->c_runtime = runtime = lbolt + delta;
 
 	/*
-	 * Calculate the future time in millisecond.
-	 * We must cast tv_sec and delta to 64-bit integers
-	 * to avoid integer overflow on 32-platforms.
-	 */
-	hresms = (int64_t)now.tv_sec * MILLISEC + now.tv_nsec / MICROSEC +
-	    TICK_TO_MSEC((int64_t)delta);
-
-	cp->c_hresms = hresms;
-
-	/*
 	 * Assign an ID to this callout
 	 */
 	if (delta > CALLOUT_LONGTERM_TICKS)
@@ -196,7 +140,6 @@ timeout_common(void (*func)(void *), void *arg, clock_t delta,
 	cp->c_xid = id;
 
 	CALLOUT_HASH_UPDATE(INSERT, ct, cp, id, runtime);
-	CALLOUT_HRES_UPDATE(INSERT, ct, cp, id, hresms);
 
 	mutex_exit(&ct->ct_lock);
 
@@ -241,7 +184,6 @@ untimeout(timeout_id_t id_arg)
 			clock_t time_left = runtime - lbolt;
 
 			CALLOUT_HASH_UPDATE(DELETE, ct, cp, id, runtime);
-			CALLOUT_HRES_UPDATE(DELETE, ct, cp, id, 0);
 			cp->c_idnext = ct->ct_freelist;
 			ct->ct_freelist = cp;
 			mutex_exit(&ct->ct_lock);
@@ -303,11 +245,9 @@ untimeout(timeout_id_t id_arg)
 static void
 callout_execute(callout_table_t *ct)
 {
-	callout_t	*cp;
-	callout_id_t	xid;
-	clock_t		runtime;
-	timestruc_t	now;
-	int64_t		hresms;
+	callout_t *cp;
+	callout_id_t xid;
+	clock_t runtime;
 
 	mutex_enter(&ct->ct_lock);
 
@@ -327,16 +267,14 @@ callout_execute(callout_table_t *ct)
 			mutex_enter(&ct->ct_lock);
 
 			/*
-			 * Delete callout from both the hash tables and the
-			 * hres queue, return it to freelist, and tell anyone
-			 * who cares that we're done.
+			 * Delete callout from hash tables, return to freelist,
+			 * and tell anyone who cares that we're done.
 			 * Even though we dropped and reacquired ct->ct_lock,
 			 * it's OK to pick up where we left off because only
 			 * newly-created timeouts can precede cp on ct_lbhash,
 			 * and those timeouts cannot be due on this tick.
 			 */
 			CALLOUT_HASH_UPDATE(DELETE, ct, cp, xid, runtime);
-			CALLOUT_HRES_UPDATE(DELETE, ct, cp, xid, hresms);
 			cp->c_idnext = ct->ct_freelist;
 			ct->ct_freelist = cp;
 			cp->c_xid = 0;	/* Indicate completion for c_done */
@@ -351,48 +289,6 @@ callout_execute(callout_table_t *ct)
 		if (ct->ct_runtime == runtime)
 			ct->ct_runtime = runtime + 1;
 	}
-
-	gethrestime(&now);
-
-	/*
-	 * Calculate the future time in millisecond.
-	 * We must cast tv_sec to 64-bit integer
-	 * to avoid integer overflow on 32-platforms.
-	 */
-	hresms = (int64_t)now.tv_sec * MILLISEC + now.tv_nsec / MICROSEC;
-
-	cp = ct->ct_hresq;
-	while (cp != NULL && hresms >= cp->c_hresms) {
-		xid = cp->c_xid;
-		if (xid & CALLOUT_EXECUTING) {
-			cp = cp->c_hrnext;
-			continue;
-		}
-		cp->c_executor = curthread;
-		cp->c_xid = xid |= CALLOUT_EXECUTING;
-		runtime = cp->c_runtime;
-		mutex_exit(&ct->ct_lock);
-		DTRACE_PROBE1(callout__start, callout_t *, cp);
-		(*cp->c_func)(cp->c_arg);
-		DTRACE_PROBE1(callout__end, callout_t *, cp);
-		mutex_enter(&ct->ct_lock);
-
-		/*
-		 * See comments above.
-		 */
-		CALLOUT_HASH_UPDATE(DELETE, ct, cp, xid, runtime);
-		CALLOUT_HRES_UPDATE(DELETE, ct, cp, xid, hresms);
-		cp->c_idnext = ct->ct_freelist;
-		ct->ct_freelist = cp;
-		cp->c_xid = 0;	/* Indicate completion for c_done */
-		cv_broadcast(&cp->c_done);
-
-		/*
-		 * Start over from the head of the list, see if
-		 * any timeout bearing an earlier hres time.
-		 */
-		cp = ct->ct_hresq;
-	}
 	mutex_exit(&ct->ct_lock);
 }
 
@@ -402,10 +298,8 @@ callout_execute(callout_table_t *ct)
 static void
 callout_schedule_1(callout_table_t *ct)
 {
-	callout_t	*cp;
-	clock_t		curtime, runtime;
-	timestruc_t	now;
-	int64_t		hresms;
+	callout_t *cp;
+	clock_t curtime, runtime;
 
 	mutex_enter(&ct->ct_lock);
 	ct->ct_curtime = curtime = lbolt;
@@ -425,30 +319,6 @@ callout_schedule_1(callout_table_t *ct)
 			return;
 		}
 		ct->ct_runtime++;
-	}
-
-	gethrestime(&now);
-
-	/*
-	 * Calculate the future time in millisecond.
-	 * We must cast tv_sec to 64-bit integer
-	 * to avoid integer overflow on 32-platforms.
-	 */
-	hresms = (int64_t)now.tv_sec * MILLISEC + now.tv_nsec / MICROSEC;
-
-	cp = ct->ct_hresq;
-	while (cp != NULL && hresms >= cp->c_hresms) {
-		if (cp->c_xid & CALLOUT_EXECUTING) {
-			cp = cp->c_hrnext;
-			continue;
-		}
-		mutex_exit(&ct->ct_lock);
-		if (ct->ct_taskq == NULL)
-			softcall((void (*)(void *))callout_execute, ct);
-		else
-			(void) taskq_dispatch(ct->ct_taskq,
-			    (task_func_t *)callout_execute, ct, KM_NOSLEEP);
-		return;
 	}
 	mutex_exit(&ct->ct_lock);
 }

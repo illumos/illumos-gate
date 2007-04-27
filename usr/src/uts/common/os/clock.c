@@ -842,7 +842,7 @@ clock(void)
 					hrestime = tod;
 					membar_enter();	/* hrestime visible */
 					timedelta = 0;
-					hrestime_isvalid = 1;
+					timechanged++;
 					tod_needsync = 0;
 					hr_clock_unlock(s);
 				}
@@ -1773,20 +1773,16 @@ clkset(time_t approx)
 	mutex_exit(&tod_lock);
 }
 
-int	hrestime_isvalid = 0;
+int	timechanged;	/* for testing if the system time has been reset */
 
 void
 set_hrestime(timestruc_t *ts)
 {
 	int spl = hr_clock_lock();
 	hrestime = *ts;
-	/*
-	 * hrestime must be visible before hrestime_isvalid
-	 * is set to 1
-	 */
-	membar_enter();
+	membar_enter();	/* hrestime must be visible before timechanged++ */
 	timedelta = 0;
-	hrestime_isvalid = 1;
+	timechanged++;
 	hr_clock_unlock(spl);
 }
 

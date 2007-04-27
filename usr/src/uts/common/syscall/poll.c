@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -290,6 +290,7 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 	int rval;
 	int i;
 	timespec_t *rqtp = NULL;
+	int timecheck = 0;
 	int imm_timeout = 0;
 	pollfd_t *pollfdp;
 	pollstate_t *ps;
@@ -306,6 +307,7 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 			imm_timeout = 1;
 		else {
 			timespec_t now;
+			timecheck = timechanged;
 			gethrestime(&now);
 			rqtp = tsp;
 			timespecadd(rqtp, &now);
@@ -346,7 +348,7 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 		if (!imm_timeout) {
 			mutex_enter(&t->t_delay_lock);
 			while ((rval = cv_waituntil_sig(&t->t_delay_cv,
-			    &t->t_delay_lock, rqtp)) > 0)
+			    &t->t_delay_lock, rqtp, timecheck)) > 0)
 				continue;
 			mutex_exit(&t->t_delay_lock);
 			if (rval == 0)
@@ -544,7 +546,7 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 			rval = -1;
 		else
 			rval = cv_waituntil_sig(&pcp->pc_cv, &pcp->pc_lock,
-				rqtp);
+				rqtp, timecheck);
 		mutex_exit(&pcp->pc_lock);
 		/*
 		 * If we have received a signal or timed out

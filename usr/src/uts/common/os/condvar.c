@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -615,13 +615,19 @@ cv_wait_stop(kcondvar_t *cvp, kmutex_t *mp, int wakeup_time)
  *	        >0 if awakened via cv_signal() or cv_broadcast()
  *		   or by a spurious wakeup.
  *		   (might return time remaining)
+ * As a special test, if someone abruptly resets the system time
+ * (but not through adjtime(2); drifting of the clock is allowed and
+ * expected [see timespectohz_adj()]), then we force a return of -1
+ * so the caller can return a premature timeout to the calling process
+ * so it can reevaluate the situation in light of the new system time.
+ * (The system clock has been reset if timecheck != timechanged.)
  */
 int
-cv_waituntil_sig(kcondvar_t *cvp, kmutex_t *mp, timestruc_t *when)
+cv_waituntil_sig(kcondvar_t *cvp, kmutex_t *mp,
+	timestruc_t *when, int timecheck)
 {
 	timestruc_t now;
 	timestruc_t delta;
-	clock_t ticks;
 	int rval;
 
 	if (when == NULL)
@@ -638,20 +644,29 @@ cv_waituntil_sig(kcondvar_t *cvp, kmutex_t *mp, timestruc_t *when)
 		 */
 		rval = cv_timedwait_sig(cvp, mp, lbolt);
 	} else {
-		ticks = lbolt + timespectohz(when, now);
-		rval = cv_timedwait_sig(cvp, mp, ticks);
-
-		gethrestime(&now);
-		delta = *when;
-		timespecsub(&delta, &now);
-
-		/*
-		 * timeout is premature iff
-		 *	ticks >= lbolt  and  when > now
-		 */
-		if (rval == -1 && ticks >= lbolt && (delta.tv_sec > 0 ||
-		    (delta.tv_sec == 0 && delta.tv_nsec > 0)))
+		if (timecheck == timechanged) {
+			rval = cv_timedwait_sig(cvp, mp,
+				lbolt + timespectohz_adj(when, now));
+		} else {
+			/*
+			 * Someone reset the system time;
+			 * just force an immediate timeout.
+			 */
+			rval = -1;
+		}
+		if (rval == -1 && timecheck == timechanged) {
+			/*
+			 * Even though cv_timedwait_sig() returned showing a
+			 * timeout, the future time may not have passed yet.
+			 * If not, change rval to indicate a normal wakeup.
+			 */
+			gethrestime(&now);
+			delta = *when;
+			timespecsub(&delta, &now);
+			if (delta.tv_sec > 0 || (delta.tv_sec == 0 &&
+			    delta.tv_nsec > 0))
 				rval = 1;
+		}
 	}
 	return (rval);
 }

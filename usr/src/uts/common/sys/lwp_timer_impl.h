@@ -2,8 +2,9 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License (the "License").
- * You may not use this file except in compliance with the License.
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +42,7 @@ typedef struct {
 	kthread_t	*lwpt_thread;
 	timespec_t	*lwpt_tsp;
 	timespec_t	lwpt_rqtime;
-	clock_t		lwpt_lbolt;
+	int		lwpt_timecheck;
 	int		lwpt_imm_timeout;
 	int		lwpt_time_error;
 	timeout_id_t	lwpt_id;

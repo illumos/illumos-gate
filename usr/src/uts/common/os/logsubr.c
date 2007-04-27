@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -327,7 +327,7 @@ log_conswitch(log_t *src, log_t *dst)
 		lc->flags |= SL_LOGONLY;
 
 		/*
-		 * The ttime is written with 0 in log_sendmsg() only when
+		 * The ttime is written with 0 in log_sensmsg() only when
 		 * good gethrestime_sec() data is not available to store in
 		 * the log_ctl_t in the early boot phase.
 		 */
@@ -605,12 +605,16 @@ log_sendmsg(mblk_t *mp, zoneid_t zoneid)
 	log_enter();
 
 	/*
-	 * If we are still in the early boot phase and the hrestime is invalid,
-	 * we set ttime to 0 so that log_conswitch() can determine the correct
-	 * ttime with a log_ctl_t structure which contains a valid ttime stamp.
+	 * In the early boot phase hrestime is invalid, then timechanged is 0.
+	 * If hrestime is not valid, the ttime is set to 0 here and the correct
+	 * ttime is calculated in log_conswitch() later. The log_conswitch()
+	 * calculation to determine the correct ttime does not use ttime data
+	 * from these log_ctl_t structures; it only uses ttime from log_ctl_t's
+	 * that contain good data.
+	 *
 	 */
 	lc->ltime = lbolt;
-	if (hrestime_isvalid) {
+	if (timechanged) {
 		lc->ttime = gethrestime_sec();
 	} else {
 		lc->ttime = 0;

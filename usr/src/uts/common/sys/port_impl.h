@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -182,6 +182,7 @@ extern	uint_t	port_max_list;
 typedef struct	port_gettimer {
 	ushort_t	pgt_flags;
 	ushort_t	pgt_loop;
+	int		pgt_timecheck;
 	timespec_t	pgt_rqtime;
 	timespec_t	*pgt_rqtp;
 	struct timespec	*pgt_timeout;

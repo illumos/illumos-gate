@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -850,6 +850,28 @@ timespectohz(timespec_t *tv, timespec_t now)
 }
 
 /*
+ * Same as timespectohz() except that we adjust the clock ticks down a bit.
+ * If we will be waiting for a long time, we may encounter skewing problems
+ * due to adjtime() system calls.  Since we can skew up to 1/16 lbolt rate
+ * if adjtime is going crazy, we reduce the time delta since timeout() takes
+ * clock ticks rather than wallclock elapsed time.  This may cause the caller
+ * (who calls timeout()) to return with a timeout prematurely and callers
+ * must accommodate this.  See lwp_timeout(), queue_lwptimer() and
+ * cv_waituntil_sig(), currently the only callers of this function.
+ */
+clock_t
+timespectohz_adj(timespec_t *tv, timespec_t now)
+{
+	timespec_t wait_time = *tv;
+
+	timespecsub(&wait_time, &now);
+	wait_time.tv_sec -= wait_time.tv_sec >> 4;
+	wait_time.tv_nsec -= wait_time.tv_nsec >> 4;
+	timespecadd(&wait_time, &now);
+	return (timespectohz(&wait_time, now));
+}
+
+/*
  * hrt2ts(): convert from hrtime_t to timestruc_t.
  *
  * All this routine really does is:
@@ -1162,6 +1184,7 @@ nanosleep(timespec_t *rqtp, timespec_t *rmtp)
 	timespec_t rqtime;
 	timespec_t rmtime;
 	timespec_t now;
+	int timecheck;
 	int ret = 1;
 	model_t datamodel = get_udatamodel();
 
@@ -1181,11 +1204,12 @@ nanosleep(timespec_t *rqtp, timespec_t *rmtp)
 		return (set_errno(EINVAL));
 
 	if (timerspecisset(&rqtime)) {
+		timecheck = timechanged;
 		gethrestime(&now);
 		timespecadd(&rqtime, &now);
 		mutex_enter(&curthread->t_delay_lock);
 		while ((ret = cv_waituntil_sig(&curthread->t_delay_cv,
-		    &curthread->t_delay_lock, &rqtime)) > 0)
+		    &curthread->t_delay_lock, &rqtime, timecheck)) > 0)
 			continue;
 		mutex_exit(&curthread->t_delay_lock);
 	}

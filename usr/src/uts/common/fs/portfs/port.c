@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1141,6 +1141,7 @@ port_getn(port_t *pp, port_event_t *uevp, uint_t max, uint_t *nget,
 	uint_t		tnent;
 	int		rval;
 	int		blocking = -1;
+	int		timecheck;
 	int		flag;
 	timespec_t	rqtime;
 	timespec_t	*rqtp = NULL;
@@ -1227,6 +1228,7 @@ port_getn(port_t *pp, port_event_t *uevp, uint_t max, uint_t *nget,
 			goto portnowait;
 		}
 		rqtp = pgt->pgt_rqtp;
+		timecheck = pgt->pgt_timecheck;
 		pgt->pgt_flags |= PORTGET_WAIT_EVENTS;
 	} else {
 		/* check if enough events are available ... */
@@ -1250,6 +1252,7 @@ port_getn(port_t *pp, port_event_t *uevp, uint_t max, uint_t *nget,
 
 		if (rqtp != NULL) {
 			timespec_t	now;
+			timecheck = timechanged;
 			gethrestime(&now);
 			timespecadd(rqtp, &now);
 		}
@@ -1291,7 +1294,7 @@ port_getn(port_t *pp, port_event_t *uevp, uint_t max, uint_t *nget,
 		}
 
 		rval = cv_waituntil_sig(&pgetp->portget_cv, &portq->portq_mutex,
-		    rqtp);
+		    rqtp, timecheck);
 
 		if (rval <= 0) {
 			error = (rval == 0) ? EINTR : ETIME;
@@ -1506,6 +1509,7 @@ portnowait:
 			}
 			if (rqtp != NULL) {
 				timespec_t	now;
+				pgt->pgt_timecheck = timechanged;
 				gethrestime(&now);
 				timespecadd(&pgt->pgt_rqtime, &now);
 			}
@@ -1514,6 +1518,7 @@ portnowait:
 			/* timeout already checked -> remember values */
 			pgt->pgt_rqtp = rqtp;
 			if (rqtp != NULL) {
+				pgt->pgt_timecheck = timecheck;
 				pgt->pgt_rqtime = *rqtp;
 			}
 		}
