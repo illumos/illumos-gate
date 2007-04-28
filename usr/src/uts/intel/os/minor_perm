@@ -133,6 +133,7 @@ clone:ipw 0666 root sys
 clone:iwi 0666 root sys
 clone:pcwl 0666 root sys
 clone:pcan 0666 root sys
+clone:wpi 0666 root sys
 bge:* 0666 root sys
 rge:* 0666 root sys
 xge:* 0666 root sys
@@ -146,6 +147,7 @@ ipw:* 0666 root sys
 iwi:* 0666 root sys
 pcwl:* 0666 root sys
 pcan:* 0666 root sys
+wpi:* 0666 root sys
 physmem:* 0600 root sys
 sdp:sdp 0666 root sys
 battery:* 0666 root sys

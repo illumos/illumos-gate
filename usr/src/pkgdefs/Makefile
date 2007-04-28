@@ -140,6 +140,7 @@ i386_SUBDIRS= \
 	SUNWrtls \
 	SUNWsi3124 \
 	SUNWvia823x \
+	SUNWwpi \
 	SUNWxsvc
 
 i386_XMODS= \
