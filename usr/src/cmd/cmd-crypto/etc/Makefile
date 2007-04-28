@@ -41,6 +41,9 @@ ETCCERTSFILES = \
 	SUNWSolarisCA \
 	SUNWObjectCA
 
+ANNOTATEDFILES = \
+	certs/SUNWObjectCA.annot
+
 include ../../Makefile.cmd
 
 .KEEP_STATE:
@@ -72,7 +75,7 @@ $(RELEASECRYPTO:%=$(ROOTCRYPTODIR)/certs/%): \
 			$(MV) $(@D)/$(@F:SUNW_SunOS_5.%=SUNWCryptographic%) $@
 
 $(ROOTETCCERTSDIR)/SUNWObjectCA: \
-			certs/$(@F)
+			certs/$$(@F)
 			$(RM) $@
 			$(INS) -s -m $(FILEMODE) -f $(@D) certs/$(@F)
 $(ROOTETCCERTSDIR)/%:	certs/%
@@ -84,6 +87,13 @@ $(RELEASECERTS:%=$(ROOTETCCERTSDIR)/%): \
 				certs/$(@F:SUNW_SunOS_5.%=SUNWSolaris%)
 			$(MV) $(@D)/$(@F:SUNW_SunOS_5.%=SUNWSolaris%) $@
 
+ANNOT_DEL =	SOURCE ANNOTATION DELETE
+$(ANNOTATEDFILES:%.annot=%): \
+			$$(@:%=%.annot)
+			$(RM) $@
+			$(SED) -e '/${ANNOT_DEL} START/,/${ANNOT_DEL} END/d' \
+				$(@:%=%.annot) > $@
+
 $(IETCCRYPTOFILES):=	FILEMODE= 644
 $(IETCCRYPTOFILES):=	OWNER= root
 $(IETCCRYPTOFILES):=	GROUP= sys
@@ -92,3 +102,6 @@ $(IETCCERTSFILES):=	OWNER= root
 $(IETCCERTSFILES):=	GROUP= sys
 
 install:	$(IETCCRYPTOFILES) $(IETCCERTSFILES)
+
+clean clobber:
+		$(RM) $(ANNOTATEDFILES:%.annot=%)

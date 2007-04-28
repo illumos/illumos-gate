@@ -1,3 +1,4 @@
+SOURCE ANNOTATION DELETE START
 CDDL HEADER START
 
 The contents of this file are subject to the terms of the
@@ -24,6 +25,7 @@ ident	"%Z%%M%	%I%	%E% SMI"
 
 Subject: O=Sun Microsystems Inc, OU=VeriSign Trust Network,
 	 OU=Class 2 OnSite Subscriber CA, CN=Object Signing CA
+SOURCE ANNOTATION DELETE END
 -----BEGIN CERTIFICATE-----
 MIIE5jCCA86gAwIBAgIQHiBGeRMOJw614tvYy3sSTTANBgkqhkiG9w0BAQUFADBn
 MR0wGwYDVQQKExRTdW4gTWljcm9zeXN0ZW1zIEluYzEfMB0GA1UECxMWVmVyaVNp
