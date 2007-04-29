@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -325,7 +325,7 @@ print_stats(rcid_type_t stat_type)
 			continue;
 
 		if (col->col_paged_att == 0)
-			strlcpy(nproc, "-", sizeof (nproc));
+			(void) strlcpy(nproc, "-", sizeof (nproc));
 		else
 			(void) snprintf(nproc, sizeof (nproc), "%lld",
 			    col->col_nproc);
@@ -413,7 +413,7 @@ main(int argc, char *argv[])
 			(void) fflush(stdout);
 			while (stat(STAT_FILE_DEFAULT, &st) == 0 &&
 			    st.st_mtime == stat_mod)
-				usleep((useconds_t)(0.2 * MICROSEC));
+				(void) usleep((useconds_t)(0.2 * MICROSEC));
 		}
 	}
 
