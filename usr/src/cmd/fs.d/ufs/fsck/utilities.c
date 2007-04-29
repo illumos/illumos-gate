@@ -1175,7 +1175,7 @@ updateclean(void)
 	/*
 	 * If ufs log is not okay, note that we need to clear it.
 	 */
-	examinelog(sblock.fs_logbno, NULL);
+	examinelog(NULL);
 	if (fslogbno && !(islog && islogok)) {
 		fsclean = FSACTIVE;
 		fslogbno = 0;
@@ -1289,7 +1289,7 @@ updateclean(void)
 		printclean();
 
 	if (sblock.fs_logbno != fslogbno) {
-		examinelog(sblock.fs_logbno, &freelogblk);
+		examinelog(&freelogblk);
 		freedlog++;
 	}
 
@@ -2172,7 +2172,7 @@ fix_cg(struct cg *cgp, int cgno)
 }
 
 void
-examinelog(daddr32_t start, void (*cb)(daddr32_t))
+examinelog(void (*cb)(daddr32_t))
 {
 	struct bufarea *bp;
 	extent_block_t *ebp;
@@ -2181,8 +2181,19 @@ examinelog(daddr32_t start, void (*cb)(daddr32_t))
 	int i;
 	int j;
 
-	if (start < SBLOCK)
+	/*
+	 * Since ufs stores fs_logbno as blocks and MTBufs stores it as frags
+	 * we need to translate accordingly using logbtodb()
+	 */
+
+	if (logbtodb(&sblock, sblock.fs_logbno) < SBLOCK) {
+		if (debug) {
+			(void) printf("fs_logbno < SBLOCK: %ld < %ld\n" \
+			    "Aborting log examination\n", \
+			    logbtodb(&sblock, sblock.fs_logbno), SBLOCK);
+		}
 		return;
+	}
 
 	/*
 	 * Read errors will return zeros, which will cause us

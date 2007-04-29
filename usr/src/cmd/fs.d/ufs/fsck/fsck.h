@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -549,7 +549,7 @@ int		dirscan(struct inodesc *);
 void		dirty(struct bufarea *);
 int		do_errorlock(int);
 int		dofix(struct inodesc *, caddr_t, ...);
-void		examinelog(daddr32_t, void (*)(daddr32_t));
+void		examinelog(void (*)(daddr32_t));
 void		errexit(caddr_t, ...);
 void		fileerror(fsck_ino_t, fsck_ino_t, caddr_t, ...);
 caddr_t		file_id(fsck_ino_t, mode_t);

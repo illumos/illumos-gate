@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,7 +90,7 @@ pass1(void)
 	 * freeing free block panic.
 	 */
 	if (islog && islogok && sblock.fs_logbno)
-		examinelog(sblock.fs_logbno, &note_used);
+		examinelog(&note_used);
 
 	/*
 	 * Find all allocated blocks.  This must be completed before
