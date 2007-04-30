@@ -229,8 +229,9 @@ struct aac_fib {
 #define	OnLineDiagnostic		800
 #define	FduAdapterTest			801
 
-
-/* Structures used to respond to a RequestAdapterInfo FIB */
+/*
+ * Revision number handling
+ */
 struct FsaRev {
 	union {
 		struct {
@@ -244,6 +245,9 @@ struct FsaRev {
 	uint32_t buildNumber;
 };
 
+/*
+ * Structures used to respond to a RequestAdapterInfo FIB
+ */
 struct aac_adapter_info {
 	uint32_t	PlatformBase;	/* adapter type */
 	uint32_t	CpuArchitecture; /* adapter CPU type */
@@ -262,6 +266,59 @@ struct aac_adapter_info {
 	uint32_t	batteryPlatform;
 	uint32_t	SupportedOptions; /* supported features */
 	uint32_t	OemVariant;
+};
+
+/*
+ * The following definitions on Supplement Adapter Information
+ * come from Adaptec:
+ */
+struct vpd_info {
+	uint8_t		AssemblyPn[8];
+	uint8_t		FruPn[8];
+	uint8_t		BatteryFruPn[8];
+	uint8_t		EcVersionString[8];
+	uint8_t		Tsid[12];
+};
+
+#define	MFG_PCBA_SERIAL_NUMBER_WIDTH	12
+#define	MFG_WWN_WIDTH			8
+
+struct aac_supplement_adapter_info {
+	/* The assigned Adapter Type Text, extra byte for null termination */
+	int8_t		AdapterTypeText[17+1];
+	/* Pad for the text above */
+	int8_t		Pad[2];
+	/* Size in bytes of the memory that is flashed */
+	uint32_t	FlashMemoryByteSize;
+	/* The assigned IMAGEID_xxx for this adapter */
+	uint32_t	FlashImageId;
+	/*
+	 * The maximum number of Phys available on a SATA/SAS
+	 * Controller, 0 otherwise
+	 */
+	uint32_t	MaxNumberPorts;
+	/* Version of expansion area */
+	uint32_t	Version;
+	uint32_t	FeatureBits;
+	uint8_t		SlotNumber;
+	uint8_t		ReservedPad0[3];
+	uint8_t		BuildDate[12];
+	/* The current number of Ports on a SAS controller, 0 otherwise */
+	uint32_t	CurrentNumberPorts;
+
+	struct vpd_info VpdInfo;
+
+	/* Firmware Revision (Vmaj.min-dash.) */
+	struct FsaRev	FlashFirmwareRevision;
+	uint32_t	RaidTypeMorphOptions;
+	/* Firmware's boot code Revision (Vmaj.min-dash.) */
+	struct FsaRev	FlashFirmwareBootRevision;
+	/* PCBA serial no. from th MFG sector */
+	uint8_t		MfgPcbaSerialNo[MFG_PCBA_SERIAL_NUMBER_WIDTH];
+	/* WWN from the MFG sector */
+	uint8_t		MfgWWNName[MFG_WWN_WIDTH];
+	/* Growth Area for future expansion ((7*4) - 12 - 8)/4 = 2 words */
+	uint32_t	ReservedGrowth[2];
 };
 
 /* Container creation data */
@@ -316,8 +373,28 @@ struct aac_mntinforesp {
 #define	CNT_SIZE			5
 
 /* Container types */
-#define	CT_NONE				0
-#define	CT_PASSTHRU			8
+typedef enum {
+	CT_NONE = 0,
+	CT_VOLUME,
+	CT_MIRROR,
+	CT_STRIPE,
+	CT_RAID5,
+	CT_SSRW,
+	CT_SSRO,
+	CT_MORPH,
+	CT_PASSTHRU,
+	CT_RAID4,
+	CT_RAID10,		/* stripe of mirror */
+	CT_RAID00,		/* stripe of stripe */
+	CT_VOLUME_OF_MIRRORS,	/* volume of mirror */
+	CT_PSEUDO_RAID3,	/* really raid4 */
+	CT_RAID50,		/* stripe of raid5 */
+	CT_RAID5D,		/* raid5 distributed hot-sparing */
+	CT_RAID5D0,
+	CT_RAID1E,		/* extended raid1 mirroring */
+	CT_RAID6,
+	CT_RAID60
+} AAC_FSAVolType;
 
 /*
  * Container Configuration Sub-Commands
@@ -655,8 +732,28 @@ typedef enum {
 	MAX_VMCOMMAND_NUM	/* used for sizing stats array - leave last */
 } AAC_VmCommand;
 
-/* Host-addressable object types */
-#define	FT_FILESYS		8
+/*
+ * Host-addressable object types
+ */
+typedef enum {
+	FT_REG = 1,	/* regular file */
+	FT_DIR,		/* directory */
+	FT_BLK,		/* "block" device - reserved */
+	FT_CHR,		/* "character special" device - reserved */
+	FT_LNK,		/* symbolic link */
+	FT_SOCK,	/* socket */
+	FT_FIFO,	/* fifo */
+	FT_FILESYS,	/* ADAPTEC's "FSA"(tm) filesystem */
+	FT_DRIVE,	/* physical disk - addressable in scsi by b/t/l */
+	FT_SLICE,	/* virtual disk - raw volume - slice */
+	FT_PARTITION,	/* FSA partition - carved out of a slice - building */
+			/* block for containers */
+	FT_VOLUME,	/* Container - Volume Set */
+	FT_STRIPE,	/* Container - Stripe Set */
+	FT_MIRROR,	/* Container - Mirror Set */
+	FT_RAID5,	/* Container - Raid 5 Set */
+	FT_DATABASE	/* Storage object with "foreign" content manager */
+} AAC_FType;
 
 /* Host-side scatter/gather list for 32-bit, 64-bit, raw commands */
 struct aac_sg_entry {

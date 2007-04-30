@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,7 +80,7 @@ _NOTE(CONSTCOND) } while (0)
 
 #define	AAC_DRIVER_MAJOR_VERSION	2
 #define	AAC_DRIVER_MINOR_VERSION	1
-#define	AAC_DRIVER_BUGFIX_LEVEL		12
+#define	AAC_DRIVER_BUGFIX_LEVEL		13
 #define	AAC_DRIVER_TYPE			AAC_TYPE_RELEASE
 
 #define	STR(s)				# s
@@ -151,6 +151,7 @@ struct aac_card_type {
 	char *desc;		/* ASCII data for INQUIRY command product id */
 };
 
+/* Array description */
 struct aac_container {
 	uint16_t valid;
 	uint32_t cid;		/* container id */
@@ -222,9 +223,9 @@ struct aac_slot {
 struct aac_softstate;
 struct aac_interface {
 	int (*aif_get_fwstatus)(struct aac_softstate *);
-	int (*aif_get_mailbox)(struct aac_softstate *, int mb);
-	void (*aif_set_mailbox)(struct aac_softstate *, uint32_t command,
-		uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3);
+	int (*aif_get_mailbox)(struct aac_softstate *, int);
+	void (*aif_set_mailbox)(struct aac_softstate *, uint32_t,
+		uint32_t, uint32_t, uint32_t, uint32_t);
 };
 
 struct aac_fib_context {
@@ -234,8 +235,14 @@ struct aac_fib_context {
 	struct aac_fib_context *next, *prev;
 };
 
+#define	AAC_VENDOR_LEN		8
+#define	AAC_PRODUCT_LEN		16
+
 struct aac_softstate {
 	int card;		/* index to aac_cards */
+	uint16_t hwif;		/* card chip type: i960 or Rocket */
+	char vendor_name[AAC_VENDOR_LEN + 1];
+	char product_name[AAC_PRODUCT_LEN + 1];
 	uint32_t support_opt;	/* firmware features */
 	uint32_t atu_size;	/* actual size of PCI mem space */
 	uint32_t map_size;	/* mapped PCI mem space size */
@@ -280,7 +287,7 @@ struct aac_softstate {
 	struct aac_cmd_queue q_wait;		/* for async FIB requests */
 	struct aac_cmd_queue q_comp;		/* for completed io requests */
 
-	/* aac I/O slots and FIBs */
+	/* I/O slots and FIBs */
 	int total_slots;		/* total slots allocated */
 	int total_fibs;			/* total FIBs allocated */
 	struct aac_slot *io_slot;	/* static list for allocated slots */

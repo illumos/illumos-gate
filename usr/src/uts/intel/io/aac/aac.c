@@ -105,7 +105,11 @@ _NOTE(CONSTCOND) } while (0)
 	((uint64_t)(mir)->MntObj.CapacityHigh << 32) : \
 	(uint64_t)(mir)->MntObj.Capacity)
 
-#define	BUF_IS_READ(bp) ((bp)->b_flags & B_READ)
+/* The last entry of aac_cards[] is for unknown cards */
+#define	AAC_UNKNOWN_CARD \
+	(sizeof (aac_cards) / sizeof (struct aac_card_type) - 1)
+#define	CARD_IS_UNKNOWN(i)	(i == AAC_UNKNOWN_CARD)
+#define	BUF_IS_READ(bp)		((bp)->b_flags & B_READ)
 #define	AAC_IS_Q_EMPTY(q) (((q)->q_head == NULL) ? 1 : 0)
 
 #define	PCI_MEM_GET32(softs, off) ddi_get32((softs)->pci_mem_handle, \
@@ -140,6 +144,9 @@ _NOTE(CONSTCOND) } while (0)
 #define	AAC_IOCMD_ALL		(AAC_IOCMD_SYNC | AAC_IOCMD_ASYNC | \
 				AAC_IOCMD_OUTSTANDING)
 
+/*
+ * Hardware access functions
+ */
 static int aac_rx_get_fwstatus(struct aac_softstate *);
 static int aac_rx_get_mailbox(struct aac_softstate *, int);
 static void aac_rx_set_mailbox(struct aac_softstate *, uint32_t,
@@ -159,8 +166,6 @@ static struct aac_interface aac_rkt_interface = {
 	aac_rkt_get_mailbox,
 	aac_rkt_set_mailbox
 };
-
-static int aac_send_command(struct aac_softstate *, struct aac_slot *);
 
 /*
  * SCSA function prototypes
@@ -184,14 +189,17 @@ static int aac_check_card_type(struct aac_softstate *);
 static int aac_check_firmware(struct aac_softstate *);
 static int aac_common_attach(struct aac_softstate *);
 static void aac_common_detach(struct aac_softstate *);
-int aac_sync_mbcommand(struct aac_softstate *, uint32_t, uint32_t,
-	uint32_t, uint32_t, uint32_t, uint32_t *);
 static int aac_get_container(struct aac_softstate *);
 static int aac_alloc_comm_space(struct aac_softstate *);
 static int aac_setup_comm_space(struct aac_softstate *);
 static void aac_free_comm_space(struct aac_softstate *);
 static int aac_hba_setup(struct aac_softstate *);
 
+/*
+ * Sync FIB operation functions
+ */
+int aac_sync_mbcommand(struct aac_softstate *, uint32_t, uint32_t,
+	uint32_t, uint32_t, uint32_t, uint32_t *);
 static int aac_sync_fib(struct aac_softstate *, uint32_t, struct aac_fib *,
 	uint16_t);
 static struct aac_fib *aac_grab_sync_fib(struct aac_softstate *,
@@ -199,7 +207,7 @@ static struct aac_fib *aac_grab_sync_fib(struct aac_softstate *,
 static void aac_release_sync_fib(struct aac_softstate *);
 
 /*
- * hardware queue operation funcitons
+ * Waiting/complete queue operation funcitons
  */
 static void aac_cmd_enqueue(struct aac_cmd_queue *, struct aac_cmd *);
 static struct aac_cmd *aac_cmd_dequeue(struct aac_cmd_queue *);
@@ -232,22 +240,23 @@ static void aac_start_waiting_io(struct aac_softstate *);
 static void aac_drain_comp_q(struct aac_softstate *);
 static int aac_do_poll_io(struct aac_softstate *, struct aac_cmd *);
 int aac_do_async_io(struct aac_softstate *, struct aac_cmd *);
+static int aac_send_command(struct aac_softstate *, struct aac_slot *);
 static void aac_dma_sync(ddi_dma_handle_t, off_t, size_t, uint_t);
 static int aac_shutdown(struct aac_softstate *);
 static int aac_reset_adapter(struct aac_softstate *);
 
 /*
- * Timeout handling thread function
+ * Adapter Initiated FIB handling function
  */
 static int aac_handle_aif(struct aac_softstate *, struct aac_fib *);
 
 /*
  * Timeout handling thread function
  */
-static void aac_daemon(void*);
+static void aac_daemon(void *);
 
 /*
- * IOCTL related functions
+ * IOCTL interface related functions
  */
 static int aac_open(dev_t *, int, int, cred_t *);
 static int aac_close(dev_t, int, int, cred_t *);
@@ -304,41 +313,52 @@ static struct modlinkage aac_modlinkage = {
 static struct aac_softstate  *aac_softstatep;
 
 /*
- * Suppoted card list
+ * Supported card list
+ * ordered in vendor id, subvendor id, subdevice id, and device id
  */
 static struct aac_card_type aac_cards[] = {
+	{0x1028, 0x1, 0x1028, 0x1, AAC_HWIF_I960RX,
+		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
+	{0x1028, 0x2, 0x1028, 0x2, AAC_HWIF_I960RX,
+		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
+	{0x1028, 0x3, 0x1028, 0x3, AAC_HWIF_I960RX,
+		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Si"},
+	{0x1028, 0x8, 0x1028, 0xcf, AAC_HWIF_I960RX,
+		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
+	{0x1028, 0x4, 0x1028, 0xd0, AAC_HWIF_I960RX,
+		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Si"},
+	{0x1028, 0x2, 0x1028, 0xd1, AAC_HWIF_I960RX,
+		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
+	{0x1028, 0x2, 0x1028, 0xd9, AAC_HWIF_I960RX,
+		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
+	{0x1028, 0xa, 0x1028, 0x106, AAC_HWIF_I960RX,
+		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
+	{0x1028, 0xa, 0x1028, 0x11b, AAC_HWIF_I960RX,
+		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
+	{0x1028, 0xa, 0x1028, 0x121, AAC_HWIF_I960RX,
+		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
+	{0x9005, 0x285, 0x1028, 0x287, AAC_HWIF_I960RX,
+		AAC_FLAGS_NO4GB | AAC_FLAGS_256FIBS, AAC_TYPE_SCSI,
+		"Dell", "PERC 320/DC"},
+	{0x9005, 0x285, 0x1028, 0x291, AAC_HWIF_I960RX,
+		AAC_FLAGS_NO4GB, AAC_TYPE_SATA, "Dell", "CERC SR2"},
+
+	{0x9005, 0x285, 0x1014, 0x2f2, AAC_HWIF_I960RX,
+		0, AAC_TYPE_SCSI, "IBM", "ServeRAID 8i"},
+	{0x9005, 0x285, 0x1014, 0x34d, AAC_HWIF_I960RX,
+		0, AAC_TYPE_SAS, "IBM", "ServeRAID 8s"},
+	{0x9005, 0x286, 0x1014, 0x9580, AAC_HWIF_RKT,
+		0, AAC_TYPE_SAS, "IBM", "ServeRAID 8k"},
+
+	{0x9005, 0x285, 0x103c, 0x3227, AAC_HWIF_I960RX,
+		AAC_FLAGS_NO4GB, AAC_TYPE_SATA, "Adaptec", "2610SA"},
+
 	{0x9005, 0x285, 0x9005, 0x285, AAC_HWIF_I960RX,
 		AAC_FLAGS_NO4GB | AAC_FLAGS_256FIBS, AAC_TYPE_SCSI,
 		"Adaptec", "2200S"},
 	{0x9005, 0x285, 0x9005, 0x286, AAC_HWIF_I960RX,
 		AAC_FLAGS_NO4GB | AAC_FLAGS_256FIBS, AAC_TYPE_SCSI,
 		"Adaptec", "2120S"},
-	{0x9005, 0x285, 0x9005, 0x290, AAC_HWIF_I960RX,
-		AAC_FLAGS_NO4GB, AAC_TYPE_SATA, "Adaptec", "2410SA"},
-	{0x9005, 0x285, 0x1028, 0x287, AAC_HWIF_I960RX,
-		AAC_FLAGS_NO4GB | AAC_FLAGS_256FIBS, AAC_TYPE_SCSI,
-		"Dell", "PERC 320/DC"},
-	{0x1028, 0xa, 0x1028, 0x121, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
-	{0x1028, 0xa, 0x1028, 0x11b, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
-	{0x1028, 0xa, 0x1028, 0x106, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
-	{0x1028, 0x8, 0x1028, 0xcf, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
-	{0x1028, 0x2, 0x1028, 0xd9, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
-	{0x1028, 0x2, 0x1028, 0xd1, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
-	{0x1028, 0x4, 0x1028, 0xd0, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Si"},
-	{0x1028, 0x3, 0x1028, 0x3, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Si"},
-	{0x1028, 0x2, 0x1028, 0x2, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
-	{0x1028, 0x1, 0x1028, 0x1, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
-
 	{0x9005, 0x285, 0x9005, 0x287, AAC_HWIF_I960RX,
 		AAC_FLAGS_NO4GB | AAC_FLAGS_256FIBS, AAC_TYPE_SCSI,
 		"Adaptec", "2200S"},
@@ -358,8 +378,8 @@ static struct aac_card_type aac_cards[] = {
 		0, AAC_TYPE_SATA, "Adaptec", "2020SA"},
 	{0x9005, 0x285, 0x9005, 0x28f, AAC_HWIF_I960RX,
 		0, AAC_TYPE_SATA, "Adaptec", "2025SA"},
-	{0x9005, 0x285, 0x9005, 0x291, AAC_HWIF_I960RX,
-		AAC_FLAGS_NO4GB, AAC_TYPE_SATA, "Dell", "CERC SR2"},
+	{0x9005, 0x285, 0x9005, 0x290, AAC_HWIF_I960RX,
+		AAC_FLAGS_NO4GB, AAC_TYPE_SATA, "Adaptec", "2410SA"},
 	{0x9005, 0x285, 0x9005, 0x292, AAC_HWIF_I960RX,
 		AAC_FLAGS_NO4GB, AAC_TYPE_SATA, "Adaptec", "2810SA"},
 	{0x9005, 0x285, 0x9005, 0x293, AAC_HWIF_I960RX,
@@ -390,54 +410,27 @@ static struct aac_card_type aac_cards[] = {
 		0, AAC_TYPE_SATA, "ICP", "9047MA"},
 	{0x9005, 0x286, 0x9005, 0x2a1, AAC_HWIF_RKT,
 		0, AAC_TYPE_SATA, "ICP", "9087MA"},
-	{0x9005, 0x286, 0x9005, 0x2a2, AAC_HWIF_RKT,
-		0, AAC_TYPE_SAS, "Adaptec", "RAID 3800"},
-	{0x9005, 0x286, 0x9005, 0x2a7, AAC_HWIF_RKT,
-		0, AAC_TYPE_SAS, "Adaptec", "RAID 3805"},
-	{0x9005, 0x286, 0x9005, 0x2a8, AAC_HWIF_RKT,
-		0, AAC_TYPE_SAS, "Adaptec", "RAID 3400"},
-	{0x9005, 0x286, 0x9005, 0x2a9, AAC_HWIF_RKT,
-		0, AAC_TYPE_SAS, "ICP", "5085AU"},
-	{0x9005, 0x286, 0x9005, 0x2aa, AAC_HWIF_RKT,
-		0, AAC_TYPE_SAS, "ICP", "5045AU"},
-	{0x9005, 0x286, 0x9005, 0x2a3, AAC_HWIF_RKT,
-		0, AAC_TYPE_SAS, "ICP", "5445AU"},
 	{0x9005, 0x285, 0x9005, 0x2a4, AAC_HWIF_I960RX,
 		0, AAC_TYPE_SAS, "ICP", "9085LI"},
 	{0x9005, 0x285, 0x9005, 0x2a5, AAC_HWIF_I960RX,
 		0, AAC_TYPE_SAS, "ICP", "5085BR"},
 	{0x9005, 0x286, 0x9005, 0x2a6, AAC_HWIF_RKT,
 		0, AAC_TYPE_SATA, "ICP", "9067MA"},
-	{0x9005, 0x286, 0x9005, 0x2ac, AAC_HWIF_RKT,
-		0, AAC_TYPE_SAS, "Adaptec", "RAID 1800"},
-	{0x9005, 0x286, 0x9005, 0x2b3, AAC_HWIF_RKT,
-		0, AAC_TYPE_SAS, "Adaptec", "RAID 2400"},
-	{0x9005, 0x286, 0x9005, 0x2b4, AAC_HWIF_RKT,
-		0, AAC_TYPE_SAS, "ICP", "5045AL"},
 	{0x9005, 0x285, 0x9005, 0x2b5, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SAS, "Adaptec", "RAID 5800"},
+		0, AAC_TYPE_SAS, "Adaptec", "RAID 5445"},
 	{0x9005, 0x285, 0x9005, 0x2b6, AAC_HWIF_I960RX,
 		0, AAC_TYPE_SAS, "Adaptec", "RAID 5805"},
 	{0x9005, 0x285, 0x9005, 0x2b7, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SAS, "Adaptec", "RAID 5808"},
+		0, AAC_TYPE_SAS, "Adaptec", "RAID 5085"},
 	{0x9005, 0x285, 0x9005, 0x2b8, AAC_HWIF_I960RX,
 		0, AAC_TYPE_SAS, "ICP", "RAID ICP5445SL"},
 	{0x9005, 0x285, 0x9005, 0x2b9, AAC_HWIF_I960RX,
 		0, AAC_TYPE_SAS, "ICP", "RAID ICP5085SL"},
 	{0x9005, 0x285, 0x9005, 0x2ba, AAC_HWIF_I960RX,
 		0, AAC_TYPE_SAS, "ICP", "RAID ICP5805SL"},
-	{0x9005, 0x285, 0x1014, 0x2f2, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SCSI, "IBM", "ServeRAID 8i"},
-	{0x9005, 0x285, 0x103c, 0x3227, AAC_HWIF_I960RX,
-		AAC_FLAGS_NO4GB, AAC_TYPE_SATA, "Adaptec", "2610SA"},
-	{0x9005, 0x286, 0x1014, 0x9580, AAC_HWIF_RKT,
-		0, AAC_TYPE_SAS, "IBM", "ServeRAID 8k"},
-	{0x9005, 0x285, 0x1014, 0x034d, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SAS, "IBM", "ServeRAID 8s"},
 
 	{0, 0, 0, 0, AAC_HWIF_UNKNOWN,
 		0, AAC_TYPE_UNKNOWN, "Unknown", "AAC card"},
-	{0, 0, 0, 0, AAC_HWIF_UNKNOWN, 0, AAC_TYPE_UNKNOWN, NULL, NULL}
 };
 
 ddi_device_acc_attr_t aac_acc_attr = {
@@ -466,7 +459,7 @@ static struct {
 static ddi_dma_attr_t aac_buf_dma_attr = {
 		DMA_ATTR_V0,
 		0x2000ull,	/* lowest usable address */
-				/* (2200 and 2120 cannot dma below 8192 */
+				/* (2200 and 2120 cannot do DMA below 8192) */
 		0xffffffffull,	/* high DMA address range */
 		0x0000ffffull,	/* DMA counter register */
 		AAC_DMA_ALIGN,	/* DMA address alignment */
@@ -475,14 +468,14 @@ static ddi_dma_attr_t aac_buf_dma_attr = {
 		0xffffffffull,	/* max DMA xfer size */
 		0xffffffffull,	/* segment boundary */
 		AAC_NSEG,	/* s/g list length */
-		512,		/* granularity of device */
+		AAC_BLK_SIZE,	/* granularity of device */
 		0,		/* DMA transfer flags */
 };
 
 static ddi_dma_attr_t aac_addr_dma_attr = {
 		DMA_ATTR_V0,
 		0x2000ull,	/* lowest usable address */
-				/* (2200 and 2120 cannot dma below 8192 */
+				/* (2200 and 2120 cannot do DMA below 8192) */
 		0x7fffffffull,	/* high DMA address range */
 		0x0000ffffull,	/* DMA counter register */
 		AAC_DMA_ALIGN,	/* DMA address alignment */
@@ -580,34 +573,19 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		AACDB_PRINT((CE_WARN, "Cannot alloc soft state"));
 		goto error;
 	}
-	attach_state |= AAC_ATTACH_SOFTSTATE_ALLOCED;
 	softs = ddi_get_soft_state(aac_softstatep, instance);
-	softs->devinfo_p = dip;
+	attach_state |= AAC_ATTACH_SOFTSTATE_ALLOCED;
 
+	softs->devinfo_p = dip;
 	softs->buf_dma_attr = aac_buf_dma_attr;
 	softs->addr_dma_attr = aac_addr_dma_attr;
+	softs->card = AAC_UNKNOWN_CARD;
 
 	/* Check the card type */
-	if ((softs->card = aac_check_card_type(softs)) == AACERR) {
+	if (aac_check_card_type(softs) == AACERR) {
 		AACDB_PRINT((CE_WARN, "Card not supported"));
 		goto error;
 	}
-
-	/* Set hardware dependent interface */
-	switch (aac_cards[softs->card].hwif) {
-	case AAC_HWIF_I960RX:
-		softs->aac_if = aac_rx_interface;
-		softs->map_size_min = AAC_MAP_SIZE_MIN_RX;
-		break;
-	case AAC_HWIF_RKT:
-		softs->aac_if = aac_rkt_interface;
-		softs->map_size_min = AAC_MAP_SIZE_MIN_RKT;
-		break;
-	default:
-		goto error;
-	}
-	/* Set up quirks */
-	softs->flags = aac_cards[softs->card].quirks;
 	/* We have found the right card and everything is OK */
 	attach_state |= AAC_ATTACH_CARD_DETECTED;
 
@@ -814,7 +792,8 @@ aac_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	rw_destroy(&softs->errlock);
 
 	ddi_regs_map_free(&softs->pci_mem_handle);
-	softs->card = AACERR;
+	softs->hwif = AAC_HWIF_UNKNOWN;
+	softs->card = AAC_UNKNOWN_CARD;
 	ddi_soft_state_free(aac_softstatep, instance);
 
 	return (DDI_SUCCESS);
@@ -883,7 +862,7 @@ aac_softintr(caddr_t arg)
 /*
  * Setup auto sense data for pkt
  */
-void
+static void
 aac_set_arq_data(struct scsi_pkt *pkt, uchar_t key,
 	uchar_t add_code, uchar_t qual_code, uint64_t info)
 {
@@ -1238,16 +1217,15 @@ aac_intr_norm(struct aac_softstate *softs, struct aac_cmd *acp)
 static int
 aac_check_card_type(struct aac_softstate *softs)
 {
-	uint16_t vendid, subvendid, devid, subsysid;
-	uint32_t mem_base;
-	int card_type_index;
-	uint32_t pci_cmd;
-	int card_found;
-	dev_info_t *dip = softs->devinfo_p;
 	ddi_acc_handle_t pci_config_handle;
+	uint16_t vendid, subvendid, devid, subsysid;
+	int card_index;
+	uint32_t pci_cmd;
+	uint32_t mem_base;
 
 	/* Map pci configuration space */
-	if ((pci_config_setup(dip, &pci_config_handle)) != DDI_SUCCESS) {
+	if ((pci_config_setup(softs->devinfo_p, &pci_config_handle))
+		!= DDI_SUCCESS) {
 		AACDB_PRINT((CE_WARN, "Cannot setup pci config space"));
 		return (AACERR);
 	}
@@ -1256,55 +1234,99 @@ aac_check_card_type(struct aac_softstate *softs)
 	devid = pci_config_get16(pci_config_handle, PCI_CONF_DEVID);
 	subvendid = pci_config_get16(pci_config_handle, PCI_CONF_SUBVENID);
 	subsysid = pci_config_get16(pci_config_handle, PCI_CONF_SUBSYSID);
-	mem_base = pci_config_get32(pci_config_handle, PCI_CONF_BASE0);
-	card_type_index = 0;
-	card_found = 0;
-	while (aac_cards[card_type_index].desc != NULL) {
-		if ((aac_cards[card_type_index].vendor == vendid) &&
-			(aac_cards[card_type_index].device == devid) &&
-			(aac_cards[card_type_index].subvendor == subvendid) &&
-			(aac_cards[card_type_index].subsys == subsysid)) {
-			card_found = 1;
+	card_index = 0;
+	while (!CARD_IS_UNKNOWN(card_index)) {
+		if ((aac_cards[card_index].vendor == vendid) &&
+			(aac_cards[card_index].device == devid) &&
+			(aac_cards[card_index].subvendor == subvendid) &&
+			(aac_cards[card_index].subsys == subsysid)) {
 			/*
 			 * SATA RAID adapter's DMA capability is worse
 			 * than SCSI RAID adapter.  So we need to change
 			 * dma_attr_count_max from 0xffff to 0xfff to meet
 			 * the requirement.
 			 */
-			if (aac_cards[card_type_index].type == AAC_TYPE_SATA)
+			if (aac_cards[card_index].type == AAC_TYPE_SATA)
 				softs->buf_dma_attr.dma_attr_count_max =
 					0xfffull;
 			break;
 		}
-		card_type_index++;
+		card_index++;
 	}
 
-	/* Make sure we can talk to this card */
-	if (card_found) {
-		/* supported aac card */
-		pci_cmd = pci_config_get16(pci_config_handle, PCI_CONF_COMM);
-		if ((pci_cmd & PCI_COMM_ME) == 0) {
-			/* force the busmaster enable bit on */
-			pci_cmd |= PCI_COMM_ME;
-			pci_config_put16(pci_config_handle, PCI_CONF_COMM,
-				pci_cmd);
-			pci_cmd = pci_config_get16(pci_config_handle,
-				PCI_CONF_COMM);
-			if ((pci_cmd & PCI_COMM_ME) == 0) {
-				cmn_err(CE_CONT,
-					"?Cannot enable busmaster bit");
-				goto error;
-			}
-		}
-		if ((pci_cmd & PCI_COMM_MAE) == 0) {
-			AACDB_PRINT((CE_WARN, "Memory window not available"));
+	softs->card = card_index;
+	softs->hwif = aac_cards[card_index].hwif;
+
+	/*
+	 * Unknown aac card
+	 * do a generic match based on the VendorID and DeviceID to
+	 * support the new cards in the aac family
+	 */
+	if (CARD_IS_UNKNOWN(card_index)) {
+		if (vendid != 0x9005) {
+			AACDB_PRINT((CE_WARN,
+				"Unknown vendor 0x%x", vendid));
 			goto error;
 		}
-	} else
-		/* Unknown aac card */
-		card_type_index--;
+		switch (devid) {
+		case 0x285:
+			softs->hwif = AAC_HWIF_I960RX;
+			break;
+		case 0x286:
+			softs->hwif = AAC_HWIF_RKT;
+			break;
+		default:
+			AACDB_PRINT((CE_WARN,
+				"Unknown device \"pci9005,%x\"", devid));
+			goto error;
+		}
+	}
+
+	/* Set hardware dependent interface */
+	switch (softs->hwif) {
+	case AAC_HWIF_I960RX:
+		softs->aac_if = aac_rx_interface;
+		softs->map_size_min = AAC_MAP_SIZE_MIN_RX;
+		break;
+	case AAC_HWIF_RKT:
+		softs->aac_if = aac_rkt_interface;
+		softs->map_size_min = AAC_MAP_SIZE_MIN_RKT;
+		break;
+	default:
+		AACDB_PRINT((CE_WARN,
+			"Unknown hardware interface %d", softs->hwif));
+		goto error;
+	}
+
+	/* Set card names */
+	(void *)strncpy(softs->vendor_name, aac_cards[card_index].vid,
+		AAC_VENDOR_LEN);
+	(void *)strncpy(softs->product_name, aac_cards[card_index].desc,
+		AAC_PRODUCT_LEN);
+
+	/* Set up quirks */
+	softs->flags = aac_cards[card_index].quirks;
+
+	/* Force the busmaster enable bit on */
+	pci_cmd = pci_config_get16(pci_config_handle, PCI_CONF_COMM);
+	if ((pci_cmd & PCI_COMM_ME) == 0) {
+		pci_cmd |= PCI_COMM_ME;
+		pci_config_put16(pci_config_handle, PCI_CONF_COMM,
+			pci_cmd);
+		pci_cmd = pci_config_get16(pci_config_handle,
+			PCI_CONF_COMM);
+		if ((pci_cmd & PCI_COMM_ME) == 0) {
+			cmn_err(CE_CONT,
+				"?Cannot enable busmaster bit");
+			goto error;
+		}
+	}
+
+	/* Set memory base to map */
+	mem_base = pci_config_get32(pci_config_handle, PCI_CONF_BASE0);
 
 	pci_config_teardown(&pci_config_handle);
+
 	cmn_err(CE_NOTE,
 		"!aac driver %d.%02d.%02d-%d, found card: " \
 		"%s %s(pci0x%x.%x.%x.%x) at 0x%x",
@@ -1312,11 +1334,10 @@ aac_check_card_type(struct aac_softstate *softs)
 		AAC_DRIVER_MINOR_VERSION,
 		AAC_DRIVER_BUGFIX_LEVEL,
 		AAC_DRIVER_BUILD,
-		aac_cards[card_type_index].vid,
-		aac_cards[card_type_index].desc,
+		softs->vendor_name, softs->product_name,
 		vendid, devid, subvendid, subsysid,
 		mem_base);
-	return (card_type_index); /* card type detected */
+	return (AACOK); /* card type detected */
 
 error:
 	pci_config_teardown(&pci_config_handle);
@@ -1467,6 +1488,56 @@ aac_check_firmware(struct aac_softstate *softs)
 		softs->aac_max_fibs, softs->aac_max_fib_size,
 		softs->aac_max_sectors, softs->aac_sg_tablesize);
 
+	return (AACOK);
+}
+
+/*
+ * The following function comes from Adaptec:
+ *
+ * Query adapter information and supplement adapter information
+ */
+static int
+aac_get_adapter_info(struct aac_softstate *softs,
+	struct aac_adapter_info *ainfr,
+	struct aac_supplement_adapter_info *sinfr)
+{
+	struct aac_fib *fib;
+	struct aac_adapter_info *ainfp;
+	struct aac_supplement_adapter_info *sinfp;
+
+	fib = aac_grab_sync_fib(softs, SLEEP_FUNC);
+	fib->data[0] = 0;
+	if (aac_sync_fib(softs, RequestAdapterInfo, fib,
+		sizeof (struct aac_fib_header)) != AACOK) {
+		AACDB_PRINT((CE_WARN, "RequestAdapterInfo failed"));
+		aac_release_sync_fib(softs);
+		return (AACERR);
+	}
+	ainfp = (struct aac_adapter_info *)fib->data;
+	if (ainfr) {
+		*ainfr = *ainfp;
+	}
+	if (sinfr) {
+		if (!(softs->support_opt &
+			AAC_SUPPORTED_SUPPLEMENT_ADAPTER_INFO)) {
+			AACDB_PRINT((CE_WARN,
+				"SupplementAdapterInfo not supported"));
+			aac_release_sync_fib(softs);
+			return (AACERR);
+		}
+		fib->data[0] = 0;
+		if (aac_sync_fib(softs, RequestSupplementAdapterInfo, fib,
+			sizeof (struct aac_fib_header)) != AACOK) {
+			AACDB_PRINT((CE_WARN,
+				"RequestSupplementAdapterInfo failed"));
+			aac_release_sync_fib(softs);
+			return (AACERR);
+		}
+		sinfp = (struct aac_supplement_adapter_info *)fib->data;
+		*sinfr = *sinfp;
+	}
+
+	aac_release_sync_fib(softs);
 	return (AACOK);
 }
 
@@ -1638,6 +1709,56 @@ aac_common_attach(struct aac_softstate *softs)
 	if (softs->total_fibs == 0)
 		goto error;
 	AACDB_PRINT((CE_NOTE, "%d fibs allocated", softs->total_fibs));
+
+	/* Get adapter names */
+	if (CARD_IS_UNKNOWN(softs->card)) {
+		struct aac_supplement_adapter_info sinf;
+
+		if (aac_get_adapter_info(softs, NULL, &sinf) != AACOK) {
+			cmn_err(CE_CONT, "?Query adapter information failed");
+		} else {
+			char *p, *p0, *p1;
+
+			/*
+			 * Now find the controller name in supp_adapter_info->
+			 * AdapterTypeText. Use the first word as the vendor
+			 * and the other words as the product name.
+			 */
+			AACDB_PRINT((CE_NOTE, "sinf.AdapterTypeText = "
+				"\"%s\"", sinf.AdapterTypeText));
+			p = sinf.AdapterTypeText;
+			p0 = p1 = NULL;
+			/* Skip heading spaces */
+			while (*p && (*p == ' ' || *p == '\t'))
+				p++;
+			p0 = p;
+			while (*p && (*p != ' ' && *p != '\t'))
+				p++;
+			/* Remove middle spaces */
+			while (*p && (*p == ' ' || *p == '\t'))
+				*p++ = 0;
+			p1 = p;
+			/* Remove trailing spaces */
+			p = p1 + strlen(p1) - 1;
+			while (p > p1 && (*p == ' ' || *p == '\t'))
+				*p-- = 0;
+			if (*p0 && *p1) {
+				(void *)strncpy(softs->vendor_name, p0,
+					AAC_VENDOR_LEN);
+				(void *)strncpy(softs->product_name, p1,
+					AAC_PRODUCT_LEN);
+			} else {
+				cmn_err(CE_WARN,
+					"?adapter name mis-formatted\n");
+				if (*p0)
+					(void *)strncpy(softs->product_name,
+						p0, AAC_PRODUCT_LEN);
+			}
+			AACDB_PRINT((CE_NOTE,
+				"adapter: vendor = \"%s\", product = \"%s\"",
+				softs->vendor_name, softs->product_name));
+		}
+	}
 
 	/* Perform acceptance of adapter-detected config changes if possible */
 	if (aac_handle_adapter_config_issues(softs) != AACMPE_OK) {
@@ -2430,21 +2551,17 @@ aac_setup_comm_space(struct aac_softstate *softs)
 static uchar_t *
 aac_vendor_id(struct aac_softstate *softs, uchar_t *buf)
 {
-	struct aac_card_type *cardp = &aac_cards[softs->card];
-
-	(void) memset(buf, ' ', 8);
-	bcopy(cardp->vid, buf, strlen(cardp->vid));
-	return (buf + 8);
+	(void) memset(buf, ' ', AAC_VENDOR_LEN);
+	bcopy(softs->vendor_name, buf, strlen(softs->vendor_name));
+	return (buf + AAC_VENDOR_LEN);
 }
 
 static uchar_t *
 aac_product_id(struct aac_softstate *softs, uchar_t *buf)
 {
-	struct aac_card_type *cardp = &aac_cards[softs->card];
-
-	(void) memset(buf, ' ', 16);
-	bcopy(cardp->desc, buf, strlen(cardp->desc));
-	return (buf + 16);
+	(void) memset(buf, ' ', AAC_PRODUCT_LEN);
+	bcopy(softs->product_name, buf, strlen(softs->product_name));
+	return (buf + AAC_PRODUCT_LEN);
 }
 
 /*
@@ -3085,11 +3202,9 @@ aac_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 			cap.lbasize = BE_32(AAC_SECTOR_SIZE);
 
 			aac_free_dmamap(ac);
-			if (bp->b_flags & (B_PHYS|B_PAGEIO)) {
+			if (bp->b_flags & (B_PHYS|B_PAGEIO))
 				bp_mapin(bp);
-				bcopy(&cap, bp->b_un.b_addr, 8);
-			} else
-				bcopy(&cap, bp->b_un.b_addr, 8);
+			bcopy(&cap, bp->b_un.b_addr, 8);
 			pkt->pkt_state |= STATE_XFERRED_DATA;
 		}
 		aac_soft_callback(softs, ac, CMD_CMPLT);
@@ -3112,11 +3227,9 @@ aac_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 			cap16.sc_lbasize = BE_32(AAC_SECTOR_SIZE);
 
 			aac_free_dmamap(ac);
-			if (bp->b_flags & (B_PHYS | B_PAGEIO)) {
+			if (bp->b_flags & (B_PHYS | B_PAGEIO))
 				bp_mapin(bp);
-				bcopy(&cap16, bp->b_un.b_addr, cap_len);
-			} else
-				bcopy(&cap16, bp->b_un.b_addr, cap_len);
+			bcopy(&cap16, bp->b_un.b_addr, cap_len);
 			pkt->pkt_state |= STATE_XFERRED_DATA;
 		}
 		aac_soft_callback(softs, ac, CMD_CMPLT);
@@ -3253,9 +3366,9 @@ aac_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		ac->flags |= AAC_CMD_SOFT_INTR;
 		aac_free_dmamap(ac);
 		if (pkt->pkt_cdbp[4] & 0x01)
-			softs->container[target*16+lun].locked = 1;
+			softs->container[target].locked = 1;
 		else
-			softs->container[target*16+lun].locked = 0;
+			softs->container[target].locked = 0;
 		aac_soft_callback(softs, ac, CMD_CMPLT);
 		ret_val = TRAN_ACCEPT;
 		break;
