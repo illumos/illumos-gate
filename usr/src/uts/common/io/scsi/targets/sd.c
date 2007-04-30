@@ -2603,11 +2603,8 @@ sd_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
 		    name, valuep, lengthp));
 	} else if (!SD_IS_VALID_LABEL(un)) {
-		(void) cmlb_validate(un->un_cmlbhandle, 0,
-		    (void *)SD_PATH_DIRECT);
-		if (!SD_IS_VALID_LABEL(un))
-			return (ddi_prop_op(dev, dip, prop_op, mod_flags,
-			    name, valuep, lengthp));
+		return (ddi_prop_op(dev, dip, prop_op, mod_flags, name,
+		    valuep, lengthp));
 	}
 
 	/* get nblocks value */
@@ -17235,7 +17232,8 @@ sd_handle_mchange(struct sd_lun *un)
 	/*
 	 * Check if the media in the device is writable or not
 	 */
-	sd_check_for_writable_cd(un, SD_PATH_DIRECT_PRIORITY);
+	if (ISCD(un))
+		sd_check_for_writable_cd(un, SD_PATH_DIRECT_PRIORITY);
 
 	/*
 	 * Note: Maybe let the strategy/partitioning chain worry about getting
@@ -20537,7 +20535,8 @@ sd_check_media(dev_t dev, enum dkio_state state)
 		/*
 		 *  Check if the media in the device is writable or not
 		 */
-		sd_check_for_writable_cd(un, SD_PATH_DIRECT);
+		if (ISCD(un))
+			sd_check_for_writable_cd(un, SD_PATH_DIRECT);
 
 		mutex_exit(SD_MUTEX(un));
 		cmlb_invalidate(un->un_cmlbhandle, (void *)SD_PATH_DIRECT);
