@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,19 +32,26 @@
 #include "cache.h"
 
 int
-nscd_wait(waiter_t *wchan,  mutex_t *lock, uint8_t *key)
+nscd_wait(nsc_ctx_t *ctx, nsc_db_t *nscdb, nsc_entry_t *entry)
 {
-	waiter_t mywait;
+	waiter_t	mywait;
+	waiter_t	*wchan = &nscdb->db_wait;
+
 	(void) cond_init(&(mywait.w_waitcv), USYNC_THREAD, 0);
-	mywait.w_key = key;
+	mywait.w_key = entry;
+	mywait.w_signaled = 0;
 	mywait.w_next = wchan->w_next;
 	mywait.w_prev = wchan;
 	if (mywait.w_next)
 		mywait.w_next->w_prev = &mywait;
 	wchan->w_next = &mywait;
 
-	while (*key & ST_PENDING)
-		(void) cond_wait(&(mywait.w_waitcv), lock);
+	(void) mutex_lock(&ctx->stats_mutex);
+	ctx->stats.wait_count++;
+	(void) mutex_unlock(&ctx->stats_mutex);
+
+	while (!mywait.w_signaled)
+		(void) cond_wait(&(mywait.w_waitcv), &nscdb->db_mutex);
 	if (mywait.w_prev)
 		mywait.w_prev->w_next = mywait.w_next;
 	if (mywait.w_next)
@@ -53,14 +60,20 @@ nscd_wait(waiter_t *wchan,  mutex_t *lock, uint8_t *key)
 }
 
 int
-nscd_signal(waiter_t *wchan, uint8_t *key)
+nscd_signal(nsc_ctx_t *ctx, nsc_db_t *nscdb, nsc_entry_t *entry)
 {
-	int c = 0;
-	waiter_t *tmp = wchan->w_next;
+	int		c = 0;
+	waiter_t	*wchan = &nscdb->db_wait;
+	waiter_t	*tmp = wchan->w_next;
 
 	while (tmp) {
-		if (tmp->w_key == key) {
+		if (tmp->w_key == entry) {
 			(void) cond_signal(&(tmp->w_waitcv));
+			tmp->w_signaled = 1;
+
+			(void) mutex_lock(&ctx->stats_mutex);
+			ctx->stats.wait_count--;
+			(void) mutex_unlock(&ctx->stats_mutex);
 			c++;
 		}
 		tmp = tmp->w_next;

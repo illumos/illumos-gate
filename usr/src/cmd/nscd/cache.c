@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1514,8 +1514,7 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 				"%s: no clearance to wait\n");
 			}
 			/* yes can wait */
-			(void) nscd_wait(&ctx->wait, &nscdb->db_mutex,
-					&this_stats->status);
+			(void) nscd_wait(ctx, nscdb, this_entry);
 			(void) _nscd_release_clearance(&ctx->throttle_sema);
 			continue;
 		}
@@ -1557,7 +1556,7 @@ lookup_int(nsc_lookup_args_t *largs, int flag) {
 		(void) _nscd_release_clearance(&ctx->throttle_sema);
 
 		/* signal waiting threads */
-		(void) nscd_signal(&ctx->wait, &this_stats->status);
+		(void) nscd_signal(ctx, nscdb, this_entry);
 
 		_NSCD_LOG(NSCD_LOG_CACHE, NSCD_LOG_LEVEL_DEBUG)
 		(me, "%s: name service lookup status = %d\n",

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,15 +117,6 @@ typedef enum {
 } nsc_action_t;
 
 /*
- * Structure to handle waiting for pending name service requests
- */
-typedef struct waiter {
-	cond_t		w_waitcv;
-	uint8_t		*w_key;
-	struct waiter	*w_next, *w_prev;
-} waiter_t;
-
-/*
  *  What each entry in the nameserver cache looks like.
  */
 
@@ -150,6 +141,16 @@ typedef struct nsc_keephot {
 	void	*ptr;
 	uint_t	num;
 } nsc_keephot_t;
+
+/*
+ * Structure to handle waiting for pending name service requests
+ */
+typedef struct waiter {
+	cond_t		w_waitcv;
+	uint8_t		w_signaled;
+	nsc_entry_t	*w_key;
+	struct waiter	*w_next, *w_prev;
+} waiter_t;
 
 /*
  * Macros used by hash table
@@ -249,6 +250,7 @@ typedef struct nsc_db {
 	int		dbop;
 	char 		*name;
 	mutex_t		db_mutex;
+	waiter_t	db_wait;	/* lookup wait CV */
 	int		htsize;
 	enum hash_type {
 		nsc_ht_default = 0,
@@ -290,7 +292,6 @@ typedef struct nsc_ctx {
 	const char 	*file_name;		/* filename for check_files */
 	int		db_count;		/* number of caches */
 	nsc_db_t 	*nsc_db[_NSC_MAX_DB];	/* caches */
-	waiter_t	wait;			/* lookup wait CV */
 	sema_t		throttle_sema;		/* throttle lookups */
 	sema_t		revalidate_sema;	/* revalidation threads */
 	nscd_bool_t	revalidate_on;		/* reval. thread started */
@@ -329,8 +330,8 @@ extern void tnrhtp_init_ctx(nsc_ctx_t *);
 extern void tnrhdb_init_ctx(nsc_ctx_t *);
 
 /* Functions used to throttle threads */
-extern int nscd_wait(waiter_t *, mutex_t *, uint8_t *);
-extern int nscd_signal(waiter_t *, uint8_t *);
+extern int nscd_wait(nsc_ctx_t *, nsc_db_t *, nsc_entry_t *);
+extern int nscd_signal(nsc_ctx_t *, nsc_db_t *, nsc_entry_t *);
 
 /* Cache creation and initialization */
 extern nscd_rc_t init_cache();
