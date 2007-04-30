@@ -121,6 +121,8 @@ AMD64GART_OBJS += amd64_gart.o
 ATA_OBJS += $(GHD_OBJS) ata_blacklist.o ata_common.o ata_disk.o \
 	ata_dma.o atapi.o atapi_fsm.o ata_debug.o \
 	sil3xxx.o
+BSCBUS_OBJS += bscbus.o
+BSCV_OBJS += bscv.o
 CMDK_OBJS += cmdk.o
 CMLB_OBJS += cmlb.o
 DADK_OBJS += dadk.o

@@ -594,6 +594,8 @@ AUDIOHDRS=			\
 	g711.h
 
 BSCHDRS=			\
+	bscbus.h		\
+	bscv_impl.h		\
 	lom_ebuscodes.h		\
 	lom_io.h		\
 	lom_priv.h		\

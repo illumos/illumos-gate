@@ -21,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	Global definitions for sun4u jbos-blade implementation specific modules.
@@ -89,8 +89,8 @@ include $(UTSTREE)/sun4u/Makefile.sun4u
 #	Define modules (must come after Makefile.sun4u, for CLOSED_BUILD).
 #
 BLADE_KMODS		= platmod
-$(CLOSED_BUILD)CLOSED_BLADE_KMODS	+= bscbus
-$(CLOSED_BUILD)CLOSED_BLADE_KMODS	+= bscv
+BLADE_KMODS		+= bscbus
+BLADE_KMODS		+= bscv
 
 LINTS_DIR	= $(OBJS_DIR)
 LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/blade/lint-libs/$(OBJS_DIR)

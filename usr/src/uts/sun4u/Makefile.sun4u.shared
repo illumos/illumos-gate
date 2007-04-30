@@ -405,9 +405,9 @@ DRV_KMODS	+= rmclomv
 DRV_KMODS	+= wrsmd
 DRV_KMODS	+= sf
 DRV_KMODS	+= nxge
+DRV_KMODS	+= i2bsc 
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ctsmc
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= i2bsc 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= m1535ppm
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= memtest
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= mi2cv
@@ -448,13 +448,12 @@ MISC_KMODS	+= sbd
 MISC_KMODS	+= opl_cfg
 MISC_KMODS	+= kmech_krb5
 MISC_KMODS	+= zuluvm
+MISC_KMODS	+= gptwo_cpu gptwocfg
 
 #
 #	Brand modules
 #
 BRAND_KMODS	+= sn1_brand
-
-$(CLOSED_BUILD)CLOSED_MISC_KMODS	+= gptwo_cpu gptwocfg
 
 #
 #	Software Cryptographic Providers (/kernel/crypto):
@@ -491,8 +490,9 @@ CPU_KMODS	+= cheetah cheetahplus jalapeno serrano spitfire hummingbird
 #
 TOD_KMODS	+= todds1287 todds1337 todmostek todstarfire 
 TOD_KMODS	+= todm5819 todblade todbq4802 todsg todopl
+TOD_KMODS	+= todm5819p_rmc todstarcat 
 
-$(CLOSED_BUILD)CLOSED_TOD_KMODS	+= todm5819p_rmc todstarcat todm5823
+$(CLOSED_BUILD)CLOSED_TOD_KMODS	+= todm5823
 
 #
 #	Performance Counter BackEnd Modules (/usr/kernel/pcbe):
