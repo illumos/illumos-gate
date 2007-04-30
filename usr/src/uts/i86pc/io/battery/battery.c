@@ -1329,8 +1329,8 @@ batt_cbat_notify(ACPI_HANDLE hdl, UINT32 val, void *ctx)
 	char *ev;
 	acpi_bst_t *bst;
 
-	mutex_enter(&batt_mutex);
 	BATT_PRT_NOTIFY(hdl, val);
+	mutex_enter(&batt_mutex);
 
 	switch (val) {
 	/*
@@ -1476,12 +1476,12 @@ batt_ac_notify(ACPI_HANDLE hdl, UINT32 val, void *ctx)
 	char *ev;
 	int eval;
 
-	mutex_enter(&batt_mutex);
 	BATT_PRT_NOTIFY(hdl, val);
-
 	if (val != 0x80) {
 		return;
 	}
+	mutex_enter(&batt_mutex);
+
 	/*
 	 * Note: if unplug and then quickly plug back, two ADD
 	 * events will be generated.
