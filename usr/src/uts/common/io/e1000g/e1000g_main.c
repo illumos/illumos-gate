@@ -53,9 +53,9 @@
 #define	E1000_RX_INTPT_TIME	128
 #define	E1000_RX_PKT_CNT	8
 
-static char ident[] = "Intel PRO/1000 Ethernet 5.1.7";
+static char ident[] = "Intel PRO/1000 Ethernet 5.1.8";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.1.7";
+static char e1000g_version[] = "Driver Ver. 5.1.8";
 
 /*
  * Proto types for DDI entry points
@@ -888,6 +888,17 @@ e1000g_unattach(dev_info_t *devinfo, struct e1000g *Adapter)
 	}
 
 	if (Adapter->attach_progress & ATTACH_PROGRESS_INIT) {
+		timeout_id_t tid = 0;
+
+		/* Disable the link timer */
+		mutex_enter(&Adapter->e1000g_linklock);
+		tid = Adapter->link_tid;
+		Adapter->link_tid = 0;
+		mutex_exit(&Adapter->e1000g_linklock);
+
+		if (tid != 0)
+			(void) untimeout(tid);
+
 		e1000_reset_hw(&Adapter->Shared);
 	}
 
@@ -1763,6 +1774,14 @@ e1000g_intr_work(struct e1000g *Adapter, uint32_t ICRContents)
 			if (tid != 0)
 				(void) untimeout(tid);
 
+			/*
+			 * Workaround for esb2. Data stuck in fifo on a link
+			 * down event. Reset the adapter to recover it.
+			 */
+			if ((Adapter->link_state == LINK_STATE_DOWN) &&
+			    (Adapter->Shared.mac_type == e1000_80003es2lan))
+				(void) e1000g_reset(Adapter);
+
 			mac_link_update(Adapter->mh, Adapter->link_state);
 		}
 
@@ -2542,13 +2561,6 @@ e1000g_link_check(struct e1000g *Adapter)
 				e1000_write_phy_reg(hw,
 				    PHY_1000T_CTRL, phydata);
 			}
-			/*
-			 * Workaround for esb2. Data stuck in fifo on a link
-			 * down event. Reset the adapter to recover it.
-			 */
-			if (hw->mac_type == e1000_80003es2lan) {
-				(void) e1000g_reset(Adapter);
-			}
 		} else {
 			e1000g_smartspeed(Adapter);
 		}
@@ -2597,8 +2609,17 @@ e1000g_LocalTimer(void *ws)
 		link_changed = e1000g_link_check(Adapter);
 	mutex_exit(&Adapter->e1000g_linklock);
 
-	if (link_changed)
+	if (link_changed) {
+		/*
+		 * Workaround for esb2. Data stuck in fifo on a link
+		 * down event. Reset the adapter to recover it.
+		 */
+		if ((Adapter->link_state == LINK_STATE_DOWN) &&
+		    (hw->mac_type == e1000_80003es2lan))
+			(void) e1000g_reset(Adapter);
+
 		mac_link_update(Adapter->mh, Adapter->link_state);
+	}
 
 	/*
 	 * With 82571 controllers, any locally administered address will

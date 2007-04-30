@@ -498,3 +498,9 @@ Notes on packaging:
    6531474 Fatal PCIe Fabric Error panics on T2000 when using jumbo frames on e1000g interfaces
    6535712 e1000g: the processing of the checksum flags should be protected by tx_lock
 
+5.1.8
+======
+  This version has the following fix:
+   6548711 e1000g: recursive mutex_enter in e1000g_link_check() on ESB2 platforms
+   6550086 e1000g: detaching driver immediately after attach induces panic
+
