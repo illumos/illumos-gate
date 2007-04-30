@@ -6596,7 +6596,7 @@ ill_thread_exit(ill_t *ill, void *dummy)
 
 #ifdef ILL_DEBUG
 void
-ip_thread_exit(ip_stack_t *ipst)
+ip_thread_exit_stack(ip_stack_t *ipst)
 {
 	ill_t	*ill;
 	ipif_t	*ipif;
@@ -6616,6 +6616,23 @@ ip_thread_exit(ip_stack_t *ipst)
 	ire_walk(ire_thread_exit, NULL, ipst);
 	ndp_walk_common(ipst->ips_ndp4, NULL, nce_thread_exit, NULL, B_FALSE);
 	ndp_walk_common(ipst->ips_ndp6, NULL, nce_thread_exit, NULL, B_FALSE);
+}
+
+/*
+ * This is a function which is called from thread_exit
+ * that can be used to debug reference count issues in IP. See comment in
+ * <inet/ip.h> on how it is used.
+ */
+void
+ip_thread_exit(void)
+{
+	netstack_t *ns;
+
+	ns = netstack_get_current();
+	if (ns != NULL) {
+		ip_thread_exit_stack(ns->netstack_ip);
+		netstack_rele(ns);
+	}
 }
 
 /*

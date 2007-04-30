@@ -473,6 +473,48 @@ extern int ip_sioctl_move(ipif_t *, sin_t *, queue_t *, mblk_t *,
 
 extern	void	conn_delete_ire(conn_t *, caddr_t);
 
+/*
+ * This is a function which is called from thread_exit
+ * that can be used to debug reference count issues in IP.
+ *
+ * Notes on reference tracing on ill, ipif, ire, nce data structures:
+ *
+ * The current model of references on an ipif or ill is purely based on threads
+ * acquiring a reference by doing a lookup on the ill or ipif or by calling a
+ * refhold function on the ill or ipif. In particular any data structure that
+ * points to an ipif or ill does not explicitly contribute to a reference on the
+ * ill or ipif. More details may be seen in the block comment above ipif_down().
+ * Thus in the quiescent state an ill or ipif has a refcnt of zero. Similarly
+ * when a thread exits, there can't be any references on the ipif or ill due to
+ * the exiting thread.
+ *
+ * As a debugging aid, the refhold and refrele functions call into tracing
+ * functions that record the stack trace of the caller and the references
+ * acquired or released by the calling thread, hashed by the thread id. On
+ * thread exit, ipif_thread_exit and ill_thread_exit verify that there are no
+ * outstanding references to the ipif or ill from the exiting thread.
+ *
+ * In the case of ires and nces, the model is slightly different. Typically each
+ * ire pointing to an nce contributes to the nce_refcnt. Similarly a conn_t
+ * pointing to an ire also contributes to the ire_refcnt. Excluding the above
+ * special cases, the tracing behavior is similar to the tracing on ipif / ill.
+ * Traces are neither recorded nor verified in the exception cases, and the code
+ * is careful to use the right refhold and refrele functions. On thread exit
+ * ire_thread_exit, nce_thread_exit does the verification that are no
+ * outstanding references on the ire / nce from the exiting thread.
+ *
+ * The reference verification is driven from thread_exit() which calls into IP
+ * via a function pointer ip_cleanup_func into the verification function
+ * ip_thread_exit. This debugging aid may be helpful in tracing missing
+ * refrele's on a debug kernel. On a non-debug kernel, these missing refrele's
+ * are noticeable only when an interface is being unplumbed, and the unplumb
+ * hangs, long after the missing refrele. On a debug kernel, the traces
+ * (th_trace_t) which contain the stack backtraces can be examined on a crash
+ * dump to locate the missing refrele.
+ */
+extern void (*ip_cleanup_func)(void);
+extern void ip_thread_exit(void);
+
 #endif /* _KERNEL */
 
 #ifdef	__cplusplus

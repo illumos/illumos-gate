@@ -202,6 +202,8 @@ extern netstack_t *netstack_find_by_zoneid(zoneid_t);
 extern zoneid_t netstackid_to_zoneid(netstackid_t);
 extern netstackid_t zoneid_to_netstackid(zoneid_t);
 
+extern netstack_t *netstack_get_current(void);
+
 /*
  * Register interest in changes to the set of netstacks.
  * The createfn and destroyfn are required, but the shutdownfn can be

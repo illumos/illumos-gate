@@ -75,6 +75,8 @@
 #include <sys/kdi.h>
 #include <sys/waitq.h>
 #include <sys/cpucaps.h>
+#include <inet/ip.h>
+#include <inet/ip_if.h>
 
 struct kmem_cache *thread_cache;	/* cache of free threads */
 struct kmem_cache *lwp_cache;		/* cache of free lwps */
@@ -559,8 +561,11 @@ thread_rele(kthread_t *t)
 	}
 }
 
-
-void	(*ip_cleanup_func)(void);
+/*
+ * This is a function which is called from thread_exit
+ * that can be used to debug reference count issues in IP.
+ */
+void (*ip_cleanup_func)(void);
 
 void
 thread_exit()

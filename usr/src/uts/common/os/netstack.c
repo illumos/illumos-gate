@@ -778,7 +778,7 @@ netstack_do_destroy(void)
  * Increases the reference count, caller must do a netstack_rele.
  * It can't be called after zone_destroy() has started.
  */
-static netstack_t *
+netstack_t *
 netstack_get_current(void)
 {
 	netstack_t *ns;

@@ -5943,6 +5943,11 @@ ip_ddi_init(void)
 	ip_ire_g_init();
 	ip_net_g_init();
 
+#ifdef ILL_DEBUG
+	/* Default cleanup function */
+	ip_cleanup_func = ip_thread_exit;
+#endif
+
 	/*
 	 * We want to be informed each time a stack is created or
 	 * destroyed in the kernel, so we can maintain the
