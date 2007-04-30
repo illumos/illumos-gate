@@ -2723,7 +2723,9 @@ dcd_handle_incomplete(struct dcd_disk *un, struct buf *bp)
 	case CMD_INCOMPLETE:
 		action = dcd_check_error(un, bp);
 		DCD_DO_ERRSTATS(un, dcd_transerrs);
-		(void) dcd_reset_disk(un, pkt);
+		if (action == COMMAND_HARD_ERROR) {
+			(void) dcd_reset_disk(un, pkt);
+		}
 		break;
 
 	case CMD_FATAL:
