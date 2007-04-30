@@ -1689,6 +1689,51 @@ done:
 }
 
 static int
+zone_set_brand(zone_t *zone, const char *brand)
+{
+	struct brand_attr *attrp;
+	brand_t *bp;
+
+	attrp = kmem_alloc(sizeof (struct brand_attr), KM_SLEEP);
+	if (copyin(brand, attrp, sizeof (struct brand_attr)) != 0) {
+		kmem_free(attrp, sizeof (struct brand_attr));
+		return (EFAULT);
+	}
+
+	bp = brand_register_zone(attrp);
+	kmem_free(attrp, sizeof (struct brand_attr));
+	if (bp == NULL)
+		return (EINVAL);
+
+	/*
+	 * This is the only place where a zone can change it's brand.
+	 * We already need to hold zone_status_lock to check the zone
+	 * status, so we'll just use that lock to serialize zone
+	 * branding requests as well.
+	 */
+	mutex_enter(&zone_status_lock);
+
+	/* Re-Branding is not allowed and the zone can't be booted yet */
+	if ((ZONE_IS_BRANDED(zone)) ||
+	    (zone_status_get(zone) >= ZONE_IS_BOOTING)) {
+		mutex_exit(&zone_status_lock);
+		brand_unregister_zone(bp);
+		return (EINVAL);
+	}
+
+	if (is_system_labeled() &&
+	    strncmp(attrp->ba_brandname, NATIVE_BRAND_NAME, MAXNAMELEN) != 0) {
+		mutex_exit(&zone_status_lock);
+		brand_unregister_zone(bp);
+		return (EPERM);
+	}
+
+	zone->zone_brand = bp;
+	mutex_exit(&zone_status_lock);
+	return (0);
+}
+
+static int
 zone_set_initname(zone_t *zone, const char *zone_initname)
 {
 	char initname[INITNAME_SZ];
@@ -2717,6 +2762,7 @@ zsched(void *arg)
 	task_t *tk, *oldtk;
 	rctl_entity_p_t e;
 	kproject_t *pj;
+	boolean_t disable_plat_interposition = B_FALSE;
 
 	nvlist_t *nvl = za->nvlist;
 	nvpair_t *nvp = NULL;
@@ -2942,6 +2988,12 @@ zsched(void *arg)
 	if (zone_status_get(zone) == ZONE_IS_BOOTING) {
 		id_t cid;
 
+		/* enable platform wide brand interposition mechanisms */
+		if (ZONE_IS_BRANDED(zone)) {
+			disable_plat_interposition = B_TRUE;
+			brand_plat_interposition_enable(zone->zone_brand);
+		}
+
 		/*
 		 * Ok, this is a little complicated.  We need to grab the
 		 * zone's pool's scheduling class ID; note that by now, we
@@ -2983,6 +3035,10 @@ zsched(void *arg)
 	 * most of our life doing.
 	 */
 	zone_status_wait_cpr(zone, ZONE_IS_DYING, "zsched");
+
+	/* disable platform wide brand interposition mechanisms */
+	if (disable_plat_interposition)
+		brand_plat_interposition_disable(zone->zone_brand);
 
 	if (ct)
 		/*
@@ -4256,7 +4312,6 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 {
 	zone_t *zone;
 	zone_status_t zone_status;
-	struct brand_attr *attrp;
 	int err;
 
 	if (secpolicy_zone_config(CRED()) != 0)
@@ -4294,26 +4349,7 @@ zone_setattr(zoneid_t zoneid, int attr, void *buf, size_t bufsize)
 		err = zone_set_bootargs(zone, (const char *)buf);
 		break;
 	case ZONE_ATTR_BRAND:
-		ASSERT(!ZONE_IS_BRANDED(zone));
-		err = 0;
-		attrp = kmem_alloc(sizeof (struct brand_attr), KM_SLEEP);
-		if ((buf == NULL) ||
-		    (copyin(buf, attrp, sizeof (struct brand_attr)) != 0)) {
-			kmem_free(attrp, sizeof (struct brand_attr));
-			err = EFAULT;
-			break;
-		}
-
-		if (is_system_labeled() && strncmp(attrp->ba_brandname,
-		    NATIVE_BRAND_NAME, MAXNAMELEN) != 0) {
-			err = EPERM;
-			break;
-		}
-
-		zone->zone_brand = brand_register_zone(attrp);
-		kmem_free(attrp, sizeof (struct brand_attr));
-		if (zone->zone_brand == NULL)
-			err = EINVAL;
+		err = zone_set_brand(zone, (const char *)buf);
 		break;
 	case ZONE_ATTR_PHYS_MCAP:
 		err = zone_set_phys_mcap(zone, (const uint64_t *)buf);

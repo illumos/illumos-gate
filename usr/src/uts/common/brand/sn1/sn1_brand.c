@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -234,11 +234,6 @@ _init(void)
 {
 	int err;
 
-#if defined(sparc) && !defined(DEBUG)
-	cmn_err(CE_WARN, "The sn1 brand is only supported on DEBUG kernels.");
-	return (ENOTSUP);
-#else
-
 	/*
 	 * Set up the table indicating which system calls we want to
 	 * interpose on.  We should probably build this automatically from
@@ -255,7 +250,6 @@ _init(void)
 	}
 
 	return (err);
-#endif
 }
 
 int

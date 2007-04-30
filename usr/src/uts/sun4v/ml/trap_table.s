@@ -182,19 +182,37 @@
 	.align	32
 
 /*
- * SYSCALL is used for system calls on both ILP32 and LP64 kernels
- * depending on the "which" parameter (should be syscall_trap,
- * syscall_trap32, or nosys for unused system call traps).
+ * SYSCALL is used for unsupported syscall interfaces (with 'which'
+ * set to 'nosys') and legacy support of old SunOS 4.x syscalls (with
+ * 'which' set to 'syscall_trap32').
+ *
+ * The SYSCALL_TRAP* macros are used for syscall entry points.
+ * SYSCALL_TRAP is used to support LP64 syscalls and SYSCALL_TRAP32
+ * is used to support ILP32.  Each macro can only be used once
+ * since they each define a symbol.  The symbols are used as hot patch
+ * points by the brand infrastructure to dynamically enable and disable
+ * brand syscall interposition.  See the comments around BRAND_CALLBACK
+ * and brand_plat_interposition_enable() for more information.
  */
-#define	SYSCALL(which)			\
-	TT_TRACE(trace_gen)		;\
-	SYSCALL_NOTT(which)
-
 #define	SYSCALL_NOTT(which)		\
 	set	(which), %g1		;\
 	ba,pt	%xcc, sys_trap		;\
 	sub	%g0, 1, %g4		;\
 	.align	32
+
+#define	SYSCALL(which)			\
+	TT_TRACE(trace_gen)		;\
+	SYSCALL_NOTT(which)
+
+#define	SYSCALL_TRAP32				\
+	TT_TRACE(trace_gen)			;\
+	ALTENTRY(syscall_trap32_patch_point)	\
+	SYSCALL_NOTT(syscall_trap32)
+
+#define	SYSCALL_TRAP				\
+	TT_TRACE(trace_gen)			;\
+	ALTENTRY(syscall_trap_patch_point)	\
+	SYSCALL_NOTT(syscall_trap)
 
 /*
  * GOTO just jumps to a label.
@@ -1230,11 +1248,7 @@ trap_table0:
 	BAD;				/* 105	range check ?? */
 	GOTO(.fix_alignment);		/* 106	do unaligned references */
 	BAD;				/* 107	unused */
-#ifndef DEBUG
-	SYSCALL(syscall_trap32);	/* 108	ILP32 system call on LP64 */
-#else /* DEBUG */
-	GOTO(syscall_wrapper32);	/* 108	ILP32 system call on LP64 */
-#endif /* DEBUG */
+	SYSCALL_TRAP32;			/* 108	ILP32 system call on LP64 */
 	GOTO(set_trap0_addr);		/* 109	set trap0 address */
 	BAD; BAD; BAD4;			/* 10A - 10F unused */
 	TRP4; TRP4; TRP4; TRP4;		/* 110 - 11F V9 user trap handlers */
@@ -1254,11 +1268,7 @@ trap_table0:
 	BAD;				/* 139  unused */
 	DTRACE_RETURN;			/* 13A	dtrace pid return probe */
 	BAD; BAD4;			/* 13B - 13F unused */
-#ifndef DEBUG
-	SYSCALL(syscall_trap);		/* 140  LP64 system call */
-#else /* DEBUG */
-	GOTO(syscall_wrapper);		/* 140  LP64 system call */
-#endif /* DEBUG */
+	SYSCALL_TRAP;			/* 140  LP64 system call */
 	SYSCALL(nosys);			/* 141  unused system call trap */
 #ifdef DEBUG_USER_TRAPTRACECTL
 	GOTO(.traptrace_freeze);	/* 142  freeze traptrace */
@@ -2861,13 +2871,15 @@ fast_trap_dummy_call:
 	retl
 	nop
 
-#ifdef	DEBUG
 /*
- * Currently we only support syscall interposition for branded zones on
- * DEBUG kernels.  The only brand that makes use of this functionality is
- * the fake Solaris 10 brand.  Since this brand is only used for exercising
- * the framework, we don't want this overhead incurred on production
- * systems.
+ * Currently the brand syscall interposition code is not enabled by
+ * default.  Instead, when a branded zone is first booted the brand
+ * infrastructure will patch the trap table so that the syscall
+ * entry points are redirected to syscall_wrapper32 and syscall_wrapper
+ * for ILP32 and LP64 syscalls respectively.  this is done in
+ * brand_plat_interposition_enable().  Note that the syscall wrappers
+ * below do not collect any trap trace data since the syscall hot patch
+ * points are reached after trap trace data has already been collected.
  */
 #define	BRAND_CALLBACK(callback_id)					    \
 	CPU_ADDR(%g2, %g1)		/* load CPU struct addr to %g2	*/ ;\
@@ -2896,17 +2908,13 @@ fast_trap_dummy_call:
 1:
 
 	ENTRY_NP(syscall_wrapper32)
-	TT_TRACE(trace_gen)
 	BRAND_CALLBACK(BRAND_CB_SYSCALL32)
 	SYSCALL_NOTT(syscall_trap32)
 	SET_SIZE(syscall_wrapper32)
 
 	ENTRY_NP(syscall_wrapper)
-	TT_TRACE(trace_gen)
 	BRAND_CALLBACK(BRAND_CB_SYSCALL)
 	SYSCALL_NOTT(syscall_trap)
 	SET_SIZE(syscall_wrapper)
-
-#endif	/* DEBUG */
 
 #endif	/* lint */
