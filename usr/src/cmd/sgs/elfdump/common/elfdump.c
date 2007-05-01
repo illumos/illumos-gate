@@ -2584,7 +2584,7 @@ got(Cache *cache, Word shnum, Ehdr *ehdr, const char *file, uint_t flags)
 			/*
 			 * Only pay attention to relocations against the GOT.
 			 */
-			if ((offset < gotbgn) || (offset > gotend))
+			if ((offset < gotbgn) || (offset >= gotend))
 				continue;
 
 			/* LINTED */
@@ -2695,6 +2695,17 @@ regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 	 */
 	if (flags & FLG_EHDR)
 		Elf_ehdr(0, ehdr, shdr);
+
+	/*
+	 * If the section headers or program headers have inadequate
+	 * alignment for the class of object, print a warning. libelf
+	 * can handle such files, but programs that use them can crash
+	 * when they dereference unaligned items.
+	 */
+	if (ehdr->e_phoff & (sizeof (Addr) - 1))
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADPHDRALIGN), file);
+	if (ehdr->e_shoff & (sizeof (Addr) - 1))
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHDRALIGN), file);
 
 	/*
 	 * Print the program headers.
