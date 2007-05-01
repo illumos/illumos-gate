@@ -46,6 +46,7 @@
 #include <locale.h>
 #include <libintl.h>
 #include <sys/syscall.h>
+#include <sys/mnttab.h>
 #include <sys/vfstab.h>
 #include <sys/mount.h>
 #include <devid.h>
@@ -120,6 +121,7 @@ static int list_mappings(int, int);
 static int canopen(char *);
 static client_type_t client_by_props(char *path);
 static void list_nodes(char *drivername);
+static int canread(char *, char *);
 
 static void logerr(char *, ...);
 static void logdmsg(char *, ...);
@@ -756,6 +758,57 @@ out:
 
 
 /*
+ * Given a phci or vhci devname which is either a /dev link or /devices name
+ * get the corresponding physical node path (without the /devices prefix)
+ * and minor name.
+ *
+ * Returns 0 on success, -1 on failure.
+ */
+static int
+get_physname_minor(char *devname, char *physname, int physname_len,
+    char *minorname, int minorname_len)
+{
+	int linksize;
+	char buf[MAXPATHLEN];
+	char *p, *m;
+
+	if (strncmp(devname, DEV_DSK, sizeof (DEV_DSK) - 1) == 0 ||
+	    strncmp(devname, DEV_RDSK, sizeof (DEV_RDSK) - 1) == 0) {
+		if ((linksize = readlink(devname, buf, MAXPATHLEN))
+		    > 0 && linksize <= (MAXPATHLEN - 1)) {
+			buf[linksize] = '\0';
+		} else
+			return (-1);
+	} else
+		s_strlcpy(buf, devname, MAXPATHLEN);
+
+	if ((p = strstr(buf, SLASH_DEVICES)) == NULL)
+		return (-1);
+
+	/* point to '/' after /devices */
+	p += sizeof (SLASH_DEVICES) - 2;
+
+	if ((m = strrchr(p, ':')) == NULL) {
+		logdmsg("get_physname_minor: no minor name component in %s\n",
+		    buf);
+		return (-1);
+	}
+
+	*m = '\0';
+	m++;
+
+	if (client_name_type(p) == CLIENT_TYPE_UNKNOWN)
+		return (-1);
+
+	s_strlcpy(physname, p, physname_len);
+	s_strlcpy(minorname, m, minorname_len);
+	logdmsg("get_physname_minor: %s: physname = %s, minor = %s\n",
+	    devname, physname, minorname);
+	return (0);
+}
+
+
+/*
  * Map phci based client name to vhci based client name.
  *
  * phci_name
@@ -860,17 +913,42 @@ phci_to_vhci(char *phci_name, char *vhci_name, size_t vhci_name_len)
  * phci_name_len
  *	Length of the caller supplied phci_name buffer.
  *
+ * minor
+ *	The slice of the disk of interest.
+ *
  * Returns 0 on success, -1 on failure.
  */
 static int
-vhci_to_phci(char *vhci_name, char *phci_name, size_t phci_name_len)
+vhci_to_phci(char *vhci_name, char *phci_name, size_t phci_name_len,
+    char *minor)
 {
 	di_node_t node = DI_NODE_NIL;
 	char *vhci_guid, *devfspath;
 	char phci_guid[MAXPATHLEN];
+	char root_guid[MAXPATHLEN];
+	char root_phys[MAXPATHLEN];
+	char root_minor[MAXPATHLEN];
+	char root_path[MAXPATHLEN];
 	char *node_name;
+	FILE *mntfp;
+	struct mnttab mntpref, rootmnt;
 
 	logdmsg("vhci_to_phci: client = %s\n", vhci_name);
+
+	bzero(&mntpref, sizeof (mntpref));
+	mntpref.mnt_mountp = "/";
+
+	if (!(mntfp = fopen(MNTTAB, "r"))) {
+		logdmsg("vhci_to_phci: can't open %s\n", MNTTAB);
+		return (-1);
+	}
+
+	if (getmntany(mntfp, &rootmnt, &mntpref)) {
+		logdmsg("vhci_to_phci: can't find / in %s\n", MNTTAB);
+		return (-1);
+	}
+
+	(void) fclose(mntfp);
 
 	if (client_name_type(vhci_name) != CLIENT_TYPE_VHCI) {
 		logdmsg("vhci_to_phci: %s is not of CLIENT_TYPE_VHCI\n",
@@ -903,6 +981,37 @@ vhci_to_phci(char *vhci_name, char *phci_name, size_t phci_name_len)
 		logdmsg("vhci_to_phci: done taking devinfo snapshot\n");
 	}
 
+	if (strncmp(rootmnt.mnt_special, SLASH_DEVICES,
+	    sizeof (SLASH_DEVICES)-1))
+		(void) snprintf(root_path, sizeof (root_path), "/devices%s",
+		    rootmnt.mnt_special);
+	else
+		(void) strcpy(root_path, rootmnt.mnt_special);
+
+	/*
+	 * remove the /devices and minor components to call get_guid()
+	 * if we can't get the guid, drop through to the regular processing.
+	 */
+	if ((get_physname_minor(root_path, root_phys, sizeof (root_phys),
+	    root_minor, sizeof (root_minor)) ||
+	    (get_guid(root_phys, root_guid, sizeof (root_guid), 0,
+	    node) != 0))) {
+		logdmsg("vhci_to_phci: can't get_guid for / (%s)\n",
+		    rootmnt.mnt_special);
+		(void) strcpy(root_guid, "");
+	}
+
+	/*
+	 * We check the guid of the root device against the vhci guid so we
+	 * can return a preferred path.
+	 */
+	if ((strcmp(root_guid, vhci_guid) == 0) &&
+	    (canread(root_phys, minor))) {
+		s_strlcpy(phci_name, root_phys, phci_name_len);
+		logdmsg("vhci_to_phci: %s maps to %s preferred path\n",
+		    vhci_name, phci_name);
+		return (0);
+	}
 
 	/*
 	 * When we finally get a unified "sd" driver for all
@@ -934,7 +1043,12 @@ vhci_to_phci(char *vhci_name, char *phci_name, size_t phci_name_len)
 		    sizeof (phci_guid), 0, node) != 0)
 			continue;
 
-		if (strcmp(phci_guid, vhci_guid) == 0) {
+		/*
+		 * If the GUID's match, and we can read data from the path of
+		 * interest, we conclude we have the correct path to use.
+		 */
+		if ((strcmp(phci_guid, vhci_guid) == 0) &&
+		    (canread(devfspath, minor)))  {
 			s_strlcpy(phci_name, devfspath, phci_name_len);
 			di_devfs_path_free(devfspath);
 			logdmsg("vhci_to_phci: %s maps to %s\n", vhci_name,
@@ -970,7 +1084,12 @@ vhci_to_phci(char *vhci_name, char *phci_name, size_t phci_name_len)
 		    sizeof (phci_guid), 0, node) != 0)
 			continue;
 
-		if (strcmp(phci_guid, vhci_guid) == 0) {
+		/*
+		 * If the GUID's match, and we can read data from the path of
+		 * interest, we conclude we have the correct path to use.
+		 */
+		if ((strcmp(phci_guid, vhci_guid) == 0) &&
+		    (canread(devfspath, minor))) {
 			s_strlcpy(phci_name, devfspath, phci_name_len);
 			di_devfs_path_free(devfspath);
 			logdmsg("vhci_to_phci: %s maps to %s\n", vhci_name,
@@ -1116,10 +1235,13 @@ out:
  * len
  *	Length of the caller supplied new_physname buffer.
  *
+ * minor
+ *	The slice of the disk of interest.
+ *
  * Returns 0 on success, -1 on failure.
  */
 static int
-map_physname(char *physname, char *new_physname, size_t len)
+map_physname(char *physname, char *new_physname, size_t len, char *minor)
 {
 	int type;
 	int rv;
@@ -1129,7 +1251,7 @@ map_physname(char *physname, char *new_physname, size_t len)
 	    type, physname);
 
 	if (type == CLIENT_TYPE_VHCI)
-		rv = vhci_to_phci(physname, new_physname, len);
+		rv = vhci_to_phci(physname, new_physname, len, minor);
 	else if (type == CLIENT_TYPE_PHCI)
 		rv = phci_to_vhci(physname, new_physname, len);
 	else
@@ -1137,56 +1259,6 @@ map_physname(char *physname, char *new_physname, size_t len)
 
 	logdmsg("map_physname: returning %d\n", rv);
 	return (rv);
-}
-
-/*
- * Given a phci or vhci devname which is either a /dev link or /devices name
- * get the corresponding physical node path (without the /devices prefix)
- * and minor name.
- *
- * Returns 0 on success, -1 on failure.
- */
-static int
-get_physname_minor(char *devname, char *physname, int physname_len,
-    char *minorname, int minorname_len)
-{
-	int linksize;
-	char buf[MAXPATHLEN];
-	char *p, *m;
-
-	if (strncmp(devname, DEV_DSK, sizeof (DEV_DSK) - 1) == 0 ||
-	    strncmp(devname, DEV_RDSK, sizeof (DEV_RDSK) - 1) == 0) {
-		if ((linksize = readlink(devname, buf, MAXPATHLEN))
-		    > 0 && linksize <= (MAXPATHLEN - 1)) {
-			buf[linksize] = '\0';
-		} else
-			return (-1);
-	} else
-		s_strlcpy(buf, devname, MAXPATHLEN);
-
-	if ((p = strstr(buf, SLASH_DEVICES)) == NULL)
-		return (-1);
-
-	/* point to '/' after /devices */
-	p += sizeof (SLASH_DEVICES) - 2;
-
-	if ((m = strrchr(p, ':')) == NULL) {
-		logdmsg("get_physname_minor: no minor name component in %s\n",
-		    buf);
-		return (-1);
-	}
-
-	*m = '\0';
-	m++;
-
-	if (client_name_type(p) == CLIENT_TYPE_UNKNOWN)
-		return (-1);
-
-	s_strlcpy(physname, p, physname_len);
-	s_strlcpy(minorname, m, minorname_len);
-	logdmsg("get_physname_minor: %s: physname = %s, minor = %s\n",
-	    devname, physname, minorname);
-	return (0);
 }
 
 static int
@@ -1333,7 +1405,7 @@ map_devname(char *devname, char *new_devname, size_t len, int devlink_flag)
 	    minor, sizeof (minor)) == 0) &&
 	    (canopen(devname) == 0) &&
 	    (map_physname(physname, new_physname,
-	    sizeof (new_physname)) == 0)) {
+	    sizeof (new_physname), minor) == 0)) {
 
 		logdmsg("map_devname: now looking up devlink\n");
 
@@ -1469,7 +1541,7 @@ update_vfstab(char *vfstab_in, char *vfstab_out)
 
 		    canopen(bdev) ||
 		    (map_physname(phys_bdev, new_physname,
-		    sizeof (new_physname)) != 0) ||
+		    sizeof (new_physname), bdev_minor) != 0) ||
 		    (lookup_devlink(new_physname, bdev_minor, new_bdevlink,
 		    sizeof (new_bdevlink)) != 0) ||
 
@@ -1854,4 +1926,31 @@ clean_exit(int status)
 		(void) close(vhci_fd);
 
 	exit(status);
+}
+
+/*
+ * Attempt to read some data from the specified slice from the device.
+ */
+static int
+canread(char *physname, char *minor)
+{
+	char    devname[MAXPATHLEN];
+	int	fd, rv = 0;
+	char    tbuf[512];
+
+	(void) snprintf(devname, MAXPATHLEN, "/devices%s:%s", physname, minor);
+	if ((fd = open(devname, O_RDONLY)) == -1) {
+		logdmsg("canread: failed to open %s: %s\n", devname,
+		    strerror(errno));
+		return (rv);
+	}
+
+	if (read(fd, tbuf, sizeof (tbuf)) < 0)
+		logdmsg("canread: failed to read %s: %s\n", devname,
+		    strerror(errno));
+	else
+		rv = 1;
+
+	(void) close(fd);
+	return (rv);
 }

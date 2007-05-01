@@ -242,34 +242,6 @@ update_sysfiles()
 		done
 	fi
 
-	# if we're an x86/x64 machine and our bootpath is on fibrechannel
-	# then we cannot disable mpxio for that controller. Yet.....
-	# This code block is an ugly hack and when we either get full-time
-	# mpxio for all devices, or devfsadm gets re-written then we can
-	# remove it. For now, though, we have to see the beauty in ugly.
-
-	if [ "x$MACH" = "xi386" ]; then
-		BOOTPATH=`/usr/sbin/eeprom bootpath | $AWK -F"=" '{print $2}'`
-		FPBOOT=`echo "$BOOTPATH" | $GREP "/fp@"`
-		if [ ! -z "$FPBOOT" ]; then
-			NEWP=`/usr/bin/dirname $BOOTPATH`
-			NNEWP=`/usr/bin/dirname $NEWP`
-
-			# check that we haven't already got this entry
-			# in /kernel/drv/fp.conf.
-
-			EXISTP=`$GREP "^name.*$NNEWP" /kernel/drv/fp.conf`
-			if [ $? != 0 ]; then
-				cat >>/kernel/drv/fp.conf << EOF
-# This entry must be the last one in the fp.conf file
-# to ensure that the boot path mpxio setting is not
-# accidentally overridden
-name="fp" parent="$NNEWP" port=0 mpxio-disable="no";
-EOF
-			fi
-		fi
-	fi
-
 	if [ $need_bootscript -gt 0 ]; then
 		need_bootscript=1
 		if [ "x$MACH" = "xi386" -a "x$new_bootpath" != "x" ]; then
@@ -451,7 +423,8 @@ emit_driver_warning_msg() {
 	gettext "Do you wish to continue? [y/n] (default: y) " 1>&2
 	read response
 
-	if [ "x$response" != "xY" -a "x$response" != "xy" ]; then
+	if [ "x$response" != "x" -a "x$response" != "xY" -a \
+	    "x$response" != "xy" ]; then
 		exit
 	fi
 
@@ -553,7 +526,8 @@ if [ "x$cmd" = xenable -o "x$cmd" = xdisable -o "x$cmd" = xupdate ]; then
 		echo "Do you wish to reboot the system now? (y/n, default y) \c"
 		read response
 
-		if [ "x$response" = "xY" -o "x$response" = "xy" ]; then
+		if [ "x$response" = "x" -o "x$response" = "xY" -o \
+		    "x$response" = "xy" ]; then
 			/usr/sbin/reboot
 		else
 			/bin/echo ""
