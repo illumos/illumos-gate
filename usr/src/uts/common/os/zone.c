@@ -2989,7 +2989,8 @@ zsched(void *arg)
 		id_t cid;
 
 		/* enable platform wide brand interposition mechanisms */
-		if (ZONE_IS_BRANDED(zone)) {
+		if (ZONE_IS_BRANDED(zone) &&
+		    brand_plat_interposition_enable != NULL) {
 			disable_plat_interposition = B_TRUE;
 			brand_plat_interposition_enable(zone->zone_brand);
 		}
@@ -3037,8 +3038,10 @@ zsched(void *arg)
 	zone_status_wait_cpr(zone, ZONE_IS_DYING, "zsched");
 
 	/* disable platform wide brand interposition mechanisms */
-	if (disable_plat_interposition)
+	if (disable_plat_interposition &&
+	    brand_plat_interposition_disable != NULL) {
 		brand_plat_interposition_disable(zone->zone_brand);
+	}
 
 	if (ct)
 		/*

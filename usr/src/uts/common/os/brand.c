@@ -80,7 +80,8 @@ static kmutex_t brand_list_lock;
 void
 brand_init()
 {
-	brand_plat_interposition_init();
+	if (brand_plat_interposition_init != NULL)
+		brand_plat_interposition_init();
 	mutex_init(&brand_list_lock, NULL, MUTEX_DEFAULT, NULL);
 	p0.p_brand = &native_brand;
 }
