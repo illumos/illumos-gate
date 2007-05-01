@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -144,6 +144,9 @@ int		di_cache_debug = 0;
 /* For ddvis, which needs pseudo children under PCI */
 int pci_allow_pseudo_children = 0;
 
+/* Allow path-oriented alias driver binding on driver.conf enumerated nodes */
+int driver_conf_allow_path_alias = 1;
+
 /*
  * The following switch is for service people, in case a
  * 3rd party driver depends on identify(9e) being called.
@@ -187,6 +190,7 @@ ndi_devi_config_obp_args(dev_info_t *parent, char *devnm,
 static void i_link_vhci_node(dev_info_t *);
 static void ndi_devi_exit_and_wait(dev_info_t *dip,
     int circular, clock_t end_time);
+static int ndi_devi_unbind_driver(dev_info_t *dip);
 
 /*
  * dev_info cache and node management
@@ -233,9 +237,10 @@ i_ddi_alloc_node(dev_info_t *pdip, char *node_name, pnode_t nodeid,
 
 	if ((devi->devi_node_name = i_ddi_strdup(node_name, flag)) == NULL)
 		goto fail;
+
 	/* default binding name is node name */
 	devi->devi_binding_name = devi->devi_node_name;
-	devi->devi_major = (major_t)-1;	/* unbound by default */
+	devi->devi_major = (major_t)-1;		/* unbound by default */
 
 	/*
 	 * Make a copy of system property
@@ -369,6 +374,9 @@ i_ddi_free_node(dev_info_t *dip)
 	if (DEVI(dip)->devi_compat_names)
 		kmem_free(DEVI(dip)->devi_compat_names,
 		    DEVI(dip)->devi_compat_length);
+	if (DEVI(dip)->devi_rebinding_name)
+		kmem_free(DEVI(dip)->devi_rebinding_name,
+		    strlen(DEVI(dip)->devi_rebinding_name) + 1);
 
 	ddi_prop_remove_all(dip);	/* remove driver properties */
 	if (devi->devi_sys_prop_ptr)
@@ -573,13 +581,13 @@ link_node(dev_info_t *dip)
 	 * Extending the workaround to IB Nexus/VHCI
 	 * driver also.
 	 */
-	if (strcmp(devi->devi_name, "scsi_vhci") == 0) {
+	if (strcmp(devi->devi_binding_name, "scsi_vhci") == 0) {
 		/* Add scsi_vhci to beginning of list */
 		ASSERT((dev_info_t *)parent == top_devinfo);
 		/* scsi_vhci under rootnex */
 		devi->devi_sibling = parent->devi_child;
 		parent->devi_child = devi;
-	} else if (strcmp(devi->devi_name, "ib") == 0) {
+	} else if (strcmp(devi->devi_binding_name, "ib") == 0) {
 		i_link_vhci_node(dip);
 	} else {
 		/* Add to end of list */
@@ -732,7 +740,9 @@ unbind_node(dev_info_t *dip)
 	    (void *)dip, ddi_node_name(dip)));
 
 	unlink_from_driver_list(dip);
+
 	DEVI(dip)->devi_major = (major_t)-1;
+	DEVI(dip)->devi_binding_name = DEVI(dip)->devi_node_name;
 	return (DDI_SUCCESS);
 }
 
@@ -749,6 +759,7 @@ init_node(dev_info_t *dip)
 	dev_info_t *pdip = ddi_get_parent(dip);
 	int (*f)(dev_info_t *, dev_info_t *, ddi_ctl_enum_t, void *, void *);
 	char *path;
+	major_t	major;
 
 	ASSERT(i_ddi_node_state(dip) == DS_BOUND);
 
@@ -789,14 +800,14 @@ init_node(dev_info_t *dip)
 
 	ndi_hold_devi(pdip);
 
-	/* check for duplicate nodes */
-	if (find_duplicate_child(pdip, dip) != NULL) {
-		/* recompute path after initchild for @addr information */
-		(void) ddi_pathname(dip, path);
+	/* recompute path after initchild for @addr information */
+	(void) ddi_pathname(dip, path);
 
+	/* Check for duplicate nodes */
+	if (find_duplicate_child(pdip, dip) != NULL) {
 		/*
 		 * uninit_node() the duplicate - a successful uninit_node()
-		 * does a ndi_rele_devi
+		 * does a ndi_rele_devi.
 		 */
 		if ((error = uninit_node(dip)) != DDI_SUCCESS) {
 			ndi_rele_devi(pdip);
@@ -811,13 +822,100 @@ init_node(dev_info_t *dip)
 	}
 
 	/*
+	 * Check to see if we have a path-oriented driver alias that overrides
+	 * the current driver binding. If so, we need to rebind. This check
+	 * needs to be delayed until after a successful DDI_CTLOPS_INITCHILD,
+	 * so the unit-address is established on the last component of the path.
+	 *
+	 * NOTE: Allowing a path-oriented alias to change the driver binding
+	 * of a driver.conf node results in non-intuitive property behavior.
+	 * We provide a tunable (driver_conf_allow_path_alias) to control
+	 * this behavior. See uninit_node() for more details.
+	 *
+	 * NOTE: If you are adding a path-oriented alias for the boot device,
+	 * and there is mismatch between OBP and the kernel in regard to
+	 * generic name use, like "disk" .vs. "ssd", then you will need
+	 * to add a path-oriented alias for both paths.
+	 */
+	major = ddi_name_to_major(path);
+	if ((major != (major_t)-1) &&
+	    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED) &&
+	    (major != DEVI(dip)->devi_major) &&
+	    (ndi_dev_is_persistent_node(dip) || driver_conf_allow_path_alias)) {
+
+		/* Mark node for rebind processing. */
+		mutex_enter(&DEVI(dip)->devi_lock);
+		DEVI(dip)->devi_flags |= DEVI_REBIND;
+		mutex_exit(&DEVI(dip)->devi_lock);
+
+		/*
+		 * uninit_node() current binding - a successful uninit_node()
+		 * does a ndi_rele_devi.
+		 */
+		if ((error = uninit_node(dip)) != DDI_SUCCESS) {
+			ndi_rele_devi(pdip);
+			cmn_err(CE_WARN, "init_node: uninit for rebind "
+			    "of node %s failed", path);
+			goto out;
+		}
+
+		/* Unbind: demote the node back to DS_LINKED.  */
+		if ((error = ndi_devi_unbind_driver(dip)) != DDI_SUCCESS) {
+			cmn_err(CE_WARN, "init_node: unbind for rebind "
+			    "of node %s failed", path);
+			goto out;
+		}
+
+		/* establish rebinding name */
+		if (DEVI(dip)->devi_rebinding_name == NULL)
+			DEVI(dip)->devi_rebinding_name =
+			    i_ddi_strdup(path, KM_SLEEP);
+
+		/*
+		 * Now that we are demoted and marked for rebind, repromote.
+		 * We need to do this in steps, instead of just calling
+		 * ddi_initchild, so that we can redo the merge operation
+		 * after we are rebound to the path-bound driver.
+		 *
+		 * Start by rebinding node to the path-bound driver.
+		 */
+		if ((error = ndi_devi_bind_driver(dip, 0)) != DDI_SUCCESS) {
+			cmn_err(CE_WARN, "init_node: rebind "
+			    "of node %s failed", path);
+			goto out;
+		}
+
+		/*
+		 * If the node is not a driver.conf node then merge
+		 * driver.conf properties from new path-bound driver.conf.
+		 */
+		if (ndi_dev_is_persistent_node(dip))
+			(void) i_ndi_make_spec_children(pdip, 0);
+
+		/*
+		 * Now that we have taken care of merge, repromote back
+		 * to DS_INITIALIZED.
+		 */
+		error = ddi_initchild(pdip, dip);
+		NDI_CONFIG_DEBUG((CE_CONT, "init_node: rebind "
+		    "%s 0x%p\n", path, (void *)dip));
+		goto out;
+	}
+
+	/*
 	 * Apply multi-parent/deep-nexus optimization to the new node
 	 */
 	DEVI(dip)->devi_instance = e_ddi_assign_instance(dip);
 	ddi_optimize_dtree(dip);
 	error = DDI_SUCCESS;
 
-out:	kmem_free(path, MAXPATHLEN);
+out:	if (error != DDI_SUCCESS) {
+		/* On failure ensure that DEVI_REBIND is cleared */
+		mutex_enter(&DEVI(dip)->devi_lock);
+		DEVI(dip)->devi_flags &= ~DEVI_REBIND;
+		mutex_exit(&DEVI(dip)->devi_lock);
+	}
+	kmem_free(path, MAXPATHLEN);
 	return (error);
 }
 
@@ -888,7 +986,33 @@ uninit_node(dev_info_t *dip)
 		ndi_rele_devi(pdip);
 
 		remove_global_props(dip);
-		e_ddi_prop_remove_all(dip);
+
+		/*
+		 * NOTE: The decision on whether to allow a path-oriented
+		 * rebind of a driver.conf enumerated node is made by
+		 * init_node() based on driver_conf_allow_path_alias. The
+		 * rebind code below prevents deletion of system properties
+		 * on driver.conf nodes.
+		 *
+		 * When driver_conf_allow_path_alias is set, property behavior
+		 * on rebound driver.conf file is non-intuitive. For a
+		 * driver.conf node, the unit-address properties come from
+		 * the driver.conf file as system properties. Removing system
+		 * properties from a driver.conf node makes the node
+		 * useless (we get node without unit-address properties) - so
+		 * we leave system properties in place. The result is a node
+		 * where system properties come from the node being rebound,
+		 * and global properties come from the driver.conf file
+		 * of the driver we are rebinding to.  If we could determine
+		 * that the path-oriented alias driver.conf file defined a
+		 * node at the same unit address, it would be best to use
+		 * that node and avoid the non-intuitive property behavior.
+		 * Unfortunately, the current "merge" code does not support
+		 * this, so we live with the non-intuitive property behavior.
+		 */
+		if (!((ndi_dev_is_persistent_node(dip) == 0) &&
+		    (DEVI(dip)->devi_flags & DEVI_REBIND)))
+			e_ddi_prop_remove_all(dip);
 	} else {
 		NDI_CONFIG_DEBUG((CE_CONT, "uninit_node failed: 0x%p(%s%d)\n",
 		    (void *)dip, ddi_driver_name(dip), ddi_get_instance(dip)));
@@ -1301,6 +1425,7 @@ i_ndi_config_node(dev_info_t *dip, ddi_node_state_t state, uint_t flag)
 			 */
 			if ((rv = bind_node(dip)) == DDI_SUCCESS)
 				i_ddi_set_node_state(dip, DS_BOUND);
+
 			break;
 		case DS_BOUND:
 			/*
@@ -1874,11 +1999,15 @@ i_ddi_devi_attached(dev_info_t *dip)
  * By default, name is matched with devi_node_name. The following
  * alternative match strategies are supported:
  *
- *	FIND_NAME_BY_DRIVER: A match on driver name bound to node is conducted.
+ *	FIND_NODE_BY_NODENAME: Match on node name - typical use.
+ *	FIND_NODE_BY_DRIVER: A match on driver name bound to node is conducted.
  *		This support is used for support of OBP generic names and
- *		for the conversion from driver names to generic names.  When
+ *		for the conversion from driver names to generic names. When
  *		more consistency in the generic name environment is achieved
  *		(and not needed for upgrade) this support can be removed.
+ *	FIND_NODE_BY_ADDR: Match on just the addr.
+ *		This support is only used/needed during boot to match
+ *		a node bound via a path-based driver alias.
  *
  * If a child is not named (dev_addr == NULL), there are three
  * possible actions:
@@ -1887,7 +2016,9 @@ i_ddi_devi_attached(dev_info_t *dip)
  *	(2) FIND_ADDR_BY_INIT: bring child to DS_INITIALIZED state
  *	(3) FIND_ADDR_BY_CALLBACK: use a caller-supplied callback function
  */
-#define	FIND_NAME_BY_DRIVER	0x01
+#define	FIND_NODE_BY_NODENAME	0x01
+#define	FIND_NODE_BY_DRIVER	0x02
+#define	FIND_NODE_BY_ADDR	0x04
 #define	FIND_ADDR_BY_INIT	0x10
 #define	FIND_ADDR_BY_CALLBACK	0x20
 
@@ -1898,12 +2029,18 @@ find_sibling(dev_info_t *head, char *cname, char *caddr, uint_t flag,
 	dev_info_t	*dip;
 	char		*addr, *buf;
 	major_t		major;
+	uint_t		by;
+
+	/* only one way to find a node */
+	by = flag &
+	    (FIND_NODE_BY_DRIVER | FIND_NODE_BY_NODENAME | FIND_NODE_BY_ADDR);
+	ASSERT(by && BIT_ONLYONESET(by));
 
 	/* only one way to name a node */
 	ASSERT(((flag & FIND_ADDR_BY_INIT) == 0) ||
 	    ((flag & FIND_ADDR_BY_CALLBACK) == 0));
 
-	if (flag & FIND_NAME_BY_DRIVER) {
+	if (by == FIND_NODE_BY_DRIVER) {
 		major = ddi_name_to_major(cname);
 		if (major == (major_t)-1)
 			return (NULL);
@@ -1918,13 +2055,13 @@ find_sibling(dev_info_t *head, char *cname, char *caddr, uint_t flag,
 	 */
 
 	for (dip = head; dip; dip = ddi_get_next_sibling(dip)) {
-		if (flag & FIND_NAME_BY_DRIVER) {
-			/* match driver major */
-			if (DEVI(dip)->devi_major != major)
-				continue;
-		} else {
+		if (by == FIND_NODE_BY_NODENAME) {
 			/* match node name */
 			if (strcmp(cname, DEVI(dip)->devi_node_name) != 0)
+				continue;
+		} else if (by == FIND_NODE_BY_DRIVER) {
+			/* match driver major */
+			if (DEVI(dip)->devi_major != major)
 				continue;
 		}
 
@@ -1968,7 +2105,8 @@ find_duplicate_child(dev_info_t *pdip, dev_info_t *dip)
 	char *caddr = DEVI(dip)->devi_addr;
 
 	/* search nodes before dip */
-	dup = find_sibling(ddi_get_child(pdip), cname, caddr, 0, NULL);
+	dup = find_sibling(ddi_get_child(pdip), cname, caddr,
+	    FIND_NODE_BY_NODENAME, NULL);
 	if (dup != dip)
 		return (dup);
 
@@ -1976,7 +2114,7 @@ find_duplicate_child(dev_info_t *pdip, dev_info_t *dip)
 	 * search nodes after dip; normally this is not needed,
 	 */
 	return (find_sibling(ddi_get_next_sibling(dip), cname, caddr,
-	    0, NULL));
+	    FIND_NODE_BY_NODENAME, NULL));
 }
 
 /*
@@ -1988,7 +2126,7 @@ find_child_by_callback(dev_info_t *pdip, char *cname, char *caddr,
     int (*name_node)(dev_info_t *, char *, int))
 {
 	return (find_sibling(ddi_get_child(pdip), cname, caddr,
-	    FIND_NAME_BY_DRIVER|FIND_ADDR_BY_CALLBACK, name_node));
+	    FIND_NODE_BY_DRIVER|FIND_ADDR_BY_CALLBACK, name_node));
 }
 
 /*
@@ -2000,13 +2138,14 @@ find_child_by_name(dev_info_t *pdip, char *cname, char *caddr)
 {
 	dev_info_t	*dip;
 
-	/* attempt search without changing state of preceeding siblings */
-	dip = find_sibling(ddi_get_child(pdip), cname, caddr, 0, NULL);
+	/* attempt search without changing state of preceding siblings */
+	dip = find_sibling(ddi_get_child(pdip), cname, caddr,
+	    FIND_NODE_BY_NODENAME, NULL);
 	if (dip)
 		return (dip);
 
 	return (find_sibling(ddi_get_child(pdip), cname, caddr,
-	    FIND_ADDR_BY_INIT, NULL));
+	    FIND_NODE_BY_NODENAME|FIND_ADDR_BY_INIT, NULL));
 }
 
 /*
@@ -2018,14 +2157,41 @@ find_child_by_driver(dev_info_t *pdip, char *cname, char *caddr)
 {
 	dev_info_t	*dip;
 
-	/* attempt search without changing state of preceeding siblings */
+	/* attempt search without changing state of preceding siblings */
 	dip = find_sibling(ddi_get_child(pdip), cname, caddr,
-	    FIND_NAME_BY_DRIVER, NULL);
+	    FIND_NODE_BY_DRIVER, NULL);
 	if (dip)
 		return (dip);
 
 	return (find_sibling(ddi_get_child(pdip), cname, caddr,
-	    FIND_NAME_BY_DRIVER|FIND_ADDR_BY_INIT, NULL));
+	    FIND_NODE_BY_DRIVER|FIND_ADDR_BY_INIT, NULL));
+}
+
+/*
+ * Find a child of a given address, invoking initchild to name
+ * unnamed children. cname is the node name.
+ *
+ * NOTE: This function is only used during boot. One would hope that
+ * unique sibling unit-addresses on hardware branches of the tree would
+ * be a requirement to avoid two drivers trying to control the same
+ * piece of hardware. Unfortunately there are some cases where this
+ * situation exists (/ssm@0,0/pci@1c,700000 /ssm@0,0/sghsc@1c,700000).
+ * Until unit-address uniqueness of siblings is guaranteed, use of this
+ * interface for purposes other than boot should be avoided.
+ */
+static dev_info_t *
+find_child_by_addr(dev_info_t *pdip, char *caddr)
+{
+	dev_info_t	*dip;
+
+	/* attempt search without changing state of preceding siblings */
+	dip = find_sibling(ddi_get_child(pdip), NULL, caddr,
+	    FIND_NODE_BY_ADDR, NULL);
+	if (dip)
+		return (dip);
+
+	return (find_sibling(ddi_get_child(pdip), NULL, caddr,
+	    FIND_NODE_BY_ADDR|FIND_ADDR_BY_INIT, NULL));
 }
 
 /*
@@ -2424,6 +2590,34 @@ ddi_compatible_driver_major(dev_info_t *dip, char **formp)
 
 	if (formp)
 		*formp = NULL;
+
+	/*
+	 * Highest precedence binding is a path-oriented alias. Since this
+	 * requires a 'path', this type of binding occurs via more obtuse
+	 * 'rebind'. The need for a path-oriented alias 'rebind' is detected
+	 * after a successful DDI_CTLOPS_INITCHILD to another driver: this is
+	 * is the first point at which the unit-address (or instance) of the
+	 * last component of the path is available (even though the path is
+	 * bound to the wrong driver at this point).
+	 */
+	if (devi->devi_flags & DEVI_REBIND) {
+		p = devi->devi_rebinding_name;
+		major = ddi_name_to_major(p);
+		if ((major != (major_t)-1) &&
+		    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED)) {
+			if (formp)
+				*formp = p;
+			return (major);
+		}
+
+		/*
+		 * If for some reason devi_rebinding_name no longer resolves
+		 * to a proper driver then clear DEVI_REBIND.
+		 */
+		mutex_enter(&devi->devi_lock);
+		devi->devi_flags &= ~DEVI_REBIND;
+		mutex_exit(&devi->devi_lock);
+	}
 
 	/* look up compatible property */
 	(void) lookup_compatible(dip, KM_SLEEP);
@@ -3727,6 +3921,38 @@ static int
 bind_dip(dev_info_t *dip, void *arg)
 {
 	_NOTE(ARGUNUSED(arg))
+	char	*path;
+	major_t	major, pmajor;
+
+	/*
+	 * If the node is currently bound to the wrong driver, try to unbind
+	 * so that we can rebind to the correct driver.
+	 */
+	if (i_ddi_node_state(dip) >= DS_BOUND) {
+		major = ddi_compatible_driver_major(dip, NULL);
+		if ((DEVI(dip)->devi_major == major) &&
+		    (i_ddi_node_state(dip) >= DS_INITIALIZED)) {
+			/*
+			 * Check for a path-oriented driver alias that
+			 * takes precedence over current driver binding.
+			 */
+			path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+			(void) ddi_pathname(dip, path);
+			pmajor = ddi_name_to_major(path);
+			if ((pmajor != (major_t)-1) &&
+			    !(devnamesp[pmajor].dn_flags & DN_DRIVER_REMOVED))
+				major = pmajor;
+			kmem_free(path, MAXPATHLEN);
+		}
+
+		/* attempt unbind if current driver is incorrect */
+		if ((major != (major_t)-1) &&
+		    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED) &&
+		    (major != DEVI(dip)->devi_major))
+			(void) ndi_devi_unbind_driver(dip);
+	}
+
+	/* If unbound, try to bind to a driver */
 	if (i_ddi_node_state(dip) < DS_BOUND)
 		(void) ndi_devi_bind_driver(dip, 0);
 
@@ -3736,6 +3962,9 @@ bind_dip(dev_info_t *dip, void *arg)
 void
 i_ddi_bind_devs(void)
 {
+	/* flush devfs so that ndi_devi_unbind_driver will work when possible */
+	(void) devfs_clean(top_devinfo, NULL, 0);
+
 	ddi_walk_devs(top_devinfo, bind_dip, (void *)NULL);
 }
 
@@ -4627,6 +4856,7 @@ devi_config_one(dev_info_t *pdip, char *devnm, dev_info_t **cdipp,
 {
 	dev_info_t	*vdip = NULL;
 	char		*drivername = NULL;
+	int		find_by_addr = 0;
 	char		*name, *addr;
 	int		v_circ, p_circ;
 	clock_t		end_time;	/* 60 sec */
@@ -4656,8 +4886,10 @@ devi_config_one(dev_info_t *pdip, char *devnm, dev_info_t **cdipp,
 	 * drivername.  This allows an implementation to supply a genericly
 	 * named boot path (disk) and locate drivename nodes (sd).
 	 */
-	if (flags & NDI_PROMNAME)
+	if (flags & NDI_PROMNAME) {
 		drivername = child_path_to_driver(pdip, name, addr);
+		find_by_addr = 1;
+	}
 
 	/*
 	 * Determine end_time: This routine should *not* be called with a
@@ -4698,13 +4930,16 @@ devi_config_one(dev_info_t *pdip, char *devnm, dev_info_t **cdipp,
 			 * Search for child by name, if not found then search
 			 * for a node bound to the drivername driver with the
 			 * specified "@addr". Break out of for(;;) loop if
-			 * child found.
+			 * child found.  To support path-oriented aliases
+			 * binding on boot-device, we do a search_by_addr too.
 			 */
 again:			(void) i_ndi_make_spec_children(pdip, flags);
 			cdip = find_child_by_name(pdip, name, addr);
 			if ((cdip == NULL) && drivername)
 				cdip = find_child_by_driver(pdip,
 				    drivername, addr);
+			if ((cdip == NULL) && find_by_addr)
+				cdip = find_child_by_addr(pdip, addr);
 			if (cdip)
 				break;
 
@@ -4823,7 +5058,7 @@ ndi_devi_config_one(dev_info_t *dip, char *devnm, dev_info_t **dipp, int flags)
 	}
 
 	/*
-	 * DR usage ((i.e. call with NDI_CONFIG) recursively configures
+	 * DR usage (i.e. call with NDI_CONFIG) recursively configures
 	 * grandchildren, performing a BUS_CONFIG_ALL from the node attached
 	 * by the BUS_CONFIG_ONE.
 	 */
@@ -5585,7 +5820,8 @@ ndi_devi_find(dev_info_t *pdip, char *cname, char *caddr)
 		return ((dev_info_t *)NULL);
 
 	ndi_devi_enter(pdip, &circ);
-	child = find_sibling(ddi_get_child(pdip), cname, caddr, 0, NULL);
+	child = find_sibling(ddi_get_child(pdip), cname, caddr,
+	    FIND_NODE_BY_NODENAME, NULL);
 	ndi_devi_exit(pdip, circ);
 	return (child);
 }
@@ -5611,7 +5847,8 @@ ndi_devi_findchild(dev_info_t *pdip, char *devname)
 		return ((dev_info_t *)NULL);
 	}
 
-	child = find_sibling(ddi_get_child(pdip), cname, caddr, 0, NULL);
+	child = find_sibling(ddi_get_child(pdip), cname, caddr,
+	    FIND_NODE_BY_NODENAME, NULL);
 	kmem_free(devstr, strlen(devname)+1);
 	return (child);
 }
@@ -5671,7 +5908,16 @@ path_to_major(char *path)
 	dev_info_t *dip;
 	char *p, *q;
 	pnode_t nodeid;
-	major_t maj;
+	major_t major;
+
+	/* check for path-oriented alias */
+	major = ddi_name_to_major(path);
+	if ((major != (major_t)-1) &&
+	    !(devnamesp[major].dn_flags & DN_DRIVER_REMOVED)) {
+		NDI_CONFIG_DEBUG((CE_NOTE, "path_to_major: %s path bound %s\n",
+		    path, ddi_major_to_name(major)));
+		return (major);
+	}
 
 	/*
 	 * Get the nodeid of the given pathname, if such a mapping exists.
@@ -5702,11 +5948,11 @@ path_to_major(char *path)
 		NDI_CONFIG_DEBUG((CE_NOTE, "path_to_major: %s bound to %s\n",
 		    path, p));
 
-	maj = ddi_name_to_major(p);
+	major = ddi_name_to_major(p);
 
-	ndi_rele_devi(dip);		/* release node held during walk */
+	ndi_rele_devi(dip);		/* release e_ddi_nodeid_to_dip hold */
 
-	return (maj);
+	return (major);
 }
 
 /*
@@ -6837,24 +7083,9 @@ i_ddi_di_cache_invalidate(int kmflag)
 static void
 i_bind_vhci_node(dev_info_t *dip)
 {
-	char	*node_name;
-
-	node_name = i_ddi_strdup(ddi_node_name(dip), KM_SLEEP);
-	i_ddi_set_binding_name(dip, node_name);
-	DEVI(dip)->devi_major = ddi_name_to_major(node_name);
+	DEVI(dip)->devi_major = ddi_name_to_major(ddi_node_name(dip));
 	i_ddi_set_node_state(dip, DS_BOUND);
 }
-
-
-static void
-i_free_vhci_bind_name(dev_info_t *dip)
-{
-	if (DEVI(dip)->devi_binding_name) {
-		kmem_free(DEVI(dip)->devi_binding_name,
-		    sizeof (ddi_node_name(dip)));
-	}
-}
-
 
 static char vhci_node_addr[2];
 
@@ -6938,7 +7169,6 @@ ndi_devi_config_vhci(char *drvname, int flags)
 	i_ddi_add_devimap(dip);
 	i_bind_vhci_node(dip);
 	if (i_init_vhci_node(dip) == -1) {
-		i_free_vhci_bind_name(dip);
 		ndi_rele_devi(dip);
 		(void) ndi_devi_free(dip);
 		return (NULL);
@@ -6951,7 +7181,6 @@ ndi_devi_config_vhci(char *drvname, int flags)
 	if (devi_attach(dip, DDI_ATTACH) != DDI_SUCCESS) {
 		cmn_err(CE_CONT, "Could not attach %s driver", drvname);
 		e_ddi_free_instance(dip, vhci_node_addr);
-		i_free_vhci_bind_name(dip);
 		ndi_rele_devi(dip);
 		(void) ndi_devi_free(dip);
 		return (NULL);

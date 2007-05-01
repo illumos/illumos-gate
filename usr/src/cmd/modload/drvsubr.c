@@ -106,7 +106,8 @@ append_to_file(
 	char *entry_list,
 	char *filename,
 	char list_separator,
-	char *entry_separator)
+	char *entry_separator,
+	int quoted)
 {
 	int	i, len;
 	int	fpint;
@@ -153,12 +154,16 @@ append_to_file(
 			line[i] = 0;
 
 		current_head = get_entry(previous_head, one_entry,
-		    list_separator);
+		    list_separator, quoted);
 		previous_head = current_head;
 
 		(void) strcpy(line, driver_name);
 		(void) strcat(line, entry_separator);
+		if (quoted)
+			(void) strcat(line, "\"");
 		(void) strcat(line, one_entry);
+		if (quoted)
+			(void) strcat(line, "\"");
 		(void) strcat(line, "\n");
 
 		if ((fputs(line, fp)) == EOF) {
@@ -615,16 +620,20 @@ get_name_to_major_entry(int *major_no, char *driver_name, char *file_name)
 }
 
 /*
- * given pointer to member n in space separated list, return pointer
- * to member n+1, return member n
+ * Given pointer to begining of member 'n' in a space (or separator)
+ * separated list, return pointer to member 'n+1', and establish member 'n'
+ * in *current_entry.  If unquote, then we skip a leading quote and treat
+ * the trailing quote as a separator (and skip).
  */
 char *
 get_entry(
 	char *prev_member,
 	char *current_entry,
-	char separator)
+	char separator,
+	int  unquote)
 {
-	char *ptr;
+	char	*ptr;
+	int	quoted = 0;
 
 	ptr = prev_member;
 
@@ -632,14 +641,25 @@ get_entry(
 	while (*ptr == '\t' || *ptr == ' ')
 		ptr++;
 
-	/* read thru the current entry */
-	while (*ptr != separator && *ptr != '\0') {
+	/* if unquote skip leading quote */
+	if (unquote && *ptr == '"') {
+		quoted++;
+		ptr++;
+	}
+
+	/* read thru the current entry looking for end, separator, or unquote */
+	while (*ptr &&
+	    (*ptr != separator) &&
+	    ((separator != ' ') || (*ptr != '\t')) &&
+	    (!quoted || (*ptr != '"'))) {
 		*current_entry++ = *ptr++;
 	}
 	*current_entry = '\0';
 
-	if ((separator == ',') && (*ptr == separator))
-		ptr++;	/* skip over comma */
+	if (separator && (*ptr == separator))
+		ptr++;	/* skip over separator */
+	if (quoted && (*ptr == '"'))
+		ptr++;	/* skip over trailing quote */
 
 	/* skip white space */
 	while (*ptr == '\t' || *ptr == ' ') {
@@ -1003,7 +1023,7 @@ config_driver(
 				return (ERROR);
 			}
 			current = get_entry(previous,
-			    cmdline[n++], ' ');
+			    cmdline[n++], ' ', 0);
 			previous = current;
 
 		} while (*current != '\0');
@@ -1395,7 +1415,7 @@ check_perm_opts(char *perm_list)
 		for (i = 0; i <= len; i++)
 			one_entry[i] = 0;
 
-		current_head = get_entry(previous_head, one_entry, ',');
+		current_head = get_entry(previous_head, one_entry, ',', 0);
 
 		previous_head = current_head;
 		scan_stat = sscanf(one_entry, "%s%s%s%s%s", minor, perm, own,
@@ -1453,7 +1473,7 @@ aliases_unique(char *aliases)
 		for (i = 0; i <= len; i++)
 			one_entry[i] = 0;
 
-		current_head = get_entry(previous_head, one_entry, ' ');
+		current_head = get_entry(previous_head, one_entry, ' ', 1);
 		previous_head = current_head;
 
 		if ((unique_driver_name(one_entry, name_to_major,
@@ -1490,14 +1510,66 @@ aliases_unique(char *aliases)
 }
 
 
+/*
+ * check each alias :
+ *	if path-oriented alias, path exists
+ */
+int
+aliases_paths_exist(char *aliases)
+{
+	char *current_head;
+	char *previous_head;
+	char *one_entry;
+	int i, len;
+	char path[MAXPATHLEN];
+	struct stat buf;
+
+	len = strlen(aliases);
+
+	one_entry = calloc(len + 1, 1);
+	if (one_entry == NULL) {
+		(void) fprintf(stderr, gettext(ERR_NO_MEM));
+		return (ERROR);
+	}
+
+	previous_head = aliases;
+
+	do {
+		for (i = 0; i <= len; i++)
+			one_entry[i] = 0;
+
+		current_head = get_entry(previous_head, one_entry, ' ', 1);
+		previous_head = current_head;
+
+		/* if the alias is a path, ensure that the path exists */
+		if (*one_entry != '/')
+			continue;
+		(void) snprintf(path, sizeof (path), "/devices/%s", one_entry);
+		if (stat(path, &buf) == 0)
+			continue;
+
+		/* no device at specified path-oriented alias path */
+		(void) fprintf(stderr, gettext(ERR_PATH_ORIENTED_ALIAS),
+		    one_entry);
+		free(one_entry);
+		return (ERROR);
+
+	} while (*current_head != '\0');
+
+	free(one_entry);
+
+	return (NOERR);
+}
+
+
 int
 update_driver_aliases(
 	char *driver_name,
 	char *aliases)
 {
 	/* make call to update the aliases file */
-	return (append_to_file(driver_name, aliases, driver_aliases, ' ', " "));
-
+	return (append_to_file(driver_name, aliases, driver_aliases,
+	    ' ', " ", 1));
 }
 
 
@@ -1508,6 +1580,7 @@ unique_drv_alias(char *drv_alias)
 	char drv[FILENAME_MAX + 1];
 	char line[MAX_N2M_ALIAS_LINE + 1], *cp;
 	char alias[FILENAME_MAX + 1];
+	char *a;
 	int status = NOERR;
 
 	fp = fopen(driver_aliases, "r");
@@ -1526,8 +1599,16 @@ unique_drv_alias(char *drv_alias)
 				(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 				    driver_aliases, line);
 
+			/* unquote for compare */
+			if ((*alias == '"') &&
+			    (*(alias + strlen(alias) - 1) == '"')) {
+				a = &alias[1];
+				alias[strlen(alias) - 1] = '\0';
+			} else
+				a = alias;
+
 			if ((strcmp(drv_alias, drv) == 0) ||
-			    (strcmp(drv_alias, alias) == 0)) {
+			    (strcmp(drv_alias, a) == 0)) {
 				(void) fprintf(stderr,
 				    gettext(ERR_ALIAS_IN_USE),
 				    drv_alias);
@@ -1656,7 +1737,7 @@ update_name_to_major(char *driver_name, major_t *major_num, int server)
 				    "%d", is_unique);
 
 				if (append_to_file(driver_name, major,
-				    name_to_major, ' ', " ") == ERROR) {
+				    name_to_major, ' ', " ", 0) == ERROR) {
 					(void) fprintf(stderr,
 					    gettext(ERR_NO_UPDATE),
 					    name_to_major);
@@ -1857,7 +1938,7 @@ int
 do_the_update(char *driver_name, char *major_number)
 {
 	return (append_to_file(driver_name, major_number, name_to_major,
-	    ' ', " "));
+	    ' ', " ", 0));
 }
 
 /*

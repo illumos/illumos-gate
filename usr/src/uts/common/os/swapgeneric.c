@@ -20,7 +20,7 @@
  */
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -718,16 +718,34 @@ load_boot_driver(char *drv)
  * For a given instance, load that driver and its parents
  */
 static int
-load_parent_drivers(dev_info_t *dip)
+load_parent_drivers(dev_info_t *dip, char *path)
 {
 	int	rval = 0;
+	major_t	major = (major_t)-1;
 	char	*drv;
+	char	*p;
 
 	while (dip) {
-		drv = ddi_get_name(dip);
+		/* check for path-oriented alias */
+		if (path)
+			major = ddi_name_to_major(path);
+		else
+			major = (major_t)-1;
+
+		if (major != (major_t)-1)
+			drv = ddi_major_to_name(major);
+		else
+			drv = ddi_binding_name(dip);
+
 		if (load_boot_driver(drv) != 0)
 			rval = -1;
+
 		dip = ddi_get_parent(dip);
+		if (path) {
+			p = strrchr(path, '/');
+			if (p)
+				*p = 0;
+		}
 	}
 
 	return (rval);
@@ -741,14 +759,21 @@ load_parent_drivers(dev_info_t *dip)
 static int
 load_bootpath_drivers(char *bootpath)
 {
-	dev_info_t *dip;
+	dev_info_t	*dip;
+	char		*pathcopy;
+	int		pathcopy_len;
+	int		rval;
+	char		*p;
 
 	if (bootpath == NULL || *bootpath == 0)
 		return (-1);
 
 	BMDPRINTF(("load_bootpath_drivers: %s\n", bootpath));
 
-	dip = path_to_devinfo(bootpath);
+	pathcopy = i_ddi_strdup(bootpath, KM_SLEEP);
+	pathcopy_len = strlen(pathcopy) + 1;
+
+	dip = path_to_devinfo(pathcopy);
 
 #if defined(__i386) || defined(__amd64)
 	/*
@@ -758,44 +783,40 @@ load_bootpath_drivers(char *bootpath)
 	 * which we go ahead and load here.
 	 */
 	if (dip == NULL) {
-		char	*pathcopy, *leaf, *p;
-		int	len, rval;
-
-		len = strlen(bootpath) + 1;
-		pathcopy = kmem_zalloc(len, KM_SLEEP);
-		(void) strcpy(pathcopy, bootpath);
+		char	*leaf;
 
 		/*
-		 * Work backward to the last slash to build the
-		 * full path of the parent of the boot device
+		 * Find last slash to build the full path to the
+		 * parent of the leaf boot device
 		 */
-		for (p = pathcopy + len - 2; *p != '/'; p--)
-			;
+		p = strrchr(pathcopy, '/');
 		*p++ = 0;
 
 		/*
 		 * Now isolate the driver name of the leaf device
 		 */
-		for (leaf = p; *p && *p != '@'; p++)
-			;
+		leaf = p;
+		p = strchr(leaf, '@');
 		*p = 0;
 
 		BMDPRINTF(("load_bootpath_drivers: parent=%s leaf=%s\n",
-			pathcopy, leaf));
+			bootpath, leaf));
 
 		dip = path_to_devinfo(pathcopy);
-
-		rval = load_boot_driver(leaf);
-		kmem_free(pathcopy, len);
-		if (rval == -1)
-			return (NULL);
-
+		if (leaf) {
+			rval = load_boot_driver(leaf, NULL);
+			if (rval == -1) {
+				kmem_free(pathcopy, pathcopy_len);
+				return (NULL);
+			}
+		}
 	}
 #endif
 
 	if (dip == NULL) {
 		cmn_err(CE_WARN, "can't bind driver for boot path <%s>",
 			bootpath);
+		kmem_free(pathcopy, pathcopy_len);
 		return (NULL);
 	}
 
@@ -811,10 +832,21 @@ load_bootpath_drivers(char *bootpath)
 	if (netboot_over_ib(bootpath) &&
 	    modloadonly("drv", "ibd") == -1) {
 		cmn_err(CE_CONT, "ibd: cannot load platform driver\n");
+		kmem_free(pathcopy, pathcopy_len);
 		return (NULL);
 	}
 
-	return (load_parent_drivers(dip));
+	/* get rid of minor node at end of copy (if not already done above) */
+	p = strrchr(pathcopy, '/');
+	if (p) {
+		p = strchr(p, ':');
+		if (p)
+			*p = 0;
+	}
+
+	rval = load_parent_drivers(dip, pathcopy);
+	kmem_free(pathcopy, pathcopy_len);
+	return (rval);
 }
 
 
@@ -866,7 +898,7 @@ load_boot_platform_modules(char *drv)
 		}
 	} else {
 		while (dip) {
-			if (load_parent_drivers(dip) != 0)
+			if (load_parent_drivers(dip, NULL) != 0)
 				rval = -1;
 			dip = ddi_get_next(dip);
 		}

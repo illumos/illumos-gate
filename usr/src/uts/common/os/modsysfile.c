@@ -2147,8 +2147,8 @@ make_aliases(struct bind **bhash)
 	} state;
 
 	struct _buf *file;
-	char tokbuf[MAXNAMELEN];
-	char drvbuf[MAXNAMELEN];
+	char tokbuf[MAXPATHLEN];
+	char drvbuf[MAXPATHLEN];
 	token_t token;
 	major_t major;
 	int done = 0;

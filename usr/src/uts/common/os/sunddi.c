@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -6350,10 +6350,22 @@ ddi_deviname(dev_info_t *dip, char *name)
 		return (name);
 	}
 
-	if (i_ddi_node_state(dip) < DS_INITIALIZED) {
+	if (i_ddi_node_state(dip) < DS_BOUND) {
 		addrname = &none;
 	} else {
+		/*
+		 * Use ddi_get_name_addr() without checking state so we get
+		 * a unit-address if we are called after ddi_set_name_addr()
+		 * by nexus DDI_CTL_INITCHILD code, but before completing
+		 * node promotion to DS_INITIALIZED.  We currently have
+		 * two situations where we are called in this state:
+		 *   o  For framework processing of a path-oriented alias.
+		 *   o  If a SCSA nexus driver calls ddi_devid_register()
+		 *	from it's tran_tgt_init(9E) implementation.
+		 */
 		addrname = ddi_get_name_addr(dip);
+		if (addrname == NULL)
+			addrname = &none;
 	}
 
 	if (*addrname == '\0') {

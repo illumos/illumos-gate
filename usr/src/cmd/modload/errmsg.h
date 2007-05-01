@@ -56,8 +56,10 @@ extern "C" {
 #define	ERR_INSTALL_FAIL	"Error: Could not install driver (%s).\n"
 #define	ERR_DRVNAME_TOO_LONG	"Error: driver name must not exceed (%d)" \
 " characters; driver name too long (%s)\n"
-#define	ERR_ALIAS_IN_NAM_MAJ	"Alias (%s) already in use as driver name.\n"
-#define	ERR_ALIAS_IN_USE	"(%s) already in use as a driver or alias.\n"
+#define	ERR_ALIAS_IN_NAM_MAJ	\
+"Alias (\"%s\") already in use as driver name.\n"
+#define	ERR_ALIAS_IN_USE	\
+"(\"%s\") already in use as a driver or alias.\n"
 #define	ERR_CANT_ACCESS_FILE	"Cannot access file (%s).\n"
 #define	ERR_BAD_PATH	"Bad syntax for pathname : (%s)\n"
 #define	ERR_FORK_FAIL	"Fork failed; cannot exec : %s\n"
@@ -170,6 +172,9 @@ Use octal escape sequence \"\\040\".\n"
 
 #define	ERR_REMDRV_CLEANUP	\
 	"post-rem_drv devfs cleanup for driver %s failed (%d)\n"
+
+#define	ERR_PATH_ORIENTED_ALIAS	\
+	"no device at specified path-oriented alias \"%s\"\n"
 
 #ifdef	__cplusplus
 }

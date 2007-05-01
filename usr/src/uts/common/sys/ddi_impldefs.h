@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,7 +80,10 @@ struct dev_info  {
 	struct dev_info *devi_child;	/* my child list head		*/
 	struct dev_info *devi_sibling;	/* next element on my level	*/
 
-	char	*devi_binding_name;	/* name used to bind driver	*/
+	char	*devi_binding_name;	/* name used to bind driver:	*/
+					/* shared storage, points to	*/
+					/* devi_node_name, devi_compat_names */
+					/* or devi_rebinding_name	*/
 
 	char	*devi_addr;		/* address part of name		*/
 
@@ -189,6 +192,8 @@ struct dev_info  {
 	void		*devi_nex_pm;		/* nexus PM private */
 
 	char		*devi_addr_buf;		/* buffer for devi_addr */
+
+	char		*devi_rebinding_name;	/* binding_name of rebind */
 };
 
 #define	DEVI(dev_info_type)	((struct dev_info *)(dev_info_type))
@@ -497,6 +502,7 @@ void	i_devi_exit(dev_info_t *, uint_t c_mask, int has_lock);
 #define	DEVI_NO_BIND		0x00000010 /* prevent driver binding */
 #define	DEVI_REGISTERED_DEVID	0x00000020 /* device registered a devid */
 #define	DEVI_PHCI_SIGNALS_VHCI	0x00000040 /* pHCI ndi_devi_exit signals vHCI */
+#define	DEVI_REBIND		0x00000080 /* post initchild driver rebind */
 
 #define	DEVI_BUSY_CHANGING(dip)	(DEVI(dip)->devi_flags & DEVI_BUSY)
 #define	DEVI_BUSY_OWNED(dip)	(DEVI_BUSY_CHANGING(dip) &&	\

@@ -33,7 +33,7 @@ static uint16_t		shared_tbl[MAX_ISA_IRQ + 1];
 static char *
 interrupt_print_bus(uintptr_t dip_addr)
 {
-	char		bind_name[MODMAXNAMELEN + 1];
+	char		bind_name[MAXPATHLEN + 1];
 	struct dev_info	dev_info;
 
 	if (mdb_vread(&dev_info, sizeof (dev_info), dip_addr) == -1) {

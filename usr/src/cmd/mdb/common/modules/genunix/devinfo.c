@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1072,7 +1072,7 @@ devinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	char tmpstr[MODMAXNAMELEN];
 	char nodename[MODMAXNAMELEN];
-	char bindname[MODMAXNAMELEN];
+	char bindname[MAXPATHLEN];
 	int size, length;
 	struct dev_info devi;
 	devinfo_node_t din;
@@ -1082,6 +1082,7 @@ devinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    { "DEVICE_OFFLINE",	DEVI_DEVICE_OFFLINE,	DEVI_DEVICE_OFFLINE },
 	    { "DEVICE_DOWN",	DEVI_DEVICE_DOWN,	DEVI_DEVICE_DOWN },
 	    { "DEVICE_DEGRADED", DEVI_DEVICE_DEGRADED,	DEVI_DEVICE_DEGRADED },
+	    { "DEVICE_REMOVED", DEVI_DEVICE_REMOVED,	DEVI_DEVICE_REMOVED },
 	    { "BUS_QUIESCED",	DEVI_BUS_QUIESCED,	DEVI_BUS_QUIESCED },
 	    { "BUS_DOWN",	DEVI_BUS_DOWN,		DEVI_BUS_DOWN },
 	    { "NDI_CONFIG",	DEVI_NDI_CONFIG,	DEVI_NDI_CONFIG	},
@@ -1096,6 +1097,7 @@ devinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    { "S_REPORT",	DEVI_S_REPORT,		DEVI_S_REPORT },
 	    { "S_EVADD",	DEVI_S_EVADD,		DEVI_S_EVADD },
 	    { "S_EVREMOVE",	DEVI_S_EVREMOVE,	DEVI_S_EVREMOVE },
+	    { "S_NEED_RESET",	DEVI_S_NEED_RESET,	DEVI_S_NEED_RESET },
 	    { NULL,		0,			0 }
 	};
 
@@ -1105,6 +1107,13 @@ devinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    { "ATTACHED_CHILDREN",
 				DEVI_ATTACHED_CHILDREN,	DEVI_ATTACHED_CHILDREN},
 	    { "BRANCH_HELD",	DEVI_BRANCH_HELD,	DEVI_BRANCH_HELD },
+	    { "NO_BIND",	DEVI_NO_BIND,		DEVI_NO_BIND },
+	    { "DEVI_REGISTERED_DEVID",
+				DEVI_REGISTERED_DEVID,	DEVI_REGISTERED_DEVID },
+	    { "PHCI_SIGNALS_VHCI",
+				DEVI_PHCI_SIGNALS_VHCI,
+				DEVI_PHCI_SIGNALS_VHCI },
+	    { "REBIND",		DEVI_REBIND,		DEVI_REBIND },
 	    { NULL,		0,			0 }
 	};
 
@@ -1716,9 +1725,8 @@ binding_hash_entry(uintptr_t addr, uint_t flags, int argc,
 {
 	struct bind 	bind;
 	/* Arbitrary lengths based on output format below */
-	char name[25] = "???";
-	char bind_name[32] = "<null>";
-
+	char name[MAXPATHLEN] = "???";
+	char bind_name[MAXPATHLEN] = "<null>";
 
 	if ((flags & DCMD_ADDRSPEC) == NULL)
 		return (DCMD_USAGE);
@@ -1733,18 +1741,22 @@ binding_hash_entry(uintptr_t addr, uint_t flags, int argc,
 	}
 
 	if (DCMD_HDRSPEC(flags)) {
-		mdb_printf("%<u>%-32s %-5s %-?s%</u>\n",
-		    "NAME", "MAJOR", "NEXT");
+		mdb_printf("%<u>%?s% %-5s %s%</u>\n",
+		    "NEXT", "MAJOR", "NAME(S)");
 	}
 
 	if (mdb_readstr(name, sizeof (name), (uintptr_t)bind.b_name) == -1)
 		mdb_warn("failed to read 'name'");
 
-	/* There may be no binding name for a driver, so this may fail */
-	(void) mdb_readstr(bind_name, sizeof (bind_name),
-	    (uintptr_t)bind.b_bind_name);
-
-	mdb_printf("%-32s  %3d  %?p\n", name, bind.b_num, bind.b_next);
+	/* There may be bind_name, so this may fail */
+	if (mdb_readstr(bind_name, sizeof (bind_name),
+	    (uintptr_t)bind.b_bind_name) == -1) {
+		mdb_printf("%?p %5d %s\n",
+		    bind.b_next, bind.b_num, name);
+	} else {
+		mdb_printf("%?p %5d %s %s\n",
+		    bind.b_next, bind.b_num, name, bind_name);
+	}
 
 	return (DCMD_OK);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -863,8 +863,7 @@ find_mbind(const char *name, uintptr_t *hashtab)
 	int hashndx;
 	uintptr_t mb;
 	struct bind mb_local;
-	char node_name[MODMAXNAMELEN + 1];
-
+	char node_name[MAXPATHLEN + 1];
 
 	hashndx = nm_hash(name);
 	mb = hashtab[hashndx];
@@ -944,7 +943,7 @@ int
 mdb_devinfo2driver(uintptr_t dip_addr, char *drivername, size_t namebufsize)
 {
 	struct dev_info	devinfo;
-	char bind_name[MODMAXNAMELEN + 1];
+	char bind_name[MAXPATHLEN + 1];
 	major_t	major;
 	const char *namestr;
 
