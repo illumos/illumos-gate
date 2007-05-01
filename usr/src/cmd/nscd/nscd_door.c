@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,11 +105,11 @@ copy_output(void *outdata, int outdlen,
 	return (ret);
 }
 
-
 nss_status_t
 _nscd_doorcall(int callnum)
 {
-	nss_pheader_t	phdr;
+	size_t		buflen;
+	nss_pheader_t	*phdr;
 	void		*dptr;
 	size_t		ndata;
 	size_t		adata;
@@ -119,20 +119,23 @@ _nscd_doorcall(int callnum)
 	_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
 	(me, "processing door call %d ...\n", callnum);
 
-	phdr.nsc_callnumber = callnum;
-	ndata = sizeof (phdr);
-	adata = sizeof (phdr);
-	dptr = (void *)&phdr;
+	/* allocate door buffer from the stack */
+	NSCD_ALLOC_DOORBUF(callnum, 0, dptr, buflen);
+	ndata = buflen;
+	adata = buflen;
+
 	ret = _nsc_trydoorcall(&dptr, &ndata, &adata);
 
 	if (ret != NSS_SUCCESS) {
+		phdr = (nss_pheader_t *)dptr;
 		_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_DEBUG)
 		(me, "door call (%d) failed (status = %d, error = %s)\n",
-			callnum, ret, strerror(NSCD_GET_ERRNO(&phdr)));
+			callnum, ret, strerror(NSCD_GET_ERRNO(phdr)));
 	}
 
 	return (ret);
 }
+
 
 nss_status_t
 _nscd_doorcall_data(int callnum, void *indata, int indlen,

@@ -1748,7 +1748,13 @@ nsc_lookup(nsc_lookup_args_t *largs, int flag) {
 		break;
 
 	case SERVERERROR:
-		/* status and errno already set in the phdr */
+		/*
+		 * status and errno should have been set in the phdr,
+		 * if not, set status to NSS_ERROR
+		 */
+		if (NSCD_STATUS_IS_OK(phdr)) {
+			NSCD_SET_STATUS(phdr, NSS_ERROR, 0);
+		}
 		break;
 
 	case NOSERVER:

@@ -864,7 +864,7 @@ nss_upack_key2arg(void *buffer, size_t length, char **dbname,
 {
 	nss_pheader_t 			*pbuf = (nss_pheader_t *)buffer;
 	const char			*strtype = NULL;
-	nssuint_t 			off, *uptr;
+	nssuint_t 			off, *uptr, keysize;
 	size_t				len, slop;
 	int				i, j;
 	char				**cv, *bptr;
@@ -873,6 +873,9 @@ nss_upack_key2arg(void *buffer, size_t length, char **dbname,
 	struct nss_groupsbymem		*gbm;
 	nss_pnetgr_t			*pptr;
 	_priv_execattr			*pe;
+
+	/* keysize is length of the key area */
+	keysize = pbuf->data_off - pbuf->key_off;
 
 	off = pbuf->key_off;
 	bptr = (char *)buffer + off;
@@ -1014,11 +1017,15 @@ nss_upack_key2arg(void *buffer, size_t length, char **dbname,
 			for (j = 0; j < NSS_NETGR_N; j++) {
 				ing->arg[j].argv = cv;
 				for (i = 0; i < ing->arg[j].argc; i++) {
+					if (*uptr >= keysize)
+						return (NSS_ERROR);
 					*cv++ = (bptr + *uptr++);
 				}
 			}
 			ing->groups.argv = cv;
 			for (i = 0; i < ing->groups.argc; i++) {
+				if (*uptr >= keysize)
+					return (NSS_ERROR);
 				*cv++ = (bptr + *uptr++);
 			}
 			break;
@@ -1110,7 +1117,7 @@ nss_packed_getkey(void *buffer, size_t length, char **dbname,
 {
 	nss_pheader_t 	*pbuf = (nss_pheader_t *)buffer;
 	nss_dbd_t	*pdbd;
-	nssuint_t 	off;
+	nssuint_t 	off, dbdsize;
 	int		index;
 
 	if (buffer == NULL || length == 0 || dbop == NULL ||
@@ -1120,6 +1127,10 @@ nss_packed_getkey(void *buffer, size_t length, char **dbname,
 	*dbop = pbuf->nss_dbop;
 	off = pbuf->dbd_off;
 	pdbd = (nss_dbd_t *)((void *)((char *)buffer + off));
+	dbdsize = pbuf->key_off - pbuf->dbd_off;
+	if (pdbd->o_name >= dbdsize || pdbd->o_config_name >= dbdsize ||
+			pdbd->o_default_config >= dbdsize)
+		return (NSS_ERROR);
 	*dbname = (char *)buffer + off + pdbd->o_name;
 	if ((index = nss_dbop_search(*dbname, (uint32_t)*dbop)) < 0)
 		return (NSS_ERROR);
@@ -1169,7 +1180,7 @@ nss_packed_arg_init(void *buffer, size_t length, nss_db_root_t *db_root,
 	nss_str2ent_t		s2e = str2packent;
 	nss_str2ent_t		real_s2e = NULL;
 	nss_dbd_t		*pdbd;
-	nssuint_t 		off;
+	nssuint_t		off, dbdsize;
 	char			*dbname, *bptr;
 	size_t			len;
 	int			index;
@@ -1182,6 +1193,10 @@ nss_packed_arg_init(void *buffer, size_t length, nss_db_root_t *db_root,
 	*dbop = pbuf->nss_dbop;
 	off = pbuf->dbd_off;
 	pdbd = (nss_dbd_t *)((void *)((char *)buffer + off));
+	dbdsize = pbuf->key_off - pbuf->dbd_off;
+	if (pdbd->o_name >= dbdsize || pdbd->o_config_name >= dbdsize ||
+			pdbd->o_default_config >= dbdsize)
+		return (NSS_ERROR);
 	dbname = (char *)buffer + off + pdbd->o_name;
 	if ((index = nss_dbop_search(dbname, (uint32_t)*dbop)) < 0)
 		return (NSS_ERROR);

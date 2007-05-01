@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -377,6 +377,261 @@ _nscd_APP_check_cred(
 	}
 }
 
+/* log error and return -1 when an invalid packed buffer header is found */
+static int
+pheader_error(nss_pheader_t *phdr, uint32_t call_number)
+{
+	char *call_num_str;
+
+	switch (call_number) {
+	case NSCD_SEARCH:
+		call_num_str = "NSCD_SEARCH";
+		break;
+	case NSCD_SETENT:
+		call_num_str = "NSCD_SETENT";
+		break;
+	case NSCD_GETENT:
+		call_num_str = "NSCD_GETENT";
+		break;
+	case NSCD_ENDENT:
+		call_num_str = "NSCD_ENDENT";
+		break;
+	case NSCD_PUT:
+		call_num_str = "NSCD_PUT";
+		break;
+	case NSCD_GETHINTS:
+		call_num_str = "NSCD_GETHINTS";
+		break;
+	default:
+		call_num_str = "UNKNOWN";
+		break;
+	}
+
+	_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ALERT)
+	("pheader_error", "call number %s: invalid packed buffer header\n",
+		call_num_str);
+
+	NSCD_SET_STATUS(phdr, NSS_ERROR, EINVAL);
+	return (-1);
+}
+
+/*
+ * Validate the header of a getXbyY or setent/getent/endent request.
+ * Return 0 if good, -1 otherwise.
+ *
+ * A valid header looks like the following (size is arg_size, does
+ * not include the output area):
+ * +----------------------------------+ --
+ * | nss_pheader_t (header fixed part)| ^
+ * |                                  | |
+ * | pbufsiz, dbd,off, key_off,       | len = sizeof(nss_pheader_t)
+ * | data_off ....                    | |
+ * |                                  | v
+ * +----------------------------------+ <----- dbd_off
+ * | dbd (database description)       | ^
+ * | nss_dbd_t + up to 3 strings      | |
+ * | length = sizeof(nss_dbd_t) +     | len = key_off - dbd_off
+ * |          length of 3 strings +   | |
+ * |          length of padding       | |
+ * | (total length in multiple of 4)  | v
+ * +----------------------------------+ <----- key_off
+ * | lookup key                       | ^
+ * | nss_XbyY_key_t, content varies,  | |
+ * | based on database and lookup op  | len = data_off - key_off
+ * | length = data_off - key_off      | |
+ * | including padding, multiple of 4 | v
+ * +----------------------------------+ <----- data_off (= arg_size)
+ * |                                  | ^
+ * | area to hold results             | |
+ * |                                  | len = data_len (= pbufsiz -
+ * |                                  | |                 data_off)
+ * |                                  | v
+ * +----------------------------------+ <----- pbufsiz
+ */
+static int
+validate_pheader(
+	void		*argp,
+	size_t		arg_size,
+	uint32_t	call_number)
+{
+	nss_pheader_t	*phdr = (nss_pheader_t *)(void *)argp;
+	nssuint_t	l1, l2;
+
+	/*
+	 * current version is NSCD_HEADER_REV, length of the fixed part
+	 * of the header must match the size of nss_pheader_t
+	 */
+	if (phdr->p_version != NSCD_HEADER_REV ||
+			phdr->dbd_off != sizeof (nss_pheader_t))
+		return (pheader_error(phdr, call_number));
+
+	/*
+	 * buffer size and offsets must be in multiple of 4
+	 */
+	if ((arg_size & 3) || (phdr->dbd_off & 3) || (phdr->key_off & 3) ||
+		(phdr->data_off & 3))
+		return (pheader_error(phdr, call_number));
+
+	/*
+	 * the input arg_size is the length of the request header
+	 * and should be less than NSCD_PHDR_MAXLEN
+	 */
+	if (phdr->data_off != arg_size || arg_size > NSCD_PHDR_MAXLEN)
+		return (pheader_error(phdr, call_number));
+
+	/* get length of the dbd area */
+	l1 = phdr->key_off - phdr-> dbd_off;
+
+	/*
+	 * dbd area may contain padding, so length of dbd should
+	 * not be less than the length of the actual data
+	 */
+	if (l1 < phdr->dbd_len)
+		return (pheader_error(phdr, call_number));
+
+	/* get length of the key area */
+	l2 = phdr->data_off - phdr->key_off;
+
+	/*
+	 * key area may contain padding, so length of key area should
+	 * not be less than the length of the actual data
+	 */
+	if (l2 < phdr->key_len)
+		return (pheader_error(phdr, call_number));
+
+	/*
+	 * length of fixed part + lengths of dbd and key area = length of
+	 * the request header
+	 */
+	if (sizeof (nss_pheader_t) + l1 + l2 != phdr->data_off)
+		return (pheader_error(phdr, call_number));
+
+	/* header length + data length = buffer length */
+	if (phdr->data_off + phdr->data_len != phdr->pbufsiz)
+		return (pheader_error(phdr, call_number));
+
+	return (0);
+}
+
+/* log error and return -1 when an invalid nscd to nscd buffer is found */
+static int
+N2Nbuf_error(nss_pheader_t *phdr, uint32_t call_number)
+{
+	char *call_num_str;
+
+	switch (call_number) {
+	case NSCD_PING:
+		call_num_str = "NSCD_PING";
+		break;
+
+	case NSCD_IMHERE:
+		call_num_str = "NSCD_IMHERE";
+		break;
+
+	case NSCD_PULSE:
+		call_num_str = "NSCD_PULSE";
+		break;
+
+	case NSCD_FORK:
+		call_num_str = "NSCD_FORK";
+		break;
+
+	case NSCD_KILL:
+		call_num_str = "NSCD_KILL";
+		break;
+
+	case NSCD_REFRESH:
+		call_num_str = "NSCD_REFRESH";
+		break;
+
+	case NSCD_GETPUADMIN:
+		call_num_str = "NSCD_GETPUADMIN";
+		break;
+
+	case NSCD_GETADMIN:
+		call_num_str = "NSCD_GETADMIN";
+		break;
+
+	case NSCD_SETADMIN:
+		call_num_str = "NSCD_SETADMIN";
+		break;
+
+	case NSCD_KILLSERVER:
+		call_num_str = "NSCD_KILLSERVER";
+		break;
+	default:
+		call_num_str = "UNKNOWN";
+		break;
+	}
+
+	_NSCD_LOG(NSCD_LOG_FRONT_END, NSCD_LOG_LEVEL_ALERT)
+	("N2Nbuf_error", "call number %s: invalid N2N buffer\n",
+		call_num_str);
+
+	NSCD_SET_N2N_STATUS(phdr, NSS_NSCD_PRIV, 0,
+			NSCD_DOOR_BUFFER_CHECK_FAILED);
+
+	return (-1);
+}
+
+/*
+ * Validate the buffer of an nscd to nscd request.
+ * Return 0 if good, -1 otherwise.
+ *
+ * A valid buffer looks like the following (size is arg_size):
+ * +----------------------------------+ --
+ * | nss_pheader_t (header fixed part)| ^
+ * |                                  | |
+ * | pbufsiz, dbd,off, key_off,       | len = sizeof(nss_pheader_t)
+ * | data_off ....                    | |
+ * |                                  | v
+ * +----------------------------------+ <---dbd_off = key_off = data_off
+ * |                                  | ^
+ * | input data/output data           | |
+ * | OR no data                       | len = data_len (= pbufsiz -
+ * |                                  | |                 data_off)
+ * |                                  | | len could be zero
+ * |                                  | v
+ * +----------------------------------+ <--- pbufsiz
+ */
+static int
+validate_N2Nbuf(
+	void		*argp,
+	size_t		arg_size,
+	uint32_t	call_number)
+{
+	nss_pheader_t	*phdr = (nss_pheader_t *)(void *)argp;
+
+	/*
+	 * current version is NSCD_HEADER_REV, length of the fixed part
+	 * of the header must match the size of nss_pheader_t
+	 */
+	if (phdr->p_version != NSCD_HEADER_REV ||
+			phdr->dbd_off != sizeof (nss_pheader_t))
+		return (N2Nbuf_error(phdr, call_number));
+
+	/*
+	 * There are no dbd and key data, so the dbd, key, data
+	 * offsets should be equal
+	 */
+	if (phdr->dbd_off != phdr->key_off ||
+		phdr->dbd_off != phdr->data_off)
+		return (N2Nbuf_error(phdr, call_number));
+
+	/*
+	 * the input arg_size is the buffer length and should
+	 * be less or equal than NSCD_N2NBUF_MAXLEN
+	 */
+	if (phdr->pbufsiz != arg_size || arg_size > NSCD_N2NBUF_MAXLEN)
+		return (N2Nbuf_error(phdr, call_number));
+
+	/* header length + data length = buffer length */
+	if (phdr->data_off + phdr->data_len != phdr->pbufsiz)
+		return (N2Nbuf_error(phdr, call_number));
+
+	return (0);
+}
+
 static void
 lookup(char *argp, size_t arg_size)
 {
@@ -386,6 +641,12 @@ lookup(char *argp, size_t arg_size)
 
 	NSCD_ALLOC_LOOKUP_BUFFER(argp, arg_size, phdr, space,
 		sizeof (space));
+
+	/*
+	 * make sure the first couple bytes of the data area is null,
+	 * so that bad strings in the packed header stop here
+	 */
+	(void) memset((char *)phdr + phdr->data_off, 0, 16);
 
 	(void) memset(&largs, 0, sizeof (largs));
 	largs.buffer = argp;
@@ -506,7 +767,8 @@ if_selfcred_return_per_user_door(char *argp, size_t arg_size,
 	int		door = -1;
 	int		rc = 0;
 	door_desc_t	desc;
-	char		space[1024*4];
+	char		*space;
+	int		len;
 
 	/*
 	 * check to see if self-cred is configured and
@@ -540,17 +802,16 @@ if_selfcred_return_per_user_door(char *argp, size_t arg_size,
 	}
 
 	/* return the alternate door descriptor */
-	(void) memcpy(space, phdr, NSCD_PHDR_LEN(phdr));
-	argp = space;
-	phdr = (nss_pheader_t *)(void *)space;
+	len = strlen(dblist) + 1;
+	space = alloca(arg_size + len);
+	phdr->data_len = len;
+	(void) memcpy(space, phdr, arg_size);
+	(void) strncpy((char *)space + arg_size, dblist, len);
 	dp = &desc;
 	dp->d_attributes = DOOR_DESCRIPTOR;
 	dp->d_data.d_desc.d_descriptor = door;
-	phdr->data_len = strlen(dblist) + 1;
-	(void) strcpy(((char *)phdr) + NSCD_PHDR_LEN(phdr), dblist);
-
-	arg_size = NSCD_PHDR_LEN(phdr) + NSCD_DATA_LEN(phdr);
-	(void) door_return(argp, arg_size, dp, 1);
+	arg_size += len;
+	(void) door_return(space, arg_size, dp, 1);
 }
 
 /*ARGSUSED*/
@@ -562,7 +823,8 @@ switcher(void *cookie, char *argp, size_t arg_size,
 	pid_t			ent_pid = -1;
 	nss_pheader_t		*phdr = (nss_pheader_t *)((void *)argp);
 	void			*uptr;
-	int			buflen, len;
+	int			len;
+	size_t			buflen;
 	int			callnum;
 	char			*me = "switcher";
 
@@ -585,7 +847,14 @@ switcher(void *cookie, char *argp, size_t arg_size,
 		restart_if_cfgfile_changed();
 
 	if ((phdr->nsc_callnumber & NSCDV2CATMASK) == NSCD_CALLCAT_APP) {
+
+		/* make sure the packed buffer header is good */
+		if (validate_pheader(argp, arg_size,
+				phdr->nsc_callnumber) == -1)
+			(void) door_return(argp, arg_size, NULL, 0);
+
 		switch (phdr->nsc_callnumber) {
+
 		case NSCD_SEARCH:
 
 		/* if a fallback to main nscd, skip per-user setup */
@@ -655,6 +924,11 @@ switcher(void *cookie, char *argp, size_t arg_size,
 		callnum = phdr->nsc_callnumber;
 
 	/* nscd -> nscd v2 calls */
+
+	/* make sure the buffer is good */
+	if (validate_N2Nbuf(argp, arg_size, callnum) == -1)
+		(void) door_return(argp, arg_size, NULL, 0);
+
 	switch (callnum) {
 
 	case NSCD_PING:
@@ -684,9 +958,12 @@ switcher(void *cookie, char *argp, size_t arg_size,
 		break;
 
 	case NSCD_REFRESH:
-		if (_nscd_refresh() != NSCD_SUCCESS)
-			exit(1);
-		NSCD_SET_STATUS_SUCCESS(phdr);
+		N2N_check_priv(argp, "NSCD_REFRESH");
+		if (NSCD_STATUS_IS_OK(phdr)) {
+			if (_nscd_refresh() != NSCD_SUCCESS)
+				exit(1);
+			NSCD_SET_STATUS_SUCCESS(phdr);
+		}
 		break;
 
 	case NSCD_GETPUADMIN:

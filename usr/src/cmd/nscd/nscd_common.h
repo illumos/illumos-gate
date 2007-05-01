@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +69,7 @@ typedef enum {
 	NSCD_CREATE_GETENT_CTX_FAILED,
 	NSCD_NSS_BACKEND_NOT_FOUND,
 	NSCD_DOOR_UCRED_ERROR,
+	NSCD_DOOR_BUFFER_CHECK_FAILED,
 	NSCD_SELF_CRED_NOT_CONFIGURED,
 	NSCD_SELF_CRED_NO_FORKER,
 	NSCD_SELF_CRED_WRONG_NSCD,

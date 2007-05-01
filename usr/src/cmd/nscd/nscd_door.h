@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,8 +70,12 @@ extern "C" {
 	uptr = alloca(usz); \
 	(void) memset(uptr, 0, usz); \
 	((nss_pheader_t *)uptr)->nsc_callnumber = (cn); \
+	((nss_pheader_t *)uptr)->p_version = NSCD_HEADER_REV; \
 	((nss_pheader_t *)uptr)->pbufsiz = usz; \
-	((nss_pheader_t *)uptr)->data_off = sizeof (nss_pheader_t);
+	((nss_pheader_t *)uptr)->data_off = sizeof (nss_pheader_t); \
+	((nss_pheader_t *)uptr)->key_off = sizeof (nss_pheader_t); \
+	((nss_pheader_t *)uptr)->dbd_off = sizeof (nss_pheader_t); \
+	((nss_pheader_t *)uptr)->data_len = dsz;
 
 #define	NSCD_N2N_DOOR_DATA(type, buf) \
 	(type *)((void *)(((char *)(buf)) + sizeof (nss_pheader_t)))

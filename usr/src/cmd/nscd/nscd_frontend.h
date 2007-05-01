@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,8 @@ extern "C" {
 
 #include "cache.h"
 
+#define	NSCD_N2NBUF_MAXLEN	1024 * 8
+#define	NSCD_PHDR_MAXLEN	1024 * 8
 #define	NSCD_LOOKUP_BUFSIZE	1024 * 16
 #define	NSCD_DOORBUF_MAXLEN	1024 * 512
 #define	NSCD_PHDR_LEN(hdrp)	((hdrp)->data_off)
@@ -45,6 +47,8 @@ extern "C" {
 		bufp = space; \
 		bufsiz = spsiz; \
 		hdrp = (nss_pheader_t *)(void *)space; \
+		(hdrp)->pbufsiz = bufsiz; \
+		(hdrp)->data_len = bufsiz - (hdrp)->data_off; \
 	} else { \
 		(bufp) = NULL; \
 		bufsiz = (hdrp)->pbufsiz; \
@@ -54,6 +58,8 @@ extern "C" {
 		if ((bufp) != NULL) { \
 			(void) memcpy((bufp), (hdrp), NSCD_PHDR_LEN(hdrp)); \
 			(hdrp) = (nss_pheader_t *)(void *)(bufp); \
+			(hdrp)->pbufsiz = bufsiz; \
+			(hdrp)->data_len = bufsiz - (hdrp)->data_off; \
 		} else { \
 			NSCD_SET_STATUS((hdrp), NSS_ERROR, ENOMEM); \
 			(void) door_return((char *)(hdrp), \

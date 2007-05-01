@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,7 @@
 #include <sys/door.h>
 #include <procfs.h>
 #include <door.h>
+#include <sys/mman.h>
 #include "libc.h"
 #include "tsd.h"
 #include "base_conversion.h"
@@ -418,11 +419,20 @@ _nsc_trydoorcall_ext(void **dptr, size_t *ndata, size_t *adata)
 	nss_dbd_t	*dbd;
 	int		fb2frontd = 0;
 	int		reset_frontd = 0;
+	size_t		ndata_save = *ndata, adata_save = *adata;
+	void		*dptr_save = *dptr;
 
 	ph = (nss_pheader_t *)*dptr;
 	dbd = (nss_dbd_t *)((void *)((char *)ph + ph->dbd_off));
 	if (dbd->o_name != 0)
 		db = (char *)dbd + dbd->o_name;
+
+	/*
+	 * save away a copy of the header, in case the request needs
+	 * to be sent to nscd more than once. In that case, this
+	 * original header can be copied back to the door buffer
+	 * to replace the possibly changed header
+	 */
 	ph_save = *ph;
 
 	while (ret == NSS_ALTRETRY || ret == NSS_ALTRESET) {
@@ -449,6 +459,18 @@ _nsc_trydoorcall_ext(void **dptr, size_t *ndata, size_t *adata)
 				 * fall back and retry on front door
 				 */
 				fb2frontd = 1;
+				if (*dptr != dptr_save)
+					(void) munmap((void *)*dptr, *ndata);
+
+				/*
+				 * restore the buffer size and header
+				 * data so that the front door will
+				 * see the original request
+				 */
+				*ndata = ndata_save;
+				*adata = adata_save;
+				*dptr = dptr_save;
+				ph =  (nss_pheader_t *)*dptr;
 				*ph = ph_save;
 				/*
 				 * tell the front door server, this is
@@ -538,6 +560,18 @@ _nsc_trydoorcall_ext(void **dptr, size_t *ndata, size_t *adata)
 		(void) fcntl(backd->doorfd, F_SETFD, FD_CLOEXEC);
 		lmutex_unlock(&backd->door_lock);
 		/* NSS_ALTRETRY new back door */
+		if (*dptr != dptr_save)
+			(void) munmap((void *)*dptr, *ndata);
+
+		/*
+		 * restore the buffer size and header
+		 * data so that the back door will
+		 * see the original request
+		 */
+		*ndata = ndata_save;
+		*adata = adata_save;
+		*dptr = dptr_save;
+		ph =  (nss_pheader_t *)*dptr;
 		*ph = ph_save;
 	}
 	return (ret);
