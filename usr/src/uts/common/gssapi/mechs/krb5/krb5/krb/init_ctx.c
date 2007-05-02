@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -408,12 +408,15 @@ init_common (krb5_context *context, krb5_boolean secure)
 	if ((retval = krb5_set_default_tgs_ktypes(ctx, NULL)))
 		goto cleanup;
 
-	ctx->conf_tgs_ktypes = MALLOC(ctx->tgs_ktype_count * sizeof(krb5_enctype));
-	if (ctx->conf_tgs_ktypes == NULL && ctx->tgs_ktype_count != 0)
-            goto cleanup;
+	if (ctx->tgs_ktype_count != 0) {
+		ctx->conf_tgs_ktypes = MALLOC(ctx->tgs_ktype_count *
+					sizeof(krb5_enctype));
+		if (ctx->conf_tgs_ktypes == NULL)
+			goto cleanup;
 
-	(void) memcpy(ctx->conf_tgs_ktypes, ctx->tgs_ktypes,
-		sizeof(krb5_enctype) * ctx->tgs_ktype_count);
+		(void) memcpy(ctx->conf_tgs_ktypes, ctx->tgs_ktypes,
+				sizeof(krb5_enctype) * ctx->tgs_ktype_count);
+	}
 
 	ctx->conf_tgs_ktypes_count = ctx->tgs_ktype_count;
 

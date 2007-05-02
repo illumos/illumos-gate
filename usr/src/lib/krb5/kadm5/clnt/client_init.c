@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * $Header: /cvs/krbdev/krb5/src/lib/kadm5/clnt/client_init.c,v 1.13.2.2 2000/05/09 13:17:14 raeburn Exp $
@@ -745,7 +745,10 @@ static kadm5_ret_t _kadm5_init_any(char *client_name,
 		newsvcname = malloc(strlen(KADM5_CHANGEPW_SERVICE) +
 				    strlen(handle->params.realm) + 2);
 		if (newsvcname == NULL) {
-			return (ENOMEM);
+			ADMIN_LOGO(LOG_ERR, dgettext(TEXT_DOMAIN,
+					    "could not malloc\n"));
+			code = ENOMEM;
+			goto error;
 		}
 		sprintf(newsvcname, "%s@%s", KADM5_CHANGEPW_SERVICE,
 			handle->params.realm);
