@@ -338,8 +338,6 @@ f none usr/lib/security/pam_sample.so.1 755 root bin
 s none usr/lib/security/pam_sample.so=./pam_sample.so.1
 f none usr/lib/security/pam_roles.so.1 755 root bin
 s none usr/lib/security/pam_roles.so=./pam_roles.so.1
-f none usr/lib/security/pam_projects.so.1 755 root bin
-s none usr/lib/security/pam_projects.so=./pam_projects.so.1
 f none usr/lib/security/pam_passwd_auth.so.1 755 root bin
 s none usr/lib/security/pam_passwd_auth.so=./pam_passwd_auth.so.1
 f none usr/lib/security/audit_binfile.so.1 755 root bin

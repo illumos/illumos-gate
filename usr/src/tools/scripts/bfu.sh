@@ -5558,6 +5558,13 @@ mondo_loop() {
 	rm -f $usr/lib/security/sparcv9/pam_unix.so
 
 	#
+	# Remove pam_projects
+	rm -f $usr/lib/security/pam_projects.so.1
+	rm -f $usr/lib/security/pam_projects.so
+	rm -f $usr/lib/security/64/pam_projects.so.1
+	rm -f $usr/lib/security/64/pam_projects.so
+
+	#
 	# Remove libldap.so.3
 	#
 	rm -f $usr/lib/libldap.so.3
