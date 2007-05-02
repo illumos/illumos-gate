@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2600,6 +2600,14 @@ out:
 	return (NULL);
 }
 
+/*
+ * metaname()
+ *
+ * Wrapper function for metaname_common()
+ * If the second arg is a metadevice name then it is important that this should
+ * be a canonical name (eg d30 rather than /dev/md/dsk/d30). If this is not the
+ * case then a bad entry may be placed into the drivelistp cache.
+ */
 mdname_t *
 metaname(
 	mdsetname_t	**spp,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -300,6 +300,7 @@ meta_check_primary_mirror(
 {
 	int		smi;
 	char		*curroot;
+	char		*temproot;
 	mdname_t	*rootnp;
 	md_mirror_t	*mirrorp;
 	md_stripe_t	*stripep;
@@ -308,6 +309,20 @@ meta_check_primary_mirror(
 
 	if ((curroot = meta_get_current_root(ep)) == NULL)
 		return (-1);
+
+	/*
+	 * We need to take the canonical name here otherwise the call to
+	 * metaname will add a bad entry to the drivelistp cache and
+	 * things will get nasty later on.
+	 * However we also need to trap the case where we have a logical
+	 * device name and meta_canonicalize returns NULL.
+	 */
+	temproot = meta_canonicalize(sp, curroot);
+	if (temproot != NULL) {
+		curroot = Strdup(temproot);
+		Free(temproot);
+	}
+
 	/*
 	 * Get device name of current root metadevice. If root
 	 * is net mounted as happens if we're part of the
