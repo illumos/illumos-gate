@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,12 +77,12 @@ static void	safe_zalloc(void **, int, int);
 static int	safe_read(int, void *, size_t);
 static void	safe_write(int, void *, size_t);
 static int	safe_strtoi(char const *, char *);
-static void	ulong_delta(ulong_t *, ulong_t *, ulong_t *, ulong_t *,
+static void	ulong_delta(uint64_t *, uint64_t *, uint64_t *, uint64_t *,
 	int, int);
 static float	denom(float);
 static float	freq(float, float);
 
-static struct sa	nx, ox, ax, dx;
+static struct sa64	nx, ox, ax, dx;
 static iodevinfo_t	*nxio, *oxio, *axio, *dxio;
 static struct tm	*curt, args, arge;
 
@@ -94,7 +94,6 @@ static int	niodevs;
 static int	tabflg;
 static char	options[30], fopt[30];
 static float	tdiff, sec_diff, totsec_diff = 0.0, percent;
-static time_t	ts, te;			/* time interval start and end */
 static float	start_time, end_time, isec;
 static int 	fin, fout;
 static pid_t	childid;
@@ -309,6 +308,16 @@ main(int argc, char **argv)
 }
 
 /*
+ * Convert array of 32-bit uints to 64-bit uints
+ */
+static void
+convert_32to64(uint64_t *dst, uint_t *src, int size)
+{
+	for (; size > 0; size--)
+		*dst++ = (uint64_t)(*src++);
+}
+
+/*
  * Read records from input, classify, and decide on printing.
  */
 static void
@@ -321,6 +330,8 @@ prpass(int input_pipe)
 	ulong_t old_niodevs = 0, prev_niodevs = 0;
 	iodevinfo_t *aio, *dio, *oio;
 	struct stat in_stat;
+	struct sa tx;
+	uint64_t ts, te; /* time interval start and end */
 
 	do_disk = (strchr(fopt, 'd') != NULL);
 	if (!input_pipe && fstat(fin, &in_stat) == -1)
@@ -329,7 +340,25 @@ prpass(int input_pipe)
 	if (sflg)
 		tnext = start_time;
 
-	while (safe_read(fin, &nx, sizeof (struct sa))) {
+	while (safe_read(fin, &tx, sizeof (struct sa))) {
+		/*
+		 * First, we convert 32bit tx to 64bit nx structure
+		 * which is used later. Conversion could be done
+		 * after initial operations, right before calculations,
+		 * but it would introduce additional juggling with vars.
+		 * Thus, we convert all data now, and don't care about
+		 * tx any further.
+		 */
+		nx.valid = tx.valid;
+		nx.ts = tx.ts;
+		convert_32to64((uint64_t *)&nx.csi, (uint_t *)&tx.csi,
+		    sizeof (tx.csi) / sizeof (uint_t));
+		convert_32to64((uint64_t *)&nx.cvmi, (uint_t *)&tx.cvmi,
+		    sizeof (tx.cvmi) / sizeof (uint_t));
+		convert_32to64((uint64_t *)&nx.si, (uint_t *)&tx.si,
+		    sizeof (tx.si) / sizeof (uint_t));
+		(void) memcpy(&nx.vmi, &tx.vmi,
+		    sizeof (tx) - (((char *)&tx.vmi) - ((char *)&tx)));
 		/*
 		 * sadc is the only utility used to generate sar data
 		 * and it uses the valid field as follows:
@@ -714,12 +743,12 @@ update_counters(void)
 	int i;
 	iodevinfo_t *nio, *oio, *aio, *dio;
 
-	ulong_delta((ulong_t *)&nx.csi, (ulong_t *)&ox.csi,
-		(ulong_t *)&dx.csi, (ulong_t *)&ax.csi, 0, sizeof (ax.csi));
-	ulong_delta((ulong_t *)&nx.si, (ulong_t *)&ox.si,
-		(ulong_t *)&dx.si, (ulong_t *)&ax.si, 0, sizeof (ax.si));
-	ulong_delta((ulong_t *)&nx.cvmi, (ulong_t *)&ox.cvmi,
-		(ulong_t *)&dx.cvmi, (ulong_t *)&ax.cvmi, 0,
+	ulong_delta((uint64_t *)&nx.csi, (uint64_t *)&ox.csi,
+		(uint64_t *)&dx.csi, (uint64_t *)&ax.csi, 0, sizeof (ax.csi));
+	ulong_delta((uint64_t *)&nx.si, (uint64_t *)&ox.si,
+		(uint64_t *)&dx.si, (uint64_t *)&ax.si, 0, sizeof (ax.si));
+	ulong_delta((uint64_t *)&nx.cvmi, (uint64_t *)&ox.cvmi,
+		(uint64_t *)&dx.cvmi, (uint64_t *)&ax.cvmi, 0,
 		sizeof (ax.cvmi));
 
 	ax.vmi.freemem += dx.vmi.freemem = nx.vmi.freemem - ox.vmi.freemem;
@@ -757,7 +786,7 @@ update_counters(void)
 }
 
 static void
-prt_u_opt(struct sa *xx)
+prt_u_opt(struct sa64 *xx)
 {
 	(void) printf(" %7.0f %7.0f %7.0f %7.0f\n",
 		(float)xx->csi.cpu[1] * percent,
@@ -767,7 +796,7 @@ prt_u_opt(struct sa *xx)
 }
 
 static void
-prt_b_opt(struct sa *xx)
+prt_b_opt(struct sa64 *xx)
 {
 	(void) printf(" %7.0f %7.0f %7.0f %7.0f %7.0f %7.0f %7.0f %7.0f\n",
 		(float)xx->csi.bread / sec_diff,
@@ -806,7 +835,7 @@ prt_d_opt(int ii, iodevinfo_t *xio)
 }
 
 static void
-prt_y_opt(struct sa *xx)
+prt_y_opt(struct sa64 *xx)
 {
 	(void) printf(" %7.0f %7.0f %7.0f %7.0f %7.0f %7.0f\n",
 		(float)xx->csi.rawch / sec_diff,
@@ -818,7 +847,7 @@ prt_y_opt(struct sa *xx)
 }
 
 static void
-prt_c_opt(struct sa *xx)
+prt_c_opt(struct sa64 *xx)
 {
 	(void) printf(" %7.0f %7.0f %7.0f %7.2f %7.2f %7.0f %7.0f\n",
 		(float)xx->csi.syscall / sec_diff,
@@ -831,7 +860,7 @@ prt_c_opt(struct sa *xx)
 }
 
 static void
-prt_w_opt(struct sa *xx)
+prt_w_opt(struct sa64 *xx)
 {
 	(void) printf(" %7.2f %7.1f %7.2f %7.1f %7.0f\n",
 		(float)xx->cvmi.swapin / sec_diff,
@@ -842,7 +871,7 @@ prt_w_opt(struct sa *xx)
 }
 
 static void
-prt_a_opt(struct sa *xx)
+prt_a_opt(struct sa64 *xx)
 {
 	(void) printf(" %7.0f %7.0f %7.0f\n",
 		(float)xx->csi.ufsiget / sec_diff,
@@ -851,7 +880,7 @@ prt_a_opt(struct sa *xx)
 }
 
 static void
-prt_q_opt(struct sa *xx)
+prt_q_opt(struct sa64 *xx)
 {
 	if (xx->si.runocc == 0 || xx->si.updates == 0)
 		(void) printf(" %7.1f %7.0f", 0., 0.);
@@ -870,10 +899,10 @@ prt_q_opt(struct sa *xx)
 }
 
 static void
-prt_v_opt(struct sa *xx)
+prt_v_opt(struct sa64 *xx)
 {
-	(void) printf(" %4lu/%-4lu %4u %4lu/%-4lu %4u %4lu/%-4lu "
-	    "%4u %4lu/%-4lu\n",
+	(void) printf(" %4lu/%-4lu %4llu %4lu/%-4lu %4llu %4lu/%-4lu "
+	    "%4llu %4lu/%-4lu\n",
 	    nx.szproc, nx.mszproc, xx->csi.procovf,
 	    nx.szinode, nx.mszinode, xx->csi.inodeovf,
 	    nx.szfile, nx.mszfile, xx->csi.fileovf,
@@ -881,7 +910,7 @@ prt_v_opt(struct sa *xx)
 }
 
 static void
-prt_m_opt(struct sa *xx)
+prt_m_opt(struct sa64 *xx)
 {
 	(void) printf(" %7.2f %7.2f\n",
 		(float)xx->csi.msg / sec_diff,
@@ -889,7 +918,7 @@ prt_m_opt(struct sa *xx)
 }
 
 static void
-prt_p_opt(struct sa *xx)
+prt_p_opt(struct sa64 *xx)
 {
 	(void) printf(" %7.2f %7.2f %7.2f %7.2f %7.2f %7.2f\n",
 		(float)xx->cvmi.pgfrec / sec_diff,
@@ -901,7 +930,7 @@ prt_p_opt(struct sa *xx)
 }
 
 static void
-prt_g_opt(struct sa *xx)
+prt_g_opt(struct sa64 *xx)
 {
 	(void) printf(" %8.2f %8.2f %8.2f %8.2f %8.2f\n",
 		(float)xx->cvmi.pgout / sec_diff,
@@ -914,7 +943,7 @@ prt_g_opt(struct sa *xx)
 }
 
 static void
-prt_r_opt(struct sa *xx)
+prt_r_opt(struct sa64 *xx)
 {
 	/* Avoid divide by Zero - Should never happen */
 	if (xx->si.updates == 0)
@@ -928,7 +957,7 @@ prt_r_opt(struct sa *xx)
 }
 
 static void
-prt_k_opt(struct sa *xx, int n)
+prt_k_opt(struct sa64 *xx, int n)
 {
 	if (n != 1) {
 		(void) printf(" %7.0f %7.0f %5.0f %7.0f %7.0f %5.0f %11.0f"
@@ -1107,18 +1136,22 @@ prtavg(void)
 }
 
 static void
-ulong_delta(ulong_t *new, ulong_t *old, ulong_t *delta, ulong_t *accum,
+ulong_delta(uint64_t *new, uint64_t *old, uint64_t *delta, uint64_t *accum,
 	int begin, int end)
 {
 	int i;
-	ulong_t *np, *op, *dp, *ap;
+	uint64_t n, o, d;
 
-	np = new;
-	op = old;
-	dp = delta;
-	ap = accum;
-	for (i = begin; i < end; i += sizeof (ulong_t))
-		*ap++ += *dp++ = *np++ - *op++;
+	for (i = begin; i < end; i += sizeof (uint64_t)) {
+		n = *new++;
+		o = *old++;
+		if (o > n) {
+			d = n + 0x100000000LL - o;
+		} else {
+			d = n - o;
+		}
+		*accum++ += *delta++ = d;
+	}
 }
 
 /*

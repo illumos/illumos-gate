@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 1992-1994, 2000, 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,6 +90,129 @@ struct sa {
 	ulong_t	niodevs;		/* number of I/O devices	*/
 
 	/* An array of iodevinfo structs come next in the sadc files	*/
+};
+
+typedef struct cpu64_sysinfo {
+	uint64_t	cpu[CPU_STATES];
+	uint64_t	wait[W_STATES];
+	uint64_t	bread;
+	uint64_t	bwrite;
+	uint64_t	lread;
+	uint64_t	lwrite;
+	uint64_t	phread;
+	uint64_t	phwrite;
+	uint64_t	pswitch;
+	uint64_t	trap;
+	uint64_t	intr;
+	uint64_t	syscall;
+	uint64_t	sysread;
+	uint64_t	syswrite;
+	uint64_t	sysfork;
+	uint64_t	sysvfork;
+	uint64_t	sysexec;
+	uint64_t	readch;
+	uint64_t	writech;
+	uint64_t	rcvint;
+	uint64_t	xmtint;
+	uint64_t	mdmint;
+	uint64_t	rawch;
+	uint64_t	canch;
+	uint64_t	outch;
+	uint64_t	msg;
+	uint64_t	sema;
+	uint64_t	namei;
+	uint64_t	ufsiget;
+	uint64_t	ufsdirblk;
+	uint64_t	ufsipage;
+	uint64_t	ufsinopage;
+	uint64_t	inodeovf;
+	uint64_t	fileovf;
+	uint64_t	procovf;
+	uint64_t	intrthread;
+	uint64_t	intrblk;
+	uint64_t	idlethread;
+	uint64_t	inv_swtch;
+	uint64_t	nthreads;
+	uint64_t	cpumigrate;
+	uint64_t	xcalls;
+	uint64_t	mutex_adenters;
+	uint64_t	rw_rdfails;
+	uint64_t	rw_wrfails;
+	uint64_t	modload;
+	uint64_t	modunload;
+	uint64_t	bawrite;
+	uint64_t	rw_enters;
+	uint64_t	win_uo_cnt;
+	uint64_t	win_uu_cnt;
+	uint64_t	win_so_cnt;
+	uint64_t	win_su_cnt;
+	uint64_t	win_suo_cnt;
+} cpu64_sysinfo_t;
+
+typedef struct cpu64_vminfo {
+	uint64_t	pgrec;
+	uint64_t	pgfrec;
+	uint64_t	pgin;
+	uint64_t	pgpgin;
+	uint64_t	pgout;
+	uint64_t	pgpgout;
+	uint64_t	swapin;
+	uint64_t	pgswapin;
+	uint64_t	swapout;
+	uint64_t	pgswapout;
+	uint64_t	zfod;
+	uint64_t	dfree;
+	uint64_t	scan;
+	uint64_t	rev;
+	uint64_t	hat_fault;
+	uint64_t	as_fault;
+	uint64_t	maj_fault;
+	uint64_t	cow_fault;
+	uint64_t	prot_fault;
+	uint64_t	softlock;
+	uint64_t	kernel_asflt;
+	uint64_t	pgrrun;
+	uint64_t	execpgin;
+	uint64_t	execpgout;
+	uint64_t	execfree;
+	uint64_t	anonpgin;
+	uint64_t	anonpgout;
+	uint64_t	anonfree;
+	uint64_t	fspgin;
+	uint64_t	fspgout;
+	uint64_t	fsfree;
+} cpu64_vminfo_t;
+
+typedef struct sysinfo64 {
+	uint64_t	updates;
+	uint64_t	runque;
+	uint64_t	runocc;
+	uint64_t	swpque;
+	uint64_t	swpocc;
+	uint64_t	waiting;
+} sysinfo64_t;
+
+struct sa64 {
+	int		valid;
+	time_t		ts;
+
+	cpu64_sysinfo_t	csi;
+	cpu64_vminfo_t	cvmi;
+	sysinfo64_t	si;
+	vminfo_t	vmi;
+	kmeminfo_t	kmi;
+
+	ulong_t		szinode;
+	ulong_t		szfile;
+	ulong_t		szproc;
+	ulong_t		szlckr;
+
+	ulong_t		mszinode;
+	ulong_t		mszfile;
+	ulong_t		mszproc;
+	ulong_t		mszlckr;
+
+	ulong_t	niodevs;
 };
 
 extern struct sa sa;
