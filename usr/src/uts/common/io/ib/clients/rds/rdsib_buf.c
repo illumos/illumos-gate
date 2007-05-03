@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -519,6 +519,107 @@ rds_init_send_pool(rds_ep_t *ep)
 
 	RDS_DPRINTF3(LABEL, "rdsmemp start: %p end: %p", memp, mp);
 	RDS_DPRINTF2("rds_init_send_pool", "Return");
+
+	return (0);
+}
+
+int
+rds_reinit_send_pool(rds_ep_t *ep, ib_guid_t hca_guid)
+{
+	rds_buf_t	*bp;
+	rds_hca_t	*hcap;
+	ibt_mr_attr_t   mem_attr;
+	ibt_mr_desc_t   mem_desc;
+	rds_bufpool_t   *spool;
+	int		ret;
+
+	RDS_DPRINTF2("rds_reinit_send_pool", "Enter: EP(%p)", ep);
+
+	spool = &ep->ep_sndpool;
+	ASSERT(spool->pool_memp != NULL);
+
+	/* deregister the send pool memory from the previous HCA */
+	hcap = rds_get_hcap(rdsib_statep, ep->ep_hca_guid);
+	if (hcap == NULL) {
+		RDS_DPRINTF2("rds_reinit_send_pool", "HCA (0x%llx) not found",
+		    ep->ep_hca_guid);
+	} else {
+		if (ep->ep_snd_mrhdl != NULL) {
+			(void) ibt_deregister_mr(hcap->hca_hdl,
+			    ep->ep_snd_mrhdl);
+			ep->ep_snd_mrhdl = NULL;
+			ep->ep_snd_lkey = 0;
+		}
+
+		if ((ep->ep_type == RDS_EP_TYPE_DATA) &&
+		    (ep->ep_ackhdl != NULL)) {
+			(void) ibt_deregister_mr(hcap->hca_hdl, ep->ep_ackhdl);
+			ep->ep_ackhdl = NULL;
+			ep->ep_ack_rkey = 0;
+		}
+
+		ep->ep_hca_guid = NULL;
+	}
+
+	/* get the hcap for the new HCA */
+	hcap = rds_get_hcap(rdsib_statep, hca_guid);
+	if (hcap == NULL) {
+		RDS_DPRINTF2("rds_reinit_send_pool", "HCA (0x%llx) not found",
+		    hca_guid);
+		return (-1);
+	}
+
+	/* register the send memory */
+	mem_attr.mr_vaddr = (ib_vaddr_t)(uintptr_t)spool->pool_memp;
+	mem_attr.mr_len = spool->pool_memsize;
+	mem_attr.mr_as = NULL;
+	mem_attr.mr_flags = IBT_MR_SLEEP | IBT_MR_ENABLE_LOCAL_WRITE;
+
+	ret = ibt_register_mr(hcap->hca_hdl, hcap->hca_pdhdl,
+	    &mem_attr, &ep->ep_snd_mrhdl, &mem_desc);
+	if (ret != IBT_SUCCESS) {
+		RDS_DPRINTF2("rds_reinit_send_pool",
+		    "EP(%p): ibt_register_mr failed: %d", ep, ret);
+		return (-1);
+	}
+	ep->ep_snd_lkey = mem_desc.md_lkey;
+
+	/* register the acknowledgement space */
+	if (ep->ep_type == RDS_EP_TYPE_DATA) {
+		mem_attr.mr_vaddr = (ib_vaddr_t)ep->ep_ack_addr;
+		mem_attr.mr_len = sizeof (uintptr_t);
+		mem_attr.mr_as = NULL;
+		mem_attr.mr_flags = IBT_MR_SLEEP | IBT_MR_ENABLE_LOCAL_WRITE |
+		    IBT_MR_ENABLE_REMOTE_WRITE;
+
+		ret = ibt_register_mr(hcap->hca_hdl, hcap->hca_pdhdl,
+		    &mem_attr, &ep->ep_ackhdl, &mem_desc);
+		if (ret != IBT_SUCCESS) {
+			RDS_DPRINTF2("rds_reinit_send_pool",
+			    "EP(%p): ibt_register_mr for ack failed: %d",
+			    ep, ret);
+			(void) ibt_deregister_mr(hcap->hca_hdl,
+			    ep->ep_snd_mrhdl);
+			ep->ep_snd_mrhdl = NULL;
+			ep->ep_snd_lkey = 0;
+			return (-1);
+		}
+		ep->ep_ack_rkey = mem_desc.md_rkey;
+
+		/* update the LKEY in the acknowledgement WR */
+		ep->ep_ackds.ds_key = ep->ep_snd_lkey;
+	}
+
+	/* update the LKEY in each buffer */
+	bp = spool->pool_headp;
+	while (bp) {
+		bp->buf_ds.ds_key = ep->ep_snd_lkey;
+		bp = bp->buf_nextp;
+	}
+
+	ep->ep_hca_guid = hca_guid;
+
+	RDS_DPRINTF2("rds_reinit_send_pool", "Return: EP(%p)", ep);
 
 	return (0);
 }

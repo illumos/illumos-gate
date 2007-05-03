@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,8 +64,8 @@ typedef struct rds_path_record_s {
 	ipaddr_t			ribd_ip;
 	struct rds_path_record_s	*up;
 	struct rds_path_record_s	*downp;
-	char				lifname[LIFNAMSIZ];
-	char				rifname[LIFNAMSIZ];
+	char				lifname[MAXNAMELEN];
+	char				rifname[MAXNAMELEN];
 } rds_path_record_t;
 
 typedef struct rds_node_record_s {
@@ -79,6 +79,43 @@ typedef struct rds_node_record_s {
 kmutex_t		rds_pathmap_lock;
 rds_node_record_t	*rds_pathmap = NULL;
 
+static boolean_t
+rds_validate_interface(rds_path_t *path)
+{
+	char			devname[MAXNAMELEN];
+	uint_t			instance;
+
+	/* separate devname and instance number */
+	if (ddi_parse(path->local.ifname, devname, &instance) != DDI_SUCCESS) {
+		RDS_DPRINTF2("rds_validate_interface",
+		    "local: %s is not right", path->local.ifname);
+		return (B_FALSE);
+	}
+
+	/* don't care if it is not IPoIB interface */
+	if (strcmp(devname, "ibd") != 0) {
+		RDS_DPRINTF2("rds_validate_interface",
+		    "local: %s is not IB interface", devname);
+		return (B_FALSE);
+	}
+
+	/* separate devname and instance number */
+	if (ddi_parse(path->remote.ifname, devname, &instance) != DDI_SUCCESS) {
+		RDS_DPRINTF2("rds_validate_interface",
+		    "remote: %s is not right", path->remote.ifname);
+		return (B_FALSE);
+	}
+
+	/* don't care if it is not IPoIB interface */
+	if (strcmp(devname, "ibd") != 0) {
+		RDS_DPRINTF2("rds_validate_interface",
+		    "remote: %s is not IB interface", devname);
+		return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
 /*
  * Called by SC on discovering a new path
  */
@@ -91,11 +128,8 @@ rds_path_up(rds_path_t *path)
 	ASSERT(path != NULL);
 
 	/* don't care if it is not IPoIB interface */
-	if ((bcmp(path->local.ifname, "ibd", 3) != 0) ||
-	    (bcmp(path->remote.ifname, "ibd", 3) != 0)) {
-		RDS_DPRINTF3("rds_path_up",
-		    "(%s | %s) Not IPoIB interface, ignore",
-		    path->local.ifname, path->remote.ifname);
+	if (rds_validate_interface(path) == B_FALSE) {
+		RDS_DPRINTF2("rds_path_up", "NOT IB interface");
 		return;
 	}
 
@@ -164,11 +198,8 @@ rds_path_down(rds_path_t *path)
 	ASSERT(path != NULL);
 
 	/* don't care if it is not IPoIB interface */
-	if ((bcmp(path->local.ifname, "ibd", 3) != 0) ||
-	    (bcmp(path->remote.ifname, "ibd", 3) != 0)) {
-		RDS_DPRINTF3("rds_path_down",
-		    "(%s | %s) Not IPoIB interface, ignore",
-		    path->local.ifname, path->remote.ifname);
+	if (rds_validate_interface(path) == B_FALSE) {
+		RDS_DPRINTF2("rds_path_down", "NOT IB interface");
 		return;
 	}
 
@@ -227,7 +258,7 @@ rds_path_down(rds_path_t *path)
 		} else {
 			/* this is the first node record */
 			ASSERT(p == rds_pathmap);
-			rds_pathmap = p;
+			rds_pathmap = p->nextp;
 		}
 
 		if (p->nextp) {
@@ -276,10 +307,37 @@ rds_if_lookup_by_name(char *if_name)
 {
 	rds_node_record_t	*p;
 	rds_path_record_t	*p1;
+	char			devname[MAXNAMELEN];
+	uint_t			instance;
+
+	if (ddi_parse(if_name, devname, &instance) != DDI_SUCCESS) {
+		RDS_DPRINTF2("rds_if_lookup_by_name",
+		    "if_name: %s is not right", if_name);
+		return (B_FALSE);
+	}
 
 	mutex_enter(&rds_pathmap_lock);
 
+	if (rds_pathmap == NULL) {
+		/* SC is not configured */
+		RDS_DPRINTF2("rds_if_lookup_by_name", "Pathmap is NULL");
+		mutex_exit(&rds_pathmap_lock);
+		return (B_FALSE);
+	}
+
+	/*
+	 * Sun Cluster always names its interconnect virtual network interface
+	 * as clprivnetx, so  return TRUE if there is atleast one node record
+	 * and the interface name is clprivnet something.
+	 */
+	if (strcmp(devname, "clprivnet") == 0) {
+		/* clprivnet address */
+		mutex_exit(&rds_pathmap_lock);
+		return (B_TRUE);
+	}
+
 	p = rds_pathmap;
+
 	while (p != NULL) {
 		p1 = p->downp;
 		while ((p1 != NULL) && strcmp(if_name, p1->lifname)) {

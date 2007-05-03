@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -149,7 +149,7 @@ typedef enum rds_ep_state_s {
  *	(5) Failure in rds_session_init()
  *	(6) rds_sendmsg(3SOCKET)/Incoming CM REQ
  *	(7) Failure in rds_session_open()
- *	(8) rds_session_close() and rds_get_ibaddr()
+ *	(8) rds_session_close(), rds_get_ibaddr() and rds_session_reinit()
  *	(9) rds_session_close() and rds_session_fini()
  *	(9) rds_cleanup_passive_session() and rds_passive_session_fini()
  *	(10) Connection Error/Incoming REQ
@@ -309,6 +309,7 @@ int rds_ep_init(rds_ep_t *ep);
 rds_session_t *rds_session_create(rds_state_t *statep, ipaddr_t destip,
     ipaddr_t srcip, ibt_cm_req_rcv_t *reqp, uint8_t type);
 int rds_session_init(rds_session_t *sp);
+int rds_session_reinit(rds_session_t *sp, ib_gid_t lgid);
 void rds_session_open(rds_session_t *sp);
 void rds_session_close(rds_session_t *sp, ibt_execution_mode_t mode,
     uint_t wait);
@@ -320,6 +321,7 @@ void rds_close_sessions(void *arg);
 void rds_received_msg(rds_ep_t *ep, rds_buf_t *bp);
 void rds_handle_control_message(rds_session_t *sp, rds_ctrl_pkt_t *cp);
 void rds_handle_send_error(rds_ep_t *ep);
+void rds_session_fini(rds_session_t *sp);
 void rds_passive_session_fini(rds_session_t *sp);
 void rds_cleanup_passive_session(void *arg);
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,7 @@ rds_do_ip_ioctl(int cmd, int len, caddr_t arg)
 	vnode_t	*kvp, *vp;
 	TIUSER	*tiptr;
 	struct	strioctl iocb;
+	k_sigset_t smask;
 	int	err = 0;
 
 	if (lookupname("/dev/udp", UIO_SYSSPACE, FOLLOW, NULLVPP,
@@ -79,7 +80,9 @@ rds_do_ip_ioctl(int cmd, int len, caddr_t arg)
 	iocb.ic_timout = 0;
 	iocb.ic_len = len;
 	iocb.ic_dp = arg;
+	sigintr(&smask, 0);
 	err = kstr_ioctl(vp, I_STR, (intptr_t)&iocb);
+	sigunintr(&smask);
 	(void) t_kclose(tiptr, 0);
 	VN_RELE(kvp);
 	return (err);
@@ -91,6 +94,7 @@ rds_dl_info(ldi_handle_t lh, dl_info_ack_t *info)
 	dl_info_req_t *info_req;
 	union DL_primitives *dl_prim;
 	mblk_t *mp;
+	k_sigset_t smask;
 	int error;
 
 	if ((mp = allocb(sizeof (dl_info_req_t), BPRI_MED)) == NULL) {
@@ -103,12 +107,16 @@ rds_dl_info(ldi_handle_t lh, dl_info_ack_t *info)
 	mp->b_wptr += sizeof (dl_info_req_t);
 	info_req->dl_primitive = DL_INFO_REQ;
 
+	sigintr(&smask, 0);
 	if ((error = ldi_putmsg(lh, mp)) != 0) {
+		sigunintr(&smask);
 		return (error);
 	}
 	if ((error = ldi_getmsg(lh, &mp, (timestruc_t *)NULL)) != 0) {
+		sigunintr(&smask);
 		return (error);
 	}
+	sigunintr(&smask);
 
 	dl_prim = (union DL_primitives *)(uintptr_t)mp->b_rptr;
 	switch (dl_prim->dl_primitive) {
@@ -131,7 +139,12 @@ rds_dl_info(ldi_handle_t lh, dl_info_ack_t *info)
 }
 
 
-static boolean_t
+/*
+ * Return 0 if the interface is IB.
+ * Return error (>0) if any error is encountered during processing.
+ * Return -1 if the interface is not IB and no error.
+ */
+static int
 rds_is_ib_interface(char *name)
 {
 
@@ -156,33 +169,35 @@ rds_is_ib_interface(char *name)
 		/*
 		 * null name.
 		 */
-		return (B_FALSE);
+		return (-1);
 	}
 
 	if (strncmp("lo", name, i) == 0) {
 		/*
 		 * loopback interface is considered RDS capable
 		 */
-		return (B_TRUE);
+		return (0);
 	}
 
 	(void) strncat((dev_path + sizeof ("/dev/") -1), name, i);
 
 	ret = ldi_open_by_name(dev_path, FREAD|FWRITE, kcred, &lh, rds_li);
 	if (ret != 0) {
-		return (B_FALSE);
+		return (ret);
 	}
 
 	ret = rds_dl_info(lh, &info);
-
 	(void) ldi_close(lh, FREAD|FWRITE, kcred);
-
-	if (ret != 0 || (info.dl_mac_type != DL_IB &&
-	    !rds_transport_ops->rds_transport_if_lookup_by_name(name))) {
-		return (B_FALSE);
+	if (ret != 0) {
+		return (ret);
 	}
 
-	return (B_TRUE);
+	if (info.dl_mac_type != DL_IB &&
+	    !rds_transport_ops->rds_transport_if_lookup_by_name(name)) {
+		return (-1);
+	}
+
+	return (0);
 }
 
 void
@@ -226,8 +241,14 @@ rds_ioctl_copyin_done(queue_t *q, mblk_t *mp)
 		ifr = kifc.ifc_req;
 		n = num_ifs;
 		for (num_ifs = 0; n > 0; ifr++) {
-			if (rds_is_ib_interface(ifr->ifr_name)) {
+			err = rds_is_ib_interface(ifr->ifr_name);
+			if (err == 0) {
 				num_ifs++;
+			} else if (err > 0) {
+				num_ifs = 0;
+				break;
+			} else {
+				err = 0;
 			}
 			n--;
 		}
@@ -277,17 +298,21 @@ rds_ioctl_copyin_done(queue_t *q, mblk_t *mp)
 		for (; num_ifs > 0 &&
 		    (int)((uintptr_t)mp1->b_wptr - (uintptr_t)mp1->b_rptr) <
 		    ubuf_size; num_ifs--, ifr++) {
-			if (rds_is_ib_interface(ifr->ifr_name)) {
+			err = rds_is_ib_interface(ifr->ifr_name);
+			if (err == 0) {
 				ifr->ifr_addr.sa_family = AF_INET_OFFLOAD;
 				bcopy((caddr_t)ifr, ptr, sizeof (struct ifreq));
 				ptr++;
 				mp1->b_wptr = (uchar_t *)ptr;
+			} else if (err > 0) {
+				break;
+			} else {
+				err = 0;
 			}
 		}
 
 		STRUCT_FSET(ifc, ifc_len, (int)((uintptr_t)mp1->b_wptr -
 		    (uintptr_t)mp1->b_rptr));
-
 		kmem_free(kifc.ifc_buf, kifc.ifc_len);
 	}
 		break;
@@ -431,7 +456,7 @@ rds_verify_bind_address(ipaddr_t addr)
 
 		sin = (struct sockaddr_in *)(uintptr_t)&ifr->ifr_addr;
 		if ((sin->sin_addr.s_addr == addr) &&
-		    rds_is_ib_interface(ifr->ifr_name)) {
+		    (rds_is_ib_interface(ifr->ifr_name) == 0)) {
 				ret = B_TRUE;
 				break;
 		}

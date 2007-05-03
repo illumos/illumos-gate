@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -304,6 +304,31 @@ rds_ep_init(rds_ep_t *ep)
 	return (0);
 }
 
+static int
+rds_ep_reinit(rds_ep_t *ep, ib_guid_t hca_guid)
+{
+	int	ret;
+
+	RDS_DPRINTF3("rds_ep_reinit", "Enter: EP(%p) Type: %d",
+	    ep, ep->ep_type);
+
+	/* Re-initialize send pool */
+	ret = rds_reinit_send_pool(ep, hca_guid);
+	if (ret != 0) {
+		RDS_DPRINTF2("rds_ep_reinit",
+		    "EP(%p): rds_reinit_send_pool failed: %d", ep, ret);
+		return (-1);
+	}
+
+	/* free all the receive buffers in the pool */
+	rds_free_recv_pool(ep);
+
+	RDS_DPRINTF3("rds_ep_reinit", "Return: EP(%p) Type: %d",
+	    ep, ep->ep_type);
+
+	return (0);
+}
+
 void
 rds_session_fini(rds_session_t *sp)
 {
@@ -350,6 +375,74 @@ rds_session_init(rds_session_t *sp)
 	RDS_DPRINTF2(LABEL, "SP(%p) Data EP(%p)", sp, &sp->session_dataep);
 
 	RDS_DPRINTF2("rds_session_init", "Return");
+
+	return (0);
+}
+
+/*
+ * This should be called before moving a session from ERROR state to
+ * INIT state. This will update the HCA keys incase the session has moved from
+ * one HCA to another.
+ */
+int
+rds_session_reinit(rds_session_t *sp, ib_gid_t lgid)
+{
+	rds_hca_t	*hcap, *hcap1;
+	int		ret;
+
+	RDS_DPRINTF2("rds_session_reinit", "Enter: SP(0x%p)", sp);
+
+	/* CALLED WITH SESSION WRITE LOCK */
+
+	hcap = rds_gid_to_hcap(rdsib_statep, lgid);
+	if (hcap == NULL) {
+		RDS_DPRINTF1("rds_session_reinit", "SGID is on an "
+		    "uninitialized HCA: %llx", lgid.gid_guid);
+		return (-1);
+	}
+
+	hcap1 = rds_gid_to_hcap(rdsib_statep, sp->session_lgid);
+	if (hcap1 == NULL) {
+		RDS_DPRINTF1("rds_session_reinit", "Seems like HCA %llx "
+		    "is unplugged", sp->session_lgid.gid_guid);
+	} else if (hcap->hca_guid == hcap1->hca_guid) {
+		/*
+		 * No action is needed as the session did not move across
+		 * HCAs
+		 */
+		RDS_DPRINTF2("rds_session_reinit", "Failover on the same HCA");
+		return (0);
+	}
+
+	RDS_DPRINTF2("rds_session_reinit", "Failover across HCAs");
+
+	/* re-initialize the control channel */
+	ret = rds_ep_reinit(&sp->session_ctrlep, hcap->hca_guid);
+	if (ret != 0) {
+		RDS_DPRINTF2("rds_session_reinit",
+		    "SP(%p): Ctrl EP(%p) re-initialization failed",
+		    sp, &sp->session_ctrlep);
+		return (-1);
+	}
+
+	RDS_DPRINTF2("rds_session_reinit", "SP(%p) Control EP(%p)",
+	    sp, &sp->session_ctrlep);
+
+	/* re-initialize the data channel */
+	ret = rds_ep_reinit(&sp->session_dataep, hcap->hca_guid);
+	if (ret != 0) {
+		RDS_DPRINTF2("rds_session_reinit",
+		    "SP(%p): Data EP(%p) re-initialization failed",
+		    sp, &sp->session_dataep);
+		return (-1);
+	}
+
+	RDS_DPRINTF2("rds_session_reinit", "SP(%p) Data EP(%p)",
+	    sp, &sp->session_dataep);
+
+	sp->session_lgid = lgid;
+
+	RDS_DPRINTF2("rds_session_reinit", "Return: SP(0x%p)", sp);
 
 	return (0);
 }
@@ -409,7 +502,7 @@ rds_session_connect(rds_session_t *sp)
 		ret = rds_open_rc_channel(ep, &pinfo, IBT_BLOCKING, &datachan);
 		if (ret != IBT_SUCCESS) {
 			RDS_DPRINTF2(LABEL, "EP(%p): rds_open_rc_channel "
-			    "failed: %d", ret);
+			    "failed: %d", ep, ret);
 			return (-1);
 		}
 		sp->session_dataep.ep_chanhdl = datachan;
@@ -441,6 +534,9 @@ rds_session_connect(rds_session_t *sp)
 		mutex_exit(&ep->ep_lock);
 		return (-1);
 	}
+
+	RDS_DPRINTF2(LABEL, "Session (%p) 0x%x <--> 0x%x is CONNECTED",
+	    sp, sp->session_myip, sp->session_remip);
 
 	RDS_DPRINTF2("rds_session_connect", "Return SP(%p)", sp);
 
@@ -637,6 +733,8 @@ rds_failover_session(void *arg)
 		if (sp->session_type == RDS_SESSION_ACTIVE) {
 			rds_session_fini(sp);
 			sp->session_state = RDS_SESSION_STATE_FAILED;
+			RDS_DPRINTF3("rds_failover_session",
+			    "SP(%p) State RDS_SESSION_STATE_FAILED", sp);
 		} else {
 			RDS_DPRINTF2("rds_failover_session",
 			    "SP(%p) has become passive", sp);
@@ -662,9 +760,21 @@ rds_failover_session(void *arg)
 	}
 
 	/* move the session to init state */
-	sp->session_state = RDS_SESSION_STATE_INIT;
+	ret = rds_session_reinit(sp, lgid);
 	sp->session_lgid = lgid;
 	sp->session_rgid = rgid;
+	if (ret != 0) {
+		rds_session_fini(sp);
+		sp->session_state = RDS_SESSION_STATE_FAILED;
+		RDS_DPRINTF3("rds_failover_session",
+		    "SP(%p) State RDS_SESSION_STATE_FAILED", sp);
+		rw_exit(&sp->session_lock);
+		return;
+	} else {
+		sp->session_state = RDS_SESSION_STATE_INIT;
+		RDS_DPRINTF3("rds_failover_session",
+		    "SP(%p) State RDS_SESSION_STATE_INIT", sp);
+	}
 	rw_exit(&sp->session_lock);
 
 	rds_session_open(sp);
@@ -886,9 +996,6 @@ rds_session_open(rds_session_t *sp)
 
 		return;
 	}
-
-	RDS_DPRINTF2(LABEL, "Session (%p) 0x%x <--> 0x%x is CONNECTED",
-	    sp, sp->session_myip, sp->session_remip);
 
 	RDS_DPRINTF2("rds_session_open", "Return: SP(%p)", sp);
 }

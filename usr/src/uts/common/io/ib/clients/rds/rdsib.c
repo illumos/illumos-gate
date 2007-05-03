@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -270,6 +270,7 @@ rdsib_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    TASKQ_DEFAULTPRI, 0);
 	if (rds_taskq == NULL) {
 		RDS_DPRINTF1(LABEL, "ddi_taskq_create failed for rds_taskq");
+		rdsib_dev_info = NULL;
 		return (DDI_FAILURE);
 	}
 
@@ -278,6 +279,7 @@ rdsib_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		cmn_err(CE_CONT, "ddi_create_minor_node failed: %d", ret);
 		ddi_taskq_destroy(rds_taskq);
 		rds_taskq = NULL;
+		rdsib_dev_info = NULL;
 		return (DDI_FAILURE);
 	}
 
@@ -312,6 +314,8 @@ rdsib_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		ddi_taskq_destroy(rds_taskq);
 		rds_taskq = NULL;
 	}
+
+	rdsib_dev_info = NULL;
 
 	RDS_DPRINTF4("rdsib_detach", "return");
 

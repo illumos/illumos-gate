@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -184,7 +184,7 @@ rdsib_open_ib()
 	uint_t		ix, hcaix, nhcas;
 	int		ret;
 
-	RDS_DPRINTF4("rdsib_open_ib", "enter");
+	RDS_DPRINTF4("rdsib_open_ib", "enter: statep %p", rdsib_statep);
 
 	ASSERT(rdsib_statep != NULL);
 	if (rdsib_statep == NULL) {
@@ -309,7 +309,7 @@ rdsib_open_ib()
 		}
 	}
 
-	RDS_DPRINTF4("rdsib_open_ib", "return");
+	RDS_DPRINTF4("rdsib_open_ib", "return: statep %p", rdsib_statep);
 
 	return (0);
 }
@@ -320,10 +320,10 @@ rdsib_open_ib()
 void
 rdsib_close_ib()
 {
-	rds_hca_t	*hcap;
+	rds_hca_t	*hcap, *nextp;
 	int		ret;
 
-	RDS_DPRINTF4("rds_close_ib", "enter");
+	RDS_DPRINTF2("rds_close_ib", "enter: statep %p", rdsib_statep);
 
 	if (rdsib_statep->rds_srvhdl != NULL) {
 		(void) ibt_unbind_all_services(rdsib_statep->rds_srvhdl);
@@ -334,10 +334,15 @@ rdsib_close_ib()
 	/* close and destroy all the sessions */
 	rds_close_sessions(NULL);
 
-	/* Release all IB resources */
+	/* Release all HCA resources */
+	rw_enter(&rdsib_statep->rds_hca_lock, RW_WRITER);
 	hcap = rdsib_statep->rds_hcalistp;
+	rdsib_statep->rds_hcalistp = NULL;
+	rdsib_statep->rds_nhcas = 0;
+	rw_exit(&rdsib_statep->rds_hca_lock);
+
 	while (hcap != NULL) {
-		rdsib_statep->rds_hcalistp = hcap->hca_nextp;
+		nextp = hcap->hca_nextp;
 
 		ret = ibt_free_pd(hcap->hca_hdl, hcap->hca_pdhdl);
 		ASSERT(ret == IBT_SUCCESS);
@@ -348,7 +353,7 @@ rdsib_close_ib()
 		ASSERT(ret == IBT_SUCCESS);
 
 		kmem_free(hcap, sizeof (rds_hca_t));
-		hcap = rdsib_statep->rds_hcalistp;
+		hcap = nextp;
 	}
 
 	/* Deregister with IBTF */
@@ -357,7 +362,7 @@ rdsib_close_ib()
 		rdsib_statep->rds_ibhdl = NULL;
 	}
 
-	RDS_DPRINTF4("rds_close_ib", "return");
+	RDS_DPRINTF2("rds_close_ib", "return: statep %p", rdsib_statep);
 }
 
 /* Return hcap, given the hca guid */
@@ -387,20 +392,33 @@ rds_get_hcap(rds_state_t *statep, ib_guid_t hca_guid)
 rds_hca_t *
 rds_gid_to_hcap(rds_state_t *statep, ib_gid_t gid)
 {
-	ibt_node_info_t	nodeinfo;
-	int		ret;
+	rds_hca_t	*hcap;
+	uint_t		ix;
 
 	RDS_DPRINTF4("rds_gid_to_hcap", "Enter: statep: 0x%p gid: %llx:%llx",
 	    statep, gid.gid_prefix, gid.gid_guid);
 
-	ret = ibt_gid_to_node_info(gid, &nodeinfo);
-	if (ret != IBT_SUCCESS) {
-		RDS_DPRINTF2(LABEL, "ibt_gid_node_info for gid: %llx:%llx "
-		    "failed", gid.gid_prefix, gid.gid_guid);
-		return (NULL);
+	rw_enter(&statep->rds_hca_lock, RW_READER);
+
+	hcap = statep->rds_hcalistp;
+	while (hcap != NULL) {
+		for (ix = 0; ix < hcap->hca_nports; ix++) {
+			if ((hcap->hca_pinfop[ix].p_sgid_tbl[0].gid_prefix ==
+			    gid.gid_prefix) &&
+			    (hcap->hca_pinfop[ix].p_sgid_tbl[0].gid_guid ==
+			    gid.gid_guid)) {
+				RDS_DPRINTF4("rds_gid_to_hcap",
+				    "gid found in hcap: 0x%p", hcap);
+				rw_exit(&statep->rds_hca_lock);
+				return (hcap);
+			}
+		}
+		hcap = hcap->hca_nextp;
 	}
 
-	return (rds_get_hcap(statep, nodeinfo.n_node_guid));
+	rw_exit(&statep->rds_hca_lock);
+
+	return (NULL);
 }
 
 /* This is called from the send CQ handler */
@@ -1053,18 +1071,23 @@ rds_ep_alloc_rc_channel(rds_ep_t *ep, uint8_t hca_port)
 	ibt_cq_attr_t			scqattr, rcqattr;
 	ibt_rc_chan_alloc_args_t	chanargs;
 	ibt_channel_hdl_t		chanhdl;
+	rds_session_t			*sp;
 	rds_hca_t			*hcap;
 
 	RDS_DPRINTF4("rds_ep_alloc_rc_channel", "Enter: 0x%p port: %d",
 	    ep, hca_port);
 
-	/* get the hcap for the HCA hosting this channel */
-	hcap = rds_get_hcap(rdsib_statep, ep->ep_hca_guid);
-	if (hcap == NULL) {
-		RDS_DPRINTF2("rds_ep_alloc_rc_channel",
-		    "HCA (0x%llx) not found", ep->ep_hca_guid);
-		return (NULL);
-	}
+	/* Update the EP with the right IP address and HCA guid */
+	sp = ep->ep_sp;
+	ASSERT(sp != NULL);
+	rw_enter(&sp->session_lock, RW_READER);
+	mutex_enter(&ep->ep_lock);
+	ep->ep_myip = sp->session_myip;
+	ep->ep_remip = sp->session_remip;
+	hcap = rds_gid_to_hcap(rdsib_statep, sp->session_lgid);
+	ep->ep_hca_guid = hcap->hca_guid;
+	mutex_exit(&ep->ep_lock);
+	rw_exit(&sp->session_lock);
 
 	/* reset taskqpending flag here */
 	ep->ep_recvqp.qp_taskqpending = B_FALSE;
@@ -1217,11 +1240,15 @@ rds_handle_portup_event(rds_state_t *statep, ibt_hca_hdl_t hdl,
 	ib_gid_t		gid;
 	int			ret;
 
-	RDS_DPRINTF2("rds_handle_portup_event", "Enter: GUID: 0x%llx",
-	    event->ev_hca_guid);
+	RDS_DPRINTF2("rds_handle_portup_event",
+	    "Enter: GUID: 0x%llx Statep: %p", event->ev_hca_guid, statep);
 
 	hcap = rds_get_hcap(statep, event->ev_hca_guid);
-	ASSERT(hcap != NULL);
+	if (hcap == NULL) {
+		RDS_DPRINTF2("rds_handle_portup_event", "HCA: 0x%llx is "
+		    "not in our list", event->ev_hca_guid);
+		return;
+	}
 
 	ret = ibt_query_hca_ports(hdl, 0, &newpinfop, &nport, &newsize);
 	if (ret != IBT_SUCCESS) {

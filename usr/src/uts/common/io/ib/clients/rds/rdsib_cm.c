@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -103,7 +103,6 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 	rds_session_t		*sp;
 	rds_ep_t		*ep;
 	ibt_channel_hdl_t	chanhdl;
-	rds_hca_t		*hcap;
 	int			ret;
 
 	RDS_DPRINTF2("rds_handle_cm_req", "Enter");
@@ -150,6 +149,16 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 		    "UserBufferSize Mismatch, this node: %d remote node: %d",
 		    UserBufferSize, cmp.cmp_user_buffer_size);
 		return (IBT_CM_REJECT);
+	}
+
+	/*
+	 * RDS needs more time to process a failover REQ so send an MRA.
+	 * Otherwise, the remote may retry the REQ and fail the connection.
+	 */
+	if ((cmp.cmp_failover) && (cmp.cmp_eptype == RDS_EP_TYPE_DATA)) {
+		RDS_DPRINTF2("rds_handle_cm_req", "Session Failover, send MRA");
+		(void) ibt_cm_delay(IBT_CM_DELAY_REQ, evp->cm_session_id,
+		    10000000 /* 10 sec */, NULL, 0);
 	}
 
 	/* Is there a session to the destination node? */
@@ -199,21 +208,6 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 				sp->session_myip = cmp.cmp_remip;
 				sp->session_lgid = lgid;
 				sp->session_rgid = rgid;
-				hcap = rds_gid_to_hcap(statep, lgid);
-
-				/* change the data channel */
-				mutex_enter(&sp->session_dataep.ep_lock);
-				sp->session_dataep.ep_myip = cmp.cmp_remip;
-				sp->session_dataep.ep_hca_guid =
-				    hcap->hca_guid;
-				mutex_exit(&sp->session_dataep.ep_lock);
-
-				/* change the control channel */
-				mutex_enter(&sp->session_ctrlep.ep_lock);
-				sp->session_ctrlep.ep_myip = cmp.cmp_remip;
-				sp->session_ctrlep.ep_hca_guid =
-				    hcap->hca_guid;
-				mutex_exit(&sp->session_ctrlep.ep_lock);
 			}
 		}
 	}
@@ -237,23 +231,22 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 
 		/* move the session to init state */
 		rw_enter(&sp->session_lock, RW_WRITER);
-		sp->session_state = RDS_SESSION_STATE_INIT;
+		ret = rds_session_reinit(sp, lgid);
 		sp->session_myip = cmp.cmp_remip;
 		sp->session_lgid = lgid;
 		sp->session_rgid = rgid;
-		hcap = rds_gid_to_hcap(statep, lgid);
-
-		/* change the data channel */
-		mutex_enter(&sp->session_dataep.ep_lock);
-		sp->session_dataep.ep_myip = cmp.cmp_remip;
-		sp->session_dataep.ep_hca_guid = hcap->hca_guid;
-		mutex_exit(&sp->session_dataep.ep_lock);
-
-		/* change the control channel */
-		mutex_enter(&sp->session_ctrlep.ep_lock);
-		sp->session_ctrlep.ep_myip = cmp.cmp_remip;
-		sp->session_ctrlep.ep_hca_guid = hcap->hca_guid;
-		mutex_exit(&sp->session_ctrlep.ep_lock);
+		if (ret != 0) {
+			rds_session_fini(sp);
+			sp->session_state = RDS_SESSION_STATE_FAILED;
+			RDS_DPRINTF3("rds_handle_cm_req", "SP(%p) State "
+			    "RDS_SESSION_STATE_FAILED", sp);
+			rw_exit(&sp->session_lock);
+			return (IBT_CM_REJECT);
+		} else {
+			sp->session_state = RDS_SESSION_STATE_INIT;
+			RDS_DPRINTF3("rds_handle_cm_req", "SP(%p) State "
+			    "RDS_SESSION_STATE_INIT", sp);
+		}
 
 		if (cmp.cmp_eptype == RDS_EP_TYPE_CTRL) {
 			ep = &sp->session_ctrlep;
@@ -333,15 +326,6 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 			 */
 			ASSERT(sp->session_type == RDS_SESSION_ACTIVE);
 			ep->ep_state = RDS_EP_STATE_PASSIVE_PENDING;
-			ep->ep_myip = cmp.cmp_remip;
-			hcap = rds_gid_to_hcap(statep, lgid);
-			ep->ep_hca_guid = hcap->hca_guid;
-
-			/* change the control channel too */
-			mutex_enter(&sp->session_ctrlep.ep_lock);
-			sp->session_ctrlep.ep_myip = cmp.cmp_remip;
-			sp->session_ctrlep.ep_hca_guid = hcap->hca_guid;
-			mutex_exit(&sp->session_dataep.ep_lock);
 
 			rw_enter(&sp->session_lock, RW_WRITER);
 			sp->session_type = RDS_SESSION_PASSIVE;
@@ -565,6 +549,15 @@ rds_handle_cm_event_failure(ibt_cm_event_t *evp)
 			sp->session_state = RDS_SESSION_STATE_ERROR;
 			RDS_DPRINTF3("rds_handle_cm_event_failure",
 			    "SP(%p) State RDS_SESSION_STATE_ERROR", sp);
+
+			/*
+			 * Store the cm_channel for freeing later
+			 * Active side frees it on ibt_open_rc_channel
+			 * failure
+			 */
+			if (ep->ep_chanhdl == NULL) {
+				ep->ep_chanhdl = evp->cm_channel;
+			}
 			rw_exit(&sp->session_lock);
 
 			/*
@@ -788,6 +781,7 @@ rds_open_rc_channel(rds_ep_t *ep, ibt_path_info_t *pinfo,
 		ep->ep_recvcq = NULL;
 		(void) ibt_free_cq(ep->ep_sendcq);
 		ep->ep_sendcq = NULL;
+		return (-1);
 	}
 
 	*chanhdl = hdl;
@@ -795,7 +789,7 @@ rds_open_rc_channel(rds_ep_t *ep, ibt_path_info_t *pinfo,
 	RDS_DPRINTF2("rds_open_rc_channel", "Return: EP(%p) Chan: %p", ep,
 	    *chanhdl);
 
-	return (ret);
+	return (0);
 }
 
 int
