@@ -132,7 +132,7 @@ msgq_check_for_rwaiters(list_t *walk_this, int min, int max,
 {
 	int found = 0;
 	int ii;
-	msgq_wakeup_t *start, *walker, next;
+	msgq_wakeup_t *walker, next;
 	uintptr_t head;
 
 	for (ii = min; ii < max; ii++) {

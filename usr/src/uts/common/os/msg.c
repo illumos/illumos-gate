@@ -1287,7 +1287,6 @@ msg_fnd_spc_snd(kmsqid_t *qp, int msg_hash, long type)
 }
 
 static msgq_wakeup_t *
-/* LINTED */
 msg_fnd_neg_snd(kmsqid_t *qp, int msg_hash, long type)
 {
 	msgq_wakeup_t	*qptr;
