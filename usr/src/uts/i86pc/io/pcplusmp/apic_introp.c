@@ -89,7 +89,7 @@ apic_pci_msi_enable_vector(dev_info_t *dip, int type, int inum, int vector,
 	    "\tdriver = %s, inum=0x%x vector=0x%x apicid=0x%x\n", (void *)dip,
 	    ddi_driver_name(dip), inum, vector, target_apic_id));
 
-	if (handle == NULL)
+	if (handle == NULL || cap_ptr == 0)
 		return (PSM_FAILURE);
 
 	/* MSI Address */
@@ -553,7 +553,7 @@ apic_pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
 	int			cap_ptr = i_ddi_get_msi_msix_cap_ptr(rdip);
 	ddi_acc_handle_t	handle = i_ddi_get_pci_config_handle(rdip);
 
-	if (handle == NULL)
+	if (handle == NULL || cap_ptr == 0)
 		return (PSM_FAILURE);
 
 	if (type == DDI_INTR_TYPE_MSI) {
@@ -600,7 +600,7 @@ apic_pci_msi_enable_mode(dev_info_t *rdip, int type, int inum)
 	int			cap_ptr = i_ddi_get_msi_msix_cap_ptr(rdip);
 	ddi_acc_handle_t	handle = i_ddi_get_pci_config_handle(rdip);
 
-	if (handle == NULL)
+	if (handle == NULL || cap_ptr == 0)
 		return (PSM_FAILURE);
 
 	if (type == DDI_INTR_TYPE_MSI) {
@@ -644,7 +644,7 @@ apic_pci_msi_disable_mode(dev_info_t *rdip, int type, int inum)
 	int			cap_ptr = i_ddi_get_msi_msix_cap_ptr(rdip);
 	ddi_acc_handle_t	handle = i_ddi_get_pci_config_handle(rdip);
 
-	if (handle == NULL)
+	if (handle == NULL || cap_ptr == 0)
 		return (PSM_FAILURE);
 
 	if (type == DDI_INTR_TYPE_MSI) {

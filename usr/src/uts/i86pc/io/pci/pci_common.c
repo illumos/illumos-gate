@@ -52,6 +52,7 @@
 #include <io/pci/pci_common.h>
 #include <sys/pci_cfgspace.h>
 #include <sys/pci_impl.h>
+#include <sys/pci_cap.h>
 
 /*
  * Function prototypes
@@ -199,8 +200,11 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	int			types = 0;
 	int			pciepci = 0;
 	int			i, j, count;
+	int			rv;
 	int			behavior;
 	int			cap_ptr;
+	uint16_t		msi_cap_base, msix_cap_base, cap_ctrl;
+	char			*prop;
 	ddi_intrspec_t		isp;
 	struct intrspec		*ispec;
 	ddi_intr_handle_impl_t	tmp_hdl;
@@ -216,27 +220,86 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	/* Process the request */
 	switch (intr_op) {
 	case DDI_INTROP_SUPPORTED_TYPES:
+		/*
+		 * First we determine the interrupt types supported by the
+		 * device itself, then we filter them through what the OS
+		 * and system supports.  We determine system-level
+		 * interrupt type support for anything other than fixed intrs
+		 * through the psm_intr_ops vector
+		 */
+		rv = DDI_FAILURE;
+
 		/* Fixed supported by default */
-		*(int *)result = DDI_INTR_TYPE_FIXED;
+		types = DDI_INTR_TYPE_FIXED;
 
-		/* Figure out if MSI or MSI-X is supported? */
-		if (pci_msi_get_supported_type(rdip, &types) != DDI_SUCCESS)
+		if (psm_intr_ops == NULL) {
+			*(int *)result = types;
 			return (DDI_SUCCESS);
-
-		if (psm_intr_ops != NULL) {
-			/*
-			 * Only support MSI for now, OR it in
-			 */
-			*(int *)result |= (types & DDI_INTR_TYPE_MSI);
-
-			tmp_hdl.ih_type = *(int *)result;
-			(void) (*psm_intr_ops)(rdip, &tmp_hdl,
-			    PSM_INTR_OP_CHECK_MSI, result);
-			DDI_INTR_NEXDBG((CE_CONT, "pci_common_intr_ops: "
-			    "rdip: 0x%p supported types: 0x%x\n", (void *)rdip,
-			    *(int *)result));
 		}
-		break;
+		if (pci_config_setup(rdip, &handle) != DDI_SUCCESS)
+			return (DDI_FAILURE);
+
+		/* Sanity test cap control values if found */
+
+		if (PCI_CAP_LOCATE(handle, PCI_CAP_ID_MSI, &msi_cap_base) ==
+		    DDI_SUCCESS) {
+			cap_ctrl = PCI_CAP_GET16(handle, 0, msi_cap_base,
+			    PCI_MSI_CTRL);
+			if (cap_ctrl == PCI_CAP_EINVAL16)
+				goto SUPPORTED_TYPES_OUT;
+
+			types |= DDI_INTR_TYPE_MSI;
+		}
+
+		if (PCI_CAP_LOCATE(handle, PCI_CAP_ID_MSI_X, &msix_cap_base) ==
+		    DDI_SUCCESS) {
+			cap_ctrl = PCI_CAP_GET16(handle, 0, msix_cap_base,
+			    PCI_MSIX_CTRL);
+			if (cap_ctrl == PCI_CAP_EINVAL16)
+				goto SUPPORTED_TYPES_OUT;
+
+			types |= DDI_INTR_TYPE_MSIX;
+		}
+
+		/*
+		 * Filter device-level types through system-level support
+		 */
+
+		/* No official MSI-X support for now */
+		types &= ~DDI_INTR_TYPE_MSIX;
+
+		tmp_hdl.ih_type = types;
+		if ((*psm_intr_ops)(rdip, &tmp_hdl, PSM_INTR_OP_CHECK_MSI,
+		    &types) != PSM_SUCCESS)
+			goto SUPPORTED_TYPES_OUT;
+
+		DDI_INTR_NEXDBG((CE_CONT, "pci_common_intr_ops: "
+		    "rdip: 0x%p supported types: 0x%x\n", (void *)rdip,
+		    *(int *)result));
+
+		/*
+		 * Export any MSI/MSI-X cap locations via properties
+		 */
+		if (types & DDI_INTR_TYPE_MSI) {
+			if (ndi_prop_update_int(DDI_DEV_T_NONE, rdip,
+			    "pci-msi-capid-pointer", (int)msi_cap_base) !=
+			    DDI_PROP_SUCCESS)
+				goto SUPPORTED_TYPES_OUT;
+		}
+		if (types & DDI_INTR_TYPE_MSIX) {
+			if (ndi_prop_update_int(DDI_DEV_T_NONE, rdip,
+			    "pci-msix-capid-pointer", (int)msix_cap_base) !=
+			    DDI_PROP_SUCCESS)
+				goto SUPPORTED_TYPES_OUT;
+		}
+
+		rv = DDI_SUCCESS;
+
+SUPPORTED_TYPES_OUT:
+		*(int *)result = types;
+		pci_config_teardown(&handle);
+		return (rv);
+
 	case DDI_INTROP_NAVAIL:
 	case DDI_INTROP_NINTRS:
 		if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type)) {
@@ -280,19 +343,33 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 				i_ddi_set_pci_config_handle(rdip, handle);
 			}
 
-			if (i_ddi_get_msi_msix_cap_ptr(rdip) == 0) {
-				char *prop =
-				    (hdlp->ih_type == DDI_INTR_TYPE_MSI) ?
-				    "pci-msi-capid-pointer" :
-				    "pci-msix-capid-pointer";
+			prop = NULL;
+			cap_ptr = 0;
+			if (hdlp->ih_type == DDI_INTR_TYPE_MSI)
+				prop = "pci-msi-capid-pointer";
+			else if (hdlp->ih_type == DDI_INTR_TYPE_MSIX)
+				prop = "pci-msix-capid-pointer";
 
+			/*
+			 * Enforce the calling of DDI_INTROP_SUPPORTED_TYPES
+			 * for MSI(X) before allocation
+			 */
+			if (prop != NULL) {
 				cap_ptr = ddi_prop_get_int(DDI_DEV_T_ANY, rdip,
-				    DDI_PROP_DONTPASS, prop,
-				    PCI_CAP_NEXT_PTR_NULL);
-				i_ddi_set_msi_msix_cap_ptr(rdip, cap_ptr);
+				    DDI_PROP_DONTPASS, prop, 0);
+				if (cap_ptr == 0) {
+					DDI_INTR_NEXDBG((CE_CONT,
+					    "pci_common_intr_ops: rdip: 0x%p "
+					    "attempted MSI(X) alloc without "
+					    "cap property\n", (void *)rdip));
+					return (DDI_FAILURE);
+				}
 			}
+			i_ddi_set_msi_msix_cap_ptr(rdip, cap_ptr);
 
-
+			/*
+			 * Allocate interrupt vectors
+			 */
 			(void) (*psm_intr_ops)(rdip, hdlp,
 			    PSM_INTR_OP_ALLOC_VECTORS, result);
 
