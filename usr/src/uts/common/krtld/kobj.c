@@ -548,6 +548,19 @@ kobj_init(
 fail:
 
 	_kobj_printf(ops, "krtld: error during initial load/link phase\n");
+
+#if !defined(_UNIX_KRTLD)
+	_kobj_printf(ops, "\n");
+	_kobj_printf(ops, "krtld could neither locate nor resolve symbols"
+	    " for:\n");
+	_kobj_printf(ops, "    %s\n", filename);
+	_kobj_printf(ops, "in the boot archive. Please verify that this"
+	    " file\n");
+	_kobj_printf(ops, "matches what is found in the boot archive.\n");
+	_kobj_printf(ops, "You may need to boot using the Solaris failsafe to"
+	    " fix this.\n");
+	bop_panic("Unable to boot");
+#endif
 }
 
 #if !defined(_UNIX_KRTLD)

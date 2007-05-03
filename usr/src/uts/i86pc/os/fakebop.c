@@ -691,7 +691,7 @@ bop_panic(char *fmt, ...)
 	bop_printf(NULL, "\nPress any key to reboot.\n");
 	(void) bcons_getchar();
 	bop_printf(NULL, "Resetting...\n");
-	reset();
+	pc_reset();
 }
 
 /*
@@ -1098,13 +1098,10 @@ bop_trap(struct trapframe *tf)
 	static int depth = 0;
 
 	/*
-	 * Check for an infinite loop of traps. Avoid bop_printf() here to
-	 * reduce code path and further possibility of failure.
+	 * Check for an infinite loop of traps.
 	 */
-	if (++depth > 2) {
-		PUT_STRING("Nested trap, calling reset()\n");
-		reset();
-	}
+	if (++depth > 2)
+		bop_panic("Nested trap");
 
 	/*
 	 * adjust the tf for optional error_code by detecting the code selector
