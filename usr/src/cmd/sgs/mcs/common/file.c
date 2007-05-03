@@ -705,8 +705,16 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info)
 	dst_ehdr = *src_ehdr;
 
 	/*
-	 * flush the changes to the ehdr so the
-	 * ident array is filled in.
+	 * If we are removing the header string table section,
+	 * remove the reference to it from the ELF header.
+	 */
+	if ((shstrndx != SHN_UNDEF) &&
+	    (sec_table[shstrndx].secno == (GElf_Word)DELETED))
+		dst_ehdr.e_shstrndx = SHN_UNDEF;
+
+	/*
+	 * flush the changes to the ehdr so the ident
+	 * array and header string table index are filled in.
 	 */
 	(void) gelf_update_ehdr(dst_elf, &dst_ehdr);
 
@@ -983,9 +991,10 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info)
 				if (nobits_table[scn_no] == 0)
 					new_offset += dst_shdr.sh_size;
 			}
-		}
 
-		(void) gelf_update_shdr(dst_scn, &dst_shdr); /* flush changes */
+			/* flush changes */
+			(void) gelf_update_shdr(dst_scn, &dst_shdr);
+		}
 		scn_no++;
 	}
 

@@ -2746,7 +2746,14 @@ regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 	 * Obtain the .shstrtab data buffer to provide the required section
 	 * name strings.
 	 */
-	if ((scn = elf_getscn(elf, shstrndx)) == NULL) {
+	if (shstrndx == SHN_UNDEF) {
+		/*
+		 * It is rare, but legal, for an object to lack a
+		 * header string table section.
+		 */
+		names = NULL;
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_NOSHSTRSEC), file);
+	} else if ((scn = elf_getscn(elf, shstrndx)) == NULL) {
 		failure(file, MSG_ORIG(MSG_ELF_GETSCN));
 		(void) fprintf(stderr, MSG_INTL(MSG_ELF_ERR_SHDR),
 		    EC_XWORD(shstrndx));

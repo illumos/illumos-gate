@@ -71,7 +71,10 @@
 
 @ MSG_ERR_BADFILE	"%s: invalid file type\n"
 @ MSG_ERR_BADREL1       "%s: bad relocation entry: %s: relocation requires symbol\n"
-@ MSG_ERR_SHSTRNULL	"%s: zero size section header string table (shstrtab)\n"
+@ MSG_ERR_NOSHSTRSEC	"%s: no header string table section (shstrtab). \
+			 header names are not available\n"
+@ MSG_ERR_SHSTRNULL	"%s: zero size section header string table \
+			 (shstrtab). header names are not available\n"
 @ MSG_ERR_FAILURE	"%s: %s failed: %s\n"
 @ MSG_ERR_BADSHDRALIGN	"%s: bad section header array alignment\n"
 @ MSG_ERR_BADPHDRALIGN	"%s: bad program header array alignment\n"
