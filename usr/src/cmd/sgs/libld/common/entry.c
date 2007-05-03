@@ -182,10 +182,10 @@ static const Ent_desc	ent_desc[] = {
  * the output file descriptor.
  */
 uintptr_t
-ld_ent_setup(Ofl_desc * ofl, Xword segalign)
+ld_ent_setup(Ofl_desc *ofl, Xword segalign)
 {
-	Ent_desc *	enp;
-	Sg_desc *	sgp;
+	Ent_desc	*enp;
+	Sg_desc		*sgp;
 	size_t		size;
 
 	/*
@@ -204,7 +204,7 @@ ld_ent_setup(Ofl_desc * ofl, Xword segalign)
 	    SGSOFFSETOF(Sym_avlnode, sav_node));
 
 	/*
-	 * The datasegment permissions can differ depending on whether
+	 * The data segment permissions can differ depending on whether
 	 * this object is built statically or dynamically.
 	 */
 	if (ofl->ofl_flags & FLG_OF_DYNAMIC) {
@@ -244,8 +244,7 @@ ld_ent_setup(Ofl_desc * ofl, Xword segalign)
 	 * a default alignment (ld(1) and ld.so.1 initialize this differently).
 	 */
 	for (size = 0; size < sizeof (sg_desc); size += sizeof (Sg_desc)) {
-
-		Phdr *	phdr = &(sgp->sg_phdr);
+		Phdr	*phdr = &(sgp->sg_phdr);
 
 		if ((list_appendc(&ofl->ofl_segs, sgp)) == 0)
 			return (S_ERROR);
