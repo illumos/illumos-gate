@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1814,19 +1814,23 @@ soft_put_object_to_keystore(soft_object_t *objp)
 	if (rv != CKR_OK)
 		return (rv);
 
+	(void) pthread_mutex_lock(&soft_slot.slot_mutex);
 	if (objp->object_type == TOKEN_PUBLIC) {
 		if ((soft_keystore_put_new_obj(buf, len, B_TRUE,
 		    B_FALSE, &objp->ks_handle)) == -1) {
+			(void) pthread_mutex_unlock(&soft_slot.slot_mutex);
 			free(buf);
 			return (CKR_FUNCTION_FAILED);
 		}
 	} else {
 		if ((soft_keystore_put_new_obj(buf, len, B_FALSE,
 		    B_FALSE, &objp->ks_handle)) == -1) {
+			(void) pthread_mutex_unlock(&soft_slot.slot_mutex);
 			free(buf);
 			return (CKR_FUNCTION_FAILED);
 		}
 	}
+	(void) pthread_mutex_unlock(&soft_slot.slot_mutex);
 	free(buf);
 	return (CKR_OK);
 

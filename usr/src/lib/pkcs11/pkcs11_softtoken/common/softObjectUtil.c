@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -871,12 +871,16 @@ soft_delete_token_object(soft_object_t *objp, boolean_t persistent,
     boolean_t lock_held)
 {
 
+	if (!lock_held)
+		(void) pthread_mutex_lock(&soft_slot.slot_mutex);
 	if (persistent)
 		/* Delete the object from the keystore. */
 		(void) soft_keystore_del_obj(&objp->ks_handle, B_FALSE);
 
 	/* Remove the object from the slot's token object list. */
-	soft_remove_token_object_from_slot(objp, lock_held);
+	soft_remove_token_object_from_slot(objp, B_TRUE);
+	if (!lock_held)
+		(void) pthread_mutex_unlock(&soft_slot.slot_mutex);
 
 	soft_delete_object_cleanup(objp);
 }
@@ -1340,6 +1344,12 @@ refresh_token_objects()
 
 		ondisk_obj = on_disk_list;
 		prev_ondisk_obj = NULL;
+
+		/* larval object that has not been written to disk */
+		if (in_core_obj->ks_handle.name[0] == '\0') {
+			in_core_obj = in_core_obj->next;
+			continue;
+		}
 
 		while ((!found) && (ondisk_obj != NULL)) {
 
