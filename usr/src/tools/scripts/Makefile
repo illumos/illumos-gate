@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,6 +30,8 @@ SHFILES= \
 	Install \
 	acr \
 	bfu \
+	bfudrop \
+	bindrop \
 	bldenv \
 	build_cscope \
 	bringovercheck \
@@ -46,12 +48,14 @@ SHFILES= \
 	mkbfu \
 	mkclosed \
 	nightly \
+	onblddrop \
 	protocmp.terse \
 	sccscheck \
 	sccscp \
 	sccshist \
 	sccsmv \
 	sccsrm \
+	sdrop \
 	webrev \
 	ws \
 	wx \
@@ -62,6 +66,8 @@ PERLFILES= \
 	check_rtime \
 	hdrchk \
 	jstyle \
+	mkreadme_osol \
+	mktpl \
 	validate_flg \
 	validate_paths \
 	wdiff

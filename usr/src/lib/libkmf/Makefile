@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,7 +42,7 @@ install :=      TARGET= install
 lint :=         TARGET= lint
 install_h :=    TARGET= install_h
 
-all install: install_h $(SUBDIRS)
+all install: install_h $(SUBDIRS) THIRDPARTYLICENSE
 
 clean clobber lint:	$(SUBDIRS)
 
@@ -54,5 +54,10 @@ $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
+
+THIRDPARTYLICENSE: cdsa_license.txt
+	$(SED) -n '/Intel Open Source/,$$p' cdsa_license.txt > $@
+
+CLOBBERFILES += THIRDPARTYLICENSE
 
 include $(SRC)/lib/Makefile.targ

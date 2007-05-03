@@ -19,6 +19,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -33,7 +34,7 @@
 # The default is the old behavior of CLONE_WS
 #
 # -i on the command line, means fast options, so when it's on the
-# command line (only), lint and check builds are skipped no matter what 
+# command line (only), lint and check builds are skipped no matter what
 # the setting of their individual flags are in NIGHTLY_OPTIONS.
 #
 # LINTDIRS can be set in the env file, format is a list of:
@@ -58,30 +59,61 @@
 #
 unset CDPATH
 
-# function to do a DEBUG and non-DEBUG build. Needed because we might
+#
+# Print the tag string used to identify a build (e.g., "DEBUG
+# open-only")
+# usage: tagstring debug-part open-part
+#
+tagstring() {
+	debug_part=$1
+	open_part=$2
+
+	if [ -n "$open_part" ]; then
+		echo "$debug_part $open_part"
+	else
+		echo "$debug_part"
+	fi
+}
+
+#
+# Function to do a DEBUG and non-DEBUG build. Needed because we might
 # need to do another for the source build, and since we only deliver DEBUG or
 # non-DEBUG packages.
+#
+# usage: normal_build [-O]
+# -O	OpenSolaris delivery build.  Put the proto area, BFU archives,
+#	and packages in -open directories.  Use skeleton closed
+#	binaries.  Skip the package build (until 6414822 is fixed).
+#
 
 normal_build() {
 
-	# timestamp the start of a nightly build; the findunref tool uses it.
-	touch $SRC/.build.tstamp
+	orig_p_FLAG=$p_FLAG
+
+	suffix=""
+	open_only=""
+	while getopts O FLAG $*; do
+		case $FLAG in
+		O)
+			suffix="-open"
+			open_only="open-only"
+			p_FLAG=n
+			;;
+		esac
+	done
 
 	# non-DEBUG build begins
 
 	if [ "$F_FLAG" = "n" ]; then
-		export INTERNAL_RELEASE_BUILD ; INTERNAL_RELEASE_BUILD=
-		export RELEASE_BUILD ; RELEASE_BUILD=
-		unset EXTRA_OPTIONS
-		unset EXTRA_CFLAGS
-
-		build non-DEBUG -nd
-
-		if [ "$build_ok" = "y" -a "$X_FLAG" = "y" -a "$p_FLAG" = "y" ]; then
+		set_non_debug_build_flags
+		mytag=`tagstring "non-DEBUG" "$open_only"`
+		build "$mytag" "$suffix-nd" $MULTI_PROTO
+		if [ "$build_ok" = "y" -a "$X_FLAG" = "y" -a \
+		    "$p_FLAG" = "y" ]; then
 			copy_ihv_pkgs non-DEBUG -nd
 		fi
 	else
-		echo "\n==== No non-DEBUG build ====\n" >> $LOGFILE
+		echo "\n==== No non-DEBUG $open_only build ====\n" >> $LOGFILE
 	fi
 
 	# non-DEBUG build ends
@@ -89,23 +121,21 @@ normal_build() {
 	# DEBUG build begins
 
 	if [ "$D_FLAG" = "y" ]; then
-
-		export INTERNAL_RELEASE_BUILD ; INTERNAL_RELEASE_BUILD=
-		unset RELEASE_BUILD
-		unset EXTRA_OPTIONS
-		unset EXTRA_CFLAGS
-
-		build DEBUG ""
-
-		if [ "$build_ok" = "y" -a "$X_FLAG" = "y" -a "$p_FLAG" = "y" ]; then
+		set_debug_build_flags
+		mytag=`tagstring "DEBUG" "$open_only"`
+		build "$mytag" "$suffix" $MULTI_PROTO
+		if [ "$build_ok" = "y" -a "$X_FLAG" = "y" -a \
+		    "$p_FLAG" = "y" ]; then
 			copy_ihv_pkgs DEBUG ""
 		fi
 
 	else
-		echo "\n==== No DEBUG build ====\n" >> $LOGFILE
+		echo "\n==== No DEBUG $open_only build ====\n" >> $LOGFILE
 	fi
 
 	# DEBUG build ends
+
+	p_FLAG=$orig_p_FLAG
 }
 
 #
@@ -305,12 +335,28 @@ set_up_source_build() {
 
 }
 
-# function to do the build.
-# usage: build LABEL SUFFIX
+# Return library search directive as function of given root.
+myldlibs() {
+	echo "-L$1/lib -L$1/usr/lib"
+}
 
+# Return header search directive as function of given root.
+myheaders() {
+	echo "-I$1/usr/include"
+}
+
+#
+# Function to do the build, including cpio archive and package generation.
+# usage: build LABEL SUFFIX MULTIPROTO
+# - LABEL is used to tag build output.
+# - SUFFIX is used to distinguish files (e.g., debug vs non-debug).
+# - If MULTIPROTO is "yes", it means to name the proto area according to
+#   SUFFIX.  Otherwise ("no"), (re)use the standard proto area.
+#
 build() {
 	LABEL=$1
 	SUFFIX=$2
+	MULTIPROTO=$3
 	INSTALLOG=install${SUFFIX}-${MACH}
 	NOISE=noise${SUFFIX}-${MACH}
 	CPIODIR=${CPIODIR_ORIG}${SUFFIX}
@@ -318,6 +364,12 @@ build() {
 	if [ "$SPARC_RM_PKGARCHIVE_ORIG" ]; then
 		SPARC_RM_PKGARCHIVE=${SPARC_RM_PKGARCHIVE_ORIG}${SUFFIX}
 	fi
+
+	ORIGROOT=$ROOT
+	[ $MULTIPROTO = no ] || export ROOT=$ROOT$SUFFIX
+
+	export ENVLDLIBS1=`myldlibs $ROOT`
+	export ENVCPPFLAGS1=`myheaders $ROOT`
 
 	this_build_ok=y
 	#
@@ -516,6 +568,8 @@ build() {
 	else
 		echo "\n==== Not creating $LABEL packages ====\n" >> $LOGFILE
 	fi
+
+	ROOT=$ORIGROOT
 }
 
 # Usage: dolint /dir y|n
@@ -536,11 +590,10 @@ dolint() {
 	base=`basename $lintdir`
 	LINTOUT=$lintdir/lint-${MACH}.out
 	LINTNOISE=$lintdir/lint-noise-${MACH}
+	export ENVLDLIBS1=`myldlibs $ROOT`
+	export ENVCPPFLAGS1=`myheaders $ROOT`
 
-	export INTERNAL_RELEASE_BUILD ; INTERNAL_RELEASE_BUILD=
-	unset RELEASE_BUILD
-	unset EXTRA_OPTIONS
-	unset EXTRA_CFLAGS
+	set_debug_build_flags
 
 	#
 	#	'$MAKE lint' in $lintdir
@@ -619,6 +672,26 @@ copy_ihv_proto() {
 	else
 		echo "$IA32_IHV_ROOT: not found" >> $LOGFILE
 	fi
+
+	if [ "$MULTI_PROTO" = yes ]; then
+		if [ ! -d "$ROOT-nd" ]; then
+			echo "mkdir -p $ROOT-nd" >> $LOGFILE
+			mkdir -p $ROOT-nd
+		fi
+		# If there's a non-debug version of the IHV proto area,
+		# copy it, but copy something if there's not.
+		if [ -d "$IA32_IHV_ROOT-nd" ]; then
+			echo "copying $IA32_IHV_ROOT-nd to $ROOT-nd\n" >> $LOGFILE
+			cd $IA32_IHV_ROOT-nd
+		elif [ -d "$IA32_IHV_ROOT" ]; then
+			echo "copying $IA32_IHV_ROOT to $ROOT-nd\n" >> $LOGFILE
+			cd $IA32_IHV_ROOT
+		else
+			echo "$IA32_IHV_ROOT{-nd,}: not found" >> $LOGFILE
+			return
+		fi
+		tar -cf - . | (cd $ROOT-nd; umask 0; tar xpf - ) 2>&1 >> $LOGFILE
+	fi
 }
 
 # Install IHV packages in PKGARCHIVE
@@ -651,7 +724,13 @@ copy_ihv_pkgs() {
 	fi
 }
 
+#
+# Build and install the onbld tools.
+#
 # usage: build_tools DESTROOT
+#
+# returns non-zero status if the build was successful.
+#
 build_tools() {
 	DESTROOT=$1
 
@@ -671,45 +750,54 @@ build_tools() {
 		egrep -e "(${MAKE}:|[ 	]error[: 	\n])" | \
 		egrep -v "Ignoring unknown host" | \
 		egrep -v warning >> $mail_msg_file
-	if [ "$?" != "0" ]; then
-		STABS=${DESTROOT}/opt/onbld/bin/${MACH}/stabs
-		export STABS
-		CTFSTABS=${DESTROOT}/opt/onbld/bin/${MACH}/ctfstabs
-		export CTFSTABS
-		GENOFFSETS=${DESTROOT}/opt/onbld/bin/genoffsets
-		export GENOFFSETS
+	return $?
+}
 
-		CTFCONVERT=${DESTROOT}/opt/onbld/bin/${MACH}/ctfconvert
-		export CTFCONVERT
-		CTFMERGE=${DESTROOT}/opt/onbld/bin/${MACH}/ctfmerge
-		export CTFMERGE
+#
+# Set up to use locally installed tools.
+#
+# usage: use_tools TOOLSROOT
+#
+use_tools() {
+	TOOLSROOT=$1
 
-		CTFCVTPTBL=${DESTROOT}/opt/onbld/bin/ctfcvtptbl
-		export CTFCVTPTBL
-		CTFFINDMOD=${DESTROOT}/opt/onbld/bin/ctffindmod
-		export CTFFINDMOD
+	STABS=${TOOLSROOT}/opt/onbld/bin/${MACH}/stabs
+	export STABS
+	CTFSTABS=${TOOLSROOT}/opt/onbld/bin/${MACH}/ctfstabs
+	export CTFSTABS
+	GENOFFSETS=${TOOLSROOT}/opt/onbld/bin/genoffsets
+	export GENOFFSETS
 
-		if [ "$VERIFY_ELFSIGN" = "y" ]; then
-			ELFSIGN=${DESTROOT}/opt/onbld/bin/elfsigncmp
-		else
-			ELFSIGN=${DESTROOT}/opt/onbld/bin/${MACH}/elfsign
-		fi
-		export ELFSIGN
+	CTFCONVERT=${TOOLSROOT}/opt/onbld/bin/${MACH}/ctfconvert
+	export CTFCONVERT
+	CTFMERGE=${TOOLSROOT}/opt/onbld/bin/${MACH}/ctfmerge
+	export CTFMERGE
 
-		PATH="${DESTROOT}/opt/onbld/bin/${MACH}:${PATH}"
-		PATH="${DESTROOT}/opt/onbld/bin:${PATH}"
-		export PATH
+	CTFCVTPTBL=${TOOLSROOT}/opt/onbld/bin/ctfcvtptbl
+	export CTFCVTPTBL
+	CTFFINDMOD=${TOOLSROOT}/opt/onbld/bin/ctffindmod
+	export CTFFINDMOD
 
-		echo "\n==== New environment settings. ====\n" >> $LOGFILE
-		echo "STABS=${STABS}" >> $LOGFILE
-		echo "CTFSTABS=${CTFSTABS}" >> $LOGFILE
-		echo "CTFCONVERT=${CTFCONVERT}" >> $LOGFILE
-		echo "CTFMERGE=${CTFMERGE}" >> $LOGFILE
-		echo "CTFCVTPTBL=${CTFCVTPTBL}" >> $LOGFILE
-		echo "CTFFINDMOD=${CTFFINDMOD}" >> $LOGFILE
-		echo "ELFSIGN=${ELFSIGN}" >> $LOGFILE
-		echo "PATH=${PATH}" >> $LOGFILE
+	if [ "$VERIFY_ELFSIGN" = "y" ]; then
+		ELFSIGN=${TOOLSROOT}/opt/onbld/bin/elfsigncmp
+	else
+		ELFSIGN=${TOOLSROOT}/opt/onbld/bin/${MACH}/elfsign
 	fi
+	export ELFSIGN
+
+	PATH="${TOOLSROOT}/opt/onbld/bin/${MACH}:${PATH}"
+	PATH="${TOOLSROOT}/opt/onbld/bin:${PATH}"
+	export PATH
+
+	echo "\n==== New environment settings. ====\n" >> $LOGFILE
+	echo "STABS=${STABS}" >> $LOGFILE
+	echo "CTFSTABS=${CTFSTABS}" >> $LOGFILE
+	echo "CTFCONVERT=${CTFCONVERT}" >> $LOGFILE
+	echo "CTFMERGE=${CTFMERGE}" >> $LOGFILE
+	echo "CTFCVTPTBL=${CTFCVTPTBL}" >> $LOGFILE
+	echo "CTFFINDMOD=${CTFFINDMOD}" >> $LOGFILE
+	echo "ELFSIGN=${ELFSIGN}" >> $LOGFILE
+	echo "PATH=${PATH}" >> $LOGFILE
 }
 
 staffer() {
@@ -757,6 +845,44 @@ obsolete_build() {
     	echo "WARNING: Obsolete $1 build requested; request will be ignored"
 }
 
+#
+# wrapper over wsdiff.
+# usage: do_wsdiff LABEL OLDPROTO NEWPROTO
+#
+do_wsdiff() {
+	label=$1
+	oldproto=$2
+	newproto=$3
+
+	echo "\n==== Objects that differ since last build ($label) ====\n" | \
+	    tee -a $LOGFILE >> $mail_msg_file
+
+	wsdiff="wsdiff"
+	[ "$t_FLAG" = y ] && wsdiff="wsdiff -t"
+
+	$wsdiff -r ${TMPDIR}/wsdiff.results $oldproto $newproto 2>&1 | \
+		    tee -a $LOGFILE >> $mail_msg_file
+}
+
+#
+# Functions for setting build flags (debug/non-debug).  Keep them
+# together.
+#
+
+set_non_debug_build_flags() {
+	export INTERNAL_RELEASE_BUILD ; INTERNAL_RELEASE_BUILD=
+	export RELEASE_BUILD ; RELEASE_BUILD=
+	unset EXTRA_OPTIONS
+	unset EXTRA_CFLAGS
+}
+
+set_debug_build_flags() {
+	export INTERNAL_RELEASE_BUILD ; INTERNAL_RELEASE_BUILD=
+	unset RELEASE_BUILD
+	unset EXTRA_OPTIONS
+	unset EXTRA_CFLAGS
+}
+
 
 MACH=`uname -p`
 
@@ -797,6 +923,7 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 	-I	integration engineer default group of options (-ampu)
 	-M	do not run pmodes (safe file permission checker)
 	-N	do not run protocmp
+	-O	generate OpenSolaris deliverables
 	-R	default group of options for building a release (-mp)
 	-U	update proto area in the parent
 	-V VERS set the build version string to VERS
@@ -843,6 +970,7 @@ M_FLAG=n
 m_FLAG=n
 N_FLAG=n
 n_FLAG=n
+O_FLAG=n
 o_FLAG=n
 P_FLAG=n
 p_FLAG=n
@@ -1047,7 +1175,7 @@ check_closed_tree
 #
 NIGHTLY_OPTIONS=-${NIGHTLY_OPTIONS#-}
 OPTIND=1
-while getopts AaBCDdFfGIilMmNnoPpRrS:TtUuWwXxz FLAG $NIGHTLY_OPTIONS
+while getopts AaBCDdFfGIilMmNnOoPpRrS:TtUuWwXxz FLAG $NIGHTLY_OPTIONS
 do
 	case $FLAG in
 	  A )	A_FLAG=y
@@ -1083,6 +1211,8 @@ do
 	  N )	N_FLAG=y
 		;;
 	  n )	n_FLAG=y
+		;;
+	  O )	O_FLAG=y
 		;;
 	  o )	o_FLAG=y
 		;;
@@ -1354,11 +1484,6 @@ PARENT_ROOT=
 export ENVLDLIBS3 ENVCPPFLAGS1 ENVCPPFLAGS2 ENVCPPFLAGS3 ENVCPPFLAGS4 \
 	PARENT_ROOT
 
-ENVLDLIBS1="-L$ROOT/lib -L$ROOT/usr/lib"
-ENVCPPFLAGS1="-I$ROOT/usr/include"
-
-export ENVLDLIBS1 ENVLDLIBS2
-
 CPIODIR_ORIG=$CPIODIR
 PKGARCHIVE_ORIG=$PKGARCHIVE
 IA32_IHV_PKGS_ORIG=$IA32_IHV_PKGS
@@ -1385,6 +1510,10 @@ logshuffle() {
 
 		if [ -f $TMPDIR/wsdiff.results ]; then
 		    mv $TMPDIR/wsdiff.results $LLOG
+		fi
+
+		if [ -f $TMPDIR/wsdiff-nd.results ]; then
+			mv $TMPDIR/wsdiff-nd.results $LLOG
 		fi
 	fi
 
@@ -1506,6 +1635,24 @@ create_lock() {
 	staffer sh -c "echo $hostname $STAFFER $$ > $lockf" || exit 1
 }
 
+#
+# Return the list of interesting proto areas, depending on the current
+# options.
+#
+allprotos() {
+	roots="$ROOT"
+	if [ $O_FLAG = y ]; then
+		# OpenSolaris deliveries require separate proto areas.
+		[ $D_FLAG = y ] && roots="$roots $ROOT-open"
+		[ $F_FLAG = n ] && roots="$roots $ROOT-open-nd"
+	fi
+	if [[ $D_FLAG = y && $F_FLAG = n ]]; then
+		[ $MULTI_PROTO = yes ] && roots="$roots $ROOT-nd"
+	fi
+
+	echo $roots
+}
+
 # Ensure no other instance of this script is running on this host.
 # LOCKNAME can be set in <env_file>, and is by default, but is not
 # required due to the use of $ATLOG below.
@@ -1613,15 +1760,28 @@ EOF
 	fi
 fi
 
+if [ "$O_FLAG" = "y" -a "$a_FLAG" = "n" ]; then
+	echo "WARNING: OpenSolaris deliveries (-O) require archives;" \
+	    "enabling the -a flag." | tee -a $mail_msg_file >> $LOGFILE
+	a_FLAG=y
+fi
+
 if [ "$a_FLAG" = "y" -a "$D_FLAG" = "n" -a "$F_FLAG" = "y" ]; then
 	echo "WARNING: Neither DEBUG nor non-DEBUG build requested, but the" \
 	    "'a' option was set." | tee -a $mail_msg_file >> $LOGFILE
 fi
 
 if [ "$D_FLAG" = "n" -a "$l_FLAG" = "y" ]; then
-	echo "WARNING: DEBUG build not requested, but lint will be with" \
-	    "DEBUG enabled.\n" \
+	#
+	# In the past we just complained but went ahead with the lint
+	# pass, even though the proto area was built non-debug.  It's
+	# unlikely that non-debug headers will make a difference, but
+	# rather than assuming it's a safe combination, force the user
+	# to specify a debug build.
+	#
+	echo "WARNING: DEBUG build not requested; disabling lint.\n" \
 	    | tee -a $mail_msg_file >> $LOGFILE
+	l_FLAG=n
 fi
 
 if [ "$f_FLAG" = "y" ]; then
@@ -1638,7 +1798,7 @@ if [ "$f_FLAG" = "y" ]; then
 fi
 
 if [ "$w_FLAG" = "y" -a ! -d $ROOT ]; then
-	echo "WARNING: -w specified, but no pre-existing proto area found;" \
+	echo "WARNING: -w specified, but $ROOT does not exist;" \
 	    "ignoring -w\n" | tee -a $mail_msg_file >> $LOGFILE
 	w_FLAG=n
 fi
@@ -1663,6 +1823,19 @@ if [ "$t_FLAG" = "n" ]; then
 		    tee -a $mail_msg_file >> $LOGFILE
 	fi
 fi
+
+[ "$O_FLAG" = y ] && MULTI_PROTO=yes
+
+case $MULTI_PROTO in
+yes|no)	;;
+*)
+	echo "WARNING: MULTI_PROTO is \"$MULTI_PROTO\"; " \
+	    "should be \"yes\" or \"no\"." | tee -a $mail_msg_file >> $LOGFILE
+	echo "Setting MULTI_PROTO to \"no\".\n" | \
+	    tee -a $mail_msg_file >> $LOGFILE
+	export MULTI_PROTO=no
+	;;
+esac
 
 echo "==== Build environment ====\n" | tee -a $mail_msg_file >> $LOGFILE
 
@@ -1750,6 +1923,14 @@ if [ "$w_FLAG" = "y" -a -d "$ROOT" ]; then
     mv $ROOT $ROOT.prev
 fi
 
+# Same for non-DEBUG proto area
+if [ "$w_FLAG" = "y" -a "$MULTI_PROTO" = yes -a -d "$ROOT-nd" ]; then
+	if [ -d "$ROOT-nd.prev" ]; then
+		rm -rf $ROOT-nd.prev
+	fi
+	mv $ROOT-nd $ROOT-nd.prev
+fi
+
 #
 #	Decide whether to clobber
 #
@@ -1772,7 +1953,7 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 		egrep -v "Ignoring unknown host" \
 		>> $mail_msg_file
 
-	if [ "$t_FLAG" = "y" ]; then
+	if [[ "$t_FLAG" = "y" || "$O_FLAG" = "y" ]]; then
 		echo "\n==== Make tools clobber at `date` ====\n" >> $LOGFILE
 		cd ${TOOLS}
 		rm -f ${TOOLS}/clobber-${MACH}.out
@@ -1786,7 +1967,7 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 		mkdir -p ${TOOLS_PROTO}
 	fi
 
-	rm -rf $ROOT
+	rm -rf `allprotos`
 
 	# Get back to a clean workspace as much as possible to catch
 	# problems that only occur on fresh workspaces.
@@ -1848,16 +2029,17 @@ else
 fi
 
 #
-# Build tools if requested
+# Build and use the workspace's tools if requested
 #
-if [ "$t_FLAG" = "y" ]; then
-	export INTERNAL_RELEASE_BUILD ; INTERNAL_RELEASE_BUILD=
-	export RELEASE_BUILD ; RELEASE_BUILD=
-	unset EXTRA_OPTIONS
-	unset EXTRA_CFLAGS
+if [[ "$t_FLAG" = "y" || "$O_FLAG" = y ]]; then
+	set_non_debug_build_flags
 
-	export ONBLD_TOOLS=${ONBLD_TOOLS:=${TOOLS_PROTO}/opt/onbld}
 	build_tools ${TOOLS_PROTO}
+
+	if [[ $? -ne 0 && "$t_FLAG" = y ]]; then
+		use_tools $TOOLS_PROTO
+		export ONBLD_TOOLS=${ONBLD_TOOLS:=${TOOLS_PROTO}/opt/onbld}
+	fi
 fi
 
 #
@@ -1871,7 +2053,123 @@ if [ "$i_FLAG" = "y" -a "$SH_FLAG" = "y" ]; then
 	echo "\n==== NOT Building base OS-Net source ====\n" | \
 	    tee -a $LOGFILE >> $mail_msg_file
 else
+	# timestamp the start of the normal build; the findunref tool uses it.
+	touch $SRC/.build.tstamp
+
 	normal_build
+fi
+
+#
+# Generate OpenSolaris deliverables if requested.
+#
+if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
+	#
+	# Generate skeleton (minimal) closed binaries for open-only
+	# build.  There's no need to distinguish debug from non-debug
+	# binaries, but it simplifies file management to have separate
+	# trees.
+	#
+
+	echo "\n==== Generating skeleton closed binaries for" \
+	    "open-only build ====\n" | \
+	    tee -a $LOGFILE >> $mail_msg_file
+
+	rm -rf $CODEMGR_WS/closed.skel
+	if [ "$D_FLAG" = y ]; then
+		mkclosed $MACH $ROOT $CODEMGR_WS/closed.skel/root_$MACH \
+		    >>$LOGFILE 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Couldn't create skeleton DEBUG closed binaries." |
+			    tee -a $mail_msg_file >> $LOGFILE
+		fi
+	fi
+	if [ "$F_FLAG" = n ]; then
+		mkclosed $MACH $ROOT-nd $CODEMGR_WS/closed.skel/root_$MACH-nd \
+		    >>$LOGFILE 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Couldn't create skeleton non-DEBUG closed binaries." |
+			    tee -a $mail_msg_file >> $LOGFILE
+		fi
+	fi
+
+	ORIG_CLOSED_IS_PRESENT=$CLOSED_IS_PRESENT
+	export CLOSED_IS_PRESENT=no
+
+	ORIG_ON_CLOSED_BINS="$ON_CLOSED_BINS"
+	export ON_CLOSED_BINS=$CODEMGR_WS/closed.skel
+
+	normal_build -O
+
+	echo "\n==== Generating OpenSolaris tarballs ====\n" | \
+	    tee -a $LOGFILE >> $mail_msg_file
+
+	cd $CODEMGR_WS
+
+	echo "Generating THIRDPARTYLICENSE files..." >> $LOGFILE
+
+	mktpl usr/src/tools/opensolaris/license-list >>$LOGFILE 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Couldn't create THIRDPARTYLICENSE files" |
+		    tee -a $mail_msg_file >> $LOGFILE
+	fi
+
+	echo "Generating closed binaries tarball(s)..." >> $LOGFILE
+	if [ "$D_FLAG" = y ]; then
+		bindrop $ROOT $ROOT-open >>$LOGFILE 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Couldn't create DEBUG closed binaries." |
+			    tee -a $mail_msg_file >> $LOGFILE
+		fi
+	fi
+	if [ "$F_FLAG" = n ]; then
+		bindrop -n $ROOT-nd $ROOT-open-nd >>$LOGFILE 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Couldn't create non-DEBUG closed binaries." |
+			    tee -a $mail_msg_file >> $LOGFILE
+		fi
+	fi
+
+	echo "Generating SUNWonbld tarball..." >> $LOGFILE
+	PKGARCHIVE=$PKGARCHIVE_ORIG
+	onblddrop >> $LOGFILE 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Couldn't create SUNWonbld tarball." |
+		    tee -a $mail_msg_file >> $LOGFILE
+	fi
+
+	echo "Generating README.opensolaris..." >> $LOGFILE
+	cat $SRC/tools/opensolaris/README.opensolaris.tmpl | \
+	    mkreadme_osol $CODEMGR_WS/README.opensolaris >> $LOGFILE 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Couldn't create README.opensolaris." |
+		    tee -a $mail_msg_file >> $LOGFILE
+	fi
+
+	echo "Generating source tarball..." >> $LOGFILE
+	sdrop >>$LOGFILE 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Couldn't create source tarball." |
+			tee -a $mail_msg_file >> $LOGFILE
+	fi
+
+	echo "Generating BFU tarball(s)..." >> $LOGFILE
+	if [ "$D_FLAG" = y ]; then
+		bfudrop nightly-open >>$LOGFILE 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Couldn't create DEBUG archives tarball." |
+			    tee -a $mail_msg_file >> $LOGFILE
+		fi
+	fi
+	if [ "$F_FLAG" = n ]; then
+		bfudrop nightly-open-nd >>$LOGFILE 2>&1
+		if [ $? -ne 0 ]; then
+			echo "Couldn't create non-DEBUG archives tarball." |
+			    tee -a $mail_msg_file >> $LOGFILE
+		fi
+	fi
+
+	ON_CLOSED_BINS=$ORIG_ON_CLOSED_BINS
+	CLOSED_IS_PRESENT=$ORIG_CLOSED_IS_PRESENT
 fi
 
 ORIG_SRC=$SRC
@@ -1879,7 +2177,7 @@ BINARCHIVE=${CODEMGR_WS}/bin-${MACH}.cpio.Z
 
 #
 # For the "open" build, we don't mung any source files, so skip this
-# step. 
+# step.
 #
 if [ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o "$SH_FLAG" = "y" ]; then
 	save_binaries
@@ -1929,32 +2227,48 @@ fi
 if [ "$SO_FLAG" = "y" ]; then
 	#
 	# Copy the open sources into their own tree, set up the closed
-	# binaries, and set up the environment.
+	# binaries, and set up the environment.  The build looks for
+	# the closed binaries in a location that depends on whether
+	# it's a DEBUG build, so we might need to make two copies.
 	#
 	copy_source $CODEMGR_WS $OPEN_SRCDIR OPEN_SOURCE usr/src
 	SRC=$OPEN_SRCDIR/usr/src
 
 	# Try not to clobber any user-provided closed binaries.
 	export ON_CLOSED_BINS=$CODEMGR_WS/closed$$
-	echo "\n==== Copying skeleton closed binaries to $ON_CLOSED_BINS ====\n" | \
+
+	echo "\n==== Copying skeleton closed binaries to" \
+	    "$ON_CLOSED_BINS ====\n" | \
 	    tee -a $mail_msg_file >> $LOGFILE
-	mkclosed $MACH $CODEMGR_WS/proto $ON_CLOSED_BINS >>$LOGFILE 2>&1
-	if [ $? -ne 0 ]; then
-		build_ok=n
-		echo "Aborting (couldn't create closed binaries)." |
-			tee -a $mail_msg_file >> $LOGFILE
+
+	if [ "$D_FLAG" = y ]; then
+		mkclosed $MACH $ROOT $ON_CLOSED_BINS/root_$MACH >>$LOGFILE 2>&1
+		if [ $? -ne 0 ]; then
+			build_ok=n
+			echo "Couldn't create DEBUG closed binaries." |
+			    tee -a $mail_msg_file >> $LOGFILE
+		fi
 	fi
-	CLOSED_IS_PRESENT=no
+	if [ "$F_FLAG" = n ]; then
+		root=$ROOT
+		[ "$MULTI_PROTO" = yes ] && root=$ROOT-nd
+		mkclosed $MACH $root $ON_CLOSED_BINS/root_$MACH-nd \
+		    >>$LOGFILE 2>&1
+		if [ $? -ne 0 ]; then
+			build_ok=n
+			echo "Couldn't create non-DEBUG closed binaries." |
+			    tee -a $mail_msg_file >> $LOGFILE
+		fi
+	fi
+
+	export CLOSED_IS_PRESENT=no
 fi
 
 if is_source_build && [ $build_ok = y ] ; then
-	# remove proto area here, since we don't clobber
-	rm -rf "$ROOT"
+	# remove proto area(s) here, since we don't clobber
+	rm -rf `allprotos`
 	if [ "$t_FLAG" = "y" ]; then
-		export INTERNAL_RELEASE_BUILD ; INTERNAL_RELEASE_BUILD=
-		export RELEASE_BUILD ; RELEASE_BUILD=
-		unset EXTRA_OPTIONS
-		unset EXTRA_CFLAGS
+		set_non_debug_build_flags
 		ORIG_TOOLS=$TOOLS
 		#
 		# SRC was set earlier to point to the source build
@@ -1973,10 +2287,21 @@ if [[ "$SO_FLAG" = "y" && "$build_ok" = "y" ]]; then
 	rm -rf $ON_CLOSED_BINS
 fi
 
+#
+# There are several checks that need to look at the proto area, but
+# they only need to look at one, and they don't care whether it's
+# DEBUG or non-DEBUG.
+#
+if [[ "$MULTI_PROTO" = yes && "$D_FLAG" = n ]]; then
+	checkroot=$ROOT-nd
+else
+	checkroot=$ROOT
+fi
+
 if [ "$build_ok" = "y" ]; then
 	echo "\n==== Creating protolist system file at `date` ====" \
 		>> $LOGFILE
-	protolist $ROOT > $ATLOG/proto_list_${MACH}
+	protolist $checkroot > $ATLOG/proto_list_${MACH}
 	echo "==== protolist system file created at `date` ====\n" \
 		>> $LOGFILE
 
@@ -2006,7 +2331,7 @@ if [ "$build_ok" = "y" ]; then
 			# Use the presence of the first file entry of the cached
 			# IHV proto list in the reference list to determine
 			# whether it was build with -X or not.
-			IHV_REF_PROTO_LIST=$SRC/pkgdefs/etc/proto_list_ihv_$MACH 
+			IHV_REF_PROTO_LIST=$SRC/pkgdefs/etc/proto_list_ihv_$MACH
 			grepfor=$(nawk '$1 == "f" { print $2; exit }' \
 				$IHV_REF_PROTO_LIST 2> /dev/null)
 			if [ $? = 0 -a -n "$grepfor" ]; then
@@ -2091,9 +2416,19 @@ if [ "$U_FLAG" = "y" -a "$build_ok" = "y" ]; then
 	rm -rf $PARENT_WS/proto/root_$MACH/*
 	unset Ulockfile
 	mkdir -p $NIGHTLY_PARENT_ROOT
-	cd $ROOT
-	( tar cf - . | ( cd $NIGHTLY_PARENT_ROOT;  umask 0; tar xpf - ) ) 2>&1 |
-		tee -a $mail_msg_file >> $LOGFILE
+	if [[ "$MULTI_PROTO" = no || "$D_FLAG" = y ]]; then
+		cd $ROOT
+		( tar cf - . | 
+		    ( cd $NIGHTLY_PARENT_ROOT;  umask 0; tar xpf - ) ) 2>&1 |
+		    tee -a $mail_msg_file >> $LOGFILE
+	fi
+	if [[ "$MULTI_PROTO" = yes && "$F_FLAG" = n ]]; then
+		mkdir -p $NIGHTLY_PARENT_ROOT-nd
+		cd $ROOT-nd
+		( tar cf - . |
+		    ( cd $NIGHTLY_PARENT_ROOT-nd; umask 0; tar xpf - ) ) 2>&1 |
+		    tee -a $mail_msg_file >> $LOGFILE
+	fi
 fi
 
 #
@@ -2112,7 +2447,7 @@ if [ "$A_FLAG" = "y" -a "$build_ok" = "y" ]; then
 	mkdir -p $SRC/interfaces.out
 
 	intf_check -V -m -o -b $SRC/tools/abi/etc \
-		-d $SRC/interfaces.out $ROOT 2>&1 | sort \
+		-d $SRC/interfaces.out $checkroot 2>&1 | sort \
 		> $SRC/interfaces.out/log
 
 	# report any ERROR found in log file
@@ -2163,9 +2498,9 @@ if [ "$r_FLAG" = "y" -a "$build_ok" = "y" ]; then
 	else
 		rtime_sflag="-s"
 	fi
-	check_rtime -d $ROOT -i -m -o $rtime_sflag $ROOT 2>&1 | \
-	    egrep -v ": unreferenced object=$ROOT/.*/lib(w|intl|thread|pthread).so" | \
-	    egrep -v ": unused object=$ROOT/.*/lib(w|intl|thread|pthread).so" | \
+	check_rtime -d $checkroot -i -m -o $rtime_sflag $checkroot 2>&1 | \
+	    egrep -v ": unreferenced object=$checkroot/.*/lib(w|intl|thread|pthread).so" | \
+	    egrep -v ": unused object=$checkroot/.*/lib(w|intl|thread|pthread).so" | \
 	    sort >$SRC/runtime.out
 
 	# Determine any processing errors that will affect the final output
@@ -2291,7 +2626,7 @@ if [ "$CHECK_PATHS" = y -a "$N_FLAG" != y ]; then
 		>>$mail_msg_file
 	arg=-b
 	[ "$build_ok" = y ] && arg=
-	checkpaths $arg $ROOT 2>&1 | tee -a $LOGFILE >>$mail_msg_file
+	checkpaths $arg $checkroot 2>&1 | tee -a $LOGFILE >>$mail_msg_file
 fi
 
 if [ "$M_FLAG" != "y" -a "$build_ok" = y ]; then
@@ -2310,15 +2645,12 @@ if [ "$M_FLAG" != "y" -a "$build_ok" = y ]; then
 fi
 
 if [ "$w_FLAG" = "y" -a "$build_ok" = "y" ]; then
-	echo "\n==== Objects that differ since last build ====\n" | \
-	    tee -a $LOGFILE >> $mail_msg_file
+	if [[ "$MULTI_PROTO" = no || "$D_FLAG" = y ]]; then
+		do_wsdiff DEBUG $ROOT.prev $ROOT
+	fi
 
-	if [ "$t_FLAG" = "y" ]; then
-	    wsdiff -t -r ${TMPDIR}/wsdiff.results $ROOT.prev $ROOT | \
-		tee -a $LOGFILE >> $mail_msg_file
-	else
-	    wsdiff -r ${TMPDIR}/wsdiff.results $ROOT.prev $ROOT  | \
-		tee -a $LOGFILE >> $mail_msg_file
+	if [[ "$MULTI_PROTO" = yes && "$F_FLAG" = n ]]; then
+		do_wsdiff non-DEBUG $ROOT-nd.prev $ROOT-nd
 	fi
 fi
 

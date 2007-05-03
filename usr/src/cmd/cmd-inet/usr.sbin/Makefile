@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -157,7 +158,7 @@ route			:=	CPPFLAGS += -DNDEBUG
 
 .PARALLEL:
 
-all: $(PROG) $(ROOTFS_PROG) $(SUBDIRS)
+all: $(PROG) $(ROOTFS_PROG) $(SUBDIRS) THIRDPARTYLICENSE.arp
 
 #
 # message catalog
@@ -194,7 +195,12 @@ $(ROOTUSRSBINLINKS):
 
 install: $(PROG) $(ROOTFS_PROG) $(SUBDIRS) .WAIT $(ROOTUSRSBINPROG) \
 	$(ROOTSBINPROG) $(ROOTUSRSBINLINKS) $(ROOTETCDEFAULTFILES) \
-	$(ROOTMANIFEST)
+	$(ROOTMANIFEST) THIRDPARTYLICENSE.arp
+
+THIRDPARTYLICENSE.arp: arp.c
+	$(SED) -n '/University of California/,/SUCH DAMAGE/p' arp.c > $@
+
+CLOBBERFILES += THIRDPARTYLICENSE.arp
 
 #
 # The reason this rule checks for the existence of the

@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,7 +32,7 @@
 # when building just the open tree.
 #
 
-usage="mkclosed isa proto closed"
+usage="mkclosed isa root closed-root"
 
 if [ $# -ne 3 ]; then
 	print -u2 "usage: $usage"
@@ -48,8 +48,8 @@ sparc)	plat64=sparcv9;;
 	;;
 esac
 
-protoroot=$2/root_$isa
-closedroot=$3/root_$isa
+protoroot=$2
+closedroot=$3
 
 #
 # Make closedroot an absolute path if it isn't already.  This is

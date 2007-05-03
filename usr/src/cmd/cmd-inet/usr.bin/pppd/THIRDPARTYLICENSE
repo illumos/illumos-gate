@@ -1,0 +1,279 @@
+    * Copyright (c) 1993, 1999 The Australian National University.
+    * All rights reserved.
+    *
+    * Redistribution and use in source and binary forms are permitted
+    * provided that the above copyright notice and this paragraph are
+    * duplicated in all such forms and that any documentation,
+    * advertising materials, and other materials related to such
+    * distribution and use acknowledge that the software was developed
+    * by the Australian National University.  The name of the University
+    * may not be used to endorse or promote products derived from this
+    * software without specific prior written permission.
+    * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+    * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+    * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+
+    * Copyright (c) 1994 The Australian National University.
+    * All rights reserved.
+    *
+    * Permission to use, copy, modify, and distribute this software and its
+    * documentation is hereby granted, provided that the above copyright
+    * notice appears in all copies.  This software is provided without any
+    * warranty, express or implied. The Australian National University
+    * makes no representations about the suitability of this software for
+    * any purpose.
+    *
+    * IN NO EVENT SHALL THE AUSTRALIAN NATIONAL UNIVERSITY BE LIABLE TO ANY
+    * PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+    * ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF
+    * THE AUSTRALIAN NATIONAL UNIVERSITY HAVE BEEN ADVISED OF THE POSSIBILITY
+    * OF SUCH DAMAGE.
+    *
+    * THE AUSTRALIAN NATIONAL UNIVERSITY SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+    * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+    * AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+    * ON AN "AS IS" BASIS, AND THE AUSTRALIAN NATIONAL UNIVERSITY HAS NO
+    * OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
+    * OR MODIFICATIONS.
+
+    * Copyright (c) 1989 Carnegie Mellon University.
+    * All rights reserved.
+    *
+    * Redistribution and use in source and binary forms are permitted
+    * provided that the above copyright notice and this paragraph are
+    * duplicated in all such forms and that any documentation,
+    * advertising materials, and other materials related to such
+    * distribution and use acknowledge that the software was developed
+    * by Carnegie Mellon University.  The name of the
+    * University may not be used to endorse or promote products derived
+    * from this software without specific prior written permission.
+    * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+    * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+    * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+
+    * Copyright (c) 1995 Pedro Roque Marques
+    * All rights reserved.
+    *
+    * Redistribution and use in source and binary forms are permitted
+    * provided that the above copyright notice and this paragraph are
+    * duplicated in all such forms and that any documentation,
+    * advertising materials, and other materials related to such
+    * distribution and use acknowledge that the software was developed
+    * by Pedro Roque Marques.  The name of the author may not be used to
+    * endorse or promote products derived from this software without
+    * specific prior written permission.
+    *
+    * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+    * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+    * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+
+    * Copyright (c) 1991 Gregory M. Christy.
+    * All rights reserved.
+    *
+    * Redistribution and use in source and binary forms are permitted
+    * provided that the above copyright notice and this paragraph are
+    * duplicated in all such forms and that any documentation,
+    * advertising materials, and other materials related to such
+    * distribution and use acknowledge that the software was developed
+    * by Gregory M. Christy.  The name of the author may not be used to
+    * endorse or promote products derived from this software without
+    * specific prior written permission.
+    *
+    * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+    * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+    * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+   
+    * Copyright (c) 1995 Eric Rosenquist, Strata Software Limited.
+    * http://www.strataware.com/
+    *
+    * All rights reserved.
+    *
+    * Redistribution and use in source and binary forms are permitted
+    * provided that the above copyright notice and this paragraph are
+    * duplicated in all such forms and that any documentation,
+    * advertising materials, and other materials related to such
+    * distribution and use acknowledge that the software was developed
+    * by Eric Rosenquist.	The name of the author may not be used to
+    * endorse or promote products derived from this software without
+    * specific prior written permission.
+    *
+    * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+    * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+    * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+
+    ipv6cp.h - PPP IPV6 Control Protocol.
+    Copyright (C) 1999	Tommi Komulainen <Tommi.Komulainen@iki.fi>
+
+    Redistribution and use in source and binary forms are permitted
+    provided that the above copyright notice and this paragraph are
+    duplicated in all such forms.  The name of the author may not be
+    used to endorse or promote products derived from this software
+    without specific prior written permission.
+    THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+    IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+    WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+    */
+
+    /*  Original version, based on RFC2023 :
+
+    Copyright (c) 1995, 1996, 1997 Francis.Dupont@inria.fr, INRIA Rocquencourt,
+    Alain.Durand@imag.fr, IMAG,
+    Jean-Luc.Richier@imag.fr, IMAG-LSR.
+
+    Copyright (c) 1998, 1999 Francis.Dupont@inria.fr, GIE DYADE,
+    Alain.Durand@imag.fr, IMAG,
+    Jean-Luc.Richier@imag.fr, IMAG-LSR.
+
+    Ce travail a \351t\351 fait au sein du GIE DYADE (Groupement d'Int\351r\352t
+    \311conomique ayant pour membres BULL S.A. et l'INRIA).
+
+    Ce logiciel informatique est disponible aux conditions
+    usuelles dans la recherche, c'est-\340-dire qu'il peut
+    \352tre utilis\351, copi\351, modifi\351, distribu\351 \340 l'unique
+    condition que ce texte soit conserv\351 afin que
+    l'origine de ce logiciel soit reconnue.
+
+    Le nom de l'Institut National de Recherche en Informatique
+    et en Automatique (INRIA), de l'IMAG, ou d'une personne morale
+    ou physique ayant particip\351 \340 l'\351laboration de ce logiciel ne peut
+    \352tre utilis\351 sans son accord pr\351alable explicite.
+
+    Ce logiciel est fourni tel quel sans aucune garantie,
+    support ou responsabilit\351 d'aucune sorte.
+    Ce logiciel est d\351riv\351 de sources d'origine
+    "University of California at Berkeley" et
+    "Digital Equipment Corporation" couvertes par des copyrights.
+
+    L'Institut d'Informatique et de Math\351matiques Appliqu\351es de Grenoble (IMAG)
+    est une f\351d\351ration d'unit\351s mixtes de recherche du CNRS, de l'Institut
+    National
+    Polytechnique de Grenoble et de l'Universit\351 Joseph Fourier regroupant
+    sept laboratoires dont le laboratoire Logiciels, Syst\350mes, R\351seaux (LSR).
+
+    This work has been done in the context of GIE DYADE (joint R & D venture
+    between BULL S.A. and INRIA).
+
+    This software is available with usual "research" terms
+    with the aim of retain credits of the software.
+    Permission to use, copy, modify and distribute this software for any
+    purpose and without fee is hereby granted, provided that the above
+    copyright notice and this permission notice appear in all copies,
+    and the name of INRIA, IMAG, or any contributor not be used in advertising
+    or publicity pertaining to this material without the prior explicit
+    permission. The software is provided "as is" without any
+    warranties, support or liabilities of any kind.
+    This software is derived from source code from
+    "University of California at Berkeley" and
+    "Digital Equipment Corporation" protected by copyrights.
+
+    Grenoble's Institute of Computer Science and Applied Mathematics (IMAG)
+    is a federation of seven research units funded by the CNRS, National
+    Polytechnic Institute of Grenoble and University Joseph Fourier.
+    The research unit in Software, Systems, Networks (LSR) is member of IMAG.
+    */
+
+    * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+    * Use is subject to license terms.
+    *
+    * Permission to use, copy, modify, and distribute this software and its
+    * documentation is hereby granted, provided that the above copyright
+    * notice appears in all copies.
+    *
+    * SUN MAKES NO REPRESENTATION OR WARRANTIES ABOUT THE SUITABILITY OF
+    * THE SOFTWARE, EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+    * TO THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+    * PARTICULAR PURPOSE, OR NON-INFRINGEMENT.  SUN SHALL NOT BE LIABLE FOR
+    * ANY DAMAGES SUFFERED BY LICENSEE AS A RESULT OF USING, MODIFYING OR
+    * DISTRIBUTING THIS SOFTWARE OR ITS DERIVATIVES
+
+    * Copyright (c) 2000 Paul Mackerras.
+    * All rights reserved.
+    *
+    * Redistribution and use in source and binary forms are permitted
+    * provided that the above copyright notice and this paragraph are
+    * duplicated in all such forms.  The name of the author may not be
+    * used to endorse or promote products derived from this software
+    * without specific prior written permission.
+    * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+    * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+    * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+
+    * The basic framework for this code came from the reference
+    * implementation for MD5.  That implementation is Copyright (C)
+    * 1991-2, RSA Data Security, Inc. Created 1991. All rights reserved.
+    *
+    * License to copy and use this software is granted provided that it
+    * is identified as the "RSA Data Security, Inc. MD5 Message-Digest
+    * Algorithm" in all material mentioning or referencing this software
+    * or this function.
+    *
+    * License is also granted to make and use derivative works provided
+    * that such works are identified as "derived from the RSA Data
+    * Security, Inc. MD5 Message-Digest Algorithm" in all material
+    * mentioning or referencing the derived work.
+    *
+    * RSA Data Security, Inc. makes no representations concerning either
+    * the merchantability of this software or the suitability of this
+    * software for any particular purpose. It is provided "as is"
+    * without express or implied warranty of any kind.
+    *
+    * These notices must be retained in any copies of any part of this
+    * documentation and/or software.
+    *
+    * NOTE: Cleaned-up and optimized, version of SHA1, based on the FIPS 180-1
+    * standard, available at http://www.itl.nist.gov/div897/pubs/fip180-1.htm
+    * Not as fast as one would like -- further optimizations are encouraged
+    * and appreciated.
+
+    Copyright (c) 1985, 1986 The Regents of the University of California.
+    All rights reserved.
+
+        This code is derived from software contributed to Berkeley by
+        James A. Woods, derived from original work by Spencer Thomas
+        and Joseph Orost.
+
+        Redistribution and use in source and binary forms, with or without
+        modification, are permitted provided that the following conditions
+        are met:
+        1. Redistributions of source code must retain the above copyright
+	    notice, this list of conditions and the following disclaimer.
+        2. Redistributions in binary form must reproduce the above
+	    copyright notice, this list of conditions and the following
+	    disclaimer in the documentation and/or other materials provided
+	    with the distribution.
+        3. All advertising materials mentioning features or use of this
+	    software must display the following acknowledgement:
+	     This product includes software developed by the University of
+	     California, Berkeley and its contributors.
+        4. Neither the name of the University nor the names of its
+	    contributors may be used to endorse or promote products derived
+	    from this software without specific prior written permission.
+
+        THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS
+        IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+        LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+        FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE
+        REGENTS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+        INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+        (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+        SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+        HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+        CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+        OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+        EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+    Copyright (c) 1989 Regents of the University of California.  All
+    rights reserved.
+
+        Redistribution and use in source and binary forms are permitted
+        provided that the above copyright notice and this paragraph are
+        duplicated in all such forms and that any documentation,
+        advertising materials, and other materials related to such
+        distribution and use acknowledge that the software was developed
+        by the University of California, Berkeley.	The name of the
+        University may not be used to endorse or promote products derived
+        from this software without specific prior written permission.
+        THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+        IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+        WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR
+        PURPOSE.

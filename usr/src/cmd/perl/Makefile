@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,10 +48,12 @@ PERL_VERSIONS = \
 #
 all install test: contrib/copy_contrib $(PERL_VERSIONS)
 
+all install: THIRDPARTYLICENSE
+
 clean: $(PERL_VERSIONS)
 
 clobber: $(PERL_VERSIONS)
-	$(RM) contrib/copy_contrib
+	$(RM) contrib/copy_contrib THIRDPARTYLICENSE
 
 #
 # Perl is not lint-clean.  Fake up a target.
@@ -62,5 +64,17 @@ lint:
 
 $(PERL_VERSIONS): FRC
 	@ cd $@; pwd; $(MAKE) $(TARGET)
+
+PODDIR = 5.8.4/distrib/pod
+ARTLIC_SRC = $(PODDIR)/perlartistic.pod
+
+#
+# $(PODDIR)/pod2text may already exist (from "make install"), but it
+# doesn't hurt to regenerate it.
+#
+THIRDPARTYLICENSE: $(ARTLIC_SRC)
+	$(PERL) $(PODDIR)/pod2text.PL
+	$(PODDIR)/pod2text $(ARTLIC_SRC) | \
+	    $(SED) -n '/The "Artistic License"/,/The End/p' > $@
 
 FRC:

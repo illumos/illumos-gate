@@ -19,8 +19,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,6 +47,7 @@ Where:
 c_FLAG=n
 f_FLAG=n
 d_FLAG=n
+O_FLAG=n
 o_FLAG=n
 t_FLAG=n
 SE_FLAG=n
@@ -163,15 +165,17 @@ shift
 # must match the getopts in nightly.sh
 OPTIND=1
 NIGHTLY_OPTIONS=-${NIGHTLY_OPTIONS#-}
-while getopts ABDFMNCGIRafinlmoptuUxdrtwzWS:X FLAG $NIGHTLY_OPTIONS
+while getopts AaBCDdFfGIilMmNnOopRrS:tUuWwXxz FLAG $NIGHTLY_OPTIONS
 do
 	case $FLAG in
+	  O)	O_FLAG=y
+		;;
+	  o)	o_FLAG=y
+		;;
 	  t )	t_FLAG=y
 		;;
 	  S )
 		set_S_flag $OPTARG
-		;;
-	  o)	o_FLAG=y
 		;;
 	  *)    ;;
 	esac
@@ -191,6 +195,15 @@ else
 	export RELEASE_BUILD ; RELEASE_BUILD=
 	unset EXTRA_OPTIONS
 	unset EXTRA_CFLAGS
+fi
+
+if [ $O_FLAG = "y" ]; then
+	export MULTI_PROTO=yes
+	if [ "$CLOSED_IS_PRESENT" = "yes" ]; then
+		echo "CLOSED_IS_PRESENT is 'no' (because of '-O')"
+	fi
+	export CLOSED_IS_PRESENT=no
+	export ON_CLOSED_BINS=$CODEMGR_WS/closed.skel
 fi
 
 # update build-type variables
@@ -224,12 +237,6 @@ if [ "${SUNWSPRO}" != "" ]; then
 	PATH="${SUNWSPRO}/bin:$PATH" 
 	export PATH 
 fi 
-
-if [[ "$SO_FLAG" = "y" && "$CLOSED_IS_PRESENT" = "yes" ]]; then
-	echo "CLOSED_IS_PRESENT is 'no' (because of '-S O')"
-	CLOSED_IS_PRESENT=no
-	export CLOSED_IS_PRESENT
-fi
 
 if [ -z "$CLOSED_IS_PRESENT" ]; then
 	if [ -d $SRC/../closed ]; then
@@ -290,6 +297,16 @@ ENVCPPFLAGS2=
 ENVCPPFLAGS3=
 ENVCPPFLAGS4=
 PARENT_ROOT=
+
+[ "$O_FLAG" = "y" ] && export ROOT=$ROOT-open
+
+if [ "$MULTI_PROTO" != "yes" -a "$MULTI_PROTO" != "no" ]; then
+	echo "WARNING: invalid value for MULTI_PROTO ($MULTI_PROTO);" \
+	    "setting to \"no\"."
+	export MULTI_PROTO=no
+fi
+
+[ "$MULTI_PROTO" = "yes" ] && export ROOT=$ROOT$SUFFIX
 
 ENVLDLIBS1="-L$ROOT/lib -L$ROOT/usr/lib"
 ENVCPPFLAGS1="-I$ROOT/usr/include"

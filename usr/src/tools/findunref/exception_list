@@ -34,14 +34,12 @@
 #
 # Ignore text files.
 #
-./src/OPENSOLARIS.LICENSE
 *.txt
 */*[Rr][Ee][Aa][Dd][Mm][Ee]*
 */ChangeLog
 */READ_ME
 */TODO
 */COPYRIGHT
-*/LICENSE
 
 #
 # Ignore oddly-named text files scattered about -- someday these should be

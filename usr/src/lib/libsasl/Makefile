@@ -18,8 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,6 +55,8 @@ MSGFILES=	lib/canonusr.c lib/checkpw.c lib/client.c lib/common.c \
 
 all clean clobber install lint: $(SUBDIRS)
 
+all install: THIRDPARTYLICENSE
+
 install_h:	$(ROOTHDRS)
 
 check:	$(CHECKHDRS)
@@ -69,6 +72,11 @@ $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
+
+THIRDPARTYLICENSE: LICENSE.txt
+	$(SED) -n '/Carnegie Mellon/,$$p' LICENSE.txt > $@
+
+CLOBBERFILES += THIRDPARTYLICENSE
 
 # EXPORT DELETE START
 # CRYPT DELETE START

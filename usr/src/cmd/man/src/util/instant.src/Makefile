@@ -1,5 +1,5 @@
 #
-# Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -92,7 +92,7 @@ OBJ	= main.o util.o info.o translate.o traninit.o tranvar.o tables.o \
 	browse.o masterVersion.o
 PROGS	= instant
 
-all:	dotptregexp .WAIT $(PROGS) 
+all:	dotptregexp .WAIT $(PROGS) THIRDPARTYLICENSE
 
 dotptregexp:
 	cd tptregexp; $(MAKE) all
@@ -125,6 +125,7 @@ clobber:	clean _localclobber
 _localclobber:
 	rm -f $(PROGS)
 	cd tptregexp; $(MAKE) clobber
+	$(RM) THIRDPARTYLICENSE
 
 .PARALLEL:	$(OBJ)
 
@@ -138,3 +139,6 @@ tranvar.o:	tranvar.c general.h translate.h
 tables.o:	tables.c general.h translate.h
 browse.o:	browse.c general.h
 
+THIRDPARTYLICENSE: README
+	$(SED) -n -e '2d' -e '/# Copyright/,/# written authorization/p' \
+	    README > $@

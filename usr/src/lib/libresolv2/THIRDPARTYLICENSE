@@ -1,0 +1,223 @@
+ * Copyright (c) 1995-1999 by Internet Software Consortium.
+ *  
+ * Permission to use, copy, modify, and distribute this software for any  
+ * purpose with or without fee is hereby granted, provided that the above  
+ * copyright notice and this permission notice appear in all copies.  
+ *  
+ * THE SOFTWARE IS PROVIDED "AS IS" AND INTERNET SOFTWARE CONSORTIUM DISCLAIMS
+ * ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL INTERNET SOFTWARE
+ * CONSORTIUM BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS
+ * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
+ * SOFTWARE.
+
+ * Portions Copyright (c) 1995 by International Business Machines, Inc.  
+ *  
+ * International Business Machines, Inc.  (hereinafter called IBM) grants  
+ * permission under its copyrights to use, copy, modify, and distribute this  
+ * Software with or without fee, provided that the above copyright notice and
+ * all paragraphs of this notice appear in all copies, and that the name of IBM
+ * not be used in connection with the marketing of any product incorporating  
+ * the Software or modifications thereof, without specific, written prior  
+ * permission.  
+ *  
+ * To the extent it has a right to do so, IBM grants an immunity from suit  
+ * under its patents, if any, for the use, sale or manufacture of products to
+ * the extent that such products are used for performing Domain Name System  
+ * dynamic updates in TCP/IP networks by means of the Software. No immunity is
+ * granted for any product per se or for any other function of any product.  
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", AND IBM DISCLAIMS ALL WARRANTIES,  
+ * INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A  
+ * PARTICULAR PURPOSE. IN NO EVENT SHALL IBM BE LIABLE FOR ANY SPECIAL,  
+ * DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER ARISING
+ * OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE, EVEN
+ * IF IBM IS APPRISED OF THE POSSIBILITY OF SUCH DAMAGES.  
+
+ * Portions Copyright (c) 1993 by Digital Equipment Corporation.  
+ *  
+ * Permission to use, copy, modify, and distribute this software for any 
+ * purpose with or without fee is hereby granted, provided that the above  
+ * copyright notice and this permission notice appear in all copies, and that
+ * the name of Digital Equipment Corporation not be used in advertising or  
+ * publicity pertaining to distribution of the document or software without  
+ * specific, written prior permission.  
+ *  
+ * THE SOFTWARE IS PROVIDED "AS IS" AND DIGITAL EQUIPMENT CORP. DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL DIGITAL EQUIPMENT  
+ * CORPORATION BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL  
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR  
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS  
+ * ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
+ * SOFTWARE.  
+
+ * Copyright (c) 1983, 1990, 1993  
+ * The Regents of the University of California. All rights reserved.  
+ *  
+ * Redistribution and use in source and binary forms, with or without  
+ * modification, are permitted provided that the following conditions  
+ * are met:  
+ * 1. Redistributions of source code must retain the above copyright  
+ *    notice, this list of conditions and the following disclaimer.  
+ * 2. Redistributions in binary form must reproduce the above copyright  
+ *    notice, this list of conditions and the following disclaimer in the  
+ *    documentation and/or other materials provided with the distribution.  
+ * 3. All advertising materials mentioning features or use of this software  
+ *    must display the following acknowledgement:  
+ *      This product includes software developed by the University of  
+ *      California, Berkeley and its contributors.  
+ * 4. Neither the name of the University nor the names of its contributors  
+ *    may be used to endorse or promote products derived from this software  
+ *    without specific prior written permission.  
+ *  
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND  
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE  
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS  
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)  
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY  
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF  
+ * SUCH DAMAGE.  
+
+/* Copyright (C) RSA Data Security, Inc. created 1986-1987, 1990,
+   1992-1994, 1996.  This is an
+   unpublished work protected as such under copyright law.  This work
+   contains proprietary, confidential, and trade secret information of
+   RSA Data Security, Inc.  Use, disclosure or reproduction without the
+   express written authorization of RSA Data Security, Inc. is
+   prohibited.
+ */
+
+                    DNSSAFE LICENSE TERMS
+
+ This BIND software includes the DNSsafe software from RSA Data
+ Security, Inc., which is copyrighted software that can only be
+ distributed under the terms of this license agreement.
+
+ The DNSsafe software cannot be used or distributed separately from the
+ BIND software.  You only have the right to use it or distribute it as
+ a bundled, integrated product.
+
+ The DNSsafe software can ONLY be used to provide authentication for
+ resource records in the Domain Name System, as specified in RFC 2065
+ and successors.  You cannot modify the BIND software to use the
+ DNSsafe software for other purposes, or to make its cryptographic
+ functions available to end-users for other uses.
+
+ If you modify the DNSsafe software itself, you cannot modify its
+ documented API, and you must grant RSA Data Security the right to use,
+ modify, and distribute your modifications, including the right to use
+ any patents or other intellectual property that your modifications
+ depend upon.
+
+ You must not remove, alter, or destroy any of RSA's copyright notices
+ or license information.  When distributing the software to the Federal
+ Government, it must be licensed to them as "commercial computer
+ software" protected under 48 CFR 12.212 of the FAR, or 48 CFR
+ 227.7202.1 of the DFARS.
+
+ You must not violate United States export control laws by distributing
+ the DNSsafe software or information about it, when such distribution
+ is prohibited by law.
+
+ THE DNSSAFE SOFTWARE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY
+ WHATSOEVER.  RSA HAS NO OBLIGATION TO SUPPORT, CORRECT, UPDATE OR
+ MAINTAIN THE RSA SOFTWARE.  RSA DISCLAIMS ALL WARRANTIES, EXPRESS,
+ IMPLIED OR STATUTORY, AS TO ANY MATTER WHATSOEVER, INCLUDING ALL
+ IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
+ PURPOSE AND NON-INFRINGEMENT OF THIRD PARTY RIGHTS.
+
+ If you desire to use DNSsafe in ways that these terms do not permit,
+ please contact RSA Data Security, Inc., 100 Marine Parkway, Redwood
+ City, California 94065, USA, to discuss alternate licensing
+ arrangements.
+
+ * Cylink Corporation \251 1998
+ *
+ * This software is licensed by Cylink to the Internet Software Consortium to
+ * promote implementation of royalty free public key cryptography within IETF
+ * standards.  Cylink wishes to expressly thank the contributions of Dr.
+ * Martin Hellman, Whitfield Diffie, Ralph Merkle and Stanford University for
+ * their contributions to Internet Security.  In accordance with the terms of
+ * this license, ISC is authorized to distribute and sublicense this software
+ * for the practice of IETF standards.
+ *
+ * The software includes BigNum, written by Colin Plumb and licensed by Philip
+ * R. Zimmermann for royalty free use and distribution with Cylink's
+ * software.  Use of BigNum as a stand alone product or component is
+ * specifically prohibited.
+ *
+ * Disclaimer of All Warranties. THIS SOFTWARE IS BEING PROVIDED "AS IS",
+ * WITHOUT ANY EXPRESSED OR IMPLIED WARRANTY OF ANY KIND WHATSOEVER. IN
+ * PARTICULAR, WITHOUT LIMITATION ON THE GENERALITY OF THE FOREGOING, CYLINK
+ * MAKES NO REPRESENTATION OF THIS SOFTWARE OR ITS FITNESS FOR ANY PARTICULAR
+ * PURPOSE.
+ *
+ * Cylink or its representatives shall not be liable for tort, indirect,
+ * special or consequential damages such as loss of profits or loss of
+ * goodwill from the use or inability to use the software for any purpose or
+ * for any reason whatsoever.
+ *
+ * EXPORT LAW: Export of the Foundations Suite may be subject to compliance
+ * with the rules and regulations promulgated from time to time by the Bureau
+ * of Export Administration, United States Department of Commerce, which
+ * restrict the export and re-export of certain products and technical data.
+ * If the export of the Foundations Suite is controlled under such rules and
+ * regulations, then the Foundations Suite shall not be exported or
+ * re-exported, directly or indirectly, (a) without all export or re-export
+ * licenses and governmental approvals required by any applicable laws, or (b)
+ * in violation of any applicable prohibition against the export or re-export
+ * of any part of the Foundations Suite. All export licenses for software
+ * containing the Foundations Suite are the sole responsibility of the licensee.
+
+ * Portions Copyright (c) 1995-1998 by Trusted Information Systems, Inc.
+ *
+ * Permission to use, copy modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND TRUSTED INFORMATION SYSTEMS
+ * DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.  IN NO EVENT SHALL
+ * TRUSTED INFORMATION SYSTEMS BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING
+ * FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+ * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION
+ * WITH THE USE OR PERFORMANCE OF THE SOFTWARE.
+
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *    This product includes software developed by WIDE Project and
+ *    its contributors.
+ * 4. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.

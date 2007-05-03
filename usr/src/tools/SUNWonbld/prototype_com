@@ -56,6 +56,7 @@ f none opt/onbld/bin/SampleLinks 644 root bin
 f none opt/onbld/bin/SamplePkgLinks 644 root bin
 f none opt/onbld/bin/acr 555 root bin
 f none opt/onbld/bin/bfu 555 root bin
+f none opt/onbld/bin/bfudrop 555 root bin
 f none opt/onbld/bin/bldenv 555 root bin
 f none opt/onbld/bin/bringovercheck 555 root bin
 f none opt/onbld/bin/build_cscope 555 root bin
@@ -67,6 +68,7 @@ f none opt/onbld/bin/checkproto 555 root bin
 f none opt/onbld/bin/cstyle 555 root bin
 f none opt/onbld/bin/ctffindmod 555 root bin
 f none opt/onbld/bin/ctfcvtptbl 555 root bin
+f none opt/onbld/bin/bindrop 555 root bin
 f none opt/onbld/bin/elfcmp 555 root bin
 f none opt/onbld/bin/flg.flp 555 root bin
 f none opt/onbld/bin/genoffsets 555 root bin
@@ -80,13 +82,17 @@ f none opt/onbld/bin/make_pkg_db 555 root bin
 f none opt/onbld/bin/mkacr 555 root bin
 f none opt/onbld/bin/mkbfu 555 root bin
 f none opt/onbld/bin/mkclosed 555 root bin
+f none opt/onbld/bin/mkreadme_osol 555 root bin
+f none opt/onbld/bin/mktpl 555 root bin
 f none opt/onbld/bin/nightly 555 root bin
+f none opt/onbld/bin/onblddrop 555 root bin
 f none opt/onbld/bin/protocmp.terse 555 root bin
 f none opt/onbld/bin/sccscheck 555 root bin
 f none opt/onbld/bin/sccscp 555 root bin
 f none opt/onbld/bin/sccshist 555 root bin
 f none opt/onbld/bin/sccsmv 555 root bin
 f none opt/onbld/bin/sccsrm 555 root bin
+f none opt/onbld/bin/sdrop 555 root bin
 f none opt/onbld/bin/signit 555 root bin
 f none opt/onbld/bin/signproto 555 root bin
 f none opt/onbld/bin/validate_flg 555 root bin

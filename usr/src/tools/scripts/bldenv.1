@@ -18,10 +18,10 @@
 .\" "
 .\" " CDDL HEADER END
 .\" "
-.\" "Copyright 2006 Sun Microsystems, Inc."
+.\" "Copyright 2007 Sun Microsystems, Inc."
 .\" "All rights reserved"
 .\" "Use is subject to license terms."
-.TH bldenv 1 "19 Sep 2006"
+.TH bldenv 1 "21 Mar 2007"
 .SH NAME
 .I bldenv
 \- spawn shell for interactive incremental OS-Net consolidation builds
@@ -52,6 +52,18 @@ appropriately.
 is particularly useful for testing Makefile targets like
 clobber, install and _msg, which otherwise require digging
 through large build logs to figure out what is being done.
+.LP
+.I bldenv
+is also useful if you run into build issues with
+the source product or when generating OpenSolaris deliverables.  If a
+source product build is flagged, the environment is set up for
+building the indicated source product tree, which is assumed to have
+already been created.  If the OpenSolaris deliverables flag
+(\fB\-O\fR) is set in NIGHTLY_OPTIONS, the environment is set up for
+building just the open source.  This includes using an alternate proto
+area, as well as using the closed binaries in
+$CODEMGR_WS/closed.skel (which is assumed to already exist).
+.LP
 By default, bldenv will invoke the shell specified in $SHELL.
 If $SHELL isn't set or is invalid, csh will be used.
 .SH OPTIONS
@@ -142,3 +154,7 @@ to create SUNWonbld with a single command:
 .PD 0
 .LP
 example% bldenv onnv_06 'cd $SRC/tools && make pkg' 
+.PD
+.LP
+.SH SEE ALSO
+.BR nightly (1)
