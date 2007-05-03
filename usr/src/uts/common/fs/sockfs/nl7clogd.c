@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -447,8 +446,8 @@ nl7c_logd_init(int fsz, caddr_t *fnv)
 				    symlink_dir, ret);
 				goto error;
 			}
-			nca_fio_dvp(&fio) = dvp;
 		}
+		nca_fio_dvp(&fio) = dvp;
 		/* No symlink so don't know were to start from */
 		goto fresh_start;
 	}
@@ -591,7 +590,6 @@ error:
 	if (dvp)
 		VN_RELE(dvp);
 
-	mutex_exit(&logd.lock);
 	return (B_FALSE);
 }
 
