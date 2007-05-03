@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +52,20 @@ extern "C" {
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
+typedef struct  msgq_wakeup {
+	list_node_t	msgw_list;
+	long		msgw_type;	/* Message type request. */
+	long		msgw_snd_wake;	/* Type of msg from msgsnd */
+	kthread_t	*msgw_thrd;	/* Thread waiting */
+	kcondvar_t	msgw_wake_cv;	/* waiting on this */
+} msgq_wakeup_t;
+
+
+typedef struct msg_select {
+	msgq_wakeup_t *(*selection)();
+	struct msg_select *next_selection;
+} msg_select_t;
+
 /*
  * There is one msg structure for each message in the system.
  */
@@ -75,9 +89,10 @@ struct msg {
  * We use multiple condition variables (kcondvar_t) to avoid needing
  * to wake all readers when sending a single message.
  */
-#define	MAX_QNUM	63
-#define	MAX_QNUM_CV	64
-#define	MSG_QNUM(x)	((x < 1) ? 0 : (x % MAX_QNUM) + 1)
+
+#define	MSG_NEG_INTERVAL 8
+#define	MSG_MAX_QNUM	64
+#define	MSG_MAX_QNUM_CV	65
 
 typedef struct kmsqid {
 	kipc_perm_t	msg_perm;	/* operation permission struct */
@@ -91,10 +106,39 @@ typedef struct kmsqid {
 	time_t		msg_stime;	/* last msgsnd time */
 	time_t		msg_rtime;	/* last msgrcv time */
 	time_t		msg_ctime;	/* last change time */
-	uint64_t	msg_snd_cnt;	/* # of waiting senders */
-	uint64_t	msg_rcv_cnt[MAX_QNUM_CV]; /* # of waiting receivers */
+	uint_t		msg_snd_cnt;	/* # of waiting senders */
+	uint_t		msg_rcv_cnt;	/* # of waiting receivers */
+	uint64_t	msg_lowest_type; /* Smallest type on queue */
+	/*
+	 * linked list of routines used to determine what to wake up next.
+	 * 	msg_fnd_sndr:	Routines for waking up readers waiting
+	 *			for a message from the sender.
+	 *	msg_fnd_rdr:	Routines for waking up readers waiting
+	 *			for a copyout to finish.
+	 */
+	msg_select_t	*msg_fnd_sndr;
+	msg_select_t	*msg_fnd_rdr;
+	/*
+	 * Various counts and queues for controlling the sleeping
+	 * and waking up of processes that are waiting for various
+	 * message queue events.
+	 *
+	 * msg_cpy_block:   List of receiving threads that are blocked because
+	 *		    the message of choice is being copied out.
+	 * msg_wait_snd:    List of receiving threads whose type specifier
+	 *		    is positive or 0 but are blocked because there
+	 *		    are no matches.
+	 * msg_wait_snd_ngt:
+	 *		    List of receiving threads whose type specifier is
+	 *		    negative message type but are blocked because
+	 *		    there are no types that qualify.
+	 */
 	kcondvar_t	msg_snd_cv;
-	kcondvar_t	msg_rcv_cv[MAX_QNUM_CV];
+	list_t		msg_cpy_block;
+	list_t		msg_wait_snd[MSG_MAX_QNUM_CV];
+	list_t		msg_wait_snd_ngt[MSG_MAX_QNUM_CV];
+	int		msg_ngt_cnt;	/* # of negative receivers blocked */
+	char		msg_neg_copy;	/* Neg type copy underway */
 } kmsqid_t;
 
 #endif	/* _KERNEL */

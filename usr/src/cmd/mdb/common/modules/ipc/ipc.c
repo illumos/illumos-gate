@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,10 +124,48 @@ ipcperm(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+
+static int
+msgq_check_for_rwaiters(list_t *walk_this, int min, int max,
+	int copy_wait, uintptr_t addr)
+
+{
+	int found = 0;
+	int ii;
+	msgq_wakeup_t *start, *walker, next;
+	uintptr_t head;
+
+	for (ii = min; ii < max; ii++) {
+		head = ((ulong_t)addr) + sizeof (list_t)*ii +
+		    sizeof (list_node_t);
+		if (head != (uintptr_t)walk_this[ii].list_head.list_next) {
+			walker =
+			    (msgq_wakeup_t *)walk_this[ii].list_head.list_next;
+			while (head != (uintptr_t)walker) {
+				if (mdb_vread(&next, sizeof (msgq_wakeup_t),
+				    (uintptr_t)walker) == -1) {
+					mdb_warn(
+					    "Failed to read message queue\n");
+					return (0);
+				}
+				mdb_printf("%15lx\t%6d\t%15lx\t%15s\n",
+				    next.msgw_thrd, next.msgw_type,
+				    walker + (uintptr_t)
+				    OFFSETOF(msgq_wakeup_t, msgw_wake_cv),
+				    (copy_wait ? "yes":"no"));
+				found++;
+				walker =
+				    (msgq_wakeup_t *)next.msgw_list.list_next;
+			}
+		}
+	}
+	return (found);
+}
+
 static void
 msq_print(kmsqid_t *msqid, uintptr_t addr)
 {
-	int	ii;
+	int	total = 0;
 
 	mdb_printf("&list: %-?p\n", addr + OFFSETOF(kmsqid_t, msg_list));
 	mdb_printf("cbytes: 0t%lu    qnum: 0t%lu    qbytes: 0t%lu"
@@ -141,16 +179,17 @@ msq_print(kmsqid_t *msqid, uintptr_t addr)
 	mdb_printf("snd_cnt: 0t%lld    snd_cv: %hd (%p)\n",
 	    msqid->msg_snd_cnt, msqid->msg_snd_cv._opaque,
 	    addr + (uintptr_t)OFFSETOF(kmsqid_t, msg_snd_cv));
-
-	mdb_printf("#    rcv_cnt:     rcv_cv:\n");
-	for (ii = 0; ii < MAX_QNUM_CV; ii++) {
-		if (msqid->msg_rcv_cnt[ii] || msqid->msg_rcv_cv[ii]._opaque) {
-			mdb_printf("%2d    0t%lld          %hd  (%p)\n", ii,
-			    msqid->msg_rcv_cnt[ii],
-			    msqid->msg_rcv_cv[ii]._opaque, addr +
-			    (uintptr_t)OFFSETOF(kmsqid_t, msg_rcv_cv[ii]));
-		}
-	}
+	mdb_printf("Blocked recievers\n");
+	mdb_printf("%15s\t%6s\t%15s\t%15s\n", "Thread Addr",
+	    "Type", "cv addr", "copyout-wait?");
+	total += msgq_check_for_rwaiters(&msqid->msg_cpy_block,
+	    0, 1, 1, addr + OFFSETOF(kmsqid_t, msg_cpy_block));
+	total += msgq_check_for_rwaiters(msqid->msg_wait_snd,
+	    0, MSG_MAX_QNUM + 1, 0, addr + OFFSETOF(kmsqid_t, msg_wait_snd));
+	total += msgq_check_for_rwaiters(msqid->msg_wait_snd_ngt,
+	    0, MSG_MAX_QNUM + 1, 0,
+	    addr + OFFSETOF(kmsqid_t, msg_wait_snd_ngt));
+	mdb_printf("Total number of waiters: %d\n", total);
 }
 
 
@@ -532,7 +571,6 @@ msg_walk_step(mdb_walk_state_t *wsp)
 	return (wsp->walk_callback(wsp->walk_addr, wsp->walk_layer,
 	    wsp->walk_cbdata));
 }
-
 
 /*
  * The "::ipcs" command itself.  Just walks each IPC type in turn.
