@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -386,11 +386,11 @@ au_buff_t *au_get_buff(void), *au_free_buff(au_buff_t *);
 /*
  * Macro for uniform "subject" token(s) generation
  */
-#define	AUDIT_SETSUBJ(u, c, a, k)      		\
+#define	AUDIT_SETSUBJ_GENERIC(u, c, a, k, p)   	\
 	au_write((u),				\
 	    au_to_subject(crgetuid(c),		\
 		crgetgid(c), crgetruid(c),	\
-		crgetrgid(c), curproc->p_pid,	\
+		crgetrgid(c), p,		\
 		(a)->ai_auid, (a)->ai_asid,	\
 		&((a)->ai_termid)));		\
 	if (is_system_labeled())		\
@@ -400,6 +400,9 @@ au_buff_t *au_get_buff(void), *au_free_buff(au_buff_t *);
 		au_write((u),			\
 		    au_to_groups(crgetgroups(c),\
 		    crgetngroups(c)))
+
+#define	AUDIT_SETSUBJ(u, c, a, k)      		\
+	AUDIT_SETSUBJ_GENERIC(u, c, a, k, curproc->p_pid)
 
 /*
  * Macros for type conversion

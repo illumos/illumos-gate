@@ -673,10 +673,10 @@ audit(caddr_t record, int length)
 	 * add on the zonename token if policy AUDIT_ZONENAME is set
 	 */
 	if (kctx->auk_policy & AUDIT_ZONENAME) {
-		zlen = au_zonename_length();
+		zlen = au_zonename_length(NULL);
 		if (zlen > 0) {
 			length += zlen;
-			m = au_to_zonename(zlen);
+			m = au_to_zonename(zlen, NULL);
 			(void) au_append_rec(ad, m, AU_PACK);
 		}
 	}

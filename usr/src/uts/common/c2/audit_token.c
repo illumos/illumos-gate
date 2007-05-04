@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -378,9 +378,11 @@ au_to_text(const char *text)
 	 * the string (strlen(zonename) + 1)
 	 */
 size_t
-au_zonename_length()
+au_zonename_length(zone_t *zone)
 {
-	return (strlen(curproc->p_zone->zone_name) + 1 +
+	if (zone == NULL)
+		zone = curproc->p_zone;
+	return (strlen(zone->zone_name) + 1 +
 	    ZONE_TOKEN_OVERHEAD);
 }
 
@@ -405,7 +407,7 @@ au_zonename_length()
  *	zero.
  */
 token_t *
-au_to_zonename(size_t zone_length)
+au_to_zonename(size_t zone_length, zone_t *zone)
 {
 	token_t *token;			/* local au_membuf */
 	adr_t adr;			/* adr memory stream header */
@@ -414,7 +416,9 @@ au_to_zonename(size_t zone_length)
 
 	token = au_getclr();
 
-	bytes = (short)strlen(curproc->p_zone->zone_name) + 1;
+	if (zone == NULL)
+		zone = curproc->p_zone;
+	bytes = (short)strlen(zone->zone_name) + 1;
 	/*
 	 * If zone_length != 0, it was precalculated and is
 	 * the token length, not the string length.
@@ -427,7 +431,7 @@ au_to_zonename(size_t zone_length)
 	adr_short(&adr, &bytes, 1);
 
 	token->len = (char)adr_count(&adr);
-	(void) au_append_buf(curproc->p_zone->zone_name, bytes, token);
+	(void) au_append_buf(zone->zone_name, bytes, token);
 
 	return (token);
 }

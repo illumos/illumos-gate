@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -288,8 +288,8 @@ token_t *au_to_text(const char *);
 /* token_t *au_to_tid(au_generic_tid_t *);  no kernel implementation */
 token_t *au_to_trailer(int);
 token_t *au_to_uauth(char *);
-size_t	au_zonename_length(void);
-token_t *au_to_zonename(size_t);
+size_t	au_zonename_length(zone_t *);
+token_t *au_to_zonename(size_t, zone_t *);
 token_t *au_to_arg32(char, char *, uint32_t);
 token_t *au_to_arg64(char, char *, uint64_t);
 token_t *au_to_socket(struct socket *);
