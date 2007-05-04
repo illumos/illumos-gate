@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * A module for Kerberos V5  security mechanism.
@@ -68,19 +68,9 @@ static gss_mechanism
  */
 extern struct mod_ops mod_miscops;
 
-#if defined(sun4u)
-
-static struct modlmisc modlmisc = {
-	&mod_miscops, "Krb5 GSS mech, sun4u optimized"
-};
-
-#else
-
 static struct modlmisc modlmisc = {
 	&mod_miscops, "Krb5 GSS mechanism"
 };
-
-#endif
 
 static struct modlinkage modlinkage = {
 	MODREV_1,

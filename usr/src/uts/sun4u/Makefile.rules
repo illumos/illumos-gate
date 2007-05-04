@@ -168,15 +168,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/rsa/%.s
 $(OBJS_DIR)/%.o:		$(SRC)/common/atomic/sparcv9/%.s
 	$(COMPILE.s) -o $@ $<
 
-KMECHKRB5_BASE=$(UTSBASE)/common/gssapi/mechs/krb5
-
-$(OBJS_DIR)/%.o:		$(KMECHKRB5_BASE)/crypto/des/sparc/sun4u/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(KMECHKRB5_BASE)/crypto/des/sparc/sun4u/%.s
-	$(COMPILE.s) -o $@ $<
-
 $(OBJS_DIR)/dtracestubs.s:	$(UNIX_O) $(LIBS)
 	nm -u $(UNIX_O) $(LIBS) | grep __dtrace_probe_ | sort | uniq | nawk '{ \
 	    printf("\t.global %s\n\t.type %s, #function\n%s:\n", \
@@ -285,12 +276,6 @@ $(LINTS_DIR)/%.ln:		$(SRC)/common/crypto/sha1/sparc/sun4u/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/rsa/%.s
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(KMECHKRB5_BASE)/crypto/des/sparc/sun4u/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(KMECHKRB5_BASE)/crypto/des/sparc/sun4u/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(SRC)/common/atomic/%.c

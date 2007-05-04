@@ -485,9 +485,6 @@ f none platform/sun4u/kernel/drv/sparcv9/zsh 755 root sys
 f none platform/sun4u/kernel/drv/trapstat.conf 644 root sys
 f none platform/sun4u/kernel/drv/zsh.conf 644 root sys
 d none platform/sun4u/kernel/misc 755 root sys
-d none platform/sun4u/kernel/misc/kgss 755 root sys
-d none platform/sun4u/kernel/misc/kgss/sparcv9 755 root sys
-f none platform/sun4u/kernel/misc/kgss/sparcv9/kmech_krb5 755 root sys
 d none platform/sun4u/kernel/misc/sparcv9 755 root sys
 f none platform/sun4u/kernel/misc/sparcv9/kmdbmod 755 root sys
 f none platform/sun4u/kernel/misc/sparcv9/bootdev 755 root sys
