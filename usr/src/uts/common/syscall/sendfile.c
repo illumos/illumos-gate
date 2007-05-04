@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,7 @@
 #include <sys/termios.h>
 #include <sys/stream.h>
 #include <sys/strsubr.h>
+#include <sys/sunddi.h>
 #include <sys/esunddi.h>
 #include <sys/flock.h>
 #include <sys/modctl.h>
@@ -74,6 +75,11 @@ extern int sosendfile64(file_t *, file_t *, const struct ksendfilevec64 *,
 		ssize32_t *);
 extern int nl7c_sendfilev(struct sonode *, u_offset_t *, struct sendfilevec *,
 		int, ssize_t *);
+extern int snf_segmap(file_t *, vnode_t *, u_offset_t, u_offset_t, uint_t,
+		ssize_t *, boolean_t);
+
+#define	readflg	(V_WRITELOCK_FALSE)
+#define	rwflag	(V_WRITELOCK_TRUE)
 
 /*
  * kstrwritemp() has very similar semantics as that of strwrite().
@@ -260,7 +266,6 @@ sendvec_chunk64(file_t *fp, u_offset_t *fileoff, struct ksendfilevec64 *sfv,
 		} else {
 			file_t	*ffp;
 			vnode_t	*readvp;
-			int	readflg = 0;
 			size_t	size;
 			caddr_t	ptr;
 
@@ -408,7 +413,6 @@ ssize32_t
 sendvec64(file_t *fp, const struct ksendfilevec64 *vec, int sfvcnt,
 	size32_t *xferred, int fildes)
 {
-	int			rwflag;
 	u_offset_t		fileoff;
 	int			copy_cnt;
 	const struct ksendfilevec64 *copy_vec;
@@ -416,15 +420,12 @@ sendvec64(file_t *fp, const struct ksendfilevec64 *vec, int sfvcnt,
 	struct vnode *vp;
 	int error;
 	ssize32_t count = 0;
-	int osfvcnt;
 
-	rwflag = 1;
 	vp = fp->f_vnode;
 	(void) VOP_RWLOCK(vp, rwflag, NULL);
 
 	copy_vec = vec;
 	fileoff = fp->f_offset;
-	osfvcnt = sfvcnt;
 
 	do {
 		copy_cnt = MIN(sfvcnt, SEND_MAX_CHUNK);
@@ -435,11 +436,10 @@ sendvec64(file_t *fp, const struct ksendfilevec64 *vec, int sfvcnt,
 		}
 
 		/*
-		 * Optimize the single regular file over
+		 * Optimize the regular file over
 		 * the socket case.
 		 */
-		if (vp->v_type == VSOCK && osfvcnt == 1 &&
-		    sfv->sfv_fd != SFV_FD_SELF) {
+		if (vp->v_type == VSOCK && sfv->sfv_fd != SFV_FD_SELF) {
 			file_t *rfp;
 			vnode_t *rvp;
 
@@ -455,7 +455,11 @@ sendvec64(file_t *fp, const struct ksendfilevec64 *vec, int sfvcnt,
 			rvp = rfp->f_vnode;
 			if (rvp->v_type == VREG) {
 				error = sosendfile64(fp, rfp, sfv, &count);
-				break;
+				if (error)
+					break;
+				copy_vec++;
+				sfvcnt--;
+				continue;
 			}
 			releasef(sfv->sfv_fd);
 		}
@@ -607,7 +611,6 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 		} else {
 			file_t	*ffp;
 			vnode_t	*readvp;
-			int	readflg = 0;
 
 			if ((ffp = getf(sfv->sfv_fd)) == NULL) {
 				freemsg(head);
@@ -897,9 +900,9 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 				}
 			}
 		} else {
+			int segmapit;
 			file_t	*ffp;
 			vnode_t	*readvp;
-			int	readflg = 0;
 			size_t	size;
 			caddr_t	ptr;
 
@@ -950,6 +953,7 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 			size = sfv_len < size ? sfv_len : size;
 
 			if (vp->v_type != VSOCK) {
+				segmapit = 0;
 				buf = kmem_alloc(size, KM_NOSLEEP);
 				if (buf == NULL) {
 					VOP_RWUNLOCK(readvp, readflg, NULL);
@@ -964,6 +968,40 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 				 */
 				if (so->so_kssl_ctx != NULL)
 					size = MIN(size, maxblk);
+
+				if (vn_has_flocks(readvp) ||
+				    readvp->v_flag & VNOMAP ||
+				    stp->sd_copyflag & STZCVMUNSAFE) {
+					segmapit = 0;
+				} else if (stp->sd_copyflag & STZCVMSAFE) {
+					segmapit = 1;
+				} else {
+					int on = 1;
+					if (SOP_SETSOCKOPT(VTOSO(vp),
+					    SOL_SOCKET, SO_SND_COPYAVOID,
+					    &on, sizeof (on)) == 0)
+					segmapit = 1;
+				}
+			}
+
+			if (segmapit) {
+				boolean_t nowait;
+				uint_t maxpsz;
+
+				nowait = (sfv->sfv_flag & SFV_NOWAIT) != 0;
+				maxpsz = stp->sd_qn_maxpsz;
+				if (maxpsz == INFPSZ)
+					maxpsz = maxphys;
+				maxpsz = roundup(maxpsz, MAXBSIZE);
+				error = snf_segmap(fp, readvp, sfv_off,
+					    (u_offset_t)sfv_len, maxpsz,
+					    (ssize_t *)&cnt, nowait);
+				releasef(sfv->sfv_fd);
+				*count += cnt;
+				if (error)
+					return (error);
+				sfv++;
+				continue;
 			}
 
 			while (sfv_len > 0) {

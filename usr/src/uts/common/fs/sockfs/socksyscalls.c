@@ -45,6 +45,7 @@
 #include <sys/stream.h>
 #include <sys/strsubr.h>
 #include <sys/strsun.h>
+#include <sys/sunddi.h>
 #include <sys/esunddi.h>
 #include <sys/flock.h>
 #include <sys/modctl.h>
@@ -2486,7 +2487,7 @@ sosendfile64(file_t *fp, file_t *rfp, const struct ksendfilevec64 *sfv,
 	vp = fp->f_vnode;
 	stp = vp->v_stream;
 	if (stp->sd_qn_maxpsz == INFPSZ)
-		maxpsz = MAXOFF32_T;
+		maxpsz = maxphys;
 	else
 		maxpsz = roundup(stp->sd_qn_maxpsz, MAXBSIZE);
 	/*
@@ -2496,7 +2497,7 @@ sosendfile64(file_t *fp, file_t *rfp, const struct ksendfilevec64 *sfv,
 	 */
 	if (sfv_len >= MAXBSIZE && (sfv_len >= (va_size >> 1) ||
 	    (sfv->sfv_flag & SFV_NOWAIT) || sfv_len >= 0x1000000) &&
-	    !vn_has_flocks(fvp)) {
+	    !vn_has_flocks(fvp) && !(fvp->v_flag & VNOMAP)) {
 		if ((stp->sd_copyflag & (STZCVMSAFE|STZCVMUNSAFE)) == 0) {
 			int on = 1;
 

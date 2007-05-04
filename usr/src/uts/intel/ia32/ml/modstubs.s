@@ -493,6 +493,7 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(sockfs, sock_getmsg,  	nomod_zero);
 	NO_UNLOAD_STUB(sockfs, sock_putmsg,  	nomod_zero);
 	NO_UNLOAD_STUB(sockfs, sosendfile64,  	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, snf_segmap,  	nomod_einval);
 	NO_UNLOAD_STUB(sockfs, sock_getfasync,  nomod_zero);
 	NO_UNLOAD_STUB(sockfs, nl7c_sendfilev,  nomod_zero);
 	NO_UNLOAD_STUB(sockfs, sostream_direct,	nomod_zero);
