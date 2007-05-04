@@ -870,13 +870,10 @@
 @ MSG_MAP_UNEXDEP	"%s: %lld: dependency `%s' unexpected; ignored"
 @ MSG_MAP_UNEXTOK	"%s: %lld: unexpected occurrence of `%c' token"
 
-@ MSG_MAP_SEGEMPLOAD	"%s: %lld: empty segment must be of type LOAD or NULL"
-@ MSG_MAP_SEGEMPEXE	"%s: %lld: a LOAD empty segment definition is only \
-			 allowed when creating a dynamic executable"
-@ MSG_MAP_SEGEMPATT	"%s: %lld: a LOAD empty segment must have an address \
-			 and size"
-@ MSG_MAP_SEGEMPNOATT	"%s: %lld: a NULL empty segment must not have an address \
-			 or size"
+@ MSG_MAP_SEGEMPEXE	"%s: %lld: empty segment definition for this output \
+			 file is unsupported"
+@ MSG_MAP_SEGEMPLOAD	"%s: %lld: empty segment must be of type LOAD"
+@ MSG_MAP_SEGEMPATT	"%s: %lld: empty segment must have an address and size"
 @ MSG_MAP_SEGEMPSEC	"%s: %lld: empty segment can not have sections \
 			 assigned to it"
 @ MSG_MAP_SEGEMNOPERM	"%s: %lld: empty segment must not have \
@@ -1139,7 +1136,6 @@
 @ MSG_MAP_TOK_2		" \"\t\n:;=#"
 @ MSG_MAP_LOAD		"load"
 @ MSG_MAP_NOTE		"note"
-@ MSG_MAP_NULL		"null"
 @ MSG_MAP_STACK		"stack"
 @ MSG_MAP_NEED		"need"
 @ MSG_MAP_SPECVERS	"specvers"
