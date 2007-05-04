@@ -769,7 +769,7 @@ static mblk_t	*tcp_ire_mp(mblk_t *mp);
 static void	tcp_iss_init(tcp_t *tcp);
 static void	tcp_keepalive_killer(void *arg);
 static int	tcp_parse_options(tcph_t *tcph, tcp_opt_t *tcpopt);
-static void	tcp_mss_set(tcp_t *tcp, uint32_t size);
+static void	tcp_mss_set(tcp_t *tcp, uint32_t size, boolean_t do_ss);
 static int	tcp_conprim_opt_process(tcp_t *tcp, mblk_t *mp,
 		    int *do_disconnectp, int *t_errorp, int *sys_errorp);
 static boolean_t tcp_allow_connopt_set(int level, int name);
@@ -8615,7 +8615,7 @@ noticmpv4:
 
 			ratio = tcp->tcp_cwnd / tcp->tcp_mss;
 			ASSERT(ratio >= 1);
-			tcp_mss_set(tcp, new_mss);
+			tcp_mss_set(tcp, new_mss, B_TRUE);
 
 			/*
 			 * Make sure we have something to
@@ -8877,7 +8877,7 @@ noticmpv6:
 
 		ratio = tcp->tcp_cwnd / tcp->tcp_mss;
 		ASSERT(ratio >= 1);
-		tcp_mss_set(tcp, new_mss);
+		tcp_mss_set(tcp, new_mss, B_TRUE);
 
 		/*
 		 * Make sure we have something to
@@ -9511,9 +9511,14 @@ tcp_parse_options(tcph_t *tcph, tcp_opt_t *tcpopt)
  * 2) PMTUd may get us a new MSS.
  * 3) If the other side stops sending us timestamp option, we need to
  *    increase the MSS size to use the extra bytes available.
+ *
+ * do_ss is used to control whether we will be doing slow start or
+ * not if there is a change in the mss. Note that for some events like
+ * tcp_paws_check() we allow the tcp_cwnd to adjust to the new mss but
+ * do not perform a slow start specifically.
  */
 static void
-tcp_mss_set(tcp_t *tcp, uint32_t mss)
+tcp_mss_set(tcp_t *tcp, uint32_t mss, boolean_t do_ss)
 {
 	uint32_t	mss_max;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
@@ -9547,13 +9552,19 @@ tcp_mss_set(tcp_t *tcp, uint32_t mss)
 	 * normally), we need to adjust the resulting tcp_cwnd properly.
 	 * The new tcp_cwnd should not get bigger.
 	 */
-	if (tcp->tcp_init_cwnd == 0) {
-		tcp->tcp_cwnd = MIN(tcps->tcps_slow_start_initial * mss,
-		    MIN(4 * mss, MAX(2 * mss, 4380 / mss * mss)));
+	/*
+	 * We need to avoid setting tcp_cwnd to its slow start value
+	 * unnecessarily. However we have to let the tcp_cwnd adjust
+	 * to the modified mss.
+	 */
+	if (tcp->tcp_init_cwnd == 0 && do_ss) {
+		tcp->tcp_cwnd = MIN(tcps->tcps_slow_start_initial *
+		    mss, MIN(4 * mss, MAX(2 * mss, 4380 / mss * mss)));
 	} else {
 		if (tcp->tcp_mss < mss) {
 			tcp->tcp_cwnd = MAX(1,
-			    (tcp->tcp_init_cwnd * tcp->tcp_mss / mss)) * mss;
+			    (tcp->tcp_init_cwnd * tcp->tcp_mss /
+			    mss)) * mss;
 		} else {
 			tcp->tcp_cwnd = tcp->tcp_init_cwnd * mss;
 		}
@@ -12489,7 +12500,7 @@ tcp_process_options(tcp_t *tcp, tcph_t *tcph)
 	 * didn't want to do window scale, tcp_rwnd_set() will take
 	 * care of that.
 	 */
-	tcp_mss_set(tcp, MIN(tcpopt.tcp_opt_mss, tcp->tcp_mss));
+	tcp_mss_set(tcp, MIN(tcpopt.tcp_opt_mss, tcp->tcp_mss), B_TRUE);
 }
 
 /*
@@ -13274,7 +13285,6 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 	urp = BE16_TO_U16(tcph->th_urp) - TCP_OLD_URP_INTERPRETATION;
 	new_swnd = BE16_TO_U16(tcph->th_win) <<
 	    ((tcph->th_flags[0] & TH_SYN) ? 0 : tcp->tcp_snd_ws);
-	mss = tcp->tcp_mss;
 
 	if (tcp->tcp_snd_ts_ok) {
 		if (!tcp_paws_check(tcp, tcph, &tcpopt)) {
@@ -13296,6 +13306,7 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 		(void) tcp_parse_options(tcph, &tcpopt);
 	}
 try_again:;
+	mss = tcp->tcp_mss;
 	gap = seg_seq - tcp->tcp_rnxt;
 	rgap = tcp->tcp_rwnd - (gap + seg_len);
 	/*
@@ -15241,7 +15252,13 @@ tcp_paws_check(tcp_t *tcp, tcph_t *tcph, tcp_opt_t *tcpoptp)
 		tcp->tcp_hdr_len -= TCPOPT_REAL_TS_LEN;
 		tcp->tcp_tcp_hdr_len -= TCPOPT_REAL_TS_LEN;
 		tcp->tcp_tcph->th_offset_and_rsrvd[0] -= (3 << 4);
-		tcp_mss_set(tcp, tcp->tcp_mss + TCPOPT_REAL_TS_LEN);
+		/*
+		 * Adjust the tcp_mss accordingly. We also need to
+		 * adjust tcp_cwnd here in accordance with the new mss.
+		 * But we avoid doing a slow start here so as to not
+		 * to lose on the transfer rate built up so far.
+		 */
+		tcp_mss_set(tcp, tcp->tcp_mss + TCPOPT_REAL_TS_LEN, B_FALSE);
 		if (tcp->tcp_snd_sack_ok) {
 			ASSERT(tcp->tcp_sack_info != NULL);
 			tcp->tcp_max_sack_blk = 4;
