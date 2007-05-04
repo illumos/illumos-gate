@@ -34,8 +34,8 @@
 
 # Usage Messages
 
-@ MSG_USAGE_BRIEF	"usage: %s [-cCdegGhHiklmnprSsuvy] [-N name] \
-			 [-w file] file(s)\n"
+@ MSG_USAGE_BRIEF	"usage: %s [-cCdegGhHiklmnprSsuvy] [-I index] \
+			 [-N name] [-w file] file(s)\n"
 @ MSG_USAGE_DETAIL1	"\t[-c]\t\tdump section header information\n"
 @ MSG_USAGE_DETAIL2	"\t[-C]\t\tdemangle C++ symbol names\n"
 @ MSG_USAGE_DETAIL3	"\t[-d]\t\tdump the contents of the .dynamic section\n"
@@ -46,25 +46,26 @@
 @ MSG_USAGE_DETAIL8	"\t[-H]\t\tdump the contents of the .SUNW_hwcap \
 			 section\n"
 @ MSG_USAGE_DETAIL9	"\t[-i]\t\tdump the contents of the .interp section\n"
-@ MSG_USAGE_DETAIL9_1	"\t[-l]\t\tdump with no truncated section names\n"
-@ MSG_USAGE_DETAIL10	"\t[-k]\t\tcalculate elf checksum\n"
-@ MSG_USAGE_DETAIL11	"\t[-m]\t\tdump the contents of the .SUNW_move \
+@ MSG_USAGE_DETAIL10	"\t[-I index]\tqualify an option with an index\n"
+@ MSG_USAGE_DETAIL11	"\t[-l]\t\tdump with no truncated section names\n"
+@ MSG_USAGE_DETAIL12	"\t[-k]\t\tcalculate elf checksum\n"
+@ MSG_USAGE_DETAIL13	"\t[-m]\t\tdump the contents of the .SUNW_move \
 			 section\n"
-@ MSG_USAGE_DETAIL12	"\t[-n]\t\tdump the contents of the .note section\n"
-@ MSG_USAGE_DETAIL13	"\t[-N name]\tqualify an option with a `name'\n"
-@ MSG_USAGE_DETAIL14	"\t[-p]\t\tdump the program headers\n"
-@ MSG_USAGE_DETAIL15	"\t[-r]\t\tdump the contents of the relocation \
+@ MSG_USAGE_DETAIL14	"\t[-n]\t\tdump the contents of the .note section\n"
+@ MSG_USAGE_DETAIL15	"\t[-N name]\tqualify an option with a `name'\n"
+@ MSG_USAGE_DETAIL16	"\t[-p]\t\tdump the program headers\n"
+@ MSG_USAGE_DETAIL17	"\t[-r]\t\tdump the contents of the relocation \
 			 sections\n"
-@ MSG_USAGE_DETAIL16	"\t[-S]\t\tdump the contents of the sort index \
+@ MSG_USAGE_DETAIL18	"\t[-S]\t\tdump the contents of the sort index \
 			 sections\n"
-@ MSG_USAGE_DETAIL17	"\t[-s]\t\tdump the contents of the symbol table \
+@ MSG_USAGE_DETAIL19	"\t[-s]\t\tdump the contents of the symbol table \
 			 sections\n"
-@ MSG_USAGE_DETAIL18	"\t[-u]\t\tdump the contents of a frame unwind \
+@ MSG_USAGE_DETAIL20	"\t[-u]\t\tdump the contents of a frame unwind \
 			 section\n"
-@ MSG_USAGE_DETAIL19	"\t[-v]\t\tdump the contents of the version sections\n"
-@ MSG_USAGE_DETAIL20	"\t[-w file]\twrite the contents of specified section \
+@ MSG_USAGE_DETAIL21	"\t[-v]\t\tdump the contents of the version sections\n"
+@ MSG_USAGE_DETAIL22	"\t[-w file]\twrite the contents of specified section \
 			 to `file'\n"
-@ MSG_USAGE_DETAIL21	"\t[-y]\t\tdump the contents of the .SUNW_syminfo \
+@ MSG_USAGE_DETAIL23	"\t[-y]\t\tdump the contents of the .SUNW_syminfo \
 			 section\n"
 
 # Errors
@@ -244,7 +245,7 @@
 
 @ MSG_GOT_SYM		"_GLOBAL_OFFSET_TABLE_"
 
-@ MSG_STR_OPTIONS	"CcdeGgHhiklmN:nprSsuvw:y"
+@ MSG_STR_OPTIONS	"CcdeGgHhiI:klmN:nprSsuvw:y"
 
 @ MSG_STR_EMPTY		""
 

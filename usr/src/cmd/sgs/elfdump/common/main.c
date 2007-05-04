@@ -31,6 +31,8 @@
 #include	<sys/param.h>
 #include	<fcntl.h>
 #include	<stdio.h>
+#include	<stdlib.h>
+#include	<ctype.h>
 #include	<libelf.h>
 #include	<link.h>
 #include	<stdarg.h>
@@ -46,6 +48,30 @@
 #include	<_elfdump.h>
 
 const Cache	cache_init = {NULL, NULL, NULL, NULL, 0};
+
+
+
+/* MATCH is  used to retain information about -N and -I options */
+typedef enum {
+	MATCH_T_NAME,		/* Record contains a name */
+	MATCH_T_NDX,		/* Record contains a single index */
+	MATCH_T_RANGE		/* Record contains an index range */
+} MATCH_T;
+
+typedef struct _match {
+	struct _match	*next;		/* Pointer to next item in list */
+	MATCH_T		type;
+	union {
+		const char	*name;	/* MATCH_T_NAME */
+		struct {		/* MATCH_T_NDX and MATCH_T_RANGE */
+			int	start;
+			int	end;	/* Only for MATCH_T_RANGE */
+		} ndx;
+	} value;
+} MATCH;
+
+/* List of MATCH records used by match() to implement -N and -I options */
+static MATCH *match_list = NULL;
 
 const char *
 _elfdump_msg(Msg mid)
@@ -90,7 +116,6 @@ detail_usage()
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL7));
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL8));
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL9));
-	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL9_1));
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL10));
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL11));
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL12));
@@ -103,20 +128,165 @@ detail_usage()
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL19));
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL20));
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL21));
+	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL22));
+	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL23));
+}
+
+/*
+ * Convert the ASCII representation of an index, or index range, into
+ * binary form, and store it in rec:
+ *
+ *	index: An positive or 0 valued integer
+ *	range: Two indexes, separated by a ':' character, denoting
+ *		a range of allowed values. If the second value is omitted,
+ *		any values equal to or greater than the first will match.
+ *
+ * exit:
+ *	On success, *rec is filled in with a MATCH_T_NDX or MATCH_T_RANGE
+ *	value, and this function returns (1). On failure, the contents
+ *	of *rec are undefined, and (0) is returned.
+ */
+int
+process_index_opt(const char *str, MATCH *rec)
+{
+#define	SKIP_BLANK for (; *str && isspace(*str); str++)
+
+	char	*endptr;
+
+	rec->value.ndx.start = strtol(str, &endptr, 10);
+	/* Value must use some of the input, and be 0 or positive */
+	if ((str == endptr) || (rec->value.ndx.start < 0))
+		return (0);
+	str = endptr;
+
+	SKIP_BLANK;
+	if (*str != ':') {
+		rec->type = MATCH_T_NDX;
+	} else {
+		str++;					/* Skip the ':' */
+		rec->type = MATCH_T_RANGE;
+		SKIP_BLANK;
+		if (*str == '\0') {
+			rec->value.ndx.end = -1;	/* Indicates "to end" */
+		} else {
+			rec->value.ndx.end = strtol(str, &endptr, 10);
+			if ((str == endptr) || (rec->value.ndx.end < 0))
+				return (0);
+			str = endptr;
+			SKIP_BLANK;
+		}
+	}
+
+	/* Syntax error if anything is left over */
+	if (*str != '\0')
+		return (0);
+
+	return (1);
+
+#undef	SKIP_BLANK
+}
+
+/*
+ * Returns True (1) if the item with the given name or index should
+ * be displayed, and False (0) if it should not be.
+ *
+ * entry:
+ *	strict - A strict match requires an explicit match to
+ *		a user specified -I or -N option. A non-strict match
+ *		succeeds if the match list is empty.
+ *	name - Name of item under consideration, or NULL if the name
+ *		should not be considered.
+ *	ndx - if (ndx >= 0) index of item under consideration.
+ *		A negative value indicates that the item has no index.
+ *
+ * exit:
+ *	True will be returned if the given name/index matches those given
+ *	by one of the -N or -I command line options, or if no such option
+ *	was used in the command invocation.
+ */
+int
+match(int strict, const char *name, int ndx)
+{
+	MATCH *list;
+
+	/* If no match options were specified, allow everything */
+	if (!strict && (match_list == NULL))
+		return (1);
+
+	/* Run through the match records and check for a hit */
+	for (list = match_list; list; list = list->next) {
+		switch (list->type) {
+		case MATCH_T_NAME:
+			if ((name != NULL) &&
+			    (strcmp(list->value.name, name) == 0))
+				return (1);
+			break;
+		case MATCH_T_NDX:
+			if (ndx == list->value.ndx.start)
+				return (1);
+			break;
+		case MATCH_T_RANGE:
+			/*
+			 * A range end value less than 0 means that any value
+			 * above the start is acceptible.
+			 */
+			if ((ndx >= list->value.ndx.start) &&
+			    ((list->value.ndx.end < 0) ||
+			    (ndx <= list->value.ndx.end)))
+				return (1);
+			break;
+		}
+	}
+
+	/* Nothing matched */
+	return (0);
+}
+
+/*
+ * Add an entry to match_list for use by match().
+ *
+ * Return True (1) for success. On failure, an error is written
+ * to stderr, and False (0) is returned.
+ */
+static int
+add_match_record(char *argv0, MATCH *data)
+{
+	MATCH *rec;
+	MATCH *list;
+
+	if ((rec = malloc(sizeof (*rec))) == NULL) {
+		int err = errno;
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_MALLOC),
+		    basename(argv0), strerror(err));
+		return (0);
+	}
+
+	*rec = *data;
+
+	/* Insert at end of match_list */
+	if (match_list == NULL) {
+		match_list = rec;
+	} else {
+		for (list = match_list; list->next != NULL; list = list->next)
+			;
+		list->next = rec;
+	}
+
+	rec->next = NULL;
+	return (1);
 }
 
 static void
-decide(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
+decide(const char *file, Elf *elf, uint_t flags, int wfd)
 {
 	if (gelf_getclass(elf) == ELFCLASS64)
-		regular64(file, elf, flags, Nname, wfd);
+		regular64(file, elf, flags, wfd);
 	else
-		regular32(file, elf, flags, Nname, wfd);
+		regular32(file, elf, flags, wfd);
 }
 
 static void
-archive(const char *file, int fd, Elf *elf, uint_t flags, char *Nname,
-    int wfd)
+archive(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 {
 	Elf_Cmd		cmd = ELF_C_READ;
 	Elf_Arhdr	*arhdr;
@@ -127,8 +297,7 @@ archive(const char *file, int fd, Elf *elf, uint_t flags, char *Nname,
 	/*
 	 * Determine if the archive symbol table itself is required.
 	 */
-	if ((flags & FLG_SYMBOLS) && ((Nname == NULL) ||
-	    (strcmp(Nname, MSG_ORIG(MSG_ELF_ARSYM)) == 0))) {
+	if ((flags & FLG_SYMBOLS) && match(0, MSG_ORIG(MSG_ELF_ARSYM), -1)) {
 		/*
 		 * Get the archive symbol table.
 		 */
@@ -211,8 +380,8 @@ archive(const char *file, int fd, Elf *elf, uint_t flags, char *Nname,
 		/*
 		 * If we only need the archive symbol table return.
 		 */
-		if ((flags & FLG_SYMBOLS) && Nname &&
-		    (strcmp(Nname, MSG_ORIG(MSG_ELF_ARSYM)) == 0))
+		if ((flags & FLG_SYMBOLS) &&
+		    match(1, MSG_ORIG(MSG_ELF_ARSYM), -1))
 			return;
 
 		/*
@@ -240,10 +409,10 @@ archive(const char *file, int fd, Elf *elf, uint_t flags, char *Nname,
 
 			switch (elf_kind(_elf)) {
 			case ELF_K_AR:
-				archive(name, fd, _elf, flags, Nname, wfd);
+				archive(name, fd, _elf, flags, wfd);
 				break;
 			case ELF_K_ELF:
-				decide(name, _elf, flags, Nname, wfd);
+				decide(name, _elf, flags, wfd);
 				break;
 			default:
 				(void) fprintf(stderr,
@@ -262,8 +431,9 @@ main(int argc, char **argv, char **envp)
 {
 	Elf		*elf;
 	int		var, fd, wfd = 0;
-	char		*Nname = NULL, *wname = 0;
+	char		*wname = 0;
 	uint_t		flags = 0;
+	MATCH		match_data;
 
 	/*
 	 * If we're on a 64-bit kernel, try to exec a full 64-bit version of
@@ -307,6 +477,16 @@ main(int argc, char **argv, char **envp)
 		case 'h':
 			flags |= FLG_HASH;
 			break;
+		case 'I':
+			if (!process_index_opt(optarg, &match_data)) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_USAGE_BRIEF),
+				    basename(argv[0]));
+				return (1);
+			}
+			if (!add_match_record(argv[0], &match_data))
+				return (1);
+			break;
 		case 'i':
 			flags |= FLG_INTERP;
 			break;
@@ -320,7 +500,10 @@ main(int argc, char **argv, char **envp)
 			flags |= FLG_MOVE;
 			break;
 		case 'N':
-			Nname = optarg;
+			match_data.type = MATCH_T_NAME;
+			match_data.value.name = optarg;
+			if (!add_match_record(argv[0], &match_data))
+				return (1);
 			break;
 		case 'n':
 			flags |= FLG_NOTE;
@@ -363,9 +546,9 @@ main(int argc, char **argv, char **envp)
 	 * Validate any arguments.
 	 */
 	if ((flags & ~(FLG_DEMANGLE | FLG_LONGNAME)) == 0) {
-		if (!wname && !Nname) {
+		if (!wname && (match_list == NULL)) {
 			flags |= FLG_EVERYTHING;
-		} else if (!wname || !Nname) {
+		} else if (!wname || (match_list == NULL)) {
 			(void) fprintf(stderr, MSG_INTL(MSG_USAGE_BRIEF),
 			    basename(argv[0]));
 			return (1);
@@ -425,10 +608,10 @@ main(int argc, char **argv, char **envp)
 
 		switch (elf_kind(elf)) {
 		case ELF_K_AR:
-			archive(file, fd, elf, flags, Nname, wfd);
+			archive(file, fd, elf, flags, wfd);
 			break;
 		case ELF_K_ELF:
-			decide(file, elf, flags, Nname, wfd);
+			decide(file, elf, flags, wfd);
 			break;
 		default:
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADFILE), file);

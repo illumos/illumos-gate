@@ -323,8 +323,7 @@ symlookup(const char *name, Cache *cache, Word shnum, Sym **sym,
  * Print section headers.
  */
 static void
-sections(const char *file, Cache *cache, Word shnum, Ehdr *ehdr,
-    const char *name)
+sections(const char *file, Cache *cache, Word shnum, Ehdr *ehdr)
 {
 	size_t	seccnt;
 
@@ -342,7 +341,7 @@ sections(const char *file, Cache *cache, Word shnum, Ehdr *ehdr,
 			    file, secname, EC_WORD(shdr->sh_type));
 		}
 
-		if (name && strcmp(name, secname))
+		if (!match(0, secname, seccnt))
 			continue;
 
 		/*
@@ -417,8 +416,8 @@ getphdr(Word phnum, Word type, const char *file, Elf *elf)
 }
 
 static void
-unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *name,
-    const char *file, Elf *elf)
+unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
+    Elf *elf)
 {
 	Word	cnt;
 	Phdr	*uphdr = 0;
@@ -451,7 +450,8 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *name,
 		    (strncmp(_cache->c_name, MSG_ORIG(MSG_SCN_FRMHDR),
 		    MSG_SCN_FRMHDR_SIZE) != 0))
 			continue;
-		if (name && strcmp(name, _cache->c_name))
+
+		if (!match(0, _cache->c_name, cnt))
 			continue;
 
 		if (_cache->c_data == NULL)
@@ -1442,8 +1442,8 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word disp_symndx, Sym *sym)
  * Search for and process any symbol tables.
  */
 void
-symbols(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
-    VERSYM_STATE *versym, const char *file, uint_t flags)
+symbols(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
+    const char *file, uint_t flags)
 {
 	SYMTBL_STATE state;
 	Cache *_cache;
@@ -1460,7 +1460,7 @@ symbols(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
 		    (shdr->sh_type != SHT_DYNSYM) &&
 		    (shdr->sh_type != SHT_SUNW_LDYNSYM))
 			continue;
-		if (name && strcmp(name, _cache->c_name))
+		if (!match(0, _cache->c_name, secndx))
 			continue;
 
 		if (!init_symtbl_state(&state, cache, shnum, secndx, ehdr,
@@ -1484,8 +1484,8 @@ symbols(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
  * These sections are always associated with the .SUNW_ldynsym./.dynsym pair.
  */
 static void
-sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
-    VERSYM_STATE *versym, const char *file, uint_t flags)
+sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
+    const char *file, uint_t flags)
 {
 	SYMTBL_STATE	ldynsym_state,	dynsym_state;
 	Cache		*sortcache,	*symcache;
@@ -1504,7 +1504,7 @@ sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
 		if ((sortshdr->sh_type != SHT_SUNW_symsort) &&
 		    (sortshdr->sh_type != SHT_SUNW_tlssort))
 			continue;
-		if (name && strcmp(name, sortcache->c_name))
+		if (!match(0, sortcache->c_name, sortsecndx))
 			continue;
 
 		/*
@@ -1617,7 +1617,7 @@ sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, const char *name,
  * Search for and process any relocation sections.
  */
 static void
-reloc(Cache *cache, Word shnum, Ehdr *ehdr, const char *name, const char *file,
+reloc(Cache *cache, Word shnum, Ehdr *ehdr, const char *file,
     uint_t flags)
 {
 	Word	cnt;
@@ -1635,7 +1635,7 @@ reloc(Cache *cache, Word shnum, Ehdr *ehdr, const char *name, const char *file,
 		if (((type = shdr->sh_type) != SHT_RELA) &&
 		    (type != SHT_REL))
 			continue;
-		if (name && strcmp(name, relname))
+		if (!match(0, relname, cnt))
 			continue;
 
 		/*
@@ -1857,7 +1857,7 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
  * Search for and process a MOVE section.
  */
 static void
-move(Cache *cache, Word shnum, const char *name, const char *file, uint_t flags)
+move(Cache *cache, Word shnum, const char *file, uint_t flags)
 {
 	Word		cnt;
 	const char	*fmt = 0;
@@ -1872,7 +1872,7 @@ move(Cache *cache, Word shnum, const char *name, const char *file, uint_t flags)
 
 		if (shdr->sh_type != SHT_SUNW_move)
 			continue;
-		if (name && strcmp(name, _cache->c_name))
+		if (!match(0, _cache->c_name, cnt))
 			continue;
 
 		/*
@@ -2113,7 +2113,7 @@ note_entry(Cache *cache, Word *data, size_t size, const char *file)
  * Search for and process a .note section.
  */
 static void
-note(Cache *cache, Word shnum, const char *name, const char *file)
+note(Cache *cache, Word shnum, const char *file)
 {
 	Word	cnt;
 
@@ -2126,7 +2126,7 @@ note(Cache *cache, Word shnum, const char *name, const char *file)
 
 		if (shdr->sh_type != SHT_NOTE)
 			continue;
-		if (name && strcmp(name, _cache->c_name))
+		if (!match(0, _cache->c_name, cnt))
 			continue;
 
 		/*
@@ -2199,7 +2199,7 @@ hash_entry(Cache *refsec, Cache *strsec, const char *hsecname, Word hashndx,
 #define	MAXCOUNT	500
 
 static void
-hash(Cache *cache, Word shnum, const char *name, const char *file, uint_t flags)
+hash(Cache *cache, Word shnum, const char *file, uint_t flags)
 {
 	static int	count[MAXCOUNT];
 	Word		cnt;
@@ -2215,8 +2215,6 @@ hash(Cache *cache, Word shnum, const char *name, const char *file, uint_t flags)
 		Word		symn;
 
 		if (hshdr->sh_type != SHT_HASH)
-			continue;
-		if (name && strcmp(name, hsecname))
 			continue;
 
 		/*
@@ -2341,8 +2339,7 @@ hash(Cache *cache, Word shnum, const char *name, const char *file, uint_t flags)
 }
 
 static void
-group(Cache *cache, Word shnum, const char *name, const char *file,
-    uint_t flags)
+group(Cache *cache, Word shnum, const char *file, uint_t flags)
 {
 	Word	scnt;
 
@@ -2356,7 +2353,7 @@ group(Cache *cache, Word shnum, const char *name, const char *file,
 
 		if (shdr->sh_type != SHT_GROUP)
 			continue;
-		if (name && strcmp(name, _cache->c_name))
+		if (!match(0, _cache->c_name, scnt))
 			continue;
 		if ((_cache->c_data == NULL) ||
 		    ((grpdata = (Word *)_cache->c_data->d_buf) == NULL))
@@ -2650,7 +2647,7 @@ checksum(Elf *elf)
 }
 
 void
-regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
+regular(const char *file, Elf *elf, uint_t flags, int wfd)
 {
 	Elf_Scn		*scn;
 	Ehdr		*ehdr;
@@ -2719,10 +2716,8 @@ regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 		}
 
 		for (cnt = 0; cnt < phnum; phdr++, cnt++) {
-
-			if (Nname &&
-			    (strcmp(Nname, conv_phdr_type(ehdr->e_machine,
-			    phdr->p_type, CONV_FMT_ALTFILE)) != 0))
+			if (!match(0, conv_phdr_type(ehdr->e_machine,
+			    phdr->p_type, CONV_FMT_ALTFILE), cnt))
 				continue;
 
 			dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
@@ -2733,12 +2728,12 @@ regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 
 	/*
 	 * Return now if there are no section, if there's just one section to
-	 * act as an extension of the ELF header, or if on section information
-	 * was requested.
+	 * act as an extension of the ELF header, or if only program header
+	 * information was requested.
 	 */
 	if ((shnum <= 1) || (flags && (flags & ~(FLG_EHDR | FLG_PHDR)) == 0)) {
 		if ((ehdr->e_type == ET_CORE) && (flags & FLG_NOTE))
-			note(0, shnum, 0, file);
+			note(0, shnum, file);
 		return;
 	}
 
@@ -2940,15 +2935,14 @@ regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 		/*
 		 * Do we wish to write the section out?
 		 */
-		if (wfd && Nname && (strcmp(Nname, _cache->c_name) == 0) &&
-		    _cache->c_data) {
+		if (wfd && match(1, _cache->c_name, cnt) && _cache->c_data) {
 			(void) write(wfd, _cache->c_data->d_buf,
 			    _cache->c_data->d_size);
 		}
 	}
 
 	if (flags & FLG_SHDR)
-		sections(file, cache, shnum, ehdr, Nname);
+		sections(file, cache, shnum, ehdr);
 
 	if (flags & FLG_INTERP)
 		interp(file, cache, shnum, phnum, elf);
@@ -2956,34 +2950,34 @@ regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 	versions(cache, shnum, file, flags, &versym);
 
 	if (flags & FLG_SYMBOLS)
-		symbols(cache, shnum, ehdr, Nname, &versym, file, flags);
+		symbols(cache, shnum, ehdr, &versym, file, flags);
 
 	if (flags & FLG_SORT)
-		sunw_sort(cache, shnum, ehdr, Nname, &versym, file, flags);
+		sunw_sort(cache, shnum, ehdr, &versym, file, flags);
 
 	if (flags & FLG_HASH)
-		hash(cache, shnum, Nname, file, flags);
+		hash(cache, shnum, file, flags);
 
 	if (flags & FLG_GOT)
 		got(cache, shnum, ehdr, file, flags);
 
 	if (flags & FLG_GROUP)
-		group(cache, shnum, Nname, file, flags);
+		group(cache, shnum, file, flags);
 
 	if (flags & FLG_SYMINFO)
 		syminfo(cache, shnum, file);
 
 	if (flags & FLG_RELOC)
-		reloc(cache, shnum, ehdr, Nname, file, flags);
+		reloc(cache, shnum, ehdr, file, flags);
 
 	if (flags & FLG_DYNAMIC)
 		dynamic(cache, shnum, ehdr, file);
 
 	if (flags & FLG_NOTE)
-		note(cache, shnum, Nname, file);
+		note(cache, shnum, file);
 
 	if (flags & FLG_MOVE)
-		move(cache, shnum, Nname, file, flags);
+		move(cache, shnum, file, flags);
 
 	if (flags & FLG_CHECKSUM)
 		checksum(elf);
@@ -2992,7 +2986,7 @@ regular(const char *file, Elf *elf, uint_t flags, char *Nname, int wfd)
 		cap(file, cache, shnum, phnum, ehdr, elf);
 
 	if (flags & FLG_UNWIND)
-		unwind(cache, shnum, phnum, ehdr, Nname, file, elf);
+		unwind(cache, shnum, phnum, ehdr, file, elf);
 
 	free(cache);
 }

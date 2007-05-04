@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* LINTLIBRARY */
@@ -45,14 +45,14 @@ foo()
 
 #if	defined(_ELF64)
 void
-regular32(const char *file, Elf *elf, uint32_t flags, char *Nname, int wfd)
+regular32(const char *file, Elf *elf, uint32_t flags, int wfd)
 {
-	regular64(file, elf, flags, Nname, wfd);
+	regular64(file, elf, flags, wfd);
 }
 #else
 void
-regular64(const char *file, Elf *elf, uint32_t flags, char *Nname, int wfd)
+regular64(const char *file, Elf *elf, uint32_t flags, int wfd)
 {
-	regular32(file, elf, flags, Nname, wfd);
+	regular32(file, elf, flags, wfd);
 }
 #endif

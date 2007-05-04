@@ -82,6 +82,7 @@ extern	const Cache	 cache_init;
 
 extern	void		failure(const char *, const char *);
 extern	const char	*demangle(const char *, uint_t);
+extern int		match(int, const char *, int);
 
 /*
  * Define various elfdump() functions into their 32-bit and 64-bit variants.
@@ -132,8 +133,8 @@ extern	const char	*demangle(const char *, uint_t);
 #define	version_need		version_need32
 #endif
 
-extern	void	regular32(const char *, Elf *, uint_t, char *, int);
-extern	void	regular64(const char *, Elf *, uint_t, char *, int);
+extern	void	regular32(const char *, Elf *, uint_t, int);
+extern	void	regular64(const char *, Elf *, uint_t, int);
 
 #ifdef	__cplusplus
 }
