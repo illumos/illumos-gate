@@ -551,18 +551,34 @@ set_inst_enabled(const scf_instance_t *inst, uint8_t desired,
 	    (ent = scf_entry_create(h)) == NULL)
 		goto out;
 
-get:
-	if (scf_instance_get_pg(inst, pgname, gpg) == -1) {
+general_pg_get:
+	if (scf_instance_get_pg(inst, SCF_PG_GENERAL, gpg) == -1) {
 		if (scf_error() != SCF_ERROR_NOT_FOUND)
 			goto out;
 
-		if (scf_instance_add_pg(inst, pgname, SCF_GROUP_FRAMEWORK,
-		    pgflags, gpg) == -1) {
+		if (scf_instance_add_pg(inst, SCF_PG_GENERAL,
+		    SCF_GROUP_FRAMEWORK, SCF_PG_GENERAL_FLAGS, gpg) == -1) {
 			if (scf_error() != SCF_ERROR_EXISTS)
 				goto out;
-			goto get;
+			goto general_pg_get;
 		}
 	}
+
+	if (strcmp(pgname, SCF_PG_GENERAL) != 0) {
+get:
+		if (scf_instance_get_pg(inst, pgname, gpg) == -1) {
+			if (scf_error() != SCF_ERROR_NOT_FOUND)
+				goto out;
+
+			if (scf_instance_add_pg(inst, pgname,
+			    SCF_GROUP_FRAMEWORK, pgflags, gpg) == -1) {
+				if (scf_error() != SCF_ERROR_EXISTS)
+					goto out;
+				goto get;
+			}
+		}
+	}
+
 	if (scf_pg_get_property(gpg, SCF_PROPERTY_ENABLED, eprop) == -1) {
 		if (scf_error() != SCF_ERROR_NOT_FOUND)
 			goto out;

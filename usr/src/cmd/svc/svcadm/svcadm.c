@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -579,6 +579,42 @@ set_inst_enabled(const char *fmri, scf_instance_t *inst, boolean_t temp,
 	if (pg == NULL)
 		scfdie();
 
+	/*
+	 * An instance's configuration is incomplete if general/enabled
+	 * doesn't exist. Create both the property group and property
+	 * here if they don't exist.
+	 */
+	pgname = SCF_PG_GENERAL;
+	if (pg_get_or_add(inst, pgname, SCF_PG_GENERAL_TYPE,
+	    SCF_PG_GENERAL_FLAGS, pg) != 0)
+		goto eperm;
+
+	if (get_bool_prop(pg, SCF_PROPERTY_ENABLED, &b) != 0) {
+		/* Create and set state to disabled */
+		switch (set_bool_prop(pg, SCF_PROPERTY_ENABLED, B_FALSE) != 0) {
+		case 0:
+			break;
+
+		case EPERM:
+			goto eperm;
+
+		case EROFS:
+			/* Shouldn't happen, but it can. */
+			if (!verbose)
+				uu_warn(gettext("%s: Repository read-only.\n"),
+				    fmri);
+			else
+				uu_warn(gettext("%s: Could not set %s/%s "
+				    "(repository read-only).\n"), fmri,
+				    SCF_PG_GENERAL, SCF_PROPERTY_ENABLED);
+			goto out;
+
+		default:
+			assert(0);
+			abort();
+		}
+	}
+
 	if (temp) {
 		/* Set general_ovr/enabled */
 		pgname = SCF_PG_GENERAL_OVR;
@@ -615,7 +651,12 @@ set_inst_enabled(const char *fmri, scf_instance_t *inst, boolean_t temp,
 			    gettext("%s temporarily disabled.\n"), fmri);
 	} else {
 again:
-		pgname = SCF_PG_GENERAL;
+		/*
+		 * Both pg and property should exist since we created
+		 * them earlier. However, there's still a chance that
+		 * someone may have deleted the property out from under
+		 * us.
+		 */
 		if (pg_get_or_add(inst, pgname, SCF_PG_GENERAL_TYPE,
 		    SCF_PG_GENERAL_FLAGS, pg) != 0)
 			goto eperm;
