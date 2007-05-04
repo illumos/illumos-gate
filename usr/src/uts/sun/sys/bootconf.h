@@ -245,6 +245,8 @@ extern char *default_path;
 extern char *dhcack;
 extern char *netdev_path;
 
+extern char *strplumb_get_netdev_path(void);
+
 #endif /* _KERNEL && !_BOOT */
 
 #ifdef __cplusplus

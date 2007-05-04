@@ -731,6 +731,7 @@ stubs_base:
 	MODULE(strplumb,misc);
 	STUB(strplumb, strplumb,     0);
 	STUB(strplumb, strplumb_load, 0);
+	STUB(strplumb, strplumb_get_netdev_path, 0)
 	END_MODULE(strplumb);
 #endif
 

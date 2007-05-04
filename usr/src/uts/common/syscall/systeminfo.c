@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -147,10 +147,20 @@ systeminfo(int command, char *buf, long count)
 			strcnt = 0;
 		} else {
 			/*
+			 * If the interface didn't have a name (bindable
+			 * driver) to begin with, it might have one now.
+			 * So, re-run strplumb_get_netdev_path() to see
+			 * if one can be established at this time.
+			 */
+			if (netdev_path == NULL || netdev_path[0] == '\0') {
+				netdev_path = strplumb_get_netdev_path();
+			}
+			/*
 			 * If the interface name has not yet been resolved
 			 * (first IFNAMSIZ bytes of dhcack[]) and a valid
 			 * netdev_path[] was stashed by loadrootmodules in
-			 * swapgeneric.c, resolve the interface name now.
+			 * swapgeneric.c, or established above, resolve
+			 * the interface name now.
 			 */
 			if (dhcack[0] == '\0' &&
 			    netdev_path != NULL && netdev_path[0] != '\0') {

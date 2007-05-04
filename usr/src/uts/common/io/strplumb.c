@@ -667,9 +667,12 @@ int dl_bind(ldi_handle_t lh, uint_t sap, uint_t max_conn,
     uint_t service, uint_t conn_mgmt);
 int dl_phys_addr(ldi_handle_t lh, struct ether_addr *eaddr);
 
+#endif  /* !__sparc */
+
 char *
 strplumb_get_netdev_path(void)
 {
+#ifndef	__sparc
 	char *macstr, *devpath = NULL;
 	uchar_t *bootp;
 	uint_t bootp_len, len;
@@ -710,7 +713,13 @@ strplumb_get_netdev_path(void)
 
 	ddi_walk_devs(ddi_root_node(), matchmac, (void *)&devpath);
 	return (devpath);
+
+#else
+	return (NULL);
+#endif  /* !__sparc */
 }
+
+#ifndef __sparc
 
 /*
  * Get boot path from the boot_mac address
