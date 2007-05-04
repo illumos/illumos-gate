@@ -24,7 +24,7 @@
 #
 # idsconfig -- script to setup iDS 5.x/6.x for Native LDAP II.
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -3185,7 +3185,7 @@ print_suffix_config()
 {
     cat <<EOF2
 # LDAP suffix related preferences used only if needed
-IDS_DATABASE="${IDS_DATABASE}" 
+IDS_DATABASE="${IDS_DATABASE}"
 LDAP_SUFFIX_OBJ="$LDAP_SUFFIX_OBJ"
 LDAP_SUFFIX_ACI=\`cat <<EOF
 ${LDAP_SUFFIX_ACI}
@@ -3453,9 +3453,9 @@ add_eq_indexes()
     if [ -z "${IDS_DATABASE}" ]; then
 	get_backend
     fi
+
     # Set _EXT to use as shortcut.
     _EXT="cn=index,cn=${IDS_DATABASE},cn=ldbm database,cn=plugins,cn=config"
-
 
     # Display message to id current step.
     ${ECHO} "  ${STEP}. Processing eq,pres indexes:"
@@ -3466,7 +3466,8 @@ add_eq_indexes()
 	[ $DEBUG -eq 1 ] && ${ECHO} "  Adding index for ${i}"
 
 	# Check if entry exists first, if so, skip to next.
-	${LDAPSEARCH} ${SERVER_ARGS} -b "cn=${i},${_EXT}" -s base "objectclass=*" > /dev/null 2>&1
+	${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} -b \"cn=${i},${_EXT}\" -s base \
+	    \"objectclass=*\" > /dev/null 2>&1"
 	if [ $? -eq 0 ]; then
 	    # Display index skipped.
 	    ${ECHO} "      ${i} (eq,pres) skipped already exists"	
@@ -3527,13 +3528,15 @@ EOF
 	# Wait for task to finish, display current status.
 	while :
 	do
-	    eval "${LDAPSEARCH} ${LDAP_ARGS} -b \"cn=index, cn=tasks, cn=config\" -s sub \"objectclass=*\" > ${TMPDIR}/istask_${i} 2>&1"
-	    ${GREP} ${TASKNAME} ${TMPDIR}/istask_${i} > /dev/null 2>&1
+	    ${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} \
+	        -b \"cn=${TASKNAME}, cn=index, cn=tasks, cn=config\" -s base \
+	        \"objectclass=*\" nstaskstatus > \"${TMPDIR}/istask_${i}\" 2>&1"
+	    ${GREP} "${TASKNAME}" "${TMPDIR}/istask_${i}" > /dev/null 2>&1
 	    if [ $? -ne 0 ]; then
 		break
 	    fi
-	    eval "${LDAPSEARCH} ${LDAP_ARGS} -b \"cn=index,cn=tasks,cn=config\" -s one \"objectclass=*\" nstaskstatus | ${GREP} -i nstaskstatus | cut -d\":\" -f2 > ${TMPDIR}/wait_task_${i}"
-	    TASK_STATUS=`head -1 ${TMPDIR}/wait_task_${i}`
+	    TASK_STATUS=`${GREP} -i nstaskstatus "${TMPDIR}/istask_${i}" |
+	        head -1 | cut -d: -f2`
 	    ${ECHO} "      ${i} (eq,pres)  $TASK_STATUS                  \r\c"
 	    ${ECHO} "$TASK_STATUS" | ${GREP} "Finished" > /dev/null 2>&1
 	    if [ $? -eq 0 ]; then
@@ -3571,7 +3574,8 @@ add_sub_indexes()
 	[ $DEBUG -eq 1 ] && ${ECHO} "  Adding index for ${i}"
 
 	# Check if entry exists first, if so, skip to next.
-	${LDAPSEARCH} ${SERVER_ARGS} -b "cn=${i},${_EXT}" -s base "objectclass=*" > /dev/null 2>&1
+	${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} -b \"cn=${i},${_EXT}\" \
+	    -s base \"objectclass=*\" > /dev/null 2>&1"
 	if [ $? -eq 0 ]; then
 	    # Display index skipped.
 	    ${ECHO} "      ${i} (eq,pres,sub) skipped already exists"	
@@ -3633,13 +3637,15 @@ EOF
 	# Wait for task to finish, display current status.
 	while :
 	do
-	    eval "${LDAPSEARCH} ${LDAP_ARGS} -b \"cn=index, cn=tasks, cn=config\" -s sub \"objectclass=*\" > ${TMPDIR}/istask_${i} 2>&1"
-	    ${GREP} ${TASKNAME} ${TMPDIR}/istask_${i} > /dev/null 2>&1
+	    ${EVAL} "${LDAPSEARCH} ${LDAP_ARGS} \
+	        -b \"cn=${TASKNAME}, cn=index, cn=tasks, cn=config\" -s base \
+	        \"objectclass=*\" nstaskstatus > \"${TMPDIR}/istask_${i}\" 2>&1"
+	    ${GREP} "${TASKNAME}" "${TMPDIR}/istask_${i}" > /dev/null 2>&1
 	    if [ $? -ne 0 ]; then
 		break
 	    fi
-	    eval "${LDAPSEARCH} ${LDAP_ARGS} -b \"cn=index,cn=tasks,cn=config\" -s one \"objectclass=*\" nstaskstatus | ${GREP} -i nstaskstatus | cut -d\":\" -f2 > ${TMPDIR}/wait_task_${i}"
-	    TASK_STATUS=`head -1 ${TMPDIR}/wait_task_${i}`
+	    TASK_STATUS=`${GREP} -i nstaskstatus "${TMPDIR}/istask_${i}" |
+	        head -1 | cut -d: -f2`
 	    ${ECHO} "      ${i} (eq,pres,sub)  $TASK_STATUS                  \r\c"
 	    ${ECHO} "$TASK_STATUS" | ${GREP} "Finished" > /dev/null 2>&1
 	    if [ $? -eq 0 ]; then
@@ -4371,7 +4377,7 @@ add_new_containers()
     [ $DEBUG -eq 1 ] && ${ECHO} "In add_new_containers()"
 
     for ou in people group rpc protocols networks netgroup \
-	aliases hosts services ethers profile printers \
+	aliases hosts services ethers profile printers projects \
 	SolarisAuthAttr SolarisProfAttr Timezone ipTnet ; do
 
 	# Check if nismaps already exist.
