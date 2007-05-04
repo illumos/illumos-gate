@@ -854,6 +854,7 @@ unlink_ptp(htable_t *higher, htable_t *old, uintptr_t vaddr)
 	uint_t		entry = htable_va2entry(vaddr, higher);
 	x86pte_t	expect = MAKEPTP(old->ht_pfn, old->ht_level);
 	x86pte_t	found;
+	hat_t		*hat = old->ht_hat;
 
 	ASSERT(higher->ht_busy > 0);
 	ASSERT(higher->ht_valid_cnt > 0);
@@ -862,6 +863,19 @@ unlink_ptp(htable_t *higher, htable_t *old, uintptr_t vaddr)
 	if (found != expect)
 		panic("Bad PTP found=" FMT_PTE ", expected=" FMT_PTE,
 		    found, expect);
+
+	/*
+	 * When any top level VLP page table entry changes, we must issue
+	 * a reload of cr3 on all processors. Also some CPU types require
+	 * invalidating when inner table entries are invalidated.
+	 */
+	if (!(hat->hat_flags & HAT_FREEING)) {
+		if (higher->ht_flags & HTABLE_VLP)
+			hat_tlb_inval(hat, DEMAP_ALL_ADDR);
+		else if (mmu.inval_nonleaf)
+			hat_tlb_inval(hat, old->ht_vaddr);
+	}
+
 	HTABLE_DEC(higher->ht_valid_cnt);
 }
 
@@ -885,6 +899,13 @@ link_ptp(htable_t *higher, htable_t *new, uintptr_t vaddr)
 	found = x86pte_cas(higher, entry, 0, newptp);
 	if ((found & ~PT_REF) != 0)
 		panic("HAT: ptp not 0, found=" FMT_PTE, found);
+
+	/*
+	 * When any top level VLP page table entry changes, we must issue
+	 * a reload of cr3 on all processors using it.
+	 */
+	if (higher->ht_flags & HTABLE_VLP)
+		hat_tlb_inval(higher->ht_hat, DEMAP_ALL_ADDR);
 }
 
 /*
@@ -966,14 +987,6 @@ htable_release(htable_t *ht)
 			 * Unlink the pagetable.
 			 */
 			unlink_ptp(higher, ht, va);
-
-			/*
-			 * When any top level VLP page table entry changes, we
-			 * must issue a reload of cr3 on all processors.
-			 */
-			if ((hat->hat_flags & HAT_VLP) &&
-			    level == VLP_LEVEL - 1)
-				hat_tlb_inval(hat, DEMAP_ALL_ADDR);
 
 			/*
 			 * remove this htable from its hash list
@@ -1162,18 +1175,6 @@ try_again:
 			if (higher != NULL) {
 				link_ptp(higher, ht, base);
 				ht->ht_parent = higher;
-
-				/*
-				 * When any top level VLP page table changes,
-				 * we must reload cr3 on all processors.
-				 */
-#ifdef __i386
-				if (mmu.pae_hat &&
-#else /* !__i386 */
-				if ((hat->hat_flags & HAT_VLP) &&
-#endif /* __i386 */
-				    l == VLP_LEVEL - 1)
-					hat_tlb_inval(hat, DEMAP_ALL_ADDR);
 			}
 			ht->ht_next = hat->hat_ht_hash[h];
 			ASSERT(ht->ht_prev == NULL);

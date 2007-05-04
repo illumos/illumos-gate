@@ -142,6 +142,7 @@ struct hat_mmu_info {
 	uint_t max_page_level;	/* maximum level at which we can map a page */
 	uint_t ptes_per_table;	/* # of entries in lower level page tables */
 	uint_t top_level_count;	/* # of entries in top most level page table */
+	uint_t inval_nonleaf;	/* invlpg after invalidates in inner tables */
 
 	uint_t	hash_cnt;	/* cnt of entries in htable_hash_cache */
 	uint_t	vlp_hash_cnt;	/* cnt of entries in vlp htable_hash_cache */

@@ -458,6 +458,16 @@ mmu_init(void)
 		mmu.pt_nx = 0;
 
 	/*
+	 * Intel CPUs allow speculative caching (in TLB-like h/w) of
+	 * entries in upper page tables even though there may not be
+	 * any valid entries in lower tables. This implies we have to
+	 * re-INVLPG at every upper page table entry invalidation.
+	 */
+	if (cpuid_getvendor(CPU) == X86_VENDOR_Intel)
+		mmu.inval_nonleaf = 1;
+	else
+		mmu.inval_nonleaf = 0;
+	/*
 	 * Use CPU info to set various MMU parameters
 	 */
 	cpuid_get_addrsize(CPU, &pa_bits, &va_bits);
