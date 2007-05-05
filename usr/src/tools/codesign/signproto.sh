@@ -71,3 +71,7 @@ find $DIRS -type f -print | while read f; do
 		(( i = i + 1 ))
 	done
 done | $dir/signit -i $ROOT -l ${CODESIGN_USER:-${LOGNAME}}
+
+if [ $? != 0 ]; then
+	echo "ERROR failure in signing operation"
+fi

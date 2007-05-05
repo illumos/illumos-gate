@@ -81,6 +81,9 @@ $Outdir = $opt_o || $Indir;	# default to input dir
 $Indir = getcwd() . "/$Indir" if (substr($Indir, 0, 1) ne "/");
 $Outdir = getcwd() . "/$Outdir" if (substr($Outdir, 0, 1) ne "/");
 
+# Ignore SIGPIPE to allow proper error messages
+$SIG{PIPE} = 'IGNORE';
+
 # Create ssh connection to server
 my(@args);
 if (defined($opt_l)) {
@@ -88,7 +91,7 @@ if (defined($opt_l)) {
 }
 push @args, "-s", $Server, "codesign";
 $pid = open2(*SRV_OUT, *SRV_IN, "/usr/bin/ssh", @args) or 
-	die "Can't start server\n";
+	die "ERROR Connection to server $Server failed\n";
 select(SRV_IN); $| = 1; select(STDOUT);	# unbuffered writes
 
 # Sign each file with the specified credential
@@ -106,9 +109,17 @@ exit($Warnings > 0);
 # Clean up after normal or abnormal exit.
 #
 sub END {
+	my $old_status = $?;
+
+	$? = 0;
 	close(SRV_IN);
 	close(SRV_OUT);
 	waitpid($pid, 0) if ($pid);
+	if ($?) {
+		print STDERR "ERROR Connection to server $Server failed\n";
+		$? = 1;
+	}
+	$? = $old_status if ($? == 0);
 }
 
 #
@@ -146,7 +157,7 @@ sub check_response {
 		exit(1);
 	}
 	else {
-		print STDERR "Unrecognized response\n";
+		printf STDERR "ERROR Protocol failure (%d)\n", length($str);
 		exit(1);
 	}
 }

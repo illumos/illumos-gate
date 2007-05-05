@@ -488,7 +488,7 @@ build() {
 	#	Re-sign selected binaries using signing server
 	#	(gatekeeper builds only)
 	#
-	if [ -n "$CODESIGN_USER" ]; then
+	if [ -n "$CODESIGN_USER" -a "$this_build_ok" = "y" ]; then
 		echo "\n==== Signing proto area at `date` ====\n" >> $LOGFILE
 		signing_file="${TMPDIR}/signing"
 		rm -f ${signing_file}
@@ -500,6 +500,10 @@ build() {
 		echo "\n==== Crypto module signing errors ($LABEL) ====\n" \
 		    >> $mail_msg_file
 		egrep 'WARNING|ERROR' ${signing_file} >> $mail_msg_file
+		if [ $? = 0 ]; then
+			build_ok=n
+			this_build_ok=n
+		fi
 	fi
 
 	#
