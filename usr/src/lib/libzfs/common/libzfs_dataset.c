@@ -957,6 +957,55 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, char *pool_name,
 				goto error;
 			}
 
+			/*
+			 * At this point, it is legitimate to set the
+			 * property. Now we want to make sure that the
+			 * property value is valid if it is sharenfs.
+			 */
+			if (prop == ZFS_PROP_SHARENFS &&
+				strcmp(strval, "on") != 0 &&
+				strcmp(strval, "off") != 0) {
+
+				/*
+				 * Must be an NFS option string so
+				 * init the libshare in order to
+				 * enable the parser and then parse
+				 * the options. We use the control API
+				 * since we don't care about the
+				 * current configuration and don't
+				 * want the overhead of loading it
+				 * until we actually do something.
+				 */
+
+			    if (zfs_init_libshare(hdl,
+					SA_INIT_CONTROL_API) != SA_OK) {
+				/* An error occurred so we can't do anything */
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+						"'%s' cannot be set: problem "
+						"in share initialization"),
+						propname);
+				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
+				goto error;
+			    }
+
+			    if (zfs_parse_options(strval, "nfs") != SA_OK) {
+				/*
+				 * There was an error in parsing so
+				 * deal with it by issuing an error
+				 * message and leaving after
+				 * uninitializing the the libshare
+				 * interface.
+				 */
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+						"'%s' cannot be set to invalid "
+						"options"), propname);
+				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
+				zfs_uninit_libshare(hdl);
+				goto error;
+			    }
+			    zfs_uninit_libshare(hdl);
+			}
+
 			break;
 
 		case ZFS_PROP_BOOTFS:

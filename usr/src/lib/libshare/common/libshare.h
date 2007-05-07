@@ -170,8 +170,8 @@ extern sa_optionset_t sa_get_derived_optionset(void *, char *, int);
 extern void sa_free_derived_optionset(sa_optionset_t);
 
 /* property functions */
-extern sa_optionset_t sa_get_property(sa_optionset_t, char *);
-extern sa_optionset_t sa_get_next_property(sa_group_t);
+extern sa_property_t sa_get_property(sa_optionset_t, char *);
+extern sa_property_t sa_get_next_property(sa_group_t);
 extern char *sa_get_property_attr(sa_property_t, char *);
 extern sa_property_t sa_create_property(char *, char *);
 extern int sa_add_property(void *, sa_property_t);

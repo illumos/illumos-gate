@@ -37,6 +37,7 @@
 
 #include <libuutil.h>
 #include <libzfs.h>
+#include <libshare.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -54,6 +55,7 @@ struct libzfs_handle {
 	char libzfs_action[1024];
 	char libzfs_desc[1024];
 	int libzfs_printerr;
+	void *libzfs_sharehdl; /* libshare handle */
 };
 
 struct zfs_handle {
@@ -139,6 +141,14 @@ int zvol_remove_link(libzfs_handle_t *, const char *);
 int zpool_iter_zvol(zpool_handle_t *, int (*)(const char *, void *), void *);
 
 void namespace_clear(libzfs_handle_t *);
+
+/*
+ * libshare (sharemgr) interfaces used internally.
+ */
+
+extern int zfs_init_libshare(libzfs_handle_t *, int);
+extern void zfs_uninit_libshare(libzfs_handle_t *);
+extern int zfs_parse_options(char *, char *);
 
 #ifdef	__cplusplus
 }

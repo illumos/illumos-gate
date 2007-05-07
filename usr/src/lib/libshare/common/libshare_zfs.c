@@ -204,6 +204,7 @@ get_zfs_dataset(sa_handle_impl_t impl_handle, char *path)
 	char *dataset = NULL;
 	zfs_handle_t **zlist;
 	char mountpoint[ZFS_MAXPROPLEN];
+	char canmount[ZFS_MAXPROPLEN];
 
 	get_all_filesystems(impl_handle, &zlist, &count);
 	qsort(zlist, count, sizeof (void *), mountpoint_compare);
@@ -221,7 +222,10 @@ get_zfs_dataset(sa_handle_impl_t impl_handle, char *path)
 		continue;
 
 	    /* canmount must be set */
-	    if (!zfs_prop_get_int(zlist[i], ZFS_PROP_CANMOUNT))
+	    canmount[0] = '\0';
+	    if (!zfs_prop_get(zlist[i], ZFS_PROP_CANMOUNT, canmount,
+		    sizeof (canmount), NULL, NULL, 0, B_FALSE) != 0 ||
+		strcmp(canmount, "off") == 0)
 		continue;
 
 	/*
@@ -651,6 +655,7 @@ sa_zfs_set_sharenfs(sa_group_t group, char *path, int on)
 	    }
 
 	    impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
+	    assert(impl_handle != NULL);
 	    if (impl_handle != NULL)
 		dataset = get_zfs_dataset(impl_handle, path);
 	    else

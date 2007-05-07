@@ -148,6 +148,7 @@ changelist_postfix(prop_changelist_t *clp)
 	prop_changenode_t *cn;
 	char shareopts[ZFS_MAXPROPLEN];
 	int ret = 0;
+	libzfs_handle_t *hdl;
 
 	/*
 	 * If we're changing the mountpoint, attempt to destroy the underlying
@@ -161,6 +162,18 @@ changelist_postfix(prop_changelist_t *clp)
 
 	if (clp->cl_prop == ZFS_PROP_MOUNTPOINT)
 		remove_mountpoint(cn->cn_handle);
+
+	/*
+	 * It is possible that the changelist_prefix() used libshare
+	 * to unshare some entries. Since libshare caches data, an
+	 * attempt to reshare during postfix can fail unless libshare
+	 * is uninitialized here so that it will reinitialize later.
+	 */
+	if (cn->cn_handle != NULL) {
+	    hdl = cn->cn_handle->zfs_hdl;
+	    assert(hdl != NULL);
+	    zfs_uninit_libshare(hdl);
+	}
 
 	/*
 	 * We walk the datasets in reverse, because we want to mount any parent

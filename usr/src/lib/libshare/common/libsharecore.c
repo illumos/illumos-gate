@@ -760,6 +760,81 @@ _sa_remove_property(sa_property_t property)
 }
 
 /*
+ * _sa_create_dummy_share()
+ *
+ * Create a share entry suitable for parsing but not tied to any real
+ * config tree.  Need to have a parent as well as the node to parse
+ * on.  Free using _sa_free_dummy_share(share);
+ */
+
+static sa_group_t
+_sa_create_dummy_share()
+{
+	xmlNodePtr parent_node = NULL;
+	xmlNodePtr child_node = NULL;
+
+	parent_node = xmlNewNode(NULL, (xmlChar *)"group");
+	if (parent_node != NULL) {
+	    child_node = xmlNewChild(parent_node, NULL, (xmlChar *)"share",
+					NULL);
+	    if (child_node != NULL) {
+		/*
+		 * Use a "zfs" tag since that will make sure nothing
+		 * really attempts to put values into the
+		 * repository. Also ZFS is currently the only user of
+		 * this interface.
+		 */
+		set_node_attr(parent_node, "type", "transient");
+		set_node_attr(parent_node, "zfs", "true");
+		set_node_attr(child_node, "type", "transient");
+		set_node_attr(child_node, "zfs", "true");
+	    } else {
+		xmlFreeNode(parent_node);
+	    }
+	}
+	return (child_node);
+}
+
+/*
+ * _sa_free_dummy_share(share)
+ *
+ * Free the dummy share and its parent.  It is an error to try and
+ * free something that isn't a dummy.
+ */
+
+static int
+_sa_free_dummy_share(sa_share_t share)
+{
+	xmlNodePtr node = (xmlNodePtr)share;
+	xmlNodePtr parent;
+	int ret = SA_OK;
+	char *name;
+
+	if (node != NULL) {
+	    parent = node->parent;
+	    name = (char *)xmlGetProp(node, (xmlChar *)"path");
+	    if (name != NULL) {
+		/* Real shares always have a path but a dummy doesn't */
+		ret = SA_NOT_ALLOWED;
+		sa_free_attr_string(name);
+	    } else {
+		/*
+		 * If there is a parent, do the free on that since
+		 * xmlFreeNode is a recursive function and free's an
+		 * child nodes.
+		 */
+		if (parent != NULL) {
+		    node = parent;
+		}
+		xmlUnlinkNode(node);
+		xmlFreeNode(node);
+	    }
+	}
+	return (ret);
+}
+
+
+/*
  * sa_parse_legacy_options(group, options, proto)
  *
  * In order to support legacy configurations, we allow the protocol
@@ -778,10 +853,28 @@ sa_parse_legacy_options(sa_group_t group, char *options, char *proto)
 {
 	int ret = SA_INVALID_PROTOCOL;
 	sa_group_t parent;
+	int using_dummy = B_FALSE;
+
+	/*
+	 * if "group" is NULL, this is just a parse without saving
+	 * anything in either SMF or ZFS.  Create a dummy group to
+	 * handle this case.
+	 */
+	if (group == NULL) {
+	    group = (sa_group_t)_sa_create_dummy_share();
+	    using_dummy = B_TRUE;
+	}
+
 	parent = sa_get_parent_group(group);
 
 	if (proto != NULL)
 	    ret = sa_proto_legacy_opts(proto, group, options);
+
+	if (using_dummy) {
+	    /* Since this is a dummy parse, cleanup and quit here */
+	    (void) _sa_free_dummy_share(group);
+	    return (ret);
+	}
 	/*
 	 * if in a group, remove the inherited options and security
 	 */

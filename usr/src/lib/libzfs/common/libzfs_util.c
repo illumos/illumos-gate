@@ -530,6 +530,7 @@ libzfs_fini(libzfs_handle_t *hdl)
 		(void) fclose(hdl->libzfs_mnttab);
 	if (hdl->libzfs_sharetab)
 		(void) fclose(hdl->libzfs_sharetab);
+	zfs_uninit_libshare(hdl);
 	namespace_clear(hdl);
 	free(hdl);
 }
