@@ -294,8 +294,10 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 	VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_POOL_GUID,
 	    spa_guid(spa)) == 0);
 	(void) ddi_strtoul(hw_serial, NULL, 10, &hostid);
-	VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_HOSTID,
-	    hostid) == 0);
+	if (hostid != 0) {
+		VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_HOSTID,
+			hostid) == 0);
+	}
 	VERIFY(nvlist_add_string(config, ZPOOL_CONFIG_HOSTNAME,
 	    utsname.nodename) == 0);
 

@@ -589,7 +589,8 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 			    ZPOOL_CONFIG_HOSTNAME, &hostname) == 0);
 
 			(void) ddi_strtoul(hw_serial, NULL, 10, &myhostid);
-			if ((unsigned long)hostid != myhostid) {
+			if (hostid != 0 && myhostid != 0 &&
+			    (unsigned long)hostid != myhostid) {
 				cmn_err(CE_WARN, "pool '%s' could not be "
 				    "loaded as it was last accessed by "
 				    "another system (host: %s hostid: 0x%lx).  "
