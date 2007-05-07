@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -45,7 +45,7 @@ JAR_FILE=Audit.jar
 
 INSTALL_JAR = $(ROOTAUDITHOME)/$(JAR_FILE)
 
-CLEAN_FILES = *.class $(JNIH) *.jar
+CLEAN_FILES = *.class $(JNIH) *.jar AuditEvent*.java
 
 DEFINES=
 

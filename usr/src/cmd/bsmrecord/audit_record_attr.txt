@@ -1956,17 +1956,6 @@ label=AUE_XMKNOD
 label=AUE_XSTAT
   skip=Not Used.  xstat() generates AUE_STAT.
 
-label=AUE_admin_authenticate
-  program=admin (various)
-  see=SMC, WBEM, or AdminSuite
-  title=Admin Server Authentication
-  format=[text]1
-    comment="successful login" or error message
-# see aue_mgrs.c
-#	header,61,2,admin login,,Tue Oct 23 12:45:22 2001, + 187 msec
-#	subject,tuser1,tuser1,emacs,tuser1,emacs,23400,3451581082,24 7 tmach2
-#	return,success,0
-
 label=AUE_allocate_fail
   program=/usr/sbin/allocate
   title=allocate: allocate-device failure
@@ -2099,76 +2088,11 @@ label=AUE_ftpd_logout
   format=text
 # See audit_ftpd
 
-label=AUE_filesystem_add
-  program=SMC server
-  see=
-  title=SMC: filesystem add
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=initial values
-
-label=AUE_filesystem_modify
-  program=SMC server
-  see=
-  title=SMC: filesystem modify
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=changed values
-
-label=AUE_filesystem_delete
-  program=SMC server
-  see=
-  title=SMC: filesystem delete
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=deleted values
-
 label=AUE_halt_solaris
   program=/usr/sbin/halt
   title=halt
   format=user
 # See audit_halt.c
-
-label=AUE_inetd_connect
-  program=/usr/sbin/inetd
-  title=inetd
-  format=text1:tid2:cmd3:privset
-  comment=service name:client address:inetd command
-
-label=AUE_inetd_ratelimit
-  program=/usr/sbin/inetd
-  title=inetd
-  format=text1:text2
-  comment=service name:limit value
-
-label=AUE_inetd_copylimit
-  program=/usr/sbin/inetd
-  title=inetd
-  format=text1:text2
-  comment=service name:limit value
-
-label=AUE_inetd_failrate
-  program=/usr/sbin/inetd
-  title=inetd
-  format=text1:text2
-  comment=service name:limit value, interval
-
-label=AUE_init_solaris
-  title=init
-  see=init(1M)
-  program=/sbin/init;/usr/sbin/init;/usr/sbin/shutdown
-  format=text1
-  comment=init level or zone name
-# See cmd/init/init.c
 
 label=AUE_kadmind_auth
   format=text1:text2:text3
@@ -2222,20 +2146,6 @@ label=AUE_listdevice_succ
     comment=command line arguments
 # See audit_allocate.c
 
-label=AUE_login
-  title=terminal login
-  program=/usr/sbin/login;/usr/dt/bin/dtlogin
-  see=login(1);dtlogin
-  format=text1
-  comment=error message or "successful login"
-
-label=AUE_logout
-  title=login: logout
-  program=various
-  see=login(1)
-  format=text1
-  comment="logout" username
-
 label=AUE_modify_user
   program=administration: modify user
   format=text1:text2:text3:text4:text5:text6:text7:text8:text9:text10:text11:text12:text13:text14
@@ -2270,108 +2180,11 @@ label=AUE_mountd_umount
   comment=mount dir
 # See audit_mountd.c; old BSM manual is way off
 
-label=AUE_network_add
-  program=SMC server
-  see=
-  title=SMC: network add
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=initial values
-
-label=AUE_network_modify
-  program=SMC server
-  see=
-  title=SMC: network modify
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=changed values
-
-label=AUE_network_delete
-  program=SMC server
-  see=
-  title=SMC: network delete
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=deleted values
-
-label=AUE_newgrp_login
-  program=newgrp
-  format=text1
-    comment=Group id
-
-label=AUE_passwd
-  program=/usr/bin/passwd
-  title=passwd
-  format=text1
-    comment=success/fail message
-# See audit_passwd.c
-
-label=AUE_printer_add
-  see=
-  program=SMC server
-  title=SMC: printer add
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=initial values
-
-label=AUE_printer_modify
-  see=
-  program=SMC server
-  title=SMC: printer modify
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=changed values
-
-label=AUE_printer_delete
-  program=SMC server
-  see=
-  title=SMC: printer delete
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=deleted values
-
 label=AUE_poweroff_solaris
   program=/usr/sbin/poweroff
   title=poweroff
   format=user
 # See audit_halt.c
-
-label=AUE_prof_cmd
-  program=/usr/bin/pfexec
-  see=pfexec(1)
-  title=pfexec
-  format=[newgroup]:path1:path2:cmd:process:[privset]:[privset]
-  comment=working directory:
-  comment=command pathname
-#header,164,2,profile command,,tmach1,Thu Oct  2 13:22:12 PDT 2003, + 914 msec
-#subject,testuser1,root,staff,testuser1,staff,2821,3890428265,0 25 tmach2
-#path,/usr/include/security
-#path,/usr/sbin
-#cmd,argcnt,0,envcnt,0,
-#process,root,root,root,root,root,2821,3890428265,0 25 tmach2
-#privilege,Limit,none
-#return,success,0
-#sequence,16972
-#trailer,164
-
 
 label=AUE_reboot_solaris
   program=/usr/sbin/reboot
@@ -2403,25 +2216,6 @@ label=AUE_rexecd
     comment="Command line&colon;" command attempted
 # See audit_rexecd.c
 
-label=AUE_rlogin
-  title=rlogin
-  program=/usr/sbin/login
-  see=login(1) - rlogin
-  format=[text]1
-    comment=success/fail message
-
-label=AUE_role_login
-  program=SMC server;/usr/bin/su
-  title=RBAC: role login
-  format=[text]1
-  comment=error message
-
-label=AUE_role_logout
-  program=/usr/bin/su
-  title=su
-  see=su(1M)
-  format=user
-
 label=AUE_rshd
   program=/usr/sbin/in.rshd
   title=in.rshd
@@ -2431,80 +2225,6 @@ label=AUE_rshd
     comment="local user" local user:
     comment=failure message
 # See audit_rshd.c
-
-label=AUE_scheduledjob_add
-  program=SMC server
-  see=
-  title=SMC: scheduled job add
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=initial values
-
-label=AUE_scheduledjob_modify
-  see=
-  program=SMC server
-  title=SMC: scheduled job modify
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=changed values
-
-label=AUE_scheduledjob_delete
-  program=SMC server
-  see=
-  title=SMC: scheduled job delete
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=deleted values
-
-label=AUE_screenlock
-  program=desktop screen lock
-  format=user
-
-label=AUE_screenunlock
-  program=desktop screen unlock
-  format=user
-
-label=AUE_serialport_add
-  program=SMC server
-  see=
-  title=SMC: serial port add
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=initial values
-
-label=AUE_serialport_modify
-  program=SMC server
-  see=
-  title=SMC: serial port modify
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=changed values
-
-label=AUE_serialport_delete
-  program=SMC server
-  see=
-  title=SMC: serial port add
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=deleted values
 
 label=AUE_shutdown_solaris
   title=shutdown
@@ -2520,34 +2240,6 @@ label=AUE_smserverd
 # see usr/src/cmd/smserverd
 # code shows a third token, path, but it isn't implemented.
 
-label=AUE_ssh
-  program=/usr/lib/ssh/sshd
-  format=[text]1
-    comment=error message
-#	header,61,2,login - ssh,,Tue Oct 23 12:45:30 2001, + 143 msec
-#	subject,tuser57,tuser57,staff,tuser57,staff,23408,296727403,0 0 0.0.0.0
-#	return,success,0
-
-label=AUE_su
-  program=/usr/bin/su
-  title=su
-  see=su(1M)
-  format=[text]1
-  comment="user name" of failed new user/role
-
-label=AUE_su_logout
-  program=/usr/bin/su
-  title=su
-  see=su(1M)
-  format=user
-
-label=AUE_telnet
-  title=telnet login
-  program=/usr/sbin/login
-  see=login(1) - telnet
-  format=[text]1
-  comment=success/fail message
-
 label=AUE_uadmin_solaris
   title=uadmin
   program=/sbin/uadmin;/usr/sbin/uadmin
@@ -2555,114 +2247,3 @@ label=AUE_uadmin_solaris
   comment=function code:argument code
 # See audit_uadmin.c
 
-label=AUE_uauth
-  program=SMC server
-  see=
-  title=SMC:  Use of Authorization
-  format=uauth1:text2
-  comment=authorization used:
-  comment=object name
-
-label=AUE_usermgr_add
-  see=
-  program=SMC server
-  title=SMC: User Manager add
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=initial values
-#	header,137,2,add user/user attributes,,Tue Oct 23 12:45:26 2001, + 725 msec
-#	subject,tuser1,tuser1,emacs,tuser1,emacs,23404,2926062642,0 0 0.0.0.0
-#	text,passwd.h
-#	text,NIS-
-#	use of authorization,phony role
-#	text,A long list of attribute / value pairs
-#	return,success,0
-
-label=AUE_usermgr_modify
-  program=SMC server
-  see=
-  title=SMC: User Manager modify
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=changed values
-
-label=AUE_usermgr_delete
-  program=SMC server
-  see=
-  title=SMC: User Manager delete
-  format=text1:[text]2:text3:uauth4:text5
-  comment=object name:
-  comment=domain:
-  comment=name_service:
-  comment=authorization used:
-  comment=deleted values
-
-label=AUE_zone_state
-  format=text1:zone2
-  comment=New zone state:zone name
-
-label=AUE_attach
-  program=hald
-  format=uauth1:text2:text3:[text4]
-  comment=authorization used:mount point:device:options
-label=AUE_detach
-  program=hald
-  format=uauth1:text2:text3:[text4]
-  comment=authorization used:mount point:device:options
-label=AUE_remove
-  program=hald
-  format=uauth1:[text2]:text3
-  comment=authorization used:mount point:device
-label=AUE_pool_import
-  program=hald
-  format=uauth1:text2:text3
-  comment=authorization used:pool:device
-label=AUE_pool_export
-  program=hald
-  format=uauth1:text2:text3
-  comment=authorization used:pool:device
-
-label=AUE_dladm_create_secobj
-  program=/usr/sbin/dladm
-  title=create wifi security object
-  see=dladm(1M)
-  format=uauth1:text2:text3
-  comment=authorization used:
-  comment=object class name:
-  comment=object name
-
-label=AUE_dladm_delete_secobj
-  program=/usr/sbin/dladm
-  title=delete wifi security object
-  see=dladm(1M)
-  format=uauth1:text2:text3
-  comment=authorization used:
-  comment=object class name:
-  comment=object name
-
-label=AUE_file_relabel
-  title=relabel file from one zone to another
-  program=setlabel(1)
-  see=setflabel(3TSOL)
-  format=uauth1:text2:label3:label4
-  comment=authorization used:
-  comment=file relabeled:
-  comment=original label:
-  comment=new label
-
-label=AUE_file_copy
-  title=copy file to another zone
-  program=dtfile(1X)
-  see=
-  format=uauth1:text2:label3:text4:label5
-  comment=authorization used:
-  comment=source file:
-  comment=source label:
-  comment=destination directory:
-  comment=destination label

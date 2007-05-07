@@ -29,7 +29,7 @@ Use is subject to license terms.
 <specification>
 
 <!-- comments are displayed to stderr if debug is on -->
-<debug set="off">
+<debug set="off"/>
 
     <!-- The order of events is arbitrary EXCEPT generic events must
 	 precede their instances -->
@@ -257,6 +257,7 @@ Use is subject to license terms.
 	<entry id="message">
 	    <internal token="text"/>
 	    <external opt="optional" type="msg login_text"/>
+	    <comment>error message</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -274,18 +275,22 @@ Use is subject to license terms.
 	<entry id="object_name">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>object name</comment>
 	</entry>
 	<entry id="domain">
 	    <internal token="text"/>
 	    <external opt="optional" type="char *"/>
+	    <comment>domain</comment>
 	</entry>
 	<entry id="name_service">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>name_service</comment>
 	</entry>
 	<entry id="auth_used">
 	    <internal token="uauth"/>
 	    <external opt="optional" type="char *"/>
+	    <comment>authorization used</comment>
 	</entry>
 	<!--
 	  This should really be its own token type, not "text"
@@ -293,6 +298,7 @@ Use is subject to license terms.
 	<entry id="initial_values">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>initial values</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -308,22 +314,27 @@ Use is subject to license terms.
 	<entry id="object_name">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>object name</comment>
 	</entry>
 	<entry id="domain">
 	    <internal token="text"/>
 	    <external opt="optional" type="char *"/>
+	    <comment>domain</comment>
 	</entry>
 	<entry id="name_service">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>name_service</comment>
 	</entry>
 	<entry id="auth_used">
 	    <internal token="uauth"/>
 	    <external opt="optional" type="char *"/>
+	    <comment>authorization used</comment>
 	</entry>
 	<entry id="delete_values">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>deleted values</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -339,22 +350,27 @@ Use is subject to license terms.
 	<entry id="object_name">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>object name</comment>
 	</entry>
 	<entry id="domain">
 	    <internal token="text"/>
 	    <external opt="optional" type="char *"/>
+	    <comment>domain</comment>
 	</entry>
 	<entry id="name_service">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>name_service</comment>
 	</entry>
 	<entry id="auth_used">
 	    <internal token="uauth"/>
 	    <external opt="optional" type="char *"/>
+	    <comment>authorization used</comment>
 	</entry>
 	<entry id="changed_values">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>changed values</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -374,36 +390,57 @@ Use is subject to license terms.
 -->
     <event id="AUE_admin_authenticate" instance_of="AUE_generic_login"
 	header="0" idNo="3">
+	<title>Admin Server Authentication</title>
+	<program>admin (various)</program>
+	<see>SMC, WBEM, or AdminSuite</see>
     </event>
 
     <event id="AUE_filesystem_add" instance_of="AUE_generic_SMC_add"
 	header="0" idNo="4">
+	<title>SMC: filesystem add</title>
+	<program>SMC server</program>
     </event>
     <event id="AUE_filesystem_delete" instance_of="AUE_generic_SMC_delete"
 	header="0" idNo="5">
+	<title>SMC: filesystem delete</title>
+	<program>SMC server</program>
     </event>
     <event id="AUE_filesystem_modify" instance_of="AUE_generic_SMC_modify"
 	header="0" idNo="6">
+	<title>SMC: filesystem modify</title>
+	<program>SMC server</program>
     </event>
 
     <event id="AUE_network_add" instance_of="AUE_generic_SMC_add"
 	header="0" idNo="7">
+	<title>SMC: network add</title>
+	<program>SMC server</program>
     </event>
     <event id="AUE_network_delete" instance_of="AUE_generic_SMC_delete"
 	header="0" idNo="8">
+	<title>SMC: network delete</title>
+	<program>SMC server</program>
     </event>
     <event id="AUE_network_modify" instance_of="AUE_generic_SMC_modify"
 	header="0" idNo="9">
+	<title>SMC: network modify</title>
+	<program>SMC server</program>
     </event>
 
     <event id="AUE_printer_add" instance_of="AUE_generic_SMC_add"
 	header="0" idNo="10">
+	<title>SMC: printer add</title>
+	<program>SMC server</program>
     </event>
     <event id="AUE_printer_delete" instance_of="AUE_generic_SMC_delete"
 	header="0" idNo="11">
+	<title>SMC: printer delete</title>
+	<program>SMC server</program>
     </event>
     <event id="AUE_printer_modify" instance_of="AUE_generic_SMC_modify"
 	header="0" idNo="12">
+	<title>SMC: printer modify</title>
+	<program>SMC server</program>
     </event>
 
 <!--
@@ -413,30 +450,47 @@ Use is subject to license terms.
 -->
     <event id="AUE_role_login" instance_of="AUE_generic_login"
 	header="0" idNo="13">
+	<title>RBAC: role login</title>
+	<program>SMC server</program>
+	<program>/usr/bin/su</program>
     </event>
 
     <event id="AUE_scheduledjob_add" instance_of="AUE_generic_SMC_add"
 	header="0" idNo="14">
+	<title>SMC: scheduled job add</title>
+	<program>SMC server</program>
     </event>
     <event id="AUE_scheduledjob_delete" instance_of="AUE_generic_SMC_delete"
 	header="0" idNo="15">
+	<title>SMC: scheduled job delete</title>
+	<program>SMC server</program>
     </event>
     <event id="AUE_scheduledjob_modify" instance_of="AUE_generic_SMC_modify"
 	header="0" idNo="16">
+	<title>SMC: scheduled job modify</title>
+	<program>SMC server</program>
     </event>
 
     <event id="AUE_serialport_add" instance_of="AUE_generic_SMC_add"
 	header="0" idNo="17">
+	<title>SMC: serial port add</title>
+	<program>SMC server</program>
     </event>
     <event id="AUE_serialport_delete" instance_of="AUE_generic_SMC_delete"
 	header="0" idNo="18">
+	<title>SMC: serial port delete</title>
+	<program>SMC server</program>
     </event>
     <event id="AUE_serialport_modify" instance_of="AUE_generic_SMC_modify"
 	header="0" idNo="19">
+	<title>SMC: serial port modify</title>
+	<program>SMC server</program>
     </event>
 
 <!-- This is SMC; should this also be used elsewhere? -->
     <event id="AUE_uauth" header="0" idNo="20">
+    	<title>SMC: Use of Authorization</title>
+	<program>SMC server</program>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -444,10 +498,12 @@ Use is subject to license terms.
 	<entry id="auth_used">
 	    <internal token="uauth"/>
 	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
 	</entry>
 	<entry id="objectname">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>object name</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -457,18 +513,27 @@ Use is subject to license terms.
 
     <event id="AUE_usermgr_add" instance_of="AUE_generic_SMC_add"
 	header="0" idNo="21">
+	<title>SMC: User Manager add</title>
+	<program>SMC server</program>
     </event>
     <event id="AUE_usermgr_delete" instance_of="AUE_generic_SMC_delete"
 	header="0" idNo="22">
+	<title>SMC: User Manager delete</title>
+	<program>SMC server</program>
     </event>
     <event id="AUE_usermgr_modify" instance_of="AUE_generic_SMC_modify"
 	header="0" idNo="23">
+	<title>SMC: User Manager modify</title>
+	<program>SMC server</program>
     </event>
 <!-- end of Java needed for SMC events -->
 <!--
     while not used by SMC logout is used by Lockhart
 -->
     <event id="AUE_logout" header="0" idNo="1"> 
+    	<title>login: logout</title>
+	<program>various</program>
+	<see>login(1)</see>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -483,6 +548,7 @@ Use is subject to license terms.
 	<entry id="user_name">
 	    <internal token="text" format="logout %s"/>
 	    <external opt="optional" type="char *"/>
+	    <comment>"logout" username</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -493,6 +559,10 @@ Use is subject to license terms.
 
 <!-- C Only events -->
     <event id="AUE_init_solaris" header="0" idNo="32" omit="JNI">
+    	<title>init</title>
+	<program>/sbin/init</program>
+	<program>/usr/sbin/init</program>
+	<program>/usr/sbin/shutdown</program>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -500,6 +570,7 @@ Use is subject to license terms.
 	<entry id="info">
 	    <internal token="text"/>
 	    <external opt="optional" type="char *"/>
+	    <comment>init level or zone name</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -509,18 +580,33 @@ Use is subject to license terms.
 
     <event id="AUE_login" instance_of="AUE_generic_login" header="0"
 	idNo="25" omit="JNI">
+	<title>terminal login</title>
+	<program>/usr/sbin/login</program>
+	<program>/usr/dt/bin/dtlogin</program>
+	<see>login(1)</see>
+	<see>dtlogin</see>
     </event>
     <event id="AUE_rlogin" instance_of="AUE_generic_login" header="0"
 	idNo="28" omit="JNI">
+	<title>rlogin</title>
+	<program>/usr/sbin/login</program>
+	<see>login(1) - rlogin</see>
     </event>
     <event id="AUE_telnet" instance_of="AUE_generic_login" header="0"
 	idNo="29" omit="JNI">
+	<title>telnet login</title>
+	<program>/usr/sbin/login</program>
+	<see>login(1) - telnet</see>
     </event>
     <event id="AUE_ssh" instance_of="AUE_generic_login" header="0"
 	idNo="2" omit="JNI">
+	<program>/usr/lib/ssh/sshd</program>
     </event>
 
     <event id="AUE_zlogin" header="0" idNo="38" omit="JNI">
+    	<title>zone login</title>
+	<program>/usr/sbin/login</program>
+	<see>zlogin(1)</see>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -528,6 +614,7 @@ Use is subject to license terms.
 	<entry id="message">
 	    <internal token="text"/>
 	    <external opt="optional" type="char *"/>
+	    <comment>error message</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -536,6 +623,9 @@ Use is subject to license terms.
     </event>
 
     <event id="AUE_su" header="0" idNo="30" omit="JNI">
+    	<title>su</title>
+	<program>/usr/bin/su</program>
+	<see>su(1M)</see>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -547,6 +637,7 @@ Use is subject to license terms.
 	<entry id="message">
 	    <internal token="text"/>
 	    <external opt="optional" type="char *"/>
+	    <comment>"user name" of failed new user/role</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -555,6 +646,9 @@ Use is subject to license terms.
     </event>
 
     <event id="AUE_passwd" header="0" idNo="27" omit="JNI">
+    	<title>passwd</title>
+	<program>various</program>
+	<see>passwd(1)</see>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -562,6 +656,7 @@ Use is subject to license terms.
 	<entry id="username">
 	    <internal token="text"/>
 	    <external opt="optional" type="char *"/>
+	    <comment>success/fail message</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -571,9 +666,11 @@ Use is subject to license terms.
 
     <event id="AUE_screenlock" instance_of="AUE_generic_basic" header="0"
 	idNo="26" omit="JNI">
+	<program>desktop screen lock</program>
     </event>
     <event id="AUE_screenunlock" instance_of="AUE_generic_basic" header="0"
 	idNo="31" omit="JNI">
+	<program>desktop screen unlock</program>
     </event>
 
     <!--
@@ -584,6 +681,9 @@ Use is subject to license terms.
     -->
 
     <event id="AUE_prof_cmd" header="0" idNo="24" omit="JNI">
+    	<title>pfexec</title>
+	<program>/usr/bin/pfexec</program>
+	<see>pfexec(1)</see>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -591,10 +691,12 @@ Use is subject to license terms.
 	<entry id="cwdpath">
 	    <internal token="path"/>
 	    <external opt="required" type="char*"/>
+	    <comment>working directory</comment>
 	</entry>
 	<entry id="cmdpath">
 	    <internal token="path"/>
 	    <external opt="required" type="char*"/>
+	    <comment>command pathname</comment>
 	</entry>
 	<entry id="argc,argv,envp">
 	    <internal token="command"/>
@@ -620,6 +722,8 @@ Use is subject to license terms.
     </event>
 
     <event id="AUE_inetd_connect" header="0" idNo="34" omit="JNI">
+    	<title>inetd</title>
+	<program>/usr/sbin/inetd</program>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -627,15 +731,18 @@ Use is subject to license terms.
 	<entry id="service_name">
 	    <internal token="text"/>
 	    <external opt="optional" type="char *"/>
+	    <comment>service name</comment>
 	</entry>
 	<entry id="ip_type,ip_remote_port,ip_local_port,ip_adr">
 	    <internal token="tid"/>
 	    <external opt="required"
 		type="uint32_t,uint16_t,uint16_t,uint32_t[4]"/>
+	    <comment>client address</comment>
 	</entry>
 	<entry id="cmd">
 	    <internal token="command_1"/>
 	    <external opt="required" type="char *"/>
+	    <comment>inetd command</comment>
 	</entry>
 	<entry id="privileges">
 	    <internal token="priv_effective"/>
@@ -648,6 +755,8 @@ Use is subject to license terms.
     </event>
 
     <event id="AUE_inetd_ratelimit" header="0" idNo="35" omit="JNI">
+    	<title>inetd</title>
+	<program>/usr/sbin/inetd</program>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -655,10 +764,12 @@ Use is subject to license terms.
 	<entry id="service_name">
 	    <internal token="text"/>
 	    <external opt="optional" type="char *"/>
+	    <comment>service name</comment>
 	</entry>
 	<entry id="limit">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>limit value</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -667,6 +778,8 @@ Use is subject to license terms.
     </event>
 
     <event id="AUE_inetd_copylimit" header="0" idNo="36" omit="JNI">
+    	<title>inetd</title>
+	<program>/usr/sbin/inetd</program>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -674,10 +787,12 @@ Use is subject to license terms.
 	<entry id="service_name">
 	    <internal token="text"/>
 	    <external opt="optional" type="char *"/>
+	    <comment>service name</comment>
 	</entry>
 	<entry id="limit">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>limit value</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -686,6 +801,8 @@ Use is subject to license terms.
     </event>
 
     <event id="AUE_inetd_failrate" header="0" idNo="37" omit="JNI">
+    	<title>inetd</title>
+	<program>/usr/sbin/inetd</program>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -693,10 +810,12 @@ Use is subject to license terms.
 	<entry id="service_name">
 	    <internal token="text"/>
 	    <external opt="optional" type="char *"/>
+	    <comment>service name</comment>
 	</entry>
 	<entry id="values">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>limit value, interval</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -712,10 +831,12 @@ Use is subject to license terms.
 	<entry id="new_state">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>New zone state</comment>
 	</entry>
 	<entry id="zonename">
 	    <internal token="zonename"/>
 	    <external opt="required" type="char *"/>
+	    <comment>zone name</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -725,13 +846,20 @@ Use is subject to license terms.
 
     <event id="AUE_su_logout" instance_of="AUE_generic_basic"
 	header="0" idNo="39" omit="JNI">
+	<title>su</title>
+	<program>/usr/bin/su</program>
+	<see>su(1M)</see>
     </event>
 
     <event id="AUE_role_logout" instance_of="AUE_generic_basic"
 	header="0" idNo="40" omit="JNI">
+	<title>su</title>
+	<program>/usr/bin/su</program>
+	<see>su(1M)</see>
     </event>
 
     <event id="AUE_newgrp_login" header="0" idNo="41" omit="JNI">
+    	<program>newgrp</program>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -739,6 +867,7 @@ Use is subject to license terms.
 	<entry id="groupname">
 	    <internal  token="text"/>
 	    <external opt="required"  type="char *"/>
+	    <comment>group name</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -759,18 +888,22 @@ Use is subject to license terms.
 	<entry id="auth_used">
 	    <internal token="uauth"/>
 	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
 	</entry>
 	<entry id="mount_point">
 	    <internal token="path"/>
 	    <external opt="required" type="char *"/>
+	    <comment>mount point</comment>
 	</entry>
 	<entry id="device">
 	    <internal token="path"/>
 	    <external opt="required" type="char *"/>
+	    <comment>device</comment>
 	</entry>
 	<entry id="options">
 	    <internal token="text"/>
 	    <external opt="optional" type="char *"/>
+	    <comment>options</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -780,11 +913,14 @@ Use is subject to license terms.
 
     <event id="AUE_attach" instance_of="AUE_generic_mountable"
 	header="0" idNo="42" omit="JNI">
+	<program>hald</program>
     </event>
     <event id="AUE_detach" instance_of="AUE_generic_mountable"
 	header="0" idNo="43" omit="JNI">
+	<program>hald</program>
     </event>
     <event id="AUE_remove" header="0" idNo="44" omit="JNI">
+	<program>hald</program>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -792,14 +928,17 @@ Use is subject to license terms.
 	<entry id="auth_used">
 	    <internal token="uauth"/>
 	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
 	</entry>
 	<entry id="mount_point">
 	    <internal token="path"/>
 	    <external opt="optional" type="char *"/>
+	    <comment>mount point</comment>
 	</entry>
 	<entry id="device">
 	    <internal token="path"/>
 	    <external opt="required" type="char *"/>
+	    <comment>device</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -808,6 +947,7 @@ Use is subject to license terms.
     </event>
 
     <event id="AUE_pool_import" header="0" idNo="45" omit="JNI">
+    	<program>hald</program>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -815,14 +955,17 @@ Use is subject to license terms.
 	<entry id="auth_used">
 	    <internal token="uauth"/>
 	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
 	</entry>
 	<entry id="pool">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>pool</comment>
 	</entry>
 	<entry id="device">
 	    <internal token="path"/>
 	    <external opt="required" type="char *"/>
+	    <comment>device</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -830,6 +973,7 @@ Use is subject to license terms.
 	</entry>
     </event>
     <event id="AUE_pool_export" header="0" idNo="46" omit="JNI">
+    	<program>hald</program>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -837,14 +981,17 @@ Use is subject to license terms.
 	<entry id="auth_used">
 	    <internal token="uauth"/>
 	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
 	</entry>
 	<entry id="pool">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>pool</comment>
 	</entry>
 	<entry id="device">
 	    <internal token="path"/>
 	    <external opt="required" type="char *"/>
+	    <comment>device</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -861,14 +1008,17 @@ Use is subject to license terms.
 	<entry id="auth_used">
 	    <internal token="uauth"/>
 	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
 	</entry>
 	<entry id="obj_class">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>object class name</comment>
 	</entry>
 	<entry id="obj_name">
 	    <internal token="text"/>
 	    <external opt="required" type="char *"/>
+	    <comment>object name</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -878,15 +1028,24 @@ Use is subject to license terms.
 
     <event id="AUE_dladm_create_secobj" instance_of="AUE_dladm_generic"
 	header="0" idNo="47" omit="JNI">
+	<title>create wifi security object</title>
+	<program>/usr/sbin/dladm</program>
+	<see>dladm(1M)</see>
     </event>
     <event id="AUE_dladm_delete_secobj" instance_of="AUE_dladm_generic"
 	header="0" idNo="48" omit="JNI">
+	<title>delete wifi security object</title>
+	<program>/usr/sbin/dladm</program>
+	<see>dladm(1M)</see>
     </event>
 
 <!-- Trusted eXtensions (TX) events -->
 
     <!-- labeld events -->
     <event id="AUE_file_relabel" header="0" idNo="49" omit="JNI">
+    	<title>relabel file from one zone to another</title>
+	<program>setlabel(1)</program>
+	<see>setflabel(3TSOL)</see>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -894,18 +1053,22 @@ Use is subject to license terms.
 	<entry id="auth_used">
 	    <internal token="uauth"/>
 	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
 	</entry>
 	<entry id="file">
 	    <internal token="path"/>
 	    <external opt="required" type="char *"/>
+	    <comment>file relabeled</comment>
 	</entry>
 	<entry id="src_label">
 	    <internal token="label"/>
 	    <external opt="required" type="m_label_t *"/>
+	    <comment>original label</comment>
 	</entry>
 	<entry id="dst_label">
 	    <internal token="label"/>
 	    <external opt="required" type="m_label_t *"/>
+	    <comment>new label</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -914,6 +1077,8 @@ Use is subject to license terms.
     </event>
 
     <event id="AUE_file_copy" header="0" idNo="50" omit="JNI">
+    	<title>copy file to another zone</title>
+	<program>dtfile(1X)</program>
 	<entry id="subject">
 	    <internal token="subject"/>
 	    <external opt="none"/>
@@ -921,22 +1086,27 @@ Use is subject to license terms.
 	<entry id="auth_used">
 	    <internal token="uauth"/>
 	    <external opt="required" type="char *"/>
+	    <comment>authorization used</comment>
 	</entry>
 	<entry id="src_file">
 	    <internal token="path"/>
 	    <external opt="required" type="char *"/>
+	    <comment>source file</comment>
 	</entry>
 	<entry id="src_label">
 	    <internal token="label"/>
 	    <external opt="required" type="m_label_t *"/>
+	    <comment>source label</comment>
 	</entry>
 	<entry id="dst_file">
 	    <internal token="path"/>
 	    <external opt="required" type="char *"/>
+	    <comment>destination directory</comment>
 	</entry>
 	<entry id="dst_label">
 	    <internal token="label"/>
 	    <external opt="required" type="m_label_t *"/>
+	    <comment>destination label</comment>
 	</entry>
 	<entry id="return">
 	    <internal token="return"/>
@@ -1116,5 +1286,4 @@ Use is subject to license terms.
 	<msg id="ANON_USER">No anonymous</msg>
     </msg_list>
 
-</debug>
 </specification>

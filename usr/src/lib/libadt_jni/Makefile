@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,6 +29,10 @@ include		../Makefile.lib
 
 POFILE	=	libadt_jni.po
 MSGFILES=	`$(GREP) -l gettext */*.[ch]`
+GENSRCS	=	common/adt_jni_event.c common/mapfile-vers com/sun/audit/AuditEvent.java
+LIBBSMDIR =	../libbsm
+ADTXMLFILE =	$(LIBBSMDIR)/common/adt.xml
+AUDITXML =	./auditxml_jni
 
 SUBDIRS =	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
@@ -41,10 +45,18 @@ lint	:=	TARGET= lint
 
 .KEEP_STATE:
 
-all install clean clobber lint: com/sun .WAIT $(SUBDIRS)
+CLEANFILES += $(GENSRCS)
+
+all install lint: $(GENSRCS) com/sun .WAIT $(SUBDIRS)
 
 com/sun $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
+
+$(GENSRCS):  $(AUDITXML) $(ADTXMLFILE)
+	$(PERL) -I $(LIBBSMDIR) $(AUDITXML) $(ADTXMLFILE)
+
+clean clobber: com/sun $(SUBDIRS)
+	-$(RM) $(CLEANFILES)
 
 $(POFILE): pofile_MSGFILES
 

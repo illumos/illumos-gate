@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,8 +42,6 @@ package :=	TARGET= package
 
 .KEEP_STATE:
 
-all clean clobber delete install lint package: $(SUBDIRS)
-
 COMMONDIR = common
 
 #
@@ -51,6 +49,7 @@ COMMONDIR = common
 #
 GENHDRS = audit_uevents.h
 HDRS = libbsm.h devices.h devalloc.h adt.h adt_event.h audit_private.h
+GENSRCS =	$(COMMONDIR)/adt_xlate.c $(COMMONDIR)/adt_event.h
 COMMONHDRS =	$(HDRS:%=$(COMMONDIR)/%)
 ROOTHDRDIR = 	$(ROOT)/usr/include/bsm
 ROOTCHDRS = 	$(HDRS:%=$(ROOTHDRDIR)/%)
@@ -61,6 +60,9 @@ CHECKHDRS =	$(GENHDRS:%.h=%.check)
 
 $(ROOTHDRS) := 	FILEMODE = 0644
 $(ROOTCHDRS) :=	FILEMODE = 0644
+
+all install lint package: $(GENSRCS) $(SUBDIRS)
+clean clobber delete: $(SUBDIRS)
 
 #
 # Macros for libbsm database files. These should probably be installed
@@ -132,6 +134,12 @@ $(ROOTXMLFILES) :=  GROUP = bin
 CPPFLAGS += -I$(COMMONDIR)
 CPPFLAGS += -D_REENTRANT
 
+CLEANFILES += $(GENSRCS) $(GENHDRS)
+
+ADTXMLFILE =	$(COMMONDIR)/adt.xml
+ADTXSDFILE =	$(COMMONDIR)/adt.xsd
+AUDITXML =	auditxml
+
 .KEEP_STATE:
 
 install: install_dirs install_data
@@ -141,6 +149,7 @@ install: install_dirs install_data
 install_h: $(ROOTHDRDIR) $(ROOTHDRS) $(ROOTCHDRS)
 
 check:	$(CHECKHDRS) $(CHECKCHDRS)
+	xmllint --schema $(ADTXSDFILE) --noout $(ADTXMLFILE)
 
 install_data: $(ESSRC) $(RESSRC) $(ROOTETCSECURITY) $(ETCSECURITYFILES) \
 	$(EETCSECURITYFILES) $(ROOTXMLFILES)
@@ -149,6 +158,17 @@ install_dirs: $(AUDITDIRS) $(ARSYMLNK) $(ROOTXMLDIRS)
 
 audit_uevents.h: mkhdr.sh audit_event.txt
 	sh mkhdr.sh
+
+$(COMMONDIR)/adt_event.check:	$(COMMONDIR)/adt_event.h
+	$(DOT_C_CHECK) $<
+
+clean clobber: clean_files
+
+clean_files:
+	-$(RM) $(CLEANFILES)
+
+$(GENSRCS): $(ADTXMLFILE) $(AUDITXML)
+	$(PERL) $(AUDITXML) $(ADTXMLFILE)
 
 $(ETCSECURITYFILES) $(EETCSECURITYFILES) $(RESA): \
 	$(ETCSECURITY) \
