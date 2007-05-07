@@ -291,4 +291,17 @@ if [ "$UPDATE" = yes ]; then
 _MPXIOUPGRD
 fi
 
+#
+# Add nwam to sysidconfig app list so sys-unconfig does the right thing
+#
+cat >> $BASEDIR/var/svc/profile/upgrade <<\_NWAM_SYSID
+	/usr/sbin/sysidconfig -b "${PKG_INSTALL_ROOT}" -l |\
+		/usr/bin/grep -s net-nwam >/dev/null
+
+	if [ $? -ne 0 ]; then
+		/usr/sbin/sysidconfig -b "${PKG_INSTALL_ROOT}" \
+			-a /lib/svc/method/net-nwam
+	fi
+_NWAM_SYSID
+
 exit 0

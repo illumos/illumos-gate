@@ -122,7 +122,7 @@ display(const char *msg)
 
 	dprintf("display('%s')", STRING(msg));
 	if (valid_graphical_user(B_FALSE)) {
-		(void) snprintf(cmd, sizeof (cmd), "--text=\"%s\"", msg);
+		(void) snprintf(cmd, sizeof (cmd), "--text=%s", msg);
 		(void) start_child(ZENITY, "--info", cmd, NULL);
 	} else {
 		syslog(LOG_INFO, "%s", msg);
@@ -154,7 +154,7 @@ show_if_status(const char *ifname)
 	}
 	icfg_close(h);
 	(void) snprintf(msg, sizeof (msg),
-	    gettext("brought interface %s up, got address %s"), ifname,
+	    gettext("Brought interface %s up, got address %s."), ifname,
 	    inet_ntoa(sin.sin_addr));
 	display(msg);
 }
@@ -209,11 +209,16 @@ check_svc_up(const char *fmri, int wait_time)
 
 	for (i = 1; i <= wait_time; i++) {
 		state = smf_get_state(fmri);
-		if (strcmp(SCF_STATE_STRING_ONLINE, state) == 0) {
+		if (state == NULL) {
+			syslog(LOG_ERR, "smf_get_state(%s) returned \"%s\"",
+			    fmri, scf_strerror(scf_error()));
+		} else {
+			if (strcmp(SCF_STATE_STRING_ONLINE, state) == 0) {
+				free(state);
+				return (B_TRUE);
+			}
 			free(state);
-			return (B_TRUE);
 		}
-		free(state);
 		(void) sleep(1);
 	}
 	return (B_FALSE);
@@ -644,7 +649,7 @@ takedowninterface(const char *ifname, boolean_t dhcp, boolean_t popup,
 		char msg[64]; /* enough to hold this string */
 
 		(void) snprintf(msg, sizeof (msg),
-		    gettext("took interface %s down"), ifname);
+		    gettext("Took interface %s down."), ifname);
 		display(msg);
 	}
 }
@@ -1031,8 +1036,16 @@ initialize_interfaces(void)
 
 	/*
 	 * Really we should walk the device tree instead of doing
-	 * the 'ifconfig -a plumb'.
+	 * the 'ifconfig -a plumb'.  On the first reconfigure boot
+	 * (after install) 'ifconfig -a plumb' comes back quickly
+	 * without any devices configured if we start before
+	 * 'svc:/system/device/local' finishes.  We can't create a
+	 * dependency on device/local because that would create a
+	 * dependency loop through 'svc:/system/filesystem/usr'.  So
+	 * instead we wait on device/local.
 	 */
+	if (!check_svc_up(DEV_LOCAL_SVC_FMRI, 60))
+		syslog(LOG_WARNING, DEV_LOCAL_SVC_FMRI " never came up");
 	for (times = 1; times <= 30; times++) {
 		if (start_child(IFCONFIG, "-a", "plumb", NULL) == 0)
 			break;
@@ -1044,7 +1057,7 @@ initialize_interfaces(void)
 		(void) sleep(1);
 	}
 	if (times > 30)
-		syslog(LOG_ERR, IFCONFIG "-a plumb failed %d times", times);
+		syslog(LOG_ERR, IFCONFIG " -a plumb failed %d times", times);
 
 	(void) dladm_init_linkprop();
 

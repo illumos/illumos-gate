@@ -58,6 +58,41 @@ case "$1" in
 	/usr/bin/pkill -z `smf_zonename` nwamd
 	;;
 
+'-u')
+	# After we run this part of the script upon the next reboot
+	# network/physical:default will be enabled and
+	# network/physical:nwam will be disabled.
+	# There are various other parts of the system (nscd, nfs) that
+	# depend on continuing to have a working network.  For this
+	# reason we don't change the network configuration immediately.
+	
+	SVCADM=/usr/sbin/svcadm
+	SVCCFG=/usr/sbin/svccfg
+	net_phys=svc:/network/physical:default
+	net_nwam=svc:/network/physical:nwam
+
+	# Disable network/physical temporarily and make sure that will
+	# be enabled on reboot.
+	$SVCADM disable -st $net_phys
+	$SVCCFG -s $net_phys setprop general/enabled=true
+
+	# If nwam is online then make sure that it's temporarily enabled.
+	nwam_online=`/usr/bin/svcprop -t -p restarter/state $net_nwam`	
+	if [ $? -eq 0 ]; then
+		set -- $nwam_online
+		[ $3 = "online" ] && $SVCADM enable -st $net_nwam
+	fi
+
+	# Set nwam so that it won't be enabled upon reboot.
+	$SVCCFG -s $net_nwam setprop general/enabled=false
+	exit 0
+	;;
+
+'-c')
+	# Nothing to do for sysidtool
+	exit 0
+	;;
+
 *)
 	echo "Usage: $0 { start | stop | refresh }"
 	exit $SMF_EXIT_ERR_FATAL

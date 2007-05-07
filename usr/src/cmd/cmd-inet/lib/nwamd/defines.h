@@ -37,6 +37,7 @@
 #define	IFCONFIG	"/sbin/ifconfig"
 #define	NET_SVC_METHOD	"/lib/svc/method/net-svc"
 #define	NET_SVC_FMRI	"svc:/network/service:default"
+#define	DEV_LOCAL_SVC_FMRI "svc:/system/device/local:default"
 #define	PFEXEC		"/usr/bin/pfexec"
 
 #define	ULP_DIR		"/etc/nwam/ulp"

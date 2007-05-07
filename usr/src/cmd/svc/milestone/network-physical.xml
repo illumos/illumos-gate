@@ -113,7 +113,7 @@
 		<propval name='use_net_svc' type='boolean' value='true' />
 		<propval name='popup_info' type='boolean' value='true' />
 		<propval name='popup_query' type='boolean' value='true' />
-		<propval name='autoconf' type='boolean' value='true' />
+		<propval name='autoconf' type='boolean' value='false' />
 		<propval name='dhcp_wait_time' type='count' value='60' />
 		<propval name='scan_interval' type='count' value='120' />
 		<propval name='value_authorization' type='astring'
@@ -129,6 +129,14 @@
 		<documentation>
 			<manpage title='nwamd' section='1M'
 				manpath='/usr/share/man' />
+			<doc_link
+			   name='Network Auto-Magic OpenSolaris Project Page'
+			   uri='http://opensolaris.org/os/projects/nwam/'
+				/>
+			<doc_link
+			   name='Network Auto-Magic Operational Details'
+			   uri='http://opensolaris.org/os/projects/nwam/phase0/'
+				/>
 		</documentation>
 	</template>
 
