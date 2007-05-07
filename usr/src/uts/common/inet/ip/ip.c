@@ -16995,6 +16995,9 @@ ip_rput_forward_options(mblk_t *mp, ipha_t *ipha, ire_t *ire, ip_stack_t *ipst)
  * interface which had the ipha_dst configured when the packet went
  * through ip_rput. The ill_index corresponding to the recv_ill
  * is saved in ipsec_in_rill_index
+ *
+ * NOTE2: The "ire" argument is only used in IPv4 cases.  This function
+ * cannot assume "ire" points to valid data for any IPv6 cases.
  */
 void
 ip_fanout_proto_again(mblk_t *ipsec_mp, ill_t *ill, ill_t *recv_ill, ire_t *ire)

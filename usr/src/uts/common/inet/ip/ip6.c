@@ -7086,7 +7086,7 @@ ipsec_needs_processing_v6(mblk_t *mp, uint8_t *nexthdr)
  */
 static boolean_t
 ipsec_early_ah_v6(queue_t *q, mblk_t *first_mp, boolean_t mctl_present,
-    ill_t *ill, ire_t *ire, mblk_t *hada_mp, zoneid_t zoneid)
+    ill_t *ill, mblk_t *hada_mp, zoneid_t zoneid)
 {
 	mblk_t *mp;
 	uint8_t nexthdr;
@@ -7158,7 +7158,7 @@ ipsec_early_ah_v6(queue_t *q, mblk_t *first_mp, boolean_t mctl_present,
 	switch (ipsec_rc) {
 	case IPSEC_STATUS_SUCCESS:
 		/* we're done with IPsec processing, send it up */
-		ip_fanout_proto_again(first_mp, ill, ill, ire);
+		ip_fanout_proto_again(first_mp, ill, ill, NULL);
 		break;
 	case IPSEC_STATUS_FAILED:
 		BUMP_MIB(&ipst->ips_ip6_mib, ipIfStatsInDiscards);
@@ -7713,8 +7713,9 @@ forward:
 	zoneid = ire->ire_zoneid;
 	UPDATE_IB_PKT_COUNT(ire);
 	ire->ire_last_used_time = lbolt;
-	/* Don't use the ire after this point. */
+	/* Don't use the ire after this point, we'll NULL it out to be sure. */
 	ire_refrele(ire);
+	ire = NULL;
 ipv6forus:
 	/*
 	 * Looks like this packet is for us one way or another.
@@ -8109,7 +8110,7 @@ tcp_fanout:
 
 			/* Check if AH is present. */
 			if (ipsec_early_ah_v6(q, first_mp, mctl_present, ill,
-			    ire, hada_mp, zoneid)) {
+			    hada_mp, zoneid)) {
 				ip0dbg(("dst early hada drop\n"));
 				return;
 			}
@@ -8274,7 +8275,7 @@ tcp_fanout:
 
 			/* Check if AH is present. */
 			if (ipsec_early_ah_v6(q, first_mp, mctl_present, ill,
-			    ire, hada_mp, zoneid)) {
+			    hada_mp, zoneid)) {
 				ip0dbg(("routing hada drop\n"));
 				return;
 			}
@@ -8366,7 +8367,7 @@ tcp_fanout:
 
 			if (!ipsec_loaded(ipss)) {
 				ip_proto_not_sup(q, first_mp, IP_FF_SEND_ICMP,
-				    ire->ire_zoneid, ipst);
+				    zoneid, ipst);
 				return;
 			}
 
@@ -8403,7 +8404,7 @@ tcp_fanout:
 				return;
 			}
 			/* we're done with IPsec processing, send it up */
-			ip_fanout_proto_again(first_mp, ill, inill, ire);
+			ip_fanout_proto_again(first_mp, ill, inill, NULL);
 			return;
 		}
 		case IPPROTO_NONE:
