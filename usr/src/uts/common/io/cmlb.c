@@ -4409,12 +4409,11 @@ cmlb_dkio_get_virtgeom(struct cmlb_lun *cl, caddr_t arg, int flag)
 		dkgp->dkg_nhead	= cl->cl_lgeom.g_nhead;
 		dkgp->dkg_nsect	= cl->cl_lgeom.g_nsect;
 
+		mutex_exit(CMLB_MUTEX(cl));
 		if (ddi_copyout(dkgp, (void *)arg,
 		    sizeof (struct dk_geom), flag)) {
-			mutex_exit(CMLB_MUTEX(cl));
 			err = EFAULT;
 		} else {
-			mutex_exit(CMLB_MUTEX(cl));
 			err = 0;
 		}
 	}
@@ -4494,14 +4493,10 @@ cmlb_dkio_get_phygeom(struct cmlb_lun *cl, caddr_t  arg, int flag)
 	}
 	dkgp->dkg_pcyl = dkgp->dkg_ncyl + dkgp->dkg_acyl;
 
-	if (ddi_copyout(dkgp, (void *)arg,
-	    sizeof (struct dk_geom), flag)) {
-		mutex_exit(CMLB_MUTEX(cl));
+	mutex_exit(CMLB_MUTEX(cl));
+	if (ddi_copyout(dkgp, (void *)arg, sizeof (struct dk_geom), flag))
 		err = EFAULT;
-	} else {
-		mutex_exit(CMLB_MUTEX(cl));
-		err = 0;
-	}
+
 	return (err);
 }
 #endif
@@ -4524,11 +4519,13 @@ cmlb_dkio_partinfo(struct cmlb_lun *cl, dev_t dev, caddr_t  arg, int flag)
 	/* don't check cl_solaris_size for pN */
 	if (part < P0_RAW_DISK && cl->cl_solaris_size == 0) {
 		err = EIO;
+		mutex_exit(CMLB_MUTEX(cl));
 	} else {
 		struct part_info p;
 
 		p.p_start = (daddr_t)cl->cl_offset[part];
 		p.p_length = (int)cl->cl_map[part].dkl_nblk;
+		mutex_exit(CMLB_MUTEX(cl));
 #ifdef _MULTI_DATAMODEL
 		switch (ddi_model_convert_from(flag & FMODELS)) {
 		case DDI_MODEL_ILP32:
@@ -4556,7 +4553,6 @@ cmlb_dkio_partinfo(struct cmlb_lun *cl, dev_t dev, caddr_t  arg, int flag)
 			err = EFAULT;
 #endif /* _MULTI_DATAMODEL */
 	}
-	mutex_exit(CMLB_MUTEX(cl));
 	return (err);
 }
 #endif
