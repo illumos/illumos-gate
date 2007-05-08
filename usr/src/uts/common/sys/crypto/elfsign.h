@@ -201,7 +201,8 @@ typedef struct ELFCert_s *ELFCert_t;
 
 extern boolean_t elfcertlib_init(ELFsign_t, char *);
 
-extern boolean_t elfcertlib_loadcert(ELFsign_t, ELFCert_t *, const char *);
+extern boolean_t elfcertlib_getcert(ELFsign_t ess, char *cert_pathname,
+	char *signer_DN, ELFCert_t *certp, enum ES_ACTION action);
 extern void elfcertlib_releasecert(ELFsign_t, ELFCert_t);
 extern char *elfcertlib_getdn(ELFCert_t cert);
 extern char *elfcertlib_getissuer(ELFCert_t cert);
