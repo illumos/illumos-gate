@@ -307,7 +307,7 @@ npi_dev_func_sr_init(npi_handle_t handle)
 			NXGE_REG_WR64(handle, DEV_FUNC_SR_REG, sr.value);
 		}
 
-		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+		NPI_DEBUG_MSG((handle.function, NPI_VIR_CTL,
 			" npi_dev_func_sr_init"
 			" sr <0x%x>",
 			sr.bits.ldw.sr));
@@ -1418,7 +1418,7 @@ npi_fzc_sid_set(npi_handle_t handle, fzc_sid_t sid)
 				(sid.vector & SID_DATA_INTNUM_MASK));
 	}
 
-	NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+	NPI_DEBUG_MSG((handle.function, NPI_VIR_CTL,
 	    " npi_fzc_sid_set: group %d 0x%llx", sid.ldg, sd.value));
 
 	NXGE_REG_WR64(handle,  SID_REG + LDG_SID_OFFSET(sid.ldg), sd.value);

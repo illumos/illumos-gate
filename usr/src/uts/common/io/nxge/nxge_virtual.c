@@ -342,6 +342,7 @@ nxge_common_lock_free(p_nxge_t nxgep)
 	(void) npi_dev_func_sr_lock_free(handle);
 }
 
+
 static void
 nxge_get_niu_property(dev_info_t *dip, niu_type_t *niu_type)
 {
@@ -1588,8 +1589,6 @@ nxge_get_config_properties(p_nxge_t nxgep)
 {
 	nxge_status_t status = NXGE_OK;
 	p_nxge_hw_list_t hw_p;
-	uint_t prop_len;
-	uchar_t *prop_val8;
 
 	NXGE_DEBUG_MSG((nxgep, VPD_CTL, " ==> nxge_get_config_properties"));
 
@@ -1611,34 +1610,48 @@ nxge_get_config_properties(p_nxge_t nxgep)
 			return (NXGE_ERROR);
 		}
 		break;
+
 	case NEPTUNE_2:
-		if (nxgep->function_num > 1)
-			return (NXGE_ERROR);
-
-		/* Set Board Version Number */
-		nxgep->board_ver = 0;
-		if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY,
-				nxgep->dip, 0, "board-model", &prop_val8,
-				&prop_len) == DDI_PROP_SUCCESS) {
-			if (prop_len > 9) {
-				if ((prop_val8[9] == '0') &&
-						(prop_val8[10] == '4'))
-					nxgep->board_ver = 4;
-			}
-			ddi_prop_free(prop_val8);
-		}
-		status = nxge_espc_num_ports_get(nxgep);
-		if (status != NXGE_OK)
-			return (NXGE_ERROR);
-
-		nxgep->classifier.tcam_size = TCAM_NXGE_TCAM_MAX_ENTRY;
-		break;
-
 	case NEPTUNE:
 	default:
-		status = nxge_espc_num_ports_get(nxgep);
-		if (status != NXGE_OK)
+
+		if ((nxgep->niu_type == NEPTUNE_2) &&
+				(nxgep->function_num > 1)) {
 			return (NXGE_ERROR);
+		}
+		if (!nxgep->vpd_info.ver_valid) {
+			status = nxge_espc_num_ports_get(nxgep);
+			if (status != NXGE_OK) {
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "EEPROM version [%s] invalid...please "
+				    "update", nxgep->vpd_info.ver));
+				return (status);
+			}
+			nxgep->classifier.tcam_size = TCAM_NXGE_TCAM_MAX_ENTRY;
+			break;
+		}
+		/*
+		 * First try to get the no. of ports from the info
+		 * in the VPD read off the EEPROM.
+		 */
+		if ((strncmp(nxgep->vpd_info.bd_model, NXGE_QGC_LP_BM_STR,
+		    strlen(NXGE_QGC_LP_BM_STR)) == 0) ||
+		    (strncmp(nxgep->vpd_info.bd_model, NXGE_QGC_PEM_BM_STR,
+		    strlen(NXGE_QGC_PEM_BM_STR)) == 0)) {
+			nxgep->nports = NXGE_NUM_OF_PORTS_QUAD;
+		} else if ((strncmp(nxgep->vpd_info.bd_model,
+		    NXGE_2XGF_LP_BM_STR, strlen(NXGE_2XGF_LP_BM_STR)) == 0) ||
+		    (strncmp(nxgep->vpd_info.bd_model, NXGE_2XGF_PEM_BM_STR,
+		    strlen(NXGE_2XGF_PEM_BM_STR)) == 0)) {
+			nxgep->nports = NXGE_NUM_OF_PORTS_DUAL;
+		} else {
+			NXGE_DEBUG_MSG((nxgep, VPD_CTL,
+			    "nxge_get_config_properties: port num not set in"
+			    " EEPROM...Reading from SEEPROM"));
+			status = nxge_espc_num_ports_get(nxgep);
+			if (status != NXGE_OK)
+				return (status);
+		}
 		nxgep->classifier.tcam_size = TCAM_NXGE_TCAM_MAX_ENTRY;
 		break;
 	}
@@ -3401,11 +3414,50 @@ nxge_get_mac_addr_properties(p_nxge_t nxgep)
 	} else {
 		nxgep->ouraddr = nxgep->factaddr;
 	}
-#else
-	(void) nxge_espc_mac_addrs_get(nxgep);
-	nxgep->ouraddr = nxgep->factaddr;
-#endif
 
+	if ((nxgep->niu_type == N2_NIU) ||
+	    nxge_is_valid_local_mac(nxgep->factaddr))
+		goto got_mac_addr;
+
+	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "nxge_get_mac_addr_properties: "
+	    "MAC address from properties is not valid...reading from PROM"));
+
+#endif
+	if (!nxgep->vpd_info.ver_valid) {
+		(void) nxge_espc_mac_addrs_get(nxgep);
+		if (!nxge_is_valid_local_mac(nxgep->factaddr)) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "EEPROM version "
+			    "[%s] invalid...please update",
+			    nxgep->vpd_info.ver));
+			return (NXGE_ERROR);
+		}
+		nxgep->ouraddr = nxgep->factaddr;
+		goto got_mac_addr;
+	}
+	/*
+	 * First get the MAC address from the info in the VPD data read
+	 * from the EEPROM.
+	 */
+	nxge_espc_get_next_mac_addr(nxgep->vpd_info.mac_addr,
+	    nxgep->mac.portnum, &nxgep->factaddr);
+
+	if (!nxge_is_valid_local_mac(nxgep->factaddr)) {
+		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+		    "nxge_get_mac_addr_properties: "
+		    "MAC address in EEPROM VPD data not valid"
+		    "...reading from NCR registers"));
+		(void) nxge_espc_mac_addrs_get(nxgep);
+		if (!nxge_is_valid_local_mac(nxgep->factaddr)) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "EEPROM version "
+			    "[%s] invalid...please update",
+			    nxgep->vpd_info.ver));
+			return (NXGE_ERROR);
+		}
+	}
+
+	nxgep->ouraddr = nxgep->factaddr;
+
+got_mac_addr:
 	func_num = nxgep->function_num;
 
 	/*
@@ -3415,14 +3467,25 @@ nxge_get_mac_addr_properties(p_nxge_t nxgep)
 	 * the device properties.
 	 */
 	if (nxgep->niu_type == NEPTUNE || nxgep->niu_type == NEPTUNE_2) {
-		if (nxge_espc_num_macs_get(nxgep, &total_factory_macs)
-			== NXGE_OK) {
-			nxgep->nxge_mmac_info.total_factory_macs
-				= total_factory_macs;
-	} else {
-			NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
-				"nxge_espc_num_macs_get: espc access failed"));
-			return (NXGE_ERROR);
+		/* First get VPD data from EEPROM */
+		if (nxgep->vpd_info.ver_valid && nxgep->vpd_info.num_macs) {
+			nxgep->nxge_mmac_info.total_factory_macs =
+			    nxgep->vpd_info.num_macs;
+		} else {
+			NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+			    "nxge_get_mac_addr_properties: Number of MAC "
+			    "addresses in EEPROM VPD data not valid"
+			    "...reading from NCR registers"));
+			if (nxge_espc_num_macs_get(nxgep,
+			    &total_factory_macs) == NXGE_OK) {
+				nxgep->nxge_mmac_info.total_factory_macs =
+					total_factory_macs;
+			} else {
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "EEPROM version [%s] invalid...please "
+				    "update", nxgep->vpd_info.ver));
+				return (NXGE_ERROR);
+			}
 		}
 	}
 
@@ -3458,7 +3521,33 @@ nxge_get_mac_addr_properties(p_nxge_t nxgep)
 		nxgep->nxge_mmac_info.num_factory_mmac
 			= ((nxgep->nxge_mmac_info.total_factory_macs >>
 			(nxgep->nports >> 1))) - 1;
+
+		if (nxgep->nxge_mmac_info.num_factory_mmac < 1) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "Invalid value [0x%x] for num_factory_mmac",
+			    nxgep->nxge_mmac_info.num_factory_mmac));
+			return (NXGE_ERROR);
+		}
+		if ((nxgep->function_num < 2) &&
+		    (nxgep->nxge_mmac_info.num_factory_mmac >
+		    XMAC_MAX_ALT_ADDR_ENTRY)) {
+			nxgep->nxge_mmac_info.num_factory_mmac =
+				XMAC_MAX_ALT_ADDR_ENTRY;
+		} else if ((nxgep->function_num > 1) &&
+		    (nxgep->nxge_mmac_info.num_factory_mmac >
+		    BMAC_MAX_ALT_ADDR_ENTRY)) {
+			nxgep->nxge_mmac_info.num_factory_mmac =
+				BMAC_MAX_ALT_ADDR_ENTRY;
+		}
 	}
+
+	if (nxgep->nxge_mmac_info.num_mmac < 1) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "Invalid value [0x%x] for num_mmac",
+		    nxgep->nxge_mmac_info.num_mmac));
+		return (NXGE_ERROR);
+	}
+
 	for (i = 0; i <= nxgep->nxge_mmac_info.num_mmac; i++) {
 		(void) npi_mac_altaddr_disable(nxgep->npi_handle,
 			NXGE_GET_PORT_NUM(func_num), i);

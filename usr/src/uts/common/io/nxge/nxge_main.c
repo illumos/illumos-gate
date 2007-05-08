@@ -47,7 +47,7 @@ uint32_t 	nxge_rbr_size = NXGE_RBR_RBB_DEFAULT;
 uint32_t 	nxge_rbr_spare_size = 0;
 uint32_t 	nxge_rcr_size = NXGE_RCR_DEFAULT;
 uint32_t 	nxge_tx_ring_size = NXGE_TX_RING_DEFAULT;
-uint32_t 	nxge_no_msg = 0;		/* control message display */
+boolean_t 	nxge_no_msg = B_FALSE;		/* control message display */
 uint32_t 	nxge_no_link_notify = 0;	/* control DL_NOTIFY */
 uint32_t 	nxge_bcopy_thresh = TX_BCOPY_MAX;
 uint32_t 	nxge_dvma_thresh = TX_FASTDVMA_MIN;
@@ -372,7 +372,6 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	p_nxge_t	nxgep = NULL;
 	int		instance;
 	int		status = DDI_SUCCESS;
-	nxge_status_t	nxge_status = NXGE_OK;
 	uint8_t		portn;
 	nxge_mmac_t	*mmac_info;
 
@@ -403,7 +402,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (nxgep->suspended == DDI_PM_SUSPEND) {
 			status = ddi_dev_is_needed(nxgep->dip, 0, 1);
 		} else {
-			nxge_status = nxge_resume(nxgep);
+			status = nxge_resume(nxgep);
 		}
 		goto nxge_attach_exit;
 
@@ -418,7 +417,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			status = DDI_FAILURE;
 			break;
 		}
-		nxge_status = nxge_resume(nxgep);
+		status = nxge_resume(nxgep);
 		goto nxge_attach_exit;
 
 	default:
@@ -492,10 +491,19 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* init stats ptr */
 	nxge_init_statsp(nxgep);
+
+	if (nxgep->niu_type != N2_NIU) {
+		/*
+		 * read the vpd info from the eeprom into local data
+		 * structure and check for the VPD info validity
+		 */
+		(void) nxge_vpd_info_get(nxgep);
+	}
+
 	status = nxge_get_xcvr_type(nxgep);
 
 	if (status != NXGE_OK) {
-		NXGE_DEBUG_MSG((nxgep, DDI_CTL, "nxge_attach: "
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_attach: "
 				    " Couldn't determine card type"
 				    " .... exit "));
 		goto nxge_attach_fail;
@@ -506,14 +514,20 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		nxgep->niu_type = NEPTUNE_2;
 	}
 
+	if ((nxgep->niu_type == NEPTUNE_2) && (nxgep->function_num > 1)) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "Unsupported function %d."
+		    "Only functions 0 and 1 are supported by this card",
+		    nxgep->function_num));
+		status = NXGE_ERROR;
+		goto nxge_attach_fail;
+	}
+
 	status = nxge_get_config_properties(nxgep);
 
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "get_hw create failed"));
 		goto nxge_attach_fail;
 	}
-
-	nxge_get_xcvr_properties(nxgep);
 
 	/*
 	 * Setup the Kstats for the driver.
@@ -607,8 +621,8 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 nxge_attach_fail:
 	nxge_unattach(nxgep);
-	if (nxge_status != NXGE_OK)
-		nxge_status = (NXGE_ERROR | NXGE_DDI_FAILED);
+	if (status != NXGE_OK)
+		status = (NXGE_ERROR | NXGE_DDI_FAILED);
 	nxgep = NULL;
 
 nxge_attach_exit:
@@ -1999,7 +2013,7 @@ nxge_alloc_rx_mem_fail2:
 		"==> nxge_alloc_rx_mem_pool: freeing control bufs (%d)", j));
 	for (; j >= 0; j--) {
 		nxge_free_rx_cntl_dma(nxgep,
-			(p_nxge_dma_common_t)dma_cntl_p[i]);
+			(p_nxge_dma_common_t)dma_cntl_p[j]);
 		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
 			"==> nxge_alloc_rx_mem_pool: control bufs freed (%d)",
 			j));
@@ -2434,7 +2448,7 @@ nxge_alloc_tx_mem_pool_fail2:
 	j--;
 	for (; j >= 0; j--) {
 		nxge_free_tx_cntl_dma(nxgep,
-			(p_nxge_dma_common_t)dma_cntl_p[i]);
+			(p_nxge_dma_common_t)dma_cntl_p[j]);
 	}
 
 nxge_alloc_tx_mem_pool_fail1:
@@ -2753,6 +2767,7 @@ nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
 				ddi_dma_mem_free(&dma_p->acc_handle);
 				dma_p->acc_handle = NULL;
 			}
+			(void) ddi_dma_unbind_handle(dma_p->dma_handle);
 			ddi_dma_free_handle(&dma_p->dma_handle);
 			dma_p->dma_handle = NULL;
 			return (NXGE_ERROR);
@@ -2813,6 +2828,7 @@ nxge_dma_mem_alloc(p_nxge_t nxgep, dma_method_t method,
 				dma_p->ncookies));
 
 			contig_mem_free((void *)kaddrp, length);
+			(void) ddi_dma_unbind_handle(dma_p->dma_handle);
 			ddi_dma_free_handle(&dma_p->dma_handle);
 
 			dma_p->alength = 0;
@@ -3051,7 +3067,7 @@ static void
 nxge_m_ioctl(void *arg,  queue_t *wq, mblk_t *mp)
 {
 	p_nxge_t 	nxgep = (p_nxge_t)arg;
-	struct 		iocblk *iocp = (struct iocblk *)mp->b_rptr;
+	struct 		iocblk *iocp;
 	boolean_t 	need_privilege;
 	int 		err;
 	int 		cmd;
@@ -3111,10 +3127,7 @@ nxge_m_ioctl(void *arg,  queue_t *wq, mblk_t *mp)
 	}
 
 	if (need_privilege) {
-		if (secpolicy_net_config != NULL)
-			err = secpolicy_net_config(iocp->ioc_cr, B_FALSE);
-		else
-			err = drv_priv(iocp->ioc_cr);
+		err = secpolicy_net_config(iocp->ioc_cr, B_FALSE);
 		if (err != 0) {
 			miocnak(wq, mp, 0, err);
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -3327,7 +3340,7 @@ nxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr)
 	 * 	Slot 0 is for unique (primary) MAC. The first alternate
 	 * MAC slot is slot 1.
 	 *	Each of the first two ports of Neptune has 16 alternate
-	 * MAC slots but only the first 7 (of 15) slots have assigned factory
+	 * MAC slots but only the first 7 (or 15) slots have assigned factory
 	 * MAC addresses. We first search among the slots without bundled
 	 * factory MACs. If we fail to find one in that range, then we
 	 * search the slots with bundled factory MACs.  A factory MAC

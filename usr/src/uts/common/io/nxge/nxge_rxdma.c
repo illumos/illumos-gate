@@ -1466,7 +1466,6 @@ nxge_rxdma_get_rcr_ring(p_nxge_t nxgep, uint16_t channel)
 /*
  * Static functions start here.
  */
-
 static p_rx_msg_t
 nxge_allocb(size_t size, uint32_t pri, p_nxge_dma_common_t dmabuf_p)
 {
@@ -1476,7 +1475,7 @@ nxge_allocb(size_t size, uint32_t pri, p_nxge_dma_common_t dmabuf_p)
 
 	nxge_mp = KMEM_ZALLOC(sizeof (rx_msg_t), KM_NOSLEEP);
 	if (nxge_mp == NULL) {
-		NXGE_DEBUG_MSG((NULL, MEM_CTL,
+		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
 			"Allocation of a rx msg failed."));
 		goto nxge_allocb_exit;
 	}
@@ -1503,7 +1502,7 @@ nxge_allocb(size_t size, uint32_t pri, p_nxge_dma_common_t dmabuf_p)
 	} else {
 		buffer = KMEM_ALLOC(size, KM_NOSLEEP);
 		if (buffer == NULL) {
-			NXGE_DEBUG_MSG((NULL, MEM_CTL,
+			NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
 				"Allocation of a receive page failed."));
 			goto nxge_allocb_fail1;
 		}
@@ -1511,7 +1510,7 @@ nxge_allocb(size_t size, uint32_t pri, p_nxge_dma_common_t dmabuf_p)
 
 	nxge_mp->rx_mblk_p = desballoc(buffer, size, pri, &nxge_mp->freeb);
 	if (nxge_mp->rx_mblk_p == NULL) {
-		NXGE_DEBUG_MSG((NULL, MEM_CTL, "desballoc failed."));
+		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL, "desballoc failed."));
 		goto nxge_allocb_fail2;
 	}
 
@@ -1650,7 +1649,7 @@ nxge_freeb(p_rx_msg_t rx_msg_p)
 		size = rx_msg_p->block_size;
 		NXGE_DEBUG_MSG((NULL, MEM2_CTL, "nxge_freeb: "
 			"will free: rx_msg_p = $%p (block pending %d)",
-			(long long)rx_msg_p, nxge_mblks_pending));
+			rx_msg_p, nxge_mblks_pending));
 
 		if (!rx_msg_p->use_buf_pool) {
 			KMEM_FREE(buffer, size);
@@ -2139,6 +2138,9 @@ nxge_receive_packet(p_nxge_t nxgep,
 		return;
 	}
 
+	/* Hardware sends us 4 bytes of CRC as no stripping is done.  */
+	l2_len -= ETHERFCSL;
+
 	/* shift 6 bits to get the full io address */
 	pkt_buf_addr_pp = (uint64_t *)((uint64_t)pkt_buf_addr_pp <<
 				RCR_PKT_BUF_ADDR_SHIFT_FULL);
@@ -2470,6 +2472,7 @@ nxge_receive_packet(p_nxge_t nxgep,
 
 	if (rx_msg_p->free && rx_msg_p->rx_use_bcopy) {
 		atomic_inc_32(&rx_msg_p->ref_cnt);
+		atomic_inc_32(&nxge_mblks_pending);
 		nxge_freeb(rx_msg_p);
 	}
 
@@ -2883,6 +2886,7 @@ nxge_map_rxdma_fail1:
 		"==> nxge_map_rxdma: unmap rbr,rcr "
 		"(status 0x%x channel %d i %d)",
 		status, channel, i));
+	i--;
 	for (; i >= 0; i--) {
 		channel = ((p_nxge_dma_common_t)dma_buf_p[i])->dma_channel;
 		nxge_unmap_rxdma_channel(nxgep, channel,
@@ -3034,6 +3038,8 @@ nxge_map_rxdma_channel_fail2:
 		"(nxgep 0x%x status 0x%x channel %d)",
 		nxgep, status, channel));
 	nxge_unmap_rxdma_channel_buf_ring(nxgep, *rbr_p);
+
+	status = NXGE_ERROR;
 
 nxge_map_rxdma_channel_exit:
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
@@ -3416,7 +3422,7 @@ nxge_map_rxdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 		nmsgs += tmp_bufp->nblocks;
 	}
 	if (!nmsgs) {
-		NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 			"<== nxge_map_rxdma_channel_buf_ring: channel %d "
 			"no msg blocks",
 			channel));
@@ -3505,9 +3511,10 @@ nxge_map_rxdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 		for (j = 0; j < nblocks; j++) {
 			if ((rx_msg_p = nxge_allocb(bsize, BPRI_LO,
 					dma_bufp)) == NULL) {
-				NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-					"allocb failed"));
-				break;
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+					"allocb failed (index %d i %d j %d)",
+					index, i, j));
+				goto nxge_map_rxdma_channel_buf_ring_fail1;
 			}
 			rx_msg_ring[index] = rx_msg_p;
 			rx_msg_p->block_index = index;
@@ -3516,8 +3523,8 @@ nxge_map_rxdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 					    RBR_BKADDR_SHIFT));
 
 			NXGE_DEBUG_MSG((nxgep, MEM2_CTL,
-				"index %d j %d rx_msg_p $%p",
-				index, j, rx_msg_p));
+				"index %d j %d rx_msg_p $%p mblk %p",
+				index, j, rx_msg_p, rx_msg_p->rx_mblk_p));
 
 			mblk_p = rx_msg_p->rx_mblk_p;
 			mblk_p->b_wptr = mblk_p->b_rptr + bsize;
@@ -3565,6 +3572,8 @@ nxge_map_rxdma_channel_buf_ring_fail:
 	KMEM_FREE(ring_info, sizeof (rxring_info_t));
 	KMEM_FREE(rx_msg_ring, size);
 	KMEM_FREE(rbrp, sizeof (rx_rbr_ring_t));
+
+	status = NXGE_ERROR;
 
 nxge_map_rxdma_channel_buf_ring_exit:
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,10 +30,9 @@
 #include <npi_espc.h>
 #include <nxge_espc.h>
 
-static void
-nxge_espc_get_next_mac_addr(uint8_t *, uint8_t, struct ether_addr *);
+static nxge_status_t nxge_check_vpd_version(p_nxge_t nxgep);
 
-static void
+void
 nxge_espc_get_next_mac_addr(uint8_t *st_mac, uint8_t nxt_cnt,
 			    struct ether_addr *final_mac)
 {
@@ -79,7 +78,7 @@ nxge_espc_mac_addrs_get(p_nxge_t nxgep)
 	}
 
 	nxge_espc_get_next_mac_addr(mac_addr, port_num, &nxgep->factaddr);
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		NXGE_DEBUG_MSG((nxgep, CFG_CTL,
 			"Got MAC Addr: %2x:%2x:%2x:%2x:%2x%:%2x%c \n",
 			mac_addr[0], mac_addr[1],
 			mac_addr[2], mac_addr[3],
@@ -157,29 +156,22 @@ nxge_espc_phy_type_get(p_nxge_t nxgep)
 	case ESC_PHY_10G_FIBER:
 		nxgep->mac.portmode = PORT_10G_FIBER;
 		nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
-		cmn_err(CE_NOTE, "!SPROM Read phy type 10G Fiber \n");
 		break;
 	case ESC_PHY_10G_COPPER:
 		nxgep->mac.portmode = PORT_10G_COPPER;
 		nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
-		cmn_err(CE_NOTE, "!SPROM Read phy type 10G Copper \n");
-
 		break;
 	case ESC_PHY_1G_FIBER:
 		nxgep->mac.portmode = PORT_1G_FIBER;
 		nxgep->statsp->mac_stats.xcvr_inuse = PCS_XCVR;
-		cmn_err(CE_NOTE, "!SPROM Read phy type 1G Fiber \n");
-
 		break;
 	case ESC_PHY_1G_COPPER:
 		nxgep->mac.portmode = PORT_1G_COPPER;
 		nxgep->statsp->mac_stats.xcvr_inuse = INT_MII_XCVR;
-		cmn_err(CE_NOTE, "!SPROM Read phy type 1G Copper \n");
-
 		break;
 	case ESC_PHY_NONE:
 		status = NXGE_ERROR;
-		NXGE_DEBUG_MSG((nxgep, CFG_CTL, "nxge_espc_phy_type_get:"
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_espc_phy_type_get:"
 				"No phy type set"));
 		break;
 	default:
@@ -213,6 +205,93 @@ nxge_espc_max_frame_sz_get(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, " nxge_espc_max_frame_sz_get, "
 			    "status [0x%x]", status));
+
+	return (status);
+}
+
+nxge_status_t
+nxge_vpd_info_get(p_nxge_t nxgep)
+{
+	npi_status_t	status;
+	npi_handle_t	handle = NXGE_DEV_NPI_HANDLE(nxgep);
+
+	MUTEX_ENTER(&nxgep->nxge_hw_p->nxge_cfg_lock);
+	(void) npi_espc_pio_enable(handle);
+	status = npi_espc_vpd_info_get(handle, &nxgep->vpd_info,
+				NXGE_EROM_LEN);
+	(void) npi_espc_pio_disable(handle);
+	MUTEX_EXIT(&nxgep->nxge_hw_p->nxge_cfg_lock);
+
+	nxgep->vpd_info.ver_valid = B_FALSE;
+	if (status == NPI_SUCCESS) {
+		(void) nxge_check_vpd_version(nxgep);
+		return (NXGE_OK);
+	} else
+		return (NXGE_ERROR);
+}
+
+static nxge_status_t
+nxge_check_vpd_version(p_nxge_t nxgep)
+{
+	int		i, j;
+	nxge_status_t	status = NXGE_OK;
+	const char	*fcode_str = NXGE_FCODE_ID_STR;
+	int		fcode_str_len = strlen(fcode_str);
+	char		ver_num_str[NXGE_FCODE_VER_STR_LEN];
+	char		*ver_num_w;
+	char		*ver_num_f;
+	int		ver_num_w_len = 0;
+	int		ver_num_f_len = 0;
+	int		ver_w = 0;
+	int		ver_f = 0;
+
+	nxgep->vpd_info.ver_valid = B_FALSE;
+	ver_num_str[0] = '\0';
+
+	for (i = 0; i < NXGE_VPD_VER_LEN; i++) {
+		if (nxgep->vpd_info.ver[i] == fcode_str[0]) {
+			if ((i + fcode_str_len + NXGE_FCODE_VER_STR_LEN) >
+			    NXGE_VPD_VER_LEN)
+				break;
+			for (j = 0; j < fcode_str_len; j++, i++) {
+				if (nxgep->vpd_info.ver[i] != fcode_str[j])
+					break;
+			}
+			if (j < fcode_str_len)
+				continue;
+
+			/* found the Fcode version string */
+			for (j = 0; j < NXGE_FCODE_VER_STR_LEN; j++, i++) {
+				ver_num_str[j] = nxgep->vpd_info.ver[i];
+				if (ver_num_str[j] == ' ')
+					break;
+			}
+			ver_num_str[j] = '\0';
+			break;
+		}
+	}
+
+	ver_num_w = ver_num_str;
+	for (i = 0; i < strlen(ver_num_str); i++) {
+		if (ver_num_str[i] == '.') {
+			ver_num_f = &ver_num_str[i + 1];
+			ver_num_w_len = i;
+			ver_num_f_len = strlen(ver_num_str) - (i + 1);
+			break;
+		}
+	}
+
+	for (i = 0; i < ver_num_w_len; i++) {
+		ver_w = (ver_w * 10) + (ver_num_w[i] - '0');
+	}
+
+	for (i = 0; i < ver_num_f_len; i++) {
+		ver_f = (ver_f * 10) + (ver_num_f[i] - '0');
+	}
+
+	if ((ver_w > NXGE_VPD_VALID_VER_W) ||
+	    (ver_w == NXGE_VPD_VALID_VER_W && ver_f >= NXGE_VPD_VALID_VER_F))
+		nxgep->vpd_info.ver_valid = B_TRUE;
 
 	return (status);
 }

@@ -28,6 +28,9 @@
 #include <npi_espc.h>
 #include <nxge_espc.h>
 
+static int npi_vpd_read_prop(npi_handle_t handle, uint32_t ep,
+		const char *prop, int len, char *val);
+
 npi_status_t
 npi_espc_pio_enable(npi_handle_t handle)
 {
@@ -79,6 +82,19 @@ npi_espc_eeprom_entry(npi_handle_t handle, io_op_t op, uint32_t addr,
 				" npi_espc_eeprom_entry"
 				" HW Error: EEPROM_RD <0x%x>",
 				val));
+			return (NPI_FAILURE | NPI_ESPC_EEPROM_READ_FAILED);
+		}
+		NXGE_REG_RD64(handle, ESPC_REG_ADDR(ESPC_PIO_STATUS_REG), &val);
+		/*
+		 * Workaround for synchronization issues - do a second PIO
+		 */
+		val = EPC_READ_INITIATE | (addr << EPC_EEPROM_ADDR_SHIFT);
+		NXGE_REG_WR64(handle, ESPC_REG_ADDR(ESPC_PIO_STATUS_REG), val);
+		EPC_WAIT_RW_COMP(handle, &val, EPC_READ_COMPLETE);
+		if ((val & EPC_READ_COMPLETE) == 0) {
+			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+			    " npi_espc_eeprom_entry HW Error: "
+			    "EEPROM_RD <0x%x>", val));
 			return (NPI_FAILURE | NPI_ESPC_EEPROM_READ_FAILED);
 		}
 		NXGE_REG_RD64(handle, ESPC_REG_ADDR(ESPC_PIO_STATUS_REG), &val);
@@ -349,4 +365,237 @@ npi_espc_reg_get(npi_handle_t handle, int reg_idx)
 	reg_val = val & 0xffffffff;
 
 	return (reg_val);
+}
+
+static inline uint8_t vpd_rd(npi_handle_t handle, uint32_t addr)
+{
+	uint8_t data = 0;
+
+	if (npi_espc_eeprom_entry(handle, OP_GET, addr, &data) != NPI_SUCCESS)
+		data = 0;
+	return (data);
+}
+
+npi_status_t
+npi_espc_vpd_info_get(npi_handle_t handle, p_npi_vpd_info_t vpdp,
+		uint32_t rom_len)
+{
+	int		i, len;
+	uint32_t	base = 0, kstart = 0, ep, end;
+	uint8_t		fd_flags = 0;
+
+	/* Fill the vpd_info struct with invalid vals */
+	(void) strcpy(vpdp->model, "\0");
+	(void) strcpy(vpdp->bd_model, "\0");
+	(void) strcpy(vpdp->phy_type, "\0");
+	(void) strcpy(vpdp->ver, "\0");
+	vpdp->num_macs = 0;
+	for (i = 0; i < ETHERADDRL; i++) {
+		vpdp->mac_addr[i] = 0;
+	}
+
+	ep = 0;
+	end = ep + rom_len;
+
+	/* go through the images till OBP image type is found */
+	while (ep < end) {
+		base = ep;
+		/* check for expansion rom header signature */
+		if (vpd_rd(handle, ep) != 0x55 ||
+		    vpd_rd(handle, ep + 1) != 0xaa) {
+			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+			    "npi_espc_vpd_info_get: expansion rom image "
+			    "not found, 0x%x [0x%x 0x%x]", ep,
+			    vpd_rd(handle, ep), vpd_rd(handle, ep + 1)));
+			goto vpd_info_err;
+		}
+		/* go to the beginning of the PCI data struct of this image */
+		ep = ep + 23;
+		ep = base + ((vpd_rd(handle, ep) << 8) |
+		    (vpd_rd(handle, ep + 1)));
+		/* check for PCI data struct signature "PCIR" */
+		if ((vpd_rd(handle, ep) != 0x50) ||
+		    (vpd_rd(handle, ep + 1) != 0x43) ||
+		    (vpd_rd(handle, ep + 2) != 0x49) ||
+		    (vpd_rd(handle, ep + 3) != 0x52)) {
+			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+			    "npi_espc_vpd_info_get: PCIR sig not found"));
+			goto vpd_info_err;
+		}
+		/* check for image type OBP */
+		if (vpd_rd(handle, ep + 20) != 0x01) {
+			/* go to the next image */
+			ep = base + ((vpd_rd(handle, base + 2)) * 512);
+			continue;
+		}
+		/* find the beginning of the VPD data */
+		base = base + (vpd_rd(handle, ep + 8) |
+		    (vpd_rd(handle, ep + 9) << 8));
+		break;
+	}
+
+	/* check first byte of identifier string tag */
+	if (!base || (vpd_rd(handle, base + 0) != 0x82)) {
+		NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+		    "npi_espc_vpd_info_get: Could not find VPD!!"));
+		goto vpd_info_err;
+	}
+
+	/*
+	 * skip over the ID string descriptor to go to the read-only VPD
+	 * keywords list.
+	 */
+	i = (vpd_rd(handle, base + 1) |
+	    (vpd_rd(handle, base + 2) << 8)) + 3;
+
+	while (i < EXPANSION_ROM_SIZE) {
+		if (vpd_rd(handle, base + i) != 0x90) { /* no vpd found */
+			NPI_ERROR_MSG((handle.function, NPI_ERR_CTL,
+			    "nxge_get_vpd_info: Could not find "
+			    "VPD ReadOnly list!! [0x%x] %d",
+			    vpd_rd(handle, base + i), i));
+			goto vpd_info_err;
+		}
+
+		/* found a vpd read-only list, get its length */
+		len = vpd_rd(handle, base + i + 1) |
+		    (vpd_rd(handle, base + i + 2) << 8);
+
+		/* extract keywords */
+		kstart = base + i + 3;
+		ep = kstart;
+		/*
+		 * Each keyword field is as follows:
+		 * 2 bytes keyword in the form of "Zx" where x = 0,1,2....
+		 * 1 byte keyword data field length - klen
+		 * Now the actual keyword data field:
+		 * 	1 byte VPD property instance, 'M' / 'I'
+		 * 	2 bytes
+		 * 	1 byte VPD property data type, 'B' / 'S'
+		 * 	1 byte VPD property value length - n
+		 * 	Actual property string, length (klen - n - 5) bytes
+		 * 	Actual property value, length n bytes
+		 */
+		while ((ep - kstart) < len) {
+			int klen = vpd_rd(handle, ep + 2);
+			int dlen;
+			char type;
+
+			ep += 3;
+
+			/*
+			 * Look for the following properties:
+			 *
+			 * local-mac-address:
+			 * -- VPD Instance 'I'
+			 * -- VPD Type String 'B'
+			 * -- property string == local-mac-address
+			 *
+			 * model:
+			 * -- VPD Instance 'M'
+			 * -- VPD Type String 'S'
+			 * -- property string == model
+			 *
+			 * board-model:
+			 * -- VPD Instance 'M'
+			 * -- VPD Type String 'S'
+			 * -- property string == board-model
+			 *
+			 * num-mac-addresses:
+			 * -- VPD Instance 'I'
+			 * -- VPD Type String 'B'
+			 * -- property string == num-mac-addresses
+			 *
+			 * phy-type:
+			 * -- VPD Instance 'I'
+			 * -- VPD Type String 'S'
+			 * -- property string == phy-type
+			 *
+			 * version:
+			 * -- VPD Instance 'M'
+			 * -- VPD Type String 'S'
+			 * -- property string == version
+			 */
+			if (vpd_rd(handle, ep) == 'M') {
+				type = vpd_rd(handle, ep + 3);
+				if (type == 'S') {
+					dlen = vpd_rd(handle, ep + 4);
+					if (npi_vpd_read_prop(handle, ep + 5,
+					    "model", dlen, vpdp->model)) {
+						fd_flags |= FD_MODEL;
+						goto next;
+					}
+					if (npi_vpd_read_prop(handle, ep + 5,
+					    "board-model", dlen,
+					    vpdp->bd_model)) {
+						fd_flags |= FD_BD_MODEL;
+						goto next;
+					}
+					if (npi_vpd_read_prop(handle, ep + 5,
+					    "version", dlen, vpdp->ver)) {
+						fd_flags |= FD_FW_VERSION;
+						goto next;
+					}
+				}
+				goto next;
+			} else if (vpd_rd(handle, ep) == 'I') {
+				type = vpd_rd(handle, ep + 3);
+				if (type == 'B') {
+					dlen = vpd_rd(handle, ep + 4);
+					if (npi_vpd_read_prop(handle, ep + 5,
+					    "local-mac-address", dlen,
+					    (char *)(vpdp->mac_addr))) {
+						fd_flags |= FD_MAC_ADDR;
+						goto next;
+					}
+					if (npi_vpd_read_prop(handle, ep + 5,
+					    "num-mac-addresses", dlen,
+					    (char *)&(vpdp->num_macs))) {
+						fd_flags |= FD_NUM_MACS;
+					}
+				} else if (type == 'S') {
+					dlen = vpd_rd(handle, ep + 4);
+					if (npi_vpd_read_prop(handle, ep + 5,
+					    "phy-type", dlen,
+					    vpdp->phy_type)) {
+						fd_flags |= FD_PHY_TYPE;
+					}
+				}
+				goto next;
+			} else {
+				goto vpd_info_err;
+			}
+
+next:
+			if ((fd_flags & FD_ALL) == FD_ALL)
+				goto vpd_success;
+			ep += klen;
+		}
+		i += len + 3;
+	}
+
+vpd_success:
+	return (NPI_SUCCESS);
+
+vpd_info_err:
+	return (NPI_FAILURE);
+}
+
+static int
+npi_vpd_read_prop(npi_handle_t handle, uint32_t ep, const char *prop, int len,
+		char *val)
+{
+	int prop_len =  strlen(prop) + 1;
+	int i;
+
+	for (i = 0; i < prop_len; i++) {
+		if (vpd_rd(handle, ep + i) != prop[i])
+			return (0);
+	}
+
+	ep += prop_len;
+
+	for (i = 0; i < len; i++)
+		val[i] = vpd_rd(handle, ep + i);
+	return (1);
 }

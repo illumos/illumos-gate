@@ -104,6 +104,7 @@ typedef enum {
 	param_function_number,
 	param_partition_id,
 	param_read_write_mode,
+	param_fw_version,
 	param_niu_cfg_type,
 	param_tx_quick_cfg,
 	param_rx_quick_cfg,
@@ -557,6 +558,7 @@ struct _nxge_t {
 	/* Logical device and group data structures. */
 	p_nxge_ldgv_t		ldgvp;
 
+	npi_vpd_info_t		vpd_info;
 	caddr_t			param_list;	/* Parameter list */
 
 	ether_addr_st		factaddr;	/* factory mac address	    */

@@ -29,7 +29,7 @@
 #include <sys/nxge/nxge_mac.h>
 
 extern uint32_t nxge_no_link_notify;
-extern uint32_t nxge_no_msg;
+extern boolean_t nxge_no_msg;
 extern uint32_t nxge_lb_dbg;
 extern nxge_os_mutex_t	nxge_mdio_lock;
 extern nxge_os_mutex_t	nxge_mii_lock;
@@ -40,6 +40,8 @@ extern boolean_t nxge_jumbo_enable;
  */
 static ether_addr_st etherbroadcastaddr =
 				{{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}};
+static ether_addr_st etherzeroaddr =
+				{{0x0, 0x0, 0x0, 0x0, 0x0, 0x0}};
 
 nxge_status_t nxge_mac_init(p_nxge_t);
 
@@ -2628,8 +2630,12 @@ nxge_link_is_down(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_link_is_down"));
 
 	statsp = nxgep->statsp;
-	(void) sprintf(link_stat_msg, "xcvr addr:0x%02x - link down",
+	(void) sprintf(link_stat_msg, "xcvr addr:0x%02x - link is down",
 			statsp->mac_stats.xcvr_portn);
+
+	if (nxge_no_msg == B_FALSE) {
+		NXGE_ERROR_MSG((nxgep, NXGE_NOTE, "%s", link_stat_msg));
+	}
 
 	mac_link_update(nxgep->mach, LINK_STATE_DOWN);
 
@@ -2648,7 +2654,7 @@ nxge_link_is_up(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_link_is_up"));
 
 	statsp = nxgep->statsp;
-	(void) sprintf(link_stat_msg, "xcvr addr:0x%02x - link up %d Mbps ",
+	(void) sprintf(link_stat_msg, "xcvr addr:0x%02x - link is up %d Mbps ",
 				statsp->mac_stats.xcvr_portn,
 				statsp->mac_stats.link_speed);
 
@@ -2667,6 +2673,10 @@ nxge_link_is_up(p_nxge_t nxgep)
 					XPCS_REG_SYMBOL_ERR_L0_1_COUNTER, &val);
 		(void) npi_xmac_xpcs_read(nxgep->npi_handle, nxgep->mac.portnum,
 					XPCS_REG_SYMBOL_ERR_L2_3_COUNTER, &val);
+	}
+
+	if (nxge_no_msg == B_FALSE) {
+		NXGE_ERROR_MSG((nxgep, NXGE_NOTE, "%s", link_stat_msg));
 	}
 
 	mac_link_update(nxgep->mach, LINK_STATE_UP);
@@ -3245,60 +3255,100 @@ nxge_status_t
 nxge_get_xcvr_type(p_nxge_t nxgep)
 {
 	nxge_status_t status = NXGE_OK;
-
-#if defined(_BIG_ENDIAN)
+	char *phy_type;
 	char *prop_val;
 
-	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, nxgep->dip, 0,
-		"phy-type", &prop_val) == DDI_PROP_SUCCESS) {
-		if (strcmp("xgf", prop_val) == 0) {
-			nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
-			nxgep->mac.portmode = PORT_10G_FIBER;
-			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "10G Fiber Xcvr"));
-		} else if (strcmp("mif", prop_val)	== 0) {
-			nxgep->statsp->mac_stats.xcvr_inuse = INT_MII_XCVR;
-			nxgep->mac.portmode = PORT_1G_COPPER;
-			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "1G Copper Xcvr"));
-		} else if (strcmp("pcs", prop_val) == 0) {
-			nxgep->statsp->mac_stats.xcvr_inuse = PCS_XCVR;
-			nxgep->mac.portmode = PORT_1G_FIBER;
-			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "1G Fiber Xcvr"));
-		} else if (strcmp("xgc", prop_val) == 0) {
-			nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
-			nxgep->mac.portmode = PORT_10G_COPPER;
-			NXGE_DEBUG_MSG((nxgep, MAC_CTL, "10G Copper Xcvr"));
+	if (nxgep->niu_type == N2_NIU) {
+		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, nxgep->dip, 0,
+		    "phy-type", &prop_val) == DDI_PROP_SUCCESS) {
+			if (strcmp("xgf", prop_val) == 0) {
+				nxgep->statsp->mac_stats.xcvr_inuse =
+				    XPCS_XCVR;
+				nxgep->mac.portmode = PORT_10G_FIBER;
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+				    "10G Fiber Xcvr"));
+			} else if (strcmp("mif", prop_val) == 0) {
+				nxgep->statsp->mac_stats.xcvr_inuse =
+				    INT_MII_XCVR;
+				nxgep->mac.portmode = PORT_1G_COPPER;
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+				    "1G Copper Xcvr"));
+			} else if (strcmp("pcs", prop_val) == 0) {
+				nxgep->statsp->mac_stats.xcvr_inuse = PCS_XCVR;
+				nxgep->mac.portmode = PORT_1G_FIBER;
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+				    "1G Fiber Xcvr"));
+			} else if (strcmp("xgc", prop_val) == 0) {
+				nxgep->statsp->mac_stats.xcvr_inuse =
+				    XPCS_XCVR;
+				nxgep->mac.portmode = PORT_10G_COPPER;
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+				    "10G Copper Xcvr"));
+			} else {
+				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+				    "Unknown phy-type: %s", prop_val));
+				ddi_prop_free(prop_val);
+				return (NXGE_ERROR);
+			}
+			status = NXGE_OK;
+			(void) ddi_prop_update_string(DDI_DEV_T_NONE,
+			    nxgep->dip, "phy-type", prop_val);
+			ddi_prop_free(prop_val);
+			return (status);
 		} else {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-					    "Unknown phy-type: %s",
-					    prop_val));
-			ddi_prop_free(prop_val);
-			return (NXGE_ERROR);
-		}
-		status = NXGE_OK;
-		(void) ddi_prop_update_string(DDI_DEV_T_NONE, nxgep->dip,
-						    "phy-type", prop_val);
-		ddi_prop_free(prop_val);
-	} else {
-		/*
-		 * This should really be an error. But for now default
-		 * this to 10G fiber.
-		 */
-		if (nxgep->niu_type == N2_NIU) {
-			nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
-			nxgep->mac.portmode = PORT_10G_FIBER;
-			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-					    "Cannot find phy-type: "
-					    " Default to 10G Fiber Xcvr"));
-			status = NXGE_OK;
-		} else {
-			NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-					    "Cannot get phy-type"));
+			    "Exiting...phy-type property not found"));
 			return (NXGE_ERROR);
 		}
 	}
-#else
-	status = nxge_espc_phy_type_get(nxgep);
-#endif
+
+	if (!nxgep->vpd_info.ver_valid) {
+		/*
+		 * read the phy type from the SEEPROM - NCR registers
+		 */
+		status = nxge_espc_phy_type_get(nxgep);
+		if (status != NXGE_OK)
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "EEPROM version "
+			    "[%s] invalid...please update",
+			    nxgep->vpd_info.ver));
+		return (status);
+	}
+
+	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+	    "Reading phy type from expansion ROM"));
+	/*
+	 * Try to read the phy type from the vpd data read off the
+	 * expansion ROM.
+	 */
+	phy_type = nxgep->vpd_info.phy_type;
+	if (phy_type[0] == 'm' && phy_type[1] == 'i' && phy_type[2] == 'f') {
+		nxgep->mac.portmode = PORT_1G_COPPER;
+		nxgep->statsp->mac_stats.xcvr_inuse = INT_MII_XCVR;
+	} else if (phy_type[0] == 'x' && phy_type[1] == 'g' &&
+	    phy_type[2] == 'f') {
+		nxgep->mac.portmode = PORT_10G_FIBER;
+		nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
+	} else if (phy_type[0] == 'p' && phy_type[1] == 'c' &&
+	    phy_type[2] == 's') {
+		nxgep->mac.portmode = PORT_1G_FIBER;
+		nxgep->statsp->mac_stats.xcvr_inuse = PCS_XCVR;
+	} else if (phy_type[0] == 'x' && phy_type[1] == 'g' &&
+	    phy_type[2] == 'c') {
+		nxgep->mac.portmode = PORT_10G_COPPER;
+		nxgep->statsp->mac_stats.xcvr_inuse = XPCS_XCVR;
+	} else {
+		NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+		    "nxge_get_xcvr_type: Unknown phy type [%c%c%c] in EEPROM",
+		    phy_type[0], phy_type[1], phy_type[2]));
+		/*
+		 * read the phy type from the SEEPROM - NCR registers
+		 */
+		status = nxge_espc_phy_type_get(nxgep);
+		if (status != NXGE_OK)
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "EEPROM version "
+			    "[%s] invalid...please update",
+			    nxgep->vpd_info.ver));
+	}
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_get_xcvr_type"));
 	return (status);
@@ -3322,4 +3372,15 @@ nxge_10g_link_led_off(p_nxge_t nxgep)
 		return (NXGE_ERROR);
 	else
 		return (NXGE_OK);
+}
+
+boolean_t
+nxge_is_valid_local_mac(ether_addr_st mac_addr)
+{
+	if ((mac_addr.ether_addr_octet[0] & 0x01) ||
+	    (ether_cmp(&mac_addr, &etherbroadcastaddr) == 0) ||
+	    (ether_cmp(&mac_addr, &etherzeroaddr) == 0))
+		return (B_FALSE);
+	else
+		return (B_TRUE);
 }

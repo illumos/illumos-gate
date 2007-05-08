@@ -571,7 +571,14 @@ typedef struct _nxge_mmac_stats_t {
 
 #define	NXGE_MAX_MMAC_ADDRS	32
 #define	NXGE_NUM_MMAC_ADDRS	8
-#define	NXGE_NUM_OF_PORTS	4
+#define	NXGE_NUM_OF_PORTS_QUAD	4
+#define	NXGE_NUM_OF_PORTS_DUAL	2
+
+#define	NXGE_QGC_LP_BM_STR		"501-7606"
+#define	NXGE_2XGF_LP_BM_STR		"501-7283"
+#define	NXGE_QGC_PEM_BM_STR		"501-7765"
+#define	NXGE_2XGF_PEM_BM_STR		"501-7626"
+#define	NXGE_EROM_LEN			1048576
 
 #endif
 
@@ -587,28 +594,19 @@ typedef struct _nxge_mmac_stats_t {
 #include	<sys/nxge/nxge_flow.h>
 #include	<sys/nxge/nxge_virtual.h>
 
+#include	<npi_espc.h>
+#include	<npi_vir.h>
+
 #include 	<sys/nxge/nxge.h>
 
 #include	<sys/modctl.h>
 #include	<sys/pattr.h>
 
-#include	<npi_vir.h>
-
-/*
- * Reconfiguring the network devices requires the net_config privilege
- * in Solaris 10+.  Prior to this, root privilege is required.  In order
- * that the driver binary can run on both S10+ and earlier versions, we
- * make the decisiion as to which to use at runtime.  These declarations
- * allow for either (or both) to exist ...
- */
 extern int secpolicy_net_config(const cred_t *, boolean_t);
-extern int drv_priv(cred_t *);
 extern void nxge_fm_report_error(p_nxge_t, uint8_t,
 			uint8_t, nxge_fm_ereport_id_t);
 extern int fm_check_acc_handle(ddi_acc_handle_t);
 extern int fm_check_dma_handle(ddi_dma_handle_t);
-
-#pragma weak    secpolicy_net_config
 
 /* nxge_classify.c */
 nxge_status_t nxge_classify_init(p_nxge_t);
@@ -839,12 +837,15 @@ nxge_status_t nxge_set_promisc(p_nxge_t, boolean_t);
 nxge_status_t nxge_mac_handle_sys_errors(p_nxge_t);
 nxge_status_t nxge_10g_link_led_on(p_nxge_t);
 nxge_status_t nxge_10g_link_led_off(p_nxge_t);
+boolean_t nxge_is_valid_local_mac(ether_addr_st);
 
 /* espc (sprom) prototypes */
 nxge_status_t nxge_espc_mac_addrs_get(p_nxge_t);
 nxge_status_t nxge_espc_num_macs_get(p_nxge_t, uint8_t *);
 nxge_status_t nxge_espc_num_ports_get(p_nxge_t);
 nxge_status_t nxge_espc_phy_type_get(p_nxge_t);
+void nxge_espc_get_next_mac_addr(uint8_t *, uint8_t, struct ether_addr *);
+nxge_status_t nxge_vpd_info_get(p_nxge_t);
 
 
 void nxge_debug_msg(p_nxge_t, uint64_t, char *, ...);

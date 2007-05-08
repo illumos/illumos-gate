@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,38 @@ extern "C" {
 					ESPC_STR_LEN_INVALID)
 #define	NPI_ESPC_PORT_INVALID		((ESPC_BLK_ID << 8) | PORT_INVALID)
 
+/* EEPROM size, Fcode and VPD definitions */
+
+/*
+ * VPD information.
+ */
+#define	NXGE_VPD_MOD_LEN	32
+#define	NXGE_VPD_BD_MOD_LEN	16
+#define	NXGE_VPD_PHY_LEN	5
+#define	NXGE_VPD_VER_LEN	60
+typedef struct _npi_vpd_info_t {
+	uint8_t		mac_addr[ETHERADDRL];
+	uint8_t		num_macs;
+	char		model[NXGE_VPD_MOD_LEN];
+	char		bd_model[NXGE_VPD_BD_MOD_LEN];
+	char		phy_type[NXGE_VPD_PHY_LEN];
+	char		ver[NXGE_VPD_VER_LEN];
+	boolean_t	ver_valid;
+} npi_vpd_info_t, *p_npi_vpd_info_t;
+
+#define	NXGE_FCODE_ID_STR	"FCode "
+#define	NXGE_FCODE_VER_STR_LEN	5
+#define	NXGE_VPD_VALID_VER_W	3
+#define	NXGE_VPD_VALID_VER_F	4
+#define	EXPANSION_ROM_SIZE	65536
+#define	FD_MODEL		0x01
+#define	FD_BD_MODEL		0x02
+#define	FD_MAC_ADDR		0x04
+#define	FD_NUM_MACS		0x08
+#define	FD_PHY_TYPE		0x10
+#define	FD_FW_VERSION		0x20
+#define	FD_ALL			0x3f
+
 npi_status_t npi_espc_pio_enable(npi_handle_t);
 npi_status_t npi_espc_pio_disable(npi_handle_t);
 npi_status_t npi_espc_eeprom_entry(npi_handle_t, io_op_t,
@@ -79,6 +111,7 @@ npi_status_t npi_espc_chksum_get(npi_handle_t, uint8_t *);
 npi_status_t npi_espc_intr_num_get(npi_handle_t, uint8_t *);
 uint32_t npi_espc_reg_get(npi_handle_t, int);
 void npi_espc_dump(npi_handle_t);
+npi_status_t npi_espc_vpd_info_get(npi_handle_t, p_npi_vpd_info_t, uint32_t);
 
 #ifdef	__cplusplus
 }

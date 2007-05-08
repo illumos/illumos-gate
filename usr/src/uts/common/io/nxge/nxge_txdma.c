@@ -2273,7 +2273,8 @@ nxge_map_txdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 		}
 	}
 	if (i < nmsgs) {
-		NXGE_DEBUG_MSG((nxgep, MEM3_CTL, "Allocate handles failed."));
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "Allocate handles failed."));
 		goto nxge_map_txdma_channel_buf_ring_fail1;
 	}
 
@@ -2332,6 +2333,7 @@ nxge_map_txdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 	}
 
 	if (i < num_chunks) {
+		status = NXGE_ERROR;
 		goto nxge_map_txdma_channel_buf_ring_fail1;
 	}
 
@@ -2347,13 +2349,15 @@ nxge_map_txdma_channel_buf_ring_fail1:
 
 	index--;
 	for (; index >= 0; index--) {
-		if (tx_msg_ring[i].dma_handle != NULL) {
-			ddi_dma_free_handle(&tx_msg_ring[i].dma_handle);
+		if (tx_msg_ring[index].dma_handle != NULL) {
+			ddi_dma_free_handle(&tx_msg_ring[index].dma_handle);
 		}
 	}
 	MUTEX_DESTROY(&tx_ring_p->lock);
-	KMEM_FREE(tx_msg_ring, sizeof (tx_msg_t) * tx_ring_p->tx_ring_size);
+	KMEM_FREE(tx_msg_ring, size);
 	KMEM_FREE(tx_ring_p, sizeof (tx_ring_t));
+
+	status = NXGE_ERROR;
 
 nxge_map_txdma_channel_buf_ring_exit:
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,

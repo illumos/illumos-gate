@@ -108,6 +108,7 @@ static int nxge_param_hash_lookup_enable(p_nxge_t, queue_t *,
 	mblk_t *, char *, caddr_t);
 static int nxge_param_tcam_enable(p_nxge_t, queue_t *,
 	mblk_t *, char *, caddr_t);
+static int nxge_param_get_fw_ver(p_nxge_t, queue_t *, p_mblk_t, caddr_t);
 static int nxge_param_get_rxdma_info(p_nxge_t, queue_t *q,
 	p_mblk_t, caddr_t);
 static int nxge_param_get_txdma_info(p_nxge_t, queue_t *q,
@@ -166,6 +167,9 @@ static nxge_param_t	nxge_param_arr[] = {
 	/* Read Write Permission Mode */
 	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ | NXGE_PARAM_DONT_SHOW,
 		0, 2, 0, 0, "read-write-mode", "read_write_mode"},
+
+	{ nxge_param_get_fw_ver, NULL, NXGE_PARAM_READ,
+		0, 32, 0, 0, "version",	"fw_version"},
 
 	/* hw cfg types */
 	/* control the DMA config of Neptune/NIU */
@@ -813,6 +817,19 @@ nxge_param_get_mac(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 
 	(void) mi_mpprintf(mp, "%d", (uint32_t)pa->value);
 	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_get_mac"));
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+nxge_param_get_fw_ver(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
+{
+	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "==> nxge_param_get_fw_ver"));
+
+	(void) mi_mpprintf(mp, "Firmware version for nxge%d:  %s\n",
+	    nxgep->instance, nxgep->vpd_info.ver);
+
+	NXGE_DEBUG_MSG((nxgep, NDD_CTL, "<== nxge_param_get_fw_ver"));
 	return (0);
 }
 
