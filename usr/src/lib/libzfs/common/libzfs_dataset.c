@@ -3344,17 +3344,22 @@ zfs_rename(zfs_handle_t *zhp, const char *target, int recursive)
 	if (recursive) {
 		struct destroydata dd;
 
-		parentname = strdup(zhp->zfs_name);
+		parentname = zfs_strdup(zhp->zfs_hdl, zhp->zfs_name);
+		if (parentname == NULL) {
+			ret = -1;
+			goto error;
+		}
 		delim = strchr(parentname, '@');
 		*delim = '\0';
 		zhrp = zfs_open(zhp->zfs_hdl, parentname, ZFS_TYPE_ANY);
 		if (zhrp == NULL) {
-			return (-1);
+			ret = -1;
+			goto error;
 		}
 
 		dd.snapname = delim + 1;
 		dd.gotone = B_FALSE;
-		dd.closezhp = B_FALSE;
+		dd.closezhp = B_TRUE;
 
 		/* We remove any zvol links prior to renaming them */
 		ret = zfs_iter_filesystems(zhrp, zfs_remove_link_cb, &dd);
