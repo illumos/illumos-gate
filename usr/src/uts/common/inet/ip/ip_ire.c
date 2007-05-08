@@ -3448,6 +3448,9 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 	 *
 	 * Find the first entry that matches ire_addr. *irep will be null
 	 * if no match.
+	 *
+	 * Note: the loopback and non-loopback broadcast entries for an
+	 * interface MUST be added before any MULTIRT entries.
 	 */
 	irep = (ire_t **)irb_ptr;
 	while ((ire1 = *irep) != NULL && ire->ire_addr != ire1->ire_addr)
@@ -3479,18 +3482,26 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 		 *    that matches the address and the ill_group. Then
 		 *    we will insert the ire at the end of that group.
 		 */
-		/* LINTED : constant in conditional context */
-		while (1) {
+		for (;;) {
 			ire1 = *irep;
 			if ((ire1->ire_next == NULL) ||
 			    (ire1->ire_next->ire_addr != ire->ire_addr) ||
 			    (ire1->ire_type != IRE_BROADCAST) ||
+			    (ire1->ire_flags & RTF_MULTIRT) ||
 			    (ire1->ire_ipif->ipif_ill->ill_group ==
 			    ire->ire_ipif->ipif_ill->ill_group))
 				break;
 			irep = &ire1->ire_next;
 		}
 		ASSERT(*irep != NULL);
+		/*
+		 * The ire will be added before *irep, so
+		 * if irep is a MULTIRT ire, just break to
+		 * ire insertion code.
+		 */
+		if (((*irep)->ire_flags & RTF_MULTIRT) != 0)
+			goto insert_ire;
+
 		irep = &((*irep)->ire_next);
 
 		/*
@@ -3526,6 +3537,7 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 		}
 	}
 
+insert_ire:
 	/* Insert at *irep */
 	ire1 = *irep;
 	if (ire1 != NULL)
