@@ -655,6 +655,16 @@ typedef struct CK_AES_CTR_PARAMS32 {
 
 #if defined(_KERNEL)
 
+#define	N2CP_REQ_SETUP(reqp, in, out) \
+	reqp->nr_tmpin = *in; \
+	reqp->nr_in = &reqp->nr_tmpin; \
+	if (in == out) { \
+		reqp->nr_out = in; \
+	} else { \
+		reqp->nr_out = out; \
+	} \
+	reqp->nr_out->cd_length = 0;
+
 #if defined(DEBUG)
 
 #define	DWARN		0x00000001
