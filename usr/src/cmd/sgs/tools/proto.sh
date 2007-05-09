@@ -127,13 +127,11 @@ esac
 
 # We need a local copy of libc_pic.a (we should get this from the parent
 # workspace, but as we can't be sure how the proto area is constructed there
-# simply take it from a stashed copy on linkers.central or linkers.eng.)
-#
-# We try for the linkers server in the current domain. Failing that,
-# we fall over to linkers.central.
-LIBC_PICDIR=/net/linkers/export/big/libc_pic/$RELEASE
-if [ ! -d $LIBC_PICDIR ]; then
-    LIBC_PICDIR=/net/linkers.central/export/big/libc_pic/$RELEASE
+# simply take it from a stashed copy on the linkers server. If
+# LINKERS_EXPORT is defined, we use it. Failing that, we fall over
+#  to linkers.central.
+if [ "$LINKERS_EXPORT" = "" ]; then
+    LINKERS_EXPORT=/net/linkers.central/export
 fi
 
 
@@ -153,7 +151,8 @@ do
 		mkdir -p $SRCLIBCDIR
 	fi
 	if [ ! -f $SRCLIBCDIR/libc_pic.a ]; then
-		cp $LIBC_PICDIR/$p/libc_pic.a $SRCLIBCDIR
+		cp $LINKERS_EXPORT/big/libc_pic/$RELEASE/$p/libc_pic.a \
+			$SRCLIBCDIR
 	fi
 done
 

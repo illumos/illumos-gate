@@ -1,13 +1,12 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 @ _START_
 
@@ -31,8 +30,9 @@
 @ MSG_REL_NOFIT		"relocation error: %s: file %s: symbol %s: \
 			 value 0x%llx does not fit"
 
-@ MSG_UNW_BADVERS	"dlgetamd64unwind: version mismatch: current %d: \
-			 required %d"
+@ MSG_UNW_BADVERS	"dlgetamd64unwind: invalid data buffer dlui_version: \
+			 %d: version unitialized, or exceeds current version: %d"
+
 @ _END_
 
 @ MSG_SYM_LAAMD64PLTENTER	"la_amd64_pltenter"

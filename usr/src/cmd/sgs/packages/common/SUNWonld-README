@@ -1235,3 +1235,4 @@ Bugid   Risk Synopsis
 6246083 elfdump should allow section index specification
 	(numeric -N equivalent) (D)
 	PSARC/2007/247 Add -I option to elfdump
+6532924 AMD64: Solaris 5.11 55b: SEGV after whocatches

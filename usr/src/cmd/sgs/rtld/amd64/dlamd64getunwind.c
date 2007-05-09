@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,19 +41,20 @@
 #include <stdio.h>
 
 static Dl_amd64_unwindinfo *
-getunwind_core(Rt_map *lmp, void *pc, Dl_amd64_unwindinfo *unwindinfo)
+getunwind_core(Lm_list *lml, Rt_map *lmp, void *pc,
+    Dl_amd64_unwindinfo *unwindinfo)
 {
 	/*
 	 * Validate the version information.
 	 */
 	if (unwindinfo == NULL) {
-		eprintf(LIST(lmp), ERR_FATAL, MSG_INTL(MSG_ARG_ILLVAL));
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLVAL));
 		return (0);
 	}
 	if ((unwindinfo->dlui_version < DLUI_VERS_1) ||
 	    (unwindinfo->dlui_version > DLUI_VERS_CURRENT)) {
-		eprintf(LIST(lmp), ERR_FATAL, MSG_INTL(MSG_UNW_BADVERS),
-		    DLUI_VERS_CURRENT, unwindinfo->dlui_version);
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_UNW_BADVERS),
+		    unwindinfo->dlui_version, DLUI_VERS_CURRENT);
 		return (0);
 	}
 
@@ -119,19 +120,27 @@ Dl_amd64_unwindinfo *
 _dlamd64getunwind(void *pc, Dl_amd64_unwindinfo *unwindinfo)
 {
 	Rt_map	*lmp;
+	Lm_list	*lml;
 	int	entry = enter();
 
 	/*
 	 * Identify the link-map associated with the exception "pc".  Note,
 	 * this is not the actual caller of _dlamd64getunwind(), which is
 	 * probably one of the libC libraries.  However, the caller and
-	 * exception object are both on the same link-map list.
+	 * exception object are both on the same link-map list.  In doing this,
+	 * we must guard against being given a pc that does not correspond to a
+	 * link-map (as can happen with a pc fabricated by a debugger such as
+	 * dbx).  In this case, getunwind_core() will fill the unwind data
+	 * buffer with flags set to indicate an unknown caller.
 	 */
-	lmp = _caller(pc, CL_NONE);
+	if ((lmp = _caller(pc, CL_NONE)) != 0)
+		lml = LIST(lmp);
+	else
+		lml = 0;
 
-	unwindinfo = getunwind_core(lmp, pc, unwindinfo);
+	unwindinfo = getunwind_core(lml, lmp, pc, unwindinfo);
 
 	if (entry)
-		leave(LIST(lmp));
+		leave(lml);
 	return (unwindinfo);
 }
