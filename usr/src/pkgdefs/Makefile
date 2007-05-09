@@ -129,6 +129,7 @@ i386_SUBDIRS= \
 	SUNWlxr \
 	SUNWlxu \
 	SUNWmv88sx \
+	SUNWnvsata \
 	SUNWnxge.i \
 	SUNWonmtst.i \
 	SUNWos86r  \
