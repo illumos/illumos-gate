@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,7 +110,11 @@ txml_print_prop(topo_hdl_t *thp, FILE *fp, topo_propval_t *pv)
 	char vbuf[INT64BUFSZ], tbuf[10], *pval;
 	nvpair_t *nvp;
 
-	if ((nvp = nvlist_next_nvpair(pv->tp_val, NULL)) == NULL)
+	nvp = nvlist_next_nvpair(pv->tp_val, NULL);
+	while (nvp && (strcmp(TOPO_PROP_VAL_VAL, nvpair_name(nvp)) != 0))
+			nvp = nvlist_next_nvpair(pv->tp_val, nvp);
+
+	if (nvp == NULL)
 		return;
 
 	switch (pv->tp_type) {
@@ -188,8 +192,6 @@ txml_print_pgroup(topo_hdl_t *thp, FILE *fp, topo_pgroup_t *pg)
 	(void) snprintf(version, INT32BUFSZ, "%d", pip->tpi_version);
 	begin_element(fp, Propgrp, Name, pip->tpi_name, Namestab,
 	    namestab, Datastab, datastab, Version, version, NULL);
-	topo_hdl_strfree(thp, (char *)namestab);
-	topo_hdl_strfree(thp, (char *)datastab);
 	for (plp = topo_list_next(&pg->tpg_pvals); plp != NULL;
 	    plp = topo_list_next(plp)) {
 		txml_print_prop(thp, fp, plp->tp_pval);
