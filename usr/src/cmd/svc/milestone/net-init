@@ -90,6 +90,16 @@ unset encr
 #
 [ -f /etc/default/inetinit ] && . /etc/default/inetinit
 
+# Set the SDP system Policy.  This needs to happen after basic
+# networking is up but before any networking services that might
+# want to use SDP are enabled
+if [ -f /usr/sbin/sdpadm -a -f /etc/sdp.conf ]; then
+	. /etc/sdp.conf
+	if [ "$sysenable" = "1" ]; then
+		/usr/sbin/sdpadm enable
+	fi
+fi
+
 #
 # Set TCP ISS generation.  By default the ISS generation is
 # time + random()-delta.  This might not be strong enough for some users.
