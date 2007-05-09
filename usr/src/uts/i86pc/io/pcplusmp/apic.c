@@ -1451,8 +1451,12 @@ apic_shutdown(int cmd, int fcn)
 	if (cmd != A_SHUTDOWN)
 		return;
 
-	/* switch system back into Legacy Mode if using ACPI */
-	if (apic_enable_acpi)
+	/*
+	 * Switch system back into Legacy-Mode if using ACPI and
+	 * not powering-off.  Some BIOSes need to remain in ACPI-mode
+	 * for power-off to succeed (Dell Dimension 4600)
+	 */
+	if (apic_enable_acpi && (fcn != AD_POWEROFF))
 		(void) AcpiDisable();
 
 	/* remainder of function is for shutdown+poweroff case only */

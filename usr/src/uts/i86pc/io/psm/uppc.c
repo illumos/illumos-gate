@@ -473,11 +473,15 @@ uppc_shutdown(int cmd, int fcn)
 	if ((cmd != A_SHUTDOWN) || (!uppc_enable_acpi))
 		return;
 
-	/* switch system back into Legacy Mode */
-	(void) AcpiDisable();
-
-	if (fcn != AD_POWEROFF)
+	/*
+	 * Switch system back into Legacy-Mode if using ACPI and
+	 * not powering-off.  Some BIOSes need to remain in ACPI-mode
+	 * for power-off to succeed (Dell Dimension 4600)
+	 */
+	if (fcn != AD_POWEROFF) {
+		(void) AcpiDisable();
 		return;
+	}
 
 	(void) acpi_poweroff();
 }
