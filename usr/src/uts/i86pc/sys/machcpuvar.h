@@ -71,6 +71,8 @@ struct	machcpu {
 
 	struct hat_cpu_info	*mcpu_hat_info;
 
+	volatile ulong_t	mcpu_tlb_info;
+
 	/* i86 hardware table addresses that cannot be shared */
 
 	user_desc_t	*mcpu_gdt;	/* GDT */

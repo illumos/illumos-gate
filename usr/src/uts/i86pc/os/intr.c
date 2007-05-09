@@ -53,6 +53,7 @@
 #include <sys/ontrap.h>
 #include <sys/x86_archext.h>
 #include <sys/promif.h>
+#include <vm/hat_i86.h>
 
 
 /*
@@ -899,6 +900,11 @@ do_interrupt(struct regs *rp, trap_trace_rec_t *ttp)
 	ttp->ttr_spl = cpu->cpu_base_spl;
 	ttp->ttr_vector = 0xff;
 #endif	/* TRAPTRACE */
+
+	/*
+	 * Handle any pending TLB flushing
+	 */
+	tlb_service();
 
 	/*
 	 * If it's a softint go do it now.

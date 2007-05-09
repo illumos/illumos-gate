@@ -62,6 +62,7 @@
 #include <sys/bootconf.h>
 #include <sys/bootsvcs.h>
 #include <sys/bootinfo.h>
+#include <sys/archsystm.h>
 
 #include <vm/seg_kmem.h>
 #include <vm/hat_i86.h>
@@ -185,26 +186,6 @@ extern void atomic_andb(uchar_t *addr, uchar_t val);
 #define	PP_CLRALL(pp)		PP_CLRRM(pp, P_MOD | P_REF | P_RO)
 
 /*
- * some useful tracing macros
- */
-
-int hattrace = 0;
-#ifdef DEBUG
-
-#define	HATIN(r, h, a, l)	\
-	if (hattrace) prom_printf("->%s hat=%p, adr=%p, len=%lx\n", #r, h, a, l)
-
-#define	HATOUT(r, h, a)		\
-	if (hattrace) prom_printf("<-%s hat=%p, adr=%p\n", #r, h, a)
-#else
-
-#define	HATIN(r, h, a, l)
-#define	HATOUT(r, h, a)
-
-#endif
-
-
-/*
  * kmem cache constructor for struct hat
  */
 /*ARGSUSED*/
@@ -218,8 +199,6 @@ hati_constructor(void *buf, void *handle, int kmflags)
 	    sizeof (pgcnt_t) * (mmu.max_page_level + 1));
 	hat->hat_stats = 0;
 	hat->hat_flags = 0;
-	mutex_init(&hat->hat_switch_mutex, NULL, MUTEX_DRIVER,
-	    (void *)ipltospl(DISP_LEVEL));
 	CPUSET_ZERO(hat->hat_cpus);
 	hat->hat_htable = NULL;
 	hat->hat_ht_hash = NULL;
@@ -913,13 +892,10 @@ hat_switch(hat_t *hat)
 	}
 
 	/*
-	 * Wait for any in flight pagetable invalidates on this hat to finish.
-	 * This is a spin lock at DISP_LEVEL
+	 * Add this CPU to the active set for this HAT.
 	 */
 	if (hat != kas.a_hat) {
-		mutex_enter(&hat->hat_switch_mutex);
 		CPUSET_ATOMIC_ADD(hat->hat_cpus, cpu->cpu_id);
-		mutex_exit(&hat->hat_switch_mutex);
 	}
 	cpu->cpu_current_hat = hat;
 
@@ -1460,7 +1436,6 @@ hat_memload(
 	level_t		level = 0;
 	pfn_t		pfn = page_pptonum(pp);
 
-	HATIN(hat_memload, hat, addr, (size_t)MMU_PAGESIZE);
 	ASSERT(IS_PAGEALIGNED(va));
 	ASSERT(hat == kas.a_hat || va < _userlimit);
 	ASSERT(hat == kas.a_hat ||
@@ -1486,7 +1461,6 @@ hat_memload(
 	attr |= HAT_STORECACHING_OK;
 	if (hati_load_common(hat, va, pp, attr, flags, level, pfn) != 0)
 		panic("unexpected hati_load_common() failure");
-	HATOUT(hat_memload, hat, addr);
 }
 
 /*
@@ -1509,7 +1483,6 @@ hat_memload_array(
 	pfn_t		pfn;
 	pgcnt_t		i;
 
-	HATIN(hat_memload_array, hat, addr, len);
 	ASSERT(IS_PAGEALIGNED(va));
 	ASSERT(hat == kas.a_hat || va + len <= _userlimit);
 	ASSERT(hat == kas.a_hat ||
@@ -1581,7 +1554,6 @@ hat_memload_array(
 		va += pgsize;
 		pgindx += mmu_btop(pgsize);
 	}
-	HATOUT(hat_memload_array, hat, addr);
 }
 
 /*
@@ -1631,7 +1603,6 @@ hat_devload(
 	int		f;	/* per PTE copy of flags  - maybe modified */
 	uint_t		a;	/* per PTE copy of attr */
 
-	HATIN(hat_devload, hat, addr, len);
 	ASSERT(IS_PAGEALIGNED(va));
 	ASSERT(hat == kas.a_hat || eva <= _userlimit);
 	ASSERT(hat == kas.a_hat ||
@@ -1694,7 +1665,6 @@ hat_devload(
 		va += pgsize;
 		pfn += mmu_btop(pgsize);
 	}
-	HATOUT(hat_devload, hat, addr);
 }
 
 /*
@@ -1786,6 +1756,85 @@ hati_demap_func(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
 }
 
 /*
+ * Flush all TLB entries, including global (ie. kernel) ones.
+ */
+static void
+flush_all_tlb_entries(void)
+{
+	ulong_t cr4 = getcr4();
+
+	if (cr4 & CR4_PGE) {
+		setcr4(cr4 & ~(ulong_t)CR4_PGE);
+		setcr4(cr4);
+
+		/*
+		 * 32 bit PAE also needs to always reload_cr3()
+		 */
+		if (mmu.max_level == 2)
+			reload_cr3();
+	} else {
+		reload_cr3();
+	}
+}
+
+#define	TLB_CPU_HALTED	(01ul)
+#define	TLB_INVAL_ALL	(02ul)
+#define	CAS_TLB_INFO(cpu, old, new)	\
+	caslong((ulong_t *)&(cpu)->cpu_m.mcpu_tlb_info, (old), (new))
+
+/*
+ * Record that a CPU is going idle
+ */
+void
+tlb_going_idle(void)
+{
+	atomic_or_long((ulong_t *)&CPU->cpu_m.mcpu_tlb_info, TLB_CPU_HALTED);
+}
+
+/*
+ * Service a delayed TLB flush if coming out of being idle.
+ */
+void
+tlb_service(void)
+{
+	ulong_t flags = getflags();
+	ulong_t tlb_info;
+	ulong_t found;
+
+	/*
+	 * Be sure interrupts are off while doing this so that
+	 * higher level interrupts correctly wait for flushes to finish.
+	 */
+	if (flags & PS_IE)
+		flags = intr_clear();
+
+	/*
+	 * We only have to do something if coming out of being idle.
+	 */
+	tlb_info = CPU->cpu_m.mcpu_tlb_info;
+	if (tlb_info & TLB_CPU_HALTED) {
+		ASSERT(CPU->cpu_current_hat == kas.a_hat);
+
+		/*
+		 * Atomic clear and fetch of old state.
+		 */
+		while ((found = CAS_TLB_INFO(CPU, tlb_info, 0)) != tlb_info) {
+			ASSERT(found & TLB_CPU_HALTED);
+			tlb_info = found;
+			SMT_PAUSE();
+		}
+		if (tlb_info & TLB_INVAL_ALL)
+			flush_all_tlb_entries();
+	}
+
+	/*
+	 * Restore interrupt enable control bit.
+	 */
+	if (flags & PS_IE)
+		sti();
+}
+
+/*
  * Internal routine to do cross calls to invalidate a range of pages on
  * all CPUs using a given hat.
  */
@@ -1794,7 +1843,10 @@ hat_tlb_inval(hat_t *hat, uintptr_t va)
 {
 	extern int	flushes_require_xcalls;	/* from mp_startup.c */
 	cpuset_t	justme;
+	cpuset_t	check_cpus;
 	cpuset_t	cpus_to_shootdown;
+	cpu_t		*cpup;
+	int		c;
 
 	/*
 	 * If the hat is being destroyed, there are no more users, so
@@ -1832,6 +1884,34 @@ hat_tlb_inval(hat_t *hat, uintptr_t va)
 		cpus_to_shootdown = khat_cpuset;
 	else
 		cpus_to_shootdown = hat->hat_cpus;
+
+	/*
+	 * If any CPUs in the set are idle, just request a delayed flush
+	 * and avoid waking them up.
+	 */
+	check_cpus = cpus_to_shootdown;
+	for (c = 0; c < NCPU && !CPUSET_ISNULL(check_cpus); ++c) {
+		ulong_t tlb_info;
+
+		if (!CPU_IN_SET(check_cpus, c))
+			continue;
+		CPUSET_DEL(check_cpus, c);
+		cpup = cpu[c];
+		if (cpup == NULL)
+			continue;
+
+		tlb_info = cpup->cpu_m.mcpu_tlb_info;
+		while (tlb_info == TLB_CPU_HALTED) {
+			(void) CAS_TLB_INFO(cpup, TLB_CPU_HALTED,
+				TLB_CPU_HALTED | TLB_INVAL_ALL);
+			SMT_PAUSE();
+			tlb_info = cpup->cpu_m.mcpu_tlb_info;
+		}
+		if (tlb_info == (TLB_CPU_HALTED | TLB_INVAL_ALL)) {
+			HATSTAT_INC(hs_tlb_inval_delayed);
+			CPUSET_DEL(cpus_to_shootdown, c);
+		}
+	}
 
 	if (CPUSET_ISNULL(cpus_to_shootdown) ||
 	    CPUSET_ISEQUAL(cpus_to_shootdown, justme)) {
@@ -2066,7 +2146,6 @@ hat_unload_callback(
 	uint_t		r_cnt = 0;
 	x86pte_t	old_pte;
 
-	HATIN(hat_unload_callback, hat, addr, len);
 	ASSERT(hat == kas.a_hat || eaddr <= _userlimit);
 	ASSERT(IS_PAGEALIGNED(vaddr));
 	ASSERT(IS_PAGEALIGNED(eaddr));
@@ -2128,8 +2207,6 @@ hat_unload_callback(
 	 */
 	if (r_cnt > 0)
 		handle_ranges(cb, r_cnt, r);
-
-	HATOUT(hat_unload_callback, hat, addr);
 }
 
 /*
@@ -2598,7 +2675,6 @@ hat_share(
 	 * valid mappings. That's because it rounds the segment size up to a
 	 * large pagesize, even if the actual memory mapped by ism_hat is less.
 	 */
-	HATIN(hat_share, hat, addr, len);
 	ASSERT(IS_PAGEALIGNED(vaddr_start));
 	ASSERT(IS_PAGEALIGNED(ism_addr_start));
 	ASSERT(ism_hat->hat_flags & HAT_SHARED);
@@ -2714,8 +2790,6 @@ hat_share(
 	}
 	if (ism_ht != NULL)
 		htable_release(ism_ht);
-
-	HATOUT(hat_share, hat, addr);
 	return (0);
 }
 
@@ -2736,7 +2810,6 @@ hat_unshare(hat_t *hat, caddr_t addr, size_t len, uint_t ismszc)
 
 	ASSERT(hat != kas.a_hat);
 	ASSERT(eaddr <= _userlimit);
-	HATIN(hat_unshare, hat, addr, len);
 	ASSERT(IS_PAGEALIGNED(vaddr));
 	ASSERT(IS_PAGEALIGNED(eaddr));
 
@@ -2781,8 +2854,6 @@ hat_unshare(hat_t *hat, caddr_t addr, size_t len, uint_t ismszc)
 	 * couldn't share pagetables.
 	 */
 	hat_unload(hat, addr, len, HAT_UNLOAD_UNMAP);
-
-	HATOUT(hat_unshare, hat, addr);
 }
 
 

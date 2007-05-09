@@ -131,7 +131,6 @@ xc_serv(caddr_t arg1, caddr_t arg2)
 	int pri = (int)(uintptr_t)arg1;
 	struct cpu *cpup = CPU;
 	xc_arg_t arg2val;
-	uint_t initiator_first;
 
 	XC_TRACE(TT_XC_SVC_BEGIN, pri, (ulong_t)arg2);
 
@@ -168,22 +167,12 @@ xc_serv(caddr_t arg1, caddr_t arg2)
 	op = cpup->cpu_m.xc_state[pri];
 
 	/*
-	 * Special handling for xc_wait_sync(). The cross call is used
-	 * to allow the initiating CPU to wait until all other CPUs are
-	 * captured in the cross call.  Then the initiator invokes the
-	 * service function before any other CPU. Then other CPUs can
-	 * invoke the service function.
-	 */
-	initiator_first = (cpup->cpu_m.xc_wait[pri] == 2);
-
-	/*
 	 * Don't invoke a null function.
 	 */
 	if (xc_mboxes[pri].func != NULL) {
-		if (!initiator_first)
-			cpup->cpu_m.xc_retval[pri] = (*xc_mboxes[pri].func)
-			    (xc_mboxes[pri].arg1, xc_mboxes[pri].arg2,
-				xc_mboxes[pri].arg3);
+		cpup->cpu_m.xc_retval[pri] =
+		    (*xc_mboxes[pri].func)(xc_mboxes[pri].arg1,
+		    xc_mboxes[pri].arg2, xc_mboxes[pri].arg3);
 	} else
 		cpup->cpu_m.xc_retval[pri] = 0;
 
@@ -203,12 +192,6 @@ xc_serv(caddr_t arg1, caddr_t arg2)
 
 		while (cpup->cpu_m.xc_state[pri] != XC_DONE)
 			SMT_PAUSE();
-
-		if (xc_mboxes[pri].func != NULL && initiator_first) {
-			cpup->cpu_m.xc_retval[pri] = (*xc_mboxes[pri].func)
-			    (xc_mboxes[pri].arg1, xc_mboxes[pri].arg2,
-			    xc_mboxes[pri].arg3);
-		}
 
 		/*
 		 * Acknowledge that we have received the directive to continue.
@@ -293,24 +276,6 @@ xc_sync(
 {
 	xc_do_call(arg1, arg2, arg3, pri, set, func, 1);
 }
-
-/*
- * xc_sync_wait: similar to xc_sync(), except that the starting
- * cpu waits for all other cpus to check in before running its
- * service locally.
- */
-void
-xc_wait_sync(
-	xc_arg_t arg1,
-	xc_arg_t arg2,
-	xc_arg_t arg3,
-	int pri,
-	cpuset_t set,
-	xc_func_t func)
-{
-	xc_do_call(arg1, arg2, arg3, pri, set, func, 2);
-}
-
 
 /*
  * The routines xc_capture_cpus and xc_release_cpus
@@ -463,7 +428,6 @@ xc_release_cpus(void)
  *	-1 - no waiting, don't release remotes
  *	0 - no waiting, release remotes immediately
  *	1 - run service locally w/o waiting for remotes.
- *	2 - wait for remotes before running locally
  */
 static void
 xc_common(
@@ -521,9 +485,9 @@ xc_common(
 	}
 
 	/*
-	 * Run service locally if not waiting for remotes.
+	 * Run service locally
 	 */
-	if (sync != 2 && CPU_IN_SET(set, lcx) && func != NULL) {
+	if (CPU_IN_SET(set, lcx) && func != NULL) {
 		XC_TRACE(TT_XC_START, pri, CPU->cpu_id);
 		CPU->cpu_m.xc_retval[pri] = (*func)(arg1, arg2, arg3);
 	}
@@ -543,12 +507,6 @@ xc_common(
 			cpup->cpu_m.xc_ack[pri] = 0;
 		}
 	}
-
-	/*
-	 * Run service locally if waiting for remotes.
-	 */
-	if (sync == 2 && CPU_IN_SET(set, lcx) && func != NULL)
-		CPU->cpu_m.xc_retval[pri] = (*func)(arg1, arg2, arg3);
 
 	if (sync == 0)
 		return;

@@ -1857,34 +1857,6 @@ x86pte_cas(htable_t *ht, uint_t entry, x86pte_t old, x86pte_t new)
 }
 
 /*
- * data structure for cross call information
- */
-typedef struct xcall_inval {
-	caddr_t		xi_addr;
-	x86pte_t	xi_found;
-	x86pte_t	xi_oldpte;
-	x86pte_t	*xi_pteptr;
-	processorid_t	xi_initiator;
-} xcall_inval_t;
-
-/*
- * Cross call service routine to invalidate TLBs. On the
- * initiating CPU, this first clears the PTE in memory.
- */
-/*ARGSUSED*/
-static int
-x86pte_inval_func(xc_arg_t a1, xc_arg_t a2, xc_arg_t a3)
-{
-	xcall_inval_t	*xi = (xcall_inval_t *)a1;
-
-	if (CPU->cpu_id == xi->xi_initiator)
-		xi->xi_found = CAS_PTE(xi->xi_pteptr, xi->xi_oldpte, 0);
-
-	mmu_tlbflush_entry(xi->xi_addr);
-	return (0);
-}
-
-/*
  * Invalidate a page table entry as long as it currently maps something that
  * matches the value determined by expect.
  *
@@ -1897,10 +1869,9 @@ x86pte_inval(
 	x86pte_t expect,
 	x86pte_t *pte_ptr)
 {
-	hat_t		*hat = ht->ht_hat;
 	x86pte_t	*ptep;
-	xcall_inval_t	xi;
-	cpuset_t	cpus;
+	x86pte_t	oldpte;
+	x86pte_t	found;
 
 	ASSERT(!(ht->ht_flags & HTABLE_SHARED_PFN));
 	ASSERT(ht->ht_level != VLP_LEVEL);
@@ -1909,48 +1880,24 @@ x86pte_inval(
 		ptep = pte_ptr;
 	else
 		ptep = x86pte_access_pagetable(ht, entry);
-	xi.xi_pteptr = ptep;
-	xi.xi_addr = (caddr_t)htable_e2va(ht, entry);
 
 	/*
-	 * Setup a cross call to any CPUs using this HAT
-	 */
-	kpreempt_disable();
-	xi.xi_initiator = CPU->cpu_id;
-	CPUSET_ZERO(cpus);
-	if (hat == kas.a_hat) {
-		CPUSET_OR(cpus, khat_cpuset);
-	} else {
-		mutex_enter(&hat->hat_switch_mutex);
-		CPUSET_OR(cpus, hat->hat_cpus);
-		CPUSET_ADD(cpus, CPU->cpu_id);
-	}
-
-	/*
-	 * Do the cross call to invalidate the PTE and flush TLBs.
 	 * Note that the loop is needed to handle changes due to h/w updating
 	 * of PT_MOD/PT_REF.
 	 */
 	do {
-		xi.xi_oldpte = GET_PTE(ptep);
-		if (expect != 0 &&
-		    (xi.xi_oldpte & PT_PADDR) != (expect & PT_PADDR))
-			break;
-		if (panicstr == NULL)
-			xc_wait_sync((xc_arg_t)&xi, NULL, NULL, X_CALL_HIPRI,
-				    cpus, x86pte_inval_func);
-		else
-			(void) x86pte_inval_func((xc_arg_t)&xi, NULL, NULL);
-	} while (xi.xi_found != xi.xi_oldpte);
+		oldpte = GET_PTE(ptep);
+		if (expect != 0 && (oldpte & PT_PADDR) != (expect & PT_PADDR))
+			goto done;
+		found = CAS_PTE(ptep, oldpte, 0);
+	} while (found != oldpte);
+	if (oldpte & (PT_REF | PT_MOD))
+		hat_tlb_inval(ht->ht_hat, htable_e2va(ht, entry));
 
-	if (hat != kas.a_hat)
-		mutex_exit(&hat->hat_switch_mutex);
-	kpreempt_enable();
-
+done:
 	if (pte_ptr == NULL)
 		x86pte_release_pagetable(ht);
-
-	return (xi.xi_oldpte);
+	return (oldpte);
 }
 
 /*

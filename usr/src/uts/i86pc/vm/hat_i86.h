@@ -79,7 +79,6 @@ extern "C" {
  */
 struct hat {
 	kmutex_t	hat_mutex;
-	kmutex_t	hat_switch_mutex;
 	struct as	*hat_as;
 	uint_t		hat_stats;
 	pgcnt_t		hat_pages_mapped[MAX_PAGE_LEVEL + 1];
@@ -130,24 +129,29 @@ typedef struct hat hat_t;
  * debugger.
  */
 struct hatstats {
-	uint64_t	hs_reap_attempts;
-	uint64_t	hs_reaped;
-	uint64_t	hs_steals;
-	uint64_t	hs_ptable_allocs;
-	uint64_t	hs_ptable_frees;
-	uint64_t	hs_htable_rgets;	/* allocs from reserve */
-	uint64_t	hs_htable_rputs;	/* putbacks to reserve */
-	uint64_t	hs_htable_shared;	/* number of htables shared */
-	uint64_t	hs_htable_unshared;	/* number of htables unshared */
-	uint64_t	hs_hm_alloc;
-	uint64_t	hs_hm_free;
-	uint64_t	hs_hm_put_reserve;
-	uint64_t	hs_hm_get_reserve;
-	uint64_t	hs_hm_steals;
-	uint64_t	hs_hm_steal_exam;
+	ulong_t	hs_reap_attempts;
+	ulong_t	hs_reaped;
+	ulong_t	hs_steals;
+	ulong_t	hs_ptable_allocs;
+	ulong_t	hs_ptable_frees;
+	ulong_t	hs_htable_rgets;	/* allocs from reserve */
+	ulong_t	hs_htable_rputs;	/* putbacks to reserve */
+	ulong_t	hs_htable_shared;	/* number of htables shared */
+	ulong_t	hs_htable_unshared;	/* number of htables unshared */
+	ulong_t	hs_hm_alloc;
+	ulong_t	hs_hm_free;
+	ulong_t	hs_hm_put_reserve;
+	ulong_t	hs_hm_get_reserve;
+	ulong_t	hs_hm_steals;
+	ulong_t	hs_hm_steal_exam;
+	ulong_t hs_tlb_inval_delayed;
 };
 extern struct hatstats hatstat;
-#define	HATSTAT_INC(x)	(atomic_add_64(&hatstat.x, 1))
+#ifdef DEBUG
+#define	HATSTAT_INC(x)	(++hatstat.x)
+#else
+#define	HATSTAT_INC(x)	(0)
+#endif
 
 #if defined(_KERNEL)
 
@@ -225,6 +229,13 @@ extern uintptr_t hat_kernelbase(uintptr_t);
 extern void hat_kmap_init(uintptr_t base, size_t len);
 
 extern hment_t *hati_page_unmap(page_t *pp, htable_t *ht, uint_t entry);
+
+/*
+ * routines to deal with delayed TLB invalidations for idle CPUs
+ */
+extern void tlb_going_idle(void);
+extern void tlb_service(void);
+
 /*
  * Hat switch function invoked to load a new context into %cr3
  */

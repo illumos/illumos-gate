@@ -43,6 +43,7 @@
 #include <sys/mach_mmu.h>
 #include <sys/promif.h>
 #include <sys/cpu.h>
+#include <vm/hat_i86.h>
 
 extern void real_mode_start(void);
 extern void real_mode_end(void);
@@ -244,7 +245,9 @@ mach_cpu_halt(char *msg)
 void
 mach_cpu_idle(void)
 {
+	tlb_going_idle();
 	i86_halt();
+	tlb_service();
 }
 
 void
