@@ -130,4 +130,4 @@ check_add_drv()
 
 }
 
-check_add_drv -i '"pccard156,2" "pccardb,7300" "pci1260,3873" "pci1260,3872" "pci1385,4105"' -b "$BASEDIR" pcwl 
+check_add_drv -i '"pccard156,2" "pccard138,2" "pccardb,7300" "pci1260,3873" "pci1260,3872" "pci1385,4105"' -b "$BASEDIR" pcwl 

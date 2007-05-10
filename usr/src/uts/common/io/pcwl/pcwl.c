@@ -2585,7 +2585,7 @@ pcwl_cmd_scan(pcwl_maci_t *pcwl_p)
 	}
 done:
 	if (ret)
-		cmn_err(CE_WARN, "pcwl: scan failed due to hareware error");
+		cmn_err(CE_WARN, "pcwl: scan failed due to hardware error");
 	return (ret);
 
 }
@@ -3503,7 +3503,7 @@ pcwl_connect_timeout(void *arg)
 	PCWL_ENABLE_INTR(pcwl_p);
 done:
 	if (ret)
-		cmn_err(CE_WARN, "pcwl: connect failed due to hareware error");
+		cmn_err(CE_WARN, "pcwl: connect failed due to hardware error");
 	mutex_exit(&pcwl_p->pcwl_glock);
 	pcwl_p->pcwl_connect_timeout_id = 0;
 }
