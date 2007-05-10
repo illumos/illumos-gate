@@ -32,15 +32,20 @@ MAGIC= magic
 ELFCAP=	$(SRC)/common/elfcap
 SGSRTCID=	$(SRC)/common/sgsrtcid
 
-LOBJS=	file.o magicutils.o
+LOBJS=	file.o elf_read32.o elf_read64.o magicutils.o
 OBJS=	$(LOBJS) elfcap.o
 XPG4OBJS= $(OBJS:%.o=xpg4_%.o)
-SRCS=	$(LOBJS:%.o=%.c) $(ELFCAP)/elfcap.c
+SRCS=	file.c elf_read.c magicutils.c $(ELFCAP)/elfcap.c
 
 include ../Makefile.cmd
 
 POFILE= file_all.po
-POFILES= $(LOBJS:%.o=%.po)
+POFILES= $(SRCS:%.c=%.po)
+
+# The debug binary can be built using the flag
+# -D COPTFLAG=-g CGLOBALSTATIC=
+# This will avoid the multiple symbols definition error
+# for static global variables in elf_read32.o and elf_read64.o
 
 LDLIBS += -lelf
 CPPFLAGS += -DCAP_UPPERCASE -I$(ELFCAP) -I$(SGSRTCID)
@@ -67,8 +72,20 @@ $(XPG4) : $(XPG4OBJS)
 %.o:	%.c
 	$(COMPILE.c) -o $@ $<
 
+%32.o:	%.c
+	$(COMPILE.c) -o $@ $<
+
+%64.o:	%.c
+	$(COMPILE.c) -D_ELF64 -o $@ $<
+
 xpg4_%.o:	%.c
 	$(COMPILE.c) -o $@ $<
+
+xpg4_%32.o:	%.c
+	$(COMPILE.c) -o $@ $<
+
+xpg4_%64.o:	%.c
+	$(COMPILE.c) -D_ELF64 -o $@ $<
 
 elfcap.o:	$(ELFCAP)/elfcap.c
 	$(COMPILE.c) -o $@ $(ELFCAP)/elfcap.c

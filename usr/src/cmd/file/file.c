@@ -63,8 +63,7 @@
 #include <elfcap.h>
 #include <sgsrtcid.h>
 #include "file.h"
-
-typedef Elf64_Nhdr	GElf_Nhdr;
+#include "elf_read.h"
 
 /*
  *	Misc
@@ -133,7 +132,6 @@ static char	*as[] = {	/* Assembler Pseudo Ops, prepended with '.' */
 static char	*debug_sections[] = { /* Debug sections in a ELF file */
 		".debug", ".stab", ".dwarf", ".line", NULL};
 
-
 /* start for MB env */
 static wchar_t	wchar;
 static int	length;
@@ -161,8 +159,6 @@ static char	**mlist2p;	/* next entry in mlist2 */
 
 static ssize_t	mread;
 
-static void is_stripped(Elf *elf);
-static Elf *is_elf_file(int elffd);
 static void ar_coff_or_aout(int ifd);
 static int type(char *file);
 static int def_position_tests(char *file);
@@ -173,10 +169,8 @@ static int ccom(void);
 static int ascom(void);
 static int sccs(void);
 static int english(char *bp, int n);
-static int old_core(Elf *elf, GElf_Ehdr *ehdr, int format);
-static int core(Elf *elf, GElf_Ehdr *ehdr, int format, char *file);
 static int shellscript(char buf[], struct stat64 *sb);
-static int elf_check(Elf *elf, char *file);
+static int elf_check(char *file);
 static int get_door_target(char *, char *, size_t);
 static int zipfile(char *, int);
 static int is_crash_dump(const char *, int);
@@ -184,12 +178,15 @@ static void print_dumphdr(const int, const dumphdr_t *, uint32_t (*)(uint32_t),
     const char *);
 static uint32_t swap_uint32(uint32_t);
 static uint32_t return_uint32(uint32_t);
-static int is_in_list(char *[], char *);
 static void usage(void);
 static void default_magic(void);
 static void add_to_mlist(char *, int);
 static void fd_cleanup(void);
 static int is_rtld_config(void);
+
+/* from elf_read.c */
+int elf_read32(int elffd, Elf_Info *EInfo);
+int elf_read64(int elffd, Elf_Info *EInfo);
 
 #ifdef XPG4
 	/* SUSv3 requires a single <space> after the colon */
@@ -620,21 +617,16 @@ spcl:
 static int
 def_position_tests(char *file)
 {
-	Elf	*elf;
-
 	if (sccs()) {	/* look for "1hddddd" where d is a digit */
 		(void) printf("sccs \n");
 		return (1);
 	}
 	if (fbuf[0] == '#' && fbuf[1] == '!' && shellscript(fbuf+2, &mbuf))
 		return (1);
-	if ((elf = is_elf_file(elffd)) != NULL) {
-		(void) elf_check(elf, file);
-		(void) elf_end(elf);
+
+	if (elf_check(file) == 0) {
 		(void) putchar('\n');
 		return (1);
-
-
 	/* LINTED: pointer cast may result in improper alignment */
 	} else if (*(int *)fbuf == CORE_MAGIC) {
 		/* LINTED: pointer cast may result in improper alignment */
@@ -922,27 +914,6 @@ troffint(char *bp, int n)
 	return (1);
 }
 
-/*
- * Determine if the passed descriptor describes an ELF file.
- * If so, return the Elf handle.
- */
-static Elf *
-is_elf_file(int elffd)
-{
-	Elf *elf;
-
-	elf = elf_begin(elffd, ELF_C_READ, (Elf *)0);
-	switch (elf_kind(elf)) {
-	case ELF_K_ELF:
-		break;
-	default:
-		(void) elf_end(elf);
-		elf = NULL;
-		break;
-	}
-	return (elf);
-}
-
 static void
 ar_coff_or_aout(int elffd)
 {
@@ -976,9 +947,9 @@ ar_coff_or_aout(int elffd)
 
 
 static void
-print_elf_type(Elf *elf, GElf_Ehdr *ehdr, int format)
+print_elf_type(Elf_Info EI)
 {
-	switch (ehdr->e_type) {
+	switch (EI.type) {
 	case ET_NONE:
 		(void) printf(" %s", gettext("unknown type"));
 		break;
@@ -990,12 +961,6 @@ print_elf_type(Elf *elf, GElf_Ehdr *ehdr, int format)
 		break;
 	case ET_DYN:
 		(void) printf(" %s", gettext("dynamic lib"));
-		break;
-	case ET_CORE:
-		if (old_core(elf, ehdr, format))
-			(void) printf(" %s", gettext("pre-2.6 core file"));
-		else
-			(void) printf(" %s", gettext("core file"));
 		break;
 	default:
 		break;
@@ -1152,9 +1117,12 @@ print_elf_class(int class)
 }
 
 static void
-print_elf_flags(int machine, unsigned int flags)
+print_elf_flags(Elf_Info EI)
 {
-	switch (machine) {
+	unsigned int flags;
+
+	flags = EI.flags;
+	switch (EI.machine) {
 	case EM_SPARCV9:
 		if (flags & EF_SPARC_EXT_MASK) {
 			if (flags & EF_SPARC_SUN_US3) {
@@ -1188,221 +1156,125 @@ print_elf_flags(int machine, unsigned int flags)
 	}
 }
 
+/*
+ * check_ident:	checks the ident field of the presumeably
+ *		elf file. If check fails, this is not an
+ *		elf file.
+ */
 static int
-print_cap(Elf *elf, GElf_Ehdr *ehdr, char *file)
+check_ident(unsigned char *ident, int fd)
 {
-	Elf_Scn	*scn = 0;
+	int class;
+	if (pread64(fd, ident, EI_NIDENT, 0) != EI_NIDENT)
+		return (ELF_READ_FAIL);
+	class = ident[EI_CLASS];
+	if (class != ELFCLASS32 && class != ELFCLASS64)
+		return (ELF_READ_FAIL);
+	if (ident[EI_MAG0] != ELFMAG0 || ident[EI_MAG1] != ELFMAG1 ||
+	    ident[EI_MAG2] != ELFMAG2 || ident[EI_MAG3] != ELFMAG3)
+		return (ELF_READ_FAIL);
 
-	/*
-	 * Traverse the files sections to see if any software/hardware
-	 * capabilities are available.
-	 */
-	while ((scn = elf_nextscn(elf, scn)) != 0) {
-		GElf_Word	ndx, capn;
-		GElf_Shdr	shdr;
-		Elf_Data	*data;
-
-		if (gelf_getshdr(scn, &shdr) == 0) {
-			(void) fprintf(stderr, gettext("%s: %s: can't read "
-			    "ELF section header - ELF capabilities ignored\n"),
-			    File, file);
-			return (1);
-		}
-		if (shdr.sh_type != SHT_SUNW_cap)
-			continue;
-
-		/*
-		 * Get the data associated with the .cap section.
-		 */
-		if ((data = elf_getdata(scn, 0)) == 0) {
-			(void) fprintf(stderr, gettext("%s: %s: can't read "
-			    "ELF section data - ELF capabilities ignored\n"),
-			    File, file);
-			return (1);
-		}
-
-		if ((shdr.sh_size == 0) || (shdr.sh_entsize == 0)) {
-			(void) fprintf(stderr, gettext("%s: %s zero size or "
-			    "zero entry ELF section - ELF capabilities "
-			    "ignored\n"), File, file);
-			return (1);
-		}
-		capn = (GElf_Word)(shdr.sh_size / shdr.sh_entsize);
-
-		for (ndx = 0; ndx < capn; ndx++) {
-			char		str[100];
-			GElf_Cap	cap;
-
-			if (gelf_getcap(data, ndx, &cap) == NULL) {
-				(void) fprintf(stderr, gettext("%s: %s: can't "
-				    "read ELF capabilities data - ELF "
-				    "capabilities ignored\n"), File, file);
-				return (1);
-			}
-			if (cap.c_tag != CA_SUNW_NULL) {
-				(void) cap_val2str(cap.c_tag, cap.c_un.c_val,
-				    str, sizeof (str), 0, ehdr->e_machine);
-				(void) printf(" [%s]", str);
-			}
-		}
-	}
-	return (0);
+	return (ELF_READ_OKAY);
 }
 
 static int
-elf_check(Elf *elf, char *file)
+elf_check(char *file)
 {
-	GElf_Ehdr	ehdr;
-	GElf_Phdr	phdr;
-	int		dynamic, cnt;
-	char	*ident;
-	size_t	size;
+	Elf_Info EInfo;
+	int class, version, format;
+	unsigned char ident[EI_NIDENT];
+
+	(void) memset(&EInfo, 0, sizeof (Elf_Info));
+	EInfo.file = file;
 
 	/*
-	 * Verify information in file header.
+	 * Verify information in file indentifier.
+	 * Return quietly if not elf; Different type of file.
 	 */
-	if (gelf_getehdr(elf, &ehdr) == (GElf_Ehdr *)0) {
-		(void) fprintf(stderr, gettext("%s: %s: can't read ELF "
-		    "header\n"), File, file);
-		return (1);
-	}
-	ident = elf_getident(elf, &size);
-	(void) printf("%s", gettext("ELF"));
-	print_elf_class(ident[EI_CLASS]);
-	print_elf_datatype(ident[EI_DATA]);
-	print_elf_type(elf, &ehdr, ident[EI_DATA]);
-	print_elf_machine(ehdr.e_machine);
-	if (ehdr.e_version == 1)
-		(void) printf(" %s %d",
-		    gettext("Version"), (int)ehdr.e_version);
-	print_elf_flags(ehdr.e_machine, ehdr.e_flags);
-
-	if (core(elf, &ehdr, ident[EI_DATA], file)) /* check for core file */
-		return (0);
-
-	if (print_cap(elf, &ehdr, file))
+	if (check_ident(ident, elffd) == ELF_READ_FAIL)
 		return (1);
 
 	/*
-	 * Check type.
+	 * Read the elf headers for processing and get the
+	 * get the needed information in Elf_Info struct.
 	 */
-	if ((ehdr.e_type != ET_EXEC) && (ehdr.e_type != ET_DYN))
-		return (1);
-
-	/*
-	 * Read program header and check for dynamic section.
-	 */
-	if (ehdr.e_phnum == 0) {
-		(void) fprintf(stderr, gettext("%s: %s: no ELF program headers "
-		    "exist\n"), File, file);
-		return (1);
-	}
-
-	for (dynamic = 0, cnt = 0; cnt < (int)ehdr.e_phnum; cnt++) {
-		if (gelf_getphdr(elf, cnt, &phdr) == NULL) {
-			(void) fprintf(stderr, gettext("%s: %s: can't read "
-			    "ELF program header\n"), File, file);
+	class = ident[EI_CLASS];
+	if (class == ELFCLASS32) {
+		if (elf_read32(elffd, &EInfo) == ELF_READ_FAIL) {
+			(void) fprintf(stderr, gettext("%s: %s: can't "
+			    "read ELF header\n"), File, file);
 			return (1);
 		}
-		if (phdr.p_type == PT_DYNAMIC) {
-			dynamic = 1;
-			break;
+	} else if (class == ELFCLASS64) {
+		if (elf_read64(elffd, &EInfo) == ELF_READ_FAIL) {
+			(void) fprintf(stderr, gettext("%s: %s: can't "
+			    "read ELF header\n"), File, file);
+			return (1);
 		}
+	} else {
+		/* something wrong */
+		return (1);
 	}
-	if (dynamic)
+
+	/* version not in ident then 1 */
+	version = ident[EI_VERSION] ? ident[EI_VERSION] : 1;
+
+	format = ident[EI_DATA];
+	(void) printf("%s", gettext("ELF"));
+	print_elf_class(class);
+	print_elf_datatype(format);
+	print_elf_type(EInfo);
+
+	if (EInfo.core_type != EC_NOTCORE) {
+		/* Print what kind of core is this */
+		if (EInfo.core_type == EC_OLDCORE)
+			(void) printf(" %s", gettext("pre-2.6 core file"));
+		else
+			(void) printf(" %s", gettext("core file"));
+	}
+
+	/* Print machine info */
+	print_elf_machine(EInfo.machine);
+
+	/* Print Version */
+	if (version == 1)
+		(void) printf(" %s %d", gettext("Version"), version);
+
+	/* Print Flags */
+	print_elf_flags(EInfo);
+
+	/* Last bit, if it is a core */
+	if (EInfo.core_type != EC_NOTCORE) {
+		/* Print the program name that dumped this core */
+		(void) printf(gettext(", from '%s'"), EInfo.fname);
+		return (0);
+	}
+
+	/* Print Capabilities */
+	if (EInfo.cap_str[0] != '\0')
+		(void) printf(" [%s]", EInfo.cap_str);
+
+	if ((EInfo.type != ET_EXEC) && (EInfo.type != ET_DYN))
+		return (0);
+
+	/* Print if it is dynamically linked */
+	if (EInfo.dynamic)
 		(void) printf(gettext(", dynamically linked"));
 	else
 		(void) printf(gettext(", statically linked"));
 
-	is_stripped(elf);
-	return (0);
-}
-
-/*
- * is_stripped prints information on whether the executable has
- * been stripped.
- */
-static void
-is_stripped(Elf *elf)
-{
-	GElf_Shdr	shdr;
-	GElf_Ehdr	ehdr;
-	Elf_Scn		*scn, *nextscn;
-	char		*section_name;
-	int		symtab = 0;
-	int		debuginfo = 0;
-
-
-	if (gelf_getehdr(elf, &ehdr) == NULL) {
-		return;
-	}
-
-	/*
-	 * Definition time:
-	 *	- "not stripped" means that an executable file
-	 *	contains a Symbol Table (.symtab)
-	 *	- "stripped" means that an executable file
-	 *	does not contain a Symbol Table.
-	 * When strip -l or strip -x is run, it strips the
-	 * debugging information (.line section name (strip -l),
-	 * .line, .debug*, .stabs*, .dwarf* section names
-	 * and SHT_SUNW_DEBUGSTR and SHT_SUNW_DEBUG
-	 * section types (strip -x), however the Symbol
-	 * Table will still be present.
-	 * Therefore, if
-	 *	- No Symbol Table present, then report
-	 *		"stripped"
-	 *	- Symbol Table present with debugging
-	 *	information (line number or debug section names,
-	 *	or SHT_SUNW_DEBUGSTR or SHT_SUNW_DEBUG section
-	 *	types) then report:
-	 *		"not stripped"
-	 *	- Symbol Table present with no debugging
-	 *	information (line number or debug section names,
-	 *	or SHT_SUNW_DEBUGSTR or SHT_SUNW_DEBUG section
-	 *	types) then report:
-	 *		"not stripped, no debugging information
-	 *		available"
-	 */
-	scn = NULL;
-	while ((nextscn = elf_nextscn(elf, scn)) != NULL) {
-		if (symtab && debuginfo) {
-			break;
-		}
-
-		scn = nextscn;
-		if (gelf_getshdr(scn, &shdr) == NULL) {
-			continue;
-		}
-
-		if (!symtab && (shdr.sh_type == SHT_SYMTAB)) {
-			symtab++;
-			continue;
-		}
-
-		if (!debuginfo &&
-		    ((shdr.sh_type == SHT_SUNW_DEBUG) ||
-		    (shdr.sh_type == SHT_SUNW_DEBUGSTR) ||
-		    (((section_name = elf_strptr(elf, ehdr.e_shstrndx,
-		    (size_t)shdr.sh_name)) != NULL) &&
-		    (is_in_list(debug_sections, section_name))))) {
-			debuginfo++;
-		}
-	}
-
-	/*
-	 * Now that we've scanned all sections, print out the appropriate
-	 * diagnostic.
-	 */
-	if (symtab) {
+	/* Printf it it is stripped */
+	if (EInfo.stripped & E_SYMTAB) {
 		(void) printf(gettext(", not stripped"));
-		if (!debuginfo) {
+		if (!(EInfo.stripped & E_DBGINF)) {
 			(void) printf(gettext(
 			    ", no debugging information available"));
 		}
 	} else {
 		(void) printf(gettext(", stripped"));
 	}
+
+	return (0);
 }
 
 /*
@@ -1580,173 +1452,6 @@ english(char *bp, int n)
 	return (vow * 5 >= n - ct[' '] && freq >= 10 * rare);
 }
 
-/*
- * Convert a word from an elf file to native format.
- * This is needed because there's no elf routine to
- * get and decode a Note section header.
- */
-static void
-convert_gelf_word(Elf *elf, GElf_Word *data, int version, int format)
-{
-	Elf_Data src, dst;
-
-	dst.d_buf = data;
-	dst.d_version = version;
-	dst.d_size = sizeof (GElf_Word);
-	dst.d_type = ELF_T_WORD;
-	src.d_buf = data;
-	src.d_version = version;
-	src.d_size = sizeof (GElf_Word);
-	src.d_type = ELF_T_WORD;
-	(void) gelf_xlatetom(elf, &dst, &src, format);
-}
-
-static void
-convert_gelf_nhdr(Elf *elf, GElf_Nhdr *nhdr, GElf_Word version, int format)
-{
-	convert_gelf_word(elf, &nhdr->n_namesz, version, format);
-	convert_gelf_word(elf, &nhdr->n_descsz, version, format);
-	convert_gelf_word(elf, &nhdr->n_type, version, format);
-}
-
-/*
- * Return true if it is an old (pre-restructured /proc) core file.
- */
-static int
-old_core(Elf *elf, GElf_Ehdr *ehdr, int format)
-{
-	register int inx;
-	GElf_Phdr phdr;
-	GElf_Phdr nphdr;
-	GElf_Nhdr nhdr;
-	off_t offset;
-
-	if (ehdr->e_type != ET_CORE)
-		return (0);
-	for (inx = 0; inx < (int)ehdr->e_phnum; inx++) {
-		if (gelf_getphdr(elf, inx, &phdr) == NULL) {
-			return (0);
-		}
-		if (phdr.p_type == PT_NOTE) {
-			/*
-			 * If the next segment is also a note, use it instead.
-			 */
-			if (gelf_getphdr(elf, inx+1, &nphdr) == NULL) {
-				return (0);
-			}
-			if (nphdr.p_type == PT_NOTE)
-				phdr = nphdr;
-			offset = (off_t)phdr.p_offset;
-			(void) pread(ifd, &nhdr, sizeof (GElf_Nhdr), offset);
-			convert_gelf_nhdr(elf, &nhdr, ehdr->e_version, format);
-			/*
-			 * Old core files have type NT_PRPSINFO.
-			 */
-			if (nhdr.n_type == NT_PRPSINFO)
-				return (1);
-			return (0);
-		}
-	}
-	return (0);
-}
-
-/*
- * If it's a core file, print out the name of the file that dumped core.
- */
-static int
-core(Elf *elf, GElf_Ehdr *ehdr, int format, char *file)
-{
-	register int inx;
-	char *psinfo;
-	GElf_Phdr phdr;
-	GElf_Phdr nphdr;
-	GElf_Nhdr nhdr;
-	off_t offset;
-
-	if (ehdr->e_type != ET_CORE)
-		return (0);
-	for (inx = 0; inx < (int)ehdr->e_phnum; inx++) {
-		if (gelf_getphdr(elf, inx, &phdr) == NULL) {
-			(void) fprintf(stderr, gettext("%s: %s: can't read "
-			    "ELF program header\n"), File, file);
-			return (0);
-		}
-		if (phdr.p_type == PT_NOTE) {
-			char *fname;
-			size_t size;
-
-			/*
-			 * If the next segment is also a note, use it instead.
-			 */
-			if (gelf_getphdr(elf, inx+1, &nphdr) == NULL) {
-				(void) fprintf(stderr, gettext("%s: %s: can't "
-				    "read ELF program header\n"), File, file);
-				return (0);
-			}
-			if (nphdr.p_type == PT_NOTE)
-				phdr = nphdr;
-			offset = (off_t)phdr.p_offset;
-			(void) pread(ifd, &nhdr, sizeof (GElf_Nhdr), offset);
-			convert_gelf_nhdr(elf, &nhdr, ehdr->e_version, format);
-
-			/*
-			 * Note: the ABI states that n_namesz must
-			 * be rounded up to a 4 byte boundary.
-			 */
-			offset += sizeof (GElf_Nhdr) +
-			    ((nhdr.n_namesz + 0x03) & ~0x3);
-			size = nhdr.n_descsz;
-			if ((psinfo = malloc(size)) == NULL) {
-				int err = errno;
-				(void) fprintf(stderr, gettext("%s: malloc "
-				    "failed: %s\n"), File, strerror(err));
-				exit(2);
-			}
-			(void) pread(ifd, psinfo, size, offset);
-
-			/*
-			 * We want to print the string contained
-			 * in psinfo->pr_fname[], where 'psinfo'
-			 * is either an old NT_PRPSINFO structure
-			 * or a new NT_PSINFO structure.
-			 *
-			 * Old core files have only type NT_PRPSINFO.
-			 * New core files have type NT_PSINFO.
-			 *
-			 * These structures are also different by
-			 * virtue of being contained in a core file
-			 * of either 32-bit or 64-bit type.
-			 *
-			 * To further complicate matters, we ourself
-			 * might be compiled either 32-bit or 64-bit.
-			 *
-			 * For these reason, we just *know* the offsets of
-			 * pr_fname[] into the four different structures
-			 * here, regardless of how we are compiled.
-			 */
-			if (gelf_getclass(elf) == ELFCLASS32) {
-				/* 32-bit core file, 32-bit structures */
-				if (nhdr.n_type == NT_PSINFO)
-					fname = psinfo + 88;
-				else	/* old: NT_PRPSINFO */
-					fname = psinfo + 84;
-			} else if (gelf_getclass(elf) == ELFCLASS64) {
-				/* 64-bit core file, 64-bit structures */
-				if (nhdr.n_type == NT_PSINFO)
-					fname = psinfo + 136;
-				else	/* old: NT_PRPSINFO */
-					fname = psinfo + 120;
-			} else {
-				free(psinfo);
-				break;
-			}
-			(void) printf(gettext(", from '%s'"), fname);
-			free(psinfo);
-			break;
-		}
-	}
-	return (1);
-}
 
 static int
 shellscript(char buf[], struct stat64 *sb)
@@ -1966,8 +1671,8 @@ return_uint32(uint32_t in)
 /*
  * Check if str is in the string list str_list.
  */
-static int
-is_in_list(char *str_list[], char *str)
+int
+is_in_list(char *str)
 {
 	int i;
 
@@ -1976,8 +1681,9 @@ is_in_list(char *str_list[], char *str)
 	 * That way .stab will match on .stab* sections, and
 	 * .debug will match on .debug* sections.
 	 */
-	for (i = 0; str_list[i] != NULL; i++) {
-		if (strncmp(str_list[i], str, strlen(str_list[i])) == 0) {
+	for (i = 0; debug_sections[i] != NULL; i++) {
+		if (strncmp(debug_sections[i], str,
+			strlen(debug_sections[i])) == 0) {
 			return (1);
 		}
 	}
