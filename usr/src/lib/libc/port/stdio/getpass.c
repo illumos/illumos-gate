@@ -47,7 +47,6 @@
 #include "stdiom.h"
 #include "tsd.h"
 
-static void catch(int);
 static int intrupt;
 static char *__getpass(const char *, int);
 
@@ -76,18 +75,26 @@ __getpass(const char *prompt, int size)
 	int c;
 	FILE	*fi;
 	char *pbuf = tsdalloc(_T_GETPASS, MAXPASSWD + 1, NULL);
-	void	(*sig)(int);
+	struct sigaction act, osigint, osigtstp;
+	static void catch(int);
 
 	if (pbuf == NULL ||
 	    (fi = fopen("/dev/tty", "r+F")) == NULL)
 		return (NULL);
 	setbuf(fi, NULL);
-	sig = signal(SIGINT, catch);
+
 	intrupt = 0;
-	(void) ioctl(FILENO(fi), TCGETA, &ttyb);
+	act.sa_flags = 0;
+	act.sa_handler = catch;
+	(void) sigemptyset(&act.sa_mask);
+	(void) sigaction(SIGINT, &act, &osigint);	/* trap interrupt */
+	act.sa_handler = SIG_IGN;
+	(void) sigaction(SIGTSTP, &act, &osigtstp);	/* ignore stop */
+	(void) ioctl(fileno(fi), TCGETA, &ttyb);
 	flags = ttyb.c_lflag;
 	ttyb.c_lflag &= ~(ECHO | ECHOE | ECHOK | ECHONL);
-	(void) ioctl(FILENO(fi), TCSETAF, &ttyb);
+	(void) ioctl(fileno(fi), TCSETAF, &ttyb);
+
 	(void) fputs(prompt, fi);
 	p = pbuf;
 	while (!intrupt &&
@@ -97,12 +104,16 @@ __getpass(const char *prompt, int size)
 	}
 	*p = '\0';
 	(void) PUTC('\n', fi);
+
 	ttyb.c_lflag = flags;
-	(void) ioctl(FILENO(fi), TCSETAW, &ttyb);
-	(void) signal(SIGINT, sig);
+	(void) ioctl(fileno(fi), TCSETAW, &ttyb);
+	(void) sigaction(SIGINT, &osigint, NULL);
+	(void) sigaction(SIGTSTP, &osigtstp, NULL);
 	(void) fclose(fi);
-	if (intrupt)
+	if (intrupt) {		/* if interrupted erase the input */
+		pbuf[0] = '\0';
 		(void) kill(getpid(), SIGINT);
+	}
 	return (pbuf);
 }
 
