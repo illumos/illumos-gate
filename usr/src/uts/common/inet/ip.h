@@ -3546,7 +3546,7 @@ typedef void    (*ipsq_func_t)(ipsq_t *, queue_t *, mblk_t *, void *);
 #define	SQTAG_TCP_ACCEPT_FINISH_Q0	11
 #define	SQTAG_TCP_ACCEPT_PENDING	12
 #define	SQTAG_TCP_LISTEN_DISCON		13
-#define	SQTAG_TCP_CONN_REQ		14
+#define	SQTAG_TCP_CONN_REQ_1		14
 #define	SQTAG_TCP_EAGER_BLOWOFF		15
 #define	SQTAG_TCP_EAGER_CLEANUP		16
 #define	SQTAG_TCP_EAGER_CLEANUP_Q0	17
@@ -3570,6 +3570,7 @@ typedef void    (*ipsq_func_t)(ipsq_t *, queue_t *, mblk_t *, void *);
 #define	SQTAG_UDP_OUTPUT		35
 #define	SQTAG_TCP_KSSL_INPUT		36
 #define	SQTAG_TCP_DROP_Q0		37
+#define	SQTAG_TCP_CONN_REQ_2		38
 
 #define	NOT_OVER_IP(ip_wq)	\
 	(ip_wq->q_next != NULL ||	\

@@ -1840,16 +1840,17 @@ tcp_time_wait_collector(void *arg)
 				 * time_wait list). tcp_closemp_used can safely
 				 * be changed without taking a lock as no other
 				 * thread can concurrently access it at this
-				 * point in the connection lifecycle. We
-				 * increment tcp_closemp_used to record any
-				 * attempt to reuse tcp_closemp while it is
-				 * still in use.
+				 * point in the connection lifecycle.
 				 */
 
 				if (tcp->tcp_closemp.b_prev == NULL)
-					tcp->tcp_closemp_used = 1;
+					tcp->tcp_closemp_used = B_TRUE;
 				else
-					tcp->tcp_closemp_used++;
+					cmn_err(CE_PANIC,
+					    "tcp_timewait_collector: "
+					    "concurrent use of tcp_closemp: "
+					    "connp %p tcp %p\n", (void *)connp,
+					    (void *)tcp);
 
 				TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
 				mp = &tcp->tcp_closemp;
@@ -1868,16 +1869,16 @@ tcp_time_wait_collector(void *arg)
 			 * time_wait list). tcp_closemp_used can safely
 			 * be changed without taking a lock as no other
 			 * thread can concurrently access it at this
-			 * point in the connection lifecycle. We
-			 * increment tcp_closemp_used to record any
-			 * attempt to reuse tcp_closemp while it is
-			 * still in use.
+			 * point in the connection lifecycle.
 			 */
 
 			if (tcp->tcp_closemp.b_prev == NULL)
-				tcp->tcp_closemp_used = 1;
+				tcp->tcp_closemp_used = B_TRUE;
 			else
-				tcp->tcp_closemp_used++;
+				cmn_err(CE_PANIC, "tcp_timewait_collector: "
+				    "concurrent use of tcp_closemp: "
+				    "connp %p tcp %p\n", (void *)connp,
+				    (void *)tcp);
 
 			TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
 			mp = &tcp->tcp_closemp;
@@ -4021,17 +4022,14 @@ tcp_close(queue_t *q, int flags)
 	/*
 	 * tcp_closemp_used is used below without any protection of a lock
 	 * as we don't expect any one else to use it concurrently at this
-	 * point otherwise it would be a major defect, though we do
-	 * increment tcp_closemp_used to record any attempt to reuse
-	 * tcp_closemp while it is still in use. This would help debugging.
+	 * point otherwise it would be a major defect.
 	 */
 
-	if (mp->b_prev == NULL) {
-		tcp->tcp_closemp_used = 1;
-	} else {
-		tcp->tcp_closemp_used++;
-		ASSERT(mp->b_prev == NULL);
-	}
+	if (mp->b_prev == NULL)
+		tcp->tcp_closemp_used = B_TRUE;
+	else
+		cmn_err(CE_PANIC, "tcp_close: concurrent use of tcp_closemp: "
+		    "connp %p tcp %p\n", (void *)connp, (void *)tcp);
 
 	TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
 
@@ -5582,7 +5580,6 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	uint_t 		ip_hdr_len;
 	conn_t		*connp = (conn_t *)arg;
 	tcp_t		*tcp = connp->conn_tcp;
-	ire_t		*ire;
 	cred_t		*credp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	ip_stack_t	*ipst;
@@ -5925,8 +5922,14 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	eager->tcp_state = TCPS_SYN_RCVD;
 	mp1 = tcp_xmit_mp(eager, eager->tcp_xmit_head, eager->tcp_mss,
 	    NULL, NULL, eager->tcp_iss, B_FALSE, NULL, B_FALSE);
-	if (mp1 == NULL)
-		goto error1;
+	if (mp1 == NULL) {
+		/*
+		 * Increment the ref count as we are going to
+		 * enqueueing an mp in squeue
+		 */
+		CONN_INC_REF(econnp);
+		goto error;
+	}
 	DB_CPID(mp1) = tcp->tcp_cpid;
 	eager->tcp_cpid = tcp->tcp_cpid;
 	eager->tcp_open_time = lbolt64;
@@ -5987,37 +5990,11 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 
 	return;
 error:
-	(void) TCP_TIMER_CANCEL(eager, eager->tcp_timer_tid);
-	CONN_DEC_REF(eager->tcp_connp);
 	freemsg(mp1);
-error1:
-	/* Undo what we did above */
-	mutex_enter(&tcp->tcp_eager_lock);
-	tcp_eager_unlink(eager);
-	mutex_exit(&tcp->tcp_eager_lock);
-	/* Drop eager's reference on the listener */
-	CONN_DEC_REF(connp);
-
-	/*
-	 * Delete the cached ire in conn_ire_cache and also mark
-	 * the conn as CONDEMNED
-	 */
-	mutex_enter(&econnp->conn_lock);
-	econnp->conn_state_flags |= CONN_CONDEMNED;
-	ire = econnp->conn_ire_cache;
-	econnp->conn_ire_cache = NULL;
-	mutex_exit(&econnp->conn_lock);
-	if (ire != NULL)
-		IRE_REFRELE_NOTR(ire);
-
-	/*
-	 * tcp_accept_comm inserts the eager to the bind_hash
-	 * we need to remove it from the hash if ipcl_conn_insert
-	 * fails.
-	 */
-	tcp_bind_hash_remove(eager);
-	/* Drop the eager ref placed in tcp_open_detached */
-	CONN_DEC_REF(econnp);
+	eager->tcp_closemp_used = B_TRUE;
+	TCP_DEBUG_GETPCSTACK(eager->tcmp_stk, 15);
+	squeue_fill(econnp->conn_sqp, &eager->tcp_closemp, tcp_eager_kill,
+	    econnp, SQTAG_TCP_CONN_REQ_2);
 
 	/*
 	 * If a connection already exists, send the mp to that connections so
@@ -6041,18 +6018,16 @@ error1:
 			freemsg(mp);
 		} else {
 			squeue_fill(econnp->conn_sqp, mp, tcp_input,
-			    econnp, SQTAG_TCP_CONN_REQ);
+			    econnp, SQTAG_TCP_CONN_REQ_1);
 		}
 	} else {
 		/* Nobody wants this packet */
 		freemsg(mp);
 	}
 	return;
-error2:
-	freemsg(mp);
-	return;
 error3:
 	CONN_DEC_REF(econnp);
+error2:
 	freemsg(mp);
 }
 
@@ -7071,10 +7046,12 @@ tcp_display(tcp_t *tcp, char *sup_buf, char format)
 }
 
 /*
- * Called via squeue to get on to eager's perimeter to send a
- * TH_RST. The listener wants the eager to disappear either
- * by means of tcp_eager_blowoff() or tcp_eager_cleanup()
- * being called.
+ * Called via squeue to get on to eager's perimeter. It sends a
+ * TH_RST if eager is in the fanout table. The listener wants the
+ * eager to disappear either by means of tcp_eager_blowoff() or
+ * tcp_eager_cleanup() being called. tcp_eager_kill() can also be
+ * called (via squeue) if the eager cannot be inserted in the
+ * fanout table in tcp_conn_request().
  */
 /* ARGSUSED */
 void
@@ -7095,7 +7072,12 @@ tcp_eager_kill(void *arg, mblk_t *mp, void *arg2)
 	eager->tcp_rq = tcps->tcps_g_q;
 	eager->tcp_wq = WR(tcps->tcps_g_q);
 
-	if (eager->tcp_state > TCPS_LISTEN) {
+	/*
+	 * An eager's conn_fanout will be NULL if it's a duplicate
+	 * for an existing 4-tuples in the conn fanout table.
+	 * We don't want to send an RST out in such case.
+	 */
+	if (econnp->conn_fanout != NULL && eager->tcp_state > TCPS_LISTEN) {
 		tcp_xmit_ctl("tcp_eager_kill, can't wait",
 		    eager, eager->tcp_snxt, 0, TH_RST);
 	}
@@ -7144,11 +7126,11 @@ tcp_eager_blowoff(tcp_t	*listener, t_scalar_t seqnum)
 		}
 	} while (eager->tcp_conn_req_seqnum != seqnum);
 
-	if (eager->tcp_closemp_used > 0) {
+	if (eager->tcp_closemp_used) {
 		mutex_exit(&listener->tcp_eager_lock);
 		return (B_TRUE);
 	}
-	eager->tcp_closemp_used = 1;
+	eager->tcp_closemp_used = B_TRUE;
 	TCP_DEBUG_GETPCSTACK(eager->tcmp_stk, 15);
 	CONN_INC_REF(eager->tcp_connp);
 	mutex_exit(&listener->tcp_eager_lock);
@@ -7176,8 +7158,8 @@ tcp_eager_cleanup(tcp_t *listener, boolean_t q0_only)
 		TCP_STAT(tcps, tcp_eager_blowoff_q);
 		eager = listener->tcp_eager_next_q;
 		while (eager != NULL) {
-			if (eager->tcp_closemp_used == 0) {
-				eager->tcp_closemp_used = 1;
+			if (!eager->tcp_closemp_used) {
+				eager->tcp_closemp_used = B_TRUE;
 				TCP_DEBUG_GETPCSTACK(eager->tcmp_stk, 15);
 				CONN_INC_REF(eager->tcp_connp);
 				mp = &eager->tcp_closemp;
@@ -7192,8 +7174,8 @@ tcp_eager_cleanup(tcp_t *listener, boolean_t q0_only)
 	TCP_STAT(tcps, tcp_eager_blowoff_q0);
 	eager = listener->tcp_eager_next_q0;
 	while (eager != listener) {
-		if (eager->tcp_closemp_used == 0) {
-			eager->tcp_closemp_used = 1;
+		if (!eager->tcp_closemp_used) {
+			eager->tcp_closemp_used = B_TRUE;
 			TCP_DEBUG_GETPCSTACK(eager->tcmp_stk, 15);
 			CONN_INC_REF(eager->tcp_connp);
 			mp = &eager->tcp_closemp;
@@ -8161,7 +8143,7 @@ tcp_reinit_values(tcp)
 	ASSERT(!tcp->tcp_kssl_pending);
 	PRESERVE(tcp->tcp_kssl_ent);
 
-	tcp->tcp_closemp_used = 0;
+	tcp->tcp_closemp_used = B_FALSE;
 
 #ifdef DEBUG
 	DONTCARE(tcp->tcmp_stk[0]);
@@ -16968,7 +16950,7 @@ tcp_timer(void *arg)
 			tcp->tcp_syn_rcvd_timeout = 1;
 			mutex_enter(&listener->tcp_eager_lock);
 			listener->tcp_syn_rcvd_timeout++;
-			if (!tcp->tcp_dontdrop && tcp->tcp_closemp_used == 0) {
+			if (!tcp->tcp_dontdrop && !tcp->tcp_closemp_used) {
 				/*
 				 * Make this eager available for drop if we
 				 * need to drop one to accomodate a new
@@ -16996,7 +16978,7 @@ tcp_timer(void *arg)
 			mutex_enter(&listener->tcp_eager_lock);
 			tcp->tcp_syn_rcvd_timeout++;
 			if (tcp->tcp_syn_rcvd_timeout > 1 &&
-			    tcp->tcp_closemp_used == 0) {
+			    !tcp->tcp_closemp_used) {
 				/*
 				 * This is our second timeout. Put the tcp in
 				 * the list of droppable eagers to allow it to

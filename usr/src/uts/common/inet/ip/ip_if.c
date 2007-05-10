@@ -8225,12 +8225,14 @@ ipsq_clean_ring(ill_t *ill, ill_rx_ring_t *rx_ring)
 	 */
 	connp = ill->ill_dls_capab->ill_unbind_conn;
 
-	ASSERT(!connp->conn_tcp->tcp_closemp.b_prev);
-	TCP_DEBUG_GETPCSTACK(connp->conn_tcp->tcmp_stk, 15);
 	if (connp->conn_tcp->tcp_closemp.b_prev == NULL)
-		connp->conn_tcp->tcp_closemp_used = 1;
+		connp->conn_tcp->tcp_closemp_used = B_TRUE;
 	else
-		connp->conn_tcp->tcp_closemp_used++;
+		cmn_err(CE_PANIC, "ipsq_clean_ring: "
+		    "concurrent use of tcp_closemp_used: connp %p tcp %p\n",
+		    (void *)connp, (void *)connp->conn_tcp);
+
+	TCP_DEBUG_GETPCSTACK(connp->conn_tcp->tcmp_stk, 15);
 	mp = &connp->conn_tcp->tcp_closemp;
 	CONN_INC_REF(connp);
 	squeue_enter(sqp, mp, ip_squeue_clean, connp, NULL);

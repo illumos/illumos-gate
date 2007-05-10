@@ -576,12 +576,10 @@ typedef struct tcp_s {
 	 * when used for eagers. When used for a tcp in TIME_WAIT state
 	 * or in tcp_close(), it is not protected by any lock as we
 	 * do not expect any other thread to use it concurrently.
-	 * Since we do allow re-use of tcp_closemp at certain places,
-	 * tcp_closemp_used is declared as uint32_t instead of boolean_t
-	 * to record any attempt to re-use tcp_closemp while it is still
-	 * in use. This would facilitate debugging in non-debug kernels.
+	 * We do allow re-use of tcp_closemp in tcp_time_wait_collector()
+	 * and tcp_close() but not concurrently.
 	 */
-	uint32_t tcp_closemp_used;
+	boolean_t tcp_closemp_used;
 
 	/*
 	 * previous and next eagers in the list of droppable eagers. See
