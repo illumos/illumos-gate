@@ -1,9 +1,4 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
  * drm_drv.h -- Generic driver template -*- linux-c -*-
  * Created: Thu Nov 23 03:10:50 2000 by gareth@valinux.com
  */
@@ -35,6 +30,11 @@
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
+ */
+
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -300,6 +300,10 @@ drm_load(drm_softstate_t *dev)
 	cv_init(&(dev->lock.lock_cv), NULL, CV_DRIVER, NULL);
 	mutex_init(&(dev->lock.lock_mutex), NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&(dev->dev_lock), NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&dev->drw_lock, NULL, MUTEX_DRIVER, NULL);
+
+	dev->pci_vendor = pci_get_vendor(dev);
+	dev->pci_device = pci_get_device(dev);
 
 	dev->cloneopens = 0;
 	dev->minordevs = NULL;
@@ -353,6 +357,7 @@ error:
 	cv_destroy(&(dev->lock.lock_cv));
 	mutex_destroy(&(dev->lock.lock_mutex));
 	mutex_destroy(&(dev->dev_lock));
+	mutex_destroy(&dev->drw_lock);
 
 	return (retcode);
 }
@@ -384,6 +389,7 @@ drm_unload(drm_softstate_t *dev)
 	cv_destroy(&dev->lock.lock_cv);
 	mutex_destroy(&dev->lock.lock_mutex);
 	mutex_destroy(&dev->dev_lock);
+	mutex_destroy(&dev->drw_lock);
 
 	DRM_INFO("!drm: drm_unload: cleanup the resource");
 }
@@ -448,7 +454,7 @@ drm_close(drm_softstate_t *dev, dev_t kdev, int flag, int otyp,
 		    DRM_CURRENTPID, dev->open_count);
 
 	if (dev->lock.hw_lock &&
-	    _DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock) &&
+		_DRM_LOCK_IS_HELD(dev->lock.hw_lock->lock) &&
 	dev->lock.filp == filp) {
 		DRM_DEBUG("Process %d dead, freeing lock for context %d",
 		    DRM_CURRENTPID,

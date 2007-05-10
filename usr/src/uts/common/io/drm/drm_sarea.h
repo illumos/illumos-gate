@@ -43,7 +43,7 @@
 #define SAREA_MAX                       0x10000	/* 64kB */
 #else
 /* Intel 830M driver needs at least 8k SAREA */
-#define SAREA_MAX                       0x2000
+#define SAREA_MAX                       0x2000UL
 #endif
 
 /** Maximum number of drawables in the SAREA */

@@ -1,9 +1,4 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
  * drmP.h -- Private header for Direct Rendering Manager -*- linux-c -*-
  * Created: Mon Jan  4 10:05:05 1999 by faith@precisioninsight.com
  */
@@ -37,6 +32,11 @@
  *
  */
 
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #ifndef _DRMP_H
 #define	_DRMP_H
 
@@ -57,7 +57,7 @@
 
 #include "drm.h"
 #include "queue.h"
-
+#include "drm_linux_list.h"
 #include <sys/agpgart.h>
 
 #ifdef NOPID
@@ -144,10 +144,16 @@ typedef uint32_t	atomic_t;
 #define	DRM_SPINLOCK_ASSERT(l)
 #define	DRM_LOCK()	mutex_enter(&dev->dev_lock)
 #define	DRM_UNLOCK()	mutex_exit(&dev->dev_lock)
+#define	spin_lock_irqsave(l, flag)	mutex_enter(l)
+#define	spin_unlock_irqrestore(u, flag)	mutex_exit(u)
+#define	spin_lock(l)		mutex_enter(l)
+#define	spin_unlock(u)		mutex_exit(u)
+#define	atomic_inc		atomic_inc_32
 
-#define	DRM_UDELAY(sec)  delay(drv_usectohz(sec *1000))
+#define	DRM_UDELAY(sec)  delay(drv_usectohz(sec * 1000))
 #define	DRM_MEMORYBARRIER()
 
+#define	drm_device drm_softstate
 typedef struct drm_softstate drm_device_t;
 typedef struct drm_softstate drm_softstate_t;
 
@@ -178,14 +184,24 @@ typedef struct drm_softstate drm_softstate_t;
 
 #define	DRM_DEVICE	drm_softstate_t *dev = dev1
 
-#define	DRM_READ16(map, offset) 	*(volatile uint16_t *)\
-	(((unsigned long)(map)->dev_addr) + (offset))
-#define	DRM_WRITE16(map, offset, val)	*(volatile uint16_t *)\
-	(((unsigned long)(map)->dev_addr) + (offset)) = val
-#define	DRM_READ32(map, offset) 	*(volatile uint32_t *)\
-	(((unsigned long)(map)->dev_addr) + (offset))
-#define	DRM_WRITE32(map, offset, val)	*(volatile uint32_t *)\
-	(((unsigned long)(map)->dev_addr) + (offset)) = val
+#define	DRM_READ8(map, offset) \
+	ddi_get8((map)->dev_handle, \
+		(void *)((char *)((map)->dev_addr) + (offset)))
+#define	DRM_READ16(map, offset) \
+	ddi_get16((map)->dev_handle, \
+		(void *)((char *)((map)->dev_addr) + (offset)))
+#define	DRM_READ32(map, offset) \
+	ddi_get32((map)->dev_handle, \
+		(void *)((char *)((map)->dev_addr) + (offset)))
+#define	DRM_WRITE8(map, offset, val) \
+	ddi_put8((map)->dev_handle, \
+		(void *)((char *)((map)->dev_addr) + (offset)), (val))
+#define	DRM_WRITE16(map, offset, val) \
+	ddi_put16((map)->dev_handle, \
+		(void *)((char *)((map)->dev_addr) + (offset)), (val))
+#define	DRM_WRITE32(map, offset, val) \
+	ddi_put32((map)->dev_handle, \
+		(void *)((char *)((map)->dev_addr) + (offset)), (val))
 
 #define	DRM_WAIT_ON(ret, cv, timeout, condition)  \
 mutex_enter(&dev->irq_lock);					\
@@ -251,6 +267,7 @@ mutex_exit(&dev->irq_lock);
 #define	DRM_GET_PRIV_WITH_RETURN(filp_priv, filp)
 
 typedef unsigned long dma_addr_t;
+typedef uint64_t	u64;
 typedef uint32_t	u32;
 typedef uint8_t		u8;
 typedef uint16_t	u16;
@@ -476,8 +493,6 @@ struct drm_softstate {
 	ddi_acc_handle_t pci_cfg_hdl;
 	int drm_supported;
 	const char *desc; /* current driver description */
-	kmutex_t *irq_mutex;
-	kcondvar_t *irq_cv;
 
 	ddi_iblock_cookie_t intr_block;
 	/* workaround */
@@ -547,6 +562,8 @@ struct drm_softstate {
 	unsigned use_vbl_irq :1;
 	unsigned use_mtrr :1;
 	/* End of driver-config section */
+	uint32_t pci_device;		/* PCI device id */
+	uint32_t pci_vendor;		/* PCI vendor id */
 
 	char		  *unique;	/* Unique identifier: e.g., busid  */
 	int		  unique_len;	/* Length of unique field	   */
@@ -590,8 +607,12 @@ struct drm_softstate {
 	int		  pci_func;
 	atomic_t	  context_flag;	/* Context swapping flag	   */
 	int		  last_context;	/* Last current context		   */
-	int		  vbl_queue;	/* vbl wait channel */
+	wait_queue_head_t vbl_queue;	/* vbl wait channel */
 	atomic_t	  vbl_received;
+	atomic_t	  vbl_received2;
+	kmutex_t	  tasklet_lock;
+	void (*locked_tasklet_func)(struct drm_softstate *dev);
+
 	pid_t		  buf_pgid;
 	drm_agp_head_t    *agp;
 	drm_sg_mem_t	  *sg;  /* Scatter gather memory */
@@ -601,6 +622,9 @@ struct drm_softstate {
 	drm_local_map_t   *agp_buffer_map;
 
 	kstat_t		  *asoft_ksp; /* kstat support */
+
+	/* name Drawable information */
+	kmutex_t drw_lock;
 };
 
 
@@ -610,155 +634,161 @@ extern void drm_error(const char *fmt, ...);
 extern void drm_info(const char *fmt, ...);
 
 /* Memory management support (drm_memory.c) */
-void	drm_mem_init(void);
-void	drm_mem_uninit(void);
-void	*drm_alloc(size_t size, int area);
-void	*drm_calloc(size_t nmemb, size_t size, int area);
-void	*drm_realloc(void *oldpt, size_t oldsize, size_t size, int area);
-void	drm_free(void *pt, size_t size, int area);
-int 	drm_ioremap(drm_softstate_t *, drm_local_map_t *);
-void	drm_ioremapfree(drm_local_map_t *map);
+extern	void	drm_mem_init(void);
+extern	void	drm_mem_uninit(void);
+extern	void	*drm_alloc(size_t size, int area);
+extern	void	*drm_calloc(size_t nmemb, size_t size, int area);
+extern	void	*drm_realloc(void *oldpt, size_t oldsize,
+				size_t size, int area);
+extern	void	drm_free(void *pt, size_t size, int area);
+extern	int 	drm_ioremap(drm_softstate_t *, drm_local_map_t *);
+extern	void	drm_ioremapfree(drm_local_map_t *map);
 
-void drm_core_ioremap(struct drm_local_map *, struct drm_softstate *);
-void drm_core_ioremapfree(struct drm_local_map *, struct drm_softstate *);
+extern	void drm_core_ioremap(struct drm_local_map *, struct drm_softstate *);
+extern	void drm_core_ioremapfree(struct drm_local_map *,
+				struct drm_softstate *);
 
-void drm_pci_free(drm_softstate_t *);
-void *drm_pci_alloc(drm_softstate_t *, uint32_t, dma_addr_t *);
+extern	void drm_pci_free(drm_softstate_t *);
+extern	void *drm_pci_alloc(drm_softstate_t *, uint32_t, dma_addr_t *);
 
-struct drm_local_map *drm_core_findmap(struct drm_softstate *, unsigned long);
+extern	struct drm_local_map *drm_core_findmap(struct drm_softstate *,
+					unsigned long);
 
-int	drm_context_switch(drm_softstate_t *dev, int old, int new);
-int	drm_context_switch_complete(drm_softstate_t *dev, int new);
-int	drm_ctxbitmap_init(drm_softstate_t *dev);
-void	drm_ctxbitmap_cleanup(drm_softstate_t *dev);
-void	drm_ctxbitmap_free(drm_softstate_t *dev, int ctx_handle);
-int	drm_ctxbitmap_next(drm_softstate_t *dev);
+extern	int	drm_context_switch(drm_softstate_t *dev, int old, int new);
+extern	int	drm_context_switch_complete(drm_softstate_t *dev, int new);
+extern	int	drm_ctxbitmap_init(drm_softstate_t *dev);
+extern	void	drm_ctxbitmap_cleanup(drm_softstate_t *dev);
+extern	void	drm_ctxbitmap_free(drm_softstate_t *dev, int ctx_handle);
+extern	int	drm_ctxbitmap_next(drm_softstate_t *dev);
 
 /* Locking IOCTL support (drm_lock.c) */
-int	drm_lock_take(volatile unsigned int *lock, unsigned int context);
-int	drm_lock_transfer(drm_softstate_t *dev,
+extern	int	drm_lock_take(volatile unsigned int *lock,
+				unsigned int context);
+extern	int	drm_lock_transfer(drm_softstate_t *dev,
 					volatile unsigned int *lock,
 					unsigned int context);
-int	drm_lock_free(drm_softstate_t *dev,
+extern	int	drm_lock_free(drm_softstate_t *dev,
 				    volatile unsigned int *lock,
 				    unsigned int context);
 
 /* Buffer management support (drm_bufs.c) */
-unsigned long drm_get_resource_start(drm_softstate_t *dev,
-	unsigned int resource);
-unsigned long drm_get_resource_len(drm_softstate_t *dev, unsigned int resource);
-int	drm_initmap(drm_softstate_t *dev, unsigned long start,
+extern	unsigned long drm_get_resource_start(drm_softstate_t *dev,
+		unsigned int resource);
+extern	unsigned long drm_get_resource_len(drm_softstate_t *dev,
+		unsigned int resource);
+extern	int	drm_initmap(drm_softstate_t *dev, unsigned long start,
 	unsigned long len, unsigned int resource, int type, int flags);
-void	drm_rmmap(drm_softstate_t *dev, drm_local_map_t *map);
-int	drm_addmap(drm_device_t *softstate, unsigned long long offset,
+extern	void	drm_rmmap(drm_softstate_t *dev, drm_local_map_t *map);
+extern	int	drm_addmap(drm_device_t *softstate, unsigned long long offset,
 	unsigned long size, drm_map_type_t type, drm_map_flags_t flags,
 	drm_local_map_t **map_ptr);
-int	drm_order(unsigned long size);
+extern	int	drm_order(unsigned long size);
 
 /* DMA support (drm_dma.c) */
-int	drm_dma_setup(drm_softstate_t *dev);
-void	drm_dma_takedown(drm_softstate_t *dev);
-void	drm_free_buffer(drm_softstate_t *dev, drm_buf_t *buf);
-void	drm_reclaim_buffers(drm_softstate_t *dev, DRMFILE filp);
-
+extern	int	drm_dma_setup(drm_softstate_t *dev);
+extern	void	drm_dma_takedown(drm_softstate_t *dev);
+extern	void	drm_free_buffer(drm_softstate_t *dev, drm_buf_t *buf);
+extern	void	drm_reclaim_buffers(drm_softstate_t *dev, DRMFILE filp);
 /* IRQ support (drm_irq.c) */
-int	drm_irq_install(drm_softstate_t *dev);
-int	drm_irq_uninstall(drm_softstate_t *dev);
-uint_t	drm_irq_handler(DRM_IRQ_ARGS);
-void	drm_driver_irq_preinstall(drm_softstate_t *dev);
-void	drm_driver_irq_postinstall(drm_softstate_t *dev);
-void	drm_driver_irq_uninstall(drm_softstate_t *dev);
-int	drm_vblank_wait(drm_softstate_t *dev, unsigned int *vbl_seq);
-void	drm_vbl_send_signals(drm_softstate_t *dev);
+extern	int	drm_irq_install(drm_softstate_t *dev);
+extern	int	drm_irq_uninstall(drm_softstate_t *dev);
+extern	uint_t	drm_irq_handler(DRM_IRQ_ARGS);
+extern	void	drm_driver_irq_preinstall(drm_softstate_t *dev);
+extern	void	drm_driver_irq_postinstall(drm_softstate_t *dev);
+extern	void	drm_driver_irq_uninstall(drm_softstate_t *dev);
+extern	int	drm_vblank_wait(drm_softstate_t *dev, unsigned int *vbl_seq);
+extern	void	drm_vbl_send_signals(drm_softstate_t *dev);
+extern	void 	drm_locked_tasklet(drm_device_t *dev,
+				void(*func)(drm_device_t *));
 
 /* AGP/GART support (drm_agpsupport.c) */
-int	drm_device_is_agp(drm_softstate_t *dev);
-int 	drm_device_is_pcie(drm_softstate_t *dev);
-drm_agp_head_t *drm_agp_init();
-void	drm_agp_uninit(drm_agp_head_t *);
-int 	drm_agp_do_release(drm_softstate_t *);
-void	*drm_agp_allocate_memory(size_t pages, uint32_t type);
-int	drm_agp_free_memory(void *handle);
-int	drm_agp_bind_memory(unsigned int, uint32_t, drm_device_t *);
-int	drm_agp_unbind_memory(unsigned long, uint32_t, drm_device_t *);
+extern	int	drm_device_is_agp(drm_softstate_t *dev);
+extern	int 	drm_device_is_pcie(drm_softstate_t *dev);
+extern	drm_agp_head_t	*drm_agp_init();
+extern	void	drm_agp_uninit(drm_agp_head_t *);
+extern	int 	drm_agp_do_release(drm_softstate_t *);
+extern	void	*drm_agp_allocate_memory(size_t pages, uint32_t type);
+extern	int	drm_agp_free_memory(void *handle);
+extern	int	drm_agp_bind_memory(unsigned int, uint32_t, drm_device_t *);
+extern	int	drm_agp_unbind_memory(unsigned long, uint32_t, drm_device_t *);
 
 /* kstat support (drm_kstats.c) */
-int	drm_init_kstats(drm_softstate_t *sc);
-void	drm_fini_kstats(drm_softstate_t *sc);
+extern	int	drm_init_kstats(drm_softstate_t *sc);
+extern	void	drm_fini_kstats(drm_softstate_t *sc);
 
 /* Scatter Gather Support (drm_scatter.c) */
-void	drm_sg_cleanup(drm_sg_mem_t *entry);
+extern	void	drm_sg_cleanup(drm_sg_mem_t *entry);
 
 /* ATI PCIGART support (ati_pcigart.c) */
-int	drm_ati_pcigart_init(drm_softstate_t *dev, unsigned long *addr,
+extern	int	drm_ati_pcigart_init(drm_softstate_t *dev, unsigned long *addr,
 			    unsigned long *bus_addr, int is_pcie);
-int	drm_ati_pcigart_cleanup(drm_softstate_t *dev, unsigned long addr,
-			    unsigned long bus_addr);
+extern	int	drm_ati_pcigart_cleanup(drm_softstate_t *dev,
+			unsigned long addr, unsigned long bus_addr);
 
 /* Locking IOCTL support (drm_drv.c) */
-int	drm_lock(DRM_IOCTL_ARGS);
-int	drm_unlock(DRM_IOCTL_ARGS);
-int	drm_version(DRM_IOCTL_ARGS);
-int	drm_setversion(DRM_IOCTL_ARGS);
+extern	int	drm_lock(DRM_IOCTL_ARGS);
+extern	int	drm_unlock(DRM_IOCTL_ARGS);
+extern	int	drm_version(DRM_IOCTL_ARGS);
+extern	int	drm_setversion(DRM_IOCTL_ARGS);
 
 /* Misc. IOCTL support (drm_ioctl.c) */
-int	drm_irq_by_busid(DRM_IOCTL_ARGS);
-int	drm_getunique(DRM_IOCTL_ARGS);
-int	drm_setunique(DRM_IOCTL_ARGS);
-int	drm_getmap(DRM_IOCTL_ARGS);
-int	drm_getclient(DRM_IOCTL_ARGS);
-int	drm_getstats(DRM_IOCTL_ARGS);
-int	drm_noop(DRM_IOCTL_ARGS);
+extern	int	drm_irq_by_busid(DRM_IOCTL_ARGS);
+extern	int	drm_getunique(DRM_IOCTL_ARGS);
+extern	int	drm_setunique(DRM_IOCTL_ARGS);
+extern	int	drm_getmap(DRM_IOCTL_ARGS);
+extern	int	drm_getclient(DRM_IOCTL_ARGS);
+extern	int	drm_getstats(DRM_IOCTL_ARGS);
+extern	int	drm_noop(DRM_IOCTL_ARGS);
 
 /* Context IOCTL support (drm_context.c) */
-int	drm_resctx(DRM_IOCTL_ARGS);
-int	drm_addctx(DRM_IOCTL_ARGS);
-int	drm_modctx(DRM_IOCTL_ARGS);
-int	drm_getctx(DRM_IOCTL_ARGS);
-int	drm_switchctx(DRM_IOCTL_ARGS);
-int	drm_newctx(DRM_IOCTL_ARGS);
-int	drm_rmctx(DRM_IOCTL_ARGS);
-int	drm_setsareactx(DRM_IOCTL_ARGS);
-int	drm_getsareactx(DRM_IOCTL_ARGS);
+extern	int	drm_resctx(DRM_IOCTL_ARGS);
+extern	int	drm_addctx(DRM_IOCTL_ARGS);
+extern	int	drm_modctx(DRM_IOCTL_ARGS);
+extern	int	drm_getctx(DRM_IOCTL_ARGS);
+extern	int	drm_switchctx(DRM_IOCTL_ARGS);
+extern	int	drm_newctx(DRM_IOCTL_ARGS);
+extern	int	drm_rmctx(DRM_IOCTL_ARGS);
+extern	int	drm_setsareactx(DRM_IOCTL_ARGS);
+extern	int	drm_getsareactx(DRM_IOCTL_ARGS);
 
 /* Drawable IOCTL support (drm_drawable.c) */
-int	drm_adddraw(DRM_IOCTL_ARGS);
-int	drm_rmdraw(DRM_IOCTL_ARGS);
+extern	int	drm_adddraw(DRM_IOCTL_ARGS);
+extern	int	drm_rmdraw(DRM_IOCTL_ARGS);
 
 /* Authentication IOCTL support (drm_auth.c) */
-int	drm_getmagic(DRM_IOCTL_ARGS);
-int	drm_authmagic(DRM_IOCTL_ARGS);
-int	drm_remove_magic(drm_device_t *dev, drm_magic_t magic);
-drm_file_t	*drm_find_file(drm_device_t *dev, drm_magic_t magic);
+extern	int	drm_getmagic(DRM_IOCTL_ARGS);
+extern	int	drm_authmagic(DRM_IOCTL_ARGS);
+extern	int	drm_remove_magic(drm_device_t *dev, drm_magic_t magic);
+extern	drm_file_t	*drm_find_file(drm_device_t *dev, drm_magic_t magic);
 /* Buffer management support (drm_bufs.c) */
-int	drm_addmap_ioctl(DRM_IOCTL_ARGS);
-int	drm_rmmap_ioctl(DRM_IOCTL_ARGS);
-int	drm_addbufs_ioctl(DRM_IOCTL_ARGS);
-int	drm_infobufs(DRM_IOCTL_ARGS);
-int	drm_markbufs(DRM_IOCTL_ARGS);
-int	drm_freebufs(DRM_IOCTL_ARGS);
-int	drm_mapbufs(DRM_IOCTL_ARGS);
+extern	int	drm_addmap_ioctl(DRM_IOCTL_ARGS);
+extern	int	drm_rmmap_ioctl(DRM_IOCTL_ARGS);
+extern	int	drm_addbufs_ioctl(DRM_IOCTL_ARGS);
+extern	int	drm_infobufs(DRM_IOCTL_ARGS);
+extern	int	drm_markbufs(DRM_IOCTL_ARGS);
+extern	int	drm_freebufs(DRM_IOCTL_ARGS);
+extern	int	drm_mapbufs(DRM_IOCTL_ARGS);
 
 /* DMA support (drm_dma.c) */
-int	drm_dma(DRM_IOCTL_ARGS);
+extern	int	drm_dma(DRM_IOCTL_ARGS);
 
 /* IRQ support (drm_irq.c) */
-int	drm_control(DRM_IOCTL_ARGS);
-int	drm_wait_vblank(DRM_IOCTL_ARGS);
+extern	int	drm_control(DRM_IOCTL_ARGS);
+extern	int	drm_wait_vblank(DRM_IOCTL_ARGS);
 
 /* AGP/GART support (drm_agpsupport.c) */
-int	drm_agp_acquire(DRM_IOCTL_ARGS);
-int	drm_agp_release(DRM_IOCTL_ARGS);
-int	drm_agp_enable(DRM_IOCTL_ARGS);
-int	drm_agp_info(DRM_IOCTL_ARGS);
-int	drm_agp_alloc(DRM_IOCTL_ARGS);
-int	drm_agp_free(DRM_IOCTL_ARGS);
-int	drm_agp_unbind(DRM_IOCTL_ARGS);
-int	drm_agp_bind(DRM_IOCTL_ARGS);
+extern	int	drm_agp_acquire(DRM_IOCTL_ARGS);
+extern	int	drm_agp_release(DRM_IOCTL_ARGS);
+extern	int	drm_agp_enable(DRM_IOCTL_ARGS);
+extern	int	drm_agp_info(DRM_IOCTL_ARGS);
+extern	int	drm_agp_alloc(DRM_IOCTL_ARGS);
+extern	int	drm_agp_free(DRM_IOCTL_ARGS);
+extern	int	drm_agp_unbind(DRM_IOCTL_ARGS);
+extern	int	drm_agp_bind(DRM_IOCTL_ARGS);
 
 /* Scatter Gather Support (drm_scatter.c) */
-int	drm_sg_alloc(DRM_IOCTL_ARGS);
-int	drm_sg_free(DRM_IOCTL_ARGS);
+extern	int	drm_sg_alloc(DRM_IOCTL_ARGS);
+extern	int	drm_sg_free(DRM_IOCTL_ARGS);
 
 extern int drm_debug_flag;
 #define	DRM_DEBUG		if (drm_debug_flag >= 2) drm_debug
@@ -789,6 +819,9 @@ extern int test_and_clear_bit(int, volatile void *);
 extern int find_first_zero_bit(void *, unsigned);
 extern int atomic_cmpset_int(volatile unsigned int *, unsigned int,
 	unsigned int);
+
+extern drm_drawable_info_t *drm_get_drawable_info(drm_device_t *,
+			drm_drawable_t);
 
 /* File Operations helpers (drm_fops.c) */
 extern drm_file_t *drm_find_file_by_proc(drm_softstate_t *, cred_t *);

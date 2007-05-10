@@ -1,10 +1,10 @@
 /*
- * drm_drawable.h -- IOCTLs for drawables -*- linux-c -*-
- * Created: Tue Feb  2 08:37:54 1999 by faith@valinux.com
+ * drm_linux_list.h -- linux list functions for the BSDs.
+ * Created: Mon Apr 7 14:30:16 1999 by anholt@FreeBSD.org
  */
 /*
- * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
- * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
+ * -
+ * Copyright 2003 Eric Anholt
  * All Rights Reserved.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -27,38 +27,45 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  * Authors:
- *    Rickard E. (Rik) Faith <faith@valinux.com>
- *    Gareth Hughes <gareth@valinux.com>
+ *    Eric Anholt <anholt@FreeBSD.org>
  *
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "drmP.h"
+#ifndef _DRM_LINUX_LIST_H_
+#define	_DRM_LINUX_LIST_H_
 
-/*ARGSUSED*/
-int
-drm_adddraw(DRM_IOCTL_ARGS)
-{
-	drm_draw_t draw;
+struct list_head {
+	struct list_head *next, *prev;
+};
 
-	draw.handle = 0;	/* NOOP */
-	DRM_DEBUG("draw.handle = %d\n", draw.handle);
+/* Cheat, assume the list_head is at the start of the struct */
+#define	list_entry(entry, type, member)	(type *)(entry)
 
-	DRM_COPY_TO_USER_IOCTL((drm_draw_t *)data, draw, sizeof (draw));
-
-	return (0);
+#define	INIT_LIST_HEAD(head) { \
+	(head)->next = head;   \
+	(head)->prev = head;   \
 }
 
-/*ARGSUSED*/
-int
-drm_rmdraw(DRM_IOCTL_ARGS)
-{
-	return (0);
+#define	list_add_tail(entry, head) {  \
+	(entry)->prev = (head)->prev; \
+	(entry)->next = head;         \
+	(head)->prev->next = entry;   \
+	(head)->prev = entry;         \
 }
 
-/*ARGSUSED*/
-drm_drawable_info_t *
-drm_get_drawable_info(drm_device_t *dev, drm_drawable_t id) {
-	return (NULL);
+#define	list_del(entry) {                         \
+	(entry)->next->prev = (entry)->prev;      \
+	(entry)->prev->next = (entry)->next;      \
 }
+
+#define	list_for_each(entry, head)				\
+    for (entry = (head)->next; entry != head; entry = (entry)->next)
+
+#define	list_for_each_safe(entry, temp, head)			\
+    for (entry = (head)->next, temp = (entry)->next;		\
+	temp != head; 						\
+	entry = temp, temp = temp->next)
+
+#endif /* _DRM_LINUX_LIST_H_ */

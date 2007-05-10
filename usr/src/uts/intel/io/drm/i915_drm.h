@@ -1,12 +1,6 @@
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 /* BEGIN CSTYLED */
 
-/**************************************************************************
- * 
+/*
  * Copyright 2003 Tungsten Graphics, Inc., Cedar Park, Texas.
  * All Rights Reserved.
  * 
@@ -30,7 +24,12 @@
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * 
- **************************************************************************/
+ */
+
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #ifndef _I915_DRM_H
 #define _I915_DRM_H
@@ -84,7 +83,56 @@ typedef struct _drm_i915_sarea {
 	int pf_active;
 	int pf_current_page;	/* which buffer is being displayed? */
 	int perf_boxes;		/* performance boxes to be displayed */
+	int width, height;      /* screen size in pixels */
+
+	drm_handle_t front_handle;
+	int front_offset;
+	int front_size;
+
+	drm_handle_t back_handle;
+	int back_offset;
+	int back_size;
+
+	drm_handle_t depth_handle;
+	int depth_offset;
+	int depth_size;
+
+	drm_handle_t tex_handle;
+	int tex_offset;
+	int tex_size;
+	int log_tex_granularity;
+	int pitch;
+	int rotation;           /* 0, 90, 180 or 270 */
+	int rotated_offset;
+	int rotated_size;
+	int rotated_pitch;
+	int virtualX, virtualY;
+
+	unsigned int front_tiled;
+	unsigned int back_tiled;
+	unsigned int depth_tiled;
+	unsigned int rotated_tiled;
+	unsigned int rotated2_tiled;
+
+	int pipeA_x;
+	int pipeA_y;
+	int pipeA_w;
+	int pipeA_h;
+	int pipeB_x;
+	int pipeB_y;
+	int pipeB_w;
+	int pipeB_h;
 } drm_i915_sarea_t;
+
+/* Driver specific fence types and classes.
+ */
+
+/* The only fence class we support */
+#define DRM_I915_FENCE_CLASS_ACCEL 0
+/* Fence type that guarantees read-write flush */
+#define DRM_I915_FENCE_TYPE_RW 2
+/* MI_FLUSH programmed just before the fence */
+#define DRM_I915_FENCE_FLAG_FLUSHED 0x01000000
 
 /* Flags for perf_boxes
  */
@@ -109,6 +157,7 @@ typedef struct _drm_i915_sarea {
 #define DRM_I915_FREE		0x09
 #define DRM_I915_INIT_HEAP	0x0a
 #define DRM_I915_CMDBUFFER	0x0b
+#define DRM_I915_DESTROY_HEAP	0x0c
 
 #define DRM_IOCTL_I915_INIT		DRM_IOW( DRM_COMMAND_BASE + DRM_I915_INIT, drm_i915_init_t)
 #define DRM_IOCTL_I915_FLUSH		DRM_IO ( DRM_COMMAND_BASE + DRM_I915_FLUSH)
@@ -122,6 +171,7 @@ typedef struct _drm_i915_sarea {
 #define DRM_IOCTL_I915_FREE             DRM_IOW( DRM_COMMAND_BASE + DRM_I915_FREE, drm_i915_mem_free_t)
 #define DRM_IOCTL_I915_INIT_HEAP        DRM_IOW( DRM_COMMAND_BASE + DRM_I915_INIT_HEAP, drm_i915_mem_init_heap_t)
 #define DRM_IOCTL_I915_CMDBUFFER	DRM_IOW( DRM_COMMAND_BASE + DRM_I915_CMDBUFFER, drm_i915_cmdbuffer_t)
+#define DRM_IOCTL_I915_DESTROY_HEAP	DRM_IOW( DRM_COMMAND_BASE + DRM_I915_DESTROY_HEAP, drm_i915_mem_destroy_heap_t)
 
 /* Allow drivers to submit batchbuffers directly to hardware, relying
  * on the security mechanisms provided by hardware.
@@ -183,6 +233,7 @@ typedef struct drm_i915_irq_wait {
  */
 #define I915_PARAM_IRQ_ACTIVE            1
 #define I915_PARAM_ALLOW_BATCHBUFFER     2
+#define I915_PARAM_LAST_DISPATCH         3
 
 typedef struct drm_i915_getparam {
 	int param;
@@ -233,5 +284,29 @@ typedef struct drm_i915_mem_init_heap {
 	int size;
 	int start;
 } drm_i915_mem_init_heap_t;
+
+/* Allow memory manager to be torn down and re-initialized (eg on
+ * rotate):
+ */
+typedef struct drm_i915_mem_destroy_heap {
+	        int region;
+} drm_i915_mem_destroy_heap_t;
+
+/* Allow X server to configure which pipes to monitor for vblank signals
+ */
+#define	DRM_I915_VBLANK_PIPE_A	1
+#define	DRM_I915_VBLANK_PIPE_B	2
+
+typedef struct drm_i915_vblank_pipe {
+	int pipe;
+} drm_i915_vblank_pipe_t;
+
+/* Schedule buffer swap at given vertical blank:
+ */
+typedef struct drm_i915_vblank_swap {
+	drm_drawable_t drawable;
+	drm_vblank_seq_type_t seqtype;
+	unsigned int sequence;
+} drm_i915_vblank_swap_t;
 
 #endif /* _I915_DRM_H */

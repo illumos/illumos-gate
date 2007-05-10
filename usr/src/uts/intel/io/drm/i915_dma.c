@@ -1,14 +1,8 @@
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 /* BEGIN CSTYLED */
 
 /* i915_dma.c -- DMA support for the I915 -*- linux-c -*-
  */
-/**************************************************************************
- *
+/*
  * Copyright 2003 Tungsten Graphics, Inc., Cedar Park, Texas.
  * All Rights Reserved.
  *
@@ -32,7 +26,12 @@
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
- **************************************************************************/
+ */
+
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -40,6 +39,12 @@
 #include "drm.h"
 #include "i915_drm.h"
 #include "i915_drv.h"
+
+#define IS_I965G(dev)  (dev->pci_device == 0x2972 || \
+			dev->pci_device == 0x2982 || \
+			dev->pci_device == 0x2992 || \
+			dev->pci_device == 0x29A2)
+
 
 /* Really want an OS-independent resettable timer.  Would like to have
  * this loop run for (eg) 3 sec, but have the timer reset every time
@@ -68,6 +73,7 @@ int i915_wait_ring(drm_device_t * dev, int n, const char *caller)
 			i = 0;
 
 		last_head = ring->head;
+		DRM_UDELAY(1);
 	}
 
 	return DRM_ERR(EBUSY);
@@ -173,6 +179,7 @@ static int i915_initialize(drm_device_t * dev,
 
 	dev_priv->ring.virtual_start = (u8 *)dev_priv->ring.map.dev_addr;
 
+	dev_priv->cpp = init->cpp;
 	dev_priv->back_offset = init->back_offset;
 	dev_priv->front_offset = init->front_offset;
 	dev_priv->current_page = 0;
@@ -219,6 +226,9 @@ static int i915_initialize(drm_device_t * dev,
 
 	dev->dev_private = (void *)dev_priv;
 
+#ifdef I915_HAVE_BUFFER
+	drm_bo_driver_init(dev);
+#endif
 	return 0;
 }
 
@@ -226,7 +236,7 @@ static int i915_dma_resume(drm_device_t * dev)
 {
 	drm_i915_private_t *dev_priv = (drm_i915_private_t *) dev->dev_private;
 
-	DRM_DEBUG("%s", "i915_dma_resume");
+	DRM_DEBUG("%s\n", __FUNCTION__);
 
 	if (!dev_priv->sarea) {
 		DRM_ERROR("can not find sarea!\n");
@@ -283,7 +293,7 @@ static int i915_dma_init(DRM_IOCTL_ARGS)
 		retcode = i915_dma_resume(dev);
 		break;
 	default:
-		retcode = -EINVAL;
+		retcode = DRM_ERR(EINVAL);
 		break;
 	}
 
@@ -376,18 +386,21 @@ static int i915_emit_cmds(drm_device_t * dev, int __user * buffer, int dwords, i
 	int i;
 	RING_LOCALS;
 
+	if ((dwords+1) * sizeof(int) >= dev_priv->ring.Size - 8)
+		return DRM_ERR(EINVAL);
+
+	BEGIN_LP_RING((dwords+1)&~1);
+
 	for (i = 0; i < dwords;) {
 		int cmd, sz;
 
 		if (DRM_COPY_FROM_USER_UNCHECKED(&cmd, &buffer[i], sizeof(cmd)))
 			return DRM_ERR(EINVAL);
 
-/* 		printk("%d/%d ", i, dwords); */
 
 		if ((sz = validate_cmd(cmd)) == 0 || i + sz > dwords)
 			return DRM_ERR(EINVAL);
 
-		BEGIN_LP_RING(sz);
 		OUT_RING(cmd);
 
 		while (++i, --sz) {
@@ -397,9 +410,13 @@ static int i915_emit_cmds(drm_device_t * dev, int __user * buffer, int dwords, i
 			}
 			OUT_RING(cmd);
 		}
-		ADVANCE_LP_RING();
 	}
 
+	if (dwords & 1)
+		OUT_RING(0);
+
+	ADVANCE_LP_RING();
+		
 	return 0;
 }
 
@@ -412,7 +429,7 @@ static int i915_emit_box(drm_device_t * dev,
 	RING_LOCALS;
 
 	if (DRM_COPY_FROM_USER_UNCHECKED(&box, &boxes[i], sizeof(box))) {
-		return EFAULT;
+		return DRM_ERR(EFAULT);
 	}
 
 	if (box.y2 <= box.y1 || box.x2 <= box.x1 || box.y2 <= 0 || box.x2 <= 0) {
@@ -421,12 +438,64 @@ static int i915_emit_box(drm_device_t * dev,
 		return DRM_ERR(EINVAL);
 	}
 
-	BEGIN_LP_RING(6);
-	OUT_RING(GFX_OP_DRAWRECT_INFO);
-	OUT_RING(DR1);
-	OUT_RING((box.x1 & 0xffff) | (box.y1 << 16));
-	OUT_RING(((box.x2 - 1) & 0xffff) | ((box.y2 - 1) << 16));
-	OUT_RING(DR4);
+	if (IS_I965G(dev)) {
+		BEGIN_LP_RING(4);
+		OUT_RING(GFX_OP_DRAWRECT_INFO_I965);
+		OUT_RING((box.x1 & 0xffff) | (box.y1 << 16));
+		OUT_RING(((box.x2 - 1) & 0xffff) | ((box.y2 - 1) << 16));
+		OUT_RING(DR4);
+		ADVANCE_LP_RING();
+	} else {
+		BEGIN_LP_RING(6);
+		OUT_RING(GFX_OP_DRAWRECT_INFO);
+		OUT_RING(DR1);
+		OUT_RING((box.x1 & 0xffff) | (box.y1 << 16));
+		OUT_RING(((box.x2 - 1) & 0xffff) | ((box.y2 - 1) << 16));
+		OUT_RING(DR4);
+		OUT_RING(0);
+		ADVANCE_LP_RING();
+	}
+
+	return 0;
+}
+
+/* XXX: Emitting the counter should really be moved to part of the IRQ
+ * emit.  For now, do it in both places:
+ */
+
+static void i915_emit_breadcrumb(drm_device_t *dev)
+{
+	drm_i915_private_t *dev_priv = dev->dev_private;
+	RING_LOCALS;
+
+	dev_priv->sarea_priv->last_enqueue = ++dev_priv->counter;
+
+	BEGIN_LP_RING(4);
+	OUT_RING(CMD_STORE_DWORD_IDX);
+	OUT_RING(20);
+	OUT_RING(dev_priv->counter);
+	OUT_RING(0);
+	ADVANCE_LP_RING();
+#ifdef I915_HAVE_FENCE
+	drm_fence_flush_old(dev, 0, dev_priv->counter);
+#endif
+}
+
+
+int i915_emit_mi_flush(drm_device_t *dev, uint32_t flush)
+{
+	drm_i915_private_t *dev_priv = dev->dev_private;
+	uint32_t flush_cmd = CMD_MI_FLUSH;
+	RING_LOCALS;
+
+	flush_cmd |= flush;
+
+	i915_kernel_lost_context(dev);
+
+	BEGIN_LP_RING(4);
+	OUT_RING(flush_cmd);
+	OUT_RING(0);
+	OUT_RING(0);
 	OUT_RING(0);
 	ADVANCE_LP_RING();
 
@@ -461,6 +530,7 @@ static int i915_dispatch_cmdbuffer(drm_device_t * dev,
 			return ret;
 	}
 
+	i915_emit_breadcrumb( dev );
 	return 0;
 }
 
@@ -505,14 +575,7 @@ static int i915_dispatch_batchbuffer(drm_device_t * dev,
 		}
 	}
 
-	dev_priv->sarea_priv->last_enqueue = dev_priv->counter++;
-
-	BEGIN_LP_RING(4);
-	OUT_RING(CMD_STORE_DWORD_IDX);
-	OUT_RING(20);
-	OUT_RING(dev_priv->counter);
-	OUT_RING(0);
-	ADVANCE_LP_RING();
+	i915_emit_breadcrumb( dev );
 
 	return 0;
 }
@@ -560,7 +623,9 @@ static int i915_dispatch_flip(drm_device_t * dev)
 	OUT_RING(dev_priv->counter);
 	OUT_RING(0);
 	ADVANCE_LP_RING();
-
+#ifdef I915_HAVE_FENCE
+	drm_fence_flush_old(dev, 0, dev_priv->counter);
+#endif
 	dev_priv->sarea_priv->pf_current_page = dev_priv->current_page;
 	return 0;
 }
@@ -693,7 +758,7 @@ static int i915_do_cleanup_pageflip(drm_device_t * dev)
 {
 	drm_i915_private_t *dev_priv = dev->dev_private;
 
-	DRM_DEBUG("i915_do_cleanup_pageflip\n");
+	DRM_DEBUG("%s\n", __FUNCTION__);
 	if (dev_priv->current_page != 0)
 		(void) i915_dispatch_flip(dev);
 
@@ -745,8 +810,11 @@ static int i915_getparam(DRM_IOCTL_ARGS)
 	case I915_PARAM_ALLOW_BATCHBUFFER:
 		value = dev_priv->allow_batchbuffer ? 1 : 0;
 		break;
+	case I915_PARAM_LAST_DISPATCH:
+		value = READ_BREADCRUMB(dev_priv);
+		break;
 	default:
-		DRM_ERROR("Unkown parameter %d\n", param.param);
+		DRM_ERROR("Unknown parameter %d\n", param.param);
 		return DRM_ERR(EINVAL);
 	}
 
@@ -860,6 +928,8 @@ i915_init_ioctl_arrays(void)
 	    i915_mem_init_heap, 1, 1, "i915_mem_init_heap");
 	i915_set_ioctl_desc(DRM_IOCTL_NR(DRM_I915_CMDBUFFER),
 	    i915_cmdbuffer, 1, 0, "i915_cmdbuffer");
+	i915_set_ioctl_desc(DRM_IOCTL_NR(DRM_I915_DESTROY_HEAP),
+	    i915_mem_destroy_heap, 1, 1, "i915_mem_destroy_heap");
 }
 /**
  * Determine if the device really is AGP or not.

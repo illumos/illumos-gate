@@ -1,12 +1,7 @@
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 /* BEGIN CSTYLED */
 
 /*
- * i915_drv.c -- ATI Radeon driver -*- linux-c -*-
+ * i915_drv.c -- Intel i915 driver -*- linux-c -*-
  * Created: Wed Feb 14 17:10:04 2001 by gareth@valinux.com
  */
 
@@ -36,6 +31,11 @@
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
  *
+ */
+
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"

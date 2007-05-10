@@ -1,8 +1,3 @@
-/*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 /* BEGIN CSTYLED */
 
 /**
@@ -62,6 +57,11 @@
  *
  */
 
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #ifndef _DRM_H_
 #define _DRM_H_
 
@@ -72,6 +72,9 @@
 #ifndef __user
 #define __user
 #endif
+#ifndef __iomem
+#define __iomem
+#endif
 
 #ifdef __GNUC__
 # define DEPRECATED  __attribute__ ((deprecated))
@@ -81,9 +84,6 @@
 #endif
 
 #if defined(__linux__)
-#if defined(__KERNEL__)
-#include <linux/config.h>
-#endif
 #include <asm/ioctl.h>		/* For _IO* macros */
 #define DRM_IOCTL_NR(n)		_IOC_NR(n)
 #define DRM_IOC_VOID		_IOC_NONE
@@ -91,8 +91,8 @@
 #define DRM_IOC_WRITE		_IOC_WRITE
 #define DRM_IOC_READWRITE	_IOC_READ|_IOC_WRITE
 #define DRM_IOC(dir, group, nr, size) _IOC(dir, group, nr, size)
-#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
-#if defined(__FreeBSD__) && defined(IN_MODULE)
+#elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__DragonFly__)
+#if (defined(__FreeBSD__) || defined(__FreeBSD_kernel__)) && defined(IN_MODULE)
 /* Prevent name collision when including sys/ioccom.h */
 #undef ioctl
 #include <sys/ioccom.h>
@@ -189,7 +189,7 @@
 #if defined(__linux__) || defined(__NetBSD__)
 #define DRM_MAJOR       226
 #endif
-#define DRM_MAX_MINOR   255
+#define DRM_MAX_MINOR   15
 #endif
 #define DRM_NAME	"drm"	  /**< Name in kernel, /dev, and /proc */
 #define DRM_MIN_ORDER	5	  /**< At least 2^5 bytes = 32 bytes */
@@ -203,9 +203,21 @@
 #define _DRM_LOCKING_CONTEXT(lock) ((lock) & ~(_DRM_LOCK_HELD|_DRM_LOCK_CONT))
 
 #if defined(__linux__)
-typedef unsigned int drm_handle_t;
+#if defined(__KERNEL__)
+typedef __u64 drm_u64_t;
 #else
+typedef unsigned long long drm_u64_t;
+#endif
+
+typedef unsigned int drm_handle_t;
+#elif defined(__SVR4) && defined(__sun)
+#include <sys/types.h>
+typedef uint64_t drm_u64_t;
 typedef unsigned long long drm_handle_t;	/**< To mapped regions */
+#else
+#include <sys/types.h>
+typedef u_int64_t drm_u64_t;
+typedef unsigned long drm_handle_t;	/**< To mapped regions */
 #endif
 typedef unsigned int drm_context_t;	/**< GLXContext handle */
 typedef unsigned int drm_drawable_t;
@@ -226,6 +238,14 @@ typedef struct drm_clip_rect {
 	unsigned short x2;
 	unsigned short y2;
 } drm_clip_rect_t;
+
+/**
+ * Drawable information.
+ */
+typedef struct drm_drawable_info {
+	unsigned int num_rects;
+	drm_clip_rect_t *rects;
+} drm_drawable_info_t;
 
 /**
  * Texture region,
@@ -915,11 +935,13 @@ typedef struct drm_set_version {
 
 /**
  * Device specific ioctls should only be in their respective headers
- * The device specific ioctl range is from 0x40 to 0x79.
+ * The device specific ioctl range is from 0x40 to 0x99.
+ * Generic IOCTLS restart at 0xA0.
  *
  * \sa drmCommandNone(), drmCommandRead(), drmCommandWrite(), and
  * drmCommandReadWrite().
  */
 #define DRM_COMMAND_BASE                0x40
+#define DRM_COMMAND_END                 0xA0
 
 #endif /* _DRM_H_ */

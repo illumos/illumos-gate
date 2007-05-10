@@ -1,9 +1,4 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
  * drm_irq.c -- IRQ IOCTL and function support
  * Created: Fri Oct 18 2003 by anholt@FreeBSD.org
  */
@@ -32,6 +27,11 @@
  * Authors:
  *    Eric Anholt <anholt@FreeBSD.org>
  *
+ */
+
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -122,6 +122,8 @@ drm_irq_install(drm_softstate_t *dev)
 
 	dev->context_flag = 0;
 
+	mutex_init(&dev->tasklet_lock, NULL, MUTEX_DRIVER, NULL);
+
 	/* before installing handler */
 	dev->irq_preinstall(dev);
 
@@ -152,6 +154,9 @@ drm_uninstall_irq_handle(drm_device_t *dev)
 int
 drm_irq_uninstall(drm_softstate_t *dev)
 {
+	if (!dev->irq_enabled) {
+		return (DRM_ERR(EINVAL));
+	}
 
 	dev->irq_enabled = 0;
 
@@ -159,6 +164,9 @@ drm_irq_uninstall(drm_softstate_t *dev)
 
 	drm_uninstall_irq_handle(dev);
 
+	dev->locked_tasklet_func = NULL;
+
+	mutex_destroy(&dev->tasklet_lock);
 	return (DDI_SUCCESS);
 }
 
@@ -193,4 +201,25 @@ int
 drm_wait_vblank(DRM_IOCTL_ARGS)
 {
 	return (0);
+}
+
+/*ARGSUSED*/
+void
+drm_vbl_send_signals(drm_device_t *dev)
+{
+}
+
+void
+drm_locked_tasklet(drm_device_t *dev, void (*func)(drm_device_t *))
+{
+	mutex_enter(&dev->tasklet_lock);
+
+	if (dev->locked_tasklet_func) {
+		mutex_exit(&dev->tasklet_lock);
+		return;
+	}
+
+	dev->locked_tasklet_func = func;
+
+	mutex_exit(&dev->tasklet_lock);
 }

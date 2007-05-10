@@ -1,9 +1,4 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-/*
  * drm_ioctl.h -- IOCTL processing for DRM -*- linux-c -*-
  * Created: Fri Jan  8 09:01:26 1999 by faith@valinux.com
  */
@@ -35,6 +30,11 @@
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
+ */
+
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -303,7 +303,7 @@ drm_getstats(DRM_IOCTL_ARGS)
 }
 
 #define	DRM_IF_MAJOR	1
-#define	DRM_IF_MINOR	2
+#define	DRM_IF_MINOR	4
 
 /*ARGSUSED*/
 int
