@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -311,5 +311,42 @@ topo_search_path(topo_mod_t *mod, const char *rootdir, const char *file)
 
 	pp = topo_mod_strdup(mod, sp);
 
+	return (pp);
+}
+
+/*
+ * SMBIOS serial numbers can contain characters (particularly ':' and ' ')
+ * that are invalid for the authority and can break FMRI parsing.  We translate
+ * any invalid characters to a safe '-', as well as trimming any leading or
+ * trailing whitespace.
+ */
+char *
+topo_cleanup_auth_str(topo_hdl_t *thp, char *begin)
+{
+	char buf[MAXNAMELEN];
+	size_t count;
+	char *str, *end, *pp;
+
+	end = begin + strlen(begin);
+
+	while (begin < end && isspace(*begin))
+		begin++;
+	while (begin < end && isspace(*(end - 1)))
+		end--;
+
+	if (begin >= end)
+		return (NULL);
+
+	count = end - begin;
+	count += 1;
+
+	if (count > sizeof (buf))
+		return (NULL);
+
+	(void) snprintf(buf, count, "%s", begin);
+	while ((str = strpbrk(buf, " :=")) != NULL)
+		*str = '-';
+
+	pp = topo_hdl_strdup(thp, buf);
 	return (pp);
 }

@@ -57,15 +57,6 @@ extern int _dm_assert(const char *assertion, const char *file, int line,
 	_dm_assert("EX", __FILE__, __LINE__, NULL))
 #endif  /* __STDC__ */
 
-
-/*
- * List of strings with arbitrary matching values
- */
-typedef struct slist {
-	char	*str;
-	int	value;
-} slist_t;
-
 /*
  * The following structures comprise the implementation of the
  * queue structure that's used to construct the list of state
@@ -93,11 +84,8 @@ typedef struct q_head {
 
 typedef enum log_class {
 	MM_CONF		= 0x0001,
-	MM_FAULTMGR	= 0x0002,
 	MM_HPMGR	= 0x0004,
 	MM_SCHGMGR	= 0x0008,
-	MM_FLTANALYZE	= 0x0010,
-	MM_SCSI		= 0x0020,
 	MM_MAIN		= 0x0040,
 	MM_TOPO 	= 0x0100,
 	MM_ERR		= 0x0200,
@@ -111,10 +99,6 @@ extern void *queue_remove(qu_t *qp);
 extern qu_t *new_queue(boolean_t block_on_empty, void *(*nodealloc)(size_t),
     void (*nodefree)(void *, size_t), void (*deallocator)(void *));
 extern void queue_free(qu_t **qp);
-
-extern char *find_string(slist_t *slist, int match_value);
-
-extern void log_dump(log_class_t cl, char *label, char *start, unsigned length);
 
 extern void *dmalloc(size_t sz);
 extern void *dzmalloc(size_t sz);

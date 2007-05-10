@@ -693,8 +693,10 @@ d none usr/include/sys/fm/fs 755 root bin
 f none usr/include/sys/fm/fs/zfs.h 644 root bin
 d none usr/include/sys/fm/io 755 root bin
 f none usr/include/sys/fm/io/ddi.h 644 root bin
+f none usr/include/sys/fm/io/disk.h 644 root bin
 f none usr/include/sys/fm/io/opl_mc_fm.h 644 root bin
 f none usr/include/sys/fm/io/pci.h 644 root bin
+f none usr/include/sys/fm/io/scsi.h 644 root bin
 f none usr/include/sys/fm/io/sun4upci.h 644 root bin
 f none usr/include/sys/fork.h 644 root bin
 f none usr/include/sys/frame.h 644 root bin

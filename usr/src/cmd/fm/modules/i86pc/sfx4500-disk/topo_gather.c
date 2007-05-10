@@ -114,11 +114,13 @@ dm_fmri_to_diskmon(fmd_hdl_t *hdl, nvlist_t *fmri)
 	(void) nvlist_remove(dupfmri, FM_FMRI_HC_SERIAL_ID, DATA_TYPE_STRING);
 	(void) nvlist_remove(dupfmri, FM_FMRI_HC_PART, DATA_TYPE_STRING);
 
-	thdl = fmd_hdl_topology(hdl, TOPO_VERSION);
+	thdl = fmd_hdl_topo_hold(hdl, TOPO_VERSION);
 	if (topo_fmri_nvl2str(thdl, dupfmri, &buf, &err) != 0) {
+		fmd_hdl_topo_rele(hdl, thdl);
 		nvlist_free(dupfmri);
 		return (NULL);
 	}
+	fmd_hdl_topo_rele(hdl, thdl);
 
 	diskp = dm_fmristring_to_diskmon(buf);
 
@@ -218,52 +220,6 @@ fmri2ptr(topo_hdl_t *thp, tnode_t *node, char **str, int *err)
 	return (p);
 }
 
-static void
-transform_model_string(char *manuf, char *model, char **finalstring,
-    int *finalstringbuflen)
-{
-	int buflen = 0;
-	int i = 0;
-	int j = 0;
-	char *buf;
-	char *finalmodelstring;
-
-	if (manuf != NULL)
-		buflen += strlen(manuf);
-	if (model != NULL)
-		buflen += strlen(model);
-	buflen += 2;
-
-	buf = dmalloc(buflen);
-	finalmodelstring = dmalloc(buflen);
-	if (manuf != NULL && model != NULL)
-		(void) snprintf(buf, buflen, "%s-%s", manuf, model);
-	else
-		(void) snprintf(buf, buflen, "%s",
-		    manuf == NULL ? model : manuf);
-
-	while (buf[i] != 0) {
-
-		if (isspace(buf[i])) {
-			finalmodelstring[j++] = '-';
-			/*
-			 * Advance past spaces, but not past the
-			 * end of the string (since isspace('\0')
-			 * returns FALSE).
-			 */
-			while (isspace(buf[i]))
-				i++;
-		} else
-			finalmodelstring[j++] = buf[i++];
-	}
-
-	finalmodelstring[j] = 0;
-
-	dfree(buf, buflen);
-	*finalstring = finalmodelstring;
-	*finalstringbuflen = buflen;
-}
-
 typedef struct walk_diskmon {
 	diskmon_t *target;
 	char *pfmri;
@@ -273,19 +229,14 @@ static int
 topo_add_disk(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
 {
 	diskmon_t *target_diskp = wdp->target;
-	nvlist_t	*fmri = NULL;
-	nvlist_t	*asru_fmri;
-	nvlist_t	*fru_fmri;
 	char		*devpath = NULL;
 	char		*capacity = NULL;
 	char		*firmrev = NULL;
 	char		*serial = NULL;
 	char		*manuf = NULL;
 	char		*model = NULL;
-	char		*buf;
 	char		*label;
 	uint64_t	ptr = 0;
-	int		buflen;
 	int		err;
 	dm_fru_t	*frup;
 	diskmon_t	*diskp;
@@ -311,26 +262,6 @@ topo_add_disk(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
 	/* If we were called upon to update a particular disk, do it */
 	if (target_diskp != NULL && diskp != target_diskp) {
 		return (0);
-	}
-
-	/*
-	 * Update the diskmon's ASRU and FRU with our information (this
-	 * information is cached in the diskmon so we don't have to do a
-	 * time-consuming topo traversal when we get an ereport).
-	 */
-	if (topo_prop_get_fmri(node, TOPO_PGROUP_PROTOCOL, TOPO_PROP_ASRU,
-	    &asru_fmri, &err) == 0) {
-		diskmon_add_asru(diskp, asru_fmri);
-		nvlist_free(asru_fmri);
-	}
-	if (topo_prop_get_fmri(node, TOPO_PGROUP_PROTOCOL, TOPO_PROP_FRU,
-	    &fru_fmri, &err) == 0) {
-		diskmon_add_fru(diskp, fru_fmri);
-		nvlist_free(fru_fmri);
-	}
-	if (topo_node_resource(node, &fmri, &err) == 0) {
-		diskmon_add_disk_fmri(diskp, fmri);
-		nvlist_free(fmri);
 	}
 
 	/*
@@ -393,60 +324,16 @@ topo_add_disk(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
 	frup = new_dmfru(manuf, model, firmrev, serial,
 	    capacity == NULL ? 0 : strtoull(capacity, 0, 0));
 
-	/*
-	 * Update the disk's resource FMRI with the
-	 * SunService-required members:
-	 * FM_FMRI_HC_SERIAL_ID, FM_FMRI_HC_PART, and
-	 * FM_FMRI_HC_REVISION
-	 */
-	(void) nvlist_add_string(diskp->disk_res_fmri,
-	    FM_FMRI_HC_SERIAL_ID, serial);
-
-	transform_model_string(manuf, model, &buf, &buflen);
-
-	(void) nvlist_add_string(diskp->disk_res_fmri,
-	    FM_FMRI_HC_PART, buf);
-
-	/*
-	 * Add the serial number to the ASRU so that when the resource
-	 * is marked faulty in the fmd resource cache, the hc scheme
-	 * plugin can detect when the disk is no longer installed (and so,
-	 * can clear the faulty state automatically across fmd restarts).
-	 *
-	 * The serial number is only updated when a disk comes online
-	 * because that's when the disk node exists in the topo tree.
-	 * It's ok to keep a stale value in the ASRU when the disk is removed
-	 * because it's only used as part of fault creation when the disk
-	 * is configured (online), at which point it will be updated with
-	 * the (current) serial number of the disk inserted.
-	 */
-	(void) nvlist_add_string(diskp->asru_fmri,
-	    FM_FMRI_HC_SERIAL_ID, serial);
-
-	dfree(buf, buflen);
-
-	(void) nvlist_add_string(diskp->disk_res_fmri,
-	    FM_FMRI_HC_REVISION, firmrev);
-
-	if (model) {
+	if (model)
 		topo_hdl_strfree(thp, model);
-	}
-
-	if (manuf) {
+	if (manuf)
 		topo_hdl_strfree(thp, manuf);
-	}
-
-	if (serial) {
+	if (serial)
 		topo_hdl_strfree(thp, serial);
-	}
-
-	if (firmrev) {
+	if (firmrev)
 		topo_hdl_strfree(thp, firmrev);
-	}
-
-	if (capacity) {
+	if (capacity)
 		topo_hdl_strfree(thp, capacity);
-	}
 
 	/* Add the fru information to the diskmon: */
 	dm_assert(pthread_mutex_lock(&diskp->fru_mutex) == 0);
@@ -855,24 +742,16 @@ update_configuration_from_topo(fmd_hdl_t *hdl, diskmon_t *diskp)
 	topo_hdl_t *thp;
 	topo_walk_t *twp;
 	walk_diskmon_t wd;
-	char *uuid;
 
-	if ((thp = topo_open(TOPO_VERSION, NULL, &err)) == NULL) {
+	if ((thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION)) == NULL) {
 		return (TOPO_OPEN_ERROR);
 	}
-
-	if ((uuid = topo_snap_hold(thp, NULL, &err)) == NULL) {
-		topo_close(thp);
-		return (TOPO_SNAP_ERROR);
-	}
-
-	topo_hdl_strfree(thp, uuid);
 
 	wd.target = diskp;
 	wd.pfmri = NULL;
 	if ((twp = topo_walk_init(thp, FM_FMRI_SCHEME_HC, gather_topo_cfg,
 	    &wd, &err)) == NULL) {
-		topo_close(thp); /* topo_close() will release the snapshot */
+		fmd_hdl_topo_rele(hdl, thp);
 		return (err ? TOPO_WALK_INIT_ERROR : TOPO_SUCCESS);
 	}
 
@@ -882,12 +761,12 @@ update_configuration_from_topo(fmd_hdl_t *hdl, diskmon_t *diskp)
 		if (wd.pfmri != NULL)
 			dstrfree(wd.pfmri);
 
-		topo_close(thp);
+		fmd_hdl_topo_rele(hdl, thp);
 		return (TOPO_WALK_ERROR);
 	}
 
 	topo_walk_fini(twp);
-	topo_close(thp);
+	fmd_hdl_topo_rele(hdl, thp);
 	if (wd.pfmri != NULL)
 		dstrfree(wd.pfmri);
 

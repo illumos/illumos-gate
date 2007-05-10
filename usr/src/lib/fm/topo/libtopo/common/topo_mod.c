@@ -41,14 +41,14 @@
  *
  * Module Plugin API
  *
- * Enumerators must provide entry points for intialization and clean-up
+ * Enumerators must provide entry points for initialization and clean-up
  * (_topo_init() and _topo_fini()).  In their _topo_init() function, an
  * enumerator should register (topo_mod_register()) its enumeration callback
  * and allocate resources required for a subsequent call to the callback.
  * Optionally, methods may also be registered with topo_method_register().
  *
  * In its enumeration callback routine, the module should search for resources
- * within its realm of resposibility and create any node ranges,
+ * within its realm of responsibility and create any node ranges,
  * topo_node_range_create() and nodes, topo_node_bind().  The Enumerator
  * module is handed a node to which it may begin attaching additional
  * topology nodes.  The enumerator may only access those nodes within its
@@ -306,7 +306,7 @@ topo_mod_hcfmri(topo_mod_t *mod, tnode_t *pnode, int version, const char *name,
 	if (pnode != NULL || auth != NULL || part != NULL || rev != NULL ||
 	    serial != NULL || hc_specific != NULL) {
 		if (topo_mod_nvalloc(mod, &args, NV_UNIQUE_NAME) != 0)
-		    return (set_fmri_err(mod, EMOD_FMRI_NVL));
+			return (set_fmri_err(mod, EMOD_FMRI_NVL));
 	}
 
 	if (pnode != NULL) {
@@ -686,7 +686,8 @@ topo_mod_csn(topo_mod_t *mod)
 		return (NULL);
 	}
 
-	return (topo_mod_strdup(mod, csn));
+
+	return (topo_cleanup_auth_str(mod->tm_hdl, csn));
 }
 
 nvlist_t *

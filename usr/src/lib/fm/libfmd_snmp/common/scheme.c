@@ -299,11 +299,13 @@ fmd_fmri_warn(const char *format, ...)
 {
 }
 
-/*ARGSUSED*/
 struct topo_hdl *
-fmd_fmri_topology(int version)
+fmd_fmri_topo_hold(int version)
 {
 	int err;
+
+	if (version != TOPO_VERSION)
+		return (NULL);
 
 	if (g_thp == NULL) {
 		if ((g_thp = topo_open(TOPO_VERSION, "/", &err)) == NULL) {
@@ -314,4 +316,11 @@ fmd_fmri_topology(int version)
 	}
 
 	return (g_thp);
+}
+
+/*ARGSUSED*/
+void
+fmd_fmri_topo_rele(struct topo_hdl *thp)
+{
+	/* nothing to do */
 }

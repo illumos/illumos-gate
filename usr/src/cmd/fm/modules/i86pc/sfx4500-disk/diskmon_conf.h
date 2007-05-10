@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,8 +42,6 @@ extern "C" {
 #include <libnvpair.h>
 #include <fm/fmd_api.h>
 #include "dm_types.h"
-#include "scsi_util.h"
-#include "fault_analyze.h"
 #include "util.h"
 
 #ifndef MIN
@@ -56,9 +54,6 @@ extern "C" {
 
 #define	DEVICES_PREFIX "/devices"
 
-#define	GLOBAL_PROP_FAULT_POLL		"fault-polling-interval"
-#define	GLOBAL_PROP_FAULT_INJ		"fault-inject-max-reps"
-#define	GLOBAL_PROP_FAULT_OPTIONS	"fault-analyze-options"
 #define	GLOBAL_PROP_LOG_LEVEL		"log-level"
 
 /* Property names (and values) for the disk configuration file entity */
@@ -128,31 +123,6 @@ typedef struct indicator {
 	struct indicator	*next;
 } indicator_t;
 
-typedef struct fault_monitor_info {
-	int			mode_length;
-	logpage_supp_e		log_pages_supported;
-	modepage_supp_e		mode_pages_supported;
-	disk_option_e		options;
-	disk_extension_e	extensions; /* Vendor extensions supported */
-	uint_t			update_interval;
-
-	/* Protects fault_list and disk_fault_srcs: */
-	pthread_mutex_t		fault_data_mutex;
-	disk_flt_src_e		disk_fault_srcs;
-	struct disk_fault	*fault_list;
-
-	uint_t			reference_temp;
-
-	uint_t			last_rs_key;
-	uint_t			last_rs_asc;
-	uint_t			last_rs_ascq;
-
-	/* XXX - may not need these long-term: */
-	struct scsi_ms_hdrs	hdrs;
-	struct info_except_page	iec_current;
-	struct info_except_page	iec_changeable;
-} fault_monitor_info_t;
-
 typedef struct diskmon {
 	/*
 	 * Static configuration data
@@ -186,45 +156,17 @@ typedef struct diskmon {
 	 */
 	boolean_t		initial_configuration;
 
-
-	/* For the fault manager: */
-
-	/*
-	 * Set to TRUE when the fault manager adds faults to the diskmon
-	 * that are processed by the state manager.  Once the state
-	 * manager generates ereports and clears the disk_faults member,
-	 * it clears this flag, allowing the fault manager to add new
-	 * faults, when they are detected.
-	 */
-	boolean_t		faults_outstanding;
-	pthread_mutex_t		fault_indicator_mutex;
-	ind_state_t		fault_indicator_state;
-
-	/* Bitmap of accumulated faults: */
-	pthread_mutex_t		disk_faults_mutex;
-	disk_flt_src_e		disk_faults;
-
-	/* The time the next fault analysis is due: */
-	time_t			due;
-	/*
-	 * The number of analysis generations after which fake faults
-	 * are injected.
-	 */
-	uint_t			fault_inject_count;
-	/*
-	 * The current analysis generation (number of times the fault
-	 * analysis algorithm was run). Used to determine when to do
-	 * fault injection, when fault injection is enabled.
-	 */
-	uint_t			analysis_generation;
-
 	/* For the state-change manager: */
 
 	/*
+	 * Current state of the fault indicator.
+	 */
+	pthread_mutex_t		fault_indicator_mutex;
+	ind_state_t		fault_indicator_state;
+
+	/*
 	 * Set to TRUE when a disk transitions to the CONFIGURED state
-	 * and remains TRUE until the disk is physically removed.  Used
-	 * to detect the first configuration of a disk so that fault
-	 * state can be collected.
+	 * and remains TRUE until the disk is physically removed.
 	 */
 	boolean_t		configured_yet;
 
@@ -233,21 +175,6 @@ typedef struct diskmon {
 	 * was inserted.
 	 */
 	uint_t			state_change_count;
-
-	/*
-	 * FMRI (nvlist and string versions) for populating
-	 * ereports and faults
-	 */
-	nvlist_t		*disk_res_fmri;
-	nvlist_t		*asru_fmri;
-	nvlist_t		*fru_fmri;
-
-	/*
-	 * The following member holds details about what faults were
-	 * detected, and their details (see above for the structure
-	 * definition)
-	 */
-	fault_monitor_info_t	*fmip;
 
 	/* Disk FRU (model, manufacturer, etc) information */
 	pthread_mutex_t		fru_mutex;
@@ -301,10 +228,6 @@ extern conf_err_t	check_indrules(indrule_t *indrp,
     state_transition_t **offender);
 extern conf_err_t	check_consistent_ind_indrules(indicator_t *indp,
     indrule_t *indrp, ind_action_t **offender);
-
-extern void		diskmon_add_asru(diskmon_t *dmp, nvlist_t *fmri);
-extern void		diskmon_add_fru(diskmon_t *dmp, nvlist_t *fmri);
-extern void		diskmon_add_disk_fmri(diskmon_t *dmp, nvlist_t *fmri);
 
 extern void		cfgdata_add_diskmon(cfgdata_t *cfgp, diskmon_t *dmp);
 

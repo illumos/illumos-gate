@@ -31,6 +31,7 @@
 #include <topo_mod.h>
 #include <topo_tree.h>
 #include <topo_module.h>
+#include <stddef.h>
 
 
 /*
@@ -131,9 +132,9 @@ topo_handle(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("%-12s %-36s %-30s\n", "th_trees", "",
 	    "Scheme-specific topo tree list");
 	mdb_printf("  %-12s 0x%-34p %-30s\n", "l_prev", th.th_trees.l_prev,
-		"");
+	    "");
 	mdb_printf("  %-12s 0x%-34p %-30s\n", "l_next", th.th_trees.l_next,
-		"");
+	    "");
 	mdb_printf("%-12s 0x%-34p %-30s\n", "th_alloc", th.th_alloc,
 	    "Allocators");
 	mdb_printf("%-12s %-36d %-30s\n", "tm_ernno", th.th_errno, "errno");
@@ -177,57 +178,57 @@ topo_module(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 */
 	if (DCMD_HDRSPEC(flags)) {
 		mdb_printf("%<u>%-12s %-36s %-30s%</u>\n",
-		"FIELD", "VALUE", "DESCR");
+		    "FIELD", "VALUE", "DESCR");
 	}
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tm_lock", tm.tm_lock,
-		"Lock for tm_cv/owner/flags/refs");
+	    "Lock for tm_cv/owner/flags/refs");
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tm_cv", tm.tm_cv,
-		"Module condition variable");
+	    "Module condition variable");
 	mdb_printf("%-12s %-36s %-30s\n", "tm_busy", tm.tm_busy,
-		"Busy indicator");
+	    "Busy indicator");
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tm_next", tm.tm_next,
-		"Next module in hash chain");
+	    "Next module in hash chain");
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tm_hdl", tm.tm_hdl,
-		"Topo handle for this module");
+	    "Topo handle for this module");
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tm_alloc", tm.tm_alloc,
-		"Allocators");
+	    "Allocators");
 	mdb_printf("%-12s %-36s %-30s\n", "tm_name", name,
-		"Basename of module");
+	    "Basename of module");
 	mdb_printf("%-12s %-36s %-30s\n", "tm_path", path,
-		"Full pathname of module");
+	    "Full pathname of module");
 	mdb_printf("%-12s %-36s %-30s\n", "tm_rootdir", root,
-		"Relative root directory of module");
+	    "Relative root directory of module");
 	mdb_printf("%-12s %-36u %-30s\n", "tm_refs", tm.tm_refs,
-		"Module reference count");
+	    "Module reference count");
 	mdb_printf("%-12s %-36u %-30s\n", "tm_flags", tm.tm_flags,
-		"Module flags");
+	    "Module flags");
 	if (TOPO_MOD_INIT & tm.tm_flags) {
 		mdb_printf("%-12s %-36s %-30s\n", "", "TOPO_MOD_INIT",
-			"Module init completed");
+		    "Module init completed");
 	}
 	if (TOPO_MOD_FINI & tm.tm_flags) {
 		mdb_printf("%-12s %-36s %-30s\n", "", "TOPO_MOD_FINI",
-			"Module fini completed");
+		    "Module fini completed");
 	}
 	if (TOPO_MOD_REG & tm.tm_flags) {
 		mdb_printf("%-12s %-36s %-30s\n", "", "TOPO_MOD_REG",
-			"Module registered");
+		    "Module registered");
 	}
 	if (TOPO_MOD_UNREG & tm.tm_flags) {
 		mdb_printf("%-12s %-36s %-30s\n", "", "TOPO_MOD_UNREG",
-			"Module unregistered");
+		    "Module unregistered");
 	}
 
 	mdb_printf("%-12s %-36u %-30s\n", "tm_debug", tm.tm_debug,
-		"Debug printf mask");
+	    "Debug printf mask");
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tm_data", tm.tm_data,
-		"Private rtld/builtin data");
+	    "Private rtld/builtin data");
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tm_mops", tm.tm_mops,
-		"Module class ops vector");
+	    "Module class ops vector");
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tm_info", tm.tm_info,
-		"Module info registered with handle");
+	    "Module info registered with handle");
 	mdb_printf("%-12s %-36d %-30s\n", "tm_ernno", tm.tm_errno,
-		"Module errno");
+	    "Module errno");
 
 	return (DCMD_OK);
 }
@@ -264,14 +265,15 @@ topo_node(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		"FIELD", "VALUE", "DESCR");
 	}
 
-	mdb_printf("%-12s 0x%-34p %-30s\n", "tn_lock", tn.tn_lock,
-		"Mutex lock protecting node members");
+	mdb_printf("%-12s 0x%-34p %-30s\n", "tn_lock",
+	    addr + offsetof(tnode_t, tn_lock),
+	    "Lock protecting node members");
 	mdb_printf("%-12s %-36s %-30s\n", "tn_name", name,
-		"Node name");
+	    "Node name");
 	mdb_printf("%-12s %-36d %-30s\n", "tn_instance", tn.tn_instance,
-		"Node instance");
+	    "Node instance");
 	mdb_printf("%-12s %-36d %-30s\n", "tn_state", tn.tn_state,
-		"Node state");
+	    "Node state");
 	if (TOPO_NODE_INIT & tn.tn_state) {
 		mdb_printf("%-12s %-36s %-30s\n", "", "TOPO_NODE_INIT", "");
 	}
@@ -285,29 +287,27 @@ topo_node(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%-12s %-36s %-30s\n", "", "TOPO_NODE_LINKED", "");
 	}
 	mdb_printf("%-12s %-36d %-30s\n", "tn_fflags", tn.tn_fflags,
-		"FMRI flags");
+	    "FMRI flags");
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tn_parent", tn.tn_parent,
-		"Node parent");
+	    "Node parent");
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tn_phash", tn.tn_phash,
-		"Parent hash bucket");
+	    "Parent hash bucket");
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tn_hdl", tn.tn_hdl,
-		"Topo handle");
+	    "Topo handle");
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tn_enum", tn.tn_enum,
-		"Enumerator module");
+	    "Enumerator module");
 	mdb_printf("%-12s %-36s %-30s\n", "tn_children", "",
-		"Hash table of child nodes");
-	mdb_printf("  %-12s 0x%-34p %-30s\n", "l_prev", tn.tn_children.l_prev,
-		"");
-	mdb_printf("  %-12s 0x%-34p %-30s\n", "l_next", tn.tn_children.l_next,
-		"");
+	    "Hash table of child nodes");
+	mdb_printf("  %-12s 0x%-34p\n", "l_prev", tn.tn_children.l_prev);
+	mdb_printf("  %-12s 0x%-34p\n", "l_next", tn.tn_children.l_next);
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tn_pgroups", &(tn.tn_pgroups),
-		"Property group list");
+	    "Property group list");
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tn_methods", &(tn.tn_methods),
-		"Registered method list");
+	    "Registered method list");
 	mdb_printf("%-12s 0x%-34p %-30s\n", "tn_priv", tn.tn_priv,
-		"Private enumerator data");
+	    "Private enumerator data");
 	mdb_printf("%-12s %-36d %-30s\n", "tn_refs", tn.tn_refs,
-		"Node reference count");
+	    "Node reference count");
 
 	return (DCMD_OK);
 }

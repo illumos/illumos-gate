@@ -153,6 +153,10 @@ extern nvlist_t *topo_mod_auth(topo_mod_t *, tnode_t *);
 #define	TOPO_METH_FRU_COMPUTE_VERSION	0
 #define	TOPO_METH_FRU_COMPUTE_DESC	"Dynamic FRU constructor"
 
+#define	TOPO_METH_DISK_STATUS		"topo_disk_status"
+#define	TOPO_METH_DISK_STATUS_VERSION	0
+#define	TOPO_METH_DISK_STATUS_DESC	"Disk status"
+
 extern void *topo_mod_alloc(topo_mod_t *, size_t);
 extern void *topo_mod_zalloc(topo_mod_t *, size_t);
 extern void topo_mod_free(topo_mod_t *, void *, size_t);

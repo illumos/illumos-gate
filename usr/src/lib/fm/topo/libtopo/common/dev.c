@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <alloca.h>
+#include <devid.h>
 #include <libnvpair.h>
 #include <fm/topo_mod.h>
 #include <sys/fm/protocol.h>
@@ -49,6 +50,10 @@ static int dev_fmri_str2nvl(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
 static int dev_fmri_create_meth(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
+static int dev_fmri_present(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
+static int dev_fmri_unusable(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
 
 static const topo_method_t dev_methods[] = {
 	{ TOPO_METH_NVL2STR, TOPO_METH_NVL2STR_DESC, TOPO_METH_NVL2STR_VERSION,
@@ -57,6 +62,11 @@ static const topo_method_t dev_methods[] = {
 	    TOPO_STABILITY_INTERNAL, dev_fmri_str2nvl },
 	{ TOPO_METH_FMRI, TOPO_METH_FMRI_DESC, TOPO_METH_FMRI_VERSION,
 	    TOPO_STABILITY_INTERNAL, dev_fmri_create_meth },
+	{ TOPO_METH_PRESENT, TOPO_METH_PRESENT_DESC, TOPO_METH_PRESENT_VERSION,
+	    TOPO_STABILITY_INTERNAL, dev_fmri_present },
+	{ TOPO_METH_UNUSABLE, TOPO_METH_UNUSABLE_DESC,
+	    TOPO_METH_UNUSABLE_VERSION, TOPO_STABILITY_INTERNAL,
+	    dev_fmri_unusable },
 	{ NULL }
 };
 
@@ -286,6 +296,170 @@ dev_fmri_str2nvl(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
 	}
 	*out = fmri;
+
+	return (0);
+}
+
+/*
+ * callback routine for di_walk_minor()
+ */
+struct walkinfo {
+	int matched;
+	const char *path;
+	const char *devid;
+	int len;
+};
+
+static int
+dev_match(di_node_t node, void *arg)
+{
+	struct walkinfo *wip = (struct walkinfo *)arg;
+	char *path = di_devfs_path(node);
+	ddi_devid_t devid;
+	char *devidstr = NULL;
+
+	if (path != NULL && strncmp(path, wip->path, wip->len) == 0) {
+		/*
+		 * If we found the match we were looking for, check to see if a
+		 * devid was specified.  If so, then this must also match.
+		 */
+		if (wip->devid) {
+			if ((devid = di_devid(node)) == NULL ||
+			    (devidstr = devid_str_encode(devid, NULL)) == NULL)
+				goto out;
+
+			if (strcmp(devidstr, wip->devid) != 0)
+				goto out;
+		}
+
+		/*
+		 * Either the devid wasn't specified, or it correctly matched.
+		 * In this case, indicate a successful match and terminate the
+		 * walk.
+		 */
+		wip->matched = 1;
+		di_devfs_path_free(path);
+		devid_str_free(devidstr);
+		return (DI_WALK_TERMINATE);
+	}
+
+out:
+	if (path != NULL)
+		di_devfs_path_free(path);
+	devid_str_free(devidstr);
+	return (DI_WALK_CONTINUE);
+}
+
+/*ARGSUSED*/
+static int
+dev_fmri_present(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	di_node_t parent;
+	uint8_t fmversion;
+	char *devpath = NULL;
+	char *parentpath;
+	char *cp;
+	struct walkinfo walkinfo;
+	uint32_t present;
+	char *devid = NULL;
+
+	if (version > TOPO_METH_PRESENT_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+
+	if (nvlist_lookup_uint8(in, FM_VERSION, &fmversion) != 0 ||
+	    fmversion > FM_DEV_SCHEME_VERSION ||
+	    nvlist_lookup_string(in, FM_FMRI_DEV_PATH, &devpath) != 0)
+		return (topo_mod_seterrno(mod, EMOD_FMRI_MALFORM));
+
+	(void) nvlist_lookup_string(in, FM_FMRI_DEV_ID, &devid);
+
+	if (devpath == NULL || (walkinfo.len = strlen(devpath)) == 0)
+		return (topo_mod_seterrno(mod, EMOD_FMRI_MALFORM));
+
+	/* strip off last component of path */
+	parentpath = alloca(walkinfo.len + 1);
+	(void) strcpy(parentpath, devpath);
+	if ((cp = strrchr(parentpath, '/')) == NULL)
+		parentpath = "/";
+	else
+		*cp = '\0';
+
+	/* if the result is an empty path, start walk at "/" */
+	if (*parentpath == '\0')
+		parentpath = "/";
+
+	/*
+	 * DINFOFORCE is required for the devid to be present.
+	 */
+	if ((parent = di_init(parentpath,
+	    DINFOSUBTREE | DINFOFORCE)) == DI_NODE_NIL) {
+		if (errno != ENXIO)
+			return (topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM));
+		present = 0;
+	} else {
+		walkinfo.matched = 0;
+		walkinfo.path = devpath;
+		walkinfo.devid = devid;
+		(void) di_walk_node(parent,
+		    DI_WALK_SIBFIRST, (void *)&walkinfo, dev_match);
+		di_fini(parent);
+
+		present = walkinfo.matched;
+	}
+
+	if (topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) != 0)
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	if (nvlist_add_uint32(*out, TOPO_METH_PRESENT_RET, present) != 0) {
+		nvlist_free(*out);
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+dev_fmri_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t version,
+    nvlist_t *in, nvlist_t **out)
+{
+	di_node_t dnode;
+	uint8_t fmversion;
+	char *devpath = NULL;
+	uint32_t unusable;
+	uint_t state;
+
+	if (version > TOPO_METH_PRESENT_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+
+	if (nvlist_lookup_uint8(in, FM_VERSION, &fmversion) != 0 ||
+	    fmversion > FM_DEV_SCHEME_VERSION ||
+	    nvlist_lookup_string(in, FM_FMRI_DEV_PATH, &devpath) != 0)
+		return (topo_mod_seterrno(mod, EMOD_FMRI_MALFORM));
+
+	if (devpath == NULL)
+		return (topo_mod_seterrno(mod, EMOD_FMRI_MALFORM));
+
+	if ((dnode = di_init(devpath, DINFOCPYONE)) == DI_NODE_NIL) {
+		if (errno != ENXIO)
+			return (topo_mod_seterrno(mod, EMOD_UKNOWN_ENUM));
+		unusable = 1;
+	} else {
+		state = di_state(dnode);
+		if (state & (DI_DEVICE_OFFLINE | DI_DEVICE_DOWN |
+		    DI_BUS_QUIESCED | DI_BUS_DOWN))
+			unusable = 1;
+		else
+			unusable = 0;
+		di_fini(dnode);
+	}
+
+	if (topo_mod_nvalloc(mod, out, NV_UNIQUE_NAME) != 0)
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	if (nvlist_add_uint32(*out, TOPO_METH_PRESENT_RET, unusable) != 0) {
+		nvlist_free(*out);
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
 
 	return (0);
 }

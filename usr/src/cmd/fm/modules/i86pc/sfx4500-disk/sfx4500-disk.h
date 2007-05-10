@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,6 @@ extern "C" {
 #define	E_ERROR		1
 
 extern cfgdata_t	*config_data;
-extern fmd_xprt_t	*g_xprt_hdl;
 extern fmd_hdl_t	*g_fm_hdl;
 
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,15 +51,29 @@
 #include <fm/libtopo.h>
 
 static void
+fmd_topo_rele_locked(fmd_topo_t *ftp)
+{
+	ASSERT(MUTEX_HELD(&fmd.d_topo_lock));
+
+	if (--ftp->ft_refcount == 0) {
+		fmd_list_delete(&fmd.d_topo_list, ftp);
+		topo_close(ftp->ft_hdl);
+		fmd_free(ftp, sizeof (fmd_topo_t));
+	}
+}
+
+void
 fmd_topo_update(void)
 {
 	int err;
 	topo_hdl_t *tp;
-	fmd_topo_t *ftp;
+	fmd_topo_t *ftp, *prev;
 	char *id;
 	const char *name;
 
-	ASSERT(MUTEX_HELD(&fmd.d_topo_lock));
+	(void) pthread_mutex_lock(&fmd.d_topo_lock);
+
+	fmd.d_stats->ds_topo_drgen.fmds_value.ui64 = fmd_fmri_get_drgen();
 
 	name = fmd.d_rootdir != NULL &&
 	    *fmd.d_rootdir != '\0' ? fmd.d_rootdir : NULL;
@@ -79,38 +93,74 @@ fmd_topo_update(void)
 
 	ftp = fmd_alloc(sizeof (fmd_topo_t), FMD_SLEEP);
 	ftp->ft_hdl = tp;
+	ftp->ft_time = fmd_time_gethrtime();
 	fmd.d_stats->ds_topo_gen.fmds_value.ui64++;
+
+	/*
+	 * We always keep a reference count on the last topo snapshot taken.
+	 * Release the previous snapshot (if present), and set the current
+	 * reference count to 1.
+	 */
+	if ((prev = fmd_list_next(&fmd.d_topo_list)) != NULL)
+		fmd_topo_rele_locked(prev);
+	ftp->ft_refcount = 1;
 	fmd_list_prepend(&fmd.d_topo_list, ftp);
 
+	(void) pthread_mutex_unlock(&fmd.d_topo_lock);
 }
 
-topo_hdl_t *
-fmd_topo_handle(int version)
+fmd_topo_t *
+fmd_topo_hold(void)
 {
-	uint64_t curgen;
 	fmd_topo_t *ftp;
 
-	if (version != TOPO_VERSION)
-		return (NULL);
-
 	(void) pthread_mutex_lock(&fmd.d_topo_lock);
-	if ((curgen = fmd_fmri_get_drgen()) >
-	    fmd.d_stats->ds_topo_drgen.fmds_value.ui64) {
-		fmd.d_stats->ds_topo_drgen.fmds_value.ui64 = curgen;
-		fmd_topo_update();
-	}
 	ftp = fmd_list_next(&fmd.d_topo_list);
+	ftp->ft_refcount++;
 	(void) pthread_mutex_unlock(&fmd.d_topo_lock);
 
-	return ((topo_hdl_t *)ftp->ft_hdl);
+	return (ftp);
+}
+
+void
+fmd_topo_addref(fmd_topo_t *ftp)
+{
+	(void) pthread_mutex_lock(&fmd.d_topo_lock);
+	ftp->ft_refcount++;
+	(void) pthread_mutex_unlock(&fmd.d_topo_lock);
+}
+
+void
+fmd_topo_rele(fmd_topo_t *ftp)
+{
+	(void) pthread_mutex_lock(&fmd.d_topo_lock);
+
+	fmd_topo_rele_locked(ftp);
+
+	(void) pthread_mutex_unlock(&fmd.d_topo_lock);
+}
+
+void
+fmd_topo_rele_hdl(topo_hdl_t *thp)
+{
+	fmd_topo_t *ftp;
+
+	(void) pthread_mutex_lock(&fmd.d_topo_lock);
+	for (ftp = fmd_list_next(&fmd.d_topo_list); ftp != NULL;
+	    ftp = fmd_list_next(ftp)) {
+		if (ftp->ft_hdl == thp)
+			break;
+	}
+	ASSERT(ftp != NULL);
+
+	fmd_topo_rele_locked(ftp);
+	(void) pthread_mutex_unlock(&fmd.d_topo_lock);
 }
 
 void
 fmd_topo_init(void)
 {
-	(void) pthread_mutex_lock(&fmd.d_topo_lock);
 	fmd_topo_update();
-	(void) pthread_mutex_unlock(&fmd.d_topo_lock);
 }
 
 void

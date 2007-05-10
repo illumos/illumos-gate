@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,8 +50,9 @@ extern "C" {
 #define	FMD_API_VERSION_1	1
 #define	FMD_API_VERSION_2	2
 #define	FMD_API_VERSION_3	3
+#define	FMD_API_VERSION_4	4
 
-#define	FMD_API_VERSION		FMD_API_VERSION_3
+#define	FMD_API_VERSION		FMD_API_VERSION_4
 
 typedef struct fmd_hdl fmd_hdl_t;
 typedef struct fmd_event fmd_event_t;
@@ -107,6 +108,7 @@ typedef struct fmd_hdl_ops {
 	void (*fmdo_stats)(fmd_hdl_t *);
 	void (*fmdo_gc)(fmd_hdl_t *);
 	int (*fmdo_send)(fmd_hdl_t *, fmd_xprt_t *, fmd_event_t *, nvlist_t *);
+	void (*fmdo_topo)(fmd_hdl_t *, struct topo_hdl *);
 } fmd_hdl_ops_t;
 
 #define	FMD_SEND_SUCCESS	0	/* fmdo_send queued event */
@@ -133,7 +135,8 @@ extern void fmd_hdl_setspecific(fmd_hdl_t *, void *);
 extern void *fmd_hdl_getspecific(fmd_hdl_t *);
 
 extern void fmd_hdl_opendict(fmd_hdl_t *, const char *);
-extern struct topo_hdl *fmd_hdl_topology(fmd_hdl_t *, int);
+extern struct topo_hdl *fmd_hdl_topo_hold(fmd_hdl_t *, int);
+extern void fmd_hdl_topo_rele(fmd_hdl_t *, struct topo_hdl *);
 
 #define	FMD_NOSLEEP		0x0	/* do not sleep or retry on failure */
 #define	FMD_SLEEP		0x1	/* sleep or retry if alloc fails */
@@ -227,6 +230,8 @@ extern int fmd_nvl_fmri_contains(fmd_hdl_t *, nvlist_t *, nvlist_t *);
 extern nvlist_t *fmd_nvl_fmri_translate(fmd_hdl_t *, nvlist_t *, nvlist_t *);
 
 extern int fmd_event_local(fmd_hdl_t *, fmd_event_t *);
+extern uint64_t fmd_event_ena_create(fmd_hdl_t *);
+
 
 #define	FMD_XPRT_RDONLY		0x1	/* transport is read-only */
 #define	FMD_XPRT_RDWR		0x3	/* transport is read-write */

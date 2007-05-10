@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -183,7 +182,8 @@ fmd_verror(int err, const char *format, va_list ap)
 	 * FMD_LF_BUSY flag is set, we can't attempt to log the event because
 	 * a replay is running and we will deadlock on ourself in log_append.
 	 */
-	if (!fmd.d_fg && fmd.d_running && tp->thr_errdepth == 1 &&
+	if (!fmd.d_fg && fmd.d_running &&
+	    tp != NULL && tp->thr_errdepth == 1 &&
 	    (nvl = fmd_protocol_fmderror(err, format, ap)) != NULL) {
 
 		(void) nvlist_lookup_string(nvl, FM_CLASS, &class);

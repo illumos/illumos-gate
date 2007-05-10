@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,12 +38,19 @@ extern "C" {
 
 extern void fmd_topo_init(void);
 extern void fmd_topo_fini(void);
-extern topo_hdl_t *fmd_topo_handle(int);
 
 typedef struct fmd_topo {
 	fmd_list_t ft_list;
 	topo_hdl_t *ft_hdl;
+	uint32_t ft_refcount;
+	hrtime_t ft_time;
 } fmd_topo_t;
+
+extern void fmd_topo_update(void);
+extern fmd_topo_t *fmd_topo_hold(void);
+extern void fmd_topo_addref(fmd_topo_t *);
+extern void fmd_topo_rele(fmd_topo_t *);
+extern void fmd_topo_rele_hdl(topo_hdl_t *);
 
 #ifdef __cplusplus
 }

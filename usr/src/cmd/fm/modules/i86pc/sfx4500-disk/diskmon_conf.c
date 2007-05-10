@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -354,23 +354,11 @@ new_diskmon(nvlist_t *app_props, indicator_t *indp, indrule_t *indrp,
 
 	dmp->initial_configuration = B_TRUE;
 
-	dmp->fmip = NULL;
-
-	dmp->faults_outstanding = B_FALSE;
 	dm_assert(pthread_mutex_init(&dmp->fault_indicator_mutex, NULL) == 0);
 	dmp->fault_indicator_state = INDICATOR_UNKNOWN;
-	dm_assert(pthread_mutex_init(&dmp->disk_faults_mutex, NULL) == 0);
-	dmp->disk_faults = DISK_FAULT_SOURCE_NONE;
-	dmp->due = (time_t)0;
-	dmp->fault_inject_count = 0;
-	dmp->analysis_generation = 0;
 
 	dmp->configured_yet = B_FALSE;
 	dmp->state_change_count = 0;
-
-	dmp->disk_res_fmri = NULL;
-	dmp->asru_fmri = NULL;
-	dmp->fru_fmri = NULL;
 
 	dm_assert(pthread_mutex_init(&dmp->fru_mutex, NULL) == 0);
 	dmp->frup = NULL;
@@ -398,14 +386,6 @@ diskmon_free(diskmon_t *dmp)
 			indrule_free(dmp->indrule_list);
 		if (dmp->app_props)
 			nvlist_free(dmp->app_props);
-		if (dmp->fmip)
-			disk_fault_uninit(dmp);
-		if (dmp->disk_res_fmri)
-			nvlist_free(dmp->disk_res_fmri);
-		if (dmp->asru_fmri)
-			nvlist_free(dmp->asru_fmri);
-		if (dmp->fru_fmri)
-			nvlist_free(dmp->fru_fmri);
 		if (dmp->frup)
 			dmfru_free(dmp->frup);
 		dfree(dmp, sizeof (diskmon_t));
@@ -461,36 +441,6 @@ cfgdata_free(cfgdata_t *cdp)
 	nvlist_free(cdp->props);
 	diskmon_free(cdp->disk_list);
 	dfree(cdp, sizeof (cfgdata_t));
-}
-
-void
-diskmon_add_asru(diskmon_t *dmp, nvlist_t *fmri)
-{
-	if (dmp->asru_fmri) {
-		nvlist_free(dmp->asru_fmri);
-		dmp->asru_fmri = NULL;
-	}
-	(void) nvlist_dup(fmri, &dmp->asru_fmri, 0);
-}
-
-void
-diskmon_add_fru(diskmon_t *dmp, nvlist_t *fmri)
-{
-	if (dmp->fru_fmri) {
-		nvlist_free(dmp->fru_fmri);
-		dmp->fru_fmri = NULL;
-	}
-	(void) nvlist_dup(fmri, &dmp->fru_fmri, 0);
-}
-
-void
-diskmon_add_disk_fmri(diskmon_t *dmp, nvlist_t *fmri)
-{
-	if (dmp->disk_res_fmri) {
-		nvlist_free(dmp->disk_res_fmri);
-		dmp->disk_res_fmri = NULL;
-	}
-	(void) nvlist_dup(fmri, &dmp->disk_res_fmri, 0);
 }
 
 conf_err_t

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 #include <limits.h>
 #include <syslog.h>
 #include <alloca.h>
+#include <stddef.h>
 
 #include <fmd_module.h>
 #include <fmd_api.h>
@@ -368,7 +369,7 @@ fmd_hdl_register(fmd_hdl_t *hdl, int version, const fmd_hdl_info_t *mip)
 	 * the module thread to which we assigned this client handle.  The info
 	 * provided for the handle must be valid and have the minimal settings.
 	 */
-	if (version > FMD_API_VERSION_3)
+	if (version > FMD_API_VERSION_4)
 		return (fmd_hdl_register_error(mp, EFMD_VER_NEW));
 
 	if (version < FMD_API_VERSION_1)
@@ -392,7 +393,10 @@ fmd_hdl_register(fmd_hdl_t *hdl, int version, const fmd_hdl_info_t *mip)
 	bzero(&ops, sizeof (ops));
 
 	if (version < FMD_API_VERSION_3)
-		bcopy(mip->fmdi_ops, &ops, sizeof (ops) - sizeof (void *));
+		bcopy(mip->fmdi_ops, &ops, offsetof(fmd_hdl_ops_t, fmdo_send));
+	else if (version < FMD_API_VERSION_4)
+		bcopy(mip->fmdi_ops, &ops,
+		    offsetof(fmd_hdl_ops_t, fmdo_topo));
 	else
 		bcopy(mip->fmdi_ops, &ops, sizeof (ops));
 
@@ -408,6 +412,8 @@ fmd_hdl_register(fmd_hdl_t *hdl, int version, const fmd_hdl_info_t *mip)
 		ops.fmdo_gc = (void (*)())fmd_hdl_nop;
 	if (ops.fmdo_send == NULL)
 		ops.fmdo_send = (int (*)())fmd_hdl_nop;
+	if (ops.fmdo_topo == NULL)
+		ops.fmdo_topo = (void (*)())fmd_hdl_nop;
 
 	/*
 	 * Make two passes through the property array to initialize the formals
@@ -691,7 +697,7 @@ fmd_hdl_opendict(fmd_hdl_t *hdl, const char *dict)
 }
 
 topo_hdl_t *
-fmd_hdl_topology(fmd_hdl_t *hdl, int v)
+fmd_hdl_topo_hold(fmd_hdl_t *hdl, int v)
 {
 	fmd_module_t *mp = fmd_api_module_lock(hdl);
 	topo_hdl_t *thp;
@@ -701,10 +707,23 @@ fmd_hdl_topology(fmd_hdl_t *hdl, int v)
 		    "fmd version %d != client version %d\n", TOPO_VERSION, v);
 	}
 
-	thp = fmd_topo_handle(v);
+	thp = fmd_module_topo_hold(mp);
+	ASSERT(thp != NULL);
 
 	fmd_module_unlock(mp);
 	return (thp);
+}
+
+void
+fmd_hdl_topo_rele(fmd_hdl_t *hdl, topo_hdl_t *thp)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+
+	if (fmd_module_topo_rele(mp, thp) != 0)
+		fmd_api_error(mp, EFMD_MOD_TOPO, "failed to release invalid "
+		    "topo handle: %p\n", (void *)thp);
+
+	fmd_module_unlock(mp);
 }
 
 void *
@@ -1668,11 +1687,11 @@ fmd_nvl_create_fault(fmd_hdl_t *hdl, const char *class,
 	char *loc = NULL;
 	int err;
 
-	thp = fmd_hdl_topology(hdl, TOPO_VERSION);
-
 	mp = fmd_api_module_lock(hdl);
 	if (class == NULL || class[0] == '\0')
 		fmd_api_error(mp, EFMD_NVL_INVAL, "invalid fault class\n");
+
+	thp = fmd_module_topo_hold(mp);
 
 	/*
 	 * Try to find the location label for this resource
@@ -1681,10 +1700,13 @@ fmd_nvl_create_fault(fmd_hdl_t *hdl, const char *class,
 
 	nvl = fmd_protocol_fault(class, certainty, asru, fru, rsrc, loc);
 
-	fmd_module_unlock(mp);
-
 	if (loc != NULL)
 		topo_hdl_strfree(thp, loc);
+
+	err = fmd_module_topo_rele(mp, thp);
+	ASSERT(err == 0);
+
+	fmd_module_unlock(mp);
 
 	return (nvl);
 }
@@ -1832,6 +1854,13 @@ fmd_event_local(fmd_hdl_t *hdl, fmd_event_t *ep)
 	}
 
 	return (((fmd_event_impl_t *)ep)->ev_flags & FMD_EVF_LOCAL);
+}
+
+/*ARGSUSED*/
+uint64_t
+fmd_event_ena_create(fmd_hdl_t *hdl)
+{
+	return (fmd_ena());
 }
 
 fmd_xprt_t *

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,9 @@
 #include <assert.h>
 #include <sys/dkio.h>
 #include <pthread.h>
+#include <fm/libdiskstatus.h>
+#include <sys/fm/io/scsi.h>
+#include <devid.h>
 
 #include "sata.h"
 #include "sfx4500_props.h"
@@ -62,6 +65,18 @@
 #define	MAX_ACTION_RULES		10
 
 #define	MAX_MACHNAMELEN			256
+
+/*
+ * Given a /devices path for a whole disk, appending this extension gives the
+ * path to a raw device that can be opened.
+ */
+#if defined(__i386) || defined(__amd64)
+#define	PHYS_EXTN	":q,raw"
+#elif defined(__sparc) || defined(__sparcv9)
+#define	PHYS_EXTN	":c,raw"
+#else
+#error	Unknown architecture
+#endif
 
 struct sata_machine_specific_properties *machprops[] = {
 	&SFX4500_machprops, NULL
@@ -86,13 +101,12 @@ static tnode_t *node_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
     char *label, cfga_list_data_t *, int *err);
 static char *trimdup(const char *s, int *slen, topo_mod_t *mod);
 static boolean_t get_machine_name(char **name, int *namelen, topo_mod_t *mod);
-static int make_legacyhc_fmri(topo_mod_t *mod, const char *str,
-    nvlist_t **fmri);
 static int sata_minorname_to_ap(char *minorname, char **ap, int *apbuflen,
     cfga_list_data_t **list_array, topo_mod_t *mod);
 static sata_dev_prop_t *lookup_sdp_by_minor(char *minorpath);
 static boolean_t find_physical_disk_node(char *physpath, int pathbuflen,
     int portnum, topo_mod_t *mod);
+static char *devpath_to_devid(char *devpath);
 static int sata_maximum_port(char *dpath, topo_mod_t *mod);
 static void sata_add_port_props(tnode_t *cnode, sata_dev_prop_t *sdp, int *err);
 static void sata_port_add_private_props(tnode_t *cnode, char *minorpath,
@@ -100,34 +114,32 @@ static void sata_port_add_private_props(tnode_t *cnode, char *minorpath,
 static void sata_info_to_fru(char *info, char **model, int *modlen,
     char **manuf, int *manulen, char **serial, int *serlen, char **firm,
     int *firmlen, topo_mod_t *mod);
-static void sata_add_disk_props(tnode_t *cnode, int portnum,
+static void sata_add_disk_props(tnode_t *cnode, const char *physpath,
     cfga_list_data_t *cfgap, int *err, topo_mod_t *mod);
 static boolean_t is_sata_controller(char *dpath);
-static int sata_disks_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *pasru,
-    const char *name, int portnum, cfga_list_data_t *cfglist, int ndisks,
-    int *err);
+static int sata_disks_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
+    int portnum, cfga_list_data_t *cfglist, int ndisks, int *err);
 static int sata_port_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
     topo_instance_t min, topo_instance_t max);
 static int sata_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
     topo_instance_t min, topo_instance_t max, void *notused1, void *notused2);
-static int sata_present(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
+static int sata_disk_status(topo_mod_t *, tnode_t *, topo_version_t, nvlist_t *,
     nvlist_t **);
 static void sata_release(topo_mod_t *mod, tnode_t *nodep);
 
 /*
- * The topo method is bound to the sata-port nodes because we want
- * the hc scheme's lookup to find the method and execute it.  If it
- * were bound to the disk nodes, and if a disk were not inserted,
- * the present method would never execute, and the hc scheme plugin
- * would return PRESENT (because other hc-schemed FMRIs do not implement
- * a presence method, and in those cases, the correct default is to
- * assert presence).
+ * Methods for SATA disks.  This is used by the disk-transport module to
+ * generate ereports based off SCSI disk status.  Unlike the present method,
+ * this can only function when we have a /devices path (i.e. the disk is
+ * configured) and so must be a function of the disk itself.
  */
-static const topo_method_t SATA_METHODS[] = {
-	{ TOPO_METH_PRESENT, TOPO_METH_PRESENT_DESC, TOPO_METH_PRESENT_VERSION,
-	    TOPO_STABILITY_INTERNAL, sata_present },
+static const topo_method_t sata_disk_methods[] = {
+	{ TOPO_METH_DISK_STATUS, TOPO_METH_DISK_STATUS_DESC,
+	    TOPO_METH_DISK_STATUS_VERSION, TOPO_STABILITY_INTERNAL,
+	    sata_disk_status },
 	{ NULL }
 };
+
 /*
  * Since the global data is only initialized ONCE in _topo_init
  * and multiple threads that use libtopo can cause _topo_init to
@@ -156,10 +168,7 @@ static const topo_modinfo_t sata_info =
 static void
 sata_release(topo_mod_t *mod, tnode_t *nodep)
 {
-	/* Only need to unregister methods for the sata port nodes */
-	if (strcmp(topo_node_name(nodep), SATA_PORT) == 0)
-		topo_method_unregister_all(mod, nodep);
-
+	topo_method_unregister_all(mod, nodep);
 	topo_node_unbind(nodep);
 }
 
@@ -373,17 +382,6 @@ _topo_fini(topo_mod_t *mod)
 }
 
 static int
-make_legacyhc_fmri(topo_mod_t *mod, const char *str, nvlist_t **fmri)
-{
-	char buf[PATH_MAX];
-
-	(void) snprintf(buf, PATH_MAX, "hc:///component=%s", str);
-
-	return (topo_mod_str2nvl(mod, buf, fmri));
-}
-
-
-static int
 config_list_ext_poll(int num, char * const *path,
     cfga_list_data_t **list_array, int *nlist)
 {
@@ -426,113 +424,6 @@ config_list_ext_poll(int num, char * const *path,
 	} while (!done && !timedout && !interrupted);
 
 	return (e);
-}
-
-static boolean_t
-sata_serial_match(topo_mod_t *mod, char *sn, char *ap_lname, char *info)
-{
-	char *p, *apsn;
-	boolean_t rv = B_FALSE;
-	int buflen;
-
-	/* Some cfgadm plugins provide serial number information (e.g. sata) */
-	if (strncmp(ap_lname, "sata", 4) == 0 && isdigit(ap_lname[4])) {
-		/* The sata plugin provides the serial number after "SN: " */
-		if ((p = strstr(info, "SN: ")) != NULL) {
-
-			p += 4 /* strlen("SN: ") */;
-
-			/*
-			 * Terminate the string at any spaces (the serial
-			 * number is a string with no spaces)
-			 */
-			buflen = strlen(p) + 1;
-			apsn = topo_mod_alloc(mod, buflen);
-			(void) strcpy(apsn, p);
-			if ((p = strpbrk(apsn, " \t")) != NULL)
-				*p = 0;
-
-			rv = (strcasecmp(apsn, sn) == 0);
-
-			topo_mod_free(mod, apsn, buflen);
-		}
-	} else /* Unknown cfgadm plugin ap type -- assume sn matches */
-	    rv = B_TRUE;
-
-	return (rv);
-}
-
-/*ARGSUSED*/
-static int
-sata_present(topo_mod_t *mod, tnode_t *nodep, topo_version_t vers,
-    nvlist_t *nvl, nvlist_t **out_nvl)
-{
-	nvlist_t	**hcprs = NULL;
-	uint8_t		version;
-	char		*nm = NULL;
-	char		*id = NULL;
-	uint_t		hcnprs;
-	int		err;
-	cfga_list_data_t *list_array = NULL;
-	int		nlist;
-	char		*ap_path[1];
-	int		present = 1;
-	char		*sn;
-
-	/*
-	 * If this FMRI is a legacy hc FMRI with a component
-	 * looking like an attachment point, use libcfgadm to
-	 * detect its state:
-	 */
-
-	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
-	    version > FM_HC_SCHEME_VERSION) {
-
-		return (topo_mod_seterrno(mod, EINVAL));
-	}
-
-	err = nvlist_lookup_nvlist_array(nvl, FM_FMRI_HC_LIST, &hcprs, &hcnprs);
-	if (err != 0 || hcprs == NULL) {
-
-		return (topo_mod_seterrno(mod, EINVAL));
-	}
-
-	(void) nvlist_lookup_string(hcprs[0], FM_FMRI_HC_NAME, &nm);
-	(void) nvlist_lookup_string(hcprs[0], FM_FMRI_HC_ID, &id);
-	/* The hc-list must have 1 entry and that entry must be a component */
-	if (hcnprs == 1 && nm != NULL && id != NULL &&
-	    strcmp(nm, FM_FMRI_LEGACY_HC) == 0 && strchr(id, '/') != NULL) {
-		ap_path[0] = id;
-
-		if (config_list_ext_poll(1, ap_path, &list_array, &nlist)
-		    == CFGA_OK) {
-
-			if (nvlist_lookup_string(nvl, FM_FMRI_HC_SERIAL_ID, &sn)
-			    != 0)
-				sn = NULL;
-
-			/*
-			 * If a serial number is included in the FMRI, use it
-			 * to verify presence
-			 */
-			present = (list_array[0].ap_r_state
-			    == CFGA_STAT_CONNECTED && (sn == NULL ||
-			    (sn != NULL &&
-			    sata_serial_match(mod, sn, list_array[0].ap_log_id,
-			    list_array[0].ap_info))));
-
-			free(list_array);
-		}
-	}
-
-	if (topo_mod_nvalloc(mod, out_nvl, NV_UNIQUE_NAME) != 0)
-		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
-	if (nvlist_add_uint32(*out_nvl, TOPO_METH_PRESENT_RET, present) != 0) {
-		nvlist_free(*out_nvl);
-		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
-	}
-
-	return (0);
 }
 
 /*
@@ -633,6 +524,27 @@ find_physical_disk_node(char *physpath, int pathbuflen, int portnum,
 	topo_mod_free(mod, dent, dentlen);
 	closedir(dp);
 	return (found);
+}
+
+static char *
+devpath_to_devid(char *devpath)
+{
+	di_node_t node;
+	ddi_devid_t devid;
+	char *devidstr = NULL;
+
+	if ((node = di_init(devpath, DINFOCPYONE)) == DI_NODE_NIL)
+		return (NULL);
+
+	if ((devid = di_devid(node)) == NULL) {
+		di_fini(node);
+		return (NULL);
+	}
+
+	devidstr = devid_str_encode(devid, NULL);
+	di_fini(node);
+
+	return (devidstr);
 }
 
 static int
@@ -837,38 +749,24 @@ sata_info_to_fru(char *info, char **model, int *modlen, char **manuf,
 }
 
 static void
-sata_add_disk_props(tnode_t *cnode, int portnum, cfga_list_data_t *cfgap,
-    int *err, topo_mod_t *mod)
+sata_add_disk_props(tnode_t *cnode, const char *physpath,
+    cfga_list_data_t *cfgap, int *err, topo_mod_t *mod)
 {
-	char physpath[PATH_MAX];
 	char *ldev, *p;
 	char *model = NULL, *manuf = NULL, *serial = NULL, *firm = NULL;
-	boolean_t physpath_found = B_FALSE;
 	int manuf_len, model_len, serial_len, firm_len;
 
-	/*
-	 * The physical path to the drive can be derived by
-	 * taking the attachment point physical path, chopping off the
-	 * minor portion, and looking for the target node of the form
-	 * <nodename>@<X>,0 (where <X> is the port number)
-	 */
-	strncpy(physpath, cfgap->ap_phys_id, PATH_MAX);
+	(void) topo_pgroup_create(cnode, &storage_pgroup, err);
 
-	/* The AP phys path MUST have a colon: */
-	*strchr(physpath, ':') = 0;
-
-	if (find_physical_disk_node(physpath, PATH_MAX, portnum, mod)) {
-
-		(void) topo_pgroup_create(cnode, &io_pgroup, err);
+	if (physpath) {
+		(void) topo_pgroup_create(cnode, &io_pgroup,
+		    err);
 
 		(void) topo_prop_set_string(cnode, TOPO_PGROUP_IO,
 		    TOPO_IO_DEV_PATH, TOPO_PROP_IMMUTABLE,
 		    physpath + 8 /* strlen("/devices") */,
 		    err);
-		physpath_found = B_TRUE;
 	}
-
-	(void) topo_pgroup_create(cnode, &storage_pgroup, err);
 
 	if ((ldev = strstr(cfgap->ap_log_id, "::")) != NULL) {
 		ldev += 2 /* strlen("::") */;
@@ -903,22 +801,21 @@ sata_add_disk_props(tnode_t *cnode, int portnum, cfga_list_data_t *cfgap,
 		topo_mod_free(mod, firm, firm_len);
 	}
 
-#if defined(__i386) || defined(__amd64)
 	/*
 	 * Try to get the disk capacity and store it in a property if the
 	 * device is accessible
 	 */
-	if (physpath_found) {
+	if (physpath) {
 		int fd;
 		struct dk_minfo dkmi;
 		uint64_t capacity = 0;
 		char capstr[32];
-		/*
-		 * On x86, for disk target drivers, `:q,raw' means "access the
-		 * character device that corresponds to the whole disk".
-		 */
-		strncat(physpath, ":q,raw", PATH_MAX);
-		if ((fd = open(physpath, O_RDONLY)) >= 0) {
+		char buf[PATH_MAX];
+
+		(void) snprintf(buf, sizeof (buf), "%s%s", physpath,
+		    PHYS_EXTN);
+
+		if ((fd = open(buf, O_RDONLY)) >= 0) {
 			if (ioctl(fd, DKIOCGMEDIAINFO, &dkmi) == 0) {
 				capacity = dkmi.dki_capacity *
 				    (uint64_t)dkmi.dki_lbsize;
@@ -933,7 +830,6 @@ sata_add_disk_props(tnode_t *cnode, int portnum, cfga_list_data_t *cfgap,
 			    err);
 		}
 	}
-#endif
 }
 
 static boolean_t
@@ -957,14 +853,17 @@ is_sata_controller(char *dpath)
 }
 
 static int
-sata_disks_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *pasru,
-    const char *name, int portnum, cfga_list_data_t *cfglist,
-    int ndisks, int *err)
+sata_disks_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
+    int portnum, cfga_list_data_t *cfglist, int ndisks, int *err)
 {
 	tnode_t *cnode;
 	sata_dev_prop_t *sdp;
 	nvlist_t *fru = NULL;
 	int i, nerrs = 0;
+	char physpath_buf[PATH_MAX];
+	char *physpath, *devpath;
+	char *devid;
+	nvlist_t *asru;
 
 	if (topo_node_range_create(mod, pnode, name, 0, ndisks - 1) < 0) {
 		topo_mod_dprintf(mod, "Unable to create "
@@ -981,33 +880,57 @@ sata_disks_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *pasru,
 		    (cfglist[i].ap_o_state == CFGA_STAT_CONFIGURED ||
 		    cfglist[i].ap_o_state == CFGA_STAT_UNCONFIGURED)) {
 
-			if ((sdp = lookup_sdp_by_minor(cfglist[i].ap_phys_id))
-			    != NULL) {
-				if (make_legacyhc_fmri(mod, sdp->label, &fru)
-				    != 0) {
-					topo_mod_dprintf(mod, "Error creating "
-					    "FRU while creating " SATA_DISK
-					    " nodes: %s\n",
-					    topo_mod_errmsg(mod));
-				}
-			}
+			sdp = lookup_sdp_by_minor(cfglist[i].ap_phys_id);
 
 			/*
-			 * If this disk is one which we're decorating with
-			 * machine-specific properties, set the FRU to
-			 * a legacy-hc FMRI with the label as the component,
-			 * the ASRU as the parent's ASRU (the ASRU of the
-			 * sata port, e.g. the attachment point);  otherwise,
-			 * use the node's FMRI as its FRU (fru will be NULL
-			 * in that case, causing node_create to use the FMRI).
+			 * The physical path to the drive can be derived by
+			 * taking the attachment point physical path, chopping
+			 * off the minor portion, and looking for the target
+			 * node of the form <nodename>@<X>,0 (where <X> is the
+			 * port number)
 			 */
+			strncpy(physpath_buf, cfglist[i].ap_phys_id, PATH_MAX);
+
+			/* The AP phys path MUST have a colon: */
+			*strchr(physpath_buf, ':') = 0;
+
+			/*
+			 * Create the ASRU.  If the device is attached to the
+			 * system but unconfigured, then it will have no
+			 * associated ASRU.
+			 */
+			if (find_physical_disk_node(physpath_buf, PATH_MAX,
+			    portnum, mod)) {
+				physpath = physpath_buf;
+				devpath = physpath_buf +
+				    sizeof ("/devices") - 1;
+				/*
+				 * Given the /devices path, attempt to find an
+				 * associated devid.
+				 */
+				devid = devpath_to_devid(devpath);
+				asru = topo_mod_devfmri(mod,
+				    FM_DEV_SCHEME_VERSION, devpath, devid);
+				devid_str_free(devid);
+			} else {
+				physpath = NULL;
+				asru = NULL;
+			}
+
 			if ((cnode = node_create(mod, pnode, name, i,
-			    B_TRUE, fru, pasru, sdp ? (char *)sdp->label : NULL,
+			    B_TRUE, fru, asru, sdp ? (char *)sdp->label : NULL,
 			    &cfglist[i], err)) != NULL) {
 
-				sata_add_disk_props(cnode, portnum, &cfglist[i],
-				    err, mod);
+				sata_add_disk_props(cnode, physpath,
+				    &cfglist[i], err, mod);
 
+				if (topo_method_register(mod, cnode,
+				    sata_disk_methods) < 0) {
+					topo_mod_dprintf(mod,
+					    "topo_method_register failed: %s\n",
+					    topo_strerror(topo_mod_errno(mod)));
+					++nerrs;
+				}
 			} else {
 				topo_mod_dprintf(mod, "Error creating disk "
 				    "node for port %d: %s\n", portnum,
@@ -1015,8 +938,8 @@ sata_disks_create(topo_mod_t *mod, tnode_t *pnode, nvlist_t *pasru,
 				++nerrs;
 			}
 
-			if (fru)
-				nvlist_free(fru);
+			nvlist_free(fru);
+			nvlist_free(asru);
 		}
 	}
 
@@ -1032,7 +955,7 @@ static int
 sata_port_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
     topo_instance_t min, topo_instance_t max)
 {
-	nvlist_t *asru, *fru;
+	nvlist_t *asru;
 	tnode_t *cnode;
 	int err = 0, nerr = 0;
 	int i;
@@ -1066,15 +989,6 @@ sata_port_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		return (-1);
 	}
 
-	/* Create the FRU - a legacy component FMRI */
-	if (make_legacyhc_fmri(mod, "motherboard", &fru) != 0) {
-		topo_mod_dprintf(mod, "Unable to create legacy FRU FMRI for "
-		    "node " SATA_PORT ": %s\n",
-		    topo_strerror(err));
-		topo_mod_free(mod, dpath, dpathlen);
-		return (-1);
-	}
-
 	for (i = min; i <= max; i++) {
 
 		/* The minor node name = "/devices" + dpath + ":" + i */
@@ -1088,8 +1002,9 @@ sata_port_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 			continue;
 		}
 
-		/* Create the ASRU - a legacy component FMRI */
-		if (make_legacyhc_fmri(mod, ap, &asru) != 0) {
+		/* Create the ASRU - a dev:// FMRI */
+		if ((asru = topo_mod_devfmri(mod, FM_DEV_SCHEME_VERSION,
+		    dpath, NULL)) == NULL) {
 			free(cfglist);
 			topo_mod_free(mod, ap, apbuflen);
 			topo_mod_dprintf(mod, "failed to make ASRU FMRI: "
@@ -1099,12 +1014,10 @@ sata_port_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		}
 
 		/*
-		 * The ASRU is a legacy-hc component FMRI with the
-		 * component being the attachment point
-		 * The FRU is a legacy-hc component FMRI with the
-		 * component being "MB".
+		 * The ASRU is the devices path
+		 * The FRU is a the component FRMI
 		 */
-		if ((cnode = node_create(mod, pnode, name, i, B_TRUE, fru,
+		if ((cnode = node_create(mod, pnode, name, i, B_TRUE, NULL,
 		    asru, ap, NULL, &err)) == NULL) {
 			nvlist_free(asru);
 			free(cfglist);
@@ -1115,24 +1028,13 @@ sata_port_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 			continue;
 		}
 
-		if (topo_method_register(mod, cnode, SATA_METHODS) < 0) {
-			topo_mod_dprintf(mod, "topo_method_register failed: "
-			    "%s\n", topo_strerror(topo_mod_errno(mod)));
-			topo_node_unbind(cnode);
-			nvlist_free(asru);
-			free(cfglist);
-			topo_mod_free(mod, ap, apbuflen);
-			++nerr;
-			continue;
-		}
-
 		topo_mod_free(mod, ap, apbuflen);
 
 		/* For now, ignore errors from private property creation */
 		sata_port_add_private_props(cnode, minorname, &err);
 
 		/* Create the disk node(s) under this sata-port: */
-		if (sata_disks_create(mod, cnode, asru, SATA_DISK, i, cfglist,
+		if (sata_disks_create(mod, cnode, SATA_DISK, i, cfglist,
 		    1 /* one disk for now */, &err) != 0) {
 			topo_mod_dprintf(mod, "Error while creating " SATA_DISK
 			    " node(s): %s\n", topo_strerror(err));
@@ -1144,7 +1046,6 @@ sata_port_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		nvlist_free(asru);
 	}
 
-	nvlist_free(fru);
 	topo_mod_free(mod, dpath, dpathlen);
 
 	if (nerr != 0) {
@@ -1162,5 +1063,93 @@ sata_enum(topo_mod_t *mod, tnode_t *pnode, const char *name,
 	if (strcmp(name, SATA_PORT) == 0)
 		return (sata_port_create(mod, pnode, name, min, max));
 
+	return (0);
+}
+
+/*
+ * Query the current disk status.  If successful, the disk status is returned as
+ * an nvlist consisting of at least the following members:
+ *
+ *	protocol	string		Supported protocol (currently "scsi")
+ *
+ *	status		nvlist		Arbitrary protocol-specific information
+ *					about the current state of the disk.
+ *
+ *	faults		nvlist		A list of supported faults.  Each
+ *					element of this list is a boolean value.
+ *					An element's existence indicates that
+ *					the drive supports detecting this fault,
+ *					and the value indicates the current
+ *					state of the fault.
+ *
+ *	<fault-name>	nvlist		For each fault named in 'faults', a
+ *					nvlist describing protocol-specific
+ *					attributes of the fault.
+ *
+ * This method relies on the libdiskstatus library to query this information.
+ */
+static int
+sata_disk_status(topo_mod_t *mod, tnode_t *nodep, topo_version_t vers,
+    nvlist_t *in_nvl, nvlist_t **out_nvl)
+{
+	disk_status_t *dsp;
+	char *devpath, *fullpath;
+	size_t pathlen;
+	int err;
+	nvlist_t *status;
+	*out_nvl = NULL;
+
+	if (vers != TOPO_METH_DISK_STATUS_VERSION)
+		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
+
+	/*
+	 * If the caller specifies the "path" parameter, then this indicates
+	 * that we should use this instead of deriving it from the topo node
+	 * itself.
+	 */
+	if (nvlist_lookup_string(in_nvl, "path", &fullpath) == 0) {
+		devpath = NULL;
+	} else {
+		/*
+		 * Get the /devices path and attempt to open the disk status
+		 * handle.
+		 */
+		if (topo_prop_get_string(nodep, TOPO_PGROUP_IO,
+		    TOPO_IO_DEV_PATH, &devpath, &err) != 0)
+			return (topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP));
+
+		/*
+		 * Note that sizeof(string) includes the terminating NULL byte
+		 */
+		pathlen = strlen(devpath) + sizeof ("/devices") +
+		    sizeof (PHYS_EXTN) - 1;
+
+		if ((fullpath = topo_mod_alloc(mod, pathlen)) == NULL)
+			return (topo_mod_seterrno(mod, EMOD_NOMEM));
+
+		(void) snprintf(fullpath, pathlen, "/devices%s%s", devpath,
+		    PHYS_EXTN);
+
+		topo_mod_strfree(mod, devpath);
+	}
+
+	if ((dsp = disk_status_open(fullpath, &err)) == NULL) {
+		topo_mod_free(mod, fullpath, pathlen);
+		return (topo_mod_seterrno(mod, err == EDS_NOMEM ?
+		    EMOD_NOMEM : EMOD_METHOD_NOTSUP));
+	}
+
+	if (devpath)
+		topo_mod_free(mod, fullpath, pathlen);
+
+	if ((status = disk_status_get(dsp)) == NULL) {
+		err = (disk_status_errno(dsp) == EDS_NOMEM ?
+		    EMOD_NOMEM : EMOD_METHOD_NOTSUP);
+		disk_status_close(dsp);
+		return (topo_mod_seterrno(mod, err));
+	}
+
+	*out_nvl = status;
+	disk_status_close(dsp);
 	return (0);
 }

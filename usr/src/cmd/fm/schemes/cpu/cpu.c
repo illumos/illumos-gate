@@ -172,6 +172,7 @@ fmd_fmri_expand(nvlist_t *nvl)
 	uint64_t serialid;
 	char *serstr, serbuf[21]; /* sizeof (UINT64_MAX) + '\0' */
 	int rc, err;
+	topo_hdl_t *thp;
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
 	    nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID, &cpuid) != 0)
@@ -180,7 +181,11 @@ fmd_fmri_expand(nvlist_t *nvl)
 	/*
 	 * If the cpu-scheme topology exports this method expand(), invoke it.
 	 */
-	rc = topo_fmri_expand(fmd_fmri_topology(TOPO_VERSION), nvl, &err);
+	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL)
+		return (fmd_fmri_set_errno(EINVAL));
+
+	rc = topo_fmri_expand(thp, nvl, &err);
+	fmd_fmri_topo_rele(thp);
 	if (err != ETOPO_METHOD_NOTSUP)
 		return (rc);
 
@@ -225,6 +230,7 @@ fmd_fmri_present(nvlist_t *nvl)
 	uint32_t cpuid;
 	uint64_t nvlserid, curserid;
 	char *nvlserstr, curserbuf[21]; /* sizeof (UINT64_MAX) + '\0' */
+	topo_hdl_t *thp;
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
 	    nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID, &cpuid) != 0)
@@ -233,7 +239,10 @@ fmd_fmri_present(nvlist_t *nvl)
 	/*
 	 * If the cpu-scheme topology exports this method present(), invoke it.
 	 */
-	rc = topo_fmri_present(fmd_fmri_topology(TOPO_VERSION), nvl, &err);
+	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL)
+		return (fmd_fmri_set_errno(EINVAL));
+	rc = topo_fmri_present(thp, nvl, &err);
+	fmd_fmri_topo_rele(thp);
 	if (err != ETOPO_METHOD_NOTSUP)
 		return (rc);
 
@@ -272,6 +281,7 @@ fmd_fmri_unusable(nvlist_t *nvl)
 	int rc, err;
 	uint8_t version;
 	uint32_t cpuid;
+	topo_hdl_t *thp;
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
 	    version > FM_CPU_SCHEME_VERSION ||
@@ -281,7 +291,10 @@ fmd_fmri_unusable(nvlist_t *nvl)
 	/*
 	 * If the cpu-scheme topology exports this method unusable(), invoke it.
 	 */
-	rc = topo_fmri_unusable(fmd_fmri_topology(TOPO_VERSION), nvl, &err);
+	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL)
+		return (fmd_fmri_set_errno(EINVAL));
+	rc = topo_fmri_unusable(thp, nvl, &err);
+	fmd_fmri_topo_rele(thp);
 	if (err != ETOPO_METHOD_NOTSUP)
 		return (rc);
 

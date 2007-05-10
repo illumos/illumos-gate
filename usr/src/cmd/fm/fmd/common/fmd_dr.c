@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,13 +40,21 @@
  * avoids the complexity of direct participation in DR, avoids the need for
  * resource-specific processing of DR events, and is relatively easy to port
  * to other systems that support dynamic reconfiguration.
+ *
+ * The dr generation is only incremented in response to hardware changes.  Since
+ * ASRUs can be in any scheme, including the device scheme, we must also be
+ * aware of software configuration changes which may affect the resource cache.
+ * In addition, we take a snapshot of the topology whenever a reconfiguration
+ * event occurs and notify any modules of the change.
  */
 
 #include <sys/types.h>
+#include <sys/sunddi.h>
 #include <sys/sysevent/dr.h>
 #include <sys/sysevent/eventdefs.h>
 
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <libsysevent.h>
 
@@ -56,59 +64,76 @@
 
 #include <fmd_asru.h>
 #include <fmd_error.h>
+#include <fmd_event.h>
 #include <fmd_fmri.h>
+#include <fmd_module.h>
 #include <fmd_subr.h>
+#include <fmd_topo.h>
 #include <fmd.h>
-
-static void
-fmd_dr_repair_containee(fmd_asru_t *ee, void *er)
-{
-	if ((ee->asru_flags & FMD_ASRU_FAULTY) &&
-	    fmd_fmri_contains(er, ee->asru_fmri) > 0)
-		(void) fmd_asru_clrflags(ee, FMD_ASRU_FAULTY, NULL, NULL);
-}
-
-/*ARGSUSED*/
-static void
-fmd_dr_rcache_sync(fmd_asru_t *ap, void *arg)
-{
-	if (fmd_fmri_present(ap->asru_fmri) != 0)
-		return;
-
-	if (!fmd_asru_clrflags(ap, FMD_ASRU_FAULTY, NULL, NULL))
-		return;
-
-	/*
-	 * We've located the requested ASRU, and have repaired it.  Now
-	 * traverse the ASRU cache, looking for any faulty entries that
-	 * are contained by this one.  If we find any, repair them too.
-	 */
-	fmd_asru_hash_apply(fmd.d_asrus, fmd_dr_repair_containee,
-	    ap->asru_fmri);
-}
 
 static void
 fmd_dr_event(sysevent_t *sep)
 {
 	uint64_t gen;
+	fmd_event_t *e;
+	const char *class = sysevent_get_class_name(sep);
+	hrtime_t evtime;
+	fmd_topo_t *ftp, *prev;
+	boolean_t update_topo = B_FALSE;
 
 	/*
-	 * If the event target is in the R$ and this sysevent indicates it was
-	 * removed, remove it from the R$ also.
+	 * The dr generation is only changed in response to DR events.
 	 */
-	(void) fmd_asru_hash_apply(fmd.d_asrus, fmd_dr_rcache_sync, NULL);
+	if (strcmp(class, EC_DR) == 0) {
+		update_topo = B_TRUE;
 
-	(void) pthread_mutex_lock(&fmd.d_stats_lock);
-	gen = fmd.d_stats->ds_dr_gen.fmds_value.ui64++;
-	(void) pthread_mutex_unlock(&fmd.d_stats_lock);
+		(void) pthread_mutex_lock(&fmd.d_stats_lock);
+		gen = fmd.d_stats->ds_dr_gen.fmds_value.ui64++;
+		(void) pthread_mutex_unlock(&fmd.d_stats_lock);
 
-	TRACE((FMD_DBG_XPRT, "dr event %p, gen=%llu", (void *)sep, gen));
+		TRACE((FMD_DBG_XPRT, "dr event %p, gen=%llu",
+		    (void *)sep, gen));
+	}
+
+	/*
+	 * Take a topo snapshot and notify modules of the change.  Picking an
+	 * accurate time here is difficult.  On one hand, we have the timestamp
+	 * of the underlying sysevent, indicating when the reconfiguration event
+	 * occurred.  On the other hand, we are taking the topo snapshot
+	 * asynchronously, and hence the timestamp of the snapshot is the
+	 * current time.  Pretending this topo snapshot was valid at the time
+	 * the sysevent was posted seems wrong, so we instead opt for the
+	 * current time as an upper bound on the snapshot validity.
+	 *
+	 * Along these lines, we keep track of the last time we dispatched a
+	 * topo snapshot.  If the sysevent occurred before the last topo
+	 * snapshot, then don't bother dispatching another topo change event.
+	 * We've already indicated (to the best of our ability) the change in
+	 * topology.  This prevents endless topo snapshots in response to a
+	 * flurry of sysevents.
+	 */
+	sysevent_get_time(sep, &evtime);
+	prev = fmd_topo_hold();
+	if (evtime <= prev->ft_time &&
+	    fmd.d_clockops == &fmd_timeops_native) {
+		fmd_topo_rele(prev);
+		return;
+	}
+	fmd_topo_rele(prev);
+
+	if (update_topo)
+		fmd_topo_update();
+
+	ftp = fmd_topo_hold();
+	e = fmd_event_create(FMD_EVT_TOPO, ftp->ft_time, NULL, ftp);
+	fmd_modhash_dispatch(fmd.d_mod_hash, e);
 }
 
 void
 fmd_dr_init(void)
 {
-	const char *subclass = ESC_DR_AP_STATE_CHANGE;
+	const char *drsubclass = ESC_DR_AP_STATE_CHANGE;
+	const char *devsubclass = EC_SUB_ALL;
 
 	if (geteuid() != 0)
 		return; /* legacy sysevent mechanism is still root-only */
@@ -116,8 +141,12 @@ fmd_dr_init(void)
 	if ((fmd.d_dr_hdl = sysevent_bind_handle(fmd_dr_event)) == NULL)
 		fmd_error(EFMD_EXIT, "failed to bind handle for DR sysevent");
 
-	if (sysevent_subscribe_event(fmd.d_dr_hdl, EC_DR, &subclass, 1) == -1)
-		fmd_error(EFMD_EXIT, "failed to subscribe for DR sysevent");
+	if (sysevent_subscribe_event(fmd.d_dr_hdl, EC_DR, &drsubclass, 1) == -1)
+		fmd_error(EFMD_EXIT, "failed to subscribe to DR sysevent");
+
+	if (sysevent_subscribe_event(fmd.d_dr_hdl, EC_DEVFS,
+	    &devsubclass, 1) == -1)
+		fmd_error(EFMD_EXIT, "failed to subscribe to devfs sysevent");
 }
 
 void

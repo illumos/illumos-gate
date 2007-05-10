@@ -102,37 +102,6 @@ set_open_errno(topo_hdl_t *thp, int *errp, int err)
 	return (NULL);
 }
 
-static char *
-smbios_fix(topo_hdl_t *thp, char *begin)
-{
-	char buf[MAXNAMELEN];
-	size_t count;
-	char *str, *end, *pp;
-
-	end = begin + strlen(begin);
-
-	while (begin < end && isspace(*begin))
-		begin++;
-	while (begin < end && isspace(*(end - 1)))
-		end--;
-
-	if (begin >= end)
-		return (NULL);
-
-	count = end - begin;
-	count += 1;
-
-	if (count > sizeof (buf))
-		return (NULL);
-
-	(void) snprintf(buf, count, "%s", begin);
-	while ((str = strchr(buf, ' ')) != NULL)
-		*str = '-';
-
-	pp = topo_hdl_strdup(thp, buf);
-	return (pp);
-}
-
 topo_hdl_t *
 topo_open(int version, const char *rootdir, int *errp)
 {
@@ -218,7 +187,7 @@ topo_open(int version, const char *rootdir, int *errp)
 
 			if (strcmp(s2.smbi_product, SMB_DEFAULT1) != 0 &&
 			    strcmp(s2.smbi_product, SMB_DEFAULT2) != 0) {
-				thp->th_product = smbios_fix(thp,
+				thp->th_product = topo_cleanup_auth_str(thp,
 				    (char *)s2.smbi_product);
 			}
 		}

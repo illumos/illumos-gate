@@ -36,6 +36,7 @@ i386_SUBDIRS =
 
 SUBDIRS = \
 	libdiagcode \
+	libdiskstatus \
 	libfmd_adm \
 	libfmd_log \
 	libfmd_msg \

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +49,7 @@
 #include <fmd_buf.h>
 #include <fmd_ckpt.h>
 #include <fmd_xprt.h>
+#include <fmd_topo.h>
 
 #include <fmd.h>
 
@@ -208,6 +208,8 @@ fmd_module_create(const char *path, const fmd_modops_t *ops)
 	fmd_buf_hash_create(&mp->mod_bufs);
 	fmd_serd_hash_create(&mp->mod_serds);
 
+	mp->mod_topo_current = fmd_topo_hold();
+
 	(void) pthread_mutex_lock(&fmd.d_mod_lock);
 	fmd_list_append(&fmd.d_mod_list, mp);
 	(void) pthread_mutex_unlock(&fmd.d_mod_lock);
@@ -337,6 +339,8 @@ fmd_module_untimeout(fmd_idspace_t *ids, id_t id, fmd_module_t *mp)
 void
 fmd_module_unload(fmd_module_t *mp)
 {
+	fmd_modtopo_t *mtp;
+
 	(void) pthread_mutex_lock(&mp->mod_lock);
 
 	if (mp->mod_flags & FMD_MOD_QUIT) {
@@ -386,6 +390,12 @@ fmd_module_unload(fmd_module_t *mp)
 	(void) fmd_buf_hash_destroy(&mp->mod_bufs);
 	fmd_serd_hash_destroy(&mp->mod_serds);
 
+	while ((mtp = fmd_list_next(&mp->mod_topolist)) != NULL) {
+		fmd_list_delete(&mp->mod_topolist, mtp);
+		fmd_topo_rele(mtp->mt_topo);
+		fmd_free(mtp, sizeof (fmd_modtopo_t));
+	}
+
 	fmd_module_unlock(mp);
 	fmd_dprintf(FMD_DBG_MOD, "unloaded module %s\n", mp->mod_name);
 }
@@ -415,6 +425,9 @@ fmd_module_destroy(fmd_module_t *mp)
 	(void) pthread_mutex_lock(&fmd.d_mod_lock);
 	fmd_list_delete(&fmd.d_mod_list, mp);
 	(void) pthread_mutex_unlock(&fmd.d_mod_lock);
+
+	if (mp->mod_topo_current != NULL)
+		fmd_topo_rele(mp->mod_topo_current);
 
 	/*
 	 * Once the module is no longer processing events and no longer visible
@@ -547,6 +560,12 @@ fmd_module_dispatch(fmd_module_t *mp, fmd_event_t *e)
 			break;
 		case FMD_EVT_PUBLISH:
 			fmd_case_publish(ep->ev_data, FMD_CASE_CURRENT);
+			break;
+		case FMD_EVT_TOPO:
+			fmd_topo_rele(mp->mod_topo_current);
+			mp->mod_topo_current = (fmd_topo_t *)ep->ev_data;
+			fmd_topo_addref(mp->mod_topo_current);
+			ops->fmdo_topo(hdl, mp->mod_topo_current->ft_hdl);
 			break;
 		}
 	}
@@ -1310,4 +1329,41 @@ fmd_modstat_snapshot(fmd_module_t *mp, fmd_ustat_snap_t *uss)
 	(void) pthread_mutex_unlock(&mp->mod_lock);
 
 	return (err);
+}
+
+struct topo_hdl *
+fmd_module_topo_hold(fmd_module_t *mp)
+{
+	fmd_modtopo_t *mtp;
+
+	ASSERT(fmd_module_locked(mp));
+
+	mtp = fmd_zalloc(sizeof (fmd_modtopo_t), FMD_SLEEP);
+	mtp->mt_topo = mp->mod_topo_current;
+	fmd_topo_addref(mtp->mt_topo);
+	fmd_list_prepend(&mp->mod_topolist, mtp);
+
+	return (mtp->mt_topo->ft_hdl);
+}
+
+int
+fmd_module_topo_rele(fmd_module_t *mp, struct topo_hdl *hdl)
+{
+	fmd_modtopo_t *mtp;
+
+	ASSERT(fmd_module_locked(mp));
+
+	for (mtp = fmd_list_next(&mp->mod_topolist); mtp != NULL;
+	    mtp = fmd_list_next(mtp)) {
+		if (mtp->mt_topo->ft_hdl == hdl)
+			break;
+	}
+
+	if (mtp == NULL)
+		return (-1);
+
+	fmd_list_delete(&mp->mod_topolist, mtp);
+	fmd_topo_rele(mtp->mt_topo);
+	fmd_free(mtp, sizeof (fmd_modtopo_t));
+	return (0);
 }

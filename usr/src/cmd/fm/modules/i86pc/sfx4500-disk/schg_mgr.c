@@ -35,10 +35,7 @@
 #include "sfx4500-disk.h"
 #include "schg_mgr.h"
 #include "hotplug_mgr.h"
-#include "fault_mgr.h"
-#include "fault_analyze.h"
 #include "topo_gather.h"
-#include "fm_disk_events.h"
 #include "dm_platform.h"
 
 /* State-change event processing thread data */
@@ -247,137 +244,6 @@ schg_update_fru_info(diskmon_t *diskp)
 	}
 }
 
-/*
- * [Lifted from fmd]
- * Create a local ENA value for fmd-generated ereports.  We use ENA Format 1
- * with the low bits of gethrtime() and pthread_self() as the processor ID.
- */
-static uint64_t
-dm_gen_ena(void)
-{
-	hrtime_t hrt = gethrtime();
-
-	return ((uint64_t)((FM_ENA_FMT1 & ENA_FORMAT_MASK) |
-	    ((pthread_self() << ENA_FMT1_CPUID_SHFT) & ENA_FMT1_CPUID_MASK) |
-	    ((hrt << ENA_FMT1_TIME_SHFT) & ENA_FMT1_TIME_MASK)));
-}
-
-
-static void
-dm_send_ereport(char *class, uint64_t ena, nvlist_t *detector,
-    nvlist_t *payload)
-{
-	nvlist_t *nvl;
-	int e = 0;
-
-	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) == 0) {
-		/*
-		 * An ereport nvlist consists of:
-		 *
-		 * FM_CLASS		class
-		 * FM_VERSION		FM_EREPORT_VERSION
-		 * FM_EREPORT_ENA	ena
-		 * FM_EREPORT_DETECTOR	detector
-		 * <Other payload members>
-		 *
-		 */
-		e |= nvlist_add_string(nvl, FM_CLASS, class);
-		e |= nvlist_add_uint8(nvl, FM_VERSION, FM_EREPORT_VERSION);
-		e |= nvlist_add_uint64(nvl, FM_EREPORT_ENA, ena);
-		e |= nvlist_add_nvlist(nvl, FM_EREPORT_DETECTOR, detector);
-		e |= nvlist_merge(nvl, payload, 0);
-
-		if (e == 0)
-			fmd_xprt_post(g_fm_hdl, g_xprt_hdl, nvl, 0);
-		else
-			nvlist_free(nvl);
-	}
-}
-
-static void
-schg_consume_faults(diskmon_t *diskp)
-{
-	struct disk_fault *faults;
-	nvlist_t *nvl;
-	uint64_t ena;
-	char *er_class;
-	int e;
-
-	dm_assert(diskp->fmip != NULL);
-
-	/* Use the same ENA for all current faults */
-	ena = dm_gen_ena();
-
-	dm_assert(pthread_mutex_lock(&diskp->fmip->fault_data_mutex) == 0);
-	faults = diskp->fmip->fault_list;
-
-	/* Go through the list of faults, executing actions if present */
-	while (faults != NULL) {
-
-		dm_assert(pthread_mutex_lock(&diskp->disk_faults_mutex) == 0);
-		diskp->disk_faults |= faults->fault_src;
-		dm_assert(pthread_mutex_unlock(&diskp->disk_faults_mutex) == 0);
-
-		er_class = NULL;
-		e = nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0);
-
-		switch (faults->fault_src) {
-		case DISK_FAULT_SOURCE_SELFTEST:
-			if (e == 0) {
-				er_class = EREPORT_SATA_STFAIL;
-				e |= nvlist_add_uint16(nvl,
-				    EV_PAYLOAD_STCODE,
-				    faults->selftest_code);
-			}
-			break;
-
-		case DISK_FAULT_SOURCE_OVERTEMP:
-			if (e == 0) {
-				er_class = EREPORT_SATA_OVERTEMP;
-				e |= nvlist_add_uint16(nvl,
-				    EV_PAYLOAD_CURTEMP,
-				    faults->cur_temp);
-				e |= nvlist_add_uint16(nvl,
-				    EV_PAYLOAD_THRESH,
-				    faults->thresh_temp);
-			}
-			break;
-
-		case DISK_FAULT_SOURCE_INFO_EXCPT:
-			er_class = EREPORT_SATA_PREDFAIL;
-			if (e == 0 && faults->sense_valid) {
-				e |= nvlist_add_uint16(nvl,
-				    EV_PAYLOAD_ASC,
-				    faults->asc);
-				e |= nvlist_add_uint16(nvl,
-				    EV_PAYLOAD_ASCQ,
-				    faults->ascq);
-			}
-			break;
-
-		default:
-			break;
-		}
-
-		if (e == 0 && er_class != NULL) {
-			log_msg(MM_SCHGMGR, "[%s] Sending ereport %s\n",
-			    diskp->location, er_class);
-
-			dm_send_ereport(er_class, ena,
-			    diskp->disk_res_fmri, nvl);
-		}
-
-		if (nvl)
-			nvlist_free(nvl);
-
-		faults = faults->next;
-	}
-
-	free_disk_fault_list(diskp->fmip);
-
-	dm_assert(pthread_mutex_unlock(&diskp->fmip->fault_data_mutex) == 0);
-}
-
 void
 block_state_change_events(void)
 {
@@ -421,9 +287,7 @@ disk_state_change_thread(void *vdisklistp)
 	diskmon_t	*disklistp = (diskmon_t *)vdisklistp;
 	diskmon_t	*diskp;
 	disk_statechg_t	*dscp;
-	int		err;
 	hotplug_state_t	nextstate;
-	boolean_t	poke_fault_manager;
 	const char	*pth;
 
 	/*
@@ -452,8 +316,6 @@ disk_state_change_thread(void *vdisklistp)
 			dm_assert(g_schgt_state == TS_EXIT_REQUESTED);
 			continue;
 		}
-
-		poke_fault_manager = B_FALSE;
 
 		diskp = dscp->diskp;
 
@@ -501,20 +363,7 @@ disk_state_change_thread(void *vdisklistp)
 		 *
 		 */
 
-		if (dscp->newstate == HPS_FAULTED) {
-
-			/*
-			 * fmip can be NULL here if the DE is processing
-			 * replayed faults.  In this case, no need to
-			 * do anything.
-			 */
-			if (diskp->fmip) {
-				schg_consume_faults(diskp);
-
-				diskp->faults_outstanding = B_FALSE;
-			}
-
-		} else if (dscp->newstate != HPS_FAULTED &&
+		if (dscp->newstate != HPS_FAULTED &&
 		    DISK_STATE(nextstate) != HPS_UNKNOWN &&
 		    dscp->newstate != HPS_REPAIRED) {
 
@@ -533,8 +382,7 @@ disk_state_change_thread(void *vdisklistp)
 			 * the disk is UNCONFIGURED, there's another
 			 * state change somewhere later in the queue), then
 			 * it's possible for the disk path property to not
-			 * exist -- so check it, and if it doesn't exist,
-			 * do not try to do disk_fault_init.
+			 * exist.
 			 */
 			if (dm_prop_lookup(diskp->props,
 			    DISK_PROP_DEVPATH) == NULL) {
@@ -543,30 +391,8 @@ disk_state_change_thread(void *vdisklistp)
 				    "Processed stale state change "
 				    "for disk %s\n", diskp->location);
 
-			} else if ((err = disk_fault_init(diskp)) != 0) {
-
-				if (err != IE_NOT_SUPPORTED)
-					log_warn("Error initializing fault "
-					    "monitor for disk in %s.\n",
-					    diskp->location);
 			} else {
 				diskp->configured_yet = B_TRUE;
-
-				/*
-				 * Now that the fault info for the disk is
-				 * initialized, we can request that the fault
-				 * manager do an analysis immediately.  This is
-				 * an initial analysis, so it will only happen
-				 * the first time the disk enters the CONFIGURED
-				 * state.  After that, it is polled at the
-				 * fault-polling interval.
-				 * Note that the poking of the fault manager
-				 * MUST occur AFTER the disk state is set
-				 * (below), otherwise, the fault manager could
-				 * ignore the disk if it analyzes it before
-				 * this thread can set the state to configured.
-				 */
-				poke_fault_manager = B_TRUE;
 			}
 
 		}
@@ -593,34 +419,10 @@ disk_state_change_thread(void *vdisklistp)
 			 */
 			dm_assert(DISK_STATE(nextstate) != HPS_CONFIGURED);
 
-			disk_fault_uninit(diskp);
-
 			diskp->configured_yet = B_FALSE;
 
-		} else if (dscp->newstate == HPS_REPAIRED) {
-			/*
-			 * Drop the current list of faults.  There may be
-			 * other faults pending in the fault list, and that's
-			 * OK.
-			 */
-			dm_assert(pthread_mutex_lock(&diskp->disk_faults_mutex)
-			    == 0);
-			diskp->disk_faults = DISK_FAULT_SOURCE_NONE;
-			dm_assert(
-			    pthread_mutex_unlock(&diskp->disk_faults_mutex)
-			    == 0);
 		}
 		dm_assert(pthread_mutex_unlock(&diskp->manager_mutex) == 0);
-
-
-		if (poke_fault_manager) {
-			/*
-			 * Now we can wake up the fault monitor thread
-			 * to do an initial analysis of the disk:
-			 */
-			poke_fault_manager = B_FALSE;
-			fault_manager_poke();
-		}
 
 		pth = dm_prop_lookup(diskp->props, DISK_PROP_DEVPATH);
 

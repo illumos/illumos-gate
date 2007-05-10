@@ -31,6 +31,8 @@
 d none usr/lib/fm/amd64 755 root bin
 f none usr/lib/fm/amd64/libdiagcode.so.1 755 root bin
 s none usr/lib/fm/amd64/libdiagcode.so=./libdiagcode.so.1
+f none usr/lib/fm/amd64/libdiskstatus.so.1 755 root bin
+s none usr/lib/fm/amd64/libdiskstatus.so=./libdiskstatus.so.1
 f none usr/lib/fm/amd64/libfmd_adm.so.1 755 root bin
 s none usr/lib/fm/amd64/libfmd_adm.so=./libfmd_adm.so.1
 f none usr/lib/fm/amd64/libfmd_log.so.1 755 root bin
@@ -42,6 +44,7 @@ s none usr/lib/fm/amd64/libfmd_snmp.so=./libfmd_snmp.so.1
 f none usr/lib/fm/amd64/libtopo.so.1 755 root bin
 s none usr/lib/fm/amd64/libtopo.so=libtopo.so.1
 f none usr/lib/fm/amd64/llib-ldiagcode.ln 644 root bin
+f none usr/lib/fm/amd64/llib-ldiskstatus.ln 644 root bin
 f none usr/lib/fm/amd64/llib-lfmd_adm.ln 644 root bin
 f none usr/lib/fm/amd64/llib-lfmd_log.ln 644 root bin
 f none usr/lib/fm/amd64/llib-lfmd_msg.ln 644 root bin

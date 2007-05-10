@@ -751,7 +751,8 @@ char **rev, nvlist_t **auth)
 			if (na == NULL) {
 				if (topo_mod_nvalloc(mod, &na,
 				    NV_UNIQUE_NAME) == 0) {
-				    (void) nvlist_add_string(na, aname, aid);
+					(void) nvlist_add_string(na, aname,
+					    aid);
 				}
 			} else {
 				(void) nvlist_add_string(na, aname, aid);
@@ -1375,7 +1376,7 @@ hc_is_present(topo_mod_t *mod, tnode_t *node, void *pdata)
 		return (ETOPO_PROP_NVL);
 	}
 
-	return (err);
+	return (0);
 }
 
 static int

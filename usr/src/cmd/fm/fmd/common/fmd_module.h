@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@ extern "C" {
 #include <fmd_buf.h>
 #include <fmd_api.h>
 #include <fmd_eventq.h>
+#include <fmd_topo.h>
 
 struct fmd_module;			/* see below */
 struct fmd_thread;			/* see <fmd_thread.h> */
@@ -133,6 +134,8 @@ typedef struct fmd_module {
 	fmd_buf_hash_t mod_bufs;	/* hash of bufs owned by this module */
 	fmd_serd_hash_t mod_serds;	/* hash of serd engs owned by module */
 	fmd_list_t mod_transports;	/* list of transports owned by module */
+	fmd_list_t mod_topolist;	/* list of held topo handles */
+	fmd_topo_t *mod_topo_current;	/* current libtopo snapshot */
 } fmd_module_t;
 
 #define	FMD_MOD_INIT	0x001		/* mod_ops->mop_init() has completed */
@@ -151,6 +154,11 @@ typedef struct fmd_modtimer {
 	void *mt_arg;			/* module private timer argument */
 	id_t mt_id;			/* timer ID (or -1 if still pending) */
 } fmd_modtimer_t;
+
+typedef struct fmd_modtopo {
+	fmd_list_t mt_link;		/* link on module topo list */
+	fmd_topo_t *mt_topo;		/* topo handle */
+} fmd_modtopo_t;
 
 extern const fmd_modops_t fmd_bltin_ops; /* see fmd/common/fmd_builtin.c */
 extern const fmd_modops_t fmd_rtld_ops;	/* see fmd/common/fmd_rtld.c */
@@ -207,6 +215,9 @@ extern void fmd_modhash_dispatch(fmd_modhash_t *, fmd_event_t *);
 
 extern void fmd_modstat_publish(fmd_module_t *);
 extern int fmd_modstat_snapshot(fmd_module_t *, struct fmd_ustat_snap *);
+
+extern struct topo_hdl *fmd_module_topo_hold(fmd_module_t *);
+extern int fmd_module_topo_rele(fmd_module_t *, struct topo_hdl *);
 
 #ifdef	__cplusplus
 }

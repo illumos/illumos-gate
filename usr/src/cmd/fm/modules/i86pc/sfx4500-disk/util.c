@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,129 +45,6 @@
 extern log_class_t g_verbose;
 
 static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-static void log_msg_nl(log_class_t cl, const char *fmt, ...);
-
-/*
- * Search a string list for a particular value.
- * Return the string associated with that value.
- */
-char *
-find_string(slist_t *slist, int match_value)
-{
-	for (; slist->str != NULL; slist++) {
-		if (slist->value == match_value) {
-			return (slist->str);
-		}
-	}
-
-	return ((char *)NULL);
-}
-
-/*
- * Produce a pretty dump of memory
- * <X> <Byte_i-1> <Byte_i> <Byte_i+1> ... [TEXT REPRESENTATION]
- */
-static void
-dump(log_class_t cl, char *label, char *start, unsigned length)
-{
-	int byte_count;
-	int i;
-#define	LINEBUFLEN 128
-	char linebuf[LINEBUFLEN];
-	char *linep;
-	int bufleft, len;
-
-	if (label != NULL)
-		log_msg_nl(cl, "%s\n", label);
-
-	linep = linebuf;
-	bufleft = LINEBUFLEN;
-
-	for (byte_count = 0; byte_count < length; byte_count += i) {
-
-		(void) snprintf(linep, bufleft, "%s0x%08" PRIX64 " ", "",
-		    (uint64_t)byte_count);
-		len = strlen(linep);
-		bufleft -= len;
-		linep += len;
-
-		/*
-		 * Inner loop processes 16 bytes at a time, or less
-		 * if we have less than 16 bytes to go
-		 */
-		for (i = 0; (i < 16) && ((byte_count + i) < length); i++) {
-			(void) snprintf(linep, bufleft, "%02X", (unsigned int)
-			    (unsigned char) start[byte_count + i]);
-
-			len = strlen(linep);
-			bufleft -= len;
-			linep += len;
-
-			if (bufleft >= 2) {
-				if (i == 7)
-					*linep = '-';
-				else
-					*linep = ' ';
-
-				--bufleft;
-				++linep;
-			}
-		}
-
-		/*
-		 * If i is less than 16, then we had less than 16 bytes
-		 * written to the output.  We need to fixup the alignment
-		 * to allow the "text" output to be aligned
-		 */
-		if (i < 16) {
-			int numspaces = (16 - i) * 3;
-			while (numspaces-- > 0) {
-				if (bufleft >= 2) {
-					*linep = ' ';
-					--bufleft;
-					linep++;
-				}
-			}
-		}
-
-		if (bufleft >= 2) {
-			*linep = ' ';
-			--bufleft;
-			++linep;
-		}
-
-		for (i = 0; (i < 16) && ((byte_count + i) < length); i++) {
-			int subscript = byte_count + i;
-			char ch =  (isprint(start[subscript]) ?
-			    start[subscript] : '.');
-
-			if (bufleft >= 2) {
-				*linep = ch;
-				--bufleft;
-				++linep;
-			}
-		}
-
-		linebuf[LINEBUFLEN - bufleft] = 0;
-
-		log_msg_nl(cl, "%s\n", linebuf);
-
-		linep = linebuf;
-		bufleft = LINEBUFLEN;
-	}
-}
-
-void
-log_dump(log_class_t cl, char *label, char *start, unsigned length)
-{
-	if ((g_verbose & cl) != cl)
-		return;
-
-	dm_assert(pthread_mutex_lock(&log_mutex) == 0);
-	dump(cl, label, start, length);
-	dm_assert(pthread_mutex_unlock(&log_mutex) == 0);
-}
 
 static void
 verror(const char *fmt, va_list ap)
@@ -222,19 +99,6 @@ vcont(log_class_t cl, const char *fmt, va_list ap)
 		fmd_hdl_debug(g_fm_hdl, ": %s\n", strerror(error));
 
 	dm_assert(pthread_mutex_unlock(&log_mutex) == 0);
-}
-
-static void
-log_msg_nl(log_class_t cl, const char *fmt, ...)
-{
-	va_list ap;
-
-	if ((g_verbose & cl) != cl)
-		return;
-
-	va_start(ap, fmt);
-	fmd_hdl_vdebug(g_fm_hdl, fmt, ap);
-	va_end(ap);
 }
 
 void

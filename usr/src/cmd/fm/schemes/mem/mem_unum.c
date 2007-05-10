@@ -406,10 +406,15 @@ mem_unum_rewrite(nvlist_t *nvl, nvlist_t **rnvl)
 	    !ISHCUNUM(unumstr))
 		return (0);
 
-	thp = fmd_fmri_topology(TOPO_VERSION);
-
-	if (topo_fmri_str2nvl(thp, unumstr, &unum, &err) != 0)
+	if ((thp = fmd_fmri_topo_hold(TOPO_VERSION)) == NULL)
 		return (EINVAL);
+
+	if (topo_fmri_str2nvl(thp, unumstr, &unum, &err) != 0) {
+		fmd_fmri_topo_rele(thp);
+		return (EINVAL);
+	}
+
+	fmd_fmri_topo_rele(thp);
 
 	if ((err = nvlist_dup(nvl, rnvl, 0)) != 0) {
 		nvlist_free(unum);

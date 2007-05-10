@@ -359,7 +359,7 @@ topo_fmri_fru(topo_hdl_t *thp, nvlist_t *nvl, nvlist_t **fru, int *err)
 	nvlist_t *fp, *prop = NULL;
 
 	if (fmri_prop(thp, nvl, TOPO_PGROUP_PROTOCOL, TOPO_PROP_FRU,
-	    nvl, fru, err) < 0)
+	    nvl, &prop, err) < 0)
 		return (set_error(thp, *err, err, "topo_fmri_fru", NULL));
 
 	if (nvlist_lookup_nvlist(prop, TOPO_PROP_VAL_VAL, &fp) != 0)

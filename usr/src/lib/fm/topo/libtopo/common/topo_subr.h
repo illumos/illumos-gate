@@ -90,6 +90,8 @@ extern void topo_fmristr_build(ssize_t *, char *, size_t, char *, char *,
 
 extern int topo_walk_byid(topo_walk_t *wp, const char *name, topo_instance_t);
 
+extern char *topo_cleanup_auth_str(topo_hdl_t *, char *);
+
 #ifdef __cplusplus
 }
 #endif

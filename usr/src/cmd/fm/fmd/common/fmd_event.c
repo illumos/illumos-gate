@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 #include <fmd_case.h>
 #include <fmd_log.h>
 #include <fmd_time.h>
+#include <fmd_topo.h>
 #include <fmd_ctl.h>
 
 #include <fmd.h>
@@ -215,6 +216,9 @@ fmd_event_destroy(fmd_event_t *e)
 		break;
 	case FMD_EVT_CTL:
 		fmd_ctl_fini(ep->ev_data);
+		break;
+	case FMD_EVT_TOPO:
+		fmd_topo_rele(ep->ev_data);
 		break;
 	}
 

@@ -80,7 +80,8 @@ LINTFLAGS = -msux
 LINTFLAGS64 = -msux -Xarch=$(MACH64:sparcv9=v9)
 
 $(DYNLIB)  := LDLIBS += \
-	-lnvpair -lelf -lumem -lxml2 -lkstat -luuid -ldevinfo -lsmbios -lc
+	-lnvpair -lelf -lumem -lxml2 -lkstat -luuid -ldevinfo \
+	-lsmbios -lc -ldevid
 
 $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 $(LINTLIB) := LINTFLAGS = -nsvx

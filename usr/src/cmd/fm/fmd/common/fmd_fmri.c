@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,7 +82,7 @@ fmd_fmri_warn(const char *format, ...)
  * Convert an input string to a URI escaped string and return the new string.
  * RFC2396 Section 2.4 says that data must be escaped if it does not have a
  * representation using an unreserved character, where an unreserved character
- * is one that is either alphanumberic or one of the marks defined in S2.3.
+ * is one that is either alphanumeric or one of the marks defined in S2.3.
  */
 static size_t
 fmd_fmri_uriescape(const char *s, const char *xmark, char *buf, size_t len)
@@ -230,9 +230,22 @@ fmd_fmri_get_drgen(void)
 }
 
 struct topo_hdl *
-fmd_fmri_topology(int version)
+fmd_fmri_topo_hold(int version)
 {
-	return (fmd_topo_handle(version));
+	fmd_topo_t *ftp;
+
+	if (version != TOPO_VERSION)
+		return (NULL);
+
+	ftp = fmd_topo_hold();
+
+	return (ftp->ft_hdl);
+}
+
+void
+fmd_fmri_topo_rele(struct topo_hdl *thp)
+{
+	fmd_topo_rele_hdl(thp);
 }
 
 /*

@@ -694,7 +694,9 @@ FMFSHDRS=			\
 
 FMIOHDRS=			\
 	ddi.h			\
+	disk.h			\
 	pci.h			\
+	scsi.h			\
 	sun4upci.h		\
 	opl_mc_fm.h
 

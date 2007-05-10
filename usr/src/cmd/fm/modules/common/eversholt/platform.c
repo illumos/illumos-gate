@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * platform.c -- interfaces to the platform's configuration information
@@ -151,7 +151,7 @@ void
 platform_init(void)
 {
 	(void) nv_alloc_init(&Eft_nv_hdl, &Eft_nv_alloc_ops);
-	Eft_topo_hdl = fmd_hdl_topology(Hdl, TOPO_VERSION);
+	Eft_topo_hdl = fmd_hdl_topo_hold(Hdl, TOPO_VERSION);
 	platform_globals();
 
 	out(O_ALTFP, "platform_init() sucessful");
@@ -169,6 +169,7 @@ platform_fini(void)
 		Initcfg = NULL;
 	}
 
+	fmd_hdl_topo_rele(Hdl, Eft_topo_hdl);
 	platform_free_globals();
 	(void) nv_alloc_fini(&Eft_nv_hdl);
 
@@ -218,8 +219,8 @@ hc_fmri_nodeize(nvlist_t *hcfmri)
 		}
 		sname = stable(ename);
 		tmpn = tree_name_iterator(
-			tree_name(sname, IT_VERTICAL, NULL, 0),
-			tree_num(eid, NULL, 0));
+		    tree_name(sname, IT_VERTICAL, NULL, 0),
+		    tree_num(eid, NULL, 0));
 
 		if (pathtree == NULL)
 			pathtree = tmpn;
@@ -566,7 +567,8 @@ platform_config_snapshot(void)
 
 	out(O_ALTFP, "platform_config_snapshot(): topo snapshot");
 
-	Eft_topo_hdl = fmd_hdl_topology(Hdl, TOPO_VERSION);
+	fmd_hdl_topo_rele(Hdl, Eft_topo_hdl);
+	Eft_topo_hdl = fmd_hdl_topo_hold(Hdl, TOPO_VERSION);
 
 	if ((twp = topo_walk_init(Eft_topo_hdl, FM_FMRI_SCHEME_HC, cfgcollect,
 	    Lastcfg, &err)) == NULL) {
@@ -793,7 +795,7 @@ platform_get_files(const char *dirname[], const char *fnstr, int nodups)
 					/* allocate ten more slots */
 					slots += 10;
 					files = (char **)REALLOC(files,
-						slots * sizeof (char *));
+					    slots * sizeof (char *));
 				}
 				/* prepend directory name and / */
 				totlen = strlen(dirname[i]) + 1;
@@ -897,16 +899,16 @@ forkandexecve(const char *path, char *const argv[], char *const envp[],
 	 */
 	if (pipe(outpipe) < 0)
 		if (strlcat(errbuf, ": pipe(outpipe) failed",
-			    errbuflen) >= errbuflen)
+		    errbuflen) >= errbuflen)
 			return (1);
 	if (pipe(errpipe) < 0)
 		if (strlcat(errbuf, ": pipe(errpipe) failed",
-			    errbuflen) >= errbuflen)
+		    errbuflen) >= errbuflen)
 			return (1);
 
-	if ((pid = fork()) < 0)
+	if ((pid = fork()) < 0) {
 		rt = (int)strlcat(errbuf, ": fork() failed", errbuflen);
-	else if (pid) {
+	} else if (pid) {
 		int wstat, count;
 
 		/* parent */
@@ -916,7 +918,7 @@ forkandexecve(const char *path, char *const argv[], char *const envp[],
 		/* PHASE2 need to guard against hang in child? */
 		if (waitpid(pid, &wstat, 0) < 0)
 			if (strlcat(errbuf, ": waitpid() failed",
-				    errbuflen) >= errbuflen)
+			    errbuflen) >= errbuflen)
 				return (1);
 
 		/* check for stderr contents */
@@ -928,7 +930,7 @@ forkandexecve(const char *path, char *const argv[], char *const envp[],
 				 * reading
 				 */
 				if (strlcat(errbuf, ": read(errpipe) failed",
-					    errbuflen) >= errbuflen)
+				    errbuflen) >= errbuflen)
 					return (1);
 			}
 			/*
@@ -942,11 +944,11 @@ forkandexecve(const char *path, char *const argv[], char *const envp[],
 				errbuf[count] = '\0';
 		} else if (WIFSIGNALED(wstat))
 			if (strlcat(errbuf, ": signaled",
-				    errbuflen) >= errbuflen)
+			    errbuflen) >= errbuflen)
 				return (1);
 		else if (WIFEXITED(wstat) && WEXITSTATUS(wstat))
 			if (strlcat(errbuf, ": abnormal exit",
-				    errbuflen) >= errbuflen)
+			    errbuflen) >= errbuflen)
 				return (1);
 
 		/* check for stdout contents */
@@ -958,7 +960,7 @@ forkandexecve(const char *path, char *const argv[], char *const envp[],
 				 * reading
 				 */
 				if (strlcat(errbuf, ": read(outpipe) failed",
-					    errbuflen) >= errbuflen)
+				    errbuflen) >= errbuflen)
 					return (1);
 			}
 			/*
@@ -1009,7 +1011,7 @@ arglist2argv(struct node *np, struct lut **globals, struct config *croot,
 		break;
 	case T_LIST:
 		if (arglist2argv(np->u.expr.left, globals, croot, arrowp,
-				argv, argc, argvlen))
+		    argv, argc, argvlen))
 			return (1);
 		/*
 		 * only leftmost element of a list can provide the command
@@ -1017,7 +1019,7 @@ arglist2argv(struct node *np, struct lut **globals, struct config *croot,
 		 */
 		ASSERT(*argc > 0);
 		if (arglist2argv(np->u.expr.right, globals, croot, arrowp,
-				argv, argc, argvlen))
+		    argv, argc, argvlen))
 			return (1);
 		break;
 	case T_FUNC:
@@ -1048,7 +1050,7 @@ arglist2argv(struct node *np, struct lut **globals, struct config *croot,
 		struct evalue value;
 
 		if (!eval_expr(np, NULL, NULL, globals, croot, arrowp,
-			    0, &value))
+		    0, &value))
 			return (1);
 
 		switch (value.t) {
@@ -1125,7 +1127,7 @@ arglist2argv(struct node *np, struct lut **globals, struct config *croot,
 			 */
 			*argvlen += 10;
 			*argv = (char **)REALLOC(*argv,
-						sizeof (char *) * *argvlen);
+			    sizeof (char *) * *argvlen);
 		}
 		(*argv)[*argc] = addthisarg;
 		(*argc)++;
@@ -1170,7 +1172,7 @@ generate_envp(struct arrow *arrowp, char ***envp, int *envc, int *envplen)
 		/* large enough for max int */
 		envvalues[3] = MALLOC(sizeof (char) * 25);
 		(void) snprintf(envvalues[3], sizeof (envvalues[3]), "%d",
-				arrowp->head->myevent->enode->line);
+		    arrowp->head->myevent->enode->line);
 	}
 
 	for (i = 0; envnames[i] != NULL && i < *envc; i++) {
@@ -1249,8 +1251,8 @@ platform_call(struct node *np, struct lut **globals, struct config *croot,
 	errbuf[0] = '\0';
 
 	ret = forkandexecve((const char *) argv[0], (char *const *) argv,
-			    (char *const *) envp, outbuf, sizeof (outbuf),
-			    errbuf, sizeof (errbuf));
+	    (char *const *) envp, outbuf, sizeof (outbuf),
+	    errbuf, sizeof (errbuf));
 
 	for (i = 0; i < envc; i++)
 		FREE(envp[i]);
@@ -1259,7 +1261,7 @@ platform_call(struct node *np, struct lut **globals, struct config *croot,
 
 	if (ret) {
 		outfl(O_OK, np->file, np->line,
-			"call: failure in fork + exec of %s", argv[0]);
+		    "call: failure in fork + exec of %s", argv[0]);
 	} else {
 		char *ptr;
 
@@ -1276,8 +1278,8 @@ platform_call(struct node *np, struct lut **globals, struct config *croot,
 	if (errbuf[0] != '\0') {
 		ret = 1;
 		outfl(O_OK, np->file, np->line,
-			"call: unexpected stderr output from %s: %s",
-			argv[0], errbuf);
+		    "call: unexpected stderr output from %s: %s",
+		    argv[0], errbuf);
 	}
 
 	for (i = 0; i < argc; i++)
@@ -1544,11 +1546,11 @@ platform_payloadprop(struct node *np, struct evalue *valuep)
 		while ((w = strtok(NULL, ".")) != NULL) {
 			if (get_array_info(lastnameptr, &nameptr, &index)) {
 				ier = nvlist_lookup_nvlist(basenvp,
-						    lastnameptr, &basenvp);
+				    lastnameptr, &basenvp);
 			} else {
 				/* handle array of nvlists */
 				ier = nvlist_lookup_nvlist_array(basenvp,
-					    nameptr, &arraynvp, &nelem);
+				    nameptr, &arraynvp, &nelem);
 				if (ier == 0) {
 					if ((uint_t)index > nelem - 1)
 						ier = 1;

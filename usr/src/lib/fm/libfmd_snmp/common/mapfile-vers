@@ -38,7 +38,8 @@ SUNWprivate {
 	fmd_fmri_strdup;
 	fmd_fmri_strescape;
 	fmd_fmri_strfree;
-	fmd_fmri_topology;
+	fmd_fmri_topo_hold;
+	fmd_fmri_topo_rele;
 	fmd_fmri_warn;
 	fmd_fmri_zalloc;
 	init_sunFM;

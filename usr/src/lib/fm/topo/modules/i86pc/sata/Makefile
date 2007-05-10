@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,4 +31,4 @@ MODULESRCS = sata.c sfx4500_props.c
 
 include ../../Makefile.plugin
 
-LDLIBS += -lcfgadm -lsmbios -ldevinfo
+LDLIBS += -lcfgadm -lsmbios -ldevinfo -ldiskstatus -ldevid

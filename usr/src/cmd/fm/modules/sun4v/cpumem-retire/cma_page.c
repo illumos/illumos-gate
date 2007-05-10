@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,13 +127,16 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid)
 	    strncmp(unumstr, "hc:/", 4) == 0) {
 		int err;
 		nvlist_t *unumfmri;
-		struct topo_hdl *thp = fmd_hdl_topology(hdl, TOPO_VERSION);
+		struct topo_hdl *thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION);
 
 		if (topo_fmri_str2nvl(thp, unumstr, &unumfmri, &err) != 0) {
 			fmd_hdl_debug(hdl, "page retire str2nvl failed: %s\n",
 			    topo_strerror(err));
+			fmd_hdl_topo_rele(hdl, thp);
 			return (CMA_RA_FAILURE);
 		}
+
+		fmd_hdl_topo_rele(hdl, thp);
 
 		if (nvlist_dup(asru, &asrucp, 0) != 0) {
 			fmd_hdl_debug(hdl, "page retire nvlist dup failed\n");
