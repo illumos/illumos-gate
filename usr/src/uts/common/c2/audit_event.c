@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1846,7 +1846,7 @@ aus_close(struct t_audit_data *tad)
 	struct f_audit_data *fad;
 	struct vnode *vp;
 	struct vattr attr;
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	struct a {
 		long	i;
@@ -3826,7 +3826,7 @@ auf_recvmsg(
 	struct f_audit_data *fad;		/* unix domain sockets */
 	short so_family, so_type;
 	int add_sock_token = 0;
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	fd = (int)uap->fd;
 
@@ -4036,7 +4036,7 @@ auf_recvfrom(
 	int err;
 	struct file *fp;
 	struct f_audit_data *fad;		/* unix domain sockets */
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	fd = (int)uap->fd;
 
@@ -4241,7 +4241,7 @@ auf_sendmsg(struct t_audit_data *tad, int error, rval_t *rval)
 	caddr_t		msg_name;
 	socklen_t	msg_namelen;
 	STRUCT_DECL(msghdr, msg);
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	fd = (int)uap->fd;
 
@@ -4440,7 +4440,7 @@ auf_sendto(struct t_audit_data *tad, int error, rval_t *rval)
 	int		add_sock_token = 0;
 	struct file	*fp;
 	struct f_audit_data *fad;
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	fd = (int)uap->fd;
 
@@ -5203,7 +5203,7 @@ auf_read(tad, error, rval)
 	register struct a {
 		long	fd;
 	} *uap = (struct a *)ttolwp(curthread)->lwp_ap;
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	fd = (int)uap->fd;
 
@@ -5260,7 +5260,7 @@ auf_write(tad, error, rval)
 	register struct a {
 		long	fd;
 	} *uap = (struct a *)ttolwp(curthread)->lwp_ap;
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	fd = (int)uap->fd;
 
@@ -5323,7 +5323,7 @@ auf_recv(tad, error, rval)
 	register struct a {
 		long	fd;
 	} *uap = (struct a *)ttolwp(curthread)->lwp_ap;
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	/*
 	 * If there was an error, then nothing to do. Only generate
@@ -5461,7 +5461,7 @@ auf_send(tad, error, rval)
 	register struct a {
 		long	fd;
 	} *uap = (struct a *)ttolwp(curthread)->lwp_ap;
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	fd = (int)uap->fd;
 

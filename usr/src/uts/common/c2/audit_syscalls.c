@@ -534,9 +534,7 @@ audit(caddr_t record, int length)
 	int	size;	/* 0: 32 bit utility  1: 64 bit utility */
 	int	host_len;
 	size_t	zlen;
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
-
-	ASSERT(kctx != NULL);
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	/* if auditing not enabled, then don't generate an audit record */
 	if (kctx->auk_auditstate != AUC_AUDITING &&
@@ -760,7 +758,7 @@ auditdoor(int fd)
 	if (!(audit_policy & AUDIT_PERZONE) && !INGLOBALZONE(curproc))
 		return (EINVAL);
 
-	kctx = SET_KCTX_LZ;
+	kctx = GET_KCTX_NGZ;
 
 	/*
 	 * Prevent a second audit daemon from running this code.
@@ -933,7 +931,7 @@ static int
 getpolicy(caddr_t data)
 {
 	int	policy;
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	policy = audit_policy | kctx->auk_policy;
 
@@ -971,8 +969,7 @@ setpolicy(caddr_t data)
 	if (copyin(data, &policy, sizeof (int)))
 		return (EFAULT);
 
-	kctx = SET_KCTX_LZ;
-	ASSERT(kctx != NULL);
+	kctx = GET_KCTX_NGZ;
 
 	if (INGLOBALZONE(curproc)) {
 		if (policy & ~(AUDIT_GLOBAL | AUDIT_LOCAL))
@@ -1022,7 +1019,7 @@ getkmask(caddr_t data)
 {
 	au_kcontext_t	*kctx;
 
-	kctx = SET_KCTX_PZ;
+	kctx = GET_KCTX_PZ;
 
 	if (copyout(&kctx->auk_info.ai_mask, data, sizeof (au_mask_t)))
 		return (EFAULT);
@@ -1038,7 +1035,7 @@ setkmask(caddr_t data)
 	if (!(audit_policy & AUDIT_PERZONE) && !INGLOBALZONE(curproc))
 		return (EINVAL);
 
-	kctx = SET_KCTX_LZ;
+	kctx = GET_KCTX_NGZ;
 
 	if (copyin(data, &mask, sizeof (au_mask_t)))
 		return (EFAULT);
@@ -1052,7 +1049,7 @@ getkaudit(caddr_t info_p, int len)
 {
 	STRUCT_DECL(auditinfo_addr, info);
 	model_t model;
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	model = get_udatamodel();
 	STRUCT_INIT(info, model);
@@ -1110,7 +1107,7 @@ setkaudit(caddr_t info_p, int len)
 	if (!(audit_policy & AUDIT_PERZONE) && !INGLOBALZONE(curproc))
 		return (EINVAL);
 
-	kctx = SET_KCTX_LZ;
+	kctx = GET_KCTX_NGZ;
 
 	model = get_udatamodel();
 	STRUCT_INIT(info, model);
@@ -1176,7 +1173,7 @@ setkaudit(caddr_t info_p, int len)
 static int
 getqctrl(caddr_t data)
 {
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 	STRUCT_DECL(au_qctrl, qctrl);
 	STRUCT_INIT(qctrl, get_udatamodel());
 
@@ -1203,7 +1200,7 @@ setqctrl(caddr_t data)
 
 	if (!(audit_policy & AUDIT_PERZONE) && !INGLOBALZONE(curproc))
 		return (EINVAL);
-	kctx = SET_KCTX_LZ;
+	kctx = GET_KCTX_NGZ;
 
 	if (copyin(data, STRUCT_BUF(qctrl), STRUCT_SIZE(qctrl)))
 		return (EFAULT);
@@ -1319,7 +1316,7 @@ getcar(caddr_t data, int length)
 static int
 getstat(caddr_t data)
 {
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	membar_consumer();
 
@@ -1332,7 +1329,7 @@ getstat(caddr_t data)
 static int
 setstat(caddr_t data)
 {
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 	au_stat_t au_stat;
 
 	if (!(audit_policy & AUDIT_PERZONE) && !INGLOBALZONE(curproc))
@@ -1516,7 +1513,7 @@ getcond(caddr_t data)
 		if (copyout(&au_auditstate, data, sizeof (int)))
 			return (EFAULT);
 
-	kctx = SET_KCTX_PZ;
+	kctx = GET_KCTX_PZ;
 
 	if (copyout(&(kctx->auk_auditstate), data, sizeof (int)))
 		return (EFAULT);
@@ -1538,7 +1535,7 @@ setcond(caddr_t data)
 	if (!(audit_policy & AUDIT_PERZONE) && (!INGLOBALZONE(curproc)))
 		return (EINVAL);
 
-	kctx = SET_KCTX_LZ;
+	kctx = GET_KCTX_NGZ;
 
 	if (copyin(data, &auditstate, sizeof (int)))
 		return (EFAULT);
@@ -1577,7 +1574,7 @@ static int
 getclass(caddr_t data)
 {
 	au_evclass_map_t event;
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	if (copyin(data, &event, sizeof (au_evclass_map_t)))
 		return (EFAULT);
@@ -1602,7 +1599,7 @@ setclass(caddr_t data)
 	if (!(audit_policy & AUDIT_PERZONE) && !INGLOBALZONE(curproc))
 		return (EINVAL);
 
-	kctx = SET_KCTX_LZ;
+	kctx = GET_KCTX_NGZ;
 
 	if (copyin(data, &event, sizeof (au_evclass_map_t)))
 		return (EFAULT);
@@ -1823,7 +1820,7 @@ static int
 getfsize(caddr_t data)
 {
 	au_fstat_t fstat;
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	mutex_enter(&(kctx->auk_fstat_lock));
 	fstat.af_filesz = kctx->auk_file_stat.af_filesz;
@@ -1845,7 +1842,7 @@ setfsize(caddr_t data)
 	if (!(audit_policy & AUDIT_PERZONE) && !INGLOBALZONE(curproc))
 		return (EINVAL);
 
-	kctx = SET_KCTX_LZ;
+	kctx = GET_KCTX_NGZ;
 
 	if (copyin(data, &fstat, sizeof (au_fstat_t)))
 		return (EFAULT);
@@ -1990,7 +1987,7 @@ auditsvc(int fd, int limit)
 	if (!INGLOBALZONE(curproc))
 		return (EINVAL);
 
-	kctx = SET_KCTX_GZ;
+	kctx = GET_KCTX_GZ;
 
 	if (limit < 0 ||
 	    (!(kctx->auk_auditstate == AUC_AUDITING ||

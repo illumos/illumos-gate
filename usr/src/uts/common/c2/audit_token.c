@@ -102,7 +102,7 @@ au_to_header_ex(int byte_count, au_event_t e_type, au_emod_t e_mod)
 {
 	adr_t adr;			/* adr memory stream header */
 	token_t *m;			/* au_membuf pointer */
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 #ifdef _LP64
 	char data_header = AUT_HEADER64_EX;	/* header for this token */

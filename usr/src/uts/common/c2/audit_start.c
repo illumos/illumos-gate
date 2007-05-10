@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -295,12 +295,7 @@ audit_start(
 	/* get basic event for system call */
 	event = (*audit_s2e[scid].au_init)(audit_s2e[scid].au_event);
 
-	kctx = SET_KCTX_PZ;
-	if (kctx == NULL) {
-		zone_status_t zstate = zone_status_get(curproc->p_zone);
-		ASSERT(zstate != ZONE_IS_READY);
-		return (0);
-	}
+	kctx = GET_KCTX_PZ;
 
 	estate = kctx->auk_ets[event];
 
@@ -366,13 +361,7 @@ audit_finish(
 	struct t_audit_data *tad;
 	int	flag;
 	au_defer_info_t	*attr;
-	au_kcontext_t *kctx = SET_KCTX_PZ;
-
-	if (kctx == NULL) {
-		zone_status_t zstate = zone_status_get(curproc->p_zone);
-		ASSERT(zstate != ZONE_IS_READY);
-		return;
-	}
+	au_kcontext_t *kctx = GET_KCTX_PZ;
 
 	tad = U2A(u);
 

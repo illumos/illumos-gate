@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -448,16 +448,14 @@ struct audit_fstat {
 };
 typedef struct audit_fstat au_fstat_t;
 
-/* set kernel audit context dependent on AUDIT_PERZONE policy */
-#define	SET_KCTX_PZ	zone_getspecific(au_zone_key,\
-			    (audit_policy & AUDIT_PERZONE) ?\
-			    curproc->p_zone :\
-			    global_zone)
-/* set kernel audit context to global zone */
-#define	SET_KCTX_GZ	zone_getspecific(au_zone_key,\
-			    global_zone)
-/* set kernel audit context to local zone */
-#define	SET_KCTX_LZ	zone_getspecific(au_zone_key, curproc->p_zone)
+/* get kernel audit context dependent on AUDIT_PERZONE policy */
+#define	GET_KCTX_PZ	(audit_policy & AUDIT_PERZONE) ?\
+			    curproc->p_zone->zone_audit_kctxt :\
+			    global_zone->zone_audit_kctxt
+/* get kernel audit context of global zone */
+#define	GET_KCTX_GZ	global_zone->zone_audit_kctxt
+/* get kernel audit context of non-global zone */
+#define	GET_KCTX_NGZ	curproc->p_zone->zone_audit_kctxt
 
 #define	AS_INC(a, b, c) atomic_add_32(&(c->auk_statistics.a), (b))
 #define	AS_DEC(a, b, c) atomic_add_32(&(c->auk_statistics.a), -(b))

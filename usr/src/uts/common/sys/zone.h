@@ -419,6 +419,10 @@ typedef struct zone {
 	struct dlnamelist *zone_dl_list;
 	netstack_t	*zone_netstack;
 	struct cpucap	*zone_cpucap;	/* CPU caps data */
+	/*
+	 * Solaris Auditing per-zone audit context
+	 */
+	struct au_kcontext	*zone_audit_kctxt;
 } zone_t;
 
 /*

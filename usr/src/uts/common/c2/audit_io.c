@@ -135,9 +135,7 @@ au_doio(vp, limit)
 					/* 1 - force write of audit record */
 					/* 2 - finished writing AR, commit */
 
-	kctx = SET_KCTX_GZ;
-
-	ASSERT(kctx != NULL);
+	kctx = GET_KCTX_GZ;
 
 	/*
 	 * Check to ensure enough free space on audit device.
@@ -987,8 +985,8 @@ audit_async_drop(caddr_t *rpp, int flags)
 	/* could not generate audit record, clean up */
 	audit_async_done((caddr_t *)rpp, flags);
 
-	kctx = SET_KCTX_GZ;
-	ASSERT(kctx != NULL);
+	kctx = GET_KCTX_GZ;
+
 	/* just drop the record and return */
 	if (((audit_policy & AUDIT_AHLT) == 0) ||
 	    (kctx->auk_auditstate == AUC_INIT_AUDIT)) {
@@ -1019,9 +1017,7 @@ audit_async_start(label_t *jb, int event, int sorf)
 	t_audit_data_t *tad = U2A(u);
 	au_state_t estate;
 	int success = 0, failure = 0;
-	au_kcontext_t	*kctx = SET_KCTX_GZ;
-
-	ASSERT(kctx != NULL);
+	au_kcontext_t	*kctx = GET_KCTX_GZ;
 
 	/* if audit state off, then no audit record generation */
 	if ((kctx->auk_auditstate != AUC_AUDITING) &&
@@ -1059,8 +1055,7 @@ audit_async_finish(caddr_t *ad, int aid, int amod)
 {
 	au_kcontext_t	*kctx;
 
-	kctx  = SET_KCTX_GZ;
-	ASSERT(kctx != NULL);
+	kctx  = GET_KCTX_GZ;
 
 	au_close(kctx, ad, AU_DONTBLOCK | AU_OK, aid, PAD_NONATTR|amod);
 }
@@ -1080,8 +1075,7 @@ audit_async_finish_backend(void *addr)
 	if (attr == NULL)
 		return;		/* won't happen unless softcall is broken */
 
-	kctx  = SET_KCTX_GZ;
-	ASSERT(kctx != NULL);
+	kctx  = GET_KCTX_GZ;
 
 	if (audit_async_block(kctx, (caddr_t *)&attr->audi_ad)) {
 		kmem_free(attr, sizeof (au_defer_info_t));

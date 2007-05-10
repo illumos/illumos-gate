@@ -261,19 +261,9 @@ audit_savepath(
 {
 
 	t_audit_data_t *tad;	/* current thread */
-	p_audit_data_t *pad;	/* current process */
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
-
-	if (kctx == NULL) {
-		zone_status_t zstate = zone_status_get(curproc->p_zone);
-		ASSERT(zstate != ZONE_IS_READY);
-		return (0);
-	}
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	tad = U2A(u);
-	ASSERT(tad != (t_audit_data_t *)0);
-	pad = P2A(curproc);
-	ASSERT(pad != (p_audit_data_t *)0);
 
 	/*
 	 * this event being audited or do we need path information
@@ -430,14 +420,8 @@ audit_pathbuild(struct pathname *pnp)
 void
 audit_addcomponent(struct pathname *pnp)
 {
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 	t_audit_data_t *tad;
-
-	if (kctx == NULL) {
-		zone_status_t zstate = zone_status_get(curproc->p_zone);
-		ASSERT(zstate != ZONE_IS_READY);
-		return;
-	}
 
 	tad = U2A(u);
 	/*
@@ -492,14 +476,8 @@ audit_addcomponent(struct pathname *pnp)
 void
 audit_anchorpath(struct pathname *pnp, int flag)
 {
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 	t_audit_data_t *tad;
-
-	if (kctx == NULL) {
-		zone_status_t zstate = zone_status_get(curproc->p_zone);
-		ASSERT(zstate != ZONE_IS_READY);
-		return;
-	}
 
 	tad = U2A(u);
 
@@ -570,13 +548,7 @@ audit_symlink(struct pathname *pnp, struct pathname *sympath)
 	char *cp;	/* start of symlink path */
 	uint_t len_path;	/* processed path before symlink */
 	t_audit_data_t *tad;
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
-
-	if (kctx == NULL) {
-		zone_status_t zstate = zone_status_get(curproc->p_zone);
-		ASSERT(zstate != ZONE_IS_READY);
-		return;
-	}
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	tad = U2A(u);
 
@@ -653,13 +625,7 @@ audit_symlink(struct pathname *pnp, struct pathname *sympath)
 int
 file_is_public(struct vattr *attr)
 {
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
-
-	if (kctx == NULL) {
-		zone_status_t zstate = zone_status_get(curproc->p_zone);
-		ASSERT(zstate != ZONE_IS_READY);
-		return (0);
-	}
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	if (!(kctx->auk_policy & AUDIT_PUBLIC) && (attr->va_uid == 0) &&
 	    ((attr->va_type == VLNK) ||
@@ -833,13 +799,7 @@ audit_core_start(int sig)
 	ASSERT(tad->tad_flag == 0);
 	ASSERT(tad->tad_aupath == NULL);
 
-	kctx = SET_KCTX_PZ;
-
-	if (kctx == NULL) {
-		zone_status_t zstate = zone_status_get(curproc->p_zone);
-		ASSERT(zstate != ZONE_IS_READY);
-		return;
-	}
+	kctx = GET_KCTX_PZ;
 
 	/* get basic event for system call */
 	event = AUE_CORE;
@@ -900,12 +860,7 @@ audit_core_finish(int code)
 	}
 	tad->tad_flag = 0;
 
-	kctx = SET_KCTX_PZ;
-	if (kctx == NULL) {
-		zone_status_t zstate = zone_status_get(curproc->p_zone);
-		ASSERT(zstate != ZONE_IS_READY);
-		return;
-	}
+	kctx = GET_KCTX_PZ;
 
 	/* kludge for error 0, should use `code==CLD_DUMPED' instead */
 	if (flag = audit_success(kctx, tad, 0)) {
@@ -1054,13 +1009,7 @@ audit_closef(struct file *fp)
 	const auditinfo_addr_t *ainfo;
 	int getattr_ret;
 	cred_t *cr;
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
-
-	if (kctx == NULL) {
-		zone_status_t zstate = zone_status_get(curproc->p_zone);
-		ASSERT(zstate != ZONE_IS_READY);
-		return;
-	}
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	fad = F2A(fp);
 	estate = kctx->auk_ets[AUE_CLOSE];
@@ -1294,13 +1243,7 @@ audit_reboot(void)
 {
 	int flag;
 	t_audit_data_t *tad;
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
-
-	if (kctx == NULL) {
-		zone_status_t zstate = zone_status_get(curproc->p_zone);
-		ASSERT(zstate != ZONE_IS_READY);
-		return;
-	}
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	tad = U2A(u);
 
@@ -1518,9 +1461,7 @@ audit_exec(
 	ssize_t envc)		/* total # environment variables */
 {
 	t_audit_data_t *tad;
-	au_kcontext_t	*kctx = SET_KCTX_PZ;
-
-	ASSERT(kctx != NULL);
+	au_kcontext_t	*kctx = GET_KCTX_PZ;
 
 	tad = U2A(u);
 
@@ -1751,7 +1692,6 @@ audit_sock(
 	au_mask_t amask;
 	const auditinfo_addr_t *ainfo;
 	au_kcontext_t	*kctx;
-	zone_status_t	zstate;
 
 	if (q->q_stream == NULL)
 		return;
@@ -1789,12 +1729,7 @@ audit_sock(
 	 */
 	tad = U2A(u);
 
-	kctx = SET_KCTX_PZ;
-	if (kctx == NULL) {
-		zstate = zone_status_get(curproc->p_zone);
-		ASSERT(zstate != ZONE_IS_READY);
-		return;
-	}
+	kctx = GET_KCTX_PZ;
 
 	/* proceed ONLY if user is being audited */
 	if (!tad->tad_flag)
@@ -2132,9 +2067,7 @@ audit_cryptoadm(int cmd, char *module_name, crypto_mech_name_t *mech_names,
 	token_t			*ad = NULL;
 	const auditinfo_addr_t	*ainfo = crgetauinfo(cr);
 	char			buffer[MAXNAMELEN * 2];
-	au_kcontext_t		*kctx = SET_KCTX_PZ;
-
-	ASSERT(kctx != NULL);
+	au_kcontext_t		*kctx = GET_KCTX_PZ;
 
 	tad = U2A(u);
 	if (tad == NULL)
@@ -2281,9 +2214,8 @@ audit_kssl(int cmd, void *params, int error)
 	t_audit_data_t		*tad;
 	token_t			*ad = NULL;
 	const auditinfo_addr_t	*ainfo = crgetauinfo(cr);
-	au_kcontext_t		*kctx = SET_KCTX_PZ;
+	au_kcontext_t		*kctx = GET_KCTX_PZ;
 
-	ASSERT(kctx != NULL);
 	tad = U2A(u);
 
 	if (ainfo == NULL)
