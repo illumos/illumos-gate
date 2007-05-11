@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -7585,6 +7585,9 @@ bus_config_all_phcis(mdi_vhci_cache_t *vhcache, uint_t flags,
 
 	for (cphci = vhcache->vhcache_phci_head; cphci != NULL;
 	    cphci = cphci->cphci_next) {
+		/* skip phcis that haven't attached before root is available */
+		if (!modrootloaded && (cphci->cphci_phci == NULL))
+			continue;
 		phbc = kmem_zalloc(sizeof (*phbc), KM_SLEEP);
 		phbc->phbc_phci_path = i_ddi_strdup(cphci->cphci_path,
 		    KM_SLEEP);
