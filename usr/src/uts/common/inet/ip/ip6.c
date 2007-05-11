@@ -8844,7 +8844,6 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 		ipfb->ipfb_count += ipf->ipf_count;
 		ASSERT(ipfb->ipfb_count > 0);	/* Wraparound */
 		ill->ill_frag_count += ipf->ipf_count;
-		ASSERT(ill->ill_frag_count > 0);	/* Wraparound */
 		/* If the frag timer wasn't already going, start it. */
 		mutex_enter(&ill->ill_lock);
 		ill_frag_timer_start(ill);
@@ -8892,7 +8891,6 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 		ipfb->ipfb_count += msg_len;
 		ASSERT(ipfb->ipfb_count > 0);	/* Wraparound */
 		ill->ill_frag_count += msg_len;
-		ASSERT(ill->ill_frag_count > 0);	/* Wraparound */
 		if (more_frags) {
 			/* More to come. */
 			ipf->ipf_end = end;
@@ -8924,7 +8922,6 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 			ipfb->ipfb_count += count;
 			ASSERT(ipfb->ipfb_count > 0);	/* Wraparound */
 			ill->ill_frag_count += count;
-			ASSERT(ill->ill_frag_count > 0); /* Wraparound */
 		}
 		if (ret == IP_REASS_PARTIAL) {
 			goto partial_reass_done;

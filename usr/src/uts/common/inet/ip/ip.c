@@ -12682,7 +12682,6 @@ reass_done:
 		ipfb->ipfb_count += ipf->ipf_count;
 		ASSERT(ipfb->ipfb_count > 0);	/* Wraparound */
 		ill->ill_frag_count += ipf->ipf_count;
-		ASSERT(ill->ill_frag_count > 0); /* Wraparound */
 		/* If the frag timer wasn't already going, start it. */
 		mutex_enter(&ill->ill_lock);
 		ill_frag_timer_start(ill);
@@ -12729,7 +12728,6 @@ reass_done:
 		ipfb->ipfb_count += msg_len;
 		ASSERT(ipfb->ipfb_count > 0);	/* Wraparound */
 		ill->ill_frag_count += msg_len;
-		ASSERT(ill->ill_frag_count > 0); /* Wraparound */
 		if (frag_offset_flags & IPH_MF) {
 			/* More to come. */
 			ipf->ipf_end = end;
@@ -12755,7 +12753,6 @@ reass_done:
 			ipfb->ipfb_count += count;
 			ASSERT(ipfb->ipfb_count > 0); /* Wraparound */
 			ill->ill_frag_count += count;
-			ASSERT(ill->ill_frag_count > 0);
 		}
 		if (ret == IP_REASS_PARTIAL) {
 			goto reass_done;
