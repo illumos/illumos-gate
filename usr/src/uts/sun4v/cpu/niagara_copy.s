@@ -362,10 +362,6 @@ kcopy(const void *from, void *to, size_t count)
 	bnz,pn	%ncc, 1f
 	  stb	%l0, [THREAD_REG + T_PREEMPT]
 
-	ldsb	[THREAD_REG + T_PREEMPT], %l0
-	dec	%l0
-	stb	%l0, [THREAD_REG + T_PREEMPT]
-
 	! Check for a kernel preemption request
 	ldn	[THREAD_REG + T_CPU], %l0
 	ldub	[%l0 + CPU_KPRUNRUN], %l0
@@ -1181,9 +1177,6 @@ loop2:
 	brnz,a,pt	%l0, 1f	! Need to call kpreempt?
 	  or	%l1, KPREEMPT_FLAG, %l1	! If so, set the flag
 
-	ldsb	[THREAD_REG + T_PREEMPT], %l0
-	dec	%l0
-	stb	%l0, [THREAD_REG + T_PREEMPT]
 1:
 	btst	BCOPY_FLAG, %l1
 	bz,pn	%icc, 3f
