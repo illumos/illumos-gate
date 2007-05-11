@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -153,17 +154,15 @@ cpu_fiximp(struct cpu_node *cpunode)
 		cpunode->ecache_associativity = L2CACHE_ASSOCIATIVITY;
 }
 
-static int niagara2_cpucnt;
-
 void
-cpu_init_private(struct cpu *cp)
+cpu_map_exec_units(struct cpu *cp)
 {
-	extern int niagara_kstat_init(void);
+	ASSERT(MUTEX_HELD(&cpu_lock));
 
 	/*
 	 * The cpu_ipipe and cpu_fpu fields are initialized based on
-	 * the execution unit sharing information from the MD. They default
-	 * to the virtual CPU id in the absence of such information.
+	 * the execution unit sharing information from the MD. They
+	 * default to the CPU id in the absence of such information.
 	 */
 	cp->cpu_m.cpu_ipipe = cpunodes[cp->cpu_id].exec_unit_mapping;
 	if (cp->cpu_m.cpu_ipipe == NO_EU_MAPPING_FOUND)
@@ -177,21 +176,33 @@ cpu_init_private(struct cpu *cp)
 	 * Niagara 2 defines the core to be at the FPU level
 	 */
 	cp->cpu_m.cpu_core = cp->cpu_m.cpu_fpu;
+}
+
+static int niagara2_cpucnt;
+
+void
+cpu_init_private(struct cpu *cp)
+{
+	extern void niagara_kstat_init(void);
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	cpu_map_exec_units(cp);
+
 	if ((niagara2_cpucnt++ == 0) && (niagara2_hsvc_available == B_TRUE))
-		(void) niagara_kstat_init();
+		niagara_kstat_init();
 }
 
 /*ARGSUSED*/
 void
 cpu_uninit_private(struct cpu *cp)
 {
-	extern int niagara_kstat_fini(void);
+	extern void niagara_kstat_fini(void);
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
+
 	if ((--niagara2_cpucnt == 0) && (niagara2_hsvc_available == B_TRUE))
-		(void) niagara_kstat_fini();
+		niagara_kstat_fini();
 }
 
 /*

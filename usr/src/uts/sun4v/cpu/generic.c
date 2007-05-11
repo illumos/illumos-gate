@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -149,13 +150,14 @@ dtrace_flush_sec(uintptr_t addr)
 }
 
 void
-cpu_init_private(struct cpu *cp)
+cpu_map_exec_units(struct cpu *cp)
 {
+	ASSERT(MUTEX_HELD(&cpu_lock));
+
 	/*
 	 * The cpu_ipipe and cpu_fpu fields are initialized based on
-	 * the execution unit sharing information from the Machine
-	 * Description table. They default to the CPU id in the
-	 * absence of such information.
+	 * the execution unit sharing information from the MD. They
+	 * default to the CPU id in the absence of such information.
 	 */
 	cp->cpu_m.cpu_ipipe = cpunodes[cp->cpu_id].exec_unit_mapping;
 	if (cp->cpu_m.cpu_ipipe == NO_EU_MAPPING_FOUND)
@@ -169,9 +171,15 @@ cpu_init_private(struct cpu *cp)
 }
 
 void
-cpu_uninit_private(struct cpu *cp)
+cpu_init_private(struct cpu *cp)
 {
+	cpu_map_exec_units(cp);
 }
+
+/*ARGSUSED*/
+void
+cpu_uninit_private(struct cpu *cp)
+{}
 
 /*
  * Invalidate a TSB. Since this needs to work on all sun4v

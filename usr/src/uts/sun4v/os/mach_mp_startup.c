@@ -169,13 +169,15 @@ mp_cpu_configure(int cpuid)
 	extern int setup_cpu_common(int);
 	extern int cleanup_cpu_common(int);
 	extern void setup_exec_unit_mappings(md_t *);
-	md_t *mdp;
-	mde_cookie_t rootnode, cpunode = MDE_INVAL_ELEM_COOKIE;
-	int listsz, i;
-	mde_cookie_t *listp = NULL;
-	int	num_nodes;
-	uint64_t cpuid_prop;
 
+	md_t		*mdp;
+	mde_cookie_t	rootnode, cpunode = MDE_INVAL_ELEM_COOKIE;
+	int		listsz, i;
+	mde_cookie_t	*listp = NULL;
+	int		num_nodes;
+	uint64_t	cpuid_prop;
+	cpu_t		*cpu;
+	processorid_t	id;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 
@@ -221,9 +223,19 @@ mp_cpu_configure(int cpuid)
 	fill_cpu(mdp, cpunode);
 
 	/*
-	 * Remap all the cpunodes' execunit mappings.
+	 * Adding a CPU may cause the execution unit sharing
+	 * relationships to change. Update the mappings in
+	 * the cpunode structures.
 	 */
 	setup_exec_unit_mappings(mdp);
+
+	/* propagate the updated mappings to the CPU structures */
+	for (id = 0; id < NCPU; id++) {
+		if ((cpu = cpu_get(id)) == NULL)
+			continue;
+
+		cpu_map_exec_units(cpu);
+	}
 
 	(void) md_fini_handle(mdp);
 
@@ -231,6 +243,7 @@ mp_cpu_configure(int cpuid)
 		(void) cleanup_cpu_common(cpuid);
 		return (i);
 	}
+
 	return (0);
 }
 

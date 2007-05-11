@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +30,14 @@
 #include <vm/page.h>
 #include <vm/seg_map.h>
 
+/*ARGSUSED*/
 void
 cpu_fiximp(struct cpu_node *cpunode)
+{}
+
+/*ARGSUSED*/
+void
+cpu_map_exec_units(struct cpu *cp)
 {}
 
 void
