@@ -528,6 +528,8 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 		if (!(in->in_capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME) ||
 		    !(ic->ic_caps & IEEE80211_C_SHSLOT)) {
 			capinfo &= ~IEEE80211_CAPINFO_SHORT_SLOTTIME;
+		} else {
+			capinfo |= IEEE80211_CAPINFO_SHORT_SLOTTIME;
 		}
 		*(uint16_t *)frm = LE_16(capinfo);
 		frm += 2;

@@ -1975,7 +1975,8 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 */
 	/* 11g support is identified when we fetch the channel set */
 	if (asc->asc_have11g)
-		ic->ic_caps |= IEEE80211_C_SHPREAMBLE;
+		ic->ic_caps |= IEEE80211_C_SHPREAMBLE |
+		    IEEE80211_C_SHSLOT;		/* short slot time */
 	/*
 	 * Query the hal to figure out h/w crypto support.
 	 */
