@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -305,12 +305,24 @@ bufchk(char *buf, int64_t len, fsck_ino_t inum)
 	caddr_t end = buf + len;
 	int64_t recsz = 0;
 	int64_t min_recsz = FSD_RECSZ(fsdp, sizeof (*fsdp));
+	struct shadowclientinfo *sci;
+	struct shadowclients *scc;
+	fsck_ino_t target;
+	int numtargets = 0;
+
+	/*
+	 * check we have a non-zero length for this shadow inode
+	 */
+	if (len == 0) {
+		pwarn("ACL I=%d HAS ZERO LENGTH\n", inum);
+		return (1);
+	}
 
 	(void) memset(type_counts, 0, sizeof (type_counts));
 
 	/* LINTED pointer cast alignment (aligned buffer always passed in) */
 	for (fsdp = (ufs_fsd_t *)buf;
-	    ((caddr_t)fsdp + recsz) <= end;
+	    (caddr_t)fsdp < end;
 	    /* LINTED as per the above */
 	    fsdp = (ufs_fsd_t *)((caddr_t)fsdp + recsz)) {
 
@@ -524,11 +536,26 @@ bufchk(char *buf, int64_t len, fsck_ino_t inum)
 	}
 
 	/*
-	 * If there are default acls, we better be looking at something
-	 * that's a directory or an xattr directory.
+	 * If there are default acls, then the shadow inode's clients
+	 * must be a directory or an xattr directory.
 	 */
-	if (numdefs != 0 && !INO_IS_DVALID(inum)) {
-		return (1);
+	if (numdefs != 0) {
+		/* This is an ACL so find it's clients */
+		for (sci = shadowclientinfo; sci != NULL; sci = sci->next)
+			if (sci->shadow == inum)
+			    break;
+		if ((sci ==  NULL) || (sci->clients == NULL))
+			return (1);
+
+		/* Got shadow info, now look at clients */
+		for (scc = sci->clients; scc != NULL; scc = scc->next) {
+			for (numtargets = 0; numtargets < scc->nclients;
+			    numtargets++) {
+				target = scc->client[numtargets];
+				if (!INO_IS_DVALID(target))
+					return (1);
+			}
+		}
 	}
 
 	if (tcp_all->ndef_groups && !tcp_all->ndef_class_objs) {
