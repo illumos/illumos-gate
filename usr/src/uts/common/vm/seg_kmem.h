@@ -114,7 +114,7 @@ typedef struct segkmem_lpcb {
 	uint64_t	alloc_bytes_failed;
 } segkmem_lpcb_t;
 
-extern void	*segkmem_alloc_lp(vmem_t *, size_t *, int);
+extern void	*segkmem_alloc_lp(vmem_t *, size_t *, size_t, int);
 extern void	segkmem_free_lp(vmem_t *, void *, size_t);
 extern int	segkmem_lpsetup();
 extern void	segkmem_heap_lp_init(void);

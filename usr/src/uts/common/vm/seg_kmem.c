@@ -1244,8 +1244,9 @@ segkmem_free_one_lp(caddr_t addr, size_t size)
  * it was not able to satisfy the upgraded request it then calls regular
  * segkmem_alloc() that satisfies the request by importing from "*vmp" arena
  */
+/*ARGSUSED*/
 void *
-segkmem_alloc_lp(vmem_t *vmp, size_t *sizep, int vmflag)
+segkmem_alloc_lp(vmem_t *vmp, size_t *sizep, size_t align, int vmflag)
 {
 	size_t size;
 	kthread_t *t = curthread;

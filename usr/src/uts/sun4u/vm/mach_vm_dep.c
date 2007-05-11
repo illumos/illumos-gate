@@ -332,6 +332,14 @@ contig_mem_init(void)
 	/* not applicable to sun4u */
 }
 
+/*ARGSUSED*/
+caddr_t
+contig_mem_prealloc(caddr_t alloc_base, pgcnt_t npages)
+{
+	/* not applicable to sun4u */
+	return (alloc_base);
+}
+
 size_t
 exec_get_spslew(void)
 {

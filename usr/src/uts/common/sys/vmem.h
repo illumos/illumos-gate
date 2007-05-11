@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,9 +72,13 @@ extern "C" {
 #define	VMC_IDENTIFIER	0x00040000	/* not backed by memory */
 /*
  * internal use only;	the import function uses the vmem_ximport_t interface
- *			and may increase the request size if it so desires
+ *			and may increase the request size if it so desires.
+ *			VMC_XALIGN, for use with vmem_xcreate, specifies that
+ *			the address returned by the import function will be
+ *			aligned according to the alignment argument.
  */
 #define	VMC_XALLOC	0x00080000
+#define	VMC_XALIGN	0x00100000
 #define	VMC_FLAGS	0xFFFF0000
 
 /*
@@ -110,7 +113,7 @@ typedef void (vmem_free_t)(vmem_t *, void *, size_t);
  * Alternate import style; the requested size is passed in a pointer,
  * which can be increased by the import function if desired.
  */
-typedef void *(vmem_ximport_t)(vmem_t *, size_t *, int);
+typedef void *(vmem_ximport_t)(vmem_t *, size_t *, size_t, int);
 
 #ifdef _KERNEL
 extern vmem_t *vmem_init(const char *, void *, size_t, size_t,

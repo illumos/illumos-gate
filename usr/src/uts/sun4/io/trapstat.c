@@ -1592,8 +1592,11 @@ trapstat_go()
 	 */
 	tstat_va = contig_mem_alloc(MMU_PAGESIZE4M);
 	tstat_pfn = va_to_pfn(tstat_va);
-	if (tstat_pfn == PFN_INVALID)
+	if (tstat_pfn == PFN_INVALID) {
+		mutex_exit(&tstat_lock);
+		mutex_exit(&cpu_lock);
 		return (EAGAIN);
+	}
 
 	/*
 	 * For detailed TLB statistics, invoke CPU specific interface
@@ -1609,6 +1612,8 @@ trapstat_go()
 			tstat_fast_tlbstat = B_TRUE;
 		else if (error != ENOTSUP) {
 			contig_mem_free(tstat_va, MMU_PAGESIZE4M);
+			mutex_exit(&tstat_lock);
+			mutex_exit(&cpu_lock);
 			return (error);
 		}
 	}

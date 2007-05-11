@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1050,7 +1049,8 @@ do_alloc:
 			size_t aquantum = MAX(vmp->vm_quantum,
 			    vmp->vm_source->vm_quantum);
 			size_t aphase = phase;
-			if (align > aquantum) {
+			if ((align > aquantum) &&
+			    !(vmp->vm_cflags & VMC_XALIGN)) {
 				aphase = (P2PHASE(phase, aquantum) != 0) ?
 				    align - vmp->vm_quantum : align - aquantum;
 				ASSERT(aphase >= phase);
@@ -1081,10 +1081,12 @@ do_alloc:
 				size_t oasize = asize;
 				vaddr = ((vmem_ximport_t *)
 				    vmp->vm_source_alloc)(vmp->vm_source,
-				    &asize, vmflag & VM_KMFLAGS);
+				    &asize, align, vmflag & VM_KMFLAGS);
 				ASSERT(asize >= oasize);
 				ASSERT(P2PHASE(asize,
 				    vmp->vm_source->vm_quantum) == 0);
+				ASSERT(!(vmp->vm_cflags & VMC_XALIGN) ||
+				    IS_P2ALIGNED(vaddr, align));
 			} else {
 				vaddr = vmp->vm_source_alloc(vmp->vm_source,
 				    asize, vmflag & VM_KMFLAGS);
@@ -1553,8 +1555,8 @@ vmem_create(const char *name, void *base, size_t size, size_t quantum,
     vmem_alloc_t *afunc, vmem_free_t *ffunc, vmem_t *source,
     size_t qcache_max, int vmflag)
 {
-	ASSERT(!(vmflag & VMC_XALLOC));
-	vmflag &= ~VMC_XALLOC;
+	ASSERT(!(vmflag & (VMC_XALLOC | VMC_XALIGN)));
+	vmflag &= ~(VMC_XALLOC | VMC_XALIGN);
 
 	return (vmem_create_common(name, base, size, quantum,
 	    afunc, ffunc, source, qcache_max, vmflag));

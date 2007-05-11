@@ -41,6 +41,8 @@ extern "C" {
 #define	NIAGARA2_HSVC_MAJOR	1
 #define	NIAGARA2_HSVC_MINOR	0
 
+#define	NIAGARA2_PREALLOC_BASE	MB(196)
+
 /* PIC overflow range is -16 to -1 */
 #define	PIC_IN_OV_RANGE(x)	(((uint32_t)x >= 0xfffffff0) ? 1 : 0)
 

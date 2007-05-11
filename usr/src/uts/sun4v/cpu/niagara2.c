@@ -78,6 +78,7 @@ cpu_setup(void)
 {
 	extern int mmu_exported_pagesize_mask;
 	extern int cpc_has_overflow_intr;
+	extern size_t contig_mem_prealloc_base;
 	int status;
 
 	/*
@@ -133,6 +134,8 @@ cpu_setup(void)
 	max_uheap_lpsize = MMU_PAGESIZE4M;
 	max_ustack_lpsize = MMU_PAGESIZE4M;
 	max_privmap_lpsize = MMU_PAGESIZE4M;
+
+	contig_mem_prealloc_base = NIAGARA2_PREALLOC_BASE;
 }
 
 /*

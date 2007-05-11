@@ -70,6 +70,7 @@ extern void setup_trap_table(void);
 extern int cpu_intrq_setup(struct cpu *);
 extern void cpu_intrq_register(struct cpu *);
 extern void contig_mem_init(void);
+extern caddr_t contig_mem_prealloc(caddr_t, pgcnt_t);
 extern void mach_dump_buffer_init(void);
 extern void mach_descrip_init(void);
 extern void mach_descrip_startup_fini(void);
@@ -1133,6 +1134,11 @@ startup_memlist(void)
 		PRM_DEBUG(khme_hash);
 		PRM_DEBUG(uhme_hash);
 	}
+
+	/*
+	 * Allow for an early allocation of physically contiguous memory.
+	 */
+	alloc_base = contig_mem_prealloc(alloc_base, npages);
 
 	/*
 	 * Allocate the remaining page freelists.  NUMA systems can

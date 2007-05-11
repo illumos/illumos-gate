@@ -111,6 +111,63 @@ size_t max_utext_lpsize = MMU_PAGESIZE4M;
 size_t max_shm_lpsize = MMU_PAGESIZE4M;
 
 /*
+ * Contiguous memory allocator data structures and variables.
+ *
+ * The sun4v kernel must provide a means to allocate physically
+ * contiguous, non-relocatable memory. The contig_mem_arena
+ * and contig_mem_slab_arena exist for this purpose. Allocations
+ * that require physically contiguous non-relocatable memory should
+ * be made using contig_mem_alloc() or contig_mem_alloc_align()
+ * which return memory from contig_mem_arena or contig_mem_reloc_arena.
+ * These arenas import memory from the contig_mem_slab_arena one
+ * contiguous chunk at a time.
+ *
+ * When importing slabs, an attempt is made to allocate a large page
+ * to use as backing. As a result of the non-relocatable requirement,
+ * slabs are allocated from the kernel cage freelists. If the cage does
+ * not contain any free contiguous chunks large enough to satisfy the
+ * slab allocation, the slab size will be downsized and the operation
+ * retried. Large slab sizes are tried first to minimize cage
+ * fragmentation. If the slab allocation is unsuccessful still, the slab
+ * is allocated from outside the kernel cage. This is undesirable because,
+ * until slabs are freed, it results in non-relocatable chunks scattered
+ * throughout physical memory.
+ *
+ * Allocations from the contig_mem_arena are backed by slabs from the
+ * cage. Allocations from the contig_mem_reloc_arena are backed by
+ * slabs allocated outside the cage. Slabs are left share locked while
+ * in use to prevent non-cage slabs from being relocated.
+ *
+ * Since there is no guarantee that large pages will be available in
+ * the kernel cage, contiguous memory is reserved and added to the
+ * contig_mem_arena at boot time, making it available for later
+ * contiguous memory allocations. This reserve will be used to satisfy
+ * contig_mem allocations first and it is only when the reserve is
+ * completely allocated that new slabs will need to be imported.
+ */
+static	vmem_t		*contig_mem_slab_arena;
+static	vmem_t		*contig_mem_arena;
+static	vmem_t		*contig_mem_reloc_arena;
+static	kmutex_t	contig_mem_lock;
+#define	CONTIG_MEM_ARENA_QUANTUM	64
+#define	CONTIG_MEM_SLAB_ARENA_QUANTUM	MMU_PAGESIZE64K
+
+/* contig_mem_arena import slab sizes, in decreasing size order */
+static size_t contig_mem_import_sizes[] = {
+	MMU_PAGESIZE4M,
+	MMU_PAGESIZE512K,
+	MMU_PAGESIZE64K
+};
+#define	NUM_IMPORT_SIZES	\
+	(sizeof (contig_mem_import_sizes) / sizeof (size_t))
+static size_t contig_mem_import_size_max	= MMU_PAGESIZE4M;
+size_t contig_mem_slab_size			= MMU_PAGESIZE4M;
+
+/* Boot-time allocated buffer to pre-populate the contig_mem_arena */
+static size_t prealloc_size;
+static void *prealloc_buf;
+
+/*
  * map_addr_proc() is the routine called when the system is to
  * choose an address for the user.  We will pick an address
  * range which is just below the current stack limit.  The
@@ -332,13 +389,6 @@ mmu_init_kernel_pgsz(struct hat *hat)
 {
 }
 
-#define	QUANTUM_SIZE	64
-
-static	vmem_t	*contig_mem_slab_arena;
-static	vmem_t	*contig_mem_arena;
-
-uint_t contig_mem_slab_size = MMU_PAGESIZE4M;
-
 static void *
 contig_mem_span_alloc(vmem_t *vmp, size_t size, int vmflag)
 {
@@ -348,18 +398,11 @@ contig_mem_span_alloc(vmem_t *vmp, size_t size, int vmflag)
 	pgcnt_t npages = btopr(size);
 	page_t **ppa;
 	int pgflags;
-	int i = 0;
+	spgcnt_t i = 0;
 
 
-	/*
-	 * The import request should be at least
-	 * contig_mem_slab_size because that is the
-	 * slab arena's quantum. The size can be
-	 * further restricted since contiguous
-	 * allocations larger than contig_mem_slab_size
-	 * are not supported here.
-	 */
-	ASSERT(size == contig_mem_slab_size);
+	ASSERT(size <= contig_mem_import_size_max);
+	ASSERT((size & (size - 1)) == 0);
 
 	if ((addr = vmem_xalloc(vmp, size, size, 0, 0,
 	    NULL, NULL, vmflag)) == NULL) {
@@ -367,7 +410,7 @@ contig_mem_span_alloc(vmem_t *vmp, size_t size, int vmflag)
 	}
 
 	/* The address should be slab-size aligned. */
-	ASSERT(((uintptr_t)addr & (contig_mem_slab_size - 1)) == 0);
+	ASSERT(((uintptr_t)addr & (size - 1)) == 0);
 
 	if (page_resv(npages, vmflag & VM_KMFLAGS) == 0) {
 		vmem_xfree(vmp, addr, size);
@@ -375,12 +418,8 @@ contig_mem_span_alloc(vmem_t *vmp, size_t size, int vmflag)
 	}
 
 	pgflags = PG_EXCL;
-	if ((vmflag & VM_NOSLEEP) == 0)
-		pgflags |= PG_WAIT;
-	if (vmflag & VM_PANIC)
-		pgflags |= PG_PANIC;
-	if (vmflag & VM_PUSHPAGE)
-		pgflags |= PG_PUSHPAGE;
+	if (vmflag & VM_NORELOC)
+		pgflags |= PG_NORELOC;
 
 	ppl = page_create_va_large(&kvp, (u_offset_t)(uintptr_t)addr, size,
 	    pgflags, &kvseg, addr, NULL);
@@ -398,6 +437,7 @@ contig_mem_span_alloc(vmem_t *vmp, size_t size, int vmflag)
 		ppa[i++] = pp;
 		page_sub(&ppl, pp);
 		ASSERT(page_iolock_assert(pp));
+		ASSERT(PAGE_EXCL(pp));
 		page_io_unlock(pp);
 	}
 
@@ -408,47 +448,123 @@ contig_mem_span_alloc(vmem_t *vmp, size_t size, int vmflag)
 	hat_memload_array(kas.a_hat, (caddr_t)rootpp->p_offset, size,
 	    ppa, (PROT_ALL & ~PROT_USER) | HAT_NOSYNC, HAT_LOAD_LOCK);
 
+	ASSERT(i == page_get_pagecnt(ppa[0]->p_szc));
 	for (--i; i >= 0; --i) {
+		ASSERT(ppa[i]->p_szc == ppa[0]->p_szc);
+		ASSERT(page_pptonum(ppa[i]) == page_pptonum(ppa[0]) + i);
 		(void) page_pp_lock(ppa[i], 0, 1);
-		page_unlock(ppa[i]);
+		/*
+		 * Leave the page share locked. For non-cage pages,
+		 * this would prevent memory DR if it were supported
+		 * on sun4v.
+		 */
+		page_downgrade(ppa[i]);
 	}
 
 	kmem_free(ppa, npages * sizeof (page_t *));
 	return (addr);
 }
 
-void
+/*
+ * Allocates a slab by first trying to use the largest slab size
+ * in contig_mem_import_sizes and then falling back to smaller slab
+ * sizes still large enough for the allocation. The sizep argument
+ * is a pointer to the requested size. When a slab is successfully
+ * allocated, the slab size, which must be >= *sizep and <=
+ * contig_mem_import_size_max, is returned in the *sizep argument.
+ * Returns the virtual address of the new slab.
+ */
+static void *
+span_alloc_downsize(vmem_t *vmp, size_t *sizep, size_t align, int vmflag)
+{
+	int i;
+
+	ASSERT(*sizep <= contig_mem_import_size_max);
+
+	for (i = 0; i < NUM_IMPORT_SIZES; i++) {
+		size_t page_size = contig_mem_import_sizes[i];
+
+		/*
+		 * Check that the alignment is also less than the
+		 * import (large page) size. In the case where the
+		 * alignment is larger than the size, a large page
+		 * large enough for the allocation is not necessarily
+		 * physical-address aligned to satisfy the requested
+		 * alignment. Since alignment is required to be a
+		 * power-of-2, any large page >= size && >= align will
+		 * suffice.
+		 */
+		if (*sizep <= page_size && align <= page_size) {
+			void *addr;
+			addr = contig_mem_span_alloc(vmp, page_size, vmflag);
+			if (addr == NULL)
+				continue;
+			*sizep = page_size;
+			return (addr);
+		}
+		return (NULL);
+	}
+
+	return (NULL);
+}
+
+static void *
+contig_mem_span_xalloc(vmem_t *vmp, size_t *sizep, size_t align, int vmflag)
+{
+	return (span_alloc_downsize(vmp, sizep, align, vmflag | VM_NORELOC));
+}
+
+static void *
+contig_mem_reloc_span_xalloc(vmem_t *vmp, size_t *sizep, size_t align,
+    int vmflag)
+{
+	ASSERT((vmflag & VM_NORELOC) == 0);
+	return (span_alloc_downsize(vmp, sizep, align, vmflag));
+}
+
+/*
+ * Free a span, which is always exactly one large page.
+ */
+static void
 contig_mem_span_free(vmem_t *vmp, void *inaddr, size_t size)
 {
 	page_t *pp;
 	caddr_t addr = inaddr;
 	caddr_t eaddr;
 	pgcnt_t npages = btopr(size);
-	pgcnt_t pgs_left = npages;
 	page_t *rootpp = NULL;
 
-	ASSERT(((uintptr_t)addr & (contig_mem_slab_size - 1)) == 0);
+	ASSERT(size <= contig_mem_import_size_max);
+	/* All slabs should be size aligned */
+	ASSERT(((uintptr_t)addr & (size - 1)) == 0);
 
 	hat_unload(kas.a_hat, addr, size, HAT_UNLOAD_UNLOCK);
 
 	for (eaddr = addr + size; addr < eaddr; addr += PAGESIZE) {
-		pp = page_lookup(&kvp, (u_offset_t)(uintptr_t)addr, SE_EXCL);
-		if (pp == NULL)
+		pp = page_find(&kvp, (u_offset_t)(uintptr_t)addr);
+		if (pp == NULL) {
 			panic("contig_mem_span_free: page not found");
+		}
+		if (!page_tryupgrade(pp)) {
+			page_unlock(pp);
+			pp = page_lookup(&kvp,
+			    (u_offset_t)(uintptr_t)addr, SE_EXCL);
+			if (pp == NULL)
+				panic("contig_mem_span_free: page not found");
+		}
 
 		ASSERT(PAGE_EXCL(pp));
+		ASSERT(size == page_get_pagesize(pp->p_szc));
+		ASSERT(rootpp == NULL || rootpp->p_szc == pp->p_szc);
+		ASSERT(rootpp == NULL || (page_pptonum(rootpp) +
+		    (pgcnt_t)btop(addr - (caddr_t)inaddr) == page_pptonum(pp)));
+
 		page_pp_unlock(pp, 0, 1);
 
 		if (rootpp == NULL)
 			rootpp = pp;
-		if (--pgs_left == 0) {
-			/*
-			 * similar logic to segspt_free_pages, but we know we
-			 * have one large page.
-			 */
-			page_destroy_pages(rootpp);
-		}
 	}
+	page_destroy_pages(rootpp);
 	page_unresv(npages);
 
 	if (vmp != NULL)
@@ -456,29 +572,30 @@ contig_mem_span_free(vmem_t *vmp, void *inaddr, size_t size)
 }
 
 static void *
-contig_vmem_xalloc_aligned_wrapper(vmem_t *vmp, size_t size, int vmflag)
+contig_vmem_xalloc_aligned_wrapper(vmem_t *vmp, size_t *sizep, size_t align,
+    int vmflag)
 {
-	return (vmem_xalloc(vmp, size, size, 0, 0, NULL, NULL, vmflag));
+	ASSERT((align & (align - 1)) == 0);
+	return (vmem_xalloc(vmp, *sizep, align, 0, 0, NULL, NULL, vmflag));
 }
 
 /*
- * conting_mem_alloc_align allocates real contiguous memory with the specified
- * alignment upto contig_mem_slab_size. The alignment must be a power of 2.
+ * contig_mem_alloc, contig_mem_alloc_align
+ *
+ * Caution: contig_mem_alloc and contig_mem_alloc_align should be
+ * used only when physically contiguous non-relocatable memory is
+ * required. Furthermore, use of these allocation routines should be
+ * minimized as well as should the allocation size. As described in the
+ * contig_mem_arena comment block above, slab allocations fall back to
+ * being outside of the cage. Therefore, overuse of these allocation
+ * routines can lead to non-relocatable large pages being allocated
+ * outside the cage. Such pages prevent the allocation of a larger page
+ * occupying overlapping pages. This can impact performance for
+ * applications that utilize e.g. 256M large pages.
  */
-void *
-contig_mem_alloc_align(size_t size, size_t align)
-{
-	ASSERT(align <= contig_mem_slab_size);
-
-	if ((align & (align - 1)) != 0)
-		return (NULL);
-
-	return (vmem_xalloc(contig_mem_arena, size, align, 0, 0,
-	    NULL, NULL, VM_NOSLEEP));
-}
 
 /*
- * Allocates size aligned contiguous memory upto contig_mem_slab_size.
+ * Allocates size aligned contiguous memory up to contig_mem_import_size_max.
  * Size must be a power of 2.
  */
 void *
@@ -488,33 +605,130 @@ contig_mem_alloc(size_t size)
 	return (contig_mem_alloc_align(size, size));
 }
 
+/*
+ * contig_mem_alloc_align allocates real contiguous memory with the specified
+ * alignment up to contig_mem_import_size_max. The alignment must be a
+ * power of 2 and no greater than contig_mem_import_size_max. We assert
+ * the aligment is a power of 2. For non-debug, vmem_xalloc will panic
+ * for non power of 2 alignments.
+ */
+void *
+contig_mem_alloc_align(size_t size, size_t align)
+{
+	void *buf;
+
+	ASSERT(size <= contig_mem_import_size_max);
+	ASSERT(align <= contig_mem_import_size_max);
+	ASSERT((align & (align - 1)) == 0);
+
+	if (align < CONTIG_MEM_ARENA_QUANTUM)
+		align = CONTIG_MEM_ARENA_QUANTUM;
+
+	/*
+	 * We take the lock here to serialize span allocations.
+	 * We do not lose concurrency for the common case, since
+	 * allocations that don't require new span allocations
+	 * are serialized by vmem_xalloc. Serializing span
+	 * allocations also prevents us from trying to allocate
+	 * more spans that necessary.
+	 */
+	mutex_enter(&contig_mem_lock);
+
+	buf = vmem_xalloc(contig_mem_arena, size, align, 0, 0,
+	    NULL, NULL, VM_NOSLEEP | VM_NORELOC);
+
+	if ((buf == NULL) && (size <= MMU_PAGESIZE)) {
+		mutex_exit(&contig_mem_lock);
+		return (vmem_xalloc(static_alloc_arena, size, align, 0, 0,
+		    NULL, NULL, VM_NOSLEEP));
+	}
+
+	if (buf == NULL) {
+		buf = vmem_xalloc(contig_mem_reloc_arena, size, align, 0, 0,
+		    NULL, NULL, VM_NOSLEEP);
+	}
+
+	mutex_exit(&contig_mem_lock);
+
+	return (buf);
+}
+
 void
 contig_mem_free(void *vaddr, size_t size)
 {
-	vmem_xfree(contig_mem_arena, vaddr, size);
+	if (vmem_contains(contig_mem_arena, vaddr, size)) {
+		vmem_xfree(contig_mem_arena, vaddr, size);
+	} else if (size > MMU_PAGESIZE) {
+		vmem_xfree(contig_mem_reloc_arena, vaddr, size);
+	} else {
+		vmem_xfree(static_alloc_arena, vaddr, size);
+	}
 }
 
 /*
  * We create a set of stacked vmem arenas to enable us to
- * allocate large >PAGESIZE chucks of contiguous Real Address space
- * This is  what the Dynamics TSB support does for TSBs.
- * The contig_mem_arena import functions are exactly the same as the
- * TSB kmem_default arena import functions.
+ * allocate large >PAGESIZE chucks of contiguous Real Address space.
+ * The vmem_xcreate interface is used to create the contig_mem_arena
+ * allowing the import routine to downsize the requested slab size
+ * and return a smaller slab.
  */
 void
 contig_mem_init(void)
 {
+	mutex_init(&contig_mem_lock, NULL, MUTEX_DEFAULT, NULL);
 
-	contig_mem_slab_arena = vmem_create("contig_mem_slab_arena", NULL, 0,
-	    contig_mem_slab_size, contig_vmem_xalloc_aligned_wrapper,
-	    vmem_xfree, heap_arena, 0, VM_SLEEP);
+	contig_mem_slab_arena = vmem_xcreate("contig_mem_slab_arena", NULL, 0,
+	    CONTIG_MEM_SLAB_ARENA_QUANTUM, contig_vmem_xalloc_aligned_wrapper,
+	    vmem_xfree, heap_arena, 0, VM_SLEEP | VMC_XALIGN);
 
-	contig_mem_arena = vmem_create("contig_mem_arena", NULL, 0,
-	    QUANTUM_SIZE, contig_mem_span_alloc, contig_mem_span_free,
-	    contig_mem_slab_arena, 0, VM_SLEEP | VM_BESTFIT);
+	contig_mem_arena = vmem_xcreate("contig_mem_arena", NULL, 0,
+	    CONTIG_MEM_ARENA_QUANTUM, contig_mem_span_xalloc,
+	    contig_mem_span_free, contig_mem_slab_arena, 0,
+	    VM_SLEEP | VM_BESTFIT | VMC_XALIGN);
 
+	contig_mem_reloc_arena = vmem_xcreate("contig_mem_reloc_arena", NULL, 0,
+	    CONTIG_MEM_ARENA_QUANTUM, contig_mem_reloc_span_xalloc,
+	    contig_mem_span_free, contig_mem_slab_arena, 0,
+	    VM_SLEEP | VM_BESTFIT | VMC_XALIGN);
+
+	if (vmem_add(contig_mem_arena, prealloc_buf, prealloc_size,
+	    VM_SLEEP) == NULL)
+		cmn_err(CE_PANIC, "Failed to pre-populate contig_mem_arena");
 }
 
+/*
+ * In calculating how much memory to pre-allocate, we include a small
+ * amount per-CPU to account for per-CPU buffers in line with measured
+ * values for different size systems. contig_mem_prealloc_base is the
+ * base fixed amount to be preallocated before considering per-CPU
+ * requirements and memory size. We take the minimum of
+ * contig_mem_prealloc_base and a small percentage of physical memory
+ * to prevent allocating too much on smaller systems.
+ */
+#define	PREALLOC_PER_CPU	(256 * 1024)		/* 256K */
+#define	PREALLOC_PERCENT	(4)			/* 4% */
+#define	PREALLOC_MIN		(16 * 1024 * 1024)	/* 16M */
+size_t contig_mem_prealloc_base = 0;
+
+/*
+ * Called at boot-time allowing pre-allocation of contiguous memory.
+ * The argument 'alloc_base' is the requested base address for the
+ * allocation and originates in startup_memlist.
+ */
+caddr_t
+contig_mem_prealloc(caddr_t alloc_base, pgcnt_t npages)
+{
+	prealloc_size = MIN((PREALLOC_PER_CPU * ncpu_guest_max) +
+	    contig_mem_prealloc_base, (ptob(npages) * PREALLOC_PERCENT) / 100);
+	prealloc_size = MAX(prealloc_size, PREALLOC_MIN);
+	prealloc_size = P2ROUNDUP(prealloc_size, MMU_PAGESIZE4M);
+
+	alloc_base = (caddr_t)roundup((uintptr_t)alloc_base, MMU_PAGESIZE4M);
+	prealloc_buf = alloc_base;
+	alloc_base += prealloc_size;
+
+	return (alloc_base);
+}
 
 static uint_t sp_color_stride = 16;
 static uint_t sp_color_mask = 0x1f;

@@ -480,6 +480,7 @@ extern uint64_t cpu_q_entries;
 extern uint64_t dev_q_entries;
 extern uint64_t cpu_rq_entries;
 extern uint64_t cpu_nrq_entries;
+extern uint64_t ncpu_guest_max;
 #endif /* _ASM */
 
 #endif /* _KERNEL */

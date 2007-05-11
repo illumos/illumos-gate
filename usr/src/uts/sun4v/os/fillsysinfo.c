@@ -60,6 +60,7 @@ uint64_t cpu_q_entries;
 uint64_t dev_q_entries;
 uint64_t cpu_rq_entries;
 uint64_t cpu_nrq_entries;
+uint64_t ncpu_guest_max;
 
 void fill_cpu(md_t *, mde_cookie_t);
 
@@ -654,7 +655,6 @@ get_q_sizes(md_t *mdp, mde_cookie_t cpu_node_cookie)
 {
 	uint64_t max_qsize;
 	mde_cookie_t *platlist;
-	uint64_t ncpus = NCPU;
 	int nrnode;
 
 	/*
@@ -667,8 +667,9 @@ get_q_sizes(md_t *mdp, mde_cookie_t cpu_node_cookie)
 
 	ASSERT(nrnode == 1);
 
-	(void) md_get_prop_val(mdp, platlist[0], "max-cpus", &ncpus);
-	max_qsize = ncpus * CPU_MONDO_Q_MULTIPLIER;
+	ncpu_guest_max = NCPU;
+	(void) md_get_prop_val(mdp, platlist[0], "max-cpus", &ncpu_guest_max);
+	max_qsize = ncpu_guest_max * CPU_MONDO_Q_MULTIPLIER;
 
 	md_free_scan_dag(mdp, &platlist);
 
