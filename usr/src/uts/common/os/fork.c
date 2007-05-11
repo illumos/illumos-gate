@@ -272,6 +272,8 @@ cfork(int isvfork, int isfork1, int flags)
 
 		error = as_dup(p->p_as, &cp->p_as);
 		if (error != 0) {
+			mutex_enter(&p->p_lock);
+			sprunlock(p);
 			fork_fail(cp);
 			mutex_enter(&pidlock);
 			orphpp = &p->p_orphan;
@@ -298,7 +300,7 @@ cfork(int isvfork, int isfork1, int flags)
 			p->p_flag &= ~SFORKING;
 			pool_barrier_exit();
 			continuelwps(p);
-			sprunlock(p);
+			mutex_exit(&p->p_lock);
 			/*
 			 * Preserve ENOMEM error condition but
 			 * map all others to EAGAIN.
