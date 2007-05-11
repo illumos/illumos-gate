@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1036,9 +1036,14 @@ sbbc_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 	switch (infocmd) {
 		case DDI_INFO_DEVT2DEVINFO:
 			sbbcsoftp = (struct sbbcsoft *)
-				ddi_get_soft_state(sbbcsoft_statep, instance);
-			*result = sbbcsoftp->dip;
-			ret = DDI_SUCCESS;
+			    ddi_get_soft_state(sbbcsoft_statep, instance);
+			if (sbbcsoftp == NULL) {
+				*result = (void *) NULL;
+				ret = DDI_FAILURE;
+			} else {
+				*result = sbbcsoftp->dip;
+				ret = DDI_SUCCESS;
+			}
 			break;
 		case DDI_INFO_DEVT2INSTANCE:
 			*result = (void *)(uintptr_t)instance;
