@@ -71,10 +71,12 @@ io_dev_addlabel(void)
 
 	node_count = md_node_count(mdp);
 	if (node_count == 0) {
-		pri_debug(LOG_NOTICE, "io_dev_addlabel: no nodes to process\n");
+		pri_debug(LOG_NOTICE, "io_dev_addlabel: no nodes to "
+		    "process\n");
 		return;
 	}
-	components = (mde_cookie_t *)malloc(node_count * sizeof (mde_cookie_t));
+	components = (mde_cookie_t *)malloc(node_count *
+	    sizeof (mde_cookie_t));
 	if (components == NULL) {
 		pri_debug(LOG_NOTICE,
 		    "io_dev_addlabel: can't get memory for IO nodes\n");
@@ -92,11 +94,12 @@ io_dev_addlabel(void)
 		 * Try to fetch the "type" as a string or as "data" until we
 		 * can agree on what its tag type should be.
 		 */
-		if (md_get_prop_str(mdp, components[i], "type", &type) == -1) {
+		if (md_get_prop_str(mdp, components[i], "type", &type) ==
+		    -1) {
 			if (md_get_prop_data(mdp, components[i], "type",
 			    (uint8_t **)&type, &type_size)) {
-				pri_debug(LOG_NOTICE, "io_add_devlabel: can't "
-				    "get type for component %d\n", i);
+				pri_debug(LOG_NOTICE, "io_add_devlabel: "
+				    "can't get type for component %d\n", i);
 			continue;
 			}
 		}
@@ -122,7 +125,8 @@ io_dev_addlabel(void)
 		} else
 			nac_size = strlen(nac) + 1;
 
-		if (md_get_prop_str(mdp, components[i], "path", &path) == -1) {
+		if (md_get_prop_str(mdp, components[i], "path", &path) ==
+		    -1) {
 			pri_debug(LOG_NOTICE,
 			    "io_add_devlabel: can't get path value for "
 			    "device <%s>\n", type);
@@ -202,8 +206,8 @@ io_dev_addlabel(void)
 		 * on the device we matched from the PRI path.
 		 */
 		for (status = PICL_SUCCESS; status == PICL_SUCCESS;
-			status = ptree_get_propval_by_name(tpn, PICL_PROP_PEER,
-			    &tpn, sizeof (picl_nodehdl_t))) {
+			status = ptree_get_propval_by_name(tpn,
+			    PICL_PROP_PEER, &tpn, sizeof (picl_nodehdl_t))) {
 			/*
 			 * Add Labels to peers that have the same bus-addr
 			 * value (ignoring the function numbers.)
@@ -218,13 +222,13 @@ io_dev_addlabel(void)
 				    picl_strerror(substatus));
 			} else {
 				/*
-				 * If the nac doesn't include a specific
+				 * If the PRI path doesn't include a specific
 				 * function number then don't look for one
 				 * in the bus-addr.  Devices on PCI-X bridges
 				 * may have a function number in the path,
 				 * so don't ignore that.
 				 */
-				if (strchr(nac, ',') == NULL) {
+				if (strchr(saved_path, ',') == NULL) {
 					if ((q = strchr(busaddr, ',')) !=
 					    NULL) {
 						*q = '\0';
@@ -291,8 +295,8 @@ find_node_by_string_prop(picl_nodehdl_t rooth, const char *pname,
 
 	for (err = ptree_get_propval_by_name(rooth, PICL_PROP_CHILD, &childh,
 	    sizeof (picl_nodehdl_t)); err != PICL_PROPNOTFOUND;
-		err = ptree_get_propval_by_name(childh, PICL_PROP_PEER, &childh,
-		    sizeof (picl_nodehdl_t))) {
+		err = ptree_get_propval_by_name(childh, PICL_PROP_PEER,
+		    &childh, sizeof (picl_nodehdl_t))) {
 		if (err != PICL_SUCCESS)
 			return (err);
 
