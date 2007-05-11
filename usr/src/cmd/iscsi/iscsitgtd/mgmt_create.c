@@ -294,7 +294,7 @@ error:
 	if (size != NULL)
 		free(size);
 	if (alias != NULL)
-		free(name);
+		free(alias);
 	if (backing != NULL)
 		free(backing);
 	if (node_name != NULL)

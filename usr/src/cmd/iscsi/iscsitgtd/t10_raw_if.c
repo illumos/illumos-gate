@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -408,7 +408,7 @@ raw_read(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 
 	do {
 		min = MIN((cnt * 512) - offset, T10_MAX_OUT(cmd));
-		if ((offset * min) < (cnt * 512LL))
+		if ((offset + min) < (cnt * 512LL))
 			c = trans_cmd_dup(cmd);
 		else
 			c = cmd;
@@ -794,7 +794,6 @@ raw_write_cmplt(emul_handle_t e)
 		raw_write(cmd, cmd->c_cdb, cmd->c_cdb_len);
 		return;
 	}
-	raw_free_io(io);
 	trans_send_complete(cmd, STATUS_GOOD);
 }
 

@@ -781,6 +781,7 @@ spc_report_tpgs(t10_cmd_t *cmd, uint8_t *cdb, size_t cdb_len)
 		tp->rel_tpi[0] = hibyte(loword(lu_per->l_targ->s_tp_grp));
 		tp->rel_tpi[1] = lobyte(loword(lu_per->l_targ->s_tp_grp));
 		lu_per = AVL_NEXT(&lu->l_all_open, lu_per);
+		tp++;
 	} while (lu_per != NULL);
 
 	if (trans_send_datain(cmd, (char *)r, MIN(rqst_len, alloc_len), 0,
