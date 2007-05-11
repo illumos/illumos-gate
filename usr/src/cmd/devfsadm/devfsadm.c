@@ -973,7 +973,7 @@ devi_tree_walk(struct dca_impl *dcip, int flags, char *ev_subclass)
 	 */
 	if (ev_subclass)
 		build_and_enq_event(EC_DEV_ADD, ev_subclass, dcip->dci_root,
-		    node);
+		    node, dcip->dci_minor);
 
 	if ((dcip->dci_flags & DCA_NOTIFY_RCM) && rcm_hdl)
 		(void) notify_rcm(node, dcip->dci_minor);
@@ -1567,29 +1567,25 @@ event_handler(sysevent_t *ev)
 		    &path)) != 0)
 			goto out;
 
-		if (strcmp(subclass, ESC_DEVFS_DEVI_ADD) == 0 ||
-		    strcmp(subclass, ESC_DEVFS_DEVI_REMOVE) == 0) {
-			if (nvlist_lookup_string(attr_list, DEVFS_DEVI_CLASS,
-			    &dev_ev_subclass) != 0)
-				dev_ev_subclass = NULL;
+		if (nvlist_lookup_string(attr_list, DEVFS_DEVI_CLASS,
+		    &dev_ev_subclass) != 0)
+			dev_ev_subclass = NULL;
 
-			if (nvlist_lookup_string(attr_list, DEVFS_DRIVER_NAME,
-			    &driver_name) != 0)
-				driver_name = NULL;
+		if (nvlist_lookup_string(attr_list, DEVFS_DRIVER_NAME,
+		    &driver_name) != 0)
+			driver_name = NULL;
 
-			if (nvlist_lookup_int32(attr_list, DEVFS_INSTANCE,
-			    &instance) != 0)
-				instance = -1;
+		if (nvlist_lookup_int32(attr_list, DEVFS_INSTANCE,
+		    &instance) != 0)
+			instance = -1;
 
-			if (nvlist_lookup_int32(attr_list, DEVFS_BRANCH_EVENT,
-			    &branch_event) != 0)
-				branch_event = 0;
+		if (nvlist_lookup_int32(attr_list, DEVFS_BRANCH_EVENT,
+		    &branch_event) != 0)
+			branch_event = 0;
 
-		} else {
-			if (nvlist_lookup_string(attr_list, DEVFS_MINOR_NAME,
-			    &minor) != 0)
-				minor = NULL;
-		}
+		if (nvlist_lookup_string(attr_list, DEVFS_MINOR_NAME,
+		    &minor) != 0)
+			minor = NULL;
 
 		lock_dev();
 
@@ -1597,21 +1593,24 @@ event_handler(sysevent_t *ev)
 			add_minor_pathname(path, NULL, dev_ev_subclass);
 			if (branch_event) {
 				build_and_enq_event(EC_DEV_BRANCH,
-				    ESC_DEV_BRANCH_ADD, path, DI_NODE_NIL);
+				    ESC_DEV_BRANCH_ADD, path, DI_NODE_NIL,
+				    NULL);
 			}
 
 		} else if (strcmp(ESC_DEVFS_MINOR_CREATE, subclass) == 0) {
-			add_minor_pathname(path, minor, NULL);
+			add_minor_pathname(path, minor, dev_ev_subclass);
 
 		} else if (strcmp(ESC_DEVFS_MINOR_REMOVE, subclass) == 0) {
-			hot_cleanup(path, minor, NULL, NULL, -1);
+			hot_cleanup(path, minor, dev_ev_subclass, driver_name,
+			    instance);
 
 		} else { /* ESC_DEVFS_DEVI_REMOVE */
 			hot_cleanup(path, NULL, dev_ev_subclass,
 			    driver_name, instance);
 			if (branch_event) {
 				build_and_enq_event(EC_DEV_BRANCH,
-				    ESC_DEV_BRANCH_REMOVE, path, DI_NODE_NIL);
+				    ESC_DEV_BRANCH_REMOVE, path, DI_NODE_NIL,
+				    NULL);
 			}
 		}
 
@@ -1631,7 +1630,7 @@ event_handler(sysevent_t *ev)
 
 		lock_dev();
 		build_and_enq_event(EC_DEV_BRANCH, dev_ev_subclass, path,
-		    DI_NODE_NIL);
+		    DI_NODE_NIL, NULL);
 		unlock_dev(CACHE_STATE);
 	} else
 		err_print(UNKNOWN_EVENT, subclass);
@@ -4127,7 +4126,7 @@ hot_cleanup(char *node_path, char *minor_name, char *ev_subclass,
 	 */
 	if (ev_subclass != NULL)
 		nvl = build_event_attributes(EC_DEV_REMOVE, ev_subclass,
-		    node_path, DI_NODE_NIL, driver_name, instance);
+		    node_path, DI_NODE_NIL, driver_name, instance, minor_name);
 
 	(void) strcpy(path, node_path);
 	(void) strcat(path, ":");
@@ -7899,6 +7898,46 @@ lookup_disk_dev_name(char *node_path)
 }
 
 static char *
+lookup_lofi_dev_name(char *node_path, char *minor)
+{
+	struct devlink_cb_arg cb_arg;
+	char *dev_name = NULL;
+	int i;
+	int len1, len2;
+
+	cb_arg.count = 0;
+	cb_arg.rv = 0;
+	(void) di_devlink_cache_walk(devlink_cache, NULL, node_path,
+	    DI_PRIMARY_LINK, &cb_arg, devlink_cb);
+
+	if (cb_arg.rv == -1 || cb_arg.count == 0)
+		return (NULL);
+
+	/* lookup based on a minor name ending with ",raw" */
+	len1 = strlen(minor);
+	for (i = 0; i < cb_arg.count; i++) {
+		len2 = strlen(cb_arg.link_contents[i]);
+		if (len2 >= len1 &&
+		    strcmp(cb_arg.link_contents[i] + len2 - len1,
+		    minor) == 0) {
+			dev_name = s_strdup(cb_arg.dev_names[i]);
+			break;
+		}
+	}
+
+	free_dev_names(&cb_arg);
+
+	if (dev_name == NULL)
+		return (NULL);
+	if (strlen(dev_name) == 0) {
+		free(dev_name);
+		return (NULL);
+	}
+
+	return (dev_name);
+}
+
+static char *
 lookup_network_dev_name(char *node_path, char *driver_name)
 {
 	char *dev_name = NULL;
@@ -7960,7 +7999,7 @@ lookup_printer_dev_name(char *node_path)
  */
 static nvlist_t *
 build_event_attributes(char *class, char *subclass, char *node_path,
-    di_node_t node, char *driver_name, int instance)
+    di_node_t node, char *driver_name, int instance, char *minor)
 {
 	nvlist_t *nvl;
 	int err = 0;
@@ -8002,6 +8041,23 @@ build_event_attributes(char *class, char *subclass, char *node_path,
 		}
 	} else if (strcmp(subclass, ESC_PRINTER) == 0) {
 		if ((dev_name = lookup_printer_dev_name(node_path)) == NULL) {
+			dev_name_lookup_err = 1;
+			goto out;
+		}
+	} else if (strcmp(subclass, ESC_LOFI) == 0) {
+		/*
+		 * The raw minor node is created or removed after the block
+		 * node.  Lofi devfs events are dependent on this behavior.
+		 * Generate the sysevent only for the raw minor node.
+		 */
+		if (strstr(minor, "raw") == NULL) {
+			if (nvl) {
+				nvlist_free(nvl);
+			}
+			return (NULL);
+		}
+		if ((dev_name = lookup_lofi_dev_name(node_path, minor)) ==
+		    NULL) {
 			dev_name_lookup_err = 1;
 			goto out;
 		}
@@ -8124,7 +8180,7 @@ process_syseventq()
 
 static void
 build_and_enq_event(char *class, char *subclass, char *node_path,
-	di_node_t node)
+	di_node_t node, char *minor)
 {
 	nvlist_t *nvl;
 
@@ -8133,10 +8189,10 @@ build_and_enq_event(char *class, char *subclass, char *node_path,
 
 	if (node != DI_NODE_NIL)
 		nvl = build_event_attributes(class, subclass, node_path, node,
-		    di_driver_name(node), di_instance(node));
+		    di_driver_name(node), di_instance(node), minor);
 	else
 		nvl = build_event_attributes(class, subclass, node_path, node,
-		    NULL, -1);
+		    NULL, -1, minor);
 
 	if (nvl) {
 		enqueue_sysevent(class, subclass, nvl);

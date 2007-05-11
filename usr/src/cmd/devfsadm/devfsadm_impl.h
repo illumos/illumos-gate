@@ -499,9 +499,9 @@ static void (*librcm_free_handle)(rcm_handle_t *);
 static int (*librcm_notify_event)(rcm_handle_t *, char *, uint_t, nvlist_t *,
     rcm_info_t *);
 static nvlist_t *build_event_attributes(char *, char *, char *,
-    di_node_t, char *, int);
+    di_node_t, char *, int, char *);
 static void log_event(char *, char *, nvlist_t *);
-static void build_and_enq_event(char *, char *, char *, di_node_t);
+static void build_and_enq_event(char *, char *, char *, di_node_t, char *);
 
 static void read_logindevperm_file(void);
 static void set_logindev_perms(char *devlink);

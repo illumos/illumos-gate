@@ -5514,7 +5514,7 @@ i_log_devfs_minor_create(dev_info_t *dip, char *minor_name)
 	int se_flag;
 	int kmem_flag;
 	int se_err;
-	char *pathname;
+	char *pathname, *class_name;
 	sysevent_t *ev = NULL;
 	sysevent_id_t eid;
 	sysevent_value_t se_val;
@@ -5556,6 +5556,17 @@ i_log_devfs_minor_create(dev_info_t *dip, char *minor_name)
 		goto fail;
 	}
 	kmem_free(pathname, MAXPATHLEN);
+
+	/* add the device class attribute */
+	if ((class_name = i_ddi_devi_class(dip)) != NULL) {
+		se_val.value_type = SE_DATA_TYPE_STRING;
+		se_val.value.sv_string = class_name;
+		if (sysevent_add_attr(&ev_attr_list,
+		    DEVFS_DEVI_CLASS, &se_val, SE_SLEEP) != 0) {
+			sysevent_free_attr(ev_attr_list);
+			goto fail;
+		}
+	}
 
 	/*
 	 * allow for NULL minor names
@@ -5604,7 +5615,7 @@ fail:
 static int
 i_log_devfs_minor_remove(dev_info_t *dip, char *minor_name)
 {
-	char *pathname;
+	char *pathname, *class_name;
 	sysevent_t *ev;
 	sysevent_id_t eid;
 	sysevent_value_t se_val;
@@ -5658,6 +5669,35 @@ i_log_devfs_minor_remove(dev_info_t *dip, char *minor_name)
 		}
 	}
 
+	if ((class_name = i_ddi_devi_class(dip)) != NULL) {
+		/* add the device class, driver name and instance attributes */
+
+		se_val.value_type = SE_DATA_TYPE_STRING;
+		se_val.value.sv_string = class_name;
+		if (sysevent_add_attr(&ev_attr_list,
+		    DEVFS_DEVI_CLASS, &se_val, SE_SLEEP) != 0) {
+			sysevent_free_attr(ev_attr_list);
+			goto fail;
+		}
+
+		se_val.value_type = SE_DATA_TYPE_STRING;
+		se_val.value.sv_string = (char *)ddi_driver_name(dip);
+		if (sysevent_add_attr(&ev_attr_list,
+		    DEVFS_DRIVER_NAME, &se_val, SE_SLEEP) != 0) {
+			sysevent_free_attr(ev_attr_list);
+			goto fail;
+		}
+
+		se_val.value_type = SE_DATA_TYPE_INT32;
+		se_val.value.sv_int32 = ddi_get_instance(dip);
+		if (sysevent_add_attr(&ev_attr_list,
+		    DEVFS_INSTANCE, &se_val, SE_SLEEP) != 0) {
+			sysevent_free_attr(ev_attr_list);
+			goto fail;
+		}
+
+	}
+
 	if (sysevent_attach_attributes(ev, ev_attr_list) != 0) {
 		sysevent_free_attr(ev_attr_list);
 	} else {
@@ -5700,6 +5740,12 @@ derive_devi_class(dev_info_t *dip, char *node_type, int flag)
 		    node_type[sizeof (DDI_NT_PRINTER) - 1] == ':')) {
 
 			rv = i_ddi_set_devi_class(dip, ESC_PRINTER, flag);
+
+		} else if (strncmp(node_type, DDI_PSEUDO,
+		    sizeof (DDI_PSEUDO) -1) == 0 &&
+		    (strncmp(ESC_LOFI, ddi_node_name(dip),
+		    sizeof (ESC_LOFI) -1) == 0)) {
+			rv = i_ddi_set_devi_class(dip, ESC_LOFI, flag);
 		}
 	}
 

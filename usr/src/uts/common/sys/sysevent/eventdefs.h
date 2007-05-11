@@ -185,6 +185,7 @@ extern "C" {
 #define	ESC_DISK	"disk"		/* disk device */
 #define	ESC_NETWORK	"network"	/* network interface */
 #define	ESC_PRINTER	"printer"	/* printer device */
+#define	ESC_LOFI	"lofi"		/* lofi device */
 
 /*
  * EC_DEV_BRANCH subclass definitions - supporting attributes (name/value pairs)
