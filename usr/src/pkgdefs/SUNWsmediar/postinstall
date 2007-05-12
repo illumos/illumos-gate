@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,6 +34,14 @@ elif [ "${PKG_INSTALL_ROOT:-/}" = "/" ]; then
 	# live system
 	if [ -z "$SUNW_PKG_INSTALL_ZONENAME" -o "$SUNW_PKG_INSTALL_ZONENAME" = "global" ]; then
 		/usr/sbin/svcadm enable svc:/network/rpc/smserver:default
+
+		# This works around the problem of legacy volfs service removal.
+		# When r.manifest is fixed to work on alternate pkg root,
+		# the service will be deleted along with its package SUNWvolr.
+		# Until then need to invoke svccfg explicitly here. SUNWsmediar
+		# was chosen because it replaces SUNWvolr in pkghistory. This
+		# invocation is useful when upgrading from multiple CD media.
+		/usr/sbin/svccfg delete -f svc:/system/filesystem/volfs 2>/dev/null
 	fi
 else
 	# upgrade
@@ -42,10 +50,13 @@ else
 		/usr/sbin/svcadm enable svc:/network/rpc/smserver:default
 	fi
 
-	# This works around the problem of legacy volfs service removal
-	# until r.manifest is fixed to work on alternate pkg root.
-	# SUNWsmediar was chosen because it replaces SUNWvolr in pkghistory.
-	/usr/sbin/svccfg delete -f svc:/system/filesystem/volfs
+	# This works around the problem of legacy volfs service removal.
+	# When r.manifest is fixed to work on alternate pkg root,
+	# the service will be deleted along with its package SUNWvolr.
+	# Until then need to invoke svccfg explicitly here. SUNWsmediar
+	# was chosen because it replaces SUNWvolr in pkghistory. This
+	# invocation is useful when upgrading from single media (net, DVD).
+	/usr/sbin/svccfg delete -f svc:/system/filesystem/volfs 2>/dev/null
 	EOF
 fi
 

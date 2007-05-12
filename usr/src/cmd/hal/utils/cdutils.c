@@ -1,8 +1,8 @@
 /***************************************************************************
  *
- * cdutils.h : CD/DVD utilities
+ * cdutils.c : CD/DVD utilities
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
@@ -372,13 +372,21 @@ get_disc_info(int fd, disc_info_t *di)
 		return (B_FALSE);
 	}
 
+	/*
+	 * According to MMC-5 6.22.3.2, the Disc Information Length should be
+	 * 32+8*(Number of OPC Tables). Some devices, like U3 sticks, return 0.
+	 */
+	if (GET16(&buf[0]) < 32) {
+		return (B_FALSE);
+	}
+
 	di->disc_status = buf[2] & 0x03;
 	di->erasable = buf[2] & 0x10;
 	if ((buf[21] != 0) && (buf[21] != 0xff)) {
 		di->capacity = ((buf[21] * 60) + buf[22]) * 75;
 	} else {
 		di->capacity = 0;
-        }
+	}
 
 	return (B_TRUE);
 }
