@@ -208,30 +208,33 @@ zfs_name_valid(const char *name, zfs_type_t type)
  * This function takes the raw DSL properties, and filters out the user-defined
  * properties into a separate nvlist.
  */
-static int
-process_user_props(zfs_handle_t *zhp)
+static nvlist_t *
+process_user_props(zfs_handle_t *zhp, nvlist_t *props)
 {
 	libzfs_handle_t *hdl = zhp->zfs_hdl;
 	nvpair_t *elem;
 	nvlist_t *propval;
+	nvlist_t *nvl;
 
-	nvlist_free(zhp->zfs_user_props);
-
-	if (nvlist_alloc(&zhp->zfs_user_props, NV_UNIQUE_NAME, 0) != 0)
-		return (no_memory(hdl));
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0) {
+		(void) no_memory(hdl);
+		return (NULL);
+	}
 
 	elem = NULL;
-	while ((elem = nvlist_next_nvpair(zhp->zfs_props, elem)) != NULL) {
+	while ((elem = nvlist_next_nvpair(props, elem)) != NULL) {
 		if (!zfs_prop_user(nvpair_name(elem)))
 			continue;
 
 		verify(nvpair_value_nvlist(elem, &propval) == 0);
-		if (nvlist_add_nvlist(zhp->zfs_user_props,
-		    nvpair_name(elem), propval) != 0)
-			return (no_memory(hdl));
+		if (nvlist_add_nvlist(nvl, nvpair_name(elem), propval) != 0) {
+			nvlist_free(nvl);
+			(void) no_memory(hdl);
+			return (NULL);
+		}
 	}
 
-	return (0);
+	return (nvl);
 }
 
 /*
@@ -242,6 +245,7 @@ get_stats(zfs_handle_t *zhp)
 {
 	zfs_cmd_t zc = { 0 };
 	libzfs_handle_t *hdl = zhp->zfs_hdl;
+	nvlist_t *allprops, *userprops;
 
 	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 
@@ -264,20 +268,23 @@ get_stats(zfs_handle_t *zhp)
 
 	(void) strlcpy(zhp->zfs_root, zc.zc_value, sizeof (zhp->zfs_root));
 
-	if (zhp->zfs_props) {
-		nvlist_free(zhp->zfs_props);
-		zhp->zfs_props = NULL;
-	}
-
-	if (zcmd_read_dst_nvlist(hdl, &zc, &zhp->zfs_props) != 0) {
+	if (zcmd_read_dst_nvlist(hdl, &zc, &allprops) != 0) {
 		zcmd_free_nvlists(&zc);
 		return (-1);
 	}
 
 	zcmd_free_nvlists(&zc);
 
-	if (process_user_props(zhp) != 0)
+	if ((userprops = process_user_props(zhp, allprops)) == NULL) {
+		nvlist_free(allprops);
 		return (-1);
+	}
+
+	nvlist_free(zhp->zfs_props);
+	nvlist_free(zhp->zfs_user_props);
+
+	zhp->zfs_props = allprops;
+	zhp->zfs_user_props = userprops;
 
 	return (0);
 }
@@ -963,8 +970,8 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, char *pool_name,
 			 * property value is valid if it is sharenfs.
 			 */
 			if (prop == ZFS_PROP_SHARENFS &&
-				strcmp(strval, "on") != 0 &&
-				strcmp(strval, "off") != 0) {
+			    strcmp(strval, "on") != 0 &&
+			    strcmp(strval, "off") != 0) {
 
 				/*
 				 * Must be an NFS option string so
@@ -977,33 +984,38 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, char *pool_name,
 				 * until we actually do something.
 				 */
 
-			    if (zfs_init_libshare(hdl,
-					SA_INIT_CONTROL_API) != SA_OK) {
-				/* An error occurred so we can't do anything */
-				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-						"'%s' cannot be set: problem "
-						"in share initialization"),
-						propname);
-				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
-				goto error;
-			    }
+				if (zfs_init_libshare(hdl,
+				    SA_INIT_CONTROL_API) != SA_OK) {
+					/*
+					 * An error occurred so we can't do
+					 * anything
+					 */
+					zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+					    "'%s' cannot be set: problem "
+					    "in share initialization"),
+					    propname);
+					(void) zfs_error(hdl, EZFS_BADPROP,
+					    errbuf);
+					goto error;
+				}
 
-			    if (zfs_parse_options(strval, "nfs") != SA_OK) {
-				/*
-				 * There was an error in parsing so
-				 * deal with it by issuing an error
-				 * message and leaving after
-				 * uninitializing the the libshare
-				 * interface.
-				 */
-				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-						"'%s' cannot be set to invalid "
-						"options"), propname);
-				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
+				if (zfs_parse_options(strval, "nfs") != SA_OK) {
+					/*
+					 * There was an error in parsing so
+					 * deal with it by issuing an error
+					 * message and leaving after
+					 * uninitializing the the libshare
+					 * interface.
+					 */
+					zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+					    "'%s' cannot be set to invalid "
+					    "options"), propname);
+					(void) zfs_error(hdl, EZFS_BADPROP,
+					    errbuf);
+					zfs_uninit_libshare(hdl);
+					goto error;
+				}
 				zfs_uninit_libshare(hdl);
-				goto error;
-			    }
-			    zfs_uninit_libshare(hdl);
 			}
 
 			break;

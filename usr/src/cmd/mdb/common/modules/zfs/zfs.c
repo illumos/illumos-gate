@@ -1565,6 +1565,9 @@ spa_vdevs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
  * The 'address' column is indented by one space for each depth level as we
  * descend down the tree.
  */
+
+#define	ZIO_MAXDEPTH	16
+
 static int
 zio_print_cb(uintptr_t addr, const void *data, void *priv)
 {
@@ -1574,16 +1577,9 @@ zio_print_cb(uintptr_t addr, const void *data, void *priv)
 	const char *type, *stage;
 	int maxdepth;
 
-	/*
-	 * Allow enough space for a pointer and up to a 16-deep tree.
-	 */
-	maxdepth = sizeof (uintptr_t) * 2 + 16;
-	if (depth > 16)
-		depth = 16;
-
-	if (depth == 0)
-		mdb_printf("%<u>%-*s %-5s %-22s %-?s%</u>\n", maxdepth,
-		    "ADDRESS", "TYPE", "STAGE", "WAITER");
+	maxdepth = sizeof (uintptr_t) * 2 + ZIO_MAXDEPTH;
+	if (depth > ZIO_MAXDEPTH)
+		depth = ZIO_MAXDEPTH;
 
 	if (mdb_ctf_lookup_by_name("enum zio_type", &type_enum) == -1 ||
 	    mdb_ctf_lookup_by_name("enum zio_stage", &stage_enum) == -1) {
@@ -1623,6 +1619,9 @@ static int
 zio_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	zio_t zio;
+	int maxdepth;
+
+	maxdepth = sizeof (uintptr_t) * 2 + ZIO_MAXDEPTH;
 
 	if (!(flags & DCMD_ADDRSPEC))
 		return (DCMD_USAGE);
@@ -1631,6 +1630,10 @@ zio_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_warn("failed to read zio_t at %p", addr);
 		return (DCMD_ERR);
 	}
+
+	if (DCMD_HDRSPEC(flags))
+		mdb_printf("%<u>%-*s %-5s %-22s %-?s%</u>\n", maxdepth,
+		    "ADDRESS", "TYPE", "STAGE", "WAITER");
 
 	if (zio_print_cb(addr, &zio, NULL) != WALK_NEXT)
 		return (DCMD_ERR);

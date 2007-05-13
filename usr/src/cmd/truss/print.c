@@ -104,10 +104,10 @@ prt_dec(private_t *pri, int raw, long val)	/* print as decimal */
 	GROW(24);
 	if (data_model == PR_MODEL_ILP32)
 		pri->sys_leng += sprintf(pri->sys_string + pri->sys_leng,
-			"%d", (int)val);
+		    "%d", (int)val);
 	else
 		pri->sys_leng += sprintf(pri->sys_string + pri->sys_leng,
-			"%ld", val);
+		    "%ld", val);
 }
 
 /*ARGSUSED*/
@@ -117,10 +117,10 @@ prt_uns(private_t *pri, int raw, long val)	/* print as unsigned decimal */
 	GROW(24);
 	if (data_model == PR_MODEL_ILP32)
 		pri->sys_leng += sprintf(pri->sys_string + pri->sys_leng,
-			"%u", (int)val);
+		    "%u", (int)val);
 	else
 		pri->sys_leng += sprintf(pri->sys_string + pri->sys_leng,
-			"%lu", val);
+		    "%lu", val);
 }
 
 /*ARGSUSED*/
@@ -130,10 +130,10 @@ prt_oct(private_t *pri, int raw, long val)	/* print as octal */
 	GROW(24);
 	if (data_model == PR_MODEL_ILP32)
 		pri->sys_leng += sprintf(pri->sys_string + pri->sys_leng,
-			"%#o", (int)val);
+		    "%#o", (int)val);
 	else
 		pri->sys_leng += sprintf(pri->sys_string + pri->sys_leng,
-			"%#lo", val);
+		    "%#lo", val);
 }
 
 /*ARGSUSED*/
@@ -143,10 +143,10 @@ prt_hex(private_t *pri, int raw, long val)	/* print as hexadecimal */
 	GROW(20);
 	if (data_model == PR_MODEL_ILP32)
 		pri->sys_leng += sprintf(pri->sys_string + pri->sys_leng,
-			"0x%.8X", (int)val);
+		    "0x%.8X", (int)val);
 	else
 		pri->sys_leng += sprintf(pri->sys_string + pri->sys_leng,
-			"0x%.8lX", val);
+		    "0x%.8lX", val);
 }
 
 /* print as hexadecimal (half size) */
@@ -157,10 +157,10 @@ prt_hhx(private_t *pri, int raw, long val)
 	GROW(20);
 	if (data_model == PR_MODEL_ILP32)
 		pri->sys_leng += sprintf(pri->sys_string + pri->sys_leng,
-			"0x%.4X", (int)val);
+		    "0x%.4X", (int)val);
 	else
 		pri->sys_leng += sprintf(pri->sys_string + pri->sys_leng,
-			"0x%.4lX", val);
+		    "0x%.4lX", val);
 }
 
 /* print as decimal if small, else hexadecimal */
@@ -190,13 +190,13 @@ prt_llo(private_t *pri, int raw, long val1, long val2)
 	loval = (int)val2;
 #endif
 
-	if (hival == 0)
+	if (hival == 0) {
 		prt_dex(pri, 0, loval);
-	else {
+	} else {
 		GROW(18);
 		pri->sys_leng +=
-			sprintf(pri->sys_string + pri->sys_leng, "0x%.8X%.8X",
-			hival, loval);
+		    sprintf(pri->sys_string + pri->sys_leng, "0x%.8X%.8X",
+		    hival, loval);
 	}
 }
 
@@ -231,7 +231,7 @@ escape_string(private_t *pri, const char *s)
 			pri->sys_string[pri->sys_leng++] = s[i];
 		} else {
 			pri->sys_leng += sprintf(pri->sys_string +
-			    pri->sys_leng, "\\x%02x", s[i]);
+			    pri->sys_leng, "\\x%02x", (uint8_t)s[i]);
 		}
 	}
 	pri->sys_string[pri->sys_leng++] = '"';
@@ -253,7 +253,7 @@ void
 prt_rst(private_t *pri, int raw, long val)
 {
 	char *s = (raw || pri->Errno)? NULL :
-		fetchstring(pri, (long)val, PATH_MAX);
+	    fetchstring(pri, (long)val, PATH_MAX);
 
 	if (s == NULL)
 		prt_hex(pri, 0, val);
@@ -269,8 +269,8 @@ void
 prt_rlk(private_t *pri, int raw, long val)
 {
 	char *s = (raw || pri->Errno || pri->Rval1 <= 0)? NULL :
-		fetchstring(pri, (long)val,
-			(pri->Rval1 > PATH_MAX)? PATH_MAX : (int)pri->Rval1);
+	    fetchstring(pri, (long)val,
+	    (pri->Rval1 > PATH_MAX)? PATH_MAX : (int)pri->Rval1);
 
 	if (s == NULL)
 		prt_hex(pri, 0, val);
@@ -306,11 +306,11 @@ prt_ioa(private_t *pri, int raw, long val)	/* print ioctl argument */
 #ifdef _LP64
 		if (data_model == PR_MODEL_ILP32)
 			prt_stg(pri, raw,
-				val + offsetof(kstat32_t, ks_name[0]));
+			    val + offsetof(kstat32_t, ks_name[0]));
 		else
 #endif
 			prt_stg(pri, raw,
-				val + offsetof(kstat_t, ks_name[0]));
+			    val + offsetof(kstat_t, ks_name[0]));
 		break;
 
 	/* streams ioctl()s */
@@ -593,7 +593,7 @@ prt_iob(private_t *pri, int raw, long val)
 	int syscall = Lsp->pr_what;
 	int fdp1 = pri->sys_args[0] + 1;
 	ssize_t nbyte = ISWRITE(syscall)? pri->sys_args[2] :
-		(pri->Errno? 0 : pri->Rval1);
+	    (pri->Errno? 0 : pri->Rval1);
 	int elsewhere = FALSE;		/* TRUE iff dumped elsewhere */
 	char buffer[IOBSIZE];
 
@@ -617,9 +617,9 @@ prt_iob(private_t *pri, int raw, long val)
 			pri->iob_buf[0] = '"';
 			showbytes(buffer, nb, pri->iob_buf + 1);
 			(void) strlcat(pri->iob_buf,
-				(nb == nbyte)?
-				    (const char *)"\"" : (const char *)"\"..",
-				sizeof (pri->iob_buf));
+			    (nb == nbyte)?
+			    (const char *)"\"" : (const char *)"\"..",
+			    sizeof (pri->iob_buf));
 			if (raw)
 				prt_hex(pri, 0, val);
 			else
@@ -728,7 +728,7 @@ mmap_type(private_t *pri, long arg)
 	if (arg & ~(MAP_FIXED|MAP_RENAME|MAP_NORESERVE|MAP_ANON|MAP_ALIGN|
 	    MAP_TEXT|MAP_INITDATA))
 		(void) snprintf(str + used, sizeof (pri->code_buf) - used,
-			    "|0x%lX", arg);
+		    "|0x%lX", arg);
 	else {
 		if (arg & MAP_FIXED)
 			(void) strlcat(str, "|MAP_FIXED", CBSIZE);
@@ -847,7 +847,7 @@ prt_mc4(private_t *pri, int raw, long val) /* print memcntl() (4th) argument */
 					(void) strlcat(s, "|MS_ASYNC", CBSIZE);
 				if (val & MS_INVALIDATE)
 					(void) strlcat(s, "|MS_INVALIDATE",
-						    CBSIZE);
+					    CBSIZE);
 			}
 			break;
 
@@ -857,10 +857,10 @@ prt_mc4(private_t *pri, int raw, long val) /* print memcntl() (4th) argument */
 				*(s = pri->code_buf) = '\0';
 				if (val & MCL_CURRENT)
 					(void) strlcat(s, "|MCL_CURRENT",
-						    CBSIZE);
+					    CBSIZE);
 				if (val & MCL_FUTURE)
 					(void) strlcat(s, "|MCL_FUTURE",
-						    CBSIZE);
+					    CBSIZE);
 			}
 			break;
 		}
@@ -1375,7 +1375,7 @@ grow(private_t *pri, int nbyte)	/* reallocate format buffer if necessary */
 {
 	while (pri->sys_leng + nbyte >= pri->sys_ssize)
 		pri->sys_string = my_realloc(pri->sys_string,
-			pri->sys_ssize *= 2, "format buffer");
+		    pri->sys_ssize *= 2, "format buffer");
 }
 
 void
@@ -1773,7 +1773,7 @@ sol_optname(private_t *pri, long val)
 		case SO_DOMAIN:		return ("SO_DOMAIN");
 
 		default:		(void) snprintf(pri->code_buf, CBSIZE,
-						    "0x%lx", val);
+					    "0x%lx", val);
 					return (pri->code_buf);
 		}
 	} else {
@@ -2276,7 +2276,7 @@ prt_laf(private_t *pri, int raw, long val)
 	lgrp_affinity_args_t	laff;
 
 	if (Pread(Proc, &laff, sizeof (lgrp_affinity_args_t), val) !=
-		sizeof (lgrp_affinity_args_t)) {
+	    sizeof (lgrp_affinity_args_t)) {
 		prt_hex(pri, 0, val);
 		return;
 	}
