@@ -119,10 +119,11 @@ elif [ -f /etc/defaultrouter ]; then
 		#
 		do_delete=yes
 		for router in $defrouters; do
-			set -- `/usr/sbin/route -n add default \
+			route_added=`/usr/sbin/route -n add default \
 			    -gateway $router`
-			[ $? -ne 0 -a "x$5" = "x$route_IP:" ] \
-			    && do_delete=no
+			res=$?
+			set -- $route_added
+			[ $res -ne 0 -a "$5" = "$route_IP:" ] && do_delete=no
 		done
 
 		#
