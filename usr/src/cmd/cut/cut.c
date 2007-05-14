@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
 
 #define	MAX_RANGES	MAX_INPUT	/* maximum number of ranges */
 					/* as input args */
@@ -140,7 +141,7 @@ main(int argc, char **argv)
 	if (nflag) {
 		if (cflag || fflag) {
 			(void) fprintf(stderr, gettext(
-				"cut: -n may only be used with -b\n"));
+			    "cut: -n may only be used with -b\n"));
 			usage();
 		}
 	}
@@ -149,10 +150,10 @@ main(int argc, char **argv)
 		if (bflag || cflag) {
 			if (dflag)
 				(void) fprintf(stderr, gettext(
-					"cut: -d may only be used with -f\n"));
+				    "cut: -d may only be used with -f\n"));
 			if (supflag)
 				(void) fprintf(stderr, gettext(
-					"cut: -s may only be used with -f\n"));
+				    "cut: -s may only be used with -f\n"));
 			usage();
 		}
 	}
@@ -179,9 +180,8 @@ main(int argc, char **argv)
 			inptr = stdin;
 		else
 			if ((inptr = fopen(argv[filenr], "r")) == NULL) {
-				(void) fprintf(stderr, gettext(
-					"cut: cannot open %s\n"),
-						argv[filenr]);
+				(void) fprintf(stderr, "cut: %s: %s\n",
+				    argv[filenr], strerror(errno));
 				status = 1;
 				continue;
 			}
