@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,6 +38,7 @@ include ../../Makefile.targ
 LIBNTP=		../$(LIBNTP_A)
 LIBPARSE=	../$(LIBPARSE_A)
 LINTLIB=	../$(LLIBNTP_A)
+LIBS += 	-lscf
 LDLIBS +=		$(LIBNTP) $(LIBPARSE) $(LIBS)
 #
 SOURCE=	ntp_config.c ntp_control.c ntp_io.c ntp_leap.c \

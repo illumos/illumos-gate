@@ -1,5 +1,5 @@
 /*
- * Copyright 1996, 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -15,6 +15,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <libscf.h>
 
 #include "ntpd.h"
 #include "ntp_stdlib.h"
@@ -1238,6 +1239,7 @@ clock_update(peer)
 	u_char ostratum;
 	s_fp d;
 	extern u_char leap_mask;
+	char *fmri;
 
 #ifdef DEBUG
 	if (debug)
@@ -1300,6 +1302,17 @@ clock_update(peer)
 		 * Clock is too screwed up. Just exit for now.
 		 */
 		report_event(EVNT_SYSFAULT, (struct peer *)0);
+		/* enter the maintenance mode */
+		if ((fmri = getenv("SMF_FMRI")) != NULL) {
+			if (smf_maintain_instance(fmri, 0) < 0) {
+				printf("smf_maintain_instance:%s\n",
+				    scf_strerror(scf_error()));
+				exit(1);
+			}
+			/* sleep until SMF kills us */
+			for (;;)
+				pause();
+		}
 		exit(1);
 		/*NOTREACHED*/
 	case 0:
