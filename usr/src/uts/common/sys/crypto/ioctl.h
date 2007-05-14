@@ -1321,6 +1321,97 @@ typedef struct crypto_set_pin32 {
 #define	CRYPTO_INIT_PIN				CRYPTO(125)
 #define	CRYPTO_SET_PIN				CRYPTO(126)
 
+/*
+ * No (Key) Store Key Generation Ioctls
+ */
+typedef struct crypto_nostore_generate_key {
+	uint_t			ngk_return_value;
+	crypto_session_id_t	ngk_session;
+	crypto_mechanism_t	ngk_mechanism;
+	uint_t			ngk_in_count;
+	uint_t			ngk_out_count;
+	caddr_t			ngk_in_attributes;
+	caddr_t			ngk_out_attributes;
+} crypto_nostore_generate_key_t;
+
+typedef struct crypto_nostore_generate_key_pair {
+	uint_t			nkp_return_value;
+	crypto_session_id_t	nkp_session;
+	uint_t			nkp_in_public_count;
+	uint_t			nkp_in_private_count;
+	uint_t			nkp_out_public_count;
+	uint_t			nkp_out_private_count;
+	caddr_t			nkp_in_public_attributes;
+	caddr_t			nkp_in_private_attributes;
+	caddr_t			nkp_out_public_attributes;
+	caddr_t			nkp_out_private_attributes;
+	crypto_mechanism_t	nkp_mechanism;
+} crypto_nostore_generate_key_pair_t;
+
+typedef struct crypto_nostore_derive_key {
+	uint_t			ndk_return_value;
+	crypto_session_id_t	ndk_session;
+	crypto_mechanism_t	ndk_mechanism;
+	crypto_key_t		ndk_base_key;
+	uint_t			ndk_in_count;
+	uint_t			ndk_out_count;
+	caddr_t			ndk_in_attributes;
+	caddr_t			ndk_out_attributes;
+} crypto_nostore_derive_key_t;
+
+#ifdef	_KERNEL
+#ifdef	_SYSCALL32
+
+typedef struct crypto_nostore_generate_key32 {
+	uint32_t		ngk_return_value;
+	crypto_session_id_t	ngk_session;
+	crypto_mechanism32_t	ngk_mechanism;
+	uint32_t		ngk_in_count;
+	uint32_t		ngk_out_count;
+	caddr32_t		ngk_in_attributes;
+	caddr32_t		ngk_out_attributes;
+} crypto_nostore_generate_key32_t;
+
+typedef struct crypto_nostore_generate_key_pair32 {
+	uint32_t		nkp_return_value;
+	crypto_session_id_t	nkp_session;
+	uint32_t		nkp_in_public_count;
+	uint32_t		nkp_in_private_count;
+	uint32_t		nkp_out_public_count;
+	uint32_t		nkp_out_private_count;
+	caddr32_t		nkp_in_public_attributes;
+	caddr32_t		nkp_in_private_attributes;
+	caddr32_t		nkp_out_public_attributes;
+	caddr32_t		nkp_out_private_attributes;
+	crypto_mechanism32_t	nkp_mechanism;
+} crypto_nostore_generate_key_pair32_t;
+
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack(4)
+#endif
+
+typedef struct crypto_nostore_derive_key32 {
+	uint32_t		ndk_return_value;
+	crypto_session_id_t	ndk_session;
+	crypto_mechanism32_t	ndk_mechanism;
+	crypto_key32_t		ndk_base_key;
+	uint32_t		ndk_in_count;
+	uint32_t		ndk_out_count;
+	caddr32_t		ndk_in_attributes;
+	caddr32_t		ndk_out_attributes;
+} crypto_nostore_derive_key32_t;
+
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack()
+#endif
+
+#endif	/* _SYSCALL32 */
+#endif	/* _KERNEL */
+
+#define	CRYPTO_NOSTORE_GENERATE_KEY		CRYPTO(127)
+#define	CRYPTO_NOSTORE_GENERATE_KEY_PAIR	CRYPTO(128)
+#define	CRYPTO_NOSTORE_DERIVE_KEY		CRYPTO(129)
+
 #ifdef	__cplusplus
 }
 #endif

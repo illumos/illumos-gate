@@ -1429,6 +1429,49 @@ common_submit_request(kcf_provider_desc_t *pd, crypto_ctx_t *ctx,
 		break;
 	}
 
+	case KCF_OG_NOSTORE_KEY: {
+		kcf_key_ops_params_t *kops = &params->rp_u.key_params;
+
+		ASSERT(ctx == NULL);
+		KCF_SET_PROVIDER_MECHNUM(kops->ko_framework_mechtype, pd,
+		    &kops->ko_mech);
+
+		switch (optype) {
+		case KCF_OP_KEY_GENERATE:
+			err = KCF_PROV_NOSTORE_KEY_GENERATE(pd, kops->ko_sid,
+			    &kops->ko_mech, kops->ko_key_template,
+			    kops->ko_key_attribute_count,
+			    kops->ko_out_template1,
+			    kops->ko_out_attribute_count1, rhndl);
+			break;
+
+		case KCF_OP_KEY_GENERATE_PAIR:
+			err = KCF_PROV_NOSTORE_KEY_GENERATE_PAIR(pd,
+			    kops->ko_sid, &kops->ko_mech,
+			    kops->ko_key_template, kops->ko_key_attribute_count,
+			    kops->ko_private_key_template,
+			    kops->ko_private_key_attribute_count,
+			    kops->ko_out_template1,
+			    kops->ko_out_attribute_count1,
+			    kops->ko_out_template2,
+			    kops->ko_out_attribute_count2,
+			    rhndl);
+			break;
+
+		case KCF_OP_KEY_DERIVE:
+			err = KCF_PROV_NOSTORE_KEY_DERIVE(pd, kops->ko_sid,
+			    &kops->ko_mech, kops->ko_key,
+			    kops->ko_key_template,
+			    kops->ko_key_attribute_count,
+			    kops->ko_out_template1,
+			    kops->ko_out_attribute_count1, rhndl);
+			break;
+
+		default:
+			break;
+		}
+		break;
+	}
 	default:
 		break;
 	}		/* end of switch(params->rp_opgrp) */

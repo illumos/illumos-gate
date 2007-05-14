@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -691,4 +690,37 @@ get_template_boolean(CK_ATTRIBUTE_TYPE type, CK_ATTRIBUTE *attributes,
 	}
 
 	return (found);
+}
+
+/*
+ * set_template_boolean
+ *
+ * Look for the specified boolean attribute, and set its value.
+ *
+ * if 'local' is true, it sets the pointer to the value in the template a new
+ * location.  There should be no memory leak created by this because we are
+ * only doing this to booleans which should not be malloc'ed.
+ *
+ * if 'local' is false, it sets its value.
+ *
+ * The return value specifies if the attribute was found (or not).
+ */
+int
+set_template_boolean(CK_ATTRIBUTE_TYPE type, CK_ATTRIBUTE *attributes,
+	CK_ULONG num_attributes, boolean_t local, CK_BBOOL *value)
+{
+	int i;
+
+	for (i = 0; i < num_attributes; i++) {
+		if (attributes[i].type == type) {
+			if (local)
+				attributes[i].pValue = value;
+			else
+				*((CK_BBOOL *)attributes[i].pValue) = *value;
+
+			return (i);
+		}
+	}
+
+	return (-1);
 }

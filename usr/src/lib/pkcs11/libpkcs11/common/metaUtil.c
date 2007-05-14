@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -559,14 +558,44 @@ meta_generate_keys(meta_session_t *session, CK_MECHANISM *pMechanism,
 	unsigned long i, slotCount = 0;
 	boolean_t doKeyPair = B_FALSE, token_only = B_FALSE;
 	CK_ULONG slotnum;
+	/*
+	 * Since the keygen call is in a loop, it is performance-wise useful
+	 * to keep track of the token value
+	 */
+	CK_BBOOL current_token1_value = FALSE, current_token2_value = FALSE;
 
 	(void) get_template_boolean(CKA_TOKEN, k1Template, k1AttrCount,
 	    &(key1->isToken));
+	(void) get_template_boolean(CKA_SENSITIVE, k1Template, k1AttrCount,
+	    &(key1->isSensitive));
+	(void) get_template_boolean(CKA_PRIVATE, k1Template, k1AttrCount,
+	    &(key1->isPrivate));
+
+	if (!get_template_boolean(CKA_EXTRACTABLE, k1Template, k1AttrCount,
+		&(key1->isExtractable)))
+		key1->isExtractable = B_TRUE;
+
+	if (key1->isToken)
+		current_token1_value = TRUE;
+
 	if (key2) {
 		(void) get_template_boolean(CKA_TOKEN, k2Template, k2AttrCount,
 		    &(key2->isToken));
+		(void) get_template_boolean(CKA_SENSITIVE, k2Template,
+		    k2AttrCount, &(key2->isSensitive));
+		(void) get_template_boolean(CKA_PRIVATE, k2Template,
+		    k2AttrCount, &(key2->isPrivate));
+
+		if (!get_template_boolean(CKA_EXTRACTABLE, k2Template,
+		    k2AttrCount, &(key2->isExtractable)))
+			key2->isExtractable = B_TRUE;
+
+		if (key2->isToken)
+			current_token2_value = TRUE;
+
 		doKeyPair = B_TRUE;
 	}
+
 
 	/* Can't create token objects in a read-only session. */
 	if ((IS_READ_ONLY_SESSION(session->session_flags)) &&
@@ -574,11 +603,39 @@ meta_generate_keys(meta_session_t *session, CK_MECHANISM *pMechanism,
 		return (CKR_SESSION_READ_ONLY);
 	}
 
+	if (meta_freeobject_check(session, key1, pMechanism, k1Template,
+		k1AttrCount, NULL)) {
+
+		if ((key1->isPrivate || (doKeyPair && key2->isPrivate)) &&
+		    !metaslot_logged_in())
+			return (CKR_USER_NOT_LOGGED_IN);
+
+		if (!meta_freeobject_set(key1, k1Template, k1AttrCount,
+			B_FALSE))
+			return (CKR_FUNCTION_FAILED);
+
+		if (doKeyPair) {
+			key2->isFreeObject = FREE_ALLOWED_KEY;
+			if (!meta_freeobject_set(key2, k2Template, k2AttrCount,
+				B_FALSE))
+				return (CKR_FUNCTION_FAILED);
+		}
+
+	} else if (doKeyPair) {
+		/*
+		 * If this is a keypair operation, the second key cannot be
+		 * a FreeObject if the first is not.  Both keys will have the
+		 * same fate when it comes to provider choices
+		 */
+		key2->isFreeObject = FREE_DISABLED;
+		key2->isFreeToken = FREE_DISABLED;
+	}
+
 	if ((key1->isToken) || ((doKeyPair) && (key2->isToken))) {
 		/*
 		 * Token objects can only be generated in the token object
 		 * slot.  If token object slot doesn't support generating
-		 * the key, it will just not be done
+		 * the key, it will just not be done.
 		 */
 		token_only = B_TRUE;
 	}
@@ -626,8 +683,27 @@ meta_generate_keys(meta_session_t *session, CK_MECHANISM *pMechanism,
 			}
 		}
 
+		/*
+		 * If this is a freetoken, make sure the templates are
+		 * approriate for the slot being used.
+		 */
+		if (key1->isFreeToken == FREE_ENABLED) {
+			rv = meta_freetoken_set(slotnum,
+			    &current_token1_value, k1Template, k1AttrCount);
+			if (rv != CKR_OK)
+				goto loop_cleanup;
+		}
+
+		if (doKeyPair && key2->isFreeToken == FREE_ENABLED) {
+			rv = meta_freetoken_set(slotnum,
+			    &current_token2_value, k2Template, k2AttrCount);
+			if (rv != CKR_OK)
+				goto loop_cleanup;
+		}
+
 		fw_st_id = gen_session->fw_st_id;
 		hSession = gen_session->hSession;
+
 		if (doKeyPair) {
 			rv = FUNCLIST(fw_st_id)->C_GenerateKeyPair(hSession,
 			    pMechanism, k1Template, k1AttrCount,
@@ -657,7 +733,6 @@ loop_cleanup:
 		goto finish;
 	}
 
-
 	rv = meta_object_get_attr(gen_session, slot_key1->hObject, key1);
 	if (rv != CKR_OK) {
 		goto finish;
@@ -675,13 +750,23 @@ loop_cleanup:
 	key1->clones[slotnum] = slot_key1;
 	key1->master_clone_slotnum = slotnum;
 	slot_key1 = NULL;
+	if (key1->isFreeObject == FREE_ENABLED) {
+		rv = meta_freeobject_clone(session, key1);
+		if (rv != CKR_OK)
+			goto finish;
+	}
 
 	if (doKeyPair) {
 		meta_slot_object_activate(slot_key2, gen_session,
-			key2->isToken);
+		    key2->isToken);
 		key2->clones[slotnum] = slot_key2;
 		key2->master_clone_slotnum = slotnum;
 		slot_key2 = NULL;
+		if (key2->isFreeObject == FREE_ENABLED) {
+			rv = meta_freeobject_clone(session, key2);
+			if (rv != CKR_OK)
+				goto finish;
+		}
 	}
 
 finish:
@@ -999,7 +1084,7 @@ meta_derive_key(meta_session_t *session, CK_MECHANISM *pMechanism,
 	slot_object_t *slot_basekey1 = NULL, *slot_basekey2 = NULL;
 	slot_object_t *slotkey1 = NULL, *slotkey2 = NULL,
 		*slotkey3 = NULL, *slotkey4 = NULL;
-
+	CK_BBOOL current_token_value = FALSE;
 
 	/*
 	 * if the derived key needs to be a token object, can only
@@ -1007,12 +1092,30 @@ meta_derive_key(meta_session_t *session, CK_MECHANISM *pMechanism,
 	 */
 	(void) get_template_boolean(CKA_TOKEN, pTemplate, ulAttributeCount,
 	    &(newKey1->isToken));
+	(void) get_template_boolean(CKA_PRIVATE, pTemplate, ulAttributeCount,
+	    &(newKey1->isPrivate));
+	(void) get_template_boolean(CKA_SENSITIVE, pTemplate, ulAttributeCount,
+	    &(newKey1->isSensitive));
+
+	if (newKey1->isToken)
+		current_token_value = TRUE;
 
 	/* Can't create token objects in a read-only session. */
 	if ((IS_READ_ONLY_SESSION(session->session_flags)) &&
 	    newKey1->isToken) {
 		rv = CKR_SESSION_READ_ONLY;
 		goto finish;
+	}
+
+	if (meta_freeobject_check(session, newKey1, pMechanism, pTemplate,
+		ulAttributeCount, NULL)) {
+
+		if (newKey1->isPrivate && !metaslot_logged_in())
+			return (CKR_USER_NOT_LOGGED_IN);
+
+		if (!meta_freeobject_set(newKey1, pTemplate, ulAttributeCount,
+			B_FALSE))
+			return (CKR_FUNCTION_FAILED);
 	}
 
 	rv = get_slotlist_for_mech(pMechanism->mechanism,
@@ -1082,6 +1185,13 @@ meta_derive_key(meta_session_t *session, CK_MECHANISM *pMechanism,
 
 			/* Pass the handle somewhere in the mech params. */
 			*phBaseKey2 = slot_basekey2->hObject;
+		}
+
+		if (newKey1->isFreeToken == FREE_ENABLED) {
+			rv = meta_freetoken_set(slotnum, &current_token_value,
+			    pTemplate, ulAttributeCount);
+			if (rv != CKR_OK)
+				goto loop_cleanup;
 		}
 
 		rv = FUNCLIST(derive_session->fw_st_id)->C_DeriveKey(
@@ -1187,10 +1297,14 @@ loop_cleanup:
 		if (rv != CKR_OK) {
 			goto finish;
 		}
+
 		meta_slot_object_activate(slotkey1, derive_session,
 			newKey1->isToken);
 		slotkey1 = NULL;
 	}
+
+	if (newKey1->isFreeObject == FREE_ENABLED)
+		(void) meta_freeobject_clone(session, newKey1);
 
 
 finish:

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,8 +88,8 @@ static pthread_rwlock_t meta_objectclose_lock;
 static pthread_rwlock_t tokenobject_list_lock;
 static meta_object_t *tokenobject_list_head;
 
-static CK_BBOOL falsevalue = FALSE;
-static CK_BBOOL truevalue = TRUE;
+CK_BBOOL falsevalue = FALSE;
+CK_BBOOL truevalue = TRUE;
 
 /*
  * Public and private exponent, and Module value for
@@ -278,53 +277,122 @@ CK_RV
 meta_object_get_attr(slot_session_t *slot_session, CK_OBJECT_HANDLE hObject,
     meta_object_t *object)
 {
-	CK_BBOOL is_sensitive, is_extractable, is_token, is_private;
+	CK_BBOOL is_sensitive = object->isSensitive;
+	CK_BBOOL is_extractable = object->isExtractable;
+	CK_BBOOL is_token = B_FALSE, is_private = B_FALSE;
+	CK_KEY_TYPE keytype;
 	CK_OBJECT_CLASS class;
 	CK_ATTRIBUTE attrs[3];
 	CK_RV rv;
 	CK_SESSION_HANDLE hSession = slot_session->hSession;
 	CK_SLOT_ID fw_st_id = slot_session->fw_st_id;
+	int count = 1;
 
 	attrs[0].type = CKA_CLASS;
 	attrs[0].pValue = &class;
 	attrs[0].ulValueLen = sizeof (class);
 
-	attrs[1].type = CKA_TOKEN;
-	attrs[1].pValue = &is_token;
-	attrs[1].ulValueLen = sizeof (is_token);
+	if (object->isFreeObject != FREE_ENABLED) {
+		attrs[1].type = CKA_TOKEN;
+		attrs[1].pValue = &is_token;
+		attrs[1].ulValueLen = sizeof (is_token);
+		count++;
+	}
 
-	attrs[2].type = CKA_PRIVATE;
-	attrs[2].pValue = &is_private;
-	attrs[2].ulValueLen = sizeof (is_private);
+	/*
+	 * If this is a freeobject, we already know the Private value
+	 * and we don't want to overwrite it with the wrong value
+	 */
+	if (object->isFreeObject <= FREE_DISABLED) {
+		attrs[count].type = CKA_PRIVATE;
+		attrs[count].pValue = &is_private;
+		attrs[count].ulValueLen = sizeof (is_private);
+		count++;
+	} else
+		is_private = object->isPrivate;
 
 	rv = FUNCLIST(fw_st_id)->C_GetAttributeValue(hSession, hObject,
-	    attrs, 3);
+	    attrs, count);
 	if (rv != CKR_OK) {
 		return (rv);
 	}
 
+	count = 0;
+	switch (class) {
+	case CKO_PRIVATE_KEY:
+	case CKO_SECRET_KEY:
+		/* Only need to check these for private & secret keys */
+		attrs[0].type = CKA_EXTRACTABLE;
+		attrs[0].pValue = &is_extractable;
+		attrs[0].ulValueLen = sizeof (is_extractable);
+		count = 1;
 
-	if ((class == CKO_PRIVATE_KEY) || (class == CKO_SECRET_KEY)) {
 		/*
-		 * CKA_SENSITIVE and CKA_EXTRACTABLE only applies to private
-		 * and secret keys.
+		 * If this is a freeobject, we already know the Sensitive
+		 * value and we don't want to overwrite it with the wrong
+		 * value.
 		 */
-		attrs[0].type = CKA_SENSITIVE;
-		attrs[0].pValue = &is_sensitive;
-		attrs[0].ulValueLen = sizeof (is_sensitive);
 
-		attrs[1].type = CKA_EXTRACTABLE;
-		attrs[1].pValue = &is_extractable;
-		attrs[1].ulValueLen = sizeof (is_extractable);
+		if (object->isFreeObject <= FREE_DISABLED) {
+			attrs[1].type = CKA_SENSITIVE;
+			attrs[1].pValue = &is_sensitive;
+			attrs[1].ulValueLen = sizeof (is_sensitive);
+			count = 2;
 
-		rv = FUNCLIST(fw_st_id)->C_GetAttributeValue(hSession,
-		    hObject, attrs, 2);
+			/*
+			 * We only need the key type if this is the first
+			 * time we've looked at the object
+			 */
+			if (object->isFreeObject == FREE_UNCHECKED) {
+				attrs[2].type = CKA_KEY_TYPE;
+				attrs[2].pValue = &keytype;
+				attrs[2].ulValueLen = sizeof (keytype);
+				count = 3;
+			}
+		}
+
+		break;
+
+	case CKO_PUBLIC_KEY:
+		if (object->isFreeObject == FREE_UNCHECKED) {
+			attrs[count].type = CKA_KEY_TYPE;
+			attrs[count].pValue = &keytype;
+			attrs[count].ulValueLen = sizeof (keytype);
+			count++;
+		}
+		is_sensitive = CK_FALSE;
+		is_extractable = CK_TRUE;
+		break;
+
+	default:
+		object->isFreeObject = FREE_DISABLED;
+		is_sensitive = CK_FALSE;
+		is_extractable = CK_TRUE;
+	};
+
+	if (count > 0) {
+		rv = FUNCLIST(fw_st_id)->C_GetAttributeValue(hSession, hObject,
+		    attrs, count);
 		if (rv != CKR_OK) {
 			return (rv);
 		}
-	} else {
-		is_sensitive = CK_FALSE;
-		is_extractable = CK_TRUE;
+
+		if (object->isFreeObject == FREE_UNCHECKED) {
+			if (keytype == CKK_EC || keytype == CKK_RSA ||
+			    keytype == CKK_DH) {
+				if (metaslot_config.auto_key_migrate) {
+					object->isFreeObject = FREE_DISABLED;
+					object->isFreeToken = FREE_DISABLED;
+				}
+
+				object->isFreeObject = FREE_ENABLED;
+				if (is_token)
+					object->isFreeToken = FREE_ENABLED;
+			} else
+				object->isFreeObject = FREE_DISABLED;
+
+		}
+
 	}
 
 	object->isToken = is_token;
@@ -493,8 +561,9 @@ meta_object_dealloc(meta_object_t *object, boolean_t nukeSourceObj)
 		clone = object->clones[slotnum];
 		if (clone == NULL)
 			continue;
-
-		if (nukeSourceObj || !object->isToken) {
+		if (nukeSourceObj || (!object->isToken &&
+			!(object->isFreeToken == FREE_ENABLED &&
+			    get_keystore_slotnum() == slotnum))) {
 
 			rv = meta_get_slot_session(slotnum, &obj_session,
 			    object->creator_session->session_flags);
@@ -585,6 +654,13 @@ meta_slot_object_activate(slot_object_t *object,
 		INSERT_INTO_LIST(session->object_list_head, object);
 		(void) pthread_rwlock_unlock(&session->object_list_lock);
 	}
+
+	/*
+	 * This set tells the slot object that we are in the token list,
+	 * but does not cause harm with the metaobject knowing the object
+	 * isn't a token, but a freetoken
+	 */
+
 	object->isToken = isToken;
 }
 
@@ -888,8 +964,8 @@ static CK_RV
 clone_by_create(meta_object_t *object, slot_object_t *new_clone,
     slot_session_t *dst_slot_session)
 {
-
 	CK_RV rv;
+	int free_token_index = -1;
 
 	if (object->attributes == NULL) {
 		rv = meta_object_copyin(object);
@@ -906,10 +982,29 @@ clone_by_create(meta_object_t *object, slot_object_t *new_clone,
 		}
 	}
 
+	if (object->isFreeToken == FREE_ENABLED) {
+		if (dst_slot_session->slotnum == get_keystore_slotnum())
+			free_token_index = set_template_boolean(CKA_TOKEN,
+			    object->clone_template,
+			    object->clone_template_size, B_FALSE, &truevalue);
+		else
+			free_token_index = set_template_boolean(CKA_TOKEN,
+			    object->clone_template,
+			    object->clone_template_size, B_FALSE, &falsevalue);
+	}
+
 	/* Create the clone... */
 	rv = FUNCLIST(dst_slot_session->fw_st_id)->C_CreateObject(
 	    dst_slot_session->hSession, object->clone_template,
 	    object->clone_template_size, &(new_clone->hObject));
+
+	if (free_token_index != -1) {
+			free_token_index = set_template_boolean(
+				CKA_TOKEN, object->clone_template,
+				object->clone_template_size,
+				B_FALSE, &falsevalue);
+	}
+
 	if (rv != CKR_OK) {
 		return (rv);
 	}
@@ -1467,14 +1562,20 @@ meta_object_get_clone(meta_object_t *object,
 		goto finish;
 	}
 
-
 	rv = meta_slot_object_alloc(&newclone);
 	if (rv != CKR_OK)
 		goto finish;
 
 	object->tried_create_clone[slot_num] = B_TRUE;
 
-	if (object->isSensitive) {
+	/*
+	 * If this object is sensitive and we do not have not copied in the
+	 * attributes via FreeObject functionality, then we need to wrap it off
+	 * the provider.  If we do have attributes, we can just create the
+	 * clone
+	 */
+
+	if (object->isSensitive && object->attributes == NULL) {
 		rv = clone_by_wrap(object, newclone, slot_session);
 	} else {
 		rv = clone_by_create(object, newclone, slot_session);
@@ -1522,7 +1623,9 @@ meta_clone_template_setup(meta_object_t *object,
 	(void) pthread_rwlock_rdlock(&object->attribute_lock);
 
 	for (i = 0; i < num_attributes; i++) {
-		if (!attributes[i].isCloneAttr) {
+		if (!attributes[i].isCloneAttr ||
+		    (attributes[i].attribute.type == CKA_TOKEN &&
+			object->isFreeToken == FREE_DISABLED)) {
 			continue;
 		}
 		if ((!(attributes[i].hasValueForClone)) &&
@@ -1709,4 +1812,368 @@ meta_object_delay_free(meta_object_t *objp)
 		obj_delay_freed.first = tmp;
 	}
 	(void) pthread_mutex_unlock(&obj_delay_freed.obj_to_be_free_mutex);
+}
+
+
+/*
+ * This function checks if the object passed can be a freeobject.
+ *
+ * If there is more than one provider that supports the supported freeobject
+ * mechanisms then allow freeobjects to be an option.
+ */
+
+boolean_t
+meta_freeobject_check(meta_session_t *session, meta_object_t *object,
+    CK_MECHANISM *pMech, CK_ATTRIBUTE *tmpl, CK_ULONG tmpl_len,
+    CK_KEY_TYPE keytype)
+{
+	mech_support_info_t *info = &(session->mech_support_info);
+
+	/*
+	 * If key migration is turned off, or the object does not has any of
+	 * the required flags and there is only one slot, then we don't need
+	 * FreeObjects.
+	 */
+	if (!metaslot_auto_key_migrate ||
+	    (!object->isToken && !object->isSensitive &&
+		meta_slotManager_get_slotcount() < 2))
+		goto failure;
+
+	/*
+	 * If this call is for key generation, check pMech for supported
+	 * FreeObject mechs
+	 */
+	if (pMech != NULL) {
+		if (pMech->mechanism == CKM_RSA_PKCS_KEY_PAIR_GEN ||
+		    pMech->mechanism == CKM_EC_KEY_PAIR_GEN ||
+		    pMech->mechanism == CKM_DH_PKCS_KEY_PAIR_GEN ||
+		    pMech->mechanism == CKM_DH_PKCS_DERIVE)
+			info->mech = pMech->mechanism;
+		else
+			goto failure;
+
+	/*
+	 * If this call is for an object creation, look inside the template
+	 * for supported FreeObject mechs
+	 */
+	} else if (tmpl_len > 0) {
+		if (!get_template_ulong(CKA_KEY_TYPE, tmpl, tmpl_len,
+			&keytype))
+			goto failure;
+
+		switch (keytype) {
+		case CKK_RSA:
+			info->mech = CKM_RSA_PKCS_KEY_PAIR_GEN;
+			break;
+		case CKK_EC:
+			info->mech = CKM_EC_KEY_PAIR_GEN;
+			break;
+		case CKK_DH:
+			info->mech = CKM_DH_PKCS_KEY_PAIR_GEN;
+			break;
+		default:
+			goto failure;
+		}
+	} else
+		goto failure;
+
+	/* Get the slot that support this mech... */
+	if (meta_mechManager_get_slots(info, B_FALSE) != CKR_OK)
+		goto failure;
+
+	/*
+	 * If there is only one slot with the mech or the first slot in
+	 * the list is the keystore slot, we should bail.
+	 */
+	if (info->num_supporting_slots < 2 &&
+	    info->supporting_slots[0]->slotnum == get_keystore_slotnum())
+		goto failure;
+
+	if (object->isToken)
+		object->isFreeToken = FREE_ALLOWED_KEY;
+	else
+		object->isFreeToken = FREE_DISABLED;
+
+	object->isFreeObject = FREE_ALLOWED_KEY;
+
+	return (B_TRUE);
+
+failure:
+	object->isFreeToken = FREE_DISABLED;
+	object->isFreeObject = FREE_DISABLED;
+	return (B_FALSE);
+}
+
+/*
+ * This function assumes meta_freeobject_check() has just been called and set
+ * the isFreeObject and/or isFreeToken vars to FREE_ALLOWED_KEY.
+ *
+ * If the template value for CKA_PRIVATE, CKA_SENSITIVE and/or CKA_TOKEN are
+ * true, then isFreeObject is fully enabled.  In addition isFreeToken is
+ * enabled if is CKA_TOKEN true.
+ *
+ * If create is true, we are doing a C_CreateObject operation and don't
+ * handle CKA_PRIVATE & CKA_SENSITIVE flags, we only care about CKA_TOKEN.
+ */
+
+boolean_t
+meta_freeobject_set(meta_object_t *object, CK_ATTRIBUTE *tmpl,
+    CK_ULONG tmpl_len, boolean_t create)
+{
+
+	/* This check should never be true, if it is, it's a bug */
+	if (object->isFreeObject < FREE_ALLOWED_KEY)
+		return (B_FALSE);
+
+	if (!create) {
+		/* Turn off the Sensitive flag */
+		if (object->isSensitive) {
+			if (set_template_boolean(CKA_SENSITIVE, tmpl,
+				tmpl_len, B_TRUE, &falsevalue) == -1)
+				goto failure;
+
+			object->isFreeObject = FREE_ENABLED;
+		}
+
+		/* Turn off the Private flag */
+		if (object->isPrivate) {
+			if (set_template_boolean(CKA_PRIVATE, tmpl,
+				tmpl_len, B_TRUE, &falsevalue) == -1)
+				goto failure;
+
+			object->isFreeObject = FREE_ENABLED;
+		}
+	}
+
+	if (object->isToken) {
+		object->isToken = B_FALSE;
+		object->isFreeToken = FREE_ENABLED;
+		object->isFreeObject = FREE_ENABLED;
+	} else
+		object->isFreeToken = FREE_DISABLED;
+
+	/*
+	 *  If isFreeObject is not in the FREE_ENABLED state yet, it can be
+	 *  turned off because the object doesn't not need to be a FreeObject.
+	 */
+	if (object->isFreeObject == FREE_ALLOWED_KEY)
+		object->isFreeObject = FREE_DISABLED;
+
+	return (B_TRUE);
+
+failure:
+	object->isFreeToken = FREE_DISABLED;
+	object->isFreeObject = FREE_DISABLED;
+	return (B_FALSE);
+}
+
+/*
+ * This function sets the CKA_TOKEN flag on a given object template depending
+ * if the slot being used is a keystore.
+ *
+ * If the object is a token, but the slot is not the system keystore or has
+ * no keystore, then set the template to token = false; otherwise it's true.
+ * In addition we know ahead of time what the value is, so if the value is
+ * already correct, bypass the setting function
+ */
+CK_RV
+meta_freetoken_set(CK_ULONG slot_num, CK_BBOOL *current_value,
+    CK_ATTRIBUTE *tmpl, CK_ULONG tmpl_len)
+{
+
+	if (slot_num == get_keystore_slotnum()) {
+		if (*current_value == TRUE)
+			return (CKR_OK);
+
+		if (set_template_boolean(CKA_TOKEN, tmpl, tmpl_len, B_TRUE,
+			&truevalue) == -1)
+			return (CKR_FUNCTION_FAILED);
+
+	} else {
+
+		if (*current_value == FALSE)
+			return (CKR_OK);
+
+		if (set_template_boolean(CKA_TOKEN, tmpl, tmpl_len, B_TRUE,
+			&falsevalue) == -1)
+			return (CKR_FUNCTION_FAILED);
+
+		*current_value = FALSE;
+	}
+
+	return (CKR_OK);
+}
+
+/*
+ * Cloning function for meta_freeobject_clone() to use.  This function
+ * is streamlined because we know what the object is and this should
+ * not be called as a generic cloner.
+ */
+
+static CK_RV
+meta_freeobject_clone_maker(meta_session_t *session, meta_object_t *object,
+    CK_ULONG slotnum)
+{
+
+	slot_object_t *slot_object = NULL;
+	slot_session_t *slot_session = NULL;
+	CK_RV rv;
+
+	rv = meta_slot_object_alloc(&slot_object);
+	if (rv != CKR_OK)
+		goto cleanup;
+
+	rv = meta_get_slot_session(slotnum, &slot_session,
+	    session->session_flags);
+	if (rv != CKR_OK)
+		goto cleanup;
+
+	rv = clone_by_create(object, slot_object, slot_session);
+	if (rv == CKR_OK) {
+		object->clones[slotnum] = slot_object;
+		meta_slot_object_activate(slot_object, slot_session, B_TRUE);
+	}
+
+cleanup:
+	meta_release_slot_session(slot_session);
+	return (rv);
+
+}
+
+/*
+ * This function is called when a object is a FreeObject.
+ *
+ * What we are given is an object that has been generated on a provider
+ * that is not its final usage place. That maybe because:
+ * 1) it's a token and needs to be stored in keystore.
+ * 2) it was to be a private/sensitive object that we modified so we could know
+ *    the important attributes for cloning before we make it private/sensitive.
+ */
+
+boolean_t
+meta_freeobject_clone(meta_session_t *session, meta_object_t *object)
+{
+	CK_RV rv;
+	CK_ULONG keystore_slotnum;
+	CK_ATTRIBUTE attr[2];
+	boolean_t failover = B_FALSE;
+
+	if (object->attributes == NULL) {
+		rv = meta_object_copyin(object);
+		if (rv != CKR_OK)
+			return (rv);
+	}
+
+	if (object->isPrivate) {
+		CK_OBJECT_HANDLE new_clone;
+		CK_ULONG slotnum = object->master_clone_slotnum;
+		slot_session_t *slot_session;
+
+		attr[0].type = CKA_PRIVATE;
+		attr[0].pValue = &truevalue;
+		attr[0].ulValueLen = sizeof (truevalue);
+
+		/* Set the master attribute list */
+		rv = attribute_set_value(attr, object->attributes,
+		    object->num_attributes);
+		if (rv > 0)
+			return (CKR_FUNCTION_FAILED);
+
+		/* Get a slot session */
+		rv = meta_get_slot_session(slotnum, &slot_session,
+		    session->session_flags);
+		if (rv > 0)
+			return (rv);
+
+		/* Create the new CKA_PRIVATE one */
+		rv = FUNCLIST(slot_session->fw_st_id)->\
+		    C_CopyObject(slot_session->hSession,
+			object->clones[slotnum]->hObject, attr, 1, &new_clone);
+
+		if (rv == CKR_USER_NOT_LOGGED_IN) {
+			/*
+			 * If the CopyObject fails, we may be using a provider
+			 * that has a keystore that is not the default
+			 * keystore set in metaslot or has object management
+			 * abilities. In which case we should write this
+			 * object to metaslot's keystore and let the failover.
+			 * rest of the function know we've changed providers.
+			 */
+			failover = B_TRUE;
+			keystore_slotnum = get_keystore_slotnum();
+			if (object->clones[keystore_slotnum] == NULL) {
+				rv = meta_freeobject_clone_maker(session,
+				    object, keystore_slotnum);
+				if (rv != CKR_OK) {
+					goto failure;
+				}
+			}
+			object->master_clone_slotnum = keystore_slotnum;
+
+		} else if (rv != CKR_OK) {
+			meta_release_slot_session(slot_session);
+			goto failure;
+		}
+		/* Remove the old object */
+		rv = FUNCLIST(slot_session->fw_st_id)->	\
+		    C_DestroyObject(slot_session->hSession,
+			object->clones[slotnum]->hObject);
+		if (rv != CKR_OK) {
+			meta_release_slot_session(slot_session);
+			goto failure;
+		}
+
+		if (!failover)
+			object->clones[slotnum]->hObject = new_clone;
+		else
+			object->clones[slotnum] = NULL;
+
+		meta_release_slot_session(slot_session);
+
+	}
+
+	if (object->isSensitive) {
+		slot_session_t *slot_session;
+		CK_ULONG slotnum = object->master_clone_slotnum;
+
+		attr[0].type = CKA_SENSITIVE;
+		attr[0].pValue = &truevalue;
+		attr[0].ulValueLen = sizeof (truevalue);
+		rv = attribute_set_value(attr, object->attributes,
+		    object->num_attributes);
+		if (rv != CKR_OK)
+			goto failure;
+
+		rv = meta_get_slot_session(slotnum, &slot_session,
+		    session->session_flags);
+		if (rv == CKR_OK) {
+			rv = FUNCLIST(slot_session->fw_st_id)->		\
+			    C_SetAttributeValue(slot_session->hSession,
+				object->clones[slotnum]->hObject, attr, 1);
+
+			meta_release_slot_session(slot_session);
+		}
+	}
+
+	if (object->isFreeToken == FREE_ENABLED || failover) {
+		keystore_slotnum = get_keystore_slotnum();
+		if (object->clones[keystore_slotnum] == NULL) {
+			rv = meta_freeobject_clone_maker(session, object,
+			    keystore_slotnum);
+			if (rv != CKR_OK)
+				goto failure;
+
+			object->master_clone_slotnum = keystore_slotnum;
+		}
+		object->isFreeToken = FREE_ENABLED;
+	}
+
+	object->isFreeObject = FREE_ENABLED;
+	return (CKR_OK);
+
+failure:
+	object->isFreeToken = FREE_DISABLED;
+	object->isFreeObject = FREE_DISABLED;
+	return (rv);
+
 }

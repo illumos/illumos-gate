@@ -541,6 +541,8 @@ extern rctl_hndl_t rc_project_crypto_mem;
 #define	KCF_PROV_KEY_OPS(pd)		((pd)->pd_ops_vector->co_key_ops)
 #define	KCF_PROV_PROVIDER_OPS(pd)	((pd)->pd_ops_vector->co_provider_ops)
 #define	KCF_PROV_MECH_OPS(pd)		((pd)->pd_ops_vector->co_mech_ops)
+#define	KCF_PROV_NOSTORE_KEY_OPS(pd)	\
+	((pd)->pd_ops_vector->co_nostore_key_ops)
 
 /*
  * Wrappers for crypto_control_ops(9S) entry points.
@@ -1158,6 +1160,36 @@ extern rctl_hndl_t rc_project_crypto_mem;
 	KCF_PROV_PROVIDER_OPS(pd)->set_pin((pd)->pd_prov_handle, \
 	session, old_pin, old_len, new_pin, new_len, req) : \
 	    CRYPTO_NOT_SUPPORTED)
+
+/*
+ * Wrappers for crypto_nostore_key_ops(9S) entry points.
+ */
+
+#define	KCF_PROV_NOSTORE_KEY_GENERATE(pd, session, mech, template, count, \
+	    out_template, out_count, req) ( \
+	(KCF_PROV_NOSTORE_KEY_OPS(pd) && \
+	    KCF_PROV_NOSTORE_KEY_OPS(pd)->nostore_key_generate) ? \
+	KCF_PROV_NOSTORE_KEY_OPS(pd)->nostore_key_generate( \
+	    (pd)->pd_prov_handle, session, mech, template, count, \
+	    out_template, out_count, req) : CRYPTO_NOT_SUPPORTED)
+
+#define	KCF_PROV_NOSTORE_KEY_GENERATE_PAIR(pd, session, mech, pub_template, \
+	    pub_count, priv_template, priv_count, out_pub_template, \
+	    out_pub_count, out_priv_template, out_priv_count, req) ( \
+	(KCF_PROV_NOSTORE_KEY_OPS(pd) && \
+	    KCF_PROV_NOSTORE_KEY_OPS(pd)->nostore_key_generate_pair) ? \
+	KCF_PROV_NOSTORE_KEY_OPS(pd)->nostore_key_generate_pair( \
+	    (pd)->pd_prov_handle, session, mech, pub_template, pub_count, \
+	    priv_template, priv_count, out_pub_template, out_pub_count, \
+	    out_priv_template, out_priv_count, req) : CRYPTO_NOT_SUPPORTED)
+
+#define	KCF_PROV_NOSTORE_KEY_DERIVE(pd, session, mech, base_key, template, \
+	    count, out_template, out_count, req) ( \
+	(KCF_PROV_NOSTORE_KEY_OPS(pd) && \
+	    KCF_PROV_NOSTORE_KEY_OPS(pd)->nostore_key_derive) ? \
+	KCF_PROV_NOSTORE_KEY_OPS(pd)->nostore_key_derive( \
+	    (pd)->pd_prov_handle, session, mech, base_key, template, count, \
+	    out_template, out_count, req) : CRYPTO_NOT_SUPPORTED)
 
 /*
  * The following routines are exported by the kcf module (/kernel/misc/kcf)

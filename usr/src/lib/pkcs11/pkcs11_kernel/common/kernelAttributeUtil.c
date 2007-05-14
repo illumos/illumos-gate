@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -850,6 +849,16 @@ kernel_cleanup_object_bigint_attrs(kernel_object_t *object_p)
 				bigint_attr_cleanup(OBJ_PUB_DSA_VALUE(
 				    object_p));
 				break;
+
+			case CKK_DH:
+				bigint_attr_cleanup(OBJ_PUB_DH_PRIME(object_p));
+				bigint_attr_cleanup(OBJ_PUB_DH_BASE(object_p));
+				bigint_attr_cleanup(OBJ_PUB_DH_VALUE(object_p));
+				break;
+
+			case CKK_EC:
+				bigint_attr_cleanup(OBJ_PUB_EC_POINT(object_p));
+				break;
 			}
 
 			/* Release Public Key Object struct */
@@ -890,6 +899,16 @@ kernel_cleanup_object_bigint_attrs(kernel_object_t *object_p)
 				bigint_attr_cleanup(OBJ_PRI_DSA_VALUE(
 				    object_p));
 				break;
+
+			case CKK_DH:
+				bigint_attr_cleanup(OBJ_PRI_DH_PRIME(object_p));
+				bigint_attr_cleanup(OBJ_PRI_DH_BASE(object_p));
+				bigint_attr_cleanup(OBJ_PRI_DH_VALUE(object_p));
+				break;
+
+			case CKK_EC:
+				bigint_attr_cleanup(OBJ_PRI_EC_VALUE(object_p));
+				break;
 			}
 
 			/* Release Private Key Object struct. */
@@ -928,10 +947,11 @@ kernel_parse_common_attrs(CK_ATTRIBUTE_PTR template, kernel_session_t *sp,
 	case CKA_PRIVATE:
 		if ((*(CK_BBOOL *)template->pValue) == TRUE) {
 			/*
-			 * Can not create a private object if user isn't
-			 * logged in.
+			 * Cannot create a private object if the token
+			 * has a keystore and the user isn't logged in.
 			 */
-			if (pslot->sl_state != CKU_USER) {
+			if (pslot->sl_func_list.fl_object_create &&
+			    pslot->sl_state != CKU_USER) {
 				rv = CKR_ATTRIBUTE_VALUE_INVALID;
 			} else {
 				*attr_mask_p |= PRIVATE_BOOL_ON;
@@ -977,7 +997,8 @@ kernel_parse_common_attrs(CK_ATTRIBUTE_PTR template, kernel_session_t *sp,
  */
 CK_RV
 kernel_build_public_key_object(CK_ATTRIBUTE_PTR template,
-    CK_ULONG ulAttrNum,	kernel_object_t *new_object, kernel_session_t *sp)
+    CK_ULONG ulAttrNum,	kernel_object_t *new_object, kernel_session_t *sp,
+    uint_t mode)
 {
 
 	int		i;
@@ -992,6 +1013,8 @@ kernel_build_public_key_object(CK_ATTRIBUTE_PTR template,
 	int		isSubprime = 0;
 	int		isBase = 0;
 	int		isValue = 0;
+	int		isPoint = 0;
+	int		isParams = 0;
 	/* Must not set flags */
 	int		isModulusBits = 0;
 	CK_ULONG	modulus_bits = 0;
@@ -1002,7 +1025,9 @@ kernel_build_public_key_object(CK_ATTRIBUTE_PTR template,
 	biginteger_t	subprime;
 	biginteger_t	base;
 	biginteger_t	value;
+	biginteger_t	point;
 	CK_ATTRIBUTE	string_tmp;
+	CK_ATTRIBUTE	param_tmp;
 
 	public_key_obj_t  *pbk;
 
@@ -1013,7 +1038,9 @@ kernel_build_public_key_object(CK_ATTRIBUTE_PTR template,
 	(void) memset(&subprime, 0x0, sizeof (biginteger_t));
 	(void) memset(&base, 0x0, sizeof (biginteger_t));
 	(void) memset(&value, 0x0, sizeof (biginteger_t));
+	(void) memset(&point, 0x0, sizeof (biginteger_t));
 	string_tmp.pValue = NULL;
+	param_tmp.pValue = NULL;
 
 	for (i = 0; i < ulAttrNum; i++) {
 
@@ -1160,6 +1187,22 @@ kernel_build_public_key_object(CK_ATTRIBUTE_PTR template,
 				goto fail_cleanup;
 			break;
 
+		case CKA_EC_POINT:
+			isPoint = 1;
+			rv = get_bigint_attr_from_template(&point,
+			    &template[i]);
+			if (rv != CKR_OK)
+				goto fail_cleanup;
+			break;
+
+		case CKA_EC_PARAMS:
+			isParams = 1;
+			rv = get_string_from_template(&param_tmp,
+			    &template[i]);
+			if (rv != CKR_OK)
+				goto fail_cleanup;
+			break;
+
 		default:
 			rv = kernel_parse_common_attrs(&template[i], sp,
 			    &attr_mask);
@@ -1183,16 +1226,17 @@ kernel_build_public_key_object(CK_ATTRIBUTE_PTR template,
 		rv = CKR_TEMPLATE_INCOMPLETE;
 		goto fail_cleanup;
 	}
-
 	new_object->key_type = keytype;
 
 	/* Supported key types of the Public Key Object */
 	switch (keytype) {
 	case CKK_RSA:
-		if (isModulusBits || isPrime || isSubprime ||
-		    isBase|| isValue) {
-			rv = CKR_TEMPLATE_INCONSISTENT;
-			goto fail_cleanup;
+		if (mode == KERNEL_CREATE_OBJ) {
+			if (isModulusBits || isPrime || isSubprime ||
+			    isBase|| isValue) {
+				rv = CKR_TEMPLATE_INCONSISTENT;
+				goto fail_cleanup;
+			}
 		}
 
 		if (isModulus && isPubExpo) {
@@ -1200,12 +1244,19 @@ kernel_build_public_key_object(CK_ATTRIBUTE_PTR template,
 			 * Copy big integer attribute value to the
 			 * designated place in the public key object.
 			 */
-			copy_bigint_attr(&modulus, KEY_PUB_RSA_MOD(pbk));
+			copy_bigint_attr(&modulus,
+			    KEY_PUB_RSA_MOD(pbk));
 
-			copy_bigint_attr(&pubexpo, KEY_PUB_RSA_PUBEXPO(pbk));
+			copy_bigint_attr(&pubexpo,
+			    KEY_PUB_RSA_PUBEXPO(pbk));
 		} else {
 			rv = CKR_TEMPLATE_INCOMPLETE;
 			goto fail_cleanup;
+		}
+
+		/* must be generating a RSA key pair by value */
+		if (isModulusBits) {
+			KEY_PUB_RSA_MOD_BITS(pbk) = modulus_bits;
 		}
 		break;
 
@@ -1228,6 +1279,33 @@ kernel_build_public_key_object(CK_ATTRIBUTE_PTR template,
 
 		copy_bigint_attr(&value, KEY_PUB_DSA_VALUE(pbk));
 
+		break;
+
+	case CKK_DH:
+		if (!(isPrime && isBase && isValue)) {
+			rv = CKR_TEMPLATE_INCOMPLETE;
+			goto fail_cleanup;
+		}
+
+		copy_bigint_attr(&prime, KEY_PUB_DH_PRIME(pbk));
+
+		copy_bigint_attr(&base, KEY_PUB_DH_BASE(pbk));
+
+		copy_bigint_attr(&value, KEY_PUB_DH_VALUE(pbk));
+
+		break;
+
+	case CKK_EC:
+		if (!isPoint || !isParams) {
+			rv = CKR_TEMPLATE_INCOMPLETE;
+			goto fail_cleanup;
+		}
+
+		copy_bigint_attr(&point, KEY_PUB_EC_POINT(pbk));
+		rv = kernel_add_extra_attr(&param_tmp, new_object);
+		if (rv != CKR_OK)
+			goto fail_cleanup;
+		string_attr_cleanup(&param_tmp);
 		break;
 	default:
 		rv = CKR_TEMPLATE_INCONSISTENT;
@@ -1255,7 +1333,9 @@ fail_cleanup:
 	bigint_attr_cleanup(&subprime);
 	bigint_attr_cleanup(&base);
 	bigint_attr_cleanup(&value);
+	bigint_attr_cleanup(&point);
 	string_attr_cleanup(&string_tmp);
+	string_attr_cleanup(&param_tmp);
 
 	/*
 	 * cleanup the storage allocated inside the object itself.
@@ -1285,7 +1365,8 @@ fail_cleanup:
  */
 CK_RV
 kernel_build_private_key_object(CK_ATTRIBUTE_PTR template,
-    CK_ULONG ulAttrNum,	kernel_object_t *new_object, kernel_session_t *sp)
+    CK_ULONG ulAttrNum,	kernel_object_t *new_object, kernel_session_t *sp,
+    uint_t mode)
 {
 	ulong_t		i;
 	CK_KEY_TYPE	keytype = (CK_KEY_TYPE)~0UL;
@@ -1299,6 +1380,7 @@ kernel_build_private_key_object(CK_ATTRIBUTE_PTR template,
 	int		isSubprime = 0;
 	int		isBase = 0;
 	int		isValue = 0;
+	int		isParams = 0;
 	/* Must not set flags */
 	int		isValueBits = 0;
 	CK_ULONG	value_bits = 0;
@@ -1325,6 +1407,7 @@ kernel_build_private_key_object(CK_ATTRIBUTE_PTR template,
 	biginteger_t	expo2;
 	biginteger_t	coef;
 	CK_ATTRIBUTE	string_tmp;
+	CK_ATTRIBUTE	param_tmp;
 
 	private_key_obj_t *pvk;
 
@@ -1342,6 +1425,7 @@ kernel_build_private_key_object(CK_ATTRIBUTE_PTR template,
 	(void) memset(&expo2, 0x0, sizeof (biginteger_t));
 	(void) memset(&coef, 0x0, sizeof (biginteger_t));
 	string_tmp.pValue = NULL;
+	param_tmp.pValue = NULL;
 
 	for (i = 0; i < ulAttrNum; i++) {
 
@@ -1553,6 +1637,14 @@ kernel_build_private_key_object(CK_ATTRIBUTE_PTR template,
 				goto fail_cleanup;
 			break;
 
+		case CKA_EC_PARAMS:
+			isParams = 1;
+			rv = get_string_from_template(&param_tmp,
+			    &template[i]);
+			if (rv != CKR_OK)
+				goto fail_cleanup;
+			break;
+
 		default:
 			rv = kernel_parse_common_attrs(&template[i], sp,
 			    &attr_mask);
@@ -1652,6 +1744,38 @@ kernel_build_private_key_object(CK_ATTRIBUTE_PTR template,
 
 		break;
 
+	case CKK_DH:
+		if (mode == KERNEL_CREATE_OBJ && isValueBits) {
+			rv = CKR_TEMPLATE_INCONSISTENT;
+			goto fail_cleanup;
+		}
+		if (!(isPrime && isBase && isValue)) {
+			rv = CKR_TEMPLATE_INCOMPLETE;
+			goto fail_cleanup;
+		}
+
+		copy_bigint_attr(&prime, KEY_PRI_DH_PRIME(pvk));
+
+		copy_bigint_attr(&base, KEY_PRI_DH_BASE(pvk));
+
+		copy_bigint_attr(&value, KEY_PRI_DH_VALUE(pvk));
+
+		KEY_PRI_DH_VAL_BITS(pvk) = (isValueBits) ? value_bits : 0;
+
+		break;
+
+	case CKK_EC:
+		if (!isValue || !isParams) {
+			rv = CKR_TEMPLATE_INCOMPLETE;
+			goto fail_cleanup;
+		}
+
+		copy_bigint_attr(&value, KEY_PRI_EC_VALUE(pvk));
+		rv = kernel_add_extra_attr(&param_tmp, new_object);
+		if (rv != CKR_OK)
+			goto fail_cleanup;
+		string_attr_cleanup(&param_tmp);
+		break;
 	default:
 		rv = CKR_TEMPLATE_INCONSISTENT;
 		goto fail_cleanup;
@@ -1685,6 +1809,7 @@ fail_cleanup:
 	bigint_attr_cleanup(&expo2);
 	bigint_attr_cleanup(&coef);
 	string_attr_cleanup(&string_tmp);
+	string_attr_cleanup(&param_tmp);
 
 	/*
 	 * cleanup the storage allocated inside the object itself.
@@ -2010,7 +2135,7 @@ fail_cleanup:
  */
 CK_RV
 kernel_build_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
-    kernel_object_t *new_object, kernel_session_t *sp)
+    kernel_object_t *new_object, kernel_session_t *sp, uint_t mode)
 {
 
 	CK_OBJECT_CLASS class = (CK_OBJECT_CLASS)~0UL;
@@ -2035,12 +2160,12 @@ kernel_build_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 	switch (class) {
 	case CKO_PUBLIC_KEY:
 		rv = kernel_build_public_key_object(template, ulAttrNum,
-		    new_object, sp);
+		    new_object, sp, mode);
 		break;
 
 	case CKO_PRIVATE_KEY:
 		rv = kernel_build_private_key_object(template, ulAttrNum,
-		    new_object, sp);
+		    new_object, sp, mode);
 		break;
 
 	case CKO_SECRET_KEY:
@@ -2192,6 +2317,7 @@ kernel_get_public_key_attribute(kernel_object_t *object_p,
 	switch (template->type) {
 
 	case CKA_SUBJECT:
+	case CKA_EC_PARAMS:
 		/*
 		 * The above extra attributes have byte array type.
 		 */
@@ -2255,6 +2381,9 @@ kernel_get_public_key_attribute(kernel_object_t *object_p,
 		case CKK_DSA:
 			return (get_bigint_attr_from_object(
 			    OBJ_PUB_DSA_PRIME(object_p), template));
+		case CKK_DH:
+			return (get_bigint_attr_from_object(
+			    OBJ_PUB_DH_PRIME(object_p), template));
 		default:
 			template->ulValueLen = (CK_ULONG)-1;
 			return (CKR_ATTRIBUTE_TYPE_INVALID);
@@ -2275,6 +2404,9 @@ kernel_get_public_key_attribute(kernel_object_t *object_p,
 		case CKK_DSA:
 			return (get_bigint_attr_from_object(
 			    OBJ_PUB_DSA_BASE(object_p), template));
+		case CKK_DH:
+			return (get_bigint_attr_from_object(
+			    OBJ_PUB_DH_BASE(object_p), template));
 		default:
 			template->ulValueLen = (CK_ULONG)-1;
 			return (CKR_ATTRIBUTE_TYPE_INVALID);
@@ -2285,11 +2417,23 @@ kernel_get_public_key_attribute(kernel_object_t *object_p,
 		case CKK_DSA:
 			return (get_bigint_attr_from_object(
 			    OBJ_PUB_DSA_VALUE(object_p), template));
+		case CKK_DH:
+			return (get_bigint_attr_from_object(
+			    OBJ_PUB_DH_VALUE(object_p), template));
 		default:
 			template->ulValueLen = (CK_ULONG)-1;
 			return (CKR_ATTRIBUTE_TYPE_INVALID);
 		}
 
+	case CKA_EC_POINT:
+		switch (keytype) {
+		case CKK_EC:
+			return (get_bigint_attr_from_object(
+			    OBJ_PUB_EC_POINT(object_p), template));
+		default:
+			template->ulValueLen = (CK_ULONG)-1;
+			return (CKR_ATTRIBUTE_TYPE_INVALID);
+		}
 	default:
 		/*
 		 * First, get the value of the request attribute defined
@@ -2349,6 +2493,7 @@ kernel_get_private_key_attribute(kernel_object_t *object_p,
 	switch (template->type) {
 
 	case CKA_SUBJECT:
+	case CKA_EC_PARAMS:
 		/*
 		 * The above extra attributes have byte array type.
 		 */
@@ -2473,14 +2618,23 @@ kernel_get_private_key_attribute(kernel_object_t *object_p,
 		}
 
 	case CKA_VALUE_BITS:
-		template->ulValueLen = (CK_ULONG)-1;
-		rv = CKR_ATTRIBUTE_TYPE_INVALID;
-		break;
+		if (keytype == CKK_DH) {
+			return (get_ulong_attr_from_object(
+			    OBJ_PRI_DH_VAL_BITS(object_p), template));
+		} else {
+			template->ulValueLen = (CK_ULONG)-1;
+			rv = CKR_ATTRIBUTE_TYPE_INVALID;
+			break;
+		}
+
 	case CKA_PRIME:
 		switch (keytype) {
 		case CKK_DSA:
 			return (get_bigint_attr_from_object(
 			    OBJ_PRI_DSA_PRIME(object_p), template));
+		case CKK_DH:
+			return (get_bigint_attr_from_object(
+			    OBJ_PRI_DH_PRIME(object_p), template));
 		default:
 			template->ulValueLen = (CK_ULONG)-1;
 			return (CKR_ATTRIBUTE_TYPE_INVALID);
@@ -2501,6 +2655,9 @@ kernel_get_private_key_attribute(kernel_object_t *object_p,
 		case CKK_DSA:
 			return (get_bigint_attr_from_object(
 			    OBJ_PRI_DSA_BASE(object_p), template));
+		case CKK_DH:
+			return (get_bigint_attr_from_object(
+			    OBJ_PRI_DH_BASE(object_p), template));
 		default:
 			template->ulValueLen = (CK_ULONG)-1;
 			return (CKR_ATTRIBUTE_TYPE_INVALID);
@@ -2511,6 +2668,12 @@ kernel_get_private_key_attribute(kernel_object_t *object_p,
 		case CKK_DSA:
 			return (get_bigint_attr_from_object(
 			    OBJ_PRI_DSA_VALUE(object_p), template));
+		case CKK_DH:
+			return (get_bigint_attr_from_object(
+			    OBJ_PRI_DH_VALUE(object_p), template));
+		case CKK_EC:
+			return (get_bigint_attr_from_object(
+			    OBJ_PRI_EC_VALUE(object_p), template));
 		default:
 			template->ulValueLen = (CK_ULONG)-1;
 			return (CKR_ATTRIBUTE_TYPE_INVALID);
@@ -2770,7 +2933,12 @@ kernel_set_common_key_attribute(kernel_object_t *object_p,
 		}
 
 		(void) pthread_mutex_lock(&pslot->sl_mutex);
-		if (pslot->sl_state != CKU_USER) {
+		/*
+		 * Cannot create a private object if the token
+		 * has a keystore and the user isn't logged in.
+		 */
+		if (pslot->sl_func_list.fl_object_create &&
+		    pslot->sl_state != CKU_USER) {
 			rv = CKR_USER_NOT_LOGGED_IN;
 		} else {
 			rv = set_bool_attr_to_object(object_p,

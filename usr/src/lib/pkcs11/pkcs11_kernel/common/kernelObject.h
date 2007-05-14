@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,9 +38,13 @@ extern "C" {
 
 #define	KERNELTOKEN_OBJECT_MAGIC	0xECF0B003
 
+#define	KERNEL_CREATE_OBJ	1
+#define	KERNEL_GEN_KEY		2
+
 #define	RSA_PRI_ATTR_COUNT		7
 #define	RSA_PUB_ATTR_COUNT		3
 #define	DSA_ATTR_COUNT			4
+#define	EC_ATTR_COUNT			1
 
 /*
  * Secret key Struct
@@ -93,6 +96,22 @@ typedef struct dsa_pub_key {
 	biginteger_t value;
 } dsa_pub_key_t;
 
+/*
+ * PKCS11: Diffie-Hellman Public Key Object Attributes
+ */
+typedef struct dh_pub_key {
+	biginteger_t prime;
+	biginteger_t base;
+	biginteger_t value;
+} dh_pub_key_t;
+
+/*
+ * PKCS11: EC Public Key Object Attributes
+ */
+typedef struct ec_pub_key {
+	biginteger_t point;
+} ec_pub_key_t;
+
 
 /*
  * Public Key Main Struct
@@ -101,6 +120,8 @@ typedef struct public_key_obj {
 	union {
 		rsa_pub_key_t rsa_pub_key; /* RSA public key */
 		dsa_pub_key_t dsa_pub_key; /* DSA public key */
+		dh_pub_key_t dh_pub_key; /* DH public key */
+		ec_pub_key_t ec_pub_key; /* EC public key */
 	} key_type_u;
 } public_key_obj_t;
 
@@ -132,12 +153,32 @@ typedef struct dsa_pri_key {
 
 
 /*
+ * PKCS11: Diffie-Hellman Private Key Object Attributes
+ */
+typedef struct dh_pri_key {
+	biginteger_t prime;
+	biginteger_t base;
+	biginteger_t value;
+	CK_ULONG value_bits;
+} dh_pri_key_t;
+
+
+/*
+ * PKCS11: EC Private Key Object Attributes
+ */
+typedef struct ec_pri_key {
+	biginteger_t value;
+} ec_pri_key_t;
+
+/*
  * Private Key Main Struct
  */
 typedef struct private_key_obj {
 	union {
 		rsa_pri_key_t rsa_pri_key; /* RSA private key */
 		dsa_pri_key_t dsa_pri_key; /* DSA private key */
+		dh_pri_key_t dh_pri_key; /* DH private key */
+		ec_pri_key_t ec_pri_key; /* EC private key */
 	} key_type_u;
 } private_key_obj_t;
 
@@ -266,6 +307,34 @@ extern object_to_be_freed_list_t obj_delay_freed;
 
 
 /*
+ * Diffie-Hellman Public Key Object Attributes
+ */
+#define	KEY_PUB_DH(k) \
+	&((k)->key_type_u.dh_pub_key)
+#define	OBJ_PUB_DH_PRIME(o) \
+	&((o)->object_class_u.public_key->key_type_u.dh_pub_key.prime)
+#define	KEY_PUB_DH_PRIME(k) \
+	&((k)->key_type_u.dh_pub_key.prime)
+#define	OBJ_PUB_DH_BASE(o) \
+	&((o)->object_class_u.public_key->key_type_u.dh_pub_key.base)
+#define	KEY_PUB_DH_BASE(k) \
+	&((k)->key_type_u.dh_pub_key.base)
+#define	OBJ_PUB_DH_VALUE(o) \
+	&((o)->object_class_u.public_key->key_type_u.dh_pub_key.value)
+#define	KEY_PUB_DH_VALUE(k) \
+	&((k)->key_type_u.dh_pub_key.value)
+
+
+/*
+ * EC Public Key Object Attributes
+ */
+#define	OBJ_PUB_EC_POINT(o) \
+	&((o)->object_class_u.public_key->key_type_u.ec_pub_key.point)
+#define	KEY_PUB_EC_POINT(k) \
+	&((k)->key_type_u.ec_pub_key.point)
+
+
+/*
  * RSA Private Key Object Attributes
  */
 #define	OBJ_PRI(o) \
@@ -326,6 +395,36 @@ extern object_to_be_freed_list_t obj_delay_freed;
 	&((o)->object_class_u.private_key->key_type_u.dsa_pri_key.value)
 #define	KEY_PRI_DSA_VALUE(k) \
 	&((k)->key_type_u.dsa_pri_key.value)
+
+/*
+ * Diffie-Hellman Private Key Object Attributes
+ */
+#define	KEY_PRI_DH(k) \
+	&((k)->key_type_u.dh_pri_key)
+#define	OBJ_PRI_DH_PRIME(o) \
+	&((o)->object_class_u.private_key->key_type_u.dh_pri_key.prime)
+#define	KEY_PRI_DH_PRIME(k) \
+	&((k)->key_type_u.dh_pri_key.prime)
+#define	OBJ_PRI_DH_BASE(o) \
+	&((o)->object_class_u.private_key->key_type_u.dh_pri_key.base)
+#define	KEY_PRI_DH_BASE(k) \
+	&((k)->key_type_u.dh_pri_key.base)
+#define	OBJ_PRI_DH_VALUE(o) \
+	&((o)->object_class_u.private_key->key_type_u.dh_pri_key.value)
+#define	KEY_PRI_DH_VALUE(k) \
+	&((k)->key_type_u.dh_pri_key.value)
+#define	OBJ_PRI_DH_VAL_BITS(o) \
+	((o)->object_class_u.private_key->key_type_u.dh_pri_key.value_bits)
+#define	KEY_PRI_DH_VAL_BITS(k) \
+	((k)->key_type_u.dh_pri_key.value_bits)
+
+/*
+ * EC Private Key Object Attributes
+ */
+#define	OBJ_PRI_EC_VALUE(o) \
+	&((o)->object_class_u.private_key->key_type_u.ec_pri_key.value)
+#define	KEY_PRI_EC_VALUE(k) \
+	&((k)->key_type_u.ec_pri_key.value)
 
 /*
  * key related attributes with CK_BBOOL data type
@@ -437,8 +536,8 @@ CK_RV kernel_copy_extra_attr(CK_ATTRIBUTE_INFO_PTR old_attrp,
 
 void kernel_cleanup_object_bigint_attrs(kernel_object_t *object_p);
 
-CK_RV kernel_build_object(CK_ATTRIBUTE_PTR template,
-    CK_ULONG ulAttrNum, kernel_object_t *new_object, kernel_session_t *sp);
+CK_RV kernel_build_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
+    kernel_object_t *new_object, kernel_session_t *sp, uint_t);
 
 CK_RV kernel_copy_object(kernel_object_t *old_object,
     kernel_object_t **new_object, boolean_t copy_everything,

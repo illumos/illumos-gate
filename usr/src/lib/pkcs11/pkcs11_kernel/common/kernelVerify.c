@@ -113,6 +113,12 @@ C_VerifyInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 				rv = CKR_HOST_MEMORY;
 				goto clean_exit;
 			}
+		} else if (key_p->key_type == CKK_EC) {
+			if (get_ec_public_key(key_p, &verify_init.vi_key) !=
+			    CKR_OK) {
+				rv = CKR_HOST_MEMORY;
+				goto clean_exit;
+			}
 		} else {
 			rv = CKR_KEY_TYPE_INCONSISTENT;
 			goto clean_exit;

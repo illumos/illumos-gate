@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,7 +78,7 @@ kernel_cleanup_object(kernel_object_t *objp)
 	 * Free the storage allocated to a secret key object.
 	 */
 	if (objp->class == CKO_SECRET_KEY) {
-		if (OBJ_SEC_VALUE(objp) != NULL) {
+		if (OBJ_SEC(objp) != NULL && OBJ_SEC_VALUE(objp) != NULL) {
 			bzero(OBJ_SEC_VALUE(objp), OBJ_SEC_VALUE_LEN(objp));
 			free(OBJ_SEC_VALUE(objp));
 			OBJ_SEC_VALUE(objp) = NULL;
@@ -293,7 +292,8 @@ kernel_add_object(CK_ATTRIBUTE_PTR pTemplate,  CK_ULONG ulCount,
 		 * Validate attribute template and fill in the attributes
 		 * in the kernel_object_t.
 		 */
-		rv = kernel_build_object(pTemplate, ulCount, new_objp, sp);
+		rv = kernel_build_object(pTemplate, ulCount, new_objp, sp,
+		    KERNEL_CREATE_OBJ);
 		if (rv != CKR_OK) {
 			goto fail_cleanup;
 		}
@@ -959,6 +959,10 @@ kernel_get_object_size(kernel_object_t *obj, CK_ULONG_PTR pulSize)
 			big = OBJ_PUB_DSA_VALUE(obj);
 			obj_size += big->big_value_len;
 
+		} else if (obj->key_type == CKK_EC) {
+			big = OBJ_PUB_EC_POINT(obj);
+			obj_size += big->big_value_len;
+
 		} else {
 			rv = CKR_OBJECT_HANDLE_INVALID;
 		}
@@ -1010,6 +1014,10 @@ kernel_get_object_size(kernel_object_t *obj, CK_ULONG_PTR pulSize)
 			big = OBJ_PRI_DSA_BASE(obj);
 			obj_size += big->big_value_len;
 			big = OBJ_PRI_DSA_VALUE(obj);
+			obj_size += big->big_value_len;
+
+		} else if (obj->key_type == CKK_EC) {
+			big = OBJ_PRI_EC_VALUE(obj);
 			obj_size += big->big_value_len;
 
 		} else {

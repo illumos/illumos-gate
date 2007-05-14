@@ -199,6 +199,10 @@ typedef struct kcf_key_ops_params {
 	crypto_key_t			*ko_key;
 	uchar_t				*ko_wrapped_key;
 	size_t				*ko_wrapped_key_len_ptr;
+	crypto_object_attribute_t	*ko_out_template1;
+	crypto_object_attribute_t	*ko_out_template2;
+	uint_t				ko_out_attribute_count1;
+	uint_t				ko_out_attribute_count2;
 } kcf_key_ops_params_t;
 
 /*
@@ -310,7 +314,8 @@ typedef enum kcf_op_group {
 	KCF_OG_SESSION,
 	KCF_OG_OBJECT,
 	KCF_OG_KEY,
-	KCF_OG_PROVMGMT
+	KCF_OG_PROVMGMT,
+	KCF_OG_NOSTORE_KEY
 } kcf_op_group_t;
 
 /*
@@ -559,6 +564,31 @@ typedef struct kcf_req_params {
 	pops->po_label = _label;					\
 	pops->po_ext_info = _ext_info;					\
 	pops->po_pd = _pd;						\
+}
+
+#define	KCF_WRAP_NOSTORE_KEY_OPS_PARAMS(req, ftype, _sid, _mech,	\
+	_key_template, _key_attribute_count, _private_key_template,	\
+	_private_key_attribute_count, _key, _out_template1,		\
+	_out_attribute_count1, _out_template2, _out_attribute_count2) {	\
+	kcf_key_ops_params_t *kops = &(req)->rp_u.key_params;		\
+									\
+	(req)->rp_opgrp = KCF_OG_NOSTORE_KEY;				\
+	(req)->rp_optype = ftype;					\
+	kops->ko_sid = _sid;						\
+	kcf_dup_mech(_mech, &kops->ko_mech, &kops->ko_framework_mechtype); \
+	kops->ko_key_template = _key_template;				\
+	kops->ko_key_attribute_count = _key_attribute_count;		\
+	kops->ko_key_object_id_ptr = NULL;				\
+	kops->ko_private_key_template = _private_key_template;		\
+	kops->ko_private_key_attribute_count = _private_key_attribute_count; \
+	kops->ko_private_key_object_id_ptr = NULL;			\
+	kops->ko_key = _key;						\
+	kops->ko_wrapped_key = NULL;					\
+	kops->ko_wrapped_key_len_ptr = 0;				\
+	kops->ko_out_template1 = _out_template1;			\
+	kops->ko_out_template2 = _out_template2;			\
+	kops->ko_out_attribute_count1 = _out_attribute_count1;		\
+	kops->ko_out_attribute_count2 = _out_attribute_count2;		\
 }
 
 #define	KCF_SET_PROVIDER_MECHNUM(fmtype, pd, mechp)			\

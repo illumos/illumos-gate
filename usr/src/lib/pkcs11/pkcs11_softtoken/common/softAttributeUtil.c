@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,6 +80,7 @@ CK_ATTRIBUTE_TYPE attr_map[] = {
 	CKA_ALWAYS_SENSITIVE,
 	CKA_MODIFIABLE,
 	CKA_ECDSA_PARAMS,
+	CKA_EC_PARAMS,
 	CKA_EC_POINT,
 	CKA_SECONDARY_AUTH,
 	CKA_AUTH_PIN_FLAGS,
@@ -142,7 +143,6 @@ CK_ATTRIBUTE_TYPE PRIV_KEY_ATTRS[] =
 	CKA_EXTRACTABLE,
 	CKA_NEVER_EXTRACTABLE,
 	CKA_ALWAYS_SENSITIVE,
-	CKA_ECDSA_PARAMS,
 	CKA_EC_PARAMS
 };
 
@@ -1064,6 +1064,12 @@ soft_cleanup_object_bigint_attrs(soft_object_t *object_p)
 				bigint_attr_cleanup(OBJ_PUB_DH942_VALUE(
 				    object_p));
 				break;
+			case CKK_EC:
+				bigint_attr_cleanup(OBJ_PUB_EC_PARAM(
+				    object_p));
+				bigint_attr_cleanup(OBJ_PUB_EC_POINT(
+				    object_p));
+				break;
 			}
 
 			/* Release Public Key Object struct */
@@ -1122,6 +1128,13 @@ soft_cleanup_object_bigint_attrs(soft_object_t *object_p)
 				bigint_attr_cleanup(OBJ_PRI_DH942_SUBPRIME(
 				    object_p));
 				bigint_attr_cleanup(OBJ_PRI_DH942_VALUE(
+				    object_p));
+				break;
+
+			case CKK_EC:
+				bigint_attr_cleanup(OBJ_PRI_EC_PARAM(
+				    object_p));
+				bigint_attr_cleanup(OBJ_PRI_EC_VALUE(
 				    object_p));
 				break;
 			}
@@ -1283,14 +1296,16 @@ soft_build_public_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 	int		isSubprime = 0;
 	int		isBase = 0;
 	int		isValue = 0;
+	int		isECParam = 0;
+	int		isECPoint = 0;
 	/* Must not set flags */
 	int		isModulusBits = 0;
 	CK_ULONG	modulus_bits = 0;
 
 	biginteger_t	modulus;
 	biginteger_t	pubexpo;
-	biginteger_t	prime;
-	biginteger_t	subprime;
+	biginteger_t	prime;		/* Shared with CKA_EC_PARAMS */
+	biginteger_t	subprime;	/* Shared with CKA_EC_POINT */
 	biginteger_t	base;
 	biginteger_t	value;
 	CK_ATTRIBUTE	string_tmp;
@@ -1475,6 +1490,24 @@ soft_build_public_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 		case CKA_LABEL:
 			isLabel = 1;
 			rv = get_string_from_template(&string_tmp,
+			    &template[i]);
+			if (rv != CKR_OK)
+				goto fail_cleanup;
+			break;
+
+		case CKA_EC_PARAMS:
+			isECParam = 1;
+			/* use prime variable for ec_param */
+			rv = get_bigint_attr_from_template(&prime,
+			    &template[i]);
+			if (rv != CKR_OK)
+				goto fail_cleanup;
+			break;
+
+		case CKA_EC_POINT:
+			isECPoint = 1;
+			/* use subprime variable for ec_point */
+			rv = get_bigint_attr_from_template(&subprime,
 			    &template[i]);
 			if (rv != CKR_OK)
 				goto fail_cleanup;
@@ -1671,6 +1704,21 @@ soft_build_public_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 
 		break;
 
+	case CKK_EC:
+		if (isModulusBits || isModulus || isPubExpo || isPrime ||
+			isSubprime || isBase || isValue) {
+			rv = CKR_TEMPLATE_INCONSISTENT;
+			goto fail_cleanup;
+
+		} else if (!isECParam && !isECPoint) {
+			rv = CKR_TEMPLATE_INCOMPLETE;
+			goto fail_cleanup;
+		}
+
+		copy_bigint_attr(&prime, KEY_PUB_EC_PARAM(pbk));
+		copy_bigint_attr(&subprime, KEY_PUB_EC_POINT(pbk));
+		break;
+
 	default:
 		rv = CKR_TEMPLATE_INCONSISTENT;
 		goto fail_cleanup;
@@ -1735,6 +1783,7 @@ soft_build_private_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 	uint64_t	attr_mask = PRIVATE_KEY_DEFAULT;
 	CK_RV 		rv = CKR_OK;
 	int		isLabel = 0;
+	int		isECParam = 0;
 	/* Must set flags unless mode == SOFT_UNWRAP_KEY */
 	int		isModulus = 0;
 	int		isPriExpo = 0;
@@ -2031,6 +2080,15 @@ soft_build_private_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 				goto fail_cleanup;
 			break;
 
+		case CKA_EC_PARAMS:
+			isECParam = 1;
+			/* use prime variable for ec_param */
+			rv = get_bigint_attr_from_template(&prime,
+			    &template[i]);
+			if (rv != CKR_OK)
+				goto fail_cleanup;
+			break;
+
 		default:
 			rv = soft_parse_common_attrs(&template[i],
 			    &object_type);
@@ -2293,6 +2351,22 @@ soft_build_private_key_object(CK_ATTRIBUTE_PTR template, CK_ULONG ulAttrNum,
 			rv = CKR_TEMPLATE_INCOMPLETE;
 			goto fail_cleanup;
 		}
+		break;
+
+	case CKK_EC:
+		if (isModulus || isPubExpo || isPrime ||
+		    isPrime1 || isPrime2 || isExpo1 || isExpo2 || isCoef ||
+			isValueBits || isBase) {
+			rv = CKR_TEMPLATE_INCONSISTENT;
+			goto fail_cleanup;
+
+		} else if (!isECParam && !isValue) {
+			rv = CKR_TEMPLATE_INCOMPLETE;
+			goto fail_cleanup;
+		}
+
+		copy_bigint_attr(&prime, KEY_PRI_EC_PARAM(pvk));
+		copy_bigint_attr(&value, KEY_PRI_EC_VALUE(pvk));
 		break;
 
 	default:
@@ -3860,6 +3934,14 @@ soft_get_public_key_attribute(soft_object_t *object_p,
 			return (CKR_ATTRIBUTE_TYPE_INVALID);
 		}
 
+	case CKA_EC_PARAMS:
+		return (get_bigint_attr_from_object(OBJ_PUB_EC_PARAM(
+			    object_p), template));
+
+	case CKA_EC_POINT:
+		return (get_bigint_attr_from_object(OBJ_PUB_EC_POINT(
+			    object_p), template));
+
 	case CKA_VALUE:
 		switch (keytype) {
 		case CKK_DSA:
@@ -4125,6 +4207,10 @@ soft_get_private_key_attribute(soft_object_t *object_p,
 			return (CKR_ATTRIBUTE_TYPE_INVALID);
 		}
 
+	case CKA_EC_PARAMS:
+		return (get_bigint_attr_from_object(OBJ_PRI_EC_PARAM(
+			    object_p), template));
+
 	case CKA_VALUE:
 		switch (keytype) {
 		case CKK_DSA:
@@ -4138,6 +4224,10 @@ soft_get_private_key_attribute(soft_object_t *object_p,
 		case CKK_X9_42_DH:
 			return (get_bigint_attr_from_object(
 			    OBJ_PRI_DH942_VALUE(object_p), template));
+
+		case CKK_EC:
+			return (get_bigint_attr_from_object(
+			    OBJ_PRI_EC_VALUE(object_p), template));
 
 		default:
 			template->ulValueLen = (CK_ULONG)-1;

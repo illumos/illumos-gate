@@ -279,6 +279,14 @@ allocate_ops_v2(crypto_ops_t *src, crypto_ops_t *dst)
 		    KM_SLEEP);
 }
 
+static void
+allocate_ops_v3(crypto_ops_t *src, crypto_ops_t *dst)
+{
+	if (src->co_nostore_key_ops != NULL)
+		dst->co_nostore_key_ops =
+		    kmem_alloc(sizeof (crypto_nostore_key_ops_t), KM_SLEEP);
+}
+
 /*
  * Allocate a provider descriptor. mech_list_count specifies the
  * number of mechanisms supported by the providers, and is used
@@ -324,8 +332,10 @@ kcf_alloc_provider_desc(crypto_provider_info_t *info)
 
 	if (info->pi_provider_type != CRYPTO_LOGICAL_PROVIDER) {
 		allocate_ops_v1(src_ops, desc->pd_ops_vector, &mech_list_count);
-		if (info->pi_interface_version == CRYPTO_SPI_VERSION_2)
+		if (info->pi_interface_version >= CRYPTO_SPI_VERSION_2)
 			allocate_ops_v2(src_ops, desc->pd_ops_vector);
+		if (info->pi_interface_version == CRYPTO_SPI_VERSION_3)
+			allocate_ops_v3(src_ops, desc->pd_ops_vector);
 	}
 
 	desc->pd_mech_list_count = mech_list_count;
@@ -459,6 +469,10 @@ kcf_free_provider_desc(kcf_provider_desc_t *desc)
 		if (desc->pd_ops_vector->co_mech_ops != NULL)
 			kmem_free(desc->pd_ops_vector->co_mech_ops,
 			    sizeof (crypto_mech_ops_t));
+
+		if (desc->pd_ops_vector->co_nostore_key_ops != NULL)
+			kmem_free(desc->pd_ops_vector->co_nostore_key_ops,
+			    sizeof (crypto_nostore_key_ops_t));
 
 		kmem_free(desc->pd_ops_vector, sizeof (crypto_ops_t));
 	}

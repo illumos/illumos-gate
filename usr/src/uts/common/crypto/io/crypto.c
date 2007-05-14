@@ -5114,6 +5114,142 @@ out:
 
 /* ARGSUSED */
 static int
+nostore_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
+{
+	STRUCT_DECL(crypto_nostore_generate_key, generate_key);
+	/* LINTED E_FUNC_SET_NOT_USED */
+	STRUCT_DECL(crypto_object_attribute, oa);
+	kcf_provider_desc_t *real_provider = NULL;
+	kcf_req_params_t params;
+	crypto_mechanism_t mech;
+	crypto_object_attribute_t *k_in_attrs = NULL;
+	crypto_object_attribute_t *k_out_attrs = NULL;
+	crypto_session_id_t session_id;
+	crypto_minor_t *cm;
+	crypto_session_data_t *sp = NULL;
+	caddr_t in_attributes;
+	caddr_t out_attributes;
+	size_t k_in_attrs_size;
+	size_t k_out_attrs_size;
+	size_t mech_rctl_bytes = 0;
+	size_t in_key_rctl_bytes = 0, out_key_rctl_bytes = 0;
+	size_t carry;
+	uint_t in_count;
+	uint_t out_count;
+	int error = 0;
+	int rv;
+	boolean_t allocated_by_crypto_module = B_FALSE;
+	caddr_t u_attrs = NULL;
+
+	STRUCT_INIT(generate_key, mode);
+	STRUCT_INIT(oa, mode);
+
+	if ((cm = crypto_hold_minor(getminor(dev))) == NULL) {
+		cmn_err(CE_WARN, "nostore_generate_key: failed holding minor");
+		return (ENXIO);
+	}
+
+	if (copyin(arg, STRUCT_BUF(generate_key),
+	    STRUCT_SIZE(generate_key)) != 0) {
+		crypto_release_minor(cm);
+		return (EFAULT);
+	}
+
+	session_id = STRUCT_FGET(generate_key, ngk_session);
+
+	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
+		goto release_minor;
+	}
+
+	bcopy(STRUCT_FADDR(generate_key, ngk_mechanism), &mech.cm_type,
+	    sizeof (crypto_mech_type_t));
+
+	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider,
+	    CRYPTO_FG_GENERATE)) != CRYPTO_SUCCESS) {
+		goto release_minor;
+	}
+
+	carry = 0;
+	rv = crypto_provider_copyin_mech_param(real_provider,
+	    STRUCT_FADDR(generate_key, ngk_mechanism), &mech, mode, &error);
+
+	if (rv == CRYPTO_NOT_SUPPORTED) {
+		allocated_by_crypto_module = B_TRUE;
+		if (!copyin_mech(mode, STRUCT_FADDR(generate_key,
+		    ngk_mechanism), &mech, &mech_rctl_bytes, &carry, &rv,
+		    &error)) {
+			goto release_minor;
+		}
+	} else {
+		if (rv != CRYPTO_SUCCESS)
+			goto release_minor;
+	}
+
+	in_count = STRUCT_FGET(generate_key, ngk_in_count);
+	in_attributes = STRUCT_FGETP(generate_key, ngk_in_attributes);
+	if (!copyin_attributes(mode, in_count, in_attributes, &k_in_attrs,
+	    &k_in_attrs_size, NULL, &rv, &error, &in_key_rctl_bytes,
+	    carry, B_TRUE)) {
+		goto release_minor;
+	}
+
+	out_count = STRUCT_FGET(generate_key, ngk_out_count);
+	out_attributes = STRUCT_FGETP(generate_key, ngk_out_attributes);
+	if (!copyin_attributes(mode, out_count, out_attributes, &k_out_attrs,
+	    &k_out_attrs_size, &u_attrs, &rv, &error, &out_key_rctl_bytes,
+	    0, B_FALSE)) {
+		goto release_minor;
+	}
+
+	KCF_WRAP_NOSTORE_KEY_OPS_PARAMS(&params, KCF_OP_KEY_GENERATE,
+	    sp->sd_provider_session->ps_session, &mech, k_in_attrs, in_count,
+	    NULL, 0, NULL, k_out_attrs, out_count, NULL, 0);
+
+	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
+
+	if (rv == CRYPTO_SUCCESS) {
+		error = copyout_attributes(mode, out_attributes,
+		    out_count, k_out_attrs, u_attrs);
+	}
+release_minor:
+	if (mech_rctl_bytes + in_key_rctl_bytes + out_key_rctl_bytes != 0)
+		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + in_key_rctl_bytes +
+		    out_key_rctl_bytes);
+
+	if (k_in_attrs != NULL)
+		kmem_free(k_in_attrs, k_in_attrs_size);
+	if (k_out_attrs != NULL) {
+		bzero(k_out_attrs, k_out_attrs_size);
+		kmem_free(k_out_attrs, k_out_attrs_size);
+	}
+
+	if (u_attrs != NULL)
+		kmem_free(u_attrs, out_count * STRUCT_SIZE(oa));
+
+	if (error != 0)
+		goto out;
+
+	STRUCT_FSET(generate_key, ngk_return_value, rv);
+	if (copyout(STRUCT_BUF(generate_key), arg,
+	    STRUCT_SIZE(generate_key)) != 0) {
+		error = EFAULT;
+	}
+out:
+	if (sp != NULL)
+		CRYPTO_SESSION_RELE(sp);
+	crypto_release_minor(cm);
+
+	if (real_provider != NULL) {
+		crypto_free_mech(real_provider,
+		    allocated_by_crypto_module, &mech);
+		KCF_PROV_REFRELE(real_provider);
+	}
+	return (error);
+}
+
+/* ARGSUSED */
+static int
 object_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_object_generate_key_pair, generate_key_pair);
@@ -5250,6 +5386,194 @@ release_minor:
 
 			error = EFAULT;
 		}
+	}
+out:
+	if (sp != NULL)
+		CRYPTO_SESSION_RELE(sp);
+	crypto_release_minor(cm);
+
+	if (real_provider != NULL) {
+		crypto_free_mech(real_provider,
+		    allocated_by_crypto_module, &mech);
+		KCF_PROV_REFRELE(real_provider);
+	}
+	return (error);
+}
+
+/* ARGSUSED */
+static int
+nostore_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
+{
+	STRUCT_DECL(crypto_nostore_generate_key_pair, generate_key_pair);
+	/* LINTED E_FUNC_SET_NOT_USED */
+	STRUCT_DECL(crypto_object_attribute, oa);
+	kcf_provider_desc_t *real_provider = NULL;
+	kcf_req_params_t params;
+	crypto_mechanism_t mech;
+	crypto_object_attribute_t *k_in_pub_attrs = NULL;
+	crypto_object_attribute_t *k_in_pri_attrs = NULL;
+	crypto_object_attribute_t *k_out_pub_attrs = NULL;
+	crypto_object_attribute_t *k_out_pri_attrs = NULL;
+	crypto_session_id_t session_id;
+	crypto_minor_t *cm;
+	crypto_session_data_t *sp = NULL;
+	caddr_t in_pri_attributes;
+	caddr_t in_pub_attributes;
+	caddr_t out_pri_attributes;
+	caddr_t out_pub_attributes;
+	size_t k_in_pub_attrs_size, k_in_pri_attrs_size;
+	size_t k_out_pub_attrs_size, k_out_pri_attrs_size;
+	size_t mech_rctl_bytes = 0;
+	size_t in_pub_rctl_bytes = 0;
+	size_t in_pri_rctl_bytes = 0;
+	size_t out_pub_rctl_bytes = 0;
+	size_t out_pri_rctl_bytes = 0;
+	size_t carry;
+	uint_t in_pub_count;
+	uint_t in_pri_count;
+	uint_t out_pub_count;
+	uint_t out_pri_count;
+	int error = 0;
+	int rv;
+	boolean_t allocated_by_crypto_module = B_FALSE;
+	caddr_t u_pub_attrs = NULL;
+	caddr_t u_pri_attrs = NULL;
+
+	STRUCT_INIT(generate_key_pair, mode);
+	STRUCT_INIT(oa, mode);
+
+	if ((cm = crypto_hold_minor(getminor(dev))) == NULL) {
+		cmn_err(CE_WARN,
+		    "nostore_generate_key_pair: failed holding minor");
+		return (ENXIO);
+	}
+
+	if (copyin(arg, STRUCT_BUF(generate_key_pair),
+	    STRUCT_SIZE(generate_key_pair)) != 0) {
+		crypto_release_minor(cm);
+		return (EFAULT);
+	}
+
+	session_id = STRUCT_FGET(generate_key_pair, nkp_session);
+
+	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
+		goto release_minor;
+	}
+
+	bcopy(STRUCT_FADDR(generate_key_pair, nkp_mechanism), &mech.cm_type,
+	    sizeof (crypto_mech_type_t));
+
+	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider,
+	    CRYPTO_FG_GENERATE_KEY_PAIR)) != CRYPTO_SUCCESS) {
+		goto release_minor;
+	}
+
+	carry = 0;
+	rv = crypto_provider_copyin_mech_param(real_provider,
+	    STRUCT_FADDR(generate_key_pair, nkp_mechanism), &mech, mode,
+	    &error);
+
+	if (rv == CRYPTO_NOT_SUPPORTED) {
+		allocated_by_crypto_module = B_TRUE;
+		if (!copyin_mech(mode, STRUCT_FADDR(generate_key_pair,
+		    nkp_mechanism), &mech, &mech_rctl_bytes, &carry, &rv,
+		    &error)) {
+			goto release_minor;
+		}
+	} else {
+		if (rv != CRYPTO_SUCCESS)
+			goto release_minor;
+	}
+
+	in_pub_count = STRUCT_FGET(generate_key_pair, nkp_in_public_count);
+	in_pri_count = STRUCT_FGET(generate_key_pair, nkp_in_private_count);
+
+	in_pub_attributes = STRUCT_FGETP(generate_key_pair,
+	    nkp_in_public_attributes);
+	if (!copyin_attributes(mode, in_pub_count, in_pub_attributes,
+	    &k_in_pub_attrs, &k_in_pub_attrs_size, NULL, &rv, &error,
+	    &in_pub_rctl_bytes, carry, B_TRUE)) {
+		goto release_minor;
+	}
+
+	in_pri_attributes = STRUCT_FGETP(generate_key_pair,
+	    nkp_in_private_attributes);
+	if (!copyin_attributes(mode, in_pri_count, in_pri_attributes,
+	    &k_in_pri_attrs, &k_in_pri_attrs_size, NULL, &rv, &error,
+	    &in_pri_rctl_bytes, 0, B_TRUE)) {
+		goto release_minor;
+	}
+
+	out_pub_count = STRUCT_FGET(generate_key_pair, nkp_out_public_count);
+	out_pri_count = STRUCT_FGET(generate_key_pair, nkp_out_private_count);
+
+	out_pub_attributes = STRUCT_FGETP(generate_key_pair,
+	    nkp_out_public_attributes);
+	if (!copyin_attributes(mode, out_pub_count, out_pub_attributes,
+	    &k_out_pub_attrs, &k_out_pub_attrs_size, &u_pub_attrs, &rv, &error,
+	    &out_pub_rctl_bytes, 0, B_FALSE)) {
+		goto release_minor;
+	}
+
+	out_pri_attributes = STRUCT_FGETP(generate_key_pair,
+	    nkp_out_private_attributes);
+	if (!copyin_attributes(mode, out_pri_count, out_pri_attributes,
+	    &k_out_pri_attrs, &k_out_pri_attrs_size, &u_pri_attrs, &rv, &error,
+	    &out_pri_rctl_bytes, 0, B_FALSE)) {
+		goto release_minor;
+	}
+
+	KCF_WRAP_NOSTORE_KEY_OPS_PARAMS(&params, KCF_OP_KEY_GENERATE_PAIR,
+	    sp->sd_provider_session->ps_session, &mech, k_in_pub_attrs,
+	    in_pub_count, k_in_pri_attrs, in_pri_count, NULL, k_out_pub_attrs,
+	    out_pub_count, k_out_pri_attrs, out_pri_count);
+
+	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
+
+	if (rv == CRYPTO_SUCCESS) {
+		error = copyout_attributes(mode, out_pub_attributes,
+		    out_pub_count, k_out_pub_attrs, u_pub_attrs);
+		if (error != CRYPTO_SUCCESS)
+			goto release_minor;
+		error = copyout_attributes(mode, out_pri_attributes,
+		    out_pri_count, k_out_pri_attrs, u_pri_attrs);
+	}
+
+release_minor:
+	if (mech_rctl_bytes + in_pub_rctl_bytes + in_pri_rctl_bytes +
+	    out_pub_rctl_bytes + out_pri_rctl_bytes != 0)
+		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + in_pub_rctl_bytes +
+		    in_pri_rctl_bytes + out_pub_rctl_bytes +
+		    out_pri_rctl_bytes);
+
+	if (k_in_pub_attrs != NULL)
+		kmem_free(k_in_pub_attrs, k_in_pub_attrs_size);
+
+	if (k_in_pri_attrs != NULL)
+		kmem_free(k_in_pri_attrs, k_in_pri_attrs_size);
+
+	if (k_out_pub_attrs != NULL)
+		kmem_free(k_out_pub_attrs, k_out_pub_attrs_size);
+
+	if (k_out_pri_attrs != NULL) {
+		bzero(k_out_pri_attrs, k_out_pri_attrs_size);
+		kmem_free(k_out_pri_attrs, k_out_pri_attrs_size);
+	}
+
+	if (u_pub_attrs != NULL)
+		kmem_free(u_pub_attrs, out_pub_count * STRUCT_SIZE(oa));
+
+	if (u_pri_attrs != NULL)
+		kmem_free(u_pri_attrs, out_pri_count * STRUCT_SIZE(oa));
+
+	if (error != 0)
+		goto out;
+
+	STRUCT_FSET(generate_key_pair, nkp_return_value, rv);
+	if (copyout(STRUCT_BUF(generate_key_pair), arg,
+	    STRUCT_SIZE(generate_key_pair)) != 0) {
+		error = EFAULT;
 	}
 out:
 	if (sp != NULL)
@@ -5727,6 +6051,160 @@ out:
 
 /* ARGSUSED */
 static int
+nostore_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
+{
+	STRUCT_DECL(crypto_nostore_derive_key, derive_key);
+	/* LINTED E_FUNC_SET_NOT_USED */
+	STRUCT_DECL(crypto_object_attribute, oa);
+	kcf_provider_desc_t *real_provider = NULL;
+	kcf_req_params_t params;
+	crypto_object_attribute_t *k_in_attrs = NULL;
+	crypto_object_attribute_t *k_out_attrs = NULL;
+	crypto_mechanism_t mech;
+	crypto_key_t base_key;
+	crypto_session_id_t session_id;
+	crypto_minor_t *cm;
+	crypto_session_data_t *sp = NULL;
+	size_t k_in_attrs_size, k_out_attrs_size;
+	size_t key_rctl_bytes = 0, mech_rctl_bytes = 0;
+	size_t in_attributes_rctl_bytes = 0;
+	size_t out_attributes_rctl_bytes = 0;
+	size_t carry;
+	caddr_t in_attributes, out_attributes;
+	uint_t in_count, out_count;
+	int error = 0;
+	int rv;
+	boolean_t allocated_by_crypto_module = B_FALSE;
+	caddr_t u_attrs = NULL;
+
+	STRUCT_INIT(derive_key, mode);
+	STRUCT_INIT(oa, mode);
+
+	if ((cm = crypto_hold_minor(getminor(dev))) == NULL) {
+		cmn_err(CE_WARN, "nostore_derive_key: failed holding minor");
+		return (ENXIO);
+	}
+
+	if (copyin(arg, STRUCT_BUF(derive_key), STRUCT_SIZE(derive_key)) != 0) {
+		crypto_release_minor(cm);
+		return (EFAULT);
+	}
+
+	bzero(&base_key, sizeof (base_key));
+
+	session_id = STRUCT_FGET(derive_key, ndk_session);
+
+	if (!get_session_ptr(session_id, cm, &sp, &error, &rv)) {
+		goto release_minor;
+	}
+
+	bcopy(STRUCT_FADDR(derive_key, ndk_mechanism), &mech.cm_type,
+	    sizeof (crypto_mech_type_t));
+
+	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider,
+	    CRYPTO_FG_DERIVE)) != CRYPTO_SUCCESS) {
+		goto release_minor;
+	}
+
+	carry = 0;
+	rv = crypto_provider_copyin_mech_param(real_provider,
+	    STRUCT_FADDR(derive_key, ndk_mechanism), &mech, mode, &error);
+
+	if (rv == CRYPTO_NOT_SUPPORTED) {
+		allocated_by_crypto_module = B_TRUE;
+		if (!copyin_mech(mode, STRUCT_FADDR(derive_key, ndk_mechanism),
+		    &mech, &mech_rctl_bytes, &carry, &rv, &error)) {
+			goto release_minor;
+		}
+	} else {
+		if (rv != CRYPTO_SUCCESS)
+			goto release_minor;
+	}
+
+	if (!copyin_key(mode, STRUCT_FADDR(derive_key, ndk_base_key),
+	    &base_key, &key_rctl_bytes, &rv, &error, carry)) {
+		goto release_minor;
+	}
+
+	in_count = STRUCT_FGET(derive_key, ndk_in_count);
+	out_count = STRUCT_FGET(derive_key, ndk_out_count);
+
+	in_attributes = STRUCT_FGETP(derive_key, ndk_in_attributes);
+	if (!copyin_attributes(mode, in_count, in_attributes, &k_in_attrs,
+	    &k_in_attrs_size, NULL, &rv, &error, &in_attributes_rctl_bytes,
+	    0, B_TRUE)) {
+		goto release_minor;
+	}
+
+	out_attributes = STRUCT_FGETP(derive_key, ndk_out_attributes);
+	if (!copyin_attributes(mode, out_count, out_attributes, &k_out_attrs,
+	    &k_out_attrs_size, &u_attrs, &rv, &error,
+	    &out_attributes_rctl_bytes, 0, B_FALSE)) {
+		goto release_minor;
+	}
+
+	KCF_WRAP_NOSTORE_KEY_OPS_PARAMS(&params, KCF_OP_KEY_DERIVE,
+	    sp->sd_provider_session->ps_session, &mech, k_in_attrs, in_count,
+	    NULL, 0, &base_key, k_out_attrs, out_count, NULL, 0);
+
+	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
+
+	if (rv == CRYPTO_SUCCESS) {
+		rv = crypto_provider_copyout_mech_param(real_provider,
+		    &mech, STRUCT_FADDR(derive_key, ndk_mechanism),
+		    mode, &error);
+
+		if (rv == CRYPTO_NOT_SUPPORTED) {
+			rv = CRYPTO_SUCCESS;
+		}
+		/* copyout the derived secret */
+		if (copyout_attributes(mode, out_attributes, out_count,
+		    k_out_attrs, u_attrs) != 0)
+			error = EFAULT;
+	}
+
+release_minor:
+	if (mech_rctl_bytes + key_rctl_bytes + in_attributes_rctl_bytes +
+	    out_attributes_rctl_bytes != 0)
+		CRYPTO_DECREMENT_RCTL(mech_rctl_bytes + key_rctl_bytes +
+		    in_attributes_rctl_bytes + out_attributes_rctl_bytes);
+
+	if (k_in_attrs != NULL)
+		kmem_free(k_in_attrs, k_in_attrs_size);
+	if (k_out_attrs != NULL) {
+		bzero(k_out_attrs, k_out_attrs_size);
+		kmem_free(k_out_attrs, k_out_attrs_size);
+	}
+
+	if (u_attrs != NULL)
+		kmem_free(u_attrs, out_count * STRUCT_SIZE(oa));
+
+	free_crypto_key(&base_key);
+
+	if (error != 0)
+		goto out;
+
+	STRUCT_FSET(derive_key, ndk_return_value, rv);
+	if (copyout(STRUCT_BUF(derive_key), arg,
+	    STRUCT_SIZE(derive_key)) != 0) {
+		error = EFAULT;
+	}
+out:
+	if (sp != NULL)
+		CRYPTO_SESSION_RELE(sp);
+	crypto_release_minor(cm);
+
+	if (real_provider != NULL) {
+		crypto_free_mech(real_provider,
+		    allocated_by_crypto_module, &mech);
+		KCF_PROV_REFRELE(real_provider);
+	}
+	return (error);
+}
+
+/* ARGSUSED */
+static int
 crypto_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
     int *rval)
 {
@@ -5888,6 +6366,15 @@ crypto_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 
 	case CRYPTO_DERIVE_KEY:
 		return (object_derive_key(dev, ARG, mode, rval));
+
+	case CRYPTO_NOSTORE_GENERATE_KEY:
+		return (nostore_generate_key(dev, ARG, mode, rval));
+
+	case CRYPTO_NOSTORE_GENERATE_KEY_PAIR:
+		return (nostore_generate_key_pair(dev, ARG, mode, rval));
+
+	case CRYPTO_NOSTORE_DERIVE_KEY:
+		return (nostore_derive_key(dev, ARG, mode, rval));
 	}
 	return (EINVAL);
 }

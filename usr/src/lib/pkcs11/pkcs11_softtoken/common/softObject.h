@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,6 +108,15 @@ typedef struct dh942_pub_key {
 
 
 /*
+ * PKCS11: Elliptic Curve Public Key Object Attributes
+ */
+typedef struct ec_pub_key {
+	biginteger_t param;
+	biginteger_t point;
+} ec_pub_key_t;
+
+
+/*
  * Public Key Main Struct
  */
 typedef struct public_key_obj {
@@ -117,6 +125,7 @@ typedef struct public_key_obj {
 		dsa_pub_key_t dsa_pub_key; /* DSA public key */
 		dh_pub_key_t  dh_pub_key;  /* DH public key */
 		dh942_pub_key_t dh942_pub_key;	/* DH9.42 public key */
+		ec_pub_key_t ec_pub_key; /* Elliptic Curve public key */
 	} key_type_u;
 } public_key_obj_t;
 
@@ -165,6 +174,14 @@ typedef struct dh942_pri_key {
 	biginteger_t value;
 } dh942_pri_key_t;
 
+/*
+ * PKCS11: Elliptic Curve Private Key Object Attributes
+ */
+typedef struct ec_pri_key {
+	biginteger_t param;
+	biginteger_t value;
+} ec_pri_key_t;
+
 
 /*
  * Private Key Main Struct
@@ -175,6 +192,7 @@ typedef struct private_key_obj {
 		dsa_pri_key_t dsa_pri_key; /* DSA private key */
 		dh_pri_key_t  dh_pri_key;  /* DH private key */
 		dh942_pri_key_t dh942_pri_key;	/* DH9.42 private key */
+		ec_pri_key_t ec_pri_key; /* Elliptic Curve private key */
 	} key_type_u;
 } private_key_obj_t;
 
@@ -452,6 +470,21 @@ typedef enum {
 	&((k)->key_type_u.dh942_pub_key.value)
 
 /*
+ * Elliptic Curve Public Key Object Attributes
+ */
+#define	KEY_PUB_EC(k) \
+	&((k)->key_type_u.ec_pub_key)
+#define	OBJ_PUB_EC_PARAM(o) \
+	&((o)->object_class_u.public_key->key_type_u.ec_pub_key.param)
+#define	KEY_PUB_EC_PARAM(k) \
+	&((k)->key_type_u.ec_pub_key.param)
+#define	OBJ_PUB_EC_POINT(o) \
+	&((o)->object_class_u.public_key->key_type_u.ec_pub_key.point)
+#define	KEY_PUB_EC_POINT(k) \
+	&((k)->key_type_u.ec_pub_key.point)
+
+
+/*
  * RSA Private Key Object Attributes
  */
 #define	OBJ_PRI(o) \
@@ -556,6 +589,21 @@ typedef enum {
 	&((o)->object_class_u.private_key->key_type_u.dh942_pri_key.value)
 #define	KEY_PRI_DH942_VALUE(k) \
 	&((k)->key_type_u.dh942_pri_key.value)
+
+/*
+ * Elliptic Curve Private Key Object Attributes
+ */
+
+#define	KEY_PRI_EC(k) \
+	&((k)->key_type_u.ec_pri_key)
+#define	OBJ_PRI_EC_PARAM(o) \
+	&((o)->object_class_u.private_key->key_type_u.ec_pri_key.param)
+#define	KEY_PRI_EC_PARAM(k) \
+	&((k)->key_type_u.ec_pri_key.param)
+#define	OBJ_PRI_EC_VALUE(o) \
+	&((o)->object_class_u.private_key->key_type_u.ec_pri_key.value)
+#define	KEY_PRI_EC_VALUE(k) \
+	&((k)->key_type_u.ec_pri_key.value)
 
 /*
  * DSA Domain Parameters Object Attributes

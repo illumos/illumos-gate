@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -609,6 +609,122 @@ mem_failure:
 
 
 /*
+ * Convert a EC private key object into a crypto_key structure.
+ * Memory is allocated for each attribute stored in the crypto_key
+ * structure.  Memory for the crypto_key structure is not
+ * allocated.  Attributes can be freed by free_ec_key_attributes().
+ */
+CK_RV
+get_ec_private_key(kernel_object_t *object_p, crypto_key_t *key)
+{
+	biginteger_t *big;
+	crypto_object_attribute_t *attrs, *cur_attr;
+	CK_ATTRIBUTE tmp;
+	char *ptr;
+	int rv;
+
+	(void) pthread_mutex_lock(&object_p->object_mutex);
+	if (object_p->key_type != CKK_EC ||
+	    object_p->class != CKO_PRIVATE_KEY) {
+		(void) pthread_mutex_unlock(&object_p->object_mutex);
+		return (CKR_ATTRIBUTE_TYPE_INVALID);
+	}
+
+	attrs = calloc(1,
+	    (EC_ATTR_COUNT + 1) * sizeof (crypto_object_attribute_t));
+	if (attrs == NULL) {
+		(void) pthread_mutex_unlock(&object_p->object_mutex);
+		return (CKR_HOST_MEMORY);
+	}
+
+	key->ck_format = CRYPTO_KEY_ATTR_LIST;
+	key->ck_count = EC_ATTR_COUNT + 1;
+	key->ck_attrs = attrs;
+
+	cur_attr = attrs;
+	big = OBJ_PRI_EC_VALUE(object_p);
+	if ((ptr = malloc(big->big_value_len)) == NULL) {
+		rv = CKR_HOST_MEMORY;
+		goto fail;
+	}
+	ENCODE_ATTR(CKA_VALUE, big->big_value, big->big_value_len);
+
+	tmp.type = CKA_EC_PARAMS;
+	tmp.pValue = NULL;
+	rv = kernel_get_attribute(object_p, &tmp);
+	if (rv != CKR_OK) {
+		goto fail;
+	}
+
+	tmp.pValue = malloc(tmp.ulValueLen);
+	if (tmp.pValue == NULL) {
+		rv = CKR_HOST_MEMORY;
+		goto fail;
+	}
+
+	rv = kernel_get_attribute(object_p, &tmp);
+	if (rv != CKR_OK) {
+		free(tmp.pValue);
+		goto fail;
+	}
+
+	cur_attr->oa_type = tmp.type;
+	cur_attr->oa_value = tmp.pValue;
+	cur_attr->oa_value_len = tmp.ulValueLen;
+
+	(void) pthread_mutex_unlock(&object_p->object_mutex);
+	return (CKR_OK);
+
+fail:
+	(void) pthread_mutex_unlock(&object_p->object_mutex);
+	free_key_attributes(key);
+	return (rv);
+}
+
+/*
+ * Convert an EC public key object into a crypto_key structure.
+ * Memory is allocated for each attribute stored in the crypto_key
+ * structure.  Memory for the crypto_key structure is not
+ * allocated.  Attributes can be freed by free_ec_key_attributes().
+ */
+CK_RV
+get_ec_public_key(kernel_object_t *object_p, crypto_key_t *key)
+{
+	biginteger_t *big;
+	crypto_object_attribute_t *attrs, *cur_attr;
+	char *ptr;
+
+	(void) pthread_mutex_lock(&object_p->object_mutex);
+	if (object_p->key_type != CKK_EC ||
+	    object_p->class != CKO_PUBLIC_KEY) {
+		(void) pthread_mutex_unlock(&object_p->object_mutex);
+		return (CKR_ATTRIBUTE_TYPE_INVALID);
+	}
+
+	attrs = calloc(1, EC_ATTR_COUNT * sizeof (crypto_object_attribute_t));
+	if (attrs == NULL) {
+		(void) pthread_mutex_unlock(&object_p->object_mutex);
+		return (CKR_HOST_MEMORY);
+	}
+
+	key->ck_format = CRYPTO_KEY_ATTR_LIST;
+	key->ck_count = EC_ATTR_COUNT;
+	key->ck_attrs = attrs;
+
+	cur_attr = attrs;
+	big = OBJ_PUB_EC_POINT(object_p);
+	if ((ptr = malloc(big->big_value_len)) == NULL) {
+		(void) pthread_mutex_unlock(&object_p->object_mutex);
+		free_key_attributes(key);
+		return (CKR_HOST_MEMORY);
+	}
+	ENCODE_ATTR(CKA_EC_POINT, big->big_value, big->big_value_len);
+
+	(void) pthread_mutex_unlock(&object_p->object_mutex);
+	return (CKR_OK);
+}
+
+/*
  * Convert an attribute template into an obj_attrs array.
  * Memory is allocated for each attribute stored in the obj_attrs.
  * The memory can be freed by free_object_attributes().
@@ -652,6 +768,7 @@ process_object_attributes(CK_ATTRIBUTE_PTR pTemplate, CK_ULONG ulCount,
 		case CKA_CLASS:
 		case CKA_CERTIFICATE_TYPE:
 		case CKA_KEY_TYPE:
+		case CKA_MODULUS_BITS:
 		case CKA_HW_FEATURE_TYPE:
 			value_len = sizeof (ulong_t);
 			if (pTemplate[i].pValue != NULL &&
@@ -769,6 +886,7 @@ free_object_attributes(caddr_t obj_attrs, CK_ULONG ulCount)
 	/* LINTED */
 	cur_attr = (crypto_object_attribute_t *)obj_attrs;
 	for (i = 0; i < ulCount; i++) {
+		/* XXX check that oa_value > 0 */
 		if (cur_attr->oa_value != NULL) {
 			free(cur_attr->oa_value);
 		}

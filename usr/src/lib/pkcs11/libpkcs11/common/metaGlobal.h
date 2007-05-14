@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -195,6 +195,14 @@ extern "C" {
 	if (session != NULL) {						\
 		(void) pthread_rwlock_unlock(&session->session_lock);	\
 	}
+
+/* FreeObject/FreeToken Enumeration */
+typedef enum {
+	FREE_UNCHECKED = 0,	/* Has not been checked */
+	FREE_DISABLED = 1,	/* No supported provider or key type */
+	FREE_ALLOWED_KEY = 2,	/* Supported key type */
+	FREE_ENABLED = 3	/* FreeObject/Token enabled */
+} freeobject_state_t;
 
 
 /* Generic attribute type, for storing and managing PKCS#11 attributes. */
@@ -381,6 +389,9 @@ struct metaobject {
 	boolean_t isSensitive;		/* alias for CKA_SENSITIVE */
 	boolean_t isExtractable;	/* alias for CKA_EXTRACTABLE */
 
+	freeobject_state_t isFreeToken;
+	freeobject_state_t isFreeObject;
+
 	CK_ULONG master_clone_slotnum; /* set when object is created */
 	slot_object_t **clones;
 	/* indicate if tried to create clone object in a slot */
@@ -535,6 +546,9 @@ extern pthread_mutex_t initmutex;
 extern ses_to_be_freed_list_t ses_delay_freed;
 extern object_to_be_freed_list_t obj_delay_freed;
 
+extern CK_BBOOL falsevalue;
+extern CK_BBOOL truevalue;
+
 /* --- Prototypes --- */
 
 CK_RV meta_slotManager_initialize();
@@ -620,8 +634,14 @@ meta_object_t *meta_object_find_by_handle(CK_OBJECT_HANDLE hObject,
 	CK_ULONG slotnum, boolean_t token_only);
 CK_RV meta_token_object_deactivate(token_obj_type_t token_type);
 void meta_object_delay_free(meta_object_t *objp);
-
-
+boolean_t meta_freeobject_set(meta_object_t *object, CK_ATTRIBUTE *tmpl,
+    CK_ULONG tmpl_len, boolean_t create);
+CK_RV meta_freetoken_set(CK_ULONG slot_num, CK_BBOOL *current_value,
+    CK_ATTRIBUTE *tmpl, CK_ULONG tmpl_len);
+boolean_t meta_freeobject_check(meta_session_t *session, meta_object_t *obj,
+    CK_MECHANISM *pMech, CK_ATTRIBUTE *tmpl, CK_ULONG tmpl_len,
+    CK_KEY_TYPE keytype);
+boolean_t meta_freeobject_clone(meta_session_t *session, meta_object_t *object);
 
 CK_RV get_master_attributes_by_object(slot_session_t *session,
     slot_object_t *slot_object, generic_attr_t **attributes,
@@ -643,7 +663,9 @@ boolean_t get_template_ulong(CK_ATTRIBUTE_TYPE type, CK_ATTRIBUTE *attributes,
 	CK_ULONG num_attributes, CK_ULONG *result);
 boolean_t get_template_boolean(CK_ATTRIBUTE_TYPE type,
     CK_ATTRIBUTE *attributes, CK_ULONG num_attributes, boolean_t *result);
-
+int set_template_boolean(CK_ATTRIBUTE_TYPE type,
+    CK_ATTRIBUTE *attributes, CK_ULONG num_attributes, boolean_t local,
+    CK_BBOOL *value);
 CK_ULONG get_keystore_slotnum(void);
 CK_SLOT_ID meta_slotManager_get_framework_table_id(CK_ULONG slotnum);
 CK_ULONG meta_slotManager_get_slotcount(void);

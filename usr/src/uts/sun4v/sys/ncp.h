@@ -78,6 +78,10 @@ typedef enum {
 #define	DSAPARTLEN	20	/* Size of fixed DSA parts (r, s, q, x, v) */
 #define	DSASIGLEN	40	/* Size of a DSA signature */
 
+#define	DES_KEYSIZE	8
+#define	DES2_KEYSIZE	(2 * DES_KEYSIZE)
+#define	DES3_KEYSIZE	(3 * DES_KEYSIZE)
+
 /*
  * Mechanism info structure passed to KCF during registration.
  */
@@ -86,6 +90,9 @@ typedef enum {
 
 #define	RSA_MIN_KEY_LEN		32	/* RSA min key length in bytes */
 #define	RSA_MAX_KEY_LEN		256	/* RSA max key length in bytes */
+
+#define	DH_MIN_KEY_LEN		64	/* DH min key length in bytes */
+#define	DH_MAX_KEY_LEN		256	/* DH max key length in bytes */
 
 /*
  * RSA implementation.
@@ -96,12 +103,19 @@ typedef enum {
 #define	NCP_RSA_VRFY	3
 #define	NCP_RSA_SIGNR	4
 #define	NCP_RSA_VRFYR	5
+#define	NCP_RSA_GEN	6
 
 /*
  * DSA implementation.
  */
 #define	NCP_DSA_SIGN	0
 #define	NCP_DSA_VRFY	1
+
+/*
+ * DH implementation.
+ */
+#define	NCP_DH_GEN	0
+#define	NCP_DH_DERIVE	1
 
 /*
  * NCP Structures.
@@ -123,12 +137,17 @@ struct ncp_listnode {
 typedef enum ncp_mech_type {
 	DSA_MECH_INFO_TYPE,		/* SUN_CKM_DSA */
 	RSA_X_509_MECH_INFO_TYPE,	/* SUN_CKM_RSA_X_509 */
-	RSA_PKCS_MECH_INFO_TYPE		/* SUN_CKM_RSA_PKCS */
+	RSA_PKCS_MECH_INFO_TYPE,	/* SUN_CKM_RSA_PKCS */
+	DH_PKCS_KEY_PAIR_GEN_MECH_INFO_TYPE, /* SUN_CKM_DH_PKCS_KEY_PAIR_GEN */
+	DH_PKCS_DERIVE_MECH_INFO_TYPE,	/* SUN_CKM_DH_PKCS_DERIVE */
+	RSA_PKCS_KEY_PAIR_GEN_MECH_INFO_TYPE /* SUN_CKM_RSA_PKCS_KEY_PAIR_GEN */
 } ncp_mech_type_t;
 
 
 #define	SUN_CKM_DSA			"CKM_DSA"
-
+#define	SUN_CKM_DH_PKCS_KEY_PAIR_GEN	"CKM_DH_PKCS_KEY_PAIR_GEN"
+#define	SUN_CKM_DH_PKCS_DERIVE		"CKM_DH_PKCS_DERIVE"
+#define	SUN_CKM_RSA_PKCS_KEY_PAIR_GEN	"CKM_RSA_PKCS_KEY_PAIR_GEN"
 
 /*
  * Work structure.
@@ -147,6 +166,14 @@ struct ncp_request {
 	 */
 	crypto_data_t		*nr_in;
 	crypto_data_t		*nr_out;
+
+	/*
+	 * Consumer's output buffers for key generation/derivation.
+	 */
+	crypto_object_attribute_t *nr_public_attrs;
+	crypto_object_attribute_t *nr_private_attrs;
+	uint_t			nr_public_attrs_count;
+	uint_t			nr_private_attrs_count;
 
 	crypto_mech_type_t	nr_ctx_cm_type;	/* Mechanism type */
 	int			nr_mode;	/* Mode of operation */
@@ -219,7 +246,10 @@ typedef enum ncp_sg_param {
 #define	DS_RSAPRIVATE		1
 #define	DS_DSASIGN		2
 #define	DS_DSAVERIFY		3
-#define	DS_MAX			4
+#define	DS_RSAGEN		4
+#define	DS_DHGEN		5
+#define	DS_DHDERIVE		6
+#define	DS_MAX			7
 
 
 /*
@@ -242,6 +272,7 @@ typedef enum ncp_sg_param {
 #define	CKA_VALUE		0x00000011
 #define	CKA_KEY_TYPE		0x00000100
 #define	CKA_MODULUS		0x00000120
+#define	CKA_MODULUS_BITS	0x00000121
 #define	CKA_PUBLIC_EXPONENT	0x00000122
 #define	CKA_PRIVATE_EXPONENT	0x00000123
 #define	CKA_PRIME_1		0x00000124
@@ -252,7 +283,15 @@ typedef enum ncp_sg_param {
 #define	CKA_PRIME		0x00000130
 #define	CKA_SUBPRIME		0x00000131
 #define	CKA_BASE		0x00000132
+#define	CKA_VALUE_BITS		0x00000160
+#define	CKA_VALUE_LEN		0x00000161
 
+#define	CKK_GENERIC_SECRET	0x00000010
+#define	CKK_RC4			0x00000012
+#define	CKK_DES			0x00000013
+#define	CKK_DES2		0x00000014
+#define	CKK_DES3		0x00000015
+#define	CKK_AES			0x0000001F
 
 struct ncp_stat {
 	kstat_named_t		ns_status;
@@ -542,8 +581,15 @@ void	ncp_rsactxfree(void *);
 int	ncp_rsaatomic(crypto_provider_handle_t, crypto_session_id_t,
 			crypto_mechanism_t *, crypto_key_t *, crypto_data_t *,
 			crypto_data_t *, int, crypto_req_handle_t, int);
+int	ncp_rsa_generate_key(crypto_provider_handle_t, crypto_session_id_t,
+			crypto_mechanism_t *, crypto_object_attribute_t *,
+			uint_t, crypto_object_attribute_t *, uint_t,
+			crypto_object_attribute_t *, uint_t,
+			crypto_object_attribute_t *, uint_t, int,
+			crypto_req_handle_t);
 int	ncp_rsa_private_process(ncp_t *ncp, ncp_request_t *reqp);
 int	ncp_rsa_public_process(ncp_t *ncp, ncp_request_t *reqp);
+int	ncp_rsa_generate_process(ncp_t *ncp, ncp_request_t *reqp);
 int	ncp_dsa_sign_process(ncp_t *ncp, ncp_request_t *reqp);
 int	ncp_dsa_verify_process(ncp_t *ncp, ncp_request_t *reqp);
 
@@ -560,6 +606,24 @@ void	ncp_dsactxfree(void *);
 int	ncp_dsaatomic(crypto_provider_handle_t, crypto_session_id_t,
 			crypto_mechanism_t *, crypto_key_t *, crypto_data_t *,
 			crypto_data_t *, int, crypto_req_handle_t, int);
+
+/*
+ * ncp_dh.c
+ */
+void	ncp_dhctxfree(void *);
+int	ncp_dh_generate_key(crypto_provider_handle_t, crypto_session_id_t,
+			crypto_mechanism_t *, crypto_object_attribute_t *,
+			uint_t, crypto_object_attribute_t *, uint_t,
+			crypto_object_attribute_t *, uint_t,
+			crypto_object_attribute_t *, uint_t, int,
+			crypto_req_handle_t);
+int	ncp_dh_derive(crypto_provider_handle_t, crypto_session_id_t,
+			crypto_mechanism_t *, crypto_key_t *,
+			crypto_object_attribute_t *, uint_t,
+			crypto_object_attribute_t *, uint_t, int,
+			crypto_req_handle_t);
+int	ncp_dh_generate_process(ncp_t *ncp, ncp_request_t *reqp);
+int	ncp_dh_derive_process(ncp_t *ncp, ncp_request_t *reqp);
 
 /*
  * ncp_md.

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -421,6 +420,9 @@ soft_genkey_pair(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	case CKM_DH_PKCS_KEY_PAIR_GEN:
 		key_type = CKK_DH;
 		break;
+
+	case CKM_EC_KEY_PAIR_GEN:
+		key_type = CKK_EC;
 
 	default:
 		return (CKR_MECHANISM_INVALID);
@@ -828,8 +830,6 @@ soft_derivekey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 
 	CK_RV rv = CKR_OK;
 	soft_object_t *secret_key;
-	CK_BYTE *public_value;
-	CK_ULONG public_value_len;
 	CK_MECHANISM digest_mech;
 	CK_BYTE hash[SHA512_DIGEST_LENGTH]; /* space enough for all mechs */
 	CK_ULONG hash_len = SHA512_DIGEST_LENGTH;
@@ -837,14 +837,7 @@ soft_derivekey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 	CK_ULONG hash_size;
 
 	switch (pMechanism->mechanism) {
-
 	case CKM_DH_PKCS_DERIVE:
-		/* Get public value and value_len from the parameters. */
-		public_value = (CK_BYTE *)(pMechanism->pParameter);
-		public_value_len = pMechanism->ulParameterLen;
-
-		if (phKey == NULL_PTR)
-			return (CKR_ARGUMENTS_BAD);
 		/*
 		 * Create a new object for secret key. The key type should
 		 * be provided in the template.
@@ -860,8 +853,9 @@ soft_derivekey(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism,
 		/* Obtain the secret object pointer. */
 		secret_key = (soft_object_t *)*phKey;
 
-		rv = soft_dh_key_derive(basekey_p, secret_key, public_value,
-			public_value_len);
+		rv = soft_dh_key_derive(basekey_p, secret_key,
+		    (CK_BYTE *)pMechanism->pParameter,
+		    pMechanism->ulParameterLen);
 
 		if (rv != CKR_OK) {
 			if (IS_TOKEN_OBJECT(secret_key))
@@ -906,9 +900,6 @@ common:
 		 * to be provided in the template. If it is not specified in
 		 * the template, the default is CKK_GENERIC_SECRET.
 		 */
-		if (phKey == NULL_PTR)
-			return (CKR_ARGUMENTS_BAD);
-
 		rv = soft_gen_keyobject(pTemplate, ulAttributeCount,
 		    phKey, session_p, CKO_SECRET_KEY,
 		    (CK_KEY_TYPE)CKK_GENERIC_SECRET, 0,

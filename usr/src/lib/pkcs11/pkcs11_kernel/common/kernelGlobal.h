@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,7 +75,10 @@ CK_RV get_rsa_public_key(kernel_object_t *, crypto_key_t *);
 CK_RV get_rsa_private_key(kernel_object_t *, crypto_key_t *);
 CK_RV get_dsa_public_key(kernel_object_t *, crypto_key_t *);
 CK_RV get_dsa_private_key(kernel_object_t *, crypto_key_t *);
+CK_RV get_ec_public_key(kernel_object_t *, crypto_key_t *);
+CK_RV get_ec_private_key(kernel_object_t *, crypto_key_t *);
 void free_key_attributes(crypto_key_t *);
+void get_ulong_attr_from_template(CK_ULONG *, CK_ATTRIBUTE_PTR);
 CK_RV process_object_attributes(CK_ATTRIBUTE_PTR, CK_ULONG, caddr_t *,
     CK_BBOOL *);
 CK_RV get_object_attributes(CK_ATTRIBUTE_PTR, CK_ULONG, caddr_t);
@@ -90,6 +93,7 @@ CK_RV kernel_decrypt_init(kernel_session_t *, kernel_object_t *,
     CK_MECHANISM_PTR);
 CK_RV kernel_decrypt(kernel_session_t *, CK_BYTE_PTR, CK_ULONG, CK_BYTE_PTR,
     CK_ULONG_PTR);
+CK_RV kernel_add_extra_attr(CK_ATTRIBUTE_PTR, kernel_object_t *);
 
 #ifdef	__cplusplus
 }

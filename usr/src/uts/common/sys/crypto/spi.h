@@ -46,6 +46,7 @@ extern "C" {
 
 #define	CRYPTO_SPI_VERSION_1	1
 #define	CRYPTO_SPI_VERSION_2	2
+#define	CRYPTO_SPI_VERSION_3	3
 
 /*
  * Provider-private handle. This handle is specified by a provider
@@ -475,6 +476,21 @@ typedef struct crypto_mech_ops {
 	int (*free_mechanism)(crypto_provider_handle_t, crypto_mechanism_t *);
 } crypto_mech_ops_t;
 
+typedef struct crypto_nostore_key_ops {
+	int (*nostore_key_generate)(crypto_provider_handle_t,
+	    crypto_session_id_t, crypto_mechanism_t *,
+	    crypto_object_attribute_t *, uint_t, crypto_object_attribute_t *,
+	    uint_t, crypto_req_handle_t);
+	int (*nostore_key_generate_pair)(crypto_provider_handle_t,
+	    crypto_session_id_t, crypto_mechanism_t *,
+	    crypto_object_attribute_t *, uint_t, crypto_object_attribute_t *,
+	    uint_t, crypto_object_attribute_t *, uint_t,
+	    crypto_object_attribute_t *, uint_t, crypto_req_handle_t);
+	int (*nostore_key_derive)(crypto_provider_handle_t, crypto_session_id_t,
+	    crypto_mechanism_t *, crypto_key_t *, crypto_object_attribute_t *,
+	    uint_t, crypto_object_attribute_t *, uint_t, crypto_req_handle_t);
+} crypto_nostore_key_ops_t;
+
 /*
  * The crypto_ops(9S) structure contains the structures containing
  * the pointers to functions implemented by cryptographic providers.
@@ -504,8 +520,14 @@ typedef struct crypto_ops_v2 {
 	crypto_mech_ops_t			*co_mech_ops;
 } crypto_ops_v2_t;
 
+typedef struct crypto_ops_v3 {
+	crypto_ops_v2_t				v2_ops;
+	crypto_nostore_key_ops_t		*co_nostore_key_ops;
+} crypto_ops_v3_t;
+
 typedef struct crypto_ops {
 	union {
+		crypto_ops_v3_t	cou_v3;
 		crypto_ops_v2_t	cou_v2;
 		crypto_ops_v1_t	cou_v1;
 	} cou;
@@ -526,6 +548,7 @@ typedef struct crypto_ops {
 #define	co_provider_ops			cou.cou_v1.co_provider_ops
 #define	co_ctx_ops			cou.cou_v1.co_ctx_ops
 #define	co_mech_ops			cou.cou_v2.co_mech_ops
+#define	co_nostore_key_ops		cou.cou_v3.co_nostore_key_ops
 
 /*
  * Provider device specification passed during registration.

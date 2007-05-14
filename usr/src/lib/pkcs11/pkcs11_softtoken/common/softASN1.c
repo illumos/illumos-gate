@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,6 +78,11 @@ pad_bigint_attr(biginteger_t *src, biginteger_t *dst)
 	if (src == NULL || dst == NULL)
 		return (CKR_HOST_MEMORY);
 
+	if (src->big_value_len == 0) {
+		dst->big_value = NULL;
+		dst->big_value_len = 0;
+		return (CKR_OK);
+	}
 	/*
 	 * Realloc() may free() or shrink previous memory location, so
 	 * clear out potentially sensitive data before that happens.
@@ -113,6 +117,12 @@ unpad_bigint_attr(biginteger_t src, biginteger_t *dst)
 
 	if (dst == NULL)
 		return (CKR_HOST_MEMORY);
+
+	if (src.big_value_len == 0) {
+		dst->big_value = NULL;
+		dst->big_value_len = 0;
+		return (CKR_OK);
+	}
 
 	offset = (src.big_value[0] == 0x00) ? 1 : 0;
 	dst->big_value_len = src.big_value_len - offset;
@@ -203,8 +213,9 @@ rsa_pri_to_asn1(soft_object_t *objp, uchar_t *buf, ulong_t *buf_len)
 	if ((rv = pad_bigint_attr(OBJ_PRI_RSA_PUBEXPO(objp), &tmp_pad)) !=
 	    CKR_OK)
 		goto cleanup_rsapri2asn;
-	if (ber_printf(key_asn, "to", LBER_INTEGER,
-	    tmp_pad.big_value, tmp_pad.big_value_len) == -1) {
+
+	else if (ber_printf(key_asn, "to", LBER_INTEGER, tmp_pad.big_value,
+	    tmp_pad.big_value_len) == -1) {
 		rv = CKR_GENERAL_ERROR;
 		goto cleanup_rsapri2asn;
 	}
@@ -223,7 +234,7 @@ rsa_pri_to_asn1(soft_object_t *objp, uchar_t *buf, ulong_t *buf_len)
 	if ((rv = pad_bigint_attr(OBJ_PRI_RSA_PRIME1(objp), &tmp_pad)) !=
 	    CKR_OK)
 		goto cleanup_rsapri2asn;
-	if (ber_printf(key_asn, "to", LBER_INTEGER,
+	else if (ber_printf(key_asn, "to", LBER_INTEGER,
 	    tmp_pad.big_value, tmp_pad.big_value_len) == -1) {
 		rv = CKR_GENERAL_ERROR;
 		goto cleanup_rsapri2asn;
@@ -233,7 +244,7 @@ rsa_pri_to_asn1(soft_object_t *objp, uchar_t *buf, ulong_t *buf_len)
 	if ((rv = pad_bigint_attr(OBJ_PRI_RSA_PRIME2(objp), &tmp_pad)) !=
 	    CKR_OK)
 		goto cleanup_rsapri2asn;
-	if (ber_printf(key_asn, "to", LBER_INTEGER,
+	else if (ber_printf(key_asn, "to", LBER_INTEGER,
 	    tmp_pad.big_value, tmp_pad.big_value_len) == -1) {
 		rv = CKR_GENERAL_ERROR;
 		goto cleanup_rsapri2asn;
@@ -242,7 +253,7 @@ rsa_pri_to_asn1(soft_object_t *objp, uchar_t *buf, ulong_t *buf_len)
 	/* ... exponent 1, */
 	if ((rv = pad_bigint_attr(OBJ_PRI_RSA_EXPO1(objp), &tmp_pad)) != CKR_OK)
 		goto cleanup_rsapri2asn;
-	if (ber_printf(key_asn, "to", LBER_INTEGER,
+	else if (ber_printf(key_asn, "to", LBER_INTEGER,
 	    tmp_pad.big_value, tmp_pad.big_value_len) == -1) {
 		rv = CKR_GENERAL_ERROR;
 		goto cleanup_rsapri2asn;
@@ -251,7 +262,7 @@ rsa_pri_to_asn1(soft_object_t *objp, uchar_t *buf, ulong_t *buf_len)
 	/* ... exponent 2, */
 	if ((rv = pad_bigint_attr(OBJ_PRI_RSA_EXPO2(objp), &tmp_pad)) != CKR_OK)
 		goto cleanup_rsapri2asn;
-	if (ber_printf(key_asn, "to", LBER_INTEGER,
+	else if (ber_printf(key_asn, "to", LBER_INTEGER,
 	    tmp_pad.big_value, tmp_pad.big_value_len) == -1) {
 		rv = CKR_GENERAL_ERROR;
 		goto cleanup_rsapri2asn;
@@ -260,7 +271,7 @@ rsa_pri_to_asn1(soft_object_t *objp, uchar_t *buf, ulong_t *buf_len)
 	/* ... coeffient } end-sequence */
 	if ((rv = pad_bigint_attr(OBJ_PRI_RSA_COEF(objp), &tmp_pad)) != CKR_OK)
 		goto cleanup_rsapri2asn;
-	if (ber_printf(key_asn, "to}", LBER_INTEGER,
+	else if (ber_printf(key_asn, "to}", LBER_INTEGER,
 	    tmp_pad.big_value, tmp_pad.big_value_len) == -1) {
 		rv = CKR_GENERAL_ERROR;
 		goto cleanup_rsapri2asn;

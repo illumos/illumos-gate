@@ -126,6 +126,7 @@ static uint32_t dprov_debug = 0;
 #define	DPROV_CALL(f, r, x)
 #endif /* DEBUG */
 
+static int nostore_key_gen;
 static boolean_t dprov_no_multipart = B_FALSE;
 static int dprov_max_digestsz = INT_MAX;
 
@@ -907,6 +908,16 @@ static crypto_mech_ops_t dprov_mech_ops = {
 	dprov_free_mechanism
 };
 
+static int dprov_nostore_key_generate(crypto_provider_handle_t,
+    crypto_session_id_t, crypto_mechanism_t *, crypto_object_attribute_t *,
+    uint_t, crypto_object_attribute_t *, uint_t, crypto_req_handle_t);
+
+static crypto_nostore_key_ops_t dprov_nostore_key_ops = {
+	dprov_nostore_key_generate,
+	NULL, /* dprov_nostore_key_generate_pair */
+	NULL  /* dprov_nostore_key_derive */
+};
+
 static crypto_ops_t dprov_crypto_ops = {
 	&dprov_control_ops,
 	&dprov_digest_ops,
@@ -999,6 +1010,7 @@ typedef struct dprov_object {
 #define	DPROV_CKA_VALUE			0x00000011
 #define	DPROV_CKA_CERTIFICATE_TYPE	0x00000080
 #define	DPROV_CKA_KEY_TYPE		0x00000100
+#define	DPROV_CKA_SENSITIVE		0x00000103
 #define	DPROV_CKA_ENCRYPT		0x00000104
 #define	DPROV_CKA_DECRYPT		0x00000105
 #define	DPROV_CKA_WRAP			0x00000106
@@ -1203,7 +1215,9 @@ typedef enum dprov_req_type {
 	DPROV_REQ_MGMT_EXTINFO,
 	DPROV_REQ_MGMT_INITTOKEN,
 	DPROV_REQ_MGMT_INITPIN,
-	DPROV_REQ_MGMT_SETPIN
+	DPROV_REQ_MGMT_SETPIN,
+	/* no (key)store key management requests */
+	DPROV_REQ_NOSTORE_KEY_GENERATE
 } dprov_req_type_t;
 
 /* for DPROV_REQ_DIGEST requests */
@@ -1321,6 +1335,10 @@ typedef struct dprov_key_req {
 	crypto_key_t *kr_key;
 	uchar_t *kr_wrapped_key;
 	size_t *kr_wrapped_key_len_ptr;
+	crypto_object_attribute_t *kr_out_template1;
+	crypto_object_attribute_t *kr_out_template2;
+	uint_t kr_out_attribute_count1;
+	uint_t kr_out_attribute_count2;
 } dprov_key_req_t;
 
 /* for DPROV_REQ_MGMT requests */
@@ -1420,7 +1438,8 @@ static int dprov_key_submit_req(dprov_req_type_t, dprov_state_t *,
     crypto_req_handle_t, crypto_session_id_t, crypto_mechanism_t *,
     crypto_object_attribute_t *, uint_t, crypto_object_id_t *,
     crypto_object_attribute_t *, uint_t, crypto_object_id_t *,
-    crypto_key_t *, uchar_t *, size_t *);
+    crypto_key_t *, uchar_t *, size_t *, crypto_object_attribute_t *,
+    uint_t, crypto_object_attribute_t *, uint_t);
 static int dprov_mgmt_submit_req(dprov_req_type_t, dprov_state_t *,
     crypto_req_handle_t, crypto_session_id_t, char *, size_t, char *, size_t,
     char *, crypto_provider_ext_info_t *);
@@ -1630,6 +1649,14 @@ dprov_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		mutex_destroy(&softc->ds_lock);
 		ddi_soft_state_free(statep, instance);
 		return (DDI_FAILURE);
+	}
+
+	nostore_key_gen = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "nostore_key_gen", 0);
+	if (nostore_key_gen != 0) {
+		dprov_prov_info.pi_interface_version = CRYPTO_SPI_VERSION_3;
+		dprov_crypto_ops.co_object_ops = NULL;
+		dprov_crypto_ops.co_nostore_key_ops = &dprov_nostore_key_ops;
 	}
 
 	dprov_max_digestsz = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
@@ -3836,7 +3863,7 @@ dprov_key_generate(crypto_provider_handle_t provider,
 	/* submit request to the taskq */
 	error = dprov_key_submit_req(DPROV_REQ_KEY_GENERATE, softc, req,
 	    session_id, mechanism, template, attribute_count, object, NULL,
-	    0, NULL, NULL, NULL, 0);
+	    0, NULL, NULL, NULL, 0, NULL, 0, NULL, 0);
 
 	DPROV_DEBUG(D_KEY, ("(%d) dprov_key_generate: done err = 0x0%x\n",
 	    instance, error));
@@ -3867,7 +3894,8 @@ dprov_key_generate_pair(crypto_provider_handle_t provider,
 	error = dprov_key_submit_req(DPROV_REQ_KEY_GENERATE_PAIR, softc, req,
 	    session_id, mechanism, public_key_template,
 	    public_key_attribute_count, public_key, private_key_template,
-	    private_key_attribute_count, private_key, NULL, NULL, 0);
+	    private_key_attribute_count, private_key, NULL, NULL, 0, NULL, 0,
+	    NULL, 0);
 
 	DPROV_DEBUG(D_KEY, ("(%d) dprov_key_generate_pair: done err = 0x0%x\n",
 	    instance, error));
@@ -3893,7 +3921,8 @@ dprov_key_wrap(crypto_provider_handle_t provider,
 	/* submit request to the taskq */
 	error = dprov_key_submit_req(DPROV_REQ_KEY_WRAP, softc, req,
 	    session_id, mechanism, NULL, 0, key, NULL,
-	    0, NULL, wrapping_key, wrapped_key, wrapped_key_len_ptr);
+	    0, NULL, wrapping_key, wrapped_key, wrapped_key_len_ptr,
+	    NULL, 0, NULL, 0);
 
 	DPROV_DEBUG(D_KEY, ("(%d) dprov_key_wrap: done err = 0x0%x\n",
 	    instance, error));
@@ -3920,7 +3949,8 @@ dprov_key_unwrap(crypto_provider_handle_t provider,
 	/* submit request to the taskq */
 	error = dprov_key_submit_req(DPROV_REQ_KEY_UNWRAP, softc, req,
 	    session_id, mechanism, template, attribute_count, key, NULL,
-	    0, NULL, unwrapping_key, wrapped_key, wrapped_key_len_ptr);
+	    0, NULL, unwrapping_key, wrapped_key, wrapped_key_len_ptr,
+	    NULL, 0, NULL, 0);
 
 	DPROV_DEBUG(D_KEY, ("(%d) dprov_key_unwrap: done err = 0x0%x\n",
 	    instance, error));
@@ -3946,7 +3976,7 @@ dprov_key_derive(crypto_provider_handle_t provider,
 	/* submit request to the taskq */
 	error = dprov_key_submit_req(DPROV_REQ_KEY_DERIVE, softc, req,
 	    session_id, mechanism, template, attribute_count, key, NULL,
-	    0, NULL, base_key, NULL, 0);
+	    0, NULL, base_key, NULL, 0, NULL, 0, NULL, 0);
 
 	DPROV_DEBUG(D_KEY, ("(%d) dprov_key_derive: done err = 0x0%x\n",
 	    instance, error));
@@ -4362,6 +4392,37 @@ dprov_free_mechanism(crypto_provider_handle_t provider,
 }
 
 /*
+ * No (Key)Store Key management entry point.
+ */
+static int
+dprov_nostore_key_generate(crypto_provider_handle_t provider,
+    crypto_session_id_t session_id, crypto_mechanism_t *mechanism,
+    crypto_object_attribute_t *template, uint_t attribute_count,
+    crypto_object_attribute_t *out_template, uint_t out_attribute_count,
+    crypto_req_handle_t req)
+{
+	int error = CRYPTO_FAILED;
+	dprov_state_t *softc = (dprov_state_t *)provider;
+	/* LINTED E_FUNC_SET_NOT_USED */
+	int instance;
+
+	instance = ddi_get_instance(softc->ds_dip);
+	DPROV_DEBUG(D_KEY, ("(%d) dprov_nostore_key_generate: started\n",
+	    instance));
+
+	/* submit request to the taskq */
+	error = dprov_key_submit_req(DPROV_REQ_NOSTORE_KEY_GENERATE,
+	    softc, req, session_id, mechanism, template, attribute_count,
+	    NULL, NULL, 0, NULL, NULL, NULL, 0, out_template,
+	    out_attribute_count, NULL, 0);
+
+	DPROV_DEBUG(D_KEY, ("(%d) dprov_nostore_key_generate: "
+	    "done err = 0x0%x\n", instance, error));
+
+	return (error);
+}
+
+/*
  * Allocate a dprov taskq request and initialize the common fields.
  * Return NULL if the memory allocation failed.
  */
@@ -4685,7 +4746,9 @@ dprov_key_submit_req(dprov_req_type_t req_type,
     crypto_object_attribute_t *private_key_template,
     uint_t private_key_attribute_count,
     crypto_object_id_t *private_key_object_id_ptr, crypto_key_t *key,
-    uchar_t *wrapped_key, size_t *wrapped_key_len_ptr)
+    uchar_t *wrapped_key, size_t *wrapped_key_len_ptr,
+    crypto_object_attribute_t *out_template1, uint_t out_attribute_count1,
+    crypto_object_attribute_t *out_template2, uint_t out_attribute_count2)
 {
 	dprov_req_t *taskq_req;
 
@@ -4706,6 +4769,10 @@ dprov_key_submit_req(dprov_req_type_t req_type,
 	taskq_req->dr_key_req.kr_key = key;
 	taskq_req->dr_key_req.kr_wrapped_key = wrapped_key;
 	taskq_req->dr_key_req.kr_wrapped_key_len_ptr = wrapped_key_len_ptr;
+	taskq_req->dr_key_req.kr_out_template1 = out_template1;
+	taskq_req->dr_key_req.kr_out_attribute_count1 = out_attribute_count1;
+	taskq_req->dr_key_req.kr_out_template2 = out_template2;
+	taskq_req->dr_key_req.kr_out_attribute_count2 = out_attribute_count2;
 
 	return (dprov_taskq_dispatch(softc, taskq_req,
 	    (task_func_t *)dprov_key_task, KM_NOSLEEP));
@@ -6979,7 +7046,7 @@ destroy_object:
 				error = CRYPTO_TEMPLATE_INCONSISTENT;
 				break;
 			}
-			pri_key_type = DPROV_CKK_RSA;
+			pub_key_type = DPROV_CKK_RSA;
 
 			if (pri_key_type != ~0UL &&
 			    pri_key_type != DPROV_CKK_RSA) {
@@ -7533,8 +7600,43 @@ free_unwrapped_key:
 free_derived_key:
 		bzero(digest_buf, hash_size);
 		kmem_free(digest_buf, hash_size);
+		break;
 	}
+
+	case DPROV_REQ_NOSTORE_KEY_GENERATE: {
+		crypto_object_attribute_t *out_template;
+		uint_t out_attribute_count;
+		void *value;
+		size_t value_len = 0;
+
+		out_template = taskq_req->dr_key_req.kr_out_template1;
+		out_attribute_count =
+		    taskq_req->dr_key_req.kr_out_attribute_count1;
+
+		error = dprov_get_template_attr_array(out_template,
+		    out_attribute_count, DPROV_CKA_VALUE, &value, &value_len);
+		if (error != CRYPTO_SUCCESS)
+			break;
+
+		/* fill the entire array with pattern */
+		{
+			int i = 0;
+			char *p = value;
+			while (i < value_len) {
+				p[i++] = 'A';
+				if (i >= value_len)
+					break;
+				p[i++] = 'B';
+				if (i >= value_len)
+					break;
+				p[i++] = 'C';
+			}
+		}
+
+		error = CRYPTO_SUCCESS;
+		break;
 	}
+	} /* end case */
 
 	mutex_exit(&softc->ds_lock);
 	dprov_op_done(taskq_req, error);
@@ -8168,7 +8270,9 @@ dprov_create_object_from_template(dprov_state_t *softc,
 	dprov_object_t *object;
 	boolean_t is_token = B_FALSE;
 	boolean_t extractable_attribute_present = B_FALSE;
+	boolean_t sensitive_attribute_present = B_FALSE;
 	boolean_t private_attribute_present = B_FALSE;
+	boolean_t token_attribute_present = B_FALSE;
 	uint_t i;
 	int error;
 	uint_t attr;
@@ -8234,6 +8338,8 @@ dprov_create_object_from_template(dprov_state_t *softc,
 			extractable_attribute_present = B_TRUE;
 		} else if (type == DPROV_CKA_PRIVATE) {
 			private_attribute_present = B_TRUE;
+		} else if (type == DPROV_CKA_TOKEN) {
+			token_attribute_present = B_TRUE;
 		}
 		object->do_attr[oattr].oa_type = type;
 		object->do_attr[oattr].oa_value_len = new_len;
@@ -8269,6 +8375,21 @@ dprov_create_object_from_template(dprov_state_t *softc,
 		oattr++;
 	}
 
+	if (token_attribute_present == B_FALSE) {
+		object->do_attr[oattr].oa_type = DPROV_CKA_TOKEN;
+		object->do_attr[oattr].oa_value_len = 1;
+		object->do_attr[oattr].oa_value = kmem_alloc(1, KM_SLEEP);
+		object->do_attr[oattr].oa_value[0] = B_FALSE;
+		oattr++;
+	}
+
+	if (sensitive_attribute_present == B_FALSE) {
+		object->do_attr[oattr].oa_type = DPROV_CKA_SENSITIVE;
+		object->do_attr[oattr].oa_value_len = 1;
+		object->do_attr[oattr].oa_value = kmem_alloc(1, KM_SLEEP);
+		object->do_attr[oattr].oa_value[0] = B_FALSE;
+		oattr++;
+	}
 	return (CRYPTO_SUCCESS);
 }
 

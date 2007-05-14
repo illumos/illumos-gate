@@ -114,6 +114,11 @@ C_SignInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 			if (rv != CKR_OK) {
 				goto clean_exit;
 			}
+		} else if (key_p->key_type == CKK_EC) {
+			rv = get_ec_private_key(key_p, &sign_init.si_key);
+			if (rv != CKR_OK) {
+				goto clean_exit;
+			}
 		} else {
 			rv = CKR_KEY_TYPE_INCONSISTENT;
 			goto clean_exit;

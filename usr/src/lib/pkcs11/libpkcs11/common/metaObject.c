@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,6 +119,9 @@ meta_CreateObject(CK_SESSION_HANDLE hSession, CK_ATTRIBUTE_PTR pTemplate,
 	slot_session_t *slot_session = NULL;
 	meta_object_t *object = NULL;
 	slot_object_t *slot_object = NULL;
+	CK_OBJECT_HANDLE hNewObject;
+	CK_ULONG slot_num, keystore_slotnum;
+	CK_RV first_rv;
 
 	if (pTemplate == NULL || ulCount < 1 || phObject == NULL)
 		return (CKR_ARGUMENTS_BAD);
@@ -139,8 +141,52 @@ meta_CreateObject(CK_SESSION_HANDLE hSession, CK_ATTRIBUTE_PTR pTemplate,
 	if (rv != CKR_OK)
 		goto cleanup;
 
+	/*
+	 * Set to true (token object) if template has CKA_TOKEN=true;
+	 * otherwise, it is false (session object).
+	 */
 	(void) get_template_boolean(CKA_TOKEN, pTemplate, ulCount,
 	    &(object->isToken));
+
+	/*
+	 * Set to true (private object) if template has CKA_PRIVATE=true;
+	 * otherwise, it is false (public object).
+	 */
+	(void) get_template_boolean(CKA_PRIVATE, pTemplate, ulCount,
+	    &(object->isPrivate));
+
+	/* Assume object is extractable unless template has otherwise */
+	object->isExtractable = B_TRUE;
+	(void) get_template_boolean(CKA_EXTRACTABLE, pTemplate, ulCount,
+	    &(object->isExtractable));
+
+	/*
+	 * Set to true (sensitive object) if template has CKA_SENSITIVE=true;
+	 * otherwise, it is false.
+	 */
+	(void) get_template_boolean(CKA_SENSITIVE, pTemplate, ulCount,
+	    &(object->isSensitive));
+
+	/*
+	 * Check if this can be a FreeObject.
+	 *
+	 * For creating objects, this check is mostly for preventing
+	 * non-keystore hardware from creating CKA_PRIVATE objects without
+	 * logging in.
+	 */
+
+	if (meta_freeobject_check(session, object, NULL, pTemplate, ulCount,
+		NULL)) {
+		/*
+		 * Make sure we are logged into the keystore if this is a
+		 * private freetoken object.
+		 */
+		if (object->isPrivate && !metaslot_logged_in())
+			return (CKR_USER_NOT_LOGGED_IN);
+
+		if (!meta_freeobject_set(object, pTemplate, ulCount, B_TRUE))
+			goto cleanup;
+	}
 
 	/* Can't create token objects in a read-only session. */
 	if ((IS_READ_ONLY_SESSION(session->session_flags)) && object->isToken) {
@@ -148,48 +194,30 @@ meta_CreateObject(CK_SESSION_HANDLE hSession, CK_ATTRIBUTE_PTR pTemplate,
 		goto cleanup;
 	}
 
-	if (object->isToken) {
-		CK_OBJECT_HANDLE hNewObject;
-		CK_ULONG keystore_slotnum;
+	keystore_slotnum = get_keystore_slotnum();
 
-		keystore_slotnum = get_keystore_slotnum();
+	if (object->isToken || object->isFreeToken == FREE_ENABLED) {
 
-		rv = meta_get_slot_session(keystore_slotnum, &slot_session,
+		/*
+		 * If this is a token object or a FreeToken then create it
+		 * on the keystore slot.
+		 */
+
+		slot_num = keystore_slotnum;
+		rv = meta_get_slot_session(slot_num, &slot_session,
 		    session->session_flags);
 		if (rv != CKR_OK)
 			goto cleanup;
 
-		object->tried_create_clone[keystore_slotnum] = B_TRUE;
+		object->tried_create_clone[slot_num] = B_TRUE;
 		rv = FUNCLIST(slot_session->fw_st_id)->C_CreateObject(
-		    slot_session->hSession, pTemplate, ulCount, &hNewObject);
-		if (rv != CKR_OK) {
+			slot_session->hSession, pTemplate, ulCount,
+			    &hNewObject);
+
+		if (rv != CKR_OK)
 			goto cleanup;
-		}
 
-		slot_object->hObject = hNewObject;
-
-		/*
-		 * Store slot object and forget about it. If we fail later in
-		 * this function, let the metaobject cleanup handle it.
-		 */
-		object->clones[keystore_slotnum] = slot_object;
-		object->master_clone_slotnum = keystore_slotnum;
-		meta_slot_object_activate(slot_object, slot_session, B_TRUE);
-		slot_object = NULL;
-
-		meta_release_slot_session(slot_session);
-		slot_session = NULL;
-
-		/*
-		 * record if it is a private object or not.
-		 * if CKA_PRIVATE=true is not specified, it is not
-		 * a private object
-		 */
-		(void) get_template_boolean(CKA_PRIVATE, pTemplate, ulCount,
-		    &(object->isPrivate));
 	} else {
-
-		CK_OBJECT_HANDLE hNewObject;
 
 		/*
 		 * Create a clone of the object in the first available slot.
@@ -200,80 +228,72 @@ meta_CreateObject(CK_SESSION_HANDLE hSession, CK_ATTRIBUTE_PTR pTemplate,
 		 * decision to stop or continue is made based on the return
 		 * code.
 		 */
-
-		CK_ULONG slot_num, num_slots;
-		CK_RV first_rv;
-
-		num_slots = meta_slotManager_get_slotcount();
+		CK_ULONG num_slots = meta_slotManager_get_slotcount();
 
 		for (slot_num = 0; slot_num < num_slots; slot_num++) {
+			/*
+			 * If this is a free token and we are on the keystore
+			 * slot, bypass this because it was already created
+			 */
+
 			rv = meta_get_slot_session(slot_num, &slot_session,
 			    session->session_flags);
-			if (rv != CKR_OK) {
+			if (rv != CKR_OK)
 				goto cleanup;
-			}
 
 			object->tried_create_clone[slot_num] = B_TRUE;
 			rv = FUNCLIST(slot_session->fw_st_id)->C_CreateObject(
-			    slot_session->hSession, pTemplate, ulCount,
-			    &hNewObject);
-			if (rv == CKR_OK) {
+				slot_session->hSession, pTemplate, ulCount,
+				    &hNewObject);
+			if (rv == CKR_OK)
 				break;
-			}
 
-			if (!try_again(rv)) {
+			if (!try_again(rv))
 				goto cleanup;
-			}
 
-			if (slot_num == 0) {
-				/* save first rv for other errors */
+			/* save first rv for other errors */
+			if (slot_num == 0)
 				first_rv = rv;
-			}
 
 			meta_release_slot_session(slot_session);
 			slot_session = NULL;
 
-		}
-
-		if (rv == CKR_OK) {
-
-			slot_object->hObject = hNewObject;
-			object->clones[slot_num] = slot_object;
-			object->master_clone_slotnum = slot_num;
-			meta_slot_object_activate(slot_object, slot_session,
-			    B_FALSE);
-			slot_object = NULL;
-			meta_release_slot_session(slot_session);
-			slot_session = NULL;
-		} else {
-			/*
-			 * return either first error code or
-			 * CKR_FUNCTION_FAILED depending on the failure
-			 */
-			int i;
-			for (i = 0; i < num_other_rv; i++) {
-				if (rv == other_rv[i]) {
-					rv = CKR_FUNCTION_FAILED;
-					goto cleanup;
-				}
-			}
-			/* need to return first rv */
-			rv = first_rv;
-			goto cleanup;
 		}
 	}
 
-	/* Get the CKA_EXTRACTABLE and CKA_SENSITIVE attribute */
+	if (rv == CKR_OK) {
+		slot_object->hObject = hNewObject;
+		object->clones[slot_num] = slot_object;
+		object->master_clone_slotnum = slot_num;
 
-	/* assume object is extractable unless indicated otherwise */
-	object->isExtractable = B_TRUE;
-	(void) get_template_boolean(CKA_EXTRACTABLE, pTemplate, ulCount,
-	    &(object->isExtractable));
+		if (object->isToken || object->isFreeToken == FREE_ENABLED)
+			meta_slot_object_activate(slot_object,
+			    slot_session, B_TRUE);
+		else
+			meta_slot_object_activate(slot_object,
+			    slot_session, B_FALSE);
 
-	/* assume object is not sensitive unless indicated otherwise */
-	object->isSensitive = B_FALSE;
-	(void) get_template_boolean(CKA_SENSITIVE, pTemplate, ulCount,
-	    &(object->isSensitive));
+		slot_object = NULL;
+		meta_release_slot_session(slot_session);
+		slot_session = NULL;
+
+	} else {
+		/*
+		 * return either first error code or
+		 * CKR_FUNCTION_FAILED depending on the failure
+		 */
+		int i;
+		for (i = 0; i < num_other_rv; i++) {
+			if (rv == other_rv[i]) {
+				rv = CKR_FUNCTION_FAILED;
+				goto cleanup;
+			}
+		}
+		/* need to return first rv */
+		rv = first_rv;
+		goto cleanup;
+	}
+
 
 	/*
 	 * always keep a copy of the template for C_CreateObject,
