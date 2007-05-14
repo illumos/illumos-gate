@@ -20679,7 +20679,7 @@ sd_media_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 				if (asc == 0x28) {
 					state = DKIO_INSERTED;
 				}
-			} else {
+			} else if (skey == KEY_NOT_READY) {
 				/*
 				 * if 02/04/02  means that the host
 				 * should send start command. Explicitly
@@ -20691,23 +20691,31 @@ sd_media_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 				 * device to the right state good for
 				 * media access.
 				 */
-				if ((skey == KEY_NOT_READY) &&
-				    (asc == 0x3a)) {
+				if (asc == 0x3a) {
 					state = DKIO_EJECTED;
+				} else {
+					/*
+					 * If the drive is busy with an
+					 * operation or long write, keep the
+					 * media in an inserted state.
+					 */
+
+					if ((asc == 0x04) &&
+					    ((ascq == 0x02) ||
+					    (ascq == 0x07) ||
+					    (ascq == 0x08))) {
+						state = DKIO_INSERTED;
+					}
 				}
-
-				/*
-				 * If the drivge is busy with an operation
-				 * or long write, keep the media in an
-				 * inserted state.
-				 */
-
-				if ((skey == KEY_NOT_READY) &&
-				    (asc == 0x04) &&
-				    ((ascq == 0x02) ||
-				    (ascq == 0x07) ||
-				    (ascq == 0x08))) {
-					state = DKIO_INSERTED;
+			} else if (skey == KEY_NO_SENSE) {
+				if ((asc == 0x00) && (ascq == 0x00)) {
+					/*
+					 * Sense Data 00/00/00 does not provide
+					 * any information about the state of
+					 * the media. Ignore it.
+					 */
+					mutex_exit(SD_MUTEX(un));
+					return (0);
 				}
 			}
 		}
