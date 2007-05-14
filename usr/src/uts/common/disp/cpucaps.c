@@ -545,6 +545,7 @@ cap_project_usage_walker(cpucap_t *cap)
 			if (zcap->cap_usage > zcap->cap_maxusage)
 				zcap->cap_maxusage = zcap->cap_usage;
 			zcap->cap_usage = 0;
+			zcap->cap_lbolt = lbolt64;
 		}
 		DTRACE_PROBE2(cpucaps__zusage, cpucap_t *, zcap,
 		    hrtime_t, cap_usage);
