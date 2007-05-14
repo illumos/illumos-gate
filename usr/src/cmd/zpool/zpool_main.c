@@ -2082,7 +2082,7 @@ zpool_do_list(int argc, char **argv)
 
 	ret = for_each_pool(argc, argv, B_TRUE, NULL, list_callback, &cb);
 
-	if (argc == 0 && cb.cb_first) {
+	if (argc == 0 && cb.cb_first && !cb.cb_scripted) {
 		(void) printf(gettext("no pools available\n"));
 		return (0);
 	}

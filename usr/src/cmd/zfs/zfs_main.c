@@ -1469,7 +1469,7 @@ zfs_do_list(int argc, char **argv)
 	zfs_free_proplist(cb.cb_proplist);
 	zfs_free_sort_columns(sortcol);
 
-	if (ret == 0 && cb.cb_first)
+	if (ret == 0 && cb.cb_first && !cb.cb_scripted)
 		(void) printf(gettext("no datasets available\n"));
 
 	return (ret);
