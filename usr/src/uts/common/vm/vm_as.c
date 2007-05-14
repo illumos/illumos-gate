@@ -1483,6 +1483,8 @@ as_map_segvn_segs(struct as *as, caddr_t addr, size_t size, uint_t szcvec,
 		error = (*crfp)(seg, vn_a);
 		if (error != 0) {
 			seg_free(seg);
+		} else {
+			as->a_size += size;
 		}
 		return (error);
 	}
@@ -1514,6 +1516,7 @@ as_map_segvn_segs(struct as *as, caddr_t addr, size_t size, uint_t szcvec,
 				seg_free(seg);
 				return (error);
 			}
+			as->a_size += segsize;
 			*segcreated = 1;
 			if (do_off) {
 				vn_a->offset += segsize;
@@ -1541,6 +1544,7 @@ as_map_segvn_segs(struct as *as, caddr_t addr, size_t size, uint_t szcvec,
 				seg_free(seg);
 				return (error);
 			}
+			as->a_size += segsize;
 			*segcreated = 1;
 			if (do_off) {
 				vn_a->offset += segsize;
@@ -1588,6 +1592,8 @@ again:
 		error = (*crfp)(seg, vn_a);
 		if (error != 0) {
 			seg_free(seg);
+		} else {
+			as->a_size += size;
 		}
 		return (error);
 	}
@@ -1740,12 +1746,11 @@ as_map_locked(struct as *as, caddr_t addr, size_t size, int (*crfp)(),
 			AS_LOCK_EXIT(as, &as->a_lock);
 			return (error);
 		}
+		/*
+		 * Add size now so as_unmap will work if as_ctl fails.
+		 */
+		as->a_size += rsize;
 	}
-
-	/*
-	 * Add size now so as_unmap will work if as_ctl fails.
-	 */
-	as->a_size += rsize;
 
 	as_setwatch(as);
 
