@@ -2286,7 +2286,7 @@ const char * const	string;
 
 static int
 mkdirs(argname)
-char *		argname;
+char *argname;
 {
 	register char *name;
 	register char *cp;
