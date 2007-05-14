@@ -51,6 +51,7 @@
 #include <libscf.h>
 #include <libproc.h>
 #include <sys/priocntl.h>
+#include <libuutil.h>
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -88,8 +89,6 @@
 #define	DTD_ELEM_MCAP		(const xmlChar *) "mcap"
 #define	DTD_ELEM_PACKAGE	(const xmlChar *) "package"
 #define	DTD_ELEM_PATCH		(const xmlChar *) "patch"
-#define	DTD_ELEM_OBSOLETES	(const xmlChar *) "obsoletes"
-#define	DTD_ELEM_INCOMPATIBLE	(const xmlChar *) "incompatible"
 #define	DTD_ELEM_DEV_PERM	(const xmlChar *) "dev-perm"
 
 #define	DTD_ATTR_ACTION		(const xmlChar *) "action"
@@ -150,6 +149,8 @@
 #define	MAX_TMP_POOL_NAME	(ZONENAME_MAX + 9)
 #define	RCAP_SERVICE	"system/rcap:default"
 #define	POOLD_SERVICE	"system/pools/dynamic:default"
+
+enum zn_ipd_fs {ZONE_IPD, ZONE_FS};
 
 /*
  * rctl alias definitions
@@ -220,6 +221,18 @@ struct zone_pkginfo {
 	char		*zpi_version;
 	char		**zpi_patchinfo;
 };
+
+typedef struct {
+	uu_avl_node_t	patch_node;
+	char		*patch_num;
+	char		*patch_vers;
+} patch_node_t;
+
+typedef struct {
+	uu_avl_t	*obs_patches_avl;
+	zone_dochandle_t handle;
+	int		res;
+} patch_parms_t;
 
 char *zonecfg_root = "";
 
@@ -6651,6 +6664,40 @@ zonecfg_enddevperment(zone_dochandle_t handle)
 }
 
 /*
+ * Maintain a space separated list of unique pkg names.  PATH_MAX is used in
+ * the pkg code as the maximum size for a pkg name.
+ */
+static int
+add_pkg_to_str(char **str, char *pkg)
+{
+	int len, newlen;
+	char tstr[PATH_MAX + 3];
+	char *tmp;
+
+	len = strlen(pkg);
+	if (*str == NULL) {
+		/* space for str + 2 spaces + NULL */
+		if ((*str = (char *)malloc(len + 3)) == NULL)
+			return (Z_NOMEM);
+		(void) snprintf(*str, len + 3, " %s ", pkg);
+		return (Z_OK);
+	}
+
+	(void) snprintf(tstr, sizeof (tstr), " %s ", pkg);
+	if (strstr(*str, tstr) != NULL)
+		return (Z_OK);
+
+	/* space for str + 1 space + NULL */
+	newlen = strlen(*str) + len + 2;
+	if ((tmp = (char *)realloc(*str, newlen)) == NULL)
+		return (Z_NOMEM);
+	*str = tmp;
+	(void) strlcat(*str, pkg, newlen);
+	(void) strlcat(*str, " ", newlen);
+	return (Z_OK);
+}
+
+/*
  * Process a list of pkgs from an entry in the contents file, adding each pkg
  * name to the list of pkgs.
  *
@@ -6659,7 +6706,7 @@ zonecfg_enddevperment(zone_dochandle_t handle)
  * first char is not an Alpha char.  If so, skip over it.
  */
 static int
-add_pkg_list(char *lastp, char ***plist, int *pcnt)
+add_pkg_list(char *lastp, char ***plist, int *pcnt, char **pkg_warn)
 {
 	char	*p;
 	int	pkg_cnt = *pcnt;
@@ -6671,8 +6718,11 @@ add_pkg_list(char *lastp, char ***plist, int *pcnt)
 		int	i;
 
 		/* skip over any special pkg bookkeeping char */
-		if (!isalpha(*p))
+		if (!isalpha(*p)) {
 			p++;
+			if ((res = add_pkg_to_str(pkg_warn, p)) != Z_OK)
+				break;
+		}
 
 		/* Check if the pkg is already in the list */
 		for (i = 0; i < pkg_cnt; i++) {
@@ -6705,60 +6755,87 @@ add_pkg_list(char *lastp, char ***plist, int *pcnt)
 }
 
 /*
- * Process an entry from the contents file (type "directory") and if the
- * directory path is in the list of paths, add the associated list of pkgs
- * to the pkg list.  The input parameter "entry" will be broken up by
- * the parser within this function so its value will be modified when this
- * function exits.
+ * Process an entry from the contents file (type "directory").  If the
+ * directory path is in the list of ipds and is not under a lofs mount within
+ * the ipd then add the associated list of pkgs to the pkg list.  The input
+ * parameter "entry" will be broken up by the parser within this function so
+ * its value will be modified when this function exits.
  *
  * The entries we are looking for will look something like:
  *	/usr d none 0755 root sys SUNWctpls SUNWidnl SUNWlibCf ....
  */
 static int
-get_path_pkgs(char *entry, char **paths, int cnt, char ***pkgs, int *pkg_cnt)
+get_path_pkgs(char *entry, char **ipds, char **fss, char ***pkgs, int *pkg_cnt,
+    char **pkg_warn)
 {
 	char	*f1;
 	char	*f2;
 	char	*lastp;
 	int	i;
-	int	res = Z_OK;
+	char	*nlp;
 
 	if ((f1 = strtok_r(entry, " ", &lastp)) == NULL ||
 	    (f2 = strtok_r(NULL, " ", &lastp)) == NULL || strcmp(f2, "d") != 0)
 		return (Z_OK);
 
-	/* Check if this directory entry is in the list of paths. */
-	for (i = 0; i < cnt; i++) {
-		if (fnmatch(paths[i], f1, FNM_PATHNAME) == 0) {
-			/*
-			 * We do want the pkgs for this path.  First, skip
-			 * over the next 4 fields in the entry so that we call
-			 * add_pkg_list starting with the pkg names.
-			 */
-			int j;
-			char	*nlp;
+	/* Check if this directory entry is in the list of ipds. */
+	for (i = 0; ipds[i] != NULL; i++) {
+		char wildcard[MAXPATHLEN];
 
-			for (j = 0; j < 4 &&
-			    strtok_r(NULL, " ", &lastp) != NULL; j++)
-				;
-			/*
-			 * If there are < 4 fields this entry is corrupt,
-			 * just skip it.
-			 */
-			if (j < 4)
-				return (Z_OK);
-
-			/* strip newline from the line */
-			nlp = (lastp + strlen(lastp) - 1);
-			if (*nlp == '\n')
-				*nlp = '\0';
-
-			res = add_pkg_list(lastp, pkgs, pkg_cnt);
+		/*
+		 * We want to match on the path and any other directory
+		 * entries under this path.  When we use FNM_PATHNAME then
+		 * that means '/' will not be matched by a wildcard (*) so
+		 * we omit FNM_PATHNAME on the call with the wildcard matching.
+		 */
+		(void) snprintf(wildcard, sizeof (wildcard), "%s/*", ipds[i]);
+		if (fnmatch(ipds[i], f1, FNM_PATHNAME) == 0 ||
+		    fnmatch(wildcard, f1, 0) == 0) {
+			/* It looks like we do want the pkgs for this path. */
 			break;
 		}
 	}
 
-	return (res);
+	/* This entry did not match any of the ipds. */
+	if (ipds[i] == NULL)
+		return (Z_OK);
+
+	/*
+	 * Check if there is a fs mounted under the ipd.  If so, ignore this
+	 * entry.
+	 */
+	for (i = 0; fss[i] != NULL; i++) {
+		char wildcard[MAXPATHLEN];
+
+		(void) snprintf(wildcard, sizeof (wildcard), "%s/*", fss[i]);
+		if (fnmatch(fss[i], f1, FNM_PATHNAME) == 0 ||
+		    fnmatch(wildcard, f1, 0) == 0) {
+			/* We should ignore this path. */
+			break;
+		}
+	}
+
+	/* If not null, then we matched an fs mount point so ignore entry. */
+	if (fss[i] != NULL)
+		return (Z_OK);
+
+	/*
+	 * We do want the pkgs for this entry.  First, skip over the next 4
+	 * fields in the entry so that we call add_pkg_list starting with the
+	 * pkg names.
+	 */
+	for (i = 0; i < 4 && strtok_r(NULL, " ", &lastp) != NULL; i++)
+		;
+	/* If there are < 4 fields this entry is corrupt, just skip it. */
+	if (i < 4)
+		return (Z_OK);
+
+	/* strip newline from the line */
+	nlp = (lastp + strlen(lastp) - 1);
+	if (*nlp == '\n')
+		*nlp = '\0';
+
+	return (add_pkg_list(lastp, pkgs, pkg_cnt, pkg_warn));
 }
 
 /*
@@ -6827,6 +6904,80 @@ free_ipd_pkgs(char **pkgs, int cnt)
 }
 
 /*
+ * Get a list of the inherited pkg dirs or fs entries configured for the
+ * zone.  The type parameter will be either ZONE_IPD or ZONE_FS.
+ */
+static int
+get_ipd_fs_list(zone_dochandle_t handle, enum zn_ipd_fs type, char ***list)
+{
+	int	res;
+	struct zone_fstab fstab;
+	int	cnt = 0;
+	char	**entries = NULL;
+	int	i;
+	int	(*fp)(zone_dochandle_t, struct zone_fstab *);
+
+	if (type == ZONE_IPD) {
+		fp = zonecfg_getipdent;
+		res = zonecfg_setipdent(handle);
+	} else {
+		fp = zonecfg_getfsent;
+		res = zonecfg_setfsent(handle);
+	}
+
+	if (res != Z_OK)
+		return (res);
+
+	while (fp(handle, &fstab) == Z_OK) {
+		char	**p;
+
+		if ((p = (char **)realloc(entries,
+		    sizeof (char *) * (cnt + 1))) == NULL) {
+			res = Z_NOMEM;
+			break;
+		}
+		entries = p;
+
+		if ((entries[cnt] = strdup(fstab.zone_fs_dir)) == NULL) {
+			res = Z_NOMEM;
+			break;
+		}
+
+		cnt++;
+	}
+
+	if (type == ZONE_IPD)
+		(void) zonecfg_endipdent(handle);
+	else
+		(void) zonecfg_endfsent(handle);
+
+	/* Add a NULL terminating element. */
+	if (res == Z_OK) {
+		char	**p;
+
+		if ((p = (char **)realloc(entries,
+		    sizeof (char *) * (cnt + 1))) == NULL) {
+			res = Z_NOMEM;
+		} else {
+			entries = p;
+			entries[cnt] = NULL;
+		}
+	}
+
+	if (res != Z_OK) {
+		if (entries != NULL) {
+			for (i = 0; i < cnt; i++)
+				free(entries[i]);
+			free(entries);
+		}
+		return (res);
+	}
+
+	*list = entries;
+	return (Z_OK);
+}
+
+/*
  * Get the list of inherited-pkg-dirs (ipd) for the zone and then get the
  * list of pkgs that deliver into those dirs.
  */
@@ -6834,74 +6985,57 @@ static int
 get_ipd_pkgs(zone_dochandle_t handle, char ***pkg_list, int *cnt)
 {
 	int	res;
-	struct zone_fstab fstab;
-	int	ipd_cnt = 0;
-	char	**ipds = NULL;
+	char	**ipds;
+	char	**fss;
 	int	pkg_cnt = 0;
 	char	**pkgs = NULL;
 	int	i;
 
-	if ((res = zonecfg_setipdent(handle)) != Z_OK)
+	if ((res = get_ipd_fs_list(handle, ZONE_IPD, &ipds)) != Z_OK)
 		return (res);
 
-	while (zonecfg_getipdent(handle, &fstab) == Z_OK) {
-		char	**p;
-		int	len;
-
-		if ((p = (char **)realloc(ipds,
-		    sizeof (char *) * (ipd_cnt + 2))) == NULL) {
-			res = Z_NOMEM;
-			break;
-		}
-		ipds = p;
-
-		if ((ipds[ipd_cnt] = strdup(fstab.zone_fs_dir)) == NULL) {
-			res = Z_NOMEM;
-			break;
-		}
-		ipd_cnt++;
-
-		len = strlen(fstab.zone_fs_dir) + 3;
-		if ((ipds[ipd_cnt] = malloc(len)) == NULL) {
-			res = Z_NOMEM;
-			break;
-		}
-
-		(void) snprintf(ipds[ipd_cnt], len, "%s/*", fstab.zone_fs_dir);
-		ipd_cnt++;
-	}
-
-	(void) zonecfg_endipdent(handle);
-
-	if (res != Z_OK) {
-		for (i = 0; i < ipd_cnt; i++)
+	if ((res = get_ipd_fs_list(handle, ZONE_FS, &fss)) != Z_OK) {
+		for (i = 0; ipds[i] != NULL; i++)
 			free(ipds[i]);
 		free(ipds);
 		return (res);
 	}
 
 	/* We only have to process the contents file if we have ipds. */
-	if (ipd_cnt > 0) {
+	if (ipds != NULL) {
 		FILE	*fp;
 
 		if ((fp = fopen(CONTENTS_FILE, "r")) != NULL) {
 			char	*buf;
+			char	*pkg_warn = NULL;
 
 			while ((buf = read_pkg_data(fp)) != NULL) {
-				res = get_path_pkgs(buf, ipds, ipd_cnt, &pkgs,
-				    &pkg_cnt);
+				res = get_path_pkgs(buf, ipds, fss, &pkgs,
+				    &pkg_cnt, &pkg_warn);
 				free(buf);
 				if (res != Z_OK)
 					break;
 			}
 
 			(void) fclose(fp);
+
+			if (pkg_warn != NULL) {
+				(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+				    "WARNING: package operation in progress "
+				    "on the following packages:\n   %s\n"),
+				    pkg_warn);
+				free(pkg_warn);
+			}
 		}
 	}
 
-	for (i = 0; i < ipd_cnt; i++)
+	for (i = 0; ipds[i] != NULL; i++)
 		free(ipds[i]);
 	free(ipds);
+
+	for (i = 0; fss[i] != NULL; i++)
+		free(fss[i]);
+	free(fss);
 
 	if (res != Z_OK) {
 		free_ipd_pkgs(pkgs, pkg_cnt);
@@ -6931,63 +7065,182 @@ dir_pkg(char *pkg_name, char **pkg_list, int cnt)
 }
 
 /*
- * Start by adding the patch to the sw inventory on the handle.
- *
- * The info parameter will be the portion of the PATCH_INFO_ entry following
- * the '='.  For example:
- * Installed: Wed Dec  7 07:13:51 PST 2005 From: mum Obsoletes: 120777-03 \
- *	121087-02 119108-07 Requires: 119575-02 119255-06 Incompatibles:
- *
- * A backed out patch will have an info line of "backed out\n".  We should
- * skip these patches.
- *
- * We also want to add the Obsolete and Incompatible patches to the
- * sw inventory description of this patch.
+ * Keep track of obsoleted patches.  We don't need to keep track of the patch
+ * version since once a patch is obsoleted, all prior versions are also
+ * obsolete and there won't be any new versions.
  */
 static int
-add_patch(zone_dochandle_t handle, char *patch, char *info)
+save_obs_patch(char *num, uu_avl_pool_t *patches_pool,
+    uu_avl_t *obs_patches_avl)
 {
-	xmlNodePtr	node;
-	xmlNodePtr	cur;
-	int		err;
+	patch_node_t	*patch;
+	uu_avl_index_t where;
+
+	if ((patch = (patch_node_t *)malloc(sizeof (patch_node_t))) == NULL)
+		return (Z_NOMEM);
+
+	if ((patch->patch_num = strdup(num)) == NULL) {
+		free(patch);
+		return (Z_NOMEM);
+	}
+
+	patch->patch_vers = NULL;
+	uu_avl_node_init(patch, &patch->patch_node, patches_pool);
+
+	if (uu_avl_find(obs_patches_avl, patch, NULL, &where) != NULL) {
+		free(patch->patch_num);
+		free(patch);
+		return (Z_OK);
+	}
+
+	uu_avl_insert(obs_patches_avl, patch, where);
+	return (Z_OK);
+}
+
+/*
+ * Keep a list of patches for a pkg.  If we see a newer version of a patch,
+ * we only keep track of the newer version.
+ */
+static void
+save_patch(patch_node_t *patch, uu_avl_t *patches_avl)
+{
+	patch_node_t *existing;
+	uu_avl_index_t where;
+
+	/* Check if this is a newer version of a patch we already have. */
+	if ((existing = (patch_node_t *)uu_avl_find(patches_avl, patch, NULL,
+	    &where)) != NULL) {
+		char *endptr;
+		ulong_t pvers, evers;
+
+		pvers = strtoul(patch->patch_vers, &endptr, 10);
+		evers = strtoul(existing->patch_vers, &endptr, 10);
+
+		if (pvers > evers) {
+			free(existing->patch_vers);
+			existing->patch_vers = patch->patch_vers;
+			free(patch->patch_num);
+			free(patch);
+			return;
+		}
+	}
+
+	uu_avl_insert(patches_avl, patch, where);
+}
+
+/*
+ * Check if a patch is on the list of obsoleted patches.  We don't need to
+ * check the patch version since once a patch is obsoleted, all prior versions
+ * are also obsolete and there won't be any new versions.
+ */
+static boolean_t
+obsolete_patch(patch_node_t *patch, uu_avl_t *obs_patches_avl)
+{
+	uu_avl_index_t	where;
+
+	if (uu_avl_find(obs_patches_avl, patch, NULL, &where) != NULL)
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
+
+/* ARGSUSED */
+static int
+patch_node_compare(const void *l_arg, const void *r_arg, void *private)
+{
+	patch_node_t *l = (patch_node_t *)l_arg;
+	patch_node_t *r = (patch_node_t *)r_arg;
+	char *endptr;
+	ulong_t lnum, rnum;
+
+	lnum = strtoul(l->patch_num, &endptr, 10);
+	rnum = strtoul(r->patch_num, &endptr, 10);
+
+	if (lnum > rnum)
+		return (1);
+	if (lnum < rnum)
+		return (-1);
+	return (0);
+}
+
+/*
+ * Parse the patchinfo string for the patch.
+ *
+ * We are parsing entries of the form:
+ * PATCH_INFO_121454-02=Installed: Wed Dec  7 07:13:51 PST 2005 From: mum \
+ *	Obsoletes: 120777-03 121087-02 119108-07 Requires: 119575-02 \
+ *	119255-06 Incompatibles:
+ *
+ * A backed out patch will have "backed out\n" as the status.  We should
+ * skip these patches.  We also also ignore any entries that seem to be
+ * corrupted.
+ */
+static int
+parse_info(char *patchinfo, uu_avl_pool_t *patches_pool, uu_avl_t *patches_avl,
+    uu_avl_t *obs_patches_avl)
+{
 	char		*p;
 	char		*lastp;
+	char		*ep;
+	char		*pvers;
 	boolean_t	add_info = B_FALSE;
-	boolean_t	obsolete;
+	patch_node_t	*patch;
 
-	if (strcmp(info, "backed out\n") == 0)
+	if (strlen(patchinfo) < (sizeof (PATCHINFO) - 1))
 		return (Z_OK);
 
-	if ((err = operation_prep(handle)) != Z_OK)
-		return (err);
+	/* Skip over "PATCH_INFO_" to get the patch id. */
+	p = patchinfo + sizeof (PATCHINFO) - 1;
+	if ((ep = strchr(p, '=')) == NULL)
+		return (Z_OK);
 
-	cur = handle->zone_dh_cur;
-	node = xmlNewTextChild(cur, NULL, DTD_ELEM_PATCH, NULL);
-	if ((err = newprop(node, DTD_ATTR_ID, patch)) != Z_OK)
-		return (err);
+	*ep++ = '\0';
+
+	/* Ignore all but installed patches. */
+	if (strncmp(ep, "Installed:", 10) != 0)
+		return (Z_OK);
+
+	/* remove newline */
+	lastp = (ep + strlen(ep) - 1);
+	if (*lastp == '\n')
+		*lastp = '\0';
+
+	if ((patch = (patch_node_t *)malloc(sizeof (patch_node_t))) == NULL)
+		return (Z_NOMEM);
+
+	if ((pvers = strchr(p, '-')) != NULL)
+		*pvers++ = '\0';
+	else
+		pvers = "";
+
+	if ((patch->patch_num = strdup(p)) == NULL) {
+		free(patch);
+		return (Z_NOMEM);
+	}
+	if ((patch->patch_vers = strdup(pvers)) == NULL) {
+		free(patch->patch_num);
+		free(patch);
+		return (Z_NOMEM);
+	}
+
+	uu_avl_node_init(patch, &patch->patch_node, patches_pool);
+	save_patch(patch, patches_avl);
 
 	/*
 	 * Start with the first token.  This will probably be "Installed:".
 	 * If we can't tokenize this entry, just return.
 	 */
-	if ((p = strtok_r(info, " ", &lastp)) == NULL)
+	if ((p = strtok_r(ep, " ", &lastp)) == NULL)
 		return (Z_OK);
 
 	do {
-		xmlNodePtr new_node;
-		char	*nlp;
-
 		if (strcmp(p, "Installed:") == 0 ||
 		    strcmp(p, "Requires:") == 0 ||
-		    strcmp(p, "From:") == 0) {
+		    strcmp(p, "From:") == 0 ||
+		    strcmp(p, "Incompatibles:") == 0) {
 			add_info = B_FALSE;
 			continue;
 		} else if (strcmp(p, "Obsoletes:") == 0) {
-			obsolete = B_TRUE;
-			add_info = B_TRUE;
-			continue;
-		} else if (strcmp(p, "Incompatibles:") == 0) {
-			obsolete = B_FALSE;
 			add_info = B_TRUE;
 			continue;
 		}
@@ -6995,81 +7248,106 @@ add_patch(zone_dochandle_t handle, char *patch, char *info)
 		if (!add_info)
 			continue;
 
-		/* strip newline from last patch in the line */
-		nlp = (p + strlen(p) - 1);
-		if (*nlp == '\n')
-			*nlp = '\0';
+		if ((pvers = strchr(p, '-')) != NULL)
+			*pvers = '\0';
 
-		if (obsolete)
-			new_node = xmlNewTextChild(node, NULL,
-			    DTD_ELEM_OBSOLETES, NULL);
-		else
-			new_node = xmlNewTextChild(node, NULL,
-			    DTD_ELEM_INCOMPATIBLE, NULL);
-
-		if ((err = newprop(new_node, DTD_ATTR_ID, p)) != Z_OK)
-			return (err);
-
+		if (save_obs_patch(p, patches_pool, obs_patches_avl) != Z_OK)
+			return (Z_NOMEM);
 	} while ((p = strtok_r(NULL, " ", &lastp)) != NULL);
 
 	return (Z_OK);
 }
 
-static boolean_t
-unique_patch(zone_dochandle_t handle, char *patch)
+/*
+ * AVL walker callback used to add patch to XML manifest.
+ *
+ * PATH_MAX is used in the pkg/patch code as the maximum size for the patch
+ * number/version string.
+ */
+static int
+add_patch(void *e, void *p)
 {
+	xmlNodePtr	node;
 	xmlNodePtr	cur;
-	char		id[MAXNAMELEN];
+	char		id[PATH_MAX];
+	patch_node_t	*patch;
+	patch_parms_t	*args;
 
-	cur = xmlDocGetRootElement(handle->zone_dh_doc);
-	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
-		if (xmlStrcmp(cur->name, DTD_ELEM_PATCH) == 0) {
-			if (fetchprop(cur, DTD_ATTR_ID, id, sizeof (id))
-			    != Z_OK)
-				continue;
+	patch = e;
+	args = p;
 
-			if (strcmp(patch, id) == 0)
-				return (B_FALSE);
+	/* skip this patch if it has been obsoleted */
+	if (obsolete_patch(patch, args->obs_patches_avl))
+		return (UU_WALK_NEXT);
+
+	if (patch->patch_vers[0] == '\0')
+		(void) snprintf(id, sizeof (id), "%s", patch->patch_num);
+	else
+		(void) snprintf(id, sizeof (id), "%s-%s", patch->patch_num,
+		    patch->patch_vers);
+
+	if ((args->res = operation_prep(args->handle)) != Z_OK)
+		return (UU_WALK_DONE);
+
+	cur = args->handle->zone_dh_cur;
+	node = xmlNewTextChild(cur, NULL, DTD_ELEM_PATCH, NULL);
+	if ((args->res = newprop(node, DTD_ATTR_ID, id)) != Z_OK)
+		return (UU_WALK_DONE);
+
+	return (UU_WALK_NEXT);
+}
+
+static void
+patch_avl_delete(uu_avl_t *patches_avl)
+{
+	if (patches_avl != NULL) {
+		patch_node_t *p;
+		void *cookie = NULL;
+
+		while ((p = (patch_node_t *)uu_avl_teardown(patches_avl,
+		    &cookie)) != NULL) {
+			free(p->patch_num);
+			free(p->patch_vers);
+			free(p);
 		}
-	}
 
-	return (B_TRUE);
+		uu_avl_destroy(patches_avl);
+	}
 }
 
 /*
- * Add the unique patches associated with this pkg to the sw inventory on the
- * handle.
- *
- * We are processing entries of the form:
- * PATCH_INFO_121454-02=Installed: Wed Dec  7 07:13:51 PST 2005 From: mum \
- *	Obsoletes: 120777-03 121087-02 119108-07 Requires: 119575-02 \
- *	119255-06 Incompatibles:
- *
+ * Add the unique, highest version patches that are associated with this pkg
+ * to the sw inventory on the handle.
  */
 static int
-add_patches(zone_dochandle_t handle, struct zone_pkginfo *infop)
+add_patches(zone_dochandle_t handle, struct zone_pkginfo *infop,
+    uu_avl_pool_t *patches_pool, uu_avl_t *obs_patches_avl)
 {
-	int i;
-	int res = Z_OK;
+	int		i;
+	int		res;
+	uu_avl_t 	*patches_avl;
+	patch_parms_t	args;
+
+	if ((patches_avl = uu_avl_create(patches_pool, NULL, UU_DEFAULT))
+	    == NULL)
+		return (Z_NOMEM);
 
 	for (i = 0; i < infop->zpi_patch_cnt; i++) {
-		char *p, *ep;
-
-		if (strlen(infop->zpi_patchinfo[i]) < (sizeof (PATCHINFO) - 1))
-			continue;
-
-		/* Skip over "PATCH_INFO_" to get the patch id. */
-		p = infop->zpi_patchinfo[i] + sizeof (PATCHINFO) - 1;
-		if ((ep = strchr(p, '=')) == NULL)
-			continue;
-
-		*ep = '\0';
-		if (unique_patch(handle, p))
-			if ((res = add_patch(handle, p, ep + 1)) != Z_OK)
-				break;
+		if ((res = parse_info(infop->zpi_patchinfo[i], patches_pool,
+		    patches_avl, obs_patches_avl)) != Z_OK) {
+			patch_avl_delete(patches_avl);
+			return (res);
+		}
 	}
 
-	return (res);
+	args.obs_patches_avl = obs_patches_avl;
+	args.handle = handle;
+	args.res = Z_OK;
+
+	(void) uu_avl_walk(patches_avl, add_patch, &args, 0);
+
+	patch_avl_delete(patches_avl);
+	return (args.res);
 }
 
 /*
@@ -7212,11 +7490,30 @@ zonecfg_sw_inventory(zone_dochandle_t handle)
 	struct zone_pkginfo	info;
 	int		pkg_cnt = 0;
 	char		**pkgs = NULL;
+	uu_avl_pool_t 	*patches_pool;
+	uu_avl_t 	*obs_patches_avl;
 
-	if ((res = get_ipd_pkgs(handle, &pkgs, &pkg_cnt)) != Z_OK)
+	if ((patches_pool = uu_avl_pool_create("patches_pool",
+	    sizeof (patch_node_t), offsetof(patch_node_t, patch_node),
+	    patch_node_compare, UU_DEFAULT)) == NULL) {
+		return (Z_NOMEM);
+	}
+
+	if ((obs_patches_avl = uu_avl_create(patches_pool, NULL, UU_DEFAULT))
+	    == NULL) {
+		uu_avl_pool_destroy(patches_pool);
+		return (Z_NOMEM);
+	}
+
+	if ((res = get_ipd_pkgs(handle, &pkgs, &pkg_cnt)) != Z_OK) {
+		patch_avl_delete(obs_patches_avl);
+		uu_avl_pool_destroy(patches_pool);
 		return (res);
+	}
 
 	if ((dirp = opendir(PKG_PATH)) == NULL) {
+		patch_avl_delete(obs_patches_avl);
+		uu_avl_pool_destroy(patches_pool);
 		free_ipd_pkgs(pkgs, pkg_cnt);
 		return (Z_OK);
 	}
@@ -7243,7 +7540,8 @@ zonecfg_sw_inventory(zone_dochandle_t handle)
 			if ((res = add_pkg(handle, dp->d_name,
 			    info.zpi_version)) == Z_OK) {
 				if (info.zpi_patch_cnt > 0)
-					res = add_patches(handle, &info);
+					res = add_patches(handle, &info,
+					    patches_pool, obs_patches_avl);
 			}
 		}
 
@@ -7255,6 +7553,8 @@ zonecfg_sw_inventory(zone_dochandle_t handle)
 
 	(void) closedir(dirp);
 
+	patch_avl_delete(obs_patches_avl);
+	uu_avl_pool_destroy(patches_pool);
 	free_ipd_pkgs(pkgs, pkg_cnt);
 
 	if (res == Z_OK)
