@@ -1122,6 +1122,7 @@ f none usr/share/lib/zoneinfo/America/Indiana/Marengo 644 root bin
 f none usr/share/lib/zoneinfo/America/Indiana/Petersburg 644 root bin
 f none usr/share/lib/zoneinfo/America/Indiana/Vevay 644 root bin
 f none usr/share/lib/zoneinfo/America/Indiana/Vincennes 644 root bin
+f none usr/share/lib/zoneinfo/America/Indiana/Winamac 644 root bin
 l none usr/share/lib/zoneinfo/America/Indianapolis=../../../../../usr/share/lib/zoneinfo/America/Indiana/Indianapolis
 f none usr/share/lib/zoneinfo/America/Inuvik 644 root bin
 f none usr/share/lib/zoneinfo/America/Iqaluit 644 root bin
@@ -1172,6 +1173,7 @@ f none usr/share/lib/zoneinfo/America/Rainy_River 644 root bin
 f none usr/share/lib/zoneinfo/America/Rankin_Inlet 644 root bin
 f none usr/share/lib/zoneinfo/America/Recife 644 root bin
 f none usr/share/lib/zoneinfo/America/Regina 644 root bin
+f none usr/share/lib/zoneinfo/America/Resolute 644 root bin
 f none usr/share/lib/zoneinfo/America/Rio_Branco 644 root bin
 l none usr/share/lib/zoneinfo/America/Rosario=../../../../../usr/share/lib/zoneinfo/America/Argentina/Cordoba
 f none usr/share/lib/zoneinfo/America/Santiago 644 root bin

@@ -1,10 +1,10 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-static char	elsieid[] = "@(#)zic.c	7.128";
+static char	elsieid[] = "@(#)zic.c	7.128.1";
 
 /*
  * #define	LEAPSECOND_SUPPORT
@@ -97,7 +97,7 @@ static void	adjleap(void);
 static void	associate(void);
 static int	ciequal(const char *ap, const char *bp);
 static void	convert(long val, char *buf);
-static void	dolink(const char *fromfile, const char *tofile);
+static void	dolink(const char *fromfield, const char *tofield);
 static void	doabbr(char *abbr, const char *format,
 			const char *letters, int isdst);
 static void	eat(const char *name, int num);
@@ -592,26 +592,26 @@ char	*argv[];
 }
 
 static void
-dolink(fromfile, tofile)
-const char * const	fromfile;
-const char * const	tofile;
+dolink(fromfield, tofield)
+const char * const	fromfield;
+const char * const	tofield;
 {
 	register char *fromname;
 	register char *toname;
 
-	if (fromfile[0] == '/')
-		fromname = ecpyalloc(fromfile);
+	if (fromfield[0] == '/')
+		fromname = ecpyalloc(fromfield);
 	else {
 		fromname = ecpyalloc(directory);
 		fromname = ecatalloc(fromname, "/");
-		fromname = ecatalloc(fromname, fromfile);
+		fromname = ecatalloc(fromname, fromfield);
 	}
-	if (tofile[0] == '/')
-		toname = ecpyalloc(tofile);
+	if (tofield[0] == '/')
+		toname = ecpyalloc(tofield);
 	else {
 		toname = ecpyalloc(directory);
 		toname = ecatalloc(toname, "/");
-		toname = ecatalloc(toname, tofile);
+		toname = ecatalloc(toname, tofield);
 	}
 	/*
 	 * We get to be careful here since
@@ -629,13 +629,13 @@ const char * const	tofile;
 
 		if (result != 0 && access(fromname, F_OK) == 0 &&
 		    !itsdir(fromname)) {
-			const char *s = tofile;
+			const char *s = tofield;
 			register char *symlinkcontents = NULL;
 
 			while ((s = strchr(s+1, '/')) != NULL)
 				symlinkcontents = ecatalloc(symlinkcontents,
 					"../");
-			symlinkcontents = ecatalloc(symlinkcontents, fromfile);
+			symlinkcontents = ecatalloc(symlinkcontents, fromname);
 			result = symlink(symlinkcontents, toname);
 			if (result == 0)
 				warning(gettext(
@@ -925,7 +925,8 @@ const char		*string;
 const char * const	errstring;
 const int		signable;
 {
-	int	hh, mm, ss, sign;
+	long	hh;
+	int	mm, ss, sign;
 
 	if (string == NULL || *string == '\0')
 		return (0);
@@ -935,28 +936,35 @@ const int		signable;
 		sign = -1;
 		++string;
 	} else	sign = 1;
-	if (sscanf(string, scheck(string, "%d"), &hh) == 1)
+	if (sscanf(string, scheck(string, "%ld"), &hh) == 1)
 		mm = ss = 0;
-	else if (sscanf(string, scheck(string, "%d:%d"), &hh, &mm) == 2)
+	else if (sscanf(string, scheck(string, "%ld:%d"), &hh, &mm) == 2)
 		ss = 0;
-	else if (sscanf(string, scheck(string, "%d:%d:%d"),
+	else if (sscanf(string, scheck(string, "%ld:%d:%d"),
 		&hh, &mm, &ss) != 3) {
 			error(errstring);
 			return (0);
 	}
-	if ((hh < 0 || hh >= HOURSPERDAY ||
+	if (hh < 0 ||
 		mm < 0 || mm >= MINSPERHOUR ||
-		ss < 0 || ss > SECSPERMIN) &&
-		!(hh == HOURSPERDAY && mm == 0 && ss == 0)) {
+		ss < 0 || ss > SECSPERMIN) {
 			error(errstring);
 			return (0);
 	}
-	if (noise && hh == HOURSPERDAY)
+	if (LONG_MAX / SECSPERHOUR < hh) {
+		error(gettext("time overflow"));
+		return (0);
+	}
+	if (noise && hh == HOURSPERDAY && mm == 0 && ss == 0)
 		warning(
 		    gettext("24:00 not handled by pre-1998 versions of zic"));
-	return (eitol(sign) *
-		(eitol(hh * MINSPERHOUR + mm) *
-		eitol(SECSPERMIN) + eitol(ss)));
+	if (noise && (hh > HOURSPERDAY ||
+		(hh == HOURSPERDAY && (mm != 0 || ss != 0))))
+		warning(gettext("values over 24 hours not handled by "
+			    "pre-2007 versions of zic"));
+
+	return (oadd(eitol(sign) * hh * eitol(SECSPERHOUR),
+		eitol(sign) * (eitol(mm) * eitol(SECSPERMIN) + eitol(ss))));
 }
 
 static void
@@ -1881,6 +1889,10 @@ const int		ttisgmt;
 		error(gettext("too many local time types"));
 		exit(EXIT_FAILURE);
 	}
+	if (!(-1L - 2147483647L <= gmtoff && gmtoff <= 2147483647L)) {
+		error(gettext("UTC offset out of range"));
+		exit(EXIT_FAILURE);
+	}
 	gmtoffs[i] = gmtoff;
 	isdsts[i] = isdst;
 	ttisstds[i] = ttisstd;
@@ -2077,9 +2089,11 @@ register char *cp;
 			else while ((*dp = *cp++) != '"')
 				if (*dp != '\0')
 					++dp;
-				else
+				else {
 					error(gettext(
 					    "Odd number of quotation marks"));
+					exit(1);
+				}
 		} while (*cp != '\0' && *cp != '#' &&
 			(!isascii(*cp) || !isspace((unsigned char) *cp)));
 		if (isascii(*cp) && isspace((unsigned char) *cp))
@@ -2272,7 +2286,7 @@ const char * const	string;
 
 static int
 mkdirs(argname)
-char * const	argname;
+char *		argname;
 {
 	register char *name;
 	register char *cp;
