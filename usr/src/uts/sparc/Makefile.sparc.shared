@@ -140,6 +140,7 @@ CFLAGS		+= $(CCSTATICSYM)
 CFLAGS		+= $(IROPTFLAG)
 CFLAGS		+= $(CGLOBALSTATIC)
 CFLAGS		+= -xregs=no%float
+CFLAGS		+= -xstrconst
 
 ASFLAGS		+= $(XARCH)
 
