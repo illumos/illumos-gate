@@ -1188,7 +1188,7 @@ nss_getent_u(nss_db_root_t *rootp, nss_db_initf_t initf,
 			 * for the last source. We exhausted all sources.
 			 */
 			nss_endent_u(rootp, initf, contextpp);
-			return (NSS_SUCCESS);
+			return (NSS_NOTFOUND);
 		}
 		contextp->n_src	= n_src;
 		contextp->be	= be;
