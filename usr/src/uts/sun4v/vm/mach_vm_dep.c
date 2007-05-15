@@ -58,6 +58,7 @@ uint_t page_colors = 0;
 uint_t page_colors_mask = 0;
 uint_t page_coloring_shift = 0;
 int consistent_coloring;
+int update_proc_pgcolorbase_after_fork = 1;
 
 uint_t mmu_page_sizes = MMU_PAGE_SIZES;
 uint_t max_mmu_page_sizes = MMU_PAGE_SIZES;

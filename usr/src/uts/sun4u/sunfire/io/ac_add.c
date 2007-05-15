@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -182,14 +182,12 @@ ac_add_bank(struct bd_list *add, ac_cfga_pkt_t *pkt)
 	/*
 	 * Add the board to the cage growth list.
 	 */
-	kcage_range_lock();
-	errs = kcage_range_add(base_pa >> PAGESHIFT, bank_size >> PAGESHIFT, 1);
+	errs = kcage_range_add(btop(base_pa), btop(bank_size), KCAGE_DOWN);
 	/* TODO: deal with error return. */
 	if (errs != 0)
 		cmn_err(CE_NOTE, "ac_add_bank(): board %d, bank %d, "
 		    "kcage_range_add() returned %d",
 		    add->sc.board, pkt->bank, errs);
-	kcage_range_unlock();
 
 	return (0);
 }

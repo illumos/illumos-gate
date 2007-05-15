@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,17 +59,17 @@ extern void kcage_freemem_add(pgcnt_t);
 extern void kcage_freemem_sub(pgcnt_t);
 extern int kcage_create_throttle(pgcnt_t, int);
 
-/* Third arg controls direction of growth: 0: increasing pfns, 1: decreasing. */
-extern void kcage_range_lock(void);
-extern void kcage_range_unlock(void);
+/*
+ * Control direction of growth: 0: increasing pfns, 1: decreasing.
+ */
+typedef enum {KCAGE_UP, KCAGE_DOWN} kcage_dir_t;
+extern void kcage_range_init(struct memlist *, kcage_dir_t, pgcnt_t);
+extern int kcage_range_add(pfn_t, pgcnt_t, kcage_dir_t);
+
 extern int kcage_current_pfn(pfn_t *);
-extern int kcage_range_islocked(void);
-extern int kcage_range_init(struct memlist *, int);
-extern int kcage_range_add(pfn_t, pgcnt_t, int);
 extern int kcage_range_delete(pfn_t, pgcnt_t);
 extern int kcage_range_delete_post_mem_del(pfn_t, pgcnt_t);
 
-extern void kcage_init(pgcnt_t);
 extern void kcage_recalc_thresholds(void);
 
 /* Called from vm_pageout.c */
