@@ -249,6 +249,30 @@ enable_group(sa_group_t group, char *updateproto)
 }
 
 /*
+ * isenabled(group)
+ *
+ * Returns B_TRUE if the group is enabled or B_FALSE if it isn't.
+ * Moved to separate function to reduce clutter in the code.
+ */
+
+static int
+isenabled(sa_group_t group)
+{
+	char *state;
+	int ret = B_FALSE;
+
+	if (group != NULL) {
+	    state = sa_get_group_attr(group, "state");
+	    if (state != NULL) {
+		if (strcmp(state, "enabled") == 0)
+		    ret = B_TRUE;
+		sa_free_attr_string(state);
+	    }
+	}
+	return (ret);
+}
+
+/*
  * enable_all_groups(list, setstate, online, updateproto)
  *	Given a list of groups, enable each one found.  If updateproto
  *	is not NULL, then update all the shares for the protocol that
@@ -258,7 +282,7 @@ static int
 enable_all_groups(sa_handle_t handle, struct list *work, int setstate,
 	int online, char *updateproto)
 {
-	int ret = SA_OK;
+	int ret;
 	char instance[SA_MAX_NAME_LEN + sizeof (SA_SVC_FMRI_BASE) + 1];
 	char *state;
 	char *name;
@@ -266,37 +290,59 @@ enable_all_groups(sa_handle_t handle, struct list *work, int setstate,
 	sa_group_t group;
 	sa_group_t subgroup;
 
-	while (work != NULL && ret == SA_OK) {
+	for (ret = SA_OK; work != NULL;	work = work->next) {
 	    group = (sa_group_t)work->item;
+
+		/*
+		 * If setstate == TRUE, then make sure to set
+		 * enabled. This needs to be done here in order for
+		 * the isenabled check to succeed on a newly enabled
+		 * group.
+		 */
+	    if (setstate == B_TRUE) {
+		ret = sa_set_group_attr(group, "state",	"enabled");
+		if (ret != SA_OK)
+		    break;
+	    }
+
+		/*
+		 * Check to see if group is enabled. If it isn't, skip
+		 * the rest.  We don't want shares starting if the
+		 * group is disabled. The properties may have been
+		 * updated, but there won't be a change until the
+		 * group is enabled.
+		 */
+	    if (!isenabled(group))
+		continue;
+
 	    /* if itemdata != NULL then a single share */
 	    if (work->itemdata != NULL) {
 		ret = sa_enable_share((sa_share_t)work->itemdata, NULL);
 	    }
-	    if (setstate)
-		ret = sa_set_group_attr(group, "state",
-					"enabled");
-	    if (ret == SA_OK) {
-		/* if itemdata == NULL then the whole group */
-		if (work->itemdata == NULL) {
-		    zfs = sa_get_group_attr(group, "zfs");
-			/*
-			 * if the share is managed by ZFS, don't
-			 * update any of the protocols since ZFS is
-			 * handling this.  updateproto will contain
-			 * the name of the protocol that we want to
-			 * update legacy files for.
-			 */
-		    enable_group(group, zfs == NULL ? updateproto : NULL);
-		    for (subgroup = sa_get_sub_group(group); subgroup != NULL;
+	    if (ret != SA_OK)
+		break;
+
+	    /* if itemdata == NULL then the whole group */
+	    if (work->itemdata == NULL) {
+		zfs = sa_get_group_attr(group, "zfs");
+		/*
+		 * if the share is managed by ZFS, don't
+		 * update any of the protocols since ZFS is
+		 * handling this.  updateproto will contain
+		 * the name of the protocol that we want to
+		 * update legacy files for.
+		 */
+		enable_group(group, zfs == NULL ? updateproto : NULL);
+		for (subgroup = sa_get_sub_group(group); subgroup != NULL;
 			subgroup = sa_get_next_group(subgroup)) {
 			/* never update legacy for ZFS subgroups */
 			enable_group(subgroup, NULL);
-		    }
 		}
-		if (online) {
-		    zfs = sa_get_group_attr(group, "zfs");
-		    name = sa_get_group_attr(group, "name");
-		    if (name != NULL) {
+	    }
+	    if (online) {
+		zfs = sa_get_group_attr(group, "zfs");
+		name = sa_get_group_attr(group, "name");
+		if (name != NULL) {
 			if (zfs == NULL) {
 			    (void) snprintf(instance, sizeof (instance),
 						"%s:%s",
@@ -313,9 +359,7 @@ enable_all_groups(sa_handle_t handle, struct list *work, int setstate,
 			}
 			if (name != NULL)
 			    sa_free_attr_string(name);
-		    }
 		}
-		work = work->next;
 	    }
 	}
 	if (ret == SA_OK) {

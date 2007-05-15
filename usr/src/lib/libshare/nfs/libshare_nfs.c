@@ -2069,6 +2069,22 @@ fixcaseupper(char *str)
 }
 
 /*
+ * skipwhitespace(str)
+ *
+ * Skip leading white space. It is assumed that it is called with a
+ * valid pointer.
+ */
+
+static char *
+skipwhitespace(char *str)
+{
+	while (*str && isspace(*str))
+		str++;
+
+	return (str);
+}
+
+/*
  * initprotofromdefault()
  *
  * read the default file(s) and add the defined values to the
@@ -2103,6 +2119,9 @@ initprotofromdefault()
 			value = strchr(name, '=');
 			if (value != NULL) {
 			    *value++ = '\0';
+			    /* Remove any leading white space. */
+			    name = skipwhitespace(name);
+
 			    if ((index = findprotoopt(name, 0)) >= 0) {
 				fixcaselower(name);
 				prop = sa_create_property(
@@ -2249,7 +2268,8 @@ read_default_file(char *fname)
 	    while (fgets(buff, sizeof (buff), file) != NULL) {
 		newdef = (struct deffile *)calloc(1, sizeof (struct deffile));
 		if (newdef != NULL) {
-		    newdef->line = strdup(buff);
+		    /* Make sure we skip any leading whitespace. */
+		    newdef->line = strdup(skipwhitespace(buff));
 		    if (defs == NULL) {
 			prevdef = defs = newdef;
 		    } else {
