@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1634,7 +1634,9 @@ sbdp_mem_del_span(sbdp_handle_t *hp, uint64_t address, uint64_t size)
 
 	if (size > 0) {
 		int rv;
+		kcage_range_lock();
 		rv = kcage_range_delete_post_mem_del(basepfn, npages);
+		kcage_range_unlock();
 		if (rv != 0) {
 			cmn_err(CE_WARN,
 			    "unexpected kcage_range_delete_post_mem_del"

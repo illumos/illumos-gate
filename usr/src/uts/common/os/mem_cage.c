@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -227,7 +227,6 @@ static struct kcage_glist *kcage_current_glist;
  * until that cage has somewhere to go. This is not currently a problem
  * as early kmem_alloc's use BOP_ALLOC instead of page_create_va.
  */
-static vmem_t *kcage_arena;
 static struct kcage_glist kcage_glist_firstfree;
 static struct kcage_glist *kcage_glist_freelist = &kcage_glist_firstfree;
 
@@ -239,9 +238,6 @@ static int kcage_glist_delete(pfn_t, pfn_t, struct kcage_glist **);
 static void kcage_cageout(void);
 static int kcage_invalidate_page(page_t *, pgcnt_t *);
 static int kcage_setnoreloc_pages(page_t *, se_t);
-static int kcage_range_add_internal(pfn_t base, pgcnt_t npgs, kcage_dir_t);
-static void kcage_init(pgcnt_t preferred_size);
-static int kcage_range_delete_internal(pfn_t base, pgcnt_t npgs);
 
 /*
  * Kernel Memory Cage counters and thresholds.
@@ -273,12 +269,36 @@ static int kcage_kstat_snapshot(kstat_t *ksp, void *buf, int rw);
 
 /*
  * Startup and Dynamic Reconfiguration interfaces.
+ * kcage_range_lock()
+ * kcage_range_unlock()
+ * kcage_range_islocked()
  * kcage_range_add()
  * kcage_range_del()
- * kcage_range_delete_post_mem_del()
- * kcage_range_init()
+ * kcage_init()
  * kcage_set_thresholds()
  */
+
+/*
+ * Called outside of this file to add/remove from the list,
+ * therefore, it takes a writer lock
+ */
+void
+kcage_range_lock(void)
+{
+	rw_enter(&kcage_range_rwlock, RW_WRITER);
+}
+
+void
+kcage_range_unlock(void)
+{
+	rw_exit(&kcage_range_rwlock);
+}
+
+int
+kcage_range_islocked(void)
+{
+	return (rw_lock_held(&kcage_range_rwlock));
+}
 
 /*
  * Called from page_get_contig_pages to get the approximate kcage pfn range
@@ -376,50 +396,42 @@ kcage_next_range(int incage, pfn_t lo, pfn_t hi,
 	return (0);
 }
 
-void
-kcage_range_init(struct memlist *ml, kcage_dir_t d, pgcnt_t preferred_size)
+int
+kcage_range_init(struct memlist *ml, int decr)
 {
 	int ret = 0;
 
-	ASSERT(kcage_arena == NULL);
-	kcage_arena = vmem_create("kcage_arena", NULL, 0, sizeof (uint64_t),
-	    segkmem_alloc, segkmem_free, heap_arena, 0, VM_SLEEP);
-	ASSERT(kcage_arena != NULL);
+	ASSERT(kcage_range_islocked());
 
-	if (d == KCAGE_DOWN) {
+	if (decr) {
 		while (ml->next != NULL)
 			ml = ml->next;
 	}
 
-	rw_enter(&kcage_range_rwlock, RW_WRITER);
-
 	while (ml != NULL) {
-		ret = kcage_range_add_internal(btop(ml->address),
-		    btop(ml->size), d);
+		ret = kcage_range_add(btop(ml->address), btop(ml->size), decr);
 		if (ret)
-			panic("kcage_range_add_internal failed: "
-			    "ml=0x%x, ret=0x%x\n", ml, ret);
+			break;
 
-		ml = (d == KCAGE_DOWN ? ml->prev : ml->next);
+		ml = (decr ? ml->prev : ml->next);
 	}
 
-	rw_exit(&kcage_range_rwlock);
-
-	if (ret == 0)
-		kcage_init(preferred_size);
+	return (ret);
 }
 
 /*
  * Third arg controls direction of growth: 0: increasing pfns,
  * 1: decreasing.
+ * Calls to add and delete must be protected by calls to
+ * kcage_range_lock() and kcage_range_unlock().
  */
-static int
-kcage_range_add_internal(pfn_t base, pgcnt_t npgs, kcage_dir_t d)
+int
+kcage_range_add(pfn_t base, pgcnt_t npgs, int decr)
 {
 	struct kcage_glist *new, **lpp;
 	pfn_t lim;
 
-	ASSERT(rw_write_held(&kcage_range_rwlock));
+	ASSERT(kcage_range_islocked());
 
 	ASSERT(npgs != 0);
 	if (npgs == 0)
@@ -438,7 +450,7 @@ kcage_range_add_internal(pfn_t base, pgcnt_t npgs, kcage_dir_t d)
 
 	new->base = base;
 	new->lim = lim;
-	new->decr = (d == KCAGE_DOWN);
+	new->decr = decr;
 	if (new->decr != 0)
 		new->curr = new->lim;
 	else
@@ -465,27 +477,17 @@ kcage_range_add_internal(pfn_t base, pgcnt_t npgs, kcage_dir_t d)
 	return (0);
 }
 
-int
-kcage_range_add(pfn_t base, pgcnt_t npgs, kcage_dir_t d)
-{
-	int ret;
-
-	rw_enter(&kcage_range_rwlock, RW_WRITER);
-	ret = kcage_range_add_internal(base, npgs, d);
-	rw_exit(&kcage_range_rwlock);
-	return (ret);
-}
-
 /*
- * Calls to add and delete must be protected by kcage_range_rwlock
+ * Calls to add and delete must be protected by calls to
+ * kcage_range_lock() and kcage_range_unlock().
  */
-static int
-kcage_range_delete_internal(pfn_t base, pgcnt_t npgs)
+int
+kcage_range_delete(pfn_t base, pgcnt_t npgs)
 {
 	struct kcage_glist *lp;
 	pfn_t lim;
 
-	ASSERT(rw_write_held(&kcage_range_rwlock));
+	ASSERT(kcage_range_islocked());
 
 	ASSERT(npgs != 0);
 	if (npgs == 0)
@@ -529,28 +531,18 @@ kcage_range_delete_internal(pfn_t base, pgcnt_t npgs)
 	return (kcage_glist_delete(base, lim, &kcage_glist));
 }
 
-int
-kcage_range_delete(pfn_t base, pgcnt_t npgs)
-{
-	int ret;
-
-	rw_enter(&kcage_range_rwlock, RW_WRITER);
-	ret = kcage_range_delete_internal(base, npgs);
-	rw_exit(&kcage_range_rwlock);
-	return (ret);
-}
-
 /*
- * Calls to add and delete must be protected by kcage_range_rwlock.
+ * Calls to add and delete must be protected by calls to
+ * kcage_range_lock() and kcage_range_unlock().
  * This routine gets called after successful Solaris memory
  * delete operation from DR post memory delete routines.
  */
-static int
-kcage_range_delete_post_mem_del_internal(pfn_t base, pgcnt_t npgs)
+int
+kcage_range_delete_post_mem_del(pfn_t base, pgcnt_t npgs)
 {
 	pfn_t lim;
 
-	ASSERT(rw_write_held(&kcage_range_rwlock));
+	ASSERT(kcage_range_islocked());
 
 	ASSERT(npgs != 0);
 	if (npgs == 0)
@@ -565,20 +557,9 @@ kcage_range_delete_post_mem_del_internal(pfn_t base, pgcnt_t npgs)
 	return (kcage_glist_delete(base, lim, &kcage_glist));
 }
 
-int
-kcage_range_delete_post_mem_del(pfn_t base, pgcnt_t npgs)
-{
-	int ret;
-
-	rw_enter(&kcage_range_rwlock, RW_WRITER);
-	ret = kcage_range_delete_post_mem_del_internal(base, npgs);
-	rw_exit(&kcage_range_rwlock);
-	return (ret);
-}
-
 /*
  * No locking is required here as the whole operation is covered
- * by kcage_range_rwlock writer lock.
+ * by the kcage_range_lock().
  */
 static struct kcage_glist *
 kcage_glist_alloc(void)
@@ -587,13 +568,10 @@ kcage_glist_alloc(void)
 
 	if ((new = kcage_glist_freelist) != NULL) {
 		kcage_glist_freelist = new->next;
-	} else {
-		new = vmem_alloc(kcage_arena, sizeof (*new), VM_NOSLEEP);
-	}
-
-	if (new != NULL)
 		bzero(new, sizeof (*new));
-
+	} else {
+		new = kmem_zalloc(sizeof (struct kcage_glist), KM_NOSLEEP);
+	}
 	return (new);
 }
 
@@ -688,31 +666,30 @@ kcage_glist_delete(pfn_t base, pfn_t lim, struct kcage_glist **lpp)
 }
 
 /*
- * If lockit is 1, kcage_get_pfn holds the
- * reader lock for kcage_range_rwlock.
- * Changes to lp->curr can cause race conditions, but
- * they are handled by higher level code (see kcage_next_range.)
+ * The caller of kcage_get_pfn must hold the kcage_range_lock to make
+ * sure that there are no concurrent calls. The same lock
+ * must be obtained for range add and delete by calling
+ * kcage_range_lock() and kcage_range_unlock().
  */
 static pfn_t
-kcage_get_pfn(int lockit)
+kcage_get_pfn(void)
 {
 	struct kcage_glist *lp;
-	pfn_t pfn = PFN_INVALID;
+	pfn_t pfn;
 
-	if (lockit && !rw_tryenter(&kcage_range_rwlock, RW_READER))
-		return (pfn);
+	ASSERT(kcage_range_islocked());
 
 	lp = kcage_current_glist;
 	while (lp != NULL) {
 		if (lp->decr != 0) {
 			if (lp->curr != lp->base) {
 				pfn = --lp->curr;
-				break;
+				return (pfn);
 			}
 		} else {
 			if (lp->curr != lp->lim) {
 				pfn = lp->curr++;
-				break;
+				return (pfn);
 			}
 		}
 
@@ -721,9 +698,7 @@ kcage_get_pfn(int lockit)
 			kcage_current_glist = lp;
 	}
 
-	if (lockit)
-		rw_exit(&kcage_range_rwlock);
-	return (pfn);
+	return (PFN_INVALID);
 }
 
 /*
@@ -745,7 +720,7 @@ kcage_get_pfn(int lockit)
  * list is not installed or if none of the PFNs in the installed list have
  * been allocated to the cage. In otherwords, there is no cage.
  *
- * Caller need not hold kcage_range_rwlock while calling this function
+ * Caller need not hold kcage_range_lock while calling this function
  * as the front part of the list is static - pages never come out of
  * the cage.
  *
@@ -897,7 +872,7 @@ kcage_recalc_preferred_size(pgcnt_t preferred_size)
  * The size of the cage is determined by the argument preferred_size.
  * or the actual amount of memory, whichever is smaller.
  */
-static void
+void
 kcage_init(pgcnt_t preferred_size)
 {
 	pgcnt_t wanted;
@@ -909,6 +884,7 @@ kcage_init(pgcnt_t preferred_size)
 	extern void page_list_noreloc_startup(page_t *);
 
 	ASSERT(!kcage_on);
+	ASSERT(kcage_range_islocked());
 
 	/* increase preferred cage size for lp for kmem */
 	preferred_size = kcage_recalc_preferred_size(preferred_size);
@@ -949,7 +925,7 @@ kcage_init(pgcnt_t preferred_size)
 	kcage_freemem = 0;
 	pfn = PFN_INVALID;			/* prime for alignment test */
 	while (wanted != 0) {
-		if ((pfn = kcage_get_pfn(0)) == PFN_INVALID)
+		if ((pfn = kcage_get_pfn()) == PFN_INVALID)
 			break;
 
 		if ((pp = page_numtopp_nolock(pfn)) != NULL) {
@@ -1021,6 +997,7 @@ kcage_init(pgcnt_t preferred_size)
 		ksp->ks_lock = &kcage_kstat_lock; /* XXX - not really needed */
 		kstat_install(ksp);
 	}
+
 }
 
 static int
@@ -1033,7 +1010,7 @@ kcage_kstat_update(kstat_t *ksp, int rw)
 		return (EACCES);
 
 	count = 0;
-	rw_enter(&kcage_range_rwlock, RW_WRITER);
+	kcage_range_lock();
 	for (lp = kcage_glist; lp != NULL; lp = lp->next) {
 		if (lp->decr) {
 			if (lp->curr != lp->lim) {
@@ -1045,7 +1022,7 @@ kcage_kstat_update(kstat_t *ksp, int rw)
 			}
 		}
 	}
-	rw_exit(&kcage_range_rwlock);
+	kcage_range_unlock();
 
 	ksp->ks_ndata = count;
 	ksp->ks_data_size = count * 2 * sizeof (uint64_t);
@@ -1068,7 +1045,7 @@ kcage_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
 	ksp->ks_snaptime = gethrtime();
 
 	kspmem = (struct memunit *)buf;
-	rw_enter(&kcage_range_rwlock, RW_WRITER);
+	kcage_range_lock();
 	for (lp = kcage_glist; lp != NULL; lp = lp->next, kspmem++) {
 		if ((caddr_t)kspmem >= (caddr_t)buf + ksp->ks_data_size)
 			break;
@@ -1085,7 +1062,7 @@ kcage_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
 			}
 		}
 	}
-	rw_exit(&kcage_range_rwlock);
+	kcage_range_unlock();
 
 	return (0);
 }
@@ -1475,6 +1452,13 @@ kcage_expand()
 		return (0);
 	}
 
+	/*
+	 * Try to get the range list reader lock. If the lock is already
+	 * held, then don't get stuck here waiting for it.
+	 */
+	if (!rw_tryenter(&kcage_range_rwlock, RW_READER))
+		return (0);
+
 	KCAGE_STAT_INCR(ke_calls);
 	KCAGE_STAT_SET_SCAN(ke_wanted, (uint_t)wanted);
 
@@ -1484,7 +1468,7 @@ kcage_expand()
 	n = 0;				/* number of pages PP_SETNORELOC'd */
 	nf = 0;				/* number of those actually free */
 	while (kcage_on && nf < wanted) {
-		pfn = kcage_get_pfn(1);
+		pfn = kcage_get_pfn();
 		if (pfn == PFN_INVALID) {	/* eek! no where to grow */
 			KCAGE_STAT_INCR(ke_nopfn);
 			goto terminate;
@@ -1506,6 +1490,12 @@ kcage_expand()
 			continue;
 		}
 
+		/*
+		 * NORELOC is only set at boot-time or by this routine
+		 * under the kcage_range_rwlock lock which is currently
+		 * held. This means we can do a fast check here before
+		 * locking the page in kcage_assimilate_page.
+		 */
 		if (PP_ISNORELOC(pp)) {
 			KCAGE_STAT_INCR(ke_isnoreloc);
 			continue;
@@ -1550,6 +1540,7 @@ kcage_expand()
 	 */
 
 terminate:
+	kcage_range_unlock();
 
 	return (did_something);
 }

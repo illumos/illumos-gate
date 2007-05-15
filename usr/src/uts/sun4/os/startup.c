@@ -590,7 +590,11 @@ setup_cage_params(void)
 	if (kernel_cage_enable == 0) {
 		return;
 	}
-	kcage_range_init(phys_avail, KCAGE_DOWN, total_pages / 256);
+	kcage_range_lock();
+	if (kcage_range_init(phys_avail, 1) == 0) {
+		kcage_init(total_pages / 256);
+	}
+	kcage_range_unlock();
 
 	if (kcage_on) {
 		cmn_err(CE_NOTE, "!Kernel Cage is ENABLED");

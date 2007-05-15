@@ -337,6 +337,7 @@ set_platform_cage_params(void)
 	extern pgcnt_t total_pages;
 	extern struct memlist *phys_avail;
 	struct memlist *ml, *tml;
+	int ret;
 
 	if (kernel_cage_enable) {
 		pgcnt_t preferred_cage_size;
@@ -346,6 +347,7 @@ set_platform_cage_params(void)
 
 		ml = opl_memlist_per_board(phys_avail);
 
+		kcage_range_lock();
 		/*
 		 * Note: we are assuming that post has load the
 		 * whole show in to the high end of memory. Having
@@ -353,7 +355,7 @@ set_platform_cage_params(void)
 		 * the glist and arrange for the cage to grow
 		 * downward (descending pfns).
 		 */
-		kcage_range_init(ml, KCAGE_DOWN, preferred_cage_size);
+		ret = kcage_range_init(ml, 1);
 
 		/* free the memlist */
 		do {
@@ -361,6 +363,10 @@ set_platform_cage_params(void)
 			kmem_free(ml, sizeof (struct memlist));
 			ml = tml;
 		} while (ml != NULL);
+
+		if (ret == 0)
+			kcage_init(preferred_cage_size);
+		kcage_range_unlock();
 	}
 
 	if (kcage_on)

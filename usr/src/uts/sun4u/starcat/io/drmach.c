@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -6417,7 +6417,9 @@ drmach_mem_add_span(drmachid_t id, uint64_t basepa, uint64_t size)
 	if (!DRMACH_IS_MEM_ID(id))
 		return (drerr_new(0, ESTC_INAPPROP, NULL));
 
-	rv = kcage_range_add(basepfn, npages, KCAGE_DOWN);
+	kcage_range_lock();
+	rv = kcage_range_add(basepfn, npages, 1);
+	kcage_range_unlock();
 	if (rv == ENOMEM) {
 		cmn_err(CE_WARN, "%lu megabytes not available"
 			" to kernel cage", size >> 20);
@@ -6443,7 +6445,9 @@ drmach_mem_del_span(drmachid_t id, uint64_t basepa, uint64_t size)
 		return (drerr_new(0, ESTC_INAPPROP, NULL));
 
 	if (size > 0) {
+		kcage_range_lock();
 		rv = kcage_range_delete_post_mem_del(basepfn, npages);
+		kcage_range_unlock();
 		if (rv != 0) {
 			cmn_err(CE_WARN,
 			    "unexpected kcage_range_delete_post_mem_del"

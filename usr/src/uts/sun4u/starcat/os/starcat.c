@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -196,6 +196,7 @@ set_platform_cage_params(void)
 {
 	extern pgcnt_t total_pages;
 	extern struct memlist *phys_avail;
+	int ret;
 
 	if (kernel_cage_enable) {
 		pgcnt_t preferred_cage_size;
@@ -207,6 +208,7 @@ set_platform_cage_params(void)
 		if (starcat_cage_size_limit)
 			preferred_cage_size = starcat_cage_size_limit;
 #endif
+		kcage_range_lock();
 		/*
 		 * Note: we are assuming that post has load the
 		 * whole show in to the high end of memory. Having
@@ -214,7 +216,10 @@ set_platform_cage_params(void)
 		 * the glist and arrange for the cage to grow
 		 * downward (descending pfns).
 		 */
-		kcage_range_init(phys_avail, KCAGE_DOWN, preferred_cage_size);
+		ret = kcage_range_init(phys_avail, 1);
+		if (ret == 0)
+			kcage_init(preferred_cage_size);
+		kcage_range_unlock();
 	}
 
 	if (kcage_on)

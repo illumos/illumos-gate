@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -268,6 +268,7 @@ set_platform_cage_params(void)
 {
 	extern pgcnt_t total_pages;
 	extern struct memlist *phys_avail;
+	int ret;
 
 	if (kernel_cage_enable) {
 		pgcnt_t preferred_cage_size;
@@ -278,11 +279,15 @@ set_platform_cage_params(void)
 		if (serengeti_cage_size_limit)
 			preferred_cage_size = serengeti_cage_size_limit;
 #endif
+		kcage_range_lock();
 		/*
 		 * Post copies obp into the lowest slice.  This requires the
 		 * cage to grow upwards
 		 */
-		kcage_range_init(phys_avail, KCAGE_UP, preferred_cage_size);
+		ret = kcage_range_init(phys_avail, 0);
+		if (ret == 0)
+			kcage_init(preferred_cage_size);
+		kcage_range_unlock();
 	}
 
 	/* Only note when the cage is off since it should always be on. */
