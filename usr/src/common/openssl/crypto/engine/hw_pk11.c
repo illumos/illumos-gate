@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1516,11 +1516,19 @@ static CK_OBJECT_HANDLE pk11_get_cipher_key(EVP_CIPHER_CTX *ctx,
 	a_key_template[5].pValue = (void *) key;
 	a_key_template[5].ulValueLen = (unsigned long) ctx->key_len;
 
+	/*
+	 * As stated in v2.20, 11.7 Object Management Function, in section for
+	 * C_FindObjectsInit(), at most one search operation may be active at
+	 * a given time in a given session. Therefore, we must group these
+	 * three calls in one atomic operation.
+	 */
+	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
 	rv = pFuncList->C_FindObjectsInit(session, a_key_template, 
 		ul_key_attr_count);
 
 	if (rv != CKR_OK)
 		{
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		PK11err(PK11_F_GET_CIPHER_KEY, PK11_R_FINDOBJECTSINIT);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
@@ -1531,6 +1539,7 @@ static CK_OBJECT_HANDLE pk11_get_cipher_key(EVP_CIPHER_CTX *ctx,
 
 	if (rv != CKR_OK)
 		{
+		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 		PK11err(PK11_F_GET_CIPHER_KEY, PK11_R_FINDOBJECTS);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
@@ -1538,6 +1547,7 @@ static CK_OBJECT_HANDLE pk11_get_cipher_key(EVP_CIPHER_CTX *ctx,
 		}
 
 	rv = pFuncList->C_FindObjectsFinal(session);
+	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
 
 	if (rv != CKR_OK)
 		{

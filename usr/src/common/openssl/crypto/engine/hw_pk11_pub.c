@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1981,19 +1981,18 @@ err:
 
 static int pk11_DH_compute_key(unsigned char *key,const BIGNUM *pub_key,DH *dh)
 	{
-	CK_ULONG i;
+	int i;
 	CK_MECHANISM mechanism = {CKM_DH_PKCS_DERIVE, NULL_PTR, 0};
 	CK_OBJECT_CLASS key_class = CKO_SECRET_KEY;
 	CK_KEY_TYPE key_type = CKK_GENERIC_SECRET;
 	CK_OBJECT_HANDLE h_derived_key = CK_INVALID_HANDLE;
 	CK_OBJECT_HANDLE h_key = CK_INVALID_HANDLE;
 
-	CK_ULONG ul_priv_key_attr_count = 3; 
+	CK_ULONG ul_priv_key_attr_count = 2;
 	CK_ATTRIBUTE priv_key_template[] =
 		{
 		{CKA_CLASS, (void*) NULL, sizeof(key_class)},
 		{CKA_KEY_TYPE, (void*) NULL,  sizeof(key_type)},
-		{CKA_VALUE_LEN, (void*) NULL,  sizeof(i)},
 		};
 
 	CK_ULONG priv_key_attr_result_count = 1;
@@ -2034,8 +2033,6 @@ static int pk11_DH_compute_key(unsigned char *key,const BIGNUM *pub_key,DH *dh)
 		goto err;
 		}
 
-	i = mechanism.ulParameterLen;
-	priv_key_template[2].pValue = &i;
 	rv = pFuncList->C_DeriveKey(sp->session,
 			   &mechanism,
 			   h_key,
@@ -2089,9 +2086,23 @@ static int pk11_DH_compute_key(unsigned char *key,const BIGNUM *pub_key,DH *dh)
 	 * length of the public key. It is long enough for the derived key */
 	if (priv_key_result[0].type == CKA_VALUE)
 		{
-		memcpy(key, priv_key_result[0].pValue, 
-			priv_key_result[0].ulValueLen);
-		ret = priv_key_result[0].ulValueLen;
+		/* CKM_DH_PKCS_DERIVE mechanism is not supposed to strip
+		 * leading zeros from a computed shared secret. However,
+		 * OpenSSL always did it so we must do the same here. The
+		 * vagueness of the spec regarding leading zero bytes was
+		 * finally cleared with TLS 1.1 (RFC 4346) saying that leading
+		 * zeros are stripped before the computed data is used as the
+		 * pre-master secret.
+		 */
+		for (i = 0; i < priv_key_result[0].ulValueLen; ++i)
+			{
+			if (((char *) priv_key_result[0].pValue)[i] != 0)
+				break;
+			}
+
+		memcpy(key, ((char *) priv_key_result[0].pValue) + i, 
+			priv_key_result[0].ulValueLen - i);
+		ret = priv_key_result[0].ulValueLen - i;
 		}
 
 err:
