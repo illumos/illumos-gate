@@ -268,32 +268,20 @@ wrtmp(
 		}
 
 		/*
-		 * We have to drop the contents lock to prevent the VM
-		 * system from trying to reaquire it in tmp_getpage()
-		 * should the uiomove cause a pagefault. If we're doing
-		 * a pagecreate segmap creates the page without calling
-		 * the filesystem so we need to hold onto the lock until
-		 * the page is created.
+		 * We have to drop the contents lock to allow the VM
+		 * system to reaquire it in tmp_getpage()
 		 */
-		if (!pagecreate)
-			rw_exit(&tp->tn_contents);
+		rw_exit(&tp->tn_contents);
 
 		newpage = 0;
 		if (vpm_enable) {
 			/*
-			 * XXX Why do we need to hold the contents lock?
-			 * The kpm mappings will not cause a fault.
-			 *
 			 * Copy data. If new pages are created, part of
 			 * the page that is not written will be initizliazed
 			 * with zeros.
 			 */
 			error = vpm_data_copy(vp, offset, bytes, uio,
 				!pagecreate, &newpage, 1, S_WRITE);
-
-			if (pagecreate) {
-				rw_exit(&tp->tn_contents);
-			}
 		} else {
 			/* Get offset within the segmap mapping */
 			segmap_offset = (offset & PAGEMASK) & MAXBOFFSET;
@@ -304,15 +292,12 @@ wrtmp(
 
 
 		if (!vpm_enable && pagecreate) {
-			rw_downgrade(&tp->tn_contents);
-
 			/*
 			 * segmap_pagecreate() returns 1 if it calls
 			 * page_create_va() to allocate any pages.
 			 */
 			newpage = segmap_pagecreate(segkmap,
 			    base + segmap_offset, (size_t)PAGESIZE, 0);
-			rw_exit(&tp->tn_contents);
 			/*
 			 * Clear from the beginning of the page to the starting
 			 * offset of the data.
