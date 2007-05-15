@@ -21,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -78,12 +78,43 @@ build_filelist()
 	done
 }
 
-LIBLIST=`build_liblist`
-FILELIST=`build_filelist`
+build_newitemsfile ()
+{
+	rm -f ${SGSBACKUPDIR}.newfiles
+
+	# Build a list of files/directories that this package is going
+	# add to the system that do not already exist.
+	cd $BASEDIR/$SGSDIR/lib
+	find . -depth -print | while read file
+	do
+		# Built in /bin/sh test lacks -e
+		/usr/bin/test \! -e "$BASEDIR/$LIBBASE/$file"
+		if [ $? = 0 ]; then
+			echo $LIBBASE/$file >> ${SGSBACKUPDIR}.newfiles
+		fi
+	done
+
+	cd $BASEDIR/$SGSDIR
+	find usr -depth -print | while read file
+	do
+		/usr/bin/test \! -e "$BASEDIR/$file"
+		if [ $? = 0 ]; then
+			echo $file >> ${SGSBACKUPDIR}.newfiles
+		fi
+	done
+}
+
+# Generate a file containing the names of the files and directories
+# that are being added (as opposed to being replaced) to the system.
+# These items will need to be explicitly removed at uninstall.
+build_newitemsfile
+
 
 #
 # backup all existing SGStools.
 #
+LIBLIST=`build_liblist`
+FILELIST=`build_filelist`
 echo "Backup up existing SGS tools to $SGSBACKUPDIR..."
 cd $BASEDIR
 for file in $LIBLIST $FILELIST $ETCLIST

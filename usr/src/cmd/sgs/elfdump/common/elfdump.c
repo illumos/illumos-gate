@@ -2646,17 +2646,55 @@ checksum(Elf *elf)
 	dbg_print(0, MSG_INTL(MSG_STR_CHECKSUM), elf_checksum(elf));
 }
 
+/*
+ * This variable is used by regular() to communicate the address of
+ * the section header cache to sort_shdr_ndx_arr(). Unfortunately,
+ * the qsort() interface does not include a userdata argument by which
+ * such arbitrary data can be passed, so we are stuck using global data.
+ */
+static Cache *sort_shdr_ndx_arr_cache;
+
+
+/*
+ * Used with qsort() to sort the section indices so that they can be
+ * used to access the section headers in order of increasing data offset.
+ *
+ * entry:
+ *	sort_shdr_ndx_arr_cache - Contains address of
+ *		section header cache.
+ *	v1, v2 - Point at elements of sort_shdr_bits array to be compared.
+ *
+ * exit:
+ *	Returns -1 (less than), 0 (equal) or 1 (greater than).
+ */
+static int
+sort_shdr_ndx_arr(const void *v1, const void *v2)
+{
+	Cache	*cache1 = sort_shdr_ndx_arr_cache + *((size_t *)v1);
+	Cache	*cache2 = sort_shdr_ndx_arr_cache + *((size_t *)v2);
+
+	if (cache1->c_shdr->sh_offset < cache2->c_shdr->sh_offset)
+		return (-1);
+
+	if (cache1->c_shdr->sh_offset > cache2->c_shdr->sh_offset)
+		return (1);
+
+	return (0);
+}
+
+
 void
 regular(const char *file, Elf *elf, uint_t flags, int wfd)
 {
 	Elf_Scn		*scn;
 	Ehdr		*ehdr;
 	Elf_Data	*data;
-	size_t		cnt, shstrndx, shnum, phnum;
+	size_t		ndx, shstrndx, shnum, phnum;
 	Shdr		*nameshdr, *shdr;
 	char		*names = 0;
 	Cache		*cache, *_cache;
 	VERSYM_STATE	versym;
+	size_t		*shdr_ndx_arr, shdr_ndx_arr_cnt;
 
 	if ((ehdr = elf_getehdr(elf)) == NULL) {
 		failure(file, MSG_ORIG(MSG_ELF_GETEHDR));
@@ -2715,13 +2753,13 @@ regular(const char *file, Elf *elf, uint_t flags, int wfd)
 			return;
 		}
 
-		for (cnt = 0; cnt < phnum; phdr++, cnt++) {
+		for (ndx = 0; ndx < phnum; phdr++, ndx++) {
 			if (!match(0, conv_phdr_type(ehdr->e_machine,
-			    phdr->p_type, CONV_FMT_ALTFILE), cnt))
+			    phdr->p_type, CONV_FMT_ALTFILE), ndx))
 				continue;
 
 			dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
-			dbg_print(0, MSG_INTL(MSG_ELF_PHDR), EC_WORD(cnt));
+			dbg_print(0, MSG_INTL(MSG_ELF_PHDR), EC_WORD(ndx));
 			Elf_phdr(0, ehdr->e_machine, phdr);
 		}
 	}
@@ -2769,7 +2807,7 @@ regular(const char *file, Elf *elf, uint_t flags, int wfd)
 	/*
 	 * Allocate a cache to maintain a descriptor for each section.
 	 */
-	if ((cache = malloc(shnum * sizeof (Cache))) == 0) {
+	if ((cache = malloc(shnum * sizeof (Cache))) == NULL) {
 		int err = errno;
 		(void) fprintf(stderr, MSG_INTL(MSG_ERR_MALLOC),
 		    file, strerror(err));
@@ -2779,6 +2817,28 @@ regular(const char *file, Elf *elf, uint_t flags, int wfd)
 	*cache = cache_init;
 	_cache = cache;
 	_cache++;
+
+	/*
+	 * Allocate an array that will hold the section index for
+	 * each section that has data in the ELF file:
+	 *
+	 *	- Is not a NOBITS section
+	 *	- Data has non-zero length
+	 *
+	 * Note that shnum is an upper bound on the size required. It
+	 * is likely that we won't use a few of these array elements.
+	 * Allocating a modest amount of extra memory in this case means
+	 * that we can avoid an extra loop to count the number of needed
+	 * items, and can fill this array immediately in the first loop
+	 * below.
+	 */
+	if ((shdr_ndx_arr = malloc(shnum * sizeof (*shdr_ndx_arr))) == NULL) {
+		int err = errno;
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_MALLOC),
+		    file, strerror(err));
+		return;
+	}
+	shdr_ndx_arr_cnt = 0;
 
 	/*
 	 * Traverse the sections of the file.  This gathering of data is
@@ -2798,11 +2858,11 @@ regular(const char *file, Elf *elf, uint_t flags, int wfd)
 	 * of this data that has caused problems with elfdump()'s ability to
 	 * extract the data.
 	 */
-	for (cnt = 1, scn = NULL; scn = elf_nextscn(elf, scn);
-	    cnt++, _cache++) {
+	for (ndx = 1, scn = NULL; scn = elf_nextscn(elf, scn);
+	    ndx++, _cache++) {
 		char	scnndxnm[100];
 
-		_cache->c_ndx = cnt;
+		_cache->c_ndx = ndx;
 		_cache->c_scn = scn;
 
 		if ((_cache->c_shdr = elf_getshdr(scn)) == NULL) {
@@ -2810,6 +2870,14 @@ regular(const char *file, Elf *elf, uint_t flags, int wfd)
 			(void) fprintf(stderr, MSG_INTL(MSG_ELF_ERR_SCN),
 			    EC_WORD(elf_ndxscn(scn)));
 		}
+
+		/*
+		 * If this section has data in the file, include it in
+		 * the array of sections to check for address overlap.
+		 */
+		if ((_cache->c_shdr->sh_size != 0) &&
+		    (_cache->c_shdr->sh_type != SHT_NOBITS))
+			shdr_ndx_arr[shdr_ndx_arr_cnt++] = ndx;
 
 		/*
 		 * If a shstrtab exists, assign the section name.
@@ -2833,7 +2901,7 @@ regular(const char *file, Elf *elf, uint_t flags, int wfd)
 			    (nameshdr->sh_size <= _cache->c_shdr->sh_name)) {
 				(void) fprintf(stderr,
 				    MSG_INTL(MSG_ERR_BADSHNAME), file,
-				    EC_WORD(cnt),
+				    EC_WORD(ndx),
 				    EC_XWORD(_cache->c_shdr->sh_name));
 			}
 		}
@@ -2844,9 +2912,9 @@ regular(const char *file, Elf *elf, uint_t flags, int wfd)
 		 * section.
 		 */
 		(void) snprintf(scnndxnm, sizeof (scnndxnm),
-		    MSG_INTL(MSG_FMT_SCNNDX), cnt);
+		    MSG_INTL(MSG_FMT_SCNNDX), ndx);
 
-		if ((_cache->c_name = malloc(strlen(scnndxnm) + 1)) == 0) {
+		if ((_cache->c_name = malloc(strlen(scnndxnm) + 1)) == NULL) {
 			int err = errno;
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_MALLOC),
 			    file, strerror(err));
@@ -2870,41 +2938,53 @@ regular(const char *file, Elf *elf, uint_t flags, int wfd)
 	 * sections, so rather than bailing on an error condition, continue
 	 * processing to see if any data can be salvaged.
 	 */
-	for (cnt = 1; cnt < shnum; cnt++) {
-		Cache	*_cache = &cache[cnt];
+	if (shdr_ndx_arr_cnt > 1) {
+		sort_shdr_ndx_arr_cache = cache;
+		qsort(shdr_ndx_arr, shdr_ndx_arr_cnt,
+		    sizeof (*shdr_ndx_arr), sort_shdr_ndx_arr);
+	}
+	for (ndx = 0; ndx < shdr_ndx_arr_cnt; ndx++) {
+		Cache	*_cache = cache + shdr_ndx_arr[ndx];
 		Shdr	*shdr = _cache->c_shdr;
 		Off	bgn1, bgn = shdr->sh_offset;
 		Off	end1, end = shdr->sh_offset + shdr->sh_size;
-		int	cnt1;
+		size_t	ndx1;
 
-		if ((shdr->sh_size == 0) || (shdr->sh_type == SHT_NOBITS))
-			continue;
-
-		for (cnt1 = 1; cnt1 < shnum; cnt1++) {
-			Cache	*_cache1 = &cache[cnt1];
+		/*
+		 * Check the section against all following ones, reporting
+		 * any overlaps. Since we've sorted the sections by offset,
+		 * we can stop after the first comparison that fails. There
+		 * are no overlaps in a properly formed ELF file, in which
+		 * case this algorithm runs in O(n) time. This will degenerate
+		 * to O(n^2) for a completely broken file. Such a file is
+		 * (1) highly unlikely, and (2) unusable, so it is reasonable
+		 * for the analysis to take longer.
+		 */
+		for (ndx1 = ndx + 1; ndx1 < shdr_ndx_arr_cnt; ndx1++) {
+			Cache	*_cache1 = cache + shdr_ndx_arr[ndx1];
 			Shdr	*shdr1 = _cache1->c_shdr;
 
 			bgn1 = shdr1->sh_offset;
 			end1 = shdr1->sh_offset + shdr1->sh_size;
 
-			if ((cnt1 == cnt) || (shdr->sh_size == 0) ||
-			    (shdr1->sh_type == SHT_NOBITS))
-				continue;
-
 			if (((bgn1 <= bgn) && (end1 > bgn)) ||
 			    ((bgn1 < end) && (end1 >= end))) {
 				(void) fprintf(stderr,
 				    MSG_INTL(MSG_ERR_SECMEMOVER), file,
-				    EC_WORD(elf_ndxscn(_cache1->c_scn)),
-				    _cache1->c_name, EC_OFF(bgn1), EC_OFF(end1),
 				    EC_WORD(elf_ndxscn(_cache->c_scn)),
-				    _cache->c_name, EC_OFF(bgn), EC_OFF(end));
+				    _cache->c_name, EC_OFF(bgn), EC_OFF(end),
+				    EC_WORD(elf_ndxscn(_cache1->c_scn)),
+				    _cache1->c_name, EC_OFF(bgn1),
+				    EC_OFF(end1));
+			} else {	/* No overlap, so can stop */
+				break;
 			}
 		}
 
 		/*
-		 * And finally, make sure this section doesn't overlap the
-		 * section header itself.
+		 * In addition to checking for sections overlapping
+		 * each other (done above), we should also make sure
+		 * the section doesn't overlap the section header array.
 		 */
 		bgn1 = ehdr->e_shoff;
 		end1 = ehdr->e_shoff + (ehdr->e_shentsize * ehdr->e_shnum);
@@ -2920,10 +3000,10 @@ regular(const char *file, Elf *elf, uint_t flags, int wfd)
 	}
 
 	/*
-	 * Finally, obtain the data for each section.
+	 * Obtain the data for each section.
 	 */
-	for (cnt = 1; cnt < shnum; cnt++) {
-		Cache	*_cache = &cache[cnt];
+	for (ndx = 1; ndx < shnum; ndx++) {
+		Cache	*_cache = &cache[ndx];
 		Elf_Scn	*scn = _cache->c_scn;
 
 		if ((_cache->c_data = elf_getdata(scn, NULL)) == NULL) {
@@ -2935,7 +3015,7 @@ regular(const char *file, Elf *elf, uint_t flags, int wfd)
 		/*
 		 * Do we wish to write the section out?
 		 */
-		if (wfd && match(1, _cache->c_name, cnt) && _cache->c_data) {
+		if (wfd && match(1, _cache->c_name, ndx) && _cache->c_data) {
 			(void) write(wfd, _cache->c_data->d_buf,
 			    _cache->c_data->d_size);
 		}

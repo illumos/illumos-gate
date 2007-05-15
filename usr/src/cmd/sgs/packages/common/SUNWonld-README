@@ -1238,3 +1238,4 @@ Bugid   Risk Synopsis
 6532924 AMD64: Solaris 5.11 55b: SEGV after whocatches
 6551627 OGL: SIGSEGV when trying to use OpenGL pipeline with splash screen,
 	Solaris/Nvidia only
+6556563 elfdump section overlap checking is too slow for large files
