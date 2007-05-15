@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -625,7 +625,7 @@ instance_refresh svc:/milestone/multi-user-server:default
 # Add inetd_offline methods for some services
 for svc in chargen comsat daytime discard echo nfs/rquota rpc/gss rpc/rex \
     rpc/ocfserv rpc/rstat rpc/rusers rpc/smserver rpc/spray rpc/wall \
-    security/ktkt_warn talk time tname; do
+    security/ktkt_warn talk time; do
 	prophist_addmeth svc:/network/$svc inetd_offline :kill_process 0
 	instance_refresh svc:/network/$svc:default
 done

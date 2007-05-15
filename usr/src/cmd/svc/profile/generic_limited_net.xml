@@ -209,9 +209,6 @@
   <!--
 	non-default inetd(1M) services
   -->
-  <service name='network/tname' version='1' type='service'>
-    <instance name='default' enabled='false'/>
-  </service>
   <service name='network/uucp' version='1' type='service'>
     <instance name='default' enabled='false'/>
   </service>

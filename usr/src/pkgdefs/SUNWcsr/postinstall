@@ -108,8 +108,7 @@ _DEL_BIND8
 cat >> $BASEDIR/var/svc/profile/upgrade <<\_DEL_TNAME
 	svcs svc:/network/tname > /dev/null 2>&1
 	if [ "$?" = 0 ]; then
-		svcadm disable -s svc:/network/tname
-		svccfg delete svc:/network/tname
+		svccfg delete -f svc:/network/tname
 	fi
 _DEL_TNAME
 
