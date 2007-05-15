@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -195,13 +195,11 @@ lx_fcntl_com(int fd, int cmd, ulong_t arg)
 		break;
 
 	case LX_F_SETOWN:
-		rc = fcntl(fd, FIOSETOWN, arg);
+		rc = fcntl(fd, F_SETOWN, arg);
 		break;
 
 	case LX_F_GETOWN:
-		lx_debug("\tioctl(%d, 0x%x - %s, ...)",
-		    fd, FIOGETOWN, "FIOGETOWN");
-		rc = ioctl(fd, FIOGETOWN, arg);
+		rc = fcntl(fd, F_GETOWN, arg);
 		break;
 
 	default:
