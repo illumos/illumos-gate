@@ -1202,7 +1202,7 @@ smf_handle_new_services () {
 	fi
 	if [[ $zone = global &&
 	    ! -f $rootprefix/var/svc/manifest/network/ipsec/ike.xml &&
-	    $rootprefix/etc/inet/ike/config ]]; then
+	    -f $rootprefix/etc/inet/ike/config ]]; then
 		smf_enable svc:/network/ipsec/ike:default
 	fi
 }
