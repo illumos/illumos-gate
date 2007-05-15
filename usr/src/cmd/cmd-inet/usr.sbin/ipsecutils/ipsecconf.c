@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,14 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp6.h>
 
+/*
+ * Globals
+ */
+int lfd;
+char *my_fmri;
+FILE *debugfile = stderr;
+
+#define	USAGE() if (!smf_managed) usage()
 /*
  * Buffer length to read in pattern/properties.
  */
@@ -116,6 +124,7 @@ typedef enum error_type {BAD_ERROR, DUP_ERROR, REQ_ERROR} error_type_t;
 /* Error message human readable conversions */
 static char *sys_error_message(int);
 static void error_message(error_type_t, int, int);
+static int get_pf_pol_socket(void);
 
 static int cmd;
 static char *filename;
@@ -314,7 +323,7 @@ static int	parse_index(const char *, char *);
 static int	attach_tunname(spd_if_t *);
 static void	usage(void);
 static int	ipsec_conf_del(int, boolean_t);
-static int	ipsec_conf_add(void);
+static int	ipsec_conf_add(boolean_t, boolean_t);
 static int	ipsec_conf_sub(void);
 static int	ipsec_conf_flush(int);
 static int	ipsec_conf_view(void);
@@ -584,7 +593,7 @@ fetch_algorithms()
 	struct spd_attribute *attr, *endattr;
 	spd_ext_t *exts[SPD_EXT_MAX+1];
 	uint64_t reply_buf[256];
-	int sfd = socket(PF_POLICY, SOCK_RAW, PF_POLICY_V1);
+	int sfd;
 	int cnt, retval;
 	uint64_t *start, *end;
 	alginfo_t alg = {0, 0, 0, 0, 0};
@@ -596,6 +605,7 @@ fetch_algorithms()
 	else
 		has_run = B_TRUE;
 
+	sfd = get_pf_pol_socket();
 	if (sfd < 0) {
 		err(-1, gettext("unable to open policy socket"));
 	}
@@ -1196,7 +1206,12 @@ get_pf_pol_socket(void)
 {
 	int s = socket(PF_POLICY, SOCK_RAW, PF_POLICY_V1);
 	if (s < 0) {
-		warn(gettext("(loading pf_policy) socket:"));
+		if (errno == EPERM) {
+			EXIT_BADPERM("Insufficient privileges to open "
+			    "PF_POLICY socket.");
+		} else {
+			warn(gettext("(loading pf_policy) socket:"));
+		}
 	}
 
 	return (s);
@@ -1306,7 +1321,16 @@ main(int argc, char *argv[])
 	int ret, flushret;
 	int c;
 	int index;
-	int lfd;
+	boolean_t smf_managed;
+	boolean_t just_check = B_FALSE;
+
+	char *smf_warning = gettext(
+		"\n\tIPsec policy should be managed using smf(5). Modifying\n"
+		"\tthe IPsec policy from the command line while the 'policy'\n"
+		"\tservice is enabled could result in an inconsistent\n"
+		"\tsecurity policy.\n\n");
+
+	flushret = 0;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)
@@ -1325,12 +1349,18 @@ main(int argc, char *argv[])
 		cmd = IPSEC_CONF_VIEW;
 		goto done;
 	}
-	while ((c = getopt(argc, argv, "nlfLFa:qd:r:i:")) != EOF) {
+	my_fmri = getenv("SMF_FMRI");
+	if (my_fmri == NULL)
+		smf_managed = B_FALSE;
+	else
+		smf_managed = B_TRUE;
+
+	while ((c = getopt(argc, argv, "nlfLFa:qd:r:i:c:")) != EOF) {
 		switch (c) {
 		case 'F':
 			if (interface_name != NULL) {
-				usage();
-				exit(1);
+				USAGE();
+				EXIT_FATAL("interface name not required.");
 			}
 			/* Apply to all policy heads - global and tunnels. */
 			interface_name = &all_polheads;
@@ -1338,15 +1368,15 @@ main(int argc, char *argv[])
 		case 'f':
 			/* Only one command at a time */
 			if (cmd != 0) {
-				usage();
-				exit(1);
+				USAGE();
+				EXIT_FATAL("Multiple commands specified");
 			}
 			cmd = IPSEC_CONF_FLUSH;
 			break;
 		case 'L':
 			if (interface_name != NULL) {
-				usage();
-				exit(1);
+				USAGE();
+				EXIT_FATAL("interface name not required.");
 			}
 			/* Apply to all policy heads - global and tunnels. */
 			interface_name = &all_polheads;
@@ -1354,16 +1384,21 @@ main(int argc, char *argv[])
 		case 'l':
 			/* Only one command at a time */
 			if (cmd != 0) {
-				usage();
-				exit(1);
+				USAGE();
+				EXIT_FATAL("Multiple commands specified");
 			}
 			cmd = IPSEC_CONF_LIST;
 			break;
+		case 'c':
+			just_check = B_TRUE;
+			ipsecconf_qflag++;
+			/* FALLTHRU */
 		case 'a':
 			/* Only one command at a time, and no interface name */
 			if (cmd != 0 || interface_name != NULL) {
-				usage();
-				exit(1);
+				USAGE();
+				EXIT_FATAL("Multiple commands or interface "
+				    "not required.");
 			}
 			cmd = IPSEC_CONF_ADD;
 			filename = optarg;
@@ -1374,8 +1409,8 @@ main(int argc, char *argv[])
 			 * optional.
 			 */
 			if (cmd != 0) {
-				usage();
-				exit(1);
+				USAGE();
+				EXIT_FATAL("Multiple commands specified");
 			}
 			cmd = IPSEC_CONF_DEL;
 			index = parse_index(optarg, NULL);
@@ -1389,37 +1424,33 @@ main(int argc, char *argv[])
 		case 'r' :
 			/* Only one command at a time, and no interface name */
 			if (cmd != 0 || interface_name != NULL) {
-				usage();
-				exit(1);
+				USAGE();
+				EXIT_FATAL("Multiple commands or interface "
+				    "not required.");
 			}
 			cmd = IPSEC_CONF_SUB;
 			filename = optarg;
 			break;
 		case 'i':
 			if (interface_name != NULL) {
-				warnx(
-				    gettext("Interface name already selected"));
-				exit(1);
+				EXIT_FATAL("Interface name already selected");
 			}
 			interface_name = optarg;
 			/* Check for some cretin using the all-polheads name. */
 			if (strlen(optarg) == 0) {
-				usage();
-				exit(1);
+				USAGE();
+				EXIT_FATAL("Invalid interface name.");
 			}
 			break;
 		default :
-			usage();
-			exit(1);
+			USAGE();
+			EXIT_FATAL("Bad usage.");
 		}
 	}
 
 done:
 	ret = 0;
 	lfd = lock();
-	if (lfd == -1) {
-		exit(1);
-	}
 
 	/*
 	 * ADD, FLUSH, DELETE needs to do two operations.
@@ -1442,13 +1473,14 @@ done:
 		if ((ret = block_all_signals()) == -1) {
 			break;
 		}
+		if (!smf_managed && !ipsecconf_qflag)
+			(void) fprintf(stdout, "%s", smf_warning);
 		ret = ipsec_conf_flush(SPD_ACTIVE);
 		(void) restore_all_signals();
 		break;
 	case IPSEC_CONF_VIEW:
 		if (interface_name != NULL) {
-			warnx(gettext("Cannot view for one interface only.\n"));
-			exit(1);
+			EXIT_FATAL("Cannot view for one interface only.");
 		}
 		ret = ipsec_conf_view();
 		break;
@@ -1461,15 +1493,25 @@ done:
 		if ((ret = block_all_signals()) == -1) {
 			break;
 		}
+		if (!smf_managed && !ipsecconf_qflag)
+			(void) fprintf(stdout, "%s", smf_warning);
 		ret = ipsec_conf_del(index, B_FALSE);
 		(void) restore_all_signals();
+		flushret = ipsec_conf_flush(SPD_STANDBY);
 		break;
 	case IPSEC_CONF_ADD:
-		fetch_algorithms();
+		/*
+		 * The IPsec kernel modules should only be loaded
+		 * if there is a policy to install, for this
+		 * reason ipsec_conf_add() calls fetch_algorithms()
+		 * and ipsec_conf_flush() only when appropriate.
+		 */
 		if ((ret = block_all_signals()) == -1) {
 			break;
 		}
-		ret = ipsec_conf_add();
+		if (!smf_managed && !ipsecconf_qflag)
+			(void) fprintf(stdout, "%s", smf_warning);
+		ret = ipsec_conf_add(just_check, smf_managed);
 		(void) restore_all_signals();
 		break;
 	case IPSEC_CONF_SUB:
@@ -1477,18 +1519,17 @@ done:
 		if ((ret = block_all_signals()) == -1) {
 			break;
 		}
+		if (!smf_managed && !ipsecconf_qflag)
+			(void) fprintf(stdout, "%s", smf_warning);
 		ret = ipsec_conf_sub();
 		(void) restore_all_signals();
+		flushret = ipsec_conf_flush(SPD_STANDBY);
 		break;
 	default :
 		/* If no argument is given but a "-" */
-		usage();
-		exit(1);
+		USAGE();
+		EXIT_FATAL("Bad usage.");
 	}
-
-	/* flush standby db */
-	flushret = (cmd != IPSEC_CONF_VIEW) ?
-	    ipsec_conf_flush(SPD_STANDBY) : 0;
 
 	(void) unlock(lfd);
 	if (ret != 0 || flushret != 0)
@@ -1496,14 +1537,15 @@ done:
 	return (ret);
 }
 
-static int
+static void
 perm_check(void)
 {
-	if (errno != EACCES)
-		warn(gettext("Cannot open lock file %s"), LOCK_FILE);
+	if (errno == EACCES)
+		EXIT_BADPERM("Insufficient privilege to run ipsecconf.");
 	else
-		warnx(gettext("You must be root to run ipsecconf."));
-	return (-1);
+		warn(gettext("Cannot open lock file %s"), LOCK_FILE);
+
+	EXIT_BADPERM(NULL);
 }
 
 static int
@@ -1522,8 +1564,8 @@ lock()
 	if ((fd = open(LOCK_FILE, O_EXCL|O_CREAT|O_RDWR, S_IRUSR|S_IWUSR))
 	    == -1) {
 		if (errno != EEXIST) {
-			/* Some other problem. */
-			return (perm_check());
+			/* Some other problem. Will exit. */
+			perm_check();
 		}
 
 		/*
@@ -1535,8 +1577,7 @@ lock()
 		 * link.
 		 */
 		if (lstat(LOCK_FILE, &sbuf1) == -1) {
-			warn(gettext("Cannot lstat lock file %s"), LOCK_FILE);
-			return (-1);
+			EXIT_FATAL2("Cannot lstat lock file %s", LOCK_FILE);
 		}
 		/*
 		 * Check whether it is a regular file and not a symbolic
@@ -1547,30 +1588,27 @@ lock()
 		    sbuf1.st_nlink != 1 ||
 		    sbuf1.st_uid != 0 ||
 		    sbuf1.st_size != 0) {
-			warnx(gettext("Bad lock file %s"), LOCK_FILE);
-			return (-1);
+			EXIT_FATAL2("Bad lock file %s", LOCK_FILE);
 		}
 		if ((fd = open(LOCK_FILE, O_CREAT|O_RDWR,
 		    S_IRUSR|S_IWUSR)) == -1) {
-			return (perm_check());
+			/* Will exit */
+			perm_check();
 		}
 		/*
 		 * Check whether we opened the file that we lstat()ed.
 		 */
 		if (fstat(fd, &sbuf2) == -1) {
-			warn(gettext("Cannot fstat lock file %s"), LOCK_FILE);
-			return (-1);
+			EXIT_FATAL2("Cannot lstat lock file %s", LOCK_FILE);
 		}
 		if (sbuf1.st_dev != sbuf2.st_dev ||
 		    sbuf1.st_ino != sbuf2.st_ino) {
 			/* File changed after we did the lstat() above */
-			warnx(gettext("Bad lock file %s"), LOCK_FILE);
-			return (-1);
+			EXIT_FATAL2("Bad lock file %s", LOCK_FILE);
 		}
 	}
 	if (lockf(fd, F_LOCK, 0) == -1) {
-		warn("lockf");
-		return (-1);
+		EXIT_FATAL2("Cannot lockf %s", LOCK_FILE);
 	}
 	return (fd);
 }
@@ -1731,7 +1769,6 @@ print_raw_address(void *input, boolean_t isv4)
 	sa_family_t af;
 	int addr_len;
 
-
 	if (isv4) {
 		af = AF_INET;
 		(void) memcpy(&V4_PART_OF_V6(in_addr), input, 4);
@@ -1755,7 +1792,7 @@ print_raw_address(void *input, boolean_t isv4)
 	if (!ipsecconf_nflag) {
 		if (sysinfo(SI_HOSTNAME, domain, MAXHOSTNAMELEN) != -1 &&
 			(cp = strchr(domain, '.')) != NULL) {
-			(void) strcpy(domain, cp + 1);
+			(void) strlcpy(domain, cp + 1, sizeof (domain));
 		} else {
 			domain[0] = 0;
 		}
@@ -2542,9 +2579,10 @@ pfp_delete_rule(uint64_t index)
 {
 	struct spd_msg *msg;
 	struct spd_rule *rule;
-	int sfd = socket(PF_POLICY, SOCK_RAW, PF_POLICY_V1);
+	int sfd;
 	int cnt, len, alloclen;
 
+	sfd = get_pf_pol_socket();
 	if (sfd < 0) {
 		warn(gettext("unable to open policy socket"));
 		return (-1);
@@ -2624,7 +2662,7 @@ static int
 ipsec_conf_flush(int db)
 {
 	int pfd, cnt, len;
-	int sfd = socket(PF_POLICY, SOCK_RAW, PF_POLICY_V1);
+	int sfd;
 	struct spd_msg *msg;
 	/*
 	 * Add an extra 8 bytes of space (+1 uint64_t) to avoid truncation
@@ -2633,6 +2671,7 @@ ipsec_conf_flush(int db)
 	uint64_t buffer[
 	    SPD_8TO64(sizeof (*msg) + sizeof (spd_if_t) + LIFNAMSIZ) + 1];
 
+	sfd = get_pf_pol_socket();
 	if (sfd < 0) {
 		warn(gettext("unable to open policy socket"));
 		return (-1);
@@ -2706,12 +2745,13 @@ static void
 ipsec_conf_admin(uint8_t type)
 {
 	int cnt;
-	int sfd = socket(PF_POLICY, SOCK_RAW, PF_POLICY_V1);
+	int sfd;
 	struct spd_msg *msg;
 	uint64_t buffer[
 	    SPD_8TO64(sizeof (struct spd_msg) + sizeof (spd_if_t))];
 	char *save_ifname;
 
+	sfd = get_pf_pol_socket();
 	if (sfd < 0) {
 		err(-1, gettext("unable to open policy socket"));
 	}
@@ -2766,6 +2806,7 @@ usage(void)
 	(void) fprintf(stderr, gettext(
 	"Usage:	ipsecconf\n"
 	"\tipsecconf -a ([-]|<filename>) [-q]\n"
+	"\tipsecconf -c <filename>\n"
 	"\tipsecconf -r ([-]|<filename>) [-q]\n"
 	"\tipsecconf -d [-i tunnel-interface] <index>\n"
 	"\tipsecconf -d <tunnel-interface,index>\n"
@@ -2864,8 +2905,7 @@ parse_index(const char *str, char *iname)
 
 	copy = strdup(str);
 	if (copy == NULL) {
-		warnx(gettext("Out of memory"));
-		exit(1);
+		EXIT_FATAL("Out of memory.");
 	}
 
 	intf = strtok(copy, ",");
@@ -2881,14 +2921,12 @@ parse_index(const char *str, char *iname)
 		(void) strlcpy(iname, intf, LIFNAMSIZ);
 	} else {
 		if (interface_name != NULL) {
-			warnx(gettext("Interface name already selected"));
-			exit(1);
+			EXIT_FATAL("Interface name already selected");
 		}
 
 		interface_name = strdup(intf);
 		if (interface_name == NULL) {
-			warnx(gettext("Out of memory"));
-			exit(1);
+			EXIT_FATAL("Out of memory.");
 		}
 	}
 
@@ -3699,7 +3737,7 @@ scan:
 			 * leftover buffer.
 			 */
 			if (*buf != NULL) {
-				(void) strcpy(lo_buf, buf);
+				(void) strlcpy(lo_buf, buf, sizeof (lo_buf));
 				*leftover = lo_buf;
 			} else {
 				*leftover = NULL;
@@ -3816,7 +3854,8 @@ ret:
 				 * leftover buffer if any.
 				 */
 				if (*buf != NULL) {
-					(void) strcpy(lo_buf, buf);
+					(void) strlcpy(lo_buf, buf,
+					    sizeof (lo_buf));
 					*leftover = lo_buf;
 				} else {
 					*leftover = NULL;
@@ -3880,7 +3919,8 @@ ret:
 					 * leftover buffer.
 					 */
 					if (*buf != NULL) {
-						(void) strcpy(lo_buf, buf);
+						(void) strlcpy(lo_buf, buf,
+						    sizeof (lo_buf));
 						*leftover = lo_buf;
 					} else {
 						*leftover = NULL;
@@ -4963,17 +5003,14 @@ print_cmd_buf(FILE *fp, int error)
 	*(cbuf + cbuf_offset) = '\0';
 
 	if (fp == stderr) {
+		if (error != EEXIST) {
+			warnx(gettext("Malformed command (fatal):\n%s"), cbuf);
+			return (0);
+		}
 		if (ipsecconf_qflag) {
 			return (0);
 		}
-		if (error == EEXIST) {
-			warnx(gettext("Duplicate policy entry (ignored):\n%s"),
-			    cbuf);
-		} else {
-			warnx(gettext("Malformed command (fatal):\n%s"),
-			    cbuf);
-		}
-
+		warnx(gettext("Duplicate policy entry (ignored):\n%s"), cbuf);
 	} else {
 		if (fprintf(fp, "%s", cbuf) == -1) {
 			warn("fprintf");
@@ -5042,8 +5079,8 @@ dump_conf(ips_conf_t *conf)
 
 	while (iap != NULL) {
 		(void) printf("------------------------------------\n");
-		(void) printf("IPSec act is %d\n", iap->iap_action);
-		(void) printf("IPSec attr is %d\n", iap->iap_attr);
+		(void) printf("IPsec act is %d\n", iap->iap_action);
+		(void) printf("IPsec attr is %d\n", iap->iap_attr);
 		dump_algreq("AH authentication", &iap->iap_aauth);
 		dump_algreq("ESP authentication", &iap->iap_eauth);
 		dump_algreq("ESP encryption", &iap->iap_eencr);
@@ -5051,18 +5088,18 @@ dump_conf(ips_conf_t *conf)
 		iap = iap->iap_next;
 	}
 
-	fflush(stdout);
+	(void) fflush(stdout);
 }
 #endif	/* DEBUG */
 
 
 static int
-ipsec_conf_add(void)
+ipsec_conf_add(boolean_t just_check, boolean_t smf_managed)
 {
 	act_prop_t *act_props = malloc(sizeof (act_prop_t));
 	ips_conf_t conf;
 	FILE *fp, *policy_fp;
-	int ret, i, j, diag;
+	int ret, flushret, i, j, diag, num_rules, good_rules;
 	char *warning = gettext(
 		"\tWARNING : New policy entries that are being added may\n "
 		"\taffect the existing connections. Existing connections\n"
@@ -5071,21 +5108,37 @@ ipsec_conf_add(void)
 		"\tpolicy. This can disrupt the communication of the\n"
 		"\texisting connections.\n\n");
 
+	boolean_t first_time = B_TRUE;
+	num_rules = 0;
+	good_rules = 0;
+
 	if (act_props == NULL) {
 		warn(gettext("memory"));
 		return (-1);
 	}
-
-	/* clone into standby DB */
-	ipsec_conf_admin(SPD_CLONE);
 
 	if (strcmp(filename, "-") == 0)
 		fp = stdin;
 	else
 		fp = fopen(filename, "r");
 
+	/*
+	 * Treat the non-existence of a policy file as a special
+	 * case when ipsecconf is being managed by smf(5).
+	 * The assumption is the administrator has not yet
+	 * created a policy file, this should not force the service
+	 * into maintenance mode.
+	 */
+
 	if (fp == NULL) {
-		warn(gettext("%s : Input file cannot be opened"), filename);
+		if (smf_managed) {
+			(void) fprintf(stdout, gettext(
+			    "Policy configuration file (%s) does not exist.\n"
+			    "IPsec policy not configured.\n"), filename);
+			return (0);
+		}
+		warn(gettext("%s : Policy config file cannot be opened"),
+		    filename);
 		usage();
 		return (-1);
 	}
@@ -5098,10 +5151,6 @@ ipsec_conf_add(void)
 	if (policy_fp == NULL) {
 		warn(gettext("%s cannot be opened"), POLICY_CONF_FILE);
 		return (-1);
-	}
-
-	if (!ipsecconf_qflag) {
-		(void) printf("%s", warning);
 	}
 
 	/*
@@ -5120,10 +5169,26 @@ ipsec_conf_add(void)
 		    act_props->ap[0].act == NULL)
 				break;
 
+		num_rules++;
+
 		ret = form_ipsec_conf(act_props, &conf);
 		if (ret != 0) {
 			warnx(gettext("form_ipsec_conf error"));
-			break;
+			(void) print_cmd_buf(stderr, NOERROR);
+			continue;
+		}
+
+		good_rules++;
+
+		if (first_time) {
+			/*
+			 * Time to assume that there are valid policy entries.
+			 * If the IPsec kernel modules are not loaded this
+			 * will load them now.
+			 */
+			first_time = B_FALSE;
+			fetch_algorithms();
+			ipsec_conf_admin(SPD_CLONE);
 		}
 
 		/*
@@ -5244,12 +5309,12 @@ ipsec_conf_add(void)
 				break;
 			}
 		}
+next:
 		/*
 		 * Make sure this gets to the disk before
 		 * we parse the next entry.
 		 */
 		(void) fflush(policy_fp);
-next:
 		for (i = 0; act_props->pattern[i] != NULL; i++)
 			free(act_props->pattern[i]);
 		for (j = 0; act_props->ap[j].act != NULL; j++) {
@@ -5271,14 +5336,44 @@ bail:
 	}
 #ifdef DEBUG_HEAVY
 	(void) printf("ipsec_conf_add: ret val = %d\n", ret);
-	fflush(stdout);
+	(void) fflush(stdout);
 #endif
-	/* looks good, flip it in */
-	if (ret == 0)
-		ipsec_conf_admin(SPD_FLIP);
-	else
-		nuke_adds();
+	if (!good_rules) {
+		(void) restore_all_signals();
+		(void) unlock(lfd);
+		EXIT_OK("Policy file does not contain any valid rules.");
+	}
+	if (smf_managed && !just_check) {
+		(void) fprintf(stdout, gettext(
+		    "%d policy rules added.\n"), good_rules);
+		(void) fflush(stdout);
+	}
 
+	if (num_rules != good_rules) {
+		/* This is an error */
+		(void) restore_all_signals();
+		(void) unlock(lfd);
+		EXIT_BADCONFIG2("%d policy rule(s) contained errors.",
+		    num_rules - good_rules);
+	}
+
+	/* looks good, flip it in */
+	if (ret == 0 && !just_check) {
+		if (!ipsecconf_qflag) {
+			(void) printf("%s", warning);
+		}
+		ipsec_conf_admin(SPD_FLIP);
+	} else {
+		nuke_adds();
+		if (just_check) {
+			(void) fprintf(stdout, gettext(
+			    "IPsec policy was not modified.\n"));
+			(void) fflush(stdout);
+		}
+	}
+	flushret = ipsec_conf_flush(SPD_STANDBY);
+	if (flushret != 0)
+		return (flushret);
 	return (ret);
 }
 
@@ -5292,7 +5387,7 @@ ipsec_conf_sub()
 	    *warning = gettext(
 		"\tWARNING: Policy entries that are being removed may\n"
 		"\taffect the existing connections.  Existing connections\n"
-		"\tthat are subjeced to policy constraints may no longer\n"
+		"\tthat are subjected to policy constraints may no longer\n"
 		"\tbe subjected to policy contraints because of its\n"
 		"\tremoval.  This can compromise security, and disrupt\n"
 		"\tthe communication of the existing connection.\n"

@@ -61,21 +61,6 @@ fi
     /usr/lib/inet/in.mpathd -a
 
 #
-# Pass to the kernel the list of supported IPsec protocols and algorithms.
-# This will not cause IPsec to be loaded.
-#
-/usr/sbin/ipsecalgs -s
-
-#
-# Initialize IPsec only if ipsecinit.conf exists.  Otherwise, save the
-# kernel memory that'll be consumed if IPsec is loaded.  See below for more
-# IPsec-related commands.
-#
-if [ -f /etc/inet/ipsecinit.conf ] ; then
-	/usr/sbin/ipsecconf -qa /etc/inet/ipsecinit.conf
-fi
-
-#
 # Set the RFC 1948 entropy, regardless of if I'm using it or not.  If present,
 # use the encrypted root password as a source of entropy.  Otherwise,
 # just use the pre-set (and hopefully difficult to guess) entropy that
@@ -108,22 +93,6 @@ fi
 #
 if [ $TCP_STRONG_ISS ]; then
 	/usr/sbin/ndd -set /dev/tcp tcp_strong_iss $TCP_STRONG_ISS
-fi
-
-#
-# In spite of global policy, there may be a need for IPsec because of
-# per-socket policy or tunnelled policy.  With that in mind, check for manual
-# keys in /etc/inet/secret/ipseckeys, or check for IKE configuration in
-# /etc/inet/ike/config.  Either of these will also load and initialize IPsec,
-# thereby consuming kernel memory.
-#
-
-if [ -f /etc/inet/secret/ipseckeys ] ; then
-	/usr/sbin/ipseckey -f /etc/inet/secret/ipseckeys
-fi
-
-if [ -f /etc/inet/ike/config ] ; then
-	/usr/lib/inet/in.iked
 fi
 
 #

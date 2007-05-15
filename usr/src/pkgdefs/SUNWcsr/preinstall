@@ -114,4 +114,17 @@ elif [ -n "$SUNW_PKG_INSTALL_ZONENAME" -a \
 	touch $BASEDIR/var/SUNWcsr-apply-limited-net
 fi
 
+if [ "$UPDATE" = yes ]; then
+	# Check for existing smf(5) manifests
+	BASEPREFIX=`echo $BASEDIR | sed "s/\//_/g"`
+	if [ -f ${PKG_INSTALL_ROOT}/var/svc/network/ipsec/ike.xml ]; then
+		IKEMANIFEST=`echo ike.xml"$BASEPREFIX" | cut -c 1-256`
+		touch /tmp/${IKEMANIFEST}
+	fi
+	if [ -f ${PKG_INSTALL_ROOT}/var/svc/network/ipsec/manual-key.xml ]; then
+		MANKEYMANIFEST=`echo manual-key.xml$BASEPREFIX" | cut -c 1-256`
+		touch /tmp/${MANKEYMANIFEST}
+	fi
+fi
+
 exit 0

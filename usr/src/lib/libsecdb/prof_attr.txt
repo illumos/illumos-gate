@@ -50,10 +50,11 @@ Maintenance and Repair:::Maintain and repair a system:auths=solaris.smf.manage.s
 Media Backup:::Backup files and file systems:help=RtMediaBkup.html
 Media Restore:::Restore files and file systems from backups:help=RtMediaRestore.html
 Network Management:::Manage the host and network configuration:auths=solaris.smf.manage.name-service-cache,solaris.smf.manage.bind,solaris.smf.value.routing,solaris.smf.manage.routing,solaris.smf.value.nwam,solaris.smf.manage.nwam,solaris.smf.manage.wpa;profiles=Network Wifi Management;help=RtNetMngmnt.html
-Network Security:::Manage network and host security:auths=solaris.smf.manage.ssh;profiles=Network Wifi Security,Network Link Security;help=RtNetSecure.html
+Network Security:::Manage network and host security:auths=solaris.smf.manage.ssh;profiles=Network Wifi Security,Network Link Security,Network IPsec Management;help=RtNetSecure.html
 Network Wifi Management:::Manage wifi network configuration:auths=solaris.network.wifi.config;help=RtNetWifiMngmnt.html
 Network Wifi Security:::Manage wifi network security:auths=solaris.network.wifi.wep;help=RtNetWifiSecure.html
 Network Link Security:::Manage network link security:auths=solaris.network.link.security;help=RtNetLinkSecure.html
+Network IPsec Management:::Manage IPsec and IKE:auths=solaris.smf.manage.ipsec,solaris.smf.value.ipsec;help=RtNetIPsec.html
 Name Service Management:::Non-security name service scripts/commands:help=RtNameServiceAdmin.html
 Name Service Security:::Security related name service scripts/commands:help=RtNameServiceSecure.html
 Object Access Management:::Change ownership and permission on files:help=RtObAccessMngmnt.html

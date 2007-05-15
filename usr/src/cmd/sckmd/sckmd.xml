@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -39,15 +39,6 @@
 
 	<single_instance />
 
-	<!-- Required for loading the IPsec algorithms -->
-	<dependency
-	    name='net_init'
-	    grouping='require_all'
-	    restart_on='none'
-	    type='service'>
-		<service_fmri value='svc:/network/initial' />
-	</dependency>
-
 	<!-- Required as non-root local directories could be accessed -->
 	<dependency
 	    name='local-filesystems'
@@ -57,12 +48,29 @@
 	        <service_fmri value='svc:/system/filesystem/local' />
 	</dependency>
 
+	<dependency
+	    name='network'
+	    type='service'
+	    grouping='require_all'
+	    restart_on='none'>
+		<service_fmri value='svc:/milestone/network' />
+	</dependency>
+
 	<!-- Required for loading the cryptographic services -->
 	<dependency name='cryptosvc'
 		grouping='require_all'
 		restart_on='none'
 		type='service'>
 		<service_fmri value='svc:/system/cryptosvc' />
+	</dependency>
+
+	<!-- Required for loading the IPsec algorithms -->
+	<dependency
+	    name='ipsecalgs'
+	    grouping='require_all'
+	    restart_on='none'
+	    type='service'>
+		<service_fmri value='svc:/network/ipsec/ipsecalgs' />
 	</dependency>
 
 	<exec_method

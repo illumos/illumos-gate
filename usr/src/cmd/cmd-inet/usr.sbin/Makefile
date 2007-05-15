@@ -33,11 +33,10 @@ DHCPPROG=	dhcpconfig dhtadm pntadm
 XMODPROG=	wanbootutil
 # EXPORT DELETE END
 
-PROG=		6to4relay arp gettable if_mpadm ikeadm ikecert \
+PROG=		6to4relay arp gettable if_mpadm \
 		in.comsat in.fingerd in.rarpd in.rexecd in.rlogind \
 		in.rshd in.rwhod in.telnetd in.tftpd ipaddrsel \
-		ipsecalgs ipsecconf ipseckey ndd $(SYNCPROG) $(DHCPPROG) \
-		$(XMODPROG)
+		ndd $(SYNCPROG) $(DHCPPROG) $(XMODPROG)
 
 MANIFEST=	rarp.xml telnet.xml comsat.xml finger.xml \
 		login.xml shell.xml rexec.xml 
@@ -50,13 +49,11 @@ AUDITPROG=	in.rexecd in.rlogind in.rshd in.telnetd
 PAMPROG=	in.rexecd in.rlogind in.rshd in.telnetd
 SOCKETPROG=	6to4relay arp gettable hostconfig if_mpadm in.comsat \
 		in.fingerd in.rarpd in.rexecd in.rlogind in.rshd \
-		in.rwhod in.telnetd in.tftpd ipaddrsel \
-		ipsecalgs ipsecconf ipseckey route
-NSLPROG=	6to4relay arp gettable hostconfig ikeadm in.comsat in.rarpd \
+		in.rwhod in.telnetd in.tftpd ipaddrsel route
+NSLPROG=	6to4relay arp gettable hostconfig in.comsat in.rarpd \
 		in.rexecd in.rlogind in.rshd in.rwhod in.telnetd \
-		in.tftpd ipaddrsel ipsecalgs ipsecconf ipseckey route
+		in.tftpd ipaddrsel route
 CMDPROG=	in.telnetd
-IPSECUTILPROG=	ikeadm ipsecalgs ipsecconf ipseckey
 K5PROGS=	in.telnetd in.rlogind in.rshd
 TSNETPROG=	route
 DEFAULTFILES=	telnetd.dfl
@@ -71,7 +68,7 @@ SRCS=		$(PROGSRCS) $(OTHERSRC)
 SUBDIRS=	bootconfchk htable ifconfig in.ftpd in.rdisc in.routed \
 		in.talkd inetadm inetconv ipqosconf kssl/kssladm \
 		kssl/ksslcfg  mipagentconfig mipagentstat ping routeadm \
-		snoop sppptun traceroute wificonfig
+		snoop sppptun traceroute wificonfig ipsecutils
 
 MSGSUBDIRS=	bootconfchk htable ifconfig in.ftpd in.routed in.talkd \
 		inetadm inetconv ipqosconf kssl/ksslcfg mipagentconfig \
@@ -80,8 +77,8 @@ MSGSUBDIRS=	bootconfchk htable ifconfig in.ftpd in.routed in.talkd \
 # As programs get lint-clean, add them here and to the 'lint' target.
 # Eventually this hack should go away, and all in PROG should be
 # lint-clean.
-LINTCLEAN=	6to4relay arp ikeadm in.rlogind in.rshd in.telnetd in.tftpd \
-		ipaddrsel ipsecalgs ipseckey ipsecconf route \
+LINTCLEAN=	6to4relay arp in.rlogind in.rshd in.telnetd in.tftpd \
+		ipaddrsel route \
 		in.rarpd if_mpadm $(SYNCPROG)
 # Likewise, as subdirs get lint-clean, add them here.  Once
 # they're all clean, replace the dependency of the lint target
@@ -89,10 +86,10 @@ LINTCLEAN=	6to4relay arp ikeadm in.rlogind in.rshd in.telnetd in.tftpd \
 # for the lint rule.
 LINTSUBDIRS=	bootconfchk in.rdisc in.routed in.talkd inetadm inetconv \
 		ipqosconf mipagentstat ping routeadm sppptun traceroute \
-		wificonfig
+		wificonfig ipsecutils
 # And as programs are verified not to attempt to write into constants,
 # -xstrconst should be used to ensure they stay that way.
-CONSTCLEAN=	ikeadm
+CONSTCLEAN=
 
 include ../../Makefile.cmd
 ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
@@ -109,8 +106,7 @@ SRCS+=		$(COMMONSRCS)
 #
 # Message catalog
 #
-POFILES=	6to4relay.po if_mpadm.po ikeadm.po in.comsat.po ipaddrsel.po \
-		ipsecalgs.po ipsecconf.po ipseckey.po route.po
+POFILES=	6to4relay.po if_mpadm.po in.comsat.po ipaddrsel.po route.po
 POFILE=		usr.sbin.po
 
 all:=		TARGET= all
@@ -148,7 +144,6 @@ $(K5PROGS)		:=	CPPFLAGS += -I$(SRC)/head \
 				-I$(SRC)/lib/gss_mechs/mech_krb5/include \
 				-I$(SRC)/lib/pam_modules/krb5
 LDLIBS +=	$(K5LIBS)
-$(IPSECUTILPROG)	:=	LDLIBS += -lipsecutil
 $(TSNETPROG)		:=	LDLIBS += $(ZLAZYLOAD) -ltsnet $(ZNOLAZYLOAD)
 
 in.rarpd		:=	LDLIBS += -linetutil
@@ -249,10 +244,6 @@ lint: $(LINTSUBDIRS)
 		in.telnetd.c $(LDLIBS) -lbsm -lpam -lsocket -lnsl
 	$(LINT.c) if_mpadm.c $(LDLIBS) -lsocket -lnsl -lipmp
 	$(LINT.c) ipaddrsel.c $(LDLIBS) -lsocket -lnsl
-	$(LINT.c) ipsecalgs.c $(LDLIBS) -lsocket -lnsl -lipsecutil
-	$(LINT.c) ipsecconf.c $(LDLIBS) -lsocket -lnsl -lipsecutil
-	$(LINT.c) ipseckey.c $(LDLIBS) -lsocket -lnsl -lipsecutil
-	$(LINT.c) ikeadm.c $(LDLIBS) -lnsl -lipsecutil
 	$(LINT.c) route.c $(LDLIBS) -lsocket -lnsl -ltsnet
 	$(LINT.c) syncinit.c $(LDLIBS) -ldlpi
 	$(LINT.c) syncloop.c $(LDLIBS) -ldlpi

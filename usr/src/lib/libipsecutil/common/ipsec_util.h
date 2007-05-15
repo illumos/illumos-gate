@@ -84,6 +84,17 @@ typedef struct keywdtab {
 	char	*kw_str;
 } keywdtab_t;
 
+/* Exit the programe and enter new state */
+typedef enum exit_type {
+	SERVICE_EXIT_OK,
+	SERVICE_DEGRADE,
+	SERVICE_BADPERM,
+	SERVICE_BADCONF,
+	SERVICE_MAINTAIN,
+	SERVICE_DISABLE,
+	SERVICE_FATAL,
+	SERVICE_RESTART
+} exit_type_t;
 
 /*
  * Function Prototypes
@@ -92,6 +103,7 @@ typedef struct keywdtab {
 /*
  * Print errno and if cmdline or readfile, exit; if interactive reset state
  */
+extern void ipsecutil_exit(exit_type_t, char *, FILE *, const char *fmt, ...);
 extern void bail(char *);
 
 /*
@@ -134,9 +146,12 @@ extern boolean_t dump_sadb_idtype(uint8_t, FILE *, int *);
  */
 
 /* callback function passed in to do_interactive() */
-typedef void (*parse_cmdln_fn)(int, char **);
+typedef void (*parse_cmdln_fn)(int, char **, char *);
 
-extern void do_interactive(FILE *, char *, parse_cmdln_fn);
+extern void do_interactive(FILE *, char *, char *, char *, parse_cmdln_fn);
+
+extern uint_t lines_parsed;
+extern uint_t lines_added;
 
 /* convert a string to an IKE_PRIV_* constant */
 extern int privstr2num(char *);
@@ -319,6 +334,59 @@ extern boolean_t save_ident(struct sadb_ident *, FILE *);
 extern void save_assoc(uint64_t *, FILE *);
 extern FILE *opensavefile(char *);
 extern const char *do_inet_ntop(const void *, char *, size_t);
+
+/*
+ * These exit macros give a consistent exit behaviour for all
+ * programs that use libipsecutil. These wll work in usr/src/cmd
+ * and usr/src/lib, but because macros in usr/src/lib don't get
+ * expanded when I18N message catalogs are built, avoid using
+ * these with text inside libipsecutil.
+ */
+#define	EXIT_OK(x) \
+	ipsecutil_exit(SERVICE_EXIT_OK, my_fmri, debugfile, \
+	dgettext(TEXT_DOMAIN, x))
+#define	EXIT_OK2(x, y) \
+	ipsecutil_exit(SERVICE_EXIT_OK, my_fmri, debugfile, \
+	dgettext(TEXT_DOMAIN, x), y)
+#define	EXIT_OK3(x, y, z) \
+	ipsecutil_exit(SERVICE_EXIT_OK, my_fmri, debugfile, \
+	dgettext(TEXT_DOMAIN, x), y, z)
+#define	EXIT_BADCONFIG(x) \
+	ipsecutil_exit(SERVICE_BADCONF, my_fmri, debugfile, \
+	dgettext(TEXT_DOMAIN, x))
+#define	EXIT_BADCONFIG2(x, y) \
+	ipsecutil_exit(SERVICE_BADCONF, my_fmri, debugfile, \
+	dgettext(TEXT_DOMAIN, x), y)
+#define	EXIT_BADCONFIG3(x, y, z) \
+	ipsecutil_exit(SERVICE_BADCONF, my_fmri, debugfile, \
+	dgettext(TEXT_DOMAIN, x), y, z)
+#define	EXIT_MAINTAIN(x) \
+	ipsecutil_exit(SERVICE_MAINTAIN, my_fmri, debugfile, \
+	dgettext(TEXT_DOMAIN, x))
+#define	EXIT_MAINTAIN2(x, y) \
+	ipsecutil_exit(SERVICE_MAINTAIN, my_fmri, debugfile, \
+	dgettext(TEXT_DOMAIN, x), y)
+#define	EXIT_DEGRADE(x) \
+	ipsecutil_exit(SERVICE_DEGRADE, my_fmri, debugfile, \
+	dgettext(TEXT_DOMAIN, x))
+#define	EXIT_BADPERM(x) \
+	ipsecutil_exit(SERVICE_BADPERM, my_fmri, debugfile, \
+	dgettext(TEXT_DOMAIN, x))
+#define	EXIT_BADPERM2(x, y) \
+	ipsecutil_exit(SERVICE_BADPERM, my_fmri, debugfile, \
+	dgettext(TEXT_DOMAIN, x), y)
+#define	EXIT_FATAL(x) \
+	ipsecutil_exit(SERVICE_FATAL, my_fmri, debugfile, \
+	dgettext(TEXT_DOMAIN, x))
+#define	EXIT_FATAL2(x, y) \
+	ipsecutil_exit(SERVICE_FATAL, my_fmri, debugfile, \
+	dgettext(TEXT_DOMAIN, x), y)
+#define	EXIT_FATAL3(x, y, z) \
+	ipsecutil_exit(SERVICE_FATAL, my_fmri, debugfile, \
+	dgettext(TEXT_DOMAIN, x), y, z)
+#define	EXIT_RESTART(x) \
+	ipsecutil_exit(SERVICE_RESTART, my_fmri, debugfile, \
+	dgettext(TEXT_DOMAIN, x))
 
 #ifdef __cplusplus
 }

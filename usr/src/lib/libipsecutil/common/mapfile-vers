@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -53,12 +53,17 @@ SUNWprivate_1.1 {
 	ipsecalgs_diag;
 	ipsecproto_get_exec_mode;
 	ipsecproto_set_exec_mode;
+	ipsecutil_exit;
 	keysock_diag;
 	kmc_insert_mapping;
 	kmc_lookup_by_cookie;
 	lineno;
+	lines_added;
+	lines_parsed;
 	list_ints;
 	nflag;
+	debugfile;
+	my_fmri;
 	opensavefile;
 	parsedbgopts;
 	pflag;

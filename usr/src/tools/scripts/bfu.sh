@@ -1195,6 +1195,16 @@ smf_handle_new_services () {
 		echo /usr/sbin/svcadm enable system/filesystem/rmvolmgr >> \
 		    $rootprefix/var/svc/profile/upgrade
 	fi
+	if [[ $zone = global &&
+	    ! -f $rootprefix/var/svc/manifest/network/ipsec/manual-key.xml &&
+	    -f $rootprefix/etc/inet/secret/ipseckeys ]]; then
+		smf_enable svc:/network/ipsec/manual-key:default
+	fi
+	if [[ $zone = global &&
+	    ! -f $rootprefix/var/svc/manifest/network/ipsec/ike.xml &&
+	    $rootprefix/etc/inet/ike/config ]]; then
+		smf_enable svc:/network/ipsec/ike:default
+	fi
 }
 
 smf_copy_manifest() {
@@ -1585,7 +1595,7 @@ smf_apply_conf () {
 	[ -f $rootprefix/etc/resolv.conf ] && smf_enable network/dns/client
 	[ -f $rootprefix/etc/inet/dhcpsvc.conf ] && \
 	    smf_enable network/dhcp-server
-
+  
 	# Not concerned about enabling/disabling rcap but will migrate
 	# configuration parameters if rcap.conf exists
 	#

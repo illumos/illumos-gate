@@ -695,7 +695,6 @@ parse_ident(int argc, char **argv, sadb_ident_t **idpp)
 {
 	int		alloclen, consumed;
 	sadb_ident_t	*idp;
-
 	if ((argc < 2) || (argv == NULL) || (argv[0] == NULL) ||
 	    (argv[1] == NULL))
 		return (-1);
@@ -715,7 +714,8 @@ parse_ident(int argc, char **argv, sadb_ident_t **idpp)
 	idp->sadb_ident_id = 0;
 
 	/* now copy in identity param */
-	(void) strcpy((char *)(idp + 1), argv[1]);
+	(void) strlcpy((char *)(idp + 1), argv[1],
+	    alloclen - (sizeof (sadb_ident_t)));
 
 	return (++consumed);
 }
@@ -1083,7 +1083,7 @@ parse_ps(int argc, char **argv, ike_ps_t **presharedpp, int *len)
 		sidp = (sadb_ident_t *)((int)psp + psp->ps_localid_off);
 		sidp->sadb_ident_len = psp->ps_localid_len;
 		sidp->sadb_ident_type = locidtype;
-		(void) strcpy((char *)(sidp + 1), locid);
+		(void) strlcpy((char *)(sidp + 1), locid, a_locidtotal);
 	}
 
 	psp->ps_remoteid_off = psp->ps_localid_off + a_locidtotal;
@@ -1111,7 +1111,7 @@ parse_ps(int argc, char **argv, ike_ps_t **presharedpp, int *len)
 		sidp = (sadb_ident_t *)((int)psp + psp->ps_remoteid_off);
 		sidp->sadb_ident_len = psp->ps_remoteid_len;
 		sidp->sadb_ident_type = remidtype;
-		(void) strcpy((char *)(sidp + 1), remid);
+		(void) strlcpy((char *)(sidp + 1), remid, a_remidtotal);
 	}
 
 	psp->ps_key_off = psp->ps_remoteid_off + a_remidtotal;
@@ -2841,8 +2841,9 @@ do_rbdump()
 
 #define	REQ_ARG_CNT	1
 
+/*ARGSUSED*/
 static void
-parseit(int argc, char **argv)
+parseit(int argc, char **argv, char *notused)
 {
 	int	cmd, cmd_obj_args = 1;
 	char	*cmdstr, *objstr;
@@ -2991,10 +2992,10 @@ main(int argc, char **argv)
 
 	if (*argv == NULL) {
 		/* no cmd-line args, do interactive mode */
-		do_interactive(stdin, "ikeadm> ", parseit);
+		do_interactive(stdin, NULL, "ikeadm> ", NULL, parseit);
 	}
 
-	parseit(argc, argv);
+	parseit(argc, argv, NULL);
 
 	return (0);
 }

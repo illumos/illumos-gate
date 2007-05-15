@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -49,12 +49,13 @@
 		<service_fmri value='svc:/network/loopback' />
 	</dependency>
 
+	<!-- sckmd is required on OPL and Starcat but not Starfire -->
 	<dependency
-	    name='net_init'
-	    grouping='require_all'
+	    name='sckmd'
+	    grouping='optional_all'
 	    restart_on='none'
 	    type='service'>
-		<service_fmri value='svc:/network/initial' />
+		<service_fmri value='svc:/platform/sun4u/sckmd' />
 	</dependency>
 
 	<dependency 

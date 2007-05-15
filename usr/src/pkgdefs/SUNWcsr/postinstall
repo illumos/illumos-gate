@@ -23,7 +23,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-
+BASEPREFIX=`echo $BASEDIR | sed "s/\//_/g"`
 #
 # Clear sysidtool which may have gone into maintenance due to a dependency
 # cycle with milestone/single-user, when upgrading to a system that
@@ -132,6 +132,34 @@ if [ -x /usr/sbin/svcadm -a -x /usr/sbin/svccfg -a \
 	svccfg delete svc:/network/aggregation >/dev/null 2>&1
 	svccfg delete svc:/network/datalink-init >/dev/null 2>&1
 	svccfg delete svc:/network/datalink >/dev/null 2>&1
+fi
+
+# The ipsecalgs and policy services are delivered enabled.
+# The ike and manual-key services are delivered disabled. The
+# system administrator will need to enable them after creating
+# the config file(s). If the system has been upgraded and the
+# config files exist, enable the services on first boot.
+# The file in /tmp indicates that this system had already been
+# upgraded. The service will only be enabled on first upgrade.
+IKEMANIFEST=`echo ike.xml"$BASEPREFIX" | cut -c 1-256`
+if [ ! -f /tmp/${IKEMANIFEST} ]; then
+	cat >> ${PKG_INSTALL_ROOT}/var/svc/profile/upgrade <<\_IPSECUPGRD
+	if [ -f /etc/inet/ike/config ]; then
+		/usr/sbin/svcadm enable svc:/network/ipsec/ike:default
+	fi
+_IPSECUPGRD
+	else
+		rm /tmp/${IKEMANIFEST}
+fi
+MANKEYMANIFEST=`echo manual-key.xml"$BASEPREFIX" | cut -c 1-256`
+if [ ! -f /tmp/${MANKEYMANIFEST} ]; then
+	cat >> ${PKG_INSTALL_ROOT}/var/svc/profile/upgrade <<\_IPSECUPGRD
+	if [ -f /etc/inet/secret/ipseckeys ]; then
+		/usr/sbin/svcadm enable svc:/network/ipsec/manual-key:default
+	fi
+_IPSECUPGRD
+	else
+		rm /tmp/${MANKEYMANIFEST}
 fi
 
 #

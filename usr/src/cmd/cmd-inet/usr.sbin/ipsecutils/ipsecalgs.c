@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +38,7 @@
 #include <strings.h>
 #include <errno.h>
 #include <sys/crypto/common.h>
+#include <zone.h>
 
 #define	SPDSOCK_DIAG_BUF_LEN	128
 
@@ -930,6 +930,8 @@ int
 main(int argc, char *argv[])
 {
 	int c;
+	zoneid_t zoneid;
+	ushort_t flags;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)
@@ -1066,8 +1068,27 @@ main(int argc, char *argv[])
 			usage();
 	}
 
-	if (synch_kernel)
-		kernel_synch();
+	if (synch_kernel) {
+		/*
+		 * This will only work in the global zone or
+		 * a zone with an exclusive IP stack.
+		 */
+		if ((zoneid = getzoneid()) == 0) {
+			kernel_synch();
+		} else {
+			if (zone_getattr(zoneid, ZONE_ATTR_FLAGS, &flags,
+			    sizeof (flags)) < 0) {
+				err(EXIT_FAILURE, gettext(
+				    "Unable to determine zone IP type"));
+			}
+			if (flags & ZF_NET_EXCL) {
+				kernel_synch();
+			} else {
+				(void) printf(gettext("Synchronization with "
+				    "kernel not appropriate in this zone.\n"));
+			}
+		}
+	}
 
 	return (EXIT_SUCCESS);
 }

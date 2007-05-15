@@ -45,6 +45,7 @@
 #include <libintl.h>
 #include <setjmp.h>
 #include <libgen.h>
+#include <libscf.h>
 
 #include "ipsec_util.h"
 #include "ikedoor.h"
@@ -60,7 +61,11 @@ boolean_t nflag = B_FALSE;	/* avoid nameservice? */
 boolean_t interactive = B_FALSE;	/* util not running on cmdline */
 boolean_t readfile = B_FALSE;	/* cmds are being read from a file */
 uint_t	lineno = 0;		/* track location if reading cmds from file */
+uint_t	lines_added = 0;
+uint_t	lines_parsed = 0;
 jmp_buf	env;		/* for error recovery in interactive/readfile modes */
+char *my_fmri = NULL;
+FILE *debugfile = stderr;
 
 /*
  * Print errno and exit if cmdline or readfile, reset state if interactive
@@ -72,14 +77,13 @@ bail(char *what)
 	if (errno != 0)
 		warn(what);
 	else
-		warnx("Error: %s", what);
+		warnx(dgettext(TEXT_DOMAIN, "Error: %s"), what);
 	if (readfile) {
-		warnx(dgettext(TEXT_DOMAIN,
-		    "System error on line %u."), lineno);
+		return;
 	}
 	if (interactive && !readfile)
 		longjmp(env, 2);
-	exit(1);
+	EXIT_FATAL(NULL);
 }
 
 /*
@@ -105,7 +109,7 @@ bail_msg(char *fmt, ...)
 	if (interactive && !readfile)
 		longjmp(env, 1);
 
-	exit(1);
+	EXIT_FATAL(NULL);
 }
 
 
@@ -390,7 +394,7 @@ create_argv(char *ibuf, int *newargc, char ***thisargv)
 		} else {
 			if (firstchar) {
 				firstchar = B_FALSE;
-				if (*ibuf == COMMENT_CHAR) {
+				if (*ibuf == COMMENT_CHAR || *ibuf == '\n') {
 					free(*thisargv);
 					return (COMMENT_LINE);
 				}
@@ -434,15 +438,17 @@ create_argv(char *ibuf, int *newargc, char ***thisargv)
  * Enter a mode where commands are read from a file.  Treat stdin special.
  */
 void
-do_interactive(FILE *infile, char *promptstring, parse_cmdln_fn parseit)
+do_interactive(FILE *infile, char *configfile, char *promptstring,
+    char *my_fmri, parse_cmdln_fn parseit)
 {
 	char		ibuf[IBUF_SIZE], holder[IBUF_SIZE];
-	char		*hptr, **thisargv;
+	char		*hptr, **thisargv, *ebuf;
 	int		thisargc;
 	boolean_t	continue_in_progress = B_FALSE;
 
 	(void) setjmp(env);
 
+	ebuf = NULL;
 	interactive = B_TRUE;
 	bzero(ibuf, IBUF_SIZE);
 
@@ -464,10 +470,8 @@ do_interactive(FILE *infile, char *promptstring, parse_cmdln_fn parseit)
 		 * be null-terminated because of fgets().
 		 */
 		if (ibuf[IBUF_SIZE - 2] != '\0') {
-			(void) fprintf(stderr,
-			    dgettext(TEXT_DOMAIN,
-			    "Line %d too big.\n"), lineno);
-			exit(1);
+			ipsecutil_exit(SERVICE_FATAL, my_fmri, debugfile,
+			    dgettext(TEXT_DOMAIN, "Line %d too big."), lineno);
 		}
 
 		if (!continue_in_progress) {
@@ -492,10 +496,9 @@ do_interactive(FILE *infile, char *promptstring, parse_cmdln_fn parseit)
 			(void) strncpy(hptr, ibuf,
 			    (size_t)(&(holder[IBUF_SIZE]) - hptr));
 			if (holder[IBUF_SIZE - 1] != '\0') {
-				(void) fprintf(stderr,
-				    dgettext(TEXT_DOMAIN,
-				    "Command buffer overrun.\n"));
-				exit(1);
+				ipsecutil_exit(SERVICE_FATAL, my_fmri,
+				    debugfile, dgettext(TEXT_DOMAIN,
+				    "Command buffer overrun."));
 			}
 			/* Use - 2 because of \n from fgets. */
 			if (hptr[strlen(hptr) - 2] == CONT_CHAR) {
@@ -515,23 +518,51 @@ do_interactive(FILE *infile, char *promptstring, parse_cmdln_fn parseit)
 			}
 		}
 
+		/*
+		 * Just in case the command fails keep a copy of the
+		 * command buffer for diagnostic output.
+		 */
+		if (readfile) {
+			/*
+			 * The error buffer needs to be big enough to
+			 * hold the longest command string, plus
+			 * some extra text, see below.
+			 */
+			ebuf = calloc((IBUF_SIZE * 2), sizeof (char));
+			if (ebuf == NULL) {
+				ipsecutil_exit(SERVICE_FATAL, my_fmri,
+				    debugfile, dgettext(TEXT_DOMAIN,
+				    "Memory allocation error."));
+			} else {
+				(void) snprintf(ebuf, (IBUF_SIZE * 2),
+				    dgettext(TEXT_DOMAIN,
+				    "Config file entry near line %u "
+				    "caused error(s) or warnings:\n\n%s\n\n"),
+				    lineno, ibuf);
+			}
+		}
+
 		switch (create_argv(ibuf, &thisargc, &thisargv)) {
 		case TOO_MANY_TOKENS:
-			(void) fprintf(stderr,
-			    dgettext(TEXT_DOMAIN, "Too many input tokens.\n"));
-			exit(1);
+			ipsecutil_exit(SERVICE_BADCONF, my_fmri, debugfile,
+			    dgettext(TEXT_DOMAIN, "Too many input tokens."));
 			break;
 		case MEMORY_ALLOCATION:
-			(void) fprintf(stderr,
-			    dgettext(TEXT_DOMAIN,
-			    "Memory allocation error.\n"));
-			exit(1);
+			ipsecutil_exit(SERVICE_BADCONF, my_fmri, debugfile,
+			    dgettext(TEXT_DOMAIN, "Memory allocation error."));
 			break;
 		case COMMENT_LINE:
 			/* Comment line. */
+			free(ebuf);
 			break;
 		default:
-			parseit(thisargc, thisargv);
+			if (thisargc != 0) {
+				lines_parsed++;
+				/* ebuf consumed */
+				parseit(thisargc, thisargv, ebuf);
+			} else {
+				free(ebuf);
+			}
 			free(thisargv);
 			if (infile == stdin) {
 				(void) printf("%s", promptstring);
@@ -545,6 +576,41 @@ do_interactive(FILE *infile, char *promptstring, parse_cmdln_fn parseit)
 		(void) putchar('\n');
 		(void) fflush(stdout);
 	}
+	if (lines_added == 0)
+		ipsecutil_exit(SERVICE_BADCONF, my_fmri, debugfile,
+		    dgettext(TEXT_DOMAIN, "Configuration file did not "
+		    "contain any valid SAs"));
+
+	/*
+	 * There were some errors. Putting the service in maintenance mode.
+	 * When svc.startd(1M) allows services to degrade themselves,
+	 * this should be revisited.
+	 *
+	 * If this function was called from a program running as a
+	 * smf_method(5), print a warning message. Don't spew out the
+	 * errors as these will end up in the smf(5) log file which is
+	 * publically readable, the errors may contain sensitive information.
+	 */
+	if ((lines_added < lines_parsed) && (configfile != NULL)) {
+		if (my_fmri != NULL) {
+			ipsecutil_exit(SERVICE_BADCONF, my_fmri, debugfile,
+			dgettext(TEXT_DOMAIN,
+			    "The configuration file contained %d errors.\n"
+			    "Manually check the configuration with:\n"
+			    "ipseckey -c %s\n"
+			    "Use svcadm(1M) to clear maintenance condition "
+			    "when errors are resolved.\n"),
+			    lines_parsed - lines_added, configfile);
+		} else {
+			EXIT_BADCONFIG(NULL);
+		}
+	} else {
+		if (my_fmri != NULL)
+			ipsecutil_exit(SERVICE_EXIT_OK, my_fmri, debugfile,
+			    dgettext(TEXT_DOMAIN,
+			    "%d SA's successfullly added."), lines_added);
+	}
+	EXIT_OK(NULL);
 	exit(0);
 }
 
@@ -2624,4 +2690,89 @@ rparseidtype(uint16_t type)
 
 	(void) snprintf(numprint, NBUF_SIZE, "%d", type);
 	return (numprint);
+}
+
+/*
+ * This is a general purpose exit function, calling functions can specify an
+ * error type. If the command calling this function was started by smf(5) the
+ * error type could be used as a hint to the restarter. In the future this
+ * function could be used to do something more intelligent with a process that
+ * encounters an error.
+ *
+ * The function will handle an optional variable args error message, this
+ * will be written to the error stream, typically a log file or stderr.
+ */
+void
+ipsecutil_exit(exit_type_t type, char *fmri, FILE *fp, const char *fmt, ...)
+{
+	int exit_status;
+	va_list args;
+
+	if (fp == NULL)
+		fp = stderr;
+	if (fmt != NULL) {
+		va_start(args, fmt);
+		vwarnxfp(fp, fmt, args);
+		va_end(args);
+	}
+
+	if (fmri == NULL) {
+		/* Command being run directly from a shell. */
+		switch (type) {
+		case SERVICE_EXIT_OK:
+			exit_status = 0;
+			break;
+		case SERVICE_DEGRADE:
+			return;
+			break;
+		case SERVICE_BADPERM:
+		case SERVICE_BADCONF:
+		case SERVICE_MAINTAIN:
+		case SERVICE_DISABLE:
+		case SERVICE_FATAL:
+		case SERVICE_RESTART:
+			warnxfp(fp, "Fatal error - exiting.");
+			exit_status = 1;
+			break;
+		}
+	} else {
+		/* Command being run as a smf(5) method. */
+		switch (type) {
+		case SERVICE_EXIT_OK:
+			exit_status = SMF_EXIT_OK;
+			break;
+		case SERVICE_DEGRADE:
+			return;
+			break;
+		case SERVICE_BADPERM:
+			warnxfp(fp, dgettext(TEXT_DOMAIN,
+			    "Permission error with %s."), fmri);
+			exit_status = SMF_EXIT_ERR_PERM;
+			break;
+		case SERVICE_BADCONF:
+			warnxfp(fp, dgettext(TEXT_DOMAIN,
+			    "Bad configuration of service %s."), fmri);
+			exit_status = SMF_EXIT_ERR_FATAL;
+			break;
+		case SERVICE_MAINTAIN:
+			warnxfp(fp, dgettext(TEXT_DOMAIN,
+			    "Service %s needs maintenance."), fmri);
+			exit_status = SMF_EXIT_ERR_FATAL;
+			break;
+		case SERVICE_DISABLE:
+			exit_status = SMF_EXIT_ERR_FATAL;
+			break;
+		case SERVICE_FATAL:
+			warnxfp(fp, dgettext(TEXT_DOMAIN,
+			    "Service %s fatal error."), fmri);
+			exit_status = SMF_EXIT_ERR_FATAL;
+			break;
+		case SERVICE_RESTART:
+			exit_status = 1;
+			break;
+		}
+	}
+	(void) fflush(fp);
+	(void) fclose(fp);
+	exit(exit_status);
 }

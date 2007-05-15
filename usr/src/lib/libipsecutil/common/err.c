@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +44,7 @@ static const char *progname;
  * a warncore() component in it.
  */
 static void
-warncore(const char *fmt, va_list args)
+warncore(FILE *fp, const char *fmt, va_list args)
 {
 	if (progname == NULL) {
 		progname = strrchr(getexecname(), '/');
@@ -55,40 +54,52 @@ warncore(const char *fmt, va_list args)
 			progname++;
 	}
 
-	(void) fputs(progname, stderr);
+	(void) fputs(progname, fp);
 
 	if (fmt != NULL) {
-		(void) fputc(':', stderr);
-		(void) fputc(' ', stderr);
-		(void) vfprintf(stderr, fmt, args);
+		(void) fputc(':', fp);
+		(void) fputc(' ', fp);
+		(void) vfprintf(fp, fmt, args);
 	}
 }
 
 /* Finish a warning with a newline and a flush of stderr. */
 static void
-warnfinish(void)
+warnfinish(FILE *fp)
 {
-	(void) fputc('\n', stderr);
-	(void) fflush(stderr);
+	(void) fputc('\n', fp);
+	(void) fflush(fp);
+}
+
+void
+vwarnxfp(FILE *fp, const char *fmt, va_list args)
+{
+	warncore(fp, fmt, args);
+	warnfinish(fp);
+}
+
+void
+vwarnfp(FILE *fp, const char *fmt, va_list args)
+{
+	int tmperr = errno;	/* Capture errno now. */
+
+	warncore(fp, fmt, args);
+	(void) fputc(':', fp);
+	(void) fputc(' ', fp);
+	(void) fputs(strerror(tmperr), fp);
+	warnfinish(fp);
 }
 
 void
 vwarnx(const char *fmt, va_list args)
 {
-	warncore(fmt, args);
-	warnfinish();
+	vwarnxfp(stderr, fmt, args);
 }
 
 void
 vwarn(const char *fmt, va_list args)
 {
-	int tmperr = errno;	/* Capture errno now. */
-
-	warncore(fmt, args);
-	(void) fputc(':', stderr);
-	(void) fputc(' ', stderr);
-	(void) fputs(strerror(tmperr), stderr);
-	warnfinish();
+	vwarnfp(stderr, fmt, args);
 }
 
 /* PRINTFLIKE1 */
@@ -110,6 +121,26 @@ warn(const char *fmt, ...)
 
 	va_start(args, fmt);
 	vwarn(fmt, args);
+	va_end(args);
+}
+
+void
+warnxfp(FILE *fp, const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	vwarnxfp(fp, fmt, args);
+	va_end(args);
+}
+
+void
+warnfp(FILE *fp, const char *fmt, ...)
+{
+	va_list args;
+
+	va_start(args, fmt);
+	vwarnfp(fp, fmt, args);
 	va_end(args);
 }
 

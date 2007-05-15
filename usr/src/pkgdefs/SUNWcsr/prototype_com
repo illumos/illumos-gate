@@ -487,6 +487,11 @@ f manifest var/svc/manifest/network/network-loopback.xml 0444 root sys
 f manifest var/svc/manifest/network/network-physical.xml 0444 root sys
 f manifest var/svc/manifest/network/network-routing-setup.xml 0444 root sys
 f manifest var/svc/manifest/network/network-service.xml 0444 root sys
+d none var/svc/manifest/network/ipsec 0755 root sys
+f manifest var/svc/manifest/network/ipsec/ipsecalgs.xml 0444 root sys
+f manifest var/svc/manifest/network/ipsec/policy.xml 0444 root sys
+f manifest var/svc/manifest/network/ipsec/manual-key.xml 0444 root sys
+f manifest var/svc/manifest/network/ipsec/ike.xml 0444 root sys
 d none var/svc/manifest/network/routing 755 root sys
 f manifest var/svc/manifest/network/routing/legacy-routing.xml 0444 root sys
 d none var/svc/manifest/network/rpc 755 root sys

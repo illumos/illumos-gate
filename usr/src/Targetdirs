@@ -163,6 +163,7 @@ ROOT.SYS= \
 	/var/svc/manifest/system/svc \
 	/var/svc/manifest/network \
 	/var/svc/manifest/network/dns \
+  	/var/svc/manifest/network/ipsec \
 	/var/svc/manifest/network/ldap \
 	/var/svc/manifest/network/nfs \
 	/var/svc/manifest/network/nis \

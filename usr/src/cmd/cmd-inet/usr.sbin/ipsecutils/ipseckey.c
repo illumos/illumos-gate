@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <netdb.h>
 #include <pwd.h>
 #include <errno.h>
@@ -65,23 +66,89 @@ static int keysock;
 static uint32_t seq;
 static pid_t mypid;
 static boolean_t vflag = B_FALSE;	/* Verbose? */
+static boolean_t cflag = B_FALSE;	/* Check Only */
+
+char *my_fmri = NULL;
+FILE *debugfile = stdout;
 
 #define	MAX_GET_SIZE	1024
+/*
+ * WARN() and ERROR() do the same thing really, with ERROR() the fucntion
+ * that prints the error buffer needs to be called at the end of a code block
+ * This will print out all accumulated errors before bailing. The WARN()
+ * macro calls handle_errors() in such a way that it prints the message
+ * then continues.
+ * If the FATAL() macro used call handle_errors() immediately.
+ */
+#define	ERROR(x, y, z)  x = record_error(x, y, z)
+#define	ERROR1(w, x, y, z)  w = record_error(w, x, y, z)
+#define	ERROR2(v, w, x, y, z)  v = record_error(v, w, x, y, z)
+#define	WARN(x, y, z) ERROR(x, y, z);\
+	handle_errors(x, NULL, B_FALSE, B_FALSE); x = NULL
+#define	WARN1(w, x, y, z) ERROR1(w, x, y, z);\
+	handle_errors(w, NULL, B_FALSE, B_FALSE); w = NULL
+#define	WARN2(v, w, x, y, z) ERROR2(v, w, x, y, z);\
+	handle_errors(v, NULL, B_FALSE, B_FALSE); v = NULL
+#define	FATAL(x, y, z) ERROR(x, y, z);\
+	handle_errors(x, y, B_TRUE, B_TRUE)
+#define	FATAL1(w, x, y, z) ERROR1(w, x, y, z);\
+	handle_errors(w, x, B_TRUE, B_TRUE)
+
 /* Defined as a uint64_t array for alignment purposes. */
 static uint64_t get_buffer[MAX_GET_SIZE];
 
 /*
- * When something syntactically bad happens while reading commands,
- * print it.  For command line, exit.  For reading from a file, exit, and
- * print the offending line number.  For interactive, just print the error
- * and reset the program state with the longjmp().
+ * Create/Grow a buffer large enough to hold error messages. If *ebuf
+ * is not NULL then it will contain a copy of the command line that
+ * triggered the error/warning, copy this into a new buffer or
+ * append new messages to the existing buffer.
+ */
+/*PRINTFLIKE1*/
+char *
+record_error(char *ep, char *ebuf, char *fmt, ...)
+{
+	char *err_ptr;
+	char tmp_buff[1024];
+	va_list ap;
+	int length = 0;
+	err_ptr = ep;
+
+	va_start(ap, fmt);
+	(void) vsnprintf(tmp_buff, sizeof (tmp_buff), fmt, ap);
+	va_end(ap);
+
+	if (ep == NULL) {
+		/*
+		 * This is the first error to record, get a
+		 * new buffer, copy in the command line that
+		 * triggered this error/warning.
+		 */
+		if (ebuf != NULL) {
+			length = strlen(ebuf);
+			err_ptr = calloc(length, sizeof (char));
+			if (err_ptr == NULL)
+				Bail("calloc() failed");
+			(void) strlcpy(err_ptr, ebuf, length);
+		}
+	} else {
+		length = strlen(ep);
+	}
+	length += strlen(tmp_buff);
+	/* There is a new line character */
+	length++;
+	err_ptr = realloc(err_ptr, length);
+	if (err_ptr == NULL)
+		Bail("realloc() failure");
+	(void) strlcat(err_ptr, tmp_buff, length);
+	return (err_ptr);
+}
+
+/*
+ * Print usage message.
  */
 static void
 usage(void)
 {
-	if (readfile) {
-		warnx(gettext("Parse error on line %u."), lineno);
-	}
 	if (!interactive) {
 		(void) fprintf(stderr, gettext("Usage:\t"
 		    "ipseckey [ -nvp ] | cmd [sa_type] [extfield value]*\n"));
@@ -89,9 +156,53 @@ usage(void)
 		    gettext("\tipseckey [ -nvp ] -f infile\n"));
 		(void) fprintf(stderr,
 		    gettext("\tipseckey [ -nvp ] -s outfile\n"));
-		exit(1);
+	}
+	EXIT_FATAL(NULL);
+}
+
+
+/*
+ * Print out any errors, tidy up as required.
+ * error pointer ep will be free()'d
+ */
+void
+handle_errors(char *ep, char *ebuf, boolean_t fatal, boolean_t done)
+{
+	if (ep != NULL) {
+		if (my_fmri == NULL) {
+			/*
+			 * For now suppress the errors when run from smf(5)
+			 * because potentially sensitive information could
+			 * end up in a publicly readable logfile.
+			 */
+			(void) fprintf(stdout, "%s\n", ep);
+			(void) fflush(stdout);
+		}
+		free(ep);
+		if (fatal) {
+			if (ebuf != NULL) {
+				free(ebuf);
+			}
+			/* reset command buffer */
+			if (interactive)
+				longjmp(env, 1);
+		} else {
+			return;
+		}
 	} else {
-		longjmp(env, 1);
+		/*
+		 * No errors, if this is the last time that this function
+		 * is called, free(ebuf) and reset command buffer.
+		 */
+		if (done) {
+			if (ebuf != NULL) {
+				free(ebuf);
+			}
+			/* reset command buffer */
+			if (interactive)
+				longjmp(env, 1);
+		}
+		return;
 	}
 }
 
@@ -179,23 +290,24 @@ parsecmd(char *cmdstr)
  * calls don't deal in units of uintNN_t.
  */
 static u_longlong_t
-parsenum(char *num, boolean_t bail)
+parsenum(char *num, boolean_t bail, char *ebuf)
 {
-	u_longlong_t rc;
+	u_longlong_t rc = 0;
 	char *end = NULL;
+	char *ep = NULL;
 
 	if (num == NULL) {
-		warnx(gettext("Unexpected end of command line."));
-		usage();
+		FATAL(ep, ebuf, gettext("Unexpected end of command line,"
+		    " was expecting a number.\n"));
+		/* NOTREACHED */
 	}
 
 	errno = 0;
 	rc = strtoull(num, &end, 0);
 	if (errno != 0 || end == num || *end != '\0') {
 		if (bail) {
-			/* Errno message printed by warn(). */
-			warn(gettext("Expecting a number, but got"));
-			usage();
+			ERROR1(ep, ebuf, gettext(
+			"Expecting a number, not \"%s\"!\n"), num);
 		} else {
 			/*
 			 * -1, while not optimal, is sufficiently out of range
@@ -205,7 +317,7 @@ parsenum(char *num, boolean_t bail)
 			return ((u_longlong_t)-1);
 		}
 	}
-
+	handle_errors(ep, NULL, B_FALSE, B_FALSE);
 	return (rc);
 }
 
@@ -225,9 +337,10 @@ static struct typetable {
 
 
 static int
-parsesatype(char *type)
+parsesatype(char *type, char *ebuf)
 {
 	struct typetable *tt = type_table;
+	char *ep = NULL;
 
 	if (type == NULL)
 		return (SADB_SATYPE_UNSPEC);
@@ -240,13 +353,14 @@ parsesatype(char *type)
 	 * protocols) may be added, so parse a numeric value if possible.
 	 */
 	if (tt->type == NULL) {
-		tt->token = (int)parsenum(type, B_FALSE);
+		tt->token = (int)parsenum(type, B_FALSE, ebuf);
 		if (tt->token == -1) {
-			warnx(gettext("Unknown SA type (%s)."), type);
-			usage();
+			ERROR1(ep, ebuf, gettext(
+			    "Unknown SA type (%s).\n"), type);
+			tt->token = SADB_SATYPE_UNSPEC;
 		}
 	}
-
+	handle_errors(ep, NULL, B_FALSE, B_FALSE);
 	return (tt->token);
 }
 
@@ -424,7 +538,7 @@ parseextval(char *value, int *next)
  * Parse possible state values.
  */
 static uint8_t
-parsestate(char *state)
+parsestate(char *state, char *ebuf)
 {
 	struct states {
 		char *state;
@@ -437,19 +551,19 @@ parsestate(char *state)
 		{NULL,		0}
 	};
 	struct states *sp;
+	char *ep = NULL;
 
 	if (state == NULL) {
-		warnx(gettext("Unexpected end of command line."));
-		usage();
+		FATAL(ep, ebuf, "Unexpected end of command line "
+		    "was expecting a state.\n");
 	}
 
 	for (sp = states; sp->state != NULL; sp++) {
 		if (strcmp(sp->state, state) == 0)
 			return (sp->retval);
 	}
-	warnx(gettext("Unknown state type %s."), state);
-	usage();
-	/* NOTREACHED */
+	ERROR1(ep, ebuf, gettext("Unknown state type \"%s\"\n"), state);
+	handle_errors(ep, NULL, B_FALSE, B_FALSE);
 	return (0);
 }
 
@@ -458,14 +572,15 @@ parsestate(char *state)
  * algorithm name.
  */
 static uint8_t
-parsealg(char *alg, int proto_num)
+parsealg(char *alg, int proto_num, char *ebuf)
 {
 	u_longlong_t invalue;
 	struct ipsecalgent *algent;
+	char *ep = NULL;
 
 	if (alg == NULL) {
-		warnx(gettext("Unexpected end of command line."));
-		usage();
+		FATAL(ep, ebuf, gettext("Unexpected end of command line, "
+		    "was expecting an algorithm name.\n"));
 	}
 
 	algent = getipsecalgbyname(alg, proto_num, NULL);
@@ -482,18 +597,19 @@ parsealg(char *alg, int proto_num)
 	 * Since algorithms can be loaded during kernel run-time, check for
 	 * numeric algorithm values too.  PF_KEY can catch bad ones with EINVAL.
 	 */
-	invalue = parsenum(alg, B_FALSE);
+	invalue = parsenum(alg, B_FALSE, ebuf);
 	if (invalue != (u_longlong_t)-1 &&
 	    (u_longlong_t)(invalue & (u_longlong_t)0xff) == invalue)
 		return ((uint8_t)invalue);
 
-	if (proto_num == IPSEC_PROTO_ESP)
-		warnx(gettext("Unknown encryption algorithm type %s."), alg);
-	else
-		warnx(gettext("Unknown authentication algorithm type %s."),
-		    alg);
-	usage();
-	/* NOTREACHED */
+	if (proto_num == IPSEC_PROTO_ESP) {
+		ERROR1(ep, ebuf, gettext(
+		    "Unknown encryption algorithm type \"%s\"\n"), alg);
+	} else {
+		ERROR1(ep, ebuf, gettext(
+		    "Unknown authentication algorithm type \"%s\"\n"), alg);
+	}
+	handle_errors(ep, NULL, B_FALSE, B_FALSE);
 	return (0);
 }
 
@@ -516,15 +632,16 @@ static struct idtypes {
 };
 
 static uint16_t
-parseidtype(char *type)
+parseidtype(char *type, char *ebuf)
 {
 	struct idtypes *idp;
 	u_longlong_t invalue;
+	char *ep = NULL;
 
 	if (type == NULL) {
 		/* Shouldn't reach here, see callers for why. */
-		warnx(gettext("Unexpected end of command line."));
-		usage();
+		FATAL(ep, ebuf, gettext("Unexpected end of command line, "
+		    "was expecting a type.\n"));
 	}
 
 	for (idp = idtypes; idp->idtype != NULL; idp++) {
@@ -535,15 +652,15 @@ parseidtype(char *type)
 	 * Since identity types are almost arbitrary, check for numeric
 	 * algorithm values too.  PF_KEY can catch bad ones with EINVAL.
 	 */
-	invalue = parsenum(type, B_FALSE);
+	invalue = parsenum(type, B_FALSE, ebuf);
 	if (invalue != (u_longlong_t)-1 &&
 	    (u_longlong_t)(invalue & (u_longlong_t)0xffff) == invalue)
 		return ((uint16_t)invalue);
 
 
-	warnx(gettext("Unknown identity type %s."), type);
-	usage();
-	/* NOTREACHED */
+	ERROR1(ep, ebuf, gettext("Unknown identity type \"%s\"\n"), type);
+
+	handle_errors(ep, NULL, B_FALSE, B_FALSE);
 	return (0);
 }
 
@@ -565,14 +682,15 @@ static union {
 } addr1;
 
 static int
-parseaddr(char *addr, struct hostent **hpp, boolean_t v6only)
+parseaddr(char *addr, struct hostent **hpp, boolean_t v6only, char *ebuf)
 {
 	int hp_errno;
 	struct hostent *hp = NULL;
+	char *ep = NULL;
 
 	if (addr == NULL) {
-		warnx(gettext("Unexpected end of command line."));
-		usage();
+		FATAL(ep, ebuf, gettext("Unexpected end of command line, "
+		    "was expecting an address.\n"));
 	}
 
 	if (!nflag) {
@@ -618,13 +736,12 @@ parseaddr(char *addr, struct hostent **hpp, boolean_t v6only)
 		}
 	}
 
-	if (hp == NULL) {
-		warnx(gettext("Unknown address %s."), addr);
-		usage();
-	}
+	if (hp == NULL)
+		WARN1(ep, ebuf, gettext("Unknown address %s."), addr);
 
 	*hpp = hp;
 	/* Always return sockaddr_in6 for now. */
+	handle_errors(ep, NULL, B_FALSE, B_FALSE);
 	return (sizeof (struct sockaddr_in6));
 }
 
@@ -647,15 +764,16 @@ parseaddr(char *addr, struct hostent **hpp, boolean_t v6only)
 	(((hd) >= 'a' && (hd) <= 'f') ? ((hd) - 'a' + 10) : ((hd) - 'A' + 10)))
 
 static struct sadb_key *
-parsekey(char *input)
+parsekey(char *input, char *ebuf)
 {
 	struct sadb_key *retval;
 	uint_t i, hexlen = 0, bits, alloclen;
 	uint8_t *key;
+	char *ep = NULL;
 
 	if (input == NULL) {
-		warnx(gettext("Unexpected end of command line."));
-		usage();
+		FATAL(ep, ebuf, gettext("Unexpected end of command line, "
+		    "was expecting a key.\n"));
 	}
 
 	for (i = 0; input[i] != '\0' && input[i] != '/'; i++)
@@ -667,23 +785,23 @@ parsekey(char *input)
 		/* Have /nn. */
 		input[i] = '\0';
 		if (sscanf((input + i + 1), "%u", &bits) != 1) {
-			warnx(gettext("%s is not a bit specifier."),
+			FATAL1(ep, ebuf, gettext(
+			    "\"%s\" is not a bit specifier.\n"),
 			    (input + i + 1));
-			usage();
 		}
 		/* hexlen in nibbles */
 		if (((bits + 3) >> 2) > hexlen) {
-			warnx(gettext("bit length %d is too big for %s."),
-			    bits, input);
-			usage();
+			ERROR2(ep, ebuf, gettext(
+			    "bit length %d is too big for %s.\n"), bits, input);
 		}
 		/*
 		 * Adjust hexlen down if user gave us too small of a bit
 		 * count.
 		 */
 		if ((hexlen << 2) > bits + 3) {
-			warnx(gettext("WARNING: Lower bits will be truncated "
-			    "for:\n\t%s/%d."), input, bits);
+			WARN2(ep, ebuf, gettext(
+			    "WARNING: Lower bits will be truncated "
+			    "for:\n\t%s/%d.\n"), input, bits);
 			hexlen = (bits + 3) >> 2;
 			input[hexlen] = '\0';
 		}
@@ -716,8 +834,11 @@ parsekey(char *input)
 
 		if (!isxdigit(input[i]) ||
 		    (!isxdigit(input[i + 1]) && second)) {
-			warnx(gettext("string '%s' not a hex string."), input);
-			usage();
+			ERROR1(ep, ebuf, gettext(
+			    "string '%s' not a hex value.\n"), input);
+			free(retval);
+			retval = NULL;
+			break;
 		}
 		*key = (hd2num(input[i]) << 4);
 		if (second)
@@ -732,6 +853,7 @@ parsekey(char *input)
 		*((input[i] == '\0') ? key - 1 : key) &=
 		    0xff << (8 - (bits & 0x7));
 
+	handle_errors(ep, NULL, B_FALSE, B_FALSE);
 	return (retval);
 }
 
@@ -961,7 +1083,8 @@ static void
 doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
     struct hostent *srchp, struct hostent *dsthp,
     struct sadb_address *src, struct sadb_address *dst,
-    boolean_t unspec_src, uint64_t *buffer, int buffer_size, uint32_t spi)
+    boolean_t unspec_src, uint64_t *buffer, int buffer_size, uint32_t spi,
+    char *ebuf)
 {
 	boolean_t single_dst;
 	struct sockaddr_in6 *sin6;
@@ -971,6 +1094,7 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 	char *first_match;
 	uint64_t savebuf[MAX_GET_SIZE];
 	uint16_t srcport = 0, dstport = 0;
+	char *ep = NULL;
 
 	/*
 	 * Okay, now we have "src", "dst", and maybe "proxy" reassigned
@@ -1068,12 +1192,14 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 			errno = msgp->sadb_msg_errno;
 			if (errno != 0) {
 				if (errno == EINVAL) {
-					warnx(gettext("One of the entered "
-						"values is incorrect."));
+					WARN(ep, ebuf, gettext(
+					    "One of the entered "
+					    "values is incorrect."));
 					print_diagnostic(stderr,
 					    msgp->sadb_x_msg_diagnostic);
+				} else {
+					Bail("return message (in doaddresses)");
 				}
-				Bail("return message (in doaddresses)");
 			}
 
 			/* ...and then restore the saved buffer. */
@@ -1133,12 +1259,13 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 					 * No IPv4 hits.  Is this a single
 					 * dest?
 					 */
-					warnx(gettext(
+					WARN1(ep, ebuf, gettext(
 					    "No IPv4 source address "
-					    "for name %s."), srchp->h_name);
+					    "for name %s.\n"), srchp->h_name);
 					if (single_dst) {
-						/* Error. */
-						usage();
+						ERROR(ep, ebuf, gettext(
+						    "Only single destination "
+						    "IP address.\n"));
 					} else {
 						/* Continue, but do I print? */
 						continue;  /* for loop */
@@ -1156,7 +1283,7 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 					 *
 					 * Issue a null-source warning?
 					 */
-					warnx(gettext(
+					WARN1(ep, ebuf, gettext(
 					    "Multiple IPv4 source addresses "
 					    "for %s, using unspecified source "
 					    "instead."), srchp->h_name);
@@ -1214,13 +1341,15 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 					 * No IPv6 hits.  Is this a single
 					 * dest?
 					 */
-					warnx(gettext(
+					WARN1(ep, ebuf, gettext(
 					    "No IPv6 source address of "
-					    "matching scope for name %s."),
+					    "matching scope for name %s.\n"),
 					    srchp->h_name);
 					if (single_dst) {
-						/* Error. */
-						usage();
+						ERROR(ep, ebuf, gettext(
+						    "Only a single IPV6 "
+						    "destination "
+						    "address.\n"));
 					} else {
 						/* Continue, but do I print? */
 						continue;  /* for loop */
@@ -1234,10 +1363,10 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 					 * Early loop exit.  Issue a
 					 * null-source warning?
 					 */
-					warnx(gettext(
+					WARN1(ep, ebuf, gettext(
 					    "Multiple IPv6 source addresses "
 					    "for %s of the same scope, using "
-					    "unspecified source instead."),
+					    "unspecified source instead.\n"),
 					    srchp->h_name);
 				} else {
 					/*
@@ -1251,6 +1380,12 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 				}
 			}
 		}
+
+		/*
+		 * If there are errors at this point there is no
+		 * point sending anything to PF_KEY.
+		 */
+		handle_errors(ep, ebuf, B_TRUE, B_FALSE);
 
 		/* Save off a copy for later writing... */
 		msgp = (struct sadb_msg *)buffer;
@@ -1313,10 +1448,12 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 
 			errno = msgp->sadb_msg_errno;
 			if (errno == on_errno) {
-				warnx(gettext("Association (type = %s) "
-				    "with spi 0x%x and addr\n%s %s."),
+				ERROR2(ep, ebuf, gettext(
+				    "Association (type = %s) "
+				    "with spi 0x%x and addr\n"),
 				    rparsesatype(msgp->sadb_msg_satype),
-				    ntohl(spi),
+				    ntohl(spi));
+				ERROR2(ep, ebuf, "%s %s.\n",
 				    do_inet_ntop(dsthp->h_addr_list[i],
 					addrprint, sizeof (addrprint)),
 				    on_errno_msg);
@@ -1326,31 +1463,43 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 				continue;
 			} else {
 				if (errno == EINVAL) {
-					warnx(gettext("One of the entered "
-						"values is incorrect."));
-					print_diagnostic(stderr,
-					    msgp->sadb_x_msg_diagnostic);
+					ERROR2(ep, ebuf, gettext(
+					    "PF_KEY Diagnostic code %u: %s.\n"),
+					    msgp->sadb_x_msg_diagnostic,
+					    keysock_diag(
+					    msgp->sadb_x_msg_diagnostic));
+				} else {
+					Bail("return message (in doaddresses)");
 				}
-				Bail("return message (in doaddresses)");
 			}
 		}
+
 		if (cmd == CMD_GET) {
 			if (msgp->sadb_msg_len > MAX_GET_SIZE) {
-				warnx(gettext("WARNING:  "
-				    "SA information bigger than %d bytes."),
+				WARN1(ep, ebuf, gettext("WARNING:  "
+				    "SA information bigger than %d bytes.\n"),
 				    SADB_64TO8(MAX_GET_SIZE));
 			}
 			print_samsg(buffer, B_FALSE, vflag);
 		}
 
+		handle_errors(ep, ebuf, B_TRUE, B_FALSE);
+
 		/* ...and then restore the saved buffer. */
 		msgp = (struct sadb_msg *)savebuf;
 		bcopy(savebuf, buffer, SADB_64TO8(msgp->sadb_msg_len));
+		lines_added++;
 	}
 
 	/* Degenerate case, h_addr_list[0] == NULL. */
 	if (i == 0)
 		Bail("Empty destination address list");
+
+	/*
+	 * free(ebuf) even if there are no errors.
+	 * handle_errors() won't return here.
+	 */
+	handle_errors(ep, ebuf, B_TRUE, B_TRUE);
 }
 
 /*
@@ -1358,7 +1507,7 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
  * they need.
  */
 static void
-doaddup(int cmd, int satype, char *argv[])
+doaddup(int cmd, int satype, char *argv[], char *ebuf)
 {
 	uint64_t *buffer, *nexthdr;
 	struct sadb_msg msg;
@@ -1382,6 +1531,7 @@ doaddup(int cmd, int satype, char *argv[])
 	uint16_t srcport = 0, dstport = 0, natt_lport = 0, natt_rport = 0,
 	    isrcport = 0, idstport = 0;
 	uint8_t proto = 0, iproto = 0;
+	char *ep = NULL;
 
 	thiscmd = (cmd == CMD_ADD) ? "add" : "update";
 
@@ -1397,9 +1547,8 @@ doaddup(int cmd, int satype, char *argv[])
 			/* Do nothing, I'm done. */
 			break;
 		case TOK_UNKNOWN:
-			warnx(gettext("Unknown extension field %s."),
-			    *(argv - 1));
-			usage();	/* Will exit program. */
+			ERROR1(ep, ebuf, gettext(
+			    "Unknown extension field \"%s\" \n"), *(argv - 1));
 			break;
 		case TOK_SPI:
 		case TOK_REPLAY:
@@ -1432,13 +1581,19 @@ doaddup(int cmd, int satype, char *argv[])
 				 * can type in another SPI.
 				 */
 				if (assoc->sadb_sa_spi != 0) {
-					warnx(gettext("Can only specify "
-						"single SPI value."));
-					usage();
+					ERROR(ep, ebuf, gettext(
+					    "Can only specify "
+					    "single SPI value.\n"));
+					break;
 				}
 				/* Must convert SPI to network order! */
 				assoc->sadb_sa_spi =
-				    htonl((uint32_t)parsenum(*argv, B_TRUE));
+				    htonl((uint32_t)parsenum(*argv, B_TRUE,
+				    ebuf));
+				if (assoc->sadb_sa_spi == 0) {
+					ERROR(ep, ebuf, gettext(
+					    "Invalid SPI value \"0\" .\n"));
+				}
 				break;
 			case TOK_REPLAY:
 				/*
@@ -1446,16 +1601,17 @@ doaddup(int cmd, int satype, char *argv[])
 				 * replay.
 				 */
 				if (assoc->sadb_sa_replay != 0) {
-					warnx(gettext("Can only specify "
-						"single replay wsize."));
-					usage();
+					ERROR(ep, ebuf, gettext(
+					    "Can only specify "
+					    "single replay window size.\n"));
+					break;
 				}
 				assoc->sadb_sa_replay =
-				    (uint8_t)parsenum(*argv, B_TRUE);
+				    (uint8_t)parsenum(*argv, B_TRUE, ebuf);
 				if (assoc->sadb_sa_replay != 0) {
-					warnx(gettext(
+					WARN(ep, ebuf, gettext(
 					    "WARNING:  Replay with manual"
-					    " keying considered harmful."));
+					    " keying considered harmful.\n"));
 				}
 				break;
 			case TOK_STATE:
@@ -1466,46 +1622,52 @@ doaddup(int cmd, int satype, char *argv[])
 				 * command line.
 				 */
 				if (assoc->sadb_sa_state != 0) {
-					warnx(gettext("Can only specify "
-						"single SA state."));
-					usage();
+					ERROR(ep, ebuf, gettext(
+					    "Can only specify "
+					    "single SA state.\n"));
+					break;
 				}
-				assoc->sadb_sa_state = parsestate(*argv);
+				assoc->sadb_sa_state = parsestate(*argv,
+				    ebuf);
 				readstate = B_TRUE;
 				break;
 			case TOK_AUTHALG:
 				if (assoc->sadb_sa_auth != 0) {
-					warnx(gettext("Can only specify "
-						"single auth algorithm."));
-					usage();
+					ERROR(ep, ebuf, gettext(
+					    "Can only specify "
+					    "single auth algorithm.\n"));
+					break;
 				}
 				assoc->sadb_sa_auth = parsealg(*argv,
-				    IPSEC_PROTO_AH);
+				    IPSEC_PROTO_AH, ebuf);
 				break;
 			case TOK_ENCRALG:
 				if (satype == SADB_SATYPE_AH) {
-					warnx(gettext("Cannot specify"
-					    " encryption with SA type ah."));
-					usage();
+					ERROR(ep, ebuf, gettext("Cannot specify"
+					    " encryption with SA type ah.\n"));
+					break;
 				}
 				if (assoc->sadb_sa_encrypt != 0) {
-					warnx(gettext("Can only specify single"
-						" encryption algorithm."));
-					usage();
+					ERROR(ep, ebuf, gettext(
+					    "Can only specify "
+					    "single encryption algorithm.\n"));
+					break;
 				}
 				assoc->sadb_sa_encrypt = parsealg(*argv,
-				    IPSEC_PROTO_ESP);
+				    IPSEC_PROTO_ESP, ebuf);
 				break;
 			case TOK_ENCAP:
 				if (use_natt) {
-					warnx(gettext("Can only specify single"
-					    " encapsulation."));
-					usage();
+					ERROR(ep, ebuf, gettext(
+					    "Can only specify single"
+					    " encapsulation.\n"));
+					break;
 				}
 				if (strncmp(*argv, "udp", 3)) {
-					warnx(gettext("Can only specify udp"
-					    " encapsulation."));
-					usage();
+					ERROR(ep, ebuf, gettext(
+					    "Can only specify udp"
+					    " encapsulation.\n"));
+					break;
 				}
 				use_natt = B_TRUE;
 				/* set assoc flags later */
@@ -1515,101 +1677,115 @@ doaddup(int cmd, int satype, char *argv[])
 			break;
 		case TOK_SRCPORT:
 			if (srcport != 0) {
-				warnx(gettext("Can only specify "
-					"single source port."));
-				usage();
+				ERROR(ep, ebuf,  gettext("Can only specify "
+				    "single source port.\n"));
+				break;
 			}
-			srcport = parsenum(*argv, B_TRUE);
+			srcport = parsenum(*argv, B_TRUE, ebuf);
 			argv++;
 			break;
 		case TOK_DSTPORT:
 			if (dstport != 0) {
-				warnx(gettext("Can only specify "
-				    "single destination port."));
-				usage();
+				ERROR(ep, ebuf, gettext("Can only specify "
+				    "single destination port.\n"));
+				break;
 			}
-			dstport = parsenum(*argv, B_TRUE);
+			dstport = parsenum(*argv, B_TRUE, ebuf);
 			argv++;
 			break;
 		case TOK_ISRCPORT:
 			alloc_inner = B_TRUE;
 			if (isrcport != 0) {
-				warnx(gettext("Can only specify "
-					"single inner-source port."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify "
+				    "single inner-source port.\n"));
+				break;
 			}
-			isrcport = parsenum(*argv, B_TRUE);
+			isrcport = parsenum(*argv, B_TRUE, ebuf);
 			argv++;
 			break;
 		case TOK_IDSTPORT:
 			alloc_inner = B_TRUE;
 			if (idstport != 0) {
-				warnx(gettext("Can only specify "
-				    "single inner-destination port."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify "
+				    "single inner-destination port.\n"));
+				break;
 			}
-			idstport = parsenum(*argv, B_TRUE);
+			idstport = parsenum(*argv, B_TRUE, ebuf);
 			argv++;
 			break;
 		case TOK_NATLPORT:
 			if (natt_lport != 0) {
-				warnx(gettext("Can only specify "
-				    "single natt local port."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify "
+				    "single NAT-T local port.\n"));
+				break;
 			}
 
 			if (natt_rport != 0) {
-				warnx(gettext("Can only specify "
-				    "one of natt remote and local port."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify "
+				    "one of NAT-T remote and local port.\n"));
+				break;
 			}
-			natt_lport = parsenum(*argv, B_TRUE);
+			natt_lport = parsenum(*argv, B_TRUE, ebuf);
 			argv++;
 			break;
 		case TOK_NATRPORT:
 			if (natt_rport != 0) {
-				warnx(gettext("Can only specify "
-				    "single natt remote port."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify "
+				    "single NAT-T remote port.\n"));
+				break;
 			}
 
 			if (natt_lport != 0) {
-				warnx(gettext("Can only specify "
-				    "one of natt remote and local port."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify "
+				    "one of NAT-T remote and local port.\n"));
+				break;
 			}
-			natt_rport = parsenum(*argv, B_TRUE);
+			natt_rport = parsenum(*argv, B_TRUE, ebuf);
 			argv++;
 			break;
 
 		case TOK_PROTO:
 			if (proto != 0) {
-				warnx(gettext("Can only specify "
-				    "single protocol."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify "
+				    "single protocol.\n"));
+				break;
 			}
-			proto = parsenum(*argv, B_TRUE);
+			proto = parsenum(*argv, B_TRUE, ebuf);
 			argv++;
 			break;
 		case TOK_IPROTO:
 			alloc_inner = B_TRUE;
 			if (iproto != 0) {
-				warnx(gettext("Can only specify "
-				    "single inner protocol."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify "
+				    "single inner protocol.\n"));
+				break;
 			}
-			iproto = parsenum(*argv, B_TRUE);
+			iproto = parsenum(*argv, B_TRUE, ebuf);
 			argv++;
 			break;
 		case TOK_SRCADDR:
 		case TOK_SRCADDR6:
 			if (src != NULL) {
-				warnx(gettext("Can only specify "
-					"single source address."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify "
+				    "single source address.\n"));
+				break;
 			}
 			sa_len = parseaddr(*argv, &srchp,
-			    (token == TOK_SRCADDR6));
+			    (token == TOK_SRCADDR6), ebuf);
+			if (srchp == NULL) {
+				ERROR1(ep, ebuf, gettext(
+				    "Unknown src address \"%s\"\n"), *argv);
+				break;
+			}
 			argv++;
 			/*
 			 * Round of the sockaddr length to an 8 byte
@@ -1639,12 +1815,18 @@ doaddup(int cmd, int satype, char *argv[])
 		case TOK_DSTADDR:
 		case TOK_DSTADDR6:
 			if (dst != NULL) {
-				warnx(gettext("Can only specify single "
-				    "destination address."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify single "
+				    "destination address.\n"));
+				break;
 			}
 			sa_len = parseaddr(*argv, &dsthp,
-			    (token == TOK_DSTADDR6));
+			    (token == TOK_DSTADDR6), ebuf);
+			if (dsthp == NULL) {
+				ERROR1(ep, ebuf, gettext(
+				    "Unknown dst address \"%s\"\n"), *argv);
+				break;
+			}
 			argv++;
 			alloclen = sizeof (*dst) + roundup(sa_len, 8);
 			dst = malloc(alloclen);
@@ -1670,18 +1852,19 @@ doaddup(int cmd, int satype, char *argv[])
 		case TOK_PROXYADDR:
 		case TOK_PROXYADDR6:
 			if (isrc != NULL) {
-				warnx(gettext("Can only specify single "
-					"proxy/inner-source address."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify single "
+				    "proxy/inner-source address.\n"));
+				break;
 			}
 			if ((pstr = strchr(*argv, '/')) != NULL) {
 				/* Parse out the prefix. */
 				errno = 0;
 				prefix = strtol(pstr + 1, NULL, 10);
 				if (errno != 0) {
-					warnx(gettext("Invalid prefix %s."),
-					    pstr);
-					usage();
+					ERROR1(ep, ebuf, gettext(
+					    "Invalid prefix %s."), pstr);
+					break;
 				}
 				/* Recycle pstr */
 				alloclen = (int)(pstr - *argv);
@@ -1701,7 +1884,13 @@ doaddup(int cmd, int satype, char *argv[])
 				prefix = 128;
 			}
 			sa_len = parseaddr(pstr, &isrchp,
-			    (token == TOK_PROXYADDR6));
+			    (token == TOK_PROXYADDR6), ebuf);
+			if (isrchp == NULL) {
+				ERROR1(ep, ebuf, gettext(
+				    "Unknown proxy/inner-source address "
+				    "\"%s\"\n"), *argv);
+				break;
+			}
 			if (pstr != *argv)
 				free(pstr);
 			argv++;
@@ -1741,27 +1930,30 @@ doaddup(int cmd, int satype, char *argv[])
 				totallen -= alloclen;
 				free(isrc);
 				isrc = NULL;
-				warnx(gettext("Proxy/inner-source address %s "
-				    "is vague, not using."), isrchp->h_name);
+				WARN1(ep, ebuf, gettext(
+				    "Proxy/inner-source address %s "
+				    "is vague, not using.\n"), isrchp->h_name);
 				freehostent(isrchp);
 				isrchp = NULL;
+				break;
 			}
 			break;
 		case TOK_IDSTADDR:
 		case TOK_IDSTADDR6:
 			if (idst != NULL) {
-				warnx(gettext("Can only specify single "
-					"inner-destination address."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify single "
+				    "inner-destination address.\n"));
+				break;
 			}
 			if ((pstr = strchr(*argv, '/')) != NULL) {
 				/* Parse out the prefix. */
 				errno = 0;
 				prefix = strtol(pstr + 1, NULL, 10);
 				if (errno != 0) {
-					warnx(gettext("Invalid prefix %s."),
-					    pstr);
-					usage();
+					ERROR1(ep, ebuf, gettext(
+					    "Invalid prefix %s.\n"), pstr);
+					break;
 				}
 				/* Recycle pstr */
 				alloclen = (int)(pstr - *argv);
@@ -1781,7 +1973,13 @@ doaddup(int cmd, int satype, char *argv[])
 				prefix = 128;
 			}
 			sa_len = parseaddr(pstr, &idsthp,
-			    (token == TOK_IDSTADDR6));
+			    (token == TOK_IDSTADDR6), ebuf);
+			if (idsthp == NULL) {
+				ERROR1(ep, ebuf, gettext(
+				    "Unknown Inner Src address "
+				    " \"%s\"\n"), *argv);
+				break;
+			}
 			if (pstr != *argv)
 				free(pstr);
 			argv++;
@@ -1821,19 +2019,28 @@ doaddup(int cmd, int satype, char *argv[])
 				totallen -= alloclen;
 				free(idst);
 				idst = NULL;
-				warnx(gettext("Inner destination address %s "
-				    "is vague, not using."), idsthp->h_name);
+				WARN1(ep, ebuf, gettext(
+				    "Inner destination address %s "
+				    "is vague, not using.\n"), idsthp->h_name);
 				freehostent(idsthp);
 				idsthp = NULL;
+				break;
 			}
 			break;
 		case TOK_NATLOC:
 			if (natt_local != NULL) {
-				warnx(gettext("Can only specify "
-					"single natt local address."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify "
+				    "single NAT-T local address.\n"));
+				break;
 			}
-			sa_len = parseaddr(*argv, &natt_lhp, 0);
+			sa_len = parseaddr(*argv, &natt_lhp, 0, ebuf);
+			if (natt_lhp == NULL) {
+				ERROR1(ep, ebuf, gettext(
+				    "Unknown NAT-T local address \"%s\"\n"),
+				    *argv);
+				break;
+			}
 			argv++;
 			/*
 			 * Round of the sockaddr length to an 8 byte
@@ -1868,19 +2075,29 @@ doaddup(int cmd, int satype, char *argv[])
 				totallen -= alloclen;
 				free(natt_local);
 				natt_local = NULL;
-				warnx(gettext("Proxy/inner-source address %s "
-				    "is vague, not using."), natt_lhp->h_name);
+				WARN1(ep, ebuf, gettext(
+				    "NAT-T local address %s "
+				    "is vague, not using.\n"),
+				    natt_lhp->h_name);
 				freehostent(natt_lhp);
 				natt_lhp = NULL;
+				break;
 			}
 			break;
 		case TOK_NATREM:
 			if (natt_remote != NULL) {
-				warnx(gettext("Can only specify "
-					"single natt remote address."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify "
+				    "single NAT-T remote address.\n"));
+				break;
 			}
-			sa_len = parseaddr(*argv, &natt_rhp, 0);
+			sa_len = parseaddr(*argv, &natt_rhp, 0, ebuf);
+			if (natt_rhp == NULL) {
+				ERROR1(ep, ebuf, gettext(
+				    "Unknown NAT-T remote address \"%s\"\n"),
+				    *argv);
+				break;
+			}
 			argv++;
 			/*
 			 * Round of the sockaddr length to an 8 byte
@@ -1909,50 +2126,68 @@ doaddup(int cmd, int satype, char *argv[])
 				    &sin6->sin6_addr, sizeof (struct in6_addr));
 			} else {
 				/*
-				 * If the nat-local address is vague, don't
+				 * If the nat-renote address is vague, don't
 				 * bother.
 				 */
 				totallen -= alloclen;
 				free(natt_remote);
 				natt_remote = NULL;
-				warnx(gettext("Proxy/inner-source address %s "
-				    "is vague, not using."), natt_rhp->h_name);
+				WARN1(ep, ebuf, gettext(
+				    "NAT-T remote address %s "
+				    "is vague, not using.\n"),
+				    natt_rhp->h_name);
 				freehostent(natt_rhp);
 				natt_rhp = NULL;
+				break;
 			}
 			break;
 		case TOK_ENCRKEY:
 			if (encrypt != NULL) {
-				warnx(gettext("Can only specify "
-					"single encryption key."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify "
+				    "single encryption key.\n"));
+				break;
 			}
-			encrypt = parsekey(*argv);
-			totallen += SADB_64TO8(encrypt->sadb_key_len);
+			encrypt = parsekey(*argv, ebuf);
 			argv++;
+			if (encrypt == NULL) {
+				ERROR(ep, ebuf, gettext(
+				    "Invalid encryption key.\n"));
+				break;
+			}
+			totallen += SADB_64TO8(encrypt->sadb_key_len);
 			encrypt->sadb_key_exttype = SADB_EXT_KEY_ENCRYPT;
 			break;
 		case TOK_AUTHKEY:
 			if (auth != NULL) {
-				warnx(gettext("Can only specify single"
-					" authentication key."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify single"
+				    " authentication key.\n"));
+				break;
 			}
-			auth = parsekey(*argv);
+			auth = parsekey(*argv, ebuf);
 			argv++;
+			if (auth == NULL) {
+				ERROR(ep, ebuf, gettext(
+				    "Invalid authentication key.\n"));
+				break;
+			}
 			totallen += SADB_64TO8(auth->sadb_key_len);
 			auth->sadb_key_exttype = SADB_EXT_KEY_AUTH;
 			break;
 		case TOK_SRCIDTYPE:
 			if (*argv == NULL || *(argv + 1) == NULL) {
-				warnx(gettext("Unexpected end of command "
-					"line."));
-				usage();
+				FATAL(ep, ebuf, gettext(
+				    "Unexpected end of command "
+				    "line - Expecting Src Type.\n"));
+				/* NOTREACHED */
+				break;
 			}
 			if (srcid != NULL) {
-				warnx(gettext("Can only specify single"
-					" source certificate identity."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify single"
+				    " source certificate identity.\n"));
+				break;
 			}
 			alloclen = sizeof (*srcid) +
 			    roundup(strlen(*(argv + 1)) + 1, 8);
@@ -1960,26 +2195,27 @@ doaddup(int cmd, int satype, char *argv[])
 			if (srcid == NULL)
 				Bail("malloc(srcid)");
 			totallen += alloclen;
-			srcid->sadb_ident_type = parseidtype(*argv);
+			srcid->sadb_ident_type = parseidtype(*argv, ebuf);
 			argv++;
 			srcid->sadb_ident_len = SADB_8TO64(alloclen);
 			srcid->sadb_ident_exttype = SADB_EXT_IDENTITY_SRC;
 			srcid->sadb_ident_reserved = 0;
 			srcid->sadb_ident_id = 0;  /* Not useful here. */
-			/* Can use strcpy because I allocate my own memory. */
-			(void) strcpy((char *)(srcid + 1), *argv);
+			(void) strlcpy((char *)(srcid + 1), *argv, alloclen);
 			argv++;
 			break;
 		case TOK_DSTIDTYPE:
 			if (*argv == NULL || *(argv + 1) == NULL) {
-				warnx(gettext("Unexpected end of command"
-					" line."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Unexpected end of command"
+				    " line - expecting dst type.\n"));
+				break;
 			}
 			if (dstid != NULL) {
-				warnx(gettext("Can only specify single destina"
-					"tion certificate identity."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify single destination "
+					"certificate identity.\n"));
+				break;
 			}
 			alloclen = sizeof (*dstid) +
 			    roundup(strlen(*(argv + 1)) + 1, 8);
@@ -1987,14 +2223,13 @@ doaddup(int cmd, int satype, char *argv[])
 			if (dstid == NULL)
 				Bail("malloc(dstid)");
 			totallen += alloclen;
-			dstid->sadb_ident_type = parseidtype(*argv);
+			dstid->sadb_ident_type = parseidtype(*argv, ebuf);
 			argv++;
 			dstid->sadb_ident_len = SADB_8TO64(alloclen);
 			dstid->sadb_ident_exttype = SADB_EXT_IDENTITY_DST;
 			dstid->sadb_ident_reserved = 0;
 			dstid->sadb_ident_id = 0;  /* Not useful here. */
-			/* Can use strcpy because I allocate my own memory. */
-			(void) strcpy((char *)(dstid + 1), *argv);
+			(void) strlcpy((char *)(dstid + 1), *argv, alloclen);
 			argv++;
 			break;
 		case TOK_HARD_ALLOC:
@@ -2015,39 +2250,43 @@ doaddup(int cmd, int satype, char *argv[])
 			switch (token) {
 			case TOK_HARD_ALLOC:
 				if (hard->sadb_lifetime_allocations != 0) {
-					warnx(gettext("Can only specify single"
-						" hard allocation limit."));
-					usage();
+					ERROR(ep, ebuf, gettext(
+					    "Can only specify single"
+					    " hard allocation limit.\n"));
+					break;
 				}
 				hard->sadb_lifetime_allocations =
-				    (uint32_t)parsenum(*argv, B_TRUE);
+				    (uint32_t)parsenum(*argv, B_TRUE, ebuf);
 				break;
 			case TOK_HARD_BYTES:
 				if (hard->sadb_lifetime_bytes != 0) {
-					warnx(gettext("Can only specify "
-						"single hard byte limit."));
-					usage();
+					ERROR(ep, ebuf, gettext(
+					    "Can only specify "
+					    "single hard byte limit.\n"));
+					break;
 				}
 				hard->sadb_lifetime_bytes = parsenum(*argv,
-				    B_TRUE);
+				    B_TRUE, ebuf);
 				break;
 			case TOK_HARD_ADDTIME:
 				if (hard->sadb_lifetime_addtime != 0) {
-					warnx(gettext("Can only specify "
-						"single past-add lifetime."));
-					usage();
+					ERROR(ep, ebuf, gettext(
+					    "Can only specify "
+					    "single past-add lifetime.\n"));
+					break;
 				}
 				hard->sadb_lifetime_addtime = parsenum(*argv,
-				    B_TRUE);
+				    B_TRUE, ebuf);
 				break;
 			case TOK_HARD_USETIME:
 				if (hard->sadb_lifetime_usetime != 0) {
-					warnx(gettext("Can only specify "
-						"single past-use lifetime."));
-					usage();
+					ERROR(ep, ebuf, gettext(
+					    "Can only specify "
+					    "single past-use lifetime.\n"));
+					break;
 				}
 				hard->sadb_lifetime_usetime = parsenum(*argv,
-				    B_TRUE);
+				    B_TRUE, ebuf);
 				break;
 			}
 			argv++;
@@ -2070,50 +2309,56 @@ doaddup(int cmd, int satype, char *argv[])
 			switch (token) {
 			case TOK_SOFT_ALLOC:
 				if (soft->sadb_lifetime_allocations != 0) {
-					warnx(gettext("Can only specify single"
-						" soft allocation limit."));
-					usage();
+					ERROR(ep, ebuf, gettext(
+					    "Can only specify single"
+					    " soft allocation limit.\n"));
+					break;
 				}
 				soft->sadb_lifetime_allocations =
-				    (uint32_t)parsenum(*argv, B_TRUE);
+				    (uint32_t)parsenum(*argv, B_TRUE, ebuf);
 				break;
 			case TOK_SOFT_BYTES:
 				if (soft->sadb_lifetime_bytes != 0) {
-					warnx(gettext("Can only specify single"
-						" soft byte limit."));
-					usage();
+					ERROR(ep, ebuf, gettext(
+					    "Can only specify single"
+					    " soft byte limit.\n"));
+					break;
 				}
 				soft->sadb_lifetime_bytes = parsenum(*argv,
-				    B_TRUE);
+				    B_TRUE, ebuf);
 				break;
 			case TOK_SOFT_ADDTIME:
 				if (soft->sadb_lifetime_addtime != 0) {
-					warnx(gettext("Can only specify single"
-						" past-add lifetime."));
-					usage();
+					ERROR(ep, ebuf, gettext(
+					    "Can only specify single"
+					    " past-add lifetime.\n"));
+					break;
 				}
 				soft->sadb_lifetime_addtime = parsenum(*argv,
-				    B_TRUE);
+				    B_TRUE, ebuf);
 				break;
 			case TOK_SOFT_USETIME:
 				if (soft->sadb_lifetime_usetime != 0) {
-					warnx(gettext("Can only specify single"
-						" past-use lifetime."));
-					usage();
+					ERROR(ep, ebuf, gettext(
+					    "Can only specify single"
+					    " past-use lifetime.\n"));
+					break;
 				}
 				soft->sadb_lifetime_usetime = parsenum(*argv,
-				    B_TRUE);
+				    B_TRUE, ebuf);
 				break;
 			}
 			argv++;
 			break;
 		default:
-			warnx(gettext("Don't use extension %s for add/update."),
+			ERROR1(ep, ebuf, gettext(
+			    "Don't use extension %s for add/update.\n"),
 			    *(argv - 1));
-			usage();
 			break;
 		}
 	} while (token != TOK_EOF);
+
+	handle_errors(ep, ebuf, B_TRUE, B_FALSE);
 
 	/*
 	 * If we specify inner ports w/o addresses, we still need to
@@ -2181,15 +2426,16 @@ doaddup(int cmd, int satype, char *argv[])
 	nexthdr += SADB_8TO64(sizeof (msg));
 	if (assoc != NULL) {
 		if (assoc->sadb_sa_spi == 0) {
-			warnx(gettext("The SPI value is missing for "
-				"the association you wish to %s."), thiscmd);
-			usage();
+			ERROR1(ep, ebuf, gettext(
+			    "The SPI value is missing for "
+			    "the association you wish to %s.\n"), thiscmd);
 		}
 		if (assoc->sadb_sa_auth == 0 && assoc->sadb_sa_encrypt == 0 &&
 			cmd == CMD_ADD) {
-			warnx(gettext("Select at least one algorithm "
-				"for this add."));
-			usage();
+			free(assoc);
+			FATAL(ep, ebuf, gettext(
+			    "Select at least one algorithm "
+			    "for this add.\n"));
 		}
 
 		/* Hack to let user specify NULL ESP implicitly. */
@@ -2199,9 +2445,10 @@ doaddup(int cmd, int satype, char *argv[])
 
 		/* 0 is an actual value.  Print a warning if it was entered. */
 		if (assoc->sadb_sa_state == 0) {
-			if (readstate)
-				warnx(gettext(
-				    "WARNING: Cannot set LARVAL SA state."));
+			if (readstate) {
+				ERROR(ep, ebuf, gettext(
+				    "WARNING: Cannot set LARVAL SA state.\n"));
+			}
 			assoc->sadb_sa_state = SADB_SASTATE_MATURE;
 		}
 
@@ -2221,8 +2468,9 @@ doaddup(int cmd, int satype, char *argv[])
 			assoc->sadb_sa_flags |= SADB_X_SAFLAGS_TUNNEL;
 			if (proto != 0 && proto != IPPROTO_ENCAP &&
 			    proto != IPPROTO_IPV6) {
-				warnx(gettext("WARNING: Protocol type %d not "
-					"for use with Tunnel-Mode SA."), proto);
+				ERROR1(ep, ebuf, gettext(
+				    "WARNING: Protocol type %d not "
+				    "for use with Tunnel-Mode SA.\n"), proto);
 				/* Continue and let PF_KEY scream... */
 			}
 		}
@@ -2233,8 +2481,8 @@ doaddup(int cmd, int satype, char *argv[])
 		spi = assoc->sadb_sa_spi;
 		free(assoc);
 	} else {
-		warnx(gettext("Need SA parameters for %s."), thiscmd);
-		usage();
+		ERROR1(ep, ebuf, gettext(
+		    "Need SA parameters for %s.\n"), thiscmd);
 	}
 
 	if (hard != NULL) {
@@ -2250,8 +2498,8 @@ doaddup(int cmd, int satype, char *argv[])
 	}
 
 	if (encrypt == NULL && auth == NULL && cmd == CMD_ADD) {
-		warnx(gettext("Must have at least one key for an add."));
-		usage();
+		ERROR(ep, ebuf, gettext(
+		    "Must have at least one key for an add.\n"));
 	}
 
 	if (encrypt != NULL) {
@@ -2288,28 +2536,27 @@ doaddup(int cmd, int satype, char *argv[])
 		((struct sockaddr_in6 *)(dst + 1))->sin6_port = htons(dstport);
 		nexthdr += dst->sadb_address_len;
 	} else {
-		warnx(gettext("Need destination address for %s."), thiscmd);
-		usage();
+		FATAL1(ep, ebuf, gettext(
+		    "Need destination address for %s.\n"), thiscmd);
 	}
 
 	if (use_natt) {
 		if (natt_remote == NULL && natt_local == NULL) {
-			warnx(gettext(
-			    "Must specify natt remote or local address "
-			    "for UDP encapsulation."));
-			usage();
+			ERROR(ep, ebuf, gettext(
+			    "Must specify NAT-T remote or local address "
+			    "for UDP encapsulation.\n"));
 		}
 
 		if (natt_lport != 0 && natt_local == NULL) {
-			warnx(gettext("If natt local port is specified, natt "
-			    "local address must also be specified."));
-			usage();
+			ERROR(ep, ebuf, gettext(
+			    "If NAT-T local port is specified, NAT-T "
+			    "local address must also be specified.\n"));
 		}
 
 		if (natt_rport != 0 && natt_remote == NULL) {
-			warnx(gettext("If natt remote port is specified, natt "
-			    "remote address must also be specified."));
-			usage();
+			ERROR(ep, ebuf, gettext(
+			    "If NAT-T remote port is specified, NAT-T "
+			    "remote address must also be specified.\n"));
 		}
 
 		if (natt_remote != NULL) {
@@ -2332,6 +2579,9 @@ doaddup(int cmd, int satype, char *argv[])
 			    htons(natt_lport);
 		}
 	}
+
+	handle_errors(ep, ebuf, B_TRUE, B_FALSE);
+
 	/*
 	 * PF_KEY requires a source address extension, even if the source
 	 * address itself is unspecified. (See "Set explicit unspecified..."
@@ -2364,22 +2614,27 @@ doaddup(int cmd, int satype, char *argv[])
 		nexthdr += idst->sadb_address_len;
 	}
 
-	doaddresses((cmd == CMD_ADD) ? SADB_ADD : SADB_UPDATE, satype, cmd,
-	    srchp, dsthp, src, dst, unspec_src, buffer, totallen, spi);
-	free(buffer);
+	if (!cflag) {
+		doaddresses((cmd == CMD_ADD) ? SADB_ADD : SADB_UPDATE, satype,
+		    cmd, srchp, dsthp, src, dst, unspec_src, buffer, totallen,
+		    spi, ebuf);
+	}
 
 	if (isrchp != NULL && isrchp != &dummy.he)
-		freehostent(isrchp);
+	    freehostent(isrchp);
 	if (idsthp != NULL && idsthp != &dummy.he)
-		freehostent(idsthp);
+	    freehostent(idsthp);
 	if (srchp != NULL && srchp != &dummy.he)
-		freehostent(srchp);
+	    freehostent(srchp);
 	if (dsthp != NULL && dsthp != &dummy.he)
-		freehostent(dsthp);
+	    freehostent(dsthp);
 	if (natt_lhp != NULL && natt_lhp != &dummy.he)
-		freehostent(natt_lhp);
+	    freehostent(natt_lhp);
 	if (natt_rhp != NULL && natt_rhp != &dummy.he)
-		freehostent(natt_rhp);
+	    freehostent(natt_rhp);
+
+	free(ebuf);
+	free(buffer);
 }
 
 /*
@@ -2388,7 +2643,7 @@ doaddup(int cmd, int satype, char *argv[])
  * information.
  */
 static void
-dodelget(int cmd, int satype, char *argv[])
+dodelget(int cmd, int satype, char *argv[], char *ebuf)
 {
 	struct sadb_msg *msg = (struct sadb_msg *)get_buffer;
 	uint64_t *nextext;
@@ -2402,6 +2657,7 @@ dodelget(int cmd, int satype, char *argv[])
 	boolean_t unspec_src = B_TRUE;
 	uint16_t srcport = 0, dstport = 0;
 	uint8_t proto = 0;
+	char *ep = NULL;
 
 	msg_init(msg, ((cmd == CMD_GET) ? SADB_GET : SADB_DELETE),
 	    (uint8_t)satype);
@@ -2427,61 +2683,66 @@ dodelget(int cmd, int satype, char *argv[])
 			/* Do nothing, I'm done. */
 			break;
 		case TOK_UNKNOWN:
-			warnx(gettext("Unknown extension field %s."),
-			    *(argv - 1));
-			usage();	/* Will exit program. */
+			ERROR1(ep, ebuf, gettext(
+			    "Unknown extension field \"%s\"\n"), *(argv - 1));
 			break;
 		case TOK_SPI:
 			if (assoc != NULL) {
-				warnx(gettext(
-				    "Can only specify single SPI value."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify single SPI value.\n"));
+				break;
 			}
 			assoc = (struct sadb_sa *)nextext;
 			nextext = (uint64_t *)(assoc + 1);
 			assoc->sadb_sa_len = SADB_8TO64(sizeof (*assoc));
 			assoc->sadb_sa_exttype = SADB_EXT_SA;
 			assoc->sadb_sa_spi = htonl((uint32_t)parsenum(*argv,
-			    B_TRUE));
+			    B_TRUE, ebuf));
 			spi = assoc->sadb_sa_spi;
 			argv++;
 			break;
 		case TOK_SRCPORT:
 			if (srcport != 0) {
-				warnx(gettext(
-				    "Can only specify single source port."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify single source port.\n"));
+				break;
 			}
-			srcport = parsenum(*argv, B_TRUE);
+			srcport = parsenum(*argv, B_TRUE, ebuf);
 			argv++;
 			break;
 		case TOK_DSTPORT:
 			if (dstport != 0) {
-				warnx(gettext("Can only "
-				    "specify single destination port."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only "
+				    "specify single destination port.\n"));
+				break;
 			}
-			dstport = parsenum(*argv, B_TRUE);
+			dstport = parsenum(*argv, B_TRUE, ebuf);
 			argv++;
 			break;
 		case TOK_PROTO:
 			if (proto != 0) {
-				warnx(gettext(
-				    "Can only specify single protocol."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify single protocol.\n"));
+				break;
 			}
-			proto = parsenum(*argv, B_TRUE);
+			proto = parsenum(*argv, B_TRUE, ebuf);
 			argv++;
 			break;
 		case TOK_SRCADDR:
 		case TOK_SRCADDR6:
 			if (src != NULL) {
-				warnx(gettext(
-				    "Can only specify single source addr."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify single source addr.\n"));
+				break;
 			}
 			sa_len = parseaddr(*argv, &srchp,
-			    (token == TOK_SRCADDR6));
+			    (token == TOK_SRCADDR6), ebuf);
+			if (srchp == NULL) {
+				ERROR1(ep, ebuf, gettext(
+				    "Unknown source address \"%s\"\n"), *argv);
+				break;
+			}
 			argv++;
 
 			unspec_src = B_FALSE;
@@ -2503,12 +2764,19 @@ dodelget(int cmd, int satype, char *argv[])
 		case TOK_DSTADDR:
 		case TOK_DSTADDR6:
 			if (dst != NULL) {
-				warnx(gettext("Can only specify single dest. "
-					"addr."));
-				usage();
+				ERROR(ep, ebuf, gettext(
+				    "Can only specify single destination "
+				    "address.\n"));
+				break;
 			}
 			sa_len = parseaddr(*argv, &dsthp,
-			    (token == TOK_SRCADDR6));
+			    (token == TOK_SRCADDR6), ebuf);
+			if (dsthp == NULL) {
+				ERROR1(ep, ebuf, gettext(
+				    "Unknown destination address \"%s\"\n"),
+				    *argv);
+				break;
+			}
 			argv++;
 
 			ALLOC_ADDR_EXT(dst, SADB_EXT_ADDRESS_DST);
@@ -2526,12 +2794,14 @@ dodelget(int cmd, int satype, char *argv[])
 			/* The rest is pre-bzeroed for us. */
 			break;
 		default:
-			warnx(gettext("Don't use extension %s "
-			    "for '%s' command."), *(argv - 1), thiscmd);
-			usage();	/* Will exit program. */
+			ERROR2(ep, ebuf, gettext(
+			    "Don't use extension %s for '%s' command.\n"),
+			    *(argv - 1), thiscmd);
 			break;
 		}
 	} while (token != TOK_EOF);
+
+	handle_errors(ep, ebuf, B_TRUE, B_FALSE);
 
 	if ((srcport != 0) && (src == NULL)) {
 		ALLOC_ADDR_EXT(src, SADB_EXT_ADDRESS_SRC);
@@ -2554,9 +2824,16 @@ dodelget(int cmd, int satype, char *argv[])
 	/* So I have enough of the message to send it down! */
 	msg->sadb_msg_len = nextext - get_buffer;
 
-	doaddresses((cmd == CMD_GET) ? SADB_GET : SADB_DELETE, satype, cmd,
-	    srchp, dsthp, src, dst, unspec_src, get_buffer,
-	    sizeof (get_buffer), spi);
+	if (assoc == NULL) {
+		FATAL1(ep, ebuf, gettext(
+		    "Need SA parameters for %s.\n"), thiscmd);
+	}
+
+	if (!cflag) {
+		doaddresses((cmd == CMD_GET) ? SADB_GET : SADB_DELETE, satype,
+		    cmd, srchp, dsthp, src, dst, unspec_src, get_buffer,
+		    sizeof (get_buffer), spi, NULL);
+	}
 
 	if (srchp != NULL && srchp != &dummy.he)
 		freehostent(srchp);
@@ -2743,9 +3020,10 @@ dohelp(char *cmds)
  * "Parse" a command line from argv.
  */
 static void
-parseit(int argc, char *argv[])
+parseit(int argc, char *argv[], char *ebuf)
 {
 	int cmd, satype;
+	char *ep = NULL;
 
 	if (argc == 0)
 		return;
@@ -2762,10 +3040,10 @@ parseit(int argc, char *argv[])
 		domonitor(B_TRUE);
 		break;
 	case CMD_QUIT:
-		exit(0);
+		EXIT_OK(NULL);
 	}
 
-	satype = parsesatype(*argv);
+	satype = parsesatype(*argv, ebuf);
 
 	if (satype != SADB_SATYPE_UNSPEC) {
 		argv++;
@@ -2776,9 +3054,9 @@ parseit(int argc, char *argv[])
 		 */
 		if (cmd == CMD_SAVE)
 			if (*argv == NULL) {
-				warnx(gettext("Must specify a specific "
-					"SA type for save."));
-				usage();
+				FATAL(ep, ebuf, gettext(
+				    "Must specify a specific "
+				    "SA type for save.\n"));
 			} else {
 				argv++;
 			}
@@ -2796,25 +3074,25 @@ parseit(int argc, char *argv[])
 		 */
 		if (!interactive) {
 			errx(1, gettext(
-			    "can't do ADD or UPDATE from the command line."));
+			    "can't do ADD or UPDATE from the command line.\n"));
 		}
 		if (satype == SADB_SATYPE_UNSPEC) {
-			warnx(gettext("Must specify a specific SA type."));
-			usage();
+			FATAL(ep, ebuf, gettext(
+			    "Must specify a specific SA type."));
 			/* NOTREACHED */
 		}
 		/* Parse for extensions, including keying material. */
-		doaddup(cmd, satype, argv);
+		doaddup(cmd, satype, argv, ebuf);
 		break;
 	case CMD_DELETE:
 	case CMD_GET:
 		if (satype == SADB_SATYPE_UNSPEC) {
-			warnx(gettext("Must specify a single SA type."));
-			usage();
+			FATAL(ep, ebuf, gettext(
+			    "Must specify a single SA type."));
 			/* NOTREACHED */
 		}
 		/* Parse for bare minimum to locate an SA. */
-		dodelget(cmd, satype, argv);
+		dodelget(cmd, satype, argv, ebuf);
 		break;
 	case CMD_DUMP:
 		dodump(satype, NULL);
@@ -2825,7 +3103,7 @@ parseit(int argc, char *argv[])
 		mask_signals(B_TRUE);	/* Unmask signals */
 		break;
 	default:
-		warnx(gettext("Unknown command (%s)."),
+		warnx(gettext("Unknown command (%s).\n"),
 		    *(argv - ((satype == SADB_SATYPE_UNSPEC) ? 1 : 2)));
 		usage();
 	}
@@ -2837,6 +3115,7 @@ main(int argc, char *argv[])
 	int ch;
 	FILE *infile = stdin, *savefile;
 	boolean_t dosave = B_FALSE, readfile = B_FALSE;
+	char *configfile = NULL;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)
@@ -2844,15 +3123,20 @@ main(int argc, char *argv[])
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
+	/*
+	 * Check to see if the command is being run from smf(5).
+	 */
+	my_fmri = getenv("SMF_FMRI");
+
 	openlog("ipseckey", LOG_CONS, LOG_AUTH);
 	if (getuid() != 0) {
-		errx(1, "You must be root to run ipseckey.");
+		errx(1, "Insufficient privileges to run ipseckey.");
 	}
 
 	/* umask me to paranoid, I only want to create files read-only */
 	(void) umask((mode_t)00377);
 
-	while ((ch = getopt(argc, argv, "pnvf:s:")) != EOF)
+	while ((ch = getopt(argc, argv, "pnvf:s:c:")) != EOF)
 		switch (ch) {
 		case 'p':
 			pflag = B_TRUE;
@@ -2863,12 +3147,18 @@ main(int argc, char *argv[])
 		case 'v':
 			vflag = B_TRUE;
 			break;
+		case 'c':
+			cflag = B_TRUE;
+			/* FALLTHRU */
 		case 'f':
 			if (dosave)
 				usage();
 			infile = fopen(optarg, "r");
-			if (infile == NULL)
-				bail(optarg);
+			if (infile == NULL) {
+				EXIT_BADCONFIG2("Unable to open configuration "
+				    "file: %s\n", optarg);
+			}
+			configfile = strdup(optarg);
 			readfile = B_TRUE;
 			break;
 		case 's':
@@ -2888,22 +3178,39 @@ main(int argc, char *argv[])
 
 	keysock = socket(PF_KEY, SOCK_RAW, PF_KEY_V2);
 
-	if (keysock == -1)
-		Bail("Opening PF_KEY socket");
+	if (keysock == -1) {
+		if (errno == EPERM) {
+			EXIT_BADPERM("Insufficient privileges to open "
+			    "PF_KEY socket.\n");
+		} else {
+			/* some other reason */
+			EXIT_FATAL("Opening PF_KEY socket");
+		}
+	}
 
 	if (dosave) {
 		mask_signals(B_FALSE);	/* Mask signals */
 		dodump(SADB_SATYPE_UNSPEC, savefile);
 		mask_signals(B_TRUE);	/* Unmask signals */
-		exit(0);
+		EXIT_OK(NULL);
 	}
 
+	/*
+	 * When run from smf(5) flush any existing SA's first
+	 * otherwise you will end up in maintenance mode.
+	 */
+	if ((my_fmri != NULL) && readfile) {
+		(void) fprintf(stdout, gettext(
+		    "Flushing existing SA's before adding new SA's\n"));
+		(void) fflush(stdout);
+		doflush(SADB_SATYPE_UNSPEC);
+	}
 	if (infile != stdin || *argv == NULL) {
 		/* Go into interactive mode here. */
-		do_interactive(infile, "ipseckey> ", parseit);
+		do_interactive(infile, configfile, "ipseckey> ", my_fmri,
+		    parseit);
 	}
-
-	parseit(argc, argv);
+	parseit(argc, argv, NULL);
 
 	return (0);
 }
