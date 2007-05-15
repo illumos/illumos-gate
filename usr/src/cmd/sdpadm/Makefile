@@ -70,6 +70,6 @@ clobber: clean
 	$(RM) $(PROG) $(MSGFILES) $(POFILE)
 
 lint:	$(LINT_OBJS) 
-	$(LINT.c) $(LINTFLAGS) $(LINT_OBJS)
+	$(LINT.c) $(LINTFLAGS) $(LDLIBS) $(LINT_OBJS)
 
 include $(SRC)/Makefile.msg.targ
