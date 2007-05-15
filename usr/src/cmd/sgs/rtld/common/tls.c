@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -263,30 +263,38 @@ tls_statmod(Lm_list *lml, Rt_map *lmp)
 	fptr = (void (*)())lml->lm_lcs[CI_TLS_STATMOD].lc_un.lc_func;
 
 	/*
-	 * If we don't have any TLS modules - report that and return.
-	 */
-	if (tlsmodcnt == 0) {
-		if (fptr)
-			(*fptr)(0, 0);
-		DBG_CALL(Dbg_tls_static_block(&lml_main, 0, 0,
-		    tls_static_resv));
-		return (1);
-	}
-	lml->lm_tls = 0;
-
-	/*
 	 * Allocate a buffer to report the TLS modules, the buffer consists of:
 	 *
 	 *	TLS_modinfo *	ptrs[tlsmodcnt + 1]
 	 *	TLS_modinfo	bufs[tlsmodcnt]
 	 *
-	 * The ptrs are initialized to the bufs - except the last
-	 * one which null terminates the array.
+	 * The ptrs are initialized to the bufs - except the last one which
+	 * null terminates the array.
+	 *
+	 * Note, even if no TLS has yet been observed, we still supply a
+	 * TLS buffer with a single null entry.  This allows us to initialize
+	 * the backup TLS reservation.
 	 */
 	if ((tlsmodlist = calloc((sizeof (TLS_modinfo *) * (tlsmodcnt + 1)) +
 	    (sizeof (TLS_modinfo) * tlsmodcnt), 1)) == 0)
 		return (0);
 
+	lml->lm_tls = 0;
+
+	/*
+	 * If we don't have any TLS modules - report that and return.
+	 */
+	if (tlsmodcnt == 0) {
+		if (fptr)
+			(*fptr)(tlsmodlist, tls_static_resv);
+		DBG_CALL(Dbg_tls_static_block(&lml_main, 0, 0,
+		    tls_static_resv));
+		return (1);
+	}
+
+	/*
+	 * Initialize the TLS buffer.
+	 */
 	tlsbuflist = (TLS_modinfo *)((uintptr_t)tlsmodlist +
 	    ((tlsmodcnt + 1) * sizeof (TLS_modinfo *)));
 

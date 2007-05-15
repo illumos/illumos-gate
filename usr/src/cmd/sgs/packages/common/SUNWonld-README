@@ -1236,3 +1236,5 @@ Bugid   Risk Synopsis
 	(numeric -N equivalent) (D)
 	PSARC/2007/247 Add -I option to elfdump
 6532924 AMD64: Solaris 5.11 55b: SEGV after whocatches
+6551627 OGL: SIGSEGV when trying to use OpenGL pipeline with splash screen,
+	Solaris/Nvidia only

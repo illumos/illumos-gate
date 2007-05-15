@@ -3263,34 +3263,41 @@ ld_update_outfile(Ofl_desc *ofl)
 #endif
 		if (phdr->p_type == PT_TLS) {
 			Os_desc	*tlsosp;
-			Shdr	*firstshdr = 0, *lastfilshdr, *lastmemshdr;
+			Shdr	*firstshdr = 0, *lastfileshdr = 0, *lastshdr;
 
 			if (ofl->ofl_ostlsseg.head == NULL)
 				continue;
 
+			/*
+			 * Scan through the sections that have contributed TLS.
+			 * Remember the first and last so as to determine the
+			 * TLS memory size requirement.  Remember the last
+			 * non-nobits section to determine the TLS data
+			 * contribution, which determines the TLS file size.
+			 */
 			for (LIST_TRAVERSE(&ofl->ofl_ostlsseg, lnp2, tlsosp)) {
 				Shdr	*tlsshdr = tlsosp->os_shdr;
 
-				if (firstshdr == 0) {
-					firstshdr = lastfilshdr = lastmemshdr =
-					    tlsosp->os_shdr;
-					continue;
-				}
-
-				if (tlsshdr->sh_type == SHT_NOBITS)
-					lastmemshdr = tlsshdr;
-				else
-					lastfilshdr = tlsshdr;
+				if (firstshdr == 0)
+					firstshdr = tlsshdr;
+				if (tlsshdr->sh_type != SHT_NOBITS)
+					lastfileshdr = tlsshdr;
+				lastshdr = tlsshdr;
 			}
 
 			phdr->p_flags = PF_R | PF_W;
 			phdr->p_vaddr = firstshdr->sh_addr;
 			phdr->p_offset = firstshdr->sh_offset;
 			phdr->p_align = firstshdr->sh_addralign;
-			phdr->p_filesz = lastfilshdr->sh_offset +
-			    lastfilshdr->sh_size - phdr->p_offset;
-			phdr->p_memsz = lastmemshdr->sh_offset +
-			    lastmemshdr->sh_size - phdr->p_offset;
+
+			if (lastfileshdr)
+				phdr->p_filesz = lastfileshdr->sh_offset +
+				    lastfileshdr->sh_size - phdr->p_offset;
+			else
+				phdr->p_filesz = 0;
+
+			phdr->p_memsz = lastshdr->sh_offset +
+			    lastshdr->sh_size - phdr->p_offset;
 
 			DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
 
