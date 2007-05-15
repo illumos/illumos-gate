@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -197,7 +197,7 @@ __bt_dnpage(dbp, pgno)
  * Parameters:
  *	h:	pointer to the PAGE
  */
-int
+void
 __bt_dpage(dbp, h)
 	DB *dbp;
 	PAGE *h;
@@ -291,7 +291,7 @@ __bt_dpage(dbp, h)
 		(void)fprintf(tracefp, "\n");
 	}
 	(void)fflush(tracefp);
-	return (0);
+	return;
 }
 #endif
 

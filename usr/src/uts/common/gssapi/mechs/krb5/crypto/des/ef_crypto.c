@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -15,7 +15,7 @@
 int
 k5_ef_crypto(const char *in, char *out,
 	long length, krb5_keyblock *key,
-	krb5_data *ivec, int encrypt_flag)
+	const krb5_data *ivec, int encrypt_flag)
 {
 	int rv = CRYPTO_FAILED;
 

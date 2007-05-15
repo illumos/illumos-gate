@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 1998-1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,7 +42,8 @@ debugEnable(int displayMsgs)
 #endif
 
 #if DEBUG
-	debugDisplaySS(displayMsgs);
+	/* Solaris Kerberos: not supported */
+	/* debugDisplaySS(displayMsgs); */
 #endif
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,7 +64,7 @@ get_algo(krb5_enctype etype, KRB5_MECH_TO_PKCS *algos)
 			return (CKR_OK);
 		case ENCTYPE_AES128_CTS_HMAC_SHA1_96:
 		case ENCTYPE_AES256_CTS_HMAC_SHA1_96:
-			algos->enc_algo = CKM_AES_ECB;
+			algos->enc_algo = CKM_AES_CBC;
 			algos->hash_algo = CKM_SHA_1_HMAC;
 			algos->str2key_algo = CKM_PKCS5_PBKD2;
 			algos->flags = USE_ENCR;

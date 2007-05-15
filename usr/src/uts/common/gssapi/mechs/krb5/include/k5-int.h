@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -871,7 +871,7 @@ void krb5_nfold (int inbits, krb5_const unsigned char *in,
 int k5_ef_crypto(
 	const char *, char *,
 	long, krb5_keyblock *,
-	krb5_data *, int);
+	const krb5_data *, int);
 
 krb5_error_code
 krb5_hmac(krb5_context, const krb5_keyblock *,

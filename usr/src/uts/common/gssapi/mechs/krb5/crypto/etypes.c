@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -291,6 +291,10 @@ struct krb5_keytypes krb5_enctypes_list[] = {
 #endif /* !_KERNEL */
     },
 
+    /*
+     * Note, all AES enctypes must use SUN_CKM_AES_CBC.  See aes_provider.c for
+     * more info.
+     */
     { ENCTYPE_AES128_CTS_HMAC_SHA1_96,
 	"aes128-cts-hmac-sha1-96", "AES-128 CTS mode with 96-bit SHA-1 HMAC",
 	&krb5int_enc_aes128, &krb5_hash_sha1,
@@ -299,7 +303,7 @@ struct krb5_keytypes krb5_enctypes_list[] = {
 #ifndef _KERNEL
 	krb5int_aes_string_to_key,
 #else
-      SUN_CKM_AES_ECB,
+      SUN_CKM_AES_CBC,
       SUN_CKM_SHA1_HMAC,
       CRYPTO_MECH_INVALID,
       CRYPTO_MECH_INVALID
@@ -313,7 +317,7 @@ struct krb5_keytypes krb5_enctypes_list[] = {
 #ifndef _KERNEL
 	krb5int_aes_string_to_key,
 #else
-      SUN_CKM_AES_ECB,
+      SUN_CKM_AES_CBC,
       SUN_CKM_SHA1_HMAC,
       CRYPTO_MECH_INVALID,
       CRYPTO_MECH_INVALID
@@ -327,7 +331,7 @@ struct krb5_keytypes krb5_enctypes_list[] = {
 #ifndef _KERNEL
 	krb5int_aes_string_to_key,
 #else
-      SUN_CKM_AES_ECB,
+      SUN_CKM_AES_CBC,
       SUN_CKM_SHA1_HMAC,
       CRYPTO_MECH_INVALID,
       CRYPTO_MECH_INVALID
@@ -341,7 +345,7 @@ struct krb5_keytypes krb5_enctypes_list[] = {
 #ifndef _KERNEL
 	krb5int_aes_string_to_key,
 #else
-      SUN_CKM_AES_ECB,
+      SUN_CKM_AES_CBC,
       SUN_CKM_SHA1_HMAC,
       CRYPTO_MECH_INVALID,
       CRYPTO_MECH_INVALID

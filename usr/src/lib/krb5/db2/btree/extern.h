@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,7 +116,7 @@ int	 __ovfl_put __P((BTREE *, const DBT *, db_pgno_t *));
 
 #ifdef DEBUG
 int	 __bt_dnpage __P((DB *, db_pgno_t));
-int	 __bt_dpage __P((DB *, PAGE *));
+void	 __bt_dpage __P((DB *, PAGE *));
 int	 __bt_dmpage __P((PAGE *));
 int	 __bt_dump __P((DB *));
 #endif

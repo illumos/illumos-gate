@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,9 +42,9 @@ static char *rcsid = "$Header: /cvs/krbdev/krb5/src/lib/kadm5/clnt/client_princi
 #include    "client_internal.h"
 
 #ifdef DEBUG /* SUNWresync14 XXX */
-#define eret() clnt_perror(handle->clnt, "null ret"); return KADM5_RPC_ERROR;
+#define eret() {clnt_perror(handle->clnt, "null ret"); return KADM5_RPC_ERROR;}
 #else
-#define eret() return KADM5_RPC_ERROR;
+#define eret() return KADM5_RPC_ERROR
 #endif
 
 kadm5_ret_t

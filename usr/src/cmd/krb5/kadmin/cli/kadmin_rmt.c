@@ -38,7 +38,8 @@ debugEnable(int displayMsgs)
 {
 
 #ifdef DEBUG
-	debugDisplaySS(displayMsgs);
+	/* Solaris Kerberos: not supported */
+	/* debugDisplaySS(displayMsgs); */
 #endif
 }
 
