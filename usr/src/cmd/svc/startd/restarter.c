@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2024,6 +2024,9 @@ restarter_contracts_event_thread(void *unused)
 
 		cookie = ct_status_get_cookie(status);
 
+		log_framework(LOG_DEBUG, "Received event %d for ctid %ld "
+		    "cookie %lld\n", type, ctid, cookie);
+
 		ct_status_free(status);
 
 		startd_close(sfd);
@@ -2038,7 +2041,37 @@ restarter_contracts_event_thread(void *unused)
 			continue;
 		}
 
-		inst = contract_to_inst(ctid);
+		inst = NULL;
+		if (storing_contract != 0 &&
+		    (inst = contract_to_inst(ctid)) == NULL) {
+			/*
+			 * This can happen for two reasons:
+			 * - method_run() has not yet stored the
+			 *    the contract into the internal hash table.
+			 * - we receive an EMPTY event for an abandoned
+			 *    contract.
+			 * If there is any contract in the process of
+			 * being stored into the hash table then re-read
+			 * the event later.
+			 */
+			log_framework(LOG_DEBUG,
+			    "Reset event %d for unknown "
+			    "contract id %ld\n", type, ctid);
+
+			/* don't go too fast */
+			(void) poll(NULL, 0, 100);
+
+			(void) ct_event_reset(fd);
+			ct_event_free(ev);
+			continue;
+		}
+
+		/*
+		 * Do not call contract_to_inst() again if first
+		 * call succeeded.
+		 */
+		if (inst == NULL)
+			inst = contract_to_inst(ctid);
 		if (inst == NULL) {
 			/*
 			 * This can happen if we receive an EMPTY

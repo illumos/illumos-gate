@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,10 +70,18 @@
 #include <string.h>
 #include <strings.h>
 #include <unistd.h>
+#include <atomic.h>
+#include <poll.h>
 
 #include "startd.h"
 
 #define	SBIN_SH		"/sbin/sh"
+
+/*
+ * Used to tell if contracts are in the process of being
+ * stored into the svc.startd internal hash table.
+ */
+volatile uint16_t	storing_contract = 0;
 
 /*
  * Mapping from restart_on method-type to contract events.  Must correspond to
@@ -181,6 +189,9 @@ method_store_contract(restarter_inst_t *inst, int type, ctid_t *cid)
 
 		inst->ri_i.i_primary_ctid = *cid;
 		inst->ri_i.i_primary_ctid_stopped = 0;
+
+		log_framework(LOG_DEBUG, "Storing primary contract %ld for "
+		    "%s.\n", *cid, inst->ri_i.i_fmri);
 
 		contract_hash_store(*cid, inst->ri_id);
 	}
@@ -594,8 +605,6 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 	uint8_t timeout_retry;
 	ctid_t ctid;
 	int ctfd = -1;
-	ct_evthdl_t ctev;
-	uint_t evtype;
 	restarter_inst_t *inst = *instp;
 	int id = inst->ri_id;
 	int forkerr;
@@ -770,12 +779,13 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		}
 	}
 
+	atomic_add_16(&storing_contract, 1);
 	pid = startd_fork1(&forkerr);
 	if (pid == 0)
 		exec_method(inst, type, method, mcp, need_session);
 
-	restarter_free_method_context(mcp);
 	if (pid == -1) {
+		atomic_add_16(&storing_contract, -1);
 		if (forkerr == EAGAIN)
 			result = EAGAIN;
 		else
@@ -785,6 +795,7 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 		    "%s: Couldn't fork to execute method %s: %s\n",
 		    inst->ri_i.i_fmri, method, strerror(forkerr));
 
+		restarter_free_method_context(mcp);
 		goto out;
 	}
 
@@ -794,6 +805,9 @@ method_run(restarter_inst_t **instp, int type, int *exit_code)
 	 * stash it in inst & the repository.
 	 */
 	method_store_contract(inst, type, &ctid);
+	atomic_add_16(&storing_contract, -1);
+
+	restarter_free_method_context(mcp);
 
 	/*
 	 * Similarly for the start method PID.
@@ -936,15 +950,8 @@ assured_kill:
 			    timeout);
 
 		for (;;) {
-			do {
-				r = ct_event_read_critical(ctfd, &ctev);
-			} while (r == EINTR);
-			if (r != 0)
-				break;
-
-			evtype = ct_event_get_type(ctev);
-			ct_event_free(ctev);
-			if (evtype == CT_PR_EV_EMPTY)
+			(void) poll(NULL, 0, 100);
+			if (contract_is_empty(inst->ri_i.i_primary_ctid))
 				break;
 		}
 		if (r) {

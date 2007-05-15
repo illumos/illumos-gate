@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -538,6 +538,8 @@ typedef struct contract_entry {
 
 	uu_list_node_t	ce_link;
 } contract_entry_t;
+
+extern volatile uint16_t	storing_contract;
 
 uu_list_pool_t *contract_list_pool;
 
