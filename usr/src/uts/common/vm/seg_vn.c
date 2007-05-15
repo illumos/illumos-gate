@@ -2609,8 +2609,8 @@ segvn_faultpage(
 	 * MAP_NORESERVE will have made advance reservations.
 	 */
 	if ((svd->flags & MAP_NORESERVE) && (ap == NULL)) {
-		if (anon_resv(ptob(1))) {
-			svd->swresv += ptob(1);
+		if (anon_resv_zone(ptob(1), seg->s_as->a_proc->p_zone)) {
+			atomic_add_long(&svd->swresv, ptob(1));
 		} else {
 			page_unlock(opp);
 			err = ENOMEM;
@@ -5308,7 +5308,8 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 		if (prot & PROT_WRITE) {
 			size_t sz;
 			if (svd->swresv == 0 && !(svd->flags & MAP_NORESERVE)) {
-				if (anon_resv(seg->s_size) == 0) {
+				if (anon_resv_zone(seg->s_size,
+				    seg->s_as->a_proc->p_zone) == 0) {
 					SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 					return (IE_NOMEM);
 				}
@@ -5327,7 +5328,8 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 			if (svd->swresv != 0 && svd->vp != NULL &&
 			    svd->amp == NULL && addr == seg->s_base &&
 			    len == seg->s_size && svd->pageprot == 0) {
-				anon_unresv(svd->swresv);
+				anon_unresv_zone(svd->swresv,
+				    seg->s_as->a_proc->p_zone);
 				svd->swresv = 0;
 				TRACE_3(TR_FAC_VM, TR_ANON_PROC,
 					"anon proc:%p %lu %u",
