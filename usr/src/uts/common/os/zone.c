@@ -2762,7 +2762,6 @@ zsched(void *arg)
 	task_t *tk, *oldtk;
 	rctl_entity_p_t e;
 	kproject_t *pj;
-	boolean_t disable_plat_interposition = B_FALSE;
 
 	nvlist_t *nvl = za->nvlist;
 	nvpair_t *nvp = NULL;
@@ -2988,13 +2987,6 @@ zsched(void *arg)
 	if (zone_status_get(zone) == ZONE_IS_BOOTING) {
 		id_t cid;
 
-		/* enable platform wide brand interposition mechanisms */
-		if (ZONE_IS_BRANDED(zone) &&
-		    brand_plat_interposition_enable != NULL) {
-			disable_plat_interposition = B_TRUE;
-			brand_plat_interposition_enable(zone->zone_brand);
-		}
-
 		/*
 		 * Ok, this is a little complicated.  We need to grab the
 		 * zone's pool's scheduling class ID; note that by now, we
@@ -3036,12 +3028,6 @@ zsched(void *arg)
 	 * most of our life doing.
 	 */
 	zone_status_wait_cpr(zone, ZONE_IS_DYING, "zsched");
-
-	/* disable platform wide brand interposition mechanisms */
-	if (disable_plat_interposition &&
-	    brand_plat_interposition_disable != NULL) {
-		brand_plat_interposition_disable(zone->zone_brand);
-	}
 
 	if (ct)
 		/*

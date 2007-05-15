@@ -38,6 +38,10 @@
 #define	SUPPORTED_BRAND_VERSION BRAND_VER_1
 
 #if defined(__sparcv9)
+/* sparcv9 uses system wide brand interposition hooks */
+static void brand_plat_interposition_enable(void);
+static void brand_plat_interposition_disable(void);
+
 struct brand_mach_ops native_mach_ops  = {
 		NULL, NULL
 };
@@ -67,12 +71,6 @@ struct brand_list {
 static struct brand_list *brand_list = NULL;
 
 /*
- * Used to enable brand platform specific interposition code
- */
-#pragma	weak	brand_plat_interposition_init
-extern void brand_plat_interposition_init(void);
-
-/*
  * This lock protects the integrity of the brand list.
  */
 static kmutex_t brand_list_lock;
@@ -80,8 +78,6 @@ static kmutex_t brand_list_lock;
 void
 brand_init()
 {
-	if (brand_plat_interposition_init != NULL)
-		brand_plat_interposition_init();
 	mutex_init(&brand_list_lock, NULL, MUTEX_DEFAULT, NULL);
 	p0.p_brand = &native_brand;
 }
@@ -141,10 +137,17 @@ brand_register(brand_t *brand)
 		}
 	}
 
+#if defined(__sparcv9)
+	/* sparcv9 uses system wide brand interposition hooks */
+	if (brand_list == NULL)
+		brand_plat_interposition_enable();
+#endif /* __sparcv9 */
+
 	list->bl_brand = brand;
 	list->bl_refcnt = 0;
 	list->bl_next = brand_list;
 	brand_list = list;
+
 	mutex_exit(&brand_list_lock);
 
 	return (0);
@@ -192,6 +195,12 @@ brand_unregister(brand_t *brand)
 		prev->bl_next = list->bl_next;
 	else
 		brand_list = list->bl_next;
+
+#if defined(__sparcv9)
+	/* sparcv9 uses system wide brand interposition hooks */
+	if (brand_list == NULL)
+		brand_plat_interposition_disable();
+#endif /* __sparcv9 */
 
 	mutex_exit(&brand_list_lock);
 
@@ -332,14 +341,12 @@ brand_setbrand(proc_t *p)
 
 #if defined(__sparcv9)
 /*
- * Currently, only sparc has platform level brand syscall interposition.
+ * Currently, only sparc has system level brand syscall interposition.
  * On x86 we're able to enable syscall interposition on a per-cpu basis
  * when a branded thread is scheduled to run on a cpu.
  */
 
 /* Local variables needed for dynamic syscall interposition support */
-static kmutex_t	brand_interposition_lock;
-static int	brand_interposition_count;
 static uint32_t	syscall_trap_patch_instr_orig;
 static uint32_t	syscall_trap32_patch_instr_orig;
 
@@ -356,34 +363,15 @@ extern void	syscall_wrapper32(void);
 #define	DISP22(from, to) \
 	((((uintptr_t)(to) - (uintptr_t)(from)) >> 2) & 0x3fffff)
 
-void
-brand_plat_interposition_init(void)
-{
-	mutex_init(&brand_interposition_lock, NULL, MUTEX_DEFAULT, NULL);
-	brand_interposition_count = 0;
-}
-
 /*ARGSUSED*/
-void
-brand_plat_interposition_enable(brand_t *bp)
+static void
+brand_plat_interposition_enable(void)
 {
-	ASSERT((bp != NULL) && (bp != &native_brand));
-
-	mutex_enter(&brand_interposition_lock);
-	ASSERT(brand_interposition_count >= 0);
-
-	if (brand_interposition_count++ > 0) {
-		mutex_exit(&brand_interposition_lock);
-		return;
-	}
+	ASSERT(MUTEX_HELD(&brand_list_lock));
 
 	/*
-	 * This is the first branded zone that is being enabled on
-	 * this system.
-	 *
 	 * Before we hot patch the kernel save the current instructions
-	 * so that we can restore them if all branded zones on the
-	 * system are shutdown.
+	 * so that we can restore them later.
 	 */
 	syscall_trap_patch_instr_orig =
 	    *(uint32_t *)syscall_trap_patch_point;
@@ -411,27 +399,15 @@ brand_plat_interposition_enable(brand_t *bp)
 	hot_patch_kernel_text((caddr_t)syscall_trap32_patch_point,
 	    BA_A_INSTR | DISP22(syscall_trap32_patch_point, syscall_wrapper32),
 	    4);
-
-	mutex_exit(&brand_interposition_lock);
 }
 
 /*ARGSUSED*/
-void
-brand_plat_interposition_disable(brand_t *bp)
+static void
+brand_plat_interposition_disable(void)
 {
-	ASSERT((bp != NULL) && (bp != &native_brand));
-
-	mutex_enter(&brand_interposition_lock);
-	ASSERT(brand_interposition_count > 0);
-
-	if (--brand_interposition_count > 0) {
-		mutex_exit(&brand_interposition_lock);
-		return;
-	}
+	ASSERT(MUTEX_HELD(&brand_list_lock));
 
 	/*
-	 * The last branded zone on this system has been shutdown.
-	 *
 	 * Restore the original instructions at the trap table syscall
 	 * patch points to disable the brand syscall interposition
 	 * mechanism.
@@ -440,7 +416,5 @@ brand_plat_interposition_disable(brand_t *bp)
 	    syscall_trap_patch_instr_orig, 4);
 	hot_patch_kernel_text((caddr_t)syscall_trap32_patch_point,
 	    syscall_trap32_patch_instr_orig, 4);
-
-	mutex_exit(&brand_interposition_lock);
 }
 #endif /* __sparcv9 */

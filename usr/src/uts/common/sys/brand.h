@@ -117,9 +117,6 @@ extern brand_t native_brand;
 #define	ZBROP(z)		((z)->zone_brand->b_ops)
 #define	BRMOP(p)		((p)->p_brand->b_machops)
 
-#pragma	weak	brand_plat_interposition_enable
-#pragma	weak	brand_plat_interposition_disable
-
 extern void	brand_init();
 extern int	brand_register(brand_t *);
 extern int	brand_unregister(brand_t *);
@@ -128,8 +125,6 @@ extern brand_t	*brand_find_name(char *);
 extern void	brand_unregister_zone(brand_t *);
 extern int	brand_zone_count(brand_t *);
 extern void	brand_setbrand(proc_t *);
-extern void	brand_plat_interposition_enable(brand_t *);
-extern void	brand_plat_interposition_disable(brand_t *);
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus
