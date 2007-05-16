@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,13 +113,13 @@ umem_update_thread(void *arg)
 			    &umem_update_lock, &abs_time);
 		}
 	}
-	/* LINTED no return statement */
 }
 
 int
 umem_create_update_thread(void)
 {
 	sigset_t sigmask, oldmask;
+	thread_t newthread;
 
 	ASSERT(MUTEX_HELD(&umem_update_lock));
 	ASSERT(umem_update_thr == 0);
@@ -130,12 +129,36 @@ umem_create_update_thread(void)
 	 */
 	(void) sigfillset(&sigmask);
 	(void) thr_sigsetmask(SIG_BLOCK, &sigmask, &oldmask);
+
+	/*
+	 * drop the umem_update_lock; we cannot hold locks acquired in
+	 * pre-fork handler while calling thr_create or thr_continue().
+	 */
+
+	(void) mutex_unlock(&umem_update_lock);
+
 	if (thr_create(NULL, NULL, umem_update_thread, NULL,
-	    THR_BOUND | THR_DAEMON | THR_DETACHED, &umem_update_thr) == 0) {
+	    THR_BOUND | THR_DAEMON | THR_DETACHED | THR_SUSPENDED,
+	    &newthread) == 0) {
 		(void) thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
+
+		(void) mutex_lock(&umem_update_lock);
+		/*
+		 * due to the locking in umem_reap(), only one thread can
+		 * ever call umem_create_update_thread() at a time.  This
+		 * must be the case for this code to work.
+		 */
+
+		ASSERT(umem_update_thr == 0);
+		umem_update_thr = newthread;
+		(void) mutex_unlock(&umem_update_lock);
+		(void) thr_continue(newthread);
+		(void) mutex_lock(&umem_update_lock);
+
 		return (1);
+	} else { /* thr_create failed */
+		(void) thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
+		(void) mutex_lock(&umem_update_lock);
 	}
-	umem_update_thr = 0;
-	(void) thr_sigsetmask(SIG_SETMASK, &oldmask, NULL);
 	return (0);
 }
