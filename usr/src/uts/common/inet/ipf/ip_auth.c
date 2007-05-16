@@ -140,9 +140,6 @@ int fr_authgeniter __P((ipftoken_t *, ipfgeniter_t *, ipf_stack_t *));
 int fr_authinit(ifs)
 ipf_stack_t *ifs;
 {
-	ifs->ifs_fr_authsize = FR_NUMAUTH;
-	ifs->ifs_fr_defaultauthage = 600;
-
 	KMALLOCS(ifs->ifs_fr_auth, frauth_t *,
 		 ifs->ifs_fr_authsize * sizeof(*ifs->ifs_fr_auth));
 	if (ifs->ifs_fr_auth != NULL)

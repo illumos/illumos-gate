@@ -165,9 +165,6 @@ ipf_stack_t *ifs;
 {
 	int	i;
 	
-	ifs->ifs_ipl_suppress = 1;
-	ifs->ifs_ipl_logmax = IPL_LOGMAX;
-	ifs->ifs_ipl_logsize = IPFILTER_LOGSIZE;
 	for (i = IPL_LOGMAX; i >= 0; i--) {
 		ifs->ifs_iplt[i] = NULL;
 		ifs->ifs_ipll[i] = NULL;

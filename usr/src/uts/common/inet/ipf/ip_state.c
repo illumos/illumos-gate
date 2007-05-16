@@ -159,26 +159,6 @@ ipf_stack_t *ifs;
 {
 	int i;
 
-	ifs->ifs_fr_tcpidletimeout = FIVE_DAYS;
-	ifs->ifs_fr_tcpclosewait = IPF_TTLVAL(TCP_MSL);
-	ifs->ifs_fr_tcplastack = IPF_TTLVAL(TCP_MSL);
-	ifs->ifs_fr_tcptimeout = IPF_TTLVAL(TCP_MSL);
-	ifs->ifs_fr_tcpclosed = IPF_TTLVAL(60);
-	ifs->ifs_fr_tcphalfclosed = IPF_TTLVAL(2 * 3600);	/* 2 hours */
-	ifs->ifs_fr_udptimeout = IPF_TTLVAL(120);
-	ifs->ifs_fr_udpacktimeout = IPF_TTLVAL(12);
-	ifs->ifs_fr_icmptimeout = IPF_TTLVAL(60);
-	ifs->ifs_fr_icmpacktimeout = IPF_TTLVAL(6);
-	ifs->ifs_fr_iptimeout = IPF_TTLVAL(60);
-	ifs->ifs_fr_statemax = IPSTATE_MAX;
-	ifs->ifs_fr_statesize = IPSTATE_SIZE;
-	ifs->ifs_fr_state_maxbucket_reset = 1;
-#ifdef	IPFILTER_LOG
-	ifs->ifs_ipstate_logging = 1;
-#else
-	ifs->ifs_ipstate_logging = 0;
-#endif
-
 	KMALLOCS(ifs->ifs_ips_table, ipstate_t **, 
 		 ifs->ifs_fr_statesize * sizeof(ipstate_t *));
 	if (ifs->ifs_ips_table == NULL)

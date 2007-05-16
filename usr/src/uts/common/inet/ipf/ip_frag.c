@@ -126,8 +126,9 @@ ipf_stack_t *ifs;
 	ifs->ifs_ipfr_tail = &ifs->ifs_ipfr_list;
 	ifs->ifs_ipfr_nattail = &ifs->ifs_ipfr_natlist;
 	ifs->ifs_ipfr_ipidtail = &ifs->ifs_ipfr_ipidlist;
-	ifs->ifs_ipfr_size = IPFT_SIZE;
-	ifs->ifs_fr_ipfrttl = 120;	/* 60 seconds */
+	/* the IP frag related variables are set in ipftuneable_setdefs() to
+	 * their default values
+	 */
 
 	KMALLOCS(ifs->ifs_ipfr_heads, ipfr_t **,
 	    ifs->ifs_ipfr_size * sizeof(ipfr_t *));

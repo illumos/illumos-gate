@@ -6010,6 +6010,78 @@ tune_lookup(ipf_stack_t *ifs, char *name)
 extern dev_info_t *ipf_dev_info;
 extern int ipf_property_update __P((dev_info_t *, ipf_stack_t *));
 #endif
+
+/* -------------------------------------------------------------------- */
+/* Function:	ipftuneable_setdefs()					*/
+/* Returns:		void						*/
+/* Parameters:	ifs - pointer to newly allocated IPF instance		*/
+/*				assigned to	IP instance		*/
+/*									*/
+/* Function initializes IPF instance variables. Function is invoked	*/
+/* from	ipftuneable_alloc(). ipftuneable_alloc() is called only one	*/
+/* time during IP instance lifetime - at the time of IP instance	*/
+/* creation. Anytime IP	instance is being created new private IPF	*/
+/* instance is allocated and assigned to it. The moment of IP 		*/
+/* instance creation is the right time to initialize those IPF 		*/
+/* variables.								*/
+/*									*/
+/* -------------------------------------------------------------------- */
+static void ipftuneable_setdefs(ipf_stack_t *ifs)
+{
+	ifs->ifs_ipfr_size = IPFT_SIZE;
+	ifs->ifs_fr_ipfrttl = 120;	/* 60 seconds */
+
+	/* it comes from fr_authinit() in IPF auth */
+	ifs->ifs_fr_authsize = FR_NUMAUTH;
+	ifs->ifs_fr_defaultauthage = 600;
+
+	/* it comes from fr_stateinit() in IPF state */
+	ifs->ifs_fr_tcpidletimeout = IPF_TTLVAL(3600 * 24 * 5);	/* five days */
+	ifs->ifs_fr_tcpclosewait = IPF_TTLVAL(TCP_MSL);
+	ifs->ifs_fr_tcplastack = IPF_TTLVAL(TCP_MSL);
+	ifs->ifs_fr_tcptimeout = IPF_TTLVAL(TCP_MSL);
+	ifs->ifs_fr_tcpclosed = IPF_TTLVAL(60);
+	ifs->ifs_fr_tcphalfclosed = IPF_TTLVAL(2 * 3600);	/* 2 hours */
+	ifs->ifs_fr_udptimeout = IPF_TTLVAL(120);
+	ifs->ifs_fr_udpacktimeout = IPF_TTLVAL(12);
+	ifs->ifs_fr_icmptimeout = IPF_TTLVAL(60);
+	ifs->ifs_fr_icmpacktimeout = IPF_TTLVAL(6);
+	ifs->ifs_fr_iptimeout = IPF_TTLVAL(60);
+	ifs->ifs_fr_statemax = IPSTATE_MAX;
+	ifs->ifs_fr_statesize = IPSTATE_SIZE;
+	ifs->ifs_fr_state_maxbucket_reset = 1;
+
+	/* it comes from fr_natinit() in ipnat */
+	ifs->ifs_ipf_nattable_sz = NAT_TABLE_SZ;
+	ifs->ifs_ipf_nattable_max = NAT_TABLE_MAX;
+	ifs->ifs_ipf_natrules_sz = NAT_SIZE;
+	ifs->ifs_ipf_rdrrules_sz = RDR_SIZE;
+	ifs->ifs_ipf_hostmap_sz = HOSTMAP_SIZE;
+	ifs->ifs_fr_nat_maxbucket_reset = 1;
+	ifs->ifs_fr_defnatage = DEF_NAT_AGE;
+	ifs->ifs_fr_defnatipage = 120;		/* 60 seconds */
+	ifs->ifs_fr_defnaticmpage = 6;		/* 3 seconds */
+
+#ifdef IPFILTER_LOG
+	/* it comes from fr_loginit() in IPF log */
+	ifs->ifs_ipl_suppress = 1;
+	ifs->ifs_ipl_logmax = IPL_LOGMAX;
+	ifs->ifs_ipl_logsize = IPFILTER_LOGSIZE;
+
+	/* from fr_natinit() */
+	ifs->ifs_nat_logging = 1;
+
+	/* from fr_stateinit() */
+	ifs->ifs_ipstate_logging = 1;
+#else
+	/* from fr_natinit() */
+	ifs->ifs_nat_logging = 0;
+
+	/* from fr_stateinit() */
+	ifs->ifs_ipstate_logging = 0;
+#endif
+
+}
 /*
  * Allocate a per-stack tuneable and copy in the names. Then
  * set it to point to each of the per-stack tunables.
@@ -6077,6 +6149,8 @@ ipftuneable_alloc(ipf_stack_t *ifs)
     TUNE_SET(ifs, "ipl_logsize", ifs_ipl_logsize);
 #endif
 #undef TUNE_SET
+
+	ipftuneable_setdefs(ifs);
 
 #ifdef _KERNEL
     (void) ipf_property_update(ipf_dev_info, ifs);

@@ -187,21 +187,6 @@ ipf_stack_t *ifs;
 {
 	int i;
 
-	ifs->ifs_ipf_nattable_sz = NAT_TABLE_SZ;
-	ifs->ifs_ipf_nattable_max = NAT_TABLE_MAX;
-	ifs->ifs_ipf_natrules_sz = NAT_SIZE;
-	ifs->ifs_ipf_rdrrules_sz = RDR_SIZE;
-	ifs->ifs_ipf_hostmap_sz = HOSTMAP_SIZE;
-	ifs->ifs_fr_nat_maxbucket_reset = 1;
-#ifdef  IPFILTER_LOG
-	ifs->ifs_nat_logging = 1;
-#else
-	ifs->ifs_nat_logging = 0;
-#endif
-	ifs->ifs_fr_defnatage = DEF_NAT_AGE;
-	ifs->ifs_fr_defnatipage = 120;		/* 60 seconds */
-	ifs->ifs_fr_defnaticmpage = 6;		/* 3 seconds */
-
 	KMALLOCS(ifs->ifs_nat_table[0], nat_t **,
 		 sizeof(nat_t *) * ifs->ifs_ipf_nattable_sz);
 	if (ifs->ifs_nat_table[0] != NULL)
