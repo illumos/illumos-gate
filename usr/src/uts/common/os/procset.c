@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,11 +69,10 @@ static	int lwpinset(proc_t *, procset_t *, kthread_t *, int *);
 
 /*
  * The dotoprocs function locates the process(es) specified
- * by the procset structure pointed to by psp.  If funcp
- * is non-NULL then it points to a function which dotoprocs
- * will call for each process in the specified set.  The
- * arguments to this function will be a pointer to the
- * current process from the set and arg.
+ * by the procset structure pointed to by psp.  funcp points to a
+ * function which dotoprocs will call for each process in the
+ * specified set.  The arguments to this function will be a pointer
+ * to the current process from the set and arg.
  * If the called function returns -1, it means that processing of the
  * procset should stop and a normal (non-error) return should be made
  * to the caller of dotoprocs.
@@ -91,6 +90,8 @@ dotoprocs(procset_t *psp, int (*funcp)(), char *arg)
 	int	error;
 	int	nfound;	/* Nbr of processes found.	*/
 	proc_t	*lastprp;	/* Last proc found.	*/
+
+	ASSERT(funcp != NULL);
 
 	/*
 	 * Check that the procset_t is valid.
@@ -133,12 +134,22 @@ dotoprocs(procset_t *psp, int (*funcp)(), char *arg)
 
 			pid = (psp->p_lidtype == P_PID) ?
 			    psp->p_lid : psp->p_rid;
-			if ((prp = prfind((pid_t)pid)) == NULL) {
-				/* specified proc doesn't exist */
+			if (((prp = prfind((pid_t)pid)) == NULL) ||
+			    (prp->p_stat == SIDL || prp->p_stat == SZOMB ||
+			    prp->p_tlist == NULL || prp->p_flag & SSYS)) {
+				/*
+				 * Specified proc doesn't exist or should
+				 * not be operated on.
+				 * Don't need to make HASZONEACCESS check
+				 * here since prfind() takes care of that.
+				 */
 				mutex_exit(&pidlock);
 				return (ESRCH);
 			}
-			/* operate only on the specified proc */
+			/*
+			 * Operate only on the specified proc.  It's okay
+			 * if it's init.
+			 */
 			error = (*funcp)(prp, arg);
 			mutex_exit(&pidlock);
 			if (error == -1)
@@ -163,7 +174,7 @@ dotoprocs(procset_t *psp, int (*funcp)(), char *arg)
 		if (procinset(prp, psp)) {
 			nfound++;
 			lastprp = prp;
-			if (funcp != NULL && prp != proc_init) {
+			if (prp != proc_init) {
 				error = (*funcp)(prp, arg);
 				if (error == -1) {
 					mutex_exit(&pidlock);
@@ -179,7 +190,7 @@ dotoprocs(procset_t *psp, int (*funcp)(), char *arg)
 		mutex_exit(&pidlock);
 		return (ESRCH);
 	}
-	if (nfound == 1 && lastprp == proc_init && funcp != NULL)
+	if (nfound == 1 && lastprp == proc_init)
 		error = (*funcp)(lastprp, arg);
 	if (error == -1)
 		error = 0;
