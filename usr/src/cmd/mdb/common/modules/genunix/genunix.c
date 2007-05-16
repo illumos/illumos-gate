@@ -3181,7 +3181,7 @@ panicinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	cpu_t panic_cpu;
 	kthread_t *panic_thread;
-	void *panicbuf;
+	void *buf;
 	panic_data_t *pd;
 	int i, n;
 
@@ -3204,17 +3204,17 @@ panicinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	else
 		mdb_printf("%16s %?p\n", "thread", panic_thread);
 
-	panicbuf = mdb_alloc(PANICBUFSIZE, UM_SLEEP);
-	pd = (panic_data_t *)panicbuf;
+	buf = mdb_alloc(PANICBUFSIZE, UM_SLEEP);
+	pd = (panic_data_t *)buf;
 
-	if (mdb_readsym(panicbuf, PANICBUFSIZE, "panicbuf") == -1 ||
+	if (mdb_readsym(buf, PANICBUFSIZE, "panicbuf") == -1 ||
 	    pd->pd_version != PANICBUFVERS) {
 		mdb_warn("failed to read 'panicbuf'");
-		mdb_free(panicbuf, PANICBUFSIZE);
+		mdb_free(buf, PANICBUFSIZE);
 		return (DCMD_ERR);
 	}
 
-	mdb_printf("%16s %s\n", "message",  (char *)panicbuf + pd->pd_msgoff);
+	mdb_printf("%16s %s\n", "message",  (char *)buf + pd->pd_msgoff);
 
 	n = (pd->pd_msgoff - (sizeof (panic_data_t) -
 	    sizeof (panic_nv_t))) / sizeof (panic_nv_t);
@@ -3223,7 +3223,7 @@ panicinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%16s %?llx\n",
 		    pd->pd_nvdata[i].pnv_name, pd->pd_nvdata[i].pnv_value);
 
-	mdb_free(panicbuf, PANICBUFSIZE);
+	mdb_free(buf, PANICBUFSIZE);
 	return (DCMD_OK);
 }
 

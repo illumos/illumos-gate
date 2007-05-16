@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,7 +61,7 @@ char	b[20];
 	flags = 0;
 	if (getmsg(fd, &ctl, &data, &flags) < 0) {
 		perror("getmsg in incoming\n");
-		return(-1);
+		return (-1);
 	}
 	/*
 	dumpctl(&ctl);
@@ -80,7 +79,7 @@ char	b[20];
 				sprintf(debugmsg, "Client failed validation\n");
 				senddebug(MSG_WARN_2);
 			}
-			return;
+			return (0);
 		}
 		break;
 	case CMD_SEND_FILE:
@@ -93,7 +92,7 @@ char	b[20];
 				sprintf(debugmsg, "Unknown client request to SEND FILE\n");
 				senddebug(MSG_WARN_2);
 			}
-			return;
+			return (0);
 		}
 
 		switch (cp->status) {
@@ -154,7 +153,7 @@ char	b[20];
 								sprintf(debugmsg, "Cannot open %s in retransmit processing\n", tmpfp->filename);
 								senddebug(MSG_ERROR_1);
 							}
-							return;
+							return (0);
 						}
 						cp->currfp = tmpfp;
 						stat(tmpfp->filename, &statbuf);
@@ -175,7 +174,7 @@ char	b[20];
 								sprintf(debugmsg, "Cannot open %s in retransmit, last file closed.\n");
 								senddebug(MSG_ERROR_1);
 							}
-							return;
+							return (0);
 						}
 						cp->currfp = tmpfp;
 						stat(tmpfp->filename, &statbuf);
@@ -231,6 +230,5 @@ char	b[20];
 		}
 		break;
 	}
-	return(0);
+	return (0);
 }
-
