@@ -116,9 +116,23 @@ ndptrap_frstor(void)
 	 * Nobody said that the design of sysenter was particularly
 	 * elegant, did they?
 	 */
+
 	pushq	%r11
+
+	/*
+	 * At this point the stack looks like this:
+	 *
+	 * (high address) 	r_ss
+	 *			r_rsp
+	 *			r_rfl
+	 *			r_cs
+	 *			r_rip		<-- %rsp + 24
+	 *			r_err		<-- %rsp + 16
+	 *			r_trapno	<-- %rsp + 8
+	 * (low address)	%r11		<-- %rsp
+	 */
 	leaq	sys_sysenter(%rip), %r11
-	cmpq	%r11, 8(%rsp)
+	cmpq	%r11, 24(%rsp)	/* Compare to saved r_rip on the stack */
 	jne	1f
 	SWAPGS
 1:	popq	%r11
