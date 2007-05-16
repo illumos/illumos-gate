@@ -761,7 +761,7 @@ group_status(sa_group_t group)
 	    }
 	    sa_free_attr_string(state);
 	}
-	return (enabled ? gettext("enabled") : gettext("disabled"));
+	return (enabled ? "enabled" : "disabled");
 }
 
 /*
@@ -1055,11 +1055,13 @@ sa_list(sa_handle_t handle, int flags, int argc, char *argv[])
 		    (void) printf("%s", (char *)name);
 		    if (verbose) {
 			/*
-			 * need the list of protocols
-			 * and current status once
-			 * available.
+			 * need the list of protocols and current
+			 * status once available. We do want to
+			 * translate the enabled/disabled text here.
 			 */
-			(void) printf("\t%s", group_status(group));
+			(void) printf("\t%s", isenabled(group) ?
+					gettext("enabled") :
+						gettext("disabled"));
 			proto = group_proto(group);
 			if (proto != NULL) {
 			    (void) printf("\t%s", (char *)proto);
