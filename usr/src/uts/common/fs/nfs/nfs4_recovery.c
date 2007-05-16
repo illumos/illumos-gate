@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1886,7 +1886,7 @@ make_milist(nfs4_server_t *sp, int *nummip)
 	for (tmi = sp->mntinfo4_list; tmi != NULL; tmi = tmi->mi_clientid_next)
 		nummi++;
 
-	milist = kmem_alloc(nummi * sizeof (mntinfo4_t *), KM_NOSLEEP);
+	milist = kmem_alloc(nummi * sizeof (mntinfo4_t *), KM_SLEEP);
 
 	for (i = 0, tmi = sp->mntinfo4_list; tmi != NULL; i++,
 	    tmi = tmi->mi_clientid_next) {
