@@ -80,13 +80,11 @@ fetch_princ_entry(
 
 	code = krb5_parse_name(context, kprinc, &princ);
 	if (code != 0) {
-		krb5_free_context(context);
 		return (PAM_SYSTEM_ERR);
 	}
 
 	if (strlen(password) == 0) {
 		krb5_free_principal(context, princ);
-		krb5_free_context(context);
 		if (debug)
 			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (acct): fetch_princ_entry: pwlen=0");
@@ -107,7 +105,6 @@ fetch_princ_entry(
 			"service name for realm '%s'",
 			admin_realm);
 		krb5_free_principal(context, princ);
-		krb5_free_context(context);
 		return (PAM_SYSTEM_ERR);
 	}
 
@@ -120,7 +117,6 @@ fetch_princ_entry(
 			    "PAM-KRB5 (acct): fetch_princ_entry: "
 			    "init_with_pw failed: code = %d", code);
 		krb5_free_principal(context, princ);
-		krb5_free_context(context);
 		return ((code == KADM5_BAD_PASSWORD) ?
 			PAM_AUTH_ERR : PAM_SYSTEM_ERR);
 	}
@@ -133,7 +129,6 @@ fetch_princ_entry(
 			    "princ entry");
 		(void) kadm5_destroy(server_handle);
 		krb5_free_principal(context, princ);
-		krb5_free_context(context);
 		return (PAM_SYSTEM_ERR);
 	}
 
@@ -143,14 +138,12 @@ fetch_princ_entry(
 	if (code != 0) {
 		(void) kadm5_destroy(server_handle);
 		krb5_free_principal(context, princ);
-		krb5_free_context(context);
 		return ((code == KADM5_UNK_PRINC) ?
 			PAM_USER_UNKNOWN : PAM_SYSTEM_ERR);
 	}
 
 	(void) kadm5_destroy(server_handle);
 	krb5_free_principal(context, princ);
-	krb5_free_context(context);
 
 	return (PAM_SUCCESS);
 }
@@ -193,8 +186,14 @@ exp_warn(
 
 	if (!pamh || !user || !password) {
 		err = PAM_SERVICE_ERR;
-		goto out;
+		goto exit;
 	}
+
+	/*
+	 * If we error out from krb5_init_context, then just set error code,
+	 * check to see about debug message and exit out of routine as the
+	 * context could not possibly have been setup.
+	 */
 
 	if (code = krb5_init_context(&kmd->kcontext)) {
 		err = PAM_SYSTEM_ERR;
@@ -202,7 +201,7 @@ exp_warn(
 			__pam_log(LOG_AUTH | LOG_ERR, "PAM-KRB5 (acct): "
 			    "krb5_init_context failed: code=%d",
 			    code);
-		goto out;
+		goto exit;
 	}
 	if (code = krb5_timeofday(kmd->kcontext, &now)) {
 		err = PAM_SYSTEM_ERR;
@@ -274,6 +273,14 @@ exp_warn(
 	err = PAM_SUCCESS;
 
 out:
+
+	if (kmd->kcontext) {
+		krb5_free_context(kmd->kcontext);
+		kmd->kcontext = NULL;
+	}
+
+exit:
+
 	if (debug)
 		__pam_log(LOG_AUTH | LOG_DEBUG,
 		    "PAM-KRB5 (acct): exp_warn end: err = %d", err);
