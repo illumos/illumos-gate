@@ -84,10 +84,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/px/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/fpc/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/px/%.s
 	$(COMPILE.s) -o $@ $<
 
@@ -211,9 +207,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/px/%.c
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/px/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/fpc/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/wrsm/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))

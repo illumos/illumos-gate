@@ -25,7 +25,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	uts/sun4u/fpc/Makefile
+#	uts/sun4u/chicago/fpc/Makefile
 #
 #	This makefile drives the production of the sun4u
 #	fire performance counter kernel module
@@ -36,7 +36,7 @@
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
-UTSBASE	= ../..
+UTSBASE	= ../../..
 
 #
 #	Define the module and object file sets.
@@ -85,7 +85,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE) \
 #	Include SUN4 and SUN4U specific headers files
 #
 INC_PATH	+= -I$(UTSBASE)/sun4/io/fpc
-INC_PATH	+= -I$(UTSBASE)/sun4u/io/fpc
 
 #
 # lint pass one enforcement

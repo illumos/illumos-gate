@@ -373,7 +373,6 @@ DRV_KMODS	+= rootnex sbusmem upa64s zs zsh
 DRV_KMODS	+= sbus
 DRV_KMODS	+= pcisch pcipsy simba
 DRV_KMODS	+= px
-DRV_KMODS	+= fpc
 DRV_KMODS	+= ebus
 DRV_KMODS	+= su
 DRV_KMODS	+= tod
