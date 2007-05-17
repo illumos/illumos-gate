@@ -1352,9 +1352,7 @@ msg_rcvq_sleep(list_t *queue, msgq_wakeup_t *entry, kmutex_t **lock,
 	/*
 	 * We have woken up, so remove ourselves from the waiter list.
 	 */
-	if (!IPC_FREE(&qp->msg_perm)) {
-		list_remove(queue, entry);
-	}
+	list_remove(queue, entry);
 
 	return (cvres);
 }
