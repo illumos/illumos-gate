@@ -148,12 +148,6 @@ daemonize(void)
 	}
 	(void) chdir("/");
 	(void) umask(022);
-	closelog();
-	(void) closefrom(STDIN_FILENO);
-	(void) open("/dev/null", O_RDONLY);
-	(void) open("/dev/null", O_WRONLY);
-	(void) dup2(STDOUT_FILENO, STDERR_FILENO);
-	start_logging();
 }
 
 /*

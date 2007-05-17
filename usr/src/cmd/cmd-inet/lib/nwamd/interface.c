@@ -1013,7 +1013,9 @@ do_unplumb_if(icfg_if_t *intf, void *arg)
 void
 initialize_interfaces(void)
 {
-	int times;
+	int numifs;
+	unsigned int wait_time = 1;
+	boolean_t found_nonlo_if;
 
 	dprintf("initialize_interfaces: setting link_layer_profile(%p) to NULL",
 	    (void *)link_layer_profile);
@@ -1046,18 +1048,41 @@ initialize_interfaces(void)
 	 */
 	if (!check_svc_up(DEV_LOCAL_SVC_FMRI, 60))
 		syslog(LOG_WARNING, DEV_LOCAL_SVC_FMRI " never came up");
-	for (times = 1; times <= 30; times++) {
-		if (start_child(IFCONFIG, "-a", "plumb", NULL) == 0)
-			break;
+
+	for (;;) {
+		icfg_if_t *if_list;
+
+		(void) start_child(IFCONFIG, "-a", "plumb", NULL);
 
 		/*
-		 * Assume the di_init problem is the cause: sleep and try
-		 * again, as the DDI has probably not been initialized yet.
+		 * There are cases where we get here and the devices list
+		 * still isn't initialized yet.  Hang out until we see
+		 * something other than loopback.
 		 */
-		(void) sleep(1);
+		if (icfg_get_if_list(&if_list, &numifs, AF_INET, ICFG_PLUMBED)
+		    != ICFG_SUCCESS) {
+			syslog(LOG_ERR, "couldn't get the interface list: %m");
+			numifs = 0;
+			if_list = NULL;
+		} else {
+			dprintf("found %d plumbed interfaces", numifs);
+		}
+
+		found_nonlo_if = B_FALSE;
+		while (numifs > 0 && !found_nonlo_if) {
+			if (strcmp(if_list[--numifs].if_name, LOOPBACK_IF) != 0)
+				found_nonlo_if = B_TRUE;
+		}
+		icfg_free_if_list(if_list);
+
+		if (found_nonlo_if)
+			break;
+
+		(void) sleep(wait_time);
+		wait_time *= 2;
+		if (wait_time > NWAM_IF_WAIT_DELTA_MAX)
+			wait_time = NWAM_IF_WAIT_DELTA_MAX;
 	}
-	if (times > 30)
-		syslog(LOG_ERR, IFCONFIG " -a plumb failed %d times", times);
 
 	(void) dladm_init_linkprop();
 

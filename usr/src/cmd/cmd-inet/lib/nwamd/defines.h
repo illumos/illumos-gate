@@ -52,6 +52,7 @@
 #define	NP_LISTEN_PORT		12340
 
 #define	NWAM_DEFAULT_DHCP_WAIT_TIME	60	/* 1 minute */
+#define	NWAM_IF_WAIT_DELTA_MAX		300	/* 5 minutes poll rate max */
 
 #define	TIMER_INFINITY		0xffffffff	/* we use uint32s for timers */
 #define	NSEC_TO_SEC(nsec)	(nsec) / NANOSEC
