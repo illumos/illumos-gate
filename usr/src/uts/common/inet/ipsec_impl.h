@@ -786,10 +786,10 @@ extern void ipsec_log_policy_failure(int, char *, ipha_t *, ip6_t *, boolean_t,
 extern boolean_t ipsec_inbound_accept_clear(mblk_t *, ipha_t *, ip6_t *);
 extern int ipsec_conn_cache_policy(conn_t *, boolean_t);
 extern mblk_t *ipsec_alloc_ipsec_out(netstack_t *);
-extern mblk_t	*ipsec_attach_ipsec_out(mblk_t *, conn_t *, ipsec_policy_t *,
+extern mblk_t	*ipsec_attach_ipsec_out(mblk_t **, conn_t *, ipsec_policy_t *,
     uint8_t, netstack_t *);
-extern mblk_t	*ipsec_init_ipsec_out(mblk_t *, conn_t *, ipsec_policy_t *,
-    uint8_t, netstack_t *);
+extern mblk_t	*ipsec_init_ipsec_out(mblk_t *, mblk_t **, conn_t *,
+    ipsec_policy_t *, uint8_t, netstack_t *);
 struct ipsec_in_s;
 extern ipsec_action_t *ipsec_in_to_out_action(struct ipsec_in_s *);
 extern boolean_t ipsec_check_ipsecin_latch(struct ipsec_in_s *, mblk_t *,

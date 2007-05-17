@@ -4683,6 +4683,7 @@ tun_wdata_v4(queue_t *q, mblk_t *mp)
 
 	switch (atp->tun_flags & TUN_LOWER_MASK) {
 	case TUN_L_V4:
+		hdrlen = IPH_HDR_LENGTH(&atp->tun_ipha);
 		if (inner_ipha->ipha_dst == atp->tun_ipha.ipha_dst) {
 			/*
 			 * Watch out!  There is potential for an infinite loop.
@@ -4702,11 +4703,10 @@ tun_wdata_v4(queue_t *q, mblk_t *mp)
 		}
 
 		/* room for IPv4 header? */
-		if ((mp->b_rptr - mp->b_datap->db_base) < sizeof (ipha_t)) {
+		if ((mp->b_rptr - mp->b_datap->db_base) < hdrlen) {
 			/* no */
 
-			nmp = allocb(sizeof (ipha_t) + atp->tun_extra_offset,
-			    BPRI_HI);
+			nmp = allocb(hdrlen + atp->tun_extra_offset, BPRI_HI);
 			if (nmp == NULL) {
 				atomic_add_32(&atp->tun_OutDiscard, 1);
 				atomic_add_32(&atp->tun_allocbfail, 1);
@@ -4716,10 +4716,10 @@ tun_wdata_v4(queue_t *q, mblk_t *mp)
 			nmp->b_cont = mp;
 			mp = nmp;
 			mp->b_wptr = mp->b_datap->db_lim;
-			mp->b_rptr = mp->b_wptr - sizeof (ipha_t);
+			mp->b_rptr = mp->b_wptr - hdrlen;
 		} else {
 			/* yes */
-			mp->b_rptr -= sizeof (ipha_t);
+			mp->b_rptr -= hdrlen;
 		}
 		outer_ipha = (ipha_t *)mp->b_rptr;
 
@@ -4728,7 +4728,7 @@ tun_wdata_v4(queue_t *q, mblk_t *mp)
 		 */
 		*outer_ipha = atp->tun_ipha;
 		outer_ipha->ipha_length = htons(ntohs(inner_ipha->ipha_length)
-		    + sizeof (ipha_t));
+		    + hdrlen);
 		/*
 		 * copy the tos from inner header. We mask off
 		 * ECN bits (bits 6 and 7) because  there is currently no

@@ -20416,7 +20416,7 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 	 * lose the "conn" if we go through ip_newroute.
 	 */
 	if (connp->conn_out_enforce_policy || (connp->conn_latch != NULL)) {
-		if (((mp = ipsec_attach_ipsec_out(mp, connp, NULL,
+		if (((mp = ipsec_attach_ipsec_out(&mp, connp, NULL,
 		    ipha->ipha_protocol, ipst->ips_netstack)) == NULL)) {
 			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
 			if (need_decref)
@@ -20974,7 +20974,7 @@ qnext:
 			 * We need to attach a IPSEC_OUT.
 			 */
 			if (connp->conn_out_enforce_policy) {
-				if (((mp = ipsec_attach_ipsec_out(mp, connp,
+				if (((mp = ipsec_attach_ipsec_out(&mp, connp,
 				    NULL, ipha->ipha_protocol,
 				    ipst->ips_netstack)) == NULL)) {
 					BUMP_MIB(&ipst->ips_ip_mib,

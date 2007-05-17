@@ -77,7 +77,7 @@ static ipsec_act_t *ipsec_act_wildcard_expand(ipsec_act_t *, uint_t *,
     netstack_t *);
 static void ipsec_out_free(void *);
 static void ipsec_in_free(void *);
-static mblk_t *ipsec_attach_global_policy(mblk_t *, conn_t *,
+static mblk_t *ipsec_attach_global_policy(mblk_t **, conn_t *,
     ipsec_selector_t *, netstack_t *);
 static mblk_t *ipsec_apply_global_policy(mblk_t *, conn_t *,
     ipsec_selector_t *, netstack_t *);
@@ -1543,7 +1543,7 @@ ipsec_actvec_free(ipsec_act_t *act, uint_t nact)
  * an ipsec_out_t to the packet..
  */
 static mblk_t *
-ipsec_attach_global_policy(mblk_t *mp, conn_t *connp, ipsec_selector_t *sel,
+ipsec_attach_global_policy(mblk_t **mp, conn_t *connp, ipsec_selector_t *sel,
     netstack_t *ns)
 {
 	ipsec_policy_t *p;
@@ -4241,7 +4241,7 @@ ipsec_alloc_ipsec_out(netstack_t *ns)
  * If pol is non-null, we consume a reference to it.
  */
 mblk_t *
-ipsec_attach_ipsec_out(mblk_t *mp, conn_t *connp, ipsec_policy_t *pol,
+ipsec_attach_ipsec_out(mblk_t **mp, conn_t *connp, ipsec_policy_t *pol,
     uint8_t proto, netstack_t *ns)
 {
 	mblk_t *ipsec_mp;
@@ -4253,13 +4253,17 @@ ipsec_attach_ipsec_out(mblk_t *mp, conn_t *connp, ipsec_policy_t *pol,
 	if (ipsec_mp == NULL) {
 		ipsec_rl_strlog(ns, IP_MOD_ID, 0, 0, SL_ERROR|SL_NOTE,
 		    "ipsec_attach_ipsec_out: Allocation failure\n");
-		ip_drop_packet(mp, B_FALSE, NULL, NULL,
+		ip_drop_packet(*mp, B_FALSE, NULL, NULL,
 		    DROPPER(ipss, ipds_spd_nomem),
 		    &ipss->ipsec_spd_dropper);
+		*mp = NULL;
 		return (NULL);
 	}
-	ipsec_mp->b_cont = mp;
-	return (ipsec_init_ipsec_out(ipsec_mp, connp, pol, proto, ns));
+	ipsec_mp->b_cont = *mp;
+	/*
+	 * If *mp is NULL, ipsec_init_ipsec_out() won't/should not be using it.
+	 */
+	return (ipsec_init_ipsec_out(ipsec_mp, mp, connp, pol, proto, ns));
 }
 
 /*
@@ -4269,22 +4273,18 @@ ipsec_attach_ipsec_out(mblk_t *mp, conn_t *connp, ipsec_policy_t *pol,
  * If pol is non-null, we consume a reference to it.
  */
 mblk_t *
-ipsec_init_ipsec_out(mblk_t *ipsec_mp, conn_t *connp, ipsec_policy_t *pol,
-    uint8_t proto, netstack_t *ns)
+ipsec_init_ipsec_out(mblk_t *ipsec_mp, mblk_t **mp, conn_t *connp,
+    ipsec_policy_t *pol, uint8_t proto, netstack_t *ns)
 {
-	mblk_t *mp;
 	ipsec_out_t *io;
 	ipsec_policy_t *p;
 	ipha_t *ipha;
 	ip6_t *ip6h;
 	ipsec_stack_t *ipss = ns->netstack_ipsec;
 
-	ASSERT((pol != NULL) || (connp != NULL));
+	ASSERT(ipsec_mp->b_cont == *mp);
 
-	/*
-	 * If mp is NULL, we won't/should not be using it.
-	 */
-	mp = ipsec_mp->b_cont;
+	ASSERT((pol != NULL) || (connp != NULL));
 
 	ASSERT(ipsec_mp->b_datap->db_type == M_CTL);
 	ASSERT(ipsec_mp->b_wptr == (ipsec_mp->b_rptr + sizeof (ipsec_info_t)));
@@ -4302,8 +4302,8 @@ ipsec_init_ipsec_out(mblk_t *ipsec_mp, conn_t *connp, ipsec_policy_t *pol,
 
 	io->ipsec_out_ns = ns;		/* No netstack_hold */
 
-	if (mp != NULL) {
-		ipha = (ipha_t *)mp->b_rptr;
+	if (*mp != NULL) {
+		ipha = (ipha_t *)(*mp)->b_rptr;
 		if (IPH_HDR_VERSION(ipha) == IP_VERSION) {
 			io->ipsec_out_v4 = B_TRUE;
 			ip6h = NULL;
@@ -4350,9 +4350,11 @@ ipsec_init_ipsec_out(mblk_t *ipsec_mp, conn_t *connp, ipsec_policy_t *pol,
 		 * it from the packet.
 		 */
 
-		if (!ipsec_init_outbound_ports(&sel, mp, ipha, ip6h, 0,
+		if (!ipsec_init_outbound_ports(&sel, *mp, ipha, ip6h, 0,
 		    ns->netstack_ipsec)) {
-			/* Callee did ip_drop_packet(). */
+			/* Callee did ip_drop_packet() on *mp. */
+			*mp = NULL;
+			freeb(ipsec_mp);
 			return (NULL);
 		}
 		io->ipsec_out_src_port = sel.ips_local_port;
@@ -4383,6 +4385,7 @@ ipsec_init_ipsec_out(mblk_t *ipsec_mp, conn_t *connp, ipsec_policy_t *pol,
 			ip_drop_packet(ipsec_mp, B_FALSE, NULL, NULL,
 			    DROPPER(ipss, ipds_spd_explicit),
 			    &ipss->ipsec_spd_dropper);
+			*mp = NULL;
 			ipsec_mp = NULL;
 		}
 	}
@@ -4672,7 +4675,13 @@ ip_wput_attach_policy(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
 		ASSERT(io->ipsec_out_need_policy == B_FALSE);
 		return (ipsec_mp);
 	}
-	ipsec_mp = ipsec_attach_global_policy(mp, connp, &sel, ns);
+	/*
+	 * We pass in a pointer to a pointer because mp can become
+	 * NULL due to allocation failures or explicit drops.  Callers
+	 * of this function should assume a NULL mp means the packet
+	 * was dropped.
+	 */
+	ipsec_mp = ipsec_attach_global_policy(&mp, connp, &sel, ns);
 	if (ipsec_mp == NULL)
 		return (mp);
 

@@ -9476,7 +9476,7 @@ ip_output_v6(void *arg, mblk_t *mp, void *arg2, int caller)
 		    connp->conn_latch != NULL)) {
 			ASSERT(first_mp == mp);
 			/* XXX Any better way to get the protocol fast ? */
-			if (((mp = ipsec_attach_ipsec_out(mp, connp, NULL,
+			if (((mp = ipsec_attach_ipsec_out(&mp, connp, NULL,
 			    connp->conn_ulp, ipst->ips_netstack)) == NULL)) {
 				BUMP_MIB(mibptr, ipIfStatsOutDiscards);
 				if (need_decref)
