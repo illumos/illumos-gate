@@ -2689,6 +2689,7 @@ anon_map_createpages(
 	anoff_t		ap_off;
 	size_t		pgsz;
 	lgrp_t		*lgrp;
+	kmutex_t	*ahm;
 
 	/*
 	 * XXX For now only handle S_CREATE.
@@ -2730,6 +2731,29 @@ anon_map_createpages(
 			}
 			pp = anon_pl[0];
 			ppa[p_index++] = pp;
+
+			/*
+			 * an_pvp can become non-NULL after SysV's page was
+			 * paged out before ISM was attached to this SysV
+			 * shared memory segment. So free swap slot if needed.
+			 */
+			if (ap->an_pvp != NULL) {
+				page_io_lock(pp);
+				ahm = &anonhash_lock[AH_LOCK(ap->an_vp,
+					ap->an_off)];
+				mutex_enter(ahm);
+				if (ap->an_pvp != NULL) {
+					swap_phys_free(ap->an_pvp,
+					    ap->an_poff, PAGESIZE);
+					ap->an_pvp = NULL;
+					ap->an_poff = 0;
+					mutex_exit(ahm);
+					hat_setmod(pp);
+				} else {
+					mutex_exit(ahm);
+				}
+				page_io_unlock(pp);
+			}
 
 			addr += PAGESIZE;
 			index++;

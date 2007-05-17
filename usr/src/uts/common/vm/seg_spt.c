@@ -710,14 +710,6 @@ segspt_free_pages(struct seg *seg, caddr_t addr, size_t len)
 		 * these were created by segspt.
 		 */
 		if (pp->p_szc != 0) {
-			/*
-			 * For DISM swap is released in shm_rm_amp.
-			 */
-			if ((sptd->spt_flags & SHM_PAGEABLE) == 0 &&
-			    ap->an_pvp != NULL) {
-				panic("segspt_free_pages: pvp non NULL");
-				/*NOTREACHED*/
-			}
 			if (root == 0) {
 				ASSERT(curnpgs == 0);
 				root = 1;
