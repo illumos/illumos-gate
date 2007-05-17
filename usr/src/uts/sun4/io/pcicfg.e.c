@@ -3174,7 +3174,7 @@ pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 
 	ret = PCI_CAP_LOCATE(config_handle, PCI_CAP_ID_PCI_E, &cap_ptr);
 
-	if ((pcie_dev && ret) > 0) {
+	if (pcie_dev && (ret == DDI_SUCCESS)) {
 		val = PCI_CAP_GET16(config_handle, NULL, cap_ptr,
 				PCIE_PCIECAP) & PCIE_PCIECAP_SLOT_IMPL;
 		/* if slot implemented, get physical slot number */
