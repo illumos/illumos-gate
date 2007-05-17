@@ -113,6 +113,7 @@ umem_update_thread(void *arg)
 			    &umem_update_lock, &abs_time);
 		}
 	}
+	/* LINTED no return statement */
 }
 
 int
