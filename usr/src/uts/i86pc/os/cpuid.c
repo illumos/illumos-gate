@@ -461,14 +461,14 @@ cpuid_pass1(cpu_t *cpu)
 		cpi->cpi_family += CPI_FAMILY_XTD(cpi);
 
 	/*
-	 * Beware: AMD uses "extended model" iff *FAMILY* == 0xf.
+	 * Beware: AMD uses "extended model" iff base *FAMILY* == 0xf.
 	 * Intel, and presumably everyone else, uses model == 0xf, as
 	 * one would expect (max value means possible overflow).  Sigh.
 	 */
 
 	switch (cpi->cpi_vendor) {
 	case X86_VENDOR_AMD:
-		if (cpi->cpi_family == 0xf)
+		if (CPI_FAMILY(cpi) == 0xf)
 			cpi->cpi_model += CPI_MODEL_XTD(cpi) << 4;
 		break;
 	default:
@@ -2112,8 +2112,8 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 	 * a legacy (32-bit) AMD CPU.
 	 */
 	if (cpi->cpi_vendor != X86_VENDOR_AMD ||
-	    CPI_FAMILY(cpi) == 4 || CPI_FAMILY(cpi) == 5 ||
-	    CPI_FAMILY(cpi) == 6)
+	    cpi->cpi_family == 4 || cpi->cpi_family == 5 ||
+	    cpi->cpi_family == 6)
 
 		return (0);
 
@@ -2149,17 +2149,17 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 
 	switch (erratum) {
 	case 1:
-		return (1);
+		return (cpi->cpi_family < 0x10);
 	case 51:	/* what does the asterisk mean? */
 		return (B(eax) || SH_C0(eax) || CG(eax));
 	case 52:
 		return (B(eax));
 	case 57:
-		return (1);
+		return (cpi->cpi_family <= 0x10);
 	case 58:
 		return (B(eax));
 	case 60:
-		return (1);
+		return (cpi->cpi_family <= 0x10);
 	case 61:
 	case 62:
 	case 63:
@@ -2176,11 +2176,11 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 	case 74:
 		return (B(eax));
 	case 75:
-		return (1);
+		return (cpi->cpi_family < 0x10);
 	case 76:
 		return (B(eax));
 	case 77:
-		return (1);
+		return (cpi->cpi_family <= 0x10);
 	case 78:
 		return (B(eax) || SH_C0(eax));
 	case 79:
@@ -2192,7 +2192,7 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 	case 83:
 		return (B(eax) || SH_C0(eax) || CG(eax));
 	case 85:
-		return (1);
+		return (cpi->cpi_family < 0x10);
 	case 86:
 		return (SH_C0(eax) || CG(eax));
 	case 88:
@@ -2202,7 +2202,7 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 		return (B(eax) || SH_C0(eax));
 #endif
 	case 89:
-		return (1);
+		return (cpi->cpi_family < 0x10);
 	case 90:
 		return (B(eax) || SH_C0(eax) || CG(eax));
 	case 91:
@@ -2262,15 +2262,15 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 	case 121:
 		return (B(eax) || SH_C0(eax) || CG(eax) || D0(eax) || EX(eax));
 	case 122:
-		return (1);
+		return (cpi->cpi_family < 0x10);
 	case 123:
 		return (JH_E1(eax) || BH_E4(eax) || JH_E6(eax));
 	case 131:
-		return (1);
+		return (cpi->cpi_family < 0x10);
 	case 6336786:
 		/*
 		 * Test for AdvPowerMgmtInfo.TscPStateInvariant
-		 * if this is a K8 family processor
+		 * if this is a K8 family or newer processor
 		 */
 		if (CPI_FAMILY(cpi) == 0xf) {
 			struct cpuid_regs regs;
