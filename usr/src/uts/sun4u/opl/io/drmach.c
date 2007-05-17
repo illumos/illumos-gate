@@ -2283,9 +2283,7 @@ drmach_mem_add_span(drmachid_t id, uint64_t basepa, uint64_t size)
 	if (!DRMACH_IS_MEM_ID(id))
 		return (drerr_new(0, EOPL_INAPPROP, NULL));
 
-	kcage_range_lock();
-	rv = kcage_range_add(basepfn, npages, 1);
-	kcage_range_unlock();
+	rv = kcage_range_add(basepfn, npages, KCAGE_DOWN);
 	if (rv == ENOMEM) {
 		cmn_err(CE_WARN, "%ld megabytes not available to kernel cage",
 			(size == 0 ? 0 : size / MBYTE));
@@ -2315,9 +2313,7 @@ drmach_mem_del_span(drmachid_t id, uint64_t basepa, uint64_t size)
 		return (drerr_new(0, EOPL_INAPPROP, NULL));
 
 	if (size > 0) {
-		kcage_range_lock();
 		rv = kcage_range_delete_post_mem_del(basepfn, npages);
-		kcage_range_unlock();
 		if (rv != 0) {
 			cmn_err(CE_WARN,
 			    "unexpected kcage_range_delete_post_mem_del"

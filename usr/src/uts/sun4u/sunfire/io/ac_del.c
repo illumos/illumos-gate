@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -243,9 +243,7 @@ ac_del_bank_add_span(
 	/*
 	 * Delete the pages from the cage growth list.
 	 */
-	kcage_range_lock();
 	ret = kcage_range_delete(base, npgs);
-	kcage_range_unlock();
 	if (ret != 0) {
 		/* TODO: Should this be a separate error? */
 		AC_ERR_SET(pkt, AC_ERR_KPM_NONRELOC);
@@ -263,8 +261,7 @@ ac_del_bank_add_span(
 		 * TODO: We should not unconditionally add back
 		 * if we conditionally add at memory add time.
 		 */
-		kcage_range_lock();
-		errs = kcage_range_add(base, npgs, 1);
+		errs = kcage_range_add(base, npgs, KCAGE_DOWN);
 		/* TODO: deal with error return. */
 		if (errs != 0) {
 			AC_ERR_SET(pkt, ac_kpm_err_cvt(errs));
@@ -273,7 +270,6 @@ ac_del_bank_add_span(
 			    "kcage_range_add() returned %d",
 			    pkt->softsp->board, pkt->bank, errs);
 		}
-		kcage_range_unlock();
 		return (EINVAL);
 	}
 	return (0);
@@ -307,15 +303,13 @@ ac_del_bank_add_cage(
 	 * TODO: We should not unconditionally add back
 	 * if we conditionally add at memory add time.
 	 */
-	kcage_range_lock();
-	errs = kcage_range_add(base, npgs, 1);
+	errs = kcage_range_add(base, npgs, KCAGE_DOWN);
 	/* TODO: deal with error return. */
 	if (errs != 0)
 		cmn_err(CE_NOTE, "ac_del_bank_add_cage(): "
 		    "board %d, bank %d, "
 		    "kcage_range_add() returned %d",
 		    del->sc.board, bank, errs);
-	kcage_range_unlock();
 }
 
 static int

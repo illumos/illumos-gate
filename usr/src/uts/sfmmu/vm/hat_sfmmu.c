@@ -1761,11 +1761,17 @@ int
 hat_dup(struct hat *hat, struct hat *newhat, caddr_t addr, size_t len,
 	uint_t flag)
 {
+	extern uint_t get_color_start(struct as *);
+
 	ASSERT(hat->sfmmu_xhat_provider == NULL);
 	ASSERT((flag == 0) || (flag == HAT_DUP_ALL) || (flag == HAT_DUP_COW));
 
 	if (flag == HAT_DUP_COW) {
 		panic("hat_dup: HAT_DUP_COW not supported");
+	}
+	if (flag == HAT_DUP_ALL && consistent_coloring == 0 &&
+	    update_proc_pgcolorbase_after_fork != 0) {
+		hat->sfmmu_clrbin = get_color_start(hat->sfmmu_as);
 	}
 	return (0);
 }

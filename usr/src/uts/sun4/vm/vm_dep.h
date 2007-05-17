@@ -419,6 +419,7 @@ extern int ecache_alignsize;
 #define	L2CACHE_ALIGN		ecache_alignsize
 #define	L2CACHE_ALIGN_MAX	512
 
+extern int update_proc_pgcolorbase_after_fork;
 extern int consistent_coloring;
 extern uint_t vac_colors_mask;
 extern int vac_size;
