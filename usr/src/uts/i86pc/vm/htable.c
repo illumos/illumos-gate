@@ -903,8 +903,13 @@ link_ptp(htable_t *higher, htable_t *new, uintptr_t vaddr)
 	/*
 	 * When any top level VLP page table entry changes, we must issue
 	 * a reload of cr3 on all processors using it.
+	 * We also need to do this for the kernel hat on PAE 32 bit kernel.
 	 */
-	if (higher->ht_flags & HTABLE_VLP)
+	if (
+#ifdef __i386
+	    (higher->ht_hat == kas.a_hat && higher->ht_level == VLP_LEVEL) ||
+#endif
+	    (higher->ht_flags & HTABLE_VLP))
 		hat_tlb_inval(higher->ht_hat, DEMAP_ALL_ADDR);
 }
 
