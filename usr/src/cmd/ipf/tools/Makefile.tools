@@ -57,6 +57,7 @@ include ../../../Makefile.cmd
 include ../../Makefile.ipf
 
 LDLIBS		+= $(LIBBPF)
+LDFLAGS		+= $(MAPFILE.NGB:%=-M%)
 
 CPPFLAGS	+= -I. -DIPFILTER_LOOKUP -DIPFILTER_LOG
 
@@ -106,7 +107,7 @@ $(ROOTIPFLINKS): FRC
 
 .KEEP_STATE:
 
-ipf:	$(IPF_OBJS) $(LIBIPF)
+ipf:	$(IPF_OBJS) $(LIBIPF) $(MAPFILE.NGB)
 	$(LINK.c) -o ipf $(IPF_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
@@ -135,11 +136,11 @@ ipfs:	$(IPFS_OBJS)
 	$(LINK.c) -o ipfs $(IPFS_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-ipfstat:	$(IPFSTAT_OBJS)
+ipfstat:	$(IPFSTAT_OBJS) $(MAPFILE.NGB)
 	$(LINK.c) -o ipfstat $(IPFSTAT_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-ipmon:	$(IPMON_OBJS) $(LIBIPF)
+ipmon:	$(IPMON_OBJS) $(LIBIPF) $(MAPFILE.NGB)
 	$(LINK.c) -o ipmon $(IPMON_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
@@ -165,7 +166,7 @@ ipmon_l.o: ../ipmon_l.c $(COMMONIPF)/ipmon.h ../ipmon_y.h ../ipmon_l.h
 ../ipmon_l.h: ../lexer.h
 	sed -e 's/yy/ipmon_yy/g' ../lexer.h > $@
 
-ipnat:	$(IPNAT_OBJS) $(LIBIPF)
+ipnat:	$(IPNAT_OBJS) $(LIBIPF) $(MAPFILE.NGB)
 	$(LINK.c) -o ipnat $(IPNAT_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
@@ -191,7 +192,7 @@ ipnat_l.o: ../ipnat_l.c $(COMMONIPF)/netinet/ip_nat.h ../ipnat_l.h
 ../ipnat_l.h: ../lexer.h
 	sed -e 's/yy/ipnat_yy/g' ../lexer.h > $@
 
-ippool:	$(IPPOOL_OBJS) $(LIBIPF)
+ippool:	$(IPPOOL_OBJS) $(LIBIPF) $(MAPFILE.NGB)
 	$(LINK.c) -o ippool $(IPPOOL_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
@@ -217,8 +218,8 @@ ippool_l.o: ../ippool_l.c $(COMMONIPF)/netinet/ip_pool.h ../ippool_l.h
 ../ippool_l.h: ../lexer.h
 	sed -e 's/yy/ippool_yy/g' ../lexer.h > $@
 
-ipftest:	$(IPFTEST_OBJS) $(LIBIPF)
-	$(LINK.c) -zignore -o ipftest $(IPFTEST_OBJS) $(LDLIBS)  
+ipftest:	$(IPFTEST_OBJS) $(LIBIPF) $(MAPFILE.NGB)
+	$(LINK.c) $(ZIGNORE) -o ipftest $(IPFTEST_OBJS) $(LDLIBS)  
 	$(POST_PROCESS)
 
 clean:

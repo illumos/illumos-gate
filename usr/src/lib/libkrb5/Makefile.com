@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,13 +28,15 @@
 # include library definitions
 include $(SRC)/lib/Makefile.lib
 
-LIBRARY= libkrb5.a
-LLIBRARY= libkrb5.so.1
-VERS= .1
-MAPFILE=../common/mapfile
+LIBRARY =	libkrb5.a
+LLIBRARY =	libkrb5.so.1
+VERS =		.1
 
+MAPFILES =	../common/mapfile $(MAPFILE.FLT)
 
-LIBS=		$(DYNLIB)
+DYNFLAGS +=	-G $(ZLOADFLTR)
+
+LIBS =		$(DYNLIB)
 
 #override liblink
 INS.liblink=	-$(RM) $@; $(SYMLINK) $(LIBLINKS)$(VERS) $@
@@ -43,10 +45,8 @@ INS.liblink=	-$(RM) $@; $(SYMLINK) $(LIBLINKS)$(VERS) $@
 
 all:	$(LIBS)
 
-
-$(LIBS):	$(MAPFILE)
-	$(LD) $(DYNFLAGS) -o $@ -M$(MAPFILE)
-
+$(LIBS):	$(MAPFILES)
+	$(LD) $(DYNFLAGS) -o $@
 
 
 $(ROOTLIBDIR)/$(DYNLIB) :=	FILEMODE= 755

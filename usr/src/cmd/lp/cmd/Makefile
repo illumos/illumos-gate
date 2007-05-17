@@ -20,7 +20,7 @@
 
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -55,14 +55,15 @@ ROOTSYMLINKS=	$(LIBLINKS:%=$(ROOTLIB)/%)
 
 
 CPPFLAGS =	-I$(LPINC) $(CPPFLAGS.master)
+LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
 
 # conditional assignments
 #
 lpfilter:=	LDLIBS += $(LIBFLT) $(LIBMSG) $(LIBACC) $(LIBOAM) $(LIBLP) \
-			-lgen -z lazyload -lsecdb -z nolazyload
+			-lgen $(ZLAZYLOAD) -lsecdb $(ZNOLAZYLOAD)
 lpforms:=	LDLIBS += $(LIBFRM) $(LIBMSG) $(LIBREQ) $(LIBOAM) \
 			$(LIBACC) $(LIBLP) \
-			-z lazyload -lsecdb -z nolazyload
+			$(ZLAZYLOAD) -lsecdb $(ZNOLAZYLOAD)
 lpshut:=	LDLIBS += $(LIBMSG) $(LIBOAM) $(LIBLP)
 lpusers:=	LDLIBS += $(LIBMSG) $(LIBACC) $(LIBOAM) $(LIBUSR) $(LIBLP)
 

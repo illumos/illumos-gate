@@ -34,7 +34,7 @@ include		../../Makefile.lib
 # install this library in the root filesystem
 include		../../Makefile.rootfs
 
-MAPFILES +=	$(MAPFILE-FLTR)
+MAPFILES +=	$(MAPFILE.FLT)
 
 SRCDIR=		../common
 LIBS=		$(DYNLIB) $(LINTLIB)

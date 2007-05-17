@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,13 +34,14 @@ LFLAGS =	-t
 YFLAGS =	-d -b zonecfg_grammar
 LDLIBS +=	-lzonecfg -ll -lnsl -ltecla -lzfs -lbrand
 CPPFLAGS +=	-I.
+LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
 CLEANFILES +=	zonecfg_lex.c zonecfg_grammar.tab.c zonecfg_grammar.tab.h
 
 .KEEP_STATE:
 
 all: $(PROG)
 
-$(PROG): $(OBJS)
+$(PROG): $(OBJS) $(MAPFILE.NGB)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 

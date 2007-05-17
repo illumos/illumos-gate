@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -48,6 +49,8 @@ IFLAGS		= -I$(SRC)/lib/libc/inc -I$(SRC)/uts/$(PLATFORM) \
 CPPFLAGS	= -D_REENTRANT -D$(MACH) $(IFLAGS) $(CPPFLAGS.master)
 ASDEFS		= -D__STDC__ -D_ASM $(CPPFLAGS)
 ASFLAGS		= -P $(ASDEFS)
+
+MAPFILES	= ../../sun4u/mapfile-vers $(MAPFILE.FLT)
 
 #
 # Used when building links in /platform/$(PLATFORM)/lib

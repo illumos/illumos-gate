@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,15 +44,15 @@ CPPFLAGS +=	-I$(SRC)/lib/print/libpapi-common/common
 CPPFLAGS +=	-D_REENTRANT
 CPPFLAGS +=	$(ENVCPPFLAGS1)
 CPPFLAGS +=	$(ENVCPPFLAGS2)
-LDLIBS +=	-lc
-LDLIBS	+=	-L$(SRC)/cmd/lp/lib/msgs -llpmsg
-LDLIBS	+=	-L$(SRC)/cmd/lp/lib/printers -llpprt
-LDLIBS	+=	-L$(SRC)/cmd/lp/lib/class -llpcls
-LDLIBS	+=	-L$(SRC)/cmd/lp/lib/requests -llpreq
-LDLIBS	+=	-L$(SRC)/cmd/lp/lib/secure -llpsec
-LDLIBS	+=	-L$(SRC)/cmd/lp/lib/forms -llpfrm
-LDLIBS	+=	-L$(SRC)/cmd/lp/lib/access -llpacc
-LDLIBS	+=	-L$(SRC)/cmd/lp/lib/lp -llp
+LDLIBS +=	-lcurses -lc
+LDLIBS +=	-L$(SRC)/cmd/lp/lib/msgs -llpmsg
+LDLIBS +=	-L$(SRC)/cmd/lp/lib/printers -llpprt
+LDLIBS +=	-L$(SRC)/cmd/lp/lib/class -llpcls
+LDLIBS +=	-L$(SRC)/cmd/lp/lib/requests -llpreq
+LDLIBS +=	-L$(SRC)/cmd/lp/lib/secure -llpsec
+LDLIBS +=	-L$(SRC)/cmd/lp/lib/forms -llpfrm
+LDLIBS +=	-L$(SRC)/cmd/lp/lib/access -llpacc
+LDLIBS +=	-L$(SRC)/cmd/lp/lib/lp -llp
 
 MAPFILES =	mapfile
 

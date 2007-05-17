@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,12 +52,11 @@ typedef void	(*end_node_fp_t)(fru_nodehdl_t node, const char *path,
 /*
  * Project-private exported symbols
  */
-fru_encrypt_func_t encrypt_func;
+extern	fru_encrypt_func_t encrypt_func;
 
-fru_errno_t fru_encryption_supported(void);
+extern	fru_errno_t fru_encryption_supported(void);
 
-fru_errno_t
-fru_walk_tree(fru_nodehdl_t node, const char *prior_path,
+extern	fru_errno_t fru_walk_tree(fru_nodehdl_t node, const char *prior_path,
 		fru_errno_t (*process_node)(fru_nodehdl_t node,
 						const char *path,
 						const char *name, void *args,
@@ -66,14 +64,14 @@ fru_walk_tree(fru_nodehdl_t node, const char *prior_path,
 						void **end_args),
 		void *args);
 
-int fru_pathmatch(const char *path, const char *searchpath);
+extern	int fru_pathmatch(const char *path, const char *searchpath);
 
-fru_errno_t fru_for_each_segment(fru_nodehdl_t node,
+extern	fru_errno_t fru_for_each_segment(fru_nodehdl_t node,
 					int (*function)(fru_seghdl_t segment,
 						void *args),
 					void *args);
-fru_errno_t fru_get_segment_name(fru_seghdl_t segment, char **name);
-fru_errno_t fru_for_each_packet(fru_seghdl_t segment,
+extern	fru_errno_t fru_get_segment_name(fru_seghdl_t segment, char **name);
+extern	fru_errno_t fru_for_each_packet(fru_seghdl_t segment,
 				int (*function)(fru_tag_t *tag,
 						uint8_t *payload,
 						size_t length, void *args),

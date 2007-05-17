@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -100,8 +100,8 @@ LPLIBS =			\
 		$(LIBLP)	\
 		$(LIBSEC)
 
-SYSLIBS=	-lcurses -lgen -lcurses -lnsl -z lazyload \
-		-ltsol -lsecdb -lbsm -z nolazyload
+SYSLIBS=	-lcurses -lgen -lcurses -lnsl $(ZLAZYLOAD) \
+		-ltsol -lsecdb -lbsm $(ZNOLAZYLOAD)
 
 LDLIBS +=	$(LPLIBS) $(SYSLIBS)
 

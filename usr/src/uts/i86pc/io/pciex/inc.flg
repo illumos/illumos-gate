@@ -19,6 +19,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -118,5 +119,4 @@ echo_file  usr/src/pkgdefs/Makefile.prtarg
 echo_file  usr/src/pkgdefs/Makefile.targ
 echo_file  usr/src/pkgdefs/etc/exception_list_sparc
 echo_file  usr/src/pkgdefs/etc/exception_list_i386
-echo_file  usr/src/cmd/mapfile_noexstk
-echo_file  usr/src/cmd/sgs/mapfiles/sparc/map.pagealign
+find_files "s.*" usr/src/common/mapfiles

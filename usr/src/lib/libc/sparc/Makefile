@@ -121,6 +121,7 @@ GENOBJS=			\
 	_xregs_clrptr.o		\
 	abs.o			\
 	alloca.o		\
+	byteorder.o		\
 	cuexit.o		\
 	ecvt.o			\
 	errlst.o		\
@@ -1000,7 +1001,7 @@ DTRACE_DATA =	-zdtrace=dtrace_data
 DYNFLAGS +=	$(DTRACE_DATA)
 
 # DTrace needs an executable data segment.
-NX_MAP=
+MAPFILE.NED=
 
 BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
 
@@ -1049,6 +1050,7 @@ SRCS=							\
 	$(FPOBJS:%.o=../$(MACH)/fp/%.c)			\
 	$(LIBCBASE)/crt/_ftou.c				\
 	$(LIBCBASE)/gen/_xregs_clrptr.c			\
+	$(LIBCBASE)/gen/byteorder.c			\
 	$(LIBCBASE)/gen/ecvt.c				\
 	$(LIBCBASE)/gen/getctxt.c			\
 	$(LIBCBASE)/gen/lexp10.c			\

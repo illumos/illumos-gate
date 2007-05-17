@@ -50,7 +50,7 @@ SRCDIR =	../common
 PLAT =		$(VAR_PLAT_$(BASEPLAT))
 
 # DTrace needs an executable data segment.
-NX_MAP=
+MAPFILE.NED=
 
 MAPFILES +=	$(MAPFILE-ORDER) $(MAPFILE-PLAT)
 

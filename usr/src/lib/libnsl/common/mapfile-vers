@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -197,7 +197,7 @@ SUNW_0.7 {		# SunOS 5.3 (Solaris 2.3)
 	getrpcbynumber_r;
 	getrpcent;
 	getrpcent_r;
-	h_errno;
+	h_errno = NODIRECT;
 	inet_ntoa_r;
 	key_secretkey_is_set;
 	maxbno;

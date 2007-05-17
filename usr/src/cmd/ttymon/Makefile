@@ -18,8 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -72,6 +73,7 @@ $(XPG4STTYOBJ) := CPPFLAGS += -DEUC
 
 LINTFLAGS = -b -x
 CFLAGS += $(CCVERBOSE)
+LDFLAGS += $(MAPFILE.NGB:%=-M%)
 
 #
 # Message catalog
@@ -102,11 +104,11 @@ ROOTXPG6SYMLINK= $(ROOTXPG6BIN)/stty
 
 all: $(PROG) $(XPG4)
 
-stty:	sttyobjs $(STTYOBJ)
+stty:	sttyobjs $(STTYOBJ) $(MAPFILE.NGB)
 	$(LINK.c) $(STTYOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-stty.xpg4: $(XPG4STTYOBJ)
+stty.xpg4: $(XPG4STTYOBJ) $(MAPFILE.NGB)
 	$(LINK.c) $(XPG4STTYOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
@@ -124,15 +126,15 @@ sttyobjs:
 sttyobjs.xpg4:
 	-@mkdir -p $@
 
-ttymon:	$(TTYMONOBJ)
+ttymon:	$(TTYMONOBJ) $(MAPFILE.NGB)
 	$(LINK.c) $(TTYMONOBJ) -o $@ $(LDLIBS) -lpam
 	$(POST_PROCESS)
 
-ttyadm:	$(TTYADMOBJ)
+ttyadm:	$(TTYADMOBJ) $(MAPFILE.NGB)
 	$(LINK.c) $(TTYADMOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-sttydefs: $(STTYDEFSOBJ)
+sttydefs: $(STTYDEFSOBJ) $(MAPFILE.NGB)
 	$(LINK.c) $(STTYDEFSOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 

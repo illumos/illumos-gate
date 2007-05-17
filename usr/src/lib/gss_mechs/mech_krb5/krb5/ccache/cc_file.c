@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1286,7 +1286,11 @@ krb5_fcc_open_nounlink(char *filename, int open_flag, int *ret_fd, int *new)
 	       return (-1);
 	  }
 
-	  uid = getuid();
+	  /*
+	   * Solaris Kerberos
+	   * Use krb5_getuid to select the mechanism to obtain the uid.
+	   */
+	  uid = krb5_getuid();
 	  euid = geteuid();
 	  /*
 	   * Some apps (gssd, via a priv version of getuid())

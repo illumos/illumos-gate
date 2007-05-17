@@ -19,14 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include ../Makefile.com
+include		../Makefile.com
 
-DYNFLAGS = -G -h$(DYNLIB) -ztext -zdefs -zcombreloc -zloadfltr -R/usr/lib/gss
+DYNFLAGS +=	-R/usr/lib/gss
 
-install: all $(ROOTLIBDIR) $(ROOTLIBS) $(ROOTLINKS)
+install:	all $(ROOTLIBDIR) $(ROOTLIBS) $(ROOTLINKS)

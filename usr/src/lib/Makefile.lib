@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,13 +36,6 @@ include		$(SRC)/Makefile.master
 LORDER=		lorder
 TSORT=		tsort
 AWK=		awk
-
-MAPFILE-FLTR=	$(SRC)/lib/common/mapfile-filter
-
-NX_MAP_i386=	$(SRC)/cmd/mapfile_noexdata
-NX_MAP_sparc=
-
-NX_MAP=		$(NX_MAP_$(MACH))
 
 #
 # By default, we define the source directory for libraries to be
@@ -169,7 +162,7 @@ SONAME=		$(DYNLIB)
 
 HSONAME=	-h$(SONAME)
 DYNFLAGS=	$(HSONAME) $(ZTEXT) $(ZDEFS) $(ZCOMBRELOC) \
-		$(MAPFILES:%=-M%) $(PGA_MAPFILE:%=-M%) $(NX_MAP:%=-M%)
+		$(MAPFILES:%=-M%) $(MAPFILE.PGA:%=-M%) $(MAPFILE.NED:%=-M%)
 
 LDLIBS=		$(LDLIBS.lib)
 
@@ -243,7 +236,7 @@ HSONAMECCC=	-h $(SONAMECCC)
 # Keep in sync with the standard DYNFLAGS
 #
 $(DYNLIBCCC):=	DYNFLAGS = $(HSONAMECCC) $(ZTEXT) $(ZDEFS) $(ZCOMBRELOC) \
-		$(MAPFILES:%=-M%) $(PGA_MAPFILE:%=-M%) $(NX_MAP:%=-M%) \
+		$(MAPFILES:%=-M%) $(MAPFILE.PGA:%=-M%) $(MAPFILE.NED:%=-M%) \
 		$(NORUNPATH)
 
 

@@ -21,7 +21,7 @@
 
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -69,7 +69,6 @@ OBJECTS =	Syscalls.o	\
 		strip.o		\
 		syntax.o	\
 		tidbit.o	\
-		tinames.o	\
 		tx.o		\
 		wherelist.o	\
 		which.o

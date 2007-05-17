@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,7 +37,8 @@ BLTOBJ=		msg.o
 
 OBJS=		$(BLTOBJ) $(COMOBJ)
 
-MAPFILE=	../common/mapfile-vers
+MAPFILE=	$(MAPFILE.NGB)
+MAPOPT=		$(MAPFILE:%=-M%)
 
 # Building SUNWonld results in a call to the `package' target.  Requirements
 # needed to run this application on older releases are established:
@@ -51,7 +52,7 @@ CPPFLAGS +=	-I. -I../../include -I../../include/$(MACH) \
 		$(CPPFLAGS.master) -D__EXTENSIONS__
 LLDFLAGS =	'-R$$ORIGIN/../lib'
 LLDFLAGS64 =	'-R$$ORIGIN/../../lib/$(MACH64)'
-LDFLAGS +=	$(VERSREF) $(USE_PROTO) -M$(MAPFILE) \
+LDFLAGS +=	$(VERSREF) $(USE_PROTO) $(MAPOPT) \
 			$(LLDFLAGS) $(ZNOLAZYLOAD)
 LDLIBS +=	-lelf $(CONVLIBDIR) $(CONV_LIB) $(DLLIB)
 LINTFLAGS +=	-mx

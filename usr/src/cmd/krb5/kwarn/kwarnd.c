@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,8 +81,6 @@ char **argv;
 	int c;
 	char mname[FMNAMESZ + 1];
 	int rpc_svc_mode = RPC_SVC_MT_AUTO;
-	extern int _getuid();
-
 
 	/* set locale and domain for internationalization */
 	setlocale(LC_ALL, "");
@@ -96,19 +94,16 @@ char **argv;
 	(void) strlcpy(progname, basename(argv[0]), sizeof (progname));
 
 	/*
-	 * take special note that "_getuid()" is called here. This is necessary
-	 * since we must fake out the mechanism libraries calls to getuid()
-	 * with a special routine that is provided as part of kwarnd. However,
-	 * the call below MUST call the real getuid() to ensure it is running
+	 * Take special note that "getuid()" is called here.  This call is used
+	 * rather that app_krb5_user_uid(), to ensure ktkt_warnd(1M) is running
 	 * as root.
 	 */
-
 #ifdef DEBUG
 	(void) setuid(0);		/* DEBUG: set ruid to root */
 #endif /* DEBUG */
-	if (_getuid()) {
+	if (getuid()) {
 		(void) fprintf(stderr,
-				gettext("[%s] must be run as root\n"), argv[0]);
+			gettext("[%s] must be run as root\n"), argv[0]);
 #ifdef DEBUG
 		(void) fprintf(stderr, gettext(" warning only\n"));
 #else /* !DEBUG */

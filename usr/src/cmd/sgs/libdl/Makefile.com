@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,7 +33,7 @@ include 	$(SRC)/cmd/sgs/Makefile.com
 
 SRCDIR =	../common
 
-MAPFILES +=	mapfile-vers $(MAPFILE-FLTR)
+MAPFILES +=	mapfile-vers $(MAPFILE.FLT)
 
 # Redefine shared object build rule to use $(LD) directly (this avoids .init
 # and .fini sections being added).  Also, since there are no OBJECTS, turn

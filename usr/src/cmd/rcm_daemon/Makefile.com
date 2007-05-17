@@ -101,6 +101,9 @@ CPPFLAGS += -I..
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT
 CFLAGS += $(CCVERBOSE) $(C_PICFLAGS)
 
+MAPFILES = ../common/mapfile-intf $(MAPFILE.NGB)
+rcm_daemon := LDFLAGS += $(MAPFILES:%=-M%)
+
 LINTFLAGS += -u -erroff=E_FUNC_ARG_UNUSED
 
 LDLIBS_MODULES = 
@@ -168,7 +171,7 @@ include ../../Makefile.targ
 $(POFILE):      $(POFILES)
 	$(RM) $@; cat $(POFILES) > $@
 
-$(RCM_DAEMON): $(RCM_OBJ)
+$(RCM_DAEMON): $(RCM_OBJ) $(MAPFILES)
 	$(LINK.c) -o $@ $< $(RCM_OBJ) $(LDLIBS)
 	$(POST_PROCESS)
 

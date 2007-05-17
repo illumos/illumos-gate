@@ -1,8 +1,8 @@
 /*
  * utils.c - various utility functions used in pppd.
  *
- * Copyright (c) 2000-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * Permission to use, copy, modify, and distribute this software and its
  * documentation is hereby granted, provided that the above copyright
@@ -100,45 +100,6 @@ strllen(str, len)
 	    break;
     return (ret);
 }
-
-/*
- * strlcpy - like strcpy/strncpy, doesn't overflow destination buffer,
- * always leaves destination null-terminated (for len > 0).
- */
-size_t
-strlcpy(dest, src, len)
-    char *dest;
-    const char *src;
-    size_t len;
-{
-    size_t ret = strlen(src);
-
-    if (len != 0) {
-	if (ret < len)
-	    (void) strcpy(dest, src);
-	else {
-	    (void) strncpy(dest, src, len - 1);
-	    dest[len-1] = 0;
-	}
-    }
-    return (ret);
-}
-
-/*
- * strlcat - like strcat/strncat, doesn't overflow destination buffer,
- * always leaves destination null-terminated (for len > 0).
- */
-size_t
-strlcat(dest, src, len)
-    char *dest;
-    const char *src;
-    size_t len;
-{
-    size_t dlen = strlen(dest);
-
-    return (dlen + strlcpy(dest + dlen, src, (len > dlen? len - dlen: 0)));
-}
-
 
 /*
  * slprintf - format a message into a buffer.  Like sprintf except we

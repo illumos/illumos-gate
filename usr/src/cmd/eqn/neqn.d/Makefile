@@ -1,7 +1,8 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1989 by Sun Microsystems, Inc.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # cmd/eqn/neqn.d/Makefile
 #
@@ -27,6 +28,7 @@ CLEANFILES =	y.tab.c y.tab.h $(YACCSRC:%.y=%.c) $(YACCSRC:%.y=%.def)
 
 YFLAGS =	-d
 CPPFLAGS =	-DNEQN -I. -I.. $(CPPFLAGS.master)
+LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
 
 #
 # for message catalog
@@ -38,7 +40,7 @@ POFILES= e.po
 
 all :		$(PROG)
 
-$(PROG) :	$(OBJS)
+$(PROG) :	$(OBJS) $(MAPFILE.NGB)
 		$(LINK.c) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
 		$(POST_PROCESS)
 

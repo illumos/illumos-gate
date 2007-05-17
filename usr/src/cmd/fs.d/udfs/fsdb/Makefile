@@ -21,7 +21,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -32,6 +32,7 @@ include		../../Makefile.fstype
 
 CPPFLAGS += -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64
 LDLIBS += -lmalloc -ll -ladm
+LDFLAGS += $(MAPFILE.NGB:%=-M%)
 YFLAGS="-d"
 
 LINTFLAGS += -erroff=E_STATIC_UNUSED
@@ -39,7 +40,7 @@ LINTFLAGS64 += -erroff=E_STATIC_UNUSED
 
 SRCS=	fsdb.c ud_lib.c
 
-fsdb : fsdb_yacc.o fsdb_lex.o ud_lib.o fsdb.o
+fsdb : fsdb_yacc.o fsdb_lex.o ud_lib.o fsdb.o $(MAPFILE.NGB)
 	$(LINK.c) -o $@ fsdb.o fsdb_yacc.o fsdb_lex.o \
 			ud_lib.o $(LDLIBS)
 	$(POST_PROCESS)

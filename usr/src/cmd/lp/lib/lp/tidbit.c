@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,25 +44,25 @@
 
 extern char		*boolnames[],
 			*numnames[],
-			*stringnames[];
+			*strnames[];
 
 extern char		*getenv();
 
-ushort			tidbit_boolean	= 0;
+ushort_t		tidbit_boolean	= 0;
 
 short			tidbit_number	= 0;
 
 char			*tidbit_string	= 0;
 
 #if	defined(__STDC__)
-static int		open_terminfo_file ( char * , char * );
+static int		open_terminfo_file(char *, char *);
 #else
 static int		open_terminfo_file();
 #endif
 
-/**
- ** _Getsh() - GET TWO-BYTE SHORT FROM (char *) POINTER PORTABLY
- **/
+/*
+ * _Getsh() - GET TWO-BYTE SHORT FROM "char *" POINTER PORTABLY
+ */
 
 /*
  * "function" to get a short from a pointer.  The short is in a standard
@@ -83,7 +82,7 @@ static int		open_terminfo_file();
  *	NCR @ Torrey Pines.		- Tony Hansen
  */
 #if	u3b || u3b15 || u3b2 || m68000 || sparc
-#define	_Getsh(ip)	((short) (*((unsigned char *) ip) | (*(ip+1) << 8)))
+#define	_Getsh(ip)	((short)(*((unsigned char *) ip) | (*(ip+1) << 8)))
 #endif	/* u3b || u3b15 || u3b2 || m68000 || sparc */
 
 #ifndef	_Getsh
@@ -97,11 +96,11 @@ static int		open_terminfo_file();
 
 static int
 #if	defined(__STDC__)
-_Getsh (
-	register char *		p
+_Getsh(
+	register char		*p
 )
 #else
-_Getsh (p)
+_Getsh(p)
 	register char		*p;
 #endif
 {
@@ -121,7 +120,7 @@ _Getsh (p)
 }
 #endif	/* _Getsh */
 
-#define MAX_TIDBS	32
+#define	MAX_TIDBS	32
 
 static struct tidb	{
 
@@ -139,9 +138,9 @@ static struct tidb	{
 
 }			tidbs[MAX_TIDBS + 1];	/* one for last ditch */
 
-/**
- ** tidbit() - TERMINFO DATABASE LOOKUP
- **/
+/*
+ * tidbit() - TERMINFO DATABASE LOOKUP
+ */
 
 /*
  * Four forms of calling:
@@ -191,13 +190,13 @@ static struct tidb	{
 /*VARARGS2*/
 int
 #if	defined(__STDC__)
-tidbit (
-	char *			term,
-	char *			cap,
+tidbit(
+	char			*term,
+	char			*cap,
 	...
 )
 #else
-tidbit (term, cap, va_alist)
+tidbit(term, cap, va_alist)
 	char			*term,
 				*cap;
 	va_dcl
@@ -226,7 +225,7 @@ tidbit (term, cap, va_alist)
 		}
 	if (term != last_term) {
 		if (last_term)
-			Free (last_term);
+			Free(last_term);
 		last_term = Strdup(term);
 	}
 
@@ -267,7 +266,7 @@ tidbit (term, cap, va_alist)
 			tfd = open_terminfo_file(TERMINFO, term);
 #endif
 		if (tfd >= 0)
-			(void)Fstat (tfd, &statbuf);
+			(void) Fstat(tfd, &statbuf);
 
 		if (tfd < 0 || !statbuf.st_size) {
 			errno = ENOENT;
@@ -275,25 +274,25 @@ tidbit (term, cap, va_alist)
 		}
 
 		if (pt->tiebuf)
-			Free (pt->tiebuf);
+			Free(pt->tiebuf);
 		if (!(pt->tiebuf = Malloc(statbuf.st_size))) {
 			errno = ENOMEM;
 			return (-1);
 		}
 
 		n = Read(tfd, pt->tiebuf, statbuf.st_size);
-		(void)Close (tfd);
+		(void) Close(tfd);
 		if (n <= 0 || n >= 4096 || _Getsh(pt->tiebuf) != 0432) {
-			Free (pt->tiebuf);
+			Free(pt->tiebuf);
 			pt->tiebuf = 0;
 			errno = EBADF;
 			return (-1);
 		}
 
 		if (pt->term)
-			Free (pt->term);
+			Free(pt->term);
 		if (!(pt->term = Strdup(term))) {
-			Free (pt->tiebuf);
+			Free(pt->tiebuf);
 			pt->tiebuf = 0;
 			errno = ENOMEM;
 			return (-1);
@@ -319,22 +318,22 @@ tidbit (term, cap, va_alist)
 	rc = 0;
 
 #if	defined(__STDC__)
-	va_start (ap, cap);
+	va_start(ap, cap);
 #else
-	va_start (ap);
+	va_start(ap);
 #endif
 
 	if (!cap || !*cap)
 		;
 
 	else if ((pp = wherelist(cap, boolnames))) {
-		register ushort		*ushort_p;
+		register ushort_t	*ushort_p;
 
 		register char		*ip;
 
 		register int		index	= pp - boolnames;
 
-		if (!(ushort_p = va_arg(ap, ushort *))) {
+		if (!(ushort_p = va_arg(ap, ushort_t *))) {
 			ushort_p = &tidbit_boolean;
 			rc = 1;
 		}
@@ -367,12 +366,12 @@ tidbit (term, cap, va_alist)
 				*short_p = -1;
 		}
 
-	} else if ((pp = wherelist(cap, stringnames))) {
+	} else if ((pp = wherelist(cap, strnames))) {
 		register char		**charstar_p;
 
 		register char		*ip;
 
-		register int		index	= pp - stringnames;
+		register int		index	= pp - strnames;
 
 		register short		sindex;
 
@@ -393,21 +392,21 @@ tidbit (term, cap, va_alist)
 		}
 	}
 
-	va_end (ap);
+	va_end(ap);
 	return (rc);
 }
 
-/**
- ** untidbit() - FREE SPACE ASSOCIATED WITH A TERMINFO ENTRY
- **/
+/*
+ * untidbit() - FREE SPACE ASSOCIATED WITH A TERMINFO ENTRY
+ */
 
 void
 #if	defined(__STDC__)
-untidbit (
-	char *			term
+untidbit(
+	char			*term
 )
 #else
-untidbit (term)
+untidbit(term)
 	char			*term;
 #endif
 {
@@ -417,28 +416,27 @@ untidbit (term)
 	for (i = 0; i < MAX_TIDBS; i++)
 		if (tidbs[i].term && STREQU(tidbs[i].term, term)) {
 			if (tidbs[i].tiebuf) {
-				Free (tidbs[i].tiebuf);
+				Free(tidbs[i].tiebuf);
 				tidbs[i].tiebuf = 0;
 			}
-			Free (tidbs[i].term);
+			Free(tidbs[i].term);
 			tidbs[i].term = 0;
 			break;
 		}
-	return;
 }
 
-/**
- ** open_terminfo_file() - OPEN FILE FOR TERM ENTRY
- **/
+/*
+ * open_terminfo_file() - OPEN FILE FOR TERM ENTRY
+ */
 
 static int
 #if	defined(__STDC__)
-open_terminfo_file (
-	char *			terminfo,
-	char *			term
+open_terminfo_file(
+	char			*terminfo,
+	char			*term
 )
 #else
-open_terminfo_file (terminfo, term)
+open_terminfo_file(terminfo, term)
 	char			*terminfo,
 				*term;
 #endif
@@ -453,11 +451,11 @@ open_terminfo_file (terminfo, term)
 
 	/* start fix for bugid 1109709	*/
 	if (path == NULL) {
-		return -1;
+		return (-1);
 	}
 	/* end fix for bugid 1109709	*/
 
 	fd = Open(path, 0);
-	Free (path);
+	Free(path);
 	return (fd);
 }

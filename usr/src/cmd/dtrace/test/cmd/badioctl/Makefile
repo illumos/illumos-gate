@@ -32,7 +32,7 @@ include $(SRC)/cmd/Makefile.cmd
 ROOTOPTPKG = $(ROOT)/opt/SUNWdtrt
 ROOTBIN = $(ROOTOPTPKG)/bin
 
-LDFLAGS += -znodefs -ztextoff
+LDFLAGS += $(ZNODEFS) $(ZTEXTOFF)
 LDLIBS = $(LDLIBS.cmd)
 
 SRCS = badioctl

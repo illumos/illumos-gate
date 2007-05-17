@@ -1,7 +1,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -50,6 +50,8 @@ CPPFLAGS +=	-DBSD_COMP -D_FILE_OFFSET_BITS=64 -DINET6 -DSOLARIS_BSM_AUDIT \
 LDLIBS +=	-lsocket -lnsl -lpam -lbsm -lsendfile -lgss
 YFLAGS +=	-d
 
+in.ftpd :=	LDFLAGS += $(MAPFILE.NGB:%=-M%)
+
 # tcov output relies on atexit(3C) registered functions being called, so stop
 # _exit() from being used. Passing -l to yacc stops it generating #line
 # directives which don't work with tcov.
@@ -61,7 +63,7 @@ tcov :=		YFLAGS += -l
 
 all tcov:	$(PROG) ckconfig ftpwho $(CONFIGFILES) $(SCRIPTS)
 
-in.ftpd:	$(FTPD_OBJS)
+in.ftpd:	$(FTPD_OBJS) $(MAPFILE.NGB)
 		$(LINK.c) $(FTPD_OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 

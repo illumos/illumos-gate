@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,7 +33,7 @@ OBJECTS=	$(COMOBJ)  $(MACHOBJ)
 
 include 	../../../lib/Makefile.lib
 
-MAPFILES =	mapfile-vers $(MAPFILE-FLTR)
+MAPFILES =	mapfile-vers $(MAPFILE.FLT)
 
 # Define libsys to be a filter on libc.  The ABI requires the runtime linker as
 # the soname.

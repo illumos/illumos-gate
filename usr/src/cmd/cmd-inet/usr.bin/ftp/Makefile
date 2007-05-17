@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,11 +42,14 @@ CPPFLAGS +=	-D_FILE_OFFSET_BITS=64 \
 		-I$(SRC)/uts/common/gssapi/mechs/krb5/include
 
 LDLIBS +=	-lsocket -lnsl -lgss
-LDFLAGS +=	$(ZLAZYLOAD)
+
+# ftp defines its own delete and glob - localize all symbols to prevent a
+# name clash.
+LDFLAGS +=	$(ZLAZYLOAD) $(MAPFILE.NGB:%=-M%)
 
 .KEEP_STATE:
 
-all:		$(PROG)
+all:		$(PROG) $(MAPFILE.NGB)
 
 $(PROG):	$(OBJS)
 		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)

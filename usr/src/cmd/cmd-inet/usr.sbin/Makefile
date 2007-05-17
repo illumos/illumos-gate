@@ -148,6 +148,7 @@ $(TSNETPROG)		:=	LDLIBS += $(ZLAZYLOAD) -ltsnet $(ZNOLAZYLOAD)
 
 in.rarpd		:=	LDLIBS += -linetutil
 route			:=	CPPFLAGS += -DNDEBUG
+gettable in.comsat	:=	LDFLAGS += $(MAPFILE.NGB:%=-M%)
 
 .KEEP_STATE:
 

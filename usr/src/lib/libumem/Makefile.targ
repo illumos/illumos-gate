@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -51,7 +51,7 @@ $(TYPES:%=lint.%):
 	@CURTYPE=$(@:lint.%=%) $(MAKE) lintcheck
 
 $(STANDLIBRARY): $(OBJS) $(LINKTEST_OBJ)
-	$(LD) -Breduce -zdefs $(LDFLAGS) -o $@.linktest $(OBJS) $(LINKTEST_OBJ)
+	$(LD) $(BREDUCE) $(ZDEFS) $(LDFLAGS) -o $@.linktest $(OBJS) $(LINKTEST_OBJ)
 	rm $@.linktest
 	$(LD) $(LDFLAGS) -o $@ $(OBJS)
 

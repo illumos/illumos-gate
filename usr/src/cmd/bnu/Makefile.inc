@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,7 +36,7 @@ SRCS =		account.c anlwrk.c bnuconvert.c callers.c		\
 		gtcfile.c gwd.c imsg.c in.uucpd.c interface.c limits.c	\
 		line.c logent.c mailst.c perfstat.c			\
 		permission.c pk0.c pk1.c pkdefs.c security.c		\
-		setmode.c shio.c statlog.c stoa.c strecpy.c strpbrk.c	\
+		setmode.c shio.c statlog.c stoa.c strpbrk.c	\
 		strsave.c sysfiles.c systat.c ulockf.c unknown.c	\
 		utility.c uucheck.c uucico.c uucleanup.c uucp.c		\
 		uucpdefs.c uucpname.c uudecode.c uuencode.c		\
@@ -81,11 +80,11 @@ uucico.cat :=	POBJS =	uucpdefs.o uucico.o conn.o callers.o cntrl.o	\
 			pk0.o pk1.o anlwrk.o permission.o getargs.o	\
 			gnxseq.o pkdefs.o imsg.o gtcfile.o grades.o	\
 			mailst.o uucpname.o line.o chremdir.o		\
-			interface.o statlog.o strecpy.o stoa.o		\
+			interface.o statlog.o stoa.o			\
 			perfstat.o account.o security.o limits.o	\
 			$(STRPBRK) $(PROTOCOLOBJS) $(OTHEROBJS)		\
 			versys.o setmode.o
-uucico:=	PLIBS =	$(TLILIB)
+uucico:=	PLIBS =	$(TLILIB) -lgen
 
 uuname \
 uuname.cat :=	POBJS =	uuname.o uucpname.o uucpdefs.o getpwinfo.o	\
@@ -125,14 +124,14 @@ remote.unknown.cat := POBJS =	unknown.o
 cu \
 cu.cat :=	POBJS =	cu.o callers.o getargs.o line.o uucpdefs.o	\
 			ulockf.o conn.o interface.o strsave.o		\
-			sysfiles.o strecpy.o stoa.o setmode.o
-cu:=		PLIBS =	$(TLILIB)
+			sysfiles.o stoa.o setmode.o
+cu:=		PLIBS =	$(TLILIB) -lgen
 
 ct \
 ct.cat :=	POBJS =	ct.o callers.o getargs.o line.o uucpdefs.o	\
 			ulockf.o conn.o interface.o sysfiles.o		\
-			strsave.o strecpy.o stoa.o setmode.o
-ct:=		PLIBS =	$(TLILIB)
+			strsave.o stoa.o setmode.o
+ct:=		PLIBS =	$(TLILIB) -lgen
 
 uudecode \
 uudecode.cat :=	POBJS =	uudecode.o common.o

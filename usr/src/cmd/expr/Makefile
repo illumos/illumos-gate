@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,10 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG= expr
 XPG4PROG= expr
@@ -49,21 +48,24 @@ XGETFLAGS += -a -x expr.xcl
 
 LDLIBS += -lgen
 
+MAPFILES =	$(MAPFILE.INT) $(MAPFILE.NGB)
+LDFLAGS +=	$(MAPFILES:%=-M%)
+
 .KEEP_STATE:
 
 all: $(PROG) $(XPG4) $(XPG6)
 
 install: all $(ROOTPROG) $(ROOTXPG4PROG) $(ROOTXPG6PROG)
 
-$(PROG): exprobjs $(EXPROBJ)
+$(PROG): exprobjs $(EXPROBJ) $(MAPFILES)
 	$(LINK.c) $(EXPROBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-$(XPG4): exprobjs.xpg4 $(XPG4EXPROBJ)
+$(XPG4): exprobjs.xpg4 $(XPG4EXPROBJ) $(MAPFILES)
 	$(LINK.c) $(XPG4EXPROBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-$(XPG6): exprobjs.xpg6 $(XPG6EXPROBJ)
+$(XPG6): exprobjs.xpg6 $(XPG6EXPROBJ) $(MAPFILES)
 	$(LINK.c) $(XPG6EXPROBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 

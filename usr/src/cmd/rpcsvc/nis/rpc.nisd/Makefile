@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -66,6 +65,13 @@ rpc.nisd :=	LDLIBS += -lnisdb -lldap
 nisldapmaptest :=	LDLIBS += -lnisdb -lldap
 LDLIBS += -lnsl -lc
 
+MAPFILE.INT.L =	$(MAPFILE.NGB) mapfile-intf-nislog
+MAPFILE.INT.T =	$(MAPFILE.NGB) mapfile-intf-nisldapmaptest
+MAPFILE.INT.R =	$(MAPFILE.NGB) mapfile-intf-rpc.nisd
+nislog :=	LDFLAGS += $(MAPFILE.INT.L:%=-M%)
+nisldapmaptest :=	LDFLAGS += $(MAPFILE.INT.T:%=-M%)
+rpc.nisd :=	LDFLAGS += $(MAPFILE.INT.R:%=-M%)
+
 SUBDIR= resolv_server configs
 
 .KEEP_STATE:
@@ -89,7 +95,7 @@ lint: lint_SRCS
 # Explicit link rules for the actual programs to get around the C++
 # situation.
 #
-nislog: $(LOG_OBJS)
+nislog: $(LOG_OBJS) $(MAPFILE.INT.L)
 	$(LINK.cc) -o $@ $(LOG_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
@@ -97,11 +103,11 @@ nisinit: $(INIT_OBJS)
 	$(LINK.c) -o $@ $(INIT_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-rpc.nisd: $(SRV_OBJS)
+rpc.nisd: $(SRV_OBJS) $(MAPFILE.INT.R)
 	$(LINK.cc) -o $@ $(SRV_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-nisldapmaptest: $(NISLDAPMAPTEST_OBJS)
+nisldapmaptest: $(NISLDAPMAPTEST_OBJS) $(MAPFILE.INT.T)
 	$(LINK.cc) -o $@ $(NISLDAPMAPTEST_OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 

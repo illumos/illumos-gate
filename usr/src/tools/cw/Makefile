@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,7 +45,7 @@ $(__GNUC)CFLAGS=	-O -D__sun -Wall -Wno-unknown-pragmas -Werror \
 			-std=gnu89 -nodefaultlibs
 
 $(__GNUC)LDLIBS +=	-lc
-$(__GNUC)LDFLAGS= 	$(NES_MAPFILE:%=-Wl,-M%)
+$(__GNUC)LDFLAGS= 	$(MAPFILE.NES:%=-Wl,-M%)
 
 CPPFLAGS += -DDEFAULT_CC_DIR='"$(SPRO_VROOT)/bin"'
 CPPFLAGS += -DDEFAULT_GCC_DIR='"$(GNU_ROOT)/bin"'

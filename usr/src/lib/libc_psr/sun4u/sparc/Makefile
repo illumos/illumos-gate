@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,8 +35,6 @@ PLATFORM	= sun4u
 OBJECTS		= memcpy.o memset.o memcmp.o
 
 include ../Makefile.com
-
-MAPFILES =	../../sun4u/mapfile-vers $(MAPFILE-FLTR)
 
 ASFLAGS	+=	-xarch=v8plusa -warn
 

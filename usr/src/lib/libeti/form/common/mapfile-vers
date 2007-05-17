@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -146,13 +146,12 @@ SUNWprivate_1.1 {
 	_ins_char;
 	_ins_line;
 	_ins_mode;
-	__i_size;
+	__i_size = DATA FILTER libc.so.1 S0x4;
 	_last_field;
 	_last_page;
 	_left_char;
 	_left_field;
 	_lib_version;
-	__loc1;
 	__lptr_;
 	_makearg;
 	_misc_request;

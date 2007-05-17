@@ -18,11 +18,10 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-#
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/sendmail/aux/Makefile
@@ -64,6 +63,10 @@ SUNENVDEF=	-DSUN_EXTENSIONS -DUSE_VENDOR_CF_PATH
 DBMDEF=		-DNDBM -DNEWDB
 
 CPPFLAGS =	$(INCPATH) $(ENVDEF) $(SUNENVDEF) $(DBMDEF) $(CPPFLAGS.sm)
+
+# Nearly every support application provides sleep().  This isn't incompatible
+# with libc, but can be confined to the applications themselves.
+LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
 
 .KEEP_STATE:
 

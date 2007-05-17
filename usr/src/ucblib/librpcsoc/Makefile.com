@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,6 +44,7 @@ LIBS = $(DYNLIB)
 
 LDLIBS += -lnsl -lsocket -lc
 CPPFLAGS += -DPORTMAP
+DYNFLAGS += $(ZINTERPOSE)
 
 ROOTLIBDIR=	$(ROOT)/usr/ucblib
 ROOTLIBDIR64=   $(ROOT)/usr/ucblib/$(MACH64)

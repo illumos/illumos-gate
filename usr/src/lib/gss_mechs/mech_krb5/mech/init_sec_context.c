@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -908,7 +908,11 @@ get_default_cred(OM_uint32 *minor_status, void *ct, gss_cred_id_t *cred_handle)
 	krb5_gss_cred_id_t cred;
 	OM_uint32 major;
 	OM_uint32 mntmp;
-	uid_t uid = getuid();
+	/*
+	 * Solaris Kerberos
+	 * Use krb5_getuid() to select the mechanism to obtain the uid.
+	 */
+	uid_t uid = krb5_getuid();
 	krb5_context context = (krb5_context)ct;
 
 	KRB5_LOG0(KRB5_INFO, "get_default_cred() start\n");

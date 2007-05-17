@@ -18,10 +18,10 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # snmp/snmprelayd/Makefile
 #
@@ -124,7 +124,7 @@ CPPFLAGS += -I. -I../agent -I../snmplib -I../../include/netmgt -I${BIN}
 
 CFLAGS += -c -D$(TARG_SYS)
 
-LDFLAGS += $(LDLIBS)
+LDFLAGS += $(MAPFILE.INT:%=-M%) $(LDLIBS)
 
 LINT=lint
 
@@ -157,7 +157,7 @@ all: $(SOURCES.h) $(BINPROG) $(CONFIG_FILES)
 
 install: all $(OPTPROG) $(CONFRULE) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
-$(BINPROG): $(BIN) $(OBJECTS) $(BIN)/config.o $(MYLIBS)
+$(BINPROG): $(BIN) $(OBJECTS) $(BIN)/config.o $(MYLIBS) $(MAPFILE.INT)
 	$(CC) -o $(BINPROG) $(LDFLAGS) $(OBJECTS) $(BIN)/config.o \
 	    $(MYLINKLIBS) $(LIBS)
 	$(POST_PROCESS)

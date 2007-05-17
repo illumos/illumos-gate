@@ -123,16 +123,11 @@ ROOTSFWMAN7=	$(ROOT)/usr/sfw/share/man/man7
 ISAEXEC=	$(ROOT)/usr/lib/isaexec
 PLATEXEC=	$(ROOT)/usr/lib/platexec
 
-NX_MAP_i386=	$(SRC)/cmd/mapfile_noexdata
-NX_MAP_sparc=
-NX_MAP=		$(NX_MAP_$(MACH))
-NES_MAPFILE=	$(SRC)/cmd/mapfile_noexstk $(NX_MAP)
-
 LDLIBS =	$(LDLIBS.cmd)
 
 LDFLAGS.cmd = \
 	$(ENVLDFLAGS1) $(ENVLDFLAGS2) $(ENVLDFLAGS3) \
-	$(NES_MAPFILE:%=-M%) $(PGA_MAPFILE:%=-M%)
+	$(MAPFILE.NES:%=-M%) $(MAPFILE.PGA:%=-M%) $(MAPFILE.NED:%=-M%)
 
 LDFLAGS =	$(LDFLAGS.cmd)
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1995,1997, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,26 +35,22 @@
 #include <stdlib.h>
 #include <libintl.h>
 
-uid_t gssd_uid;
+static uid_t krb5_cc_uid;
 
 void
-set_gssd_uid(uid)
-	uid_t	uid;
+set_gssd_uid(uid_t uid)
 {
-
 	/*
-	 * set the value of gssd_uid, so it can be retrieved when getuid()
-	 * is called by the underlying mechanism libraries
+	 * set the value of krb5_cc_uid, so it can be retrieved when
+	 * app_krb5_user_uid() is called by the underlying mechanism libraries.
 	 */
 	printf(gettext("set_gssd_uid called with uid = %d\n"), uid);
-	gssd_uid = uid;
+	krb5_cc_uid = uid;
 }
 
 uid_t
-getuid(void)
-
+app_krb5_user_uid(void)
 {
-
 	/*
 	 * return the value set when one of the gssd procedures was
 	 * entered. This is the value of the uid under which the
@@ -65,6 +60,6 @@ getuid(void)
 	 * in files and directories specific to the user
 	 */
 	printf(gettext(
-		"getuid called and returning gsssd_uid = %d\n"), gssd_uid);
-	return (gssd_uid);
+		"getuid called and returning gsssd_uid = %d\n"), krb5_cc_uid);
+	return (krb5_cc_uid);
 }

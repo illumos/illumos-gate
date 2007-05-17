@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,7 +53,12 @@ static krb5_error_code get_from_os(
 {
 	krb5_error_code retval;
 
-	retval = snprintf(name_buf, name_size, "FILE:/tmp/krb5cc_%d", getuid());
+	/*
+	 * Solaris Kerberos
+	 * Use krb5_getuid() to select the mechanism to obtain the uid.
+	 */
+	retval = snprintf(name_buf, name_size, "FILE:/tmp/krb5cc_%d",
+	    krb5_getuid());
 	KRB5_LOG(KRB5_INFO, "get_from_os() FILE=%s\n", name_buf);
 	if (retval < 0)
 		return retval;

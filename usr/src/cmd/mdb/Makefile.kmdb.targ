@@ -19,14 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 $(PROG).core: $(OBJS) $(KMDBLIBS) $(MAPFILE)
-	$(LD) -r -Breduce -znoversion -zdefs -M$(MAPFILE) -o $@ $(OBJS) \
+	$(LD) -r $(BREDUCE) $(ZNOVERSION) $(ZDEFS) -M$(MAPFILE) -o $@ $(OBJS) \
 	    $(KMDBLIBS)
 
 $(PROG): $(PROG).core $(KCTLOBJS)

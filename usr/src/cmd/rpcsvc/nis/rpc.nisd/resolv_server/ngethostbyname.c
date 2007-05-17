@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1993,1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,8 +47,6 @@
 #ifndef NO_DATA
 #define	NO_DATA NO_ADDRESS
 #endif
-
-int	h_errno;	/* defined here */
 
 static void nres_abort_xmit(struct nres *);
 static struct nres *nres_setup(char *,
@@ -108,13 +105,13 @@ nres_gethostbyname(name, handler, info)
 			if (temp->tcp_socket >= 0)
 				(void) close(temp->tcp_socket);
 			h_errno = temp->h_errno;
-			free((char *) temp);
-			return ((struct nres *) 0);
+			free((char *)temp);
+			return ((struct nres *)0);
 
 		}
 	} else {
 		prnt(P_INFO, "nres-gethostbyname:setup failed.\n");
-		return ((struct nres *) - 1);
+		return ((struct nres *)-1);
 	}
 
 }
@@ -154,7 +151,7 @@ nres_gethostbyaddr(addr, len, type, handler, info)
 		strcpy(qp, "ip6.int");
 		break;
 	default:
-		return ((struct nres *) 0);
+		return ((struct nres *)0);
 	}
 
 	temp = nres_setup(qbuf, handler, info);
@@ -173,13 +170,13 @@ nres_gethostbyaddr(addr, len, type, handler, info)
 			if (temp->tcp_socket >= 0)
 				(void) close(temp->tcp_socket);
 			h_errno = temp->h_errno;
-			free((char *) temp);
-			return ((struct nres *) 0);
+			free((char *)temp);
+			return ((struct nres *)0);
 
 		}
 	} else {
 		prnt(P_INFO, "nres-gethostbyaddr:setup failed.\n");
-		return ((struct nres *) - 1);
+		return ((struct nres *)-1);
 	}
 
 }
@@ -195,7 +192,7 @@ nres_dotimeout(as)
 {
 
 	struct nres    *temp;
-	temp = (struct nres *) as->as_userptr;
+	temp = (struct nres *)as->as_userptr;
 
 	/*
 	 * timeout
@@ -255,7 +252,7 @@ nres_abort_xmit(temp)
 			(void) close(temp->udp_socket);
 		if (temp->tcp_socket >= 0)
 			(void) close(temp->tcp_socket);
-		free((char *) temp);
+		free((char *)temp);
 	}
 }
 
@@ -279,7 +276,7 @@ nres_dosrch(temp)
 		type = temp->qtype;
 		prnt(P_INFO, "search \'%s\'.\n", temp->search_name);
 		temp->question_len = res_mkquery(QUERY, temp->search_name,
-					C_IN, type, (uchar_t *) NULL, 0, NULL,
+					C_IN, type, (uchar_t *)NULL, 0, NULL,
 					(uchar_t *)temp->question, MAXPACKET);
 		if (temp->question_len < 0) {
 			temp->h_errno = NO_RECOVERY;
@@ -331,7 +328,7 @@ nres_dorecv(as)
 	struct in6_addr **a6;
 	void		(*done) ();
 
-	temp = (struct nres *) as->as_userptr;
+	temp = (struct nres *)as->as_userptr;
 	theans = NULL;
 	errno = 0;
 	status = nres_rcv(temp);
@@ -390,13 +387,13 @@ out:
 			if (theans->h_addrtype == AF_INET) {
 				theans->h_length = 4;
 				theans->h_addr_list[0] =
-						(char *) &(temp->theaddr);
+						(char *)&(temp->theaddr);
 			} else {
 				theans->h_length = 16;
 				theans->h_addr_list[0] =
-						(char *) &(temp->theaddr6);
+						(char *)&(temp->theaddr6);
 			}
-			theans->h_addr_list[1] = (char *) 0;
+			theans->h_addr_list[1] = (char *)0;
 			if (temp->udp_socket >= 0)
 				(void) close(temp->udp_socket);
 			if (temp->tcp_socket >= 0)
@@ -421,7 +418,7 @@ out:
 						(void) close(again->udp_socket);
 					if (again->tcp_socket >= 0)
 						(void) close(again->tcp_socket);
-					free((char *) again);
+					free((char *)again);
 				}
 			} else {
 				/* memory error */
@@ -431,7 +428,7 @@ out:
 								temp->h_errno);
 
 			}
-			free((char *) temp);
+			free((char *)temp);
 			return;
 		} else if (temp->reverse == REVERSE_A) {
 			int found_addr = FALSE;
@@ -496,7 +493,7 @@ out:
 		(void) close(temp->udp_socket);
 	if (temp->tcp_socket >= 0)
 		(void) close(temp->tcp_socket);
-	free((char *) temp);
+	free((char *)temp);
 	return;			/* done running */
 
 }
@@ -510,7 +507,7 @@ nres_register(a, b)
 	a->nres_rpc_as.as_timeout_flag = TRUE;
 	a->nres_rpc_as.as_timeout = nres_dotimeout;
 	a->nres_rpc_as.as_recv = nres_dorecv;
-	a->nres_rpc_as.as_userptr = (char *) a;
+	a->nres_rpc_as.as_userptr = (char *)a;
 	return (rpc_as_register(&(a->nres_rpc_as)));
 }
 
@@ -522,7 +519,7 @@ nres_setup(name, done, userinfo)
 {
 	struct nres	*tmp;
 
-	tmp = (struct nres *) calloc(1, sizeof (struct nres));
+	tmp = (struct nres *)calloc(1, sizeof (struct nres));
 	if (tmp == NULL)
 		return (tmp);
 	(void) strncpy(tmp->name, name, MAXDNAME);

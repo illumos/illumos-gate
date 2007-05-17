@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,7 +39,7 @@
 
 SUNWprivate_4.2 {
 	global:
-		dbg_print;
+		dbg_print  = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
 
 		ld32_main;
 		ld64_main;

@@ -94,6 +94,10 @@ MAPFILES +=	mapfile-vers
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)
 
+# All interfaces are interposable, therefore don't allow direct binding to this
+# shared object.
+DYNFLAGS +=	$(BNODIRECT)
+
 .KEEP_STATE:
 
 all: $(LIBS)

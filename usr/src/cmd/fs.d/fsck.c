@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,8 +70,6 @@
 int	nrun, ndisks;
 int	maxrun = 8;	/* should be based on the machine resources */
 
-extern char	*optarg;
-extern int	optind;
 extern char	*default_fstype();
 
 int	nargc = 2;
@@ -894,89 +891,6 @@ vfserror(int flag)
 		break;
 	}
 	exit(1);
-}
-
-int opterr = 1, optind = 1, optopt = 0;
-char *optarg = 0;
-
-int
-getopt(int argc, char * const *argv, const char *opts)
-{
-	static int sp = 1;
-	int c;
-	char *cp;
-
-	if (sp == 1)
-		if (optind >= argc ||
-		    argv[optind][0] != '-' || argv[optind][1] == '\0')
-			return (-1);
-		else if (strcmp(argv[optind], "--") == 0) {
-			optind++;
-			return (-1);
-		}
-	optopt = c = argv[optind][sp];
-	if (c == ':' || (cp = strchr(opts, c)) == 0) {
-		if (opterr)
-			fprintf(stderr,
-				gettext("%s: illegal option -- %c\n"),
-				*argv, c);
-		if (argv[optind][++sp] == '\0') {
-			optind++;
-			sp = 1;
-		}
-		return ('?');
-	}
-	if (*++cp == ':') {
-		if (argv[optind][sp+1] != '\0')
-			optarg = &argv[optind++][sp+1];
-		else if (++optind >= argc) {
-			if (opterr)
-				fprintf(stderr,
-		gettext("%s: option requires an argument -- %c\n"), *argv, c);
-			sp = 1;
-			return ('?');
-		} else
-			optarg = argv[optind++];
-		sp = 1;
-	} else if (*cp == ';') {
-		if (argv[optind][++sp] != '\0')
-			if (isoptarg(c, &argv[optind][sp])) {
-				optarg = &argv[optind++][sp];
-				sp = 1;
-			} else
-				optarg = NULL;
-		else {
-			sp = 1;
-			if (++optind >= argc || !isoptarg(c, &argv[optind][0]))
-				optarg = NULL;
-			else
-				optarg = argv[optind++];
-		}
-	} else {
-		if (argv[optind][++sp] == '\0') {
-			sp = 1;
-			optind++;
-		}
-		optarg = NULL;
-	}
-	return (c);
-}
-
-int
-isoptarg(int cc, char *arg)
-{
-	if (cc == 's' || cc == 'S') {
-		while (*arg >= '0' && *arg <= '9')
-			arg++;
-		if (*arg++ != ':')
-			return (0);
-		while (*arg >= '0' && *arg <= '9')
-			arg++;
-		if (*arg)
-			return (0);
-		return (1);
-	}
-	return (0);
 }
 
 static void

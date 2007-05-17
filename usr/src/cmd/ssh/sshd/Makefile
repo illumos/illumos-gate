@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -81,6 +81,8 @@ LDLIBS += $(SSH_COMMON_LDLIBS) -lsocket \
 	$(OPENSSL_LDFLAGS) -lcrypto \
 	-lgss \
 	-lcontract
+MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
+LDFLAGS += $(MAPFILES:%=-M%)
 
 DYNFLAGS += $(OPENSSL_DYNFLAGS) $(C99_DISABLE)
 
@@ -94,7 +96,8 @@ CPPFLAGS += -I$(ROOTSFWINCLUDE)
 
 all: $(PROG)
 
-$(PROG): $(OBJS) ../libssh/$(MACH)/libssh.a ../libopenbsd-compat/$(MACH)/libopenbsd-compat.a
+$(PROG): $(OBJS) $(MAPFILES) ../libssh/$(MACH)/libssh.a \
+	../libopenbsd-compat/$(MACH)/libopenbsd-compat.a
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS) $(DYNFLAGS)
 	$(POST_PROCESS)
 

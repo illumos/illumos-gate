@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -52,7 +52,7 @@ MAPFILES =
 
 CFLAGS +=	-K PIC -DCRYPTO_UNLIMITED
 CFLAGS64 +=	-K PIC -DCRYPTO_UNLIMITED
-ZDEFS =		-znodefs
+ZDEFS =		$(ZNODEFS)
 
 SONAME =        $(LIBRARY:.a=.so)$(VERS)
 

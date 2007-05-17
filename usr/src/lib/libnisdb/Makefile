@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -143,6 +143,11 @@ CPPFLAGS += -I$(SRC)/cmd/ypcmd
 LIBS = $(DYNLIB)
 ZDEFS=
 LDLIBS += -lnsl -lldap -lc
+
+# A number of interfaces are interposed by numerous applications, therefore
+# prevent direct binding to anything in this shared object.  In addition,
+# libnisdb.so.1 interposes on socket().
+DYNFLAGS +=	$(BNODIRECT) $(ZINTERPOSE)
 
 all :=		TARGET= all
 clean :=	TARGET= clean

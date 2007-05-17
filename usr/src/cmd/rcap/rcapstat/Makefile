@@ -22,7 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 .KEEP_STATE:
 .SUFFIXES:
@@ -39,6 +39,7 @@ LINTSRCS =	$(COMMON_DIR)/utils.c \
 $(NOT_RELEASE_BUILD)CPPFLAGS 	+= -DDEBUG
 CPPFLAGS 			+= -I$(COMMON_DIR)
 LDLIBS 				+= -lumem -lzonecfg -lscf
+LDFLAGS				+= $(MAPFILE.NGB:%=-M%)
 
 LINTFLAGS			+= $(LDLIBS) -mnu
 
@@ -53,7 +54,7 @@ CLOBBERFILES += 		rcapd_conf.c $(POFILES) $(POFILE)
 .NO_PARALLEL:
 .PARALLEL: $(OBJS) $(LINTFILES)
 
-all: $(PROG)
+all: $(PROG) $(MAPFILE.NGB)
 
 include ../Makefile.com
 

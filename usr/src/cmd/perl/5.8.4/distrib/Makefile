@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -202,7 +202,7 @@ $(DYNALOADER): ext/DynaLoader/Makefile $(PERL_CONFIGDEP) cflags FRC
 #
 
 perl: libperl.so $(DYNALOADER) $(PERL_STATIC_TGT) perlmain.o
-	$(LINK.c) -z ignore -R$(PERL_REAL_CORE_DIR) \
+	$(LINK.c) $(ZIGNORE) -R$(PERL_REAL_CORE_DIR) \
 	-o $@ perlmain.o $(DYNALOADER) -L. -lperl $(LDLIBS)
 	$(POST_PROCESS)
 

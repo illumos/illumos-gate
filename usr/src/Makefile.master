@@ -154,6 +154,7 @@ NAWK=		/usr/bin/nawk
 CP=		/usr/bin/cp -f
 MCS=		/usr/ccs/bin/mcs
 CAT=            /usr/bin/cat
+ELFDUMP=	/usr/ccs/bin/elfdump
 M4=		/usr/ccs/bin/m4
 STRIP=		/usr/ccs/bin/strip
 LEX=		/usr/ccs/bin/lex
@@ -543,11 +544,42 @@ CCOPTFLAG=	$($(MACH)_CCOPTFLAG)
 CCOPTFLAG64=	$($(MACH64)_CCOPTFLAG)
 CCFLAGS=	$(CCOPTFLAG) $($(MACH)_CCFLAGS)
 CCFLAGS64=	$(CCOPTFLAG64) $($(MACH64)_CCFLAGS)
+
 #
-# Used by Makefile.cmd, Makefile.lib and Makefile.ucbcmd
+# Various mapfiles that are used throughout the build, and delivered to
+# /usr/lib/ld.
 #
-PGA_MAPFILE =	$(SRC)/cmd/sgs/mapfiles/$(MACH)/map.pagealign
+MAPFILE.NED_i386 =	$(SRC)/common/mapfiles/i386/map.noexdata
+MAPFILE.NED_sparc =
+MAPFILE.NED =		$(MAPFILE.NED_$(MACH))
+MAPFILE.PGA =		$(SRC)/common/mapfiles/$(MACH)/map.pagealign
+MAPFILE.NES =		$(SRC)/common/mapfiles/common/map.noexstk
+MAPFILE.FLT =		$(SRC)/common/mapfiles/common/map.filter
+
 #
+# Generated mapfiles that are compiler specific, and used throughout the
+# build.  These mapfiles are not delivered in /usr/lib/ld.
+#
+MAPFILE.NGB_sparc=	$(SRC)/common/mapfiles/gen/sparc_cc_map.noexeglobs
+$(__GNUC64)MAPFILE.NGB_sparc= \
+			$(SRC)/common/mapfiles/gen/sparc_gcc_map.noexeglobs
+MAPFILE.NGB_sparcv9=	$(SRC)/common/mapfiles/gen/sparcv9_cc_map.noexeglobs
+$(__GNUC64)MAPFILE.NGB_sparcv9= \
+			$(SRC)/common/mapfiles/gen/sparcv9_gcc_map.noexeglobs
+MAPFILE.NGB_i386=	$(SRC)/common/mapfiles/gen/i386_cc_map.noexeglobs
+$(__GNUC64)MAPFILE.NGB_i386= \
+			$(SRC)/common/mapfiles/gen/i386_gcc_map.noexeglobs
+MAPFILE.NGB_amd64=	$(SRC)/common/mapfiles/gen/amd64_cc_map.noexeglobs
+$(__GNUC64)MAPFILE.NGB_amd64= \
+			$(SRC)/common/mapfiles/gen/amd64_gcc_map.noexeglobs
+MAPFILE.NGB =		$(MAPFILE.NGB_$(MACH))
+
+#
+# A generic interface mapfile name, used by various dynamic objects to define
+# the interfaces and interposers the object must export.
+#
+MAPFILE.INT =		mapfile-intf
+
 # 
 # LDLIBS32 can be set in the environment to override the following assignment.
 # LDLIBS64 can be set to override the assignment made in Makefile.master.64.
@@ -705,11 +737,13 @@ CCYFLAG=		-Y I,
 BDIRECT=	-Bdirect
 BDYNAMIC=	-Bdynamic
 BLOCAL=		-Blocal
+BNODIRECT=	-Bnodirect
 BREDUCE=	-Breduce
 BSTATIC=	-Bstatic
 
 ZCOMBRELOC=	-zcombreloc
 ZDEFS=		-zdefs
+ZDIRECT=	-zdirect
 ZIGNORE=	-zignore
 ZINITFIRST=	-zinitfirst
 ZINTERPOSE=	-zinterpose
@@ -726,6 +760,7 @@ ZNORELOC=	-znoreloc
 ZNOVERSION=	-znoversion
 ZREDLOCSYM=	-zredlocsym
 ZTEXT=		-ztext
+ZVERBOSE=	-zverbose
 
 GSHARED=	-G
 CCMT=		-mt

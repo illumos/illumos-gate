@@ -2225,5 +2225,10 @@ krb5_boolean KRB5_CALLCONV is_in_keytype
 	(krb5_const krb5_enctype *keytype, 
 	int numkeytypes, krb5_enctype enctype); 
 
+/*
+ * Solaris Kerberos
+ * Use krb5_getuid() to select the mechanism to obtain the uid.
+ */
+extern uid_t	krb5_getuid();
 
 #endif /* _KRB5_INT_H */

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -55,7 +55,9 @@ LDLIBS +=	-lc
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_REENTRANT -I../ -I ../../lx_brand \
 			-I$(UTSBASE)/common/brand/lx
-DYNFLAGS +=	$(MAPOPTS)
+
+# lx_think.so.1 interposes on a number of libc.so.1 routines.
+DYNFLAGS +=	$(MAPOPTS) $(ZINTERPOSE)
 
 LIBS =		$(DYNLIB)
 

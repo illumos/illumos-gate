@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,7 +100,6 @@ char **argv;
 	extern int optind;
 	int c;
 	char mname[FMNAMESZ + 1];
-	extern int _getuid();
 
 	/* set locale and domain for internationalization */
 	setlocale(LC_ALL, "");
@@ -109,19 +107,16 @@ char **argv;
 
 
 	/*
-	 * take special note that "_getuid()" is called here. This is necessary
-	 * since we must fake out the mechanism libraries calls to getuid()
-	 * with a special routine that is provided as part of gssd. However,
-	 * the call below MUST call the real getuid() to ensure it is running
-	 * as root.
+	 * Take special note that "getuid()" is called here.  This call is used
+	 * rather than app_krb5_user_uid(), to ensure gssd(1M) is running as
+	 * root.
 	 */
-
 #ifdef DEBUG
 	(void) setuid(0);		/* DEBUG: set ruid to root */
 #endif /* DEBUG */
-	if (_getuid()) {
+	if (getuid()) {
 		(void) fprintf(stderr,
-				gettext("[%s] must be run as root\n"), argv[0]);
+			gettext("[%s] must be run as root\n"), argv[0]);
 #ifdef DEBUG
 		(void) fprintf(stderr, gettext(" warning only\n"));
 #else /* DEBUG */

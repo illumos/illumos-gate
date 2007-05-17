@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -74,8 +74,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 CFLAGS		+= $(CCVERBOSE)
 CPPFLAGS	+= -DELF_TARGET_SPARC -D_KRTLD $(MODSUFFIX)
 MAPFILE		= $(UTSBASE)/sparc/krtld/mapfile
-LDFLAGS		= -e _kobj_boot -M$(MAPFILE) \
-		  -Breduce -znoversion
+LDFLAGS		= -e _kobj_boot -M$(MAPFILE) $(BREDUCE) $(ZNOVERSION)
 
 # krtld uses a mapfile during the link to hide some symbols, thus changing
 # their scope from global to local.  This will fool ctfmerge (it won't record

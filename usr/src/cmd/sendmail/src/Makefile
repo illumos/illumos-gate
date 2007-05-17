@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,7 +41,8 @@ OBJS= alias.o arpadate.o bf.o collect.o conf.o control.o convtime.o daemon.o \
 
 SRCS=	$(OBJS:%.o=%.c)
 
-LDFLAGS +=	-R$(SFW_ROOT)/lib
+MAPFILES =	$(MAPFILE.INT) $(MAPFILE.NGB)
+LDFLAGS +=	-R$(SFW_ROOT)/lib $(MAPFILES:%=-M%)
 
 # EXPORT DELETE START
 CRYPTOLIBS=	-lssl -lcrypto
@@ -75,7 +76,8 @@ all:		$(PROG)
 
 .PARALLEL:	$(OBJS)
 
-$(PROG):	$(OBJS) ../libsmutil/libsmutil.a ../libsm/libsm.a ../db/libdb.a
+$(PROG):	$(OBJS) $(MAPFILES) \
+	../libsmutil/libsmutil.a ../libsm/libsm.a ../db/libdb.a
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 

@@ -19,16 +19,11 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-echo_file usr/src/cmd/mapfile_noexstk
-echo_file usr/src/cmd/mapfile_noexdata
-echo_file usr/src/cmd/sgs/mapfiles/i386/map.pagealign
-echo_file usr/src/cmd/sgs/mapfiles/sparc/map.pagealign
 echo_file usr/src/lib/Makefile.lib
 echo_file usr/src/lib/Makefile.targ
 echo_file usr/src/lib/libctf/common/libctf.h
@@ -40,3 +35,4 @@ echo_file usr/src/tools/Makefile.targ
 echo_file usr/src/tools/Makefile.tools
 echo_file usr/src/uts/common/sys/ctf.h
 echo_file usr/src/uts/common/sys/multiboot.h
+find_files "s.*" usr/src/common/mapfiles

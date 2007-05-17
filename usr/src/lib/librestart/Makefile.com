@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,8 +35,8 @@ include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 
-START_LAZY = -z lazyload
-END_LAZY = -z nolazyload
+START_LAZY =	$(ZLAZYLOAD)
+END_LAZY =	$(ZNOLAZYLOAD)
 
 lintcheck := START_LAZY =
 lintcheck := END_LAZY =

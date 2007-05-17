@@ -22,7 +22,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 .KEEP_STATE:
 .SUFFIXES:
@@ -59,14 +59,13 @@ all: $(PROG)
 
 include ../Makefile.com
 
-$(PROG): $(OBJS)
+$(PROG): $(OBJS) $(MAPFILE.NGB)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
 $(POFILE): $(POFILES)
 	$(RM) $@
 	$(CAT) $(POFILES) > $@
-
 
 clean:
 	$(RM) $(OBJS)

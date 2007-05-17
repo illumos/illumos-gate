@@ -22,13 +22,15 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # Definitions for targets shared by some subdirs, which have
 # dependencies in rcap/common, the path to which must be the value of
 # COMMON_DIR.
 #
+
+LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
 
 %.o: $(COMMON_DIR)/%.c
 	$(COMPILE.c) $<

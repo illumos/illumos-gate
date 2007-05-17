@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,6 +44,8 @@ ROOTDIRS =	$(NETSVC) $(NETYP)
 # include library definitions
 #LDLIBS +=	-lrpcsvc -lnsl -lcrypt -lintl -lgen
 LDLIBS +=	-lnsl -lnisdb -lc
+MAPFILES =	$(MAPFILE.INT) $(MAPFILE.NGB)
+LDFLAGS +=	$(MAPFILES:%=-M%)
 
 # Pick up includes from library
 CPPFLAGS += -I$(SRC)/lib/libnisdb/yptol
@@ -83,7 +85,7 @@ $(ETCDFLTFILE) := FILEMODE=0444
 
 all: $(PROG)
 
-rpc.yppasswdd: $(RPCYPPASSWDDOBJ) $(COMMONOBJ) 
+rpc.yppasswdd: $(RPCYPPASSWDDOBJ) $(COMMONOBJ) $(MAPFILES)
 	$(LINK.cc) -o $@ $(RPCYPPASSWDDOBJ) \
 	$(SHAREDOBJ) $(COMMONOBJ) $(LDLIBS)
 	$(POST_PROCESS)

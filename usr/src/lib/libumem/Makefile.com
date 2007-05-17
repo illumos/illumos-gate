@@ -117,7 +117,7 @@ MAPFILE_SUPPLEMENTAL = $(MAPFILE_SUPPLEMENTAL_$(CURTYPE))
 
 LDLIBS +=	-lc
 
-LDFLAGS_standalone = -znoversion -Breduce  -M../common/mapfile-vers \
+LDFLAGS_standalone = $(ZNOVERSION) $(BREDUCE) -M../common/mapfile-vers \
 	-M$(MAPFILE_SUPPLEMENTAL) -dy -r
 LDFLAGS = $(LDFLAGS_$(CURTYPE))
 

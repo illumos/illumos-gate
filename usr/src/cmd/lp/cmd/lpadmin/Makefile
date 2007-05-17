@@ -21,7 +21,7 @@
 
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -66,8 +66,9 @@ LPLIBS=		$(LIBACC)	\
 
 SYSLIBS=	-lcurses
 
-LDLIBS +=	-z lazyload -lsecdb -z nolazyload $(LPLIBS) \
+LDLIBS +=	$(ZLAZYLOAD) -lsecdb $(ZNOLAZYLOAD) $(LPLIBS) \
 			$(SYSLIBS) $(I18N)
+LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
 
 PROG=		lpadmin
 
@@ -80,7 +81,7 @@ POFILE=		lp_cmd_lpadmin.po
 
 all:		$(PROG)
 
-$(PROG):	$(OBJS)
+$(PROG):	$(OBJS) $(MAPFILE.NGB)
 		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 

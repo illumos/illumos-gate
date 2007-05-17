@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,7 +37,7 @@ LOCAL_OBJS =	bootp.o dhcp.o dhcptab.o encode.o generic.o hash.o icmp.o \
 		interfaces.o logging.o main.o misc.o per_dnet.o relay.o
 LOCAL_SRCS =	$(LOCAL_OBJS:%.o=%.c)
 
-CMN_OBJS =	scan.o ipv4_sum.o
+CMN_OBJS =	ipv4_sum.o
 CMN_SRCS =	$(CMN_OBJS:%.o=$(CMN_DIR)/%.c)
 
 SRCS =		$(LOCAL_SRCS) $(CMN_SRCS)
@@ -49,7 +49,7 @@ ROOTMANIFESTDIR=	$(ROOTSVCNETWORK)
 
 CPPFLAGS  += -DNDEBUG -DNPROBE -D_REENTRANT -I./ -I$(CMN_DIR)
 LINTFLAGS += -u
-LDFLAGS	  += -L$(NSU_DIR) -R/usr/lib/inet/dhcp/nsu 
+LDFLAGS	  += -L$(NSU_DIR) -R/usr/lib/inet/dhcp/nsu $(MAPFILE.NGB:%=-M%)
 LDLIBS    += $(NSU_DIR)/rfc2136.so.1 -ldhcpsvc -ldhcputil -linetutil \
 	     -lsocket -lnsl -lmtmalloc -lresolv
 lint := LDLIBS = $(LDLIBS.cmd) -ldhcpsvc -ldhcputil -linetutil -lsocket -lnsl
@@ -72,7 +72,7 @@ XGETFLAGS += -a -x in.dhcpd.xcl
 
 all:		$(PROG)
 
-$(PROG): 	$(OBJS)
+$(PROG): 	$(OBJS) $(MAPFILE.NGB)
 		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 

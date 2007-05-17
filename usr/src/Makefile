@@ -83,10 +83,13 @@ _msg :=			TARGET= _msg
 #	build create 'packages' also.  To build packages
 #	cd pkgdefs and do a 'make install'
 #
-all: closedbins sgs .WAIT $(SUBDIRS) pkg_all
-install: closedbins sgs .WAIT $(SUBDIRS) pkg_all .WAIT _msg
+all: mapfiles closedbins sgs .WAIT $(SUBDIRS) pkg_all
+install: mapfiles closedbins sgs .WAIT $(SUBDIRS) pkg_all .WAIT _msg
 	@cd pkgdefs/SUNW0on; pwd; $(MAKE) _msg
 	@rm -rf "$(ROOT)/catalog"
+
+mapfiles:
+	@cd common/mapfiles; pwd; $(MAKE) install
 
 clean clobber: $(SUBDIRS) head pkgdefs
 _msg: _msgdirs rootdirs $(MSGSUBDIRS)
@@ -147,7 +150,7 @@ sgs: rootdirs .WAIT sysheaders userheaders .WAIT \
 # source trees w/o usr/closed), this also depends on the closedbins
 # target (above) in order to properly seed the proto area
 #
-setup: closedbins sgs
+setup: mapfiles closedbins sgs
 	@cd tools; pwd; $(MAKE) install
 
 # /var/mail/:saved is a special case because of the colon in the name.

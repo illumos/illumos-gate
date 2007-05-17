@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -157,7 +157,7 @@ SUNW_0.7 {
 	_encrypt;
 	endgrent;
 	endpwent;
-	errno;
+	errno = NODIRECT;
 	___errno;
 	fgetgrent;
 	fgetgrent_r;
@@ -844,8 +844,6 @@ SUNWprivate_1.1 {
 	gtty;
 	_gtty;
 	_hasmntopt;
-	htonl;
-	htons;
 	_imaxabs_c89;
 	_imaxdiv_c89;
 	_ld_libc = FUNCTION FILTER /usr/lib/ld.so.1;
@@ -854,8 +852,6 @@ SUNWprivate_1.1 {
 	_memmove;
 	_memset;
 	__moddi3;
-	ntohl;
-	ntohs;
 	_printf_c89;
 	_scanf_c89;
 	_snprintf_c89;

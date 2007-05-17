@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -143,11 +143,6 @@ $(UNIX_BIN):	$(UNIX_O) $(MODSTUBS_O) $(MAPFILE) $(LIBS) $(DTRACESTUBS)
 symcheck.targ:	$(UNIX_O) $(MODSTUBS_O) $(LIBS) $(DTRACESTUBS) 
 	$(LD) -dy -b -o $(SYM_MOD) -M $(MAPFILE) \
 	$(UNIX_O) $(MODSTUBS_O) $(LIBOPTS) $(DTRACESTUBS) 
-
-#$(UNIX).glom:	$(UNIX)
-#	${LD} -dy -b -z nodefs -o $@ -e _start -I $(KRTLD) -M $(MAPFILE) \
-#	$(UNIX_O) $(MODSTUBS_O) $(GENUNIX_DIR)/$(GENUNIX)
-#	$(POST_PROCESS)
 
 $(UNIX_O):	$(OBJECTS) $(OBJS_DIR)/vers.o
 	$(LD) -r -o $@ $(OBJECTS) $(OBJS_DIR)/vers.o

@@ -1,5 +1,5 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -248,10 +248,9 @@ lemon-build:	lemon.o $(TOOLDIR)/lempar.c
 
 shell.o: sqlite.h
 
-NES_MAPFILE=	$(SRC)/cmd/mapfile_noexstk $(NX_MAP)
-
 sqlite:	shell.o $(RELOC)
-	$(LINK.c) -o sqlite shell.o $(NES_MAPFILE:%=-M%) $(RELOC)
+	$(LINK.c) -o sqlite shell.o \
+	    $(MAPFILE.NES:%=-M%) $(MAPFILE.NED:%=-M%) $(RELOC)
 	$(CTFMERGE) -t -L VERSION -o $@ shell.o $(RELOC)
 	$(POST_PROCESS)
 

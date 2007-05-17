@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -98,7 +98,7 @@ $(ITM) :=	sparcv9_CFLAGS += -xregs=no%appl
 LDLIBS += -lgen
 
 MY_NATIVE_CPPFLAGS = -D_FILE_OFFSET_BITS=64 -I. -I..
-MY_NATIVE_LDFLAGS = $(NES_MAPFILE:%=-M%) $(PGA_MAPFILE:%=-M%)
+MY_NATIVE_LDFLAGS = $(MAPFILE.NES:%=-M%) $(MAPFILE.PGA:%=-M%) $(MAPFILE.NED:%=-M%)
 MY_NATIVE_LDLIBS = -lgen
 
 #

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -55,6 +55,7 @@ ROOTSACF= $(SACF:%=$(LIBSAFD)/%)
 ROOTADMF= $(ADMF:%=$(ROOTUSRSBIN)/%)
 
 LDLIBS += -lnsl
+LDFLAGS += $(MAPFILE.NGB:%=-M%)
 LINTFLAGS += -b -x
 OWNER= root
 GROUP= sys
@@ -75,15 +76,15 @@ $(LIBSAFD)/% : %
 
 all: $(PROG) 
 
-sac: $(SACOBJS)
+sac: $(SACOBJS) $(MAPFILE.NGB)
 	$(LINK.c) $(SACOBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-sacadm: $(SACADMOBJS)
+sacadm: $(SACADMOBJS) $(MAPFILE.NGB)
 	$(LINK.c) $(SACADMOBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-pmadm: $(PMADMOBJS)
+pmadm: $(PMADMOBJS) $(MAPFILE.NGB)
 	$(LINK.c) $(PMADMOBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 

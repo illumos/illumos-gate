@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -76,14 +76,9 @@ $(PROG) :=	LDLIBS += -lsocket -lnsl -lsendfile -lpapi
 PROG_OBJS = $(LPD_PORT_OBJS:%=pics/%)
 OBJS += $(PROG_OBJS)
 
-NX_MAP_i386=    $(SRC)/cmd/mapfile_noexdata
-NX_MAP_sparc=
-NX_MAP=         $(NX_MAP_$(MACH))
-NES_MAPFILE=    $(SRC)/cmd/mapfile_noexstk $(NX_MAP)
-
 LDFLAGS.cmd = \
         $(ENVLDFLAGS1) $(ENVLDFLAGS2) $(ENVLDFLAGS3) \
-        $(NES_MAPFILE:%=-M%) $(PGA_MAPFILE:%=-M%)
+        $(MAPFILE.NES:%=-M%) $(MAPFILE.PGA:%=-M%) $(MAPFILE.NED:%=-M%)
 
 $(PROG):	$(PROG_OBJS)
 	$(LINK.c) -o $@ $(PROG_OBJS) $(LDFLAGS.cmd) $(LDLIBS)

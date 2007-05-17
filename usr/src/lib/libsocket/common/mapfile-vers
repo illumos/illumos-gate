@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -119,10 +119,10 @@ SUNW_0.7 {
 	getservbyport_r;
 	getservent;
 	getservent_r;
-	htonl;
-	htons;
-	ntohl;
-	ntohs;
+	htonl = FUNCTION FILTER libc.so.1;
+	htons = FUNCTION FILTER libc.so.1;
+	ntohl = FUNCTION FILTER libc.so.1;
+	ntohs = FUNCTION FILTER libc.so.1;
 	rcmd;
 	rexec;
 	rresvport;

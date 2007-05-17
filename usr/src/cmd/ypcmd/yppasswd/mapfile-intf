@@ -20,18 +20,31 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Specify what global symbols we export.  Note that we're not really
-# interested in declaring a version, simply scoping the file is sufficient.
 
+# rpc.yppasswdd interposes on a number of routines from libnisdb and libnsl, so
+# define these as interposers.  Note, libnisdb is itself an interposer, so
+# these rpc.yppasswdd definitions are required to override libnisdb.
 {
 	global:
-		main;
-		eprintf;
-	local:
-		*;
+		delete_map = INTERPOSE;
+		hash = INTERPOSE;
+		init_lock_map = INTERPOSE;
+		lock_core = INTERPOSE;
+		lock_map = INTERPOSE;
+		mflag = INTERPOSE;
+		nogecos = INTERPOSE;
+		nopw = INTERPOSE;
+		noshell = INTERPOSE;
+		rename_map = INTERPOSE;
+		single = INTERPOSE;
+		unlock_core = INTERPOSE;
+		unlock_map = INTERPOSE;
+		validloginshell = INTERPOSE;
+		validstr = INTERPOSE;
+		xdr_yppasswd = INTERPOSE;
 };

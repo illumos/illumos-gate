@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,7 +50,7 @@ LIBUCB=		../../ucblib/libucb/sparc/libucb.so.1
 # need libc/sparc/inc for PIC.h
 ASFLAGS=	-P -D_ASM -DPIC -K pic
 LDFLAGS=	-R /usr/4lib:/usr/ucblib -e _start -G -t \
-		-zdefs -z text -zcombreloc -I /usr/lib/ld.so.1
+		$(ZDEFS) $(ZTEXT) $(ZCOMBRELOC) -I /usr/lib/ld.so.1
 OBJS=		sbcp.o
 LIBS=		$(LDLIBS.lib) -lmapmalloc $(LIBBC) $(LIBUCB) -lnsl -lc
 

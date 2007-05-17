@@ -45,6 +45,16 @@ tcpd tcpdmatch try-from := \
 tcpdchk := \
 	LDLIBS += -R$(SFW_ROOT)/lib -L$(ROOTSFWLIB) -lwrap -lnsl
 
+# Various components must export interfaces, but also contain name-space
+# clashes with system libraries.
+MAPFILE.INT.D =	$(MAPFILE.NGB) mapfile-intf-tcpdchk
+MAPFILE.INT.M =	$(MAPFILE.NGB) mapfile-intf-tcpdmatch
+MAPFILE.INT.F =	$(MAPFILE.NGB) mapfile-intf-tryfrom
+
+tcpdchk :=	LDFLAGS +=$(MAPFILE.INT.D:%=-M%)
+tcpdmatch :=	LDFLAGS +=$(MAPFILE.INT.M:%=-M%)
+try-from :=	LDFLAGS +=$(MAPFILE.INT.F:%=-M%)
+
 # SRCONLY files are not used for building but are included in the source code
 # package SUNWtcpdS for consistency and completeness with respect to the
 # public tcp_wrappers distribution.
@@ -142,17 +152,17 @@ $(ROOTSFW):
 
 TCPDMATCH_OBJ = tcpdmatch.o fakelog.o inetcf.o scaffold.o
 
-tcpdmatch: $(TCPDMATCH_OBJ) $(LIB)
+tcpdmatch: $(TCPDMATCH_OBJ) $(LIB) $(MAPFILE.INTF.M)
 	$(LINK.c) -o $@ $(TCPDMATCH_OBJ) $(LDLIBS)
 	$(POST_PROCESS)
 
-try-from: try-from.o fakelog.o $(LIB)
+try-from: try-from.o fakelog.o $(LIB) $(MAPFILE.INTF.F)
 	$(LINK.c) -o $@ try-from.o fakelog.o $(LDLIBS)
 	$(POST_PROCESS)
 
 TCPDCHK_OBJ = tcpdchk.o fakelog.o inetcf.o scaffold.o
 
-tcpdchk: $(TCPDCHK_OBJ) $(LIB)
+tcpdchk: $(TCPDCHK_OBJ) $(LIB) $(MAPFILE.INTF.C)
 	$(LINK.c) -o $@ $(TCPDCHK_OBJ) $(LDLIBS)
 	$(POST_PROCESS)
 

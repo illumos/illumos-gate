@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -57,6 +57,8 @@ $(NIS2LDAPPROG) := LDLIBS += -lc -lnsl -lnisdb
 ypinit :=	LDLIBS += -lnsl
 yppoll :=	LDLIBS += -lnsl
 ypset :=	LDLIBS += -lnsl
+makedbm :=	MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
+makedbm :=	LDFLAGS += $(MAPFILES:%=-M%)
 
 $(ROOTVAR_YP)/aliases :=	GROUP=bin
 $(ROOTVAR_YP)/aliases :=	FILEMODE=555
@@ -191,7 +193,7 @@ ypbind: $(YPBINDOBJ)
 	$(LINK.c) $(YPBINDOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-makedbm ypalias: $$@.o $(COMMONOBJ)
+makedbm ypalias: $$@.o $(COMMONOBJ) $$(MAPFILES)
 	$(LINK.c) -o $@ $@.o $(COMMONOBJ) $(LDLIBS)
 	$(POST_PROCESS)
 

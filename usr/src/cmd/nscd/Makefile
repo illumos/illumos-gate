@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -65,6 +65,11 @@ CPPFLAGS +=	-D_REENTRANT -DSUN_THREADS \
 LINTFLAGS +=	-erroff=E_GLOBAL_COULD_BE_STATIC2
 LINTFLAGS +=	-erroff=E_NAME_USED_NOT_DEF2
 LINTFLAGS +=	-erroff=E_NAME_DEF_NOT_USED2
+
+# nscd interposes on many symbols, and must export others for its own dlsym()
+# use, and dlsym() calls from libc.  Itemizing the interfaces within a mapfile
+# is error-prone, so establish the whole object as an interposer.
+LDFLAGS +=	$(ZINTERPOSE)
 
 # TCOV_FLAG=	-ql
 # GPROF_FLAG=	-xpg

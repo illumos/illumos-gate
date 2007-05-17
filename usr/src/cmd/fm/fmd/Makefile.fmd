@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -116,7 +116,7 @@ LDLIBS += -L$(ROOTLIB)/fm -ltopo -ldiagcode -lsysevent -lsmbios -luuid -lnvpair
 LDLIBS += -lexacct -lnsl -lumem -ldevinfo
 
 $(DMOD) := CFLAGS += $(CC_PICFLAGS) -G $(XREGSFLAG)
-$(DMOD) := LDFLAGS += $(ZTEXT) -z combreloc
+$(DMOD) := LDFLAGS += $(ZTEXT) $(ZCOMBRELOC)
 
 #
 # rpcgen(1) produces code that wants to be in the foreground if we're compiled

@@ -48,8 +48,8 @@ HDRS=	snoop.h snoop_mip.h at.h snoop_ospf.h snoop_ospf6.h
 include	../../../Makefile.cmd
 
 CPPFLAGS += -I. -I$(SRC)/common/net/dhcp
-LDLIBS += -ldhcputil -ldlpi -lsocket -lnsl \
-	-z lazyload -ltsol -z nolazyload
+LDLIBS += -ldhcputil -ldlpi -lsocket -lnsl $(ZLAZYLOAD) -ltsol $(ZNOLAZYLOAD)
+LDFLAGS += $(MAPFILE.NGB:%=-M%)
 
 .KEEP_STATE:
 
@@ -57,7 +57,7 @@ LDLIBS += -ldhcputil -ldlpi -lsocket -lnsl \
 
 all:	$(PROG)
 
-$(PROG): $(OBJS)
+$(PROG): $(OBJS) $(MAPFILE.NGB)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -695,40 +695,40 @@ SUNWprivate_1.1 {
 	resync_genid;
 	s_delrec;
 	s_delset;
-	sdssc_add_hosts;
-	sdssc_bindclusterdevs;
-	sdssc_binddevs;
-	sdssc_bind_library;
-	sdssc_clnt_bind_devs;
-	sdssc_clnt_proxy_cmd;
-	sdssc_cmd_proxy;
-	sdssc_cm_nid2nm;
-	sdssc_cm_nm2nid;
-	sdssc_cm_sr_nid2nm;
-	sdssc_cm_sr_nm2nid;
-	sdssc_convert_cluster_path;
-	sdssc_convert_ctd_path;
-	sdssc_convert_path_free;
-	sdssc_create_begin;
-	sdssc_create_end;
-	sdssc_delete_begin;
-	sdssc_delete_end;
-	sdssc_delete_hosts;
-	sdssc_free_mdcerr_list;
-	sdssc_freenodelist;
-	sdssc_get_index;
-	sdssc_getnodelist;
-	sdssc_get_primary_host;
-	sdssc_get_priv_ipaddr;
-	sdssc_get_services;
-	sdssc_get_services_free;
-	sdssc_gettransportbynode;
-	sdssc_mo_create_begin;
-	sdssc_notify_service;
-	sdssc_property_get;
-	sdssc_property_set;
-	sdssc_suspend;
-	sdssc_version;
+	sdssc_add_hosts = NODIRECT;
+	sdssc_bindclusterdevs = NODIRECT;
+	sdssc_binddevs = NODIRECT;
+	sdssc_bind_library = NODIRECT;
+	sdssc_clnt_bind_devs = NODIRECT;
+	sdssc_clnt_proxy_cmd = NODIRECT;
+	sdssc_cmd_proxy = NODIRECT;
+	sdssc_cm_nid2nm = NODIRECT;
+	sdssc_cm_nm2nid = NODIRECT;
+	sdssc_cm_sr_nid2nm = NODIRECT;
+	sdssc_cm_sr_nm2nid = NODIRECT;
+	sdssc_convert_cluster_path = NODIRECT;
+	sdssc_convert_ctd_path = NODIRECT;
+	sdssc_convert_path_free = NODIRECT;
+	sdssc_create_begin = NODIRECT;
+	sdssc_create_end = NODIRECT;
+	sdssc_delete_begin = NODIRECT;
+	sdssc_delete_end = NODIRECT;
+	sdssc_delete_hosts = NODIRECT;
+	sdssc_free_mdcerr_list = NODIRECT;
+	sdssc_freenodelist = NODIRECT;
+	sdssc_get_index = NODIRECT;
+	sdssc_getnodelist = NODIRECT;
+	sdssc_get_primary_host = NODIRECT;
+	sdssc_get_priv_ipaddr = NODIRECT;
+	sdssc_get_services = NODIRECT;
+	sdssc_get_services_free = NODIRECT;
+	sdssc_gettransportbynode = NODIRECT;
+	sdssc_mo_create_begin = NODIRECT;
+	sdssc_notify_service = NODIRECT;
+	sdssc_property_get = NODIRECT;
+	sdssc_property_set = NODIRECT;
+	sdssc_suspend = NODIRECT;
+	sdssc_version = NODIRECT;
 	setdevstamp;
 	setdup;
 	set_snarf;

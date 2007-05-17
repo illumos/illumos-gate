@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -94,7 +94,7 @@ $(LINTLIB):= SRCS=../llib-lcurses
 
 CFLAGS	+=	$(CCVERBOSE)
 CFLAGS64 +=	$(CCVERBOSE)
-DYNFLAGS +=	
+DYNFLAGS +=	$(ZINTERPOSE)
 DYNFLAGS32 =	-R/usr/ucblib
 DYNFLAGS64 =	-R/usr/ucblib/$(MACH64)
 LDLIBS +=	-ltermcap -lucb -lc

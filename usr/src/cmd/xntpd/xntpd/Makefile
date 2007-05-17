@@ -39,7 +39,8 @@ LIBNTP=		../$(LIBNTP_A)
 LIBPARSE=	../$(LIBPARSE_A)
 LINTLIB=	../$(LLIBNTP_A)
 LIBS += 	-lscf
-LDLIBS +=		$(LIBNTP) $(LIBPARSE) $(LIBS)
+LDLIBS +=	$(LIBNTP) $(LIBPARSE) $(LIBS)
+LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
 #
 SOURCE=	ntp_config.c ntp_control.c ntp_io.c ntp_leap.c \
 	ntp_loopfilter.c ntp_monitor.c ntp_peer.c ntp_proto.c \
@@ -74,7 +75,7 @@ OBJS=	ntp_config.o ntp_control.o ntp_io.o ntp_leap.o \
 
 $(REFCLK_OBJS) :=	CFLAGS += $(CLOCKDEFS)
 
-$(PROG): $(OBJS) $(LIBNTP) $(LIBPARSE)
+$(PROG): $(OBJS) $(LIBNTP) $(LIBPARSE) $(MAPFILE.NGB)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 

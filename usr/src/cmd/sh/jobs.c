@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,14 +49,14 @@ struct job
 	struct job *j_nxtp;	/* next job in job ID order */
 	struct job *j_curp;	/* next job in job currency order */
 	struct termios j_stty;	/* termio save area when job stops */
-	pid_t  j_pid;		/* job leader's process ID */
-	pid_t  j_pgid;		/* job's process group ID */
-	pid_t  j_tgid;		/* job's foreground process group ID */
-	uint   j_jid;		/* job ID */
-	ushort j_xval;		/* exit code, or exit or stop signal */
-	ushort j_flag;		/* various status flags defined below */
-	char  *j_pwd;		/* job's working directory */
-	char  *j_cmd;		/* cmd used to invoke this job */
+	pid_t	j_pid;		/* job leader's process ID */
+	pid_t	j_pgid;		/* job's process group ID */
+	pid_t	j_tgid;		/* job's foreground process group ID */
+	uint_t	j_jid;		/* job ID */
+	ushort_t j_xval;	/* exit code, or exit or stop signal */
+	ushort_t j_flag;	/* various status flags defined below */
+	char	*j_pwd;		/* job's working directory */
+	char	*j_cmd;		/* cmd used to invoke this job */
 };
 
 /* defines for j_flag */
@@ -97,23 +97,6 @@ static struct job 	*jobcur, /* active jobs listed in currency order */
 			*joblst; /* active jobs listed in job ID order	 */
 
 static void printjob(struct job *, int);
-
-pid_t
-tcgetpgrp(fd)
-{
-	pid_t pgid;
-	if (ioctl(fd, TIOCGPGRP, &pgid) == 0)
-		return (pgid);
-	return ((pid_t)-1);
-}
-
-int
-tcsetpgrp(fd, pgid)
-int fd;
-pid_t pgid;
-{
-	return (ioctl(fd, TIOCSPGRP, &pgid));
-}
 
 static struct job *
 pgid2job(pid_t pgid)
@@ -642,7 +625,7 @@ deallocjob()
 }
 
 void
-allocjob(char *cmd, unchar *cwd, int monitor)
+allocjob(char *cmd, uchar_t *cwd, int monitor)
 {
 	struct job *jp, **jpp;
 	int jid, cmdlen, cwdlen;

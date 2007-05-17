@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,6 +62,7 @@ $(NATIVE_BUILD)OBJS = $(MYOBJS:%.o=%-native.o)
 
 MYCPPFLAGS =	-I ../common -I/usr/include/libxml2
 CPPFLAGS +=	$(MYCPPFLAGS)
+LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
 
 LFLAGS = -t
 YFLAGS = -d
@@ -69,7 +70,7 @@ YFLAGS = -d
 CLOBBERFILES += svccfg_lex.c svccfg_grammar.c svccfg_grammar.h \
     $(MYPROG:%=%-native)
 
-LAZYLIBS = -z lazyload -lxml2 -z nolazyload
+LAZYLIBS = $(ZLAZYLOAD) -lxml2 $(ZNOLAZYLOAD)
 SVCCFG_EXTRA_LIBS = $(LAZYLIBS) -lscf -ll -luutil -lumem -lmd5
 $(NOT_NATIVE)SVCCFG_EXTRA_LIBS += -ltecla
 
@@ -113,7 +114,7 @@ native: FRC
 	@cd $(LIBSCF)/native; pwd; $(MAKE) $(MFLAGS) install
 	@NATIVE_BUILD= $(MAKE) $(MFLAGS) all
 
-$(PROG): $(OBJS)
+$(PROG): $(OBJS) $(MAPFILE.NGB)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS) $(CTFMERGE_HOOK)
 	$(POST_PROCESS)
 

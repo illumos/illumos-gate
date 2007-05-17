@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,14 +43,15 @@ BLTOBJ =	msg.o
 
 OBJS=		$(BLTOBJ) $(COMOBJ) $(COMOBJ32) $(COMOBJ64) $(TOOLOBJ)
 
-MAPFILE=	../common/mapfile-vers
+MAPFILE=	$(MAPFILE.NGB)
+MAPOPT=		$(MAPFILE:%=-M%)
 
 CPPFLAGS=	-I. -I../common -I../../include -I../../include/$(MACH) \
 		-I$(SRCBASE)/lib/libc/inc -I$(SRCBASE)/uts/$(ARCH)/sys \
 		$(CPPFLAGS.master)
 LLDFLAGS =	$(VAR_ELFDUMP_LLDFLAGS)
 LLDFLAGS64 =	$(VAR_LD_LLDFLAGS64)
-LDFLAGS +=	$(VERSREF) $(USE_PROTO) -M$(MAPFILE) $(LLDFLAGS) $(ZLAZYLOAD)
+LDFLAGS +=	$(VERSREF) $(USE_PROTO) $(MAPOPT) $(LLDFLAGS) $(ZLAZYLOAD)
 LDLIBS +=	$(ELFLIBDIR) -lelf $(LDDBGLIBDIR) $(LDDBG_LIB) \
 		    $(CONVLIBDIR) $(CONV_LIB)
 

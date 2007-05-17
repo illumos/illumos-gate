@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -77,6 +77,9 @@ COPTFLAG += $(XESS) #-I$(KINCDIR)
 
 LDLIBS += -lgss -lnsl
 
+gssd :=	MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
+gssd :=	LDFLAGS += $(MAPFILES:%=-M%)
+
 $(GPROGS) := CPPFLAGS += -DSYSV -DSunOS=50 
 
 .KEEP_STATE:
@@ -89,7 +92,7 @@ $(ROOTLIB):
 $(ROOTLIB)/%:	%
 	$(INS.file)
 
-gssd:	$(GSSDOBJS) 
+gssd:	$(GSSDOBJS) $$(MAPFILES)
 	$(LINK.c) $(GSSDOBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 

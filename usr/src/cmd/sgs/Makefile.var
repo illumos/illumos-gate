@@ -217,11 +217,6 @@ VAR_LIBLDDBG_CPPFLAGS=-DDEMANGLE
 VAR_LIBRTLD_DB_RDB_DEMO_LINTFLAGS64=	$(VAR_LINTFLAGS64)
 
 #
-# mapfiles
-#
-VAR_MAPFILES_FILES=	$(ROOTDIR)/map.default $(ROOTDIR)/map.pagealign
-
-#
 # rtld
 #
 VAR_RTLD_CPICLIB=	-L ../../../../lib/libc/$(MACH)

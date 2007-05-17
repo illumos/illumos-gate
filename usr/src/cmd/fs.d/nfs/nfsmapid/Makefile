@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,7 +44,7 @@ all:		$(TYPEPROG) $(TESTPROG)
 
 $(TYPEPROG):	$(OBJS) $(DSRC)
 		$(COMPILE.d) -s $(DSRC) -o $(DOBJ) $(OBJS)
-		$(LINK.c) -zignore -o $@ $(DOBJ) $(OBJS) $(LDLIBS)
+		$(LINK.c) $(ZIGNORE) -o $@ $(DOBJ) $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
 
 TESTSRCS  =	nfsmapid_test.c

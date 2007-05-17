@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -672,40 +672,36 @@ safe_popen_w(char *path_to_cmd, char **argv)
 }
 
 
-static uid_t gssd_uid;
+static uid_t krb5_cc_uid;
 
 void
 set_warnd_uid(uid_t uid)
 {
-
 	/*
-	 * set the value of gssd_uid, so it can be retrieved when getuid()
-	 * is called by the underlying mechanism libraries
+	 * set the value of krb5_cc_uid, so it can be retrieved when
+	 * app_krb5_user_uid() is called by the underlying mechanism libraries.
 	 */
 	if (kwarnd_debug)
 		printf("set_warnd_uid called with uid = %d\n", uid);
-
-	gssd_uid = uid;
+	krb5_cc_uid = uid;
 }
 
 uid_t
-getuid(void)
-
+app_krb5_user_uid(void)
 {
 
 	/*
-	 * return the value set when one of the gssd procedures was
+	 * return the value set when one of the kwarnd procedures was
 	 * entered. This is the value of the uid under which the
 	 * underlying mechanism library must operate in order to
 	 * get the user's credentials. This call is necessary since
-	 * gssd runs as root and credentials are many times stored
+	 * kwarnd runs as root and credentials are many times stored
 	 * in files and directories specific to the user
 	 */
 	if (kwarnd_debug)
-		printf("getuid called and returning gsssd_uid = %d\n",
-		    gssd_uid);
-
-	return (gssd_uid);
+		printf("app_krb5_user_uid called and returning uid = %d\n",
+		    krb5_cc_uid);
+	return (krb5_cc_uid);
 }
 
 
@@ -742,11 +738,11 @@ renew_creds(
 	krb5_error_code code = 0;
 	struct k5_data k5;
 
-	uid_t saved_u = getuid();
+	uid_t saved_u = app_krb5_user_uid();
 	uid_t u;
 
 	if (kwarnd_debug)
-		printf("renew start: uid=%d\n", getuid());
+		printf("renew start: uid=%d\n", app_krb5_user_uid());
 
 	if (!getpruid(princ, &u)) {
 		if (kwarnd_debug)
@@ -817,7 +813,7 @@ out:
 
 	if (kwarnd_debug)
 		printf("renew end: code=%s, uid=%d\n", error_message(code),
-		    getuid());
+		    app_krb5_user_uid());
 
 	return (code);
 }
@@ -883,8 +879,8 @@ kwarnd_check_warning_list(void)
 	char			*renew_subj = "Kerberos credentials renewed";
 
 	if (kwarnd_debug)
-		printf("check list: start: getuid=%d, cw list=%p\n", getuid(),
-			cred_warning_list);
+		printf("check list: start: uid=%d, cw list=%p\n",
+		    app_krb5_user_uid(), cred_warning_list);
 
 	while (1) {
 		(void) poll(NULL, NULL, 60000);

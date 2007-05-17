@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,6 +47,9 @@ lint := LAZYLIBS = -lgen -lcrypt
 LDLIBS += -lmapmalloc $(LAZYLIBS)
 XGETFLAGS += -a -x ed.xcl
 
+MAPFILE.INT =	../expr/mapfile-intf
+LDFLAGS +=	$(MAPFILE.INT:%=-M%)
+
 POFILE= ed_cmd.po
 
 %.po: ../expr/%.c
@@ -57,17 +59,17 @@ POFILE= ed_cmd.po
 
 .KEEP_STATE:
 
-all: $(PROG) $(XPG4) $(XPG6)
+all:	$(PROG) $(XPG4) $(XPG6)
 
-$(PROG): $(EDOBJ) 
+$(PROG): $(EDOBJ) $(MAPFILE.INT)
 	$(LINK.c) $(EDOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-$(XPG4): edobjs.xpg4 $(XPG4EDOBJ) 
+$(XPG4): edobjs.xpg4 $(XPG4EDOBJ) $(MAPFILE.INT) 
 	$(LINK.c) $(XPG4EDOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
-$(XPG6): edobjs.xpg6 $(XPG6EDOBJ) 
+$(XPG6): edobjs.xpg6 $(XPG6EDOBJ)  $(MAPFILE.INT)
 	$(LINK.c) $(XPG6EDOBJ) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 

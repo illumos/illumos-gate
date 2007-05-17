@@ -1,8 +1,8 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1994 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # cmd/eqn/eqn.d/Makefile
 #
@@ -33,6 +33,7 @@ CLEANFILES =	y.tab.c y.tab.h $(YACCSRC:%.y=%.c) $(YACCSRC:%.y=%.def)
 
 YFLAGS =	-d
 CPPFLAGS =	-I. -I.. $(CPPFLAGS.master)
+LDFLAGS +=	$(MAPFILE.NGB:%=-M%)
 
 .KEEP_STATE:
 
@@ -44,7 +45,7 @@ $(POFILE):      e.def $(POFILES)
 	$(RM)	$@
 	cat     $(POFILES)      > $@
 
-$(PROG) :	$(OBJS)
+$(PROG) :	$(OBJS) $(MAPFILE.NGB)
 		$(LINK.c) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
 		$(POST_PROCESS)
 

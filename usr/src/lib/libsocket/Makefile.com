@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,7 +28,7 @@
 LIBRARY	=	libsocket.a
 VERS =		.1
 
-INETOBJS =	bindresvport.o bootparams_getbyname.o byteorder.o ether_addr.o \
+INETOBJS =	bindresvport.o bootparams_getbyname.o ether_addr.o \
 	   	getaddrinfo.o getnameinfo.o getnetent.o getnetent_r.o \
 		getprotoent.o getprotoent_r.o getservbyname_r.o getservent.o \
 		getservent_r.o inet_lnaof.o inet_mkaddr.o inet_network.o \

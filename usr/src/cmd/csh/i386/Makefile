@@ -1,4 +1,4 @@
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
@@ -30,6 +30,9 @@ CPPFLAGS += -D_FILE_OFFSET_BITS=64
 LAZYLIBS = $(ZLAZYLOAD) -lsecdb $(ZNOLAZYLOAD)
 lint := LAZYLIBS = -lsecdb
 LDLIBS += -lcurses $(LAZYLIBS)
+
+MAPFILES =	../mapfile-intf $(MAPFILE.NGB)
+LDFLAGS +=	$(MAPFILES:%=-M%)
 
 PFOBJS = sh_policy.o
 
@@ -63,7 +66,7 @@ all: $(PROG)
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 
-$(CSH_PROG): $(COMMONOBJS) $(PFOBJS) $(LOCALOBJS)
+$(CSH_PROG): $(COMMONOBJS) $(PFOBJS) $(LOCALOBJS) $(MAPFILES)
 	$(LINK.c) $(COMMONOBJS) $(PFOBJS) $(LOCALOBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 

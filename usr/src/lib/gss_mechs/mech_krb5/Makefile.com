@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -153,7 +153,7 @@ K5_OS=	an_to_ln.o def_realm.o ccdefname.o free_krbhs.o free_hstrl.o \
 	read_msg.o read_pwd.o realm_dom.o sendto_kdc.o sn2princ.o \
 	unlck_file.o ustime.o write_msg.o safechown.o \
 	prompter.o realm_iter.o foreachaddr.o \
-	dnsglue.o dnssrv.o thread_safe.o changepw.o
+	dnsglue.o dnssrv.o thread_safe.o changepw.o getuid.o
 
 K5_OS_UTS=init_os_ctx.o timeofday.o toffset.o c_ustime.o
 

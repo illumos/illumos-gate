@@ -39,7 +39,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 CFLAGS		+= $(CCVERBOSE)
 CPPFLAGS	+= -I$(SRC)/common/ctf -DCTF_OLD_VERSIONS
-LDFLAGS		+= -Breduce -M$(UTSBASE)/common/ctf/mapfile -dy
+LDFLAGS		+= $(BREDUCE) -M$(UTSBASE)/common/ctf/mapfile -dy
 
 #
 # For now, disable these lint checks; maintainers should endeavor

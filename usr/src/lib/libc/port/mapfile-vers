@@ -63,6 +63,8 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	fdatasync;
 	forkallx;
 	forkx;
+	htonl;
+	htons;
 	lio_listio;
 	mkdtemp;
 	_mkdtemp;
@@ -81,6 +83,8 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	mq_timedsend;
 	mq_unlink;
 	nanosleep;
+	ntohl;
+	ntohs;
 	posix_fallocate;
 	pthread_key_create_once_np;
 	_renameat;

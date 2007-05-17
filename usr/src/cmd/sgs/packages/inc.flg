@@ -61,6 +61,7 @@ find_files "s.*" \
 	usr/src/common/dtrace \
 	usr/src/common/elfcap \
 	usr/src/common/sgsrtcid \
+	usr/src/common/mapfiles \
 	usr/src/lib/libc/inc \
 	usr/src/lib/libproc \
 	usr/src/lib/common
