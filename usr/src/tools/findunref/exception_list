@@ -229,3 +229,13 @@
 # Ignore any files that get used during a gcc build only.
 #
 ./src/cmd/sgs/rtld/common/mapfile-order-gcc
+
+#
+# Ignore license files.  This should be temporary, and these lines
+# should be removed once we start generating the opensolaris.org
+# deliverables from the nightly gate builds.
+#
+*/COPYING*
+*/LICENSE*
+*/THIRDPARTYLICENSE*
+*/OPENSOLARIS.LICENSE
