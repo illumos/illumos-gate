@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2259,6 +2259,16 @@ static int
 post_event(const char *subclass, nvlist_t *nvl)
 {
 	sysevent_id_t eid;
+
+	/*
+	 * Since sysevents don't work yet in non-global zones, there cannot
+	 * possibly be any consumers yet, so don't bother trying to generate
+	 * them.  (Otherwise, we'll spew warnings.)
+	 */
+	if (getzoneid() != GLOBAL_ZONEID) {
+		nvlist_free(nvl);
+		return (0);
+	}
 
 	errno = nvlist_add_uint32(nvl, IPMP_EVENT_VERSION,
 	    IPMP_EVENT_CUR_VERSION);
