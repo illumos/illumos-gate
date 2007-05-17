@@ -1020,7 +1020,7 @@ project_kstat_delete(kproject_t *pj)
 	if (pj->kpj_data.kpd_lockedmem_kstat != NULL) {
 		data = pj->kpj_data.kpd_lockedmem_kstat->ks_data;
 		kstat_delete(pj->kpj_data.kpd_lockedmem_kstat);
-		kmem_free(data, sizeof (zone_kstat_t));
+		kmem_free(data, sizeof (kproject_kstat_t));
 	}
 	pj->kpj_data.kpd_lockedmem_kstat = NULL;
 }

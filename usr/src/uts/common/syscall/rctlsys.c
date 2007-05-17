@@ -870,11 +870,6 @@ rctlsys_projset(char *name, rctl_opaque_t *rblk, size_t size, int flags)
 		return (set_errno(EFAULT));
 	}
 
-	if (secpolicy_rctlsys(CRED(), B_TRUE) != 0) {
-		kmem_free(kname, MAXPATHLEN);
-		return (set_errno(EPERM));
-	}
-
 	if (size > RCTL_PROJSET_MAXSIZE) {
 		kmem_free(kname, MAXPATHLEN);
 		return (set_errno(EINVAL));
@@ -891,6 +886,11 @@ rctlsys_projset(char *name, rctl_opaque_t *rblk, size_t size, int flags)
 	if ((krde->rcd_entity != RCENTITY_PROJECT) || (size <= 0)) {
 		kmem_free(kname, MAXPATHLEN);
 		return (set_errno(EINVAL));
+	}
+
+	if (secpolicy_rctlsys(CRED(), B_FALSE) != 0) {
+		kmem_free(kname, MAXPATHLEN);
+		return (set_errno(EPERM));
 	}
 
 	/* Allocate an array large enough for all resource control blocks */
