@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -170,6 +170,7 @@ nis_object2str(nobj, obj, be, argp)
 	char			*buffer, *name, *passwd, *shadow;
 	int			buflen, namelen, passwdlen, shadowlen;
 	char			*endnum, *uidstr;
+	uid_t			uid;
 	int			uidlen;
 	struct entry_col	*ecol;
 
@@ -196,7 +197,7 @@ nis_object2str(nobj, obj, be, argp)
 
 	/* uid */
 	__NISPLUS_GETCOL_OR_RETURN(ecol, PW_NDX_UID, uidlen, uidstr);
-	(void) strtol(uidstr, &endnum, 10);
+	uid = strtol(uidstr, &endnum, 10);
 	if (*endnum != 0 || endnum == uidstr)
 		return (NSS_STR_PARSE_PARSE);
 	/*
@@ -205,8 +206,10 @@ nis_object2str(nobj, obj, be, argp)
 	 *   _nss_nisplus_getent(), but that's OK -- when we're doing
 	 *   enumerations we don't care what's in the argp->key union.
 	 */
-	if (strncmp(passwd, "*NP*", passwdlen) == 0)
+	if (strncmp(passwd, "*NP*", passwdlen) == 0) {
 		be->flag = 1;
+		argp->key.uid = uid;
+	}
 
 	/*
 	 * shadow information
