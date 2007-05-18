@@ -98,6 +98,9 @@ enum {
 	EZFS_POOL_NOTSUP,	/* ops not supported for this type of pool */
 	EZFS_POOL_INVALARG,	/* invalid argument for this pool operation */
 	EZFS_NAMETOOLONG,	/* dataset name is too long */
+	EZFS_OPENFAILED,	/* open of device failed */
+	EZFS_NOCAP,		/* couldn't get capacity */
+	EZFS_LABELFAILED,	/* write of label failed */
 	EZFS_UNKNOWN
 };
 
@@ -164,6 +167,7 @@ extern int zpool_vdev_detach(zpool_handle_t *, const char *);
 extern int zpool_vdev_remove(zpool_handle_t *, const char *);
 extern int zpool_clear(zpool_handle_t *, const char *);
 extern nvlist_t *zpool_find_vdev(zpool_handle_t *, const char *, boolean_t *);
+extern int zpool_label_disk(libzfs_handle_t *, zpool_handle_t *, char *);
 
 /*
  * Functions to manage pool properties

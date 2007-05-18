@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,12 +46,6 @@ extern "C" {
 #ifndef UINT_MAX32
 #define	UINT_MAX32	0xffffffff
 #endif
-
-/*
- * This is the size of the reserved partition.
- * Valid in case of EFI labels.
- */
-#define	EFI_MIN_RESV_SIZE	(16 * 1024)
 
 /*
  * This file contains global definitions and declarations.  It is intended

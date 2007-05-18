@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,12 +102,6 @@ struct dk_map2  default_vtoc_map[NDKMAP] = {
 	{	V_UNASSIGNED,	0	},		/* p - 15 */
 #endif			/* defined(_SUNOS_VTOC_16) */
 };
-
-/*
- * This is the size of the reserved partition.
- * Valid in case of EFI labels.
- */
-#define	EFI_MIN_RESV_SIZE	(16 * 1024)
 
 #ifdef DEBUG
 int efi_debug = 1;

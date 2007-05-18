@@ -127,6 +127,7 @@ SUNWprivate_1.1 {
 	zpool_import_status;
 	zpool_in_use;
 	zpool_iter;
+	zpool_label_disk;
 	zpool_log_history;
 	zpool_mount_datasets;
 	zpool_obj_to_path;

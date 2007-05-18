@@ -169,6 +169,13 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		    "this pool operation"));
 	case EZFS_NAMETOOLONG:
 		return (dgettext(TEXT_DOMAIN, "dataset name is too long"));
+	case EZFS_OPENFAILED:
+		return (dgettext(TEXT_DOMAIN, "open failed"));
+	case EZFS_NOCAP:
+		return (dgettext(TEXT_DOMAIN,
+		    "disk capacity information could not be retrieved"));
+	case EZFS_LABELFAILED:
+		return (dgettext(TEXT_DOMAIN, "write of label failed"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:

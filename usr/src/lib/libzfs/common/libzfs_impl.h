@@ -85,6 +85,7 @@ struct zpool_handle {
 	nvlist_t *zpool_config;
 	nvlist_t *zpool_old_config;
 	nvlist_t *zpool_props;
+	diskaddr_t zpool_start_block;
 };
 
 int zfs_error(libzfs_handle_t *, int, const char *);

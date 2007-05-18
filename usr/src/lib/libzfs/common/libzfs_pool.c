@@ -38,6 +38,8 @@
 #include <stdlib.h>
 #include <strings.h>
 #include <unistd.h>
+#include <sys/efi_partition.h>
+#include <sys/vtoc.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/zio.h>
 #include <strings.h>
@@ -1902,6 +1904,167 @@ zpool_obj_to_path(zpool_handle_t *zhp, uint64_t dsobj, uint64_t obj,
 		(void) snprintf(pathname, len, "%s:<0x%llx>", dsname, obj);
 	}
 	free(mntpnt);
+}
+
+#define	RDISK_ROOT	"/dev/rdsk"
+#define	BACKUP_SLICE	"s2"
+/*
+ * Don't start the slice at the default block of 34; many storage
+ * devices will use a stripe width of 128k, so start there instead.
+ */
+#define	NEW_START_BLOCK	256
+
+/*
+ * determine where a partition starts on a disk in the current
+ * configuration
+ */
+static diskaddr_t
+find_start_block(nvlist_t *config)
+{
+	nvlist_t **child;
+	uint_t c, children;
+	char *path;
+	diskaddr_t sb = MAXOFFSET_T;
+	int fd;
+	char diskname[MAXPATHLEN];
+	uint64_t wholedisk;
+
+	if (nvlist_lookup_nvlist_array(config,
+	    ZPOOL_CONFIG_CHILDREN, &child, &children) != 0) {
+		if (nvlist_lookup_uint64(config,
+		    ZPOOL_CONFIG_WHOLE_DISK,
+		    &wholedisk) != 0 || !wholedisk) {
+			return (MAXOFFSET_T);
+		}
+		if (nvlist_lookup_string(config,
+		    ZPOOL_CONFIG_PATH, &path) != 0) {
+			return (MAXOFFSET_T);
+		}
+
+		(void) snprintf(diskname, sizeof (diskname), "%s%s",
+		    RDISK_ROOT, strrchr(path, '/'));
+		if ((fd = open(diskname, O_RDONLY|O_NDELAY)) >= 0) {
+			struct dk_gpt *vtoc;
+			if (efi_alloc_and_read(fd, &vtoc) >= 0) {
+				sb = vtoc->efi_parts[0].p_start;
+				efi_free(vtoc);
+			}
+			(void) close(fd);
+		}
+		return (sb);
+	}
+
+	for (c = 0; c < children; c++) {
+		sb = find_start_block(child[c]);
+		if (sb != MAXOFFSET_T) {
+			return (sb);
+		}
+	}
+	return (MAXOFFSET_T);
+}
+
+/*
+ * Label an individual disk.  The name provided is the short name,
+ * stripped of any leading /dev path.
+ */
+int
+zpool_label_disk(libzfs_handle_t *hdl, zpool_handle_t *zhp, char *name)
+{
+	char path[MAXPATHLEN];
+	struct dk_gpt *vtoc;
+	int fd;
+	size_t resv = EFI_MIN_RESV_SIZE;
+	uint64_t slice_size;
+	diskaddr_t start_block;
+	char errbuf[1024];
+
+	if (zhp) {
+		nvlist_t *nvroot;
+
+		verify(nvlist_lookup_nvlist(zhp->zpool_config,
+		    ZPOOL_CONFIG_VDEV_TREE, &nvroot) == 0);
+
+		if (zhp->zpool_start_block == 0)
+			start_block = find_start_block(nvroot);
+		else
+			start_block = zhp->zpool_start_block;
+		zhp->zpool_start_block = start_block;
+	} else {
+		/* new pool */
+		start_block = NEW_START_BLOCK;
+	}
+
+	(void) snprintf(path, sizeof (path), "%s/%s%s", RDISK_ROOT, name,
+	    BACKUP_SLICE);
+
+	if ((fd = open(path, O_RDWR | O_NDELAY)) < 0) {
+		/*
+		 * This shouldn't happen.  We've long since verified that this
+		 * is a valid device.
+		 */
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "cannot "
+		    "label '%s': unable to open device"), name);
+		return (zfs_error(hdl, EZFS_OPENFAILED, errbuf));
+	}
+
+	if (efi_alloc_and_init(fd, EFI_NUMPAR, &vtoc) != 0) {
+		/*
+		 * The only way this can fail is if we run out of memory, or we
+		 * were unable to read the disk's capacity
+		 */
+		if (errno == ENOMEM)
+			(void) no_memory(hdl);
+
+		(void) close(fd);
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "cannot "
+		    "label '%s': unable to read disk capacity"), name);
+
+		return (zfs_error(hdl, EZFS_NOCAP, errbuf));
+	}
+
+	slice_size = vtoc->efi_last_u_lba + 1;
+	slice_size -= EFI_MIN_RESV_SIZE;
+	if (start_block == MAXOFFSET_T)
+		start_block = NEW_START_BLOCK;
+	slice_size -= start_block;
+
+	vtoc->efi_parts[0].p_start = start_block;
+	vtoc->efi_parts[0].p_size = slice_size;
+
+	/*
+	 * Why we use V_USR: V_BACKUP confuses users, and is considered
+	 * disposable by some EFI utilities (since EFI doesn't have a backup
+	 * slice).  V_UNASSIGNED is supposed to be used only for zero size
+	 * partitions, and efi_write() will fail if we use it.  V_ROOT, V_BOOT,
+	 * etc. were all pretty specific.  V_USR is as close to reality as we
+	 * can get, in the absence of V_OTHER.
+	 */
+	vtoc->efi_parts[0].p_tag = V_USR;
+	(void) strcpy(vtoc->efi_parts[0].p_name, "zfs");
+
+	vtoc->efi_parts[8].p_start = slice_size + start_block;
+	vtoc->efi_parts[8].p_size = resv;
+	vtoc->efi_parts[8].p_tag = V_RESERVED;
+
+	if (efi_write(fd, vtoc) != 0) {
+		/*
+		 * Some block drivers (like pcata) may not support EFI
+		 * GPT labels.  Print out a helpful error message dir-
+		 * ecting the user to manually label the disk and give
+		 * a specific slice.
+		 */
+		(void) close(fd);
+		efi_free(vtoc);
+
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "cannot label '%s': try using fdisk(1M) and then "
+		    "provide a specific slice"), name);
+		return (zfs_error(hdl, EZFS_LABELFAILED, errbuf));
+	}
+
+	(void) close(fd);
+	efi_free(vtoc);
+	return (0);
 }
 
 int

@@ -481,7 +481,7 @@ zpool_do_add(int argc, char **argv)
 	}
 
 	/* pass off to get_vdev_spec for processing */
-	nvroot = make_root_vdev(config, force, !force, B_FALSE, argc, argv);
+	nvroot = make_root_vdev(zhp, force, !force, B_FALSE, argc, argv);
 	if (nvroot == NULL) {
 		zpool_close(zhp);
 		return (1);
@@ -2125,7 +2125,6 @@ zpool_do_attach_or_replace(int argc, char **argv, int replacing)
 	nvlist_t *nvroot;
 	char *poolname, *old_disk, *new_disk;
 	zpool_handle_t *zhp;
-	nvlist_t *config;
 	int ret;
 	int log_argc;
 	char **log_argv;
@@ -2187,14 +2186,14 @@ zpool_do_attach_or_replace(int argc, char **argv, int replacing)
 	if ((zhp = zpool_open(g_zfs, poolname)) == NULL)
 		return (1);
 
-	if ((config = zpool_get_config(zhp, NULL)) == NULL) {
+	if (zpool_get_config(zhp, NULL) == NULL) {
 		(void) fprintf(stderr, gettext("pool '%s' is unavailable\n"),
 		    poolname);
 		zpool_close(zhp);
 		return (1);
 	}
 
-	nvroot = make_root_vdev(config, force, B_FALSE, replacing, argc, argv);
+	nvroot = make_root_vdev(zhp, force, B_FALSE, replacing, argc, argv);
 	if (nvroot == NULL) {
 		zpool_close(zhp);
 		return (1);

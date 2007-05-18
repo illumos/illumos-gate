@@ -45,7 +45,8 @@ void zpool_no_memory(void);
 /*
  * Virtual device functions
  */
-nvlist_t *make_root_vdev(nvlist_t *poolconfig, int force, int check_rep,
+
+nvlist_t *make_root_vdev(zpool_handle_t *zhp, int force, int check_rep,
     boolean_t isreplace, int argc, char **argv);
 
 /*

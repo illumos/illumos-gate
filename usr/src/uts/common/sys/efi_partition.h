@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -137,9 +137,13 @@ typedef struct efi_gpe_Attrs {
 #define	EFI_AAPL_UFS	{ 0x55465300, 0x0000, 0x11aa, 0xaa, 0x11, \
 			    { 0x00, 0x30, 0x65, 0x43, 0xec, 0xac } }
 
+/* minimum # of bytes for partition table entires, per EFI spec */
 #define	EFI_MIN_ARRAY_SIZE	(16 * 1024)
 
 #define	EFI_PART_NAME_LEN	36
+
+/* size of the "reserved" partition, in blocks */
+#define	EFI_MIN_RESV_SIZE	(16 * 1024)
 
 /* EFI Guid Partition Entry */
 typedef struct efi_gpe {
