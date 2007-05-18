@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,7 +74,7 @@ write_image(void)
 	write_init(TRACK_MODE_DATA);
 
 	if (image_file) {
-		h = open_file_read_stream(image_file);
+		h = open_iso_read_stream(image_file);
 	} else {
 		h = open_stdin_read_stream();
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,10 @@ str_errno_to_string(int serrno)
 		return (gettext("Unsupported wav format"));
 	case STR_ERR_WAV_BAD_HEADER:
 		return (gettext("Bad wav header"));
+	case STR_ERR_ISO_READ_ERR:
+		return (gettext("Unable to read ISO header"));
+	case STR_ERR_ISO_BAD_HEADER:
+		return (gettext("Invalid ISO header or not an ISO"));
 	default:
 		return (gettext("unknown error"));
 	}
@@ -276,6 +280,76 @@ open_file_read_stream(char *file)
 	h->bstr_size = file_stream_size;
 	h->bstr_rewind = file_stream_rewind;
 
+	return (h);
+}
+
+bstreamhandle
+open_iso_read_stream(char *fname)
+{
+	bstreamhandle h;
+	off_t iso_size = 0;
+	char iso_desc[ISO9660_PRIMARY_DESC_SIZE];
+
+	h = open_file_read_stream(fname);
+
+	/* If we don't have a valid handle immediately return NULL */
+	if (h == NULL)
+		return (NULL);
+
+	if (debug)
+		(void) printf("Checking the ISO 9660 file header\n");
+
+	/* Check to see if we have a valid sized ISO image */
+	h->bstr_size(h, &iso_size);
+	if (iso_size < ISO9660_HEADER_SIZE) {
+		if (debug)
+			(void) printf("ISO 9660 header size not sane.\n");
+		h->bstr_close(h);
+		str_errno = STR_ERR_ISO_BAD_HEADER;
+		return (NULL);
+	}
+
+	if (debug)
+		(void) printf("ISO 9660 header size is sane.\n");
+
+	/* Skip over the boot block sector of the ISO. */
+	(void) lseek(h->bstr_fd, ISO9660_BOOT_BLOCK_SIZE, SEEK_SET);
+
+	/*
+	 * Try to read in the ISO Descriptor and validate this
+	 * is in fact an ISO 9660 image.
+	 */
+	if (read(h->bstr_fd, iso_desc, ISO9660_PRIMARY_DESC_SIZE) ==
+	    ISO9660_PRIMARY_DESC_SIZE) {
+		/*
+		 * Bytes one through five of a valid ISO 9660 cd image
+		 * should contain the string CD001. High Sierra format,
+		 * the ISO 9660 predecessor, fills this field with the
+		 * string CDROM. If neither is the case then we should
+		 * close the stream, set str_errno, and return NULL.
+		 */
+		if (strncmp(iso_desc + ISO9660_STD_IDENT_OFFSET, "CD001",
+		    5) != 0 && strncmp(iso_desc + ISO9660_STD_IDENT_OFFSET,
+		    "CDROM", 5) != 0) {
+			if (debug)
+				(void) printf("Invalid ISO 9660 identifier.\n");
+			h->bstr_close(h);
+			str_errno = STR_ERR_ISO_BAD_HEADER;
+			return (NULL);
+		}
+	} else {
+		h->bstr_close(h);
+		str_errno = STR_ERR_ISO_READ_ERR;
+		return (NULL);
+	}
+
+	/*
+	 * Our ISO image is valid rewind the stream
+	 * and return the handle.
+	 */
+	if (debug)
+		(void) printf("ISO 9660 header is sane.\n");
+	h->bstr_rewind(h);
 	return (h);
 }
 
