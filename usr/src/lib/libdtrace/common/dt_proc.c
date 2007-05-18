@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -162,7 +162,7 @@ dt_proc_bpmatch(dtrace_hdl_t *dtp, dt_proc_t *dpr)
 	(void) Pxecbkpt(dpr->dpr_proc, dbp->dbp_instr);
 }
 
-void
+static void
 dt_proc_bpenable(dt_proc_t *dpr)
 {
 	dt_bkpt_t *dbp;
@@ -179,7 +179,7 @@ dt_proc_bpenable(dt_proc_t *dpr)
 	dt_dprintf("breakpoints enabled\n");
 }
 
-void
+static void
 dt_proc_bpdisable(dt_proc_t *dpr)
 {
 	dt_bkpt_t *dbp;
@@ -241,8 +241,17 @@ dt_proc_stop(dt_proc_t *dpr, uint8_t why)
 
 		(void) pthread_cond_broadcast(&dpr->dpr_cv);
 
+		/*
+		 * We disable breakpoints while stopped to preserve the
+		 * integrity of the program text for both our own disassembly
+		 * and that of the kernel.
+		 */
+		dt_proc_bpdisable(dpr);
+
 		while (dpr->dpr_stop & DT_PROC_STOP_IDLE)
 			(void) pthread_cond_wait(&dpr->dpr_cv, &dpr->dpr_lock);
+
+		dt_proc_bpenable(dpr);
 	}
 }
 

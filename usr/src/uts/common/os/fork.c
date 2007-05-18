@@ -328,13 +328,20 @@ cfork(int isvfork, int isfork1, int flags)
 		 * sprlock() may fail because the child is being forked.
 		 */
 		if (p->p_dtrace_helpers != NULL) {
+			mutex_enter(&p->p_lock);
+			sprunlock(p);
+
 			ASSERT(dtrace_helpers_fork != NULL);
 			(*dtrace_helpers_fork)(p, cp);
-		}
 
-		mutex_enter(&p->p_lock);
-		p->p_flag &= ~SFORKING;
-		sprunlock(p);
+			mutex_enter(&p->p_lock);
+			p->p_flag &= ~SFORKING;
+			mutex_exit(&p->p_lock);
+		} else {
+			mutex_enter(&p->p_lock);
+			p->p_flag &= ~SFORKING;
+			sprunlock(p);
+		}
 	}
 
 	/*

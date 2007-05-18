@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -440,11 +440,6 @@ dt_pid_create_pid_probes(dtrace_probedesc_t *pdp, dtrace_hdl_t *dtp,
 	dt_pid_probe_t pp;
 	int ret = 0;
 
-	/*
-	 * Disable breakpoints so they don't interfere with our disassembly.
-	 */
-	dt_proc_bpdisable(dpr);
-
 	pp.dpp_dtp = dtp;
 	pp.dpp_dpr = dpr;
 	pp.dpp_pr = dpr->dpr_proc;
@@ -455,7 +450,6 @@ dt_pid_create_pid_probes(dtrace_probedesc_t *pdp, dtrace_hdl_t *dtp,
 	 * hidden some magic in ld.so.1 as well as libc.so.1).
 	 */
 	if (Pname_to_map(pp.dpp_pr, PR_OBJ_LDSO) == NULL) {
-		dt_proc_bpenable(dpr);
 		return (dt_pid_error(dtp, pcb, dpr, NULL, D_PROC_DYN,
 		    "process %s is not a dynamically-linked executable",
 		    &pdp->dtpd_provider[3]));
@@ -476,14 +470,12 @@ dt_pid_create_pid_probes(dtrace_probedesc_t *pdp, dtrace_hdl_t *dtp,
 		    (aout = Pname_to_map(pp.dpp_pr, "a.out")) == NULL ||
 		    (pmp = Pname_to_map(pp.dpp_pr, pp.dpp_mod)) == NULL ||
 		    aout->pr_vaddr != pmp->pr_vaddr) {
-			dt_proc_bpenable(dpr);
 			return (dt_pid_error(dtp, pcb, dpr, NULL, D_PROC_LIB,
 			    "only the a.out module is valid with the "
 			    "'-' function"));
 		}
 
 		if (strisglob(pp.dpp_name)) {
-			dt_proc_bpenable(dpr);
 			return (dt_pid_error(dtp, pcb, dpr, NULL, D_PROC_NAME,
 			    "only individual addresses may be specified "
 			    "with the '-' function"));
@@ -515,8 +507,6 @@ dt_pid_create_pid_probes(dtrace_probedesc_t *pdp, dtrace_hdl_t *dtp,
 			ret = dt_pid_per_mod(&pp, pmp, obj);
 		}
 	}
-
-	dt_proc_bpenable(dpr);
 
 	return (ret);
 }

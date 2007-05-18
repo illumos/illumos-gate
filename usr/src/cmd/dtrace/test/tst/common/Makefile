@@ -60,5 +60,18 @@ usdt/tst.argmap.exe: usdt/tst.argmap.o usdt/argmap.o
 usdt/argmap.o: usdt/argmap.d usdt/tst.argmap.o
 	$(COMPILE.d) -o usdt/argmap.o -s usdt/argmap.d usdt/tst.argmap.o
 
+usdt/tst.forker.exe: usdt/tst.forker.o usdt/forker.o
+	$(LINK.c) -o usdt/tst.forker.exe usdt/tst.forker.o usdt/forker.o \
+		$(LDLIBS)
+	$(POST_PROCESS) ; $(STRIP_STABS)
+
+usdt/forker.o: usdt/forker.d usdt/tst.forker.o
+	$(COMPILE.d) -o usdt/forker.o -s usdt/forker.d usdt/tst.forker.o
+
+usdt/tst.forker.o: usdt/forker.h
+
+usdt/forker.h: usdt/forker.d
+	$(DTRACE) -h -s usdt/forker.d -o usdt/forker.h
+
 SUBDIRS = java_api
 include ../../Makefile.subdirs
