@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -52,11 +52,9 @@
 #include <pwd.h>
 #include <sys/sendfile.h>
 #include <ctype.h>
-#include <alloca.h>
 #ifdef HAVE_PRIV_H
 #include <priv.h>
 #endif
-#include <papi_impl.h>
 
 #ifndef	JOB_ID_FILE
 #define	JOB_ID_FILE	"/var/run/rfc-1179.seq"
@@ -109,7 +107,7 @@ null(int i)
 }
 
 static int
-sock_connect(int sock, uri_t *uri, int timeout)
+sock_connect(int sock, char *host, int timeout)
 {
 	struct hostent *hp;
 	struct servent *sp;
@@ -122,13 +120,11 @@ sock_connect(int sock, uri_t *uri, int timeout)
 	int	err,
 		error_num;
 	unsigned timo = 1;
-	int port = -1;
-
 
 	/*
 	 * Get the host address and port number to connect to.
 	 */
-	if ((uri == NULL) || (uri->host == NULL)) {
+	if (host == NULL) {
 		return (-1);
 	}
 
@@ -136,7 +132,7 @@ sock_connect(int sock, uri_t *uri, int timeout)
 	(void) memset((char *)&sin, (int)NULL, sizeof (sin));
 
 #if defined(HAVE_GETIPNODEBYNAME) && defined(HAVE_RRESVPORT_AF)
-	if ((hp = getipnodebyname(uri->host, AF_INET6, AI_DEFAULT,
+	if ((hp = getipnodebyname(host, AF_INET6, AI_DEFAULT,
 		    &error_num)) == NULL) {
 		errno = ENOENT;
 		return (-1);
@@ -144,7 +140,7 @@ sock_connect(int sock, uri_t *uri, int timeout)
 	(void) memcpy((caddr_t)&sin.sin6_addr, hp->h_addr, hp->h_length);
 	sin.sin6_family = hp->h_addrtype;
 #else
-	if ((hp = gethostbyname(uri->host)) == NULL) {
+	if ((hp = gethostbyname(host)) == NULL) {
 		errno = ENOENT;
 		return (-1);
 	}
@@ -158,15 +154,10 @@ sock_connect(int sock, uri_t *uri, int timeout)
 		return (-1);
 	}
 
-	if (uri->port != NULL)
-		port = atoi(uri->port);
-	if (port < 0)
-		port = sp->s_port;
-
 #if defined(HAVE_GETIPNODEBYNAME) && defined(HAVE_RRESVPORT_AF)
-	sin.sin6_port = port;
+	sin.sin6_port = sp->s_port;
 #else
-	sin.sin_port = port;
+	sin.sin_port = sp->s_port;
 #endif
 
 retry:
@@ -446,8 +437,9 @@ send_control_file(int sock, char *data, int id)
 
 
 static int
-submit_job(int sock, uri_t *uri, int job_id, char *path)
+submit_job(int sock, char *printer, int job_id, char *path)
 {
+	struct stat st;
 	int current = 0;
 	off_t off = 0;
 	char *metadata = NULL;
@@ -456,30 +448,36 @@ submit_job(int sock, uri_t *uri, int job_id, char *path)
 	int sent_files = 0;
 	char buf[BUFSIZ];
 	size_t len;
-	char *printer = queue_name_from_uri(uri);
+
+	/* open the control file */
+	if ((fd = open(path, O_RDONLY)) < 0) {
+		syslog(LOG_ERR, "submit_job(%d, %s, %d, %s): open(): %m",
+			sock, printer, job_id, path);
+		return (-1);
+	}
+
+	/* get the size of the control file */
+	if (fstat(fd, &st) < 0) {
+		syslog(LOG_ERR, "submit_job(%d, %s, %d, %s): fstat(): %m",
+			sock, printer, job_id, path);
+		close(fd);
+		return (-1);
+	}
+
+	/* allocate memory for the control file */
+	if ((metadata = calloc(1, st.st_size + 1)) == NULL) {
+		syslog(LOG_ERR, "submit_job(%d, %s, %d, %s): calloc(): %m",
+			sock, printer, job_id, path);
+		close(fd);
+		return (-1);
+	}
 
 	/* read in the control file */
-	if ((fd = open(path, O_RDONLY)) >= 0) {
-		struct stat st;
-
-		if (fstat(fd, &st) < 0) {
-			close(fd);
-			return (-1);
-		}
-
-		metadata = alloca(st.st_size + 1);
-		memset(metadata, 0, st.st_size + 1);
-
-		if (read(fd, metadata, st.st_size) != st.st_size) {
-			close(fd);
-			free(metadata);
-			metadata = NULL;
-			return (-1);
-		}
-
-	} else {
-		syslog(LOG_ERR,
-			"lpd-port:submit_job:open failed : %m path %s", path);
+	if (read(fd, metadata, st.st_size) != st.st_size) {
+		syslog(LOG_ERR, "submit_job(%d, %s, %d, %s): read(): %m",
+			sock, printer, job_id, path);
+		free(metadata);
+		close(fd);
 		return (-1);
 	}
 
@@ -488,6 +486,9 @@ submit_job(int sock, uri_t *uri, int job_id, char *path)
 		/* bad control data, dump the job */
 		syslog(LOG_ALERT,
 			"bad control file, possible subversion attempt");
+		free(metadata);
+		close(fd);
+		return (-1);
 	}
 
 	/* request to transfer the job */
@@ -547,13 +548,11 @@ submit_job(int sock, uri_t *uri, int job_id, char *path)
 
 	return (0);
 }
-
 static int
-query(int fd, uri_t *uri, int ac, char **av)
+query(int fd, char *printer, int ac, char **av)
 {
 	char buf[BUFSIZ];
 	int rc, len;
-	char *printer = queue_name_from_uri(uri);
 
 	/* build the request */
 	snprintf(buf, sizeof (buf), "\04%s", printer);
@@ -571,11 +570,10 @@ query(int fd, uri_t *uri, int ac, char **av)
 }
 
 static int
-cancel(int fd, uri_t *uri, int ac, char **av)
+cancel(int fd, char *printer, int ac, char **av)
 {
 	char buf[BUFSIZ];
 	int rc, len;
-	char *printer = queue_name_from_uri(uri);
 
 	/* build the request */
 	snprintf(buf, sizeof (buf), "\05%s %s", printer, get_user_name());
@@ -604,12 +602,12 @@ usage(char *program)
 	else
 		name++;
 
-	fprintf(stderr, "usage:\t%s -u uri [-t timeout] "
-			"[-s control ]\n", name);
-	fprintf(stderr, "\t%s -u uri [-t timeout] "
-			"[-c user|job ...]\n", name);
-	fprintf(stderr, "\t%s -u uri [-t timeout] "
-			"[-q user|job ...]\n", name);
+	fprintf(stderr, "usage:\t%s -H host [-t timeout] -s queue control ]\n",
+			name);
+	fprintf(stderr, "\t%s -H host [-t timeout] -c queue [user|job ...]\n",
+			name);
+	fprintf(stderr, "\t%s -H host [-t timeout] -q queue [user|job ...]\n",
+			name);
 	exit(EINVAL);
 }
 
@@ -628,7 +626,7 @@ main(int ac, char *av[])
 {
 	enum { OP_NONE, OP_SUBMIT, OP_QUERY, OP_CANCEL } operation = OP_NONE;
 	int fd, c, timeout = 0, exit_code = 0;
-	uri_t *uri = NULL;
+	char *host = NULL, *queue = NULL;
 	uid_t uid = getuid();
 #ifdef	PRIV_ALLSETS
 	priv_set_t *saveset = NULL;
@@ -672,30 +670,31 @@ main(int ac, char *av[])
 	seteuid(uid);
 #endif
 
-
-	while ((c = getopt(ac, av, "cqst:u:")) != EOF) {
+	while ((c = getopt(ac, av, "H:t:c:q:s:")) != EOF) {
 		switch (c) {
+		case 'H':
+			host = optarg;
+			break;
+		case 't':
+			timeout = atoi(optarg);
+			break;
 		case 'c':
 			if (operation != OP_NONE)
 				usage(av[0]);
 			operation = OP_CANCEL;
+			queue = optarg;
 			break;
 		case 'q':
 			if (operation != OP_NONE)
 				usage(av[0]);
 			operation = OP_QUERY;
+			queue = optarg;
 			break;
 		case 's':
 			if (operation != OP_NONE)
 				usage(av[0]);
 			operation = OP_SUBMIT;
-			break;
-		case 't':
-			timeout = atoi(optarg);
-			break;
-		case 'u':
-			if (uri_from_string(optarg, &uri) < 0)
-				usage(av[0]);
+			queue = optarg;
 			break;
 		default:
 			usage(av[0]);
@@ -703,11 +702,8 @@ main(int ac, char *av[])
 		}
 	}
 
-	if ((uri == NULL) || (timeout < 0) || (operation == OP_NONE))
-		usage(av[0]);
-
-	if ((strcasecmp(uri->scheme, "lpd") != 0) &&
-	    (strcasecmp(uri->scheme, "rfc-1179") != 0))
+	if ((host == NULL) || (queue == NULL) || (timeout < 0) ||
+	    (operation == OP_NONE))
 		usage(av[0]);
 
 	if (operation == OP_SUBMIT)	/* get a job-id if we need it */
@@ -728,23 +724,22 @@ main(int ac, char *av[])
 
 	setreuid(uid, uid);
 
-
 	/* connect to the print service */
-	if ((fd = sock_connect(fd, uri, timeout)) < 0)
+	if ((fd = sock_connect(fd, host, timeout)) < 0)
 		return (errno);
 
 	/* perform the requested operation */
 	switch (operation) {
 	case OP_SUBMIT:	/* transfer the job, close the fd */
-		if (submit_job(fd, uri, c, av[optind]) < 0)
+		if (submit_job(fd, queue, c, av[optind]) < 0)
 			exit_code = errno;
 		break;
 	case OP_QUERY:	/* send the query string, return the fd */
-		if (query(fd, uri, ac - optind, &av[optind]) < 0)
+		if (query(fd, queue, ac - optind, &av[optind]) < 0)
 			exit_code = errno;
 		break;
 	case OP_CANCEL:	/* send the cancel string, return the fd */
-		if (cancel(fd, uri, ac - optind, &av[optind]) < 0)
+		if (cancel(fd, queue, ac - optind, &av[optind]) < 0)
 			exit_code = errno;
 		break;
 	default:	/* This should never happen */

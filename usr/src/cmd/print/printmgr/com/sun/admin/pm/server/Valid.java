@@ -21,7 +21,7 @@
 /*
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Valid
@@ -43,10 +43,10 @@ public class  Valid {
     /* JSTYLED */
     static String baddestmetas = "\"\\$^&*(){}`'|;?<>";
 
-    // lpadmin only takes 14.
-    static int validlocalprinternamelength = 14;
-    // MAXHOSTNAMELEN seems reasonable.
-    static int validremoteprinternamelength = 256;
+    // lpadmin used to only take 14.
+    static int validlocalprinternamelength = 1024;
+    // MAXHOSTNAMELEN + MAXPATHLEN seems reasonable.
+    static int validremoteprinternamelength = 1280;
 
     static int validdestinationlength = 1023;	// BUFSIZ-1 seems generous
     static int validcommentlength = 256;	// From admintool

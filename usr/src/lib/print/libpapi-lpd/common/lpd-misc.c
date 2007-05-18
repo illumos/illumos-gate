@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -129,7 +129,7 @@ lpd_open(service_t *svc, char type, char **args, int timeout)
 {
 	int ac, rc = -1, fds[2];
 	pid_t pid;
-	char *av[64], buf[BUFSIZ];
+	char *av[64], *tmp, buf[BUFSIZ];
 
 	if ((svc == NULL) || (svc->uri == NULL))
 		return (-1);
@@ -139,18 +139,30 @@ lpd_open(service_t *svc, char type, char **args, int timeout)
 #endif
 
 	av[0] = SUID_LPD_PORT; ac = 1;
-	uri_to_string(svc->uri, buf, sizeof (buf));
-	av[ac++] = "-u";
-	av[ac++] = strdup(buf);
 
+	/* server */
+	av[ac++] = "-H";
+	av[ac++] = svc->uri->host;
+
+	/* timeout */
 	if (timeout > 0) {
 		snprintf(buf, sizeof (buf), "%d", timeout);
 		av[ac++] = "-t";
 		av[ac++] = strdup(buf);
 	}
+
+	/* operation */
 	snprintf(buf, sizeof (buf), "-%c", type);
 	av[ac++] = buf;
 
+	/* queue */
+	if ((tmp = strrchr(svc->uri->path, '/')) == NULL)
+		tmp = svc->uri->path;
+	else
+		tmp++;
+	av[ac++] = tmp;
+
+	/* args */
 	if (args != NULL)
 		while ((*args != NULL) && (ac < 62))
 			av[ac++] = *args++;
