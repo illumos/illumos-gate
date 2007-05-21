@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -421,6 +421,8 @@ void
 userauth_gssapi_finish(Authctxt *authctxt, Gssctxt *gssctxt)
 {
 	char *local_user = NULL;
+	gss_buffer_desc dispname;
+	OM_uint32 major;
 
 	if (*authctxt->user != '\0' &&
 		PRIVSEP(ssh_gssapi_userok(gssctxt, authctxt->user))) {
@@ -454,6 +456,19 @@ userauth_gssapi_finish(Authctxt *authctxt, Gssctxt *gssctxt)
 
 	if (local_user != NULL)
 		xfree(local_user);
+
+	if (*authctxt->user != '\0' && authctxt->method->authenticated != 0) {
+		major = gss_display_name(&gssctxt->minor, gssctxt->src_name,
+			    &dispname, NULL);
+		if (major == GSS_S_COMPLETE) {
+			log("Authorized principal %.*s, authenticated with "
+			    "GSS mechanism %s, to: %s",
+				dispname.length, (char *)dispname.value,
+				ssh_gssapi_oid_to_name(gssctxt->actual_mech),
+				authctxt->user);
+		}
+		(void) gss_release_buffer(&gssctxt->minor, &dispname);
+	}
 }
 
 #if 0
