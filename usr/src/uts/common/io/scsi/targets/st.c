@@ -3821,8 +3821,7 @@ st_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 	if (IS_PE_FLAG_SET(un)) {
 		if ((cmd == MTIOCLRERR) ||
 		    (cmd == MTIOCPERSISTENT) ||
-		    (cmd == MTIOCGET) ||
-		    (cmd == USCSIGETRQS)) {
+		    (cmd == MTIOCGET)) {
 			goto check_commands;
 		} else {
 			rval = un->un_errno;
@@ -4249,100 +4248,6 @@ check_commands:
 
 			rval = st_take_ownership(dev);
 
-			break;
-		}
-	case USCSIGETRQS:
-		{
-#ifdef _MULTI_DATAMODEL
-		/*
-		 * For use when a 32 bit app makes a call into a
-		 * 64 bit ioctl
-		 */
-		struct uscsi_rqs32	urqs_32;
-		struct uscsi_rqs32	*urqs_32_ptr = &urqs_32;
-#endif /* _MULTI_DATAMODEL */
-			struct uscsi_rqs	urqs;
-			struct uscsi_rqs	*urqs_ptr = &urqs;
-			ushort_t		len;
-#ifdef _MULTI_DATAMODEL
-		switch (ddi_model_convert_from(flag & FMODELS)) {
-		case DDI_MODEL_ILP32:
-		{
-			if (ddi_copyin((void *)arg, urqs_32_ptr,
-			    sizeof (struct uscsi_rqs32), flag)) {
-				rval = EFAULT;
-				break;
-			}
-			urqs_ptr->rqs_buflen = urqs_32_ptr->rqs_buflen;
-			urqs_ptr->rqs_bufaddr =
-			    (caddr_t)(uintptr_t)urqs_32_ptr->rqs_bufaddr;
-			break;
-		}
-		case DDI_MODEL_NONE:
-			if (ddi_copyin((void *)arg, urqs_ptr,
-			    sizeof (struct uscsi_rqs), flag)) {
-				rval = EFAULT;
-				break;
-			}
-		}
-#else /* ! _MULTI_DATAMODEL */
-		if (ddi_copyin((void *)arg, urqs_ptr, sizeof (urqs), flag)) {
-			rval = EFAULT;
-			break;
-		}
-#endif /* _MULTI_DATAMODEL */
-
-			urqs_ptr->rqs_flags = (int)un->un_rqs_state &
-			    (ST_RQS_OVR | ST_RQS_VALID);
-			if (urqs_ptr->rqs_buflen <= SENSE_LENGTH) {
-			    len = urqs_ptr->rqs_buflen;
-			    urqs_ptr->rqs_resid = 0;
-			} else {
-			    len = SENSE_LENGTH;
-			    urqs_ptr->rqs_resid = urqs_ptr->rqs_buflen
-				    - SENSE_LENGTH;
-			}
-			if (!(un->un_rqs_state & ST_RQS_VALID)) {
-			    urqs_ptr->rqs_resid = urqs_ptr->rqs_buflen;
-			}
-			un->un_rqs_state |= ST_RQS_READ;
-			un->un_rqs_state &= ~(ST_RQS_OVR);
-
-#ifdef _MULTI_DATAMODEL
-		switch (ddi_model_convert_from(flag & FMODELS)) {
-		case DDI_MODEL_ILP32:
-			urqs_32_ptr->rqs_flags = urqs_ptr->rqs_flags;
-			urqs_32_ptr->rqs_resid = urqs_ptr->rqs_resid;
-			if (ddi_copyout(&urqs_32, (void *)arg,
-			    sizeof (urqs_32), flag)) {
-				rval = EFAULT;
-			}
-			break;
-		case DDI_MODEL_NONE:
-			if (ddi_copyout(&urqs, (void *)arg, sizeof (urqs),
-			    flag)) {
-				rval = EFAULT;
-			}
-			break;
-		}
-
-		if (un->un_rqs_state & ST_RQS_VALID) {
-			if (ddi_copyout(un->un_uscsi_rqs_buf,
-			    urqs_ptr->rqs_bufaddr, len, flag)) {
-				rval = EFAULT;
-		    }
-		}
-#else /* ! _MULTI_DATAMODEL */
-		if (ddi_copyout(&urqs, (void *)arg, sizeof (urqs), flag)) {
-			rval = EFAULT;
-		}
-		if (un->un_rqs_state & ST_RQS_VALID) {
-			if (ddi_copyout(un->un_uscsi_rqs_buf,
-			    urqs_ptr->rqs_bufaddr, len, flag)) {
-				rval = EFAULT;
-		    }
-		}
-#endif /* _MULTI_DATAMODEL */
 			break;
 		}
 

@@ -181,7 +181,6 @@ struct uscsi_rqs32	{
  */
 #define	USCSIIOC	(0x04 << 8)
 #define	USCSICMD	(USCSIIOC|201) 	/* user scsi command */
-#define	USCSIGETRQS	(USCSIIOC|202) 	/* retrieve SCSI sense data */
 
 #ifdef	_KERNEL
 
