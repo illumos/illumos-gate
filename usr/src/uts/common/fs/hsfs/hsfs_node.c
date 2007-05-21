@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,6 +102,12 @@ static int hsfs_use_dnlc = 1;
  * Use "set hsfs:strict_iso9660_ordering = 1" in /etc/system to override.
  */
 static int strict_iso9660_ordering = 0;
+
+/*
+ * This tunable allows us to ignore inode numbers from rrip-1.12.
+ * In this case, we fall back to our default inode algorithm.
+ */
+int use_rrip_inodes = 1;
 
 static void hs_hsnode_cache_reclaim(void *unused);
 static void hs_addfreeb(struct hsfs *fsp, struct hsnode *hp);
@@ -362,12 +368,15 @@ hs_remfree(struct hsfs *fsp, struct hsnode *hp)
 
 /*
  * Look for hsnode in hash list.
- * Check equality of fsid and nodeid.
+ * If the inode number is != HS_DUMMY_INO (16), then
+ * only the inode number is used for the check. If the
+ * inode number is == HS_DUMMY_INO, we always in
+ * addition check equality of fsid and nodeid.
  * If found, reactivate it if inactive.
  * Must be entered with hsfs_hash_lock held.
  */
 struct vnode *
-hs_findhash(ino64_t nodeid, struct vfs *vfsp)
+hs_findhash(ino64_t nodeid, uint_t lbn, uint_t off, struct vfs *vfsp)
 {
 	struct hsnode *tp;
 	struct hsfs *fsp;
@@ -380,6 +389,21 @@ hs_findhash(ino64_t nodeid, struct vfs *vfsp)
 	    tp = tp->hs_hash) {
 		if (tp->hs_nodeid == nodeid) {
 			struct vnode *vp;
+
+			if (nodeid == HS_DUMMY_INO) {
+				/*
+				 * If this is the dummy inode number, look for
+				 * matching dir_lbn and dir_off.
+				 */
+				for (; tp != NULL; tp = tp->hs_hash) {
+					if (tp->hs_nodeid == nodeid &&
+					    tp->hs_dir_lbn == lbn &&
+					    tp->hs_dir_off == off)
+						break;
+				}
+				if (tp == NULL)
+					return (NULL);
+			}
 
 			mutex_enter(&tp->hs_contents_lock);
 			vp = HTOV(tp);
@@ -498,14 +522,15 @@ hs_makenode(
 	fsp = VFS_TO_HSFS(vfsp);
 
 	/*
-	 * Construct the nodeid: in the case of a directory
+	 * Construct the data that allows us to re-read the meta data without
+	 * knowing the name of the file: in the case of a directory
 	 * entry, this should point to the canonical dirent, the "."
 	 * directory entry for the directory.  This dirent is pointed
 	 * to by all directory entries for that dir (including the ".")
 	 * entry itself.
 	 * In the case of a file, simply point to the dirent for that
-	 * file (there are no hard links in Rock Ridge, so there's no
-	 * need to determine what the canonical dirent is.
+	 * file (there are hard links in Rock Ridge, so we need to use
+	 * different data to contruct the node id).
 	 */
 	if (dp->type == VDIR) {
 		lbn = dp->ext_lbn;
@@ -519,13 +544,27 @@ hs_makenode(
 	hvp = &fsp->hsfs_vol;
 	lbn += off >> hvp->lbn_shift;
 	off &= hvp->lbn_maxoffset;
-	nodeid = (ino64_t)MAKE_NODEID(lbn, off, vfsp);
+	/*
+	 * If the media carries rrip-v1.12 or newer, and we trust the inodes
+	 * from the rrip data (use_rrip_inodes != 0), use that data. If the
+	 * media has been created by a recent mkisofs version, we may trust
+	 * all numbers in the starting extent number; otherwise, we cannot
+	 * do this for zero sized files. We use HS_DUMMY_INO in this case and
+	 * make sure that we will not map all files to the same meta data.
+	 */
+	if (dp->inode != 0 && use_rrip_inodes) {
+		nodeid = dp->inode;
+	} else {
+		nodeid = dp->ext_lbn;
+		if (dp->ext_size == 0 && (fsp->hsfs_flags & HSFSMNT_INODE) == 0)
+			nodeid = HS_DUMMY_INO;
+	}
 
 	/* look for hsnode in cache first */
 
 	rw_enter(&fsp->hsfs_hash_lock, RW_READER);
 
-	if ((vp = hs_findhash(nodeid, vfsp)) == NULL) {
+	if ((vp = hs_findhash(nodeid, lbn, off, vfsp)) == NULL) {
 
 		/*
 		 * Not in cache.  However, someone else may have come
@@ -535,7 +574,7 @@ hs_makenode(
 		rw_exit(&fsp->hsfs_hash_lock);
 		rw_enter(&fsp->hsfs_hash_lock, RW_WRITER);
 
-		if ((vp = hs_findhash(nodeid, vfsp)) == NULL) {
+		if ((vp = hs_findhash(nodeid, lbn, off, vfsp)) == NULL) {
 			/*
 			 * Now we are really sure that the hsnode is not
 			 * in the cache.  Get one off freelist or else
@@ -722,7 +761,7 @@ hs_dirlook(
 	struct hsfs	*fsp;
 	int		error = 0;
 	uint_t		offset;		/* real offset in directory */
-	uint_t		last_offset;	/* last index into current dir block */
+	uint_t		last_offset;	/* last index in directory */
 	char		*cmpname;	/* case-folded name */
 	int		cmpname_size;	/* how much memory we allocate for it */
 	int		cmpnamelen;
@@ -880,7 +919,7 @@ hs_parsedir(
 	struct hs_direntry	*hdp,
 	char			*dnp,
 	int			*dnlen,
-	int			last_offset)
+	int			last_offset)	/* last offset in dirp */
 {
 	char	*on_disk_name;
 	int	on_disk_namelen;
@@ -953,6 +992,7 @@ hs_parsedir(
 		hdp->uid = fsp -> hsfs_vol.vol_uid;
 		hdp->gid = fsp -> hsfs_vol.vol_gid;
 		hdp->mode = hdp-> mode | (fsp -> hsfs_vol.vol_prot & 0777);
+		hdp->inode = 0;		/* initialize with 0, then check rrip */
 
 		/*
 		 * Having this all filled in, let's see if we have any
@@ -960,7 +1000,8 @@ hs_parsedir(
 		 */
 		if (IS_SUSP_IMPLEMENTED(fsp)) {
 			error = parse_sua((uchar_t *)dnp, dnlen,
-					&name_change_flag, dirp, hdp, fsp,
+					&name_change_flag, dirp, last_offset,
+					hdp, fsp,
 					(uchar_t *)NULL, NULL);
 			if (error) {
 				if (hdp->sym_link) {
@@ -1412,7 +1453,7 @@ process_dirblock(
 	int		dnamelen;	/* length of name */
 	struct hs_direntry hd;
 	int		hdlen;
-	uchar_t		*dirp;	/* the directory entry */
+	uchar_t		*dirp;		/* the directory entry */
 	int		res;
 	int		parsedir_res;
 	int		is_rrip;
@@ -1521,7 +1562,8 @@ process_dirblock(
 
 			rrip_name_str[0] = '\0';
 			rr_namelen = rrip_namecopy(nm, &rrip_name_str[0],
-			    &rrip_tmp_name[0], dirp, fsp, &hd);
+			    &rrip_tmp_name[0], dirp, last_offset - *offset,
+			    fsp, &hd);
 			if (hd.sym_link) {
 				kmem_free(hd.sym_link,
 				    (size_t)(hd.ext_size+1));
@@ -1609,7 +1651,7 @@ process_dirblock(
 			/* name matches */
 			parsedir_res = hs_parsedir(fsp, dirp, &hd,
 			    (char *)NULL, (int *)NULL,
-					last_offset - rel_offset(*offset));
+					last_offset - *offset);
 			if (!parsedir_res) {
 				uint_t lbn;	/* logical block number */
 

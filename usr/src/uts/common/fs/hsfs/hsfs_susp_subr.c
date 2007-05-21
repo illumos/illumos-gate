@@ -22,7 +22,7 @@
  * System Use Sharing protocol subroutines for High Sierra filesystem
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +84,7 @@ parse_sua(
 	int			*name_len_p,	/* location to put name len */
 	int			*name_change_p,	/* flags to signal name chg */
 	uchar_t			*dirp,		/* pointer to ISO dir entry */
+	uint_t			last_offset,	/* last ind. in cur. dirblock */
 	struct hs_direntry	*hdp,		/* loc to store dir info */
 	struct hsfs		*fsp,		/* filesystem pointer */
 	uchar_t			*search_sig,	/* signature to search for */
@@ -110,8 +111,15 @@ parse_sua(
 	 * between sizes of SUA and ISO directory entry. This entry
 	 * is corrupted, return an appropriate error.
 	 */
-	if (SUA_len < 0)
+	if (SUA_len < 0) {
+		hs_log_bogus_disk_warning(fsp, HSFS_ERR_NEG_SUA_LEN, 0);
 		return (SUA_EINVAL);
+	}
+
+	if ((tmp_SUA_p + tmp_SUA_len) > (dirp + last_offset)) {
+		hs_log_bogus_disk_warning(fsp, HSFS_ERR_BAD_SUA_LEN, 0);
+		return (SUA_EINVAL);
+	}
 
 	/*
 	 * Make sure that the continuation lenth is zero, as that is
@@ -421,11 +429,24 @@ hs_check_root_dirent(struct vnode *vp, struct hs_direntry *hdp)
 		if ((susp_sp->sig_handler)(&sig_args) == (uchar_t *)NULL) {
 			goto end;
 		}
-	} else
+	} else {
 		goto end;
+	}
 
-	(void) hs_parsedir(fsp, root_ptr, hdp, (char *)NULL, (int *)NULL,
-					HS_SECTOR_SIZE - secoff);
+	/*
+	 * If the "ER" signature in the root directory is past any non SU
+	 * signature, the Rock Ridge signatures will be ignored. This happens
+	 * e.g. for filesystems created by mkisofs. In this case,
+	 * IS_RRIP_IMPLEMENTED(fsp) will return 0 when the "ER" signature is
+	 * parsed. Unfortunately, the results of this run will be cached for
+	 * the root vnode. The solution is to run hs_parsedir() a second time
+	 * for the root directory.
+	 */
+	if (hs_parsedir(fsp, root_ptr, hdp, (char *)NULL, (int *)NULL,
+	    HS_SECTOR_SIZE - secoff) == 0) {
+		(void) hs_parsedir(fsp, root_ptr, hdp, (char *)NULL,
+		    (int *)NULL, HS_SECTOR_SIZE - secoff);
+	}
 
 	/*
 	 * If we did not get at least 1 extension, let's assume ISO and

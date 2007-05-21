@@ -21,7 +21,7 @@
 /*
  * Miscellaneous support subroutines for High Sierra filesystem
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,6 +114,16 @@ struct hsfs_error {
 	"hsfs: Warning: file system mounted on %s "
 		"has inconsistent data:",
 	"invalid directory or file name length (ignored)\n",
+	1, 0,
+	/* HSFS_ERR_NEG_SUA_LEN */
+	"hsfs: Warning: file system mounted on %s "
+		"has inconsistent Rock Ridge data:",
+	"negative SUA len\n",
+	1, 0,
+	/* HSFS_ERR_BAD_SUA_LEN */
+	"hsfs: Warning: file system mounted on %s "
+		"has inconsistent Rock Ridge data:",
+	"SUA len too big\n",
 	1, 0,
 };
 

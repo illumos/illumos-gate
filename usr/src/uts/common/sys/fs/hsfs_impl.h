@@ -22,7 +22,7 @@
  * High Sierra filesystem internal routine definitions.
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,7 +53,8 @@ extern int hs_remakenode(uint_t lbn, uint_t off, struct vfs *vfsp,
 extern int hs_dirlook(struct vnode *dvp, char *name, int namlen,
 	struct vnode **vpp, struct cred *cred);
 /* find an hsnode in the hash list */
-extern struct vnode *hs_findhash(ino64_t nodeid, struct vfs *vfsp);
+extern struct vnode *hs_findhash(ino64_t nodeid, uint_t lbn, uint_t off,
+	struct vfs *vfsp);
 /* destroy an hsnode */
 extern void hs_freenode(vnode_t *vp, struct hsfs *fsp, int nopage);
 /* parse a directory entry */

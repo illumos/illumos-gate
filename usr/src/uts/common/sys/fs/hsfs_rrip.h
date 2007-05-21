@@ -22,7 +22,7 @@
  * ISO 9660 RRIP extension filesystem specifications
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,8 @@ extern "C" {
 #define	HSFSMNT_NOJOLIET	0x20	/* ignore Joliet even if present */
 #define	HSFSMNT_JOLIETLONG	0x40	/* do not truncate Joliet filenames */
 #define	HSFSMNT_NOVERS2		0x80	/* ignore ISO-9660:1999		 */
+#define	HSFSMNT_INODE		0x1000	/* May use ext_lbn as inode #, */
+					/* FS is from a recent mkisofs */
 
 /*
  * XXX: The following flag was used in the past to instruct the kernel to
@@ -177,6 +179,12 @@ FOR CONTACT INFORMATION."
 #define	RRIP_gid(x)		(&((uchar_t *)x)[28])
 #define	RRIP_GID(x)		(gid_t)BOTH_INT(RRIP_gid(x))
 
+#define	RRIP_ino(x)		(&((uchar_t *)x)[36])
+#define	RRIP_INO(x)		(uint32_t)BOTH_INT(RRIP_ino(x))
+
+#define	RRIP_PX_OLD_SIZE	36
+#define	RRIP_PX_SIZE		44
+
 /*
  * "PN" Posix major/minor numbers
  */
@@ -290,7 +298,8 @@ extern uchar_t *rrip_child_link(sig_args_t *);
 extern uchar_t *rrip_reloc_dir(sig_args_t *);
 extern uchar_t *rrip_rock_ridge(sig_args_t *);
 extern void hs_check_root_dirent(struct vnode *vp, struct hs_direntry *hdp);
-extern int rrip_namecopy(char *from, char *to, char *tmp_name, uchar_t *dirp,
+extern int rrip_namecopy(char *from, char *to, char *tmp_name,
+				uchar_t *dirp, uint_t last_offset,
 				struct hsfs *fsp, struct hs_direntry *hdp);
 #endif	/* _KERNEL */
 
