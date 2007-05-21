@@ -922,7 +922,7 @@ update_osym(Ofl_desc *ofl)
 	}
 
 	/*
-	 * Assign .SUNWbss information for use with updating COMMON symbols.
+	 * Assign .SUNW_bss information for use with updating COMMON symbols.
 	 */
 	if (ofl->ofl_issunwbss) {
 		osp = ofl->ofl_issunwbss->is_osdesc;
@@ -3132,13 +3132,14 @@ ld_update_outfile(Ofl_desc *ofl)
 {
 	Addr		size, etext, vaddr = ofl->ofl_segorigin;
 	Listnode	*lnp1, *lnp2;
-	Sg_desc		*sgp;
+	Sg_desc		*sgp, *dtracesgp = 0, *capsgp = 0;
 	Os_desc		**ospp, *osp;
-	int		phdrndx = 0, capndx = 0, segndx = -1, secndx;
+	int		phdrndx = 0, segndx = -1, secndx;
+	int		dtracepndx, dtracesndx, cappndx, capsndx;
 	Ehdr		*ehdr = ofl->ofl_nehdr;
 	Shdr		*hshdr;
-	Phdr		*_phdr = 0, *dtracephdr = 0;
-	Word		phdrsz = ehdr->e_phnum *ehdr->e_phentsize, shscnndx;
+	Phdr		*_phdr = 0;
+	Word		phdrsz = (ehdr->e_phnum * ehdr->e_phentsize), shscnndx;
 	Word		flags = ofl->ofl_flags, ehdrsz = ehdr->e_ehsize;
 	Boolean		nobits;
 	Off		offset;
@@ -3149,7 +3150,7 @@ ld_update_outfile(Ofl_desc *ofl)
 	 */
 	DBG_CALL(Dbg_seg_title(ofl->ofl_lml));
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
-		Phdr *	phdr = &(sgp->sg_phdr);
+		Phdr	*phdr = &(sgp->sg_phdr);
 		Xword 	p_align;
 
 		segndx++;
@@ -3168,6 +3169,7 @@ ld_update_outfile(Ofl_desc *ofl)
 			if (ofl->ofl_osinterp) {
 				phdr->p_offset = ehdr->e_phoff;
 				phdr->p_filesz = phdr->p_memsz = phdrsz;
+
 				DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
 				ofl->ofl_phdr[phdrndx++] = *phdr;
 			}
@@ -3175,11 +3177,12 @@ ld_update_outfile(Ofl_desc *ofl)
 		}
 		if (phdr->p_type == PT_INTERP) {
 			if (ofl->ofl_osinterp) {
-				Shdr *	shdr = ofl->ofl_osinterp->os_shdr;
+				Shdr	*shdr = ofl->ofl_osinterp->os_shdr;
 
 				phdr->p_vaddr = phdr->p_memsz = 0;
 				phdr->p_offset = shdr->sh_offset;
 				phdr->p_filesz = shdr->sh_size;
+
 				DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
 				ofl->ofl_phdr[phdrndx++] = *phdr;
 			}
@@ -3187,18 +3190,17 @@ ld_update_outfile(Ofl_desc *ofl)
 		}
 
 		/*
-		 * If we are creating a PT_SUNWDTRACE segment,
-		 * just remember where the program header is.
-		 *
-		 * It's actual values will be assigned after
-		 * update_osym() has completed and the symbol
-		 * table addresses have been udpated.
+		 * If we are creating a PT_SUNWDTRACE segment, remember where
+		 * the program header is.  The header values are assigned after
+		 * update_osym() has completed and the symbol table addresses
+		 * have been udpated.
 		 */
 		if (phdr->p_type == PT_SUNWDTRACE) {
 			if ((ofl->ofl_dtracesym) &&
 			    ((flags & FLG_OF_RELOBJ) == 0)) {
-				dtracephdr = &ofl->ofl_phdr[phdrndx];
-				ofl->ofl_phdr[phdrndx++] = *phdr;
+				dtracesgp = sgp;
+				dtracesndx = segndx;
+				dtracepndx = phdrndx++;
 			}
 			continue;
 		}
@@ -3211,15 +3213,9 @@ ld_update_outfile(Ofl_desc *ofl)
 		 */
 		if (phdr->p_type == PT_SUNWCAP) {
 			if (ofl->ofl_oscap) {
-				Shdr *	shdr = ofl->ofl_oscap->os_shdr;
-
-				phdr->p_vaddr = shdr->sh_addr;
-				phdr->p_offset = shdr->sh_offset;
-				phdr->p_filesz = shdr->sh_size;
-				phdr->p_flags = PF_R;
-				DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
-				capndx = phdrndx;
-				ofl->ofl_phdr[phdrndx++] = *phdr;
+				capsgp = sgp;
+				capsndx = segndx;
+				cappndx = phdrndx++;
 			}
 			continue;
 		}
@@ -3232,22 +3228,32 @@ ld_update_outfile(Ofl_desc *ofl)
 		 */
 		if (phdr->p_type == PT_DYNAMIC) {
 			if (OFL_ALLOW_DYNSYM(ofl)) {
-				Shdr *	shdr = ofl->ofl_osdynamic->os_shdr;
+				Shdr	*shdr = ofl->ofl_osdynamic->os_shdr;
 
 				phdr->p_vaddr = shdr->sh_addr;
 				phdr->p_offset = shdr->sh_offset;
 				phdr->p_filesz = shdr->sh_size;
 				phdr->p_flags = M_DATASEG_PERM;
+
 				DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
 				ofl->ofl_phdr[phdrndx++] = *phdr;
 			}
 			continue;
 		}
+
+		/*
+		 * As the AMD unwind program header occurs after the loadable
+		 * headers in the segment descriptor table, all the address
+		 * information for the .eh_frame output section will have been
+		 * figured out by now.
+		 */
 #if	(defined(__i386) || defined(__amd64)) && defined(_ELF64)
 		if (phdr->p_type == PT_SUNW_UNWIND) {
 			Shdr	    *shdr;
+
 			if (ofl->ofl_unwindhdr == 0)
 				continue;
+
 			shdr = ofl->ofl_unwindhdr->os_shdr;
 
 			phdr->p_flags = PF_R;
@@ -3261,6 +3267,12 @@ ld_update_outfile(Ofl_desc *ofl)
 			continue;
 		}
 #endif
+		/*
+		 * As the TLS program header occurs after the loadable
+		 * headers in the segment descriptor table, all the address
+		 * information for the .tls output section will have been
+		 * figured out by now.
+		 */
 		if (phdr->p_type == PT_TLS) {
 			Os_desc	*tlsosp;
 			Shdr	*firstshdr = 0, *lastfileshdr = 0, *lastshdr;
@@ -3300,21 +3312,25 @@ ld_update_outfile(Ofl_desc *ofl)
 			    lastshdr->sh_size - phdr->p_offset;
 
 			DBG_CALL(Dbg_seg_entry(ofl, segndx, sgp));
-
-			ofl->ofl_tlsphdr = phdr;
-			ofl->ofl_phdr[phdrndx++] = *phdr;
+			ofl->ofl_phdr[phdrndx] = *phdr;
+			ofl->ofl_tlsphdr = &ofl->ofl_phdr[phdrndx++];
 			continue;
 		}
 
 		/*
 		 * If this is an empty segment declaration, it will occur after
-		 * all other loadable segments, make sure the previous segment
-		 * doesn't overlap. We do not do the check if we are generating
-		 * a relocatable file.
+		 * all other loadable segments.  As empty segments can be
+		 * defind with fixed addresses, make sure that no loadable
+		 * segments overlap.  This might occur as the object evolves
+		 * and the loadable segments grow, thus encroaching upon an
+		 * existing segment reservation.
+		 *
+		 * Segments are only created for dynamic objects, thus this
+		 * checking can be skipped when building a relocatable object.
 		 */
 		if (!(ofl->ofl_flags & FLG_OF_RELOBJ) &&
 		    (sgp->sg_flags & FLG_SG_EMPTY)) {
-			int i;
+			int	i;
 			Addr	v_e;
 
 			vaddr = phdr->p_vaddr;
@@ -3326,6 +3342,7 @@ ld_update_outfile(Ofl_desc *ofl)
 				continue;
 
 			v_e = vaddr + phdr->p_memsz;
+
 			/*
 			 * Check overlaps
 			 */
@@ -3481,14 +3498,10 @@ ld_update_outfile(Ofl_desc *ofl)
 		if ((_phdr == 0) && (phdr->p_type == PT_LOAD)) {
 			_phdr = phdr;
 
-			if (!(ofl->ofl_dtflags_1 & DF_1_NOHDR)) {
+			if ((ofl->ofl_dtflags_1 & DF_1_NOHDR) == 0) {
 				if (ofl->ofl_osinterp)
 					ofl->ofl_phdr[0].p_vaddr =
 					    vaddr + ehdrsz;
-
-				if (ofl->ofl_oscap)
-				    ofl->ofl_phdr[capndx].p_vaddr = vaddr +
-					ofl->ofl_phdr[capndx].p_offset;
 
 				/*
 				 * Finally, if we're creating a dynamic object
@@ -3502,12 +3515,15 @@ ld_update_outfile(Ofl_desc *ofl)
 					vaddr += size;
 			} else {
 				/*
-				 * If the DF_1_NOHDR flag was set, PT_PHDR
+				 * If the DF_1_NOHDR flag was set, and an
+				 * interpreter is being generated, the PT_PHDR
 				 * will not be part of any loadable segment.
 				 */
-				ofl->ofl_phdr[0].p_vaddr = 0;
-				ofl->ofl_phdr[0].p_memsz = 0;
-				ofl->ofl_phdr[0].p_flags = 0;
+				if (ofl->ofl_osinterp) {
+					ofl->ofl_phdr[0].p_vaddr = 0;
+					ofl->ofl_phdr[0].p_memsz = 0;
+					ofl->ofl_phdr[0].p_flags = 0;
+				}
 			}
 		}
 
@@ -3589,6 +3605,7 @@ ld_update_outfile(Ofl_desc *ofl)
 			phdr->p_align = 0;
 			phdr->p_memsz = 0;
 		}
+
 		if ((phdr->p_type != PT_NULL) && !(flags & FLG_OF_RELOBJ))
 			ofl->ofl_phdr[phdrndx++] = *phdr;
 	}
@@ -3624,19 +3641,39 @@ ld_update_outfile(Ofl_desc *ofl)
 	 * If we have a PT_SUNWDTRACE phdr, update it now with the address of
 	 * the symbol.  It's only now been updated via update_sym().
 	 */
-	if (dtracephdr && ofl->ofl_dtracesym) {
-		Phdr		*pphdr;
+	if (dtracesgp && ofl->ofl_dtracesym) {
+		Phdr		*aphdr, *phdr = &(dtracesgp->sg_phdr);
 		Sym_desc	*sdp = ofl->ofl_dtracesym;
 
-		dtracephdr->p_vaddr = sdp->sd_sym->st_value;
-		dtracephdr->p_memsz = sdp->sd_sym->st_size;
+		phdr->p_vaddr = sdp->sd_sym->st_value;
+		phdr->p_memsz = sdp->sd_sym->st_size;
 
 		/*
 		 * Take permisions of the segment the symbol is associated with.
 		 */
-		pphdr = &sdp->sd_isc->is_osdesc->os_sgdesc->sg_phdr;
-		assert(pphdr);
-		dtracephdr->p_flags = pphdr->p_flags;
+		aphdr = &sdp->sd_isc->is_osdesc->os_sgdesc->sg_phdr;
+		assert(aphdr);
+		phdr->p_flags = aphdr->p_flags;
+
+		DBG_CALL(Dbg_seg_entry(ofl, dtracesndx, dtracesgp));
+		ofl->ofl_phdr[dtracepndx] = *phdr;
+	}
+
+	/*
+	 * If we have a PT_SUNWCAP phdr, update it now from the associated
+	 * section information.
+	 */
+	if (capsgp && ofl->ofl_oscap) {
+		Phdr	*phdr = &(capsgp->sg_phdr);
+		Shdr	*shdr = ofl->ofl_oscap->os_shdr;
+
+		phdr->p_vaddr = shdr->sh_addr;
+		phdr->p_offset = shdr->sh_offset;
+		phdr->p_filesz = shdr->sh_size;
+		phdr->p_flags = PF_R;
+
+		DBG_CALL(Dbg_seg_entry(ofl, capsndx, capsgp));
+		ofl->ofl_phdr[cappndx] = *phdr;
 	}
 
 	/*

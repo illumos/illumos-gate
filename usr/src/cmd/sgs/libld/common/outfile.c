@@ -464,18 +464,16 @@ ld_create_outfile(Ofl_desc *ofl)
 			} else if (ptype == PT_SUNWBSS) {
 				if (ofl->ofl_issunwbss)
 					nseg++;
-			} else if (ptype == PT_SUNWSTACK) {
-					nseg++;
 			} else if (ptype == PT_SUNWDTRACE) {
 				if (ofl->ofl_dtracesym)
 					nseg++;
 			} else if (ptype == PT_SUNWCAP) {
 				if (ofl->ofl_oscap)
 					nseg++;
-			} else if ((sgp->sg_osdescs != NULL) ||
-			    (sgp->sg_flags & FLG_SG_EMPTY)) {
-				if (((sgp->sg_flags & FLG_SG_EMPTY) == 0) &&
-				    ((sgp->sg_flags & FLG_SG_PHREQ) == 0)) {
+			} else if (sgp->sg_flags & FLG_SG_EMPTY) {
+					nseg++;
+			} else if (sgp->sg_osdescs != NULL) {
+				if ((sgp->sg_flags & FLG_SG_PHREQ) == 0) {
 					/*
 					 * If this is a segment for which
 					 * we are not making a program header,

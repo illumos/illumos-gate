@@ -27,6 +27,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <strings.h>
 #include <stdio.h>
@@ -50,60 +51,60 @@ static char *image;	/* pointer to the ELF file in memory */
  * Find the amount that e_entry exceeds that amount.
  * Now go back and subtract the excess from the p_paddr of the LOAD segment.
  */
-static void
+static int
 patch64(Elf64_Ehdr *eh)
 {
-	Elf64_Phdr *phdr;
-	caddr_t allphdrs;
-	int i;
-	int m;
-	int extra;
-	multiboot_header_t *mbh;
+	Elf64_Phdr		*phdr;
+	caddr_t			phdrs = NULL;
+	int			ndx, mem;
+	multiboot_header_t	*mbh;
 
-	allphdrs = NULL;
-
+	/*
+	 * Verify some ELF basics - this must be an executable with program
+	 * headers.
+	 */
 	if (eh->e_type != ET_EXEC) {
-		(void) fprintf(stderr, "%s: not ET_EXEC, e_type = 0x%x\n",
-		    pname, eh->e_type);
-		exit(1);
+		(void) fprintf(stderr, "%s: %s: not ET_EXEC, e_type = 0x%x\n",
+		    pname, fname, eh->e_type);
+		return (1);
 	}
-	if (eh->e_phnum == 0 || eh->e_phoff == 0) {
-		(void) fprintf(stderr, "%s: no program headers\n", pname);
-		exit(1);
+	if ((eh->e_phnum == 0) || (eh->e_phoff == 0)) {
+		(void) fprintf(stderr, "%s: %s: no program headers\n", pname,
+		    fname);
+		return (1);
 	}
 
 	/*
 	 * Get the program headers.
 	 */
-	allphdrs = ELFSEEK(eh->e_phoff);
-	if (allphdrs == NULL) {
-		(void) fprintf(stderr, "%s: Failed to get %d program hdrs\n",
-		    pname, eh->e_phnum);
-		exit(1);
+	if ((phdrs = ELFSEEK(eh->e_phoff)) == NULL) {
+		(void) fprintf(stderr, "%s: %s: failed to get %d program "
+		    "hdrs\n", pname, fname, eh->e_phnum);
+		return (1);
 	}
 
 	/*
 	 * Look for multiboot header.  It must be 32-bit aligned and
 	 * completely contained in the 1st 8K of the file.
 	 */
-	for (m = 0; m < 8192 - sizeof (multiboot_header_t); m += 4) {
-		mbh = (void *)(image + m);
+	for (mem = 0; mem < 8192 - sizeof (multiboot_header_t); mem += 4) {
+		mbh = ELFSEEK(mem);
 		if (mbh->magic == MB_HEADER_MAGIC)
 			break;
 	}
 
-	if (m >= 8192 - sizeof (multiboot_header_t)) {
-		(void) fprintf(stderr, "%s: Didn't find multiboot header\n",
-		    pname);
-		exit(1);
+	if (mem >= 8192 - sizeof (multiboot_header_t)) {
+		(void) fprintf(stderr, "%s: %s: Didn't find multiboot header\n",
+		    pname, fname);
+		return (1);
 	}
 
 	/*
 	 * Find the 1:1 mapped PT_LOAD section
 	 */
-	for (i = 0; i < eh->e_phnum; i++) {
+	for (ndx = 0; ndx < eh->e_phnum; ndx++) {
 		/*LINTED [ELF program header alignment]*/
-		phdr = (Elf64_Phdr *)(allphdrs + eh->e_phentsize * i);
+		phdr = (Elf64_Phdr *)(phdrs + eh->e_phentsize * ndx);
 
 		/*
 		 * Find the low memory 1:1 PT_LOAD section!
@@ -117,56 +118,57 @@ patch64(Elf64_Ehdr *eh)
 		if (phdr->p_paddr != phdr->p_vaddr)
 			continue;
 
-		if (i != 0) {
-			(void) fprintf(stderr, "%s: identity mapped PT_LOAD"
-			    " wasn't 1st\n", pname);
-			exit(1);
-		}
-
 		/*
-		 * Patch the multiboot header fields to get entire
-		 * file loaded, with entry aligned at extra.
+		 * Make sure the multiboot header is part of the first PT_LOAD
+		 * segment, and that the executables entry point starts at the
+		 * same segment.
 		 */
+		if ((mem < phdr->p_offset) ||
+		    (mem >= (phdr->p_offset + phdr->p_filesz))) {
+			(void) fprintf(stderr, "%s: %s: identity mapped "
+			    "PT_LOAD wasn't 1st PT_LOAD\n", pname, fname);
+			return (1);
+		}
 		if (eh->e_entry != phdr->p_paddr) {
-			(void) fprintf(stderr, "%s: entry != paddr\n", pname);
-			exit(1);
+			(void) fprintf(stderr, "%s: %s: entry != paddr\n",
+			    pname, fname);
+			return (1);
 		}
 
 		/*
+		 * Patch the multiboot header fields to get entire file loaded.
 		 * Grub uses the MB header for 64 bit loading.
 		 */
 		mbh->load_addr = phdr->p_paddr - phdr->p_offset;
 		mbh->entry_addr = phdr->p_paddr;
-		mbh->header_addr = mbh->load_addr + m;
+		mbh->header_addr = mbh->load_addr + mem;
 #ifdef VERBOSE
-		(void) printf("%s ELF64 MB header patched by 0x%0x "
-		    "bytes:\n", fname, extra);
-		(void) printf("\tload_addr now 0x%x\n", mbh->load_addr);
-		(void) printf("\tentry_addr now 0x%x\n", mbh->entry_addr);
-		(void) printf("\theader_addr now 0x%x\n", mbh->header_addr);
+		(void) printf("  %s: ELF64 MB header patched\n", fname);
+		(void) printf("\tload_addr now:   0x%x\n", mbh->load_addr);
+		(void) printf("\tentry_addr now:  0x%x\n", mbh->entry_addr);
+		(void) printf("\theader_addr now: 0x%x\n", mbh->header_addr);
 #endif
-		exit(0);
+		return (0);
 	}
 
-	(void) fprintf(stderr, "%s: Didn't find 1:1 mapped PT_LOAD section\n",
-	    pname);
-	exit(1);
+	(void) fprintf(stderr, "%s: %s: Didn't find 1:1 mapped PT_LOAD "
+	    "section\n", pname, fname);
+	return (1);
 }
-
 
 int
 main(int argc, char **argv)
 {
-	int fd;
+	int	fd;
 	uchar_t *ident;
-	void *hdr = NULL;
+	void	*hdr = NULL;
 
 	/*
 	 * we expect one argument -- the elf file
 	 */
 	if (argc != 2) {
 		(void) fprintf(stderr, "usage: %s <unix-elf-file>\n", argv[0]);
-		exit(1);
+		return (1);
 	}
 
 	pname = strrchr(argv[0], '/');
@@ -176,11 +178,10 @@ main(int argc, char **argv)
 		++pname;
 
 	fname = argv[1];
-	fd = open(fname, O_RDWR);
-	if (fd < 0) {
-		(void) fprintf(stderr, "%s: open(%s, O_RDWR) failed\n",
-		    pname, fname);
-		exit(1);
+	if ((fd = open(fname, O_RDWR)) < 0) {
+		(void) fprintf(stderr, "%s: open(%s, O_RDWR) failed: %s\n",
+		    pname, fname, strerror(errno));
+		return (1);
 	}
 
 	/*
@@ -189,25 +190,27 @@ main(int argc, char **argv)
 	 */
 	image = mmap(NULL, 8192, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 	if (image == MAP_FAILED) {
-		(void) fprintf(stderr, "%s: mmap() of %s failed\n",
-		    pname, fname);
-		exit(1);
+		(void) fprintf(stderr, "%s: mmap() of %s failed: %s\n",
+		    pname, fname, strerror(errno));
+		return (1);
 	}
 
 	ident = ELFSEEK(0);
 	if (ident[EI_MAG0] != ELFMAG0 || ident[EI_MAG1] != ELFMAG1 ||
 	    ident[EI_MAG2] != ELFMAG2 || ident[EI_MAG3] != ELFMAG3) {
-		(void) fprintf(stderr, "%s: not an ELF file!\n", pname);
-		exit(1);
+		(void) fprintf(stderr, "%s: %s: not an ELF file!\n", pname,
+		    fname);
+		return (1);
 	}
 
 	if (ident[EI_CLASS] == ELFCLASS64) {
 		hdr = ELFSEEK(0);
-		patch64(hdr);
-	} else if (ident[EI_CLASS] != ELFCLASS32) {
+		return (patch64(hdr));
+	}
+	if (ident[EI_CLASS] != ELFCLASS32) {
 		(void) fprintf(stderr, "%s: Unknown ELF class 0x%x\n", pname,
 		    ident[EI_CLASS]);
-		exit(1);
+		return (1);
 	}
 	return (0);
 }

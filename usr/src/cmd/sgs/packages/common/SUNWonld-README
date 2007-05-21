@@ -1082,7 +1082,7 @@ All the above changes are incorporated in the following patches:
 --------------------------------------------------------------------------------
 
 -------------------------------------
-Solaris 10 607 (4th Q-update - s10u4)
+Solaris 10 707 (4th Q-update - s10u4)
 -------------------------------------
 Bugid   Risk Synopsis
 ================================================================================
@@ -1239,3 +1239,4 @@ Bugid   Risk Synopsis
 6551627 OGL: SIGSEGV when trying to use OpenGL pipeline with splash screen,
 	Solaris/Nvidia only
 6556563 elfdump section overlap checking is too slow for large files
+5006034 need ?E mapfile feature extension (D)

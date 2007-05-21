@@ -55,12 +55,11 @@ typedef enum {
 #if	defined(__x86) && defined(_ELF64)
 	LD_LRODATA,	LD_LDATA,
 #endif
-	LD_DYN,		LD_DTRACE,	 LD_NOTE,	LD_SUNWBSS,
-	LD_TLS,
+	LD_DYN,		LD_DTRACE,	 LD_SUNWBSS,	LD_TLS,
 #if	defined(__x86) && defined(_ELF64)
 	LD_UNWIND,
 #endif
-	LD_EXTRA,
+	LD_NOTE,	LD_EXTRA,
 	LD_NUM
 } Segment_ndx;
 

@@ -325,6 +325,26 @@ map_cap(const char *mapfile, Word type, Ofl_desc *ofl)
 }
 
 /*
+ * Common segment error checking.
+ */
+static Boolean
+seg_check(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl, Boolean b_type,
+    Word p_type)
+{
+	if (b_type) {
+		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_MAP_MOREONCE),
+		    mapfile, EC_XWORD(Line_num), MSG_INTL(MSG_MAP_SEGTYP));
+		return (FALSE);
+	}
+	if ((sgp->sg_flags & FLG_SG_TYPE) && (sgp->sg_phdr.p_type != p_type)) {
+		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_MAP_REDEFATT),
+		    mapfile, EC_XWORD(Line_num), MSG_INTL(MSG_MAP_SEGTYP),
+		    sgp->sg_name);
+	}
+	return (TRUE);
+}
+
+/*
  * Process a mapfile segment declaration definition.
  *	segment_name	= segment_attribute;
  * 	segment_attribute : segment_type  segment_flags  virtual_addr
@@ -362,57 +382,42 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 		lowercase(Start_tok);
 
 		/*
-		 * Segment type.  Presently there can only be multiple
-		 * PT_LOAD and PT_NOTE segments, other segment types are
-		 * only defined in seg_desc[].
+		 * Segment type.  Users are permitted to define PT_LOAD,
+		 * PT_NOTE, PT_STACK and PT_NULL segments.  Other segment types
+		 * are only defined in seg_desc[].
 		 */
 		if (strcmp(Start_tok, MSG_ORIG(MSG_MAP_LOAD)) == 0) {
-			if (b_type) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_MOREONCE), mapfile,
-				    EC_XWORD(Line_num),
-				    MSG_INTL(MSG_MAP_SEGTYP));
+			if ((b_type = seg_check(mapfile, sgp, ofl, b_type,
+			    PT_LOAD)) == FALSE)
 				return (S_ERROR);
-			}
-			if ((sgp->sg_flags & FLG_SG_TYPE) &&
-			    (sgp->sg_phdr.p_type != PT_LOAD))
-				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    MSG_INTL(MSG_MAP_REDEFATT), mapfile,
-				    EC_XWORD(Line_num),
-				    MSG_INTL(MSG_MAP_SEGTYP), sgp->sg_name);
+
 			sgp->sg_phdr.p_type = PT_LOAD;
 			sgp->sg_flags |= FLG_SG_TYPE;
-			b_type = TRUE;
+
 		} else if (strcmp(Start_tok, MSG_ORIG(MSG_MAP_STACK)) == 0) {
-			if (b_type) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_MOREONCE), mapfile,
-				    EC_XWORD(Line_num),
-				    MSG_INTL(MSG_MAP_SEGTYP));
+			if ((b_type = seg_check(mapfile, sgp, ofl, b_type,
+			    PT_SUNWSTACK)) == FALSE)
 				return (S_ERROR);
-			}
+
 			sgp->sg_phdr.p_type = PT_SUNWSTACK;
-			sgp->sg_flags |= (FLG_SG_TYPE|FLG_SG_EMPTY);
-			b_type = TRUE;
-		} else if (strcmp(Start_tok, MSG_ORIG(MSG_MAP_NOTE)) == 0) {
-			if (b_type) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_MAP_MOREONCE), mapfile,
-				    EC_XWORD(Line_num),
-				    MSG_INTL(MSG_MAP_SEGTYP));
+			sgp->sg_flags |= (FLG_SG_TYPE | FLG_SG_EMPTY);
+
+		} else if (strcmp(Start_tok, MSG_ORIG(MSG_MAP_NULL)) == 0) {
+			if ((b_type = seg_check(mapfile, sgp, ofl, b_type,
+			    PT_NULL)) == FALSE)
 				return (S_ERROR);
-			}
-			if ((sgp->sg_flags & FLG_SG_TYPE) &&
-			    (sgp->sg_phdr.p_type != PT_NOTE))
-				eprintf(ofl->ofl_lml, ERR_WARNING,
-				    MSG_INTL(MSG_MAP_REDEFATT), mapfile,
-				    EC_XWORD(Line_num),
-				    MSG_INTL(MSG_MAP_SEGTYP), sgp->sg_name);
+
+			sgp->sg_phdr.p_type = PT_NULL;
+			sgp->sg_flags |= FLG_SG_TYPE;
+
+		} else if (strcmp(Start_tok, MSG_ORIG(MSG_MAP_NOTE)) == 0) {
+			if ((b_type = seg_check(mapfile, sgp, ofl, b_type,
+			    PT_NOTE)) == FALSE)
+				return (S_ERROR);
+
 			sgp->sg_phdr.p_type = PT_NOTE;
 			sgp->sg_flags |= FLG_SG_TYPE;
-			b_type = TRUE;
 		}
-
 
 		/* Segment Flags. */
 
@@ -621,34 +626,56 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 	}
 
 	/*
-	 * Segment reservations are only allowable for executables. In addition
-	 * they must have an associated address, size, no permisions,
-	 * and are only meaningful for LOAD segments (the last failure
-	 * we can correct, hence the warning condition).
+	 * Empty segments can be used to define PT_LOAD segment reservations, or
+	 * to reserve PT_NULL program headers.
+	 *
+	 * PT_LOAD reservations are only allowed within executables, as the
+	 * reservation must be established through exec() as part of initial
+	 * process loading.  In addition, PT_LOAD reservations must have an
+	 * associated address and size.
+	 *
+	 * PT_NULL program headers are established for later use by applications
+	 * such as the post-optimizer.  PT_NULL headers should have no other
+	 * attributes assigned.
 	 */
 	if ((sgp->sg_flags & FLG_SG_EMPTY) &&
 	    (sgp->sg_phdr.p_type != PT_SUNWSTACK)) {
-		if (!(ofl->ofl_flags & FLG_OF_EXEC)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MAP_SEGEMPEXE), mapfile,
-			    EC_XWORD(Line_num));
-			return (S_ERROR);
-		}
+
+		/*
+		 * Any style of empty segment should have no permissions.
+		 */
 		if (sgp->sg_phdr.p_flags != 0) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_MAP_SEGEMNOPERM), mapfile,
 			    EC_XWORD(Line_num),
-				EC_WORD(sgp->sg_phdr.p_flags));
+			    EC_WORD(sgp->sg_phdr.p_flags));
 			return (S_ERROR);
 		}
-		if ((sgp->sg_flags & (FLG_SG_LENGTH | FLG_SG_VADDR)) !=
-		    (FLG_SG_LENGTH | FLG_SG_VADDR)) {
-			eprintf(ofl->ofl_lml, ERR_FATAL,
-			    MSG_INTL(MSG_MAP_SEGEMPATT), mapfile,
-			    EC_XWORD(Line_num));
-			return (S_ERROR);
-		}
-		if (sgp->sg_phdr.p_type != PT_LOAD) {
+
+		if (sgp->sg_phdr.p_type == PT_LOAD) {
+			if ((ofl->ofl_flags & FLG_OF_EXEC) == 0) {
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_SEGEMPEXE), mapfile,
+				    EC_XWORD(Line_num));
+				return (S_ERROR);
+			}
+			if ((sgp->sg_flags & (FLG_SG_LENGTH | FLG_SG_VADDR)) !=
+			    (FLG_SG_LENGTH | FLG_SG_VADDR)) {
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_SEGEMPATT), mapfile,
+				    EC_XWORD(Line_num));
+				return (S_ERROR);
+			}
+		} else if (sgp->sg_phdr.p_type == PT_NULL) {
+			if ((sgp->sg_flags & (FLG_SG_LENGTH | FLG_SG_VADDR)) &&
+			    ((sgp->sg_length != 0) ||
+			    (sgp->sg_phdr.p_vaddr != 0))) {
+				eprintf(ofl->ofl_lml, ERR_FATAL,
+				    MSG_INTL(MSG_MAP_SEGEMPNOATT), mapfile,
+				    EC_XWORD(Line_num));
+				return (S_ERROR);
+			}
+		} else {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_MAP_SEGEMPLOAD), mapfile,
 			    EC_XWORD(Line_num));
@@ -664,8 +691,9 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 	 * When clearing an attribute leave the flag set as an indicator for
 	 * later entries re-specifying the same segment.
 	 */
-	if (sgp->sg_phdr.p_type != PT_NULL && sgp->sg_phdr.p_type != PT_LOAD) {
-		const char *fmt;
+	if ((sgp->sg_phdr.p_type != PT_NULL) &&
+	    (sgp->sg_phdr.p_type != PT_LOAD)) {
+		const char	*fmt;
 
 		if (sgp->sg_phdr.p_type == PT_SUNWSTACK)
 			fmt = MSG_INTL(MSG_MAP_NOSTACK1);
@@ -2003,15 +2031,19 @@ ld_sort_seg_list(Ofl_desc *ofl)
 	seg1.head = seg1.tail = seg2.head = seg2.tail = NULL;
 
 	/*
-	 * Add the .phdr and .interp segments to our list. These segments must
-	 * occur before any PT_LOAD segments (refer exec/elf/elf.c).
+	 * Add the .phdr and .interp segments to our list.  These segments must
+	 * occur before any PT_LOAD segments (refer exec/elf/elf.c).  Also add
+	 * the capabilities segment.  This isn't essential, but the capabilities
+	 * section is one of the first in an object.
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp1)) {
 		Word	type = sgp1->sg_phdr.p_type;
 
-		if ((type == PT_PHDR) || (type == PT_INTERP))
+		if ((type == PT_PHDR) || (type == PT_INTERP) ||
+		    (type == PT_SUNWCAP)) {
 			if (list_appendc(&seg1, sgp1) == 0)
 				return (S_ERROR);
+		}
 	}
 
 	/*
@@ -2019,8 +2051,10 @@ ld_sort_seg_list(Ofl_desc *ofl)
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp1)) {
 		DBG_CALL(Dbg_map_sort_orig(ofl->ofl_lml, sgp1));
+
 		if (sgp1->sg_phdr.p_type != PT_LOAD)
 			continue;
+
 		if (!(sgp1->sg_flags & FLG_SG_VADDR) ||
 		    (sgp1->sg_flags & FLG_SG_EMPTY)) {
 			if (list_appendc(&seg2, sgp1) == 0)
@@ -2077,7 +2111,7 @@ ld_sort_seg_list(Ofl_desc *ofl)
 	}
 
 	/*
-	 * add the sorted loadable segments to our list
+	 * Add the sorted loadable segments to our list.
 	 */
 	for (LIST_TRAVERSE(&seg2, lnp1, sgp1)) {
 		if (list_appendc(&seg1, sgp1) == 0)
@@ -2085,15 +2119,16 @@ ld_sort_seg_list(Ofl_desc *ofl)
 	}
 
 	/*
-	 * add all other segments to our list
+	 * Add all other segments to our list.
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp1)) {
 		Word	type = sgp1->sg_phdr.p_type;
 
 		if ((type != PT_PHDR) && (type != PT_INTERP) &&
-		    (type != PT_LOAD))
+		    (type != PT_SUNWCAP) && (type != PT_LOAD)) {
 			if (list_appendc(&seg1, sgp1) == 0)
 				return (S_ERROR);
+		}
 	}
 	ofl->ofl_segs.head = ofl->ofl_segs.tail = NULL;
 
@@ -2108,8 +2143,6 @@ ld_sort_seg_list(Ofl_desc *ofl)
 	}
 	return (1);
 }
-
-
 
 /*
  * Parse the mapfile.
@@ -2324,6 +2357,7 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 					return (S_ERROR);
 				DBG_CALL(Dbg_cap_mapfile(ofl->ofl_lml,
 				    CA_SUNW_HW_1, ofl->ofl_hwcap_1, M_MACH));
+				continue;
 
 			} else if (strcmp(sgp1->sg_name,
 			    MSG_ORIG(MSG_STR_SFCAP_1)) == 0) {
@@ -2332,6 +2366,7 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 					return (S_ERROR);
 				DBG_CALL(Dbg_cap_mapfile(ofl->ofl_lml,
 				    CA_SUNW_SF_1, ofl->ofl_sfcap_1, M_MACH));
+				continue;
 
 			} else {
 				if (map_equal(mapfile, sgp1, ofl) == S_ERROR)
@@ -2401,7 +2436,8 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 			 * If specific fields have not been supplied via
 			 * map_equal(), make sure defaults are supplied.
 			 */
-			if (sgp1->sg_phdr.p_type == PT_NULL) {
+			if (((sgp1->sg_flags & FLG_SG_TYPE) == 0) &&
+			    (sgp1->sg_phdr.p_type == PT_NULL)) {
 				sgp1->sg_phdr.p_type = PT_LOAD;
 				sgp1->sg_flags |= FLG_SG_TYPE;
 			}
@@ -2420,6 +2456,7 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 			 */
 			switch (sgp1->sg_phdr.p_type) {
 			case PT_LOAD:
+			case PT_NULL:
 				if (sgp1->sg_flags & FLG_SG_EMPTY)
 					src_type = 4;
 				else
@@ -2514,9 +2551,9 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 	}
 
 	/*
-	 * If the output file is a static file without an interpreter
-	 * and if any virtual address is specified, then assume $n flag
-	 * for backward compatiblity.
+	 * If the output file is a static file without an interpreter, and
+	 * if any virtual address is specified, then set the ?N flag for
+	 * backward compatiblity.
 	 */
 	if (!(ofl->ofl_flags & FLG_OF_DYNAMIC) &&
 	    !(ofl->ofl_flags & FLG_OF_RELOBJ) &&
@@ -2525,8 +2562,8 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 		ofl->ofl_dtflags_1 |= DF_1_NOHDR;
 
 	/*
-	 * If the output file is a relocatable file,
-	 * then ?N have no effect. Knock it off.
+	 * If the output file is a relocatable file, then ?N has no effect.
+	 * Make sure this flag isn't set.
 	 */
 	if (ofl->ofl_flags & FLG_OF_RELOBJ)
 		ofl->ofl_dtflags_1 &= ~DF_1_NOHDR;

@@ -75,9 +75,6 @@ static Sg_desc sg_desc[LD_NUM] = {
 	{{PT_SUNWDTRACE, M_DATASEG_PERM | PF_X, 0, 0, 0, 0, 0, 0},
 		MSG_ORIG(MSG_ENT_DTRACE), 0, 0, NULL, NULL,
 		(FLG_SG_TYPE | FLG_SG_FLAGS), NULL, 0, 0},
-	{{PT_NOTE, 0, 0, 0, 0, 0, 0, 0},
-		MSG_ORIG(MSG_ENT_NOTE), 0, 0, NULL, NULL,
-		FLG_SG_TYPE, NULL, 0, 0},
 	{{PT_SUNWBSS, 0, 0, 0, 0, 0, 0, 0},
 		MSG_ORIG(MSG_ENT_SUNWBSS), 0, 0, NULL, NULL,
 		FLG_SG_TYPE, NULL, 0, 0},
@@ -89,6 +86,9 @@ static Sg_desc sg_desc[LD_NUM] = {
 		MSG_ORIG(MSG_ENT_UNWIND), 0, 0, NULL, NULL,
 		(FLG_SG_TYPE | FLG_SG_FLAGS), NULL, 0, 0},
 #endif
+	{{PT_NOTE, 0, 0, 0, 0, 0, 0, 0},
+		MSG_ORIG(MSG_ENT_NOTE), 0, 0, NULL, NULL,
+		FLG_SG_TYPE, NULL, 0, 0},
 	{{PT_NULL, 0, 0, 0, 0, 0, 0, 0},
 		MSG_ORIG(MSG_STR_EMPTY), 0, 0, NULL, NULL,
 		FLG_SG_TYPE, NULL, 0, 0}
@@ -119,15 +119,15 @@ static Sg_desc sg_desc[LD_NUM] = {
 	{{PT_SUNWDTRACE, 0, 0, 0, 0, 0, M_DATASEG_PERM, 0},
 		MSG_ORIG(MSG_ENT_DTRACE), 0, 0, NULL, NULL,
 		(FLG_SG_TYPE | FLG_SG_FLAGS), NULL, 0, 0},
-	{{PT_NOTE, 0, 0, 0, 0, 0, 0, 0},
-		MSG_ORIG(MSG_ENT_NOTE), 0, 0, NULL, NULL,
-		FLG_SG_TYPE, NULL, 0, 0},
 	{{PT_SUNWBSS, 0, 0, 0, 0, 0, 0, 0},
 		MSG_ORIG(MSG_ENT_SUNWBSS), 0, 0, NULL, NULL,
 		FLG_SG_TYPE, NULL, 0, 0},
 	{{PT_TLS, PF_R, 0, 0, 0, 0, 0, 0},
 		MSG_ORIG(MSG_ENT_TLS), 0, 0, NULL, NULL,
 		(FLG_SG_TYPE | FLG_SG_FLAGS), NULL, 0, 0},
+	{{PT_NOTE, 0, 0, 0, 0, 0, 0, 0},
+		MSG_ORIG(MSG_ENT_NOTE), 0, 0, NULL, NULL,
+		FLG_SG_TYPE, NULL, 0, 0},
 	{{PT_NULL, 0, 0, 0, 0, 0, 0, 0},
 		MSG_ORIG(MSG_STR_EMPTY), 0, 0, NULL, NULL,
 		FLG_SG_TYPE, NULL, 0, 0}
@@ -182,10 +182,10 @@ static const Ent_desc	ent_desc[] = {
  * the output file descriptor.
  */
 uintptr_t
-ld_ent_setup(Ofl_desc * ofl, Xword segalign)
+ld_ent_setup(Ofl_desc *ofl, Xword segalign)
 {
-	Ent_desc *	enp;
-	Sg_desc *	sgp;
+	Ent_desc	*enp;
+	Sg_desc		*sgp;
 	size_t		size;
 
 	/*
@@ -204,7 +204,7 @@ ld_ent_setup(Ofl_desc * ofl, Xword segalign)
 	    SGSOFFSETOF(Sym_avlnode, sav_node));
 
 	/*
-	 * The datasegment permissions can differ depending on whether
+	 * The data segment permissions can differ depending on whether
 	 * this object is built statically or dynamically.
 	 */
 	if (ofl->ofl_flags & FLG_OF_DYNAMIC) {
@@ -244,8 +244,7 @@ ld_ent_setup(Ofl_desc * ofl, Xword segalign)
 	 * a default alignment (ld(1) and ld.so.1 initialize this differently).
 	 */
 	for (size = 0; size < sizeof (sg_desc); size += sizeof (Sg_desc)) {
-
-		Phdr *	phdr = &(sgp->sg_phdr);
+		Phdr	*phdr = &(sgp->sg_phdr);
 
 		if ((list_appendc(&ofl->ofl_segs, sgp)) == 0)
 			return (S_ERROR);
