@@ -6542,7 +6542,8 @@ void passive(int passive_mode, int proto)
     errno = EADDRINUSE;
 
     /* try each port in the specified range a maximum of 3 times */
-    for (i = 0; i < 3 && bind_error != 0 && errno == EADDRINUSE; i++) {
+    for (i = 0; i < 3 && bind_error != 0 && \
+	((errno == EADDRINUSE) || (errno == EACCES)); i++) {
 	if (i > 0)
 	    sleep(i);
 	if (SOCK_PORT(pasv_addr) == 0)
@@ -6556,7 +6557,8 @@ void passive(int passive_mode, int proto)
 	     * Using the modulus operator with a prime number allows us to
 	     * try each port in the range once.
 	     */
-	    for (j = 0; j < range && bind_error != 0 && errno == EADDRINUSE; j++) {
+	    for (j = 0; j < range && bind_error != 0 && \
+		((errno == EADDRINUSE) || (errno == EACCES)); j++) {
 		while ((val = ((val + inc) % prime)) >= range)
 		    ;
 		SET_SOCK_PORT(pasv_addr, htons(val + passive_port_min));
