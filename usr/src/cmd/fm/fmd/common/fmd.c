@@ -770,9 +770,14 @@ fmd_run(fmd_t *dp, int pfd)
 	name = dp->d_rootdir != NULL &&
 	    *dp->d_rootdir != '\0' ? dp->d_rootdir : NULL;
 
+	/*
+	 * The clock must be initialized before fmd_topo_init() because
+	 * fmd_topo_update() calls fmd_time_gethrtime().
+	 */
+	dp->d_clockptr = dp->d_clockops->fto_init();
+
 	fmd_topo_init();
 
-	dp->d_clockptr = dp->d_clockops->fto_init();
 	dp->d_xprt_ids = fmd_idspace_create("xprt_ids", 1, INT_MAX);
 	fmd_xprt_suspend_all();
 
