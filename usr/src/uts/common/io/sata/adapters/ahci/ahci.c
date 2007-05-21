@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -448,12 +448,6 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	AHCIDBG1(AHCIDBG_INIT, ahci_ctlp, "hba capabilites = 0x%x",
 	    cap_status);
 
-	/* Get the max number of ports supported by the HBA */
-	ahci_ctlp->ahcictl_num_ports = (cap_status & AHCI_HBA_CAP_NP) + 1;
-
-	AHCIDBG1(AHCIDBG_INIT, ahci_ctlp, "hba number of ports: 0x%x",
-	    ahci_ctlp->ahcictl_num_ports);
-
 	/* Get the number of command slots supported by the HBA */
 	ahci_ctlp->ahcictl_num_cmd_slots =
 	    ((cap_status & AHCI_HBA_CAP_NCS) >>
@@ -469,6 +463,21 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	AHCIDBG1(AHCIDBG_INIT, ahci_ctlp, "hba implementation of ports: 0x%x",
 	    ahci_ctlp->ahcictl_ports_implemented);
+
+	/*
+	 * According to the AHCI spec, CAP.NP should indicate the maximum
+	 * number of ports supported by the HBA silicon, but we found
+	 * this value of ICH8 chipset only indicates the number of ports
+	 * implemented (exposed) by it. Therefore, the driver should calculate
+	 * the potential maximum value by checking PI register, and use
+	 * the maximum of this value and CAP.NP.
+	 */
+	ahci_ctlp->ahcictl_num_ports = max(
+	    (cap_status & AHCI_HBA_CAP_NP) + 1,
+	    ddi_fls(ahci_ctlp->ahcictl_ports_implemented));
+
+	AHCIDBG1(AHCIDBG_INIT, ahci_ctlp, "hba number of ports: %d",
+	    ahci_ctlp->ahcictl_num_ports);
 
 	/* Get the number of implemented ports by the HBA */
 	ahci_ctlp->ahcictl_num_implemented_ports =
@@ -1613,7 +1622,7 @@ ahci_reset_device_reject_pkts(ahci_ctl_t *ahci_ctlp,
 
 	/* Indicate to the framework that a reset has happened */
 	bzero((void *)&sdevice, sizeof (sata_device_t));
-	sdevice.satadev_addr.cport = port;
+	sdevice.satadev_addr.cport = ahci_ctlp->ahcictl_port_to_cport[port];
 	sdevice.satadev_addr.pmport = AHCI_PORTMULT_CONTROL_PORT;
 
 	if (ahci_portp->ahciport_device_type == SATA_DTYPE_PMULT) {
@@ -1776,7 +1785,8 @@ ahci_reset_hba_reject_pkts(ahci_ctl_t *ahci_ctlp)
 
 		/* Indicate to the framework that a reset has happened */
 		bzero((void *)&sdevice[port], sizeof (sata_device_t));
-		sdevice[port].satadev_addr.cport = port;
+		sdevice[port].satadev_addr.cport =
+		    ahci_ctlp->ahcictl_port_to_cport[port];
 		sdevice[port].satadev_addr.pmport = AHCI_PORTMULT_CONTROL_PORT;
 
 		if (ahci_portp->ahciport_device_type == SATA_DTYPE_PMULT) {
@@ -4159,7 +4169,7 @@ ahci_intr_phyrdy_change(ahci_ctl_t *ahci_ctlp,
 	}
 
 	bzero((void *)&sdevice, sizeof (sata_device_t));
-	sdevice.satadev_addr.cport = port;
+	sdevice.satadev_addr.cport = ahci_ctlp->ahcictl_port_to_cport[port];
 	sdevice.satadev_addr.qual = SATA_ADDR_CPORT;
 	sdevice.satadev_addr.pmport = 0;
 	sdevice.satadev_state = SATA_PSTATE_PWRON;
@@ -4540,7 +4550,7 @@ ahci_intr_cold_port_detect(ahci_ctl_t *ahci_ctlp,
 	    "port %d device status has changed", port);
 
 	bzero((void *)&sdevice, sizeof (sata_device_t));
-	sdevice.satadev_addr.cport = port;
+	sdevice.satadev_addr.cport = ahci_ctlp->ahcictl_port_to_cport[port];
 	sdevice.satadev_addr.qual = SATA_ADDR_CPORT;
 	sdevice.satadev_addr.pmport = 0;
 	sdevice.satadev_state = SATA_PSTATE_PWRON;
@@ -5146,7 +5156,8 @@ ahci_restart_port_wait_till_ready(ahci_ctl_t *ahci_ctlp,
 	if (!(flag & AHCI_RESET_NO_EVENTS_UP)) {
 
 		bzero((void *)&sdevice, sizeof (sata_device_t));
-		sdevice.satadev_addr.cport = port;
+		sdevice.satadev_addr.cport =
+		    ahci_ctlp->ahcictl_port_to_cport[port];
 		sdevice.satadev_addr.pmport = AHCI_PORTMULT_CONTROL_PORT;
 
 		if (ahci_portp->ahciport_device_type == SATA_DTYPE_PMULT) {
