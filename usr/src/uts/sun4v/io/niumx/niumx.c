@@ -772,6 +772,8 @@ niumx_set_intr(dev_info_t *dip, dev_info_t *rdip,
 		NAMEINST(rdip), valid, valid ? "enabling" : "disabling",
 		ih_p->ih_inum, ih_p->ih_sysino);
 
+	if (valid == HV_INTR_VALID)
+		(void) hvio_intr_setstate(ih_p->ih_sysino, HV_INTR_IDLE_STATE);
 	if ((hvret = hvio_intr_setvalid(ih_p->ih_sysino, valid))
 		!= H_EOK) {
 		DBG(DBG_A_INTX, dip, "hvio_intr_setvalid failed, ret 0x%x\n",
@@ -946,6 +948,8 @@ niumx_intr_hdlr(void *arg)
 
 	DTRACE_PROBE4(interrupt__complete, dev_info_t, ih_p->ih_dip, void *,
 		ih_p->ih_hdlr, caddr_t, ih_p->ih_arg1, int, r);
+
+	(void) hvio_intr_setstate(ih_p->ih_sysino, HV_INTR_IDLE_STATE);
 	return (r);
 }
 
