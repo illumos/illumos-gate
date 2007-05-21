@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,6 +66,64 @@ extern "C" {
 #define	MMC_FTR_FORMATTABLE	0x0023	/* Formattable Feature */
 #define	MMC_FTR_DFCT_MNGMNT	0x0024	/* Hardware Defect Management Feature */
 #define	MMC_FTR_RT_STREAM	0x0107	/* Real Time Streaming Feature */
+
+/* Constants for READ TOC/PMA/ATIP command */
+#define	FORMAT_FORMATTED_TOC	0
+#define	FORMAT_MULTISESS_INFO	1
+#define	FORMAT_RAW_TOC		2
+
+/* size in bytes of raw TOC Data Length field */
+#define	RTOC_DATA_LEN_SZ	2
+
+/* Point field values for Raw TOC Track Descriptor */
+#define	POINT_SESS_FIRST_TRK	0xA0	/* 1st track in session */
+#define	POINT_SESS_LAST_TRK	0xA1	/* Last track in session */
+#define	POINT_LEADOUT_ADDR	0xA2	/* Starting leadout address */
+
+/* Q Sub-channel constants */
+#define	Q_MODE_1		1	/* Mode-1 Q */
+#define	Q_MODE_2		2	/* Mode-2 Q */
+
+/* Convert Minute,Second,Frame address into Logical Block Address */
+#define	MSF2LBA(m, s, f)	(((m) * 60 + (s)) * 75 + (f) - 150)
+
+/*
+ * MMC Response Data structures.  Use the read_scsi[16,32] and load_scsi[16,32]
+ * routines when reading/writing fields > 1 byte in size.
+ */
+/*
+ * Structures for the Raw TOC Response Format of the READ TOC/PMA/ATIP
+ * command.
+ */
+typedef struct rtoc_hdr {	/* Raw TOC response format Header */
+	uchar_t rh_data_len1;
+	uchar_t rh_data_len0;
+	uchar_t rh_first_sess_num;
+	uchar_t rh_last_sess_num;
+} rtoc_hdr_t;
+
+typedef struct rtoc_td {	/* Raw TOC response format Track Descriptor */
+	uchar_t rt_session_num;
+#if defined(_BIT_FIELDS_LTOH)
+	uchar_t	rt_control	: 4;
+	uchar_t rt_adr		: 4;
+#elif defined(_BIT_FIELDS_HTOL)
+	uchar_t rt_adr		: 4;
+	uchar_t rt_control	: 4;
+#else
+#error	One of _BIT_FIELDS_LTOH or _BIT_FIELDS_HTOL must be defined
+#endif	/* _BIT_FIELDS_LTOH */
+
+	uchar_t rt_tno;
+	uchar_t rt_point;
+	uchar_t rt_min;
+	uchar_t rt_sec;
+	uchar_t rt_frame;
+	uchar_t rt_zero;
+	uchar_t	rt_pmin;
+	uchar_t rt_psec;
+	uchar_t rt_pframe;
+} rtoc_td_t;
 
 int test_unit_ready(int fd);
 int inquiry(int fd, uchar_t *inq);

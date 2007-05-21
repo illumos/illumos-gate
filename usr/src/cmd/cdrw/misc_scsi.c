@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,17 @@
 #include "toshiba.h"
 #include "msgs.h"
 #include "device.h"
+
+static int check_track_size(cd_device *dev, int trk_num,
+    struct track_info *tip);
+static int rtoc_get_trk_sess_num(uchar_t *rtoc, size_t rtoc_len, int trk_num,
+    int *sess_nump);
+static int rtoc_get_sess_last_trk_num(uchar_t *rtoc, size_t rtoc_len,
+    int sess_num, int *last_trk_nump);
+static int rtoc_get_sess_leadout_lba(uchar_t *rtoc, size_t rtoc_len,
+    int sess_num, uint32_t *leadout_lba);
+static rtoc_td_t *get_rtoc_td(rtoc_td_t *begin_tdp, rtoc_td_t *end_tdp,
+    uchar_t adr, uchar_t point);
 
 uint32_t
 read_scsi32(void *addr)
@@ -271,8 +282,173 @@ build_track_info(cd_device *dev, int trackno, struct track_info *t_info)
 			 */
 			t_info->ti_track_size -= 11400;
 		}
+	} else {
+		if (check_track_size(dev, trackno, t_info) != 1)
+			return (0);
+	}
+
+	return (1);
+}
+
+/*
+ * The size of the last track in one of the first N - 1 sessions of an
+ * N-session (N > 1) disc is reported incorrectly by some drives and calculated
+ * incorrectly for others, because a pre-gap/lead-out/lead-in section that ends
+ * a session is erroneously considered part of that track. This function checks
+ * for this corner case, and adjusts the track size if necessary.
+ */
+static int
+check_track_size(cd_device *dev, int trk_num, struct track_info *tip)
+{
+	size_t raw_toc_len;
+	uchar_t *raw_toc;
+	rtoc_hdr_t hdr;
+	uint32_t sess_leadout_lba;
+	int sess_last_trk_num;
+	int trk_sess_num;
+	uint32_t trk_size;
+
+	/* Request Raw TOC Header for session count. */
+	if (read_toc(dev->d_fd, FORMAT_RAW_TOC, 1,
+	    sizeof (rtoc_hdr_t), (uchar_t *)&hdr) != 1)
+		return (0);
+
+	/* Is this a multi-session medium? */
+	if (hdr.rh_last_sess_num > hdr.rh_first_sess_num) {
+		/* Yes; request entire Raw TOC. */
+		raw_toc_len = read_scsi16(&hdr.rh_data_len1) + RTOC_DATA_LEN_SZ;
+		raw_toc = (uchar_t *)my_zalloc(raw_toc_len);
+
+		if (read_toc(dev->d_fd, FORMAT_RAW_TOC, 1, raw_toc_len, raw_toc)
+		    != 1)
+			goto fail;
+
+		if (rtoc_get_trk_sess_num(raw_toc, raw_toc_len, trk_num,
+		    &trk_sess_num) != 1)
+			goto fail;
+
+		tip->ti_session_no = trk_sess_num;
+		tip->ti_flags |= TI_SESSION_NO_VALID;
+
+		/* Is the track in one of the first N - 1 sessions? */
+		if (trk_sess_num < hdr.rh_last_sess_num) {
+			if (rtoc_get_sess_last_trk_num(raw_toc, raw_toc_len,
+			    trk_sess_num, &sess_last_trk_num) != 1)
+				goto fail;
+
+			/* Is the track the last track in the session? */
+			if (trk_num == sess_last_trk_num) {
+				if (rtoc_get_sess_leadout_lba(raw_toc,
+				    raw_toc_len, trk_sess_num,
+				    &sess_leadout_lba) != 1)
+					goto fail;
+
+				trk_size = sess_leadout_lba -
+				    tip->ti_start_address;
+
+				/* Fix track size if it was too big. */
+				if (tip->ti_track_size > trk_size)
+					tip->ti_track_size = trk_size;
+			}
+		}
+		free(raw_toc);
 	}
 	return (1);
+
+fail:
+	free(raw_toc);
+	return (0);
+}
+
+/*
+ * Determine what session number a track is in by parsing the Raw TOC format of
+ * the the READ TOC/PMA/ATIP command response data.
+ */
+static int
+rtoc_get_trk_sess_num(uchar_t *rtoc, size_t rtoc_len, int trk_num,
+    int *sess_nump)
+{
+	rtoc_td_t *tdp = (rtoc_td_t *)(rtoc + sizeof (rtoc_hdr_t));
+	rtoc_td_t *last_tdp = (rtoc_td_t *)(rtoc + rtoc_len -
+	    sizeof (rtoc_td_t));
+
+	if ((tdp = get_rtoc_td(tdp, last_tdp, Q_MODE_1, (uchar_t)trk_num)) !=
+	    NULL) {
+		*sess_nump = tdp->rt_session_num;
+		return (1);
+	} else
+		return (0);
+}
+
+/*
+ * Determine the last track number in a specified session number by parsing the
+ * Raw TOC format of the READ TOC/PMA/ATIP command response data.
+ */
+static int
+rtoc_get_sess_last_trk_num(uchar_t *rtoc, size_t rtoc_len, int sess_num,
+    int *last_trk_nump)
+{
+	rtoc_td_t *tdp = (rtoc_td_t *)(rtoc + sizeof (rtoc_hdr_t));
+	rtoc_td_t *last_tdp = (rtoc_td_t *)(rtoc + rtoc_len -
+	    sizeof (rtoc_td_t));
+
+	while ((tdp = get_rtoc_td(tdp, last_tdp, Q_MODE_1,
+	    POINT_SESS_LAST_TRK)) != NULL) {
+		if (tdp->rt_session_num == sess_num) {
+			*last_trk_nump = tdp->rt_pmin;
+			return (1);
+		} else {
+			++tdp;
+		}
+	}
+
+	return (0);
+}
+
+/*
+ * Determine the starting LBA of the the session leadout by parsing the Raw TOC
+ * format of the READ TOC/PMA/ATIP command response data.
+ */
+static int
+rtoc_get_sess_leadout_lba(uchar_t *rtoc, size_t rtoc_len, int sess_num,
+    uint32_t *leadout_lba)
+{
+	rtoc_td_t *tdp = (rtoc_td_t *)(rtoc + sizeof (rtoc_hdr_t));
+	rtoc_td_t *last_tdp = (rtoc_td_t *)(rtoc + rtoc_len -
+	    sizeof (rtoc_td_t));
+
+	while ((tdp = get_rtoc_td(tdp, last_tdp, Q_MODE_1,
+	    POINT_LEADOUT_ADDR)) != NULL) {
+		if (tdp->rt_session_num == sess_num) {
+			*leadout_lba = MSF2LBA(tdp->rt_pmin, tdp->rt_psec,
+			    tdp->rt_pframe);
+			return (1);
+		} else {
+			++tdp;
+		}
+	}
+
+	return (0);
+}
+
+/*
+ * Search a set of Raw TOC Track Descriptors using <'adr', 'point'> as the
+ * search key. Return a pointer to the first Track Descriptor that matches.
+ */
+static rtoc_td_t *
+get_rtoc_td(rtoc_td_t *begin_tdp, rtoc_td_t *end_tdp, uchar_t adr,
+    uchar_t point)
+{
+	rtoc_td_t *cur_tdp = begin_tdp;
+
+	while (cur_tdp <= end_tdp) {
+		if ((cur_tdp->rt_adr == adr) && (cur_tdp->rt_point == point))
+			return (cur_tdp);
+		else
+			cur_tdp++;
+	}
+
+	return (NULL);
 }
 
 uchar_t
