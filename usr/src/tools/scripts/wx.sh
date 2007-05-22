@@ -22,7 +22,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
 #ident	"@(#)wx	1.12	98/11/09 SMI" (from bonwick)
@@ -4717,7 +4717,7 @@ comment_file=
 # mode for updating comments in active list
 comment_mode="replace"
 
-CSTYLE_FLAGS=${CSTYLE_FLAGS:='-P -p'}
+CSTYLE_FLAGS=${CSTYLE_FLAGS:='-P -p -c'}
 JSTYLE_FLAGS=${JSTYLE_FLAGS:='-p'}
 
 BACKUP_ERRORS=/tmp/${ME}_berrors_$(/usr/xpg4/bin/id -un)_$$
