@@ -768,18 +768,26 @@ __s_api_cvtEntry(LDAP	*ld,
 					ep->attr_count = nAttrs + 1;
 
 				} else {
-					(void) strcat(ap[nAttrs]->attrvalue[0],
-						",");
-					ap[nAttrs]->attrvalue[0] =
-						(char *)realloc(
-						ap[nAttrs]->attrvalue[0],
-						strlen(ap[nAttrs]->
-						attrvalue[0]) + 2);
-					if (ap[nAttrs]->attrvalue[0] == NULL) {
+					char	*tmp = NULL;
+
+					/*
+					 * realloc to add "," and
+					 * ap[k]->attrvalue[0]
+					 */
+					tmp = (char *)realloc(
+						    ap[nAttrs]->attrvalue[0],
+						    strlen(ap[nAttrs]->
+							attrvalue[0]) +
+						    strlen(ap[k]->
+							attrvalue[0]) + 2);
+					if (tmp == NULL) {
 						__ns_ldap_freeEntry(ep);
 						ep = NULL;
 						return (NS_LDAP_MEMORY);
 					}
+					ap[nAttrs]->attrvalue[0] = tmp;
+					(void) strcat(ap[nAttrs]->attrvalue[0],
+						",");
 					(void) strcat(ap[nAttrs]->attrvalue[0],
 						ap[k]->attrvalue[0]);
 				}
