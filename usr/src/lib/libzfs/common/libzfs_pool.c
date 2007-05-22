@@ -587,7 +587,7 @@ zpool_add(zpool_handle_t *zhp, nvlist_t *nvroot)
 
 		case EDOM:
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "root pool can not have concatenated devices"));
+			    "root pool can not have multiple vdevs"));
 			(void) zfs_error(hdl, EZFS_POOL_NOTSUP, msg);
 			break;
 
