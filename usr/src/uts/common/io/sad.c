@@ -86,7 +86,8 @@ struct streamtab sadinfo = {
 };
 
 DDI_DEFINE_STREAM_OPS(sad_ops, nulldev, nulldev, sad_attach,
-    nodev, nodev, sad_info, D_MTPERQ | D_MP, &sadinfo);
+    nodev, nodev, sad_info,
+    D_MP | D_MTPERQ | D_MTOUTPERIM | D_MTOCEXCL, &sadinfo);
 
 /*
  * Module linkage information for the kernel.
