@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,6 +95,9 @@ INTFUNC(htonll(0x1234567890abcdefL))
 INTFUNC(ntohs(0x1234))
 INTFUNC(ntohl(0x12345678))
 INTFUNC(ntohll(0x1234567890abcdefL))
+STRFUNC(inet_ntoa((ipaddr_t *)alloca(sizeof (ipaddr_t))))
+STRFUNC(inet_ntoa6((in6_addr_t *)alloca(sizeof (in6_addr_t))))
+STRFUNC(inet_ntop(AF_INET, (void *)alloca(sizeof (ipaddr_t))))
 
 BEGIN
 /subr == DIF_SUBR_MAX + 1/

@@ -91,6 +91,8 @@
 #include <sys/mkdev.h>
 #include <sys/kdi.h>
 #include <sys/zone.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 /*
  * DTrace Tunable Variables
@@ -307,6 +309,8 @@ static kmutex_t dtrace_errlock;
 	    *((char **)((uintptr_t)(rhs) + (hash)->dth_stroffs))) == 0)
 
 #define	DTRACE_AGGHASHSIZE_SLEW		17
+
+#define	DTRACE_V4MAPPED_OFFSET		(sizeof (uint32_t) * 3)
 
 /*
  * The key for a thread-local variable consists of the lower 61 bits of the
@@ -4044,6 +4048,211 @@ next:
 		mstate->dtms_scratch_ptr += size;
 		break;
 	}
+
+	case DIF_SUBR_INET_NTOA:
+	case DIF_SUBR_INET_NTOA6:
+	case DIF_SUBR_INET_NTOP: {
+		size_t size;
+		int af, argi, i;
+		char *base, *end;
+
+		if (subr == DIF_SUBR_INET_NTOP) {
+			af = (int)tupregs[0].dttk_value;
+			argi = 1;
+		} else {
+			af = subr == DIF_SUBR_INET_NTOA ? AF_INET: AF_INET6;
+			argi = 0;
+		}
+
+		if (af == AF_INET) {
+			ipaddr_t ip4;
+			uint8_t *ptr8, val;
+
+			/*
+			 * Safely load the IPv4 address.
+			 */
+			ip4 = dtrace_load32(tupregs[argi].dttk_value);
+
+			/*
+			 * Check an IPv4 string will fit in scratch.
+			 */
+			size = INET_ADDRSTRLEN;
+			if (!DTRACE_INSCRATCH(mstate, size)) {
+				DTRACE_CPUFLAG_SET(CPU_DTRACE_NOSCRATCH);
+				regs[rd] = NULL;
+				break;
+			}
+			base = (char *)mstate->dtms_scratch_ptr;
+			end = (char *)mstate->dtms_scratch_ptr + size - 1;
+
+			/*
+			 * Stringify as a dotted decimal quad.
+			 */
+			*end-- = '\0';
+			ptr8 = (uint8_t *)&ip4;
+			for (i = 3; i >= 0; i--) {
+				val = ptr8[i];
+
+				if (val == 0) {
+					*end-- = '0';
+				} else {
+					for (; val; val /= 10) {
+						*end-- = '0' + (val % 10);
+					}
+				}
+
+				if (i > 0)
+					*end-- = '.';
+			}
+			ASSERT(end + 1 >= base);
+
+		} else if (af == AF_INET6) {
+			struct in6_addr ip6;
+			int firstzero, tryzero, numzero, v6end;
+			uint16_t val;
+			const char digits[] = "0123456789abcdef";
+
+			/*
+			 * Stringify using RFC 1884 convention 2 - 16 bit
+			 * hexadecimal values with a zero-run compression.
+			 * Lower case hexadecimal digits are used.
+			 * 	eg, fe80::214:4fff:fe0b:76c8.
+			 * The IPv4 embedded form is returned for inet_ntop,
+			 * just the IPv4 string is returned for inet_ntoa6.
+			 */
+
+			/*
+			 * Safely load the IPv6 address.
+			 */
+			dtrace_bcopy(
+			    (void *)(uintptr_t)tupregs[argi].dttk_value,
+			    (void *)(uintptr_t)&ip6, sizeof (struct in6_addr));
+
+			/*
+			 * Check an IPv6 string will fit in scratch.
+			 */
+			size = INET6_ADDRSTRLEN;
+			if (!DTRACE_INSCRATCH(mstate, size)) {
+				DTRACE_CPUFLAG_SET(CPU_DTRACE_NOSCRATCH);
+				regs[rd] = NULL;
+				break;
+			}
+			base = (char *)mstate->dtms_scratch_ptr;
+			end = (char *)mstate->dtms_scratch_ptr + size - 1;
+			*end-- = '\0';
+
+			/*
+			 * Find the longest run of 16 bit zero values
+			 * for the single allowed zero compression - "::".
+			 */
+			firstzero = -1;
+			tryzero = -1;
+			numzero = 1;
+			for (i = 0; i < sizeof (struct in6_addr); i++) {
+				if (ip6._S6_un._S6_u8[i] == 0 &&
+				    tryzero == -1 && i % 2 == 0) {
+					tryzero = i;
+					continue;
+				}
+
+				if (tryzero != -1 &&
+				    (ip6._S6_un._S6_u8[i] != 0 ||
+				    i == sizeof (struct in6_addr) - 1)) {
+
+					if (i - tryzero <= numzero) {
+						tryzero = -1;
+						continue;
+					}
+
+					firstzero = tryzero;
+					numzero = i - i % 2 - tryzero;
+					tryzero = -1;
+
+					if (ip6._S6_un._S6_u8[i] == 0 &&
+					    i == sizeof (struct in6_addr) - 1)
+						numzero += 2;
+				}
+			}
+			ASSERT(firstzero + numzero <= sizeof (struct in6_addr));
+
+			/*
+			 * Check for an IPv4 embedded address.
+			 */
+			v6end = sizeof (struct in6_addr) - 2;
+			if (IN6_IS_ADDR_V4MAPPED(&ip6) ||
+			    IN6_IS_ADDR_V4COMPAT(&ip6)) {
+				for (i = sizeof (struct in6_addr) - 1;
+				    i >= DTRACE_V4MAPPED_OFFSET; i--) {
+					ASSERT(end >= base);
+
+					val = ip6._S6_un._S6_u8[i];
+
+					if (val == 0) {
+						*end-- = '0';
+					} else {
+						for (; val; val /= 10) {
+							*end-- = '0' + val % 10;
+						}
+					}
+
+					if (i > DTRACE_V4MAPPED_OFFSET)
+						*end-- = '.';
+				}
+
+				if (subr == DIF_SUBR_INET_NTOA6)
+					goto inetout;
+
+				/*
+				 * Set v6end to skip the IPv4 address that
+				 * we have already stringified.
+				 */
+				v6end = 10;
+			}
+
+			/*
+			 * Build the IPv6 string by working through the
+			 * address in reverse.
+			 */
+			for (i = v6end; i >= 0; i -= 2) {
+				ASSERT(end >= base);
+
+				if (i == firstzero + numzero - 2) {
+					*end-- = ':';
+					*end-- = ':';
+					i -= numzero - 2;
+					continue;
+				}
+
+				if (i < 14 && i != firstzero - 2)
+					*end-- = ':';
+
+				val = (ip6._S6_un._S6_u8[i] << 8) +
+				    ip6._S6_un._S6_u8[i + 1];
+
+				if (val == 0) {
+					*end-- = '0';
+				} else {
+					for (; val; val /= 16) {
+						*end-- = digits[val % 16];
+					}
+				}
+			}
+			ASSERT(end + 1 >= base);
+
+		} else {
+			/*
+			 * The user didn't use AH_INET or AH_INET6.
+			 */
+			DTRACE_CPUFLAG_SET(CPU_DTRACE_ILLOP);
+			regs[rd] = NULL;
+			break;
+		}
+
+inetout:	regs[rd] = (uintptr_t)end + 1;
+		mstate->dtms_scratch_ptr += size;
+		break;
+	}
+
 	}
 }
 
@@ -7973,6 +8182,9 @@ dtrace_difo_validate_helper(dtrace_difo_t *dp)
 			    subr == DIF_SUBR_COPYINTO ||
 			    subr == DIF_SUBR_COPYINSTR ||
 			    subr == DIF_SUBR_INDEX ||
+			    subr == DIF_SUBR_INET_NTOA ||
+			    subr == DIF_SUBR_INET_NTOA6 ||
+			    subr == DIF_SUBR_INET_NTOP ||
 			    subr == DIF_SUBR_LLTOSTR ||
 			    subr == DIF_SUBR_RINDEX ||
 			    subr == DIF_SUBR_STRCHR ||

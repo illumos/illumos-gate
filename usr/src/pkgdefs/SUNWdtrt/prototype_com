@@ -505,6 +505,10 @@ f none SUNWdtrt/tst/common/funcs/err.chillbadarg.ksh 0444 root bin
 f none SUNWdtrt/tst/common/funcs/err.copyout.d 0444 root bin
 f none SUNWdtrt/tst/common/funcs/err.copyoutbadaddr.ksh 0444 root bin
 f none SUNWdtrt/tst/common/funcs/err.copyoutstrbadaddr.ksh 0444 root bin
+f none SUNWdtrt/tst/common/funcs/err.inet_ntopbadarg.d 0444 root bin
+f none SUNWdtrt/tst/common/funcs/err.inet_ntopbadaddr.d 0444 root bin
+f none SUNWdtrt/tst/common/funcs/err.inet_ntoabadaddr.d 0444 root bin
+f none SUNWdtrt/tst/common/funcs/err.inet_ntoa6badaddr.d 0444 root bin
 f none SUNWdtrt/tst/common/funcs/tst.badfreopen.ksh 0444 root bin
 f none SUNWdtrt/tst/common/funcs/tst.basename.d 0444 root bin
 f none SUNWdtrt/tst/common/funcs/tst.basename.d.out 0444 root bin
@@ -522,6 +526,12 @@ f none SUNWdtrt/tst/common/funcs/tst.ftruncate.ksh.out 0444 root bin
 f none SUNWdtrt/tst/common/funcs/tst.hton.d 0444 root bin
 f none SUNWdtrt/tst/common/funcs/tst.index.d 0444 root bin
 f none SUNWdtrt/tst/common/funcs/tst.index.d.out 0444 root bin
+f none SUNWdtrt/tst/common/funcs/tst.inet_ntoa.d 0444 root bin
+f none SUNWdtrt/tst/common/funcs/tst.inet_ntoa.d.out 0444 root bin
+f none SUNWdtrt/tst/common/funcs/tst.inet_ntoa6.d 0444 root bin
+f none SUNWdtrt/tst/common/funcs/tst.inet_ntoa6.d.out 0444 root bin
+f none SUNWdtrt/tst/common/funcs/tst.inet_ntop.d 0444 root bin
+f none SUNWdtrt/tst/common/funcs/tst.inet_ntop.d.out 0444 root bin
 f none SUNWdtrt/tst/common/funcs/tst.lltostr.d 0444 root bin
 f none SUNWdtrt/tst/common/funcs/tst.lltostr.d.out 0444 root bin
 f none SUNWdtrt/tst/common/funcs/tst.mutex_owned.d 0444 root bin

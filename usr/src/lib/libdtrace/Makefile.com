@@ -76,6 +76,7 @@ DRTIOBJ = $(DRTISRC:%.c=%.o)
 DLIBSRCS += \
 	errno.d \
 	io.d \
+	ip.d \
 	procfs.d \
 	regs.d \
 	sched.d \
@@ -93,6 +94,7 @@ SRCDIR = ../common
 CLEANFILES += dt_lex.c dt_grammar.c dt_grammar.h y.output
 CLEANFILES += ../common/procfs.sed ../common/procfs.d
 CLEANFILES += ../common/io.sed ../common/io.d
+CLEANFILES += ../common/ip.sed ../common/ip.d
 CLEANFILES += ../common/errno.d ../common/signal.d
 CLEANFILES += ../common/dt_errtags.c ../common/dt_names.c
 CLEANFILES += ../common/sysevent.sed ../common/sysevent.d
@@ -164,6 +166,9 @@ pics/dt_lex.o pics/dt_grammar.o := CCVERBOSE =
 
 ../common/io.d: ../common/io.sed ../common/io.d.in
 	sed -f ../common/io.sed < ../common/io.d.in > $@
+
+../common/ip.d: ../common/ip.sed ../common/ip.d.in
+	sed -f ../common/ip.sed < ../common/ip.d.in > $@
 
 ../common/sysevent.d: ../common/sysevent.sed ../common/sysevent.d.in
 	sed -f ../common/sysevent.sed < ../common/sysevent.d.in > $@

@@ -49,6 +49,7 @@ d none usr/lib/dtrace 755 root bin
 f none usr/lib/dtrace/drti.o 644 root bin
 f none usr/lib/dtrace/errno.d 644 root bin
 f none usr/lib/dtrace/io.d 644 root bin
+f none usr/lib/dtrace/ip.d 644 root bin
 f none usr/lib/dtrace/procfs.d 644 root bin
 f none usr/lib/dtrace/regs.d 644 root bin
 f none usr/lib/dtrace/sched.d 644 root bin
