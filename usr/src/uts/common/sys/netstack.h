@@ -63,6 +63,7 @@ typedef id_t	netstackid_t;
  * the creation (which done in ascending order) and destruction (which is
  * done ine in decending order).
  */
+#define	NS_ALL		-1	/* Match all */
 #define	NS_HOOK		0
 #define	NS_NETI		1
 #define	NS_ARP		2

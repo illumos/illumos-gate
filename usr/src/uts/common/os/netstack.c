@@ -106,15 +106,16 @@ static void	*netstack_zone_create(zoneid_t zoneid);
 static void	netstack_zone_shutdown(zoneid_t zoneid, void *arg);
 static void	netstack_zone_destroy(zoneid_t zoneid, void *arg);
 
-static void	netstack_do_create(void);
-static void	netstack_do_shutdown(void);
-static void	netstack_do_destroy(void);
+static void	netstack_do_create(netstack_t *ns, int moduleid);
+static void	netstack_do_shutdown(netstack_t *ns, int moduleid);
+static void	netstack_do_destroy(netstack_t *ns, int moduleid);
 
 static void	netstack_shared_zone_add(zoneid_t zoneid);
 static void	netstack_shared_zone_remove(zoneid_t zoneid);
 static void	netstack_shared_kstat_add(kstat_t *ks);
 static void	netstack_shared_kstat_remove(kstat_t *ks);
 
+typedef boolean_t applyfn_t(kmutex_t *, netstack_t *, int);
 
 void
 netstack_init(void)
@@ -182,11 +183,12 @@ netstack_register(int moduleid,
 	mutex_exit(&netstack_g_lock);
 
 	/*
-	 * Call the create function for each stack that has CREATE_NEEDED.
+	 * Call the create function for each stack that has CREATE_NEEDED
+	 * for this moduleid.
 	 * Set CREATE_INPROGRESS, drop lock, and after done,
 	 * set CREATE_COMPLETE
 	 */
-	netstack_do_create();
+	netstack_do_create(NULL, moduleid);
 }
 
 void
@@ -225,8 +227,8 @@ netstack_unregister(int moduleid)
 	}
 	mutex_exit(&netstack_g_lock);
 
-	netstack_do_shutdown();
-	netstack_do_destroy();
+	netstack_do_shutdown(NULL, moduleid);
+	netstack_do_destroy(NULL, moduleid);
 
 	/*
 	 * Clear the netstack_m_state so that we can handle this module
@@ -325,7 +327,7 @@ netstack_zone_create(zoneid_t zoneid)
 	}
 	mutex_exit(&netstack_g_lock);
 
-	netstack_do_create();
+	netstack_do_create(ns, NS_ALL);
 
 	mutex_enter(&ns->netstack_lock);
 	ns->netstack_flags &= ~NSF_UNINIT;
@@ -372,8 +374,11 @@ netstack_zone_shutdown(zoneid_t zoneid, void *arg)
 	}
 	mutex_exit(&netstack_g_lock);
 
-	/* Call the shutdown function for all registered modules */
-	netstack_do_shutdown();
+	/*
+	 * Call the shutdown function for all registered modules for this
+	 * netstack.
+	 */
+	netstack_do_shutdown(ns, NS_ALL);
 }
 
 /*
@@ -401,8 +406,7 @@ netstack_zone_destroy(zoneid_t zoneid, void *arg)
 		return;
 	}
 	/*
-	 * Set CLOSING so that netstack_find_by will not find it
-	 * and decrement the reference count.
+	 * Set CLOSING so that netstack_find_by will not find it.
 	 */
 	ns->netstack_flags |= NSF_CLOSING;
 	mutex_exit(&ns->netstack_lock);
@@ -459,8 +463,12 @@ netstack_stack_inactive(netstack_t *ns)
 	}
 	mutex_exit(&netstack_g_lock);
 
-	netstack_do_shutdown();
-	netstack_do_destroy();
+	/*
+	 * Call the shutdown and destroy functions for all registered modules
+	 * for this netstack.
+	 */
+	netstack_do_shutdown(ns, NS_ALL);
+	netstack_do_destroy(ns, NS_ALL);
 }
 
 /*
@@ -604,123 +612,113 @@ netstack_apply_destroy(kmutex_t *lockp, netstack_t *ns, int moduleid)
 	}
 }
 
+/*
+ * Apply a function to all netstacks for a particular moduleid.
+ *
+ * The applyfn has to drop netstack_g_lock if it does some work.
+ * In that case we don't follow netstack_next after reacquiring the
+ * lock, even if it is possible to do so without any hazards. This is
+ * because we want the design to allow for the list of netstacks threaded
+ * by netstack_next to change in any arbitrary way during the time the
+ * lock was dropped.
+ *
+ * It is safe to restart the loop at netstack_head since the applyfn
+ * changes netstack_m_state as it processes things, so a subsequent
+ * pass through will have no effect in applyfn, hence the loop will terminate
+ * in at worst O(N^2).
+ */
 static void
-apply_loop(netstack_t **headp, kmutex_t *lockp,
-    boolean_t (*applyfn)(kmutex_t *, netstack_t *, int moduleid))
+apply_all_netstacks(int moduleid, applyfn_t *applyfn)
 {
 	netstack_t *ns;
-	int i;
-	boolean_t lock_dropped, result;
 
-	lock_dropped = B_FALSE;
-	ns = *headp;
+	mutex_enter(&netstack_g_lock);
+	ns = netstack_head;
 	while (ns != NULL) {
-		for (i = 0; i < NS_MAX; i++) {
-			result = (applyfn)(lockp, ns, i);
-			if (result) {
+		if ((applyfn)(&netstack_g_lock, ns, moduleid)) {
+			/* Lock dropped - restart at head */
 #ifdef NS_DEBUG
-				(void) printf("netstack_do_apply: "
-				    "LD for %p/%d, %d\n",
-				    (void *)ns, ns->netstack_stackid, i);
+			(void) printf("apply_all_netstacks: "
+			    "LD for %p/%d, %d\n",
+			    (void *)ns, ns->netstack_stackid, moduleid);
 #endif
-				lock_dropped = B_TRUE;
-				mutex_enter(lockp);
-			}
-		}
-		/*
-		 * If at least one applyfn call caused lockp to be dropped,
-		 * then we don't follow netstack_next after reacquiring the
-		 * lock, even if it is possible to do so without any hazards.
-		 * This is because we want the design to allow for the list of
-		 * netstacks threaded by netstack_next to change in any
-		 * arbitrary way during the time the 'lockp' was dropped.
-		 *
-		 * It is safe to restart the loop at *headp since
-		 * the applyfn changes netstack_m_state as it processes
-		 * things, so a subsequent pass through will have no
-		 * effect in applyfn, hence the loop will terminate
-		 * in at worst O(N^2).
-		 */
-		if (lock_dropped) {
-#ifdef NS_DEBUG
-			(void) printf("netstack_do_apply: "
-			    "Lock Dropped for %p/%d, %d\n",
-			    (void *)ns, ns->netstack_stackid, i);
-#endif
-			lock_dropped = B_FALSE;
-			ns = *headp;
+			mutex_enter(&netstack_g_lock);
+			ns = netstack_head;
 		} else {
 			ns = ns->netstack_next;
 		}
 	}
-}
-
-/* Like above, but in the reverse order of moduleids */
-static void
-apply_loop_reverse(netstack_t **headp, kmutex_t *lockp,
-    boolean_t (*applyfn)(kmutex_t *, netstack_t *, int moduleid))
-{
-	netstack_t *ns;
-	int i;
-	boolean_t lock_dropped, result;
-
-	lock_dropped = B_FALSE;
-	ns = *headp;
-	while (ns != NULL) {
-		for (i = NS_MAX-1; i >= 0; i--) {
-			result = (applyfn)(lockp, ns, i);
-			if (result) {
-#ifdef NS_DEBUG
-				(void) printf("netstack_do_apply: "
-				    "LD for %p/%d, %d\n",
-				    (void *)ns, ns->netstack_stackid, i);
-#endif
-				lock_dropped = B_TRUE;
-				mutex_enter(lockp);
-			}
-		}
-		/*
-		 * If at least one applyfn call caused lockp to be dropped,
-		 * then we don't follow netstack_next after reacquiring the
-		 * lock, even if it is possible to do so without any hazards.
-		 * This is because we want the design to allow for the list of
-		 * netstacks threaded by netstack_next to change in any
-		 * arbitrary way during the time the 'lockp' was dropped.
-		 *
-		 * It is safe to restart the loop at *headp since
-		 * the applyfn changes netstack_m_state as it processes
-		 * things, so a subsequent pass through will have no
-		 * effect in applyfn, hence the loop will terminate
-		 * in at worst O(N^2).
-		 */
-		if (lock_dropped) {
-#ifdef NS_DEBUG
-			(void) printf("netstack_do_apply: "
-			    "Lock Dropped for %p/%d, %d\n",
-			    (void *)ns, ns->netstack_stackid, i);
-#endif
-			lock_dropped = B_FALSE;
-			ns = *headp;
-		} else {
-			ns = ns->netstack_next;
-		}
-	}
+	mutex_exit(&netstack_g_lock);
 }
 
 /*
- * Apply a function to all module/netstack combinations.
+ * Apply a function to all moduleids for a particular netstack.
+ *
+ * Since the netstack linkage doesn't matter in this case we can
+ * ignore whether the function drops the lock.
+ */
+static void
+apply_all_modules(netstack_t *ns, applyfn_t *applyfn)
+{
+	int i;
+
+	mutex_enter(&netstack_g_lock);
+	for (i = 0; i < NS_MAX; i++) {
+		if ((applyfn)(&netstack_g_lock, ns, i)) {
+			/*
+			 * Lock dropped but since we are not iterating over
+			 * netstack_head we can just reacquire the lock.
+			 */
+			mutex_enter(&netstack_g_lock);
+		}
+	}
+	mutex_exit(&netstack_g_lock);
+}
+
+/* Like the above but in reverse moduleid order */
+static void
+apply_all_modules_reverse(netstack_t *ns, applyfn_t *applyfn)
+{
+	int i;
+
+	mutex_enter(&netstack_g_lock);
+	for (i = NS_MAX-1; i >= 0; i--) {
+		if ((applyfn)(&netstack_g_lock, ns, i)) {
+			/*
+			 * Lock dropped but since we are not iterating over
+			 * netstack_head we can just reacquire the lock.
+			 */
+			mutex_enter(&netstack_g_lock);
+		}
+	}
+	mutex_exit(&netstack_g_lock);
+}
+
+/*
+ * Apply a function to a subset of all module/netstack combinations.
+ *
+ * If ns is non-NULL we restrict it to that particular instance.
+ * If moduleid is a particular one (not NS_ALL), then we restrict it
+ * to that particular moduleid.
+ * When walking the moduleid, the reverse argument specifies that they
+ * should be walked in reverse order.
  * The applyfn returns true if it had dropped the locks.
  */
 static void
-netstack_do_apply(int reverse,
-    boolean_t (*applyfn)(kmutex_t *, netstack_t *, int moduleid))
+netstack_do_apply(netstack_t *ns, int moduleid, boolean_t reverse,
+    applyfn_t *applyfn)
 {
-	mutex_enter(&netstack_g_lock);
-	if (reverse)
-		apply_loop_reverse(&netstack_head, &netstack_g_lock, applyfn);
-	else
-		apply_loop(&netstack_head, &netstack_g_lock, applyfn);
-	mutex_exit(&netstack_g_lock);
+	if (ns != NULL) {
+		ASSERT(moduleid == NS_ALL);
+		if (reverse)
+			apply_all_modules_reverse(ns, applyfn);
+		else
+			apply_all_modules(ns, applyfn);
+	} else {
+		ASSERT(moduleid != NS_ALL);
+
+		apply_all_netstacks(moduleid, applyfn);
+	}
 }
 
 /*
@@ -732,9 +730,9 @@ netstack_do_apply(int reverse,
  * set CREATE_COMPLETE
  */
 static void
-netstack_do_create(void)
+netstack_do_create(netstack_t *ns, int moduleid)
 {
-	netstack_do_apply(B_FALSE, netstack_apply_create);
+	netstack_do_apply(ns, moduleid, B_FALSE, netstack_apply_create);
 }
 
 /*
@@ -746,9 +744,9 @@ netstack_do_create(void)
  * set SHUTDOWN_COMPLETE
  */
 static void
-netstack_do_shutdown(void)
+netstack_do_shutdown(netstack_t *ns, int moduleid)
 {
-	netstack_do_apply(B_FALSE, netstack_apply_shutdown);
+	netstack_do_apply(ns, moduleid, B_FALSE, netstack_apply_shutdown);
 }
 
 /*
@@ -764,13 +762,13 @@ netstack_do_shutdown(void)
  * netstack_m_state the way it is i.e. with NSS_DESTROY_COMPLETED set.
  */
 static void
-netstack_do_destroy(void)
+netstack_do_destroy(netstack_t *ns, int moduleid)
 {
 	/*
 	 * Have to walk the moduleids in reverse order since some
 	 * modules make implicit assumptions about the order
 	 */
-	netstack_do_apply(B_TRUE, netstack_apply_destroy);
+	netstack_do_apply(ns, moduleid, B_TRUE, netstack_apply_destroy);
 }
 
 /*
@@ -937,6 +935,10 @@ netstack_rele(netstack_t *ns)
 		 */
 		netstack_stack_inactive(ns);
 
+		/* Make sure nothing increased the references */
+		ASSERT(ns->netstack_refcnt == 0);
+		ASSERT(ns->netstack_numzones == 0);
+
 		/* Finally remove from list of netstacks */
 		mutex_enter(&netstack_g_lock);
 		found = B_FALSE;
@@ -951,6 +953,10 @@ netstack_rele(netstack_t *ns)
 		}
 		ASSERT(found);
 		mutex_exit(&netstack_g_lock);
+
+		/* Make sure nothing increased the references */
+		ASSERT(ns->netstack_refcnt == 0);
+		ASSERT(ns->netstack_numzones == 0);
 
 		ASSERT(ns->netstack_flags & NSF_CLOSING);
 		kmem_free(ns, sizeof (*ns));

@@ -399,7 +399,10 @@ ipf_stack_init(netstackid_t stackid, netstack_t *ns)
 
 	RWLOCK_EXIT(&ifs->ifs_ipf_global);
 
-	cmn_err(CE_CONT, "!%s, running.\n", ipfilter_version);
+	/* Limit to global stack */
+	if (stackid == GLOBAL_NETSTACKID)
+		cmn_err(CE_CONT, "!%s, running.\n", ipfilter_version);
+
 	return (ifs);
 }
 
