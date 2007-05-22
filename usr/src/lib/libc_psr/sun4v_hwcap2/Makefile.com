@@ -44,6 +44,8 @@ CPPFLAGS	= -D_REENTRANT -D$(MACH) -DNIAGARA2_IMPL $(IFLAGS) $(CPPFLAGS.master)
 ASDEFS		= -D__STDC__ -D_ASM $(CPPFLAGS)
 ASFLAGS		= -P $(ASDEFS)
 
+MAPFILES	= ../../sun4v/mapfile-vers ../mapfile $(MAPFILE.FLT)
+
 #
 # build rules
 #

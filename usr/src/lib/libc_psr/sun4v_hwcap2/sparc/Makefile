@@ -36,8 +36,6 @@ OBJECTS		= memcpy.o memset.o
 
 include ../Makefile.com
 
-MAPFILES	= ../../sun4v/mapfile-vers ../mapfile $(MAPFILE-FLTR)
-
 ASFLAGS		+= -xarch=v8plusa
 
 # Redefine shared object build rule to use $(LD) directly (this avoids .init

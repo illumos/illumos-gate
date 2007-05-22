@@ -42,7 +42,7 @@ include ../Makefile.cmd
 
 LDLIBS += -lcurses
 CPPFLAGS += -I../../lib/libcurses/screen
-MAPFILE = $(MAPFILE.INT) $(MAPFILE.NGB)
+MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
 LDFLAGS += $(MAPFILES:%=-M%)
 
 .KEEP_STATE:

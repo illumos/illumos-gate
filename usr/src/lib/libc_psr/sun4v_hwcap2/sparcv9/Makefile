@@ -36,8 +36,6 @@ OBJECTS		= memcpy.o memset.o
 
 include ../Makefile.com
 
-MAPFILES	= ../../sun4v/mapfile-vers ../mapfile $(MAPFILE-FLTR)
-
 ASDEFS		+= -D__sparcv9
 ASFLAGS		+= -xarch=v9a
 
