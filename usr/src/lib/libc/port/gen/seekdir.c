@@ -77,7 +77,12 @@ seekdir(DIR *dirp, long loc)
 
 #else	/* _LP64 */
 
-static void
+/*
+ * Note: Instead of making this function static, we reduce it to local
+ * scope in the mapfile. That allows the linker to prevent it from
+ * appearing in the .SUNW_dynsymsort section.
+ */
+void
 seekdir64(DIR *dirp, off64_t loc)
 {
 	private_DIR	*pdirp = (private_DIR *)(uintptr_t)dirp;

@@ -25,8 +25,42 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
+SUNW_1.22.1 {
+    global:
+	# Note: The atomic_OP_WIDTH_nv symbols defined here are also defined
+	# by the common mapfile. Here, we add the NODYNSORT attribute
+	# to them. On this platform, they are aliases for the non-_nv
+	# versions. If that is changed, these lines should be removed.
+	atomic_add_8_nv =		NODYNSORT;
+	atomic_and_8_nv =		NODYNSORT;
+	atomic_and_16_nv =		NODYNSORT;
+	atomic_and_32_nv =		NODYNSORT;
+	atomic_and_64_nv =		NODYNSORT;
+	atomic_dec_8_nv =		NODYNSORT;
+	atomic_dec_16_nv =		NODYNSORT;
+	atomic_dec_32_nv =		NODYNSORT;
+	atomic_dec_64_nv =		NODYNSORT;
+	atomic_inc_8_nv =		NODYNSORT;
+	atomic_inc_16_nv =		NODYNSORT;
+	atomic_inc_32_nv =		NODYNSORT;
+	atomic_inc_64_nv =		NODYNSORT;
+	atomic_or_8_nv =		NODYNSORT;
+	atomic_or_16_nv =		NODYNSORT;
+	atomic_or_32_nv =		NODYNSORT;
+	atomic_or_64_nv =		NODYNSORT;
+} SUNW_1.22;
+
+
 SUNW_1.22 {
     global:
+	# Note: atomic_add_[16,32,64]_nv are also defined by the common
+	# mapfile. Here, we add the NODYNSORT attribute to them. On this
+	# platform, they are aliases for the non-_nv versions. If that is
+	# changed, these lines should be removed.
+	atomic_add_16_nv =		NODYNSORT;
+	atomic_add_32_nv =		NODYNSORT;
+	atomic_add_64_nv =		NODYNSORT;
+
 	dladdr = FUNCTION FILTER /usr/lib/sparcv9/ld.so.1;
 	dladdr1 = FUNCTION FILTER /usr/lib/sparcv9/ld.so.1;
 	dlclose = FUNCTION FILTER /usr/lib/sparcv9/ld.so.1;
@@ -62,11 +96,14 @@ SUNW_0.7 {
 	_addseverity;
 	alarm;
 	_alarm;
-	__align_cpy_1;
+	# __align_cpy_1 is an alias for memcpy. Filter it out of
+	# the .SUNW_dynsymsort section
+	__align_cpy_1 = NODYNSORT;
 	__align_cpy_16;
 	__align_cpy_2;
 	__align_cpy_4;
-	__align_cpy_8;
+	# __align_cpy_8 is same as __align_cpy_16
+	__align_cpy_8 = NODYNSORT;
 	_altzone;
 	asctime;
 	asctime_r;
@@ -399,8 +436,8 @@ SUNW_0.7 {
 	_munlock;
 	munmap;
 	_munmap;
-	_mutex_held;
-	_mutex_lock;
+	_mutex_held = NODYNSORT;
+	_mutex_lock = NODYNSORT;
 	nextafter = FUNCTION FILTER libm.so.2;
 	_nextafter = FUNCTION FILTER libm.so.2;
 	nftw;
@@ -515,7 +552,7 @@ SUNW_0.7 {
 	_semop;
 	setbuf;
 	setcontext;
-	_setcontext;
+	_setcontext = NODYNSORT;
 	setgid;
 	_setgid;
 	setgrent;
@@ -550,7 +587,7 @@ SUNW_0.7 {
 	_shmget;
 	_sibuf;
 	sigaction = NODIRECT;
-	_sigaction = NODIRECT;
+	_sigaction = NODIRECT NODYNSORT;
 	sigaddset;
 	_sigaddset;
 	sigaltstack;
@@ -585,7 +622,7 @@ SUNW_0.7 {
 	sigset;
 	_sigset;
 	sigsetjmp;
-	_sigsetjmp;
+	_sigsetjmp = NODYNSORT;
 	sigsuspend;
 	_sigsuspend;
 	sleep;
@@ -773,4 +810,7 @@ SUNWprivate_1.1 {
 	_syssun;
 	_xregs_clrptr;
 	__yday_to_month;
+
+    local:
+	__cerror =		NODYNSORT;
 };

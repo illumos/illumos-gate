@@ -64,7 +64,7 @@ use vars  qw($SkipUndefDirs $SkipUndefFiles $SkipUnusedDirs $SkipUnusedFiles);
 use vars  qw($SkipStabFiles $SkipNoExStkFiles $SkipCrleConf);
 use vars  qw($UnusedNoise $Prog $Mach $Isalist $Env $Ena64 $Tmpdir $Error);
 use vars  qw($UnusedFiles $UnusedPaths $LddNoU $Crle32 $Crle64 $Conf32 $Conf64);
-use vars  qw($SkipInterps $OldDeps %opt);
+use vars  qw($SkipInterps $SkipSymSort $OldDeps %opt);
 
 use strict;
 
@@ -236,6 +236,25 @@ $OldDeps = qr{ ^(?:
 	libthread\.so\.1 |
 	libpthread\.so\.1 |
 	libdl\.so\.1
+	)$
+}x;
+
+# Files for which we skip checking of duplicate addresses in the
+# symbol sort sections. Such exceptions should be rare --- most code will
+# not have duplicate addresses, since it takes assember or a "#pragma weak"
+# to do such aliasing in C. C++ is different: The compiler generates aliases
+# for implementation reasons, and the mangled names used to encode argument
+# and return value types are difficult to handle well in mapfiles.
+# Furthermore, the Sun compiler and gcc use different and incompatible
+# name mangling conventions. Since ON must be buildable by either, we
+# would have to maintain two sets of mapfiles for each such object.
+# C++ use is rare in ON, so this is not worth pursuing.
+#
+$SkipSymSort = qr{ ^.*(?:
+	opt/SUNWdtrt/tst/common/pid/tst.weak2.exe |	# DTrace test
+	lib/amd64/libnsl\.so\.1 |			# C++
+	lib/sparcv9/libnsl\.so\.1 |			# C++
+	lib/sparcv9/libfru\.so\.1			# C++
 	)$
 }x;
 
@@ -441,7 +460,7 @@ sub OutMsg {
 sub ProcFile {
 	my($FullPath, $RelPath, $File, $Secure) = @_;
 	my(@Elf, @Ldd, $Dyn, $Intp, $Dll, $Ttl, $Sym, $Interp, $Stack);
-	my($Sun, $Relsz, $Pltsz, $Uns, $Tex, $Stab, $Strip, $Lddopt);
+	my($Sun, $Relsz, $Pltsz, $Uns, $Tex, $Stab, $Strip, $Lddopt, $SymSort);
 	my($Val, $Header, $SkipLdd, $IsX86, $RWX);
 
 	# Ignore symbolic links.
@@ -746,7 +765,7 @@ LDD:	foreach my $Line (@Ldd) {
 	# Reuse the elfdump(1) data to investigate additional dynamic linking
 	# information.
 
-	$Sun = $Relsz = $Pltsz = $Dyn = $Stab = 0;
+	$Sun = $Relsz = $Pltsz = $Dyn = $Stab = $SymSort = 0;
 	$Tex = $Strip = 1;
 
 	$Header = 'None';
@@ -763,6 +782,10 @@ ELF:	foreach my $Line (@Elf) {
 			} elsif (($Stab == 0) && ($Line =~ /\.stab/)) {
 				# This object contain .stabs sections
 				$Stab = 1;
+			} elsif (($SymSort == 0) &&
+				 ($Line =~ /\.SUNW_dyn(sym)|(tls)sort/)) {
+				# This object contains a symbol sort section
+				$SymSort = 1;
 			}
 
 			if (($Strip == 1) && ($Line =~ /\.symtab/)) {
@@ -861,6 +884,93 @@ DONESTAB:
 		OutMsg($Ttl++, $RelPath,
 		    "\tsymbol table should not be stripped\t<remove -s?>");
 	}
+
+	# If there are symbol sort sections in this object, report on
+	# any that have duplicate addresses.
+	ProcSymSort($FullPath, $RelPath, \$Ttl) if $SymSort;
+}
+
+
+## ProcSymSortOutMsg(RefTtl, RelPath, secname, addr, names...)
+#
+# Call OutMsg for a duplicate address error in a symbol sort
+# section
+#
+sub ProcSymSortOutMsg {
+	my($RefTtl, $RelPath, $secname, $addr, @names) = @_;
+
+	OutMsg($$RefTtl++, $RelPath,
+	    "$secname: duplicate $addr: ". join(', ', @names));
+}
+
+
+
+## ProcSymSort(FullPath, RelPath)
+#
+# Examine the symbol sort sections for the given object and report
+# on any duplicate addresses found.  Ideally, mapfile directives
+# should be used when building objects that have multiple symbols
+# with the same address so that only one of them appears in the sort
+# section. This saves space, reduces user confusion, and ensures that
+# libproc and debuggers always display public names instead of symbols
+# that are merely implementation details.
+#
+sub ProcSymSort {
+
+	my($FullPath, $RelPath, $RefTtl) = @_;
+
+	# If this object is exempt from checking, return quietly
+	return if ($FullPath =~ $SkipSymSort);
+
+
+	open(SORT, "elfdump -S $FullPath|") ||
+	    die "$Prog: Unable to execute elfdump (symbol sort sections)\n";
+
+	my $line;
+	my $last_addr;
+	my @dups = ();
+	my $secname;
+	while ($line = <SORT>) {
+		chomp $line;
+		
+		next if ($line eq '');
+
+		# If this is a header line, pick up the section name
+		if ($line =~ /^Symbol Sort Section:\s+([^\s]+)\s+/) {
+			$secname = $1;
+
+			# Every new section is followed by a column header line
+			$line = <SORT>;		# Toss header line
+
+			# Flush anything left from previous section
+			ProcSymSortOutMsg($RefTtl, $RelPath, $secname,
+			    $last_addr, @dups) if (scalar(@dups) > 1);
+
+			# Reset variables for new sort section
+			$last_addr = '';
+			@dups = ();
+
+			next;
+		}
+
+		# Process symbol line
+		my @fields = split /\s+/, $line;
+		my $new_addr = $fields[2]; 
+		my $new_name = $fields[9]; 
+		if ($new_addr eq $last_addr) {
+			push @dups, $new_name;
+		} else {
+			ProcSymSortOutMsg($RefTtl, $RelPath, $secname,
+			    $last_addr, @dups) if (scalar(@dups) > 1);
+			@dups = ( $new_name );
+			$last_addr = $new_addr; 
+		}
+	}
+
+	ProcSymSortOutMsg($RefTtl, $RelPath, $secname, $last_addr, @dups)
+		if (scalar(@dups) > 1);
+	
+	close SORT;
 }
 
 

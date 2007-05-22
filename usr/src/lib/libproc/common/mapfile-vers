@@ -243,15 +243,15 @@ SUNWprivate_1.1 {
 	ps_pbrandname;
 	ps_pcontinue;
 	ps_pdmodel;
-	ps_pdread;
-	ps_pdwrite;
+	ps_pdread = NODYNSORT;		# Alias of ps_pread
+	ps_pdwrite = NODYNSORT;		# Alias of ps_pwrite
 	ps_pglobal_lookup;
 	ps_pglobal_sym;
 	ps_plog;
 	ps_pread;
 	ps_pstop;
-	ps_ptread;
-	ps_ptwrite;
+	ps_ptread = NODYNSORT;		# Alias of ps_pread
+	ps_ptwrite = NODYNSORT;		# Alias of ps_pwrite
 	ps_pwrite;
 	Pstack_iter;
 	Pstate;

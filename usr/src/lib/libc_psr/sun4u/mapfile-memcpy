@@ -25,15 +25,13 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-SUNW_0.7 {
-    global:
-	SUNW_0.7;
-} SISCD_2.3;
+# This mapfile is used along with mapfile-vers for the sun4u
+# libc_psr. Some of the other versions of sun4u libc_psr also use
+# mapfile-vers, but the contents of this file do not apply to them.
 
-SISCD_2.3 {
-    global:
-	# Bind is intended to interpose on the real system call. However,
-	# we want debuggers to see its real name (nca_bind), so use NODYNSORT
-	# to prevent "bind" from going into the ELF .SUNW_dynsymsort section
-	bind = NODYNSORT;
+SUNWprivate_1.1 {
+    local:
+	# __align_cpy_1 is an alias for memcpy. Filter it out of
+	# the .SUNW_dynsymsort section.
+	__align_cpy_1 = NODYNSORT;
 };

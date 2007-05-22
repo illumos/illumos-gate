@@ -105,9 +105,14 @@ fork_lock_exit(void)
 	sigon(self);
 }
 
+/*
+ * Note: Instead of making this function static, we reduce it to local
+ * scope in the mapfile. That allows the linker to prevent it from
+ * appearing in the .SUNW_dynsymsort section.
+ */
 #pragma weak forkx = _private_forkx
 #pragma weak _forkx = _private_forkx
-static pid_t
+pid_t
 _private_forkx(int flags)
 {
 	ulwp_t *self = curthread;
@@ -226,7 +231,7 @@ _fork(void)
  */
 #pragma weak forkallx = _private_forkallx
 #pragma weak _forkallx = _private_forkallx
-static pid_t
+pid_t
 _private_forkallx(int flags)
 {
 	ulwp_t *self = curthread;

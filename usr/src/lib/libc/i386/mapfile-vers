@@ -44,10 +44,29 @@ SUNW_1.23 {
 	posix_fallocate64;
 };
 
+SUNW_1.22.1 {
+    global:
+	# Note: atomic_[and,dec,inc,or]_64_nv are also defined
+	# by the common mapfile. Here, we add the NODYNSORT attribute
+	# to them. On this platform, they are aliases for the non-_nv
+	# versions. If that is changed, these lines should be removed.
+	atomic_and_64_nv =		NODYNSORT;
+	atomic_dec_64_nv =		NODYNSORT;
+	atomic_inc_64_nv =		NODYNSORT;
+	atomic_or_64_nv =		NODYNSORT;
+} SUNW_1.22;
+
 SUNW_1.22 {
     global:
 	alphasort64;
 	_alphasort64;
+
+	# Note: atomic_add_64_nv is also defined by the common mapfile.
+	# Here, we add the NODYNSORT attribute to it. On this platform,
+	# it is an aliases for atomic_add_64. If that is changed, this
+	# line should be removed.
+	atomic_add_64_nv = 		NODYNSORT;
+
 	dladdr = FUNCTION FILTER /usr/lib/ld.so.1;
 	dladdr1 = FUNCTION FILTER /usr/lib/ld.so.1;
 	dlclose = FUNCTION FILTER /usr/lib/ld.so.1;
@@ -126,7 +145,7 @@ SUNW_1.1 {
 	setrlimit64;
 	_setrlimit64;
 	s_fcntl;
-	_s_fcntl;
+	_s_fcntl = NODYNSORT;
 	s_ioctl;
 	stat64;
 	_stat64;
@@ -187,8 +206,8 @@ SUNW_0.7 {
 	_lastbuf;
 	localtime_r;
 	__mul64;
-	_mutex_held;
-	_mutex_lock;
+	_mutex_held = NODYNSORT;
+	_mutex_lock = NODYNSORT;
 	p_online;
 	putchar_unlocked;
 	putc_unlocked;
@@ -208,7 +227,7 @@ SUNW_0.7 {
 	srand48;
 	strtok_r;
 	_sys_buslist;
-	_syscall;
+	_syscall = NODYNSORT;
 	_sys_cldlist;
 	sys_errlist;
 	_sys_fpelist;
@@ -617,7 +636,7 @@ SYSVABI_1.3 {
 	_semop;
 	setbuf;
 	setcontext;
-	_setcontext;
+	_setcontext = NODYNSORT;
 	setgid;
 	_setgid;
 	setgroups;
@@ -645,7 +664,7 @@ SYSVABI_1.3 {
 	shmget;
 	_shmget;
 	sigaction = NODIRECT;
-	_sigaction = NODIRECT;
+	_sigaction = NODIRECT NODYNSORT;
 	sigaddset;
 	_sigaddset;
 	sigaltstack;
@@ -680,7 +699,7 @@ SYSVABI_1.3 {
 	sigset;
 	_sigset;
 	sigsetjmp;
-	_sigsetjmp;
+	_sigsetjmp = NODYNSORT;
 	sigsuspend;
 	_sigsuspend;
 	sleep;
@@ -867,7 +886,7 @@ SUNWprivate_1.1 {
 	sysi86;
 	_sysi86;
 	_sys_index;
-	_sys_nerr;
+	_sys_nerr = NODYNSORT;
 	_sys_num_err;
 	___tls_get_addr;
 	__udivdi3;
@@ -902,4 +921,10 @@ SUNWprivate_1.1 {
 	__xtoll;
 	__xtoul;
 	__xtoull;
+
+    local:
+	__systemcall6 =		NODYNSORT;
+	_private_sysi86 =	NODYNSORT;
+	_seekdir64 =		NODYNSORT;
+	_telldir64 =		NODYNSORT;
 };

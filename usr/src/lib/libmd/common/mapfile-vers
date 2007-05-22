@@ -19,11 +19,24 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+
+# Note:
+#
+#	SHA256Update, SHA384Update, and SHA512Update are all
+#	weak aliases for SHA2Update.
+#
+#	SHA256Final, SHA384Final, and SHA512Final are all
+#	weak aliases for SHA2Final
+#
+# We use NODYNSORT to keep the weak aliases out of the .SUNW_dymsymsort
+# ELF section. As a result, ld will put the two main symbols in.
+#
+
 
 SUNW_1.1 {
     global:
@@ -37,18 +50,18 @@ SUNW_1.1 {
 	SHA1Final;
 	SHA1Init;
 	SHA1Update;
-	SHA256Final;
+	SHA256Final =	NODYNSORT;
 	SHA256Init;
-	SHA256Update;
+	SHA256Update =	NODYNSORT;
 	SHA2Final;
 	SHA2Init;
 	SHA2Update;
-	SHA384Final;
+	SHA384Final =	NODYNSORT;
 	SHA384Init;
-	SHA384Update;
-	SHA512Final;
+	SHA384Update =	NODYNSORT;
+	SHA512Final =	NODYNSORT;
 	SHA512Init;
-	SHA512Update;
+	SHA512Update =	NODYNSORT;
     local:
 	*;
 };

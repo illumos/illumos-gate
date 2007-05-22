@@ -400,8 +400,8 @@ SUNW_0.7 {
 	_munlock;
 	munmap;
 	_munmap;
-	_mutex_held;
-	_mutex_lock;
+	_mutex_held = NODYNSORT;
+	_mutex_lock = NODYNSORT;
 	nextafter = FUNCTION FILTER libm.so.2;
 	_nextafter = FUNCTION FILTER libm.so.2;
 	nftw;
@@ -489,7 +489,7 @@ SUNW_0.7 {
 	_semop;
 	setbuf;
 	setcontext;
-	_setcontext;
+	_setcontext = NODYNSORT;
 	setgid;
 	_setgid;
 	setgrent;
@@ -524,7 +524,7 @@ SUNW_0.7 {
 	_shmget;
 	_sibuf;
 	sigaction = NODIRECT;
-	_sigaction = NODIRECT;
+	_sigaction = NODIRECT NODYNSORT;
 	sigaddset;
 	_sigaddset;
 	sigaltstack;
@@ -559,7 +559,7 @@ SUNW_0.7 {
 	sigset;
 	_sigset;
 	sigsetjmp;
-	_sigsetjmp;
+	_sigsetjmp = NODYNSORT;
 	sigsuspend;
 	_sigsuspend;
 	sleep;
@@ -764,4 +764,8 @@ SUNWprivate_1.1 {
 	__xtoll;
 	__xtoul;
 	__xtoull;
+
+    local:
+	_private_sysi86 = NODYNSORT;
+	___tls_get_addr = NODYNSORT;
 };

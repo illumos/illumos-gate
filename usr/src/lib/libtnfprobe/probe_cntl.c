@@ -473,9 +473,13 @@ _tnf_fork1(void)
  * interpose function is required for x86;  if the 512 byte 'slop skip'
  * is ever removed from the i386 door_return, then it will also need
  * interpose function intervention.
+ *
+ * Note: Instead of making this function static, we reduce it to local
+ * scope in the mapfile. That allows the linker to prevent it from
+ * appearing in the .SUNW_dynsymsort section.
  */
 #pragma weak thr_stksegment = _tnf_thr_stksegment
-static int
+int
 _tnf_thr_stksegment(stack_t *s)
 {
 	static tnf_thr_stksegment_func_t real_thr_stksegment = NULL;

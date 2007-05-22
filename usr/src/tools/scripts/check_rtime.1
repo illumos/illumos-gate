@@ -1,13 +1,12 @@
 .\" ident	"%Z%%M%	%I%	%E% SMI"
-.\" Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+.\" Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
 .\" CDDL HEADER START
 .\"
 .\" The contents of this file are subject to the terms of the
-.\" Common Development and Distribution License, Version 1.0 only
-.\" (the "License").  You may not use this file except in compliance
-.\" with the License.
+.\" Common Development and Distribution License (the "License").
+.\" You may not use this file except in compliance with the License.
 .\"
 .\" You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 .\" or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH check_rtime 1 "30 Aug 2005"
+.TH check_rtime 1 "23 Apr 2007"
 .SH NAME
 .I check_rtime
 \- check ELF runtime attributes
@@ -129,8 +128,9 @@ See also the section ENVIRONMENT VARIABLES.
 .I check_rtime
 uses \fBelfdump(1)\fP to look for a concatenated relocation
 section in shared objects, the existence of text relocations,
-whether debugging or symbol table information exists, and whether
-applications have a non-executable stack defined.
+whether debugging or symbol table information exists, whether
+applications have a non-executable stack defined, and for duplicate
+entries in the symbol sorting sections.
 These checks are carried out for the following reasons:
 .TP 4
 \(bu
@@ -227,6 +227,38 @@ foo: application requires non-executable data \\
 .br
 	<no -Mmapfile_noexdata?>
 .RE
+.sp
+.TP
+\(bu
+Solaris ELF files contain symbol sort sections used by DTrace to
+map addresses in memory to the related function or variable symbols. There
+are two such sections, \fI.SUNW_dynsymsort\fP for
+regular symbols, and \fI.SUNW_dyntlssort\fP for thread
+local symbols. To ensure that the best
+names are shown for each
+such address, and that the same name is given across Solaris releases,
+.I check_rtime
+enforces the rule that only one symbol can appear in the sort sections for
+any given address.
+There are two common ways in which multiple symbols 
+or a given address occur in the ON distribution. The first is from
+code written in assembly language. The second is as a 
+result of using \fB#pragma weak\fP in C to create weak symbols. The
+best solution to this
+situation is to modify the code to avoid symbol aliasing. Alternatively,
+the \fBNODYNSORT\fP mapfile attribute can be used to eliminate the unwanted
+symbol.
+.sp
+Duplicate entries in a symbol sort section are
+displayed in one of the following ways, depending on
+whether the section is for regular, or thread local symbols:
+.sp
+.RS 6
+foo: .SUNW_dynsymsort: duplicate ADDRESS: sym1, sym2
+.br
+foo: .SUNW_dyntlssort: duplicate OFFSET: sym1, sym2
+.RE
+
 .sp
 .LP
 .I check_rtime also

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,5 +27,8 @@
 
 SUNW_0.7 {
     global:
-	bind;
+	# Bind is intended to interpose on the real system call. However,
+	# we want debuggers to see its real name (nca_bind), so use NODYNSORT
+	# to prevent "bind" from going into the ELF .SUNW_dynsymsort section
+	bind = NODYNSORT;
 };

@@ -50,7 +50,8 @@ CPPFLAGS	= -D_REENTRANT -D$(MACH) $(IFLAGS) $(CPPFLAGS.master)
 ASDEFS		= -D__STDC__ -D_ASM $(CPPFLAGS)
 ASFLAGS		= -P $(ASDEFS)
 
-MAPFILES	= ../../sun4u/mapfile-vers $(MAPFILE.FLT)
+MAPFILES	= ../../sun4u/mapfile-vers ../../sun4u/mapfile-memcpy \
+			$(MAPFILE.FLT)
 
 #
 # Used when building links in /platform/$(PLATFORM)/lib

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,17 +29,29 @@
 
 #include "SYS.h"
 
+	/*
+	 * NOTE: htonl/ntohl are identical routines, as are htons/ntohs.
+	 * As such, they could be implemented as a single routine, using
+	 * multiple ALTENTRY/SET_SIZE definitions. We don't do this so
+	 * that they will have unique addresses, allowing DTrace and
+	 * other debuggers to tell them apart. 
+	 */
+
 /	unsigned long htonl( hl )
 /	unsigned long ntohl( hl )
 /	long hl;
 /	reverses the byte order of 'long hl'
 /
 	ENTRY(htonl)
-	ENTRY(ntohl)
 	movl	4(%esp), %eax	/ %eax = hl
 	bswap	%eax		/ reverses the byte order of %eax
 	ret			/ return (%eax)
 	SET_SIZE(htonl)
+
+	ENTRY(ntohl)
+	movl	4(%esp), %eax	/ %eax = hl
+	bswap	%eax		/ reverses the byte order of %eax
+	ret			/ return (%eax)
 	SET_SIZE(ntohl)
 
 /	unsigned short htons( hs )
@@ -49,10 +60,15 @@
 /	reverses the byte order in hs.
 /
 	ENTRY(htons)
-	ENTRY(ntohs)
 	movl	4(%esp), %eax	/ %eax = hs
 	bswap	%eax		/ reverses the byte order of %eax
 	shrl	$16, %eax	/ moves high 16-bit to low 16-bit
 	ret			/ return (%eax)
 	SET_SIZE(htons)
+
+	ENTRY(ntohs)
+	movl	4(%esp), %eax	/ %eax = hs
+	bswap	%eax		/ reverses the byte order of %eax
+	shrl	$16, %eax	/ moves high 16-bit to low 16-bit
+	ret			/ return (%eax)
 	SET_SIZE(ntohs)

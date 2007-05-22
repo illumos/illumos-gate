@@ -70,7 +70,12 @@ telldir(DIR *dirp)
 
 #else
 
-static off64_t
+/*
+ * Note: Instead of making this function static, we reduce it to local
+ * scope in the mapfile. That allows the linker to prevent it from
+ * appearing in the .SUNW_dynsymsort section.
+ */
+off64_t
 telldir64(DIR *dirp)
 {
 	private_DIR	*pdirp = (private_DIR *)(uintptr_t)dirp;

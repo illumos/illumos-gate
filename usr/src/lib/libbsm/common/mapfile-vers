@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -310,5 +310,14 @@ SUNWprivate_1.1 {
 	setdmapent;
 	setdmapfile;
     local:
+	# These functions are aliased to "int" versions. Let those
+	# go into .SUNW_dynsymsort, and keep these out.
+	adrm_long =	NODYNSORT;
+	adrm_u_long =	NODYNSORT;
+	adrf_long =	NODYNSORT;
+	adrf_u_long =	NODYNSORT;
+	adrm_putlong =	NODYNSORT;
+
+	# Reduce all remaining global symbols to local scope
 	*;
 };

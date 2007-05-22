@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -64,58 +64,58 @@ SUNW_1.0 {
         papiAttributeListFree;
 
 	# PAPI Service Calls
-        papiServiceCreate;
-        papiServiceDestroy;
-        papiServiceSetUserName;
-        papiServiceSetPassword;
-        papiServiceSetEncryption;
-        papiServiceSetAuthCB;
-        papiServiceSetAppData;
-        papiServiceGetUserName;
-        papiServiceGetPassword;
+        papiServiceCreate =		NODYNSORT;
+        papiServiceDestroy =		NODYNSORT;
+        papiServiceSetUserName =	NODYNSORT;
+        papiServiceSetPassword =	NODYNSORT;
+        papiServiceSetEncryption =	NODYNSORT;
+        papiServiceSetAuthCB =		NODYNSORT;
+        papiServiceSetAppData =		NODYNSORT;
+        papiServiceGetUserName =	NODYNSORT;
+        papiServiceGetPassword =	NODYNSORT;
         papiServiceGetEncryption;
-        papiServiceGetAppData;
-        papiServiceGetServiceName;
-        papiServiceGetAttributeList;
-        papiServiceGetStatusMessage;
+        papiServiceGetAppData =		NODYNSORT;
+        papiServiceGetServiceName =	NODYNSORT;
+        papiServiceGetAttributeList =	NODYNSORT;
+        papiServiceGetStatusMessage =	NODYNSORT;
 
 	# PAPI Printer Calls
-        papiPrintersList;
-        papiPrinterQuery;
-        papiPrinterAdd;
-        papiPrinterModify;
-        papiPrinterRemove;
-        papiPrinterDisable;
-        papiPrinterEnable;
-        papiPrinterPause;
-        papiPrinterResume;
-        papiPrinterPurgeJobs;
-        papiPrinterListJobs;
-        papiPrinterGetAttributeList;
-        papiPrinterFree;
-        papiPrinterListFree;
+        papiPrintersList =		NODYNSORT;
+        papiPrinterQuery =		NODYNSORT;
+        papiPrinterAdd =		NODYNSORT;
+        papiPrinterModify =		NODYNSORT;
+        papiPrinterRemove =		NODYNSORT;
+        papiPrinterDisable =		NODYNSORT;
+        papiPrinterEnable =		NODYNSORT;
+        papiPrinterPause =		NODYNSORT;
+        papiPrinterResume =		NODYNSORT;
+        papiPrinterPurgeJobs =		NODYNSORT;
+        papiPrinterListJobs =		NODYNSORT;
+        papiPrinterGetAttributeList =	NODYNSORT;
+        papiPrinterFree =		NODYNSORT;
+        papiPrinterListFree =		NODYNSORT;
 
 	# PAPI Job Calls
-        papiJobSubmit;
-        papiJobSubmitByReference;
-        papiJobValidate;
-        papiJobStreamOpen;
-        papiJobStreamWrite;
-        papiJobStreamClose;
-        papiJobQuery;
-        papiJobModify;
-        papiJobMove;
-        papiJobCancel;
-        papiJobHold;
-        papiJobRelease;
-        papiJobRestart;
-        papiJobPromote;
-        papiJobGetAttributeList;
-        papiJobGetPrinterName;
+        papiJobSubmit =			NODYNSORT;
+        papiJobSubmitByReference =	NODYNSORT;
+        papiJobValidate =		NODYNSORT;
+        papiJobStreamOpen =		NODYNSORT;
+        papiJobStreamWrite =		NODYNSORT;
+        papiJobStreamClose =		NODYNSORT;
+        papiJobQuery =			NODYNSORT;
+        papiJobModify =			NODYNSORT;
+        papiJobMove =			NODYNSORT;
+        papiJobCancel =			NODYNSORT;
+        papiJobHold =			NODYNSORT;
+        papiJobRelease =		NODYNSORT;
+        papiJobRestart =		NODYNSORT;
+        papiJobPromote =		NODYNSORT;
+        papiJobGetAttributeList =	NODYNSORT;
+        papiJobGetPrinterName =		NODYNSORT;
         papiJobGetId;
-        papiJobGetJobTicket;
-        papiJobFree;
-        papiJobListFree;
+        papiJobGetJobTicket =		NODYNSORT;
+        papiJobFree =			NODYNSORT;
+        papiJobListFree =		NODYNSORT;
 
 	# Misc. PAPI Calls
         papiStatusString;
@@ -125,10 +125,10 @@ SUNW_1.0 {
 
 SUNWprivate_1.0 { # Misc. semi-private supporting calls
     global:
-        papiServiceSetPeer;
-        papiJobCreate;
-        papiJobStreamAdd;
-        papiJobCommit;
+        papiServiceSetPeer =		NODYNSORT;
+        papiJobCreate =			NODYNSORT;
+        papiJobStreamAdd =		NODYNSORT;
+        papiJobCommit =			NODYNSORT;
 
 	#     URI
         uri_from_string;
@@ -141,7 +141,7 @@ SUNWprivate_1.0 { # Misc. semi-private supporting calls
         list_concatenate;
 
 	#	NS
-	getprinterbyname;
+	getprinterbyname =		NODYNSORT;
 
 	#    extra Attribute Calls
         copy_attributes;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,6 +120,12 @@
 	SET_SIZE(atomic_inc_uint_nv)
 	SET_SIZE(atomic_inc_32_nv)
 
+	/*
+	 * NOTE: If atomic_inc_64 and atomic_inc_64_nv are ever
+	 * separated, you need to also edit the libc i386 platform
+	 * specific mapfile and remove the NODYNSORT attribute
+	 * from atomic_inc_64_nv.
+	 */
 	ENTRY(atomic_inc_64)
 	ALTENTRY(atomic_inc_64_nv)
 	pushl	%edi
@@ -218,6 +223,12 @@
 	SET_SIZE(atomic_dec_uint_nv)
 	SET_SIZE(atomic_dec_32_nv)
 
+	/*
+	 * NOTE: If atomic_dec_64 and atomic_dec_64_nv are ever
+	 * separated, it is important to edit the libc i386 platform
+	 * specific mapfile and remove the NODYNSORT attribute
+	 * from atomic_dec_64_nv.
+	 */
 	ENTRY(atomic_dec_64)
 	ALTENTRY(atomic_dec_64_nv)
 	pushl	%edi
@@ -390,6 +401,12 @@
 	SET_SIZE(atomic_add_int_nv)
 	SET_SIZE(atomic_add_32_nv)
 
+	/*
+	 * NOTE: If atomic_add_64 and atomic_add_64_nv are ever
+	 * separated, it is important to edit the libc i386 platform
+	 * specific mapfile and remove the NODYNSORT attribute
+	 * from atomic_add_64_nv.
+	 */
 	ENTRY(atomic_add_64)
 	ALTENTRY(atomic_add_64_nv)
 	pushl	%edi
@@ -460,6 +477,12 @@
 	SET_SIZE(atomic_or_uint_nv)
 	SET_SIZE(atomic_or_32_nv)
 
+	/*
+	 * NOTE: If atomic_or_64 and atomic_or_64_nv are ever
+	 * separated, it is important to edit the libc i386 platform
+	 * specific mapfile and remove the NODYNSORT attribute
+	 * from atomic_or_64_nv.
+	 */
 	ENTRY(atomic_or_64)
 	ALTENTRY(atomic_or_64_nv)
 	pushl	%edi
@@ -530,6 +553,12 @@
 	SET_SIZE(atomic_and_uint_nv)
 	SET_SIZE(atomic_and_32_nv)
 
+	/*
+	 * NOTE: If atomic_and_64 and atomic_and_64_nv are ever
+	 * separated, it is important to edit the libc i386 platform
+	 * specific mapfile and remove the NODYNSORT attribute
+	 * from atomic_and_64_nv.
+	 */
 	ENTRY(atomic_and_64)
 	ALTENTRY(atomic_and_64_nv)
 	pushl	%edi
@@ -682,16 +711,37 @@
 
 #if !defined(_KERNEL)
 
+	/*
+	 * NOTE: membar_enter, membar_exit, membar_producer, and 
+	 * membar_consumer are all identical routines. We define them
+	 * separately, instead of using ALTENTRY definitions to alias them
+	 * together, so that DTrace and debuggers will see a unique address
+	 * for them, allowing more accurate tracing.
+	*/
+
+
 	ENTRY(membar_enter)
-	ALTENTRY(membar_exit)
-	ALTENTRY(membar_producer)
-	ALTENTRY(membar_consumer)
+	lock
+	xorl	$0, (%esp)
+	ret
+	SET_SIZE(membar_enter)
+
+	ENTRY(membar_exit)
+	lock
+	xorl	$0, (%esp)
+	ret
+	SET_SIZE(membar_exit)
+
+	ENTRY(membar_producer)
+	lock
+	xorl	$0, (%esp)
+	ret
+	SET_SIZE(membar_producer)
+
+	ENTRY(membar_consumer)
 	lock
 	xorl	$0, (%esp)
 	ret
 	SET_SIZE(membar_consumer)
-	SET_SIZE(membar_producer)
-	SET_SIZE(membar_exit)
-	SET_SIZE(membar_enter)
 
 #endif	/* !_KERNEL */

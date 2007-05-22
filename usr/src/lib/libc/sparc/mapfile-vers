@@ -44,10 +44,45 @@ SUNW_1.23 {
 	posix_fallocate64;
 };
 
+SUNW_1.22.1 {
+    global:
+	# Note: The atomic_OP_WIDTH_nv symbols defined here are also defined
+	# by the common mapfile. Here, we add the NODYNSORT attribute
+	# to them. On this platform, they are aliases for the non-_nv
+	# versions. If that is changed, these lines should be removed.
+	atomic_add_8_nv =		NODYNSORT;
+	atomic_and_8_nv =		NODYNSORT;
+	atomic_and_16_nv =		NODYNSORT;
+	atomic_and_32_nv =		NODYNSORT;
+	atomic_and_64_nv =		NODYNSORT;
+	atomic_dec_8_nv =		NODYNSORT;
+	atomic_dec_16_nv =		NODYNSORT;
+	atomic_dec_32_nv =		NODYNSORT;
+	atomic_dec_64_nv =		NODYNSORT;
+	atomic_inc_8_nv =		NODYNSORT;
+	atomic_inc_16_nv =		NODYNSORT;
+	atomic_inc_32_nv =		NODYNSORT;
+	atomic_inc_64_nv =		NODYNSORT;
+	atomic_or_8_nv =		NODYNSORT;
+	atomic_or_16_nv =		NODYNSORT;
+	atomic_or_32_nv =		NODYNSORT;
+	atomic_or_64_nv =		NODYNSORT;
+} SUNW_1.22;
+
+
 SUNW_1.22 {
     global:
 	alphasort64;
 	_alphasort64;
+
+	# Note: atomic_add_[16,32,64]_nv are also defined by the common
+	# mapfile. Here, we add the NODYNSORT attribute to them. On this
+	# platform, they are aliases for the non-_nv versions. If that is
+	# changed, these lines should be removed.
+	atomic_add_16_nv =		NODYNSORT;
+	atomic_add_32_nv =		NODYNSORT;
+	atomic_add_64_nv =		NODYNSORT;
+
 	dladdr = FUNCTION FILTER /usr/lib/ld.so.1;
 	dladdr1 = FUNCTION FILTER /usr/lib/ld.so.1;
 	dlclose = FUNCTION FILTER /usr/lib/ld.so.1;
@@ -133,7 +168,7 @@ SUNW_1.1 {
 	setrlimit64;
 	_setrlimit64;
 	s_fcntl;
-	_s_fcntl;
+	_s_fcntl = NODYNSORT;
 	s_ioctl;
 	stat64;
 	_stat64;
@@ -156,8 +191,8 @@ SUNW_0.7 {
 	file_to_decimal;
 	_flsbuf;
 	_lastbuf;
-	_mutex_held;
-	_mutex_lock;
+	_mutex_held = NODYNSORT;
+	_mutex_lock = NODYNSORT;
 	p_online;
 	_rw_read_held;
 	_rw_write_held;
@@ -245,7 +280,7 @@ SISCD_2.3 {
 	_sysinfo;
 	ttyname_r;
 	__udiv64;
-	__umul64;
+	__umul64 = NODYNSORT;		# Same address as __mul64
 	__urem64;
 } SYSVABI_1.3;
 
@@ -257,7 +292,8 @@ SYSVABI_1.3 {
 	.stret1;
 	.stret2;
 	.stret4;
-	.stret8;
+	# .stret4 and .stret8 are the same thing
+	.stret8 = NODYNSORT;
 	.udiv;
 	.umul;
 	.urem;
@@ -663,7 +699,7 @@ SYSVABI_1.3 {
 	_semop;
 	setbuf;
 	setcontext;
-	_setcontext;
+	_setcontext = NODYNSORT;
 	setgid;
 	_setgid;
 	setgroups;
@@ -691,7 +727,7 @@ SYSVABI_1.3 {
 	shmget;
 	_shmget;
 	sigaction = NODIRECT;
-	_sigaction = NODIRECT;
+	_sigaction = NODIRECT NODYNSORT;
 	sigaddset;
 	_sigaddset;
 	sigaltstack;
@@ -726,7 +762,7 @@ SYSVABI_1.3 {
 	sigset;
 	_sigset;
 	sigsetjmp;
-	_sigsetjmp;
+	_sigsetjmp = NODYNSORT;
 	sigsuspend;
 	_sigsuspend;
 	sleep;
@@ -923,7 +959,7 @@ SUNWprivate_1.1 {
 	_sys_errlist;
 	_sys_errs;
 	_sys_index;
-	_sys_nerr;
+	_sys_nerr = NODYNSORT;
 	_sys_num_err;
 	_syssun;
 	__ucmpdi2;
@@ -948,4 +984,10 @@ SUNWprivate_1.1 {
 	_wscanf_c89;
 	_xregs_clrptr;
 	__yday_to_month;
+
+    local:
+	__cerror =		NODYNSORT;
+	__cerror64 =		NODYNSORT;
+	_seekdir64 =		NODYNSORT;
+	_telldir64 =		NODYNSORT;
 };
