@@ -16419,7 +16419,7 @@ illgrp_insert(ill_group_t **illgrp_head, ill_t *ill, char *groupname,
  * be more than one when there are ill groups.
  *
  * If 'usable' is set, then we exclude ones that are marked with any of
- * (PHYI_FAILED|PHYI_STANDBY|PHYI_OFFLINE|PHYI_INACTIVE).
+ * (PHYI_FAILED|PHYI_OFFLINE|PHYI_INACTIVE).
  * Needs work: called only from ip_sioctl_groupname and from the ipmp/netinfo
  * emulation of ipmp.
  */
@@ -16444,7 +16444,7 @@ phyint_lookup_group(char *groupname, boolean_t usable, ip_stack_t *ipst)
 		 * sometime use this for sending packets.
 		 */
 		if (usable && (phyi->phyint_flags &
-		    (PHYI_FAILED|PHYI_STANDBY|PHYI_OFFLINE|PHYI_INACTIVE)))
+		    (PHYI_FAILED|PHYI_OFFLINE|PHYI_INACTIVE)))
 			continue;
 
 		ASSERT(phyi->phyint_groupname != NULL);
@@ -16458,7 +16458,7 @@ phyint_lookup_group(char *groupname, boolean_t usable, ip_stack_t *ipst)
 /*
  * Return the first usable phyint matching the group index. By 'usable'
  * we exclude ones that are marked ununsable with any of
- * (PHYI_FAILED|PHYI_STANDBY|PHYI_OFFLINE|PHYI_INACTIVE).
+ * (PHYI_FAILED|PHYI_OFFLINE|PHYI_INACTIVE).
  *
  * Used only for the ipmp/netinfo emulation of ipmp.
  */
@@ -16490,7 +16490,7 @@ phyint_lookup_group_ifindex(uint_t group_ifindex, ip_stack_t *ipst)
 		 * sometime use this for sending packets.
 		 */
 		if (phyi->phyint_flags &
-		    (PHYI_FAILED|PHYI_STANDBY|PHYI_OFFLINE|PHYI_INACTIVE))
+		    (PHYI_FAILED|PHYI_OFFLINE|PHYI_INACTIVE))
 			continue;
 		if (phyi->phyint_group_ifindex == group_ifindex)
 			return (phyi);

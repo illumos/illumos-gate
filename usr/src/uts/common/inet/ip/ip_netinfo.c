@@ -1351,7 +1351,7 @@ ip_ne_queue_func(void *arg)
  * Temporary function to support IPMP emulation for IP Filter.
  * Lookup an ill based on the ifindex assigned to the group.
  * Skips unusable ones i.e. where any of these flags are set:
- * (PHYI_FAILED|PHYI_STANDBY|PHYI_OFFLINE|PHYI_INACTIVE)
+ * (PHYI_FAILED|PHYI_OFFLINE|PHYI_INACTIVE)
  */
 ill_t *
 ill_group_lookup_on_ifindex(uint_t index, boolean_t isv6, ip_stack_t *ipst)
@@ -1371,6 +1371,7 @@ ill_group_lookup_on_ifindex(uint_t index, boolean_t isv6, ip_stack_t *ipst)
 				rw_exit(&ipst->ips_ill_g_lock);
 				return (ill);
 			}
+			mutex_exit(&ill->ill_lock);
 		}
 	}
 	rw_exit(&ipst->ips_ill_g_lock);
@@ -1381,7 +1382,7 @@ ill_group_lookup_on_ifindex(uint_t index, boolean_t isv6, ip_stack_t *ipst)
  * Temporary function to support IPMP emulation for IP Filter.
  * Lookup an ill based on the group name.
  * Skips unusable ones i.e. where any of these flags are set:
- * (PHYI_FAILED|PHYI_STANDBY|PHYI_OFFLINE|PHYI_INACTIVE)
+ * (PHYI_FAILED|PHYI_OFFLINE|PHYI_INACTIVE)
  */
 ill_t *
 ill_group_lookup_on_name(char *name, boolean_t isv6, ip_stack_t *ipst)
@@ -1401,6 +1402,7 @@ ill_group_lookup_on_name(char *name, boolean_t isv6, ip_stack_t *ipst)
 				rw_exit(&ipst->ips_ill_g_lock);
 				return (ill);
 			}
+			mutex_exit(&ill->ill_lock);
 		}
 	}
 	rw_exit(&ipst->ips_ill_g_lock);
