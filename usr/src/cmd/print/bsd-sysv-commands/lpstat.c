@@ -35,6 +35,7 @@
 #include <string.h>
 #include <locale.h>
 #include <libintl.h>
+#include <ctype.h>
 #include <pwd.h>
 #include <papi.h>
 #include <uri.h>
@@ -863,8 +864,18 @@ main(int ac, char *av[])
 	(void) textdomain("SUNW_OST_OSCMD");
 
 	argv = (char **)calloc((ac + 1), sizeof (char *));
-	for (c = 0; c < ac; c++)
-		argv[c] = av[c];
+	for (c = 0; c < ac; c++) {
+		if ((av[c][0] == '-') && (av[c][1] == 'l') &&
+			(isalpha(av[c][2]) != 0)) {
+			/* preserve old "-l[po...]" behavior */
+			argv[c] = &av[c][1];
+			argv[c][0] = '-';
+			verbose = 1;
+
+		} else
+			argv[c] = av[c];
+	}
+
 	argv[c++] = "--";
 	ac = c;
 
