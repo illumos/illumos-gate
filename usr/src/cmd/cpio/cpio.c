@@ -5300,7 +5300,15 @@ setup(int largc, char **largv)
 		} else { /* directory must be specified */
 			if (largc != 1)
 				Error_cnt++;
-			else if (access(*largv, 2) < 0)
+			else if (access(*largv, 2) < 0 && (errno != EACCES))
+				/*
+				 * EACCES is ignored here as it may occur
+				 * when any directory component of the path
+				 * does not have write permission, even though
+				 * the destination subdirectory has write
+				 * access. Writing to a read only directory
+				 * is handled later, as in "copy in" mode.
+				 */
 				msg(ERRN,
 				    "Error during access() of \"%s\"", *largv);
 		}
