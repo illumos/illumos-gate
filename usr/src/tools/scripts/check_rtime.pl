@@ -623,6 +623,8 @@ DYN:
 	# Only use ldd unless we've encountered an interpreter that should
 	# be skipped.
 	if (!$SkipLdd && $Interp) {
+		my $LDDFullPath = $FullPath;
+
 		if ($Secure) {
 			# The execution of a secure application over an nfs file
 			# system mounted nosuid will result in warning messages
@@ -634,9 +636,9 @@ DYN:
 	
 			my($TmpPath) = "$Tmpdir/$File";
 
-			system('cp', $FullPath, $TmpPath);
+			system('cp', $LDDFullPath, $TmpPath);
 			chmod 0777, $TmpPath;
-			$FullPath = $TmpPath;
+			$LDDFullPath = $TmpPath;
 		}
 
 		# Use ldd(1) to determine the objects relocatability and use.
@@ -649,9 +651,9 @@ DYN:
 		} else {
 			$Lddopt = "-rU";
 		}
-		@Ldd = split(/\n/, `ldd $Lddopt $Env $FullPath 2>&1`);
+		@Ldd = split(/\n/, `ldd $Lddopt $Env $LDDFullPath 2>&1`);
 		if ($Secure) {
-			unlink $FullPath;
+			unlink $LDDFullPath;
 		}
 	}
 
