@@ -968,7 +968,6 @@ ipw2200_init(struct ipw2200_softc *sc)
 	 */
 	delay(drv_usectohz(delay_config_stable));
 
-	ieee80211_begin_scan(&sc->sc_ic, 1); /* reset scan */
 	return (DDI_SUCCESS); /* return successfully */
 fail:
 	ipw2200_stop(sc);
@@ -1714,6 +1713,7 @@ static void
 ipw2200_thread(struct ipw2200_softc *sc)
 {
 	struct ieee80211com	*ic = &sc->sc_ic;
+	enum ieee80211_state	ostate;
 	int32_t			nlstate;
 	int			stat_cnt = 0;
 
@@ -1753,12 +1753,22 @@ ipw2200_thread(struct ipw2200_softc *sc)
 			sc->sc_flags &= ~IPW2200_FLAG_HW_ERR_RECOVER;
 
 			mutex_exit(&sc->sc_mflock);
+
+			ostate = ic->ic_state;
 			(void) ipw2200_init(sc); /* Force state machine */
 			/*
 			 * workround. Delay for a while after init especially
 			 * when something wrong happened already.
 			 */
 			delay(drv_usectohz(delay_fatal_recover));
+
+			/*
+			 * Init scan will recovery the original connection if
+			 * the original state is run
+			 */
+			if (ostate != IEEE80211_S_INIT)
+				ieee80211_begin_scan(ic, 0);
+
 			mutex_enter(&sc->sc_mflock);
 		}
 
@@ -1789,6 +1799,7 @@ static int
 ipw2200_m_start(void *arg)
 {
 	struct ipw2200_softc	*sc = (struct ipw2200_softc *)arg;
+	struct ieee80211com	*ic = &sc->sc_ic;
 
 	IPW2200_DBG(IPW2200_DBG_GLD, (sc->sc_dip, CE_CONT,
 	    "ipw2200_m_start(): enter\n"));
@@ -1796,6 +1807,10 @@ ipw2200_m_start(void *arg)
 	 * initialize ipw2200 hardware, everything ok will start scan
 	 */
 	(void) ipw2200_init(sc);
+	/*
+	 * set the state machine to INIT
+	 */
+	ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 
 	sc->sc_flags |= IPW2200_FLAG_RUNNING;
 
@@ -1806,11 +1821,16 @@ static void
 ipw2200_m_stop(void *arg)
 {
 	struct ipw2200_softc	*sc = (struct ipw2200_softc *)arg;
+	struct ieee80211com	*ic = &sc->sc_ic;
 
 	IPW2200_DBG(IPW2200_DBG_GLD, (sc->sc_dip, CE_CONT,
 	    "ipw2200_m_stop(): enter\n"));
 
 	ipw2200_stop(sc);
+	/*
+	 * set the state machine to INIT
+	 */
+	ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
 
 	sc->sc_flags &= ~IPW2200_FLAG_RUNNING;
 }
