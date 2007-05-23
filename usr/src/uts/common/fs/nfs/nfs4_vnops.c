@@ -14106,12 +14106,17 @@ recov_retry:
 	NFS4_DEBUG(nfs4_client_lock_debug, (CE_NOTE,
 	    "nfs4frlock: needrecov %d", needrecov));
 
-	if (ep->error != 0 && !needrecov && ep->error != EACCES)
-		goto out;
-
 	if (ep->error == 0 && nfs4_need_to_bump_seqid(resp))
 		nfs4frlock_bump_seqid(lock_args, locku_args, oop, lop,
 		    args.ctag);
+
+	/*
+	 * Check if one of these mutually exclusive error cases has
+	 * happened:
+	 *   need to swap credentials due to access error
+	 *   recovery is needed
+	 *   different error (only known case is missing Kerberos ticket)
+	 */
 
 	if ((ep->error == EACCES ||
 	    (ep->error == 0 && resp->status == NFS4ERR_ACCESS)) &&
@@ -14158,6 +14163,15 @@ recov_retry:
 		}
 		goto out;
 	}
+
+	/*
+	 * Bail out if have reached this point with ep->error set. Can
+	 * happen if (ep->error == EACCES && !needrecov && cred_otw == cr).
+	 * This happens if Kerberos ticket has expired or has been
+	 * destroyed.
+	 */
+	if (ep->error != 0)
+		goto out;
 
 	/*
 	 * Process the reply.
