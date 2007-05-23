@@ -2032,6 +2032,10 @@ ath_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	ic->ic_crypto.cs_key_delete = ath_key_delete;
 	ic->ic_crypto.cs_key_set = ath_key_set;
 	ieee80211_media_init(ic);
+	/*
+	 * initialize default tx key
+	 */
+	ic->ic_def_txkey = 0;
 
 	asc->asc_rx_pend = 0;
 	ATH_HAL_INTRSET(ah, 0);
