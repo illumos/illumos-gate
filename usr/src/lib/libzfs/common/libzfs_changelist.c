@@ -170,9 +170,9 @@ changelist_postfix(prop_changelist_t *clp)
 	 * is uninitialized here so that it will reinitialize later.
 	 */
 	if (cn->cn_handle != NULL) {
-	    hdl = cn->cn_handle->zfs_hdl;
-	    assert(hdl != NULL);
-	    zfs_uninit_libshare(hdl);
+		hdl = cn->cn_handle->zfs_hdl;
+		assert(hdl != NULL);
+		zfs_uninit_libshare(hdl);
 	}
 
 	/*

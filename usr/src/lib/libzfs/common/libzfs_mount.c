@@ -281,11 +281,12 @@ zfs_mount(zfs_handle_t *zhp, const char *options, int flags)
 		 * from mount(), and they're well-understood.  We pick a few
 		 * common ones to improve upon.
 		 */
-		if (errno == EBUSY)
+		if (errno == EBUSY) {
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "mountpoint or dataset is busy"));
-		else
+		} else {
 			zfs_error_aux(hdl, strerror(errno));
+		}
 
 		return (zfs_error_fmt(hdl, EZFS_MOUNTFAILED,
 		    dgettext(TEXT_DOMAIN, "cannot mount '%s'"),
@@ -334,9 +335,9 @@ zfs_unmount(zfs_handle_t *zhp, const char *mountpoint, int flags)
 		 * overwritten later. We strdup it to play it safe.
 		 */
 		if (mountpoint == NULL)
-		    mntpt = zfs_strdup(zhp->zfs_hdl, entry.mnt_mountp);
+			mntpt = zfs_strdup(zhp->zfs_hdl, entry.mnt_mountp);
 		else
-		    mntpt = zfs_strdup(zhp->zfs_hdl, mountpoint);
+			mntpt = zfs_strdup(zhp->zfs_hdl, mountpoint);
 
 		/*
 		 * Unshare and unmount the filesystem
@@ -455,25 +456,25 @@ _zfs_init_libshare(void)
 
 #if defined(_LP64)
 	if (sysinfo(SI_ARCHITECTURE_64, isa, MAXISALEN) == -1)
-	    isa[0] = '\0';
+		isa[0] = '\0';
 #else
 	isa[0] = '\0';
 #endif
 	(void) snprintf(path, MAXPATHLEN,
-			"/usr/lib/%s/libshare.so.1", isa);
+	    "/usr/lib/%s/libshare.so.1", isa);
 
 	if ((libshare = dlopen(path, RTLD_LAZY | RTLD_GLOBAL)) != NULL) {
-	    _sa_init = (sa_handle_t (*)(int))dlsym(libshare, "sa_init");
-	    _sa_fini = (void (*)(sa_handle_t))dlsym(libshare, "sa_fini");
-	    _sa_find_share = (sa_share_t (*)(sa_handle_t, char *))
-					dlsym(libshare, "sa_find_share");
-	    _sa_enable_share = (int (*)(sa_share_t, char *))dlsym(libshare,
-					"sa_enable_share");
-	    _sa_disable_share = (int (*)(sa_share_t, char *))dlsym(libshare,
-					"sa_disable_share");
-	    _sa_errorstr = (char *(*)(int))dlsym(libshare, "sa_errorstr");
-	    _sa_parse_legacy_options = (int (*)(sa_group_t, char *, char *))
-				dlsym(libshare, "sa_parse_legacy_options");
+		_sa_init = (sa_handle_t (*)(int))dlsym(libshare, "sa_init");
+		_sa_fini = (void (*)(sa_handle_t))dlsym(libshare, "sa_fini");
+		_sa_find_share = (sa_share_t (*)(sa_handle_t, char *))
+		    dlsym(libshare, "sa_find_share");
+		_sa_enable_share = (int (*)(sa_share_t, char *))dlsym(libshare,
+		    "sa_enable_share");
+		_sa_disable_share = (int (*)(sa_share_t, char *))dlsym(libshare,
+		    "sa_disable_share");
+		_sa_errorstr = (char *(*)(int))dlsym(libshare, "sa_errorstr");
+		_sa_parse_legacy_options = (int (*)(sa_group_t, char *, char *))
+		    dlsym(libshare, "sa_parse_legacy_options");
 	}
 }
 
@@ -491,15 +492,15 @@ zfs_init_libshare(libzfs_handle_t *zhandle, int service)
 {
 	int ret = SA_OK;
 
-	if (_sa_init == NULL) {
-	    ret = SA_CONFIG_ERR;
-	}
-	if (ret == SA_OK && zhandle && zhandle->libzfs_sharehdl == NULL) {
-	    zhandle->libzfs_sharehdl = _sa_init(service);
-	}
-	if (ret == SA_OK && zhandle->libzfs_sharehdl == NULL) {
-	    ret = SA_NO_MEMORY;
-	}
+	if (_sa_init == NULL)
+		ret = SA_CONFIG_ERR;
+
+	if (ret == SA_OK && zhandle && zhandle->libzfs_sharehdl == NULL)
+		zhandle->libzfs_sharehdl = _sa_init(service);
+
+	if (ret == SA_OK && zhandle->libzfs_sharehdl == NULL)
+		ret = SA_NO_MEMORY;
+
 	return (ret);
 }
 
@@ -515,9 +516,9 @@ zfs_uninit_libshare(libzfs_handle_t *zhandle)
 {
 
 	if (zhandle != NULL && zhandle->libzfs_sharehdl != NULL) {
-	    if (_sa_fini != NULL)
-		_sa_fini(zhandle->libzfs_sharehdl);
-	    zhandle->libzfs_sharehdl = NULL;
+		if (_sa_fini != NULL)
+			_sa_fini(zhandle->libzfs_sharehdl);
+		zhandle->libzfs_sharehdl = NULL;
 	}
 }
 
@@ -534,9 +535,9 @@ zfs_parse_options(char *options, char *proto)
 	int ret;
 
 	if (_sa_parse_legacy_options != NULL)
-	    ret = _sa_parse_legacy_options(NULL, options, proto);
+		ret = _sa_parse_legacy_options(NULL, options, proto);
 	else
-	    ret = SA_CONFIG_ERR;
+		ret = SA_CONFIG_ERR;
 	return (ret);
 }
 
@@ -551,7 +552,7 @@ static sa_share_t
 zfs_sa_find_share(sa_handle_t handle, char *path)
 {
 	if (_sa_find_share != NULL)
-	    return (_sa_find_share(handle, path));
+		return (_sa_find_share(handle, path));
 	return (NULL);
 }
 
@@ -566,7 +567,7 @@ static int
 zfs_sa_enable_share(sa_share_t share, char *proto)
 {
 	if (_sa_enable_share != NULL)
-	    return (_sa_enable_share(share, proto));
+		return (_sa_enable_share(share, proto));
 	return (SA_CONFIG_ERR);
 }
 
@@ -581,7 +582,7 @@ static int
 zfs_sa_disable_share(sa_share_t share, char *proto)
 {
 	if (_sa_disable_share != NULL)
-	    return (_sa_disable_share(share, proto));
+		return (_sa_disable_share(share, proto));
 	return (SA_CONFIG_ERR);
 }
 
@@ -619,25 +620,25 @@ zfs_share_nfs(zfs_handle_t *zhp)
 		return (0);
 
 	if ((ret = zfs_init_libshare(hdl, SA_INIT_SHARE_API)) != SA_OK) {
-	    (void) zfs_error_fmt(hdl, EZFS_SHARENFSFAILED,
-			dgettext(TEXT_DOMAIN, "cannot share '%s': %s"),
-			zfs_get_name(zhp), _sa_errorstr(ret));
-	    return (-1);
+		(void) zfs_error_fmt(hdl, EZFS_SHARENFSFAILED,
+		    dgettext(TEXT_DOMAIN, "cannot share '%s': %s"),
+		    zfs_get_name(zhp), _sa_errorstr(ret));
+		return (-1);
 	}
 	share = zfs_sa_find_share(hdl->libzfs_sharehdl, mountpoint);
 	if (share != NULL) {
-	    int err;
-	    err = zfs_sa_enable_share(share, "nfs");
-	    if (err != SA_OK) {
-		(void) zfs_error_fmt(hdl, EZFS_SHARENFSFAILED,
-			dgettext(TEXT_DOMAIN, "cannot share '%s'"),
-			zfs_get_name(zhp));
-		return (-1);
-	    }
+		int err;
+		err = zfs_sa_enable_share(share, "nfs");
+		if (err != SA_OK) {
+			(void) zfs_error_fmt(hdl, EZFS_SHARENFSFAILED,
+			    dgettext(TEXT_DOMAIN, "cannot share '%s'"),
+			    zfs_get_name(zhp));
+			return (-1);
+		}
 	} else {
 		(void) zfs_error_fmt(hdl, EZFS_SHARENFSFAILED,
-			dgettext(TEXT_DOMAIN, "cannot share '%s'"),
-			zfs_get_name(zhp));
+		    dgettext(TEXT_DOMAIN, "cannot share '%s'"),
+		    zfs_get_name(zhp));
 		return (-1);
 	}
 
@@ -665,9 +666,8 @@ unshare_one(libzfs_handle_t *hdl, const char *name, const char *mountpoint)
 	if ((err = zfs_init_libshare(hdl, SA_INIT_SHARE_API)) != SA_OK) {
 		free(mntpt);	/* don't need the copy anymore */
 		return (zfs_error_fmt(hdl, EZFS_SHARENFSFAILED,
-				dgettext(TEXT_DOMAIN,
-					"cannot unshare '%s': %s"),
-					name, _sa_errorstr(err)));
+		    dgettext(TEXT_DOMAIN, "cannot unshare '%s': %s"),
+		    name, _sa_errorstr(err)));
 	}
 
 	share = zfs_sa_find_share(hdl->libzfs_sharehdl, mntpt);
@@ -676,15 +676,14 @@ unshare_one(libzfs_handle_t *hdl, const char *name, const char *mountpoint)
 	if (share != NULL) {
 		err = zfs_sa_disable_share(share, "nfs");
 		if (err != SA_OK) {
-		    return (zfs_error_fmt(hdl, EZFS_UNSHARENFSFAILED,
-				dgettext(TEXT_DOMAIN,
-				"cannot unshare '%s': %s"), name,
-				_sa_errorstr(err)));
+			return (zfs_error_fmt(hdl, EZFS_UNSHARENFSFAILED,
+			    dgettext(TEXT_DOMAIN, "cannot unshare '%s': %s"),
+			    name, _sa_errorstr(err)));
 		}
 	} else {
 		return (zfs_error_fmt(hdl, EZFS_UNSHARENFSFAILED,
-			    dgettext(TEXT_DOMAIN,
-			    "cannot unshare '%s': not found"), name));
+		    dgettext(TEXT_DOMAIN, "cannot unshare '%s': not found"),
+		    name));
 	}
 	return (0);
 }
@@ -702,9 +701,9 @@ zfs_unshare_nfs(zfs_handle_t *zhp, const char *mountpoint)
 	search.mnt_special = (char *)zfs_get_name(zhp);
 	search.mnt_fstype = MNTTYPE_ZFS;
 	rewind(zhp->zfs_hdl->libzfs_mnttab);
-	if (mountpoint != NULL) {
-	    mountpoint = mntpt = zfs_strdup(zhp->zfs_hdl, mountpoint);
-	}
+	if (mountpoint != NULL)
+		mountpoint = mntpt = zfs_strdup(zhp->zfs_hdl, mountpoint);
+
 	if (mountpoint != NULL || ((zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM) &&
 	    getmntany(zhp->zfs_hdl->libzfs_mnttab, &entry, &search) == 0)) {
 
@@ -719,7 +718,7 @@ zfs_unshare_nfs(zfs_handle_t *zhp, const char *mountpoint)
 		}
 	}
 	if (mntpt != NULL)
-	    free(mntpt);
+		free(mntpt);
 
 	return (0);
 }
@@ -936,11 +935,10 @@ zpool_enable_datasets(zpool_handle_t *zhp, const char *mntopts, int flags)
 	good = zfs_alloc(zhp->zpool_hdl, cb.cb_used * sizeof (int));
 	ret = 0;
 	for (i = 0; i < cb.cb_used; i++) {
-		if (zfs_mount(cb.cb_datasets[i], mntopts, flags) != 0) {
+		if (zfs_mount(cb.cb_datasets[i], mntopts, flags) != 0)
 			ret = -1;
-		} else {
+		else
 			good[i] = 1;
-		}
 	}
 	/*
 	 * Then share all the ones that need to be shared. This needs
