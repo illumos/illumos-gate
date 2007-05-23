@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
@@ -329,7 +329,7 @@ top:
 		    ch->ch_vers == ci->cl_vers &&
 		    ch->ch_dev == svp->sv_knconf->knc_rdev &&
 		    (strcmp(ch->ch_protofmly,
-			svp->sv_knconf->knc_protofmly) == 0))
+		    svp->sv_knconf->knc_protofmly) == 0))
 			break;
 		plistp = &ch->ch_next;
 	}
@@ -670,7 +670,7 @@ clreclaim_zone(struct nfs_clnt *nfscl, uint_t cl_holdtime)
 		cpl = ch->ch_list;
 		cpp = &ch->ch_list;
 		while (cpl != NULL &&
-			cpl->ch_freed + cl_holdtime > gethrestime_sec()) {
+		    cpl->ch_freed + cl_holdtime > gethrestime_sec()) {
 			cpp = &cpl->ch_list;
 			cpl = cpl->ch_list;
 		}
@@ -945,7 +945,7 @@ rfscall(mntinfo_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 
 
 	TRACE_2(TR_FAC_NFS, TR_RFSCALL_START,
-		"rfscall_start:which %d mi %p", which, mi);
+	    "rfscall_start:which %d mi %p", which, mi);
 
 	nfscl = zone_getspecific(nfsclnt_zone_key, nfs_zone());
 	ASSERT(nfscl != NULL);
@@ -1056,8 +1056,8 @@ failoverretry:
 		mutex_exit(&mi->mi_lock);
 
 		if ((rpcerr.re_errno == ETIMEDOUT ||
-				rpcerr.re_errno == ECONNRESET) &&
-				failover_safe(fi)) {
+		    rpcerr.re_errno == ECONNRESET) &&
+		    failover_safe(fi)) {
 			if (svp == mi->mi_curr_serv)
 				failover_newserver(mi);
 			goto failoverretry;
@@ -1495,7 +1495,7 @@ aclcall(mntinfo_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 
 #if 0 /* notyet */
 	TRACE_2(TR_FAC_NFS, TR_RFSCALL_START,
-		"rfscall_start:which %d mi %p", which, mi);
+	    "rfscall_start:which %d mi %p", which, mi);
 #endif
 
 	nfscl = zone_getspecific(nfsclnt_zone_key, nfs_zone());
@@ -1604,8 +1604,8 @@ failoverretry:
 		mutex_exit(&mi->mi_lock);
 
 		if ((rpcerr.re_errno == ETIMEDOUT ||
-				rpcerr.re_errno == ECONNRESET) &&
-				failover_safe(fi)) {
+		    rpcerr.re_errno == ECONNRESET) &&
+		    failover_safe(fi)) {
 			if (svp == mi->mi_curr_serv)
 				failover_newserver(mi);
 			goto failoverretry;
@@ -2396,7 +2396,7 @@ makenfs3node(nfs_fh3 *fh, fattr3 *attr, struct vfs *vfsp, hrtime_t t,
 		else
 			vp->v_type = nf3_to_vt[attr->type];
 		vp->v_rdev = makedevice(attr->rdev.specdata1,
-			    attr->rdev.specdata2);
+		    attr->rdev.specdata2);
 		nfs3_attrcache(vp, attr, t);
 		rw_exit(&rtable[index].r_lock);
 	}
@@ -3482,8 +3482,7 @@ nfs_subrinit(void)
 	 * Allocate and initialize the client handle cache
 	 */
 	chtab_cache = kmem_cache_create("client_handle_cache",
-		sizeof (struct chtab), 0, NULL, NULL, clreclaim, NULL,
-		NULL, 0);
+	    sizeof (struct chtab), 0, NULL, NULL, clreclaim, NULL, NULL, 0);
 	/*
 	 * Initialize the list of per-zone client handles (and associated data).
 	 * This needs to be done before we call zone_key_create().
@@ -3654,6 +3653,7 @@ puterrno3(int error)
 		return (NFS3ERR_STALE);
 	case EREMOTE:
 		return (NFS3ERR_REMOTE);
+	case ENOSYS:
 	case EOPNOTSUPP:
 		return (NFS3ERR_NOTSUPP);
 	case EOVERFLOW:
@@ -3673,6 +3673,7 @@ puterrno3(int error)
 		return (NFS3ERR_DQUOT);
 	case ESTALE:
 		return (NFS3ERR_STALE);
+	case ENOSYS:
 	case EOPNOTSUPP:
 		return (NFS3ERR_NOTSUPP);
 	case EREMOTE:
@@ -4759,7 +4760,7 @@ nfs_rw_enter_sig(nfs_rwlock_t *l, krw_t rw, int intr)
 #ifdef	DEBUG
 		if ((l->count % 10000) == 9999)
 			cmn_err(CE_WARN, "nfs_rw_enter_sig: count %d on"
-				"rwlock @ %p\n", l->count, (void *)&l);
+			    "rwlock @ %p\n", l->count, (void *)&l);
 #endif
 		l->count++;
 	} else {

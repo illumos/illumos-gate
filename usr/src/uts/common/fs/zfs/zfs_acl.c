@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -438,7 +438,7 @@ zfs_aclset_common(znode_t *zp, zfs_acl_t *aclp, dmu_tx_t *tx, int *ihp)
 		 */
 		if (zphys->zp_acl.z_acl_extern_obj) {
 			error = dmu_object_free(zfsvfs->z_os,
-				zp->z_phys->zp_acl.z_acl_extern_obj, tx);
+			    zp->z_phys->zp_acl.z_acl_extern_obj, tx);
 			if (error)
 				return (error);
 			zphys->zp_acl.z_acl_extern_obj = 0;
@@ -1161,7 +1161,7 @@ zfs_setacl(znode_t *zp, vsecattr_t *vsecp, cred_t *cr)
 	zfs_acl_t	*aclp;
 
 	if (mask == 0)
-		return (EINVAL);
+		return (ENOSYS);
 
 	if (!zfs_acl_valid(zp, acep, aclcnt, &inherit))
 		return (EINVAL);
