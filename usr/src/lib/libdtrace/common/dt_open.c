@@ -101,8 +101,9 @@
 #define	DT_VERS_1_3	DT_VERSION_NUMBER(1, 3, 0)
 #define	DT_VERS_1_4	DT_VERSION_NUMBER(1, 4, 0)
 #define	DT_VERS_1_4_1	DT_VERSION_NUMBER(1, 4, 1)
-#define	DT_VERS_LATEST	DT_VERS_1_4_1
-#define	DT_VERS_STRING	"Sun D 1.4.1"
+#define	DT_VERS_1_5	DT_VERSION_NUMBER(1, 5, 0)
+#define	DT_VERS_LATEST	DT_VERS_1_5
+#define	DT_VERS_STRING	"Sun D 1.5"
 
 const dt_version_t _dtrace_versions[] = {
 	DT_VERS_1_0,	/* D API 1.0.0 (PSARC 2001/466) Solaris 10 FCS */
@@ -113,6 +114,7 @@ const dt_version_t _dtrace_versions[] = {
 	DT_VERS_1_3,	/* D API 1.3 Solaris Express 10/06 */
 	DT_VERS_1_4,	/* D API 1.4 Solaris Express 2/07 */
 	DT_VERS_1_4_1,	/* D API 1.4.1 Solaris Express 4/07 */
+	DT_VERS_1_5,	/* D API 1.5 Solaris Express 7/07 */
 	0
 };
 
@@ -233,11 +235,11 @@ static const dt_ident_t _dtrace_globals[] = {
 { "index", DT_IDENT_FUNC, 0, DIF_SUBR_INDEX, DT_ATTR_STABCMN, DT_VERS_1_1,
 	&dt_idops_func, "int(const char *, const char *, [int])" },
 { "inet_ntoa", DT_IDENT_FUNC, 0, DIF_SUBR_INET_NTOA, DT_ATTR_STABCMN,
-	DT_VERS_1_0, &dt_idops_func, "string(ipaddr_t *)" },
+	DT_VERS_1_5, &dt_idops_func, "string(ipaddr_t *)" },
 { "inet_ntoa6", DT_IDENT_FUNC, 0, DIF_SUBR_INET_NTOA6, DT_ATTR_STABCMN,
-	DT_VERS_1_0, &dt_idops_func, "string(in6_addr_t *)" },
+	DT_VERS_1_5, &dt_idops_func, "string(in6_addr_t *)" },
 { "inet_ntop", DT_IDENT_FUNC, 0, DIF_SUBR_INET_NTOP, DT_ATTR_STABCMN,
-	DT_VERS_1_0, &dt_idops_func, "string(int, void *)" },
+	DT_VERS_1_5, &dt_idops_func, "string(int, void *)" },
 { "ipl", DT_IDENT_SCALAR, 0, DIF_VAR_IPL, DT_ATTR_STABCMN, DT_VERS_1_0,
 	&dt_idops_type, "uint_t" },
 { "jstack", DT_IDENT_ACTFUNC, 0, DT_ACT_JSTACK, DT_ATTR_STABCMN, DT_VERS_1_0,
