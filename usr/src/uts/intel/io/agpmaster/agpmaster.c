@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,7 +66,8 @@ int agpm_debug = 0;
 
 #define	IS_INTEL_9XX(agpmaster) ((agpmaster->agpm_id == INTEL_IGD_910) || \
 		    (agpmaster->agpm_id == INTEL_IGD_910M) || \
-		    (agpmaster->agpm_id == INTEL_IGD_945))
+		    (agpmaster->agpm_id == INTEL_IGD_945) || \
+		    (agpmaster->agpm_id == INTEL_IGD_945GM))
 
 static struct modlmisc modlmisc = {
 	&mod_miscops, "AGP master interfaces v%I%"
@@ -195,8 +196,8 @@ agpmaster_attach(dev_info_t *devi, agp_master_softc_t **master_softcp,
 			    agpmaster->agpm_data.agpm_gtt.gtt_mmio_base;
 		} else
 			agpmaster->agpm_data.agpm_gtt.gtt_addr =
-			agpmaster->agpm_data.agpm_gtt.gtt_mmio_base +
-			I8XX_PTE_OFFSET;
+			    agpmaster->agpm_data.agpm_gtt.gtt_mmio_base +
+			    I8XX_PTE_OFFSET;
 
 		/* get graphics memory size */
 		if (IS_INTEL_9XX(agpmaster)) {
@@ -346,7 +347,7 @@ agpmaster_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred,
 
 		ddi_put32(softc->agpm_data.agpm_gtt.gtt_mmio_handle,
 		    (uint32_t *)(softc->agpm_data.agpm_gtt.gtt_mmio_base +
-			I8XX_PGTBL_CTL),
+		    I8XX_PGTBL_CTL),
 		    addr);
 		break;
 	case I8XX_GET_INFO:
@@ -402,7 +403,7 @@ agpmaster_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred,
 			ddi_put32(softc->agpm_data.agpm_gtt.gtt_mmio_handle,
 			    (uint32_t *)
 			    (softc->agpm_data.agpm_gtt.gtt_mmio_base +
-				I8XX_PGTBL_CTL), 0);
+			    I8XX_PGTBL_CTL), 0);
 		/*
 		 * may need to clear all gtt entries here for i830 series,
 		 * but may not be necessary
@@ -425,7 +426,7 @@ agpmaster_cap_find(ddi_acc_handle_t acc_handle)
 
 	/* check if this device supports capibility pointer */
 	value = (uint8_t)(pci_config_get16(acc_handle, PCI_CONF_STAT)
-			    & PCI_CONF_CAP_MASK);
+	    & PCI_CONF_CAP_MASK);
 
 	if (!value)
 		return (0);
@@ -468,6 +469,7 @@ detect_i8xx_device(agp_master_softc_t *master_softc)
 	case INTEL_IGD_910:
 	case INTEL_IGD_910M:
 	case INTEL_IGD_945:
+	case INTEL_IGD_945GM:
 		master_softc->agpm_dev_type = DEVICE_IS_I830;
 		break;
 	default:		/* unknown id */

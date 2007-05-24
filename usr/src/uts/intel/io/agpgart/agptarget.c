@@ -333,6 +333,7 @@ i8xx_biosmem_detect(agp_target_softstate_t *softstate)
 		break;
 	case INTEL_BR_910:
 	case INTEL_BR_945:
+	case INTEL_BR_945GM:
 		memval = pci_config_get8(softstate->tsoft_pcihdl, I8XX_CONF_GC);
 		switch (memval & I8XX_GC_MODE_MASK) {
 		case I8XX_GC_MODE1:
@@ -531,7 +532,7 @@ agp_target_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 		info.iagp_ver.agpv_minor = (uint16_t)((value >> 16) & 0xf);
 		info.iagp_devid = st->tsoft_devid;
 		info.iagp_mode = pci_config_get32(st->tsoft_pcihdl,
-			    cap + AGP_CONF_STATUS);
+		    cap + AGP_CONF_STATUS);
 		info.iagp_aperbase = agp_target_get_apbase(st);
 		info.iagp_apersize = agp_target_get_apsize(st);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,7 @@ extern "C" {
 #define	INTEL_BR_910			0x25808086
 #define	INTEL_BR_910M			0x25908086
 #define	INTEL_BR_945			0x27708086
+#define	INTEL_BR_945GM			0x27a08086
 
 /* AGP common register offset in pci configuration space */
 #define	AGP_CONF_MISC			0x51 /* one byte */
@@ -121,6 +122,7 @@ extern "C" {
 #define	INTEL_IGD_910			0x25828086
 #define	INTEL_IGD_910M			0x25928086
 #define	INTEL_IGD_945			0x27728086
+#define	INTEL_IGD_945GM			0x27a28086
 #define	I8XX_CONF_GMADR			0x10 /* offset in PCI config space */
 #define	I915_CONF_GMADR			0x18 /* offset in PCI config space */
 #define	I8XX_CONF_GC			0x52 /* offset in PCI config space */
