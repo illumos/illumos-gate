@@ -908,3 +908,7 @@ usr/lib/llib-lpri			sparc
 usr/lib/llib-lpri.ln			sparc
 usr/lib/sparcv9/libpri.so		sparc
 usr/lib/sparcv9/llib-lpri.ln		sparc
+#
+# Private/Internal u8_textprep header file. Do not ship.
+#
+usr/include/sys/u8_textprep_data.h	sparc

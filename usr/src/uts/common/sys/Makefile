@@ -530,6 +530,7 @@ CHKHDRS=			\
 	turnstile.h		\
 	types.h			\
 	types32.h		\
+	u8_textprep_data.h	\
 	uadmin.h		\
 	ucred.h			\
 	uio.h			\

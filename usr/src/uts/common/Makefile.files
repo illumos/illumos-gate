@@ -318,6 +318,7 @@ GENUNIX_OBJS +=	\
 		tnf_res.o	\
 		turnstile.o	\
 		tty_common.o	\
+		u8_textprep.o	\
 		uadmin.o	\
 		uconv.o		\
 		ucredsys.o	\
