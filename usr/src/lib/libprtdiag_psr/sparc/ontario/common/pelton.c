@@ -57,7 +57,6 @@
 #define	TEXT_DOMAIN	"SYS_TEST"
 #endif
 
-
 /* local functions */
 static int pelton_get_first_compatible_value(picl_nodehdl_t nodeh,
     char **outbuf);
@@ -73,13 +72,23 @@ get_bus_type(char *path, struct io_card *card)
 		(void) strcpy(card->bus_type, "PCIX");
 	} else if (strncmp(path, PEL_PCIX_SLOT2, PCIX_COMP_NUM) == 0) {
 		(void) strcpy(card->bus_type, "PCIX");
-	} else if (strncmp(path, PEL_PCIX_SLOT3, PCIX_COMP_NUM) == 0) {
+	} else if (strncmp(path, PEL_PCIX_ONBOARD0, PCIX_COMP_NUM) == 0) {
 		(void) strcpy(card->bus_type, "PCIX");
 	} else {
 		(void) strcpy(card->bus_type, "PCIE");
 	}
 }
 
+/*
+ * 'path' is the device-path of the *parent* of the IO card ('card').
+ *
+ * Compare the prefix of the string representing the device-path with
+ * the strings representing the platform's Slots.
+ *
+ * Note that string for PEL_PCIX_SLOT1 is a prefix of PEL_PCIX_SLOT2's
+ * string.  Since we want to match the longest possible substring of
+ * 'path', compare SLOT2 before comparing SLOT1.
+ */
 static void
 get_slot_number(char *path, struct io_card *card)
 {
@@ -87,14 +96,14 @@ get_slot_number(char *path, struct io_card *card)
 		(void) strcpy(card->slot_str, "0");
 		card->slot = 0;
 	} else if (strncmp(path, PEL_PCIX_SLOT2, strlen(PEL_PCIX_SLOT2)) == 0) {
-		(void) strcpy(card->slot_str, "PCIX");
-		card->slot = -1;
+		(void) strcpy(card->slot_str, "2");
+		card->slot = 2;
 	} else if (strncmp(path, PEL_PCIX_SLOT1, strlen(PEL_PCIX_SLOT1)) == 0) {
-		(void) strcpy(card->slot_str, "PCIX");
-		card->slot = -1;
+		(void) strcpy(card->slot_str, "3");
+		card->slot = 3;
 	} else if (strncmp(path, PEL_PCIX_SLOT0, strlen(PEL_PCIX_SLOT0)) == 0) {
-		(void) strcpy(card->slot_str, "PCIX");
-		card->slot = -1;
+		(void) strcpy(card->slot_str, "1");
+		card->slot = 1;
 	} else {
 		(void) strcpy(card->slot_str, IOBOARD);
 		card->slot = -1;
@@ -105,16 +114,16 @@ static int
 pelton_get_network_instance(char *path)
 {
 	if (strncmp(path, PEL_NETWORK_1_PATH,
-		strlen(PEL_NETWORK_1_PATH)) == 0) {
+	    strlen(PEL_NETWORK_1_PATH)) == 0) {
 		return (1);
 	} else if (strncmp(path, PEL_NETWORK_3_PATH,
-		strlen(PEL_NETWORK_3_PATH)) == 0) {
+	    strlen(PEL_NETWORK_3_PATH)) == 0) {
 		return (3);
 	} else if (strncmp(path, PEL_NETWORK_0_PATH,
-		strlen(PEL_NETWORK_0_PATH)) == 0) {
+	    strlen(PEL_NETWORK_0_PATH)) == 0) {
 		return (0);
 	} else if (strncmp(path, PEL_NETWORK_2_PATH,
-		strlen(PEL_NETWORK_2_PATH)) == 0) {
+	    strlen(PEL_NETWORK_2_PATH)) == 0) {
 		return (2);
 	} else {
 		return (-1);
@@ -156,14 +165,9 @@ pelton_pci_callback(picl_nodehdl_t pcih, void *args)
 		if (err !=  PICL_SUCCESS)
 			return (err);
 
-		if (strcmp(piclclass, "pciex") == 0) {
+		if ((strcmp(piclclass, PICL_CLASS_PCIEX) == 0) ||
+		    (strcmp(piclclass, PICL_CLASS_PCI) == 0)) {
 			err = picl_get_propval_by_name(nodeh, PICL_PROP_PEER,
-			    &nodeh, sizeof (picl_nodehdl_t));
-			continue;
-		}
-
-		if (strcmp(piclclass, PICL_CLASS_PCI) == 0) {
-			err = picl_get_propval_by_name(nodeh, PICL_PROP_CHILD,
 			    &nodeh, sizeof (picl_nodehdl_t));
 			continue;
 		}
@@ -332,7 +336,7 @@ pelton_hw_rev_callback(picl_nodehdl_t pcih, void *args)
 	if ((strcmp(path, PEL_PCIX_SLOT0) == 0) ||
 	    (strcmp(path, PEL_PCIX_SLOT1) == 0) ||
 	    (strcmp(path, PEL_PCIX_SLOT2) == 0) ||
-	    (strcmp(path, PEL_PCIX_SLOT3) == 0)) {
+	    (strcmp(path, PEL_PCIX_ONBOARD0) == 0)) {
 		device_found = 1;
 		(void) snprintf(NAC, sizeof (NAC), "%s/%s", IOBOARD,
 		    PCI_BRIDGE);
@@ -399,7 +403,7 @@ pelton_get_first_compatible_value(picl_nodehdl_t nodeh, char **outbuf)
 	err = picl_get_propinfo_by_name(nodeh, OBP_PROP_COMPATIBLE,
 	    &pinfo, &proph);
 	if (err != PICL_SUCCESS)
-	    return (err);
+		return (err);
 
 	if (pinfo.type == PICL_PTYPE_CHARSTRING) {
 		pval = malloc(pinfo.size);
@@ -428,7 +432,7 @@ pelton_get_first_compatible_value(picl_nodehdl_t nodeh, char **outbuf)
 
 	err = picl_get_propinfo(rowproph, &pinfo);
 	if (err != PICL_SUCCESS)
-	    return (err);
+		return (err);
 
 	pval = malloc(pinfo.size);
 	if (pval == NULL)
@@ -465,8 +469,8 @@ pelton_get_int_propval(picl_nodehdl_t modh, char *prop_name, int *ret)
 	 * If it is not an int, uint or byte array prop, return failure
 	 */
 	if ((pinfo.type != PICL_PTYPE_INT) &&
-		(pinfo.type != PICL_PTYPE_UNSIGNED_INT) &&
-		(pinfo.type != PICL_PTYPE_BYTEARRAY)) {
+	    (pinfo.type != PICL_PTYPE_UNSIGNED_INT) &&
+	    (pinfo.type != PICL_PTYPE_BYTEARRAY)) {
 		*ret = PICL_FAILURE;
 		return (0);
 	}

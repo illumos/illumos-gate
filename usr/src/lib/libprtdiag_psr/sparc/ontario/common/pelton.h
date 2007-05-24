@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,7 +64,7 @@ extern "C" {
 #define	PEL_PCIX_SLOT0			"/pci@780/pci@0/pci@8/pci@0"
 #define	PEL_PCIX_SLOT1			"/pci@7c0/pci@0/pci@9/pci@0"
 #define	PEL_PCIX_SLOT2			"/pci@7c0/pci@0/pci@9/pci@0,2"
-#define	PEL_PCIX_SLOT3			"/pci@7c0/pci@0/pci@1/pci@0"
+#define	PEL_PCIX_ONBOARD0		"/pci@7c0/pci@0/pci@1/pci@0"
 #define	PEL_LSI_PATH		"/pci@780/pci@0/pci@8/pci@0/LSILogic,sas@1"
 #define	PEL_SAS_HBA		"SAS-SATA-HBA"
 

@@ -335,28 +335,30 @@ sun4v_display_pci(picl_nodehdl_t plafh)
 	 * Call functions based on appropriate platform
 	 */
 	if ((strncmp(platbuf, ONTARIO_PLATFORM,
-		strlen(ONTARIO_PLATFORM)) == 0) ||
+	    strlen(ONTARIO_PLATFORM)) == 0) ||
 	    (strncmp(platbuf, ONTARIO_PLATFORM2,
-		strlen(ONTARIO_PLATFORM2)) == 0)) {
+	    strlen(ONTARIO_PLATFORM2)) == 0)) {
 		(void) picl_walk_tree_by_class(plafh, "pciex",
-			"pciex", ontario_pci_callback);
+		    "pciex", ontario_pci_callback);
 		(void) picl_walk_tree_by_class(plafh, "pci",
-			"pci", ontario_pci_callback);
+		    "pci", ontario_pci_callback);
 	} else if ((strncmp(platbuf, PELTON_PLATFORM,
-		strlen(PELTON_PLATFORM))) == 0) {
+	    strlen(PELTON_PLATFORM))) == 0) {
 		(void) picl_walk_tree_by_class(plafh, "pciex",
 		    "pciex", pelton_pci_callback);
+		(void) picl_walk_tree_by_class(plafh, "pci",
+		    "pci", pelton_pci_callback);
 	} else if ((strncmp(platbuf, STPAUL_PLATFORM,
-		strlen(STPAUL_PLATFORM))) == 0) {
+	    strlen(STPAUL_PLATFORM))) == 0) {
 		(void) picl_walk_tree_by_class(plafh, "pciex",
 		    "pciex", stpaul_pci_callback);
 	} else if ((strncmp(platbuf, HURON_1U_PLATFORM,
-		strlen(HURON_1U_PLATFORM)) == 0) || (strncmp(platbuf,
-		HURON_2U_PLATFORM, strlen(HURON_2U_PLATFORM)) == 0)) {
+	    strlen(HURON_1U_PLATFORM)) == 0) || (strncmp(platbuf,
+	    HURON_2U_PLATFORM, strlen(HURON_2U_PLATFORM)) == 0)) {
 			(void) picl_walk_tree_by_class(plafh, "sun4v",
-				"niu", huron_pci_callback);
+			    "niu", huron_pci_callback);
 			(void) picl_walk_tree_by_class(plafh, "pciex",
-				"pciex", huron_pci_callback);
+			    "pciex", huron_pci_callback);
 	} else {
 		(void) picl_walk_tree_by_class(plafh, "pciex", "pciex",
 		    erie_pci_callback);
@@ -508,22 +510,22 @@ sun4v_display_hw_revisions(Prom_node *root, picl_nodehdl_t plafh)
 	char	*fmt = "%-20s %-45s %-30s %-9s";
 
 	log_printf(dgettext(TEXT_DOMAIN, "\n"
-		"========================= HW Revisions "
-		"=======================================\n\n"));
+	    "========================= HW Revisions "
+	    "=======================================\n\n"));
 
 	log_printf(dgettext(TEXT_DOMAIN,
-		"System PROM revisions:\n"
-		"----------------------\n"));
+	    "System PROM revisions:\n"
+	    "----------------------\n"));
 
 	pnode = dev_find_node(root, "openprom");
 	if (pnode != NULL) {
-	    value = (char *)get_prop_val(find_prop(pnode, "version"));
-	    log_printf(value);
+		value = (char *)get_prop_val(find_prop(pnode, "version"));
+		log_printf(value);
 	}
 
 	log_printf(dgettext(TEXT_DOMAIN, "\n\n"
-		"IO ASIC revisions:\n"
-			    "------------------\n"));
+	    "IO ASIC revisions:\n"
+	    "------------------\n"));
 	log_printf(fmt, "Location", "Path", "Device", "Revision\n", 0);
 	log_printf(fmt, "--------------------",
 	    "---------------------------------------------",
@@ -569,16 +571,16 @@ sun4v_display_hw_revisions(Prom_node *root, picl_nodehdl_t plafh)
 		(void) picl_walk_tree_by_class(plafh, "scsi-2", "scsi-2",
 		    stpaul_hw_rev_callback);
 	} else if ((strncmp(platbuf, HURON_1U_PLATFORM,
-		strlen(HURON_1U_PLATFORM)) == 0) || (strncmp(platbuf,
-		HURON_2U_PLATFORM, strlen(HURON_2U_PLATFORM)) == 0)) {
+	    strlen(HURON_1U_PLATFORM)) == 0) || (strncmp(platbuf,
+	    HURON_2U_PLATFORM, strlen(HURON_2U_PLATFORM)) == 0)) {
 		(void) picl_walk_tree_by_class(plafh, "pciex",
-			"pciex", huron_hw_rev_callback);
+		    "pciex", huron_hw_rev_callback);
 		(void) picl_walk_tree_by_class(plafh, "sun4v",
-			"niu", huron_hw_rev_callback);
+		    "niu", huron_hw_rev_callback);
 		(void) picl_walk_tree_by_class(plafh, "network",
-			"network", huron_hw_rev_callback);
+		    "network", huron_hw_rev_callback);
 		(void) picl_walk_tree_by_class(plafh, "scsi-2", "scsi-2",
-			huron_hw_rev_callback);
+		    huron_hw_rev_callback);
 	} else {
 		(void) picl_walk_tree_by_class(plafh, "pciex", "pciex",
 		    erie_hw_rev_callback);
@@ -607,7 +609,7 @@ ontario_get_first_compatible_value(picl_nodehdl_t nodeh, char **outbuf)
 	err = picl_get_propinfo_by_name(nodeh, OBP_PROP_COMPATIBLE,
 	    &pinfo, &proph);
 	if (err != PICL_SUCCESS)
-	    return (err);
+		return (err);
 
 	if (pinfo.type == PICL_PTYPE_CHARSTRING) {
 		pval = malloc(pinfo.size);
@@ -636,7 +638,7 @@ ontario_get_first_compatible_value(picl_nodehdl_t nodeh, char **outbuf)
 
 	err = picl_get_propinfo(rowproph, &pinfo);
 	if (err != PICL_SUCCESS)
-	    return (err);
+		return (err);
 
 	pval = malloc(pinfo.size);
 	if (pval == NULL)
@@ -673,8 +675,8 @@ ontario_get_int_propval(picl_nodehdl_t modh, char *prop_name, int *ret)
 	 * If it is not an int, uint or byte array prop, return failure
 	 */
 	if ((pinfo.type != PICL_PTYPE_INT) &&
-		(pinfo.type != PICL_PTYPE_UNSIGNED_INT) &&
-		(pinfo.type != PICL_PTYPE_BYTEARRAY)) {
+	    (pinfo.type != PICL_PTYPE_UNSIGNED_INT) &&
+	    (pinfo.type != PICL_PTYPE_BYTEARRAY)) {
 		*ret = PICL_FAILURE;
 		return (0);
 	}
