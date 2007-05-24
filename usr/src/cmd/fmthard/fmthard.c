@@ -31,7 +31,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -824,7 +824,7 @@ fmthard: Partition %d specified as %lld sectors starting at %lld\n\
 
 		if (efi->efi_parts[i].p_tag != V_BACKUP &&
 		    efi->efi_parts[i].p_size != fullsz) {
-			for (j = 0; j < V_NUMPAR; j++) {
+			for (j = 0; j < efi->efi_nparts; j++) {
 				if (efi->efi_parts[j].p_size == fullsz)
 					continue;
 				isize = efi->efi_parts[i].p_size;

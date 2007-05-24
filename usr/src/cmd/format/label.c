@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -234,7 +234,7 @@ SMI_vtoc_to_EFI(int fd, struct dk_gpt **new_vtoc)
 	efi->efi_parts[0].p_tag = V_USR;
 	efi->efi_parts[0].p_start = efi->efi_first_u_lba;
 	efi->efi_parts[0].p_size = efi->efi_last_u_lba - efi->efi_first_u_lba
-		- EFI_MIN_RESV_SIZE;
+	    - EFI_MIN_RESV_SIZE + 1;
 
 	/*
 	 * s1-s6 are unassigned slices
@@ -250,7 +250,7 @@ SMI_vtoc_to_EFI(int fd, struct dk_gpt **new_vtoc)
 	 */
 	efi->efi_parts[efi->efi_nparts - 1].p_tag = V_RESERVED;
 	efi->efi_parts[efi->efi_nparts - 1].p_start =
-		efi->efi_last_u_lba - EFI_MIN_RESV_SIZE;
+	    efi->efi_last_u_lba - EFI_MIN_RESV_SIZE + 1;
 	efi->efi_parts[efi->efi_nparts - 1].p_size = EFI_MIN_RESV_SIZE;
 
 	return (0);

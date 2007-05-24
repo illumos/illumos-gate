@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -272,37 +272,33 @@ auto_efi_sense(int fd, struct efi_info *label)
 
 	label->e_parts = vtoc;
 
-	for (i = 0; i < min(vtoc->efi_nparts, V_NUMPAR); i++) {
-		vtoc->efi_parts[i].p_tag = default_vtoc_map[i].p_tag;
-		vtoc->efi_parts[i].p_flag = default_vtoc_map[i].p_flag;
+	/*
+	 * Create a whole hog EFI partition table:
+	 * S0 takes the whole disk except the primary EFI label,
+	 * backup EFI label, and the reserved partition.
+	 */
+	vtoc->efi_parts[0].p_tag = V_USR;
+	vtoc->efi_parts[0].p_start = vtoc->efi_first_u_lba;
+	vtoc->efi_parts[0].p_size = vtoc->efi_last_u_lba - vtoc->efi_first_u_lba
+	    - EFI_MIN_RESV_SIZE + 1;
+
+	/*
+	 * S1-S6 are unassigned slices.
+	 */
+	for (i = 1; i < vtoc->efi_nparts - 2; i ++) {
+		vtoc->efi_parts[i].p_tag = V_UNASSIGNED;
 		vtoc->efi_parts[i].p_start = 0;
 		vtoc->efi_parts[i].p_size = 0;
 	}
+
 	/*
-	 * Make constants first
-	 * and variable partitions later
+	 * The reserved slice
 	 */
+	vtoc->efi_parts[vtoc->efi_nparts - 1].p_tag = V_RESERVED;
+	vtoc->efi_parts[vtoc->efi_nparts - 1].p_start =
+	    vtoc->efi_last_u_lba - EFI_MIN_RESV_SIZE + 1;
+	vtoc->efi_parts[vtoc->efi_nparts - 1].p_size = EFI_MIN_RESV_SIZE;
 
-	/* root partition - s0 128 MB */
-	vtoc->efi_parts[0].p_start = 34;
-	vtoc->efi_parts[0].p_size = 262144;
-
-	/* partition - s1  128 MB */
-	vtoc->efi_parts[1].p_start = 262178;
-	vtoc->efi_parts[1].p_size = 262144;
-
-	/* partition -s2 is NOT the Backup disk */
-	vtoc->efi_parts[2].p_tag = V_UNASSIGNED;
-
-	/* partition -s6 /usr partition - HOG */
-	vtoc->efi_parts[6].p_start = 524322;
-	vtoc->efi_parts[6].p_size = vtoc->efi_last_u_lba - 524322
-	    - (1024 * 16);
-
-	/* efi reserved partition - s9 16K */
-	vtoc->efi_parts[8].p_start = vtoc->efi_last_u_lba - (1024 * 16);
-	vtoc->efi_parts[8].p_size = (1024 * 16);
-	vtoc->efi_parts[8].p_tag = V_RESERVED;
 	/*
 	 * Now stick all of it into the disk_type struct
 	 */
