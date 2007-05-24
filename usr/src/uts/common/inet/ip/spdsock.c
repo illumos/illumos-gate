@@ -66,6 +66,8 @@
 
 #include <sys/isa_defs.h>
 
+#include <c2/audit.h>
+
 /*
  * This is a transport provider for the PF_POLICY IPsec policy
  * management socket, which provides a management interface into the
@@ -184,6 +186,8 @@ static const uint_t execmodes[] = {
 
 #define	ALL_ACTIVE_POLHEADS ((ipsec_policy_head_t *)-1)
 #define	ALL_INACTIVE_POLHEADS ((ipsec_policy_head_t *)-2)
+
+#define	ITP_NAME(itp) (itp != NULL ? itp->itp_name : NULL)
 
 /* ARGSUSED */
 static int
@@ -565,7 +569,8 @@ spdsock_flush_one(ipsec_policy_head_t *iph, netstack_t *ns)
 }
 
 static void
-spdsock_flush(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp)
+spdsock_flush(queue_t *q, ipsec_policy_head_t *iph, ipsec_tun_pol_t *itp,
+    mblk_t *mp)
 {
 	boolean_t active;
 	spdsock_t *ss = (spdsock_t *)q->q_ptr;
@@ -574,16 +579,29 @@ spdsock_flush(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp)
 
 	if (iph != ALL_ACTIVE_POLHEADS && iph != ALL_INACTIVE_POLHEADS) {
 		spdsock_flush_one(iph, spds->spds_netstack);
+		if (audit_active) {
+			spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+
+			active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
+			audit_pf_policy(SPD_FLUSH, DB_CRED(mp), ns,
+			    ITP_NAME(itp), active, 0, DB_CPID(mp));
+		}
 	} else {
 		active = (iph == ALL_ACTIVE_POLHEADS);
 
 		/* First flush the global policy. */
 		spdsock_flush_one(active ? ipsec_system_policy(ns) :
 		    ipsec_inactive_policy(ns), ns);
-
+		if (audit_active) {
+			audit_pf_policy(SPD_FLUSH, DB_CRED(mp), ns, NULL,
+			    active, 0, DB_CPID(mp));
+		}
 		/* Then flush every tunnel's appropriate one. */
 		itp_walk(spdsock_flush_node, (void *)active,
 		    spds->spds_netstack);
+		if (audit_active)
+			audit_pf_policy(SPD_FLUSH, DB_CRED(mp), ns,
+			    "all tunnels", active, 0, DB_CPID(mp));
 	}
 
 	spd_echo(q, mp);
@@ -985,6 +1003,14 @@ spdsock_addrule(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
 
 	if (rule == NULL) {
 		spdsock_diag(q, mp, SPD_DIAGNOSTIC_NO_RULE_EXT);
+		if (audit_active) {
+			spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+
+			active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
+			audit_pf_policy(SPD_ADDRULE, DB_CRED(mp),
+			    spds->spds_netstack, ITP_NAME(itp), active,
+			    SPD_DIAGNOSTIC_NO_RULE_EXT, DB_CPID(mp));
+		}
 		return;
 	}
 
@@ -1084,6 +1110,13 @@ spdsock_addrule(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
 
 	ipsec_actvec_free(actp, nact);
 	spd_echo(q, mp);
+	if (audit_active) {
+		spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+
+		active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
+		audit_pf_policy(SPD_ADDRULE, DB_CRED(mp), spds->spds_netstack,
+		    ITP_NAME(itp), active, 0, DB_CPID(mp));
+	}
 	return;
 
 fail:
@@ -1099,6 +1132,13 @@ fail2:
 		mutex_exit(&itp->itp_lock);
 	}
 	spdsock_error(q, mp, error, diag);
+	if (audit_active) {
+		spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+
+		active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
+		audit_pf_policy(SPD_ADDRULE, DB_CRED(mp), spds->spds_netstack,
+		    ITP_NAME(itp), active, error, DB_CPID(mp));
+	}
 }
 
 void
@@ -1113,6 +1153,15 @@ spdsock_deleterule(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
 
 	if (rule == NULL) {
 		spdsock_diag(q, mp, SPD_DIAGNOSTIC_NO_RULE_EXT);
+		if (audit_active) {
+			boolean_t active;
+			spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+
+			active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
+			audit_pf_policy(SPD_DELETERULE, DB_CRED(mp),
+			    spds->spds_netstack, ITP_NAME(itp), active,
+			    SPD_DIAGNOSTIC_NO_RULE_EXT, DB_CPID(mp));
+		}
 		return;
 	}
 
@@ -1164,11 +1213,28 @@ spdsock_deleterule(queue_t *q, ipsec_policy_head_t *iph, mblk_t *mp,
 		mutex_exit(&itp->itp_lock);
 	}
 	spd_echo(q, mp);
+	if (audit_active) {
+		boolean_t active;
+		spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+
+		active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
+		audit_pf_policy(SPD_DELETERULE, DB_CRED(mp),
+		    spds->spds_netstack, ITP_NAME(itp), active, 0, DB_CPID(mp));
+	}
 	return;
 fail:
 	if (itp != NULL)
 		mutex_exit(&itp->itp_lock);
 	spdsock_error(q, mp, err, diag);
+	if (audit_active) {
+		boolean_t active;
+		spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+
+		active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
+		audit_pf_policy(SPD_DELETERULE, DB_CRED(mp),
+		    spds->spds_netstack, ITP_NAME(itp), active, err,
+		    DB_CPID(mp));
+	}
 }
 
 /* Do NOT consume a reference to itp. */
@@ -1195,19 +1261,65 @@ spdsock_flip(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 		if (*tname == '\0') {
 			/* can't fail */
 			ipsec_swap_global_policy(spds->spds_netstack);
+			if (audit_active) {
+				boolean_t active;
+				spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+
+				active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
+				audit_pf_policy(SPD_FLIP, DB_CRED(mp),
+				    spds->spds_netstack, NULL, active, 0,
+				    DB_CPID(mp));
+			}
 			itp_walk(spdsock_flip_node, NULL, spds->spds_netstack);
+			if (audit_active) {
+				boolean_t active;
+				spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+
+				active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
+				audit_pf_policy(SPD_FLIP, DB_CRED(mp),
+				    spds->spds_netstack, "all tunnels", active,
+				    0, DB_CPID(mp));
+			}
 		} else {
 			itp = get_tunnel_policy(tname, spds->spds_netstack);
 			if (itp == NULL) {
 				/* Better idea for "tunnel not found"? */
 				spdsock_error(q, mp, ESRCH, 0);
+				if (audit_active) {
+					boolean_t active;
+					spd_msg_t *spmsg =
+					    (spd_msg_t *)mp->b_rptr;
+
+					active = (spmsg->spd_msg_spdid ==
+					    SPD_ACTIVE);
+					audit_pf_policy(SPD_FLIP, DB_CRED(mp),
+					    spds->spds_netstack, ITP_NAME(itp),
+					    active, ESRCH, DB_CPID(mp));
+				}
 				return;
 			}
 			spdsock_flip_node(itp, NULL, NULL);
+			if (audit_active) {
+				boolean_t active;
+				spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+
+				active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
+				audit_pf_policy(SPD_FLIP, DB_CRED(mp),
+				    spds->spds_netstack, ITP_NAME(itp), active,
+				    0, DB_CPID(mp));
+			}
 			ITP_REFRELE(itp, spds->spds_netstack);
 		}
 	} else {
 		ipsec_swap_global_policy(spds->spds_netstack);	/* can't fail */
+		if (audit_active) {
+			boolean_t active;
+			spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+
+			active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
+			audit_pf_policy(SPD_FLIP, DB_CRED(mp),
+			    spds->spds_netstack, NULL, active, 0, DB_CPID(mp));
+		}
 	}
 	spd_echo(q, mp);
 }
@@ -1937,20 +2049,71 @@ spdsock_clone(queue_t *q, mblk_t *mp, spd_if_t *tunname)
 		tname = (char *)tunname->spd_if_name;
 		if (*tname == '\0') {
 			error = ipsec_clone_system_policy(spds->spds_netstack);
-			if (error == 0)
+			if (audit_active) {
+				boolean_t active;
+				spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+
+				active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
+				audit_pf_policy(SPD_CLONE, DB_CRED(mp),
+				    spds->spds_netstack, NULL, active, error,
+				    DB_CPID(mp));
+			}
+			if (error == 0) {
 				itp_walk(spdsock_clone_node, &error,
 				    spds->spds_netstack);
+				if (audit_active) {
+					boolean_t active;
+					spd_msg_t *spmsg =
+					    (spd_msg_t *)mp->b_rptr;
+
+					active = (spmsg->spd_msg_spdid ==
+					    SPD_ACTIVE);
+					audit_pf_policy(SPD_CLONE, DB_CRED(mp),
+					    spds->spds_netstack,
+					    "all tunnels", active, 0,
+					    DB_CPID(mp));
+				}
+			}
 		} else {
 			itp = get_tunnel_policy(tname, spds->spds_netstack);
 			if (itp == NULL) {
 				spdsock_error(q, mp, ENOENT, 0);
+				if (audit_active) {
+					boolean_t active;
+					spd_msg_t *spmsg =
+					    (spd_msg_t *)mp->b_rptr;
+
+					active = (spmsg->spd_msg_spdid ==
+					    SPD_ACTIVE);
+					audit_pf_policy(SPD_CLONE, DB_CRED(mp),
+					    spds->spds_netstack, ITP_NAME(itp),
+					    active, ENOENT, DB_CPID(mp));
+				}
 				return;
 			}
 			spdsock_clone_node(itp, &error, NULL);
 			ITP_REFRELE(itp, spds->spds_netstack);
+			if (audit_active) {
+				boolean_t active;
+				spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+
+				active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
+				audit_pf_policy(SPD_CLONE, DB_CRED(mp),
+				    spds->spds_netstack, ITP_NAME(itp), active,
+				    error, DB_CPID(mp));
+			}
 		}
 	} else {
 		error = ipsec_clone_system_policy(spds->spds_netstack);
+		if (audit_active) {
+			boolean_t active;
+			spd_msg_t *spmsg = (spd_msg_t *)mp->b_rptr;
+
+			active = (spmsg->spd_msg_spdid == SPD_ACTIVE);
+			audit_pf_policy(SPD_CLONE, DB_CRED(mp),
+			    spds->spds_netstack, NULL, active, error,
+			    DB_CPID(mp));
+		}
 	}
 
 	if (error != 0)
@@ -2495,7 +2658,10 @@ spdsock_updatealg(queue_t *q, mblk_t *mp, spd_ext_t *extv[])
 		spds->spds_mp_algs = mp;
 		spds->spds_algs_pending = B_TRUE;
 		mutex_exit(&spds->spds_alg_lock);
-
+		if (audit_active)
+			audit_pf_policy(SPD_UPDATEALGS, DB_CRED(mp),
+			    spds->spds_netstack, NULL, B_TRUE, EAGAIN,
+			    DB_CPID(mp));
 		spd_echo(q, new_mp);
 	} else {
 		/*
@@ -2506,10 +2672,19 @@ spdsock_updatealg(queue_t *q, mblk_t *mp, spd_ext_t *extv[])
 		mutex_enter(&spds->spds_alg_lock);
 		spdsock_do_updatealg(extv, &diag, spds);
 		mutex_exit(&spds->spds_alg_lock);
-		if (diag == -1)
+		if (diag == -1) {
 			spd_echo(q, mp);
-		else
+		if (audit_active)
+			audit_pf_policy(SPD_UPDATEALGS, DB_CRED(mp),
+			    spds->spds_netstack, NULL, B_TRUE, 0,
+			    DB_CPID(mp));
+		} else {
 			spdsock_diag(q, mp, diag);
+		if (audit_active)
+			audit_pf_policy(SPD_UPDATEALGS, DB_CRED(mp),
+			    spds->spds_netstack, NULL, B_TRUE, diag,
+			    DB_CPID(mp));
+		}
 	}
 }
 
@@ -2812,7 +2987,7 @@ spdsock_parse(queue_t *q, mblk_t *mp)
 			mutex_exit(&itp->itp_lock);
 			ITP_REFRELE(itp, ns);
 		}
-		spdsock_flush(q, iph, mp);
+		spdsock_flush(q, iph, itp, mp);
 		return;
 	case SPD_DUMP:
 		if (itp != NULL)

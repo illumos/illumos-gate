@@ -403,7 +403,7 @@ audit_finish(
 	if (tad->tad_flag) {
 		tad->tad_flag = 0;
 
-		if (flag = audit_success(kctx, tad, error)) {
+		if (flag = audit_success(kctx, tad, error, NULL)) {
 			unsigned int sy_flags;
 			cred_t *cr = CRED();
 			const auditinfo_addr_t *ainfo = crgetauinfo(cr);
@@ -497,7 +497,8 @@ audit_finish(
 }
 
 int
-audit_success(au_kcontext_t *kctx, struct t_audit_data *tad, int error)
+audit_success(au_kcontext_t *kctx, struct t_audit_data *tad, int error,
+    cred_t *cr)
 {
 	au_state_t ess;
 	au_state_t esf;
@@ -521,7 +522,12 @@ audit_success(au_kcontext_t *kctx, struct t_audit_data *tad, int error)
 	if (tad->tad_ctrl & PAD_AUDITME)
 		return (AU_OK);
 
-	ainfo = crgetauinfo(CRED());
+	/*
+	 * Used passed cred if available, otherwise use cred from kernel thread
+	 */
+	if (cr == NULL)
+		cr = CRED();
+	ainfo = crgetauinfo(cr);
 	if (ainfo == NULL)
 		return (0);
 	amask = ainfo->ai_mask;

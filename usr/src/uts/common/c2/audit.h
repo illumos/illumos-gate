@@ -486,6 +486,7 @@ typedef struct audit_fstat au_fstat_t;
 #include <netinet/in.h>
 #include <c2/audit_door_infc.h>
 #include <sys/crypto/ioctladmin.h>
+#include <sys/netstack.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -564,7 +565,7 @@ void	audit_async_drop(caddr_t *, int);
 typedef struct au_kcontext au_kcontext_t;
 #endif
 
-int	audit_success(au_kcontext_t *, struct t_audit_data *, int);
+int	audit_success(au_kcontext_t *, struct t_audit_data *, int, cred_t *);
 int	auditme(au_kcontext_t *, struct t_audit_data *, au_state_t);
 void	audit_fixpath(struct audit_path *, int);
 void	audit_ipc(int, int, void *);
@@ -579,6 +580,8 @@ void	audit_setppriv(int, int, const struct priv_set *, const cred_t *);
 void	audit_devpolicy(int, const struct devplcysys *);
 void	audit_update_context(proc_t *, cred_t *);
 void	audit_kssl(int, void *, int);
+void	audit_pf_policy(int, cred_t *, netstack_t *, char *, boolean_t, int,
+    pid_t);
 void	audit_sec_attributes(caddr_t *, struct vnode *);
 
 #endif

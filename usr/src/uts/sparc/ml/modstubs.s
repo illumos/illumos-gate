@@ -871,6 +871,7 @@ stubs_base:
 	NO_UNLOAD_STUB(c2audit, audit_cryptoadm,	nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_update_context,	nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_kssl,		nomod_zero);
+	NO_UNLOAD_STUB(c2audit, audit_pf_policy,	nomod_zero);
 	END_MODULE(c2audit);
 #endif
 

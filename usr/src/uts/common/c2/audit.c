@@ -62,7 +62,9 @@
 #include <sys/disp.h>		/* for servicing_interrupt() */
 #include <sys/devpolicy.h>
 #include <sys/crypto/ioctladmin.h>
+#include <sys/cred_impl.h>
 #include <inet/kssl/kssl.h>
+#include <net/pfpolicy.h>
 
 static void add_return_token(caddr_t *, unsigned int scid, int err, int rval);
 
@@ -863,7 +865,7 @@ audit_core_finish(int code)
 	kctx = GET_KCTX_PZ;
 
 	/* kludge for error 0, should use `code==CLD_DUMPED' instead */
-	if (flag = audit_success(kctx, tad, 0)) {
+	if (flag = audit_success(kctx, tad, 0, NULL)) {
 		cred_t *cr = CRED();
 		const auditinfo_addr_t *ainfo = crgetauinfo(cr);
 
@@ -1252,7 +1254,7 @@ audit_reboot(void)
 		return;
 
 	/* do preselection on success/failure */
-	if (flag = audit_success(kctx, tad, 0)) {
+	if (flag = audit_success(kctx, tad, 0, NULL)) {
 		/* add a process token */
 
 		cred_t *cr = CRED();
@@ -2078,7 +2080,7 @@ audit_cryptoadm(int cmd, char *module_name, crypto_mech_name_t *mech_names,
 
 	tad->tad_event = AUE_CRYPTOADM;
 
-	if (audit_success(kctx, tad, error) != AU_OK)
+	if (audit_success(kctx, tad, error, NULL) != AU_OK)
 		return;
 
 	/* Add subject information */
@@ -2223,7 +2225,7 @@ audit_kssl(int cmd, void *params, int error)
 
 	tad->tad_event = AUE_CONFIGKSSL;
 
-	if (audit_success(kctx, tad, error) != AU_OK)
+	if (audit_success(kctx, tad, error, NULL) != AU_OK)
 		return;
 
 	/* Add subject information */
@@ -2270,6 +2272,144 @@ audit_kssl(int cmd, void *params, int error)
 	AS_INC(as_kernel, 1, kctx);
 
 	au_close(kctx, (caddr_t *)&ad, AU_OK, AUE_CONFIGKSSL, 0);
+}
+
+/*
+ * Audit the kernel PF_POLICY administration commands.  Record command,
+ * zone, policy type (global or tunnel, active or inactive)
+ */
+/*
+ * ROUTINE:	AUDIT_PF_POLICY
+ * PURPOSE:	Records arguments to administrative ioctls on PF_POLICY socket
+ * CALLBY:	SPD_ADDRULE, SPD_DELETERULE, SPD_FLUSH, SPD_UPDATEALGS,
+ *		SPD_CLONE, SPD_FLIP
+ * NOTE:
+ * TODO:
+ * QUESTION:
+ */
+
+void
+audit_pf_policy(int cmd, cred_t *cred, netstack_t *ns, char *tun,
+    boolean_t active, int error, pid_t pid)
+{
+	const auditinfo_addr_t	*ainfo;
+	t_audit_data_t		*tad;
+	token_t			*ad = NULL;
+	au_kcontext_t		*kctx = GET_KCTX_PZ;
+	char			buf[80];
+	int			flag;
+
+	tad = U2A(u);
+	if (tad == NULL)
+		return;
+
+	ainfo = crgetauinfo((cred != NULL) ? cred : CRED());
+	if (ainfo == NULL)
+		return;
+
+	/*
+	 * Initialize some variables since these are only set
+	 * with system calls.
+	 */
+
+	switch (cmd) {
+	case SPD_ADDRULE: {
+		tad->tad_event = AUE_PF_POLICY_ADDRULE;
+		break;
+	}
+
+	case SPD_DELETERULE: {
+		tad->tad_event = AUE_PF_POLICY_DELRULE;
+		break;
+	}
+
+	case SPD_FLUSH: {
+		tad->tad_event = AUE_PF_POLICY_FLUSH;
+		break;
+	}
+
+	case SPD_UPDATEALGS: {
+		tad->tad_event = AUE_PF_POLICY_ALGS;
+		break;
+	}
+
+	case SPD_CLONE: {
+		tad->tad_event = AUE_PF_POLICY_CLONE;
+		break;
+	}
+
+	case SPD_FLIP: {
+		tad->tad_event = AUE_PF_POLICY_FLIP;
+		break;
+	}
+
+	default:
+		tad->tad_event = AUE_NULL;
+	}
+
+	tad->tad_evmod = 0;
+
+	if (flag = audit_success(kctx, tad, error, cred)) {
+		zone_t *nszone;
+
+		/*
+		 * For now, just audit that an event happened,
+		 * along with the error code.
+		 */
+		au_write((caddr_t *)&ad,
+		    au_to_arg32(1, "Policy Active?", (uint32_t)active));
+		au_write((caddr_t *)&ad,
+		    au_to_arg32(2, "Policy Global?", (uint32_t)(tun == NULL)));
+
+		/* Supplemental data */
+
+		/*
+		 * Generate this zone token if the target zone differs
+		 * from the administrative zone.  If netstacks are expanded
+		 * to something other than a 1-1 relationship with zones,
+		 * the auditing framework should create a new token type
+		 * and audit it as a netstack instead.
+		 * Turn on general zone auditing to get the administrative zone.
+		 */
+
+		nszone = zone_find_by_id(netstackid_to_zoneid(
+		    ns->netstack_stackid));
+		if (strncmp(cred->cr_zone->zone_name, nszone->zone_name,
+		    ZONENAME_MAX) != 0) {
+			token_t *ztoken;
+
+			ztoken = au_to_zonename(0, nszone);
+			au_write((caddr_t *)&ad, ztoken);
+		}
+
+		if (tun != NULL) {
+			/* write tunnel name - tun is bounded */
+			(void) snprintf(buf, sizeof (buf), "tunnel_name:%s",
+			    tun);
+			au_write((caddr_t *)&ad, au_to_text(buf));
+		}
+
+		/* Add subject information */
+		AUDIT_SETSUBJ_GENERIC((caddr_t *)&ad,
+		    ((cred != NULL) ? cred : CRED()), ainfo, kctx, pid);
+
+		/* add a return token */
+		add_return_token((caddr_t *)&ad, 0, error, 0);
+
+		AS_INC(as_generated, 1, kctx);
+		AS_INC(as_kernel, 1, kctx);
+
+	}
+	au_close(kctx, (caddr_t *)&ad, flag, tad->tad_event, 0);
+
+	/*
+	 * clear the ctrl flag so that we don't have spurious collection of
+	 * audit information.
+	 */
+	tad->tad_scid  = 0;
+	tad->tad_event = 0;
+	tad->tad_evmod = 0;
+	tad->tad_ctrl  = 0;
 }
 
 /*

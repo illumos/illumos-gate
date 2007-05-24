@@ -338,6 +338,12 @@
 292:AUE_CRYPTOADM:kernel cryptographic framework:as
 293:AUE_CONFIGSSL:configure kernel SSL:as
 294:AUE_BRANDSYS:brandsys(2):ot
+295:AUE_PF_POLICY_ADDRULE:Add IPsec policy rule:as
+296:AUE_PF_POLICY_DELRULE:Delete IPsec policy rule:as
+297:AUE_PF_POLICY_CLONE:Clone IPsec policy:as
+298:AUE_PF_POLICY_FLIP:Flip IPsec policy:as
+299:AUE_PF_POLICY_FLUSH:Flush IPsec policy rules:as
+300:AUE_PF_POLICY_ALGS:Update IPsec algorithms:as
 #
 # user level audit events
 #	2048 -  6143	Reserved

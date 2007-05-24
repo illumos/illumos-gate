@@ -1956,6 +1956,66 @@ label=AUE_XMKNOD
 label=AUE_XSTAT
   skip=Not Used.  xstat() generates AUE_STAT.
 
+label=AUE_PF_POLICY_ADDRULE
+  title=Add IPsec policy rule
+  see=
+  syscall=none
+  format=arg1:arg2:[zone]3:[text]4
+  comment=Operation applied to active policy (1 is active, 0 is inactive):
+  comment=Operation applied to global policy (1 is global, 0 is tunnel):
+  comment=affected zone:
+  comment=Name of target tunnel
+
+label=AUE_PF_POLICY_DELRULE
+  title=Delete IPsec policy rule
+  see=
+  syscall=none
+  format=arg1:arg2:[zone]3:[text]4
+  comment=Operation applied to active policy (1 is active, 0 is inactive):
+  comment=Operation applied to global policy (1 is global, 0 is tunnel):
+  comment=affected zone:
+  comment=Name of target tunnel
+
+label=AUE_PF_POLICY_CLONE
+  title=Clone IPsec policy
+  see=
+  syscall=none
+  format=arg1:arg2:[zone]3:[text]4
+  comment=Operation applied to active policy (1 is active, 0 is inactive):
+  comment=Operation applied to global policy (1 is global, 0 is tunnel):
+  comment=affected zone:
+  comment=Name of target tunnel
+
+label=AUE_PF_POLICY_FLIP
+  title=Flip IPsec policy
+  see=
+  syscall=none
+  format=arg1:arg2:[zone]3:[text]4
+  comment=Operation applied to active policy (1 is active, 0 is inactive):
+  comment=Operation applied to global policy (1 is global, 0 is tunnel):
+  comment=affected zone:
+  comment=Name of target tunnel
+
+label=AUE_PF_POLICY_FLUSH
+  title=Flip IPsec policy rules
+  see=
+  syscall=none
+  format=arg1:arg2:[zone]3:[text]4
+  comment=Operation applied to active policy (1 is active, 0 is inactive):
+  comment=Operation applied to global policy (1 is global, 0 is tunnel):
+  comment=affected zone:
+  comment=Name of target tunnel
+
+label=AUE_PF_POLICY_ALGS
+  title=Update IPsec algorithms
+  see=
+  syscall=none
+  format=arg1:arg2:[zone]3:[text]4
+  comment=Operation applied to active policy (1 is active, 0 is inactive):
+  comment=Operation applied to global policy (1 is global, 0 is tunnel):
+  comment=affected zone:
+  comment=Name of target tunnel
+
 label=AUE_allocate_fail
   program=/usr/sbin/allocate
   title=allocate: allocate-device failure

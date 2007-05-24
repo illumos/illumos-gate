@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -331,9 +331,15 @@ extern "C" {
 #define	AUE_CRYPTOADM		292	/* =as kernel cryptographic framework */
 #define	AUE_CONFIGKSSL		293	/* =as kernel SSL */
 #define	AUE_BRANDSYS		294	/* =ot */
+#define	AUE_PF_POLICY_ADDRULE	295	/* =as Add IPsec policy rule */
+#define	AUE_PF_POLICY_DELRULE	296	/* =as Delete IPsec policy rule */
+#define	AUE_PF_POLICY_CLONE	297	/* =as Clone IPsec policy */
+#define	AUE_PF_POLICY_FLIP	298	/* =as Flip IPsec policy */
+#define	AUE_PF_POLICY_FLUSH	299	/* =as Flush IPsec policy rules */
+#define	AUE_PF_POLICY_ALGS	300	/* =as Update IPsec algorithms */
 /* NOTE: update MAX_KEVENTS below if events are added. */
 
-#define	MAX_KEVENTS		294
+#define	MAX_KEVENTS		300
 
 
 #ifdef __cplusplus
