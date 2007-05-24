@@ -813,4 +813,5 @@ SUNWprivate_1.1 {
 
     local:
 	__cerror =		NODYNSORT;
+	__cleanup =		NODYNSORT;
 };

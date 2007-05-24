@@ -1643,7 +1643,7 @@ SUNWprivate_1.1 {
 	_lock_clear;
 	_lock_try;
 	_logb = FUNCTION FILTER libm.so.2;
-	_lone;
+	_lone =				NODYNSORT;
 	_lrand48;
 	_lshiftl;
 	_lsub;
@@ -1667,7 +1667,7 @@ SUNWprivate_1.1 {
 	__lwp_sema_trywait;
 	__lwp_sema_wait;
 	__lwp_suspend;
-	_lzero;
+	_lzero =			NODYNSORT;
 	_madvise;
 	makeut;
 	_makeut;
