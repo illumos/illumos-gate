@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -213,18 +213,14 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 
 	ENTRY_NP(sfmmu_getctx_pri)
 	set	MMU_PCONTEXT, %o0
-	set	CTXREG_CTX_MASK, %o1
-	ldxa	[%o0]ASI_MMU_CTX, %o0
 	retl
-	and	%o0, %o1, %o0
+	ldxa	[%o0]ASI_MMU_CTX, %o0
 	SET_SIZE(sfmmu_getctx_pri)
 
 	ENTRY_NP(sfmmu_getctx_sec)
 	set	MMU_SCONTEXT, %o0
-	set	CTXREG_CTX_MASK, %o1
-	ldxa	[%o0]ASI_MMU_CTX, %o0
 	retl
-	and	%o0, %o1, %o0
+	ldxa	[%o0]ASI_MMU_CTX, %o0
 	SET_SIZE(sfmmu_getctx_sec)
 
 	/*

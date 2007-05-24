@@ -131,11 +131,6 @@ extern "C" {
 #define	TAGACC_CTX_LSHIFT	(64 - TAGACC_SHIFT)
 
 /*
- * MMU PRIMARY/SECONDARY CONTEXT register
- */
-#define	CTXREG_CTX_MASK		0xFFFF
-
-/*
  * The kernel always runs in KCONTEXT, and no user mappings
  * are ever valid in it (so any user access pagefaults).
  */
