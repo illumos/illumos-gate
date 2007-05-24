@@ -55,9 +55,8 @@ dnode_increase_indirection(dnode_t *dn, dmu_tx_t *tx)
 	ASSERT(db != NULL);
 
 	dn->dn_phys->dn_nlevels = new_level;
-	dprintf("os=%p obj=%llu, increase to %d\n",
-		dn->dn_objset, dn->dn_object,
-		dn->dn_phys->dn_nlevels);
+	dprintf("os=%p obj=%llu, increase to %d\n", dn->dn_objset,
+	    dn->dn_object, dn->dn_phys->dn_nlevels);
 
 	/* check for existing blkptrs in the dnode */
 	for (i = 0; i < nblkptr; i++)
@@ -160,7 +159,7 @@ free_verify(dmu_buf_impl_t *db, uint64_t start, uint64_t end, dmu_tx_t *tx)
 
 		rw_enter(&db->db_dnode->dn_struct_rwlock, RW_READER);
 		err = dbuf_hold_impl(db->db_dnode, db->db_level-1,
-			(db->db_blkid << epbs) + i, TRUE, FTAG, &child);
+		    (db->db_blkid << epbs) + i, TRUE, FTAG, &child);
 		rw_exit(&db->db_dnode->dn_struct_rwlock);
 		if (err == ENOENT)
 			continue;
@@ -367,6 +366,7 @@ dnode_evict_dbufs(dnode_t *dn, int try)
 		for (; db != &marker; db = list_head(&dn->dn_dbufs)) {
 			list_remove(&dn->dn_dbufs, db);
 			list_insert_tail(&dn->dn_dbufs, db);
+			ASSERT3P(db->db_dnode, ==, dn);
 
 			mutex_enter(&db->db_mtx);
 			if (db->db_state == DB_EVICTING) {

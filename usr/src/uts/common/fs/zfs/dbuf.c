@@ -1471,17 +1471,23 @@ dbuf_destroy(dmu_buf_impl_t *db)
 
 	if (db->db_blkid != DB_BONUS_BLKID) {
 		dnode_t *dn = db->db_dnode;
+		boolean_t need_mutex = !MUTEX_HELD(&dn->dn_dbufs_mtx);
+
+		if (need_mutex)
+			mutex_enter(&dn->dn_dbufs_mtx);
 
 		/*
 		 * If this dbuf is still on the dn_dbufs list,
 		 * remove it from that list.
 		 */
 		if (list_link_active(&db->db_link)) {
-			mutex_enter(&dn->dn_dbufs_mtx);
+			ASSERT(need_mutex);
 			list_remove(&dn->dn_dbufs, db);
 			mutex_exit(&dn->dn_dbufs_mtx);
 
 			dnode_rele(dn, db);
+		} else if (need_mutex) {
+			mutex_exit(&dn->dn_dbufs_mtx);
 		}
 		dbuf_hash_remove(db);
 	}
@@ -1489,6 +1495,7 @@ dbuf_destroy(dmu_buf_impl_t *db)
 	db->db_dnode = NULL;
 	db->db_buf = NULL;
 
+	ASSERT(!list_link_active(&db->db_link));
 	ASSERT(db->db.db_data == NULL);
 	ASSERT(db->db_hash_next == NULL);
 	ASSERT(db->db_blkptr == NULL);
@@ -1939,6 +1946,14 @@ dbuf_sync_leaf(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 	}
 
 	/*
+	 * This function may have dropped the db_mtx lock allowing a dmu_sync
+	 * operation to sneak in. As a result, we need to ensure that we
+	 * don't check the dr_override_state until we have returned from
+	 * dbuf_check_blkptr.
+	 */
+	dbuf_check_blkptr(dn, db);
+
+	/*
 	 * If this buffer is in the middle of an immdiate write,
 	 * wait for the synchronous IO to complete.
 	 */
@@ -1947,8 +1962,6 @@ dbuf_sync_leaf(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 		cv_wait(&db->db_changed, &db->db_mtx);
 		ASSERT(dr->dt.dl.dr_override_state != DR_NOT_OVERRIDDEN);
 	}
-
-	dbuf_check_blkptr(dn, db);
 
 	/*
 	 * If this dbuf has already been written out via an immediate write,
