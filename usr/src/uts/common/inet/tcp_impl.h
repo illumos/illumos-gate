@@ -109,6 +109,41 @@ extern "C" {
 }
 
 /*
+ * Before caching the conn IRE, we need to make sure certain TCP
+ * states are in sync with the ire. The mismatch could occur if the
+ * TCP state has been set in tcp_adapt_ire() using a different IRE,
+ * e.g if an address was not present during an initial connect(),
+ * tcp_adapt_ire() will set the state using the interface route.
+ * Subsequently, if the address is added to the local machine, the
+ * retransmitted SYN will get the correct (loopback) IRE, but the TCP
+ * state (tcp_loopback and tcp_localnet) will remain out of sync.
+ * This is especially an issue with TCP fusion which relies on the
+ * TCP state to be accurate.
+ *
+ * This check/change should be made only if the TCP is not yet in
+ * the established state, else it would lead to inconsistencies.
+ */
+#define	TCP_CHECK_IREINFO(tcp, ire) {					\
+	if ((tcp)->tcp_state < TCPS_ESTABLISHED) {			\
+		if (((ire)->ire_type & (IRE_LOOPBACK | 			\
+		    IRE_LOCAL)) && !(tcp)->tcp_loopback) {		\
+			(tcp)->tcp_loopback = B_TRUE;			\
+		} else if ((tcp)->tcp_loopback && 			\
+		    !((ire)->ire_type & (IRE_LOOPBACK | IRE_LOCAL))) {	\
+			(tcp)->tcp_loopback = B_FALSE;			\
+		}							\
+		if ((tcp)->tcp_ipversion == IPV4_VERSION) {		\
+			(tcp)->tcp_localnet =				\
+			    ((ire)->ire_gateway_addr == 0);		\
+		} else {						\
+			(tcp)->tcp_localnet =				\
+			    IN6_IS_ADDR_UNSPECIFIED(			\
+			    &(ire)->ire_gateway_addr_v6);		\
+		}							\
+	}								\
+}
+
+/*
  * Write-side flow-control is implemented via the per instance STREAMS
  * write-side Q by explicitly setting QFULL to stop the flow of mblk_t(s)
  * and clearing QFULL and calling qbackenable() to restart the flow based

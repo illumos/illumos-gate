@@ -116,6 +116,7 @@ typedef struct sctp_ill_s {
 	uint32_t	sctp_ill_ipifcnt;
 	uint_t		sctp_ill_index;
 	uint64_t	sctp_ill_flags;
+	boolean_t	sctp_ill_isv6;
 	netstack_t	*sctp_ill_netstack; /* Does not have a netstack_hold */
 } sctp_ill_t;
 
@@ -151,9 +152,6 @@ typedef struct sctp_ill_hash_s {
 #define	SCTP_ADDR_SUBSET	2
 #define	SCTP_ADDR_OVERLAP	3
 #define	SCTP_ADDR_DISJOINT	4
-
-extern void		sctp_update_ill(ill_t *, int);
-extern void		sctp_update_ipif(ipif_t *, int);
 
 extern int		sctp_valid_addr_list(sctp_t *, const void *, uint32_t,
 			    uchar_t *, size_t);

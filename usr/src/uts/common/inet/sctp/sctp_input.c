@@ -2866,6 +2866,7 @@ ret:
 		}
 		fp->acked = 0;
 	}
+	fp = sctp->sctp_current;
 check_ss_rxmit:
 	/*
 	 * If this is a SACK following a timeout, check if there are

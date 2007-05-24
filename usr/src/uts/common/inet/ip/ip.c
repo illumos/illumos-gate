@@ -20658,6 +20658,8 @@ standard_path:
 		if (CONN_CACHE_IRE(connp) && connp->conn_ire_cache == NULL) {
 			rw_enter(&ire->ire_bucket->irb_lock, RW_READER);
 			if (!(ire->ire_marks & IRE_MARK_CONDEMNED)) {
+				if (connp->conn_ulp == IPPROTO_TCP)
+					TCP_CHECK_IREINFO(connp->conn_tcp, ire);
 				connp->conn_ire_cache = ire;
 				cached = B_TRUE;
 			}

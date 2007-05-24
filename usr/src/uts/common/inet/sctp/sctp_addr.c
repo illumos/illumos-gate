@@ -28,6 +28,7 @@
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/stream.h>
+#include <sys/cmn_err.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/kmem.h>
@@ -53,28 +54,12 @@ static sctp_ipif_t	*sctp_lookup_ipif_addr(in6_addr_t *, boolean_t,
 			    zoneid_t, boolean_t, uint_t, uint_t, boolean_t,
 			    sctp_stack_t *);
 static int		sctp_get_all_ipifs(sctp_t *, int);
-int			sctp_valid_addr_list(sctp_t *, const void *, uint32_t,
-			    uchar_t *, size_t);
 static int		sctp_ipif_hash_insert(sctp_t *, sctp_ipif_t *, int,
 			    boolean_t, boolean_t);
 static void		sctp_ipif_hash_remove(sctp_t *, sctp_ipif_t *);
 static int		sctp_compare_ipif_list(sctp_ipif_hash_t *,
 			    sctp_ipif_hash_t *);
-int			sctp_compare_saddrs(sctp_t *, sctp_t *);
 static int		sctp_copy_ipifs(sctp_ipif_hash_t *, sctp_t *, int);
-int			sctp_dup_saddrs(sctp_t *, sctp_t *, int);
-void			sctp_free_saddrs(sctp_t *);
-void			sctp_update_ill(ill_t *, int);
-void			sctp_update_ipif(ipif_t *, int);
-void			sctp_move_ipif(ipif_t *, ill_t *, ill_t *);
-void			sctp_del_saddr(sctp_t *, sctp_saddr_ipif_t *);
-void			sctp_del_saddr_list(sctp_t *, const void *, int,
-			    boolean_t);
-sctp_saddr_ipif_t	*sctp_saddr_lookup(sctp_t *, in6_addr_t *, uint_t);
-in6_addr_t		sctp_get_valid_addr(sctp_t *, boolean_t);
-int			sctp_getmyaddrs(void *, void *, int *);
-void			sctp_saddr_init(sctp_stack_t *);
-void			sctp_saddr_fini(sctp_stack_t *);
 
 #define	SCTP_ADDR4_HASH(addr)	\
 	(((addr) ^ ((addr) >> 8) ^ ((addr) >> 16) ^ ((addr) >> 24)) &	\
@@ -670,8 +655,10 @@ sctp_update_ill(ill_t *ill, int op)
 	index = SCTP_ILL_HASH_FN(SCTP_ILL_TO_PHYINDEX(ill));
 	sctp_ill = list_head(&sctps->sctps_g_ills[index].sctp_ill_list);
 	for (i = 0; i < sctps->sctps_g_ills[index].ill_count; i++) {
-		if (sctp_ill->sctp_ill_index == SCTP_ILL_TO_PHYINDEX(ill))
+		if ((sctp_ill->sctp_ill_index == SCTP_ILL_TO_PHYINDEX(ill)) &&
+		    (sctp_ill->sctp_ill_isv6 == ill->ill_isv6)) {
 			break;
+		}
 		sctp_ill = list_next(&sctps->sctps_g_ills[index].sctp_ill_list,
 		    sctp_ill);
 	}
@@ -688,14 +675,16 @@ sctp_update_ill(ill_t *ill, int op)
 		sctp_ill = kmem_zalloc(sizeof (sctp_ill_t), KM_NOSLEEP);
 		/* Need to re-try? */
 		if (sctp_ill == NULL) {
-			ip1dbg(("sctp_ill_insert: mem error..\n"));
+			cmn_err(CE_WARN, "sctp_update_ill: error adding "
+			    "ILL %p to SCTP's ILL list", (void *)ill);
 			rw_exit(&sctps->sctps_g_ills_lock);
 			return;
 		}
 		sctp_ill->sctp_ill_name = kmem_zalloc(ill->ill_name_length,
 		    KM_NOSLEEP);
 		if (sctp_ill->sctp_ill_name == NULL) {
-			ip1dbg(("sctp_ill_insert: mem error..\n"));
+			cmn_err(CE_WARN, "sctp_update_ill: error adding "
+			    "ILL %p to SCTP's ILL list", (void *)ill);
 			kmem_free(sctp_ill, sizeof (sctp_ill_t));
 			rw_exit(&sctps->sctps_g_ills_lock);
 			return;
@@ -706,6 +695,7 @@ sctp_update_ill(ill_t *ill, int op)
 		sctp_ill->sctp_ill_index = SCTP_ILL_TO_PHYINDEX(ill);
 		sctp_ill->sctp_ill_flags = ill->ill_phyint->phyint_flags;
 		sctp_ill->sctp_ill_netstack = ns;	/* No netstack_hold */
+		sctp_ill->sctp_ill_isv6 = ill->ill_isv6;
 		list_insert_tail(&sctps->sctps_g_ills[index].sctp_ill_list,
 		    (void *)sctp_ill);
 		sctps->sctps_g_ills[index].ill_count++;
@@ -736,6 +726,55 @@ sctp_update_ill(ill_t *ill, int op)
 	rw_exit(&sctps->sctps_g_ills_lock);
 }
 
+/*
+ * The ILL's index is being changed, just remove it from the old list,
+ * change the SCTP ILL's index and re-insert using the new index.
+ */
+void
+sctp_ill_reindex(ill_t *ill, uint_t orig_ill_index)
+{
+	sctp_ill_t	*sctp_ill = NULL;
+	sctp_ill_t	*nxt_sill;
+	uint_t		indx;
+	uint_t		nindx;
+	boolean_t	once = B_FALSE;
+	netstack_t	*ns = ill->ill_ipst->ips_netstack;
+	sctp_stack_t	*sctps = ns->netstack_sctp;
+
+	rw_enter(&sctps->sctps_g_ills_lock, RW_WRITER);
+
+	indx = SCTP_ILL_HASH_FN(orig_ill_index);
+	nindx = SCTP_ILL_HASH_FN(SCTP_ILL_TO_PHYINDEX(ill));
+	sctp_ill = list_head(&sctps->sctps_g_ills[indx].sctp_ill_list);
+	while (sctp_ill != NULL) {
+		nxt_sill = list_next(&sctps->sctps_g_ills[indx].sctp_ill_list,
+		    sctp_ill);
+		if (sctp_ill->sctp_ill_index == orig_ill_index) {
+			sctp_ill->sctp_ill_index = SCTP_ILL_TO_PHYINDEX(ill);
+			/*
+			 * if the new index hashes to the same value, all's
+			 * done.
+			 */
+			if (nindx != indx) {
+				list_remove(
+				    &sctps->sctps_g_ills[indx].sctp_ill_list,
+				    (void *)sctp_ill);
+				sctps->sctps_g_ills[indx].ill_count--;
+				list_insert_tail(
+				    &sctps->sctps_g_ills[nindx].sctp_ill_list,
+				    (void *)sctp_ill);
+				sctps->sctps_g_ills[nindx].ill_count++;
+			}
+			if (once)
+				break;
+			/* We might have one for v4 and for v6 */
+			once = B_TRUE;
+		}
+		sctp_ill = nxt_sill;
+	}
+	rw_exit(&sctps->sctps_g_ills_lock);
+}
+
 /* move ipif from f_ill to t_ill */
 void
 sctp_move_ipif(ipif_t *ipif, ill_t *f_ill, ill_t *t_ill)
@@ -754,8 +793,10 @@ sctp_move_ipif(ipif_t *ipif, ill_t *f_ill, ill_t *t_ill)
 	hindex = SCTP_ILL_HASH_FN(SCTP_ILL_TO_PHYINDEX(f_ill));
 	fsctp_ill = list_head(&sctps->sctps_g_ills[hindex].sctp_ill_list);
 	for (i = 0; i < sctps->sctps_g_ills[hindex].ill_count; i++) {
-		if (fsctp_ill->sctp_ill_index == SCTP_ILL_TO_PHYINDEX(f_ill))
+		if (fsctp_ill->sctp_ill_index == SCTP_ILL_TO_PHYINDEX(f_ill) &&
+		    fsctp_ill->sctp_ill_isv6 == f_ill->ill_isv6) {
 			break;
+		}
 		fsctp_ill = list_next(
 		    &sctps->sctps_g_ills[hindex].sctp_ill_list, fsctp_ill);
 	}
@@ -763,8 +804,10 @@ sctp_move_ipif(ipif_t *ipif, ill_t *f_ill, ill_t *t_ill)
 	hindex = SCTP_ILL_HASH_FN(SCTP_ILL_TO_PHYINDEX(t_ill));
 	tsctp_ill = list_head(&sctps->sctps_g_ills[hindex].sctp_ill_list);
 	for (i = 0; i < sctps->sctps_g_ills[hindex].ill_count; i++) {
-		if (tsctp_ill->sctp_ill_index == SCTP_ILL_TO_PHYINDEX(t_ill))
+		if (tsctp_ill->sctp_ill_index == SCTP_ILL_TO_PHYINDEX(t_ill) &&
+		    tsctp_ill->sctp_ill_isv6 == t_ill->ill_isv6) {
 			break;
+		}
 		tsctp_ill = list_next(
 		    &sctps->sctps_g_ills[hindex].sctp_ill_list, tsctp_ill);
 	}
@@ -937,16 +980,19 @@ sctp_update_ipif_addr(ipif_t *ipif, in6_addr_t v6addr)
 	ill_index = SCTP_ILL_HASH_FN(SCTP_ILL_TO_PHYINDEX(ill));
 	sctp_ill = list_head(&sctps->sctps_g_ills[ill_index].sctp_ill_list);
 	for (i = 0; i < sctps->sctps_g_ills[ill_index].ill_count; i++) {
-		if (sctp_ill->sctp_ill_index == SCTP_ILL_TO_PHYINDEX(ill))
+		if (sctp_ill->sctp_ill_index == SCTP_ILL_TO_PHYINDEX(ill) &&
+		    sctp_ill->sctp_ill_isv6 == ill->ill_isv6) {
 			break;
+		}
 		sctp_ill = list_next(
 		    &sctps->sctps_g_ills[ill_index].sctp_ill_list, sctp_ill);
 	}
 
 	if (sctp_ill == NULL) {
-		ip1dbg(("sctp_ipif_insert: ill not found ..\n"));
+		ip1dbg(("sctp_update_ipif_addr: ill not found ..\n"));
 		rw_exit(&sctps->sctps_g_ipifs_lock);
 		rw_exit(&sctps->sctps_g_ills_lock);
+		return;
 	}
 
 	if (osctp_ipif != NULL) {
@@ -1005,7 +1051,8 @@ sctp_update_ipif_addr(ipif_t *ipif, in6_addr_t v6addr)
 	sctp_ipif = kmem_zalloc(sizeof (sctp_ipif_t), KM_NOSLEEP);
 	/* Try again? */
 	if (sctp_ipif == NULL) {
-		ip1dbg(("sctp_ipif_insert: mem failure..\n"));
+		cmn_err(CE_WARN, "sctp_update_ipif_addr: error adding "
+		    "IPIF %p to SCTP's IPIF list", (void *)ipif);
 		rw_exit(&sctps->sctps_g_ipifs_lock);
 		rw_exit(&sctps->sctps_g_ills_lock);
 		return;
@@ -1057,8 +1104,10 @@ sctp_update_ipif(ipif_t *ipif, int op)
 	ill_index = SCTP_ILL_HASH_FN(SCTP_ILL_TO_PHYINDEX(ill));
 	sctp_ill = list_head(&sctps->sctps_g_ills[ill_index].sctp_ill_list);
 	for (i = 0; i < sctps->sctps_g_ills[ill_index].ill_count; i++) {
-		if (sctp_ill->sctp_ill_index == SCTP_ILL_TO_PHYINDEX(ill))
+		if (sctp_ill->sctp_ill_index == SCTP_ILL_TO_PHYINDEX(ill) &&
+		    sctp_ill->sctp_ill_isv6 == ill->ill_isv6) {
 			break;
+		}
 		sctp_ill = list_next(
 		    &sctps->sctps_g_ills[ill_index].sctp_ill_list, sctp_ill);
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -178,7 +178,7 @@ struct ifnet {
 	(IFF_BROADCAST | IFF_POINTOPOINT | IFF_RUNNING | IFF_PROMISC | \
 	IFF_MULTICAST | IFF_MULTI_BCAST | IFF_UNNUMBERED | IFF_IPV4 | \
 	IFF_IPV6 | IFF_INACTIVE | IFF_FIXEDMTU | IFF_VIRTUAL | \
-	IFF_LOOPBACK | IFF_ALLMULTI | IFF_DUPLICATE)
+	IFF_LOOPBACK | IFF_ALLMULTI | IFF_DUPLICATE | IFF_COS_ENABLED)
 
 /*
  * Output queues (ifp->if_snd) and internetwork datagram level (pup level 1)

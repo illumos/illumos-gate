@@ -12914,6 +12914,12 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 		 * the connection has been accept()ed since it can't
 		 * buffer OOB data.  Discard segment if this happens.
 		 *
+		 * We can't just rely on a non-null tcp_listener to indicate
+		 * that the accept() has completed since unlinking of the
+		 * eager and completion of the accept are not atomic.
+		 * tcp_detached, when it is not set (B_FALSE) indicates
+		 * that the accept() has completed.
+		 *
 		 * Nor can it reassemble urgent pointers, so discard
 		 * if it's not the next segment expected.
 		 *
@@ -12922,7 +12928,7 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 		 * data, and new data all are in the same mblk.
 		 */
 		ASSERT(mp != NULL);
-		if (tcp->tcp_listener || !pullupmsg(mp, -1)) {
+		if (tcp->tcp_detached || !pullupmsg(mp, -1)) {
 			freemsg(mp);
 			return;
 		}
@@ -18769,6 +18775,7 @@ tcp_send_find_ire(tcp_t *tcp, ipaddr_t *dst, ire_t **irep)
 		if (CONN_CACHE_IRE(connp)) {
 			rw_enter(&ire->ire_bucket->irb_lock, RW_READER);
 			if (!(ire->ire_marks & IRE_MARK_CONDEMNED)) {
+				TCP_CHECK_IREINFO(tcp, ire);
 				connp->conn_ire_cache = ire;
 				cached = B_TRUE;
 			}

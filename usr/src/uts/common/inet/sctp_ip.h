@@ -79,14 +79,14 @@ extern void sctp_update_ill(ill_t *, int);
 extern void sctp_update_ipif(ipif_t *, int);
 extern void sctp_move_ipif(ipif_t *, ill_t *, ill_t *);
 extern void sctp_update_ipif_addr(ipif_t *, in6_addr_t);
+extern void sctp_ill_reindex(ill_t *, uint_t);
 
 #define	SCTP_ILL_INSERT		1
 #define	SCTP_ILL_REMOVE		2
-#define	SCTP_IPIF_INSERT	3
-#define	SCTP_IPIF_REMOVE	4
-#define	SCTP_IPIF_UP		5
-#define	SCTP_IPIF_DOWN		6
-#define	SCTP_IPIF_UPDATE	7
+#define	SCTP_IPIF_REMOVE	3
+#define	SCTP_IPIF_UP		4
+#define	SCTP_IPIF_DOWN		5
+#define	SCTP_IPIF_UPDATE	6
 
 /* IP routines for SCTP to call. */
 extern void ip_fanout_sctp_raw(mblk_t *, ill_t *, ipha_t *, boolean_t,

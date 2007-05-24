@@ -22278,6 +22278,9 @@ ip_sioctl_slifindex(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 
 	phyi->phyint_ifindex = index;
 
+	/* Update SCTP's ILL list */
+	sctp_ill_reindex(ill, old_index);
+
 	connc.cc_old_ifindex = old_index;
 	connc.cc_new_ifindex = index;
 	ip_change_ifindex(ill, &connc);
