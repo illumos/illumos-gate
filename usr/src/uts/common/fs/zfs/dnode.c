@@ -284,6 +284,7 @@ dnode_create(objset_impl_t *os, dnode_phys_t *dnp, dmu_buf_impl_t *db,
 	list_insert_head(&os->os_dnodes, dn);
 	mutex_exit(&os->os_lock);
 
+	arc_space_consume(sizeof (dnode_t));
 	return (dn);
 }
 
@@ -318,6 +319,7 @@ dnode_destroy(dnode_t *dn)
 		dn->dn_bonus = NULL;
 	}
 	kmem_cache_free(dnode_cache, dn);
+	arc_space_return(sizeof (dnode_t));
 }
 
 void
@@ -601,9 +603,10 @@ dnode_hold_impl(objset_impl_t *os, uint64_t object, int flag,
 	}
 
 	if ((dn = children_dnodes[idx]) == NULL) {
+		dnode_phys_t *dnp = (dnode_phys_t *)db->db.db_data+idx;
 		dnode_t *winner;
-		dn = dnode_create(os, (dnode_phys_t *)db->db.db_data+idx,
-			db, object);
+
+		dn = dnode_create(os, dnp, db, object);
 		winner = atomic_cas_ptr(&children_dnodes[idx], NULL, dn);
 		if (winner != NULL) {
 			dnode_destroy(dn);

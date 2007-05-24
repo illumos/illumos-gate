@@ -2230,7 +2230,7 @@ spa_scrub_io_done(zio_t *zio)
 {
 	spa_t *spa = zio->io_spa;
 
-	zio_data_buf_free(zio->io_data, zio->io_size);
+	arc_data_buf_free(zio->io_data, zio->io_size);
 
 	mutex_enter(&spa->spa_scrub_lock);
 	if (zio->io_error && !(zio->io_flags & ZIO_FLAG_SPECULATIVE)) {
@@ -2266,7 +2266,7 @@ spa_scrub_io_start(spa_t *spa, blkptr_t *bp, int priority, int flags,
 	spa->spa_scrub_inflight++;
 	mutex_exit(&spa->spa_scrub_lock);
 
-	data = zio_data_buf_alloc(size);
+	data = arc_data_buf_alloc(size);
 
 	if (zb->zb_level == -1 && BP_GET_TYPE(bp) != DMU_OT_OBJSET)
 		flags |= ZIO_FLAG_SPECULATIVE;	/* intent log block */

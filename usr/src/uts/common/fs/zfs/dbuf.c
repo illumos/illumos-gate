@@ -470,6 +470,7 @@ dbuf_read_impl(dmu_buf_impl_t *db, zio_t *zio, uint32_t *flags)
 	if (db->db_blkid == DB_BONUS_BLKID) {
 		ASSERT3U(db->db_dnode->dn_bonuslen, ==, db->db.db_size);
 		db->db.db_data = zio_buf_alloc(DN_MAX_BONUSLEN);
+		arc_space_consume(512);
 		if (db->db.db_size < DN_MAX_BONUSLEN)
 			bzero(db->db.db_data, DN_MAX_BONUSLEN);
 		bcopy(DN_BONUS(db->db_dnode->dn_phys), db->db.db_data,
@@ -657,6 +658,7 @@ dbuf_fix_old_data(dmu_buf_impl_t *db, uint64_t txg)
 	if (db->db_blkid == DB_BONUS_BLKID) {
 		/* Note that the data bufs here are zio_bufs */
 		dr->dt.dl.dr_data = zio_buf_alloc(DN_MAX_BONUSLEN);
+		arc_space_consume(DN_MAX_BONUSLEN);
 		bcopy(db->db.db_data, dr->dt.dl.dr_data, DN_MAX_BONUSLEN);
 	} else if (refcount_count(&db->db_holds) > db->db_dirtycnt) {
 		int size = db->db.db_size;
@@ -1277,8 +1279,10 @@ dbuf_clear(dmu_buf_impl_t *db)
 
 	if (db->db_state == DB_CACHED) {
 		ASSERT(db->db.db_data != NULL);
-		if (db->db_blkid == DB_BONUS_BLKID)
+		if (db->db_blkid == DB_BONUS_BLKID) {
 			zio_buf_free(db->db.db_data, DN_MAX_BONUSLEN);
+			arc_space_return(DN_MAX_BONUSLEN);
+		}
 		db->db.db_data = NULL;
 		db->db_state = DB_UNCACHED;
 	}
@@ -1396,6 +1400,7 @@ dbuf_create(dnode_t *dn, uint8_t level, uint64_t blkid,
 		db->db.db_offset = DB_BONUS_BLKID;
 		db->db_state = DB_UNCACHED;
 		/* the bonus dbuf is not placed in the hash table */
+		arc_space_consume(sizeof (dmu_buf_impl_t));
 		return (db);
 	} else {
 		int blocksize =
@@ -1422,6 +1427,7 @@ dbuf_create(dnode_t *dn, uint8_t level, uint64_t blkid,
 	list_insert_head(&dn->dn_dbufs, db);
 	db->db_state = DB_UNCACHED;
 	mutex_exit(&dn->dn_dbufs_mtx);
+	arc_space_consume(sizeof (dmu_buf_impl_t));
 
 	if (parent && parent != dn->dn_dbuf)
 		dbuf_add_ref(parent, db);
@@ -1489,6 +1495,7 @@ dbuf_destroy(dmu_buf_impl_t *db)
 	ASSERT(db->db_data_pending == NULL);
 
 	kmem_cache_free(dbuf_cache, db);
+	arc_space_return(sizeof (dmu_buf_impl_t));
 }
 
 void
@@ -1913,8 +1920,10 @@ dbuf_sync_leaf(dbuf_dirty_record_t *dr, dmu_tx_t *tx)
 		ASSERT3U(db->db_level, ==, 0);
 		ASSERT3U(dn->dn_phys->dn_bonuslen, <=, DN_MAX_BONUSLEN);
 		bcopy(*datap, DN_BONUS(dn->dn_phys), dn->dn_phys->dn_bonuslen);
-		if (*datap != db->db.db_data)
+		if (*datap != db->db.db_data) {
 			zio_buf_free(*datap, DN_MAX_BONUSLEN);
+			arc_space_return(DN_MAX_BONUSLEN);
+		}
 		db->db_data_pending = NULL;
 		drp = &db->db_last_dirty;
 		while (*drp != dr)
