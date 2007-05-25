@@ -67,7 +67,7 @@ pam_handle_t    *pamh;
 
 char lastlog[] = "/var/adm/lastlog";
 struct	passwd nouser = {
-    "", "nope", (uid_t)-1, (gid_t)-1, "", "", "", "", "" };
+	"", "nope", (uid_t)-1, (gid_t)-1, "", "", "", "", "" };
 #ifdef ATTSVR4
 struct	spwd noupass = { "", "nope" };
 #endif
