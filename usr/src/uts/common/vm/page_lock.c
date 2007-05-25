@@ -131,7 +131,11 @@ static pad_mutex_t	pszc_mutex[PSZC_MTX_TABLE_SIZE];
  * XX64	VPH_TABLE_SIZE and VP_HASH_FUNC might break in 64 bit world.
  *	Need to review again.
  */
+#if defined(_LP64)
+#define	VPH_TABLE_SIZE  (1 << (VP_SHIFT + 3))
+#else	/* 32 bits */
 #define	VPH_TABLE_SIZE	(2 << VP_SHIFT)
+#endif
 
 #define	VP_HASH_FUNC(vp) \
 	((((uintptr_t)(vp) >> 6) + \

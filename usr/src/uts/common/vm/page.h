@@ -539,6 +539,18 @@ typedef	page_t	devpage_t;
  * shifting/summing are fast register to register operations with no additional
  * memory references).
  */
+#if defined(_LP64)
+
+#if NCPU < 4
+#define	PH_TABLE_SIZE	128
+#define	VP_SHIFT	7
+#else
+#define	PH_TABLE_SIZE	1024
+#define	VP_SHIFT	9
+#endif
+
+#else	/* 32 bits */
+
 #if NCPU < 4
 #define	PH_TABLE_SIZE	16
 #define	VP_SHIFT	7
@@ -546,6 +558,8 @@ typedef	page_t	devpage_t;
 #define	PH_TABLE_SIZE	128
 #define	VP_SHIFT	9
 #endif
+
+#endif	/* _LP64 */
 
 /*
  * The amount to use for the successive shifts in the hash function below.
