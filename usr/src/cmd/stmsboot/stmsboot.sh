@@ -460,10 +460,8 @@ else
 	DRVLIST=$DRV
 fi
 
-
-STMSPRIVS=`/usr/bin/ppriv $$ | $EGREP "E:.*all|E:.*sys_devices"`
-USERID=`id`
-if [ "$USERID" != "uid=0(root) gid=0(root)" ] -o [ "x$STMSPRIVS" == "x" ]; then
+USERID=`id | $EGREP "uid=0"`
+if [ -z "$USERID" ]; then
 	gettext "You must be super-user to run this script.\n" 1>&2
 	exit 1
 fi
