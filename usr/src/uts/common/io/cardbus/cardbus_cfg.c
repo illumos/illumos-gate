@@ -1233,6 +1233,7 @@ cardbus_allocate_chunk(dev_info_t *dip, uint8_t type, uint8_t sec_bus)
 
 	mem_request->ra_align_mask = phdl->memory_gran - 1;
 	io_request->ra_align_mask = phdl->io_gran - 1;
+	phdl->res_dip = (dev_info_t *)-1;
 
 	mem_request->ra_len += cardbus_min_spare_mem;
 	if (mem_request->ra_len) {

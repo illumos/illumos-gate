@@ -4517,7 +4517,6 @@ pcmcia_pci_alloc(dev_info_t *dip, ndi_ra_request_t *req, ra_return_t *ret,
 			ret->ra_addr_hi = 0;
 			ret->ra_addr_lo = 0;
 			ret->ra_len = 0;
-			*res_dip = (dev_info_t *)-1;
 			return (DDI_FAILURE);
 		}
 	}
@@ -4569,6 +4568,8 @@ pcmcia_free_io(dev_info_t *dip, ra_return_t *ret)
 int
 pcmcia_ra_free(dev_info_t *dip, ra_return_t *ret, char *type)
 {
+	if (dip == (dev_info_t *)-1)
+		return (DDI_FAILURE);
 	if (ndi_ra_free(dip, (uint64_t)ret->ra_addr_lo, (uint64_t)ret->ra_len,
 	    type, NDI_RA_PASS) == NDI_SUCCESS) {
 		return (DDI_SUCCESS);
