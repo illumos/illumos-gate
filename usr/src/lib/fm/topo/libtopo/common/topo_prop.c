@@ -498,8 +498,11 @@ prop_create(tnode_t *node, const char *pgname, const char *pname,
 	/*
 	 * Replace existing prop value with new one
 	 */
-	if ((pg = pgroup_get(node, pgname)) == NULL)
+	if ((pg = pgroup_get(node, pgname)) == NULL) {
+		topo_node_unlock(node);
+		*err = ETOPO_PROP_NOENT;
 		return (NULL);
+	}
 
 	if ((pv = propval_get(pg, pname)) != NULL) {
 		if (pv->tp_type != type)
@@ -517,6 +520,8 @@ prop_create(tnode_t *node, const char *pgname, const char *pname,
 		if ((pv = topo_hdl_zalloc(thp, sizeof (topo_propval_t)))
 		    == NULL)
 			return (set_seterror(node, pvl, err, ETOPO_NOMEM));
+
+		pv->tp_hdl = thp;
 		pvl->tp_pval = pv;
 
 		if ((pv->tp_name = topo_hdl_strdup(thp, pname))
@@ -524,7 +529,6 @@ prop_create(tnode_t *node, const char *pgname, const char *pname,
 			return (set_seterror(node, pvl, err, ETOPO_NOMEM));
 		pv->tp_flag = flag;
 		pv->tp_type = type;
-		pv->tp_hdl = thp;
 		topo_prop_hold(pv);
 		topo_list_append(&pg->tpg_pvals, pvl);
 	}
@@ -1007,7 +1011,7 @@ topo_pgroup_info(tnode_t *node, const char *pgname, int *err)
 
 			pip = pg->tpg_info;
 			if ((info->tpi_name =
-				topo_hdl_strdup(thp, pip->tpi_name)) == NULL) {
+			    topo_hdl_strdup(thp, pip->tpi_name)) == NULL) {
 				*err = ETOPO_PROP_NOMEM;
 				topo_hdl_free(thp, info,
 				    sizeof (topo_pgroup_info_t));

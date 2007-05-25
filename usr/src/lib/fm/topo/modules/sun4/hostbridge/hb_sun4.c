@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -156,6 +156,9 @@ hb_process(topo_mod_t *mod, tnode_t *ptn, topo_instance_t hbi,
 		return (NULL);
 	if (topo_mod_enumerate(mod, hb, PCI_BUS, PCI_BUS, bi, bi, hbdid) == 0)
 		return (hb);
+
+	topo_node_unbind(hb);
+
 	return (NULL);
 }
 
@@ -169,6 +172,9 @@ rc_process(topo_mod_t *mod, tnode_t *ptn, topo_instance_t rci, di_node_t bn)
 	if (topo_mod_enumerate(mod,
 	    rc, PCI_BUS, PCIEX_BUS, 0, MAX_HB_BUSES, NULL) == 0)
 		return (rc);
+
+	topo_node_unbind(rc);
+
 	return (NULL);
 }
 
@@ -197,6 +203,7 @@ int
 declare_exbuses(topo_mod_t *mod, busorrc_t *list, tnode_t *ptn, int nhb,
     int nrc)
 {
+	int err = 0;
 	tnode_t **rcs;
 	tnode_t **hb;
 	busorrc_t *p;
@@ -211,32 +218,42 @@ declare_exbuses(topo_mod_t *mod, busorrc_t *list, tnode_t *ptn, int nhb,
 	/*
 	 * Allocate an array to point at the root complex tnode_t pointers.
 	 */
-	if ((rcs = topo_mod_zalloc(mod, nrc * sizeof (tnode_t *))) == NULL)
+	if ((rcs = topo_mod_zalloc(mod, nrc * sizeof (tnode_t *))) == NULL) {
+		topo_mod_free(mod, hb, nhb * sizeof (tnode_t *));
 		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+	}
 
 	br = rc = 0;
 	for (p = list; p != NULL; p = p->br_nextbus) {
 		topo_mod_dprintf(mod,
 		    "declaring (%x,%x)\n", p->br_ba_bc, p->br_ba_ac);
 
-		if (did_create(mod, p->br_din, 0, br, rc, rc) == NULL)
-			return (-1);
+		if (did_create(mod, p->br_din, 0, br, rc, rc) == NULL) {
+			err = -1;
+			break;
+		}
 
 		if (hb[br] == NULL) {
 			hb[br] = pciexhostbridge_declare(mod, ptn, p->br_din,
 			    br);
-			if (hb[br] == NULL)
-				return (-1);
+			if (hb[br] == NULL) {
+				err = -1;
+				break;
+			}
 		}
 		if (rcs[rc] == NULL) {
 			rcs[rc] = rc_process(mod, hb[br], rc, p->br_din);
-			if (rcs[rc] == NULL)
-				return (-1);
+			if (rcs[rc] == NULL) {
+				err = -1;
+				break;
+			}
 		} else {
 			if (topo_mod_enumerate(mod,
 			    rcs[rc], PCI_BUS, PCIEX_BUS, 0, MAX_HB_BUSES,
-			    NULL) < 0)
-				return (-1);
+			    NULL) < 0) {
+				err = -1;
+				break;
+			}
 		}
 		rc++;
 		if (rc == nrc) {
@@ -246,9 +263,20 @@ declare_exbuses(topo_mod_t *mod, busorrc_t *list, tnode_t *ptn, int nhb,
 				br = 0;
 		}
 	}
+
+	if (err != 0) {
+		int i;
+
+		for (i = 0; i < nhb; ++i)
+			topo_node_unbind(hb[br]);
+		for (i = 0; i < nrc; ++i)
+			topo_node_unbind(rcs[rc]);
+	}
+
 	topo_mod_free(mod, rcs, nrc * sizeof (tnode_t *));
 	topo_mod_free(mod, hb, nhb * sizeof (tnode_t *));
-	return (0);
+
+	return (err);
 }
 
 /*
@@ -267,6 +295,7 @@ declare_exbuses(topo_mod_t *mod, busorrc_t *list, tnode_t *ptn, int nhb,
 int
 declare_buses(topo_mod_t *mod, busorrc_t *list, tnode_t *ptn, int nhb)
 {
+	int err = 0;
 	busorrc_t *p;
 	tnode_t **hb;
 	did_t *link;
@@ -284,18 +313,23 @@ declare_buses(topo_mod_t *mod, busorrc_t *list, tnode_t *ptn, int nhb)
 		    "declaring (%x,%x)\n", p->br_ba_bc, p->br_ba_ac);
 
 		if ((link =
-		    did_create(mod, p->br_din, 0, br, NO_RC, bus)) == NULL)
-			return (-1);
+		    did_create(mod, p->br_din, 0, br, NO_RC, bus)) == NULL) {
+			err = -1;
+			break;
+		}
 
 		if (hb[br] == NULL) {
 			hb[br] = hb_process(mod, ptn, br, bus, p->br_din, link);
-			if (hb[br] == NULL)
-				return (-1);
+			if (hb[br] == NULL) {
+				err = -1;
+				break;
+			}
 		} else {
 			did_link_set(mod, hb[br], link);
 			if (topo_mod_enumerate(mod,
 			    hb[br], PCI_BUS, PCI_BUS, bus, bus, link) < 0) {
-				return (-1);
+				err = -1;
+				break;
 			}
 		}
 		br++;
@@ -304,6 +338,14 @@ declare_buses(topo_mod_t *mod, busorrc_t *list, tnode_t *ptn, int nhb)
 			bus++;
 		}
 	}
+
+	if (err != 0) {
+		int i;
+
+		for (i = 0; i < nhb; ++i)
+			topo_node_unbind(hb[br]);
+	}
+
 	topo_mod_free(mod, hb, nhb * sizeof (tnode_t *));
-	return (0);
+	return (err);
 }

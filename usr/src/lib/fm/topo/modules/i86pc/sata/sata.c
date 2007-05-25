@@ -245,13 +245,18 @@ node_create(topo_mod_t *mod, tnode_t *pnode, const char *name, int instance,
 
 		sata_info_to_fru(cfgap->ap_info, &model, &model_len, &manuf,
 		    &manuf_len, &serial, &serial_len, &firm, &firm_len, mod);
-		if ((s = strchr(model, ' ')) != NULL)
-			*s = '-';
-		len = manuf_len + model_len + 1;
-		if ((mm = topo_mod_alloc(mod, len)) != NULL)
-			(void) snprintf(mm, len, "%s-%s", manuf, model);
-		else
-			mm = model;
+
+		if (model != NULL && manuf != NULL) {
+			if ((s = strchr(model, ' ')) != NULL)
+				*s = '-';
+			len = manuf_len + model_len + 1;
+			if ((mm = topo_mod_alloc(mod, len)) != NULL) {
+				(void) snprintf(mm, len, "%s-%s", manuf, model);
+			} else {
+				len = 0;
+				mm = model;
+			}
+		}
 	}
 
 	auth = topo_mod_auth(mod, pnode);
@@ -443,7 +448,9 @@ sata_minorname_to_ap(char *minorname, char **ap, int *apbuflen,
 
 		assert(nlist == 1);
 		*apbuflen = PATH_MAX;
-		*ap = topo_mod_alloc(mod, *apbuflen);
+		if ((*ap = topo_mod_alloc(mod, *apbuflen)) == NULL)
+			return (-1);
+
 		strncpy(*ap, (*list_array)[0].ap_log_id, PATH_MAX);
 		/*
 		 * The logical id is:
@@ -503,7 +510,10 @@ find_physical_disk_node(char *physpath, int pathbuflen, int portnum,
 	dentlen = pathconf(physpath, _PC_NAME_MAX);
 	dentlen = ((dentlen <= 0) ? MAXNAMELEN : dentlen) +
 	    sizeof (struct dirent);
-	dent = topo_mod_alloc(mod, dentlen);
+	if ((dent = topo_mod_alloc(mod, dentlen)) == NULL) {
+		closedir(dp);
+		return (-1);
+	}
 
 	errno = 0;
 	while (!found && readdir_r(dp, dent, &dep) == 0 && dep != NULL) {
@@ -700,7 +710,7 @@ sata_info_to_fru(char *info, char **model, int *modlen, char **manuf,
     topo_mod_t *mod)
 {
 	int infolen;
-	char *sata_info = tp_strdup(mod, info, &infolen);
+	char *sata_info;
 	char *modlp, *revp, *snp, *manup;
 
 	/*
@@ -710,10 +720,12 @@ sata_info_to_fru(char *info, char **model, int *modlen, char **manuf,
 	 * Mod: <model> FRev: <revision> SN: <serialno>
 	 */
 
+	if ((sata_info = tp_strdup(mod, info, &infolen)) == NULL)
+		return;
+
 	if ((modlp = strstr(sata_info, "Mod: ")) == NULL ||
 	    (revp = strstr(sata_info, " FRev: ")) == NULL ||
 	    (snp = strstr(sata_info, " SN: ")) == NULL) {
-		*model = *manuf = *serial = *firm = NULL;
 		topo_mod_free(mod, sata_info, infolen);
 		return;
 	}
@@ -778,8 +790,8 @@ sata_add_disk_props(tnode_t *cnode, const char *physpath,
 		    ldev, err);
 	}
 
-	sata_info_to_fru(cfgap->ap_info, &model, &model_len, &manuf, &manuf_len,
-	    &serial, &serial_len, &firm, &firm_len, mod);
+	sata_info_to_fru(cfgap->ap_info, &model, &model_len, &manuf,
+	    &manuf_len, &serial, &serial_len, &firm, &firm_len, mod);
 	if (model) {
 		(void) topo_prop_set_string(cnode, TOPO_STORAGE_PGROUP,
 		    TOPO_STORAGE_MODEL, TOPO_PROP_IMMUTABLE, model, err);
@@ -943,10 +955,8 @@ sata_disks_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		}
 	}
 
-	if (nerrs) {
-		topo_node_range_destroy(pnode, name);
+	if (nerrs)
 		return (-1);
-	}
 
 	return (0);
 }
@@ -1048,10 +1058,9 @@ sata_port_create(topo_mod_t *mod, tnode_t *pnode, const char *name,
 
 	topo_mod_free(mod, dpath, dpathlen);
 
-	if (nerr != 0) {
-		topo_node_range_destroy(pnode, name);
+	if (nerr != 0)
 		return (-1);
-	} else
+	else
 		return (0);
 }
 

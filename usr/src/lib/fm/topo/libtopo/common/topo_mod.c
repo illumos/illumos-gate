@@ -310,8 +310,10 @@ topo_mod_hcfmri(topo_mod_t *mod, tnode_t *pnode, int version, const char *name,
 	}
 
 	if (pnode != NULL) {
-		if (topo_node_resource(pnode, &pfmri, &err) < 0)
+		if (topo_node_resource(pnode, &pfmri, &err) < 0) {
+			nvlist_free(args);
 			return (set_fmri_err(mod, EMOD_NVL_INVAL));
+		}
 
 		if (nvlist_add_nvlist(args, TOPO_METH_FMRI_ARG_PARENT,
 		    pfmri) != 0) {
@@ -699,6 +701,11 @@ topo_mod_auth(topo_mod_t *mod, tnode_t *pnode)
 	char *server = NULL;
 	nvlist_t *auth;
 
+	if ((err = topo_mod_nvalloc(mod, &auth, NV_UNIQUE_NAME)) != 0) {
+		(void) topo_mod_seterrno(mod, EMOD_FMRI_NVL);
+		return (NULL);
+	}
+
 	(void) topo_prop_get_string(pnode, FM_FMRI_AUTHORITY,
 	    FM_FMRI_AUTH_PRODUCT, &prod, &err);
 	(void) topo_prop_get_string(pnode, FM_FMRI_AUTHORITY,
@@ -720,14 +727,12 @@ topo_mod_auth(topo_mod_t *mod, tnode_t *pnode)
 	/*
 	 * No luck, return NULL
 	 */
-	if (!prod && !server && !csn)
-		return (NULL);
-
-	if ((err = topo_mod_nvalloc(mod, &auth, NV_UNIQUE_NAME)) != 0) {
-		(void) topo_mod_seterrno(mod, EMOD_FMRI_NVL);
+	if (!prod && !server && !csn) {
+		nvlist_free(auth);
 		return (NULL);
 	}
 
+	err = 0;
 	if (prod != NULL) {
 		err |= nvlist_add_string(auth, FM_FMRI_AUTH_PRODUCT, prod);
 		topo_mod_strfree(mod, prod);

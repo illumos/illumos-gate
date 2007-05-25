@@ -196,7 +196,8 @@ topo_open(int version, const char *rootdir, int *errp)
 		thp->th_product = topo_hdl_strdup(thp, thp->th_platform);
 	}
 
-	if (thp->th_rootdir == NULL)
+	if (thp->th_rootdir == NULL || thp->th_platform == NULL ||
+	    thp->th_machine == NULL)
 		return (set_open_errno(thp, errp, ETOPO_NOMEM));
 
 	dbflags	 = getenv("TOPO_DEBUG");

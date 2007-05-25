@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -154,6 +154,7 @@ topo_tree_destroy(ttree_t *tp)
 static int
 topo_tree_enum(topo_hdl_t *thp, ttree_t *tp)
 {
+	int rv = 0;
 	char *pp;
 
 	/*
@@ -184,13 +185,11 @@ topo_tree_enum(topo_hdl_t *thp, ttree_t *tp)
 			if (topo_file_load(tp->tt_root->tn_enum, tp->tt_root,
 			    thp->th_machine, tp->tt_scheme) < 0) {
 
-				if (topo_file_load(tp->tt_root->tn_enum,
-				    tp->tt_root, NULL, tp->tt_scheme) < 0) {
+				if ((rv = topo_file_load(tp->tt_root->tn_enum,
+				    tp->tt_root, NULL, tp->tt_scheme)) < 0) {
 					topo_dprintf(thp, TOPO_DBG_ERR, "no "
 					    "topology map found for the %s "
 					    "FMRI set\n", tp->tt_scheme);
-					return (topo_hdl_seterrno(thp,
-					    ETOPO_ENUM_NOMAP));
 				}
 			}
 		}
@@ -210,6 +209,8 @@ topo_tree_enum(topo_hdl_t *thp, ttree_t *tp)
 		thp->th_pi = DI_PROM_HANDLE_NIL;
 	}
 
+	if (rv != 0)
+		return (topo_hdl_seterrno(thp, ETOPO_ENUM_NOMAP));
 
 	return (0);
 }

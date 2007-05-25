@@ -323,6 +323,9 @@ dev_for_hostbridge(topo_mod_t *mp, char *path)
 	char *lastslash;
 	char *newpath;
 	char *comma;
+	int plen;
+
+	plen = strlen(path) + 1;
 
 	/*
 	 * We only care about the last component of the dev path. If
@@ -339,10 +342,13 @@ dev_for_hostbridge(topo_mod_t *mp, char *path)
 	assert(comma != NULL);
 
 	*comma = '\0';
-	if ((newpath = topo_mod_strdup(mp, path)) == NULL)
-		return (path);
+	if ((newpath = topo_mod_strdup(mp, path)) == NULL) {
+		topo_mod_free(mp, path, plen);
+		return (NULL);
+	}
+
 	*comma = ',';
-	topo_mod_strfree(mp, path);
+	topo_mod_free(mp, path, plen);
 	return (newpath);
 }
 
@@ -421,7 +427,7 @@ FRU_fmri_set(topo_mod_t *mp, tnode_t *tn)
 	if (topo_node_resource(tn, &fmri, &err) < 0 ||
 	    fmri == NULL) {
 		topo_mod_dprintf(mp, "FRU_fmri_set error: %s\n",
-			topo_strerror(topo_mod_errno(mp)));
+		    topo_strerror(topo_mod_errno(mp)));
 		return (topo_mod_seterrno(mp, err));
 	}
 	e = topo_node_fru_set(tn, fmri, 0, &err);
@@ -462,7 +468,7 @@ FRU_set(tnode_t *tn, did_t *pd,
 		e = FRU_fmri_set(mp, tn);
 		return (e);
 	} else if (strcmp(nm, PCI_DEVICE) == 0 ||
-		strcmp(nm, PCIEX_DEVICE) == 0) {
+	    strcmp(nm, PCIEX_DEVICE) == 0) {
 		nvlist_t *in, *out;
 
 		mp = did_mod(pd);
@@ -473,8 +479,8 @@ FRU_set(tnode_t *tn, did_t *pd,
 			return (topo_mod_seterrno(mp, EMOD_NOMEM));
 		}
 		if (topo_method_invoke(tn,
-			TOPO_METH_FRU_COMPUTE, TOPO_METH_FRU_COMPUTE_VERSION,
-			in, &out, &err) != 0) {
+		    TOPO_METH_FRU_COMPUTE, TOPO_METH_FRU_COMPUTE_VERSION,
+		    in, &out, &err) != 0) {
 			nvlist_free(in);
 			return (topo_mod_seterrno(mp, err));
 		}
@@ -664,7 +670,10 @@ maybe_di_chars_copy(tnode_t *tn, did_t *pd,
 	if (di_bytes_get(did_mod(pd), did_dinode(pd), dpnm, &sz, &typbuf) < 0)
 		return (0);
 	mp = did_mod(pd);
-	tmpbuf = topo_mod_alloc(mp, sz + 1);
+
+	if ((tmpbuf = topo_mod_alloc(mp, sz + 1)) == NULL)
+		return (topo_mod_seterrno(mp, EMOD_NOMEM));
+
 	bcopy(typbuf, tmpbuf, sz);
 	tmpbuf[sz] = 0;
 	e = topo_prop_set_string(tn,

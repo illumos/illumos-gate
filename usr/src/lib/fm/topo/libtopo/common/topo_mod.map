@@ -65,6 +65,8 @@
 	topo_mod_str2nvl = FUNCTION extern;
 	topo_mod_auth = FUNCTION extern;
 
+	topo_mod_walk_init = FUNCTION extern;
+
 	topo_method_register = FUNCTION extern;
 	topo_method_unregister = FUNCTION extern;
 	topo_method_unregister_all = FUNCTION extern;

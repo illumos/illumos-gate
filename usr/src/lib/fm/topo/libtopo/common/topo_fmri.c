@@ -156,13 +156,14 @@ topo_fmri_str2nvl(topo_hdl_t *thp, const char *fmristr, nvlist_t **fmri,
 	    TOPO_METH_STR2NVL_VERSION, in, &out, err) != 0)
 		return (set_error(thp, *err, err, TOPO_METH_STR2NVL, in));
 
+	nvlist_free(in);
+
 	if (out == NULL ||
 	    topo_hdl_nvdup(thp, out, fmri) != 0)
 		return (set_error(thp, ETOPO_FMRI_NVL, err,
-		    TOPO_METH_STR2NVL, in));
+		    TOPO_METH_STR2NVL, out));
 
 	nvlist_free(out);
-	nvlist_free(in);
 
 	return (0);
 }

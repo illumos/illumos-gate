@@ -200,8 +200,12 @@ topo_mod_destroy(topo_mod_t *mod)
 static topo_mod_t *
 set_create_error(topo_hdl_t *thp, topo_mod_t *mod, const char *path, int err)
 {
-	topo_dprintf(thp, TOPO_DBG_ERR, "unable to load module %s: %s\n",
-	    path, topo_strerror(err));
+	if (path != NULL)
+		topo_dprintf(thp, TOPO_DBG_ERR, "unable to load module %s: "
+		    "%s\n", path, topo_strerror(err));
+	else
+		topo_dprintf(thp, TOPO_DBG_ERR, "unable to load module: "
+		    "%s\n", topo_strerror(err));
 
 	if (mod != NULL)
 		topo_mod_destroy(mod);

@@ -131,6 +131,9 @@ topo_node_destroy(tnode_t *node)
 	if (node == NULL)
 		return;
 
+	topo_dprintf(mod->tm_hdl, TOPO_DBG_MODSVC, "destroying node %s=%d\n",
+	    topo_node_name(node), topo_node_instance(node));
+
 	assert(node->tn_refs == 0);
 
 	/*
@@ -344,15 +347,11 @@ topo_node_range_destroy(tnode_t *pnode, const char *name)
 		return;
 	}
 
+	for (i = 0; i < nhp->th_arrlen; i++)
+		assert(nhp->th_nodearr[i] == NULL);
+
 	topo_list_delete(&pnode->tn_children, nhp);
 	topo_node_unlock(pnode);
-
-	/*
-	 * Should be an empty node range
-	 */
-	for (i = 0; i < nhp->th_arrlen; i++) {
-		topo_node_unbind(nhp->th_nodearr[i]);
-	}
 
 	mod = nhp->th_enum;
 	if (nhp->th_name != NULL)
@@ -480,7 +479,8 @@ topo_node_bind(topo_mod_t *mod, tnode_t *pnode, const char *name,
 		return (node_bind_seterror(mod, pnode, node, err));
 
 	topo_dprintf(mod->tm_hdl, TOPO_DBG_MODSVC,
-	    "node bound %s=%d\n", node->tn_name, node->tn_instance);
+	    "node bound %s=%d/%s=%d\n", topo_node_name(pnode),
+	    topo_node_instance(pnode), node->tn_name, node->tn_instance);
 
 	node->tn_state |= TOPO_NODE_BOUND;
 
@@ -515,6 +515,12 @@ topo_node_unbind(tnode_t *node)
 
 	node->tn_state &= ~TOPO_NODE_BOUND;
 	topo_node_unlock(node);
+
+	topo_dprintf(node->tn_hdl, TOPO_DBG_MODSVC,
+	    "node unbound %s=%d/%s=%d refs = %d\n",
+	    topo_node_name(node->tn_parent),
+	    topo_node_instance(node->tn_parent), node->tn_name,
+	    node->tn_instance, node->tn_refs);
 
 	topo_node_rele(node);
 }
@@ -573,7 +579,7 @@ topo_node_walk_init(topo_hdl_t *thp, topo_mod_t *mod, tnode_t *node,
 		wp->tw_node = child;
 	} else {
 		topo_node_unlock(node);
-		topo_node_hold(child);
+		topo_node_hold(node); /* rele at walk end */
 		wp->tw_node = node;
 	}
 

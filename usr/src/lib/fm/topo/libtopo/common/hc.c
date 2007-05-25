@@ -353,7 +353,7 @@ hc_compare(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 		return (topo_mod_seterrno(mod, EMOD_VER_NEW));
 
 	if (nvlist_lookup_nvlist(in, TOPO_METH_FMRI_ARG_NV1, &nv1) != 0 ||
-	    nvlist_lookup_nvlist(in, TOPO_METH_FMRI_ARG_NV1, &nv2) != 0)
+	    nvlist_lookup_nvlist(in, TOPO_METH_FMRI_ARG_NV2, &nv2) != 0)
 		return (topo_mod_seterrno(mod, EMOD_METHOD_INVAL));
 
 	ret = fmri_compare(mod, nv1, nv2);
@@ -508,8 +508,10 @@ hc_fmri_nvl2str(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
 	}
 
-	if (topo_mod_nvalloc(mod, &fmristr, NV_UNIQUE_NAME) != 0)
+	if (topo_mod_nvalloc(mod, &fmristr, NV_UNIQUE_NAME) != 0) {
+		topo_mod_free(mod, name, len + 1);
 		return (topo_mod_seterrno(mod, EMOD_FMRI_NVL));
+	}
 	if (nvlist_add_string(fmristr, "fmri-string", name) != 0) {
 		topo_mod_free(mod, name, len + 1);
 		nvlist_free(fmristr);
@@ -570,10 +572,12 @@ make_hc_pairs(topo_mod_t *mod, char *fmri, int *num)
 	char *cid = NULL;
 	int nslashes = 0;
 	int npairs = 0;
-	int i;
+	int i, hclen;
 
 	if ((hc = topo_mod_strdup(mod, fmri + 5)) == NULL)
 		return (NULL);
+
+	hclen = strlen(hc) + 1;
 
 	/*
 	 * Count equal signs and slashes to determine how many
@@ -600,7 +604,7 @@ make_hc_pairs(topo_mod_t *mod, char *fmri, int *num)
 	 * Do we appear to have a well-formed string version of the FMRI?
 	 */
 	if (nslashes < npairs || npairs == 0) {
-		topo_mod_strfree(mod, hc);
+		topo_mod_free(mod, hc, hclen);
 		return (NULL);
 	}
 
@@ -608,8 +612,8 @@ make_hc_pairs(topo_mod_t *mod, char *fmri, int *num)
 
 	find = fromstr;
 
-	if ((pa = topo_mod_alloc(mod, npairs * sizeof (nvlist_t *))) == NULL) {
-		topo_mod_strfree(mod, hc);
+	if ((pa = topo_mod_zalloc(mod, npairs * sizeof (nvlist_t *))) == NULL) {
+		topo_mod_free(mod, hc, hclen);
 		return (NULL);
 	}
 
@@ -623,7 +627,6 @@ make_hc_pairs(topo_mod_t *mod, char *fmri, int *num)
 	 * slash from there.
 	 */
 	for (i = 0; i < npairs; i++) {
-		pa[i] = NULL;
 		startn = strchr(find, '/');
 		if (startn == NULL)
 			break;
@@ -669,14 +672,14 @@ make_hc_pairs(topo_mod_t *mod, char *fmri, int *num)
 	topo_mod_strfree(mod, cid);
 
 	if (i < npairs) {
-		while (i >= 0)
-			nvlist_free(pa[i + 1]);
+		for (i = 0; i < npairs; i++)
+			nvlist_free(pa[i]);
 		topo_mod_free(mod, pa, npairs * sizeof (nvlist_t *));
-		topo_mod_strfree(mod, hc);
+		topo_mod_free(mod, hc, hclen);
 		return (NULL);
 	}
 
-	topo_mod_strfree(mod, hc);
+	topo_mod_free(mod, hc, hclen);
 
 	return (pa);
 }

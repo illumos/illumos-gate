@@ -87,6 +87,7 @@ SUNWprivate {
 	topo_mod_strfree;
 	topo_mod_unload;
 	topo_mod_unregister;
+	topo_mod_walk_init;
 	topo_mod_zalloc;
 	topo_node_asru;
 	topo_node_asru_set;

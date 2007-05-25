@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,8 +45,13 @@ hb_process(topo_mod_t *mod, tnode_t *ptn, topo_instance_t hbi, di_node_t bn)
 		return (-1);
 	if ((hb = pcihostbridge_declare(mod, ptn, bn, hbi)) == NULL)
 		return (-1);
-	return (topo_mod_enumerate(mod,
-	    hb, PCI_BUS, PCI_BUS, 0, MAX_HB_BUSES, (void *)hbdid));
+	if (topo_mod_enumerate(mod,
+	    hb, PCI_BUS, PCI_BUS, 0, MAX_HB_BUSES, (void *)hbdid) < 0) {
+		topo_node_unbind(hb);
+		return (-1);
+	}
+
+	return (0);
 }
 
 static int
@@ -62,8 +67,14 @@ rc_process(topo_mod_t *mod, tnode_t *ptn, topo_instance_t hbi, di_node_t bn)
 		return (-1);
 	if ((rc = pciexrc_declare(mod, hb, bn, hbi)) == NULL)
 		return (-1);
-	return (topo_mod_enumerate(mod,
-	    rc, PCI_BUS, PCIEX_BUS, 0, MAX_HB_BUSES, (void *)hbdid));
+	if (topo_mod_enumerate(mod,
+	    rc, PCI_BUS, PCIEX_BUS, 0, MAX_HB_BUSES, (void *)hbdid) < 0) {
+		topo_node_unbind(hb);
+		topo_node_unbind(rc);
+		return (-1);
+	}
+
+	return (0);
 }
 
 
@@ -84,11 +95,12 @@ pci_hostbridges_find(topo_mod_t *mod, tnode_t *ptn)
 
 	pnode = di_drv_first_node(PCI, devtree);
 	while (pnode != DI_NODE_NIL) {
-		if (hb_process(mod, ptn, hbcnt++, pnode)
-		    < 0) {
-			topo_node_range_destroy(ptn, HOSTBRIDGE);
+		if (hb_process(mod, ptn, hbcnt, pnode) < 0) {
+			if (hbcnt == 0)
+				topo_node_range_destroy(ptn, HOSTBRIDGE);
 			return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
 		}
+		hbcnt++;
 		pnode = di_drv_next_node(pnode);
 	}
 
@@ -99,20 +111,24 @@ pci_hostbridges_find(topo_mod_t *mod, tnode_t *ptn)
 			if (di_driver_name(cnode) == NULL)
 				continue;
 			if (strcmp(di_driver_name(cnode), PCI_PCI) == 0) {
-				if (hb_process(mod, ptn, hbcnt++, cnode) < 0) {
-					topo_node_range_destroy(ptn,
-					    HOSTBRIDGE);
+				if (hb_process(mod, ptn, hbcnt, cnode) < 0) {
+					if (hbcnt == 0)
+						topo_node_range_destroy(ptn,
+						    HOSTBRIDGE);
 					return (topo_mod_seterrno(mod,
 					    EMOD_PARTIAL_ENUM));
 				}
+				hbcnt++;
 			}
 			if (strcmp(di_driver_name(cnode), PCIE_PCI) == 0) {
-				if (rc_process(mod, ptn, hbcnt++, cnode) < 0) {
-					topo_node_range_destroy(ptn,
-					    HOSTBRIDGE);
+				if (rc_process(mod, ptn, hbcnt, cnode) < 0) {
+					if (hbcnt == 0)
+						topo_node_range_destroy(ptn,
+						    HOSTBRIDGE);
 					return (topo_mod_seterrno(mod,
 					    EMOD_PARTIAL_ENUM));
 				}
+				hbcnt++;
 			}
 		}
 		pnode = di_drv_next_node(pnode);

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,6 +140,7 @@ static int
 hb_enum(topo_mod_t *mp, tnode_t *pn, const char *name, topo_instance_t imin,
     topo_instance_t imax, void *notused, void *data)
 {
+	int rv;
 	topo_mod_t *pcimod;
 
 	if (strcmp(name, HOSTBRIDGE) != 0) {
@@ -161,7 +162,6 @@ hb_enum(topo_mod_t *mp, tnode_t *pn, const char *name, topo_instance_t imin,
 	 * did_t structures we can use to enumerate the singled out hostbridge.
 	 */
 	if (imin != imax) {
-		int rv;
 
 		if (did_hash_init(mp) < 0) {
 			topo_mod_dprintf(mp,
@@ -170,14 +170,13 @@ hb_enum(topo_mod_t *mp, tnode_t *pn, const char *name, topo_instance_t imin,
 			topo_mod_unload(pcimod);
 			return (-1);
 		}
-		if ((rv = platform_hb_enum(mp, pn, name, imin, imax)) < 0)
-			topo_mod_seterrno(mp, EMOD_PARTIAL_ENUM);
+		rv = platform_hb_enum(mp, pn, name, imin, imax);
 		did_hash_fini(mp);
-		return (rv);
 	} else {
-		return (specific_hb_enum(mp, pn, name, imin, imax,
-		    data));
+		rv = specific_hb_enum(mp, pn, name, imin, imax, data);
 	}
+
+	return (rv);
 }
 
 /*ARGSUSED*/
@@ -185,12 +184,6 @@ static void
 hb_release(topo_mod_t *mp, tnode_t *node)
 {
 	topo_method_unregister_all(mp, node);
-
-	/*
-	 * node private data (did_t) for this node is destroyed in
-	 * did_hash_destroy()
-	 */
-
 }
 
 static tnode_t *

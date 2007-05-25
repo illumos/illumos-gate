@@ -269,7 +269,14 @@ txml_print_range(topo_hdl_t *thp, FILE *fp, tnode_t *node, int dependent)
 static void
 txml_print_topology(topo_hdl_t *thp, FILE *fp, char *scheme, tnode_t *node)
 {
-	begin_element(fp, Topology, Name, thp->th_product, Scheme, scheme,
+	char *name;
+
+	if (thp->th_product != NULL)
+		name = thp->th_product;
+	else
+		name = thp->th_platform;
+
+	begin_element(fp, Topology, Name, name, Scheme, scheme,
 	    NULL);
 	(void) txml_print_range(thp, fp, node, 0);
 	end_element(fp, Topology);

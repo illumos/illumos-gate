@@ -149,8 +149,10 @@ hostbridge_asdevice(topo_mod_t *mod, tnode_t *bus)
 
 	if ((dev32 = pcidev_declare(mod, bus, di, 32)) == NULL)
 		return (-1);
-	if (pcifn_declare(mod, dev32, di, 0) == NULL)
+	if (pcifn_declare(mod, dev32, di, 0) == NULL) {
+		topo_node_unbind(dev32);
 		return (-1);
+	}
 	return (0);
 }
 
@@ -174,11 +176,12 @@ pciexfn_declare(topo_mod_t *mod, tnode_t *parent, di_node_t dn,
 	 * We may find pci-express buses or plain-pci buses beneath a function
 	 */
 	if (child_range_add(mod, ntn, PCIEX_BUS, 0, MAX_HB_BUSES) < 0) {
-		topo_node_range_destroy(ntn, PCIEX_BUS);
+		topo_node_unbind(ntn);
 		return (NULL);
 	}
 	if (child_range_add(mod, ntn, PCI_BUS, 0, MAX_HB_BUSES) < 0) {
-		topo_node_range_destroy(ntn, PCI_BUS);
+		topo_node_range_destroy(ntn, PCIEX_BUS);
+		topo_node_unbind(ntn);
 		return (NULL);
 	}
 	return (ntn);
@@ -207,7 +210,7 @@ pciexdev_declare(topo_mod_t *mod, tnode_t *parent, di_node_t dn,
 	 */
 	if (child_range_add(mod,
 	    ntn, PCIEX_FUNCTION, 0, MAX_PCIDEV_FNS) < 0) {
-		topo_node_range_destroy(ntn, PCIEX_FUNCTION);
+		topo_node_unbind(ntn);
 		return (NULL);
 	}
 	return (ntn);
@@ -225,7 +228,6 @@ pciexbus_declare(topo_mod_t *mod, tnode_t *parent, di_node_t dn,
 	if ((ntn = pci_tnode_create(mod, parent, PCIEX_BUS, i, dn)) == NULL)
 		return (NULL);
 	if (did_props_set(ntn, pd, Bus_common_props, Bus_propcnt) < 0) {
-		topo_node_range_destroy(ntn, PCI_DEVICE);
 		topo_node_unbind(ntn);
 		return (NULL);
 	}
@@ -234,7 +236,7 @@ pciexbus_declare(topo_mod_t *mod, tnode_t *parent, di_node_t dn,
 	 */
 	if (child_range_add(mod,
 	    ntn, PCIEX_DEVICE, 0, MAX_PCIBUS_DEVS) < 0) {
-		topo_node_range_destroy(ntn, PCIEX_DEVICE);
+		topo_node_unbind(ntn);
 		return (NULL);
 	}
 	return (ntn);
@@ -301,7 +303,6 @@ pcidev_declare(topo_mod_t *mod, tnode_t *parent, di_node_t dn,
 	 * We can expect to find pci functions beneath the device
 	 */
 	if (child_range_add(mod, ntn, PCI_FUNCTION, 0, MAX_PCIDEV_FNS) < 0) {
-		topo_node_range_destroy(ntn, PCI_FUNCTION);
 		topo_node_unbind(ntn);
 		return (NULL);
 	}
@@ -372,11 +373,11 @@ pci_bridge_declare(topo_mod_t *mod, tnode_t *fn, di_node_t din, int board,
 	return (err);
 }
 
-static int
+static void
 declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
     int board, int bridge, int rc, int devno, int fnno, int depth)
 {
-	int err = 0;
+	int dcnt = 0;
 	tnode_t *fn;
 	uint_t class, subclass;
 
@@ -386,16 +387,28 @@ declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
 		else
 			*dev = pcidev_declare(mod, bus, din, devno);
 		if (*dev == NULL)
-			return (-1);
+			return;
+		++dcnt;
 	}
 	if (rc >= 0)
 		fn = pciexfn_declare(mod, *dev, din, fnno);
 	else
 		fn = pcifn_declare(mod, *dev, din, fnno);
-	if (fn == NULL)
-		return (-1);
-	if (pci_classcode_get(mod, din, &class, &subclass) < 0)
-		return (-1);
+
+	if (fn == NULL) {
+		if (dcnt) {
+			topo_node_unbind(*dev);
+			*dev = NULL;
+		}
+		return;
+	}
+
+	if (pci_classcode_get(mod, din, &class, &subclass) < 0) {
+		topo_node_unbind(fn);
+		if (dcnt)
+			topo_node_unbind(*dev);
+		return;
+	}
 
 	/*
 	 * This function may be a bridge.  If not, check for a possible
@@ -403,12 +416,10 @@ declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
 	 * devices.
 	 */
 	if (class == PCI_CLASS_BRIDGE && subclass == PCI_BRIDGE_PCI)
-		err = pci_bridge_declare(mod, fn, din, board, bridge, rc,
+		(void) pci_bridge_declare(mod, fn, din, board, bridge, rc,
 		    depth);
 	else if (class == PCI_CLASS_MASS)
 		(void) topo_mod_enummap(mod, fn, "storage", FM_FMRI_SCHEME_HC);
-
-	return (err);
 }
 
 int
@@ -459,15 +470,18 @@ pci_children_instantiate(topo_mod_t *mod, tnode_t *parent, di_node_t pn,
 			if (pps[d][f] == NULL)
 				continue;
 			din = did_dinode(pps[d][f]);
+
 			/*
-			 * Ignore error and try to enumerate as much as
-			 * possible.  If we ever need to check for an
-			 * error all declared buses, devices and functions
-			 * need to be cleaned up
+			 * Try to enumerate as many devices and functions as
+			 * possible.  If we fail to declare a device, break
+			 * out of the function loop.
 			 */
-			(void) declare_dev_and_fn(mod, bn,
+			declare_dev_and_fn(mod, bn,
 			    &dn, din, board, bridge, rc, d, f, depth);
 			did_rele(pps[d][f]);
+
+			if (dn == NULL)
+				break;
 		}
 		dn = NULL;
 	}

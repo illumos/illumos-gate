@@ -133,9 +133,9 @@ print_node(topo_hdl_t *thp, tnode_t *node, nvlist_t *nvl, const char *fmri)
 		nvlist_t *fru = NULL;
 
 		if (topo_node_asru(node, &asru, NULL, &err) == 0)
-		    (void) topo_fmri_nvl2str(thp, asru, &aname, &err);
+			(void) topo_fmri_nvl2str(thp, asru, &aname, &err);
 		if (topo_node_fru(node, &fru, NULL, &err) == 0)
-		    (void) topo_fmri_nvl2str(thp, fru, &fname, &err);
+			(void) topo_fmri_nvl2str(thp, fru, &fname, &err);
 		(void) topo_node_label(node, &lname, &err);
 		if (aname != NULL) {
 			nvlist_free(asru);
@@ -249,7 +249,7 @@ print_prop_nameval(topo_hdl_t *thp, nvlist_t *nvl)
 		    g_pname);
 		return;
 	} else {
-	    (void) nvpair_value_string(pv_nvp, &propn);
+		(void) nvpair_value_string(pv_nvp, &propn);
 	}
 
 	if ((pv_nvp = nvlist_next_nvpair(nvl, pv_nvp)) == NULL ||
@@ -986,9 +986,9 @@ print_fmri(topo_hdl_t *thp, char *uuid)
 		nvlist_t *fru = NULL;
 
 		if (topo_fmri_asru(thp, nvl, &asru, &err) == 0)
-		    (void) topo_fmri_nvl2str(thp, asru, &aname, &err);
+			(void) topo_fmri_nvl2str(thp, asru, &aname, &err);
 		if (topo_fmri_fru(thp, nvl, &fru, &err) == 0)
-		    (void) topo_fmri_nvl2str(thp, fru, &fname, &err);
+			(void) topo_fmri_nvl2str(thp, fru, &fname, &err);
 		(void) topo_fmri_label(thp, nvl, &lname, &err);
 
 		nvlist_free(fru);
@@ -1165,7 +1165,5 @@ main(int argc, char *argv[])
 		return (fmtopo_exit(thp, uuid, FMTOPO_EXIT_ERROR));
 	}
 
-	topo_hdl_strfree(thp, uuid);
-
-	return (FMTOPO_EXIT_SUCCESS);
+	return (fmtopo_exit(thp, uuid, FMTOPO_EXIT_SUCCESS));
 }
