@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1997-1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _SYS_TYPES32_H
@@ -58,8 +57,8 @@ typedef	uint32_t	major32_t;
 typedef	uint32_t	minor32_t;
 typedef	int32_t		key32_t;
 typedef	uint32_t	mode32_t;
-typedef	int32_t		uid32_t;
-typedef	int32_t		gid32_t;
+typedef	uint32_t	uid32_t;
+typedef	uint32_t	gid32_t;
 typedef	uint32_t	nlink32_t;
 typedef	uint32_t	dev32_t;
 typedef	int32_t		pid32_t;

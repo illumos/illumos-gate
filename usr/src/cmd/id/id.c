@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@
 #include <string.h>
 #include <project.h>
 #include <stdlib.h>
+#include <alloca.h>
 
 #define	PWNULL  ((struct passwd *)0)
 #define	GRNULL  ((struct group *)0)
@@ -73,7 +74,8 @@ main(int argc, char *argv[])
 	int c, aflag = 0, project_flag = 0;
 	struct passwd *pwp;
 	int i, j;
-	gid_t groupids[NGROUPS_UMAX];
+	int groupmax = sysconf(_SC_NGROUPS_MAX);
+	gid_t *groupids = alloca(groupmax * sizeof (gid_t));
 	struct group *gr;
 	char *user = NULL;
 
@@ -167,10 +169,10 @@ main(int argc, char *argv[])
 		else if (mode == ALLGROUPS) {
 			pgid(gid);
 			if (user)
-				i = getusergroups(NGROUPS_UMAX, groupids, user,
+				i = getusergroups(groupmax, groupids, user,
 				    prgid);
 			else
-				i = getgroups(NGROUPS_UMAX, groupids);
+				i = getgroups(groupmax, groupids);
 			if (i == -1)
 				perror("getgroups");
 			else if (i > 0) {
@@ -193,16 +195,16 @@ main(int argc, char *argv[])
 
 		if (aflag) {
 			if (user)
-				i = getusergroups(NGROUPS_UMAX, groupids, user,
+				i = getusergroups(groupmax, groupids, user,
 				    prgid);
 			else
-				i = getgroups(NGROUPS_UMAX, groupids);
+				i = getgroups(groupmax, groupids);
 			if (i == -1)
 				perror("getgroups");
 			else if (i > 0) {
 				(void) printf(" groups=");
 				for (idp = groupids; i--; idp++) {
-					(void) printf("%d", (int)*idp);
+					(void) printf("%u", *idp);
 					if (gr = getgrgid(*idp))
 						(void) printf("(%s)",
 							gr->gr_name);
@@ -229,10 +231,10 @@ main(int argc, char *argv[])
 		 */
 		else {
 			if (user)
-				i = getusergroups(NGROUPS_UMAX, groupids, user,
+				i = getusergroups(groupmax, groupids, user,
 				    prgid);
 			else
-				i = getgroups(NGROUPS_UMAX, groupids);
+				i = getgroups(groupmax, groupids);
 			if (i == -1)
 				perror("getgroups");
 			else if (i > 1) {
@@ -240,7 +242,7 @@ main(int argc, char *argv[])
 				for (idp = groupids; i--; idp++) {
 					if (*idp == egid)
 						continue;
-					(void) printf("%d", (int)*idp);
+					(void) printf("%u", *idp);
 					if (gr = getgrgid(*idp))
 						(void) printf("(%s)",
 							gr->gr_name);
@@ -309,7 +311,7 @@ puid(uid_t uid)
 	if (nflag && (pw = getpwuid(uid)) != PWNULL)
 		(void) printf("%s", pw->pw_name);
 	else
-		(void) printf("%u", (int)uid);
+		(void) printf("%u", uid);
 }
 
 static void
@@ -320,7 +322,7 @@ pgid(gid_t gid)
 	if (nflag && (gr = getgrgid(gid)) != GRNULL)
 		(void) printf("%s", gr->gr_name);
 	else
-		(void) printf("%u", (int)gid);
+		(void) printf("%u", gid);
 }
 
 static void
@@ -348,7 +350,7 @@ prid(TYPE how, uid_t id)
 	}
 	if (s != NULL)
 		(void) printf("%s=", s);
-	(void) printf("%u", (int)id);
+	(void) printf("%u", id);
 	switch ((int)how) {
 	case UID:
 	case EUID:

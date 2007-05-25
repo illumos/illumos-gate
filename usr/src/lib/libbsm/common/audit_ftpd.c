@@ -19,13 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <stdio.h>
 #include <sys/fcntl.h>
 #include <stdlib.h>
@@ -155,8 +156,8 @@ generate_record(
 
 	pwd = getpwnam(locuser);
 	if (pwd == NULL) {
-		uid = -1;
-		gid = -1;
+		uid = (uid_t)-1;
+		gid = (gid_t)-1;
 	} else {
 		uid = pwd->pw_uid;
 		gid = pwd->pw_gid;
@@ -233,7 +234,7 @@ selected(
 	struct au_mask mask;
 
 	mask.am_success = mask.am_failure = 0;
-	if (uid < 0) {
+	if (uid > MAXEPHUID) {
 		rc = getacna(naflags, 256); /* get non-attrib flags */
 		if (rc == 0)
 			(void) getauditflagsbin(naflags, &mask);

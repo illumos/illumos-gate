@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,11 +18,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5 */
 
 #include <sys/types.h>
 #include <stdio.h>
@@ -64,7 +67,7 @@ findnextgid()
 	    "r")) == NULL)
 		return (-1);
 
-	if (fscanf(fptr, "%ld\n", &next) == EOF) {
+	if (fscanf(fptr, "%u\n", &next) == EOF) {
 		(void) pclose(fptr);
 		return (DEFRID + 1);
 	}
@@ -98,7 +101,7 @@ findnextgid()
 		gid = -1;
 		last = next;
 
-	} while (fscanf(fptr, "%ld\n", &next) != EOF);
+	} while (fscanf(fptr, "%u\n", &next) != EOF);
 
 	(void) pclose(fptr);
 

@@ -19,12 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdio_ext.h>
 #include <stdlib.h>
@@ -59,8 +60,8 @@ static int ngrp = -1;
 static gid_t *groups;
 static long ngroups_max;
 
-static uid_t uid = -1;
-static uid_t gid = -1;
+static uid_t uid = (uid_t)-1;
+static gid_t gid = (gid_t)-1;
 
 int
 main(int argc, char **argv)
@@ -139,9 +140,9 @@ main(int argc, char **argv)
 static void
 credupdate(prcred_t *pcr)
 {
-	if (uid != -1)
+	if (uid != (uid_t)-1)
 		pcr->pr_euid = pcr->pr_ruid = pcr->pr_suid = uid;
-	if (gid != -1)
+	if (gid != (gid_t)-1)
 		pcr->pr_egid = pcr->pr_rgid = pcr->pr_sgid = gid;
 	if (ngrp >= 0) {
 
@@ -202,24 +203,18 @@ look(char *arg)
 	if (!all &&
 	    prcred->pr_euid == prcred->pr_ruid &&
 	    prcred->pr_ruid == prcred->pr_suid)
-		(void) printf("e/r/suid=%d  ",
-			(int)prcred->pr_euid);
+		(void) printf("e/r/suid=%u  ", prcred->pr_euid);
 	else
-		(void) printf("euid=%d ruid=%d suid=%d  ",
-			(int)prcred->pr_euid,
-			(int)prcred->pr_ruid,
-			(int)prcred->pr_suid);
+		(void) printf("euid=%u ruid=%u suid=%u  ",
+			prcred->pr_euid, prcred->pr_ruid, prcred->pr_suid);
 
 	if (!all &&
 	    prcred->pr_egid == prcred->pr_rgid &&
 	    prcred->pr_rgid == prcred->pr_sgid)
-		(void) printf("e/r/sgid=%d\n",
-			(int)prcred->pr_egid);
+		(void) printf("e/r/sgid=%u\n", prcred->pr_egid);
 	else
-		(void) printf("egid=%d rgid=%d sgid=%d\n",
-			(int)prcred->pr_egid,
-			(int)prcred->pr_rgid,
-			(int)prcred->pr_sgid);
+		(void) printf("egid=%u rgid=%u sgid=%u\n",
+			prcred->pr_egid, prcred->pr_rgid, prcred->pr_sgid);
 
 	if (prcred->pr_ngroups != 0 &&
 	    (all || prcred->pr_ngroups != 1 ||
@@ -228,7 +223,7 @@ look(char *arg)
 
 		(void) printf("\tgroups:");
 		for (i = 0; i < prcred->pr_ngroups; i++)
-			(void) printf(" %d", (int)prcred->pr_groups[i]);
+			(void) printf(" %u", prcred->pr_groups[i]);
 		(void) printf("\n");
 	}
 
@@ -259,17 +254,18 @@ usage(void)
 }
 
 
-static id_t
+static uint32_t
 str2id(const char *str)
 {
-	long res;
+	unsigned long res;
 	char *p;
 
-	res = strtol(str, &p, 0);
-	if (p == str || *p != '\0' || res < 0)
-		return (-1);
+	errno = 0;
+	res = strtoul(str, &p, 0);
+	if (p == str || *p != '\0' || errno != 0)
+		return ((uint32_t)-1);
 	else
-		return ((id_t)res);
+		return ((uint32_t)res);
 }
 
 static gid_t
@@ -279,8 +275,8 @@ str2gid(const char *grnam)
 	gid_t res;
 
 	if (grp == NULL) {
-		res = str2id(grnam);
-		if (res < 0) {
+		res = (gid_t)str2id(grnam);
+		if (res == (gid_t)-1) {
 			(void) fprintf(stderr, "%s: %s: unknown group"
 			    " or bad gid\n",
 			    command, grnam);
@@ -321,8 +317,8 @@ initcred(void)
 	if (user != NULL) {
 		pwd = getpwnam(user);
 		if (pwd == NULL) {
-			uid = str2id(user);
-			if (uid < 0) {
+			uid = (uid_t)str2id(user);
+			if (uid == (uid_t)-1) {
 				(void) fprintf(stderr, "%s: %s: unknown user"
 				    " or bad uid\n",
 				    command, user);

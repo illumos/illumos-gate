@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -153,7 +153,7 @@ void rmfiles ( RSTATUS * rp, int log_it )	/* funcdef */
 
 		    (void) strftime(time_buf, sizeof (time_buf),
 			NULL, localtime(&(rp->secure->date)));
-		    fdprintf(fd, "= %s, uid %d, gid %d, size %ld, %s\n",
+		    fdprintf(fd, "= %s, uid %u, gid %u, size %ld, %s\n",
 			rp->secure->req_id, rp->secure->uid, rp->secure->gid,
 			rp->secure->size, time_buf);
 		    if (rp->slow)

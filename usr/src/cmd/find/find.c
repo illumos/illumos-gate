@@ -1398,7 +1398,7 @@ getname(uid_t uid)
 #else
 	cp = uid & ((NUID) - 1);
 #endif
-	if (uid >= 0 && nc[cp].id == uid && nc[cp].name[0])
+	if (nc[cp].id == uid && nc[cp].name[0])
 		return (nc[cp].name);
 	pw = getpwuid(uid);
 	if (!pw)
@@ -1423,7 +1423,7 @@ getgroup(gid_t gid)
 #else
 	cp = gid & ((NGID) - 1);
 #endif
-	if (gid >= 0 && gc[cp].id == gid && gc[cp].name[0])
+	if (gc[cp].id == gid && gc[cp].name[0])
 		return (gc[cp].name);
 	gr = getgrgid(gid);
 	if (!gr)
@@ -1566,13 +1566,13 @@ list(file, stp)
 	if (cp != NULL)
 		(void) sprintf(uname, "%-8s ", cp);
 	else
-		(void) sprintf(uname, "%-8ld ", stp->st_uid);
+		(void) sprintf(uname, "%-8u ", stp->st_uid);
 
 	cp = getgroup(stp->st_gid);
 	if (cp != NULL)
 		(void) sprintf(gname, "%-8s ", cp);
 	else
-		(void) sprintf(gname, "%-8ld ", stp->st_gid);
+		(void) sprintf(gname, "%-8u ", stp->st_gid);
 
 	if (pmode[0] == 'b' || pmode[0] == 'c')
 		(void) sprintf(fsize, "%3ld,%4ld",

@@ -155,7 +155,7 @@ adt_get_mask_from_user(uid_t uid, au_mask_t *mask)
 	if (auditstate == AUC_DISABLED) {
 		mask->am_success = 0;
 		mask->am_failure = 0;
-	} else if (uid >= 0) {
+	} else if (uid <= MAXUID) {
 		if (getpwuid_r(uid, &pwd, pwd_buff, NSS_BUFSIZ) == NULL) {
 			/*
 			 * getpwuid_r returns NULL without setting
@@ -1507,7 +1507,7 @@ adt_changeuser(adt_internal_state_t *state, uid_t ruid)
 	if (!(state->as_have_user_data & ADT_HAVE_ASID))
 		state->as_info.ai_asid = adt_get_unique_id(ruid);
 
-	if (ruid >= 0) {
+	if (ruid <= MAXEPHUID) {
 		if (adt_get_mask_from_user(ruid, &mask))
 			return (-1);
 

@@ -442,10 +442,10 @@ int	Append = 0,	/* Flag set while searching to end of archive */
 
 
 static
-gid_t	Lastgid = -1;	/* Used with -t & -v to record current gid */
+gid_t	Lastgid = (gid_t)-1;	/* Used with -t & -v to record current gid */
 
 static
-uid_t	Lastuid = -1;	/* Used with -t & -v to record current uid */
+uid_t	Lastuid = (uid_t)-1;	/* Used with -t & -v to record current uid */
 
 static
 long	Args,		/* Mask of selected options */

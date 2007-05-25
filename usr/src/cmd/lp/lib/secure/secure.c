@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,9 +125,9 @@ getsecure(char *file)
 	 * anything strange.
 	 */
 	if (
-	        secp->uid > MAXUID || secp->uid < -1
+	        secp->uid > MAXUID
 	     || !secp->user
-	     || secp->gid > MAXUID || secp->gid < -1
+	     || secp->gid > MAXUID
 	     || secp->size == 0
 	     || secp->date <= 0
 	) {
@@ -180,7 +180,7 @@ putsecure(char *file, SECURE *secbufp)
 			break;
 
 		case SC_UID:
-			(void)fdprintf(fd, "%ld\n", secbufp->uid);
+			(void)fdprintf(fd, "%u\n", secbufp->uid);
 			break;
 
 		case SC_USER:
@@ -188,7 +188,7 @@ putsecure(char *file, SECURE *secbufp)
 			break;
 
 		case SC_GID:
-			(void)fdprintf(fd, "%ld\n", secbufp->gid);
+			(void)fdprintf(fd, "%u\n", secbufp->gid);
 			break;
 
 		case SC_SIZE:
@@ -267,4 +267,3 @@ freesecure(SECURE *secbufp)
 
 	return;
 }
-

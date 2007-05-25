@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 /*
  * PPPoE Server-mode daemon option parsing.
  *
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2295,9 +2294,9 @@ dump_configuration(FILE *fp)
 			(void) fprintf(fp, "\t    %s: debug level %d",
 			    sep->se_name, sep->se_debug);
 			if (sep->se_flags & SEF_UIDSET)
-				(void) fprintf(fp, ", UID %ld", sep->se_uid);
+				(void) fprintf(fp, ", UID %u", sep->se_uid);
 			if (sep->se_flags & SEF_GIDSET)
-				(void) fprintf(fp, ", GID %ld", sep->se_gid);
+				(void) fprintf(fp, ", GID %u", sep->se_gid);
 			if (sep->se_flags & SEF_WILD)
 				(void) fprintf(fp, ", wildcard");
 			else if (sep->se_flags & SEF_NOWILD)

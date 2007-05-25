@@ -243,8 +243,8 @@ const struct systable systable[] = {
 {"getpid",	0, DEC, DEC},					/*  20 */
 {"mount",	8, DEC, NOV, STG, STG, MTF, MFT, HEX, DEC, HEX, DEC},	/* 21 */
 {"umount",	1, DEC, NOV, STG},				/*  22 */
-{"setuid",	1, DEC, NOV, DEC},				/*  23 */
-{"getuid",	0, DEC, DEC},					/*  24 */
+{"setuid",	1, DEC, NOV, UNS},				/*  23 */
+{"getuid",	0, UNS, UNS},					/*  24 */
 {"stime",	1, DEC, NOV, DEC},				/*  25 */
 {"pcsample",	2, DEC, NOV, HEX, DEC},				/*  26 */
 {"alarm",	1, DEC, NOV, UNS},				/*  27 */
@@ -266,8 +266,8 @@ const struct systable systable[] = {
 {"times",	1, DEC, NOV, HEX},				/*  43 */
 {"profil",	4, DEC, NOV, HEX, UNS, HEX, OCT},		/*  44 */
 {"plock",	1, DEC, NOV, PLK},				/*  45 */
-{"setgid",	1, DEC, NOV, DEC},				/*  46 */
-{"getgid",	0, DEC, DEC},					/*  47 */
+{"setgid",	1, DEC, NOV, UNS},				/*  46 */
+{"getgid",	0, UNS, UNS},					/*  47 */
 {"signal",	2, HEX, NOV, SIG, ACT},				/*  48 */
 {"msgsys",	6, DEC, NOV, DEC, DEC, DEC, DEC, DEC, DEC},	/*  49 */
 {"sysi86",	4, HEX, NOV, S86, HEX, HEX, HEX, DEC, DEC},	/*  50 */
@@ -298,7 +298,7 @@ const struct systable systable[] = {
 {"exacctsys",	6, DEC, NOV, DEC, IDT, DEC, HEX, DEC, HEX},	/*  72 */
 {"getpagesizes", 2, DEC, NOV, HEX, DEC},			/*  73 */
 {"rctlsys",	6, DEC, NOV, RSC, STG, HEX, HEX, DEC, DEC},	/*  74 */
-{"issetugid",	0, DEC, NOV},					/*  75 */
+{"sidsys",	4, UNS, UNS, DEC, DEC, DEC, DEC},		/*  75 */
 {"fsat",	6, DEC, NOV, HEX, HEX, HEX, HEX, HEX, HEX},	/*  76 */
 {"lwp_park",	3, DEC, NOV, DEC, HEX, DEC},			/*  77 */
 {"sendfilev",	5, DEC, NOV, DEC, DEC, HEX, DEC, HEX},		/*  78 */
@@ -359,12 +359,12 @@ const struct systable systable[] = {
 {"putpmsg",	5, DEC, NOV, DEC, HEX, HEX, DEC, HHX},		/* 133 */
 {"rename",	2, DEC, NOV, STG, STG},				/* 134 */
 {"uname",	1, DEC, NOV, HEX},				/* 135 */
-{"setegid",	1, DEC, NOV, DEC},				/* 136 */
+{"setegid",	1, DEC, NOV, UNS},				/* 136 */
 {"sysconfig",	1, DEC, NOV, CNF},				/* 137 */
 {"adjtime",	2, DEC, NOV, HEX, HEX},				/* 138 */
 {"sysinfo",	3, DEC, NOV, INF, RST, DEC},			/* 139 */
 {"sharefs",	3, DEC, NOV, DEC, HEX, DEC},			/* 140 */
-{"seteuid",	1, DEC, NOV, DEC},				/* 141 */
+{"seteuid",	1, DEC, NOV, UNS},				/* 141 */
 {"forksys",	2, DEC, NOV, DEC, HHX},				/* 142 */
 {"fork1",	0, DEC, NOV},					/* 143 */
 {"sigtimedwait", 3, DEC, NOV, HEX, HEX, HEX},			/* 144 */
@@ -425,8 +425,8 @@ const struct systable systable[] = {
 {"nanosleep",	2, DEC, NOV, HEX, HEX},				/* 199 */
 {"facl",	4, DEC, NOV, DEC, ACL, DEC, HEX},		/* 200 */
 {"door",	6, DEC, NOV, DEC, HEX, HEX, HEX, HEX, DEC},	/* 201 */
-{"setreuid",	2, DEC, NOV, DEC, DEC},				/* 202 */
-{"setregid",	2, DEC, NOV, DEC, DEC},				/* 203 */
+{"setreuid",	2, DEC, NOV, UN1, UN1},				/* 202 */
+{"setregid",	2, DEC, NOV, UN1, UN1},				/* 203 */
 {"install_utrap", 3, DEC, NOV, DEC, HEX, HEX},			/* 204 */
 {"signotify",	3, DEC, NOV, DEC, HEX, HEX},			/* 205 */
 {"schedctl",	0, HEX, NOV},					/* 206 */
@@ -700,6 +700,7 @@ static const	struct systable privsystable[] = {
 {"getprivimplinfo",	5, DEC, NOV, HID, HID, HID, HEX, DEC},	/* 2 */
 {"setpflags",		3, DEC, NOV, HID, PFL, DEC},		/* 3 */
 {"getpflags",		2, DEC, NOV, HID, PFL},			/* 4 */
+{"issetugid",		0, DEC, NOV, HID},			/* 5 */
 };
 #define	NPRIVSYSCODE	(sizeof (privsystable) / sizeof (struct systable))
 
@@ -828,6 +829,13 @@ const	struct systable forktable[] = {
 {"vforkx",	0, DEC, NOV},					/* 5 */
 };
 #define	NFORKCODE	(sizeof (forktable) / sizeof (struct systable))
+
+const	struct systable sidsystable[] = {
+{"allocids",	4, UNS, UNS, HID, DEC, DEC, DEC},		/* 0 */
+{"idmap_reg",	2, DEC, NOV, HID, DEC},				/* 1 */
+{"idmap_unreg",	2, DEC, NOV, HID, DEC},				/* 2 */
+};
+#define	NSIDSYSCODE	(sizeof (sidsystable) / sizeof (struct systable))
 
 const	struct sysalias sysalias[] = {
 	{ "exit",	SYS_exit	},
@@ -984,6 +992,7 @@ const	struct sysalias sysalias[] = {
 	{ "setrctl",		SYS_rctlsys	},
 	{ "rctlsys_lst",	SYS_rctlsys	},
 	{ "rctlsys_ctl",	SYS_rctlsys	},
+	{ "allocids",		SYS_sidsys	},
 	{  NULL,	0	}	/* end-of-list */
 };
 
@@ -1128,6 +1137,10 @@ subsys(int syscall, int subcode)
 		case SYS_forksys:	/* fork family */
 			if ((unsigned)subcode < NFORKCODE)
 				stp = &forktable[subcode];
+			break;
+		case SYS_sidsys:	/* SID family */
+			if ((unsigned)subcode < NSIDSYSCODE)
+				stp = &sidsystable[subcode];
 			break;
 		}
 	}
@@ -1287,6 +1300,7 @@ getsubcode(private_t *pri)
 		case SYS_zone:		/* zone */
 		case SYS_labelsys:	/* labelsys */
 		case SYS_rctlsys:	/* rctlsys */
+		case SYS_sidsys:	/* sidsys */
 			subcode = arg0;
 			break;
 		case SYS_fcntl:		/* fcntl() */
@@ -1349,7 +1363,8 @@ maxsyscalls()
 	    + NZONECODE - 1
 	    + NLABELCODE - 1
 	    + NRCTLCODE - 1
-	    + NFORKCODE - 1);
+	    + NFORKCODE - 1
+	    + NSIDSYSCODE - 1);
 }
 
 /*
@@ -1425,6 +1440,8 @@ nsubcodes(int syscall)
 		return (NRCTLCODE);
 	case SYS_forksys:
 		return (NFORKCODE);
+	case SYS_sidsys:
+		return (NSIDSYSCODE);
 	default:
 		return (1);
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -488,7 +488,7 @@ ln_aent_to_ace(aclent_t *aclent, int n, ace_t **acepp, int *rescount, int isdir)
 			acep->a_type = ACE_ACCESS_DENIED_ACE_TYPE;
 			acep->a_flags = 0;
 			if (aclent[i].a_type & GROUP_OBJ) {
-				acep->a_who = -1;
+				acep->a_who = (uid_t)-1;
 				acep->a_flags |=
 				    (ACE_IDENTIFIER_GROUP|ACE_GROUP);
 			} else if (aclent[i].a_type & USER) {
@@ -532,7 +532,7 @@ ln_aent_to_ace(aclent_t *aclent, int n, ace_t **acepp, int *rescount, int isdir)
 		 * differently for each different a_type.
 		 */
 		if (aclent[i].a_type & USER_OBJ) {
-			acep->a_who = -1;
+			acep->a_who = (uid_t)-1;
 			acep->a_flags |= ACE_OWNER;
 			ace_make_deny(acep, acep + 1, isdir, B_TRUE);
 			acep += 2;
@@ -542,7 +542,7 @@ ln_aent_to_ace(aclent_t *aclent, int n, ace_t **acepp, int *rescount, int isdir)
 			acep += 2;
 		} else if (aclent[i].a_type & (GROUP_OBJ | GROUP)) {
 			if (aclent[i].a_type & GROUP_OBJ) {
-				acep->a_who = -1;
+				acep->a_who = (uid_t)-1;
 				acep->a_flags |= ACE_GROUP;
 			} else {
 				acep->a_who = aclent[i].a_id;
@@ -579,7 +579,7 @@ ln_aent_to_ace(aclent_t *aclent, int n, ace_t **acepp, int *rescount, int isdir)
 			else
 				acep += 1;
 		} else if (aclent[i].a_type & OTHER_OBJ) {
-			acep->a_who = -1;
+			acep->a_who = (uid_t)-1;
 			acep->a_flags |= ACE_EVERYONE;
 			ace_make_deny(acep, acep + 1, isdir, B_FALSE);
 			acep += 2;
@@ -1841,9 +1841,9 @@ ace_match(void *entry1, void *entry2)
 	 * accurate comparison, since field is undefined.
 	 */
 	if (ace1.a_flags & (ACE_OWNER|ACE_GROUP|ACE_EVERYONE))
-		ace1.a_who = -1;
+		ace1.a_who = (uid_t)-1;
 	if (ace2.a_flags & (ACE_OWNER|ACE_GROUP|ACE_EVERYONE))
-		ace2.a_who = -1;
+		ace2.a_who = (uid_t)-1;
 	return (memcmp(&ace1, &ace2, sizeof (ace_t)));
 }
 

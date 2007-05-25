@@ -40,8 +40,8 @@
 
 #define	_F_GETGRNAM	"(&(objectClass=posixGroup)(cn=%s))"
 #define	_F_GETGRNAM_SSD	"(&(%%s)(cn=%s))"
-#define	_F_GETGRGID	"(&(objectClass=posixGroup)(gidNumber=%ld))"
-#define	_F_GETGRGID_SSD	"(&(%%s)(gidNumber=%ld))"
+#define	_F_GETGRGID	"(&(objectClass=posixGroup)(gidNumber=%u))"
+#define	_F_GETGRGID_SSD	"(&(%%s)(gidNumber=%u))"
 #define	_F_GETGRMEM	"(&(objectClass=posixGroup)(memberUid=%s))"
 #define	_F_GETGRMEM_SSD	"(&(%%s)(memberUid=%s))"
 
@@ -209,12 +209,12 @@ getbygid(ldap_backend_ptr be, void *a)
 	int ret;
 
 	ret = snprintf(searchfilter, sizeof (searchfilter),
-	    _F_GETGRGID, (long)argp->key.uid);
+	    _F_GETGRGID, argp->key.uid);
 	if (ret >= sizeof (searchfilter) || ret < 0)
 		return ((nss_status_t)NSS_NOTFOUND);
 
 	ret = snprintf(userdata, sizeof (userdata),
-	    _F_GETGRGID_SSD, (long)argp->key.uid);
+	    _F_GETGRGID_SSD, argp->key.uid);
 	if (ret >= sizeof (userdata) || ret < 0)
 		return ((nss_status_t)NSS_NOTFOUND);
 

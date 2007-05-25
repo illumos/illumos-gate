@@ -1702,11 +1702,11 @@ get_gid(const char *str)
 		gid = strtol(str, &cp, 10);
 
 		if (gid == 0 && errno != 0)
-			return (-1);
+			return ((gid_t)-1);
 
 		for (; *cp != '\0'; ++cp)
 			if (*cp != ' ' || *cp != '\t')
-				return (-1);
+				return ((gid_t)-1);
 
 		return (gid);
 	} else {
@@ -1723,7 +1723,7 @@ get_gid(const char *str)
 		ret = getgrnam_r(str, &grp, buffer, buflen);
 		free(buffer);
 
-		return (ret == NULL ? -1 : grp.gr_gid);
+		return (ret == NULL ? (gid_t)-1 : grp.gr_gid);
 	}
 }
 
@@ -1875,7 +1875,7 @@ get_groups(char *str, struct method_context *ci)
 
 		*end = '\0';
 
-		if ((ci->groups[i] = get_gid(cp)) == -1) {
+		if ((ci->groups[i] = get_gid(cp)) == (gid_t)-1) {
 			ci->ngroups = 0;
 			return (EINVAL);
 		}
@@ -1937,7 +1937,7 @@ get_profile(scf_propertygroup_t *pg, scf_property_t *prop, scf_value_t *val,
 	/* Get the euid first so we don't override ci->pwd for the uid. */
 	if ((value = kva_match(eap->attr, EXECATTR_EUID_KW)) != NULL) {
 		if (get_uid(value, ci, &ci->euid) != 0) {
-			ci->euid = -1;
+			ci->euid = (uid_t)-1;
 			errstr = "Could not interpret profile euid.";
 			goto out;
 		}
@@ -1945,7 +1945,7 @@ get_profile(scf_propertygroup_t *pg, scf_property_t *prop, scf_value_t *val,
 
 	if ((value = kva_match(eap->attr, EXECATTR_UID_KW)) != NULL) {
 		if (get_uid(value, ci, &ci->uid) != 0) {
-			ci->euid = ci->uid = -1;
+			ci->euid = ci->uid = (uid_t)-1;
 			errstr = "Could not interpret profile uid.";
 			goto out;
 		}
@@ -1954,7 +1954,7 @@ get_profile(scf_propertygroup_t *pg, scf_property_t *prop, scf_value_t *val,
 
 	if ((value = kva_match(eap->attr, EXECATTR_GID_KW)) != NULL) {
 		ci->egid = ci->gid = get_gid(value);
-		if (ci->gid == -1) {
+		if (ci->gid == (gid_t)-1) {
 			errstr = "Could not interpret profile gid.";
 			goto out;
 		}
@@ -1962,7 +1962,7 @@ get_profile(scf_propertygroup_t *pg, scf_property_t *prop, scf_value_t *val,
 
 	if ((value = kva_match(eap->attr, EXECATTR_EGID_KW)) != NULL) {
 		ci->egid = get_gid(value);
-		if (ci->egid == -1) {
+		if (ci->egid == (gid_t)-1) {
 			errstr = "Could not interpret profile egid.";
 			goto out;
 		}
@@ -2019,7 +2019,7 @@ get_ids(scf_propertygroup_t *pg, scf_property_t *prop, scf_value_t *val,
 	}
 
 	if (get_uid(vbuf, ci, &ci->uid) != 0) {
-		ci->uid = -1;
+		ci->uid = (uid_t)-1;
 		errstr = "Could not interpret user property.";
 		goto out;
 	}
@@ -2032,7 +2032,7 @@ get_ids(scf_propertygroup_t *pg, scf_property_t *prop, scf_value_t *val,
 
 	if (strcmp(vbuf, ":default") != 0) {
 		ci->gid = get_gid(vbuf);
-		if (ci->gid == -1) {
+		if (ci->gid == (gid_t)-1) {
 			errstr = "Could not interpret group property.";
 			goto out;
 		}
@@ -2043,7 +2043,7 @@ get_ids(scf_propertygroup_t *pg, scf_property_t *prop, scf_value_t *val,
 			break;
 
 		case ENOENT:
-			ci->gid = -1;
+			ci->gid = (gid_t)-1;
 			errstr = "No passwd entry.";
 			goto out;
 
@@ -2251,10 +2251,10 @@ restarter_get_method_context(uint_t version, scf_instance_t *inst,
 		return (ALLOCFAIL);
 
 	(void) memset(cip, 0, sizeof (*cip));
-	cip->uid = -1;
-	cip->euid = -1;
-	cip->gid = -1;
-	cip->egid = -1;
+	cip->uid = (uid_t)-1;
+	cip->euid = (uid_t)-1;
+	cip->gid = (gid_t)-1;
+	cip->egid = (gid_t)-1;
 
 	cip->vbuf_sz = scf_limit(SCF_LIMIT_MAX_VALUE_LENGTH);
 	assert(cip->vbuf_sz >= 0);
@@ -2613,9 +2613,9 @@ restarter_set_method_context(struct method_context *cip, const char **fp)
 	cip->pwbuf = NULL;
 	*fp = NULL;
 
-	if (cip->gid != -1) {
+	if (cip->gid != (gid_t)-1) {
 		if (setregid(cip->gid,
-		    cip->egid != -1 ? cip->egid : cip->gid) != 0) {
+		    cip->egid != (gid_t)-1 ? cip->egid : cip->gid) != 0) {
 			*fp = "setregid";
 
 			ret = errno;
@@ -2645,7 +2645,8 @@ restarter_set_method_context(struct method_context *cip, const char **fp)
 		}
 
 		if (setregid(cip->pwd.pw_gid,
-		    cip->egid != -1 ? cip->egid : cip->pwd.pw_gid) != 0) {
+		    cip->egid != (gid_t)-1 ?
+		    cip->egid : cip->pwd.pw_gid) != 0) {
 			*fp = "setregid";
 
 			ret = errno;
@@ -2816,7 +2817,8 @@ restarter_set_method_context(struct method_context *cip, const char **fp)
 	 */
 
 	*fp = "setreuid";
-	if (setreuid(cip->uid, cip->euid != -1 ? cip->euid : cip->uid) != 0) {
+	if (setreuid(cip->uid,
+	    cip->euid != (uid_t)-1 ? cip->euid : cip->uid) != 0) {
 		ret = errno;
 		assert(ret == EINVAL || ret == EPERM);
 		goto out;

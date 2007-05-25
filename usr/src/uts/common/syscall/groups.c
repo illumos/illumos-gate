@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 /*
  * Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +47,8 @@ setgroups(int gidsetsize, gid_t *gidset)
 	int	n = gidsetsize;
 	gid_t	*groups = NULL;
 	int	error;
+	int	scnt = 0;
+	ksidlist_t *ksl = NULL;
 
 	/* Perform the cheapest tests before grabbing p_crlock  */
 	if (n > ngroups_max || n < 0)
@@ -62,18 +63,28 @@ setgroups(int gidsetsize, gid_t *gidset)
 		}
 
 		for (i = 0; i < n; i++) {
-			if (groups[i] < 0 || groups[i] > MAXUID) {
+			if (!VALID_GID(groups[i])) {
+				kmem_free(groups, n * sizeof (gid_t));
+				return (set_errno(EINVAL));
+			}
+			if (groups[i] > MAXUID)
+				scnt++;
+		}
+		if (scnt > 0) {
+			ksl = kcrsid_gidstosids(n, groups);
+			if (ksl == NULL) {
 				kmem_free(groups, n * sizeof (gid_t));
 				return (set_errno(EINVAL));
 			}
 		}
 	}
 
+
 	/*
 	 * Need to pre-allocate the new cred structure before acquiring
 	 * the p_crlock mutex.
 	 */
-	newcr = cralloc();
+	newcr = cralloc_ksid();
 	p = ttoproc(curthread);
 	mutex_enter(&p->p_crlock);
 	cr = p->p_cred;
@@ -82,11 +93,14 @@ setgroups(int gidsetsize, gid_t *gidset)
 		mutex_exit(&p->p_crlock);
 		if (groups != NULL)
 			kmem_free(groups, n * sizeof (gid_t));
+		if (ksl != NULL)
+			ksidlist_rele(ksl);
 		crfree(newcr);
 		return (set_errno(error));
 	}
 
 	crdup_to(cr, newcr);
+	crsetsidlist(newcr, ksl);
 
 	if (n != 0) {
 		bcopy(groups, newcr->cr_groups, n * sizeof (gid_t));

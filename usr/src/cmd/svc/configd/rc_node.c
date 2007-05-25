@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1012,7 +1012,7 @@ perm_granted(const permcheck_t *pcp)
 	}
 
 	uid = ucred_geteuid(uc);
-	assert(uid != -1);
+	assert(uid != (uid_t)-1);
 
 	uap = getuseruid(uid);
 	if (uap != NULL) {

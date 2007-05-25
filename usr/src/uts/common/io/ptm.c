@@ -572,7 +572,8 @@ ptmwput(queue_t *qp, mblk_t *mp)
 
 			ptop = (pt_own_t *)mp->b_cont->b_rptr;
 
-			if (ptop->pto_ruid < 0 || ptop->pto_rgid < 0) {
+			if (!VALID_UID(ptop->pto_ruid) ||
+			    !VALID_GID(ptop->pto_rgid)) {
 				miocnak(qp, mp, 0, EINVAL);
 				break;
 			}

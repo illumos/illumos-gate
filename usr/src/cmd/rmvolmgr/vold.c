@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,8 +108,8 @@ boolean_t	rmm_vold_mountpoints_enabled = B_FALSE;
 static char	*prog_name = NULL;
 static pid_t	prog_pid = 0;
 static int	system_labeled = 0;
-static uid_t	mnt_uid = -1;
-static gid_t	mnt_gid = -1;
+static uid_t	mnt_uid = (uid_t)-1;
+static gid_t	mnt_gid = (gid_t)-1;
 static zoneid_t	mnt_zoneid = -1;
 static char	mnt_zoneroot[MAXPATHLEN];
 static char	mnt_userdir[MAXPATHLEN];

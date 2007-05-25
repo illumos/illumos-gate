@@ -438,6 +438,7 @@ CHKHDRS=			\
 	share.h			\
 	shm.h			\
 	shm_impl.h		\
+	sid.h			\
 	siginfo.h		\
 	signal.h		\
 	sleepq.h		\

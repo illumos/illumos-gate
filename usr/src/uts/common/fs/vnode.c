@@ -150,6 +150,16 @@ int vopstats_enabled = 1;
 }
 
 /*
+ * If the filesystem does not support XIDs map credential
+ * If the vfsp is NULL, perhaps we should also map?
+ */
+#define	VOPXID_MAP_CR(vp, cr)	{					\
+	vfs_t *vfsp = (vp)->v_vfsp;					\
+	if (vfsp != NULL && (vfsp->vfs_flag & VFS_XID) == 0)		\
+		cr = crgetmapped(cr);					\
+	}
+
+/*
  * Convert stat(2) formats to vnode types and vice versa.  (Knows about
  * numerical order of S_IFMT and vnode types.)
  */
@@ -669,6 +679,8 @@ vn_rdwr(
 
 	if (len < 0)
 		return (EIO);
+
+	VOPXID_MAP_CR(vp, cr);
 
 	iov.iov_base = base;
 	iov.iov_len = len;
@@ -2718,6 +2730,8 @@ fop_open(
 			atomic_add_32(&((*vpp)->v_wrcnt), 1);
 	}
 
+	VOPXID_MAP_CR(vp, cr);
+
 	ret = (*(*(vpp))->v_op->vop_open)(vpp, mode, cr);
 
 	if (ret) {
@@ -2766,6 +2780,8 @@ fop_close(
 {
 	int err;
 
+	VOPXID_MAP_CR(vp, cr);
+
 	err = (*(vp)->v_op->vop_close)(vp, flag, count, offset, cr);
 	VOPSTATS_UPDATE(vp, close);
 	/*
@@ -2796,6 +2812,8 @@ fop_read(
 	int	err;
 	ssize_t	resid_start = uiop->uio_resid;
 
+	VOPXID_MAP_CR(vp, cr);
+
 	err = (*(vp)->v_op->vop_read)(vp, uiop, ioflag, cr, ct);
 	VOPSTATS_UPDATE_IO(vp, read,
 	    read_bytes, (resid_start - uiop->uio_resid));
@@ -2812,6 +2830,8 @@ fop_write(
 {
 	int	err;
 	ssize_t	resid_start = uiop->uio_resid;
+
+	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_write)(vp, uiop, ioflag, cr, ct);
 	VOPSTATS_UPDATE_IO(vp, write,
@@ -2830,6 +2850,8 @@ fop_ioctl(
 {
 	int	err;
 
+	VOPXID_MAP_CR(vp, cr);
+
 	err = (*(vp)->v_op->vop_ioctl)(vp, cmd, arg, flag, cr, rvalp);
 	VOPSTATS_UPDATE(vp, ioctl);
 	return (err);
@@ -2844,6 +2866,8 @@ fop_setfl(
 {
 	int	err;
 
+	VOPXID_MAP_CR(vp, cr);
+
 	err = (*(vp)->v_op->vop_setfl)(vp, oflags, nflags, cr);
 	VOPSTATS_UPDATE(vp, setfl);
 	return (err);
@@ -2857,6 +2881,8 @@ fop_getattr(
 	cred_t *cr)
 {
 	int	err;
+
+	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_getattr)(vp, vap, flags, cr);
 	VOPSTATS_UPDATE(vp, getattr);
@@ -2873,6 +2899,8 @@ fop_setattr(
 {
 	int	err;
 
+	VOPXID_MAP_CR(vp, cr);
+
 	err = (*(vp)->v_op->vop_setattr)(vp, vap, flags, cr, ct);
 	VOPSTATS_UPDATE(vp, setattr);
 	return (err);
@@ -2886,6 +2914,8 @@ fop_access(
 	cred_t *cr)
 {
 	int	err;
+
+	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_access)(vp, mode, flags, cr);
 	VOPSTATS_UPDATE(vp, access);
@@ -2903,6 +2933,8 @@ fop_lookup(
 	cred_t *cr)
 {
 	int ret;
+
+	VOPXID_MAP_CR(dvp, cr);
 
 	ret = (*(dvp)->v_op->vop_lookup)(dvp, nm, vpp, pnp, flags, rdir, cr);
 	if (ret == 0 && *vpp) {
@@ -2928,6 +2960,8 @@ fop_create(
 {
 	int ret;
 
+	VOPXID_MAP_CR(dvp, cr);
+
 	ret = (*(dvp)->v_op->vop_create)
 				(dvp, name, vap, excl, mode, vpp, cr, flag);
 	if (ret == 0 && *vpp) {
@@ -2948,6 +2982,8 @@ fop_remove(
 {
 	int	err;
 
+	VOPXID_MAP_CR(dvp, cr);
+
 	err = (*(dvp)->v_op->vop_remove)(dvp, nm, cr);
 	VOPSTATS_UPDATE(dvp, remove);
 	return (err);
@@ -2961,6 +2997,8 @@ fop_link(
 	cred_t *cr)
 {
 	int	err;
+
+	VOPXID_MAP_CR(tdvp, cr);
 
 	err = (*(tdvp)->v_op->vop_link)(tdvp, svp, tnm, cr);
 	VOPSTATS_UPDATE(tdvp, link);
@@ -2977,6 +3015,8 @@ fop_rename(
 {
 	int	err;
 
+	VOPXID_MAP_CR(tdvp, cr);
+
 	err = (*(sdvp)->v_op->vop_rename)(sdvp, snm, tdvp, tnm, cr);
 	VOPSTATS_UPDATE(sdvp, rename);
 	return (err);
@@ -2991,6 +3031,8 @@ fop_mkdir(
 	cred_t *cr)
 {
 	int ret;
+
+	VOPXID_MAP_CR(dvp, cr);
 
 	ret = (*(dvp)->v_op->vop_mkdir)(dvp, dirname, vap, vpp, cr);
 	if (ret == 0 && *vpp) {
@@ -3013,6 +3055,8 @@ fop_rmdir(
 {
 	int	err;
 
+	VOPXID_MAP_CR(dvp, cr);
+
 	err = (*(dvp)->v_op->vop_rmdir)(dvp, nm, cdir, cr);
 	VOPSTATS_UPDATE(dvp, rmdir);
 	return (err);
@@ -3027,6 +3071,8 @@ fop_readdir(
 {
 	int	err;
 	ssize_t	resid_start = uiop->uio_resid;
+
+	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_readdir)(vp, uiop, cr, eofp);
 	VOPSTATS_UPDATE_IO(vp, readdir,
@@ -3044,6 +3090,8 @@ fop_symlink(
 {
 	int	err;
 
+	VOPXID_MAP_CR(dvp, cr);
+
 	err = (*(dvp)->v_op->vop_symlink) (dvp, linkname, vap, target, cr);
 	VOPSTATS_UPDATE(dvp, symlink);
 	return (err);
@@ -3056,6 +3104,8 @@ fop_readlink(
 	cred_t *cr)
 {
 	int	err;
+
+	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_readlink)(vp, uiop, cr);
 	VOPSTATS_UPDATE(vp, readlink);
@@ -3070,6 +3120,8 @@ fop_fsync(
 {
 	int	err;
 
+	VOPXID_MAP_CR(vp, cr);
+
 	err = (*(vp)->v_op->vop_fsync)(vp, syncflag, cr);
 	VOPSTATS_UPDATE(vp, fsync);
 	return (err);
@@ -3082,6 +3134,9 @@ fop_inactive(
 {
 	/* Need to update stats before vop call since we may lose the vnode */
 	VOPSTATS_UPDATE(vp, inactive);
+
+	VOPXID_MAP_CR(vp, cr);
+
 	(*(vp)->v_op->vop_inactive)(vp, cr);
 }
 
@@ -3157,6 +3212,8 @@ fop_frlock(
 {
 	int	err;
 
+	VOPXID_MAP_CR(vp, cr);
+
 	err = (*(vp)->v_op->vop_frlock)
 				(vp, cmd, bfp, flag, offset, flk_cbp, cr);
 	VOPSTATS_UPDATE(vp, frlock);
@@ -3174,6 +3231,8 @@ fop_space(
 	caller_context_t *ct)
 {
 	int	err;
+
+	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_space)(vp, cmd, bfp, flag, offset, cr, ct);
 	VOPSTATS_UPDATE(vp, space);
@@ -3207,6 +3266,8 @@ fop_getpage(
 {
 	int	err;
 
+	VOPXID_MAP_CR(vp, cr);
+
 	err = (*(vp)->v_op->vop_getpage)
 			(vp, off, len, protp, plarr, plsz, seg, addr, rw, cr);
 	VOPSTATS_UPDATE(vp, getpage);
@@ -3222,6 +3283,8 @@ fop_putpage(
 	cred_t *cr)
 {
 	int	err;
+
+	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_putpage)(vp, off, len, flags, cr);
 	VOPSTATS_UPDATE(vp, putpage);
@@ -3241,6 +3304,8 @@ fop_map(
 	cred_t *cr)
 {
 	int	err;
+
+	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_map)
 			(vp, off, as, addrp, len, prot, maxprot, flags, cr);
@@ -3262,6 +3327,8 @@ fop_addmap(
 {
 	int error;
 	u_longlong_t delta;
+
+	VOPXID_MAP_CR(vp, cr);
 
 	error = (*(vp)->v_op->vop_addmap)
 			(vp, off, as, addr, len, prot, maxprot, flags, cr);
@@ -3309,6 +3376,9 @@ fop_delmap(
 {
 	int error;
 	u_longlong_t delta;
+
+	VOPXID_MAP_CR(vp, cr);
+
 	error = (*(vp)->v_op->vop_delmap)
 		(vp, off, as, addr, len, prot, maxprot, flags, cr);
 
@@ -3385,6 +3455,8 @@ fop_pathconf(
 {
 	int	err;
 
+	VOPXID_MAP_CR(vp, cr);
+
 	err = (*(vp)->v_op->vop_pathconf)(vp, cmd, valp, cr);
 	VOPSTATS_UPDATE(vp, pathconf);
 	return (err);
@@ -3400,6 +3472,8 @@ fop_pageio(
 	cred_t *cr)
 {
 	int	err;
+
+	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_pageio)(vp, pp, io_off, io_len, flags, cr);
 	VOPSTATS_UPDATE(vp, pageio);
@@ -3428,6 +3502,9 @@ fop_dispose(
 {
 	/* Must do stats first since it's possible to lose the vnode */
 	VOPSTATS_UPDATE(vp, dispose);
+
+	VOPXID_MAP_CR(vp, cr);
+
 	(*(vp)->v_op->vop_dispose)(vp, pp, flag, dn, cr);
 }
 
@@ -3439,6 +3516,8 @@ fop_setsecattr(
 	cred_t *cr)
 {
 	int	err;
+
+	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_setsecattr) (vp, vsap, flag, cr);
 	VOPSTATS_UPDATE(vp, setsecattr);
@@ -3454,6 +3533,8 @@ fop_getsecattr(
 {
 	int	err;
 
+	VOPXID_MAP_CR(vp, cr);
+
 	err = (*(vp)->v_op->vop_getsecattr) (vp, vsap, flag, cr);
 	VOPSTATS_UPDATE(vp, getsecattr);
 	return (err);
@@ -3468,6 +3549,8 @@ fop_shrlock(
 	cred_t *cr)
 {
 	int	err;
+
+	VOPXID_MAP_CR(vp, cr);
 
 	err = (*(vp)->v_op->vop_shrlock)(vp, cmd, shr, flag, cr);
 	VOPSTATS_UPDATE(vp, shrlock);

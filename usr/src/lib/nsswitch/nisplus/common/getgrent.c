@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,7 +71,7 @@ getbygid(be, a)
 	nss_XbyY_args_t		*argp = (nss_XbyY_args_t *)a;
 	char			gidstr[12];	/* More than enough */
 
-	(void) snprintf(gidstr, 12, "%ld", argp->key.gid);
+	(void) snprintf(gidstr, 12, "%u", argp->key.gid);
 	return (_nss_nisplus_lookup(be, argp, GR_TAG_GID, gidstr));
 }
 

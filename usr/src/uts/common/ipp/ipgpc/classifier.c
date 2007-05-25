@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -614,7 +614,7 @@ find_ids(ipgpc_packet_t *packet, mblk_t *mp)
 		packet->uid = crgetuid(cr);
 		packet->projid = crgetprojid(cr);
 	} else {
-		packet->uid = -1;
+		packet->uid = (uid_t)-1;
 		packet->projid = -1;
 	}
 }

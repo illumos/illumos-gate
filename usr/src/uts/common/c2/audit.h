@@ -62,7 +62,7 @@ extern "C" {
  * The user id -2 is never audited - in fact, a setauid(AU_NOAUDITID)
  * will turn off auditing.
  */
-#define	AU_NOAUDITID	-2
+#define	AU_NOAUDITID	((au_id_t)-2)
 
 /*
  * success/failure bits for asynchronous events

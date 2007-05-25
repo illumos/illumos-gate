@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -271,7 +271,7 @@ static	char	zone_name[ZONENAME_MAX];
 /*
  * Illegal passwd entries.
  */
-static	struct	passwd nouser = { "", "no:password", ~ROOTUID };
+static	struct	passwd nouser = { "", "no:password", (uid_t)-1 };
 /* ONC_PLUS EXTRACT END */
 
 /*

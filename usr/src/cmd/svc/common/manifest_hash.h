@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,8 +43,8 @@ extern "C" {
 #define	MHASH_PG_FLAGS	0
 #define	MHASH_PROP	"md5sum"
 
-#define	MHASH_FORMAT_V1	"%llx%lx%llx%lx"
-#define	MHASH_FORMAT_V2	"%lx%lx%llx%lx"
+#define	MHASH_FORMAT_V1	"%llx%x%llx%lx"
+#define	MHASH_FORMAT_V2	"%x%x%llx%lx"
 
 #define	MHASH_NEWFILE		(0)
 #define	MHASH_RECONCILED	(1)

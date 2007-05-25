@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -232,7 +232,7 @@ static	int	zflg;
 static	int	Zflg;
 static	int	hflg;
 static	int	Hflg;
-static	uid_t	tuid = -1;
+static	uid_t	tuid = (uid_t)-1;
 static	int	errflg;
 
 static	int	ndev;		/* number of devices */
@@ -310,7 +310,7 @@ static	int	search(pid_t *, int, pid_t);
 static	void	add_ugentry(struct ughead *, char *);
 static	int	uconv(struct ughead *);
 static	int	gconv(struct ughead *);
-static	int	ugfind(uid_t, struct ughead *);
+static	int	ugfind(id_t, struct ughead *);
 static	void	prtime(timestruc_t, int, int);
 static	void	przom(psinfo_t *);
 static	int	namencnt(char *, int, int);
@@ -318,6 +318,7 @@ static	char	*err_string(int);
 static	int	print_proc(char *pname);
 static	time_t	delta_secs(const timestruc_t *);
 static	int	str2id(const char *, pid_t *, long, long);
+static	int	str2uid(const char *,  uid_t *, unsigned long, unsigned long);
 static	void	*Realloc(void *, size_t);
 static	int	pidcmp(const void *p1, const void *p2);
 
@@ -919,15 +920,15 @@ retry:
 		found++;
 	else if (pflg && search(pid, npid, info.pr_pid))
 		found++;	/* ppid in p option arg list */
-	else if (uflg && ugfind(info.pr_euid, &euid_tbl))
+	else if (uflg && ugfind((id_t)info.pr_euid, &euid_tbl))
 		found++;	/* puid in u option arg list */
-	else if (Uflg && ugfind(info.pr_uid, &ruid_tbl))
+	else if (Uflg && ugfind((id_t)info.pr_uid, &ruid_tbl))
 		found++;	/* puid in U option arg list */
 #ifdef NOT_YET
-	else if (gflg && ugfind(info.pr_egid, &egid_tbl))
+	else if (gflg && ugfind((id_t)info.pr_egid, &egid_tbl))
 		found++;	/* pgid in g option arg list */
 #endif	/* NOT_YET */
-	else if (Gflg && ugfind(info.pr_gid, &rgid_tbl))
+	else if (Gflg && ugfind((id_t)info.pr_gid, &rgid_tbl))
 		found++;	/* pgid in G option arg list */
 	else if (gflg && search(grpid, ngrpid, info.pr_pgid))
 		found++;	/* grpid in g option arg list */
@@ -1253,7 +1254,7 @@ prfind(int found, psinfo_t *psinfo, char **tpp)
 			match = 1;
 			tp = other;
 		}
-		if (!match || (tuid != -1 && tuid != psinfo->pr_euid)) {
+		if (!match || (tuid != (uid_t)-1 && tuid != psinfo->pr_euid)) {
 			/*
 			 * not found OR not matching euid
 			 */
@@ -1325,9 +1326,9 @@ prcom(psinfo_t *psinfo, char *ttyp)
 		if ((pwd = getpwuid(psinfo->pr_euid)) != NULL)
 			(void) printf("%8.8s ", pwd->pw_name);
 		else
-			(void) printf("%7.7d ", (int)psinfo->pr_euid);
+			(void) printf("%7.7u ", psinfo->pr_euid);
 	} else if (lflg) {
-		(void) printf("%6d ", (int)psinfo->pr_euid);
+		(void) printf("%6u ", psinfo->pr_euid);
 	}
 	(void) printf("%*d", pidwidth, (int)psinfo->pr_pid); /* PID */
 	if (lflg || fflg)
@@ -1551,37 +1552,37 @@ print_field(psinfo_t *psinfo, struct field *f, const char *ttyp)
 		if ((pwd = getpwuid(psinfo->pr_uid)) != NULL)
 			(void) printf("%*s", width, pwd->pw_name);
 		else
-			(void) printf("%*d", width, (int)psinfo->pr_uid);
+			(void) printf("%*u", width, psinfo->pr_uid);
 		break;
 	case F_USER:
 		if ((pwd = getpwuid(psinfo->pr_euid)) != NULL)
 			(void) printf("%*s", width, pwd->pw_name);
 		else
-			(void) printf("%*d", width, (int)psinfo->pr_euid);
+			(void) printf("%*u", width, psinfo->pr_euid);
 		break;
 	case F_RGROUP:
 		if ((grp = getgrgid(psinfo->pr_gid)) != NULL)
 			(void) printf("%*s", width, grp->gr_name);
 		else
-			(void) printf("%*d", width, (int)psinfo->pr_gid);
+			(void) printf("%*u", width, psinfo->pr_gid);
 		break;
 	case F_GROUP:
 		if ((grp = getgrgid(psinfo->pr_egid)) != NULL)
 			(void) printf("%*s", width, grp->gr_name);
 		else
-			(void) printf("%*d", width, (int)psinfo->pr_egid);
+			(void) printf("%*u", width, psinfo->pr_egid);
 		break;
 	case F_RUID:
-		(void) printf("%*d", width, (int)psinfo->pr_uid);
+		(void) printf("%*u", width, psinfo->pr_uid);
 		break;
 	case F_UID:
-		(void) printf("%*d", width, (int)psinfo->pr_euid);
+		(void) printf("%*u", width, psinfo->pr_euid);
 		break;
 	case F_RGID:
-		(void) printf("%*d", width, (int)psinfo->pr_gid);
+		(void) printf("%*u", width, psinfo->pr_gid);
 		break;
 	case F_GID:
-		(void) printf("%*d", width, (int)psinfo->pr_egid);
+		(void) printf("%*u", width, psinfo->pr_egid);
 		break;
 	case F_PID:
 		(void) printf("%*d", width, (int)psinfo->pr_pid);
@@ -1953,7 +1954,7 @@ uconv(struct ughead *uhead)
 		/*
 		 * If name is numeric, ask for numeric id
 		 */
-		if (str2id(utbl[i].name, &uid, 0, UID_MAX) == 0)
+		if (str2uid(utbl[i].name, &uid, 0, MAXEPHUID) == 0)
 			pwd = getpwuid(uid);
 		else
 			pwd = getpwnam(utbl[i].name);
@@ -1993,7 +1994,7 @@ gconv(struct ughead *ghead)
 		/*
 		 * If name is numeric, ask for numeric id
 		 */
-		if (str2id(gtbl[i].name, &gid, 0, UID_MAX) == 0)
+		if (str2uid(gtbl[i].name, (uid_t *)&gid, 0, MAXEPHUID) == 0)
 			grp = getgrgid(gid);
 		else
 			grp = getgrnam(gtbl[i].name);
@@ -2109,9 +2110,9 @@ przom(psinfo_t *psinfo)
 		if ((pwd = getpwuid(psinfo->pr_euid)) != NULL)
 			(void) printf("%8.8s ", pwd->pw_name);
 		else
-			(void) printf("%7.7d ", (int)psinfo->pr_euid);
+			(void) printf("%7.7u ", psinfo->pr_euid);
 	} else if (lflg)
-		(void) printf("%6d ", (int)psinfo->pr_euid);
+		(void) printf("%6u ", psinfo->pr_euid);
 
 	(void) printf("%*d", pidwidth, (int)psinfo->pr_pid);	/* PID */
 	if (lflg || fflg)
@@ -2247,6 +2248,43 @@ str2id(const char *p, pid_t *val, long min, long max)
 		if ((error = errno) == 0) {
 			/*
 			 * strtol() can fail without setting errno, or it can
+			 * set it to EINVAL or ERANGE.  In the case errno is
+			 * still zero, return EINVAL.
+			 */
+			error = EINVAL;
+		}
+	} else if (number < min || number > max) {
+		error = ERANGE;
+	} else {
+		error = 0;
+	}
+
+	*val = number;
+
+	return (error);
+}
+
+/*
+ * Returns the following:
+ *
+ * 	0	No error
+ * 	EINVAL	Invalid number
+ * 	ERANGE	Value exceeds (min, max) range
+ */
+static int
+str2uid(const char *p, uid_t *val, unsigned long min, unsigned long max)
+{
+	char *q;
+	unsigned long number;
+	int error;
+
+	errno = 0;
+	number = strtoul(p, &q, 10);
+
+	if (errno != 0 || q == p || *q != '\0') {
+		if ((error = errno) == 0) {
+			/*
+			 * strtoul() can fail without setting errno, or it can
 			 * set it to EINVAL or ERANGE.  In the case errno is
 			 * still zero, return EINVAL.
 			 */

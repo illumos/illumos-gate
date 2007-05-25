@@ -1279,6 +1279,7 @@ SUNWprivate_1.1 {
 	_acctctl;
 	_acl;
 	_adjtime;
+	allocids;
 	___Argv = NODIRECT;
 	_ascftime;
 	_asctime_r;
@@ -1596,6 +1597,8 @@ SUNWprivate_1.1 {
 	_iconv;
 	_iconv_close;
 	_iconv_open;
+	idmap_reg;
+	idmap_unreg;
 	__inf_read;
 	__inf_written;
 	__init_daemon_priv;

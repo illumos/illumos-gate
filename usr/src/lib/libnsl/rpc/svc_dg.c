@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -45,6 +45,7 @@
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <rpc/rpc.h>
+#include <rpcsvc/svc_dg_priv.h>
 #include <errno.h>
 #include <syslog.h>
 #include <stdlib.h>
@@ -63,23 +64,6 @@ static struct xp_ops *svc_dg_ops();
 static void cache_set();
 static int cache_get();
 
-#define	MAX_OPT_WORDS	128		/* needs to fit a ucred */
-
-/*
- * kept in xprt->xp_p2
- */
-struct svc_dg_data {
-	/* XXX: optbuf should be the first field, used by ti_opts.c code */
-	struct	netbuf optbuf;			/* netbuf for options */
-	int	opts[MAX_OPT_WORDS];		/* options */
-	uint_t   su_iosz;			/* size of send.recv buffer */
-	uint32_t	su_xid;			/* transaction id */
-	XDR	su_xdrs;			/* XDR handle */
-	char	su_verfbody[MAX_AUTH_BYTES];	/* verifier body */
-	char 	*su_cache;			/* cached data, NULL if none */
-	struct t_unitdata   su_tudata;		/* tu_data for recv */
-};
-#define	su_data(xprt)	((struct svc_dg_data *)(xprt->xp_p2))
 #define	rpc_buffer(xprt) ((xprt)->xp_p1)
 
 /*
@@ -108,7 +92,7 @@ svc_dg_xprtfree(SVCXPRT *xprt)
 /* LINTED pointer alignment */
 	SVCXPRT_EXT		*xt = xprt ? SVCEXT(xprt) : NULL;
 /* LINTED pointer alignment */
-	struct svc_dg_data	*su = xprt ? su_data(xprt) : NULL;
+	struct svc_dg_data	*su = xprt ? get_svc_dg_data(xprt) : NULL;
 
 	if (xprt == NULL)
 		return;
@@ -257,7 +241,7 @@ svc_dg_xprtcopy(SVCXPRT *parent)
 		return (NULL);
 	}
 /* LINTED pointer alignment */
-	su->su_iosz = su_data(parent)->su_iosz;
+	su->su_iosz = get_svc_dg_data(parent)->su_iosz;
 	if ((rpc_buffer(xprt) = malloc(su->su_iosz)) == NULL) {
 		svc_dg_xprtfree(xprt);
 		free(su);
@@ -271,7 +255,7 @@ svc_dg_xprtcopy(SVCXPRT *parent)
 	su->su_tudata.opt.buf = (char *)su->opts;
 	su->su_tudata.udata.maxlen = su->su_iosz;
 	su->su_tudata.opt.maxlen = MAX_OPT_WORDS << 2;  /* no of bytes */
-	xprt->xp_p2 = (caddr_t)su;	/* su_data(xprt) = su */
+	xprt->xp_p2 = (caddr_t)su;	/* get_svc_dg_data(xprt) = su */
 	xprt->xp_verf.oa_base = su->su_verfbody;
 
 	return (xprt);
@@ -319,7 +303,7 @@ static bool_t
 svc_dg_recv(SVCXPRT *xprt, struct rpc_msg *msg)
 {
 /* LINTED pointer alignment */
-	struct svc_dg_data *su = su_data(xprt);
+	struct svc_dg_data *su = get_svc_dg_data(xprt);
 	XDR *xdrs = &(su->su_xdrs);
 	struct t_unitdata *tu_data = &(su->su_tudata);
 	int moreflag;
@@ -428,7 +412,7 @@ static bool_t
 svc_dg_reply(SVCXPRT *xprt, struct rpc_msg *msg)
 {
 /* LINTED pointer alignment */
-	struct svc_dg_data *su = su_data(xprt);
+	struct svc_dg_data *su = get_svc_dg_data(xprt);
 	XDR *xdrs = &(su->su_xdrs);
 	bool_t stat = FALSE;
 	xdrproc_t xdr_results;
@@ -484,14 +468,15 @@ svc_dg_getargs(SVCXPRT *xprt, xdrproc_t xdr_args, caddr_t args_ptr)
 		svc_args_done(xprt);
 /* LINTED pointer alignment */
 	return (SVCAUTH_UNWRAP(&SVC_XP_AUTH(xprt),
-				&(su_data(xprt)->su_xdrs), xdr_args, args_ptr));
+				&(get_svc_dg_data(xprt)->su_xdrs),
+				xdr_args, args_ptr));
 }
 
 static bool_t
 svc_dg_freeargs(SVCXPRT *xprt, xdrproc_t xdr_args, caddr_t args_ptr)
 {
 /* LINTED pointer alignment */
-	XDR *xdrs = &(su_data(xprt)->su_xdrs);
+	XDR *xdrs = &(get_svc_dg_data(xprt)->su_xdrs);
 
 	xdrs->x_op = XDR_FREE;
 	return ((*xdr_args)(xdrs, args_ptr));
@@ -623,7 +608,7 @@ struct cl_cache {
  */
 #define	CACHE_LOC(transp, xid)	\
 	(xid % (SPARSENESS * ((struct cl_cache *) \
-		su_data(transp)->su_cache)->uc_size))
+		get_svc_dg_data(transp)->su_cache)->uc_size))
 
 extern mutex_t	dupreq_lock;
 
@@ -649,7 +634,7 @@ svc_dg_enablecache(SVCXPRT *xprt, const uint_t size)
 	else
 		transp = xprt;
 /* LINTED pointer alignment */
-	su = su_data(transp);
+	su = get_svc_dg_data(transp);
 
 	(void) mutex_lock(&dupreq_lock);
 	if (su->su_cache != NULL) {
@@ -723,9 +708,9 @@ cache_set(SVCXPRT *xprt, uint32_t replylen)
 	else
 		parent = xprt;
 /* LINTED pointer alignment */
-	su = su_data(xprt);
+	su = get_svc_dg_data(xprt);
 /* LINTED pointer alignment */
-	uc = (struct cl_cache *)su_data(parent)->su_cache;
+	uc = (struct cl_cache *)get_svc_dg_data(parent)->su_cache;
 
 	(void) mutex_lock(&dupreq_lock);
 	/*
@@ -836,9 +821,9 @@ cache_get(SVCXPRT *xprt, struct rpc_msg *msg, char **replyp,
 	else
 		parent = xprt;
 /* LINTED pointer alignment */
-	su = su_data(xprt);
+	su = get_svc_dg_data(xprt);
 /* LINTED pointer alignment */
-	uc = (struct cl_cache *)su_data(parent)->su_cache;
+	uc = (struct cl_cache *)get_svc_dg_data(parent)->su_cache;
 
 	(void) mutex_lock(&dupreq_lock);
 /* LINTED pointer alignment */

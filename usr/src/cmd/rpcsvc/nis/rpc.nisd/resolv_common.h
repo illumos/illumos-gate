@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +33,7 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <rpcsvc/svc_dg_priv.h>
 
 /*
  * Definitions common to rpc.nisd resolv and rpc.resolv code.
@@ -47,21 +47,7 @@ extern "C" {
 #define	GETCALLER(xprt)	svc_getrpccaller(xprt)
 #define	SETCALLER(xprt, nbufp)	xprt->xp_rtaddr.len = nbufp->len; \
 			memcpy(xprt->xp_rtaddr.buf, nbufp->buf, nbufp->len);
-#define	MAX_OPT_WORDS   128
 #define	RPC_BUF_MAX	32768
-struct bogus_data {
-	/* XXX: optbuf should be the first field, used by ti_opts.c code */
-	struct  netbuf optbuf;			/* netbuf for options */
-	long    opts[MAX_OPT_WORDS];		/* options */
-	u_int   su_iosz;			/* size of send.recv buffer */
-	u_long  su_xid;				/* transaction id */
-	XDR	su_xdrs;			/* XDR handle */
-	char    su_verfbody[MAX_AUTH_BYTES];    /* verifier body */
-	char	*su_cache;			/* cached data, NULL if none */
-	struct t_unitdata	su_tudata;	/* tu_data for recv */
-};
-#define	getbogus_data(xprt) ((struct bogus_data *)(xprt->xp_p2))
-
 
 struct ypfwdreq_key4 {
 	char *map;

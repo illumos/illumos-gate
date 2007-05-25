@@ -87,6 +87,7 @@ extern "C" {
 #ifdef _KERNEL
 #define	MAX_TASKID	999999
 #define	MAX_MAXPID	999999
+#define	MAXEPHUID	0xfffffffcu	/* max ephemeral user id */
 #endif
 
 #ifdef DEBUG
@@ -99,8 +100,11 @@ extern "C" {
 #endif
 
 #define	MAXUID		2147483647	/* max user id */
+
 #define	MAXPROJID	MAXUID		/* max project id */
 #define	MAXLINK		32767	/* max links */
+
+#define	MINEPHUID	0x80000000u	/* min ephemeral user id */
 
 #define	NMOUNT		40	/* est. of # mountable fs for quota calc */
 
@@ -464,6 +468,7 @@ extern long _sysconf(int);	/* System Private interface to sysconf() */
 #define	PAGEOFFSET	(PAGESIZE - 1)
 #define	PAGEMASK	(~PAGEOFFSET)
 #define	MAXPID		((pid_t)_sysconf(_SC_MAXPID))
+#define	MAXEPHUID	((uid_t)_sysconf(_SC_EPHID_MAX))
 
 #ifdef	__cplusplus
 }

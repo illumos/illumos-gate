@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,11 +94,11 @@ audit_save_policy(door_data_t *door_dp)
 void
 audit_init(door_data_t *door_dp)
 {
-	door_dp->audit_auid = -1;
-	door_dp->audit_uid = -1;
-	door_dp->audit_euid = -1;
-	door_dp->audit_gid = -1;
-	door_dp->audit_egid = -1;
+	door_dp->audit_auid = (uid_t)-1;
+	door_dp->audit_uid = (uid_t)-1;
+	door_dp->audit_euid = (uid_t)-1;
+	door_dp->audit_gid = (gid_t)-1;
+	door_dp->audit_egid = (gid_t)-1;
 	door_dp->audit_pid = -1;
 	door_dp->audit_tid.at_port = 0;
 	door_dp->audit_tid.at_type = 0;
@@ -261,7 +261,7 @@ static int
 audit_selected(door_data_t *door_dp)
 {
 
-	if (door_dp->audit_uid < 0) {
+	if (door_dp->audit_uid > MAXUID) {
 		(void) audit_save_namask(door_dp);
 		return (audit_na_selected(door_dp));
 	}

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,6 +81,7 @@ typedef enum priv_op {
 #define	PRIVSYS_GETIMPLINFO	2
 #define	PRIVSYS_SETPFLAGS	3
 #define	PRIVSYS_GETPFLAGS	4
+#define	PRIVSYS_ISSETUGID	5
 
 /*
  * Maximum length of a user defined privilege name.

@@ -1885,3 +1885,15 @@ secpolicy_zfs(const cred_t *cr)
 {
 	return (PRIV_POLICY(cr, PRIV_SYS_MOUNT, B_FALSE, EPERM, NULL));
 }
+
+/*
+ * secpolicy_idmap
+ *
+ * Determine if the calling process has permissions to register an SID
+ * mapping daemon and allocate ephemeral IDs.
+ */
+int
+secpolicy_idmap(const cred_t *cr)
+{
+	return (PRIV_POLICY(cr, PRIV_ALL, B_FALSE, EPERM, NULL));
+}

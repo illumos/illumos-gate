@@ -84,7 +84,6 @@ int	gtty();
 int	hrtsys();
 #endif /* __i386 || __amd64 */
 int	ioctl();
-int	issetugid();
 int	kill();
 int	labelsys();
 int	link();
@@ -110,6 +109,7 @@ int	setgid();
 int	setpgrp();
 int	setuid();
 uintptr_t	shmsys();
+uint64_t	sidsys();
 int	ssig();
 int	sigprocmask();
 int	sigsuspend();
@@ -521,7 +521,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 72 */ SYSENT_LOADABLE(),		/* exacct */
 	/* 73 */ SYSENT_CI("getpagesizes",	getpagesizes,	2),
 	/* 74 */ SYSENT_CI("rctlsys",		rctlsys,	6),
-	/* 75 */ SYSENT_CI("issetugid",		issetugid,	0),
+	/* 75 */ SYSENT_2CI("sidsys",		sidsys,		4),
 	/* 76 */ IF_LP64(
 			SYSENT_CI("fsat",	fsat64,		6),
 			SYSENT_CI("fsat",	fsat32,		6)),
@@ -922,7 +922,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 72 */ SYSENT_LOADABLE32(),		/* exacct */
 	/* 73 */ SYSENT_CI("getpagesizes",	getpagesizes32,	2),
 	/* 74 */ SYSENT_CI("rctlsys",		rctlsys,	6),
-	/* 75 */ SYSENT_CI("issetugid",		issetugid,	0),
+	/* 75 */ SYSENT_2CI("sidsys",		sidsys,		4),
 	/* 76 */ SYSENT_CI("fsat",		fsat32,		6),
 	/* 77 */ SYSENT_CI("lwp_park",		syslwp_park,	3),
 	/* 78 */ SYSENT_CI("sendfilev",		sendfilev,	5),

@@ -47,6 +47,7 @@ usr/lib/font/devpost/charlib/~=		i386
 usr/include/auth_list.h			i386
 usr/include/getxby_door.h		i386
 usr/include/rpcsvc/daemon_utils.h	i386
+usr/include/rpcsvc/svc_dg_priv.h	i386
 usr/include/priv_utils.h		i386
 usr/include/bsm/audit_door_infc.h	i386
 usr/include/bsm/audit_private.h		i386

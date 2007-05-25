@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -463,8 +463,8 @@ ptms_minor_valid(minor_t dminor, uid_t *ruid, gid_t *rgid)
 	ASSERT(ruid);
 	ASSERT(rgid);
 
-	*ruid = -1;
-	*rgid = -1;
+	*ruid = (uid_t)-1;
+	*rgid = (gid_t)-1;
 
 	/*
 	 * /dev/pts/0 is not used, but some applications may check it, so create

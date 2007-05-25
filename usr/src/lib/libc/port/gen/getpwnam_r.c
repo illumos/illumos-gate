@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -330,7 +330,7 @@ str2passwd(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 		 * Now we just check for negative uids; anything else
 		 * is administrative policy
 		 */
-		if (passwd->pw_uid < 0)
+		if (passwd->pw_uid > MAXUID)
 			passwd->pw_uid = UID_NOBODY;
 	}
 	if (*next++ != ':') {
@@ -356,7 +356,7 @@ str2passwd(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 		 * gid should be non-negative; anything else
 		 * is administrative policy.
 		 */
-		if (passwd->pw_gid < 0)
+		if (passwd->pw_gid > MAXUID)
 			passwd->pw_gid = GID_NOBODY;
 	}
 	if (*next++ != ':') {

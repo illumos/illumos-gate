@@ -529,7 +529,7 @@ ipcperm_set(ipc_service_t *service, struct cred *cr,
 	if (secpolicy_ipc_owner(cr, kperm) != 0)
 		return (EPERM);
 
-	if ((uid < 0) || (uid > MAXUID) || (gid < 0) || (gid > MAXUID))
+	if (!VALID_UID(uid) || !VALID_GID(gid))
 		return (EINVAL);
 
 	kperm->ipc_uid = uid;
@@ -568,8 +568,7 @@ ipcperm_set64(ipc_service_t *service, struct cred *cr,
 	if (secpolicy_ipc_owner(cr, kperm) != 0)
 		return (EPERM);
 
-	if ((perm64->ipcx_uid < 0) || (perm64->ipcx_uid > MAXUID) ||
-	    (perm64->ipcx_gid < 0) || (perm64->ipcx_gid > MAXUID))
+	if (!VALID_UID(perm64->ipcx_uid) || !VALID_GID(perm64->ipcx_gid))
 		return (EINVAL);
 
 	kperm->ipc_uid = perm64->ipcx_uid;

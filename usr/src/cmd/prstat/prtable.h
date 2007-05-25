@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,7 +75,7 @@ typedef struct plwp {		/* linked list of pointers to lwps */
 	struct plwp	*l_next;
 } plwp_t;
 
-extern void pwd_getname(int, char *, int);
+extern void pwd_getname(uid_t, char *, int);
 extern void add_uid(nametbl_t *, char *);
 extern int has_uid(nametbl_t *, uid_t);
 extern void add_element(table_t *, long);

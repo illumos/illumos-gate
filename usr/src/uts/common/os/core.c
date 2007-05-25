@@ -490,10 +490,10 @@ expand_string(const char *pat, char *fp, int size, cred_t *cr)
 			(void) sprintf((s = buf), "%d", p->p_pid);
 			break;
 		case 'u':	/* effective uid */
-			(void) sprintf((s = buf), "%d", crgetuid(p->p_cred));
+			(void) sprintf((s = buf), "%u", crgetuid(p->p_cred));
 			break;
 		case 'g':	/* effective gid */
-			(void) sprintf((s = buf), "%d", crgetgid(p->p_cred));
+			(void) sprintf((s = buf), "%u", crgetgid(p->p_cred));
 			break;
 		case 'f':	/* exec'd filename */
 			s = PTOU(p)->u_comm;

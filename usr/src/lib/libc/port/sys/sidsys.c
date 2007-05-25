@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -26,47 +27,43 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Routines used by rpc.nisd and by rpc.nisd_resolv
+ * UID/SID mapping system call entries.
  */
 
-#include <rpc/rpc.h>
-#include <netdb.h>
-#include <rpcsvc/yp_prot.h>
-#include <errno.h>
-#include <sys/types.h>
-#include "resolv_common.h"
+#include "synonyms.h"
+#include <sys/sid.h>
+#include <sys/syscall.h>
 
-bool_t
-xdr_ypfwdreq_key4(XDR *xdrs, struct ypfwdreq_key4 *ps)
+
+int
+allocids(int flag, int nuids, uid_t *suid, int ngids, gid_t *sgid)
 {
-	return (xdr_ypmap_wrap_string(xdrs, &ps->map) &&
-		xdr_datum(xdrs, &ps->keydat) &&
-		xdr_u_long(xdrs, &ps->xid) &&
-		xdr_u_long(xdrs, &ps->ip) &&
-		xdr_u_short(xdrs, &ps->port));
+	sysret_t rv;
+	int e;
+
+	e = __systemcall(&rv, SYS_sidsys, SIDSYS_ALLOC_IDS, flag, nuids, ngids);
+
+	if (e != 0) {
+		(void) __set_errno(e);
+		return (-1);
+	}
+
+	if (suid != NULL)
+		*suid = (uid_t)rv.sys_rval1;
+	if (sgid != NULL)
+		*sgid = (gid_t)rv.sys_rval2;
+
+	return (0);
 }
 
-
-bool_t
-xdr_ypfwdreq_key6(XDR *xdrs, struct ypfwdreq_key6 *ps)
+int
+idmap_reg(int fd)
 {
-	u_int	addrsize = sizeof (struct in6_addr)/sizeof (uint32_t);
-	char	**addrp = (caddr_t *)&(ps->addr);
-
-	return (xdr_ypmap_wrap_string(xdrs, &ps->map) &&
-		xdr_datum(xdrs, &ps->keydat) &&
-		xdr_u_long(xdrs, &ps->xid) &&
-		xdr_array(xdrs, addrp, &addrsize, addrsize,
-			sizeof (uint32_t), xdr_uint32_t) &&
-		xdr_u_short(xdrs, &ps->port));
+	return (syscall(SYS_sidsys, SIDSYS_IDMAP_REG, fd));
 }
 
-
-u_long
-svc_getxid(SVCXPRT *xprt)
+int
+idmap_unreg(int fd)
 {
-	struct svc_dg_data *su = get_svc_dg_data(xprt);
-	if (su == NULL)
-		return (0);
-	return (su->su_xid);
+	return (syscall(SYS_sidsys, SIDSYS_IDMAP_UNREG, fd));
 }

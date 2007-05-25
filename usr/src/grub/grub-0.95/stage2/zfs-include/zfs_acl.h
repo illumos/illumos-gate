@@ -26,11 +26,10 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#if defined(_LP64) || defined(_I32LPx)
-typedef	int	uid_t;			/* UID type */
-#else
-typedef	long	uid_t;			/* (historical version) */
-#endif
+#ifndef _UID_T
+#define	_UID_T
+typedef	unsigned int uid_t;			/* UID type */
+#endif /* _UID_T */
 
 typedef struct ace {
 	uid_t		a_who;		/* uid or gid */

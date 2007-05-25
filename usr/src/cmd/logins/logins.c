@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -400,7 +399,7 @@ initdisp(void)
 	displayhead->nextuid = NULL;
 	displayhead->loginID = "";
 	displayhead->freefield = "";
-	displayhead->userID = -1;
+	displayhead->userID = (uid_t)-1;
 }
 
 
@@ -856,7 +855,7 @@ writeunformatted(struct display *current, int xtndflag, int expflag)
 	struct pwdinfo *pwdinfo;	/* Password aging info */
 
 	/* Write the general information */
-	(void) fprintf(stdout, "%s:%ld:%s:%ld:%s",
+	(void) fprintf(stdout, "%s:%u:%s:%u:%s",
 	    current->loginID,
 	    current->userID,
 	    current->groupname == NULL ? "" : current->groupname,
@@ -868,7 +867,7 @@ writeunformatted(struct display *current, int xtndflag, int expflag)
 	 * there if it's supposed to be written)
 	 */
 	for (psecgrp = current->secgrplist; psecgrp; psecgrp = psecgrp->next) {
-		(void) fprintf(stdout, ":%s:%ld",
+		(void) fprintf(stdout, ":%s:%u",
 		    psecgrp->groupname, psecgrp->groupID);
 	}
 
@@ -926,7 +925,7 @@ writeformatted(struct display *current, int xtndflag, int expflag)
 	struct pwdinfo *pwdinfo;	/* Password aging info */
 
 	/* Write general information */
-	(void) fprintf(stdout, "%-14s  %-6ld  %-14s  %-6ld  %s\n",
+	(void) fprintf(stdout, "%-14s  %-6u  %-14s  %-6u  %s\n",
 	    current->loginID, current->userID,
 	    current->groupname == NULL ? "" : current->groupname,
 	    current->groupID, current->freefield);
@@ -936,7 +935,7 @@ writeformatted(struct display *current, int xtndflag, int expflag)
 	 * (it only exists if it is to be written)
 	 */
 	for (psecgrp = current->secgrplist; psecgrp; psecgrp = psecgrp->next) {
-	    (void) fprintf(stdout, "                        %-14s  %-6ld\n",
+	    (void) fprintf(stdout, "                        %-14s  %-6u\n",
 		psecgrp->groupname, psecgrp->groupID);
 	}
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -336,6 +336,7 @@ int
 privsys(int code, priv_op_t op, priv_ptype_t type, void *buf, size_t bufsize)
 {
 	int retv;
+	extern int issetugid(void);
 
 	switch (code) {
 	case PRIVSYS_SETPPRIV:
@@ -354,6 +355,8 @@ privsys(int code, priv_op_t op, priv_ptype_t type, void *buf, size_t bufsize)
 	case PRIVSYS_GETPFLAGS:
 		retv = (int)getpflags((uint_t)op, CRED());
 		return (retv == -1 ? set_errno(EINVAL) : retv);
+	case PRIVSYS_ISSETUGID:
+		return (issetugid());
 	}
 	return (set_errno(EINVAL));
 }

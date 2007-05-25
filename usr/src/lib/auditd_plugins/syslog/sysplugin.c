@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * convert binary audit records to syslog messages and
@@ -452,7 +452,7 @@ getuname(uid_t uid, gid_t gid, char *p, size_t max, char *prefix,
 	(void) memcpy(p, uidhash[ix].ht_value, l);
 	len += l - 1;
 
-	if (gid != -2) {
+	if (gid != (gid_t)-2) {
 		p += l - 1;
 		max -= l - 1;
 		if (max < 2)
@@ -528,12 +528,12 @@ filter(const char *input, uint32_t sequence, char *output,
 		initial_ctx.out.sf_reclen = 0;
 		initial_ctx.out.sf_pass = 0;
 		initial_ctx.out.sf_asid = 0;
-		initial_ctx.out.sf_auid = -2;
-		initial_ctx.out.sf_euid = -2;
-		initial_ctx.out.sf_egid = -2;
+		initial_ctx.out.sf_auid = (uid_t)-2;
+		initial_ctx.out.sf_euid = (uid_t)-2;
+		initial_ctx.out.sf_egid = (gid_t)-2;
 		initial_ctx.out.sf_tid.at_type = 0;
-		initial_ctx.out.sf_pauid = -2;
-		initial_ctx.out.sf_peuid = -2;
+		initial_ctx.out.sf_pauid = (uid_t)-2;
+		initial_ctx.out.sf_peuid = (uid_t)2;
 		initial_ctx.out.sf_uauthlen = 0;
 		initial_ctx.out.sf_uauth = NULL;
 		initial_ctx.out.sf_pathlen = 0;
@@ -673,13 +673,13 @@ filter(const char *input, uint32_t sequence, char *output,
 			remaining -= used;
 			bp += used;
 		}
-		if (ctx.out.sf_auid != -2) {
+		if (ctx.out.sf_auid != (uid_t)-2) {
 			used = getuname(ctx.out.sf_auid, -2, bp, remaining,
 			    STRCONSTARGS(" by "));
 			bp += used;
 			remaining -= used;
 		}
-		if (ctx.out.sf_euid != -2) {
+		if (ctx.out.sf_euid != (uid_t)-2) {
 			/* 4 = strlen(" as ") */
 			used = getuname(ctx.out.sf_euid, ctx.out.sf_egid, bp,
 			    remaining, STRCONSTARGS(" as "));
@@ -701,14 +701,14 @@ filter(const char *input, uint32_t sequence, char *output,
 			bp += used;
 			remaining -= used;
 		}
-		if (ctx.out.sf_pauid != -2) {
+		if (ctx.out.sf_pauid != (uid_t)-2) {
 			/* 11 = strlen(" proc_auid ") */
 			used = getuname(ctx.out.sf_pauid, -2, bp, remaining,
 			    STRCONSTARGS(" proc_auid "));
 			bp += used;
 			remaining -= used;
 		}
-		if (ctx.out.sf_peuid != -2) {
+		if (ctx.out.sf_peuid != (uid_t)-2) {
 			used = getuname(ctx.out.sf_peuid, -2, bp, remaining,
 			    STRCONSTARGS(" proc_uid "));
 			bp += used;

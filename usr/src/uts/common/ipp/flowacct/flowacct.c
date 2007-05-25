@@ -219,7 +219,7 @@ flowacct_find_ids(mblk_t *mp, header_t *header)
 		header->uid = crgetuid(cr);
 		header->projid = crgetprojid(cr);
 	} else {
-		header->uid = -1;
+		header->uid = (uid_t)-1;
 		header->projid = -1;
 	}
 }

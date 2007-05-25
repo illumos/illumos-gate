@@ -146,8 +146,6 @@ devpts_validate(struct sdev_node *dv)
 
 	ASSERT(dv->sdev_attr);
 	if (dv->sdev_attr->va_uid != uid || dv->sdev_attr->va_gid != gid) {
-		ASSERT(uid >= 0);
-		ASSERT(gid >= 0);
 		dv->sdev_attr->va_uid = uid;
 		dv->sdev_attr->va_gid = gid;
 		gethrestime(&now);
@@ -208,8 +206,6 @@ devpts_create_rvp(struct sdev_node *ddv, char *nm,
 	 */
 	*vap = devpts_vattr;
 	vap->va_rdev = makedevice(maj, min);
-	ASSERT(uid >= 0);
-	ASSERT(gid >= 0);
 	vap->va_uid = uid;
 	vap->va_gid = gid;
 	gethrestime(&now);

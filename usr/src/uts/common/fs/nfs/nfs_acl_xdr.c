@@ -56,7 +56,7 @@
 bool_t
 xdr_uid(XDR *xdrs, uid32_t *objp)
 {
-	if (!xdr_int(xdrs, objp))
+	if (!xdr_u_int(xdrs, objp))
 		return (FALSE);
 	return (TRUE);
 }

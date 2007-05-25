@@ -134,7 +134,8 @@ extern "C" {
 #define	RCF	92		/* print rctlsys_ctl flags */
 #define	FXF	93		/* print forkx flags */
 #define	SPF	94		/* print rctlsys_projset flags */
-#define	HID	95		/* hidden argument, don't print */
+#define	UN1	95		/* unsigned except for -1 */
+#define	HID	96		/* hidden argument, don't print */
 				/* make sure HID is always the last member */
 
 /*

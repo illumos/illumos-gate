@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,7 +140,7 @@ void s_print_request ( char * m, MESG * md )
 		rp->secure->user = Strdup(pw->pw_name);
 	    else {
 		rp->secure->user = Strdup(BIGGEST_NUMBER_S);
-		(void) sprintf (rp->secure->user, "%ld", md->uid);
+		(void) sprintf (rp->secure->user, "%u", md->uid);
 	    }
 
 	    if ((rp->request->actions & ACT_SPECIAL) == ACT_HOLD)

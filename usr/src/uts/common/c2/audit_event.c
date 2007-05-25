@@ -351,7 +351,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 73 (loadable) was notused */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 74 (loadable) was notused */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 75 issetugid */
+aui_null,	AUE_NULL,	aus_null,	/* 75 sidsys */
 						/*	was sigret (SunOS) */
 		auf_null,	0,
 aui_fsat,	AUE_FSAT,	aus_fsat,	/* 76 fsat */

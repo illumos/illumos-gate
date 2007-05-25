@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1995-1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -82,7 +81,7 @@ xdr_ypfwdreq_key6(XDR *xdrs, struct ypfwdreq_key6 *ps)
 u_long
 svc_getxid(SVCXPRT *xprt)
 {
-	register struct bogus_data *su = getbogus_data(xprt);
+	struct svc_dg_data *su = get_svc_dg_data(xprt);
 	if (su == NULL)
 		return (0);
 

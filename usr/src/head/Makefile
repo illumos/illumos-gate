@@ -246,6 +246,7 @@ RPCSVC_SRC_HDRS =	\
 	nis_db.h	\
 	nis_tags.h	\
 	nislib.h	\
+	svc_dg_priv.h	\
 	yp_prot.h	\
 	ypclnt.h	\
 	yppasswd.h	\

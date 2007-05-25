@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,7 +94,7 @@ yp_resolv(sa_family_t af, void *req, SVCXPRT *transp)
 	char tmp[12]; /* max size of 9 rounded up to multiple of 4 bytes */
 	char buf[MAX_UADDR];
 	struct netbuf *nbuf;
-	struct bogus_data *bd = NULL;
+	struct svc_dg_data *bd = NULL;
 	struct ypfwdreq_key4 *req4 = (struct ypfwdreq_key4 *)req;
 	struct ypfwdreq_key6 *req6 = (struct ypfwdreq_key6 *)req;
 	in_port_t port;
@@ -138,7 +137,7 @@ yp_resolv(sa_family_t af, void *req, SVCXPRT *transp)
 	 * since we never did a recv on this unreg'ed xprt.
 	 */
 	if (!bd) { /* just set maxlen and buf once */
-		bd = getbogus_data(transp);
+		bd = get_svc_dg_data(transp);
 		bd->su_tudata.addr.maxlen = GETCALLER(transp)->maxlen;
 		bd->su_tudata.addr.buf = GETCALLER(transp)->buf;
 	}
@@ -376,7 +375,7 @@ svc_setxid(xprt, xid)
 	register SVCXPRT *xprt;
 	ulong_t xid;
 {
-	register struct bogus_data *su = getbogus_data(xprt);
+	struct svc_dg_data *su = get_svc_dg_data(xprt);
 	ulong_t old_xid;
 	if (su == NULL)
 		return (0);

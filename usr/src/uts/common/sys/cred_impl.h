@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/cred.h>
 #include <sys/priv_impl.h>
+#include <sys/sid.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -78,6 +79,7 @@ struct cred {
 	projid_t	cr_projid;	/* project */
 	struct zone	*cr_zone;	/* pointer to per-zone structure */
 	struct ts_label_s *cr_label;	/* pointer to the effective label */
+	credsid_t	*cr_ksid;	/* pointer to SIDs */
 	gid_t		cr_groups[1];	/* cr_groups size not fixed */
 					/* audit info is defined dynamically */
 					/* and valid only when audit enabled */

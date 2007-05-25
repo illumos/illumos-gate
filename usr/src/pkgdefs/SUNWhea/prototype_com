@@ -1069,6 +1069,7 @@ f none usr/include/sys/sha2.h 644 root bin
 f none usr/include/sys/share.h 644 root bin
 f none usr/include/sys/shm.h 644 root bin
 f none usr/include/sys/shm_impl.h 644 root bin
+f none usr/include/sys/sid.h 644 root bin
 f none usr/include/sys/siginfo.h 644 root bin
 f none usr/include/sys/signal.h 644 root bin
 f none usr/include/sys/sleepq.h 644 root bin

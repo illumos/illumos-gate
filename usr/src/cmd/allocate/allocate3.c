@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -279,7 +279,7 @@ print_dev_attrs(int optflag, devalloc_t *da, devmap_t *dm,
 		else if (!DEV_ALLOCATED(fip->fi_stat))
 			(void) printf("owner=/FREE%s", KV_DELIMITER);
 		else
-			(void) printf("owner=%ld%s", fip->fi_stat.st_uid,
+			(void) printf("owner=%u%s", fip->fi_stat.st_uid,
 			    KV_DELIMITER);
 	}
 	(void) printf("files=%s", dm->dmap_devlist);

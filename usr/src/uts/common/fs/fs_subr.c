@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -543,12 +543,12 @@ cred_t		*cr;
 
 		aclentp->a_type = OTHER_OBJ;    /* Other */
 		aclentp->a_perm = vattr.va_mode & 0007;
-		aclentp->a_id = -1;		/* Really undefined */
+		aclentp->a_id = (gid_t)-1;	/* Really undefined */
 		aclentp++;
 
 		aclentp->a_type = CLASS_OBJ;    /* Class */
 		aclentp->a_perm = (ushort_t)(0007);
-		aclentp->a_id = -1;		/* Really undefined */
+		aclentp->a_id = (gid_t)-1;	/* Really undefined */
 	} else if (vsecattr->vsa_mask & (VSA_ACECNT | VSA_ACE)) {
 		vsecattr->vsa_aclcnt	= 6;
 		vsecattr->vsa_aclentp = kmem_zalloc(6 * sizeof (ace_t),

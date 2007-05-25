@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -396,10 +396,9 @@ str2group(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 			return (NSS_STR_PARSE_PARSE);
 		}
 		/*
-		 * gids should be non-negative; anything else
-		 * is administrative policy.
+		 * gids should be in the range 0 .. MAXUID
 		 */
-		if (group->gr_gid < 0)
+		if (group->gr_gid > MAXUID)
 			group->gr_gid = GID_NOBODY;
 	}
 	if (*next++ != ':') {

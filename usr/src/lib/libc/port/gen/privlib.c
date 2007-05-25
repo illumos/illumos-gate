@@ -508,7 +508,7 @@ __init_daemon_priv(int flags, uid_t uid, gid_t gid, ...)
 	if (flags & PU_RESETGROUPS)
 		(void) setgroups(0, NULL);
 
-	if (gid != -1 && setgid(gid) != 0)
+	if (gid != (gid_t)-1 && setgid(gid) != 0)
 		goto end;
 
 	perm = priv_allocset();
@@ -520,7 +520,7 @@ __init_daemon_priv(int flags, uid_t uid, gid_t gid, ...)
 	(void) setppriv(PRIV_SET, effective, perm);
 
 	/* Now reset suid and euid */
-	if (uid != -1 && setreuid(uid, uid) != 0)
+	if (uid != (uid_t)-1 && setreuid(uid, uid) != 0)
 		goto end;
 
 	/* Check for the limit privs */
@@ -549,7 +549,7 @@ end:
 	if (core_get_process_path(buf, sizeof (buf), getpid()) == 0 &&
 	    strcmp(buf, "core") == 0) {
 
-		if ((uid == -1 ? geteuid() : uid) == 0) {
+		if ((uid == (uid_t)-1 ? geteuid() : uid) == 0) {
 			(void) core_set_process_path(root_cp, sizeof (root_cp),
 			    getpid());
 		} else {

@@ -880,6 +880,7 @@ PORTSYS=			\
 	set_errno.o		\
 	sharefs.o		\
 	shmsys.o		\
+	sidsys.o		\
 	siginterrupt.o		\
 	signal.o		\
 	sigpending.o		\

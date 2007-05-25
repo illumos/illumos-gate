@@ -123,6 +123,16 @@ prt_uns(private_t *pri, int raw, long val)	/* print as unsigned decimal */
 		    "%lu", val);
 }
 
+/* print as unsigned decimal, except for -1 */
+void
+prt_un1(private_t *pri, int raw, long val)
+{
+	if ((int)val == -1)
+		prt_dec(pri, raw, val);
+	else
+		prt_uns(pri, raw, val);
+}
+
 /*ARGSUSED*/
 void
 prt_oct(private_t *pri, int raw, long val)	/* print as octal */
@@ -2680,5 +2690,6 @@ void (* const Print[])() = {
 	prt_rcf,	/* RCF -- print rctlsys_ctl() flags */
 	prt_fxf,	/* FXF -- print forkx() flags */
 	prt_spf,	/* SPF -- print rctlsys_projset() flags */
+	prt_un1,	/* UN1 -- as prt_uns except for -1 */
 	prt_dec,	/* HID -- hidden argument, make this the last one */
 };

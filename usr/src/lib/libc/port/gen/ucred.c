@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,7 +115,7 @@ ucred_geteuid(const ucred_t *uc)
 
 	if (cr == NULL) {
 		errno = EINVAL;
-		return (-1);
+		return ((uid_t)-1);
 	}
 
 	return (cr->pr_euid);
@@ -129,7 +129,7 @@ ucred_getruid(const ucred_t *uc)
 
 	if (cr == NULL) {
 		errno = EINVAL;
-		return (-1);
+		return ((uid_t)-1);
 	}
 
 	return (cr->pr_ruid);
@@ -143,7 +143,7 @@ ucred_getsuid(const ucred_t *uc)
 
 	if (cr == NULL) {
 		errno = EINVAL;
-		return (-1);
+		return ((uid_t)-1);
 	}
 
 	return (cr->pr_suid);
@@ -157,7 +157,7 @@ ucred_getegid(const ucred_t *uc)
 
 	if (cr == NULL) {
 		errno = EINVAL;
-		return (-1);
+		return ((gid_t)-1);
 	}
 
 	return (cr->pr_egid);
@@ -171,7 +171,7 @@ ucred_getrgid(const ucred_t *uc)
 
 	if (cr == NULL) {
 		errno = EINVAL;
-		return (-1);
+		return ((gid_t)-1);
 	}
 
 	return (cr->pr_rgid);
@@ -185,7 +185,7 @@ ucred_getsgid(const ucred_t *uc)
 
 	if (cr == NULL) {
 		errno = EINVAL;
-		return (-1);
+		return ((gid_t)-1);
 	}
 
 	return (cr->pr_sgid);

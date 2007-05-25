@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,8 +56,8 @@
 static struct		passwd	*pwd;
 static struct		group	*grp;
 static struct		stat	stbuf;
-static uid_t		uid = -1;
-static gid_t		gid = -1;
+static uid_t		uid = (uid_t)-1;
+static gid_t		gid = (gid_t)-1;
 static int		status = 0;	/* total number of errors received */
 static int		hflag = 0,
 			rflag = 0,
@@ -196,7 +196,7 @@ main(int argc, char *argv[])
 		} else {
 			if (isnumber(grpp)) {
 				errno = 0;
-				gid = (gid_t)strtol(grpp, NULL, 10);
+				gid = (gid_t)strtoul(grpp, NULL, 10);
 				if (errno != 0) {
 					if (errno == ERANGE) {
 						(void) fprintf(stderr, gettext(
@@ -221,7 +221,7 @@ main(int argc, char *argv[])
 	} else {
 		if (isnumber(argv[0])) {
 			errno = 0;
-			uid = (uid_t)strtol(argv[0], NULL, 10);
+			uid = (uid_t)strtoul(argv[0], NULL, 10);
 			if (errno != 0) {
 				if (errno == ERANGE) {
 					(void) fprintf(stderr, gettext(

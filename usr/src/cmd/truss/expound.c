@@ -435,10 +435,10 @@ show_fusers(private_t *pri, long offset, long nproc)
 
 	while (nproc > 0 &&
 	    Pread(Proc, &fubuf, sizeof (fubuf), offset) == sizeof (fubuf)) {
-		(void) printf("%s\tpid=%-5d uid=%-5d flags=%s\n",
+		(void) printf("%s\tpid=%-5d uid=%-5u flags=%s\n",
 		    pri->pname,
 		    (int)fubuf.fu_pid,
-		    (int)fubuf.fu_uid,
+		    fubuf.fu_uid,
 		    fuflags(pri, fubuf.fu_flags));
 		nproc--;
 		offset += sizeof (fubuf);
@@ -1015,11 +1015,11 @@ show_strrecvfd(private_t *pri, long offset)
 	if (Pread(Proc, &strrecvfd, sizeof (strrecvfd), offset) ==
 	    sizeof (strrecvfd)) {
 		(void) printf(
-			"%s\tfd=%-5d uid=%-5d gid=%d\n",
+			"%s\tfd=%-5d uid=%-5u gid=%u\n",
 			pri->pname,
 			strrecvfd.fd,
-			(int)strrecvfd.uid,
-			(int)strrecvfd.gid);
+			strrecvfd.uid,
+			strrecvfd.gid);
 	}
 }
 
@@ -2131,13 +2131,13 @@ show_pollsys(private_t *pri)
 static void
 show_perm64(private_t *pri, struct ipc_perm64 *ip)
 {
-	(void) printf("%s\tu=%-5d g=%-5d cu=%-5d cg=%-5d z=%-5d "
+	(void) printf("%s\tu=%-5u g=%-5u cu=%-5u cg=%-5u z=%-5d "
 	    "m=0%.6o key=%d projid=%-5d\n",
 	    pri->pname,
-	    (int)ip->ipcx_uid,
-	    (int)ip->ipcx_gid,
-	    (int)ip->ipcx_cuid,
-	    (int)ip->ipcx_cgid,
+	    ip->ipcx_uid,
+	    ip->ipcx_gid,
+	    ip->ipcx_cuid,
+	    ip->ipcx_cgid,
 	    (int)ip->ipcx_zoneid,
 	    (unsigned int)ip->ipcx_mode,
 	    ip->ipcx_key,
@@ -2150,10 +2150,10 @@ show_perm(private_t *pri, struct ipc_perm *ip)
 	(void) printf(
 	"%s\tu=%-5u g=%-5u cu=%-5u cg=%-5u m=0%.6o seq=%u key=%d\n",
 		pri->pname,
-		(int)ip->uid,
-		(int)ip->gid,
-		(int)ip->cuid,
-		(int)ip->cgid,
+		ip->uid,
+		ip->gid,
+		ip->cuid,
+		ip->cgid,
 		(int)ip->mode,
 		ip->seq,
 		ip->key);
@@ -2970,9 +2970,9 @@ print_siginfo(private_t *pri, const siginfo_t *sip)
 		signame(pri, sip->si_signo));
 
 	if (sip->si_signo != 0 && SI_FROMUSER(sip) && sip->si_pid != 0) {
-		(void) printf(" pid=%d uid=%d",
+		(void) printf(" pid=%d uid=%u",
 		    (int)sip->si_pid,
-		    (int)sip->si_uid);
+		    sip->si_uid);
 		if (sip->si_code != 0)
 			(void) printf(" code=%d", sip->si_code);
 		(void) fputc('\n', stdout);
@@ -3675,14 +3675,14 @@ show_ucred(private_t *pri, long offset)
 	 * value.  We accept short reads that fill the whole header.
 	 */
 	if (sz >= sizeof (ucred_t) && sz >= uc->uc_size) {
-		(void) printf("%s\teuid=%d egid=%d\n",
+		(void) printf("%s\teuid=%u egid=%u\n",
 		    pri->pname,
-		    (int)ucred_geteuid(uc),
-		    (int)ucred_getegid(uc));
-		(void) printf("%s\truid=%d rgid=%d\n",
+		    ucred_geteuid(uc),
+		    ucred_getegid(uc));
+		(void) printf("%s\truid=%u rgid=%u\n",
 		    pri->pname,
-		    (int)ucred_getruid(uc),
-		    (int)ucred_getrgid(uc));
+		    ucred_getruid(uc),
+		    ucred_getrgid(uc));
 		(void) printf("%s\tpid=%d zoneid=%d\n",
 		    pri->pname,
 		    (int)ucred_getpid(uc),

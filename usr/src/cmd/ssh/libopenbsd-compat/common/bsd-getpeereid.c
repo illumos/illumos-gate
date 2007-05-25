@@ -23,7 +23,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,9 +57,9 @@ getpeereid(int s, uid_t *euid, gid_t *gid)
 
 	if (getpeerucred(s, &ucred) == -1)
 		return (-1);
-	if ((*euid = ucred_geteuid(ucred)) == -1)
+	if ((*euid = ucred_geteuid(ucred)) == (uid_t)-1)
 		return (-1);
-	if ((*gid = ucred_getrgid(ucred)) == -1)
+	if ((*gid = ucred_getrgid(ucred)) == (gid_t)-1)
 		return (-1);
 
 	ucred_free(ucred);

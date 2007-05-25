@@ -251,6 +251,8 @@ GENUNIX_OBJS +=	\
 		rw.o		\
 		rwstlock.o	\
 		sad_conf.o	\
+		sid.o		\
+		sidsys.o	\
 		sched.o		\
 		schedctl.o	\
 		seg_dev.o	\

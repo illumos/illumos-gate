@@ -269,6 +269,7 @@ typedef struct vfs {
 #define	VFS_NODEVICES	0x800		/* device-special files disallowed */
 #define	VFS_NOEXEC	0x1000		/* executables disallowed */
 #define	VFS_STATS	0x2000		/* file system can collect stats */
+#define	VFS_XID		0x4000		/* file system supports extended ids */
 
 #define	VFS_NORESOURCE	"unspecified_resource"
 #define	VFS_NOMNTPT	"unspecified_mountpoint"
@@ -405,6 +406,7 @@ enum {
 #define	VSW_NOTZONESAFE	0x08	/* zone_enter(2) should fail for these files */
 #define	VSW_VOLATILEDEV	0x10	/* vfs_dev can change each time fs is mounted */
 #define	VSW_STATS	0x20	/* file system can collect stats */
+#define	VSW_XID		0x40	/* file system supports extended ids */
 
 #define	VSW_INSTALLED	0x8000	/* this vsw is associated with a file system */
 

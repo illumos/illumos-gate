@@ -865,8 +865,8 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	    "Pid:\t%d\n"
 	    "PPid:\t%d\n"
 	    "TracerPid:\t%d\n"
-	    "Uid:\t%d\t%d\t%d\t%d\n"
-	    "Gid:\t%d\t%d\t%d\t%d\n"
+	    "Uid:\t%u\t%u\t%u\t%u\n"
+	    "Gid:\t%u\t%u\t%u\t%u\n"
 	    "FDSize:\t%d\n"
 	    "Groups:\t",
 	    up->u_comm,
@@ -883,7 +883,7 @@ lxpr_read_pid_status(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	groups  = crgetgroups(cr);
 	for (i = 0; i < ngroups; i++) {
 		lxpr_uiobuf_printf(uiobuf,
-		    "%d ",
+		    "%u ",
 		    groups[i]);
 	}
 	crfree(cr);
@@ -987,12 +987,12 @@ lxpr_read_pid_stat(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	 * Set Linux defaults if we're the zone's init process
 	 */
 	if (pid == curproc->p_zone->zone_proc_initpid) {
-		pid = 1;	/* PID for init */
-		ppid = 0;	/* parent PID for init is 0 */
-		pgpid = 0;	/* process group for init is 0 */
-		psgid = -1;	/* credential GID for init is -1 */
-		spid = 0;	/* session id for init is 0 */
-		psdev = 0;	/* session device for init is 0 */
+		pid = 1;		/* PID for init */
+		ppid = 0;		/* parent PID for init is 0 */
+		pgpid = 0;		/* process group for init is 0 */
+		psgid = (gid_t)-1;	/* credential GID for init is -1 */
+		spid = 0;		/* session id for init is 0 */
+		psdev = 0;		/* session device for init is 0 */
 	} else {
 		/*
 		 * Make sure not to reference parent PIDs that reside outside

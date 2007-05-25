@@ -203,7 +203,13 @@ extern "C" {
 	 * 	rctllist(...) :: rctlsys(2, ...)
 	 * 	rctlctl(...) :: rctlsys(3, ...)
 	 */
-#define	SYS_issetugid	75
+#define	SYS_sidsys	75
+	/*
+	 * subcodes:
+	 * 	allocids(...)		:: sidsys(0, ...)
+	 * 	idmap_reg(...)		:: sidsys(1, ...)
+	 * 	idmap_unreg(...)	:: sidsys(2, ...)
+	 */
 #define	SYS_fsat	76
 	/*
 	 * subcodes:
@@ -240,6 +246,7 @@ extern "C" {
 	 * 	getimplinfo(...)	:: privsys(2, ...)
 	 * 	setpflags(...) 		:: privsys(3, ...)
 	 * 	getpflags(...) 		:: privsys(4, ...)
+	 *	issetugid();		:: privsys(5)
 	 */
 #define	SYS_ucredsys	83
 	/*

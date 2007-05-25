@@ -38,6 +38,7 @@
 usr/include/auth_list.h			sparc
 usr/include/getxby_door.h		sparc
 usr/include/rpcsvc/daemon_utils.h	sparc
+usr/include/rpcsvc/svc_dg_priv.h	sparc
 usr/include/priv_utils.h		sparc
 usr/include/bsm/audit_door_infc.h	sparc
 usr/include/bsm/audit_private.h		sparc

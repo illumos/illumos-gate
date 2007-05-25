@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -866,7 +865,7 @@ cachefs_xdr_getpage(XDR *xdrs, struct cachefs_log_getpage_record *rec)
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->vfsp, sizeof (rec->vfsp))) ||
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->fid, sizeof (rec->fid))) ||
 	    (! xdr_ino64(xdrs, &rec->fileno)) ||
-	    (! xdr_int(xdrs, &rec->uid)) ||
+	    (! xdr_u_int(xdrs, &rec->uid)) ||
 	    (! xdr_u_longlong_t(xdrs, &rec->offset)) ||
 	    (! xdr_u_int(xdrs, &rec->len)))
 		return (FALSE);
@@ -914,7 +913,7 @@ cachefs_xdr_readdir(XDR *xdrs, struct cachefs_log_readdir_record *rec)
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->vfsp, sizeof (rec->vfsp))) ||
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->fid, sizeof (rec->fid))) ||
 	    (! xdr_ino64(xdrs, &rec->fileno)) ||
-	    (! xdr_int(xdrs, &rec->uid)) ||
+	    (! xdr_u_int(xdrs, &rec->uid)) ||
 	    (! xdr_u_longlong_t(xdrs, (u_longlong_t *)&rec->offset)) ||
 	    (! xdr_int(xdrs, &rec->eof)))
 		return (FALSE);
@@ -961,7 +960,7 @@ cachefs_xdr_readlink(XDR *xdrs, struct cachefs_log_readlink_record *rec)
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->vfsp, sizeof (rec->vfsp))) ||
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->fid, sizeof (rec->fid))) ||
 	    (! xdr_ino64(xdrs, &rec->fileno)) ||
-	    (! xdr_int(xdrs, &rec->uid)) ||
+	    (! xdr_u_int(xdrs, &rec->uid)) ||
 	    (! xdr_u_int(xdrs, &rec->length)))
 		return (FALSE);
 
@@ -1006,7 +1005,7 @@ cachefs_xdr_remove(XDR *xdrs, struct cachefs_log_remove_record *rec)
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->vfsp, sizeof (rec->vfsp))) ||
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->fid, sizeof (rec->fid))) ||
 	    (! xdr_ino64(xdrs, &rec->fileno)) ||
-	    (! xdr_int(xdrs, &rec->uid)))
+	    (! xdr_u_int(xdrs, &rec->uid)))
 		return (FALSE);
 
 	return (TRUE);
@@ -1050,7 +1049,7 @@ cachefs_xdr_rmdir(XDR *xdrs, struct cachefs_log_rmdir_record *rec)
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->vfsp, sizeof (rec->vfsp))) ||
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->fid, sizeof (rec->fid))) ||
 	    (! xdr_ino64(xdrs, &rec->fileno)) ||
-	    (! xdr_int(xdrs, &rec->uid)))
+	    (! xdr_u_int(xdrs, &rec->uid)))
 		return (FALSE);
 
 	return (TRUE);
@@ -1095,7 +1094,7 @@ cachefs_xdr_truncate(XDR *xdrs, struct cachefs_log_truncate_record *rec)
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->vfsp, sizeof (rec->vfsp))) ||
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->fid, sizeof (rec->fid))) ||
 	    (! xdr_ino64(xdrs, &rec->fileno)) ||
-	    (! xdr_int(xdrs, &rec->uid)) ||
+	    (! xdr_u_int(xdrs, &rec->uid)) ||
 	    (! xdr_u_longlong_t(xdrs, &rec->size)))
 		return (FALSE);
 
@@ -1142,7 +1141,7 @@ cachefs_xdr_putpage(XDR *xdrs, struct cachefs_log_putpage_record *rec)
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->vfsp, sizeof (rec->vfsp))) ||
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->fid, sizeof (rec->fid))) ||
 	    (! xdr_ino64(xdrs, &rec->fileno)) ||
-	    (! xdr_int(xdrs, &rec->uid)) ||
+	    (! xdr_u_int(xdrs, &rec->uid)) ||
 	    (! xdr_u_longlong_t(xdrs, (u_longlong_t *)&rec->offset)) ||
 	    (! xdr_u_int(xdrs, &rec->len)))
 		return (FALSE);
@@ -1188,7 +1187,7 @@ cachefs_xdr_create(XDR *xdrs, struct cachefs_log_create_record *rec)
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->vfsp, sizeof (rec->vfsp))) ||
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->fid, sizeof (rec->fid))) ||
 	    (! xdr_ino64(xdrs, &rec->fileno)) ||
-	    (! xdr_int(xdrs, &rec->uid)))
+	    (! xdr_u_int(xdrs, &rec->uid)))
 		return (FALSE);
 
 	return (TRUE);
@@ -1234,7 +1233,7 @@ cachefs_xdr_mkdir(XDR *xdrs, struct cachefs_log_mkdir_record *rec)
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->vfsp, sizeof (rec->vfsp))) ||
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->fid, sizeof (rec->fid))) ||
 	    (! xdr_ino64(xdrs, &rec->fileno)) ||
-	    (! xdr_int(xdrs, &rec->uid)))
+	    (! xdr_u_int(xdrs, &rec->uid)))
 		return (FALSE);
 
 	return (TRUE);
@@ -1279,7 +1278,7 @@ cachefs_xdr_rename(XDR *xdrs, struct cachefs_log_rename_record *rec)
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->vfsp, sizeof (rec->vfsp))) ||
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->gone, sizeof (rec->gone))) ||
 	    (! xdr_int(xdrs, &rec->removed)) ||
-	    (! xdr_int(xdrs, &rec->uid)))
+	    (! xdr_u_int(xdrs, &rec->uid)))
 		return (FALSE);
 
 	return (TRUE);
@@ -1325,7 +1324,7 @@ cachefs_xdr_symlink(XDR *xdrs, struct cachefs_log_symlink_record *rec)
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->vfsp, sizeof (rec->vfsp))) ||
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->fid, sizeof (rec->fid))) ||
 	    (! xdr_ino64(xdrs, &rec->fileno)) ||
-	    (! xdr_int(xdrs, &rec->uid)) ||
+	    (! xdr_u_int(xdrs, &rec->uid)) ||
 	    (! xdr_u_int(xdrs, &rec->size)))
 		return (FALSE);
 
@@ -1550,7 +1549,7 @@ cachefs_xdr_gpfront(XDR *xdrs, struct cachefs_log_gpfront_record *rec)
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->vfsp, sizeof (rec->vfsp))) ||
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->fid, sizeof (rec->fid))) ||
 	    (! xdr_ino64(xdrs, &rec->fileno)) ||
-	    (! xdr_int(xdrs, &rec->uid)) ||
+	    (! xdr_u_int(xdrs, &rec->uid)) ||
 	    (! xdr_u_longlong_t(xdrs, (u_longlong_t *)&rec->off)) ||
 	    (! xdr_u_int(xdrs, &rec->len)))
 		return (FALSE);
@@ -1596,7 +1595,7 @@ cachefs_xdr_rfdir(XDR *xdrs, struct cachefs_log_rfdir_record *rec)
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->vfsp, sizeof (rec->vfsp))) ||
 	    (! xdr_opaque(xdrs, (caddr_t)&rec->fid, sizeof (rec->fid))) ||
 	    (! xdr_ino64(xdrs, &rec->fileno)) ||
-	    (! xdr_int(xdrs, &rec->uid)))
+	    (! xdr_u_int(xdrs, &rec->uid)))
 		return (FALSE);
 
 	return (TRUE);

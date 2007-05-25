@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -237,7 +237,7 @@ initialize()
 	endgrent();
 	endpwent();
 #ifdef	DEBUG
-	debug("Uucp_uid = %ld, Tty_gid = %ld", Uucp_uid, Tty_gid);
+	debug("Uucp_uid = %u, Tty_gid = %u", Uucp_uid, Tty_gid);
 #endif
 
 	log("Initialization Completed");

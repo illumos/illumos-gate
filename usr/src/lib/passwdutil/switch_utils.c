@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -367,10 +366,10 @@ str2passwd(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 		 * than 60001 (the rfs limit).  If it met either of
 		 * these conditions, the uid was translated to 60001.
 		 *
-		 * Now we just check for negative uids; anything else
+		 * Now we just check for ephemeral uids; anything else
 		 * is administrative policy
 		 */
-		if (passwd->pw_uid < 0)
+		if (passwd->pw_uid > MAXUID)
 			passwd->pw_uid = UID_NOBODY;
 	}
 	if (*next++ != ':') {
@@ -396,7 +395,7 @@ str2passwd(const char *instr, int lenstr, void *ent, char *buffer, int buflen)
 		 * gid should be non-negative; anything else
 		 * is administrative policy.
 		 */
-		if (passwd->pw_gid < 0)
+		if (passwd->pw_gid > MAXUID)
 			passwd->pw_gid = GID_NOBODY;
 	}
 	if (*next++ != ':') {

@@ -64,7 +64,7 @@ acctctl			71
 exacctsys		72
 getpagesizes		73
 rctlsys			74
-issetugid		75
+sidsys			75
 fsat			76
 lwp_park		77
 sendfilev		78

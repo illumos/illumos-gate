@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,9 +55,18 @@
 #include <sys/ucred.h>
 #include <sys/prsystm.h>
 #include <sys/modctl.h>
+#include <sys/avl.h>
 #include <c2/audit.h>
 #include <sys/zone.h>
 #include <sys/tsol/label.h>
+#include <sys/sid.h>
+
+typedef struct ephidmap_data {
+	uid_t		min_uid, last_uid;
+	gid_t		min_gid, last_gid;
+	cred_t		*nobody;
+	kmutex_t	eph_lock;
+} ephidmap_data_t;
 
 static struct kmem_cache *cred_cache;
 static size_t crsize = 0;
@@ -74,6 +83,16 @@ static int get_c2audit_load(void);
 			    ((char *)(c)) + audoff)
 
 #define	REMOTE_PEER_CRED(c)	((c)->cr_gid == -1)
+
+/*
+ * XXX: should be per-zone.
+ * Start with an invalid value for atomic increments.
+ */
+static ephidmap_data_t ephemeral_data = {
+	MAXUID, MAXUID, MAXUID, MAXUID
+};
+
+static boolean_t hasephids = B_FALSE;
 
 /*
  * Initialize credentials data structures.
@@ -111,12 +130,13 @@ cred_init(void)
 	dummycr = cralloc();
 	bzero(dummycr, crsize);
 	dummycr->cr_ref = 1;
-	dummycr->cr_uid = -1;
-	dummycr->cr_gid = -1;
-	dummycr->cr_ruid = -1;
-	dummycr->cr_rgid = -1;
-	dummycr->cr_suid = -1;
-	dummycr->cr_sgid = -1;
+	dummycr->cr_uid = (uid_t)-1;
+	dummycr->cr_gid = (gid_t)-1;
+	dummycr->cr_ruid = (uid_t)-1;
+	dummycr->cr_rgid = (gid_t)-1;
+	dummycr->cr_suid = (uid_t)-1;
+	dummycr->cr_sgid = (gid_t)-1;
+
 
 	/*
 	 * kcred is used by anything that needs all privileges; it's
@@ -152,6 +172,13 @@ cred_init(void)
 	ttoproc(curthread)->p_cred = kcred;
 	curthread->t_cred = kcred;
 
+	/*
+	 * nobody is used to map SID containing CRs.
+	 */
+	ephemeral_data.nobody = crdup(kcred);
+	(void) crsetugid(ephemeral_data.nobody, UID_NOBODY, GID_NOBODY);
+	CR_FLAGS(kcred) = 0;
+
 	ucredsize = UCRED_SIZE;
 }
 
@@ -165,6 +192,19 @@ cralloc(void)
 	cr->cr_ref = 1;		/* So we can crfree() */
 	cr->cr_zone = NULL;
 	cr->cr_label = NULL;
+	cr->cr_ksid = NULL;
+	return (cr);
+}
+
+/*
+ * As cralloc but prepared for ksid change (if appropriate).
+ */
+cred_t *
+cralloc_ksid(void)
+{
+	cred_t *cr = cralloc();
+	if (hasephids)
+		cr->cr_ksid = kcrsid_alloc();
 	return (cr);
 }
 
@@ -248,6 +288,8 @@ crfree(cred_t *cr)
 			label_rele(cr->cr_label);
 		if (cr->cr_zone)
 			zone_cred_rele(cr->cr_zone);
+		if (cr->cr_ksid)
+			kcrsid_rele(cr->cr_ksid);
 		kmem_cache_free(cred_cache, cr);
 	}
 }
@@ -268,6 +310,8 @@ crcopy(cred_t *cr)
 		zone_cred_hold(newcr->cr_zone);
 	if (newcr->cr_label)
 		label_hold(cr->cr_label);
+	if (newcr->cr_ksid)
+		kcrsid_hold(cr->cr_ksid);
 	crfree(cr);
 	newcr->cr_ref = 2;		/* caller gets two references */
 	return (newcr);
@@ -283,11 +327,18 @@ crcopy(cred_t *cr)
 void
 crcopy_to(cred_t *oldcr, cred_t *newcr)
 {
+	credsid_t *nkcr = newcr->cr_ksid;
+
 	bcopy(oldcr, newcr, crsize);
 	if (newcr->cr_zone)
 		zone_cred_hold(newcr->cr_zone);
 	if (newcr->cr_label)
 		label_hold(newcr->cr_label);
+	if (nkcr) {
+		newcr->cr_ksid = nkcr;
+		kcrsidcopy_to(oldcr->cr_ksid, newcr->cr_ksid);
+	} else if (newcr->cr_ksid)
+		kcrsid_hold(newcr->cr_ksid);
 	crfree(oldcr);
 	newcr->cr_ref = 2;		/* caller gets two references */
 }
@@ -307,6 +358,8 @@ crdup(cred_t *cr)
 		zone_cred_hold(newcr->cr_zone);
 	if (newcr->cr_label)
 		label_hold(newcr->cr_label);
+	if (newcr->cr_ksid)
+		kcrsid_hold(newcr->cr_ksid);
 	newcr->cr_ref = 1;
 	return (newcr);
 }
@@ -320,11 +373,18 @@ crdup(cred_t *cr)
 void
 crdup_to(cred_t *oldcr, cred_t *newcr)
 {
+	credsid_t *nkcr = newcr->cr_ksid;
+
 	bcopy(oldcr, newcr, crsize);
 	if (newcr->cr_zone)
 		zone_cred_hold(newcr->cr_zone);
 	if (newcr->cr_label)
 		label_hold(newcr->cr_label);
+	if (nkcr) {
+		newcr->cr_ksid = nkcr;
+		kcrsidcopy_to(oldcr->cr_ksid, newcr->cr_ksid);
+	} else if (newcr->cr_ksid)
+		kcrsid_hold(newcr->cr_ksid);
 	newcr->cr_ref = 1;
 }
 
@@ -559,14 +619,15 @@ crisremote(const cred_t *cr)
 	return (REMOTE_PEER_CRED(cr));
 }
 
-#define	BADID(x)	((x) != -1 && (unsigned int)(x) > MAXUID)
+#define	BADUID(x)	((x) != -1 && !VALID_UID(x))
+#define	BADGID(x)	((x) != -1 && !VALID_GID(x))
 
 int
 crsetresuid(cred_t *cr, uid_t r, uid_t e, uid_t s)
 {
 	ASSERT(cr->cr_ref <= 2);
 
-	if (BADID(r) || BADID(e) || BADID(s))
+	if (BADUID(r) || BADUID(e) || BADUID(s))
 		return (-1);
 
 	if (r != -1)
@@ -584,7 +645,7 @@ crsetresgid(cred_t *cr, gid_t r, gid_t e, gid_t s)
 {
 	ASSERT(cr->cr_ref <= 2);
 
-	if (BADID(r) || BADID(e) || BADID(s))
+	if (BADGID(r) || BADGID(e) || BADGID(s))
 		return (-1);
 
 	if (r != -1)
@@ -602,7 +663,7 @@ crsetugid(cred_t *cr, uid_t uid, gid_t gid)
 {
 	ASSERT(cr->cr_ref <= 2);
 
-	if (uid < 0 || uid > MAXUID || gid < 0 || gid > MAXUID)
+	if (!VALID_UID(uid) || !VALID_GID(gid))
 		return (-1);
 
 	cr->cr_uid = cr->cr_ruid = cr->cr_suid = uid;
@@ -903,4 +964,121 @@ zone_kcred(void)
 		return (zone->zone_kcred);
 	else
 		return (kcred);
+}
+
+boolean_t
+valid_ephemeral_uid(uid_t id)
+{
+	membar_consumer();
+	return (id > ephemeral_data.min_uid && id <= ephemeral_data.last_uid);
+}
+
+boolean_t
+valid_ephemeral_gid(gid_t id)
+{
+	membar_consumer();
+	return (id > ephemeral_data.min_gid && id <= ephemeral_data.last_gid);
+}
+
+int
+eph_uid_alloc(int flags, uid_t *start, int count)
+{
+	mutex_enter(&ephemeral_data.eph_lock);
+
+	/* Test for unsigned integer wrap around */
+	if (ephemeral_data.last_uid + count < ephemeral_data.last_uid) {
+		mutex_exit(&ephemeral_data.eph_lock);
+		return (-1);
+	}
+
+	/* first call or idmap crashed and state corrupted */
+	if (flags != 0)
+		ephemeral_data.min_uid = ephemeral_data.last_uid;
+
+	hasephids = B_TRUE;
+	*start = ephemeral_data.last_uid + 1;
+	atomic_add_32(&ephemeral_data.last_uid, count);
+	mutex_exit(&ephemeral_data.eph_lock);
+	return (0);
+}
+
+int
+eph_gid_alloc(int flags, gid_t *start, int count)
+{
+	mutex_enter(&ephemeral_data.eph_lock);
+
+	/* Test for unsigned integer wrap around */
+	if (ephemeral_data.last_gid + count < ephemeral_data.last_gid) {
+		mutex_exit(&ephemeral_data.eph_lock);
+		return (-1);
+	}
+
+	/* first call or idmap crashed and state corrupted */
+	if (flags != 0)
+		ephemeral_data.min_gid = ephemeral_data.last_gid;
+
+	hasephids = B_TRUE;
+	*start = ephemeral_data.last_gid + 1;
+	atomic_add_32(&ephemeral_data.last_gid, count);
+	mutex_exit(&ephemeral_data.eph_lock);
+	return (0);
+}
+
+/*
+ * If the credential contains any ephemeral IDs, map the credential
+ * to nobody.
+ */
+cred_t *
+crgetmapped(const cred_t *cr)
+{
+	if (cr->cr_ksid != NULL) {
+		int i;
+
+		for (i = 0; i < KSID_COUNT; i++)
+			if (cr->cr_ksid->kr_sidx[i].ks_id > MAXUID)
+				return (ephemeral_data.nobody);
+		if (cr->cr_ksid->kr_sidlist != NULL &&
+		    cr->cr_ksid->kr_sidlist->ksl_neid > 0) {
+				return (ephemeral_data.nobody);
+		}
+	}
+
+	return ((cred_t *)cr);
+}
+
+/* index should be in range for a ksidindex_t */
+void
+crsetsid(cred_t *cr, ksid_t *ksp, int index)
+{
+	ASSERT(cr->cr_ref <= 2);
+	ASSERT(index >= 0 && index < KSID_COUNT);
+	if (cr->cr_ksid == NULL && ksp == NULL)
+		return;
+	cr->cr_ksid = kcrsid_setsid(cr->cr_ksid, ksp, index);
+}
+
+void
+crsetsidlist(cred_t *cr, ksidlist_t *ksl)
+{
+	ASSERT(cr->cr_ref <= 2);
+	if (cr->cr_ksid == NULL && ksl == NULL)
+		return;
+	cr->cr_ksid = kcrsid_setsidlist(cr->cr_ksid, ksl);
+}
+
+ksid_t *
+crgetsid(const cred_t *cr, int i)
+{
+	ASSERT(i >= 0 && i < KSID_COUNT);
+	if (cr->cr_ksid != NULL && cr->cr_ksid->kr_sidx[i].ks_domain)
+		return ((ksid_t *)&cr->cr_ksid->kr_sidx[i]);
+	return (NULL);
+}
+
+ksidlist_t *
+crgetsidlist(const cred_t *cr)
+{
+	if (cr->cr_ksid != NULL && cr->cr_ksid->kr_sidlist != NULL)
+		return ((ksidlist_t *)&cr->cr_ksid->kr_sidlist);
+	return (NULL);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -480,7 +480,7 @@ lx_setgroups(uintptr_t p1, uintptr_t p2)
 		 * value (yuck).
 		 */
 		for (i = 0; i < ng; i++) {
-			if (glist[i] < 0 || glist[i] > MAXUID)
+			if (glist[i] > MAXUID)
 				glist[i] = MAXUID;
 		}
 	}

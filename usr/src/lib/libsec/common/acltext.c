@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,7 +89,7 @@ pruname(uid_t uid, char *uidp, size_t buflen, int noresolve)
 		passwdp = getpwuid(uid);
 	if (passwdp == (struct passwd *)NULL) {
 		/* could not get passwd information: display uid instead */
-		(void) snprintf(uidp, buflen, "%ld", (long)uid);
+		(void) snprintf(uidp, buflen, "%u", uid);
 	} else {
 		(void) strlcpy(uidp, passwdp->pw_name, buflen);
 	}
@@ -105,7 +105,7 @@ prgname(gid_t gid, char *gidp, size_t buflen, int noresolve)
 		groupp = getgrgid(gid);
 	if (groupp == (struct group *)NULL) {
 		/* could not get group information: display gid instead */
-		(void) snprintf(gidp, buflen, "%ld", (long)gid);
+		(void) snprintf(gidp, buflen, "%u", gid);
 	} else {
 		(void) strlcpy(gidp, groupp->gr_name, buflen);
 	}

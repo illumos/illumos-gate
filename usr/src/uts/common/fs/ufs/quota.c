@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -259,15 +258,7 @@ loop:
 	 * Large Files: i_size need to be accessed atomically now.
 	 */
 	rw_enter(&qip->i_contents, RW_READER);
-	if (uid >= 0 && dqoff(uid) >= 0 && dqoff(uid) < qip->i_size) {
-		/*
-		 * This could almost be a static comparison with UID_MAX,
-		 * but we keep the ASSERT here to document the restriction
-		 * inherent in this simplistic database.
-		 */
-		ASSERT((u_offset_t)uid <
-		    UFS_MAXOFFSET_T / sizeof (struct dqblk));
-
+	if (uid <= MAXUID && dqoff(uid) >= 0 && dqoff(uid) < qip->i_size) {
 		/*
 		 * Read quota info off disk.
 		 */

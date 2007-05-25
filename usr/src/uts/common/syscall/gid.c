@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994,2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,19 +43,28 @@
 int
 setgid(gid_t gid)
 {
-	register proc_t *p;
+	proc_t *p;
 	int error;
 	int do_nocd = 0;
 	cred_t	*cr, *newcr;
+	ksid_t ksid, *ksp;
 
-	if (gid < 0 || gid > MAXUID)
+	if (!VALID_GID(gid))
 		return (set_errno(EINVAL));
+
+	if (gid > MAXUID) {
+		if (ksid_lookup(gid, &ksid) != 0)
+			return (set_errno(EINVAL));
+		ksp = &ksid;
+	} else {
+		ksp = NULL;
+	}
 
 	/*
 	 * Need to pre-allocate the new cred structure before grabbing
 	 * the p_crlock mutex.
 	 */
-	newcr = cralloc();
+	newcr = cralloc_ksid();
 	p = ttoproc(curthread);
 	mutex_enter(&p->p_crlock);
 	cr = p->p_cred;
@@ -67,6 +75,7 @@ setgid(gid_t gid)
 		crcopy_to(cr, newcr);
 		p->p_cred = newcr;
 		newcr->cr_gid = gid;
+		crsetsid(newcr, ksp, KSID_GROUP);
 	} else if ((error = secpolicy_allow_setid(cr, -1, B_FALSE)) == 0) {
 		/*
 		 * A privileged process that makes itself look like a
@@ -81,8 +90,13 @@ setgid(gid_t gid)
 		newcr->cr_gid = gid;
 		newcr->cr_rgid = gid;
 		newcr->cr_sgid = gid;
-	} else
+		crsetsid(newcr, ksp, KSID_GROUP);
+	} else {
 		crfree(newcr);
+		if (ksp != NULL)
+			ksid_rele(ksp);
+
+	}
 
 	mutex_exit(&p->p_crlock);
 
@@ -113,19 +127,27 @@ getgid(void)
 int
 setegid(gid_t gid)
 {
-	register proc_t *p;
-	register cred_t	*cr, *newcr;
+	proc_t *p;
+	cred_t	*cr, *newcr;
 	int error = EPERM;
 	int do_nocd = 0;
+	ksid_t ksid, *ksp;
 
-	if (gid < 0 || gid > MAXUID)
+	if (!VALID_GID(gid))
 		return (set_errno(EINVAL));
 
+	if (gid > MAXUID) {
+		if (ksid_lookup(gid, &ksid) != 0)
+			return (set_errno(EINVAL));
+		ksp = &ksid;
+	} else {
+		ksp = NULL;
+	}
 	/*
 	 * Need to pre-allocate the new cred structure before grabbing
 	 * the p_crlock mutex.
 	 */
-	newcr = cralloc();
+	newcr = cralloc_ksid();
 	p = ttoproc(curthread);
 	mutex_enter(&p->p_crlock);
 	cr = p->p_cred;
@@ -141,8 +163,12 @@ setegid(gid_t gid)
 		crcopy_to(cr, newcr);
 		p->p_cred = newcr;
 		newcr->cr_gid = gid;
-	} else
+		crsetsid(newcr, ksp, KSID_GROUP);
+	} else {
 		crfree(newcr);
+		if (ksp != NULL)
+			ksid_rele(ksp);
+	}
 
 	mutex_exit(&p->p_crlock);
 
@@ -172,16 +198,24 @@ setregid(gid_t rgid, gid_t egid)
 	int error = EPERM;
 	int do_nocd = 0;
 	cred_t *cr, *newcr;
+	ksid_t ksid, *ksp;
 
-	if ((rgid != -1 && (rgid < 0 || rgid > MAXUID)) ||
-	    (egid != -1 && (egid < 0 || egid > MAXUID)))
+	if ((rgid != -1 && !VALID_GID(rgid)) ||
+	    (egid != -1 && !VALID_GID(egid)))
 		return (set_errno(EINVAL));
 
+	if (egid != -1 && egid > MAXUID) {
+		if (ksid_lookup(egid, &ksid) != 0)
+			return (set_errno(EINVAL));
+		ksp = &ksid;
+	} else {
+		ksp = NULL;
+	}
 	/*
 	 * Need to pre-allocate the new cred structure before grabbing
 	 * the p_crlock mutex.
 	 */
-	newcr = cralloc();
+	newcr = cralloc_ksid();
 
 	p = ttoproc(curthread);
 	mutex_enter(&p->p_crlock);
@@ -196,8 +230,10 @@ setregid(gid_t rgid, gid_t egid)
 		crcopy_to(cr, newcr);
 		p->p_cred = newcr;
 
-		if (egid != -1)
+		if (egid != -1) {
 			newcr->cr_gid = egid;
+			crsetsid(newcr, ksp, KSID_GROUP);
+		}
 		if (rgid != -1)
 			newcr->cr_rgid = rgid;
 		/*
@@ -231,5 +267,7 @@ setregid(gid_t rgid, gid_t egid)
 		return (0);
 	}
 	crfree(newcr);
+	if (ksp != NULL)
+		ksid_rele(ksp);
 	return (set_errno(error));
 }

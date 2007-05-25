@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -540,7 +540,7 @@ netname2user_ldap(int *err, char *netname, struct netid_userdata *argp)
 	groups[0] = pw.pw_gid;
 
 	ngroups = _getgroupsbymember(pw.pw_name, groups, NGROUPS_MAX,
-				(pw.pw_gid >= 0) ? 1 : 0);
+				(pw.pw_gid <= MAXUID) ? 1 : 0);
 
 	if (ngroups < 0) {
 		*err = __NSW_UNAVAIL;

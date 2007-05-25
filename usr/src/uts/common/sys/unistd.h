@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -26,7 +25,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -211,6 +210,7 @@ extern "C" {
 #define	_SC_STACK_PROT		515	/* default stack protection */
 #define	_SC_NPROCESSORS_MAX	516	/* maximum # of processors */
 #define	_SC_CPUID_MAX		517	/* maximum CPU id */
+#define	_SC_EPHID_MAX		518	/* maximum ephemeral id */
 
 /*
  * POSIX.1c (pthreads) names. These values are defined above

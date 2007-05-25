@@ -1570,6 +1570,9 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 			vfsp->vfs_fstypevsp = get_fstype_vopstats(vfsp, vswp);
 		}
 
+		if (vswp->vsw_flag & VSW_XID)
+			vfsp->vfs_flag |= VFS_XID;
+
 		vfs_unlock(vfsp);
 	}
 	mount_completed();

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,26 +41,35 @@
 #include <sys/debug.h>
 #include <sys/policy.h>
 #include <sys/zone.h>
+#include <sys/sid.h>
 
 int
 setuid(uid_t uid)
 {
-	register proc_t *p;
+	proc_t *p;
 	int error;
 	int do_nocd = 0;
 	int uidchge = 0;
 	cred_t	*cr, *newcr;
 	uid_t oldruid = uid;
 	zoneid_t zoneid = getzoneid();
+	ksid_t ksid, *ksp;
 
-	if (uid < 0 || uid > MAXUID)
+	if (!VALID_UID(uid))
 		return (set_errno(EINVAL));
 
+	if (uid > MAXUID) {
+		if (ksid_lookup(uid, &ksid) != 0)
+			return (set_errno(EINVAL));
+		ksp = &ksid;
+	} else {
+		ksp = NULL;
+	}
 	/*
 	 * Need to pre-allocate the new cred structure before grabbing
 	 * the p_crlock mutex.
 	 */
-	newcr = cralloc();
+	newcr = cralloc_ksid();
 
 	p = ttoproc(curthread);
 
@@ -75,6 +83,7 @@ retry:
 		crcopy_to(cr, newcr);
 		p->p_cred = newcr;
 		newcr->cr_uid = uid;
+		crsetsid(newcr, ksp, KSID_USER);
 	} else if ((error = secpolicy_allow_setid(cr, uid, B_FALSE)) == 0) {
 		if (!uidchge && uid != cr->cr_ruid) {
 			/*
@@ -111,9 +120,13 @@ retry:
 		newcr->cr_ruid = uid;
 		newcr->cr_suid = uid;
 		newcr->cr_uid = uid;
+		crsetsid(newcr, ksp, KSID_USER);
 		ASSERT(uid != oldruid ? uidchge : 1);
-	} else
+	} else {
 		crfree(newcr);
+		if (ksp != NULL)
+			ksid_rele(ksp);
+	}
 
 	mutex_exit(&p->p_crlock);
 
@@ -155,19 +168,28 @@ getuid(void)
 int
 seteuid(uid_t uid)
 {
-	register proc_t *p;
+	proc_t *p;
 	int error = EPERM;
 	int do_nocd = 0;
 	cred_t	*cr, *newcr;
+	ksid_t ksid, *ksp;
 
-	if (uid < 0 || uid > MAXUID)
+	if (!VALID_UID(uid))
 		return (set_errno(EINVAL));
+
+	if (uid > MAXUID) {
+		if (ksid_lookup(uid, &ksid) != 0)
+			return (set_errno(EINVAL));
+		ksp = &ksid;
+	} else {
+		ksp = NULL;
+	}
 
 	/*
 	 * Need to pre-allocate the new cred structure before grabbing
 	 * the p_crlock mutex.
 	 */
-	newcr = cralloc();
+	newcr = cralloc_ksid();
 	p = ttoproc(curthread);
 	mutex_enter(&p->p_crlock);
 	cr = p->p_cred;
@@ -185,8 +207,12 @@ seteuid(uid_t uid)
 		crcopy_to(cr, newcr);
 		p->p_cred = newcr;
 		newcr->cr_uid = uid;
-	} else
+		crsetsid(newcr, ksp, KSID_USER);
+	} else {
 		crfree(newcr);
+		if (ksp != NULL)
+			ksid_rele(ksp);
+	}
 
 	mutex_exit(&p->p_crlock);
 
@@ -219,16 +245,25 @@ setreuid(uid_t ruid, uid_t euid)
 	uid_t oldruid = ruid;
 	cred_t *cr, *newcr;
 	zoneid_t zoneid = getzoneid();
+	ksid_t ksid, *ksp;
 
-	if ((ruid != -1 && (ruid < 0 || ruid > MAXUID)) ||
-	    (euid != -1 && (euid < 0 || euid > MAXUID)))
+	if ((ruid != -1 && !VALID_UID(ruid)) ||
+	    (euid != -1 && !VALID_UID(euid)))
 		return (set_errno(EINVAL));
+
+	if (euid != -1 && euid > MAXUID) {
+		if (ksid_lookup(euid, &ksid) != 0)
+			return (set_errno(EINVAL));
+		ksp = &ksid;
+	} else {
+		ksp = NULL;
+	}
 
 	/*
 	 * Need to pre-allocate the new cred structure before grabbing
 	 * the p_crlock mutex.
 	 */
-	newcr = cralloc();
+	newcr = cralloc_ksid();
 
 	p = ttoproc(curthread);
 
@@ -269,8 +304,10 @@ retry:
 		crcopy_to(cr, newcr);
 		p->p_cred = newcr;
 
-		if (euid != -1)
+		if (euid != -1) {
 			newcr->cr_uid = euid;
+			crsetsid(newcr, ksp, KSID_USER);
+		}
 		if (ruid != -1) {
 			oldruid = newcr->cr_ruid;
 			newcr->cr_ruid = ruid;
@@ -319,5 +356,7 @@ retry:
 		return (0);
 	}
 	crfree(newcr);
+	if (ksp != NULL)
+		ksid_rele(ksp);
 	return (set_errno(error));
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -632,8 +631,8 @@ ipgpc_parse_filter(ipgpc_filter_t *filter, nvlist_t *nvlp)
 	}
 
 	/* parse uid */
-	if (nvlist_lookup_int32(nvlp, IPGPC_UID, &filter->uid) != 0) {
-		filter->uid = IPGPC_WILDCARD;
+	if (nvlist_lookup_uint32(nvlp, IPGPC_UID, &filter->uid) != 0) {
+		filter->uid = (uid_t)IPGPC_WILDCARD;
 	}
 
 	/* parse projid */
@@ -2337,7 +2336,7 @@ build_filter_nvlist(nvlist_t **nvlpp, ipgpc_filter_t *in_filter,
 
 	/* add uid */
 	if (in_filter->uid != IPGPC_WILDCARD) {
-		if ((rc = nvlist_add_int32(nvlp, IPGPC_UID, in_filter->uid))
+		if ((rc = nvlist_add_uint32(nvlp, IPGPC_UID, in_filter->uid))
 		    != 0) {
 			return (rc);
 		}

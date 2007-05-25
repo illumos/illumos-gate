@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1362,8 +1362,8 @@ __s_cvt_passwd(const void *data, char **rdn,
 	/* Convert the structure */
 	ptr = (struct passwd *)data;
 
-	if (ptr->pw_name == NULL || ptr->pw_uid < 0 ||
-	    ptr->pw_gid < 0 || ptr->pw_dir == NULL) {
+	if (ptr->pw_name == NULL || ptr->pw_uid > MAXUID ||
+	    ptr->pw_gid > MAXUID || ptr->pw_dir == NULL) {
 		__ns_ldap_freeEntry(e);
 		*entry = NULL;
 		return (NS_LDAP_INVALID_PARAM);
@@ -1399,22 +1399,14 @@ __s_cvt_passwd(const void *data, char **rdn,
 		}
 	}
 
-#ifdef _LP64
-	(void) sprintf(ibuf, "%d", ptr->pw_uid);
-#else
-	(void) sprintf(ibuf, "%ld", ptr->pw_uid);
-#endif
+	(void) sprintf(ibuf, "%u", ptr->pw_uid);
 	rc = __s_add_attr(e, "uidNumber", ibuf);
 	if (rc != NS_LDAP_SUCCESS) {
 		__s_cvt_freeEntryRdn(entry, rdn);
 		return (rc);
 	}
 
-#ifdef _LP64
-	(void) sprintf(ibuf, "%d", ptr->pw_gid);
-#else
-	(void) sprintf(ibuf, "%ld", ptr->pw_gid);
-#endif
+	(void) sprintf(ibuf, "%u", ptr->pw_gid);
 	rc = __s_add_attr(e, "gidNumber", ibuf);
 	if (rc != NS_LDAP_SUCCESS) {
 		__s_cvt_freeEntryRdn(entry, rdn);
@@ -1603,7 +1595,7 @@ __s_cvt_group(const void *data, char **rdn,
 	/* Convert the structure */
 	ptr = (struct group *)data;
 
-	if (ptr->gr_name == NULL || ptr->gr_gid < 0) {
+	if (ptr->gr_name == NULL || ptr->gr_gid > MAXUID) {
 		__ns_ldap_freeEntry(e);
 		*entry = NULL;
 		return (NS_LDAP_INVALID_PARAM);
@@ -1625,11 +1617,7 @@ __s_cvt_group(const void *data, char **rdn,
 		return (rc);
 	}
 
-#ifdef _LP64
-	(void) sprintf(ibuf, "%d", ptr->gr_gid);
-#else
-	(void) sprintf(ibuf, "%ld", ptr->gr_gid);
-#endif
+	(void) sprintf(ibuf, "%u", ptr->gr_gid);
 	rc = __s_add_attr(e, "gidNumber", ibuf);
 	if (rc != NS_LDAP_SUCCESS) {
 		__s_cvt_freeEntryRdn(entry, rdn);

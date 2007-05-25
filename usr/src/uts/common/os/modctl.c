@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1537,12 +1537,12 @@ process_minorperm(int cmd, nvlist_t *nvl)
 		nvp = nvlist_next_nvpair(nvl, nvp);
 		ASSERT(strcmp(nvpair_name(nvp), "uid") == 0);
 		if (mp)
-			(void) nvpair_value_int32(nvp, &mp->mp_uid);
+			(void) nvpair_value_uint32(nvp, &mp->mp_uid);
 		/* gid */
 		nvp = nvlist_next_nvpair(nvl, nvp);
 		ASSERT(strcmp(nvpair_name(nvp), "gid") == 0);
 		if (mp) {
-			(void) nvpair_value_int32(nvp, &mp->mp_gid);
+			(void) nvpair_value_uint32(nvp, &mp->mp_gid);
 
 			if (cmd == MODREMMINORPERM) {
 				rem_minorperm(major, name, mp, is_clone);

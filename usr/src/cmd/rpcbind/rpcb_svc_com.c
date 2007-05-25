@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -49,6 +49,7 @@
 #include <strings.h>
 #include <rpc/rpc.h>
 #include <rpc/rpcb_prot.h>
+#include <rpcsvc/svc_dg_priv.h>
 #include <netconfig.h>
 #include <sys/param.h>
 #include <errno.h>
@@ -677,25 +678,7 @@ int fd;
  *	to the original requestor.
  */
 
-/*	begin kludge XXX */
-/*
- * This is from .../libnsl/rpc/svc_dg.c, and is the structure that xprt->xp_p2
- * points to (and shouldn't be here - we should know nothing of its structure).
- */
-#define	MAX_OPT_WORDS	128
 #define	RPC_BUF_MAX	65536	/* can be raised if required */
-struct svc_dg_data {
-	/* XXX: optbuf should be the first field, used by ti_opts.c code */
-	struct  netbuf optbuf;			/* netbuf for options */
-	long    opts[MAX_OPT_WORDS];		/* options */
-	uint_t   su_iosz;			/* size of send.recv buffer */
-	ulong_t  su_xid;				/* transaction id */
-	XDR	su_xdrs;			/* XDR handle */
-	char    su_verfbody[MAX_AUTH_BYTES];	/* verifier body */
-	char    *su_cache;			/* cached data, NULL if none */
-	struct t_unitdata   su_tudata;		/* tu_data for recv */
-};
-#define	getbogus_data(xprt) ((struct svc_dg_data *)(xprt->xp_p2))
 
 /*
  *  This is from ../ypcmd/yp_b.h
@@ -703,8 +686,6 @@ struct svc_dg_data {
  */
 #define	YPBINDPROG ((ulong_t)100007)
 #define	YPBINDPROC_SETDOM ((ulong_t)2)
-
-/*	end kludge XXX	*/
 
 void
 rpcbproc_callit_com(rqstp, transp, reply_type, versnum)
@@ -990,7 +971,7 @@ fprintf(stderr,
 		ma.m_uaddr = NULL;
 		goto error;
 	}
-	bd = getbogus_data(transp);
+	bd = get_svc_dg_data(transp);
 	call_msg.rm_xid = forward_register(bd->su_xid,
 			caller, fd, ma.m_uaddr, reply_type, versnum);
 	if (call_msg.rm_xid == 0) {
@@ -1493,7 +1474,7 @@ xprt_set_caller(xprt, fi)
 	struct svc_dg_data *bd;
 
 	*(svc_getrpccaller(xprt)) = *(fi->caller_addr);
-	bd = (struct svc_dg_data *)getbogus_data(xprt);
+	bd = get_svc_dg_data(xprt);
 	bd->su_xid = fi->caller_xid;	/* set xid on reply */
 }
 
@@ -1650,7 +1631,7 @@ handle_reply(fd, xprt)
 
 	xprt_set_caller(xprt, fi);
 	/* XXX hack */
-	tu_data =  &(getbogus_data(xprt)->su_tudata);
+	tu_data =  &(get_svc_dg_data(xprt)->su_tudata);
 
 	tu_data->addr = xprt->xp_rtaddr;
 #ifdef	SVC_RUN_DEBUG

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -773,6 +773,13 @@ sysexit(private_t *pri, int dotrace)
 #endif
 					fmt = "= %#lo";
 					break;
+				case UNS:
+#ifdef _LP64
+					if (data_model == PR_MODEL_ILP32)
+						rv1 &= 0xffffffff;
+#endif
+					fmt = "= %lu";
+					break;
 				default:
 					fmt = "= %ld";
 					break;
@@ -805,6 +812,13 @@ sysexit(private_t *pri, int dotrace)
 					rv2 &= 0xffffffff;
 #endif
 				fmt = " [%#lo]";
+				break;
+			case UNS:
+#ifdef _LP64
+				if (data_model == PR_MODEL_ILP32)
+					rv2 &= 0xffffffff;
+#endif
+				fmt = " [%lu]";
 				break;
 			default:
 				fmt = " [%ld]";

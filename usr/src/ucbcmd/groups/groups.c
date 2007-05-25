@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,7 +53,7 @@ main(int argc, char *argv[])
 	for (i = 0; i < ngroups; i++) {
 		gr = getgrgid(groups[i]);
 		if (gr == NULL) {
-			(void) printf("%s%ld", sep, groups[i]);
+			(void) printf("%s%u", sep, groups[i]);
 			sep = " ";
 			continue;
 		}

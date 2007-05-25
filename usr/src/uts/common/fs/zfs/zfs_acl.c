@@ -343,16 +343,16 @@ zfs_acl_valid(znode_t *zp, ace_t *uace, int aclcnt, int *inherit)
 
 		switch (acep->a_flags & ACE_TYPE_FLAGS) {
 		case ACE_OWNER:
-			acep->a_who = -1;
+			acep->a_who = (uid_t)-1;
 			break;
 		case (ACE_IDENTIFIER_GROUP | ACE_GROUP):
 		case ACE_IDENTIFIER_GROUP:
 			if (acep->a_flags & ACE_GROUP) {
-				acep->a_who = -1;
+				acep->a_who = (uid_t)-1;
 			}
 			break;
 		case ACE_EVERYONE:
-			acep->a_who = -1;
+			acep->a_who = (uid_t)-1;
 			break;
 		}
 

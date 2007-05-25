@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2137,12 +2137,12 @@ pr_scred(proc_t *p, prcred_t *prcred, cred_t *cr, boolean_t dogrps)
 	uid_t oldruid;
 	int error;
 
-	if ((uint_t)prcred->pr_euid > MAXUID ||
-	    (uint_t)prcred->pr_ruid > MAXUID ||
-	    (uint_t)prcred->pr_suid > MAXUID ||
-	    (uint_t)prcred->pr_egid > MAXUID ||
-	    (uint_t)prcred->pr_rgid > MAXUID ||
-	    (uint_t)prcred->pr_sgid > MAXUID)
+	if (!VALID_UID(prcred->pr_euid) ||
+	    !VALID_UID(prcred->pr_ruid) ||
+	    !VALID_UID(prcred->pr_suid) ||
+	    !VALID_GID(prcred->pr_egid) ||
+	    !VALID_GID(prcred->pr_rgid) ||
+	    !VALID_GID(prcred->pr_sgid))
 		return (EINVAL);
 
 	if (dogrps) {
@@ -2153,7 +2153,7 @@ pr_scred(proc_t *p, prcred_t *prcred, cred_t *cr, boolean_t dogrps)
 			return (EINVAL);
 
 		for (i = 0; i < ngrp; i++) {
-			if ((uint_t)prcred->pr_groups[i] > MAXUID)
+			if (!VALID_GID(prcred->pr_groups[i]))
 				return (EINVAL);
 		}
 	}

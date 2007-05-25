@@ -72,7 +72,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"proc",
 	prinit,
-	VSW_HASPROTO|VSW_STATS,
+	VSW_HASPROTO|VSW_STATS|VSW_XID,
 	&proc_mntopts
 };
 

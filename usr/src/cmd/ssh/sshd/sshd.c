@@ -41,7 +41,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -737,7 +737,7 @@ privsep_preauth_child(void)
 #else
 	gidset[0] = pw->pw_gid;
 	if (setgid(pw->pw_gid) < 0)
-		fatal("setgid failed for %ld", pw->pw_gid);
+		fatal("setgid failed for %u", pw->pw_gid);
 	if (setgroups(1, gidset) < 0)
 		fatal("setgroups: %.100s", strerror(errno));
 	permanently_set_uid(pw);

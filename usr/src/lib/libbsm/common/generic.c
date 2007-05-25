@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -102,11 +102,11 @@ cannot_audit(force)
 void
 aug_init()
 {
-	aug_auid = -1;
-	aug_uid = -1;
-	aug_euid = -1;
-	aug_gid = -1;
-	aug_egid = -1;
+	aug_auid = (uid_t)-1;
+	aug_uid = (uid_t)-1;
+	aug_euid = (uid_t)-1;
+	aug_gid = (gid_t)-1;
+	aug_egid = (gid_t)-1;
 	aug_pid = -1;
 	aug_tid.at_port = 0;
 	aug_tid.at_type = AU_IPv4;
@@ -420,7 +420,7 @@ aug_audit(void)
 		(void) au_write(ad, au_to_mylabel());
 	if (aug_policy & AUDIT_GROUP) {
 		int ng;
-		gid_t grplst[NGROUPS_MAX];
+		gid_t grplst[NGROUPS_UMAX];
 
 		(void) memset(grplst, 0, sizeof (grplst));
 		if ((ng = getgroups(NGROUPS_UMAX, grplst))) {
@@ -472,7 +472,7 @@ aug_selected()
 {
 	auditinfo_addr_t mask;
 
-	if (aug_uid < 0) {
+	if (aug_uid > MAXEPHUID) {
 		(void) aug_save_namask();
 		return (aug_na_selected());
 	}

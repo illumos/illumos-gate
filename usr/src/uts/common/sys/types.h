@@ -365,11 +365,7 @@ typedef	ulong_t	mode_t;			/* (historical version) */
 
 #ifndef	_UID_T
 #define	_UID_T
-#if defined(_LP64) || defined(_I32LPx)
-typedef	int	uid_t;			/* UID type		*/
-#else
-typedef	long	uid_t;			/* (historical version) */
-#endif
+typedef	unsigned int uid_t;		/* UID type		*/
 #endif	/* _UID_T */
 
 typedef	uid_t	gid_t;			/* GID type		*/

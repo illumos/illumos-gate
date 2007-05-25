@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -557,7 +557,7 @@ char *argv[];
 
 	/* set gid flag */
 	nargv[argindex++] = "-g";
-	(void) sprintf(gidstring, "%ld", gid);
+	(void) sprintf(gidstring, "%u", gid);
 	nargv[argindex++] = gidstring;
 
 	/* shell */
@@ -577,7 +577,7 @@ char *argv[];
 
 	/* set uid flag */
 	nargv[argindex++] = "-u";
-	(void) sprintf(uidstring, "%ld", uid);
+	(void) sprintf(uidstring, "%u", uid);
 	nargv[argindex++] = uidstring;
 
 	if (oflag) nargv[argindex++] = "-o";
@@ -641,7 +641,7 @@ char *argv[];
 					    "user id");
 					exit(EX_ID_EXISTS);
 				}
-				(void) sprintf(uidstring, "%ld", uid);
+				(void) sprintf(uidstring, "%u", uid);
 			}
 			break;
 

@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,8 +80,8 @@ _setup(Boot * ebp, Dyn * ld_dyn)
 	Phdr *		phdr = 0;
 	Rt_map *	lmp;
 	auxv_t		*auxv, *_auxv;
-	uid_t		uid = -1, euid = -1;
-	gid_t		gid = -1, egid = -1;
+	uid_t		uid = (uid_t)-1, euid = (uid_t)-1;
+	gid_t		gid = (gid_t)-1, egid = (gid_t)-1;
 	char		*_platform = 0, *_execname = 0, *_emulator = 0;
 	int		auxflags = -1;
 	/*
