@@ -19638,7 +19638,7 @@ skip_ready_valid:
 		break;
 
 	case MHIOCGRP_REGISTERANDIGNOREKEY:
-		SD_TRACE(SD_LOG_IOCTL, un, "MHIOCGRP_PREEMPTANDABORT\n");
+		SD_TRACE(SD_LOG_IOCTL, un, "MHIOCGRP_REGISTERANDIGNOREKEY\n");
 		if ((err = drv_priv(cred_p)) != EPERM) {
 			if (un->un_reservation_type == SD_SCSI2_RESERVATION) {
 				err = ENOTSUP;
