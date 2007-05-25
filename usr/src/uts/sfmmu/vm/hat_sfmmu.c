@@ -7003,6 +7003,10 @@ hat_page_setattr(page_t *pp, uint_t flag)
 	page_t		**listp;
 	kmutex_t	*pmtx;
 	kmutex_t	*vphm = NULL;
+	int		noshuffle;
+
+	noshuffle = flag & P_NSH;
+	flag &= ~P_NSH;
 
 	ASSERT(!(flag & ~(P_MOD | P_REF | P_RO)));
 
@@ -7012,7 +7016,8 @@ hat_page_setattr(page_t *pp, uint_t flag)
 	if ((pp->p_nrm & flag) == flag)
 		return;
 
-	if ((flag & P_MOD) != 0 && vp != NULL && IS_VMODSORT(vp)) {
+	if ((flag & P_MOD) != 0 && vp != NULL && IS_VMODSORT(vp) &&
+	    !noshuffle) {
 		vphm = page_vnode_mutex(vp);
 		mutex_enter(vphm);
 	}

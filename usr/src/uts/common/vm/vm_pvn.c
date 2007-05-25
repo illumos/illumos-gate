@@ -401,7 +401,7 @@ pvn_write_done(page_t *plist, int flags)
 		if (vp == NULL)
 			vp = pp->p_vnode;
 
-		if (IS_VMODSORT(vp)) {
+		if (((flags & B_ERROR) == 0) && IS_VMODSORT(vp)) {
 			/*
 			 * Move page to the top of the v_page list.
 			 * Skip pages modified during IO.
@@ -431,7 +431,7 @@ pvn_write_done(page_t *plist, int flags)
 				/*LINTED: constant in conditional context*/
 				VN_DISPOSE(pp, B_INVAL, 0, kcred);
 			} else {
-				hat_setmod(pp);
+				hat_setmod_only(pp);
 				page_io_unlock(pp);
 				page_unlock(pp);
 			}

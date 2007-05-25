@@ -2935,11 +2935,16 @@ hat_page_setattr(struct page *pp, uint_t flag)
 	vnode_t		*vp = pp->p_vnode;
 	kmutex_t	*vphm = NULL;
 	page_t		**listp;
+	int		noshuffle;
+
+	noshuffle = flag & P_NSH;
+	flag &= ~P_NSH;
 
 	if (PP_GETRM(pp, flag) == flag)
 		return;
 
-	if ((flag & P_MOD) != 0 && vp != NULL && IS_VMODSORT(vp)) {
+	if ((flag & P_MOD) != 0 && vp != NULL && IS_VMODSORT(vp) &&
+	    !noshuffle) {
 		vphm = page_vnode_mutex(vp);
 		mutex_enter(vphm);
 	}
