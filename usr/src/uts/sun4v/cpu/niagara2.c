@@ -304,9 +304,11 @@ page_get_nsz_color_cpu(uchar_t szc, uint_t color)
 uint_t
 page_get_color_shift_cpu(uchar_t szc, uchar_t nszc)
 {
-	ASSERT(nszc > szc);
+	ASSERT(nszc >= szc);
 	ASSERT(nszc <= TTE256M);
 
+	if (szc == nszc)
+		return (0);
 	if (szc <= TTE64K)
 		return ((nszc >= TTE4M) ? 2 : ((nszc >= TTE512K) ? 1 : 0));
 	if (szc == TTE512K)
