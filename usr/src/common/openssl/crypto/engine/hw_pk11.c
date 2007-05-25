@@ -192,38 +192,34 @@ static CK_BBOOL pk11_have_random = CK_FALSE;
 
 typedef struct PK11_CIPHER_st 
 	{
-	int		id;
-	int		nid;
-	int		ivmax;
-	int		key_len;
-	CK_KEY_TYPE	key_type;
-	CK_MECHANISM 	mech;
+	int			id;
+	int			nid;
+	int			ivmax;
+	int			key_len;
+	CK_KEY_TYPE		key_type;
+	CK_MECHANISM_TYPE	mech_type;
 	} PK11_CIPHER;
 
 static PK11_CIPHER ciphers[] = 
 	{
-	{PK11_DES_CBC,  NID_des_cbc,      8,  8,   CKK_DES,  
-		{CKM_DES_CBC, NULL, 0},},
-	{PK11_DES3_CBC, NID_des_ede3_cbc, 8,	24,  CKK_DES3, 
-		{CKM_DES3_CBC, NULL, 0},},
-	{PK11_AES_CBC,  NID_aes_128_cbc,  16, 16,  CKK_AES,  
-		{CKM_AES_CBC, NULL, 0},},
-	{PK11_RC4,      NID_rc4,          0,  16,  CKK_RC4,  
-		{CKM_RC4, NULL, 0},},
+	{PK11_DES_CBC,  NID_des_cbc,      8,  8,   CKK_DES,  CKM_DES_CBC, },
+	{PK11_DES3_CBC, NID_des_ede3_cbc, 8,  24,  CKK_DES3, CKM_DES3_CBC, },
+	{PK11_AES_CBC,  NID_aes_128_cbc,  16, 16,  CKK_AES,  CKM_AES_CBC, },
+	{PK11_RC4,      NID_rc4,          0,  16,  CKK_RC4,  CKM_RC4, },
 	};
 
 typedef struct PK11_DIGEST_st
 	{
-	int		id;
-	int		nid;
-	CK_MECHANISM	mech;
+	int			id;
+	int			nid;
+	CK_MECHANISM_TYPE	mech_type;
 	} PK11_DIGEST;
 
 static PK11_DIGEST digests[] = 
 	{
-	{PK11_MD5,	NID_md5,	{CKM_MD5, NULL, 0},},
-	{PK11_SHA1,	NID_sha1,	{CKM_SHA_1, NULL, 0},},
-	{0,		NID_undef,	{0xFFFF, NULL, 0},},
+	{PK11_MD5,	NID_md5,	CKM_MD5, },
+	{PK11_SHA1,	NID_sha1,	CKM_SHA_1, },
+	{0,		NID_undef,	0xFFFF, },
 	};
 
 /* Structure to be used for the cipher_data/md_data in 
@@ -1199,6 +1195,7 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
     const unsigned char *iv, int enc)
 	{
 	CK_RV rv;
+	CK_MECHANISM mech;
 	int index;
 	PK11_CIPHER_STATE *state = (PK11_CIPHER_STATE *) ctx->cipher_data;
 	PK11_SESSION *sp;
@@ -1217,6 +1214,11 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 
 	if ((sp = pk11_get_session()) == NULL)
 		return 0;
+
+	/* if applicable, the mechanism parameter is used for IV */
+	mech.mechanism = pcp->mech_type;
+	mech.pParameter = NULL;
+	mech.ulParameterLen = 0;
 
 	/* The key object is destroyed here if it is not the current key
 	 */
@@ -1261,14 +1263,14 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 
 	if (ctx->cipher->iv_len > 0)
 		{
-		pcp->mech.pParameter = (void *) ctx->iv;
-		pcp->mech.ulParameterLen = ctx->cipher->iv_len;
+		mech.pParameter = (void *) ctx->iv;
+		mech.ulParameterLen = ctx->cipher->iv_len;
 		}
 
 	/* If we get here, the encryption needs to be reinitialized */
 	if (ctx->encrypt)
 		{
-		rv = pFuncList->C_EncryptInit(sp->session_cipher, &pcp->mech, 
+		rv = pFuncList->C_EncryptInit(sp->session_cipher, &mech, 
 			sp->cipher_key);
 
 		if (rv != CKR_OK)
@@ -1282,7 +1284,7 @@ pk11_cipher_init(EVP_CIPHER_CTX *ctx, const unsigned char *key,
 		}
 	else
 		{
-		rv = pFuncList->C_DecryptInit(sp->session_cipher, &pcp->mech, 
+		rv = pFuncList->C_DecryptInit(sp->session_cipher, &mech, 
 			sp->cipher_key);
 
 		if (rv != CKR_OK)
@@ -1597,6 +1599,7 @@ static int
 pk11_digest_init(EVP_MD_CTX *ctx)
         { 
 	CK_RV rv;
+	CK_MECHANISM mech;
 	int index;
 	PK11_SESSION *sp;
 	PK11_DIGEST *pdp;
@@ -1612,7 +1615,12 @@ pk11_digest_init(EVP_MD_CTX *ctx)
 	if ((sp = pk11_get_session()) == NULL)
 		return 0;
 
-	rv = pFuncList->C_DigestInit(sp->session, &pdp->mech);
+	/* at present, no parameter is needed for supported digests */
+	mech.mechanism = pdp->mech_type;
+	mech.pParameter = NULL;
+	mech.ulParameterLen = 0;
+
+	rv = pFuncList->C_DigestInit(sp->session, &mech);
 
 	if (rv != CKR_OK)
 		{

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -204,7 +204,8 @@ typedef struct PK11_SESSION_st
         CK_SESSION_HANDLE       session;        /* PK11 session handle */
         CK_SESSION_HANDLE       session_cipher; /* PK11 sess handle for ciph */
         pid_t                   pid;            /* Current process ID */
-        CK_OBJECT_HANDLE        rsa_pub_key;    /* RSA key handle in the sess */        CK_OBJECT_HANDLE        rsa_priv_key;   /* RSA private key handle */
+        CK_OBJECT_HANDLE        rsa_pub_key;    /* RSA key handle in the sess */
+	CK_OBJECT_HANDLE        rsa_priv_key;   /* RSA private key handle */
         CK_OBJECT_HANDLE        dsa_pub_key;    /* DSA pub key handle */
         CK_OBJECT_HANDLE        dsa_priv_key;   /* DSA priv key handle */
         CK_OBJECT_HANDLE        dh_key;         /* RSA pub key handle for DH */
@@ -235,4 +236,4 @@ extern EVP_PKEY *pk11_load_pubkey(ENGINE*, const char* pubkey_file,
 
 extern CK_FUNCTION_LIST_PTR pFuncList;
 
-#endif
+#endif /* HW_PK11_ERR_H */
