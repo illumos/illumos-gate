@@ -378,7 +378,7 @@ label/**/2:								\
 	ldx	[tsbinfo + TSBINFO_PADDR], tsbreg;		\
 	lduh	[tsbinfo + TSBINFO_SZCODE], tmp1;		\
 	and	tmp1, TSB_SOFTSZ_MASK, tmp1;			\
-	or	tsbreg, tmp1, tsbreg;				\
+	or	tsbreg, tmp1, tsbreg;
 
 
 /*

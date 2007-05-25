@@ -988,7 +988,7 @@ struct hmehash_bucket {
 #define	HASHADDR_MASK(hashno)	TTE_PAGEMASK(hashno)
 
 #define	HME_HASH_SHIFT(ttesz)						\
-	((ttesz == TTE8K)? HBLK_RANGE_SHIFT : TTE_PAGE_SHIFT(ttesz))	\
+	((ttesz == TTE8K)? HBLK_RANGE_SHIFT : TTE_PAGE_SHIFT(ttesz))
 
 #define	HME_HASH_ADDR(vaddr, hmeshift)					\
 	((caddr_t)(((uintptr_t)(vaddr) >> (hmeshift)) << (hmeshift)))
@@ -1065,7 +1065,7 @@ struct hmehash_bucket {
 			/* found hme_blk */				\
 			break;						\
 		}							\
-	}								\
+	}
 
 
 #define	SFMMU_HASH_LOCK(hmebp)						\

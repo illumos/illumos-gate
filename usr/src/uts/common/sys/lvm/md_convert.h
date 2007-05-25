@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001, 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -185,7 +184,7 @@ extern void dump_mr_unit32_od(mr_unit32_od_t *);
 	small_mdr->un_ncomp	 = big_mdr->un_ncomp;			\
 	small_mdr->un_blocks	 = (daddr32_t)big_mdr->un_blocks;	\
 	small_mdr->un_cum_blocks = (daddr32_t)big_mdr->un_cum_blocks;	\
-	small_mdr->un_interlace	 = (daddr32_t)big_mdr->un_interlace;	\
+	small_mdr->un_interlace	 = (daddr32_t)big_mdr->un_interlace;
 
 /* ms_row -> ms_row32_od */
 #define	MSROW_SMALL2BIG(small_mdr, big_mdr)				\
@@ -193,7 +192,7 @@ extern void dump_mr_unit32_od(mr_unit32_od_t *);
 	big_mdr->un_ncomp	= small_mdr->un_ncomp;			\
 	big_mdr->un_blocks	= (diskaddr_t)small_mdr->un_blocks;	\
 	big_mdr->un_cum_blocks	= (diskaddr_t)small_mdr->un_cum_blocks;	\
-	big_mdr->un_interlace	= (diskaddr_t)small_mdr->un_interlace;	\
+	big_mdr->un_interlace	= (diskaddr_t)small_mdr->un_interlace;
 
 
 
