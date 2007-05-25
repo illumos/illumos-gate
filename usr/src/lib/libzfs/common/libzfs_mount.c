@@ -475,6 +475,18 @@ _zfs_init_libshare(void)
 		_sa_errorstr = (char *(*)(int))dlsym(libshare, "sa_errorstr");
 		_sa_parse_legacy_options = (int (*)(sa_group_t, char *, char *))
 		    dlsym(libshare, "sa_parse_legacy_options");
+		if (_sa_init == NULL || _sa_fini == NULL ||
+		    _sa_find_share == NULL || _sa_enable_share == NULL ||
+		    _sa_disable_share == NULL || _sa_errorstr == NULL ||
+		    _sa_parse_legacy_options == NULL) {
+			_sa_init = NULL;
+			_sa_fini = NULL;
+			_sa_disable_share = NULL;
+			_sa_enable_share = NULL;
+			_sa_errorstr = NULL;
+			_sa_parse_legacy_options = NULL;
+			(void) dlclose(libshare);
+		}
 	}
 }
 

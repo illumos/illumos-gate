@@ -55,6 +55,7 @@
 					(tm.tv_nsec & 0xffffffff))
 
 #define	DFS_LOCK_FILE	"/etc/dfs/fstypes"
+#define	SA_STRSIZE	256	/* max string size for names */
 
 /*
  * internal data structures
@@ -74,7 +75,7 @@ extern int sa_path_is_zfs(char *);
 extern int sa_zfs_set_sharenfs(sa_group_t, char *, int);
 extern void update_legacy_config(sa_handle_t);
 extern int issubdir(char *, char *);
-extern void sa_zfs_init(sa_handle_impl_t);
+extern int sa_zfs_init(sa_handle_impl_t);
 extern void sa_zfs_fini(sa_handle_impl_t);
 extern void sablocksigs(sigset_t *);
 extern void saunblocksigs(sigset_t *);
@@ -92,6 +93,11 @@ struct doc2handle {
 	xmlNodePtr		root;
 	sa_handle_impl_t	handle;
 };
+
+/* definitions used in a couple of property functions */
+#define	SA_PROP_OP_REMOVE	1
+#define	SA_PROP_OP_ADD		2
+#define	SA_PROP_OP_UPDATE	3
 
 static struct doc2handle *sa_global_handles = NULL;
 
@@ -111,81 +117,81 @@ sa_errorstr(int err)
 
 	switch (err) {
 	case SA_OK:
-	    ret = dgettext(TEXT_DOMAIN, "ok");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "ok");
+		break;
 	case SA_NO_SUCH_PATH:
-	    ret = dgettext(TEXT_DOMAIN, "path doesn't exist");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "path doesn't exist");
+		break;
 	case SA_NO_MEMORY:
-	    ret = dgettext(TEXT_DOMAIN, "no memory");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "no memory");
+		break;
 	case SA_DUPLICATE_NAME:
-	    ret = dgettext(TEXT_DOMAIN, "name in use");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "name in use");
+		break;
 	case SA_BAD_PATH:
-	    ret = dgettext(TEXT_DOMAIN, "bad path");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "bad path");
+		break;
 	case SA_NO_SUCH_GROUP:
-	    ret = dgettext(TEXT_DOMAIN, "no such group");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "no such group");
+		break;
 	case SA_CONFIG_ERR:
-	    ret = dgettext(TEXT_DOMAIN, "configuration error");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "configuration error");
+		break;
 	case SA_SYSTEM_ERR:
-	    ret = dgettext(TEXT_DOMAIN, "system error");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "system error");
+		break;
 	case SA_SYNTAX_ERR:
-	    ret = dgettext(TEXT_DOMAIN, "syntax error");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "syntax error");
+		break;
 	case SA_NO_PERMISSION:
-	    ret = dgettext(TEXT_DOMAIN, "no permission");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "no permission");
+		break;
 	case SA_BUSY:
-	    ret = dgettext(TEXT_DOMAIN, "busy");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "busy");
+		break;
 	case SA_NO_SUCH_PROP:
-	    ret = dgettext(TEXT_DOMAIN, "no such property");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "no such property");
+		break;
 	case SA_INVALID_NAME:
-	    ret = dgettext(TEXT_DOMAIN, "invalid name");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "invalid name");
+		break;
 	case SA_INVALID_PROTOCOL:
-	    ret = dgettext(TEXT_DOMAIN, "invalid protocol");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "invalid protocol");
+		break;
 	case SA_NOT_ALLOWED:
-	    ret = dgettext(TEXT_DOMAIN, "operation not allowed");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "operation not allowed");
+		break;
 	case SA_BAD_VALUE:
-	    ret = dgettext(TEXT_DOMAIN, "bad property value");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "bad property value");
+		break;
 	case SA_INVALID_SECURITY:
-	    ret = dgettext(TEXT_DOMAIN, "invalid security type");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "invalid security type");
+		break;
 	case SA_NO_SUCH_SECURITY:
-	    ret = dgettext(TEXT_DOMAIN, "security type not found");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "security type not found");
+		break;
 	case SA_VALUE_CONFLICT:
-	    ret = dgettext(TEXT_DOMAIN, "property value conflict");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "property value conflict");
+		break;
 	case SA_NOT_IMPLEMENTED:
-	    ret = dgettext(TEXT_DOMAIN, "not implemented");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "not implemented");
+		break;
 	case SA_INVALID_PATH:
-	    ret = dgettext(TEXT_DOMAIN, "invalid path");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "invalid path");
+		break;
 	case SA_NOT_SUPPORTED:
-	    ret = dgettext(TEXT_DOMAIN, "operation not supported");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "operation not supported");
+		break;
 	case SA_PROP_SHARE_ONLY:
-	    ret = dgettext(TEXT_DOMAIN, "property not valid for group");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "property not valid for group");
+		break;
 	case SA_NOT_SHARED:
-	    ret = dgettext(TEXT_DOMAIN, "not shared");
-	    break;
+		ret = dgettext(TEXT_DOMAIN, "not shared");
+		break;
 	default:
-	    (void) snprintf(errstr, sizeof (errstr),
-				dgettext(TEXT_DOMAIN, "unknown %d"), err);
-	    ret = errstr;
+		(void) snprintf(errstr, sizeof (errstr),
+		    dgettext(TEXT_DOMAIN, "unknown %d"), err);
+		ret = errstr;
 	}
 	return (ret);
 }
@@ -204,12 +210,12 @@ get_handle_for_root(xmlNodePtr root)
 
 	(void) mutex_lock(&sa_global_lock);
 	for (item = sa_global_handles; item != NULL; item = item->next) {
-	    if (item->root == root)
-		break;
+		if (item->root == root)
+			break;
 	}
 	(void) mutex_unlock(&sa_global_lock);
 	if (item != NULL)
-	    return (item->handle);
+		return (item->handle);
 	return (NULL);
 }
 
@@ -221,13 +227,13 @@ add_handle_for_root(xmlNodePtr root, sa_handle_impl_t handle)
 
 	item = (struct doc2handle *)calloc(sizeof (struct doc2handle), 1);
 	if (item != NULL) {
-	    item->root = root;
-	    item->handle = handle;
-	    (void) mutex_lock(&sa_global_lock);
-	    item->next = sa_global_handles;
-	    sa_global_handles = item;
-	    (void) mutex_unlock(&sa_global_lock);
-	    ret = SA_OK;
+		item->root = root;
+		item->handle = handle;
+		(void) mutex_lock(&sa_global_lock);
+		item->next = sa_global_handles;
+		sa_global_handles = item;
+		(void) mutex_unlock(&sa_global_lock);
+		ret = SA_OK;
 	}
 	return (ret);
 }
@@ -246,19 +252,18 @@ remove_handle_for_root(xmlNodePtr root)
 
 	(void) mutex_lock(&sa_global_lock);
 	for (prev = NULL, item = sa_global_handles; item != NULL;
-		item = item->next) {
-	    if (item->root == root) {
-		if (prev == NULL) {
-		    /* first in the list */
-		    sa_global_handles = sa_global_handles->next;
-		} else {
-		    prev->next = item->next;
+	    item = item->next) {
+		if (item->root == root) {
+			/* first in the list */
+			if (prev == NULL)
+				sa_global_handles = sa_global_handles->next;
+			else
+				prev->next = item->next;
+			/* Item is out of the list so free the list structure */
+			free(item);
+			break;
 		}
-		/* Item is out of the list so free the list structure */
-		free(item);
-		break;
-	    }
-	    prev = item;
+		prev = item;
 	}
 	(void) mutex_unlock(&sa_global_lock);
 }
@@ -276,12 +281,12 @@ sa_find_group_handle(sa_group_t group)
 	sa_handle_t handle;
 
 	while (node != NULL) {
-	    if (strcmp((char *)(node->name), "sharecfg") == 0) {
-		/* have the root so get the handle */
-		handle = (sa_handle_t)get_handle_for_root(node);
-		return (handle);
-	    }
-	    node = node->parent;
+		if (strcmp((char *)(node->name), "sharecfg") == 0) {
+			/* have the root so get the handle */
+			handle = (sa_handle_t)get_handle_for_root(node);
+			return (handle);
+		}
+		node = node->parent;
 	}
 	return (NULL);
 }
@@ -304,46 +309,49 @@ set_legacy_timestamp(xmlNodePtr root, char *path, uint64_t tval)
 	/* Have to have a handle or else we weren't initialized. */
 	handle = get_handle_for_root(root);
 	if (handle == NULL)
-	    return;
+		return;
 
 	for (node = root->xmlChildrenNode; node != NULL;
-		node = node->next) {
-	    if (xmlStrcmp(node->name, (xmlChar *)"legacy") == 0) {
-		/* a possible legacy node for this path */
-		lpath = xmlGetProp(node, (xmlChar *)"path");
-		if (lpath != NULL && xmlStrcmp(lpath, (xmlChar *)path) == 0) {
-		    xmlFree(lpath);
-		    break;
+	    node = node->next) {
+		if (xmlStrcmp(node->name, (xmlChar *)"legacy") == 0) {
+			/* a possible legacy node for this path */
+			lpath = xmlGetProp(node, (xmlChar *)"path");
+			if (lpath != NULL &&
+			    xmlStrcmp(lpath, (xmlChar *)path) == 0) {
+				xmlFree(lpath);
+				break;
+			}
+			if (lpath != NULL)
+				xmlFree(lpath);
 		}
-		if (lpath != NULL)
-		    xmlFree(lpath);
-	    }
 	}
 	if (node == NULL) {
-	    /* need to create the first legacy timestamp node */
-	    node = xmlNewChild(root, NULL, (xmlChar *)"legacy", NULL);
+		/* need to create the first legacy timestamp node */
+		node = xmlNewChild(root, NULL, (xmlChar *)"legacy", NULL);
 	}
 	if (node != NULL) {
-	    char tstring[32];
-	    int ret;
+		char tstring[32];
+		int ret;
 
-	    (void) snprintf(tstring, sizeof (tstring), "%lld", tval);
-	    xmlSetProp(node, (xmlChar *)"timestamp", (xmlChar *)tstring);
-	    xmlSetProp(node, (xmlChar *)"path", (xmlChar *)path);
-	    /* now commit to SMF */
-	    ret = sa_get_instance(handle->scfhandle, "default");
-	    if (ret == SA_OK) {
-		ret = sa_start_transaction(handle->scfhandle, "operation");
+		(void) snprintf(tstring, sizeof (tstring), "%lld", tval);
+		xmlSetProp(node, (xmlChar *)"timestamp", (xmlChar *)tstring);
+		xmlSetProp(node, (xmlChar *)"path", (xmlChar *)path);
+		/* now commit to SMF */
+		ret = sa_get_instance(handle->scfhandle, "default");
 		if (ret == SA_OK) {
-		    ret = sa_set_property(handle->scfhandle, "legacy-timestamp",
-					    tstring);
-		    if (ret == SA_OK) {
-			(void) sa_end_transaction(handle->scfhandle);
-		    } else {
-			sa_abort_transaction(handle->scfhandle);
-		    }
+			ret = sa_start_transaction(handle->scfhandle,
+			    "operation");
+			if (ret == SA_OK) {
+				ret = sa_set_property(handle->scfhandle,
+				    "legacy-timestamp", tstring);
+				if (ret == SA_OK) {
+					(void) sa_end_transaction(
+					    handle->scfhandle);
+				} else {
+					sa_abort_transaction(handle->scfhandle);
+				}
+			}
 		}
-	    }
 	}
 }
 
@@ -360,9 +368,9 @@ is_shared(sa_share_t share)
 
 	shared = sa_get_share_attr(share, "shared");
 	if (shared != NULL) {
-	    if (strcmp(shared, "true") == 0)
-		result = 1;
-	    sa_free_attr_string(shared);
+		if (strcmp(shared, "true") == 0)
+			result = 1;
+		sa_free_attr_string(shared);
 	}
 	return (result);
 }
@@ -395,10 +403,10 @@ checksubdirgroup(sa_group_t group, char *newpath, int strictness)
 		 * could be considered incorrect.  We may tighten this
 		 * up in the future.
 		 */
-	    if (strictness == SA_CHECK_NORMAL && !is_shared(share))
-		continue;
+		if (strictness == SA_CHECK_NORMAL && !is_shared(share))
+			continue;
 
-	    path = sa_get_share_attr(share, "path");
+		path = sa_get_share_attr(share, "path");
 		/*
 		 * If path is NULL, then a share is in the process of
 		 * construction or someone has modified the property
@@ -407,18 +415,18 @@ checksubdirgroup(sa_group_t group, char *newpath, int strictness)
 		 * implementation and does the difficult part of
 		 * checking subdirectories.
 		 */
-	    if (path == NULL)
-		continue;
-	    if (newpath != NULL &&
-		(strcmp(path, newpath) == 0 || issubdir(newpath, path) ||
-		issubdir(path, newpath))) {
+		if (path == NULL)
+			continue;
+		if (newpath != NULL &&
+		    (strcmp(path, newpath) == 0 || issubdir(newpath, path) ||
+		    issubdir(path, newpath))) {
+			sa_free_attr_string(path);
+			path = NULL;
+			issub = SA_INVALID_PATH;
+			break;
+		}
 		sa_free_attr_string(path);
 		path = NULL;
-		issub = SA_INVALID_PATH;
-		break;
-	    }
-	    sa_free_attr_string(path);
-	    path = NULL;
 	}
 	return (issub);
 }
@@ -442,20 +450,20 @@ checksubdir(sa_handle_t handle, char *newpath, int strictness)
 	char *path = NULL;
 
 	for (issub = 0, group = sa_get_group(handle, NULL);
-		group != NULL && !issub;
-		group = sa_get_next_group(group)) {
-	    if (sa_group_is_zfs(group)) {
-		sa_group_t subgroup;
-		for (subgroup = sa_get_sub_group(group);
-		    subgroup != NULL && !issub;
-		    subgroup = sa_get_next_group(subgroup))
-		    issub = checksubdirgroup(subgroup, newpath, strictness);
-	    } else {
-		issub = checksubdirgroup(group, newpath, strictness);
-	    }
+	    group != NULL && !issub; group = sa_get_next_group(group)) {
+		if (sa_group_is_zfs(group)) {
+			sa_group_t subgroup;
+			for (subgroup = sa_get_sub_group(group);
+			    subgroup != NULL && !issub;
+			    subgroup = sa_get_next_group(subgroup))
+				issub = checksubdirgroup(subgroup, newpath,
+				    strictness);
+		} else {
+			issub = checksubdirgroup(group, newpath, strictness);
+		}
 	}
 	if (path != NULL)
-	    sa_free_attr_string(path);
+		sa_free_attr_string(path);
 	return (issub);
 }
 
@@ -473,36 +481,36 @@ validpath(sa_handle_t handle, char *path, int strictness)
 	sa_share_t share;
 	char *fstype;
 
-	if (*path != '/') {
-	    return (SA_BAD_PATH);
-	}
+	if (*path != '/')
+		return (SA_BAD_PATH);
+
 	if (stat(path, &st) < 0) {
-	    error = SA_NO_SUCH_PATH;
+		error = SA_NO_SUCH_PATH;
 	} else {
-	    share = sa_find_share(handle, path);
-	    if (share != NULL) {
-		error = SA_DUPLICATE_NAME;
-	    }
-	    if (error == SA_OK) {
-		/*
-		 * check for special case with file system that might
-		 * have restrictions.  For now, ZFS is the only case
-		 * since it has its own idea of how to configure
-		 * shares. We do this before subdir checking since
-		 * things like ZFS will do that for us. This should
-		 * also be done via plugin interface.
-		 */
-		fstype = sa_fstype(path);
-		if (fstype != NULL && strcmp(fstype, "zfs") == 0) {
-		    if (sa_zfs_is_shared(handle, path))
-			error = SA_INVALID_NAME;
+		share = sa_find_share(handle, path);
+		if (share != NULL)
+			error = SA_DUPLICATE_NAME;
+
+		if (error == SA_OK) {
+			/*
+			 * check for special case with file system
+			 * that might have restrictions.  For now, ZFS
+			 * is the only case since it has its own idea
+			 * of how to configure shares. We do this
+			 * before subdir checking since things like
+			 * ZFS will do that for us. This should also
+			 * be done via plugin interface.
+			 */
+			fstype = sa_fstype(path);
+			if (fstype != NULL && strcmp(fstype, "zfs") == 0) {
+				if (sa_zfs_is_shared(handle, path))
+					error = SA_INVALID_NAME;
+			}
+			if (fstype != NULL)
+				sa_free_fstype(fstype);
 		}
-		if (fstype != NULL)
-		    sa_free_fstype(fstype);
-	    }
-	    if (error == SA_OK) {
-		error = checksubdir(handle, path, strictness);
-	    }
+		if (error == SA_OK)
+			error = checksubdir(handle, path, strictness);
 	}
 	return (error);
 }
@@ -518,9 +526,9 @@ is_persistent(sa_group_t group)
 
 	type = sa_get_group_attr(group, "type");
 	if (type != NULL && strcmp(type, "transient") == 0)
-	    persist = 0;
+		persist = 0;
 	if (type != NULL)
-	    sa_free_attr_string(type);
+		sa_free_attr_string(type);
 	return (persist);
 }
 
@@ -541,18 +549,18 @@ sa_valid_group_name(char *name)
 	ssize_t len;
 
 	if (name != NULL && isalpha(*name)) {
-	    char c;
-	    len = strlen(name);
-	    if (len < (scf_max_name_len - sizeof ("group:"))) {
-		for (c = *name++; c != '\0' && ret != 0; c = *name++) {
-		    if (!isalnum(c) && c != '-' && c != '_')
+		char c;
+		len = strlen(name);
+		if (len < (scf_max_name_len - sizeof ("group:"))) {
+			for (c = *name++; c != '\0' && ret != 0; c = *name++) {
+				if (!isalnum(c) && c != '-' && c != '_')
+					ret = 0;
+			}
+		} else {
 			ret = 0;
 		}
-	    } else {
-		ret = 0;
-	    }
 	} else {
-	    ret = 0;
+		ret = 0;
 	}
 	return (ret);
 }
@@ -569,15 +577,14 @@ is_zfs_group(sa_group_t group)
 	xmlNodePtr parent;
 	xmlChar *zfs;
 
-	if (strcmp((char *)((xmlNodePtr)group)->name, "share") == 0) {
-	    parent = (xmlNodePtr)sa_get_parent_group(group);
-	} else {
-	    parent = (xmlNodePtr)group;
-	}
+	if (strcmp((char *)((xmlNodePtr)group)->name, "share") == 0)
+		parent = (xmlNodePtr)sa_get_parent_group(group);
+	else
+		parent = (xmlNodePtr)group;
 	zfs = xmlGetProp(parent, (xmlChar *)"zfs");
 	if (zfs != NULL) {
-	    xmlFree(zfs);
-	    ret = 1;
+		xmlFree(zfs);
+		ret = 1;
 	}
 	return (ret);
 }
@@ -600,13 +607,13 @@ sa_optionset_name(sa_optionset_t optionset, char *oname, size_t len, char *id)
 	char *proto;
 
 	if (id == NULL)
-	    id = "optionset";
+		id = "optionset";
 
 	proto = sa_get_optionset_attr(optionset, "type");
 	len = snprintf(oname, len, "%s_%s", id, proto ? proto : "default");
 
 	if (proto != NULL)
-	    sa_free_attr_string(proto);
+		sa_free_attr_string(proto);
 	return (len);
 }
 
@@ -630,18 +637,38 @@ sa_security_name(sa_security_t security, char *oname, size_t len, char *id)
 	char *sectype;
 
 	if (id == NULL)
-	    id = "optionset";
+		id = "optionset";
 
 	proto = sa_get_security_attr(security, "type");
 	sectype = sa_get_security_attr(security, "sectype");
-	len = snprintf(oname, len, "%s_%s_%s", id,
-			    proto ? proto : "default",
-			    sectype ? sectype : "default");
+	len = snprintf(oname, len, "%s_%s_%s", id, proto ? proto : "default",
+	    sectype ? sectype : "default");
 	if (proto != NULL)
-	    sa_free_attr_string(proto);
+		sa_free_attr_string(proto);
 	if (sectype != NULL)
-	    sa_free_attr_string(sectype);
+		sa_free_attr_string(sectype);
 	return (len);
+}
+
+/*
+ * verifydefgroupopts(handle)
+ *
+ * Make sure a "default" group exists and has default protocols enabled.
+ */
+static void
+verifydefgroupopts(sa_handle_t handle)
+{
+	sa_group_t defgrp;
+	sa_optionset_t opt;
+	defgrp = sa_get_group(handle, "default");
+	if (defgrp != NULL) {
+		opt = sa_get_optionset(defgrp, NULL);
+		/*
+		 * NFS is the default for default group
+		 */
+		if (opt == NULL)
+			opt = sa_create_optionset(defgrp, "nfs");
+	}
 }
 
 /*
@@ -651,6 +678,10 @@ sa_security_name(sa_security_t security, char *oname, size_t len, char *id)
  *	init the tables with all objects
  *	read in the current configuration
  */
+
+#define	GETPROP(prop)	scf_simple_prop_next_astring(prop)
+#define	CHECKTSTAMP(st, tval)	stat(SA_LEGACY_DFSTAB, &st) >= 0 && \
+	tval != TSTAMP(st.st_ctim)
 
 sa_handle_t
 sa_init(int init_service)
@@ -668,144 +699,153 @@ sa_init(int init_service)
 	handle = calloc(sizeof (struct sa_handle_impl), 1);
 
 	if (handle != NULL) {
-	    /* get protocol specific structures */
-	    (void) proto_plugin_init();
-	    if (init_service & SA_INIT_SHARE_API) {
-		/*
-		 * initialize access into libzfs. We use this when
-		 * collecting info about ZFS datasets and shares.
-		 */
-		sa_zfs_init(handle);
-		/*
-		 * since we want to use SMF, initialize an svc handle
-		 * and find out what is there.
-		 */
-		handle->scfhandle = sa_scf_init(handle);
-		if (handle->scfhandle != NULL) {
+		/* get protocol specific structures */
+		(void) proto_plugin_init();
+		if (init_service & SA_INIT_SHARE_API) {
 			/*
-			 * Need to lock the extraction of the
-			 * configuration if the dfstab file has
-			 * changed. Lock everything now and release if
-			 * not needed.  Use a file that isn't being
-			 * manipulated by other parts of the system in
-			 * order to not interfere with locking. Using
-			 * dfstab doesn't work.
+			 * initialize access into libzfs. We use this
+			 * when collecting info about ZFS datasets and
+			 * shares.
 			 */
-		    sablocksigs(&old);
-		    lockfd = open(DFS_LOCK_FILE, O_RDWR);
-		    if (lockfd >= 0) {
-			extern int errno;
-			errno = 0;
-			(void) lockf(lockfd, F_LOCK, 0);
-			/*
-			 * Check whether we are going to need to merge
-			 * any dfstab changes. This is done by
-			 * comparing the value of legacy-timestamp
-			 * with the current st_ctim of the file. If
-			 * they are different, an update is needed and
-			 * the file must remain locked until the merge
-			 * is done in order to prevent multiple
-			 * startups from changing the SMF repository
-			 * at the same time.  The first to get the
-			 * lock will make any changes before the
-			 * others can read the repository.
-			 */
-			prop = scf_simple_prop_get(handle->scfhandle->handle,
-						(const char *)
-						    SA_SVC_FMRI_BASE ":default",
-						"operation",
-						"legacy-timestamp");
-			if (prop != NULL) {
-			    char *i64;
-			    i64 = scf_simple_prop_next_astring(prop);
-			    if (i64 != NULL) {
-				tval = strtoull(i64, NULL, 0);
-			    }
-			    if (stat(SA_LEGACY_DFSTAB, &st) >= 0 &&
-				tval != TSTAMP(st.st_ctim)) {
-				updatelegacy = B_TRUE;
-			    }
-			} else {
-			    /* We haven't set the timestamp before so do it. */
-			    updatelegacy = B_TRUE;
+			if (sa_zfs_init(handle) == B_FALSE) {
+				free(handle);
+				(void) proto_plugin_fini();
+				return (NULL);
 			}
-		    }
-		    if (updatelegacy == B_FALSE) {
-			/* Don't need the lock anymore */
-			(void) lockf(lockfd, F_ULOCK, 0);
-			(void) close(lockfd);
-		    }
+			/*
+			 * since we want to use SMF, initialize an svc handle
+			 * and find out what is there.
+			 */
+			handle->scfhandle = sa_scf_init(handle);
+			if (handle->scfhandle != NULL) {
+				/*
+				 * Need to lock the extraction of the
+				 * configuration if the dfstab file has
+				 * changed. Lock everything now and release if
+				 * not needed.  Use a file that isn't being
+				 * manipulated by other parts of the system in
+				 * order to not interfere with locking. Using
+				 * dfstab doesn't work.
+				 */
+				sablocksigs(&old);
+				lockfd = open(DFS_LOCK_FILE, O_RDWR);
+				if (lockfd >= 0) {
+					extern int errno;
+					errno = 0;
+					(void) lockf(lockfd, F_LOCK, 0);
+					/*
+					 * Check whether we are going to need
+					 * to merge any dfstab changes. This
+					 * is done by comparing the value of
+					 * legacy-timestamp with the current
+					 * st_ctim of the file. If they are
+					 * different, an update is needed and
+					 * the file must remain locked until
+					 * the merge is done in order to
+					 * prevent multiple startups from
+					 * changing the SMF repository at the
+					 * same time.  The first to get the
+					 * lock will make any changes before
+					 * the others can read the repository.
+					 */
+					prop = scf_simple_prop_get
+					    (handle->scfhandle->handle,
+					    (const char *)SA_SVC_FMRI_BASE
+					    ":default", "operation",
+					    "legacy-timestamp");
+					if (prop != NULL) {
+						char *i64;
+						i64 = GETPROP(prop);
+						if (i64 != NULL)
+							tval = strtoull(i64,
+							    NULL, 0);
+						if (CHECKTSTAMP(st, tval))
+							updatelegacy = B_TRUE;
+						scf_simple_prop_free(prop);
+					} else {
+						/*
+						 * We haven't set the
+						 * timestamp before so do it.
+						 */
+						updatelegacy = B_TRUE;
+					}
+				}
+				if (updatelegacy == B_FALSE) {
+					/* Don't need the lock anymore */
+					(void) lockf(lockfd, F_ULOCK, 0);
+					(void) close(lockfd);
+				}
 
-		/*
-		 * It is essential that the document tree and
-		 * the internal list of roots to handles be
-		 * setup before anything that might try to
-		 * create a new object is called. The document
-		 * tree is the combination of handle->doc and
-		 * handle->tree. This allows searches,
-		 * etc. when all you have is an object in the
-		 * tree.
-		 */
-		    handle->doc = xmlNewDoc((xmlChar *)"1.0");
-		    handle->tree = xmlNewNode(NULL, (xmlChar *)"sharecfg");
-		    if (handle->doc != NULL && handle->tree != NULL) {
-			xmlDocSetRootElement(handle->doc, handle->tree);
-			err = add_handle_for_root(handle->tree, handle);
-			if (err == SA_OK)
-			    err = sa_get_config(handle->scfhandle,
+				/*
+				 * It is essential that the document tree and
+				 * the internal list of roots to handles be
+				 * setup before anything that might try to
+				 * create a new object is called. The document
+				 * tree is the combination of handle->doc and
+				 * handle->tree. This allows searches,
+				 * etc. when all you have is an object in the
+				 * tree.
+				 */
+				handle->doc = xmlNewDoc((xmlChar *)"1.0");
+				handle->tree = xmlNewNode(NULL,
+				    (xmlChar *)"sharecfg");
+				if (handle->doc != NULL &&
+				    handle->tree != NULL) {
+					xmlDocSetRootElement(handle->doc,
+					    handle->tree);
+					err = add_handle_for_root(handle->tree,
+					    handle);
+					if (err == SA_OK)
+						err = sa_get_config(
+						    handle->scfhandle,
 						    handle->tree, handle);
-		    } else {
-			if (handle->doc != NULL)
-			    xmlFreeDoc(handle->doc);
-			if (handle->tree != NULL)
-			    xmlFreeNode(handle->tree);
-			err = SA_NO_MEMORY;
-		    }
+				} else {
+					if (handle->doc != NULL)
+						xmlFreeDoc(handle->doc);
+					if (handle->tree != NULL)
+						xmlFreeNode(handle->tree);
+					err = SA_NO_MEMORY;
+				}
 
-		    saunblocksigs(&old);
+				saunblocksigs(&old);
 
-		    if (err != SA_OK) {
-			/*
-			 * If we couldn't add the tree handle
-			 * to the list, then things are going
-			 * to fail badly. Might as well undo
-			 * everything now and fail the
-			 * sa_init().
-			 */
-			sa_fini(handle);
-			return (NULL);
-		    }
+				if (err != SA_OK) {
+					/*
+					 * If we couldn't add the tree handle
+					 * to the list, then things are going
+					 * to fail badly. Might as well undo
+					 * everything now and fail the
+					 * sa_init().
+					 */
+					sa_fini(handle);
+					return (NULL);
+				}
 
-		    if (tval == 0) {
-			/* first time so make sure default is setup */
-			sa_group_t defgrp;
-			sa_optionset_t opt;
-			defgrp = sa_get_group(handle, "default");
-			if (defgrp != NULL) {
-			    opt = sa_get_optionset(defgrp, NULL);
-			    if (opt == NULL)
-				/* NFS is the default for default */
-				opt = sa_create_optionset(defgrp, "nfs");
+				if (tval == 0) {
+					/*
+					 * first time so make sure
+					 * default is setup
+					 */
+					verifydefgroupopts(handle);
+				}
+
+			if (updatelegacy == B_TRUE) {
+				sablocksigs(&old);
+				getlegacyconfig((sa_handle_t)handle,
+				    SA_LEGACY_DFSTAB, &handle->tree);
+				if (stat(SA_LEGACY_DFSTAB, &st) >= 0)
+					set_legacy_timestamp(handle->tree,
+					    SA_LEGACY_DFSTAB,
+					    TSTAMP(st.st_ctim));
+				saunblocksigs(&old);
+				/* Safe to unlock now to allow others to run */
+				(void) lockf(lockfd, F_ULOCK, 0);
+				(void) close(lockfd);
 			}
-		    }
-
-		    if (updatelegacy == B_TRUE) {
-			sablocksigs(&old);
-			getlegacyconfig((sa_handle_t)handle,
-					    SA_LEGACY_DFSTAB, &handle->tree);
-			if (stat(SA_LEGACY_DFSTAB, &st) >= 0)
-			    set_legacy_timestamp(handle->tree,
-						SA_LEGACY_DFSTAB,
-						TSTAMP(st.st_ctim));
-			saunblocksigs(&old);
-			/* Safe to unlock now to allow others to run */
-			(void) lockf(lockfd, F_ULOCK, 0);
-			(void) close(lockfd);
-		    }
-		    legacy |= sa_get_zfs_shares(handle, "zfs");
-		    legacy |= gettransients(handle, &handle->tree);
+			legacy |= sa_get_zfs_shares(handle, "zfs");
+			legacy |= gettransients(handle, &handle->tree);
 		}
-	    }
+		}
 	}
 	return ((sa_handle_t)handle);
 }
@@ -842,7 +882,7 @@ sa_fini(sa_handle_t handle)
 		 * plugins that were loaded.
 		 */
 		if (sa_global_handles == NULL)
-		    (void) proto_plugin_fini();
+			(void) proto_plugin_fini();
 
 	}
 }
@@ -863,23 +903,24 @@ sa_get_protocols(char ***protocols)
 	int numproto = -1;
 
 	if (protocols != NULL) {
-	    struct sa_proto_plugin *plug;
-	    for (numproto = 0, plug = sap_proto_list; plug != NULL;
-		plug = plug->plugin_next) {
-		numproto++;
-	    }
-
-	    *protocols = calloc(numproto + 1,  sizeof (char *));
-	    if (*protocols != NULL) {
-		int ret = 0;
-		for (plug = sap_proto_list; plug != NULL;
+		struct sa_proto_plugin *plug;
+		for (numproto = 0, plug = sap_proto_list; plug != NULL;
 		    plug = plug->plugin_next) {
-		    /* faking for now */
-		    (*protocols)[ret++] = plug->plugin_ops->sa_protocol;
+			numproto++;
 		}
-	    } else {
-		numproto = -1;
-	    }
+
+		*protocols = calloc(numproto + 1,  sizeof (char *));
+		if (*protocols != NULL) {
+			int ret = 0;
+			for (plug = sap_proto_list; plug != NULL;
+			    plug = plug->plugin_next) {
+				/* faking for now */
+				(*protocols)[ret++] =
+				    plug->plugin_ops->sa_protocol;
+			}
+		} else {
+			numproto = -1;
+		}
 	}
 	return (numproto);
 }
@@ -899,23 +940,21 @@ find_group_by_name(xmlNodePtr node, xmlChar *group)
 
 	for (node = node->xmlChildrenNode; node != NULL;
 	    node = node->next) {
-	    if (xmlStrcmp(node->name, (xmlChar *)"group") == 0) {
-		/* if no groupname, return the first found */
-		if (group == NULL)
-		    break;
-		name = xmlGetProp(node, (xmlChar *)"name");
-		if (name != NULL &&
-		    xmlStrcmp(name, group) == 0) {
-		    break;
+		if (xmlStrcmp(node->name, (xmlChar *)"group") == 0) {
+			/* if no groupname, return the first found */
+			if (group == NULL)
+				break;
+			name = xmlGetProp(node, (xmlChar *)"name");
+			if (name != NULL && xmlStrcmp(name, group) == 0)
+				break;
+			if (name != NULL) {
+				xmlFree(name);
+				name = NULL;
+			}
 		}
-		if (name != NULL) {
-		    xmlFree(name);
-		    name = NULL;
-		}
-	    }
 	}
 	if (name != NULL)
-	    xmlFree(name);
+		xmlFree(name);
 	return (node);
 }
 
@@ -933,22 +972,21 @@ sa_get_group(sa_handle_t handle, char *groupname)
 	sa_handle_impl_t impl_handle = (sa_handle_impl_t)handle;
 
 	if (impl_handle != NULL && impl_handle->tree != NULL) {
-	    if (groupname != NULL) {
-		group = strdup(groupname);
-		subgroup = strchr(group, '/');
-		if (subgroup != NULL)
-		    *subgroup++ = '\0';
-	    }
-	    node = find_group_by_name(impl_handle->tree, (xmlChar *)group);
-	    /* if a subgroup, find it before returning */
-	    if (subgroup != NULL && node != NULL) {
-		node = find_group_by_name(node, (xmlChar *)subgroup);
-	    }
+		if (groupname != NULL) {
+			group = strdup(groupname);
+			subgroup = strchr(group, '/');
+			if (subgroup != NULL)
+				*subgroup++ = '\0';
+		}
+		node = find_group_by_name(impl_handle->tree, (xmlChar *)group);
+		/* if a subgroup, find it before returning */
+		if (subgroup != NULL && node != NULL)
+			node = find_group_by_name(node, (xmlChar *)subgroup);
 	}
 	if (node != NULL && (char *)group != NULL)
-	    (void) sa_get_instance(impl_handle->scfhandle, (char *)group);
+		(void) sa_get_instance(impl_handle->scfhandle, (char *)group);
 	if (group != NULL)
-	    free(group);
+		free(group);
 	return ((sa_group_t)(node));
 }
 
@@ -962,11 +1000,11 @@ sa_get_next_group(sa_group_t group)
 {
 	xmlNodePtr ngroup = NULL;
 	if (group != NULL) {
-	    for (ngroup = ((xmlNodePtr)group)->next; ngroup != NULL;
+		for (ngroup = ((xmlNodePtr)group)->next; ngroup != NULL;
 		    ngroup = ngroup->next) {
-		if (xmlStrcmp(ngroup->name, (xmlChar *)"group") == 0)
-		    break;
-	    }
+			if (xmlStrcmp(ngroup->name, (xmlChar *)"group") == 0)
+				break;
+		}
 	}
 	return ((sa_group_t)ngroup);
 }
@@ -988,23 +1026,25 @@ sa_get_share(sa_group_t group, char *sharepath)
 	 * services.
 	 */
 	if (group != NULL) {
-	    for (node = ((xmlNodePtr)group)->children; node != NULL;
+		for (node = ((xmlNodePtr)group)->children; node != NULL;
 		    node = node->next) {
-		if (xmlStrcmp(node->name, (xmlChar *)"share") == 0) {
-			if (sharepath == NULL) {
-				break;
-			} else {
-				/* is it the correct share? */
-			    path = xmlGetProp(node, (xmlChar *)"path");
-			    if (path != NULL &&
-				xmlStrcmp(path, (xmlChar *)sharepath) == 0) {
-				xmlFree(path);
-				break;
-			    }
-			    xmlFree(path);
+			if (xmlStrcmp(node->name, (xmlChar *)"share") == 0) {
+				if (sharepath == NULL) {
+					break;
+				} else {
+					/* is it the correct share? */
+					path = xmlGetProp(node,
+					    (xmlChar *)"path");
+					if (path != NULL &&
+					    xmlStrcmp(path,
+					    (xmlChar *)sharepath) == 0) {
+						xmlFree(path);
+						break;
+					}
+					xmlFree(path);
+				}
 			}
 		}
-	    }
 	}
 	return ((sa_share_t)node);
 }
@@ -1022,12 +1062,12 @@ sa_get_next_share(sa_share_t share)
 	xmlNodePtr node = NULL;
 
 	if (share != NULL) {
-	    for (node = ((xmlNodePtr)share)->next; node != NULL;
+		for (node = ((xmlNodePtr)share)->next; node != NULL;
 		    node = node->next) {
-		if (xmlStrcmp(node->name, (xmlChar *)"share") == 0) {
-			break;
+			if (xmlStrcmp(node->name, (xmlChar *)"share") == 0) {
+				break;
+			}
 		}
-	    }
 	}
 	return ((sa_share_t)node);
 }
@@ -1045,8 +1085,8 @@ _sa_get_child_node(xmlNodePtr node, xmlChar *type)
 	xmlNodePtr child;
 	for (child = node->xmlChildrenNode; child != NULL;
 	    child = child->next)
-	    if (xmlStrcmp(child->name, type) == 0)
-		return (child);
+		if (xmlStrcmp(child->name, type) == 0)
+			return (child);
 	return ((xmlNodePtr)NULL);
 }
 
@@ -1065,13 +1105,13 @@ find_share(sa_group_t group, char *sharepath)
 
 	for (share = sa_get_share(group, NULL); share != NULL;
 	    share = sa_get_next_share(share)) {
-	    path = sa_get_share_attr(share, "path");
-	    if (path != NULL && strcmp(path, sharepath) == 0) {
-		sa_free_attr_string(path);
-		break;
-	    }
-	    if (path != NULL)
-		sa_free_attr_string(path);
+		path = sa_get_share_attr(share, "path");
+		if (path != NULL && strcmp(path, sharepath) == 0) {
+			sa_free_attr_string(path);
+			break;
+		}
+		if (path != NULL)
+			sa_free_attr_string(path);
 	}
 	return (share);
 }
@@ -1088,7 +1128,7 @@ sa_group_t
 sa_get_sub_group(sa_group_t group)
 {
 	return ((sa_group_t)_sa_get_child_node((xmlNodePtr)group,
-					    (xmlChar *)"group"));
+	    (xmlChar *)"group"));
 }
 
 /*
@@ -1108,20 +1148,22 @@ sa_find_share(sa_handle_t handle, char *sharepath)
 	int done = 0;
 
 	for (group = sa_get_group(handle, NULL); group != NULL && !done;
-		group = sa_get_next_group(group)) {
-	    if (is_zfs_group(group)) {
-		for (zgroup = (sa_group_t)_sa_get_child_node((xmlNodePtr)group,
-							(xmlChar *)"group");
-		    zgroup != NULL; zgroup = sa_get_next_group(zgroup)) {
-		    share = find_share(zgroup, sharepath);
-		    if (share != NULL)
-			break;
+	    group = sa_get_next_group(group)) {
+		if (is_zfs_group(group)) {
+			for (zgroup =
+			    (sa_group_t)_sa_get_child_node((xmlNodePtr)group,
+			    (xmlChar *)"group");
+			    zgroup != NULL;
+			    zgroup = sa_get_next_group(zgroup)) {
+				share = find_share(zgroup, sharepath);
+				if (share != NULL)
+					break;
+			}
+		} else {
+			share = find_share(group, sharepath);
 		}
-	    } else {
-		share = find_share(group, sharepath);
-	    }
-	    if (share != NULL)
-		break;
+		if (share != NULL)
+			break;
 	}
 	return (share);
 }
@@ -1164,49 +1206,53 @@ _sa_add_share(sa_group_t group, char *sharepath, int persist, int *error)
 
 	err  = SA_OK; /* assume success */
 
-	node = xmlNewChild((xmlNodePtr)group, NULL,
-				(xmlChar *)"share", NULL);
+	node = xmlNewChild((xmlNodePtr)group, NULL, (xmlChar *)"share", NULL);
 	if (node != NULL) {
-	    xmlSetProp(node, (xmlChar *)"path", (xmlChar *)sharepath);
-	    xmlSetProp(node, (xmlChar *)"type", persist ?
-			(xmlChar *)"persist" : (xmlChar *)"transient");
-	    if (persist != SA_SHARE_TRANSIENT) {
-		/*
-		 * persistent shares come in two flavors: SMF and
-		 * ZFS. Sort this one out based on target group and
-		 * path type. Currently, only NFS is supported in the
-		 * ZFS group and it is always on.
-		 */
-		if (sa_group_is_zfs(group) && sa_path_is_zfs(sharepath)) {
-		    err = sa_zfs_set_sharenfs(group, sharepath, 1);
-		} else {
-		    sa_handle_impl_t impl_handle;
-		    impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
-		    if (impl_handle != NULL)
-			err = sa_commit_share(impl_handle->scfhandle, group,
-						(sa_share_t)node);
-		    else
-			err = SA_SYSTEM_ERR;
+		xmlSetProp(node, (xmlChar *)"path", (xmlChar *)sharepath);
+		xmlSetProp(node, (xmlChar *)"type",
+		    persist ? (xmlChar *)"persist" : (xmlChar *)"transient");
+		if (persist != SA_SHARE_TRANSIENT) {
+			/*
+			 * persistent shares come in two flavors: SMF and
+			 * ZFS. Sort this one out based on target group and
+			 * path type. Currently, only NFS is supported in the
+			 * ZFS group and it is always on.
+			 */
+			if (sa_group_is_zfs(group) &&
+			    sa_path_is_zfs(sharepath)) {
+				err = sa_zfs_set_sharenfs(group, sharepath, 1);
+			} else {
+				sa_handle_impl_t impl_handle;
+				impl_handle =
+				    (sa_handle_impl_t)sa_find_group_handle(
+				    group);
+				if (impl_handle != NULL) {
+					err = sa_commit_share(
+					    impl_handle->scfhandle, group,
+					    (sa_share_t)node);
+				} else {
+					err = SA_SYSTEM_ERR;
+				}
+			}
 		}
-	    }
-	    if (err == SA_NO_PERMISSION && persist & SA_SHARE_PARSER) {
-		/* called by the dfstab parser so could be a show */
-		err = SA_OK;
-	    }
-	    if (err != SA_OK) {
-		/*
-		 * we couldn't commit to the repository so undo
-		 * our internal state to reflect reality.
-		 */
-		xmlUnlinkNode(node);
-		xmlFreeNode(node);
-		node = NULL;
-	    }
+		if (err == SA_NO_PERMISSION && persist & SA_SHARE_PARSER) {
+			/* called by the dfstab parser so could be a show */
+			err = SA_OK;
+		}
+		if (err != SA_OK) {
+			/*
+			 * we couldn't commit to the repository so undo
+			 * our internal state to reflect reality.
+			 */
+			xmlUnlinkNode(node);
+			xmlFreeNode(node);
+			node = NULL;
+		}
 	} else {
-	    err = SA_NO_MEMORY;
+		err = SA_NO_MEMORY;
 	}
 	if (error != NULL)
-	    *error = err;
+		*error = err;
 	return (node);
 }
 
@@ -1238,17 +1284,16 @@ sa_add_share(sa_group_t group, char *sharepath, int persist, int *error)
 	 * it as an override.
 	 */
 	if (persist & SA_SHARE_PARSER || persist == SA_SHARE_PERMANENT)
-	    strictness = SA_CHECK_STRICT;
+		strictness = SA_CHECK_STRICT;
 
 	handle = sa_find_group_handle(group);
 
 	if ((dup = sa_find_share(handle, sharepath)) == NULL &&
-		(*error = sa_check_path(group, sharepath, strictness)) ==
-			SA_OK) {
-	    node = _sa_add_share(group, sharepath, persist, error);
+	    (*error = sa_check_path(group, sharepath, strictness)) == SA_OK) {
+		node = _sa_add_share(group, sharepath, persist, error);
 	}
 	if (dup != NULL)
-	    *error = SA_DUPLICATE_NAME;
+		*error = SA_DUPLICATE_NAME;
 
 	return ((sa_share_t)node);
 }
@@ -1267,22 +1312,26 @@ sa_enable_share(sa_share_t share, char *protocol)
 
 	sharepath = sa_get_share_attr(share, "path");
 	if (stat(sharepath, &st) < 0) {
-	    err = SA_NO_SUCH_PATH;
+		err = SA_NO_SUCH_PATH;
 	} else {
-	    /* tell the server about the share */
-	    if (protocol != NULL) {
-		/* lookup protocol specific handler */
-		err = sa_proto_share(protocol, share);
-		if (err == SA_OK)
-		    (void) sa_set_share_attr(share, "shared", "true");
-	    } else {
-		/* tell all protocols */
-		err = sa_proto_share("nfs", share); /* only NFS for now */
-		(void) sa_set_share_attr(share, "shared", "true");
-	    }
+		/* tell the server about the share */
+		if (protocol != NULL) {
+			/* lookup protocol specific handler */
+			err = sa_proto_share(protocol, share);
+			if (err == SA_OK)
+				(void) sa_set_share_attr(share, "shared",
+				    "true");
+		} else {
+			/*
+			 * Tell all protocols.  Only NFS for now but
+			 * SMB is coming.
+			 */
+			err = sa_proto_share("nfs", share);
+			(void) sa_set_share_attr(share, "shared", "true");
+		}
 	}
 	if (sharepath != NULL)
-	    sa_free_attr_string(sharepath);
+		sa_free_attr_string(sharepath);
 	return (err);
 }
 
@@ -1302,17 +1351,17 @@ sa_disable_share(sa_share_t share, char *protocol)
 	shared = sa_get_share_attr(share, "shared");
 
 	if (protocol != NULL) {
-	    ret = sa_proto_unshare(protocol, path);
+		ret = sa_proto_unshare(protocol, path);
 	} else {
-	    /* need to do all protocols */
-	    ret = sa_proto_unshare("nfs", path);
+		/* need to do all protocols */
+		ret = sa_proto_unshare("nfs", path);
 	}
 	if (ret == SA_OK)
 		(void) sa_set_share_attr(share, "shared", NULL);
 	if (path != NULL)
-	    sa_free_attr_string(path);
+		sa_free_attr_string(path);
 	if (shared != NULL)
-	    sa_free_attr_string(shared);
+		sa_free_attr_string(shared);
 	return (ret);
 }
 
@@ -1338,9 +1387,9 @@ sa_remove_share(sa_share_t share)
 	zfs = sa_get_group_attr(group, "zfs");
 	groupname = sa_get_group_attr(group, "name");
 	if (type != NULL && strcmp(type, "persist") != 0)
-	    transient = 1;
+		transient = 1;
 	if (type != NULL)
-	    sa_free_attr_string(type);
+		sa_free_attr_string(type);
 
 	/* remove the node from its group then free the memory */
 
@@ -1349,30 +1398,35 @@ sa_remove_share(sa_share_t share)
 	 */
 	/* only do SMF action if permanent */
 	if (!transient || zfs != NULL) {
-	    /* remove from legacy dfstab as well as possible SMF */
-	    ret = sa_delete_legacy(share);
-	    if (ret == SA_OK) {
-		if (!sa_group_is_zfs(group)) {
-		    sa_handle_impl_t impl_handle;
-		    impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
-		    if (impl_handle != NULL)
-			ret = sa_delete_share(impl_handle->scfhandle,
-						group, share);
-		    else
-			ret = SA_SYSTEM_ERR;
-		} else {
-		    char *sharepath = sa_get_share_attr(share, "path");
-		    if (sharepath != NULL) {
-			ret = sa_zfs_set_sharenfs(group, sharepath, 0);
-			sa_free_attr_string(sharepath);
-		    }
+		/* remove from legacy dfstab as well as possible SMF */
+		ret = sa_delete_legacy(share);
+		if (ret == SA_OK) {
+			if (!sa_group_is_zfs(group)) {
+				sa_handle_impl_t impl_handle;
+				impl_handle = (sa_handle_impl_t)
+				    sa_find_group_handle(group);
+				if (impl_handle != NULL) {
+					ret = sa_delete_share(
+					    impl_handle->scfhandle, group,
+					    share);
+				} else {
+					ret = SA_SYSTEM_ERR;
+				}
+			} else {
+				char *sharepath = sa_get_share_attr(share,
+				    "path");
+				if (sharepath != NULL) {
+					ret = sa_zfs_set_sharenfs(group,
+					    sharepath, 0);
+					sa_free_attr_string(sharepath);
+				}
+			}
 		}
-	    }
 	}
 	if (groupname != NULL)
-	    sa_free_attr_string(groupname);
+		sa_free_attr_string(groupname);
 	if (zfs != NULL)
-	    sa_free_attr_string(zfs);
+		sa_free_attr_string(zfs);
 
 	xmlUnlinkNode((xmlNodePtr)share);
 	xmlFreeNode((xmlNodePtr)share);
@@ -1396,25 +1450,30 @@ sa_move_share(sa_group_t group, sa_share_t share)
 
 	oldgroup = sa_get_parent_group(share);
 	if (oldgroup != group) {
-	    sa_handle_impl_t impl_handle;
-	    xmlUnlinkNode((xmlNodePtr)share);
-	    /* now that the share isn't in its old group, add to the new one */
-	    xmlAddChild((xmlNodePtr)group, (xmlNodePtr)share);
-	    /* need to deal with SMF */
-	    impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
-	    if (impl_handle != NULL) {
+		sa_handle_impl_t impl_handle;
+		xmlUnlinkNode((xmlNodePtr)share);
 		/*
-		 * need to remove from old group first and then add to
-		 * new group. Ideally, we would do the other order but
-		 * need to avoid having the share in two groups at the
-		 * same time.
+		 * now that the share isn't in its old group, add to
+		 * the new one
 		 */
-		ret = sa_delete_share(impl_handle->scfhandle, oldgroup, share);
-		if (ret == SA_OK)
-		    ret = sa_commit_share(impl_handle->scfhandle, group, share);
-	    } else {
-		ret = SA_SYSTEM_ERR;
-	    }
+		xmlAddChild((xmlNodePtr)group, (xmlNodePtr)share);
+		/* need to deal with SMF */
+		impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
+		if (impl_handle != NULL) {
+			/*
+			 * need to remove from old group first and then add to
+			 * new group. Ideally, we would do the other order but
+			 * need to avoid having the share in two groups at the
+			 * same time.
+			 */
+			ret = sa_delete_share(impl_handle->scfhandle, oldgroup,
+			    share);
+			if (ret == SA_OK)
+				ret = sa_commit_share(impl_handle->scfhandle,
+				    group, share);
+		} else {
+			ret = SA_SYSTEM_ERR;
+		}
 	}
 	return (ret);
 }
@@ -1431,15 +1490,15 @@ sa_get_parent_group(sa_share_t share)
 {
 	xmlNodePtr node = NULL;
 	if (share != NULL) {
-	    node = ((xmlNodePtr)share)->parent;
+		node = ((xmlNodePtr)share)->parent;
 		/*
 		 * make sure parent is a group and not sharecfg since
 		 * we may be cheating and passing in a group.
 		 * Eventually, groups of groups might come into being.
 		 */
-	    if (node == NULL ||
-		xmlStrcmp(node->name, (xmlChar *)"sharecfg") == 0)
-		node = NULL;
+		if (node == NULL ||
+		    xmlStrcmp(node->name, (xmlChar *)"sharecfg") == 0)
+			node = NULL;
 	}
 	return ((sa_group_t)node);
 }
@@ -1457,12 +1516,14 @@ _sa_create_group(sa_handle_impl_t impl_handle, char *groupname)
 	xmlNodePtr node = NULL;
 
 	if (sa_valid_group_name(groupname)) {
-	    node = xmlNewChild(impl_handle->tree, NULL,
-				(xmlChar *)"group", NULL);
-	    if (node != NULL) {
-		xmlSetProp(node, (xmlChar *)"name", (xmlChar *)groupname);
-		xmlSetProp(node, (xmlChar *)"state", (xmlChar *)"enabled");
-	    }
+		node = xmlNewChild(impl_handle->tree, NULL, (xmlChar *)"group",
+		    NULL);
+		if (node != NULL) {
+			xmlSetProp(node, (xmlChar *)"name",
+			    (xmlChar *)groupname);
+			xmlSetProp(node, (xmlChar *)"state",
+			    (xmlChar *)"enabled");
+		}
 	}
 	return ((sa_group_t)node);
 }
@@ -1479,8 +1540,7 @@ _sa_create_zfs_group(sa_group_t group, char *groupname)
 {
 	xmlNodePtr node = NULL;
 
-	node = xmlNewChild((xmlNodePtr)group, NULL,
-				(xmlChar *)"group", NULL);
+	node = xmlNewChild((xmlNodePtr)group, NULL, (xmlChar *)"group", NULL);
 	if (node != NULL) {
 		xmlSetProp(node, (xmlChar *)"name", (xmlChar *)groupname);
 		xmlSetProp(node, (xmlChar *)"state", (xmlChar *)"enabled");
@@ -1504,84 +1564,99 @@ sa_create_group(sa_handle_t handle, char *groupname, int *error)
 	xmlNodePtr node = NULL;
 	sa_group_t group;
 	int ret;
-	char rbacstr[256];
+	char rbacstr[SA_STRSIZE];
 	sa_handle_impl_t impl_handle = (sa_handle_impl_t)handle;
 
 	ret = SA_OK;
 
 	if (impl_handle == NULL || impl_handle->scfhandle == NULL) {
-	    ret = SA_SYSTEM_ERR;
-	    goto err;
+		ret = SA_SYSTEM_ERR;
+		goto err;
 	}
 
 	group = sa_get_group(handle, groupname);
 	if (group != NULL) {
-	    ret = SA_DUPLICATE_NAME;
+		ret = SA_DUPLICATE_NAME;
 	} else {
-	    if (sa_valid_group_name(groupname)) {
-		node = xmlNewChild(impl_handle->tree, NULL,
-				    (xmlChar *)"group", NULL);
-		if (node != NULL) {
-		    xmlSetProp(node, (xmlChar *)"name", (xmlChar *)groupname);
-		    /* default to the group being enabled */
-		    xmlSetProp(node, (xmlChar *)"state", (xmlChar *)"enabled");
-		    ret = sa_create_instance(impl_handle->scfhandle, groupname);
-		    if (ret == SA_OK) {
-			ret = sa_start_transaction(impl_handle->scfhandle,
-							"operation");
-		    }
-		    if (ret == SA_OK) {
-			ret = sa_set_property(impl_handle->scfhandle,
-						"state", "enabled");
-			if (ret == SA_OK) {
-			    ret = sa_end_transaction(impl_handle->scfhandle);
-			} else {
-			    sa_abort_transaction(impl_handle->scfhandle);
-			}
-		    }
-		    if (ret == SA_OK) {
-			/* initialize the RBAC strings */
-			ret = sa_start_transaction(impl_handle->scfhandle,
-							"general");
-			if (ret == SA_OK) {
-			    (void) snprintf(rbacstr, sizeof (rbacstr), "%s.%s",
-					SA_RBAC_MANAGE, groupname);
-			    ret = sa_set_property(impl_handle->scfhandle,
+		if (sa_valid_group_name(groupname)) {
+			node = xmlNewChild(impl_handle->tree, NULL,
+			    (xmlChar *)"group", NULL);
+			if (node != NULL) {
+				xmlSetProp(node, (xmlChar *)"name",
+				    (xmlChar *)groupname);
+				/* default to the group being enabled */
+				xmlSetProp(node, (xmlChar *)"state",
+				    (xmlChar *)"enabled");
+				ret = sa_create_instance(impl_handle->scfhandle,
+				    groupname);
+				if (ret == SA_OK) {
+					ret = sa_start_transaction(
+					    impl_handle->scfhandle,
+					    "operation");
+				}
+				if (ret == SA_OK) {
+					ret = sa_set_property(
+					    impl_handle->scfhandle,
+					    "state", "enabled");
+					if (ret == SA_OK) {
+						ret = sa_end_transaction(
+						    impl_handle->scfhandle);
+					} else {
+						sa_abort_transaction(
+						    impl_handle->scfhandle);
+					}
+				}
+				if (ret == SA_OK) {
+					/* initialize the RBAC strings */
+					ret = sa_start_transaction(
+					    impl_handle->scfhandle,
+					    "general");
+					if (ret == SA_OK) {
+						(void) snprintf(rbacstr,
+						    sizeof (rbacstr), "%s.%s",
+						    SA_RBAC_MANAGE, groupname);
+						ret = sa_set_property(
+						    impl_handle->scfhandle,
 						    "action_authorization",
 						    rbacstr);
-			}
-			if (ret == SA_OK) {
-			    (void) snprintf(rbacstr, sizeof (rbacstr), "%s.%s",
-					SA_RBAC_VALUE, groupname);
-			    ret = sa_set_property(impl_handle->scfhandle,
+					}
+					if (ret == SA_OK) {
+						(void) snprintf(rbacstr,
+						    sizeof (rbacstr), "%s.%s",
+						    SA_RBAC_VALUE, groupname);
+						ret = sa_set_property(
+						    impl_handle->scfhandle,
 						    "value_authorization",
 						    rbacstr);
-			}
-			if (ret == SA_OK) {
-			    ret = sa_end_transaction(impl_handle->scfhandle);
+					}
+					if (ret == SA_OK) {
+						ret = sa_end_transaction(
+						    impl_handle->scfhandle);
+					} else {
+						sa_abort_transaction(
+						    impl_handle->scfhandle);
+					}
+				}
+				if (ret != SA_OK) {
+					/*
+					 * Couldn't commit the group
+					 * so we need to undo
+					 * internally.
+					 */
+					xmlUnlinkNode(node);
+					xmlFreeNode(node);
+					node = NULL;
+				}
 			} else {
-			    sa_abort_transaction(impl_handle->scfhandle);
+				ret = SA_NO_MEMORY;
 			}
-		    }
-		    if (ret != SA_OK) {
-			/*
-			 * Couldn't commit the group so we need to
-			 * undo internally.
-			 */
-			xmlUnlinkNode(node);
-			xmlFreeNode(node);
-			node = NULL;
-		    }
 		} else {
-		    ret = SA_NO_MEMORY;
+			ret = SA_INVALID_NAME;
 		}
-	    } else {
-		ret = SA_INVALID_NAME;
-	    }
 	}
 err:
 	if (error != NULL)
-	    *error = ret;
+		*error = ret;
 	return ((sa_group_t)node);
 }
 
@@ -1601,15 +1676,15 @@ sa_remove_group(sa_group_t group)
 
 	impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
 	if (impl_handle != NULL) {
-	    name = sa_get_group_attr(group, "name");
-	    if (name != NULL) {
-		ret = sa_delete_instance(impl_handle->scfhandle, name);
-		sa_free_attr_string(name);
-	    }
-	    xmlUnlinkNode((xmlNodePtr)group); /* make sure unlinked */
-	    xmlFreeNode((xmlNodePtr)group);   /* now it is gone */
+		name = sa_get_group_attr(group, "name");
+		if (name != NULL) {
+			ret = sa_delete_instance(impl_handle->scfhandle, name);
+			sa_free_attr_string(name);
+		}
+		xmlUnlinkNode((xmlNodePtr)group); /* make sure unlinked */
+		xmlFreeNode((xmlNodePtr)group);   /* now it is gone */
 	} else {
-	    ret = SA_SYSTEM_ERR;
+		ret = SA_SYSTEM_ERR;
 	}
 	return (ret);
 }
@@ -1647,9 +1722,8 @@ get_node_attr(void *nodehdl, char *tag)
 	xmlNodePtr node = (xmlNodePtr)nodehdl;
 	xmlChar *name = NULL;
 
-	if (node != NULL) {
+	if (node != NULL)
 		name = xmlGetProp(node, (xmlChar *)tag);
-	}
 	return ((char *)name);
 }
 
@@ -1666,11 +1740,10 @@ set_node_attr(void *nodehdl, char *tag, char *value)
 {
 	xmlNodePtr node = (xmlNodePtr)nodehdl;
 	if (node != NULL && tag != NULL) {
-		if (value != NULL) {
+		if (value != NULL)
 			xmlSetProp(node, (xmlChar *)tag, (xmlChar *)value);
-		} else {
+		else
 			xmlUnsetProp(node, (xmlChar *)tag);
-		}
 	}
 }
 
@@ -1705,24 +1778,27 @@ sa_set_group_attr(sa_group_t group, char *tag, char *value)
 
 	impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
 	if (impl_handle != NULL) {
-	    groupname = sa_get_group_attr(group, "name");
-	    ret = sa_get_instance(impl_handle->scfhandle, groupname);
-	    if (ret == SA_OK) {
-		set_node_attr((void *)group, tag, value);
-		ret = sa_start_transaction(impl_handle->scfhandle, "operation");
+		groupname = sa_get_group_attr(group, "name");
+		ret = sa_get_instance(impl_handle->scfhandle, groupname);
 		if (ret == SA_OK) {
-		    ret = sa_set_property(impl_handle->scfhandle, tag, value);
-		    if (ret == SA_OK)
-			(void) sa_end_transaction(impl_handle->scfhandle);
-		    else {
-			sa_abort_transaction(impl_handle->scfhandle);
-		    }
+			set_node_attr((void *)group, tag, value);
+			ret = sa_start_transaction(impl_handle->scfhandle,
+			    "operation");
+			if (ret == SA_OK) {
+				ret = sa_set_property(impl_handle->scfhandle,
+				    tag, value);
+				if (ret == SA_OK)
+					(void) sa_end_transaction(
+					    impl_handle->scfhandle);
+				else
+					sa_abort_transaction(
+					    impl_handle->scfhandle);
+			}
 		}
-	    }
-	    if (groupname != NULL)
-		sa_free_attr_string(groupname);
+		if (groupname != NULL)
+			sa_free_attr_string(groupname);
 	} else {
-	    ret = SA_SYSTEM_ERR;
+		ret = SA_SYSTEM_ERR;
 	}
 	return (ret);
 }
@@ -1757,18 +1833,18 @@ sa_get_resource(sa_group_t group, char *resource)
 	char *name = NULL;
 
 	if (resource != NULL) {
-	    for (share = sa_get_share(group, NULL); share != NULL;
-		share = sa_get_next_share(share)) {
-		name = sa_get_share_attr(share, "resource");
-		if (name != NULL) {
-		    if (strcmp(name, resource) == 0)
-			break;
-		    sa_free_attr_string(name);
-		    name = NULL;
+		for (share = sa_get_share(group, NULL); share != NULL;
+		    share = sa_get_next_share(share)) {
+			name = sa_get_share_attr(share, "resource");
+			if (name != NULL) {
+				if (strcmp(name, resource) == 0)
+					break;
+				sa_free_attr_string(name);
+				name = NULL;
+			}
 		}
-	    }
-	    if (name != NULL)
-		sa_free_attr_string(name);
+		if (name != NULL)
+			sa_free_attr_string(name);
 	}
 	return ((sa_share_t)share);
 }
@@ -1784,8 +1860,8 @@ xmlNodePtr
 _sa_set_share_description(sa_share_t share, char *content)
 {
 	xmlNodePtr node;
-	node = xmlNewChild((xmlNodePtr)share,
-			    NULL, (xmlChar *)"description", NULL);
+	node = xmlNewChild((xmlNodePtr)share, NULL, (xmlChar *)"description",
+	    NULL);
 	xmlNodeSetContent(node, (xmlChar *)content);
 	return (node);
 }
@@ -1816,28 +1892,32 @@ sa_set_share_attr(sa_share_t share, char *tag, char *value)
 	 */
 
 	if (strcmp(tag, "resource") == 0) {
-	    resource = sa_get_resource(group, value);
-	    if (resource != share && resource != NULL)
-		ret = SA_DUPLICATE_NAME;
+		resource = sa_get_resource(group, value);
+		if (resource != share && resource != NULL)
+			ret = SA_DUPLICATE_NAME;
 	}
 	if (ret == SA_OK) {
-	    set_node_attr((void *)share, tag, value);
-	    if (group != NULL) {
-		char *type;
-		/* we can probably optimize this some */
-		type = sa_get_share_attr(share, "type");
-		if (type == NULL || strcmp(type, "transient") != 0) {
-		    sa_handle_impl_t impl_handle;
-		    impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
-		    if (impl_handle != NULL)
-			ret = sa_commit_share(impl_handle->scfhandle,
-						group, share);
-		    else
-			ret = SA_SYSTEM_ERR;
+		set_node_attr((void *)share, tag, value);
+		if (group != NULL) {
+			char *type;
+			/* we can probably optimize this some */
+			type = sa_get_share_attr(share, "type");
+			if (type == NULL || strcmp(type, "transient") != 0) {
+				sa_handle_impl_t impl_handle;
+				impl_handle =
+				    (sa_handle_impl_t)sa_find_group_handle(
+				    group);
+				if (impl_handle != NULL) {
+					ret = sa_commit_share(
+					    impl_handle->scfhandle, group,
+					    share);
+				} else {
+					ret = SA_SYSTEM_ERR;
+				}
+			}
+			if (type != NULL)
+				sa_free_attr_string(type);
 		}
-		if (type != NULL)
-		    sa_free_attr_string(type);
-	    }
 	}
 	return (ret);
 }
@@ -1909,25 +1989,25 @@ sa_get_optionset(void *group, char *proto)
 	xmlChar *value = NULL;
 
 	for (node = ((xmlNodePtr)group)->children; node != NULL;
-		node = node->next) {
+	    node = node->next) {
 		if (xmlStrcmp(node->name, (xmlChar *)"optionset") == 0) {
-		    value = xmlGetProp(node, (xmlChar *)"type");
-		    if (proto != NULL) {
-			if (value != NULL &&
-			    xmlStrcmp(value, (xmlChar *)proto) == 0) {
-			    break;
+			value = xmlGetProp(node, (xmlChar *)"type");
+			if (proto != NULL) {
+				if (value != NULL &&
+				    xmlStrcmp(value, (xmlChar *)proto) == 0) {
+					break;
+				}
+				if (value != NULL) {
+					xmlFree(value);
+					value = NULL;
+				}
+			} else {
+				break;
 			}
-			if (value != NULL) {
-			    xmlFree(value);
-			    value = NULL;
-			}
-		    } else {
-			break;
-		    }
 		}
 	}
 	if (value != NULL)
-	    xmlFree(value);
+		xmlFree(value);
 	return ((sa_optionset_t)node);
 }
 
@@ -1943,7 +2023,7 @@ sa_get_next_optionset(sa_optionset_t optionset)
 	xmlNodePtr node;
 
 	for (node = ((xmlNodePtr)optionset)->next; node != NULL;
-		node = node->next) {
+	    node = node->next) {
 		if (xmlStrcmp(node->name, (xmlChar *)"optionset") == 0) {
 			break;
 		}
@@ -1967,41 +2047,41 @@ sa_get_security(sa_group_t group, char *sectype, char *proto)
 	xmlChar *value = NULL;
 
 	for (node = ((xmlNodePtr)group)->children; node != NULL;
-		node = node->next) {
-	    if (xmlStrcmp(node->name, (xmlChar *)"security") == 0) {
-		if (proto != NULL) {
-		    value = xmlGetProp(node, (xmlChar *)"type");
-		    if (value == NULL ||
-			(value != NULL &&
-			xmlStrcmp(value, (xmlChar *)proto) != 0)) {
-			/* it doesn't match so continue */
-			xmlFree(value);
-			value = NULL;
-			continue;
-		    }
+	    node = node->next) {
+		if (xmlStrcmp(node->name, (xmlChar *)"security") == 0) {
+			if (proto != NULL) {
+				value = xmlGetProp(node, (xmlChar *)"type");
+				if (value == NULL ||
+				    (value != NULL &&
+				    xmlStrcmp(value, (xmlChar *)proto) != 0)) {
+					/* it doesn't match so continue */
+					xmlFree(value);
+					value = NULL;
+					continue;
+				}
+			}
+			if (value != NULL) {
+				xmlFree(value);
+				value = NULL;
+			}
+			/* potential match */
+			if (sectype != NULL) {
+				value = xmlGetProp(node, (xmlChar *)"sectype");
+				if (value != NULL &&
+				    xmlStrcmp(value, (xmlChar *)sectype) == 0) {
+					break;
+				}
+			} else {
+				break;
+			}
 		}
 		if (value != NULL) {
-		    xmlFree(value);
-		    value = NULL;
+			xmlFree(value);
+			value = NULL;
 		}
-		/* potential match */
-		if (sectype != NULL) {
-		    value = xmlGetProp(node, (xmlChar *)"sectype");
-		    if (value != NULL &&
-			xmlStrcmp(value, (xmlChar *)sectype) == 0) {
-			break;
-		    }
-		} else {
-		    break;
-		}
-	    }
-	    if (value != NULL) {
-		xmlFree(value);
-		value = NULL;
-	    }
 	}
 	if (value != NULL)
-	    xmlFree(value);
+		xmlFree(value);
 	return ((sa_security_t)node);
 }
 
@@ -2017,7 +2097,7 @@ sa_get_next_security(sa_security_t security)
 	xmlNodePtr node;
 
 	for (node = ((xmlNodePtr)security)->next; node != NULL;
-		node = node->next) {
+	    node = node->next) {
 		if (xmlStrcmp(node->name, (xmlChar *)"security") == 0) {
 			break;
 		}
@@ -2039,28 +2119,32 @@ sa_get_property(sa_optionset_t optionset, char *prop)
 	xmlChar *value = NULL;
 
 	if (optionset == NULL)
-	    return (NULL);
+		return (NULL);
 
 	for (node = node->children; node != NULL;
-		node = node->next) {
-	    if (xmlStrcmp(node->name, (xmlChar *)"option") == 0) {
-		if (prop == NULL)
-		    break;
-		value = xmlGetProp(node, (xmlChar *)"type");
-		if (value != NULL && xmlStrcmp(value, (xmlChar *)prop) == 0) {
-		    break;
+	    node = node->next) {
+		if (xmlStrcmp(node->name, (xmlChar *)"option") == 0) {
+			if (prop == NULL)
+				break;
+			value = xmlGetProp(node, (xmlChar *)"type");
+			if (value != NULL &&
+			    xmlStrcmp(value, (xmlChar *)prop) == 0) {
+				break;
+			}
+			if (value != NULL) {
+				xmlFree(value);
+				value = NULL;
+			}
 		}
-		if (value != NULL) {
-		    xmlFree(value);
-		    value = NULL;
-		}
-	    }
 	}
 	if (value != NULL)
 		xmlFree(value);
 	if (node != NULL && xmlStrcmp(node->name, (xmlChar *)"option") != 0) {
-	    /* avoid a non option node -- it is possible to be a text node */
-	    node = NULL;
+		/*
+		 * avoid a non option node -- it is possible to be a
+		 * text node
+		 */
+		node = NULL;
 	}
 	return ((sa_property_t)node);
 }
@@ -2078,7 +2162,7 @@ sa_get_next_property(sa_property_t property)
 	xmlNodePtr node;
 
 	for (node = ((xmlNodePtr)property)->next; node != NULL;
-		node = node->next) {
+	    node = node->next) {
 		if (xmlStrcmp(node->name, (xmlChar *)"option") == 0) {
 			break;
 		}
@@ -2100,7 +2184,7 @@ sa_set_share_description(sa_share_t share, char *content)
 	int ret = SA_OK;
 
 	for (node = ((xmlNodePtr)share)->children; node != NULL;
-		node = node->next) {
+	    node = node->next) {
 		if (xmlStrcmp(node->name, (xmlChar *)"description") == 0) {
 			break;
 		}
@@ -2109,7 +2193,7 @@ sa_set_share_description(sa_share_t share, char *content)
 	/* no existing description but want to add */
 	if (node == NULL && content != NULL) {
 		/* add a description */
-	    node = _sa_set_share_description(share, content);
+		node = _sa_set_share_description(share, content);
 	} else if (node != NULL && content != NULL) {
 		/* update a description */
 		xmlNodeSetContent(node, (xmlChar *)content);
@@ -2119,12 +2203,14 @@ sa_set_share_description(sa_share_t share, char *content)
 		xmlFreeNode(node);
 	}
 	if (group != NULL && is_persistent((sa_group_t)share)) {
-	    sa_handle_impl_t impl_handle;
-	    impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
-	    if (impl_handle != NULL)
-		ret = sa_commit_share(impl_handle->scfhandle, group, share);
-	    else
-		ret = SA_SYSTEM_ERR;
+		sa_handle_impl_t impl_handle;
+		impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
+		if (impl_handle != NULL) {
+			ret = sa_commit_share(impl_handle->scfhandle, group,
+			    share);
+		} else {
+			ret = SA_SYSTEM_ERR;
+		}
 	}
 	return (ret);
 }
@@ -2140,10 +2226,10 @@ fixproblemchars(char *str)
 {
 	int c;
 	for (c = *str; c != '\0'; c = *++str) {
-	    if (c == '\t' || c == '\n')
-		*str = ' ';
-	    else if (c == '"')
-		*str = '\'';
+		if (c == '\t' || c == '\n')
+			*str = ' ';
+		else if (c == '"')
+			*str = '\'';
 	}
 }
 
@@ -2161,14 +2247,14 @@ sa_get_share_description(sa_share_t share)
 	xmlNodePtr node;
 
 	for (node = ((xmlNodePtr)share)->children; node != NULL;
-		node = node->next) {
-	    if (xmlStrcmp(node->name, (xmlChar *)"description") == 0) {
-		break;
-	    }
+	    node = node->next) {
+		if (xmlStrcmp(node->name, (xmlChar *)"description") == 0) {
+			break;
+		}
 	}
 	if (node != NULL) {
-	    description = xmlNodeGetContent((xmlNodePtr)share);
-	    fixproblemchars((char *)description);
+		description = xmlNodeGetContent((xmlNodePtr)share);
+		fixproblemchars((char *)description);
 	}
 	return ((char *)description);
 }
@@ -2201,47 +2287,48 @@ sa_create_optionset(sa_group_t group, char *proto)
 	optionset = sa_get_optionset(group, proto);
 	if (optionset != NULL) {
 		/* can't have a duplicate protocol */
-	    optionset = NULL;
+		optionset = NULL;
 	} else {
-	    optionset = (sa_optionset_t)xmlNewChild((xmlNodePtr)group,
-						    NULL,
-						    (xmlChar *)"optionset",
-						    NULL);
+		optionset = (sa_optionset_t)xmlNewChild((xmlNodePtr)group,
+		    NULL, (xmlChar *)"optionset", NULL);
 		/*
 		 * only put to repository if on a group and we were
 		 * able to create an optionset.
 		 */
-	    if (optionset != NULL) {
-		char oname[256];
-		char *groupname;
-		char *id = NULL;
+		if (optionset != NULL) {
+			char oname[SA_STRSIZE];
+			char *groupname;
+			char *id = NULL;
 
-		if (sa_is_share(group))
-		    parent = sa_get_parent_group((sa_share_t)group);
+			if (sa_is_share(group))
+				parent = sa_get_parent_group((sa_share_t)group);
 
-		sa_set_optionset_attr(optionset, "type", proto);
+			sa_set_optionset_attr(optionset, "type", proto);
 
-		if (sa_is_share(group)) {
-			id = sa_get_share_attr((sa_share_t)group, "id");
+			if (sa_is_share(group)) {
+				id = sa_get_share_attr((sa_share_t)group, "id");
+			}
+			(void) sa_optionset_name(optionset, oname,
+			    sizeof (oname), id);
+			groupname = sa_get_group_attr(parent, "name");
+			if (groupname != NULL && is_persistent(group)) {
+				sa_handle_impl_t impl_handle;
+				impl_handle = (sa_handle_impl_t)
+				    sa_find_group_handle(group);
+				assert(impl_handle != NULL);
+				if (impl_handle != NULL) {
+					(void) sa_get_instance(
+					    impl_handle->scfhandle,
+					    groupname);
+					(void) sa_create_pgroup(
+					    impl_handle->scfhandle, oname);
+				}
+			}
+			if (groupname != NULL)
+				sa_free_attr_string(groupname);
+			if (id != NULL)
+				sa_free_attr_string(id);
 		}
-		(void) sa_optionset_name(optionset, oname,
-					sizeof (oname), id);
-		groupname = sa_get_group_attr(parent, "name");
-		if (groupname != NULL && is_persistent(group)) {
-		    sa_handle_impl_t impl_handle;
-		    impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
-		    assert(impl_handle != NULL);
-		    if (impl_handle != NULL) {
-			(void) sa_get_instance(impl_handle->scfhandle,
-						groupname);
-			(void) sa_create_pgroup(impl_handle->scfhandle, oname);
-		    }
-		}
-		if (groupname != NULL)
-		    sa_free_attr_string(groupname);
-		if (id != NULL)
-		    sa_free_attr_string(id);
-	    }
 	}
 	return (optionset);
 }
@@ -2258,9 +2345,8 @@ sa_get_property_parent(sa_property_t property)
 {
 	xmlNodePtr node = NULL;
 
-	if (property != NULL) {
-	    node = ((xmlNodePtr)property)->parent;
-	}
+	if (property != NULL)
+		node = ((xmlNodePtr)property)->parent;
 	return ((sa_optionset_t)node);
 }
 
@@ -2276,9 +2362,8 @@ sa_get_optionset_parent(sa_optionset_t optionset)
 {
 	xmlNodePtr node = NULL;
 
-	if (optionset != NULL) {
-	    node = ((xmlNodePtr)optionset)->parent;
-	}
+	if (optionset != NULL)
+		node = ((xmlNodePtr)optionset)->parent;
 	return ((sa_group_t)node);
 }
 
@@ -2300,7 +2385,7 @@ zfs_needs_update(sa_share_t share)
 
 	attr = sa_get_share_attr(share, "changed");
 	if (attr != NULL) {
-	    sa_free_attr_string(attr);
+		sa_free_attr_string(attr);
 		result = 1;
 	}
 	set_node_attr((void *)share, "changed", NULL);
@@ -2338,28 +2423,30 @@ sa_commit_properties(sa_optionset_t optionset, int clear)
 
 	group = sa_get_optionset_parent(optionset);
 	if (group != NULL && (sa_is_share(group) || is_zfs_group(group))) {
-	    /* only update ZFS if on a share */
-	    parent = sa_get_parent_group(group);
-	    zfs++;
-	    if (parent != NULL && is_zfs_group(parent)) {
-		needsupdate = zfs_needs_update(group);
-	    } else {
-		zfs = 0;
-	    }
+		/* only update ZFS if on a share */
+		parent = sa_get_parent_group(group);
+		zfs++;
+		if (parent != NULL && is_zfs_group(parent))
+			needsupdate = zfs_needs_update(group);
+		else
+			zfs = 0;
 	}
 	if (zfs) {
-	    if (!clear && needsupdate)
-		ret = sa_zfs_update((sa_share_t)group);
+		if (!clear && needsupdate)
+			ret = sa_zfs_update((sa_share_t)group);
 	} else {
-	    impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
-	    if (impl_handle != NULL) {
-		if (clear)
-		    (void) sa_abort_transaction(impl_handle->scfhandle);
-		else
-		    ret = sa_end_transaction(impl_handle->scfhandle);
-	    } else {
-		ret = SA_SYSTEM_ERR;
-	    }
+		impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
+		if (impl_handle != NULL) {
+			if (clear) {
+				(void) sa_abort_transaction(
+				    impl_handle->scfhandle);
+			} else {
+				ret = sa_end_transaction(
+				    impl_handle->scfhandle);
+			}
+		} else {
+			ret = SA_SYSTEM_ERR;
+		}
 	}
 	return (ret);
 }
@@ -2374,7 +2461,7 @@ sa_commit_properties(sa_optionset_t optionset, int clear)
 int
 sa_destroy_optionset(sa_optionset_t optionset)
 {
-	char name[256];
+	char name[SA_STRSIZE];
 	int len;
 	int ret;
 	char *id = NULL;
@@ -2384,25 +2471,26 @@ sa_destroy_optionset(sa_optionset_t optionset)
 	/* now delete the prop group */
 	group = sa_get_optionset_parent(optionset);
 	if (group != NULL && sa_is_share(group)) {
-	    ispersist = is_persistent(group);
-	    id = sa_get_share_attr((sa_share_t)group, "id");
+		ispersist = is_persistent(group);
+		id = sa_get_share_attr((sa_share_t)group, "id");
 	}
 	if (ispersist) {
-	    sa_handle_impl_t impl_handle;
-	    len = sa_optionset_name(optionset, name, sizeof (name), id);
-	    impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
-	    if (impl_handle != NULL) {
-		if (len > 0) {
-		    ret = sa_delete_pgroup(impl_handle->scfhandle, name);
+		sa_handle_impl_t impl_handle;
+		len = sa_optionset_name(optionset, name, sizeof (name), id);
+		impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
+		if (impl_handle != NULL) {
+			if (len > 0) {
+				ret = sa_delete_pgroup(impl_handle->scfhandle,
+				    name);
+			}
+		} else {
+			ret = SA_SYSTEM_ERR;
 		}
-	    } else {
-		ret = SA_SYSTEM_ERR;
-	    }
 	}
 	xmlUnlinkNode((xmlNodePtr)optionset);
 	xmlFreeNode((xmlNodePtr)optionset);
 	if (id != NULL)
-	    sa_free_attr_string(id);
+		sa_free_attr_string(id);
 	return (ret);
 }
 
@@ -2433,12 +2521,12 @@ sa_create_security(sa_group_t group, char *sectype, char *proto)
 	char *groupname = NULL;
 
 	if (group != NULL && sa_is_share(group)) {
-	    id = sa_get_share_attr((sa_share_t)group, "id");
-	    parent = sa_get_parent_group(group);
-	    if (parent != NULL)
-		groupname = sa_get_group_attr(parent, "name");
+		id = sa_get_share_attr((sa_share_t)group, "id");
+		parent = sa_get_parent_group(group);
+		if (parent != NULL)
+			groupname = sa_get_group_attr(parent, "name");
 	} else if (group != NULL) {
-	    groupname = sa_get_group_attr(group, "name");
+		groupname = sa_get_group_attr(group, "name");
 	}
 
 	security = sa_get_security(group, sectype, proto);
@@ -2447,31 +2535,30 @@ sa_create_security(sa_group_t group, char *sectype, char *proto)
 		security = NULL;
 	} else {
 		security = (sa_security_t)xmlNewChild((xmlNodePtr)group,
-							NULL,
-							(xmlChar *)"security",
-							NULL);
+		    NULL, (xmlChar *)"security", NULL);
 		if (security != NULL) {
-			char oname[256];
+			char oname[SA_STRSIZE];
 			sa_set_security_attr(security, "type", proto);
 
 			sa_set_security_attr(security, "sectype", sectype);
 			(void) sa_security_name(security, oname,
-						sizeof (oname), id);
+			    sizeof (oname), id);
 			if (groupname != NULL && is_persistent(group)) {
-			    sa_handle_impl_t impl_handle;
-			    impl_handle =
-				(sa_handle_impl_t)sa_find_group_handle(group);
-			    if (impl_handle != NULL) {
-				(void) sa_get_instance(impl_handle->scfhandle,
-							groupname);
-				(void) sa_create_pgroup(impl_handle->scfhandle,
-							oname);
-			    }
+				sa_handle_impl_t impl_handle;
+				impl_handle =
+				    (sa_handle_impl_t)sa_find_group_handle(
+				    group);
+				if (impl_handle != NULL) {
+					(void) sa_get_instance(
+					    impl_handle->scfhandle, groupname);
+					(void) sa_create_pgroup(
+					    impl_handle->scfhandle, oname);
+				}
 			}
 		}
 	}
 	if (groupname != NULL)
-	    sa_free_attr_string(groupname);
+		sa_free_attr_string(groupname);
 	return (security);
 }
 
@@ -2485,7 +2572,7 @@ sa_create_security(sa_group_t group, char *sectype, char *proto)
 int
 sa_destroy_security(sa_security_t security)
 {
-	char name[256];
+	char name[SA_STRSIZE];
 	int len;
 	int ret = SA_OK;
 	char *id = NULL;
@@ -2496,32 +2583,33 @@ sa_destroy_security(sa_security_t security)
 	group = sa_get_optionset_parent(security);
 
 	if (group != NULL)
-	    iszfs = sa_group_is_zfs(group);
+		iszfs = sa_group_is_zfs(group);
 
 	if (group != NULL && !iszfs) {
-	    if (sa_is_share(group))
-		ispersist = is_persistent(group);
-	    id = sa_get_share_attr((sa_share_t)group, "id");
+		if (sa_is_share(group))
+			ispersist = is_persistent(group);
+		id = sa_get_share_attr((sa_share_t)group, "id");
 	}
 	if (ispersist) {
-	    len = sa_security_name(security, name, sizeof (name), id);
-	    if (!iszfs && len > 0) {
-		sa_handle_impl_t impl_handle;
-		impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
-		if (impl_handle != NULL) {
-		    ret = sa_delete_pgroup(impl_handle->scfhandle, name);
-		} else {
-		    ret = SA_SYSTEM_ERR;
+		len = sa_security_name(security, name, sizeof (name), id);
+		if (!iszfs && len > 0) {
+			sa_handle_impl_t impl_handle;
+			impl_handle =
+			    (sa_handle_impl_t)sa_find_group_handle(group);
+			if (impl_handle != NULL) {
+				ret = sa_delete_pgroup(impl_handle->scfhandle,
+				    name);
+			} else {
+				ret = SA_SYSTEM_ERR;
+			}
 		}
-	    }
 	}
 	xmlUnlinkNode((xmlNodePtr)security);
 	xmlFreeNode((xmlNodePtr)security);
-	if (iszfs) {
-	    ret = sa_zfs_update(group);
-	}
+	if (iszfs)
+		ret = sa_zfs_update(group);
 	if (id != NULL)
-	    sa_free_attr_string(id);
+		sa_free_attr_string(id);
 	return (ret);
 }
 
@@ -2562,6 +2650,40 @@ is_nodetype(void *node, char *type)
 	return (strcmp((char *)((xmlNodePtr)node)->name, type) == 0);
 }
 
+
+/*
+ * add_or_update()
+ *
+ * Add or update a property. Pulled out of sa_set_prop_by_prop for
+ * readability.
+ */
+static int
+add_or_update(scfutilhandle_t *scf_handle, int type, scf_value_t *value,
+    scf_transaction_entry_t *entry, char *name, char *valstr)
+{
+	int ret = SA_SYSTEM_ERR;
+
+	if (value != NULL) {
+		if (type == SA_PROP_OP_ADD)
+			ret = scf_transaction_property_new(scf_handle->trans,
+			    entry, name, SCF_TYPE_ASTRING);
+		else
+			ret = scf_transaction_property_change(scf_handle->trans,
+			    entry, name, SCF_TYPE_ASTRING);
+		if (ret == 0) {
+			ret = scf_value_set_astring(value, valstr);
+			if (ret == 0)
+				ret = scf_entry_add_value(entry, value);
+			if (ret == 0)
+				return (ret);
+			scf_value_destroy(value);
+		} else {
+			scf_entry_destroy(entry);
+		}
+	}
+	return (SA_SYSTEM_ERR);
+}
+
 /*
  * sa_set_prop_by_prop(optionset, group, prop, type)
  *
@@ -2571,9 +2693,6 @@ is_nodetype(void *node, char *type)
  * marked as needing an update)
  */
 
-#define	SA_PROP_OP_REMOVE	1
-#define	SA_PROP_OP_ADD		2
-#define	SA_PROP_OP_UPDATE	3
 static int
 sa_set_prop_by_prop(sa_optionset_t optionset, sa_group_t group,
 			sa_property_t prop, int type)
@@ -2596,12 +2715,11 @@ sa_set_prop_by_prop(sa_optionset_t optionset, sa_group_t group,
 		 * if the group/share is not persistent we don't need
 		 * to do anything here
 		 */
-	    return (SA_OK);
+		return (SA_OK);
 	}
 	impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
-	if (impl_handle == NULL || impl_handle->scfhandle == NULL) {
-	    return (SA_SYSTEM_ERR);
-	}
+	if (impl_handle == NULL || impl_handle->scfhandle == NULL)
+		return (SA_SYSTEM_ERR);
 	scf_handle = impl_handle->scfhandle;
 	name = sa_get_property_attr(prop, "type");
 	valstr = sa_get_property_attr(prop, "value");
@@ -2609,97 +2727,78 @@ sa_set_prop_by_prop(sa_optionset_t optionset, sa_group_t group,
 	opttype = is_nodetype((void *)optionset, "optionset");
 
 	if (valstr != NULL && entry != NULL) {
-	    if (sa_is_share(group)) {
-		isshare = 1;
-		parent = sa_get_parent_group(group);
-		if (parent != NULL) {
-		    iszfs = is_zfs_group(parent);
+		if (sa_is_share(group)) {
+			isshare = 1;
+			parent = sa_get_parent_group(group);
+			if (parent != NULL)
+				iszfs = is_zfs_group(parent);
+		} else {
+			iszfs = is_zfs_group(group);
 		}
-	    } else {
-		iszfs = is_zfs_group(group);
-	    }
-	    if (!iszfs) {
-		    if (scf_handle->trans == NULL) {
-			char oname[256];
-			char *groupname = NULL;
-			if (isshare) {
-			    if (parent != NULL) {
-				groupname = sa_get_group_attr(parent, "name");
-			    }
-			    id = sa_get_share_attr((sa_share_t)group, "id");
-			} else {
-			    groupname = sa_get_group_attr(group, "name");
-			}
-			if (groupname != NULL) {
-			    ret = sa_get_instance(scf_handle, groupname);
-			    sa_free_attr_string(groupname);
-			}
-			if (opttype)
-			    (void) sa_optionset_name(optionset, oname,
-							sizeof (oname), id);
-			else
-			    (void) sa_security_name(optionset, oname,
-							sizeof (oname), id);
-			ret = sa_start_transaction(scf_handle, oname);
-		    }
-		    if (ret == SA_OK) {
-			switch (type) {
-			case SA_PROP_OP_REMOVE:
-			    ret = scf_transaction_property_delete(
-							scf_handle->trans,
-							entry, name);
-			    break;
-			case SA_PROP_OP_ADD:
-			case SA_PROP_OP_UPDATE:
-			    value = scf_value_create(scf_handle->handle);
-			    if (value != NULL) {
-				if (type == SA_PROP_OP_ADD)
-				    ret = scf_transaction_property_new(
-							scf_handle->trans,
-							entry,
-							name,
-							SCF_TYPE_ASTRING);
-				else
-				    ret = scf_transaction_property_change(
-							scf_handle->trans,
-							entry,
-							name,
-							SCF_TYPE_ASTRING);
-				if (ret == 0) {
-				    ret = scf_value_set_astring(value, valstr);
-				    if (ret == 0)
-					ret = scf_entry_add_value(entry, value);
-				    if (ret != 0) {
-					scf_value_destroy(value);
-					ret = SA_SYSTEM_ERR;
-				    }
+		if (!iszfs) {
+			if (scf_handle->trans == NULL) {
+				char oname[SA_STRSIZE];
+				char *groupname = NULL;
+				if (isshare) {
+					if (parent != NULL) {
+						groupname =
+						    sa_get_group_attr(parent,
+						    "name");
+					}
+					id =
+					    sa_get_share_attr((sa_share_t)group,
+					    "id");
 				} else {
-				    scf_entry_destroy(entry);
-				    ret = SA_SYSTEM_ERR;
+					groupname = sa_get_group_attr(group,
+					    "name");
 				}
-				break;
-			    }
+				if (groupname != NULL) {
+					ret = sa_get_instance(scf_handle,
+					    groupname);
+					sa_free_attr_string(groupname);
+				}
+				if (opttype)
+					(void) sa_optionset_name(optionset,
+					    oname, sizeof (oname), id);
+				else
+					(void) sa_security_name(optionset,
+					    oname, sizeof (oname), id);
+				ret = sa_start_transaction(scf_handle, oname);
 			}
-		    }
-	    } else {
-		/*
-		 * ZFS update. The calling function would have updated
-		 * the internal XML structure. Just need to flag it as
-		 * changed for ZFS.
-		 */
-		zfs_set_update((sa_share_t)group);
-	    }
+			if (ret == SA_OK) {
+				switch (type) {
+				case SA_PROP_OP_REMOVE:
+					ret = scf_transaction_property_delete(
+					    scf_handle->trans, entry, name);
+					break;
+				case SA_PROP_OP_ADD:
+				case SA_PROP_OP_UPDATE:
+					value = scf_value_create(
+					    scf_handle->handle);
+					ret = add_or_update(scf_handle, type,
+					    value, entry, name, valstr);
+					break;
+				}
+			}
+		} else {
+			/*
+			 * ZFS update. The calling function would have updated
+			 * the internal XML structure. Just need to flag it as
+			 * changed for ZFS.
+			 */
+			zfs_set_update((sa_share_t)group);
+		}
 	}
 
 	if (name != NULL)
-	    sa_free_attr_string(name);
+		sa_free_attr_string(name);
 	if (valstr != NULL)
-	    sa_free_attr_string(valstr);
+		sa_free_attr_string(valstr);
 	else if (entry != NULL)
-	    scf_entry_destroy(entry);
+		scf_entry_destroy(entry);
 
 	if (ret == -1)
-	    ret = SA_SYSTEM_ERR;
+		ret = SA_SYSTEM_ERR;
 
 	return (ret);
 }
@@ -2740,87 +2839,105 @@ sa_add_property(void *object, sa_property_t property)
 
 	proto = sa_get_optionset_attr(object, "type");
 	if (property != NULL) {
-	    if ((ret = sa_valid_property(object, proto, property)) == SA_OK) {
-		property = (sa_property_t)xmlAddChild((xmlNodePtr)object,
-							(xmlNodePtr)property);
-	    } else {
-		if (proto != NULL)
-		    sa_free_attr_string(proto);
-		return (ret);
-	    }
+		if ((ret = sa_valid_property(object, proto, property)) ==
+		    SA_OK) {
+			property = (sa_property_t)xmlAddChild(
+			    (xmlNodePtr)object, (xmlNodePtr)property);
+		} else {
+			if (proto != NULL)
+				sa_free_attr_string(proto);
+			return (ret);
+		}
 	}
 
 	if (proto != NULL)
-	    sa_free_attr_string(proto);
+		sa_free_attr_string(proto);
 
 	parent = sa_get_parent_group(object);
 	if (!is_persistent(parent)) {
-	    return (ret);
+		return (ret);
 	}
 
 	if (sa_is_share(parent))
-	    group = sa_get_parent_group(parent);
+		group = sa_get_parent_group(parent);
 	else
-	    group = parent;
+		group = parent;
 
-	if (property == NULL)
-	    ret = SA_NO_MEMORY;
-	else {
-	    char oname[256];
+	if (property == NULL) {
+		ret = SA_NO_MEMORY;
+	} else {
+		char oname[SA_STRSIZE];
 
-	    if (!is_zfs_group(group)) {
-		char *id = NULL;
-		sa_handle_impl_t impl_handle;
-		scfutilhandle_t  *scf_handle;
+		if (!is_zfs_group(group)) {
+			char *id = NULL;
+			sa_handle_impl_t impl_handle;
+			scfutilhandle_t  *scf_handle;
 
-		impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
-		if (impl_handle == NULL || impl_handle->scfhandle == NULL)
-		    ret = SA_SYSTEM_ERR;
-		if (ret == SA_OK) {
-		    scf_handle = impl_handle->scfhandle;
-		    if (sa_is_share((sa_group_t)parent)) {
-			id = sa_get_share_attr((sa_share_t)parent, "id");
-		    }
-		    if (scf_handle->trans == NULL) {
-			if (is_nodetype(object, "optionset"))
-			    (void) sa_optionset_name((sa_optionset_t)object,
-					    oname, sizeof (oname), id);
-			else
-			    (void) sa_security_name((sa_optionset_t)object,
-					    oname, sizeof (oname), id);
-			ret = sa_start_transaction(scf_handle, oname);
-		    }
-		    if (ret == SA_OK) {
-			char *name;
-			char *value;
-			name = sa_get_property_attr(property, "type");
-			value = sa_get_property_attr(property, "value");
-			if (name != NULL && value != NULL) {
-			    if (scf_handle->scf_state == SCH_STATE_INIT)
-				ret = sa_set_property(scf_handle, name, value);
-			} else
-			    ret = SA_CONFIG_ERR;
-			if (name != NULL)
-			    sa_free_attr_string(name);
-			if (value != NULL)
-			    sa_free_attr_string(value);
-		    }
-		    if (id != NULL)
-			sa_free_attr_string(id);
+			impl_handle = (sa_handle_impl_t)sa_find_group_handle(
+			    group);
+			if (impl_handle == NULL ||
+			    impl_handle->scfhandle == NULL)
+				ret = SA_SYSTEM_ERR;
+			if (ret == SA_OK) {
+				scf_handle = impl_handle->scfhandle;
+				if (sa_is_share((sa_group_t)parent)) {
+					id = sa_get_share_attr(
+					    (sa_share_t)parent, "id");
+				}
+				if (scf_handle->trans == NULL) {
+					if (is_nodetype(object, "optionset")) {
+						(void) sa_optionset_name(
+						    (sa_optionset_t)object,
+						    oname, sizeof (oname), id);
+					} else {
+						(void) sa_security_name(
+						    (sa_optionset_t)object,
+						    oname, sizeof (oname), id);
+					}
+					ret = sa_start_transaction(scf_handle,
+					    oname);
+				}
+				if (ret == SA_OK) {
+					char *name;
+					char *value;
+					name = sa_get_property_attr(property,
+					    "type");
+					value = sa_get_property_attr(property,
+					    "value");
+					if (name != NULL && value != NULL) {
+						if (scf_handle->scf_state ==
+						    SCH_STATE_INIT) {
+							ret = sa_set_property(
+							    scf_handle, name,
+							    value);
+						}
+					} else {
+						ret = SA_CONFIG_ERR;
+					}
+					if (name != NULL)
+						sa_free_attr_string(
+						    name);
+					if (value != NULL)
+						sa_free_attr_string(value);
+				}
+				if (id != NULL)
+					sa_free_attr_string(id);
+			}
+		} else {
+			/*
+			 * ZFS is a special case. We do want
+			 * to allow editing property/security
+			 * lists since we can have a better
+			 * syntax and we also want to keep
+			 * things consistent when possible.
+			 *
+			 * Right now, we defer until the
+			 * sa_commit_properties so we can get
+			 * them all at once. We do need to
+			 * mark the share as "changed"
+			 */
+			zfs_set_update((sa_share_t)parent);
 		}
-	    } else {
-		/*
-		 * ZFS is a special case. We do want to allow editing
-		 * property/security lists since we can have a better
-		 * syntax and we also want to keep things consistent
-		 * when possible.
-		 *
-		 * Right now, we defer until the sa_commit_properties
-		 * so we can get them all at once. We do need to mark
-		 * the share as "changed"
-		 */
-		zfs_set_update((sa_share_t)parent);
-	    }
 	}
 	return (ret);
 }
@@ -2842,16 +2959,16 @@ sa_remove_property(sa_property_t property)
 		sa_group_t group;
 		optionset = sa_get_property_parent(property);
 		if (optionset != NULL) {
-		    group = sa_get_optionset_parent(optionset);
-		    if (group != NULL) {
-			ret = sa_set_prop_by_prop(optionset, group, property,
-					    SA_PROP_OP_REMOVE);
-		    }
+			group = sa_get_optionset_parent(optionset);
+			if (group != NULL) {
+				ret = sa_set_prop_by_prop(optionset, group,
+				    property, SA_PROP_OP_REMOVE);
+			}
 		}
 		xmlUnlinkNode((xmlNodePtr)property);
 		xmlFreeNode((xmlNodePtr)property);
 	} else {
-	    ret = SA_NO_SUCH_PROP;
+		ret = SA_NO_SUCH_PROP;
 	}
 	return (ret);
 }
@@ -2875,13 +2992,13 @@ sa_update_property(sa_property_t property, char *value)
 		set_node_attr((void *)property, "value", value);
 		optionset = sa_get_property_parent(property);
 		if (optionset != NULL) {
-		    group = sa_get_optionset_parent(optionset);
-		    if (group != NULL) {
-			ret = sa_set_prop_by_prop(optionset, group, property,
-					    SA_PROP_OP_UPDATE);
-		    }
+			group = sa_get_optionset_parent(optionset);
+			if (group != NULL) {
+				ret = sa_set_prop_by_prop(optionset, group,
+				    property, SA_PROP_OP_UPDATE);
+			}
 		} else {
-		    ret = SA_NO_SUCH_PROP;
+			ret = SA_NO_SUCH_PROP;
 		}
 	}
 	return (ret);
@@ -2901,26 +3018,29 @@ sa_get_protocol_property(sa_protocol_properties_t propset, char *prop)
 	xmlChar *value = NULL;
 
 	for (node = node->children; node != NULL;
-		node = node->next) {
-	    if (xmlStrcmp(node->name, (xmlChar *)"option") == 0) {
-		if (prop == NULL)
-		    break;
-		value = xmlGetProp(node, (xmlChar *)"type");
-		if (value != NULL &&
-		    xmlStrcasecmp(value, (xmlChar *)prop) == 0) {
-		    break;
+	    node = node->next) {
+		if (xmlStrcmp(node->name, (xmlChar *)"option") == 0) {
+			if (prop == NULL)
+				break;
+			value = xmlGetProp(node, (xmlChar *)"type");
+			if (value != NULL &&
+			    xmlStrcasecmp(value, (xmlChar *)prop) == 0) {
+				break;
+			}
+			if (value != NULL) {
+				xmlFree(value);
+				value = NULL;
+			}
 		}
-		if (value != NULL) {
-		    xmlFree(value);
-		    value = NULL;
-		}
-	    }
 	}
 	if (value != NULL)
 		xmlFree(value);
 	if (node != NULL && xmlStrcmp(node->name, (xmlChar *)"option") != 0) {
-	    /* avoid a non option node -- it is possible to be a text node */
-	    node = NULL;
+		/*
+		 * avoid a non option node -- it is possible to be a
+		 * text node
+		 */
+		node = NULL;
 	}
 	return ((sa_property_t)node);
 }
@@ -2937,7 +3057,7 @@ sa_get_next_protocol_property(sa_property_t prop)
 	xmlNodePtr node;
 
 	for (node = ((xmlNodePtr)prop)->next; node != NULL;
-		node = node->next) {
+	    node = node->next) {
 		if (xmlStrcmp(node->name, (xmlChar *)"option") == 0) {
 			break;
 		}
@@ -2961,12 +3081,12 @@ sa_set_protocol_property(sa_property_t prop, char *value)
 
 	propset = ((xmlNodePtr)prop)->parent;
 	if (propset != NULL) {
-	    proto = sa_get_optionset_attr(propset, "type");
-	    if (proto != NULL) {
-		set_node_attr((xmlNodePtr)prop, "value", value);
-		ret = sa_proto_set_property(proto, prop);
-		sa_free_attr_string(proto);
-	    }
+		proto = sa_get_optionset_attr(propset, "type");
+		if (proto != NULL) {
+			set_node_attr((xmlNodePtr)prop, "value", value);
+			ret = sa_proto_set_property(proto, prop);
+			sa_free_attr_string(proto);
+		}
 	}
 	return (ret);
 }
@@ -2985,7 +3105,7 @@ sa_add_protocol_property(sa_protocol_properties_t propset, sa_property_t prop)
 	/* should check for legitimacy */
 	node = xmlAddChild((xmlNodePtr)propset, (xmlNodePtr)prop);
 	if (node != NULL)
-	    return (SA_OK);
+		return (SA_OK);
 	return (SA_NO_MEMORY);
 }
 
@@ -2999,9 +3119,9 @@ sa_protocol_properties_t
 sa_create_protocol_properties(char *proto)
 {
 	xmlNodePtr node;
+
 	node = xmlNewNode(NULL, (xmlChar *)"propertyset");
-	if (node != NULL) {
-	    xmlSetProp(node, (xmlChar *)"type", (xmlChar *)proto);
-	}
+	if (node != NULL)
+		xmlSetProp(node, (xmlChar *)"type", (xmlChar *)proto);
 	return (node);
 }
