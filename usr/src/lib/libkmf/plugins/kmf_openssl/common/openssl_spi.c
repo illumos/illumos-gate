@@ -316,15 +316,15 @@ KMF_Plugin_Initialize()
 		 * openssl default set.
 		 */
 		(void) OBJ_create("2.5.29.30", "nameConstraints",
-				"X509v3 Name Constraints");
+		    "X509v3 Name Constraints");
 		(void) OBJ_create("2.5.29.33", "policyMappings",
-				"X509v3 Policy Mappings");
+		    "X509v3 Policy Mappings");
 		(void) OBJ_create("2.5.29.36", "policyConstraints",
-			"X509v3 Policy Constraints");
+		    "X509v3 Policy Constraints");
 		(void) OBJ_create("2.5.29.46", "freshestCRL",
-			"X509v3 Freshest CRL");
+		    "X509v3 Freshest CRL");
 		(void) OBJ_create("2.5.29.54", "inhibitAnyPolicy",
-			"X509v3 Inhibit Any-Policy");
+		    "X509v3 Inhibit Any-Policy");
 		/*
 		 * Set up for thread-safe operation.
 		 */
@@ -367,7 +367,7 @@ get_x509_dn(X509_NAME *sslDN, KMF_X509_NAME *kmfDN)
 	/* Convert to raw DER format */
 	derdata.Length = i2d_X509_NAME(sslDN, NULL);
 	if ((tmp = derdata.Data = (uchar_t *)OPENSSL_malloc(derdata.Length))
-		== NULL) {
+	    == NULL) {
 		return (KMF_ERR_MEMORY);
 	}
 	(void) i2d_X509_NAME(sslDN, &tmp);
@@ -508,8 +508,8 @@ check_cert(X509 *xcert, KMF_FINDCERT_PARAMS *params, boolean_t *match)
 				}
 				bnlen = BN_bn2bin(bn, a);
 				*match = !memcmp(a,
-					params->serial->val,
-					params->serial->len);
+				    params->serial->val,
+				    params->serial->len);
 				rv = KMF_OK;
 				free(a);
 			}
@@ -668,12 +668,11 @@ load_certs(KMF_HANDLE *kmfh, KMF_FINDCERT_PARAMS *params, char *pathname,
 		/* We need a credential to access a PKCS#12 file */
 		rv = KMF_ERR_BAD_CERT_FORMAT;
 	} else if (format == KMF_FORMAT_PEM ||
-		format != KMF_FORMAT_PEM_KEYPAIR) {
+	    format != KMF_FORMAT_PEM_KEYPAIR) {
 
 		/* This function only works on PEM files */
 		rv = extract_objects(kmfh, params, pathname,
-			(uchar_t *)NULL, 0, NULL,
-			&certs, &nc);
+		    (uchar_t *)NULL, 0, NULL, &certs, &nc);
 	} else {
 		return (KMF_ERR_ENCODING);
 	}
@@ -785,8 +784,8 @@ readAltFormatPrivateKey(KMF_DATA *filedata, EVP_PKEY **pkey)
 	}
 
 	if (kmfber_scanf(asn1, "{{Dn{IIIIII}}}",
-		&OID, &Mod, &PubExp, &PriExp, &Prime1,
-		&Prime2, &Coef) == -1)  {
+	    &OID, &Mod, &PubExp, &PriExp, &Prime1,
+	    &Prime2, &Coef) == -1)  {
 		ret = KMF_ERR_ENCODING;
 		goto out;
 	}
@@ -943,15 +942,15 @@ openssl_load_key(KMF_HANDLE_T handle, const char *file)
 			keyfile = NULL;
 			/* Try odd ASN.1 variations */
 			rv = KMF_ReadInputFile(kmfh, (char *)file,
-				&filedata);
+			    &filedata);
 			if (rv == KMF_OK) {
 				(void) readAltFormatPrivateKey(&filedata,
-					&pkey);
+				    &pkey);
 				KMF_FreeData(&filedata);
 			}
 		}
 	} else if (format == KMF_FORMAT_PEM ||
-		format == KMF_FORMAT_PEM_KEYPAIR) {
+	    format == KMF_FORMAT_PEM_KEYPAIR) {
 		pkey = PEM_read_bio_PrivateKey(keyfile, NULL, NULL, NULL);
 		if (pkey == NULL) {
 			KMF_DATA derdata;
@@ -960,17 +959,17 @@ openssl_load_key(KMF_HANDLE_T handle, const char *file)
 			 * RSA private key file.
 			 */
 			rv = KMF_ReadInputFile(kmfh, (char *)file,
-				&filedata);
+			    &filedata);
 			if (rv == KMF_OK) {
 				uchar_t *d = NULL;
 				int len;
 				rv = KMF_Pem2Der(filedata.Data,
-					filedata.Length, &d, &len);
+				    filedata.Length, &d, &len);
 				if (rv == KMF_OK && d != NULL) {
 					derdata.Data = d;
 					derdata.Length = (size_t)len;
 					(void) readAltFormatPrivateKey(
-						&derdata, &pkey);
+					    &derdata, &pkey);
 					free(d);
 				}
 				KMF_FreeData(&filedata);
@@ -1009,7 +1008,7 @@ OpenSSL_FindCert(KMF_HANDLE_T handle,
 	*num_certs = 0;
 
 	fullpath = get_fullpath(params->sslparms.dirpath,
-		params->sslparms.certfile);
+	    params->sslparms.certfile);
 
 	if (fullpath == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -1032,11 +1031,10 @@ OpenSSL_FindCert(KMF_HANDLE_T handle,
 			    strcmp(dp->d_name, "..") == 0)
 				continue;
 
-			fname = get_fullpath(fullpath,
-				(char *)&dp->d_name);
+			fname = get_fullpath(fullpath, (char *)&dp->d_name);
 
 			rv = load_certs(kmfh, params, fname, &certlist,
-				&loaded_certs);
+			    &loaded_certs);
 
 			if (rv != KMF_OK) {
 				free(fname);
@@ -1053,16 +1051,16 @@ OpenSSL_FindCert(KMF_HANDLE_T handle,
 				for (i = 0; i < loaded_certs &&
 				    n < maxcerts; i++) {
 					kmf_cert[n].certificate.Data =
-						certlist[i].Data;
+					    certlist[i].Data;
 					kmf_cert[n].certificate.Length =
-						certlist[i].Length;
+					    certlist[i].Length;
 
 					kmf_cert[n].kmf_private.keystore_type =
-						KMF_KEYSTORE_OPENSSL;
+					    KMF_KEYSTORE_OPENSSL;
 					kmf_cert[n].kmf_private.flags =
-						KMF_FLAG_CERT_VALID;
+					    KMF_FLAG_CERT_VALID;
 					kmf_cert[n].kmf_private.label =
-						strdup(fname);
+					    strdup(fname);
 					n++;
 				}
 				/*
@@ -1091,7 +1089,7 @@ exit:
 		uint32_t loaded_certs = 0;
 
 		rv = load_certs(kmfh, params, fullpath,
-			&certlist, &loaded_certs);
+		    &certlist, &loaded_certs);
 		if (rv != KMF_OK) {
 			free(fullpath);
 			return (rv);
@@ -1101,15 +1099,15 @@ exit:
 		if (kmf_cert != NULL && certlist != NULL) {
 			for (i = 0; i < loaded_certs && i < maxcerts; i++) {
 				kmf_cert[n].certificate.Data =
-					certlist[i].Data;
+				    certlist[i].Data;
 				kmf_cert[n].certificate.Length =
-					certlist[i].Length;
+				    certlist[i].Length;
 				kmf_cert[n].kmf_private.keystore_type =
-					KMF_KEYSTORE_OPENSSL;
+				    KMF_KEYSTORE_OPENSSL;
 				kmf_cert[n].kmf_private.flags =
-					KMF_FLAG_CERT_VALID;
+				    KMF_FLAG_CERT_VALID;
 				kmf_cert[n].kmf_private.label =
-					strdup(fullpath);
+				    strdup(fullpath);
 				n++;
 			}
 			/* If maxcerts < loaded_certs, clean up */
@@ -1177,7 +1175,7 @@ OpenSSL_StoreCert(KMF_HANDLE_T handle, KMF_STORECERT_PARAMS *params,
 
 
 	fullpath = get_fullpath(params->sslparms.dirpath,
-		params->sslparms.certfile);
+	    params->sslparms.certfile);
 	if (fullpath == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
@@ -1198,8 +1196,7 @@ OpenSSL_StoreCert(KMF_HANDLE_T handle, KMF_STORECERT_PARAMS *params,
 	}
 	(void) memcpy(outbuf, pcert->Data, pcert->Length);
 
-	if ((fp = fopen(fullpath, "w")) ==
-		NULL) {
+	if ((fp = fopen(fullpath, "w")) == NULL) {
 		SET_SYS_ERROR(kmfh, errno);
 		ret = KMF_ERR_INTERNAL;
 		goto out;
@@ -1270,7 +1267,7 @@ OpenSSL_DeleteCert(KMF_HANDLE_T handle, KMF_DELETECERT_PARAMS *params)
 	}
 
 	fullpath = get_fullpath(params->sslparms.dirpath,
-		params->sslparms.certfile);
+	    params->sslparms.certfile);
 
 	if (fullpath == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -1290,7 +1287,7 @@ OpenSSL_DeleteCert(KMF_HANDLE_T handle, KMF_DELETECERT_PARAMS *params)
 				char *fname;
 
 				fname = get_fullpath(fullpath,
-					(char *)&dp->d_name);
+				    (char *)&dp->d_name);
 
 				if (fname == NULL) {
 					rv = KMF_ERR_MEMORY;
@@ -1373,7 +1370,7 @@ OpenSSL_EncodePubKeyData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 		}
 		DSA_free(pubkey);
 	} else {
-	    return (KMF_ERR_BAD_PARAMETER);
+		return (KMF_ERR_BAD_PARAMETER);
 	}
 	keydata->Length = n;
 
@@ -1417,18 +1414,14 @@ ssl_write_private_key(KMF_HANDLE *kmfh, KMF_ENCODE_FORMAT format, BIO *out,
 			if (pkey->type == EVP_PKEY_RSA) {
 				rsa = EVP_PKEY_get1_RSA(pkey);
 				rv = PEM_write_bio_RSAPrivateKey(out,
-					rsa,
-					NULL /* encryption type */,
-					NULL, 0, NULL,
-					cred->cred);
+				    rsa, NULL /* encryption type */,
+				    NULL, 0, NULL, cred->cred);
 				RSA_free(rsa);
 			} else if (pkey->type == EVP_PKEY_DSA) {
 				dsa = EVP_PKEY_get1_DSA(pkey);
 				rv = PEM_write_bio_DSAPrivateKey(out,
-					dsa,
-					NULL /* encryption type */,
-					NULL, 0, NULL,
-					cred->cred);
+				    dsa, NULL /* encryption type */,
+				    NULL, 0, NULL, cred->cred);
 				DSA_free(dsa);
 			}
 
@@ -1466,7 +1459,7 @@ OpenSSL_CreateKeypair(KMF_HANDLE_T handle, KMF_CREATEKEYPAIR_PARAMS *params,
 	}
 
 	fullpath = get_fullpath(params->sslparms.dirpath,
-			params->sslparms.keyfile);
+	    params->sslparms.keyfile);
 
 	if (fullpath == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -1497,13 +1490,13 @@ OpenSSL_CreateKeypair(KMF_HANDLE_T handle, KMF_CREATEKEYPAIR_PARAMS *params,
 			eValue = *(uint32_t *)params->rsa_exponent.val;
 
 		sslPrivKey = RSA_generate_key(params->keylength, eValue,
-			NULL, NULL);
+		    NULL, NULL);
 		if (sslPrivKey == NULL) {
 			SET_ERROR(kmfh, ERR_get_error());
 			rv = KMF_ERR_KEYGEN_FAILED;
 		} else {
 			if (privkey != NULL &&
-				EVP_PKEY_set1_RSA(eprikey, sslPrivKey)) {
+			    EVP_PKEY_set1_RSA(eprikey, sslPrivKey)) {
 				privkey->kstype = KMF_KEYSTORE_OPENSSL;
 				privkey->keyalg = KMF_RSA;
 				privkey->keyclass = KMF_ASYM_PRI;
@@ -1513,7 +1506,7 @@ OpenSSL_CreateKeypair(KMF_HANDLE_T handle, KMF_CREATEKEYPAIR_PARAMS *params,
 			}
 			/* OpenSSL derives the public key from the private */
 			if (pubkey != NULL &&
-				EVP_PKEY_set1_RSA(epubkey, sslPrivKey)) {
+			    EVP_PKEY_set1_RSA(epubkey, sslPrivKey)) {
 				pubkey->kstype = KMF_KEYSTORE_OPENSSL;
 				pubkey->keyalg = KMF_RSA;
 				pubkey->israw = FALSE;
@@ -1530,19 +1523,19 @@ OpenSSL_CreateKeypair(KMF_HANDLE_T handle, KMF_CREATEKEYPAIR_PARAMS *params,
 		}
 
 		if ((sslDSAKey->p = BN_bin2bn(P, sizeof (P), sslDSAKey->p)) ==
-			NULL) {
+		    NULL) {
 			SET_ERROR(kmfh, ERR_get_error());
 			rv = KMF_ERR_KEYGEN_FAILED;
 			goto cleanup;
 		}
 		if ((sslDSAKey->q = BN_bin2bn(Q, sizeof (Q), sslDSAKey->q)) ==
-			NULL) {
+		    NULL) {
 			SET_ERROR(kmfh, ERR_get_error());
 			rv = KMF_ERR_KEYGEN_FAILED;
 			goto cleanup;
 		}
 		if ((sslDSAKey->g = BN_bin2bn(G, sizeof (G), sslDSAKey->g)) ==
-			NULL) {
+		    NULL) {
 			SET_ERROR(kmfh, ERR_get_error());
 			rv = KMF_ERR_KEYGEN_FAILED;
 			goto cleanup;
@@ -1691,9 +1684,9 @@ OpenSSL_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 	const EVP_MD *md;
 
 	if (key == NULL || AlgOID == NULL ||
-		tobesigned == NULL || output == NULL ||
-		tobesigned->Data == NULL ||
-		output->Data == NULL)
+	    tobesigned == NULL || output == NULL ||
+	    tobesigned->Data == NULL ||
+	    output->Data == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
 	/* Map the OID to an OpenSSL algorithm */
@@ -1721,8 +1714,8 @@ OpenSSL_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 
 			p = output->Data;
 			if ((len = RSA_private_encrypt(tobesigned->Length,
-				tobesigned->Data, p, rsa,
-				RSA_PKCS1_PADDING)) <= 0) {
+			    tobesigned->Data, p, rsa,
+			    RSA_PKCS1_PADDING)) <= 0) {
 				SET_ERROR(kmfh, ERR_get_error());
 				ret = KMF_ERR_INTERNAL;
 			}
@@ -1731,7 +1724,7 @@ OpenSSL_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 			(void) EVP_MD_CTX_init(&ctx);
 			(void) EVP_SignInit_ex(&ctx, md, NULL);
 			(void) EVP_SignUpdate(&ctx, tobesigned->Data,
-				(uint32_t)tobesigned->Length);
+			    (uint32_t)tobesigned->Length);
 			len = (uint32_t)output->Length;
 			p = output->Data;
 			if (!EVP_SignFinal(&ctx, p, (uint32_t *)&len, pkey)) {
@@ -1761,7 +1754,7 @@ OpenSSL_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 		EVP_MD_CTX_init(&ctx);
 		(void) EVP_DigestInit_ex(&ctx, md, NULL);
 		(void) EVP_DigestUpdate(&ctx, tobesigned->Data,
-			tobesigned->Length);
+		    tobesigned->Length);
 		(void) EVP_DigestFinal_ex(&ctx, hash, &hashlen);
 		(void) EVP_MD_CTX_cleanup(&ctx);
 
@@ -1770,7 +1763,7 @@ OpenSSL_SignData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 			int i;
 			output->Length = i = BN_bn2bin(dsasig->r, output->Data);
 			output->Length += BN_bn2bin(dsasig->s,
-				&output->Data[i]);
+			    &output->Data[i]);
 			DSA_SIG_free(dsasig);
 		} else {
 			SET_ERROR(kmfh, ERR_get_error());
@@ -1792,8 +1785,8 @@ OpenSSL_DeleteKey(KMF_HANDLE_T handle, KMF_DELETEKEY_PARAMS *params,
 		return (KMF_ERR_BAD_PARAMETER);
 
 	if (key->keyclass != KMF_ASYM_PUB &&
-		key->keyclass != KMF_ASYM_PRI &&
-		key->keyclass != KMF_SYMMETRIC)
+	    key->keyclass != KMF_ASYM_PRI &&
+	    key->keyclass != KMF_SYMMETRIC)
 		return (KMF_ERR_BAD_KEY_CLASS);
 
 	if (key->keyclass == KMF_SYMMETRIC) {
@@ -1856,7 +1849,7 @@ OpenSSL_ImportCRL(KMF_HANDLE_T handle, KMF_IMPORTCRL_PARAMS *params)
 	}
 
 	outcrlfile = get_fullpath(params->sslparms.dirpath,
-		params->sslparms.outcrlfile);
+	    params->sslparms.outcrlfile);
 
 	if (outcrlfile == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -2004,7 +1997,7 @@ OpenSSL_ListCRL(KMF_HANDLE_T handle, KMF_LISTCRL_PARAMS *params,
 	}
 
 	crlfile = get_fullpath(params->sslparms.dirpath,
-		params->sslparms.crlfile);
+	    params->sslparms.crlfile);
 
 	if (crlfile == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -2097,7 +2090,7 @@ OpenSSL_DeleteCRL(KMF_HANDLE_T handle, KMF_DELETECRL_PARAMS *params)
 	}
 
 	crlfile = get_fullpath(params->sslparms.dirpath,
-		params->sslparms.crlfile);
+	    params->sslparms.crlfile);
 
 	if (crlfile == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -2360,7 +2353,7 @@ OpenSSL_CertGetPrintable(KMF_HANDLE_T handle, const KMF_DATA *pcert,
 		if (i2a_ASN1_INTEGER(mem, X509_get_serialNumber(xcert)) > 0) {
 			(void) strcpy(resultStr, "0x");
 			len = BIO_gets(mem, &resultStr[2],
-				KMF_CERT_PRINTABLE_LEN - 2);
+			    KMF_CERT_PRINTABLE_LEN - 2);
 		}
 		break;
 
@@ -2385,16 +2378,16 @@ OpenSSL_CertGetPrintable(KMF_HANDLE_T handle, const KMF_DATA *pcert,
 
 			if (pkey->type == EVP_PKEY_RSA) {
 				(void) BIO_printf(mem,
-					"RSA Public Key: (%d bit)\n",
-					BN_num_bits(pkey->pkey.rsa->n));
+				    "RSA Public Key: (%d bit)\n",
+				    BN_num_bits(pkey->pkey.rsa->n));
 				(void) RSA_print(mem, pkey->pkey.rsa, 0);
 			} else if (pkey->type == EVP_PKEY_DSA) {
 				(void) BIO_printf(mem,
-					"%12sDSA Public Key:\n", "");
+				    "%12sDSA Public Key:\n", "");
 				(void) DSA_print(mem, pkey->pkey.dsa, 0);
 			} else {
 				(void) BIO_printf(mem,
-					"%12sUnknown Public Key:\n", "");
+				    "%12sUnknown Public Key:\n", "");
 			}
 			(void) BIO_printf(mem, "\n");
 			EVP_PKEY_free(pkey);
@@ -2405,15 +2398,15 @@ OpenSSL_CertGetPrintable(KMF_HANDLE_T handle, const KMF_DATA *pcert,
 	case KMF_CERT_PUBKEY_ALG:
 		if (flag == KMF_CERT_SIGNATURE_ALG) {
 			len = i2a_ASN1_OBJECT(mem,
-				xcert->sig_alg->algorithm);
+			    xcert->sig_alg->algorithm);
 		} else {
 			len = i2a_ASN1_OBJECT(mem,
-				xcert->cert_info->key->algor->algorithm);
+			    xcert->cert_info->key->algor->algorithm);
 		}
 
 		if (len > 0) {
 			len = BIO_read(mem, resultStr,
-				KMF_CERT_PRINTABLE_LEN);
+			    KMF_CERT_PRINTABLE_LEN);
 		}
 		break;
 
@@ -2459,8 +2452,8 @@ OpenSSL_CertGetPrintable(KMF_HANDLE_T handle, const KMF_DATA *pcert,
 		(void) i2a_ASN1_OBJECT(mem, X509_EXTENSION_get_object(ex));
 
 		if (BIO_printf(mem, ": %s\n",
-			X509_EXTENSION_get_critical(ex) ? "critical" : "") <=
-			0) {
+		    X509_EXTENSION_get_critical(ex) ? "critical" : "") <=
+		    0) {
 			SET_ERROR(kmfh, ERR_get_error());
 			ret = KMF_ERR_ENCODING;
 			goto out;
@@ -2560,7 +2553,7 @@ OpenSSL_DecryptData(KMF_HANDLE_T handle, KMF_KEY_HANDLE *key,
 
 	for (i = 0; i < blocks; i++) {
 		out_len  = RSA_private_decrypt(in_len,
-			in_data, out_data, rsa, RSA_PKCS1_PADDING);
+		    in_data, out_data, rsa, RSA_PKCS1_PADDING);
 
 		if (out_len == 0) {
 			ret = KMF_ERR_INTERNAL;
@@ -2605,7 +2598,7 @@ create_certid(KMF_HANDLE_T handle, const KMF_DATA *issuer_cert,
 	/* convert the DER-encoded issuer cert to an internal X509 */
 	ptmp = issuer_cert->Data;
 	issuer = d2i_X509(NULL, (const uchar_t **)&ptmp,
-		issuer_cert->Length);
+	    issuer_cert->Length);
 	if (issuer == NULL) {
 		SET_ERROR(kmfh, ERR_get_error());
 		ret = KMF_ERR_OCSP_BAD_ISSUER;
@@ -2615,7 +2608,7 @@ create_certid(KMF_HANDLE_T handle, const KMF_DATA *issuer_cert,
 	/* convert the DER-encoded user cert to an internal X509 */
 	ptmp = user_cert->Data;
 	cert = d2i_X509(NULL, (const uchar_t **)&ptmp,
-		user_cert->Length);
+	    user_cert->Length);
 	if (cert == NULL) {
 		SET_ERROR(kmfh, ERR_get_error());
 
@@ -2799,7 +2792,7 @@ check_response_signature(KMF_HANDLE_T handle, OCSP_BASICRESP *bs,
 		 */
 		ptmp = issuer_cert->Data;
 		issuer = d2i_X509(NULL, (const uchar_t **)&ptmp,
-			issuer_cert->Length);
+		    issuer_cert->Length);
 		if (issuer == NULL) {
 			SET_ERROR(kmfh, ERR_get_error());
 			ret = KMF_ERR_OCSP_BAD_ISSUER;
@@ -3100,12 +3093,12 @@ OpenSSL_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *params,
 		return (KMF_ERR_BAD_PARAMETER);
 
 	if (params->keyclass != KMF_ASYM_PUB &&
-		params->keyclass != KMF_ASYM_PRI &&
-		params->keyclass != KMF_SYMMETRIC)
+	    params->keyclass != KMF_ASYM_PRI &&
+	    params->keyclass != KMF_SYMMETRIC)
 		return (KMF_ERR_BAD_KEY_CLASS);
 
 	fullpath = get_fullpath(params->sslparms.dirpath,
-		params->sslparms.keyfile);
+	    params->sslparms.keyfile);
 
 	if (fullpath == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -3132,11 +3125,11 @@ OpenSSL_FindKey(KMF_HANDLE_T handle, KMF_FINDKEY_PARAMS *params,
 				char *fname;
 
 				fname = get_fullpath(fullpath,
-					(char *)&dp->d_name);
+				    (char *)&dp->d_name);
 
 				rv = fetch_key(handle, fname,
-					params->keyclass,
-					key ? &key[n] : NULL);
+				    params->keyclass,
+				    key ? &key[n] : NULL);
 
 				if (rv == KMF_OK)
 					n++;
@@ -3206,7 +3199,7 @@ write_pkcs12(KMF_HANDLE *kmfh,
 	if (sslcert != NULL && pkey != NULL) {
 		if (X509_check_private_key(sslcert, pkey)) {
 			(void) X509_digest(sslcert, EVP_sha1(), keyid,
-				&keyidlen);
+			    &keyidlen);
 		} else {
 			/* The key doesn't match the cert */
 			HANDLE_PK12_ERROR
@@ -3226,7 +3219,7 @@ write_pkcs12(KMF_HANDLE *kmfh,
 
 		/* Add the key id to the certificate bag. */
 		if (keyidlen > 0 &&
-			!PKCS12_add_localkeyid(bag, keyid, keyidlen)) {
+		    !PKCS12_add_localkeyid(bag, keyid, keyidlen)) {
 			HANDLE_PK12_ERROR
 		}
 
@@ -3244,7 +3237,7 @@ write_pkcs12(KMF_HANDLE *kmfh,
 
 				uchar_t *p = (uchar_t *)c->certificate.Data;
 				ca = d2i_X509(NULL, &p,
-					c->certificate.Length);
+				    c->certificate.Length);
 				if (ca == NULL) {
 					HANDLE_PK12_ERROR
 				}
@@ -3264,11 +3257,9 @@ write_pkcs12(KMF_HANDLE *kmfh,
 #endif
 		/* Turn bag_stack of certs into encrypted authsafe. */
 		cert_authsafe = PKCS12_pack_p7encdata(
-			NID_pbe_WithSHA1And40BitRC2_CBC,
-			cred->cred,
-			cred->credlen, NULL, 0,
-			PKCS12_DEFAULT_ITER,
-			bag_stack);
+		    NID_pbe_WithSHA1And40BitRC2_CBC,
+		    cred->cred, cred->credlen, NULL, 0,
+		    PKCS12_DEFAULT_ITER, bag_stack);
 
 		/* Clear away this bag_stack, we're done with it. */
 		sk_PKCS12_SAFEBAG_pop_free(bag_stack, PKCS12_SAFEBAG_free);
@@ -3294,9 +3285,9 @@ write_pkcs12(KMF_HANDLE *kmfh,
 		}
 		/* Put the shrouded key into a PKCS#12 bag. */
 		bag = PKCS12_MAKE_SHKEYBAG(
-			NID_pbe_WithSHA1And3_Key_TripleDES_CBC,
-			cred->cred, cred->credlen,
-			NULL, 0, PKCS12_DEFAULT_ITER, p8);
+		    NID_pbe_WithSHA1And3_Key_TripleDES_CBC,
+		    cred->cred, cred->credlen,
+		    NULL, 0, PKCS12_DEFAULT_ITER, p8);
 
 		/* Clean up the PKCS#8 shrouded key, don't need it now. */
 		PKCS8_PRIV_KEY_INFO_free(p8);
@@ -3306,12 +3297,12 @@ write_pkcs12(KMF_HANDLE *kmfh,
 			HANDLE_PK12_ERROR
 		}
 		if (keyidlen &&
-			!PKCS12_add_localkeyid(bag, keyid, keyidlen)) {
+		    !PKCS12_add_localkeyid(bag, keyid, keyidlen)) {
 			HANDLE_PK12_ERROR
 		}
 		if (lab != NULL) {
 			if (!PKCS12_add_friendlyname(bag,
-				(char *)lab, lab_len)) {
+			    (char *)lab, lab_len)) {
 				HANDLE_PK12_ERROR
 			}
 		}
@@ -3374,7 +3365,7 @@ write_pkcs12(KMF_HANDLE *kmfh,
 
 	/* Set the integrity MAC on the PKCS#12 element. */
 	if (!PKCS12_set_mac(p12_elem, cred->cred, cred->credlen,
-		NULL, 0, PKCS12_DEFAULT_ITER, NULL)) {
+	    NULL, 0, PKCS12_DEFAULT_ITER, NULL)) {
 		HANDLE_PK12_ERROR
 	}
 
@@ -3406,37 +3397,37 @@ ImportRawRSAKey(KMF_RAW_RSA_KEY *key)
 		return (NULL);
 
 	if ((rsa->e = BN_bin2bn(key->pubexp.val, key->pubexp.len, rsa->e)) ==
-		NULL)
+	    NULL)
 		return (NULL);
 
 	if (key->priexp.val != NULL)
 		if ((rsa->d = BN_bin2bn(key->priexp.val, key->priexp.len,
-			rsa->d)) == NULL)
+		    rsa->d)) == NULL)
 			return (NULL);
 
 	if (key->prime1.val != NULL)
 		if ((rsa->p = BN_bin2bn(key->prime1.val, key->prime1.len,
-			rsa->p)) == NULL)
+		    rsa->p)) == NULL)
 			return (NULL);
 
 	if (key->prime2.val != NULL)
 		if ((rsa->q = BN_bin2bn(key->prime2.val, key->prime2.len,
-			rsa->q)) == NULL)
+		    rsa->q)) == NULL)
 			return (NULL);
 
 	if (key->exp1.val != NULL)
 		if ((rsa->dmp1 = BN_bin2bn(key->exp1.val, key->exp1.len,
-			rsa->dmp1)) == NULL)
+		    rsa->dmp1)) == NULL)
 			return (NULL);
 
 	if (key->exp2.val != NULL)
 		if ((rsa->dmq1 = BN_bin2bn(key->exp2.val, key->exp2.len,
-			rsa->dmq1)) == NULL)
+		    rsa->dmq1)) == NULL)
 			return (NULL);
 
 	if (key->coef.val != NULL)
 		if ((rsa->iqmp = BN_bin2bn(key->coef.val, key->coef.len,
-			rsa->iqmp)) == NULL)
+		    rsa->iqmp)) == NULL)
 			return (NULL);
 
 	if ((newkey = EVP_PKEY_new()) == NULL)
@@ -3460,19 +3451,19 @@ ImportRawDSAKey(KMF_RAW_DSA_KEY *key)
 		return (NULL);
 
 	if ((dsa->p = BN_bin2bn(key->prime.val, key->prime.len,
-		dsa->p)) == NULL)
+	    dsa->p)) == NULL)
 		return (NULL);
 
 	if ((dsa->q = BN_bin2bn(key->subprime.val, key->subprime.len,
-		dsa->q)) == NULL)
+	    dsa->q)) == NULL)
 		return (NULL);
 
 	if ((dsa->g = BN_bin2bn(key->base.val, key->base.len,
-		dsa->g)) == NULL)
+	    dsa->g)) == NULL)
 		return (NULL);
 
 	if ((dsa->priv_key = BN_bin2bn(key->value.val, key->value.len,
-		dsa->priv_key)) == NULL)
+	    dsa->priv_key)) == NULL)
 		return (NULL);
 
 	if ((newkey = EVP_PKEY_new()) == NULL)
@@ -3519,10 +3510,10 @@ ExportPK12FromRawData(KMF_HANDLE_T handle,
 
 				if (key->keytype == KMF_RSA) {
 					pkey = ImportRawRSAKey(
-						&key->rawdata.rsa);
+					    &key->rawdata.rsa);
 				} else if (key->keytype == KMF_DSA) {
 					pkey = ImportRawDSAKey(
-						&key->rawdata.dsa);
+					    &key->rawdata.dsa);
 				} else {
 					rv = KMF_ERR_BAD_PARAMETER;
 				}
@@ -3580,16 +3571,14 @@ OpenSSL_ExportP12(KMF_HANDLE_T handle,
 	 */
 	if (certlist != NULL || keylist != NULL) {
 		rv = ExportPK12FromRawData(handle,
-			&params->p12cred,
-			numcerts, certlist,
-			numkeys, keylist,
-			filename);
+		    &params->p12cred, numcerts, certlist,
+		    numkeys, keylist, filename);
 		return (rv);
 	}
 
 	if (params->sslparms.certfile != NULL) {
 		fullpath = get_fullpath(params->sslparms.dirpath,
-			params->sslparms.certfile);
+		    params->sslparms.certfile);
 
 		if (fullpath == NULL)
 			return (KMF_ERR_BAD_PARAMETER);
@@ -3620,7 +3609,7 @@ OpenSSL_ExportP12(KMF_HANDLE_T handle,
 	 */
 	if (params->sslparms.keyfile != NULL) {
 		fullpath = get_fullpath(params->sslparms.dirpath,
-			params->sslparms.keyfile);
+		    params->sslparms.keyfile);
 
 		if (fullpath == NULL)
 			return (KMF_ERR_BAD_PARAMETER);
@@ -3648,7 +3637,7 @@ OpenSSL_ExportP12(KMF_HANDLE_T handle,
 
 	/* Stick the key and the cert into a PKCS#12 file */
 	rv = write_pkcs12(kmfh, bio, &params->p12cred,
-		pkey, xcert);
+	    pkey, xcert);
 
 end:
 	if (fullpath)
@@ -3679,7 +3668,7 @@ extract_objects(KMF_HANDLE *kmfh, KMF_FINDCERT_PARAMS *params,
 {
 	KMF_RETURN rv = KMF_OK;
 	FILE *fp;
-	STACK_OF(X509_INFO) *x509_info_stack;
+	STACK_OF(X509_INFO) *x509_info_stack = NULL;
 	int i, ncerts = 0, matchcerts = 0;
 	EVP_PKEY *pkey = NULL;
 	X509_INFO *info;
@@ -3701,16 +3690,18 @@ extract_objects(KMF_HANDLE *kmfh, KMF_FINDCERT_PARAMS *params,
 		return (KMF_ERR_ENCODING);
 	}
 
-	/*LINTED*/
-	while ((info = sk_X509_INFO_pop(x509_info_stack)) != NULL &&
-		info->x509 != NULL && ncerts < MAX_CHAIN_LENGTH) {
-		cert_infos[ncerts] = info;
+	for (i = 0;
+	    i < sk_X509_INFO_num(x509_info_stack) && i < MAX_CHAIN_LENGTH;
+	    i++) {
+		/*LINTED*/
+		cert_infos[ncerts] = sk_X509_INFO_value(x509_info_stack, i);
 		ncerts++;
 	}
 
 	if (ncerts == 0) {
 		(void) fclose(fp);
-		return (KMF_ERR_CERT_NOT_FOUND);
+		rv = KMF_ERR_CERT_NOT_FOUND;
+		goto err;
 	}
 
 	if (priv_key != NULL) {
@@ -3725,15 +3716,16 @@ extract_objects(KMF_HANDLE *kmfh, KMF_FINDCERT_PARAMS *params,
 	 */
 	if (pkey != NULL && !X509_check_private_key(x, pkey)) {
 		EVP_PKEY_free(pkey);
-		return (KMF_ERR_KEY_MISMATCH);
+		rv = KMF_ERR_KEY_MISMATCH;
+		goto err;
 	}
 
 	certlist = (KMF_DATA *)malloc(ncerts * sizeof (KMF_DATA));
 	if (certlist == NULL) {
 		if (pkey != NULL)
 			EVP_PKEY_free(pkey);
-		X509_INFO_free(info);
-		return (KMF_ERR_MEMORY);
+		rv = KMF_ERR_MEMORY;
+		goto err;
 	}
 
 	/*
@@ -3747,7 +3739,6 @@ extract_objects(KMF_HANDLE *kmfh, KMF_FINDCERT_PARAMS *params,
 		if (params != NULL) {
 			rv = check_cert(info->x509, params, &match);
 			if (rv != KMF_OK || match != TRUE) {
-				X509_INFO_free(info);
 				rv = KMF_OK;
 				continue;
 			}
@@ -3761,8 +3752,6 @@ extract_objects(KMF_HANDLE *kmfh, KMF_FINDCERT_PARAMS *params,
 			certlist = NULL;
 			ncerts = matchcerts = 0;
 		}
-
-		X509_INFO_free(info);
 	}
 
 	if (numcerts != NULL)
@@ -3774,6 +3763,16 @@ extract_objects(KMF_HANDLE *kmfh, KMF_FINDCERT_PARAMS *params,
 		EVP_PKEY_free(pkey);
 	else if (priv_key != NULL && pkey != NULL)
 		*priv_key = pkey;
+
+err:
+	/* Cleanup the stack of X509 info records */
+	for (i = 0; i < sk_X509_INFO_num(x509_info_stack); i++) {
+		/*LINTED*/
+		info = (X509_INFO *)sk_X509_INFO_value(x509_info_stack, i);
+		X509_INFO_free(info);
+	}
+	if (x509_info_stack)
+		sk_X509_INFO_free(x509_info_stack);
 
 	return (rv);
 }
@@ -3970,7 +3969,7 @@ add_key_to_list(KMF_RAW_KEY_DATA **keylist,
 		list = (KMF_RAW_KEY_DATA *)malloc(sizeof (KMF_RAW_KEY_DATA));
 	} else {
 		list = (KMF_RAW_KEY_DATA *)realloc(list,
-			sizeof (KMF_RAW_KEY_DATA) * (n + 1));
+		    sizeof (KMF_RAW_KEY_DATA) * (n + 1));
 	}
 
 	if (list == NULL)
@@ -4001,14 +4000,14 @@ convertPK12Objects(
 		switch (sslkey->type) {
 			case EVP_PKEY_RSA:
 				rv = exportRawRSAKey(EVP_PKEY_get1_RSA(sslkey),
-					&key);
+				    &key);
 				if (rv != KMF_OK)
 					return (rv);
 
 				break;
 			case EVP_PKEY_DSA:
 				rv = exportRawDSAKey(EVP_PKEY_get1_DSA(sslkey),
-					&key);
+				    &key);
 				if (rv != KMF_OK)
 					return (rv);
 
@@ -4073,15 +4072,13 @@ openssl_read_pkcs12(KMF_HANDLE *kmfh,
 	*ncerts = 0;
 	*nkeys = 0;
 
-	rv = extract_pkcs12(bio,
-		(uchar_t *)cred->cred,
-		(uint32_t)cred->credlen,
-		&privkey, &cert, &cacerts);
+	rv = extract_pkcs12(bio, (uchar_t *)cred->cred,
+	    (uint32_t)cred->credlen, &privkey, &cert, &cacerts);
 
 	if (rv == KMF_OK)
 		/* Convert keys and certs to exportable format */
 		rv = convertPK12Objects(kmfh, privkey, cert, cacerts,
-			keylist, nkeys, certlist, ncerts);
+		    keylist, nkeys, certlist, ncerts);
 
 end:
 	if (bio != NULL)
@@ -4122,7 +4119,7 @@ openssl_import_keypair(KMF_HANDLE *kmfh,
 
 	/* This function only works on PEM files */
 	if (format != KMF_FORMAT_PEM &&
-		format != KMF_FORMAT_PEM_KEYPAIR)
+	    format != KMF_FORMAT_PEM_KEYPAIR)
 		return (KMF_ERR_ENCODING);
 
 	*certlist = NULL;
@@ -4130,15 +4127,14 @@ openssl_import_keypair(KMF_HANDLE *kmfh,
 	*ncerts = 0;
 	*nkeys = 0;
 	rv = extract_objects(kmfh, NULL, filename,
-		(uchar_t *)cred->cred,
-		(uint32_t)cred->credlen,
-		&privkey, certlist, ncerts);
+	    (uchar_t *)cred->cred, (uint32_t)cred->credlen,
+	    &privkey, certlist, ncerts);
 
 	/* Reached end of import file? */
 	if (rv == KMF_OK)
 		/* Convert keys and certs to exportable format */
 		rv = convertPK12Objects(kmfh, privkey, NULL, NULL,
-			keylist, nkeys, NULL, NULL);
+		    keylist, nkeys, NULL, NULL);
 
 end:
 	if (privkey)
@@ -4172,7 +4168,7 @@ OpenSSL_StorePrivateKey(KMF_HANDLE_T handle, KMF_STOREKEY_PARAMS *params,
 		return (rv);
 
 	fullpath = get_fullpath(params->sslparms.dirpath,
-			params->sslparms.keyfile);
+	    params->sslparms.keyfile);
 
 	if (fullpath == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
@@ -4190,9 +4186,8 @@ OpenSSL_StorePrivateKey(KMF_HANDLE_T handle, KMF_STOREKEY_PARAMS *params,
 		goto cleanup;
 	}
 
-	rv = ssl_write_private_key(kmfh,
-		params->sslparms.format,
-		bio, &params->cred, pkey);
+	rv = ssl_write_private_key(kmfh, params->sslparms.format,
+	    bio, &params->cred, pkey);
 
 cleanup:
 	if (fullpath)
@@ -4347,7 +4342,7 @@ OpenSSL_CreateSymKey(KMF_HANDLE_T handle, KMF_CREATESYMKEY_PARAMS *params,
 	}
 
 	fullpath = get_fullpath(params->sslparms.dirpath,
-		params->sslparms.keyfile);
+	    params->sslparms.keyfile);
 	if (fullpath == NULL)
 		return (KMF_ERR_BAD_PARAMETER);
 
@@ -4687,7 +4682,7 @@ OpenSSL_IsCertFile(KMF_HANDLE_T handle, char *filename,
 
 	if ((*pformat) == KMF_FORMAT_PEM) {
 		if ((xcert = PEM_read_bio_X509(bio, NULL,
-			NULL, NULL)) == NULL) {
+		    NULL, NULL)) == NULL) {
 			ret = KMF_ERR_BAD_CERTFILE;
 		}
 	} else if ((*pformat) == KMF_FORMAT_ASN1) {
@@ -4884,7 +4879,7 @@ OpenSSL_VerifyDataWithCert(KMF_HANDLE_T handle,
 
 	/* Decrypt the input signature */
 	len = RSA_public_decrypt(insig->Length,
-		insig->Data, rsaout, pkey->pkey.rsa, RSA_PKCS1_PADDING);
+	    insig->Data, rsaout, pkey->pkey.rsa, RSA_PKCS1_PADDING);
 	if (len < 1) {
 		SET_ERROR(kmfh, ERR_get_error());
 		ret = KMF_ERR_BAD_PARAMETER;
@@ -4911,11 +4906,11 @@ OpenSSL_VerifyDataWithCert(KMF_HANDLE_T handle,
 			}
 			(void) EVP_DigestInit(&ctx, md);
 			(void) EVP_DigestUpdate(&ctx, indata->Data,
-				indata->Length);
+			    indata->Length);
 
 			/* Add the digest AFTER the ASN1 prefix */
 			(void) EVP_DigestFinal(&ctx,
-				(uchar_t *)digest + pfxlen, &dlen);
+			    (uchar_t *)digest + pfxlen, &dlen);
 
 			dlen += pfxlen;
 		} else {
