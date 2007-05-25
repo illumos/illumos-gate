@@ -166,6 +166,9 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
+
+hrtime_t niumx_intr_timeout = 2ull * NANOSEC; /* 2 seconds in nanoseconds */
+
 void
 niumx_intr_dist(void *arg)
 {
@@ -178,7 +181,9 @@ niumx_intr_dist(void *arg)
 	for (; i < NIUMX_MAX_INTRS; i++, ih_p++) {
 		sysino_t sysino = ih_p->ih_sysino;
 		cpuid_t	cpuid;
-		int	intr_state;
+		int	intr_state, state;
+		hrtime_t	start;
+		dev_info_t	*dip = ih_p->ih_dip;
 		if (!sysino ||	/* sequence is significant */
 		    (hvio_intr_getvalid(sysino, &intr_state) != H_EOK) ||
 		    (intr_state == HV_INTR_NOTVALID) ||
@@ -186,6 +191,21 @@ niumx_intr_dist(void *arg)
 			continue;
 
 		(void) hvio_intr_setvalid(sysino, HV_INTR_NOTVALID);
+
+		/* check for pending interrupts, busy wait if so */
+		for (start = gethrtime(); !panicstr &&
+		    (hvio_intr_getstate(sysino, &state) == H_EOK) &&
+		    (state == HV_INTR_DELIVERED_STATE); /* */) {
+			if (gethrtime() - start > niumx_intr_timeout) {
+				cmn_err(CE_WARN, "%s%d: niumx_intr_dist: "
+				    "pending interrupt (%x,%lx) timedout\n",
+				    ddi_driver_name(dip), ddi_get_instance(dip),
+				    ih_p->ih_inum, sysino);
+				(void) hvio_intr_setstate(sysino,
+					HV_INTR_IDLE_STATE);
+				break;
+			}
+		}
 		(void) hvio_intr_settarget(sysino, cpuid);
 		(void) hvio_intr_setvalid(sysino, HV_INTR_VALID);
 		ih_p->ih_cpuid = cpuid;
@@ -895,10 +915,10 @@ niumx_rem_intr(dev_info_t *dip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp)
 {
 	niumx_ih_t	*ih_p;
-	cpuid_t		curr_cpu;
 	devino_t	*inos_p;
-	int		inoslen, ret = DDI_SUCCESS;
-	uint64_t	hvret;
+	int		inoslen, ret = DDI_SUCCESS, state;
+	hrtime_t	start;
+	sysino_t 	sysino;
 
 	ASSERT(hdlp->ih_inum < NIUMX_MAX_INTRS);
 
@@ -909,21 +929,26 @@ niumx_rem_intr(dev_info_t *dip, dev_info_t *rdip,
 		goto fail1;
 	}
 	ih_p = niumx_ihtable + inos_p[hdlp->ih_inum];
-	DBG(DBG_R_INTX, dip, "removing (%x,%x)\n", ih_p->ih_inum,
-			ih_p->ih_sysino);
+	sysino = ih_p->ih_sysino;
+	DBG(DBG_R_INTX, dip, "removing (%x,%x)\n", ih_p->ih_inum, sysino);
 
-	/* Get the current cpu */
-	if ((hvret = hvio_intr_gettarget(ih_p->ih_sysino, &curr_cpu))
-		!= H_EOK) {
-		DBG(DBG_R_INTX, dip, "hvio_intr_gettarget failed, ret 0x%x\n",
-			hvret);
-		ret = DDI_FAILURE;
-		goto fail2;
+	(void) hvio_intr_setvalid(sysino, HV_INTR_NOTVALID);
+
+	/* check for pending interrupts, busy wait if so */
+	for (start = gethrtime(); !panicstr &&
+	    (hvio_intr_getstate(sysino, &state) == H_EOK) &&
+	    (state == HV_INTR_DELIVERED_STATE); /* */) {
+		if (gethrtime() - start > niumx_intr_timeout) {
+			cmn_err(CE_WARN, "%s%d: niumx_intr_dist: "
+			    "pending interrupt (%x,%lx) timedout\n",
+			    ddi_driver_name(dip), ddi_get_instance(dip),
+			    ih_p->ih_inum, sysino);
+			ret = DDI_FAILURE;
+			goto fail2;
+		}
 	}
 
-	intr_dist_cpuid_rem_device_weight(ih_p->ih_cpuid, rdip);
-
-	hdlp->ih_vector = ih_p->ih_sysino;
+	hdlp->ih_vector = (uint32_t)sysino;
 	if (hdlp->ih_vector !=  NULL) i_ddi_rem_ivintr(hdlp);
 
 fail2:
