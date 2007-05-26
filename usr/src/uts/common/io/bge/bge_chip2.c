@@ -1856,6 +1856,7 @@ bge_nvmem_id(bge_t *bgep)
 	case DEVICE_ID_5752:
 	case DEVICE_ID_5752M:
 	case DEVICE_ID_5754:
+	case DEVICE_ID_5755:
 	case DEVICE_ID_5721:
 	case DEVICE_ID_5714C:
 	case DEVICE_ID_5714S:
@@ -2039,6 +2040,24 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->mbuf_base = bge_mbuf_pool_base_5705;
 		cidp->mbuf_length = bge_mbuf_pool_len_5705;
 		cidp->recv_slots = BGE_RECV_SLOTS_5705;
+		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
+		cidp->flags |= CHIP_FLAG_NO_JUMBO;
+		cidp->flags |= CHIP_FLAG_PARTIAL_CSUM;
+		cidp->statistic_type = BGE_STAT_REG;
+		dev_ok = B_TRUE;
+		break;
+
+	case DEVICE_ID_5755:
+		cidp->chip_label = 5755;
+		cidp->pci_type = BGE_PCI_E;
+		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
+		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
+		cidp->mbuf_hi_water = MBUF_HIWAT_5705;
+		cidp->mbuf_base = bge_mbuf_pool_base_5705;
+		cidp->mbuf_length = bge_mbuf_pool_len_5705;
+		cidp->recv_slots = BGE_RECV_SLOTS_5705;
+		cidp->bge_mlcr_default |= MLCR_MISC_PINS_OUTPUT_ENABLE_1;
 		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
 		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
@@ -2436,7 +2455,9 @@ bge_chip_reset_engine(bge_t *bgep, bge_regno_t regno)
 				if (bgep->chipid.asic_rev ==
 				    MHCR_CHIP_REV_5751_A0 ||
 				    bgep->chipid.asic_rev ==
-				    MHCR_CHIP_REV_5721_A0) {
+				    MHCR_CHIP_REV_5721_A0 ||
+				    bgep->chipid.asic_rev ==
+				    MHCR_CHIP_REV_5755_A0) {
 					val32 = bge_reg_get32(bgep,
 					    PHY_TEST_CTRL_REG);
 					if (val32 == (PHY_PCIE_SCRAM_MODE |
@@ -3140,6 +3161,7 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	if ((bgep->chipid.chip_label == 5721) ||
 		(bgep->chipid.chip_label == 5751) ||
 		(bgep->chipid.chip_label == 5752) ||
+		(bgep->chipid.chip_label == 5755) ||
 		(bgep->chipid.chip_label == 5789))
 		bge_reg_set32(bgep, TLP_CONTROL_REG, TLP_DATA_FIFO_PROTECT);
 
@@ -3345,6 +3367,7 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	uint32_t mtu;
 	uint32_t maxring;
 	uint32_t stats_mask;
+	uint32_t dma_wrprio;
 	uint64_t ring;
 	int retval = DDI_SUCCESS;
 
@@ -3690,8 +3713,14 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	if (DEVICE_5704_SERIES_CHIPSETS(bgep))
 		if (!bge_chip_enable_engine(bgep, DMA_COMPLETION_MODE_REG, 0))
 			retval = DDI_FAILURE;
+	dma_wrprio = (bge_dma_wrprio << DMA_PRIORITY_SHIFT) |
+				ALL_DMA_ATTN_BITS;
+	if (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
+		MHCR_CHIP_ASIC_REV_5755) {
+		dma_wrprio |= DMA_STATUS_TAG_FIX_CQ12384;
+	}
 	if (!bge_chip_enable_engine(bgep, WRITE_DMA_MODE_REG,
-	    (bge_dma_wrprio << DMA_PRIORITY_SHIFT) | ALL_DMA_ATTN_BITS))
+			dma_wrprio))
 		retval = DDI_FAILURE;
 	if (!bge_chip_enable_engine(bgep, READ_DMA_MODE_REG,
 	    (bge_dma_rdprio << DMA_PRIORITY_SHIFT) | ALL_DMA_ATTN_BITS))

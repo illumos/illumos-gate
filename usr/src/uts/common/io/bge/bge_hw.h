@@ -78,6 +78,7 @@ extern "C" {
 #define	DEVICE_ID_5752			0x1600
 #define	DEVICE_ID_5752M			0x1601
 #define	DEVICE_ID_5754			0x167a
+#define	DEVICE_ID_5755			0x167b
 #define	DEVICE_ID_5721			0x1659
 #define	DEVICE_ID_5714C			0x1668
 #define	DEVICE_ID_5714S			0x1669
@@ -157,7 +158,8 @@ extern "C" {
 		(bgep->chipid.device == DEVICE_ID_5782) ||\
 		(bgep->chipid.device == DEVICE_ID_5788) ||\
 		(bgep->chipid.device == DEVICE_ID_5705_2) ||\
-		(bgep->chipid.device == DEVICE_ID_5754))
+		(bgep->chipid.device == DEVICE_ID_5754) ||\
+		(bgep->chipid.device == DEVICE_ID_5755))
 
 #define	DEVICE_5721_SERIES_CHIPSETS(bgep) \
 		((bgep->chipid.device == DEVICE_ID_5721) ||\
@@ -257,6 +259,9 @@ extern "C" {
 #define	MHCR_CHIP_REV_5754_A0		0xb0000000
 #define	MHCR_CHIP_REV_5754_A1		0xb0010000
 
+#define	MHCR_CHIP_REV_5755_A0		0xa0000000
+#define	MHCR_CHIP_REV_5755_A1		0xa0010000
+
 #define	MHCR_CHIP_ASIC_REV(ChipRevId)	((ChipRevId) & 0xf0000000)
 #define	MHCR_CHIP_ASIC_REV_5700		(0x7 << 28)
 #define	MHCR_CHIP_ASIC_REV_5701		(0x0 << 28)
@@ -267,6 +272,7 @@ extern "C" {
 #define	MHCR_CHIP_ASIC_REV_5714 	(0x5 << 28)
 #define	MHCR_CHIP_ASIC_REV_5752		(0x6 << 28)
 #define	MHCR_CHIP_ASIC_REV_5754		(0xb << 28)
+#define	MHCR_CHIP_ASIC_REV_5755		((uint32_t)0xa << 28)
 #define	MHCR_CHIP_ASIC_REV_5715 	((uint32_t)0x9 << 28)
 
 
@@ -574,6 +580,15 @@ extern "C" {
 #define	DMA_PRIORITY_MASK		0xc0000000
 #define	DMA_PRIORITY_SHIFT		30
 #define	ALL_DMA_ATTN_BITS		0x000003fc
+
+/*
+ * BCM5755, 5755M, 5906, 5906M only
+ * 1 - Enable Fix. Device will send out the status block before
+ *     the interrupt message
+ * 0 - Disable fix. Device will send out the interrupt message
+ *     before the status block
+ */
+#define	DMA_STATUS_TAG_FIX_CQ12384	0x20000000
 
 /*
  * End of state machine control register definitions
