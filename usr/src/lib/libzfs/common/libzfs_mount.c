@@ -342,9 +342,12 @@ zfs_unmount(zfs_handle_t *zhp, const char *mountpoint, int flags)
 		/*
 		 * Unshare and unmount the filesystem
 		 */
-		if (zfs_unshare_nfs(zhp, mntpt) != 0 ||
-		    unmount_one(zhp->zfs_hdl, mntpt, flags) != 0) {
+		if (zfs_unshare_nfs(zhp, mntpt) != 0)
+			return (-1);
+
+		if (unmount_one(zhp->zfs_hdl, mntpt, flags) != 0) {
 			free(mntpt);
+			zfs_share_nfs(zhp);
 			return (-1);
 		}
 		free(mntpt);
