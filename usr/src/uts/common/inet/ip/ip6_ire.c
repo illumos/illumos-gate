@@ -1881,7 +1881,7 @@ ire_ftable_lookup_v6(const in6_addr_t *addr, const in6_addr_t *mask,
 					ire_refrele(rire);
 				} else if (ipst->
 				    ips_ipv6_ire_default_count > 1 &&
-				    zoneid != ALL_ZONES) {
+				    zoneid != GLOBAL_ZONEID) {
 					/*
 					 * When we're in a local zone, we're
 					 * only interested in default routers
@@ -1891,11 +1891,17 @@ ire_ftable_lookup_v6(const in6_addr_t *addr, const in6_addr_t *mask,
 					 * ire_route_lookup_v6() is avoided when
 					 * we have only one default route.
 					 */
-					match_flags |= MATCH_IRE_TYPE;
+					int ire_match_flags = MATCH_IRE_TYPE |
+					    MATCH_IRE_SECATTR;
+
+					if (ire->ire_ipif != NULL) {
+						ire_match_flags |=
+						    MATCH_IRE_ILL_GROUP;
+					}
 					rire = ire_route_lookup_v6(&gw_addr_v6,
 					    NULL, NULL, IRE_INTERFACE,
 					    ire->ire_ipif, NULL,
-					    zoneid, tsl, match_flags, ipst);
+					    zoneid, tsl, ire_match_flags, ipst);
 					if (rire != NULL) {
 						ire_refrele(rire);
 						saved_ire = ire;
