@@ -620,13 +620,6 @@ handle_text_msg(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 			c->c_text_len	= text_length;
 			text_length	= c->c_max_recv_data;
 			c->c_text_sent	= text_length;
-
-			queue_prt(c->c_mgmtq, Q_CONN_NONIO,
-			    "CON%x  Text PDU: %d PDUs required (len=%d)\n",
-			    c->c_num,
-			    (c->c_text_len + c->c_max_recv_data - 1) /
-			    c->c_max_recv_data, c->c_text_len);
-
 		} else {
 			rsp.flags	= ISCSI_FLAG_FINAL;
 			rsp.ttt		= ISCSI_RSVD_TASK_TAG;
