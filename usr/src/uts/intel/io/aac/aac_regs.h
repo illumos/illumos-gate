@@ -87,13 +87,23 @@ extern "C" {
 #define	AAC_MONKER_GETCOMMPREF	0x26
 #define	AAC_IOP_RESET		0x1000
 
+#define	AAC_SECTOR_SIZE		512
+#define	AAC_NUMBER_OF_HEADS	255
+#define	AAC_SECTORS_PER_TRACK	63
+#define	AAC_ROTATION_SPEED	10000
+#define	AAC_MAX_PFN		0xfffff
+
+#define	AAC_ADDITIONAL_LEN	31
+#define	AAC_ANSI_VER		2
+#define	AAC_RESP_DATA_FORMAT	2
+
 #define	AAC_NSEG		17	/* max number of segments */
 #define	AAC_MAX_LD		64	/* max number of logical disks */
-#define	AAC_BLK_SIZE		512
+#define	AAC_BLK_SIZE		AAC_SECTOR_SIZE
 #define	AAC_DMA_ALIGN		4
 #define	AAC_DMA_ALIGN_MASK	(AAC_DMA_ALIGN - 1)
 
-#define	AAC_MAX_CONTAINERS	64
+#define	AAC_MAX_CONTAINERS	AAC_MAX_LD
 
 /*
  * Minimum memory sizes we need to map to address the adapter. Before
@@ -643,10 +653,6 @@ typedef enum {
 /* General return status */
 #define	CT_OK				218
 
-/* Status codes for SCSI passthrough commands */
-#define	AAC_SRB_STS_SUCCESS		1
-#define	AAC_SRB_STS_INVALID_REQUEST	6
-
 struct aac_fsa_ctm {
 	uint32_t	command;
 	uint32_t	param[CT_FIB_PARAMS];
@@ -841,6 +847,9 @@ struct aac_raw_io {
 	struct aac_sg_tableraw	SgMapRaw;
 };
 
+/*
+ * Container shutdown command.
+ */
 struct aac_close_command {
 	uint32_t		Command;
 	uint32_t		ContainerId;
@@ -945,7 +954,7 @@ struct aac_queue_entry {
 
 /*
  * Table of queue indices and queues used to communicate with the
- * controller.  This structure must be aligned to AAC_QUEUE_ALIGN
+ * controller. This structure must be aligned to AAC_QUEUE_ALIGN.
  */
 struct aac_queue_table {
 	/* queue consumer/producer indexes (layout mandated by adapter) */
@@ -953,21 +962,21 @@ struct aac_queue_table {
 
 	/* queue entry structures (layout mandated by adapter) */
 	struct aac_queue_entry qt_HostNormCmdQueue \
-		[AAC_HOST_NORM_CMD_ENTRIES];
+	    [AAC_HOST_NORM_CMD_ENTRIES];
 	struct aac_queue_entry qt_HostHighCmdQueue \
-		[AAC_HOST_HIGH_CMD_ENTRIES];
+	    [AAC_HOST_HIGH_CMD_ENTRIES];
 	struct aac_queue_entry qt_AdapNormCmdQueue \
-		[AAC_ADAP_NORM_CMD_ENTRIES];
+	    [AAC_ADAP_NORM_CMD_ENTRIES];
 	struct aac_queue_entry qt_AdapHighCmdQueue \
-		[AAC_ADAP_HIGH_CMD_ENTRIES];
+	    [AAC_ADAP_HIGH_CMD_ENTRIES];
 	struct aac_queue_entry qt_HostNormRespQueue \
-		[AAC_HOST_NORM_RESP_ENTRIES];
+	    [AAC_HOST_NORM_RESP_ENTRIES];
 	struct aac_queue_entry qt_HostHighRespQueue \
-		[AAC_HOST_HIGH_RESP_ENTRIES];
+	    [AAC_HOST_HIGH_RESP_ENTRIES];
 	struct aac_queue_entry qt_AdapNormRespQueue \
-		[AAC_ADAP_NORM_RESP_ENTRIES];
+	    [AAC_ADAP_NORM_RESP_ENTRIES];
 	struct aac_queue_entry qt_AdapHighRespQueue \
-		[AAC_ADAP_HIGH_RESP_ENTRIES];
+	    [AAC_ADAP_HIGH_RESP_ENTRIES];
 };
 /* ************AAC QUEUE DEFINES (ABOVE)*********** */
 
@@ -1342,6 +1351,78 @@ typedef enum {
 #define	DiskPERControl			0x0055
 #define	Read10				0x0056
 #define	Write10				0x0057
+
+/*
+ * SRB SCSI Status
+ * Status codes for SCSI passthrough commands,
+ * set in aac_srb->scsi_status
+ */
+#define	SRB_STATUS_PENDING			0x00
+#define	SRB_STATUS_SUCCESS			0x01
+#define	SRB_STATUS_ABORTED			0x02
+#define	SRB_STATUS_ABORT_FAILED			0x03
+#define	SRB_STATUS_ERROR			0x04
+#define	SRB_STATUS_BUSY				0x05
+#define	SRB_STATUS_INVALID_REQUEST		0x06
+#define	SRB_STATUS_INVALID_PATH_ID		0x07
+#define	SRB_STATUS_NO_DEVICE			0x08
+#define	SRB_STATUS_TIMEOUT			0x09
+#define	SRB_STATUS_SELECTION_TIMEOUT		0x0A
+#define	SRB_STATUS_COMMAND_TIMEOUT		0x0B
+#define	SRB_STATUS_MESSAGE_REJECTED		0x0D
+#define	SRB_STATUS_BUS_RESET			0x0E
+#define	SRB_STATUS_PARITY_ERROR			0x0F
+#define	SRB_STATUS_REQUEST_SENSE_FAILED		0x10
+#define	SRB_STATUS_NO_HBA			0x11
+#define	SRB_STATUS_DATA_OVERRUN			0x12
+#define	SRB_STATUS_UNEXPECTED_BUS_FREE		0x13
+#define	SRB_STATUS_PHASE_SEQUENCE_FAILURE	0x14
+#define	SRB_STATUS_BAD_SRB_BLOCK_LENGTH		0x15
+#define	SRB_STATUS_REQUEST_FLUSHED		0x16
+#define	SRB_STATUS_DELAYED_RETRY		0x17
+#define	SRB_STATUS_INVALID_LUN			0x20
+#define	SRB_STATUS_INVALID_TARGET_ID		0x21
+#define	SRB_STATUS_BAD_FUNCTION			0x22
+#define	SRB_STATUS_ERROR_RECOVERY		0x23
+#define	SRB_STATUS_NOT_STARTED			0x24
+#define	SRB_STATUS_NOT_IN_USE			0x30
+#define	SRB_STATUS_FORCE_ABORT			0x31
+#define	SRB_STATUS_DOMAIN_VALIDATION_FAIL	0x32
+
+/*
+ * The following definitions come from Adaptec:
+ *
+ * SRB is required for the new management tools
+ * and non-DASD support.
+ */
+#define	SRB_DataIn	0x0040
+#define	SRB_DataOut	0x0080
+struct aac_srb
+{
+	uint32_t function;
+	uint32_t channel;
+	uint32_t id;
+	uint32_t lun;
+	uint32_t timeout;
+	uint32_t flags;
+	uint32_t count;	/* Data xfer size */
+	uint32_t retry_limit;
+	uint32_t cdb_size;
+	uint8_t cdb[16];
+	struct aac_sg_table sg;
+};
+
+#define	AAC_SENSE_BUFFERSIZE	 30
+struct aac_srb_reply
+{
+	uint32_t status;
+	uint32_t srb_status;
+	uint32_t scsi_status;
+	uint32_t data_xfer_length;
+	uint32_t sense_data_size;
+	uint8_t sense_data[AAC_SENSE_BUFFERSIZE];    /* Can this be */
+						    /* SCSI_SENSE_BUFFERSIZE */
+};
 
 #pragma	pack()
 

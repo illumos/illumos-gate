@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,7 +55,7 @@
  * External functions
  */
 extern int aac_sync_mbcommand(struct aac_softstate *, uint32_t, uint32_t,
-	uint32_t, uint32_t, uint32_t, uint32_t *);
+    uint32_t, uint32_t, uint32_t, uint32_t *);
 extern int aac_do_async_io(struct aac_softstate *, struct aac_cmd *);
 
 extern ddi_device_acc_attr_t aac_acc_attr;
@@ -75,7 +75,7 @@ static int aac_query_disk(struct aac_softstate *, intptr_t, int);
 static int aac_delete_disk(struct aac_softstate *, intptr_t, int);
 static int aac_supported_features(struct aac_softstate *, intptr_t, int);
 static int aac_return_aif(struct aac_softstate *, struct aac_fib_context *,
-	caddr_t, int);
+    caddr_t, int);
 
 int
 aac_do_ioctl(struct aac_softstate *softs, int cmd, intptr_t arg, int mode)
@@ -132,13 +132,13 @@ aac_check_revision(intptr_t arg, int mode)
 
 	/* Copyin the revision struct from userspace */
 	if (ddi_copyin((void *)arg, &aac_rev,
-		sizeof (struct aac_revision), mode) != 0)
+	    sizeof (struct aac_revision), mode) != 0)
 		return (EFAULT);
 
 	/* Doctor up the response struct */
 	aac_rev.compat = 1;
 	if (ddi_copyout(&aac_rev, (void *)arg,
-		sizeof (struct aac_revision), mode) != 0)
+	    sizeof (struct aac_revision), mode) != 0)
 		return (EFAULT);
 
 	return (0);
@@ -147,25 +147,26 @@ aac_check_revision(intptr_t arg, int mode)
 static int
 aac_ioctl_send_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 {
+	int hbalen;
 	struct aac_cmd *acp;
 	struct aac_fib *fibp;
 	unsigned size;
-	int hbalen, rval = 0;
+	int rval = 0;
 
 	DBCALLED(1);
 
 	if (softs->state == AAC_STATE_DEAD)
 		return (ENXIO);
 
-	/* Copy in the FIB */
+	/* Copy in FIB header */
 	hbalen = sizeof (struct aac_cmd) - sizeof (struct aac_fib) +
-		softs->aac_max_fib_size;
+	    softs->aac_max_fib_size;
 	if ((acp = kmem_zalloc(hbalen, KM_NOSLEEP)) == NULL)
 		return (ENOMEM);
 
 	fibp = &acp->fib;
 	if (ddi_copyin((void *)arg, fibp,
-		sizeof (struct aac_fib_header), mode) != 0) {
+	    sizeof (struct aac_fib_header), mode) != 0) {
 		rval = EFAULT;
 		goto finish;
 	}
@@ -176,6 +177,8 @@ aac_ioctl_send_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 		rval = EFAULT;
 		goto finish;
 	}
+
+	/* Copy in FIB data */
 	if (ddi_copyin((void *)arg, fibp, size, mode) != 0) {
 		rval = EFAULT;
 		goto finish;
@@ -186,12 +189,12 @@ aac_ioctl_send_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 	/* Process FIB */
 	if (fibp->Header.Command == TakeABreakPt) {
 		(void) aac_sync_mbcommand(softs, AAC_BREAKPOINT_REQ,
-			0, 0, 0, 0, NULL);
+		    0, 0, 0, 0, NULL);
 		fibp->Header.XferState = 0;
 	} else {
 		ASSERT(!(fibp->Header.XferState & AAC_FIBSTATE_ASYNC));
 		fibp->Header.XferState |=
-			(AAC_FIBSTATE_FROMHOST | AAC_FIBSTATE_REXPECTED);
+		    (AAC_FIBSTATE_FROMHOST | AAC_FIBSTATE_REXPECTED);
 		fibp->Header.Size = size;
 
 		acp->flags = AAC_CMD_HARD_INTR;
@@ -218,7 +221,7 @@ aac_ioctl_send_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 
 	if (rval == 0) {
 		if (ddi_copyout(fibp, (void *)arg,
-			fibp->Header.Size, mode) != 0) {
+		    fibp->Header.Size, mode) != 0) {
 			rval = EFAULT;
 			goto finish;
 		}
@@ -242,9 +245,9 @@ aac_open_getadapter_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 
 	mutex_enter(&softs->aifq_mutex);
 	/* All elements are already 0, add to queue */
-	if (softs->fibctx == NULL)
+	if (softs->fibctx == NULL) {
 		softs->fibctx = fibctx;
-	else {
+	} else {
 		for (ctx = softs->fibctx; ctx->next; ctx = ctx->next)
 			;
 		ctx->next = fibctx;
@@ -252,7 +255,7 @@ aac_open_getadapter_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 	}
 
 	/* Evaluate unique value */
-	fibctx->unique = (unsigned long)fibctx & 0xffffffff;
+	fibctx->unique = (unsigned long)fibctx & 0xfffffffful;
 	ctx = softs->fibctx;
 	while (ctx != fibctx) {
 		if (ctx->unique == fibctx->unique) {
@@ -265,7 +268,7 @@ aac_open_getadapter_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 	mutex_exit(&softs->aifq_mutex);
 
 	if (ddi_copyout(&fibctx->unique, (void *)arg,
-		sizeof (uint32_t), mode) != 0)
+	    sizeof (uint32_t), mode) != 0)
 		return (EFAULT);
 
 	return (0);
@@ -297,7 +300,7 @@ aac_next_getadapter_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 #endif
 	if (rval == EAGAIN && af.wait) {
 		AACDB_PRINT((CE_NOTE,
-			"aac_next_getadapter_fib(): waiting for AIF"));
+		    "aac_next_getadapter_fib(): waiting for AIF"));
 		mutex_enter(&softs->aifq_mutex);
 		rval = cv_wait_sig(&softs->aifv, &softs->aifq_mutex);
 		mutex_exit(&softs->aifq_mutex);
@@ -306,10 +309,10 @@ aac_next_getadapter_fib(struct aac_softstate *softs, intptr_t arg, int mode)
 		else
 #ifdef	_LP64
 			rval = aac_return_aif(softs, ctx,
-				(caddr_t)(uint64_t)af.aif_fib, mode);
+			    (caddr_t)(uint64_t)af.aif_fib, mode);
 #else
 			rval = aac_return_aif(softs, ctx,
-				(caddr_t)af.aif_fib, mode);
+			    (caddr_t)af.aif_fib, mode);
 #endif
 	}
 
@@ -328,9 +331,9 @@ aac_close_getadapter_fib(struct aac_softstate *softs, intptr_t arg)
 		if (ctx->unique != (uint32_t)arg)
 			continue;
 
-		if (ctx == softs->fibctx)
+		if (ctx == softs->fibctx) {
 			softs->fibctx = NULL;
-		else {
+		} else {
 			ctx->prev->next = ctx->next;
 			if (ctx->next)
 				ctx->next->prev = ctx->prev;
@@ -352,16 +355,17 @@ aac_close_getadapter_fib(struct aac_softstate *softs, intptr_t arg)
 static int
 aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 {
+	int hbalen;
 	struct aac_cmd *acp;
 	struct aac_fib *fibp;
 	struct aac_srb *srbcmd;
 	struct aac_srb *user_srb = (struct aac_srb *)arg;
 	struct aac_srb_reply *srbreply;
 	void *user_reply;
-	int err, hbalen, rval = 0;
 	uint32_t byte_count = 0, fibsize = 0;
 	uint_t i, dma_flags = DDI_DMA_CONSISTENT;
 	ddi_dma_cookie_t *cookiep = NULL;
+	int err, rval = 0;
 
 	DBCALLED(1);
 
@@ -369,22 +373,26 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 		return (ENXIO);
 
 	hbalen = sizeof (struct aac_cmd) - sizeof (struct aac_fib) +
-		softs->aac_max_fib_size;
+	    softs->aac_max_fib_size;
 	if ((acp = kmem_zalloc(hbalen, KM_NOSLEEP)) == NULL)
 		return (ENOMEM);
 
 	fibp = &acp->fib;
 	srbcmd = (struct aac_srb *)fibp->data;
+
+	/* Read srb size */
 	if (ddi_copyin((void *)&user_srb->count, &fibsize,
-		sizeof (uint32_t), mode) != 0) {
+	    sizeof (uint32_t), mode) != 0) {
 		rval = EFAULT;
 		goto finish;
 	}
 	if (fibsize > (softs->aac_max_fib_size - \
-		sizeof (struct aac_fib_header))) {
+	    sizeof (struct aac_fib_header))) {
 		rval = EINVAL;
 		goto finish;
 	}
+
+	/* Copy in srb */
 	if (ddi_copyin((void *)user_srb, srbcmd, fibsize, mode) != 0) {
 		rval = EFAULT;
 		goto finish;
@@ -397,9 +405,9 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 		rval = EINVAL;
 		goto finish;
 	}
-	/* Check fibsize */
+	/* Check FIB size */
 	if (fibsize != (sizeof (struct aac_srb) + \
-		(srbcmd->sg.SgCount - 1) * sizeof (struct aac_sg_entry))) {
+	    (srbcmd->sg.SgCount - 1) * sizeof (struct aac_sg_entry))) {
 		rval = EINVAL;
 		goto finish;
 	}
@@ -411,10 +419,10 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 	acp->left_cookien = 0;
 
 	err = ddi_dma_alloc_handle(softs->devinfo_p, &softs->buf_dma_attr,
-		DDI_DMA_DONTWAIT, NULL, &acp->buf_dma_handle);
+	    DDI_DMA_DONTWAIT, NULL, &acp->buf_dma_handle);
 	if (err != DDI_SUCCESS) {
 		AACDB_PRINT((CE_WARN,
-			"Can't allocate DMA handle, errno=%d", err));
+		    "Can't allocate DMA handle, errno=%d", rval));
 		rval = EFAULT;
 		goto finish;
 	}
@@ -424,29 +432,29 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 		size_t bufsz;
 
 		err = ddi_dma_mem_alloc(acp->buf_dma_handle,
-			AAC_ROUNDUP(srbcmd->sg.SgEntry[0].SgByteCount,
-			AAC_DMA_ALIGN),
-			&aac_acc_attr, DDI_DMA_STREAMING, DDI_DMA_DONTWAIT,
-			NULL, &acp->abp, &bufsz, &acp->abh);
+		    AAC_ROUNDUP(srbcmd->sg.SgEntry[0].SgByteCount,
+		    AAC_DMA_ALIGN),
+		    &aac_acc_attr, DDI_DMA_STREAMING, DDI_DMA_DONTWAIT,
+		    NULL, &acp->abp, &bufsz, &acp->abh);
 		if (err != DDI_SUCCESS) {
 			AACDB_PRINT((CE_NOTE,
-				"Cannot alloc DMA to non-aligned buf"));
+			    "Cannot alloc DMA to non-aligned buf"));
 			rval = ENOMEM;
 			goto finish;
 		}
 
-		if ((srbcmd->flags & (SRB_DataIn|SRB_DataOut)) ==
-			(SRB_DataIn|SRB_DataOut))
+		if ((srbcmd->flags & (SRB_DataIn | SRB_DataOut)) ==
+		    (SRB_DataIn | SRB_DataOut))
 			dma_flags |= DDI_DMA_RDWR;
-		else if ((srbcmd->flags & (SRB_DataIn|SRB_DataOut)) ==
-			SRB_DataIn)
+		else if ((srbcmd->flags & (SRB_DataIn | SRB_DataOut)) ==
+		    SRB_DataIn)
 			dma_flags |= DDI_DMA_READ;
-		else if ((srbcmd->flags & (SRB_DataIn|SRB_DataOut)) ==
-			SRB_DataOut)
+		else if ((srbcmd->flags & (SRB_DataIn | SRB_DataOut)) ==
+		    SRB_DataOut)
 			dma_flags |= DDI_DMA_WRITE;
 		err = ddi_dma_addr_bind_handle(acp->buf_dma_handle, NULL,
-			acp->abp, bufsz, dma_flags, DDI_DMA_DONTWAIT, 0,
-			&acp->cookie, &acp->left_cookien);
+		    acp->abp, bufsz, dma_flags, DDI_DMA_DONTWAIT, 0,
+		    &acp->cookie, &acp->left_cookien);
 		if (err != DDI_DMA_MAPPED) {
 			AACDB_PRINT((CE_NOTE, "Cannot bind buf for DMA"));
 			rval = EFAULT;
@@ -457,13 +465,13 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 		if (srbcmd->flags & SRB_DataOut) {
 			if (ddi_copyin(
 #ifdef _LP64
-				(void *)(uint64_t)user_srb-> \
-					sg.SgEntry[0].SgAddress,
+			    (void *)(uint64_t)user_srb-> \
+			    sg.SgEntry[0].SgAddress,
 #else
-				(void *)user_srb->sg.SgEntry[0].SgAddress,
+			    (void *)user_srb->sg.SgEntry[0].SgAddress,
 #endif
-				acp->abp, user_srb->sg.SgEntry[0].SgByteCount,
-				mode) != 0) {
+			    acp->abp, user_srb->sg.SgEntry[0].SgByteCount,
+			    mode) != 0) {
 				rval = EFAULT;
 				goto finish;
 			}
@@ -473,48 +481,48 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 	/* Fill in command, sg elements */
 	if (softs->flags & AAC_FLAGS_SG_64BIT) {
 		struct aac_sg_entry64 *sgp = (struct aac_sg_entry64 *)
-			srbcmd->sg.SgEntry;
+		    srbcmd->sg.SgEntry;
 
 		fibp->Header.Command = ScsiPortCommandU64;
 		for (i = 0; i < acp->left_cookien &&
-			i < softs->aac_sg_tablesize; i++) {
+		    i < softs->aac_sg_tablesize; i++) {
 			sgp[i].SgAddress = cookiep->dmac_laddress;
 			sgp[i].SgByteCount = cookiep->dmac_size;
 			if ((i + 1) < acp->left_cookien)
 				ddi_dma_nextcookie(acp->buf_dma_handle,
-					cookiep);
+				    cookiep);
 			byte_count += sgp[i].SgByteCount;
 		}
 		fibsize = sizeof (struct aac_srb) - \
-			sizeof (struct aac_sg_entry) + \
-			i * sizeof (struct aac_sg_entry64);
+		    sizeof (struct aac_sg_entry) + \
+		    i * sizeof (struct aac_sg_entry64);
 	} else {
 		struct aac_sg_entry *sgp = srbcmd->sg.SgEntry;
 
 		fibp->Header.Command = ScsiPortCommand;
 		for (i = 0; i < acp->left_cookien &&
-			i < softs->aac_sg_tablesize; i++) {
+		    i < softs->aac_sg_tablesize; i++) {
 			sgp[i].SgAddress = cookiep->dmac_laddress;
 			sgp[i].SgByteCount = cookiep->dmac_size;
 			if ((i + 1) < acp->left_cookien)
 				ddi_dma_nextcookie(acp->buf_dma_handle,
-					cookiep);
+				    cookiep);
 			byte_count += sgp[i].SgByteCount;
 		}
 		fibsize = sizeof (struct aac_srb) + \
-			(i - 1) * sizeof (struct aac_sg_entry);
+		    (i - 1) * sizeof (struct aac_sg_entry);
 	}
 	srbcmd->count = byte_count;
 	srbcmd->sg.SgCount = i;
 
 	/* Fill fib header */
 	fibp->Header.XferState =
-		AAC_FIBSTATE_HOSTOWNED |
-		AAC_FIBSTATE_INITIALISED |
-		AAC_FIBSTATE_EMPTY |
-		AAC_FIBSTATE_FROMHOST |
-		AAC_FIBSTATE_REXPECTED |
-		AAC_FIBSTATE_NORM;
+	    AAC_FIBSTATE_HOSTOWNED |
+	    AAC_FIBSTATE_INITIALISED |
+	    AAC_FIBSTATE_EMPTY |
+	    AAC_FIBSTATE_FROMHOST |
+	    AAC_FIBSTATE_REXPECTED |
+	    AAC_FIBSTATE_NORM;
 	fibp->Header.Size = sizeof (struct aac_fib_header) + fibsize;
 	fibp->Header.StructType = AAC_FIBTYPE_TFIB;
 	fibp->Header.SenderSize = softs->aac_max_fib_size;
@@ -548,20 +556,20 @@ aac_send_raw_srb(struct aac_softstate *softs, intptr_t arg, int mode)
 	if ((srbcmd->sg.SgCount == 1) && (srbcmd->flags & SRB_DataIn)) {
 		if (ddi_copyout(acp->abp,
 #ifdef _LP64
-			(void *)(uint64_t)user_srb->sg.SgEntry[0].SgAddress,
+		    (void *)(uint64_t)user_srb->sg.SgEntry[0].SgAddress,
 #else
-			(void *)user_srb->sg.SgEntry[0].SgAddress,
+		    (void *)user_srb->sg.SgEntry[0].SgAddress,
 #endif
-			user_srb->sg.SgEntry[0].SgByteCount, mode) != 0) {
+		    user_srb->sg.SgEntry[0].SgByteCount, mode) != 0) {
 			rval = EFAULT;
 			goto finish;
 		}
 	}
 
-	/* Status struct. */
+	/* Status struct */
 	srbreply = (struct aac_srb_reply *)fibp->data;
 	if (ddi_copyout(srbreply, user_reply,
-		sizeof (struct aac_srb_reply), mode) != 0) {
+	    sizeof (struct aac_srb_reply), mode) != 0) {
 		rval = EFAULT;
 		goto finish;
 	}
@@ -580,15 +588,15 @@ finish:
 static int
 aac_get_pci_info(intptr_t arg, int mode)
 {
-	struct aac_pci_info response;
+	struct aac_pci_info resp;
 
 	DBCALLED(1);
 
-	response.bus = 0;
-	response.slot = 0;
+	resp.bus = 0;
+	resp.slot = 0;
 
-	if (ddi_copyout(&response, (void *)arg,
-		sizeof (struct aac_pci_info), mode) != 0)
+	if (ddi_copyout(&resp, (void *)arg,
+	    sizeof (struct aac_pci_info), mode) != 0)
 		return (EFAULT);
 	return (0);
 }
@@ -603,16 +611,17 @@ aac_query_disk(struct aac_softstate *softs, intptr_t arg, int mode)
 	if (ddi_copyin((void *)arg, &qdisk, sizeof (qdisk), mode) != 0)
 		return (EFAULT);
 
-	if (qdisk.container_no == -1)
+	if (qdisk.container_no == -1) {
 		qdisk.container_no = qdisk.target * 16 + qdisk.lun;
-	else if (qdisk.bus == -1 && qdisk.target == -1 && qdisk.lun == -1) {
+	} else if (qdisk.bus == -1 && qdisk.target == -1 && qdisk.lun == -1) {
 		if (qdisk.container_no > AAC_MAX_CONTAINERS)
 			return (EINVAL);
 		qdisk.bus = 0;
 		qdisk.target = (qdisk.container_no & 0xf);
 		qdisk.lun = (qdisk.container_no >> 4);
-	} else
+	} else {
 		return (EINVAL);
+	}
 
 	qdisk.valid = softs->container[qdisk.container_no].valid;
 	qdisk.locked = softs->container[qdisk.container_no].locked;
@@ -673,12 +682,12 @@ aac_supported_features(struct aac_softstate *softs, intptr_t arg, int mode)
 	 */
 	if (f.feat.fValue == 0) {
 		f.feat.fBits.largeLBA =
-			(softs->flags & AAC_FLAGS_LBA_64BIT) ? 1 : 0;
+		    (softs->flags & AAC_FLAGS_LBA_64BIT) ? 1 : 0;
 		/* TODO: In the future, add other features state here as well */
 	} else {
 		if (f.feat.fBits.largeLBA)
 			f.feat.fBits.largeLBA =
-				(softs->flags & AAC_FLAGS_LBA_64BIT) ? 1 : 0;
+			    (softs->flags & AAC_FLAGS_LBA_64BIT) ? 1 : 0;
 		/* TODO: Add other features state and data in the future */
 	}
 
@@ -689,7 +698,7 @@ aac_supported_features(struct aac_softstate *softs, intptr_t arg, int mode)
 
 static int
 aac_return_aif(struct aac_softstate *softs,
-	struct aac_fib_context *ctx, caddr_t uptr, int mode)
+    struct aac_fib_context *ctx, caddr_t uptr, int mode)
 {
 	int current;
 
@@ -701,7 +710,7 @@ aac_return_aif(struct aac_softstate *softs,
 		return (EAGAIN);
 	}
 	if (ddi_copyout(&softs->aifq[current], (void *)uptr,
-		sizeof (struct aac_fib), mode) != 0) {
+	    sizeof (struct aac_fib), mode) != 0) {
 		mutex_exit(&softs->aifq_mutex);
 		return (EFAULT);
 	}

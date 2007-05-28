@@ -109,16 +109,6 @@ _NOTE(CONSTCOND) } while (0)
 #define	SCMD_SYNCHRONIZE_CACHE		0x35
 #endif
 
-#define	AAC_SECTOR_SIZE			512
-#define	AAC_NUMBER_OF_HEADS		255
-#define	AAC_SECTORS_PER_TRACK		63
-#define	AAC_ROTATION_SPEED		10000
-#define	AAC_MAX_PFN			0xfffff
-
-#define	AAC_ADDITIONAL_LEN		31
-#define	AAC_ANSI_VER			2
-#define	AAC_RESP_DATA_FORMAT		2
-
 /*
  * The controller reports status events in AIFs. We hang on to a number of
  * these in order to pass them out to user-space management tools.
@@ -225,7 +215,7 @@ struct aac_interface {
 	int (*aif_get_fwstatus)(struct aac_softstate *);
 	int (*aif_get_mailbox)(struct aac_softstate *, int);
 	void (*aif_set_mailbox)(struct aac_softstate *, uint32_t,
-		uint32_t, uint32_t, uint32_t, uint32_t);
+	    uint32_t, uint32_t, uint32_t, uint32_t);
 };
 
 struct aac_fib_context {
@@ -248,44 +238,54 @@ struct aac_softstate {
 	uint32_t map_size;	/* mapped PCI mem space size */
 	uint32_t map_size_min;	/* minimum size of PCI mem that must be */
 				/* mapped to address the card */
+	int flags;		/* firmware features enabled */
 	dev_info_t *devinfo_p;
 
-	/* dma attributes */
+	/* DMA attributes */
 	ddi_dma_attr_t buf_dma_attr;
 	ddi_dma_attr_t addr_dma_attr;
 
+	/* PCI spaces */
 	ddi_acc_handle_t pci_mem_handle;
 	char *pci_mem_base_addr;
 
-	/* adapter hardware interface */
-	struct aac_interface aac_if;
+	struct aac_interface aac_if;	/* adapter hardware interface */
 
-	struct aac_container container[AAC_MAX_LD];
-	int container_count;	/* max container id */
+	struct sync_mode_res sync_mode;	/* sync FIB */
 
-	struct sync_mode_res sync_mode;
-
-	/* the following is communication space */
+	/* Communication space */
 	struct aac_comm_space *comm_space;
 	ddi_acc_handle_t comm_space_acc_handle;
 	ddi_dma_handle_t comm_space_dma_handle;
 	uint32_t comm_space_phyaddr;
 
-	/* the following is about message queues */
+	/* Old Comm. interface: message queues */
 	struct aac_queue_table *qtablep;
 	struct aac_queue_entry *qentries[AAC_QUEUE_COUNT];
 
-	/* the following is used for soft int */
-	ddi_softintr_t softint_id;
+	/* New Comm. interface */
+	uint32_t aac_max_fibs;		/* max. FIB count */
+	uint32_t aac_max_fib_size;	/* max. FIB size */
+	uint32_t aac_sg_tablesize;	/* max. sg count from host */
+	uint32_t aac_max_sectors;	/* max. I/O size from host (blocks) */
+
+	ddi_iblock_cookie_t iblock_cookie;
+	ddi_softintr_t softint_id;	/* soft intr */
+
+	krwlock_t errlock;		/* hold IO requests at reset */
+	int state;			/* driver state */
+
+	struct aac_container container[AAC_MAX_LD];
+	int container_count;		/* max container id + 1 */
 
 	/*
 	 * Command queues
 	 * Each aac command flows through wait(or wait_sync) queue,
 	 * io_slot and comp queue sequentially.
 	 */
-	struct aac_cmd_queue q_wait_sync;	/* for sync FIB requests */
-	struct aac_cmd_queue q_wait;		/* for async FIB requests */
-	struct aac_cmd_queue q_comp;		/* for completed io requests */
+	struct aac_cmd_queue q_wait_sync; /* sync FIB requests */
+	struct aac_cmd_queue q_wait;	/* async FIB requests */
+	struct aac_cmd_queue q_comp;	/* completed io requests */
 
 	/* I/O slots and FIBs */
 	int total_slots;		/* total slots allocated */
@@ -301,12 +301,7 @@ struct aac_softstate {
 	timeout_id_t timeout_id;
 	uint32_t timeout_count;
 
-	int flags;			/* firmware features enabled */
-	int state;			/* driver state */
-	krwlock_t errlock;		/* hold IO requests at reset */
-
-	/* for ioctl_send_fib() */
-	kmutex_t event_mutex;
+	kmutex_t event_mutex;		/* for ioctl_send_fib() */
 	kcondvar_t event;
 
 	/* AIF */
@@ -317,14 +312,6 @@ struct aac_softstate {
 	int aifq_filled;
 	struct aac_fib_context *fibctx;
 	int devcfg_wait_on;		/* AIF event waited for rescan */
-
-	/* new comm. interface */
-	uint32_t aac_max_fibs;		/* max. FIB count */
-	uint32_t aac_max_fib_size;	/* max. FIB size */
-	uint32_t aac_sg_tablesize;	/* max. sg count from host */
-	uint32_t aac_max_sectors;	/* max. I/O size from host (blocks) */
-
-	ddi_iblock_cookie_t iblock_cookie;
 };
 
 /* aac_cmd flags */
@@ -358,6 +345,7 @@ struct aac_cmd {
 	caddr_t abp;
 	ddi_acc_handle_t abh;
 
+	/* Data transfer state */
 	ddi_dma_cookie_t cookie;
 	uint_t left_cookien;
 	uint_t cur_win;

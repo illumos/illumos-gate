@@ -66,9 +66,11 @@ char _depends_on[] = "misc/scsi";
 #define	AAC_SCSA_MINOR(x)	((x) & TRAN_MINOR_MASK)
 #define	AAC_IS_SCSA_NODE(x)	((x) == DEVCTL_MINOR || (x) == SCSI_MINOR)
 
-#define	AACOFFSET(type, member) ((size_t)(&((type *)0)->member))
+#define	AACOFFSET(type, member)	((size_t)(&((type *)0)->member))
 #define	AAC_TRAN2SOFTS(tran) ((struct aac_softstate *)(tran)->tran_hba_private)
-#define	PKT2AC(pkt) ((struct aac_cmd *)(pkt)->pkt_ha_private)
+#define	AAC_DIP2TRAN(dip)	((scsi_hba_tran_t *)ddi_get_driver_private(dip))
+#define	AAC_DIP2SOFTS(dip)	(AAC_TRAN2SOFTS(AAC_DIP2TRAN(dip)))
+#define	PKT2AC(pkt)		((struct aac_cmd *)(pkt)->pkt_ha_private)
 #define	AAC_BUSYWAIT(cond, timeout /* in millisecond */) \
 	do { \
 		int count = 0; \
@@ -81,7 +83,8 @@ char _depends_on[] = "misc/scsi";
 		} \
 _NOTE(CONSTCOND) } while (0)
 
-#define	AAC_SENSE_DATA_DESCR_LEN (sizeof (struct scsi_descr_sense_hdr) + \
+#define	AAC_SENSE_DATA_DESCR_LEN \
+	(sizeof (struct scsi_descr_sense_hdr) + \
 	sizeof (struct scsi_information_sense_descr))
 /* NOTE: GETG4ADDRTL(cdbp) is int32_t */
 #define	AAC_GETGXADDR(cmdlen, cdbp) \
@@ -110,12 +113,14 @@ _NOTE(CONSTCOND) } while (0)
 	(sizeof (aac_cards) / sizeof (struct aac_card_type) - 1)
 #define	CARD_IS_UNKNOWN(i)	(i == AAC_UNKNOWN_CARD)
 #define	BUF_IS_READ(bp)		((bp)->b_flags & B_READ)
-#define	AAC_IS_Q_EMPTY(q) (((q)->q_head == NULL) ? 1 : 0)
+#define	AAC_IS_Q_EMPTY(q)	((q)->q_head == NULL)
 
-#define	PCI_MEM_GET32(softs, off) ddi_get32((softs)->pci_mem_handle, \
-	(uint32_t *)((softs)->pci_mem_base_addr + (off)))
-#define	PCI_MEM_PUT32(softs, off, val)	ddi_put32((softs)->pci_mem_handle, \
-	(uint32_t *)((softs)->pci_mem_base_addr + (off)), (uint32_t)(val))
+#define	PCI_MEM_GET32(softs, off) \
+	ddi_get32((softs)->pci_mem_handle, \
+	    (uint32_t *)((softs)->pci_mem_base_addr + (off)))
+#define	PCI_MEM_PUT32(softs, off, val) \
+	ddi_put32((softs)->pci_mem_handle, \
+	    (uint32_t *)((softs)->pci_mem_base_addr + (off)), (uint32_t)(val))
 
 #define	AAC_ENABLE_INTR(softs) \
 	do { \
@@ -124,19 +129,19 @@ _NOTE(CONSTCOND) } while (0)
 		else \
 			PCI_MEM_PUT32(softs, AAC_OIMR, ~AAC_DB_INTR_BITS); \
 _NOTE(CONSTCOND) } while (0)
-#define	AAC_DISABLE_INTR(softs)	PCI_MEM_PUT32(softs, AAC_OIMR, ~0)
-#define	AAC_STATUS_CLR(softs, mask) PCI_MEM_PUT32(softs, AAC_ODBR, mask)
-#define	AAC_STATUS_GET(softs) PCI_MEM_GET32(softs, AAC_ODBR)
-#define	AAC_NOTIFY(softs, val) PCI_MEM_PUT32(softs, AAC_IDBR, val)
-#define	AAC_OUTB_GET(softs) PCI_MEM_GET32(softs, AAC_OQUE)
-#define	AAC_OUTB_SET(softs, val) PCI_MEM_PUT32(softs, AAC_OQUE, val)
+#define	AAC_DISABLE_INTR(softs)		PCI_MEM_PUT32(softs, AAC_OIMR, ~0)
+#define	AAC_STATUS_CLR(softs, mask)	PCI_MEM_PUT32(softs, AAC_ODBR, mask)
+#define	AAC_STATUS_GET(softs)		PCI_MEM_GET32(softs, AAC_ODBR)
+#define	AAC_NOTIFY(softs, val)		PCI_MEM_PUT32(softs, AAC_IDBR, val)
+#define	AAC_OUTB_GET(softs)		PCI_MEM_GET32(softs, AAC_OQUE)
+#define	AAC_OUTB_SET(softs, val)	PCI_MEM_PUT32(softs, AAC_OQUE, val)
 #define	AAC_FWSTATUS_GET(softs)	\
-	((softs)->aac_if.aif_get_fwstatus((softs)))
+	((softs)->aac_if.aif_get_fwstatus(softs))
 #define	AAC_MAILBOX_GET(softs, mb) \
 	((softs)->aac_if.aif_get_mailbox((softs), (mb)))
 #define	AAC_MAILBOX_SET(softs, cmd, arg0, arg1, arg2, arg3) \
 	((softs)->aac_if.aif_set_mailbox((softs), (cmd), \
-	(arg0), (arg1), (arg2), (arg3)))
+	    (arg0), (arg1), (arg2), (arg3)))
 
 #define	AAC_IOCMD_SYNC		(1 << 0)
 #define	AAC_IOCMD_ASYNC		(1 << 1)
@@ -150,22 +155,11 @@ _NOTE(CONSTCOND) } while (0)
 static int aac_rx_get_fwstatus(struct aac_softstate *);
 static int aac_rx_get_mailbox(struct aac_softstate *, int);
 static void aac_rx_set_mailbox(struct aac_softstate *, uint32_t,
-	uint32_t, uint32_t, uint32_t, uint32_t);
-static struct aac_interface aac_rx_interface = {
-	aac_rx_get_fwstatus,
-	aac_rx_get_mailbox,
-	aac_rx_set_mailbox
-};
-
+    uint32_t, uint32_t, uint32_t, uint32_t);
 static int aac_rkt_get_fwstatus(struct aac_softstate *);
 static int aac_rkt_get_mailbox(struct aac_softstate *, int);
 static void aac_rkt_set_mailbox(struct aac_softstate *, uint32_t, uint32_t,
-	uint32_t, uint32_t, uint32_t);
-static struct aac_interface aac_rkt_interface = {
-	aac_rkt_get_fwstatus,
-	aac_rkt_get_mailbox,
-	aac_rkt_set_mailbox
-};
+    uint32_t, uint32_t, uint32_t);
 
 /*
  * SCSA function prototypes
@@ -189,7 +183,7 @@ static int aac_check_card_type(struct aac_softstate *);
 static int aac_check_firmware(struct aac_softstate *);
 static int aac_common_attach(struct aac_softstate *);
 static void aac_common_detach(struct aac_softstate *);
-static int aac_get_container(struct aac_softstate *);
+static int aac_get_containers(struct aac_softstate *);
 static int aac_alloc_comm_space(struct aac_softstate *);
 static int aac_setup_comm_space(struct aac_softstate *);
 static void aac_free_comm_space(struct aac_softstate *);
@@ -199,11 +193,11 @@ static int aac_hba_setup(struct aac_softstate *);
  * Sync FIB operation functions
  */
 int aac_sync_mbcommand(struct aac_softstate *, uint32_t, uint32_t,
-	uint32_t, uint32_t, uint32_t, uint32_t *);
+    uint32_t, uint32_t, uint32_t, uint32_t *);
 static int aac_sync_fib(struct aac_softstate *, uint32_t, struct aac_fib *,
-	uint16_t);
+    uint16_t);
 static struct aac_fib *aac_grab_sync_fib(struct aac_softstate *,
-	int (*)(caddr_t));
+    int (*)(caddr_t));
 static void aac_release_sync_fib(struct aac_softstate *);
 
 /*
@@ -213,15 +207,15 @@ static void aac_cmd_enqueue(struct aac_cmd_queue *, struct aac_cmd *);
 static struct aac_cmd *aac_cmd_dequeue(struct aac_cmd_queue *);
 
 /*
- * fib queue operation functions
+ * FIB queue operation functions
  */
 static int aac_fib_enqueue(struct aac_softstate *, int, struct aac_fib *);
 static int aac_resp_enqueue(struct aac_softstate *, int, struct aac_fib *);
 static int aac_fib_dequeue(struct aac_softstate *, int, struct aac_fib **,
-	struct aac_cmd **);
+    struct aac_cmd **);
 
 /*
- * slot operation functions
+ * Slot operation functions
  */
 static int aac_create_slots(struct aac_softstate *);
 static void aac_destroy_slots(struct aac_softstate *);
@@ -318,119 +312,137 @@ static struct aac_softstate  *aac_softstatep;
  */
 static struct aac_card_type aac_cards[] = {
 	{0x1028, 0x1, 0x1028, 0x1, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
+	    AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
 	{0x1028, 0x2, 0x1028, 0x2, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
+	    AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
 	{0x1028, 0x3, 0x1028, 0x3, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Si"},
+	    AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Si"},
 	{0x1028, 0x8, 0x1028, 0xcf, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
+	    AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
 	{0x1028, 0x4, 0x1028, 0xd0, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Si"},
+	    AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Si"},
 	{0x1028, 0x2, 0x1028, 0xd1, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
+	    AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
 	{0x1028, 0x2, 0x1028, 0xd9, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
+	    AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
 	{0x1028, 0xa, 0x1028, 0x106, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
+	    AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
 	{0x1028, 0xa, 0x1028, 0x11b, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
+	    AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
 	{0x1028, 0xa, 0x1028, 0x121, AAC_HWIF_I960RX,
-		AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
+	    AAC_FLAGS_PERC, AAC_TYPE_SCSI, "Dell", "PERC 3/Di"},
 	{0x9005, 0x285, 0x1028, 0x287, AAC_HWIF_I960RX,
-		AAC_FLAGS_NO4GB | AAC_FLAGS_256FIBS, AAC_TYPE_SCSI,
-		"Dell", "PERC 320/DC"},
+	    AAC_FLAGS_NO4GB | AAC_FLAGS_256FIBS, AAC_TYPE_SCSI,
+	    "Dell", "PERC 320/DC"},
 	{0x9005, 0x285, 0x1028, 0x291, AAC_HWIF_I960RX,
-		AAC_FLAGS_NO4GB, AAC_TYPE_SATA, "Dell", "CERC SR2"},
+	    AAC_FLAGS_NO4GB, AAC_TYPE_SATA, "Dell", "CERC SR2"},
 
 	{0x9005, 0x285, 0x1014, 0x2f2, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SCSI, "IBM", "ServeRAID 8i"},
+	    0, AAC_TYPE_SCSI, "IBM", "ServeRAID 8i"},
 	{0x9005, 0x285, 0x1014, 0x34d, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SAS, "IBM", "ServeRAID 8s"},
+	    0, AAC_TYPE_SAS, "IBM", "ServeRAID 8s"},
 	{0x9005, 0x286, 0x1014, 0x9580, AAC_HWIF_RKT,
-		0, AAC_TYPE_SAS, "IBM", "ServeRAID 8k"},
+	    0, AAC_TYPE_SAS, "IBM", "ServeRAID 8k"},
 
 	{0x9005, 0x285, 0x103c, 0x3227, AAC_HWIF_I960RX,
-		AAC_FLAGS_NO4GB, AAC_TYPE_SATA, "Adaptec", "2610SA"},
+	    AAC_FLAGS_NO4GB, AAC_TYPE_SATA, "Adaptec", "2610SA"},
 
 	{0x9005, 0x285, 0x9005, 0x285, AAC_HWIF_I960RX,
-		AAC_FLAGS_NO4GB | AAC_FLAGS_256FIBS, AAC_TYPE_SCSI,
-		"Adaptec", "2200S"},
+	    AAC_FLAGS_NO4GB | AAC_FLAGS_256FIBS, AAC_TYPE_SCSI,
+	    "Adaptec", "2200S"},
 	{0x9005, 0x285, 0x9005, 0x286, AAC_HWIF_I960RX,
-		AAC_FLAGS_NO4GB | AAC_FLAGS_256FIBS, AAC_TYPE_SCSI,
-		"Adaptec", "2120S"},
+	    AAC_FLAGS_NO4GB | AAC_FLAGS_256FIBS, AAC_TYPE_SCSI,
+	    "Adaptec", "2120S"},
 	{0x9005, 0x285, 0x9005, 0x287, AAC_HWIF_I960RX,
-		AAC_FLAGS_NO4GB | AAC_FLAGS_256FIBS, AAC_TYPE_SCSI,
-		"Adaptec", "2200S"},
+	    AAC_FLAGS_NO4GB | AAC_FLAGS_256FIBS, AAC_TYPE_SCSI,
+	    "Adaptec", "2200S"},
 	{0x9005, 0x285, 0x9005, 0x288, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SCSI, "Adaptec", "3230S"},
+	    0, AAC_TYPE_SCSI, "Adaptec", "3230S"},
 	{0x9005, 0x285, 0x9005, 0x289, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SCSI, "Adaptec", "3240S"},
+	    0, AAC_TYPE_SCSI, "Adaptec", "3240S"},
 	{0x9005, 0x285, 0x9005, 0x28a, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SCSI, "Adaptec", "2020ZCR"},
+	    0, AAC_TYPE_SCSI, "Adaptec", "2020ZCR"},
 	{0x9005, 0x285, 0x9005, 0x28b, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SCSI, "Adaptec", "2025ZCR"},
+	    0, AAC_TYPE_SCSI, "Adaptec", "2025ZCR"},
 	{0x9005, 0x286, 0x9005, 0x28c, AAC_HWIF_RKT,
-		0, AAC_TYPE_SCSI, "Adaptec", "2230S"},
+	    0, AAC_TYPE_SCSI, "Adaptec", "2230S"},
 	{0x9005, 0x286, 0x9005, 0x28d, AAC_HWIF_RKT,
-		0, AAC_TYPE_SCSI, "Adaptec", "2130S"},
+	    0, AAC_TYPE_SCSI, "Adaptec", "2130S"},
 	{0x9005, 0x285, 0x9005, 0x28e, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SATA, "Adaptec", "2020SA"},
+	    0, AAC_TYPE_SATA, "Adaptec", "2020SA"},
 	{0x9005, 0x285, 0x9005, 0x28f, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SATA, "Adaptec", "2025SA"},
+	    0, AAC_TYPE_SATA, "Adaptec", "2025SA"},
 	{0x9005, 0x285, 0x9005, 0x290, AAC_HWIF_I960RX,
-		AAC_FLAGS_NO4GB, AAC_TYPE_SATA, "Adaptec", "2410SA"},
+	    AAC_FLAGS_NO4GB, AAC_TYPE_SATA, "Adaptec", "2410SA"},
 	{0x9005, 0x285, 0x9005, 0x292, AAC_HWIF_I960RX,
-		AAC_FLAGS_NO4GB, AAC_TYPE_SATA, "Adaptec", "2810SA"},
+	    AAC_FLAGS_NO4GB, AAC_TYPE_SATA, "Adaptec", "2810SA"},
 	{0x9005, 0x285, 0x9005, 0x293, AAC_HWIF_I960RX,
-		AAC_FLAGS_NO4GB, AAC_TYPE_SATA, "Adaptec", "21610SA"},
+	    AAC_FLAGS_NO4GB, AAC_TYPE_SATA, "Adaptec", "21610SA"},
 	{0x9005, 0x285, 0x9005, 0x294, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SATA, "Adaptec", "2026ZCR"},
+	    0, AAC_TYPE_SATA, "Adaptec", "2026ZCR"},
 	{0x9005, 0x285, 0x9005, 0x296, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SCSI, "Adaptec", "2240S"},
+	    0, AAC_TYPE_SCSI, "Adaptec", "2240S"},
 	{0x9005, 0x285, 0x9005, 0x297, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SAS, "Adaptec", "4005SAS"},
+	    0, AAC_TYPE_SAS, "Adaptec", "4005SAS"},
 	{0x9005, 0x285, 0x9005, 0x298, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SAS, "Adaptec", "RAID 4000"},
+	    0, AAC_TYPE_SAS, "Adaptec", "RAID 4000"},
 	{0x9005, 0x285, 0x9005, 0x299, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SAS, "Adaptec", "4800SAS"},
+	    0, AAC_TYPE_SAS, "Adaptec", "4800SAS"},
 	{0x9005, 0x285, 0x9005, 0x29a, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SAS, "Adaptec", "4805SAS"},
+	    0, AAC_TYPE_SAS, "Adaptec", "4805SAS"},
 	{0x9005, 0x286, 0x9005, 0x29b, AAC_HWIF_RKT,
-		0, AAC_TYPE_SATA, "Adaptec", "2820SA"},
+	    0, AAC_TYPE_SATA, "Adaptec", "2820SA"},
 	{0x9005, 0x286, 0x9005, 0x29c, AAC_HWIF_RKT,
-		0, AAC_TYPE_SATA, "Adaptec", "2620SA"},
+	    0, AAC_TYPE_SATA, "Adaptec", "2620SA"},
 	{0x9005, 0x286, 0x9005, 0x29d, AAC_HWIF_RKT,
-		0, AAC_TYPE_SATA, "Adaptec", "2420SA"},
+	    0, AAC_TYPE_SATA, "Adaptec", "2420SA"},
 	{0x9005, 0x286, 0x9005, 0x29e, AAC_HWIF_RKT,
-		0, AAC_TYPE_SATA, "ICP", "9024RO"},
+	    0, AAC_TYPE_SATA, "ICP", "9024RO"},
 	{0x9005, 0x286, 0x9005, 0x29f, AAC_HWIF_RKT,
-		0, AAC_TYPE_SATA, "ICP", "9014RO"},
+	    0, AAC_TYPE_SATA, "ICP", "9014RO"},
 	{0x9005, 0x286, 0x9005, 0x2a0, AAC_HWIF_RKT,
-		0, AAC_TYPE_SATA, "ICP", "9047MA"},
+	    0, AAC_TYPE_SATA, "ICP", "9047MA"},
 	{0x9005, 0x286, 0x9005, 0x2a1, AAC_HWIF_RKT,
-		0, AAC_TYPE_SATA, "ICP", "9087MA"},
+	    0, AAC_TYPE_SATA, "ICP", "9087MA"},
 	{0x9005, 0x285, 0x9005, 0x2a4, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SAS, "ICP", "9085LI"},
+	    0, AAC_TYPE_SAS, "ICP", "9085LI"},
 	{0x9005, 0x285, 0x9005, 0x2a5, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SAS, "ICP", "5085BR"},
+	    0, AAC_TYPE_SAS, "ICP", "5085BR"},
 	{0x9005, 0x286, 0x9005, 0x2a6, AAC_HWIF_RKT,
-		0, AAC_TYPE_SATA, "ICP", "9067MA"},
+	    0, AAC_TYPE_SATA, "ICP", "9067MA"},
 	{0x9005, 0x285, 0x9005, 0x2b5, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SAS, "Adaptec", "RAID 5445"},
+	    0, AAC_TYPE_SAS, "Adaptec", "RAID 5445"},
 	{0x9005, 0x285, 0x9005, 0x2b6, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SAS, "Adaptec", "RAID 5805"},
+	    0, AAC_TYPE_SAS, "Adaptec", "RAID 5805"},
 	{0x9005, 0x285, 0x9005, 0x2b7, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SAS, "Adaptec", "RAID 5085"},
+	    0, AAC_TYPE_SAS, "Adaptec", "RAID 5085"},
 	{0x9005, 0x285, 0x9005, 0x2b8, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SAS, "ICP", "RAID ICP5445SL"},
+	    0, AAC_TYPE_SAS, "ICP", "RAID ICP5445SL"},
 	{0x9005, 0x285, 0x9005, 0x2b9, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SAS, "ICP", "RAID ICP5085SL"},
+	    0, AAC_TYPE_SAS, "ICP", "RAID ICP5085SL"},
 	{0x9005, 0x285, 0x9005, 0x2ba, AAC_HWIF_I960RX,
-		0, AAC_TYPE_SAS, "ICP", "RAID ICP5805SL"},
+	    0, AAC_TYPE_SAS, "ICP", "RAID ICP5805SL"},
 
 	{0, 0, 0, 0, AAC_HWIF_UNKNOWN,
-		0, AAC_TYPE_UNKNOWN, "Unknown", "AAC card"},
+	    0, AAC_TYPE_UNKNOWN, "Unknown", "AAC card"},
+};
+
+/*
+ * Hardware access functions for i960 based cards
+ */
+static struct aac_interface aac_rx_interface = {
+	aac_rx_get_fwstatus,
+	aac_rx_get_mailbox,
+	aac_rx_set_mailbox
+};
+
+/*
+ * Hardware access functions for Rocket based cards
+ */
+static struct aac_interface aac_rkt_interface = {
+	aac_rkt_get_fwstatus,
+	aac_rkt_get_mailbox,
+	aac_rkt_set_mailbox
 };
 
 ddi_device_acc_attr_t aac_acc_attr = {
@@ -457,63 +469,63 @@ static struct {
  * Default aac dma attributes
  */
 static ddi_dma_attr_t aac_buf_dma_attr = {
-		DMA_ATTR_V0,
-		0x2000ull,	/* lowest usable address */
-				/* (2200 and 2120 cannot do DMA below 8192) */
-		0xffffffffull,	/* high DMA address range */
-		0x0000ffffull,	/* DMA counter register */
-		AAC_DMA_ALIGN,	/* DMA address alignment */
-		1,		/* DMA burstsizes */
-		1,		/* min effective DMA size */
-		0xffffffffull,	/* max DMA xfer size */
-		0xffffffffull,	/* segment boundary */
-		AAC_NSEG,	/* s/g list length */
-		AAC_BLK_SIZE,	/* granularity of device */
-		0,		/* DMA transfer flags */
+	DMA_ATTR_V0,
+	0x2000ull,	/* lowest usable address */
+			/* (2200 and 2120 cannot do DMA below 8192) */
+	0xffffffffull,	/* high DMA address range */
+	0x0000ffffull,	/* DMA counter register */
+	AAC_DMA_ALIGN,	/* DMA address alignment */
+	1,		/* DMA burstsizes */
+	1,		/* min effective DMA size */
+	0xffffffffull,	/* max DMA xfer size */
+	0xffffffffull,	/* segment boundary */
+	AAC_NSEG,	/* s/g list length */
+	AAC_BLK_SIZE,	/* granularity of device */
+	0,		/* DMA transfer flags */
 };
 
 static ddi_dma_attr_t aac_addr_dma_attr = {
-		DMA_ATTR_V0,
-		0x2000ull,	/* lowest usable address */
-				/* (2200 and 2120 cannot do DMA below 8192) */
-		0x7fffffffull,	/* high DMA address range */
-		0x0000ffffull,	/* DMA counter register */
-		AAC_DMA_ALIGN,	/* DMA address alignment */
-		1,		/* DMA burstsizes */
-		1,		/* min effective DMA size */
-		0x7fffffffull,	/* max DMA xfer size */
-		0x7fffffffull,	/* segment boundary */
-		1,		/* s/g list length */
-		1,		/* granularity of device */
-		0,		/* DMA transfer flags */
+	DMA_ATTR_V0,
+	0x2000ull,	/* lowest usable address */
+			/* (2200 and 2120 cannot do DMA below 8192) */
+	0x7fffffffull,	/* high DMA address range */
+	0x0000ffffull,	/* DMA counter register */
+	AAC_DMA_ALIGN,	/* DMA address alignment */
+	1,		/* DMA burstsizes */
+	1,		/* min effective DMA size */
+	0x7fffffffull,	/* max DMA xfer size */
+	0x7fffffffull,	/* segment boundary */
+	1,		/* s/g list length */
+	1,		/* granularity of device */
+	0,		/* DMA transfer flags */
 };
 
 int
 _init(void)
 {
-	int retval = 0;
+	int rval = 0;
 
 	DBCALLED(1);
 
-	if ((retval = ddi_soft_state_init((void *)&aac_softstatep,
-		sizeof (struct aac_softstate), 0)) != 0)
+	if ((rval = ddi_soft_state_init((void *)&aac_softstatep,
+	    sizeof (struct aac_softstate), 0)) != 0)
 		goto error;
 
-	if ((retval = scsi_hba_init(&aac_modlinkage)) != 0) {
-		ddi_soft_state_fini((void*)&aac_softstatep);
+	if ((rval = scsi_hba_init(&aac_modlinkage)) != 0) {
+		ddi_soft_state_fini((void *)&aac_softstatep);
 		goto error;
 	}
 
-	if ((retval = mod_install(&aac_modlinkage)) != 0) {
-		ddi_soft_state_fini((void*)&aac_softstatep);
+	if ((rval = mod_install(&aac_modlinkage)) != 0) {
+		ddi_soft_state_fini((void *)&aac_softstatep);
 		scsi_hba_fini(&aac_modlinkage);
 		goto error;
 	}
-	return (retval);
+	return (rval);
 
 error:
 	AACDB_PRINT((CE_WARN, "Mod init error!"));
-	return (retval);
+	return (rval);
 }
 
 int
@@ -530,29 +542,28 @@ _info(struct modinfo *modinfop)
 int
 _fini(void)
 {
-	int err;
+	int rval;
 
 	DBCALLED(1);
 
-	if ((err = mod_remove(&aac_modlinkage)) != 0)
+	if ((rval = mod_remove(&aac_modlinkage)) != 0)
 		goto error;
 
 	scsi_hba_fini(&aac_modlinkage);
-	ddi_soft_state_fini((void*)&aac_softstatep);
+	ddi_soft_state_fini((void *)&aac_softstatep);
 
 	return (0);
 
 error:
 	AACDB_PRINT((CE_WARN, "AAC is busy, cannot unload!"));
-	return (err);
+	return (rval);
 }
 
 static int
 aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	int instance;
-	struct aac_softstate  *softs;
-	scsi_hba_tran_t *tran;
+	struct aac_softstate *softs;
 	int attach_state = 0;
 
 	DBCALLED(1);
@@ -591,9 +602,9 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* Map PCI mem space */
 	if (ddi_regs_map_setup(dip, 1,
-		(caddr_t *)&softs->pci_mem_base_addr, 0,
-		softs->map_size_min, &aac_acc_attr,
-		&softs->pci_mem_handle) != DDI_SUCCESS)
+	    (caddr_t *)&softs->pci_mem_base_addr, 0,
+	    softs->map_size_min, &aac_acc_attr,
+	    &softs->pci_mem_handle) != DDI_SUCCESS)
 		goto error;
 
 	softs->map_size = softs->map_size_min;
@@ -603,37 +614,37 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if (ddi_intr_hilevel(dip, 0)) {
 		AACDB_PRINT((CE_WARN,
-			"High level interrupt is not supported!"));
+		    "High level interrupt is not supported!"));
 		goto error;
 	}
 
 	/* Init mutexes */
-	if (ddi_get_iblock_cookie(dip, 0, &softs->iblock_cookie)
-		!= DDI_SUCCESS) {
+	if (ddi_get_iblock_cookie(dip, 0, &softs->iblock_cookie) !=
+	    DDI_SUCCESS) {
 		AACDB_PRINT((CE_WARN,
-			"Can not get interrupt block cookie!"));
+		    "Can not get interrupt block cookie!"));
 		goto error;
 	}
 	mutex_init(&softs->sync_mode.mutex, NULL,
-		MUTEX_DRIVER, (void *)softs->iblock_cookie);
+	    MUTEX_DRIVER, (void *)softs->iblock_cookie);
 	mutex_init(&softs->q_wait_sync.q_mutex, NULL,
-		MUTEX_DRIVER, (void *)softs->iblock_cookie);
+	    MUTEX_DRIVER, (void *)softs->iblock_cookie);
 	mutex_init(&softs->q_wait.q_mutex, NULL,
-		MUTEX_DRIVER, (void *)softs->iblock_cookie);
+	    MUTEX_DRIVER, (void *)softs->iblock_cookie);
 	mutex_init(&softs->q_comp.q_mutex, NULL,
-		MUTEX_DRIVER, (void *)softs->iblock_cookie);
+	    MUTEX_DRIVER, (void *)softs->iblock_cookie);
 	mutex_init(&softs->slot_mutex, NULL,
-		MUTEX_DRIVER, (void *)softs->iblock_cookie);
+	    MUTEX_DRIVER, (void *)softs->iblock_cookie);
 	mutex_init(&softs->fib_mutex, NULL,
-		MUTEX_DRIVER, (void *)softs->iblock_cookie);
+	    MUTEX_DRIVER, (void *)softs->iblock_cookie);
 	cv_init(&softs->event, NULL, CV_DRIVER, NULL);
 	mutex_init(&softs->event_mutex, NULL,
-		MUTEX_DRIVER, (void *)softs->iblock_cookie);
+	    MUTEX_DRIVER, (void *)softs->iblock_cookie);
 	cv_init(&softs->aifv, NULL, CV_DRIVER, NULL);
 	mutex_init(&softs->aifq_mutex, NULL,
-		MUTEX_DRIVER, (void *)softs->iblock_cookie);
+	    MUTEX_DRIVER, (void *)softs->iblock_cookie);
 	rw_init(&softs->errlock, NULL, RW_DRIVER,
-		(void *)softs->iblock_cookie);
+	    (void *)softs->iblock_cookie);
 	attach_state |= AAC_ATTACH_KMUTEX_INITED;
 
 	/*
@@ -651,19 +662,19 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto error;
 	attach_state |= AAC_ATTACH_SCSI_TRAN_SETUP;
 
-	/* Connect interrupt handler */
+	/* Connect interrupt handlers */
 	if (ddi_add_intr(dip, 0, &softs->iblock_cookie,
-		(ddi_idevice_cookie_t *)0,
-		(softs->flags & AAC_FLAGS_NEW_COMM) ?
-		aac_intr_new : aac_intr_old, (caddr_t)softs) != DDI_SUCCESS) {
+	    (ddi_idevice_cookie_t *)0,
+	    (softs->flags & AAC_FLAGS_NEW_COMM) ?
+	    aac_intr_new : aac_intr_old, (caddr_t)softs) != DDI_SUCCESS) {
 		AACDB_PRINT((CE_WARN,
-			"Can not setup interrupt handler!"));
+		    "Can not setup interrupt handler!"));
 		goto error;
 	}
 	attach_state |= AAC_ATTACH_HARD_INTR_SETUP;
 
 	if (ddi_add_softintr(dip, DDI_SOFTINT_LOW, &softs->softint_id,
-		NULL, NULL, aac_softintr, (caddr_t)softs) != DDI_SUCCESS) {
+	    NULL, NULL, aac_softintr, (caddr_t)softs) != DDI_SUCCESS) {
 		AACDB_PRINT((CE_WARN, "Can not setup soft interrupt handler!"));
 		goto error;
 	}
@@ -671,32 +682,30 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* Create devctl/scsi nodes for cfgadm */
 	if (ddi_create_minor_node(dip, "devctl", S_IFCHR,
-		INST2DEVCTL(instance),
-		DDI_NT_SCSI_NEXUS, 0) != DDI_SUCCESS) {
+	    INST2DEVCTL(instance), DDI_NT_SCSI_NEXUS, 0) != DDI_SUCCESS) {
 		AACDB_PRINT((CE_WARN, "failed to create devctl node"));
 		goto error;
 	}
 	attach_state |= AAC_ATTACH_CREATE_DEVCTL;
 
-	if (ddi_create_minor_node(dip, "scsi", S_IFCHR,
-		INST2SCSI(instance),
-		DDI_NT_SCSI_ATTACHMENT_POINT, 0) != DDI_SUCCESS) {
+	if (ddi_create_minor_node(dip, "scsi", S_IFCHR, INST2SCSI(instance),
+	    DDI_NT_SCSI_ATTACHMENT_POINT, 0) != DDI_SUCCESS) {
 		AACDB_PRINT((CE_WARN, "failed to create scsi node"));
 		goto error;
 	}
 	attach_state |= AAC_ATTACH_CREATE_SCSI;
 
-	/* create aac node for app. to issue ioctls */
-	if (ddi_create_minor_node(dip, "aac", S_IFCHR,
-		INST2AAC(instance), DDI_PSEUDO, 0) != DDI_SUCCESS) {
+	/* Create aac node for app. to issue ioctls */
+	if (ddi_create_minor_node(dip, "aac", S_IFCHR, INST2AAC(instance),
+	    DDI_PSEUDO, 0) != DDI_SUCCESS) {
 		AACDB_PRINT((CE_WARN, "failed to create aac node"));
 		goto error;
 	}
 
 	softs->state = AAC_STATE_RUN;
 	/* Create a thread for command timeout */
-	softs->timeout_id = timeout(aac_daemon, (void*)softs,
-		(60 * drv_usectohz(1000000)));
+	softs->timeout_id = timeout(aac_daemon, (void *)softs,
+	    (60 * drv_usectohz(1000000)));
 
 	/* Common attach is OK, so we are attached! */
 	AAC_ENABLE_INTR(softs);
@@ -712,9 +721,8 @@ error:
 	if (attach_state & AAC_ATTACH_COMM_SPACE_SETUP)
 		aac_common_detach(softs);
 	if (attach_state & AAC_ATTACH_SCSI_TRAN_SETUP) {
-		tran = (scsi_hba_tran_t *)ddi_get_driver_private(dip);
 		(void) scsi_hba_detach(dip);
-		scsi_hba_tran_free(tran);
+		scsi_hba_tran_free(AAC_DIP2TRAN(dip));
 	}
 	if (attach_state & AAC_ATTACH_HARD_INTR_SETUP)
 		ddi_remove_intr(dip, 0, softs->iblock_cookie);
@@ -745,9 +753,8 @@ error:
 static int
 aac_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	int instance;
-	struct aac_softstate *softs;
-	scsi_hba_tran_t *tran;
+	scsi_hba_tran_t *tran = AAC_DIP2TRAN(dip);
+	struct aac_softstate *softs = AAC_TRAN2SOFTS(tran);
 
 	DBCALLED(1);
 
@@ -760,9 +767,6 @@ aac_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	instance = ddi_get_instance(dip);
-	tran = (scsi_hba_tran_t *)ddi_get_driver_private(dip);
-	softs = AAC_TRAN2SOFTS(tran);
 	ddi_remove_minor_node(dip, "aac");
 	ddi_remove_minor_node(dip, "scsi");
 	ddi_remove_minor_node(dip, "devctl");
@@ -794,7 +798,7 @@ aac_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	ddi_regs_map_free(&softs->pci_mem_handle);
 	softs->hwif = AAC_HWIF_UNKNOWN;
 	softs->card = AAC_UNKNOWN_CARD;
-	ddi_soft_state_free(aac_softstatep, instance);
+	ddi_soft_state_free(aac_softstatep, ddi_get_instance(dip));
 
 	return (DDI_SUCCESS);
 }
@@ -803,13 +807,10 @@ aac_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 static int
 aac_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
 {
-	struct aac_softstate *softs;
-	scsi_hba_tran_t *tran;
+	struct aac_softstate *softs = AAC_DIP2SOFTS(dip);
 
 	DBCALLED(1);
 
-	tran = (scsi_hba_tran_t *)ddi_get_driver_private(dip);
-	softs = AAC_TRAN2SOFTS(tran);
 	(void) aac_shutdown(softs);
 
 	return (DDI_SUCCESS);
@@ -824,39 +825,39 @@ aac_reset(dev_info_t *dip, ddi_reset_cmd_t cmd)
 static int
 aac_shutdown(struct aac_softstate *softs)
 {
-	int status;
-	struct aac_fib *fib;
+	struct aac_fib *fibp;
 	struct aac_close_command *cc;
+	int rval;
 
-	fib = aac_grab_sync_fib(softs, SLEEP_FUNC);
-	cc = (struct aac_close_command *)&fib->data[0];
+	fibp = aac_grab_sync_fib(softs, SLEEP_FUNC);
+	cc = (struct aac_close_command *)&fibp->data[0];
 
 	cc->Command = VM_CloseAll;
-	cc->ContainerId = 0xffffffff;
+	cc->ContainerId = 0xfffffffful;
 
-	/* flush all caches, set FW to write through mode */
-	status = aac_sync_fib(softs, ContainerCommand, fib,
-		sizeof (struct aac_fib_header) + \
-		sizeof (struct aac_close_command));
+	/* Flush all caches, set FW to write through mode */
+	rval = aac_sync_fib(softs, ContainerCommand, fibp,
+	    sizeof (struct aac_fib_header) + \
+	    sizeof (struct aac_close_command));
 
 	AACDB_PRINT((CE_NOTE,
-		"shutting down aac %s", (status == AACOK) ? "ok" : "fail"));
+	    "shutting down aac %s", (rval == AACOK) ? "ok" : "fail"));
 
 	aac_release_sync_fib(softs);
-	return (status);
+	return (rval);
 }
 
 static uint_t
 aac_softintr(caddr_t arg)
 {
-	struct aac_softstate *softs;
+	struct aac_softstate *softs = (struct aac_softstate *)arg;
 
-	softs = (struct aac_softstate *)arg;
 	if (!AAC_IS_Q_EMPTY(&softs->q_comp)) {
 		aac_drain_comp_q(softs);
 		return (DDI_INTR_CLAIMED);
-	} else
+	} else {
 		return (DDI_INTR_UNCLAIMED);
+	}
 }
 
 /*
@@ -864,7 +865,7 @@ aac_softintr(caddr_t arg)
  */
 static void
 aac_set_arq_data(struct scsi_pkt *pkt, uchar_t key,
-	uchar_t add_code, uchar_t qual_code, uint64_t info)
+    uchar_t add_code, uchar_t qual_code, uint64_t info)
 {
 	struct scsi_arq_status *arqstat;
 
@@ -875,13 +876,13 @@ aac_set_arq_data(struct scsi_pkt *pkt, uchar_t key,
 	arqstat->sts_rqpkt_reason = CMD_CMPLT;
 	arqstat->sts_rqpkt_resid = 0;
 	arqstat->sts_rqpkt_state =
-		STATE_GOT_BUS |
-		STATE_GOT_TARGET |
-		STATE_SENT_CMD |
-		STATE_XFERRED_DATA;
+	    STATE_GOT_BUS |
+	    STATE_GOT_TARGET |
+	    STATE_SENT_CMD |
+	    STATE_XFERRED_DATA;
 	arqstat->sts_rqpkt_statistics = 0;
 
-	if (info <= 0xffffffff) {
+	if (info <= 0xfffffffful) {
 		arqstat->sts_sensedata.es_valid = 1;
 		arqstat->sts_sensedata.es_class = CLASS_EXTENDED_SENSE;
 		arqstat->sts_sensedata.es_code = CODE_FMT_FIXED_CURRENT;
@@ -904,7 +905,7 @@ aac_set_arq_data(struct scsi_pkt *pkt, uchar_t key,
 		dsp->ds_add_code = add_code;
 		dsp->ds_qual_code = qual_code;
 		dsp->ds_addl_sense_length =
-			sizeof (struct scsi_information_sense_descr);
+		    sizeof (struct scsi_information_sense_descr);
 
 		isd = (struct scsi_information_sense_descr *)(dsp+1);
 		isd->isd_descr_type = DESCR_INFORMATION;
@@ -964,7 +965,7 @@ aac_send_command(struct aac_softstate *softs, struct aac_slot *slotp)
 
 	device = index;
 	PCI_MEM_PUT32(softs, device,
-		(uint32_t)(slotp->fib_phyaddr & 0xffffffffUL));
+	    (uint32_t)(slotp->fib_phyaddr & 0xfffffffful));
 	device += 4;
 	PCI_MEM_PUT32(softs, device, (uint32_t)(slotp->fib_phyaddr >> 32));
 	device += 4;
@@ -982,38 +983,21 @@ aac_send_command(struct aac_softstate *softs, struct aac_slot *slotp)
 static uint_t
 aac_intr_new(caddr_t arg)
 {
-	struct aac_softstate *softs;
-	struct aac_cmd *acp;
+	struct aac_softstate *softs = (struct aac_softstate *)arg;
 	struct aac_fib *fibp;
-	uint32_t index, fast;
+	uint32_t index;
 
 	/* AACDB_PRINT((CE_NOTE, "INTR! new")); */
-	softs = (struct aac_softstate *)arg;
 	index = AAC_OUTB_GET(softs);
-	if (index == 0xffffffff)
+	if (index == 0xfffffffful)
 		index = AAC_OUTB_GET(softs);
-	if (index == 0xffffffff)
+	if (index == 0xfffffffful)
 		return (DDI_INTR_UNCLAIMED);
 	do {
-		if (index & AAC_SENDERADDR_MASK_AIF) {
-			int i;
+		if ((index & AAC_SENDERADDR_MASK_AIF) == 0) {
+			struct aac_cmd *acp;
+			uint32_t fast;
 
-			if (index == 0xfffffffe)
-				return (DDI_INTR_CLAIMED);
-			/* AIF received */
-			fibp = &softs->comm_space->adapter_fibs[0];
-			index &= ~2;
-			for (i = 0; i < sizeof (struct aac_fib)/4; ++i)
-				((uint32_t *)fibp)[i] =
-					PCI_MEM_GET32(softs, index+i*4);
-			(void) aac_handle_aif(softs, fibp);
-			/*
-			 * AIF memory is owned by the adapter, so let it
-			 * know that we are done with it.
-			 */
-			AAC_OUTB_SET(softs, index);
-			AAC_STATUS_CLR(softs, AAC_DB_RESPONSE_READY);
-		} else {
 			fast = index & AAC_SENDERADDR_MASK_FAST_RESPONSE;
 			index >>= 2;
 
@@ -1026,13 +1010,31 @@ aac_intr_new(caddr_t arg)
 			if (fast) {
 				fibp = softs->io_slot[index].fibp;
 				fibp->Header.XferState |=
-					AAC_FIBSTATE_DONEADAP;
+				    AAC_FIBSTATE_DONEADAP;
 				*((uint32_t *)(fibp->data)) = 0;
 			}
 			aac_intr_norm(softs, acp);
+		} else if (index != 0xfffffffeul) {
+			int i;
+
+			/* AIF received */
+			fibp = &softs->comm_space->adapter_fibs[0];
+			index &= ~2;
+			for (i = 0; i < sizeof (struct aac_fib)/4; ++i)
+				((uint32_t *)fibp)[i] =
+				    PCI_MEM_GET32(softs, index+i*4);
+			(void) aac_handle_aif(softs, fibp);
+			/*
+			 * AIF memory is owned by the adapter, so let it
+			 * know that we are done with it.
+			 */
+			AAC_OUTB_SET(softs, index);
+			AAC_STATUS_CLR(softs, AAC_DB_RESPONSE_READY);
+		} else {
+			return (DDI_INTR_CLAIMED);
 		}
 		index = AAC_OUTB_GET(softs);
-	} while (index != 0xffffffff);
+	} while (index != 0xfffffffful);
 
 	aac_start_waiting_io(softs);
 	ddi_trigger_softintr(softs->softint_id);
@@ -1049,23 +1051,21 @@ aac_intr_new(caddr_t arg)
 static uint_t
 aac_intr_old(caddr_t arg)
 {
-	struct aac_softstate *softs;
+	struct aac_softstate *softs = (struct aac_softstate *)arg;
 	struct aac_cmd *acp;
 	struct aac_fib *fibp;
 	uint16_t status;
 	int rval;
 
 	/* AACDB_PRINT((CE_NOTE, "INTR! old")); */
-	softs = (struct aac_softstate *)arg;
 	status = AAC_STATUS_GET(softs);
 	if (status & AAC_DB_RESPONSE_READY) {
 		/* ACK the intr */
 		AAC_STATUS_CLR(softs, AAC_DB_RESPONSE_READY);
 		(void) AAC_STATUS_GET(softs);
 		do {
-			rval = aac_fib_dequeue(softs,
-				AAC_HOST_NORM_RESP_Q,
-				&fibp, &acp);
+			rval = aac_fib_dequeue(softs, AAC_HOST_NORM_RESP_Q,
+			    &fibp, &acp);
 			if (rval == 0 && acp)
 				aac_intr_norm(softs, acp);
 		} while (rval == 0);
@@ -1078,22 +1078,21 @@ aac_intr_old(caddr_t arg)
 		AAC_STATUS_CLR(softs, AAC_DB_PRINTF_READY);
 		(void) AAC_STATUS_GET(softs);
 		aac_dma_sync(softs->comm_space_dma_handle,
-			AACOFFSET(struct aac_comm_space, adapter_print_buf),
-			AAC_ADAPTER_PRINT_BUFSIZE,
-			DDI_DMA_SYNC_FORCPU);
+		    AACOFFSET(struct aac_comm_space, adapter_print_buf),
+		    AAC_ADAPTER_PRINT_BUFSIZE, DDI_DMA_SYNC_FORCPU);
 		cmn_err(CE_NOTE, "MSG From Adapter: %s",
-			softs->comm_space->adapter_print_buf);
+		    softs->comm_space->adapter_print_buf);
 		AAC_NOTIFY(softs, AAC_DB_PRINTF_READY);
 		return (DDI_INTR_CLAIMED);
 	} else if (status & AAC_DB_COMMAND_READY) {
 		AAC_STATUS_CLR(softs, AAC_DB_COMMAND_READY);
 		(void) AAC_STATUS_GET(softs);
 		rval = aac_fib_dequeue(softs, AAC_HOST_NORM_CMD_Q,
-			&fibp, &acp);
+		    &fibp, &acp);
 		if (rval == 0 && fibp) {
 			(void) aac_handle_aif(softs, fibp);
-			if (aac_resp_enqueue(softs, AAC_ADAP_NORM_RESP_Q, fibp)
-				== AACERR)
+			if (aac_resp_enqueue(softs, AAC_ADAP_NORM_RESP_Q,
+			    fibp) == AACERR)
 				cmn_err(CE_NOTE, "!AIF ack failed");
 		}
 		return (DDI_INTR_CLAIMED);
@@ -1110,48 +1109,49 @@ aac_intr_old(caddr_t arg)
 		AAC_STATUS_CLR(softs, AAC_DB_COMMAND_NOT_FULL);
 		AAC_STATUS_CLR(softs, AAC_DB_RESPONSE_NOT_FULL);
 		return (DDI_INTR_CLAIMED);
-	} else
+	} else {
 		return (DDI_INTR_UNCLAIMED);
+	}
 }
 
 /*
  * Handle a finished pkt of AAC_CMD_HARD_INTR mode
  */
 static void
-aac_hard_callback(struct aac_softstate *softs, struct aac_cmd *ac,
-	uchar_t reason)
+aac_hard_callback(struct aac_softstate *softs, struct aac_cmd *acp,
+    uchar_t reason)
 {
-	ac->pkt->pkt_reason = reason;
-	aac_cmd_enqueue(&softs->q_comp, ac);
+	acp->pkt->pkt_reason = reason;
+	aac_cmd_enqueue(&softs->q_comp, acp);
 }
 
 /*
  * Handle a finished pkt of non AAC_CMD_HARD_INTR mode
  */
 static void
-aac_soft_callback(struct aac_softstate *softs, struct aac_cmd *ac,
-	uchar_t reason)
+aac_soft_callback(struct aac_softstate *softs, struct aac_cmd *acp,
+    uchar_t reason)
 {
-	struct scsi_pkt *pkt = ac->pkt;
+	struct scsi_pkt *pkt = acp->pkt;
 
 	/* AAC_CMD_NO_INTR means no complete callback */
-	ASSERT(!(ac->flags & AAC_CMD_NO_INTR) || (reason == CMD_CMPLT));
+	ASSERT(!(acp->flags & AAC_CMD_NO_INTR) || (reason == CMD_CMPLT));
 
 	pkt->pkt_reason = reason;
 	if (reason == CMD_CMPLT)
 		pkt->pkt_state |=
-			STATE_GOT_BUS |
-			STATE_GOT_TARGET |
-			STATE_SENT_CMD;
+		    STATE_GOT_BUS |
+		    STATE_GOT_TARGET |
+		    STATE_SENT_CMD;
 
-	if (!(ac->flags & AAC_CMD_NO_INTR)) {
-		aac_cmd_enqueue(&softs->q_comp, ac);
+	if (!(acp->flags & AAC_CMD_NO_INTR)) {
+		aac_cmd_enqueue(&softs->q_comp, acp);
 		ddi_trigger_softintr(softs->softint_id);
 	}
 }
 
 /*
- * Handle a complete IO, common to aac_intr_new() and aac_intr_old()
+ * Handlers for completed IOs, common to aac_intr_new() and aac_intr_old()
  */
 static void
 aac_intr_norm(struct aac_softstate *softs, struct aac_cmd *acp)
@@ -1224,8 +1224,8 @@ aac_check_card_type(struct aac_softstate *softs)
 	uint32_t mem_base;
 
 	/* Map pci configuration space */
-	if ((pci_config_setup(softs->devinfo_p, &pci_config_handle))
-		!= DDI_SUCCESS) {
+	if ((pci_config_setup(softs->devinfo_p, &pci_config_handle)) !=
+	    DDI_SUCCESS) {
 		AACDB_PRINT((CE_WARN, "Cannot setup pci config space"));
 		return (AACERR);
 	}
@@ -1237,9 +1237,9 @@ aac_check_card_type(struct aac_softstate *softs)
 	card_index = 0;
 	while (!CARD_IS_UNKNOWN(card_index)) {
 		if ((aac_cards[card_index].vendor == vendid) &&
-			(aac_cards[card_index].device == devid) &&
-			(aac_cards[card_index].subvendor == subvendid) &&
-			(aac_cards[card_index].subsys == subsysid)) {
+		    (aac_cards[card_index].device == devid) &&
+		    (aac_cards[card_index].subvendor == subvendid) &&
+		    (aac_cards[card_index].subsys == subsysid)) {
 			/*
 			 * SATA RAID adapter's DMA capability is worse
 			 * than SCSI RAID adapter.  So we need to change
@@ -1248,7 +1248,7 @@ aac_check_card_type(struct aac_softstate *softs)
 			 */
 			if (aac_cards[card_index].type == AAC_TYPE_SATA)
 				softs->buf_dma_attr.dma_attr_count_max =
-					0xfffull;
+				    0xfffull;
 			break;
 		}
 		card_index++;
@@ -1265,7 +1265,7 @@ aac_check_card_type(struct aac_softstate *softs)
 	if (CARD_IS_UNKNOWN(card_index)) {
 		if (vendid != 0x9005) {
 			AACDB_PRINT((CE_WARN,
-				"Unknown vendor 0x%x", vendid));
+			    "Unknown vendor 0x%x", vendid));
 			goto error;
 		}
 		switch (devid) {
@@ -1277,7 +1277,7 @@ aac_check_card_type(struct aac_softstate *softs)
 			break;
 		default:
 			AACDB_PRINT((CE_WARN,
-				"Unknown device \"pci9005,%x\"", devid));
+			    "Unknown device \"pci9005,%x\"", devid));
 			goto error;
 		}
 	}
@@ -1294,15 +1294,15 @@ aac_check_card_type(struct aac_softstate *softs)
 		break;
 	default:
 		AACDB_PRINT((CE_WARN,
-			"Unknown hardware interface %d", softs->hwif));
+		    "Unknown hardware interface %d", softs->hwif));
 		goto error;
 	}
 
 	/* Set card names */
 	(void *)strncpy(softs->vendor_name, aac_cards[card_index].vid,
-		AAC_VENDOR_LEN);
+	    AAC_VENDOR_LEN);
 	(void *)strncpy(softs->product_name, aac_cards[card_index].desc,
-		AAC_PRODUCT_LEN);
+	    AAC_PRODUCT_LEN);
 
 	/* Set up quirks */
 	softs->flags = aac_cards[card_index].quirks;
@@ -1311,13 +1311,10 @@ aac_check_card_type(struct aac_softstate *softs)
 	pci_cmd = pci_config_get16(pci_config_handle, PCI_CONF_COMM);
 	if ((pci_cmd & PCI_COMM_ME) == 0) {
 		pci_cmd |= PCI_COMM_ME;
-		pci_config_put16(pci_config_handle, PCI_CONF_COMM,
-			pci_cmd);
-		pci_cmd = pci_config_get16(pci_config_handle,
-			PCI_CONF_COMM);
+		pci_config_put16(pci_config_handle, PCI_CONF_COMM, pci_cmd);
+		pci_cmd = pci_config_get16(pci_config_handle, PCI_CONF_COMM);
 		if ((pci_cmd & PCI_COMM_ME) == 0) {
-			cmn_err(CE_CONT,
-				"?Cannot enable busmaster bit");
+			cmn_err(CE_CONT, "?Cannot enable busmaster bit");
 			goto error;
 		}
 	}
@@ -1328,15 +1325,15 @@ aac_check_card_type(struct aac_softstate *softs)
 	pci_config_teardown(&pci_config_handle);
 
 	cmn_err(CE_NOTE,
-		"!aac driver %d.%02d.%02d-%d, found card: " \
-		"%s %s(pci0x%x.%x.%x.%x) at 0x%x",
-		AAC_DRIVER_MAJOR_VERSION,
-		AAC_DRIVER_MINOR_VERSION,
-		AAC_DRIVER_BUGFIX_LEVEL,
-		AAC_DRIVER_BUILD,
-		softs->vendor_name, softs->product_name,
-		vendid, devid, subvendid, subsysid,
-		mem_base);
+	    "!aac driver %d.%02d.%02d-%d, found card: " \
+	    "%s %s(pci0x%x.%x.%x.%x) at 0x%x",
+	    AAC_DRIVER_MAJOR_VERSION,
+	    AAC_DRIVER_MINOR_VERSION,
+	    AAC_DRIVER_BUGFIX_LEVEL,
+	    AAC_DRIVER_BUILD,
+	    softs->vendor_name, softs->product_name,
+	    vendid, devid, subvendid, subsysid,
+	    mem_base);
 	return (AACOK); /* card type detected */
 
 error:
@@ -1362,11 +1359,11 @@ aac_check_firmware(struct aac_softstate *softs)
 	uint32_t status;
 
 	/* Get supported options */
-	if ((aac_sync_mbcommand(softs, AAC_MONKER_GETINFO, 0, 0, 0, 0, &status))
-		!= AACOK) {
-		if (status != AAC_SRB_STS_INVALID_REQUEST) {
+	if ((aac_sync_mbcommand(softs, AAC_MONKER_GETINFO, 0, 0, 0, 0,
+	    &status)) != AACOK) {
+		if (status != SRB_STATUS_INVALID_REQUEST) {
 			cmn_err(CE_CONT,
-				"?Fatal error: request adapter info error");
+			    "?Fatal error: request adapter info error");
 			return (AACERR);
 		}
 		options = 0;
@@ -1381,20 +1378,24 @@ aac_check_firmware(struct aac_softstate *softs)
 
 	if ((softs->state == AAC_STATE_RESET)) {
 		if ((softs->support_opt == options) &&
-			(softs->atu_size == atu_size))
+		    (softs->atu_size == atu_size))
 			return (AACOK);
 
 		cmn_err(CE_WARN,
-			"?Fatal error: firmware changed, system needs reboot");
+		    "?Fatal error: firmware changed, system needs reboot");
 		return (AACERR);
 	}
 
+	/*
+	 * The following critical settings are initialized only once during
+	 * driver attachment.
+	 */
 	softs->support_opt = options;
 	softs->atu_size = atu_size;
 
 	/* Process supported options */
 	if ((options & AAC_SUPPORTED_4GB_WINDOW) != 0 &&
-		(softs->flags & AAC_FLAGS_NO4GB) == 0) {
+	    (softs->flags & AAC_FLAGS_NO4GB) == 0) {
 		cmn_err(CE_NOTE, "!Enable FIB map 4GB window");
 		softs->addr_dma_attr.dma_attr_addr_hi = 0xffffffffull;
 		softs->addr_dma_attr.dma_attr_maxxfer = 0xffffffffull;
@@ -1418,7 +1419,7 @@ aac_check_firmware(struct aac_softstate *softs)
 	/* Read preferred settings */
 	max_fib_size = 0;
 	if ((aac_sync_mbcommand(softs, AAC_MONKER_GETCOMMPREF,
-		0, 0, 0, 0, NULL)) == AACOK) {
+	    0, 0, 0, 0, NULL)) == AACOK) {
 		options = AAC_MAILBOX_GET(softs, 1);
 		max_fib_size = (options & 0xffff);
 		max_sectors = (options >> 16) << 1;
@@ -1430,12 +1431,11 @@ aac_check_firmware(struct aac_softstate *softs)
 
 	/* Enable new comm. and rawio at the same time */
 	if ((softs->support_opt & AAC_SUPPORTED_NEW_COMM) &&
-		(max_fib_size != 0)) {
+	    (max_fib_size != 0)) {
 		if ((atu_size > softs->map_size) &&
-			(ddi_regs_map_setup(softs->devinfo_p, 1,
-			(caddr_t *)&pci_mbr, 0,
-			atu_size, &aac_acc_attr, &pci_handle)
-			== DDI_SUCCESS)) {
+		    (ddi_regs_map_setup(softs->devinfo_p, 1,
+		    (caddr_t *)&pci_mbr, 0, atu_size, &aac_acc_attr,
+		    &pci_handle) == DDI_SUCCESS)) {
 			ddi_regs_map_free(&softs->pci_mem_handle);
 			softs->pci_mem_handle = pci_handle;
 			softs->pci_mem_base_addr = pci_mbr;
@@ -1458,25 +1458,25 @@ aac_check_firmware(struct aac_softstate *softs)
 		cmn_err(CE_NOTE, "!Enable RawIO");
 	} else {
 		softs->aac_max_fibs =
-			(softs->flags & AAC_FLAGS_256FIBS) ? 256 : 512;
+		    (softs->flags & AAC_FLAGS_256FIBS) ? 256 : 512;
 		softs->aac_max_fib_size = sizeof (struct aac_fib);
 		softs->aac_max_sectors = 128;
 		if (softs->flags & AAC_FLAGS_PERC)
 			softs->aac_sg_tablesize = AAC_NSEG;
 		else if (softs->flags & AAC_FLAGS_SG_64BIT)
 			softs->aac_sg_tablesize = (AAC_FIB_DATASIZE -
-				sizeof (struct aac_blockwrite64) +
-				sizeof (struct aac_sg_entry64)) /
-				sizeof (struct aac_sg_entry64);
+			    sizeof (struct aac_blockwrite64) +
+			    sizeof (struct aac_sg_entry64)) /
+			    sizeof (struct aac_sg_entry64);
 		else
 			softs->aac_sg_tablesize = (AAC_FIB_DATASIZE -
-				sizeof (struct aac_blockwrite) +
-				sizeof (struct aac_sg_entry)) /
-				sizeof (struct aac_sg_entry);
+			    sizeof (struct aac_blockwrite) +
+			    sizeof (struct aac_sg_entry)) /
+			    sizeof (struct aac_sg_entry);
 	}
 
 	if ((softs->flags & AAC_FLAGS_RAW_IO) &&
-		(softs->flags & AAC_FLAGS_ARRAY_64BIT)) {
+	    (softs->flags & AAC_FLAGS_ARRAY_64BIT)) {
 		softs->flags |= AAC_FLAGS_LBA_64BIT;
 		cmn_err(CE_NOTE, "!Enable 64-bit array");
 	}
@@ -1484,9 +1484,9 @@ aac_check_firmware(struct aac_softstate *softs)
 	softs->buf_dma_attr.dma_attr_maxxfer = softs->aac_max_sectors << 9;
 
 	cmn_err(CE_NOTE,
-		"!max_fibs %d max_fibsize 0x%x max_sectors %d max_sg %d",
-		softs->aac_max_fibs, softs->aac_max_fib_size,
-		softs->aac_max_sectors, softs->aac_sg_tablesize);
+	    "!max_fibs %d max_fibsize 0x%x max_sectors %d max_sg %d",
+	    softs->aac_max_fibs, softs->aac_max_fib_size,
+	    softs->aac_max_sectors, softs->aac_sg_tablesize);
 
 	return (AACOK);
 }
@@ -1498,42 +1498,42 @@ aac_check_firmware(struct aac_softstate *softs)
  */
 static int
 aac_get_adapter_info(struct aac_softstate *softs,
-	struct aac_adapter_info *ainfr,
-	struct aac_supplement_adapter_info *sinfr)
+    struct aac_adapter_info *ainfr,
+    struct aac_supplement_adapter_info *sinfr)
 {
-	struct aac_fib *fib;
+	struct aac_fib *fibp;
 	struct aac_adapter_info *ainfp;
 	struct aac_supplement_adapter_info *sinfp;
 
-	fib = aac_grab_sync_fib(softs, SLEEP_FUNC);
-	fib->data[0] = 0;
-	if (aac_sync_fib(softs, RequestAdapterInfo, fib,
-		sizeof (struct aac_fib_header)) != AACOK) {
+	fibp = aac_grab_sync_fib(softs, SLEEP_FUNC);
+	fibp->data[0] = 0;
+	if (aac_sync_fib(softs, RequestAdapterInfo, fibp,
+	    sizeof (struct aac_fib_header)) != AACOK) {
 		AACDB_PRINT((CE_WARN, "RequestAdapterInfo failed"));
 		aac_release_sync_fib(softs);
 		return (AACERR);
 	}
-	ainfp = (struct aac_adapter_info *)fib->data;
+	ainfp = (struct aac_adapter_info *)fibp->data;
 	if (ainfr) {
 		*ainfr = *ainfp;
 	}
 	if (sinfr) {
 		if (!(softs->support_opt &
-			AAC_SUPPORTED_SUPPLEMENT_ADAPTER_INFO)) {
+		    AAC_SUPPORTED_SUPPLEMENT_ADAPTER_INFO)) {
 			AACDB_PRINT((CE_WARN,
-				"SupplementAdapterInfo not supported"));
+			    "SupplementAdapterInfo not supported"));
 			aac_release_sync_fib(softs);
 			return (AACERR);
 		}
-		fib->data[0] = 0;
-		if (aac_sync_fib(softs, RequestSupplementAdapterInfo, fib,
-			sizeof (struct aac_fib_header)) != AACOK) {
+		fibp->data[0] = 0;
+		if (aac_sync_fib(softs, RequestSupplementAdapterInfo, fibp,
+		    sizeof (struct aac_fib_header)) != AACOK) {
 			AACDB_PRINT((CE_WARN,
-				"RequestSupplementAdapterInfo failed"));
+			    "RequestSupplementAdapterInfo failed"));
 			aac_release_sync_fib(softs);
 			return (AACERR);
 		}
-		sinfp = (struct aac_supplement_adapter_info *)fib->data;
+		sinfp = (struct aac_supplement_adapter_info *)fibp->data;
 		*sinfr = *sinfp;
 	}
 
@@ -1582,69 +1582,60 @@ aac_get_adapter_info(struct aac_softstate *softs,
 static int
 aac_handle_adapter_config_issues(struct aac_softstate *softs)
 {
-	struct aac_fib *fib;
+	struct aac_fib *fibp;
 	struct aac_Container *cmd;
-	struct aac_Container_resp *rsp;
+	struct aac_Container_resp *resp;
 	struct aac_cf_status_header *cfg_sts_hdr;
 	uint32_t cfg_stat_action;
-	int status;
-	int ret;
+	int rval;
 
-	/*
-	 * Get adapter config status
-	 */
-	fib = aac_grab_sync_fib(softs, SLEEP_FUNC);
-	cmd = (struct aac_Container *)&fib->data[0];
-	rsp = (struct aac_Container_resp *)cmd;
-	cfg_sts_hdr = (struct aac_cf_status_header *)rsp->CTResponse.data;
+	fibp = aac_grab_sync_fib(softs, SLEEP_FUNC);
+	/* Get adapter config status */
+	cmd = (struct aac_Container *)&fibp->data[0];
 
 	cmd->Command = VM_ContainerConfig;
 	cmd->CTCommand.command = CT_GET_CONFIG_STATUS;
 	cmd->CTCommand.param[CNT_SIZE] = sizeof (struct aac_cf_status_header);
-	status = aac_sync_fib(softs, ContainerCommand, fib,
-		sizeof (struct aac_fib_header) + \
-		sizeof (struct aac_Container));
+	rval = aac_sync_fib(softs, ContainerCommand, fibp,
+	    sizeof (struct aac_fib_header) + \
+	    sizeof (struct aac_Container));
+	resp = (struct aac_Container_resp *)cmd;
+	cfg_sts_hdr = (struct aac_cf_status_header *)resp->CTResponse.data;
 
-	if ((status == AACOK) &&
-		(*(uint32_t *)rsp == 0) &&
-		(rsp->CTResponse.param[0] == CT_OK)) {
+	if ((rval == AACOK) && (*(uint32_t *)resp == 0) &&
+	    (resp->CTResponse.param[0] == CT_OK)) {
 		cfg_stat_action = cfg_sts_hdr->action;
 
-		/*
-		 * Commit configuration if it's reasonable to do so.
-		 */
+		/* Commit configuration if it's reasonable to do so. */
 		if (cfg_stat_action <= CFACT_PAUSE) {
 			bzero(cmd, sizeof (struct aac_Container) - \
-				CT_PACKET_SIZE);
+			    CT_PACKET_SIZE);
 			cmd->Command = VM_ContainerConfig;
 			cmd->CTCommand.command = CT_COMMIT_CONFIG;
-			status = aac_sync_fib(softs, ContainerCommand, fib,
-				sizeof (struct aac_fib_header) + \
-				sizeof (struct aac_Container));
-			if ((status == AACOK) &&
-				(*(uint32_t *)rsp == 0) &&
-				(rsp->CTResponse.param[0] == CT_OK))
-					/* Successful completion */
-					ret = AACMPE_OK;
-				else
-					/*
-					 * Auto-commit aborted due to error(s).
-					 */
-					ret = AACMPE_COMMIT_CONFIG;
+			rval = aac_sync_fib(softs, ContainerCommand, fibp,
+			    sizeof (struct aac_fib_header) + \
+			    sizeof (struct aac_Container));
+			if ((rval == AACOK) && (*(uint32_t *)resp == 0) &&
+			    (resp->CTResponse.param[0] == CT_OK))
+				/* Successful completion */
+				rval = AACMPE_OK;
+			else
+				/* Auto-commit aborted due to error(s). */
+				rval = AACMPE_COMMIT_CONFIG;
 		} else {
 			/*
 			 * Auto-commit aborted due to adapter indicating
 			 * configuration issue(s) too dangerous to auto-commit.
 			 */
-			ret = AACMPE_CONFIG_STATUS;
+			rval = AACMPE_CONFIG_STATUS;
 		}
 	} else {
 		cmn_err(CE_WARN, "!Configuration issue, auto-commit aborted");
-		ret = AACMPE_CONFIG_STATUS;
+		rval = AACMPE_CONFIG_STATUS;
 	}
 
 	aac_release_sync_fib(softs);
-	return (ret);
+	return (rval);
 }
 
 /*
@@ -1663,7 +1654,7 @@ aac_common_attach(struct aac_softstate *softs)
 	 * attempts to communicate with it.
 	 */
 	AAC_BUSYWAIT(AAC_FWSTATUS_GET(softs) & AAC_KERNEL_UP_AND_RUNNING,
-		AAC_FWUP_TIMEOUT * 1000);
+	    AAC_FWUP_TIMEOUT * 1000);
 	if (!(AAC_FWSTATUS_GET(softs) & AAC_KERNEL_UP_AND_RUNNING)) {
 		cmn_err(CE_CONT, "?Fatal error: controller not ready");
 		goto error;
@@ -1687,8 +1678,7 @@ aac_common_attach(struct aac_softstate *softs)
 	}
 
 	/* Allocate slots */
-	if ((softs->total_slots == 0) &&
-		(aac_create_slots(softs) != AACOK)) {
+	if ((softs->total_slots == 0) && (aac_create_slots(softs) != AACOK)) {
 		cmn_err(CE_CONT, "?Fatal error: slots allocate failed");
 		goto error;
 	}
@@ -1696,12 +1686,14 @@ aac_common_attach(struct aac_softstate *softs)
 
 	/* Allocate FIBs */
 	for (i = 0; i < softs->total_slots &&
-		softs->total_fibs < softs->aac_max_fibs; i++) {
+	    softs->total_fibs < softs->aac_max_fibs; i++) {
 		slotp = &(softs->io_slot[i]);
 		if (slotp->fib_phyaddr)
 			continue;
 		if (aac_alloc_fib(softs, slotp) != AACOK)
 			break;
+
+		/* Insert the slot to the free slot list */
 		slotp->index = i;
 		aac_release_slot(softs, slotp);
 		softs->total_fibs++;
@@ -1725,7 +1717,7 @@ aac_common_attach(struct aac_softstate *softs)
 			 * and the other words as the product name.
 			 */
 			AACDB_PRINT((CE_NOTE, "sinf.AdapterTypeText = "
-				"\"%s\"", sinf.AdapterTypeText));
+			    "\"%s\"", sinf.AdapterTypeText));
 			p = sinf.AdapterTypeText;
 			p0 = p1 = NULL;
 			/* Skip heading spaces */
@@ -1744,19 +1736,19 @@ aac_common_attach(struct aac_softstate *softs)
 				*p-- = 0;
 			if (*p0 && *p1) {
 				(void *)strncpy(softs->vendor_name, p0,
-					AAC_VENDOR_LEN);
+				    AAC_VENDOR_LEN);
 				(void *)strncpy(softs->product_name, p1,
-					AAC_PRODUCT_LEN);
+				    AAC_PRODUCT_LEN);
 			} else {
 				cmn_err(CE_WARN,
-					"?adapter name mis-formatted\n");
+				    "?adapter name mis-formatted\n");
 				if (*p0)
 					(void *)strncpy(softs->product_name,
-						p0, AAC_PRODUCT_LEN);
+					    p0, AAC_PRODUCT_LEN);
 			}
 			AACDB_PRINT((CE_NOTE,
-				"adapter: vendor = \"%s\", product = \"%s\"",
-				softs->vendor_name, softs->product_name));
+			    "adapter: vendor = \"%s\", product = \"%s\"",
+			    softs->vendor_name, softs->product_name));
 		}
 	}
 
@@ -1767,7 +1759,7 @@ aac_common_attach(struct aac_softstate *softs)
 	}
 
 	/* Setup containers */
-	if (aac_get_container(softs) != AACOK) {
+	if (aac_get_containers(softs) != AACOK) {
 		cmn_err(CE_CONT, "?Fatal error: get container info error");
 		goto error;
 	}
@@ -1791,7 +1783,6 @@ static void
 aac_common_detach(struct aac_softstate *softs)
 {
 	int i;
-	struct aac_slot *slotp;
 
 	DBCALLED(1);
 
@@ -1799,6 +1790,8 @@ aac_common_detach(struct aac_softstate *softs)
 
 	/* Release FIBs */
 	for (i = 0; i < softs->total_slots; i++) {
+		struct aac_slot *slotp;
+
 		slotp = &(softs->io_slot[i]);
 		if (slotp->fib_phyaddr == 0)
 			continue;
@@ -1821,13 +1814,13 @@ aac_common_detach(struct aac_softstate *softs)
  */
 int
 aac_sync_mbcommand(struct aac_softstate *softs, uint32_t cmd,
-	uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3,
-	uint32_t *statusp)
+    uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3,
+    uint32_t *statusp)
 {
 	uint32_t status;
 
 	if (statusp != NULL)
-		*statusp = AAC_SRB_STS_SUCCESS;
+		*statusp = SRB_STATUS_SUCCESS;
 
 	/* Fill in mailbox */
 	AAC_MAILBOX_SET(softs, cmd, arg0, arg1, arg2, arg3);
@@ -1840,11 +1833,11 @@ aac_sync_mbcommand(struct aac_softstate *softs, uint32_t cmd,
 
 	/* Spin waiting for the command to complete */
 	AAC_BUSYWAIT(AAC_STATUS_GET(softs) & AAC_DB_SYNC_COMMAND,
-		AAC_IMMEDIATE_TIMEOUT * 1000);
+	    AAC_IMMEDIATE_TIMEOUT * 1000);
 	if (!(AAC_STATUS_GET(softs) & AAC_DB_SYNC_COMMAND)) {
 		AACDB_PRINT((CE_WARN,
-			"Sync command timed out after %d seconds (0x%x)!",
-			AAC_IMMEDIATE_TIMEOUT, AAC_FWSTATUS_GET(softs)));
+		    "Sync command timed out after %d seconds (0x%x)!",
+		    AAC_IMMEDIATE_TIMEOUT, AAC_FWSTATUS_GET(softs)));
 		return (AACERR);
 	}
 
@@ -1855,9 +1848,9 @@ aac_sync_mbcommand(struct aac_softstate *softs, uint32_t cmd,
 	status = AAC_MAILBOX_GET(softs, 0);
 	if (statusp != NULL)
 		*statusp = status;
-	if (status != AAC_SRB_STS_SUCCESS) {
+	if (status != SRB_STATUS_SUCCESS) {
 		AACDB_PRINT((CE_WARN,
-			"Sync command fail: status = 0x%x", status));
+		    "Sync command fail: status = 0x%x", status));
 		return (AACERR);
 	}
 
@@ -1869,40 +1862,41 @@ aac_sync_mbcommand(struct aac_softstate *softs, uint32_t cmd,
  */
 static int
 aac_sync_fib(struct aac_softstate *softs, uint32_t cmd,
-	struct aac_fib *fib, uint16_t fibsize)
+    struct aac_fib *fibp, uint16_t fibsize)
 {
-	int err;
 	uint32_t status;
+	int rval;
 
 	/* Sync fib only supports 512 bytes */
 	if (fibsize > AAC_FIB_SIZE)
 		return (AACERR);
 
 	/* Setup sync fib */
-	fib->Header.XferState =
-		AAC_FIBSTATE_HOSTOWNED |
-		AAC_FIBSTATE_INITIALISED |
-		AAC_FIBSTATE_EMPTY |
-		AAC_FIBSTATE_FROMHOST |
-		AAC_FIBSTATE_NORM;
-	fib->Header.Command = cmd;
-	fib->Header.StructType = AAC_FIBTYPE_TFIB;
-	fib->Header.Flags = 0;
-	fib->Header.Size = fibsize;
-	fib->Header.SenderSize = sizeof (struct aac_fib); /* syncfib 512B */
-	fib->Header.SenderFibAddress = 0;
-	fib->Header.ReceiverFibAddress = softs->sync_mode.fib_phyaddr;
-	fib->Header.SenderData = 0;
+	fibp->Header.XferState =
+	    AAC_FIBSTATE_HOSTOWNED |
+	    AAC_FIBSTATE_INITIALISED |
+	    AAC_FIBSTATE_EMPTY |
+	    AAC_FIBSTATE_FROMHOST |
+	    AAC_FIBSTATE_NORM;
+	fibp->Header.Command = cmd;
+	fibp->Header.StructType = AAC_FIBTYPE_TFIB;
+	fibp->Header.Flags = 0;
+	fibp->Header.Size = fibsize;
+	fibp->Header.SenderSize = sizeof (struct aac_fib); /* syncfib 512B */
+	fibp->Header.SenderFibAddress = 0;
+	fibp->Header.ReceiverFibAddress = softs->sync_mode.fib_phyaddr;
+	fibp->Header.SenderData = 0;
 
 	aac_dma_sync(softs->comm_space_dma_handle,
-		AACOFFSET(struct aac_comm_space, sync_fib), AAC_FIB_SIZE,
-		DDI_DMA_SYNC_FORDEV);
+	    AACOFFSET(struct aac_comm_space, sync_fib), AAC_FIB_SIZE,
+	    DDI_DMA_SYNC_FORDEV);
 
 	/* Give the FIB to the controller, wait for a response. */
-	err = aac_sync_mbcommand(softs, AAC_MONKER_SYNCFIB,
-		fib->Header.ReceiverFibAddress, 0, 0, 0, &status);
-	if (err == AACERR) {
-		AACDB_PRINT((CE_WARN, "Send sync fib to controller failed"));
+	rval = aac_sync_mbcommand(softs, AAC_MONKER_SYNCFIB,
+	    fibp->Header.ReceiverFibAddress, 0, 0, 0, &status);
+	if (rval == AACERR) {
+		AACDB_PRINT((CE_WARN,
+		    "Send sync fib to controller failed"));
 		return (AACERR);
 	}
 
@@ -1910,20 +1904,20 @@ aac_sync_fib(struct aac_softstate *softs, uint32_t cmd,
 }
 
 static struct aac_fib *
-aac_grab_sync_fib(struct aac_softstate *softs,
-	int (*callback)(caddr_t))
+aac_grab_sync_fib(struct aac_softstate *softs, int (*callback)(caddr_t))
 {
-	struct aac_fib *fib = NULL;
+	struct aac_fib *fibp = NULL;
 
 	if (callback == NULL_FUNC) {
 		if (!mutex_tryenter(&softs->sync_mode.mutex))
 			return (NULL);
-	} else
+	} else {
 		mutex_enter(&softs->sync_mode.mutex);
+	}
 
-	fib = softs->sync_mode.fib;
-	bzero(fib, sizeof (struct aac_fib));
-	return (fib);
+	fibp = softs->sync_mode.fib;
+	bzero(fibp, sizeof (struct aac_fib));
+	return (fibp);
 }
 
 static void
@@ -1933,40 +1927,41 @@ aac_release_sync_fib(struct aac_softstate *softs)
 }
 
 /*
- * Remove cmd from queue
+ * Remove a cmd from the head of q
  */
 static struct aac_cmd *
 aac_cmd_dequeue(struct aac_cmd_queue *q)
 {
-	struct aac_cmd *ac = NULL;
-
 	mutex_enter(&q->q_mutex);
 	if (q->q_head) {
-		ac = q->q_head;
-		q->q_head = ac->next;
-		ac->next = NULL;
+		struct aac_cmd *acp;
+
+		acp = q->q_head;
+		q->q_head = acp->next;
+		acp->next = NULL;
 		if (q->q_head == NULL)
 			q->q_tail = NULL;
 		q->q_len--;
+		mutex_exit(&q->q_mutex);
+		return (acp);
 	}
 	mutex_exit(&q->q_mutex);
-
-	return (ac);
+	return (NULL);
 }
 
 /*
  * Add a cmd to the tail of q
  */
 static void
-aac_cmd_enqueue(struct aac_cmd_queue *q, struct aac_cmd *ac)
+aac_cmd_enqueue(struct aac_cmd_queue *q, struct aac_cmd *acp)
 {
 	mutex_enter(&q->q_mutex);
-	ac->next = NULL;
+	acp->next = NULL;
 	if (!q->q_head) /* empty queue */
-		q->q_head = ac;
+		q->q_head = acp;
 	else
-		q->q_tail->next = ac;
-	q->q_tail = ac;
+		q->q_tail->next = acp;
+	q->q_tail = acp;
 	q->q_len++;
 	mutex_exit(&q->q_mutex);
 }
@@ -1981,8 +1976,7 @@ aac_cmd_enqueue(struct aac_cmd_queue *q, struct aac_cmd *ac)
  *	 separate queue/notify interface).
  */
 static int
-aac_fib_enqueue(struct aac_softstate *softs, int queue,
-	struct aac_fib *fibp)
+aac_fib_enqueue(struct aac_softstate *softs, int queue, struct aac_fib *fibp)
 {
 	uint32_t pi, ci;
 	uint32_t fib_size;
@@ -2030,8 +2024,7 @@ aac_fib_enqueue(struct aac_softstate *softs, int queue,
  * Put our response to an AIF on the response queue
  */
 static int
-aac_resp_enqueue(struct aac_softstate *softs, int queue,
-	struct aac_fib *fibp)
+aac_resp_enqueue(struct aac_softstate *softs, int queue, struct aac_fib *fibp)
 {
 	uint32_t pi, ci;
 	uint32_t fib_size;
@@ -2069,7 +2062,6 @@ aac_resp_enqueue(struct aac_softstate *softs, int queue,
 
 	if (aac_qinfo[queue].notify != 0)
 		AAC_NOTIFY(softs, aac_qinfo[queue].notify);
-
 	return (AACOK);
 }
 
@@ -2079,7 +2071,7 @@ aac_resp_enqueue(struct aac_softstate *softs, int queue,
  */
 static int
 aac_fib_dequeue(struct aac_softstate *softs, int queue, struct aac_fib **fibpp,
-	struct aac_cmd **acpp)
+    struct aac_cmd **acpp)
 {
 	uint32_t pi, ci, index, fast;
 	int error = 0, unfull = 0;
@@ -2116,7 +2108,7 @@ aac_fib_dequeue(struct aac_softstate *softs, int queue, struct aac_fib **fibpp,
 	case AAC_HOST_NORM_CMD_Q:
 	case AAC_HOST_HIGH_CMD_Q:
 		index = (softs->qentries[queue] + ci)->aq_fib_addr /
-			sizeof (struct aac_fib);
+		    sizeof (struct aac_fib);
 		ASSERT((index >= 0) && (index < AAC_ADAPTER_FIBS));
 		*fibpp = &softs->comm_space->adapter_fibs[index];
 		ASSERT(*fibpp != NULL);
@@ -2133,8 +2125,7 @@ aac_fib_dequeue(struct aac_softstate *softs, int queue, struct aac_fib **fibpp,
 		ASSERT(*acpp != NULL);
 		*fibpp = softs->io_slot[index].fibp;
 		if (fast) {
-			(*fibpp)->Header.XferState |=
-				AAC_FIBSTATE_DONEADAP;
+			(*fibpp)->Header.XferState |= AAC_FIBSTATE_DONEADAP;
 			*((uint32_t *)((*fibpp)->data)) = 0;
 		}
 		break;
@@ -2151,7 +2142,6 @@ out:
 	mutex_exit(&softs->fib_mutex);
 	if (unfull && aac_qinfo[queue].notify != 0)
 		AAC_NOTIFY(softs, aac_qinfo[queue].notify);
-
 	return (error);
 }
 
@@ -2160,49 +2150,49 @@ out:
  * Request information of the container cid
  */
 static struct aac_mntinforesp *
-aac_get_container_info(struct aac_softstate *softs, struct aac_fib *fib,
-	int cid)
+aac_get_container_info(struct aac_softstate *softs, struct aac_fib *fibp,
+    int cid)
 {
 	struct aac_mntinfo *mi;
 
-	mi = (struct aac_mntinfo *)&fib->data[0];
+	mi = (struct aac_mntinfo *)&fibp->data[0];
 	mi->Command = /* Use 64-bit LBA if enabled */
-		(softs->flags & AAC_FLAGS_LBA_64BIT) ?
-		VM_NameServe64 : VM_NameServe;
+	    (softs->flags & AAC_FLAGS_LBA_64BIT) ?
+	    VM_NameServe64 : VM_NameServe;
 	mi->MntType = FT_FILESYS;
 	mi->MntCount = cid;
 
-	if (aac_sync_fib(softs, ContainerCommand, fib,
-		sizeof (struct aac_fib_header) + \
-		sizeof (struct aac_mntinfo)) == AACERR) {
+	if (aac_sync_fib(softs, ContainerCommand, fibp,
+	    sizeof (struct aac_fib_header) + \
+	    sizeof (struct aac_mntinfo)) == AACERR) {
 		AACDB_PRINT((CE_WARN, "Error probe container %d", cid));
 		return (NULL);
 	}
 
-	return ((struct aac_mntinforesp *)&fib->data[0]);
+	return ((struct aac_mntinforesp *)&fibp->data[0]);
 }
 
 static struct aac_Container *
-aac_get_container_uid(struct aac_softstate *softs, struct aac_fib *fib,
-	uint32_t cid)
+aac_get_container_uid(struct aac_softstate *softs, struct aac_fib *fibp,
+    uint32_t cid)
 {
 	struct aac_Container *ct;
 
-	ct = (struct aac_Container *)&fib->data[0];
+	ct = (struct aac_Container *)&fibp->data[0];
 	ct->Command = VM_ContainerConfig;
 	ct->CTCommand.command = CT_CID_TO_32BITS_UID;
 	ct->CTCommand.param[0] = cid;
 
-	if (aac_sync_fib(softs, ContainerCommand, fib,
-		sizeof (struct aac_fib_header) + \
-		sizeof (struct aac_Container)) == AACERR)
+	if (aac_sync_fib(softs, ContainerCommand, fibp,
+	    sizeof (struct aac_fib_header) + \
+	    sizeof (struct aac_Container)) == AACERR)
 		return (NULL);
 	return (ct);
 }
 
 static void
 aac_init_container(struct aac_softstate *softs, uint32_t cid, uint32_t uid,
-	uint64_t size)
+    uint64_t size)
 {
 	softs->container[cid].cid = cid;
 	softs->container[cid].uid = uid;
@@ -2213,21 +2203,23 @@ aac_init_container(struct aac_softstate *softs, uint32_t cid, uint32_t uid,
 }
 
 static int
-aac_get_container(struct aac_softstate *softs)
+aac_get_containers(struct aac_softstate *softs)
 {
-	struct aac_fib *fib;
+	struct aac_fib *fibp;
 	struct aac_mntinforesp *mir;
-	int i = 0, count = 0, total = 0;
+	int i, count, total;
 	struct aac_Container *ct;
 	uint32_t uid;
 	uint64_t size;
 
 	bzero(softs->container, sizeof (softs->container));
-	fib = aac_grab_sync_fib(softs, SLEEP_FUNC);
+	fibp = aac_grab_sync_fib(softs, SLEEP_FUNC);
 
 	/* Loop over possible containers */
+	i = count = total = 0;
 	do {
-		if ((mir = aac_get_container_info(softs, fib, i)) == NULL)
+		/* Get container basic info */
+		if ((mir = aac_get_container_info(softs, fibp, i)) == NULL)
 			goto next;
 
 		if (i == 0) /* the first time */
@@ -2237,21 +2229,24 @@ aac_get_container(struct aac_softstate *softs)
 			goto next;
 
 		size = AAC_MIR_SIZE(softs, mir);
-		if ((ct = aac_get_container_uid(softs, fib, i)) == NULL)
+
+		/* Get container UID */
+		if ((ct = aac_get_container_uid(softs, fibp, i)) == NULL)
 			goto next;
 		if (ct->CTCommand.param[0] != CT_OK)
 			goto next;
-
 		uid = ct->CTCommand.param[1];
+
+		/* Init container */
 		aac_init_container(softs, i, uid, size);
 		total++;
 		AACDB_PRINT((CE_NOTE, "Container #%d found: " \
-			"uid=0x%08x, size=0x%x.%08x, type=%d, name=%s",
-			i, uid,
-			mir->MntObj.CapacityHigh,
-			mir->MntObj.Capacity,
-			mir->MntObj.VolType,
-			mir->MntObj.FileSystemName));
+		    "uid=0x%08x, size=0x%x.%08x, type=%d, name=%s",
+		    i, uid,
+		    mir->MntObj.CapacityHigh,
+		    mir->MntObj.Capacity,
+		    mir->MntObj.VolType,
+		    mir->MntObj.FileSystemName));
 next:
 		bzero(mir, sizeof (struct aac_mntinforesp));
 		i++;
@@ -2269,53 +2264,55 @@ next:
  * with newly online/offline containers.
  */
 static void
-aac_rescan_container(struct aac_softstate *softs)
+aac_rescan_containers(struct aac_softstate *softs)
 {
 	int cid;
-	struct aac_fib *fib;
-	struct aac_mntinforesp *mir;
+	struct aac_fib *fibp;
 	int count;
-	uint64_t ct_size;
 	int found;
-	struct aac_Container *ct;
 
 	AACDB_PRINT((CE_NOTE, "--- rescan containers ---"));
 
-	cid = 0; found = 0;
-	fib = aac_grab_sync_fib(softs, SLEEP_FUNC);
+	cid = found = 0;
+	fibp = aac_grab_sync_fib(softs, SLEEP_FUNC);
 
 	do {
-		if ((mir = aac_get_container_info(softs, fib, cid)) == NULL)
+		struct aac_mntinforesp *mir;
+		uint64_t ct_size;
+		struct aac_Container *ct;
+
+		if ((mir = aac_get_container_info(softs, fibp, cid)) == NULL)
 			goto next;
 
 		count = mir->MntRespCount;
-		if ((mir->Status != 0) || (mir->MntObj.VolType == CT_NONE))
+		if ((mir->Status != 0) ||
+		    (mir->MntObj.VolType == CT_NONE))
 			goto next;
 
 		found = 1;
 		ct_size = AAC_MIR_SIZE(softs, mir);
 		if (softs->container[cid].valid == 0) {
-			if ((ct = aac_get_container_uid(softs, fib, cid))
-				== NULL)
+			if ((ct = aac_get_container_uid(softs, fibp,
+			    cid)) == NULL)
 				goto next;
 			if (ct->CTCommand.param[0] != CT_OK)
 				goto next;
 
 			AACDB_PRINT((CE_NOTE, ">>> Container %d added", cid));
-			aac_init_container(softs,
-				cid, ct->CTCommand.param[1], ct_size);
+			aac_init_container(softs, cid, ct->CTCommand.param[1],
+			    ct_size);
 			if ((cid + 1) > softs->container_count)
 				softs->container_count = cid + 1;
 		} else {
 			if (softs->container[cid].size != ct_size) {
 #ifdef	_LP64
 				AACDB_PRINT((CE_NOTE,
-					">>> Container %u size changed to %lu",
-					cid, ct_size));
+				    ">>> Container %u size changed to %lu",
+				    cid, ct_size));
 #else
 				AACDB_PRINT((CE_NOTE,
-					">>> Container %u size changed to %llu",
-					cid, ct_size));
+				    ">>> Container %u size changed to %llu",
+				    cid, ct_size));
 #endif
 				softs->container[cid].size = ct_size;
 			}
@@ -2325,7 +2322,7 @@ next:
 		if ((found == 0) && softs->container[cid].valid) {
 			AACDB_PRINT((CE_NOTE, ">>> Container %d deleted", cid));
 			bzero(&softs->container[cid],
-				sizeof (struct aac_container));
+			    sizeof (struct aac_container));
 		}
 
 		if (mir)
@@ -2338,9 +2335,10 @@ next:
 		for (cid = count; cid < softs->container_count; cid++) {
 			if (softs->container[cid].valid == 0)
 				continue;
-			AACDB_PRINT((CE_NOTE, ">>> Container %d deleted", cid));
+			AACDB_PRINT((CE_NOTE, ">>> Container %d deleted",
+			    cid));
 			bzero(&softs->container[cid],
-				sizeof (struct aac_container));
+			    sizeof (struct aac_container));
 		}
 		softs->container_count = count;
 	}
@@ -2357,41 +2355,41 @@ aac_alloc_comm_space(struct aac_softstate *softs)
 
 	/* Allocate DMA for comm. space */
 	if (ddi_dma_alloc_handle(
-		softs->devinfo_p,
-		&softs->addr_dma_attr,
-		DDI_DMA_SLEEP,
-		NULL,
-		&softs->comm_space_dma_handle) != DDI_SUCCESS) {
+	    softs->devinfo_p,
+	    &softs->addr_dma_attr,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    &softs->comm_space_dma_handle) != DDI_SUCCESS) {
 		AACDB_PRINT((CE_WARN,
-			"Cannot alloc dma handle for communication area"));
+		    "Cannot alloc dma handle for communication area"));
 		goto error;
 	}
 	if (ddi_dma_mem_alloc(
-		softs->comm_space_dma_handle,
-		sizeof (struct aac_comm_space),
-		&aac_acc_attr,
-		DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-		DDI_DMA_SLEEP,
-		NULL,
-		(caddr_t *)&softs->comm_space,
-		&rlen,
-		&softs->comm_space_acc_handle) != DDI_SUCCESS) {
+	    softs->comm_space_dma_handle,
+	    sizeof (struct aac_comm_space),
+	    &aac_acc_attr,
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    (caddr_t *)&softs->comm_space,
+	    &rlen,
+	    &softs->comm_space_acc_handle) != DDI_SUCCESS) {
 		AACDB_PRINT((CE_WARN,
-			"Cannot alloc mem for communication area"));
+		    "Cannot alloc mem for communication area"));
 		goto error;
 	}
 	if (ddi_dma_addr_bind_handle(
-		softs->comm_space_dma_handle,
-		NULL,
-		(caddr_t)softs->comm_space,
-		sizeof (struct aac_comm_space),
-		DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-		DDI_DMA_SLEEP,
-		NULL,
-		&cookie,
-		&cookien) != DDI_DMA_MAPPED) {
+	    softs->comm_space_dma_handle,
+	    NULL,
+	    (caddr_t)softs->comm_space,
+	    sizeof (struct aac_comm_space),
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    &cookie,
+	    &cookien) != DDI_DMA_MAPPED) {
 		AACDB_PRINT((CE_WARN,
-			"DMA bind failed for communication area"));
+		    "DMA bind failed for communication area"));
 		goto error;
 	}
 	softs->comm_space_phyaddr = cookie.dmac_address;
@@ -2399,7 +2397,7 @@ aac_alloc_comm_space(struct aac_softstate *softs)
 	/* Setup sync FIB space */
 	softs->sync_mode.fib = &softs->comm_space->sync_fib;
 	softs->sync_mode.fib_phyaddr = softs->comm_space_phyaddr + \
-		AACOFFSET(struct aac_comm_space, sync_fib);
+	    AACOFFSET(struct aac_comm_space, sync_fib);
 
 	return (AACOK);
 
@@ -2460,88 +2458,87 @@ aac_setup_comm_space(struct aac_softstate *softs)
 		 * important shared data structures
 		 */
 		initp->AdapterFibsPhysicalAddress = comm_space_phyaddr + \
-			AACOFFSET(struct aac_comm_space, adapter_fibs);
+		    AACOFFSET(struct aac_comm_space, adapter_fibs);
 		initp->AdapterFibsVirtualAddress = 0;
 		initp->AdapterFibAlign = sizeof (struct aac_fib);
 		initp->AdapterFibsSize = AAC_ADAPTER_FIBS * \
-			sizeof (struct aac_fib);
+		    sizeof (struct aac_fib);
 		initp->PrintfBufferAddress = comm_space_phyaddr + \
-			AACOFFSET(struct aac_comm_space, adapter_print_buf);
+		    AACOFFSET(struct aac_comm_space, adapter_print_buf);
 		initp->PrintfBufferSize = AAC_ADAPTER_PRINT_BUFSIZE;
 		initp->MiniPortRevision = AAC_INIT_STRUCT_MINIPORT_REVISION;
 		initp->HostPhysMemPages = AAC_MAX_PFN;
 
 		qoffset = (comm_space_phyaddr + \
-			AACOFFSET(struct aac_comm_space, qtable)) % \
-			AAC_QUEUE_ALIGN;
+		    AACOFFSET(struct aac_comm_space, qtable)) % \
+		    AAC_QUEUE_ALIGN;
 		if (qoffset)
 			qoffset = AAC_QUEUE_ALIGN - qoffset;
 		softs->qtablep = (struct aac_queue_table *) \
-			((char *)&softs->comm_space->qtable + qoffset);
+		    ((char *)&softs->comm_space->qtable + qoffset);
 		initp->CommHeaderAddress = comm_space_phyaddr + \
-			AACOFFSET(struct aac_comm_space, qtable) + qoffset;
+		    AACOFFSET(struct aac_comm_space, qtable) + qoffset;
 
 		/* Init queue table */
 		softs->qtablep->qt_qindex[AAC_HOST_NORM_CMD_Q] \
-			[AAC_PRODUCER_INDEX] = AAC_HOST_NORM_CMD_ENTRIES;
+		    [AAC_PRODUCER_INDEX] = AAC_HOST_NORM_CMD_ENTRIES;
 		softs->qtablep->qt_qindex[AAC_HOST_NORM_CMD_Q] \
-			[AAC_CONSUMER_INDEX] = AAC_HOST_NORM_CMD_ENTRIES;
+		    [AAC_CONSUMER_INDEX] = AAC_HOST_NORM_CMD_ENTRIES;
 		softs->qtablep->qt_qindex[AAC_HOST_HIGH_CMD_Q] \
-			[AAC_PRODUCER_INDEX] = AAC_HOST_HIGH_CMD_ENTRIES;
+		    [AAC_PRODUCER_INDEX] = AAC_HOST_HIGH_CMD_ENTRIES;
 		softs->qtablep->qt_qindex[AAC_HOST_HIGH_CMD_Q] \
-			[AAC_CONSUMER_INDEX] = AAC_HOST_HIGH_CMD_ENTRIES;
+		    [AAC_CONSUMER_INDEX] = AAC_HOST_HIGH_CMD_ENTRIES;
 		softs->qtablep->qt_qindex[AAC_ADAP_NORM_CMD_Q] \
-			[AAC_PRODUCER_INDEX] = AAC_ADAP_NORM_CMD_ENTRIES;
+		    [AAC_PRODUCER_INDEX] = AAC_ADAP_NORM_CMD_ENTRIES;
 		softs->qtablep->qt_qindex[AAC_ADAP_NORM_CMD_Q] \
-			[AAC_CONSUMER_INDEX] = AAC_ADAP_NORM_CMD_ENTRIES;
+		    [AAC_CONSUMER_INDEX] = AAC_ADAP_NORM_CMD_ENTRIES;
 		softs->qtablep->qt_qindex[AAC_ADAP_HIGH_CMD_Q] \
-			[AAC_PRODUCER_INDEX] = AAC_ADAP_HIGH_CMD_ENTRIES;
+		    [AAC_PRODUCER_INDEX] = AAC_ADAP_HIGH_CMD_ENTRIES;
 		softs->qtablep->qt_qindex[AAC_ADAP_HIGH_CMD_Q] \
-			[AAC_CONSUMER_INDEX] = AAC_ADAP_HIGH_CMD_ENTRIES;
+		    [AAC_CONSUMER_INDEX] = AAC_ADAP_HIGH_CMD_ENTRIES;
 		softs->qtablep->qt_qindex[AAC_HOST_NORM_RESP_Q] \
-			[AAC_PRODUCER_INDEX] = AAC_HOST_NORM_RESP_ENTRIES;
+		    [AAC_PRODUCER_INDEX] = AAC_HOST_NORM_RESP_ENTRIES;
 		softs->qtablep->qt_qindex[AAC_HOST_NORM_RESP_Q] \
-			[AAC_CONSUMER_INDEX] = AAC_HOST_NORM_RESP_ENTRIES;
+		    [AAC_CONSUMER_INDEX] = AAC_HOST_NORM_RESP_ENTRIES;
 		softs->qtablep->qt_qindex[AAC_HOST_HIGH_RESP_Q] \
-			[AAC_PRODUCER_INDEX] = AAC_HOST_HIGH_RESP_ENTRIES;
+		    [AAC_PRODUCER_INDEX] = AAC_HOST_HIGH_RESP_ENTRIES;
 		softs->qtablep->qt_qindex[AAC_HOST_HIGH_RESP_Q] \
-			[AAC_CONSUMER_INDEX] = AAC_HOST_HIGH_RESP_ENTRIES;
+		    [AAC_CONSUMER_INDEX] = AAC_HOST_HIGH_RESP_ENTRIES;
 		softs->qtablep->qt_qindex[AAC_ADAP_NORM_RESP_Q] \
-			[AAC_PRODUCER_INDEX] = AAC_ADAP_NORM_RESP_ENTRIES;
+		    [AAC_PRODUCER_INDEX] = AAC_ADAP_NORM_RESP_ENTRIES;
 		softs->qtablep->qt_qindex[AAC_ADAP_NORM_RESP_Q] \
-			[AAC_CONSUMER_INDEX] = AAC_ADAP_NORM_RESP_ENTRIES;
+		    [AAC_CONSUMER_INDEX] = AAC_ADAP_NORM_RESP_ENTRIES;
 		softs->qtablep->qt_qindex[AAC_ADAP_HIGH_RESP_Q] \
-			[AAC_PRODUCER_INDEX] = AAC_ADAP_HIGH_RESP_ENTRIES;
+		    [AAC_PRODUCER_INDEX] = AAC_ADAP_HIGH_RESP_ENTRIES;
 		softs->qtablep->qt_qindex[AAC_ADAP_HIGH_RESP_Q] \
-			[AAC_CONSUMER_INDEX] = AAC_ADAP_HIGH_RESP_ENTRIES;
+		    [AAC_CONSUMER_INDEX] = AAC_ADAP_HIGH_RESP_ENTRIES;
 
 		/* Init queue entries */
 		softs->qentries[AAC_HOST_NORM_CMD_Q] =
-			&softs->qtablep->qt_HostNormCmdQueue[0];
+		    &softs->qtablep->qt_HostNormCmdQueue[0];
 		softs->qentries[AAC_HOST_HIGH_CMD_Q] =
-			&softs->qtablep->qt_HostHighCmdQueue[0];
+		    &softs->qtablep->qt_HostHighCmdQueue[0];
 		softs->qentries[AAC_ADAP_NORM_CMD_Q] =
-			&softs->qtablep->qt_AdapNormCmdQueue[0];
+		    &softs->qtablep->qt_AdapNormCmdQueue[0];
 		softs->qentries[AAC_ADAP_HIGH_CMD_Q] =
-			&softs->qtablep->qt_AdapHighCmdQueue[0];
+		    &softs->qtablep->qt_AdapHighCmdQueue[0];
 		softs->qentries[AAC_HOST_NORM_RESP_Q] =
-			&softs->qtablep->qt_HostNormRespQueue[0];
+		    &softs->qtablep->qt_HostNormRespQueue[0];
 		softs->qentries[AAC_HOST_HIGH_RESP_Q] =
-			&softs->qtablep->qt_HostHighRespQueue[0];
+		    &softs->qtablep->qt_HostHighRespQueue[0];
 		softs->qentries[AAC_ADAP_NORM_RESP_Q] =
-			&softs->qtablep->qt_AdapNormRespQueue[0];
+		    &softs->qtablep->qt_AdapNormRespQueue[0];
 		softs->qentries[AAC_ADAP_HIGH_RESP_Q] =
-			&softs->qtablep->qt_AdapHighRespQueue[0];
+		    &softs->qtablep->qt_AdapHighRespQueue[0];
 	}
 
 	/* Send init structure to the card */
-	if (aac_sync_mbcommand(softs,
-		AAC_MONKER_INITSTRUCT,
-		comm_space_phyaddr + \
-		AACOFFSET(struct aac_comm_space, init_data),
-		0, 0, 0, NULL) == AACERR) {
+	if (aac_sync_mbcommand(softs, AAC_MONKER_INITSTRUCT,
+	    comm_space_phyaddr + \
+	    AACOFFSET(struct aac_comm_space, init_data),
+	    0, 0, 0, NULL) == AACERR) {
 		AACDB_PRINT((CE_WARN,
-			"Cannot send init structrue to adapter"));
+		    "Cannot send init structrue to adapter"));
 		return (AACERR);
 	}
 
@@ -2586,7 +2583,7 @@ aac_lun_serialno(struct aac_softstate *softs, int tgt, uchar_t *buf)
  */
 static void
 aac_inquiry(struct aac_softstate *softs, struct scsi_pkt *pkt,
-	union scsi_cdb *cdbp, struct buf *bp)
+    union scsi_cdb *cdbp, struct buf *bp)
 {
 	int tgt = pkt->pkt_address.a_target;
 	char *b_addr = NULL;
@@ -2663,27 +2660,25 @@ aac_inquiry(struct aac_softstate *softs, struct scsi_pkt *pkt,
 			sp = aac_vendor_id(softs, sp);
 			sp = aac_product_id(softs, sp);
 			sp = aac_lun_serialno(softs, tgt, sp);
-			idp[AAC_VPD_ID_LENGTH] =
-				sp - &idp[AAC_VPD_ID_DATA];
+			idp[AAC_VPD_ID_LENGTH] = sp - &idp[AAC_VPD_ID_DATA];
 
 			vpdp[AAC_VPD_PAGE_LENGTH] =
-				sp - &vpdp[AAC_VPD_PAGE_DATA];
+			    sp - &vpdp[AAC_VPD_PAGE_DATA];
 			pkt->pkt_state |= STATE_XFERRED_DATA;
 			break;
 
 		default:
 			aac_set_arq_data(pkt, KEY_ILLEGAL_REQUEST,
-				0x24, 0x00, 0);
+			    0x24, 0x00, 0);
 			break;
 		}
 	} else {
-		struct scsi_inquiry *inqp =
-			(struct scsi_inquiry *)b_addr;
+		struct scsi_inquiry *inqp = (struct scsi_inquiry *)b_addr;
 		size_t len = sizeof (struct scsi_inquiry);
 
 		if (page != 0) {
 			aac_set_arq_data(pkt, KEY_ILLEGAL_REQUEST,
-				0x24, 0x00, 0);
+			    0x24, 0x00, 0);
 			return;
 		}
 		if (inqp == NULL)
@@ -2712,7 +2707,7 @@ aac_inquiry(struct aac_softstate *softs, struct scsi_pkt *pkt,
  */
 static void
 aac_mode_sense(struct aac_softstate *softs, struct scsi_pkt *pkt,
-	union scsi_cdb *cdbp, struct buf *bp, int capacity)
+    union scsi_cdb *cdbp, struct buf *bp, int capacity)
 {
 	uchar_t pagecode;
 	struct mode_format *page3p;
@@ -2734,7 +2729,7 @@ aac_mode_sense(struct aac_softstate *softs, struct scsi_pkt *pkt,
 	/* SBC-3 7.1.3.3 Format device page */
 	case SD_MODE_SENSE_PAGE3_CODE:
 		page3p = (struct mode_format *)((caddr_t)headerp +
-			MODE_HEADER_LENGTH + MODE_BLK_DESC_LENGTH);
+		    MODE_HEADER_LENGTH + MODE_BLK_DESC_LENGTH);
 		page3p->mode_page.code = SD_MODE_SENSE_PAGE3_CODE;
 		page3p->mode_page.length = sizeof (struct mode_format);
 		page3p->data_bytes_sect = BE_16(AAC_SECTOR_SIZE);
@@ -2744,7 +2739,7 @@ aac_mode_sense(struct aac_softstate *softs, struct scsi_pkt *pkt,
 	/* SBC-3 7.1.3.8 Rigid disk device geometry page */
 	case SD_MODE_SENSE_PAGE4_CODE:
 		page4p = (struct mode_geometry *)((caddr_t)headerp +
-			MODE_HEADER_LENGTH + MODE_BLK_DESC_LENGTH);
+		    MODE_HEADER_LENGTH + MODE_BLK_DESC_LENGTH);
 		page4p->mode_page.code = SD_MODE_SENSE_PAGE4_CODE;
 		page4p->mode_page.length = sizeof (struct mode_geometry);
 		page4p->heads = AAC_NUMBER_OF_HEADS;
@@ -2760,14 +2755,15 @@ aac_mode_sense(struct aac_softstate *softs, struct scsi_pkt *pkt,
 			struct mode_control_scsi3 *mctl;
 
 			mctl = (struct mode_control_scsi3 *)((caddr_t)headerp +
-				MODE_HEADER_LENGTH + MODE_BLK_DESC_LENGTH);
+			    MODE_HEADER_LENGTH + MODE_BLK_DESC_LENGTH);
 			mctl->mode_page.code = MODEPAGE_CTRL_MODE;
 			mctl->mode_page.length =
-				sizeof (struct mode_control_scsi3) -
-				sizeof (struct mode_page);
+			    sizeof (struct mode_control_scsi3) -
+			    sizeof (struct mode_page);
 			mctl->d_sense = 1;
-		} else
+		} else {
 			bzero(bp->b_un.b_addr, bp->b_bcount);
+		}
 		break;
 
 	default:
@@ -2779,9 +2775,9 @@ aac_mode_sense(struct aac_softstate *softs, struct scsi_pkt *pkt,
 /*ARGSUSED*/
 static int
 aac_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
-	scsi_hba_tran_t *tran, struct scsi_device *sd)
+    scsi_hba_tran_t *tran, struct scsi_device *sd)
 {
-	struct aac_softstate  *softs;
+	struct aac_softstate *softs = AAC_TRAN2SOFTS(tran);
 	int tgt = sd->sd_address.a_target;
 	int lun = sd->sd_address.a_lun;
 
@@ -2789,18 +2785,20 @@ aac_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 
 	if ((0 > tgt) || (tgt >= AAC_MAX_LD)) {
 		AACDB_PRINT((CE_NOTE,
-			"aac_tran_tgt_init: t%dL%d out", tgt, lun));
+		    "aac_tran_tgt_init: t%dL%d out", tgt, lun));
 		return (DDI_FAILURE);
 	}
-	softs = AAC_TRAN2SOFTS(tran);
+
+	/*
+	 * Only support container that has been detected and valid
+	 */
 	if (softs->container[tgt].valid && (lun == 0)) {
-		/* Only support container that has been detected and valid */
 		AACDB_PRINT((CE_NOTE,
-			"aac_tran_tgt_init: t%dL%d ok", tgt, lun));
+		    "aac_tran_tgt_init: t%dL%d ok", tgt, lun));
 		return (DDI_SUCCESS);
 	} else {
 		AACDB_PRINT((CE_NOTE,
-			"aac_tran_tgt_init: t%dL%d", tgt, lun));
+		    "aac_tran_tgt_init: t%dL%d", tgt, lun));
 		return (DDI_FAILURE);
 	}
 }
@@ -2815,25 +2813,25 @@ aac_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 static int
 aac_check_adapter_health(struct aac_softstate *softs)
 {
-	int ret;
+	int rval;
 
-	ret = PCI_MEM_GET32(softs, AAC_OMR0);
+	rval = PCI_MEM_GET32(softs, AAC_OMR0);
 
-	if (ret & AAC_KERNEL_UP_AND_RUNNING)
-		ret = 0;
-	else if (ret & AAC_KERNEL_PANIC)
-		ret = ((ret >> 16) & 0xff) + 1; /* avoid 0 as return value */
+	if (rval & AAC_KERNEL_UP_AND_RUNNING)
+		rval = 0;
+	else if (rval & AAC_KERNEL_PANIC)
+		rval = ((rval >> 16) & 0xff) + 1; /* avoid 0 as return value */
 	else
-		ret = -1;
+		rval = -1;
 
-	return (ret);
+	return (rval);
 }
 
 static int
 aac_quiesce_adapter(struct aac_softstate *softs)
 {
-	int ret = AACERR;
 	int count = 0;
+	int rval = AACERR;
 
 	ASSERT(rw_read_locked(&softs->errlock) == 0);
 
@@ -2843,9 +2841,9 @@ aac_quiesce_adapter(struct aac_softstate *softs)
 	 */
 	while (aac_check_adapter_health(softs) == 0) {
 		if ((softs->q_wait_sync.q_len == 0) &&
-			(softs->slot_hold == 1 || softs->q_wait.q_len == 0) &&
-			(softs->free_io_slot_len == softs->total_fibs)) {
-			ret = AACOK;
+		    (softs->slot_hold == 1 || softs->q_wait.q_len == 0) &&
+		    (softs->free_io_slot_len == softs->total_fibs)) {
+			rval = AACOK;
 			break;
 		}
 		/*
@@ -2858,7 +2856,7 @@ aac_quiesce_adapter(struct aac_softstate *softs)
 		count++;
 	}
 
-	return (ret);
+	return (rval);
 }
 
 /*
@@ -2882,9 +2880,10 @@ aac_abort_iocmds(struct aac_softstate *softs, int iocmd)
 		 * NOTE: interrupt should have been fully disabled before
 		 * aborting outstanding commands when doing IOP reset
 		 */
-		for (i = 0; i < AAC_MAX_LD; i++)
+		for (i = 0; i < AAC_MAX_LD; i++) {
 			if (softs->container[i].valid)
 				softs->container[i].reset = 1;
+		}
 		for (i = 0; i < softs->total_fibs; i++) {
 			/*
 			 * Now no other will touch the free slot queue entries,
@@ -2901,7 +2900,7 @@ aac_abort_iocmds(struct aac_softstate *softs, int iocmd)
 			acp->state = AAC_CMD_ABORT;
 
 			if ((slotp->fibp->Header.XferState &
-				AAC_FIBSTATE_ASYNC) == 0) {
+			    AAC_FIBSTATE_ASYNC) == 0) {
 				/* IOCTL */
 				mutex_enter(&softs->event_mutex);
 				cv_broadcast(&softs->event);
@@ -2974,28 +2973,28 @@ aac_reset_adapter(struct aac_softstate *softs)
 		(void) aac_shutdown(softs);
 
 	/* Execute IOP reset */
-	if ((aac_sync_mbcommand(softs, AAC_IOP_RESET, 0, 0, 0, 0, &status))
-		!= AACOK) {
-		struct aac_fib *fib;
+	if ((aac_sync_mbcommand(softs, AAC_IOP_RESET, 0, 0, 0, 0,
+	    &status)) != AACOK) {
+		struct aac_fib *fibp;
 		struct aac_pause_command *pc;
 
-		if (status == AAC_SRB_STS_INVALID_REQUEST)
+		if (status == SRB_STATUS_INVALID_REQUEST)
 			cmn_err(CE_WARN, "!IOP_RESET not supported");
 		else /* probably timeout */
 			cmn_err(CE_WARN, "!IOP_RESET failed");
 
 		/* Unwind aac_shutdown() */
-		fib = aac_grab_sync_fib(softs, SLEEP_FUNC);
-		pc = (struct aac_pause_command *)&fib->data[0];
+		fibp = aac_grab_sync_fib(softs, SLEEP_FUNC);
+		pc = (struct aac_pause_command *)&fibp->data[0];
 		pc->Command = VM_ContainerConfig;
 		pc->Type = CT_PAUSE_IO;
 		pc->Timeout = 1;
 		pc->Min = 1;
 		pc->NoRescan = 1;
 
-		(void) aac_sync_fib(softs, ContainerCommand, fib,
-			sizeof (struct aac_fib_header) + \
-			sizeof (struct aac_pause_command));
+		(void) aac_sync_fib(softs, ContainerCommand, fibp,
+		    sizeof (struct aac_fib_header) + \
+		    sizeof (struct aac_pause_command));
 		aac_release_sync_fib(softs);
 
 		goto finish;
@@ -3013,15 +3012,14 @@ aac_reset_adapter(struct aac_softstate *softs)
 
 finish:
 	AAC_ENABLE_INTR(softs);
-
 	return (rval);
 }
 
 static int
 aac_do_reset(struct aac_softstate *softs)
 {
-	int ret = AACOK;
 	int old_state;
+	int rval = AACOK;
 
 	rw_enter(&softs->errlock, RW_WRITER);
 	old_state = softs->state;
@@ -3033,26 +3031,24 @@ aac_do_reset(struct aac_softstate *softs)
 	 */
 	if (aac_quiesce_adapter(softs) != AACOK) {
 		if (aac_reset_adapter(softs) != AACOK)
-			ret = AACERR;
+			rval = AACERR;
 	} else if (softs->q_wait.q_len > 0) {
 		aac_abort_iocmds(softs, AAC_IOCMD_ASYNC);
 	}
 
-	softs->state = (ret == AACERR) ? AAC_STATE_DEAD : old_state;
+	softs->state = (rval == AACERR) ? AAC_STATE_DEAD : old_state;
 	rw_exit(&softs->errlock);
 
-	return (ret);
+	return (rval);
 }
 
 /*ARGSUSED*/
 static int
 aac_tran_reset(struct scsi_address *ap, int level)
 {
-	struct aac_softstate *softs;
+	struct aac_softstate *softs = AAC_TRAN2SOFTS(ap->a_hba_tran);
 
 	DBCALLED(1);
-
-	softs = AAC_TRAN2SOFTS(ap->a_hba_tran);
 
 	/*
 	 * Core dump is a crucial method to analyze problems after panic,
@@ -3064,10 +3060,10 @@ aac_tran_reset(struct scsi_address *ap, int level)
 		if ((softs->flags & AAC_FLAGS_NEW_COMM) == 0) {
 			uint32_t *pip, *cip;
 
-			pip = &(softs->qtablep->qt_qindex
-				[AAC_ADAP_NORM_CMD_Q][AAC_PRODUCER_INDEX]);
-			cip = &(softs->qtablep->qt_qindex
-				[AAC_ADAP_NORM_CMD_Q][AAC_CONSUMER_INDEX]);
+			pip = &(softs->qtablep->qt_qindex \
+			    [AAC_ADAP_NORM_CMD_Q][AAC_PRODUCER_INDEX]);
+			cip = &(softs->qtablep->qt_qindex \
+			    [AAC_ADAP_NORM_CMD_Q][AAC_CONSUMER_INDEX]);
 			AAC_BUSYWAIT(*pip == *cip, 6 * 1000);
 			if (*pip != *cip)
 				return (0);
@@ -3090,7 +3086,7 @@ aac_tran_reset(struct scsi_address *ap, int level)
 static int
 aac_tran_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
-	struct aac_softstate *softs;
+	struct aac_softstate *softs = AAC_TRAN2SOFTS(ap->a_hba_tran);
 	int old_slot_hold;
 
 	DBCALLED(1);
@@ -3098,7 +3094,6 @@ aac_tran_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 	if (pkt != NULL)
 		return (0);
 
-	softs = AAC_TRAN2SOFTS(ap->a_hba_tran);
 	rw_enter(&softs->errlock, RW_WRITER);
 
 	old_slot_hold = softs->slot_hold;
@@ -3111,66 +3106,64 @@ aac_tran_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 }
 
 static void
-aac_free_dmamap(struct aac_cmd *ac)
+aac_free_dmamap(struct aac_cmd *acp)
 {
 	/* Free dma mapping */
-	if (ac->flags & AAC_CMD_DMA_VALID) {
-		ASSERT(ac->buf_dma_handle);
-		(void) ddi_dma_unbind_handle(ac->buf_dma_handle);
-		ac->flags &= ~AAC_CMD_DMA_VALID;
+	if (acp->flags & AAC_CMD_DMA_VALID) {
+		ASSERT(acp->buf_dma_handle);
+		(void) ddi_dma_unbind_handle(acp->buf_dma_handle);
+		acp->flags &= ~AAC_CMD_DMA_VALID;
 	}
 
-	if (ac->abp != NULL) { /* free non-aligned buf DMA */
-		ASSERT(ac->buf_dma_handle);
-		ddi_dma_mem_free(&ac->abh);
-		ac->abp = NULL;
+	if (acp->abp != NULL) { /* free non-aligned buf DMA */
+		ASSERT(acp->buf_dma_handle);
+		ddi_dma_mem_free(&acp->abh);
+		acp->abp = NULL;
 	}
 
-	if (ac->buf_dma_handle) {
-		ddi_dma_free_handle(&ac->buf_dma_handle);
-		ac->buf_dma_handle = NULL;
+	if (acp->buf_dma_handle) {
+		ddi_dma_free_handle(&acp->buf_dma_handle);
+		acp->buf_dma_handle = NULL;
 	}
 }
 
 static int
 aac_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
-	struct aac_softstate *softs;
-	struct aac_cmd *ac;
+	struct aac_softstate *softs = AAC_TRAN2SOFTS(ap->a_hba_tran);
+	struct aac_cmd *acp;
 	struct aac_fib *fibp;
-	struct buf *bp;
 	union scsi_cdb *cdbp;
+	struct buf *bp;
 	uchar_t cmd;
-	int ret_val;
 	int target = ap->a_target;
 	int lun = ap->a_lun;
 	int capacity;
 	uint64_t blkno;
 	uint32_t blkcnt;
+	int rval;
 
 	DBCALLED(2);
 
-	softs = AAC_TRAN2SOFTS(ap->a_hba_tran);
-
 	if (!softs->container[target].valid || lun != 0 ||
-		softs->state == AAC_STATE_DEAD) {
+	    softs->state == AAC_STATE_DEAD) {
 		AACDB_PRINT((CE_WARN,
-			"Cannot send cmd to target t%dL%d: %s",
-			target, lun,
-			(softs->state == AAC_STATE_DEAD) ?
-			"adapter dead" : "target invalid"));
+		    "Cannot send cmd to target t%dL%d: %s",
+		    target, lun,
+		    (softs->state == AAC_STATE_DEAD) ?
+		    "adapter dead" : "target invalid"));
 		return (TRAN_FATAL_ERROR);
 	}
 
 	rw_enter(&softs->errlock, RW_READER);
 
 	/* Init ac and pkt */
-	ac = PKT2AC(pkt);
+	acp = PKT2AC(pkt);
 	cdbp = (union scsi_cdb *)pkt->pkt_cdbp;
-	bp = ac->bp;
+	bp = acp->bp;
 	cmd = cdbp->scc_cmd;
-	ac->flags |= (pkt->pkt_flags & FLAG_NOINTR) ? AAC_CMD_NO_INTR : 0;
-	ac->state = AAC_CMD_INCMPLT;
+	acp->flags |= (pkt->pkt_flags & FLAG_NOINTR) ? AAC_CMD_NO_INTR : 0;
+	acp->state = AAC_CMD_INCMPLT;
 	pkt->pkt_state = 0;
 	pkt->pkt_statistics = STAT_SYNC;
 	*pkt->pkt_scbp = 0; /* clear arq scsi_status */
@@ -3179,15 +3172,15 @@ aac_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 	switch (cmd) {
 	case SCMD_INQUIRY: /* inquiry */
-		ac->flags |= AAC_CMD_SOFT_INTR;
-		aac_free_dmamap(ac);
+		acp->flags |= AAC_CMD_SOFT_INTR;
+		aac_free_dmamap(acp);
 		aac_inquiry(softs, pkt, cdbp, bp);
-		aac_soft_callback(softs, ac, CMD_CMPLT);
-		ret_val = TRAN_ACCEPT;
+		aac_soft_callback(softs, acp, CMD_CMPLT);
+		rval = TRAN_ACCEPT;
 		break;
 
 	case SCMD_READ_CAPACITY: /* read capacity */
-		ac->flags |= AAC_CMD_SOFT_INTR;
+		acp->flags |= AAC_CMD_SOFT_INTR;
 		if (bp && bp->b_un.b_addr && bp->b_bcount) {
 			struct scsi_capacity cap;
 			uint64_t last_lba;
@@ -3195,20 +3188,20 @@ aac_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 			/* check 64-bit LBA */
 			last_lba = softs->container[target].size - 1;
 			if (last_lba > 0xffffffffull) {
-				cap.capacity = 0xffffffff;
+				cap.capacity = 0xfffffffful;
 			} else {
 				cap.capacity = BE_32(last_lba);
 			}
 			cap.lbasize = BE_32(AAC_SECTOR_SIZE);
 
-			aac_free_dmamap(ac);
+			aac_free_dmamap(acp);
 			if (bp->b_flags & (B_PHYS|B_PAGEIO))
 				bp_mapin(bp);
 			bcopy(&cap, bp->b_un.b_addr, 8);
 			pkt->pkt_state |= STATE_XFERRED_DATA;
 		}
-		aac_soft_callback(softs, ac, CMD_CMPLT);
-		ret_val = TRAN_ACCEPT;
+		aac_soft_callback(softs, acp, CMD_CMPLT);
+		rval = TRAN_ACCEPT;
 		break;
 
 	case SCMD_SVC_ACTION_IN_G4: /* read capacity 16 */
@@ -3216,24 +3209,24 @@ aac_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		if (cdbp->cdb_opaque[1] != SSVC_ACTION_READ_CAPACITY_G4)
 			goto unknown;
 
-		ac->flags |= AAC_CMD_SOFT_INTR;
+		acp->flags |= AAC_CMD_SOFT_INTR;
 		if (bp && bp->b_un.b_addr && bp->b_bcount) {
 			struct scsi_capacity_16 cap16;
 			int cap_len = sizeof (struct scsi_capacity_16);
 
 			bzero(&cap16, cap_len);
 			cap16.sc_capacity =
-				BE_64(softs->container[target].size);
+			    BE_64(softs->container[target].size);
 			cap16.sc_lbasize = BE_32(AAC_SECTOR_SIZE);
 
-			aac_free_dmamap(ac);
+			aac_free_dmamap(acp);
 			if (bp->b_flags & (B_PHYS | B_PAGEIO))
 				bp_mapin(bp);
 			bcopy(&cap16, bp->b_un.b_addr, cap_len);
 			pkt->pkt_state |= STATE_XFERRED_DATA;
 		}
-		aac_soft_callback(softs, ac, CMD_CMPLT);
-		ret_val = TRAN_ACCEPT;
+		aac_soft_callback(softs, acp, CMD_CMPLT);
+		rval = TRAN_ACCEPT;
 		break;
 
 	case SCMD_READ_G4: /* read_16 */
@@ -3248,48 +3241,50 @@ aac_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	case SCMD_READ_G1: /* read_10 */
 	case SCMD_WRITE: /* write_6 */
 	case SCMD_WRITE_G1: /* write_10 */
-		ac->flags |= AAC_CMD_HARD_INTR;
-		if (!(ac->flags & AAC_CMD_DMA_VALID) ||
-			!(ac->fib.Header.XferState &
-			AAC_FIBSTATE_HOSTOWNED)) {
-			ret_val = TRAN_BADPKT;
+		acp->flags |= AAC_CMD_HARD_INTR;
+		if (!(acp->flags & AAC_CMD_DMA_VALID) ||
+		    !(acp->fib.Header.XferState & AAC_FIBSTATE_HOSTOWNED)) {
+			rval = TRAN_BADPKT;
 			break;
 		}
 
-		blkno = AAC_GETGXADDR(ac->cmdlen, cdbp);
-		fibp = &ac->fib;
+		blkno = AAC_GETGXADDR(acp->cmdlen, cdbp);
+		fibp = &acp->fib;
 		if (softs->flags & AAC_FLAGS_RAW_IO) {
 			/* Fill in correct blkno */
 			struct aac_raw_io *io =
-				(struct aac_raw_io *)&fibp->data[0];
+			    (struct aac_raw_io *)&fibp->data[0];
+
 			io->BlockNumber = blkno;
-			io->Flags = (ac->flags & AAC_CMD_BUF_READ) ? 1:0;
+			io->Flags = (acp->flags & AAC_CMD_BUF_READ) ? 1:0;
 			blkcnt = io->ByteCount / AAC_BLK_SIZE;
 		} else if (softs->flags & AAC_FLAGS_SG_64BIT) {
 			/* Fill in correct blkno */
-			if (ac->flags & AAC_CMD_BUF_READ) {
+			if (acp->flags & AAC_CMD_BUF_READ) {
 				struct aac_blockread64 *br =
-					(struct aac_blockread64 *) \
-					&fibp->data[0];
+				    (struct aac_blockread64 *)&fibp->data[0];
+
 				br->BlockNumber = (uint32_t)blkno;
 				blkcnt = br->SectorCount;
 			} else {
 				struct aac_blockwrite64 *bw =
-					(struct aac_blockwrite64 *) \
-					&fibp->data[0];
+				    (struct aac_blockwrite64 *)&fibp->data[0];
+
 				bw->BlockNumber = (uint32_t)blkno;
 				blkcnt = bw->SectorCount;
 			}
 		} else {
 			/* Fill in correct blkno */
-			if (ac->flags & AAC_CMD_BUF_READ) {
+			if (acp->flags & AAC_CMD_BUF_READ) {
 				struct aac_blockread *br =
-					(struct aac_blockread *)&fibp->data[0];
+				    (struct aac_blockread *)&fibp->data[0];
+
 				br->BlockNumber = (uint32_t)blkno;
 				blkcnt = br->ByteCount / AAC_BLK_SIZE;
 			} else {
 				struct aac_blockwrite *bw =
-					(struct aac_blockwrite *)&fibp->data[0];
+				    (struct aac_blockwrite *)&fibp->data[0];
+
 				bw->BlockNumber = (uint32_t)blkno;
 				blkcnt = bw->ByteCount / AAC_BLK_SIZE;
 			}
@@ -3301,46 +3296,47 @@ aac_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		 * NOTE: (blkno + blkcnt) may overflow
 		 */
 		if ((blkno >= softs->container[target].size) ||
-			((blkno + blkcnt) > softs->container[target].size)) {
+		    ((blkno + blkcnt) > softs->container[target].size)) {
 			/*
 			 * Request exceed the capacity of disk set error
 			 * block number to last LBA + 1
 			 */
 			aac_set_arq_data(pkt, KEY_ILLEGAL_REQUEST,
-				0x21, 0x00, softs->container[target].size);
-			aac_soft_callback(softs, ac, CMD_CMPLT);
-			ret_val = TRAN_ACCEPT;
+			    0x21, 0x00, softs->container[target].size);
+			aac_soft_callback(softs, acp, CMD_CMPLT);
+			rval = TRAN_ACCEPT;
 			break;
 		}
 
-		if ((ac->flags & AAC_CMD_NO_INTR) ||
-			(ac->flags & AAC_CMD_SOFT_INTR)) {
+		if ((acp->flags & AAC_CMD_NO_INTR) ||
+		    (acp->flags & AAC_CMD_SOFT_INTR)) {
 			/* Poll pkt */
-			if (aac_do_poll_io(softs, ac) == AACOK) {
-				aac_soft_callback(softs, ac, CMD_CMPLT);
-				ret_val = TRAN_ACCEPT;
-			} else
-				ret_val = TRAN_BADPKT;
+			if (aac_do_poll_io(softs, acp) == AACOK) {
+				aac_soft_callback(softs, acp, CMD_CMPLT);
+				rval = TRAN_ACCEPT;
+			} else {
+				rval = TRAN_BADPKT;
+			}
 		} else {
 			/* Async pkt */
-			if (aac_do_async_io(softs, ac) == AACOK)
-				ret_val = TRAN_ACCEPT;
+			if (aac_do_async_io(softs, acp) == AACOK)
+				rval = TRAN_ACCEPT;
 			else
-				ret_val = TRAN_BUSY;
+				rval = TRAN_BUSY;
 		}
 		break;
 
 	case SCMD_MODE_SENSE: /* mode_sense_6 */
 	case SCMD_MODE_SENSE_G1: /* mode_sense_10 */
-		ac->flags |= AAC_CMD_SOFT_INTR;
-		aac_free_dmamap(ac);
+		acp->flags |= AAC_CMD_SOFT_INTR;
+		aac_free_dmamap(acp);
 		if (softs->container[target].size > 0xffffffffull)
-			capacity = 0xffffffff; /* 64-bit LBA */
+			capacity = 0xfffffffful; /* 64-bit LBA */
 		else
 			capacity = softs->container[target].size;
 		aac_mode_sense(softs, pkt, cdbp, bp, capacity);
-		aac_soft_callback(softs, ac, CMD_CMPLT);
-		ret_val = TRAN_ACCEPT;
+		aac_soft_callback(softs, acp, CMD_CMPLT);
+		rval = TRAN_ACCEPT;
 		break;
 
 	case SCMD_TEST_UNIT_READY:
@@ -3348,63 +3344,62 @@ aac_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	case SCMD_FORMAT:
 	case SCMD_START_STOP:
 	case SCMD_SYNCHRONIZE_CACHE:
-		ac->flags |= AAC_CMD_SOFT_INTR;
-		aac_free_dmamap(ac);
+		acp->flags |= AAC_CMD_SOFT_INTR;
+		aac_free_dmamap(acp);
 		if (bp && bp->b_un.b_addr && bp->b_bcount) {
-			if (ac->flags & AAC_CMD_BUF_READ) {
+			if (acp->flags & AAC_CMD_BUF_READ) {
 				if (bp->b_flags & (B_PHYS|B_PAGEIO))
 					bp_mapin(bp);
 				bzero(bp->b_un.b_addr, bp->b_bcount);
 			}
 			pkt->pkt_state |= STATE_XFERRED_DATA;
 		}
-		aac_soft_callback(softs, ac, CMD_CMPLT);
-		ret_val = TRAN_ACCEPT;
+		aac_soft_callback(softs, acp, CMD_CMPLT);
+		rval = TRAN_ACCEPT;
 		break;
 
 	case SCMD_DOORLOCK:
-		ac->flags |= AAC_CMD_SOFT_INTR;
-		aac_free_dmamap(ac);
+		acp->flags |= AAC_CMD_SOFT_INTR;
+		aac_free_dmamap(acp);
 		if (pkt->pkt_cdbp[4] & 0x01)
 			softs->container[target].locked = 1;
 		else
 			softs->container[target].locked = 0;
-		aac_soft_callback(softs, ac, CMD_CMPLT);
-		ret_val = TRAN_ACCEPT;
+		aac_soft_callback(softs, acp, CMD_CMPLT);
+		rval = TRAN_ACCEPT;
 		break;
 
 	default: /* unknown command */
 unknown:
 		AACDB_PRINT((CE_CONT, "SCMD not supported"));
-		aac_free_dmamap(ac);
+		aac_free_dmamap(acp);
 		aac_set_arq_data(pkt, KEY_ILLEGAL_REQUEST, 0x20, 0x00, 0);
-		aac_soft_callback(softs, ac, CMD_CMPLT);
-		ret_val = TRAN_ACCEPT;
+		aac_soft_callback(softs, acp, CMD_CMPLT);
+		rval = TRAN_ACCEPT;
 		break;
 	}
 
 	rw_exit(&softs->errlock);
-	return (ret_val);
+	return (rval);
 }
 
 static int
 aac_tran_getcap(struct scsi_address *ap, char *cap, int whom)
 {
-	int rval;
-	struct aac_softstate *softs;
+	struct aac_softstate *softs = AAC_TRAN2SOFTS(ap->a_hba_tran);
 	int target = ap->a_target;
 	int lun = ap->a_lun;
+	int rval;
 
 	DBCALLED(1);
 
 	/* We don't allow inquiring about capabilities for other targets */
 	if (cap == NULL || whom == 0) {
 		AACDB_PRINT((CE_WARN,
-			"GetCap> %s not supported: whom=%d", cap, whom));
+		    "GetCap> %s not supported: whom=%d", cap, whom));
 		return (-1);
 	}
 
-	softs = AAC_TRAN2SOFTS(ap->a_hba_tran);
 	if (!softs->container[target].valid || !(lun == 0)) {
 		AACDB_PRINT((CE_WARN, "Bad target to getcap"));
 		return (-1);
@@ -3423,7 +3418,7 @@ aac_tran_getcap(struct scsi_address *ap, char *cap, int whom)
 	case SCSI_CAP_TOTAL_SECTORS:
 		/* Number of sectors */
 		if (softs->container[target].size > 0xffffffffull)
-			rval = 0xffffffff; /* 64-bit LBA */
+			rval = 0xfffffffful; /* 64-bit LBA */
 		else
 			rval = softs->container[target].size;
 		break;
@@ -3436,31 +3431,28 @@ aac_tran_getcap(struct scsi_address *ap, char *cap, int whom)
 		break;
 	}
 	AACDB_PRINT((CE_NOTE, "GetCap> %s t%dL%d: rval=%d",
-		cap, ap->a_target, ap->a_lun, rval));
+	    cap, ap->a_target, ap->a_lun, rval));
 
 	return (rval);
 }
 
 /*ARGSUSED*/
 static int
-aac_tran_setcap(struct scsi_address *ap, char *cap, int value,
-	int whom)
+aac_tran_setcap(struct scsi_address *ap, char *cap, int value, int whom)
 {
-	int rval;
-	struct aac_softstate *softs;
+	struct aac_softstate *softs = AAC_TRAN2SOFTS(ap->a_hba_tran);
 	int target = ap->a_target;
 	int lun = ap->a_lun;
+	int rval;
 
 	DBCALLED(1);
 
 	/* We don't allow inquiring about capabilities for other targets */
 	if (cap == NULL || whom == 0) {
 		AACDB_PRINT((CE_WARN,
-			"SetCap> %s not supported: whom=%d", cap, whom));
+		    "SetCap> %s not supported: whom=%d", cap, whom));
 		return (-1);
 	}
-
-	softs = AAC_TRAN2SOFTS(ap->a_hba_tran);
 
 	if (!softs->container[target].valid || !(lun == 0)) {
 		AACDB_PRINT((CE_WARN, "Bad target to setcap"));
@@ -3490,97 +3482,98 @@ aac_tran_setcap(struct scsi_address *ap, char *cap, int value,
 		rval = -1;
 		break;
 	}
-	AACDB_PRINT((CE_NOTE, "SetCap> %s t%dL%d val=%d: rval=%d",
-		cap, ap->a_target, ap->a_lun, value, rval));
 
+	AACDB_PRINT((CE_NOTE, "SetCap> %s t%dL%d val=%d: rval=%d",
+	    cap, ap->a_target, ap->a_lun, value, rval));
 	return (rval);
 }
 
 static void
-aac_tran_destroy_pkt(struct scsi_address *ap,
-	struct scsi_pkt *pkt)
+aac_tran_destroy_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
-	struct aac_cmd *ac = PKT2AC(pkt);
+	struct aac_cmd *acp = PKT2AC(pkt);
 
 	DBCALLED(2);
 
-	aac_free_dmamap(ac);
-	ASSERT(ac->slotp == NULL);
+	aac_free_dmamap(acp);
+	ASSERT(acp->slotp == NULL);
 	scsi_hba_pkt_free(ap, pkt);
 }
 
 static struct scsi_pkt *
 aac_tran_init_pkt(struct scsi_address *ap,
-	struct scsi_pkt *pkt, struct buf *bp, int cmdlen, int statuslen,
-	int tgtlen, int flags, int (*callback)(), caddr_t arg)
+    struct scsi_pkt *pkt, struct buf *bp, int cmdlen, int statuslen,
+    int tgtlen, int flags, int (*callback)(), caddr_t arg)
 {
-	struct aac_softstate *softs;
-	struct aac_cmd *ac, *new_ac = NULL;
-	int err;
+	struct aac_softstate *softs = AAC_TRAN2SOFTS(ap->a_hba_tran);
+	struct aac_cmd *acp, *new_acp;
 	uint_t dma_flags = 0;
-	int (*cb) (caddr_t);
-	int slen, hbalen;
+	int (*cb)(caddr_t);
 	size_t transfer_num;
+	int rval;
 
 	DBCALLED(2);
-
-	softs = AAC_TRAN2SOFTS(ap->a_hba_tran);
 
 	cb = (callback == NULL_FUNC) ? DDI_DMA_DONTWAIT : DDI_DMA_SLEEP;
 
 	/* Allocate pkt */
 	if (pkt == NULL) {
+		int slen, hbalen;
+
 		/* Force auto request sense */
 		/* 64-bit LBA needs descriptor format sense data */
 		slen = (sizeof (struct scsi_extended_sense) <
-			AAC_SENSE_DATA_DESCR_LEN) ?
-			(sizeof (struct scsi_arq_status) +
-			AAC_SENSE_DATA_DESCR_LEN -
-			sizeof (struct scsi_extended_sense)) :
-			sizeof (struct scsi_arq_status);
+		    AAC_SENSE_DATA_DESCR_LEN) ?
+		    (sizeof (struct scsi_arq_status) +
+		    AAC_SENSE_DATA_DESCR_LEN -
+		    sizeof (struct scsi_extended_sense)) :
+		    sizeof (struct scsi_arq_status);
 		if (statuslen > slen)
 			slen = statuslen;
 		hbalen = sizeof (struct aac_cmd) - sizeof (struct aac_fib) +
-			softs->aac_max_fib_size;
+		    softs->aac_max_fib_size;
 		pkt = scsi_hba_pkt_alloc(softs->devinfo_p, ap, cmdlen,
-			slen, tgtlen, hbalen, callback, arg);
+		    slen, tgtlen, hbalen, callback, arg);
 		if (pkt == NULL) {
 			AACDB_PRINT((CE_WARN, "Alloc scsi pkt failed"));
 			return (NULL);
 		}
-		ac = new_ac = PKT2AC(pkt);
-		ac->pkt = pkt;
-		ac->cmdlen = cmdlen;
-		ac->slotp = NULL;
+		acp = new_acp = PKT2AC(pkt);
+		acp->pkt = pkt;
+		acp->cmdlen = cmdlen;
+		acp->slotp = NULL;
 
 		/*
 		 * We will still use this point to fake some
 		 * infomation in tran_start
 		 */
-		ac->bp = bp;
+		acp->bp = bp;
 
 		/* Set cmd flags according to pkt alloc flags */
 		if (flags & PKT_CONSISTENT)
-			ac->flags |= AAC_CMD_CONSISTENT;
+			acp->flags |= AAC_CMD_CONSISTENT;
 		if (flags & PKT_DMA_PARTIAL)
-			ac->flags |= AAC_CMD_DMA_PARTIAL;
+			acp->flags |= AAC_CMD_DMA_PARTIAL;
+	} else {
+		acp = PKT2AC(pkt);
+		new_acp = NULL;
 	}
+
 	if (bp == NULL || (bp->b_bcount == 0))
 		return (pkt);
 
 	/* We need to transfer data, so we alloc DMA resources for this pkt */
-	ac = PKT2AC(pkt);
-	if (!(ac->flags & AAC_CMD_DMA_VALID)) {
+	if (!(acp->flags & AAC_CMD_DMA_VALID)) {
 
-		ASSERT(new_ac != NULL); /* pkt is reused without init */
+		ASSERT(new_acp != NULL); /* pkt is reused without init */
 
 		/* Set dma flags */
 		if (BUF_IS_READ(bp)) {
 			dma_flags |= DDI_DMA_READ;
-			ac->flags |= AAC_CMD_BUF_READ;
+			acp->flags |= AAC_CMD_BUF_READ;
 		} else {
 			dma_flags |= DDI_DMA_WRITE;
-			ac->flags |= AAC_CMD_BUF_WRITE;
+			acp->flags |= AAC_CMD_BUF_WRITE;
 		}
 		if (flags & PKT_CONSISTENT)
 			dma_flags |= DDI_DMA_CONSISTENT;
@@ -3588,115 +3581,119 @@ aac_tran_init_pkt(struct scsi_address *ap,
 			dma_flags |= DDI_DMA_PARTIAL;
 
 		/* Alloc buf dma handle */
-		err = DDI_SUCCESS;
-		if (!ac->buf_dma_handle)
-			err = ddi_dma_alloc_handle(softs->devinfo_p,
-				&softs->buf_dma_attr, cb, NULL,
-				&ac->buf_dma_handle);
-		if (err != DDI_SUCCESS) {
+		rval = DDI_SUCCESS;
+		if (!acp->buf_dma_handle)
+			rval = ddi_dma_alloc_handle(softs->devinfo_p,
+			    &softs->buf_dma_attr, cb, NULL,
+			    &acp->buf_dma_handle);
+		if (rval != DDI_SUCCESS) {
 			AACDB_PRINT((CE_WARN,
-				"Can't allocate DMA handle, errno=%d", err));
-			if (new_ac)
+			    "Can't allocate DMA handle, errno=%d", rval));
+			if (new_acp)
 				scsi_hba_pkt_free(ap, pkt);
 			return (NULL);
 		}
 
 		/* Bind buf */
 		if ((((uintptr_t)bp->b_un.b_addr & AAC_DMA_ALIGN_MASK) == 0) &&
-			((bp->b_bcount & AAC_DMA_ALIGN_MASK) == 0)) {
-			err = ddi_dma_buf_bind_handle(ac->buf_dma_handle,
-				bp, dma_flags, DDI_DMA_SLEEP, NULL,
-				&ac->cookie, &ac->left_cookien);
+		    ((bp->b_bcount & AAC_DMA_ALIGN_MASK) == 0)) {
+			rval = ddi_dma_buf_bind_handle(acp->buf_dma_handle,
+			    bp, dma_flags, DDI_DMA_SLEEP, NULL,
+			    &acp->cookie, &acp->left_cookien);
 		} else {
 			size_t bufsz;
 
 			AACDB_PRINT((CE_WARN,
-				"non-aligned buffer: addr=0x%p, cnt=%lu",
-				(void *)bp->b_un.b_addr, bp->b_bcount));
+			    "non-aligned buffer: addr=0x%p, cnt=%lu",
+			    (void *)bp->b_un.b_addr, bp->b_bcount));
 			if (bp->b_flags & (B_PAGEIO|B_PHYS))
 				bp_mapin(bp);
 
-			err = ddi_dma_mem_alloc(ac->buf_dma_handle,
-				AAC_ROUNDUP(bp->b_bcount, AAC_DMA_ALIGN),
-				&aac_acc_attr, DDI_DMA_STREAMING,
-				DDI_DMA_SLEEP, NULL,
-				&ac->abp, &bufsz, &ac->abh);
+			rval = ddi_dma_mem_alloc(acp->buf_dma_handle,
+			    AAC_ROUNDUP(bp->b_bcount, AAC_DMA_ALIGN),
+			    &aac_acc_attr, DDI_DMA_STREAMING,
+			    DDI_DMA_SLEEP, NULL, &acp->abp, &bufsz, &acp->abh);
 
-			if (err != DDI_SUCCESS) {
+			if (rval != DDI_SUCCESS) {
 				AACDB_PRINT((CE_NOTE,
-					"Cannot alloc DMA to non-aligned buf"));
+				    "Cannot alloc DMA to non-aligned buf"));
 				bioerror(bp, 0);
 				goto error_out;
 			}
 
-			if (ac->flags & AAC_CMD_BUF_WRITE)
-				bcopy(bp->b_un.b_addr, ac->abp, bp->b_bcount);
+			if (acp->flags & AAC_CMD_BUF_WRITE)
+				bcopy(bp->b_un.b_addr, acp->abp, bp->b_bcount);
 
-			err = ddi_dma_addr_bind_handle(ac->buf_dma_handle, NULL,
-				ac->abp, bufsz, dma_flags, DDI_DMA_SLEEP, 0,
-				&ac->cookie, &ac->left_cookien);
+			rval = ddi_dma_addr_bind_handle(acp->buf_dma_handle,
+			    NULL, acp->abp, bufsz, dma_flags, DDI_DMA_SLEEP,
+			    0, &acp->cookie, &acp->left_cookien);
 		}
 
-		switch (err) {
+		switch (rval) {
 		case DDI_DMA_PARTIAL_MAP:
-			ac->flags |= AAC_CMD_DMA_VALID;
-			if (ddi_dma_numwin(ac->buf_dma_handle, &ac->total_nwin)
-				== DDI_FAILURE) {
+			acp->flags |= AAC_CMD_DMA_VALID;
+			if (ddi_dma_numwin(acp->buf_dma_handle,
+			    &acp->total_nwin) == DDI_FAILURE) {
 				AACDB_PRINT((CE_WARN,
-					"Cannot get number of DMA windows"));
+				    "Cannot get number of DMA windows"));
 				bioerror(bp, 0);
 				goto error_out;
 			}
-			AACDB_PRINT((CE_NOTE,
-				"buf bind, %d segs", ac->left_cookien));
-			ac->cur_win = 0;
+			AACDB_PRINT((CE_NOTE, "buf bind, %d segs",
+			    acp->left_cookien));
+			acp->cur_win = 0;
 			break;
 
 		case DDI_DMA_MAPPED:
-			AACDB_PRINT((CE_NOTE,
-				"buf bind, %d segs", ac->left_cookien));
-			ac->flags |= AAC_CMD_DMA_VALID;
-			ac->cur_win = 0;
-			ac->total_nwin = 1;
+			AACDB_PRINT((CE_NOTE, "buf bind, %d segs",
+			    acp->left_cookien));
+			acp->flags |= AAC_CMD_DMA_VALID;
+			acp->cur_win = 0;
+			acp->total_nwin = 1;
 			break;
 
 		case DDI_DMA_NORESOURCES:
 			bioerror(bp, 0);
+			AACDB_PRINT((CE_WARN,
+			    "Cannot bind buf for DMA: DDI_DMA_NORESOURCES"));
 			goto error_out;
 		case DDI_DMA_BADATTR:
 		case DDI_DMA_NOMAPPING:
 			bioerror(bp, EFAULT);
+			AACDB_PRINT((CE_WARN,
+			    "Cannot bind buf for DMA: DDI_DMA_NOMAPPING"));
 			goto error_out;
 		case DDI_DMA_TOOBIG:
 		default:
 			bioerror(bp, EINVAL);
+			AACDB_PRINT((CE_WARN,
+			    "Cannot bind buf for DMA: %d", rval));
 			goto error_out;
 		}
 	}
 
 	/* Build FIB for this ac/pkt and return remaining byte count */
-	transfer_num = aac_cmd_fib(softs, ac);
+	transfer_num = aac_cmd_fib(softs, acp);
 	if (transfer_num == 0)
 		goto error_out;
 	pkt->pkt_resid = bp->b_bcount - transfer_num;
 
 	AACDB_PRINT((CE_NOTE,
-		"bp=0x%p, xfered=%d/%d, resid=%d",
-		(void *)bp->b_un.b_addr,
-		(int)ac->total_xfer, (int)bp->b_bcount, (int)pkt->pkt_resid));
+	    "bp=0x%p, xfered=%d/%d, resid=%d",
+	    (void *)bp->b_un.b_addr,
+	    (int)acp->total_xfer, (int)bp->b_bcount, (int)pkt->pkt_resid));
 
 	ASSERT((pkt->pkt_resid >= 0) ||
-		((bp->b_bcount & AAC_DMA_ALIGN_MASK) != 0));
+	    ((bp->b_bcount & AAC_DMA_ALIGN_MASK) != 0));
 
 	if (pkt->pkt_resid < 0)
 		pkt->pkt_resid = 0;
-
 	return (pkt);
 
 error_out:
 	AACDB_PRINT((CE_WARN, "Cannot bind buf for DMA"));
-	aac_free_dmamap(ac);
-	if (new_ac)
+	aac_free_dmamap(acp);
+	if (new_acp)
 		scsi_hba_pkt_free(ap, pkt);
 	return (NULL);
 }
@@ -3708,18 +3705,18 @@ error_out:
 static void
 aac_tran_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
-	struct aac_cmd *ac = PKT2AC(pkt);
+	struct aac_cmd *acp = PKT2AC(pkt);
 	struct buf *bp;
 
 	DBCALLED(2);
 
-	if (ac->buf_dma_handle) {
-		aac_dma_sync(ac->buf_dma_handle, 0, 0,
-			(ac->flags & AAC_CMD_BUF_WRITE) ?
-			DDI_DMA_SYNC_FORDEV : DDI_DMA_SYNC_FORCPU);
-		if (ac->abp != NULL) {
-			bp = ac->bp;
-			bcopy(ac->abp, bp->b_un.b_addr, bp->b_bcount);
+	if (acp->buf_dma_handle) {
+		aac_dma_sync(acp->buf_dma_handle, 0, 0,
+		    (acp->flags & AAC_CMD_BUF_WRITE) ?
+		    DDI_DMA_SYNC_FORDEV : DDI_DMA_SYNC_FORCPU);
+		if (acp->abp != NULL) {
+			bp = acp->bp;
+			bcopy(acp->abp, bp->b_un.b_addr, bp->b_bcount);
 		}
 	}
 }
@@ -3731,25 +3728,20 @@ aac_tran_sync_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 static void
 aac_tran_dmafree(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
-	struct aac_cmd *ac = PKT2AC(pkt);
+	struct aac_cmd *acp = PKT2AC(pkt);
 
 	DBCALLED(2);
 
-	aac_free_dmamap(ac);
+	aac_free_dmamap(acp);
 }
 
-/*ARGSUSED*/
 static int
 aac_tran_quiesce(dev_info_t *dip)
 {
-	struct aac_softstate *softs;
-	scsi_hba_tran_t *tran;
-	int ret = 1;
+	struct aac_softstate *softs = AAC_DIP2SOFTS(dip);
+	int rval = 1;
 
 	DBCALLED(1);
-
-	tran = (scsi_hba_tran_t *)ddi_get_driver_private(dip);
-	softs = AAC_TRAN2SOFTS(tran);
 
 	rw_enter(&softs->errlock, RW_WRITER);
 	if (softs->state != AAC_STATE_RUN)
@@ -3758,27 +3750,22 @@ aac_tran_quiesce(dev_info_t *dip)
 	softs->slot_hold = 1;
 	if (aac_quiesce_adapter(softs) == AACOK) {
 		softs->state = AAC_STATE_QUIESCE;
-		ret = 0;
+		rval = 0;
 	} else {
 		softs->slot_hold = 0;
 	}
 
 finish:
 	rw_exit(&softs->errlock);
-	return (ret);
+	return (rval);
 }
 
-/*ARGSUSED*/
 static int
 aac_tran_unquiesce(dev_info_t *dip)
 {
-	struct aac_softstate *softs;
-	scsi_hba_tran_t *tran;
+	struct aac_softstate *softs = AAC_DIP2SOFTS(dip);
 
 	DBCALLED(1);
-
-	tran = (scsi_hba_tran_t *)ddi_get_driver_private(dip);
-	softs = AAC_TRAN2SOFTS(tran);
 
 	rw_enter(&softs->errlock, RW_WRITER);
 
@@ -3799,8 +3786,8 @@ aac_tran_unquiesce(dev_info_t *dip)
 static int
 aac_hba_setup(struct aac_softstate *softs)
 {
-	scsi_hba_tran_t *hba_tran = NULL;
-	int err;
+	scsi_hba_tran_t *hba_tran;
+	int rval;
 
 	hba_tran = scsi_hba_tran_alloc(softs->devinfo_p, SCSI_HBA_CANSLEEP);
 	if (hba_tran == NULL)
@@ -3819,9 +3806,9 @@ aac_hba_setup(struct aac_softstate *softs)
 	hba_tran->tran_dmafree = aac_tran_dmafree;
 	hba_tran->tran_quiesce = aac_tran_quiesce;
 	hba_tran->tran_unquiesce = aac_tran_unquiesce;
-	err = scsi_hba_attach_setup(softs->devinfo_p, &softs->buf_dma_attr,
-		hba_tran, SCSI_HBA_TRAN_CLONE);
-	if (err != DDI_SUCCESS) {
+	rval = scsi_hba_attach_setup(softs->devinfo_p, &softs->buf_dma_attr,
+	    hba_tran, SCSI_HBA_TRAN_CLONE);
+	if (rval != DDI_SUCCESS) {
 		scsi_hba_tran_free(hba_tran);
 		AACDB_PRINT((CE_WARN, "aac_hba_setup failed"));
 		return (AACERR);
@@ -3831,7 +3818,7 @@ aac_hba_setup(struct aac_softstate *softs)
 }
 
 static size_t
-aac_cmd_fib(struct aac_softstate *softs, struct aac_cmd *ac)
+aac_cmd_fib(struct aac_softstate *softs, struct aac_cmd *acp)
 {
 	int count, sgelem;
 	off_t off;
@@ -3848,25 +3835,25 @@ aac_cmd_fib(struct aac_softstate *softs, struct aac_cmd *ac)
 	struct aac_fib *fibp;
 	uint16_t *seccountp, *fib_datasizep;
 
-	fibp = &ac->fib;
-	pkt = ac->pkt;
+	fibp = &acp->fib;
+	pkt = acp->pkt;
 	ap = &pkt->pkt_address;
-	dma_handle = ac->buf_dma_handle;
-	cookiep = &ac->cookie;
-	cookien = ac->left_cookien;
+	dma_handle = acp->buf_dma_handle;
+	cookiep = &acp->cookie;
+	cookien = acp->left_cookien;
 
-	if (cookien == 0 && ac->total_nwin == 1)
+	if (cookien == 0 && acp->total_nwin == 1)
 		return (0); /* nothing to be transfered */
 	/* Fill in fib header */
 	fibp->Header.XferState =
-		AAC_FIBSTATE_HOSTOWNED |
-		AAC_FIBSTATE_INITIALISED |
-		AAC_FIBSTATE_EMPTY |
-		AAC_FIBSTATE_FROMHOST |
-		AAC_FIBSTATE_REXPECTED |
-		AAC_FIBSTATE_NORM |
-		AAC_FIBSTATE_ASYNC |
-		AAC_FIBSTATE_FAST_RESPONSE; /* enable fast io */
+	    AAC_FIBSTATE_HOSTOWNED |
+	    AAC_FIBSTATE_INITIALISED |
+	    AAC_FIBSTATE_EMPTY |
+	    AAC_FIBSTATE_FROMHOST |
+	    AAC_FIBSTATE_REXPECTED |
+	    AAC_FIBSTATE_NORM |
+	    AAC_FIBSTATE_ASYNC |
+	    AAC_FIBSTATE_FAST_RESPONSE; /* enable fast io */
 	fibp->Header.Command = ContainerCommand;
 	fibp->Header.StructType = AAC_FIBTYPE_TFIB;
 	fibp->Header.Flags = 0; /* don't care */
@@ -3883,9 +3870,8 @@ aac_cmd_fib(struct aac_softstate *softs, struct aac_cmd *ac)
 		fibp->Header.Command = RawIo;
 		io = (struct aac_raw_io *)&fibp->data[0];
 		*fib_datasizep += sizeof (struct aac_raw_io);
-		io->ContainerId =
-			AAC_TRAN2SOFTS(ap->a_hba_tran)-> \
-			container[ap->a_target].cid;
+		io->ContainerId = AAC_TRAN2SOFTS(ap->a_hba_tran)-> \
+		    container[ap->a_target].cid;
 		io->BpTotal = 0;
 		io->BpComplete = 0;
 		sgmapraw = &io->SgMapRaw;
@@ -3895,15 +3881,14 @@ aac_cmd_fib(struct aac_softstate *softs, struct aac_cmd *ac)
 	} else if (softs->flags & AAC_FLAGS_SG_64BIT) {
 		fibp->Header.Command = ContainerCommand64;
 		/* Fill in fib data */
-		if (ac->flags & AAC_CMD_BUF_READ) {
+		if (acp->flags & AAC_CMD_BUF_READ) {
 			struct aac_blockread64 *br;
 
 			br = (struct aac_blockread64 *)&fibp->data[0];
 			*fib_datasizep += sizeof (struct aac_blockread64);
 			br->Command = VM_CtHostRead64;
-			br->ContainerId =
-				AAC_TRAN2SOFTS(ap->a_hba_tran)-> \
-				container[ap->a_target].cid;
+			br->ContainerId = AAC_TRAN2SOFTS(ap->a_hba_tran)-> \
+			    container[ap->a_target].cid;
 			br->Pad = 0;
 			br->Flags = 0;
 			sgmap64 = &br->SgMap64;
@@ -3914,9 +3899,8 @@ aac_cmd_fib(struct aac_softstate *softs, struct aac_cmd *ac)
 			bw = (struct aac_blockwrite64 *)&fibp->data[0];
 			*fib_datasizep += sizeof (struct aac_blockwrite64);
 			bw->Command = VM_CtHostWrite64;
-			bw->ContainerId =
-				AAC_TRAN2SOFTS(ap->a_hba_tran)-> \
-				container[ap->a_target].cid;
+			bw->ContainerId = AAC_TRAN2SOFTS(ap->a_hba_tran)-> \
+			    container[ap->a_target].cid;
 			bw->Pad = 0;
 			bw->Flags = 0;
 			sgmap64 = &bw->SgMap64;
@@ -3927,15 +3911,14 @@ aac_cmd_fib(struct aac_softstate *softs, struct aac_cmd *ac)
 	} else {
 		fibp->Header.Command = ContainerCommand;
 		/* Fill in fib data */
-		if (ac->flags & AAC_CMD_BUF_READ) {
+		if (acp->flags & AAC_CMD_BUF_READ) {
 			struct aac_blockread *br;
 
 			br = (struct aac_blockread *)&fibp->data[0];
 			*fib_datasizep += sizeof (struct aac_blockread);
 			br->Command = VM_CtBlockRead;
-			br->ContainerId =
-				AAC_TRAN2SOFTS(ap->a_hba_tran)-> \
-				container[ap->a_target].cid;
+			br->ContainerId = AAC_TRAN2SOFTS(ap->a_hba_tran)-> \
+			    container[ap->a_target].cid;
 			sgmap = &br->SgMap;
 			bytecountp = &br->ByteCount;
 		} else {
@@ -3944,9 +3927,8 @@ aac_cmd_fib(struct aac_softstate *softs, struct aac_cmd *ac)
 			bw = (struct aac_blockwrite *)&fibp->data[0];
 			*fib_datasizep += sizeof (struct aac_blockwrite);
 			bw->Command = VM_CtBlockWrite;
-			bw->ContainerId =
-				AAC_TRAN2SOFTS(ap->a_hba_tran)-> \
-				container[ap->a_target].cid;
+			bw->ContainerId = AAC_TRAN2SOFTS(ap->a_hba_tran)-> \
+			    container[ap->a_target].cid;
 			bw->Stable = CUNSTABLE;
 			sgmap = &bw->SgMap;
 			bytecountp = &bw->ByteCount;
@@ -3957,15 +3939,17 @@ aac_cmd_fib(struct aac_softstate *softs, struct aac_cmd *ac)
 
 	/* Move cookie and window to build s/g map */
 	if (cookien == 0) { /* we need to move window */
-		if ((ac->cur_win + 1) < ac->total_nwin) {
-			int err;
-			ac->cur_win++;
-			err = ddi_dma_getwin(ac->buf_dma_handle, ac->cur_win,
-				&off, &len, cookiep, &cookien);
-			if (err != DDI_SUCCESS)
+		if ((acp->cur_win + 1) < acp->total_nwin) {
+			int rval;
+
+			acp->cur_win++;
+			rval = ddi_dma_getwin(acp->buf_dma_handle, acp->cur_win,
+			    &off, &len, cookiep, &cookien);
+			if (rval != DDI_SUCCESS)
 				return (0);
-		} else
+		} else {
 			return (0);
+		}
 	}
 
 	count = 0;
@@ -3977,25 +3961,25 @@ aac_cmd_fib(struct aac_softstate *softs, struct aac_cmd *ac)
 	 * attribute. So we have to ensure it by ourself.
 	 */
 	while (count < softs->aac_sg_tablesize &&
-		next_total_xfer <= softs->buf_dma_attr.dma_attr_maxxfer) {
+	    next_total_xfer <= softs->buf_dma_attr.dma_attr_maxxfer) {
 		if (softs->flags & AAC_FLAGS_RAW_IO) {
 			sgmapraw->SgEntryRaw[count].SgAddress =
-				cookiep->dmac_laddress;
+			    cookiep->dmac_laddress;
 			sgmapraw->SgEntryRaw[count].SgByteCount =
-				cookiep->dmac_size;
+			    cookiep->dmac_size;
 			sgmapraw->SgEntryRaw[count].Next = 0;
 			sgmapraw->SgEntryRaw[count].Prev = 0;
 			sgmapraw->SgEntryRaw[count].Flags = 0;
 		} else if (softs->flags & AAC_FLAGS_SG_64BIT) {
 			sgmap64->SgEntry64[count].SgAddress =
-				cookiep->dmac_laddress;
+			    cookiep->dmac_laddress;
 			sgmap64->SgEntry64[count].SgByteCount =
-				cookiep->dmac_size;
+			    cookiep->dmac_size;
 		} else {
 			sgmap->SgEntry[count].SgAddress =
-				cookiep->dmac_laddress;
+			    cookiep->dmac_laddress;
 			sgmap->SgEntry[count].SgByteCount =
-				cookiep->dmac_size;
+			    cookiep->dmac_size;
 		}
 
 		count++;
@@ -4009,44 +3993,45 @@ aac_cmd_fib(struct aac_softstate *softs, struct aac_cmd *ac)
 	}
 
 	if ((softs->flags & AAC_FLAGS_SG_64BIT) &&
-		(softs->flags & AAC_FLAGS_RAW_IO) == 0)
+	    (softs->flags & AAC_FLAGS_RAW_IO) == 0)
 		*seccountp = (uint16_t)(cur_total_xfer/AAC_BLK_SIZE);
 	else
 		*bytecountp = cur_total_xfer;
 	*sgcountp = count;
 
-	ac->left_cookien = cookien;
-	ac->total_xfer += cur_total_xfer;
+	acp->left_cookien = cookien;
+	acp->total_xfer += cur_total_xfer;
 	AACDB_PRINT((CE_NOTE, "    blks xfered=%d", cur_total_xfer >> 9));
 
 	/* Calculate fib data size */
 	*fib_datasizep += (count - 1) * sgelem;
 
-	return (ac->total_xfer);
+	return (acp->total_xfer);
 }
 
 static void
 aac_start_io(struct aac_softstate *softs, struct aac_slot *slotp,
-	struct aac_cmd *ac)
+    struct aac_cmd *acp)
 {
-	int status;
+	int rval;
 
 	/* Set ac and pkt */
-	ac->slotp = slotp;
-	ac->fib.Header.ReceiverFibAddress = slotp->fib_phyaddr;
-	ac->fib.Header.SenderFibAddress = slotp->index << 2;
-	bcopy(&ac->fib, slotp->fibp,
-		ac->fib.Header.Size); /* only copy data of needed length */
+	acp->slotp = slotp;
+	acp->fib.Header.ReceiverFibAddress = slotp->fib_phyaddr;
+	acp->fib.Header.SenderFibAddress = slotp->index << 2;
+	bcopy(&acp->fib, slotp->fibp,
+	    acp->fib.Header.Size); /* only copy data of needed length */
 	aac_dma_sync(slotp->fib_dma_handle, 0, 0, DDI_DMA_SYNC_FORDEV);
-	if (ac->pkt) { /* ac from ioctl has no pkt */
-		ac->pkt->pkt_state =
-			STATE_GOT_BUS |
-			STATE_GOT_TARGET |
-			STATE_SENT_CMD;
-		ac->timeout = ac->pkt->pkt_time;
-	} else
-		ac->timeout = AAC_IOCTL_TIMEOUT;
-	ac->start_time = ddi_get_time();
+	if (acp->pkt) { /* ac from ioctl has no pkt */
+		acp->pkt->pkt_state =
+		    STATE_GOT_BUS |
+		    STATE_GOT_TARGET |
+		    STATE_SENT_CMD;
+		acp->timeout = acp->pkt->pkt_time;
+	} else {
+		acp->timeout = AAC_IOCTL_TIMEOUT;
+	}
+	acp->start_time = ddi_get_time();
 
 	/*
 	 * NOTE: Assigning ac to acp should be done after ac has been inited
@@ -4054,29 +4039,29 @@ aac_start_io(struct aac_softstate *softs, struct aac_slot *slotp,
 	 * This way no seperate busy queue and en/de-queue operations are
 	 * needed.
 	 */
-	slotp->acp = ac;
+	slotp->acp = acp;
 
 	if (softs->flags & AAC_FLAGS_NEW_COMM) {
-		status = aac_send_command(softs, slotp);
+		rval = aac_send_command(softs, slotp);
 	} else {
 		/*
 		 * If fib can not be enqueued, the adapter is in an abnormal
 		 * state, there will be no interrupt to us.
 		 */
-		status = aac_fib_enqueue(softs,
-			AAC_ADAP_NORM_CMD_Q, slotp->fibp);
+		rval = aac_fib_enqueue(softs, AAC_ADAP_NORM_CMD_Q,
+		    slotp->fibp);
 	}
 
 	/*
 	 * NOTE: We send command only when slots availabe, so should never
 	 * reach here.
 	 */
-	if (status != AACOK) {
+	if (rval != AACOK) {
 		AACDB_PRINT((CE_NOTE, "SCMD send failed"));
-		aac_release_slot(softs, ac->slotp);
-		ac->slotp = NULL;
-		ac->pkt->pkt_state &= ~STATE_SENT_CMD;
-		aac_hard_callback(softs, ac, CMD_INCOMPLETE);
+		aac_release_slot(softs, acp->slotp);
+		acp->slotp = NULL;
+		acp->pkt->pkt_state &= ~STATE_SENT_CMD;
+		aac_hard_callback(softs, acp, CMD_INCOMPLETE);
 		ddi_trigger_softintr(softs->softint_id);
 	}
 }
@@ -4084,7 +4069,7 @@ aac_start_io(struct aac_softstate *softs, struct aac_slot *slotp,
 static void
 aac_start_waiting_io(struct aac_softstate *softs)
 {
-	struct aac_cmd *ac;
+	struct aac_cmd *acp;
 	struct aac_slot *slotp;
 
 	/* Serve as many waiting io's as possible */
@@ -4093,26 +4078,26 @@ aac_start_waiting_io(struct aac_softstate *softs)
 		 * Sync FIB io is served before async FIB io so that io requests
 		 * sent by interactive userland commands get responded asap.
 		 */
-		if ((ac = aac_cmd_dequeue(&softs->q_wait_sync)) == NULL &&
-			(softs->slot_hold == 1 ||
-			(ac = aac_cmd_dequeue(&softs->q_wait)) == NULL)) {
+		if ((acp = aac_cmd_dequeue(&softs->q_wait_sync)) == NULL &&
+		    (softs->slot_hold == 1 ||
+		    (acp = aac_cmd_dequeue(&softs->q_wait)) == NULL)) {
 			aac_release_slot(softs, slotp);
 			break;
 		}
 
-		aac_start_io(softs, slotp, ac);
+		aac_start_io(softs, slotp, acp);
 	}
 }
 
 static void
 aac_drain_comp_q(struct aac_softstate *softs)
 {
-	struct aac_cmd *ac;
+	struct aac_cmd *acp;
 	struct scsi_pkt *pkt;
 
-	while ((ac = aac_cmd_dequeue(&softs->q_comp)) != NULL) {
-		ASSERT(ac->pkt != NULL);
-		pkt = ac->pkt;
+	while ((acp = aac_cmd_dequeue(&softs->q_comp)) != NULL) {
+		ASSERT(acp->pkt != NULL);
+		pkt = acp->pkt;
 
 		switch (pkt->pkt_reason) {
 		case CMD_TIMEOUT:
@@ -4121,22 +4106,22 @@ aac_drain_comp_q(struct aac_softstate *softs)
 		case CMD_RESET:
 			/* aac support only RESET_ALL */
 			pkt->pkt_statistics |= STAT_BUS_RESET;
-			if (ac->flags & AAC_CMD_TIMEOUT) {
+			if (acp->flags & AAC_CMD_TIMEOUT) {
 				pkt->pkt_statistics |= STAT_TIMEOUT;
 				pkt->pkt_reason = CMD_TIMEOUT;
 			}
 			break;
 		case CMD_ABORTED:
 			pkt->pkt_statistics |= STAT_ABORTED;
-			if (ac->flags & AAC_CMD_TIMEOUT) {
+			if (acp->flags & AAC_CMD_TIMEOUT) {
 				pkt->pkt_statistics |= STAT_TIMEOUT;
 				pkt->pkt_reason = CMD_TIMEOUT;
 			}
 			break;
 		}
 
-		if (ac->pkt->pkt_comp)
-			(*ac->pkt->pkt_comp)(ac->pkt);
+		if (acp->pkt->pkt_comp)
+			(*acp->pkt->pkt_comp)(acp->pkt);
 	}
 }
 
@@ -4149,41 +4134,41 @@ aac_alloc_fib(struct aac_softstate *softs, struct aac_slot *slotp)
 
 	/* Allocate FIB dma resource */
 	if (ddi_dma_alloc_handle(
-		softs->devinfo_p,
-		&softs->addr_dma_attr,
-		DDI_DMA_SLEEP,
-		NULL,
-		&slotp->fib_dma_handle) != DDI_SUCCESS) {
+	    softs->devinfo_p,
+	    &softs->addr_dma_attr,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    &slotp->fib_dma_handle) != DDI_SUCCESS) {
 		AACDB_PRINT((CE_WARN,
-			"Cannot alloc dma handle for slot fib area"));
+		    "Cannot alloc dma handle for slot fib area"));
 		goto error;
 	}
 	if (ddi_dma_mem_alloc(
-		slotp->fib_dma_handle,
-		softs->aac_max_fib_size,
-		&aac_acc_attr,
-		DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-		DDI_DMA_SLEEP,
-		NULL,
-		(caddr_t *)&slotp->fibp,
-		&rlen,
-		&slotp->fib_acc_handle) != DDI_SUCCESS) {
+	    slotp->fib_dma_handle,
+	    softs->aac_max_fib_size,
+	    &aac_acc_attr,
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    (caddr_t *)&slotp->fibp,
+	    &rlen,
+	    &slotp->fib_acc_handle) != DDI_SUCCESS) {
 		AACDB_PRINT((CE_WARN,
-			"Cannot alloc mem for slot fib area"));
+		    "Cannot alloc mem for slot fib area"));
 		goto error;
 	}
 	if (ddi_dma_addr_bind_handle(
-		slotp->fib_dma_handle,
-		NULL,
-		(caddr_t)slotp->fibp,
-		softs->aac_max_fib_size,
-		DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-		DDI_DMA_SLEEP,
-		NULL,
-		&cookie,
-		&cookien) != DDI_DMA_MAPPED) {
+	    slotp->fib_dma_handle,
+	    NULL,
+	    (caddr_t)slotp->fibp,
+	    softs->aac_max_fib_size,
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    &cookie,
+	    &cookien) != DDI_DMA_MAPPED) {
 		AACDB_PRINT((CE_WARN,
-			"dma bind failed for slot fib area"));
+		    "dma bind failed for slot fib area"));
 		goto error;
 	}
 	slotp->fib_phyaddr = cookie.dmac_laddress;
@@ -4218,7 +4203,7 @@ aac_create_slots(struct aac_softstate *softs)
 	int i;
 
 	softs->io_slot = kmem_zalloc(sizeof (struct aac_slot) * \
-		softs->aac_max_fibs, KM_SLEEP);
+	    softs->aac_max_fibs, KM_SLEEP);
 	if (softs->io_slot == NULL) {
 		AACDB_PRINT((CE_WARN, "Cannot allocate slot"));
 		return (AACERR);
@@ -4239,7 +4224,7 @@ aac_destroy_slots(struct aac_softstate *softs)
 	ASSERT(softs->total_fibs == 0);
 
 	kmem_free(softs->io_slot, sizeof (struct aac_slot) * \
-		softs->total_slots);
+	    softs->total_slots);
 	softs->io_slot = NULL;
 	softs->total_slots = 0;
 }
@@ -4296,7 +4281,7 @@ static int
 aac_do_poll_io(struct aac_softstate *softs, struct aac_cmd *acp)
 {
 	struct aac_fib *ac_fibp, *sync_fibp;
-	int ret_val;
+	int rval;
 
 	ASSERT(acp);
 	ASSERT(softs);
@@ -4309,7 +4294,7 @@ aac_do_poll_io(struct aac_softstate *softs, struct aac_cmd *acp)
 	 * new comm. for poll IO.
 	 */
 	if (softs->flags & AAC_FLAGS_NEW_COMM) {
-		ret_val = AACOK;
+		rval = AACOK;
 		ac_fibp->Header.XferState &= ~AAC_FIBSTATE_ASYNC;
 
 		if (aac_do_async_io(softs, acp) != AACOK) {
@@ -4325,14 +4310,14 @@ aac_do_poll_io(struct aac_softstate *softs, struct aac_cmd *acp)
 			while (acp->state == AAC_CMD_INCMPLT)
 				(void) aac_intr_new((caddr_t)softs);
 			if (acp->state == AAC_CMD_ABORT)
-				ret_val = AACERR;
+				rval = AACERR;
 		} else {
 			ac_fibp->Header.XferState &= ~AAC_FIBSTATE_ASYNC;
 			mutex_enter(&softs->event_mutex);
 			while (acp->state == AAC_CMD_INCMPLT)
 				cv_wait(&softs->event, &softs->event_mutex);
 			if (acp->state == AAC_CMD_ABORT)
-				ret_val = AACERR;
+				rval = AACERR;
 			mutex_exit(&softs->event_mutex);
 		}
 	} else {
@@ -4340,34 +4325,34 @@ aac_do_poll_io(struct aac_softstate *softs, struct aac_cmd *acp)
 		/* Only copy data of needed length */
 		bcopy(ac_fibp, sync_fibp, ac_fibp->Header.Size);
 
-		ret_val = aac_sync_fib(softs, ContainerCommand, sync_fibp,
-			ac_fibp->Header.Size);
+		rval = aac_sync_fib(softs, ContainerCommand, sync_fibp,
+		    ac_fibp->Header.Size);
 		aac_release_sync_fib(softs);
 	}
 
-	return (ret_val);
+	return (rval);
 }
 
 /*
- * Io requests have to be queued up in q_wait(_sync) to ensure that
+ * IO requests should be queued up in q_wait(_sync) to ensure that
  * they are executed in order. Out-of-order execution of io requests
  * is not allowed.
  */
 int
-aac_do_async_io(struct aac_softstate *softs, struct aac_cmd *ac)
+aac_do_async_io(struct aac_softstate *softs, struct aac_cmd *acp)
 {
-	int retval = AACOK;
+	int rval = AACOK;
 
-	if (ac->fib.Header.XferState & AAC_FIBSTATE_ASYNC)
+	if (acp->fib.Header.XferState & AAC_FIBSTATE_ASYNC)
 		/* Async FIB io request enters q_wait */
-		aac_cmd_enqueue(&softs->q_wait, ac);
+		aac_cmd_enqueue(&softs->q_wait, acp);
 	else
 		/* Sync FIB io request enters q_wait_sync */
-		aac_cmd_enqueue(&softs->q_wait_sync, ac);
+		aac_cmd_enqueue(&softs->q_wait_sync, acp);
 
 	aac_start_waiting_io(softs);
 
-	return (retval);
+	return (rval);
 }
 
 static void
@@ -4401,7 +4386,7 @@ aac_handle_aif(struct aac_softstate *softs, struct aac_fib *fibp)
 
 	if (fibp->Header.Command != AifRequest) {
 		cmn_err(CE_NOTE, "!Unknown command from controller: 0x%x",
-			fibp->Header.Command);
+		    fibp->Header.Command);
 		return (AACERR);
 	}
 
@@ -4436,8 +4421,8 @@ aac_handle_aif(struct aac_softstate *softs, struct aac_fib *fibp)
 				softs->devcfg_wait_on = AifEnConfigChange;
 			break;
 		case AifEnContainerEvent:
-			if (aif->data.EN.data.ECE.eventType == \
-				CT_PUP_MISSING_DRIVE)
+			if (aif->data.EN.data.ECE.eventType ==
+			    CT_PUP_MISSING_DRIVE)
 				devcfg_needed = 1;
 			break;
 		}
@@ -4448,18 +4433,18 @@ aac_handle_aif(struct aac_softstate *softs, struct aac_fib *fibp)
 	case AifCmdJobProgress:
 		if (aif->data.PR[0].jd.type == AifJobCtrZero) {
 			if ((aif->data.PR[0].currentTick ==
-				aif->data.PR[0].finalTick) ||
-				(aif->data.PR[0].status == AifJobStsSuccess))
+			    aif->data.PR[0].finalTick) ||
+			    (aif->data.PR[0].status == AifJobStsSuccess))
 				softs->devcfg_wait_on = AifEnContainerChange;
 			else if ((aif->data.PR[0].currentTick == 0) &&
-				(aif->data.PR[0].status == AifJobStsRunning))
+			    (aif->data.PR[0].status == AifJobStsRunning))
 				softs->devcfg_wait_on = AifEnContainerChange;
 		}
 		break;
 	}
 
 	if (devcfg_needed)
-		aac_rescan_container(softs);
+		aac_rescan_containers(softs);
 
 	/* Copy AIF data to AIF queue */
 	mutex_enter(&softs->aifq_mutex);
@@ -4486,6 +4471,7 @@ aac_handle_aif(struct aac_softstate *softs, struct aac_fib *fibp)
 	cv_broadcast(&softs->aifv);
 	mutex_exit(&softs->aifq_mutex);
 
+	/* Complete AIF back to adapter with good status */
 	if (fibp->Header.XferState & AAC_FIBSTATE_FROMADAP) {
 		fibp->Header.XferState |= AAC_FIBSTATE_DONEHOST;
 		((int *)fibp->data)[0] = 0; /* ST_OK */
@@ -4496,7 +4482,7 @@ aac_handle_aif(struct aac_softstate *softs, struct aac_fib *fibp)
 }
 
 static void
-aac_daemon(void* arg)
+aac_daemon(void *arg)
 {
 	int i;
 	uint32_t t_flag;
@@ -4537,8 +4523,8 @@ aac_daemon(void* arg)
 
 		acp->flags |= AAC_CMD_TIMEOUT;
 		AACDB_PRINT((CE_NOTE, "timeout=%d,startime=%d;curtime=%d",
-			(uint32_t)acp->timeout,	(uint32_t)acp->start_time,
-			curtime));
+		    (uint32_t)acp->timeout, (uint32_t)acp->start_time,
+		    curtime));
 
 		mutex_exit(&softs->slot_mutex);
 		softs->timeout_count++;
@@ -4560,9 +4546,9 @@ aac_daemon(void* arg)
 	}
 
 	if ((softs->timeout_id != 0) &&
-		(softs->state != AAC_STATE_STOPPED))
+	    (softs->state != AAC_STATE_STOPPED))
 		softs->timeout_id = timeout(aac_daemon, (void*)softs,
-			(60 * drv_usectohz(1000000)));
+		    (60 * drv_usectohz(1000000)));
 }
 
 /*
@@ -4582,7 +4568,7 @@ aac_rx_get_mailbox(struct aac_softstate *softs, int mb)
 
 static void
 aac_rx_set_mailbox(struct aac_softstate *softs, uint32_t cmd,
-	uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3)
+    uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3)
 {
 	PCI_MEM_PUT32(softs, AAC_RX_MAILBOX, cmd);
 	PCI_MEM_PUT32(softs, AAC_RX_MAILBOX + 4, arg0);
@@ -4605,7 +4591,7 @@ aac_rkt_get_mailbox(struct aac_softstate *softs, int mb)
 
 static void
 aac_rkt_set_mailbox(struct aac_softstate *softs, uint32_t cmd,
-	uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3)
+    uint32_t arg0, uint32_t arg1, uint32_t arg2, uint32_t arg3)
 {
 	PCI_MEM_PUT32(softs, AAC_RKT_MAILBOX, cmd);
 	PCI_MEM_PUT32(softs, AAC_RKT_MAILBOX + 4, arg0);
@@ -4672,8 +4658,8 @@ aac_close(dev_t dev, int flag, int otyp, cred_t *cred)
 }
 
 static int
-aac_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
-	cred_t *cred_p, int *rval_p)
+aac_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
+    int *rval_p)
 {
 	struct aac_softstate *softs;
 	int minor0, minor;
@@ -4951,7 +4937,7 @@ aac_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 	CT_CHECK_CONFLICT_UID, "CT_CHECK_CONFLICT_UID", \
 	CT_CONTAINER_UID_CHECK, "CT_CONTAINER_UID_CHECK", \
 	CT_IS_CONTAINER_MEATADATA_STANDARD, \
-		"CT_IS_CONTAINER_MEATADATA_STANDARD", \
+	    "CT_IS_CONTAINER_MEATADATA_STANDARD", \
 	CT_IS_SLICE_METADATA_STANDARD, "CT_IS_SLICE_METADATA_STANDARD", \
 	CT_GET_IMPORT_COUNT, "CT_GET_IMPORT_COUNT", \
 	CT_CANCEL_ALL_IMPORTS, "CT_CANCEL_ALL_IMPORTS", \
@@ -5166,45 +5152,44 @@ aac_print_scmd(struct scsi_pkt *pkt)
 	int lun = ap->a_lun;
 	union scsi_cdb *cdbp = (union scsi_cdb *)pkt->pkt_cdbp;
 	uchar_t cmd = cdbp->scc_cmd;
-	struct aac_cmd *ac = PKT2AC(pkt);
+	struct aac_cmd *acp = PKT2AC(pkt);
 	char *desc;
 
 	if ((desc = aac_cmd_name(cmd,
-		(struct aac_key_strings *)scsi_cmds)) == NULL) {
+	    (struct aac_key_strings *)scsi_cmds)) == NULL) {
 		cmn_err(CE_NOTE, "SCMD> Unknown(0x%2x) to t%dL%d",
-			cmd, tgt, lun);
+		    cmd, tgt, lun);
 		return;
 	}
 
 	switch (cmd) {
 	case SCMD_READ:
 	case SCMD_WRITE:
-		cmn_err(CE_NOTE, "SCMD> %s t%dL%d 0x%x %s",
-			desc, tgt, lun,	GETG0ADDR(cdbp),
-			((ac->flags & AAC_CMD_NO_INTR) ||
-			(ac->flags & AAC_CMD_SOFT_INTR)) ?
-				"poll" : "intr");
+		cmn_err(CE_NOTE,
+		    "SCMD> %s t%dL%d 0x%x %s",
+		    desc, tgt, lun, GETG0ADDR(cdbp),
+		    ((acp->flags & AAC_CMD_NO_INTR) ||
+		    (acp->flags & AAC_CMD_SOFT_INTR)) ? "poll" : "intr");
 		break;
 	case SCMD_READ_G1:
 	case SCMD_WRITE_G1:
-		cmn_err(CE_NOTE, "SCMD> %s t%dL%d 0x%x %s",
-			desc, tgt, lun, GETG1ADDR(cdbp),
-			((ac->flags & AAC_CMD_NO_INTR) ||
-			(ac->flags & AAC_CMD_SOFT_INTR)) ?
-				"poll" : "intr");
+		cmn_err(CE_NOTE,
+		    "SCMD> %s t%dL%d 0x%x %s",
+		    desc, tgt, lun, GETG1ADDR(cdbp),
+		    ((acp->flags & AAC_CMD_NO_INTR) ||
+		    (acp->flags & AAC_CMD_SOFT_INTR)) ? "poll" : "intr");
 		break;
 	case SCMD_READ_G4:
 	case SCMD_WRITE_G4:
-		cmn_err(CE_NOTE, "SCMD> %s t%dL%d 0x%x.%08x %s",
-			desc, tgt, lun,
-			GETG4ADDR(cdbp), GETG4ADDRTL(cdbp),
-			((ac->flags & AAC_CMD_NO_INTR) ||
-			(ac->flags & AAC_CMD_SOFT_INTR)) ?
-				"poll" : "intr");
+		cmn_err(CE_NOTE,
+		    "SCMD> %s t%dL%d 0x%x.%08x %s",
+		    desc, tgt, lun, GETG4ADDR(cdbp), GETG4ADDRTL(cdbp),
+		    ((acp->flags & AAC_CMD_NO_INTR) ||
+		    (acp->flags & AAC_CMD_SOFT_INTR)) ? "poll" : "intr");
 		break;
 	default:
 		cmn_err(CE_NOTE, "SCMD> %s t%dL%d",
-			desc, tgt, lun);
+		    desc, tgt, lun);
 	}
 }
 
@@ -5239,10 +5224,10 @@ aac_print_fib(struct aac_fib *fibp)
 			if (subcmdstr == NULL)
 				break;
 			cmn_err(CE_NOTE, "FIB> %s (0x%x, 0x%x, 0x%x)",
-				subcmdstr,
-				pContainer->CTCommand.param[0],
-				pContainer->CTCommand.param[1],
-				pContainer->CTCommand.param[2]);
+			    subcmdstr,
+			    pContainer->CTCommand.param[0],
+			    pContainer->CTCommand.param[1],
+			    pContainer->CTCommand.param[2]);
 			return;
 		case VM_Ioctl:
 			sub_cmd = ((int32_t *)pContainer)[4];
@@ -5267,16 +5252,16 @@ aac_print_fib(struct aac_fib *fibp)
 
 	if (subcmdstr)
 		cmn_err(CE_NOTE, "FIB> %s, sz=%d", subcmdstr,
-			fibp->Header.Size);
+		    fibp->Header.Size);
 	else if (cmdstr && sub_cmd == -1)
 		cmn_err(CE_NOTE, "FIB> %s, sz=%d", cmdstr,
-			fibp->Header.Size);
+		    fibp->Header.Size);
 	else if (cmdstr)
 		cmn_err(CE_NOTE, "FIB> %s: Unknown(0x%x), sz=%d", cmdstr,
-			sub_cmd, fibp->Header.Size);
+		    sub_cmd, fibp->Header.Size);
 	else
 		cmn_err(CE_NOTE, "FIB> Unknown(0x%x), sz=%d", fib_cmd,
-			fibp->Header.Size);
+		    fibp->Header.Size);
 }
 
 static void
@@ -5291,7 +5276,7 @@ aac_print_aif(struct aac_aif_command *aif)
 			cmn_err(CE_NOTE, "AIF! %s", str);
 		else
 			cmn_err(CE_NOTE, "AIF! Unknown(0x%x)",
-				aif->data.EN.type);
+			    aif->data.EN.type);
 		break;
 
 	case AifCmdJobProgress:
@@ -5312,9 +5297,9 @@ aac_print_aif(struct aac_aif_command *aif)
 			str = "unknown"; break;
 		}
 		cmn_err(CE_NOTE, "AIF! JobProgress (%d) - %s (%d, %d)",
-			aif->seqNumber, str,
-			aif->data.PR[0].currentTick,
-			aif->data.PR[0].finalTick);
+		    aif->seqNumber, str,
+		    aif->data.PR[0].currentTick,
+		    aif->data.PR[0].finalTick);
 		break;
 
 	case AifCmdAPIReport:
@@ -5327,7 +5312,7 @@ aac_print_aif(struct aac_aif_command *aif)
 
 	default:
 		cmn_err(CE_NOTE,
-			"AIF! AIF %d (%d)", aif->command, aif->seqNumber);
+		    "AIF! AIF %d (%d)", aif->command, aif->seqNumber);
 		break;
 	}
 }

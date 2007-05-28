@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,38 +114,7 @@ struct aac_delete_disk {
 
 /*
  * The following definitions come from Adaptec:
- *
- * SRB is required for the new management tools
  */
-#define	SRB_DataIn	0x0040
-#define	SRB_DataOut	0x0080
-struct aac_srb
-{
-	int32_t function;
-	int32_t channel;
-	int32_t id;
-	int32_t lun;
-	int32_t timeout;
-	int32_t flags;
-	int32_t count;	/* Data xfer size */
-	int32_t retry_limit;
-	int32_t cdb_size;
-	int8_t cdb[16];
-	struct aac_sg_table sg;
-};
-
-#define		AAC_SENSE_BUFFERSIZE	 30
-struct aac_srb_reply
-{
-	int32_t	status;
-	int32_t srb_status;
-	int32_t scsi_status;
-	int32_t data_xfer_length;
-	int32_t sense_data_size;
-	int8_t sense_data[AAC_SENSE_BUFFERSIZE];    /* Can this be */
-						    /* SCSI_SENSE_BUFFERSIZE */
-};
-
 typedef union {
 	struct {
 		uint32_t largeLBA  : 1;	/* disk support greater 2TB */
