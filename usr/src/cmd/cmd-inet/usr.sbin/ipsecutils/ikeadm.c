@@ -2843,7 +2843,7 @@ do_rbdump()
 
 /*ARGSUSED*/
 static void
-parseit(int argc, char **argv, char *notused)
+parseit(int argc, char **argv, char *notused, boolean_t notused_either)
 {
 	int	cmd, cmd_obj_args = 1;
 	char	*cmdstr, *objstr;
@@ -2995,7 +2995,7 @@ main(int argc, char **argv)
 		do_interactive(stdin, NULL, "ikeadm> ", NULL, parseit);
 	}
 
-	parseit(argc, argv, NULL);
+	parseit(argc, argv, NULL, B_FALSE);
 
 	return (0);
 }

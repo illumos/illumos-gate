@@ -559,7 +559,7 @@ do_interactive(FILE *infile, char *configfile, char *promptstring,
 			if (thisargc != 0) {
 				lines_parsed++;
 				/* ebuf consumed */
-				parseit(thisargc, thisargv, ebuf);
+				parseit(thisargc, thisargv, ebuf, readfile);
 			} else {
 				free(ebuf);
 			}
@@ -572,46 +572,57 @@ do_interactive(FILE *infile, char *configfile, char *promptstring,
 		}
 		bzero(ibuf, IBUF_SIZE);
 	}
-	if (!readfile) {
+
+	/*
+	 * The following code is ipseckey specific. This should never be
+	 * used by ikeadm which also calls this function because ikeadm
+	 * only runs interactively. If this ever changes this code block
+	 * sould be revisited.
+	 */
+	if (readfile) {
+		if (lines_parsed != 0 && lines_added == 0) {
+			ipsecutil_exit(SERVICE_BADCONF, my_fmri, debugfile,
+			    dgettext(TEXT_DOMAIN, "Configuration file did not "
+			    "contain any valid SAs"));
+		}
+
+		/*
+		 * There were errors. Putting the service in maintenance mode.
+		 * When svc.startd(1M) allows services to degrade themselves,
+		 * this should be revisited.
+		 *
+		 * If this function was called from a program running as a
+		 * smf_method(5), print a warning message. Don't spew out the
+		 * errors as these will end up in the smf(5) log file which is
+		 * publically readable, the errors may contain sensitive
+		 * information.
+		 */
+		if ((lines_added < lines_parsed) && (configfile != NULL)) {
+			if (my_fmri != NULL) {
+				ipsecutil_exit(SERVICE_BADCONF, my_fmri,
+				    debugfile, dgettext(TEXT_DOMAIN,
+				    "The configuration file contained %d "
+				    "errors.\n"
+				    "Manually check the configuration with:\n"
+				    "ipseckey -c %s\n"
+				    "Use svcadm(1M) to clear maintenance "
+				    "condition when errors are resolved.\n"),
+				    lines_parsed - lines_added, configfile);
+			} else {
+				EXIT_BADCONFIG(NULL);
+			}
+		} else {
+			if (my_fmri != NULL)
+				ipsecutil_exit(SERVICE_EXIT_OK, my_fmri,
+				    debugfile, dgettext(TEXT_DOMAIN,
+				    "%d actions successfully processed."),
+				    lines_added);
+		}
+	} else {
 		(void) putchar('\n');
 		(void) fflush(stdout);
 	}
-	if (lines_added == 0)
-		ipsecutil_exit(SERVICE_BADCONF, my_fmri, debugfile,
-		    dgettext(TEXT_DOMAIN, "Configuration file did not "
-		    "contain any valid SAs"));
-
-	/*
-	 * There were some errors. Putting the service in maintenance mode.
-	 * When svc.startd(1M) allows services to degrade themselves,
-	 * this should be revisited.
-	 *
-	 * If this function was called from a program running as a
-	 * smf_method(5), print a warning message. Don't spew out the
-	 * errors as these will end up in the smf(5) log file which is
-	 * publically readable, the errors may contain sensitive information.
-	 */
-	if ((lines_added < lines_parsed) && (configfile != NULL)) {
-		if (my_fmri != NULL) {
-			ipsecutil_exit(SERVICE_BADCONF, my_fmri, debugfile,
-			dgettext(TEXT_DOMAIN,
-			    "The configuration file contained %d errors.\n"
-			    "Manually check the configuration with:\n"
-			    "ipseckey -c %s\n"
-			    "Use svcadm(1M) to clear maintenance condition "
-			    "when errors are resolved.\n"),
-			    lines_parsed - lines_added, configfile);
-		} else {
-			EXIT_BADCONFIG(NULL);
-		}
-	} else {
-		if (my_fmri != NULL)
-			ipsecutil_exit(SERVICE_EXIT_OK, my_fmri, debugfile,
-			    dgettext(TEXT_DOMAIN,
-			    "%d SA's successfullly added."), lines_added);
-	}
 	EXIT_OK(NULL);
-	exit(0);
 }
 
 /*
@@ -1556,7 +1567,7 @@ print_lifetimes(time_t wallclock, struct sadb_lifetime *current,
 	if (hard != NULL &&
 	    hard->sadb_lifetime_len != SADB_8TO64(sizeof (*hard))) {
 		warnx(dgettext(TEXT_DOMAIN, "WARNING: HARD lifetime "
-			"extension length (%u) is bad."),
+		    "extension length (%u) is bad."),
 		    SADB_64TO8(hard->sadb_lifetime_len));
 	}
 
@@ -1610,12 +1621,12 @@ print_lifetimes(time_t wallclock, struct sadb_lifetime *current,
 				    "%s%llu more bytes can be protected.\n"),
 				    soft_prefix,
 				    (soft->sadb_lifetime_bytes >
-					current->sadb_lifetime_bytes) ?
+				    current->sadb_lifetime_bytes) ?
 				    (soft->sadb_lifetime_bytes -
-					current->sadb_lifetime_bytes) : (0));
+				    current->sadb_lifetime_bytes) : (0));
 			if (soft->sadb_lifetime_addtime != 0 ||
 			    (soft->sadb_lifetime_usetime != 0 &&
-				current->sadb_lifetime_usetime != 0)) {
+			    current->sadb_lifetime_usetime != 0)) {
 				int64_t adddelta, usedelta;
 
 				if (soft->sadb_lifetime_addtime != 0) {
@@ -1672,12 +1683,12 @@ print_lifetimes(time_t wallclock, struct sadb_lifetime *current,
 				    "%s%llu more bytes can be protected.\n"),
 				    hard_prefix,
 				    (hard->sadb_lifetime_bytes >
-					current->sadb_lifetime_bytes) ?
+				    current->sadb_lifetime_bytes) ?
 				    (hard->sadb_lifetime_bytes -
-					current->sadb_lifetime_bytes) : (0));
+				    current->sadb_lifetime_bytes) : (0));
 			if (hard->sadb_lifetime_addtime != 0 ||
 			    (hard->sadb_lifetime_usetime != 0 &&
-				current->sadb_lifetime_usetime != 0)) {
+			    current->sadb_lifetime_usetime != 0)) {
 				int64_t adddelta, usedelta;
 
 				if (hard->sadb_lifetime_addtime != 0) {
@@ -2208,7 +2219,7 @@ print_samsg(uint64_t *buffer, boolean_t want_timestamp, boolean_t vflag)
 
 	if (current - buffer != samsg->sadb_msg_len) {
 		warnx(dgettext(TEXT_DOMAIN, "WARNING: insufficient buffer "
-			"space or corrupt message."));
+		    "space or corrupt message."));
 	}
 
 	(void) fflush(stdout);	/* Make sure our message is out there. */
@@ -2318,7 +2329,7 @@ save_address(struct sadb_address *addr, FILE *ofile)
 		return (B_FALSE);
 	if (addr->sadb_address_prefixlen != 0 &&
 	    !((addr->sadb_address_prefixlen == 32 && af == AF_INET) ||
-		(addr->sadb_address_prefixlen == 128 && af == AF_INET6))) {
+	    (addr->sadb_address_prefixlen == 128 && af == AF_INET6))) {
 		if (fprintf(ofile, "/%d", addr->sadb_address_prefixlen) < 0)
 			return (B_FALSE);
 	}
@@ -2443,7 +2454,7 @@ save_assoc(uint64_t *buffer, FILE *ofile)
 			if (assoc->sadb_sa_encrypt != SADB_EALG_NONE) {
 				if (fprintf(ofile, "encr_alg %s ",
 				    rparsealg(assoc->sadb_sa_encrypt,
-					IPSEC_PROTO_ESP)) < 0) {
+				    IPSEC_PROTO_ESP)) < 0) {
 					tidyup();
 					bail(dgettext(TEXT_DOMAIN,
 					    "save_assoc: fprintf encrypt"));
@@ -2452,7 +2463,7 @@ save_assoc(uint64_t *buffer, FILE *ofile)
 			if (assoc->sadb_sa_auth != SADB_AALG_NONE) {
 				if (fprintf(ofile, "auth_alg %s ",
 				    rparsealg(assoc->sadb_sa_auth,
-					IPSEC_PROTO_AH)) < 0) {
+				    IPSEC_PROTO_AH)) < 0) {
 					tidyup();
 					bail(dgettext(TEXT_DOMAIN,
 					    "save_assoc: fprintf auth"));

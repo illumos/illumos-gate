@@ -146,7 +146,7 @@ extern boolean_t dump_sadb_idtype(uint8_t, FILE *, int *);
  */
 
 /* callback function passed in to do_interactive() */
-typedef void (*parse_cmdln_fn)(int, char **, char *);
+typedef void (*parse_cmdln_fn)(int, char **, char *, boolean_t);
 
 extern void do_interactive(FILE *, char *, char *, char *, parse_cmdln_fn);
 

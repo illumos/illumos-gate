@@ -885,7 +885,7 @@ time_critical_catch(int signal)
 		errx(1, gettext("Reply message from PF_KEY timed out."));
 	} else {
 		errx(1, gettext("Caught signal %d while trying to receive"
-			"PF_KEY reply message"), signal);
+		    "PF_KEY reply message"), signal);
 	}
 	/* errx() calls exit. */
 }
@@ -1455,7 +1455,7 @@ doaddresses(uint8_t sadb_msg_type, uint8_t sadb_msg_satype, int cmd,
 				    ntohl(spi));
 				ERROR2(ep, ebuf, "%s %s.\n",
 				    do_inet_ntop(dsthp->h_addr_list[i],
-					addrprint, sizeof (addrprint)),
+				    addrprint, sizeof (addrprint)),
 				    on_errno_msg);
 				msgp = (struct sadb_msg *)savebuf;
 				bcopy(savebuf, buffer,
@@ -2214,7 +2214,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 			if (dstid != NULL) {
 				ERROR(ep, ebuf, gettext(
 				    "Can only specify single destination "
-					"certificate identity.\n"));
+				    "certificate identity.\n"));
 				break;
 			}
 			alloclen = sizeof (*dstid) +
@@ -2431,7 +2431,7 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 			    "the association you wish to %s.\n"), thiscmd);
 		}
 		if (assoc->sadb_sa_auth == 0 && assoc->sadb_sa_encrypt == 0 &&
-			cmd == CMD_ADD) {
+		    cmd == CMD_ADD) {
 			free(assoc);
 			FATAL(ep, ebuf, gettext(
 			    "Select at least one algorithm "
@@ -2614,24 +2614,31 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 		nexthdr += idst->sadb_address_len;
 	}
 
-	if (!cflag) {
+	if (cflag) {
+		/*
+		 * Assume the checked cmd would have worked if it was actually
+		 * used. doaddresses() will increment lines_added if it
+		 * succeeds.
+		 */
+		lines_added++;
+	} else {
 		doaddresses((cmd == CMD_ADD) ? SADB_ADD : SADB_UPDATE, satype,
 		    cmd, srchp, dsthp, src, dst, unspec_src, buffer, totallen,
 		    spi, ebuf);
 	}
 
 	if (isrchp != NULL && isrchp != &dummy.he)
-	    freehostent(isrchp);
+		freehostent(isrchp);
 	if (idsthp != NULL && idsthp != &dummy.he)
-	    freehostent(idsthp);
+		freehostent(idsthp);
 	if (srchp != NULL && srchp != &dummy.he)
-	    freehostent(srchp);
+		freehostent(srchp);
 	if (dsthp != NULL && dsthp != &dummy.he)
-	    freehostent(dsthp);
+		freehostent(dsthp);
 	if (natt_lhp != NULL && natt_lhp != &dummy.he)
-	    freehostent(natt_lhp);
+		freehostent(natt_lhp);
 	if (natt_rhp != NULL && natt_rhp != &dummy.he)
-	    freehostent(natt_rhp);
+		freehostent(natt_rhp);
 
 	free(ebuf);
 	free(buffer);
@@ -2829,7 +2836,14 @@ dodelget(int cmd, int satype, char *argv[], char *ebuf)
 		    "Need SA parameters for %s.\n"), thiscmd);
 	}
 
-	if (!cflag) {
+	if (cflag) {
+		/*
+		 * Assume the checked cmd would have worked if it was actually
+		 * used. doaddresses() will increment lines_added if it
+		 * succeeds.
+		 */
+		lines_added++;
+	} else {
 		doaddresses((cmd == CMD_GET) ? SADB_GET : SADB_DELETE, satype,
 		    cmd, srchp, dsthp, src, dst, unspec_src, get_buffer,
 		    sizeof (get_buffer), spi, NULL);
@@ -3020,7 +3034,7 @@ dohelp(char *cmds)
  * "Parse" a command line from argv.
  */
 static void
-parseit(int argc, char *argv[], char *ebuf)
+parseit(int argc, char *argv[], char *ebuf, boolean_t read_cmdfile)
 {
 	int cmd, satype;
 	char *ep = NULL;
@@ -3029,19 +3043,38 @@ parseit(int argc, char *argv[], char *ebuf)
 		return;
 	cmd = parsecmd(*argv++);
 
+	/*
+	 * Some commands loop forever and should only be run from the command
+	 * line, they should never be run from a command file as this may
+	 * be used at boot time.
+	 */
 	switch (cmd) {
 	case CMD_HELP:
-		dohelp(*argv);
+		if (read_cmdfile)
+			ERROR(ep, ebuf, gettext("Help not appropriate in "
+			    "config file."));
+		else
+			dohelp(*argv);
 		return;
 	case CMD_MONITOR:
-		domonitor(B_FALSE);
+		if (read_cmdfile)
+			ERROR(ep, ebuf, gettext("Monitor not appropriate in "
+			    "config file."));
+		else
+			domonitor(B_FALSE);
 		break;
 	case CMD_PMONITOR:
-		domonitor(B_TRUE);
+		if (read_cmdfile)
+			ERROR(ep, ebuf, gettext("Monitor not appropriate in "
+			    "config file."));
+		else
+			domonitor(B_TRUE);
 		break;
 	case CMD_QUIT:
 		EXIT_OK(NULL);
 	}
+
+	handle_errors(ep, ebuf, B_FALSE, B_FALSE);
 
 	satype = parsesatype(*argv, ebuf);
 
@@ -3064,7 +3097,14 @@ parseit(int argc, char *argv[], char *ebuf)
 
 	switch (cmd) {
 	case CMD_FLUSH:
-		doflush(satype);
+		if (!cflag)
+			doflush(satype);
+		/*
+		 * If this was called because of an entry in a cmd file
+		 * then this action needs to be counted to prevent
+		 * do_interactive() treating this as an error.
+		 */
+		lines_added++;
 		break;
 	case CMD_ADD:
 	case CMD_UPDATE:
@@ -3095,18 +3135,28 @@ parseit(int argc, char *argv[], char *ebuf)
 		dodelget(cmd, satype, argv, ebuf);
 		break;
 	case CMD_DUMP:
-		dodump(satype, NULL);
+		if (read_cmdfile)
+			ERROR(ep, ebuf, gettext("Dump not appropriate in "
+			    "config file."));
+		else
+			dodump(satype, NULL);
 		break;
 	case CMD_SAVE:
-		mask_signals(B_FALSE);	/* Mask signals */
-		dodump(satype, opensavefile(argv[0]));
-		mask_signals(B_TRUE);	/* Unmask signals */
+		if (read_cmdfile) {
+			ERROR(ep, ebuf, gettext("Save not appropriate in "
+			    "config file."));
+		} else {
+			mask_signals(B_FALSE);	/* Mask signals */
+			dodump(satype, opensavefile(argv[0]));
+			mask_signals(B_TRUE);	/* Unmask signals */
+		}
 		break;
 	default:
 		warnx(gettext("Unknown command (%s).\n"),
 		    *(argv - ((satype == SADB_SATYPE_UNSPEC) ? 1 : 2)));
 		usage();
 	}
+	handle_errors(ep, ebuf, B_FALSE, B_FALSE);
 }
 
 int
@@ -3210,7 +3260,7 @@ main(int argc, char *argv[])
 		do_interactive(infile, configfile, "ipseckey> ", my_fmri,
 		    parseit);
 	}
-	parseit(argc, argv, NULL);
+	parseit(argc, argv, NULL, B_FALSE);
 
 	return (0);
 }
