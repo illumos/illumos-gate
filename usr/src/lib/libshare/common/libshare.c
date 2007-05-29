@@ -974,11 +974,23 @@ sa_get_group(sa_handle_t handle, char *groupname)
 	if (impl_handle != NULL && impl_handle->tree != NULL) {
 		if (groupname != NULL) {
 			group = strdup(groupname);
-			subgroup = strchr(group, '/');
-			if (subgroup != NULL)
-				*subgroup++ = '\0';
+			if (group != NULL) {
+				subgroup = strchr(group, '/');
+				if (subgroup != NULL)
+					*subgroup++ = '\0';
+			}
 		}
-		node = find_group_by_name(impl_handle->tree, (xmlChar *)group);
+		/*
+		 * We want to find the, possibly, named group. If
+		 * group is not NULL, then lookup the name. If it is
+		 * NULL, we only do the find if groupname is also
+		 * NULL. This allows lookup of the "first" group in
+		 * the internal list.
+		 */
+		if (group != NULL || groupname == NULL)
+			node = find_group_by_name(impl_handle->tree,
+			    (xmlChar *)group);
+
 		/* if a subgroup, find it before returning */
 		if (subgroup != NULL && node != NULL)
 			node = find_group_by_name(node, (xmlChar *)subgroup);

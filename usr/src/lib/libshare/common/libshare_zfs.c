@@ -28,6 +28,7 @@
 
 #include <libzfs.h>
 #include <string.h>
+#include <strings.h>
 #include <libshare.h>
 #include "libshare_impl.h"
 #include <libintl.h>
@@ -48,6 +49,7 @@ typedef struct get_all_cbdata {
 	zfs_handle_t	**cb_handles;
 	size_t		cb_alloc;
 	size_t		cb_used;
+	uint_t		cb_types;
 } get_all_cbdata_t;
 
 /*
@@ -80,17 +82,24 @@ void
 sa_zfs_fini(sa_handle_impl_t impl_handle)
 {
 	if (impl_handle->zfs_libhandle != NULL) {
-		libzfs_fini(impl_handle->zfs_libhandle);
-		impl_handle->zfs_libhandle = NULL;
 		if (impl_handle->zfs_list != NULL) {
+			zfs_handle_t **zhp = impl_handle->zfs_list;
+			size_t i;
+
 			/*
-			 * contents of zfs_list were already freed by
-			 * the call to libzfs_fini().
+			 * Contents of zfs_list need to be freed so we
+			 * don't lose ZFS handles.
 			 */
+			for (i = 0; i < impl_handle->zfs_list_count; i++) {
+				zfs_close(zhp[i]);
+			}
 			free(impl_handle->zfs_list);
 			impl_handle->zfs_list = NULL;
 			impl_handle->zfs_list_count = 0;
 		}
+
+		libzfs_fini(impl_handle->zfs_libhandle);
+		impl_handle->zfs_libhandle = NULL;
 	}
 }
 
@@ -100,17 +109,32 @@ sa_zfs_fini(sa_handle_impl_t impl_handle)
  * an interator function called while iterating through the ZFS
  * root. It accumulates into an array of file system handles that can
  * be used to derive info about those file systems.
+ *
+ * Note that as this function is called, we close all zhp handles that
+ * are not going to be places into the cp_handles list. We don't want
+ * to close the ones we are keeping, but all others would be leaked if
+ * not closed here.
  */
 
 static int
 get_one_filesystem(zfs_handle_t *zhp, void *data)
 {
 	get_all_cbdata_t *cbp = data;
+	zfs_type_t type = zfs_get_type(zhp);
 
 	/*
-	 * Skip any zvols
+	 * Interate over any nested datasets.
 	 */
-	if (zfs_get_type(zhp) != ZFS_TYPE_FILESYSTEM) {
+	if (type == ZFS_TYPE_FILESYSTEM &&
+	    zfs_iter_filesystems(zhp, get_one_filesystem, data) != 0) {
+		zfs_close(zhp);
+		return (1);
+	}
+
+	/*
+	 * Skip any datasets whose type does not match.
+	 */
+	if ((type & cbp->cb_types) == 0) {
 		zfs_close(zhp);
 		return (0);
 	}
@@ -123,13 +147,15 @@ get_one_filesystem(zfs_handle_t *zhp, void *data)
 		else
 			cbp->cb_alloc *= 2;
 
-		handles = calloc(1, cbp->cb_alloc * sizeof (void *));
+		handles = (zfs_handle_t **)calloc(1,
+		    cbp->cb_alloc * sizeof (void *));
+
 		if (handles == NULL) {
+			zfs_close(zhp);
 			return (0);
 		}
-
 		if (cbp->cb_handles) {
-			(void) memcpy(handles, cbp->cb_handles,
+			bcopy(cbp->cb_handles, handles,
 			    cbp->cb_used * sizeof (void *));
 			free(cbp->cb_handles);
 		}
@@ -139,7 +165,7 @@ get_one_filesystem(zfs_handle_t *zhp, void *data)
 
 	cbp->cb_handles[cbp->cb_used++] = zhp;
 
-	return (zfs_iter_filesystems(zhp, get_one_filesystem, data));
+	return (0);
 }
 
 /*
@@ -156,6 +182,7 @@ get_all_filesystems(sa_handle_impl_t impl_handle,
 			zfs_handle_t ***fslist, size_t *count)
 {
 	get_all_cbdata_t cb = { 0 };
+	cb.cb_types = ZFS_TYPE_FILESYSTEM;
 
 	if (impl_handle->zfs_list != NULL) {
 		*fslist = impl_handle->zfs_list;
@@ -512,11 +539,11 @@ zfs_notinherited(sa_group_t group, char *mountpoint, char *shareopts)
 				 * put it on the share.
 				 */
 				options = strdup(shareopts);
-				if (options != NULL)
+				if (options != NULL) {
 					err = sa_parse_legacy_options(share,
 					    options, "nfs");
-				if (options != NULL)
 					free(options);
+				}
 			}
 			/* unmark the share's changed state */
 			set_node_attr(share, "changed", NULL);
@@ -644,14 +671,14 @@ sa_get_zfs_shares(sa_handle_t handle, char *groupname)
 						    zfsgroup, dataset);
 						if (group == NULL) {
 							static int err = 0;
-							/*
-							 * there is a problem,
-							 * but we can't do
-							 * anything about it
-							 * at this point so we
-							 * issue a warning an
-							 * move on.
-							 */
+						/*
+						 * there is a problem,
+						 * but we can't do
+						 * anything about it
+						 * at this point so we
+						 * issue a warning an
+						 * move on.
+						 */
 							zfs_grp_error(err);
 							err = 1;
 							continue;

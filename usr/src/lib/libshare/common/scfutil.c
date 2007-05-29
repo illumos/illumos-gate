@@ -72,8 +72,10 @@ sa_scf_fini(scfutilhandle_t *handle)
 		unbind = 1;
 		scf_scope_destroy(handle->scope);
 	    }
+	    if (handle->instance != NULL)
+		scf_instance_destroy(handle->instance);
 	    if (handle->service != NULL)
-		    scf_service_destroy(handle->service);
+		scf_service_destroy(handle->service);
 	    if (handle->pg != NULL)
 		scf_pg_destroy(handle->pg);
 	    if (handle->handle != NULL) {
@@ -112,7 +114,13 @@ sa_scf_init(sa_handle_impl_t ihandle)
 		    handle->scope = scf_scope_create(handle->handle);
 		    handle->service = scf_service_create(handle->handle);
 		    handle->pg = scf_pg_create(handle->handle);
+
+		    /* make sure we have sufficient SMF running */
 		    handle->instance = scf_instance_create(handle->handle);
+		    if (handle->scope == NULL || handle->service == NULL ||
+			handle->pg == NULL || handle->instance == NULL)
+				goto err;
+
 		    if (scf_handle_get_scope(handle->handle,
 					SCF_SCOPE_LOCAL, handle->scope) == 0) {
 			if (scf_scope_get_service(handle->scope,
