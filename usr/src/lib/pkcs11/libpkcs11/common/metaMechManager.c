@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -214,12 +213,13 @@ meta_mechManager_get_mechs(CK_MECHANISM_TYPE *list, CK_ULONG *listsize)
  */
 CK_RV
 meta_mechManager_get_slots(mech_support_info_t  *mech_support_info,
-    boolean_t force_update)
+    boolean_t force_update, CK_MECHANISM_INFO *mech_info)
 {
 	CK_RV rv;
 	boolean_t found;
 	CK_ULONG i, num_slots;
 	unsigned long index, num_found = 0;
+	CK_MECHANISM_INFO info;
 
 	rv = meta_mechManager_update_mech(mech_support_info->mech,
 	    force_update);
@@ -239,6 +239,13 @@ meta_mechManager_get_slots(mech_support_info_t  *mech_support_info,
 		if (!mechlist[index].slots[i].initialized ||
 		    !mechlist[index].slots[i].supported)
 			continue;
+
+		if (mech_info) {
+			info = mechlist[index].slots[i].mechanism_info;
+			if (!(info.flags & mech_info->flags)) {
+				continue;
+			}
+		}
 
 		num_found++;
 		(mech_support_info->supporting_slots)[num_found - 1]
@@ -384,11 +391,11 @@ meta_mechManager_update_slot(CK_ULONG slotnum)
 
 	/* Sort the mechanisms by value. */
 	qsort(slot_mechlist, slot_mechlistsize, sizeof (CK_MECHANISM_TYPE),
-		qsort_mechtypes);
+	    qsort_mechtypes);
 
 	/* Ensure list contains the mechanisms. */
 	rv = meta_mechManager_allocmechs(slot_mechlist, slot_mechlistsize,
-		&index);
+	    &index);
 	if (rv != CKR_OK)
 		goto finish;
 
@@ -459,7 +466,7 @@ update_slotmech(CK_MECHANISM_TYPE mech, CK_ULONG slotnum,
 		mechlist[index].slots[slotnum].initialized = B_TRUE;
 		mechlist[index].slots[slotnum].supported = B_FALSE;
 		bzero(&mechlist[index].slots[slotnum].mechanism_info,
-			sizeof (CK_MECHANISM_INFO));
+		    sizeof (CK_MECHANISM_INFO));
 		goto finish;
 	}
 
@@ -473,7 +480,7 @@ update_slotmech(CK_MECHANISM_TYPE mech, CK_ULONG slotnum,
 		mechlist[index].slots[slotnum].initialized = B_TRUE;
 		mechlist[index].slots[slotnum].supported = B_FALSE;
 		bzero(&mechlist[index].slots[slotnum].mechanism_info,
-			sizeof (CK_MECHANISM_INFO));
+		    sizeof (CK_MECHANISM_INFO));
 	}
 
 finish:
@@ -530,7 +537,7 @@ meta_mechManager_allocmechs(CK_MECHANISM_TYPE *new_mechs,
 			mechinfo_t *new_mechinfos;
 
 			new_mechinfos = calloc(meta_slotManager_get_slotcount(),
-				sizeof (mechinfo_t));
+			    sizeof (mechinfo_t));
 			if (new_mechinfos == NULL) {
 				rv = CKR_HOST_MEMORY;
 				goto finish;
@@ -544,8 +551,8 @@ meta_mechManager_allocmechs(CK_MECHANISM_TYPE *new_mechs,
 				mechlist_t *newmechlist;
 
 				newmechlist = realloc(mechlist,
-					2 * true_mechlist_size *
-					sizeof (mechlist_t));
+				    2 * true_mechlist_size *
+				    sizeof (mechlist_t));
 
 				if (newmechlist == NULL) {
 					rv = CKR_HOST_MEMORY;
@@ -559,7 +566,7 @@ meta_mechManager_allocmechs(CK_MECHANISM_TYPE *new_mechs,
 
 			/* Shift existing entries to make space. */
 			(void) memmove(&mechlist[index+1], &mechlist[index],
-				(num_mechs - index) * sizeof (mechlist_t));
+			    (num_mechs - index) * sizeof (mechlist_t));
 			num_mechs++;
 
 			mechlist[index].type = new_mechs[i];
@@ -638,12 +645,13 @@ qsort_mechtypes(const void *arg1, const void *arg2)
 CK_RV
 meta_mechManager_slot_supports_mech(CK_MECHANISM_TYPE mechanism,
     CK_ULONG slotnum, boolean_t *supports, mechinfo_t **slot_info,
-    boolean_t force_update)
+    boolean_t force_update, CK_MECHANISM_INFO *mech_info)
 {
 
 	boolean_t found;
 	CK_RV rv;
 	unsigned long index;
+	CK_MECHANISM_INFO info;
 
 	*supports = B_FALSE;
 
@@ -660,6 +668,12 @@ meta_mechManager_slot_supports_mech(CK_MECHANISM_TYPE mechanism,
 
 	if ((mechlist[index].slots[slotnum].initialized) &&
 	    (mechlist[index].slots[slotnum].supported)) {
+		if (mech_info) {
+			info = mechlist[index].slots[slotnum].mechanism_info;
+			if (!(info.flags & mech_info->flags)) {
+				goto finish;
+			}
+		}
 		*supports = B_TRUE;
 		if (slot_info) {
 			*slot_info = &(mechlist[index].slots[slotnum]);

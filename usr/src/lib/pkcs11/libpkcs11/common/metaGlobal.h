@@ -23,8 +23,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef _METAGLOBAL_H
-#define	_METAGLOBAL_H
+#ifndef _META_GLOBAL_H
+#define	_META_GLOBAL_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -81,21 +81,9 @@ extern "C" {
 	(!(session_flag & CKF_RW_SESSION))
 
 /*
- * Operation types passed to meta_init_operation() / meta_do_operation()
  * Operation modes passed to meta_do_operation()
- *
- * OP_* and MODE_* must be disjoint (treat as a bitmask), see meta_do_operation
- *
  * MODE_UPDATE_WITHKEY is only used for C_DigestKey.
  */
-#define	OP_UNUSED		0x0000
-#define	OP_ENCRYPT		0x0001
-#define	OP_DECRYPT		0x0002
-#define	OP_DIGEST		0x0004
-#define	OP_SIGN			0x0008
-#define	OP_VERIFY		0x0010
-#define	OP_SIGNRECOVER		0x0020
-#define	OP_VERIFYRECOVER	0x0040
 #define	MODE_SINGLE		0x0100
 #define	MODE_UPDATE		0x0200
 #define	MODE_UPDATE_WITHKEY	0x0400
@@ -301,7 +289,7 @@ typedef struct mechinfo {
  * Part of a meta_session_t, used to track active operations.
  */
 typedef struct opinfo {
-	int type;
+	CK_FLAGS type;
 	slot_session_t *session;
 	mechinfo_t *stats;
 } operation_info_t;
@@ -414,7 +402,7 @@ struct metaobject {
  * C_GetOperationState.
  */
 typedef struct opstate_data {
-	int		op_type;
+	CK_FLAGS	op_type;
 	CK_ULONG	op_slotnum;
 	CK_ULONG	op_state_len;
 } opstate_data_t;
@@ -562,18 +550,18 @@ CK_RV meta_mechManager_initialize();
 void meta_mechManager_finalize();
 CK_RV meta_mechManager_get_mechs(CK_MECHANISM_TYPE *list, CK_ULONG *listsize);
 CK_RV meta_mechManager_get_slots(mech_support_info_t  *mech_support_info,
-    boolean_t force_update);
+    boolean_t force_update, CK_MECHANISM_INFO *mech_info);
 CK_RV meta_mechManager_slot_supports_mech(CK_MECHANISM_TYPE mechanism,
     CK_ULONG slotnum, boolean_t *supports, mechinfo_t **slot_info,
-    boolean_t force_update);
+    boolean_t force_update, CK_MECHANISM_INFO *mech_info);
 
-CK_RV meta_operation_init(int optype, meta_session_t *session,
+CK_RV meta_operation_init(CK_FLAGS optype, meta_session_t *session,
     CK_MECHANISM *pMechanism, meta_object_t *key);
-CK_RV meta_do_operation(int optype, int mode,
+CK_RV meta_do_operation(CK_FLAGS optype, int mode,
     meta_session_t *session, meta_object_t *object,
     CK_BYTE *in, CK_ULONG inLen, CK_BYTE *out, CK_ULONG *outLen);
 
-void meta_operation_cleanup(meta_session_t *session, int optype,
+void meta_operation_cleanup(meta_session_t *session, CK_FLAGS optype,
     boolean_t finished_normally);
 
 CK_RV meta_generate_keys(meta_session_t *session, CK_MECHANISM *pMechanism,
@@ -826,4 +814,4 @@ CK_RV meta_WaitForSlotEvent(CK_FLAGS flags, CK_SLOT_ID_PTR pSlot,
 }
 #endif
 
-#endif /* _METAGLOBAL_H */
+#endif /* _META_GLOBAL_H */

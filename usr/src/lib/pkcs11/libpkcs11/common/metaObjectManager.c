@@ -562,8 +562,8 @@ meta_object_dealloc(meta_object_t *object, boolean_t nukeSourceObj)
 		if (clone == NULL)
 			continue;
 		if (nukeSourceObj || (!object->isToken &&
-			!(object->isFreeToken == FREE_ENABLED &&
-			    get_keystore_slotnum() == slotnum))) {
+		    !(object->isFreeToken == FREE_ENABLED &&
+		    get_keystore_slotnum() == slotnum))) {
 
 			rv = meta_get_slot_session(slotnum, &obj_session,
 			    object->creator_session->session_flags);
@@ -999,10 +999,9 @@ clone_by_create(meta_object_t *object, slot_object_t *new_clone,
 	    object->clone_template_size, &(new_clone->hObject));
 
 	if (free_token_index != -1) {
-			free_token_index = set_template_boolean(
-				CKA_TOKEN, object->clone_template,
-				object->clone_template_size,
-				B_FALSE, &falsevalue);
+			free_token_index = set_template_boolean(CKA_TOKEN,
+			    object->clone_template, object->clone_template_size,
+			    B_FALSE, &falsevalue);
 	}
 
 	if (rv != CKR_OK) {
@@ -1027,6 +1026,9 @@ find_best_match_wrap_mech(wrap_info_t *wrap_info, int num_info,
 	int i;
 	boolean_t src_supports, dst_supports;
 	CK_RV rv;
+	CK_MECHANISM_INFO mech_info;
+
+	mech_info.flags = CKF_WRAP;
 
 	for (i = 0; i < num_info; i++) {
 		src_supports = B_FALSE;
@@ -1034,14 +1036,14 @@ find_best_match_wrap_mech(wrap_info_t *wrap_info, int num_info,
 
 		rv = meta_mechManager_slot_supports_mech(
 		    (wrap_info[i]).mech_type, src_slotnum,
-		    &src_supports, NULL, B_FALSE);
+		    &src_supports, NULL, B_FALSE, &mech_info);
 		if (rv != CKR_OK) {
 			return (rv);
 		}
 
 		rv = meta_mechManager_slot_supports_mech(
 		    (wrap_info[i]).mech_type, dst_slotnum,
-		    &dst_supports, NULL, B_FALSE);
+		    &dst_supports, NULL, B_FALSE, &mech_info);
 		if (rv != CKR_OK) {
 			return (rv);
 		}
@@ -1078,6 +1080,9 @@ get_wrap_mechanism(CK_OBJECT_CLASS obj_class, CK_KEY_TYPE key_type,
 	int i;
 	boolean_t src_supports = B_FALSE, dst_supports = B_FALSE;
 	int first_src_mech, rsa_first_src_mech, first_both_mech;
+	CK_MECHANISM_INFO mech_info;
+
+	mech_info.flags = CKF_WRAP;
 
 	if ((obj_class == CKO_PRIVATE_KEY) && (key_type == CKK_KEA)) {
 		/*
@@ -1096,14 +1101,14 @@ get_wrap_mechanism(CK_OBJECT_CLASS obj_class, CK_KEY_TYPE key_type,
 
 			rv = meta_mechManager_slot_supports_mech(
 			    (special_wrap_info[i]).mech_type, src_slotnum,
-			    &src_supports, NULL, B_FALSE);
+			    &src_supports, NULL, B_FALSE, &mech_info);
 			if (rv != CKR_OK) {
 				goto finish;
 			}
 
 			rv = meta_mechManager_slot_supports_mech(
 			    (special_wrap_info[i]).mech_type, dst_slotnum,
-			    &dst_supports, NULL, B_FALSE);
+			    &dst_supports, NULL, B_FALSE, &mech_info);
 			if (rv != CKR_OK) {
 				goto finish;
 			}
@@ -1625,7 +1630,7 @@ meta_clone_template_setup(meta_object_t *object,
 	for (i = 0; i < num_attributes; i++) {
 		if (!attributes[i].isCloneAttr ||
 		    (attributes[i].attribute.type == CKA_TOKEN &&
-			object->isFreeToken == FREE_DISABLED)) {
+		    object->isFreeToken == FREE_DISABLED)) {
 			continue;
 		}
 		if ((!(attributes[i].hasValueForClone)) &&
@@ -1635,7 +1640,7 @@ meta_clone_template_setup(meta_object_t *object,
 
 		clone_template[c].type = attributes[i].attribute.type;
 		clone_template[c].ulValueLen =
-				attributes[i].attribute.ulValueLen;
+		    attributes[i].attribute.ulValueLen;
 		/* Allocate space to store the attribute value. */
 		clone_template[c].pValue = malloc(clone_template[c].ulValueLen);
 		if (clone_template[c].pValue == NULL) {
@@ -1836,7 +1841,7 @@ meta_freeobject_check(meta_session_t *session, meta_object_t *object,
 	 */
 	if (!metaslot_auto_key_migrate ||
 	    (!object->isToken && !object->isSensitive &&
-		meta_slotManager_get_slotcount() < 2))
+	    meta_slotManager_get_slotcount() < 2))
 		goto failure;
 
 	/*
@@ -1857,8 +1862,7 @@ meta_freeobject_check(meta_session_t *session, meta_object_t *object,
 	 * for supported FreeObject mechs
 	 */
 	} else if (tmpl_len > 0) {
-		if (!get_template_ulong(CKA_KEY_TYPE, tmpl, tmpl_len,
-			&keytype))
+		if (!get_template_ulong(CKA_KEY_TYPE, tmpl, tmpl_len, &keytype))
 			goto failure;
 
 		switch (keytype) {
@@ -1878,7 +1882,7 @@ meta_freeobject_check(meta_session_t *session, meta_object_t *object,
 		goto failure;
 
 	/* Get the slot that support this mech... */
-	if (meta_mechManager_get_slots(info, B_FALSE) != CKR_OK)
+	if (meta_mechManager_get_slots(info, B_FALSE, NULL) != CKR_OK)
 		goto failure;
 
 	/*
@@ -1928,8 +1932,8 @@ meta_freeobject_set(meta_object_t *object, CK_ATTRIBUTE *tmpl,
 	if (!create) {
 		/* Turn off the Sensitive flag */
 		if (object->isSensitive) {
-			if (set_template_boolean(CKA_SENSITIVE, tmpl,
-				tmpl_len, B_TRUE, &falsevalue) == -1)
+			if (set_template_boolean(CKA_SENSITIVE, tmpl, tmpl_len,
+			    B_TRUE, &falsevalue) == -1)
 				goto failure;
 
 			object->isFreeObject = FREE_ENABLED;
@@ -1937,8 +1941,8 @@ meta_freeobject_set(meta_object_t *object, CK_ATTRIBUTE *tmpl,
 
 		/* Turn off the Private flag */
 		if (object->isPrivate) {
-			if (set_template_boolean(CKA_PRIVATE, tmpl,
-				tmpl_len, B_TRUE, &falsevalue) == -1)
+			if (set_template_boolean(CKA_PRIVATE, tmpl, tmpl_len,
+			    B_TRUE, &falsevalue) == -1)
 				goto failure;
 
 			object->isFreeObject = FREE_ENABLED;
@@ -1986,7 +1990,7 @@ meta_freetoken_set(CK_ULONG slot_num, CK_BBOOL *current_value,
 			return (CKR_OK);
 
 		if (set_template_boolean(CKA_TOKEN, tmpl, tmpl_len, B_TRUE,
-			&truevalue) == -1)
+		    &truevalue) == -1)
 			return (CKR_FUNCTION_FAILED);
 
 	} else {
@@ -1995,7 +1999,7 @@ meta_freetoken_set(CK_ULONG slot_num, CK_BBOOL *current_value,
 			return (CKR_OK);
 
 		if (set_template_boolean(CKA_TOKEN, tmpl, tmpl_len, B_TRUE,
-			&falsevalue) == -1)
+		    &falsevalue) == -1)
 			return (CKR_FUNCTION_FAILED);
 
 		*current_value = FALSE;
@@ -2088,7 +2092,7 @@ meta_freeobject_clone(meta_session_t *session, meta_object_t *object)
 		/* Create the new CKA_PRIVATE one */
 		rv = FUNCLIST(slot_session->fw_st_id)->\
 		    C_CopyObject(slot_session->hSession,
-			object->clones[slotnum]->hObject, attr, 1, &new_clone);
+		    object->clones[slotnum]->hObject, attr, 1, &new_clone);
 
 		if (rv == CKR_USER_NOT_LOGGED_IN) {
 			/*
@@ -2117,7 +2121,7 @@ meta_freeobject_clone(meta_session_t *session, meta_object_t *object)
 		/* Remove the old object */
 		rv = FUNCLIST(slot_session->fw_st_id)->	\
 		    C_DestroyObject(slot_session->hSession,
-			object->clones[slotnum]->hObject);
+		    object->clones[slotnum]->hObject);
 		if (rv != CKR_OK) {
 			meta_release_slot_session(slot_session);
 			goto failure;
@@ -2149,7 +2153,7 @@ meta_freeobject_clone(meta_session_t *session, meta_object_t *object)
 		if (rv == CKR_OK) {
 			rv = FUNCLIST(slot_session->fw_st_id)->		\
 			    C_SetAttributeValue(slot_session->hSession,
-				object->clones[slotnum]->hObject, attr, 1);
+			    object->clones[slotnum]->hObject, attr, 1);
 
 			meta_release_slot_session(slot_session);
 		}

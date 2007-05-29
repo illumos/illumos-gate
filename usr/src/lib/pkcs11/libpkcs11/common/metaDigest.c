@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,7 +50,7 @@ meta_DigestInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism)
 	if (rv != CKR_OK)
 		return (rv);
 
-	rv = meta_operation_init(OP_DIGEST, session, pMechanism, NULL);
+	rv = meta_operation_init(CKF_DIGEST, session, pMechanism, NULL);
 
 	REFRELEASE(session);
 
@@ -78,8 +77,8 @@ meta_Digest(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 	if (rv != CKR_OK)
 		return (rv);
 
-	rv = meta_do_operation(OP_DIGEST, MODE_SINGLE, session, NULL,
-		pData, ulDataLen, pDigest, pulDigestLen);
+	rv = meta_do_operation(CKF_DIGEST, MODE_SINGLE, session, NULL,
+	    pData, ulDataLen, pDigest, pulDigestLen);
 
 	REFRELEASE(session);
 
@@ -106,8 +105,8 @@ meta_DigestUpdate(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pPart,
 	if (rv != CKR_OK)
 		return (rv);
 
-	rv = meta_do_operation(OP_DIGEST, MODE_UPDATE, session, NULL,
-		pPart, ulPartLen, NULL, NULL);
+	rv = meta_do_operation(CKF_DIGEST, MODE_UPDATE, session, NULL,
+	    pPart, ulPartLen, NULL, NULL);
 
 	REFRELEASE(session);
 
@@ -143,7 +142,7 @@ meta_DigestKey(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hKey)
 	}
 
 	/* meta_do_operation() will clone the key, if needed. */
-	rv = meta_do_operation(OP_DIGEST, MODE_UPDATE_WITHKEY, session, key,
+	rv = meta_do_operation(CKF_DIGEST, MODE_UPDATE_WITHKEY, session, key,
 	    NULL, 0, NULL, NULL);
 
 	OBJRELEASE(key);
@@ -171,8 +170,8 @@ meta_DigestFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pDigest,
 	if (rv != CKR_OK)
 		return (rv);
 
-	rv = meta_do_operation(OP_DIGEST, MODE_FINAL, session, NULL,
-		NULL, 0, pDigest, pulDigestLen);
+	rv = meta_do_operation(CKF_DIGEST, MODE_FINAL, session, NULL,
+	    NULL, 0, pDigest, pulDigestLen);
 
 	REFRELEASE(session);
 

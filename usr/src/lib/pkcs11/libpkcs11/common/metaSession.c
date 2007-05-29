@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -224,7 +223,7 @@ meta_getopstatelen(meta_session_t *session, CK_ULONG *out_length)
 	CK_ULONG length;
 
 	*out_length = sizeof (meta_opstate_t);
-	if (session->op1.type != OP_UNUSED) {
+	if (session->op1.type != 0) {
 		slot_session = session->op1.session;
 		rv = FUNCLIST(slot_session->fw_st_id)->C_GetOperationState(
 		    slot_session->hSession, NULL, &length);
@@ -257,7 +256,7 @@ meta_GetOperationState(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pOperationState,
 	/*
 	 * If no operation is active, then bail out.
 	 */
-	if (session->op1.type == OP_UNUSED) {
+	if (session->op1.type == 0) {
 		rv = CKR_OPERATION_NOT_INITIALIZED;
 		goto endgetopstate;
 	}
@@ -308,12 +307,12 @@ meta_GetOperationState(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pOperationState,
 	(void) memset(&opstate, 0, sizeof (meta_opstate_t));
 	opstate.magic_marker = METASLOT_OPSTATE_MAGIC;
 
-	if (session->op1.type != OP_UNUSED) {
+	if (session->op1.type != 0) {
 		slot_session = session->op1.session;
 		opstate.state[0].op_type = session->op1.type;
 		opstate.state[0].op_slotnum = slot_session->slotnum;
 		opstate.state[0].op_state_len = *pulOperationStateLen -
-				sizeof (meta_opstate_t);
+		    sizeof (meta_opstate_t);
 		rv = FUNCLIST(slot_session->fw_st_id)->C_GetOperationState(
 		    slot_session->hSession,
 		    pOperationState + sizeof (meta_opstate_t),
@@ -337,10 +336,10 @@ meta_GetOperationState(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pOperationState,
 endgetopstate:
 	if (rv == CKR_OK && pOperationState != NULL) {
 		(void) memcpy(pOperationState, (void *)&opstate,
-			sizeof (meta_opstate_t));
+		    sizeof (meta_opstate_t));
 
 		*pulOperationStateLen = sizeof (meta_opstate_t) +
-			opstate.state[0].op_state_len;
+		    opstate.state[0].op_state_len;
 	}
 
 	REFRELEASE(session);
@@ -355,23 +354,21 @@ meta_set_opstate(slot_session_t *slot_session,
 		CK_BYTE *databuf)
 {
 	CK_RV rv;
-	static CK_ULONG encrypt_optypes = (OP_ENCRYPT | OP_DECRYPT);
-	static CK_ULONG sign_optypes = (OP_SIGN | OP_VERIFY |
-			OP_SIGNRECOVER | OP_VERIFYRECOVER);
+	static CK_ULONG encrypt_optypes = (CKF_ENCRYPT | CKF_DECRYPT);
+	static CK_ULONG sign_optypes = (CKF_SIGN | CKF_VERIFY |
+	    CKF_SIGN_RECOVER | CKF_VERIFY_RECOVER);
 	slot_object_t *enc_key_obj = NULL, *auth_key_obj = NULL;
 
 	if (state->op_type & encrypt_optypes) {
-		rv = meta_object_get_clone(meta_enc_key,
-			slot_session->slotnum,
-			slot_session, &enc_key_obj);
+		rv = meta_object_get_clone(meta_enc_key, slot_session->slotnum,
+		    slot_session, &enc_key_obj);
 		if (rv != CKR_OK) {
 			return (rv);
 		}
 	}
 	if (state->op_type & sign_optypes) {
-		rv = meta_object_get_clone(meta_auth_key,
-			slot_session->slotnum,
-			slot_session, &auth_key_obj);
+		rv = meta_object_get_clone(meta_auth_key, slot_session->slotnum,
+		    slot_session, &auth_key_obj);
 		if (rv != CKR_OK) {
 			return (rv);
 		}
@@ -443,7 +440,7 @@ meta_SetOperationState(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pOperationState,
 	 * data is present.  Length of state provided must be exact.
 	 */
 	if (ulOperationStateLen != (sizeof (meta_opstate_t) +
-		opstate.state[0].op_state_len))
+	    opstate.state[0].op_state_len))
 		return (CKR_SAVED_STATE_INVALID);
 
 	rv = meta_handle2session(hSession, &session);
@@ -461,27 +458,26 @@ meta_SetOperationState(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pOperationState,
 			goto cleanup;
 	}
 
-	if (opstate.state[0].op_type != OP_UNUSED) {
-		if (session->op1.type != OP_UNUSED)
+	if (opstate.state[0].op_type != 0) {
+		if (session->op1.type != 0)
 			meta_operation_cleanup(session, session->op1.type,
-				B_FALSE);
+			    B_FALSE);
 
 		rv = meta_get_slot_session(opstate.state[0].op_slotnum,
-			&slot_session, session->session_flags);
+		    &slot_session, session->session_flags);
 		if (rv != CKR_OK)
 			goto cleanup;
 
 		session->op1.type = opstate.state[0].op_type;
 		session->op1.session = slot_session;
 
-		rv = meta_set_opstate(slot_session,
-			meta_enc_key, meta_auth_key,
-			&(opstate.state[0]),
-			pOperationState + sizeof (meta_opstate_t));
+		rv = meta_set_opstate(slot_session, meta_enc_key,
+		    meta_auth_key, &(opstate.state[0]),
+		    pOperationState + sizeof (meta_opstate_t));
 
 		if (rv != CKR_OK) {
 			meta_operation_cleanup(session, session->op1.type,
-				FALSE);
+			    FALSE);
 			goto cleanup;
 		}
 	}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,7 +58,7 @@ meta_EncryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		return (rv);
 	}
 
-	rv = meta_operation_init(OP_ENCRYPT, session, pMechanism, key);
+	rv = meta_operation_init(CKF_ENCRYPT, session, pMechanism, key);
 
 	OBJRELEASE(key);
 	REFRELEASE(session);
@@ -85,12 +84,12 @@ meta_Encrypt(CK_SESSION_HANDLE hSession,
 		return (rv);
 
 	if (pData == NULL || pulEncryptedDataLen == NULL) {
-		meta_operation_cleanup(session, OP_ENCRYPT, FALSE);
+		meta_operation_cleanup(session, CKF_ENCRYPT, FALSE);
 		REFRELEASE(session);
 		return (CKR_ARGUMENTS_BAD);
 	}
 
-	rv = meta_do_operation(OP_ENCRYPT, MODE_SINGLE, session, NULL,
+	rv = meta_do_operation(CKF_ENCRYPT, MODE_SINGLE, session, NULL,
 	    pData, ulDataLen, pEncryptedData, pulEncryptedDataLen);
 
 	REFRELEASE(session);
@@ -116,12 +115,12 @@ meta_EncryptUpdate(CK_SESSION_HANDLE hSession,
 		return (rv);
 
 	if (pPart == NULL || pulEncryptedPartLen == NULL) {
-		meta_operation_cleanup(session, OP_ENCRYPT, FALSE);
+		meta_operation_cleanup(session, CKF_ENCRYPT, FALSE);
 		REFRELEASE(session);
 		return (CKR_ARGUMENTS_BAD);
 	}
 
-	rv = meta_do_operation(OP_ENCRYPT, MODE_UPDATE, session, NULL,
+	rv = meta_do_operation(CKF_ENCRYPT, MODE_UPDATE, session, NULL,
 	    pPart, ulPartLen, pEncryptedPart, pulEncryptedPartLen);
 
 	REFRELEASE(session);
@@ -146,12 +145,12 @@ meta_EncryptFinal(CK_SESSION_HANDLE hSession,
 		return (rv);
 
 	if (pulLastEncryptedPartLen == NULL) {
-		meta_operation_cleanup(session, OP_ENCRYPT, FALSE);
+		meta_operation_cleanup(session, CKF_ENCRYPT, FALSE);
 		REFRELEASE(session);
 		return (CKR_ARGUMENTS_BAD);
 	}
 
-	rv = meta_do_operation(OP_ENCRYPT, MODE_FINAL, session, NULL,
+	rv = meta_do_operation(CKF_ENCRYPT, MODE_FINAL, session, NULL,
 	    NULL, 0, pLastEncryptedPart, pulLastEncryptedPartLen);
 
 	REFRELEASE(session);
@@ -185,7 +184,7 @@ meta_DecryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		return (rv);
 	}
 
-	rv = meta_operation_init(OP_DECRYPT, session, pMechanism, key);
+	rv = meta_operation_init(CKF_DECRYPT, session, pMechanism, key);
 
 	OBJRELEASE(key);
 	REFRELEASE(session);
@@ -211,12 +210,12 @@ meta_Decrypt(CK_SESSION_HANDLE hSession,
 		return (rv);
 
 	if (pEncryptedData == NULL || pulDataLen == NULL) {
-		meta_operation_cleanup(session, OP_DECRYPT, FALSE);
+		meta_operation_cleanup(session, CKF_DECRYPT, FALSE);
 		REFRELEASE(session);
 		return (CKR_ARGUMENTS_BAD);
 	}
 
-	rv = meta_do_operation(OP_DECRYPT, MODE_SINGLE, session, NULL,
+	rv = meta_do_operation(CKF_DECRYPT, MODE_SINGLE, session, NULL,
 	    pEncryptedData, ulEncryptedDataLen, pData, pulDataLen);
 
 	REFRELEASE(session);
@@ -242,12 +241,12 @@ meta_DecryptUpdate(CK_SESSION_HANDLE hSession,
 		return (rv);
 
 	if (pEncryptedPart == NULL || pulPartLen == NULL) {
-		meta_operation_cleanup(session, OP_DECRYPT, FALSE);
+		meta_operation_cleanup(session, CKF_DECRYPT, FALSE);
 		REFRELEASE(session);
 		return (CKR_ARGUMENTS_BAD);
 	}
 
-	rv = meta_do_operation(OP_DECRYPT, MODE_UPDATE, session, NULL,
+	rv = meta_do_operation(CKF_DECRYPT, MODE_UPDATE, session, NULL,
 	    pEncryptedPart, ulEncryptedPartLen, pPart, pulPartLen);
 
 	REFRELEASE(session);
@@ -272,12 +271,12 @@ meta_DecryptFinal(CK_SESSION_HANDLE hSession,
 		return (rv);
 
 	if (pulLastPartLen == NULL) {
-		meta_operation_cleanup(session, OP_DECRYPT, FALSE);
+		meta_operation_cleanup(session, CKF_DECRYPT, FALSE);
 		REFRELEASE(session);
 		return (CKR_ARGUMENTS_BAD);
 	}
 
-	rv = meta_do_operation(OP_DECRYPT, MODE_FINAL, session, NULL,
+	rv = meta_do_operation(CKF_DECRYPT, MODE_FINAL, session, NULL,
 	    NULL, 0, pLastPart, pulLastPartLen);
 
 	REFRELEASE(session);

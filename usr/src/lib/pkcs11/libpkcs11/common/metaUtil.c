@@ -37,7 +37,7 @@
  *
  */
 CK_RV
-meta_operation_init(int optype, meta_session_t *session,
+meta_operation_init(CK_FLAGS optype, meta_session_t *session,
 	CK_MECHANISM *pMechanism, meta_object_t *key)
 {
 	CK_RV rv, save_rv;
@@ -45,14 +45,17 @@ meta_operation_init(int optype, meta_session_t *session,
 	CK_ULONG slotnum;
 	unsigned long i, slotCount = 0;
 	slot_session_t *init_session = NULL;
+	CK_MECHANISM_INFO mech_info;
 
 	/*
 	 * If an operation is already active, cleanup existing operation
 	 * and start a new one.
 	 */
-	if (session->op1.type != OP_UNUSED) {
+	if (session->op1.type != 0) {
 		meta_operation_cleanup(session, session->op1.type, B_FALSE);
 	}
+
+	mech_info.flags = optype;
 
 	/*
 	 * Get a list of capable slots.
@@ -65,7 +68,7 @@ meta_operation_init(int optype, meta_session_t *session,
 	    ((session->mech_support_info).num_supporting_slots == 0)) {
 		(session->mech_support_info).mech = pMechanism->mechanism;
 		rv = meta_mechManager_get_slots(&(session->mech_support_info),
-		    B_FALSE);
+		    B_FALSE, &mech_info);
 		if (rv != CKR_OK) {
 			goto finish;
 		}
@@ -121,9 +124,9 @@ meta_operation_init(int optype, meta_session_t *session,
 		}
 
 		/* if necessary, ensure a clone of the obj exists in slot */
-		if (optype != OP_DIGEST) {
+		if (optype != CKF_DIGEST) {
 			rv = meta_object_get_clone(key, slotnum, init_session,
-				&init_key);
+			    &init_key);
 
 			if (rv != CKR_OK) {
 				goto loop_cleanup;
@@ -132,39 +135,39 @@ meta_operation_init(int optype, meta_session_t *session,
 
 		fw_st_id = init_session->fw_st_id;
 		switch (optype) {
-			case OP_ENCRYPT:
+			case CKF_ENCRYPT:
 				rv = FUNCLIST(fw_st_id)->C_EncryptInit(
-					init_session->hSession, pMechanism,
-					init_key->hObject);
+				    init_session->hSession, pMechanism,
+				    init_key->hObject);
 				break;
-			case OP_DECRYPT:
+			case CKF_DECRYPT:
 				rv = FUNCLIST(fw_st_id)->C_DecryptInit(
-					init_session->hSession, pMechanism,
-					init_key->hObject);
+				    init_session->hSession, pMechanism,
+				    init_key->hObject);
 				break;
-			case OP_DIGEST:
+			case CKF_DIGEST:
 				rv = FUNCLIST(fw_st_id)->C_DigestInit(
-					init_session->hSession, pMechanism);
+				    init_session->hSession, pMechanism);
 				break;
-			case OP_SIGN:
+			case CKF_SIGN:
 				rv = FUNCLIST(fw_st_id)->C_SignInit(
-					init_session->hSession, pMechanism,
-					init_key->hObject);
+				    init_session->hSession, pMechanism,
+				    init_key->hObject);
 				break;
-			case OP_VERIFY:
+			case CKF_VERIFY:
 				rv = FUNCLIST(fw_st_id)->C_VerifyInit(
-					init_session->hSession, pMechanism,
-					init_key->hObject);
+				    init_session->hSession, pMechanism,
+				    init_key->hObject);
 				break;
-			case OP_SIGNRECOVER:
+			case CKF_SIGN_RECOVER:
 				rv = FUNCLIST(fw_st_id)->C_SignRecoverInit(
-					init_session->hSession, pMechanism,
-					init_key->hObject);
+				    init_session->hSession, pMechanism,
+				    init_key->hObject);
 				break;
-			case OP_VERIFYRECOVER:
+			case CKF_VERIFY_RECOVER:
 				rv = FUNCLIST(fw_st_id)->C_VerifyRecoverInit(
-					init_session->hSession, pMechanism,
-					init_key->hObject);
+				    init_session->hSession, pMechanism,
+				    init_key->hObject);
 				break;
 
 			default:
@@ -231,7 +234,7 @@ finish:
  *    this argument (use NULL).
  */
 CK_RV
-meta_do_operation(int optype, int mode,
+meta_do_operation(CK_FLAGS optype, int mode,
     meta_session_t *session, meta_object_t *object,
     CK_BYTE *in, CK_ULONG inLen, CK_BYTE *out, CK_ULONG *outLen)
 {
@@ -259,43 +262,34 @@ meta_do_operation(int optype, int mode,
 
 
 	/* Do the operation... */
-	switch (optype | mode) {
-		case OP_ENCRYPT | MODE_SINGLE:
+	if (optype == CKF_ENCRYPT && mode == MODE_SINGLE) {
 			rv = FUNCLIST(fw_st_id)->C_Encrypt(hSession, in,
 			    inLen, out, outLen);
-			break;
-		case OP_ENCRYPT | MODE_UPDATE:
+	} else if (optype == CKF_ENCRYPT && mode == MODE_UPDATE) {
 			rv = FUNCLIST(fw_st_id)->C_EncryptUpdate(hSession, in,
 			    inLen, out, outLen);
-			break;
-		case OP_ENCRYPT | MODE_FINAL:
+	} else if (optype == CKF_ENCRYPT && mode == MODE_FINAL) {
 			rv = FUNCLIST(fw_st_id)->C_EncryptFinal(hSession, out,
 			    outLen);
-			break;
 
-		case OP_DECRYPT | MODE_SINGLE:
+	} else if (optype == CKF_DECRYPT && mode == MODE_SINGLE) {
 			rv = FUNCLIST(fw_st_id)->C_Decrypt(hSession, in,
 			    inLen, out, outLen);
-			break;
-		case OP_DECRYPT | MODE_UPDATE:
+	} else if (optype == CKF_DECRYPT && mode == MODE_UPDATE) {
 			rv = FUNCLIST(fw_st_id)->C_DecryptUpdate(hSession, in,
 			    inLen, out, outLen);
-			break;
-		case OP_DECRYPT | MODE_FINAL:
+	} else if (optype == CKF_DECRYPT && mode == MODE_FINAL) {
 			rv = FUNCLIST(fw_st_id)->C_DecryptFinal(hSession, out,
 			    outLen);
-			break;
 
-		case OP_DIGEST | MODE_SINGLE:
+	} else if (optype == CKF_DIGEST && mode == MODE_SINGLE) {
 			rv = FUNCLIST(fw_st_id)->C_Digest(hSession, in, inLen,
 			    out, outLen);
-			break;
-		case OP_DIGEST | MODE_UPDATE:
+	} else if (optype == CKF_DIGEST && mode == MODE_UPDATE) {
 			/* noOutputForOp = TRUE; */
 			rv = FUNCLIST(fw_st_id)->C_DigestUpdate(hSession, in,
 			    inLen);
-			break;
-		case OP_DIGEST | MODE_UPDATE_WITHKEY:
+	} else if (optype == CKF_DIGEST && mode == MODE_UPDATE_WITHKEY) {
 			/* noOutputForOp = TRUE; */
 			/*
 			 * For C_DigestKey, a key is provided and
@@ -306,58 +300,46 @@ meta_do_operation(int optype, int mode,
 			if (rv == CKR_OK)
 				rv = FUNCLIST(fw_st_id)->C_DigestKey(hSession,
 				    slot_object->hObject);
-			break;
-		case OP_DIGEST | MODE_FINAL:
+	} else if (optype == CKF_DIGEST && mode == MODE_FINAL) {
 			rv = FUNCLIST(fw_st_id)->C_DigestFinal(hSession, out,
 			    outLen);
-			break;
 
-
-		case OP_SIGN | MODE_SINGLE:
+	} else if (optype == CKF_SIGN && mode == MODE_SINGLE) {
 			rv = FUNCLIST(fw_st_id)->C_Sign(hSession, in, inLen,
 			    out, outLen);
-			break;
-		case OP_SIGN | MODE_UPDATE:
+	} else if (optype == CKF_SIGN && mode == MODE_UPDATE) {
 			/* noOutputForOp = TRUE; */
 			rv = FUNCLIST(fw_st_id)->C_SignUpdate(hSession, in,
 			    inLen);
-			break;
-		case OP_SIGN | MODE_FINAL:
+	} else if (optype == CKF_SIGN && mode == MODE_FINAL) {
 			rv = FUNCLIST(fw_st_id)->C_SignFinal(hSession, out,
 			    outLen);
-			break;
 
-		case OP_VERIFY | MODE_SINGLE:
+	} else if (optype == CKF_VERIFY && mode == MODE_SINGLE) {
 			/* noOutputForOp = TRUE; */
 			/* Yes, use *outLen not outLen (think in2/in2Len) */
 			rv = FUNCLIST(fw_st_id)->C_Verify(hSession, in,
 			    inLen, out, *outLen);
-			break;
-		case OP_VERIFY | MODE_UPDATE:
+	} else if (optype == CKF_VERIFY && mode == MODE_UPDATE) {
 			/* noOutputForOp = TRUE; */
 			rv = FUNCLIST(fw_st_id)->C_VerifyUpdate(hSession, in,
 			    inLen);
-			break;
-		case OP_VERIFY | MODE_FINAL:
+	} else if (optype == CKF_VERIFY && mode == MODE_FINAL) {
 			/* noOutputForOp = TRUE; */
 			/* Yes, use in/inLen instead of out/outLen */
 			rv = FUNCLIST(fw_st_id)->C_VerifyFinal(hSession, in,
 			    inLen);
-			break;
 
-		case OP_SIGNRECOVER | MODE_SINGLE:
+	} else if (optype == CKF_SIGN_RECOVER && mode == MODE_SINGLE) {
 			rv = FUNCLIST(fw_st_id)->C_SignRecover(hSession, in,
 			    inLen, out, outLen);
-			break;
-		case OP_VERIFYRECOVER | MODE_SINGLE:
+	} else if (optype == CKF_VERIFY_RECOVER && mode == MODE_SINGLE) {
 			rv = FUNCLIST(fw_st_id)->C_VerifyRecover(hSession, in,
 			    inLen, out, outLen);
-			break;
 
-		default:
+	} else {
 			rv = CKR_FUNCTION_FAILED;
 	}
-
 
 
 	/*
@@ -377,7 +359,7 @@ meta_do_operation(int optype, int mode,
 	 * the spec, the operation will remain active.
 	 */
 	if (rv == CKR_BUFFER_TOO_SMALL ||
-	    (rv == CKR_OK && out == NULL && optype != OP_VERIFY)) {
+	    (rv == CKR_OK && out == NULL && optype != CKF_VERIFY)) {
 		/* Leave op active for retry (with larger buffer). */
 		shutdown = B_FALSE;
 	} else if (rv != CKR_OK) {
@@ -406,7 +388,7 @@ meta_do_operation(int optype, int mode,
  * the operation to terminate.
  */
 void
-meta_operation_cleanup(meta_session_t *session, int optype,
+meta_operation_cleanup(meta_session_t *session, CK_FLAGS optype,
     boolean_t finished_normally)
 {
 	operation_info_t *op;
@@ -438,35 +420,35 @@ meta_operation_cleanup(meta_session_t *session, int optype,
 		 */
 
 		switch (optype) {
-		    case OP_ENCRYPT:
+		case CKF_ENCRYPT:
 			(void) FUNCLIST(fw_st_id)->C_EncryptUpdate(hSession,
 			    NULL, 8, dummy_buf, NULL);
 			break;
-		    case OP_DECRYPT:
+		case CKF_DECRYPT:
 			(void) FUNCLIST(fw_st_id)->C_DecryptUpdate(hSession,
 			    NULL, 8, dummy_buf, NULL);
 			break;
-		    case OP_DIGEST:
+		case CKF_DIGEST:
 			(void) FUNCLIST(fw_st_id)->C_DigestUpdate(hSession,
 			    NULL, 8);
 			break;
-		    case OP_SIGN:
+		case CKF_SIGN:
 			(void) FUNCLIST(fw_st_id)->C_SignUpdate(hSession,
 			    NULL, 8);
 			break;
-		    case OP_SIGNRECOVER:
+		case CKF_SIGN_RECOVER:
 			(void) FUNCLIST(fw_st_id)->C_SignRecover(hSession,
 			    NULL, 8, dummy_buf, NULL);
 			break;
-		    case OP_VERIFY:
+		case CKF_VERIFY:
 			(void) FUNCLIST(fw_st_id)->C_VerifyUpdate(hSession,
 			    NULL, 8);
 			break;
-		    case OP_VERIFYRECOVER:
+		case CKF_VERIFY_RECOVER:
 			(void) FUNCLIST(fw_st_id)->C_VerifyRecover(hSession,
 			    NULL, 8, dummy_buf, NULL);
 			break;
-		    default:
+		default:
 			/*NOTREACHED*/
 			break;
 		}
@@ -474,7 +456,7 @@ meta_operation_cleanup(meta_session_t *session, int optype,
 		session->op1.session = NULL;
 	}
 
-	session->op1.type = OP_UNUSED;
+	session->op1.type = 0;
 }
 
 /*
@@ -489,7 +471,8 @@ meta_operation_cleanup(meta_session_t *session, int optype,
 static CK_RV
 get_slotlist_for_mech(CK_MECHANISM_TYPE mech_type,
     mech_support_info_t *mech_support_info,
-    mechinfo_t ***slots, unsigned long *slot_count, boolean_t token_only)
+    mechinfo_t ***slots, unsigned long *slot_count, boolean_t token_only,
+    CK_MECHANISM_INFO *mech_info)
 {
 	boolean_t mech_supported = B_FALSE;
 	CK_RV rv = CKR_OK;
@@ -497,7 +480,8 @@ get_slotlist_for_mech(CK_MECHANISM_TYPE mech_type,
 	if (token_only) {
 		rv = meta_mechManager_slot_supports_mech(mech_type,
 		    get_keystore_slotnum(), &mech_supported,
-		    &((mech_support_info->supporting_slots)[0]), B_FALSE);
+		    &((mech_support_info->supporting_slots)[0]), B_FALSE,
+		    mech_info);
 
 		if (rv != CKR_OK) {
 			return (rv);
@@ -529,7 +513,7 @@ get_slotlist_for_mech(CK_MECHANISM_TYPE mech_type,
 		    (mech_support_info->num_supporting_slots == 0)) {
 			mech_support_info->mech = mech_type;
 			rv = meta_mechManager_get_slots(mech_support_info,
-			    B_FALSE);
+			    B_FALSE, mech_info);
 			if (rv != CKR_OK) {
 				return (CKR_FUNCTION_FAILED);
 			}
@@ -558,6 +542,7 @@ meta_generate_keys(meta_session_t *session, CK_MECHANISM *pMechanism,
 	unsigned long i, slotCount = 0;
 	boolean_t doKeyPair = B_FALSE, token_only = B_FALSE;
 	CK_ULONG slotnum;
+	CK_MECHANISM_INFO mech_info;
 	/*
 	 * Since the keygen call is in a loop, it is performance-wise useful
 	 * to keep track of the token value
@@ -572,11 +557,13 @@ meta_generate_keys(meta_session_t *session, CK_MECHANISM *pMechanism,
 	    &(key1->isPrivate));
 
 	if (!get_template_boolean(CKA_EXTRACTABLE, k1Template, k1AttrCount,
-		&(key1->isExtractable)))
+	    &(key1->isExtractable)))
 		key1->isExtractable = B_TRUE;
 
 	if (key1->isToken)
 		current_token1_value = TRUE;
+
+	mech_info.flags = CKF_GENERATE;
 
 	if (key2) {
 		(void) get_template_boolean(CKA_TOKEN, k2Template, k2AttrCount,
@@ -594,6 +581,7 @@ meta_generate_keys(meta_session_t *session, CK_MECHANISM *pMechanism,
 			current_token2_value = TRUE;
 
 		doKeyPair = B_TRUE;
+		mech_info.flags = CKF_GENERATE_KEY_PAIR;
 	}
 
 
@@ -604,20 +592,20 @@ meta_generate_keys(meta_session_t *session, CK_MECHANISM *pMechanism,
 	}
 
 	if (meta_freeobject_check(session, key1, pMechanism, k1Template,
-		k1AttrCount, NULL)) {
+	    k1AttrCount, NULL)) {
 
 		if ((key1->isPrivate || (doKeyPair && key2->isPrivate)) &&
 		    !metaslot_logged_in())
 			return (CKR_USER_NOT_LOGGED_IN);
 
 		if (!meta_freeobject_set(key1, k1Template, k1AttrCount,
-			B_FALSE))
+		    B_FALSE))
 			return (CKR_FUNCTION_FAILED);
 
 		if (doKeyPair) {
 			key2->isFreeObject = FREE_ALLOWED_KEY;
 			if (!meta_freeobject_set(key2, k2Template, k2AttrCount,
-				B_FALSE))
+			    B_FALSE))
 				return (CKR_FUNCTION_FAILED);
 		}
 
@@ -641,7 +629,8 @@ meta_generate_keys(meta_session_t *session, CK_MECHANISM *pMechanism,
 	}
 
 	rv = get_slotlist_for_mech(pMechanism->mechanism,
-	    &(session->mech_support_info), &slots, &slotCount, token_only);
+	    &(session->mech_support_info), &slots, &slotCount, token_only,
+	    &mech_info);
 
 	if (rv != CKR_OK) {
 		goto finish;
@@ -812,14 +801,16 @@ meta_wrap_key(meta_session_t *session, CK_MECHANISM *pMechanism,
 	mechinfo_t **slots = NULL;
 	unsigned long i, slotCount = 0;
 	CK_ULONG slotnum;
+	CK_MECHANISM_INFO mech_info;
 
 	/*
 	 * If the key to be wrapped is a token object,
 	 * the operation can only be done in the token object slot.
 	 */
+	mech_info.flags = CKF_WRAP;
 	rv = get_slotlist_for_mech(pMechanism->mechanism,
 	    &(session->mech_support_info), &slots, &slotCount,
-	    inputkey->isToken);
+	    inputkey->isToken, &mech_info);
 
 	if (rv != CKR_OK) {
 		return (rv);
@@ -926,6 +917,7 @@ meta_unwrap_key(meta_session_t *session,
 	mechinfo_t **slots = NULL;
 	unsigned long i, slotCount = 0;
 	CK_ULONG slotnum;
+	CK_MECHANISM_INFO mech_info;
 
 	/* Can't create token objects in a read-only session. */
 	if ((IS_READ_ONLY_SESSION(session->session_flags)) &&
@@ -938,9 +930,10 @@ meta_unwrap_key(meta_session_t *session,
 	 * needs to be a token object, the operation can only
 	 * be performed in the token slot, if it is supported.
 	 */
+	mech_info.flags = CKF_UNWRAP;
 	rv = get_slotlist_for_mech(pMechanism->mechanism,
 	    &(session->mech_support_info), &slots, &slotCount,
-	    unwrapped_key->isToken);
+	    unwrapped_key->isToken, &mech_info);
 
 	if (rv != CKR_OK) {
 		return (rv);
@@ -1082,8 +1075,9 @@ meta_derive_key(meta_session_t *session, CK_MECHANISM *pMechanism,
 	unsigned long i, slot_count = 0;
 	slot_session_t *derive_session = NULL;
 	slot_object_t *slot_basekey1 = NULL, *slot_basekey2 = NULL;
-	slot_object_t *slotkey1 = NULL, *slotkey2 = NULL,
-		*slotkey3 = NULL, *slotkey4 = NULL;
+	slot_object_t *slotkey1 = NULL, *slotkey2 = NULL, *slotkey3 = NULL,
+	    *slotkey4 = NULL;
+	CK_MECHANISM_INFO mech_info;
 	CK_BBOOL current_token_value = FALSE;
 
 	/*
@@ -1108,19 +1102,20 @@ meta_derive_key(meta_session_t *session, CK_MECHANISM *pMechanism,
 	}
 
 	if (meta_freeobject_check(session, newKey1, pMechanism, pTemplate,
-		ulAttributeCount, NULL)) {
+	    ulAttributeCount, NULL)) {
 
 		if (newKey1->isPrivate && !metaslot_logged_in())
 			return (CKR_USER_NOT_LOGGED_IN);
 
 		if (!meta_freeobject_set(newKey1, pTemplate, ulAttributeCount,
-			B_FALSE))
+		    B_FALSE))
 			return (CKR_FUNCTION_FAILED);
 	}
 
+	mech_info.flags = CKF_DERIVE;
 	rv = get_slotlist_for_mech(pMechanism->mechanism,
 	    &(session->mech_support_info), &slots, &slot_count,
-	    newKey1->isToken);
+	    newKey1->isToken, &mech_info);
 
 	if (rv != CKR_OK) {
 		return (rv);
@@ -1275,16 +1270,16 @@ loop_cleanup:
 		newKey4->master_clone_slotnum = slotnum;
 
 		meta_slot_object_activate(slotkey1, derive_session,
-			newKey1->isToken);
+		    newKey1->isToken);
 		slotkey1 = NULL;
 		meta_slot_object_activate(slotkey2, derive_session,
-			newKey2->isToken);
+		    newKey2->isToken);
 		slotkey2 = NULL;
 		meta_slot_object_activate(slotkey3, derive_session,
-			newKey3->isToken);
+		    newKey3->isToken);
 		slotkey3 = NULL;
 		meta_slot_object_activate(slotkey4, derive_session,
-				newKey4->isToken);
+		    newKey4->isToken);
 		slotkey4 = NULL;
 
 	} else {
@@ -1299,7 +1294,7 @@ loop_cleanup:
 		}
 
 		meta_slot_object_activate(slotkey1, derive_session,
-			newKey1->isToken);
+		    newKey1->isToken);
 		slotkey1 = NULL;
 	}
 

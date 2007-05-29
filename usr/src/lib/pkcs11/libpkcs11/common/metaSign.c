@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,7 +58,7 @@ meta_SignInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		return (rv);
 	}
 
-	rv = meta_operation_init(OP_SIGN, session, pMechanism, key);
+	rv = meta_operation_init(CKF_SIGN, session, pMechanism, key);
 
 	OBJRELEASE(key);
 	REFRELEASE(session);
@@ -85,12 +84,12 @@ meta_Sign(CK_SESSION_HANDLE hSession,
 		return (rv);
 
 	if (pData == NULL || pulSignatureLen == NULL) {
-		meta_operation_cleanup(session, OP_SIGN, FALSE);
+		meta_operation_cleanup(session, CKF_SIGN, FALSE);
 		REFRELEASE(session);
 		return (CKR_ARGUMENTS_BAD);
 	}
 
-	rv = meta_do_operation(OP_SIGN, MODE_SINGLE, session, NULL,
+	rv = meta_do_operation(CKF_SIGN, MODE_SINGLE, session, NULL,
 	    pData, ulDataLen, pSignature, pulSignatureLen);
 
 	REFRELEASE(session);
@@ -115,12 +114,12 @@ meta_SignUpdate(CK_SESSION_HANDLE hSession,
 		return (rv);
 
 	if (pPart == NULL) {
-		meta_operation_cleanup(session, OP_SIGN, FALSE);
+		meta_operation_cleanup(session, CKF_SIGN, FALSE);
 		REFRELEASE(session);
 		return (CKR_ARGUMENTS_BAD);
 	}
 
-	rv = meta_do_operation(OP_SIGN, MODE_UPDATE, session, NULL,
+	rv = meta_do_operation(CKF_SIGN, MODE_UPDATE, session, NULL,
 	    pPart, ulPartLen, NULL, NULL);
 
 	REFRELEASE(session);
@@ -145,12 +144,12 @@ meta_SignFinal(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pSignature,
 		return (rv);
 
 	if (pulSignatureLen == NULL) {
-		meta_operation_cleanup(session, OP_SIGN, FALSE);
+		meta_operation_cleanup(session, CKF_SIGN, FALSE);
 		REFRELEASE(session);
 		return (CKR_ARGUMENTS_BAD);
 	}
 
-	rv = meta_do_operation(OP_SIGN, MODE_FINAL, session, NULL,
+	rv = meta_do_operation(CKF_SIGN, MODE_FINAL, session, NULL,
 	    NULL, 0, pSignature, pulSignatureLen);
 
 	REFRELEASE(session);
@@ -183,7 +182,7 @@ meta_SignRecoverInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		return (rv);
 	}
 
-	rv = meta_operation_init(OP_SIGNRECOVER, session, pMechanism, key);
+	rv = meta_operation_init(CKF_SIGN_RECOVER, session, pMechanism, key);
 
 	OBJRELEASE(key);
 	REFRELEASE(session);
@@ -208,12 +207,12 @@ meta_SignRecover(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData,
 		return (rv);
 
 	if (pData == NULL || pulSignatureLen == NULL) {
-		meta_operation_cleanup(session, OP_SIGNRECOVER, FALSE);
+		meta_operation_cleanup(session, CKF_SIGN_RECOVER, FALSE);
 		REFRELEASE(session);
 		return (CKR_ARGUMENTS_BAD);
 	}
 
-	rv = meta_do_operation(OP_SIGNRECOVER, MODE_SINGLE, session, NULL,
+	rv = meta_do_operation(CKF_SIGN_RECOVER, MODE_SINGLE, session, NULL,
 	    pData, ulDataLen, pSignature, pulSignatureLen);
 
 	REFRELEASE(session);
