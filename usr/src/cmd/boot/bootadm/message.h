@@ -329,6 +329,9 @@ the failsafe archive unbootable\n")
 
 #define	UNKNOWN_KERNEL	gettext("Unable to expand %s to a full file path.\n")
 
+#define	UNKNOWN_KERNEL_REBOOT	\
+	gettext("Rebooting with default kernel and options.\n")
+
 #define	NOT_DBOOT \
 	gettext("bootadm set-menu %s may only be run on directboot kernels.\n")
 

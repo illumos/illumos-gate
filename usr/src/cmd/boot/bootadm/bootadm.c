@@ -3460,7 +3460,7 @@ static error_t
 update_temp(menu_t *mp, char *menupath, char *opt)
 {
 	int entry;
-	char *grubdisk, *rootdev, *path;
+	char *grubdisk, *rootdev, *path, *opt_ptr;
 	char kernbuf[BUFSIZ];
 	char args_buf[BUFSIZ];
 	struct stat sb;
@@ -3526,14 +3526,62 @@ update_temp(menu_t *mp, char *menupath, char *opt)
 			(void) strlcat(kernbuf, " ", BUFSIZ);
 			(void) strlcat(kernbuf, opt, BUFSIZ);
 		} else if (opt[0] == '/') {
-			/* It's a full path - write it out and go home */
+			/* It's a full path, so write it out. */
 			(void) strlcpy(kernbuf, opt, BUFSIZ);
+
+			/*
+			 * If someone runs:
+			 *
+			 *	# eeprom boot-args='-kd'
+			 *	# reboot /platform/i86pc/kernel/unix
+			 *
+			 * we want to use the boot-args as part of the boot
+			 * line.  On the other hand, if someone runs:
+			 *
+			 *	# reboot "/platform/i86pc/kernel/unix -kd"
+			 *
+			 * we don't need to mess with boot-args.  If there's
+			 * no space in the options string, assume we're in the
+			 * first case.
+			 */
+			if (strchr(opt, ' ') == NULL) {
+				if (set_kernel(mp, ARGS_CMD, NULL, args_buf,
+				    BUFSIZ) != BAM_SUCCESS)
+					return (BAM_ERROR);
+
+				if (args_buf[0] != '\0') {
+					(void) strlcat(kernbuf, " ", BUFSIZ);
+					(void) strlcat(kernbuf, args_buf,
+					    BUFSIZ);
+				}
+			}
 		} else {
+			/*
+			 * It may be a partial path, or it may be a partial
+			 * path followed by options.  Assume that only options
+			 * follow a space.  If someone sends us a kernel path
+			 * that includes a space, they deserve to be broken.
+			 */
+			opt_ptr = strchr(opt, ' ');
+			if (opt_ptr != NULL) {
+				*opt_ptr = '\0';
+			}
+
 			path = expand_path(opt);
 			if (path != NULL) {
 				(void) strlcpy(kernbuf, path, BUFSIZ);
 				free(path);
-				if (strcmp(opt, "kmdb") == 0) {
+
+				/*
+				 * If there were options given, use those.
+				 * Otherwise, copy over the default options.
+				 */
+				if (opt_ptr != NULL) {
+					/* Restore the space in opt string */
+					*opt_ptr = ' ';
+					(void) strlcat(kernbuf, opt_ptr,
+					    BUFSIZ);
+				} else {
 					if (set_kernel(mp, ARGS_CMD, NULL,
 					    args_buf, BUFSIZ) != BAM_SUCCESS)
 						return (BAM_ERROR);
@@ -3545,6 +3593,10 @@ update_temp(menu_t *mp, char *menupath, char *opt)
 						    args_buf, BUFSIZ);
 					}
 				}
+			} else {
+				bam_error(UNKNOWN_KERNEL, opt);
+				bam_print_stderr(UNKNOWN_KERNEL_REBOOT);
+				return (BAM_ERROR);
 			}
 		}
 		entry = add_boot_entry(mp, REBOOT_TITLE, grubdisk, kernbuf,
@@ -3643,14 +3695,15 @@ set_global(menu_t *mp, char *globalcmd, int val)
 	free(found->line);
 	found->line = s_calloc(1, len);
 	(void) snprintf(found->line, len,
-		"%s%s%s%d", prefix, globalcmd, menu_cmds[SEP_CMD], val);
+	    "%s%s%s%d", prefix, globalcmd, menu_cmds[SEP_CMD], val);
 
 	return (BAM_WRITE); /* need a write to menu */
 }
 
 /*
  * partial_path may be anything like "kernel/unix" or "kmdb".  Try to
- * expand it to a full unix path.
+ * expand it to a full unix path.  The calling function is expected to
+ * output a message if an error occurs and NULL is returned.
  */
 static char *
 expand_path(const char *partial_path)
@@ -3696,7 +3749,6 @@ expand_path(const char *partial_path)
 		return (new_path);
 	}
 
-	bam_error(UNKNOWN_KERNEL, partial_path);
 	free(new_path);
 	return (NULL);
 }
@@ -3919,6 +3971,7 @@ set_kernel(menu_t *mp, menu_cmd_t optnum, char *path, char *buf, size_t bufsize)
 	if ((optnum == KERNEL_CMD) && (path[0] != '/')) {
 		new_path = expand_path(path);
 		if (new_path == NULL) {
+			bam_error(UNKNOWN_KERNEL, path);
 			return (BAM_ERROR);
 		}
 		free_new_path = 1;

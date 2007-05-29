@@ -589,7 +589,10 @@ set_bootadm_var(char *name, char *value)
 	}
 }
 
-static void
+/*
+ * Returns 1 if bootenv.rc was modified, 0 otherwise.
+ */
+static int
 set_var(char *name, char *val, eplist_t *list)
 {
 	benv_ent_t *p;
@@ -598,7 +601,7 @@ set_var(char *name, char *val, eplist_t *list)
 	if ((strcmp(name, "boot-file") == 0) ||
 	    (strcmp(name, "boot-args") == 0)) {
 		set_bootadm_var(name, val);
-		return;
+		return (0);
 	}
 
 	/*
@@ -627,13 +630,14 @@ set_var(char *name, char *val, eplist_t *list)
 		(void) printf("new:");
 		print_var(name, list);
 	}
+	return (1);
 }
 
 /*
- *  Modified to return 1 if value modified or 0 if no modification
- *  was necessary.  This allows us to implement non super-user
- *  look up of variables by name without the user being yelled at for
- *  trying to modify the bootenv.rc file.
+ * Returns 1 if bootenv.rc is modified or 0 if no modification was
+ * necessary.  This allows us to implement non super-user look-up of
+ * variables by name without the user being yelled at for trying to
+ * modify the bootenv.rc file.
  */
 static int
 proc_var(char *name, eplist_t *list)
@@ -645,8 +649,7 @@ proc_var(char *name, eplist_t *list)
 		return (0);
 	} else {
 		*val++ = '\0';
-		set_var(name, val, list);
-		return (1);
+		return (set_var(name, val, list));
 	}
 }
 
@@ -994,12 +997,12 @@ write_benv(benv_des_t *bd)
 		if (name) {
 			if (bent->val) {
 				(void) fprintf(fp, "%s %s ",
-					bent->cmd, bent->name);
+				    bent->cmd, bent->name);
 				put_quoted(fp, bent->val);
 				(void) fprintf(fp, "\n");
 			} else {
 				(void) fprintf(fp, "%s %s\n",
-					bent->cmd, bent->name);
+				    bent->cmd, bent->name);
 			}
 		} else {
 			(void) fprintf(fp, "%s\n", bent->cmd);
