@@ -290,7 +290,7 @@ pcan_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	pcan_p->glds_noxmtbuf		= 0;
 	pcan_p->glds_norcvbuf		= 0;
 	pcan_p->pcan_socket		= ddi_getprop(DDI_DEV_T_NONE, dip,
-					DDI_PROP_DONTPASS, "socket", -1);
+	    DDI_PROP_DONTPASS, "socket", -1);
 
 	pcan_p->pcan_reschedule_need = B_FALSE;
 	pcan_p->pcan_info_softint_pending = 0;
@@ -763,7 +763,7 @@ pcan_card_insert(pcan_maci_t *pcan_p)
 			break;
 		}
 		if (tbl_p->flags & CISTPL_CFTABLE_TPCE_FS_PWR &&
-			tbl_p->pd.flags & CISTPL_CFTABLE_TPCE_FS_PWR_VCC) {
+		    tbl_p->pd.flags & CISTPL_CFTABLE_TPCE_FS_PWR_VCC) {
 			if (tbl_p->pd.pd_vcc.avgI > hi) {
 				hi = tbl_p->pd.pd_vcc.avgI;
 				pcan_p->pcan_config_hi = tbl_p->index;
@@ -1063,7 +1063,7 @@ pcan_send(pcan_maci_t *pcan_p, mblk_t *mblk_p)
 	mutex_enter(&pcan_p->pcan_glock);
 	(void) WRCH1(pcan_p, xmt_id, 0, (uint16_t *)buf_p, 0x38); /* frm */
 	(void) WRPKT(pcan_p, xmt_id, 0x38, (uint16_t *)(buf_p + 0x38),
-		pkt_len + 12);
+	    pkt_len + 12);
 	ring_idx = pcan_set_cmd(pcan_p, AN_CMD_TX, xmt_id);
 	mutex_exit(&pcan_p->pcan_glock);
 
@@ -1251,7 +1251,7 @@ pcan_gstat(void *arg, uint_t statitem, uint64_t *val)
 		goto done;
 	}
 	if (pcan_get_ltv(pcan_p, sizeof (pcan_p->an_stats),
-		AN_RID_16BITS_DELTACLR, (uint16_t *)&pcan_p->an_stats)) {
+	    AN_RID_16BITS_DELTACLR, (uint16_t *)&pcan_p->an_stats)) {
 		cmn_err(CE_WARN, "pcan kstat: get ltv(32 delta statistics)"
 		    " failed \n");
 		ret = PCAN_FAIL;
@@ -1455,7 +1455,7 @@ pcan_intr(caddr_t arg)
 	PCAN_WRITE(pcan_p, AN_EVENT_ACK(pcan_p), ~AN_INTRS(pcan_p));
 
 	PCANDBG((CE_NOTE, "pcan intr: stat=%x pcan_flags=%x\n", stat,
-		pcan_p->pcan_flag));
+	    pcan_p->pcan_flag));
 
 	if (stat & AN_EV_AWAKE) {
 		PCAN_WRITE(pcan_p, AN_EVENT_ACK(pcan_p), AN_EV_AWAKE);
@@ -1600,7 +1600,7 @@ pcan_rcv(pcan_maci_t *pcan_p)
 	off += sizeof (data_len);
 	off += ETHERADDRL << 1;
 	PCANDBG((CE_NOTE, "pcan rcv: pkt_stat=%x payload_len=%x+c off=%x\n",
-		pkt_stat, data_len, off));
+	    pkt_stat, data_len, off));
 
 #ifdef DEBUG
 	if (pcan_debug & PCAN_DBG_RCV) {
@@ -2017,7 +2017,7 @@ pcan_get_ltv(pcan_maci_t *pcan_p, uint16_t len, uint16_t type, uint16_t *val_p)
 	uint16_t stat;
 
 	PCANDBG((CE_NOTE, "pcan: get_ltv(%p,%x,%x,%p)\n",
-		(void *)pcan_p, len, type, (void *)val_p));
+	    (void *)pcan_p, len, type, (void *)val_p));
 	ASSERT(!(len & 1));
 
 	if (pcan_p->pcan_device_type == PCAN_DEVICE_PCI) {
@@ -2247,7 +2247,7 @@ pcan_cap_ltv(int rw, pcan_maci_t *pcan_p)
 		return (PCAN_FAIL);
 	}
 	if (ret = pcan_get_ltv(pcan_p, sizeof (struct an_ltv_caps),
-		AN_RID_CAPABILITIES, (uint16_t *)&pcan_p->an_caps))
+	    AN_RID_CAPABILITIES, (uint16_t *)&pcan_p->an_caps))
 		return (ret);
 
 	PCAN_SWAP16_BUF(pcan_p->an_caps.an_oui);
@@ -2771,7 +2771,7 @@ pcan_loaddef(pcan_maci_t *pcan_p)
 
 	pcan_p->an_ssidlist.an_ssid1_len = 0;
 	bzero(pcan_p->an_ssidlist.an_ssid1,
-		sizeof (pcan_p->an_ssidlist.an_ssid1));
+	    sizeof (pcan_p->an_ssidlist.an_ssid1));
 	for (i = 0; i < MAX_NWEPKEYS; i++) {
 		pcan_p->an_wepkey[i].an_index = 0xffff;
 		bzero(pcan_p->an_wepkey[i].an_key,
@@ -3101,7 +3101,7 @@ done:
 	}
 exit:
 	if (ret)
-		cmn_err(CE_WARN, "pcan: scan failed due to hareware error");
+		cmn_err(CE_WARN, "pcan: scan failed due to hardware error");
 	return (ret);
 }
 
@@ -3766,10 +3766,10 @@ pcan_cfg_wepkey(mblk_t *mp, pcan_maci_t *pcan_p, uint32_t cmd)
 				wepkey_p = &pcan_p->an_wepkey[i];
 				bzero(wepkey_p, sizeof (*wepkey_p));
 				wepkey_p->an_keylen =
-					p_wepkey_tab[i].wl_wep_length;
+				    p_wepkey_tab[i].wl_wep_length;
 				bcopy(p_wepkey_tab[i].wl_wep_key,
-					wepkey_p->an_key,
-					p_wepkey_tab[i].wl_wep_length);
+				    wepkey_p->an_key,
+				    p_wepkey_tab[i].wl_wep_length);
 				wepkey_p->an_index = i;
 				wepkey_p->an_macaddr[0] = 1;
 			}
@@ -3803,7 +3803,7 @@ pcan_connect_timeout(void *arg)
 	ret = pcan_set_cmd(pcan_p, AN_CMD_ENABLE, 0);
 done:
 	if (ret)
-		cmn_err(CE_WARN, "pcan: connect failed due to hareware error");
+		cmn_err(CE_WARN, "pcan: connect failed due to hardware error");
 	mutex_exit(&pcan_p->pcan_glock);
 	pcan_p->pcan_connect_timeout_id = 0;
 }

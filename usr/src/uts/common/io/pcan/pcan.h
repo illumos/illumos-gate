@@ -796,8 +796,13 @@ struct an_ltv_scanresult {
 	uint16_t	an_index;
 	uint16_t	an_radiotype;
 	uint8_t		an_bssid[6];
+#ifdef	_BIG_ENDIAN
+	uint8_t		an_ssidlen;
+	uint8_t		an_zero;
+#else
 	uint8_t		an_zero;
 	uint8_t		an_ssidlen;
+#endif
 	char		an_ssid[32];
 	uint16_t	an_rssi;
 	uint16_t	an_cap;
