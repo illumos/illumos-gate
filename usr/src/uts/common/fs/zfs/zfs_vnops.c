@@ -176,7 +176,7 @@ zfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
 	znode_t	*zp = VTOZ(vp);
 
 	/* Decrement the synchronous opens in the znode */
-	if (flag & (FSYNC | FDSYNC))
+	if ((flag & (FSYNC | FDSYNC)) && (count == 1))
 		atomic_dec_32(&zp->z_sync_cnt);
 
 	/*
@@ -241,19 +241,19 @@ zfs_ioctl(vnode_t *vp, int com, intptr_t data, int flag, cred_t *cred,
 	zfsvfs_t *zfsvfs;
 
 	switch (com) {
-	    case _FIOFFS:
+	case _FIOFFS:
 		return (zfs_sync(vp->v_vfsp, 0, cred));
 
 		/*
 		 * The following two ioctls are used by bfu.  Faking out,
 		 * necessary to avoid bfu errors.
 		 */
-	    case _FIOGDIO:
-	    case _FIOSDIO:
+	case _FIOGDIO:
+	case _FIOSDIO:
 		return (0);
 
-	    case _FIO_SEEK_DATA:
-	    case _FIO_SEEK_HOLE:
+	case _FIO_SEEK_DATA:
+	case _FIO_SEEK_HOLE:
 		if (ddi_copyin((void *)data, &off, sizeof (off), flag))
 			return (EFAULT);
 
@@ -737,7 +737,7 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 		    secpolicy_vnode_setid_retain(cr,
 		    (zp->z_phys->zp_mode & S_ISUID) != 0 &&
 		    zp->z_phys->zp_uid == 0) != 0) {
-			    zp->z_phys->zp_mode &= ~(S_ISUID | S_ISGID);
+			zp->z_phys->zp_mode &= ~(S_ISUID | S_ISGID);
 		}
 		mutex_exit(&zp->z_acl_lock);
 
@@ -2946,11 +2946,10 @@ zfs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr)
 	for (io_off = off; io_off < off + len; io_off += io_len) {
 		if ((flags & B_INVAL) || ((flags & B_ASYNC) == 0)) {
 			pp = page_lookup(vp, io_off,
-				(flags & (B_INVAL | B_FREE)) ?
-					SE_EXCL : SE_SHARED);
+			    (flags & (B_INVAL | B_FREE)) ? SE_EXCL : SE_SHARED);
 		} else {
 			pp = page_lookup_nowait(vp, io_off,
-				(flags & B_FREE) ? SE_EXCL : SE_SHARED);
+			    (flags & B_FREE) ? SE_EXCL : SE_SHARED);
 		}
 
 		if (pp != NULL && pvn_getdirty(pp, flags)) {
@@ -3136,7 +3135,7 @@ zfs_fillpage(vnode_t *vp, u_offset_t off, struct seg *seg,
 		ASSERT3U(off, >=, koff);
 		ASSERT3U(off, <, koff + klen);
 		pp = pvn_read_kluster(vp, off, seg, addr, &io_off,
-			    &io_len, koff, klen, 0);
+		    &io_len, koff, klen, 0);
 	}
 	if (pp == NULL) {
 		/*
