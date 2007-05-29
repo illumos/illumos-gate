@@ -23,8 +23,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef _META_GLOBAL_H
-#define	_META_GLOBAL_H
+#ifndef _METAGLOBAL_H
+#define	_METAGLOBAL_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -814,4 +814,4 @@ CK_RV meta_WaitForSlotEvent(CK_FLAGS flags, CK_SLOT_ID_PTR pSlot,
 }
 #endif
 
-#endif /* _META_GLOBAL_H */
+#endif /* _METAGLOBAL_H */
