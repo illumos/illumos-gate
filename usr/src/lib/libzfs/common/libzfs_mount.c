@@ -347,7 +347,7 @@ zfs_unmount(zfs_handle_t *zhp, const char *mountpoint, int flags)
 
 		if (unmount_one(zhp->zfs_hdl, mntpt, flags) != 0) {
 			free(mntpt);
-			zfs_share_nfs(zhp);
+			(void) zfs_share_nfs(zhp);
 			return (-1);
 		}
 		free(mntpt);
