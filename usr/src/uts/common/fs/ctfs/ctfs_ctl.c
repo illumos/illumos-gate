@@ -117,16 +117,16 @@ ctfs_ctl_open(vnode_t **vpp, int flag, cred_t *cr)
 }
 
 /*
- * ctfs_ctl_getattr - VOP_GETATTR entry point
+ * ctfs_ctl_common_getattr
+ * Implements fucntionality common to ctl and status ctfs VOP_GETATTR
+ * entry points. It assumes vp->v_data is set
  */
-/* ARGSUSED */
 static int
-ctfs_ctl_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+ctfs_ctl_common_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 {
 	ctfs_ctlnode_t *ctlnode = vp->v_data;
 
 	vap->va_type = VREG;
-	vap->va_mode = 0222;
 	vap->va_nlink = 1;
 	vap->va_size = 0;
 	vap->va_ctime = ctlnode->ctfs_ctl_contract->ct_ctime;
@@ -137,6 +137,30 @@ ctfs_ctl_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 	ctfs_common_getattr(vp, vap);
 
 	return (0);
+}
+
+/*
+ * ctfs_ctl_getattr - VOP_GETATTR entry point
+ */
+/* ARGSUSED */
+static int
+ctfs_ctl_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+{
+	vap->va_mode = 0222;
+
+	return (ctfs_ctl_common_getattr(vp, vap, flags, cr));
+}
+
+/*
+ * ctfs_stat_getattr - VOP_GETATTR entry point
+ */
+/* ARGSUSED */
+static int
+ctfs_stat_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+{
+	vap->va_mode = 0444;
+
+	return (ctfs_ctl_common_getattr(vp, vap, flags, cr));
 }
 
 /*
@@ -279,7 +303,7 @@ const fs_operation_def_t ctfs_tops_stat[] = {
 	{ VOPNAME_OPEN,		{ .vop_open = ctfs_open } },
 	{ VOPNAME_CLOSE,	{ .vop_close = ctfs_close } },
 	{ VOPNAME_IOCTL,	{ .vop_ioctl = ctfs_stat_ioctl } },
-	{ VOPNAME_GETATTR,	{ .vop_getattr = ctfs_ctl_getattr } },
+	{ VOPNAME_GETATTR,	{ .vop_getattr = ctfs_stat_getattr } },
 	{ VOPNAME_ACCESS,	{ .vop_access = ctfs_access_readonly } },
 	{ VOPNAME_READDIR,	{ .error = fs_notdir } },
 	{ VOPNAME_LOOKUP,	{ .error = fs_notdir } },
