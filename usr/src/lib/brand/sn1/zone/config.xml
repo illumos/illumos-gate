@@ -36,6 +36,7 @@
 
 	<initname>/sbin/init</initname>
 	<login_cmd>/usr/bin/login -z %Z -f %u</login_cmd>
+	<user_cmd>/usr/bin/getent passwd %u</user_cmd>
 
 	<install>/usr/lib/lu/lucreatezone -z %z</install>
 	<installopts></installopts>

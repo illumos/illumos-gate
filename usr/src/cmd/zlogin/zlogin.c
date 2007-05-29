@@ -58,12 +58,13 @@
 #include <sys/contract/process.h>
 #include <sys/ctfs.h>
 #include <sys/brand.h>
-
+#include <sys/wait.h>
 #include <alloca.h>
 #include <assert.h>
 #include <ctype.h>
 #include <door.h>
 #include <errno.h>
+#include <nss_dbdefs.h>
 #include <poll.h>
 #include <priv.h>
 #include <pwd.h>
@@ -745,20 +746,20 @@ process_output(int in_fd, int out_fd)
  * This is the main I/O loop, and is shared across all zlogin modes.
  * Parameters:
  * 	stdin_fd:  The fd representing 'stdin' for the slave side; input to
- *	           the zone will be written here.
+ *		   the zone will be written here.
  *
  * 	appin_fd:  The fd representing the other end of the 'stdin' pipe (when
  *		   we're running non-interactive); used in process_raw_input
  *		   to ensure we don't fill up the application's stdin pipe.
  *
  *	stdout_fd: The fd representing 'stdout' for the slave side; output
- *	           from the zone will arrive here.
+ *		   from the zone will arrive here.
  *
  *	stderr_fd: The fd representing 'stderr' for the slave side; output
- *	           from the zone will arrive here.
+ *		   from the zone will arrive here.
  *
  *	raw_mode:  If TRUE, then no processing (for example, for '~.') will
- *	           be performed on the input coming from STDIN.
+ *		   be performed on the input coming from STDIN.
  *
  * stderr_fd may be specified as -1 if there is no stderr (only non-interactive
  * mode supplies a stderr).
@@ -899,6 +900,62 @@ retry:
 			goto retry;
 		}
 	}
+}
+
+/*
+ * Fetch the user_cmd brand hook for getting a user's passwd(4) entry.
+ */
+static const char *
+zone_get_user_cmd(brand_handle_t bh, const char *login, char *user_cmd,
+    size_t len)
+{
+	bzero(user_cmd, sizeof (user_cmd));
+	if (brand_get_user_cmd(bh, login, user_cmd, len) != 0)
+		return (NULL);
+
+	return (user_cmd);
+}
+
+/* From libc */
+extern int str2passwd(const char *, int, void *, char *, int);
+
+/*
+ * exec() the user_cmd brand hook, and convert the output string to a
+ * struct passwd.  This is to be called after zone_enter().
+ *
+ */
+static struct passwd *
+zone_get_user_pw(const char *user_cmd, struct passwd *pwent, char *pwbuf,
+    int pwbuflen)
+{
+	char pwline[NSS_BUFLEN_PASSWD];
+	char *cin = NULL;
+	FILE *fin;
+	int status;
+
+	assert(getzoneid() != GLOBAL_ZONEID);
+
+	if ((fin = popen(user_cmd, "r")) == NULL)
+		return (NULL);
+
+	while (cin == NULL && !feof(fin))
+		cin = fgets(pwline, sizeof (pwline), fin);
+
+	if (cin == NULL) {
+		(void) pclose(fin);
+		return (NULL);
+	}
+
+	status = pclose(fin);
+	if (!WIFEXITED(status))
+		return (NULL);
+	if (WEXITSTATUS(status) != 0)
+		return (NULL);
+
+	if (str2passwd(pwline, sizeof (pwline), pwent, pwbuf, pwbuflen) == 0)
+		return (pwent);
+	else
+		return (NULL);
 }
 
 static char **
@@ -1102,32 +1159,45 @@ prep_env()
  * that.
  */
 static char **
-prep_env_noninteractive(char *login, char **env)
+prep_env_noninteractive(const char *user_cmd, char **env)
 {
 	size_t size;
-	struct passwd *pw;
 	char **new_env;
 	int e, i;
 	char *estr;
 	char varmail[LOGNAME_MAX + 11]; /* strlen(/var/mail/) = 10, NUL */
+	char pwbuf[NSS_BUFLEN_PASSWD + 1];
+	struct passwd pwent;
+	struct passwd *pw = NULL;
 
 	assert(env != NULL);
 	assert(failsafe == 0);
+
+	/*
+	 * Exec the "user_cmd" brand hook to get a pwent for the
+	 * login user.  If this fails, HOME will be set to "/", SHELL
+	 * will be set to $DEFAULTSHELL, and we will continue to exec
+	 * SUPATH <login> -c <cmd>.
+	 */
+	pw = zone_get_user_pw(user_cmd, &pwent, pwbuf, sizeof (pwbuf));
 
 	/*
 	 * Get existing envp size.
 	 */
 	for (size = 0; env[size] != NULL; size++)
 		;
+
 	e = size;
 
 	/*
 	 * Finish filling out the environment; we duplicate the environment
 	 * setup described in login(1), for lack of a better precedent.
 	 */
-	if ((pw = getpwnam(login)) != NULL) {
+	if (pw != NULL)
 		size += 3;	/* LOGNAME, HOME, MAIL */
-	}
+	else
+		size += 1;	/* HOME */
+
 	size++;	/* always fill in SHELL */
 	size++; /* terminating NULL */
 
@@ -1159,6 +1229,10 @@ prep_env_noninteractive(char *login, char **env)
 		(void) snprintf(varmail, sizeof (varmail), "/var/mail/%s",
 		    pw->pw_name);
 		if ((estr = add_env("MAIL", varmail)) == NULL)
+			goto malloc_fail;
+		new_env[e++] = estr;
+	} else {
+		if ((estr = add_env("HOME", "/")) == NULL)
 			goto malloc_fail;
 		new_env[e++] = estr;
 	}
@@ -1376,7 +1450,7 @@ init_template(void)
 }
 
 static int
-noninteractive_login(char *zonename, zoneid_t zoneid, char *login,
+noninteractive_login(char *zonename, const char *user_cmd, zoneid_t zoneid,
     char **new_args, char **new_env)
 {
 	pid_t retval;
@@ -1475,8 +1549,16 @@ noninteractive_login(char *zonename, zoneid_t zoneid, char *login,
 			_exit(1);
 		}
 
+		/*
+		 * For non-native zones, tell libc where it can find locale
+		 * specific getttext() messages.
+		 */
+		if (access("/native/usr/lib/locale", R_OK) == 0)
+			(void) bindtextdomain(TEXT_DOMAIN,
+			    "/native/usr/lib/locale");
+
 		if (!failsafe)
-			new_env = prep_env_noninteractive(login, new_env);
+			new_env = prep_env_noninteractive(user_cmd, new_env);
 
 		if (new_env == NULL) {
 			_exit(1);
@@ -1534,6 +1616,7 @@ main(int argc, char **argv)
 	struct stat sb;
 	char kernzone[ZONENAME_MAX];
 	brand_handle_t bh;
+	char user_cmd[MAXPATHLEN];
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -1759,6 +1842,19 @@ main(int argc, char **argv)
 		brand_close(bh);
 		return (1);
 	}
+	/*
+	 * Get the brand specific user_cmd.  This command is used to get
+	 * a passwd(4) entry for login.
+	 */
+	if (!interactive && !failsafe) {
+		if (zone_get_user_cmd(bh, login, user_cmd,
+		    sizeof (user_cmd)) == NULL) {
+			zerror(gettext("could not get user_cmd for zone %s"),
+			    zonename);
+			brand_close(bh);
+			return (1);
+		}
+	}
 	brand_close(bh);
 
 	if ((new_env = prep_env()) == NULL) {
@@ -1767,8 +1863,8 @@ main(int argc, char **argv)
 	}
 
 	if (!interactive)
-		return (noninteractive_login(zonename, zoneid, login, new_args,
-		    new_env));
+		return (noninteractive_login(zonename, user_cmd, zoneid,
+		    new_args, new_env));
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot use interactive login with scratch "

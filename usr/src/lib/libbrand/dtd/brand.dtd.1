@@ -186,6 +186,21 @@
 <!ATTLIST login_cmd>
 
 <!--
+  user_cmd
+
+    Path to the binary that will translate a user name to a passwd(4) entry.
+
+    The following replacements are performed:
+
+      %u        User login name
+
+    It has no attributes.  The passwd(4) entry is used to determine $LOGNAME,
+    $HOME, and $SHELL for non-interactive "zlogin -l <user> <cmd>".
+-->
+<!ELEMENT user_cmd   (#PCDATA) >
+<!ATTLIST user_cmd>
+
+<!--
   postclone
 
     Path to a script that will perform any necessary post-processing on
@@ -242,8 +257,8 @@
 		directory in which the configuration file is stored.
 -->
 
-<!ELEMENT brand		(modname, initname, login_cmd, install, installopts,
-			boot, halt, verify_cfg, verify_adm, postclone,
-			privilege+)>
+<!ELEMENT brand		(modname, initname, login_cmd, user_cmd, install,
+			installopts, boot, halt, verify_cfg, verify_adm,
+			postclone, privilege+)>
 
 <!ATTLIST brand		name		CDATA #REQUIRED>

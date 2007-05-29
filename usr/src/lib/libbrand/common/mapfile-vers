@@ -39,6 +39,7 @@ SUNWprivate {
 	brand_get_login_cmd;
 	brand_get_modname;
 	brand_get_postclone;
+	brand_get_user_cmd;
 	brand_get_verify_adm;
 	brand_get_verify_cfg;
 	brand_is_native;

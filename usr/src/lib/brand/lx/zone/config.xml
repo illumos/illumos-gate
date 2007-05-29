@@ -36,6 +36,7 @@
 
 	<initname>/sbin/init</initname>
 	<login_cmd>/bin/login -h zone:%Z -f %u</login_cmd>
+	<user_cmd>/usr/bin/getent passwd %u</user_cmd>
 
 	<install>/usr/lib/brand/lx/lx_install %z %R %*</install>
 	<installopts>d:hsvX</installopts>

@@ -63,6 +63,7 @@ extern int brand_get_login_cmd(brand_handle_t, const char *, char *, size_t);
 extern int brand_get_modname(brand_handle_t, char *, size_t);
 extern int brand_get_postclone(brand_handle_t, const char *, const char *,
     char *, size_t, int, char **);
+extern int brand_get_user_cmd(brand_handle_t, const char *, char *, size_t);
 extern int brand_get_verify_cfg(brand_handle_t, char *, size_t);
 extern int brand_get_verify_adm(brand_handle_t, const char *, const char *,
     char *, size_t, int, char **);

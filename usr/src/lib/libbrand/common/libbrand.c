@@ -62,6 +62,7 @@
 #define	DTD_ELEM_POSTCLONE	((const xmlChar *) "postclone")
 #define	DTD_ELEM_PRIVILEGE	((const xmlChar *) "privilege")
 #define	DTD_ELEM_SYMLINK	((const xmlChar *) "symlink")
+#define	DTD_ELEM_USER_CMD	((const xmlChar *) "user_cmd")
 #define	DTD_ELEM_VERIFY_CFG	((const xmlChar *) "verify_cfg")
 #define	DTD_ELEM_VERIFY_ADM	((const xmlChar *) "verify_adm")
 
@@ -482,6 +483,16 @@ brand_get_login_cmd(brand_handle_t bh, const char *username,
 	const char *curr_zone = get_curr_zone();
 	return (brand_get_value(bhp, NULL, NULL, username, curr_zone,
 	    buf, len, 0, NULL, DTD_ELEM_LOGIN_CMD, B_TRUE, B_FALSE));
+}
+
+int
+brand_get_user_cmd(brand_handle_t bh, const char *username,
+    char *buf, size_t len)
+{
+	struct brand_handle *bhp = (struct brand_handle *)bh;
+
+	return (brand_get_value(bhp, NULL, NULL, username, NULL,
+	    buf, len, 0, NULL, DTD_ELEM_USER_CMD, B_TRUE, B_FALSE));
 }
 
 int
