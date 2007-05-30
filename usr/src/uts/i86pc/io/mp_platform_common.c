@@ -699,8 +699,8 @@ acpi_probe(char *modname)
 			acpi_nmi_scnt++;
 
 			cmn_err(CE_NOTE, "!apic: nmi source: %d %d %d\n",
-				mns->Interrupt, mns->Polarity,
-				mns->TriggerMode);
+			    mns->Interrupt, mns->Polarity,
+			    mns->TriggerMode);
 			break;
 
 		case APIC_LOCAL_NMI:
@@ -711,15 +711,15 @@ acpi_probe(char *modname)
 			acpi_nmi_ccnt++;
 
 			cmn_err(CE_NOTE, "!apic: local nmi: %d %d %d %d\n",
-				mlan->ProcessorId, mlan->Polarity,
-				mlan->TriggerMode, mlan->Lint);
+			    mlan->ProcessorId, mlan->Polarity,
+			    mlan->TriggerMode, mlan->Lint);
 			break;
 
 		case APIC_ADDRESS_OVERRIDE:
 			/* UNIMPLEMENTED */
 			mao = (MADT_ADDRESS_OVERRIDE *) ap;
 			cmn_err(CE_NOTE, "!apic: address override: %lx\n",
-				(long)mao->Address);
+			    (long)mao->Address);
 			break;
 
 		case APIC_IO_SAPIC:
@@ -727,8 +727,8 @@ acpi_probe(char *modname)
 			misa = (MADT_IO_SAPIC *) ap;
 
 			cmn_err(CE_NOTE, "!apic: io sapic: %d %d %lx\n",
-				misa->IoSapicId, misa->InterruptBase,
-				(long)misa->Address);
+			    misa->IoSapicId, misa->InterruptBase,
+			    (long)misa->Address);
 			break;
 
 		case APIC_XRUPT_SOURCE:
@@ -736,11 +736,11 @@ acpi_probe(char *modname)
 			mis = (MADT_INTERRUPT_SOURCE *) ap;
 
 			cmn_err(CE_NOTE,
-				"!apic: irq source: %d %d %d %d %d %d %d\n",
-				mis->ProcessorId, mis->ProcessorEid,
-				mis->Interrupt, mis->Polarity,
-				mis->TriggerMode, mis->InterruptType,
-				mis->IoSapicVector);
+			    "!apic: irq source: %d %d %d %d %d %d %d\n",
+			    mis->ProcessorId, mis->ProcessorEid,
+			    mis->Interrupt, mis->Polarity,
+			    mis->TriggerMode, mis->InterruptType,
+			    mis->IoSapicVector);
 			break;
 		default:
 			break;
@@ -1047,7 +1047,7 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 
 				ioapic_mask_workaround[apic_io_max] =
 				    apic_is_ioapic_AMD_813x(
-					ioapicp->io_apic_addr);
+				    ioapicp->io_apic_addr);
 
 				apic_ix = apic_io_max;
 				id = ioapic_read(apic_ix, APIC_ID_CMD);
@@ -1848,7 +1848,7 @@ apic_handle_pci_pci_bridge(dev_info_t *idip, int child_devno, int child_ipin,
 	/*CONSTCOND*/
 	while (1) {
 		if (((dipp = ddi_get_parent(dip)) == (dev_info_t *)NULL) ||
-		    (pci_config_setup(dipp, &cfg_handle) == DDI_SUCCESS))
+		    (pci_config_setup(dipp, &cfg_handle) != DDI_SUCCESS))
 			return (-1);
 		if ((pci_config_get8(cfg_handle, PCI_CONF_BASCLASS) ==
 		    PCI_CLASS_BRIDGE) && (pci_config_get8(cfg_handle,
@@ -2499,7 +2499,7 @@ apic_allocate_irq(int irq)
 		    kmem_zalloc(sizeof (apic_irq_t), KM_NOSLEEP);
 		if (apic_irq_table[freeirq] == NULL) {
 			cmn_err(CE_WARN, "%s: NO memory to allocate IRQ",
-			psm_name);
+			    psm_name);
 			return (-1);
 		}
 		apic_irq_table[freeirq]->airq_mps_intr_index = FREE_INDEX;
@@ -2828,8 +2828,8 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 			    irq_ptr->airq_intin_no,
 			    cpu_infop->aci_local_id) != PSM_SUCCESS) {
 				cmn_err(CE_WARN, "pcplusmp: "
-					"apic_pci_msi_enable_vector "
-					"returned PSM_FAILURE");
+				    "apic_pci_msi_enable_vector "
+				    "returned PSM_FAILURE");
 			}
 		}
 		if ((ioapicindex + irq_ptr->airq_intin_no - 1) ==
