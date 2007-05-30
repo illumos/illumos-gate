@@ -3037,8 +3037,22 @@ sd_enable_descr_sense(struct sd_lun *un)
 	 */
 	bd_len  = ((struct mode_header *)header)->bdesc_length;
 
+	/* Clear the mode data length field for MODE SELECT */
+	((struct mode_header *)header)->length = 0;
+
 	ctrl_bufp = (struct mode_control_scsi3 *)
 	    (header + MODE_HEADER_LENGTH + bd_len);
+
+	/*
+	 * If the page length is smaller than the expected value,
+	 * the target device doesn't support D_SENSE. Bail out here.
+	 */
+	if (ctrl_bufp->mode_page.length <
+	    sizeof (struct mode_control_scsi3) - 2) {
+		SD_ERROR(SD_LOG_COMMON, un,
+		    "sd_enable_descr_sense: enable D_SENSE failed\n");
+		goto eds_exit;
+	}
 
 	/*
 	 * Clear PS bit for MODE SELECT
