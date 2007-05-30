@@ -122,7 +122,7 @@ ctfs_ctl_open(vnode_t **vpp, int flag, cred_t *cr)
  * entry points. It assumes vp->v_data is set
  */
 static int
-ctfs_ctl_common_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
+ctfs_ctl_common_getattr(vnode_t *vp, vattr_t *vap)
 {
 	ctfs_ctlnode_t *ctlnode = vp->v_data;
 
@@ -148,7 +148,7 @@ ctfs_ctl_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 {
 	vap->va_mode = 0222;
 
-	return (ctfs_ctl_common_getattr(vp, vap, flags, cr));
+	return (ctfs_ctl_common_getattr(vp, vap));
 }
 
 /*
@@ -160,7 +160,7 @@ ctfs_stat_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 {
 	vap->va_mode = 0444;
 
-	return (ctfs_ctl_common_getattr(vp, vap, flags, cr));
+	return (ctfs_ctl_common_getattr(vp, vap));
 }
 
 /*
