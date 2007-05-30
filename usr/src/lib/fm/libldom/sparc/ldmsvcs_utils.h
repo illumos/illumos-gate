@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -147,6 +147,25 @@ struct ldom_hdl {
 	struct ldmsvcs_info *lsinfo;
 };
 
+/*
+ * in the default case of ldmd (the LDOM manager daemon/service)
+ * not installed/running, set short timeouts for contacting ldmd,
+ * so that higher levels in the software stack (ex: diagnosis engines)
+ * are not excessively delayed by ldmd's absence. both timeouts are tunable
+ * via SMF properties in ldmd's service manifest, and expected to be set
+ * thusly to appropriate values when ldmd is installed.
+ *
+ * timeouts are in seconds. init is the initial timeout; running is
+ * for subsequent timeouts.
+ */
+#define	LDM_INIT_WAIT_TIME	2
+#define	LDM_RUNNING_WAIT_TIME	2
+
+#define	LDM_SVC_NM		"svc:/ldoms/ldmd:default"
+#define	LDM_PROP_GROUP_NM	"fmd_config"
+
+#define	LDM_INIT_TO_PROP_NM	"fmd_to_ldmd_init_timeout"
+#define	LDM_RUNNING_TO_PROP_NM	"fmd_to_ldmd_running_timeout"
 
 extern int ldmsvcs_check_channel(void);
 

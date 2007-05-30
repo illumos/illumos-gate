@@ -35,6 +35,7 @@
 #include <libnvpair.h>
 #include <dlfcn.h>
 #include <link.h>
+#include <assert.h>
 
 #include <sys/processor.h>
 #include <sys/stat.h>
@@ -51,15 +52,20 @@
 #include "ldmsvcs_utils.h"
 
 #define	MD_STR_PLATFORM		"platform"
-#define	MD_STR_DOM_ENABLE	"domaining-enabled"
+#define	MD_STR_DOM_CAPABLE	"domaining-enabled"
+
+static int ldom_ldmd_is_up = 0; /* assume stays up if ever seen up */
 
 static void *ldom_dl_hp = (void *)NULL;
 static const char *ldom_dl_path = "libpri.so.1";
 static int ldom_dl_mode = (RTLD_NOW | RTLD_LOCAL);
 
-static int (*ldom_pri_init)(void) = (int (*)(void))NULL;
-static void (*ldom_pri_fini)(void) = (void (*)(void))NULL;
-static ssize_t (*ldom_pri_get)(uint8_t wait, uint64_t *token, uint64_t **buf,
+static pthread_mutex_t ldom_pri_lock = PTHREAD_MUTEX_INITIALIZER;
+static int ldom_pri_ref_cnt = 0; /* num of outstanding ldom_pri_init()s */
+static int ldom_pri_init_done = 0; /* bool for real pri_init() done */
+static int (*ldom_pri_fp_init)(void) = (int (*)(void))NULL;
+static void (*ldom_pri_fp_fini)(void) = (void (*)(void))NULL;
+static ssize_t (*ldom_pri_fp_get)(uint8_t wait, uint64_t *token, uint64_t **buf,
 	void *(*allocp)(size_t), void (*freep)(void *, size_t)) =
 	(ssize_t (*)(uint8_t wait, uint64_t *token, uint64_t **buf,
 	void *(*allocp)(size_t), void (*freep)(void *, size_t)))NULL;
@@ -76,9 +82,9 @@ ldom_pri_config(void)
 	if ((ldom_dl_hp = dlopen(ldom_dl_path, ldom_dl_mode)) == NULL)
 		return;
 
-	ldom_pri_init = (int (*)(void))dlsym(ldom_dl_hp, "pri_init");
-	ldom_pri_fini = (void (*)(void))dlsym(ldom_dl_hp, "pri_fini");
-	ldom_pri_get = (ssize_t (*)(uint8_t wait, uint64_t *token,
+	ldom_pri_fp_init = (int (*)(void))dlsym(ldom_dl_hp, "pri_init");
+	ldom_pri_fp_fini = (void (*)(void))dlsym(ldom_dl_hp, "pri_fini");
+	ldom_pri_fp_get = (ssize_t (*)(uint8_t wait, uint64_t *token,
 	    uint64_t **buf, void *(*allocp)(size_t),
 	    void (*freep)(void *, size_t)))dlsym(ldom_dl_hp, "pri_get");
 }
@@ -89,13 +95,69 @@ ldom_pri_unconfig(void)
 	if (ldom_dl_hp == NULL)
 		return;
 
-	ldom_pri_init = (int (*)(void))NULL;
-	ldom_pri_fini = (void (*)(void))NULL;
-	ldom_pri_get = (ssize_t (*)(uint8_t wait, uint64_t *token,
+	ldom_pri_fp_init = (int (*)(void))NULL;
+	ldom_pri_fp_fini = (void (*)(void))NULL;
+	ldom_pri_fp_get = (ssize_t (*)(uint8_t wait, uint64_t *token,
 	    uint64_t **buf, void *(*allocp)(size_t),
 	    void (*freep)(void *, size_t)))NULL;
 	(void) dlclose(ldom_dl_hp);
 	ldom_dl_hp = (void *)NULL;
+}
+
+/*
+ * ldom_pri_lock is assumed already held by anyone accessing ldom_pri_ref_cnt
+ */
+
+static int
+ldom_pri_init(void)
+{
+	if (ldom_pri_ref_cnt == 0) {
+		ldom_pri_config();
+		/*
+		 * ldom_pri_init() is called before we know whether we
+		 * have LDOMS FW or not; defer calling pri_init() via
+		 * ldom_pri_fp_init until the first time we try to
+		 * actually get a PRI
+		 */
+	}
+	ldom_pri_ref_cnt++;
+
+	assert(ldom_pri_ref_cnt > 0);
+
+	return (0);
+}
+
+static void
+ldom_pri_fini(void)
+{
+	assert(ldom_pri_ref_cnt > 0);
+
+	ldom_pri_ref_cnt--;
+	if (ldom_pri_ref_cnt == 0) {
+		if (ldom_pri_init_done && (ldom_pri_fp_fini != NULL)) {
+			(*ldom_pri_fp_fini)();
+			ldom_pri_init_done = 0;
+		}
+		ldom_pri_unconfig();
+	}
+}
+
+static ssize_t
+ldom_pri_get(uint8_t wait, uint64_t *token, uint64_t **buf,
+		void *(*allocp)(size_t), void (*freep)(void *, size_t))
+{
+	assert(ldom_pri_ref_cnt > 0);
+
+	if ((!ldom_pri_init_done) && (ldom_pri_fp_init != NULL)) {
+		if ((*ldom_pri_fp_init)() < 0)
+			return (-1);
+		ldom_pri_init_done = 1;
+	}
+
+	if (ldom_pri_fp_get != NULL)
+		return ((*ldom_pri_fp_get)(wait, token, buf, allocp, freep));
+	else
+		return (-1);
 }
 
 static ssize_t
@@ -103,14 +165,7 @@ get_local_core_md(ldom_hdl_t *lhp, uint64_t **buf)
 {
 	int fh;
 	size_t size;
-	ssize_t ssize;
-	uint64_t tok;
 	uint64_t *bufp;
-
-	if (ldom_pri_get != NULL)
-		if ((ssize = (*ldom_pri_get)(PRI_GET, &tok, buf,
-		    lhp->allocp, lhp->freep)) >= 0)
-			return (ssize);
 
 	if ((fh = open("/devices/pseudo/mdesc@0:mdesc", O_RDONLY, 0)) < 0)
 		return (-1);
@@ -153,9 +208,8 @@ get_local_md_prop_value(ldom_hdl_t *lhp, char *node, char *prop, uint64_t *val)
 			listp = lhp->allocp(sizeof (mde_cookie_t) * num_nodes);
 
 			if (md_scan_dag(mdp, MDE_INVAL_ELEM_COOKIE,
-					md_find_name(mdp, node),
-					md_find_name(mdp, "fwd"),
-					listp) > 0 &&
+			    md_find_name(mdp, node),
+			    md_find_name(mdp, "fwd"), listp) > 0 &&
 			    md_get_prop_val(mdp, listp[0], prop, val) >= 0) {
 				/* found the property */
 				rc = 0;
@@ -179,7 +233,7 @@ ldom_getinfo(struct ldom_hdl *lhp)
 	static int busy_init = 0;
 
 	int ier, rc = 0;
-	uint64_t domain_enable;
+	uint64_t domain_capable;
 
 	(void) pthread_mutex_lock(&mt);
 
@@ -207,15 +261,14 @@ ldom_getinfo(struct ldom_hdl *lhp)
 	 */
 	major_version = 0;
 	service_ldom = 0;
-	domain_enable = 0;
 
-	if (get_local_md_prop_value(lhp, MD_STR_PLATFORM, MD_STR_DOM_ENABLE,
-				&domain_enable) == 0 &&
-	    domain_enable != 0) {
+	if (get_local_md_prop_value(lhp, MD_STR_PLATFORM, MD_STR_DOM_CAPABLE,
+	    &domain_capable) == 0) {
 
 		/*
-		 * Domaining is enable and ldmd is not in config mode
-		 * so this is a ldom env.
+		 * LDOMS capable FW is installed; it should be ok to
+		 * try to communicate with ldmd and if that fails/timesout
+		 * then use libpri
 		 */
 		major_version = 1;
 
@@ -249,7 +302,9 @@ ldom_getinfo(struct ldom_hdl *lhp)
 
 /*
  * search the machine description for a "pid" entry (physical cpuid) and
- * return the corresponding "id" entry (virtual cpuid)
+ * return the corresponding "id" entry (virtual cpuid).
+ * return -1 if not found.
+ * if the pid property does not exist in a cpu node, assume pid = id.
  */
 static processorid_t
 cpu_phys2virt(ldom_hdl_t *lhp, uint32_t cpuid)
@@ -260,10 +315,10 @@ cpu_phys2virt(ldom_hdl_t *lhp, uint32_t cpuid)
 	ssize_t bufsize;
 	processorid_t vid;
 	uint64_t *bufp;
-	uint64_t pval;
+	uint64_t pval, pid, id;
 	int num_nodes, ncpus, i;
 
-	(void) sysinfo(SI_ARCHITECTURE, isa, MAXNAMELEN);
+	(void) sysinfo(SI_MACHINE, isa, MAXNAMELEN);
 
 	if (strcmp(isa, "sun4v") != 0)
 		return ((processorid_t)cpuid);
@@ -271,7 +326,7 @@ cpu_phys2virt(ldom_hdl_t *lhp, uint32_t cpuid)
 	/*
 	 * convert the physical cpuid to a virtual cpuid
 	 */
-	if ((bufsize = ldom_get_core_md(lhp, &bufp)) < 1)
+	if ((bufsize = get_local_core_md(lhp, &bufp)) < 1)
 		return (-1);
 
 	if ((mdp = md_init_intern(bufp, lhp->allocp, lhp->freep)) == NULL ||
@@ -282,16 +337,22 @@ cpu_phys2virt(ldom_hdl_t *lhp, uint32_t cpuid)
 
 	listp = (mde_cookie_t *)lhp->allocp(sizeof (mde_cookie_t) * num_nodes);
 	ncpus = md_scan_dag(mdp, MDE_INVAL_ELEM_COOKIE,
-			    md_find_name(mdp, "cpu"),
-			    md_find_name(mdp, "fwd"), listp);
+	    md_find_name(mdp, "cpu"), md_find_name(mdp, "fwd"), listp);
 
 	vid = -1;
 	for (i = 0; i < ncpus; i++) {
-		if (md_get_prop_val(mdp, listp[i], "pid", &pval) >= 0 &&
-		    pval == (uint64_t)cpuid) {
-			if (md_get_prop_val(mdp, listp[i], "id", &pval) >= 0)
-				vid = (processorid_t)pval;
+		if (md_get_prop_val(mdp, listp[i], "id", &pval) < 0)
+			pval = (uint64_t)-1;
+		id = pval;
 
+		/* if pid does not exist, assume pid=id */
+		if (md_get_prop_val(mdp, listp[i], "pid", &pval) < 0)
+			pval = id;
+		pid = pval;
+
+		if (pid == (uint64_t)cpuid) {
+			/* Found the entry */
+			vid = (processorid_t)id;
 			break;
 		}
 	}
@@ -342,7 +403,7 @@ os_mem_page_retire(ldom_hdl_t *lhp, int cmd, nvlist_t *nvl)
 	}
 
 	if ((errno = nvlist_pack(nvl, &fmribuf, &fmrisz,
-				    NV_ENCODE_NATIVE, 0)) != 0) {
+	    NV_ENCODE_NATIVE, 0)) != 0) {
 		lhp->freep(fmribuf, fmrisz);
 		(void) close(fd);
 		return (EINVAL);
@@ -364,64 +425,58 @@ os_mem_page_retire(ldom_hdl_t *lhp, int cmd, nvlist_t *nvl)
 	return (rc);
 }
 
+
 int
 ldom_fmri_status(ldom_hdl_t *lhp, nvlist_t *nvl)
 {
 	char *name;
-	int ret;
+	int ret = ENOTSUP;
 
 	if (nvlist_lookup_string(nvl, FM_FMRI_SCHEME, &name) != 0)
 		return (EINVAL);
 
-	switch (ldom_major_version(lhp)) {
-	case 0:
-		/*
-		 * version == 0 means LDOMS support is not available
-		 */
+	/*
+	 * ldom_ldmd_is_up can only be true if ldom_major_version()
+	 * returned 1 earlier; the major version is constant for the
+	 * life of the client process
+	 */
+
+	if (!ldom_ldmd_is_up) {
+		/* Zeus is unavail; use local routines for status/retire */
+
 		if (strcmp(name, FM_FMRI_SCHEME_CPU) == 0) {
 			processorid_t vid;
 			uint32_t cpuid;
 
-			if (nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID,
-						    &cpuid) == 0 &&
-			    (vid = cpu_phys2virt(lhp, cpuid)) != -1)
+			if (nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID, &cpuid)
+			    == 0 && (vid = cpu_phys2virt(lhp, cpuid)) != -1)
 				return (p_online(vid, P_STATUS));
 		} else if (strcmp(name, FM_FMRI_SCHEME_MEM) == 0) {
 			return (os_mem_page_retire(lhp,
-						MEM_PAGE_FMRI_ISRETIRED, nvl));
+			    MEM_PAGE_FMRI_ISRETIRED, nvl));
 		}
 
 		return (EINVAL);
-		/*NOTREACHED*/
-		break;
-	case 1:
-		/* LDOMS 1.0 */
+	} else {
+		/* Zeus is avail; use Zeus for status/retire */
+
 		if (strcmp(name, FM_FMRI_SCHEME_CPU) == 0) {
 			uint32_t cpuid;
 
 			if (nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID,
-						&cpuid) == 0)
+			    &cpuid) == 0)
 				ret = ldmsvcs_cpu_req_status(lhp, cpuid);
 		} else if (strcmp(name, FM_FMRI_SCHEME_MEM) == 0) {
 			uint64_t pa;
 
 			if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR,
-						&pa) == 0)
+			    &pa) == 0)
 				ret = ldmsvcs_mem_req_status(lhp, pa);
 			else
 				ret = EINVAL;
-		} else {
-			ret = ENOTSUP;
 		}
 		return (ret);
-
-		/*NOTREACHED*/
-		break;
-	default:
-		break;
 	}
-
-	return (ENOTSUP);
 }
 
 
@@ -429,60 +484,53 @@ int
 ldom_fmri_retire(ldom_hdl_t *lhp, nvlist_t *nvl)
 {
 	char *name;
-	int ret;
+	int ret = ENOTSUP;
 
 	if (nvlist_lookup_string(nvl, FM_FMRI_SCHEME, &name) != 0)
 		return (EINVAL);
 
-	switch (ldom_major_version(lhp)) {
-	case 0:
-		/*
-		 * version == 0 means LDOMS support is not available
-		 */
+	/*
+	 * ldom_ldmd_is_up can only be true if ldom_major_version()
+	 * returned 1 earlier; the major version is constant for the
+	 * life of the client process
+	 */
+
+	if (!ldom_ldmd_is_up) {
+		/* Zeus is unavail; use local routines for status/retire */
+
 		if (strcmp(name, FM_FMRI_SCHEME_CPU) == 0) {
 			processorid_t vid;
 			uint32_t cpuid;
 
-			if (nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID,
-						    &cpuid) == 0 &&
-			    (vid = cpu_phys2virt(lhp, cpuid)) != -1)
+			if (nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID, &cpuid)
+			    == 0 && (vid = cpu_phys2virt(lhp, cpuid)) != -1)
 				return (p_online(vid, P_FAULTED));
 		} else if (strcmp(name, FM_FMRI_SCHEME_MEM) == 0) {
 			return (os_mem_page_retire(lhp,
-						MEM_PAGE_FMRI_RETIRE, nvl));
+			    MEM_PAGE_FMRI_RETIRE, nvl));
 		}
 
 		return (EINVAL);
-		/*NOTREACHED*/
-		break;
-	case 1:
-		/* LDOMS 1.0 */
+	} else {
+		/* Zeus is avail; use Zeus for status/retire */
+
 		if (strcmp(name, FM_FMRI_SCHEME_CPU) == 0) {
 			uint32_t cpuid;
 
 			if (nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID,
-						&cpuid) == 0)
+			    &cpuid) == 0)
 				ret = ldmsvcs_cpu_req_offline(lhp, cpuid);
 		} else if (strcmp(name, FM_FMRI_SCHEME_MEM) == 0) {
 			uint64_t pa;
 
 			if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR,
-						&pa) == 0)
+			    &pa) == 0)
 				ret = ldmsvcs_mem_req_retire(lhp, pa);
 			else
 				ret = EINVAL;
-		} else {
-			ret = ENOTSUP;
 		}
 		return (ret);
-
-		/*NOTREACHED*/
-		break;
-	default:
-		break;
 	}
-
-	return (ENOTSUP);
 }
 
 
@@ -542,30 +590,34 @@ ssize_t
 ldom_get_core_md(ldom_hdl_t *lhp, uint64_t **buf)
 {
 	ssize_t		rv;	/* return value */
+	uint64_t	tok;	/* opaque PRI token */
 
 	switch (ldom_major_version(lhp)) {
 	case 0:
-		return (get_local_core_md(lhp, buf));
-		/*NOTREACHED*/
+		/* pre LDOMS */
+		rv = get_local_core_md(lhp, buf);
 		break;
 	case 1:
-		/* LDOMS 1.0 */
+		/* LDOMS 1.0 - Zeus and libpri usable only on service dom */
 		if (ldom_on_service(lhp) == 1) {
-			if ((rv = ldmsvcs_get_core_md(lhp, buf)) < 0)
-				rv = get_local_core_md(lhp, buf);
-			return (rv);
+			if ((rv = ldmsvcs_get_core_md(lhp, buf)) < 1) {
+				(void) pthread_mutex_lock(&ldom_pri_lock);
+				rv = ldom_pri_get(PRI_GET, &tok,
+				    buf, lhp->allocp, lhp->freep);
+				(void) pthread_mutex_unlock(&ldom_pri_lock);
+			} else {
+				ldom_ldmd_is_up = 1;
+			}
 		} else {
-			return (get_local_core_md(lhp, buf));
+			rv = get_local_core_md(lhp, buf);
 		}
-
-		/*NOTREACHED*/
 		break;
 	default:
-		*buf = NULL;
+		rv = -1;
 		break;
 	}
 
-	return (-1);
+	return (rv);
 }
 
 /*
@@ -606,16 +658,20 @@ ldom_init(void *(*allocp)(size_t size),
 {
 	struct ldom_hdl *lhp;
 
-	ldom_pri_config();
-	if (ldom_pri_init != NULL)
-		if ((*ldom_pri_init)() < 0)
-			return (NULL);
+	(void) pthread_mutex_lock(&ldom_pri_lock);
 
-	if ((lhp = allocp(sizeof (struct ldom_hdl))) == NULL) {
-		if (ldom_pri_fini != NULL)
-			(*ldom_pri_fini)();
+	if (ldom_pri_init() < 0) {
+		(void) pthread_mutex_unlock(&ldom_pri_lock);
 		return (NULL);
 	}
+
+	if ((lhp = allocp(sizeof (struct ldom_hdl))) == NULL) {
+		ldom_pri_fini();
+		(void) pthread_mutex_unlock(&ldom_pri_lock);
+		return (NULL);
+	}
+
+	(void) pthread_mutex_unlock(&ldom_pri_lock);
 
 	lhp->major_version = -1;	/* version not yet determined */
 	lhp->allocp = allocp;
@@ -636,9 +692,11 @@ ldom_fini(ldom_hdl_t *lhp)
 	ldmsvcs_fini(lhp);
 	lhp->freep(lhp, sizeof (struct ldom_hdl));
 
-	if (ldom_pri_fini != NULL)
-		(*ldom_pri_fini)();
-	ldom_pri_unconfig();
+	(void) pthread_mutex_lock(&ldom_pri_lock);
+
+	ldom_pri_fini();
+
+	(void) pthread_mutex_unlock(&ldom_pri_lock);
 }
 
 /* end file */

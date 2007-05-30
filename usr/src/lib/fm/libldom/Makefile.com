@@ -44,7 +44,7 @@ CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
 LDLIBS += $(MACH_LDLIBS)
-LDLIBS += -lnvpair -lmdesc -lc
+LDLIBS += -lnvpair -lscf -lmdesc -lc
 
 LINTFLAGS = -msux
 LINTFLAGS64 = -msux -Xarch=$(MACH64:sparcv9=v9)

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,8 @@
 #include <sys/processor.h>
 #include <poll.h>
 #include <pthread.h>
+#include <values.h>
+#include <libscf.h>
 
 #include "ldmsvcs_utils.h"
 
@@ -52,15 +54,10 @@
 	"/devices/virtual-devices@100/channel-devices@200/" \
 	"/virtual-channel-client@1:ldmfma"
 
-/*
- * use a long conservative reinitialization time (in seconds) for the LDOM
- * manager; use a short wait time afterwards
- */
-#define	LDM_INIT_WAIT_TIME	600
-#define	LDM_RUNNING_WAIT_TIME	10
+/* allow timeouts in sec that are nearly forever but small enough for an int */
+#define	LDM_TIMEOUT_CEILING	(MAXINT / 2)
 
 #define	MIN(x, y)	((x) < (y) ? (x) : (y))
-
 
 /*
  * functions in this file are for version 1.0 of FMA domain services
@@ -127,21 +124,43 @@ static int channel_openreset(struct ldmsvcs_info *lsp);
 static int read_msg(struct ldmsvcs_info *lsp);
 
 
+static int
+get_smf_int_val(char *prop_nm, int min, int max, int default_val)
+{
+	scf_simple_prop_t	*prop;		/* SMF property */
+	int64_t			*valp;		/* prop value ptr */
+	int64_t			val;		/* prop value to return */
+
+	val = default_val;
+	if ((prop = scf_simple_prop_get(NULL, LDM_SVC_NM, LDM_PROP_GROUP_NM,
+	    prop_nm)) != NULL) {
+		if ((valp = scf_simple_prop_next_integer(prop)) != NULL) {
+			val = *valp;
+			if (val < min)
+				val = min;
+			else if (val > max)
+				val = max;
+		}
+		scf_simple_prop_free(prop);
+	}
+	return ((int)val);
+}
+
 static void
 channel_close(struct ldmsvcs_info *lsp)
 {
 	(void) pthread_mutex_lock(&lsp->mt);
 
 	if (lsp->fds_chan.state == CHANNEL_OPEN ||
-		lsp->fds_chan.state == CHANNEL_READY) {
+	    lsp->fds_chan.state == CHANNEL_READY) {
 		(void) close(lsp->fds_chan.fd);
-		lsp->cv_twait = LDM_INIT_WAIT_TIME;
+		lsp->cv_twait = get_smf_int_val(LDM_INIT_TO_PROP_NM,
+		    0, LDM_TIMEOUT_CEILING, LDM_INIT_WAIT_TIME);
 		lsp->fds_chan.state = CHANNEL_CLOSED;
 	}
 
 	(void) pthread_mutex_unlock(&lsp->mt);
 }
-
 
 /*
  * read size bytes of data from a streaming fd into buf
@@ -262,7 +281,7 @@ poller_recv_data(struct ldom_hdl *lhp, uint64_t req_num, int index,
 	while (pollbase.list[index]->status == PENDING &&
 	    pollbase.doreset == 0 && ier == 0)
 		ier = pthread_cond_timedwait(&pollbase.cv, &pollbase.mt,
-					    &twait);
+		    &twait);
 
 	if (ier == 0) {
 		if (pollbase.doreset == 0) {
@@ -272,13 +291,13 @@ poller_recv_data(struct ldom_hdl *lhp, uint64_t req_num, int index,
 			 * need to add req_num to beginning of resp
 			 */
 			*resplen = pollbase.list[index]->datalen +
-				sizeof (uint64_t);
+			    sizeof (uint64_t);
 			*resp = lhp->allocp(*resplen);
 			*((uint64_t *)*resp) = req_num;
 
 			if (read_stream(pollbase.list[index]->fd,
-				(void *)((ptrdiff_t)*resp + sizeof (uint64_t)),
-					*resplen - sizeof (uint64_t)) != 0)
+			    (void *)((ptrdiff_t)*resp + sizeof (uint64_t)),
+			    *resplen - sizeof (uint64_t)) != 0)
 				ier = ETIMEDOUT;
 
 			pollbase.list[index]->status = UNUSED;
@@ -351,7 +370,7 @@ poller_add_pending(struct ldom_hdl *lhp, uint64_t req_num)
 
 			newlen = pollbase.list_len + 5;
 			newlist = lhp->allocp(newlen *
-					    sizeof (struct listdata_s));
+			    sizeof (struct listdata_s));
 
 			for (i = 0; i < pollbase.list_len; i++)
 				newlist[i] = pollbase.list[i];
@@ -359,7 +378,7 @@ poller_add_pending(struct ldom_hdl *lhp, uint64_t req_num)
 			oldlist = pollbase.list;
 			pollbase.list = newlist;
 			lhp->freep(oldlist, pollbase.list_len *
-				sizeof (struct listdata_s));
+			    sizeof (struct listdata_s));
 
 			for (i = pollbase.list_len; i < newlen; i++) {
 				pollbase.list[i] =
@@ -431,7 +450,7 @@ poller_loop(void *arg)
 
 			while (pollbase.pending_count > 0)
 				(void) pthread_cond_wait(&pollbase.cv,
-							&pollbase.mt);
+				    &pollbase.mt);
 
 			ASSERT(pollbase.pending_count == 0);
 			for (i = 0; i < pollbase.list_len; i++)
@@ -489,10 +508,10 @@ poller_init(struct ldmsvcs_info *lsp)
 		 */
 		(void) pthread_attr_init(&attr);
 		(void) pthread_attr_setdetachstate(&attr,
-						PTHREAD_CREATE_DETACHED);
+		    PTHREAD_CREATE_DETACHED);
 
 		if (pthread_create(&pollbase.polling_tid, &attr,
-				    poller_loop, lsp) != 0)
+		    poller_loop, lsp) != 0)
 			rc = 1;
 
 		(void) pthread_attr_destroy(&attr);
@@ -673,9 +692,9 @@ fds_svc_reset(struct ldmsvcs_info *lsp, int index)
 		lsp->fmas_svcs.tbl[i]->hdl = 0;
 		lsp->fmas_svcs.tbl[i]->state = DS_SVC_INVAL;
 		lsp->fmas_svcs.tbl[i]->ver.major =
-			ds_vers[DS_NUM_VER - 1].major;
+		    ds_vers[DS_NUM_VER - 1].major;
 		lsp->fmas_svcs.tbl[i]->ver.minor =
-			ds_vers[DS_NUM_VER - 1].minor;
+		    ds_vers[DS_NUM_VER - 1].minor;
 	}
 
 	(void) pthread_mutex_unlock(&lsp->fmas_svcs.mt);
@@ -751,7 +770,8 @@ ds_handle_init_req(struct ldmsvcs_info *lsp, void *buf, size_t len)
 		 * Reset the timeout to a smaller value for receiving messages
 		 * from the domain services.
 		 */
-		lsp->cv_twait = LDM_RUNNING_WAIT_TIME;
+		lsp->cv_twait = get_smf_int_val(LDM_RUNNING_TO_PROP_NM,
+		    0, LDM_TIMEOUT_CEILING, LDM_RUNNING_WAIT_TIME);
 
 		(void) pthread_mutex_unlock(&lsp->mt);
 	} else {
@@ -799,7 +819,7 @@ ds_handle_reg_req(struct ldmsvcs_info *lsp, void *buf, size_t len)
 
 	if (fds_negotiate_version(req->major_vers, &new_major, &new_minor) &&
 	    (dup_svcreg = fds_svc_add(lsp, req,
-				    MIN(new_minor, req->minor_vers))) == 0) {
+	    MIN(new_minor, req->minor_vers))) == 0) {
 
 		/*
 		 * Check version info. ACK only if the major numbers
@@ -923,11 +943,11 @@ fds_svc_alloc(struct ldom_hdl *lhp, struct ldmsvcs_info *lsp)
 		;
 
 	lsp->fmas_svcs.tbl = (fds_svc_t **)lhp->allocp(sizeof (fds_svc_t *) *
-						lsp->fmas_svcs.nsvcs);
+	    lsp->fmas_svcs.nsvcs);
 
 	for (i = 0; i < lsp->fmas_svcs.nsvcs; i++) {
 		lsp->fmas_svcs.tbl[i] =
-			(fds_svc_t *)lhp->allocp(sizeof (fds_svc_t));
+		    (fds_svc_t *)lhp->allocp(sizeof (fds_svc_t));
 		bzero(lsp->fmas_svcs.tbl[i], sizeof (fds_svc_t));
 		lsp->fmas_svcs.tbl[i]->name = name[i];
 	}
@@ -961,7 +981,7 @@ fds_svc_lookup(struct ldmsvcs_info *lsp, char *name)
 	while (svc->state != DS_SVC_ACTIVE && ier == 0 &&
 	    lsp->fds_chan.state != CHANNEL_UNUSABLE)
 		ier = pthread_cond_timedwait(&lsp->fmas_svcs.cv,
-					    &lsp->fmas_svcs.mt, &twait);
+		    &lsp->fmas_svcs.mt, &twait);
 
 	(void) pthread_mutex_unlock(&lsp->fmas_svcs.mt);
 
@@ -998,14 +1018,14 @@ read_msg(struct ldmsvcs_info *lsp)
 
 	if (header.msg_type >=
 	    sizeof (ds_msg_handlers) / sizeof (ds_msg_handler_t))
-	    return (1);
+		return (1);
 
 	/*
 	 * handle data as a special case
 	 */
 	if (header.msg_type == 9)
 		return (poller_handle_data(lsp->fds_chan.fd,
-					    header.payload_len));
+		    header.payload_len));
 
 	/*
 	 * all other types of messages should be small
@@ -1050,7 +1070,8 @@ channel_openreset(struct ldmsvcs_info *lsp)
 
 		if ((lsp->fds_chan.fd = open(FDS_VLDC, O_RDWR)) < 0) {
 			lsp->fds_chan.state = CHANNEL_UNUSABLE;
-			lsp->cv_twait = LDM_RUNNING_WAIT_TIME;
+			lsp->cv_twait = get_smf_int_val(LDM_RUNNING_TO_PROP_NM,
+			    0, LDM_TIMEOUT_CEILING, LDM_RUNNING_WAIT_TIME);
 			(void) pthread_mutex_unlock(&lsp->mt);
 			(void) pthread_cond_broadcast(&lsp->fmas_svcs.cv);
 
@@ -1063,7 +1084,7 @@ channel_openreset(struct ldmsvcs_info *lsp)
 			op.opt_val = LDC_MODE_STREAM;
 
 			if (ioctl(lsp->fds_chan.fd, VLDC_IOCTL_OPT_OP,
-				&op) != 0) {
+			    &op) != 0) {
 				(void) close(lsp->fds_chan.fd);
 				(void) pthread_mutex_unlock(&lsp->mt);
 				return (1);
@@ -1136,11 +1157,12 @@ channel_init(struct ldom_hdl *lhp)
 	(void) pthread_mutex_unlock(&mt);
 
 	root = (struct ldmsvcs_info *)
-		lhp->allocp(sizeof (struct ldmsvcs_info));
+	    lhp->allocp(sizeof (struct ldmsvcs_info));
 	bzero(root, sizeof (struct ldmsvcs_info));
 
 	root->fds_chan.state = CHANNEL_UNINITIALIZED;
-	root->cv_twait = LDM_INIT_WAIT_TIME;
+	root->cv_twait = get_smf_int_val(LDM_INIT_TO_PROP_NM,
+	    0, LDM_TIMEOUT_CEILING, LDM_INIT_WAIT_TIME);
 
 	if (pthread_mutex_init(&root->mt, NULL) != 0 ||
 	    pthread_cond_init(&root->cv, NULL) != 0) {
@@ -1222,7 +1244,7 @@ sendrecv(struct ldom_hdl *lhp, uint64_t req_num,
 
 		if ((ier = fds_send(lsp, msg, msglen)) != 0 ||
 		    (ier = poller_recv_data(lhp, req_num, index, resp,
-					    resplen)) != 0)
+		    resplen)) != 0)
 			poller_delete_pending(req_num, index);
 
 	} while (i++ < maxretries && ier != 0);
@@ -1264,7 +1286,7 @@ cpu_request(struct ldom_hdl *lhp, uint32_t msg_type, uint32_t cpuid)
 		return (ENOMSG);
 
 	reqmsglen = sizeof (ds_hdr_t) + sizeof (ds_data_handle_t) +
-		sizeof (fma_cpu_service_req_t);
+	    sizeof (fma_cpu_service_req_t);
 
 	H = lhp->allocp(reqmsglen);
 	D = (void *)((ptrdiff_t)H + sizeof (ds_hdr_t));
@@ -1272,14 +1294,14 @@ cpu_request(struct ldom_hdl *lhp, uint32_t msg_type, uint32_t cpuid)
 
 	H->msg_type = DS_DATA;
 	H->payload_len = sizeof (ds_data_handle_t) +
-		sizeof (fma_cpu_service_req_t);
+	    sizeof (fma_cpu_service_req_t);
 
 	R->req_num = fds_svc_req_num();
 	R->msg_type = msg_type;
 	R->cpu_id = cpuid;
 
 	if ((rc = sendrecv(lhp, R->req_num, H, reqmsglen,
-			    &D->svc_handle, svcname, &resp, &resplen)) != 0) {
+	    &D->svc_handle, svcname, &resp, &resplen)) != 0) {
 		lhp->freep(H, reqmsglen);
 		return (rc);
 	}
@@ -1348,7 +1370,7 @@ mem_request(struct ldom_hdl *lhp, uint32_t msg_type, uint64_t pa,
 		return (ENOMSG);
 
 	reqmsglen = sizeof (ds_hdr_t) + sizeof (ds_data_handle_t) +
-		sizeof (fma_mem_service_req_t);
+	    sizeof (fma_mem_service_req_t);
 
 	H = lhp->allocp(reqmsglen);
 	bzero(H, reqmsglen);
@@ -1357,7 +1379,7 @@ mem_request(struct ldom_hdl *lhp, uint32_t msg_type, uint64_t pa,
 
 	H->msg_type = DS_DATA;
 	H->payload_len = sizeof (ds_data_handle_t) +
-		sizeof (fma_mem_service_req_t);
+	    sizeof (fma_mem_service_req_t);
 
 	R->req_num = fds_svc_req_num();
 	R->msg_type = msg_type;
@@ -1365,7 +1387,7 @@ mem_request(struct ldom_hdl *lhp, uint32_t msg_type, uint64_t pa,
 	R->length = pgsize;
 
 	if ((rc = sendrecv(lhp, R->req_num, H, reqmsglen,
-			    &D->svc_handle, svcname, &resp, &resplen)) != 0) {
+	    &D->svc_handle, svcname, &resp, &resplen)) != 0) {
 		lhp->freep(H, reqmsglen);
 		return (rc);
 	}
@@ -1466,7 +1488,7 @@ ldmsvcs_get_core_md(struct ldom_hdl *lhp, uint64_t **buf)
 		return (-1);
 
 	reqmsglen = sizeof (ds_hdr_t) + sizeof (ds_data_handle_t) +
-		sizeof (fma_req_pri_t);
+	    sizeof (fma_req_pri_t);
 
 	H = lhp->allocp(reqmsglen);
 	D = (void *)((ptrdiff_t)H + sizeof (ds_hdr_t));
@@ -1474,12 +1496,12 @@ ldmsvcs_get_core_md(struct ldom_hdl *lhp, uint64_t **buf)
 
 	H->msg_type = DS_DATA;
 	H->payload_len = sizeof (ds_data_handle_t) +
-		sizeof (fma_req_pri_t);
+	    sizeof (fma_req_pri_t);
 
 	R->req_num = fds_svc_req_num();
 
 	if ((rc = sendrecv(lhp, R->req_num, H, reqmsglen,
-			    &D->svc_handle, svcname, &resp, &resplen)) != 0) {
+	    &D->svc_handle, svcname, &resp, &resplen)) != 0) {
 		lhp->freep(H, reqmsglen);
 		errno = rc;
 		return (-1);
