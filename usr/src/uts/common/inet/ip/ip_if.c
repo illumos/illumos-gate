@@ -149,8 +149,7 @@ static int	ip_sioctl_arp_common(ill_t *ill, queue_t *q, mblk_t *mp,
 static ipaddr_t	ip_subnet_mask(ipaddr_t addr, ipif_t **, ip_stack_t *);
 static void	ip_wput_ioctl(queue_t *q, mblk_t *mp);
 static void	ipsq_flush(ill_t *ill);
-static void	ipsq_clean_all(ill_t *ill);
-static void	ipsq_clean_ring(ill_t *ill, ill_rx_ring_t *rx_ring);
+
 static	int	ip_sioctl_token_tail(ipif_t *ipif, sin6_t *sin6, int addrlen,
     queue_t *q, mblk_t *mp, boolean_t need_up);
 static void	ipsq_delete(ipsq_t *);
@@ -785,28 +784,6 @@ ipif_non_duplicate(ipif_t *ipif)
 }
 
 /*
- * Send all deferred messages without waiting for their ACKs.
- */
-void
-ill_send_all_deferred_mp(ill_t *ill)
-{
-	mblk_t *mp, *next;
-
-	/*
-	 * Clear ill_dlpi_pending so that the message is not queued in
-	 * ill_dlpi_send().
-	 */
-	ill->ill_dlpi_pending = DL_PRIM_INVAL;
-
-	for (mp = ill->ill_dlpi_deferred; mp != NULL; mp = next) {
-		next = mp->b_next;
-		mp->b_next = NULL;
-		ill_dlpi_send(ill, mp);
-	}
-	ill->ill_dlpi_deferred = NULL;
-}
-
-/*
  * ill_delete_tail is called from ip_modclose after all references
  * to the closing ill are gone. The wait is done in ip_modclose
  */
@@ -843,15 +820,6 @@ ill_delete_tail(ill_t *ill)
 	 */
 	if (ill->ill_capabilities & (ILL_CAPAB_POLL|ILL_CAPAB_SOFT_RING))
 		ill_capability_dls_disable(ill);
-
-	/*
-	 * Send the detach if there's one to send (i.e., if we're above a
-	 * style 2 DLPI driver).
-	 */
-	if (ill->ill_detach_mp != NULL) {
-		ill_dlpi_send(ill, ill->ill_detach_mp);
-		ill->ill_detach_mp = NULL;
-	}
 
 	if (ill->ill_net_type != IRE_LOOPBACK)
 		qprocsoff(ill->ill_rq);
@@ -2875,7 +2843,7 @@ ill_capability_dls_init(ill_t *ill)
 /*
  * ill_capability_dls_disable: disable soft_ring and/or polling
  * capability. Since any of the rings might already be in use, need
- * to call ipsq_clean_all() which gets behind the squeue to disable
+ * to call ip_squeue_clean_all() which gets behind the squeue to disable
  * direct calls if necessary.
  */
 static void
@@ -2884,7 +2852,7 @@ ill_capability_dls_disable(ill_t *ill)
 	ill_dls_capab_t	*ill_dls = ill->ill_dls_capab;
 
 	if (ill->ill_capabilities & ILL_CAPAB_DLS) {
-		ipsq_clean_all(ill);
+		ip_squeue_clean_all(ill);
 		ill_dls->ill_tx = NULL;
 		ill_dls->ill_tx_handle = NULL;
 		ill_dls->ill_dls_change_status = NULL;
@@ -3992,7 +3960,7 @@ nd_ill_forward_set(queue_t *q, mblk_t *mp, char *valuestr, caddr_t cp,
 	}
 
 	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
-	retval = ill_forward_set(q, mp, (value != 0), cp);
+	retval = ill_forward_set((ill_t *)cp, (value != 0));
 	rw_exit(&ipst->ips_ill_g_lock);
 	return (retval);
 }
@@ -4003,19 +3971,19 @@ nd_ill_forward_set(queue_t *q, mblk_t *mp, char *valuestr, caddr_t cp,
  * up RTS_IFINFO routing socket messages for each interface whose flags we
  * change.
  */
-/* ARGSUSED */
 int
-ill_forward_set(queue_t *q, mblk_t *mp, boolean_t enable, caddr_t cp)
+ill_forward_set(ill_t *ill, boolean_t enable)
 {
-	ill_t *ill = (ill_t *)cp;
 	ill_group_t *illgrp;
 	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ASSERT(IAM_WRITER_ILL(ill) || RW_READ_HELD(&ipst->ips_ill_g_lock));
 
 	if ((enable && (ill->ill_flags & ILLF_ROUTER)) ||
-	    (!enable && !(ill->ill_flags & ILLF_ROUTER)) ||
-	    (ill->ill_phyint->phyint_flags & PHYI_LOOPBACK))
+	    (!enable && !(ill->ill_flags & ILLF_ROUTER)))
+		return (0);
+
+	if (ill->ill_phyint->phyint_flags & PHYI_LOOPBACK)
 		return (EINVAL);
 
 	/*
@@ -6332,6 +6300,11 @@ ipif_ill_refrele_tail(ill_t *ill)
 	mp = ipsq_pending_mp_get(ipsq, &connp);
 	ASSERT(mp != NULL);
 
+	/*
+	 * NOTE: all of the qwriter_ip() calls below use CUR_OP since
+	 * we can only get here when the current operation decides it
+	 * it needs to quiesce via ipsq_pending_mp_add().
+	 */
 	switch (mp->b_datap->db_type) {
 	case M_PCPROTO:
 	case M_PROTO:
@@ -6343,7 +6316,7 @@ ipif_ill_refrele_tail(ill_t *ill)
 
 		switch (dlindp->dl_notification) {
 		case DL_NOTE_PHYS_ADDR:
-			qwriter_ip(NULL, ill, ill->ill_rq, mp,
+			qwriter_ip(ill, ill->ill_rq, mp,
 			    ill_set_phys_addr_tail, CUR_OP, B_TRUE);
 			return;
 		default:
@@ -6353,13 +6326,13 @@ ipif_ill_refrele_tail(ill_t *ill)
 
 	case M_ERROR:
 	case M_HANGUP:
-		qwriter_ip(NULL, ill, ill->ill_rq, mp, ipif_all_down_tail,
-		    CUR_OP, B_TRUE);
+		qwriter_ip(ill, ill->ill_rq, mp, ipif_all_down_tail, CUR_OP,
+		    B_TRUE);
 		return;
 
 	case M_IOCTL:
 	case M_IOCDATA:
-		qwriter_ip(NULL, ill, (connp != NULL ? CONNP_TO_WQ(connp) :
+		qwriter_ip(ill, (connp != NULL ? CONNP_TO_WQ(connp) :
 		    ill->ill_wq), mp, ip_reprocess_ioctl, CUR_OP, B_TRUE);
 		return;
 
@@ -7850,32 +7823,26 @@ ipsq_try_enter(ipif_t *ipif, ill_t *ill, queue_t *q, mblk_t *mp,
 }
 
 /*
- * Try to enter the ipsq exclusively, corresponding to ipif or ill. (only 1 of
- * ipif or ill can be specified). The caller ensures ipif or ill is valid by
- * ref-holding it if necessary. If the ipsq cannot be entered, the mp is queued
- * completion.
- *
- * This function does a refrele on the ipif/ill.
+ * Try to enter the IPSQ corresponding to `ill' as writer.  The caller ensures
+ * ill is valid by refholding it if necessary; we will refrele.  If the IPSQ
+ * cannot be entered, the mp is queued for completion.
  */
 void
-qwriter_ip(ipif_t *ipif, ill_t *ill, queue_t *q, mblk_t *mp,
-    ipsq_func_t func, int type, boolean_t reentry_ok)
+qwriter_ip(ill_t *ill, queue_t *q, mblk_t *mp, ipsq_func_t func, int type,
+    boolean_t reentry_ok)
 {
 	ipsq_t	*ipsq;
 
-	ipsq = ipsq_try_enter(ipif, ill, q, mp, func, type, reentry_ok);
+	ipsq = ipsq_try_enter(NULL, ill, q, mp, func, type, reentry_ok);
+
 	/*
-	 * Caller must have done a refhold on the ipif. ipif_refrele
-	 * happens on the passed ipif. We can do this since we are
-	 * already exclusive, or we won't access ipif henceforth, Both
-	 * this func and caller will just return if we ipsq_try_enter
-	 * fails above. This is needed because func needs to
-	 * see the correct refcount. Eg. removeif can work only then.
+	 * Drop the caller's refhold on the ill.  This is safe since we either
+	 * entered the IPSQ (and thus are exclusive), or failed to enter the
+	 * IPSQ, in which case we return without accessing ill anymore.  This
+	 * is needed because func needs to see the correct refcount.
+	 * e.g. removeif can work only then.
 	 */
-	if (ipif != NULL)
-		ipif_refrele(ipif);
-	else
-		ill_refrele(ill);
+	ill_refrele(ill);
 	if (ipsq != NULL) {
 		(*func)(ipsq, q, mp, NULL);
 		ipsq_exit(ipsq, B_TRUE, B_TRUE);
@@ -8158,109 +8125,6 @@ ipsq_flush(ill_t *ill)
 	(void) ipsq_pending_mp_cleanup(ill, NULL);
 	ipsq_xopq_mp_cleanup(ill, NULL);
 	ill_pending_mp_cleanup(ill);
-}
-
-/*
- * Clean up one squeue element. ill_inuse_ref is protected by ill_lock.
- * The real cleanup happens behind the squeue via ip_squeue_clean function but
- * we need to protect ourselfs from 2 threads trying to cleanup at the same
- * time (possible with one port going down for aggr and someone tearing down the
- * entire aggr simultaneously. So we use ill_inuse_ref protected by ill_lock
- * to indicate when the cleanup has started (1 ref) and when the cleanup
- * is done (0 ref). When a new ring gets assigned to squeue, we start by
- * putting 2 ref on ill_inuse_ref.
- */
-static void
-ipsq_clean_ring(ill_t *ill, ill_rx_ring_t *rx_ring)
-{
-	conn_t *connp;
-	squeue_t *sqp;
-	mblk_t *mp;
-
-	ASSERT(rx_ring != NULL);
-
-	/* Just clean one squeue */
-	mutex_enter(&ill->ill_lock);
-	/*
-	 * Reset the ILL_SOFT_RING_ASSIGN bit so that
-	 * ip_squeue_soft_ring_affinty() will not go
-	 * ahead with assigning rings.
-	 */
-	ill->ill_state_flags &= ~ILL_SOFT_RING_ASSIGN;
-	while (rx_ring->rr_ring_state == ILL_RING_INPROC)
-		/* Some operations pending on the ring. Wait */
-		cv_wait(&ill->ill_cv, &ill->ill_lock);
-
-	if (rx_ring->rr_ring_state != ILL_RING_INUSE) {
-		/*
-		 * Someone already trying to clean
-		 * this squeue or its already been cleaned.
-		 */
-		mutex_exit(&ill->ill_lock);
-		return;
-	}
-	sqp = rx_ring->rr_sqp;
-
-	if (sqp == NULL) {
-		/*
-		 * The rx_ring never had a squeue assigned to it.
-		 * We are under ill_lock so we can clean it up
-		 * here itself since no one can get to it.
-		 */
-		rx_ring->rr_blank = NULL;
-		rx_ring->rr_handle = NULL;
-		rx_ring->rr_sqp = NULL;
-		rx_ring->rr_ring_state = ILL_RING_FREE;
-		mutex_exit(&ill->ill_lock);
-		return;
-	}
-
-	/* Set the state that its being cleaned */
-	rx_ring->rr_ring_state = ILL_RING_BEING_FREED;
-	ASSERT(sqp != NULL);
-	mutex_exit(&ill->ill_lock);
-
-	/*
-	 * Use the preallocated ill_unbind_conn for this purpose
-	 */
-	connp = ill->ill_dls_capab->ill_unbind_conn;
-
-	if (connp->conn_tcp->tcp_closemp.b_prev == NULL)
-		connp->conn_tcp->tcp_closemp_used = B_TRUE;
-	else
-		cmn_err(CE_PANIC, "ipsq_clean_ring: "
-		    "concurrent use of tcp_closemp_used: connp %p tcp %p\n",
-		    (void *)connp, (void *)connp->conn_tcp);
-
-	TCP_DEBUG_GETPCSTACK(connp->conn_tcp->tcmp_stk, 15);
-	mp = &connp->conn_tcp->tcp_closemp;
-	CONN_INC_REF(connp);
-	squeue_enter(sqp, mp, ip_squeue_clean, connp, NULL);
-
-	mutex_enter(&ill->ill_lock);
-	while (rx_ring->rr_ring_state != ILL_RING_FREE)
-		cv_wait(&ill->ill_cv, &ill->ill_lock);
-
-	mutex_exit(&ill->ill_lock);
-}
-
-static void
-ipsq_clean_all(ill_t *ill)
-{
-	int idx;
-
-	/*
-	 * No need to clean if poll_capab isn't set for this ill
-	 */
-	if (!(ill->ill_capabilities & (ILL_CAPAB_POLL|ILL_CAPAB_SOFT_RING)))
-		return;
-
-	for (idx = 0; idx < ILL_MAX_RINGS; idx++) {
-		ill_rx_ring_t *ipr = &ill->ill_dls_capab->ill_ring_tbl[idx];
-		ipsq_clean_ring(ill, ipr);
-	}
-
-	ill->ill_capabilities &= ~(ILL_CAPAB_POLL|ILL_CAPAB_SOFT_RING);
 }
 
 /* ARGSUSED */
@@ -12189,10 +12053,8 @@ ip_sioctl_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	 * group, all other interfaces that are part of the same IPMP
 	 * group.
 	 */
-	if ((turn_on | turn_off) & ILLF_ROUTER) {
-		(void) ill_forward_set(q, mp, ((turn_on & ILLF_ROUTER) != 0),
-		    (caddr_t)ill);
-	}
+	if ((turn_on | turn_off) & ILLF_ROUTER)
+		(void) ill_forward_set(ill, ((turn_on & ILLF_ROUTER) != 0));
 
 	/*
 	 * If the interface is not UP and we are not going to
@@ -13623,6 +13485,30 @@ ipif_insert(ipif_t *ipif, boolean_t acquire_g_lock, boolean_t acquire_ill_lock)
 	if (acquire_g_lock)
 		rw_exit(&ipst->ips_ill_g_lock);
 	return (0);
+}
+
+static void
+ipif_remove(ipif_t *ipif, boolean_t acquire_ill_lock)
+{
+	ipif_t	**ipifp;
+	ill_t	*ill = ipif->ipif_ill;
+
+	ASSERT(RW_WRITE_HELD(&ill->ill_ipst->ips_ill_g_lock));
+	if (acquire_ill_lock)
+		mutex_enter(&ill->ill_lock);
+	else
+		ASSERT(MUTEX_HELD(&ill->ill_lock));
+
+	ipifp = &ill->ill_ipif;
+	for (; *ipifp != NULL; ipifp = &ipifp[0]->ipif_next) {
+		if (*ipifp == ipif) {
+			*ipifp = ipif->ipif_next;
+			break;
+		}
+	}
+
+	if (acquire_ill_lock)
+		mutex_exit(&ill->ill_lock);
 }
 
 /*
@@ -17689,7 +17575,6 @@ ipif_move(ipif_t *ipif, ill_t *to_ill, queue_t *q, mblk_t *mp,
 {
 	ill_t	*from_ill;
 	ipif_t	*rep_ipif;
-	ipif_t	**ipifp;
 	uint_t	unit;
 	int err = 0;
 	ipif_t	*to_ipif;
@@ -17883,13 +17768,7 @@ ipif_move(ipif_t *ipif, ill_t *to_ill, queue_t *q, mblk_t *mp,
 	}
 
 	/* Get it out of the ILL interface list. */
-	ipifp = &ipif->ipif_ill->ill_ipif;
-	for (; *ipifp != NULL; ipifp = &ipifp[0]->ipif_next) {
-		if (*ipifp == ipif) {
-			*ipifp = ipif->ipif_next;
-			break;
-		}
-	}
+	ipif_remove(ipif, B_FALSE);
 
 	/* Assign the new ill */
 	ipif->ipif_ill = to_ill;
@@ -18540,7 +18419,7 @@ ill_dl_down(ill_t *ill)
 	mutex_exit(&ill->ill_lock);
 }
 
-void
+static void
 ill_dlpi_dispatch(ill_t *ill, mblk_t *mp)
 {
 	union DL_primitives *dlp;
@@ -18580,19 +18459,17 @@ ill_dlpi_dispatch(ill_t *ill, mblk_t *mp)
 	}
 	mutex_exit(&ill->ill_lock);
 
-	/*
-	 * Some drivers send M_FLUSH up to IP as part of unbind
-	 * request.  When this M_FLUSH is sent back to the driver,
-	 * this can go after we send the detach request if the
-	 * M_FLUSH ends up in IP's syncq. To avoid that, we reply
-	 * to the M_FLUSH in ip_rput and locally generate another
-	 * M_FLUSH for the correctness.  This will get freed in
-	 * ip_wput_nondata.
-	 */
-	if (prim == DL_UNBIND_REQ)
-		(void) putnextctl1(ill->ill_rq, M_FLUSH, FLUSHRW);
-
 	putnext(ill->ill_wq, mp);
+}
+
+/*
+ * Helper function for ill_dlpi_send().
+ */
+/* ARGSUSED */
+static void
+ill_dlpi_send_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
+{
+	ill_dlpi_send((ill_t *)q->q_ptr, mp);
 }
 
 /*
@@ -18600,19 +18477,28 @@ ill_dlpi_dispatch(ill_t *ill, mblk_t *mp)
  * is only one outstanding message. Uses ill_dlpi_pending to tell
  * when it must queue. ip_rput_dlpi_writer calls ill_dlpi_done()
  * when an ACK or a NAK is received to process the next queued message.
- *
- * We don't protect ill_dlpi_pending with any lock. This is okay as
- * every place where its accessed, ip is exclusive while accessing
- * ill_dlpi_pending except when this function is called from ill_init()
  */
 void
 ill_dlpi_send(ill_t *ill, mblk_t *mp)
 {
 	mblk_t **mpp;
 
-	ASSERT(IAM_WRITER_ILL(ill));
 	ASSERT(DB_TYPE(mp) == M_PROTO || DB_TYPE(mp) == M_PCPROTO);
 
+	/*
+	 * To ensure that any DLPI requests for current exclusive operation
+	 * are always completely sent before any DLPI messages for other
+	 * operations, require writer access before enqueuing.
+	 */
+	if (!IAM_WRITER_ILL(ill)) {
+		ill_refhold(ill);
+		/* qwriter_ip() does the ill_refrele() */
+		qwriter_ip(ill, ill->ill_wq, mp, ill_dlpi_send_writer,
+		    NEW_OP, B_TRUE);
+		return;
+	}
+
+	mutex_enter(&ill->ill_lock);
 	if (ill->ill_dlpi_pending != DL_PRIM_INVAL) {
 		/* Must queue message. Tail insertion */
 		mpp = &ill->ill_dlpi_deferred;
@@ -18623,10 +18509,69 @@ ill_dlpi_send(ill_t *ill, mblk_t *mp)
 		    ill->ill_name));
 
 		*mpp = mp;
+		mutex_exit(&ill->ill_lock);
 		return;
 	}
-
+	mutex_exit(&ill->ill_lock);
 	ill_dlpi_dispatch(ill, mp);
+}
+
+/*
+ * Send all deferred DLPI messages without waiting for their ACKs.
+ */
+void
+ill_dlpi_send_deferred(ill_t *ill)
+{
+	mblk_t *mp, *nextmp;
+
+	/*
+	 * Clear ill_dlpi_pending so that the message is not queued in
+	 * ill_dlpi_send().
+	 */
+	mutex_enter(&ill->ill_lock);
+	ill->ill_dlpi_pending = DL_PRIM_INVAL;
+	mp = ill->ill_dlpi_deferred;
+	ill->ill_dlpi_deferred = NULL;
+	mutex_exit(&ill->ill_lock);
+
+	for (; mp != NULL; mp = nextmp) {
+		nextmp = mp->b_next;
+		mp->b_next = NULL;
+		ill_dlpi_send(ill, mp);
+	}
+}
+
+/*
+ * Check if the DLPI primitive `prim' is pending; print a warning if not.
+ */
+boolean_t
+ill_dlpi_pending(ill_t *ill, t_uscalar_t prim)
+{
+	t_uscalar_t prim_pending;
+
+	mutex_enter(&ill->ill_lock);
+	prim_pending = ill->ill_dlpi_pending;
+	mutex_exit(&ill->ill_lock);
+
+	/*
+	 * During teardown, ill_dlpi_send_deferred() will send requests
+	 * without waiting; don't bother printing any warnings in that case.
+	 */
+	if (!(ill->ill_flags & ILL_CONDEMNED) && prim_pending != prim) {
+		if (prim_pending == DL_PRIM_INVAL) {
+			(void) mi_strlog(ill->ill_rq, 1,
+			    SL_CONSOLE|SL_ERROR|SL_TRACE, "ip: received "
+			    "unsolicited ack for %s on %s\n",
+			    dlpi_prim_str(prim), ill->ill_name);
+		} else {
+			(void) mi_strlog(ill->ill_rq, 1,
+			    SL_CONSOLE|SL_ERROR|SL_TRACE, "ip: received "
+			    "unexpected ack for %s on %s (expecting %s)\n",
+			    dlpi_prim_str(prim), ill->ill_name,
+			    dlpi_prim_str(prim_pending));
+		}
+	}
+	return (prim_pending == prim);
 }
 
 /*
@@ -18639,30 +18584,15 @@ ill_dlpi_done(ill_t *ill, t_uscalar_t prim)
 	mblk_t *mp;
 
 	ASSERT(IAM_WRITER_ILL(ill));
+	mutex_enter(&ill->ill_lock);
 
 	ASSERT(prim != DL_PRIM_INVAL);
-	if (ill->ill_dlpi_pending != prim) {
-		if (ill->ill_dlpi_pending == DL_PRIM_INVAL) {
-			(void) mi_strlog(ill->ill_rq, 1,
-			    SL_CONSOLE|SL_ERROR|SL_TRACE,
-			    "ill_dlpi_done: unsolicited ack for %s from %s\n",
-			    dlpi_prim_str(prim), ill->ill_name);
-		} else {
-			(void) mi_strlog(ill->ill_rq, 1,
-			    SL_CONSOLE|SL_ERROR|SL_TRACE,
-			    "ill_dlpi_done: unexpected ack for %s from %s "
-			    "(expecting ack for %s)\n",
-			    dlpi_prim_str(prim), ill->ill_name,
-			    dlpi_prim_str(ill->ill_dlpi_pending));
-		}
-		return;
-	}
+	ASSERT(ill->ill_dlpi_pending == prim);
 
 	ip1dbg(("ill_dlpi_done: %s has completed %s (%u)\n", ill->ill_name,
 	    dlpi_prim_str(ill->ill_dlpi_pending), ill->ill_dlpi_pending));
 
 	if ((mp = ill->ill_dlpi_deferred) == NULL) {
-		mutex_enter(&ill->ill_lock);
 		ill->ill_dlpi_pending = DL_PRIM_INVAL;
 		cv_signal(&ill->ill_cv);
 		mutex_exit(&ill->ill_lock);
@@ -18671,6 +18601,7 @@ ill_dlpi_done(ill_t *ill, t_uscalar_t prim)
 
 	ill->ill_dlpi_deferred = mp->b_next;
 	mp->b_next = NULL;
+	mutex_exit(&ill->ill_lock);
 
 	ill_dlpi_dispatch(ill, mp);
 }
@@ -19346,8 +19277,7 @@ static void
 ipif_free_tail(ipif_t *ipif)
 {
 	mblk_t	*mp;
-	ipif_t	**ipifp;
-	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
+	ip_stack_t *ipst = ipif->ipif_ill->ill_ipst;
 
 	/*
 	 * Free state for addition IRE_IF_[NO]RESOLVER ire's.
@@ -19380,23 +19310,13 @@ ipif_free_tail(ipif_t *ipif)
 	 */
 	ASSERT(ilm_walk_ipif(ipif) == 0);
 
-
 	IPIF_TRACE_CLEANUP(ipif);
 
 	/* Ask SCTP to take it out of it list */
 	sctp_update_ipif(ipif, SCTP_IPIF_REMOVE);
 
-	mutex_enter(&ipif->ipif_ill->ill_lock);
 	/* Get it out of the ILL interface list. */
-	ipifp = &ipif->ipif_ill->ill_ipif;
-	for (; *ipifp != NULL; ipifp = &ipifp[0]->ipif_next) {
-		if (*ipifp == ipif) {
-			*ipifp = ipif->ipif_next;
-			break;
-		}
-	}
-
-	mutex_exit(&ipif->ipif_ill->ill_lock);
+	ipif_remove(ipif, B_TRUE);
 	rw_exit(&ipst->ips_ill_g_lock);
 
 	mutex_destroy(&ipif->ipif_saved_ire_lock);
@@ -19405,7 +19325,7 @@ ipif_free_tail(ipif_t *ipif)
 	ASSERT(ipif->ipif_recovery_id == 0);
 
 	/* Free the memory. */
-	mi_free((char *)ipif);
+	mi_free(ipif);
 }
 
 /*
@@ -20215,37 +20135,29 @@ ipif_up(ipif_t *ipif, queue_t *q, mblk_t *mp)
 static int
 ill_dl_up(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 {
+	areq_t	*areq;
 	mblk_t	*areq_mp = NULL;
 	mblk_t	*bind_mp = NULL;
 	mblk_t	*unbind_mp = NULL;
 	conn_t	*connp;
 	boolean_t success;
+	uint16_t sap_addr;
 
 	ip1dbg(("ill_dl_up(%s)\n", ill->ill_name));
 	ASSERT(IAM_WRITER_ILL(ill));
-
 	ASSERT(mp != NULL);
 
 	/* Create a resolver cookie for ARP */
 	if (!ill->ill_isv6 && ill->ill_net_type == IRE_IF_RESOLVER) {
-		areq_t		*areq;
-		uint16_t	sap_addr;
-
-		areq_mp = ill_arp_alloc(ill,
-			(uchar_t *)&ip_areq_template, 0);
-		if (areq_mp == NULL) {
+		areq_mp = ill_arp_alloc(ill, (uchar_t *)&ip_areq_template, 0);
+		if (areq_mp == NULL)
 			return (ENOMEM);
-		}
+
 		freemsg(ill->ill_resolver_mp);
 		ill->ill_resolver_mp = areq_mp;
 		areq = (areq_t *)areq_mp->b_rptr;
 		sap_addr = ill->ill_sap;
 		bcopy(&sap_addr, areq->areq_sap, sizeof (sap_addr));
-		/*
-		 * Wait till we call ill_pending_mp_add to determine
-		 * the success before we free the ill_resolver_mp and
-		 * attach areq_mp in it's place.
-		 */
 	}
 	bind_mp = ip_dlpi_alloc(sizeof (dl_bind_req_t) + sizeof (long),
 	    DL_BIND_REQ);
@@ -24237,21 +24149,6 @@ ill_ipsec_capab_delete(ill_t *ill, uint_t dl_cap)
 	rw_exit(&ipst->ips_ipsec_capab_ills_lock);
 }
 
-
-/*
- * Handling of DL_CONTROL_REQ messages that must be sent down to
- * an ill while having exclusive access.
- */
-/* ARGSUSED */
-static void
-ill_ipsec_capab_send_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *arg)
-{
-	ill_t *ill = (ill_t *)q->q_ptr;
-
-	ill_dlpi_send(ill, mp);
-}
-
-
 /*
  * Called by SADB to send a DL_CONTROL_REQ message to every ill
  * supporting the specified IPsec protocol acceleration.
@@ -24324,29 +24221,21 @@ ill_ipsec_capab_send_all(uint_t sa_type, mblk_t *mp, ipsa_t *sa,
 
 	rw_exit(&ipst->ips_ipsec_capab_ills_lock);
 
-	nmp = mp_ship_list;
-	while (nmp != NULL) {
+	for (nmp = mp_ship_list; nmp != NULL; nmp = next_mp) {
 		/* restore the mblk to a sane state */
 		next_mp = nmp->b_next;
 		nmp->b_next = NULL;
 		ill = (ill_t *)nmp->b_prev;
 		nmp->b_prev = NULL;
 
-		/*
-		 * Ship the mblk to the ill, must be exclusive. Keep the
-		 * reference to the ill as qwriter_ip() does a ill_referele().
-		 */
-		(void) qwriter_ip(NULL, ill, ill->ill_wq, nmp,
-		    ill_ipsec_capab_send_writer, NEW_OP, B_TRUE);
-
-		nmp = next_mp;
+		ill_dlpi_send(ill, nmp);
+		ill_refrele(ill);
 	}
 
 	if (sa != NULL)
 		IPSA_REFRELE(sa);
 	freemsg(mp);
 }
-
 
 /*
  * Derive an interface id from the link layer address.
@@ -24812,11 +24701,12 @@ ill_set_phys_addr_tail(ipsq_t *ipsq, queue_t *q, mblk_t *addrmp, void *dummy)
 	}
 
 	/*
-	 * If there are ipifs to bring up, ill_up_ipifs() will return nonzero,
-	 * and ipsq_current_finish() will be called by ip_rput_dlpi_writer()
-	 * or ip_arp_done() when the last ipif is brought up.
+	 * If there are ipifs to bring up, ill_up_ipifs() will return
+	 * EINPROGRESS, and ipsq_current_finish() will be called by
+	 * ip_rput_dlpi_writer() or ip_arp_done() when the last ipif is
+	 * brought up.
 	 */
-	if (ill_up_ipifs(ill, q, addrmp) == 0)
+	if (ill_up_ipifs(ill, q, addrmp) != EINPROGRESS)
 		ipsq_current_finish(ipsq);
 }
 
@@ -24831,8 +24721,6 @@ ill_set_ndmp(ill_t *ill, mblk_t *ndmp, uint_t addroff, uint_t addrlen)
 	ill->ill_nd_lla_mp = ndmp;
 	ill->ill_nd_lla_len = addrlen;
 }
-
-
 
 major_t IP_MAJ;
 #define	IP	"ip"

@@ -158,7 +158,10 @@ extern	mblk_t	*ipif_area_alloc(ipif_t *);
 extern	mblk_t	*ipif_ared_alloc(ipif_t *);
 extern	mblk_t	*ill_ared_alloc(ill_t *, ipaddr_t);
 extern	void	ill_dlpi_done(ill_t *, t_uscalar_t);
+extern	boolean_t ill_dlpi_pending(ill_t *, t_uscalar_t);
 extern	void	ill_dlpi_send(ill_t *, mblk_t *);
+extern	void	ill_dlpi_send_deferred(ill_t *);
+
 extern	mblk_t	*ill_dlur_gen(uchar_t *, uint_t, t_uscalar_t, t_scalar_t);
 extern  ill_t	*ill_group_lookup_on_ifindex(uint_t, boolean_t, ip_stack_t *);
 extern	ill_t	*ill_group_lookup_on_name(char *, boolean_t, ip_stack_t *);
@@ -174,7 +177,6 @@ extern uint_t	ill_get_next_ifindex(uint_t, boolean_t, ip_stack_t *);
 extern uint_t	ill_get_ifindex_by_name(char *, ip_stack_t *);
 extern ill_t	*ill_get_first(boolean_t isv6);
 extern	void	ill_ipif_cache_delete(ire_t *, char *);
-extern	void	ill_send_all_deferred_mp(ill_t *);
 extern	void	ill_delete(ill_t *);
 extern	void	ill_delete_tail(ill_t *);
 extern	int	ill_dl_phys(ill_t *, ipif_t *, mblk_t *, queue_t *);
@@ -183,6 +185,7 @@ extern	void	ill_fastpath_ack(ill_t *, mblk_t *);
 extern	void	ill_fastpath_nack(ill_t *);
 extern	int	ill_fastpath_probe(ill_t *, mblk_t *);
 extern	void	ill_fastpath_flush(ill_t *);
+extern	int	ill_forward_set(ill_t *, boolean_t);
 extern	void	ill_frag_prune(ill_t *, uint_t);
 extern	void	ill_frag_free_pkts(ill_t *, ipfb_t *, ipf_t *, int);
 extern	time_t	ill_frag_timeout(ill_t *, time_t);
@@ -286,8 +289,8 @@ extern	void	ipsq_exit(ipsq_t *, boolean_t, boolean_t);
 extern mblk_t	*ipsq_pending_mp_get(ipsq_t *, conn_t **);
 extern boolean_t ipsq_pending_mp_add(conn_t *, ipif_t *, queue_t *,
     mblk_t *, int);
-extern	void qwriter_ip(ipif_t *, ill_t *, queue_t *, mblk_t *, ipsq_func_t,
-    int, boolean_t);
+extern	void	qwriter_ip(ill_t *, queue_t *, mblk_t *, ipsq_func_t, int,
+    boolean_t);
 
 extern	int	ip_extract_lifreq_cmn(queue_t *, mblk_t *, int, int,
     cmd_info_t *, ipsq_func_t);

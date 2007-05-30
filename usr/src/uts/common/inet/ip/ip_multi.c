@@ -771,7 +771,7 @@ ip_ll_send_enabmulti_req(ill_t *ill, const in6_addr_t *v6groupp)
 		    ill->ill_name));
 		putnext(ill->ill_rq, mp);
 	} else {
-		ip1dbg(("ip_ll_send_enabmulti_req: IPv6 ndp_squery_mp %s on"
+		ip1dbg(("ip_ll_send_enabmulti_req: IPv6 ndp_mcastreq %s on"
 		    " %s\n",
 		    inet_ntop(AF_INET6, v6groupp, group_buf,
 		    sizeof (group_buf)),
@@ -1042,7 +1042,7 @@ ip_ll_send_disabmulti_req(ill_t *ill, const in6_addr_t *v6groupp)
 		    ill->ill_name));
 		putnext(ill->ill_rq, mp);
 	} else {
-		ip1dbg(("ip_ll_send_disabmulti_req: IPv6 ndp_squery_mp %s on"
+		ip1dbg(("ip_ll_send_disabmulti_req: IPv6 ndp_mcastreq %s on"
 		    " %s\n",
 		    inet_ntop(AF_INET6, v6groupp, group_buf,
 		    sizeof (group_buf)),
@@ -1119,7 +1119,7 @@ ip_join_allmulti(ipif_t *ipif)
 		    sizeof (dl_promiscon_req_t), &addrlen, &addroff);
 		if (mp == NULL)
 			return (ENOMEM);
-		putnext(ill->ill_wq, mp);
+		ill_dlpi_send(ill, mp);
 	}
 
 	mutex_enter(&ill->ill_lock);
@@ -1165,7 +1165,7 @@ ip_leave_allmulti(ipif_t *ipif)
 		    sizeof (dl_promiscoff_req_t), &addrlen, &addroff);
 		if (mp == NULL)
 			return (ENOMEM);
-		putnext(ill->ill_wq, mp);
+		ill_dlpi_send(ill, mp);
 	}
 
 	mutex_enter(&ill->ill_lock);
@@ -1373,20 +1373,16 @@ ip_wput_ctl(queue_t *q, mblk_t *mp_orig)
 {
 	ill_t	*ill = (ill_t *)q->q_ptr;
 	mblk_t	*mp = mp_orig;
-	area_t	*area;
+	area_t	*area = (area_t *)mp->b_rptr;
 
 	/* Check that we have a AR_ENTRY_SQUERY with a tacked on mblk */
-	if ((mp->b_wptr - mp->b_rptr) < sizeof (area_t) ||
-	    mp->b_cont == NULL) {
-		putnext(q, mp);
-		return;
-	}
-	area = (area_t *)mp->b_rptr;
-	if (area->area_cmd != AR_ENTRY_SQUERY) {
+	if (MBLKL(mp) < sizeof (area_t) || mp->b_cont == NULL ||
+	    area->area_cmd != AR_ENTRY_SQUERY) {
 		putnext(q, mp);
 		return;
 	}
 	mp = mp->b_cont;
+
 	/*
 	 * Update dl_addr_length and dl_addr_offset for primitives that
 	 * have physical addresses as opposed to full saps
@@ -1406,7 +1402,7 @@ ip_wput_ctl(queue_t *q, mblk_t *mp_orig)
 		break;
 	}
 	freeb(mp_orig);
-	putnext(q, mp);
+	ill_dlpi_send(ill, mp);
 }
 
 /*

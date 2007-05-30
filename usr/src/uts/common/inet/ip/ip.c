@@ -4057,8 +4057,8 @@ ip_arp_news(queue_t *q, mblk_t *mp)
 			 * gratuitous ARP.
 			 */
 			if (defs >= maxdefense && ill->ill_arp_extend) {
-				(void) qwriter_ip(NULL, ill, q, mp,
-				    ip_arp_excl, CUR_OP, B_FALSE);
+				qwriter_ip(ill, q, mp, ip_arp_excl, NEW_OP,
+				    B_FALSE);
 			} else {
 				cmn_err(CE_WARN,
 				    "node %s is using our IP address %s on %s",
@@ -4070,8 +4070,8 @@ ip_arp_news(queue_t *q, mblk_t *mp)
 				 * only with new ARP.
 				 */
 				if (ill->ill_arp_extend) {
-					(void) qwriter_ip(NULL, ill, q, mp,
-					    ip_arp_defend, CUR_OP, B_FALSE);
+					qwriter_ip(ill, q, mp, ip_arp_defend,
+					    NEW_OP, B_FALSE);
 				} else {
 					ill_refrele(ill);
 				}
@@ -4143,8 +4143,8 @@ ip_arp_news(queue_t *q, mblk_t *mp)
 			    IPIF_DUPLICATE) {
 				ipif_refrele(ipif);
 				ill_refhold(ill);
-				(void) qwriter_ip(NULL, ill, q, mp,
-				    ip_arp_excl, CUR_OP, B_FALSE);
+				qwriter_ip(ill, q, mp, ip_arp_excl, NEW_OP,
+				    B_FALSE);
 				return;
 			}
 			/*
@@ -4172,8 +4172,7 @@ ip_arp_news(queue_t *q, mblk_t *mp)
 		if (isv6)
 			break;
 		ill_refhold(ill);
-		(void) qwriter_ip(NULL, ill, q, mp, ip_arp_excl, CUR_OP,
-		    B_FALSE);
+		qwriter_ip(ill, q, mp, ip_arp_excl, NEW_OP, B_FALSE);
 		return;
 	}
 	freemsg(mp);
@@ -5354,7 +5353,6 @@ ip_carve_mp(mblk_t **mpp, ssize_t len)
 int
 ip_modclose(ill_t *ill)
 {
-
 	boolean_t success;
 	ipsq_t	*ipsq;
 	ipif_t	*ipif;
@@ -5419,12 +5417,12 @@ ip_modclose(ill_t *ill)
 	mutex_exit(&ill->ill_lock);
 
 	/*
-	 * Send all the deferred control messages downstream which came in
+	 * Send all the deferred DLPI messages downstream which came in
 	 * during the small window right before ipsq_enter(). We do this
 	 * without waiting for the ACKs because all the ACKs for M_PROTO
 	 * messages are ignored in ip_rput() when ILL_CONDEMNED is set.
 	 */
-	ill_send_all_deferred_mp(ill);
+	ill_dlpi_send_deferred(ill);
 
 	/*
 	 * Shut down fragmentation reassembly.
@@ -5449,7 +5447,7 @@ ip_modclose(ill_t *ill)
 	 * Then make sure that threads that are waiting to enter the
 	 * ipsq have seen the error returned by ipsq_enter and have
 	 * gone away. Then we call ill_delete_tail which does the
-	 * DL_UNBIND and DL_DETACH with the driver and then qprocsoff.
+	 * DL_UNBIND_REQ with the driver and then qprocsoff.
 	 */
 	ill_delete(ill);
 	mutex_enter(&ill->ill_lock);
@@ -11874,7 +11872,7 @@ ip_forward_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *ioc_cr)
 {
 	long new_value;
 	int *forwarding_value = (int *)cp;
-	ill_t *walker;
+	ill_t *ill;
 	boolean_t isv6;
 	ill_walk_context_t ctx;
 	ip_stack_t *ipst = CONNQ_TO_IPST(q);
@@ -11897,15 +11895,14 @@ ip_forward_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *ioc_cr)
 	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 
 	if (isv6)
-		walker = ILL_START_WALK_V6(&ctx, ipst);
+		ill = ILL_START_WALK_V6(&ctx, ipst);
 	else
-		walker = ILL_START_WALK_V4(&ctx, ipst);
-	for (; walker != NULL; walker = ill_next(&ctx, walker)) {
-		(void) ill_forward_set(q, mp, (new_value != 0),
-		    (caddr_t)walker);
-	}
-	rw_exit(&ipst->ips_ill_g_lock);
+		ill = ILL_START_WALK_V4(&ctx, ipst);
 
+	for (; ill != NULL; ill = ill_next(&ctx, ill))
+		(void) ill_forward_set(ill, new_value != 0);
+
+	rw_exit(&ipst->ips_ill_g_lock);
 	return (0);
 }
 
@@ -14816,8 +14813,7 @@ ip_rput_process_notdata(queue_t *q, mblk_t **first_mpp, ill_t *ill,
 		 * bump up the refcount
 		 */
 		ill_refhold(ill);
-		(void) qwriter_ip(NULL, ill, q, mp, ip_rput_other, CUR_OP,
-		    B_FALSE);
+		qwriter_ip(ill, q, mp, ip_rput_other, CUR_OP, B_FALSE);
 		return (B_TRUE);
 	case M_CTL:
 		if ((MBLKL(first_mp) >= sizeof (da_ipsec_t)) &&
@@ -14871,19 +14867,10 @@ ip_rput_process_notdata(queue_t *q, mblk_t **first_mpp, ill_t *ill,
 		}
 		putnext(q, mp);
 		return (B_TRUE);
-	case M_FLUSH:
-		if (*mp->b_rptr & FLUSHW) {
-			*mp->b_rptr &= ~FLUSHR;
-			qreply(q, mp);
-			return (B_TRUE);
-		}
-		freemsg(mp);
-		return (B_TRUE);
 	case M_IOCNAK:
 		ip1dbg(("got iocnak "));
 		iocp = (struct iocblk *)mp->b_rptr;
 		switch (iocp->ioc_cmd) {
-		case DL_IOC_HDR_INFO:
 		case SIOCSTUNPARAM:
 		case OSIOCSTUNPARAM:
 			/*
@@ -14891,9 +14878,9 @@ ip_rput_process_notdata(queue_t *q, mblk_t **first_mpp, ill_t *ill,
 			 * bump up the refcount
 			 */
 			ill_refhold(ill);
-			(void) qwriter_ip(NULL, ill, q, mp, ip_rput_other,
-			    CUR_OP, B_FALSE);
+			qwriter_ip(ill, q, mp, ip_rput_other, CUR_OP, B_FALSE);
 			return (B_TRUE);
+		case DL_IOC_HDR_INFO:
 		case SIOCGTUNPARAM:
 		case OSIOCGTUNPARAM:
 			ip_rput_other(NULL, q, mp, NULL);
@@ -14912,34 +14899,28 @@ ip_rput_process_notdata(queue_t *q, mblk_t **first_mpp, ill_t *ill,
 void
 ip_rput(queue_t *q, mblk_t *mp)
 {
-	ill_t	*ill;
-	ip_stack_t	*ipst;
+	ill_t		*ill = (ill_t *)q->q_ptr;
+	ip_stack_t	*ipst = ill->ill_ipst;
+	union DL_primitives *dl;
 
 	TRACE_1(TR_FAC_IP, TR_IP_RPUT_START, "ip_rput_start: q %p", q);
 
-	ill = (ill_t *)q->q_ptr;
-	ipst = ill->ill_ipst;
-
 	if (ill->ill_state_flags & (ILL_CONDEMNED | ILL_LL_SUBNET_PENDING)) {
-		union DL_primitives *dl;
-
 		/*
-		 * Things are opening or closing. Only accept DLPI control
-		 * messages. In the open case, the ill->ill_ipif has not yet
-		 * been created. In the close case, things hanging off the
-		 * ill could have been freed already. In either case it
-		 * may not be safe to proceed further.
+		 * If things are opening or closing, only accept high-priority
+		 * DLPI messages.  (On open ill->ill_ipif has not yet been
+		 * created; on close, things hanging off the ill may have been
+		 * freed already.)
 		 */
-
 		dl = (union DL_primitives *)mp->b_rptr;
-		if ((mp->b_datap->db_type != M_PCPROTO) ||
-		    (dl->dl_primitive == DL_UNITDATA_IND)) {
+		if (DB_TYPE(mp) != M_PCPROTO ||
+		    dl->dl_primitive == DL_UNITDATA_IND) {
 			/*
-			 * Also SIOC[GS]TUN* ioctls can come here.
+			 * SIOC[GS]TUNPARAM ioctls can come here.
 			 */
 			inet_freemsg(mp);
 			TRACE_2(TR_FAC_IP, TR_IP_RPUT_END,
-			    "ip_input_end: q %p (%S)", q, "uninit");
+			    "ip_rput_end: q %p (%S)", q, "uninit");
 			return;
 		}
 	}
@@ -15583,12 +15564,11 @@ ip_rput_dlpi(queue_t *q, mblk_t *mp)
 {
 	dl_ok_ack_t	*dloa = (dl_ok_ack_t *)mp->b_rptr;
 	dl_error_ack_t	*dlea = (dl_error_ack_t *)dloa;
-	ill_t		*ill;
+	ill_t		*ill = (ill_t *)q->q_ptr;
+	boolean_t	pending;
 
 	ip1dbg(("ip_rput_dlpi"));
-	ill = (ill_t *)q->q_ptr;
-	switch (dloa->dl_primitive) {
-	case DL_ERROR_ACK:
+	if (dloa->dl_primitive == DL_ERROR_ACK) {
 		ip2dbg(("ip_rput_dlpi(%s): DL_ERROR_ACK %s (0x%x): "
 		    "%s (0x%x), unix %u\n", ill->ill_name,
 		    dlpi_prim_str(dlea->dl_error_primitive),
@@ -15596,67 +15576,61 @@ ip_rput_dlpi(queue_t *q, mblk_t *mp)
 		    dlpi_err_str(dlea->dl_errno),
 		    dlea->dl_errno,
 		    dlea->dl_unix_errno));
-		switch (dlea->dl_error_primitive) {
-		case DL_UNBIND_REQ:
+	}
+
+	/*
+	 * If we received an ACK but didn't send a request for it, then it
+	 * can't be part of any pending operation; discard up-front.
+	 */
+	switch (dloa->dl_primitive) {
+	case DL_NOTIFY_IND:
+		pending = B_TRUE;
+		break;
+	case DL_ERROR_ACK:
+		pending = ill_dlpi_pending(ill, dlea->dl_error_primitive);
+		break;
+	case DL_OK_ACK:
+		pending = ill_dlpi_pending(ill, dloa->dl_correct_primitive);
+		break;
+	case DL_INFO_ACK:
+		pending = ill_dlpi_pending(ill, DL_INFO_REQ);
+		break;
+	case DL_BIND_ACK:
+		pending = ill_dlpi_pending(ill, DL_BIND_REQ);
+		break;
+	case DL_PHYS_ADDR_ACK:
+		pending = ill_dlpi_pending(ill, DL_PHYS_ADDR_REQ);
+		break;
+	case DL_NOTIFY_ACK:
+		pending = ill_dlpi_pending(ill, DL_NOTIFY_REQ);
+		break;
+	case DL_CONTROL_ACK:
+		pending = ill_dlpi_pending(ill, DL_CONTROL_REQ);
+		break;
+	case DL_CAPABILITY_ACK:
+		pending = ill_dlpi_pending(ill, DL_CAPABILITY_REQ);
+		break;
+	default:
+		/* Not a DLPI message we support or were expecting */
+		freemsg(mp);
+		return;
+	}
+
+	if (!pending) {
+		freemsg(mp);
+		return;
+	}
+
+	switch (dloa->dl_primitive) {
+	case DL_ERROR_ACK:
+		if (dlea->dl_error_primitive == DL_UNBIND_REQ) {
 			mutex_enter(&ill->ill_lock);
 			ill->ill_state_flags &= ~ILL_DL_UNBIND_IN_PROGRESS;
 			cv_signal(&ill->ill_cv);
 			mutex_exit(&ill->ill_lock);
-			/* FALLTHRU */
-		case DL_NOTIFY_REQ:
-		case DL_ATTACH_REQ:
-		case DL_DETACH_REQ:
-		case DL_INFO_REQ:
-		case DL_BIND_REQ:
-		case DL_ENABMULTI_REQ:
-		case DL_PHYS_ADDR_REQ:
-		case DL_CAPABILITY_REQ:
-		case DL_CONTROL_REQ:
-			/*
-			 * Refhold the ill to match qwriter_ip which does a
-			 * refrele. Since this is on the ill stream we
-			 * unconditionally bump up the refcount without
-			 * checking for ILL_CAN_LOOKUP
-			 */
-			ill_refhold(ill);
-			(void) qwriter_ip(NULL, ill, q, mp, ip_rput_dlpi_writer,
-			    CUR_OP, B_FALSE);
-			return;
-		case DL_DISABMULTI_REQ:
-			freemsg(mp);	/* Don't want to pass this up */
-			return;
-		default:
-			break;
 		}
-		ip_dlpi_error(ill, dlea->dl_error_primitive,
-		    dlea->dl_errno, dlea->dl_unix_errno);
-		freemsg(mp);
-		return;
-	case DL_INFO_ACK:
-	case DL_BIND_ACK:
-	case DL_PHYS_ADDR_ACK:
-	case DL_NOTIFY_ACK:
-	case DL_CAPABILITY_ACK:
-	case DL_CONTROL_ACK:
-		/*
-		 * Refhold the ill to match qwriter_ip which does a refrele
-		 * Since this is on the ill stream we unconditionally
-		 * bump up the refcount without doing ILL_CAN_LOOKUP.
-		 */
-		ill_refhold(ill);
-		(void) qwriter_ip(NULL, ill, q, mp, ip_rput_dlpi_writer,
-		    CUR_OP, B_FALSE);
-		return;
-	case DL_NOTIFY_IND:
-		ill_refhold(ill);
-		/*
-		 * The DL_NOTIFY_IND is an asynchronous message that has no
-		 * relation to the current ioctl in progress (if any). Hence we
-		 * pass in NEW_OP in this case.
-		 */
-		(void) qwriter_ip(NULL, ill, q, mp, ip_rput_dlpi_writer,
-		    NEW_OP, B_FALSE);
-		return;
+		break;
+
 	case DL_OK_ACK:
 		ip1dbg(("ip_rput: DL_OK_ACK for %s\n",
 		    dlpi_prim_str((int)dloa->dl_correct_primitive)));
@@ -15666,29 +15640,38 @@ ip_rput_dlpi(queue_t *q, mblk_t *mp)
 			ill->ill_state_flags &= ~ILL_DL_UNBIND_IN_PROGRESS;
 			cv_signal(&ill->ill_cv);
 			mutex_exit(&ill->ill_lock);
-			/* FALLTHRU */
-		case DL_ATTACH_REQ:
-		case DL_DETACH_REQ:
-			/*
-			 * Refhold the ill to match qwriter_ip which does a
-			 * refrele. Since this is on the ill stream we
-			 * unconditionally bump up the refcount
-			 */
-			ill_refhold(ill);
-			qwriter_ip(NULL, ill, q, mp, ip_rput_dlpi_writer,
-			    CUR_OP, B_FALSE);
-			return;
+			break;
+
 		case DL_ENABMULTI_REQ:
 			if (ill->ill_dlpi_multicast_state == IDS_INPROGRESS)
 				ill->ill_dlpi_multicast_state = IDS_OK;
 			break;
-
 		}
 		break;
 	default:
 		break;
 	}
-	freemsg(mp);
+
+	/*
+	 * We know the message is one we're waiting for (or DL_NOTIFY_IND),
+	 * and we need to become writer to continue to process it. If it's not
+	 * a DL_NOTIFY_IND, we assume we're in the middle of an exclusive
+	 * operation and pass CUR_OP.  If this isn't true, we'll end up doing
+	 * some work as part of the current exclusive operation that actually
+	 * is not part of it -- which is wrong, but better than the
+	 * alternative of deadlock (if NEW_OP is always used).  Someday, we
+	 * should track which DLPI requests have ACKs that we wait on
+	 * synchronously so we can know whether to use CUR_OP or NEW_OP.
+	 *
+	 * As required by qwriter_ip(), we refhold the ill; it will refrele.
+	 * Since this is on the ill stream we unconditionally bump up the
+	 * refcount without doing ILL_CAN_LOOKUP().
+	 */
+	ill_refhold(ill);
+	if (dloa->dl_primitive == DL_NOTIFY_IND)
+		qwriter_ip(ill, q, mp, ip_rput_dlpi_writer, NEW_OP, B_FALSE);
+	else
+		qwriter_ip(ill, q, mp, ip_rput_dlpi_writer, CUR_OP, B_FALSE);
 }
 
 /*
@@ -15741,10 +15724,12 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 
 	switch (dloa->dl_primitive) {
 	case DL_ERROR_ACK:
+		ip1dbg(("ip_rput_dlpi_writer: got DL_ERROR_ACK for %s\n",
+		    dlpi_prim_str(dlea->dl_error_primitive)));
+
 		switch (dlea->dl_error_primitive) {
 		case DL_UNBIND_REQ:
 		case DL_ATTACH_REQ:
-		case DL_DETACH_REQ:
 		case DL_INFO_REQ:
 			ill_dlpi_done(ill, dlea->dl_error_primitive);
 			break;
@@ -15827,14 +15812,13 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			}
 			break;
 		case DL_ENABMULTI_REQ:
-			ip1dbg(("DL_ERROR_ACK to enabmulti\n"));
+			ill_dlpi_done(ill, DL_ENABMULTI_REQ);
 
 			if (ill->ill_dlpi_multicast_state == IDS_INPROGRESS)
 				ill->ill_dlpi_multicast_state = IDS_FAILED;
 			if (ill->ill_dlpi_multicast_state == IDS_FAILED) {
 				ipif_t *ipif;
 
-				log = B_FALSE;
 				printf("ip: joining multicasts failed (%d)"
 				    " on %s - will use link layer "
 				    "broadcasts for multicast\n",
@@ -15861,10 +15845,14 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			}
 			freemsg(mp);	/* Don't want to pass this up */
 			return;
+
+		case DL_DISABMULTI_REQ:
+			ill_dlpi_done(ill, DL_DISABMULTI_REQ);
+			freemsg(mp);
+			return;
+
 		case DL_CAPABILITY_REQ:
 		case DL_CONTROL_REQ:
-			ip1dbg(("ip_rput_dlpi_writer: got DL_ERROR_ACK for "
-			    "DL_CAPABILITY/CONTROL REQ\n"));
 			ill_dlpi_done(ill, dlea->dl_error_primitive);
 			ill->ill_dlpi_capab_state = IDS_FAILED;
 			freemsg(mp);
@@ -16368,9 +16356,10 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		    dlpi_prim_str((int)dloa->dl_correct_primitive),
 		    dloa->dl_correct_primitive));
 		switch (dloa->dl_correct_primitive) {
+		case DL_ENABMULTI_REQ:
+		case DL_DISABMULTI_REQ:
 		case DL_UNBIND_REQ:
 		case DL_ATTACH_REQ:
-		case DL_DETACH_REQ:
 			ill_dlpi_done(ill, dloa->dl_correct_primitive);
 			break;
 		}
@@ -27550,15 +27539,7 @@ nak:
 		if (*mp->b_rptr & FLUSHW)
 			flushq(q, FLUSHALL);
 		if (q->q_next) {
-			/*
-			 * M_FLUSH is sent up to IP by some drivers during
-			 * unbind. ip_rput has already replied to it. We are
-			 * here for the M_FLUSH that we originated in IP
-			 * before sending the unbind request to the driver.
-			 * Just free it as we don't queue packets in IP
-			 * on the write side of the device instance.
-			 */
-			freemsg(mp);
+			putnext(q, mp);
 			return;
 		}
 		if (*mp->b_rptr & FLUSHR) {
@@ -27616,8 +27597,7 @@ nak:
 			/* qwriter_ip releases the refhold */
 			/* refhold on ill stream is ok without ILL_CAN_LOOKUP */
 			ill_refhold(ill);
-			(void) qwriter_ip(NULL, ill, q, mp, ip_arp_done,
-			    CUR_OP, B_FALSE);
+			qwriter_ip(ill, q, mp, ip_arp_done, CUR_OP, B_FALSE);
 			return;
 		case AR_ARP_CLOSING:
 			/*

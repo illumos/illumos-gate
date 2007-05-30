@@ -1353,7 +1353,8 @@ typedef struct ipif_s {
  *
  *		 Table of ipif_t members and their protection
  *
- * ipif_next		ill_g_lock		ill_g_lock
+ * ipif_next		ipsq + ill_lock +	ipsq OR ill_lock OR
+ *			ill_g_lock		ill_g_lock
  * ipif_ill		ipsq + down ipif	write once
  * ipif_id		ipsq + down ipif	write once
  * ipif_mtu		ipsq
@@ -1821,7 +1822,6 @@ typedef struct ill_s {
 #define	ill_first_mp_to_free	ill_bcast_mp
 	mblk_t	*ill_bcast_mp;		/* DLPI header for broadcasts. */
 	mblk_t	*ill_resolver_mp;	/* Resolver template. */
-	mblk_t	*ill_detach_mp;		/* detach mp, or NULL if style1 */
 	mblk_t	*ill_unbind_mp;		/* unbind mp from ill_dl_up() */
 	mblk_t	*ill_dlpi_deferred;	/* b_next chain of control messages */
 	mblk_t	*ill_phys_addr_mp;	/* mblk which holds ill_phys_addr */
@@ -2020,7 +2020,7 @@ extern	void	ill_delete_glist(ill_t *);
  *
  * ill_error			ipsq			None
  * ill_ipif			ill_g_lock + ipsq	ill_g_lock OR ipsq
- * ill_ipif_up_count		ill_lock + ipsq		ill_lock
+ * ill_ipif_up_count		ill_lock + ipsq		ill_lock OR ipsq
  * ill_max_frag			ipsq			Write once
  *
  * ill_name			ill_g_lock + ipsq	Write once
@@ -2051,8 +2051,8 @@ extern	void	ill_delete_glist(ill_t *);
  * ill_bcast_mp			ipsq			ipsq
  * ill_resolver_mp		ipsq			only when ill is up
  * ill_down_mp			ipsq			ipsq
- * ill_dlpi_deferred		ipsq			ipsq
- * ill_dlpi_pending		ipsq and ill_lock	ipsq or ill_lock
+ * ill_dlpi_deferred		ill_lock		ill_lock
+ * ill_dlpi_pending		ill_lock		ill_lock
  * ill_phys_addr_mp		ipsq + down ill		only when ill is up
  * ill_phys_addr		ipsq + down ill		only when ill is up
  *
@@ -3247,7 +3247,6 @@ extern mblk_t	*ipsec_in_alloc(boolean_t, netstack_t *);
 extern boolean_t ipsec_in_is_secure(mblk_t *);
 extern void	ipsec_out_process(queue_t *, mblk_t *, ire_t *, uint_t);
 extern void	ipsec_out_to_in(mblk_t *);
-extern int	ill_forward_set(queue_t *, mblk_t *, boolean_t, caddr_t);
 extern void	ip_fanout_proto_again(mblk_t *, ill_t *, ill_t *, ire_t *);
 
 extern void	ire_cleanup(ire_t *);
@@ -3512,14 +3511,12 @@ typedef void (*squeue_func_t)(squeue_t *, mblk_t *, sqproc_t, void *, uint8_t);
 extern void ip_squeue_init(void (*)(squeue_t *));
 extern squeue_t	*ip_squeue_random(uint_t);
 extern squeue_t *ip_squeue_get(ill_rx_ring_t *);
-extern void ip_squeue_get_pkts(squeue_t *);
 extern int ip_squeue_bind_set(queue_t *, mblk_t *, char *, caddr_t, cred_t *);
-extern int ip_squeue_bind_get(queue_t *, mblk_t *, caddr_t, cred_t *);
-extern void ip_squeue_clean(void *, mblk_t *, void *);
-extern void ip_resume_tcp_bind(void *, mblk_t *, void *);
-extern void	ip_soft_ring_assignment(ill_t *, ill_rx_ring_t *,
+extern void ip_squeue_clean_all(ill_t *);
+extern void ip_soft_ring_assignment(ill_t *, ill_rx_ring_t *,
     mblk_t *, struct mac_header_info_s *);
 
+extern void ip_resume_tcp_bind(void *, mblk_t *, void *);
 extern void tcp_wput(queue_t *, mblk_t *);
 
 extern int	ip_fill_mtuinfo(struct in6_addr *, in_port_t,

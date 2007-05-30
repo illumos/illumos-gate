@@ -118,6 +118,13 @@ struct ifnet {
 #define	IFF_PROMISC	0x0000000100	/* receive all packets */
 #define	IFF_ALLMULTI	0x0000000200	/* receive all multicast packets */
 #define	IFF_INTELLIGENT	0x0000000400	/* protocol code on board */
+/*
+ * The IFF_MULTICAST flag indicates that the network can support the
+ * transmission and reception of higher-level (e.g., IP) multicast packets.
+ * It is independent of hardware support for multicasting; for example,
+ * point-to-point links or pure broadcast networks may well support
+ * higher-level multicasts.
+ */
 #define	IFF_MULTICAST	0x0000000800	/* supports multicast */
 
 #define	IFF_MULTI_BCAST	0x0000001000	/* multicast using broadcast address */
@@ -161,17 +168,8 @@ struct ifnet {
 #define	IFF_TEMPORARY	0x0800000000ll	/* RFC3041 */
 
 #define	IFF_FIXEDMTU	0x1000000000ll	/* MTU manually set with SIOCSLIFMTU */
-
 #define	IFF_VIRTUAL	0x2000000000ll	/* Does not send or receive packets */
 #define	IFF_DUPLICATE	0x4000000000ll	/* Local address already in use */
-
-/*
- * The IFF_MULTICAST flag indicates that the network can support the
- * transmission and reception of higher-level (e.g., IP) multicast packets.
- * It is independent of hardware support for multicasting; for example,
- * point-to-point links or pure broadcast networks may well support
- * higher-level multicasts.
- */
 
 /* flags set internally only: */
 #define	IFF_CANTCHANGE \

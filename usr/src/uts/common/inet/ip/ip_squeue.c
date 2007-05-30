@@ -156,6 +156,8 @@ static int ip_squeue_cpu_setup(cpu_setup_t, int, void *);
 static void ip_squeue_set_bind(squeue_set_t *);
 static void ip_squeue_set_unbind(squeue_set_t *);
 static squeue_t *ip_find_unused_squeue(squeue_set_t *, cpu_t *, boolean_t);
+static void ip_squeue_clean(void *, mblk_t *, void *);
+static void ip_squeue_clean_ring(ill_t *, ill_rx_ring_t *);
 
 #define	CPU_ISON(c) (c != NULL && CPU_ACTIVE(c) && (c->cpu_flags & CPU_EXISTS))
 
@@ -278,7 +280,7 @@ ip_squeue_random(uint_t index)
 }
 
 /* ARGSUSED */
-void
+static void
 ip_squeue_clean(void *arg1, mblk_t *mp, void *arg2)
 {
 	squeue_t	*sqp = arg2;
@@ -320,6 +322,110 @@ ip_squeue_clean(void *arg1, mblk_t *mp, void *arg2)
 	ring->rr_ring_state = ILL_RING_FREE;
 	cv_signal(&ill->ill_cv);
 	mutex_exit(&ill->ill_lock);
+}
+
+/*
+ * Clean up one squeue element. ill_inuse_ref is protected by ill_lock.
+ * The real cleanup happens behind the squeue via ip_squeue_clean function but
+ * we need to protect ourselves from 2 threads trying to cleanup at the same
+ * time (possible with one port going down for aggr and someone tearing down the
+ * entire aggr simultaneously). So we use ill_inuse_ref protected by ill_lock
+ * to indicate when the cleanup has started (1 ref) and when the cleanup
+ * is done (0 ref). When a new ring gets assigned to squeue, we start by
+ * putting 2 ref on ill_inuse_ref.
+ */
+static void
+ip_squeue_clean_ring(ill_t *ill, ill_rx_ring_t *rx_ring)
+{
+	conn_t *connp;
+	squeue_t *sqp;
+	mblk_t *mp;
+
+	ASSERT(rx_ring != NULL);
+
+	/* Just clean one squeue */
+	mutex_enter(&ill->ill_lock);
+	/*
+	 * Reset the ILL_SOFT_RING_ASSIGN bit so that
+	 * ip_squeue_soft_ring_affinty() will not go
+	 * ahead with assigning rings.
+	 */
+	ill->ill_state_flags &= ~ILL_SOFT_RING_ASSIGN;
+	while (rx_ring->rr_ring_state == ILL_RING_INPROC)
+		/* Some operations pending on the ring. Wait */
+		cv_wait(&ill->ill_cv, &ill->ill_lock);
+
+	if (rx_ring->rr_ring_state != ILL_RING_INUSE) {
+		/*
+		 * Someone already trying to clean
+		 * this squeue or it's already been cleaned.
+		 */
+		mutex_exit(&ill->ill_lock);
+		return;
+	}
+	sqp = rx_ring->rr_sqp;
+
+	if (sqp == NULL) {
+		/*
+		 * The rx_ring never had a squeue assigned to it.
+		 * We are under ill_lock so we can clean it up
+		 * here itself since no one can get to it.
+		 */
+		rx_ring->rr_blank = NULL;
+		rx_ring->rr_handle = NULL;
+		rx_ring->rr_sqp = NULL;
+		rx_ring->rr_ring_state = ILL_RING_FREE;
+		mutex_exit(&ill->ill_lock);
+		return;
+	}
+
+	/* Indicate that it's being cleaned */
+	rx_ring->rr_ring_state = ILL_RING_BEING_FREED;
+	ASSERT(sqp != NULL);
+	mutex_exit(&ill->ill_lock);
+
+	/*
+	 * Use the preallocated ill_unbind_conn for this purpose
+	 */
+	connp = ill->ill_dls_capab->ill_unbind_conn;
+
+	if (connp->conn_tcp->tcp_closemp.b_prev == NULL) {
+		connp->conn_tcp->tcp_closemp_used = B_TRUE;
+	} else {
+		cmn_err(CE_PANIC, "ip_squeue_clean_ring: "
+		    "concurrent use of tcp_closemp_used: connp %p tcp %p\n",
+		    (void *)connp, (void *)connp->conn_tcp);
+	}
+
+	TCP_DEBUG_GETPCSTACK(connp->conn_tcp->tcmp_stk, 15);
+	mp = &connp->conn_tcp->tcp_closemp;
+	CONN_INC_REF(connp);
+	squeue_enter(sqp, mp, ip_squeue_clean, connp, NULL);
+
+	mutex_enter(&ill->ill_lock);
+	while (rx_ring->rr_ring_state != ILL_RING_FREE)
+		cv_wait(&ill->ill_cv, &ill->ill_lock);
+	mutex_exit(&ill->ill_lock);
+}
+
+void
+ip_squeue_clean_all(ill_t *ill)
+{
+	int idx;
+
+	/*
+	 * No need to clean if poll_capab isn't set for this ill
+	 */
+	if (!(ill->ill_capabilities & (ILL_CAPAB_POLL|ILL_CAPAB_SOFT_RING)))
+		return;
+
+	for (idx = 0; idx < ILL_MAX_RINGS; idx++) {
+		ill_rx_ring_t *ipr = &ill->ill_dls_capab->ill_ring_tbl[idx];
+
+		ip_squeue_clean_ring(ill, ipr);
+	}
+
+	ill->ill_capabilities &= ~(ILL_CAPAB_POLL|ILL_CAPAB_SOFT_RING);
 }
 
 typedef struct ip_taskq_arg {

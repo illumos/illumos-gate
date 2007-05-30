@@ -1393,7 +1393,7 @@ ndp_mcastreq(ill_t *ill, const in6_addr_t *addr, uint32_t hw_addr_len,
 	}
 	nce_make_mapping(nce, hw_addr, (uchar_t *)addr);
 	NCE_REFRELE(nce);
-	putnext(ill->ill_wq, mp);
+	ill_dlpi_send(ill, mp);
 	return (0);
 }
 
@@ -1615,8 +1615,8 @@ ndp_do_recovery(ipif_t *ipif)
 		bcopy(&ipif->ipif_v6lcl_addr, mp->b_rptr,
 		    sizeof (ipif->ipif_v6lcl_addr));
 		ill_refhold(ill);
-		(void) qwriter_ip(NULL, ill, ill->ill_rq, mp, ip_ndp_recover,
-		    CUR_OP, B_FALSE);
+		qwriter_ip(ill, ill->ill_rq, mp, ip_ndp_recover, NEW_OP,
+		    B_FALSE);
 	}
 }
 
@@ -1799,8 +1799,8 @@ ip_ndp_failure(ill_t *ill, mblk_t *mp, mblk_t *dl_mp, nce_t *nce)
 			freemsg(mp);
 		} else {
 			ill_refhold(ill);
-			(void) qwriter_ip(NULL, ill, ill->ill_rq, dl_mp,
-			    ip_ndp_excl, CUR_OP, B_FALSE);
+			qwriter_ip(ill, ill->ill_rq, dl_mp, ip_ndp_excl, NEW_OP,
+			    B_FALSE);
 		}
 	}
 	ndp_delete(nce);

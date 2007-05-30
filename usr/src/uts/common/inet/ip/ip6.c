@@ -6838,10 +6838,14 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 			ill = (ill_t *)q->q_ptr;
 			ill_fastpath_ack(ill, mp);
 			return;
-		case SIOCSTUNPARAM:
+
 		case SIOCGTUNPARAM:
-		case OSIOCSTUNPARAM:
 		case OSIOCGTUNPARAM:
+			ip_rput_other(NULL, q, mp, NULL);
+			return;
+
+		case SIOCSTUNPARAM:
+		case OSIOCSTUNPARAM:
 			/* Go through qwriter */
 			break;
 		default:
@@ -6859,7 +6863,7 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 		}
 		ill_refhold_locked(ill);
 		mutex_exit(&ill->ill_lock);
-		qwriter_ip(NULL, ill, q, mp, ip_rput_other, CUR_OP, B_FALSE);
+		qwriter_ip(ill, q, mp, ip_rput_other, CUR_OP, B_FALSE);
 		return;
 	case M_CTL:
 		if ((MBLKL(mp) > sizeof (int)) &&
@@ -6874,10 +6878,13 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 		iocp = (struct iocblk *)mp->b_rptr;
 		switch (iocp->ioc_cmd) {
 		case DL_IOC_HDR_INFO:
-		case SIOCSTUNPARAM:
 		case SIOCGTUNPARAM:
-		case OSIOCSTUNPARAM:
 		case OSIOCGTUNPARAM:
+			ip_rput_other(NULL, q, mp, NULL);
+			return;
+
+		case SIOCSTUNPARAM:
+		case OSIOCSTUNPARAM:
 			mutex_enter(&ill->ill_lock);
 			if (ill->ill_state_flags & ILL_CONDEMNED) {
 				mutex_exit(&ill->ill_lock);
@@ -6886,8 +6893,7 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 			}
 			ill_refhold_locked(ill);
 			mutex_exit(&ill->ill_lock);
-			qwriter_ip(NULL, ill, q, mp, ip_rput_other, CUR_OP,
-			    B_FALSE);
+			qwriter_ip(ill, q, mp, ip_rput_other, CUR_OP, B_FALSE);
 			return;
 		default:
 			break;

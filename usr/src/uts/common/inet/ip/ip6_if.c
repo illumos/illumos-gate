@@ -2645,7 +2645,6 @@ ill_dl_phys(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 	mblk_t	*phys_mp = NULL;
 	mblk_t	*info_mp = NULL;
 	mblk_t	*attach_mp = NULL;
-	mblk_t	*detach_mp = NULL;
 	mblk_t	*bind_mp = NULL;
 	mblk_t	*unbind_mp = NULL;
 	mblk_t	*notify_mp = NULL;
@@ -2705,18 +2704,13 @@ ill_dl_phys(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 	if (unbind_mp == NULL)
 		goto bad;
 
-	/* If we need to attach/detach, pre-alloc and initialize the mblks */
+	/* If we need to attach, pre-alloc and initialize the mblk */
 	if (ill->ill_needs_attach) {
 		attach_mp = ip_dlpi_alloc(sizeof (dl_attach_req_t),
 		    DL_ATTACH_REQ);
 		if (attach_mp == NULL)
 			goto bad;
 		((dl_attach_req_t *)attach_mp->b_rptr)->dl_ppa = ill->ill_ppa;
-
-		detach_mp = ip_dlpi_alloc(sizeof (dl_detach_req_t),
-		    DL_DETACH_REQ);
-		if (detach_mp == NULL)
-			goto bad;
 	}
 
 	/*
@@ -2750,35 +2744,19 @@ ill_dl_phys(ill_t *ill, ipif_t *ipif, mblk_t *mp, queue_t *q)
 	ill_dlpi_send(ill, unbind_mp);
 
 	/*
-	 * Save the DL_DETACH_REQ (if there is one) for use in ill_delete().
-	 */
-	ASSERT(ill->ill_detach_mp == NULL);
-	ill->ill_detach_mp = detach_mp;
-
-	/*
 	 * This operation will complete in ip_rput_dlpi_writer with either
 	 * a DL_PHYS_ADDR_ACK or DL_ERROR_ACK.
 	 */
 	return (EINPROGRESS);
 bad:
-	if (v6token_mp != NULL)
-		freemsg(v6token_mp);
-	if (v6lla_mp != NULL)
-		freemsg(v6lla_mp);
-	if (phys_mp != NULL)
-		freemsg(phys_mp);
-	if (info_mp != NULL)
-		freemsg(info_mp);
-	if (attach_mp != NULL)
-		freemsg(attach_mp);
-	if (detach_mp != NULL)
-		freemsg(detach_mp);
-	if (bind_mp != NULL)
-		freemsg(bind_mp);
-	if (unbind_mp != NULL)
-		freemsg(unbind_mp);
-	if (notify_mp != NULL)
-		freemsg(notify_mp);
+	freemsg(v6token_mp);
+	freemsg(v6lla_mp);
+	freemsg(phys_mp);
+	freemsg(info_mp);
+	freemsg(attach_mp);
+	freemsg(bind_mp);
+	freemsg(unbind_mp);
+	freemsg(notify_mp);
 	return (ENOMEM);
 }
 
