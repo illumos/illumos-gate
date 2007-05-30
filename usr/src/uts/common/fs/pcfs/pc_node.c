@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -207,8 +207,7 @@ syncpcp(struct pcnode *pcp, int flags)
 	if (!vn_has_cached_data(PCTOV(pcp)))
 		err = 0;
 	else
-		err = VOP_PUTPAGE(PCTOV(pcp), (offset_t)0, (uint_t)0,
-		    flags, (struct cred *)0);
+		err = VOP_PUTPAGE(PCTOV(pcp), 0, 0, flags, kcred);
 
 	return (err);
 }
