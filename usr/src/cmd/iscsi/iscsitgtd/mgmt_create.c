@@ -54,6 +54,7 @@
 #include "utility.h"
 #include "errcode.h"
 #include "t10_spc.h"
+#include "isns_client.h"
 
 extern char *getfullrawname();
 
@@ -86,8 +87,8 @@ create_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
     ucred_t *cred)
 {
 	tgt_node_t	*x;
-	char		msgbuf[80],
-			*reply_msg	= NULL;
+	char		msgbuf[80];
+	char		*reply_msg	= NULL;
 
 	if (p->x_child == NULL) {
 		xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
@@ -120,19 +121,17 @@ create_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
 static char *
 create_target(tgt_node_t *x, ucred_t *cred)
 {
-	char		*msg		= NULL,
-			*name		= NULL,
-			*alias		= NULL,
-			*size		= NULL,
-			*type		= NULL,
-			*backing	= NULL,
-			*node_name	= NULL,
-			path[MAXPATHLEN];
-	int		lun		= 0, /* default to LUN 0 */
-			i;
-	tgt_node_t	*n,
-			*c,
-			*l;
+	char		*msg		= NULL;
+	char		*name		= NULL;
+	char		*alias		= NULL;
+	char		*size		= NULL;
+	char		*type		= NULL;
+	char		*backing	= NULL;
+	char		*node_name	= NULL;
+	char		path[MAXPATHLEN];
+	int		lun		= 0; /* default to LUN 0 */
+	int		i;
+	tgt_node_t	*n, *c, *l;
 	err_code_t	code;
 	const priv_set_t	*eset;
 
@@ -270,6 +269,14 @@ create_target(tgt_node_t *x, ucred_t *cred)
 		if (update_config_targets(&msg) == False)
 			goto error;
 
+		/* Only isns register on the 1st creation of the target */
+		if (lun == 0 && isns_enabled() == True) {
+			if (isns_reg(node_name) != 0) {
+				xml_rtn_msg(&msg, ERR_ISNS_ERROR);
+				goto error;
+			}
+		}
+
 	} else if ((lun == 0) && (code != ERR_LUN_EXISTS)) {
 
 		/*
@@ -308,12 +315,11 @@ error:
 static char *
 create_initiator(tgt_node_t *x, ucred_t *cred)
 {
-	char		*msg		= NULL,
-			*name		= NULL,
-			*iscsi_name	= NULL;
-	tgt_node_t	*inode		= NULL,
-			*n,
-			*c;
+	char		*msg		= NULL;
+	char		*name		= NULL;
+	char		*iscsi_name	= NULL;
+	tgt_node_t	*inode		= NULL;
+	tgt_node_t	*n, *c;
 	const priv_set_t	*eset;
 
 	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
@@ -364,11 +370,11 @@ error:
 static char *
 create_tpgt(tgt_node_t *x, ucred_t *cred)
 {
-	char		*msg	= NULL,
-			*tpgt	= NULL,
-			*extra	 = NULL;
-	tgt_node_t	*tnode	= NULL,
-			*n;
+	char		*msg	= NULL;
+	char		*tpgt	= NULL;
+	char		*extra	 = NULL;
+	tgt_node_t	*tnode	= NULL;
+	tgt_node_t	*n;
 	int		tpgt_val;
 	const priv_set_t	*eset;
 
@@ -422,20 +428,20 @@ error:
 static char *
 create_zfs(tgt_node_t *x, ucred_t *cred)
 {
-	char		*msg		= NULL,
-			*dataset	= NULL,
-			*node_name	= NULL,
-			*prop		= NULL,
-			path[MAXPATHLEN],
-			*cp,	/* current pair */
-			*np,	/* next pair */
-			*vp;	/* value pointer */
-	tgt_node_t	*dnode		= NULL,
-			*n,
-			*c,
-			*attr,
-			*ll,
-			*l;
+	char		*msg		= NULL;
+	char		*dataset	= NULL;
+	char		*node_name	= NULL;
+	char		*prop		= NULL;
+	char		path[MAXPATHLEN];
+	char		*cp;	/* current pair */
+	char		*np;	/* next pair */
+	char		*vp;	/* value pointer */
+	tgt_node_t	*dnode		= NULL;
+	tgt_node_t	*n;
+	tgt_node_t	*c;
+	tgt_node_t	*attr;
+	tgt_node_t	*ll;
+	tgt_node_t	*l;
 	libzfs_handle_t	*zh		= NULL;
 	zfs_handle_t	*zfsh		= NULL;
 	uint64_t	size;
@@ -583,6 +589,7 @@ create_zfs(tgt_node_t *x, ucred_t *cred)
 
 		c = tgt_node_alloc(XML_ELEMENT_INAME, String, node_name);
 		tgt_node_add(n, c);
+		free(node_name);
 
 		c = tgt_node_alloc(XML_ELEMENT_LUNLIST, String, "");
 		tgt_node_add(n, c);
@@ -636,6 +643,16 @@ create_zfs(tgt_node_t *x, ucred_t *cred)
 
 	tgt_node_add(targets_config, n);
 
+	/* register with iSNS */
+	node_name = NULL;
+	if (isns_enabled() == True) {
+		(void) tgt_find_value_str(n, XML_ELEMENT_INAME, &node_name);
+		if (isns_reg(node_name) != 0) {
+			xml_rtn_msg(&msg, ERR_ISNS_ERROR);
+			goto error;
+		}
+	}
+
 	xml_rtn_msg(&msg, ERR_SUCCESS);
 error:
 	if (zfsh)
@@ -666,9 +683,9 @@ static char *
 create_node_name(char *local_nick, char *alias)
 {
 	uuid_t	id;
-	char	id_str[37],
-		*p,
-		*anp;		/* alias or nick pointer */
+	char	id_str[37];
+	char	*p;
+	char	*anp;		/* alias or nick pointer */
 
 	if ((p = (char *)malloc(ISCSI_MAX_NAME_LEN)) == NULL)
 		return (NULL);
@@ -718,8 +735,8 @@ create_node_name(char *local_nick, char *alias)
 static Boolean_t
 create_target_dir(char *targ_name, char *local_name)
 {
-	char	path[MAXPATHLEN],
-		sympath[MAXPATHLEN];
+	char	path[MAXPATHLEN];
+	char	sympath[MAXPATHLEN];
 
 	if ((mkdir(target_basedir, 0777) == -1) && (errno != EEXIST))
 		return (False);
@@ -750,16 +767,16 @@ create_lun(char *targ_name, char *type, int lun, char *size_str, char *backing,
     err_code_t *code)
 {
 	uint64_t	size;
-	int		fd		= -1,
-			rpm		= DEFAULT_RPM,
-			heads		= DEFAULT_HEADS,
-			cylinders	= DEFAULT_CYLINDERS,
-			spt		= DEFAULT_SPT,
-			bytes_sect	= DEFAULT_BYTES_PER,
-			interleave	= DEFAULT_INTERLEAVE;
-	char		*vid		= DEFAULT_VID,
-			*pid		= DEFAULT_PID,
-			path[MAXPATHLEN];
+	int		fd		= -1;
+	int		rpm		= DEFAULT_RPM;
+	int		heads		= DEFAULT_HEADS;
+	int		cylinders	= DEFAULT_CYLINDERS;
+	int		spt		= DEFAULT_SPT;
+	int		bytes_sect	= DEFAULT_BYTES_PER;
+	int		interleave	= DEFAULT_INTERLEAVE;
+	char		*vid		= DEFAULT_VID;
+	char		*pid		= DEFAULT_PID;
+	char		path[MAXPATHLEN];
 	FILE		*fp		= NULL;
 
 	/*
@@ -918,11 +935,11 @@ create_lun_common(char *targ_name, int lun, uint64_t size, err_code_t *code)
 {
 	struct stat		s;
 	int			fd			= -1;
-	char			path[MAXPATHLEN],
-				buf[512];
+	char			path[MAXPATHLEN];
+	char			buf[512];
 	struct statvfs		fs;
-	tgt_node_t		*node			= NULL,
-				*c;
+	tgt_node_t		*node			= NULL;
+	tgt_node_t		*c;
 	xmlTextReaderPtr	r;
 
 	/*
@@ -1088,12 +1105,10 @@ setup_disk_backing(err_code_t *code, char *path, char *backing, FILE *fp,
     uint64_t *size)
 {
 	struct stat	s;
-	char		*raw_name,
-			buf[512];
+	char		*raw_name, buf[512];
 	struct vtoc	vtoc;
 	struct dk_gpt	*efi;
-	int		slice,
-			fd;
+	int		slice, fd;
 
 	/*
 	 * Error checking regarding size and backing store has already
@@ -1293,11 +1308,8 @@ static void
 zfs_lun(tgt_node_t *l, uint64_t size, char *dataset)
 {
 	tgt_node_t	*c;
-	int		cylinders,
-			heads,
-			spt,
-			val,
-			guid;
+	int		cylinders, heads, spt, val, guid;
+
 	create_geom(size, &cylinders, &heads, &spt);
 
 	guid = 0;

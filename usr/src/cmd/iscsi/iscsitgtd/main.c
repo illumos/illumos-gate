@@ -68,6 +68,8 @@
 #include "errcode.h"
 #include "t10.h"
 
+#include "isns_client.h"
+
 #define	EMPTY_CONFIG "<config version='1.0'>\n</config>\n"
 
 /* ---- Forward declarations ---- */
@@ -116,6 +118,7 @@ admin_table_t admin_prop_list[] = {
 	{XML_ELEMENT_RAD_SERV,		valid_radius_srv},
 	{XML_ELEMENT_RAD_SECRET,	0},
 	{XML_ELEMENT_ISNS_ACCESS,	0},
+	{XML_ELEMENT_ISNS_SERV,		valid_isns_srv},
 	{XML_ELEMENT_FAST,		0},
 	{0,				0}
 };
@@ -153,11 +156,11 @@ Boolean_t
 process_target_config()
 {
 	xmlTextReaderPtr	r			= NULL;
-	char			path[MAXPATHLEN],
-				*target			= NULL;
+	char			path[MAXPATHLEN];
+	char			*target			= NULL;
 	struct stat		ss;
-	tgt_node_t		*node			= NULL,
-				*next			= NULL;
+	tgt_node_t		*node			= NULL;
+	tgt_node_t		*next			= NULL;
 	int			xml_fd			= -1;
 
 	if (target_basedir != NULL) {
@@ -300,8 +303,8 @@ static Boolean_t
 process_config(char *file)
 {
 	xmlTextReaderPtr	r;
-	int			ret,
-				xml_fd		= -1;
+	int			ret;
+	int			xml_fd		= -1;
 	tgt_node_t		*node = NULL;
 
 #ifndef lint
@@ -403,8 +406,7 @@ process_config(char *file)
 static void *
 logout_cleanup(void *v)
 {
-	int		msg_sent,
-			i;
+	int		msg_sent, i;
 	char		*targ = (char *)v;
 	mgmt_request_t	m;
 	iscsi_conn_t	*conn;
@@ -446,8 +448,7 @@ logout_targ(char *targ)
 {
 	mgmt_request_t	m;
 	iscsi_conn_t	*conn;
-	int		i,
-			msg_sent;
+	int		i, msg_sent;
 	pthread_t	junk;
 	extern pthread_mutex_t	port_mutex;
 
@@ -690,8 +691,7 @@ server_for_door(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 static void
 setup_door(target_queue_t *q, char *door_name)
 {
-	int		did,
-			fd;
+	int		did, fd;
 	struct stat	s;
 	door_arg_t	d;
 	char		*msg = NULL;
@@ -810,16 +810,13 @@ exit_after_door_setup(int sig, siginfo_t *sip, void *v)
 int
 main(int argc, char **argv)
 {
-	char			c,
-				*p,
-				*door_name;
+	char			c, *p, *door_name;
 	msg_t			*msg;
 	target_queue_t		*q;
-	port_args_t		port1,
-				port2;
-	Boolean_t		mgmt_up		= False,
-				daemonize	= True,
-				console_output	= True;
+	port_args_t		port1, port2;
+	Boolean_t		mgmt_up		= False;
+	Boolean_t		daemonize	= True;
+	Boolean_t		console_output	= True;
 	pthread_t		junk;
 	mgmt_request_t		*mgmt;
 	struct sigaction	act;
@@ -971,6 +968,7 @@ main(int argc, char **argv)
 	port_init();
 	queue_init();
 	util_init();
+	isns_init(q);
 
 	/*
 	 * If there's no MAC address currently available don't worry about

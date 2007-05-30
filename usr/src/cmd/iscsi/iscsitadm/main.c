@@ -122,6 +122,7 @@ optionTbl_t longOptions[] = {
 	{"radius-server", required_arg, 'r', "hostname[:port]"},
 	{"radius-secret", no_arg, 'P', NULL},
 	{"isns-access", required_arg, 'S', "enable/disable"},
+	{"isns-server", required_arg, 's', "hostname[:port]"},
 	{"fast-write-ack", required_arg, 'f', "enable/disable"},
 	{"verbose", no_arg, 'v', NULL},
 	{"interval", required_arg, 'I', "seconds"},
@@ -220,7 +221,7 @@ optionRules_t optionRules[] = {
 	{TPGT, MODIFY, "i", B_TRUE, NULL},
 	{TPGT, DELETE, "Ai", B_TRUE, NULL},
 	{TPGT, LIST,   "v", B_FALSE, NULL},
-	{ADMIN, MODIFY, "dHCRrPSf", B_TRUE, NULL},
+	{ADMIN, MODIFY, "dHCRrPSsf", B_TRUE, NULL},
 	{STATS, SHOW, "vIN", B_FALSE, NULL},
 };
 
@@ -359,8 +360,8 @@ deleteFunc(int operandLen, char *operand[], int object, cmdOptions_t *options,
 static int
 formatErrString(tgt_node_t *node)
 {
-	int	code	= 0,
-		rtn	= 0;
+	int	code	= 0;
+	int	rtn	= 0;
 	char	*msg	= NULL;
 
 	if (node == NULL) {
@@ -679,9 +680,9 @@ modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 	char		*first_str	= NULL;
 	tgt_node_t	*node;
 	cmdOptions_t	*optionList	= options;
-	char		chapSecret[MAX_CHAP_SECRET_LEN],
-			olddir[MAXPATHLEN],
-			newdir[MAXPATHLEN];
+	char		chapSecret[MAX_CHAP_SECRET_LEN];
+	char		olddir[MAXPATHLEN];
+	char		newdir[MAXPATHLEN];
 	int		secretLen	= 0;
 	int		ret		= 0;
 
@@ -743,19 +744,19 @@ modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 				break;
 			case 'R': /* radius access */
 				if (strcmp(optionList->optarg,
-					OPT_ENABLE) == 0) {
+				    OPT_ENABLE) == 0) {
 					tgt_buf_add(&first_str,
 					    XML_ELEMENT_RAD_ACCESS, OPT_TRUE);
 				} else
 					if (strcmp(optionList->optarg,
-						OPT_DISABLE) == 0) {
+					    OPT_DISABLE) == 0) {
 					tgt_buf_add(&first_str,
 					    XML_ELEMENT_RAD_ACCESS, OPT_FALSE);
 				} else {
 					(void) fprintf(stderr, "%s: %s\n",
 					    cmdName,
 					    gettext("Option value should be"
-						"enable/disable"));
+					    "enable/disable"));
 					free(first_str);
 					return (1);
 				}
@@ -782,38 +783,42 @@ modifyAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 				break;
 			case 'S': /* iSNS access */
 				if (strcmp(optionList->optarg,
-					OPT_ENABLE) == 0) {
+				    OPT_ENABLE) == 0) {
 					tgt_buf_add(&first_str,
 					    XML_ELEMENT_ISNS_ACCESS, OPT_TRUE);
 				} else
 					if (strcmp(optionList->optarg,
-						OPT_DISABLE) == 0) {
+					    OPT_DISABLE) == 0) {
 					tgt_buf_add(&first_str,
 					    XML_ELEMENT_ISNS_ACCESS, OPT_FALSE);
 				} else {
 					(void) fprintf(stderr, "%s: %s\n",
 					    cmdName,
 					    gettext("Option value should be"
-						"enable/disable"));
+					    "enable/disable"));
 					free(first_str);
 					return (1);
 				}
 				break;
+			case 's': /* iSNS server */
+				tgt_buf_add(&first_str, XML_ELEMENT_ISNS_SERV,
+				    optionList->optarg);
+				break;
 			case 'f': /* fast write back */
 				if (strcmp(optionList->optarg,
-					OPT_ENABLE) == 0) {
+				    OPT_ENABLE) == 0) {
 					tgt_buf_add(&first_str,
 					    XML_ELEMENT_FAST, OPT_TRUE);
 				} else
 					if (strcmp(optionList->optarg,
-						OPT_DISABLE) == 0) {
+					    OPT_DISABLE) == 0) {
 					tgt_buf_add(&first_str,
 					    XML_ELEMENT_FAST, OPT_FALSE);
 				} else {
 					(void) fprintf(stderr, "%s: %s\n",
 					    cmdName,
 					    gettext("Option value should be"
-						"enable/disable"));
+					    "enable/disable"));
 					free(first_str);
 					return (1);
 				}
@@ -1119,8 +1124,8 @@ listTarget(int operandLen, char *operand[], cmdOptions_t *options)
 				(void) printf("%s%s: %s\n", dospace(3),
 				    gettext("Size"),
 				    number_to_scaled_string(buf,
-					strtoll(n4->x_value,
-					NULL, 0), 512, 1024));
+				    strtoll(n4->x_value,
+				    NULL, 0), 512, 1024));
 			} else {
 				(void) printf("%s%s: %s\n", dospace(3),
 				    gettext("Size"), gettext("unknown"));
@@ -1168,7 +1173,7 @@ listInitiator(int operandLen, char *operand[], cmdOptions_t *options)
 		case 'v':
 			verbose = True;
 			tgt_buf_add(&first_str,
-				    XML_ELEMENT_VERBOSE, OPT_TRUE);
+			    XML_ELEMENT_VERBOSE, OPT_TRUE);
 			break;
 
 		default:
@@ -1247,7 +1252,7 @@ listTpgt(int operandLen, char *operand[], cmdOptions_t *options)
 		case 'v':
 			verbose = True;
 			tgt_buf_add(&first_str,
-				    XML_ELEMENT_VERBOSE, OPT_TRUE);
+			    XML_ELEMENT_VERBOSE, OPT_TRUE);
 			break;
 		default:
 			(void) fprintf(stderr, "%s: %c: %s\n",
@@ -1376,6 +1381,10 @@ showAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 	} else
 		(void) printf("%s\n", gettext("Not set"));
 
+	n2 = tgt_node_next_child(n1, XML_ELEMENT_ISNS_SERV, NULL);
+	(void) printf("%s%s: %s\n", dospace(1), gettext("iSNS Server"),
+	    n2 ? n2->x_value : gettext("Not set"));
+
 	n2 = tgt_node_next_child(n1, XML_ELEMENT_FAST, NULL);
 	(void) printf("%s%s: ", dospace(1), gettext("Fast Write ACK"));
 	if (n2) {
@@ -1392,15 +1401,13 @@ showAdmin(int operandLen, char *operand[], cmdOptions_t *options)
 static int
 showStats(int operandLen, char *operand[], cmdOptions_t *options)
 {
-	char		*first_str	= NULL,
-			scale_buf[16];
-	tgt_node_t	*node,
-			*n1;
-	int		interval	= -1,
-			count		= -1,
-			header;
-	stat_delta_t	cur_data,
-			*pd;
+	char		*first_str	= NULL;
+	char		scale_buf[16];
+	tgt_node_t	*node, *n1;
+	int		interval	= -1;
+	int		count		= -1;
+	int		header;
+	stat_delta_t	cur_data, *pd;
 
 	tgt_buf_add_tag(&first_str, "list", Tag_Start);
 	tgt_buf_add_tag(&first_str, XML_ELEMENT_TARG, Tag_Start);

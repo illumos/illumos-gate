@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <syslog.h>
 #include <sys/iscsi_protocol.h>
 #include <iscsitgt_impl.h>
 #include "queue.h"
@@ -39,6 +40,7 @@
 #include "iscsi_login.h"
 #include "utility.h"
 #include "target.h"
+#include "isns_client.h"
 
 typedef enum auth_action {
 	LOGIN_NO_AUTH,
@@ -132,16 +134,16 @@ iscsi_handle_login_pkt(iscsi_conn_t *c)
 	iscsi_login_rsp_hdr_t	*rsp		= NULL;
 	Boolean_t		rval		= False;
 	IscsiAuthClient		*auth_client	= NULL;
-	char			*text		= NULL,
-				*end		= NULL,
-				*text_rsp	= NULL,
-				debug[128];
-	int			debug_status	= 0,
-				errcode		= 0,
-				text_length	= 0,
-				keytype		= 0,
-				transit		= 0,
-				rc		= 0;
+	char			*text		= NULL;
+	char			*end		= NULL;
+	char			*text_rsp	= NULL;
+	char			debug[128];
+	int			debug_status	= 0;
+	int			errcode		= 0;
+	int			text_length	= 0;
+	int			keytype		= 0;
+	int			transit		= 0;
+	int			rc		= 0;
 	auth_action_t		auth_action	= LOGIN_DROP;
 	tgt_node_t		*tnode		= NULL;
 
@@ -220,7 +222,7 @@ iscsi_handle_login_pkt(iscsi_conn_t *c)
 
 	auth_client =
 	    (c->c_sess->sess_auth.auth_buffers &&
-		c->c_sess->sess_auth.num_auth_buffers) ?
+	    c->c_sess->sess_auth.num_auth_buffers) ?
 	    (IscsiAuthClient *) c->c_sess->sess_auth.auth_buffers[0].address :
 	    NULL;
 
@@ -305,7 +307,7 @@ iscsi_handle_login_pkt(iscsi_conn_t *c)
 		}
 
 		if (iscsiAuthClientRecvTransitBit(auth_client,
-			transit) != iscsiAuthStatusNoError) {
+		    transit) != iscsiAuthStatusNoError) {
 			(void) snprintf(debug, sizeof (debug),
 			    "iscsi connection(%u) login failed - "
 			    "authentication transmit failed", c->c_num);
@@ -340,13 +342,13 @@ more_text:
 				    (char *)iscsiAuthClientGetKeyName(keytype);
 				if ((key) &&
 				    (iscsi_find_key_value(key, text, end,
-					&value, &value_end))) {
+				    &value, &value_end))) {
 					(void) snprintf(debug, sizeof (debug),
 					    "%s=%s", key, value);
 					queue_str(c->c_mgmtq, Q_CONN_ERRS,
 					    msg_log, debug);
 					if (iscsiAuthClientRecvKeyValue(
-						    auth_client, keytype, value)
+					    auth_client, keytype, value)
 					    != iscsiAuthStatusNoError) {
 						(void) snprintf(debug,
 						    sizeof (debug),
@@ -396,11 +398,9 @@ more_text:
 			    &debug_status);
 			(void) snprintf(debug, sizeof (debug),
 			    "iscsi connection(%u) authentication failed (%s)",
-			    c->c_num,
-			    iscsiAuthClientDebugStatusToText(
-				    debug_status));
-			queue_str(c->c_mgmtq, Q_CONN_ERRS, msg_log,
-			    debug);
+			    c->c_num, iscsiAuthClientDebugStatusToText(
+			    debug_status));
+			queue_str(c->c_mgmtq, Q_CONN_ERRS, msg_log, debug);
 
 			send_login_reject(c, &lh,
 			    (ISCSI_STATUS_CLASS_INITIATOR_ERR << 8) |
@@ -603,7 +603,7 @@ more_text:
 
 		if ((lh.flags & ISCSI_FLAG_LOGIN_TRANSIT) &&
 		    (ISCSI_LOGIN_NEXT_STAGE(lh.flags) ==
-			ISCSI_FULL_FEATURE_PHASE)) {
+		    ISCSI_FULL_FEATURE_PHASE)) {
 
 			conn_state(c, T5);
 
@@ -718,7 +718,7 @@ login_set_auth(iscsi_sess_t *s)
 		    &szIniAlias);
 
 		if (tgt_find_value_str(xnInitiator, XML_ELEMENT_INAME,
-			&szIscsiName) == True) {
+		    &szIscsiName) == True) {
 
 			comp = strcmp(s->s_i_name, szIscsiName);
 			free(szIscsiName);
@@ -727,8 +727,8 @@ login_set_auth(iscsi_sess_t *s)
 			if (comp == 0) {
 
 				if (tgt_find_value_str(xnInitiator,
-					XML_ELEMENT_CHAPNAME,
-					&szChapName) == True) {
+				    XML_ELEMENT_CHAPNAME,
+				    &szChapName) == True) {
 					/*CSTYLED*/
 					(void) strcpy((char *)sess_auth->username_in,
 					    szChapName);
@@ -736,8 +736,8 @@ login_set_auth(iscsi_sess_t *s)
 				}
 
 				if (tgt_find_value_str(xnInitiator,
-					XML_ELEMENT_CHAPSECRET,
-					&szChapSecret) == True) {
+				    XML_ELEMENT_CHAPSECRET,
+				    &szChapSecret) == True) {
 					/*CSTYLED*/
 					(void) strcpy((char *)sess_auth->password_in,
 					    szChapSecret);
@@ -759,6 +759,15 @@ login_set_auth(iscsi_sess_t *s)
 		 * Should not happen for non-discovery session
 		 */
 		return (LOGIN_DROP);
+	}
+
+	/*
+	 * If iSNS enabled set LOGIN_AUTH
+	 */
+	if (isns_enabled() == True) {
+		if (sess_auth->password_length_in == 0)
+			return (LOGIN_NO_AUTH);
+		return (LOGIN_AUTH);
 	}
 
 	/*
@@ -785,7 +794,7 @@ login_set_auth(iscsi_sess_t *s)
 		if (comp == 0) {
 
 			if ((xnAcl = tgt_node_next(xnTarget,
-				XML_ELEMENT_ACLLIST, 0)) == NULL) {
+			    XML_ELEMENT_ACLLIST, 0)) == NULL) {
 				/*
 				 * No acl_list found, return True for no auth
 				 */
@@ -799,7 +808,7 @@ login_set_auth(iscsi_sess_t *s)
 			 */
 			xnInitiator = NULL;
 			while ((xnInitiator = tgt_node_next(xnAcl,
-				    XML_ELEMENT_INIT, xnInitiator)) != NULL) {
+			    XML_ELEMENT_INIT, xnInitiator)) != NULL) {
 
 				if ((tgt_find_value_str(xnInitiator,
 				    XML_ELEMENT_INIT, &possible) == False) ||

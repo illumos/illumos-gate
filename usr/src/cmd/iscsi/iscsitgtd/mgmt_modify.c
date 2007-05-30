@@ -47,6 +47,7 @@
 #include "iscsi_cmd.h"
 #include "target.h"
 #include "errcode.h"
+#include "isns_client.h"
 
 static char *modify_target(tgt_node_t *x, ucred_t *cred);
 static char *modify_initiator(tgt_node_t *x, ucred_t *cred);
@@ -101,28 +102,27 @@ modify_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
 static char *
 modify_target(tgt_node_t *x, ucred_t *cred)
 {
-	char		*msg		= NULL,
-			*name		= NULL,
-			*iscsi,
-			*prop		= NULL,
-			size_str[16],
-			path[MAXPATHLEN],
-			*m,
-			buf[512];		/* one sector size block */
-	tgt_node_t	*t		= NULL,
-			*list		= NULL,
-			*c		= NULL,
-			*node;
+	char		*msg		= NULL;
+	char		*name		= NULL;
+	char		*iscsi;
+	char		*prop		= NULL;
+	char		size_str[16];
+	char		path[MAXPATHLEN];
+	char		*m;
+	char		buf[512];		/* one sector size block */
+	tgt_node_t	*t		= NULL;
+	tgt_node_t	*list		= NULL;
+	tgt_node_t	*c		= NULL;
+	tgt_node_t	*node;
+	tgt_node_t	*tpgt		= NULL;
 	Boolean_t	change_made	= False;
-	int		lun		= 0,
-			fd,
-			xml_fd;
-	uint64_t	val,
-			new_lu_size,
-			cur_lu_size;
+	int		lun		= 0;
+	int		fd, xml_fd;
+	uint64_t	val, new_lu_size, cur_lu_size;
 	struct stat	st;
 	xmlTextReaderPtr	r;
 	const priv_set_t	*eset;
+	uint32_t		isns_mods	= 0;
 
 	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
 	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
@@ -294,7 +294,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 
 	if (tgt_find_value_str(x, XML_ELEMENT_TPGT, &prop) == True) {
 		if (prop == NULL) {
-			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_ACL);
+			xml_rtn_msg(&msg, ERR_SYNTAX_EMPTY_TPGT);
 			return (msg);
 		}
 
@@ -307,6 +307,21 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 			xml_rtn_msg(&msg, ERR_INVALID_TPGT);
 			free(prop);
 			return (msg);
+		}
+
+		/* update isns only if TPGT contains ip_addr */
+		while ((tpgt = tgt_node_next(main_config, XML_ELEMENT_TPGT,
+		    tpgt)) != NULL) {
+			if (strcmp(prop, tpgt->x_value) != 0)
+				continue;
+			if (tgt_node_next(tpgt, XML_ELEMENT_IPADDR, NULL)
+			    != NULL) {
+				isns_mods |= ISNS_MOD_TPGT;
+				break;
+			} else {
+				xml_rtn_msg(&msg, ERR_TPGT_NO_IPADDR);
+				return (msg);
+			}
 		}
 
 		if ((c = tgt_node_alloc(XML_ELEMENT_TPGT, String, prop)) ==
@@ -335,8 +350,10 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 			tgt_node_add(list, c);
 			tgt_node_add(t, list);
 		}
+
 		free(prop);
 		prop = NULL;
+
 		change_made = True;
 	}
 
@@ -383,6 +400,7 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		}
 		free(prop);
 		prop = NULL;
+		isns_mods |= ISNS_MOD_ALIAS;
 		change_made = True;
 	}
 
@@ -417,8 +435,17 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 	}
 
 	if (change_made == True) {
-		if (update_config_targets(&msg) == True)
-			xml_rtn_msg(&msg, ERR_SUCCESS);
+		if (update_config_targets(&msg) == False) {
+			xml_rtn_msg(&msg, ERR_UPDATE_TARGCFG_FAILED);
+			return (msg);
+		}
+		if (isns_enabled() == True) {
+			if (isns_dev_update(t->x_value, isns_mods) != 0) {
+				xml_rtn_msg(&msg, ERR_UPDATE_TARGCFG_FAILED);
+				return (msg);
+			}
+		}
+		xml_rtn_msg(&msg, ERR_SUCCESS);
 	} else {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_OPERAND);
 	}
@@ -434,9 +461,9 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 static char *
 modify_initiator(tgt_node_t *x, ucred_t *cred)
 {
-	char		*msg		= NULL,
-			*name		= NULL,
-			*prop		= NULL;
+	char		*msg		= NULL;
+	char		*name		= NULL;
+	char		*prop		= NULL;
 	tgt_node_t	*inode		= NULL;
 	Boolean_t	changes_made	= False;
 	const priv_set_t	*eset;
@@ -519,8 +546,8 @@ modify_initiator(tgt_node_t *x, ucred_t *cred)
 static char *
 modify_admin(tgt_node_t *x, ucred_t *cred)
 {
-	char		*msg	= NULL,
-			*prop;
+	char		*msg	= NULL;
+	char		*prop;
 	Boolean_t	changes_made = False;
 	admin_table_t	*ap;
 	const priv_set_t	*eset;
@@ -557,6 +584,11 @@ modify_admin(tgt_node_t *x, ucred_t *cred)
 	}
 
 	if (changes_made == True) {
+		/* isns_update updates isns_access & isns server name */
+		if (isns_update() != 0) {
+			xml_rtn_msg(&msg, ERR_ISNS_ERROR);
+			return (msg);
+		}
 		if (update_config_main(&msg) == True)
 			xml_rtn_msg(&msg, ERR_SUCCESS);
 	} else {
@@ -575,9 +607,9 @@ static char *
 modify_tpgt(tgt_node_t *x, ucred_t *cred)
 {
 	struct addrinfo	*res	= NULL;
-	char		*msg	= NULL,
-			*name	= NULL,
-			*ip_str	= NULL;
+	char		*msg	= NULL;
+	char		*name	= NULL;
+	char		*ip_str	= NULL;
 	tgt_node_t	*tnode	= NULL;
 	const priv_set_t	*eset;
 
@@ -618,6 +650,14 @@ modify_tpgt(tgt_node_t *x, ucred_t *cred)
 	if (update_config_main(&msg) == True)
 		xml_rtn_msg(&msg, ERR_SUCCESS);
 
+	/*
+	 * Re-register all targets, currently there's no method to
+	 * update TPGT for individual target
+	 */
+	if (isns_enabled() == True) {
+		isns_reg_all();
+	}
+
 error:
 	if (name)
 		free(name);
@@ -636,9 +676,9 @@ error:
 static char *
 modify_zfs(tgt_node_t *x, ucred_t *cred)
 {
-	char		*msg		= NULL,
-			*prop		= NULL,
-			*dataset	= NULL;
+	char		*msg		= NULL;
+	char		*prop		= NULL;
+	char		*dataset	= NULL;
 	libzfs_handle_t	*zh		= NULL;
 	zfs_handle_t	*zfsh		= NULL;
 	tgt_node_t	*n		= NULL;
@@ -724,8 +764,8 @@ update_basedir(char *name, char *prop)
 {
 	tgt_node_t	*targ	= NULL;
 	int		count	= 0;
-	char		*msg	= NULL,
-			*val	= NULL;
+	char		*msg	= NULL;
+	char		*val	= NULL;
 
 	if ((prop == NULL) || (strlen(prop) == 0) || (prop[0] != '/')) {
 		xml_rtn_msg(&msg, ERR_INVALID_BASEDIR);
@@ -781,9 +821,8 @@ char *
 valid_radius_srv(char *name, char *prop)
 {
 	struct addrinfo	*res	= NULL;
-	char		*msg	= NULL,
-			*sp,
-			*p;
+	char		*msg	= NULL;
+	char		*sp, *p;
 	int		port;
 
 	if ((sp = strdup(prop)) == NULL) {
@@ -800,6 +839,39 @@ valid_radius_srv(char *name, char *prop)
 	}
 	if ((getaddrinfo(sp, NULL, NULL, &res) != 0) || (res == NULL))
 		xml_rtn_msg(&msg, ERR_INVALID_RADSRV);
+	else
+		freeaddrinfo(res);
+	free(sp);
+	return (msg);
+}
+
+/*
+ * []----
+ * | validate_isns_server -- validate that server[:port] are valid
+ * []----
+ */
+char *
+valid_isns_srv(char *name, char *prop)
+{
+	struct addrinfo	*res	= NULL;
+	char		*msg	= NULL;
+	char		*sp, *p;
+	int		port;
+
+	if ((sp = strdup(prop)) == NULL) {
+		xml_rtn_msg(&msg, ERR_NO_MEM);
+		return (msg);
+	} else if ((p = strrchr(sp, ':')) != NULL) {
+		*p++ = '\0';
+		port = atoi(p);
+		if ((port < 1) || (port > 65535)) {
+			xml_rtn_msg(&msg, ERR_INVALID_ISNS_SRV);
+			free(sp);
+			return (msg);
+		}
+	}
+	if ((getaddrinfo(sp, NULL, NULL, &res) != 0) || (res == NULL))
+		xml_rtn_msg(&msg, ERR_INVALID_ISNS_SRV);
 	else
 		freeaddrinfo(res);
 	free(sp);

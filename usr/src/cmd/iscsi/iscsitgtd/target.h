@@ -179,6 +179,7 @@ void list_func(tgt_node_t *, target_queue_t *, target_queue_t *, ucred_t *);
 void logout_targ(char *targ);
 char *update_basedir(char *, char *);
 char *valid_radius_srv(char *name, char *prop);
+char *valid_isns_srv(char *name, char *prop);
 Boolean_t if_find_mac(target_queue_t *mgmt);
 void if_target_address(char **text, int *text_length, struct sockaddr *sp);
 Boolean_t process_target_config();
@@ -195,7 +196,8 @@ extern size_t		mac_len;
 extern int		main_vers_maj,
 			main_vers_min,
 			targets_vers_maj,
-			targets_vers_min;
+			targets_vers_min,
+			iscsi_port;
 extern Boolean_t	enforce_strict_guid,
 			thin_provisioning,
 			disable_tpgs,

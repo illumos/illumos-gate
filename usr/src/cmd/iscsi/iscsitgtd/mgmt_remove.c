@@ -36,6 +36,7 @@
 #include <strings.h>
 #include <unistd.h>
 #include <priv.h>
+#include <syslog.h>
 
 #include <iscsitgt_impl.h>
 #include "utility.h"
@@ -43,6 +44,7 @@
 #include "target.h"
 #include "iscsi_cmd.h"
 #include "errcode.h"
+#include "isns_client.h"
 
 static char *remove_target(tgt_node_t *x, ucred_t *cred);
 static char *remove_initiator(tgt_node_t *x, ucred_t *cred);
@@ -56,8 +58,8 @@ remove_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
     ucred_t *cred)
 {
 	tgt_node_t	*x;
-	char		msgbuf[80],
-			*reply_msg	= NULL;
+	char		msgbuf[80];
+	char		*reply_msg	= NULL;
 
 	if (p->x_child == NULL) {
 		xml_rtn_msg(&reply_msg, ERR_SYNTAX_MISSING_OBJECT);
@@ -90,8 +92,8 @@ remove_func(tgt_node_t *p, target_queue_t *reply, target_queue_t *mgmt,
 static char *
 remove_zfs(tgt_node_t *x, ucred_t *cred)
 {
-	char		*prop,
-			*msg		= NULL;
+	char		*prop;
+	char		*msg		= NULL;
 	tgt_node_t	*targ		= NULL;
 	const priv_set_t	*eset;
 
@@ -137,6 +139,10 @@ remove_zfs(tgt_node_t *x, ucred_t *cred)
 	 * to issue the logout we'll have removed reference to the target
 	 * such that this can't happen.
 	 */
+	if (isns_enabled() == True) {
+		if (isns_dereg(prop) != 0)
+			syslog(LOG_INFO, "ISNS dereg failed\n");
+	}
 	logout_targ(prop);
 	free(prop);
 
@@ -147,11 +153,11 @@ remove_zfs(tgt_node_t *x, ucred_t *cred)
 static char *
 remove_target(tgt_node_t *x, ucred_t *cred)
 {
-	char		*msg			= NULL,
-			*prop			= NULL;
-	tgt_node_t	*targ			= NULL,
-			*list,
-			*c			= NULL;
+	char		*msg			= NULL;
+	char		*prop			= NULL;
+	tgt_node_t	*targ			= NULL;
+	tgt_node_t	*list;
+	tgt_node_t	*c			= NULL;
 	Boolean_t	change_made		= False;
 	int		lun_num;
 	const priv_set_t	*eset;
@@ -221,6 +227,13 @@ remove_target(tgt_node_t *x, ucred_t *cred)
 		if (list->x_child == NULL)
 			(void) tgt_node_remove(targ, list, MatchName);
 		free(prop);
+
+		/* update isns */
+		if (isns_enabled()) {
+			if (isns_dev_update(targ->x_value, ISNS_MOD_TPGT) != 0)
+				syslog(LOG_ALERT, "ISNS register failed\n");
+		}
+
 		change_made = True;
 	}
 	if (tgt_find_value_int(x, XML_ELEMENT_LUN, &lun_num) == True) {
@@ -247,6 +260,12 @@ remove_target(tgt_node_t *x, ucred_t *cred)
 		if (msg != NULL)
 			goto error;
 
+		/* ISNS de-register target if it's the last lun */
+		if (lun_num == 0 && isns_enabled() == True) {
+			if (isns_dereg(prop) != 0)
+				syslog(LOG_INFO, "ISNS dereg failed\n");
+		}
+
 		iscsi_inventory_change(prop);
 		free(prop);
 		change_made = True;
@@ -272,8 +291,8 @@ error:
 static char *
 remove_initiator(tgt_node_t *x, ucred_t *cred)
 {
-	char		*msg	= NULL,
-			*name;
+	char		*msg	= NULL;
+	char		*name;
 	tgt_node_t	*node	= NULL;
 	const priv_set_t	*eset;
 
@@ -314,10 +333,10 @@ remove_initiator(tgt_node_t *x, ucred_t *cred)
 static char *
 remove_tpgt(tgt_node_t *x, ucred_t *cred)
 {
-	char		*msg		= NULL,
-			*prop		= NULL;
-	tgt_node_t	*node		= NULL,
-			*c		= NULL;
+	char		*msg		= NULL;
+	char		*prop		= NULL;
+	tgt_node_t	*node		= NULL;
+	tgt_node_t	*c		= NULL;
 	Boolean_t	change_made	= False;
 	const priv_set_t	*eset;
 
@@ -364,6 +383,9 @@ remove_tpgt(tgt_node_t *x, ucred_t *cred)
 	}
 
 	if (change_made == True) {
+		/* Isns re-register all target */
+		if (isns_enabled() == True)
+			isns_reg_all();
 		if (update_config_main(&msg) == True)
 			xml_rtn_msg(&msg, ERR_SUCCESS);
 	} else {

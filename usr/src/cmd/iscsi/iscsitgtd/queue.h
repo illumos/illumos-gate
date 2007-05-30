@@ -58,6 +58,8 @@ extern "C" {
 #define	Q_GEN_ERRS	0x01000
 #define	Q_GEN_DETAILS	0x02000
 
+#define	Q_ISNS_DBG	0x10000
+
 /*
  * When used the queue request will be place at the head of the queue.
  */

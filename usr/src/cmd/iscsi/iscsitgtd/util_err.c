@@ -39,7 +39,7 @@ errcode_to_str(err_code_t err_code)
 		return ((char *)gettext("Null XML message"));
 	case ERR_SYNTAX_EMPTY:
 		return ((char *)gettext("Syntax error: "
-			    "Empty XML message or syntax error"));
+		    "Empty XML message or syntax error"));
 	case ERR_SYNTAX_MISSING_ALL:
 		return ((char *)gettext("Syntax error: Missing --all"));
 	case ERR_SYNTAX_MISSING_BACKING_STORE:
@@ -111,10 +111,10 @@ errcode_to_str(err_code_t err_code)
 		return ((char *)gettext("TPGT not found"));
 	case ERR_ACCESS_RAW_DEVICE_FAILED:
 		return ((char *)gettext("Failed to "
-			    "access direct access device"));
+		    "access direct access device"));
 	case ERR_CREATE_METADATA_FAILED:
 		return ((char *)gettext("Failed to "
-			    "create meta data for tape device"));
+		    "create meta data for tape device"));
 	case ERR_CREATE_SYMLINK_FAILED:
 		return ((char *)gettext("Failed to "
 		    "create symbol link to backing store"));
@@ -129,19 +129,19 @@ errcode_to_str(err_code_t err_code)
 		    "exists"));
 	case ERR_DISK_BACKING_MUST_BE_REGULAR_FILE:
 		return ((char *)gettext("For type "
-			    "'disk' backing must be a regular file"));
+		    "'disk' backing must be a regular file"));
 	case ERR_DISK_BACKING_NOT_VALID_RAW:
 		return ((char *)gettext("Backing store is not valid raw "
 		    "device"));
 	case ERR_STAT_BACKING_FAILED:
 		return ((char *)gettext("Failed to "
-			    "stat(2) backing for 'disk'"));
+		    "stat(2) backing for 'disk'"));
 	case ERR_RAW_PART_NOT_CAP:
 		return ((char *)gettext("Partition size doesn't match capacity"
 		    " of device, use p0 or ctd name"));
 	case ERR_CREATE_TARGET_DIR_FAILED:
 		return ((char *)gettext("Failed to "
-			    "create target directory"));
+		    "create target directory"));
 	case ERR_ENCODE_GUID_FAILED:
 		return ((char *)gettext("Failed to encode GUID value"));
 	case ERR_INIT_XML_READER_FAILED:
@@ -150,16 +150,16 @@ errcode_to_str(err_code_t err_code)
 		return ((char *)gettext("Failed to open parameter file"));
 	case ERR_UPDATE_MAINCFG_FAILED:
 		return ((char *)gettext("Failed to "
-			    "update main configuration file"));
+		    "update main configuration file"));
 	case ERR_UPDATE_TARGCFG_FAILED:
 		return ((char *)gettext("Failed to "
-			    "update target configuration file"));
+		    "update target configuration file"));
 	case ERR_VALID_TARG_EXIST:
 		return ((char *)gettext("Valid targets "
-			    "exist under current base directory"));
+		    "exist under current base directory"));
 	case ERR_TARGCFG_MISSING_INAME:
 		return ((char *)gettext("Missing "
-			    "iscsi name in target configuration"));
+		    "iscsi name in target configuration"));
 	case ERR_NO_MATCH:
 		return ((char *)gettext("No match"));
 	case ERR_NO_MEM:
@@ -193,6 +193,10 @@ errcode_to_str(err_code_t err_code)
 		return ((char *)gettext("No credentials available from door"));
 	case ERR_NO_PERMISSION:
 		return ((char *)gettext("Permission denied"));
+	case ERR_ISNS_ERROR:
+		return ((char *)gettext("ISNS error"));
+	case ERR_TPGT_NO_IPADDR:
+		return ((char *)gettext("TPGT has no ip-addr"));
 	default:
 		return ((char *)gettext("Internal error: unknown message"));
 	}

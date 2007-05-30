@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,7 @@
 #include "target.h"
 #include "utility.h"
 #include "errcode.h"
+#include "isns_client.h"
 #include <sys/scsi/generic/commands.h>
 
 #define	CRC32_STR	"CRC32C"
@@ -74,12 +75,51 @@ util_init()
 Boolean_t
 check_access(tgt_node_t *targ, char *initiator_name, Boolean_t req_chap)
 {
-	tgt_node_t	*acl,
-			*inode		= NULL,
-			*tgt_initiator	= NULL;
+	tgt_node_t	*acl;
+	tgt_node_t	*inode		= NULL;
+	tgt_node_t	*tgt_initiator	= NULL;
 	char		*dummy;
-	Boolean_t	valid		= False,
-			found_chap	= False;
+	Boolean_t	valid		= False;
+	Boolean_t	found_chap	= False;
+	Boolean_t	access		= False;
+
+	/*
+	 * If ISNS is enable check for access privilege from isns server
+	 */
+	if (isns_enabled() == True) {
+		if (tgt_find_value_str(targ, XML_ELEMENT_INAME, &dummy)
+		    == False) {
+			return (False);
+		}
+		access = isns_qry_initiator(dummy, initiator_name);
+		free(dummy);
+		if (req_chap == False) {
+			return (access);
+		}
+
+		/* Need to check if CHAP is needed for initiator */
+		while ((inode = tgt_node_next(main_config, XML_ELEMENT_INIT,
+		    inode)) != NULL) {
+			if (tgt_find_value_str(inode, XML_ELEMENT_INAME, &dummy)
+			    == True) {
+				if (strcmp(dummy, initiator_name) == 0) {
+					free(dummy);
+					if (tgt_find_value_str(inode,
+					    XML_ELEMENT_CHAPSECRET, &dummy)
+					    == True) {
+						free(dummy);
+						found_chap = True;
+						break;
+					}
+				}
+			}
+		}
+		if (access == True) {
+			if ((req_chap == True) && (found_chap == True))
+				access = False;
+		}
+		return (access);
+	}
 
 	/*
 	 * If there's no ACL for this target everyone has access.
@@ -153,8 +193,8 @@ check_access(tgt_node_t *targ, char *initiator_name, Boolean_t req_chap)
 static Boolean_t
 convert_local_tpgt(char **text, int *text_length, char *local_tpgt)
 {
-	tgt_node_t	*tpgt	= NULL,
-	*x;
+	tgt_node_t	*tpgt	= NULL;
+	tgt_node_t 	*x;
 	char		buf[80];
 	char		ipaddr[4];
 
@@ -207,15 +247,15 @@ static void
 add_target_address(iscsi_conn_t *c, char **text, int *text_length,
     tgt_node_t *targ)
 {
-	tgt_node_t	*tpgt_list,
-			*tpgt		= NULL;
+	tgt_node_t	*tpgt_list;
+	tgt_node_t	*tpgt = NULL;
 	struct sockaddr_in	*sp4;
 	struct sockaddr_in6	*sp6;
 	/*
 	 * 7 is enough room for the largest TPGT of "65536", the ',' and a NULL
 	 */
-	char	buf[INET6_ADDRSTRLEN + 7],
-		net_buf[INET6_ADDRSTRLEN];
+	char	buf[INET6_ADDRSTRLEN + 7];
+	char	net_buf[INET6_ADDRSTRLEN];
 
 	if ((tpgt_list = tgt_node_next(targ, XML_ELEMENT_TPGTLIST,
 	    NULL)) == NULL) {
@@ -233,16 +273,16 @@ add_target_address(iscsi_conn_t *c, char **text, int *text_length,
 				sp4 = (struct sockaddr_in *)&c->c_target_sockaddr;
 				(void) snprintf(buf, sizeof (buf), "%s,%s",
 				    inet_ntop(sp4->sin_family,
-					(void *)&sp4->sin_addr,
-					net_buf, sizeof (net_buf)),
+				    (void *)&sp4->sin_addr,
+				    net_buf, sizeof (net_buf)),
 				    tpgt->x_value);
 			} else {
 				/*CSTYLED*/
 				sp6 = (struct sockaddr_in6 *)&c->c_target_sockaddr;
 				(void) snprintf(buf, sizeof (buf), "%s,%s",
 				    inet_ntop(sp6->sin6_family,
-					(void *)&sp6->sin6_addr,
-					net_buf, sizeof (net_buf)),
+				    (void *)&sp6->sin6_addr,
+				    net_buf, sizeof (net_buf)),
 				    tpgt->x_value);
 			}
 			(void) add_text(text, text_length, "TargetAddress",
@@ -298,8 +338,8 @@ add_targets(iscsi_conn_t *c, char **text, int *text_length)
 Boolean_t
 add_text(char **text, int *current_length, char *name, char *val)
 {
-	int	dlen = *current_length,
-		plen;
+	int	dlen = *current_length;
+	int	plen;
 	char	*p;
 
 	/*
@@ -385,10 +425,10 @@ Boolean_t
 parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
     int *errcode)
 {
-	char		*p		= NULL,
-			*n,
-			*cur_pair,
-			param_rsp[32];
+	char		*p		= NULL;
+	char		*n;
+	char		*cur_pair;
+	char		param_rsp[32];
 	int		plen;		/* pair length */
 	Boolean_t	rval		= True;
 	char		param_buf[16];
@@ -544,7 +584,7 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 			if ((rval = connection_parameters_get(c, n)) == False) {
 				*errcode =
 				    (ISCSI_STATUS_CLASS_INITIATOR_ERR << 8) |
-					ISCSI_LOGIN_STATUS_TGT_FORBIDDEN;
+				    ISCSI_LOGIN_STATUS_TGT_FORBIDDEN;
 			} else if ((rval = add_text(text, text_length,
 			    "TargetAlias", c->c_targ_alias)) == True) {
 
@@ -767,7 +807,7 @@ parse_text(iscsi_conn_t *c, int dlen, char **text, int *text_length,
 			 * for future processing.
 			 */
 			rval = add_text(text, text_length,
-					cur_pair, "NotUnderstood");
+			    cur_pair, "NotUnderstood");
 
 			/*
 			 * Go ahead a log this information in case we see
@@ -822,8 +862,8 @@ static int
 find_main_tpgt(struct sockaddr_storage *pst)
 {
 	char		ip_addr[16];
-	tgt_node_t	*tpgt				= NULL,
-			*ip_node			= NULL;
+	tgt_node_t	*tpgt				= NULL;
+	tgt_node_t	*ip_node			= NULL;
 	struct in_addr	addr;
 	struct in6_addr	addr6;
 
@@ -844,7 +884,7 @@ find_main_tpgt(struct sockaddr_storage *pst)
 			if (pst->ss_family == AF_INET) {
 
 				if (inet_pton(AF_INET, ip_node->x_value,
-					ip_addr) != 1) {
+				    ip_addr) != 1) {
 					continue;
 				}
 				if (bcmp(ip_addr, &addr,
@@ -854,7 +894,7 @@ find_main_tpgt(struct sockaddr_storage *pst)
 			} else if (pst->ss_family == AF_INET6) {
 
 				if (inet_pton(AF_INET6, ip_node->x_value,
-					ip_addr) != 1) {
+				    ip_addr) != 1) {
 					continue;
 				}
 				if (bcmp(ip_addr, &addr6,
@@ -880,10 +920,9 @@ find_main_tpgt(struct sockaddr_storage *pst)
 static int
 convert_to_tpgt(iscsi_conn_t *c, tgt_node_t *targ)
 {
-	tgt_node_t	*list,
-			*tpgt		= NULL;
-	int		addr_tpgt,
-			pos_tpgt;
+	tgt_node_t	*list;
+	tgt_node_t	*tpgt		= NULL;
+	int		addr_tpgt, pos_tpgt;
 
 	/*
 	 * If this target doesn't have a list of target portal group tags
@@ -938,8 +977,7 @@ find_target_node(char *targ_name)
 static Boolean_t
 connection_parameters_get(iscsi_conn_t *c, char *targ_name)
 {
-	tgt_node_t	*targ,
-			*alias;
+	tgt_node_t	*targ, *alias;
 	Boolean_t	rval	= False;
 
 	if ((targ = find_target_node(targ_name)) != NULL) {
@@ -973,10 +1011,9 @@ connection_parameters_get(iscsi_conn_t *c, char *targ_name)
 Boolean_t
 validate_version(tgt_node_t *node, int *maj_p, int *min_p)
 {
-	char	*vers_str	= NULL,
-		*minor_part;
-	int	maj,
-		min;
+	char	*vers_str	= NULL;
+	char	*minor_part;
+	int	maj, min;
 
 	if ((tgt_find_attr_str(node, XML_ELEMENT_VERS, &vers_str) == False) ||
 	    (vers_str == NULL))
@@ -1005,8 +1042,8 @@ int
 sna_lt(uint32_t n1, uint32_t n2)
 {
 	return ((n1 != n2) &&
-		(((n1 < n2) && ((n2 - n1) < SNA32_CHECK)) ||
-		    ((n1 > n2) && ((n2 - n1) < SNA32_CHECK))));
+	    (((n1 < n2) && ((n2 - n1) < SNA32_CHECK)) ||
+	    ((n1 > n2) && ((n2 - n1) < SNA32_CHECK))));
 }
 
 /*
@@ -1018,8 +1055,8 @@ int
 sna_lte(uint32_t n1, uint32_t n2)
 {
 	return ((n1 == n2) ||
-		(((n1 < n2) && ((n2 - n1) < SNA32_CHECK)) ||
-		    ((n1 > n2) && ((n2 - n1) < SNA32_CHECK))));
+	    (((n1 < n2) && ((n2 - n1) < SNA32_CHECK)) ||
+	    ((n1 > n2) && ((n2 - n1) < SNA32_CHECK))));
 }
 
 Boolean_t
@@ -1057,8 +1094,7 @@ util_create_guid(char **guid)
 	 */
 	uint32_t	tval = (uint_t)time((time_t *)0);
 	size_t		guid_size;
-	int		i,
-			fd;
+	int		i, fd;
 
 	if ((mac_len == 0) && (if_find_mac(NULL) == False)) {
 
@@ -1126,8 +1162,8 @@ util_create_guid(char **guid)
 void
 create_geom(diskaddr_t size, int *cylinder, int *heads, int *spt)
 {
-	diskaddr_t	sects	= size >> 9,
-			c, h, s, t;
+	diskaddr_t	sects	= size >> 9;
+	diskaddr_t	c, h, s, t;
 	int		pass;
 
 	/*
@@ -1226,8 +1262,7 @@ void
 util_title(target_queue_t *q, int type, int num, char *title)
 {
 	char	*type_str;
-	int	len,
-		pad;
+	int	len, pad;
 
 	len	= strlen(title);
 	pad	= len & 1;
@@ -1475,17 +1510,13 @@ thick_provo_chk_thr(char *targ, int lun)
 void
 remove_target_common(char *name, int lun_num, char **msg)
 {
-	tgt_node_t	*targ			= NULL,
-			*list,
-			*lun,
-			*node,
-			*c;
-	char		path[MAXPATHLEN],
-			*tname			= NULL,
-			*iname			= NULL,
-			*bs_path		= NULL;
-	int		chk,
-			xml_fd;
+	tgt_node_t	*targ			= NULL;
+	tgt_node_t	*list, *lun, *node, *c;
+	char		path[MAXPATHLEN];
+	char		*tname			= NULL;
+	char		*iname			= NULL;
+	char		*bs_path		= NULL;
+	int		chk, xml_fd;
 	Boolean_t	bs_delete		= False;
 	xmlTextReaderPtr	r;
 
