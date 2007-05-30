@@ -2735,6 +2735,7 @@ aus_auditsys(struct t_audit_data *tad)
 	au_evclass_map_t event;
 	au_mask_t mask;
 	int auditstate, policy;
+	au_id_t auid;
 
 
 	struct a {
@@ -2753,7 +2754,9 @@ aus_auditsys(struct t_audit_data *tad)
 
 	switch (tad->tad_event) {
 	case AUE_SETAUID:
-		au_uwrite(au_to_arg32(2, "setauid", (uint32_t)a1));
+		if (copyin((caddr_t)a1, &auid, sizeof (au_id_t)))
+				return;
+		au_uwrite(au_to_arg32(2, "setauid", auid));
 		break;
 	case AUE_SETAUDIT:
 		STRUCT_INIT(ainfo, get_udatamodel());
