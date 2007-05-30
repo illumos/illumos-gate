@@ -113,6 +113,7 @@
 #include <libuutil.h>
 #include <stddef.h>
 #include <bsm/adt_event.h>
+#include <ucred.h>
 #include "inetd_impl.h"
 
 /* path to inetd's binary */
@@ -1048,7 +1049,7 @@ create_bound_fds(instance_t *instance)
 			 * without causing an error.
 			 */
 			if (is_rpc_num_in_use(pi->ri->prognum, pi->proto,
-				pi->ri->lowver, pi->ri->highver)) {
+			    pi->ri->lowver, pi->ri->highver)) {
 				failure = B_TRUE;
 				close_net_fd(instance, pi->listen_fd);
 				pi->listen_fd = -1;
@@ -2538,6 +2539,8 @@ process_uds_event(void)
 	socklen_t		len = sizeof (addr);
 	int			ret;
 	uint_t			retries = 0;
+	ucred_t			*ucred = NULL;
+	uid_t			euid;
 
 	debug_msg("Entering process_uds_event");
 
@@ -2547,6 +2550,22 @@ process_uds_event(void)
 	if (fd < 0) {
 		if (errno != EWOULDBLOCK)
 			error_msg("accept failed: %s", strerror(errno));
+		return (-1);
+	}
+
+	if (getpeerucred(fd, &ucred) == -1) {
+		error_msg("getpeerucred failed: %s", strerror(errno));
+		(void) close(fd);
+		return (-1);
+	}
+
+	/* Check peer credentials before acting on the request */
+	euid = ucred_geteuid(ucred);
+	ucred_free(ucred);
+	if (euid != 0 && getuid() != euid) {
+		debug_msg("peer euid %u != uid %u",
+		    (uint_t)euid, (uint_t)getuid());
+		(void) close(fd);
 		return (-1);
 	}
 
@@ -2900,8 +2919,8 @@ smf_kill_process(instance_t *instance, int sig)
 		    (errno != ESRCH)) {
 			ret = IMRET_FAILURE;
 			error_msg(gettext("Unable to kill "
-			"start process (%ld) of instance %s: %s"),
-			rv->val, instance->fmri, strerror(errno));
+			    "start process (%ld) of instance %s: %s"),
+			    rv->val, instance->fmri, strerror(errno));
 		}
 	}
 	return (ret);
