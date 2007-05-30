@@ -561,7 +561,7 @@ is_remote_fstype(const char *fstype, char *const *remote_fstypes)
 static void
 root_to_lu(zlog_t *zlogp, char *zroot, size_t zrootlen, boolean_t isresolved)
 {
-	assert(zone_isnative);
+	assert(zone_isnative || zone_iscluster);
 
 	if (!isresolved && zonecfg_in_alt_root())
 		resolve_lofs(zlogp, zroot, zrootlen);
@@ -1279,7 +1279,7 @@ build_mounted_pre_var(zlog_t *zlogp, char *rootpath,
 	FILE *fp;
 	uuid_t uuid;
 
-	assert(zone_isnative);
+	assert(zone_isnative || zone_iscluster);
 
 	resolve_lofs(zlogp, rootpath, rootlen);
 	(void) snprintf(luroot, lurootlen, "%s/lu", zonepath);
@@ -1733,7 +1733,7 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 			 * but /dev is special and always goes at the top
 			 * so strip the trailing '/a' from the rootpath.
 			 */
-			assert(zone_isnative);
+			assert(zone_isnative || zone_iscluster);
 			assert(strcmp(&rootpath[slen], "/a") == 0);
 			rootpath[slen] = '\0';
 			if (mount_one(zlogp, &fs_ptr[i], rootpath) != 0)
@@ -4026,7 +4026,7 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 		goto error;
 
 	if (mount_cmd) {
-		assert(zone_isnative);
+		assert(zone_isnative || zone_iscluster);
 		root_to_lu(zlogp, rootpath, sizeof (rootpath), B_TRUE);
 
 		/*
@@ -4319,7 +4319,7 @@ lu_root_teardown(zlog_t *zlogp)
 {
 	char zroot[MAXPATHLEN];
 
-	assert(zone_isnative);
+	assert(zone_isnative || zone_iscluster);
 
 	if (zone_get_rootpath(zone_name, zroot, sizeof (zroot)) != Z_OK) {
 		zerror(zlogp, B_FALSE, "unable to determine zone root");

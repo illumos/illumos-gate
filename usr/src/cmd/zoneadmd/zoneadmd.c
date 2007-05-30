@@ -106,6 +106,7 @@ static char *progname;
 char *zone_name;	/* zone which we are managing */
 char brand_name[MAXNAMELEN];
 boolean_t zone_isnative;
+boolean_t zone_iscluster;
 static zoneid_t zone_id;
 
 zlog_t logsys;
@@ -1023,7 +1024,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 		case Z_FORCEMOUNT:
 			if (kernelcall)	/* Invalid; can't happen */
 				abort();
-			if (!zone_isnative) {
+			if (!zone_isnative && !zone_iscluster) {
 				zerror(zlogp, B_FALSE,
 				    "%s operation is invalid for branded "
 				    "zones", z_cmd_name(cmd));
@@ -1494,6 +1495,7 @@ main(int argc, char *argv[])
 		return (1);
 	}
 	zone_isnative = brand_is_native(bh);
+	zone_iscluster = (strcmp(brand_name, CLUSTER_BRAND_NAME) == 0);
 	brand_close(bh);
 
 	/*

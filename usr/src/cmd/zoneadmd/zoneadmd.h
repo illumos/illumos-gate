@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,8 @@ extern "C" {
 #define	EXEC_PREFIX	"exec "
 #define	EXEC_LEN	(strlen(EXEC_PREFIX))
 
+#define	CLUSTER_BRAND_NAME	"cluster"
+
 typedef struct zlog {
 	FILE *logfile;	/* file to log to */
 
@@ -79,7 +81,7 @@ extern char *zone_name;
 extern char boot_args[BOOTARGS_MAX];
 extern char bad_boot_arg[BOOTARGS_MAX];
 extern boolean_t zone_isnative;
-
+extern boolean_t zone_iscluster;
 
 extern void zerror(zlog_t *, boolean_t, const char *, ...);
 extern char *localize_msg(char *locale, const char *msg);

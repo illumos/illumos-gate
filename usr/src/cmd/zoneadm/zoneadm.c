@@ -99,9 +99,12 @@ typedef struct zone_entry {
 	zone_iptype_t	ziptype;
 } zone_entry_t;
 
+#define	CLUSTER_BRAND_NAME	"cluster"
+
 static zone_entry_t *zents;
 static size_t nzents;
 static boolean_t is_native_zone = B_TRUE;
+static boolean_t is_cluster_zone = B_FALSE;
 
 #define	LOOPBACK_IF	"lo0"
 #define	SOCKET_AF(af)	(((af) == AF_UNSPEC) ? AF_INET : (af))
@@ -1625,7 +1628,7 @@ fake_up_local_zone(zoneid_t zid, zone_entry_t *zeptr)
 		(void) zone_getattr(zid, ZONE_ATTR_ROOT, zeptr->zroot,
 		    sizeof (zeptr->zroot));
 		(void) strlcpy(zeptr->zbrand, NATIVE_BRAND_NAME,
-			    sizeof (zeptr->zbrand));
+		    sizeof (zeptr->zbrand));
 	} else {
 		(void) strlcpy(zeptr->zroot, "/", sizeof (zeptr->zroot));
 		(void) zone_getattr(zid, ZONE_ATTR_BRAND, zeptr->zbrand,
@@ -1963,7 +1966,7 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 		return (Z_ERR);
 	}
 
-	if (!is_native_zone && cmd_num == CMD_MOUNT) {
+	if (!is_native_zone && !is_cluster_zone && cmd_num == CMD_MOUNT) {
 		zerror(gettext("%s operation is invalid for branded zones."),
 		    cmd_to_str(cmd_num));
 			return (Z_ERR);
@@ -2869,8 +2872,8 @@ verify_handle(int cmd_num, zone_dochandle_t handle, char *argv[])
 				print_net_err(nwiftab.zone_nwif_physical,
 				    nwiftab.zone_nwif_address, af,
 				    zonecfg_strerror(res));
-			    return_code = Z_ERR;
-			    continue;
+				return_code = Z_ERR;
+				continue;
 			}
 			af = lifr.lifr_addr.ss_family;
 			if (!zonecfg_ifname_exists(af,
@@ -2884,9 +2887,9 @@ verify_handle(int cmd_num, zone_dochandle_t handle, char *argv[])
 				 */
 				(void) fprintf(stderr,
 				    gettext("WARNING: skipping network "
-					"interface '%s' which may not be "
-					"present/plumbed in the global "
-					"zone.\n"),
+				    "interface '%s' which may not be "
+				    "present/plumbed in the global "
+				    "zone.\n"),
 				    nwiftab.zone_nwif_physical);
 			}
 			break;
@@ -4700,6 +4703,8 @@ dryrun_attach(char *manifest_path, char *argv[])
 		exit(Z_ERR);
 	}
 	is_native_zone = (strcmp(target_brand, NATIVE_BRAND_NAME) == 0);
+	is_cluster_zone =
+	    (strcmp(target_brand, CLUSTER_BRAND_NAME) == 0);
 
 	res = verify_handle(CMD_ATTACH, local_handle, argv);
 
@@ -5683,6 +5688,8 @@ main(int argc, char **argv)
 			exit(Z_ERR);
 		}
 		is_native_zone = (strcmp(target_brand, NATIVE_BRAND_NAME) == 0);
+		is_cluster_zone =
+		    (strcmp(target_brand, CLUSTER_BRAND_NAME) == 0);
 	}
 
 	err = parse_and_run(argc - optind, &argv[optind]);
