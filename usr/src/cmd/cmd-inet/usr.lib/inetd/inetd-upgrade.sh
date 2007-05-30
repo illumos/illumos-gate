@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -23,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -172,6 +171,13 @@ done
 
 rm /tmp/inetd-upgrade.$$.sed
 
+# Check whether we've ever run inetconv before by looking for the
+# configuration file hash.  If we haven't run it before, then we need
+# to enable services based on inetd.conf.  If we have, then the
+# repository is authoritative.  `unimported' will be 0 if the hash exists.
+svcprop -qp hash svc:/network/inetd:default
+unimported=$?
+
 # Run inetconv on generated file, overwriting previous manifests and values
 # in repository.
 /usr/sbin/inetconv -f -i $inetdconf_entries_file
@@ -182,11 +188,11 @@ for inst in $instances_to_disable; do
 done
 
 
-# If there is a saved config file from upgrade, use it to enable services
+# If there is a saved config file from upgrade, use it to enable services,
+# but only if we're coming from a release that didn't have SMF.
 saved_config=/etc/inet/inetd.conf.preupgrade
-
-if [ -f ${saved_config} ]; then 
-	/usr/sbin/inetconv -e -i ${saved_config}
+if [ $unimported -ne 0 -a -f $saved_config ]; then
+	/usr/sbin/inetconv -e -i $saved_config
 fi
 
 # Now convert the remaining entries in inetd.conf to service manifests
