@@ -3305,7 +3305,6 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 		 */
 		cdip = ct->ct_dip;
 		if ((flag & NDI_DEVI_REMOVE) &&
-		    (MDI_CLIENT_STATE(ct) == MDI_CLIENT_STATE_DEGRADED) &&
 		    (ct->ct_path_count == 1)) {
 			i_mdi_client_unlock(ct);
 			rv = ndi_devi_offline(cdip, 0);
