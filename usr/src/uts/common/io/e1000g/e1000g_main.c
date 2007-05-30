@@ -53,9 +53,9 @@
 #define	E1000_RX_INTPT_TIME	128
 #define	E1000_RX_PKT_CNT	8
 
-static char ident[] = "Intel PRO/1000 Ethernet 5.1.8";
+static char ident[] = "Intel PRO/1000 Ethernet 5.1.9";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.1.8";
+static char e1000g_version[] = "Driver Ver. 5.1.9";
 
 /*
  * Proto types for DDI entry points
@@ -216,8 +216,19 @@ static mac_callbacks_t e1000g_m_callbacks = {
 /*
  * Global variables
  */
-boolean_t force_detach_enabled = B_FALSE;
+boolean_t e1000g_force_detach = B_TRUE;
 uint32_t e1000g_mblks_pending = 0;
+/*
+ * Here we maintain a private dev_info list if e1000g_force_detach is
+ * enabled. If we force the driver to detach while there are still some
+ * rx buffers retained in the upper layer, we have to keep a copy of the
+ * dev_info. In some cases (Dynamic Reconfiguration), the dev_info data
+ * structure will be freed after the driver is detached. However when we
+ * finally free those rx buffers released by the upper layer, we need to
+ * refer to the dev_info to free the dma buffers. So we save a copy of
+ * the dev_info for this purpose.
+ */
+private_devi_list_t *e1000g_private_devi_list = NULL;
 /*
  * The rwlock is defined to protect the whole processing of rx recycling
  * and the rx packets release in detach processing to make them mutually
@@ -314,6 +325,24 @@ _fini(void)
 	status = mod_remove(&modlinkage);
 	if (status == DDI_SUCCESS) {
 		mac_fini_ops(&ws_ops);
+
+		if (e1000g_force_detach) {
+			private_devi_list_t *devi_node;
+
+			rw_enter(&e1000g_rx_detach_lock, RW_WRITER);
+			while (e1000g_private_devi_list != NULL) {
+				devi_node = e1000g_private_devi_list;
+				e1000g_private_devi_list =
+				    e1000g_private_devi_list->next;
+
+				kmem_free(devi_node->priv_dip,
+				    sizeof (struct dev_info));
+				kmem_free(devi_node,
+				    sizeof (private_devi_list_t));
+			}
+			rw_exit(&e1000g_rx_detach_lock);
+		}
+
 		rw_destroy(&e1000g_rx_detach_lock);
 		rw_destroy(&e1000g_dma_type_lock);
 	}
@@ -419,6 +448,40 @@ e1000gattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	ddi_set_driver_private(devinfo, (caddr_t)Adapter);
 
+	if (e1000g_force_detach) {
+		private_devi_list_t *devi_node;
+		boolean_t devi_existed;
+
+		devi_existed = B_FALSE;
+		devi_node = e1000g_private_devi_list;
+		while (devi_node != NULL) {
+			if (devi_node->dip == devinfo) {
+				devi_existed = B_TRUE;
+				break;
+			}
+			devi_node = devi_node->next;
+		}
+
+		if (devi_existed) {
+			Adapter->priv_dip = devi_node->priv_dip;
+		} else {
+			Adapter->priv_dip =
+			    kmem_zalloc(sizeof (struct dev_info), KM_SLEEP);
+			bcopy(DEVI(devinfo), DEVI(Adapter->priv_dip),
+			    sizeof (struct dev_info));
+
+			devi_node =
+			    kmem_zalloc(sizeof (private_devi_list_t), KM_SLEEP);
+
+			rw_enter(&e1000g_rx_detach_lock, RW_WRITER);
+			devi_node->dip = devinfo;
+			devi_node->priv_dip = Adapter->priv_dip;
+			devi_node->next = e1000g_private_devi_list;
+			e1000g_private_devi_list = devi_node;
+			rw_exit(&e1000g_rx_detach_lock);
+		}
+	}
+
 	hw = &Adapter->Shared;
 
 	/*
@@ -433,9 +496,9 @@ e1000gattach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	    (off_t *)&mem_size);
 
 	if ((ddi_regs_map_setup(devinfo, 1, /* register of interest */
-		(caddr_t *)&hw->hw_addr,
-		0, mem_size, &accattr1, &Adapter->E1000_handle))
-		!= DDI_SUCCESS) {
+	    (caddr_t *)&hw->hw_addr,
+	    0, mem_size, &accattr1, &Adapter->E1000_handle))
+	    != DDI_SUCCESS) {
 		e1000g_log(Adapter, CE_WARN, "ddi_regs_map_setup failed");
 		goto attach_fail;
 	}
@@ -833,7 +896,7 @@ e1000gdetach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 		e1000g_stop(Adapter);
 
 	if (!e1000g_rx_drain(Adapter)) {
-		if (!force_detach_enabled)
+		if (!e1000g_force_detach)
 			return (DDI_FAILURE);
 	}
 
@@ -1092,7 +1155,7 @@ e1000g_init(struct e1000g *Adapter)
 		else
 			pba = E1000_PBA_48K;	/* 48K for Rx, 16K for Tx */
 	} else if (hw->mac_type >= e1000_82571 &&
-			hw->mac_type <= e1000_82572) {
+	    hw->mac_type <= e1000_82572) {
 		/*
 		 * Total FIFO is 48K
 		 */
@@ -1242,7 +1305,7 @@ e1000g_link_up(struct e1000g *Adapter)
 	if ((E1000_READ_REG(hw, STATUS) & E1000_STATUS_LU) ||
 	    ((!hw->get_link_status) && (hw->mac_type == e1000_82543)) ||
 	    ((hw->media_type == e1000_media_type_internal_serdes) &&
-		(!hw->serdes_link_down))) {
+	    (!hw->serdes_link_down))) {
 		link_up = B_TRUE;
 	} else {
 		link_up = B_FALSE;
@@ -1309,7 +1372,7 @@ e1000g_m_ioctl(void *arg, queue_t *q, mblk_t *mp)
 		 * Error, reply with a NAK and EINVAL or the specified error
 		 */
 		miocnak(q, mp, 0, iocp->ioc_error == 0 ?
-			EINVAL : iocp->ioc_error);
+		    EINVAL : iocp->ioc_error);
 		break;
 
 	case IOC_DONE:
@@ -1330,7 +1393,7 @@ e1000g_m_ioctl(void *arg, queue_t *q, mblk_t *mp)
 		 * OK, send prepared reply as ACK or NAK
 		 */
 		mp->b_datap->db_type = iocp->ioc_error == 0 ?
-			M_IOCACK : M_IOCNAK;
+		    M_IOCACK : M_IOCNAK;
 		qreply(q, mp);
 		break;
 	}
@@ -2167,7 +2230,7 @@ e1000g_m_multicst(void *arg, boolean_t add, const uint8_t *addr)
 	struct e1000g *Adapter = (struct e1000g *)arg;
 
 	return ((add) ? multicst_add(Adapter, addr)
-		: multicst_remove(Adapter, addr));
+	    : multicst_remove(Adapter, addr));
 }
 
 int
@@ -2334,32 +2397,32 @@ e1000g_getparam(struct e1000g *Adapter)
 	 */
 	Adapter->NumTxDescriptors =
 	    e1000g_getprop(Adapter, "NumTxDescriptors",
-		MINNUMTXDESCRIPTOR, MAXNUMTXDESCRIPTOR,
-		DEFAULTNUMTXDESCRIPTOR);
+	    MINNUMTXDESCRIPTOR, MAXNUMTXDESCRIPTOR,
+	    DEFAULTNUMTXDESCRIPTOR);
 
 	/*
 	 * NumRxDescriptors
 	 */
 	Adapter->NumRxDescriptors =
 	    e1000g_getprop(Adapter, "NumRxDescriptors",
-		MINNUMRXDESCRIPTOR, MAXNUMRXDESCRIPTOR,
-		DEFAULTNUMRXDESCRIPTOR);
+	    MINNUMRXDESCRIPTOR, MAXNUMRXDESCRIPTOR,
+	    DEFAULTNUMRXDESCRIPTOR);
 
 	/*
 	 * NumRxFreeList
 	 */
 	Adapter->NumRxFreeList =
 	    e1000g_getprop(Adapter, "NumRxFreeList",
-		MINNUMRXFREELIST, MAXNUMRXFREELIST,
-		DEFAULTNUMRXFREELIST);
+	    MINNUMRXFREELIST, MAXNUMRXFREELIST,
+	    DEFAULTNUMRXFREELIST);
 
 	/*
 	 * NumTxPacketList
 	 */
 	Adapter->NumTxSwPacket =
 	    e1000g_getprop(Adapter, "NumTxPacketList",
-		MINNUMTXSWPACKET, MAXNUMTXSWPACKET,
-		DEFAULTNUMTXSWPACKET);
+	    MINNUMTXSWPACKET, MAXNUMTXSWPACKET,
+	    DEFAULTNUMTXSWPACKET);
 
 	/*
 	 * FlowControl
@@ -2532,9 +2595,9 @@ e1000g_link_check(struct e1000g *Adapter)
 			e1000g_log(Adapter, CE_NOTE,
 			    "Adapter %dMbps %s %s link is up.", speed,
 			    ((duplex == FULL_DUPLEX) ?
-				"full duplex" : "half duplex"),
+			    "full duplex" : "half duplex"),
 			    ((hw->media_type == e1000_media_type_copper) ?
-				"copper" : "fiber"));
+			    "copper" : "fiber"));
 		}
 		Adapter->smartspeed = 0;
 	} else {
@@ -2547,7 +2610,7 @@ e1000g_link_check(struct e1000g *Adapter)
 			e1000g_log(Adapter, CE_NOTE,
 			    "Adapter %s link is down.",
 			    ((hw->media_type == e1000_media_type_copper) ?
-				"copper" : "fiber"));
+			    "copper" : "fiber"));
 
 			/*
 			 * SmartSpeed workaround for Tabor/TanaX, When the
@@ -2756,8 +2819,8 @@ e1000g_force_speed_duplex(struct e1000g *Adapter)
 		Adapter->Shared.autoneg = B_TRUE;
 		Adapter->Shared.autoneg_advertised =
 		    (uint16_t)e1000g_getprop(Adapter, "AutoNegAdvertised",
-			0, AUTONEG_ADVERTISE_SPEED_DEFAULT,
-			AUTONEG_ADVERTISE_SPEED_DEFAULT);
+		    0, AUTONEG_ADVERTISE_SPEED_DEFAULT,
+		    AUTONEG_ADVERTISE_SPEED_DEFAULT);
 		break;
 	}	/* switch */
 }
@@ -3039,7 +3102,7 @@ e1000g_smartspeed(struct e1000g *adapter)
 			 */
 			if (!e1000_phy_setup_autoneg(&adapter->Shared) &&
 			    !e1000_read_phy_reg(&adapter->Shared, PHY_CTRL,
-				&phy_ctrl)) {
+			    &phy_ctrl)) {
 				phy_ctrl |= (MII_CR_AUTO_NEG_EN |
 				    MII_CR_RESTART_AUTO_NEG);
 				e1000_write_phy_reg(&adapter->Shared,
@@ -3075,7 +3138,7 @@ e1000g_smartspeed(struct e1000g *adapter)
 		 */
 		if (!e1000_phy_setup_autoneg(&adapter->Shared) &&
 		    !e1000_read_phy_reg(&adapter->Shared, PHY_CTRL,
-			&phy_ctrl)) {
+		    &phy_ctrl)) {
 			phy_ctrl |=
 			    (MII_CR_AUTO_NEG_EN | MII_CR_RESTART_AUTO_NEG);
 			e1000_write_phy_reg(&adapter->Shared, PHY_CTRL,
@@ -3171,8 +3234,8 @@ e1000g_pp_ioctl(struct e1000g *e1000gp, struct iocblk *iocp, mblk_t *mp)
 
 	deault:
 		e1000g_DEBUGLOG_1(e1000gp, e1000g_INFO_LEVEL,
-			"e1000g_diag_ioctl: invalid ioctl command 0x%X\n",
-			iocp->ioc_cmd);
+		    "e1000g_diag_ioctl: invalid ioctl command 0x%X\n",
+		    iocp->ioc_cmd);
 		return (IOC_INVAL);
 	}
 
@@ -3193,8 +3256,8 @@ e1000g_pp_ioctl(struct e1000g *e1000gp, struct iocblk *iocp, mblk_t *mp)
 
 	default:
 		e1000g_DEBUGLOG_1(e1000gp, e1000g_INFO_LEVEL,
-			"e1000g_diag_ioctl: invalid access space 0x%X\n",
-			ppd->pp_acc_space);
+		    "e1000g_diag_ioctl: invalid access space 0x%X\n",
+		    ppd->pp_acc_space);
 		return (IOC_INVAL);
 
 	case E1000G_PP_SPACE_REG:
@@ -3245,7 +3308,7 @@ e1000g_ioc_peek_reg(struct e1000g *e1000gp, e1000g_peekpoke_t *ppd)
 	uint32_t *regaddr;
 
 	handle =
-	    ((struct e1000g_osdep *)(&e1000gp->Shared)->back)->E1000_handle,
+	    ((struct e1000g_osdep *)(&e1000gp->Shared)->back)->E1000_handle;
 	regaddr =
 	    (uint32_t *)((&e1000gp->Shared)->hw_addr + ppd->pp_acc_offset);
 
@@ -3260,7 +3323,7 @@ e1000g_ioc_poke_reg(struct e1000g *e1000gp, e1000g_peekpoke_t *ppd)
 	uint32_t value;
 
 	handle =
-	    ((struct e1000g_osdep *)(&e1000gp->Shared)->back)->E1000_handle,
+	    ((struct e1000g_osdep *)(&e1000gp->Shared)->back)->E1000_handle;
 	regaddr =
 	    (uint32_t *)((&e1000gp->Shared)->hw_addr + ppd->pp_acc_offset);
 	value = (uint32_t)ppd->pp_acc_data;
@@ -3295,8 +3358,8 @@ e1000g_ioc_peek_mem(struct e1000g *e1000gp, e1000g_peekpoke_t *ppd)
 	}
 
 	e1000g_DEBUGLOG_4(e1000gp, e1000g_INFO_LEVEL,
-		"e1000g_ioc_peek_mem($%p, $%p) peeked 0x%llx from $%p\n",
-		(void *)e1000gp, (void *)ppd, value, vaddr);
+	    "e1000g_ioc_peek_mem($%p, $%p) peeked 0x%llx from $%p\n",
+	    (void *)e1000gp, (void *)ppd, value, vaddr);
 
 	ppd->pp_acc_data = value;
 }
@@ -3311,8 +3374,8 @@ e1000g_ioc_poke_mem(struct e1000g *e1000gp, e1000g_peekpoke_t *ppd)
 	value = ppd->pp_acc_data;
 
 	e1000g_DEBUGLOG_4(e1000gp, e1000g_INFO_LEVEL,
-		"e1000g_ioc_poke_mem($%p, $%p) poking 0x%llx at $%p\n",
-		(void *)e1000gp, (void *)ppd, value, vaddr);
+	    "e1000g_ioc_poke_mem($%p, $%p) poking 0x%llx at $%p\n",
+	    (void *)e1000gp, (void *)ppd, value, vaddr);
 
 	switch (ppd->pp_acc_size) {
 	case 1:
@@ -3590,10 +3653,10 @@ e1000g_set_internal_loopback(struct e1000g *Adapter)
 		e1000_write_phy_reg(hw, M88E1000_PHY_SPEC_CTRL, 0x0808);
 		/* Reset PHY to update Auto-MDI/MDIX */
 		e1000_write_phy_reg(hw, PHY_CTRL,
-			phy_ctrl | MII_CR_RESET | MII_CR_AUTO_NEG_EN);
+		    phy_ctrl | MII_CR_RESET | MII_CR_AUTO_NEG_EN);
 		/* Reset PHY to auto-neg off and force 1000 */
 		e1000_write_phy_reg(hw, PHY_CTRL,
-			phy_ctrl | MII_CR_RESET);
+		    phy_ctrl | MII_CR_RESET);
 		break;
 	}
 
@@ -3606,9 +3669,9 @@ e1000g_set_internal_loopback(struct e1000g *Adapter)
 	ctrl = E1000_READ_REG(hw, CTRL);
 	ctrl &= ~E1000_CTRL_SPD_SEL;	/* Clear the speed sel bits */
 	ctrl |= (E1000_CTRL_FRCSPD |	/* Set the Force Speed Bit */
-		E1000_CTRL_FRCDPX |	/* Set the Force Duplex Bit */
-		E1000_CTRL_SPD_1000 |	/* Force Speed to 1000 */
-		E1000_CTRL_FD);		/* Force Duplex to FULL */
+	    E1000_CTRL_FRCDPX |		/* Set the Force Duplex Bit */
+	    E1000_CTRL_SPD_1000 |	/* Force Speed to 1000 */
+	    E1000_CTRL_FD);		/* Force Duplex to FULL */
 
 	switch (hw->mac_type) {
 	case e1000_82540:
@@ -3697,20 +3760,20 @@ e1000g_set_external_loopback_1000(struct e1000g *Adapter)
 
 		rctl = E1000_READ_REG(hw, RCTL);
 		rctl |= (E1000_RCTL_EN |
-			E1000_RCTL_SBP |
-			E1000_RCTL_UPE |
-			E1000_RCTL_MPE |
-			E1000_RCTL_LPE |
-			E1000_RCTL_BAM);		/* 0x803E */
+		    E1000_RCTL_SBP |
+		    E1000_RCTL_UPE |
+		    E1000_RCTL_MPE |
+		    E1000_RCTL_LPE |
+		    E1000_RCTL_BAM);		/* 0x803E */
 		E1000_WRITE_REG(hw, RCTL, rctl);
 
 		ctrl_ext = E1000_READ_REG(hw, CTRL_EXT);
 		ctrl_ext |= (E1000_CTRL_EXT_SDP4_DATA |
-			E1000_CTRL_EXT_SDP6_DATA |
-			E1000_CTRL_EXT_SDP7_DATA |
-			E1000_CTRL_EXT_SDP4_DIR |
-			E1000_CTRL_EXT_SDP6_DIR |
-			E1000_CTRL_EXT_SDP7_DIR);	/* 0x0DD0 */
+		    E1000_CTRL_EXT_SDP6_DATA |
+		    E1000_CTRL_EXT_SDP7_DATA |
+		    E1000_CTRL_EXT_SDP4_DIR |
+		    E1000_CTRL_EXT_SDP6_DIR |
+		    E1000_CTRL_EXT_SDP7_DIR);	/* 0x0DD0 */
 		E1000_WRITE_REG(hw, CTRL_EXT, ctrl_ext);
 
 		/*
@@ -3775,26 +3838,26 @@ e1000g_set_external_loopback_100(struct e1000g *Adapter)
 	phy_spd_state(hw, B_FALSE);
 
 	phy_ctrl = (MII_CR_FULL_DUPLEX |
-		MII_CR_SPEED_100);
+	    MII_CR_SPEED_100);
 
 	/* Force 100/FD, reset PHY */
 	e1000_write_phy_reg(hw, PHY_CTRL,
-		phy_ctrl | MII_CR_RESET);	/* 0xA100 */
+	    phy_ctrl | MII_CR_RESET);	/* 0xA100 */
 	msec_delay(10);
 
 	/* Force 100/FD */
 	e1000_write_phy_reg(hw, PHY_CTRL,
-		phy_ctrl);			/* 0x2100 */
+	    phy_ctrl);			/* 0x2100 */
 	msec_delay(10);
 
 	/* Now setup the MAC to the same speed/duplex as the PHY. */
 	ctrl = E1000_READ_REG(hw, CTRL);
 	ctrl &= ~E1000_CTRL_SPD_SEL;	/* Clear the speed sel bits */
 	ctrl |= (E1000_CTRL_SLU |	/* Force Link Up */
-		E1000_CTRL_FRCSPD |	/* Set the Force Speed Bit */
-		E1000_CTRL_FRCDPX |	/* Set the Force Duplex Bit */
-		E1000_CTRL_SPD_100 |	/* Force Speed to 100 */
-		E1000_CTRL_FD);		/* Force Duplex to FULL */
+	    E1000_CTRL_FRCSPD |		/* Set the Force Speed Bit */
+	    E1000_CTRL_FRCDPX |		/* Set the Force Duplex Bit */
+	    E1000_CTRL_SPD_100 |	/* Force Speed to 100 */
+	    E1000_CTRL_FD);		/* Force Duplex to FULL */
 
 	E1000_WRITE_REG(hw, CTRL, ctrl);
 }
@@ -3812,26 +3875,26 @@ e1000g_set_external_loopback_10(struct e1000g *Adapter)
 	phy_spd_state(hw, B_FALSE);
 
 	phy_ctrl = (MII_CR_FULL_DUPLEX |
-		MII_CR_SPEED_10);
+	    MII_CR_SPEED_10);
 
 	/* Force 10/FD, reset PHY */
 	e1000_write_phy_reg(hw, PHY_CTRL,
-		phy_ctrl | MII_CR_RESET);	/* 0x8100 */
+	    phy_ctrl | MII_CR_RESET);	/* 0x8100 */
 	msec_delay(10);
 
 	/* Force 10/FD */
 	e1000_write_phy_reg(hw, PHY_CTRL,
-		phy_ctrl);			/* 0x0100 */
+	    phy_ctrl);			/* 0x0100 */
 	msec_delay(10);
 
 	/* Now setup the MAC to the same speed/duplex as the PHY. */
 	ctrl = E1000_READ_REG(hw, CTRL);
 	ctrl &= ~E1000_CTRL_SPD_SEL;	/* Clear the speed sel bits */
 	ctrl |= (E1000_CTRL_SLU |	/* Force Link Up */
-		E1000_CTRL_FRCSPD |	/* Set the Force Speed Bit */
-		E1000_CTRL_FRCDPX |	/* Set the Force Duplex Bit */
-		E1000_CTRL_SPD_10 |	/* Force Speed to 10 */
-		E1000_CTRL_FD);		/* Force Duplex to FULL */
+	    E1000_CTRL_FRCSPD |		/* Set the Force Speed Bit */
+	    E1000_CTRL_FRCDPX |		/* Set the Force Duplex Bit */
+	    E1000_CTRL_SPD_10 |		/* Force Speed to 10 */
+	    E1000_CTRL_FD);		/* Force Duplex to FULL */
 
 	E1000_WRITE_REG(hw, CTRL, ctrl);
 }
@@ -4240,7 +4303,7 @@ int32_t
 e1000_read_pcie_cap_reg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
 {
 	*value = pci_config_get16(((struct e1000g_osdep *)hw->back)->handle,
-		PCI_EX_CONF_CAP + reg);
+	    PCI_EX_CONF_CAP + reg);
 
 	return (0);
 }

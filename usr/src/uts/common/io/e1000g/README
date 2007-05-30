@@ -504,3 +504,8 @@ Notes on packaging:
    6548711 e1000g: recursive mutex_enter in e1000g_link_check() on ESB2 platforms
    6550086 e1000g: detaching driver immediately after attach induces panic
 
+5.1.9
+======
+  This version has the following fix:
+   6507422 Dynamic Reconfiguration detach fails for e1000g
+

@@ -584,6 +584,12 @@ static ddi_device_acc_attr_t accattr2 = {
 };
 #endif
 
+typedef struct _private_devi_list {
+	dev_info_t *dip;
+	dev_info_t *priv_dip;
+	struct _private_devi_list *next;
+} private_devi_list_t;
+
 /*
  * A structure that points to the next entry in the queue.
  */
@@ -871,6 +877,7 @@ typedef struct _e1000g_rx_ring {
 typedef struct e1000g {
 	mac_handle_t mh;
 	dev_info_t *dip;
+	dev_info_t *priv_dip;
 	ddi_acc_handle_t handle;
 	ddi_acc_handle_t E1000_handle;		/* Ws-PCI handle to regs */
 	int AdapterInstance;
@@ -1117,7 +1124,7 @@ void e1000_enable_pciex_master(struct e1000_hw *hw);
 /*
  * Global variables
  */
-extern boolean_t force_detach_enabled;
+extern boolean_t e1000g_force_detach;
 extern uint32_t e1000g_mblks_pending;
 extern krwlock_t e1000g_rx_detach_lock;
 

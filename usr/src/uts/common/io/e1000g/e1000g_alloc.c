@@ -558,9 +558,9 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 	 * the ddi_dma_mem_alloc call.
 	 */
 	mystat = ddi_dma_addr_bind_handle(rx_ring->rbd_dma_handle,
-		(struct as *)NULL, (caddr_t)rx_ring->rbd_area,
-		len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-		DDI_DMA_SLEEP, 0, &cookie, &cookie_count);
+	    (struct as *)NULL, (caddr_t)rx_ring->rbd_area,
+	    len, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP, 0, &cookie, &cookie_count);
 
 	if (mystat != DDI_SUCCESS) {
 		e1000g_log(Adapter, CE_WARN,
@@ -748,7 +748,10 @@ e1000g_alloc_dvma_buffer(struct e1000g *Adapter,
 	dev_info_t *devinfo;
 	ddi_dma_cookie_t cookie;
 
-	devinfo = Adapter->dip;
+	if (e1000g_force_detach)
+		devinfo = Adapter->priv_dip;
+	else
+		devinfo = Adapter->dip;
 
 	mystat = dvma_reserve(devinfo,
 	    &e1000g_dma_limits,
@@ -820,7 +823,10 @@ e1000g_alloc_dma_buffer(struct e1000g *Adapter,
 	size_t len;
 	uint_t count;
 
-	devinfo = Adapter->dip;
+	if (e1000g_force_detach)
+		devinfo = Adapter->priv_dip;
+	else
+		devinfo = Adapter->dip;
 
 	mystat = ddi_dma_alloc_handle(devinfo,
 	    &buf_dma_attr,
@@ -1200,28 +1206,33 @@ e1000g_free_rx_sw_packet(PRX_SW_PACKET packet)
 static void
 e1000g_free_rx_packets(e1000g_rx_ring_t *rx_ring)
 {
-	PRX_SW_PACKET packet, next_packet;
+	PRX_SW_PACKET packet, next_packet, free_list;
 
 	rw_enter(&e1000g_rx_detach_lock, RW_WRITER);
-	for (packet = rx_ring->packet_area; packet != NULL;
-	    packet = packet->next) {
-		if (packet->flag & E1000G_RX_SW_SENDUP) {
-			e1000g_mblks_pending++;
-			packet->flag |= E1000G_RX_SW_DETACHED;
-		}
-	}
-	rw_exit(&e1000g_rx_detach_lock);
 
+	free_list = NULL;
 	packet = rx_ring->packet_area;
-	rx_ring->packet_area = NULL;
-
 	for (; packet != NULL; packet = next_packet) {
 		next_packet = packet->next;
 
-		if (packet->flag & E1000G_RX_SW_DETACHED)
-			continue;
+		if (packet->flag & E1000G_RX_SW_SENDUP) {
+			e1000g_mblks_pending++;
+			packet->flag |= E1000G_RX_SW_DETACHED;
+			packet->next = NULL;
+		} else {
+			packet->next = free_list;
+			free_list = packet;
+		}
+	}
+	rx_ring->packet_area = NULL;
 
-		ASSERT((packet->flag & E1000G_RX_SW_SENDUP) == 0);
+	rw_exit(&e1000g_rx_detach_lock);
+
+	packet = free_list;
+	for (; packet != NULL; packet = next_packet) {
+		next_packet = packet->next;
+
+		ASSERT(packet->flag == E1000G_RX_SW_FREE);
 		e1000g_free_rx_sw_packet(packet);
 	}
 }
