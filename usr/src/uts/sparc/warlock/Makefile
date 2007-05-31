@@ -80,26 +80,27 @@ warlock.usb:
 	@cd ../usb_ia; make clean; $(MAKE) warlock
 	@cd ../usbprn; make clean; $(MAKE) warlock
 	@cd ../usbser; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/usbser_edge; make clean; $(MAKE) warlock
 	@cd ../usbsksp; make clean; $(MAKE) warlock
 	@cd ../usbsprl; make clean; $(MAKE) warlock
 	@cd ../usbsacm; make clean; $(MAKE) warlock
 	@cd ../usbskel; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/usbser_edge; \
+		make clean; $(MAKE) warlock
 
 warlock.scsi:
 	@cd ../dad; make clean; $(MAKE) warlock
 	@cd ../dada; make clean; $(MAKE) warlock
 	@cd ../esp; make clean; $(MAKE) warlock
 	@cd ../fas; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/glm; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/mpt; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/ifp; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/isp; make clean; $(MAKE) warlock
 	@cd ../sd; make clean; $(MAKE) warlock
 	@cd ../ses; make clean; $(MAKE) warlock
 	@cd ../st; make clean; $(MAKE) warlock
 	@cd ../ssd; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/uata; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/uata; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/glm; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/mpt; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/ifp; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/isp; make clean; $(MAKE) warlock
 
 warlock.1394:
 	@cd ../s1394; make clean; $(MAKE) warlock
@@ -113,34 +114,36 @@ warlock.ecpp:
 warlock.audio:
 	@cd ../audiosup; make clean; $(MAKE) warlock
 	@cd ../mixer; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/amsrc1; make clean; $(MAKE) warlock
 	@cd ../amsrc2; make clean; $(MAKE) warlock
 	@cd ../audio1575; make clean; $(MAKE) warlock
 	@cd ../audio810; make clean; $(MAKE) warlock
 	@cd ../audiohd; make clean; $(MAKE) warlock
 	@cd ../audioixp; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/audiovia823x; make clean; $(MAKE) warlock
 	@cd ../audiocs; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/audioens; make clean; $(MAKE) warlock
 	@cd ../audiots; make clean; $(MAKE) warlock
 	@cd ../usb_ac; make clean; $(MAKE) warlock
 	@cd ../usb_as; make clean; $(MAKE) warlock
 	@cd ../usb_ah; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/amsrc1; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/audiovia823x; \
+		make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/audioens; make clean; $(MAKE) warlock
 
 warlock.smartcard:
-	@cd $(CLOSED)/uts/sun4u/scmi2c; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/sun4u/scmi2c; make clean; $(MAKE) warlock
 
 warlock.ib:
 	@cd ../ibmf; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/tavor; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/daplt; make clean; $(MAKE) warlock
 	@cd ../ib; make clean; $(MAKE) warlock
 	@cd ../ibtl; make clean; $(MAKE) warlock
 	@cd ../ibcm; make clean; $(MAKE) warlock
 	@cd ../ibd; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/tavor; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/daplt; make clean; $(MAKE) warlock
 
 warlock.sata:
 	@cd ../sata; make clean; $(MAKE) warlock
 	@cd ../si3124; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/sparc/marvell88sx ; make clean; $(MAKE) warlock
 	@cd ../ahci; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/sparc/marvell88sx; \
+		make clean; $(MAKE) warlock

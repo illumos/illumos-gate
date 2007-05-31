@@ -21,7 +21,7 @@
 #
 # uts/intel/mixer/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the audio mixer (mixer)
@@ -120,20 +120,23 @@ AMSRC2_FILES = $(AMSRC2_OBJS:%.o=$(UTSBASE)/intel/amsrc2/%.ll)
 %.wlcmd:
 	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
-warlock:	$(WARLOCK_OK)
+WARLOCK_TARGETS = $(WARLOCK_OUT) warlock_ddi.files warlock_audiosup.files \
+	warlock_standalone mixer_with_audiosup.wlcmd
 
-$(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files \
-	warlock_audiosup.files warlock_amsrc1.files \
-	warlock_amsrc2.files \
-	mixer_with_audiosup.wlcmd \
-	warlock_standalone mixer_with_audiosup.wlcmd 
-	$(WARLOCK) -c $(WLCMD_DIR)/mixer_with_audiosup.wlcmd $(WARLOCK_OUT) \
-	$(AUDIO_SUP_FILES) $(AMSRC1_FILES) \
-	-l ../warlock/ddi_dki_impl.ll
+$(CLOSED_BUILD)WARLOCK_CLOSED = warlock_closed
+
+warlock: warlock_open $(WARLOCK_CLOSED)
+	$(TOUCH) $(WARLOCK_OK)
+
+warlock_open: $(WARLOCK_TARGETS) warlock_amsrc2.files
 	$(WARLOCK) -c $(WLCMD_DIR)/mixer_with_audiosup.wlcmd $(WARLOCK_OUT) \
 	$(AUDIO_SUP_FILES) $(AMSRC2_FILES) \
 	-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $(WARLOCK_OK)
+
+warlock_closed: $(WARLOCK_TARGETS) warlock_amsrc1.files
+	$(WARLOCK) -c $(WLCMD_DIR)/mixer_with_audiosup.wlcmd \
+	$(WARLOCK_OUT) $(AUDIO_SUP_FILES) $(AMSRC1_FILES) \
+	-l ../warlock/ddi_dki_impl.ll
 
 %.ll: $(UTSBASE)/common/io/audio/sada/mixer/%.c
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<

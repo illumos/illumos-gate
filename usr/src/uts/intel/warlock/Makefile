@@ -79,18 +79,20 @@ warlock.usb:
 	@cd ../usb_mid; make clean; $(MAKE) warlock
 	@cd ../usbprn; make clean; $(MAKE) warlock
 	@cd ../usbser; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/intel/usbser_edge; make clean; $(MAKE) warlock
 	@cd ../usbsksp; make clean; $(MAKE) warlock
 	@cd ../usbsprl; make clean; $(MAKE) warlock
 	@cd ../usbsacm; make clean; $(MAKE) warlock
 	@cd ../usbskel; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/usbser_edge; \
+		make clean; $(MAKE) warlock
 
 warlock.scsi:
-	@cd $(CLOSED)/uts/intel/glm; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/intel/mpt; make clean; $(MAKE) warlock
 	@cd ../sd; make clean; $(MAKE) warlock
 	@cd ../ses; make clean; $(MAKE) warlock
 	@cd ../st; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/glm; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/mpt; make clean; $(MAKE) warlock
+
 
 warlock.1394:
 	@cd ../s1394; make clean; $(MAKE) warlock
@@ -104,28 +106,30 @@ warlock.ecpp:
 warlock.audio:
 	@cd ../audiosup; make clean; $(MAKE) warlock
 	@cd ../mixer; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/intel/amsrc1; make clean; $(MAKE) warlock
 	@cd ../amsrc2; make clean; $(MAKE) warlock
 	@cd ../../intel/audio810; make clean; $(MAKE) warlock
 	@cd ../../intel/audiohd; make clean; $(MAKE) warlock
 	@cd ../../intel/audioixp; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/intel/audiovia823x; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/intel/audioens; make clean; $(MAKE) warlock
 	@cd ../usb_ac; make clean; $(MAKE) warlock
 	@cd ../usb_as; make clean; $(MAKE) warlock
 	@cd ../usb_ah; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/amsrc1; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/audiovia823x; \
+		make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/audioens; make clean; $(MAKE) warlock
 
 warlock.ib:
 	@cd ../ibmf; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/intel/tavor; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/intel/daplt; make clean; $(MAKE) warlock
 	@cd ../ib; make clean; $(MAKE) warlock
 	@cd ../ibtl; make clean; $(MAKE) warlock
 	@cd ../ibcm; make clean; $(MAKE) warlock
 	@cd ../ibd; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/tavor; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/daplt; make clean; $(MAKE) warlock
 
 warlock.sata:
 	@cd ../sata; make clean; $(MAKE) warlock
 	@cd ../si3124; make clean; $(MAKE) warlock
-	@cd $(CLOSED)/uts/intel/marvell88sx; make clean; $(MAKE) warlock
 	@cd ../ahci; make clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/marvell88sx; \
+		make clean; $(MAKE) warlock

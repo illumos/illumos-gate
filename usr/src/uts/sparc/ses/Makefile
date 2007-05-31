@@ -21,7 +21,7 @@
 #
 # uts/sparc/ses/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -118,8 +118,8 @@ SCSI_FILES	= $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
 	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
 
-WARLOCK_TARGETS	= $(WARLOCK_OK) warlock_with_esp.ok warlock_with_fas.ok \
-		  warlock_with_isp.ok warlock_with_glm.ok
+WARLOCK_TARGETS	= $(WARLOCK_OK) warlock_with_esp.ok warlock_with_fas.ok
+$(CLOSED_BUILD)WARLOCK_TARGETS += warlock_with_isp.ok warlock_with_glm.ok
 
 warlock: $(WARLOCK_TARGETS)
 

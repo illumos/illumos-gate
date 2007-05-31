@@ -20,7 +20,7 @@
 #
 #
 # uts/intel/st/Makefile
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -118,7 +118,10 @@ TEST		= test
 
 SCSI_FILES = $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
 
-warlock: warlock_alone warlock_with_glm
+WARLOCK_TARGETS = warlock_alone
+$(CLOSED_BUILD)WARLOCK_TARGETS += warlock_with_glm
+
+warlock: $(WARLOCK_TARGETS)
 
 warlock_alone: $(WARLOCK_OK)
 

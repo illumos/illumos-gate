@@ -124,8 +124,11 @@ TEST		= test
 SCSI_FILES = $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
 CMLB_FILES = $(CMLB_OBJS:%.o=-l ../cmlb/%.ll)
 
-warlock: warlock_alone warlock_with_esp warlock_with_isp warlock_with_fas \
-	warlock_with_glm warlock_with_uata warlock_with_mpt
+WARLOCK_TARGETS = warlock_alone warlock_with_esp warlock_with_fas
+$(CLOSED_BUILD)WARLOCK_TARGETS += warlock_with_isp warlock_with_glm \
+	warlock_with_uata warlock_with_mpt
+
+warlock: $(WARLOCK_TARGETS)
 
 warlock_alone: $(WARLOCK_OK)
 
