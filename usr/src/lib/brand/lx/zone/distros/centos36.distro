@@ -18,14 +18,14 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
-# Elementary configuration information for the CentOS 3.6 distribution disc set:
+# Installation information for the CentOS 3.6 distribution disc set:
 #
 #	+ Serial number (as found in the disc set's .discinfo file)
 #	+ Version Name
@@ -37,14 +37,6 @@ distro_version="3.6"
 set -A distro_cdorder 1 2 3
 
 distro_mb_required=500
-
-unset distro_miniroot_rpms
-unset distro_base_rpms
-unset distro_desktop_rpms
-unset distro_app_rpms
-unset distro_server_rpms
-unset distro_developer_rpms
-unset distro_system_rpms
 
 # Include the common_<cluster>_* definitions.
 . ${distro_dir}/rhel_centos_common

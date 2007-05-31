@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,14 +38,6 @@ set -A distro_cdorder 2 3 4 1
 
 distro_mb_required=500
 
-unset distro_miniroot_rpms
-unset distro_base_rpms
-unset distro_desktop_rpms
-unset distro_app_rpms
-unset distro_server_rpms
-unset distro_developer_rpms
-unset distro_system_rpms
-
 # Include the common_<cluster>_* definitions.
 . ${distro_dir}/rhel_centos_common
 
@@ -63,7 +55,7 @@ delta_desktop_rpms="$delta_server_rpms \
 	mozilla-nss \
 	openoffice.org-style-gnome"
 delta_developer_rpms="$delta_desktop_rpms gd-progs"
-delta_all_rpms="$delta_developer_rpms emacs-nox comps-3AS"
+delta_all_rpms="$delta_developer_rpms emacs-nox comps"
 
 # Define the final cluster lists for the installer
 distro_miniroot_rpms="$common_miniroot_rpms $delta_miniroot_rpms"
@@ -72,3 +64,34 @@ distro_server_rpms="$common_server_rpms $delta_server_rpms"
 distro_desktop_rpms="$common_desktop_rpms $delta_desktop_rpms"
 distro_developer_rpms="$common_developer_rpms $delta_developer_rpms"
 distro_all_rpms="$common_all_rpms $delta_all_rpms"
+
+#
+# List of packages missing from the "WS" personality of this distribution
+# as compared to the "AS" personality.
+#
+distro_WS_missing="amanda-server \
+	caching-nameserver \
+	finger-server \
+	freeradius \
+	inews \
+	inn \
+	netdump-server \
+	openldap-servers \
+	pxe \
+	quagga \
+	radvd \
+	redhat-config-bind \
+	samba-swat \
+	tftp-server \
+	tux \
+	vsftpd \
+	ypserv \
+	arptables_jf \
+	mtx \
+	redhat-config-netboot"
+
+#
+# No packages are missing from the "ES" personality as compared to the "AS"
+# personality.
+#
+unset distro_ES_missing

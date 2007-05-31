@@ -141,8 +141,6 @@ $(gettext "ERROR: The specified zone root directory '%s' could not be created.")
 zone_rootsub=\
 $(gettext "ERROR: The specified zone root subdirectory '%s' does not exist.")
 
-iso_mntfail=$(gettext "Unable to mount ISO image '%s' within zone '%s'")
-iso_umntfail=$(gettext "Unable to unmount ISO image '%s' from within zone '%s'")
 mk_mntfail=$(gettext "Could not create the mount directory '%s'")
 mountfail=$(gettext "Mount of '%s' on '%s' FAILED.")
 
@@ -202,7 +200,10 @@ get_mountdev()
 	typeset device
 	unset mount_dev
 
-	device="`{ df -k "$mount_dir" | egrep "^/" ; } 2>/dev/null`" || return 1
+	#
+	# Obtain information on the specified mounted device.
+	#
+	device=`{ df -k "$mount_dir" | egrep "^/" ; } 2>/dev/null` || return 1
 	mount_dev=$(echo $device | awk -e '{print $1}' 2>/dev/null)
 
 	[[ "`echo $mount_dev | cut -c 1`" = "/" ]] && return 0
@@ -225,7 +226,10 @@ get_mountdir()
 
 	[[ -b "$mount_dev" ]] || return 1  
 
-	dir="`{ df -k "$mount_dev" | egrep "^/" ; } 2>/dev/null`" || return 1
+	#
+	# Obtain information on the specified mounted device.
+	#
+	dir=`{ df -k "$mount_dev" | egrep "^/" ; } 2>/dev/null` || return 1
 	mount_dir=$(echo $dir | awk -e '{print $6}' 2>/dev/null)
 
 	[[ "`echo $mount_dir | cut -c 1`" = "/" ]] && return 0
@@ -248,8 +252,9 @@ check_mbfree()
 	#
 	# Return free space in partition containing passed argument in MB
 	#
-	typeset mbfree=`( LC_ALL=C df -k "$dir" 2>/dev/null | \
-	    egrep -v Filesystem | awk -e '{print $4}' ) 2>/dev/null` || return 1
+	typeset mbfree=`{ LC_ALL=C df -k "$dir" | \
+	    egrep -v Filesystem ; } 2>/dev/null` || return 1
+	mbfree=$(echo $mbfree | awk -e '{print $4}' 2>/dev/null)
 
 	((mbfree /= 1024))
 	if ((mbfree < mb_required)); then
@@ -389,6 +394,13 @@ find_packages()
 		#	zlogin -z <zone> /bin/rpm --qf '%{NAME}' -qp $rpmfile
 		#
 		for arch in $archs; do
+			#
+			# Use the filename globbing functionality of ksh's
+			# echo command to search for the file we want.
+			#
+			# If no matching file is found, echo will simply
+			# return the passed string.
+			#
 			rpmglob="$rpm[.-][0-9]*.$arch.rpm"
 			rpmfile="$(echo $rpmglob)"
 
@@ -584,8 +596,12 @@ install_zone()
 				# Remove the RPM from the install_rpms list
 				# and append it to the deferred_saved array
 				#
-				install_rpms=`echo " $install_rpms " | \
-				    sed "s/ $rpm / /g"`
+				install_rpms=$(echo "$install_rpms " |
+				    sed "s/ $rpm / /g")
+
+				# remove trailing spaces, if any
+				install_rpms=${install_rpms%%+( )}
+
 				deferred_saved[${#deferred_saved[@]}]="$rpm"
 
 				if ! cp "$mounted_root/$rd_rpmdir/$rpm" \
@@ -594,7 +610,14 @@ install_zone()
 					return 1
 				fi
 			fi
+
+			#
+			# If we've deferred the installation of EVERYTHING,
+			# simply return success
+			#
+			[[ -z $install_rpms ]] && return 0
 		done
+
 		[[ -n $deferred_found ]] & verbose ""
 	elif [[ -z $deferred_saved ]]; then
 		# There are no deferred RPMs to install, so we're done.
@@ -1049,6 +1072,7 @@ read_discinfo()
 	unset rd_arch
 	unset rd_cdnum
 	unset rd_disctype
+	unset rd_pers
 	unset rd_release
 	unset rd_rpmdir
 	unset rd_serial
@@ -1111,6 +1135,59 @@ read_discinfo()
 			fi
 
 			rd_rpmdir=${rd_line[5]}
+
+			if [[ "$rd_cdnum" = "1" &&
+			   "$rd_release" = "Red Hat"* ]]; then
+				typeset rh_glob
+
+				#
+				# If this is a Red Hat release, get its
+				# personality name from the name of the
+				# redhat-release RPM package.
+				#
+				# Start by looking for the file
+				# "redhat-release-*.rpm" in the directory
+				# RedHat/RPMS of the ISO we're examining by
+				# using ksh's "echo" command to handle
+				# filename globbing.
+				#
+				# If no matching file is found, echo will
+				# simply return the passed string.
+				#
+				rh_glob="$1/RedHat/RPMS/redhat-release-*.rpm"
+				rd_pers="$(echo $rh_glob)"
+
+				if [[ "$rd_pers" != "$rh_glob" ]]; then
+					#
+					# An appropriate file was found, so
+					# extract the personality type from the
+					# filename.
+					#
+					# For example, the presence of the file:
+					#
+					#   redhat-release-3WS-13.5.1.i386.rpm
+					#
+					# would indicate the ISO either
+					# represents a "WS" personality CD or
+					# a "WS" installation DVD.
+					#
+					# Start the extraction by deleting the
+					# pathname up to the personality type.
+					#
+					rh_glob="*/redhat-release-[0-9]"
+					rd_pers="${rd_pers##$rh_glob}"
+
+					#
+					# Now remove the trailing portion of the
+					# pathname to leave only the personality
+					# type, such as "WS" or "ES."
+					#
+					rd_pers="${rd_pers%%-*\.rpm}"
+				else
+					unset rd_pers
+				fi
+			fi
+
 			return 0
 		fi
 
@@ -1160,7 +1237,7 @@ mount_install_media()
 		typeset mount_timeout=10
 		typeset mount_timer=0
 
-		typeset nickname=`basename $device`
+		typeset nickname=$(basename $device)
 
 		eject -q "$nickname" > /dev/null 2>&1 || return 2
 		removable="$nickname"
@@ -1219,7 +1296,7 @@ mount_install_media()
 	fi
 
 	if ((mount_err != 0)); then
-		screenlog "$mntfail" "$device" "$mntdir"
+		screenlog "$mountfail" "$device" "$mntdir"
 		unset mntdir
 		return 1
 	fi
@@ -1402,7 +1479,13 @@ get_cd()
 		if [[ "$rd_disctype" = "CD" ]]; then
 			verboselog "Found CD #$rd_cdnum," \
 			    "Serial #$rd_serial"
-			verboselog "Release Name \"$rd_release\"\n"
+			verboselog "Release Name \"$rd_release\""
+
+			[[ -n $rd_pers ]] &&
+			    verboselog "Detected RedHat Personality" \
+				"\"$rd_pers\""
+
+			verboselog ""
 
 			# If we didn't care which CD it was, return success
 			[[ "$cdnum" = "" ]] && return 0
@@ -1413,6 +1496,12 @@ get_cd()
 			verboselog "\nFound DVD (representing CDs" \
 			    "$rd_cdnum), Serial #$rd_serial"
 			verboselog "Release Name \"$rd_release\"\n"
+
+			[[ -n $rd_pers ]] &&
+			    verboselog "Detected RedHat Personality" \
+				"\"$rd_pers\""
+
+			verboselog ""
 
 			# If we didn't care which CD it was, return success
 			[[ "$cdnum" = "" ]] && return 0
@@ -1517,6 +1606,7 @@ iterate_media()
 	typeset install_type="$1"
 	typeset ldevs
 	typeset mountdev
+	typeset rh_pers
 
 	shift
 
@@ -1581,6 +1671,9 @@ iterate_media()
 			return 1
 		fi
 
+		# set the RedHat personality type, if applicable
+		[[ -n $rd_pers && -z $rh_pers ]] && rh_pers=$rd_pers
+
 		#
 		# We now know the actual type of media being used, so
 		# modify the "err_media" string accordingly.
@@ -1638,7 +1731,7 @@ iterate_media()
 		# If there are no RPMs left, we're done.
 		[[ -z $rpms_left_save ]] && break
 
-		disc_rpms="${rpms_left_save[@]}"
+		disc_rpms="$rpms_left_save"
 		((cdnum += 1))
 
 		if [[ "$install_media" != "ISO" ]]; then
@@ -1656,20 +1749,57 @@ iterate_media()
 		fi
 	done
 
-	if [[ -n $rpms_left_save ]]; then
-		log "\nERROR: Unable to locate some needed packages:\n" \
-		    "  ${rpms_left_save[@]}\n"
-		screenlog "$err_msg" "$zonename"
-		if [[ -n $zone_mounted ]]; then
-			umount "$zone_mounted"
-			unset zone_mounted
-		fi
-		return 1
-	fi
-
 	if [[ -n $zone_mounted ]]; then
 		umount "$zone_mounted"
 		unset zone_mounted
+	fi
+
+	if [[ -n $rpms_left_save ]]; then
+		#
+		# Uh oh - there were RPMS we couldn't locate.  This COULD
+		# indicate a failed installation, but we need to check for
+		# a RedHat personality "missing" list first.
+		#
+		if [[ -n $rh_pers && "$rh_pers" != "AS" ]]; then
+			typeset missing
+
+			if [[ $rh_pers = "WS" ]]; then
+				missing="$distro_WS_missing"
+			elif [[ $rh_pers = "ES" ]]; then
+				missing="$distro_ES_missing"
+			fi
+
+			#
+			# If any packages left in "rpm_left_save" appear in the
+			# list of packages expected to be missing from this
+			# personality, remove them from the "rpm_left_save"
+			# list.
+			#
+			if [[ -n $missing ]]; then
+				typeset pkg
+
+				for pkg in $missing
+				do
+					rpm_left_save=$(echo "$rpm_left_save " |
+					    sed "s/$pkg //g")
+
+					#
+					# If all of the packages in
+					# "rpm_left_save" appeared in this
+					# personality's list of "expected
+					# missing" packages, then the
+					# installation completed successfully.
+					#
+					[[ -z ${rpm_left_save%%+( )} ]] &&
+					    return 0
+				done
+			fi
+		fi
+
+		log "\nERROR: Unable to locate some needed packages:\n" \
+		    "  ${rpms_left_save%%+( )}\n"
+		screenlog "$err_msg" "$zonename"
+		return 1
 	fi
 
 	return 0
@@ -1712,6 +1842,26 @@ install_from_media()
 }
 
 #
+# Add an entry to the valid distro list.
+#
+# The passed argument is the ISO type ("CD Set" or "DVD")
+#
+add_to_distro_list()
+{
+	typeset name
+
+	distro_file[${#distro_file[@]}]="$distro"
+
+	name="$release_name"
+	[[ -n $redhat_pers ]] && name="$name $redhat_pers"
+
+	select_name[${#select_name[@]}]="$name ($1)"
+	release[${#release[@]}]="$release_name"
+	iso_set[${#iso_set[@]}]="${iso_names[@]}"
+	verboselog "Distro \"$name\" ($1) found."
+}
+
+#
 # Find out which distros we have ISO files to support
 #
 # Do this by cycling through the distro directory and reading each distro
@@ -1732,17 +1882,19 @@ validate_iso_distros()
 	typeset disctype
 	typeset index
 	typeset iso
-	typeset iso_names
 	typeset ncds
-	typeset release_name
+	typeset pers
+	typeset pers_cd
+	typeset pers_index
 	typeset serial
 
 	typeset distro_files="$(echo $distro_dir/*.distro)"
 	typeset nisos=${#iso_filename[@]}
 
 	unset distro_file
-	unset release
 	unset iso_set
+	unset release
+	unset select_name
 
 	if [[ "$distro_files" = "$distro_dir/*.distro" ]]; then
 		msg=$(gettext "Unable to find any distro files!")
@@ -1763,63 +1915,55 @@ validate_iso_distros()
 		ncds=${#distro_cdorder[@]}
 
 		unset iso_names
+		unset pers
+		unset pers_cd
 
 		verbose "\nChecking ISOs against distro file \"$distro\"..."
 
 		index=0
 
 		while ((index < nisos)); do
+			#
+			# If the filename has been nulled out, it's already
+			# been found as part of a distro, so continue to the
+			# next one.
+			#
 			if [[ -z ${iso_filename[$index]} ]]; then
 				((index += 1))
 				continue
 			fi
 
 			iso="${iso_filename[$index]}"
+			serial="${iso_serial[$index]}"
+			release_name="${iso_release[$index]}"
+			redhat_pers="${iso_pers[$index]}"
 
 			verbose "  ISO \"$iso\":"
-			verbose "    Serial #${iso_serial[$index]}"
-			verbose "    Release Name \"${iso_release[$index]}\""
+
+			#
+			# If the serial number doesn't match that for
+			# this distro, check other ISOs
+			#
+			if [[ "$serial" != "$distro_serial" ]]; then
+				((index += 1))
+				continue
+			fi
+
+			verbose "    Serial #$serial"
+			verbose "    Release Name \"$release_name\""
+
+			[[ -n ${iso_pers[$index]} ]] &&
+			    verbose "    RedHat Personality \"$redhat_pers\""
 
 			if [[ "${iso_disctype[$index]}" = "CD" ]]; then
-				disctype="CD"
+				disctype="CD #"
 				cd="${iso_cdnum[$index]}"
 			else
-				disctype="DVD, representing CDs"
+				disctype="DVD, representing CDs #"
 				cd=0
 			fi
 
-			verbose "    $disctype ${iso_cdnum[$index]}"
-
-			if [[ -z "$serial" ]]; then
-				#
-				# No ISO has matched this distro yet.
-				#
-				if [[ "${iso_serial[$index]}" != \
-				    "$distro_serial" ]]; then
-					((index += 1))
-					continue
-				fi
-
-				serial="${iso_serial[$index]}"
-				release_name="${iso_release[$index]}"
-			else
-				#
-				# If the serial number doesn't match that for
-				# this distro, check other ISOs
-				#
-				if [[ "${iso_serial[$index]}" != \
-				    "$serial" ]]; then
-					((index += 1))
-					continue
-				fi
-
-			fi
-
-			iso_names[$cd]="$iso"
-
-			verbose "\n  Set \"$iso\""
-			verbose "    as $release_name $distro_version" \
-			    "$disctype ${iso_cdnum[$index]}\n"
+			verbose "    ${disctype}${iso_cdnum[$index]}\n"
 
 			#
 			# Once we've matched a particular distro, don't check
@@ -1827,61 +1971,88 @@ validate_iso_distros()
 			#
 			unset iso_filename[$index]
 
+			iso_names[$cd]="$iso"
+
 			#
 			# A DVD-based distro consists of one and ONLY one disc,
-			# so exit the loop now.
+			# so process it now.
 			#
-			[[ "${iso_disctype[$index]}" = "DVD" ]] && break
+			if [[ "${iso_disctype[$index]}" = "DVD" ]]; then
+				typeset dvd_discs=",${iso_cdnum[$index]}"
 
-			#
-			# If we've found all the CDs that comprise this distro,
-			# we're done looking.
-			#
-			[[ ${#iso_names[@]} -eq $ncds ]] && break
+				cd=1 
+				while ((cd <= ncds)); do
+					dvd_discs=$(echo "$dvd_discs" |
+					    sed "s/,$cd//")
+					((cd += 1))
+				done
 
-			#
-			# Otherwise, increment the index counter and
-			# look for other CDs comprising the current distro.
-			#
+				#
+				# If no CDs are left in $dvd_discs, the DVD
+				# was a complete distribution, so add it to
+				# the valid distro list.
+				#
+				if [[ -z $dvd_discs ]]; then
+					add_to_distro_list "DVD"
+					unset iso_names[$cd]
+				fi
+			elif [[ -n ${iso_pers[$index]} ]]; then
+				#
+				# If this is a RedHat personality CD, save off
+				# some extra information about it so we can
+				# discern between mutiple personality discs
+				# later, if needed.
+				#
+				pers[${#pers[@]}]=${iso_pers[$index]}
+				pers_cd[${#pers_cd[@]}]="$iso"
+			fi
+
 			((index += 1))
 		done
 
 		#
-		# Check to see if we have ISOs representing all the CDs the
-		# distro needs for installation.  If we don't, don't mark this
-		# as an available distro.
+		# Check to see if we have ISOs representing a full CD set.
+		# If we don't, don't mark this as an available distro.
 		#
-		if [[ "$disctype" = DVD* ]]; then
-			typeset dvd_discs=",${iso_cdnum[$index]}"
+		(( ${#iso_names[@]} != $ncds )) && continue
 
-			cd=1 
-			while ((cd <= ncds)); do
-				dvd_discs=`echo "$dvd_discs" | \
-				    sed "s/,$cd//"`
-				((cd += 1))
-			done
-
-			#
-			# If any CDs are left in $dvd_discs, the DVD was
-			# missing them so this DVD can't be used to install
-			# this distro.
-			#
-			[[ -n $dvd_discs ]] && continue
-		else
-			[[ ${#iso_names[@]} -ne $ncds ]] && continue
-		fi
+		relase_name="$release_name $distro_version"
 		
-		release_name="$release_name $distro_version"
+		if [[ -z ${pers[@]} ]]; then
+			#
+			# If there were no personality discs, just add this
+			# ISO set to the distro list.
+			#
+			unset redhat_pers
+			add_distro_list "CD Set"
+		else
+			#
+			# If a valid CD-based distro was found and there are
+			# RedHat personality discs for that distro present,
+			# create entries for each personality in the available
+			# distro list.
+			#
+			pers_index=0
 
-		#
-		# Append the new distro to the distro_file, release and iso_set
-		# arrays.
-		#
-		distro_file[${#distro_file[@]}]="$distro"
-		release[${#release[@]}]="$release_name"
-		iso_set[${#iso_set[@]}]="${iso_names[@]}"
+			while ((pers_index < ${#pers[@]})); do
+				redhat_pers=${pers[$pers_index]}
 
-		verboselog "Distro \"$release_name\" found.\n"
+				if [[ -n ${pers_cd[$pers_index]} ]]; then
+					#
+					# RedHat personality discs are always
+					# disc 1 of a CD set, so if we found a
+					# valid personality disc for this set,
+					# set the disc 1 entry for this distro
+					# to the ISO for the proper personality
+					# disc.
+					#
+					iso_names[1]="${pers_cd[$pers_index]}"
+					add_to_distro_list "CD Set"
+				fi
+
+				((pers_index += 1))
+			done
+		fi
 	done
 }
 
@@ -2005,6 +2176,7 @@ scan_isos()
 	unset iso_cdnum
 	unset iso_disctype
 	unset iso_filename
+	unset iso_pers
 
 	for iso in "$@"; do
 		verbose "Checking possible ISO\n  \"$iso\"..."
@@ -2013,10 +2185,14 @@ scan_isos()
 			verbose "  added as lofi device \"$lofi_dev\""
 			if lofi_mount "$lofi_dev" "/tmp/lxiso"; then
 				if read_discinfo "$mntdir"; then
-					iso_serial[$index]="$rd_serial"
 					iso_release[$index]="$rd_release"
+					iso_serial[$index]="$rd_serial"
 					iso_cdnum[$index]="$rd_cdnum"
 					iso_disctype[$index]="$rd_disctype"
+
+					[[ -n $rd_pers ]] &&
+					    iso_pers[$index]="$rd_pers"
+
 					iso_filename[$index]="$iso"
 					((index += 1))
 				fi
@@ -2034,6 +2210,58 @@ scan_isos()
 }
 
 #
+# Prompt the user with the first argument, then make a menu selection
+# from the balance.
+#
+# This is effectively similar to the ksh "select" function, except it
+# outputs to stdout.
+#
+# Shell variables set:
+#    choice    - set to the menu number selected
+#    selection - set to the menu text selected
+#
+pick_one()
+{
+	typeset menu_items
+	typeset menu_index
+	typeset reply
+
+	typeset prompt="$1"
+	shift
+
+	unset choice
+
+	set -A menu_items "$@"
+
+	until [[ -n $choice ]]; do
+		menu_index=1
+		
+		echo "\n$prompt\n"
+
+		for f in "${menu_items[@]}"; do
+			echo "$menu_index) $f"
+			((menu_index += 1))
+		done
+
+		echo "\n$(gettext "Please select") (1-$#): " "\c"
+		read reply
+		echo
+
+		[[ -z $reply ]] && echo && continue
+
+		#
+		# Reprint menu selections if the answer was not a number in
+		# range of the menu items available
+		#
+		[[ $reply != +([0-9]) ]] && continue
+		((reply < 1)) || ((reply > $#)) && continue
+
+		choice=$reply
+		selection=${menu_items[((choice - 1))]}
+	done
+}
+
+#
 # Select a distribution to install from the arguments passed and set
 # "ndsitro" to the value chosen - 1 (so it may be used as an array index.)
 #
@@ -2042,11 +2270,13 @@ scan_isos()
 #
 select_distro()
 {
-	typeset dist
+	unset choice
 	unset ndistro
 
 	if (($# > 1)); then
 		if [[ -n $silent_mode ]]; then
+			typeset dist
+
 			log "ERROR: multiple distrubutions present in ISO" \
 				"directory but silent install"
 			log "  mode specified.  Distros available:"
@@ -2056,12 +2286,9 @@ select_distro()
 			return 1
 		fi
 
-		PS3="Select a distribution to install: "
-		select dist in "$@"; do
-			[[ -z $distro ]] && continue
-			screenlog "$install_dist" "$dist"
-			ndistro=$((REPLY - 1))
-		done
+		pick_one \
+		    "$(gettext "Which distro would you like to install?")" \
+		    "$@"
 	fi
 
 	#
@@ -2069,9 +2296,12 @@ select_distro()
 	# to the routine as well as when an EOF is sent to the distribution
 	# selection prompt.
 	#
-	if [[ -z $dist ]]; then
+	if [[ -z $choice ]]; then
 		screenlog "$install_dist" "$1"
 		ndistro=0
+	else
+		screenlog "$install_dist" "$selection"
+		ndistro=$((choice - 1))
 	fi
 
 	return 0
@@ -2189,11 +2419,14 @@ do_iso_install()
 	typeset iso_path
 	typeset ldev
 
+	msg=$(gettext "Checking for valid Linux distribution ISO images...")
+	screenlog "\n$msg"
+
 	scan_isos "$@"
 
 	if [[ -z ${iso_filename[@]} ]]; then
 		msg=$(gettext "No valid ISO images available or mountable.")
-		screenlog "$msg"
+		screenlog "\n$msg"
 		return 1
 	fi
 	
@@ -2201,11 +2434,12 @@ do_iso_install()
 
 	if [[ -z ${release[@]} ]]; then
 		msg=$(gettext "No supported Linux distributions found.")
-		screenlog "$msg"
+		screenlog "\n$msg"
 		return 1
 	fi
 
-	select_distro "${release[@]}" || return 1
+	select_distro "${select_name[@]}" || return 1
+	unset select_name
 
 	. ${distro_file[$ndistro]} > /dev/null
 	distro_ncds=${#distro_cdorder[@]}
@@ -2468,7 +2702,7 @@ else
 
 	dir_start=$(dirname "$distro_path" | cut -c 1)
 
-	[[ "$dir_start" != "/" ]] && distro_path="`pwd`/$distro_path"
+	[[ "$dir_start" != "/" ]] && distro_path="${PWD:=$(pwd)}/$distro_path"
 
 	if [[ ! -d "$distro_path" ]]; then
 		screenlog "$no_distropath" "$distro_path"
@@ -2492,7 +2726,7 @@ else
 		# If it's an hsfs file, it's an ISO, so add it to the possible
 		# distro ISO list
 		#
-		filetype=`LC_ALL=C fstyp $dir_file 2>/dev/null` &&
+		filetype=$(LC_ALL=C fstyp $dir_file 2>/dev/null) &&
 		    [[ "$filetype" = "hsfs" ]] &&
 		    iso_files="$iso_files $dir_file"
 	done
