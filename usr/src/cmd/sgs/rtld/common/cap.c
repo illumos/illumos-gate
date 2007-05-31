@@ -244,7 +244,7 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
 		 */
 		fmap->fm_mflags = MAP_PRIVATE;
 		fmap->fm_maddr = 0;
-		fmap->fm_msize = syspagsz;
+		fmap->fm_msize = FMAP_SIZE;
 		fmap->fm_hwptr = 0;
 	}
 	(void) closedir(dir);

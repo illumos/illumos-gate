@@ -133,12 +133,14 @@ elf_fix_name(const char *name, Rt_map *clmp, uint_t orig)
 	 * them libsys.so.1 (the SONAME of libsys.so.1 is ld.so.1).
 	 */
 	if (((*name == '/') &&
+	/* BEGIN CSTYLED */
 #if	defined(_ELF64)
 	    (strcmp(name, MSG_ORIG(MSG_PTH_RTLD_64)) == 0)) ||
 #else
 	    (strcmp(name, MSG_ORIG(MSG_PTH_RTLD)) == 0)) ||
 #endif
 	    (strcmp(name, MSG_ORIG(MSG_FIL_RTLD)) == 0)) {
+		/* END CSTYLED */
 		Pnode	*pnp;
 
 		DBG_CALL(Dbg_file_fixname(LIST(clmp), name,
@@ -503,6 +505,7 @@ elf_verify_vers(const char *name, Rt_map *clmp, Rt_map *nlmp)
 			 * print any unmatched versions.
 			 */
 			if (lml->lm_flags & LML_FLG_TRC_ENABLE) {
+				/* BEGIN CSTYLED */
 				if (found) {
 				    if (!(lml->lm_flags & LML_FLG_TRC_VERBOSE))
 					continue;
@@ -516,6 +519,7 @@ elf_verify_vers(const char *name, Rt_map *clmp, Rt_map *nlmp)
 				    (void) printf(MSG_INTL(MSG_LDD_VER_NFOUND),
 					need, version);
 				}
+				/* END CSTYLED */
 				continue;
 			}
 
@@ -2302,6 +2306,7 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				 * already started, then demote it.  It's too
 				 * late to guarantee complete interposition.
 				 */
+				/* BEGIN CSTYLED */
 				if (ld->d_un.d_val &
 				    (DF_1_INTERPOSE | DF_1_SYMINTPOSE)) {
 				    if (lml->lm_flags & LML_FLG_STARTREL) {
@@ -2315,6 +2320,7 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				    else
 					FLAGS(lmp) |= FLG_RT_SYMINTPO;
 				}
+				/* END CSTYLED */
 				break;
 			case DT_SYMINFO:
 				SYMINFO(lmp) = (Syminfo *)(ld->d_un.d_ptr +
@@ -2592,7 +2598,7 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	 * program headers remap them.
 	 */
 	size = (size_t)((char *)ehdr->e_phoff +
-		(ehdr->e_phnum * ehdr->e_phentsize));
+	    (ehdr->e_phnum * ehdr->e_phentsize));
 	if (size > fmap->fm_fsize) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_GEN_CORTRUNC), pname);
 		return (0);
@@ -2659,10 +2665,10 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 
 #if defined(MAP_ALIGN)
 	/*
-	 * Make sure the maximum page alignment is a power of 2 >= the system
-	 * page size, for use with MAP_ALIGN.
+	 * Make sure the maximum page alignment is a power of 2 >= the default
+	 * segment alignment, for use with MAP_ALIGN.
 	 */
-	align = M_PROUND(align);
+	align = S_ROUND(align, M_SEGM_ALIGN);
 #endif
 
 	/*
@@ -2709,17 +2715,29 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 
 	} else if ((fixed == 0) && (r_debug.rtd_objpad == 0) &&
 	    (memsize <= fmap->fm_msize) && ((fph->p_flags & PF_W) == 0) &&
-	    (fph->p_filesz == fph->p_memsz) &&
+	    (fph == lph) && (fph->p_filesz == fph->p_memsz) &&
 	    (((Xword)fmap->fm_maddr % align) == 0)) {
+		size_t	rsize;
+
 		/*
-		 * If the mapping required has already been established from
-		 * the initial page we don't need to do anything more.  Reset
-		 * the fmap address so then any later files start a new fmap.
-		 * This is really an optimization for filters, such as libdl.so,
-		 * which should only require one page.
+		 * If the file contains a single segment, and the mapping
+		 * required has already been established from the initial fmap
+		 * mapping, then we don't need to do anything more.  Reset the
+		 * fmap address so that any later files start a new fmap.  This
+		 * is really an optimization for filters, such as libdl.so,
+		 * libthread, etc. that are constructed to be a single text
+		 * segment.
 		 */
 		paddr = faddr = fmap->fm_maddr;
-		fmap->fm_maddr = 0;
+
+		/*
+		 * Free any unused mapping by assigning the fmap buffer to the
+		 * unused region.  fmap_setup() will unmap this area and
+		 * establish defaults for future mappings.
+		 */
+		rsize = M_PROUND(fph->p_filesz);
+		fmap->fm_maddr += rsize;
+		fmap->fm_msize -= rsize;
 		fmap_setup();
 	}
 
@@ -2947,7 +2965,7 @@ elf_copy_reloc(char *name, Sym *rsym, Rt_map *rlmp, void *radd, Sym *dsym,
 		if (ELF_ST_VISIBILITY(dsym->st_other) == STV_PROTECTED) {
 			(void) printf(MSG_INTL(MSG_LDD_CPY_PROT),
 			    _conv_reloc_type(M_R_COPY), demangle(name),
-				NAME(dlmp));
+			    NAME(dlmp));
 		}
 	}
 
@@ -3291,7 +3309,7 @@ elf_reloc_bad(Rt_map *lmp, void *rel, uchar_t rtype, ulong_t roffset,
 
 	if (rsymndx) {
 		Sym	*symref = (Sym *)((ulong_t)SYMTAB(lmp) +
-				(rsymndx * SYMENT(lmp)));
+		    (rsymndx * SYMENT(lmp)));
 
 		if (ELF_ST_BIND(symref->st_info) != STB_LOCAL)
 			name = (char *)(STRTAB(lmp) + symref->st_name);

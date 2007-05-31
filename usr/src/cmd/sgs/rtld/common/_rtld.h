@@ -217,6 +217,9 @@ typedef struct {
 	ulong_t		fm_hwptr;	/* hardware capabilities pointer */
 } Fmap;
 
+#define	FMAP_SIZE	0x8000		/* initial size to map from a file */
+					/* big enough to capture standard */
+					/* filters */
 /*
  * Define a file descriptor, which maintains information regarding a pathname
  * that has been opened and minimally inspected.

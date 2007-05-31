@@ -455,7 +455,7 @@ map_equal(const char *mapfile, Sg_desc *sgp, Ofl_desc *ofl)
 					case 'o':
 						sgp->sg_flags |= FLG_SG_ORDER;
 						ofl->ofl_flags |=
-							FLG_OF_SEGORDER;
+						    FLG_OF_SEGORDER;
 						break;
 					case 'n':
 						sgp->sg_flags |= FLG_SG_NOHDR;
@@ -895,7 +895,8 @@ map_colon(Ofl_desc *ofl, const char *mapfile, Ent_desc *enp)
 					}
 					enp->ec_attrmask |= SHF_EXECINSTR;
 					if (!b_bang)
-					    enp->ec_attrbits |= SHF_EXECINSTR;
+						enp->ec_attrbits |=
+						    SHF_EXECINSTR;
 					b_bang = FALSE;
 					break;
 				default:
@@ -1222,7 +1223,7 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 				    libld_malloc(strlen(Start_tok) + 1)) == 0)
 					return (S_ERROR);
 				(void) strcpy((char *)sdf->sdf_soname,
-					Start_tok);
+				    Start_tok);
 				sdf->sdf_flags |= FLG_SDF_SONAME;
 				break;
 			case MD_SPECVERS:
@@ -1257,7 +1258,7 @@ map_dash(const char *mapfile, char *name, Ofl_desc *ofl)
 			case MD_NONE:
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_MAP_UNEXTOK), mapfile,
-					EC_XWORD(Line_num), '=');
+				    EC_XWORD(Line_num), '=');
 				return (S_ERROR);
 			}
 			dolkey = MD_NONE;
@@ -1503,11 +1504,13 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 				 */
 				if (filter) {
 					if (filtee) {
+					    /* BEGIN CSTYLED */
 					    eprintf(ofl->ofl_lml, ERR_FATAL,
 						MSG_INTL(MSG_MAP_MULTFILTEE),
 						mapfile, EC_XWORD(Line_num),
 						_name);
 					    return (S_ERROR);
+					    /* END CSTYLED */
 					}
 					if ((filtee = libld_malloc(
 					    strlen(Start_tok) + 1)) == 0)
@@ -1550,6 +1553,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 
 					switch (*Start_tok) {
 					case 'v':
+					    /* BEGIN CSTYLED */
 					    if (value) {
 						eprintf(ofl->ofl_lml, ERR_FATAL,
 						    MSG_INTL(MSG_MAP_MOREONCE),
@@ -1561,7 +1565,9 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					    value = (Addr)number;
 					    novalue = 0;
 					    break;
+					    /* END CSTYLED */
 					case 's':
+					    /* BEGIN CSTYLED */
 					    if (size) {
 						eprintf(ofl->ofl_lml, ERR_FATAL,
 						    MSG_INTL(MSG_MAP_MOREONCE),
@@ -1572,6 +1578,7 @@ map_version(const char *mapfile, char *name, Ofl_desc *ofl)
 					    /* LINTED */
 					    size = (Addr)number;
 					    break;
+					    /* END CSTYLED */
 					}
 
 				} else if (strcmp(Start_tok,
@@ -2438,13 +2445,28 @@ ld_map_parse(const char *mapfile, Ofl_desc *ofl)
 			 */
 			if (((sgp1->sg_flags & FLG_SG_TYPE) == 0) &&
 			    (sgp1->sg_phdr.p_type == PT_NULL)) {
+				/*
+				 * Default to a loadable segment.
+				 */
 				sgp1->sg_phdr.p_type = PT_LOAD;
 				sgp1->sg_flags |= FLG_SG_TYPE;
 			}
-			if ((sgp1->sg_phdr.p_type == PT_LOAD) &&
-				(!(sgp1->sg_flags & FLG_SG_FLAGS))) {
-				sgp1->sg_phdr.p_flags = PF_R + PF_W + PF_X;
-				sgp1->sg_flags |= FLG_SG_FLAGS;
+			if (sgp1->sg_phdr.p_type == PT_LOAD) {
+				if ((sgp1->sg_flags & FLG_SG_FLAGS) == 0) {
+					/*
+					 * Default to read/write and execute.
+					 */
+					sgp1->sg_phdr.p_flags =
+					    PF_R + PF_W + PF_X;
+					sgp1->sg_flags |= FLG_SG_FLAGS;
+				}
+				if ((sgp1->sg_flags & FLG_SG_ALIGN) == 0) {
+					/*
+					 * Default to segment alignment
+					 */
+					sgp1->sg_phdr.p_align = M_SEGM_ALIGN;
+					sgp1->sg_flags |= FLG_SG_ALIGN;
+				}
 			}
 
 			/*

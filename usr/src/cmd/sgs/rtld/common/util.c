@@ -801,8 +801,9 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 			clmp = bdp->b_caller;
 
 			if (FLAGS1(clmp) & LML_TFLG_AUD_OBJCLOSE) {
-			    _audit_objclose(&(AUDITORS(clmp)->ad_list), lmp);
-			    break;
+				_audit_objclose(&(AUDITORS(clmp)->ad_list),
+				    lmp);
+				break;
 			}
 		}
 	}
@@ -1792,7 +1793,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 			 * and would drag too much libc implementation detail
 			 * into ld.so.1.
 			 */
-			 *s0 = '\0';
+			*s0 = '\0';
 #else
 /*
  * Verify that the above write is appropriate for any new platforms.
@@ -1995,6 +1996,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 				if (strcmp(s2, MSG_ORIG(MSG_FIL_RTLD)) == 0) {
 					return;
 				}
+				/* BEGIN CSTYLED */
 				if (rtld_flags & RT_FL_SECURE) {
 					profile_lib =
 #if	defined(_ELF64)
@@ -2010,6 +2012,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 					    MSG_ORIG(MSG_PTH_LDPROF);
 #endif
 				}
+				/* END CSTYLED */
 			} else
 				profile_lib = 0;
 		} else if (variable == ENV_FLG_SIGNAL) {
@@ -2021,7 +2024,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 					*lmflags |= LML_FLG_TRC_LDDSTUB;
 			} else
 				*lmflags &=
-				~(LML_FLG_TRC_ENABLE|LML_FLG_TRC_LDDSTUB);
+				    ~(LML_FLG_TRC_ENABLE|LML_FLG_TRC_LDDSTUB);
 		}
 	}
 }
@@ -2535,9 +2538,9 @@ again:
 				char		local[NUM_SIZE];
 				size_t		ssize = 0, psize = 0;
 				const char	*string =
-						    MSG_ORIG(MSG_STR_HEXNUM);
+				    MSG_ORIG(MSG_STR_HEXNUM);
 				const char	*prefix =
-						    MSG_ORIG(MSG_STR_EMPTY);
+				    MSG_ORIG(MSG_STR_EMPTY);
 				u_longlong_t	num;
 
 				switch (ls) {
@@ -2756,13 +2759,14 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 			error = ERR_WARNING;
 		if (error == ERR_WARNING) {
 			if (err_strs[ERR_WARNING] == 0)
-			    err_strs[ERR_WARNING] = MSG_INTL(MSG_ERR_WARNING);
+				err_strs[ERR_WARNING] =
+				    MSG_INTL(MSG_ERR_WARNING);
 		} else if (error == ERR_FATAL) {
 			if (err_strs[ERR_FATAL] == 0)
-			    err_strs[ERR_FATAL] = MSG_INTL(MSG_ERR_FATAL);
+				err_strs[ERR_FATAL] = MSG_INTL(MSG_ERR_FATAL);
 		} else if (error == ERR_ELF) {
 			if (err_strs[ERR_ELF] == 0)
-			    err_strs[ERR_ELF] = MSG_INTL(MSG_ERR_ELF);
+				err_strs[ERR_ELF] = MSG_INTL(MSG_ERR_ELF);
 		}
 		if (procname) {
 			if (bufprint(&prf, MSG_ORIG(MSG_STR_EMSGFOR1),
@@ -3040,7 +3044,7 @@ pr_open(Lm_list *lml)
 
 	if (pr_fd == FD_UNAVAIL) {
 		(void) snprintf(proc, 16, MSG_ORIG(MSG_FMT_PROC),
-			(int)getpid());
+		    (int)getpid());
 		if ((pr_fd = open(proc, O_RDONLY)) == FD_UNAVAIL) {
 			int	err = errno;
 
@@ -3144,6 +3148,7 @@ unused(Lm_list *lml)
 				if (FLAGS1(clmp) & FL1_RT_LDDSTUB)
 					continue;
 
+				/* BEGIN CSTYLED */
 				if (nl++ == 0) {
 					if (tracing & LML_FLG_TRC_UNREF)
 					    (void) printf(MSG_ORIG(MSG_STR_NL));
@@ -3157,6 +3162,7 @@ unused(Lm_list *lml)
 					NAME(lmp), NAME(clmp));
 				else
 				    DBG_CALL(Dbg_unused_unref(lmp, NAME(clmp)));
+				/* END CSTYLED */
 			}
 		}
 
@@ -3229,7 +3235,7 @@ fmap_setup()
 	fmap->fm_mflags = MAP_PRIVATE;
 #endif
 
-	fmap->fm_msize = syspagsz;
+	fmap->fm_msize = FMAP_SIZE;
 	fmap->fm_hwptr = 0;
 }
 
@@ -3428,17 +3434,17 @@ security(uid_t uid, uid_t euid, gid_t gid, gid_t egid, int auxflags)
 		return;
 	}
 #endif
-	if (uid == -1)
+	if (uid == (uid_t)-1)
 		uid = getuid();
 	if (uid) {
-		if (euid == -1)
+		if (euid == (uid_t)-1)
 			euid = geteuid();
 		if (uid != euid)
 			rtld_flags |= RT_FL_SECURE;
 		else {
-			if (gid == -1)
+			if (gid == (gid_t)-1)
 				gid = getgid();
-			if (egid == -1)
+			if (egid == (gid_t)-1)
 				egid = getegid();
 			if (gid != egid)
 				rtld_flags |= RT_FL_SECURE;
