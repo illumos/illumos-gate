@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -198,17 +198,16 @@ static prom_node_t *
 find_node_work(prom_node_t *np, pnode_t node)
 {
 	prom_node_t *nnp;
+	prom_node_t *snp;
 
-	if (np->pn_nodeid == node)
-		return (np);
+	for (snp = np; snp != NULL; snp = snp->pn_sibling) {
+		if (snp->pn_nodeid == node)
+			return (snp);
 
-	if (np->pn_child)
-		if ((nnp = find_node_work(np->pn_child, node)) != NULL)
-			return (nnp);
-
-	if (np->pn_sibling)
-		if ((nnp = find_node_work(np->pn_sibling, node)) != NULL)
-			return (nnp);
+		if (snp->pn_child)
+			if ((nnp = find_node_work(snp->pn_child, node)) != NULL)
+				return (nnp);
+	}
 
 	return (NULL);
 }
