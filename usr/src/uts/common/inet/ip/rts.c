@@ -66,7 +66,7 @@
  *
  *	Interfaces are brought up or down.
  *	Addresses are assigned to interfaces.
- *	ICMP redirects are processed and a IRE_HOST_REDIRECT is installed.
+ *	ICMP redirects are processed and a IRE_HOST/RTF_DYNAMIC is installed.
  *	No route is found while sending a packet.
  *	When TCP requests IP to remove an IRE_CACHE of a troubled destination.
  *

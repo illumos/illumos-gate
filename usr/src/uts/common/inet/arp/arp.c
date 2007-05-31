@@ -3671,6 +3671,7 @@ ar_slifname(queue_t *q, mblk_t *mp_orig)
 	rw_enter(&as->as_arl_lock, RW_WRITER);
 	arl->arl_next = as->as_arl_head;
 	as->as_arl_head = arl;
+	rw_exit(&as->as_arl_lock);
 	DTRACE_PROBE1(slifname_set, arl_t *, arl);
 
 	/*
@@ -3684,7 +3685,6 @@ ar_slifname(queue_t *q, mblk_t *mp_orig)
 	iocp->ioc_count = msgsize(ioccpy->b_cont);
 	ioccpy->b_wptr = (uchar_t *)(iocp + 1);
 	putnext(arl->arl_wq, ioccpy);
-	rw_exit(&as->as_arl_lock);
 
 	return (0);
 }

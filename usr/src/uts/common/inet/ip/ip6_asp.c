@@ -418,7 +418,7 @@ ip6_asp_replace(mblk_t *mp, ip6_asp_t *new_table, size_t new_size,
 	/*
 	 * The user has changed the address selection policy table.  IPv6
 	 * source address selection for existing IRE_CACHE and
-	 * IRE_HOST_REDIRECT entries used the old table, so we need to
+	 * RTF_DYNAMIC entries used the old table, so we need to
 	 * clear the cache.
 	 */
 	ire_walk_v6(ire_delete_cache_v6, NULL, ALL_ZONES, ipst);

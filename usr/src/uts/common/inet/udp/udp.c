@@ -8523,9 +8523,9 @@ udp_kstat_update(kstat_t *kp, int rw)
 	}
 	udpkp = (udp_named_kstat_t *)kp->ks_data;
 
-	udpkp->inDatagrams.value.ui32 =	us->us_udp_mib.udpHCInDatagrams;
+	udpkp->inDatagrams.value.ui64 =	us->us_udp_mib.udpHCInDatagrams;
 	udpkp->inErrors.value.ui32 =	us->us_udp_mib.udpInErrors;
-	udpkp->outDatagrams.value.ui32 = us->us_udp_mib.udpHCOutDatagrams;
+	udpkp->outDatagrams.value.ui64 = us->us_udp_mib.udpHCOutDatagrams;
 	udpkp->outErrors.value.ui32 =	us->us_udp_mib.udpOutErrors;
 	netstack_rele(ns);
 	return (0);

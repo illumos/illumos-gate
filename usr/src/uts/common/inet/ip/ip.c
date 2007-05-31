@@ -8230,8 +8230,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 		 * Increment the ire_ob_pkt_count field for ire if it is an
 		 * INTERFACE (IF_RESOLVER or IF_NORESOLVER) IRE type, and
 		 * increment the same for the parent IRE, sire, if it is some
-		 * sort of prefix IRE (which includes DEFAULT, PREFIX, HOST
-		 * and HOST_REDIRECT).
+		 * sort of prefix IRE (which includes DEFAULT, PREFIX, and HOST)
 		 */
 		if ((ire->ire_type & IRE_INTERFACE) != 0) {
 			UPDATE_OB_PKT_COUNT(ire);

@@ -893,8 +893,7 @@ create_irecache:
 	 * Increment the ire_ob_pkt_count field for ire if it is an
 	 * INTERFACE (IF_RESOLVER or IF_NORESOLVER) IRE type, and
 	 * increment the same for the parent IRE, sire, if it is some
-	 * sort of prefix IRE (which includes DEFAULT, PREFIX, HOST
-	 * and HOST_REDIRECT).
+	 * sort of prefix IRE (which includes DEFAULT, PREFIX, and HOST).
 	 */
 	if ((ire->ire_type & IRE_INTERFACE) != 0) {
 		UPDATE_OB_PKT_COUNT(ire);
@@ -1689,7 +1688,7 @@ ire_round_robin(irb_t *irb_ptr, zoneid_t zoneid, ire_ftable_args_t *margs,
 	 */
 	ire = ire_origin;
 	while (ire != NULL) {
-		int match_flags = 0;
+		int match_flags = MATCH_IRE_TYPE | MATCH_IRE_SECATTR;
 		ire_t *rire;
 
 		if (ire->ire_marks & IRE_MARK_CONDEMNED)
@@ -1717,15 +1716,15 @@ ire_round_robin(irb_t *irb_ptr, zoneid_t zoneid, ire_ftable_args_t *margs,
 			return (ire);
 		}
 		/*
-		 * When we're in a local zone, we're only
+		 * When we're in a non-global zone, we're only
 		 * interested in routers that are
 		 * reachable through ipifs within our zone.
 		 */
 		if (ire->ire_ipif != NULL) {
 			match_flags |= MATCH_IRE_ILL_GROUP;
 		}
-		rire = ire_route_lookup(ire->ire_gateway_addr,
-		    0, 0, 0, ire->ire_ipif, NULL, zoneid, margs->ift_tsl,
+		rire = ire_route_lookup(ire->ire_gateway_addr, 0, 0,
+		    IRE_INTERFACE, ire->ire_ipif, NULL, zoneid, margs->ift_tsl,
 		    match_flags, ipst);
 		if (rire != NULL) {
 			ire_refrele(rire);
