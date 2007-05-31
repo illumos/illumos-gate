@@ -598,6 +598,7 @@ static sd_disk_config_t sd_disk_table[] = {
 	{ "IBM     DDYFT3695",  SD_CONF_BSET_THROTTLE, &ibm_properties },
 	{ "IBM     IC35LF2D2",  SD_CONF_BSET_THROTTLE, &ibm_properties },
 	{ "IBM     IC35LF2PR",  SD_CONF_BSET_THROTTLE, &ibm_properties },
+	{ "IBM     1724-100",   SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "IBM     1726-2xx",   SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "IBM     1726-4xx",   SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
 	{ "IBM     1726-3xx",   SD_CONF_BSET_NRR_COUNT, &lsi_oem_properties },
