@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -288,67 +288,72 @@ rd_init_tuneables(void)
 	}
 
 	/*
-	 * Since availrmem is in pages (and is a long), this won't overflow.
+	 * Since availrmem_initial is a long, this won't overflow.
 	 */
-	rd_max_physmem = (availrmem * rd_percent_physmem) / 100;
+	rd_max_physmem = (availrmem_initial * rd_percent_physmem) / 100;
 }
 
 /*
- * Allocate enough physical pages to hold `size' bytes.  Returns an
+ * Allocate enough physical pages to hold "npages" pages.  Returns an
  * array of page_t * pointers that can later be mapped in or out via
  * rd_{un}map_window() but is otherwise opaque, or NULL on failure.
- *
- * This code stolen from the NCA driver.
  */
 page_t **
 rd_phys_alloc(pgcnt_t npages)
 {
 	page_t		*pp, **ppa;
-	pgcnt_t		i;
-	size_t		ppalen =  npages * sizeof (struct page_t *);
+	spgcnt_t	i;
+	size_t		ppalen;
 	struct seg	kseg;
-	char		*addr;		/* For the purposes of coloring */
+	caddr_t		addr;		/* For coloring */
 
-	if (rd_tot_physmem + npages > rd_max_physmem) {
+	if (rd_tot_physmem + npages > rd_max_physmem)
+		return (NULL);
+
+	if (!page_resv(npages, KM_NOSLEEP))
+		return (NULL);
+
+	if (!page_create_wait(npages, 0)) {
+		page_unresv(npages);
 		return (NULL);
 	}
-	ppa = kmem_zalloc(ppalen, KM_SLEEP);
-	(void) page_resv(npages, KM_SLEEP);
 
+	ppalen = npages * sizeof (struct page_t *);
+	ppa = kmem_zalloc(ppalen, KM_NOSLEEP);
+	if (ppa == NULL) {
+		page_create_putback(npages);
+		page_unresv(npages);
+		return (NULL);
+	}
+
+	kseg.s_as = &kas;
 	for (i = 0, addr = NULL; i < npages; ++i, addr += PAGESIZE) {
-		if (!page_create_wait(1, KM_SLEEP)) {
-			goto out;
-		}
-
-		kseg.s_as = &kas;
-
-		if ((pp = page_get_freelist(&kvp, 0, &kseg, addr, PAGESIZE,
-		    KM_SLEEP, NULL)) == NULL) {
-			if ((pp = page_get_cachelist(&kvp, 0, &kseg, addr,
-			    KM_SLEEP, NULL)) == NULL) {
+		pp = page_get_freelist(&kvp, 0, &kseg, addr, PAGESIZE, 0, NULL);
+		if (pp == NULL) {
+			pp = page_get_cachelist(&kvp, 0, &kseg, addr, 0, NULL);
+			if (pp == NULL)
 				goto out;
-			}
-			if (PP_ISAGED(pp) == 0) {
+			if (!PP_ISAGED(pp))
 				page_hashout(pp, NULL);
-			}
 		}
 
 		PP_CLRFREE(pp);
 		PP_CLRAGED(pp);
 		ppa[i] = pp;
-		page_downgrade(pp);
 	}
+
+	for (i = 0; i < npages; i++)
+		page_downgrade(ppa[i]);
 	rd_tot_physmem += npages;
 
 	return (ppa);
+
 out:
-	for (i = 0; ppa[i] != NULL && i < npages; ++i) {
+	ASSERT(i < npages);
+	page_create_putback(npages - i);
+	while (--i >= 0)
 		page_free(ppa[i], 0);
-	}
-
-	page_create_putback(i);
 	kmem_free(ppa, ppalen);
-
 	page_unresv(npages);
 
 	return (NULL);
@@ -716,7 +721,7 @@ rd_alloc_resources(char *name, size_t size, dev_info_t *dip)
 	 * Allocate kstat stuff.
 	 */
 	rsp->rd_kstat = kstat_create(RD_DRIVER_NAME, minor, NULL,
-					"disk", KSTAT_TYPE_IO, 1, 0);
+	    "disk", KSTAT_TYPE_IO, 1, 0);
 	if (rsp->rd_kstat) {
 		mutex_init(&rsp->rd_kstat_lock, NULL,
 		    MUTEX_DRIVER, NULL);
