@@ -36,7 +36,6 @@
 
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 #include <sys/siginfo.h>
-#include <execinfo.h>
 #endif
 
 #ifdef	__cplusplus
