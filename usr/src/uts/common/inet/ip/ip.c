@@ -15727,6 +15727,9 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		    dlpi_prim_str(dlea->dl_error_primitive)));
 
 		switch (dlea->dl_error_primitive) {
+		case DL_PROMISCON_REQ:
+		case DL_PROMISCOFF_REQ:
+		case DL_DISABMULTI_REQ:
 		case DL_UNBIND_REQ:
 		case DL_ATTACH_REQ:
 		case DL_INFO_REQ:
@@ -15843,11 +15846,6 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 				}
 			}
 			freemsg(mp);	/* Don't want to pass this up */
-			return;
-
-		case DL_DISABMULTI_REQ:
-			ill_dlpi_done(ill, DL_DISABMULTI_REQ);
-			freemsg(mp);
 			return;
 
 		case DL_CAPABILITY_REQ:
@@ -16355,6 +16353,8 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 		    dlpi_prim_str((int)dloa->dl_correct_primitive),
 		    dloa->dl_correct_primitive));
 		switch (dloa->dl_correct_primitive) {
+		case DL_PROMISCON_REQ:
+		case DL_PROMISCOFF_REQ:
 		case DL_ENABMULTI_REQ:
 		case DL_DISABMULTI_REQ:
 		case DL_UNBIND_REQ:
