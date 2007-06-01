@@ -516,13 +516,15 @@ extern void kcf_free_context(kcf_context_t *);
 
 extern int kcf_svc_wait(int *);
 extern int kcf_svc_do_run(void);
-extern int kcf_verify_signature(kcf_provider_desc_t *);
+extern int kcf_need_signature_verification(kcf_provider_desc_t *);
+extern void kcf_verify_signature(void *);
 extern struct modctl *kcf_get_modctl(crypto_provider_info_t *);
 extern void verify_unverified_providers();
 extern void kcf_free_req(kcf_areq_node_t *areq);
 extern void crypto_bufcall_service(void);
 
 extern void kcf_walk_ntfylist(uint32_t, void *);
+extern void kcf_do_notify(kcf_provider_desc_t *, boolean_t);
 
 extern kcf_dual_req_t *kcf_alloc_req(crypto_call_req_t *);
 extern void kcf_next_req(void *, int);

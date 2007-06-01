@@ -130,6 +130,7 @@ typedef struct kcf_sched_info {
 typedef enum {
 	KCF_PROV_ALLOCATED = 1,
 	KCF_PROV_UNVERIFIED,
+	KCF_PROV_VERIFICATION_FAILED,
 	/*
 	 * state < KCF_PROV_READY means the provider can not
 	 * be used at all.

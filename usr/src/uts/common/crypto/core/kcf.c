@@ -146,45 +146,26 @@ kcf_get_modctl(crypto_provider_info_t *pinfo)
 }
 
 /*
- * Verify the signature of the module of the passed in provider.
+ * Check if signature verification is needed for a provider.
  *
- * Returns 0 if the signature is verified successfully. Returns -1,
- * if the signature can not be verified now since kcfd is not up.
- * In this case, we delay the verification till kcfd is up. Returns
- * CRYPTO_MODVERIFICATION_FAILED if the verification has failed.
- *
- * This function can be called from process context only.
- *
- * We call kcfd with the full pathname of the module to be
- * verified. kcfd will return success/restricted/fail, signature length
- * and the actual signature in the ELF section of the module. If kcfd
- * returns success or restricted, we compare the signature and the length
- * with the values that krtld stored in the module structure. We log an
- * error message in case of a failure.
+ * Returns 0, if no verification is needed. Returns 1, if
+ * verification is needed. Returns -1, if there is an
+ * error.
  */
 int
-kcf_verify_signature(kcf_provider_desc_t *pd)
+kcf_need_signature_verification(kcf_provider_desc_t *pd)
 {
-	int rv;
-	int error = CRYPTO_MODVERIFICATION_FAILED;
-	door_arg_t darg;
-	kcf_door_arg_t *kda;
-	char *filename;
 	struct module *mp;
 	struct modctl *mctlp = pd->pd_mctlp;
 	crypto_ops_t *prov_ops = pd->pd_ops_vector;
 
-	/*
-	 * mctlp->mod_filename does not give us the full pathname.
-	 * So, we have to access the module structure to get it.
-	 */
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+		return (0);
+
 	if (mctlp == NULL || mctlp->mod_mp == NULL)
-		return (error);
+		return (-1);
 
 	mp = (struct module *)mctlp->mod_mp;
-	filename = mp->filename;
-
-	KCF_FRMWRK_DEBUG(2, ("Verifying module: %s\n", filename));
 
 	/*
 	 * Check if this provider needs to be verified. We always verify
@@ -202,22 +183,114 @@ kcf_verify_signature(kcf_provider_desc_t *pd)
 	 * See if this module has a proper signature section.
 	 */
 	if (mp->sigdata == NULL) {
-		return (error);
+		return (-1);
+	}
+
+	mutex_enter(&pd->pd_lock);
+	pd->pd_state = KCF_PROV_UNVERIFIED;
+	mutex_exit(&pd->pd_lock);
+
+	return (1);
+}
+
+/*
+ * Do the signature verification on the given module. This function can
+ * be called from user context or kernel context.
+ *
+ * We call kcfd with the full pathname of the module to be
+ * verified. kcfd will return success/restricted/fail, signature length
+ * and the actual signature in the ELF section of the module. If kcfd
+ * returns success or restricted, we compare the signature and the length
+ * with the values that krtld stored in the module structure. We log an
+ * error message in case of a failure.
+ *
+ * The provider state is changed to KCF_PROV_READY on success.
+ */
+void
+kcf_verify_signature(void *arg)
+{
+	int rv;
+	int error = CRYPTO_MODVERIFICATION_FAILED;
+	door_arg_t darg;
+	door_handle_t ldh;
+	kcf_door_arg_t *kda;
+	char *filename;
+	kcf_provider_desc_t *pd = arg;
+	struct module *mp;
+	boolean_t do_notify = B_FALSE;
+	boolean_t modhold_done = B_FALSE;
+	struct modctl *mctlp = pd->pd_mctlp;
+
+	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
+	ASSERT(mctlp != NULL);
+
+	for (;;) {
+		mutex_enter(&pd->pd_lock);
+		/* No need to do verification */
+		if (pd->pd_state != KCF_PROV_UNVERIFIED) {
+			mutex_exit(&pd->pd_lock);
+			goto out;
+		}
+		mutex_exit(&pd->pd_lock);
+
+		mutex_enter(&mod_lock);
+		if (mctlp->mod_mp == NULL) {
+			mutex_exit(&mod_lock);
+			goto out;
+		}
+
+		/*
+		 * This check is needed since a software provider can call
+		 * us directly from the _init->crypto_register_provider path.
+		 */
+		if (pd->pd_prov_type == CRYPTO_SW_PROVIDER &&
+		    mctlp->mod_inprogress_thread == curthread) {
+			mutex_exit(&mod_lock);
+			modhold_done = B_FALSE;
+			break;
+		}
+
+		/*
+		 * We could be in a race with the register thread or
+		 * the unregister thread. So, retry if register or
+		 * unregister is in progress. Note that we can't do
+		 * mod_hold_by_modctl without this check since that
+		 * could result in a deadlock with the other threads.
+		 */
+		if (mctlp->mod_busy) {
+			mutex_exit(&mod_lock);
+			/* delay for 10ms and try again */
+			delay(drv_usectohz(10000));
+			continue;
+		}
+
+		(void) mod_hold_by_modctl(mctlp,
+		    MOD_WAIT_FOREVER | MOD_LOCK_HELD);
+		mutex_exit(&mod_lock);
+		modhold_done = B_TRUE;
+		break;
 	}
 
 	/*
 	 * Check if the door is set up yet. This will be set when kcfd
-	 * comes up. If not, we return -1 to indicate unverified. This
-	 * will trigger the verification of the module later when kcfd
-	 * is up. This is safe as we NEVER use a provider that has not
-	 * been verified yet (assuming the provider needs to be verified).
+	 * comes up. If not, we return and leave the provider state unchanged
+	 * at KCF_PROV_UNVERIFIED. This will trigger the verification of
+	 * the module later when kcfd is up. This is safe as we NEVER use
+	 * a provider that has not been verified yet.
 	 */
 	mutex_enter(&kcf_dh_lock);
 	if (kcf_dh == NULL) {
 		mutex_exit(&kcf_dh_lock);
-		return (-1);
+		goto out;
 	}
+
+	ldh = kcf_dh;
+	door_ki_hold(ldh);
 	mutex_exit(&kcf_dh_lock);
+
+	mp = (struct module *)mctlp->mod_mp;
+	filename = mp->filename;
+	KCF_FRMWRK_DEBUG(2, ("Verifying module: %s\n", filename));
 
 	kda = kmem_alloc(sizeof (kcf_door_arg_t) + mp->sigsize, KM_SLEEP);
 	kda->da_version = KCF_KCFD_VERSION1;
@@ -234,7 +307,7 @@ kcf_verify_signature(kcf_provider_desc_t *pd)
 	/*
 	 * Make door upcall. door_ki_upcall() checks for validity of the handle.
 	 */
-	rv = door_ki_upcall(kcf_dh, &darg);
+	rv = door_ki_upcall(ldh, &darg);
 
 	if (rv == 0) {
 		kcf_door_arg_t *rkda =  (kcf_door_arg_t *)darg.rbuf;
@@ -249,12 +322,12 @@ kcf_verify_signature(kcf_provider_desc_t *pd)
 
 		/* Check kcfd result and compare against module struct fields */
 		if (((rkda->da_u.result.status != ELFSIGN_SUCCESS) &&
-			(rkda->da_u.result.status != ELFSIGN_RESTRICTED)) ||
+		    (rkda->da_u.result.status != ELFSIGN_RESTRICTED)) ||
 		    !(rkda->da_u.result.siglen == mp->sigsize) ||
 		    (bcmp(rkda->da_u.result.signature, mp->sigdata,
-			mp->sigsize))) {
+		    mp->sigsize))) {
 			cmn_err(CE_WARN, "Module verification failed for %s.",
-			    mp->filename);
+			    filename);
 		} else {
 			error = 0;
 		}
@@ -268,12 +341,35 @@ kcf_verify_signature(kcf_provider_desc_t *pd)
 			kmem_free(rkda, darg.rsize);
 
 	} else {
-		cmn_err(CE_WARN, "Module verification failed for %s.",
-		    mp->filename);
+		cmn_err(CE_WARN, "Module verification door upcall failed "
+		    "for %s. errno = %d", filename, rv);
 	}
 
 	kmem_free(kda, sizeof (kcf_door_arg_t) + mp->sigsize);
-	return (error);
+	door_ki_rele(ldh);
+
+	mutex_enter(&pd->pd_lock);
+	/* change state only if the original state is unchanged */
+	if (pd->pd_state == KCF_PROV_UNVERIFIED) {
+		if (error == 0) {
+			pd->pd_state = KCF_PROV_READY;
+			do_notify = B_TRUE;
+		} else {
+			pd->pd_state = KCF_PROV_VERIFICATION_FAILED;
+		}
+	}
+	mutex_exit(&pd->pd_lock);
+
+	if (do_notify) {
+		/* Dispatch events for this new provider */
+		kcf_do_notify(pd, B_TRUE);
+	}
+
+out:
+	if (modhold_done)
+		mod_release_mod(mctlp);
+	KCF_PROV_IREFRELE(pd);
+	KCF_PROV_REFRELE(pd);
 }
 
 /* called from the CRYPTO_LOAD_DOOR ioctl */

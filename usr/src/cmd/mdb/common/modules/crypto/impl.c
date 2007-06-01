@@ -68,6 +68,7 @@ static const char *prov_states[] = {
 	"none",
 	"KCF_PROV_ALLOCATED",
 	"KCF_PROV_UNVERIFIED",
+	"KCF_PROV_VERIFICATION_FAILED",
 	"KCF_PROV_READY",
 	"KCF_PROV_BUSY",
 	"KCF_PROV_FAILED",

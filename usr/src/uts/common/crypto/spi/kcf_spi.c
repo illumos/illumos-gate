@@ -57,6 +57,8 @@ static void process_logical_providers(crypto_provider_info_t *,
     kcf_provider_desc_t *);
 static int init_prov_mechs(crypto_provider_info_t *, kcf_provider_desc_t *);
 static int kcf_prov_kstat_update(kstat_t *, int);
+static void undo_register_provider_extra(kcf_provider_desc_t *);
+static void delete_kstat(kcf_provider_desc_t *);
 
 static kcf_prov_stats_t kcf_stats_ks_data_template = {
 	{ "kcf_ops_total",		KSTAT_DATA_UINT64 },
@@ -119,12 +121,10 @@ int
 crypto_register_provider(crypto_provider_info_t *info,
     crypto_kcf_provider_handle_t *handle)
 {
-	int i;
-	int vstatus = 0;
+	int need_verify;
 	struct modctl *mcp;
 	char *name;
 	char ks_name[KSTAT_STRLEN];
-	crypto_notify_event_change_t ec;
 
 	kcf_provider_desc_t *prov_desc = NULL;
 	int ret = CRYPTO_ARGUMENTS_BAD;
@@ -237,13 +237,10 @@ crypto_register_provider(crypto_provider_info_t *info,
 		goto bail;
 	}
 
-	if (info->pi_provider_type != CRYPTO_LOGICAL_PROVIDER) {
-		if ((vstatus = kcf_verify_signature(prov_desc)) ==
-		    CRYPTO_MODVERIFICATION_FAILED) {
-			undo_register_provider(prov_desc, B_TRUE);
-			ret = CRYPTO_MODVERIFICATION_FAILED;
-			goto bail;
-		}
+	if ((need_verify = kcf_need_signature_verification(prov_desc)) == -1) {
+		undo_register_provider(prov_desc, B_TRUE);
+		ret = CRYPTO_MODVERIFICATION_FAILED;
+		goto bail;
 	}
 
 	/*
@@ -322,46 +319,38 @@ crypto_register_provider(crypto_provider_info_t *info,
 	if (prov_desc->pd_prov_type == CRYPTO_HW_PROVIDER)
 		process_logical_providers(info, prov_desc);
 
-	/*
-	 * Inform interested clients of the mechanisms becoming
-	 * available. We skip this for logical providers as they
-	 * do not affect mechanisms.
-	 */
-	if (prov_desc->pd_prov_type != CRYPTO_LOGICAL_PROVIDER) {
-		ec.ec_provider_type = prov_desc->pd_prov_type;
-		ec.ec_change = CRYPTO_MECH_ADDED;
-		for (i = 0; i < prov_desc->pd_mech_list_count; i++) {
-			/* Skip any mechanisms not allowed by the policy */
-			if (is_mech_disabled(prov_desc,
-			    prov_desc->pd_mechanisms[i].cm_mech_name))
-				continue;
+	if (need_verify == 1) {
+		/* kcf_verify_signature routine will release these holds */
+		KCF_PROV_REFHOLD(prov_desc);
+		KCF_PROV_IREFHOLD(prov_desc);
 
-			(void) strncpy(ec.ec_mech_name,
-			    prov_desc->pd_mechanisms[i].cm_mech_name,
-			    CRYPTO_MAX_MECH_NAME);
-			kcf_walk_ntfylist(CRYPTO_EVENT_MECHS_CHANGED, &ec);
+		if (prov_desc->pd_prov_type == CRYPTO_HW_PROVIDER) {
+			/*
+			 * It is not safe to make the door upcall to kcfd from
+			 * this context since the kcfd thread could reenter
+			 * devfs. So, we dispatch a taskq job to do the
+			 * verification and return to the provider.
+			 */
+			(void) taskq_dispatch(system_taskq,
+			    kcf_verify_signature, (void *)prov_desc, TQ_SLEEP);
+		} else if (prov_desc->pd_prov_type == CRYPTO_SW_PROVIDER) {
+			kcf_verify_signature(prov_desc);
+			if (prov_desc->pd_state ==
+			    KCF_PROV_VERIFICATION_FAILED) {
+				undo_register_provider_extra(prov_desc);
+				ret = CRYPTO_MODVERIFICATION_FAILED;
+				goto bail;
+			}
 		}
-
+	} else {
+		mutex_enter(&prov_desc->pd_lock);
+		prov_desc->pd_state = KCF_PROV_READY;
+		mutex_exit(&prov_desc->pd_lock);
+		kcf_do_notify(prov_desc, B_TRUE);
 	}
 
-	/*
-	 * Inform interested clients of the new provider. In case of a
-	 * logical provider, we need to notify the event only
-	 * for the logical provider and not for the underlying
-	 * providers which are known by pi_logical_provider_count > 0.
-	 */
-	if (prov_desc->pd_prov_type == CRYPTO_LOGICAL_PROVIDER ||
-	    info->pi_logical_provider_count == 0)
-		kcf_walk_ntfylist(CRYPTO_EVENT_PROVIDER_REGISTERED, prov_desc);
-
-	mutex_enter(&prov_desc->pd_lock);
-	prov_desc->pd_state = (vstatus == 0) ? KCF_PROV_READY :
-	    KCF_PROV_UNVERIFIED;
-	mutex_exit(&prov_desc->pd_lock);
-
 	*handle = prov_desc->pd_kcf_prov_handle;
-	KCF_PROV_REFRELE(prov_desc);
-	return (CRYPTO_SUCCESS);
+	ret = CRYPTO_SUCCESS;
 
 bail:
 	KCF_PROV_REFRELE(prov_desc);
@@ -376,10 +365,8 @@ bail:
 int
 crypto_unregister_provider(crypto_kcf_provider_handle_t handle)
 {
-	int i;
 	uint_t mech_idx;
 	kcf_provider_desc_t *desc;
-	crypto_notify_event_change_t ec;
 	kcf_prov_state_t saved_state;
 
 	/* lookup provider descriptor */
@@ -453,16 +440,7 @@ crypto_unregister_provider(crypto_kcf_provider_handle_t handle)
 		return (CRYPTO_UNKNOWN_PROVIDER);
 	}
 
-	/* destroy the kstat created for this provider */
-	if (desc->pd_kstat != NULL) {
-		kcf_provider_desc_t *kspd = desc->pd_kstat->ks_private;
-
-		/* release reference held by desc->pd_kstat->ks_private */
-		ASSERT(desc == kspd);
-		kstat_delete(kspd->pd_kstat);
-		KCF_PROV_REFRELE(kspd);
-		KCF_PROV_IREFRELE(kspd);
-	}
+	delete_kstat(desc);
 
 	if (desc->pd_prov_type == CRYPTO_SW_PROVIDER) {
 		/* Release reference held by kcf_prov_tab_lookup(). */
@@ -486,37 +464,7 @@ crypto_unregister_provider(crypto_kcf_provider_handle_t handle)
 		mutex_exit(&desc->pd_lock);
 	}
 
-	/*
-	 * Inform interested clients of the mechanisms becoming
-	 * unavailable. We skip this for logical providers as they
-	 * do not affect mechanisms.
-	 */
-	if (desc->pd_prov_type != CRYPTO_LOGICAL_PROVIDER) {
-		ec.ec_provider_type = desc->pd_prov_type;
-		ec.ec_change = CRYPTO_MECH_REMOVED;
-		for (i = 0; i < desc->pd_mech_list_count; i++) {
-			/* Skip any mechanisms not allowed by the policy */
-			if (is_mech_disabled(desc,
-			    desc->pd_mechanisms[i].cm_mech_name))
-				continue;
-
-			(void) strncpy(ec.ec_mech_name,
-			    desc->pd_mechanisms[i].cm_mech_name,
-			    CRYPTO_MAX_MECH_NAME);
-			kcf_walk_ntfylist(CRYPTO_EVENT_MECHS_CHANGED, &ec);
-		}
-
-	}
-
-	/*
-	 * Inform interested clients about the departing provider.
-	 * In case of a logical provider, we need to notify the event only
-	 * for the logical provider and not for the underlying
-	 * providers which are known by the KCF_LPROV_MEMBER bit.
-	 */
-	if (desc->pd_prov_type == CRYPTO_LOGICAL_PROVIDER ||
-	    (desc->pd_flags & KCF_LPROV_MEMBER) == 0)
-		kcf_walk_ntfylist(CRYPTO_EVENT_PROVIDER_UNREGISTERED, desc);
+	kcf_do_notify(desc, B_FALSE);
 
 	if (desc->pd_prov_type == CRYPTO_SW_PROVIDER) {
 		/*
@@ -563,6 +511,9 @@ crypto_provider_notification(crypto_kcf_provider_handle_t handle, uint_t state)
 		return;
 
 	mutex_enter(&pd->pd_lock);
+
+	if (pd->pd_state <= KCF_PROV_VERIFICATION_FAILED)
+		goto out;
 
 	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
 		cmn_err(CE_WARN, "crypto_provider_notification: "
@@ -863,6 +814,13 @@ undo_register_provider(kcf_provider_desc_t *desc, boolean_t remove_prov)
 		(void) kcf_prov_tab_rem_provider(desc->pd_prov_id);
 }
 
+static void
+undo_register_provider_extra(kcf_provider_desc_t *desc)
+{
+	delete_kstat(desc);
+	undo_register_provider(desc, B_TRUE);
+}
+
 /*
  * Utility routine called from crypto_load_soft_disabled(). Callers
  * should have done a prior undo_register_provider().
@@ -991,4 +949,68 @@ remove_provider(kcf_provider_desc_t *pp)
 	}
 	pp->pd_provider_list = NULL;
 	mutex_exit(&pp->pd_lock);
+}
+
+/*
+ * Dispatch events as needed for a provider. is_added flag tells
+ * whether the provider is registering or unregistering.
+ */
+void
+kcf_do_notify(kcf_provider_desc_t *prov_desc, boolean_t is_added)
+{
+	int i;
+	crypto_notify_event_change_t ec;
+
+	ASSERT(prov_desc->pd_state > KCF_PROV_VERIFICATION_FAILED);
+
+	/*
+	 * Inform interested clients of the mechanisms becoming
+	 * available/unavailable. We skip this for logical providers
+	 * as they do not affect mechanisms.
+	 */
+	if (prov_desc->pd_prov_type != CRYPTO_LOGICAL_PROVIDER) {
+		ec.ec_provider_type = prov_desc->pd_prov_type;
+		ec.ec_change = is_added ? CRYPTO_MECH_ADDED :
+		    CRYPTO_MECH_REMOVED;
+		for (i = 0; i < prov_desc->pd_mech_list_count; i++) {
+			/* Skip any mechanisms not allowed by the policy */
+			if (is_mech_disabled(prov_desc,
+			    prov_desc->pd_mechanisms[i].cm_mech_name))
+				continue;
+
+			(void) strncpy(ec.ec_mech_name,
+			    prov_desc->pd_mechanisms[i].cm_mech_name,
+			    CRYPTO_MAX_MECH_NAME);
+			kcf_walk_ntfylist(CRYPTO_EVENT_MECHS_CHANGED, &ec);
+		}
+
+	}
+
+	/*
+	 * Inform interested clients about the new or departing provider.
+	 * In case of a logical provider, we need to notify the event only
+	 * for the logical provider and not for the underlying
+	 * providers which are known by the KCF_LPROV_MEMBER bit.
+	 */
+	if (prov_desc->pd_prov_type == CRYPTO_LOGICAL_PROVIDER ||
+	    (prov_desc->pd_flags & KCF_LPROV_MEMBER) == 0) {
+		kcf_walk_ntfylist(is_added ? CRYPTO_EVENT_PROVIDER_REGISTERED :
+		    CRYPTO_EVENT_PROVIDER_UNREGISTERED, prov_desc);
+	}
+}
+
+static void
+delete_kstat(kcf_provider_desc_t *desc)
+{
+	/* destroy the kstat created for this provider */
+	if (desc->pd_kstat != NULL) {
+		kcf_provider_desc_t *kspd = desc->pd_kstat->ks_private;
+
+		/* release reference held by desc->pd_kstat->ks_private */
+		ASSERT(desc == kspd);
+		kstat_delete(kspd->pd_kstat);
+		desc->pd_kstat = NULL;
+		KCF_PROV_REFRELE(kspd);
+		KCF_PROV_IREFRELE(kspd);
+	}
 }

@@ -95,7 +95,8 @@ kcf_prov_tab_add_provider(kcf_provider_desc_t *prov_desc)
 	mutex_enter(&prov_tab_mutex);
 
 	/* find free slot in providers table */
-	for (i = 0; i < KCF_MAX_PROVIDERS && prov_tab[i] != NULL; i++);
+	for (i = 0; i < KCF_MAX_PROVIDERS && prov_tab[i] != NULL; i++)
+		;
 	if (i == KCF_MAX_PROVIDERS) {
 		/* ran out of providers entries */
 		mutex_exit(&prov_tab_mutex);
@@ -119,7 +120,7 @@ kcf_prov_tab_add_provider(kcf_provider_desc_t *prov_desc)
 	 * provider id.
 	 */
 	prov_desc->pd_kcf_prov_handle =
-		(crypto_kcf_provider_handle_t)prov_desc->pd_prov_id;
+	    (crypto_kcf_provider_handle_t)prov_desc->pd_prov_id;
 
 #if DEBUG
 	if (kcf_frmwrk_debug >= 1)
@@ -849,7 +850,7 @@ kcf_prov_tab_dump(void)
 void
 verify_unverified_providers()
 {
-	int i, rv;
+	int i;
 	kcf_provider_desc_t *pd;
 	boolean_t need_verify;
 
@@ -870,31 +871,21 @@ verify_unverified_providers()
 		if (!need_verify)
 			continue;
 
-		if ((rv = kcf_verify_signature(pd)) ==
-		    CRYPTO_MODVERIFICATION_FAILED) {
-			/*
-			 * We need to drop this lock, since it is
-			 * acquired by crypto_unregister_provider().
-			 * This is safe, as any providers that are
-			 * added to the table after we dropped the
-			 * lock *will see* a non NULL
-			 * kcf_dh and hence would have been
-			 * verified already.
-			 */
-			mutex_exit(&prov_tab_mutex);
-			(void) crypto_unregister_provider(pd->pd_prov_id);
-			mutex_enter(&prov_tab_mutex);
-		} else {
-			/*
-			 * We are in the context of the kcfd thread doing
-			 * the CRYPTO_LOAD_DOOR ioctl. So, we have a valid
-			 * door handle and should not get -1 (unverified).
-			 */
-			ASSERT(rv == 0);
-			mutex_enter(&pd->pd_lock);
-			pd->pd_state =  KCF_PROV_READY;
-			mutex_exit(&pd->pd_lock);
-		}
+		KCF_PROV_REFHOLD(pd);
+		KCF_PROV_IREFHOLD(pd);
+
+		/*
+		 * We need to drop this lock, since it could be
+		 * acquired by kcf_verify_signature().
+		 * This is safe, as any providers that are
+		 * added to the table after we dropped the
+		 * lock *will see* a non NULL kcf_dh and hence
+		 * would have been verified by other means.
+		 */
+		mutex_exit(&prov_tab_mutex);
+		/* This routine will release the above holds */
+		kcf_verify_signature(pd);
+		mutex_enter(&prov_tab_mutex);
 	}
 
 	mutex_exit(&prov_tab_mutex);
