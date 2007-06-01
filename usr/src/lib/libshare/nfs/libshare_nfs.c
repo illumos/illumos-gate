@@ -688,14 +688,19 @@ nfs_parse_legacy_options(sa_group_t group, char *options)
 								value = "true";
 							}
 						}
-						prop = sa_create_property(
-						    token, value);
-						ret =
-						    sa_add_property(optionset,
-						    prop);
-						if (ret != SA_OK)
-							break;
 					}
+					/*
+					 * In all cases, create the
+					 * property specified. If the
+					 * value was NULL, the default
+					 * value will have been
+					 * substituted.
+					 */
+					prop = sa_create_property(token, value);
+					ret =  sa_add_property(optionset, prop);
+					if (ret != SA_OK)
+						break;
+
 					if (!iszfs) {
 						ret = sa_commit_properties(
 						    optionset, !persist);
