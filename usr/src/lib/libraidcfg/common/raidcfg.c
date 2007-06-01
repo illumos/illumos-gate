@@ -161,7 +161,6 @@ static int intcompare(const void *p1, const void *p2);
 static uint64_t raid_space_noalign(raid_obj_tab_t *, uint32_t, int,
 	raid_obj_id_t *, arraypart_attr_t *);
 static int raid_dev_config(cfga_cmd_t, uint32_t, uint32_t, uint8_t);
-static int raid_dev_unmounted(uint32_t, uint32_t);
 static int raid_handle_init();
 static void raid_handle_fini();
 static raid_obj_handle_t raid_handle_new(raid_obj_type_id_t);
@@ -369,7 +368,7 @@ raidcfg_errstr(int err_code)
 			"Illegal cache-write policy.\n");
 		break;
 	case	ERR_ARRAY_IN_USE:
-		ret_val = dgettext(TEXT_DOMAIN, "Array in use.\n");
+		ret_val = dgettext(TEXT_DOMAIN, "Array or disk in use.\n");
 		break;
 	case	ERR_ARRAY_TASK:
 		ret_val = dgettext(TEXT_DOMAIN, "Array has background task.\n");
@@ -415,8 +414,7 @@ raidcfg_errstr(int err_code)
 			"Operation is not implemented.\n");
 		break;
 	case	ERR_OP_FAILED:
-		ret_val = dgettext(TEXT_DOMAIN,
-			"Operation in plugin failed.\n");
+		ret_val = dgettext(TEXT_DOMAIN, "Operation failed.\n");
 		break;
 	case	ERR_DEVICE_NOENT:
 		ret_val = dgettext(TEXT_DOMAIN, "Device not found.\n");
@@ -1332,28 +1330,6 @@ raid_dev_config(cfga_cmd_t cmd, uint32_t controller_id, uint32_t target_id,
 	}
 
 	free(ap_id);
-	return (SUCCESS);
-}
-
-static int
-raid_dev_unmounted(uint32_t controller_id, uint32_t target_id)
-{
-	struct mnttab mt;
-	FILE *f;
-	char path[MAX_PATH_LEN];
-
-	(void) snprintf(path, MAX_PATH_LEN, "c%dt%dd0",
-		controller_id, target_id);
-
-	f = fopen(MNTTAB, "r");
-
-	while (getmntent(f, &mt) != EOF)
-		if (strstr(mt.mnt_special, path) != NULL) {
-			(void) fclose(f);
-			return (ERR_ARRAY_IN_USE);
-		}
-
-	(void) fclose(f);
 	return (SUCCESS);
 }
 
@@ -3289,13 +3265,6 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 			return (ERR_DISK_SEG_AMOUNT);
 		}
 
-		/* Each disk should be un-used */
-		if ((ret = raid_dev_unmounted(controller_attr->controller_id,
-		    disk_attr->disk_id)) != SUCCESS) {
-			free(arraypart_attrs);
-			return (ret);
-		}
-
 		/* Check if controller is a hostraid controller */
 		if (controller_attr->capability & RAID_CAP_DISK_TRANS) {
 			/*
@@ -3531,10 +3500,6 @@ obj_array_delete(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 	fd = raid_obj_get_fd(raid_tab, controller_obj_id);
 	if ((raid_lib == NULL) || (fd == 0))
 		return (ERR_DRIVER_CLOSED);
-
-	if ((ret = raid_dev_unmounted(controller_attr->controller_id,
-		array_attr->array_id)) != SUCCESS)
-		return (ret);
 
 	/* change minor nodes state for disks */
 	if (controller_attr->capability & RAID_CAP_DISK_TRANS) {
