@@ -1497,7 +1497,7 @@ audiohd_alloc_dma_mem(audiohd_state_t *statep, audiohd_dma_t *pdma,
 
 	if (ddi_dma_mem_alloc(pdma->ad_dmahdl, memsize, &hda_dev_accattr,
 	    dma_flags & (DDI_DMA_CONSISTENT | DDI_DMA_STREAMING),
-		DDI_DMA_SLEEP, NULL, (caddr_t *)&pdma->ad_vaddr,
+	    DDI_DMA_SLEEP, NULL, (caddr_t *)&pdma->ad_vaddr,
 	    &pdma->ad_real_sz, &pdma->ad_acchdl) != DDI_SUCCESS) {
 		audio_sup_log(ahandle, CE_WARN,
 		    "!map_regs() ddi_dma_mem_alloc failed");
@@ -1890,7 +1890,7 @@ audiohd_init_codec(audiohd_state_t *statep)
 {
 	int		ret;
 
-	ret = AUDIOHD_CODEC_INIT_CODEC(statep)
+	ret = AUDIOHD_CODEC_INIT_CODEC(statep);
 
 	return (ret);
 }
@@ -3005,7 +3005,7 @@ audiohd_alc880_set_port(audiohd_state_t *statep, int dir, int port)
 				    old_index << AUDIOHDC_AMP_SET_INDEX_OFFSET;
 				(void) audioha_codec_4bit_verb_get(statep,
 				    caddr, AUDIOHDC_NID(0x23),
-					AUDIOHDC_VERB_SET_AMP_MUTE, val);
+				    AUDIOHDC_VERB_SET_AMP_MUTE, val);
 			}
 		}
 
@@ -3247,10 +3247,10 @@ audiohd_stac_init_codec(audiohd_state_t *statep)
 	/* set master volume to max */
 	(void) audioha_codec_4bit_verb_get(statep, caddr,
 	    AUDIOHDC_NID(0x0B), AUDIOHDC_VERB_SET_AMP_MUTE,
-		AUDIOHDC_AMP_ROUT_MAX);
+	    AUDIOHDC_AMP_ROUT_MAX);
 	(void) audioha_codec_4bit_verb_get(statep, caddr,
 	    AUDIOHDC_NID(0x0B), AUDIOHDC_VERB_SET_AMP_MUTE,
-		AUDIOHDC_AMP_LOUT_MAX);
+	    AUDIOHDC_AMP_LOUT_MAX);
 
 	/*
 	 * Up to now, we initialized playback paths. we begin
@@ -3271,10 +3271,10 @@ audiohd_stac_init_codec(audiohd_state_t *statep)
 	/* set MUX volume to max */
 	(void) audioha_codec_4bit_verb_get(statep, caddr,
 	    AUDIOHDC_NID(0x0C), AUDIOHDC_VERB_SET_AMP_MUTE,
-		AUDIOHDC_AMP_ROUT_MAX);
+	    AUDIOHDC_AMP_ROUT_MAX);
 	(void) audioha_codec_4bit_verb_get(statep, caddr,
 	    AUDIOHDC_NID(0x0C), AUDIOHDC_VERB_SET_AMP_MUTE,
-		AUDIOHDC_AMP_LOUT_MAX);
+	    AUDIOHDC_AMP_LOUT_MAX);
 
 	/* MIC */
 	AUDIOHD_NODE_ENABLE_PIN_IN(statep, caddr, AUDIOHDC_NID(0x10));
@@ -3505,24 +3505,17 @@ audiohd_stac_mute_outputs(audiohd_state_t *statep, boolean_t mute)
 static int
 audiohd_stac_set_monitor_gain(audiohd_state_t *statep, int gain)
 {
-	uint_t		caddr = statep->hda_codec->hc_addr;
-	uint_t		val;
-
 	ASSERT((statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200) ||
 	    (statep->hda_codec->hc_vid == AUDIOHD_VID_STAC9200D));
 
 	/*
-	 * STAC9200(D) has no specific hardware/node to control
-	 * monitor gain, so we just adjust output volume
+	 * In STAC9200, there is a critical node (NID=7), which is
+	 * a MUX instead of mixer. All output streams and loopback
+	 * steams of input-ouput must walk through this node. As a
+	 * result, STAC9200(D) cannot perform this task: do playback
+	 * while spy the input streams of MIC/Line-in. For simplifying,
+	 * we just ignore this request.
 	 */
-	val = AUDIOHDC_AMP_SET_OUTPUT | AUDIOHDC_AMP_SET_LEFT | gain;
-	(void) audioha_codec_4bit_verb_get(statep, caddr,
-	    AUDIOHDC_NID(0xB), AUDIOHDC_VERB_SET_AMP_MUTE, val);
-
-	val = AUDIOHDC_AMP_SET_OUTPUT | AUDIOHDC_AMP_SET_RIGHT | gain;
-	(void) audioha_codec_4bit_verb_get(statep, caddr,
-	    AUDIOHDC_NID(0xB), AUDIOHDC_VERB_SET_AMP_MUTE, val);
-
 	statep->hda_monitor_gain = gain;
 
 	return (AUDIO_SUCCESS);

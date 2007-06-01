@@ -41,10 +41,10 @@ update_driver() {
 	aliases=$2
 	for alias in ${aliases}
 	do
-		egrep "^${driver}[  ]+${alias}" ${BASEDIR}/etc/driver_aliases>/dev/null 2>&1
+		egrep "^${driver}[ 	]+${alias}" ${BASEDIR}/etc/driver_aliases>/dev/null 2>&1
 		if [ $? -ne 0 ]
 		then
-			update_drv -b "${BASEDIR}" -a -i "${alias}" ${driver}
+			echo "${driver} ${alias}" >> ${BASEDIR}/etc/driver_aliases
 		fi
 	done
 }
