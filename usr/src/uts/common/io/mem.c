@@ -206,7 +206,7 @@ mmchpoll(dev_t dev, short events, int anyyet, short *reventsp,
 	case M_KMEM:
 	case M_ALLKMEM:
 		*reventsp = events & (POLLIN | POLLOUT | POLLPRI | POLLRDNORM |
-			POLLWRNORM | POLLRDBAND | POLLWRBAND);
+		    POLLWRNORM | POLLRDBAND | POLLWRBAND);
 		/*
 		 * A non NULL pollhead pointer should be returned in case
 		 * user polls for 0 events.
@@ -588,7 +588,7 @@ mmioctl_page_fmri_retire(int cmd, intptr_t data)
 	if ((err = mm_read_mem_page(data, &mpage)) < 0)
 		return (err);
 
-	if ((err = mm_get_mem_fmri(&mpage, &nvl)) < 0)
+	if ((err = mm_get_mem_fmri(&mpage, &nvl)) != 0)
 		return (err);
 
 	if ((err = mm_get_paddr(nvl, &pa)) != 0) {
@@ -850,7 +850,7 @@ mmsegmap(dev_t dev, off_t off, struct as *as, caddr_t *addrp, off_t len,
 		 * since this is a "clone" object that doesn't yet exist.
 		 */
 		map_addr(addrp, len, (offset_t)off,
-				(minor == M_MEM) || (minor == M_KMEM), flags);
+		    (minor == M_MEM) || (minor == M_KMEM), flags);
 
 		if (*addrp == NULL) {
 			as_rangeunlock(as);
