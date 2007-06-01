@@ -699,9 +699,11 @@ do_sysfile_cmd(struct _buf *file, const char *cmd)
 				}
 				*cp++ = (char)ch;
 			}
-			*cp = ':';
-			if (isnewline(ch))
+			*cp++ = ':';
+			if (isnewline(ch)) {
+				cp--;
 				(void) kobj_ungetc(file);
+			}
 		}
 		(void) kobj_ungetc(file);
 		*cp  = '\0';
