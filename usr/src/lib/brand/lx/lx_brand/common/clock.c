@@ -20,13 +20,14 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
+#include <string.h>
 #include <time.h>
 #include <sys/lx_misc.h>
 
@@ -48,37 +49,68 @@ static int ltos_clock[] = {
 int
 lx_clock_gettime(int clock, struct timespec *tp)
 {
-	if (clock < 0 || clock > LX_CLOCK_MAX)
-		return (EINVAL);
+	struct timespec ts;
 
-	return (clock_gettime(ltos_clock[clock], tp));
+	if (clock < 0 || clock > LX_CLOCK_MAX)
+		return (-EINVAL);
+
+	if (clock_gettime(ltos_clock[clock], &ts) < 0)
+		return (-errno);
+
+	return ((uucopy(&ts, tp, sizeof (struct timespec)) < 0) ? -EFAULT : 0);
 }
 
 int
 lx_clock_settime(int clock, struct timespec *tp)
 {
-	if (clock < 0 || clock > LX_CLOCK_MAX)
-		return (EINVAL);
+	struct timespec ts;
 
-	return (clock_settime(ltos_clock[clock], tp));
+	if (clock < 0 || clock > LX_CLOCK_MAX)
+		return (-EINVAL);
+
+	if (uucopy(tp, &ts, sizeof (struct timespec)) < 0)
+		return (-EFAULT);
+
+	return ((clock_settime(ltos_clock[clock], &ts) < 0) ? -errno : 0);
 }
 
 int
 lx_clock_getres(int clock, struct timespec *tp)
 {
-	if (clock < 0 || clock > LX_CLOCK_MAX)
-		return (EINVAL);
+	struct timespec ts;
 
-	return (clock_getres(ltos_clock[clock], tp));
+	if (clock < 0 || clock > LX_CLOCK_MAX)
+		return (-EINVAL);
+
+	if (clock_getres(ltos_clock[clock], &ts) < 0)
+		return (-errno);
+
+	return ((uucopy(&ts, tp, sizeof (struct timespec)) < 0) ? -EFAULT : 0);
 }
 
 int
 lx_clock_nanosleep(int clock, int flags, struct timespec *rqtp,
     struct timespec *rmtp)
 {
-	if (clock < 0 || clock > LX_CLOCK_MAX)
-		return (EINVAL);
+	struct timespec rqt, rmt;
 
-	/* the TIMER_ABSTIME flag is the same on Linux */
-	return (clock_nanosleep(ltos_clock[clock], flags, rqtp, rmtp));
+	if (clock < 0 || clock > LX_CLOCK_MAX)
+		return (-EINVAL);
+
+	if (uucopy(rqtp, &rqt, sizeof (struct timespec)) < 0)
+		return (-EFAULT);
+
+	/* the TIMER_RELTIME and TIMER_ABSTIME flags are the same on Linux */
+	if (clock_nanosleep(ltos_clock[clock], flags, &rqt, &rmt) < 0)
+		return (-errno);
+
+	/*
+	 * Only copy values to rmtp if the timer is TIMER_RELTIME and rmtp is
+	 * non-NULL.
+	 */
+	if (((flags & TIMER_RELTIME) == TIMER_RELTIME) && (rmtp != NULL) &&
+	    (uucopy(&rmt, rmtp, sizeof (struct timespec)) < 0))
+		return (-EFAULT);
+
+	return (0);
 }

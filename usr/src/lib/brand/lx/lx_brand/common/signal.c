@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -458,10 +458,15 @@ stol_fpstate(fpregset_t *fpr, lx_fpstate_t *lfpr)
 	 * These fields are all only significant for the first 16 bits.
 	 */
 	lfpr->cw &= 0xffff;		/* x87 control word */
-	lfpr->sw &= 0xffff;		/* x87 status word */
 	lfpr->tag &= 0xffff;		/* x87 tag word */
 	lfpr->cssel &= 0xffff;		/* cs selector */
 	lfpr->datasel &= 0xffff;	/* ds selector */
+
+	/*
+	 * Linux wants the x87 status word field to contain the value of the
+	 * x87 saved exception status word.
+	 */
+	lfpr->sw = lfpr->status & 0xffff;	/* x87 status word */
 
 	lfpr->mxcsr = fpsp->mxcsr;
 
@@ -490,6 +495,11 @@ ltos_fpstate(lx_fpstate_t *lfpr, fpregset_t *fpr)
 	 * The lx_fpstate_t and Solaris struct _fpstate are identical from the
 	 * beginning of the structure to the struct _fpstate "mxcsr" field, so
 	 * just bcopy() those entries.
+	 *
+	 * Note that we do NOT have to propogate changes the user may have made
+	 * to the "status" word back to the "sw" word, unlike the way we have
+	 * to deal with processing the ESP and UESP register values on return
+	 * from a signal handler.
 	 */
 	copy_len = (size_t)&(((struct _fpstate *)0)->mxcsr);
 	bcopy(lfpr, fpsp, copy_len);
@@ -894,7 +904,15 @@ lx_sigreturn(void)
 	 */
 	ucp = (ucontext_t *)(*(uint32_t *)sp);
 
-	/* general registers copy back as-is */
+	/*
+	 * General registers copy across as-is, except Linux expects that
+	 * changes made to uc_mcontext.gregs[ESP] will be reflected when the
+	 * interrupted thread resumes execution after the signal handler. To
+	 * emulate this behavior, we must modify uc_mcontext.gregs[UESP] to
+	 * match uc_mcontext.gregs[ESP] as Solaris will restore the UESP
+	 * value to ESP.
+	 */
+	lx_ossp->sigc.sc_esp_at_signal = lx_ossp->sigc.sc_esp;
 	bcopy(&lx_ossp->sigc, &ucp->uc_mcontext, sizeof (gregset_t));
 
 	/* copy back FP regs if present */
@@ -989,10 +1007,19 @@ lx_rt_sigreturn(void)
 	 */
 	ucp = (ucontext_t *)(*(uint32_t *)sp);
 
-	/* general registers copy back as-is */
 	lx_ucp = lx_ssp->ucp;
 
 	if (lx_ucp != NULL) {
+		/*
+		 * General registers copy across as-is, except Linux expects
+		 * that changes made to uc_mcontext.gregs[ESP] will be reflected
+		 * when the interrupted thread resumes execution after the
+		 * signal handler. To emulate this behavior, we must modify
+		 * uc_mcontext.gregs[UESP] to match uc_mcontext.gregs[ESP] as
+		 * Solaris will restore the UESP value to ESP.
+		 */
+		lx_ucp->uc_sigcontext.sc_esp_at_signal =
+		    lx_ucp->uc_sigcontext.sc_esp;
 		bcopy(&lx_ucp->uc_sigcontext, &ucp->uc_mcontext.gregs,
 		    sizeof (gregset_t));
 
@@ -1060,8 +1087,13 @@ lx_build_old_signal_frame(int lx_sig, siginfo_t *sip, void *p, void *sp)
 	lx_ossp->sigc.sc_mask = lx_sigset.__bits[0];
 	lx_ossp->sig_extra = lx_sigset.__bits[1];
 
-	/* general registers copy across as-is */
+	/*
+	 * General registers copy across as-is, except Linux expects that
+	 * uc_mcontext.gregs[ESP] == uc_mcontext.gregs[UESP] on receipt of a
+	 * signal.
+	 */
 	bcopy(&ucp->uc_mcontext, &lx_ossp->sigc, sizeof (gregset_t));
+	lx_ossp->sigc.sc_esp = lx_ossp->sigc.sc_esp_at_signal;
 
 	/*
 	 * cr2 contains the faulting address, and Linux only sets cr2 for a
@@ -1074,8 +1106,9 @@ lx_build_old_signal_frame(int lx_sig, siginfo_t *sip, void *p, void *sp)
 	if (ucp->uc_flags & UC_FPU) {
 		stol_fpstate(&ucp->uc_mcontext.fpregs, &lx_ossp->fpstate);
 		lx_ossp->sigc.sc_fpstate = &lx_ossp->fpstate;
-	} else
+	} else {
 		lx_ossp->sigc.sc_fpstate = NULL;
+	}
 
 	/*
 	 * Believe it or not, gdb wants to SEE the trampoline code on the
@@ -1128,8 +1161,13 @@ lx_build_signal_frame(int lx_sig, siginfo_t *sip, void *p, void *sp)
 	(void) stol_sigset(&ucp->uc_sigmask, &lx_ucp->uc_sigmask);
 	stol_stack(&ucp->uc_stack, &lx_ucp->uc_stack);
 
-	/* general registers copy across as-is */
+	/*
+	 * General registers copy across as-is, except Linux expects that
+	 * uc_mcontext.gregs[ESP] == uc_mcontext.gregs[UESP] on receipt of a
+	 * signal.
+	 */
 	bcopy(&ucp->uc_mcontext, &lx_ucp->uc_sigcontext, sizeof (gregset_t));
+	lx_ucp->uc_sigcontext.sc_esp = lx_ucp->uc_sigcontext.sc_esp_at_signal;
 
 	/*
 	 * cr2 contains the faulting address, which Linux only sets for a
