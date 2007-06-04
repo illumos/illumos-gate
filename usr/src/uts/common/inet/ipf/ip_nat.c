@@ -7,7 +7,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"$
 
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -167,7 +167,7 @@ static	void	nat_siocdelnat __P((ipnat_t *, ipnat_t **, int,
 static	INLINE	int nat_icmperrortype4 __P((int));
 static	INLINE	int nat_finalise __P((fr_info_t *, nat_t *, natinfo_t *,
 				      tcphdr_t *, nat_t **, int));
-static	INLINE	void nat_resolverule __P((ipnat_t *, ipf_stack_t *));
+static	INLINE	int nat_resolverule __P((ipnat_t *, ipf_stack_t *));
 static	nat_t	*fr_natclone __P((fr_info_t *, nat_t *));
 static	void	nat_mssclamp __P((tcphdr_t *, u_32_t, u_short *));
 static	INLINE	int nat_wildok __P((nat_t *, int, int, int, int));
@@ -889,11 +889,8 @@ ipf_stack_t *ifs;
 {
 	int error = 0, i, j;
 
-	nat_resolverule(n, ifs);
-	if (n->in_plabel[0] != '\0') {
-		if (n->in_apr == NULL)
-			return ENOENT;
-	}
+	if (nat_resolverule(n, ifs) != 0)
+		return ENOENT;
 
 	if ((n->in_age[0] == 0) && (n->in_age[1] != 0))
 		return EINVAL;
@@ -1010,14 +1007,16 @@ ipf_stack_t *ifs;
 
 /* ------------------------------------------------------------------------ */
 /* Function:    nat_resolvrule                                              */
-/* Returns:     Nil                                                         */
+/* Returns:     int - 0 == success, -1 == failure                           */
 /* Parameters:  n(I)  - pointer to NAT rule                                 */
 /*                                                                          */
-/* Handle SIOCADNAT.  Resolve and calculate details inside the NAT rule     */
-/* from information passed to the kernel, then add it  to the appropriate   */
-/* NAT rule table(s).                                                       */
+/* Resolve some of the details inside the NAT rule.  Includes resolving	    */
+/* any specified interfaces and proxy labels, and determines whether or not */
+/* all proxy labels are correctly specified.				    */
+/*									    */
+/* Called by nat_siocaddnat() (SIOCADNAT) and fr_natputent (SIOCSTPUT).     */
 /* ------------------------------------------------------------------------ */
-static void nat_resolverule(n, ifs)
+static int nat_resolverule(n, ifs)
 ipnat_t *n;
 ipf_stack_t *ifs;
 {
@@ -1034,7 +1033,10 @@ ipf_stack_t *ifs;
 
 	if (n->in_plabel[0] != '\0') {
 		n->in_apr = appr_lookup(n->in_p, n->in_plabel, ifs);
+		if (n->in_apr == NULL)
+			return -1;
 	}
+	return 0;
 }
 
 
@@ -1362,7 +1364,10 @@ ipf_stack_t *ifs;
 
 		ATOMIC_INC(ifs->ifs_nat_stats.ns_rules);
 
-		nat_resolverule(in, ifs);
+		if (nat_resolverule(in, ifs) != 0) {
+			error = ESRCH;
+			goto junkput;
+		}
 	}
 
 	/*
@@ -1456,13 +1461,20 @@ ipf_stack_t *ifs;
 				goto junkput;
 			}
 			ipnn->ipn_nat.nat_fr = fr;
-			fr->fr_ref = 1;
 			(void) fr_outobj(data, ipnn, IPFOBJ_NATSAVE);
 			bcopy((char *)&ipnn->ipn_fr, (char *)fr, sizeof(*fr));
+
+			fr->fr_ref = 1;
+			fr->fr_dsize = 0;
+			fr->fr_data = NULL;
+			fr->fr_type = FR_T_NONE;
+
 			MUTEX_NUKE(&fr->fr_lock);
 			MUTEX_INIT(&fr->fr_lock, "nat-filter rule lock");
 		} else {
-			READ_ENTER(&ifs->ifs_ipf_nat);
+			if (getlock) {
+				READ_ENTER(&ifs->ifs_ipf_nat);
+			}
 			for (n = ifs->ifs_nat_instances; n; n = n->nat_next)
 				if (n->nat_fr == fr)
 					break;
@@ -1472,8 +1484,9 @@ ipf_stack_t *ifs;
 				fr->fr_ref++;
 				MUTEX_EXIT(&fr->fr_lock);
 			}
-			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
-
+			if (getlock) {
+				RWLOCK_EXIT(&ifs->ifs_ipf_nat);
+			}
 			if (!n) {
 				error = ESRCH;
 				goto junkput;
@@ -2241,6 +2254,7 @@ int direction;
 		natl = nat_outlookup(fin, nflags, (u_int)fin->fin_p,
 				     fin->fin_src, fin->fin_dst);
 		if (natl != NULL) {
+			KFREE(nat);
 			nat = natl;
 			goto done;
 		}
@@ -2258,6 +2272,7 @@ int direction;
 		natl = nat_inlookup(fin, nflags, (u_int)fin->fin_p,
 				    fin->fin_src, fin->fin_dst);
 		if (natl != NULL) {
+			KFREE(nat);
 			nat = natl;
 			goto done;
 		}
