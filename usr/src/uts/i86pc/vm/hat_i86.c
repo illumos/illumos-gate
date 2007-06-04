@@ -2681,7 +2681,6 @@ hat_share(
 	level_t		l;
 	pgcnt_t		pgcnt;
 	uint_t		prot;
-	uint_t		valid_cnt;
 	int		is_dism;
 	int		flags;
 
