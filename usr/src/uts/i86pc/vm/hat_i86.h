@@ -82,6 +82,7 @@ struct hat {
 	struct as	*hat_as;
 	uint_t		hat_stats;
 	pgcnt_t		hat_pages_mapped[MAX_PAGE_LEVEL + 1];
+	pgcnt_t		hat_ism_pgcnt;
 	cpuset_t	hat_cpus;
 	uint16_t	hat_flags;
 	htable_t	*hat_htable;	/* top level htable */

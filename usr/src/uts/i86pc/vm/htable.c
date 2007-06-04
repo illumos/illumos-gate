@@ -691,7 +691,6 @@ htable_alloc(
 	 */
 	ht->ht_flags = 0;
 	if (shared != NULL) {
-		ASSERT(level == 0);
 		ASSERT(shared->ht_valid_cnt > 0);
 		ht->ht_flags |= HTABLE_SHARED_PFN;
 		ht->ht_pfn = shared->ht_pfn;
@@ -974,7 +973,6 @@ htable_release(htable_t *ht)
 			 * from elsewhere.
 			 */
 			if (ht->ht_flags & HTABLE_SHARED_PFN) {
-				ASSERT(ht->ht_level == 0);
 				ASSERT(shared == NULL);
 				shared = ht->ht_shares;
 				HATSTAT_INC(hs_htable_unshared);

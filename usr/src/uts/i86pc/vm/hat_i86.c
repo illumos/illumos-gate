@@ -73,6 +73,7 @@
 #include <vm/seg_kpm.h>
 #include <vm/vm_dep.h>
 #include <vm/kboot_mmu.h>
+#include <vm/seg_spt.h>
 
 #include <sys/cmn_err.h>
 
@@ -197,6 +198,7 @@ hati_constructor(void *buf, void *handle, int kmflags)
 	mutex_init(&hat->hat_mutex, NULL, MUTEX_DEFAULT, NULL);
 	bzero(hat->hat_pages_mapped,
 	    sizeof (pgcnt_t) * (mmu.max_page_level + 1));
+	hat->hat_ism_pgcnt = 0;
 	hat->hat_stats = 0;
 	hat->hat_flags = 0;
 	CPUSET_ZERO(hat->hat_cpus);
@@ -1082,6 +1084,7 @@ hat_get_mapped_size(hat_t *hat)
 
 	for (l = 0; l <= mmu.max_page_level; l++)
 		total += (hat->hat_pages_mapped[l] << LEVEL_SHIFT(l));
+	total += hat->hat_ism_pgcnt;
 
 	return (total);
 }
@@ -1541,7 +1544,7 @@ hat_memload_array(
 		 */
 		ASSERT(!IN_VA_HOLE(va));
 		while (hati_load_common(hat, va, pages[pgindx], attr,
-			    flags, level, pfn) != 0) {
+		    flags, level, pfn) != 0) {
 			if (level == 0)
 				panic("unexpected hati_load_common() failure");
 			--level;
@@ -1903,7 +1906,7 @@ hat_tlb_inval(hat_t *hat, uintptr_t va)
 		tlb_info = cpup->cpu_m.mcpu_tlb_info;
 		while (tlb_info == TLB_CPU_HALTED) {
 			(void) CAS_TLB_INFO(cpup, TLB_CPU_HALTED,
-				TLB_CPU_HALTED | TLB_INVAL_ALL);
+			    TLB_CPU_HALTED | TLB_INVAL_ALL);
 			SMT_PAUSE();
 			tlb_info = cpup->cpu_m.mcpu_tlb_info;
 		}
@@ -2627,11 +2630,32 @@ hat_probe(hat_t *hat, caddr_t addr)
 }
 
 /*
- * Simple implementation of ISM. hat_share() is just like hat_memload_array(),
+ * Find out if the segment for hat_share()/hat_unshare() is DISM or locked ISM.
+ */
+static int
+is_it_dism(hat_t *hat, caddr_t va)
+{
+	struct seg *seg;
+	struct shm_data *shmd;
+	struct spt_data *sptd;
+
+	seg = as_findseg(hat->hat_as, va, 0);
+	ASSERT(seg != NULL);
+	ASSERT(seg->s_base <= va);
+	shmd = (struct shm_data *)seg->s_data;
+	ASSERT(shmd != NULL);
+	sptd = (struct spt_data *)shmd->shm_sptseg->s_data;
+	ASSERT(sptd != NULL);
+	if (sptd->spt_flags & SHM_PAGEABLE)
+		return (1);
+	return (0);
+}
+
+/*
+ * Simple implementation of ISM. hat_share() is similar to hat_memload_array(),
  * except that we use the ism_hat's existing mappings to determine the pages
- * and protections to use for this hat. In case we find a properly aligned
- * and sized pagetable of 4K mappings, we will attempt to share the pagetable
- * itself.
+ * and protections to use for this hat. If we find a full properly aligned
+ * and sized pagetable, we will attempt to share the pagetable itself.
  */
 /*ARGSUSED*/
 int
@@ -2645,7 +2669,6 @@ hat_share(
 {
 	uintptr_t	vaddr_start = (uintptr_t)addr;
 	uintptr_t	vaddr;
-	uintptr_t	pt_vaddr;
 	uintptr_t	eaddr = vaddr_start + len;
 	uintptr_t	ism_addr_start = (uintptr_t)src_addr;
 	uintptr_t	ism_addr = ism_addr_start;
@@ -2659,6 +2682,8 @@ hat_share(
 	pgcnt_t		pgcnt;
 	uint_t		prot;
 	uint_t		valid_cnt;
+	int		is_dism;
+	int		flags;
 
 	/*
 	 * We might be asked to share an empty DISM hat by as_dup()
@@ -2678,6 +2703,7 @@ hat_share(
 	ASSERT(IS_PAGEALIGNED(vaddr_start));
 	ASSERT(IS_PAGEALIGNED(ism_addr_start));
 	ASSERT(ism_hat->hat_flags & HAT_SHARED);
+	is_dism = is_it_dism(hat, addr);
 	while (ism_addr < e_ism_addr) {
 		/*
 		 * use htable_walk to get the next valid ISM mapping
@@ -2687,11 +2713,85 @@ hat_share(
 			break;
 
 		/*
-		 * Find the largest page size we can use, based on the
-		 * ISM mapping size, our address alignment and the remaining
-		 * map length.
+		 * First check to see if we already share the page table.
 		 */
+		l = ism_ht->ht_level;
 		vaddr = vaddr_start + (ism_addr - ism_addr_start);
+		ht = htable_lookup(hat, vaddr, l);
+		if (ht != NULL) {
+			if (ht->ht_flags & HTABLE_SHARED_PFN)
+				goto shared;
+			htable_release(ht);
+			goto not_shared;
+		}
+
+		/*
+		 * Can't ever share top table.
+		 */
+		if (l == mmu.max_level)
+			goto not_shared;
+
+		/*
+		 * Avoid level mismatches later due to DISM faults.
+		 */
+		if (is_dism && l > 0)
+			goto not_shared;
+
+		/*
+		 * addresses and lengths must align
+		 * table must be fully populated
+		 * no lower level page tables
+		 */
+		if (ism_addr != ism_ht->ht_vaddr ||
+		    (vaddr & LEVEL_OFFSET(l + 1)) != 0)
+			goto not_shared;
+
+		/*
+		 * The range of address space must cover a full table.
+		 */
+		if (e_ism_addr - ism_addr < LEVEL_SIZE(1 + 1))
+			goto not_shared;
+
+		/*
+		 * All entries in the ISM page table must be leaf PTEs.
+		 */
+		if (l > 0) {
+			int e;
+
+			/*
+			 * We know the 0th is from htable_walk() above.
+			 */
+			for (e = 1; e < HTABLE_NUM_PTES(ism_ht); ++e) {
+				x86pte_t pte;
+				pte = x86pte_get(ism_ht, e);
+				if (!PTE_ISPAGE(pte, l))
+					goto not_shared;
+			}
+		}
+
+		/*
+		 * share the page table
+		 */
+		ht = htable_create(hat, vaddr, l, ism_ht);
+shared:
+		ASSERT(ht->ht_flags & HTABLE_SHARED_PFN);
+		ASSERT(ht->ht_shares == ism_ht);
+		hat->hat_ism_pgcnt +=
+		    (ism_ht->ht_valid_cnt - ht->ht_valid_cnt) <<
+		    (LEVEL_SHIFT(ht->ht_level) - MMU_PAGESHIFT);
+		ht->ht_valid_cnt = ism_ht->ht_valid_cnt;
+		htable_release(ht);
+		ism_addr = ism_ht->ht_vaddr + LEVEL_SIZE(l + 1);
+		htable_release(ism_ht);
+		ism_ht = NULL;
+		continue;
+
+not_shared:
+		/*
+		 * Unable to share the page table. Instead we will
+		 * create new mappings from the values in the ISM mappings.
+		 * Figure out what level size mappings to use;
+		 */
 		for (l = ism_ht->ht_level; l > 0; --l) {
 			if (LEVEL_SIZE(l) <= eaddr - vaddr &&
 			    (vaddr & LEVEL_OFFSET(l)) == 0)
@@ -2699,54 +2799,8 @@ hat_share(
 		}
 
 		/*
-		 * attempt to share the pagetable
-		 *
-		 * - only 4K pagetables are shared (ie. level == 0)
-		 * - the hat_share() length must cover the whole pagetable
-		 * - the shared address must align at level 1
-		 * - a shared PTE for this address already exists OR
-		 * - no page table for this address exists yet
-		 */
-		pt_vaddr =
-		    vaddr_start + (ism_ht->ht_vaddr - ism_addr_start);
-		if (ism_ht->ht_level == 0 &&
-		    ism_ht->ht_vaddr + LEVEL_SIZE(1) <= e_ism_addr &&
-		    (pt_vaddr & LEVEL_OFFSET(1)) == 0) {
-
-			ht = htable_lookup(hat, pt_vaddr, 0);
-			if (ht == NULL)
-				ht = htable_create(hat, pt_vaddr, 0, ism_ht);
-
-			if (ht->ht_level > 0 ||
-			    !(ht->ht_flags & HTABLE_SHARED_PFN)) {
-
-				htable_release(ht);
-
-			} else {
-
-				/*
-				 * share the page table
-				 */
-				ASSERT(ht->ht_level == 0);
-				ASSERT(ht->ht_shares == ism_ht);
-				valid_cnt = ism_ht->ht_valid_cnt;
-				atomic_add_long(&hat->hat_pages_mapped[0],
-				    valid_cnt - ht->ht_valid_cnt);
-				ht->ht_valid_cnt = valid_cnt;
-				htable_release(ht);
-				ism_addr = ism_ht->ht_vaddr + LEVEL_SIZE(1);
-				htable_release(ism_ht);
-				ism_ht = NULL;
-				continue;
-			}
-		}
-
-		/*
-		 * Unable to share the page table. Instead we will
-		 * create new mappings from the values in the ISM mappings.
-		 *
 		 * The ISM mapping might be larger than the share area,
-		 * be careful to trunctate it if needed.
+		 * be careful to truncate it if needed.
 		 */
 		if (eaddr - vaddr >= LEVEL_SIZE(ism_ht->ht_level)) {
 			pgcnt = mmu_btop(LEVEL_SIZE(ism_ht->ht_level));
@@ -2771,11 +2825,10 @@ hat_share(
 			if (!PTE_GET(pte, PT_NX))
 				prot |= PROT_EXEC;
 
-			/*
-			 * XX64 -- can shm ever be written to swap?
-			 * if not we could use HAT_NOSYNC here.
-			 */
-			while (hati_load_common(hat, vaddr, pp, prot, HAT_LOAD,
+			flags = HAT_LOAD;
+			if (!is_dism)
+				flags |= HAT_LOAD_LOCK | HAT_LOAD_NOCONSIST;
+			while (hati_load_common(hat, vaddr, pp, prot, flags,
 			    l, pfn) != 0) {
 				if (l == 0)
 					panic("hati_load_common() failure");
@@ -2807,6 +2860,8 @@ hat_unshare(hat_t *hat, caddr_t addr, size_t len, uint_t ismszc)
 	uintptr_t	eaddr = vaddr + len;
 	htable_t	*ht = NULL;
 	uint_t		need_demaps = 0;
+	int		flags = HAT_UNLOAD_UNMAP;
+	level_t		l;
 
 	ASSERT(hat != kas.a_hat);
 	ASSERT(eaddr <= _userlimit);
@@ -2820,26 +2875,31 @@ hat_unshare(hat_t *hat, caddr_t addr, size_t len, uint_t ismszc)
 	 * finished, because if hat_pageunload() were to unload a shared
 	 * pagetable page, its hat_tlb_inval() will do a global TLB invalidate.
 	 */
-	while (vaddr < eaddr) {
-		ASSERT(!IN_VA_HOLE(vaddr));
-		/*
-		 * find the pagetable that would map the current address
-		 */
-		ht = htable_lookup(hat, vaddr, 0);
-		if (ht != NULL) {
+	l = mmu.max_page_level;
+	if (l == mmu.max_level)
+		--l;
+	for (; l >= 0; --l) {
+		for (vaddr = (uintptr_t)addr; vaddr < eaddr;
+		    vaddr = (vaddr & LEVEL_MASK(l + 1)) + LEVEL_SIZE(l + 1)) {
+			ASSERT(!IN_VA_HOLE(vaddr));
+			/*
+			 * find a pagetable that maps the current address
+			 */
+			ht = htable_lookup(hat, vaddr, l);
+			if (ht == NULL)
+				continue;
 			if (ht->ht_flags & HTABLE_SHARED_PFN) {
 				/*
-				 * clear mapped pages count, set valid_cnt to 0
-				 * and let htable_release() finish the job
+				 * clear page count, set valid_cnt to 0,
+				 * let htable_release() finish the job
 				 */
-				atomic_add_long(&hat->hat_pages_mapped[0],
-				    -ht->ht_valid_cnt);
+				hat->hat_ism_pgcnt -= ht->ht_valid_cnt <<
+				    (LEVEL_SHIFT(ht->ht_level) - MMU_PAGESHIFT);
 				ht->ht_valid_cnt = 0;
 				need_demaps = 1;
 			}
 			htable_release(ht);
 		}
-		vaddr = (vaddr & LEVEL_MASK(1)) + LEVEL_SIZE(1);
 	}
 
 	/*
@@ -2853,7 +2913,9 @@ hat_unshare(hat_t *hat, caddr_t addr, size_t len, uint_t ismszc)
 	 * Now go back and clean up any unaligned mappings that
 	 * couldn't share pagetables.
 	 */
-	hat_unload(hat, addr, len, HAT_UNLOAD_UNMAP);
+	if (!is_it_dism(hat, addr))
+		flags |= HAT_UNLOAD_UNLOCK;
+	hat_unload(hat, addr, len, flags);
 }
 
 
@@ -3748,7 +3810,7 @@ hati_update_pte(htable_t *ht, uint_t entry, x86pte_t expected, x86pte_t new)
 	if (PTE_GET(expected, PT_SOFTWARE) < PT_NOSYNC &&
 	    PTE_GET(expected, PT_MOD | PT_REF) &&
 	    (PTE_GET(new, PT_NOSYNC) || !PTE_GET(new, PT_WRITABLE) ||
-		!PTE_GET(new, PT_MOD | PT_REF))) {
+	    !PTE_GET(new, PT_MOD | PT_REF))) {
 
 		ASSERT(!pfn_is_foreign(PTE2PFN(expected, ht->ht_level)));
 		pp = page_numtopp_nolock(PTE2PFN(expected, ht->ht_level));
