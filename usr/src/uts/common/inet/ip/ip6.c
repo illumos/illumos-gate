@@ -11737,6 +11737,11 @@ ip_wput_frag_v6(mblk_t *mp, ire_t *ire, uint_t reachable, conn_t *connp,
 	ASSERT(ire->ire_type == IRE_CACHE);
 	ill = (ill_t *)ire->ire_stq->q_ptr;
 
+	if (max_frag <= 0) {
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragFails);
+		freemsg(mp);
+		return;
+	}
 	BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutFragReqds);
 
 	/*

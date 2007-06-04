@@ -11918,6 +11918,12 @@ ip_sioctl_flags(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		return (EINVAL);
 
 	/*
+	 * cannot turn off IFF_NOXMIT on  VNI interfaces.
+	 */
+	if ((turn_off & IFF_NOXMIT) && IS_VNI(ipif->ipif_ill))
+		return (EINVAL);
+
+	/*
 	 * Don't allow the IFF_ROUTER flag to be turned on on loopback
 	 * interfaces.  It makes no sense in that context.
 	 */

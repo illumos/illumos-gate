@@ -24330,6 +24330,14 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 
 	BUMP_MIB(mibptr, ipIfStatsOutFragReqds);
 
+	if (max_frag == 0) {
+		ip1dbg(("ip_wput_frag: ire frag size is 0"
+		    " -  dropping packet\n"));
+		BUMP_MIB(mibptr, ipIfStatsOutFragFails);
+		freemsg(mp);
+		return;
+	}
+
 	/*
 	 * IPSEC does not allow hw accelerated packets to be fragmented
 	 * This check is made in ip_wput_ipsec_out prior to coming here
