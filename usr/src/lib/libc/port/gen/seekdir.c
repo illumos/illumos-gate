@@ -121,7 +121,7 @@ seekdir64(DIR *dirp, off64_t loc)
 void
 seekdir(DIR *dirp, long loc)
 {
-	seekdir64(dirp, (off64_t)loc);
+	seekdir64(dirp, (off64_t)(uint32_t)loc);
 }
 
 #endif	/* _LP64 */
