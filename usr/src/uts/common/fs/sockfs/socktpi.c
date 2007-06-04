@@ -1417,7 +1417,7 @@ sotpi_accept(struct sonode *so, int fflag, struct sonode **nsop)
 	struct T_conn_ind	*conn_ind;
 	struct T_conn_res	*conn_res;
 	int			error = 0;
-	mblk_t			*mp, *ctxmp;
+	mblk_t			*mp, *ctxmp, *ack_mp;
 	struct sonode		*nso;
 	vnode_t			*nvp;
 	void			*src;
@@ -1426,6 +1426,7 @@ sotpi_accept(struct sonode *so, int fflag, struct sonode **nsop)
 	t_uscalar_t		optlen;
 	t_scalar_t		PRIM_type;
 	t_scalar_t		SEQ_number;
+	size_t			sinlen;
 
 	dprintso(so, 1, ("sotpi_accept(%p, 0x%x, %p) %s\n",
 		so, fflag, nsop, pr_state(so->so_state, so->so_mode)));
@@ -1619,9 +1620,9 @@ again:
 	/*
 	 * New socket must be bound at least in sockfs and, except for AF_INET,
 	 * (or AF_INET6) it also has to be bound in the transport provider.
-	 * After accepting the connection on nso so_laddr_sa will be set to
-	 * contain the same address as the listener's local address
-	 * so the address we bind to isn't important.
+	 * We set the local address in the sonode from the T_OK_ACK of the
+	 * T_CONN_RES. For this reason the address we bind to here isn't
+	 * important.
 	 */
 	if ((nso->so_family == AF_INET || nso->so_family == AF_INET6) &&
 	    /*CONSTCOND*/
@@ -1677,7 +1678,6 @@ again:
 		nso->so_linger = so->so_linger;
 
 	if ((so->so_state & SS_DIRECT) != 0) {
-		mblk_t *ack_mp;
 
 		ASSERT(opt != NULL);
 
@@ -1791,14 +1791,6 @@ again:
 	}
 
 	/*
-	 * Copy local address from listener.
-	 */
-	nso->so_laddr_len = so->so_laddr_len;
-	ASSERT(nso->so_laddr_len <= nso->so_laddr_maxlen);
-	bcopy(so->so_laddr_sa, nso->so_laddr_sa, nso->so_laddr_len);
-	nso->so_state |= SS_LADDR_VALID;
-
-	/*
 	 * This is the non-performance case for sockets (e.g. AF_UNIX sockets)
 	 * which don't support the FireEngine accept fast-path. It is also
 	 * used when the virtual "sockmod" has been I_POP'd and I_PUSH'd
@@ -1851,11 +1843,32 @@ again:
 		eprintsoline(so, error);
 		goto disconnect_vp;
 	}
-	error = sowaitokack(so, PRIM_type);
+	error = sowaitprim(so, PRIM_type, T_OK_ACK,
+	    (t_uscalar_t)sizeof (struct T_ok_ack), &ack_mp, 0);
 	if (error) {
 		eprintsoline(so, error);
 		goto disconnect_vp;
 	}
+	/*
+	 * If there is a sin/sin6 appended onto the T_OK_ACK use
+	 * that to set the local address. If this is not present
+	 * then we zero out the address and don't set the
+	 * SS_LADDR_VALID bit.
+	 */
+	sinlen = (nso->so_family == AF_INET) ? sizeof (sin_t) : sizeof (sin6_t);
+	if ((nso->so_family == AF_INET) || (nso->so_family == AF_INET6) &&
+	    MBLKL(ack_mp) == (sizeof (struct T_ok_ack) + sinlen)) {
+		ack_mp->b_rptr += sizeof (struct T_ok_ack);
+		bcopy(ack_mp->b_rptr, nso->so_laddr_sa, sinlen);
+		nso->so_laddr_len = sinlen;
+		nso->so_state |= SS_LADDR_VALID;
+	} else {
+		nso->so_laddr_len = so->so_laddr_len;
+		ASSERT(nso->so_laddr_len <= nso->so_laddr_maxlen);
+		bzero(nso->so_laddr_sa, nso->so_addr_size);
+	}
+	freemsg(ack_mp);
+
 	so_unlock_single(so, SOLOCKED);
 	mutex_exit(&so->so_lock);
 

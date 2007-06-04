@@ -2160,6 +2160,8 @@ tcp_accept(tcp_t *listener, mblk_t *mp)
 					sin6->sin6_addr =
 					    eager->tcp_ip6h->ip6_src;
 				}
+				sin6->sin6_scope_id = 0;
+				sin6->__sin6_src_id = 0;
 				break;
 			}
 		default:
