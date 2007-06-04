@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -624,10 +624,8 @@ aiowaitn(void *uiocb, uint_t nent, uint_t *nwait, timespec_t *timout)
 	timestruc_t	*rqtp;
 
 	aiop = curproc->p_aio;
-	if (aiop == NULL)
-		return (EINVAL);
 
-	if (aiop->aio_outstanding == 0)
+	if (aiop == NULL || aiop->aio_outstanding == 0)
 		return (EAGAIN);
 
 	if (copyin(nwait, &waitcnt, sizeof (uint_t)))
