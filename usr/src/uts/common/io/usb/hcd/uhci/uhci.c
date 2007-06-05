@@ -118,7 +118,7 @@ boolean_t uhci_enable_msi = B_TRUE;
 /*
  * tunable, delay during attach in seconds
  */
-int 		uhci_attach_wait = 1;
+int 		uhci_attach_wait = 0;
 
 /* function prototypes */
 static void	uhci_handle_intr_td_errors(uhci_state_t *uhcip, uhci_td_t *td,
@@ -422,7 +422,7 @@ skip_intr:
 	 * This gets called every second.
 	 */
 	uhcip->uhci_cmd_timeout_id = timeout(uhci_cmd_timeout_hdlr,
-					(void *)uhcip, UHCI_ONE_SECOND);
+	    (void *)uhcip, UHCI_ONE_SECOND);
 
 	mutex_enter(&uhcip->uhci_int_mutex);
 
@@ -636,7 +636,7 @@ uhci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	case DDI_DETACH:
 
 		return (uhci_cleanup(uhcip) == USB_SUCCESS ?
-					DDI_SUCCESS : DDI_FAILURE);
+		    DDI_SUCCESS : DDI_FAILURE);
 	case DDI_SUSPEND:
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
 		    "uhci_detach: Suspend not supported");
@@ -951,7 +951,7 @@ uhci_handle_intr_td(uhci_state_t *uhcip, uhci_td_t *td)
 	uhci_trans_wrapper_t	*tw = td->tw;
 	uhci_pipe_private_t	*pp = tw->tw_pipe_private;
 	usb_intr_req_t		*intr_reqp =
-				    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
+	    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
 	usba_pipe_handle_data_t	*ph = pp->pp_pipe_handle;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
@@ -984,7 +984,7 @@ uhci_handle_intr_td(uhci_state_t *uhcip, uhci_td_t *td)
 		}
 
 		bytes_xfered = (bytes_xfered == ZERO_LENGTH) ?
-						0 : bytes_xfered+1;
+		    0 : bytes_xfered+1;
 		tw->tw_bytes_xfered += bytes_xfered;
 		uhci_do_byte_stats(uhcip, tw->tw_bytes_xfered,
 		    ph->p_ep.bmAttributes, ph->p_ep.bEndpointAddress);
@@ -1001,7 +1001,7 @@ uhci_handle_intr_td(uhci_state_t *uhcip, uhci_td_t *td)
 
 			/* update the element pointer */
 			SetQH32(uhcip, pp->pp_qh->element_ptr, GetTD32(
-				uhcip, tw->tw_hctd_tail->link_ptr));
+			    uhcip, tw->tw_hctd_tail->link_ptr));
 
 
 		} else if (tw->tw_bytes_xfered == tw->tw_length) {
@@ -1350,7 +1350,7 @@ uhci_handle_ctrl_td(uhci_state_t *uhcip, uhci_td_t *td)
 				xx = (tw->tw_length > 8) ? 8 : tw->tw_length;
 			} else {
 				xx = (tw->tw_length > MaxPacketSize) ?
-					MaxPacketSize : tw->tw_length;
+				    MaxPacketSize : tw->tw_length;
 			}
 
 			tw->tw_tmp = xx;
@@ -1428,8 +1428,8 @@ uhci_handle_ctrl_td(uhci_state_t *uhcip, uhci_td_t *td)
 		 */
 		if (tw->tw_bytes_pending) {
 			bytes_for_xfer = (tw->tw_bytes_pending >
-					MaxPacketSize) ? MaxPacketSize :
-					tw->tw_bytes_pending;
+			    MaxPacketSize) ? MaxPacketSize :
+			    tw->tw_bytes_pending;
 
 			tw->tw_tmp = bytes_for_xfer;
 
@@ -1482,7 +1482,7 @@ uhci_handle_ctrl_td(uhci_state_t *uhcip, uhci_td_t *td)
 
 		if ((tw->tw_length != 0) && (tw->tw_direction == PID_IN)) {
 			usb_req_attrs_t	attrs = ((usb_ctrl_req_t *)
-					tw->tw_curr_xfer_reqp)->ctrl_attributes;
+			    tw->tw_curr_xfer_reqp)->ctrl_attributes;
 			/*
 			 * Call uhci_sendup_td_message to send message
 			 * upstream. The function uhci_sendup_td_message
@@ -1534,7 +1534,7 @@ uhci_handle_intr_td_errors(uhci_state_t *uhcip, uhci_td_t *td,
 {
 	usb_cr_t		usb_err;
 	usb_intr_req_t		*intr_reqp =
-				    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
+	    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
 	    "uhci_handle_intr_td_errors: td = 0x%p tw = 0x%p", td, tw);
@@ -1566,7 +1566,7 @@ uhci_handle_one_xfer_completion(
 	uhci_pipe_private_t	*pp = tw->tw_pipe_private;
 	usba_pipe_handle_data_t	*ph = pp->pp_pipe_handle;
 	usb_intr_req_t		*intr_reqp =
-				    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
+	    (usb_intr_req_t *)tw->tw_curr_xfer_reqp;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
 	    "uhci_handle_one_xfer_completion: td = 0x%p", td);
