@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -390,6 +389,37 @@ lwp_unpark(id_t lwpid)
 }
 
 /*
+ * Cancel a previous unpark for the specified lwp.
+ *
+ * This interface exists ONLY to support older versions of libthread, which
+ * called lwp_unpark(self) to force calls to lwp_park(self) to return
+ * immediately.  These older libthreads required a mechanism to cancel the
+ * lwp_unpark(self).
+ *
+ * libc does not call this interface.  Instead, the sc_park flag in the
+ * schedctl page is cleared to force calls to lwp_park() to return
+ * immediately.
+ */
+static int
+lwp_unpark_cancel(id_t lwpid)
+{
+	proc_t *p = ttoproc(curthread);
+	kthread_t *t;
+	int error = 0;
+
+	mutex_enter(&p->p_lock);
+	if ((t = idtot(p, lwpid)) == NULL) {
+		error = ESRCH;
+	} else {
+		mutex_enter(&t->t_delay_lock);
+		t->t_unpark = 0;
+		mutex_exit(&t->t_delay_lock);
+	}
+	mutex_exit(&p->p_lock);
+	return (error);
+}
+
+/*
  * Sleep until we are set running by lwp_unpark() or until we are
  * interrupted by a signal or until we exhaust our timeout.
  * timeoutp is an in/out parameter.  On entry, it contains the relative
@@ -551,6 +581,31 @@ syslwp_park(int which, uintptr_t arg1, uintptr_t arg2)
 		break;
 	case 2:
 		error = lwp_unpark_all((id_t *)arg1, (int)arg2);
+		break;
+	case 3:
+		/*
+		 * This subcode is not used by libc.  It exists ONLY to
+		 * support older versions of libthread which do not use
+		 * the sc_park flag in the schedctl page.
+		 *
+		 * These versions of libthread need to be modifed or emulated
+		 * to change calls to syslwp_park(1, tid, 0) to
+		 * syslwp_park(3, tid).
+		 */
+		error = lwp_unpark_cancel((id_t)arg1);
+		break;
+	case 4:
+		/*
+		 * This subcode is not used by libc.  It exists ONLY to
+		 * support older versions of libthread which do not use
+		 * the sc_park flag in the schedctl page.
+		 *
+		 * These versions of libthread need to be modified or emulated
+		 * to change calls to syslwp_park(0, ts, tid) to
+		 * syslwp_park(4, ts, tid).
+		 */
+		schedctl_set_park();
+		error = lwp_park((timespec_t *)arg1, (id_t)arg2);
 		break;
 	default:
 		error = EINVAL;

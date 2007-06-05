@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -297,7 +297,7 @@ schedctl_sigblock(kthread_t *t)
 {
 	sc_shared_t *tdp = t->t_schedctl;
 
-	if (tdp)
+	if (tdp != NULL)
 		return (tdp->sc_sigblock);
 	return (0);
 }
@@ -317,7 +317,7 @@ schedctl_finish_sigblock(kthread_t *t)
 
 	ASSERT(MUTEX_HELD(&ttoproc(t)->p_lock));
 
-	if (tdp && tdp->sc_sigblock) {
+	if (tdp != NULL && tdp->sc_sigblock) {
 		t->t_hold.__sigbits[0] = FILLSET0 & ~CANTMASK0;
 		t->t_hold.__sigbits[1] = FILLSET1 & ~CANTMASK1;
 		tdp->sc_sigblock = 0;
@@ -334,7 +334,7 @@ schedctl_is_park()
 {
 	sc_shared_t *tdp = curthread->t_schedctl;
 
-	if (tdp)
+	if (tdp != NULL)
 		return (tdp->sc_park);
 	/*
 	 * If we're here and there is no shared memory (how could
@@ -343,6 +343,28 @@ schedctl_is_park()
 	return (1);
 }
 
+/*
+ * Declare thread is parking.
+ *
+ * libc will set "sc_park = 1" before calling lwpsys_park(0, tid) in order
+ * to declare that the thread is calling into the kernel to park.
+ *
+ * This interface exists ONLY to support older versions of libthread which
+ * are not aware of the sc_park flag.
+ *
+ * Older versions of libthread which are not aware of the sc_park flag need to
+ * be modified or emulated to call lwpsys_park(4, ...) instead of
+ * lwpsys_park(0, ...).  This will invoke schedctl_set_park() before
+ * lwp_park() to declare that the thread is parking.
+ */
+void
+schedctl_set_park()
+{
+	sc_shared_t *tdp = curthread->t_schedctl;
+
+	if (tdp != NULL)
+		tdp->sc_park = 1;
+}
 
 /*
  * Clear the shared sc_park flag on return from parking in the kernel.
@@ -352,7 +374,7 @@ schedctl_unpark()
 {
 	sc_shared_t *tdp = curthread->t_schedctl;
 
-	if (tdp)
+	if (tdp != NULL)
 		tdp->sc_park = 0;
 }
 

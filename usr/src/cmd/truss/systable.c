@@ -730,6 +730,8 @@ static	const	struct systable lwpparktable[] = {
 {"lwp_park",	3, DEC, NOV, HID, HEX, DEC},			/* 0 */
 {"lwp_unpark",	2, DEC, NOV, HID, DEC},				/* 1 */
 {"lwp_unpark_all", 3, DEC, NOV, HID, HEX, DEC},			/* 2 */
+{"lwp_unpark_cancel",	2, DEC, NOV, HID, DEC},			/* 3 */
+{"lwp_set_park",	3, DEC, NOV, HID, HEX, DEC},		/* 4 */
 };
 #define	NLWPPARKCODE	(sizeof (lwpparktable) / sizeof (struct systable))
 

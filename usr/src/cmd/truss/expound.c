@@ -5167,13 +5167,17 @@ expound(private_t *pri, long r0, int raw)
 		show_memcntl(pri);
 		break;
 	case SYS_lwp_park:
-		/* subcode 0: lwp_park(timespec_t *, id_t) */
-		if (pri->sys_nargs > 1 && pri->sys_args[0] == 0)
+		/*
+		 * subcode 0: lwp_park(timespec_t *, id_t)
+		 * subcode 4: lwp_set_park(timespec_t *, id_t)
+		 */
+		if (pri->sys_nargs > 1 &&
+		    (pri->sys_args[0] == 0 || pri->sys_args[0] == 4))
 			show_timestruc(pri, (long)pri->sys_args[1], "timeout");
 		/* subcode 2: lwp_unpark_all(id_t *, int) */
 		if (pri->sys_nargs > 2 && pri->sys_args[0] == 2)
 			show_ids(pri, (long)pri->sys_args[1],
-				(int)pri->sys_args[2]);
+			    (int)pri->sys_args[2]);
 		break;
 	case SYS_ntp_gettime:
 		if (!err)

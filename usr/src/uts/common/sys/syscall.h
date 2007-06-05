@@ -228,6 +228,8 @@ extern "C" {
 	 * 	_lwp_park(timespec_t *, lwpid_t) :: syslwp_park(0, ...)
 	 * 	_lwp_unpark(lwpid_t, int)	 :: syslwp_park(1, ...)
 	 * 	_lwp_unpark_all(lwpid_t *, int)  :: syslwp_park(2, ...)
+	 *	_lwp_unpark_cancel(lwpid_t *, int)  :: syslwp_park(3, ...)
+	 *	_lwp_set_park(lwpid_t *, int)   :: syslwp_park(4, ...)
 	 */
 #define	SYS_sendfilev	78
 	/*

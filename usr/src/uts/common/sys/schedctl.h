@@ -96,6 +96,7 @@ void	schedctl_set_yield(kthread_t *, short);
 int	schedctl_sigblock(kthread_t *);
 void	schedctl_finish_sigblock(kthread_t *);
 int	schedctl_is_park(void);
+void	schedctl_set_park(void);
 void	schedctl_unpark(void);
 #endif	/* _KERNEL */
 
