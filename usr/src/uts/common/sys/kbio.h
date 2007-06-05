@@ -226,7 +226,7 @@ struct freq_request {
 
 /* Used to control the AutoRepeat Min-delay and Min-Rate */
 #define	KIOCRPTDELAY_MIN	(100)
-#define	KIOCRPTRATE_MIN		(30)
+#define	KIOCRPTRATE_MIN		(1)
 
 #ifdef	__cplusplus
 }

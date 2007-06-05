@@ -79,7 +79,6 @@
 #define	MAX_LINE_SIZE		256
 #define	DEFAULT_KBD_LAYOUT	33
 
-int errno;
 char *layout_names[MAX_LAYOUT_NUM];
 int layout_numbers[MAX_LAYOUT_NUM];
 static int layout_count;
@@ -568,7 +567,7 @@ set_repeat_delay(char *delay_str, int kbd)
 	 * The error message depends on the different inputs.
 	 * a. the input is a invalid integer(unit in ms)
 	 * b. the input is a integer less than the minimal delay setting.
-	 * The condition (a) has been covered by main function and set_default
+	 * The condition (a) has been covered by main function and kbd_defaults
 	 * function.
 	 */
 	if (ioctl(kbd, KIOCSRPTDELAY, &delay) == -1) {
@@ -592,21 +591,14 @@ set_repeat_rate(char *rate_str, int kbd)
 	int rate = atoi(rate_str);
 
 	/*
-	 * The error message depends on the different inputs.
-	 * a. the input is a invalid integer(unit in ms)
-	 * b. the input is a integer less than the minimal rate setting.
-	 * The condition (a) has been covered by main function and set_default
-	 * function.
+	 * The input validation check has been covered by main function
+	 * and kbd_defaults function.Here just give an error message if
+	 * the ioctl fails.
 	 */
 	if (ioctl(kbd, KIOCSRPTRATE, &rate) == -1) {
-		if (rate < KIOCRPTRATE_MIN)
-			(void) fprintf(stderr, "kbd: specified rate %d is "
-			    "less than minimum %d\n", rate, KIOCRPTRATE_MIN);
-		else
-			perror("kbd: set repeat rate");
+		perror("kbd: set repeat rate");
 		return (1);
 	}
-
 	return (0);
 }
 
