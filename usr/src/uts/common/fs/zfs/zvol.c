@@ -802,7 +802,6 @@ zvol_strategy(buf_t *bp)
 	objset_t *os;
 	rl_t *rl;
 	int error = 0;
-	int sync;
 	boolean_t reading;
 
 	if (zv == NULL) {
@@ -829,7 +828,6 @@ zvol_strategy(buf_t *bp)
 
 	os = zv->zv_objset;
 	ASSERT(os != NULL);
-	sync = !(bp->b_flags & B_ASYNC) && !(zil_disable);
 
 	bp_mapin(bp);
 	addr = bp->b_un.b_addr;
@@ -876,7 +874,7 @@ zvol_strategy(buf_t *bp)
 	if ((bp->b_resid = resid) == bp->b_bcount)
 		bioerror(bp, off > volsize ? EINVAL : error);
 
-	if (sync)
+	if (!(bp->b_flags & B_ASYNC) && !reading && !zil_disable)
 		zil_commit(zv->zv_zilog, UINT64_MAX, ZVOL_OBJ);
 
 	biodone(bp);
