@@ -2784,6 +2784,11 @@ __s_api_getConnection(
 				sessionId, timeoutSec, errorp,
 				fail_if_new_pwd_reqd,
 				nopasswd_acct_mgmt, flags, &badSrvrs);
+			/* not using bad server if credentials were supplied */
+			if (badSrvrs && *badSrvrs) {
+				__s_api_free2dArray(badSrvrs);
+				badSrvrs = NULL;
+			}
 			if (rc == NS_LDAP_SUCCESS ||
 				rc == NS_LDAP_SUCCESS_WITH_INFO) {
 				*session = con;
