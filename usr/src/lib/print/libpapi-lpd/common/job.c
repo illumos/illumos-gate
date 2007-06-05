@@ -20,9 +20,8 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
  */
 
 /* $Id: job.c 179 2006-07-17 18:24:07Z njacobs $ */
@@ -60,7 +59,7 @@ papiJobSubmit(papi_service_t handle, char *name, papi_attribute_t **attributes,
 
 	if (job_ticket != NULL) {
 		detailed_error(svc,
-			gettext("papiJobSubmit: job ticket not supported"));
+		    gettext("papiJobSubmit: job ticket not supported"));
 		return (PAPI_OPERATION_NOT_SUPPORTED);
 	}
 
@@ -69,15 +68,18 @@ papiJobSubmit(papi_service_t handle, char *name, papi_attribute_t **attributes,
 
 	if ((*job = j = (job_t *)calloc(1, sizeof (*j))) == NULL) {
 		detailed_error(svc,
-			gettext("calloc() failed"));
+		    gettext("calloc() failed"));
 		return (PAPI_TEMPORARY_ERROR);
 	}
 
 	/* create a control file */
-	status = lpd_job_add_attributes(svc, attributes, &metadata,
-				&j->attributes);
-	status = lpd_job_add_files(svc, attributes, files, &metadata,
-				&j->attributes);
+	(void) lpd_job_add_attributes(svc, attributes, &metadata,
+	    &j->attributes);
+
+	if ((status = lpd_job_add_files(svc, attributes, files, &metadata,
+	    &j->attributes)) != PAPI_OK) {
+		return (status);
+	}
 
 	/* send the job to the server */
 	status = lpd_submit_job(svc, metadata, &j->attributes, NULL);
@@ -94,7 +96,7 @@ papiJobSubmitByReference(papi_service_t handle, char *name,
 		papi_job_ticket_t *job_ticket, char **files, papi_job_t *job)
 {
 	return (papiJobSubmit(handle, name, job_attributes,
-		job_ticket, files, job));
+	    job_ticket, files, job));
 }
 
 papi_status_t
@@ -133,9 +135,9 @@ papiJobStreamOpen(papi_service_t handle, char *name,
 		char *files[] = { "standard input", NULL };
 
 		lpd_job_add_files(svc, attributes, files, &metadata,
-				&(s->job->attributes));
+		    &(s->job->attributes));
 		status = lpd_submit_job(svc, metadata, &(s->job->attributes),
-				&s->fd);
+		    &s->fd);
 	} else {
 		char dfname[18];
 
@@ -188,9 +190,9 @@ papiJobStreamClose(papi_service_t handle, papi_stream_t stream, papi_job_t *job)
 		files[1] = NULL;
 
 		lpd_job_add_files(svc, s->job->attributes, files, &s->metadata,
-				&(s->job->attributes));
+		    &(s->job->attributes));
 		status = lpd_submit_job(svc, s->metadata,
-					&(s->job->attributes), NULL);
+		    &(s->job->attributes), NULL);
 		unlink(s->dfname);
 		free(s->dfname);
 	} else
@@ -254,7 +256,7 @@ papiJobGetPrinterName(papi_job_t job)
 
 	if (j != NULL)
 		papiAttributeListGetString(j->attributes, NULL,
-					"printer-name", &result);
+		    "printer-name", &result);
 
 	return (result);
 }
@@ -267,7 +269,7 @@ papiJobGetId(papi_job_t job)
 
 	if (j != NULL)
 		papiAttributeListGetInteger(j->attributes, NULL,
-					"job-id", &result);
+		    "job-id", &result);
 
 	return (result);
 }
