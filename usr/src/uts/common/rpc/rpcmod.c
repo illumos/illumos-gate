@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -303,6 +303,115 @@ struct temp_slot {
 	kcondvar_t wait;
 };
 
+typedef struct mir_s {
+	void	*mir_krpc_cell;	/* Reserved for KRPC use. This field */
+					/* must be first in the structure. */
+	struct xprt_style_ops	*rm_ops;
+	int	mir_type;		/* Client or server side stream */
+
+	mblk_t	*mir_head_mp;		/* RPC msg in progress */
+		/*
+		 * mir_head_mp points the first mblk being collected in
+		 * the current RPC message.  Record headers are removed
+		 * before data is linked into mir_head_mp.
+		 */
+	mblk_t	*mir_tail_mp;		/* Last mblk in mir_head_mp */
+		/*
+		 * mir_tail_mp points to the last mblk in the message
+		 * chain starting at mir_head_mp.  It is only valid
+		 * if mir_head_mp is non-NULL and is used to add new
+		 * data blocks to the end of chain quickly.
+		 */
+
+	int32_t	mir_frag_len;		/* Bytes seen in the current frag */
+		/*
+		 * mir_frag_len starts at -4 for beginning of each fragment.
+		 * When this length is negative, it indicates the number of
+		 * bytes that rpcmod needs to complete the record marker
+		 * header.  When it is positive or zero, it holds the number
+		 * of bytes that have arrived for the current fragment and
+		 * are held in mir_header_mp.
+		 */
+
+	int32_t	mir_frag_header;
+		/*
+		 * Fragment header as collected for the current fragment.
+		 * It holds the last-fragment indicator and the number
+		 * of bytes in the fragment.
+		 */
+
+	unsigned int
+		mir_ordrel_pending : 1,	/* Sent T_ORDREL_REQ */
+		mir_hold_inbound : 1,	/* Hold inbound messages on server */
+					/* side until outbound flow control */
+					/* is relieved. */
+		mir_closing : 1,	/* The stream is being closed */
+		mir_inrservice : 1,	/* data queued or rd srv proc running */
+		mir_inwservice : 1,	/* data queued or wr srv proc running */
+		mir_inwflushdata : 1,	/* flush M_DATAs when srv runs */
+		/*
+		 * On client streams, mir_clntreq is 0 or 1; it is set
+		 * to 1 whenever a new request is sent out (mir_wput)
+		 * and cleared when the timer fires (mir_timer).  If
+		 * the timer fires with this value equal to 0, then the
+		 * stream is considered idle and KRPC is notified.
+		 */
+		mir_clntreq : 1,
+		/*
+		 * On server streams, stop accepting messages
+		 */
+		mir_svc_no_more_msgs : 1,
+		mir_listen_stream : 1,	/* listen end point */
+		mir_unused : 1,	/* no longer used */
+		mir_timer_call : 1,
+		mir_junk_fill_thru_bit_31 : 21;
+
+	int	mir_setup_complete;	/* server has initialized everything */
+	timeout_id_t mir_timer_id;	/* Timer for idle checks */
+	clock_t	mir_idle_timeout;	/* Allowed idle time before shutdown */
+		/*
+		 * This value is copied from clnt_idle_timeout or
+		 * svc_idle_timeout during the appropriate ioctl.
+		 * Kept in milliseconds
+		 */
+	clock_t	mir_use_timestamp;	/* updated on client with each use */
+		/*
+		 * This value is set to lbolt
+		 * every time a client stream sends or receives data.
+		 * Even if the timer message arrives, we don't shutdown
+		 * client unless:
+		 *    lbolt >= MSEC_TO_TICK(mir_idle_timeout)+mir_use_timestamp.
+		 * This value is kept in HZ.
+		 */
+
+	uint_t	*mir_max_msg_sizep;	/* Reference to sanity check size */
+		/*
+		 * This pointer is set to &clnt_max_msg_size or
+		 * &svc_max_msg_size during the appropriate ioctl.
+		 */
+	zoneid_t mir_zoneid;	/* zone which pushed rpcmod */
+	/* Server-side fields. */
+	int	mir_ref_cnt;		/* Reference count: server side only */
+					/* counts the number of references */
+					/* that a kernel RPC server thread */
+					/* (see svc_run()) has on this rpcmod */
+					/* slot. Effectively, it is the */
+					/* number * of unprocessed messages */
+					/* that have been passed up to the */
+					/* KRPC layer */
+
+	mblk_t	*mir_svc_pend_mp;	/* Pending T_ORDREL_IND or */
+					/* T_DISCON_IND */
+
+	/*
+	 * these fields are for both client and server, but for debugging,
+	 * it is easier to have these last in the structure.
+	 */
+	kmutex_t	mir_mutex;	/* Mutex and condvar for close */
+	kcondvar_t	mir_condvar;	/* synchronization. */
+	kcondvar_t	mir_timer_cv;	/* Timer routine sync. */
+} mir_t;
+
 void tmp_rput(queue_t *q, mblk_t *mp);
 
 struct xprt_style_ops tmpops = {
@@ -352,7 +461,6 @@ rmm_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 	struct temp_slot ts, *t;
 	struct T_info_ack *pptr;
 	int error = 0;
-	int procson = 0;
 
 	ASSERT(q != NULL);
 	/*
@@ -367,7 +475,7 @@ rmm_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 	t = &ts;
 	bzero(t, sizeof (*t));
 	q->q_ptr = (void *)t;
-	/* WR(q)->q_ptr = (void *)t; */
+	WR(q)->q_ptr = (void *)t;
 
 	/*
 	 * Allocate the required messages upfront.
@@ -383,46 +491,40 @@ rmm_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 	t->ops = &tmpops;
 
 	qprocson(q);
-	procson = 1;
 	bp->b_datap->db_type = M_PCPROTO;
 	*(int32_t *)bp->b_wptr = (int32_t)T_INFO_REQ;
 	bp->b_wptr += sizeof (struct T_info_req);
 	putnext(WR(q), bp);
 
 	mutex_enter(&t->lock);
-	while ((bp = t->info_ack) == NULL) {
+	while (t->info_ack == NULL) {
 		if (cv_wait_sig(&t->wait, &t->lock) == 0) {
 			error = EINTR;
 			break;
 		}
 	}
 	mutex_exit(&t->lock);
-	mutex_destroy(&t->lock);
-	cv_destroy(&t->wait);
+
 	if (error)
 		goto out;
 
 	pptr = (struct T_info_ack *)t->info_ack->b_rptr;
 
 	if (pptr->SERV_type == T_CLTS) {
-		error = rpcmodopen(q, devp, flag, sflag, crp);
-		if (error == 0) {
-			t = (struct temp_slot *)q->q_ptr;
-			t->ops = &xprt_clts_ops;
-		}
+		if ((error = rpcmodopen(q, devp, flag, sflag, crp)) == 0)
+			((struct rpcm *)q->q_ptr)->rm_ops = &xprt_clts_ops;
 	} else {
-		error = mir_open(q, devp, flag, sflag, crp);
-		if (error == 0) {
-			t = (struct temp_slot *)q->q_ptr;
-			t->ops = &xprt_cots_ops;
-		}
+		if ((error = mir_open(q, devp, flag, sflag, crp)) == 0)
+			((mir_t *)q->q_ptr)->rm_ops = &xprt_cots_ops;
 	}
 
 out:
-	freemsg(bp);
-
-	if (error && procson)
+	if (error)
 		qprocsoff(q);
+
+	freemsg(t->info_ack);
+	mutex_destroy(&t->lock);
+	cv_destroy(&t->wait);
 
 	return (error);
 }
@@ -954,115 +1056,6 @@ rpcmod_release(queue_t *q, mblk_t *bp)
 #define	MIR_LASTFRAG	0x80000000	/* Record marker */
 
 #define	DLEN(mp) (mp->b_cont ? msgdsize(mp) : (mp->b_wptr - mp->b_rptr))
-
-typedef struct mir_s {
-	void	*mir_krpc_cell;	/* Reserved for KRPC use. This field */
-					/* must be first in the structure. */
-	struct xprt_style_ops	*rm_ops;
-	int	mir_type;		/* Client or server side stream */
-
-	mblk_t	*mir_head_mp;		/* RPC msg in progress */
-		/*
-		 * mir_head_mp points the first mblk being collected in
-		 * the current RPC message.  Record headers are removed
-		 * before data is linked into mir_head_mp.
-		 */
-	mblk_t	*mir_tail_mp;		/* Last mblk in mir_head_mp */
-		/*
-		 * mir_tail_mp points to the last mblk in the message
-		 * chain starting at mir_head_mp.  It is only valid
-		 * if mir_head_mp is non-NULL and is used to add new
-		 * data blocks to the end of chain quickly.
-		 */
-
-	int32_t	mir_frag_len;		/* Bytes seen in the current frag */
-		/*
-		 * mir_frag_len starts at -4 for beginning of each fragment.
-		 * When this length is negative, it indicates the number of
-		 * bytes that rpcmod needs to complete the record marker
-		 * header.  When it is positive or zero, it holds the number
-		 * of bytes that have arrived for the current fragment and
-		 * are held in mir_header_mp.
-		 */
-
-	int32_t	mir_frag_header;
-		/*
-		 * Fragment header as collected for the current fragment.
-		 * It holds the last-fragment indicator and the number
-		 * of bytes in the fragment.
-		 */
-
-	unsigned int
-		mir_ordrel_pending : 1,	/* Sent T_ORDREL_REQ */
-		mir_hold_inbound : 1,	/* Hold inbound messages on server */
-					/* side until outbound flow control */
-					/* is relieved. */
-		mir_closing : 1,	/* The stream is being closed */
-		mir_inrservice : 1,	/* data queued or rd srv proc running */
-		mir_inwservice : 1,	/* data queued or wr srv proc running */
-		mir_inwflushdata : 1,	/* flush M_DATAs when srv runs */
-		/*
-		 * On client streams, mir_clntreq is 0 or 1; it is set
-		 * to 1 whenever a new request is sent out (mir_wput)
-		 * and cleared when the timer fires (mir_timer).  If
-		 * the timer fires with this value equal to 0, then the
-		 * stream is considered idle and KRPC is notified.
-		 */
-		mir_clntreq : 1,
-		/*
-		 * On server streams, stop accepting messages
-		 */
-		mir_svc_no_more_msgs : 1,
-		mir_listen_stream : 1,	/* listen end point */
-		mir_unused : 1,	/* no longer used */
-		mir_timer_call : 1,
-		mir_junk_fill_thru_bit_31 : 21;
-
-	int	mir_setup_complete;	/* server has initialized everything */
-	timeout_id_t mir_timer_id;	/* Timer for idle checks */
-	clock_t	mir_idle_timeout;	/* Allowed idle time before shutdown */
-		/*
-		 * This value is copied from clnt_idle_timeout or
-		 * svc_idle_timeout during the appropriate ioctl.
-		 * Kept in milliseconds
-		 */
-	clock_t	mir_use_timestamp;	/* updated on client with each use */
-		/*
-		 * This value is set to lbolt
-		 * every time a client stream sends or receives data.
-		 * Even if the timer message arrives, we don't shutdown
-		 * client unless:
-		 *    lbolt >= MSEC_TO_TICK(mir_idle_timeout)+mir_use_timestamp.
-		 * This value is kept in HZ.
-		 */
-
-	uint_t	*mir_max_msg_sizep;	/* Reference to sanity check size */
-		/*
-		 * This pointer is set to &clnt_max_msg_size or
-		 * &svc_max_msg_size during the appropriate ioctl.
-		 */
-	zoneid_t mir_zoneid;	/* zone which pushed rpcmod */
-	/* Server-side fields. */
-	int	mir_ref_cnt;		/* Reference count: server side only */
-					/* counts the number of references */
-					/* that a kernel RPC server thread */
-					/* (see svc_run()) has on this rpcmod */
-					/* slot. Effectively, it is the */
-					/* number * of unprocessed messages */
-					/* that have been passed up to the */
-					/* KRPC layer */
-
-	mblk_t	*mir_svc_pend_mp;	/* Pending T_ORDREL_IND or */
-					/* T_DISCON_IND */
-
-	/*
-	 * these fields are for both client and server, but for debugging,
-	 * it is easier to have these last in the structure.
-	 */
-	kmutex_t	mir_mutex;	/* Mutex and condvar for close */
-	kcondvar_t	mir_condvar;	/* synchronization. */
-	kcondvar_t	mir_timer_cv;	/* Timer routine sync. */
-} mir_t;
 
 #define	MIR_SVC_QUIESCED(mir)	\
 	(mir->mir_ref_cnt == 0 && mir->mir_inrservice == 0)
