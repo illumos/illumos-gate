@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,7 @@ static int _make_db();
 
 /*
  * _da_check_for_usb
- *	returns 1 if device pointed by 'link' is a removable hotplugged
+ *	returns 1 if device pointed by 'link' is a removable hotplugged disk,
  *	else returns 0.
  */
 int
@@ -61,8 +61,10 @@ _da_check_for_usb(char *link, char *root_dir)
 	int		fd = -1;
 	int		len, dstsize;
 	int		removable = 0;
+	int		hotpluggable = 0;
 	char		*p = NULL;
-	char		path[MAXPATHLEN];
+	char		path[MAXPATHLEN + 4];
+	char		rpath[MAXPATHLEN + 4];		/* for ",raw" */
 
 	dstsize = sizeof (path);
 	if (strcmp(root_dir, "") != 0) {
@@ -72,24 +74,27 @@ _da_check_for_usb(char *link, char *root_dir)
 	} else {
 		len = 0;
 	}
-	if (strstr(link, "rdsk")) {
-		(void) snprintf(path, dstsize - len, "%s", link);
-	} else if (strstr(link, "dsk")) {
-		p = rindex(link, '/');
-		if (p == NULL)
-			return (0);
-		p++;
-		(void) snprintf(path, dstsize - len, "%s%s", "/dev/rdsk/", p);
+	(void) snprintf(path, dstsize - len, "%s", link);
+	if ((p = realpath(path, rpath)) == NULL) {
+		p = path;
 	} else {
-		return (0);
+		if (strstr(link, "rdsk")) {
+			p = rpath;
+		} else {
+			(void) snprintf(path, dstsize, "%s%s", rpath, ",raw");
+			p = path;
+		}
 	}
-
-	if ((fd = open(path, O_RDONLY | O_NONBLOCK)) < 0)
+	if ((fd = open(p, O_RDONLY | O_NONBLOCK)) < 0)
 		return (0);
 	(void) ioctl(fd, DKIOCREMOVABLE, &removable);
+	(void) ioctl(fd, DKIOCHOTPLUGGABLE, &hotpluggable);
 	(void) close(fd);
 
-	return (removable);
+	if (removable && hotpluggable)
+		return (1);
+
+	return (0);
 }
 
 /*

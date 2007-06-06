@@ -2461,36 +2461,33 @@ devfsadm_mklink(char *link, di_node_t node, di_minor_t minor, int flags)
 	    == DEVFSADM_SUCCESS) {
 		linknew = TRUE;
 		add_link_to_cache(link, acontents);
-		if (system_labeled && (flags & DA_ADD)) {
-			/*
-			 * Add this device to the list of allocatable devices.
-			 */
-			int	instance = di_instance(node);
-
-			(void) da_add_list(&devlist, devlink, instance, flags);
-			update_devdb = flags;
-		}
 	} else {
 		linknew = FALSE;
 	}
 
 	if (link_exists == TRUE) {
-		if (system_labeled && (flags & DA_CD)) {
-			/*
-			 * if this is a removable disk, add it
-			 * as that to device allocation database.
-			 */
-			if (_da_check_for_usb(devlink, root_dir) == 1) {
-				int instance = di_instance(node);
-
-				(void) da_add_list(&devlist, devlink, instance,
-				    DA_ADD|DA_RMDISK);
-				update_devdb = DA_RMDISK;
-			}
-		}
 		/* Link exists or was just created */
 		(void) di_devlink_add_link(devlink_cache, link, rcontents,
 		    DI_PRIMARY_LINK);
+
+		if (system_labeled && (flags & DA_ADD)) {
+			/*
+			 * Add this to the list of allocatable devices. If this
+			 * is a hotplugged, removable disk, add it as rmdisk.
+			 */
+			int instance = di_instance(node);
+
+			if ((flags & DA_CD) &&
+			    (_da_check_for_usb(devlink, root_dir) == 1)) {
+				(void) da_add_list(&devlist, devlink, instance,
+				    DA_ADD|DA_RMDISK);
+				update_devdb = DA_RMDISK;
+			} else if (linknew == TRUE) {
+				(void) da_add_list(&devlist, devlink, instance,
+				    flags);
+				update_devdb = flags;
+			}
+		}
 	}
 
 	return (rv);
@@ -6907,7 +6904,7 @@ read_logindevperm_file(void)
 	FILE *fp;
 	char line[MAX_LDEV_LINE];
 	int ln, perm, rv;
-	char *cp, *console, *devlist, *dev;
+	char *cp, *console, *dlist, *dev;
 	char *lasts, *devlasts, *permstr, *drv;
 	struct driver_list *list, *next;
 
@@ -6984,12 +6981,12 @@ read_logindevperm_file(void)
 			continue;
 		}
 
-		if ((devlist = strtok_r(NULL, LDEV_DELIMS, &lasts)) == NULL) {
+		if ((dlist = strtok_r(NULL, LDEV_DELIMS, &lasts)) == NULL) {
 			err_print(IGNORING_LINE_IN, ln, LDEV_FILE);
 			continue;
 		}
 
-		dev = strtok_r(devlist, LDEV_DEV_DELIM, &devlasts);
+		dev = strtok_r(dlist, LDEV_DEV_DELIM, &devlasts);
 		while (dev) {
 
 			ldev = (struct login_dev *)s_zalloc(
