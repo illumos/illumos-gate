@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +58,7 @@ alarm(int deltat)
 	clock_t del = 0;
 	clock_t ret;
 	timeout_id_t tmp_id;
+	clock_t delta = (uint_t)deltat;
 
 	/*
 	 * We must single-thread this code relative to other
@@ -83,16 +83,16 @@ alarm(int deltat)
 
 	/*
 	 * Our implementation defined limit for alarm is
-	 * INT_MAX / hz. Anything larger gets truncated
-	 * to that limit. If deltat is negative we can
-	 * assume a wrap has occurred so peg deltat in
-	 * that case too.
+	 * LONG_MAX / hz. Anything larger gets truncated
+	 * to that limit. If delta is negative we can
+	 * assume a wrap has occurred so peg delta in
+	 * that case too. 64 bit platforms have higher limit.
 	 */
-	if (deltat > (INT_MAX / hz) || deltat < 0)
-		deltat = INT_MAX / hz;
+	if (delta > (LONG_MAX / hz) || delta < 0)
+		delta = LONG_MAX / hz;
 
-	if (deltat)
-		p->p_alarmid = realtime_timeout(sigalarm2proc, p, deltat * hz);
+	if (delta)
+		p->p_alarmid = realtime_timeout(sigalarm2proc, p, delta * hz);
 	mutex_exit(&p->p_lock);
 	return (ret);
 }
