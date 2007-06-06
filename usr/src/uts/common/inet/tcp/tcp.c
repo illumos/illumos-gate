@@ -14636,6 +14636,8 @@ fin_acked:
 				    TCP_TIMER_CANCEL(tcp,
 					tcp->tcp_linger_tid) >= 0) {
 					tcp_stop_lingering(tcp);
+					freemsg(mp);
+					mp = NULL;
 				}
 			} else {
 				/*
