@@ -447,7 +447,7 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	/*
-	 * Initialize hotplug support on this bus except for the PLX switch
+	 * Initialize hotplug support on this bus except for the PLX 8532
 	 * revision AA. At a minimum (for non hotplug bus) this would create
 	 * ":devctl" minor node to support DEVCTL_DEVICE_* and DEVCTL_BUS_*
 	 * ioctls to this bus. This all takes place if this nexus has hot-plug
@@ -478,7 +478,8 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	bus_num = (secondary << 8) | primary;
 	pci_config_put16(config_handle, PCI_BCNF_PRIBUS, bus_num);
 
-	if (pxb->pxb_rev_id <= PXB_DEVICE_PLX_AA_REV)
+	if ((pxb->pxb_device_id == PXB_DEVICE_PLX_8532) &&
+	    (pxb->pxb_rev_id <= PXB_DEVICE_PLX_AA_REV))
 		goto hotplug_done;
 #endif /* PX_PLX */
 
@@ -789,7 +790,8 @@ pxb_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	int		reglen, len;
 	uint32_t	d, intr;
 
-	if (hdlp->ih_type != DDI_INTR_TYPE_FIXED)
+	if ((intr_op == DDI_INTROP_SUPPORTED_TYPES) ||
+	    (hdlp->ih_type != DDI_INTR_TYPE_FIXED))
 		goto done;
 
 	/*

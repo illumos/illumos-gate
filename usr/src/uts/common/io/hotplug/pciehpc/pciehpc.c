@@ -20,7 +20,7 @@
  */
 
 /*
- *  Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
 
@@ -1180,6 +1180,13 @@ pciehpc_slot_connect(caddr_t ops_arg, hpc_slot_t slot_hdl,
 
 		goto cleanup1;
 	}
+
+	/* clear power fault status */
+	status =  pciehpc_reg_get16(ctrl_p,
+	    ctrl_p->pcie_caps_reg_offset + PCIE_SLOTSTS);
+	status |= PCIE_SLOTSTS_PWR_FAULT_DETECTED;
+	pciehpc_reg_put16(ctrl_p, ctrl_p->pcie_caps_reg_offset + PCIE_SLOTSTS,
+	    status);
 
 	/* enable power fault detection interrupt */
 	control |= PCIE_SLOTCTL_PWR_FAULT_EN;

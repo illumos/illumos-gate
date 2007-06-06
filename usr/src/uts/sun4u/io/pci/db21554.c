@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2149,7 +2149,8 @@ db_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 	DB_DEBUG1(DB_INTR_OPS, dip, "intr_op=%d\n",  intr_op);
 
-	if (hdlp->ih_type != DDI_INTR_TYPE_FIXED)
+	if ((intr_op == DDI_INTROP_SUPPORTED_TYPES) ||
+	    (hdlp->ih_type != DDI_INTR_TYPE_FIXED))
 		goto done;
 
 	/*

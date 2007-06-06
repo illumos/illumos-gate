@@ -651,7 +651,8 @@ ppb_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	int		reglen, len;
 	uint32_t	d, intr;
 
-	if (hdlp->ih_type != DDI_INTR_TYPE_FIXED)
+	if ((intr_op == DDI_INTROP_SUPPORTED_TYPES) ||
+	    (hdlp->ih_type != DDI_INTR_TYPE_FIXED))
 		goto done;
 
 	/*

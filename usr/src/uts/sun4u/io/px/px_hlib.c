@@ -3153,6 +3153,9 @@ oberon_hp_pwron(caddr_t csr_base)
 	else
 		CSR_BS(csr_base, HOTPLUG_CONTROL, SLOTPON);
 
+	/* Wait for one second */
+	delay(drv_usectohz(1000000));
+
 	return (DDI_SUCCESS);
 
 fail2:
@@ -3181,11 +3184,14 @@ fail:
 	return ((uint_t)DDI_FAILURE);
 }
 
+hrtime_t oberon_leaf_reset_timeout = 120ll * NANOSEC;	/* 120 seconds */
+
 static uint_t
 oberon_hp_pwroff(caddr_t csr_base)
 {
 	volatile uint64_t reg;
 	volatile uint64_t reg_tluue, reg_tluce;
+	hrtime_t start_time, end_time;
 
 	DBG(DBG_HP, NULL, "oberon_hp_pwroff the slot\n");
 
@@ -3257,7 +3263,22 @@ oberon_hp_pwroff(caddr_t csr_base)
 	if (CSR_BR(csr_base, HOTPLUG_CONTROL, SLOTPON))
 		CSR_BC(csr_base, HOTPLUG_CONTROL, SLOTPON);
 	else
-		CSR_BC(csr_base, HOTPLUG_CONTROL, SLOTPON);
+		CSR_BS(csr_base, HOTPLUG_CONTROL, SLOTPON);
+
+	start_time = gethrtime();
+	/* Check Leaf Reset status */
+	while (!(CSR_BR(csr_base, ILU_ERROR_LOG_ENABLE, SPARE3))) {
+		if ((end_time = (gethrtime() - start_time)) >
+		    oberon_leaf_reset_timeout) {
+			cmn_err(CE_WARN, "Oberon leaf reset is not completed, "
+			    "even after waiting %llx ticks", end_time);
+
+			break;
+		}
+
+		/* Wait for one second */
+		delay(drv_usectohz(1000000));
+	}
 
 	/* Indicator LED off */
 	reg = CSR_XR(csr_base, TLU_SLOT_CONTROL);
