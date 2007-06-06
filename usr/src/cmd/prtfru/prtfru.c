@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "fru_tag.h"
 #include "libfrup.h"
@@ -54,12 +55,17 @@ static void	(*print_node)(fru_node_t fru_type, const char *path,
 				const char *name, end_node_fp_t *end_node,
 				void **end_args);
 
+static void	print_element(const uint8_t *data, const fru_regdef_t *def,
+const char *parent_path, int indent);
+
 static char	tagname[sizeof ("?_0123456789_0123456789_0123456789")];
 
 static int	containers_only = 0, list_only = 0, saved_status = 0, xml = 0;
 
 static FILE	*errlog;
 
+int iterglobal = 0;
+int FMAmessageR = -1;
 /*
  * Definition for data elements found in devices but not found in
  * the system's version of libfrureg
@@ -330,6 +336,33 @@ output_dtd(void)
 
 	return (0);
 }
+/*
+ * Function to convert bcd to binary to correct the SPD_Manufacturer_Week
+ *
+ */
+static void convertbcdtobinary(int *val)
+{
+	int newval, tmpval, rem, origval, poweroften;
+	int i;
+	tmpval = 0;
+	newval = 0;
+	i = 0;
+	rem = 0;
+	poweroften = 1;
+	origval = (int)(*val);
+	tmpval = (int)(*val);
+	while (tmpval != 0) {
+		if (i >= 1)
+			poweroften = poweroften * 10;
+		origval = tmpval;
+		tmpval = (int)(tmpval/16);
+		rem = origval - (tmpval * 16);
+		newval = newval +(int)(poweroften * rem);
+		i ++;
+	}
+	*val = newval;
+}
+
 
 /*
  * Safely pretty-print the value of a field
@@ -337,15 +370,22 @@ output_dtd(void)
 static void
 print_field(const uint8_t *field, const fru_regdef_t *def)
 {
-	char		*errmsg = NULL, timestring[TIMESTRINGLEN];
+	char		*errmsg = NULL, timestring[TIMESTRINGLEN], path[16384];
 
-	int		i;
+	int		i, valueint;
 
 	uint64_t	value;
 
 	time_t		timefield;
 
+	struct tm	*tm;
 
+	uchar_t		first_byte, data[128];
+
+	const fru_regdef_t	*new_def;
+
+	const char 	*elem_name = NULL;
+	const char	*parent_path;
 	switch (def->dataType) {
 	case FDTYPE_Binary:
 		assert(def->payloadLen <= sizeof (value));
@@ -365,9 +405,17 @@ print_field(const uint8_t *field, const fru_regdef_t *def)
 		case FDISP_Octal:
 		case FDISP_Decimal:
 			value = 0;
+			valueint = 0;
 			(void) memcpy((((uint8_t *)&value) +
 					sizeof (value) - def->payloadLen),
 					field, def->payloadLen);
+			if ((value != 0) &&
+			(strcmp(def->name, "SPD_Manufacture_Week") == 0)) {
+				valueint = (int)value;
+				convertbcdtobinary(&valueint);
+				output("%d", valueint);
+				return;
+			}
 			if ((value != 0) &&
 				((strcmp(def->name, "Lowest") == 0) ||
 				(strcmp(def->name, "Highest") == 0) ||
@@ -384,9 +432,20 @@ print_field(const uint8_t *field, const fru_regdef_t *def)
 				errmsg = "time value too large for formatting";
 				break;
 			}
-			(void) memcpy(&timefield, field, sizeof (timefield));
-			if (strftime(timestring, sizeof (timestring), "%C",
-					localtime(&timefield)) == 0) {
+			timefield = 0;
+			(void) memcpy((((uint8_t *)&timefield) +
+					sizeof (timefield) - def->payloadLen),
+					field, def->payloadLen);
+			if (timefield == 0) {
+				errmsg = "No Value Recorded";
+				break;
+			}
+			if ((tm = localtime(&timefield)) == NULL) {
+				errmsg = "cannot convert time value";
+				break;
+			}
+			if (strftime(timestring, sizeof (timestring), "%C", tm)
+			    == 0) {
 				errmsg = "formatted time would overflow buffer";
 				break;
 			}
@@ -395,6 +454,28 @@ print_field(const uint8_t *field, const fru_regdef_t *def)
 		}
 		break;
 	case FDTYPE_ASCII:
+		if (!xml) {
+			if (strcmp(def->name, "Message") == 0) {
+				if (FMAmessageR == 0)
+					elem_name = "FMA_Event_DataR";
+				else if (FMAmessageR == 1)
+					elem_name = "FMA_MessageR";
+				if (elem_name != NULL) {
+					(void) memcpy(data, field,
+					def->payloadLen);
+					new_def =
+					fru_reg_lookup_def_by_name(elem_name);
+					snprintf(path, sizeof (path),
+					"/Status_EventsR[%d]/Message(FMA)",
+					iterglobal);
+					parent_path = path;
+					output("\n");
+					print_element(data, new_def,
+parent_path, 2*INDENT);
+					return;
+				}
+			}
+		}
 		for (i = 0; i < def->payloadLen && field[i]; i++)
 			safeputchar(field[i]);
 		return;
@@ -405,6 +486,15 @@ print_field(const uint8_t *field, const fru_regdef_t *def)
 					field, def->payloadLen);
 		for (i = 0; i < def->enumCount; i++)
 			if (def->enumTable[i].value == value) {
+				if (strcmp(def->name, "Event_Code") == 0) {
+					if (strcmp(def->enumTable[i].text,
+"FMA Message R") == 0)
+						FMAmessageR = 1;
+				else
+					if (strcmp(def->enumTable[i].text,
+"FMA Event Data R") == 0)
+						FMAmessageR = 0;
+				}
 				safeputs(def->enumTable[i].text);
 				return;
 			}
@@ -414,14 +504,36 @@ print_field(const uint8_t *field, const fru_regdef_t *def)
 	}
 
 	/* If nothing matched above, print the field in hex */
-	for (i = 0; i < def->payloadLen; i++)
-		output("%2.2X", field[i]);
+	switch (def->dispType) {
+		case FDISP_MSGID:
+			(void) memcpy((uchar_t *)&first_byte, field, 1);
+			if (isprint(first_byte)) {
+				for (i = 0; i < def->payloadLen && field[i];
+i++)
+					safeputchar(field[i]);
+			}
+			break;
+		case FDISP_UUID:
+			for (i = 0; i < def->payloadLen; i++) {
+				if ((i == 4) || (i == 6) ||
+(i == 8) || (i == 10))
+				output("-");
+				output("%2.2x", field[i]);
+			}
+			break;
+		default:
+			for (i = 0; i < def->payloadLen; i++)
+				output("%2.2X", field[i]);
+			break;
+	}
 
 	/* Safely print any error message associated with the field */
 	if (errmsg) {
-		output(" (");
-		safeputs(errmsg);
-		output(")\n");
+		if (strcmp(def->name, "Fault_Diag_Secs") != 0) {
+			output(" (");
+			safeputs(errmsg);
+			output(")");
+		}
 	}
 }
 
@@ -439,7 +551,6 @@ print_element(const uint8_t *data, const fru_regdef_t *def,
 
 
 	indent = (xml) ? (indent + INDENT) : (2*INDENT);
-
 	/*
 	 * Construct the path, or, for XML, the name, for the current
 	 * data element
@@ -539,6 +650,7 @@ print_element(const uint8_t *data, const fru_regdef_t *def,
 				n < num;
 				i = ((i + 1) % def->iterationCount), n++) {
 			if (!xml) (void) sprintf((path + bytes), "[%d]", n);
+			iterglobal = n;
 			print_element((data + i*iterlen), &newdef, path,
 					indent);
 		}
@@ -577,6 +689,31 @@ print_element(const uint8_t *data, const fru_regdef_t *def,
 		print_field(data, def);
 		/*CSTYLED*/
 		output("\"/>\n");	/* \" confuses cstyle */
+
+		if ((strcmp(def->name, "Message") == 0) &&
+			((FMAmessageR == 0) || (FMAmessageR == 1))) {
+			const char	*elem_name = NULL;
+			const char	*parent_path;
+			uchar_t		tmpdata[128];
+			char		path[16384];
+			const fru_regdef_t	*new_def;
+
+			if (FMAmessageR == 0)
+				elem_name = "FMA_Event_DataR";
+			else if (FMAmessageR == 1)
+				elem_name = "FMA_MessageR";
+			if (elem_name != NULL) {
+				(void) memcpy(tmpdata, data, def->payloadLen);
+				new_def = fru_reg_lookup_def_by_name(elem_name);
+				snprintf(path, sizeof (path),
+				"/Status_EventsR[%d]/Message(FMA)", iterglobal);
+				parent_path = path;
+				print_element(tmpdata, new_def,
+parent_path, 2*INDENT);
+				FMAmessageR = -1;
+			}
+		}
+
 	} else {
 		/*
 		 * Base case:  print the field
@@ -599,7 +736,6 @@ print_packet(fru_tag_t *tag, uint8_t *payload, size_t length, void *args)
 	size_t			payload_length = 0;
 
 	const fru_regdef_t	*def;
-
 
 	/*
 	 * Build a definition for unrecognized tags (e.g., not in libfrureg)
