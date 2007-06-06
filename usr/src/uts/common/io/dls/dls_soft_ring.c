@@ -666,7 +666,7 @@ dls_soft_ring_fanout(void *rx_handle, void *rx_cookie, mblk_t *mp_chain,
 		bp = mp = mp_chain;
 		mp_chain = mp_chain->b_next;
 		mp->b_next = NULL;
-		if (MBLKL(mp) < sizeof (ipha_t)) {
+		if ((MBLKL(mp) < sizeof (ipha_t)) || !OK_32PTR(mp->b_rptr)) {
 			if ((mp = msgpullup(mp, sizeof (ipha_t))) == NULL) {
 				/* Let's toss this away */
 				dls_bad_ip_pkt++;
