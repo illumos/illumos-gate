@@ -58,7 +58,9 @@ typedef enum psm_intr_op_e {
 	PSM_INTR_OP_GET_SHARED,		/* 10. Get the shared intr info */
 	PSM_INTR_OP_CHECK_MSI,		/* 11. Chk if device supports MSI */
 	PSM_INTR_OP_SET_CPU,		/* 12. Set vector's CPU */
-	PSM_INTR_OP_GET_INTR		/* 13. Get vector's info */
+	PSM_INTR_OP_GET_INTR,		/* 13. Get vector's info */
+	PSM_INTR_OP_GRP_SET_CPU,	/* 14. Set all device's vectors' CPU */
+	PSM_INTR_OP_APIC_TYPE		/* 15. Returns APIC type */
 } psm_intr_op_t;
 
 struct psm_ops {

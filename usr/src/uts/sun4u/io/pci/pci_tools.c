@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -268,18 +267,30 @@ pcitool_validate_cpuid(uint32_t cpuid)
 }
 
 
-/* Return the number of interrupts on a pci bus. */
+/*ARGSUSED*/
 static int
-pcitool_intr_get_max_ino(uint32_t *arg, int mode)
+pcitool_intr_info(dev_info_t *dip, void *arg, int mode)
 {
-	uint32_t num_intr = PCI_MAX_INO;
+	pcitool_intr_info_t intr_info;
+	int rval = SUCCESS;
 
-	if (ddi_copyout(&num_intr, arg, sizeof (uint32_t), mode) !=
+	/* If we need user_version, and to ret same user version as passed in */
+	if (ddi_copyin(arg, &intr_info, sizeof (pcitool_intr_info_t), mode) !=
 	    DDI_SUCCESS) {
 		return (EFAULT);
-	} else {
-		return (SUCCESS);
 	}
+
+	intr_info.ctlr_version = 0;	/* XXX how to get real version? */
+	intr_info.ctlr_type = PCITOOL_CTLR_TYPE_RISC;
+	intr_info.num_intr = PCI_MAX_INO;
+
+	intr_info.drvr_version = PCITOOL_VERSION;
+	if (ddi_copyout(&intr_info, arg, sizeof (pcitool_intr_info_t), mode) !=
+	    DDI_SUCCESS) {
+		rval = EFAULT;
+	}
+
+	return (rval);
 }
 
 
@@ -381,7 +392,7 @@ pcitool_get_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p)
 		}
 	}
 done_get_intr:
-	iget->drvr_version = PCITOOL_DRVR_VERSION;
+	iget->drvr_version = PCITOOL_VERSION;
 	copyout_rval = ddi_copyout(iget, arg,
 	    PCITOOL_IGET_SIZE(num_devs_ret), mode);
 
@@ -415,10 +426,37 @@ pcitool_set_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p)
 	uint64_t new_imregval;
 	volatile uint64_t *imregp;
 	volatile uint64_t *idregp;
+	size_t copyinout_size;
 
-	if (ddi_copyin(arg, &iset, sizeof (pcitool_intr_set_t), mode) !=
-	    DDI_SUCCESS)
+	bzero(&iset, sizeof (pcitool_intr_set_t));
+
+	/* Version 1 of pcitool_intr_set_t doesn't have flags. */
+	copyinout_size = (size_t)&iset.flags - (size_t)&iset;
+
+	if (ddi_copyin(arg, &iset, copyinout_size, mode) != DDI_SUCCESS)
 		return (EFAULT);
+
+	switch (iset.user_version) {
+	case PCITOOL_V1:
+		break;
+
+	case PCITOOL_V2:
+		copyinout_size = sizeof (pcitool_intr_set_t);
+		if (ddi_copyin(arg, &iset, copyinout_size, mode) != DDI_SUCCESS)
+			return (EFAULT);
+		break;
+
+	default:
+		iset.status = PCITOOL_OUT_OF_RANGE;
+		rval = ENOTSUP;
+		goto done_set_intr;
+	}
+
+	if (iset.flags & PCITOOL_INTR_SET_FLAG_GROUP) {
+		iset.status = PCITOOL_IO_ERROR;
+		rval = ENOTSUP;
+		goto done_set_intr;
+	}
 
 	/* Validate input argument and that ino given belongs to a device. */
 	if ((iset.ino > PCI_MAX_INO) ||
@@ -514,9 +552,8 @@ pcitool_set_intr(dev_info_t *dip, void *arg, int mode, pci_t *pci_p)
 		rval = EINVAL;
 	}
 done_set_intr:
-	iset.drvr_version = PCITOOL_DRVR_VERSION;
-	if (ddi_copyout(&iset, arg, sizeof (pcitool_intr_set_t), mode) !=
-	    DDI_SUCCESS)
+	iset.drvr_version = PCITOOL_VERSION;
+	if (ddi_copyout(&iset, arg, copyinout_size, mode) != DDI_SUCCESS)
 		rval = EFAULT;
 
 	return (rval);
@@ -533,9 +570,9 @@ pcitool_intr_admn(dev_t dev, void *arg, int cmd, int mode)
 
 	switch (cmd) {
 
-	/* Return the number of interrupts supported by a PCI bus. */
-	case PCITOOL_DEVICE_NUM_INTR:
-		rval = pcitool_intr_get_max_ino(arg, mode);
+	/* Get system interrupt information. */
+	case PCITOOL_SYSTEM_INTR_INFO:
+		rval = pcitool_intr_info(dip, arg, mode);
 		break;
 
 	/* Get interrupt information for a given ino. */
@@ -701,7 +738,7 @@ done:
 	if (pci_rp != NULL)
 		ddi_prop_free(pci_rp);
 
-	prg.drvr_version = PCITOOL_DRVR_VERSION;
+	prg.drvr_version = PCITOOL_VERSION;
 	if (ddi_copyout(&prg, arg, sizeof (pcitool_reg_t), mode) !=
 	    DDI_SUCCESS) {
 		DEBUG0(DBG_TOOLS, dip, "Copyout failed.\n");
@@ -989,7 +1026,7 @@ pcitool_dev_reg_ops(dev_t dev, void *arg, int cmd, int mode)
 	}
 
 done_reg:
-	prg.drvr_version = PCITOOL_DRVR_VERSION;
+	prg.drvr_version = PCITOOL_VERSION;
 	if (ddi_copyout(&prg, arg, sizeof (pcitool_reg_t), mode) !=
 	    DDI_SUCCESS) {
 		DEBUG0(DBG_TOOLS, dip, "Error returning arguments.\n");

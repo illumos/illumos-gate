@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -68,14 +68,13 @@ while ($_ = shift @ARGV) {
 if ($using_scengen == 0) {
 	require Sun::Solaris::Kstat;
 	require Sun::Solaris::Intrs;
-	import Sun::Solaris::Intrs(qw(intrmove));
+	import Sun::Solaris::Intrs(qw(intrmove is_pcplusmp));
 	require Sys::Syslog;
 	import Sys::Syslog;
 	openlog($cmdname, 'pid', 'daemon');
 	setlogmask(Sys::Syslog::LOG_UPTO($debug > 0 ? &Sys::Syslog::LOG_DEBUG :
 	    &Sys::Syslog::LOG_INFO));
 }
-
 
 my $asserted = 0;
 my $assert_level = 'debug';	# syslog level for assertion failures
@@ -93,7 +92,7 @@ sub VERIFY($@)
 
 
 
-sub getstat($);
+sub getstat($$);
 sub generate_delta($$);
 sub compress_deltas($);
 sub dumpdelta($);
@@ -142,18 +141,24 @@ sub do_reconfig_cpu($$$);	# private function
 #        ->{"pil"}      == pci_intrs:<ivec#>:<nexus>:pil
 #        ->{"crtime"}   == pci_intrs:<ivec#>:<nexus>:crtime
 #        ->{"ino"}      == pci_intrs:<ivec#>:<nexus>:ino
+#        ->{"num_ino"}  == num inos of single device instance sharing this entry
+#				Will be > 1 on pcplusmp X86 systems for devices
+#				with multiple MSI interrupts.
 #        ->{"buspath"}  == pci_intrs:<ivec#>:<nexus>:buspath
 #        ->{"name"}     == pci_intrs:<ivec#>:<nexus>:name
 #        ->{"ihs"}      == pci_intrs:<ivec#>:<nexus>:ihs
 #
 
-sub getstat($)
+sub getstat($$)
 {
-	my ($ks) = @_;
+	my ($ks, $pcplusmp_sys) = @_;
 
 	my $cpucnt = 0;
 	my %stat = ();
 	my ($minsnap, $maxsnap);
+
+	# Hash of hash which matches (MSI device, ino) combos to kstats.
+	my %msidevs = ();
 
 	# kstats are not generated atomically. Each kstat hierarchy will
 	# have been generated within the kernel at a different time. On a
@@ -177,6 +182,8 @@ sub getstat($)
 
 	while (my ($cpu, $cpst) = each %{$ks->{cpu}}) {
 		next if !exists($ks->{cpu_info}{$cpu}{"cpu_info$cpu"}{state});
+		#"state" fld of kstat w/
+		#		  modname    inst name-"cpuinfo0"
 		my $state = $ks->{cpu_info}{$cpu}{"cpu_info$cpu"}{state};
 		next if ($state !~ /^on-line\0/);
 		my $cpu_sys = $cpst->{sys};
@@ -214,6 +221,10 @@ sub getstat($)
 		next unless exists $stat{$cpu};
 		next if ($intrcfg->{type} =~ /^disabled\0/);
 
+		# Perl looks beyond NULL chars in pattern matching.
+		# Truncate name field at the first NULL
+		$intrcfg->{name} =~ s/\0.*$//;
+
 		if ($intrcfg->{snaptime} < $minsnap) {
 			$minsnap = $intrcfg->{snaptime};
 		} elsif ($intrcfg->{snaptime} > $maxsnap) {
@@ -242,9 +253,62 @@ sub getstat($)
 		$stat{$cpu}{ivecs}{$cookie}{crtime} = $intrcfg->{crtime};
 		$stat{$cpu}{ivecs}{$cookie}{pil} = $intrcfg->{pil};
 		$stat{$cpu}{ivecs}{$cookie}{ino} = $intrcfg->{ino};
+		$stat{$cpu}{ivecs}{$cookie}{num_ino} = 1;
 		$stat{$cpu}{ivecs}{$cookie}{buspath} = $intrcfg->{buspath};
 		$stat{$cpu}{ivecs}{$cookie}{name} = $intrcfg->{name};
 		$stat{$cpu}{ivecs}{$cookie}{ihs} = 1;
+
+		if ($pcplusmp_sys && ($intrcfg->{type} =~ /^msi\0/)) {
+			if (!(exists($msidevs{$intrcfg->{name}}))) {
+				$msidevs{$intrcfg->{name}} = {};
+			}
+			$msidevs{$intrcfg->{name}}{$intrcfg->{ino}} =
+			    \$stat{$cpu}{ivecs}{$cookie};
+		}
+	}
+
+	# All MSI interrupts of a device instance share a single MSI address.
+	# On X86 systems with an APIC, this MSI address is interpreted as CPU
+	# routing info by the APIC.  For this reason, on these platforms, all
+	# interrupts for MSI devices must be moved to the same CPU at the same
+	# time.
+	#
+	# Since all interrupts will be on the same CPU on these platforms, all
+	# interrupts can be consolidated into one ivec entry.  For such devices,
+	# num_ino will be > 1 to denote that a group move is needed.  
+
+	# Loop thru all MSI devices on X86 pcplusmp systems.
+	# Nop on other systems.
+	foreach my $msidevkey (sort keys %msidevs) {
+
+		# Loop thru inos of the device, sorted by lowest value first
+		# For each cookie found for a device, incr num_ino for the
+		# lowest cookie and remove other cookies.
+
+		# Assumes PIL is the same for first and current cookies
+
+		my $first_ino = -1;
+		my $first_cookiep;
+		my $curr_cookiep;
+		foreach my $inokey (sort keys %{$msidevs{$msidevkey}}) {
+			$curr_cookiep = $msidevs{$msidevkey}{$inokey};
+			if ($first_ino == -1) {
+				$first_ino = $inokey;
+				$first_cookiep = $curr_cookiep;
+			} else {
+				$$first_cookiep->{num_ino}++;
+				$$first_cookiep->{time} +=
+				    $$curr_cookiep->{time};
+				if ($$curr_cookiep->{crtime} >
+				    $$first_cookiep->{crtime}) {
+					$$first_cookiep->{crtime} =
+					    $$curr_cookiep->{crtime};
+				}
+				# Invalidate this cookie, less complicated and
+				# more efficient than deleting it.
+				$$curr_cookiep->{num_ino} = 0;
+			}
+		}
 	}
 
 	# We define the timerange as the amount of time spent gathering the
@@ -287,10 +351,11 @@ sub getstat($)
 #     ->{<ivec#>}       iterates over ivecs for this cpu
 #        ->{"time"}     time used by this interrupt (in nsec)
 #        ->{"pil"}      pil level of this interrupt
-#        ->{"ino"}      interrupt number
+#        ->{"ino"}      interrupt number (or base vector if MSI group)
 #        ->{"buspath"}  filename of the directory of the device's bus
 #        ->{"name"}     device name
 #        ->{"ihs"}      number of different handlers sharing this ino
+#        ->{"num_ino"}  number of interrupt vectors in MSI group
 #
 # It prints out the delta structure in a nice, human readable display.
 #
@@ -403,9 +468,14 @@ sub generate_delta($$)
 		}
 
 		while (my ($inum, $newivec) = each %{$newcpst->{ivecs}}) {
+
+			# Unused cookie, corresponding to an MSI vector which
+			# is part of a group.  The whole group is accounted for
+			# by a different cookie.
+			next if ($newivec->{num_ino} == 0);
+
 			# If this ivec doesn't exist in $stat, or if $stat
 			# shows a different crtime, set missing.
-
 			if (VERIFY(exists $cpst->{ivecs}{$inum} &&
 				   $cpst->{ivecs}{$inum}{crtime} ==
 				   $newivec->{crtime},
@@ -446,6 +516,7 @@ sub generate_delta($$)
 			$dltivec{buspath} = $newivec->{buspath};
 			$dltivec{name} = $newivec->{name};
 			$dltivec{ihs} = $newivec->{ihs};
+			$dltivec{num_ino} = $newivec->{num_ino};
 		}
 		if ($delta{$cpu}{tot} < $delta{$cpu}{intrs}) {
 			# Ewww! Hopefully just a rounding error.
@@ -517,6 +588,7 @@ sub compress_deltas ($)
 				$newivecs->{$inum}{buspath} = $ivec->{buspath};
 				$newivecs->{$inum}{name} = $ivec->{name};
 				$newivecs->{$inum}{ihs} = $ivec->{ihs};
+				$newivecs->{$inum}{num_ino} = $ivec->{num_ino};
 			}
 		}
 	}
@@ -868,7 +940,7 @@ sub do_reconfig($)
 			next if ($ivec->{origcpu} == $cpuid);
 
 			if (!intrmove($ivec->{buspath}, $ivec->{ino},
-			    $cpuid)) {
+			    $cpuid, $ivec->{num_ino})) {
 				syslog('warning', "Unable to move interrupts")
 				    if $warned++ == 0;
 				syslog('debug', "Unable to move buspath ".
@@ -1195,9 +1267,20 @@ if (!exists($ks->{pci_intrs})) {
 	exit 0;
 }
 
-my $stat = getstat($ks);
+# See if this is a system with a pcplusmp APIC.
+# Such systems will get special handling.
+# Assume that if one bus has a pcplusmp APIC that they all do.
 
+# Get a list of pci_intrs kstats.
+my @elem = values(%{$ks->{pci_intrs}});
+my $elem0 = $elem[0];
+my $elemval = (values(%$elem0))[0];
 
+# Use its buspath to query the system.  It is assumed that either all or none
+# of the busses on a system are hosted by the pcplusmp APIC.
+my $pcplusmp_sys = is_pcplusmp($elemval->{buspath});
+
+my $stat = getstat($ks, $pcplusmp_sys);
 
 for (;;) {
 	sub clear_deltas {
@@ -1216,7 +1299,7 @@ for (;;) {
 	} else {
 		$ks = myks_update();
 	}
-	$newstat = getstat($ks);
+	$newstat = getstat($ks, $pcplusmp_sys);
 
 	# $stat or $newstat could be zero if they're uninitialized, or if
 	# getstat() failed. If $stat is zero, move $newstat to $stat, sleep
@@ -1228,7 +1311,6 @@ for (;;) {
 		$stat = $newstat;
 		next;
 	}
-
 
 	# 2. Compare $newstat with the prior set of values, result in %$delta.
 

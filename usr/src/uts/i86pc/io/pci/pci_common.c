@@ -145,7 +145,7 @@ pci_common_set_parent_private_data(dev_info_t *dip)
 
 	pdptr = (struct ddi_parent_private_data *)kmem_zalloc(
 	    (sizeof (struct ddi_parent_private_data) +
-	sizeof (struct intrspec)), KM_SLEEP);
+	    sizeof (struct intrspec)), KM_SLEEP);
 	pdptr->par_intr = (struct intrspec *)(pdptr + 1);
 	pdptr->par_nintr = 1;
 	ddi_set_parent_data(dip, pdptr);
@@ -400,7 +400,7 @@ SUPPORTED_TYPES_OUT:
 			if (pciepci) {
 				/* update priority in ispec */
 				isp = pci_intx_get_ispec(pdip, rdip,
-					(int)hdlp->ih_inum);
+				    (int)hdlp->ih_inum);
 				ispec = (struct intrspec *)isp;
 				if (ispec)
 					ispec->intrspec_pri = hdlp->ih_pri;
@@ -437,7 +437,7 @@ SUPPORTED_TYPES_OUT:
 				msix_p = i_ddi_get_msix(hdlp->ih_dip);
 				if (msix_p &&
 				    (i_ddi_intr_get_current_nintrs(
-					hdlp->ih_dip) - 1) == 0) {
+				    hdlp->ih_dip) - 1) == 0) {
 					pci_msix_fini(msix_p);
 					i_ddi_set_msix(hdlp->ih_dip, NULL);
 				}
@@ -581,8 +581,9 @@ SUPPORTED_TYPES_OUT:
 				DDI_INTR_NEXDBG((CE_CONT, "BLOCKENABLE: "
 				    "pci_enable_intr failed for %d\n", i));
 				for (j = 0; j < i; j++) {
-				    hdlp = (ddi_intr_handle_impl_t *)h_array[j];
-				    pci_disable_intr(pdip, rdip, hdlp,
+					hdlp = (ddi_intr_handle_impl_t *)
+					    h_array[j];
+					pci_disable_intr(pdip, rdip, hdlp,
 					    hdlp->ih_inum);
 				}
 				return (DDI_FAILURE);
@@ -899,7 +900,7 @@ pci_common_ioctl(dev_info_t *dip, dev_t dev, int cmd, intptr_t arg,
 		/*FALLTHRU*/
 		/* These require no special privileges. */
 		case PCITOOL_DEVICE_GET_INTR:
-		case PCITOOL_DEVICE_NUM_INTR:
+		case PCITOOL_SYSTEM_INTR_INFO:
 			rv = pcitool_intr_admn(dip, (void *)arg, cmd, mode);
 			break;
 		}
@@ -1599,9 +1600,9 @@ is_amd_northbridge(dev_info_t *dip)
 	int vendor_id, device_id;
 
 	vendor_id = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-			"vendor-id", -1);
+	    "vendor-id", -1);
 	device_id = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-			"device-id", -1);
+	    "device-id", -1);
 
 	if (IS_AMD_NTBRIDGE(vendor_id, device_id))
 		return (0);

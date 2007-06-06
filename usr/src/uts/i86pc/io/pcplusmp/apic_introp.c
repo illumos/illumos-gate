@@ -95,7 +95,7 @@ apic_pci_msi_enable_vector(dev_info_t *dip, int type, int inum, int vector,
 	/* MSI Address */
 	msi_addr = (MSI_ADDR_HDR | (target_apic_id << MSI_ADDR_DEST_SHIFT));
 	msi_addr |= ((MSI_ADDR_RH_FIXED << MSI_ADDR_RH_SHIFT) |
-		    (MSI_ADDR_DM_PHYSICAL << MSI_ADDR_DM_SHIFT));
+	    (MSI_ADDR_DM_PHYSICAL << MSI_ADDR_DM_SHIFT));
 
 	/* MSI Data: MSI is edge triggered according to spec */
 	msi_data = ((MSI_DATA_TM_EDGE << MSI_DATA_TM_SHIFT) | vector);
@@ -163,7 +163,7 @@ apic_navail_vector(dev_info_t *dip, int pri)
 	for (i = lowest; i < highest; i++) {
 		count = 0;
 		while ((apic_vector_to_irq[i] == APIC_RESV_IRQ) &&
-			(i < highest)) {
+		    (i < highest)) {
 			if (APIC_CHECK_RESERVE_VECTORS(i))
 				break;
 			count++;
@@ -212,7 +212,7 @@ apic_find_multi_vectors(int pri, int count)
 			i = (i + msibits) & ~msibits;
 		start = i;
 		while ((apic_vector_to_irq[i] == APIC_RESV_IRQ) &&
-			(i < highest)) {
+		    (i < highest)) {
 			if (APIC_CHECK_RESERVE_VECTORS(i))
 				break;
 			navail++;
@@ -433,107 +433,6 @@ apic_check_msi_support()
 	return (PSM_FAILURE);
 }
 
-int
-apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
-{
-	struct autovec *av_dev;
-	uchar_t irqno;
-	int i;
-	apic_irq_t *irq_p;
-
-	/* Sanity check the vector/irq argument. */
-	ASSERT((vecirq >= 0) || (vecirq <= APIC_MAX_VECTOR));
-
-	mutex_enter(&airq_mutex);
-
-	/*
-	 * Convert the vecirq arg to an irq using vector_to_irq table
-	 * if the arg is a vector.  Pass thru if already an irq.
-	 */
-	if ((intr_params_p->avgi_req_flags & PSMGI_INTRBY_FLAGS) ==
-	    PSMGI_INTRBY_VEC)
-		irqno = apic_vector_to_irq[vecirq];
-	else
-		irqno = vecirq;
-
-	irq_p = apic_irq_table[irqno];
-
-	if ((irq_p == NULL) ||
-	    (irq_p->airq_temp_cpu == IRQ_UNBOUND) ||
-	    (irq_p->airq_temp_cpu == IRQ_UNINIT)) {
-		mutex_exit(&airq_mutex);
-		return (PSM_FAILURE);
-	}
-
-	if (intr_params_p->avgi_req_flags & PSMGI_REQ_CPUID) {
-
-		/* Get the (temp) cpu from apic_irq table, indexed by irq. */
-		intr_params_p->avgi_cpu_id = irq_p->airq_temp_cpu;
-
-		/* Return user bound info for intrd. */
-		if (intr_params_p->avgi_cpu_id & IRQ_USER_BOUND) {
-			intr_params_p->avgi_cpu_id &= ~IRQ_USER_BOUND;
-			intr_params_p->avgi_cpu_id |= PSMGI_CPU_USER_BOUND;
-		}
-	}
-
-	if (intr_params_p->avgi_req_flags & PSMGI_REQ_VECTOR) {
-		intr_params_p->avgi_vector = irq_p->airq_vector;
-	}
-
-	if (intr_params_p->avgi_req_flags &
-	    (PSMGI_REQ_NUM_DEVS | PSMGI_REQ_GET_DEVS)) {
-		/* Get number of devices from apic_irq table shared field. */
-		intr_params_p->avgi_num_devs = irq_p->airq_share;
-	}
-
-	if (intr_params_p->avgi_req_flags &  PSMGI_REQ_GET_DEVS) {
-
-		intr_params_p->avgi_req_flags  |= PSMGI_REQ_NUM_DEVS;
-
-		/* Some devices have NULL dip.  Don't count these. */
-		if (intr_params_p->avgi_num_devs > 0) {
-			for (i = 0, av_dev = autovect[irqno].avh_link;
-			    av_dev; av_dev = av_dev->av_link)
-				if (av_dev->av_vector && av_dev->av_dip)
-					i++;
-			intr_params_p->avgi_num_devs =
-			    MIN(intr_params_p->avgi_num_devs, i);
-		}
-
-		/* There are no viable dips to return. */
-		if (intr_params_p->avgi_num_devs == 0)
-			intr_params_p->avgi_dip_list = NULL;
-
-		else {	/* Return list of dips */
-
-			/* Allocate space in array for that number of devs. */
-			intr_params_p->avgi_dip_list = kmem_zalloc(
-			    intr_params_p->avgi_num_devs *
-			    sizeof (dev_info_t *),
-			    KM_SLEEP);
-
-			/*
-			 * Loop through the device list of the autovec table
-			 * filling in the dip array.
-			 *
-			 * Note that the autovect table may have some special
-			 * entries which contain NULL dips.  These will be
-			 * ignored.
-			 */
-			for (i = 0, av_dev = autovect[irqno].avh_link;
-			    av_dev; av_dev = av_dev->av_link)
-				if (av_dev->av_vector && av_dev->av_dip)
-					intr_params_p->avgi_dip_list[i++] =
-					    av_dev->av_dip;
-		}
-	}
-
-	mutex_exit(&airq_mutex);
-
-	return (PSM_SUCCESS);
-}
-
 /*
  * apic_pci_msi_unconfigure:
  *
@@ -676,6 +575,282 @@ apic_pci_msi_disable_mode(dev_info_t *rdip, int type, int inum)
 }
 
 
+static int
+apic_set_cpu(uint32_t vector, int cpu, int *result)
+{
+	apic_irq_t *irqp;
+	int iflag;
+	int ret;
+
+	DDI_INTR_IMPLDBG((CE_CONT, "APIC_SET_CPU\n"));
+
+	/* Convert the vector to the irq using vector_to_irq table. */
+	mutex_enter(&airq_mutex);
+	irqp = apic_irq_table[apic_vector_to_irq[vector]];
+	mutex_exit(&airq_mutex);
+
+	if (irqp == NULL) {
+		*result = ENXIO;
+		return (PSM_FAILURE);
+	}
+
+	/* Fail if this is an MSI intr and is part of a group. */
+	if ((irqp->airq_mps_intr_index == MSI_INDEX) &&
+	    (irqp->airq_intin_no > 1)) {
+		*result = ENXIO;
+		return (PSM_FAILURE);
+	}
+
+	iflag = intr_clear();
+	lock_set(&apic_ioapic_lock);
+
+	ret = apic_rebind_all(irqp, cpu);
+
+	lock_clear(&apic_ioapic_lock);
+	intr_restore(iflag);
+
+	if (ret) {
+		*result = EIO;
+		return (PSM_FAILURE);
+	}
+	*result = 0;
+	return (PSM_SUCCESS);
+}
+
+static int
+apic_grp_set_cpu(uint32_t vector, int new_cpu, int *result)
+{
+	dev_info_t *orig_dip;
+	uchar_t orig_cpu;
+	int iflag;
+	apic_irq_t *irqps[PCI_MSI_MAX_INTRS];
+	int i;
+	int cap_ptr;
+	int msi_mask_off;
+	ushort_t msi_ctrl;
+	uint32_t msi_pvm;
+	ddi_acc_handle_t handle;
+	int num_vectors = 0;
+
+	DDI_INTR_IMPLDBG((CE_CONT, "APIC_GRP_SET_CPU\n"));
+
+	/*
+	 * Take mutex to insure that table doesn't change out from underneath
+	 * us while we're playing with it.
+	 */
+	mutex_enter(&airq_mutex);
+	irqps[0] = apic_irq_table[apic_vector_to_irq[vector]];
+	orig_cpu = irqps[0]->airq_temp_cpu;
+	orig_dip = irqps[0]->airq_dip;
+	num_vectors = irqps[0]->airq_intin_no;
+
+	/* A "group" of 1 */
+	if (num_vectors == 1) {
+		mutex_exit(&airq_mutex);
+		return (apic_set_cpu(vector, new_cpu, result));
+	}
+
+	*result = ENXIO;
+
+	if (irqps[0]->airq_mps_intr_index != MSI_INDEX) {
+		mutex_exit(&airq_mutex);
+		DDI_INTR_IMPLDBG((CE_CONT, "set_grp: intr not MSI\n"));
+		goto set_grp_intr_done;
+	}
+	if ((num_vectors < 1) || ((num_vectors - 1) & vector)) {
+		mutex_exit(&airq_mutex);
+		DDI_INTR_IMPLDBG((CE_CONT,
+		    "set_grp: base vec not part of a grp or not aligned: "
+		    "vec:0x%x, num_vec:0x%x\n", vector, num_vectors));
+		goto set_grp_intr_done;
+	}
+	DDI_INTR_IMPLDBG((CE_CONT, "set_grp: num intrs in grp: %d\n",
+	    num_vectors));
+
+	ASSERT((num_vectors + vector) < APIC_MAX_VECTOR);
+
+	*result = EIO;
+
+	/*
+	 * All IRQ entries in the table for the given device will be not
+	 * shared.  Since they are not shared, the dip in the table will
+	 * be true to the device of interest.
+	 */
+	for (i = 1; i < num_vectors; i++) {
+		irqps[i] = apic_irq_table[apic_vector_to_irq[vector + i]];
+		if (irqps[i] == NULL) {
+			mutex_exit(&airq_mutex);
+			goto set_grp_intr_done;
+		}
+#ifdef DEBUG
+		/* Sanity check: CPU and dip is the same for all entries. */
+		if ((irqps[i]->airq_dip != orig_dip) ||
+		    (irqps[i]->airq_temp_cpu != orig_cpu)) {
+			mutex_exit(&airq_mutex);
+			DDI_INTR_IMPLDBG((CE_CONT,
+			    "set_grp: cpu or dip for vec 0x%x difft than for "
+			    "vec 0x%x\n", vector, vector + i));
+			DDI_INTR_IMPLDBG((CE_CONT,
+			    "  cpu: %d vs %d, dip: 0x%p vs 0x%p\n", orig_cpu,
+			    irqps[i]->airq_temp_cpu, (void *)orig_dip,
+			    (void *)irqps[i]->airq_dip));
+			goto set_grp_intr_done;
+		}
+#endif /* DEBUG */
+	}
+	mutex_exit(&airq_mutex);
+
+	cap_ptr = i_ddi_get_msi_msix_cap_ptr(orig_dip);
+	handle = i_ddi_get_pci_config_handle(orig_dip);
+	msi_ctrl = pci_config_get16(handle, cap_ptr + PCI_MSI_CTRL);
+
+	/* MSI Per vector masking is supported. */
+	if (msi_ctrl & PCI_MSI_PVM_MASK) {
+		if (msi_ctrl &  PCI_MSI_64BIT_MASK)
+			msi_mask_off = cap_ptr + PCI_MSI_64BIT_MASKBITS;
+		else
+			msi_mask_off = cap_ptr + PCI_MSI_32BIT_MASK;
+		msi_pvm = pci_config_get32(handle, msi_mask_off);
+		pci_config_put32(handle, msi_mask_off, (uint32_t)-1);
+		DDI_INTR_IMPLDBG((CE_CONT,
+		    "set_grp: pvm supported.  Mask set to 0x%x\n",
+		    pci_config_get32(handle, msi_mask_off)));
+	}
+
+	iflag = intr_clear();
+	lock_set(&apic_ioapic_lock);
+
+	/*
+	 * Do the first rebind and check for errors.  Apic_rebind_all returns
+	 * an error if the CPU is not accepting interrupts.  If the first one
+	 * succeeds they all will.
+	 */
+	if (apic_rebind_all(irqps[0], new_cpu))
+		(void) apic_rebind_all(irqps[0], orig_cpu);
+	else {
+		for (i = 1; i < num_vectors; i++)
+			(void) apic_rebind_all(irqps[i], new_cpu);
+		*result = 0;	/* SUCCESS */
+	}
+
+	lock_clear(&apic_ioapic_lock);
+	intr_restore(iflag);
+
+	/* Reenable vectors if per vector masking is supported. */
+	if (msi_ctrl & PCI_MSI_PVM_MASK) {
+		pci_config_put32(handle, msi_mask_off, msi_pvm);
+		DDI_INTR_IMPLDBG((CE_CONT,
+		    "set_grp: pvm supported.  Mask restored to 0x%x\n",
+		    pci_config_get32(handle, msi_mask_off)));
+	}
+
+set_grp_intr_done:
+	if (*result != 0)
+		return (PSM_FAILURE);
+
+	return (PSM_SUCCESS);
+}
+
+static int
+apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
+{
+	struct autovec *av_dev;
+	uchar_t irqno;
+	int i;
+	apic_irq_t *irq_p;
+
+	/* Sanity check the vector/irq argument. */
+	ASSERT((vecirq >= 0) || (vecirq <= APIC_MAX_VECTOR));
+
+	mutex_enter(&airq_mutex);
+
+	/*
+	 * Convert the vecirq arg to an irq using vector_to_irq table
+	 * if the arg is a vector.  Pass thru if already an irq.
+	 */
+	if ((intr_params_p->avgi_req_flags & PSMGI_INTRBY_FLAGS) ==
+	    PSMGI_INTRBY_VEC)
+		irqno = apic_vector_to_irq[vecirq];
+	else
+		irqno = vecirq;
+
+	irq_p = apic_irq_table[irqno];
+
+	if ((irq_p == NULL) ||
+	    (irq_p->airq_temp_cpu == IRQ_UNBOUND) ||
+	    (irq_p->airq_temp_cpu == IRQ_UNINIT)) {
+		mutex_exit(&airq_mutex);
+		return (PSM_FAILURE);
+	}
+
+	if (intr_params_p->avgi_req_flags & PSMGI_REQ_CPUID) {
+
+		/* Get the (temp) cpu from apic_irq table, indexed by irq. */
+		intr_params_p->avgi_cpu_id = irq_p->airq_temp_cpu;
+
+		/* Return user bound info for intrd. */
+		if (intr_params_p->avgi_cpu_id & IRQ_USER_BOUND) {
+			intr_params_p->avgi_cpu_id &= ~IRQ_USER_BOUND;
+			intr_params_p->avgi_cpu_id |= PSMGI_CPU_USER_BOUND;
+		}
+	}
+
+	if (intr_params_p->avgi_req_flags & PSMGI_REQ_VECTOR)
+		intr_params_p->avgi_vector = irq_p->airq_vector;
+
+	if (intr_params_p->avgi_req_flags &
+	    (PSMGI_REQ_NUM_DEVS | PSMGI_REQ_GET_DEVS))
+		/* Get number of devices from apic_irq table shared field. */
+		intr_params_p->avgi_num_devs = irq_p->airq_share;
+
+	if (intr_params_p->avgi_req_flags &  PSMGI_REQ_GET_DEVS) {
+
+		intr_params_p->avgi_req_flags  |= PSMGI_REQ_NUM_DEVS;
+
+		/* Some devices have NULL dip.  Don't count these. */
+		if (intr_params_p->avgi_num_devs > 0) {
+			for (i = 0, av_dev = autovect[irqno].avh_link;
+			    av_dev; av_dev = av_dev->av_link)
+				if (av_dev->av_vector && av_dev->av_dip)
+					i++;
+			intr_params_p->avgi_num_devs =
+			    MIN(intr_params_p->avgi_num_devs, i);
+		}
+
+		/* There are no viable dips to return. */
+		if (intr_params_p->avgi_num_devs == 0)
+			intr_params_p->avgi_dip_list = NULL;
+
+		else {	/* Return list of dips */
+
+			/* Allocate space in array for that number of devs. */
+			intr_params_p->avgi_dip_list = kmem_zalloc(
+			    intr_params_p->avgi_num_devs *
+			    sizeof (dev_info_t *),
+			    KM_SLEEP);
+
+			/*
+			 * Loop through the device list of the autovec table
+			 * filling in the dip array.
+			 *
+			 * Note that the autovect table may have some special
+			 * entries which contain NULL dips.  These will be
+			 * ignored.
+			 */
+			for (i = 0, av_dev = autovect[irqno].avh_link;
+			    av_dev; av_dev = av_dev->av_link)
+				if (av_dev->av_vector && av_dev->av_dip)
+					intr_params_p->avgi_dip_list[i++] =
+					    av_dev->av_dip;
+		}
+	}
+
+	mutex_exit(&airq_mutex);
+
+	return (PSM_SUCCESS);
+}
+
+
 /*
  * This function provides external interface to the nexus for all
  * functionalities related to the new DDI interrupt framework.
@@ -695,12 +870,11 @@ int
 apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
     psm_intr_op_t intr_op, int *result)
 {
-	int		cap, ret;
+	int		cap;
 	int		count_vec;
-	int		cpu;
 	int		old_priority;
 	int		new_priority;
-	int		iflag;
+	int		new_cpu;
 	apic_irq_t	*irqp;
 	struct intrspec *ispec, intr_spec;
 
@@ -812,42 +986,28 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 		hdlp->ih_pri = new_priority; /* set the new value */
 		break;
 	case PSM_INTR_OP_SET_CPU:
+	case PSM_INTR_OP_GRP_SET_CPU:
 		/*
 		 * The interrupt handle given here has been allocated
 		 * specifically for this command, and ih_private carries
 		 * a CPU value.
 		 */
-		cpu = (int)(intptr_t)hdlp->ih_private;
-
-		if (!apic_cpu_in_range(cpu)) {
+		new_cpu = (int)(intptr_t)hdlp->ih_private;
+		if (!apic_cpu_in_range(new_cpu)) {
+			DDI_INTR_IMPLDBG((CE_CONT,
+			    "[grp_]set_cpu: cpu out of range: %d\n", new_cpu));
 			*result = EINVAL;
 			return (PSM_FAILURE);
 		}
-
-
-		/* Convert the vector to the irq using vector_to_irq table. */
-		mutex_enter(&airq_mutex);
-		irqp = apic_irq_table[apic_vector_to_irq[hdlp->ih_vector]];
-		mutex_exit(&airq_mutex);
-
-		if (irqp == NULL) {
-			*result = ENXIO;
-			return (PSM_FAILURE);
+		if (intr_op == PSM_INTR_OP_SET_CPU) {
+			if (apic_set_cpu(hdlp->ih_vector, new_cpu, result) !=
+			    PSM_SUCCESS)
+				return (PSM_FAILURE);
+		} else {
+			if (apic_grp_set_cpu(hdlp->ih_vector, new_cpu,
+			    result) != PSM_SUCCESS)
+				return (PSM_FAILURE);
 		}
-
-		iflag = intr_clear();
-		lock_set(&apic_ioapic_lock);
-
-		ret = apic_rebind_all(irqp, cpu);
-
-		lock_clear(&apic_ioapic_lock);
-		intr_restore(iflag);
-
-		if (ret) {
-			*result = EIO;
-			return (PSM_FAILURE);
-		}
-		*result = 0;
 		break;
 	case PSM_INTR_OP_GET_INTR:
 		/*
@@ -858,6 +1018,10 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 		if (apic_get_vector_intr_info(
 		    hdlp->ih_vector, hdlp->ih_private) != PSM_SUCCESS)
 			return (PSM_FAILURE);
+		break;
+	case PSM_INTR_OP_APIC_TYPE:
+		hdlp->ih_private = apic_get_apic_type();
+		hdlp->ih_ver = apic_get_apic_version();
 		break;
 	case PSM_INTR_OP_SET_CAP:
 	default:

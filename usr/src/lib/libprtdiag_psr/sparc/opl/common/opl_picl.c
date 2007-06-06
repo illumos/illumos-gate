@@ -117,7 +117,7 @@ opl_pci_callback(picl_nodehdl_t pcih, void *args)
 	(void) memset(&pci_card, 0, sizeof (pci_card));
 
 	err = picl_get_propval_by_name(pcih, PICL_PROP_CLASSNAME,
-		piclclass, sizeof (piclclass));
+	    piclclass, sizeof (piclclass));
 
 	if (err !=  PICL_SUCCESS)
 		/* Do not proceed to parse this branch */
@@ -133,7 +133,7 @@ opl_pci_callback(picl_nodehdl_t pcih, void *args)
 		/* Do not proceed to parse this branch */
 		return (err);
 	err = picl_get_propval_by_name(pcih, OBP_PROP_BOARD_NUM, &board,
-		sizeof (board));
+	    sizeof (board));
 
 	if (err == PICL_NORESPONSE)
 		/* Do not proceed to parse this branch */
@@ -148,7 +148,7 @@ opl_pci_callback(picl_nodehdl_t pcih, void *args)
 	}
 
 	err = picl_get_propval_by_name
-		(pcih, OBP_PROP_PORTID, &portid, sizeof (portid));
+	    (pcih, OBP_PROP_PORTID, &portid, sizeof (portid));
 
 	if (err != PICL_PROPNOTFOUND)
 		saved_portid = portid;
@@ -169,7 +169,7 @@ opl_pci_callback(picl_nodehdl_t pcih, void *args)
 
 		if (IS_EBUS(piclclass)) {
 			err = picl_get_propval_by_name(nodeh, PICL_PROP_PEER,
-				&nodeh, sizeof (picl_nodehdl_t));
+			    &nodeh, sizeof (picl_nodehdl_t));
 			continue;
 		}
 
@@ -193,7 +193,7 @@ opl_pci_callback(picl_nodehdl_t pcih, void *args)
 		 */
 
 		err = picl_get_propinfo_by_name
-			(nodeh, OBP_PROP_REG, &pinfo, &proph);
+		    (nodeh, OBP_PROP_REG, &pinfo, &proph);
 		if (err == PICL_SUCCESS) {
 			/* All of the array of bytes of "reg" have to be read */
 			reg_val = malloc(pinfo.size);
@@ -212,27 +212,26 @@ opl_pci_callback(picl_nodehdl_t pcih, void *args)
 
 			if (reg_val[0] != 0) {
 				pci_card.dev_no =
-					(((reg_val[0]) & PCI_DEV_MASK) >> 11);
+				    (((reg_val[0]) & PCI_DEV_MASK) >> 11);
 				pci_card.func_no =
-					(((reg_val[0]) & PCI_FUNC_MASK) >> 8);
+				    (((reg_val[0]) & PCI_FUNC_MASK) >> 8);
 				pci_card.slot =
-					(((reg_val[0]) & PCI_BUS_MASK) >> 16);
+				    (((reg_val[0]) & PCI_BUS_MASK) >> 16);
 			} else
 				free(reg_val);
 		}
 
-		err = get_lane_width
-			(root_path, pci_card.slot, pci_card.dev_no,
-				pci_card.func_no, &actual, &maximum, &freq_max,
-				&freq_at, &bus_type);
+		err = get_lane_width(root_path, pci_card.slot, pci_card.dev_no,
+		    pci_card.func_no, &actual, &maximum, &freq_max, &freq_at,
+		    &bus_type);
 
 		if (err != PICL_SUCCESS) {
 			/* Move on to next node */
 			log_printf("Getting lane width failed for path %s\n",
-				pci_card.notes);
+			    pci_card.notes);
 			err = picl_get_propval_by_name
-				(nodeh, PICL_PROP_PEER, &nodeh,
-					sizeof (picl_nodehdl_t));
+			    (nodeh, PICL_PROP_PEER, &nodeh,
+			    sizeof (picl_nodehdl_t));
 			continue;
 		}
 
@@ -292,29 +291,29 @@ opl_pci_callback(picl_nodehdl_t pcih, void *args)
 		(void) strlcpy(pci_card.model, model, prop_size);
 
 		if (bus_type == PCI)
-			(void) strlcpy
-			(pci_card.bus_type, "PCI", sizeof (pci_card.bus_type));
+			(void) strlcpy(pci_card.bus_type,
+			    "PCI", sizeof (pci_card.bus_type));
 		else if (bus_type == PCIX)
-			(void) strlcpy
-			(pci_card.bus_type, "PCIx", sizeof (pci_card.bus_type));
+			(void) strlcpy(pci_card.bus_type,
+			    "PCIx", sizeof (pci_card.bus_type));
 		else if (bus_type == PCIE)
-			(void) strlcpy
-			(pci_card.bus_type, "PCIe", sizeof (pci_card.bus_type));
+			(void) strlcpy(pci_card.bus_type,
+			    "PCIe", sizeof (pci_card.bus_type));
 		else
-			(void) strlcpy
-			(pci_card.bus_type, "UNKN", sizeof (pci_card.bus_type));
+			(void) strlcpy(pci_card.bus_type,
+			    "UNKN", sizeof (pci_card.bus_type));
 
 		/* Get revision id */
 		err = picl_get_propval_by_name
-			(nodeh, OBP_PROP_REVISION_ID, &rev_id, sizeof (rev_id));
+		    (nodeh, OBP_PROP_REVISION_ID, &rev_id, sizeof (rev_id));
 
 		/* Get device id */
 		err = picl_get_propval_by_name
-			(nodeh, OBP_PROP_DEVICE_ID, &dev_id, sizeof (dev_id));
+		    (nodeh, OBP_PROP_DEVICE_ID, &dev_id, sizeof (dev_id));
 
 		/* Get vendor id */
 		err = picl_get_propval_by_name
-			(nodeh, OBP_PROP_VENDOR_ID, &ven_id, sizeof (ven_id));
+		    (nodeh, OBP_PROP_VENDOR_ID, &ven_id, sizeof (ven_id));
 
 		/*
 		 * prtdiag -v prints all devices
@@ -328,9 +327,8 @@ opl_pci_callback(picl_nodehdl_t pcih, void *args)
 		log_printf("%-3d  ", pci_card.schizo_portid);
 		log_printf("%4x, %4x, %4x     ", rev_id, dev_id, ven_id);
 
-		log_printf
-		("%3d, %2d, %2d",
-			pci_card.slot, pci_card.dev_no, pci_card.func_no);
+		log_printf("%3d, %2d, %2d",
+		    pci_card.slot, pci_card.dev_no, pci_card.func_no);
 
 		/* Print status */
 		log_printf("  %-5.5s ", status);
@@ -387,19 +385,19 @@ opl_display_pci(int syserrlog, picl_nodehdl_t plafh)
 		log_printf("\n", 0);
 		log_printf("\n", 0);
 		log_printf(fmt, "", "IO", "", "", "", "", "Lane/Frq",
-			"", "", 0);
+		    "", "", 0);
 		log_printf("\n", 0);
 
 		log_printf(fmt, "LSB", "Type", "LPID", "  RvID,DvID,VnID",
-			"  BDF", "State", "Act,  Max", "Name", "Model", 0);
+		    "  BDF", "State", "Act,  Max", "Name", "Model", 0);
 
 		log_printf("\n");
 
-		log_printf
-			(fmt, "---", "-----", "----", "  ------------------",
-			"  ---------", "-----", "-----------",
-			"------------------------------",
-			"--------------------", 0);
+		log_printf(fmt,
+		    "---", "-----", "----", "  ------------------",
+		    "  ---------", "-----", "-----------",
+		    "------------------------------",
+		    "--------------------", 0);
 		log_printf("\n");
 		log_printf(fmt2, "    Logical Path");
 		log_printf("\n");
@@ -429,7 +427,7 @@ opl_get_first_compatible_value(picl_nodehdl_t nodeh, char **outbuf)
 	err = picl_get_propinfo_by_name(nodeh, OBP_PROP_COMPATIBLE,
 	    &pinfo, &proph);
 	if (err != PICL_SUCCESS)
-	    return (err);
+		return (err);
 
 	if (pinfo.type == PICL_PTYPE_CHARSTRING) {
 		pval = malloc(pinfo.size);
@@ -458,7 +456,7 @@ opl_get_first_compatible_value(picl_nodehdl_t nodeh, char **outbuf)
 
 	err = picl_get_propinfo(rowproph, &pinfo);
 	if (err != PICL_SUCCESS)
-	    return (err);
+		return (err);
 
 	pval = malloc(pinfo.size);
 	if (pval == NULL)
@@ -485,7 +483,7 @@ do_piclinfo(int syserrlog)
 	err = picl_initialize();
 	if (err != PICL_SUCCESS) {
 		(void) log_printf("picl_initialize failed: %s\n",
-			picl_strerror(err));
+		    picl_strerror(err));
 		return (err);
 	}
 
@@ -493,7 +491,7 @@ do_piclinfo(int syserrlog)
 	err = picl_get_root(&rooth);
 	if (err != PICL_SUCCESS) {
 		(void) log_printf("Getting root node failed: %s\n",
-			picl_strerror(err));
+		    picl_strerror(err));
 		return (err);
 	}
 
@@ -501,7 +499,7 @@ do_piclinfo(int syserrlog)
 
 	if (err != PICL_SUCCESS) {
 		(void) log_printf("Getting nodes by name failed: %s\n",
-			picl_strerror(err));
+		    picl_strerror(err));
 		return (err);
 	}
 
@@ -528,14 +526,14 @@ opl_get_node_by_name(picl_nodehdl_t rooth, char *name,
 		return (PICL_FAILURE);
 
 	err = picl_get_propval_by_name(rooth, PICL_PROP_CHILD, &childh,
-		sizeof (picl_nodehdl_t));
+	    sizeof (picl_nodehdl_t));
 
 	while (err == PICL_SUCCESS) {
 		err = picl_get_propval_by_name(childh, PICL_PROP_NAME,
-			nodename, (strlen(name) + 1));
+		    nodename, (strlen(name) + 1));
 		if (err != PICL_SUCCESS) {
 			err = picl_get_propval_by_name(childh, PICL_PROP_PEER,
-				&childh, sizeof (picl_nodehdl_t));
+			    &childh, sizeof (picl_nodehdl_t));
 			continue;
 		}
 
@@ -545,7 +543,7 @@ opl_get_node_by_name(picl_nodehdl_t rooth, char *name,
 		}
 
 		err = picl_get_propval_by_name(childh, PICL_PROP_PEER,
-			&childh, sizeof (picl_nodehdl_t));
+		    &childh, sizeof (picl_nodehdl_t));
 	}
 
 	return (err);
@@ -579,7 +577,7 @@ read_long(int fd, int bus, int dev, int func, int offset, int *ret)
 	int rval;
 	pcitool_reg_t prg;
 
-	prg.user_version = PCITOOL_USER_VERSION;
+	prg.user_version = PCITOOL_VERSION;
 	prg.barnum = 0;
 	prg.acc_attr = PCITOOL_ACC_ATTR_SIZE_4 +
 	    PCITOOL_ACC_ATTR_ENDN_LTL;
@@ -589,10 +587,8 @@ read_long(int fd, int bus, int dev, int func, int offset, int *ret)
 	prg.offset = offset;
 	rval = ioctl(fd, PCITOOL_DEVICE_GET_REG, &prg);
 	if (rval != 0) {
-		log_printf
-		("DEV_GET failed %d %s\n", rval, strerror(errno));
-		log_printf
-		("%d.%d.%d offset 0x%x\n", bus, dev, func, offset);
+		log_printf("DEV_GET failed %d %s\n", rval, strerror(errno));
+		log_printf("%d.%d.%d offset 0x%x\n", bus, dev, func, offset);
 	}
 	*ret = rval;
 	return ((uint32_t)prg.data);
@@ -604,7 +600,7 @@ read_word(int fd, int bus, int dev, int func, int offset, int *ret)
 	int rval;
 	pcitool_reg_t prg;
 
-	prg.user_version = PCITOOL_USER_VERSION;
+	prg.user_version = PCITOOL_VERSION;
 	prg.barnum = 0;
 	prg.acc_attr = PCITOOL_ACC_ATTR_SIZE_2 +
 	    PCITOOL_ACC_ATTR_ENDN_LTL;
@@ -614,10 +610,8 @@ read_word(int fd, int bus, int dev, int func, int offset, int *ret)
 	prg.offset = offset;
 	rval = ioctl(fd, PCITOOL_DEVICE_GET_REG, &prg);
 	if (rval != 0) {
-		log_printf
-		("DEV_GET failed %d %s\n", rval, strerror(errno));
-		log_printf
-		("%d.%d.%d offset 0x%x\n", bus, dev, func, offset);
+		log_printf("DEV_GET failed %d %s\n", rval, strerror(errno));
+		log_printf("%d.%d.%d offset 0x%x\n", bus, dev, func, offset);
 	}
 	*ret = rval;
 	return ((uint16_t)prg.data);
@@ -629,7 +623,7 @@ read_byte(int fd, int bus, int dev, int func, int offset, int *ret)
 	int rval;
 	pcitool_reg_t prg;
 
-	prg.user_version = PCITOOL_USER_VERSION;
+	prg.user_version = PCITOOL_VERSION;
 	prg.barnum = 0;
 	prg.acc_attr = PCITOOL_ACC_ATTR_SIZE_1 +
 	    PCITOOL_ACC_ATTR_ENDN_LTL;
@@ -639,10 +633,8 @@ read_byte(int fd, int bus, int dev, int func, int offset, int *ret)
 	prg.offset = offset;
 	rval = ioctl(fd, PCITOOL_DEVICE_GET_REG, &prg);
 	if (rval != 0) {
-		log_printf
-		("DEV_GET failed %d %s\n", rval, strerror(errno));
-		log_printf
-		("%d.%d.%d offset 0x%x\n", bus, dev, func, offset);
+		log_printf("DEV_GET failed %d %s\n", rval, strerror(errno));
+		log_printf("%d.%d.%d offset 0x%x\n", bus, dev, func, offset);
 	}
 	*ret = rval;
 	return ((uint8_t)prg.data);
@@ -700,15 +692,15 @@ get_lane_width
 			if (ret != 0) {
 				return (PICL_FAILURE);
 			}
-			link_status = read_word(fd, bus, dev, func, cap_ptr +
-				PCIE_LINKSTS, &ret);
+			link_status = read_word(fd, bus, dev, func,
+			    cap_ptr + PCIE_LINKSTS, &ret);
 			if (ret != 0) {
 				return (PICL_FAILURE);
 			}
 			*actual = ((link_status >> PCI_LINK_SHIFT) &
-				PCI_LINK_MASK);
+			    PCI_LINK_MASK);
 			*maximum = ((link_cap >> PCI_LINK_SHIFT) &
-				PCI_LINK_MASK);
+			    PCI_LINK_MASK);
 			*type = PCIE;
 		}
 		if (capid == PCI_CAP_ID_PCIX) {
@@ -717,7 +709,7 @@ get_lane_width
 			int max_speed = PCI_FREQ_66;
 
 			hdr_type = read_byte
-				(fd, bus, dev, func, PCI_CONF_HEADER, &ret);
+			    (fd, bus, dev, func, PCI_CONF_HEADER, &ret);
 			if (ret != 0) {
 				/* ioctl failure */
 				return (PICL_FAILURE);
@@ -726,7 +718,7 @@ get_lane_width
 				/* This is a PCI-X bridge */
 				uint16_t sec_status, mode;
 				sec_status = read_word(fd, bus, dev, func,
-					cap_ptr + PCI_PCIX_SEC_STATUS, &ret);
+				    cap_ptr + PCI_PCIX_SEC_STATUS, &ret);
 				if (ret != 0) {
 					/* ioctl failure */
 					return (PICL_FAILURE);
@@ -739,8 +731,8 @@ get_lane_width
 					max_speed = PCI_FREQ_533;
 				*speed_max = max_speed;
 				*type = PCIX;
-				mode = (sec_status >> PCI_CLASS_BRIDGE)
-					& PCI_BRIDGE_MC;
+				mode = (sec_status >> PCI_CLASS_BRIDGE) &
+				    PCI_BRIDGE_MC;
 				if (mode) {
 					int speed;
 					if (mode == PCI_MODE_66)
@@ -760,13 +752,13 @@ get_lane_width
 					return (PICL_FAILURE);
 				}
 				if (pcix_status &
-					(PCI_LEAF_ULONG << PCI_SHIFT_133))
+				    (PCI_LEAF_ULONG << PCI_SHIFT_133))
 					max_speed = PCI_FREQ_133;
 				if (pcix_status &
-					(PCI_LEAF_ULONG << PCI_SHIFT_266))
+				    (PCI_LEAF_ULONG << PCI_SHIFT_266))
 					max_speed = PCI_FREQ_266;
 				if (pcix_status &
-					(PCI_LEAF_ULONG << PCI_SHIFT_533))
+				    (PCI_LEAF_ULONG << PCI_SHIFT_533))
 					max_speed = PCI_FREQ_533;
 				*speed_max = max_speed;
 				*type = PCI;
@@ -823,7 +815,7 @@ picldiag_get_uint_propval(picl_nodehdl_t modh, char *prop_name, int *ret)
 	 * If it is not an int or uint prop, return failure
 	 */
 	if ((pinfo.type != PICL_PTYPE_INT) &&
-		(pinfo.type != PICL_PTYPE_UNSIGNED_INT)) {
+	    (pinfo.type != PICL_PTYPE_UNSIGNED_INT)) {
 		*ret = PICL_FAILURE;
 		return (0);
 	}
@@ -866,21 +858,21 @@ do_walk(picl_nodehdl_t rooth, const char *classname,
 	char		classval[PICL_CLASSNAMELEN_MAX];
 
 	err = picl_get_propval_by_name(rooth, PICL_PROP_CHILD, &chdh,
-		sizeof (chdh));
+	    sizeof (chdh));
 	while (err == PICL_SUCCESS) {
 		err = picl_get_propval_by_name(chdh, PICL_PROP_NAME,
-			classval, sizeof (classval));
+		    classval, sizeof (classval));
 		if (err != PICL_SUCCESS)
 			return (err);
 
 		err = callback_fn(chdh, c_args);
 
 		if ((err = do_walk(chdh, classname, c_args, callback_fn)) !=
-			PICL_WALK_CONTINUE)
+		    PICL_WALK_CONTINUE)
 			return (err);
 
 		err = picl_get_propval_by_name(chdh, PICL_PROP_PEER, &chdh,
-			sizeof (chdh));
+		    sizeof (chdh));
 	}
 	if (err == PICL_PROPNOTFOUND)   /* end of a branch */
 		return (PICL_WALK_CONTINUE);

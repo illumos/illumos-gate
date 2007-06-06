@@ -403,6 +403,7 @@ done:
 	if (px_rp != NULL)
 		ddi_prop_free(px_rp);
 
+	prg.drvr_version = PCITOOL_VERSION;
 	if (ddi_copyout(&prg, arg, sizeof (pcitool_reg_t),
 	    mode) != DDI_SUCCESS) {
 		DBG(DBG_TOOLS, dip, "Copyout failed.\n");

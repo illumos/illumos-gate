@@ -1101,6 +1101,35 @@ apic_cpu_in_range(int cpu)
 	return ((cpu & ~IRQ_USER_BOUND) < apic_nproc);
 }
 
+uint16_t
+apic_get_apic_version()
+{
+	int i;
+	uchar_t min_io_apic_ver = 0;
+	static uint16_t version;		/* Cache as value is constant */
+	static boolean_t found = B_FALSE;	/* Accomodate zero version */
+
+	if (found == B_FALSE) {
+		found = B_TRUE;
+
+		/*
+		 * Don't assume all IO APICs in the system are the same.
+		 *
+		 * Set to the minimum version.
+		 */
+		for (i = 0; i < apic_io_max; i++) {
+			if ((apic_io_ver[i] != 0) &&
+			    ((min_io_apic_ver == 0) ||
+			    (min_io_apic_ver >= apic_io_ver[i])))
+				min_io_apic_ver = apic_io_ver[i];
+		}
+
+		/* Assume all local APICs are of the same version. */
+		version = (min_io_apic_ver << 8) | apic_cpus[0].aci_local_ver;
+	}
+	return (version);
+}
+
 static struct apic_mpfps_hdr *
 apic_find_fps_sig(caddr_t cptr, int len)
 {
@@ -2766,32 +2795,36 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 
 			return (0);
 		}
-	}
 
-	/*
-	 * NOTE: We do not unmask the RDT here, as an interrupt MAY still
-	 * come in before we have a chance to reprogram it below.  The
-	 * reprogramming below will simultaneously change and unmask the
-	 * RDT entry.
-	 */
+		/*
+		 * NOTE: We do not unmask the RDT here, as an interrupt MAY
+		 * still come in before we have a chance to reprogram it below.
+		 * The reprogramming below will simultaneously change and
+		 * unmask the RDT entry.
+		 */
 
-	if ((uchar_t)bind_cpu == IRQ_UNBOUND) {
+		if ((uchar_t)bind_cpu == IRQ_UNBOUND) {
+			rdt_entry = AV_LDEST | AV_LOPRI |
+			    irq_ptr->airq_rdt_entry;
 
-		rdt_entry = AV_LDEST | AV_LOPRI | irq_ptr->airq_rdt_entry;
+			/* Write the RDT entry -- no specific CPU binding */
+			WRITE_IOAPIC_RDT_ENTRY_HIGH_DWORD(ioapicindex, intin_no,
+			    AV_TOALL);
 
-		/* Write the RDT entry -- no specific CPU binding */
-		WRITE_IOAPIC_RDT_ENTRY_HIGH_DWORD(ioapicindex, intin_no,
-		    AV_TOALL);
+			if (airq_temp_cpu != IRQ_UNINIT && airq_temp_cpu !=
+			    IRQ_UNBOUND)
+				apic_cpus[airq_temp_cpu].aci_temp_bound--;
 
-		if (airq_temp_cpu != IRQ_UNINIT && airq_temp_cpu != IRQ_UNBOUND)
-			apic_cpus[airq_temp_cpu].aci_temp_bound--;
+			/*
+			 * Write the vector, trigger, and polarity portion of
+			 * the RDT
+			 */
+			WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapicindex, intin_no,
+			    rdt_entry);
 
-		/* Write the vector, trigger, and polarity portion of the RDT */
-		WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapicindex, intin_no,
-		    rdt_entry);
-
-		irq_ptr->airq_temp_cpu = IRQ_UNBOUND;
-		return (0);
+			irq_ptr->airq_temp_cpu = IRQ_UNBOUND;
+			return (0);
+		}
 	}
 
 	if (bind_cpu & IRQ_USER_BOUND) {

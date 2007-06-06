@@ -246,7 +246,7 @@ static struct	psm_info apic_psm_info = {
 	PSM_INFO_VER01_5,			/* version */
 	PSM_OWN_EXCLUSIVE,			/* ownership */
 	(struct psm_ops *)&apic_ops,		/* operation */
-	"pcplusmp",				/* machine name */
+	APIC_PCPLUSMP_NAME,			/* machine name */
 	"pcplusmp v1.4 compatible %I%",
 };
 
@@ -2013,7 +2013,7 @@ apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type,
 		irqptr->airq_major = major;
 		if (i == 0) /* they all bound to the same cpu */
 			cpu = irqptr->airq_cpu = apic_bind_intr(dip, irqno,
-				0xff, 0xff);
+			    0xff, 0xff);
 		else
 			irqptr->airq_cpu = cpu;
 		DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_vectors: irq=0x%x "
@@ -2154,4 +2154,10 @@ apic_modify_vector(uchar_t vector, int irq)
 {
 	apic_vector_to_irq[vector] = (uchar_t)irq;
 	return (vector);
+}
+
+char *
+apic_get_apic_type()
+{
+	return (apic_psm_info.p_mach_idstring);
 }

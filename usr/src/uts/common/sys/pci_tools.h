@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,11 +35,11 @@ extern "C" {
 #endif
 
 /*
- * Versioning. Have different versions for userland program and drivers, so
- * they can all stay in sync with each other.
+ * Versioning.
  */
-#define	PCITOOL_USER_VERSION	1
-#define	PCITOOL_DRVR_VERSION	1
+#define	PCITOOL_V1	1
+#define	PCITOOL_V2	2
+#define	PCITOOL_VERSION	PCITOOL_V2
 
 /* File suffixes for nexus pcitool nodes. */
 #define	PCI_MINOR_REG	"reg"
@@ -52,20 +51,19 @@ extern "C" {
 #define	PCITOOL_IOC		(('P' << 24) | ('C' << 16) | ('T' << 8))
 
 /* Read/write a device on a PCI bus, in physical space. */
-#define	PCITOOL_DEVICE_GET_REG	(PCITOOL_IOC | 1)
-#define	PCITOOL_DEVICE_SET_REG	(PCITOOL_IOC | 2)
+#define	PCITOOL_DEVICE_GET_REG		(PCITOOL_IOC | 1)
+#define	PCITOOL_DEVICE_SET_REG		(PCITOOL_IOC | 2)
 
 /* Read/write the PCI nexus bridge, in physical space. */
-#define	PCITOOL_NEXUS_GET_REG	(PCITOOL_IOC | 3)
-#define	PCITOOL_NEXUS_SET_REG	(PCITOOL_IOC | 4)
+#define	PCITOOL_NEXUS_GET_REG		(PCITOOL_IOC | 3)
+#define	PCITOOL_NEXUS_SET_REG		(PCITOOL_IOC | 4)
 
 /* Get/set interrupt-CPU mapping for PCI devices. */
-#define	PCITOOL_DEVICE_GET_INTR	(PCITOOL_IOC | 5)
-#define	PCITOOL_DEVICE_SET_INTR	(PCITOOL_IOC | 6)
+#define	PCITOOL_DEVICE_GET_INTR		(PCITOOL_IOC | 5)
+#define	PCITOOL_DEVICE_SET_INTR		(PCITOOL_IOC | 6)
 
-/* Return the number of supported interrupts on a PCI bus. */
-#define	PCITOOL_DEVICE_NUM_INTR	(PCITOOL_IOC | 7)
-
+/* Get system interrupt information */
+#define	PCITOOL_SYSTEM_INTR_INFO	(PCITOOL_IOC | 8)
 
 /*
  * This file contains data structures for the pci tool.
@@ -131,7 +129,13 @@ typedef struct pcitool_intr_set {
 	uint32_t ino;		/* interrupt to set - to kernel */
 	uint32_t cpu_id;	/* to: cpu to set / from: old cpu returned */
 	pcitool_errno_t status;	/* from kernel */
+	uint32_t flags;		/* to kernel */
 } pcitool_intr_set_t;
+
+/*
+ * flags for pcitool_intr_set_t
+ */
+#define	PCITOOL_INTR_SET_FLAG_GROUP	0x1
 
 
 /*
@@ -144,7 +148,6 @@ typedef struct pcitool_intr_dev {
 	char		driver_name[MAXMODCONFNAME];	/* from kernel */
 	char		path[MAXPATHLEN]; /* device path - from kernel */
 } pcitool_intr_dev_t;
-
 
 typedef struct pcitool_intr_get {
 	uint16_t user_version;		/* Userland program version - to krnl */
@@ -170,6 +173,22 @@ typedef struct pcitool_intr_get {
 	(sizeof (pcitool_intr_get_t) - \
 	sizeof (pcitool_intr_dev_t) + \
 	(num_devs * sizeof (pcitool_intr_dev_t)))
+
+typedef struct pcitool_intr_info {
+	uint16_t user_version;		/* Userland program version - to krnl */
+	uint16_t drvr_version;		/* Driver version - from kernel */
+	uint32_t num_intr;		/* Number of intrs suppt by nexus */
+	uint32_t ctlr_version;		/* Intr ctlr HW version - from kernel */
+	uchar_t	ctlr_type;		/* A PCITOOL_CTLR_TYPE - from kernel */
+} pcitool_intr_info_t;
+
+/*
+ * Interrupt controller types
+ */
+#define	PCITOOL_CTLR_TYPE_UNKNOWN	0
+#define	PCITOOL_CTLR_TYPE_RISC		1
+#define	PCITOOL_CTLR_TYPE_UPPC		2
+#define	PCITOOL_CTLR_TYPE_PCPLUSMP	3
 
 /*
  * Size and endian fields for acc_attr bitmask.

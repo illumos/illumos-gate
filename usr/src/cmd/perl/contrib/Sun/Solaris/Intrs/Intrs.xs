@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,39 +42,70 @@
 #include "perl.h"
 #include "XSUB.h"
 
+static int
+open_dev(char *path)
+{
+	char intrpath[MAXPATHLEN];
+
+	(void) strcpy(intrpath, "/devices");
+	(void) strcat(intrpath, path);
+	(void) strcat(intrpath, ":intr");
+	return (open(intrpath, O_RDWR));
+}
+
 MODULE = Sun::Solaris::Intrs		PACKAGE = Sun::Solaris::Intrs
 PROTOTYPES: ENABLE
 
 int
-intrmove(path, ino, cpu)
+intrmove(path, ino, cpu, num_ino)
 	char *path
 	int ino
 	int cpu
+	int num_ino
     INIT:
-	int i, ret;
+	int fd, ret;
 	pcitool_intr_set_t iset;
-	static int fd = -1;
-	static char intrpath[MAXPATHLEN];
 
     CODE:
-	if (fd == -1 || strcmp(path, intrpath)) {
-		(void) strcpy(intrpath, "/devices");
-		(void) strcat(intrpath, path);
-		(void) strcat(intrpath, ":intr");
-		if (fd != -1)
-			(void) close(fd);
-		fd = open(intrpath, O_RDONLY);
-		if (fd == -1) {
-			XSRETURN_UNDEF;
-		}
+	if ((fd = open_dev(path)) == -1) {
+		XSRETURN_UNDEF;
 	}
 	iset.ino = ino;
 	iset.cpu_id = cpu;
-	iset.user_version = PCITOOL_USER_VERSION;
+	iset.flags = (num_ino > 1) ? PCITOOL_INTR_SET_FLAG_GROUP : 0;
+	iset.user_version = PCITOOL_VERSION;
 
 	ret = ioctl(fd, PCITOOL_DEVICE_SET_INTR, &iset);
 
 	if (ret == -1) {
 		XSRETURN_UNDEF;
 	}
+	(void) close(fd);
 	XSRETURN_YES;
+
+int
+is_pcplusmp(path)
+	char *path
+
+    INIT:
+	int fd, ret;
+	pcitool_intr_info_t iinfo;
+
+    CODE:
+	if ((fd = open_dev(path)) == -1) {
+		XSRETURN_UNDEF;
+	}
+	iinfo.user_version = PCITOOL_VERSION;
+
+	ret = ioctl(fd, PCITOOL_SYSTEM_INTR_INFO, &iinfo);
+	(void) close(fd);
+
+	if (ret == -1) {
+		XSRETURN_UNDEF;
+	}
+
+	if (iinfo.ctlr_type == PCITOOL_CTLR_TYPE_PCPLUSMP) {
+		XSRETURN_YES;
+	}
+
+	XSRETURN_NO;

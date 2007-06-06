@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -240,7 +240,7 @@ px_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		/*FALLTHRU*/
 		/* These require no special privileges. */
 		case PCITOOL_DEVICE_GET_INTR:
-		case PCITOOL_DEVICE_NUM_INTR:
+		case PCITOOL_SYSTEM_INTR_INFO:
 			rv = pxtool_intr(dip, (void *)arg, cmd, mode);
 			break;
 

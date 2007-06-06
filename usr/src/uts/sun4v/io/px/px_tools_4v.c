@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -516,6 +516,7 @@ pxtool_bus_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 	rval = pxtool_phys_access(px_p, prg.phys_addr, &prg.data,
 	    PCITOOL_ACC_IS_BIG_ENDIAN(prg.acc_attr), is_write);
 done:
+	prg.drvr_version = PCITOOL_VERSION;
 	if (ddi_copyout(&prg, arg, sizeof (pcitool_reg_t),
 	    mode) != DDI_SUCCESS) {
 		DBG(DBG_TOOLS, dip, "Copyout failed.\n");

@@ -38,6 +38,8 @@ extern "C" {
 
 #include <sys/psm_common.h>
 
+#define	APIC_PCPLUSMP_NAME	"pcplusmp"
+
 #define	APIC_IO_ADDR	0xfec00000
 #define	APIC_LOCAL_ADDR	0xfee00000
 #define	APIC_IO_MEMLEN	0xf
@@ -706,8 +708,6 @@ extern int apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri,
     int type, int behavior);
 extern void  apic_free_vectors(dev_info_t *dip, int inum, int count, int pri,
     int type);
-extern int apic_get_vector_intr_info(int vecirq,
-    apic_get_intr_t *intr_params_p);
 extern uchar_t apic_find_multi_vectors(int pri, int count);
 extern int apic_setup_io_intr(void *p, int irq, boolean_t deferred);
 extern uint32_t *mapin_apic(uint32_t addr, size_t len, int flags);
@@ -718,6 +718,8 @@ extern uchar_t apic_modify_vector(uchar_t vector, int irq);
 extern int apic_pci_msi_unconfigure(dev_info_t *rdip, int type, int inum);
 extern int apic_pci_msi_disable_mode(dev_info_t *rdip, int type, int inum);
 extern int apic_pci_msi_enable_mode(dev_info_t *rdip, int type, int inum);
+extern char *apic_get_apic_type();
+extern uint16_t	apic_get_apic_version();
 
 extern volatile uint32_t *apicadr;	/* virtual addr of local APIC   */
 extern int apic_forceload;

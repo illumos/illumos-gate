@@ -72,13 +72,12 @@ static kmutex_t pci_ks_template_lock;
 static int
 pci_ih_ks_update(kstat_t *ksp, int rw)
 {
-	pci_kstat_private_t	*private_data =
-				    (pci_kstat_private_t *)ksp->ks_private;
-	dev_info_t		*rootnex_dip = private_data->rootnex_dip;
-	ddi_intr_handle_impl_t	*ih_p = private_data->hdlp;
-	dev_info_t		*dip = ih_p->ih_dip;
-	int			maxlen =
-				    sizeof (pci_ks_template.ihks_name.value.c);
+	pci_kstat_private_t *private_data =
+	    (pci_kstat_private_t *)ksp->ks_private;
+	dev_info_t *rootnex_dip = private_data->rootnex_dip;
+	ddi_intr_handle_impl_t *ih_p = private_data->hdlp;
+	dev_info_t *dip = ih_p->ih_dip;
+	int maxlen = sizeof (pci_ks_template.ihks_name.value.c);
 	apic_get_intr_t	intrinfo;
 
 	(void) snprintf(pci_ks_template.ihks_name.value.c, maxlen, "%s%d",
@@ -112,7 +111,7 @@ pci_ih_ks_update(kstat_t *ksp, int rw)
 	intrinfo.avgi_req_flags = PSMGI_REQ_CPUID | PSMGI_REQ_VECTOR;
 	if ((ih_p->ih_state != DDI_IHDL_STATE_ENABLE) ||
 	    (pci_get_intr_from_vecirq(&intrinfo,  ih_p->ih_vector, IS_IRQ) !=
-		DDI_SUCCESS) ||
+	    DDI_SUCCESS) ||
 	    (intrinfo.avgi_cpu_id & PSMGI_CPU_FLAGS)) {
 
 		(void) strcpy(pci_ks_template.ihks_type.value.c, "disabled");
@@ -134,8 +133,17 @@ pci_ih_ks_update(kstat_t *ksp, int rw)
 	 * Interrupt is valid (not a dummy), not user-bound to a specific cpu,
 	 * and enabled.  Update kstat fields.
 	 */
-	(void) strcpy(pci_ks_template.ihks_type.value.c,
-	    DDI_INTR_IS_MSI_OR_MSIX(ih_p->ih_type) ? "msi" : "fixed");
+	switch (ih_p->ih_type) {
+	case DDI_INTR_TYPE_MSI:
+		(void) strcpy(pci_ks_template.ihks_type.value.c, "msi");
+		break;
+	case DDI_INTR_TYPE_MSIX:
+		(void) strcpy(pci_ks_template.ihks_type.value.c, "msix");
+		break;
+	default:
+		(void) strcpy(pci_ks_template.ihks_type.value.c, "fixed");
+		break;
+	}
 	pci_ks_template.ihks_pil.value.ui64 = ih_p->ih_pri;
 	pci_ks_template.ihks_time.value.ui64 =
 	    ((ihdl_plat_t *)ih_p->ih_private)->ip_ticks;
@@ -184,8 +192,8 @@ void pci_kstat_create(kstat_t **kspp, dev_info_t *rootnex_dip,
 void
 pci_kstat_delete(kstat_t *ksp)
 {
-	pci_kstat_private_t	*kstat_private;
-	ddi_intr_handle_impl_t	*hdlp;
+	pci_kstat_private_t *kstat_private;
+	ddi_intr_handle_impl_t *hdlp;
 
 	if (ksp) {
 		kstat_private = ksp->ks_private;

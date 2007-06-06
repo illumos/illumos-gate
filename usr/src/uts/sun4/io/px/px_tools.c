@@ -84,15 +84,33 @@ pxtool_validate_cpuid(uint32_t cpuid)
 }
 
 
+/*ARGSUSED*/
 static int
-pxtool_intr_get_max_ino(uint32_t *arg, int mode)
+pxtool_intr_info(dev_info_t *dip, void *arg, int mode)
 {
-	if (ddi_copyout(&pxtool_num_inos, arg, sizeof (uint32_t), mode) !=
-	    DDI_SUCCESS)
+	pcitool_intr_info_t intr_info;
+	int rval = SUCCESS;
+
+	/* If we need user_version, and to ret same user version as passed in */
+	if (ddi_copyin(arg, &intr_info, sizeof (pcitool_intr_info_t), mode) !=
+	    DDI_SUCCESS) {
 		return (EFAULT);
-	else
-		return (SUCCESS);
+	}
+
+	intr_info.ctlr_version = 0;	/* XXX how to get real version? */
+	intr_info.ctlr_type = PCITOOL_CTLR_TYPE_RISC;
+	intr_info.num_intr = pxtool_num_inos;
+
+	intr_info.drvr_version = PCITOOL_VERSION;
+	if (ddi_copyout(&intr_info, arg, sizeof (pcitool_intr_info_t), mode) !=
+	    DDI_SUCCESS) {
+		rval = EFAULT;
+	}
+
+	return (rval);
 }
+
+
 /*
  * Get interrupt information for a given ino.
  * Returns info only for inos mapped to devices.
@@ -203,6 +221,7 @@ pxtool_get_intr(dev_info_t *dip, void *arg, int mode)
 	rval = SUCCESS;
 
 done_get_intr:
+	iget->drvr_version = PCITOOL_VERSION;
 	copyout_rval =
 	    ddi_copyout(iget, arg, PCITOOL_IGET_SIZE(num_devs_ret), mode);
 
@@ -231,10 +250,37 @@ pxtool_set_intr(dev_info_t *dip, void *arg, int mode)
 	px_ib_t *ib_p = px_p->px_ib_p;
 	uint8_t zero = 0;
 	int rval = SUCCESS;
+	size_t copyinout_size;
 
-	if (ddi_copyin(arg, &iset, sizeof (pcitool_intr_set_t), mode) !=
-	    DDI_SUCCESS)
+	bzero(&iset, sizeof (pcitool_intr_set_t));
+
+	/* Version 1 of pcitool_intr_set_t doesn't have flags. */
+	copyinout_size = (size_t)&iset.flags - (size_t)&iset;
+
+	if (ddi_copyin(arg, &iset, copyinout_size, mode) != DDI_SUCCESS)
 		return (EFAULT);
+
+	switch (iset.user_version) {
+	case PCITOOL_V1:
+		break;
+
+	case PCITOOL_V2:
+		copyinout_size = sizeof (pcitool_intr_set_t);
+		if (ddi_copyin(arg, &iset, copyinout_size, mode) != DDI_SUCCESS)
+			return (EFAULT);
+		break;
+
+	default:
+		iset.status = PCITOOL_OUT_OF_RANGE;
+		rval = ENOTSUP;
+		goto done_set_intr;
+	}
+
+	if (iset.flags & PCITOOL_INTR_SET_FLAG_GROUP) {
+		iset.status = PCITOOL_IO_ERROR;
+		rval = ENOTSUP;
+		goto done_set_intr;
+	}
 
 	iset.status = PCITOOL_INVALID_INO;
 	rval = EINVAL;
@@ -283,8 +329,8 @@ pxtool_set_intr(dev_info_t *dip, void *arg, int mode)
 	mutex_exit(&cpu_lock);
 
 done_set_intr:
-	if (ddi_copyout(&iset, arg, sizeof (pcitool_intr_set_t), mode) !=
-	    DDI_SUCCESS)
+	iset.drvr_version = PCITOOL_VERSION;
+	if (ddi_copyout(&iset, arg, copyinout_size, mode) != DDI_SUCCESS)
 		rval = EFAULT;
 
 	return (rval);
@@ -299,9 +345,9 @@ pxtool_intr(dev_info_t *dip, void *arg, int cmd, int mode)
 
 	switch (cmd) {
 
-	/* Return the number of interrupts supported by a PCI bus. */
-	case PCITOOL_DEVICE_NUM_INTR:
-		rval = pxtool_intr_get_max_ino(arg, mode);
+	/* Get system interrupt information. */
+	case PCITOOL_SYSTEM_INTR_INFO:
+		rval = pxtool_intr_info(dip, arg, mode);
 		break;
 
 	/* Get interrupt information for a given ino. */
@@ -655,6 +701,7 @@ pxtool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 	rval = pxtool_pciiomem_access(px_p, &prg, &prg.data, write_flag);
 
 done_reg:
+	prg.drvr_version = PCITOOL_VERSION;
 	if (ddi_copyout(&prg, arg, sizeof (pcitool_reg_t),
 	    mode) != DDI_SUCCESS) {
 		DBG(DBG_TOOLS, dip, "Error returning arguments.\n");

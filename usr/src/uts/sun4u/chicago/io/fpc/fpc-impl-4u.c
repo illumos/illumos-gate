@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -154,7 +154,7 @@ fpc_platform_node_init(dev_info_t *dip, int *avail)
 	nodename = kmem_zalloc(nodename_size, KM_SLEEP);
 
 	platform_specific_data =
-		kmem_zalloc(sizeof (fire4u_specific_t), KM_SLEEP);
+	    kmem_zalloc(sizeof (fire4u_specific_t), KM_SLEEP);
 
 	(void) strcpy(nodename, name);
 	(void) strcat(nodename, ":");
@@ -163,7 +163,7 @@ fpc_platform_node_init(dev_info_t *dip, int *avail)
 
 	/* Get register banks. */
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		"reg", (caddr_t)&regs_p, &regs_length) != DDI_SUCCESS) {
+	    "reg", (caddr_t)&regs_p, &regs_length) != DDI_SUCCESS) {
 		goto bad_regs_p;
 	}
 
@@ -262,7 +262,7 @@ fpc_event_io(fire_perfreg_handle_t handle, fire_perfcnt_t group,
 	    (fire_counter_handle_impl_t *)handle;
 	int cmd = is_write ? PCITOOL_NEXUS_SET_REG : PCITOOL_NEXUS_GET_REG;
 
-	prg.user_version = PCITOOL_USER_VERSION;
+	prg.user_version = PCITOOL_VERSION;
 
 	if (group == jbc) {
 		prg.barnum = JBUS_BANK;
@@ -303,7 +303,7 @@ fpc_counter_io(fire_perfreg_handle_t handle, fire_perfcnt_t group,
 	int command =
 	    (is_write) ? PCITOOL_NEXUS_SET_REG : PCITOOL_NEXUS_GET_REG;
 
-	prg.user_version = PCITOOL_USER_VERSION;
+	prg.user_version = PCITOOL_VERSION;
 	/*
 	 * Note that stated PCIE offsets are relative to the beginning of their
 	 * register bank, while JBUS offsets are absolute.

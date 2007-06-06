@@ -84,7 +84,7 @@ static int pcitool_mem_access(dev_info_t *dip, pcitool_reg_t *prg,
 static uint64_t pcitool_map(uint64_t phys_addr, size_t size, size_t *num_pages);
 static void pcitool_unmap(uint64_t virt_addr, size_t num_pages);
 
-/* Extern decalrations */
+/* Extern declarations */
 extern int	(*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
 		    psm_intr_op_t, int *);
 
@@ -121,21 +121,6 @@ pcitool_uninit(dev_info_t *dip)
 	ddi_remove_minor_node(dip, PCI_MINOR_REG);
 }
 
-
-/* Return the number of interrupts on a pci bus. */
-static int
-pcitool_intr_get_max_ino(uint32_t *arg, int mode)
-{
-	uint32_t num_intr = APIC_MAX_VECTOR;
-
-	if (ddi_copyout(&num_intr, arg, sizeof (uint32_t), mode) !=
-	    DDI_SUCCESS)
-		return (EFAULT);
-	else
-		return (SUCCESS);
-}
-
-
 /*ARGSUSED*/
 static int
 pcitool_set_intr(dev_info_t *dip, void *arg, int mode)
@@ -144,11 +129,30 @@ pcitool_set_intr(dev_info_t *dip, void *arg, int mode)
 	pcitool_intr_set_t iset;
 	uint32_t old_cpu;
 	int ret, result;
+	size_t copyinout_size;
 	int rval = SUCCESS;
 
-	if (ddi_copyin(arg, &iset, sizeof (pcitool_intr_set_t), mode) !=
-	    DDI_SUCCESS)
+	/* Version 1 of pcitool_intr_set_t doesn't have flags. */
+	copyinout_size = (size_t)&iset.flags - (size_t)&iset;
+
+	if (ddi_copyin(arg, &iset, copyinout_size, mode) != DDI_SUCCESS)
 		return (EFAULT);
+
+	switch (iset.user_version) {
+	case PCITOOL_V1:
+		break;
+
+	case PCITOOL_V2:
+		copyinout_size = sizeof (pcitool_intr_set_t);
+		if (ddi_copyin(arg, &iset, copyinout_size, mode) != DDI_SUCCESS)
+			return (EFAULT);
+		break;
+
+	default:
+		iset.status = PCITOOL_OUT_OF_RANGE;
+		rval = ENOTSUP;
+		goto done_set_intr;
+	}
 
 	if (iset.ino > APIC_MAX_VECTOR) {
 		rval = EINVAL;
@@ -164,6 +168,7 @@ pcitool_set_intr(dev_info_t *dip, void *arg, int mode)
 		goto done_set_intr;
 	}
 
+
 	old_cpu &= ~PSMGI_CPU_USER_BOUND;
 
 	/*
@@ -172,9 +177,20 @@ pcitool_set_intr(dev_info_t *dip, void *arg, int mode)
 	 */
 	info_hdl.ih_vector = iset.ino;
 	info_hdl.ih_private = (void *)(uintptr_t)iset.cpu_id;
-	ret = (*psm_intr_ops)(NULL, &info_hdl, PSM_INTR_OP_SET_CPU, &result);
+	if (pcitool_debug)
+		prom_printf("user version:%d, flags:0x%x\n",
+		    iset.user_version, iset.flags);
 
-	iset.drvr_version = PCITOOL_DRVR_VERSION;
+	result = ENOTSUP;
+	if ((iset.user_version >= PCITOOL_V2) &&
+	    (iset.flags & PCITOOL_INTR_SET_FLAG_GROUP)) {
+		ret = (*psm_intr_ops)(NULL, &info_hdl, PSM_INTR_OP_GRP_SET_CPU,
+		    &result);
+	} else {
+		ret = (*psm_intr_ops)(NULL, &info_hdl, PSM_INTR_OP_SET_CPU,
+		    &result);
+	}
+
 	if (ret != PSM_SUCCESS) {
 		switch (result) {
 		case EIO:		/* Error making the change */
@@ -189,6 +205,10 @@ pcitool_set_intr(dev_info_t *dip, void *arg, int mode)
 			rval = EINVAL;
 			iset.status = PCITOOL_INVALID_CPUID;
 			break;
+		case ENOTSUP:		/* Requested PSM intr ops missing */
+			rval = ENOTSUP;
+			iset.status = PCITOOL_IO_ERROR;
+			break;
 		}
 	}
 
@@ -196,8 +216,8 @@ pcitool_set_intr(dev_info_t *dip, void *arg, int mode)
 	iset.cpu_id = old_cpu;
 
 done_set_intr:
-	if (ddi_copyout(&iset, arg, sizeof (pcitool_intr_set_t), mode) !=
-	    DDI_SUCCESS)
+	iset.drvr_version = PCITOOL_VERSION;
+	if (ddi_copyout(&iset, arg, copyinout_size, mode) != DDI_SUCCESS)
 		rval = EFAULT;
 	return (rval);
 }
@@ -337,7 +357,7 @@ done_get_intr:
 		ndi_devi_exit(dip, circ);
 	}
 
-	iget->drvr_version = PCITOOL_DRVR_VERSION;
+	iget->drvr_version = PCITOOL_VERSION;
 	copyout_rval = ddi_copyout(iget, arg,
 	    PCITOOL_IGET_SIZE(num_devs_ret), mode);
 
@@ -349,6 +369,50 @@ done_get_intr:
 
 	return (rval);
 }
+
+/*ARGSUSED*/
+static int
+pcitool_intr_info(dev_info_t *dip, void *arg, int mode)
+{
+	pcitool_intr_info_t intr_info;
+	ddi_intr_handle_impl_t info_hdl;
+	int rval = SUCCESS;
+
+	/* If we need user_version, and to ret same user version as passed in */
+	if (ddi_copyin(arg, &intr_info, sizeof (pcitool_intr_info_t), mode) !=
+	    DDI_SUCCESS) {
+		if (pcitool_debug)
+			prom_printf("Error reading arguments\n");
+		return (EFAULT);
+	}
+
+	/* For UPPC systems, psm_intr_ops has no entry for APIC_TYPE. */
+	if ((rval = (*psm_intr_ops)(NULL, &info_hdl,
+	    PSM_INTR_OP_APIC_TYPE, NULL)) != PSM_SUCCESS) {
+		intr_info.ctlr_type = PCITOOL_CTLR_TYPE_UPPC;
+		intr_info.ctlr_version = 0;
+
+	} else {
+		intr_info.ctlr_version = (uint32_t)info_hdl.ih_ver;
+		if (strcmp((char *)info_hdl.ih_private,
+		    APIC_PCPLUSMP_NAME) == 0)
+			intr_info.ctlr_type = PCITOOL_CTLR_TYPE_PCPLUSMP;
+		else
+			intr_info.ctlr_type = PCITOOL_CTLR_TYPE_UNKNOWN;
+	}
+
+	intr_info.num_intr = APIC_MAX_VECTOR;
+	intr_info.drvr_version = PCITOOL_VERSION;
+	if (ddi_copyout(&intr_info, arg, sizeof (pcitool_intr_info_t), mode) !=
+	    DDI_SUCCESS) {
+		if (pcitool_debug)
+			prom_printf("Error returning arguments.\n");
+		rval = EFAULT;
+	}
+
+	return (rval);
+}
+
 
 
 /*
@@ -372,8 +436,8 @@ pcitool_intr_admn(dev_info_t *dip, void *arg, int cmd, int mode)
 		rval = pcitool_get_intr(dip, arg, mode);
 		break;
 
-	case PCITOOL_DEVICE_NUM_INTR:
-		rval = pcitool_intr_get_max_ino(arg, mode);
+	case PCITOOL_SYSTEM_INTR_INFO:
+		rval = pcitool_intr_info(dip, arg, mode);
 		break;
 
 	default:
@@ -571,7 +635,7 @@ pcitool_io_access(dev_info_t *dip, pcitool_reg_t *prg, boolean_t write_flag)
 		no_trap();
 		if (pcitool_debug)
 			prom_printf(
-			    "pcitool_mem_access: on_trap caught an error...\n");
+			    "pcitool_io_access: on_trap caught an error...\n");
 		prg->status = PCITOOL_INVALID_ADDRESS;
 		return (EFAULT);
 	}
@@ -1075,6 +1139,7 @@ pcitool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 			pcitool_unmap(virt_addr, num_virt_pages);
 		}
 done_reg:
+		prg.drvr_version = PCITOOL_VERSION;
 		if (ddi_copyout(&prg, arg, sizeof (pcitool_reg_t), mode) !=
 		    DDI_SUCCESS) {
 			if (pcitool_debug)

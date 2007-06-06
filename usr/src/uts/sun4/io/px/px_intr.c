@@ -346,7 +346,8 @@ px_msiq_intr(caddr_t arg)
 		    ih_p && (j < ipil_p->ipil_ih_size) &&
 		    ((ih_p->ih_msg_code != msg_code) ||
 		    (ih_p->ih_rec_type != msiq_rec_p->msiq_rec_type));
-		    ih_p = ih_p->ih_next, j++);
+		    ih_p = ih_p->ih_next, j++)
+			;
 
 		if ((ih_p->ih_msg_code == msg_code) &&
 		    (ih_p->ih_rec_type == msiq_rec_p->msiq_rec_type)) {
@@ -996,8 +997,21 @@ px_ks_update(kstat_t *ksp, int rw)
 
 	if (ih_p->ih_intr_state == PX_INTR_STATE_ENABLE) {
 
-		(void) strcpy(pxintr_ks_template.pxintr_ks_type.value.c,
-		    (ih_p->ih_rec_type == 0) ? "fixed" : "msi");
+		switch (i_ddi_intr_get_current_type(ih_p->ih_dip)) {
+		case DDI_INTR_TYPE_MSI:
+			(void) strcpy(pxintr_ks_template.pxintr_ks_type.value.c,
+			    "msi");
+			break;
+		case DDI_INTR_TYPE_MSIX:
+			(void) strcpy(pxintr_ks_template.pxintr_ks_type.value.c,
+			    "msix");
+			break;
+		default:
+			(void) strcpy(pxintr_ks_template.pxintr_ks_type.value.c,
+			    "fixed");
+			break;
+		}
+
 		pxintr_ks_template.pxintr_ks_cpu.value.ui64 = ino_p->ino_cpuid;
 		pxintr_ks_template.pxintr_ks_pil.value.ui64 = ipil_p->ipil_pil;
 		pxintr_ks_template.pxintr_ks_time.value.ui64 = ih_p->ih_nsec +
