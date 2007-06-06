@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -760,25 +760,29 @@ update_field(fru_nodehdl_t nodehdl, char *field_name, char *field_value)
 	return (0);
 }
 
-static void
+static int
 update_node_data(fru_nodehdl_t node)
 {
-	int  i;
+	int	i;
+	int	status;
 
 	if (service_mode) {
 		for (i = 0; i < svcargc; i += 2)
-			(void) update_field(node, svcargv[i], svcargv[i + 1]);
+			if (update_field(node, svcargv[i], svcargv[i + 1])) {
+				status = 1;
+			}
 	} else {
-		(void) update_field(node, "/Customer_DataR/Cust_Data",
+		status = update_field(node, "/Customer_DataR/Cust_Data",
 							customer_data);
 	}
+	return (status);
 }
 
 static void
 walk_tree(fru_nodehdl_t node, const char *prior_path, int process_tree)
 {
 	char	*name, path[PATH_MAX];
-	int	process_self = process_tree, status;
+	int	process_self = process_tree, status, update_status = 0;
 	fru_nodehdl_t	 next_node;
 	fru_node_t	type;
 
@@ -819,9 +823,14 @@ walk_tree(fru_nodehdl_t node, const char *prior_path, int process_tree)
 	} else if ((process_tree || (process_self = pathmatch(path))) &&
 			(type == FRU_NODE_CONTAINER)) {
 		(void) printf("%s\n", path);
-		if (update) update_node_data(node);
+		if (update) {
+			status = update_node_data(node);
+			update_status = status;
+		}
 		print_node_data(node);
-		if (!recursive) exit(0);
+		if (!recursive) {
+			exit(status);
+		}
 	} else if (process_self && !recursive) {
 		(void) fprintf(stderr,
 		    gettext("\"%s\" is not a container\n"), path);
@@ -837,6 +846,12 @@ walk_tree(fru_nodehdl_t node, const char *prior_path, int process_tree)
 
 	if (fru_get_peer(node, &next_node) == FRU_SUCCESS)
 		walk_tree(next_node, prior_path, process_tree);
+
+	/*
+	 * when update_node_data failed, need to exit with return value 1
+	 */
+	if (update_status)
+		exit(1);
 }
 
 static int
