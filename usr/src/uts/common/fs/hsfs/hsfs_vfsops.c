@@ -476,10 +476,9 @@ hsfs_vget(struct vfs *vfsp, struct vnode **vpp, struct fid *fidp)
 
 	rw_enter(&fsp->hsfs_hash_lock, RW_READER);
 
-	nodeid = fid->hf_ino;
+	nodeid = (ino64_t)MAKE_NODEID(fid->hf_dir_lbn, fid->hf_dir_off, vfsp);
 
-	if ((*vpp = hs_findhash(nodeid, fid->hf_dir_lbn,
-				(uint_t)fid->hf_dir_off, vfsp)) == NULL) {
+	if ((*vpp = hs_findhash(nodeid, vfsp)) == NULL) {
 		/*
 		 * Not in cache, so we need to remake it.
 		 * hs_remakenode() will read the directory entry
@@ -884,10 +883,7 @@ hs_mountfs(
 		break;
 	}
 
-	/*
-	 * Add the HSFSMNT_INODE pseudo mount flag to the current mount flags.
-	 */
-	fsp->hsfs_flags = mount_flags | (fsp->hsfs_flags & HSFSMNT_INODE);
+	fsp->hsfs_flags = mount_flags;
 
 	DTRACE_PROBE1(mount__done, struct hsfs *, fsp);
 
@@ -896,9 +892,6 @@ hs_mountfs(
 	 */
 	fsp->hsfs_magic = HSFS_MAGIC;
 	mutex_exit(&hs_mounttab_lock);
-
-	kmem_free(svp, sizeof (*svp));
-	kmem_free(jvp, sizeof (*jvp));
 
 	return (0);
 
@@ -970,7 +963,6 @@ hs_findhsvol(struct hsfs *fsp, struct vnode *vp, struct hs_volume *hvp)
 {
 	struct buf *secbp;
 	int i;
-	int n;
 	uchar_t *volp;
 	int error;
 	uint_t secno;
@@ -987,12 +979,7 @@ hs_findhsvol(struct hsfs *fsp, struct vnode *vp, struct hs_volume *hvp)
 
 	volp = (uchar_t *)secbp->b_un.b_addr;
 
-	/*
-	 * To avoid that we read the whole medium in case that someone prepares
-	 * a malicious "fs image", we read at most 32 blocks.
-	 */
-	for (n = 0; n < 32 &&
-	    HSV_DESC_TYPE(volp) != VD_EOV; n++) {
+	while (HSV_DESC_TYPE(volp) != VD_EOV) {
 		for (i = 0; i < HSV_ID_STRLEN; i++)
 			if (HSV_STD_ID(volp)[i] != HSV_ID_STRING[i])
 				goto cantfind;
@@ -1100,14 +1087,12 @@ hs_findisovol(struct hsfs *fsp, struct vnode *vp,
 {
 	struct buf *secbp;
 	int i;
-	int n;
 	uchar_t *volp;
 	int error;
 	uint_t secno;
 	int foundpvd = 0;
 	int foundsvd = 0;
 	int foundjvd = 0;
-	int pvd_sum = 0;
 
 	secno = hs_findvoldesc(vp->v_rdev, ISO_VOLDESC_SEC);
 	secbp = bread(vp->v_rdev, secno * 4, ISO_SECTOR_SIZE);
@@ -1121,12 +1106,7 @@ hs_findisovol(struct hsfs *fsp, struct vnode *vp,
 
 	volp = (uchar_t *)secbp->b_un.b_addr;
 
-	/*
-	 * To avoid that we read the whole medium in case that someone prepares
-	 * a malicious "fs image", we read at most 32 blocks.
-	 */
-	for (n = 0; n < 32 &&
-	    (enum iso_voldesc_type) ISO_DESC_TYPE(volp) != ISO_VD_EOV; n++) {
+	while ((enum iso_voldesc_type) ISO_DESC_TYPE(volp) != ISO_VD_EOV) {
 		for (i = 0; i < ISO_ID_STRLEN; i++)
 			if (ISO_STD_ID(volp)[i] != ISO_ID_STRING[i])
 				goto cantfind;
@@ -1142,8 +1122,6 @@ hs_findisovol(struct hsfs *fsp, struct vnode *vp,
 					return (error);
 				}
 				foundpvd = 1;
-				for (i = 0; i < ISO_SECTOR_SIZE; i++)
-					pvd_sum += volp[i];
 			}
 			break;
 		case ISO_VD_SVD:
@@ -1187,38 +1165,6 @@ hs_findisovol(struct hsfs *fsp, struct vnode *vp,
 		}
 
 		volp = (uchar_t *)secbp->b_un.b_addr;
-	}
-	for (n = 0; n < 16; n++) {
-		brelse(secbp);
-		++secno;
-		secbp = bread(vp->v_rdev, secno * 4, HS_SECTOR_SIZE);
-		error = geterror(secbp);
-
-		if (error != 0) {
-			cmn_err(CE_NOTE, "hs_findisovol: bread: error=(%d)",
-				    error);
-			brelse(secbp);
-			return (error);
-		}
-
-		/*
-		 * Check for the signature from mkisofs that grants that
-		 * the current filesystem allows to use the extent lbn as
-		 * inode number even in pure ISO9660 mode.
-		 */
-		volp = (uchar_t *)secbp->b_un.b_addr;
-		if (strncmp((char *)volp, "MKI ", 4) == 0) {
-			int	sum;
-
-			sum  = volp[2045];
-			sum *= 256;
-			sum += volp[2046];
-			sum *= 256;
-			sum += volp[2047];
-			if (sum == pvd_sum)
-				fsp->hsfs_flags |= HSFSMNT_INODE;
-			break;
-		}
 	}
 	if (foundpvd) {
 		brelse(secbp);

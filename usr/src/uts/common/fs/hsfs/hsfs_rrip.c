@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,11 +129,6 @@ rrip_file_attr(sig_args_t *sig_args_p)
 	hdp->uid   = RRIP_UID(px_ptr);
 	hdp->gid   = RRIP_GID(px_ptr);
 
-	if (SUF_LEN(px_ptr) >= RRIP_PX_SIZE)
-		hdp->inode = (ino64_t)RRIP_INO(px_ptr);
-	else
-		hdp->inode = 0;
-
 	hdp->type = IFTOVT(hdp->mode);
 
 	return (px_ptr + SUF_LEN(px_ptr));
@@ -216,9 +211,6 @@ name_parse(
 	int		dst_size)	/* limit dest string to */
 						/* this value */
 {
-	size_t	off;
-	size_t	len;
-
 	if (IS_NAME_BIT_SET(rrip_flags, RRIP_NAME_ROOT))
 		(void) strcpy((char *)dst, "/");
 
@@ -257,21 +249,17 @@ name_parse(
 	 * Unfortunately, strlcat() cannot deal with input strings
 	 * that are not NULL-terminated - like SUA_string can be in
 	 * our case here. So we can't use it :(
-	 * Now strncat() doesn't work either - because it doesn't deal
-	 * with strings for which the 'potential NULL-termination' isn't
-	 * accessible - strncat(dst, NULL, 0) crashes although it copies
-	 * nothing in any case. If the SUA ends on a mapping boundary,
-	 * then telling strncat() to copy no more than the remaining bytes
-	 * in the buffer is of no avail if there's no NULL byte in them.
-	 *
-	 * Hence - binary copy. What are all these str* funcs for ??
+	 * We therefore have to emulate its behaviour using strncat(),
+	 * which will never access more bytes from the input string
+	 * than specified. Since strncat() doesn't necessarily NULL-
+	 * terminate the result, make sure we've got space for the
+	 * Nullbyte at the end.
 	 */
 	dst_size--;	/* trailing '\0' */
 
-	off = strlen((char *)dst);
-	len = MIN(dst_size - off, SUA_string_len);
-	bcopy((char *)SUA_string, (char *)(dst + off), len);
-	dst[off + len] = '\0';
+	(void) strncat((char *)dst, (char *)SUA_string,
+	    MIN(dst_size - strlen((char *)dst), SUA_string_len));
+	dst[dst_size] = '\0';
 	*dst_lenp = strlen((char *)dst);
 
 	if (IS_NAME_BIT_SET(rrip_flags, RRIP_NAME_CONTINUE))
@@ -445,7 +433,6 @@ rrip_namecopy(
 	char 	*to,			/* string to copy "from" to */
 	char  	*tmp_name,		/* temp storage for original name */
 	uchar_t	*dirp,			/* directory entry pointer */
-	uint_t	last_offset,		/* last index into current dir block */
 	struct 	hsfs *fsp,		/* filesystem pointer */
 	struct 	hs_direntry *hdp)	/* directory entry pointer to put */
 					/* all that good info in */
@@ -473,8 +460,7 @@ rrip_namecopy(
 	}
 
 
-	ret_val = parse_sua((uchar_t *)to, &size, &change_flag,
-			dirp, last_offset,
+	ret_val = parse_sua((uchar_t *)to, &size, &change_flag, dirp,
 			hdp, fsp, (uchar_t *)NULL, NULL);
 
 	if (IS_NAME_BIT_SET(change_flag, RRIP_NAME_CHANGE) && !ret_val)

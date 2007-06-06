@@ -22,7 +22,7 @@
  * High Sierra filesystem structure definitions
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,6 @@ struct	hs_direntry {
 	uint_t		nlink;		/* no. of links to file */
 	uid_t		uid;		/* owner's user id */
 	gid_t		gid;		/* owner's group id */
-	ino64_t		inode;		/* inode number from rrip data */
 	dev_t		r_dev;		/* major/minor device numbers */
 	uint_t		xar_prot :1;	/* 1 if protection in XAR */
 	uchar_t		xar_len;	/* no. of Logical blocks in XAR */
@@ -115,7 +114,6 @@ struct  hsfid {
 	ushort_t	hf_len;		/* length of fid */
 	ushort_t	hf_dir_off;	/* offset in LBN of directory entry */
 	uint_t		hf_dir_lbn;	/* LBN of directory */
-	uint32_t	hf_ino;		/* The inode number or HS_DUMMY_INO */
 };
 
 
@@ -152,17 +150,6 @@ struct	hs_volume {
  */
 #define	HS_HASHSIZE	32		/* hsnode hash table size */
 #define	HS_HSNODESPACE	16384		/* approx. space used for hsnodes */
-
-/*
- * We usually use the starting extent LBA for the inode numbers of files and
- * directories. As this will not work for zero sized files, we assign a dummy
- * inode number to all zero sized files. We use the number 16 as this is the
- * LBA for the PVD, this number cannot be a valid starting extent LBA for a
- * file. In case that the node number is the HS_DUMMY_INO, we use the LBA and
- * offset of the directory entry of this file (which is what we used before
- * we started to support correct hard links).
- */
-#define	HS_DUMMY_INO	16	/* dummy inode number for empty files */
 
 /*
  * High Sierra filesystem structure.
@@ -213,8 +200,6 @@ struct hsfs {
 #define	HSFS_ERR_BAD_JOLIET_FILE_LEN	5
 #define	HSFS_ERR_TRUNC_JOLIET_FILE_LEN	6
 #define	HSFS_ERR_BAD_DIR_ENTRY		7
-#define	HSFS_ERR_NEG_SUA_LEN		8
-#define	HSFS_ERR_BAD_SUA_LEN		9
 
 #define	HSFS_HAVE_LOWER_CASE(fsp) \
 	((fsp)->hsfs_err_flags & (1 << HSFS_ERR_LOWER_CASE_NM))
@@ -255,6 +240,18 @@ struct hsfs {
 				hsfs_vol.lbn_shift)
 #define	BYTE_TO_LBN(boff, vfsp)	((boff)>>((struct hsfs *)((vfsp)->vfs_data))-> \
 				hsfs_vol.lbn_shift)
+
+/*
+ * Create a nodeid.
+ * We construct the nodeid from the location of the directory
+ * entry which points to the file.  We divide by 32 to
+ * compress the range of nodeids; we know that the minimum size
+ * for an ISO9660 dirent is 34, so we will never have adjacent
+ * dirents with the same nodeid.
+ */
+#define	HSFS_MIN_DL_SHFT	5
+#define	MAKE_NODEID(lbn, off, vfsp) \
+		((LBN_TO_BYTE((lbn), (vfsp)) + (off)) >> HSFS_MIN_DL_SHFT)
 
 #ifdef	__cplusplus
 }

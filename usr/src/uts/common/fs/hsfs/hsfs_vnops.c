@@ -83,13 +83,6 @@
 
 #include <fs/fs_subr.h>
 
-/*
- * This tunable allows us to ignore inode numbers from rrip-1.12.
- * In this case, we fall back to our default inode algorithm.
- */
-extern int use_rrip_inodes;
-
-
 /* ARGSUSED */
 static int
 hsfs_fsync(vnode_t *cp, int syncflag, cred_t *cred)
@@ -383,6 +376,7 @@ hsfs_readdir(
 	size_t		dname_size;
 	struct fbuf	*fbp;
 	uint_t		last_offset;	/* last index into current dir block */
+	ulong_t		dir_lbn;	/* lbn of directory */
 	ino64_t		dirino;	/* temporary storage before storing in dirent */
 	off_t		diroff;
 
@@ -391,6 +385,7 @@ hsfs_readdir(
 	if (dhp->hs_dirent.ext_size == 0)
 		hs_filldirent(vp, &dhp->hs_dirent);
 	dirsiz = dhp->hs_dirent.ext_size;
+	dir_lbn = dhp->hs_dirent.ext_lbn;
 	if (uiop->uio_loffset >= dirsiz) {	/* at or beyond EOF */
 		if (eofp)
 			*eofp = 1;
@@ -452,7 +447,7 @@ hsfs_readdir(
 			 */
 			if (!hs_parsedir(fsp, &blkp[rel_offset(offset)],
 				&hd, dname, &dnamelen,
-					last_offset - offset)) {
+					last_offset - rel_offset(offset))) {
 				/*
 				 * Determine if there is enough room
 				 */
@@ -466,26 +461,31 @@ hsfs_readdir(
 
 				diroff = offset + hdlen;
 				/*
-				 * If the media carries rrip-v1.12 or newer,
-				 * and we trust the inodes from the rrip data
-				 * (use_rrip_inodes != 0), use that data. If the
-				 * media has been created by a recent mkisofs
-				 * version, we may trust all numbers in the
-				 * starting extent number; otherwise, we cannot
-				 * do this for zero sized files. We use
-				 * HS_DUMMY_INO in this case and make sure that
-				 * we will not map all files to the same
-				 * meta data.
+				 * Generate nodeid.
+				 * If a directory, nodeid points to the
+				 * canonical dirent describing the directory:
+				 * the dirent of the "." entry for the
+				 * directory, which is pointed to by all
+				 * dirents for that directory.
+				 * Otherwise, nodeid points to dirent of file.
 				 */
-				if (hd.inode != 0 && use_rrip_inodes) {
-					dirino = hd.inode;
+				if (hd.type == VDIR) {
+					dirino = (ino64_t)
+					    MAKE_NODEID(hd.ext_lbn, 0,
+					    vp->v_vfsp);
 				} else {
-					dirino = hd.ext_lbn;
-					if (hd.ext_size == 0 &&
-					    (fsp->hsfs_flags &
-							HSFSMNT_INODE) == 0) {
-						dirino = HS_DUMMY_INO;
-					}
+					struct hs_volume *hvp;
+					offset_t lbn, off;
+
+					/*
+					 * Normalize lbn and off
+					 */
+					hvp = &fsp->hsfs_vol;
+					lbn = dir_lbn +
+					    (offset >> hvp->lbn_shift);
+					off = offset & hvp->lbn_maxoffset;
+					dirino = (ino64_t)MAKE_NODEID(lbn,
+					    off, vp->v_vfsp);
 				}
 
 
@@ -557,7 +557,6 @@ hsfs_fid(struct vnode *vp, struct fid *fidp)
 	mutex_enter(&hp->hs_contents_lock);
 	fid->hf_dir_lbn = hp->hs_dir_lbn;
 	fid->hf_dir_off = (ushort_t)hp->hs_dir_off;
-	fid->hf_ino = hp->hs_nodeid;
 	mutex_exit(&hp->hs_contents_lock);
 	return (0);
 }
