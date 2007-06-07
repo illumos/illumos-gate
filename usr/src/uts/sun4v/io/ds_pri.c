@@ -312,7 +312,7 @@ ds_pri_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	cv_init(&sp->cv, NULL, CV_DEFAULT, NULL);
 
 	if (ddi_create_minor_node(dip, DS_PRI_NAME, S_IFCHR, instance,
-		DDI_PSEUDO, 0) != DDI_SUCCESS) {
+	    DDI_PSEUDO, 0) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s@%d: Unable to create minor node",
 		    DS_PRI_NAME, instance);
 		goto fail;
@@ -380,6 +380,8 @@ ds_pri_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	if (sp != NULL && sp->ds_pri_len != 0)
 		kmem_free(sp->ds_pri, sp->ds_pri_len);
+
+	ds_pri_ops.cb_arg = NULL;
 
 	ddi_remove_minor_node(dip, NULL);
 	cv_destroy(&sp->cv);
@@ -607,7 +609,7 @@ loop:;
 			goto loop;
 		}
 		DS_PRI_DBG("ds_pri_ioctl: DSPRI_GETINFO sz=0x%lx tok=0x%lx\n",
-			info.size, info.token);
+		    info.size, info.token);
 		mutex_exit(&sp->lock);
 
 		if (ddi_copyout(&info, (void *)arg, sizeof (info), mode) != 0)
@@ -625,10 +627,10 @@ loop:;
 		mutex_enter(&sp->lock);
 
 		DS_PRI_DBG("ds_pri_ioctl: DSPRI_WAIT gen=0x%lx sp->gen=0x%lx\n",
-			gencount, sp->gencount);
+		    gencount, sp->gencount);
 
 		while ((sp->state & DS_PRI_HAS_PRI) == 0 ||
-			gencount == sp->gencount) {
+		    gencount == sp->gencount) {
 			if ((sp->state & DS_PRI_HAS_PRI) == 0)
 				request_pri(sp);
 			if (cv_wait_sig(&sp->cv, &sp->lock) == 0) {
@@ -710,7 +712,7 @@ ds_pri_reg_handler(ds_cb_arg_t arg, ds_ver_t *ver, ds_svc_hdl_t hdl)
 		return;
 
 	DS_PRI_DBG("ds_pri_reg_handler: registering handle 0x%lx for version "
-		"0x%x:0x%x\n", (uint64_t)hdl, ver->major, ver->minor);
+	    "0x%x:0x%x\n", (uint64_t)hdl, ver->major, ver->minor);
 
 	/* When the domain service comes up automatically req the pri */
 	mutex_enter(&sp->lock);
@@ -782,7 +784,7 @@ ds_pri_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 		return;
 
 	DS_PRI_DBG("ds_pri_data_handler: msg buf len 0x%lx : type 0x%lx, "
-		"seqn 0x%lx\n", buflen, msgp->hdr.type, msgp->hdr.seq_num);
+	    "seqn 0x%lx\n", buflen, msgp->hdr.type, msgp->hdr.seq_num);
 
 	instance = ddi_get_instance(dip);
 	if ((sp = ddi_get_soft_state(ds_pri_statep, instance)) == NULL)
@@ -822,7 +824,7 @@ ds_pri_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 	/* response seq_num should match our request seq_num */
 	if (msgp->hdr.seq_num != sp->last_req_id) {
 		cmn_err(CE_WARN, "Received DS pri data out of sequence with "
-			"request");
+		    "request");
 		goto done;
 	}
 
