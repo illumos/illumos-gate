@@ -1980,7 +1980,7 @@ px_err_pciex_ue_handle(dev_info_t *rpdip, caddr_t csr_base,
 
 	err = px_err_check_pcie(rpdip, derr, &regs);
 
-	if (err == PX_PANIC) {
+	if (err & PX_PANIC) {
 		return (px_err_panic_handle(rpdip, csr_base, derr,
 			    err_reg_descr, err_bit_descr));
 	} else {
@@ -2114,7 +2114,7 @@ px_err_pciex_ce_handle(dev_info_t *rpdip, caddr_t csr_base,
 
 	err = px_err_check_pcie(rpdip, derr, &regs);
 
-	if (err == PX_PANIC) {
+	if (err & PX_PANIC) {
 		return (px_err_panic_handle(rpdip, csr_base, derr,
 			    err_reg_descr, err_bit_descr));
 	} else {
