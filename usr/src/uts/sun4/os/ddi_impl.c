@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2504,11 +2504,7 @@ e_ddi_branch_unconfigure(
 	/*
 	 * ddi_deviname() returns a component name with / prepended.
 	 */
-	rv = devfs_clean(pdip, devnm + 1, DV_CLEAN_FORCE);
-	if (rv) {
-		kmem_free(devnm, MAXNAMELEN + 1);
-		return (rv);
-	}
+	(void) devfs_clean(pdip, devnm + 1, DV_CLEAN_FORCE);
 
 	ndi_devi_enter(pdip, &circ);
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -869,17 +868,7 @@ ibnex_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			devnm = kmem_alloc(MAXNAMELEN + 1, KM_SLEEP);
 			(void) ddi_deviname(apid_dip, devnm);
 			mutex_exit(&ibnex.ibnex_mutex);
-			if (devfs_clean(pdip, devnm + 1, DV_CLEAN_FORCE)) {
-				IBTF_DPRINTF_L2("ibnex", "%s: devfs_clean of %s"
-				    " failed", msg, devnm);
-				rv = EBUSY;
-				mutex_enter(&ibnex.ibnex_mutex);
-				ndi_rele_devi(apid_dip);
-				nodep->node_dip = apid_dip;
-				nodep->node_state = IBNEX_CFGADM_CONFIGURED;
-				kmem_free(devnm, MAXNAMELEN + 1);
-				break;
-			}
+			(void) devfs_clean(pdip, devnm + 1, DV_CLEAN_FORCE);
 			mutex_enter(&ibnex.ibnex_mutex);
 			kmem_free(devnm, MAXNAMELEN + 1);
 		}

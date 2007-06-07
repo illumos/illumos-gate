@@ -370,7 +370,15 @@ devfs_clean_vhci(dev_info_t *dip, void *args)
  * devfs_clean()
  *
  * Destroy unreferenced dv_node's and detach devices.
- * Returns 0 on success, error if failed to unconfigure node.
+ *
+ * devfs_clean will try its best to clean up unused nodes. It is
+ * no longer valid to assume that just because devfs_clean fails,
+ * the device is not removable. This is because device contracts
+ * can result in userland processes releasing a device during the
+ * device offline process in the kernel. Thus it is no longer
+ * correct to fail an offline just because devfs_clean finds
+ * referenced dv_nodes. To enforce this, devfs_clean() always
+ * returns success i.e. 0.
  *
  * devfs caches unreferenced dv_node to speed by the performance
  * of ls, find, etc. devfs_clean() is invoked to cleanup cached
@@ -389,7 +397,6 @@ int
 devfs_clean(dev_info_t *dip, char *devnm, uint_t flags)
 {
 	struct dv_node		*dvp;
-	int			rval = 0;
 
 	dcmn_err(("devfs_unconfigure: dip = 0x%p, flags = 0x%x",
 		(void *)dip, flags));
@@ -401,8 +408,7 @@ devfs_clean(dev_info_t *dip, char *devnm, uint_t flags)
 	if (dvp == NULL)
 		return (0);
 
-	if (dv_cleandir(dvp, devnm, flags) != 0)
-		rval = EBUSY;
+	(void) dv_cleandir(dvp, devnm, flags);
 	VN_RELE(DVTOV(dvp));
 
 	/*
@@ -425,7 +431,7 @@ devfs_clean(dev_info_t *dip, char *devnm, uint_t flags)
 		mdi_walk_vhcis(devfs_clean_vhci, (void *)(uintptr_t)flags);
 	}
 
-	return (rval);
+	return (0);
 }
 
 /*

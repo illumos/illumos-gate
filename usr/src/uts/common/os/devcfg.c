@@ -5775,12 +5775,12 @@ ndi_devi_offline(dev_info_t *dip, uint_t flags)
 		 * operation. We skip the devfs_clean() step.
 		 */
 		if (!DEVI_BUSY_OWNED(pdip))
-			rval = devfs_clean(pdip, devname + 1, DV_CLEAN_FORCE);
+			(void) devfs_clean(pdip, devname + 1, DV_CLEAN_FORCE);
 		kmem_free(devname, MAXNAMELEN + 1);
 
-		if (rval == 0)
-			rval = devi_unconfig_branch(dip, NULL,
-			    flags|NDI_UNCONFIG, &brevq);
+		rval = devi_unconfig_branch(dip, NULL, flags|NDI_UNCONFIG,
+		    &brevq);
+
 		if (rval)
 			return (NDI_FAILURE);
 

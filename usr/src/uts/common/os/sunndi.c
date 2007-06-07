@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -512,18 +511,14 @@ ndi_devctl_device_offline(dev_info_t *dip, struct devctl_iocdata *dcp,
 	(void) snprintf(name, MAXNAMELEN, "%s@%s",
 		ndi_dc_getname(dcp), ndi_dc_getaddr(dcp));
 
-	rval = devfs_clean(dip, name, DV_CLEAN_FORCE);
-	if (rval) {
-		rval = EBUSY;
-	} else {
-		rval = ndi_devi_unconfig_one(dip, name, NULL,
-		    flags | NDI_DEVI_OFFLINE);
+	(void) devfs_clean(dip, name, DV_CLEAN_FORCE);
+	rval = ndi_devi_unconfig_one(dip, name, NULL,
+	    flags | NDI_DEVI_OFFLINE);
 
-		if (rval == NDI_BUSY) {
-			rval = EBUSY;
-		} else if (rval == NDI_FAILURE) {
-			rval = EIO;
-		}
+	if (rval == NDI_BUSY) {
+		rval = EBUSY;
+	} else if (rval == NDI_FAILURE) {
+		rval = EIO;
 	}
 
 	NDI_DEBUG(flags, (CE_CONT, "%s%d: offline: %s: %s\n",
