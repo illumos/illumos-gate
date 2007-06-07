@@ -427,11 +427,11 @@ usbvc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	usbvcp->usbvc_dip = dip;
 
 	usbvcp->usbvc_log_handle = usb_alloc_log_hdl(dip,
-				"usbvc", &usbvc_errlevel,
-				&usbvc_errmask, &usbvc_instance_debug, 0);
+	    "usbvc", &usbvc_errlevel,
+	    &usbvc_errmask, &usbvc_instance_debug, 0);
 
 	USB_DPRINTF_L3(PRINT_MASK_ATTA, usbvcp->usbvc_log_handle,
-		    "usbvc_attach: enter");
+	    "usbvc_attach: enter");
 
 	if ((status = usb_client_attach(dip, USBDRV_VERSION, 0)) !=
 	    USB_SUCCESS) {
@@ -607,7 +607,7 @@ static int
 usbvc_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 {
 	usbvc_state_t	*usbvcp =
-			    ddi_get_soft_state(usbvc_statep, getminor(*devp));
+	    ddi_get_soft_state(usbvc_statep, getminor(*devp));
 
 	if (usbvcp == NULL) {
 
@@ -653,7 +653,7 @@ usbvc_open(dev_t *devp, int flag, int otyp, cred_t *cred_p)
 		usbvcp->usbvc_pm->usbvc_raise_power = B_TRUE;
 		mutex_exit(&usbvcp->usbvc_mutex);
 		(void) pm_raise_power(usbvcp->usbvc_dip,
-					0, USB_DEV_OS_FULL_PWR);
+		    0, USB_DEV_OS_FULL_PWR);
 		mutex_enter(&usbvcp->usbvc_mutex);
 		usbvcp->usbvc_pm->usbvc_raise_power = B_FALSE;
 	}
@@ -736,7 +736,7 @@ usbvc_read(dev_t dev, struct uio *uio_p, cred_t *cred_p)
 	int			rval;
 	usbvc_stream_if_t	*strm_if;
 	usbvc_state_t	*usbvcp =
-			    ddi_get_soft_state(usbvc_statep, getminor(dev));
+	    ddi_get_soft_state(usbvc_statep, getminor(dev));
 
 	USB_DPRINTF_L4(PRINT_MASK_READ, usbvcp->usbvc_log_handle,
 	    "usbvc_read: enter");
@@ -850,7 +850,7 @@ usbvc_read(dev_t dev, struct uio *uio_p, cred_t *cred_p)
 
 	mutex_exit(&usbvcp->usbvc_mutex);
 	rval = physio(usbvc_strategy, NULL, dev, B_READ,
-		    usbvc_minphys, uio_p);
+	    usbvc_minphys, uio_p);
 
 	mutex_enter(&usbvcp->usbvc_mutex);
 	usbvc_release_access(usbvcp);
@@ -874,7 +874,7 @@ static int
 usbvc_strategy(struct buf *bp)
 {
 	usbvc_state_t *usbvcp = ddi_get_soft_state(usbvc_statep,
-				    getminor(bp->b_edev));
+	    getminor(bp->b_edev));
 
 	USB_DPRINTF_L4(PRINT_MASK_READ, usbvcp->usbvc_log_handle,
 	    "usbvc_strategy: enter");
@@ -934,8 +934,8 @@ usbvc_minphys(struct buf *bp)
 	dev_t			dev = bp->b_edev;
 	usbvc_stream_if_t	*strm_if;
 	uint32_t		maxsize;
-	usbvc_state_t	*usbvcp =
-			    ddi_get_soft_state(usbvc_statep, getminor(dev));
+	usbvc_state_t		*usbvcp =
+	    ddi_get_soft_state(usbvc_statep, getminor(dev));
 
 	mutex_enter(&usbvcp->usbvc_mutex);
 	strm_if = usbvcp->usbvc_curr_strm;
@@ -1063,7 +1063,7 @@ usbvc_devmap(dev_t dev, devmap_cookie_t handle, offset_t off,
 	mutex_exit(&usbvcp->usbvc_mutex);
 
 	error = devmap_umem_setup(handle, usbvcp->usbvc_dip, NULL,
-		buf->umem_cookie, off, len, PROT_ALL, DEVMAP_DEFAULTS, NULL);
+	    buf->umem_cookie, off, len, PROT_ALL, DEVMAP_DEFAULTS, NULL);
 	mutex_enter(&usbvcp->usbvc_mutex);
 	*maplen = len;
 	if (error == 0 && buf->status == USBVC_BUF_INIT) {
@@ -1174,7 +1174,7 @@ usbvc_init_power_mgmt(usbvc_state_t *usbvcp)
 	mutex_exit(&usbvcp->usbvc_mutex);
 
 	if (usb_create_pm_components(usbvcp->usbvc_dip, &pwr_states) ==
-		USB_SUCCESS) {
+	    USB_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_PM, usbvcp->usbvc_log_handle,
 		    "usbvc_init_power_mgmt: created PM components");
 
@@ -1342,8 +1342,8 @@ usbvc_pwrlvl0(usbvc_state_t *usbvcp)
 		ASSERT(rval == USB_SUCCESS);
 
 		usbvcp->usbvc_dev_state = USB_DEV_PWRED_DOWN;
-		usbvcp->usbvc_pm->usbvc_current_power =
-						USB_DEV_OS_PWR_OFF;
+		usbvcp->usbvc_pm->usbvc_current_power = USB_DEV_OS_PWR_OFF;
+
 		/* FALLTHRU */
 	case USB_DEV_DISCONNECTED:
 	case USB_DEV_SUSPENDED:
@@ -1451,8 +1451,7 @@ static void
 usbvc_cpr_suspend(dev_info_t *dip)
 {
 	int		instance = ddi_get_instance(dip);
-	usbvc_state_t	*usbvcp = ddi_get_soft_state(usbvc_statep,
-							instance);
+	usbvc_state_t	*usbvcp = ddi_get_soft_state(usbvc_statep, instance);
 
 	USB_DPRINTF_L4(PRINT_MASK_PM, usbvcp->usbvc_log_handle,
 	    "usbvc_cpr_suspend enter");
@@ -1494,8 +1493,7 @@ static void
 usbvc_cpr_resume(dev_info_t *dip)
 {
 	int		instance = ddi_get_instance(dip);
-	usbvc_state_t	*usbvcp = ddi_get_soft_state(usbvc_statep,
-							instance);
+	usbvc_state_t	*usbvcp = ddi_get_soft_state(usbvc_statep, instance);
 
 	USB_DPRINTF_L4(PRINT_MASK_OPEN, usbvcp->usbvc_log_handle,
 	    "resume: enter");
@@ -1590,8 +1588,7 @@ static int
 usbvc_disconnect_event_cb(dev_info_t *dip)
 {
 	int		instance = ddi_get_instance(dip);
-	usbvc_state_t	*usbvcp =
-			    ddi_get_soft_state(usbvc_statep, instance);
+	usbvc_state_t	*usbvcp = ddi_get_soft_state(usbvc_statep, instance);
 
 	USB_DPRINTF_L4(PRINT_MASK_HOTPLUG, usbvcp->usbvc_log_handle,
 	    "disconnect: enter");
@@ -1654,7 +1651,7 @@ static void
 usbvc_init_sync_objs(usbvc_state_t *usbvcp)
 {
 	mutex_init(&usbvcp->usbvc_mutex, NULL, MUTEX_DRIVER,
-			usbvcp->usbvc_reg->dev_iblock_cookie);
+	    usbvcp->usbvc_reg->dev_iblock_cookie);
 
 	cv_init(&usbvcp->usbvc_serial_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&usbvcp->usbvc_read_cv, NULL, CV_DRIVER, NULL);
@@ -1947,7 +1944,7 @@ usbvc_parse_ctrl_if(usbvc_state_t *usbvcp)
 			    (usbvc_vc_header_t *)kmem_zalloc(
 			    sizeof (usbvc_vc_header_t), KM_SLEEP);
 			usbvcp->usbvc_vc_header->descr =
-			(usbvc_vc_header_descr_t *)&cvs_buf[0];
+			    (usbvc_vc_header_descr_t *)&cvs_buf[0];
 
 			LE_TO_UINT16(usbvcp->usbvc_vc_header->descr->bcdUVC,
 			    0, version);
@@ -2472,8 +2469,8 @@ usbvc_parse_format_group(usbvc_state_t *usbvcp, usbvc_format_group_t *fmtgrp,
 
 	fmt = fmtgrp->format;
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, usbvcp->usbvc_log_handle,
-		"usbvc_parse_format_group: frame_cnt=%d, cvs_num=%d",
-		fmt->bNumFrameDescriptors, cvs_num);
+	    "usbvc_parse_format_group: frame_cnt=%d, cvs_num=%d",
+	    fmt->bNumFrameDescriptors, cvs_num);
 
 	switch (fmt->bDescriptorSubType) {
 	case VS_FORMAT_UNCOMPRESSED:
@@ -2548,57 +2545,42 @@ usbvc_parse_format_groups(usbvc_state_t *usbvcp, usbvc_stream_if_t *strm_if)
 
 	if_alt_data = strm_if->if_descr->if_alt;
 	cvs_data = if_alt_data->altif_cvs;
-	for (fmtgrp_num = 0; fmtgrp_num < fmtgrp_cnt; fmtgrp_num++) {
 
-		/* find the next format descriptor */
-		for (; cvs_num < if_alt_data->altif_n_cvs; cvs_num++) {
-			cvs_buf = cvs_data[cvs_num].cvs_buf;
-			switch (cvs_buf[2]) {
-			case VS_FORMAT_UNCOMPRESSED:
-			case VS_FORMAT_MJPEG:
-			case VS_FORMAT_MPEG2TS:
-			case VS_FORMAT_DV:
-			case VS_FORMAT_FRAME_BASED:
-			case VS_FORMAT_STREAM_BASED:
-				fmtgrp[fmtgrp_num].format =
-				    (usbvc_format_descr_t *)cvs_buf;
+	for (fmtgrp_num = 0; fmtgrp_num < fmtgrp_cnt &&
+	    cvs_num < if_alt_data->altif_n_cvs; cvs_num++) {
+		cvs_buf = cvs_data[cvs_num].cvs_buf;
+		switch (cvs_buf[2]) {
+		case VS_FORMAT_UNCOMPRESSED:
+		case VS_FORMAT_MJPEG:
+		case VS_FORMAT_MPEG2TS:
+		case VS_FORMAT_DV:
+		case VS_FORMAT_FRAME_BASED:
+		case VS_FORMAT_STREAM_BASED:
+			fmtgrp[fmtgrp_num].format =
+			    (usbvc_format_descr_t *)cvs_buf;
 
-				break;
-			default:
+			/*
+			 * Now cvs_data[cvs_num].cvs_buf is format descriptor,
+			 * usbvc_parse_format_group will then parse the frame
+			 * descriptors following this format descriptor.
+			 */
+			(void) usbvc_parse_format_group(usbvcp,
+			    &fmtgrp[fmtgrp_num], cvs_data, cvs_num,
+			    if_alt_data->altif_n_cvs);
 
-				break;
-			}
-			if (fmtgrp[fmtgrp_num].format) {
-
-				break;
-			}
-		}
-
-		/* If can't find the next format, then break. */
-		if (!(fmtgrp[fmtgrp_num].format)) {
-			strm_if->fmtgrp_cnt = fmtgrp_num;
-			USB_DPRINTF_L2(PRINT_MASK_ATTA,
-			    usbvcp->usbvc_log_handle,
-			    "usbvc_parse_format_groups: acctually %d formats"
-			    " parsed", fmtgrp_num);
+			fmtgrp_num++;
 
 			break;
+		default:
+			break;
 		}
-
-		/*
-		 * Now cvs_data[cvs_num].cvs_buf is format descriptor,
-		 * usbvc_parse_format_group will then parse the frame
-		 * descriptors following this format descriptor.
-		 */
-		(void) usbvc_parse_format_group(usbvcp, &fmtgrp[fmtgrp_num],
-		    cvs_data, cvs_num, if_alt_data->altif_n_cvs);
-
-		/*
-		 * cvs_data[cvs_num].cvs_buf is the one was parsed, so plus
-		 * 1 to move to the next format group
-		 */
-		cvs_num++;
 	}
+
+	/* Save the number of parsed format groups. */
+	strm_if->fmtgrp_cnt = fmtgrp_num;
+	USB_DPRINTF_L2(PRINT_MASK_ATTA, usbvcp->usbvc_log_handle,
+	    "usbvc_parse_format_groups: acctually %d formats parsed",
+	    fmtgrp_num);
 
 	/*
 	 * If can't find any formats, then free all allocated
@@ -2638,8 +2620,8 @@ usbvc_parse_stream_header(usbvc_state_t *usbvcp, usbvc_stream_if_t *strm_if)
 	if_alt_data = strm_if->if_descr->if_alt;
 	cvs_data = if_alt_data->altif_cvs;
 	for (cvs_num = 0; cvs_num < if_alt_data->altif_n_cvs; cvs_num++) {
-	    cvs_buf = cvs_data[cvs_num].cvs_buf;
-	    USB_DPRINTF_L2(PRINT_MASK_ATTA, usbvcp->usbvc_log_handle,
+		cvs_buf = cvs_data[cvs_num].cvs_buf;
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, usbvcp->usbvc_log_handle,
 		    "usbvc_parse_stream_header: cvs_num= %d", cvs_num);
 
 		/*
@@ -2840,7 +2822,7 @@ usbvc_alloc_map_bufs(usbvc_state_t *usbvcp, usbvc_stream_if_t *strm_if,
 
 	mutex_exit(&usbvcp->usbvc_mutex);
 	bufs[0].data = ddi_umem_alloc(buf_len * buf_cnt, DDI_UMEM_SLEEP,
-				    &bufs[0].umem_cookie);
+	    &bufs[0].umem_cookie);
 	mutex_enter(&usbvcp->usbvc_mutex);
 
 	for (i = 0; i < buf_cnt; i++) {
@@ -2998,7 +2980,7 @@ usbvc_start_isoc_polling(usbvc_state_t *usbvcp, usbvc_stream_if_t *strm_if,
 		n_pkt = USBVC_MAX_PKTS;
 	}
 	USB_DPRINTF_L3(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
-		"usbvc_start_isoc_polling: n_pkt=%d", n_pkt);
+	    "usbvc_start_isoc_polling: n_pkt=%d", n_pkt);
 
 	mutex_exit(&usbvcp->usbvc_mutex);
 	if ((req = usb_alloc_isoc_req(usbvcp->usbvc_dip, n_pkt,
@@ -3042,7 +3024,7 @@ usbvc_start_isoc_polling(usbvc_state_t *usbvcp, usbvc_stream_if_t *strm_if,
 		}
 	}
 	USB_DPRINTF_L4(PRINT_MASK_IOCTL, usbvcp->usbvc_log_handle,
-		"usbvc_start_isoc_polling: return, rval=%d", rval);
+	    "usbvc_start_isoc_polling: return, rval=%d", rval);
 
 	return (rval);
 }
@@ -3055,7 +3037,7 @@ static void
 usbvc_isoc_cb(usb_pipe_handle_t ph, usb_isoc_req_t *isoc_req)
 {
 	usbvc_state_t	*usbvcp =
-			    (usbvc_state_t *)isoc_req->isoc_client_private;
+	    (usbvc_state_t *)isoc_req->isoc_client_private;
 	int		i;
 	mblk_t		*data = isoc_req->isoc_data;
 	usbvc_buf_grp_t	*bufgrp;
@@ -3131,7 +3113,7 @@ static void
 usbvc_isoc_exc_cb(usb_pipe_handle_t ph, usb_isoc_req_t *isoc_req)
 {
 	usbvc_state_t	*usbvcp =
-			    (usbvc_state_t *)isoc_req->isoc_client_private;
+	    (usbvc_state_t *)isoc_req->isoc_client_private;
 	usb_cr_t	completion_reason;
 	int		rval;
 	usbvc_stream_if_t	*strm_if;
@@ -3215,7 +3197,7 @@ usbvc_set_alt(usbvc_state_t *usbvcp, usbvc_stream_if_t *strm_if)
 		return (USB_FAILURE);
 	}
 	USB_DPRINTF_L3(PRINT_MASK_OPEN, usbvcp->usbvc_log_handle,
-		"usbvc_set_alt: bandwidth=%x", bandwidth);
+	    "usbvc_set_alt: bandwidth=%x", bandwidth);
 
 	strm_if->curr_ep = NULL;
 	curr_pktsize = 0xffff;
@@ -3266,7 +3248,7 @@ usbvc_set_alt(usbvc_state_t *usbvcp, usbvc_stream_if_t *strm_if)
 	if_num = strm_if->if_descr->if_alt->altif_descr.bInterfaceNumber;
 	mutex_exit(&usbvcp->usbvc_mutex);
 	if ((rval = usb_set_alt_if(usbvcp->usbvc_dip, if_num, strm_if->curr_alt,
-		USB_FLAGS_SLEEP, NULL, NULL)) != USB_SUCCESS) {
+	    USB_FLAGS_SLEEP, NULL, NULL)) != USB_SUCCESS) {
 		mutex_enter(&usbvcp->usbvc_mutex);
 		USB_DPRINTF_L2(PRINT_MASK_OPEN, usbvcp->usbvc_log_handle,
 		    "usbvc_set_alt: usb_set_alt_if fail, if.alt=%d.%d, rval=%d",
@@ -3328,7 +3310,7 @@ usbvc_decode_stream_header(usbvc_state_t *usbvcp, usbvc_buf_grp_t *bufgrp,
 	 * used to indicate the end of a frame, then just skip it.
 	 */
 	if ((actual_len == head_len) && !(head_flag & USBVC_STREAM_EOF)) {
-	    USB_DPRINTF_L2(PRINT_MASK_CB, usbvcp->usbvc_log_handle,
+		USB_DPRINTF_L2(PRINT_MASK_CB, usbvcp->usbvc_log_handle,
 		    "usbvc_decode_stream_header: only header, no data");
 
 		return (USB_FAILURE);
