@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,9 +34,6 @@ extern "C" {
 
 
 #ifdef _KERNEL
-
-#define	ETHERTYPE_IPV4	ETHERTYPE_IP
-#define	ETHERTYPE_IPV6	(0x86dd)	/* IPv6 */
 
 /* Named Dispatch Parameter Management Structure */
 typedef struct param_s {
@@ -103,6 +99,7 @@ typedef struct stats {
 	uint32_t	pause_oncount;
 	uint32_t	pause_offcount;
 	uint32_t	pause_time_count;
+	uint32_t	pausing;
 
 	/*
 	 * Software event stats
@@ -174,17 +171,6 @@ typedef struct stats {
 #define	HSTATN(erip, x, n)	erip->stats.x += n;
 
 
-/*
- * Definitions for module_info.
- */
-
-#define	ERI_IDNUM	(130)		/* module ID number */
-#define	ERI_NAME	"eri"		/* module name */
-#define	ERI_MINPSZ	(0)		/* min packet size */
-#define	ERI_MAXPSZ	(ETHERMTU +14) 	/* max packet size */
-#define	ERI_HIWAT	(128 * 1024)	/* hi-water mark */
-#define	ERI_LOWAT	(1)		/* lo-water mark */
-
 #define	TX_BCOPY_MAX		704	/* bcopy for packets < 704 bytes */
 #define	RX_BCOPY_MAX		704	/* bcopy for packets < 704 bytes */
 #define	TX_STREAM_MIN		512
@@ -199,52 +185,8 @@ typedef struct stats {
  * ordered on minor device number.
  */
 
-#define	NMCHASH	64			/* # of multicast hash buckets */
-#define	INIT_BUCKET_SIZE 16		/* Initial Hash Bucket Size */
 #define	NMCFILTER_BITS	256		/* # of multicast filter bits */
 
-struct eristr {
-	struct eristr *sb_nextp;	/* next in list */
-	queue_t	*sb_rq;			/* pointer to our rq */
-	struct eri *sb_erip;		/* attached device */
-	t_uscalar_t sb_state;		/* current DL state */
-	t_uscalar_t sb_sap;		/* bound sap */
-	uint32_t sb_flags;		/* misc. flags */
-	minor_t sb_minor;		/* minor device number */
-
-	struct ether_addr
-		*sb_mctab[NMCHASH];	/* Hash table of multicast addrs */
-	uint32_t sb_mccount[NMCHASH];	/* # valid addresses in mctab[i] */
-	uint32_t sb_mcsize[NMCHASH];	/* Allocated size of mctab[i] */
-
-	uint16_t sb_ladrf[NMCFILTER_BITS/16];	/* Multicast filter bits */
-	uint16_t sb_ladrf_refcnt[NMCFILTER_BITS];
-					/* Reference count for filter bits */
-
-	kmutex_t sb_lock;	/* protect this structure */
-
-	uint32_t sb_notifications;	/* DLPI notifications */
-};
-
-#define	MCHASH(a)	((*(((uint8_t *)(a)) + 0) ^		\
-			*(((uint8_t *)(a)) + 1) ^		\
-			*(((uint8_t *)(a)) + 2) ^		\
-			*(((uint8_t *)(a)) + 3) ^		\
-			*(((uint8_t *)(a)) + 4) ^		\
-			*(((uint8_t *)(a)) + 5)) % (uint32_t)NMCHASH)
-
-/*
- * per-stream flags
- */
-#define	ERI_SFAST	0x01	/* "M_DATA fastpath" mode */
-#define	ERI_SRAW	0x02	/* M_DATA plain raw mode */
-#define	ERI_SALLPHYS	0x04	/* "promiscuous mode" */
-#define	ERI_SALLMULTI	0x08	/* enable all multicast addresses */
-#define	ERI_SALLSAP	0x10	/* enable all ether type values */
-#define	ERI_SCKSUM	0x20	/* Enable hardware tcp checksumming */
-#define	ERI_SMULTI	0x40    /* enable multicast addresses */
-#define	ERI_SSERLPBK	0x80    /* Enable SERDES loopback (DIAG) */
-#define	ERI_SMACLPBK	0x100   /* Enable MAC int loopback (DIAG) */
 
 /*
  * Maximum number of receive descriptors posted to the chip.
@@ -255,11 +197,6 @@ struct eristr {
  * Maximum number of transmit descriptors for lazy reclaim.
  */
 #define	ERI_TPENDING	(erip->tpending)
-
-/*
- * Full DLSAP address length (in struct dladdr format).
- */
-#define	ERI_ADDRL	(sizeof (uint16_t) + ETHERADDRL)
 
 /*
  * Return the address of an adjacent descriptor in the given ring.
@@ -388,20 +325,6 @@ struct eristr {
 #define	ERI_USE_NON_SERIAL_LINK		2	/* Select non-serial-link */
 
 /*
- * Speed definitions for param_speed
- */
-#define	SPEED_10	10
-#define	SPEED_100	100
-#define	SPEED_UNK	0
-
-/*
- * Mode definitions for param_mode
- */
-#define	ERI_MODE_HDX	0
-#define	ERI_MODE_FDX	1
-#define	ERI_MODE_UDX	2
-
-/*
  * eri_linkup_state" definitions
  */
 #define	ERI_START_LINK_BRINGUP	0
@@ -425,8 +348,8 @@ struct	erisave {
  * Each instance is dynamically allocated on first attach.
  */
 struct	eri {
-	struct	eri		*nextp;	/* next in a linked list */
-	dev_info_t		*dip;	/* associated dev_info */
+	mac_handle_t		mh;		/* GLDv3 handle */
+	dev_info_t		*dip;		/* associated dev_info */
 	uint_t			instance;	/* instance */
 
 	int			pci_mode;	/* sbus/pci device (future) */
@@ -434,17 +357,16 @@ struct	eri {
 	int			low_power_mode; /* E* (low power) */
 	int			asic_rev;	/* ERI ASIC rev no. */
 	int			board_rev;	/* ERI ASIC rev no. */
-	int			burstsizes; /* binary encoded val */
+	int			burstsizes;	/* binary encoded val */
 	int			pagesize;	/* btop(9f) */
-	uint32_t		rxfifo_size; /* RX FIFO size */
+	uint32_t		rxfifo_size;	/* RX FIFO size */
 
 	int			rpending;	/* Max.no. of RX bufs post */
 	int			tpending;	/* Max.no. of tX bufs post */
 	int			tx_cur_cnt;	/* # of packets for int_me */
 
-	uint_t			promisc_cnt;	/* Promiscous streams open */
-	uint_t			all_sap_cnt;
-	uint_t			all_multi_cnt;
+	uint_t			multi_refcnt;
+	boolean_t		promisc;
 
 	int			mifpoll_enable;
 	int			frame_enable;
@@ -453,12 +375,13 @@ struct	eri {
 	int			link_pulse_disabled;
 	int			xmit_dma_mode;
 	int			rcv_dma_mode;
-	struct	ether_addr	factaddr;	/* factory mac address */
-	struct	ether_addr	ouraddr;	/* individual address */
-	uint32_t		addrflags;	/* address flags */
-	uint32_t		flags;	/* misc. flags */
+	uint8_t			ouraddr[ETHERADDRL];	/* unicast address */
+	uint32_t		flags;		/* misc. flags */
 	uint32_t		alloc_flag;	/* Buff alloc. status flags */
-	uint32_t		wantw;	/* xmit: out of resources */
+	boolean_t		wantw;		/* xmit: out of resources */
+
+	uint16_t		ladrf[NMCFILTER_BITS/16]; /* Multicast filter */
+	uint16_t		ladrf_refcnt[NMCFILTER_BITS];
 
 	volatile struct	global	*globregp;	/* ERI global regs */
 	volatile struct	etx	*etxregp;	/* ERI ETX regs */
@@ -469,9 +392,6 @@ struct	eri {
 	volatile struct	pcslink	*pcsregp;	/* ERI PCS regs */
 
 	uint32_t		*sw_reset_reg;
-
-	queue_t			*ip4q;	/* ip read queue */
-	queue_t			*ip6q;	/* ip read queue */
 
 	uint32_t		rx_kick;	/* RX kick register val */
 	uint32_t		rx_completion;	/* RX completion reg val */
@@ -576,7 +496,6 @@ struct	eri {
 	int			linkup_changed; /* link bringup state */
 
 	int			linkcheck;
-	int			linksts_msg;
 	caddr_t			g_nd;	/* head of the */
 						/* named dispatch table */
 
@@ -614,7 +533,6 @@ struct	eri {
 	mblk_t		*tmblkp[ERI_TMDMAX]; /* mblks assoc with TMD */
 	mblk_t		*rmblkp[ERI_RMDMAX]; /* mblks assoc with RMD */
 	param_t		param_arr[ERI_PARAM_CNT];
-	uint_t		param_display[ERI_PARAM_CNT]; /* cntrl display */
 
 	struct	stats stats;	/* kstats */
 
@@ -623,17 +541,7 @@ struct	eri {
 	 */
 	uint32_t	starts;
 	uint32_t	txhung;
-	time_t		msg_time;
 	struct		erisave erisave;
-
-#ifdef XMIT_SERIAL_QUEUE
-	/* A syncq implementation. */
-	mblk_t		*sqfirst;	/* first mblk chain or NULL */
-	mblk_t		*sqlast;	/* last mblk chain or NULL */
-	kmutex_t	sqlock;		/* lock before using any member */
-	uint16_t	sqrefcnt;	/* count of threads using */
-	uint16_t	sqnmblks;
-#endif
 
 	uint64_t	ifspeed_old;
 
@@ -648,6 +556,16 @@ struct	eri {
 	uint32_t	tx_int_me;
 };
 
+/*
+ * LADRF bit array manipulation macros.  These are for working within the
+ * array of words defined by erip->ladrf, converting a bit (0-255) into
+ * the index and offset in the ladrf bit array.  Note that the array is
+ * provided in "Big Endian" order.
+ */
+#define	LADRF_MASK(bit)		(1 << ((bit) % 16))
+#define	LADRF_WORD(erip, bit)	erip->ladrf[(15 - ((bit) / 16))]
+#define	LADRF_SET(erip, bit)	(LADRF_WORD(erip, bit) |= LADRF_MASK(bit))
+#define	LADRF_CLR(erip, bit)	(LADRF_WORD(erip, bit) &= ~LADRF_MASK(bit))
 
 /*
  * ERI IOCTLS.
@@ -679,8 +597,7 @@ typedef struct {
  */
 #define	ERI_UNKOWN	0x00	/* unknown state	*/
 #define	ERI_RUNNING	0x01	/* chip is initialized	*/
-#define	ERI_PROMISC	0x02	/* promiscuous mode enabled */
-#define	ERI_MULTICAST	0x04	/* Multicast mode enabled */
+#define	ERI_STARTED	0x02	/* mac layer started */
 #define	ERI_SUSPENDED	0x08	/* suspended interface	*/
 #define	ERI_INITIALIZED	0x10	/* interface initialized */
 #define	ERI_NOTIMEOUTS	0x20	/* disallow timeout rescheduling */
@@ -689,7 +606,6 @@ typedef struct {
 #define	ERI_MACLOOPBACK	0x100	/* device has MAC int lpbk (DIAG) */
 #define	ERI_SERLOOPBACK	0x200	/* device has SERDES int lpbk (DIAG) */
 #define	ERI_DLPI_LINKUP	0x400	/* */
-#define	ERI_ALLMULTI	0x800	/* */
 
 /*
  * Mac address flags
@@ -699,46 +615,12 @@ typedef struct {
 
 struct erikstat {
 	/*
-	 * Link Input/Output stats
-	 */
-	struct kstat_named	erik_ipackets;
-	struct kstat_named	erik_ierrors;
-	struct kstat_named	erik_opackets;
-	struct kstat_named	erik_oerrors;
-	struct kstat_named	erik_collisions;
-	struct kstat_named	erik_ifspeed;	/* Interface Speed */
-	/*
-	 * required by kstat for MIB II objects(RFC 1213)
-	 */
-	struct  kstat_named	erik_rbytes; 	/* # octets received */
-						/* MIB - ifInOctets */
-	struct  kstat_named	erik_obytes; 	/* # octets transmitted */
-						/* MIB - ifOutOctets */
-	struct  kstat_named	erik_multircv; 	/* # multicast packets */
-						/* delivered to upper layer */
-						/* MIB - ifInNUcastPkts */
-	struct  kstat_named	erik_multixmt; 	/* # multicast packets */
-						/* requested to be sent */
-						/* MIB - ifOutNUcastPkts */
-	struct  kstat_named	erik_brdcstrcv;	/* # broadcast packets */
-						/* delivered to upper layer */
-						/* MIB - ifInNUcastPkts */
-	struct  kstat_named	erik_brdcstxmt;	/* # broadcast packets */
-						/* requested to be sent */
-						/* MIB - ifOutNUcastPkts */
-	struct  kstat_named	erik_norcvbuf; 	/* # rcv packets discarded */
-						/* MIB - ifInDiscards */
-	struct  kstat_named	erik_noxmtbuf; 	/* # xmt packets discarded */
-						/* MIB - ifOutDiscards */
-	/*
 	 * Software event stats
 	 */
 	struct kstat_named	erik_inits;
 	struct kstat_named	erik_rx_inits;
 	struct kstat_named	erik_tx_inits;
-	struct kstat_named	erik_tnocar;	/* Link down counter */
 
-	struct kstat_named	erik_nocanput;
 	struct kstat_named	erik_allocbfail;
 	struct kstat_named	erik_drop;
 
@@ -753,11 +635,7 @@ struct erikstat {
 	/*
 	 * MAC TX Event stats
 	 */
-	struct kstat_named	erik_txmac_urun;
 	struct kstat_named	erik_txmac_maxpkt_err;
-	struct kstat_named	erik_excessive_coll;
-	struct kstat_named	erik_late_coll;
-	struct kstat_named	erik_first_coll;
 	struct kstat_named	erik_defer_timer_exp;
 	struct kstat_named	erik_peak_attempt_cnt;
 	struct kstat_named	erik_jab;
@@ -767,17 +645,11 @@ struct erikstat {
 	/*
 	 * MAC RX Event stats
 	 */
-	struct kstat_named	erik_rx_corr;
 	struct kstat_named	erik_no_free_rx_desc; /* no free rx desc. */
-	struct kstat_named	erik_rx_overflow;
 	struct kstat_named	erik_rx_hang;
-	struct kstat_named	erik_rx_align_err;
-	struct kstat_named	erik_rx_crc_err;
 	struct kstat_named	erik_rx_length_err;
 	struct kstat_named	erik_rx_code_viol_err;
 	struct kstat_named	erik_rx_bad_pkts;
-	struct kstat_named	erik_rx_runt;
-	struct kstat_named	erik_rx_toolong_pkts;
 
 	/*
 	 * Fatal errors
@@ -806,21 +678,7 @@ struct erikstat {
 	struct kstat_named	erik_pci_det_parity_err;
 
 
-	/*
-	 * PSARC 1997/198 : 64bit kstats
-	 */
-	struct kstat_named	erik_ipackets64;
-	struct kstat_named	erik_opackets64;
-	struct kstat_named	erik_rbytes64; 	/* # octets received */
-						/* MIB - ifInOctets */
-	struct kstat_named	erik_obytes64; 	/* # octets transmitted */
-						/* MIB - ifOutOctets */
-
 	struct kstat_named	erik_pmcap;	/* Power management */
-
-	struct kstat_named	erik_link_up;	/* Link Status */
-
-	struct kstat_named	erik_link_duplex;	/* Link duplex */
 };
 
 /* TBD: new value ? */
@@ -849,13 +707,6 @@ struct erikstat {
 #define	ERI_FSTBYTE_OFFSET	2
 #define	ERI_CKSUM_OFFSET	14
 
-/*
- * Private DLPI full dlsap address format.
- */
-struct	eridladdr {
-	struct	ether_addr	dl_phys;
-	uint16_t dl_sap;
-};
 
 #define	ERI_PMCAP_NONE	0
 #define	ERI_PMCAP_4MHZ	4

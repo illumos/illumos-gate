@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2001, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +34,6 @@ extern "C" {
 
 #ifdef _KERNEL
 
-typedef int	(*fptri_t)();
 typedef void	(*fptrv_t)();
 
 typedef enum {
@@ -70,16 +68,16 @@ static char	*fault_msg_string[] = {
 
 
 #define	ERI_FAULT_MSG1(p, t, f, a) \
-    eri_fault_msg(__FILE__, __LINE__, (p), (t), (f), (a));
+    eri_fault_msg((p), (t), (f), (a));
 
 #define	ERI_FAULT_MSG2(p, t, f, a, b) \
-    eri_fault_msg(__FILE__, __LINE__, (p), (t), (f), (a), (b));
+    eri_fault_msg((p), (t), (f), (a), (b));
 
 #define	ERI_FAULT_MSG3(p, t, f, a, b, c) \
-    eri_fault_msg(__FILE__, __LINE__, (p), (t), (f), (a), (b), (c));
+    eri_fault_msg((p), (t), (f), (a), (b), (c));
 
 #define	ERI_FAULT_MSG4(p, t, f, a, b, c, d) \
-    eri_fault_msg(__FILE__, __LINE__, (p), (t), (f), (a), (b), (c), (d));
+    eri_fault_msg((p), (t), (f), (a), (b), (c), (d));
 
 #ifdef  DEBUG
 typedef enum {
@@ -178,8 +176,8 @@ static char	*debug_msg_string[] = {
 	"DLCAPAB"
 };
 
-static void	eri_debug_msg(char *, int, struct eri *, debug_msg_t,
-    char *, ...);
+static void	eri_debug_msg(const char *, int, struct eri *, debug_msg_t,
+    const char *, ...);
 
 #define	ERI_DEBUG_MSG1(t, f, a) \
     eri_debug_msg(__FILE__, __LINE__, (t), (f), (a));
@@ -298,7 +296,7 @@ static void	eri_debug_msg(char *, int, struct eri *, debug_msg_t,
 #define	ERI_MASK_8BIT	0xff
 
 #define	param_transceiver	(erip->param_arr[0].param_val)
-#define	param_linkup	(erip->param_arr[1].param_val)
+#define	param_linkup		(erip->param_arr[1].param_val)
 #define	param_speed		(erip->param_arr[2].param_val)
 #define	param_mode		(erip->param_arr[3].param_val)
 #define	param_ipg1		(erip->param_arr[4].param_val)
@@ -325,33 +323,22 @@ static void	eri_debug_msg(char *, int, struct eri *, debug_msg_t,
 #define	param_anlpar_100hdx	(erip->param_arr[23].param_val)
 #define	param_anlpar_10fdx	(erip->param_arr[24].param_val)
 #define	param_anlpar_10hdx	(erip->param_arr[25].param_val)
-#define	param_device		(erip->param_arr[26].param_val)
-#define	param_lance_mode	(erip->param_arr[27].param_val)
-#define	param_ipg0		(erip->param_arr[28].param_val)
-#define	param_intr_blank_time		(erip->param_arr[29].param_val)
-#define	param_intr_blank_packets	(erip->param_arr[30].param_val)
-#define	param_serial_link	(erip->param_arr[31].param_val)
+#define	param_lance_mode	(erip->param_arr[26].param_val)
+#define	param_ipg0		(erip->param_arr[27].param_val)
+#define	param_intr_blank_time		(erip->param_arr[28].param_val)
+#define	param_intr_blank_packets	(erip->param_arr[29].param_val)
+#define	param_serial_link	(erip->param_arr[30].param_val)
 
-#define	param_non_serial_link	(erip->param_arr[32].param_val)
-#define	param_select_link	(erip->param_arr[33].param_val)
-#define	param_default_link	(erip->param_arr[34].param_val)
-#define	param_link_in_use	(erip->param_arr[35].param_val)
-#define	param_unknown0		(erip->param_arr[36].param_val)
-#define	param_unknown1		(erip->param_arr[37].param_val)
-#define	param_unknown2		(erip->param_arr[38].param_val)
-#define	param_anar_asm_dir	(erip->param_arr[39].param_val)
-#define	param_anar_pause	(erip->param_arr[40].param_val)
-#define	param_unknown3		(erip->param_arr[41].param_val)
-
-#define	param_unknown4		(erip->param_arr[42].param_val)
-#define	param_unknown5		(erip->param_arr[43].param_val)
-#define	param_bmsr_asm_dir	(erip->param_arr[44].param_val)
-#define	param_bmsr_pause	(erip->param_arr[45].param_val)
-#define	param_anlpar_autoneg 	(erip->param_arr[46].param_val)
-#define	param_unknown6		(erip->param_arr[47].param_val)
-#define	param_unknown7		(erip->param_arr[48].param_val)
+#define	param_non_serial_link	(erip->param_arr[31].param_val)
+#define	param_select_link	(erip->param_arr[32].param_val)
+#define	param_default_link	(erip->param_arr[33].param_val)
+#define	param_link_in_use	(erip->param_arr[34].param_val)
+#define	param_anar_asm_dir	(erip->param_arr[35].param_val)
+#define	param_anar_pause	(erip->param_arr[36].param_val)
+#define	param_bmsr_asm_dir	(erip->param_arr[37].param_val)
+#define	param_bmsr_pause	(erip->param_arr[38].param_val)
 #define	param_anlpar_pauseTX 	(erip->param_arr[49].param_val)
-#define	param_anlpar_pauseRX 	(erip->param_arr[50].param_val)
+#define	param_anlpar_pauseRX 	(erip->param_arr[40].param_val)
 
 /* <<<<<<<<<<<<<<<<<<<<<<  Register operations >>>>>>>>>>>>>>>>>>>>> */
 #define	GET_PCSREG(reg) \
@@ -454,57 +441,12 @@ static void	eri_debug_msg(char *, int, struct eri *, debug_msg_t,
 
 
 /*
- * Ether_copy is not endian-correct. Define an endian-correct version.
- */
-#define	ether_bcopy(a, b) (bcopy((caddr_t)a, (caddr_t)b, 6))
-
-/*
  * Ether-type is specifically big-endian, but data region is unknown endian
+ * Ether-type lives at offset 12 from the start of the packet.
  */
 
-typedef struct ether_header *eehp;
-
-#define	get_ether_type(ptr) (\
-	(((uint8_t *)&((eehp)ptr)->ether_type)[0] << 8) | \
-	(((uint8_t *)&((eehp)ptr)->ether_type)[1]))
-#define	put_ether_type(ptr, value) {\
-	((uint8_t *)(&((eehp)ptr)->ether_type))[0] = \
-	    ((uint16_t)value & 0xff00) >> 8; \
-	((uint8_t *)(&((eehp)ptr)->ether_type))[1] = (value & 0xff); }
-
-
-/*
- * The following MACROS are used to filter out bad packets which are
- * a result of descriptor corruption in ERI 1.0 ASIC. The packets are
- * either concatenated or truncated. Here we compare the length field
- * of the incoming packet with what is reported by the decriptor
- * length field. This check is in addition to the illegal packet
- *  (64 < len < 1518)  size check done in eri_read routines.
- */
-
-#ifdef ERI_ERI_REV_1_0
-#define	IP_PACKET_LEN(len) \
-	(len - 14)
-#define	INVALID_IP_PACKET_LENGTH(ipp, len) \
-	((len > 0x3c) && (ipp->ip_len != (len - 14)))
-
-#define	IP_PACKET_IS_TCP(ipp)	(ipp->ip_p & 0x06)
-
-#define	ERI_ERX_HANG(wp, rp) \
-	    ((rp <= wp) ? ((wp - rp) > 1275) : ((rp -wp) < 4))
-#endif
-
-
-#define	DEVICE_NAME(dip) \
-	    ((strcmp(ddi_get_name(dip), "pci108e,1101") == 0) ? \
-	    "SUNW,eri" : "SUNW,eri:unknown")
-
-/*
- * Allocate and zero-out "number" structures
- * each of type "structure" in kernel memory.
- */
-#define	GETSTRUCT(structure, number)   \
-	(kmem_zalloc((size_t)(sizeof (structure) * (number)), KM_SLEEP))
+#define	get_ether_type(ptr) \
+	(((((uint8_t *)ptr)[12] << 8) | (((uint8_t *)ptr)[13])))
 
 #endif	/* _KERNEL */
 

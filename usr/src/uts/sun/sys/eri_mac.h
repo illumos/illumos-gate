@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_ERI_MAC_H
@@ -745,7 +744,7 @@ struct	bmac {
 #define	BMAC_SLOT_TIME		0x40
 #define	BMAC_EXT_SLOT_TIME	0x200
 #define	BMAC_MIN_FRAME_SIZE	0x40
-#define	BMAC_MAX_FRAME_SIZE	(ETHERMTU + 18)
+#define	BMAC_MAX_FRAME_SIZE	(ETHERMTU + 18 + 4)	/* enet + vlan */
 
 /*
  *	Hardware bug: set MAC_FRAME_SIZE to 0x7fff to
