@@ -36,6 +36,9 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <limits.h>
+#include <signal.h>
+#include <pthread.h>
+#include <synch.h>
 
 #include <rpcsvc/nis.h>
 #include <rpcsvc/nispasswd.h>
@@ -75,7 +78,7 @@ extern	int	_nfssys(int, void *);
  * display message to the user
  */
 /*PRINTFLIKE2*/
-int
+static int
 msg(pam_handle_t *pamh, char *fmt, ...)
 {
 	va_list	ap;
@@ -129,32 +132,32 @@ get_and_set_seckey(
 			/* password does decrypt secret key */
 			(*good_pw_cnt)++;
 			if (key_setnet_g_uid(netname, skey, keylen, NULL, 0,
-						algtype, uid, gid) >= 0) {
+			    algtype, uid, gid) >= 0) {
 				(*set_seckey_cnt)++;
 			} else {
 				if (debug)
 					syslog(LOG_DEBUG, "pam_dhkeys: "
-						"get_and_set_seckey: could not "
-						"set secret key for keytype "
-						"%d-%d", keylen, algtype);
+					    "get_and_set_seckey: could not "
+					    "set secret key for keytype "
+					    "%d-%d", keylen, algtype);
 			}
 		} else {
 			if (pamh && !(flags & PAM_SILENT)) {
 				(void) snprintf(messages[0],
 				    sizeof (messages[0]),
 				    dgettext(TEXT_DOMAIN,
-					"Password does not "
-					"decrypt secret key (type = %d-%d) "
-					"for '%s'."), keylen, algtype, netname);
+				    "Password does not "
+				    "decrypt secret key (type = %d-%d) "
+				    "for '%s'."), keylen, algtype, netname);
 				(void) __pam_display_msg(pamh, PAM_ERROR_MSG, 1,
-							messages, NULL);
+				    messages, NULL);
 			}
 		}
 	} else {
 		if (debug)
 			syslog(LOG_DEBUG, "pam_dhkeys: get_and_set_seckey: "
-				"could not get secret key for keytype %d-%d",
-				keylen, algtype);
+			    "could not get secret key for keytype %d-%d",
+			    keylen, algtype);
 	}
 
 	free(skey);
@@ -196,7 +199,7 @@ get_and_set_seckey(
  * the first des_block (eight) characters of whatever is handed down to us.
  * Therefore, we use a local variable "short_pass" to hold those 8 char's.
  */
-int
+static int
 establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 	char *netname)
 {
@@ -289,7 +292,7 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 	if (result == PWU_NOT_FOUND) {
 		if (debug)
 			syslog(LOG_DEBUG, "pam_dhkeys: user %s not found",
-				user);
+			    user);
 		result = PAM_USER_UNKNOWN;
 		goto out;
 	} else if (result != PWU_SUCCESS) {
@@ -301,7 +304,7 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 	repository_pass = attr_pw[0].data.val_s;
 
 	need_cred = (strcmp(repository_name, "nisplus") == 0 &&
-		strcmp(repository_pass, "*NP*") == 0);
+	    strcmp(repository_pass, "*NP*") == 0);
 
 	if (codepath == CODEPATH_PAM_SM_AUTHENTICATE && need_cred == 0) {
 		/*
@@ -349,15 +352,13 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 
 			if (debug)
 				syslog(LOG_DEBUG, "pam_dhkeys: trying "
-					"key type = %d-%d", mp->keylen,
-					mp->algtype);
+				    "key type = %d-%d", mp->keylen,
+				    mp->algtype);
 			valid_mech_cnt++;
 			if (!get_and_set_seckey(pamh, netname, mp->keylen,
-						mp->algtype, short_passp,
-						uid, gid,
-						&get_seckey_cnt, &good_pw_cnt,
-						&set_seckey_cnt, flags,
-						debug)) {
+			    mp->algtype, short_passp, uid, gid,
+			    &get_seckey_cnt, &good_pw_cnt, &set_seckey_cnt,
+			    flags, debug)) {
 				result = PAM_BUF_ERR;
 				goto out;
 			}
@@ -371,7 +372,7 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 		 */
 		if (debug)
 			syslog(LOG_DEBUG, "pam_dhkeys: no valid mechs "
-				"found. Trying AUTH_DES.");
+			    "found. Trying AUTH_DES.");
 	}
 
 	/*
@@ -389,13 +390,13 @@ establish_key(pam_handle_t *pamh, int flags, int codepath, int debug,
 	if (debug) {
 		syslog(LOG_DEBUG, "pam_dhkeys: mech key totals:\n");
 		syslog(LOG_DEBUG, "pam_dhkeys: %d valid mechanism(s)",
-			valid_mech_cnt);
+		    valid_mech_cnt);
 		syslog(LOG_DEBUG, "pam_dhkeys: %d secret key(s) retrieved",
-			get_seckey_cnt);
+		    get_seckey_cnt);
 		syslog(LOG_DEBUG, "pam_dhkeys: %d passwd decrypt successes",
-			good_pw_cnt);
+		    good_pw_cnt);
 		syslog(LOG_DEBUG, "pam_dhkeys: %d secret key(s) set",
-			set_seckey_cnt);
+		    set_seckey_cnt);
 	}
 
 	if (get_seckey_cnt == 0) {		/* No credentials */
@@ -443,12 +444,50 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	}
 
 	result = establish_key(pamh, flags, CODEPATH_PAM_SM_AUTHENTICATE, debug,
-				netname);
+	    netname);
 
 	return (result);
 }
 
-int
+
+typedef struct argres {
+	uid_t uid;
+	int result;
+} argres_t;
+
+/*
+ * Revoke NFS DES credentials.
+ * NFS may not be installed so we need to deal with SIGSYS
+ * when we call _nfssys(); we thus call _nfssys() in a seperate thread that
+ * is created specifically for this call. The thread specific signalmask
+ * is set to ignore SIGSYS. After the call to _nfssys(), the thread
+ * ceases to exist.
+ */
+static void *
+revoke_nfs_cred(void *ap)
+{
+	struct nfs_revauth_args nra;
+	sigset_t isigset;
+	argres_t *argres = (argres_t *)ap;
+
+	nra.authtype = AUTH_DES;
+	nra.uid = argres->uid;
+
+	(void) sigemptyset(&isigset);
+	(void) sigaddset(&isigset, SIGSYS);
+
+	if (pthread_sigmask(SIG_BLOCK, &isigset, NULL) == 0) {
+		argres->result = _nfssys(NFS_REVAUTH, &nra);
+		if (argres->result < 0 && errno == ENOSYS) {
+			argres->result = 0;
+		}
+	} else {
+		argres->result = -1;
+	}
+	return (NULL);
+}
+
+static int
 remove_key(pam_handle_t *pamh, int flags, int debug)
 {
 	int result;
@@ -458,7 +497,8 @@ remove_key(pam_handle_t *pamh, int flags, int debug)
 	pwu_repository_t *pwu_rep;
 	uid_t uid;
 	gid_t gid;
-	struct nfs_revauth_args nra;
+	argres_t argres;
+	thread_t tid;
 
 	(void) pam_get_item(pamh, PAM_USER, (void **)&uname);
 	if (uname == NULL || *uname == NULL) {
@@ -473,15 +513,15 @@ remove_key(pam_handle_t *pamh, int flags, int debug)
 			char msg[3][PAM_MAX_MSG_SIZE];
 			(void) snprintf(msg[0], sizeof (msg[0]),
 			    dgettext(TEXT_DOMAIN,
-				"removing root credentials would"
-				" break the rpc services that"));
+			    "removing root credentials would"
+			    " break the rpc services that"));
 			(void) snprintf(msg[1], sizeof (msg[1]),
 			    dgettext(TEXT_DOMAIN,
-				"use secure rpc on this host!"));
+			    "use secure rpc on this host!"));
 			(void) snprintf(msg[2], sizeof (msg[2]),
 			    dgettext(TEXT_DOMAIN,
-				"root may use keylogout -f to do"
-				" this (at your own risk)!"));
+			    "root may use keylogout -f to do"
+			    " this (at your own risk)!"));
 			(void) __pam_display_msg(pamh, PAM_ERROR_MSG, 3,
 			    msg, NULL);
 		}
@@ -519,14 +559,16 @@ remove_key(pam_handle_t *pamh, int flags, int debug)
 
 	(void) key_removesecret_g_uid(uid, gid);
 
-	/* Revoke NFS DES credentials */
-	nra.authtype = AUTH_DES;
-	nra.uid = uid;
+	argres.uid = uid;
+	argres.result = -1;
 
-	if (_nfssys(NFS_REVAUTH, &nra) < 0) {
+	if (pthread_create(&tid, NULL, revoke_nfs_cred, (void *)&argres) == 0)
+		(void) pthread_join(tid, NULL);
+
+	if (argres.result < 0) {
 		if ((flags & PAM_SILENT) == 0) {
 			(void) msg(pamh, dgettext(TEXT_DOMAIN,
-				"Warning: NFS credentials not destroyed"));
+			    "Warning: NFS credentials not destroyed"));
 		}
 		return (PAM_AUTH_ERR);
 	}
@@ -551,12 +593,12 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 	/* Check for invalid flags */
 	if (flags && (flags & PAM_ESTABLISH_CRED) == 0 &&
-			(flags & PAM_REINITIALIZE_CRED) == 0 &&
-			(flags & PAM_REFRESH_CRED) == 0 &&
-			(flags & PAM_DELETE_CRED) == 0 &&
-			(flags & PAM_SILENT) == 0) {
+	    (flags & PAM_REINITIALIZE_CRED) == 0 &&
+	    (flags & PAM_REFRESH_CRED) == 0 &&
+	    (flags & PAM_DELETE_CRED) == 0 &&
+	    (flags & PAM_SILENT) == 0) {
 		syslog(LOG_ERR, "pam_dhkeys: pam_setcred: illegal flags %d",
-				flags);
+		    flags);
 		return (PAM_SYSTEM_ERR);
 	}
 
@@ -575,7 +617,7 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		result = remove_key(pamh, flags, debug);
 	} else {
 		result = establish_key(pamh, flags, CODEPATH_PAM_SM_SETCRED,
-					debug, netname);
+		    debug, netname);
 		/* Some diagnostics */
 		if ((flags & PAM_SILENT) == 0) {
 			if (result == PAM_AUTH_ERR)
@@ -731,7 +773,7 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	 */
 
 	(void) msg(pamh, dgettext(TEXT_DOMAIN,
-		"This password differs from your secure RPC password."));
+	    "This password differs from your secure RPC password."));
 
 	tries = 0;
 	oldpw_ok = 0;
@@ -739,8 +781,8 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	while (oldpw_ok == 0 && ++tries < 3) {
 		if (tries > 1)
 			(void) msg(pamh, dgettext(TEXT_DOMAIN,
-				"This password does not decrypt your "
-				"secure RPC password."));
+			    "This password does not decrypt your "
+			    "secure RPC password."));
 		res = __pam_get_authtok(pamh, PAM_PROMPT, 0,
 		    dgettext(TEXT_DOMAIN,
 		    "Please enter your old Secure RPC password: "), &oldpw);
