@@ -770,9 +770,6 @@ eri_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	erip->bmacregp = (void *)(((caddr_t)erip->globregp) + 0x6000);
 	erip->mifregp =  (void *)(((caddr_t)erip->globregp) + 0x6200);
 
-	ERI_DEBUG_MSG4(erip, AUTOCONFIG_MSG,
-	    "eri_attach: gloregp %p alias %X gintmask %X",
-	    erip->globregp, GET_GLOBREG(status_alias), GET_GLOBREG(intmask));
 	/*
 	 * Map the software reset register.
 	 */
@@ -795,10 +792,6 @@ eri_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	pci_config_put8(erip->pci_config_handle, PCI_CONF_LATENCY_TIMER,
 	    (uchar_t)eri_pci_latency_timer);
-
-	ERI_DEBUG_MSG4(erip, AUTOCONFIG_MSG,
-	    "eri_attach: globregp %p alias %X gintmask %X",
-	    erip->globregp, GET_GLOBREG(status_alias), GET_GLOBREG(intmask));
 
 	if (ddi_intr_hilevel(dip, 0)) {
 		ERI_FAULT_MSG1(erip, SEVERITY_NONE, ERI_VERB_MSG,
@@ -2968,9 +2961,6 @@ rx_done_int:
 		rmdi = erip->rx_completion;
 		rmdp = rmdpbase + rmdi;
 
-		ERI_DEBUG_MSG3(erip, INTR_MSG,
-		    "eri_intr: packet received: rmdp = %X status %X",
-		    rmdp, erisbits);
 		/*
 		 * Sync RMD before looking at it.
 		 */
@@ -3870,9 +3860,6 @@ eri_read_dma(struct eri *erip, volatile struct rmd *rmdp,
 	 * routine, since it is run in interrupt context.
 	 */
 	if ((flags & ERI_RMD_BAD) || (len  < ETHERMIN) || (len > ETHERMAX+4)) {
-		ERI_DEBUG_MSG3(erip, CORRUPTION_MSG, "eri_read_dma: "
-		    "Corrupted Packet is Recieved flags %p length %d",
-		    flags, len);
 
 		HSTAT(erip, rx_bad_pkts);
 		if ((flags & ERI_RMD_BAD) == 0)
@@ -5431,10 +5418,6 @@ eri_reset_xcvr(struct eri *erip)
 	uint32_t	speed_100;
 	uint32_t	speed_10;
 	int n;
-
-	ERI_DEBUG_MSG4(erip, XCVR_MSG,
-	    "eri_reset_xcvr:ifspeed %X param_speed %X mif_mask %X",
-	    erip->stats.ifspeed, param_speed, erip->mif_mask);
 
 #ifdef	ERI_10_10_FORCE_SPEED_WORKAROUND
 	erip->ifspeed_old = erip->stats.ifspeed;
