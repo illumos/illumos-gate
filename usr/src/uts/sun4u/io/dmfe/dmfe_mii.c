@@ -529,7 +529,6 @@ dmfe_check_link(dmfe_t *dmfep)
 static void
 dmfe_media_update(dmfe_t *dmfep, link_state_t newstate, int speed, int duplex)
 {
-	boolean_t report;
 	int ks_id;
 
 	ASSERT(mutex_owned(dmfep->milock));
