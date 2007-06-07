@@ -2591,13 +2591,6 @@ e1000g_link_check(struct e1000g *Adapter)
 					reg_tarc &= ~(1 << 21);
 				E1000_WRITE_REG(hw, TARC0, reg_tarc);
 			}
-
-			e1000g_log(Adapter, CE_NOTE,
-			    "Adapter %dMbps %s %s link is up.", speed,
-			    ((duplex == FULL_DUPLEX) ?
-			    "full duplex" : "half duplex"),
-			    ((hw->media_type == e1000_media_type_copper) ?
-			    "copper" : "fiber"));
 		}
 		Adapter->smartspeed = 0;
 	} else {
@@ -2606,11 +2599,6 @@ e1000g_link_check(struct e1000g *Adapter)
 			Adapter->link_duplex = 0;
 			Adapter->link_state = LINK_STATE_DOWN;
 			link_changed = B_TRUE;
-
-			e1000g_log(Adapter, CE_NOTE,
-			    "Adapter %s link is down.",
-			    ((hw->media_type == e1000_media_type_copper) ?
-			    "copper" : "fiber"));
 
 			/*
 			 * SmartSpeed workaround for Tabor/TanaX, When the

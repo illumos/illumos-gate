@@ -97,10 +97,15 @@ enum ether_stat {
 	ETHER_STAT_TOOSHORT_ERRORS,
 	ETHER_STAT_CAP_REMFAULT,
 	ETHER_STAT_ADV_REMFAULT,
-	ETHER_STAT_LP_REMFAULT
+	ETHER_STAT_LP_REMFAULT,
+
+	ETHER_STAT_JABBER_ERRORS,
+	ETHER_STAT_CAP_100T4,
+	ETHER_STAT_ADV_CAP_100T4,
+	ETHER_STAT_LP_CAP_100T4,
 };
 
-#define	ETHER_NSTAT	(ETHER_STAT_LP_REMFAULT - ETHER_STAT_ALIGN_ERRORS + 1)
+#define	ETHER_NSTAT	(ETHER_STAT_LP_CAP_100T4 - ETHER_STAT_ALIGN_ERRORS + 1)
 
 #define	ETHER_STAT_ISACOUNTER(_ether_stat)				\
 	    ((_ether_stat) == ETHER_STAT_ALIGN_ERRORS ||		\
@@ -115,6 +120,7 @@ enum ether_stat {
 		(_ether_stat) == ETHER_STAT_CARRIER_ERRORS ||		\
 		(_ether_stat) == ETHER_STAT_TOOLONG_ERRORS ||		\
 		(_ether_stat) == ETHER_STAT_TOOSHORT_ERRORS ||		\
+		(_ether_stat) == ETHER_STAT_JABBER_ERRORS ||		\
 		(_ether_stat) == ETHER_STAT_MACRCV_ERRORS)
 
 /*
@@ -135,6 +141,7 @@ enum ether_stat {
 	    (_ether_stat) == ETHER_STAT_CAP_PAUSE ||			\
 	    (_ether_stat) == ETHER_STAT_CAP_AUTONEG ||			\
 	    (_ether_stat) == ETHER_STAT_CAP_REMFAULT ||			\
+	    (_ether_stat) == ETHER_STAT_CAP_100T4 ||			\
 	    (_ether_stat) == ETHER_STAT_ADV_CAP_1000FDX ||		\
 	    (_ether_stat) == ETHER_STAT_ADV_CAP_1000HDX ||		\
 	    (_ether_stat) == ETHER_STAT_ADV_CAP_100FDX ||		\
@@ -145,6 +152,7 @@ enum ether_stat {
 	    (_ether_stat) == ETHER_STAT_ADV_CAP_PAUSE ||		\
 	    (_ether_stat) == ETHER_STAT_ADV_CAP_AUTONEG ||		\
 	    (_ether_stat) == ETHER_STAT_ADV_REMFAULT ||			\
+	    (_ether_stat) == ETHER_STAT_ADV_CAP_100T4 ||		\
 	    (_ether_stat) == ETHER_STAT_LP_CAP_1000FDX ||		\
 	    (_ether_stat) == ETHER_STAT_LP_CAP_1000HDX ||		\
 	    (_ether_stat) == ETHER_STAT_LP_CAP_100FDX ||		\
@@ -155,6 +163,7 @@ enum ether_stat {
 	    (_ether_stat) == ETHER_STAT_LP_CAP_PAUSE ||			\
 	    (_ether_stat) == ETHER_STAT_LP_CAP_AUTONEG ||		\
 	    (_ether_stat) == ETHER_STAT_LP_REMFAULT ||			\
+	    (_ether_stat) == ETHER_STAT_LP_CAP_100T4 ||			\
 	    (_ether_stat) == ETHER_STAT_LINK_ASMPAUSE ||		\
 	    (_ether_stat) == ETHER_STAT_LINK_PAUSE ||			\
 	    (_ether_stat) == ETHER_STAT_LINK_AUTONEG ||			\

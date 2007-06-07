@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,26 +61,6 @@ bge_vprt(const char *fmt, va_list args)
 
 	(void) vsnprintf(buf, sizeof (buf), fmt, args);
 	cmn_err(bge_log_data.level, bge_log_data.fmt, bge_log_data.who, buf);
-}
-
-/*
- * Report a run-time event (CE_NOTE, to console & log)
- */
-void
-bge_notice(bge_t *bgep, const char *fmt, ...)
-{
-	va_list args;
-
-	mutex_enter(bge_log_mutex);
-	bge_log_data.who = bgep->ifname;
-	bge_log_data.fmt = "%s: %s";
-	bge_log_data.level = CE_NOTE;
-
-	va_start(args, fmt);
-	bge_vprt(fmt, args);
-	va_end(args);
-
-	mutex_exit(bge_log_mutex);
 }
 
 /*

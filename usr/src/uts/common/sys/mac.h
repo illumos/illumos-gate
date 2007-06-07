@@ -397,6 +397,8 @@ typedef int		(*mtops_header_info_t)(mblk_t *, void *,
     mac_header_info_t *);
 typedef boolean_t	(*mtops_pdata_verify_t)(void *, size_t);
 typedef	mblk_t		*(*mtops_header_modify_t)(mblk_t *, void *);
+typedef void		(*mtops_link_details_t)(char *, size_t, mac_handle_t,
+    void *);
 
 typedef struct mactype_ops_s {
 	uint_t			mtops_ops;
@@ -453,6 +455,14 @@ typedef struct mactype_ops_s {
 	 * header.
 	 */
 	mtops_header_modify_t	mtops_header_uncook;
+	/*
+	 * mtops_link_details() is an optional callback that provides
+	 * extended information about the link state.  Its primary purpose
+	 * is to provide type-specific support for syslog contents on
+	 * link up events.  If no implementation is provided, then a default
+	 * implementation will be used.
+	 */
+	mtops_link_details_t	mtops_link_details;
 } mactype_ops_t;
 
 /*
@@ -464,6 +474,7 @@ typedef struct mactype_ops_s {
 #define	MTOPS_PDATA_VERIFY	0x001
 #define	MTOPS_HEADER_COOK	0x002
 #define	MTOPS_HEADER_UNCOOK	0x004
+#define	MTOPS_LINK_DETAILS	0x008
 
 typedef struct mactype_register_s {
 	uint_t		mtr_version;	/* set by mactype_alloc() */

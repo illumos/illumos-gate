@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,6 +108,7 @@ typedef struct mac_impl_s {
 	uint_t			mi_active;
 	krwlock_t		mi_data_lock;
 	link_state_t		mi_linkstate;
+	link_state_t		mi_lastlinkstate;
 	uint_t			mi_promisc;
 	uint_t			mi_devpromisc;
 	uint8_t			mi_addr[MAXMACADDRLEN];

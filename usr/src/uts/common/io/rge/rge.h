@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -251,8 +251,7 @@ enum ioc_reply {
  * (Internal) enumeration of this driver's kstats
  */
 enum {
-	RGE_KSTAT_PARAMS = 0,
-	RGE_KSTAT_DRIVER,
+	RGE_KSTAT_DRIVER = 0,
 	RGE_KSTAT_COUNT
 };
 
@@ -456,18 +455,6 @@ typedef struct rge {
 	uint32_t		watchdog;	/* watches for Tx stall	*/
 	boolean_t		resched_needed;
 	uint32_t		factotum_flag;	/* softint pending	*/
-
-	/*
-	 * Link state data (protected by genlock)
-	 */
-	const char		*link_down_msg;	/* reason for link DOWN	*/
-	const char		*link_up_msg;	/* comment on link UP	*/
-
-	/*
-	 * Physical layer state data (protected by genlock)
-	 */
-	hrtime_t		phys_write_time; /* when last written	*/
-	hrtime_t		phys_event_time; /* when status changed	*/
 
 	/*
 	 * Physical layer

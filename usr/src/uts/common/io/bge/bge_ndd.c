@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -532,24 +532,6 @@ bge_nd_ioctl(bge_t *bgep, queue_t *wq, mblk_t *mp, struct iocblk *iocp)
 			return (IOC_INVAL);
 		if (iocp->ioc_error)
 			return (IOC_REPLY);
-
-		/*
-		 * OK, a successful 'set'.  Prepare the messages explaining
-		 * the link down/up cycle that will probably follow, then
-		 * return IOC_RESTART_REPLY, telling the top-level ioctl
-		 * code to update the PHY and restart the chip before
-		 * sending our prepared reply
-		 */
-		if (ndp->ndp_val) {
-			bgep->link_down_msg = " (autonegotiation enabled)";
-			bgep->link_up_msg = " (autonegotiated)";
-		} else {
-			bgep->link_down_msg = " (autonegotiation disabled)";
-			bgep->link_up_msg = " (forced)";
-		}
-		if (ndp->ndp_info == info)
-			bgep->link_down_msg = " (advertised capabilities "
-						"changed)";
 
 		return (IOC_RESTART_REPLY);
 	}

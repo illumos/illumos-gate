@@ -160,6 +160,46 @@ exit:
 }
 
 static void
+i_mac_log_link_state(mac_impl_t *mip)
+{
+	/*
+	 * If no change, then it is not interesting.
+	 */
+	if (mip->mi_lastlinkstate == mip->mi_linkstate)
+		return;
+
+	switch (mip->mi_linkstate) {
+	case LINK_STATE_UP:
+		if (mip->mi_type->mt_ops.mtops_ops & MTOPS_LINK_DETAILS) {
+			char det[200];
+
+			mip->mi_type->mt_ops.mtops_link_details(det,
+			    sizeof (det), (mac_handle_t)mip, mip->mi_pdata);
+
+			cmn_err(CE_NOTE, "!%s link up, %s", mip->mi_name, det);
+		} else {
+			cmn_err(CE_NOTE, "!%s link up", mip->mi_name);
+		}
+		break;
+
+	case LINK_STATE_DOWN:
+		/*
+		 * Only transitions from UP to DOWN are interesting
+		 */
+		if (mip->mi_lastlinkstate != LINK_STATE_UNKNOWN)
+			cmn_err(CE_NOTE, "!%s link down", mip->mi_name);
+		break;
+
+	case LINK_STATE_UNKNOWN:
+		/*
+		 * This case is normally not interesting.
+		 */
+		break;
+	}
+	mip->mi_lastlinkstate = mip->mi_linkstate;
+}
+
+static void
 i_mac_notify_task(void *notify_arg)
 {
 	mac_notify_task_arg_t	*mnta = (mac_notify_task_arg_t *)notify_arg;
@@ -172,6 +212,12 @@ i_mac_notify_task(void *notify_arg)
 	mip = mnta->mnt_mip;
 	type = mnta->mnt_type;
 	kmem_free(mnta, sizeof (*mnta));
+
+	/*
+	 * Log it.
+	 */
+	if (type == MAC_NOTE_LINK)
+		i_mac_log_link_state(mip);
 
 	/*
 	 * Walk the list of notifications.

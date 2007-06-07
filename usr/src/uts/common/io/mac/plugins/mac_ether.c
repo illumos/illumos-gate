@@ -60,6 +60,7 @@ static mac_stat_info_t ether_stats[] = {
 	{ ETHER_STAT_TOOLONG_ERRORS, "toolong_errors", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_MACRCV_ERRORS, "macrcv_errors", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_TOOSHORT_ERRORS, "runt_errors", KSTAT_DATA_UINT32,	0 },
+	{ ETHER_STAT_JABBER_ERRORS, "jabber_errors", KSTAT_DATA_UINT32,	0 },
 
 	/* Statistics described in the ieee802.3(5) man page */
 	{ ETHER_STAT_XCVR_ADDR, "xcvr_addr", KSTAT_DATA_UINT32,		0 },
@@ -67,6 +68,7 @@ static mac_stat_info_t ether_stats[] = {
 	{ ETHER_STAT_XCVR_INUSE, "xcvr_inuse", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_CAP_1000FDX, "cap_1000fdx", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_CAP_1000HDX, "cap_1000hdx", KSTAT_DATA_UINT32,	0 },
+	{ ETHER_STAT_CAP_100T4, "cap_100T4", KSTAT_DATA_UINT32,		0 },
 	{ ETHER_STAT_CAP_100FDX, "cap_100fdx", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_CAP_100HDX, "cap_100hdx", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_CAP_10FDX, "cap_10fdx", KSTAT_DATA_UINT32,		0 },
@@ -77,6 +79,7 @@ static mac_stat_info_t ether_stats[] = {
 	{ ETHER_STAT_CAP_REMFAULT, "cap_rem_fault", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_ADV_CAP_1000FDX, "adv_cap_1000fdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_ADV_CAP_1000HDX, "adv_cap_1000hdx", KSTAT_DATA_UINT32, 0 },
+	{ ETHER_STAT_ADV_CAP_100T4, "adv_cap_100T4", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_ADV_CAP_100FDX, "adv_cap_100fdx", KSTAT_DATA_UINT32, 0},
 	{ ETHER_STAT_ADV_CAP_100HDX, "adv_cap_100hdx", KSTAT_DATA_UINT32, 0},
 	{ ETHER_STAT_ADV_CAP_10FDX, "adv_cap_10fdx", KSTAT_DATA_UINT32,	0 },
@@ -88,6 +91,7 @@ static mac_stat_info_t ether_stats[] = {
 	{ ETHER_STAT_ADV_REMFAULT, "adv_rem_fault", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_LP_CAP_1000FDX, "lp_cap_1000fdx", KSTAT_DATA_UINT32, 0 },
 	{ ETHER_STAT_LP_CAP_1000HDX, "lp_cap_1000hdx", KSTAT_DATA_UINT32, 0 },
+	{ ETHER_STAT_LP_CAP_100T4, "lp_cap_100T4", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_LP_CAP_100FDX, "lp_cap_100fdx", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_LP_CAP_100HDX, "lp_cap_100hdx", KSTAT_DATA_UINT32,	0 },
 	{ ETHER_STAT_LP_CAP_10FDX, "lp_cap_10fdx", KSTAT_DATA_UINT32,	0 },
@@ -273,11 +277,34 @@ mac_ether_header_info(mblk_t *mp, void *mac_pdata, mac_header_info_t *hdr_info)
 	return (0);
 }
 
+/*ARGSUSED3*/
+void
+mac_ether_link_details(char *buf, size_t sz, mac_handle_t mh, void *mac_pdata)
+{
+	link_duplex_t	duplex;
+	uint64_t	speed;
+
+	duplex = mac_stat_get(mh, ETHER_STAT_LINK_DUPLEX);
+	speed = mac_stat_get(mh, MAC_STAT_IFSPEED);
+
+	/* convert to Mbps */
+	speed /= 1000000;
+
+	buf[0] = 0;
+	(void) snprintf(buf, sz, "%u Mbps, %s duplex", (uint32_t)speed,
+	    duplex == LINK_DUPLEX_FULL ? "full" :
+	    duplex == LINK_DUPLEX_HALF ? "half" : "unknown");
+}
+
 static mactype_ops_t mac_ether_type_ops = {
-	0,
+	MTOPS_LINK_DETAILS,
 	mac_ether_unicst_verify,
 	mac_ether_multicst_verify,
 	mac_ether_sap_verify,
 	mac_ether_header,
-	mac_ether_header_info
+	mac_ether_header_info,
+	NULL, 	/* pdata_verify */
+	NULL,	/* header_cook */
+	NULL,	/* header_uncook */
+	mac_ether_link_details
 };

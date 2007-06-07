@@ -29,7 +29,6 @@
 #include <sys/nxge/nxge_mac.h>
 
 extern uint32_t nxge_no_link_notify;
-extern boolean_t nxge_no_msg;
 extern uint32_t nxge_lb_dbg;
 extern nxge_os_mutex_t	nxge_mdio_lock;
 extern nxge_os_mutex_t	nxge_mii_lock;
@@ -2624,18 +2623,7 @@ fail:
 void
 nxge_link_is_down(p_nxge_t nxgep)
 {
-	p_nxge_stats_t statsp;
-	char link_stat_msg[64];
-
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_link_is_down"));
-
-	statsp = nxgep->statsp;
-	(void) sprintf(link_stat_msg, "xcvr addr:0x%02x - link is down",
-			statsp->mac_stats.xcvr_portn);
-
-	if (nxge_no_msg == B_FALSE) {
-		NXGE_ERROR_MSG((nxgep, NXGE_NOTE, "%s", link_stat_msg));
-	}
 
 	mac_link_update(nxgep->mach, LINK_STATE_DOWN);
 
@@ -2647,23 +2635,9 @@ nxge_link_is_down(p_nxge_t nxgep)
 void
 nxge_link_is_up(p_nxge_t nxgep)
 {
-	p_nxge_stats_t statsp;
-	char link_stat_msg[64];
 	uint32_t val;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_link_is_up"));
-
-	statsp = nxgep->statsp;
-	(void) sprintf(link_stat_msg, "xcvr addr:0x%02x - link is up %d Mbps ",
-				statsp->mac_stats.xcvr_portn,
-				statsp->mac_stats.link_speed);
-
-	if (statsp->mac_stats.link_T4)
-		(void) strcat(link_stat_msg, "T4");
-	else if (statsp->mac_stats.link_duplex == 2)
-		(void) strcat(link_stat_msg, "full duplex");
-	else
-		(void) strcat(link_stat_msg, "half duplex");
 
 	(void) nxge_xif_init(nxgep);
 
@@ -2673,10 +2647,6 @@ nxge_link_is_up(p_nxge_t nxgep)
 					XPCS_REG_SYMBOL_ERR_L0_1_COUNTER, &val);
 		(void) npi_xmac_xpcs_read(nxgep->npi_handle, nxgep->mac.portnum,
 					XPCS_REG_SYMBOL_ERR_L2_3_COUNTER, &val);
-	}
-
-	if (nxge_no_msg == B_FALSE) {
-		NXGE_ERROR_MSG((nxgep, NXGE_NOTE, "%s", link_stat_msg));
 	}
 
 	mac_link_update(nxgep->mach, LINK_STATE_UP);

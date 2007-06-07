@@ -887,18 +887,7 @@ typedef struct bge {
 	/*
 	 * Link state data (protected by genlock)
 	 */
-	const char		*link_mode_msg;	/* describes link mode	*/
-	const char		*link_down_msg;	/* reason for link DOWN	*/
-	const char		*link_up_msg;	/* comment on link UP	*/
-
 	link_state_t		link_state;
-
-	/*
-	 * Physical layer (PHY/SerDes) state data (protected by genlock)
-	 */
-	hrtime_t		phys_write_time; /* when last written	*/
-	hrtime_t		phys_event_time; /* when status changed	*/
-	hrtime_t		phys_delta_time; /* time to settle	*/
 
 	/*
 	 * Physical layer: copper only
@@ -1256,7 +1245,6 @@ void bge_pkt_dump(bge_t *bgep, bge_rbd_t *hbp, sw_rbd_t *sdp, const char *msg);
 void bge_dbg_enter(bge_t *bgep, const char *msg);
 #endif	/* BGE_DEBUGGING */
 void bge_problem(bge_t *bgep, const char *fmt, ...);
-void bge_notice(bge_t *bgep, const char *fmt, ...);
 void bge_log(bge_t *bgep, const char *fmt, ...);
 void bge_error(bge_t *bgep, const char *fmt, ...);
 void bge_fm_ereport(bge_t *bgep, char *detail);

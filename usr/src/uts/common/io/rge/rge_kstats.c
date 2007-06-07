@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,24 +36,6 @@ typedef struct {
 	offset_t	index;
 	char		*name;
 } rge_ksindex_t;
-
-static int
-rge_params_update(kstat_t *ksp, int flag)
-{
-	rge_t *rgep;
-	kstat_named_t *knp;
-	int i;
-
-	if (flag != KSTAT_READ)
-		return (EACCES);
-
-	rgep = ksp->ks_private;
-	for (knp = ksp->ks_data, i = 0; i < PARAM_COUNT; ++knp, ++i)
-		knp->value.ui64 = rgep->nd_params[i].ndp_val;
-
-	return (0);
-}
-
 
 static const rge_ksindex_t rge_driverinfo[] = {
 	{ 0,		"rx_ring_addr"		},
@@ -72,6 +54,7 @@ static const rge_ksindex_t rge_driverinfo[] = {
 	{ 13,		"phy_ver"		},
 	{ 14,		"chip_reset"		},
 	{ 15,		"phy_reset"		},
+	{ 16,		"loop_mode"		},
 	{ -1,		NULL 			}
 };
 
@@ -103,6 +86,7 @@ rge_driverinfo_update(kstat_t *ksp, int flag)
 	(knp++)->value.ui64 = rgep->chipid.phy_ver;
 	(knp++)->value.ui64 = rgep->stats.chip_reset;
 	(knp++)->value.ui64 = rgep->stats.phy_reset;
+	(knp++)->value.ui64 = rgep->param_loop_mode;
 
 	return (0);
 }
@@ -149,37 +133,9 @@ rge_setup_named_kstat(rge_t *rgep, int instance, char *name,
 	return (ksp);
 }
 
-/*
- * Create kstats corresponding to NDD parameters
- */
-static kstat_t *
-rge_setup_params_kstat(rge_t *rgep, int instance, char *name,
-	int (*update)(kstat_t *, int))
-{
-	kstat_t *ksp;
-	kstat_named_t *knp;
-	int i;
-
-	ksp = kstat_create(RGE_DRIVER_NAME, instance, name, "net",
-		KSTAT_TYPE_NAMED, PARAM_COUNT, KSTAT_FLAG_PERSISTENT);
-	if (ksp != NULL) {
-		ksp->ks_private = rgep;
-		ksp->ks_update = update;
-		for (knp = ksp->ks_data, i = 0; i < PARAM_COUNT; ++knp, ++i)
-			kstat_named_init(knp, rgep->nd_params[i].ndp_name+1,
-				KSTAT_DATA_UINT64);
-		kstat_install(ksp);
-	}
-
-	return (ksp);
-}
-
 void
 rge_init_kstats(rge_t *rgep, int instance)
 {
-	rgep->rge_kstats[RGE_KSTAT_PARAMS] = rge_setup_params_kstat(rgep,
-		instance, "parameters", rge_params_update);
-
 	rgep->rge_kstats[RGE_KSTAT_DRIVER] = rge_setup_named_kstat(rgep,
 		instance, "driverinfo", rge_driverinfo,
 		sizeof (rge_driverinfo), rge_driverinfo_update);

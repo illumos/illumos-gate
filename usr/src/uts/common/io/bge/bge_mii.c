@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,17 +80,6 @@ static const int8_t bge_copper_link_duplex[] = {
 	LINK_DUPLEX_FULL,		/* MII_AUX_STATUS_MODE_100_F	*/
 	LINK_DUPLEX_HALF,		/* MII_AUX_STATUS_MODE_1000_H	*/
 	LINK_DUPLEX_FULL		/* MII_AUX_STATUS_MODE_1000_F	*/
-};
-
-static const char * const bge_copper_link_text[] = {
-	"down",				/* MII_AUX_STATUS_MODE_NONE	*/
-	"up 10Mbps Half-Duplex",	/* MII_AUX_STATUS_MODE_10_H	*/
-	"up 10Mbps Full-Duplex",	/* MII_AUX_STATUS_MODE_10_F	*/
-	"up 100Mbps Half-Duplex",	/* MII_AUX_STATUS_MODE_100_H	*/
-	"down",				/* MII_AUX_STATUS_MODE_100_4	*/
-	"up 100Mbps Full-Duplex",	/* MII_AUX_STATUS_MODE_100_F	*/
-	"up 1000Mbps Half-Duplex",	/* MII_AUX_STATUS_MODE_1000_H	*/
-	"up 1000Mbps Full-Duplex"	/* MII_AUX_STATUS_MODE_1000_F	*/
 };
 
 #if	BGE_DEBUGGING
@@ -770,7 +759,6 @@ bge_update_copper(bge_t *bgep)
 	 * time, so that we can say whether subsequent link state
 	 * changes can be attributed to our reprogramming the PHY
 	 */
-	bgep->phys_write_time = gethrtime();
 	if ((*bgep->physops->phys_restart)(bgep, B_FALSE) == DDI_FAILURE)
 		return (DDI_FAILURE);
 	bge_mii_put16(bgep, MII_AN_ADVERT, anar);
@@ -845,12 +833,6 @@ bge_check_copper(bge_t *bgep, boolean_t recheck)
 		return (B_FALSE);
 
 	do {
-		/*
-		 * If the PHY status changed, record the time
-		 */
-		if (mii_status != bgep->phy_gen_status)
-			bgep->phys_event_time = gethrtime();
-
 		/*
 		 * Step 11: read AUX STATUS register to find speed/duplex
 		 */
@@ -941,7 +923,6 @@ bge_check_copper(bge_t *bgep, boolean_t recheck)
 	bgep->param_link_up = linkup;
 	bgep->param_link_speed = bge_copper_link_speed[mode];
 	bgep->param_link_duplex = bge_copper_link_duplex[mode];
-	bgep->link_mode_msg = bge_copper_link_text[mode];
 	bgep->link_state = LINK_STATE_UNKNOWN;
 
 	BGE_DEBUG(("bge_check_copper: link now %s speed %d duplex %d",
@@ -1145,7 +1126,6 @@ bge_update_serdes(bge_t *bgep)
 	 * changes can be attributed to our reprogramming the SerDes
 	 */
 	bgep->serdes_advert = advert;
-	bgep->phys_write_time = gethrtime();
 	(void) bge_restart_serdes(bgep, B_FALSE);
 	bge_reg_set32(bgep, SERDES_CONTROL_REG, serdes);
 
@@ -1255,10 +1235,8 @@ bge_check_serdes(bge_t *bgep, boolean_t recheck)
 			break;
 
 		/*
-		 * Record when the SerDes status changed, then go
-		 * round again until we no longer see a change ...
+		 * Go round again until we no longer see a change ...
 		 */
-		bgep->phys_event_time = gethrtime();
 		recheck = B_TRUE;
 	}
 
@@ -1353,20 +1331,6 @@ bge_check_serdes(bge_t *bgep, boolean_t recheck)
 		bgep->param_link_speed = 0;
 		bgep->param_link_duplex = LINK_DUPLEX_UNKNOWN;
 	}
-	switch (bgep->param_link_duplex) {
-	default:
-	case LINK_DUPLEX_UNKNOWN:
-		bgep->link_mode_msg = "down";
-		break;
-
-	case LINK_DUPLEX_HALF:
-		bgep->link_mode_msg = "up 1000Mbps Half-Duplex";
-		break;
-
-	case LINK_DUPLEX_FULL:
-		bgep->link_mode_msg = "up 1000Mbps Full-Duplex";
-		break;
-	}
 	bgep->link_state = LINK_STATE_UNKNOWN;
 
 	BGE_DEBUG(("bge_check_serdes: link now %s speed %d duplex %d",
@@ -1410,11 +1374,9 @@ bge_phys_init(bge_t *bgep)
 	bgep->phy_mii_addr = 1;
 	if (bge_phy_probe(bgep)) {
 		bgep->chipid.flags &= ~CHIP_FLAG_SERDES;
-		bgep->phys_delta_time = BGE_PHY_STABLE_TIME;
 		bgep->physops = &copper_ops;
 	} else {
 		bgep->chipid.flags |= CHIP_FLAG_SERDES;
-		bgep->phys_delta_time = BGE_SERDES_STABLE_TIME;
 		bgep->physops = &serdes_ops;
 	}
 

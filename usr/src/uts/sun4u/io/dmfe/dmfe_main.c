@@ -903,8 +903,10 @@ dmfe_update_tx_stats(dmfe_t *dmfep, int index, uint32_t desc0, uint32_t desc1)
 		 * see it as it causes an Abnormal interrupt and we reset
 		 * the chip in order to recover
 		 */
-		if (desc0 & TX_JABBER_TO)
+		if (desc0 & TX_JABBER_TO) {
 			dmfep->tx_stats_macxmt_errors += 1;
+			dmfep->tx_stats_jabber += 1;
+		}
 
 		if (desc0 & TX_UNDERFLOW)
 			dmfep->tx_stats_underflow += 1;
@@ -2239,6 +2241,10 @@ dmfe_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = dmfep->tx_stats_macxmt_errors;
 		break;
 
+	case ETHER_STAT_JABBER_ERRORS:
+		*val = dmfep->tx_stats_jabber;
+		break;
+
 	case ETHER_STAT_CARRIER_ERRORS:
 		*val = dmfep->tx_stats_nocarrier;
 		break;
@@ -2279,6 +2285,10 @@ dmfe_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = dmfep->op_stats_duplex;
 		break;
 
+	case ETHER_STAT_CAP_100T4:
+		*val = dmfep->param_bmsr_100T4;
+		break;
+
 	case ETHER_STAT_CAP_100FDX:
 		*val = dmfep->param_bmsr_100fdx;
 		break;
@@ -2307,6 +2317,10 @@ dmfe_m_stat(void *arg, uint_t stat, uint64_t *val)
 		*val = dmfep->param_autoneg;
 		break;
 
+	case ETHER_STAT_ADV_CAP_100T4:
+		*val = dmfep->param_anar_100T4;
+		break;
+
 	case ETHER_STAT_ADV_CAP_100FDX:
 		*val = dmfep->param_anar_100fdx;
 		break;
@@ -2329,6 +2343,10 @@ dmfe_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 	case ETHER_STAT_LP_CAP_AUTONEG:
 		*val = dmfep->param_lp_autoneg;
+		break;
+
+	case ETHER_STAT_LP_CAP_100T4:
+		*val = dmfep->param_lp_100T4;
 		break;
 
 	case ETHER_STAT_LP_CAP_100FDX:
@@ -2424,22 +2442,18 @@ dmfe_loop_ioctl(dmfe_t *dmfep, queue_t *wq, mblk_t *mp, int cmd)
 			return (IOC_INVAL);
 
 		case DMFE_LOOPBACK_OFF:
-			dmfep->link_up_msg = " (loopback off)";
 			loopmode = LOOPBACK_OFF;
 			break;
 
 		case DMFE_PHY_A_LOOPBACK_ON:
-			dmfep->link_up_msg = " (analog loopback on)";
 			loopmode = LOOPBACK_PHY_A;
 			break;
 
 		case DMFE_PHY_D_LOOPBACK_ON:
-			dmfep->link_up_msg = " (digital loopback on)";
 			loopmode = LOOPBACK_PHY_D;
 			break;
 
 		case DMFE_INT_LOOPBACK_ON:
-			dmfep->link_up_msg = " (MAC loopback on)";
 			loopmode = LOOPBACK_INTERNAL;
 			break;
 		}
@@ -2447,7 +2461,6 @@ dmfe_loop_ioctl(dmfe_t *dmfep, queue_t *wq, mblk_t *mp, int cmd)
 		if ((dmfep->opmode & LOOPBACK_MODE_MASK) != loopmode) {
 			dmfep->opmode &= ~LOOPBACK_MODE_MASK;
 			dmfep->opmode |= loopmode;
-			dmfep->link_down_msg = " (loopback changed)";
 			return (IOC_RESTART_ACK);
 		}
 
@@ -2544,7 +2557,6 @@ dmfe_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	/*
 	 * The 'reasons-for-link-change', if any, don't apply any more
 	 */
-	dmfep->link_up_msg = dmfep->link_down_msg = "";
 	mutex_exit(dmfep->oplock);
 	mutex_exit(dmfep->milock);
 
@@ -2848,8 +2860,6 @@ static const struct ks_index ks_drv_names[] = {
 
 	{	KS_LINK_UP_CNT,			"link_up_cnt"		},
 	{	KS_LINK_DROP_CNT,		"link_drop_cnt"		},
-	{	KS_LINK_CYCLE_UP_CNT,		"link_cycle_up_cnt"	},
-	{	KS_LINK_CYCLE_DOWN_CNT,		"link_cycle_down_cnt"	},
 
 	{	KS_MIIREG_BMSR,			"mii_status"		},
 	{	KS_MIIREG_ANAR,			"mii_advert_cap"	},
@@ -3074,7 +3084,6 @@ dmfe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	mutex_exit(dmfep->oplock);
 
 	dmfep->link_state = LINK_STATE_UNKNOWN;
-	dmfep->link_up_msg = dmfep->link_down_msg = " (initialised)";
 	if (dmfe_init_phy(dmfep) != B_TRUE)
 		goto attach_fail;
 	dmfep->update_phy = B_TRUE;

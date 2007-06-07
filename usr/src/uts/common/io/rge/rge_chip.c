@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -637,7 +637,6 @@ rge_phy_update(rge_t *rgep)
 	 * time, so that we can say whether subsequent link state
 	 * changes can be attributed to our reprogramming the PHY
 	 */
-	rgep->phys_write_time = gethrtime();
 	rge_phy_init(rgep);
 	rge_mii_put16(rgep, MII_AN_ADVERT, anar);
 	rge_mii_put16(rgep, MII_1000BASE_T_CONTROL, gigctrl);
@@ -1403,31 +1402,15 @@ rge_factotum_link_check(rge_t *rgep)
 {
 	uint8_t media_status;
 	int32_t link;
-	void (*logfn)(rge_t *rgep, const char *fmt, ...);
-	const char *msg;
-	hrtime_t deltat;
 
 	media_status = rge_reg_get8(rgep, PHY_STATUS_REG);
 	link = (media_status & PHY_STATUS_LINK_UP) ?
 	    LINK_STATE_UP : LINK_STATE_DOWN;
 	if (rgep->param_link_up != link) {
 		/*
-		 * Link change. We have to decide whether to write a message
-		 * on the console or only in the log.  If the PHY has
-		 * been reprogrammed (at user request) "recently", then
-		 * the message only goes in the log.  Otherwise it's an
-		 * "unexpected" event, and it goes on the console as well.
+		 * Link change.
 		 */
 		rgep->param_link_up = link;
-		rgep->phys_event_time = gethrtime();
-		deltat = rgep->phys_event_time - rgep->phys_write_time;
-		if (deltat > RGE_LINK_SETTLE_TIME)
-			msg = "";
-		else if (link == LINK_STATE_UP)
-			msg = rgep->link_up_msg;
-		else
-			msg = rgep->link_down_msg;
-		logfn = (msg == NULL || *msg == '\0') ? rge_notice : rge_log;
 
 		if (link == LINK_STATE_UP) {
 			if (media_status & PHY_STATUS_1000MF) {
@@ -1441,16 +1424,6 @@ rge_factotum_link_check(rge_t *rgep)
 				    (media_status & PHY_STATUS_DUPLEX_FULL) ?
 				    LINK_DUPLEX_FULL : LINK_DUPLEX_HALF;
 			}
-			logfn(rgep,
-			    "link up %sbps %s_Duplex%s",
-			    (rgep->param_link_speed == RGE_SPEED_10M) ?
-			    "10M" : (rgep->param_link_speed == RGE_SPEED_100M ?
-			    "100M" : "1000M"),
-			    (rgep->param_link_duplex == LINK_DUPLEX_FULL) ?
-			    "Full" : "Half",
-			    msg);
-		} else {
-			logfn(rgep, "link down%s", msg);
 		}
 		return (B_TRUE);
 	}

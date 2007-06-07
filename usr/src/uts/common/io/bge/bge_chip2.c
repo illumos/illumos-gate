@@ -4198,8 +4198,7 @@ bge_factotum_error_handler(bge_t *bgep)
  *
  * When this routine is called, the hardware link state has changed
  * and the new state is reflected in the param_* variables.  Here
- * we must update the softstate, reprogram the MAC to match, and
- * record the change in the log and/or on the console.
+ * we must update the softstate and reprogram the MAC to match.
  */
 static void bge_factotum_link_handler(bge_t *bgep);
 #pragma	no_inline(bge_factotum_link_handler)
@@ -4207,10 +4206,6 @@ static void bge_factotum_link_handler(bge_t *bgep);
 static void
 bge_factotum_link_handler(bge_t *bgep)
 {
-	void (*logfn)(bge_t *bgep, const char *fmt, ...);
-	const char *msg;
-	hrtime_t deltat;
-
 	ASSERT(mutex_owned(bgep->genlock));
 
 	/*
@@ -4225,24 +4220,6 @@ bge_factotum_link_handler(bge_t *bgep)
 	 * Reprogram the MAC modes to match
 	 */
 	bge_sync_mac_modes(bgep);
-
-	/*
-	 * Finally, we have to decide whether to write a message
-	 * on the console or only in the log.  If the PHY has
-	 * been reprogrammed (at user request) "recently", then
-	 * the message only goes in the log.  Otherwise it's an
-	 * "unexpected" event, and it goes on the console as well.
-	 */
-	deltat = bgep->phys_event_time - bgep->phys_write_time;
-	if (deltat > BGE_LINK_SETTLE_TIME)
-		msg = "";
-	else if (bgep->param_link_up)
-		msg = bgep->link_up_msg;
-	else
-		msg = bgep->link_down_msg;
-
-	logfn = (msg == NULL || *msg == '\0') ? bge_notice : bge_log;
-	(*logfn)(bgep, "link %s%s", bgep->link_mode_msg, msg);
 }
 
 static boolean_t bge_factotum_link_check(bge_t *bgep, int *dma_state);

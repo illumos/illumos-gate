@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -788,7 +788,6 @@ rge_m_stop(void *arg)
 	 */
 	mutex_enter(rgep->genlock);
 	rge_stop(rgep);
-	rgep->link_up_msg = rgep->link_down_msg = " (stopped)";
 	/*
 	 * Wait for posted buffer to be freed...
 	 */
@@ -825,7 +824,6 @@ rge_m_start(void *arg)
 	 * Start processing and record new MAC state
 	 */
 	rge_reset(rgep);
-	rgep->link_up_msg = rgep->link_down_msg = " (initialized)";
 	rge_start(rgep);
 	rgep->rge_mac_state = RGE_MAC_STARTED;
 	RGE_DEBUG(("rge_m_start($%p) done", arg));
@@ -979,8 +977,6 @@ static lb_property_t loopmodes[] = {
 static enum ioc_reply
 rge_set_loop_mode(rge_t *rgep, uint32_t mode)
 {
-	const char *msg;
-
 	/*
 	 * If the mode isn't being changed, there's nothing to do ...
 	 */
@@ -997,15 +993,8 @@ rge_set_loop_mode(rge_t *rgep, uint32_t mode)
 		return (IOC_INVAL);
 
 	case RGE_LOOP_NONE:
-		msg = " (loopback disabled)";
-		break;
-
 	case RGE_LOOP_INTERNAL_PHY:
-		msg = " (PHY internal loopback selected)";
-		break;
-
 	case RGE_LOOP_INTERNAL_MAC:
-		msg = " (MAC internal loopback selected)";
 		break;
 	}
 
@@ -1013,7 +1002,6 @@ rge_set_loop_mode(rge_t *rgep, uint32_t mode)
 	 * All OK; tell the caller to reprogram
 	 * the PHY and/or MAC for the new mode ...
 	 */
-	rgep->link_down_msg = rgep->link_up_msg = msg;
 	rgep->param_loop_mode = mode;
 	return (IOC_RESTART_ACK);
 }
@@ -1742,7 +1730,6 @@ rge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Initialise the (internal) PHY.
 	 */
 	rgep->param_link_up = LINK_STATE_UNKNOWN;
-	rgep->link_up_msg = rgep->link_down_msg = " (initialised)";
 
 	/*
 	 * Reset chip & rings to initial state; also reset address

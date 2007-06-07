@@ -525,15 +525,10 @@ dmfe_check_link(dmfe_t *dmfep)
 
 /*
  * Update all parameters and statistics after a link state change.
- * Also report the new state in the log and/or on the console.
  */
 static void
 dmfe_media_update(dmfe_t *dmfep, link_state_t newstate, int speed, int duplex)
 {
-	const char *state_msg;
-	const char *speed_msg;
-	const char *duplex_msg;
-	const char *link_msg;
 	boolean_t report;
 	int ks_id;
 
@@ -544,17 +539,10 @@ dmfe_media_update(dmfe_t *dmfep, link_state_t newstate, int speed, int duplex)
 	switch (newstate) {
 	case LINK_STATE_UP:
 		dmfep->param_linkup = 1;
-		state_msg = "up";
-		link_msg = dmfep->link_up_msg;
-		dmfep->link_up_msg = "";
-		dmfep->link_down_msg = "";
 		break;
 
 	default:
 		dmfep->param_linkup = 0;
-		state_msg = "down";
-		link_msg = dmfep->link_down_msg;
-		dmfep->link_down_msg = "";
 		break;
 	}
 
@@ -563,57 +551,27 @@ dmfe_media_update(dmfe_t *dmfep, link_state_t newstate, int speed, int duplex)
 		dmfep->op_stats_speed = 100000000;
 		dmfep->param_speed = speed;
 		dmfep->phy_inuse = XCVR_100X;
-		speed_msg = " 100 Mbps";
 		break;
 
 	case 10:
 		dmfep->op_stats_speed = 10000000;
 		dmfep->param_speed = speed;
 		dmfep->phy_inuse = XCVR_10;
-		speed_msg = " 10 Mbps";
 		break;
 
 	default:
 		dmfep->op_stats_speed = 0;
 		dmfep->phy_inuse = XCVR_UNDEFINED;
-		speed_msg = "";
-		break;
-	}
-
-	switch (duplex) {
-	case LINK_DUPLEX_FULL:
-		duplex_msg = " Full-Duplex";
-		break;
-
-	case LINK_DUPLEX_HALF:
-		duplex_msg = " Half-Duplex";
-		break;
-
-	default:
-		duplex_msg = "";
 		break;
 	}
 
 	dmfep->op_stats_duplex = dmfep->param_duplex = duplex;
 
-	/*
-	 * Were we expecting this change?  If there's no message
-	 * explaining why it was expected, we'll report the change
-	 * on the console.  Otherwise, it was anticipated, so we
-	 * just log it.
-	 */
-	report = link_msg[0] == '\0';
 	if (newstate == LINK_STATE_UP)
-		ks_id = report ? KS_LINK_UP_CNT : KS_LINK_CYCLE_UP_CNT;
+		ks_id = KS_LINK_UP_CNT;
 	else
-		ks_id = report ? KS_LINK_DROP_CNT : KS_LINK_CYCLE_DOWN_CNT;
+		ks_id = KS_LINK_DROP_CNT;
 	DRV_KS_INC(dmfep, ks_id);
-
-	(report ? dmfe_notice : dmfe_log)(dmfep, "PHY %d link %s%s%s%s",
-		dmfep->phy_addr, state_msg, speed_msg, duplex_msg, link_msg);
-
-	DMFE_DEBUG(("dmfe_media_update: report %d link %s%s%s%s",
-		report, state_msg, speed_msg, duplex_msg, link_msg));
 }
 
 /*
@@ -645,9 +603,6 @@ dmfe_link_change(dmfe_t *dmfep, link_state_t newstate)
 		duplex = LINK_DUPLEX_UNKNOWN;
 		switch (dmfep->link_state) {
 		case LINK_STATE_DOWN:		/* DOWN->UNKNOWN	*/
-			report = dmfep->link_down_msg[0] != '\0';
-			break;
-
 		case LINK_STATE_UNKNOWN:	/* UNKNOWN->DOWN	*/
 			report = B_FALSE;
 			break;
@@ -766,7 +721,7 @@ dmfe_process_bmsr(dmfe_t *dmfep, clock_t time)
 	else if (dmfep->phy_bmsr & MII_STATUS_ANDONE)
 		/*EMPTY*/;
 	else if (dmfep->phy_control & MII_CONTROL_ANE)
-		newstate = LINK_STATE_UNKNOWN;
+		newstate = LINK_STATE_DOWN;
 
 	if (newstate == LINK_STATE_UP) {
 		/*

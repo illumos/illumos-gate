@@ -203,9 +203,6 @@ xgell_callback_link_up(void *userdata)
 	xgelldev_t *lldev = (xgelldev_t *)userdata;
 
 	mac_link_update(lldev->mh, LINK_STATE_UP);
-	/* Link states should be reported to user whenever it changes */
-	cmn_err(CE_NOTE, "!%s%d: Link is up [10 Gbps Full Duplex]",
-	    XGELL_IFNAME, lldev->instance);
 }
 
 /*
@@ -219,9 +216,6 @@ xgell_callback_link_down(void *userdata)
 	xgelldev_t *lldev = (xgelldev_t *)userdata;
 
 	mac_link_update(lldev->mh, LINK_STATE_DOWN);
-	/* Link states should be reported to user whenever it changes */
-	cmn_err(CE_NOTE, "!%s%d: Link is down", XGELL_IFNAME,
-	    lldev->instance);
 }
 
 /*

@@ -181,8 +181,6 @@ enum {
 
 	KS_LINK_UP_CNT,
 	KS_LINK_DROP_CNT,
-	KS_LINK_CYCLE_UP_CNT,
-	KS_LINK_CYCLE_DOWN_CNT,
 
 	KS_MIIREG_BMSR,
 	KS_MIIREG_ANAR,
@@ -332,6 +330,7 @@ typedef struct {
 	uint64_t		tx_stats_xmtlatecoll;
 	uint64_t		tx_stats_excoll;
 	uint64_t		tx_stats_macxmt_errors;
+	uint64_t		tx_stats_jabber;
 	uint64_t		tx_stats_defer;
 	uint64_t		tx_stats_first_coll;
 	uint64_t		tx_stats_multi_coll;
@@ -366,8 +365,6 @@ typedef struct {
 	 * Physical link state data (protected by oplock)
 	 */
 	link_state_t		link_state;	/* See above		*/
-	const char		*link_down_msg;	/* reason for link DOWN	*/
-	const char		*link_up_msg;	/* comment on link UP	*/
 
 	/*
 	 * PHYceiver state data (protected by milock)

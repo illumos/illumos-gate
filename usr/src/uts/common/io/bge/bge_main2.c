@@ -476,7 +476,6 @@ bge_m_stop(void *arg)
 		mutex_exit(bgep->genlock);
 		return;
 	}
-	bgep->link_up_msg = bgep->link_down_msg = " (stopped)";
 	bge_stop(bgep);
 	/*
 	 * Free the possible tx buffers allocated in tx process.
@@ -527,8 +526,6 @@ bge_m_start(void *arg)
 		if ((bgep->asf_status == ASF_STAT_RUN) &&
 			(bgep->asf_pseudostop)) {
 
-			bgep->link_up_msg = bgep->link_down_msg
-				= " (initialized)";
 			bgep->bge_mac_state = BGE_MAC_STARTED;
 			mutex_exit(bgep->genlock);
 			return (0);
@@ -544,7 +541,6 @@ bge_m_start(void *arg)
 		mutex_exit(bgep->genlock);
 		return (EIO);
 	}
-	bgep->link_up_msg = bgep->link_down_msg = " (initialized)";
 	if (bge_start(bgep, B_TRUE) != DDI_SUCCESS) {
 		(void) bge_check_acc_handle(bgep, bgep->cfg_handle);
 		(void) bge_check_acc_handle(bgep, bgep->io_handle);
@@ -1066,8 +1062,6 @@ static lb_property_t loopmodes[] = {
 static enum ioc_reply
 bge_set_loop_mode(bge_t *bgep, uint32_t mode)
 {
-	const char *msg;
-
 	/*
 	 * If the mode isn't being changed, there's nothing to do ...
 	 */
@@ -1084,21 +1078,11 @@ bge_set_loop_mode(bge_t *bgep, uint32_t mode)
 		return (IOC_INVAL);
 
 	case BGE_LOOP_NONE:
-		msg = " (loopback disabled)";
-		break;
-
 	case BGE_LOOP_EXTERNAL_1000:
 	case BGE_LOOP_EXTERNAL_100:
 	case BGE_LOOP_EXTERNAL_10:
-		msg = " (external loopback selected)";
-		break;
-
 	case BGE_LOOP_INTERNAL_PHY:
-		msg = " (PHY internal loopback selected)";
-		break;
-
 	case BGE_LOOP_INTERNAL_MAC:
-		msg = " (MAC internal loopback selected)";
 		break;
 	}
 
@@ -1106,7 +1090,6 @@ bge_set_loop_mode(bge_t *bgep, uint32_t mode)
 	 * All OK; tell the caller to reprogram
 	 * the PHY and/or MAC for the new mode ...
 	 */
-	bgep->link_down_msg = bgep->link_up_msg = msg;
 	bgep->param_loop_mode = mode;
 	return (IOC_RESTART_ACK);
 }
@@ -2790,7 +2773,6 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Initialise the (internal) PHY.
 	 */
 	bgep->link_state = LINK_STATE_UNKNOWN;
-	bgep->link_up_msg = bgep->link_down_msg = " (initialized)";
 
 	mutex_enter(bgep->genlock);
 
@@ -2999,7 +2981,6 @@ bge_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 		bge_asf_pre_reset_operations(bgep, BGE_SHUTDOWN_RESET);
 
 		if (bgep->asf_pseudostop) {
-			bgep->link_up_msg = bgep->link_down_msg = " (stopped)";
 			bge_chip_stop(bgep, B_FALSE);
 			bgep->bge_mac_state = BGE_MAC_STOPPED;
 			bgep->asf_pseudostop = B_FALSE;
