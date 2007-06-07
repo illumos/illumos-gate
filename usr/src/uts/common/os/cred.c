@@ -1031,6 +1031,13 @@ eph_gid_alloc(int flags, gid_t *start, int count)
 cred_t *
 crgetmapped(const cred_t *cr)
 {
+	/*
+	 * Someone incorrectly passed a NULL cred to a vnode operation
+	 * either on purpose or by calling CRED() in interrupt context.
+	 */
+	if (cr == NULL)
+		return (NULL);
+
 	if (cr->cr_ksid != NULL) {
 		int i;
 
