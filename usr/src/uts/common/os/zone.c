@@ -2415,7 +2415,7 @@ zone_set_root(zone_t *zone, const char *upath)
 			 * Get the new 'vp' if so.
 			 */
 			if ((error = VOP_ACCESS(vp, VEXEC, 0, CRED())) == 0 &&
-			    (vp->v_vfsmountedhere == NULL ||
+			    (!vn_ismntpt(vp) ||
 			    (error = traverse(&vp)) == 0)) {
 				pathlen = pn.pn_pathlen + 2;
 				path = kmem_alloc(pathlen, KM_SLEEP);
