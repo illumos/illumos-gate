@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -256,16 +256,15 @@ cpu_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 	if (rv != 0) {
 		if (resp_back) {
 			if ((rv = ds_cap_send(cpu_handle, &resp_msg,
-				sizeof (resp_msg))) != 0) {
+			    sizeof (resp_msg))) != 0) {
 				FI_DBG(CE_CONT, "ds_cap_send failed (%d)\n",
 				    rv);
 			}
 			return;
 		}
 		ASSERT((rv == EINVAL) || ((rv == EBUSY) &&
-			(msg->msg_type == FMA_CPU_REQ_OFFLINE)) ||
-		    ((rv == ENOTSUP) &&
-			(msg->msg_type == FMA_CPU_REQ_ONLINE)));
+		    (msg->msg_type == FMA_CPU_REQ_OFFLINE)) ||
+		    ((rv == ENOTSUP) && (msg->msg_type == FMA_CPU_REQ_ONLINE)));
 
 		cmn_err(CE_WARN, "p_online_internal error not handled "
 		    "rv = %d\n", rv);
@@ -341,7 +340,7 @@ mem_data_handler(ds_cb_arg_t arg, void *buf, size_t buflen)
 			break;
 		/* Page is not retired. */
 		case EIO:
-			resp_msg.result = FMA_MEM_RESP_FAILURE;
+			resp_msg.result = FMA_MEM_RESP_OK;
 			resp_msg.status = FMA_MEM_STAT_NOTRETIRED;
 			break;
 		/* PA is not valid */
