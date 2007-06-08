@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,9 +45,6 @@ void (*dtrace_helpers_cleanup)(void);
 void (*dtrace_helpers_fork)(proc_t *, proc_t *);
 void (*dtrace_cpustart_init)(void);
 void (*dtrace_cpustart_fini)(void);
-
-void (*dtrace_kreloc_init)(void);
-void (*dtrace_kreloc_fini)(void);
 
 void (*dtrace_debugger_init)(void);
 void (*dtrace_debugger_fini)(void);

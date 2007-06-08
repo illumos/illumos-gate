@@ -2183,9 +2183,6 @@ extern void (*dtrace_helpers_fork)(proc_t *parent, proc_t *child);
 extern void (*dtrace_cpustart_init)();
 extern void (*dtrace_cpustart_fini)();
 
-extern void (*dtrace_kreloc_init)();
-extern void (*dtrace_kreloc_fini)();
-
 extern void (*dtrace_debugger_init)();
 extern void (*dtrace_debugger_fini)();
 extern dtrace_cacheid_t dtrace_predcache_id;

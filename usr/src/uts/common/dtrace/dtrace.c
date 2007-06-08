@@ -5353,9 +5353,10 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 
 	/*
 	 * Kick out immediately if this CPU is still being born (in which case
-	 * curthread will be set to -1)
+	 * curthread will be set to -1) or the current thread can't allow
+	 * probes in its current context.
 	 */
-	if ((uintptr_t)curthread & 1)
+	if (((uintptr_t)curthread & 1) || (curthread->t_flag & T_DONTDTRACE))
 		return;
 
 	cookie = dtrace_interrupt_disable();
@@ -14121,8 +14122,6 @@ dtrace_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	dtrace_cpustart_fini = dtrace_resume;
 	dtrace_debugger_init = dtrace_suspend;
 	dtrace_debugger_fini = dtrace_resume;
-	dtrace_kreloc_init = dtrace_suspend;
-	dtrace_kreloc_fini = dtrace_resume;
 
 	register_cpu_setup_func((cpu_setup_func_t *)dtrace_cpu_setup, NULL);
 
@@ -15223,8 +15222,6 @@ dtrace_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	dtrace_cpustart_fini = NULL;
 	dtrace_debugger_init = NULL;
 	dtrace_debugger_fini = NULL;
-	dtrace_kreloc_init = NULL;
-	dtrace_kreloc_fini = NULL;
 	dtrace_modload = NULL;
 	dtrace_modunload = NULL;
 
