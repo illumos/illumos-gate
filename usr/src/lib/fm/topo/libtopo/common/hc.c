@@ -1063,6 +1063,19 @@ hc_walker(topo_mod_t *mod, tnode_t *node, void *pdata)
 	}
 
 	inst = atoi(id);
+
+	/*
+	 * Special case for the root node.  We need to walk by siblings
+	 * until we find a matching node for cases where there may be multiple
+	 * nodes just below the hc root.
+	 */
+	if (i == 0) {
+		if (strcmp(name, topo_node_name(node)) != 0 ||
+		    inst != topo_node_instance(node)) {
+			return (TOPO_WALK_NEXT);
+		}
+	}
+
 	topo_mod_dprintf(mod, "hc_walker: walking node:%s=%d for hc:"
 	    "%s=%d at %d, end at %d \n", topo_node_name(node),
 	    topo_node_instance(node), name, inst, i, hwp->hcw_end);
@@ -1203,7 +1216,7 @@ hc_fmri_prop_get(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	plp->pl_prop = NULL;
 	if ((hwp = hc_walk_init(mod, node, plp->pl_rsrc, hc_prop_get,
 	    (void *)plp)) != NULL) {
-		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
+		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_SIBLING) ==
 		    TOPO_WALK_ERR)
 			err = -1;
 		else
@@ -1261,7 +1274,7 @@ hc_fmri_pgrp_get(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	plp->pl_prop = NULL;
 	if ((hwp = hc_walk_init(mod, node, plp->pl_rsrc, hc_pgrp_get,
 	    (void *)plp)) != NULL) {
-		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
+		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_SIBLING) ==
 		    TOPO_WALK_ERR)
 			err = -1;
 		else
@@ -1333,7 +1346,7 @@ hc_fmri_prop_set(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 
 	if ((hwp = hc_walk_init(mod, node, plp->pl_rsrc, hc_prop_setprop,
 	    (void *)plp)) != NULL) {
-		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
+		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_SIBLING) ==
 		    TOPO_WALK_ERR)
 			err = -1;
 		else
@@ -1400,7 +1413,7 @@ hc_fmri_present(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	hap->ha_nvl = NULL;
 	if ((hwp = hc_walk_init(mod, node, hap->ha_fmri, hc_is_present,
 	    (void *)hap)) != NULL) {
-		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
+		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_SIBLING) ==
 		    TOPO_WALK_ERR)
 			err = -1;
 		else
@@ -1466,7 +1479,7 @@ hc_fmri_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	hap->ha_nvl = NULL;
 	if ((hwp = hc_walk_init(mod, node, hap->ha_fmri, hc_unusable,
 	    (void *)hap)) != NULL) {
-		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_CHILD) ==
+		if (topo_walk_step(hwp->hcw_wp, TOPO_WALK_SIBLING) ==
 		    TOPO_WALK_ERR)
 			err = -1;
 		else
