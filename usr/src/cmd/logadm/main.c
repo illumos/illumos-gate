@@ -634,9 +634,12 @@ rotatelog(struct fn *fnp, struct opts *opts)
 		return (B_FALSE);
 	}
 
-	/* see if size condition is present, and return if not met */
-	if (opts_count(opts, "s") && stbuf.st_size < opts_optarg_int(opts, "s"))
+	/* even if size condition is not met, this entry is "done" */
+	if (opts_count(opts, "s") &&
+	    stbuf.st_size < opts_optarg_int(opts, "s")) {
+		Donenames = lut_add(Donenames, fname, "1");
 		return (B_TRUE);
+	}
 
 	/* see if age condition is present, and return if not met */
 	if (opts_count(opts, "p")) {
