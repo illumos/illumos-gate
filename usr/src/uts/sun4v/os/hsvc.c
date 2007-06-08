@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -657,10 +657,16 @@ hsvc_init(void)
  * Note that the HSVC_GROUP_DIAG is negotiated on behalf of
  * any driver/module using DIAG services.
  */
-static hsvc_info_t  hsvcinfo_unix[] = {
-	{HSVC_REV_1, NULL,	HSVC_GROUP_SUN4V,	1,	0, NULL},
-	{HSVC_REV_1, NULL,	HSVC_GROUP_CORE,	1,	1, NULL},
-	{HSVC_REV_1, NULL,	HSVC_GROUP_DIAG,	1,	0, NULL}
+typedef struct hsvc_info_unix_s {
+	hsvc_info_t	hsvcinfo;
+	int		required;
+} hsvc_info_unix_t;
+
+static hsvc_info_unix_t  hsvcinfo_unix[] = {
+	{{HSVC_REV_1, NULL,	HSVC_GROUP_SUN4V,	1,	0, NULL}, 1},
+	{{HSVC_REV_1, NULL,	HSVC_GROUP_CORE,	1,	1, NULL}, 1},
+	{{HSVC_REV_1, NULL,	HSVC_GROUP_DIAG,	1,	0, NULL}, 1},
+	{{HSVC_REV_1, NULL,	HSVC_GROUP_INTR,	1,	0, NULL}, 0},
 };
 
 #define	HSVCINFO_UNIX_CNT	(sizeof (hsvcinfo_unix) / sizeof (hsvc_info_t))
@@ -673,9 +679,9 @@ static char	*hsvcinfo_unix_modname = "unix";
 void
 hsvc_setup()
 {
-	int		i, status;
-	uint64_t	sup_minor;
-	hsvc_info_t	*hsvcinfop;
+	int			i, status;
+	uint64_t		sup_minor;
+	hsvc_info_unix_t	*hsvcinfop;
 
 	/*
 	 * Initialize framework
@@ -687,16 +693,17 @@ hsvc_setup()
 	 */
 	for (hsvcinfop = &hsvcinfo_unix[0], i = 0; i < HSVCINFO_UNIX_CNT;
 	    i++, hsvcinfop++) {
-		hsvcinfop->hsvc_private = NULL;
-		hsvcinfop->hsvc_modname = hsvcinfo_unix_modname;
-		status = hsvc_register(hsvcinfop, &sup_minor);
+		hsvcinfop->hsvcinfo.hsvc_private = NULL;
+		hsvcinfop->hsvcinfo.hsvc_modname = hsvcinfo_unix_modname;
+		status = hsvc_register(&(hsvcinfop->hsvcinfo), &sup_minor);
 
-		if (status != 0) {
+		if ((status != 0) && hsvcinfop->required) {
 			cmn_err(CE_PANIC, "%s: cannot negotiate hypervisor "
 			    "services - group: 0x%lx major: 0x%lx minor: 0x%lx"
-			    " errno: %d\n", hsvcinfop->hsvc_modname,
-			    hsvcinfop->hsvc_group, hsvcinfop->hsvc_major,
-			    hsvcinfop->hsvc_minor, status);
+			    " errno: %d\n", hsvcinfop->hsvcinfo.hsvc_modname,
+			    hsvcinfop->hsvcinfo.hsvc_group,
+			    hsvcinfop->hsvcinfo.hsvc_major,
+			    hsvcinfop->hsvcinfo.hsvc_minor, status);
 		}
 	}
 	HSVC_DUMP();

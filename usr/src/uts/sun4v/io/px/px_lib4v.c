@@ -65,7 +65,24 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 	uint_t			reglen;
 	int			ret;
 
+	uint64_t mjrnum;
+	uint64_t mnrnum;
+
 	DBG(DBG_ATTACH, dip, "px_lib_dev_init: dip 0x%p\n", dip);
+
+	/*
+	 * Check HV intr group api versioning.
+	 * This driver uses the old interrupt routines which are supported
+	 * in old firmware in the CORE API group and in newer firmware in
+	 * the INTR API group.  Support for these calls will be dropped
+	 * once the INTR API group major goes to 2.
+	 */
+	if ((hsvc_version(HSVC_GROUP_INTR, &mjrnum, &mnrnum) == 0) &&
+	    (mjrnum > 1)) {
+		cmn_err(CE_WARN, "niumx: unsupported intr api group: "
+		    "maj:0x%lx, min:0x%lx", mjrnum, mnrnum);
+		return (ENOTSUP);
+	}
 
 	ret = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    "reg", (uchar_t **)&rp, &reglen);

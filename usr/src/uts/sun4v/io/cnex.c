@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,7 @@
 #include <sys/ldc.h>
 #include <sys/cnex.h>
 #include <sys/mach_descrip.h>
+#include <sys/hsvc.h>
 
 /*
  * Internal functions/information
@@ -225,6 +226,23 @@ int
 _init(void)
 {
 	int err;
+	uint64_t majornum;
+	uint64_t minornum;
+
+	/*
+	 * Check HV intr group api versioning.
+	 * Note that cnex assumes interrupt cookies is
+	 * in version 1.0 of the intr group api.
+	 */
+	if ((err = hsvc_version(HSVC_GROUP_INTR, &majornum, &minornum)) != 0) {
+		cmn_err(CE_WARN, "cnex: failed to get intr api "
+		    "group versioning errno=%d", err);
+		return (err);
+	} else if ((majornum != 1) && (majornum != 2)) {
+		cmn_err(CE_WARN, "cnex: unsupported intr api group: "
+		    "maj:0x%lx, min:0x%lx", majornum, minornum);
+		return (ENOTSUP);
+	}
 
 	if ((err = ddi_soft_state_init(&cnex_state,
 		sizeof (cnex_soft_state_t), 0)) != 0) {

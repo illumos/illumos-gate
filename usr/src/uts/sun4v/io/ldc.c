@@ -142,11 +142,6 @@ static hsvc_info_t ldc_hsvc = {
 	HSVC_REV_1, NULL, HSVC_GROUP_LDC, 1, 0, "ldc"
 };
 
-static uint64_t intr_sup_minor;		/* Supported minor number */
-static hsvc_info_t intr_hsvc = {
-	HSVC_REV_1, NULL, HSVC_GROUP_INTR, 1, 0, "ldc"
-};
-
 /*
  * LDC framework supports mapping remote domain's memory
  * either directly or via shadow memory pages. Default
@@ -327,20 +322,10 @@ _init(void)
 
 	status = hsvc_register(&ldc_hsvc, &ldc_sup_minor);
 	if (status != 0) {
-		cmn_err(CE_WARN, "%s: cannot negotiate hypervisor LDC services"
+		cmn_err(CE_NOTE, "!%s: cannot negotiate hypervisor LDC services"
 		    " group: 0x%lx major: %ld minor: %ld errno: %d",
 		    ldc_hsvc.hsvc_modname, ldc_hsvc.hsvc_group,
 		    ldc_hsvc.hsvc_major, ldc_hsvc.hsvc_minor, status);
-		return (-1);
-	}
-
-	status = hsvc_register(&intr_hsvc, &intr_sup_minor);
-	if (status != 0) {
-		cmn_err(CE_WARN, "%s: cannot negotiate hypervisor interrupt "
-		    "services group: 0x%lx major: %ld minor: %ld errno: %d",
-		    intr_hsvc.hsvc_modname, intr_hsvc.hsvc_group,
-		    intr_hsvc.hsvc_major, intr_hsvc.hsvc_minor, status);
-		(void) hsvc_unregister(&ldc_hsvc);
 		return (-1);
 	}
 
@@ -452,7 +437,6 @@ _fini(void)
 	kmem_free(ldcssp, sizeof (ldc_soft_state_t));
 
 	(void) hsvc_unregister(&ldc_hsvc);
-	(void) hsvc_unregister(&intr_hsvc);
 
 	return (status);
 }

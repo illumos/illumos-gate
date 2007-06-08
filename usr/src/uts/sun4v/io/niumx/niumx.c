@@ -145,6 +145,23 @@ int
 _init(void)
 {
 	int e;
+	uint64_t mjrnum;
+	uint64_t mnrnum;
+
+	/*
+	 * Check HV intr group api versioning.
+	 * This driver uses the old interrupt routines which are supported
+	 * in old firmware in the CORE API group and in newer firmware in
+	 * the INTR API group.  Support for these calls will be dropped
+	 * once the INTR API group major goes to 2.
+	 */
+	if ((hsvc_version(HSVC_GROUP_INTR, &mjrnum, &mnrnum) == 0) &&
+	    (mjrnum > NIUMX_INTR_MAJOR_VER)) {
+		cmn_err(CE_WARN, "niumx: unsupported intr api group: "
+		    "maj:0x%lx, min:0x%lx", mjrnum, mnrnum);
+		return (ENOTSUP);
+	}
+
 	if ((e = ddi_soft_state_init(&niumx_state, sizeof (niumx_devstate_t),
 	    1)) == 0 && (e = mod_install(&modlinkage)) != 0)
 		ddi_soft_state_fini(&niumx_state);
@@ -213,15 +230,6 @@ niumx_intr_dist(void *arg)
 	mutex_exit(lock_p);
 }
 
-/*
- * Hypervisor INTR services information for the NIU nexus driver.
- */
-static	uint64_t	niumx_intr_min_ver;   /* Neg. API minor version */
-static hsvc_info_t niumx_hv_intr = {
-	HSVC_REV_1, NULL, HSVC_GROUP_INTR, NIUMX_INTR_MAJOR_VER,
-	NIUMX_INTR_MINOR_VER, "NIUMX"
-};
-
 static int
 niumx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
@@ -256,22 +264,6 @@ niumx_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		DBG(DBG_ATTACH, dip, "soft state alloc'd instance = %d, "
 			"niumxds_p = %p\n", instance, niumxds_p);
-
-		/*
-		 * Negotiate the API version for HV INTR services.
-		 */
-		if ((ret = hsvc_register(&niumx_hv_intr, &niumx_intr_min_ver))
-			!= H_EOK) {
-		    cmn_err(CE_WARN, "%s: cannot negotiate hypervisor services "
-		    "group: 0x%lx major: 0x%lx minor: 0x%lx errno: %d\n",
-		    niumx_hv_intr.hsvc_modname, niumx_hv_intr.hsvc_group,
-		    niumx_hv_intr.hsvc_major, niumx_hv_intr.hsvc_minor, ret);
-		    ret = DDI_FAILURE;
-		    goto cleanup;
-		}
-
-		DBG(DBG_ATTACH, dip, "neg. HV API major 0x%lx minor 0x%lx\n",
-			niumx_hv_intr.hsvc_major, niumx_intr_min_ver);
 
 		/* hv devhdl: low 28-bit of 1st "reg" entry's addr.hi */
 		niumxds_p->niumx_dev_hdl = (devhandle_t)(reg_p->addr_high &
@@ -309,7 +301,6 @@ niumx_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	switch (cmd) {
 	case DDI_DETACH:
-		(void) hsvc_unregister(&niumx_hv_intr);
 
 		niumxds_p = (niumx_devstate_t *)
 		    ddi_get_soft_state(niumx_state, ddi_get_instance(dip));

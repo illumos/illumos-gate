@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,7 @@
 #include <sys/ddi_intr_impl.h>
 #include <sys/hypervisor_api.h>
 #include <sys/intr.h>
+#include <sys/hsvc.h>
 
 #define	SUN4V_REG_SPEC2CFG_HDL(x)	((x >> 32) & ~(0xfull << 28))
 
@@ -178,6 +179,24 @@ static struct modlinkage modlinkage = {
 int
 _init(void)
 {
+	uint64_t mjrnum;
+	uint64_t mnrnum;
+
+	/*
+	 * Check HV intr group api versioning.
+	 * This driver uses the old interrupt routines which are supported
+	 * in old firmware in the CORE API group and in newer firmware in
+	 * the INTR API group.  Support for these calls will be dropped
+	 * once the INTR API group major goes to 2.
+	 */
+
+	if ((hsvc_version(HSVC_GROUP_INTR, &mjrnum, &mnrnum) == 0) &&
+	    (mjrnum > 1)) {
+		cmn_err(CE_WARN, "niumx: unsupported intr api group: "
+		    "maj:0x%lx, min:0x%lx", mjrnum, mnrnum);
+		return (ENOTSUP);
+	}
+
 	return (mod_install(&modlinkage));
 }
 
