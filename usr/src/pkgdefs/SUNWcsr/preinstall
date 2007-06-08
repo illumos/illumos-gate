@@ -104,7 +104,7 @@ if [ "x$UPDATE" = xyes ]; then
 
 fi
 
-# We apply the limited profile on initial installs of the OS and of
+# We apply the limited profile on initial installs of the OS and on
 # initial installs of zones. We don't apply it on upgrades or patches.
 
 if [ "x$PKG_INIT_INSTALL" = "xTRUE" ]; then

@@ -41,7 +41,6 @@ i copyright
 i checkinstall
 i postinstall
 i preinstall
-i preremove
 i i.inittab
 i i.preserve
 i i.renamenew

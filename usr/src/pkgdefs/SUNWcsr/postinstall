@@ -251,26 +251,6 @@ fi
 /usr/sbin/removef $PKGINST /etc/svc/repository.db >/dev/null 2>&1
 /usr/sbin/removef -f $PKGINST >/dev/null 2>&1
 
-# Solaris audit's internal "enable/disable" state is maintained by
-# c2audit; if c2audit accepts the auditconfig query, then auditing is
-# enabled. If that is the case, then SMF should always enable auditd
-# in the global zone and also in a non-global zone if perzone auditing
-# is in use.
-
-cat >> $BASEDIR/var/svc/profile/upgrade <<\_ENABLE_AUDIT
-/usr/sbin/auditconfig -getcond 2> /dev/null
-if [ $? -eq 0 ]; then
-	if [ `/sbin/zonename` = global ]; then
-		/usr/sbin/svcadm enable system/auditd
-	else
-		echo `/usr/sbin/auditconfig -getpolicy` | grep perzone > /dev/null
-		if [ $? -eq 0 ]; then
-			/usr/sbin/svcadm enable system/auditd
-		fi
-	fi
-fi
-_ENABLE_AUDIT
-
 PROFILEDIR=$BASEDIR/var/svc/profile
 GENERICXML=${PROFILEDIR}/generic.xml
 if [ -f $BASEDIR/var/SUNWcsr-apply-limited-net ]; then
@@ -300,12 +280,36 @@ else
 	# Otherwise (upgrade from pre-SMF filesystem) take the default 
 	# action, i.e., sym-link to ./generic_open.xml
 	#
-	if [ -h $GENERICXML.ABCsavedXYZ -o -f $GENERICXML.ABCsavedXYZ ]; then
-		mv $GENERICXML.ABCsavedXYZ $GENERICXML
-	elif [ ! -h $GENERICXML -a ! -f $GENERICXML ]; then
+	if [ ! -h $GENERICXML -a ! -f $GENERICXML ]; then
 		ln -s ./generic_open.xml $GENERICXML
 	fi
 fi
+
+# generic.xml is now dynamically maintained at install/upgrade time
+# and no longer delivered by any package. We therefore removef(1) 
+# any reference to it in the package database.
+removef $PKGINST /var/svc/profile/generic.xml >/dev/null 2>&1
+removef -f $PKGINST >/dev/null 2>&1
+
+# Solaris audit's internal "enable/disable" state is maintained by
+# c2audit; if c2audit accepts the auditconfig query, then auditing is
+# enabled. If that is the case, then SMF should always enable auditd
+# in the global zone and also in a non-global zone if perzone auditing
+# is in use.
+
+cat >> $BASEDIR/var/svc/profile/upgrade <<\_ENABLE_AUDIT
+/usr/sbin/auditconfig -getcond 2> /dev/null
+if [ $? -eq 0 ]; then
+	if [ `/sbin/zonename` = global ]; then
+		/usr/sbin/svcadm enable system/auditd
+	else
+		echo `/usr/sbin/auditconfig -getpolicy` | grep perzone > /dev/null
+		if [ $? -eq 0 ]; then
+			/usr/sbin/svcadm enable system/auditd
+		fi
+	fi
+fi
+_ENABLE_AUDIT
 
 # if platform/sun4u/mpxio-upgrade service exists, then
 # delete the service on boot after upgrading. 
