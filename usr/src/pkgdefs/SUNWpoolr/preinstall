@@ -24,16 +24,17 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+# If we are now installing pools on this system for the first
+# time, we will need to call svcadm to enable the new service. We
+# must not do this if pools is already installed, as the user may
+# have intentionally disabled it. Here we touch pools.tmp as a
+# way of telling our matching postinstall script that it should
+# update /var/svc/profile/upgrade.
 
 BASEPREFIX=`echo $BASEDIR | /usr/bin/sed "s/[\/\ ]/_/g"`
 POOLMANIFEST=`echo pools.xml"$BASEPREFIX" | /usr/bin/cut -c 1-256`
 
-if [ -f /tmp/${POOLMANIFEST} ] && [ -f ${PKG_INSTALL_ROOT}/etc/pooladm.conf ] ; then
-	echo "/usr/sbin/svcadm enable svc:/system/pools" >> \
-	    ${PKG_INSTALL_ROOT}/var/svc/profile/upgrade
-fi
-
-# Cleanup
-if [ -f /tmp/${POOLMANIFEST} ] ; then
-	/usr/bin/rm -f /tmp/${POOLMANIFEST}
+/usr/bin/rm /tmp/${POOLMANIFEST}
+if [ ! -f ${PKG_INSTALL_ROOT}/var/svc/manifest/system/pools.xml ]; then
+	/usr/bin/touch /tmp/${POOLMANIFEST}
 fi

@@ -1205,6 +1205,11 @@ smf_handle_new_services () {
 	    -f $rootprefix/etc/inet/ike/config ]]; then
 		smf_enable svc:/network/ipsec/ike:default
 	fi
+	if [[ $zone = global &&
+	    ! -f $rootprefix/var/svc/manifest/system/pools.xml &&
+	    -f $rootprefix/etc/pooladm.conf ]]; then
+		smf_enable svc:/system/pools:default
+	fi
 }
 
 smf_copy_manifest() {
