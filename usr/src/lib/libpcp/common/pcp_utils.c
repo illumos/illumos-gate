@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -288,6 +288,9 @@ svc_name_to_vldc_dev_path(char *service)
 	char *minor_name;
 	di_minor_t minor;
 	char *dev_path = NULL;
+
+	/* Ensure that the 'vldc' driver is loaded */
+	(void) di_init_driver("vldc", DI_CACHE_SNAPSHOT_FLAGS | DINFOFORCE);
 
 	/* Get device node */
 	root_node = di_init("/", DINFOCPYALL);
