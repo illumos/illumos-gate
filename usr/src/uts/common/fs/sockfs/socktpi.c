@@ -3263,7 +3263,7 @@ retry:
 			 * Caller handles truncation if length
 			 * exceeds msg_controllen.
 			 */
-			control = kmem_alloc(controllen, KM_SLEEP);
+			control = kmem_zalloc(controllen, KM_SLEEP);
 
 			error = so_opt2cmsg(mp, opt, optlen,
 					!(flags & MSG_XPG4_2),
@@ -3333,7 +3333,7 @@ retry:
 			 * Caller handles truncation if length
 			 * exceeds msg_controllen.
 			 */
-			control = kmem_alloc(controllen, KM_SLEEP);
+			control = kmem_zalloc(controllen, KM_SLEEP);
 
 			error = so_opt2cmsg(mp, opt, optlen,
 					!(flags & MSG_XPG4_2),
