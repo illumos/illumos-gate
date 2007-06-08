@@ -900,7 +900,7 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 				}
 			}
 		} else {
-			int segmapit;
+			int segmapit = 0;
 			file_t	*ffp;
 			vnode_t	*readvp;
 			size_t	size;
