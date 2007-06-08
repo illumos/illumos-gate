@@ -249,6 +249,8 @@ typedef enum dprov_mech_type {
 	AES_KEY_GEN_MECH_INFO_TYPE,	/* SUN_CKM_AES_KEY_GEN */
 	BLOWFISH_KEY_GEN_MECH_INFO_TYPE,	/* SUN_CKM_BLOWFISH_KEY_GEN */
 	RC4_KEY_GEN_MECH_INFO_TYPE,	/* SUN_CKM_RC4_KEY_GEN */
+	DH_PKCS_KEY_PAIR_GEN_MECH_INFO_TYPE, /* SUN_CKM_DH_PKCS_KEY_PAIR_GEN */
+	DH_PKCS_DERIVE_MECH_INFO_TYPE,	/* SUN_CKM_DH_PKCS_DERIVE */
 	RSA_PKCS_KEY_PAIR_GEN_MECH_INFO_TYPE /* SUN_CKM_RSA_PKCS_KEY_PAIR_GEN */
 } dprov_mech_type_t;
 
@@ -280,6 +282,9 @@ typedef enum dprov_mech_type {
 #define	RSA_MIN_KEY_LEN		256	/* RSA min key length in bits */
 #define	RSA_MAX_KEY_LEN		4096	/* RSA max key length in bits */
 
+#define	DH_MIN_KEY_LEN		64	/* DH min key length in bits */
+#define	DH_MAX_KEY_LEN		4096	/* DH max key length in bits */
+
 #define	DPROV_CKM_MD5_KEY_DERIVATION	"CKM_MD5_KEY_DERIVATION"
 #define	DPROV_CKM_SHA1_KEY_DERIVATION	"CKM_SHA1_KEY_DERIVATION"
 #define	DPROV_CKM_SHA256_KEY_DERIVATION	"CKM_SHA256_KEY_DERIVATION"
@@ -291,6 +296,8 @@ typedef enum dprov_mech_type {
 #define	DPROV_CKM_BLOWFISH_KEY_GEN	"CKM_BLOWFISH_KEY_GEN"
 #define	DPROV_CKM_RC4_KEY_GEN		"CKM_RC4_KEY_GEN"
 #define	DPROV_CKM_RSA_PKCS_KEY_PAIR_GEN	"CKM_RSA_PKCS_KEY_PAIR_GEN"
+#define	DPROV_CKM_DH_PKCS_KEY_PAIR_GEN	"CKM_DH_PKCS_KEY_PAIR_GEN"
+#define	DPROV_CKM_DH_PKCS_DERIVE	"CKM_DH_PKCS_DERIVE"
 
 static crypto_mech_info_t dprov_mech_info_tab[] = {
 	/* MD4 */
@@ -554,11 +561,66 @@ static crypto_mech_info_t dprov_mech_info_tab[] = {
 	{DPROV_CKM_RC4_KEY_GEN, RC4_KEY_GEN_MECH_INFO_TYPE,
 	    CRYPTO_FG_GENERATE, ARCFOUR_MIN_KEY_BITS, ARCFOUR_MAX_KEY_BITS,
 	    CRYPTO_KEYSIZE_UNIT_IN_BITS},
+	/* DH_PKCS_KEY_PAIR_GEN */
+	{DPROV_CKM_DH_PKCS_KEY_PAIR_GEN, DH_PKCS_KEY_PAIR_GEN_MECH_INFO_TYPE,
+	    CRYPTO_FG_GENERATE_KEY_PAIR, DH_MIN_KEY_LEN, DH_MAX_KEY_LEN,
+	    CRYPTO_KEYSIZE_UNIT_IN_BITS},
+	/* DH_PKCS_DERIVE */
+	{DPROV_CKM_DH_PKCS_DERIVE, DH_PKCS_DERIVE_MECH_INFO_TYPE,
+	    CRYPTO_FG_DERIVE, 0, 0, CRYPTO_KEYSIZE_UNIT_IN_BITS},
 	/* RSA_PKCS_KEY_PAIR_GEN */
 	{DPROV_CKM_RSA_PKCS_KEY_PAIR_GEN, RSA_PKCS_KEY_PAIR_GEN_MECH_INFO_TYPE,
 	    CRYPTO_FG_GENERATE_KEY_PAIR, RSA_MIN_KEY_LEN, RSA_MAX_KEY_LEN,
 	    CRYPTO_KEYSIZE_UNIT_IN_BITS}
+
 };
+
+/*
+ * Crypto Values
+ *
+ * These values are the used in the STC ef test suite.  If they are changed
+ * the test suite needs to be changed.
+ */
+static uchar_t dh_value[8] = { 'd', 'h', 'd', 'h', 'd', 'h', 'd', '\0' };
+char public_exponent[3] = { 0x01, 0x00, 0x01 };
+static uchar_t private_exponent[128] = {
+	0x8e, 0xc9, 0x70, 0x57, 0x6b, 0xcd, 0xfb, 0xa9,
+	0x19, 0xad, 0xcd, 0x91, 0x69, 0xd5, 0x52, 0xec,
+	0x72, 0x1e, 0x45, 0x15, 0x06, 0xdc, 0x65, 0x2d,
+	0x98, 0xc4, 0xce, 0x33, 0x54, 0x15, 0x70, 0x8d,
+	0xfa, 0x65, 0xea, 0x53, 0x44, 0xf3, 0x3e, 0x3f,
+	0xb4, 0x4c, 0x60, 0xd5, 0x01, 0x2d, 0xa4, 0x12,
+	0x99, 0xbf, 0x3f, 0x0b, 0xcd, 0xbb, 0x24, 0x10,
+	0x60, 0x30, 0x5e, 0x58, 0xf8, 0x59, 0xaa, 0xd1,
+	0x63, 0x3b, 0xbc, 0xcb, 0x94, 0x58, 0x38, 0x24,
+	0xfc, 0x65, 0x25, 0xc5, 0xa6, 0x51, 0xa2, 0x2e,
+	0xf1, 0x5e, 0xf5, 0xc1, 0xf5, 0x46, 0xf7, 0xbd,
+	0xc7, 0x62, 0xa8, 0xe2, 0x27, 0xd6, 0x94, 0x5b,
+	0xd3, 0xa2, 0xb5, 0x76, 0x42, 0x67, 0x6b, 0x86,
+	0x91, 0x97, 0x4d, 0x07, 0x92, 0x00, 0x4a, 0xdf,
+	0x0b, 0x65, 0x64, 0x05, 0x03, 0x48, 0x27, 0xeb,
+	0xce, 0x9a, 0x49, 0x7f, 0x3e, 0x10, 0xe0, 0x01
+};
+
+static uchar_t modulus[128] = {
+	0x94, 0x32, 0xb9, 0x12, 0x1d, 0x68, 0x2c, 0xda,
+	0x2b, 0xe0, 0xe4, 0x97, 0x1b, 0x4d, 0xdc, 0x43,
+	0xdf, 0x38, 0x6e, 0x7b, 0x9f, 0x07, 0x58, 0xae,
+	0x9d, 0x82, 0x1e, 0xc7, 0xbc, 0x92, 0xbf, 0xd3,
+	0xce, 0x00, 0xbb, 0x91, 0xc9, 0x79, 0x06, 0x03,
+	0x1f, 0xbc, 0x9f, 0x94, 0x75, 0x29, 0x5f, 0xd7,
+	0xc5, 0xf3, 0x73, 0x8a, 0xa4, 0x35, 0x43, 0x7a,
+	0x00, 0x32, 0x97, 0x3e, 0x86, 0xef, 0x70, 0x6f,
+	0x18, 0x56, 0x15, 0xaa, 0x6a, 0x87, 0xe7, 0x8d,
+	0x7d, 0xdd, 0x1f, 0xa4, 0xe4, 0x31, 0xd4, 0x7a,
+	0x8c, 0x0e, 0x20, 0xd2, 0x23, 0xf5, 0x57, 0x3c,
+	0x1b, 0xa8, 0x44, 0xa4, 0x57, 0x8f, 0x33, 0x52,
+	0xad, 0x83, 0xae, 0x4a, 0x97, 0xa6, 0x1e, 0xa6,
+	0x2b, 0xfa, 0xea, 0xeb, 0x6e, 0x71, 0xb8, 0xb6,
+	0x0a, 0x36, 0xed, 0x83, 0xce, 0xb0, 0xdf, 0xc1,
+	0xd4, 0x3a, 0xe9, 0x99, 0x6f, 0xf3, 0x96, 0xb7
+};
+
 
 static void dprov_provider_status(crypto_provider_handle_t, uint_t *);
 
@@ -911,11 +973,19 @@ static crypto_mech_ops_t dprov_mech_ops = {
 static int dprov_nostore_key_generate(crypto_provider_handle_t,
     crypto_session_id_t, crypto_mechanism_t *, crypto_object_attribute_t *,
     uint_t, crypto_object_attribute_t *, uint_t, crypto_req_handle_t);
+static int dprov_nostore_key_generate_pair(crypto_provider_handle_t,
+    crypto_session_id_t, crypto_mechanism_t *, crypto_object_attribute_t *,
+    uint_t, crypto_object_attribute_t *, uint_t, crypto_object_attribute_t *,
+    uint_t, crypto_object_attribute_t *, uint_t, crypto_req_handle_t);
+static int dprov_nostore_key_derive(crypto_provider_handle_t,
+    crypto_session_id_t, crypto_mechanism_t *, crypto_key_t *,
+    crypto_object_attribute_t *, uint_t, crypto_object_attribute_t *,
+    uint_t, crypto_req_handle_t);
 
 static crypto_nostore_key_ops_t dprov_nostore_key_ops = {
 	dprov_nostore_key_generate,
-	NULL, /* dprov_nostore_key_generate_pair */
-	NULL  /* dprov_nostore_key_derive */
+	dprov_nostore_key_generate_pair,
+	dprov_nostore_key_derive
 };
 
 static crypto_ops_t dprov_crypto_ops = {
@@ -1024,6 +1094,8 @@ typedef struct dprov_object {
 #define	DPROV_CKA_MODULUS_BITS		0x00000121
 #define	DPROV_CKA_PUBLIC_EXPONENT	0x00000122
 #define	DPROV_CKA_PRIVATE_EXPONENT	0x00000123
+#define	DPROV_CKA_PRIME			0x00000130
+#define	DPROV_CKA_BASE			0x00000132
 #define	DPROV_CKA_VALUE_BITS		0x00000160
 #define	DPROV_CKA_VALUE_LEN		0x00000161
 #define	DPROV_CKA_EXTRACTABLE		0x00000162
@@ -1217,7 +1289,9 @@ typedef enum dprov_req_type {
 	DPROV_REQ_MGMT_INITPIN,
 	DPROV_REQ_MGMT_SETPIN,
 	/* no (key)store key management requests */
-	DPROV_REQ_NOSTORE_KEY_GENERATE
+	DPROV_REQ_NOSTORE_KEY_GENERATE,
+	DPROV_REQ_NOSTORE_KEY_GENERATE_PAIR,
+	DPROV_REQ_NOSTORE_KEY_DERIVE
 } dprov_req_type_t;
 
 /* for DPROV_REQ_DIGEST requests */
@@ -1642,7 +1716,6 @@ dprov_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	softc->ds_prov_handle = NULL;
 
 	/* create minor node */
-	(void) sprintf(devname, "dprov%d", instance);
 	if (ddi_create_minor_node(dip, devname, S_IFCHR, instance,
 	    DDI_PSEUDO, 0) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "attach: failed creating minor node");
@@ -2178,34 +2251,34 @@ static boolean_t
 dprov_valid_cipher_mech(crypto_mech_type_t mech_type)
 {
 	return (mech_type == DES_CBC_MECH_INFO_TYPE ||
-		mech_type == DES3_CBC_MECH_INFO_TYPE ||
-		mech_type == DES_ECB_MECH_INFO_TYPE ||
-		mech_type == DES3_ECB_MECH_INFO_TYPE ||
-		mech_type == BLOWFISH_CBC_MECH_INFO_TYPE ||
-		mech_type == BLOWFISH_ECB_MECH_INFO_TYPE ||
-		mech_type == AES_CBC_MECH_INFO_TYPE ||
-		mech_type == AES_ECB_MECH_INFO_TYPE ||
-		mech_type == AES_CTR_MECH_INFO_TYPE ||
-		mech_type == RC4_MECH_INFO_TYPE ||
-		mech_type == RSA_PKCS_MECH_INFO_TYPE ||
-		mech_type == RSA_X_509_MECH_INFO_TYPE ||
-		mech_type == MD5_RSA_PKCS_MECH_INFO_TYPE ||
-		mech_type == SHA1_RSA_PKCS_MECH_INFO_TYPE ||
-		mech_type == SHA256_RSA_PKCS_MECH_INFO_TYPE ||
-		mech_type == SHA384_RSA_PKCS_MECH_INFO_TYPE ||
-		mech_type == SHA512_RSA_PKCS_MECH_INFO_TYPE);
+	    mech_type == DES3_CBC_MECH_INFO_TYPE ||
+	    mech_type == DES_ECB_MECH_INFO_TYPE ||
+	    mech_type == DES3_ECB_MECH_INFO_TYPE ||
+	    mech_type == BLOWFISH_CBC_MECH_INFO_TYPE ||
+	    mech_type == BLOWFISH_ECB_MECH_INFO_TYPE ||
+	    mech_type == AES_CBC_MECH_INFO_TYPE ||
+	    mech_type == AES_ECB_MECH_INFO_TYPE ||
+	    mech_type == AES_CTR_MECH_INFO_TYPE ||
+	    mech_type == RC4_MECH_INFO_TYPE ||
+	    mech_type == RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == RSA_X_509_MECH_INFO_TYPE ||
+	    mech_type == MD5_RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == SHA1_RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == SHA256_RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == SHA384_RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == SHA512_RSA_PKCS_MECH_INFO_TYPE);
 }
 
 static boolean_t
 is_publickey_mech(crypto_mech_type_t mech_type)
 {
 	return (mech_type == RSA_PKCS_MECH_INFO_TYPE ||
-		mech_type == RSA_X_509_MECH_INFO_TYPE ||
-		mech_type == MD5_RSA_PKCS_MECH_INFO_TYPE ||
-		mech_type == SHA1_RSA_PKCS_MECH_INFO_TYPE ||
-		mech_type == SHA256_RSA_PKCS_MECH_INFO_TYPE ||
-		mech_type == SHA384_RSA_PKCS_MECH_INFO_TYPE ||
-		mech_type == SHA512_RSA_PKCS_MECH_INFO_TYPE);
+	    mech_type == RSA_X_509_MECH_INFO_TYPE ||
+	    mech_type == MD5_RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == SHA1_RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == SHA256_RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == SHA384_RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == SHA512_RSA_PKCS_MECH_INFO_TYPE);
 }
 
 
@@ -2504,22 +2577,22 @@ static boolean_t
 dprov_valid_sign_verif_mech(crypto_mech_type_t mech_type)
 {
 	return (mech_type == MD5_HMAC_MECH_INFO_TYPE ||
-		mech_type == MD5_HMAC_GEN_MECH_INFO_TYPE ||
-		mech_type == SHA1_HMAC_MECH_INFO_TYPE ||
-		mech_type == SHA1_HMAC_GEN_MECH_INFO_TYPE ||
-		mech_type == SHA256_HMAC_MECH_INFO_TYPE ||
-		mech_type == SHA256_HMAC_GEN_MECH_INFO_TYPE ||
-		mech_type == SHA384_HMAC_MECH_INFO_TYPE ||
-		mech_type == SHA384_HMAC_GEN_MECH_INFO_TYPE ||
-		mech_type == SHA512_HMAC_MECH_INFO_TYPE ||
-		mech_type == SHA512_HMAC_GEN_MECH_INFO_TYPE ||
-		mech_type == RSA_PKCS_MECH_INFO_TYPE ||
-		mech_type == RSA_X_509_MECH_INFO_TYPE ||
-		mech_type == MD5_RSA_PKCS_MECH_INFO_TYPE ||
-		mech_type == SHA1_RSA_PKCS_MECH_INFO_TYPE ||
-		mech_type == SHA256_RSA_PKCS_MECH_INFO_TYPE ||
-		mech_type == SHA384_RSA_PKCS_MECH_INFO_TYPE ||
-		mech_type == SHA512_RSA_PKCS_MECH_INFO_TYPE);
+	    mech_type == MD5_HMAC_GEN_MECH_INFO_TYPE ||
+	    mech_type == SHA1_HMAC_MECH_INFO_TYPE ||
+	    mech_type == SHA1_HMAC_GEN_MECH_INFO_TYPE ||
+	    mech_type == SHA256_HMAC_MECH_INFO_TYPE ||
+	    mech_type == SHA256_HMAC_GEN_MECH_INFO_TYPE ||
+	    mech_type == SHA384_HMAC_MECH_INFO_TYPE ||
+	    mech_type == SHA384_HMAC_GEN_MECH_INFO_TYPE ||
+	    mech_type == SHA512_HMAC_MECH_INFO_TYPE ||
+	    mech_type == SHA512_HMAC_GEN_MECH_INFO_TYPE ||
+	    mech_type == RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == RSA_X_509_MECH_INFO_TYPE ||
+	    mech_type == MD5_RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == SHA1_RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == SHA256_RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == SHA384_RSA_PKCS_MECH_INFO_TYPE ||
+	    mech_type == SHA512_RSA_PKCS_MECH_INFO_TYPE);
 }
 
 static int
@@ -4319,6 +4392,10 @@ dprov_copyin_mechanism(crypto_provider_handle_t provider,
 		rv = copyin_aes_ctr_mech(umech, kmech, &error, mode);
 		goto out;
 
+	case DH_PKCS_DERIVE_MECH_INFO_TYPE:
+		expected_param_len = param_len;
+		break;
+
 	default:
 		/* nothing to do - mechanism has no parameters */
 		rv = CRYPTO_SUCCESS;
@@ -4417,6 +4494,70 @@ dprov_nostore_key_generate(crypto_provider_handle_t provider,
 	    out_attribute_count, NULL, 0);
 
 	DPROV_DEBUG(D_KEY, ("(%d) dprov_nostore_key_generate: "
+	    "done err = 0x0%x\n", instance, error));
+
+	return (error);
+}
+
+static int
+dprov_nostore_key_generate_pair(crypto_provider_handle_t provider,
+    crypto_session_id_t session_id, crypto_mechanism_t *mechanism,
+    crypto_object_attribute_t *public_key_template,
+    uint_t public_key_attribute_count,
+    crypto_object_attribute_t *private_key_template,
+    uint_t private_key_attribute_count,
+    crypto_object_attribute_t *out_public_key_template,
+    uint_t out_public_key_attribute_count,
+    crypto_object_attribute_t *out_private_key_template,
+    uint_t out_private_key_attribute_count,
+    crypto_req_handle_t req)
+{
+	int error = CRYPTO_FAILED;
+	dprov_state_t *softc = (dprov_state_t *)provider;
+	/* LINTED E_FUNC_SET_NOT_USED */
+	int instance;
+
+	instance = ddi_get_instance(softc->ds_dip);
+	DPROV_DEBUG(D_KEY, ("(%d) dprov_nostore_key_generate_pair: started\n",
+	    instance));
+
+	/* submit request to the taskq */
+	error = dprov_key_submit_req(DPROV_REQ_NOSTORE_KEY_GENERATE_PAIR,
+	    softc, req, session_id, mechanism, public_key_template,
+	    public_key_attribute_count, NULL, private_key_template,
+	    private_key_attribute_count, NULL, NULL, NULL, 0,
+	    out_public_key_template, out_public_key_attribute_count,
+	    out_private_key_template, out_private_key_attribute_count);
+
+	DPROV_DEBUG(D_KEY, ("(%d) dprov_nostore_key_generate_pair: "
+	    "done err = 0x0%x\n", instance, error));
+
+	return (error);
+}
+
+static int
+dprov_nostore_key_derive(crypto_provider_handle_t provider,
+    crypto_session_id_t session_id, crypto_mechanism_t *mechanism,
+    crypto_key_t *base_key, crypto_object_attribute_t *template,
+    uint_t attribute_count, crypto_object_attribute_t *out_template,
+    uint_t out_attribute_count, crypto_req_handle_t req)
+{
+	int error = CRYPTO_FAILED;
+	dprov_state_t *softc = (dprov_state_t *)provider;
+	/* LINTED E_FUNC_SET_NOT_USED */
+	int instance;
+
+	instance = ddi_get_instance(softc->ds_dip);
+	DPROV_DEBUG(D_KEY, ("(%d) dprov_nostore_key_derive: started\n",
+	    instance));
+
+	/* submit request to the taskq */
+	error = dprov_key_submit_req(DPROV_REQ_NOSTORE_KEY_DERIVE, softc, req,
+	    session_id, mechanism, template, attribute_count, NULL, NULL,
+	    0, NULL, base_key, NULL, 0, out_template, out_attribute_count,
+	    NULL, 0);
+
+	DPROV_DEBUG(D_KEY, ("(%d) dprov_nostore_key_derive: "
 	    "done err = 0x0%x\n", instance, error));
 
 	return (error);
@@ -6721,11 +6862,11 @@ dprov_object_task(dprov_req_t *taskq_req)
 
 	case DPROV_REQ_OBJECT_FIND: {
 		crypto_object_id_t *object_ids =
-			taskq_req->dr_object_req.or_object_id_ptr;
+		    taskq_req->dr_object_req.or_object_id_ptr;
 		uint_t max_object_count =
-			taskq_req->dr_object_req.or_max_object_count;
+		    taskq_req->dr_object_req.or_max_object_count;
 		dprov_find_ctx_t *find_ctx =
-			taskq_req->dr_object_req.or_find_p;
+		    taskq_req->dr_object_req.or_find_p;
 		uint_t ret_oid_idx;
 
 		/* return the desired number of object ids */
@@ -6751,6 +6892,72 @@ dprov_object_task(dprov_req_t *taskq_req)
 	mutex_exit(&softc->ds_lock);
 	dprov_op_done(taskq_req, error);
 	DPROV_DEBUG(D_OBJECT, ("(%d) dprov_object_task: end\n", instance));
+}
+
+/*
+ * Copy attribute values into a template. RSA values are precomputed.
+ */
+static int
+nostore_copy_attribute(crypto_object_attribute_t *template, uint_t count,
+    uint64_t attr_type)
+{
+	void *value, *dprov_attribute_value;
+	size_t dprov_attribute_size;
+	size_t value_len = 0;
+	int error;
+
+	switch (attr_type) {
+	case DPROV_CKA_VALUE:
+		dprov_attribute_size = sizeof (dh_value);
+		dprov_attribute_value = dh_value;
+		break;
+
+	case DPROV_CKA_MODULUS:
+		dprov_attribute_size = sizeof (modulus);
+		dprov_attribute_value = modulus;
+		break;
+
+	case DPROV_CKA_PUBLIC_EXPONENT:
+		dprov_attribute_size = sizeof (public_exponent);
+		dprov_attribute_value = public_exponent;
+		break;
+
+	case DPROV_CKA_PRIVATE_EXPONENT:
+		dprov_attribute_size = sizeof (private_exponent);
+		dprov_attribute_value = private_exponent;
+		break;
+
+	default:
+		return (CRYPTO_ATTRIBUTE_TYPE_INVALID);
+	}
+
+	error = dprov_get_template_attr_array(template, count, attr_type,
+	    &value, &value_len);
+	if (error != CRYPTO_SUCCESS)
+		return (error);
+
+	if (value_len < dprov_attribute_size)
+		return (CRYPTO_BUFFER_TOO_SMALL);
+
+	/*
+	 * The updated template will be returned to libpkcs11.
+	 */
+	bcopy(dprov_attribute_value, value, dprov_attribute_size);
+
+	return (CRYPTO_SUCCESS);
+}
+
+static void
+fill_dh(void *value, size_t len)
+{
+	int i = 0;
+	char *p = value;
+	while (i < len) {
+		p[i++] = 'D';
+		if (i >= len)
+			break;
+		p[i++] = 'H';
+	}
 }
 
 /*
@@ -6960,46 +7167,6 @@ destroy_object:
 		uint_t pri_attribute_count;
 		ulong_t pub_key_type = ~0UL, pub_class = ~0UL;
 		ulong_t pri_key_type = ~0UL, pri_class = ~0UL;
-		char public_exponent[3] = {
-		    0x01, 0x00, 0x01
-		};
-		static uchar_t private_exponent[128] = {
-		    0x4a, 0xef, 0xb9, 0x30, 0xa1, 0x44, 0x0a, 0xe0,
-		    0x30, 0xdd, 0xd3, 0x57, 0xc2, 0xb6, 0x6a, 0xba,
-		    0x5f, 0x81, 0xb0, 0x72, 0x55, 0x5b, 0x5b, 0xf3,
-		    0x07, 0xd2, 0x5f, 0x15, 0x87, 0xc0, 0x78, 0x7d,
-		    0x4f, 0x95, 0x09, 0x59, 0xd2, 0x9a, 0x95, 0xc3,
-		    0xcc, 0xdc, 0xf1, 0xa4, 0x60, 0x76, 0xd7, 0xa7,
-		    0xf8, 0x01, 0x13, 0xf8, 0x54, 0xd4, 0xf8, 0x2f,
-		    0xcf, 0x0c, 0x8b, 0x6e, 0xee, 0x34, 0x53, 0x19,
-		    0x14, 0xa6, 0x15, 0x14, 0xaf, 0xb2, 0x28, 0xa1,
-		    0x78, 0x1b, 0x2d, 0x9b, 0x28, 0x52, 0x14, 0xfa,
-		    0x72, 0x2b, 0x81, 0x11, 0xd0, 0x59, 0xde, 0xc6,
-		    0x52, 0x90, 0xa4, 0xae, 0xc9, 0xf1, 0x97, 0xd4,
-		    0x57, 0xbc, 0xe3, 0x90, 0x30, 0xc7, 0xff, 0xe8,
-		    0xd7, 0x2d, 0xd8, 0xef, 0x14, 0x2d, 0x2d, 0x60,
-		    0x54, 0x22, 0x9d, 0x32, 0x36, 0xcf, 0x4f, 0xf7,
-		    0x37, 0xcc, 0x8e, 0x00, 0x85, 0xb1, 0x00, 0x01
-		};
-
-		static uchar_t modulus[128] = {
-		    0x87, 0xb2, 0x2a, 0x54, 0x63, 0x83, 0x5e, 0x30,
-		    0xdc, 0x73, 0x03, 0xc6, 0x35, 0xf8, 0xa0, 0x25,
-		    0xa5, 0x6e, 0xcc, 0x14, 0xdd, 0x77, 0x2e, 0x80,
-		    0xd1, 0xa3, 0x05, 0x09, 0x1a, 0x2f, 0x88, 0xec,
-		    0xd1, 0x46, 0x92, 0x19, 0x8c, 0x7a, 0xf7, 0x63,
-		    0x28, 0xbf, 0x7a, 0xea, 0x9f, 0xfe, 0x96, 0x0f,
-		    0x80, 0xa1, 0x3e, 0xa6, 0xe1, 0x89, 0x7c, 0x4c,
-		    0x8e, 0x92, 0xdc, 0x6e, 0x69, 0xba, 0x4b, 0x3f,
-		    0x93, 0xc0, 0xaf, 0xbd, 0xbc, 0x81, 0xf2, 0x1e,
-		    0xc0, 0x7d, 0xc3, 0x4c, 0x8f, 0x5f, 0xfe, 0xdc,
-		    0xdb, 0xdb, 0x52, 0x03, 0x94, 0x78, 0x04, 0xa6,
-		    0x78, 0x1f, 0xdd, 0x5e, 0xd8, 0x85, 0x3e, 0x19,
-		    0x54, 0x7c, 0xd5, 0x81, 0xfb, 0x70, 0x69, 0x5d,
-		    0xbf, 0x23, 0x7a, 0xb1, 0xf9, 0x85, 0x6e, 0xc2,
-		    0x0a, 0x4d, 0x81, 0x21, 0xf8, 0xad, 0x71, 0x65,
-		    0xaf, 0xb6, 0x8f, 0xa1, 0xac, 0x46, 0x8a, 0x4d
-		};
 
 		pub_template = taskq_req->dr_key_req.kr_template;
 		pub_attribute_count = taskq_req->dr_key_req.kr_attribute_count;
@@ -7259,7 +7426,7 @@ destroy_public_object:
 			}
 			break;
 
-		case DPROV_CKO_PRIVATE_KEY:
+			case DPROV_CKO_PRIVATE_KEY:
 			/*
 			 * PKCS#11 says that ASN.1 should be used to encode
 			 * specific attributes before encrypting the blob.
@@ -7636,13 +7803,168 @@ free_derived_key:
 		error = CRYPTO_SUCCESS;
 		break;
 	}
+
+	case DPROV_REQ_NOSTORE_KEY_GENERATE_PAIR: {
+		crypto_mechanism_t *mechp;
+		crypto_object_attribute_t *pub_template;
+		uint_t pub_attribute_count;
+		crypto_object_attribute_t *out_pub_template;
+		crypto_object_attribute_t *out_pri_template;
+		uint_t out_pub_attribute_count;
+		uint_t out_pri_attribute_count;
+
+		mechp = taskq_req->dr_key_req.kr_mechanism;
+		pub_template = taskq_req->dr_key_req.kr_template;
+		pub_attribute_count = taskq_req->dr_key_req.kr_attribute_count;
+		out_pub_template = taskq_req->dr_key_req.kr_out_template1;
+		out_pub_attribute_count =
+		    taskq_req->dr_key_req.kr_out_attribute_count1;
+		out_pri_template = taskq_req->dr_key_req.kr_out_template2;
+		out_pri_attribute_count =
+		    taskq_req->dr_key_req.kr_out_attribute_count2;
+
+		switch (mechp->cm_type) {
+		case RSA_PKCS_KEY_PAIR_GEN_MECH_INFO_TYPE:
+			error = nostore_copy_attribute(out_pub_template,
+			    out_pub_attribute_count, DPROV_CKA_MODULUS);
+			if (error != CRYPTO_SUCCESS)
+				break;
+
+			error = nostore_copy_attribute(out_pub_template,
+			    out_pub_attribute_count, DPROV_CKA_PUBLIC_EXPONENT);
+			if (error == CRYPTO_ARGUMENTS_BAD) {
+				size_t tmp_len = 0;
+				void *tmp;
+
+				/* public exponent must be here */
+				error = dprov_get_template_attr_array(
+				    pub_template, pub_attribute_count,
+				    DPROV_CKA_PUBLIC_EXPONENT, &tmp, &tmp_len);
+				if (error != CRYPTO_SUCCESS)
+					break;
+			}
+			error = nostore_copy_attribute(out_pri_template,
+			    out_pri_attribute_count, DPROV_CKA_MODULUS);
+			if (error != CRYPTO_SUCCESS)
+				break;
+
+			error = nostore_copy_attribute(out_pri_template,
+			    out_pri_attribute_count,
+			    DPROV_CKA_PRIVATE_EXPONENT);
+			break;
+
+		case DH_PKCS_KEY_PAIR_GEN_MECH_INFO_TYPE:
+			/*
+			 * There is no software provider for DH mechanism;
+			 * Just return pre-defined values.
+			 */
+			error = nostore_copy_attribute(out_pub_template,
+			    out_pub_attribute_count, DPROV_CKA_VALUE);
+			error = nostore_copy_attribute(out_pri_template,
+			    out_pri_attribute_count, DPROV_CKA_VALUE);
+			break;
+
+		default:
+			error = CRYPTO_MECHANISM_INVALID;
+		}
+		break;
+	}
+
+	case DPROV_REQ_NOSTORE_KEY_DERIVE: {
+		crypto_mechanism_t *mechp;
+		crypto_object_attribute_t *in_template, *out_template;
+		crypto_key_t *base_key;
+		uint_t in_attribute_count, out_attribute_count;
+		ulong_t key_type;
+		void *value;
+		size_t value_len = 0;
+		size_t value_len_value = 0;
+
+		in_template = taskq_req->dr_key_req.kr_template;
+		out_template = taskq_req->dr_key_req.kr_out_template1;
+		in_attribute_count = taskq_req->dr_key_req.kr_attribute_count;
+		out_attribute_count =
+		    taskq_req->dr_key_req.kr_out_attribute_count1;
+		mechp = taskq_req->dr_key_req.kr_mechanism;
+		base_key = taskq_req->dr_key_req.kr_key;
+
+		/*
+		 * CKA_VALUE must be present so the derived key can
+		 * be returned by value.
+		 */
+		if (dprov_get_template_attr_array(out_template,
+		    out_attribute_count, DPROV_CKA_VALUE, &value,
+		    &value_len) != CRYPTO_SUCCESS) {
+			error = CRYPTO_TEMPLATE_INCOMPLETE;
+			break;
+		}
+
+		if (dprov_get_template_attr_ulong(in_template,
+		    in_attribute_count, DPROV_CKA_KEY_TYPE,
+		    &key_type) != CRYPTO_SUCCESS) {
+			error = CRYPTO_TEMPLATE_INCOMPLETE;
+			break;
+		}
+		switch (mechp->cm_type) {
+		case DH_PKCS_DERIVE_MECH_INFO_TYPE: {
+			size_t tmp_len = 0;
+			void *tmp;
+
+			if (base_key->ck_format != CRYPTO_KEY_ATTR_LIST) {
+				error = CRYPTO_ARGUMENTS_BAD;
+				break;
+			}
+
+			if ((dprov_get_template_attr_array(base_key->ck_attrs,
+			    base_key->ck_count, DPROV_CKA_BASE, &tmp,
+			    &tmp_len) != CRYPTO_SUCCESS) ||
+			    (dprov_get_template_attr_array(base_key->ck_attrs,
+			    base_key->ck_count, DPROV_CKA_PRIME, &tmp,
+			    &tmp_len) != CRYPTO_SUCCESS) ||
+			    (dprov_get_template_attr_array(base_key->ck_attrs,
+			    base_key->ck_count, DPROV_CKA_VALUE, &tmp,
+			    &tmp_len) != CRYPTO_SUCCESS)) {
+				error = CRYPTO_TEMPLATE_INCOMPLETE;
+				break;
+			}
+
+			/*
+			 * CKA_VALUE is added to the derived key template by
+			 * the library.
+			 */
+			error = CRYPTO_SUCCESS;
+			switch (key_type) {
+			case DPROV_CKK_AES:
+				if (dprov_get_template_attr_ulong(in_template,
+				    in_attribute_count, DPROV_CKA_VALUE_LEN,
+				    &value_len_value) != CRYPTO_SUCCESS) {
+					error = CRYPTO_TEMPLATE_INCOMPLETE;
+					break;
+				}
+				if (value_len != value_len_value) {
+					error = CRYPTO_TEMPLATE_INCONSISTENT;
+					break;
+				}
+			default:
+				error = CRYPTO_MECHANISM_INVALID;
+			}
+			if (error == CRYPTO_SUCCESS)
+				fill_dh(value, value_len);
+			break;
+		}
+		default:
+			error = CRYPTO_MECHANISM_INVALID;
+		}
+		break;
+	default:
+		error = CRYPTO_MECHANISM_INVALID;
+	}
 	} /* end case */
 
 	mutex_exit(&softc->ds_lock);
 	dprov_op_done(taskq_req, error);
 	DPROV_DEBUG(D_KEY, ("(%d) dprov_key_task: end\n", instance));
 }
-
 
 /*
  * taskq dispatcher function for provider management operations.
@@ -7867,7 +8189,7 @@ dprov_get_sw_prov(crypto_mechanism_t *mech, kcf_provider_desc_t **pd,
 	    sizeof (crypto_mech_info_t); i++) {
 		if (mech->cm_type == dprov_mech_info_tab[i].cm_mech_number) {
 			kcf_mech_type = crypto_mech2id_common(
-				dprov_mech_info_tab[i].cm_mech_name, B_TRUE);
+			    dprov_mech_info_tab[i].cm_mech_name, B_TRUE);
 		}
 	}
 

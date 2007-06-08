@@ -148,6 +148,12 @@ meta_CreateObject(CK_SESSION_HANDLE hSession, CK_ATTRIBUTE_PTR pTemplate,
 	(void) get_template_boolean(CKA_TOKEN, pTemplate, ulCount,
 	    &(object->isToken));
 
+	/* Can't create token objects in a read-only session. */
+	if ((IS_READ_ONLY_SESSION(session->session_flags)) && object->isToken) {
+		rv = CKR_SESSION_READ_ONLY;
+		goto cleanup;
+	}
+
 	/*
 	 * Set to true (private object) if template has CKA_PRIVATE=true;
 	 * otherwise, it is false (public object).
@@ -176,7 +182,7 @@ meta_CreateObject(CK_SESSION_HANDLE hSession, CK_ATTRIBUTE_PTR pTemplate,
 	 */
 
 	if (meta_freeobject_check(session, object, NULL, pTemplate, ulCount,
-		NULL)) {
+	    NULL)) {
 		/*
 		 * Make sure we are logged into the keystore if this is a
 		 * private freetoken object.
@@ -188,11 +194,6 @@ meta_CreateObject(CK_SESSION_HANDLE hSession, CK_ATTRIBUTE_PTR pTemplate,
 			goto cleanup;
 	}
 
-	/* Can't create token objects in a read-only session. */
-	if ((IS_READ_ONLY_SESSION(session->session_flags)) && object->isToken) {
-		rv = CKR_SESSION_READ_ONLY;
-		goto cleanup;
-	}
 
 	keystore_slotnum = get_keystore_slotnum();
 
@@ -211,8 +212,7 @@ meta_CreateObject(CK_SESSION_HANDLE hSession, CK_ATTRIBUTE_PTR pTemplate,
 
 		object->tried_create_clone[slot_num] = B_TRUE;
 		rv = FUNCLIST(slot_session->fw_st_id)->C_CreateObject(
-			slot_session->hSession, pTemplate, ulCount,
-			    &hNewObject);
+		    slot_session->hSession, pTemplate, ulCount, &hNewObject);
 
 		if (rv != CKR_OK)
 			goto cleanup;
@@ -243,8 +243,8 @@ meta_CreateObject(CK_SESSION_HANDLE hSession, CK_ATTRIBUTE_PTR pTemplate,
 
 			object->tried_create_clone[slot_num] = B_TRUE;
 			rv = FUNCLIST(slot_session->fw_st_id)->C_CreateObject(
-				slot_session->hSession, pTemplate, ulCount,
-				    &hNewObject);
+			    slot_session->hSession, pTemplate, ulCount,
+			    &hNewObject);
 			if (rv == CKR_OK)
 				break;
 
@@ -306,7 +306,7 @@ meta_CreateObject(CK_SESSION_HANDLE hSession, CK_ATTRIBUTE_PTR pTemplate,
 	 * any future operation.
 	 */
 	rv = get_master_attributes_by_template(pTemplate, ulCount,
-		&object->attributes, &object->num_attributes);
+	    &object->attributes, &object->num_attributes);
 	if (rv == CKR_OK) {
 		CK_ULONG i;
 		for (i = 0; i < ulCount; i++) {
@@ -378,6 +378,10 @@ meta_CopyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 	    pTemplate, ulCount, &(dst_object->isToken));
 	if (!found) {
 		dst_object->isToken = src_object->isToken;
+		if (src_object->isFreeToken == FREE_ENABLED)
+			dst_object->isToken = TRUE;
+		else
+			dst_object->isToken = src_object->isToken;
 	}
 
 	/* Can't create token objects in a read-only session. */
@@ -427,7 +431,7 @@ meta_CopyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 		goto finish;
 
 	rv = meta_object_get_clone(src_object, slotnum,
-		slot_session, &src_slot_object);
+	    slot_session, &src_slot_object);
 	if (rv != CKR_OK)
 		goto finish;
 
@@ -477,7 +481,7 @@ meta_CopyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 			}
 
 			rv = meta_object_get_clone(src_object, slotnum,
-				slot_session, &src_slot_object);
+			    slot_session, &src_slot_object);
 			if (rv != CKR_OK)
 				goto finish;
 
@@ -541,7 +545,7 @@ meta_CopyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 		}
 
 		meta_slot_object_activate(dst_slot_object,
-			slot_session, dst_object->isToken);
+		    slot_session, dst_object->isToken);
 
 		dst_object->clones[slotnum] = dst_slot_object;
 		dst_object->master_clone_slotnum = slotnum;
@@ -614,7 +618,8 @@ meta_DestroyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject)
 	}
 
 	/* Can't delete token objects from a read-only session. */
-	if ((IS_READ_ONLY_SESSION(session->session_flags)) && object->isToken) {
+	if ((IS_READ_ONLY_SESSION(session->session_flags)) &&
+	    (object->isToken || object->isFreeToken == FREE_ENABLED)) {
 		OBJRELEASE(object);
 		REFRELEASE(session);
 		return (CKR_SESSION_READ_ONLY);
@@ -743,7 +748,7 @@ meta_SetAttributeValue(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 	}
 
 	if ((IS_READ_ONLY_SESSION(session->session_flags)) &&
-	    (object->isToken)) {
+	    (object->isToken || object->isFreeToken == FREE_ENABLED)) {
 		rv = CKR_SESSION_READ_ONLY;
 		goto finish;
 	}
@@ -1120,7 +1125,7 @@ meta_FindObjectsInit(CK_SESSION_HANDLE hSession, CK_ATTRIBUTE_PTR pTemplate,
 		 * token object slot
 		 */
 		rv = meta_get_slot_session(keystore_slotnum,
-			&slot_find_session, session->session_flags);
+		    &slot_find_session, session->session_flags);
 		if (rv != CKR_OK)  {
 			goto finish;
 		}
