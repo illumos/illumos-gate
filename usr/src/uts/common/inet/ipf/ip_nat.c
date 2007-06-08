@@ -1375,6 +1375,7 @@ ipf_stack_t *ifs;
 	 */
 	bzero((char *)&fin, sizeof(fin));
 	fin.fin_p = nat->nat_p;
+	fin.fin_ifs = ifs;
 	if (nat->nat_dir == NAT_OUTBOUND) {
 		fin.fin_data[0] = ntohs(nat->nat_oport);
 		fin.fin_data[1] = ntohs(nat->nat_outport);
