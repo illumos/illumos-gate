@@ -296,7 +296,7 @@ sosdp_create(vnode_t *accessvp, int domain, int type, int protocol,
 	vnode_t *vp;
 	int error;
 	int soflags;
-
+	cred_t *cr;
 
 	dprint(4, ("Inside sosdp_create: domain:%d proto:%d type:%d",
 		domain, protocol, type));
@@ -339,7 +339,13 @@ sosdp_create(vnode_t *accessvp, int domain, int type, int protocol,
 		}
 		soflags = FREAD | FWRITE | SO_ACCEPTOR;
 	}
-	if ((error = VOP_OPEN(&vp, soflags, CRED())) != 0) {
+	/*
+	 * This function may be called in interrupt context, and CRED()
+	 * will be NULL.  In this case, pass in kcred to VOP_OPEN().
+	 */
+	if ((cr = CRED()) == NULL)
+		cr = kcred;
+	if ((error = VOP_OPEN(&vp, soflags, cr)) != 0) {
 		VN_RELE(vp);
 		*errorp = error;
 		return (NULL);
