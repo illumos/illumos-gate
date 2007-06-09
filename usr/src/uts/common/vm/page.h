@@ -614,6 +614,7 @@ extern pad_mutex_t ph_mutex[];
 					/* Page must be PP_ISNORELOC */
 #define	PG_PANIC	0x0020		/* system will panic if alloc fails */
 #define	PG_PUSHPAGE	0x0040		/* alloc may use reserve */
+#define	PG_LOCAL	0x0080		/* alloc from given lgrp only */
 
 /*
  * When p_selock has the SE_EWANTED bit set, threads waiting for SE_EXCL
@@ -669,7 +670,7 @@ int	page_exists_forreal(struct vnode *, u_offset_t, uint_t *);
 void	page_needfree(spgcnt_t);
 page_t	*page_create(struct vnode *, u_offset_t, size_t, uint_t);
 int	page_alloc_pages(struct vnode *, struct seg *, caddr_t, page_t **,
-	page_t **, uint_t, int);
+	page_t **, uint_t, int, int);
 page_t  *page_create_va_large(vnode_t *vp, u_offset_t off, size_t bytes,
 	uint_t flags, struct seg *seg, caddr_t vaddr, void *arg);
 page_t	*page_create_va(struct vnode *, u_offset_t, size_t, uint_t,

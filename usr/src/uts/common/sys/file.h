@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -182,7 +182,7 @@ extern int closef(file_t *);
 extern int closeandsetf(int, file_t *);
 extern int ufalloc_file(int, file_t *);
 extern int ufalloc(int);
-extern int ufcanalloc(proc_t *, uint_t);
+extern int ufcanalloc(struct proc *, uint_t);
 extern int falloc(struct vnode *, int, file_t **, int *);
 extern void finit(void);
 extern void unfalloc(file_t *);

@@ -563,7 +563,7 @@ schedctl_getpage(struct anon_map **newamp, caddr_t *newaddr)
 	 * Set up anonymous memory struct.  No swap reservation is
 	 * needed since the page will be locked into memory.
 	 */
-	amp = anonmap_alloc(PAGESIZE, 0);
+	amp = anonmap_alloc(PAGESIZE, 0, ANON_SLEEP);
 
 	/*
 	 * Allocate the page.

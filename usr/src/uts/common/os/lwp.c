@@ -462,6 +462,17 @@ grow:
 		branded = 1;
 	}
 
+	if (t->t_tid == 1) {
+		kpreempt_disable();
+		ASSERT(t->t_lpl != NULL);
+		p->p_t1_lgrpid = t->t_lpl->lpl_lgrpid;
+		kpreempt_enable();
+		if (p->p_tr_lgrpid != LGRP_NONE &&
+		    p->p_tr_lgrpid != p->p_t1_lgrpid) {
+			lgrp_update_trthr_migrations(1);
+		}
+	}
+
 	p->p_lwpcnt++;
 	t->t_waitfor = -1;
 
@@ -886,6 +897,9 @@ lwp_cleanup(void)
 	 */
 	kpreempt_disable();
 	lgrp_move_thread(t, NULL, 1);
+	if (t->t_tid == 1) {
+		p->p_t1_lgrpid = LGRP_NONE;
+	}
 	kpreempt_enable();
 
 	lwp_ctmpl_clear(ttolwp(t));

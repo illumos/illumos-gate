@@ -2337,7 +2337,7 @@ spt_anon_getpages(
 			ppa_szc = (uint_t)-1;
 			ierr = anon_map_getpages(amp, an_idx, szc, sptseg,
 			    lp_addr, sptd->spt_prot, &vpprot, &ppa[ppa_idx],
-			    &ppa_szc, vpage, rw, 0, segvn_anypgsz, kcred);
+			    &ppa_szc, vpage, rw, 0, segvn_anypgsz, 0, kcred);
 			anon_array_exit(&cookie);
 
 			if (ierr != 0) {

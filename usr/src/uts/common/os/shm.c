@@ -881,7 +881,7 @@ top:
 		 * unreserving the above anon, and freeing the below amp.
 		 */
 
-		sp->shm_amp = anonmap_alloc(rsize, rsize);
+		sp->shm_amp = anonmap_alloc(rsize, rsize, ANON_SLEEP);
 		sp->shm_amp->a_sp = sp;
 		/*
 		 * Store the original user's requested size, in bytes,

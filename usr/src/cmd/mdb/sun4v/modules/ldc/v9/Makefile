@@ -42,3 +42,5 @@ MODSRCS_DIR = ../
 CPPFLAGS += -DMP -D_MACHDEP
 CPPFLAGS += -Dsun4v
 CPPFLAGS += -I$(SRC)/uts/sun4v
+CPPFLAGS += -I$(SRC)/uts/sun4
+CPPFLAGS += -I$(SRC)/uts/sparc/v9

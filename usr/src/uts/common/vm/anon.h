@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -371,10 +371,10 @@ extern int	swap_getconpage(struct vnode *, u_offset_t, size_t,
 extern int	anon_map_getpages(struct anon_map *, ulong_t,
 		    uint_t, struct seg *, caddr_t, uint_t,
 		    uint_t *, page_t *[], uint_t *,
-		    struct vpage [], enum seg_rw, int, int, struct cred *);
+		    struct vpage [], enum seg_rw, int, int, int, struct cred *);
 extern int	anon_map_privatepages(struct anon_map *, ulong_t,
 		    uint_t, struct seg *, caddr_t, uint_t,
-		    page_t *[], struct vpage [], int, struct cred *);
+		    page_t *[], struct vpage [], int, int, struct cred *);
 extern struct	page *anon_private(struct anon **, struct seg *,
 		    caddr_t, uint_t, struct page *,
 		    int, struct cred *);
@@ -388,9 +388,9 @@ extern int	anon_map_demotepages(struct anon_map *, ulong_t,
 		    struct seg *, caddr_t, uint_t,
 		    struct vpage [], struct cred *);
 extern void	anon_shmap_free_pages(struct anon_map *, ulong_t, size_t);
-extern int	anon_resvmem(size_t, boolean_t, zone_t *);
+extern int	anon_resvmem(size_t, boolean_t, zone_t *, int);
 extern void	anon_unresvmem(size_t, zone_t *);
-extern struct	anon_map *anonmap_alloc(size_t, size_t);
+extern struct	anon_map *anonmap_alloc(size_t, size_t, int);
 extern void	anonmap_free(struct anon_map *);
 extern void	anon_decref(struct anon *);
 extern int	non_anon(struct anon_hdr *, ulong_t, u_offset_t *, size_t *);
@@ -424,9 +424,11 @@ extern void	anon_array_exit(anon_sync_obj_t *);
  */
 #define	anon_unresv(size)		anon_unresvmem(size, curproc->p_zone)
 #define	anon_unresv_zone(size, zone)	anon_unresvmem(size, zone)
-#define	anon_resv(size)			anon_resvmem((size), 1, curproc->p_zone)
-#define	anon_resv_zone(size, zone)	anon_resvmem((size), 1, zone)
-#define	anon_checkspace(size, zone)	anon_resvmem((size), 0, zone)
+#define	anon_resv(size)			\
+	anon_resvmem((size), 1, curproc->p_zone, 1)
+#define	anon_resv_zone(size, zone)	anon_resvmem((size), 1, zone, 1)
+#define	anon_checkspace(size, zone)	anon_resvmem((size), 0, zone, 1)
+#define	anon_try_resv_zone(size, zone)	anon_resvmem((size), 1, zone, 0)
 
 /*
  * Flags to anon_private

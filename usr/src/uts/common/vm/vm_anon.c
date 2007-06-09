@@ -730,7 +730,7 @@ set_anoninfo(void)
  * Return non-zero on success.
  */
 int
-anon_resvmem(size_t size, boolean_t takemem, zone_t *zone)
+anon_resvmem(size_t size, boolean_t takemem, zone_t *zone, int tryhard)
 {
 	pgcnt_t npages = btopr(size);
 	pgcnt_t mswap_pages = 0;
@@ -803,10 +803,12 @@ anon_resvmem(size_t size, boolean_t takemem, zone_t *zone)
 	 * swapfs_reserve is minimum of 4Mb or 1/16 of physmem.
 	 *
 	 */
-	mutex_exit(&anoninfo_lock);
-	(void) page_reclaim_mem(mswap_pages,
-	    swapfs_minfree + swapfs_reserve, 0);
-	mutex_enter(&anoninfo_lock);
+	if (tryhard) {
+		mutex_exit(&anoninfo_lock);
+		(void) page_reclaim_mem(mswap_pages,
+		    swapfs_minfree + swapfs_reserve, 0);
+		mutex_enter(&anoninfo_lock);
+	}
 
 	mutex_enter(&freemem_lock);
 	if (availrmem > (swapfs_minfree + swapfs_reserve + mswap_pages) ||
@@ -1813,6 +1815,7 @@ anon_map_getpages(
 	enum seg_rw rw,
 	int brkcow,
 	int anypgsz,
+	int pgflags,
 	struct cred *cred)
 {
 	pgcnt_t		pgcnt;
@@ -1906,7 +1909,7 @@ top:
 	if (prealloc) {
 		ASSERT(conpp == NULL);
 		if (page_alloc_pages(anon_vp, seg, addr, NULL, ppa,
-		    szc, 0) != 0) {
+		    szc, 0, pgflags) != 0) {
 			VM_STAT_ADD(anonvmstats.getpages[7]);
 			if (brkcow == 0 ||
 			    !anon_share(amp->ahp, start_idx, pgcnt)) {
@@ -1962,7 +1965,7 @@ top:
 			VM_STAT_ADD(anonvmstats.getpages[9]);
 			*protp = PROT_ALL;
 			return (anon_map_privatepages(amp, start_idx, szc, seg,
-			    addr, prot, ppa, vpage, anypgsz, cred));
+			    addr, prot, ppa, vpage, anypgsz, pgflags, cred));
 		}
 	}
 
@@ -2144,7 +2147,7 @@ top:
 
 	*protp = PROT_ALL;
 	return (anon_map_privatepages(amp, start_idx, szc, seg, addr, prot,
-	    ppa, vpage, anypgsz, cred));
+	    ppa, vpage, anypgsz, pgflags, cred));
 io_err:
 	/*
 	 * We got an IO error somewhere in our large page.
@@ -2376,6 +2379,7 @@ anon_map_privatepages(
 	page_t	*ppa[],
 	struct vpage vpage[],
 	int anypgsz,
+	int pgflags,
 	struct cred *cred)
 {
 	pgcnt_t		pgcnt;
@@ -2420,7 +2424,7 @@ anon_map_privatepages(
 		VM_STAT_ADD(anonvmstats.privatepages[2]);
 		prealloc = 0;
 	} else if (page_alloc_pages(anon_vp, seg, addr, &pplist, NULL, szc,
-	    anypgsz) != 0) {
+	    anypgsz, pgflags) != 0) {
 		VM_STAT_ADD(anonvmstats.privatepages[3]);
 		prealloc = 0;
 	}
@@ -3076,7 +3080,7 @@ top:
 	}
 
 	err = anon_map_privatepages(amp, start_idx, szc, seg, addr, prot, ppa,
-	    vpage, -1, cred);
+	    vpage, -1, 0, cred);
 	if (err > 0) {
 		VM_STAT_ADD(anonvmstats.demotepages[5]);
 		kmem_free(ppa, ppasize);
@@ -3180,16 +3184,25 @@ anon_shmap_free_pages(struct anon_map *amp, ulong_t sidx, size_t len)
  * associating the given swap reservation with the new anon_map.
  */
 struct anon_map *
-anonmap_alloc(size_t size, size_t swresv)
+anonmap_alloc(size_t size, size_t swresv, int flags)
 {
 	struct anon_map *amp;
+	int kmflags = (flags & ANON_NOSLEEP) ? KM_NOSLEEP : KM_SLEEP;
 
-	amp = kmem_cache_alloc(anonmap_cache, KM_SLEEP);
+	amp = kmem_cache_alloc(anonmap_cache, kmflags);
+	if (amp == NULL) {
+		ASSERT(kmflags == KM_NOSLEEP);
+		return (NULL);
+	}
 
+	amp->ahp = anon_create(btopr(size), flags);
+	if (amp->ahp == NULL) {
+		ASSERT(flags == ANON_NOSLEEP);
+		kmem_cache_free(anonmap_cache, amp);
+		return (NULL);
+	}
 	amp->refcnt = 1;
 	amp->size = size;
-
-	amp->ahp = anon_create(btopr(size), ANON_SLEEP);
 	amp->swresv = swresv;
 	amp->locality = 0;
 	amp->a_szc = 0;

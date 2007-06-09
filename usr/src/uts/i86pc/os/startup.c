@@ -508,6 +508,8 @@ int	l2cache_sz = 0x80000;
 int	l2cache_linesz = 0x40;
 int	l2cache_assoc = 1;
 
+static size_t	textrepl_min_gb = 10;
+
 /*
  * on 64 bit we use a predifined VA range for mapping devices in the kernel
  * on 32 bit the mappings are intermixed in the heap, so we use a bit map
@@ -832,6 +834,7 @@ startup_memlist(void)
 	caddr_t page_ctrs_mem;
 	size_t page_ctrs_size;
 	struct memlist *current;
+	extern size_t textrepl_size_thresh;
 	extern void startup_build_mem_nodes(struct memlist *);
 
 	/* XX64 fix these - they should be in include files */
@@ -1076,6 +1079,11 @@ startup_memlist(void)
 	PRM_POINT("startup_memlist() done");
 
 	PRM_DEBUG(valloc_sz);
+
+	if ((availrmem >> (30 - MMU_PAGESHIFT)) >= textrepl_min_gb &&
+	    l2cache_sz <= 2 << 20) {
+		textrepl_size_thresh = (16 << 20) - 1;
+	}
 }
 
 /*

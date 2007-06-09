@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,9 +103,21 @@ typedef struct	segvn_data {
 	ushort_t flags;		/* flags - from sys/mman.h */
 	ssize_t	softlockcnt;	/* # of pages SOFTLOCKED in seg */
 	lgrp_mem_policy_info_t policy_info; /* memory allocation policy */
+	lgrp_mem_policy_info_t tr_policy_info; /* memory allocation for TR */
+	struct	seg *seg;	/* pointer back to seg */
+	struct	segvn_data *svn_trnext; /* textrepl list next link */
+	struct	segvn_data *svn_trprev; /* textrepl list prev link */
+	int	tr_state;	/* TR (text replication) state */
 } segvn_data_t;
 
 #ifdef _KERNEL
+
+/*
+ * segment text replication states.
+ */
+#define	SEGVN_TR_INIT	(0)	/* Check if text replication can be enabled */
+#define	SEGVN_TR_ON	(1)	/* Text replication is enabled */
+#define	SEGVN_TR_OFF	(2)	/* Text replication is disabled */
 
 /*
  * Macros for segvn segment driver locking.
@@ -113,6 +125,7 @@ typedef struct	segvn_data {
 #define	SEGVN_LOCK_ENTER(as, lock, type)	rw_enter((lock), (type))
 #define	SEGVN_LOCK_EXIT(as, lock)		rw_exit((lock))
 #define	SEGVN_LOCK_DOWNGRADE(as, lock)		rw_downgrade((lock))
+#define	SEGVN_LOCK_TRYENTER(as, lock, type)	rw_tryenter((lock), (type))
 
 /*
  * Macros to test lock states.
@@ -150,6 +163,50 @@ typedef struct	segvn_data {
 	((struct segvn_crargs *)(argsp))->szc == AS_MAP_HEAP ||		\
 	((struct segvn_crargs *)(argsp))->szc == AS_MAP_STACK) &&	\
 	((struct segvn_crargs *)(argsp))->vp == NULL)
+
+#define	SVNTR_HASH_FUNC(vp)	(((((uintptr_t)(vp)) >> 4) ^		\
+				    (((uintptr_t)(vp)) >> 11)) & 	\
+					(svntr_hashtab_sz - 1))
+
+#define	SEGVN_TR_ADDSTAT(stat)						\
+	segvn_textrepl_stats[CPU->cpu_id].tr_stat_##stat++
+
+/*
+ * A hash table entry looked up by vnode, off/eoff and szc to find anon map to
+ * use for text replication based on main thread's (t_tid = 1) lgrp.
+ */
+typedef struct svntr {
+	struct vnode	*tr_vp;		/* text file vnode */
+	u_offset_t	tr_off;		/* tr_vp mapping start offset */
+	size_t		tr_eoff;	/* tr_vp mapping end offset */
+	uint_t		tr_szc;		/* tr_vp mapping pagesize */
+	int		tr_valid;	/* entry validity state */
+	struct svntr	*tr_next;	/* next svntr in this hash bucket */
+	timestruc_t	tr_mtime;	/* tr_vp modification time */
+	ulong_t		tr_refcnt;	/* number of segs sharing this entry */
+	segvn_data_t	*tr_svnhead;	/* list of segs sharing this entry */
+	struct anon_map	*tr_amp[NLGRPS_MAX]; /* per lgrp anon maps */
+} svntr_t;
+
+typedef struct svntr_bucket {
+	svntr_t		*tr_head;	/* first svntr in this hash bucket */
+	kmutex_t	tr_lock;	/* per bucket lock */
+} svntr_bucket_t;
+
+typedef struct svntr_stats {
+	ulong_t		tr_stat_gaerr;   /* VOP_GETATTR() failures */
+	ulong_t		tr_stat_overmap; /* no TR due to beyond EOF mappings */
+	ulong_t		tr_stat_wrcnt;	 /* no TR due to writtable mappings */
+	ulong_t		tr_stat_stale;	 /* TR entry is stale */
+	ulong_t		tr_stat_overlap; /* overlap with other mappings */
+	ulong_t		tr_stat_nokmem;	 /* no TR due to kmem alloc failures */
+	ulong_t		tr_stat_noanon;	 /* no TR due to no swap space */
+	ulong_t		tr_stat_normem;  /* no TR due to no repl memory */
+	ulong_t		tr_stat_nolock;	 /* async TR failure due to locks */
+	ulong_t		tr_stat_asyncrepl; /* number of async TRs */
+	ulong_t		tr_stat_repl;	  /* number of sync TRs */
+	ulong_t		tr_stat_newamp;	  /* number of new amp allocs for TR */
+} svntr_stats_t;
 
 extern void	segvn_init(void);
 extern int	segvn_create(struct seg *, void *);

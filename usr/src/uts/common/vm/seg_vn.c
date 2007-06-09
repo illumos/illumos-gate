@@ -58,6 +58,7 @@
 #include <sys/sysmacros.h>
 #include <sys/vtrace.h>
 #include <sys/cmn_err.h>
+#include <sys/callb.h>
 #include <sys/vm.h>
 #include <sys/dumphdr.h>
 #include <sys/lgrp.h>
@@ -235,6 +236,7 @@ segvn_cache_constructor(void *buf, void *cdrarg, int kmflags)
 
 	rw_init(&svd->lock, NULL, RW_DEFAULT, NULL);
 	mutex_init(&svd->segp_slock, NULL, MUTEX_DEFAULT, NULL);
+	svd->svn_trnext = svd->svn_trprev = NULL;
 	return (0);
 }
 
@@ -246,6 +248,14 @@ segvn_cache_destructor(void *buf, void *cdrarg)
 
 	rw_destroy(&svd->lock);
 	mutex_destroy(&svd->segp_slock);
+}
+
+/*ARGSUSED*/
+static int
+svntr_cache_constructor(void *buf, void *cdrarg, int kmflags)
+{
+	bzero(buf, sizeof (svntr_t));
+	return (0);
 }
 
 /*
@@ -289,6 +299,78 @@ ulong_t segvn_faultvnmpss_align_err5;
 ulong_t	segvn_vmpss_pageio_deadlk_err;
 
 /*
+ * Segvn supports text replication optimization for NUMA platforms. Text
+ * replica's are represented by anon maps (amp). There's one amp per text file
+ * region per lgroup. A process chooses the amp for each of its text mappings
+ * based on the lgroup assignment of its main thread (t_tid = 1). All
+ * processes that want a replica on a particular lgroup for the same text file
+ * mapping share the same amp. amp's are looked up in svntr_hashtab hash table
+ * with vp,off,size,szc used as a key. Text replication segments are read only
+ * MAP_PRIVATE|MAP_TEXT segments that map vnode. Replication is achieved by
+ * forcing COW faults from vnode to amp and mapping amp pages instead of vnode
+ * pages. Replication amp is assigned to a segment when it gets its first
+ * pagefault. To handle main thread lgroup rehoming segvn_trasync_thread
+ * rechecks periodically if the process still maps an amp local to the main
+ * thread. If not async thread forces process to remap to an amp in the new
+ * home lgroup of the main thread. Current text replication implementation
+ * only provides the benefit to workloads that do most of their work in the
+ * main thread of a process or all the threads of a process run in the same
+ * lgroup. To extend text replication benefit to different types of
+ * multithreaded workloads further work would be needed in the hat layer to
+ * allow the same virtual address in the same hat to simultaneously map
+ * different physical addresses (i.e. page table replication would be needed
+ * for x86).
+ *
+ * amp pages are used instead of vnode pages as long as segment has a very
+ * simple life cycle.  It's created via segvn_create(), handles S_EXEC
+ * (S_READ) pagefaults and is fully unmapped.  If anything more complicated
+ * happens such as protection is changed, real COW fault happens, pagesize is
+ * changed, MC_LOCK is requested or segment is partially unmapped we turn off
+ * text replication by converting the segment back to vnode only segment
+ * (unmap segment's address range and set svd->amp to NULL).
+ *
+ * The original file can be changed after amp is inserted into
+ * svntr_hashtab. Processes that are launched after the file is already
+ * changed can't use the replica's created prior to the file change. To
+ * implement this functionality hash entries are timestamped. Replica's can
+ * only be used if current file modification time is the same as the timestamp
+ * saved when hash entry was created. However just timestamps alone are not
+ * sufficient to detect file modification via mmap(MAP_SHARED) mappings. We
+ * deal with file changes via MAP_SHARED mappings differently. When writable
+ * MAP_SHARED mappings are created to vnodes marked as executable we mark all
+ * existing replica's for this vnode as not usable for future text
+ * mappings. And we don't create new replica's for files that currently have
+ * potentially writable MAP_SHARED mappings (i.e. vn_is_mapped(V_WRITE) is
+ * true).
+ */
+
+#define	SEGVN_TEXTREPL_MAXBYTES_FACTOR	(20)
+size_t	segvn_textrepl_max_bytes_factor = SEGVN_TEXTREPL_MAXBYTES_FACTOR;
+
+static ulong_t			svntr_hashtab_sz = 512;
+static svntr_bucket_t		*svntr_hashtab = NULL;
+static struct kmem_cache	*svntr_cache;
+static svntr_stats_t		*segvn_textrepl_stats;
+static ksema_t 			segvn_trasync_sem;
+
+int				segvn_disable_textrepl = 0;
+size_t				textrepl_size_thresh = (size_t)-1;
+size_t				segvn_textrepl_bytes = 0;
+size_t				segvn_textrepl_max_bytes = 0;
+clock_t				segvn_update_textrepl_interval = 0;
+int				segvn_update_tr_time = 10;
+int				segvn_disable_textrepl_update = 0;
+
+static void segvn_textrepl(struct seg *);
+static void segvn_textunrepl(struct seg *, int);
+static void segvn_inval_trcache(vnode_t *);
+static void segvn_trasync_thread(void);
+static void segvn_trupdate_wakeup(void *);
+static void segvn_trupdate(void);
+static void segvn_trupdate_seg(struct seg *, segvn_data_t *, svntr_t *,
+    ulong_t);
+
+/*
  * Initialize segvn data structures
  */
 void
@@ -324,6 +406,28 @@ segvn_init(void)
 	}
 	if (segvn_maxpgszc == 0 || segvn_maxpgszc > maxszc)
 		segvn_maxpgszc = maxszc;
+
+	if (lgrp_optimizations() && textrepl_size_thresh != (size_t)-1 &&
+	    !segvn_disable_textrepl) {
+		ulong_t i;
+		size_t hsz = svntr_hashtab_sz * sizeof (svntr_bucket_t);
+
+		svntr_cache = kmem_cache_create("svntr_cache",
+		    sizeof (svntr_t), 0, svntr_cache_constructor, NULL,
+		    NULL, NULL, NULL, 0);
+		svntr_hashtab = kmem_zalloc(hsz, KM_SLEEP);
+		for (i = 0; i < svntr_hashtab_sz; i++) {
+			mutex_init(&svntr_hashtab[i].tr_lock,  NULL,
+			    MUTEX_DEFAULT, NULL);
+		}
+		segvn_textrepl_max_bytes = ptob(physmem) /
+		    segvn_textrepl_max_bytes_factor;
+		segvn_textrepl_stats = kmem_zalloc(NCPU *
+		    sizeof (svntr_stats_t), KM_SLEEP);
+		sema_init(&segvn_trasync_sem, 0, NULL, SEMA_DEFAULT, NULL);
+		(void) thread_create(NULL, 0, segvn_trasync_thread,
+		    NULL, 0, &p0, TS_RUN, minclsyspri);
+	}
 }
 
 #define	SEGVN_PAGEIO	((void *)0x1)
@@ -372,6 +476,7 @@ segvn_create(struct seg *seg, void *argsp)
 	int error = 0;
 	size_t pgsz;
 	lgrp_mem_policy_t mpolicy = LGRP_MEM_POLICY_DEFAULT;
+	int trok = 0;
 
 
 	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
@@ -454,7 +559,7 @@ segvn_create(struct seg *seg, void *argsp)
 	}
 
 	/* Inform the vnode of the new mapping */
-	if (a->vp) {
+	if (a->vp != NULL) {
 		error = VOP_ADDMAP(a->vp, a->offset & PAGEMASK,
 		    seg->s_as, seg->s_base, seg->s_size, a->prot,
 		    a->maxprot, a->type, cred);
@@ -470,15 +575,22 @@ segvn_create(struct seg *seg, void *argsp)
 				seg->s_size, HAT_UNLOAD_UNMAP);
 			return (error);
 		}
+		trok = ((a->flags & MAP_TEXT) &&
+		    (seg->s_size > textrepl_size_thresh ||
+			(a->flags & _MAP_TEXTREPL)) &&
+		    lgrp_optimizations() && svntr_hashtab != NULL &&
+		    a->type == MAP_PRIVATE && swresv == 0 &&
+		    !(a->flags & MAP_NORESERVE) &&
+		    seg->s_as != &kas && a->vp->v_type == VREG);
 	}
 
 	/*
-	 * If more than one segment in the address space, and
-	 * they're adjacent virtually, try to concatenate them.
-	 * Don't concatenate if an explicit anon_map structure
-	 * was supplied (e.g., SystemV shared memory).
+	 * If more than one segment in the address space, and they're adjacent
+	 * virtually, try to concatenate them.  Don't concatenate if an
+	 * explicit anon_map structure was supplied (e.g., SystemV shared
+	 * memory) or if we'll use text replication for this segment.
 	 */
-	if (a->amp == NULL) {
+	if (a->amp == NULL && !trok) {
 		struct seg *pseg, *nseg;
 		struct segvn_data *psvd, *nsvd;
 		lgrp_mem_policy_t ppolicy, npolicy;
@@ -490,7 +602,7 @@ segvn_create(struct seg *seg, void *argsp)
 		 * extending stack/heap segments.
 		 */
 		if ((a->vp == NULL) && (a->type == MAP_PRIVATE) &&
-			!(a->flags & MAP_NORESERVE) && (seg->s_as != &kas)) {
+		    !(a->flags & MAP_NORESERVE) && (seg->s_as != &kas)) {
 			lgrp_mem_policy_flags = a->lgrp_mem_policy_flags;
 		} else {
 			/*
@@ -602,6 +714,7 @@ segvn_create(struct seg *seg, void *argsp)
 	seg->s_data = (void *)svd;
 	seg->s_szc = a->szc;
 
+	svd->seg = seg;
 	svd->vp = a->vp;
 	/*
 	 * Anonymous mappings have no backing file so the offset is meaningless.
@@ -620,6 +733,11 @@ segvn_create(struct seg *seg, void *argsp)
 	if (a->szc != 0 && a->vp != NULL) {
 		segvn_setvnode_mpss(a->vp);
 	}
+	if (svd->type == MAP_SHARED && svd->vp != NULL &&
+	    (svd->vp->v_flag & VVMEXEC) && (svd->prot & PROT_WRITE)) {
+		ASSERT(vn_is_mapped(svd->vp, V_WRITE));
+		segvn_inval_trcache(svd->vp);
+	}
 
 	amp = a->amp;
 	if ((svd->amp = amp) == NULL) {
@@ -634,7 +752,8 @@ segvn_create(struct seg *seg, void *argsp)
 			 * by remembering the swap reservation there.
 			 */
 			if (a->vp == NULL) {
-				svd->amp = anonmap_alloc(seg->s_size, swresv);
+				svd->amp = anonmap_alloc(seg->s_size, swresv,
+				    ANON_SLEEP);
 				svd->amp->a_szc = seg->s_szc;
 			}
 		} else {
@@ -696,7 +815,7 @@ segvn_create(struct seg *seg, void *argsp)
 				hat_flag |= HAT_LOAD_TEXT;
 			}
 
-			svd->amp = anonmap_alloc(seg->s_size, 0);
+			svd->amp = anonmap_alloc(seg->s_size, 0, ANON_SLEEP);
 			svd->amp->a_szc = seg->s_szc;
 			svd->anon_index = 0;
 			svd->swresv = swresv;
@@ -763,6 +882,9 @@ segvn_create(struct seg *seg, void *argsp)
 		(void) lgrp_shm_policy_set(mpolicy, svd->amp, svd->anon_index,
 		    svd->vp, svd->offset, seg->s_size);
 
+	ASSERT(!trok || !(svd->prot & PROT_WRITE));
+	svd->tr_state = trok ? SEGVN_TR_INIT : SEGVN_TR_OFF;
+
 	return (0);
 }
 
@@ -804,6 +926,13 @@ segvn_concat(struct seg *seg1, struct seg *seg2, int amp_cat)
 	 */
 	if (svd1->vp != NULL &&
 	    svd1->offset + seg1->s_size != svd2->offset) {
+		return (-1);
+	}
+
+	/*
+	 * Don't concatenate if either segment uses text replication.
+	 */
+	if (svd1->tr_state != SEGVN_TR_OFF || svd2->tr_state != SEGVN_TR_OFF) {
 		return (-1);
 	}
 
@@ -1010,6 +1139,10 @@ segvn_extend_prev(seg1, seg2, a, swresv)
 	    svd1->offset + seg1->s_size != (a->offset & PAGEMASK))
 		return (-1);
 
+	if (svd1->tr_state != SEGVN_TR_OFF) {
+		return (-1);
+	}
+
 	amp1 = svd1->amp;
 	if (amp1) {
 		pgcnt_t newpgs;
@@ -1071,6 +1204,12 @@ segvn_extend_prev(seg1, seg2, a, swresv)
 	seg_free(seg2);
 	seg1->s_size += size;
 	svd1->swresv += swresv;
+	if (svd1->pageprot && (a->prot & PROT_WRITE) &&
+	    svd1->type == MAP_SHARED && svd1->vp != NULL &&
+	    (svd1->vp->v_flag & VVMEXEC)) {
+		ASSERT(vn_is_mapped(svd1->vp, V_WRITE));
+		segvn_inval_trcache(svd1->vp);
+	}
 	return (0);
 }
 
@@ -1108,6 +1247,10 @@ segvn_extend_next(
 	if (svd2->vp != NULL &&
 	    (a->offset & PAGEMASK) + seg1->s_size != svd2->offset)
 		return (-1);
+
+	if (svd2->tr_state != SEGVN_TR_OFF) {
+		return (-1);
+	}
 
 	amp2 = svd2->amp;
 	if (amp2) {
@@ -1173,6 +1316,12 @@ segvn_extend_next(
 	seg2->s_base -= size;
 	svd2->offset -= size;
 	svd2->swresv += swresv;
+	if (svd2->pageprot && (a->prot & PROT_WRITE) &&
+	    svd2->type == MAP_SHARED && svd2->vp != NULL &&
+	    (svd2->vp->v_flag & VVMEXEC)) {
+		ASSERT(vn_is_mapped(svd2->vp, V_WRITE));
+		segvn_inval_trcache(svd2->vp);
+	}
 	return (0);
 }
 
@@ -1185,6 +1334,7 @@ segvn_dup(struct seg *seg, struct seg *newseg)
 	int error = 0;
 	uint_t prot;
 	size_t len;
+	struct anon_map *amp;
 
 	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
 
@@ -1210,6 +1360,7 @@ segvn_dup(struct seg *seg, struct seg *newseg)
 	newseg->s_data = (void *)newsvd;
 	newseg->s_szc = seg->s_szc;
 
+	newsvd->seg = newseg;
 	if ((newsvd->vp = svd->vp) != NULL) {
 		VN_HOLD(svd->vp);
 		if (svd->type == MAP_SHARED)
@@ -1228,16 +1379,23 @@ segvn_dup(struct seg *seg, struct seg *newseg)
 	newsvd->flags = svd->flags;
 	newsvd->softlockcnt = 0;
 	newsvd->policy_info = svd->policy_info;
-	if ((newsvd->amp = svd->amp) == NULL) {
+	if ((amp = svd->amp) == NULL || svd->tr_state == SEGVN_TR_ON) {
 		/*
 		 * Not attaching to a shared anon object.
 		 */
+		if (svd->tr_state == SEGVN_TR_ON) {
+			ASSERT(newsvd->vp != NULL && amp != NULL);
+			newsvd->tr_state = SEGVN_TR_INIT;
+		} else {
+			newsvd->tr_state = svd->tr_state;
+		}
+		newsvd->amp = NULL;
 		newsvd->anon_index = 0;
 	} else {
-		struct anon_map *amp;
-
-		amp = svd->amp;
+		ASSERT(svd->tr_state == SEGVN_TR_OFF);
+		newsvd->tr_state = SEGVN_TR_OFF;
 		if (svd->type == MAP_SHARED) {
+			newsvd->amp = amp;
 			ANON_LOCK_ENTER(&amp->a_rwlock, RW_WRITER);
 			amp->refcnt++;
 			ANON_LOCK_EXIT(&amp->a_rwlock);
@@ -1248,7 +1406,8 @@ segvn_dup(struct seg *seg, struct seg *newseg)
 			/*
 			 * Allocate and initialize new anon_map structure.
 			 */
-			newsvd->amp = anonmap_alloc(newseg->s_size, 0);
+			newsvd->amp = anonmap_alloc(newseg->s_size, 0,
+			    ANON_SLEEP);
 			newsvd->amp->a_szc = newseg->s_szc;
 			newsvd->anon_index = 0;
 
@@ -1438,6 +1597,7 @@ segvn_unmap(struct seg *seg, caddr_t addr, size_t len)
 	size_t nsize;
 	size_t oswresv;
 	int reclaim = 1;
+	int unmap = 1;
 
 	/*
 	 * We don't need any segment level locks for "segvn" data
@@ -1451,6 +1611,7 @@ segvn_unmap(struct seg *seg, caddr_t addr, size_t len)
 	 */
 retry:
 	if (svd->softlockcnt > 0) {
+		ASSERT(svd->tr_state == SEGVN_TR_OFF);
 		/*
 		 * since we do have the writers lock nobody can fill
 		 * the cache during the purge. The flush either succeeds
@@ -1478,6 +1639,14 @@ retry:
 		int err;
 		if (!IS_P2ALIGNED(addr, pgsz) || !IS_P2ALIGNED(len, pgsz)) {
 			ASSERT(seg->s_base != addr || seg->s_size != len);
+			if (svd->tr_state == SEGVN_TR_INIT) {
+				svd->tr_state = SEGVN_TR_OFF;
+			} else if (svd->tr_state == SEGVN_TR_ON) {
+				ASSERT(svd->amp != NULL);
+				segvn_textunrepl(seg, 1);
+				ASSERT(svd->amp == NULL);
+				ASSERT(svd->tr_state == SEGVN_TR_OFF);
+			}
 			VM_STAT_ADD(segvnvmstats.demoterange[0]);
 			err = segvn_demote_range(seg, addr, len, SDR_END, 0);
 			if (err == 0) {
@@ -1499,21 +1668,41 @@ retry:
 		if (error == EAGAIN)
 			return (error);
 	}
+
+	if (svd->tr_state == SEGVN_TR_INIT) {
+		svd->tr_state = SEGVN_TR_OFF;
+	} else if (svd->tr_state == SEGVN_TR_ON) {
+		ASSERT(svd->amp != NULL);
+		ASSERT(svd->pageprot == 0 && !(svd->prot & PROT_WRITE));
+		segvn_textunrepl(seg, 1);
+		ASSERT(svd->amp == NULL && svd->tr_state == SEGVN_TR_OFF);
+		unmap = 0;
+	}
+
 	/*
 	 * Remove any page locks set through this mapping.
 	 */
 	(void) segvn_lockop(seg, addr, len, 0, MC_UNLOCK, NULL, 0);
 
-	/*
-	 * Unload any hardware translations in the range to be taken out.
-	 * Use a callback to invoke free_vp_pages() effectively.
-	 */
-	if (svd->vp != NULL && free_pages != 0) {
-		callback.hcb_data = seg;
-		callback.hcb_function = segvn_hat_unload_callback;
-		cbp = &callback;
+	if (unmap) {
+		/*
+		 * Unload any hardware translations in the range to be taken
+		 * out.  Use a callback to invoke free_vp_pages() effectively.
+		 */
+		if (svd->vp != NULL && free_pages != 0) {
+			callback.hcb_data = seg;
+			callback.hcb_function = segvn_hat_unload_callback;
+			cbp = &callback;
+		}
+		hat_unload_callback(seg->s_as->a_hat, addr, len,
+		    HAT_UNLOAD_UNMAP, cbp);
+
+		if (svd->type == MAP_SHARED && svd->vp != NULL &&
+		    (svd->vp->v_flag & VVMEXEC) &&
+		    ((svd->prot & PROT_WRITE) || svd->pageprot)) {
+			segvn_inval_trcache(svd->vp);
+		}
 	}
-	hat_unload_callback(seg->s_as->a_hat, addr, len, HAT_UNLOAD_UNMAP, cbp);
 
 	/*
 	 * Check for entire segment
@@ -1697,6 +1886,7 @@ retry:
 	nseg->s_data = (void *)nsvd;
 	nseg->s_szc = seg->s_szc;
 	*nsvd = *svd;
+	nsvd->seg = nseg;
 	nsvd->offset = svd->offset + (uintptr_t)(nseg->s_base - seg->s_base);
 	nsvd->swresv = 0;
 	nsvd->softlockcnt = 0;
@@ -1784,7 +1974,7 @@ retry:
 
 			ASSERT(svd->type == MAP_PRIVATE);
 			nahp = anon_create(btop(seg->s_size), ANON_SLEEP);
-			namp = anonmap_alloc(nseg->s_size, 0);
+			namp = anonmap_alloc(nseg->s_size, 0, ANON_SLEEP);
 			namp->a_szc = seg->s_szc;
 			(void) anon_copy_ptr(amp->ahp, svd->anon_index, nahp,
 			    0, btop(seg->s_size), ANON_SLEEP);
@@ -1839,6 +2029,7 @@ segvn_free(struct seg *seg)
 	 * since the address space is "write" locked.
 	 */
 	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(svd->tr_state == SEGVN_TR_OFF);
 
 	/*
 	 * Be sure to unlock pages. XXX Why do things get free'ed instead
@@ -2496,7 +2687,20 @@ segvn_faultpage(
 	 * that fatal protection checks have already been made.
 	 */
 
-	cow = brkcow && ((vpprot & PROT_WRITE) == 0);
+	if (brkcow) {
+		ASSERT(svd->tr_state == SEGVN_TR_OFF);
+		cow = !(vpprot & PROT_WRITE);
+	} else if (svd->tr_state == SEGVN_TR_ON) {
+		/*
+		 * If we are doing text replication COW on first touch.
+		 */
+		ASSERT(amp != NULL);
+		ASSERT(svd->vp != NULL);
+		ASSERT(rw != S_WRITE);
+		cow = (ap == NULL);
+	} else {
+		cow = 0;
+	}
 
 	/*
 	 * If not a copy-on-write case load the translation
@@ -3422,10 +3626,12 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 	int physcontig;
 	int upgrdfail;
 	int segvn_anypgsz_vnode = 0; /* for now map vnode with 2 page sizes */
+	int tron = (svd->tr_state == SEGVN_TR_ON);
 
 	ASSERT(szc != 0);
 	ASSERT(vp != NULL);
 	ASSERT(brkcow == 0 || amp != NULL);
+	ASSERT(tron == 0 || amp != NULL);
 	ASSERT(enable_mbit_wa == 0); /* no mbit simulations with large pages */
 	ASSERT(!(svd->flags & MAP_NORESERVE));
 	ASSERT(type != F_SOFTUNLOCK);
@@ -3509,11 +3715,8 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				anon_array_enter(amp, aindx, &an_cookie);
 				if (anon_get_ptr(amp->ahp, aindx) != NULL) {
 					SEGVN_VMSTAT_FLTVNPAGES(5);
-					if (anon_pages(amp->ahp, aindx,
-					    maxpages) != maxpages) {
-						panic("segvn_fault_vnodepages:"
-						    " empty anon slots\n");
-					}
+					ASSERT(anon_pages(amp->ahp, aindx,
+					    maxpages) == maxpages);
 					anon_array_exit(&an_cookie);
 					ANON_LOCK_EXIT(&amp->a_rwlock);
 					err = segvn_fault_anonpages(hat, seg,
@@ -3531,17 +3734,16 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 						lpgeaddr = maxlpgeaddr;
 					}
 					goto next;
-				} else if (anon_pages(amp->ahp, aindx,
-				    maxpages)) {
-					panic("segvn_fault_vnodepages:"
-						" non empty anon slots\n");
 				} else {
+					ASSERT(anon_pages(amp->ahp, aindx,
+					    maxpages) == 0);
 					SEGVN_VMSTAT_FLTVNPAGES(7);
 					anon_array_exit(&an_cookie);
 					ANON_LOCK_EXIT(&amp->a_rwlock);
 				}
 			}
 			ASSERT(!brkcow || IS_P2ALIGNED(a, maxpgsz));
+			ASSERT(!tron || IS_P2ALIGNED(a, maxpgsz));
 
 			if (svd->pageprot != 0 && IS_P2ALIGNED(a, maxpgsz)) {
 				ASSERT(vpage != NULL);
@@ -3570,12 +3772,12 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			pplist = NULL;
 			physcontig = 0;
 			ppa[0] = NULL;
-			if (!brkcow && szc &&
+			if (!brkcow && !tron && szc &&
 			    !page_exists_physcontig(vp, off, szc,
 				segtype == MAP_PRIVATE ? ppa : NULL)) {
 				SEGVN_VMSTAT_FLTVNPAGES(9);
 				if (page_alloc_pages(vp, seg, a, &pplist, NULL,
-				    szc, 0) && type != F_SOFTLOCK) {
+				    szc, 0, 0) && type != F_SOFTLOCK) {
 					SEGVN_VMSTAT_FLTVNPAGES(10);
 					pszc = 0;
 					ierr = -1;
@@ -3604,7 +3806,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 						physcontig = 0;
 					}
 				}
-			} else if (!brkcow && szc && ppa[0] != NULL) {
+			} else if (!brkcow && !tron && szc && ppa[0] != NULL) {
 				SEGVN_VMSTAT_FLTVNPAGES(13);
 				ASSERT(segtype == MAP_PRIVATE);
 				physcontig = 1;
@@ -3668,7 +3870,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 					err = FC_MAKE_ERR(ierr);
 					goto out;
 				}
-				if (brkcow || type == F_SOFTLOCK) {
+				if (brkcow || tron || type == F_SOFTLOCK) {
 					/* can't reduce map area */
 					SEGVN_VMSTAT_FLTVNPAGES(23);
 					vop_size_err = 1;
@@ -3690,11 +3892,8 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				ulong_t taindx = P2ALIGN(aindx, maxpages);
 
 				SEGVN_VMSTAT_FLTVNPAGES(25);
-				if (anon_pages(amp->ahp, taindx, maxpages) !=
-				    maxpages) {
-					panic("segvn_fault_vnodepages:"
-					    " empty anon slots\n");
-				}
+				ASSERT(anon_pages(amp->ahp, taindx,
+				    maxpages) == maxpages);
 				for (i = 0; i < pages; i++) {
 					page_unlock(ppa[i]);
 				}
@@ -3717,9 +3916,12 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 					 * Therefore if we are here for
 					 * SOFTLOCK case it must be a cow
 					 * break but cow break never reduces
-					 * szc. Thus the assert below.
+					 * szc. text replication (tron) in
+					 * this case works as cow break.
+					 * Thus the assert below.
 					 */
-					ASSERT(!brkcow && type != F_SOFTLOCK);
+					ASSERT(!brkcow && !tron &&
+					    type != F_SOFTLOCK);
 					pszc = seg->s_szc;
 					ierr = -2;
 					break;
@@ -3734,7 +3936,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			}
 #endif /* DEBUG */
 
-			if (brkcow) {
+			if (brkcow || tron) {
 				ASSERT(amp != NULL);
 				ASSERT(pplist == NULL);
 				ASSERT(szc == seg->s_szc);
@@ -3743,7 +3945,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				SEGVN_VMSTAT_FLTVNPAGES(27);
 				ierr = anon_map_privatepages(amp, aindx, szc,
 				    seg, a, prot, ppa, vpage, segvn_anypgsz,
-				    svd->cred);
+				    tron ? PG_LOCAL : 0, svd->cred);
 				if (ierr != 0) {
 					SEGVN_VMSTAT_FLTVNPAGES(28);
 					anon_array_exit(&an_cookie);
@@ -4032,7 +4234,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			 */
 			if (pplist == NULL &&
 			    page_alloc_pages(vp, seg, a, &pplist, NULL,
-				szc, 0) && type != F_SOFTLOCK) {
+				szc, 0, 0) && type != F_SOFTLOCK) {
 				SEGVN_VMSTAT_FLTVNPAGES(38);
 				for (i = 0; i < pages; i++) {
 					page_unlock(ppa[i]);
@@ -4092,7 +4294,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			break;
 		ASSERT(a < lpgeaddr);
 
-		ASSERT(!brkcow && type != F_SOFTLOCK);
+		ASSERT(!brkcow && !tron && type != F_SOFTLOCK);
 
 		/*
 		 * ierr == -1 means we failed to map with a large page.
@@ -4178,14 +4380,14 @@ out:
 		SEGVN_VMSTAT_FLTVNPAGES(47);
 		return (err);
 	}
-	ASSERT(brkcow || type == F_SOFTLOCK);
+	ASSERT(brkcow || tron || type == F_SOFTLOCK);
 	/*
 	 * Large page end is mapped beyond the end of file and it's a cow
-	 * fault or softlock so we can't reduce the map area.  For now just
-	 * demote the segment. This should really only happen if the end of
-	 * the file changed after the mapping was established since when large
-	 * page segments are created we make sure they don't extend beyond the
-	 * end of the file.
+	 * fault (can be a text replication induced cow) or softlock so we can't
+	 * reduce the map area.  For now just demote the segment. This should
+	 * really only happen if the end of the file changed after the mapping
+	 * was established since when large page segments are created we make
+	 * sure they don't extend beyond the end of the file.
 	 */
 	SEGVN_VMSTAT_FLTVNPAGES(48);
 
@@ -4239,6 +4441,7 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 	int first = 1;
 	int adjszc_chk;
 	int purged = 0;
+	int pgflags = (svd->tr_state == SEGVN_TR_ON) ? PG_LOCAL : 0;
 
 	ASSERT(szc != 0);
 	ASSERT(amp != NULL);
@@ -4246,6 +4449,7 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 	ASSERT(!(svd->flags & MAP_NORESERVE));
 	ASSERT(type != F_SOFTUNLOCK);
 	ASSERT(IS_P2ALIGNED(a, maxpgsz));
+	ASSERT(!brkcow || svd->tr_state == SEGVN_TR_OFF);
 
 	ASSERT(SEGVN_LOCK_HELD(seg->s_as, &svd->lock));
 
@@ -4320,7 +4524,7 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			ppa_szc = (uint_t)-1;
 			ierr = anon_map_getpages(amp, aindx, szc, seg, a,
 				prot, &vpprot, ppa, &ppa_szc, vpage, rw, brkcow,
-				segvn_anypgsz, svd->cred);
+				segvn_anypgsz, pgflags, svd->cred);
 			if (ierr != 0) {
 				anon_array_exit(&cookie);
 				VM_STAT_ADD(segvnvmstats.fltanpages[4]);
@@ -4582,6 +4786,34 @@ segvn_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t len,
 		return (0);
 	}
 
+	if (brkcow == 0) {
+		if (svd->tr_state == SEGVN_TR_INIT) {
+			SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_WRITER);
+			if (svd->tr_state == SEGVN_TR_INIT) {
+				ASSERT(svd->vp != NULL && svd->amp == NULL);
+				ASSERT(svd->flags & MAP_TEXT);
+				ASSERT(svd->type == MAP_PRIVATE);
+				segvn_textrepl(seg);
+				ASSERT(svd->tr_state != SEGVN_TR_INIT);
+				ASSERT(svd->tr_state != SEGVN_TR_ON ||
+				    svd->amp != NULL);
+			}
+			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+		}
+	} else if (svd->tr_state != SEGVN_TR_OFF) {
+		SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_WRITER);
+		if (svd->tr_state == SEGVN_TR_ON) {
+			ASSERT(svd->vp != NULL && svd->amp != NULL);
+			segvn_textunrepl(seg, 0);
+			ASSERT(svd->amp == NULL &&
+			    svd->tr_state == SEGVN_TR_OFF);
+		} else if (svd->tr_state != SEGVN_TR_OFF) {
+			svd->tr_state = SEGVN_TR_OFF;
+		}
+		ASSERT(svd->amp == NULL && svd->tr_state == SEGVN_TR_OFF);
+		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+	}
+
 top:
 	SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_READER);
 
@@ -4692,7 +4924,7 @@ top:
 		SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_WRITER);
 
 		if (svd->amp == NULL) {
-			svd->amp = anonmap_alloc(seg->s_size, 0);
+			svd->amp = anonmap_alloc(seg->s_size, 0, ANON_SLEEP);
 			svd->amp->a_szc = seg->s_szc;
 		}
 		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
@@ -4745,7 +4977,8 @@ top:
 	if (amp != NULL) {
 		anon_index = svd->anon_index + page;
 
-		if ((type == F_PROT) && (rw == S_READ) &&
+		if (type == F_PROT && rw == S_READ &&
+		    svd->tr_state == SEGVN_TR_OFF &&
 		    svd->type == MAP_PRIVATE && svd->pageprot == 0) {
 			size_t index = anon_index;
 			struct anon *ap;
@@ -4789,7 +5022,8 @@ slow:
 	 * are faulting on, free behind all pages in the segment and put
 	 * them on the free list.
 	 */
-	if ((page != 0) && fltadvice) {	/* not if first page in segment */
+
+	if ((page != 0) && fltadvice && svd->tr_state != SEGVN_TR_ON) {
 		struct vpage *vpp;
 		ulong_t fanon_index;
 		size_t fpage;
@@ -4939,7 +5173,7 @@ slow:
 				plp[0] = NULL;
 				plsz = len;
 			} else if (rw == S_WRITE && svd->type == MAP_PRIVATE ||
-			    rw == S_OTHER ||
+			    svd->tr_state == SEGVN_TR_ON || rw == S_OTHER ||
 			    (((size_t)(addr + PAGESIZE) <
 			    (size_t)(seg->s_base + seg->s_size)) &&
 			    hat_probe(as->a_hat, addr + PAGESIZE))) {
@@ -5101,8 +5335,9 @@ slow:
 		if (pp == PAGE_HANDLED)
 			continue;
 
-		if (pp->p_offset >=  svd->offset &&
-			(pp->p_offset < svd->offset + seg->s_size)) {
+		if (svd->tr_state != SEGVN_TR_ON &&
+		    pp->p_offset >=  svd->offset &&
+		    pp->p_offset < svd->offset + seg->s_size) {
 
 			diff = pp->p_offset - svd->offset;
 
@@ -5249,6 +5484,7 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 	 * protections.
 	 */
 	if (svd->softlockcnt > 0) {
+		ASSERT(svd->tr_state == SEGVN_TR_OFF);
 		/*
 		 * Since we do have the segvn writers lock nobody can fill
 		 * the cache with entries belonging to this seg during
@@ -5260,6 +5496,20 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 			return (EAGAIN);
 		}
+	}
+
+	if (svd->tr_state == SEGVN_TR_INIT) {
+		svd->tr_state = SEGVN_TR_OFF;
+	} else if (svd->tr_state == SEGVN_TR_ON) {
+		ASSERT(svd->amp != NULL);
+		segvn_textunrepl(seg, 0);
+		ASSERT(svd->amp == NULL && svd->tr_state == SEGVN_TR_OFF);
+	}
+
+	if ((prot & PROT_WRITE) && svd->type == MAP_SHARED &&
+	    svd->vp != NULL && (svd->vp->v_flag & VVMEXEC)) {
+		ASSERT(vn_is_mapped(svd->vp, V_WRITE));
+		segvn_inval_trcache(svd->vp);
 	}
 
 	if (seg->s_szc != 0) {
@@ -5583,6 +5833,7 @@ segvn_setpagesize(struct seg *seg, caddr_t addr, size_t len, uint_t szc)
 	 * to recheck protections.
 	 */
 	if (svd->softlockcnt > 0) {
+		ASSERT(svd->tr_state == SEGVN_TR_OFF);
 		/*
 		 * Since we do have the segvn writers lock nobody can fill
 		 * the cache with entries belonging to this seg during
@@ -5593,6 +5844,15 @@ segvn_setpagesize(struct seg *seg, caddr_t addr, size_t len, uint_t szc)
 		if (svd->softlockcnt > 0) {
 			return (EAGAIN);
 		}
+	}
+
+	if (svd->tr_state == SEGVN_TR_INIT) {
+		svd->tr_state = SEGVN_TR_OFF;
+	} else if (svd->tr_state == SEGVN_TR_ON) {
+		ASSERT(svd->amp != NULL);
+		segvn_textunrepl(seg, 1);
+		ASSERT(svd->amp == NULL && svd->tr_state == SEGVN_TR_OFF);
+		amp = NULL;
 	}
 
 	/*
@@ -5766,6 +6026,7 @@ segvn_clrszc(struct seg *seg)
 	struct anon *ap, *oldap;
 	uint_t prot = svd->prot, vpprot;
 	int pageflag = 0;
+	int unmap = 1;
 
 	ASSERT(AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock) ||
 	    SEGVN_WRITE_HELD(seg->s_as, &svd->lock));
@@ -5775,13 +6036,25 @@ segvn_clrszc(struct seg *seg)
 		return (0);
 	}
 
-	/*
-	 * do HAT_UNLOAD_UNMAP since we are changing the pagesize.
-	 * unload argument is 0 when we are freeing the segment
-	 * and unload was already done.
-	 */
-	hat_unload(seg->s_as->a_hat, seg->s_base, seg->s_size,
-	    HAT_UNLOAD_UNMAP);
+	if (svd->tr_state == SEGVN_TR_INIT) {
+		svd->tr_state = SEGVN_TR_OFF;
+	} else if (svd->tr_state == SEGVN_TR_ON) {
+		ASSERT(svd->amp != NULL);
+		segvn_textunrepl(seg, 1);
+		ASSERT(svd->amp == NULL && svd->tr_state == SEGVN_TR_OFF);
+		amp = NULL;
+		unmap = 0;
+	}
+
+	if (unmap) {
+		/*
+		 * do HAT_UNLOAD_UNMAP since we are changing the pagesize.
+		 * unload argument is 0 when we are freeing the segment
+		 * and unload was already done.
+		 */
+		hat_unload(seg->s_as->a_hat, seg->s_base, seg->s_size,
+		    HAT_UNLOAD_UNMAP);
+	}
 
 	if (amp == NULL || svd->type == MAP_SHARED) {
 		seg->s_szc = 0;
@@ -5944,6 +6217,8 @@ segvn_split_seg(struct seg *seg, caddr_t addr)
 	struct segvn_data *nsvd;
 
 	ASSERT(AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(svd->tr_state == SEGVN_TR_OFF);
+
 	ASSERT(addr >= seg->s_base);
 	ASSERT(addr <= seg->s_base + seg->s_size);
 
@@ -5959,6 +6234,7 @@ segvn_split_seg(struct seg *seg, caddr_t addr)
 	nseg->s_data = (void *)nsvd;
 	nseg->s_szc = seg->s_szc;
 	*nsvd = *svd;
+	nsvd->seg = nseg;
 	rw_init(&nsvd->lock, NULL, RW_DEFAULT, NULL);
 
 	if (nsvd->vp != NULL) {
@@ -6006,7 +6282,7 @@ segvn_split_seg(struct seg *seg, caddr_t addr)
 		(void) anon_copy_ptr(oamp->ahp, svd->anon_index,
 		    nahp, 0, btop(seg->s_size), ANON_SLEEP);
 
-		namp = anonmap_alloc(nseg->s_size, 0);
+		namp = anonmap_alloc(nseg->s_size, 0, ANON_SLEEP);
 		namp->a_szc = nseg->s_szc;
 		(void) anon_copy_ptr(oamp->ahp,
 		    svd->anon_index + btop(seg->s_size),
@@ -6085,6 +6361,7 @@ segvn_demote_range(
 	uint_t tszcvec;
 
 	ASSERT(AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(svd->tr_state == SEGVN_TR_OFF);
 	ASSERT(szc != 0);
 	pgsz = page_get_pagesize(szc);
 	ASSERT(seg->s_base != addr || seg->s_size != len);
@@ -6990,6 +7267,8 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 
 	/* Determine if this segment backs a sysV shm */
 	if (svd->amp != NULL && svd->amp->a_sp != NULL) {
+		ASSERT(svd->type == MAP_SHARED);
+		ASSERT(svd->tr_state == SEGVN_TR_OFF);
 		sp = svd->amp->a_sp;
 		proj = sp->shm_perm.ipc_proj;
 		chargeproc = 0;
@@ -7015,6 +7294,17 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 		}
 	}
 
+	if (op == MC_LOCK) {
+		if (svd->tr_state == SEGVN_TR_INIT) {
+			svd->tr_state = SEGVN_TR_OFF;
+		} else if (svd->tr_state == SEGVN_TR_ON) {
+			ASSERT(svd->amp != NULL);
+			segvn_textunrepl(seg, 0);
+			ASSERT(svd->amp == NULL &&
+			    svd->tr_state == SEGVN_TR_OFF);
+		}
+	}
+
 	/*
 	 * If we're locking, then we must create a vpage structure if
 	 * none exists.  If we're unlocking, then check to see if there
@@ -7036,7 +7326,7 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 	 * by lazily testing for its existence.
 	 */
 	if (op == MC_LOCK && svd->amp == NULL && svd->vp == NULL) {
-		svd->amp = anonmap_alloc(seg->s_size, 0);
+		svd->amp = anonmap_alloc(seg->s_size, 0, ANON_SLEEP);
 		svd->amp->a_szc = seg->s_szc;
 	}
 
@@ -7371,10 +7661,15 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 	 * In case of MADV_FREE, we won't be modifying any segment private
 	 * data structures; so, we only need to grab READER's lock
 	 */
-	if (behav != MADV_FREE)
+	if (behav != MADV_FREE) {
 		SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_WRITER);
-	else
+		if (svd->tr_state != SEGVN_TR_OFF) {
+			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+			return (0);
+		}
+	} else {
 		SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_READER);
+	}
 
 	/*
 	 * Large pages are assumed to be only turned on when accesses to the
@@ -7433,7 +7728,7 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 		 * us to do. As MADV_FREE is advisory, we don't
 		 * return error in either case.
 		 */
-		if (vp || amp == NULL) {
+		if (vp != NULL || amp == NULL) {
 			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 			return (0);
 		}
@@ -8368,9 +8663,15 @@ segvn_getpolicy(struct seg *seg, caddr_t addr)
 	/*
 	 * Get policy info for private or shared memory
 	 */
-	if (svn_data->type != MAP_SHARED)
-		policy_info = &svn_data->policy_info;
-	else {
+	if (svn_data->type != MAP_SHARED) {
+		if (svn_data->tr_state != SEGVN_TR_ON) {
+			policy_info = &svn_data->policy_info;
+		} else {
+			policy_info = &svn_data->tr_policy_info;
+			ASSERT(policy_info->mem_policy ==
+			    LGRP_MEM_POLICY_NEXT_SEG);
+		}
+	} else {
 		amp = svn_data->amp;
 		anon_index = svn_data->anon_index + seg_page(seg, addr);
 		vp = svn_data->vp;
@@ -8386,4 +8687,603 @@ static int
 segvn_capable(struct seg *seg, segcapability_t capability)
 {
 	return (0);
+}
+
+/*
+ * Bind text vnode segment to an amp. If we bind successfully mappings will be
+ * established to per vnode mapping per lgroup amp pages instead of to vnode
+ * pages. There's one amp per vnode text mapping per lgroup. Many processes
+ * may share the same text replication amp. If a suitable amp doesn't already
+ * exist in svntr hash table create a new one.  We may fail to bind to amp if
+ * segment is not eligible for text replication.  Code below first checks for
+ * these conditions. If binding is successful segment tr_state is set to on
+ * and svd->amp points to the amp to use. Otherwise tr_state is set to off and
+ * svd->amp remains as NULL.
+ */
+static void
+segvn_textrepl(struct seg *seg)
+{
+	struct segvn_data	*svd = (struct segvn_data *)seg->s_data;
+	vnode_t			*vp = svd->vp;
+	u_offset_t		off = svd->offset;
+	size_t			size = seg->s_size;
+	u_offset_t		eoff = off + size;
+	uint_t			szc = seg->s_szc;
+	ulong_t			hash = SVNTR_HASH_FUNC(vp);
+	svntr_t			*svntrp;
+	struct vattr		va;
+	proc_t			*p = seg->s_as->a_proc;
+	lgrp_id_t		lgrp_id;
+	lgrp_id_t		olid;
+	int			first;
+	struct anon_map		*amp;
+
+	ASSERT(AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(SEGVN_WRITE_HELD(seg->s_as, &svd->lock));
+	ASSERT(p != NULL);
+	ASSERT(svd->tr_state == SEGVN_TR_INIT);
+	ASSERT(svd->flags & MAP_TEXT);
+	ASSERT(svd->type == MAP_PRIVATE);
+	ASSERT(vp != NULL && svd->amp == NULL);
+	ASSERT(!svd->pageprot && !(svd->prot & PROT_WRITE));
+	ASSERT(!(svd->flags & MAP_NORESERVE) && svd->swresv == 0);
+	ASSERT(seg->s_as != &kas);
+	ASSERT(off < eoff);
+	ASSERT(svntr_hashtab != NULL);
+
+	/*
+	 * If numa optimizations are no longer desired bail out.
+	 */
+	if (!lgrp_optimizations()) {
+		svd->tr_state = SEGVN_TR_OFF;
+		return;
+	}
+
+	/*
+	 * Avoid creating anon maps with size bigger than the file size.
+	 * If VOP_GETATTR() call fails bail out.
+	 */
+	va.va_mask = AT_SIZE | AT_MTIME;
+	if (VOP_GETATTR(vp, &va, 0, svd->cred) != 0) {
+		svd->tr_state = SEGVN_TR_OFF;
+		SEGVN_TR_ADDSTAT(gaerr);
+		return;
+	}
+	if (btopr(va.va_size) < btopr(eoff)) {
+		svd->tr_state = SEGVN_TR_OFF;
+		SEGVN_TR_ADDSTAT(overmap);
+		return;
+	}
+
+	/*
+	 * VVMEXEC may not be set yet if exec() prefaults text segment. Set
+	 * this flag now before vn_is_mapped(V_WRITE) so that MAP_SHARED
+	 * mapping that checks if trcache for this vnode needs to be
+	 * invalidated can't miss us.
+	 */
+	if (!(vp->v_flag & VVMEXEC)) {
+		mutex_enter(&vp->v_lock);
+		vp->v_flag |= VVMEXEC;
+		mutex_exit(&vp->v_lock);
+	}
+	mutex_enter(&svntr_hashtab[hash].tr_lock);
+	/*
+	 * Bail out if potentially MAP_SHARED writable mappings exist to this
+	 * vnode.  We don't want to use old file contents from existing
+	 * replicas if this mapping was established after the original file
+	 * was changed.
+	 */
+	if (vn_is_mapped(vp, V_WRITE)) {
+		mutex_exit(&svntr_hashtab[hash].tr_lock);
+		svd->tr_state = SEGVN_TR_OFF;
+		SEGVN_TR_ADDSTAT(wrcnt);
+		return;
+	}
+	svntrp = svntr_hashtab[hash].tr_head;
+	for (; svntrp != NULL; svntrp = svntrp->tr_next) {
+		ASSERT(svntrp->tr_refcnt != 0);
+		if (svntrp->tr_vp != vp) {
+			continue;
+		}
+		/*
+		 * Bail out if file was changed after this replication entry
+		 * was created since we need to use the latest file contents.
+		 */
+		if (!svntrp->tr_valid ||
+		    svntrp->tr_mtime.tv_sec != va.va_mtime.tv_sec ||
+		    svntrp->tr_mtime.tv_nsec != va.va_mtime.tv_nsec) {
+			mutex_exit(&svntr_hashtab[hash].tr_lock);
+			svd->tr_state = SEGVN_TR_OFF;
+			SEGVN_TR_ADDSTAT(stale);
+			return;
+		}
+		/*
+		 * if off, eoff and szc match current segment we found the
+		 * existing entry we can use.
+		 */
+		if (svntrp->tr_off == off && svntrp->tr_eoff == eoff &&
+		    svntrp->tr_szc == szc) {
+			break;
+		}
+		/*
+		 * Don't create different but overlapping in file offsets
+		 * entries to avoid replication of the same file pages more
+		 * than once per lgroup.
+		 */
+		if ((off >= svntrp->tr_off && off < svntrp->tr_eoff) ||
+		    (eoff > svntrp->tr_off && eoff <= svntrp->tr_eoff)) {
+			mutex_exit(&svntr_hashtab[hash].tr_lock);
+			svd->tr_state = SEGVN_TR_OFF;
+			SEGVN_TR_ADDSTAT(overlap);
+			return;
+		}
+	}
+	/*
+	 * If we didn't find existing entry create a new one.
+	 */
+	if (svntrp == NULL) {
+		svntrp = kmem_cache_alloc(svntr_cache, KM_NOSLEEP);
+		if (svntrp == NULL) {
+			mutex_exit(&svntr_hashtab[hash].tr_lock);
+			svd->tr_state = SEGVN_TR_OFF;
+			SEGVN_TR_ADDSTAT(nokmem);
+			return;
+		}
+#ifdef DEBUG
+		{
+			lgrp_id_t i;
+			for (i = 0; i < NLGRPS_MAX; i++) {
+				ASSERT(svntrp->tr_amp[i] == NULL);
+			}
+		}
+#endif /* DEBUG */
+		svntrp->tr_vp = vp;
+		svntrp->tr_off = off;
+		svntrp->tr_eoff = eoff;
+		svntrp->tr_szc = szc;
+		svntrp->tr_valid = 1;
+		svntrp->tr_mtime = va.va_mtime;
+		svntrp->tr_refcnt = 0;
+		svntrp->tr_next = svntr_hashtab[hash].tr_head;
+		svntr_hashtab[hash].tr_head = svntrp;
+	}
+	first = 1;
+again:
+	/*
+	 * We want to pick a replica with pages on main thread's (t_tid = 1,
+	 * aka T1) lgrp. Currently text replication is only optimized for
+	 * workloads that either have all threads of a process on the same
+	 * lgrp or execute their large text primarily on main thread.
+	 */
+	lgrp_id = p->p_t1_lgrpid;
+	if (lgrp_id == LGRP_NONE) {
+		/*
+		 * In case exec() prefaults text on non main thread use
+		 * current thread lgrpid.  It will become main thread anyway
+		 * soon.
+		 */
+		lgrp_id = lgrp_home_id(curthread);
+	}
+	/*
+	 * Set p_tr_lgrpid to lgrpid if it hasn't been set yet.  Otherwise
+	 * just set it to NLGRPS_MAX if it's different from current process T1
+	 * home lgrp.  p_tr_lgrpid is used to detect if process uses text
+	 * replication and T1 new home is different from lgrp used for text
+	 * replication. When this happens asyncronous segvn thread rechecks if
+	 * segments should change lgrps used for text replication.  If we fail
+	 * to set p_tr_lgrpid with cas32 then set it to NLGRPS_MAX without cas
+	 * if it's not already NLGRPS_MAX and not equal lgrp_id we want to
+	 * use.  We don't need to use cas in this case because another thread
+	 * that races in between our non atomic check and set may only change
+	 * p_tr_lgrpid to NLGRPS_MAX at this point.
+	 */
+	ASSERT(lgrp_id != LGRP_NONE && lgrp_id < NLGRPS_MAX);
+	olid = p->p_tr_lgrpid;
+	if (lgrp_id != olid && olid != NLGRPS_MAX) {
+		lgrp_id_t nlid = (olid == LGRP_NONE) ? lgrp_id : NLGRPS_MAX;
+		if (cas32((uint32_t *)&p->p_tr_lgrpid, olid, nlid) != olid) {
+			olid = p->p_tr_lgrpid;
+			ASSERT(olid != LGRP_NONE);
+			if (olid != lgrp_id && olid != NLGRPS_MAX) {
+				p->p_tr_lgrpid = NLGRPS_MAX;
+			}
+		}
+		ASSERT(p->p_tr_lgrpid != LGRP_NONE);
+		membar_producer();
+		/*
+		 * lgrp_move_thread() won't schedule async recheck after
+		 * p->p_t1_lgrpid update unless p->p_tr_lgrpid is not
+		 * LGRP_NONE. Recheck p_t1_lgrpid once now that p->p_tr_lgrpid
+		 * is not LGRP_NONE.
+		 */
+		if (first && p->p_t1_lgrpid != LGRP_NONE &&
+		    p->p_t1_lgrpid != lgrp_id) {
+			first = 0;
+			goto again;
+		}
+	}
+	/*
+	 * If no amp was created yet for lgrp_id create a new one as long as
+	 * we have enough memory to afford it.
+	 */
+	if ((amp = svntrp->tr_amp[lgrp_id]) == NULL) {
+		size_t trmem = atomic_add_long_nv(&segvn_textrepl_bytes, size);
+		if (trmem > segvn_textrepl_max_bytes) {
+			SEGVN_TR_ADDSTAT(normem);
+			goto fail;
+		}
+		if (anon_try_resv_zone(size, NULL) == 0) {
+			SEGVN_TR_ADDSTAT(noanon);
+			goto fail;
+		}
+		amp = anonmap_alloc(size, size, ANON_NOSLEEP);
+		if (amp == NULL) {
+			anon_unresv_zone(size, NULL);
+			SEGVN_TR_ADDSTAT(nokmem);
+			goto fail;
+		}
+		ASSERT(amp->refcnt == 1);
+		amp->a_szc = szc;
+		svntrp->tr_amp[lgrp_id] = amp;
+		SEGVN_TR_ADDSTAT(newamp);
+	}
+	svntrp->tr_refcnt++;
+	ASSERT(svd->svn_trnext == NULL);
+	ASSERT(svd->svn_trprev == NULL);
+	svd->svn_trnext = svntrp->tr_svnhead;
+	svd->svn_trprev = NULL;
+	if (svntrp->tr_svnhead != NULL) {
+		svntrp->tr_svnhead->svn_trprev = svd;
+	}
+	svntrp->tr_svnhead = svd;
+	ASSERT(amp->a_szc == szc && amp->size == size && amp->swresv == size);
+	ASSERT(amp->refcnt >= 1);
+	svd->amp = amp;
+	svd->anon_index = 0;
+	svd->tr_policy_info.mem_policy = LGRP_MEM_POLICY_NEXT_SEG;
+	svd->tr_policy_info.mem_lgrpid = lgrp_id;
+	svd->tr_state = SEGVN_TR_ON;
+	mutex_exit(&svntr_hashtab[hash].tr_lock);
+	SEGVN_TR_ADDSTAT(repl);
+	return;
+fail:
+	ASSERT(segvn_textrepl_bytes >= size);
+	atomic_add_long(&segvn_textrepl_bytes, -size);
+	ASSERT(svntrp != NULL);
+	ASSERT(svntrp->tr_amp[lgrp_id] == NULL);
+	if (svntrp->tr_refcnt == 0) {
+		ASSERT(svntrp == svntr_hashtab[hash].tr_head);
+		svntr_hashtab[hash].tr_head = svntrp->tr_next;
+		mutex_exit(&svntr_hashtab[hash].tr_lock);
+		kmem_cache_free(svntr_cache, svntrp);
+	} else {
+		mutex_exit(&svntr_hashtab[hash].tr_lock);
+	}
+	svd->tr_state = SEGVN_TR_OFF;
+}
+
+/*
+ * Convert seg back to regular vnode mapping seg by unbinding it from its text
+ * replication amp.  This routine is most typically called when segment is
+ * unmapped but can also be called when segment no longer qualifies for text
+ * replication (e.g. due to protection changes). If unload_unmap is set use
+ * HAT_UNLOAD_UNMAP flag in hat_unload_callback().  If we are the last user of
+ * svntr free all its anon maps and remove it from the hash table.
+ */
+static void
+segvn_textunrepl(struct seg *seg, int unload_unmap)
+{
+	struct segvn_data	*svd = (struct segvn_data *)seg->s_data;
+	vnode_t			*vp = svd->vp;
+	u_offset_t		off = svd->offset;
+	size_t			size = seg->s_size;
+	u_offset_t		eoff = off + size;
+	uint_t			szc = seg->s_szc;
+	ulong_t			hash = SVNTR_HASH_FUNC(vp);
+	svntr_t			*svntrp;
+	svntr_t			**prv_svntrp;
+	lgrp_id_t		lgrp_id = svd->tr_policy_info.mem_lgrpid;
+	lgrp_id_t		i;
+
+	ASSERT(AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock) ||
+	    SEGVN_WRITE_HELD(seg->s_as, &svd->lock));
+	ASSERT(svd->tr_state == SEGVN_TR_ON);
+	ASSERT(svd->amp != NULL);
+	ASSERT(svd->amp->refcnt >= 1);
+	ASSERT(svd->anon_index == 0);
+	ASSERT(lgrp_id != LGRP_NONE && lgrp_id < NLGRPS_MAX);
+	ASSERT(svntr_hashtab != NULL);
+
+	mutex_enter(&svntr_hashtab[hash].tr_lock);
+	prv_svntrp = &svntr_hashtab[hash].tr_head;
+	for (; (svntrp = *prv_svntrp) != NULL; prv_svntrp = &svntrp->tr_next) {
+		ASSERT(svntrp->tr_refcnt != 0);
+		if (svntrp->tr_vp == vp && svntrp->tr_off == off &&
+		    svntrp->tr_eoff == eoff && svntrp->tr_szc == szc) {
+			break;
+		}
+	}
+	if (svntrp == NULL) {
+		panic("segvn_textunrepl: svntr record not found");
+	}
+	if (svntrp->tr_amp[lgrp_id] != svd->amp) {
+		panic("segvn_textunrepl: amp mismatch");
+	}
+	svd->tr_state = SEGVN_TR_OFF;
+	svd->amp = NULL;
+	if (svd->svn_trprev == NULL) {
+		ASSERT(svntrp->tr_svnhead == svd);
+		svntrp->tr_svnhead = svd->svn_trnext;
+		if (svntrp->tr_svnhead != NULL) {
+			svntrp->tr_svnhead->svn_trprev = NULL;
+		}
+		svd->svn_trnext = NULL;
+	} else {
+		svd->svn_trprev->svn_trnext = svd->svn_trnext;
+		if (svd->svn_trnext != NULL) {
+			svd->svn_trnext->svn_trprev = svd->svn_trprev;
+			svd->svn_trnext = NULL;
+		}
+		svd->svn_trprev = NULL;
+	}
+	if (--svntrp->tr_refcnt) {
+		mutex_exit(&svntr_hashtab[hash].tr_lock);
+		goto done;
+	}
+	*prv_svntrp = svntrp->tr_next;
+	mutex_exit(&svntr_hashtab[hash].tr_lock);
+	for (i = 0; i < NLGRPS_MAX; i++) {
+		struct anon_map *amp = svntrp->tr_amp[i];
+		if (amp == NULL) {
+			continue;
+		}
+		ASSERT(amp->refcnt == 1);
+		ASSERT(amp->swresv == size);
+		ASSERT(amp->size == size);
+		ASSERT(amp->a_szc == szc);
+		if (amp->a_szc != 0) {
+			anon_free_pages(amp->ahp, 0, size, szc);
+		} else {
+			anon_free(amp->ahp, 0, size);
+		}
+		svntrp->tr_amp[i] = NULL;
+		ASSERT(segvn_textrepl_bytes >= size);
+		atomic_add_long(&segvn_textrepl_bytes, -size);
+		anon_unresv_zone(amp->swresv, NULL);
+		amp->refcnt = 0;
+		anonmap_free(amp);
+	}
+	kmem_cache_free(svntr_cache, svntrp);
+done:
+	hat_unload_callback(seg->s_as->a_hat, seg->s_base, size,
+	    unload_unmap ? HAT_UNLOAD_UNMAP : 0, NULL);
+}
+
+/*
+ * This is called when a MAP_SHARED writabble mapping is created to a vnode
+ * that is currently used for execution (VVMEXEC flag is set). In this case we
+ * need to prevent further use of existing replicas.
+ */
+static void
+segvn_inval_trcache(vnode_t *vp)
+{
+	ulong_t			hash = SVNTR_HASH_FUNC(vp);
+	svntr_t			*svntrp;
+
+	ASSERT(vp->v_flag & VVMEXEC);
+
+	if (svntr_hashtab == NULL) {
+		return;
+	}
+
+	mutex_enter(&svntr_hashtab[hash].tr_lock);
+	svntrp = svntr_hashtab[hash].tr_head;
+	for (; svntrp != NULL; svntrp = svntrp->tr_next) {
+		ASSERT(svntrp->tr_refcnt != 0);
+		if (svntrp->tr_vp == vp && svntrp->tr_valid) {
+			svntrp->tr_valid = 0;
+		}
+	}
+	mutex_exit(&svntr_hashtab[hash].tr_lock);
+}
+
+static void
+segvn_trasync_thread(void)
+{
+	callb_cpr_t cpr_info;
+	kmutex_t cpr_lock;	/* just for CPR stuff */
+
+	mutex_init(&cpr_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	CALLB_CPR_INIT(&cpr_info, &cpr_lock,
+	    callb_generic_cpr, "segvn_async");
+
+	if (segvn_update_textrepl_interval == 0) {
+		segvn_update_textrepl_interval = segvn_update_tr_time * hz;
+	} else {
+		segvn_update_textrepl_interval *= hz;
+	}
+	(void) timeout(segvn_trupdate_wakeup, NULL,
+	    segvn_update_textrepl_interval);
+
+	for (;;) {
+		mutex_enter(&cpr_lock);
+		CALLB_CPR_SAFE_BEGIN(&cpr_info);
+		mutex_exit(&cpr_lock);
+		sema_p(&segvn_trasync_sem);
+		mutex_enter(&cpr_lock);
+		CALLB_CPR_SAFE_END(&cpr_info, &cpr_lock);
+		mutex_exit(&cpr_lock);
+		segvn_trupdate();
+	}
+}
+
+static uint64_t segvn_lgrp_trthr_migrs_snpsht = 0;
+
+static void
+segvn_trupdate_wakeup(void *dummy)
+{
+	uint64_t cur_lgrp_trthr_migrs = lgrp_get_trthr_migrations();
+
+	if (cur_lgrp_trthr_migrs != segvn_lgrp_trthr_migrs_snpsht) {
+		segvn_lgrp_trthr_migrs_snpsht = cur_lgrp_trthr_migrs;
+		sema_v(&segvn_trasync_sem);
+	}
+
+	if (!segvn_disable_textrepl_update &&
+	    segvn_update_textrepl_interval != 0) {
+		(void) timeout(segvn_trupdate_wakeup, dummy,
+		    segvn_update_textrepl_interval);
+	}
+}
+
+static void
+segvn_trupdate(void)
+{
+	ulong_t		hash;
+	svntr_t		*svntrp;
+	segvn_data_t	*svd;
+
+	ASSERT(svntr_hashtab != NULL);
+
+	for (hash = 0; hash < svntr_hashtab_sz; hash++) {
+		mutex_enter(&svntr_hashtab[hash].tr_lock);
+		svntrp = svntr_hashtab[hash].tr_head;
+		for (; svntrp != NULL; svntrp = svntrp->tr_next) {
+			ASSERT(svntrp->tr_refcnt != 0);
+			svd = svntrp->tr_svnhead;
+			for (; svd != NULL; svd = svd->svn_trnext) {
+				segvn_trupdate_seg(svd->seg, svd, svntrp,
+				    hash);
+			}
+		}
+		mutex_exit(&svntr_hashtab[hash].tr_lock);
+	}
+}
+
+static void
+segvn_trupdate_seg(struct seg *seg,
+	segvn_data_t *svd,
+	svntr_t *svntrp,
+	ulong_t hash)
+{
+	proc_t			*p;
+	lgrp_id_t		lgrp_id;
+	struct as		*as;
+	size_t			size;
+	struct anon_map		*amp;
+
+	ASSERT(svd->vp != NULL);
+	ASSERT(svd->vp == svntrp->tr_vp);
+	ASSERT(svd->offset == svntrp->tr_off);
+	ASSERT(svd->offset + seg->s_size == svntrp->tr_eoff);
+	ASSERT(seg != NULL);
+	ASSERT(svd->seg == seg);
+	ASSERT(seg->s_data == (void *)svd);
+	ASSERT(seg->s_szc == svntrp->tr_szc);
+	ASSERT(svd->tr_state == SEGVN_TR_ON);
+	ASSERT(svd->amp != NULL);
+	ASSERT(svd->tr_policy_info.mem_policy == LGRP_MEM_POLICY_NEXT_SEG);
+	ASSERT(svd->tr_policy_info.mem_lgrpid != LGRP_NONE);
+	ASSERT(svd->tr_policy_info.mem_lgrpid < NLGRPS_MAX);
+	ASSERT(svntrp->tr_amp[svd->tr_policy_info.mem_lgrpid] == svd->amp);
+	ASSERT(svntrp->tr_refcnt != 0);
+	ASSERT(mutex_owned(&svntr_hashtab[hash].tr_lock));
+
+	as = seg->s_as;
+	ASSERT(as != NULL && as != &kas);
+	p = as->a_proc;
+	ASSERT(p != NULL);
+	ASSERT(p->p_tr_lgrpid != LGRP_NONE);
+	lgrp_id = p->p_t1_lgrpid;
+	if (lgrp_id == LGRP_NONE) {
+		return;
+	}
+	ASSERT(lgrp_id < NLGRPS_MAX);
+	if (svd->tr_policy_info.mem_lgrpid == lgrp_id) {
+		return;
+	}
+
+	/*
+	 * Use tryenter locking since we are locking as/seg and svntr hash
+	 * lock in reverse from syncrounous thread order.
+	 */
+	if (!AS_LOCK_TRYENTER(as, &as->a_lock, RW_READER)) {
+		SEGVN_TR_ADDSTAT(nolock);
+		if (segvn_lgrp_trthr_migrs_snpsht) {
+			segvn_lgrp_trthr_migrs_snpsht = 0;
+		}
+		return;
+	}
+	if (!SEGVN_LOCK_TRYENTER(seg->s_as, &svd->lock, RW_WRITER)) {
+		AS_LOCK_EXIT(as, &as->a_lock);
+		SEGVN_TR_ADDSTAT(nolock);
+		if (segvn_lgrp_trthr_migrs_snpsht) {
+			segvn_lgrp_trthr_migrs_snpsht = 0;
+		}
+		return;
+	}
+	size = seg->s_size;
+	if (svntrp->tr_amp[lgrp_id] == NULL) {
+		size_t trmem = atomic_add_long_nv(&segvn_textrepl_bytes, size);
+		if (trmem > segvn_textrepl_max_bytes) {
+			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+			AS_LOCK_EXIT(as, &as->a_lock);
+			atomic_add_long(&segvn_textrepl_bytes, -size);
+			SEGVN_TR_ADDSTAT(normem);
+			return;
+		}
+		if (anon_try_resv_zone(size, NULL) == 0) {
+			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+			AS_LOCK_EXIT(as, &as->a_lock);
+			atomic_add_long(&segvn_textrepl_bytes, -size);
+			SEGVN_TR_ADDSTAT(noanon);
+			return;
+		}
+		amp = anonmap_alloc(size, size, KM_NOSLEEP);
+		if (amp == NULL) {
+			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+			AS_LOCK_EXIT(as, &as->a_lock);
+			atomic_add_long(&segvn_textrepl_bytes, -size);
+			anon_unresv_zone(size, NULL);
+			SEGVN_TR_ADDSTAT(nokmem);
+			return;
+		}
+		ASSERT(amp->refcnt == 1);
+		amp->a_szc = seg->s_szc;
+		svntrp->tr_amp[lgrp_id] = amp;
+	}
+	/*
+	 * We don't need to drop the bucket lock but here we give other
+	 * threads a chance.  svntr and svd can't be unlinked as long as
+	 * segment lock is held as a writer and AS held as well.  After we
+	 * retake bucket lock we'll continue from where we left. We'll be able
+	 * to reach the end of either list since new entries are always added
+	 * to the beginning of the lists.
+	 */
+	mutex_exit(&svntr_hashtab[hash].tr_lock);
+	hat_unload_callback(as->a_hat, seg->s_base, size, 0, NULL);
+	mutex_enter(&svntr_hashtab[hash].tr_lock);
+
+	ASSERT(svd->tr_state == SEGVN_TR_ON);
+	ASSERT(svd->amp != NULL);
+	ASSERT(svd->tr_policy_info.mem_policy == LGRP_MEM_POLICY_NEXT_SEG);
+	ASSERT(svd->tr_policy_info.mem_lgrpid != lgrp_id);
+	ASSERT(svd->amp != svntrp->tr_amp[lgrp_id]);
+
+	svd->tr_policy_info.mem_lgrpid = lgrp_id;
+	svd->amp = svntrp->tr_amp[lgrp_id];
+	p->p_tr_lgrpid = NLGRPS_MAX;
+	SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+	AS_LOCK_EXIT(as, &as->a_lock);
+
+	ASSERT(svntrp->tr_refcnt != 0);
+	ASSERT(svd->vp == svntrp->tr_vp);
+	ASSERT(svd->tr_policy_info.mem_lgrpid == lgrp_id);
+	ASSERT(svd->amp != NULL && svd->amp == svntrp->tr_amp[lgrp_id]);
+	ASSERT(svd->seg == seg);
+	ASSERT(svd->tr_state == SEGVN_TR_ON);
+
+	SEGVN_TR_ADDSTAT(asyncrepl);
 }

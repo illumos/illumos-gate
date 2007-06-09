@@ -41,9 +41,6 @@ extern "C" {
 
 #define	LGRP_NONE	(-1)		/* non-existent lgroup ID */
 
-
-typedef id_t		lgrp_id_t;	/* lgroup ID */
-
 #if (!defined(_KERNEL) && !defined(_KMEMUSER))
 typedef struct lgrp_mem_policy_info { int opaque[2]; }	lgrp_mem_policy_info_t;
 #endif	/* !_KERNEL && !_KMEMUSER */
@@ -160,6 +157,7 @@ typedef enum lgrp_stat_types {
 	LGRP_NUM_RANDOM_PROC,	/* # of times random proc policy applied */
 	LGRP_NUM_RANDOM_PSET,	/* # of times random pset policy applied */
 	LGRP_NUM_ROUNDROBIN,	/* # of times round robin policy applied */
+	LGRP_NUM_NEXT_SEG,	/* # of times next to seg policy applied */
 	LGRP_NUM_COUNTER_STATS,	/* always last */
 	LGRP_CTR_STATS_ALLOC = 16	/* cache-align pad - multiple of 8 */
 				/* always keep >= LGRP_NUM_COUNTER_STATS */
@@ -193,6 +191,7 @@ static char *lgrp_kstat_names[] = {	\
 	"span process policy",		\
 	"span psrset policy",		\
 	"round robin policy",		\
+	"next-seg policy",		\
 					\
 	/* Snapshot stats */		\
 	"cpus",				\
@@ -311,6 +310,7 @@ typedef enum lgrp_mem_policy {
 	LGRP_MEM_POLICY_RANDOM,		/* randomly across all lgroups */
 	LGRP_MEM_POLICY_ROUNDROBIN,	/* round robin across all lgroups */
 	LGRP_MEM_POLICY_NEXT_CPU,	/* Near next CPU to touch memory */
+	LGRP_MEM_POLICY_NEXT_SEG,	/* lgrp specified directly by seg */
 	LGRP_NUM_MEM_POLICIES
 } lgrp_mem_policy_t;
 
@@ -339,8 +339,8 @@ typedef struct lgrp_mnode_cookie {
  * Information needed to implement memory allocation policy
  */
 typedef struct lgrp_mem_policy_info {
-	int	mem_policy;			/* memory allocation policy */
-	int	mem_reserved;			/* reserved */
+	int		mem_policy;		/* memory allocation policy */
+	lgrp_id_t	mem_lgrpid;		/* lgroup id */
 } lgrp_mem_policy_info_t;
 
 /*
@@ -561,6 +561,8 @@ lgrp_t	*lgrp_home_lgrp(void);
 lgrp_id_t	lgrp_home_id(kthread_t *);
 void	lgrp_loadavg(lpl_t *, uint_t, int);
 void	lgrp_move_thread(kthread_t *, lpl_t *, int);
+uint64_t lgrp_get_trthr_migrations(void);
+void 	lgrp_update_trthr_migrations(uint64_t);
 
 /*
  * lgroup topology

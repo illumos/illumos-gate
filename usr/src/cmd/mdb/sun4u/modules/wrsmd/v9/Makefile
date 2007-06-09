@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,5 +40,6 @@ CPPFLAGS += -DMP -D_MACHDEP
 CPPFLAGS += -D_KERNEL
 CPPFLAGS += -I../../../../../../../src/cmd/mdb/common
 CPPFLAGS += -I$(SRC)/uts/sun4u
+CPPFLAGS += -I$(SRC)/uts/sun4
 CPPFLAGS += -I$(SRC)/uts/sfmmu
 CPPFLAGS += -I$(SRC)/uts/sparc/v9

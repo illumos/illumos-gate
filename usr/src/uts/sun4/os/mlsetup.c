@@ -178,6 +178,8 @@ mlsetup(struct regs *rp, void *cif, kfpu_t *fp)
 	p0.p_lockp = &p0lock;
 	p0.p_utraps = NULL;
 	p0.p_brkpageszc = 0;
+	p0.p_t1_lgrpid = LGRP_NONE;
+	p0.p_tr_lgrpid = LGRP_NONE;
 	sigorset(&p0.p_ignore, &ignoredefault);
 
 	CPU->cpu_thread = &t0;

@@ -3555,24 +3555,25 @@ pgretry:
 
 	lgrp_stat_add(lgrp->lgrp_id, LGRP_NUM_ALLOC_FAIL, 1);
 
-	/*
-	 * Try to get a non-local freelist page.
-	 */
-	LGRP_MNODE_COOKIE_UPGRADE(lgrp_cookie);
-	while ((mnode = lgrp_memnode_choose(&lgrp_cookie)) >= 0) {
-		pp = page_get_func(mnode, bin, mtype, szc, flags);
-		if (pp != NULL) {
-			DTRACE_PROBE4(page__get,
-			    lgrp_t *, lgrp,
-			    int, mnode,
-			    ulong_t, bin,
-			    uint_t, flags);
-			VM_STAT_ADD(vmm_vmstats.pgf_allocokrem[szc]);
-			return (pp);
+	if (!(flags & PG_LOCAL)) {
+		/*
+		 * Try to get a non-local freelist page.
+		 */
+		LGRP_MNODE_COOKIE_UPGRADE(lgrp_cookie);
+		while ((mnode = lgrp_memnode_choose(&lgrp_cookie)) >= 0) {
+			pp = page_get_func(mnode, bin, mtype, szc, flags);
+			if (pp != NULL) {
+				DTRACE_PROBE4(page__get,
+				    lgrp_t *, lgrp,
+				    int, mnode,
+				    ulong_t, bin,
+				    uint_t, flags);
+				VM_STAT_ADD(vmm_vmstats.pgf_allocokrem[szc]);
+				return (pp);
+			}
 		}
+		ASSERT(pp == NULL);
 	}
-
-	ASSERT(pp == NULL);
 
 	/*
 	 * when the cage is off chances are page_get_contig_pages() will fail
@@ -3591,7 +3592,8 @@ pgretry:
 		goto pgretry;
 	}
 
-	if (pgcplimitsearch && page_get_func == page_get_contig_pages)
+	if (!(flags & PG_LOCAL) && pgcplimitsearch &&
+	    page_get_func == page_get_contig_pages)
 		SETPGCPFAILCNT(szc);
 
 	VM_STAT_ADD(vmm_vmstats.pgf_allocfailed[szc]);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,7 @@
 #include <sys/debug.h>
 #include <sys/pathname.h>
 #include <sys/vm.h>
+#include <sys/lgrp.h>
 #include <sys/vtrace.h>
 #include <sys/exec.h>
 #include <sys/exechdr.h>
@@ -432,6 +433,13 @@ exec_common(const char *fname, const char **argp, const char **envp,
 	 */
 	ASSERT(p->p_lwpcnt == 1 && p->p_zombcnt == 0);
 	curthread->t_tid = 1;
+	kpreempt_disable();
+	ASSERT(curthread->t_lpl != NULL);
+	p->p_t1_lgrpid = curthread->t_lpl->lpl_lgrpid;
+	kpreempt_enable();
+	if (p->p_tr_lgrpid != LGRP_NONE && p->p_tr_lgrpid != p->p_t1_lgrpid) {
+		lgrp_update_trthr_migrations(1);
+	}
 	curthread->t_unpark = 0;
 	curthread->t_proc_flag |= TP_TWAIT;
 	curthread->t_proc_flag &= ~TP_DAEMON;	/* daemons shouldn't exec */

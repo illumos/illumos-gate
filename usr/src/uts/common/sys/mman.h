@@ -82,6 +82,10 @@ extern "C" {
 #define	MAP_TEXT	0x400		/* map code segment */
 #define	MAP_INITDATA	0x800		/* map data segment */
 
+#ifdef _KERNEL
+#define	_MAP_TEXTREPL	0x1000
+#endif /* _KERNEL */
+
 /* these flags not yet implemented */
 #define	MAP_RENAME	0x20		/* rename private pages to file */
 

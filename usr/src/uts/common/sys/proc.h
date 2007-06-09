@@ -216,8 +216,11 @@ typedef struct	proc {
 	uint_t	p_tidhash_sz;		/* number of p_tidhash[] entries */
 	uint64_t p_lgrpset;		/* unprotected hint of set of lgrps */
 					/* on which process has threads */
-	uintptr_t p_lgrpres1;		/* reserved for lgrp migration */
-	uintptr_t p_lgrpres2;		/* reserved for lgrp migration */
+	volatile lgrp_id_t  p_t1_lgrpid; /* main's thread lgroup id */
+	volatile lgrp_id_t  p_tr_lgrpid; /* text replica's lgroup id */
+#if defined(_LP64)
+	uintptr_t  p_lgrpres2;		/* reserved for lgrp migration */
+#endif
 	/*
 	 * /proc (process filesystem) debugger interface stuff.
 	 */

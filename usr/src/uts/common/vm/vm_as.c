@@ -1575,6 +1575,7 @@ as_map_vnsegs(struct as *as, caddr_t addr, size_t size,
 	struct vattr va;
 	u_offset_t eoff;
 	size_t save_size = 0;
+	extern size_t textrepl_size_thresh;
 
 	ASSERT(AS_WRITE_HELD(as, &as->a_lock));
 	ASSERT(IS_P2ALIGNED(addr, PAGESIZE));
@@ -1621,6 +1622,9 @@ again:
 		}
 	}
 
+	if (size > textrepl_size_thresh) {
+		vn_a->flags |= _MAP_TEXTREPL;
+	}
 	error = as_map_segvn_segs(as, addr, size, szcvec, crfp, vn_a,
 	    segcreated);
 	if (error != 0) {

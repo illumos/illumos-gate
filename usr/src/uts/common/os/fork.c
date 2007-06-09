@@ -946,6 +946,8 @@ getproc(proc_t **cpp, int kernel)
 	 * look at the p_zone field.
 	 */
 	cp->p_zone = pp->p_zone;
+	cp->p_t1_lgrpid = LGRP_NONE;
+	cp->p_tr_lgrpid = LGRP_NONE;
 
 	if ((newpid = pid_allocate(cp, PID_ALLOC_PROC)) == -1) {
 		if (nproc == v.v_proc) {
@@ -1283,6 +1285,7 @@ try_again:
 			kpreempt_enable();
 
 			as_free(as);
+			p->p_tr_lgrpid = LGRP_NONE;
 		}
 	}
 }

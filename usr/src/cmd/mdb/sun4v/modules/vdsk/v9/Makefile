@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,3 +42,5 @@ MODSRCS_DIR = ../
 CPPFLAGS += -DMP -D_MACHDEP
 CPPFLAGS += -Dsun4v
 CPPFLAGS += -I$(SRC)/uts/sun4v
+CPPFLAGS += -I$(SRC)/uts/sun4
+CPPFLAGS += -I$(SRC)/uts/sparc/v9

@@ -410,7 +410,8 @@ lgrp_main_init(void)
 	 * Enforce a valid lgrp_mem_default_policy
 	 */
 	if ((lgrp_mem_default_policy <= LGRP_MEM_POLICY_DEFAULT) ||
-	    (lgrp_mem_default_policy >= LGRP_NUM_MEM_POLICIES))
+	    (lgrp_mem_default_policy >= LGRP_NUM_MEM_POLICIES) ||
+	    (lgrp_mem_default_policy == LGRP_MEM_POLICY_NEXT_SEG))
 		lgrp_mem_default_policy = LGRP_MEM_POLICY_NEXT;
 
 	/*
@@ -3183,6 +3184,26 @@ lpl_pick(lpl_t *lpl1, lpl_t *lpl2)
 }
 
 /*
+ * lgrp_trthr_moves counts the number of times main thread (t_tid = 1) of a
+ * process that uses text replication changed home lgrp. This info is used by
+ * segvn asyncronous thread to detect if it needs to recheck what lgrps
+ * should be used for text replication.
+ */
+static uint64_t lgrp_trthr_moves = 0;
+
+uint64_t
+lgrp_get_trthr_migrations(void)
+{
+	return (lgrp_trthr_moves);
+}
+
+void
+lgrp_update_trthr_migrations(uint64_t incr)
+{
+	atomic_add_64(&lgrp_trthr_moves, incr);
+}
+
+/*
  * An LWP is expected to be assigned to an lgroup for at least this long
  * for its anticipatory load to be justified.  NOTE that this value should
  * not be set extremely huge (say, larger than 100 years), to avoid problems
@@ -3332,6 +3353,14 @@ lgrp_move_thread(kthread_t *t, lpl_t *newlpl, int do_lgrpset_delete)
 		 * This thread is moving to a new lgroup
 		 */
 		t->t_lpl = newlpl;
+		if (t->t_tid == 1 && p->p_t1_lgrpid != newlpl->lpl_lgrpid) {
+			p->p_t1_lgrpid = newlpl->lpl_lgrpid;
+			membar_producer();
+			if (p->p_tr_lgrpid != LGRP_NONE &&
+			    p->p_tr_lgrpid != p->p_t1_lgrpid) {
+				lgrp_update_trthr_migrations(1);
+			}
+		}
 
 		/*
 		 * Reflect move in load average of new lgroup
@@ -3493,7 +3522,7 @@ lgrp_privm_policy_set(lgrp_mem_policy_t policy,
 	 * Set policy
 	 */
 	policy_info->mem_policy = policy;
-	policy_info->mem_reserved = 0;
+	policy_info->mem_lgrpid = LGRP_NONE;
 
 	return (0);
 }
@@ -3604,8 +3633,22 @@ lgrp_mem_choose(struct seg *seg, caddr_t vaddr, size_t pgsz)
 				policy = LGRP_MEM_POLICY_RANDOM;
 		} else {
 			policy_info = lgrp_mem_policy_get(seg, vaddr);
-			if (policy_info != NULL)
+			if (policy_info != NULL) {
 				policy = policy_info->mem_policy;
+				if (policy == LGRP_MEM_POLICY_NEXT_SEG) {
+					lgrp_id_t id = policy_info->mem_lgrpid;
+					ASSERT(id != LGRP_NONE);
+					ASSERT(id < NLGRPS_MAX);
+					lgrp = lgrp_table[id];
+					if (!LGRP_EXISTS(lgrp)) {
+						policy = LGRP_MEM_POLICY_NEXT;
+					} else {
+						lgrp_stat_add(id,
+						    LGRP_NUM_NEXT_SEG, 1);
+						return (lgrp);
+					}
+				}
+			}
 		}
 	}
 	lgrpset = 0;
@@ -4167,7 +4210,7 @@ lgrp_shm_policy_set(lgrp_mem_policy_t policy, struct anon_map *amp,
 			newseg = kmem_alloc(sizeof (lgrp_shm_policy_seg_t),
 			    KM_SLEEP);
 			newseg->shm_policy.mem_policy = policy;
-			newseg->shm_policy.mem_reserved = 0;
+			newseg->shm_policy.mem_lgrpid = LGRP_NONE;
 			newseg->shm_off = off;
 			avl_insert(tree, newseg, where);
 
@@ -4229,7 +4272,7 @@ lgrp_shm_policy_set(lgrp_mem_policy_t policy, struct anon_map *amp,
 			 * Set policy and update current length
 			 */
 			seg->shm_policy.mem_policy = policy;
-			seg->shm_policy.mem_reserved = 0;
+			seg->shm_policy.mem_lgrpid = LGRP_NONE;
 			len = 0;
 
 			/*
@@ -4262,7 +4305,8 @@ lgrp_shm_policy_set(lgrp_mem_policy_t policy, struct anon_map *amp,
 				 */
 				if (eoff == oldeoff) {
 					newseg->shm_policy.mem_policy = policy;
-					newseg->shm_policy.mem_reserved = 0;
+					newseg->shm_policy.mem_lgrpid =
+					    LGRP_NONE;
 					(void) lgrp_shm_policy_concat(tree,
 					    newseg, AVL_NEXT(tree, newseg));
 					break;
@@ -4278,12 +4322,13 @@ lgrp_shm_policy_set(lgrp_mem_policy_t policy, struct anon_map *amp,
 					(void) lgrp_shm_policy_split(tree,
 					    newseg, eoff);
 					newseg->shm_policy.mem_policy = policy;
-					newseg->shm_policy.mem_reserved = 0;
+					newseg->shm_policy.mem_lgrpid =
+					    LGRP_NONE;
 				} else {
 					(void) lgrp_shm_policy_split(tree, seg,
 					    eoff);
 					seg->shm_policy.mem_policy = policy;
-					seg->shm_policy.mem_reserved = 0;
+					seg->shm_policy.mem_lgrpid = LGRP_NONE;
 				}
 
 				if (off == seg->shm_off)

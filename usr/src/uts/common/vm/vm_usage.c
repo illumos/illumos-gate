@@ -1110,11 +1110,20 @@ vmu_calculate_seg(vmu_entity_t *vmu_entities, struct seg *seg)
 			if (svd->amp->swresv == 0)
 				incore = B_TRUE;
 		}
-		if (svd->amp != NULL && svd->type == MAP_PRIVATE) {
+		SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_READER);
+		/*
+		 * Text replication anon maps can be shared across all zones.
+		 * Space used for text replication is typically capped as
+		 * small % of memory.  To keep it simple for now we don't
+		 * account for swap and memory space used for text replication.
+		 */
+		if (svd->tr_state == SEGVN_TR_OFF && svd->amp != NULL &&
+		    svd->type == MAP_PRIVATE) {
 			private_amp = svd->amp;
 			p_start = svd->anon_index;
 			p_end = svd->anon_index + btop(seg->s_size) - 1;
 		}
+		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 	} else if (seg->s_ops == &segspt_shmops) {
 		shared = B_TRUE;
 		shmd = (struct shm_data *)seg->s_data;

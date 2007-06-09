@@ -300,6 +300,8 @@ typedef int		id_t;
 typedef	long		id_t;		/* (historical version) */
 #endif
 
+typedef id_t		lgrp_id_t;	/* lgroup ID */
+
 /*
  * Type useconds_t is an unsigned integral type capable of storing
  * values at least in the range of zero to 1,000,000.
