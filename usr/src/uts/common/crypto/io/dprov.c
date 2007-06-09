@@ -1716,6 +1716,7 @@ dprov_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	softc->ds_prov_handle = NULL;
 
 	/* create minor node */
+	(void) sprintf(devname, "dprov%d", instance);
 	if (ddi_create_minor_node(dip, devname, S_IFCHR, instance,
 	    DDI_PSEUDO, 0) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "attach: failed creating minor node");
