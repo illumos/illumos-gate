@@ -226,6 +226,7 @@ SUNWprivate_1.1 {
 	Java_com_sun_audit_AuditSession_dupSession;
 	Java_com_sun_audit_AuditSession_getSessionId;
 	Java_com_sun_audit_AuditSession_exportSessionData;
+	Java_com_sun_audit_AuditSession_sessionAttr;
 
 # One subclass of AuditEvent per audit record...
 EOF
