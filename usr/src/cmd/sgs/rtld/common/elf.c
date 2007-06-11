@@ -1857,7 +1857,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 		 * for additional details.
 		 */
 		if (VERNDX_INVALID(sym->st_shndx, VERDEFNUM(ilmp),
-		    VERSYM(ilmp), VERSYM(ilmp)[ndx])) {
+		    VERSYM(ilmp), ndx)) {
 			DBG_CALL(Dbg_syms_ignore_badver(ilmp, name,
 			    ndx, VERSYM(ilmp)[ndx]));
 			if ((ndx = chainptr[ndx]) != 0)

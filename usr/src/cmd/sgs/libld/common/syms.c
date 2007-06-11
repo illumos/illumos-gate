@@ -434,7 +434,9 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	    ((nsym->st_shndx == SHN_COMMON) ||
 	    (nsym->st_shndx == SHN_X86_64_LCOMMON)))))
 #else
+	/* BEGIN CSTYLED */
 	    (nsym->st_shndx == SHN_COMMON))))
+	/* END CSTYLED */
 #endif
 		sdp->sd_flags |= FLG_SY_GLOBREF;
 
@@ -565,15 +567,16 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 			 */
 			if (!(usdp->sd_flags1 & FLG_SY1_LOCL) &&
 			    (flags1 & FLG_SY1_GLOB)) {
-			    usdp->sd_aux->sa_overndx = VER_NDX_GLOBAL;
-			    if (sdaux_id == SDAUX_ID_GOT) {
-				    usdp->sd_flags1 &= ~FLG_SY1_NDIR;
-				    usdp->sd_flags1 |= FLG_SY1_PROT;
-				    usdp->sd_sym->st_other = STV_PROTECTED;
-			    } else if (((usdp->sd_flags1 & FLG_SY1_DIR) == 0) &&
-				((ofl->ofl_flags & FLG_OF_SYMBOLIC) == 0)) {
-				    usdp->sd_flags1 |= FLG_SY1_NDIR;
-			    }
+				usdp->sd_aux->sa_overndx = VER_NDX_GLOBAL;
+				if (sdaux_id == SDAUX_ID_GOT) {
+					usdp->sd_flags1 &= ~FLG_SY1_NDIR;
+					usdp->sd_flags1 |= FLG_SY1_PROT;
+					usdp->sd_sym->st_other = STV_PROTECTED;
+				} else if (
+				    ((usdp->sd_flags1 & FLG_SY1_DIR) == 0) &&
+				    ((ofl->ofl_flags & FLG_OF_SYMBOLIC) == 0)) {
+					usdp->sd_flags1 |= FLG_SY1_NDIR;
+				}
 			}
 			usdp->sd_flags1 |= flags1;
 
@@ -688,10 +691,10 @@ static void
 sym_undef_title(Ofl_desc *ofl)
 {
 	eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_FMT_UNDEF),
-		MSG_INTL(MSG_SYM_UNDEF_ITM_11),
-		MSG_INTL(MSG_SYM_UNDEF_ITM_21),
-		MSG_INTL(MSG_SYM_UNDEF_ITM_12),
-		MSG_INTL(MSG_SYM_UNDEF_ITM_22));
+	    MSG_INTL(MSG_SYM_UNDEF_ITM_11),
+	    MSG_INTL(MSG_SYM_UNDEF_ITM_21),
+	    MSG_INTL(MSG_SYM_UNDEF_ITM_12),
+	    MSG_INTL(MSG_SYM_UNDEF_ITM_22));
 
 	undef_title = FALSE;
 }
@@ -1339,7 +1342,7 @@ ld_sym_validate(Ofl_desc *ofl)
 		 */
 		if (sym->st_shndx == SHN_X86_64_LCOMMON) {
 			lbsssize = (Xword)S_ROUND(lbsssize, sym->st_value) +
-				sym->st_size;
+			    sym->st_size;
 			if (sym->st_value > lbssalign)
 				lbssalign = sym->st_value;
 		}
@@ -2011,8 +2014,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		 * comment that accompanies the VERSYM_INVALID macro in libld.h
 		 * for additional details.
 		 */
-		if (VERNDX_INVALID(shndx, ifl->ifl_vercnt, ifl->ifl_versym,
-		    ifl->ifl_versym[ndx]))
+		if (VERNDX_INVALID(shndx, ifl->ifl_vercnt,
+		    ifl->ifl_versym, ndx))
 			continue;
 
 		/*
@@ -2279,15 +2282,16 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 					s_dynbits = ssdp->sd_flags &
 					    (FLG_SY_DYNSORT | FLG_SY_NODYNSORT);
 					if (!(w_dynbits && s_dynbits)) {
-					    if (s_dynbits) {
-						if (s_dynbits == FLG_SY_DYNSORT)
-						    wsdp->sd_flags |=
-							FLG_SY_NODYNSORT;
-					    } else if (w_dynbits !=
-						FLG_SY_NODYNSORT) {
-						ssdp->sd_flags |=
-						    FLG_SY_NODYNSORT;
-					    }
+						if (s_dynbits) {
+							if (s_dynbits ==
+							    FLG_SY_DYNSORT)
+							wsdp->sd_flags |=
+							    FLG_SY_NODYNSORT;
+						} else if (w_dynbits !=
+						    FLG_SY_NODYNSORT) {
+							ssdp->sd_flags |=
+							    FLG_SY_NODYNSORT;
+						}
 					}
 					break;
 				}

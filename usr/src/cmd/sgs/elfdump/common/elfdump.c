@@ -511,8 +511,8 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 		 * Walk the Eh_frame's
 		 */
 		while (off < datasize) {
-			uint_t		cieid, cielength, cieversion,
-					cieretaddr;
+			uint_t		cieid, cielength, cieversion;
+			uint_t		cieretaddr;
 			int		cieRflag, cieLflag, ciePflag, cieZflag;
 			uint_t		cieaugndx, length, id;
 			uint64_t	ciecalign, ciedalign;
@@ -565,7 +565,8 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 				    cieretaddr);
 
 				if (cieaugstr[0])
-				    dbg_print(0, MSG_ORIG(MSG_UNW_CIEAUXVAL));
+					dbg_print(0,
+					    MSG_ORIG(MSG_UNW_CIEAXVAL));
 
 				for (cieaugndx = 0; cieaugstr[cieaugndx];
 				    cieaugndx++) {
@@ -573,48 +574,48 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 
 					switch (cieaugstr[cieaugndx]) {
 					case 'z':
-					    val = uleb_extract(&data[off],
-						&ndx);
-					    dbg_print(0,
-						MSG_ORIG(MSG_UNW_CIEAUXSIZE),
-						val);
-					    cieZflag = 1;
-					    break;
+						val = uleb_extract(&data[off],
+						    &ndx);
+						dbg_print(0,
+						    MSG_ORIG(MSG_UNW_CIEAXSIZ),
+						    val);
+						cieZflag = 1;
+						break;
 					case 'P':
-					    ciePflag = data[off + ndx];
-					    ndx += 1;
+						ciePflag = data[off + ndx];
+						ndx += 1;
 
-					    persVal = dwarf_ehe_extract(
-						&data[off],
-						&ndx, ciePflag, ehdr->e_ident,
-						shdr->sh_addr + off + ndx);
-					    dbg_print(0,
-						MSG_ORIG(MSG_UNW_CIEAUXPERS),
-						ciePflag,
-						conv_dwarf_ehe(ciePflag),
-						EC_XWORD(persVal));
-					    break;
+						persVal = dwarf_ehe_extract(
+						    &data[off], &ndx, ciePflag,
+						    ehdr->e_ident,
+						    shdr->sh_addr + off + ndx);
+						dbg_print(0,
+						    MSG_ORIG(MSG_UNW_CIEAXPERS),
+						    ciePflag,
+						    conv_dwarf_ehe(ciePflag),
+						    EC_XWORD(persVal));
+						break;
 					case 'R':
-					    val = data[off + ndx];
-					    ndx += 1;
-					    dbg_print(0,
-						MSG_ORIG(MSG_UNW_CIEAUXCENC),
-						val, conv_dwarf_ehe(val));
-					    cieRflag = val;
-					    break;
+						val = data[off + ndx];
+						ndx += 1;
+						dbg_print(0,
+						    MSG_ORIG(MSG_UNW_CIEAXCENC),
+						    val, conv_dwarf_ehe(val));
+						cieRflag = val;
+						break;
 					case 'L':
-					    val = data[off + ndx];
-					    ndx += 1;
-					    dbg_print(0,
-						MSG_ORIG(MSG_UNW_CIEAUXLSDA),
-						val, conv_dwarf_ehe(val));
-					    cieLflag = val;
-					    break;
+						val = data[off + ndx];
+						ndx += 1;
+						dbg_print(0,
+						    MSG_ORIG(MSG_UNW_CIEAXLSDA),
+						    val, conv_dwarf_ehe(val));
+						cieLflag = val;
+						break;
 					default:
-					    dbg_print(0,
-						MSG_ORIG(MSG_UNW_CIEAUXUNEC),
-						cieaugstr[cieaugndx]);
-					    break;
+						dbg_print(0,
+						    MSG_ORIG(MSG_UNW_CIEAXUNEC),
+						    cieaugstr[cieaugndx]);
+						break;
 					}
 				}
 				if ((cielength + 4) > ndx)
@@ -648,21 +649,21 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 
 				if (cieaugstr[0])
 					dbg_print(0,
-					    MSG_ORIG(MSG_UNW_FDEAUXVAL));
+					    MSG_ORIG(MSG_UNW_FDEAXVAL));
 				if (cieZflag) {
 					uint64_t    val;
 					val = uleb_extract(&data[off], &ndx);
 					dbg_print(0,
-					    MSG_ORIG(MSG_UNW_FDEAUXSIZE),
+					    MSG_ORIG(MSG_UNW_FDEAXSIZE),
 					    EC_XWORD(val));
 					if (val & cieLflag) {
-					    fdeinitloc = dwarf_ehe_extract(
-						&data[off], &ndx, cieLflag,
-						ehdr->e_ident,
-						shdr->sh_addr + off + ndx);
-					    dbg_print(0,
-						MSG_ORIG(MSG_UNW_FDEAUXLSDA),
-						EC_XWORD(val));
+						fdeinitloc = dwarf_ehe_extract(
+						    &data[off], &ndx, cieLflag,
+						    ehdr->e_ident,
+						    shdr->sh_addr + off + ndx);
+						dbg_print(0,
+						    MSG_ORIG(MSG_UNW_FDEAXLSDA),
+						    EC_XWORD(val));
 					}
 				}
 				if ((fdelength + 4) > ndx)
@@ -955,8 +956,7 @@ version_def(Verdef *vdf, Word shnum, Cache *vcache, Cache *scache,
 		const char	*name, *dep;
 		Half		vcnt = vdf->vd_cnt - 1;
 		Half		ndx = vdf->vd_ndx;
-		Verdaux		*vdap = (Verdaux *)((uintptr_t)vdf +
-				    vdf->vd_aux);
+		Verdaux *vdap = (Verdaux *)((uintptr_t)vdf + vdf->vd_aux);
 
 		/*
 		 * Obtain the name and first dependency (if any).
@@ -1004,8 +1004,7 @@ version_need(Verneed *vnd, Word shnum, Cache *vcache, Cache *scache,
 	    vnd = (Verneed *)((uintptr_t)vnd + vnd->vn_next)) {
 		const char	*name, *dep;
 		Half		vcnt = vnd->vn_cnt;
-		Vernaux		*vnap = (Vernaux *)((uintptr_t)vnd +
-					vnd->vn_aux);
+		Vernaux *vnap = (Vernaux *)((uintptr_t)vnd + vnd->vn_aux);
 
 		/*
 		 * Obtain the name of the needed file and the version name
@@ -1314,19 +1313,20 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word disp_symndx, Sym *sym)
 			Word	_shxndx;
 
 			if (symndx > state->shxndx.n) {
-			    (void) fprintf(stderr,
-				MSG_INTL(MSG_ERR_BADSYMXINDEX1),
-				state->file, state->secname, EC_WORD(symndx));
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_BADSYMXINDEX1),
+				    state->file, state->secname,
+				    EC_WORD(symndx));
 			} else if ((_shxndx =
 			    state->shxndx.data[symndx]) > state->shnum) {
-			    (void) fprintf(stderr,
-				MSG_INTL(MSG_ERR_BADSYMXINDEX2),
-				state->file, state->secname, EC_WORD(symndx),
-				EC_WORD(_shxndx));
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_BADSYMXINDEX2),
+				    state->file, state->secname,
+				    EC_WORD(symndx), EC_WORD(_shxndx));
 			} else {
-			    shndx = _shxndx;
-			    tshdr = state->cache[shndx].c_shdr;
-			    sec = state->cache[shndx].c_name;
+				shndx = _shxndx;
+				tshdr = state->cache[shndx].c_shdr;
+				sec = state->cache[shndx].c_name;
 			}
 		} else {
 			(void) fprintf(stderr,
@@ -1362,8 +1362,8 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word disp_symndx, Sym *sym)
 		 *	- If this is not a GNU "hidden bit" issue, then
 		 *		issue a generic "out of range" error.
 		 */
-		if (VERNDX_INVALID(sym->st_shndx, state->versym->num_verdef,
-		    state->versym->data, verndx)) {
+		if (VERNDX_INVALID_DIAG(sym->st_shndx,
+		    state->versym->num_verdef, state->versym->data, symndx)) {
 			if (state->versym->gnu && (verndx & 0x8000) &&
 			    ((verndx & ~0x8000) <=
 			    state->versym->num_verdef)) {
@@ -1800,7 +1800,7 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 				 */
 				end_ndx = ndx;
 				while ((end_ndx < (numdyn - 1)) &&
-					((dyn + 1)->d_tag == DT_NULL)) {
+				    ((dyn + 1)->d_tag == DT_NULL)) {
 					dyn++;
 					end_ndx++;
 				}
@@ -2415,7 +2415,7 @@ group(Cache *cache, Word shnum, const char *file, uint_t flags)
 				name = cache[grpdata[gcnt]].c_name;
 
 			(void) printf(MSG_ORIG(MSG_GRP_ENTRY), index, name,
-				EC_XWORD(grpdata[gcnt]));
+			    EC_XWORD(grpdata[gcnt]));
 		}
 	}
 }

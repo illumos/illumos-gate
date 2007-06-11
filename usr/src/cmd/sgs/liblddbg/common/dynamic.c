@@ -51,14 +51,6 @@ Elf_dyn_entry(Lm_list *lml, Dyn *dyn, int ndx, const char *name, Half mach)
 	    conv_dyn_tag(dyn->d_tag, mach, 0), EC_XWORD(dyn->d_un.d_val), name);
 }
 
-#ifdef _ELF64
-void
-GElf_dyn_entry(GElf_Dyn *dyn, int ndx, const char *name, GElf_Half mach)
-{
-	Elf_dyn_entry(NULL, dyn, ndx, name, mach);
-}
-#endif
-
 /*
  * Variant of Elf_dyn_entry() specifically for DT_NULL. Handles the
  * case of multiple adjacent DT_NULL entries by displaying them on
@@ -76,6 +68,6 @@ Elf_dyn_null_entry(Lm_list *lml, Dyn *dyn, int start_ndx, int end_ndx)
 		    MSG_ORIG(MSG_FMT_INDEX_RANGE), start_ndx, end_ndx);
 		dbg_print(lml, MSG_INTL(MSG_DYN_ENTRY), index,
 		    conv_dyn_tag(DT_NULL, 0, 0), EC_XWORD(dyn->d_un.d_val),
-			MSG_ORIG(MSG_STR_EMPTY));
+		    MSG_ORIG(MSG_STR_EMPTY));
 	}
 }

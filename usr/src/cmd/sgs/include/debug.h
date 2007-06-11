@@ -962,16 +962,6 @@ extern	void	Elf_ver_line_5(Lm_list *, const char *, const char *);
 extern	void	Elf_ver_need_title(Lm_list *);
 
 
-/*
- * Establish GElf_*() interfaces. These are wrappers around the
- * Elf64*() versions of the above functions, callable from either
- * 32 or 64-bit code. Note that they omit the Lm_list argument.
- * It is not needed, since GElf is never used within the runtime loader
- * itself, only in ELF applications.
- */
-extern	void	GElf_dyn_entry(GElf_Dyn *, int, const char *, GElf_Half);
-
-
 #ifdef	__cplusplus
 }
 #endif

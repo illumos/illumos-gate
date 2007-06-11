@@ -1241,3 +1241,4 @@ Bugid   Risk Synopsis
 6556563 elfdump section overlap checking is too slow for large files
 5006034 need ?E mapfile feature extension (D)
 6561987 data vac_conflict faults on lipthread libthread libs in s10.
+6565476 rtld symbol version check prevents GNU ld binary from running

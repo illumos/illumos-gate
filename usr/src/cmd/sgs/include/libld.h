@@ -939,13 +939,24 @@ struct	ver_index {
  * entry:
  *	_shndx - Symbol section index
  *	_vercnt - # of versions defined by object containing symbol
- *	_versym_arr - NULL, or pointer to versym array
- *	_verndx - Version index of symbol. Note that this argument is
- *		only evaluated if _versym_arr is non-NULL.
+ *		in its verdef section. 0 implies that there is no verdef.
+ *	_versym - Pointer to versym array, or NULL if there isn't one.
+ *	_symndx - Index of symbol within containing symbol table
+ *		Used to index _versym, but only if _versym is non-NULL.
  *
  * note:
- *	_vercnt and _verndx are evaluated more than once. Beware
- *	of expensive computations, or computations with side effects.
+ *	_vercnt and _versym[_symndx] are evaluated more than once.
+ *	Beware of expensive computations, or computations with side effects.
+ *
+ * There are two versions of this macro:
+ *
+ *	VERNDX_INVALID - Used by ld and rtld
+ *	VERNDX_INVALID_DIAG - Used by diagnostic tools such as elfdump.
+ *
+ * The difference is that VERNDX_INVALID does not examine the versym
+ * array if the number of defined versions is 0. This allows us to
+ * run GNU binaries (See below for details). However, the diagnostic
+ * tools will report them.
  *
  * If we encounter a defined symbol with a version that is outside the
  * range of the valid versions supplied by the file, then we quietly
@@ -973,14 +984,22 @@ struct	ver_index {
  *
  * In this case, there will be a versym section (containing version
  * indexes 0 and 1). However, there are no versions defined, and
- * hence no corresponding verdef section. We treat this case specially:
- * If the versym section is present (_versym_arr is non-NULL)
- * and the verdef section is not, we act as if _vercnt is 1.
+ * hence no corresponding verdef section.
+ *
+ * We have also seen objects produced by the GNU ld in which an object
+ * with no verdef section contains symbols with version symbols greater
+ * than 1. For both of these reasons, we allow and ignore arbitrary
+ * versions in the case where there is a versym section but the vesion
+ * count (_vercnt) is 0.
  */
-#define	VERNDX_INVALID(_shndx, _vercnt, _versym_arr, _verndx) \
-	(((_shndx) != SHN_UNDEF) && (_versym_arr != NULL) && \
-	((_verndx) > ((_vercnt == 0) ? 1 : _vercnt)) && \
-	((_verndx) < VER_NDX_LORESERVE))
+#define	VERNDX_INVALID_DIAG(_shndx, _vercnt, _versym, _symndx) \
+	(((_shndx) != SHN_UNDEF) && (_versym != NULL) && \
+	((_versym)[_symndx] > ((_vercnt == 0) ? 1 : _vercnt)) && \
+	((_versym)[_symndx] < VER_NDX_LORESERVE))
+#define	VERNDX_INVALID(_shndx, _vercnt, _versym, _symndx) \
+	(((_shndx) != SHN_UNDEF) && (_versym != NULL) && \
+	((_versym)[_symndx] > _vercnt) && ((_vercnt) > 0) && \
+	((_versym)[_symndx] < VER_NDX_LORESERVE))
 
 
 
