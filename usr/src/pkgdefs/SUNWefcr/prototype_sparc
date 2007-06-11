@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -53,3 +53,7 @@ d none var/svc/manifest/platform/sun4u 755 root sys
 d none var/svc/manifest/platform/sun4v 755 root sys
 f manifest var/svc/manifest/platform/sun4u/efdaemon.xml 444 root sys
 f manifest var/svc/manifest/platform/sun4v/efdaemon.xml 444 root sys
+d none etc 755 root sys
+d none etc/flash 755 root sys
+d none etc/flash/postdeployment 755 root sys
+f none etc/flash/postdeployment/efcode.cleanup 0744 root sys
