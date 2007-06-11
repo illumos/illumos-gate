@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * platform -- platform-specific access to configuration database
@@ -37,6 +37,7 @@ extern "C" {
 #endif
 
 #include <config.h>
+#include <fm/fmd_api.h>
 
 nvlist_t *Action_nvl;	/* nvl for problem with action=... prop on it */
 
@@ -48,6 +49,8 @@ void platform_units_translate(int, struct config *, nvlist_t **, nvlist_t **,
     nvlist_t **, char *);
 
 struct cfgdata *platform_config_snapshot(void);
+void platform_restore_config(fmd_hdl_t *hdl, fmd_case_t *fmcase);
+void platform_save_config(fmd_hdl_t *hdl, fmd_case_t *fmcase);
 struct node *platform_getpath(nvlist_t *nvl);
 
 char **platform_get_eft_files(void);

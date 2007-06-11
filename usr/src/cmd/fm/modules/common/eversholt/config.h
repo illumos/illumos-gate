@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * config.h -- public definitions for config module
@@ -43,7 +43,8 @@ extern "C" {
 #include "lut.h"
 
 struct cfgdata {
-	int refcnt;
+	int raw_refcnt;
+	int cooked_refcnt;
 	/*
 	 * The begin field points to the first byte of raw
 	 * configuration information and end to the byte past the last
@@ -66,6 +67,7 @@ void config_free(struct cfgdata *cdata);
 struct config *config_lookup(struct config *croot, char *path, int add);
 struct config *config_next(struct config *cp);
 struct config *config_child(struct config *cp);
+struct config *config_parent(struct config *cp);
 
 const char *config_getprop(struct config *cp, const char *name);
 void config_setprop(struct config *cp, const char *name, const char *val);

@@ -20,7 +20,7 @@
  */
 
 /* 
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved. 
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved. 
  * Use is subject to license terms. 
  */ 
  
@@ -46,28 +46,16 @@ asru chip/memory-controller/chip-select;
 #define	MIN(x, y) ((x) <= (y) ? (x) : (y))
 
 /*
- * GET_ADDR relies on the fact that variables have global scope across an FME.
- * Thus for each FME the assignment only occurs for the first invocation
- * but the comparison happens on each. Thus if the new address matches the 
- * address of an existing open FME, then we return true running in the context
- * of that FME. If the new address doesn't match the address of any existing 
- * open FME, then we return true in the context of a newly opened FME.
- */
-#define GET_ADDR (defined($addr) ? ($addr == payloadprop("addr")) :	\
-	($addr = payloadprop("addr")))
-
-#define	GET_OFFSET ($offset = payloadprop("resource[0].hc-specific.offset"))
-
-/*
  * SET_ADDR and SET_OFFSET are used to set a payload value in the fault that
  * we diagnose for page faults, to record the physical address of the faulting
  * page.  The "asru-" prefix is hooked in the "rewrite-ASRU" confcalls made on
  * diagnosis of associated faults when the libtopo mem scheme rewrites the
  * asru in "mem" scheme.
  */
-#define	SET_ADDR (setpayloadprop("asru-physaddr", $addr))
+#define	SET_ADDR (setpayloadprop("asru-physaddr", payloadprop("addr")))
 
-#define	SET_OFFSET (setpayloadprop("asru-offset", $offset))
+#define	SET_OFFSET (setpayloadprop("asru-offset", \
+	payloadprop("resource[0].hc-specific.offset")))
 
 /*
  * RESOURCE_EXISTS is true if a member with name "resource" exists in the
@@ -89,7 +77,9 @@ asru chip/memory-controller/chip-select;
  * such that it only happens if the payload resource matches the rank.
  */
 #define	CONTAINS_RANK (payloadprop_contains("resource", \
-	asru(chip/memory-controller/dimm/rank)))
+	asru(chip/memory-controller/dimm/rank)) \
+	|| payloadprop_contains("resource", \
+	asru(chip/memory-controller/dimm)))
 
 /*
  * The following will tell us whether a syndrome that is known to be
@@ -250,14 +240,14 @@ event fault.memory.page_ck@chip/memory-controller/dimm/rank,
 #define	RANK_PGFLT_LIMIT_REACHED \
     (SB_PGFLTS + CK_PGFLTS > RANK_PGFLT_MAX)
 
-event ereport.memory.page_sb_trip@chip/memory-controller/dimm/rank;
+event ereport.memory.page_sb_trip@chip/memory-controller/dimm/rank{within(5s)};
 engine serd.memory.page_sb@chip/memory-controller/dimm/rank,
     N=PAGE_SB_COUNT, T=PAGE_SB_TIME, method=persistent,
     trip=ereport.memory.page_sb_trip@chip/memory-controller/dimm/rank;
 event upset.memory.page_sb@chip/memory-controller/dimm/rank,
     engine=serd.memory.page_sb@chip/memory-controller/dimm/rank;
 
-event ereport.memory.page_ck_trip@chip/memory-controller/dimm/rank;
+event ereport.memory.page_ck_trip@chip/memory-controller/dimm/rank{within(5s)};
 engine serd.memory.page_ck@chip/memory-controller/dimm/rank,
     N=PAGE_CK_COUNT, T=PAGE_CK_TIME, method=persistent,
     trip=ereport.memory.page_ck_trip@chip/memory-controller/dimm/rank;
@@ -271,31 +261,27 @@ event upset.memory.overpgfltlimit@chip/memory-controller/dimm/rank;
  * continue to explain ereport observations as upsets which can lead
  * lead to page fault diagnoses if the serd engine trips.
  */
-prop upset.memory.page_sb@chip/memory-controller/dimm/rank (0)->
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu
-	{ CONTAINS_RANK && SINGLE_BIT_CE && !RANK_PGFLT_LIMIT_REACHED },
-    ereport.cpu.amd.bu.s_ecc1@chip/cpu 
- 	{ CONTAINS_RANK && SINGLE_BIT_CE && !RANK_PGFLT_LIMIT_REACHED },
-    ereport.cpu.amd.nb.mem_ce@chip/cpu
-	{ CONTAINS_RANK && SINGLE_BIT_CE && !RANK_PGFLT_LIMIT_REACHED };
+prop upset.memory.page_sb@chip/memory-controller/dimm/rank
+    { CONTAINS_RANK && SINGLE_BIT_CE && !RANK_PGFLT_LIMIT_REACHED } (0)->
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
+    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
+    ereport.cpu.amd.nb.mem_ce@chip/cpu;
 
-prop upset.memory.page_ck@chip/memory-controller/dimm/rank (0)->
+prop upset.memory.page_ck@chip/memory-controller/dimm/rank
+    { CONTAINS_RANK && MULTI_BIT_CE && !RANK_PGFLT_LIMIT_REACHED } (0)->
     /* no dc.inf_sys_ecc1 or bu.s_ecc1 in ChipKill mode */
-    ereport.cpu.amd.nb.mem_ce@chip/cpu
-	{ CONTAINS_RANK && MULTI_BIT_CE && !RANK_PGFLT_LIMIT_REACHED };
+    ereport.cpu.amd.nb.mem_ce@chip/cpu;
 
 /*
  * If we have reached the per-rank limit on faulted pages then diagnose
  * further observations on the rank to a engine-less upset (i.e., discard
  * them).
  */
-prop upset.memory.overpgfltlimit@chip/memory-controller/dimm/rank (1)->
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu
-	{ CONTAINS_RANK && RANK_PGFLT_LIMIT_REACHED },
-    ereport.cpu.amd.bu.s_ecc1@chip/cpu 
-	{ CONTAINS_RANK && RANK_PGFLT_LIMIT_REACHED },
-    ereport.cpu.amd.nb.mem_ce@chip/cpu
-	{ CONTAINS_RANK && RANK_PGFLT_LIMIT_REACHED };
+prop upset.memory.overpgfltlimit@chip/memory-controller/dimm/rank
+    { CONTAINS_RANK && RANK_PGFLT_LIMIT_REACHED } (1)->
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
+    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
+    ereport.cpu.amd.nb.mem_ce@chip/cpu;
   
 prop fault.memory.page_sb@chip/memory-controller/dimm/rank (1)->
     ereport.memory.page_sb_trip@chip/memory-controller/dimm/rank;
@@ -304,31 +290,26 @@ prop fault.memory.page_ck@chip/memory-controller/dimm/rank (1)->
     ereport.memory.page_ck_trip@chip/memory-controller/dimm/rank;
 
 prop fault.memory.page_sb@chip/memory-controller/dimm/rank
-    { SET_ADDR && SET_OFFSET } (0)->
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu
-	{ CONTAINS_RANK && GET_ADDR && GET_OFFSET },
-    ereport.cpu.amd.bu.s_ecc1@chip/cpu
-	{ CONTAINS_RANK && GET_ADDR && GET_OFFSET },
-    ereport.cpu.amd.nb.mem_ce@chip/cpu
-	{ CONTAINS_RANK && GET_ADDR && GET_OFFSET };
+    { CONTAINS_RANK && SET_ADDR && SET_OFFSET } (0)->
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
+    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
+    ereport.cpu.amd.nb.mem_ce@chip/cpu;
 
 prop fault.memory.page_ck@chip/memory-controller/dimm/rank
-    { SET_ADDR && SET_OFFSET } (0)->
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu
-	{ CONTAINS_RANK && GET_ADDR && GET_OFFSET },
-    ereport.cpu.amd.bu.s_ecc1@chip/cpu
-	{ CONTAINS_RANK && GET_ADDR && GET_OFFSET },
-    ereport.cpu.amd.nb.mem_ce@chip/cpu
-	{ CONTAINS_RANK && GET_ADDR && GET_OFFSET };
+    { CONTAINS_RANK && SET_ADDR && SET_OFFSET } (0)->
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
+    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
+    ereport.cpu.amd.nb.mem_ce@chip/cpu;
 
 /*
  * Discard memory ereports that do not indicate a resource.
  */
-prop upset.memory.discard1@chip/cpu (1)->
-    ereport.cpu.amd.ic.inf_sys_ecc1@chip/cpu { !RESOURCE_EXISTS },
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu { !RESOURCE_EXISTS },
-    ereport.cpu.amd.bu.s_ecc1@chip/cpu { !RESOURCE_EXISTS },
-    ereport.cpu.amd.nb.mem_ce@chip/cpu { !RESOURCE_EXISTS };
+prop upset.memory.discard1@chip/cpu
+    { !RESOURCE_EXISTS } (1)->
+    ereport.cpu.amd.ic.inf_sys_ecc1@chip/cpu,
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
+    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
+    ereport.cpu.amd.nb.mem_ce@chip/cpu;
 
 /*								#DIMM_SCU#
  * "Single-correctable-unit" DIMM faults are diagnosed when the total number of
@@ -383,13 +364,15 @@ event upset.memory.dimm_ck@chip/memory-controller/dimm/rank,
 
 event upset.memory.discard2@chip/memory-controller/dimm/rank;
 
-prop upset.memory.dimm_sb@chip/memory-controller/dimm/rank (0)->
-    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu { CONTAINS_RANK && SINGLE_BIT_CE },
-    ereport.cpu.amd.bu.s_ecc1@chip/cpu { CONTAINS_RANK && SINGLE_BIT_CE },
-    ereport.cpu.amd.nb.mem_ce@chip/cpu { CONTAINS_RANK && SINGLE_BIT_CE };
+prop upset.memory.dimm_sb@chip/memory-controller/dimm/rank
+    { CONTAINS_RANK && SINGLE_BIT_CE } (0)->
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
+    ereport.cpu.amd.bu.s_ecc1@chip/cpu,
+    ereport.cpu.amd.nb.mem_ce@chip/cpu;
 
-prop upset.memory.dimm_ck@chip/memory-controller/dimm/rank (0)->
-    ereport.cpu.amd.nb.mem_ce@chip/cpu { CONTAINS_RANK && MULTI_BIT_CE };
+prop upset.memory.dimm_ck@chip/memory-controller/dimm/rank
+    { CONTAINS_RANK && MULTI_BIT_CE } (0)->
+    ereport.cpu.amd.nb.mem_ce@chip/cpu;
 
 /*
  * The following two propogations diagnose a fault.memory.dimm_sb when
@@ -454,14 +437,14 @@ event fault.memory.page_ue@chip/memory-controller/dimm/rank,
     FITrate=PAGE_FIT, ASRU=dimm/rank, message=0,
     action=confcall("rewrite-ASRU"); /* rewrite ASRU to identify page in rank */
 
-event ereport.memory.dimm_ue_trip@chip/memory-controller/dimm/rank;
+event ereport.memory.dimm_ue_trip@chip/memory-controller/dimm/rank{within(5s)};
 engine serd.memory.dimm_ue@chip/memory-controller/dimm/rank,
     N=0, T=1h, method=persistent,
     trip=ereport.memory.dimm_ue_trip@chip/memory-controller/dimm/rank;
 event upset.memory.dimm_ue@chip/memory-controller/dimm/rank,
     engine=serd.memory.dimm_ue@chip/memory-controller/dimm/rank;
 
-event ereport.memory.page_ue_trip@chip/memory-controller/dimm/rank;
+event ereport.memory.page_ue_trip@chip/memory-controller/dimm/rank{within(5s)};
 engine serd.memory.page_ue@chip/memory-controller/dimm/rank,
     N=0, T=1h, method=persistent,
     trip=ereport.memory.page_ue_trip@chip/memory-controller/dimm/rank;
@@ -470,40 +453,39 @@ event upset.memory.page_ue@chip/memory-controller/dimm/rank,
 
 event upset.memory.discard3@chip/cpu;
 
-prop upset.memory.page_ue@chip/memory-controller/dimm/rank (0)->
-    ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu { CONTAINS_RANK },
-    ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu { CONTAINS_RANK },
-    ereport.cpu.amd.bu.s_eccm@chip/cpu { CONTAINS_RANK },
-    ereport.cpu.amd.nb.mem_ue@chip/cpu { CONTAINS_RANK };
+prop upset.memory.page_ue@chip/memory-controller/dimm/rank
+    { CONTAINS_RANK } (0)->
+    ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu,
+    ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu,
+    ereport.cpu.amd.bu.s_eccm@chip/cpu,
+    ereport.cpu.amd.nb.mem_ue@chip/cpu;
 
-prop upset.memory.dimm_ue@chip/memory-controller/dimm/rank (0)->
-    ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu { CONTAINS_RANK },
-    ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu { CONTAINS_RANK },
-    ereport.cpu.amd.bu.s_eccm@chip/cpu { CONTAINS_RANK },
-    ereport.cpu.amd.nb.mem_ue@chip/cpu { CONTAINS_RANK };
+prop upset.memory.dimm_ue@chip/memory-controller/dimm/rank
+    { CONTAINS_RANK } (0)->
+    ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu,
+    ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu,
+    ereport.cpu.amd.bu.s_eccm@chip/cpu,
+    ereport.cpu.amd.nb.mem_ue@chip/cpu;
 
 prop fault.memory.page_ue@chip/memory-controller/dimm/rank (1)->
     ereport.memory.page_ue_trip@chip/memory-controller/dimm/rank;
 
 prop fault.memory.page_ue@chip/memory-controller/dimm/rank
-    { SET_ADDR && SET_OFFSET } (0)-> 
-    ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu
-	{ CONTAINS_RANK && GET_ADDR && GET_OFFSET},
-    ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu
-	{ CONTAINS_RANK && GET_ADDR && GET_OFFSET},
-    ereport.cpu.amd.bu.s_eccm@chip/cpu
-	{ CONTAINS_RANK && GET_ADDR && GET_OFFSET},
-    ereport.cpu.amd.nb.mem_ue@chip/cpu
-	{ CONTAINS_RANK && GET_ADDR && GET_OFFSET };
+    { CONTAINS_RANK && SET_ADDR && SET_OFFSET } (0)-> 
+    ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu,
+    ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu,
+    ereport.cpu.amd.bu.s_eccm@chip/cpu,
+    ereport.cpu.amd.nb.mem_ue@chip/cpu;
 
 prop fault.memory.dimm_ue@chip/memory-controller/dimm/rank (1)-> 
     ereport.memory.dimm_ue_trip@chip/memory-controller/dimm/rank;
 
-prop upset.memory.discard3@chip/cpu (1)->
-    ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu { !RESOURCE_EXISTS },
-    ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu { !RESOURCE_EXISTS },
-    ereport.cpu.amd.bu.s_eccm@chip/cpu { !RESOURCE_EXISTS },
-    ereport.cpu.amd.nb.mem_ce@chip/cpu { !RESOURCE_EXISTS };
+prop upset.memory.discard3@chip/cpu
+    { !RESOURCE_EXISTS } (1)->
+    ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu,
+    ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu,
+    ereport.cpu.amd.bu.s_eccm@chip/cpu,
+    ereport.cpu.amd.nb.mem_ce@chip/cpu;
 
 /*								#CSTESTFAIL#
  * If the BIOS fails a chip-select during POST, or perhaps after a
@@ -516,7 +498,7 @@ prop upset.memory.discard3@chip/cpu (1)->
  * and resource indicating the failed chip-select.
  */
 
-event ereport.cpu.amd.mc.cs_testfail@chip/memory-controller;
+event ereport.cpu.amd.mc.cs_testfail@chip/memory-controller{within(5s)};
 
 event fault.memory.dimm_testfail@chip/memory-controller/dimm/rank,
     FITrate=1000, ASRU=dimm, FRU=dimm,
@@ -527,7 +509,7 @@ event error.memory.cs_testfail@chip/memory-controller/chip-select;
 #define	CONTAINS_CS (payloadprop_contains("resource", \
 	asru(chip/memory-controller/chip-select)))
 
-prop error.memory.cs_testfail@chip/memory-controller/chip-select ->
+prop error.memory.cs_testfail@chip/memory-controller/chip-select (1)->
     ereport.cpu.amd.mc.cs_testfail@chip/memory-controller
     { CONTAINS_CS };
 
@@ -536,7 +518,7 @@ prop error.memory.cs_testfail@chip/memory-controller/chip-select ->
 	confprop(asru(chip/memory-controller/chip-select), s) == \
 	confprop(asru(chip/memory-controller/dimm/rank), "csname"))
 
-prop fault.memory.dimm_testfail@chip/memory-controller/dimm/rank ->
+prop fault.memory.dimm_testfail@chip/memory-controller/dimm/rank (1)->
     error.memory.cs_testfail@chip/memory-controller/chip-select
     { CSMATCH("dimm1-csname") || CSMATCH("dimm2-csname")};
 
@@ -548,7 +530,7 @@ prop fault.memory.dimm_testfail@chip/memory-controller/dimm/rank ->
  *    the error.
  */
 
-event ereport.cpu.amd.nb.dramaddr_par@chip/cpu;
+event ereport.cpu.amd.nb.dramaddr_par@chip/cpu{within(5s)};
 
 event fault.cpu.amd.dramchannel@chip/memory-controller/dram-channel,
     FITrate=1000, ASRU=dram-channel;
@@ -590,7 +572,7 @@ prop fault.cpu.amd.l2cachedata@chip/cpu (1)->
 event ereport.cpu.amd.ic.inf_l2_ecc1@chip/cpu{within(5s)};
 event ereport.cpu.amd.dc.inf_l2_ecc1@chip/cpu{within(5s)};
 event ereport.cpu.amd.bu.l2d_ecc1@chip/cpu{within(5s)};
-event ereport.cpu.amd.l2d_sb_trip@chip/cpu;
+event ereport.cpu.amd.l2d_sb_trip@chip/cpu{within(5s)};
 
 engine serd.cpu.amd.l2d_sb@chip/cpu,
     N=L2CACHEDATA_SB_COUNT, T=L2CACHEDATA_SB_TIME, method=persistent, 
@@ -620,9 +602,9 @@ prop fault.cpu.amd.l2cachedata@chip/cpu (0)->
  *  - l2d_eccm : reported by bu on copyback or on snoop from another cpu 
  */ 
 
-event ereport.cpu.amd.ic.inf_l2_eccm@chip/cpu;
-event ereport.cpu.amd.dc.inf_l2_eccm@chip/cpu;
-event ereport.cpu.amd.bu.l2d_eccm@chip/cpu;
+event ereport.cpu.amd.ic.inf_l2_eccm@chip/cpu{within(5s)};
+event ereport.cpu.amd.dc.inf_l2_eccm@chip/cpu{within(5s)};
+event ereport.cpu.amd.bu.l2d_eccm@chip/cpu{within(5s)};
 
 prop error.cpu.amd.l2cachedata_mb@chip/cpu (1)->
     ereport.cpu.amd.ic.inf_l2_eccm@chip/cpu,
@@ -663,8 +645,8 @@ prop fault.cpu.amd.l2cachetag@chip/cpu (1)->
  */ 
 
 event ereport.cpu.amd.bu.l2t_ecc1@chip/cpu{within(5s)};
-event ereport.cpu.amd.bu.l2t_par@chip/cpu;
-event ereport.cpu.amd.l2t_sb_trip@chip/cpu;
+event ereport.cpu.amd.bu.l2t_par@chip/cpu{within(5s)};
+event ereport.cpu.amd.l2t_sb_trip@chip/cpu{within(5s)};
 
 engine serd.cpu.amd.l2t_sb@chip/cpu,
     N=L2CACHETAG_SB_COUNT, T=L2CACHETAG_SB_TIME, method=persistent, 
@@ -691,7 +673,7 @@ prop fault.cpu.amd.l2cachetag@chip/cpu (0)->
  *  - l2t_par : reported by bu on this cpu when detected other than during snoop
  */ 
 
-event ereport.cpu.amd.bu.l2t_eccm@chip/cpu;
+event ereport.cpu.amd.bu.l2t_eccm@chip/cpu{within(5s)};
 
 prop error.cpu.amd.l2cachetag_mb@chip/cpu (1)->
     ereport.cpu.amd.bu.l2t_eccm@chip/cpu,
@@ -712,7 +694,7 @@ prop fault.cpu.amd.l2cachetag@chip/cpu (0)->
 #define ICACHEDATA_SB_TIME	168h
 
 event ereport.cpu.amd.ic.data_par@chip/cpu{within(5s)};
-event ereport.cpu.amd.ic_dp_trip@chip/cpu;
+event ereport.cpu.amd.ic_dp_trip@chip/cpu{within(5s)};
 
 event fault.cpu.amd.icachedata@chip/cpu, FITrate=ICACHEDATA_FIT,
 	FRU=chip, ASRU=chip/cpu;
@@ -744,7 +726,7 @@ prop fault.cpu.amd.icachedata@chip/cpu (0)->
 #define ICACHETAG_SB_TIME	168h
 
 event ereport.cpu.amd.ic.tag_par@chip/cpu{within(5s)};
-event ereport.cpu.amd.ic_tp_trip@chip/cpu;
+event ereport.cpu.amd.ic_tp_trip@chip/cpu{within(5s)};
 
 event fault.cpu.amd.icachetag@chip/cpu, FITrate=ICACHETAG_FIT,
 	FRU=chip, ASRU=chip/cpu;
@@ -792,7 +774,7 @@ prop fault.cpu.amd.icachestag@chip/cpu (1)->
 #define ICACHEL1TLB_SB_TIME	168h
 
 event ereport.cpu.amd.ic.l1tlb_par@chip/cpu{within(5s)};
-event ereport.cpu.amd.ic_l1tlb_trip@chip/cpu;
+event ereport.cpu.amd.ic_l1tlb_trip@chip/cpu{within(5s)};
 
 event fault.cpu.amd.l1itlb@chip/cpu, FITrate=ICACHEL1TLB_FIT,
 	FRU=chip, ASRU=chip/cpu;
@@ -824,7 +806,7 @@ prop fault.cpu.amd.l1itlb@chip/cpu (0)->
 #define ICACHEL2TLB_SB_TIME	168h
 
 event ereport.cpu.amd.ic.l2tlb_par@chip/cpu{within(5s)};
-event ereport.cpu.amd.ic_l2tlb_trip@chip/cpu;
+event ereport.cpu.amd.ic_l2tlb_trip@chip/cpu{within(5s)};
 
 event fault.cpu.amd.l2itlb@chip/cpu, FITrate=ICACHEL2TLB_FIT,
 	FRU=chip, ASRU=chip/cpu;
@@ -873,7 +855,7 @@ prop fault.cpu.amd.dcachedata@chip/cpu (1)->
 
 event ereport.cpu.amd.dc.data_ecc1@chip/cpu{within(5s)};
 event ereport.cpu.amd.dc.data_ecc1_uc@chip/cpu{within(5s)};
-event ereport.cpu.amd.dc_sb_trip@chip/cpu;
+event ereport.cpu.amd.dc_sb_trip@chip/cpu{within(5s)};
 
 engine serd.cpu.amd.dc_sb@chip/cpu,
     N=DCACHEDATA_SB_COUNT, T=DCACHEDATA_SB_TIME, method=persistent, 
@@ -908,7 +890,7 @@ prop fault.cpu.amd.dcachedata@chip/cpu (0)->
  *  - data_eccm : reported by dc on this cpu
  */ 
 
-event ereport.cpu.amd.dc.data_eccm@chip/cpu;
+event ereport.cpu.amd.dc.data_eccm@chip/cpu{within(5s)};
 
 prop error.cpu.amd.dcachedata_mb@chip/cpu (1)->
     ereport.cpu.amd.dc.data_eccm@chip/cpu;
@@ -1003,17 +985,17 @@ prop fault.cpu.amd.l2dtlb@chip/cpu (1)->
  * to avoid "no subscription" complaints during test harness runs.
  */
 
-event ereport.cpu.amd.nb.ma@cpu;
-event ereport.cpu.amd.nb.ta@cpu;
-event ereport.cpu.amd.ls.s_rde@cpu;
-event ereport.cpu.amd.ic.rdde@cpu;
-event ereport.cpu.amd.bu.s_rde@cpu;
-event ereport.cpu.amd.nb.gart_walk@cpu;
-event ereport.cpu.amd.nb.ht_sync@cpu;
-event ereport.cpu.amd.nb.ht_crc@cpu;
-event ereport.cpu.amd.nb.rmw@cpu;
-event ereport.cpu.amd.nb.wdog@cpu;
-event ereport.cpu.amd.unknown@cpu;
+event ereport.cpu.amd.nb.ma@cpu{within(5s)};
+event ereport.cpu.amd.nb.ta@cpu{within(5s)};
+event ereport.cpu.amd.ls.s_rde@cpu{within(5s)};
+event ereport.cpu.amd.ic.rdde@cpu{within(5s)};
+event ereport.cpu.amd.bu.s_rde@cpu{within(5s)};
+event ereport.cpu.amd.nb.gart_walk@cpu{within(5s)};
+event ereport.cpu.amd.nb.ht_sync@cpu{within(5s)};
+event ereport.cpu.amd.nb.ht_crc@cpu{within(5s)};
+event ereport.cpu.amd.nb.rmw@cpu{within(5s)};
+event ereport.cpu.amd.nb.wdog@cpu{within(5s)};
+event ereport.cpu.amd.unknown@cpu{within(5s)};
 
 event upset.null_diag@cpu;
 

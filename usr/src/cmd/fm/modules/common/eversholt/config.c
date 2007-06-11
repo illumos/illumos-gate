@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,8 @@ struct config {
 	int num;
 	struct lut *props;
 };
+
+static const char *config_lastcomp;
 
 /*
  * newcnode -- local function to allocate new config node
@@ -145,6 +147,8 @@ config_lookup(struct config *croot, char *path, int add)
 		svdigit = *thiscom;
 		*thiscom = '\0';
 		s = stable(path);
+		if (add)
+			config_lastcomp = s;
 		*thiscom = svdigit;
 
 		if (nextcom != NULL)
@@ -252,6 +256,7 @@ addconfig(struct node *lhs, struct node *rhs, void *arg)
 			else
 				parent->child = newnode;
 
+			newnode->parent = parent;
 			parent = newnode;
 		}
 
@@ -273,6 +278,11 @@ config_cook(struct cfgdata *cdata)
 	char *cfgstr, *equals;
 	const char *pn, *sv;
 	char *pv;
+	const char *ptr;
+	extern struct lut *Usedprops;
+	extern struct lut *Usednames;
+
+	cdata->cooked_refcnt++;
 
 	if (cdata->cooked != NULL)
 		return;
@@ -283,6 +293,19 @@ config_cook(struct cfgdata *cdata)
 		out(O_ALTFP|O_VERB, "Platform provided no config data.");
 		goto eftcfgs;
 	}
+
+	/*
+	 * add the following properties to the "usedprops" table as they
+	 * are used internally by eft
+	 */
+	ptr = stable("module");
+	Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
+	ptr = stable("resource");
+	Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
+	ptr = stable("ASRU");
+	Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
+	ptr = stable("FRU");
+	Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
 
 	out(O_ALTFP|O_VERB3, "Raw config data follows:");
 	out(O_ALTFP|O_VERB3|O_NONL,
@@ -334,16 +357,25 @@ config_cook(struct cfgdata *cdata)
 
 		*equals = '\0';
 		pn = stable(cfgstr);
-		pv = STRDUP(equals + 1);
 
-		out(O_ALTFP|O_VERB3, "add prop (%s) val %p", pn, (void *)pv);
-		config_setprop(newnode, pn, pv);
+		/*
+		 * only actually add the props if the rules use them (saves
+		 * memory)
+		 */
+		if (lut_lookup(Usedprops, (void *)pn, NULL) != NULL &&
+		    lut_lookup(Usednames, (void *)config_lastcomp, NULL) !=
+		    NULL) {
+			pv = STRDUP(equals + 1);
+			out(O_ALTFP|O_VERB3, "add prop (%s) val %p", pn,
+			    (void *)pv);
+			config_setprop(newnode, pn, pv);
+		}
 
 		/*
 		 * If this property is a device path, cache it for quick lookup
 		 */
 		if (pn == stable(TOPO_IO_DEV)) {
-			sv = stable(pv);
+			sv = stable(equals + 1);
 			out(O_ALTFP|O_VERB3, "caching %s\n", sv);
 			cdata->devcache = lut_add(cdata->devcache,
 			    (void *)sv, (void *)newnode, NULL);
@@ -405,18 +437,23 @@ config_free(struct cfgdata *cp)
 	if (cp == NULL)
 		return;
 
-	if (--cp->refcnt > 0)
-		return;
+	if (--cp->cooked_refcnt == 0) {
+		if (cp->cooked != NULL)
+			structconfig_free(cp->cooked);
+		cp->cooked = NULL;
+		if (cp->devcache != NULL)
+			lut_free(cp->devcache, NULL, NULL);
+		cp->devcache = NULL;
+		if (cp->cpucache != NULL)
+			lut_free(cp->cpucache, NULL, NULL);
+		cp->cpucache = NULL;
+	}
 
-	if (cp->cooked != NULL)
-		structconfig_free(cp->cooked);
-	if (cp->begin != NULL)
-		FREE(cp->begin);
-	if (cp->devcache != NULL)
-		lut_free(cp->devcache, NULL, NULL);
-	if (cp->cpucache != NULL)
-		lut_free(cp->cpucache, NULL, NULL);
-	FREE(cp);
+	if (--cp->raw_refcnt == 0) {
+		if (cp->begin != NULL)
+			FREE(cp->begin);
+		FREE(cp);
+	}
 }
 
 /*
@@ -440,6 +477,17 @@ config_child(struct config *cp)
 	ASSERT(cp != NULL);
 
 	return ((struct config *)((struct config *)cp)->child);
+}
+
+/*
+ * config_parent -- get the "parent" of a config node
+ */
+struct config *
+config_parent(struct config *cp)
+{
+	ASSERT(cp != NULL);
+
+	return ((struct config *)((struct config *)cp)->parent);
 }
 
 /*
@@ -564,205 +612,6 @@ config_bycpuid_lookup(struct cfgdata *fromcfg, uint32_t id)
 		out(O_ALTFP|O_VERB3, NULL);
 	}
 	return (np);
-}
-
-/*
- * given the following:
- *   - np of type T_NAME which denotes a pathname
- *   - croot, the root node of a configuration
- *
- * return the cp for the last component in np's path
- */
-static struct config *
-name2cp(struct node *np, struct config *croot)
-{
-	char *path;
-	struct config *cp;
-
-	if (np->u.name.last->u.name.cp != NULL)
-		return (np->u.name.last->u.name.cp);
-
-	path = ipath2str(NULL, ipath(np));
-
-	cp = config_lookup(croot, path, 0);
-	FREE((void *)path);
-
-	return (cp);
-}
-
-#define	CONNECTED_SEPCHARS " ,"
-
-int
-config_is_connected(struct node *np, struct config *croot,
-		    struct evalue *valuep)
-{
-	const char *connstrings[] = { "connected", "CONNECTED", NULL };
-	struct config *cp[2], *compcp;
-	struct node *nptr[2];
-	const char *searchforname, *matchthis[2], *s;
-	char *nameslist, *w;
-	int i, j;
-
-	valuep->t = UINT64;
-	valuep->v = 0;
-
-	if (np->u.expr.left->t == T_NAME)
-		nptr[0] = np->u.expr.left;
-	else if (np->u.expr.left->u.func.s == L_fru)
-		nptr[0] = eval_fru(np->u.expr.left->u.func.arglist);
-	else if (np->u.expr.left->u.func.s == L_asru)
-		nptr[0] = eval_asru(np->u.expr.left->u.func.arglist);
-
-	if (np->u.expr.right->t == T_NAME)
-		nptr[1] = np->u.expr.right;
-	else if (np->u.expr.right->u.func.s == L_fru)
-		nptr[1] = eval_fru(np->u.expr.right->u.func.arglist);
-	else if (np->u.expr.right->u.func.s == L_asru)
-		nptr[1] = eval_asru(np->u.expr.right->u.func.arglist);
-
-	for (i = 0; i < 2; i++) {
-		cp[i] = name2cp(nptr[i], croot);
-		if (cp[i] == NULL)
-			return (1);
-	}
-
-	/* to thine self always be connected */
-	if (cp[0] == cp[1]) {
-		valuep->v = 1;
-		return (0);
-	}
-
-	/*
-	 * set one of the cp[]s to compcp and extract its "connected"
-	 * property.  search this property for the name associated with the
-	 * other cp[].
-	 */
-	for (i = 0; i < 2 && valuep->v == 0; i++) {
-		compcp = cp[i];
-
-		searchforname = ipath2str(NULL, ipath(nptr[(i == 0 ? 1 : 0)]));
-		matchthis[i] = stable(searchforname);
-		FREE((void *)searchforname);
-
-		for (j = 0; connstrings[j] != NULL && valuep->v == 0; j++) {
-			s = config_getprop(compcp, stable(connstrings[j]));
-			if (s != NULL) {
-				nameslist = STRDUP(s);
-				w = strtok(nameslist, CONNECTED_SEPCHARS);
-				while (w != NULL) {
-					if (stable(w) == matchthis[i]) {
-						valuep->v = 1;
-						break;
-					}
-					w = strtok(NULL, CONNECTED_SEPCHARS);
-				}
-				FREE(nameslist);
-			}
-		}
-	}
-
-	/* a path shouldn't have more than one cp node */
-	if (valuep->v == 0)
-		ASSERT(matchthis[0] != matchthis[1]);
-
-	return (0);
-}
-
-int
-config_is_type(struct node *np, struct config *croot, struct evalue *valuep)
-{
-	const char *typestrings[] = { "type", "TYPE", NULL };
-	struct config *cp;
-	struct node *nodep;
-	const char *s;
-	int i;
-
-	valuep->t = STRING;
-	valuep->v = 0;
-
-	if (np->u.func.s == L_fru)
-		nodep = eval_fru(np->u.func.arglist);
-	else if (np->u.func.s == L_asru)
-		nodep = eval_asru(np->u.func.arglist);
-
-	cp = name2cp(nodep, croot);
-	if (cp == NULL)
-		return (1);
-
-	for (i = 0; typestrings[i] != NULL; i++) {
-		s = config_getprop(cp, stable(typestrings[i]));
-		if (s != NULL) {
-			valuep->v = (uintptr_t)stable(s);
-			break;
-		}
-	}
-
-	/* no entry for "type" */
-	if (valuep->v == 0)
-		return (1);
-
-	return (0);
-}
-
-int
-config_is_on(struct node *np, struct config *croot, struct evalue *valuep)
-{
-	const char *onstrings[] = { "on", "ON", NULL };
-	const char *truestrings[] = { "yes", "YES", "y", "Y",
-				    "true", "TRUE", "t", "T",
-				    "1", NULL };
-	struct config *cp;
-	struct node *nodep;
-	const char *s;
-	int i, j;
-
-	valuep->t = UINT64;
-	valuep->v = 0;
-
-	if (np->u.func.s == L_fru)
-		nodep = eval_fru(np->u.func.arglist);
-	else if (np->u.func.s == L_asru)
-		nodep = eval_asru(np->u.func.arglist);
-
-	cp = name2cp(nodep, croot);
-	if (cp == NULL)
-		return (1);
-
-	for (i = 0; onstrings[i] != NULL; i++) {
-		s = config_getprop(cp, stable(onstrings[i]));
-		if (s != NULL) {
-			s = stable(s);
-			for (j = 0; truestrings[j] != NULL; j++) {
-				if (s == stable(truestrings[j])) {
-					valuep->v = 1;
-					return (0);
-				}
-			}
-		}
-	}
-
-	return (0);
-}
-
-int
-config_is_present(struct node *np, struct config *croot, struct evalue *valuep)
-{
-	struct config *cp;
-	struct node *nodep;
-
-	valuep->t = UINT64;
-	valuep->v = 0;
-
-	if (np->u.func.s == L_fru)
-		nodep = eval_fru(np->u.func.arglist);
-	else if (np->u.func.s == L_asru)
-		nodep = eval_asru(np->u.func.arglist);
-
-	cp = name2cp(nodep, croot);
-	if (cp != NULL)
-		valuep->v = 1;
-
-	return (0);
 }
 
 /*

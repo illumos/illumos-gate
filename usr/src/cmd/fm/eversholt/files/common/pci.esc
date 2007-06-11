@@ -52,7 +52,8 @@
 #define NONFATAL_DPE_D_TIME 168h
 
 #define	IS_LEAF \
-	(confprop(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) != "60400" && \
+	(confprop_defined(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) && \
+	confprop(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) != "60400" && \
 	confprop(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) != "60401")
 
 #define	IS_BDG \
@@ -60,7 +61,9 @@
 	confprop(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) == "60401")
 
 #define	FD_IS_LEAF \
-	(confprop(asru(pcibus/pcidev[fromdev]/pcifn), TOPO_PCI_CLASS) != \
+	(confprop_defined(asru(pcibus/pcidev[fromdev]/pcifn), \
+	TOPO_PCI_CLASS) && \
+	confprop(asru(pcibus/pcidev[fromdev]/pcifn), TOPO_PCI_CLASS) != \
 	"60400" && \
 	confprop(asru(pcibus/pcidev[fromdev]/pcifn), TOPO_PCI_CLASS) != "60401")
 
@@ -315,7 +318,6 @@ event error.io.pci.source-nf-dpdata-r-u@pcibus/pcidev/pcifn;
 event error.io.pci.source-f-dpdata-r-u@pcibus/pcidev/pcifn;
 event error.io.device.nf-device@pcibus/pcidev/pcifn;
 event error.io.device.f-device@pcibus/pcidev/pcifn;
-event error.io.pciex.flt-badreq-u@pcibus/pcidev/pcifn;
 
 event ereport.io.pcix.oor@pcibus/pcidev/pcifn{within(5s)};
 event ereport.io.pcix.unex-sc@pcibus/pcidev/pcifn{within(5s)};
@@ -339,7 +341,6 @@ prop fault.io.pci.device-interr@pcibus/pcidev[fromdev]/pcifn (0)->
     error.io.pcix.rx-unex-sc@PCI_NOT_HB;
 
 prop fault.io.pci.device-invreq@pcibus/pcidev[fromdev]/pcifn {FD_IS_LEAF} (0)->
-    error.io.pciex.flt-badreq-u@PCI_NOT_HB,
     error.io.pci.badreq-drw-u@PCI_NOT_HB,
     error.io.pci.badreq-pw-u@PCI_NOT_HB;
 

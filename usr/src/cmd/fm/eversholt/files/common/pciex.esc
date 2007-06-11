@@ -109,11 +109,14 @@
 	"pciexdev")
 
 #define	IS_PCI_LEAF \
-	(confprop(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) != "60400" && \
+	(confprop_defined(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) && \
+	confprop(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) != "60400" && \
 	confprop(asru(pcibus/pcidev/pcifn), TOPO_PCI_CLASS) != "60401")
 
 #define	BDF_IS_PCI_LEAF \
-	(confprop(asru(pcibus[b]/pcidev[d]/pcifn[f]),TOPO_PCI_CLASS) != \
+	(confprop_defined(asru(pcibus[b]/pcidev[d]/pcifn[f]), \
+	TOPO_PCI_CLASS) && \
+	confprop(asru(pcibus[b]/pcidev[d]/pcifn[f]), TOPO_PCI_CLASS) != \
 	"60400" && \
 	confprop(asru(pcibus[b]/pcidev[d]/pcifn[f]), TOPO_PCI_CLASS) != "60401")
 

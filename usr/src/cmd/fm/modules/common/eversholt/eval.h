@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * eval.h -- public definitions for eval module
@@ -49,13 +49,11 @@ struct evalue {
 	unsigned long long v;
 };
 
-int eval_potential(struct node *np, struct lut *ex, struct node *epnames[],
+int eval_potential(struct node *np, struct lut *ex, struct node *events[],
     struct node **newc, struct config *croot);
-int eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
+int eval_expr(struct node *np, struct lut *ex, struct node *events[],
 	struct lut **globals, struct config *croot, struct arrow *arrowp,
 	int try, struct evalue *valuep);
-struct node *eval_fru(struct node *np);
-struct node *eval_asru(struct node *np);
 
 #ifdef	__cplusplus
 }

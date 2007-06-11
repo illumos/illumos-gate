@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * fme.h -- public definitions for fme module
@@ -63,8 +63,10 @@ extern "C" {
 #define	WOBUF_CFG	"rawcfgdata"
 #define	WOBUF_ID	"fmeid"
 #define	WOBUF_ISTATS	"istats"
+#define	WOBUF_SERDS	"serds"
 
 struct lut *Istats;	/* instanced stats a la "count=" */
+struct lut *SerdEngines;
 
 struct fme;
 
@@ -74,6 +76,7 @@ void fme_receive_repair_list(fmd_hdl_t *hdl, fmd_event_t *ffep,
     nvlist_t *nvl, const char *eventstring);
 void fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress);
 void fme_istat_load(fmd_hdl_t *hdl);
+void fme_serd_load(fmd_hdl_t *hdl);
 void fme_close_case(fmd_hdl_t *hdl, fmd_case_t *fmcase);
 void fme_timer_fired(struct fme *, id_t);
 void fme_status(int flags);
@@ -85,6 +88,15 @@ struct istat_entry {
 	const struct ipath *ipath;
 };
 int istat_cmp(struct istat_entry *ent1, struct istat_entry *ent2);
+
+void serd_fini(void);
+
+struct serd_entry {
+	const char *ename;
+	const struct ipath *ipath;
+	fmd_hdl_t *hdl;
+};
+int serd_cmp(struct serd_entry *ent1, struct serd_entry *ent2);
 
 #ifdef	__cplusplus
 }

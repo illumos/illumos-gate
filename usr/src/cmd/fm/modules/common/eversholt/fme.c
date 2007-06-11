@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * fme.c -- fault management exercise module
@@ -64,7 +64,9 @@ extern int Max_fme;
 extern fmd_hdl_t *Hdl;
 
 static int Istat_need_save;
+static int Serd_need_save;
 void istat_save(void);
+void serd_save(void);
 
 /* fme under construction is global so we can free it on module abort */
 static struct fme *Nfmep;
@@ -141,7 +143,8 @@ static enum fme_state hypothesise(struct fme *fmep, struct event *ep,
 	unsigned long long at_latest_by, unsigned long long *pdelay);
 static struct node *eventprop_lookup(struct event *ep, const char *propname);
 static struct node *pathstring2epnamenp(char *path);
-static void publish_undiagnosable(fmd_hdl_t *hdl, fmd_event_t *ffep);
+static void publish_undiagnosable(fmd_hdl_t *hdl, fmd_event_t *ffep,
+	fmd_case_t *fmcase);
 static void restore_suspects(struct fme *fmep);
 static void save_suspects(struct fme *fmep);
 static void destroy_fme(struct fme *f);
@@ -149,6 +152,9 @@ static void fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
     const char *eventstring, const struct ipath *ipp, nvlist_t *nvl);
 static void istat_counter_reset_cb(struct istat_entry *entp,
     struct stats *statp, const struct ipath *ipp);
+static void serd_reset_cb(struct serd_entry *entp, void *unused,
+    const struct ipath *ipp);
+static void destroy_fme_bufs(struct fme *fp);
 
 static struct fme *
 alloc_fme(void)
@@ -204,16 +210,132 @@ fme_ready(struct fme *fmep)
 	return (fmep);
 }
 
+extern void ipath_dummy_lut(struct arrow *);
+extern struct lut *itree_create_dummy(const char *, const struct ipath *);
+
+/* ARGSUSED */
+static void
+set_needed_arrows(struct event *ep, struct event *ep2, struct fme *fmep)
+{
+	struct bubble *bp;
+	struct arrowlist *ap;
+
+	for (bp = itree_next_bubble(ep, NULL); bp;
+	    bp = itree_next_bubble(ep, bp)) {
+		if (bp->t != B_FROM)
+			continue;
+		for (ap = itree_next_arrow(bp, NULL); ap;
+		    ap = itree_next_arrow(bp, ap)) {
+			ap->arrowp->pnode->u.arrow.needed = 1;
+			ipath_dummy_lut(ap->arrowp);
+		}
+	}
+}
+
+/* ARGSUSED */
+static void
+unset_needed_arrows(struct event *ep, struct event *ep2, struct fme *fmep)
+{
+	struct bubble *bp;
+	struct arrowlist *ap;
+
+	for (bp = itree_next_bubble(ep, NULL); bp;
+	    bp = itree_next_bubble(ep, bp)) {
+		if (bp->t != B_FROM)
+			continue;
+		for (ap = itree_next_arrow(bp, NULL); ap;
+		    ap = itree_next_arrow(bp, ap))
+			ap->arrowp->pnode->u.arrow.needed = 0;
+	}
+}
+
+static void globals_destructor(void *left, void *right, void *arg);
+static void clear_arrows(struct event *ep, struct event *ep2, struct fme *fmep);
+
+static void
+prune_propagations(const char *e0class, const struct ipath *e0ipp)
+{
+	char nbuf[100];
+	unsigned long long my_delay = TIMEVAL_EVENTUALLY;
+	extern struct lut *Usednames;
+
+	Nfmep = alloc_fme();
+	Nfmep->id = Nextid;
+	Nfmep->state = FME_NOTHING;
+	Nfmep->eventtree = itree_create_dummy(e0class, e0ipp);
+	if ((Nfmep->e0 =
+	    itree_lookup(Nfmep->eventtree, e0class, e0ipp)) == NULL) {
+		out(O_ALTFP, "prune_propagations: e0 not in instance tree");
+		itree_free(Nfmep->eventtree);
+		FREE(Nfmep);
+		Nfmep = NULL;
+		return;
+	}
+	Nfmep->ecurrent = Nfmep->observations = Nfmep->e0;
+	Nfmep->e0->count++;
+
+	(void) sprintf(nbuf, "fme%d.Rcount", Nfmep->id);
+	Nfmep->Rcount = stats_new_counter(nbuf, "ereports received", 0);
+	(void) sprintf(nbuf, "fme%d.Hcall", Nfmep->id);
+	Nfmep->Hcallcount =
+	    stats_new_counter(nbuf, "calls to hypothesise()", 1);
+	(void) sprintf(nbuf, "fme%d.Rcall", Nfmep->id);
+	Nfmep->Rcallcount = stats_new_counter(nbuf,
+	    "calls to requirements_test()", 1);
+	(void) sprintf(nbuf, "fme%d.Ccall", Nfmep->id);
+	Nfmep->Ccallcount =
+	    stats_new_counter(nbuf, "calls to causes_test()", 1);
+	(void) sprintf(nbuf, "fme%d.Ecall", Nfmep->id);
+	Nfmep->Ecallcount =
+	    stats_new_counter(nbuf, "calls to effects_test()", 1);
+	(void) sprintf(nbuf, "fme%d.Tcall", Nfmep->id);
+	Nfmep->Tcallcount = stats_new_counter(nbuf, "calls to triggered()", 1);
+	(void) sprintf(nbuf, "fme%d.Marrow", Nfmep->id);
+	Nfmep->Marrowcount = stats_new_counter(nbuf,
+	    "arrows marked by mark_arrows()", 1);
+	(void) sprintf(nbuf, "fme%d.diags", Nfmep->id);
+	Nfmep->diags = stats_new_counter(nbuf, "suspect lists diagnosed", 0);
+
+	Nfmep->peek = 1;
+	lut_walk(Nfmep->eventtree, (lut_cb)unset_needed_arrows, (void *)Nfmep);
+	lut_free(Usednames, NULL, NULL);
+	Usednames = NULL;
+	lut_walk(Nfmep->eventtree, (lut_cb)clear_arrows, (void *)Nfmep);
+	(void) hypothesise(Nfmep, Nfmep->e0, Nfmep->ull, &my_delay);
+	itree_prune(Nfmep->eventtree);
+	lut_walk(Nfmep->eventtree, (lut_cb)set_needed_arrows, (void *)Nfmep);
+
+	stats_delete(Nfmep->Rcount);
+	stats_delete(Nfmep->Hcallcount);
+	stats_delete(Nfmep->Rcallcount);
+	stats_delete(Nfmep->Ccallcount);
+	stats_delete(Nfmep->Ecallcount);
+	stats_delete(Nfmep->Tcallcount);
+	stats_delete(Nfmep->Marrowcount);
+	stats_delete(Nfmep->diags);
+	itree_free(Nfmep->eventtree);
+	lut_free(Nfmep->globals, globals_destructor, NULL);
+	FREE(Nfmep);
+}
+
 static struct fme *
-newfme(const char *e0class, const struct ipath *e0ipp)
+newfme(const char *e0class, const struct ipath *e0ipp, fmd_hdl_t *hdl,
+	fmd_case_t *fmcase)
 {
 	struct cfgdata *cfgdata;
+	int init_size;
+	extern int alloc_total();
 
+	init_size = alloc_total();
+	out(O_ALTFP|O_STAMP, "start config_snapshot using %d bytes", init_size);
 	if ((cfgdata = config_snapshot()) == NULL) {
 		out(O_ALTFP, "newfme: NULL configuration");
 		Undiag_reason = UD_NOCONF;
 		return (NULL);
 	}
+	platform_save_config(hdl, fmcase);
+	out(O_ALTFP|O_STAMP, "config_snapshot added %d bytes",
+	    alloc_total() - init_size);
 
 	Nfmep = alloc_fme();
 
@@ -225,13 +347,14 @@ newfme(const char *e0class, const struct ipath *e0ipp)
 	Nfmep->pull = 0ULL;
 	Nfmep->overflow = 0;
 
-	Nfmep->fmcase = NULL;
-	Nfmep->hdl = NULL;
+	Nfmep->fmcase = fmcase;
+	Nfmep->hdl = hdl;
 
 	if ((Nfmep->eventtree = itree_create(cfgdata->cooked)) == NULL) {
 		out(O_ALTFP, "newfme: NULL instance tree");
 		Undiag_reason = UD_INSTFAIL;
 		config_free(cfgdata);
+		destroy_fme_bufs(Nfmep);
 		FREE(Nfmep);
 		Nfmep = NULL;
 		return (NULL);
@@ -245,6 +368,7 @@ newfme(const char *e0class, const struct ipath *e0ipp)
 		Undiag_reason = UD_BADEVENTI;
 		itree_free(Nfmep->eventtree);
 		config_free(cfgdata);
+		destroy_fme_bufs(Nfmep);
 		FREE(Nfmep);
 		Nfmep = NULL;
 		return (NULL);
@@ -343,17 +467,6 @@ serialize_observation(struct fme *fp, const char *cls, const struct ipath *ipp)
 static void
 init_fme_bufs(struct fme *fp)
 {
-	size_t cfglen = fp->cfgdata->nextfree - fp->cfgdata->begin;
-
-	fmd_buf_create(fp->hdl, fp->fmcase, WOBUF_CFGLEN, sizeof (cfglen));
-	fmd_buf_write(fp->hdl, fp->fmcase, WOBUF_CFGLEN, (void *)&cfglen,
-	    sizeof (cfglen));
-	if (cfglen != 0) {
-		fmd_buf_create(fp->hdl, fp->fmcase, WOBUF_CFG, cfglen);
-		fmd_buf_write(fp->hdl, fp->fmcase, WOBUF_CFG,
-		    fp->cfgdata->begin, cfglen);
-	}
-
 	fmd_buf_create(fp->hdl, fp->fmcase, WOBUF_PULL, sizeof (fp->pull));
 	fmd_buf_write(fp->hdl, fp->fmcase, WOBUF_PULL, (void *)&fp->pull,
 	    sizeof (fp->pull));
@@ -378,6 +491,7 @@ destroy_fme_bufs(struct fme *fp)
 	char tmpbuf[OBBUFNMSZ];
 	int o;
 
+	platform_restore_config(fp->hdl, fp->fmcase);
 	fmd_buf_destroy(fp->hdl, fp->fmcase, WOBUF_CFGLEN);
 	fmd_buf_destroy(fp->hdl, fp->fmcase, WOBUF_CFG);
 	fmd_buf_destroy(fp->hdl, fp->fmcase, WOBUF_PULL);
@@ -510,6 +624,21 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 	struct fme *fmep;
 	struct cfgdata *cfgdata = NULL;
 	size_t rawsz;
+	struct event *ep;
+	char *tmpbuf = alloca(OBBUFNMSZ);
+	char *sepptr;
+	char *estr;
+	int elen;
+	struct node *epnamenp = NULL;
+	int init_size;
+	extern int alloc_total();
+
+	/*
+	 * ignore solved or closed cases
+	 */
+	if (fmd_case_solved(hdl, inprogress) ||
+	    fmd_case_closed(hdl, inprogress))
+		return;
 
 	fmep = alloc_fme();
 	fmep->fmcase = inprogress;
@@ -525,13 +654,18 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 		    sizeof (fmep->posted_suspects));
 	}
 
-	/*
-	 * ignore solved or closed cases
-	 */
-	if (fmep->posted_suspects ||
-	    fmd_case_solved(fmep->hdl, fmep->fmcase) ||
-	    fmd_case_closed(fmep->hdl, fmep->fmcase))
+	if (fmd_buf_size(hdl, inprogress, WOBUF_ID) == 0) {
+		out(O_ALTFP, "restart_fme: no saved id");
+		Undiag_reason = UD_MISSINGINFO;
 		goto badcase;
+	} else {
+		fmd_buf_read(hdl, inprogress, WOBUF_ID, (void *)&fmep->id,
+		    sizeof (fmep->id));
+	}
+	if (Nextid <= fmep->id)
+		Nextid = fmep->id + 1;
+
+	out(O_ALTFP, "Replay FME %d", fmep->id);
 
 	if (fmd_buf_size(hdl, inprogress, WOBUF_CFGLEN) != sizeof (size_t)) {
 		out(O_ALTFP, "restart_fme: No config data");
@@ -547,11 +681,64 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 		goto badcase;
 	}
 
+	if (fmd_buf_size(hdl, inprogress, WOBUF_PULL) == 0) {
+		out(O_ALTFP, "restart_fme: no saved wait time");
+		Undiag_reason = UD_MISSINGINFO;
+		goto badcase;
+	} else {
+		fmd_buf_read(hdl, inprogress, WOBUF_PULL, (void *)&fmep->pull,
+		    sizeof (fmep->pull));
+	}
+
+	if (fmd_buf_size(hdl, inprogress, WOBUF_NOBS) == 0) {
+		out(O_ALTFP, "restart_fme: no count of observations");
+		Undiag_reason = UD_MISSINGINFO;
+		goto badcase;
+	} else {
+		fmd_buf_read(hdl, inprogress, WOBUF_NOBS,
+		    (void *)&fmep->uniqobs, sizeof (fmep->uniqobs));
+	}
+
+	(void) snprintf(tmpbuf, OBBUFNMSZ, "observed0");
+	elen = fmd_buf_size(fmep->hdl, fmep->fmcase, tmpbuf);
+	if (elen == 0) {
+		out(O_ALTFP, "reconstitute_observation: no %s buffer found.",
+		    tmpbuf);
+		Undiag_reason = UD_MISSINGOBS;
+		goto badcase;
+	}
+	estr = MALLOC(elen);
+	fmd_buf_read(fmep->hdl, fmep->fmcase, tmpbuf, estr, elen);
+	sepptr = strchr(estr, '@');
+	if (sepptr == NULL) {
+		out(O_ALTFP, "reconstitute_observation: %s: "
+		    "missing @ separator in %s.",
+		    tmpbuf, estr);
+		Undiag_reason = UD_MISSINGPATH;
+		FREE(estr);
+		goto badcase;
+	}
+	*sepptr = '\0';
+	if ((epnamenp = pathstring2epnamenp(sepptr + 1)) == NULL) {
+		out(O_ALTFP, "reconstitute_observation: %s: "
+		    "trouble converting path string \"%s\" "
+		    "to internal representation.", tmpbuf, sepptr + 1);
+		Undiag_reason = UD_MISSINGPATH;
+		FREE(estr);
+		goto badcase;
+	}
+	prune_propagations(stable(estr), ipath(epnamenp));
+	tree_free(epnamenp);
+	FREE(estr);
+
+	init_size = alloc_total();
+	out(O_ALTFP|O_STAMP, "start config_restore using %d bytes", init_size);
 	cfgdata = MALLOC(sizeof (struct cfgdata));
 	cfgdata->cooked = NULL;
 	cfgdata->devcache = NULL;
 	cfgdata->cpucache = NULL;
-	cfgdata->refcnt = 1;
+	cfgdata->cooked_refcnt = 0;
+	cfgdata->raw_refcnt = 1;
 
 	if (rawsz > 0) {
 		if (fmd_buf_size(hdl, inprogress, WOBUF_CFG) != rawsz) {
@@ -569,6 +756,14 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 	fmep->cfgdata = cfgdata;
 
 	config_cook(cfgdata);
+	if (cfgdata->begin)
+		FREE(cfgdata->begin);
+	cfgdata->begin = NULL;
+	cfgdata->end = NULL;
+	cfgdata->nextfree = NULL;
+	out(O_ALTFP|O_STAMP, "config_restore added %d bytes",
+	    alloc_total() - init_size);
+
 	if ((fmep->eventtree = itree_create(cfgdata->cooked)) == NULL) {
 		/* case not properly saved or irretrievable */
 		out(O_ALTFP, "restart_fme: NULL instance tree");
@@ -578,37 +773,15 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 
 	itree_ptree(O_ALTFP|O_VERB2, fmep->eventtree);
 
-	if (fmd_buf_size(hdl, inprogress, WOBUF_PULL) == 0) {
-		out(O_ALTFP, "restart_fme: no saved wait time");
-		Undiag_reason = UD_MISSINGINFO;
-		goto badcase;
-	} else {
-		fmd_buf_read(hdl, inprogress, WOBUF_PULL, (void *)&fmep->pull,
-		    sizeof (fmep->pull));
-	}
-
-	if (fmd_buf_size(hdl, inprogress, WOBUF_ID) == 0) {
-		out(O_ALTFP, "restart_fme: no saved id");
-		Undiag_reason = UD_MISSINGINFO;
-		goto badcase;
-	} else {
-		fmd_buf_read(hdl, inprogress, WOBUF_ID, (void *)&fmep->id,
-		    sizeof (fmep->id));
-	}
-	if (Nextid <= fmep->id)
-		Nextid = fmep->id + 1;
-
-	if (fmd_buf_size(hdl, inprogress, WOBUF_NOBS) == 0) {
-		out(O_ALTFP, "restart_fme: no count of observations");
-		Undiag_reason = UD_MISSINGINFO;
-		goto badcase;
-	} else {
-		fmd_buf_read(hdl, inprogress, WOBUF_NOBS,
-		    (void *)&fmep->uniqobs, sizeof (fmep->uniqobs));
-	}
-
 	if (reconstitute_observations(fmep) != 0)
 		goto badcase;
+
+	out(O_ALTFP|O_NONL, "FME %d replay observations: ", fmep->id);
+	for (ep = fmep->observations; ep; ep = ep->observations) {
+		out(O_ALTFP|O_NONL, " ");
+		itree_pevent_brief(O_ALTFP|O_NONL, ep);
+	}
+	out(O_ALTFP, NULL);
 
 	Open_fme_count++;
 
@@ -798,6 +971,7 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 	struct node *serdinst;
 	char *serdname;
 	struct node *nid;
+	struct serd_entry *newentp;
 
 	ASSERT(sp->t == N_UPSET);
 	ASSERT(ffep != NULL);
@@ -859,6 +1033,19 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 
 		fmd_serd_create(hdl, serdname, (uint_t)nN->u.ull,
 		    (hrtime_t)nT->u.ull);
+	}
+
+	newentp = MALLOC(sizeof (*newentp));
+	newentp->ename = serdinst->u.stmt.np->u.event.ename->u.name.s;
+	newentp->ipath = ipath(serdinst->u.stmt.np->u.event.epname);
+	newentp->hdl = hdl;
+	if (lut_lookup(SerdEngines, newentp, (lut_cmp)serd_cmp) == NULL) {
+		SerdEngines = lut_add(SerdEngines, (void *)newentp,
+		    (void *)NULL, (lut_cmp)serd_cmp);
+		Serd_need_save = 1;
+		serd_save();
+	} else {
+		FREE(newentp);
 	}
 
 
@@ -933,7 +1120,7 @@ upsets_eval(struct fme *fmep, fmd_event_t *ffep)
 	for (sp = fmep->suspects; sp; sp = sp->suspects)
 		if (sp->t == N_UPSET &&
 		    serd_eval(fmep, fmep->hdl, ffep, fmep->fmcase, sp,
-			    &tripped[ntrip].ename, &tripped[ntrip].ipp))
+		    &tripped[ntrip].ename, &tripped[ntrip].ipp))
 			ntrip++;
 
 	for (i = 0; i < ntrip; i++)
@@ -961,9 +1148,12 @@ fme_receive_external_report(fmd_hdl_t *hdl, fmd_event_t *ffep, nvlist_t *nvl,
 	 * For now, use our undiagnosable interface.
 	 */
 	if (epnamenp == NULL) {
+		fmd_case_t *fmcase;
+
 		out(O_ALTFP, "XFILE: Unable to get path from ereport");
 		Undiag_reason = UD_NOPATH;
-		publish_undiagnosable(hdl, ffep);
+		fmcase = fmd_case_open(hdl, NULL);
+		publish_undiagnosable(hdl, ffep, fmcase);
 		return;
 	}
 
@@ -993,7 +1183,7 @@ fme_receive_repair_list(fmd_hdl_t *hdl, fmd_event_t *ffep, nvlist_t *nvl,
 
 	while (nvc-- != 0) {
 		/*
-		 * Reset any istat associated with this path.
+		 * Reset any istat or serd engine associated with this path.
 		 */
 		char *path;
 
@@ -1008,11 +1198,8 @@ fme_receive_repair_list(fmd_hdl_t *hdl, fmd_event_t *ffep, nvlist_t *nvl,
 		lut_walk(Istats, (lut_cb)istat_counter_reset_cb, (void *)ipp);
 		istat_save();
 
-		/*
-		 * We do not have a list of stat engines in a form that
-		 * we can readily clear any associated serd engines.  When we
-		 * do, this will be the place to clear them.
-		 */
+		lut_walk(SerdEngines, (lut_cb)serd_reset_cb, (void *)ipp);
+		serd_save();
 	}
 }
 
@@ -1040,6 +1227,33 @@ clear_arrows(struct event *ep, struct event *ep2, struct fme *fmep)
 }
 
 static void
+fme_reload_cfgdata(struct fme *fmep)
+{
+	size_t rawsz;
+
+	fmep->cfgdata = MALLOC(sizeof (struct cfgdata));
+	fmep->cfgdata->cooked = NULL;
+	fmep->cfgdata->devcache = NULL;
+	fmep->cfgdata->cpucache = NULL;
+	fmep->cfgdata->cooked_refcnt = 0;
+	fmep->cfgdata->raw_refcnt = 1;
+	fmd_buf_read(fmep->hdl, fmep->fmcase, WOBUF_CFGLEN,
+	    (void *)&rawsz, sizeof (size_t));
+	if (rawsz > 0) {
+		fmep->cfgdata->begin = MALLOC(rawsz);
+		fmep->cfgdata->end = fmep->cfgdata->nextfree =
+		    fmep->cfgdata->begin + rawsz;
+		fmd_buf_read(fmep->hdl, fmep->fmcase, WOBUF_CFG,
+		    fmep->cfgdata->begin, rawsz);
+		config_cook(fmep->cfgdata);
+		FREE(fmep->cfgdata->begin);
+	}
+	fmep->cfgdata->begin = NULL;
+	fmep->cfgdata->end = NULL;
+	fmep->cfgdata->nextfree = NULL;
+}
+
+static void
 fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
     const char *eventstring, const struct ipath *ipp, nvlist_t *nvl)
 {
@@ -1049,6 +1263,7 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 	struct fme *cfmep, *svfmep;
 	int matched = 0;
 	nvlist_t *defect;
+	fmd_case_t *fmcase;
 
 	out(O_ALTFP|O_NONL, "fme_receive_report: ");
 	ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
@@ -1102,6 +1317,8 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		if (Debug == 0)
 			Verbose = 0;
 
+		fme_reload_cfgdata(fmep);
+
 		lut_walk(fmep->eventtree, (lut_cb)clear_arrows, (void *)fmep);
 		state = hypothesise(fmep, fmep->e0, fmep->ull, &my_delay);
 
@@ -1133,6 +1350,8 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		} else {
 
 			/* not a match, undo noting of observation */
+			config_free(fmep->cfgdata);
+			fmep->cfgdata = NULL;
 			fmep->ecurrent = NULL;
 			if (--ep->count == 0) {
 				/* unlink it from observations */
@@ -1158,6 +1377,7 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		cfmep = svfmep;
 	}
 	ClosedFMEs = NULL;
+	prune_propagations(eventstring, ipp);
 
 	if (ofmep) {
 		out(O_ALTFP|O_NONL, "[");
@@ -1172,19 +1392,20 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		out(O_ALTFP|O_NONL, "[");
 		ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
 		out(O_ALTFP, " MAX OPEN FME REACHED]");
+
+		fmcase = fmd_case_open(hdl, NULL);
+
 		/* Create overflow fme */
-		if ((fmep = newfme(eventstring, ipp)) == NULL) {
+		if ((fmep = newfme(eventstring, ipp, hdl, fmcase)) == NULL) {
 			out(O_ALTFP|O_NONL, "[");
 			ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
 			out(O_ALTFP, " CANNOT OPEN OVERFLOW FME]");
-			publish_undiagnosable(hdl, ffep);
+			publish_undiagnosable(hdl, ffep, fmcase);
 			return;
 		}
 
 		Open_fme_count++;
 
-		fmep->fmcase = fmd_case_open(hdl, NULL);
-		fmep->hdl = hdl;
 		init_fme_bufs(fmep);
 		fmep->overflow = B_TRUE;
 
@@ -1199,20 +1420,20 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		return;
 	}
 
+	/* open a case */
+	fmcase = fmd_case_open(hdl, NULL);
+
 	/* start a new FME */
-	if ((fmep = newfme(eventstring, ipp)) == NULL) {
+	if ((fmep = newfme(eventstring, ipp, hdl, fmcase)) == NULL) {
 		out(O_ALTFP|O_NONL, "[");
 		ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
 		out(O_ALTFP, " CANNOT DIAGNOSE]");
-		publish_undiagnosable(hdl, ffep);
+		publish_undiagnosable(hdl, ffep, fmcase);
 		return;
 	}
 
 	Open_fme_count++;
 
-	/* open a case */
-	fmep->fmcase = fmd_case_open(hdl, NULL);
-	fmep->hdl = hdl;
 	init_fme_bufs(fmep);
 
 	out(O_ALTFP|O_NONL, "[");
@@ -1322,7 +1543,8 @@ print_suspects(int circumstance, struct fme *fmep)
 		out(O_ALTFP|O_NONL, "FME%d diagnosis changed. state: %s, "
 		    "suspect list:", fmep->id, fme_state2str(fmep->state));
 	} else if (circumstance == SLWAIT) {
-		out(O_ALTFP|O_NONL, "FME%d set wait timer ", fmep->id);
+		out(O_ALTFP|O_NONL, "FME%d set wait timer %ld ", fmep->id,
+		    fmep->timer);
 		ptree_timeval(O_ALTFP|O_NONL, &fmep->wull);
 	} else if (circumstance == SLDISPROVED) {
 		out(O_ALTFP|O_NONL, "FME%d DIAGNOSIS UNKNOWN", fmep->id);
@@ -1940,6 +2162,162 @@ istat_fini(void)
 	lut_free(Istats, istat_destructor, NULL);
 }
 
+static char *Serdbuf;
+static char *Serdbufptr;
+static int Serdsz;
+
+/*
+ * serdaddsize -- calculate size of serd and add it to Serdsz
+ */
+/*ARGSUSED*/
+static void
+serdaddsize(const struct serd_entry *lhs, struct stats *rhs, void *arg)
+{
+	ASSERT(lhs != NULL);
+
+	/* count up the size of the stat name */
+	Serdsz += ipath2strlen(lhs->ename, lhs->ipath);
+	Serdsz++;	/* for the trailing NULL byte */
+}
+
+/*
+ * serd2str -- serialize a serd engine, writing result to *Serdbufptr
+ */
+/*ARGSUSED*/
+static void
+serd2str(const struct serd_entry *lhs, struct stats *rhs, void *arg)
+{
+	char *str;
+	int len;
+
+	ASSERT(lhs != NULL);
+
+	/* serialize the serd engine name */
+	str = ipath2str(lhs->ename, lhs->ipath);
+	len = strlen(str);
+
+	ASSERT(Serdbufptr + len + 1 <= &Serdbuf[Serdsz]);
+	(void) strlcpy(Serdbufptr, str, &Serdbuf[Serdsz] - Serdbufptr);
+	Serdbufptr += len;
+	FREE(str);
+	*Serdbufptr++ = '\0';
+	ASSERT(Serdbufptr <= &Serdbuf[Serdsz]);
+}
+
+void
+serd_save()
+{
+	if (Serd_need_save == 0)
+		return;
+
+	/* figure out how big the serialzed info is */
+	Serdsz = 0;
+	lut_walk(SerdEngines, (lut_cb)serdaddsize, NULL);
+
+	if (Serdsz == 0) {
+		/* no serd engines to save */
+		fmd_buf_destroy(Hdl, NULL, WOBUF_SERDS);
+		return;
+	}
+
+	/* create the serialized buffer */
+	Serdbufptr = Serdbuf = MALLOC(Serdsz);
+	lut_walk(SerdEngines, (lut_cb)serd2str, NULL);
+
+	/* clear out current saved stats */
+	fmd_buf_destroy(Hdl, NULL, WOBUF_SERDS);
+
+	/* write out the new version */
+	fmd_buf_write(Hdl, NULL, WOBUF_SERDS, Serdbuf, Serdsz);
+	FREE(Serdbuf);
+	Serd_need_save = 0;
+}
+
+int
+serd_cmp(struct serd_entry *ent1, struct serd_entry *ent2)
+{
+	if (ent1->ename != ent2->ename)
+		return (ent2->ename - ent1->ename);
+	if (ent1->ipath != ent2->ipath)
+		return ((char *)ent2->ipath - (char *)ent1->ipath);
+
+	return (0);
+}
+
+void
+fme_serd_load(fmd_hdl_t *hdl)
+{
+	int sz;
+	char *sbuf;
+	char *sepptr;
+	char *ptr;
+	struct serd_entry *newentp;
+	struct node *epname;
+	nvlist_t *fmri;
+	char *namestring;
+
+	if ((sz = fmd_buf_size(hdl, NULL, WOBUF_SERDS)) == 0)
+		return;
+	sbuf = alloca(sz);
+	fmd_buf_read(hdl, NULL, WOBUF_SERDS, sbuf, sz);
+	ptr = sbuf;
+	while (ptr < &sbuf[sz]) {
+		sepptr = strchr(ptr, '@');
+		*sepptr = '\0';
+		namestring = ptr;
+		sepptr++;
+		ptr = sepptr;
+		ptr += strlen(ptr);
+		ptr++;	/* move past the '\0' separating paths */
+		epname = pathstring2epnamenp(sepptr);
+		fmri = node2fmri(epname);
+		if (platform_path_exists(fmri)) {
+			newentp = MALLOC(sizeof (*newentp));
+			newentp->hdl = hdl;
+			newentp->ipath = ipath(epname);
+			newentp->ename = stable(namestring);
+			SerdEngines = lut_add(SerdEngines, (void *)newentp,
+			    (void *)NULL, (lut_cmp)serd_cmp);
+		} else
+			Serd_need_save = 1;
+		nvlist_free(fmri);
+	}
+	/* save it back again in case some of the paths no longer exist */
+	serd_save();
+}
+
+/*ARGSUSED*/
+static void
+serd_destructor(void *left, void *right, void *arg)
+{
+	struct serd_entry *entp = (struct serd_entry *)left;
+	FREE(entp);
+}
+
+/*
+ * Callback used in a walk of the SerdEngines to reset matching serd engines.
+ */
+/*ARGSUSED*/
+static void
+serd_reset_cb(struct serd_entry *entp, void *unused, const struct ipath *ipp)
+{
+	char *path;
+
+	if (entp->ipath == ipp) {
+		path = ipath2str(entp->ename, ipp);
+		out(O_ALTFP, "serd_reset_cb: resetting %s", path);
+		fmd_serd_reset(entp->hdl, path);
+		FREE(path);
+		Serd_need_save = 1;
+	}
+}
+
+void
+serd_fini(void)
+{
+	lut_free(SerdEngines, serd_destructor, NULL);
+}
+
 static void
 publish_suspects(struct fme *fmep)
 {
@@ -2079,7 +2457,6 @@ publish_suspects(struct fme *fmep)
 		lut_walk(rp->suspect->payloadprops,
 		    (lut_cb)addpayloadprop, (void *)fault);
 		fmd_case_add_suspect(fmep->hdl, fmep->fmcase, fault);
-		rp->suspect->fault = fault;
 		rslfree(rp);
 
 		/*
@@ -2143,8 +2520,6 @@ publish_suspects(struct fme *fmep)
 			if (suspect == NULL)
 				continue;
 
-			fault = suspect->fault;
-
 			/* if "count" exists, increment the appropriate stat */
 			if ((snp = eventprop_lookup(suspect,
 			    L_count)) != NULL) {
@@ -2172,7 +2547,7 @@ publish_suspects(struct fme *fmep)
 }
 
 static void
-publish_undiagnosable(fmd_hdl_t *hdl, fmd_event_t *ffep)
+publish_undiagnosable(fmd_hdl_t *hdl, fmd_event_t *ffep, fmd_case_t *fmcase)
 {
 	struct case_list *newcase;
 	nvlist_t *defect;
@@ -2184,8 +2559,7 @@ publish_undiagnosable(fmd_hdl_t *hdl, fmd_event_t *ffep)
 
 	newcase = MALLOC(sizeof (struct case_list));
 	newcase->next = NULL;
-
-	newcase->fmcase = fmd_case_open(hdl, NULL);
+	newcase->fmcase = fmcase;
 	if (Undiagablecaselist != NULL)
 		newcase->next = Undiagablecaselist;
 	Undiagablecaselist = newcase;
@@ -2218,7 +2592,6 @@ fme_undiagnosable(struct fme *f)
 		(void) nvlist_add_string(defect, UNDIAG_REASON, Undiag_reason);
 	fmd_case_add_suspect(f->hdl, f->fmcase, defect);
 	fmd_case_solve(f->hdl, f->fmcase);
-	destroy_fme_bufs(f);
 	fmd_case_close(f->hdl, f->fmcase);
 }
 
@@ -2358,11 +2731,14 @@ fme_timer_fired(struct fme *fmep, id_t tid)
 		return;
 	}
 
-	out(O_ALTFP, "Timer fired %lx", tid);
+	out(O_ALTFP|O_VERB, "Timer fired %lx", tid);
 	fmep->pull = fmep->wull;
 	fmep->wull = 0;
 	fmd_buf_write(fmep->hdl, fmep->fmcase,
 	    WOBUF_PULL, (void *)&fmep->pull, sizeof (fmep->pull));
+
+	fme_reload_cfgdata(fmep);
+
 	fme_eval(fmep, fmep->e0r);
 }
 
@@ -2427,19 +2803,19 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 
 	save_suspects(fmep);
 
-	out(O_ALTFP|O_VERB, "Evaluate FME %d", fmep->id);
+	out(O_ALTFP, "Evaluate FME %d", fmep->id);
 	indent_set("  ");
 
 	lut_walk(fmep->eventtree, (lut_cb)clear_arrows, (void *)fmep);
 	fmep->state = hypothesise(fmep, fmep->e0, fmep->ull, &my_delay);
 
-	out(O_ALTFP|O_VERB|O_NONL, "FME%d state: %s, suspect list:", fmep->id,
+	out(O_ALTFP|O_NONL, "FME%d state: %s, suspect list:", fmep->id,
 	    fme_state2str(fmep->state));
 	for (ep = fmep->suspects; ep; ep = ep->suspects) {
-		out(O_ALTFP|O_VERB|O_NONL, " ");
-		itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep);
+		out(O_ALTFP|O_NONL, " ");
+		itree_pevent_brief(O_ALTFP|O_NONL, ep);
 	}
-	out(O_ALTFP|O_VERB, NULL);
+	out(O_ALTFP, NULL);
 
 	switch (fmep->state) {
 	case FME_CREDIBLE:
@@ -2475,7 +2851,10 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 		ASSERT(my_delay > fmep->ull);
 		(void) fme_set_timer(fmep, my_delay);
 		print_suspects(SLWAIT, fmep);
-		break;
+		itree_prune(fmep->eventtree);
+		config_free(fmep->cfgdata);
+		fmep->cfgdata = NULL;
+		return;
 
 	case FME_DISPROVED:
 		print_suspects(SLDISPROVED, fmep);
@@ -2504,19 +2883,14 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 		if (doclose) {
 			out(O_ALTFP, "[closing FME%d, case %s (autoclose)]",
 			    fmep->id, fmd_case_uuid(fmep->hdl, fmep->fmcase));
-
-			destroy_fme_bufs(fmep);
 			fmd_case_close(fmep->hdl, fmep->fmcase);
 		}
 	}
-	if (fmep->posted_suspects == 1) {
-		itree_free(fmep->eventtree);
-		fmep->eventtree = NULL;
-		config_free(fmep->cfgdata);
-		fmep->cfgdata = NULL;
-	} else {
-		itree_prune(fmep->eventtree);
-	}
+	itree_free(fmep->eventtree);
+	fmep->eventtree = NULL;
+	config_free(fmep->cfgdata);
+	fmep->cfgdata = NULL;
+	destroy_fme_bufs(fmep);
 }
 
 static void indent(void);
@@ -2534,9 +2908,9 @@ checkconstraints(struct fme *fmep, struct arrow *arrowp)
 {
 	struct constraintlist *ctp;
 	struct evalue value;
+	char *sep = "";
 
 	if (arrowp->forever_false) {
-		char *sep = "";
 		indent();
 		out(O_ALTFP|O_VERB|O_NONL, "  Forever false constraint: ");
 		for (ctp = arrowp->constraints; ctp != NULL; ctp = ctp->next) {
@@ -2546,6 +2920,17 @@ checkconstraints(struct fme *fmep, struct arrow *arrowp)
 		}
 		out(O_ALTFP|O_VERB, NULL);
 		return (0);
+	}
+	if (arrowp->forever_true) {
+		indent();
+		out(O_ALTFP|O_VERB|O_NONL, "  Forever true constraint: ");
+		for (ctp = arrowp->constraints; ctp != NULL; ctp = ctp->next) {
+			out(O_ALTFP|O_VERB|O_NONL, sep);
+			ptree(O_ALTFP|O_VERB|O_NONL, ctp->cnode, 1, 0);
+			sep = ", ";
+		}
+		out(O_ALTFP|O_VERB, NULL);
+		return (1);
 	}
 
 	for (ctp = arrowp->constraints; ctp != NULL; ctp = ctp->next) {
@@ -2570,10 +2955,19 @@ checkconstraints(struct fme *fmep, struct arrow *arrowp)
 			    "  Deferred constraint: ");
 			ptree(O_ALTFP|O_VERB|O_NONL, ctp->cnode, 1, 0);
 			out(O_ALTFP|O_VERB, NULL);
-			return (2);
+			return (1);
 		}
 	}
 	/* known true */
+	arrowp->forever_true = 1;
+	indent();
+	out(O_ALTFP|O_VERB|O_NONL, "  True constraint: ");
+	for (ctp = arrowp->constraints; ctp != NULL; ctp = ctp->next) {
+		out(O_ALTFP|O_VERB|O_NONL, sep);
+		ptree(O_ALTFP|O_VERB|O_NONL, ctp->cnode, 1, 0);
+		sep = ", ";
+	}
+	out(O_ALTFP|O_VERB, NULL);
 	return (1);
 }
 
@@ -2624,6 +3018,9 @@ mark_arrows(struct fme *fmep, struct event *ep, int mark,
 			 * all that work evaluating constraints.
 			 */
 			if (mark == 0) {
+				if (ap->arrowp->arrow_marked == 0)
+					continue;
+				ap->arrowp->arrow_marked = 0;
 				ap->arrowp->mark &= ~EFFECTS_COUNTER;
 				if (keep && (ep2->cached_state &
 				    (WAIT_EFFECT|CREDIBLE_EFFECT|PARENT_WAIT)))
@@ -2634,6 +3031,7 @@ mark_arrows(struct fme *fmep, struct event *ep, int mark,
 				    keep);
 				continue;
 			}
+			ap->arrowp->arrow_marked = 1;
 			if (ep2->cached_state & REQMNTS_DISPROVED) {
 				indent();
 				out(O_ALTFP|O_VERB|O_NONL,
@@ -2694,11 +3092,11 @@ mark_arrows(struct fme *fmep, struct event *ep, int mark,
 			 */
 			if (ep2->t == N_EREPORT && at_latest_by == 0ULL &&
 			    ap->arrowp->maxdelay == 0ULL) {
-				result = requirements_test(fmep, ep2, Hesitate,
-				    &my_delay);
 				out(O_ALTFP|O_VERB|O_NONL, "  default wait ");
 				itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep2);
 				out(O_ALTFP|O_VERB, NULL);
+				result = requirements_test(fmep, ep2, Hesitate,
+				    &my_delay);
 			} else {
 				result = requirements_test(fmep, ep2,
 				    at_latest_by + ap->arrowp->maxdelay,
@@ -3169,8 +3567,9 @@ hypothesise(struct fme *fmep, struct event *ep,
 		if (is_problem(ep->t)) {
 			otr = effects_test(fmep, ep, at_latest_by, &my_delay);
 			if (otr != FME_DISPROVED) {
-				if (fmep->peek == 0 && ep->is_suspect++ == 0) {
+				if (fmep->peek == 0 && ep->is_suspect == 0) {
 					ep->suspects = fmep->suspects;
+					ep->is_suspect = 1;
 					fmep->suspects = ep;
 					fmep->nsuspects++;
 					if (!is_fault(ep->t))

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * tree.c -- routines for manipulating the prop tree
@@ -66,6 +66,8 @@ static struct stats *Maskcount;
 static struct stats *Nodecount;
 static struct stats *Namecount;
 static struct stats *Nodesize;
+
+struct lut *Usedprops;
 
 void
 tree_init(void)
@@ -145,13 +147,73 @@ tree_fini(void)
 	}
 }
 
+/*ARGSUSED*/
+static int
+nodesize(enum nodetype t, struct node *ret)
+{
+	int size = sizeof (struct node);
+
+	switch (t) {
+	case T_NAME:
+		size += sizeof (ret->u.name) - sizeof (ret->u);
+		break;
+
+	case T_GLOBID:
+		size += sizeof (ret->u.globid) - sizeof (ret->u);
+		break;
+
+	case T_TIMEVAL:
+	case T_NUM:
+		size += sizeof (ret->u.ull) - sizeof (ret->u);
+		break;
+
+	case T_QUOTE:
+		size += sizeof (ret->u.quote) - sizeof (ret->u);
+		break;
+
+	case T_FUNC:
+		size += sizeof (ret->u.func) - sizeof (ret->u);
+		break;
+
+	case T_FAULT:
+	case T_UPSET:
+	case T_DEFECT:
+	case T_ERROR:
+	case T_EREPORT:
+	case T_ASRU:
+	case T_FRU:
+	case T_SERD:
+	case T_STAT:
+	case T_CONFIG:
+	case T_PROP:
+	case T_MASK:
+		size += sizeof (ret->u.stmt) - sizeof (ret->u);
+		break;
+
+	case T_EVENT:
+		size += sizeof (ret->u.event) - sizeof (ret->u);
+		break;
+
+	case T_ARROW:
+		size += sizeof (ret->u.arrow) - sizeof (ret->u);
+		break;
+
+	default:
+		size += sizeof (ret->u.expr) - sizeof (ret->u);
+		break;
+	}
+	return (size);
+}
+
 struct node *
 newnode(enum nodetype t, const char *file, int line)
 {
-	struct node *ret = MALLOC(sizeof (*ret));
+	struct node *ret = NULL;
+	int size = nodesize(t, ret);
 
+	ret = alloc_xmalloc(size);
 	stats_counter_bump(Nodecount);
-	bzero(ret, sizeof (*ret));
+	bzero(ret, size);
 	ret->t = t;
 	ret->file = (file == NULL) ? "<nofile>" : file;
 	ret->line = line;
@@ -247,8 +309,7 @@ tree_free(struct node *root)
 		    root->t);
 		/*NOTREACHED*/
 	}
-	bzero(root, sizeof (*root));
-	FREE(root);
+	alloc_xfree((char *)root, nodesize(root->t, root));
 }
 
 static int
@@ -269,15 +330,15 @@ tree_treecmp(struct node *np1, struct node *np2, enum nodetype t,
 	switch (np1->t) {
 	case T_NAME:
 		if (tree_treecmp(np1->u.name.child, np2->u.name.child, t,
-				cmp_func))
+		    cmp_func))
 			return (1);
 		return (tree_treecmp(np1->u.name.next, np2->u.name.next, t,
-				    cmp_func));
+		    cmp_func));
 		/*NOTREACHED*/
 		break;
 	case T_FUNC:
 		return (tree_treecmp(np1->u.func.arglist, np2->u.func.arglist,
-				    t, cmp_func));
+		    t, cmp_func));
 		/*NOTREACHED*/
 		break;
 	case T_AND:
@@ -305,46 +366,46 @@ tree_treecmp(struct node *np1, struct node *np2, enum nodetype t,
 	case T_CONDELSE:
 	case T_LIST:
 		if (tree_treecmp(np1->u.expr.left, np2->u.expr.left, t,
-				cmp_func))
+		    cmp_func))
 			return (1);
 		return (tree_treecmp(np1->u.expr.right, np2->u.expr.right, t,
-				    cmp_func));
+		    cmp_func));
 		/*NOTREACHED*/
 		break;
 	case T_EVENT:
 		if (tree_treecmp(np1->u.event.ename, np2->u.event.ename, t,
-				cmp_func))
+		    cmp_func))
 			return (1);
 		if (tree_treecmp(np1->u.event.epname, np2->u.event.epname, t,
-				cmp_func))
+		    cmp_func))
 			return (1);
 		return (tree_treecmp(np1->u.event.eexprlist,
-				    np2->u.event.eexprlist, t, cmp_func));
+		    np2->u.event.eexprlist, t, cmp_func));
 		/*NOTREACHED*/
 		break;
 	case T_NOT:
 		return (tree_treecmp(np1->u.expr.left, np2->u.expr.left, t,
-				    cmp_func));
+		    cmp_func));
 		/*NOTREACHED*/
 		break;
 	case T_ARROW:
 		if (tree_treecmp(np1->u.arrow.lhs, np2->u.arrow.lhs, t,
-				cmp_func))
+		    cmp_func))
 			return (1);
 		if (tree_treecmp(np1->u.arrow.nnp, np2->u.arrow.nnp, t,
-				cmp_func))
+		    cmp_func))
 			return (1);
 		if (tree_treecmp(np1->u.arrow.knp, np2->u.arrow.knp, t,
-				cmp_func))
+		    cmp_func))
 			return (1);
 		return (tree_treecmp(np1->u.arrow.rhs, np2->u.arrow.rhs, t,
-				    cmp_func));
+		    cmp_func));
 		/*NOTREACHED*/
 		break;
 	case T_PROP:
 	case T_MASK:
 		return (tree_treecmp(np1->u.stmt.np, np2->u.stmt.np, t,
-				    cmp_func));
+		    cmp_func));
 		/*NOTREACHED*/
 		break;
 	case T_FAULT:
@@ -359,7 +420,7 @@ tree_treecmp(struct node *np1, struct node *np2, enum nodetype t,
 		if (tree_treecmp(np1->u.stmt.np, np2->u.stmt.np, t, cmp_func))
 			return (1);
 		return (tree_treecmp(np1->u.stmt.nvpairs, np2->u.stmt.nvpairs,
-				    t, cmp_func));
+		    t, cmp_func));
 		/*NOTREACHED*/
 		break;
 	case T_TIMEVAL:
@@ -694,11 +755,36 @@ struct node *
 tree_func(const char *s, struct node *np, const char *file, int line)
 {
 	struct node *ret = newnode(T_FUNC, file, line);
+	const char *ptr;
 
 	ret->u.func.s = s;
 	ret->u.func.arglist = np;
 
 	check_func(ret);
+
+	/*
+	 * keep track of the properties we're interested in so we can ignore the
+	 * rest
+	 */
+	if (strcmp(s, L_confprop) == 0 || strcmp(s, L_confprop_defined) == 0) {
+		ptr = stable(np->u.expr.right->u.quote.s);
+		Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
+	} else if (strcmp(s, L_is_connected) == 0) {
+		ptr = stable("connected");
+		Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
+		ptr = stable("CONNECTED");
+		Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
+	} else if (strcmp(s, L_is_type) == 0) {
+		ptr = stable("type");
+		Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
+		ptr = stable("TYPE");
+		Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
+	} else if (strcmp(s, L_is_on) == 0) {
+		ptr = stable("on");
+		Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
+		ptr = stable("ON");
+		Usedprops = lut_add(Usedprops, (void *)ptr, (void *)ptr, NULL);
+	}
 
 	return (ret);
 }
@@ -974,7 +1060,7 @@ update_serd_refstmt(void *lhs, void *rhs, void *arg)
 	ASSERT(rhs != NULL);
 
 	serd = tree_s2np_lut_lookup(((struct node *)rhs)->u.stmt.lutp,
-				    L_engine);
+	    L_engine);
 	if (serd == NULL)
 		return;
 
@@ -1142,7 +1228,7 @@ tree_stmt(enum nodetype t, struct node *np, const char *file, int line)
 
 		for (pp = Props; pp; pp = pp->u.stmt.next) {
 			if (tree_treecmp(pp, ret, T_NAME,
-					(lut_cmp)tree_namecmp) == 0) {
+			    (lut_cmp)tree_namecmp) == 0) {
 				inlist = 1;
 				break;
 			}
@@ -1166,7 +1252,7 @@ tree_stmt(enum nodetype t, struct node *np, const char *file, int line)
 
 		for (pp = Masks; pp; pp = pp->u.stmt.next) {
 			if (tree_treecmp(pp, ret, T_NAME,
-					(lut_cmp)tree_namecmp) == 0) {
+			    (lut_cmp)tree_namecmp) == 0) {
 				inlist = 1;
 				break;
 			}
@@ -1258,9 +1344,9 @@ tree_eventcmp(struct node *np1, struct node *np2)
 	ASSERTinfo(np2->t == T_EVENT, ptree_nodetype2str(np2->t));
 
 	if ((ret = tree_namecmp(np1->u.event.ename,
-		np2->u.event.ename)) == 0) {
+	    np2->u.event.ename)) == 0) {
 			if (np1->u.event.epname == NULL &&
-				np2->u.event.epname == NULL)
+			    np2->u.event.epname == NULL)
 				return (0);
 			else if (np1->u.event.epname == NULL)
 				return (-1);
@@ -1268,7 +1354,7 @@ tree_eventcmp(struct node *np1, struct node *np2)
 				return (1);
 			else
 				return tree_namecmp(np1->u.event.epname,
-					np2->u.event.epname);
+				    np2->u.event.epname);
 	} else
 	return (ret);
 }

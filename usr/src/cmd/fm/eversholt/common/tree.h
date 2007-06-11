@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * tree.h -- public definitions for tree module
@@ -40,7 +40,7 @@ extern "C" {
 
 struct node {
 	enum nodetype {
-		T_NOTHING = 1000,	/* used to keep going on error cases */
+		T_NOTHING,		/* used to keep going on error cases */
 		T_NAME,			/* identifiers, sometimes chained */
 		T_GLOBID,		/* globals (e.g. $a) */
 		T_EVENT,		/* class@path{expr} */
@@ -87,14 +87,14 @@ struct node {
 		T_PROP,			/* prop statement */
 		T_MASK,			/* mask statement */
 		T_CONFIG		/* config statement */
-	} t;
+	} t:8;
 
 	/*
 	 * regardless of the type of node, filename and line number
 	 * information from the original .esc file is tracked here.
 	 */
+	int line:24;
 	const char *file;
-	int line;
 
 	/*
 	 * the variant part of a struct node...
@@ -148,6 +148,11 @@ struct node {
 			/* opaque pointer used during config matching */
 			struct config *cp;
 
+			/*
+			 * note nametype is also declared as a three bit enum
+			 * in itree.h, so if this ever needs expanding that
+			 * will need changing too.
+			 */
 			enum nametype {
 				N_UNSPEC,
 				N_FAULT,
@@ -223,6 +228,8 @@ struct node {
 			 */
 			struct node *ename;	/* event class name */
 			struct node *epname;	/* component path name */
+			struct node *oldepname;	/* unwildcarded path name */
+			struct node *ewname;	/* wildcarded portion */
 			struct node *eexprlist;	/* constraint expression */
 			struct node *declp;	/* event declaration */
 		} event;
@@ -236,6 +243,7 @@ struct node {
 			struct node *nnp;	/* N value */
 			struct node *knp;	/* K value */
 			struct node *prop;	/* arrow is part of this prop */
+			int needed;
 		} arrow;
 
 		struct {
@@ -244,8 +252,13 @@ struct node {
 			 */
 			struct node *left;
 			struct node *right;
+			int temp;
 		} expr;
 	} u;
+	/*
+	 * Note to save memory the nodesize() function trims the end of this
+	 * structure, so best not to add anything after this point
+	 */
 };
 
 /* flags we keep with stmts */

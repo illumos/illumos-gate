@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * eval.c -- constraint evaluation module
@@ -50,18 +50,21 @@
 #include "stats.h"
 
 static struct node *eval_dup(struct node *np, struct lut *ex,
-    struct node *epnames[]);
+    struct node *events[]);
 static int check_expr_args(struct evalue *lp, struct evalue *rp,
     enum datatype dtype, struct node *np);
+static struct node *eval_fru(struct node *np);
+static struct node *eval_asru(struct node *np);
 
 /*
  * begins_with -- return true if rhs path begins with everything in lhs path
  */
 static int
-begins_with(struct node *lhs, struct node *rhs)
+begins_with(struct node *lhs, struct node *rhs, struct lut *ex)
 {
 	int lnum;
 	int rnum;
+	struct iterinfo *iterinfop;
 
 	if (lhs == NULL)
 		return (1);	/* yep -- it all matched */
@@ -75,20 +78,70 @@ begins_with(struct node *lhs, struct node *rhs)
 	if (lhs->u.name.s != rhs->u.name.s)
 		return (0);	/* nope, different component names */
 
-	if (lhs->u.name.child && lhs->u.name.child->t == T_NUM)
+	if (lhs->u.name.child && lhs->u.name.child->t == T_NUM) {
 		lnum = (int)lhs->u.name.child->u.ull;
-	else
+	} else if (lhs->u.name.child && lhs->u.name.child->t == T_NAME) {
+		iterinfop = lut_lookup(ex, (void *)lhs->u.name.child->u.name.s,
+		    NULL);
+		if (iterinfop != NULL)
+			lnum = iterinfop->num;
+		else
+			out(O_DIE, "begins_with: unexpected lhs child");
+	} else {
 		out(O_DIE, "begins_with: unexpected lhs child");
+	}
 
-	if (rhs->u.name.child && rhs->u.name.child->t == T_NUM)
+	if (rhs->u.name.child && rhs->u.name.child->t == T_NUM) {
 		rnum = (int)rhs->u.name.child->u.ull;
-	else
+	} else if (rhs->u.name.child && rhs->u.name.child->t == T_NAME) {
+		iterinfop = lut_lookup(ex, (void *)rhs->u.name.child->u.name.s,
+		    NULL);
+		if (iterinfop != NULL)
+			rnum = iterinfop->num;
+		else
+			out(O_DIE, "begins_with: unexpected rhs child");
+	} else {
 		out(O_DIE, "begins_with: unexpected rhs child");
+	}
 
 	if (lnum != rnum)
 		return (0);	/* nope, instance numbers were different */
 
-	return (begins_with(lhs->u.name.next, rhs->u.name.next));
+	return (begins_with(lhs->u.name.next, rhs->u.name.next, ex));
+}
+
+/*
+ * eval_getname - used by eval_func to evaluate a name, preferably without using
+ * eval_dup (but if it does have to use eval_dup then the *dupedp flag is set).
+ */
+static struct node *
+eval_getname(struct node *funcnp, struct lut *ex, struct node *events[],
+    struct node *np, struct lut **globals,
+    struct config *croot, struct arrow *arrowp, int try, int *dupedp)
+{
+	struct node *nodep;
+	const char *funcname = funcnp->u.func.s;
+	struct evalue val;
+
+	if (np->t == T_NAME)
+		nodep = np;
+	else if (np->u.func.s == L_fru)
+		nodep = eval_fru(np->u.func.arglist);
+	else if (np->u.func.s == L_asru)
+		nodep = eval_asru(np->u.func.arglist);
+	else
+		out(O_DIE, "%s: unexpected type: %s",
+		    funcname, ptree_nodetype2str(np->t));
+	if (try) {
+		if (eval_expr(nodep, ex, events, globals, croot,
+		    arrowp, try, &val) && val.t == NODEPTR)
+			nodep = (struct node *)(uintptr_t)val.v;
+		else {
+			*dupedp = 1;
+			nodep = eval_dup(nodep, ex, events);
+		}
+	}
+	return (nodep);
 }
 
 /*
@@ -98,11 +151,18 @@ begins_with(struct node *lhs, struct node *rhs)
  */
 /*ARGSUSED*/
 static int
-eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
+eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
     struct node *np, struct lut **globals,
     struct config *croot, struct arrow *arrowp, int try, struct evalue *valuep)
 {
 	const char *funcname = funcnp->u.func.s;
+	int duped_lhs = 0, duped_rhs = 0, duped = 0;
+	struct node *lhs;
+	struct node *rhs;
+	struct config *cp;
+	struct node *nodep;
+	char *path;
+	struct evalue val;
 
 	if (funcname == L_within) {
 		/* within()'s are not really constraints -- always true */
@@ -110,105 +170,275 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 		valuep->v = 1;
 		return (1);
 	} else if (funcname == L_is_under) {
-		struct node *lhs;
-		struct node *rhs;
+		lhs = eval_getname(funcnp, ex, events, np->u.expr.left, globals,
+		    croot, arrowp, try, &duped_lhs);
+		rhs = eval_getname(funcnp, ex, events, np->u.expr.right,
+		    globals, croot, arrowp, try, &duped_rhs);
 
-		if (np->u.expr.left->t == T_NAME)
-			lhs = np->u.expr.left;
-		else if (np->u.expr.left->u.func.s == L_fru)
-			lhs = eval_fru(np->u.expr.left->u.func.arglist);
-		else if (np->u.expr.left->u.func.s == L_asru)
-			lhs = eval_asru(np->u.expr.left->u.func.arglist);
-		else
-			out(O_DIE, "is_under: unexpected lhs type: %s",
-			    ptree_nodetype2str(np->u.expr.left->t));
-
-		if (np->u.expr.right->t == T_NAME)
-			rhs = np->u.expr.right;
-		else if (np->u.expr.right->u.func.s == L_fru)
-			rhs = eval_fru(np->u.expr.right->u.func.arglist);
-		else if (np->u.expr.right->u.func.s == L_asru)
-			rhs = eval_asru(np->u.expr.right->u.func.arglist);
-		else
-			out(O_DIE, "is_under: unexpected rhs type: %s",
-			    ptree_nodetype2str(np->u.expr.right->t));
-
-		/* eval_dup will expand wildcards, iterators, etc... */
-		lhs = eval_dup(lhs, ex, epnames);
-		rhs = eval_dup(rhs, ex, epnames);
 		valuep->t = UINT64;
-		valuep->v = begins_with(lhs, rhs);
-
+		valuep->v = begins_with(lhs, rhs, ex);
 		out(O_ALTFP|O_VERB2|O_NONL, "eval_func:is_under(");
 		ptree_name_iter(O_ALTFP|O_VERB2|O_NONL, lhs);
 		out(O_ALTFP|O_VERB2|O_NONL, ",");
 		ptree_name_iter(O_ALTFP|O_VERB2|O_NONL, rhs);
-		out(O_ALTFP|O_VERB2, ") returned %d", (int)valuep->v);
+		out(O_ALTFP|O_VERB2|O_NONL, ") returned %d", (int)valuep->v);
 
-		tree_free(lhs);
-		tree_free(rhs);
-
+		if (duped_lhs)
+			tree_free(lhs);
+		if (duped_rhs)
+			tree_free(rhs);
 		return (1);
 	} else if (funcname == L_confprop || funcname == L_confprop_defined) {
-		struct config *cp;
-		struct node *lhs;
-		char *path;
 		const char *s;
-
-		if (np->u.expr.left->u.func.s == L_fru)
-			lhs = eval_fru(np->u.expr.left->u.func.arglist);
-		else if (np->u.expr.left->u.func.s == L_asru)
-			lhs = eval_asru(np->u.expr.left->u.func.arglist);
-		else
-			out(O_DIE, "%s: unexpected lhs type: %s",
-			    funcname, ptree_nodetype2str(np->u.expr.left->t));
 
 		/* for now s will point to a quote [see addconfigprop()] */
 		ASSERT(np->u.expr.right->t == T_QUOTE);
 
-		/* eval_dup will expand wildcards, iterators, etc... */
-		lhs = eval_dup(lhs, ex, epnames);
-		path = ipath2str(NULL, ipath(lhs));
-		cp = config_lookup(croot, path, 0);
-		tree_free(lhs);
-		if (cp == NULL) {
-			out(O_ALTFP|O_VERB3, "%s: path %s not found",
-			    funcname, path);
+		nodep = eval_getname(funcnp, ex, events, np->u.expr.left,
+		    globals, croot, arrowp, try, &duped);
+		if (nodep->u.name.last->u.name.cp != NULL) {
+			cp = nodep->u.name.last->u.name.cp;
+		} else {
+			path = ipath2str(NULL, ipath(nodep));
+			cp = config_lookup(croot, path, 0);
 			FREE((void *)path);
-			if (funcname == L_confprop_defined) {
-				valuep->v = 0;
-				valuep->t = UINT64;
+		}
+		if (cp == NULL) {
+			if (funcname == L_confprop) {
+				out(O_ALTFP|O_VERB3, "%s: path ", funcname);
+				ptree_name_iter(O_ALTFP|O_VERB3|O_NONL, nodep);
+				out(O_ALTFP|O_VERB3, " not found");
+				valuep->v = (uintptr_t)stable("");
+				valuep->t = STRING;
+				if (duped)
+					tree_free(nodep);
 				return (1);
 			} else {
-				return (0);
+				valuep->v = 0;
+				valuep->t = UINT64;
+				if (duped)
+					tree_free(nodep);
+				return (1);
 			}
 		}
 		s = config_getprop(cp, np->u.expr.right->u.quote.s);
+		if (s == NULL && strcmp(np->u.expr.right->u.quote.s,
+		    "class-code") == 0)
+			s = config_getprop(cp, "CLASS-CODE");
 		if (s == NULL) {
-			out(O_ALTFP|O_VERB3, "%s: \"%s\" not found for path %s",
-			    funcname, np->u.expr.right->u.quote.s, path);
-			FREE((void *)path);
-			if (funcname == L_confprop_defined) {
-				valuep->v = 0;
-				valuep->t = UINT64;
+			if (funcname == L_confprop) {
+				out(O_ALTFP|O_VERB3|O_NONL,
+				    "%s: \"%s\" not found for path ",
+				    funcname, np->u.expr.right->u.quote.s);
+				ptree_name_iter(O_ALTFP|O_VERB3|O_NONL, nodep);
+				valuep->v = (uintptr_t)stable("");
+				valuep->t = STRING;
+				if (duped)
+					tree_free(nodep);
 				return (1);
 			} else {
-				return (0);
+				valuep->v = 0;
+				valuep->t = UINT64;
+				if (duped)
+					tree_free(nodep);
+				return (1);
 			}
 		}
 
 		if (funcname == L_confprop) {
 			valuep->v = (uintptr_t)stable(s);
 			valuep->t = STRING;
-			out(O_ALTFP|O_VERB3, "%s(\"%s\", \"%s\") = \"%s\"",
-			    funcname, path, np->u.expr.right->u.quote.s,
+			out(O_ALTFP|O_VERB3|O_NONL, "  %s(\"", funcname);
+			ptree_name_iter(O_ALTFP|O_VERB3|O_NONL, nodep);
+			out(O_ALTFP|O_VERB3|O_NONL,
+			    "\", \"%s\") = \"%s\"  ",
+			    np->u.expr.right->u.quote.s,
 			    (char *)(uintptr_t)valuep->v);
 		} else {
 			valuep->v = 1;
 			valuep->t = UINT64;
 		}
-		FREE((void *)path);
+		if (duped)
+			tree_free(nodep);
 		return (1);
+	} else if (funcname == L_is_connected) {
+		const char *connstrings[] = { "connected", "CONNECTED", NULL };
+		struct config *cp[2];
+		const char *matchthis[2], *s;
+		char *nameslist, *w;
+		int i, j;
+
+		lhs = eval_getname(funcnp, ex, events, np->u.expr.left, globals,
+		    croot, arrowp, try, &duped_lhs);
+		rhs = eval_getname(funcnp, ex, events, np->u.expr.right,
+		    globals, croot, arrowp, try, &duped_rhs);
+		path = ipath2str(NULL, ipath(lhs));
+		matchthis[1] = stable(path);
+		if (lhs->u.name.last->u.name.cp != NULL)
+			cp[0] = lhs->u.name.last->u.name.cp;
+		else
+			cp[0] = config_lookup(croot, path, 0);
+		FREE((void *)path);
+		path = ipath2str(NULL, ipath(rhs));
+		matchthis[0] = stable(path);
+		if (rhs->u.name.last->u.name.cp != NULL)
+			cp[1] = rhs->u.name.last->u.name.cp;
+		else
+			cp[1] = config_lookup(croot, path, 0);
+		FREE((void *)path);
+		if (duped_lhs)
+			tree_free(lhs);
+		if (duped_rhs)
+			tree_free(rhs);
+
+		valuep->t = UINT64;
+		valuep->v = 0;
+		if (cp[0] == NULL || cp[1] == NULL)
+			return (1);
+
+		/* to thine self always be connected */
+		if (cp[0] == cp[1]) {
+			valuep->v = 1;
+			return (1);
+		}
+
+		/*
+		 * Extract "connected" property from each cp. Search this
+		 * property for the name associated with the other cp[].
+		 */
+		for (i = 0; i < 2 && valuep->v == 0; i++) {
+			for (j = 0; connstrings[j] != NULL && valuep->v == 0;
+			    j++) {
+				s = config_getprop(cp[i],
+				    stable(connstrings[j]));
+				if (s != NULL) {
+					nameslist = STRDUP(s);
+					w = strtok(nameslist, " ,");
+					while (w != NULL) {
+						if (stable(w) == matchthis[i]) {
+							valuep->v = 1;
+							break;
+						}
+						w = strtok(NULL, " ,");
+					}
+					FREE(nameslist);
+				}
+			}
+		}
+		return (1);
+	} else if (funcname == L_is_type) {
+		const char *typestrings[] = { "type", "TYPE", NULL };
+		const char *s;
+		int i;
+
+		nodep = eval_getname(funcnp, ex, events, np, globals,
+		    croot, arrowp, try, &duped);
+		if (nodep->u.name.last->u.name.cp != NULL) {
+			cp = nodep->u.name.last->u.name.cp;
+		} else {
+			path = ipath2str(NULL, ipath(nodep));
+			cp = config_lookup(croot, path, 0);
+			FREE((void *)path);
+		}
+		if (duped)
+			tree_free(nodep);
+
+		valuep->t = STRING;
+		valuep->v = (uintptr_t)stable("");
+		if (cp == NULL)
+			return (1);
+		for (i = 0; typestrings[i] != NULL; i++) {
+			s = config_getprop(cp, stable(typestrings[i]));
+			if (s != NULL) {
+				valuep->v = (uintptr_t)stable(s);
+				break;
+			}
+		}
+		return (1);
+	} else if (funcname == L_is_on) {
+		const char *onstrings[] = { "on", "ON", NULL };
+		const char *truestrings[] = { "yes", "YES", "y", "Y",
+				    "true", "TRUE", "t", "T", "1", NULL };
+		const char *s;
+		int i, j;
+
+		nodep = eval_getname(funcnp, ex, events, np, globals,
+		    croot, arrowp, try, &duped);
+		if (nodep->u.name.last->u.name.cp != NULL) {
+			cp = nodep->u.name.last->u.name.cp;
+		} else {
+			path = ipath2str(NULL, ipath(nodep));
+			cp = config_lookup(croot, path, 0);
+			FREE((void *)path);
+		}
+		if (duped)
+			tree_free(nodep);
+
+		valuep->t = UINT64;
+		valuep->v = 0;
+		if (cp == NULL)
+			return (1);
+		for (i = 0; onstrings[i] != NULL; i++) {
+			s = config_getprop(cp, stable(onstrings[i]));
+			if (s != NULL) {
+				s = stable(s);
+				for (j = 0; truestrings[j] != NULL; j++) {
+					if (s == stable(truestrings[j])) {
+						valuep->v = 1;
+						return (1);
+					}
+				}
+			}
+		}
+		return (1);
+	} else if (funcname == L_is_present) {
+		nodep = eval_getname(funcnp, ex, events, np, globals,
+		    croot, arrowp, try, &duped);
+		if (nodep->u.name.last->u.name.cp != NULL) {
+			cp = nodep->u.name.last->u.name.cp;
+		} else {
+			path = ipath2str(NULL, ipath(nodep));
+			cp = config_lookup(croot, path, 0);
+			FREE((void *)path);
+		}
+		if (duped)
+			tree_free(nodep);
+
+		valuep->t = UINT64;
+		valuep->v = 0;
+		if (cp != NULL)
+			valuep->v = 1;
+		return (1);
+	} else if (funcname == L_count) {
+		struct stats *statp;
+		struct istat_entry ent;
+
+		ASSERTinfo(np->t == T_EVENT, ptree_nodetype2str(np->t));
+
+		nodep = np->u.event.epname;
+		if (try) {
+			if (eval_expr(nodep, ex, events, globals,
+			    croot, arrowp, try, &val) && val.t == NODEPTR)
+				nodep = (struct node *)(uintptr_t)val.v;
+			else {
+				duped = 1;
+				nodep = eval_dup(nodep, ex, events);
+			}
+		}
+		ent.ename = np->u.event.ename->u.name.s;
+		ent.ipath = ipath(nodep);
+		valuep->t = UINT64;
+		if ((statp = (struct stats *)
+		    lut_lookup(Istats, &ent, (lut_cmp)istat_cmp)) == NULL)
+			valuep->v = 0;
+		else
+			valuep->v = stats_counter_value(statp);
+		if (duped)
+			tree_free(nodep);
+		return (1);
+	} else if (funcname == L_envprop) {
+		outfl(O_DIE, np->file, np->line,
+		    "eval_func: %s not yet supported", funcname);
 	}
 
 	if (try)
@@ -230,17 +460,6 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 		return (1);
 	} else if (funcname == L_call) {
 		return (! platform_call(np, globals, croot, arrowp, valuep));
-	} else if (funcname == L_is_connected) {
-		return (! config_is_connected(np, croot, valuep));
-	} else if (funcname == L_is_on) {
-		return (! config_is_on(np, croot, valuep));
-	} else if (funcname == L_is_present) {
-		return (! config_is_present(np, croot, valuep));
-	} else if (funcname == L_is_type) {
-		return (! config_is_type(np, croot, valuep));
-	} else if (funcname == L_envprop) {
-		outfl(O_DIE, np->file, np->line,
-		    "eval_func: %s not yet supported", funcname);
 	} else if (funcname == L_payloadprop) {
 		outfl(O_ALTFP|O_VERB2|O_NONL, np->file, np->line,
 		    "payloadprop(\"%s\") ", np->u.quote.s);
@@ -291,7 +510,7 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 			payloadvalp = MALLOC(sizeof (*payloadvalp));
 		}
 
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
 		    arrowp, try, payloadvalp)) {
 			out(O_ALTFP|O_VERB2, " (cannot eval, using zero)");
 			payloadvalp->t = UINT64;
@@ -346,7 +565,7 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 		out(O_ALTFP|O_VERB2|O_NONL, ") ");
 
 		/* evaluate the expression we're comparing against */
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
 		    arrowp, try, &cmpval)) {
 			out(O_ALTFP|O_VERB2|O_NONL,
 			    "(cannot eval, using zero) ");
@@ -384,6 +603,7 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 		valuep->v = 0;
 		if (nvals == 0) {
 			out(O_ALTFP|O_VERB2, "not found.");
+			return (0);
 		} else {
 			struct evalue preval;
 			int i;
@@ -434,23 +654,6 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 		return (1);
 	} else if (funcname == L_confcall) {
 		return (!platform_confcall(np, globals, croot, arrowp, valuep));
-	} else if (funcname == L_count) {
-		struct stats *statp;
-		struct istat_entry ent;
-
-		ASSERTinfo(np->t == T_EVENT, ptree_nodetype2str(np->t));
-
-		ent.ename = np->u.event.ename->u.name.s;
-		ent.ipath = ipath(np->u.event.epname);
-
-		valuep->t = UINT64;
-		if ((statp = (struct stats *)
-		    lut_lookup(Istats, &ent, (lut_cmp)istat_cmp)) == NULL)
-			valuep->v = 0;
-		else
-			valuep->v = stats_counter_value(statp);
-
-		return (1);
 	} else
 		outfl(O_DIE, np->file, np->line,
 		    "eval_func: unexpected func: %s", funcname);
@@ -458,95 +661,18 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 	return (0);
 }
 
-static struct node *
-eval_wildcardedname(struct node *np, struct lut *ex, struct node *epnames[])
-{
-	struct node *npstart, *npend, *npref, *newnp;
-	struct node *np1, *np2, *retp;
-	int i;
+/*
+ * defines for u.expr.temp - these are used for T_OR and T_AND so that if
+ * we worked out that part of the expression was true or false during an
+ * earlier eval_expr, then we don't need to dup that part.
+ */
 
-	if (epnames == NULL || epnames[0] == NULL)
-		return (NULL);
-
-	for (i = 0; epnames[i] != NULL; i++) {
-		if (tree_namecmp(np, epnames[i]) == 0)
-			return (NULL);
-	}
-
-	/*
-	 * get to this point if np does not match any of the entries in
-	 * epnames.  check if np is a path that must preceded by a wildcard
-	 * portion.  for this case we must first determine which epnames[]
-	 * entry should be used for wildcarding.
-	 */
-	npstart = NULL;
-	for (i = 0; epnames[i] != NULL; i++) {
-		for (npref = epnames[i]; npref; npref = npref->u.name.next) {
-			if (npref->u.name.s == np->u.name.s) {
-				for (np1 = npref, np2 = np;
-				    np1 != NULL && np2 != NULL;
-				    np1 = np1->u.name.next,
-					    np2 = np2->u.name.next) {
-					if (np1->u.name.s != np2->u.name.s)
-						break;
-				}
-				if (np2 == NULL) {
-					npstart = epnames[i];
-					npend = npref;
-					if (np1 == NULL)
-						break;
-				}
-			}
-		}
-
-		if (npstart != NULL)
-			break;
-	}
-
-	if (npstart == NULL) {
-		/* no match; np is not a path to be wildcarded */
-		return (NULL);
-	}
-
-	/*
-	 * dup (npstart -- npend) which is the wildcarded portion.  all
-	 * children should be T_NUMs.
-	 */
-	retp = NULL;
-	for (npref = npstart;
-	    ! (npref == NULL || npref == npend);
-	    npref = npref->u.name.next) {
-		newnp = newnode(T_NAME, np->file, np->line);
-
-		newnp->u.name.t = npref->u.name.t;
-		newnp->u.name.s = npref->u.name.s;
-		newnp->u.name.last = newnp;
-		newnp->u.name.it = npref->u.name.it;
-		newnp->u.name.cp = npref->u.name.cp;
-
-		ASSERT(npref->u.name.child != NULL);
-		ASSERT(npref->u.name.child->t == T_NUM);
-		newnp->u.name.child = newnode(T_NUM, np->file, np->line);
-		newnp->u.name.child->u.ull = npref->u.name.child->u.ull;
-
-		if (retp == NULL) {
-			retp = newnp;
-		} else {
-			retp->u.name.last->u.name.next = newnp;
-			retp->u.name.last = newnp;
-		}
-	}
-
-	ASSERT(retp != NULL);
-
-	/* now append the nonwildcarded portion */
-	retp = tree_name_append(retp, eval_dup(np, ex, NULL));
-
-	return (retp);
-}
+#define	EXPR_TEMP_BOTH_UNK	0
+#define	EXPR_TEMP_LHS_UNK	1
+#define	EXPR_TEMP_RHS_UNK	2
 
 static struct node *
-eval_dup(struct node *np, struct lut *ex, struct node *epnames[])
+eval_dup(struct node *np, struct lut *ex, struct node *events[])
 {
 	struct node *newnp;
 
@@ -572,9 +698,6 @@ eval_dup(struct node *np, struct lut *ex, struct node *epnames[])
 	case T_BITNOT:
 	case T_LSHIFT:
 	case T_RSHIFT:
-	case T_LIST:
-	case T_AND:
-	case T_OR:
 	case T_NOT:
 	case T_ADD:
 	case T_SUB:
@@ -582,72 +705,191 @@ eval_dup(struct node *np, struct lut *ex, struct node *epnames[])
 	case T_DIV:
 	case T_MOD:
 		return (tree_expr(np->t,
-				    eval_dup(np->u.expr.left, ex, epnames),
-				    eval_dup(np->u.expr.right, ex, epnames)));
+		    eval_dup(np->u.expr.left, ex, events),
+		    eval_dup(np->u.expr.right, ex, events)));
+	case T_LIST:
+	case T_AND:
+		switch (np->u.expr.temp) {
+		case EXPR_TEMP_LHS_UNK:
+			return (eval_dup(np->u.expr.left, ex, events));
+		case EXPR_TEMP_RHS_UNK:
+			return (eval_dup(np->u.expr.right, ex, events));
+		default:
+			return (tree_expr(np->t,
+			    eval_dup(np->u.expr.left, ex, events),
+			    eval_dup(np->u.expr.right, ex, events)));
+		}
+
+	case T_OR:
+		switch (np->u.expr.temp) {
+		case EXPR_TEMP_LHS_UNK:
+			return (eval_dup(np->u.expr.left, ex, events));
+		case EXPR_TEMP_RHS_UNK:
+			return (eval_dup(np->u.expr.right, ex, events));
+		default:
+			return (tree_expr(T_OR,
+			    eval_dup(np->u.expr.left, ex, events),
+			    eval_dup(np->u.expr.right, ex, events)));
+		}
 
 	case T_NAME: {
 		struct iterinfo *iterinfop;
-		struct node *newchild = NULL;
+		int got_matchf = 0;
+		int got_matcht = 0;
+		struct evalue value;
+		struct node *np1f, *np2f, *np1t, *np2t, *retp = NULL;
+		struct node *npstart, *npcont, *npend, *npref, *newnp, *nprest;
 
-		iterinfop = lut_lookup(ex, (void *)np->u.name.s, NULL);
-		if (iterinfop != NULL) {
-			/* explicit iterator; not part of pathname */
-			newnp = newnode(T_NUM, np->file, np->line);
-			newnp->u.ull = iterinfop->num;
-			return (newnp);
+		/*
+		 * Check if we already have a match of the nonwildcarded path
+		 * in oldepname (check both to and from events).
+		 */
+		for (np1f = np, np2f = events[0]->u.event.oldepname;
+		    np1f != NULL && np2f != NULL;
+		    np1f = np1f->u.name.next, np2f = np2f->u.name.next) {
+			if (strcmp(np1f->u.name.s, np2f->u.name.s) != 0)
+				break;
+			if (np1f->u.name.child->t != np2f->u.name.child->t)
+				break;
+			if (np1f->u.name.child->t == T_NUM &&
+			    np1f->u.name.child->u.ull !=
+			    np2f->u.name.child->u.ull)
+				break;
+			if (np1f->u.name.child->t == T_NAME &&
+			    strcmp(np1f->u.name.child->u.name.s,
+			    np2f->u.name.child->u.name.s) != 0)
+				break;
+			got_matchf++;
 		}
-
-		/* see if np is a path with wildcard portion */
-		newnp = eval_wildcardedname(np, ex, epnames);
-		if (newnp != NULL)
-			return (newnp);
-
-		/* turn off wildcarding for child */
-		newchild = eval_dup(np->u.name.child, ex, NULL);
-
-		if (newchild != NULL) {
-			if (newchild->t != T_NUM) {
-				/*
-				 * not a number, eh?  we must resolve this
-				 * to a number.
-				 */
-				struct evalue value;
-
-				if (eval_expr(newchild, ex, epnames,
+		for (np1t = np, np2t = events[1]->u.event.oldepname;
+		    np1t != NULL && np2t != NULL;
+		    np1t = np1t->u.name.next, np2t = np2t->u.name.next) {
+			if (strcmp(np1t->u.name.s, np2t->u.name.s) != 0)
+				break;
+			if (np1t->u.name.child->t != np2t->u.name.child->t)
+				break;
+			if (np1t->u.name.child->t == T_NUM &&
+			    np1t->u.name.child->u.ull !=
+			    np2t->u.name.child->u.ull)
+				break;
+			if (np1t->u.name.child->t == T_NAME &&
+			    strcmp(np1t->u.name.child->u.name.s,
+			    np2t->u.name.child->u.name.s) != 0)
+				break;
+			got_matcht++;
+		}
+		nprest = np;
+		if (got_matchf || got_matcht) {
+			/*
+			 * so we are wildcarding. Copy ewname in full, plus
+			 * matching section of oldepname. Use whichever gives
+			 * the closest match.
+			 */
+			if (got_matchf > got_matcht) {
+				npstart = events[0]->u.event.ewname;
+				npcont = events[0]->u.event.oldepname;
+				npend = np2f;
+				nprest = np1f;
+			} else {
+				npstart = events[1]->u.event.ewname;
+				npcont = events[1]->u.event.oldepname;
+				npend = np2t;
+				nprest = np1t;
+			}
+			for (npref = npstart; npref != NULL;
+			    npref = npref->u.name.next) {
+				newnp = newnode(T_NAME, np->file, np->line);
+				newnp->u.name.t = npref->u.name.t;
+				newnp->u.name.s = npref->u.name.s;
+				newnp->u.name.last = newnp;
+				newnp->u.name.it = npref->u.name.it;
+				newnp->u.name.cp = npref->u.name.cp;
+				newnp->u.name.child =
+				    newnode(T_NUM, np->file, np->line);
+				if (eval_expr(npref->u.name.child, ex, events,
 				    NULL, NULL, NULL, 1, &value) == 0 ||
 				    value.t != UINT64) {
 					outfl(O_DIE, np->file, np->line,
 					    "eval_dup: could not resolve "
 					    "iterator of %s", np->u.name.s);
 				}
-
-				tree_free(newchild);
-				newchild = newnode(T_NUM, np->file, np->line);
-				newchild->u.ull = value.v;
+				newnp->u.name.child->u.ull = value.v;
+				if (retp == NULL) {
+					retp = newnp;
+				} else {
+					retp->u.name.last->u.name.next = newnp;
+					retp->u.name.last = newnp;
+				}
 			}
-
-			newnp = newnode(np->t, np->file, np->line);
-			newnp->u.name.s = np->u.name.s;
-			newnp->u.name.it = np->u.name.it;
-			newnp->u.name.cp = np->u.name.cp;
-
-			newnp->u.name.last = newnp;
-			newnp->u.name.child = newchild;
-
-			if (np->u.name.next != NULL) {
-				/* turn off wildcarding for next */
-				return (tree_name_append(newnp,
-					eval_dup(np->u.name.next, ex, NULL)));
-			} else {
-				return (newnp);
+			for (npref = npcont; npref != NULL && npref != npend;
+			    npref = npref->u.name.next) {
+				newnp = newnode(T_NAME, np->file, np->line);
+				newnp->u.name.t = npref->u.name.t;
+				newnp->u.name.s = npref->u.name.s;
+				newnp->u.name.last = newnp;
+				newnp->u.name.it = npref->u.name.it;
+				newnp->u.name.cp = npref->u.name.cp;
+				newnp->u.name.child =
+				    newnode(T_NUM, np->file, np->line);
+				if (eval_expr(npref->u.name.child, ex, events,
+				    NULL, NULL, NULL, 1, &value) == 0 ||
+				    value.t != UINT64) {
+					outfl(O_DIE, np->file, np->line,
+					    "eval_dup: could not resolve "
+					    "iterator of %s", np->u.name.s);
+				}
+				newnp->u.name.child->u.ull = value.v;
+				if (retp == NULL) {
+					retp = newnp;
+				} else {
+					retp->u.name.last->u.name.next = newnp;
+					retp->u.name.last = newnp;
+				}
 			}
 		} else {
-			outfl(O_DIE, np->file, np->line,
-			    "eval_dup: internal error: \"%s\" is neither "
-			    "an iterator nor a pathname", np->u.name.s);
+			/*
+			 * not wildcarding - check if explicit iterator
+			 */
+			iterinfop = lut_lookup(ex, (void *)np->u.name.s, NULL);
+			if (iterinfop != NULL) {
+				/* explicit iterator; not part of pathname */
+				newnp = newnode(T_NUM, np->file, np->line);
+				newnp->u.ull = iterinfop->num;
+				return (newnp);
+			}
 		}
-		/*NOTREACHED*/
-		break;
+
+		/*
+		 * finally, whether wildcarding or not, we need to copy the
+		 * remaining part of the path (if any). This must be defined
+		 * absolutely (no more expansion/wildcarding).
+		 */
+		for (npref = nprest; npref != NULL;
+		    npref = npref->u.name.next) {
+			newnp = newnode(T_NAME, np->file, np->line);
+			newnp->u.name.t = npref->u.name.t;
+			newnp->u.name.s = npref->u.name.s;
+			newnp->u.name.last = newnp;
+			newnp->u.name.it = npref->u.name.it;
+			newnp->u.name.cp = npref->u.name.cp;
+			newnp->u.name.child =
+			    newnode(T_NUM, np->file, np->line);
+			if (eval_expr(npref->u.name.child, ex, events,
+			    NULL, NULL, NULL, 1, &value) == 0 ||
+			    value.t != UINT64) {
+				outfl(O_DIE, np->file, np->line,
+				    "eval_dup: could not resolve "
+				    "iterator of %s", np->u.name.s);
+			}
+			newnp->u.name.child->u.ull = value.v;
+			if (retp == NULL) {
+				retp = newnp;
+			} else {
+				retp->u.name.last->u.name.next = newnp;
+				retp->u.name.last = newnp;
+			}
+		}
+		return (retp);
 	}
 
 	case T_EVENT:
@@ -659,12 +901,12 @@ eval_dup(struct node *np, struct lut *ex, struct node *epnames[])
 		newnp->u.name.last = newnp;
 
 		return (tree_event(newnp,
-		    eval_dup(np->u.event.epname, ex, epnames),
-		    eval_dup(np->u.event.eexprlist, ex, epnames)));
+		    eval_dup(np->u.event.epname, ex, events),
+		    eval_dup(np->u.event.eexprlist, ex, events)));
 
 	case T_FUNC:
 		return (tree_func(np->u.func.s,
-		    eval_dup(np->u.func.arglist, ex, epnames),
+		    eval_dup(np->u.func.arglist, ex, events),
 		    np->file, np->line));
 
 	case T_QUOTE:
@@ -720,20 +962,20 @@ eval_dup(struct node *np, struct lut *ex, struct node *epnames[])
  * a T_AND node at the top of *newc.
  */
 int
-eval_potential(struct node *np, struct lut *ex, struct node *epnames[],
+eval_potential(struct node *np, struct lut *ex, struct node *events[],
 	    struct node **newc, struct config *croot)
 {
 	struct node *newnp;
 	struct evalue value;
 
-	if (eval_expr(np, ex, epnames, NULL, croot, NULL, 1, &value) == 0) {
+	if (eval_expr(np, ex, events, NULL, croot, NULL, 1, &value) == 0) {
 		/*
 		 * couldn't eval expression because
 		 * it contains deferred items.  make
 		 * a duplicate expression with all the
 		 * non-deferred items expanded.
 		 */
-		newnp = eval_dup(np, ex, epnames);
+		newnp = eval_dup(np, ex, events);
 
 		if (*newc == NULL) {
 			/*
@@ -805,16 +1047,18 @@ check_expr_args(struct evalue *lp, struct evalue *rp, enum datatype dtype,
 	}
 
 	if (dtype != UNDEFINED && lp->t != dtype) {
-		outfl(O_OK, np->file, np->line,
-			"invalid datatype of argument for operation %s",
-			ptree_nodetype2str(np->t));
+		outfl(O_DIE, np->file, np->line,
+		    "invalid datatype of argument for operation %s",
+		    ptree_nodetype2str(np->t));
+		/* NOTREACHED */
 		return (1);
 	}
 
 	if (rp != NULL && lp->t != rp->t) {
-		outfl(O_OK, np->file, np->line,
-			"mismatch in datatype of arguments for operation %s",
-			ptree_nodetype2str(np->t));
+		outfl(O_DIE, np->file, np->line,
+		    "mismatch in datatype of arguments for operation %s",
+		    ptree_nodetype2str(np->t));
+		/* NOTREACHED */
 		return (1);
 	}
 
@@ -838,7 +1082,7 @@ check_expr_args(struct evalue *lp, struct evalue *rp, enum datatype dtype,
  *   - illegal arithmetic operation (argument out of range)
  */
 int
-eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
+eval_expr(struct node *np, struct lut *ex, struct node *events[],
 	struct lut **globals, struct config *croot, struct arrow *arrowp,
 	int try, struct evalue *valuep)
 {
@@ -865,7 +1109,6 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		 */
 		gval = lut_lookup(*globals, (void *)np->u.globid.s, NULL);
 		if (gval == NULL) {
-			valuep->t = UNDEFINED;
 			return (0);
 		} else {
 			valuep->t = gval->t;
@@ -881,19 +1124,18 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		 * first evaluate rhs, then try to store value in lhs which
 		 * should be a global variable
 		 */
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-			    arrowp, try, &rval))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
 			return (0);
 
 		ASSERT(np->u.expr.left->t == T_GLOBID);
 		gval = lut_lookup(*globals,
-				(void *)np->u.expr.left->u.globid.s, NULL);
+		    (void *)np->u.expr.left->u.globid.s, NULL);
 
 		if (gval == NULL) {
 			gval = MALLOC(sizeof (*gval));
 			*globals = lut_add(*globals,
-					(void *) np->u.expr.left->u.globid.s,
-					gval, NULL);
+			    (void *) np->u.expr.left->u.globid.s, gval, NULL);
 		}
 
 		gval->t = rval.t;
@@ -932,15 +1174,15 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		if (try == 0 &&
 		    np->u.expr.left->t == T_GLOBID &&
 		    (gval = lut_lookup(*globals,
-			(void *)np->u.expr.left->u.globid.s, NULL)) == NULL) {
-			if (!eval_expr(np->u.expr.right, ex, epnames, globals,
-					croot, arrowp, try, &rval))
+		    (void *)np->u.expr.left->u.globid.s, NULL)) == NULL) {
+			if (!eval_expr(np->u.expr.right, ex, events, globals,
+			    croot, arrowp, try, &rval))
 				return (0);
 
 			gval = MALLOC(sizeof (*gval));
 			*globals = lut_add(*globals,
-					(void *) np->u.expr.left->u.globid.s,
-					gval, NULL);
+			    (void *) np->u.expr.left->u.globid.s,
+			    gval, NULL);
 
 			gval->t = rval.t;
 			gval->v = rval.v;
@@ -950,25 +1192,30 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		}
 #endif  /* IMPLICIT_ASSIGN_IN_EQ */
 
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
 			return (0);
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, &rval))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
 			return (0);
-		if (check_expr_args(&lval, &rval, UNDEFINED, np))
-			return (0);
+		if (rval.t == UINT64 || lval.t == UINT64) {
+			if (check_expr_args(&lval, &rval, UINT64, np))
+				return (0);
+		} else {
+			if (check_expr_args(&lval, &rval, UNDEFINED, np))
+				return (0);
+		}
 
 		valuep->t = UINT64;
 		valuep->v = (lval.v == rval.v);
 		return (1);
 
 	case T_LT:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
 			return (0);
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, &rval))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
 			return (0);
 		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
@@ -978,11 +1225,11 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		return (1);
 
 	case T_LE:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
 			return (0);
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, &rval))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
 			return (0);
 		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
@@ -992,11 +1239,11 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		return (1);
 
 	case T_GT:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
 			return (0);
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, &rval))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
 			return (0);
 		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
@@ -1006,11 +1253,11 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		return (1);
 
 	case T_GE:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
 			return (0);
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, &rval))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
 			return (0);
 		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
@@ -1020,11 +1267,11 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		return (1);
 
 	case T_BITAND:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
 			return (0);
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, &rval))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
 			return (0);
 		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
@@ -1034,11 +1281,11 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		return (1);
 
 	case T_BITOR:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
 			return (0);
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, &rval))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
 			return (0);
 		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
@@ -1048,11 +1295,11 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		return (1);
 
 	case T_BITXOR:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
 			return (0);
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, &rval))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
 			return (0);
 		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
@@ -1062,8 +1309,8 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		return (1);
 
 	case T_BITNOT:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
 			return (0);
 		ASSERT(np->u.expr.right == NULL);
 		if (check_expr_args(&lval, NULL, UINT64, np))
@@ -1074,11 +1321,11 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		return (1);
 
 	case T_LSHIFT:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
 			return (0);
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, &rval))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
 			return (0);
 		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
@@ -1088,11 +1335,11 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		return (1);
 
 	case T_RSHIFT:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
 			return (0);
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, &rval))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
 			return (0);
 		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
@@ -1114,8 +1361,8 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		 *
 		 * "dotrue = 1" means stmtA should be evaluated.
 		 */
-		if (eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval) &&
+		if (eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval) &&
 		    lval.t != UNDEFINED && lval.v != 0)
 			dotrue = 1;
 
@@ -1130,14 +1377,13 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 			if (dotrue)
 				retnp = np->u.expr.right;
 			else {
-				valuep->t = UINT64;
-				valuep->v = 0;
-				return (0);
+				outfl(O_DIE, np->file, np->line,
+				    "eval_expr: missing condelse");
 			}
 		}
 
-		if (!eval_expr(retnp, ex, epnames, globals, croot,
-			    arrowp, try, valuep))
+		if (!eval_expr(retnp, ex, events, globals, croot,
+		    arrowp, try, valuep))
 			return (0);
 		return (1);
 	}
@@ -1149,17 +1395,22 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		 */
 		out(O_ALTFP|O_DIE, "eval_expr: wrong context for operation %s",
 		    ptree_nodetype2str(np->t));
-		return (0);
+		/*NOTREACHED*/
 
 	case T_NE:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
 			return (0);
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, &rval))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
 			return (0);
-		if (check_expr_args(&lval, &rval, UNDEFINED, np))
-			return (0);
+		if (rval.t == UINT64 || lval.t == UINT64) {
+			if (check_expr_args(&lval, &rval, UINT64, np))
+				return (0);
+		} else {
+			if (check_expr_args(&lval, &rval, UNDEFINED, np))
+				return (0);
+		}
 
 		valuep->t = UINT64;
 		valuep->v = (lval.v != rval.v);
@@ -1167,68 +1418,80 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 
 	case T_LIST:
 	case T_AND:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, valuep)) {
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, valuep)) {
 			/*
 			 * if lhs is unknown, still check rhs. If that
 			 * is false we can return false irrespectice of lhs
 			 */
-			if (!eval_expr(np->u.expr.right, ex, epnames, globals,
-			    croot, arrowp, try, valuep))
+			if (!eval_expr(np->u.expr.right, ex, events, globals,
+			    croot, arrowp, try, valuep)) {
+				np->u.expr.temp = EXPR_TEMP_BOTH_UNK;
 				return (0);
-			if (valuep->v != 0)
+			}
+			if (valuep->v != 0) {
+				np->u.expr.temp = EXPR_TEMP_LHS_UNK;
 				return (0);
+			}
 		}
 		if (valuep->v == 0) {
 			valuep->t = UINT64;
 			return (1);
 		}
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, valuep))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, valuep)) {
+			np->u.expr.temp = EXPR_TEMP_RHS_UNK;
 			return (0);
+		}
 		valuep->t = UINT64;
 		valuep->v = valuep->v == 0 ? 0 : 1;
 		return (1);
 
 	case T_OR:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, valuep)) {
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, valuep)) {
 			/*
 			 * if lhs is unknown, still check rhs. If that
 			 * is true we can return true irrespectice of lhs
 			 */
-			if (!eval_expr(np->u.expr.right, ex, epnames, globals,
-			    croot, arrowp, try, valuep))
+			if (!eval_expr(np->u.expr.right, ex, events, globals,
+			    croot, arrowp, try, valuep)) {
+				np->u.expr.temp = EXPR_TEMP_BOTH_UNK;
 				return (0);
-			if (valuep->v == 0)
+			}
+			if (valuep->v == 0) {
+				np->u.expr.temp = EXPR_TEMP_LHS_UNK;
 				return (0);
+			}
 		}
 		if (valuep->v != 0) {
 			valuep->t = UINT64;
 			valuep->v = 1;
 			return (1);
 		}
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, valuep))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, valuep)) {
+			np->u.expr.temp = EXPR_TEMP_RHS_UNK;
 			return (0);
+		}
 		valuep->t = UINT64;
 		valuep->v = valuep->v == 0 ? 0 : 1;
 		return (1);
 
 	case T_NOT:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, valuep))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, valuep))
 			return (0);
 		valuep->t = UINT64;
 		valuep->v = ! valuep->v;
 		return (1);
 
 	case T_ADD:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
 			return (0);
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, &rval))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
 			return (0);
 		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
@@ -1238,20 +1501,19 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		return (1);
 
 	case T_SUB:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
 			return (0);
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, &rval))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
 			return (0);
 		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
 
 		/* since valuep is unsigned, return false if lval.v < rval.v */
 		if (lval.v < rval.v) {
-			out(O_ERR, "eval_expr: T_SUB result is out of range");
-			valuep->t = UNDEFINED;
-			return (0);
+			outfl(O_DIE, np->file, np->line,
+			    "eval_expr: T_SUB result is out of range");
 		}
 
 		valuep->t = lval.t;
@@ -1259,11 +1521,11 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		return (1);
 
 	case T_MUL:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
 			return (0);
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, &rval))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
 			return (0);
 		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
@@ -1273,20 +1535,19 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		return (1);
 
 	case T_DIV:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
 			return (0);
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, &rval))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
 			return (0);
 		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
 
 		/* return false if dividing by zero */
 		if (rval.v == 0) {
-			out(O_ERR, "eval_expr: T_DIV division by zero");
-			valuep->t = UNDEFINED;
-			return (0);
+			outfl(O_DIE, np->file, np->line,
+			    "eval_expr: T_DIV division by zero");
 		}
 
 		valuep->t = lval.t;
@@ -1294,20 +1555,19 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		return (1);
 
 	case T_MOD:
-		if (!eval_expr(np->u.expr.left, ex, epnames, globals, croot,
-				arrowp, try, &lval))
+		if (!eval_expr(np->u.expr.left, ex, events, globals, croot,
+		    arrowp, try, &lval))
 			return (0);
-		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
-				arrowp, try, &rval))
+		if (!eval_expr(np->u.expr.right, ex, events, globals, croot,
+		    arrowp, try, &rval))
 			return (0);
 		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
 
 		/* return false if dividing by zero */
 		if (rval.v == 0) {
-			out(O_ERR, "eval_expr: T_MOD division by zero");
-			valuep->t = UNDEFINED;
-			return (0);
+			outfl(O_DIE, np->file, np->line,
+			    "eval_expr: T_MOD division by zero");
 		}
 
 		valuep->t = lval.t;
@@ -1317,18 +1577,61 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 	case T_NAME:
 		if (try) {
 			struct iterinfo *iterinfop;
+			struct node *np1, *np2;
+			int i, gotmatch = 0;
 
 			/*
-			 * at itree_create() time, we can expand simple
-			 * iterators.  anything else we'll punt on.
+			 * Check if we have an exact match of the nonwildcarded
+			 * path in oldepname - if so we can just use the
+			 * full wildcarded path in epname.
 			 */
-			iterinfop = lut_lookup(ex, (void *)np->u.name.s, NULL);
-			if (iterinfop != NULL) {
-				/* explicit iterator; not part of pathname */
-				valuep->t = UINT64;
-				valuep->v = (unsigned long long)iterinfop->num;
-				return (1);
+			for (i = 0; i < 1; i++) {
+				for (np1 = np,
+				    np2 = events[i]->u.event.oldepname;
+				    np1 != NULL && np2 != NULL;
+				    np1 = np1->u.name.next,
+				    np2 = np2->u.name.next) {
+					if (strcmp(np1->u.name.s,
+					    np2->u.name.s) != 0)
+						break;
+					if (np1->u.name.child->t !=
+					    np2->u.name.child->t)
+						break;
+					if (np1->u.name.child->t == T_NUM &&
+					    np1->u.name.child->u.ull !=
+					    np2->u.name.child->u.ull)
+						break;
+					if (np1->u.name.child->t == T_NAME &&
+					    strcmp(np1->u.name.child->u.name.s,
+					    np2->u.name.child->u.name.s) != 0)
+						break;
+					gotmatch++;
+				}
+				if (np1 == NULL && np2 == NULL) {
+					valuep->t = NODEPTR;
+					valuep->v = (uintptr_t)
+					    events[i]->u.event.epname;
+					return (1);
+				}
 			}
+			if (!gotmatch) {
+				/*
+				 * we're not wildcarding. However at
+				 * itree_create() time, we can also expand
+				 * simple iterators - so check for those.
+				 */
+				iterinfop = lut_lookup(ex, (void *)np->u.name.s,
+				    NULL);
+				if (iterinfop != NULL) {
+					valuep->t = UINT64;
+					valuep->v =
+					    (unsigned long long)iterinfop->num;
+					return (1);
+				}
+			}
+			/*
+			 * For anything else we'll have to wait for eval_dup().
+			 */
 			return (0);
 		}
 
@@ -1343,8 +1646,8 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		return (1);
 
 	case T_FUNC:
-		return (eval_func(np, ex, epnames, np->u.func.arglist,
-				globals, croot, arrowp, try, valuep));
+		return (eval_func(np, ex, events, np->u.func.arglist,
+		    globals, croot, arrowp, try, valuep));
 
 	case T_NUM:
 		valuep->t = UINT64;
@@ -1364,14 +1667,14 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
  * eval_fru() and eval_asru() don't do much, but are called from a number
  * of places.
  */
-struct node *
+static struct node *
 eval_fru(struct node *np)
 {
 	ASSERT(np->t == T_NAME);
 	return (np);
 }
 
-struct node *
+static struct node *
 eval_asru(struct node *np)
 {
 	ASSERT(np->t == T_NAME);

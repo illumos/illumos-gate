@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * alloc.c -- memory allocation wrapper functions, for eft.so FMD module
@@ -47,6 +47,8 @@ static struct stats *Malloctotal;
 static struct stats *Freetotal;
 static struct stats *Malloccount;
 static struct stats *Freecount;
+
+static int totalcount;
 
 void
 alloc_init(void)
@@ -104,6 +106,7 @@ alloc_malloc(size_t nbytes, const char *fname, int line)
 	if (Malloccount)
 		stats_counter_bump(Malloccount);
 
+	totalcount += nbytes + HDRSIZ;
 	return ((void *)retval);
 }
 
@@ -171,4 +174,42 @@ alloc_free(void *ptr, const char *fname, int line)
 
 	if (Freecount)
 		stats_counter_bump(Freecount);
+	totalcount -= osize + HDRSIZ;
+}
+
+int
+alloc_total()
+{
+	return (totalcount);
+}
+
+/*
+ * variants that don't maintain size in header - saves space
+ */
+void *
+alloc_xmalloc(size_t nbytes)
+{
+	char *retval;
+
+	ASSERT(nbytes > 0);
+	retval = fmd_hdl_alloc(Hdl, nbytes, FMD_SLEEP);
+	if (Malloctotal)
+		stats_counter_add(Malloctotal, nbytes);
+	if (Malloccount)
+		stats_counter_bump(Malloccount);
+	totalcount += nbytes;
+	return ((void *)retval);
+}
+
+void
+alloc_xfree(void *ptr, size_t size)
+{
+	ASSERT(ptr != NULL);
+
+	fmd_hdl_free(Hdl, (char *)ptr, size);
+	if (Freetotal)
+		stats_counter_add(Freetotal, size);
+	if (Freecount)
+		stats_counter_bump(Freecount);
+	totalcount -= size;
 }

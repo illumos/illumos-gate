@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * itree.h -- public definitions for itree module
@@ -74,31 +74,31 @@ extern "C" {
 #define	CAUSES_TESTED 1024
 
 struct event {
-	enum nametype t;		/* defined in tree.h */
 	struct event *suspects;
 	struct event *psuspects;
 	struct event *observations;	/* for lists like suspect list */
 	nvlist_t *nvp;			/* payload nvp for ereports */
-	int is_suspect;			/* true if on suspect list */
 	struct node *enode;		/* event node in parse tree */
 	const struct ipath *ipp;	/* instanced version of event */
 	struct lut *props;		/* instanced version of nvpairs */
 	struct lut *payloadprops;	/* nvpairs for problem payload */
 	int count;			/* for reports, number seen */
-	int cached_state;
-	int keep_in_tree;
+	enum nametype t:3;		/* defined in tree.h */
+	int is_suspect:1;		/* true if on suspect list */
+	int keep_in_tree:1;
+	int cached_state:11;
 	unsigned long long cached_delay;
 	struct bubble {
 		struct bubble *next;
+		struct event *myevent;
 		int gen;		/* generation # */
+		int nork;
+		int mark:11;
 		enum bubbletype {
-			B_FROM = 4000,
+			B_FROM,
 			B_TO,
 			B_INHIBIT
-		} t;
-		struct event *myevent;
-		int nork;
-		int mark;
+		} t:2;
 		struct arrowlist {
 			struct arrowlist *next;
 			struct arrow {
@@ -111,14 +111,15 @@ struct event {
 					/* deferred constraints */
 					struct node *cnode;
 				} *constraints;
-				int forever_false;
-				int mark;
+				int forever_false:1;
+				int forever_true:1;
+				int arrow_marked:1;
+				int mark:11;
 				unsigned long long mindelay;
 				unsigned long long maxdelay;
 			} *arrowp;
 		} *arrows;
 	} *bubbles;
-	nvlist_t *fault;
 };
 
 /*

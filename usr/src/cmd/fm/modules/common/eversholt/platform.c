@@ -66,19 +66,17 @@
 extern fmd_hdl_t *Hdl;		/* handle from eft.c */
 
 /*
- * Lastcfg points to the last configuration snapshot we made.  If we
- * need to make a dev to hc scheme conversion of an event path, we use
- * the last snapshot as a best guess.  If we don't have a last snapshot
- * we take one and save it in Initcfg below.
+ * Lastcfg points to the last configuration snapshot we made.
  */
 static struct cfgdata *Lastcfg;
-static topo_hdl_t *Eft_topo_hdl;
+static fmd_hdl_t *Lasthdl;
+static fmd_case_t *Lastfmcase;
+static const char *lastcomp;
+static int in_getpath;
+extern struct lut *Usednames;
+int prune_raw_config = 0;
 
-/*
- * Initcfg points to any config snapshot we have to make prior
- * to starting our first fme.
- */
-static struct cfgdata *Initcfg;
+static topo_hdl_t *Eft_topo_hdl;
 
 void *
 topo_use_alloc(size_t bytes)
@@ -164,11 +162,6 @@ platform_fini(void)
 		config_free(Lastcfg);
 		Lastcfg = NULL;
 	}
-	if (Initcfg != NULL) {
-		config_free(Initcfg);
-		Initcfg = NULL;
-	}
-
 	fmd_hdl_topo_rele(Hdl, Eft_topo_hdl);
 	platform_free_globals();
 	(void) nv_alloc_fini(&Eft_nv_hdl);
@@ -288,18 +281,15 @@ platform_getpath(nvlist_t *nvl)
 			return (NULL);
 		}
 
-		/*
-		 * If we haven't taken a config snapshot yet, we need
-		 * to do so now.  The call to config_snapshot() has the
-		 * side-effect of setting Lastcfg.  We squirrel away the
-		 * pointer to this snapshot so we may free it later.
-		 */
-		if (Lastcfg == NULL)
-			if ((Initcfg = config_snapshot()) == NULL) {
-				out(O_ALTFP,
-				    "XFILE: cannot snapshot configuration");
-				return (NULL);
-			}
+		lut_free(Usednames, NULL, NULL);
+		Usednames = NULL;
+		in_getpath = 1;
+		if (config_snapshot() == NULL) {
+			out(O_ALTFP,
+			    "XFILE: cannot snapshot configuration");
+			in_getpath = 0;
+			return (NULL);
+		}
 
 		/*
 		 * Look up the path or cpu id in the last config snapshot.
@@ -313,6 +303,8 @@ platform_getpath(nvlist_t *nvl)
 			out(O_ALTFP, "XFILE: no configuration node has "
 			    "cpu-id matching %u.", id);
 
+		config_free(Lastcfg);
+		in_getpath = 0;
 		return (ret);
 	}
 
@@ -380,6 +372,7 @@ hc_path(tnode_t *node)
 		(void) strlcat(tmpbuf, name, MAXPATHLEN);
 		(void) snprintf(numbuf, MAXPATHLEN, "%u", ul);
 		(void) strlcat(tmpbuf, numbuf, MAXPATHLEN);
+		lastcomp = stable(name);
 	}
 
 	nvlist_free(fmri);
@@ -394,6 +387,10 @@ add_prop_val(topo_hdl_t *thp, struct cfgdata *rawdata, char *propn,
 	int addlen, err;
 	char *propv, *fmristr = NULL;
 	nvlist_t *fmri;
+	uint32_t ui32;
+	int64_t i64;
+	int32_t i32;
+	boolean_t bool;
 	uint64_t ui64;
 	char buf[32];	/* big enough for any 64-bit int */
 
@@ -435,6 +432,43 @@ add_prop_val(topo_hdl_t *thp, struct cfgdata *rawdata, char *propn,
 		propv = buf;
 		break;
 
+	case DATA_TYPE_BOOLEAN_VALUE:
+		/*
+		 * Convert boolean_t to hex strings
+		 */
+		(void) nvpair_value_boolean_value(pv_nvp, &bool);
+		(void) snprintf(buf, sizeof (buf), "0x%llx", (uint64_t)bool);
+		propv = buf;
+		break;
+
+	case DATA_TYPE_INT32:
+		/*
+		 * Convert int32 to hex strings
+		 */
+		(void) nvpair_value_int32(pv_nvp, &i32);
+		(void) snprintf(buf, sizeof (buf), "0x%llx",
+		    (uint64_t)(int64_t)i32);
+		propv = buf;
+		break;
+
+	case DATA_TYPE_INT64:
+		/*
+		 * Convert int64 to hex strings
+		 */
+		(void) nvpair_value_int64(pv_nvp, &i64);
+		(void) snprintf(buf, sizeof (buf), "0x%llx", (uint64_t)i64);
+		propv = buf;
+		break;
+
+	case DATA_TYPE_UINT32:
+		/*
+		 * Convert uint32 to hex strings
+		 */
+		(void) nvpair_value_uint32(pv_nvp, &ui32);
+		(void) snprintf(buf, sizeof (buf), "0x%llx", (uint64_t)ui32);
+		propv = buf;
+		break;
+
 	default:
 		out(O_ALTFP, "cfgcollect: failed to get property value for "
 		    "%s", propn);
@@ -448,7 +482,7 @@ add_prop_val(topo_hdl_t *thp, struct cfgdata *rawdata, char *propn,
 	    rawdata->end - rawdata->nextfree, "%s=%s",
 	    propn, propv);
 	if (strcmp(propn, TOPO_PROP_RESOURCE) == 0)
-		out(O_ALTFP, "cfgcollect: %s", propv);
+		out(O_ALTFP|O_VERB3, "cfgcollect: %s", propv);
 
 	rawdata->nextfree += addlen;
 
@@ -478,6 +512,28 @@ cfgcollect(topo_hdl_t *thp, tnode_t *node, void *arg)
 	cfgadjust(rawdata, addlen);
 	(void) strcpy(rawdata->nextfree, path);
 	rawdata->nextfree += addlen;
+
+	/*
+	 * If the prune_raw_config flag is set then we will only include in the
+	 * raw config those nodes that are used by the rules remaining after
+	 * prune_propagations() has been run - ie only those that could possibly
+	 * be relevant to the incoming ereport given the current rules. This
+	 * means that any other parts of the config will not get saved to the
+	 * checkpoint file (even if they may theoretically be used if the
+	 * rules are subsequently modified).
+	 *
+	 * For now prune_raw_config is 0 for Solaris, though it is expected to
+	 * be set to 1 for fmsp.
+	 *
+	 * Note we only prune the raw config like this if we have been called
+	 * from newfme(), not if we have been called when handling dev or cpu
+	 * scheme ereports from platform_getpath(), as this is called before
+	 * prune_propagations() - again this is not an issue on fmsp as the
+	 * ereports are all in hc scheme.
+	 */
+	if (!in_getpath && prune_raw_config &&
+	    lut_lookup(Usednames, (void *)lastcomp, NULL) == NULL)
+		return (TOPO_WALK_NEXT);
 
 	/*
 	 * Collect properties
@@ -532,6 +588,48 @@ cfgcollect(topo_hdl_t *thp, tnode_t *node, void *arg)
 	return (TOPO_WALK_NEXT);
 }
 
+void
+platform_restore_config(fmd_hdl_t *hdl, fmd_case_t *fmcase)
+{
+	if (hdl == Lasthdl && fmcase == Lastfmcase) {
+		size_t cfglen;
+
+		fmd_buf_read(Lasthdl, Lastfmcase, WOBUF_CFGLEN, (void *)&cfglen,
+		    sizeof (size_t));
+		Lastcfg->begin = MALLOC(cfglen);
+		Lastcfg->end = Lastcfg->nextfree = Lastcfg->begin + cfglen;
+		fmd_buf_read(Lasthdl, Lastfmcase, WOBUF_CFG, Lastcfg->begin,
+		    cfglen);
+		Lasthdl = NULL;
+		Lastfmcase = NULL;
+	}
+}
+
+void
+platform_save_config(fmd_hdl_t *hdl, fmd_case_t *fmcase)
+{
+	size_t cfglen;
+
+	/*
+	 * Put the raw config into an fmd_buf. Then we can free it to
+	 * save space.
+	 */
+	Lastfmcase = fmcase;
+	Lasthdl = hdl;
+	cfglen = Lastcfg->nextfree - Lastcfg->begin;
+	fmd_buf_create(hdl, fmcase, WOBUF_CFGLEN, sizeof (cfglen));
+	fmd_buf_write(hdl, fmcase, WOBUF_CFGLEN, (void *)&cfglen,
+	    sizeof (cfglen));
+	if (cfglen != 0) {
+		fmd_buf_create(hdl, fmcase, WOBUF_CFG, cfglen);
+		fmd_buf_write(hdl, fmcase, WOBUF_CFG, Lastcfg->begin, cfglen);
+	}
+	FREE(Lastcfg->begin);
+	Lastcfg->begin = NULL;
+	Lastcfg->end = NULL;
+	Lastcfg->nextfree = NULL;
+}
+
 /*
  * platform_config_snapshot -- gather a snapshot of the current configuration
  */
@@ -548,24 +646,35 @@ platform_config_snapshot(void)
 	 * we need to grab a new snapshot, otherwise we
 	 * can simply point them at the last config.
 	 */
-	if ((curgen = fmd_fmri_get_drgen()) <= lastgen && Lastcfg != NULL) {
-		Lastcfg->refcnt++;
+	if (prune_raw_config == 0 && (curgen = fmd_fmri_get_drgen()) <=
+	    lastgen && Lastcfg != NULL) {
+		Lastcfg->raw_refcnt++;
+		/*
+		 * if config has been backed away to an fmd_buf, restore it
+		 */
+		if (Lastcfg->begin == NULL)
+			platform_restore_config(Lasthdl, Lastfmcase);
 		return (Lastcfg);
 	}
 
 	lastgen = curgen;
 	/* we're getting a new config, so clean up the last one */
-	if (Lastcfg != NULL)
-		config_free(Lastcfg);
+	if (Lastcfg != NULL) {
+		if (--Lastcfg->raw_refcnt == 0) {
+			if (Lastcfg->begin != NULL)
+				FREE(Lastcfg->begin);
+			FREE(Lastcfg);
+		}
+	}
 
 	Lastcfg = MALLOC(sizeof (struct cfgdata));
-	Lastcfg->refcnt = 2;	/* caller + Lastcfg */
+	Lastcfg->cooked_refcnt = 0;
+	Lastcfg->raw_refcnt = 2;	/* caller + Lastcfg */
 	Lastcfg->begin = Lastcfg->nextfree = Lastcfg->end = NULL;
 	Lastcfg->cooked = NULL;
 	Lastcfg->devcache = NULL;
 	Lastcfg->cpucache = NULL;
 
-	out(O_ALTFP, "platform_config_snapshot(): topo snapshot");
 
 	fmd_hdl_topo_rele(Hdl, Eft_topo_hdl);
 	Eft_topo_hdl = fmd_hdl_topo_hold(Hdl, TOPO_VERSION);
@@ -583,6 +692,7 @@ platform_config_snapshot(void)
 	}
 
 	topo_walk_fini(twp);
+	out(O_ALTFP|O_STAMP, "raw config complete");
 
 
 	return (Lastcfg);

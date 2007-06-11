@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -210,6 +210,7 @@ call_finis(void)
 	ipath_fini();
 	iexpr_fini();
 	istat_fini();
+	serd_fini();
 	lex_free();
 	check_fini();
 	tree_fini();
@@ -314,11 +315,13 @@ _fmd_init(fmd_hdl_t *hdl)
 	    Verbose, Warn, Autoclose == NULL ? "(NULL)" : Autoclose,
 	    Dupclose, Max_fme);
 
+	fme_istat_load(hdl);
+	fme_serd_load(hdl);
+
 	out(O_DEBUG, "reconstituting any existing fmes");
 	while ((casep = fmd_case_next(hdl, casep)) != NULL) {
 		fme_restart(hdl, casep);
 	}
-	fme_istat_load(hdl);
 }
 
 /*ARGSUSED*/

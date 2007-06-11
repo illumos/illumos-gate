@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ipath.c -- instanced pathname module
@@ -140,6 +139,53 @@ ipath_epnamecmp(struct ipath *ipp, struct node *np)
 		return (1);
 	else
 		return (-1);
+}
+
+struct lut *Usednames;
+
+void
+ipath_dummy_lut(struct arrow *arrowp)
+{
+	const struct ipath *ipp;
+
+	ipp = arrowp->head->myevent->ipp;
+	while (ipp->s != NULL) {
+		Usednames = lut_add(Usednames, (void *)ipp->s,
+		    (void *)ipp->s, NULL);
+		ipp++;
+	}
+	ipp = arrowp->tail->myevent->ipp;
+	while (ipp->s != NULL) {
+		Usednames = lut_add(Usednames, (void *)ipp->s,
+		    (void *)ipp->s, NULL);
+		ipp++;
+	}
+}
+
+struct ipath *
+ipath_dummy(struct node *np, struct ipath *ipp)
+{
+	struct ipath *ret;
+
+	ret = ipp;
+	while (ipp[1].s != NULL)
+		ipp++;
+	if (strcmp(ipp[0].s, np->u.name.last->u.name.s) == 0)
+		return (ret);
+
+	ret = MALLOC(sizeof (*ret) * 2);
+	ret[0].s = np->u.name.last->u.name.s;
+	ret[0].i = 0;
+	ret[1].s = NULL;
+	if ((ipp = lut_lookup(Ipaths, (void *)ret,
+	    (lut_cmp)ipath_cmp)) != NULL) {
+		FREE(ret);
+		return (ipp);
+	}
+	Ipaths = lut_add(Ipaths, (void *)ret, (void *)ret, (lut_cmp)ipath_cmp);
+	stats_counter_bump(Nipath);
+	stats_counter_add(Nbytes, 2 * sizeof (struct ipath));
+	return (ret);
 }
 
 /*

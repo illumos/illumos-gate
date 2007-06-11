@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * itree.c -- instance tree creation and manipulation
@@ -68,8 +68,7 @@ struct info {
  * for example, if the epname of an event is "c/d" and the path "a/b/c/d"
  * exists, the wildcard path ewname is filled in with the path "a/b".  when
  * matching is done, epname is temporarily replaced with the concatenation
- * of ewname and epname.  cpstart is set to the (struct config *)
- * corresponding to component "c".
+ * of ewname and epname.
  *
  * a linked list of these structs is used to track the expansion of each
  * event node as it is processed in vmatch() --> vmatch_event() calls.
@@ -77,22 +76,14 @@ struct info {
 struct wildcardinfo {
 	struct node *nptop;		/* event node fed to vmatch */
 	struct node *oldepname;		/* epname without the wildcard part */
-	enum status {
-		WC_UNDEFINED,		/* struct is not yet initialized */
-		WC_UNDERCONSTRUCTION,	/* wildcard path not yet done */
-		WC_COMPLETE		/* wildcard path done and is in use */
-	} s;
-	struct wildcardpath {
-		struct node *ewname;	/* wildcard path */
-		struct config *cpstart;	/* starting cp node for oldepname */
-		int refcount;		/* number of event nodes using this */
-	} *p;
-	struct wildcardpath *matchwc;	/* ptr to wc path to be matched */
+	struct node *ewname;		/* wildcard path */
 	struct wildcardinfo *next;
 };
 
-static void vmatch(struct info *infop, struct node *np,
-    struct node *lnp, struct node *anp, struct wildcardinfo **wcproot);
+static struct wildcardinfo *wcproot = NULL;
+
+static void vmatch(struct info *infop, struct node *np, struct node *lnp,
+    struct node *anp);
 static void hmatch(struct info *infop, struct node *np, struct node *nextnp);
 static void itree_pbubble(int flags, struct bubble *bp);
 static void itree_pruner(void *left, void *right, void *arg);
@@ -102,9 +93,10 @@ static int itree_set_arrow_traits(struct arrow *ap, struct node *fromev,
 static void itree_free_arrowlists(struct bubble *bubp, int arrows_too);
 static void itree_prune_arrowlists(struct bubble *bubp);
 static void arrow_add_within(struct arrow *ap, struct node *xpr);
-static struct arrow *itree_add_arrow(struct bubble *frombubblep,
-    struct bubble *tobubblep, struct node *apnode, struct node *fromevent,
-    struct node *toevent, struct lut *ex);
+static struct arrow *itree_add_arrow(struct node *apnode,
+    struct node *fromevent, struct node *toevent, struct lut *ex);
+static struct event *find_or_add_event(struct info *infop, struct node *np);
+static void add_arrow(struct bubble *bp, struct arrow *ap);
 static struct constraintlist *itree_add_constraint(struct arrow *arrowp,
     struct node *c);
 static struct bubble *itree_add_bubble(struct event *eventp,
@@ -158,58 +150,53 @@ generate_new(void)
 }
 
 static void
-generate_from(struct node *fromeventnp, struct event *fromevent)
+generate_from(struct node *fromeventnp)
 {
+	G.frombp = NULL;
 	G.fromnp = fromeventnp;
-	G.frome = fromevent;
-
-	out(O_ALTFP|O_VERB3|O_NONL, "from bubble on ");
-	ptree_name_iter(O_ALTFP|O_VERB3|O_NONL, G.fromnp);
-	out(O_ALTFP|O_VERB3, NULL);
-
-	G.frombp = itree_add_bubble(G.frome, B_FROM, G.n, 0);
 }
 
 static void
-generate_to(struct node *toeventnp, struct event *toevent)
+generate_to(struct node *toeventnp)
 {
 	G.tonp = toeventnp;
-	G.toe = toevent;
-
-	out(O_ALTFP|O_VERB3|O_NONL, "to bubble (gen %d) on ", G.generation);
-	ptree_name_iter(O_ALTFP|O_VERB3|O_NONL, G.tonp);
-	out(O_ALTFP|O_VERB3, NULL);
-
-	G.tobp = itree_add_bubble(G.toe, B_TO, G.k, G.generation);
 }
 
 static void
-generate(struct lut *ex)
+generate(struct info *infop)
 {
+	struct arrow *arrowp;
+
 	ASSERT(G.arrownp != NULL);
 	ASSERT(G.fromnp != NULL);
-	ASSERT(G.frome != NULL);
-	ASSERT(G.frombp != NULL);
 	ASSERT(G.tonp != NULL);
-	ASSERT(G.toe != NULL);
-	ASSERT(G.tobp != NULL);
 
 	out(O_ALTFP|O_VERB3|O_NONL, "        Arrow \"");
 	ptree_name_iter(O_ALTFP|O_VERB3|O_NONL, G.fromnp);
 	out(O_ALTFP|O_VERB3|O_NONL, "\" -> \"");
 	ptree_name_iter(O_ALTFP|O_VERB3|O_NONL, G.tonp);
+	out(O_ALTFP|O_VERB3|O_NONL, "\" ");
 
-	if (itree_add_arrow(G.frombp, G.tobp, G.arrownp,
-	    G.fromnp, G.tonp, ex) == NULL) {
-		out(O_ALTFP|O_VERB3, "\" (prevented by constraints)");
+	arrowp = itree_add_arrow(G.arrownp, G.fromnp, G.tonp, infop->ex);
+	if (arrowp == NULL) {
+		out(O_ALTFP|O_VERB3, "(prevented by constraints)");
 	} else {
-		out(O_ALTFP|O_VERB3, "\"");
+		out(O_ALTFP|O_VERB3, "");
+		if (!G.frombp) {
+			G.frome = find_or_add_event(infop, G.fromnp);
+			G.frombp = itree_add_bubble(G.frome, B_FROM, G.n, 0);
+		}
+		G.toe = find_or_add_event(infop, G.tonp);
+		G.tobp = itree_add_bubble(G.toe, B_TO, G.k, G.generation);
+		arrowp->tail = G.frombp;
+		arrowp->head = G.tobp;
+		add_arrow(G.frombp, arrowp);
+		add_arrow(G.tobp, arrowp);
 	}
 }
 
 enum childnode_action {
 	CN_NONE,
-	CN_INSTANTIZE,
 	CN_DUP
 };
 
@@ -243,37 +230,20 @@ tname_dup(struct node *namep, enum childnode_action act)
 				switch (npc->t) {
 				case T_NUM:
 					newnp->u.name.child =
-						newnode(T_NUM, file, line);
+					    newnode(T_NUM, file, line);
 					newnp->u.name.child->u.ull =
-						npc->u.ull;
+					    npc->u.ull;
 					break;
 				case T_NAME:
 					newnp->u.name.child =
-						tree_name(npc->u.name.s,
-							npc->u.name.it,
-							file, line);
+					    tree_name(npc->u.name.s,
+					    npc->u.name.it, file, line);
 					break;
 				default:
 					out(O_DIE, "tname_dup: "
 					    "invalid child type %s",
 					    ptree_nodetype2str(npc->t));
 				}
-			}
-		} else if (act == CN_INSTANTIZE) {
-			newnp->u.name.child = newnode(T_NUM, file, line);
-
-			if (namep->u.name.child == NULL ||
-			    namep->u.name.child->t != T_NUM) {
-				int inum;
-
-				ASSERT(newnp->u.name.cp != NULL);
-				config_getcompname(newnp->u.name.cp,
-						    NULL, &inum);
-				newnp->u.name.child->u.ull =
-					(unsigned long long)inum;
-			} else {
-				newnp->u.name.child->u.ull =
-					namep->u.name.child->u.ull;
 			}
 		}
 
@@ -351,7 +321,7 @@ tname_dup_to_epname(struct node *oldepname, struct node *epname)
 	    ! (npref == NULL || npref == npend);
 	    npref = npref->u.name.next) {
 		struct node *newnp = newnode(T_NAME, oldepname->file,
-					    oldepname->line);
+		    oldepname->line);
 
 		newnp->u.name.t = npref->u.name.t;
 		newnp->u.name.s = npref->u.name.s;
@@ -360,7 +330,7 @@ tname_dup_to_epname(struct node *oldepname, struct node *epname)
 		newnp->u.name.cp = npref->u.name.cp;
 
 		newnp->u.name.child = newnode(T_NUM, oldepname->file,
-					    oldepname->line);
+		    oldepname->line);
 
 		if (npref->u.name.child == NULL ||
 		    npref->u.name.child->t != T_NUM) {
@@ -371,7 +341,7 @@ tname_dup_to_epname(struct node *oldepname, struct node *epname)
 			newnp->u.name.child->u.ull = childnum;
 		} else {
 			newnp->u.name.child->u.ull =
-				npref->u.name.child->u.ull;
+			    npref->u.name.child->u.ull;
 		}
 
 		if (ret == NULL) {
@@ -397,7 +367,7 @@ tevent_dup_to_epname(struct node *oldnode, struct node *epname)
 	ret = newnode(T_EVENT, oldnode->file, oldnode->line);
 	ret->u.event.ename = tname_dup(oldnode->u.event.ename, CN_NONE);
 	ret->u.event.epname = tname_dup_to_epname(oldnode->u.event.epname,
-						    epname);
+	    epname);
 	return (ret);
 }
 
@@ -539,7 +509,7 @@ find_or_add_event(struct info *infop, struct node *np)
 		return (ret);
 
 	/* wasn't already in tree, allocate it */
-	ret = MALLOC(sizeof (*ret));
+	ret = alloc_xmalloc(sizeof (*ret));
 	bzero(ret, sizeof (*ret));
 
 	ret->t = np->u.event.ename->u.name.t;
@@ -587,8 +557,7 @@ hmatch_event(struct info *infop, struct node *eventnp, struct node *epname,
 			 * it can be used at the source of any arrows
 			 * we generate as we match events on the right side.
 			 */
-			generate_from(eventnp,
-			    find_or_add_event(infop, eventnp));
+			generate_from(eventnp);
 			hmatch(infop, nextnp, NULL);
 		} else {
 			/*
@@ -596,9 +565,8 @@ hmatch_event(struct info *infop, struct node *eventnp, struct node *epname,
 			 * the information about the destination and let
 			 * it construct the arrows as appropriate.
 			 */
-			generate_to(eventnp,
-			    find_or_add_event(infop, eventnp));
-			generate(infop->ex);
+			generate_to(eventnp);
+			generate(infop);
 		}
 
 		return;
@@ -611,62 +579,9 @@ hmatch_event(struct info *infop, struct node *eventnp, struct node *epname,
 	 * instanced epname in it already.  so we first recurse
 	 * down to the end of the name and as the recursion pops
 	 * up, we look for opportunities to advance horizontal
-	 * expansions on to the next match.  when we do advance
-	 * horizontal expansions, we potentially render all cp
-	 * pointers on all components to the right as invalid,
-	 * so we pass in an "ncp" config handle so matching against
-	 * the config can happen.
+	 * expansions on to the next match.
 	 */
-	if (rematch) {
-		struct config *ocp = epname->u.name.cp;
-		char *ncp_s;
-		int ncp_num, num;
-		struct iterinfo *iterinfop = NULL;
-		const char *iters;
-
-		for (; ncp; ncp = config_next(ncp)) {
-			config_getcompname(ncp, &ncp_s, &ncp_num);
-
-			if (ncp_s == epname->u.name.s) {
-				/* found a matching component name */
-				config_getcompname(epname->u.name.cp,
-				    NULL, &num);
-
-				if (epname->u.name.it != IT_HORIZONTAL &&
-				    ncp_num != num)
-					continue;
-
-				iters = epname->u.name.child->u.name.s;
-				if ((iterinfop = lut_lookup(infop->ex,
-				    (void *)iters, NULL)) == NULL) {
-					out(O_DIE,
-					    "hmatch_event: internal error: "
-					    "iterator \"%s\" undefined", iters);
-				} else {
-					/* advance dict entry to next match */
-					iterinfop->num = ncp_num;
-				}
-				epname->u.name.cp = ncp;
-				hmatch_event(infop, eventnp,
-				    epname->u.name.next, config_child(ncp),
-				    nextnp, 1);
-			}
-		}
-		if (iterinfop != NULL) {
-			/* restore dict entry */
-			iterinfop->num = num;
-		}
-
-		epname->u.name.cp = ocp;
-
-		return;		/* no more config to match against */
-
-	} else {
-		hmatch_event(infop, eventnp, epname->u.name.next, ncp,
-		    nextnp, 0);
-	}
-
-	if (epname->u.name.it == IT_HORIZONTAL) {
+	if (epname->u.name.it == IT_HORIZONTAL || rematch) {
 		struct config *cp;
 		struct config *ocp = epname->u.name.cp;
 		char *cp_s;
@@ -674,37 +589,61 @@ hmatch_event(struct info *infop, struct node *eventnp, struct node *epname,
 		int ocp_num;
 		struct iterinfo *iterinfop = NULL;
 		const char *iters;
+		int hexpand = 0;
 
-		config_getcompname(ocp, NULL, &ocp_num);
-
-		for (cp = config_next(ocp); cp; cp = config_next(cp)) {
+		if (epname->u.name.it != IT_HORIZONTAL) {
+			/*
+			 * Ancestor was horizontal though, so must rematch
+			 * against the name/num found in vmatch.
+			 */
+			config_getcompname(ocp, NULL, &ocp_num);
+		} else {
+			iters = epname->u.name.child->u.name.s;
+			if ((iterinfop = lut_lookup(infop->ex,
+			    (void *)iters, NULL)) == NULL) {
+				/*
+				 * do horizontal expansion on this node
+				 */
+				hexpand = 1;
+				iterinfop = alloc_xmalloc(
+				    sizeof (struct iterinfo));
+				iterinfop->num = -1;
+				iterinfop->np = epname;
+				infop->ex = lut_add(infop->ex, (void *)iters,
+				    iterinfop, NULL);
+			} else if (iterinfop->num == -1) {
+				hexpand = 1;
+			} else {
+				/*
+				 * This name has already been used in a
+				 * horizontal expansion. This time just match it
+				 */
+				ocp_num = iterinfop->num;
+			}
+		}
+		/*
+		 * Run through siblings looking for any that match the name.
+		 * If hexpand not set then num must also match ocp_num.
+		 */
+		for (cp = rematch ? ncp : ocp; cp; cp = config_next(cp)) {
 			config_getcompname(cp, &cp_s, &cp_num);
-
 			if (cp_s == epname->u.name.s) {
-				ASSERT(epname->u.name.child != NULL);
-
-				iters = epname->u.name.child->u.name.s;
-				if ((iterinfop = lut_lookup(infop->ex,
-				    (void *)iters, NULL)) == NULL) {
-					out(O_DIE,
-					    "hmatch_event: internal error: "
-					    "iterator \"%s\" undefined", iters);
-				} else {
-					/* advance dict entry to next match */
+				if (hexpand)
 					iterinfop->num = cp_num;
-				}
+				else if (ocp_num != cp_num)
+					continue;
 				epname->u.name.cp = cp;
 				hmatch_event(infop, eventnp,
 				    epname->u.name.next, config_child(cp),
 				    nextnp, 1);
 			}
 		}
-
-		if (iterinfop != NULL) {
-			/* restore dict entry */
-			iterinfop->num = ocp_num;
-		}
 		epname->u.name.cp = ocp;
+		if (hexpand)
+			iterinfop->num = -1;
+	} else {
+		hmatch_event(infop, eventnp, epname->u.name.next,
+		    NULL, nextnp, 0);
 	}
 }
 
@@ -762,7 +701,7 @@ itree_np2nork(struct node *norknp)
 	else if (norknp->t == T_NUM)
 		return ((int)norknp->u.ull);
 	else
-		out(O_DIE, norknp->file, norknp->line,
+		outfl(O_DIE, norknp->file, norknp->line,
 		    "itree_np2nork: internal error type %s",
 		    ptree_nodetype2str(norknp->t));
 	/*NOTREACHED*/
@@ -772,11 +711,10 @@ itree_np2nork(struct node *norknp)
 static struct iterinfo *
 newiterinfo(int num, struct node *np)
 {
-	struct iterinfo *ret = MALLOC(sizeof (*ret));
+	struct iterinfo *ret = alloc_xmalloc(sizeof (*ret));
 
 	ret->num = num;
 	ret->np = np;
-
 	return (ret);
 }
 
@@ -786,160 +724,98 @@ iterinfo_destructor(void *left, void *right, void *arg)
 {
 	struct iterinfo *iterinfop = (struct iterinfo *)right;
 
-	bzero(iterinfop, sizeof (*iterinfop));
-	FREE(iterinfop);
+	alloc_xfree(iterinfop, sizeof (*iterinfop));
 }
-
-/*
- * return 1 if wildcard path for wcp matches another wildcard path;
- * return 0 if otherwise.
- */
-static int
-wc_paths_match(struct wildcardinfo *wcp)
-{
-	struct node *np1, *np2;
-
-	ASSERT(wcp->matchwc != NULL);
-
-	for (np1 = wcp->p->ewname, np2 = wcp->matchwc->ewname;
-	    np1 != NULL && np2 != NULL;
-	    np1 = np1->u.name.next, np2 = np2->u.name.next) {
-		/*
-		 * names must match
-		 */
-		if (np1->u.name.s != np2->u.name.s)
-			return (0);
-
-		/*
-		 * children must exist and have the same numerical value
-		 */
-		if (np1->u.name.child == NULL || np2->u.name.child == NULL)
-			return (0);
-
-		if (np1->u.name.child->t != T_NUM ||
-		    np2->u.name.child->t != T_NUM)
-			return (0);
-
-		if (np1->u.name.child->u.ull != np2->u.name.child->u.ull)
-			return (0);
-	}
-
-	/*
-	 * return true only if we have matches for all entries of n1 and
-	 * n2.  note that NULL wildcard paths (i.e., both wcp->p->ewname
-	 * and wcp->matchwc->ewname are NULL) will be considered as
-	 * matching paths.
-	 */
-	if (np1 == NULL && np2 == NULL)
-		return (1);
-
-	return (0);
-}
-
-/*
- * update epname to include the wildcarded portion
- */
-static void
-create_wildcardedpath(struct wildcardinfo **wcproot)
-{
-	struct wildcardinfo *wcp;
-	struct node *nptop;
-
-	wcp = *wcproot;
-
-	if (wcp->s == WC_UNDERCONSTRUCTION) {
-		ASSERT(wcp->p->refcount == 1);
-		wcp->s = WC_COMPLETE;
-	}
-
-	/* path has no wildcard */
-	if (wcp->p->ewname == NULL)
-		return;
-
-	/*
-	 * get to this point if a wildcard portion of the path exists.
-	 *
-	 * first set oldepname to the start of the existing epname for use
-	 * in future comparisons, then update epname to include the
-	 * wildcard portion.
-	 */
-	nptop = wcp->nptop;
-
-	ASSERT(wcp->oldepname == nptop->u.event.epname);
-
-	nptop->u.event.epname =	tname_dup(wcp->p->ewname, CN_DUP);
-	nptop->u.event.epname = tree_name_append(nptop->u.event.epname,
-					tname_dup(wcp->oldepname, CN_DUP));
-}
-
-/*
- * restore epname to its former (nonwildcarded) state
- */
-static void
-undo_wildcardedpath(struct wildcardinfo **wcproot)
-{
-	struct wildcardinfo *wcp;
-
-	wcp = *wcproot;
-
-	if (wcp->s == WC_COMPLETE) {
-		ASSERT(wcp->p->refcount == 1);
-		wcp->s = WC_UNDERCONSTRUCTION;
-	}
-
-	/* path has no wildcard */
-	if (wcp->p->ewname == NULL)
-		return;
-
-	ASSERT(wcp->oldepname != NULL);
-
-	tree_free(wcp->nptop->u.event.epname);
-	wcp->nptop->u.event.epname = wcp->oldepname;
-}
-
-enum wildcard_action {
-	WA_NONE,	/* do not do any wildcards */
-	WA_SINGLE,	/* do wildcard only for current cp node */
-	WA_ALL		/* do wildcards for all cp nodes */
-};
 
 static void
 vmatch_event(struct info *infop, struct config *cp, struct node *np,
-	    struct node *lnp, struct node *anp,
-	    struct wildcardinfo **wcproot, enum wildcard_action dowildcard)
+	    struct node *lnp, struct node *anp, struct wildcardinfo *wcp)
 {
-	struct wildcardinfo *wcp;
 	char *cp_s;
 	int cp_num;
+	struct node *ewlp, *ewfp;
+	struct config *pcp;
+	struct node *cpnode;
+	int newewname = 0;
 
-	wcp = *wcproot;
-
-	if ((np == NULL && wcp->oldepname != NULL) ||
-	    (cp == NULL && wcp->oldepname == NULL)) {
+	if (np == NULL) {
 		/*
-		 * get to this point if the pathname matched the config
-		 * (but not necessarily a match at the end).  first check
-		 * for any matching wildcard paths.
+		 * Reached the end of the name. u.name.cp pointers should be set
+		 * up for each part of name. From this we can use config tree
+		 * to build up the wildcard part of the name (if any).
 		 */
-		if (wcp->matchwc != NULL && wc_paths_match(wcp) == 0)
+		pcp = config_parent(wcp->nptop->u.event.epname->u.name.cp);
+		if (pcp == infop->croot) {
+			/*
+			 * no wildcarding done - move on to next entry
+			 */
+			wcp->nptop->u.event.ewname = wcp->ewname;
+			wcp->nptop->u.event.oldepname = wcp->oldepname;
+			vmatch(infop, np, lnp, anp);
 			return;
+		}
+		if (wcp->ewname == NULL) {
+			/*
+			 * ewname not yet set up - do it now
+			 */
+			newewname = 1;
+			for (; pcp != infop->croot; pcp = config_parent(pcp)) {
+				config_getcompname(pcp, &cp_s, &cp_num);
+				cpnode = tree_name(cp_s, IT_NONE, NULL, 0);
+				cpnode->u.name.child = newnode(T_NUM, NULL, 0);
+				cpnode->u.name.child->u.ull = cp_num;
+				cpnode->u.name.cp = pcp;
+				if (wcp->ewname != NULL) {
+					cpnode->u.name.next = wcp->ewname;
+					cpnode->u.name.last =
+					    wcp->ewname->u.name.last;
+				}
+				wcp->ewname = cpnode;
+			}
+		}
 
-		create_wildcardedpath(wcproot);
-		vmatch(infop, np, lnp, anp, wcproot);
-		undo_wildcardedpath(wcproot);
+		/*
+		 * dup ewname and append oldepname
+		 */
+		ewfp = tname_dup(wcp->ewname, CN_DUP);
+		ewlp = ewfp->u.name.last;
+		ewfp->u.name.last = wcp->oldepname->u.name.last;
+		ewlp->u.name.next = wcp->oldepname;
 
+		wcp->nptop->u.event.epname = ewfp;
+		wcp->nptop->u.event.ewname = wcp->ewname;
+		wcp->nptop->u.event.oldepname = wcp->oldepname;
+		vmatch(infop, np, lnp, anp);
+		wcp->nptop->u.event.epname = wcp->oldepname;
+
+		/*
+		 * reduce duped ewname to original then free
+		 */
+		ewlp->u.name.next = NULL;
+		ewfp->u.name.last = ewlp;
+		tree_free(ewfp);
+
+		if (newewname) {
+			/*
+			 * free ewname if allocated above
+			 */
+			tree_free(wcp->ewname);
+			wcp->ewname = NULL;
+		}
 		return;
 	}
 
+	/*
+	 * We have an np. See if we can match it in this section of
+	 * the config tree.
+	 */
 	if (cp == NULL)
 		return;	/* no more config to match against */
 
 	for (; cp; cp = config_next(cp)) {
 		config_getcompname(cp, &cp_s, &cp_num);
 
-		if (cp_s == np->u.name.s &&
-		    ! (wcp->s == WC_UNDERCONSTRUCTION &&
-		    dowildcard == WA_SINGLE)) {
+		if (cp_s == np->u.name.s) {
 			/* found a matching component name */
 			if (np->u.name.child &&
 			    np->u.name.child->t == T_NUM) {
@@ -952,8 +828,7 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 				if (cp_num != np->u.name.child->u.ull)
 					continue;
 
-				np->u.name.cp = cp;
-			} else {
+			} else if (np->u.name.it != IT_HORIZONTAL) {
 				struct iterinfo *iterinfop;
 				const char *iters;
 
@@ -1007,54 +882,35 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 					 * "forcing components into
 					 * wildcard path".
 					 */
-					if (dowildcard == WA_ALL &&
-					    wcp->s == WC_UNDERCONSTRUCTION) {
-						vmatch_event(infop, cp, np,
-							    lnp, anp, wcproot,
-							    WA_SINGLE);
-					}
+					if (np == wcp->nptop->u.event.epname)
+						vmatch_event(infop,
+						    config_child(cp), np, lnp,
+						    anp, wcp);
 					continue;
 				}
-				np->u.name.cp = cp;
 			}
 
 			/*
-			 * if wildcarding was done in a call earlier in the
-			 * stack, record the current cp as the first
-			 * matching and nonwildcarded cp.
-			 */
-			if (dowildcard == WA_ALL &&
-			    wcp->s == WC_UNDERCONSTRUCTION)
-				wcp->p->cpstart = cp;
-
-			/*
-			 * if this was an IT_HORIZONTAL name,
-			 * hmatch() will use the cp to expand
-			 * all matches horizontally into a list.
+			 * if this was an IT_HORIZONTAL name, hmatch() will
+			 * expand all matches horizontally into a list.
 			 * we know the list will contain at least
 			 * one element (the one we just matched),
-			 * so we just store cp and let hmatch_event()
-			 * do the rest.
+			 * so we just let hmatch_event() do the rest.
 			 *
-			 * recurse on to next component.  note that
+			 * recurse on to next component. Note that
 			 * wildcarding is now turned off.
 			 */
+			np->u.name.cp = cp;
 			vmatch_event(infop, config_child(cp), np->u.name.next,
-				    lnp, anp, wcproot, WA_NONE);
+			    lnp, anp, wcp);
+			np->u.name.cp = NULL;
 
 			/*
 			 * forcing components into wildcard path:
 			 *
 			 * if this component is the first match, force it
 			 * to be part of the wildcarded path and see if we
-			 * can get additional matches.  repeat call to
-			 * vmatch_event() with the same np, making sure
-			 * wildcarding is forced for this component alone
-			 * and not its peers by specifying vmatch_event(
-			 * ..., WA_SINGLE).  in other words, in the call to
-			 * vmatch_event() below, there should be no loop
-			 * over cp's peers since that is being done in the
-			 * current loop [i.e., the loop we're in now].
+			 * can get additional matches.
 			 *
 			 * here's an example.  suppose we have the
 			 * definition
@@ -1070,8 +926,7 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 			 *
 			 * in order to discover the next match (.../x1/y1)
 			 * in the configuration we have to force "x0" into
-			 * the wildcarded part of the path.  the following
-			 * call to vmatch_event(..., WA_SINGLE) does this.
+			 * the wildcarded part of the path.
 			 * by doing so, we discover the wildcarded part
 			 * "a0/x0/y0/a1" and the nonwildcarded part "x1/y1"
 			 *
@@ -1089,11 +944,9 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 			 * if "x0" is forced to be a part of the wildcarded
 			 * path.
 			 */
-			if (dowildcard == WA_ALL &&
-			    wcp->s == WC_UNDERCONSTRUCTION) {
-				vmatch_event(infop, cp, np, lnp, anp,
-					    wcproot, WA_SINGLE);
-			}
+			if (np == wcp->nptop->u.event.epname)
+				vmatch_event(infop, config_child(cp), np, lnp,
+				    anp, wcp);
 
 			if (np->u.name.it == IT_HORIZONTAL) {
 				/*
@@ -1103,143 +956,15 @@ vmatch_event(struct info *infop, struct config *cp, struct node *np,
 				 */
 				return;
 			}
-
-		} else if ((dowildcard == WA_SINGLE || dowildcard == WA_ALL) &&
-			    wcp->s == WC_UNDERCONSTRUCTION) {
+		} else if (np == wcp->nptop->u.event.epname) {
 			/*
-			 * no matching cp, and we are constructing our own
-			 * wildcard path.  (in other words, we are not
-			 * referencing a wildcard path created for an
-			 * earlier event.)
-			 *
-			 * add wildcard entry, then recurse on to config
-			 * child
+			 * no match - carry on down the tree looking for
+			 * wildcarding
 			 */
-			struct node *cpnode, *prevlast;
-
-			cpnode = tree_name(cp_s, IT_NONE, NULL, 0);
-			cpnode->u.name.child = newnode(T_NUM, NULL, 0);
-			cpnode->u.name.child->u.ull = cp_num;
-			cpnode->u.name.cp = cp;
-
-			if (wcp->p->ewname == NULL) {
-				prevlast = NULL;
-				wcp->p->ewname = cpnode;
-			} else {
-				prevlast = wcp->p->ewname->u.name.last;
-				wcp->p->ewname =
-					tree_name_append(wcp->p->ewname,
-							    cpnode);
-			}
-
 			vmatch_event(infop, config_child(cp), np, lnp, anp,
-				    wcproot, WA_ALL);
-
-			/*
-			 * back out last addition to ewname and continue
-			 * with loop
-			 */
-			tree_free(cpnode);
-			if (prevlast == NULL) {
-				wcp->p->ewname = NULL;
-			} else {
-				prevlast->u.name.next = NULL;
-				wcp->p->ewname->u.name.last = prevlast;
-			}
-
-			/*
-			 * return if wildcarding is done only for this cp
-			 */
-			if (dowildcard == WA_SINGLE)
-				return;
+			    wcp);
 		}
 	}
-}
-
-/*
- * for the event node np, which will be subjected to pathname
- * expansion/matching, create a (struct wildcardinfo) to hold wildcard
- * information.  this struct will be inserted into the first location in
- * the list that starts with *wcproot.
- *
- * cp is the starting node of the configuration; cpstart, which is output,
- * is the starting node of the nonwildcarded portion of the path.
- */
-static void
-add_wildcardentry(struct wildcardinfo **wcproot, struct config *cp,
-		struct node *np)
-{
-	struct wildcardinfo *wcpnew, *wcp;
-	struct node *np1, *np2;
-
-	/*
-	 * create entry for np
-	 */
-	wcpnew = MALLOC(sizeof (struct wildcardinfo));
-	bzero(wcpnew, sizeof (struct wildcardinfo));
-	wcpnew->nptop = np;
-	wcpnew->oldepname = np->u.event.epname;
-	wcpnew->s = WC_UNDERCONSTRUCTION;
-
-	wcpnew->p = MALLOC(sizeof (struct wildcardpath));
-	bzero(wcpnew->p, sizeof (struct wildcardpath));
-	wcpnew->p->cpstart = cp;
-	wcpnew->p->refcount = 1;
-
-	/*
-	 * search all completed entries for an epname whose first entry
-	 * matches.  note that NULL epnames are considered valid and can be
-	 * matched.
-	 */
-	np2 = wcpnew->oldepname;
-	for (wcp = *wcproot; wcp; wcp = wcp->next) {
-		ASSERT(wcp->s == WC_COMPLETE);
-
-		np1 = wcp->oldepname;
-		if ((np1 && np2 && np1->u.name.s == np2->u.name.s) ||
-		    (np1 == NULL && np2 == NULL)) {
-			/*
-			 * if we find a match in a completed entry, set
-			 * matchwc to indicate that we would like to match
-			 * it.  it is necessary to do this since wildcards
-			 * for each event are constructed independently.
-			 */
-			wcpnew->matchwc = wcp->p;
-
-			wcp->p->refcount++;
-			break;
-		}
-	}
-
-	wcpnew->next = *wcproot;
-	*wcproot = wcpnew;
-}
-
-static void
-delete_wildcardentry(struct wildcardinfo **wcproot)
-{
-	struct wildcardinfo *wcp;
-
-	wcp = *wcproot;
-	*wcproot = wcp->next;
-
-	switch (wcp->s) {
-	case WC_UNDERCONSTRUCTION:
-	case WC_COMPLETE:
-		if (wcp->matchwc != NULL)
-			wcp->matchwc->refcount--;
-
-		ASSERT(wcp->p->refcount == 1);
-		tree_free(wcp->p->ewname);
-		FREE(wcp->p);
-		break;
-
-	default:
-		out(O_DIE, "deletewc: invalid status");
-		break;
-	}
-
-	FREE(wcp);
 }
 
 /*
@@ -1307,14 +1032,18 @@ delete_wildcardentry(struct wildcardinfo **wcproot)
  *
  */
 static void
-vmatch(struct info *infop, struct node *np, struct node *lnp,
-    struct node *anp, struct wildcardinfo **wcproot)
+vmatch(struct info *infop, struct node *np, struct node *lnp, struct node *anp)
 {
+	struct node *np1, *np2, *oldepname, *oldnptop;
+	int epmatches;
+	struct config *cp;
+	struct wildcardinfo *wcp;
+
 	if (np == NULL) {
 		if (lnp)
-			vmatch(infop, lnp, NULL, anp, wcproot);
+			vmatch(infop, lnp, NULL, anp);
 		else if (anp)
-			vmatch(infop, anp, NULL, NULL, wcproot);
+			vmatch(infop, anp, NULL, NULL);
 		else {
 			struct node *src;
 			struct node *dst;
@@ -1350,20 +1079,93 @@ vmatch(struct info *infop, struct node *np, struct node *lnp,
 
 	switch (np->t) {
 	case T_EVENT: {
-		add_wildcardentry(wcproot, config_child(infop->croot), np);
+		epmatches = 0;
+		/*
+		 * see if we already have a match in the wcps
+		 */
+		for (wcp = wcproot; wcp; wcp = wcp->next) {
+			oldepname = wcp->oldepname;
+			oldnptop = wcp->nptop;
+			for (np1 = oldepname, np2 = np->u.event.epname;
+			    np1 != NULL && np2 != NULL; np1 = np1->u.name.next,
+			    np2 = np2->u.name.next) {
+				if (strcmp(np1->u.name.s, np2->u.name.s) != 0)
+					break;
+				if (np1->u.name.child->t !=
+				    np2->u.name.child->t)
+					break;
+				if (np1->u.name.child->t == T_NUM &&
+				    np1->u.name.child->u.ull !=
+				    np2->u.name.child->u.ull)
+					break;
+				if (np1->u.name.child->t == T_NAME &&
+				    strcmp(np1->u.name.child->u.name.s,
+				    np2->u.name.child->u.name.s) != 0)
+					break;
+				epmatches++;
+			}
+			if (epmatches)
+				break;
+		}
+		if (epmatches && np1 == NULL && np2 == NULL) {
+			/*
+			 * complete names match, can just borrow the fields
+			 */
+			oldepname = np->u.event.epname;
+			np->u.event.epname = oldnptop->u.event.epname;
+			np->u.event.oldepname = wcp->oldepname;
+			np->u.event.ewname = wcp->ewname;
+			vmatch(infop, NULL, lnp, anp);
+			np->u.event.epname = oldepname;
+			return;
+		}
+		if (epmatches) {
+			/*
+			 * just first part of names match - do wildcarding
+			 * by using existing wcp including ewname and also
+			 * copying as much of pwname as is valid, then start
+			 * vmatch_event() at start of non-matching section
+			 */
+			for (np1 = oldepname, np2 = np->u.event.epname;
+			    epmatches != 0; epmatches--) {
+				cp = np1->u.name.cp;
+				np2->u.name.cp = cp;
+				np1 = np1->u.name.next;
+				np2 = np2->u.name.next;
+			}
+			wcp->oldepname = np->u.event.epname;
+			wcp->nptop = np;
+			vmatch_event(infop, config_child(cp), np2, lnp,
+			    anp, wcp);
+			wcp->oldepname = oldepname;
+			wcp->nptop = oldnptop;
+			return;
+		}
+		/*
+		 * names do not match - allocate a new wcp
+		 */
+		wcp = MALLOC(sizeof (struct wildcardinfo));
+		wcp->next = wcproot;
+		wcproot = wcp;
+		wcp->nptop = np;
+		wcp->oldepname = np->u.event.epname;
+		wcp->ewname = NULL;
+
 		vmatch_event(infop, config_child(infop->croot),
-			    np->u.event.epname, lnp, anp, wcproot, WA_ALL);
-		delete_wildcardentry(wcproot);
+		    np->u.event.epname, lnp, anp, wcp);
+
+		wcproot = wcp->next;
+		FREE(wcp);
 		break;
 	}
 	case T_LIST:
 		ASSERT(lnp == NULL);
-		vmatch(infop, np->u.expr.right, np->u.expr.left, anp, wcproot);
+		vmatch(infop, np->u.expr.right, np->u.expr.left, anp);
 		break;
 
 	case T_ARROW:
 		ASSERT(lnp == NULL && anp == NULL);
-		vmatch(infop, np->u.arrow.rhs, NULL, np->u.arrow.lhs, wcproot);
+		vmatch(infop, np->u.arrow.rhs, NULL, np->u.arrow.lhs);
 		break;
 
 	default:
@@ -1411,88 +1213,169 @@ itree_create(struct config *croot)
 {
 	struct lut *retval;
 	struct node *propnp;
+	extern int alloc_total();
+	int init_size;
 
 	Ninfo.lut = NULL;
 	Ninfo.croot = croot;
+	init_size = alloc_total();
+	out(O_ALTFP|O_STAMP, "start itree_create using %d bytes", init_size);
 	for (propnp = Props; propnp; propnp = propnp->u.stmt.next) {
 		struct node *anp = propnp->u.stmt.np;
-		struct wildcardinfo *wcproot = NULL;
 
 		ASSERTeq(anp->t, T_ARROW, ptree_nodetype2str);
 
+		if (!anp->u.arrow.needed)
+			continue;
 		Ninfo.anp = anp;
 		Ninfo.ex = NULL;
 
 		generate_arrownp(anp);
-		vmatch(&Ninfo, anp, NULL, NULL, &wcproot);
+		vmatch(&Ninfo, anp, NULL, NULL);
 
 		if (Ninfo.ex) {
 			lut_free(Ninfo.ex, iterinfo_destructor, NULL);
 			Ninfo.ex = NULL;
 		}
-		ASSERT(wcproot == NULL);
 		cp_reset(anp);
 	}
 
+	out(O_ALTFP|O_STAMP, "itree_create added %d bytes",
+	    alloc_total() - init_size);
 	retval = Ninfo.lut;
 	Ninfo.lut = NULL;
 	return (retval);
 }
 
+/*
+ * initial first pass of the rules.
+ * We don't use the config at all. Just check the last part of the pathname
+ * in the rules. If this matches the last part of the pathname in the first
+ * ereport, then set pathname to the pathname in the ereport. If not then
+ * set pathname to just the last part of pathname with instance number 0.
+ * Constraints are ignored and all nork values are set to 0. If after all that
+ * any rules can still not be associated with the ereport, then they are set
+ * to not needed in prune_propagations() and ignored in the real itree_create()
+ * which follows.
+ */
+
+static struct event *
+add_event_dummy(struct node *np, const struct ipath *ipp)
+{
+	struct event *ret;
+	struct event searchevent;	/* just used for searching */
+	extern struct ipath *ipath_dummy(struct node *, struct ipath *);
+
+	searchevent.enode = np;
+	searchevent.ipp = ipath_dummy(np->u.event.epname, (struct ipath *)ipp);
+	if ((ret = lut_lookup(Ninfo.lut, (void *)&searchevent,
+	    (lut_cmp)event_cmp)) != NULL)
+		return (ret);
+
+	ret = alloc_xmalloc(sizeof (*ret));
+	bzero(ret, sizeof (*ret));
+	ret->t = np->u.event.ename->u.name.t;
+	ret->enode = np;
+	ret->ipp = searchevent.ipp;
+	Ninfo.lut = lut_add(Ninfo.lut, (void *)ret, (void *)ret,
+	    (lut_cmp)event_cmp);
+	return (ret);
+}
+
+/*ARGSUSED*/
+struct lut *
+itree_create_dummy(const char *e0class, const struct ipath *e0ipp)
+{
+	struct node *propnp;
+	struct event *frome, *toe;
+	struct bubble *frombp, *tobp;
+	struct arrow *arrowp;
+	struct node *src, *dst, *slst, *dlst, *arrownp, *oldarrownp;
+	int gen = 0;
+	extern int alloc_total();
+	int init_size;
+
+	Ninfo.lut = NULL;
+	init_size = alloc_total();
+	out(O_ALTFP|O_STAMP, "start itree_create using %d bytes", init_size);
+	for (propnp = Props; propnp; propnp = propnp->u.stmt.next) {
+		arrownp = propnp->u.stmt.np;
+		while (arrownp) {
+			gen++;
+			dlst = arrownp->u.arrow.rhs;
+			slst = arrownp->u.arrow.lhs;
+			oldarrownp = arrownp;
+			if (slst->t == T_ARROW) {
+				arrownp = slst;
+				slst = slst->u.arrow.rhs;
+			} else {
+				arrownp = NULL;
+			}
+			while (slst) {
+				if (slst->t == T_LIST) {
+					src = slst->u.expr.right;
+					slst = slst->u.expr.left;
+				} else {
+					src = slst;
+					slst = NULL;
+				}
+				frome = add_event_dummy(src, e0ipp);
+				frombp = itree_add_bubble(frome, B_FROM, 0, 0);
+				while (dlst) {
+					if (dlst->t == T_LIST) {
+						dst = dlst->u.expr.right;
+						dlst = dlst->u.expr.left;
+					} else {
+						dst = dlst;
+						dlst = NULL;
+					}
+					arrowp = alloc_xmalloc(
+					    sizeof (struct arrow));
+					bzero(arrowp, sizeof (struct arrow));
+					arrowp->pnode = oldarrownp;
+					toe = add_event_dummy(dst, e0ipp);
+					tobp = itree_add_bubble(toe, B_TO, 0,
+					    gen);
+					arrowp->tail = frombp;
+					arrowp->head = tobp;
+					add_arrow(frombp, arrowp);
+					add_arrow(tobp, arrowp);
+					arrow_add_within(arrowp,
+					    dst->u.event.declp->u.stmt.np->
+					    u.event.eexprlist);
+					arrow_add_within(arrowp,
+					    dst->u.event.eexprlist);
+				}
+			}
+		}
+	}
+	out(O_ALTFP|O_STAMP, "itree_create added %d bytes",
+	    alloc_total() - init_size);
+	return (Ninfo.lut);
+}
+
 void
 itree_free(struct lut *lutp)
 {
+	int init_size;
+
+	init_size = alloc_total();
+	out(O_ALTFP|O_STAMP, "start itree_free");
 	lut_free(lutp, itree_destructor, NULL);
+	out(O_ALTFP|O_STAMP, "itree_free freed %d bytes",
+	    init_size - alloc_total());
 }
 
 void
 itree_prune(struct lut *lutp)
 {
+	int init_size;
+
+	init_size = alloc_total();
+	out(O_ALTFP|O_STAMP, "start itree_prune");
 	lut_walk(lutp, itree_pruner, NULL);
-}
-
-int
-itree_nameinstancecmp(struct node *np1, struct node *np2)
-{
-	int np1type = (int)np1->u.name.t;
-	int np2type = (int)np2->u.name.t;
-	int num1;
-	int num2;
-
-	while (np1 && np2 && np1->u.name.s == np2->u.name.s) {
-		if (np1->u.name.next != NULL && np2->u.name.next != NULL) {
-			if (np1->u.name.cp != NULL) {
-				config_getcompname(np1->u.name.cp, NULL, &num1);
-			} else {
-				ASSERT(np1->u.name.child != NULL);
-				ASSERT(np1->u.name.child->t == T_NUM);
-				num1 = (int)np1->u.name.child->u.ull;
-			}
-
-			if (np2->u.name.cp != NULL) {
-				config_getcompname(np2->u.name.cp, NULL, &num2);
-			} else {
-				ASSERT(np2->u.name.child != NULL);
-				ASSERT(np2->u.name.child->t == T_NUM);
-				num2 = (int)np2->u.name.child->u.ull;
-			}
-
-			if (num1 != num2)
-				return (num1 - num2);
-		}
-
-		np1 = np1->u.name.next;
-		np2 = np2->u.name.next;
-	}
-	if (np1 == NULL)
-		if (np2 == NULL)
-			return (np1type - np2type);
-		else
-			return (-1);
-	else if (np2 == NULL)
-		return (1);
-	else
-		return (strcmp(np1->u.name.s, np2->u.name.s));
+	out(O_ALTFP|O_STAMP, "itree_prune freed %d bytes",
+	    init_size - alloc_total());
 }
 
 void
@@ -1658,8 +1541,7 @@ itree_destructor(void *left, void *right, void *arg)
 
 	if (ep->nvp != NULL)
 		nvlist_free(ep->nvp);
-	bzero(ep, sizeof (*ep));
-	FREE(ep);
+	alloc_xfree(ep, sizeof (*ep));
 }
 
 /*ARGSUSED*/
@@ -1697,8 +1579,7 @@ itree_pruner(void *left, void *right, void *arg)
 static void
 itree_free_bubble(struct bubble *freeme)
 {
-	bzero(freeme, sizeof (*freeme));
-	FREE(freeme);
+	alloc_xfree(freeme, sizeof (*freeme));
 }
 
 static struct bubble *
@@ -1728,7 +1609,7 @@ itree_add_bubble(struct event *eventp, enum bubbletype btype, int nork, int gen)
 		}
 	}
 
-	newb = MALLOC(sizeof (struct bubble));
+	newb = alloc_xmalloc(sizeof (struct bubble));
 	newb->next = NULL;
 	newb->t = btype;
 	newb->myevent = eventp;
@@ -1771,7 +1652,7 @@ add_arrow(struct bubble *bp, struct arrow *ap)
 	struct arrowlist *curr;
 	struct arrowlist *newal;
 
-	newal = MALLOC(sizeof (struct arrowlist));
+	newal = alloc_xmalloc(sizeof (struct arrowlist));
 	bzero(newal, sizeof (struct arrowlist));
 	newal->arrowp = ap;
 
@@ -1788,19 +1669,13 @@ add_arrow(struct bubble *bp, struct arrow *ap)
 }
 
 static struct arrow *
-itree_add_arrow(struct bubble *frombubblep, struct bubble *tobubblep,
-    struct node *apnode, struct node *fromevent, struct node *toevent,
-    struct lut *ex)
+itree_add_arrow(struct node *apnode, struct node *fromevent,
+    struct node *toevent, struct lut *ex)
 {
 	struct arrow *newa;
 
-	ASSERTeq(frombubblep->t, B_FROM, itree_bubbletype2str);
-	ASSERTinfo(tobubblep->t == B_TO || tobubblep->t == B_INHIBIT,
-	    itree_bubbletype2str(tobubblep->t));
-	newa = MALLOC(sizeof (struct arrow));
+	newa = alloc_xmalloc(sizeof (struct arrow));
 	bzero(newa, sizeof (struct arrow));
-	newa->tail = frombubblep;
-	newa->head = tobubblep;
 	newa->pnode = apnode;
 	newa->constraints = NULL;
 
@@ -1810,12 +1685,10 @@ itree_add_arrow(struct bubble *frombubblep, struct bubble *tobubblep,
 	 */
 	newa->mindelay = newa->maxdelay = 0ULL;
 	if (itree_set_arrow_traits(newa, fromevent, toevent, ex) == 0) {
-		FREE(newa);
+		alloc_xfree(newa, sizeof (struct arrow));
 		return (NULL);
 	}
 
-	add_arrow(frombubblep, newa);
-	add_arrow(tobubblep, newa);
 	return (newa);
 }
 
@@ -1824,7 +1697,7 @@ static int
 itree_set_arrow_traits(struct arrow *ap, struct node *fromev,
     struct node *toev, struct lut *ex)
 {
-	struct node *epnames[] = { NULL, NULL, NULL };
+	struct node *events[] = { NULL, NULL, NULL };
 	struct node *newc = NULL;
 
 	ASSERTeq(fromev->t, T_EVENT, ptree_nodetype2str);
@@ -1854,9 +1727,9 @@ itree_set_arrow_traits(struct arrow *ap, struct node *fromev,
 #endif	/* notdef */
 
 	/* handle constraints on the from event in the prop statement */
-	epnames[0] = fromev->u.event.epname;
-	epnames[1] = toev->u.event.epname;
-	if (eval_potential(fromev->u.event.eexprlist, ex, epnames, &newc,
+	events[0] = fromev;
+	events[1] = toev;
+	if (eval_potential(fromev->u.event.eexprlist, ex, events, &newc,
 	    Ninfo.croot) == 0)
 		return (0);		/* constraint disallows arrow */
 
@@ -1875,9 +1748,9 @@ itree_set_arrow_traits(struct arrow *ap, struct node *fromev,
 #endif	/* notdef */
 
 	/* handle constraints on the to event in the prop statement */
-	epnames[0] = toev->u.event.epname;
-	epnames[1] = fromev->u.event.epname;
-	if (eval_potential(toev->u.event.eexprlist, ex, epnames, &newc,
+	events[0] = toev;
+	events[1] = fromev;
+	if (eval_potential(toev->u.event.eexprlist, ex, events, &newc,
 	    Ninfo.croot) == 0) {
 		if (newc != NULL)
 			tree_free(newc);
@@ -1885,8 +1758,10 @@ itree_set_arrow_traits(struct arrow *ap, struct node *fromev,
 	}
 
 	/* if we came up with any deferred constraints, add them to arrow */
-	if (newc != NULL)
+	if (newc != NULL) {
+		out(O_ALTFP|O_VERB3, "(deferred constraints)");
 		(void) itree_add_constraint(ap, iexpr(newc));
+	}
 
 	return (1);	/* constraints allow arrow */
 }
@@ -1958,11 +1833,9 @@ itree_free_arrowlists(struct bubble *bubp, int arrows_too)
 		nal = al->next;
 		if (arrows_too) {
 			itree_free_constraints(al->arrowp);
-			bzero(al->arrowp, sizeof (struct arrow));
-			FREE(al->arrowp);
+			alloc_xfree(al->arrowp, sizeof (struct arrow));
 		}
-		bzero(al, sizeof (*al));
-		FREE(al);
+		alloc_xfree(al, sizeof (*al));
 		al = nal;
 	}
 }
@@ -1975,8 +1848,7 @@ itree_delete_arrow(struct bubble *bubp, struct arrow *arrow)
 	al = bubp->arrows;
 	if (al->arrowp == arrow) {
 		bubp->arrows = al->next;
-		bzero(al, sizeof (*al));
-		FREE(al);
+		alloc_xfree(al, sizeof (*al));
 		return;
 	}
 	while (al != NULL) {
@@ -1985,8 +1857,7 @@ itree_delete_arrow(struct bubble *bubp, struct arrow *arrow)
 		ASSERT(al != NULL);
 		if (al->arrowp == arrow) {
 			oal->next = al->next;
-			bzero(al, sizeof (*al));
-			FREE(al);
+			alloc_xfree(al, sizeof (*al));
 			return;
 		}
 	}
@@ -2005,10 +1876,8 @@ itree_prune_arrowlists(struct bubble *bubp)
 		else
 			itree_delete_arrow(al->arrowp->tail, al->arrowp);
 		itree_free_constraints(al->arrowp);
-		bzero(al->arrowp, sizeof (struct arrow));
-		FREE(al->arrowp);
-		bzero(al, sizeof (*al));
-		FREE(al);
+		alloc_xfree(al->arrowp, sizeof (struct arrow));
+		alloc_xfree(al, sizeof (*al));
 		al = nal;
 	}
 }
@@ -2034,9 +1903,10 @@ itree_add_constraint(struct arrow *arrowp, struct node *c)
 
 	for (curr = arrowp->constraints;
 	    curr != NULL;
-	    prev = curr, curr = curr->next);
+	    prev = curr, curr = curr->next)
+		;
 
-	newc = MALLOC(sizeof (struct constraintlist));
+	newc = alloc_xmalloc(sizeof (struct constraintlist));
 	newc->next = NULL;
 	newc->cnode = c;
 
@@ -2073,8 +1943,7 @@ itree_free_constraints(struct arrow *ap)
 			tree_free(cl->cnode);
 		else
 			iexpr_free(cl->cnode);
-		bzero(cl, sizeof (*cl));
-		FREE(cl);
+		alloc_xfree(cl, sizeof (*cl));
 		cl = ncl;
 	}
 }
