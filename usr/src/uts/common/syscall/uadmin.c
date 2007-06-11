@@ -174,8 +174,11 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 		 */
 		if (p != &p0) {
 			proc_is_exiting(p);
-			if ((error = exitlwps(0)) != 0)
+			if ((error = exitlwps(0)) != 0) {
+				ASSERT(locked);
+				mutex_exit(&ualock);
 				return (error);
+			}
 			mutex_enter(&p->p_lock);
 			p->p_flag |= SNOWAIT;
 			sigfillset(&p->p_ignore);
