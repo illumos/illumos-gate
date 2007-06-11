@@ -92,6 +92,12 @@ static const char Hw1_s_vis[] =		"VIS";
 static const char Hw1_s_vis2[] =	"VIS2";
 static const char Hw1_s_asi_blk_init[] =	"ASI_BLK_INIT";
 static const char Hw1_s_fmaf[] = 	"FMAF";
+static const char Hw1_s_reserved1[] = 	"RESERVED1";
+static const char Hw1_s_reserved2[] = 	"RESERVED2";
+static const char Hw1_s_reserved3[] = 	"RESERVED3";
+static const char Hw1_s_reserved4[] = 	"RESERVED4";
+static const char Hw1_s_reserved5[] = 	"RESERVED5";
+static const char Hw1_s_fjfmau[] = 	"FJFMAU";
 #elif	CAP_LOWERCASE
 static const char Hw1_s_mul32[] =	"mul32";
 static const char Hw1_s_div32[] =	"div32";
@@ -102,6 +108,12 @@ static const char Hw1_s_vis[] =		"vis";
 static const char Hw1_s_vis2[] =	"vis2";
 static const char Hw1_s_asi_blk_init[] =	"asi_blk_init";
 static const char Hw1_s_fmaf[] =	"fmaf";
+static const char Hw1_s_reserved1[] = 	"reserved1";
+static const char Hw1_s_reserved2[] = 	"reserved2";
+static const char Hw1_s_reserved3[] = 	"reserved3";
+static const char Hw1_s_reserved4[] = 	"reserved4";
+static const char Hw1_s_reserved5[] = 	"reserved5";
+static const char Hw1_s_fjfmau[] =	"fjfmau";
 
 #else
 #error	"Hardware Capabilities (sparc) - what case do you want?"
@@ -121,7 +133,13 @@ static const Cap_desc hw1_s[] = {
 	{ AV_SPARC_VIS2,	Hw1_s_vis2,	sizeof (Hw1_s_vis2) - 1 },
 	{ AV_SPARC_ASI_BLK_INIT,	Hw1_s_asi_blk_init,
 		sizeof (Hw1_s_asi_blk_init) - 1 },
-	{ AV_SPARC_FMAF,	Hw1_s_fmaf,	sizeof (Hw1_s_fmaf) - 1 }
+	{ AV_SPARC_FMAF,	Hw1_s_fmaf,	sizeof (Hw1_s_fmaf) - 1 },
+	{ 0,	Hw1_s_reserved1,	sizeof (Hw1_s_reserved1) - 1 },
+	{ 0,	Hw1_s_reserved2,	sizeof (Hw1_s_reserved2) - 1 },
+	{ 0,	Hw1_s_reserved3,	sizeof (Hw1_s_reserved3) - 1 },
+	{ 0,	Hw1_s_reserved4,	sizeof (Hw1_s_reserved4) - 1 },
+	{ 0,	Hw1_s_reserved5,	sizeof (Hw1_s_reserved5) - 1 },
+	{ AV_SPARC_FJFMAU,	Hw1_s_fjfmau,	sizeof (Hw1_s_fjfmau) - 1 }
 };
 static const uint_t hw1_s_num = sizeof (hw1_s) / sizeof (Cap_desc);
 

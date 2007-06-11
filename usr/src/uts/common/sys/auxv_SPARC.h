@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,10 +47,12 @@ extern "C" {
 #define	AV_SPARC_VIS2	0x0040	/* VIS2 instruction set supported */
 #define	AV_SPARC_ASI_BLK_INIT	0x0080	/* ASI_BLK_INIT_xxx ASI */
 #define	AV_SPARC_FMAF	0x0100	/* Fused Multiply-Add */
+#define	AV_SPARC_FJFMAU	0x4000	/* Fujitsu Unfused Multiply-Add */
 
 #define	FMT_AV_SPARC	\
 	"\20"		\
-	"\11fmaf\10ASIBlkInit\7vis2\6vis\5popc\4v8plus\3fsmuld\2div32\1mul32"
+	"\17fjfmau\11fmaf"  \
+	"\10ASIBlkInit\7vis2\6vis\5popc\4v8plus\3fsmuld\2div32\1mul32"
 
 /*
  * compatibility defines: Obsolete
