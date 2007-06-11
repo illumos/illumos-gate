@@ -64,6 +64,7 @@ int watchdog_activated = WDT_OFF;
  * disabled via /etc/system.
  */
 int watchdog_enabled = 1;
+static int watchdog_initialized = 0;
 
 /*
  * The following tuneable can be set via /etc/system to control
@@ -93,8 +94,8 @@ watchdog_init(void)
 	}
 
 	if (hsvc_version(HSVC_GROUP_CORE, &major, &minor) != 0 ||
-		major != WDT_MIN_COREAPI_MAJOR ||
-		minor < WDT_MIN_COREAPI_MINOR) {
+	    major != WDT_MIN_COREAPI_MAJOR ||
+	    minor < WDT_MIN_COREAPI_MINOR) {
 		cmn_err(CE_NOTE, "Disabling watchdog as watchdog services are "
 		    "not available\n");
 		watchdog_enabled = 0;
@@ -171,8 +172,6 @@ watchdog_init(void)
 	watchdog_timeout -=
 	    watchdog_timeout % watchdog_resolution;
 
-	config_watchdog(watchdog_timeout, WDT_ON);
-
 	/*
 	 * Cyclic need to be fired twice the frequency of regular
 	 * watchdog timeout. Pedantic here and setting cyclic
@@ -187,6 +186,8 @@ watchdog_init(void)
 	cyclic_interval *= MICROSEC;
 
 	watchdog_cyclic_init(cyclic_interval);
+	watchdog_initialized = 1;
+	config_watchdog(watchdog_timeout, WDT_ON);
 }
 
 /*
@@ -245,12 +246,14 @@ config_watchdog(uint64_t timeout, int new_state)
 	uint64_t time_remaining;
 	uint64_t ret;
 
-	watchdog_activated = new_state;
-	ret = hv_mach_set_watchdog(timeout, &time_remaining);
-	if (ret != H_EOK) {
-		cmn_err(CE_WARN, "Failed to operate on the watchdog. "
-		    "Error = 0x%lx", ret);
-		watchdog_enabled = 0;
+	if (watchdog_initialized) {
+		watchdog_activated = new_state;
+		ret = hv_mach_set_watchdog(timeout, &time_remaining);
+		if (ret != H_EOK) {
+			cmn_err(CE_WARN, "Failed to operate on the watchdog. "
+			    "Error = 0x%lx", ret);
+			watchdog_enabled = 0;
+		}
 	}
 }
 
