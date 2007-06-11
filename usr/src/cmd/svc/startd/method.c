@@ -954,11 +954,6 @@ assured_kill:
 			if (contract_is_empty(inst->ri_i.i_primary_ctid))
 				break;
 		}
-		if (r) {
-			result = EFAULT;
-			log_instance(inst, B_TRUE, "Error reading service "
-			    "contract %ld.\n", inst->ri_i.i_primary_ctid);
-		}
 
 		if (timeout != METHOD_TIMEOUT_INFINITE)
 			if (inst->ri_timeout->te_fired)
