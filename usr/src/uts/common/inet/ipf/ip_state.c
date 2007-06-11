@@ -248,7 +248,14 @@ ipf_stack_t *ifs;
 	ifs->ifs_ips_iptq.ifq_head = NULL;
 	ifs->ifs_ips_iptq.ifq_tail = &ifs->ifs_ips_iptq.ifq_head;
 	MUTEX_INIT(&ifs->ifs_ips_iptq.ifq_lock, "ipftq ip tab");
-	ifs->ifs_ips_iptq.ifq_next = NULL;
+	ifs->ifs_ips_iptq.ifq_next = &ifs->ifs_ips_deletetq;
+	/* entry's ttl in deletetq is just 1 tick */
+	ifs->ifs_ips_deletetq.ifq_ttl = (u_long) 1;
+	ifs->ifs_ips_deletetq.ifq_ref = 1;
+	ifs->ifs_ips_deletetq.ifq_head = NULL;
+	ifs->ifs_ips_deletetq.ifq_tail = &ifs->ifs_ips_deletetq.ifq_head;
+	MUTEX_INIT(&ifs->ifs_ips_deletetq.ifq_lock, "state delete queue");
+	ifs->ifs_ips_deletetq.ifq_next = NULL;
 
 	RWLOCK_INIT(&ifs->ifs_ipf_state, "ipf IP state rwlock");
 	MUTEX_INIT(&ifs->ifs_ipf_stinsert, "ipf state insert mutex");
@@ -300,6 +307,7 @@ ipf_stack_t *ifs;
 		MUTEX_DESTROY(&ifs->ifs_ips_udpacktq.ifq_lock);
 		MUTEX_DESTROY(&ifs->ifs_ips_icmpacktq.ifq_lock);
 		MUTEX_DESTROY(&ifs->ifs_ips_iptq.ifq_lock);
+		MUTEX_DESTROY(&ifs->ifs_ips_deletetq.ifq_lock);
 	}
 
 	if (ifs->ifs_ips_table != NULL) {
@@ -1326,6 +1334,35 @@ ipstate_t *is;
 	tdata = &is->is_tcp.ts_data[source];
 
 	MUTEX_ENTER(&is->is_lock);
+
+	/*
+	 * If a SYN packet is received for a connection that is in a half
+	 * closed state, then move its state entry to deletetq. In such case
+	 * the SYN packet will be consequently dropped. This allows new state
+	 * entry to be created with a retransmited SYN packet.
+	 */
+	if ((tcp->th_flags & TH_OPENING) == TH_SYN) {
+		if (((is->is_state[source] > IPF_TCPS_ESTABLISHED) ||
+		    (is->is_state[source] == IPF_TCPS_CLOSED)) &&
+		    ((is->is_state[!source] > IPF_TCPS_ESTABLISHED) ||
+		    (is->is_state[!source] == IPF_TCPS_CLOSED))) {
+			/*
+			 * Do not update is->is_sti.tqe_die in case state entry
+			 * is already present in deletetq. It prevents state
+			 * entry ttl update by retransmitted SYN packets, which
+			 * may arrive before timer tick kicks off. The SYN
+			 * packet will be dropped again.
+			 */
+			if (is->is_sti.tqe_ifq != &ifs->ifs_ips_deletetq)
+				fr_movequeue(&is->is_sti, is->is_sti.tqe_ifq,
+					&fin->fin_ifs->ifs_ips_deletetq,
+					fin->fin_ifs);
+
+			MUTEX_EXIT(&is->is_lock);
+			return 0;
+		}
+	}
+
 	if (fr_tcpinwindow(fin, fdata, tdata, tcp, is->is_flags)) {
 #ifdef	IPFILTER_SCAN
 		if (is->is_flags & (IS_SC_CLIENT|IS_SC_SERVER)) {

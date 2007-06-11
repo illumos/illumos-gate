@@ -267,6 +267,7 @@ struct ipf_stack {
 	ipftq_t			ifs_ips_iptq;
 	ipftq_t			ifs_ips_icmptq;
 	ipftq_t			ifs_ips_icmpacktq;
+	ipftq_t			ifs_ips_deletetq;
 	ipftq_t			*ifs_ips_utqe;
 	int			ifs_ipstate_logging;
 	ipstate_t		*ifs_ips_list;
