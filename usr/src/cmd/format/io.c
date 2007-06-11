@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1211,7 +1210,7 @@ gigabytes\n",
 			/*
 			 * Convert token from megabytes to a block number.
 			 */
-			if (sscanf(cleantoken, "%f2", &nmegs) == 0) {
+			if (sscanf(cleantoken, "%f2", &nmegs) != 1) {
 				err_print("`%s' is not recognized\n",
 				    cleantoken);
 				break;
@@ -1237,7 +1236,7 @@ gigabytes\n",
 			/*
 			 * Convert token from gigabytes to a block number.
 			 */
-			if (sscanf(cleantoken, "%f2", &ngigs) == 0) {
+			if (sscanf(cleantoken, "%f2", &ngigs) != 1) {
 				err_print("`%s' is not recognized\n",
 				    cleantoken);
 				break;
@@ -1451,7 +1450,7 @@ megabytes or %1.2f gigabytes\n",
 			 * Convert token from megabytes to a
 			 * block number.
 			 */
-			if (sscanf(cleantoken, "%f2", &nmegs) == 0) {
+			if (sscanf(cleantoken, "%f2", &nmegs) != 1) {
 				err_print("`%s' is not recognized\n",
 				    cleantoken);
 				break;
@@ -1482,7 +1481,7 @@ megabytes or %1.2f gigabytes\n",
 			 * Convert token from gigabytes to a
 			 * block number.
 			 */
-			if (sscanf(cleantoken, "%f2", &ngigs) == 0) {
+			if (sscanf(cleantoken, "%f2", &ngigs) != 1) {
 				err_print("`%s' is not recognized\n",
 				    cleantoken);
 				break;
@@ -1646,7 +1645,7 @@ megabytes or %1.2f gigabytes\n",
 			 * Convert token from megabytes to a
 			 * block number.
 			 */
-			if (sscanf(cleantoken, "%f2", &nmegs) == 0) {
+			if (sscanf(cleantoken, "%f2", &nmegs) != 1) {
 				err_print("`%s' is not recognized\n",
 				    cleantoken);
 				break;
@@ -1663,7 +1662,7 @@ megabytes or %1.2f gigabytes\n",
 			return (mb2bn(nmegs));
 
 		case 'g':
-			if (sscanf(cleantoken, "%f2", &nmegs) == 0) {
+			if (sscanf(cleantoken, "%f2", &nmegs) != 1) {
 				err_print("`%s' is not recognized\n",
 				    cleantoken);
 				break;
@@ -1676,7 +1675,7 @@ megabytes or %1.2f gigabytes\n",
 			return (gb2bn(nmegs));
 
 		case 't':
-			if (sscanf(cleantoken, "%f2", &nmegs) == 0) {
+			if (sscanf(cleantoken, "%f2", &nmegs) != 1) {
 				err_print("`%s' is not recognized\n",
 				    cleantoken);
 				break;
@@ -2168,10 +2167,10 @@ void
 pr_dblock(void (*func)(char *, ...), diskaddr_t bn)
 {
 	if (cur_label == L_TYPE_SOLARIS) {
-	    (*func)("%d/%d/%d", bn2c((daddr_t)bn),
-		bn2h((daddr_t)bn), bn2s((daddr_t)bn));
+		(*func)("%d/%d/%d", bn2c((daddr_t)bn),
+		    bn2h((daddr_t)bn), bn2s((daddr_t)bn));
 	} else {
-	    (*func)("%llu", bn);
+		(*func)("%llu", bn);
 	}
 }
 
