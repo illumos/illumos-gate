@@ -705,7 +705,7 @@ print_element(const uint8_t *data, const fru_regdef_t *def,
 			if (elem_name != NULL) {
 				(void) memcpy(tmpdata, data, def->payloadLen);
 				new_def = fru_reg_lookup_def_by_name(elem_name);
-				snprintf(path, sizeof (path),
+				(void) snprintf(path, sizeof (path),
 				"/Status_EventsR[%d]/Message(FMA)", iterglobal);
 				parent_path = path;
 				print_element(tmpdata, new_def,
