@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -255,15 +255,15 @@ init_stubs(struct modctl *modp, struct mod_modinfo *mp)
 	for (i = 0; sp->mods_func_adr; i++, sp++) {
 		funcname = modgetsymname(sp->mods_stub_adr, &offset);
 		if (funcname == NULL) {
-		    printf("init_stubs: couldn't find symbol in module %s\n",
-			mp->modm_module_name);
+			printf("init_stubs: couldn't find symbol "
+			    "in module %s\n", mp->modm_module_name);
 			return (EFAULT);
 		}
 		funcadr = kobj_lookup(modp->mod_mp, funcname);
 
 		if (kobj_addrcheck(modp->mod_mp, (caddr_t)funcadr)) {
 			printf("%s:%s() not defined properly\n",
-				mp->modm_module_name, funcname);
+			    mp->modm_module_name, funcname);
 			return (EFAULT);
 		}
 		sp->mods_func_adr = funcadr;
@@ -397,6 +397,9 @@ impl_make_parlist(major_t major)
 		if (i_ddi_prop_search(DDI_DEV_T_ANY, DDI_FORCEATTACH,
 		    DDI_PROP_TYPE_INT, &props))
 			dnp->dn_flags |= DN_FORCE_ATTACH;
+		if (i_ddi_prop_search(DDI_DEV_T_ANY, DDI_OPEN_RETURNS_EINTR,
+		    DDI_PROP_TYPE_INT, &props))
+			dnp->dn_flags |= DN_OPEN_RETURNS_EINTR;
 	}
 
 	if (i_ddi_prop_search(DDI_DEV_T_ANY, DDI_VHCI_CLASS,
@@ -1005,7 +1008,7 @@ hwc_get_child_spec(dev_info_t *dip, major_t match_major)
 	 * name can duplicate it.
 	 */
 	pathname = (dip == ddi_root_node()) ? "/" :
-		ddi_pathname(dip, pathname_buf);
+	    ddi_pathname(dip, pathname_buf);
 	ASSERT(pathname != NULL);
 	ASSERT(*pathname == '/');
 
@@ -1024,11 +1027,10 @@ hwc_get_child_spec(dev_info_t *dip, major_t match_major)
 		 */
 		ASSERT(*deviname == '/');
 		deviname++;
-		if ((*deviname != '\0') &&
-		    (mod_hash_find(hwc_par_hash,
-			(mod_hash_key_t)deviname, &val) == 0))
-				hwc_spec_add(&list,
-				    (struct hwc_spec *)val, match_major);
+		if ((*deviname != '\0') && (mod_hash_find(hwc_par_hash,
+		    (mod_hash_key_t)deviname, &val) == 0))
+			hwc_spec_add(&list,
+			    (struct hwc_spec *)val, match_major);
 	}
 
 	/*
@@ -1039,10 +1041,10 @@ hwc_get_child_spec(dev_info_t *dip, major_t match_major)
 	if (*parname != '\0') {
 		ASSERT(*parname != '/');
 		if ((strcmp(parname, deviname) != 0) &&
-			(mod_hash_find(hwc_par_hash,
-			    (mod_hash_key_t)parname, &val) == 0)) {
-				hwc_spec_add(&list,
-				    (struct hwc_spec *)val, match_major);
+		    (mod_hash_find(hwc_par_hash,
+		    (mod_hash_key_t)parname, &val) == 0)) {
+			hwc_spec_add(&list,
+			    (struct hwc_spec *)val, match_major);
 		}
 	}
 

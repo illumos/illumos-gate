@@ -199,38 +199,40 @@ extern vnode_t *rconsvp;
 /*
  * Acquire the serial lock on the common snode.
  */
-#define	LOCK_CSP(csp)					\
-	mutex_enter(&csp->s_lock);			\
-	while (csp->s_flag & SLOCKED) {			\
-		csp->s_flag |= SWANT;			\
-		cv_wait(&csp->s_cv, &csp->s_lock);	\
-	}						\
-	csp->s_flag |= SLOCKED;				\
-	mutex_exit(&csp->s_lock);
-
-#define	LOCK_CSP_SIG(csp)	lock_csp_sig(csp)
+#define	LOCK_CSP(csp)			(void) spec_lockcsp(csp, 0, 1, 0)
+#define	LOCKHOLD_CSP_SIG(csp)		spec_lockcsp(csp, 1, 1, 1)
+#define	SYNCHOLD_CSP_SIG(csp, intr)	spec_lockcsp(csp, intr, 0, 1)
 
 /*
- * Acquire the serial lock on the common snode checking for a signal.
- * cv_wait_sig is used to allow signals to pull us out.
- * Return 1 if locked, 0 if interrupted
+ * Synchronize with active SLOCKED, optionally checking for a signal and
+ * optionally returning with SLOCKED set and SN_HOLD done.  The 'intr'
+ * argument determines if the thread is interruptible by a signal while
+ * waiting, the function returns 0 if interrupted.  When 1 is returned
+ * the 'hold' argument determines if the open count (SN_HOLD) has been
+ * incremented and the 'setlock' argument determines if the function
+ * returns with SLOCKED set.
  */
 static int
-lock_csp_sig(struct snode *csp)
+spec_lockcsp(struct snode *csp, int intr, int setlock, int hold)
 {
 	mutex_enter(&csp->s_lock);
 	while (csp->s_flag & SLOCKED) {
 		csp->s_flag |= SWANT;
-		if (!cv_wait_sig(&csp->s_cv, &csp->s_lock)) {
-			mutex_exit(&csp->s_lock);
-			/* interrupted */
-			return (0);
+		if (intr) {
+			if (!cv_wait_sig(&csp->s_cv, &csp->s_lock)) {
+				mutex_exit(&csp->s_lock);
+				return (0);		/* interrupted */
+			}
+		} else {
+			cv_wait(&csp->s_cv, &csp->s_lock);
 		}
 	}
-	csp->s_flag |= SLOCKED;
+	if (setlock)
+		csp->s_flag |= SLOCKED;
+	if (hold)
+		csp->s_count++;		/* one more open reference : SN_HOLD */
 	mutex_exit(&csp->s_lock);
-
-	return (1);
+	return (1);			/* serialized/locked */
 }
 
 /*
@@ -503,6 +505,7 @@ spec_open(struct vnode **vpp, int flag, struct cred *cr)
 	struct stdata *stp;
 	dev_info_t *dip;
 	int error, type;
+	int open_returns_eintr;
 
 	flag &= ~FCREAT;		/* paranoia */
 
@@ -564,7 +567,24 @@ spec_open(struct vnode **vpp, int flag, struct cred *cr)
 	if (STREAMSTAB(maj))
 		goto streams_open;
 
-	SN_HOLD(csp);			/* increment open count */
+	/*
+	 * Wait for in progress last close to complete. This guarantees
+	 * to the driver writer that we will never be in the drivers
+	 * open and close on the same (dev_t, otype) at the same time.
+	 * Open count already incremented (SN_HOLD) on non-zero return.
+	 * The wait is interruptible by a signal if the driver sets the
+	 * D_OPEN_RETURNS_EINTR cb_ops(9S) cb_flag or sets the
+	 * ddi-open-returns-eintr(9P) property in its driver.conf.
+	 */
+	if ((devopsp[maj]->devo_cb_ops->cb_flag & D_OPEN_RETURNS_EINTR) ||
+	    (devnamesp[maj].dn_flags & DN_OPEN_RETURNS_EINTR))
+		open_returns_eintr = 1;
+	else
+		open_returns_eintr = 0;
+	while (SYNCHOLD_CSP_SIG(csp, open_returns_eintr) == 0) {
+		if (csp->s_flag & SCLOSING)
+			return (EINTR);
+	}
 
 	/* non streams open */
 	type = (vp->v_type == VBLK ? OTYP_BLK : OTYP_CHR);
@@ -629,9 +649,15 @@ spec_open(struct vnode **vpp, int flag, struct cred *cr)
 		if (csp->s_flag & (SCLONE | SSELFCLONE))
 			csp->s_flag &= ~SDIPSET;
 
+		csp->s_flag |= SCLOSING;
 		mutex_exit(&csp->s_lock);
+
 		ASSERT(*vpp != NULL);
 		(void) device_close(*vpp, flag, cr);
+
+		mutex_enter(&csp->s_lock);
+		csp->s_flag &= ~SCLOSING;
+		mutex_exit(&csp->s_lock);
 	} else {
 		mutex_exit(&csp->s_lock);
 	}
@@ -642,20 +668,20 @@ streams_open:
 		return (ENXIO);
 
 	/*
-	 * Lock common snode to prevent any new clone opens
-	 * on this stream while one is in progress.
-	 * This is necessary since the stream currently
-	 * associated with the clone device will not be part
-	 * of it after the clone open completes.
-	 * Unfortunately we don't know in advance if this is
-	 * a clone device so we have to lock all opens.
+	 * Lock common snode to prevent any new clone opens on this
+	 * stream while one is in progress. This is necessary since
+	 * the stream currently associated with the clone device will
+	 * not be part of it after the clone open completes. Unfortunately
+	 * we don't know in advance if this is a clone
+	 * device so we have to lock all opens.
 	 *
-	 * If we fail, it's because of an interrupt.
+	 * If we fail, it's because of an interrupt - EINTR return is an
+	 * expected aspect of opening a stream so we don't need to check
+	 * D_OPEN_RETURNS_EINTR. Open count already incremented (SN_HOLD)
+	 * on non-zero return.
 	 */
-	if (LOCK_CSP_SIG(csp) == 0)
+	if (LOCKHOLD_CSP_SIG(csp) == 0)
 		return (EINTR);
-
-	SN_HOLD(csp);			/* increment open count */
 
 	error = stropen(cvp, &newdev, flag, cr);
 	stp = cvp->v_stream;
@@ -798,6 +824,7 @@ spec_close(
 		if (csp->s_flag & (SCLONE | SSELFCLONE))
 			csp->s_flag &= ~SDIPSET;
 
+		csp->s_flag |= SCLOSING;
 		mutex_exit(&csp->s_lock);
 		error = device_close(vp, flag, cr);
 
@@ -808,6 +835,7 @@ spec_close(
 			ddi_rele_driver(getmajor(dev));
 		}
 		mutex_enter(&csp->s_lock);
+		csp->s_flag &= ~SCLOSING;
 	}
 
 	UNLOCK_CSP_LOCK_HELD(csp);
@@ -886,10 +914,10 @@ spec_read(
 
 		if (vpm_enable) {
 			error = vpm_data_copy(blkvp, (u_offset_t)(off + on),
-				n, uiop, 1, NULL, 0, S_READ);
+			    n, uiop, 1, NULL, 0, S_READ);
 		} else {
 			base = segmap_getmapflt(segkmap, blkvp,
-				(u_offset_t)(off + on), n, 1, S_READ);
+			    (u_offset_t)(off + on), n, 1, S_READ);
 
 			error = uiomove(base + on, n, UIO_READ, uiop);
 		}
@@ -1005,7 +1033,7 @@ spec_write(
 		newpage = 0;
 		if (vpm_enable) {
 			error = vpm_data_copy(blkvp, (u_offset_t)(off + on),
-				n, uiop, !pagecreate, NULL, 0, S_WRITE);
+			    n, uiop, !pagecreate, NULL, 0, S_WRITE);
 		} else {
 			base = segmap_getmapflt(segkmap, blkvp,
 			    (u_offset_t)(off + on), n, !pagecreate, S_WRITE);
@@ -1017,7 +1045,7 @@ spec_write(
 
 			if (pagecreate)
 				newpage = segmap_pagecreate(segkmap, base + on,
-					n, 0);
+				    n, 0);
 
 			error = uiomove(base + on, n, UIO_WRITE, uiop);
 		}
@@ -1054,7 +1082,7 @@ spec_write(
 		 */
 		if (!vpm_enable && newpage)
 			segmap_pageunlock(segkmap, base + on,
-				(size_t)n, S_WRITE);
+			    (size_t)n, S_WRITE);
 
 		if (error == 0) {
 			int flags = 0;
@@ -1555,8 +1583,8 @@ spec_getpage(
 	if (vp->v_flag & VNOMAP)
 		return (ENOSYS);
 	TRACE_4(TR_FAC_SPECFS, TR_SPECFS_GETPAGE,
-		"specfs getpage:vp %p off %llx len %ld snode %p",
-		vp, off, len, sp);
+	    "specfs getpage:vp %p off %llx len %ld snode %p",
+	    vp, off, len, sp);
 
 	switch (vp->v_type) {
 	case VBLK:
@@ -1625,7 +1653,7 @@ spec_getapage(
 
 	sp = VTOS(vp);
 	TRACE_3(TR_FAC_SPECFS, TR_SPECFS_GETAPAGE,
-		"specfs getapage:vp %p off %llx snode %p", vp, off, sp);
+	    "specfs getapage:vp %p off %llx snode %p", vp, off, sp);
 reread:
 
 	err = 0;
@@ -1818,8 +1846,8 @@ spec_putpage(
 
 	ASSERT(vp->v_type == VBLK && cvp == vp);
 	TRACE_4(TR_FAC_SPECFS, TR_SPECFS_PUTPAGE,
-		"specfs putpage:vp %p off %llx len %ld snode %p",
-		vp, off, len, sp);
+	    "specfs putpage:vp %p off %llx len %ld snode %p",
+	    vp, off, len, sp);
 
 	if (len == 0) {
 		/*
@@ -1846,11 +1874,11 @@ spec_putpage(
 			 */
 			if ((flags & B_INVAL) || ((flags & B_ASYNC) == 0)) {
 				pp = page_lookup(vp, io_off,
-					(flags & (B_INVAL | B_FREE)) ?
-					    SE_EXCL : SE_SHARED);
+				    (flags & (B_INVAL | B_FREE)) ?
+				    SE_EXCL : SE_SHARED);
 			} else {
 				pp = page_lookup_nowait(vp, io_off,
-					(flags & B_FREE) ? SE_EXCL : SE_SHARED);
+				    (flags & B_FREE) ? SE_EXCL : SE_SHARED);
 			}
 
 			if (pp == NULL || pvn_getdirty(pp, flags) == 0)
@@ -1919,7 +1947,7 @@ spec_putapage(
 	 * Find a kluster that fits in one contiguous chunk.
 	 */
 	pp = pvn_write_kluster(vp, pp, &tmpoff, &io_len, blkoff,
-		blksz, flags);
+	    blksz, flags);
 	io_off = tmpoff;
 
 	/*
@@ -1947,8 +1975,8 @@ spec_putapage(
 	if (lenp)
 		*lenp = io_len;
 	TRACE_4(TR_FAC_SPECFS, TR_SPECFS_PUTAPAGE,
-		"specfs putapage:vp %p offp %p snode %p err %d",
-		vp, offp, sp, err);
+	    "specfs putapage:vp %p offp %p snode %p err %d",
+	    vp, offp, sp, err);
 	return (err);
 }
 
@@ -2036,8 +2064,8 @@ spec_segmap(
 	if ((mapfunc = devopsp[getmajor(dev)]->devo_cb_ops->cb_mmap) == nodev)
 		return (ENODEV);
 	TRACE_4(TR_FAC_SPECFS, TR_SPECFS_SEGMAP,
-		"specfs segmap:dev %x as %p len %lx prot %x",
-		dev, as, len, prot);
+	    "specfs segmap:dev %x as %p len %lx prot %x",
+	    dev, as, len, prot);
 
 	/*
 	 * Character devices that support the d_mmap
@@ -2106,7 +2134,7 @@ spec_char_map(
 	int (*segmap)(dev_t, off_t, struct as *,
 	    caddr_t *, off_t, uint_t, uint_t, uint_t, cred_t *);
 	int (*devmap)(dev_t, devmap_cookie_t, offset_t,
-		size_t, size_t *, uint_t);
+	    size_t, size_t *, uint_t);
 	int (*mmap)(dev_t dev, off_t off, int prot);
 
 	/*

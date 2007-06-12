@@ -315,6 +315,7 @@ typedef enum {
 #define	DDI_NO_AUTODETACH	"ddi-no-autodetach"
 #define	DDI_VHCI_CLASS		"ddi-vhci-class"
 #define	DDI_NO_ROOT_SUPPORT	"ddi-no-root-support"
+#define	DDI_OPEN_RETURNS_EINTR	"ddi-open-returns-eintr"
 
 /*
  * Values that the function supplied to the dev_info

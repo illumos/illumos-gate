@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,12 +79,13 @@ struct devnames {
 #define	DN_TAKEN_GETUDEV	0x0040	/* getudev() used this entry */
 #define	DN_DRIVER_REMOVED	0x0080	/* driver entry removed */
 
-#define	DN_FORCE_ATTACH		0x0100	/* ddi-forceattach prop */
+#define	DN_FORCE_ATTACH		0x0100	/* DDI_FORCEATTACH prop */
 #define	DN_LEAF_DRIVER		0x0200	/* this is a leaf driver */
 #define	DN_NETWORK_DRIVER	0x0400	/* network interface driver */
 #define	DN_NO_AUTODETACH	0x0800	/* no autodetach */
 #define	DN_GLDV3_DRIVER		0x1000	/* gldv3 (Nemo) driver */
 #define	DN_PHCI_DRIVER		0x2000	/* pHCI driver */
+#define	DN_OPEN_RETURNS_EINTR	0x4000	/* DDI_OPEN_RETURNS_EINTR prop */
 
 #ifdef _KERNEL
 

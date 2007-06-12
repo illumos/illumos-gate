@@ -376,7 +376,8 @@ static struct cb_ops st_cb_ops = {
 	nochpoll,		/* poll */
 	ddi_prop_op,		/* cb_prop_op */
 	0,			/* streamtab  */
-	D_64BIT | D_MP | D_NEW | D_HOTPLUG,	/* Driver compatibility flag */
+	D_64BIT | D_MP | D_NEW | D_HOTPLUG |
+	D_OPEN_RETURNS_EINTR,	/* cb_flag */
 	CB_REV,			/* cb_rev */
 	st_aread, 		/* async I/O read entry point */
 	st_awrite		/* async I/O write entry point */
@@ -571,7 +572,7 @@ static struct modlinkage modlinkage = {
 int
 _init(void)
 {
-	int e;
+	int	e;
 
 	if (((e = ddi_soft_state_init(&st_state,
 	    sizeof (struct scsi_tape), ST_MAXUNIT)) != 0)) {

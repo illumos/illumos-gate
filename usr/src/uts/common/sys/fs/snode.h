@@ -118,6 +118,7 @@ struct snode {
 					/* been multiplexed */
 #define	SSELFCLONE	0x2000		/* represents a self cloning device */
 #define	SNOFLUSH	0x4000		/* do not flush device on fsync */
+#define	SCLOSING	0x8000		/* in last close(9E) */
 
 #ifdef _KERNEL
 /*
