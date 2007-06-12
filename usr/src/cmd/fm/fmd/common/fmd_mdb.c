@@ -304,9 +304,15 @@ static int
 hash_walk_init(mdb_walk_state_t *wsp, uintptr_t addr, uint_t hashlen,
     const char *name, size_t size, size_t next)
 {
-	hashwalk_data_t *hwp = mdb_alloc(sizeof (hashwalk_data_t), UM_SLEEP);
+	hashwalk_data_t *hwp;
 	size_t len = sizeof (uintptr_t) * hashlen;
 
+	if (len == 0) {
+		mdb_warn("failed to walk hash: invalid hash length\n");
+		return (WALK_ERR);
+	}
+
+	hwp = mdb_alloc(sizeof (hashwalk_data_t), UM_SLEEP);
 	hwp->hw_hash = mdb_zalloc(len, UM_SLEEP);
 	(void) mdb_vread(hwp->hw_hash, len, addr);
 	hwp->hw_hashlen = hashlen;

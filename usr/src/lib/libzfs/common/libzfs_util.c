@@ -490,9 +490,8 @@ zfs_nicenum(uint64_t num, char *buf, size_t buflen)
 		 */
 		int i;
 		for (i = 2; i >= 0; i--) {
-			(void) snprintf(buf, buflen, "%.*f%c", i,
-			    (double)num / (1ULL << 10 * index), u);
-			if (strlen(buf) <= 5)
+			if (snprintf(buf, buflen, "%.*f%c", i,
+			    (double)num / (1ULL << 10 * index), u) <= 5)
 				break;
 		}
 	}

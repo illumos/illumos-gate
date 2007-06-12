@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,9 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *ashift)
 	vdev_disk_t *dvd;
 	struct dk_minfo dkm;
 	int error;
+	dev_t dev;
+	char *physpath, *minorname;
+	int otyp;
 
 	/*
 	 * We must have a pathname, and it must be absolute.
@@ -141,9 +144,54 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *ashift)
 		error = ldi_open_by_devid(dvd->vd_devid, dvd->vd_minor,
 		    spa_mode, kcred, &dvd->vd_lh, zfs_li);
 
+	/*
+	 * If all else fails, then try opening by physical path (if available)
+	 * or the logical path (if we failed due to the devid check).  While not
+	 * as reliable as the devid, this will give us something, and the higher
+	 * level vdev validation will prevent us from opening the wrong device.
+	 */
+	if (error) {
+		if (vd->vdev_physpath != NULL &&
+		    (dev = ddi_pathname_to_dev_t(vd->vdev_physpath)) != ENODEV)
+			error = ldi_open_by_dev(&dev, OTYP_BLK, spa_mode,
+			    kcred, &dvd->vd_lh, zfs_li);
+
+		/*
+		 * Note that we don't support the legacy auto-wholedisk support
+		 * as above.  This hasn't been used in a very long time and we
+		 * don't need to propagate its oddities to this edge condition.
+		 */
+		if (error && vd->vdev_path != NULL)
+			error = ldi_open_by_name(vd->vdev_path, spa_mode, kcred,
+			    &dvd->vd_lh, zfs_li);
+	}
+
 	if (error) {
 		vd->vdev_stat.vs_aux = VDEV_AUX_OPEN_FAILED;
 		return (error);
+	}
+
+	/*
+	 * Once a device is opened, verify that the physical device path (if
+	 * available) is up to date.
+	 */
+	if (ldi_get_dev(dvd->vd_lh, &dev) == 0 &&
+	    ldi_get_otyp(dvd->vd_lh, &otyp) == 0) {
+		physpath = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+		minorname = NULL;
+		if (ddi_dev_pathname(dev, otyp, physpath) == 0 &&
+		    ldi_get_minor_name(dvd->vd_lh, &minorname) == 0 &&
+		    (vd->vdev_physpath == NULL ||
+		    strcmp(vd->vdev_physpath, physpath) != 0)) {
+			if (vd->vdev_physpath)
+				spa_strfree(vd->vdev_physpath);
+			(void) strlcat(physpath, ":", MAXPATHLEN);
+			(void) strlcat(physpath, minorname, MAXPATHLEN);
+			vd->vdev_physpath = spa_strdup(physpath);
+		}
+		if (minorname)
+			kmem_free(minorname, strlen(minorname) + 1);
+		kmem_free(physpath, MAXPATHLEN);
 	}
 
 	/*
@@ -190,10 +238,6 @@ vdev_disk_close(vdev_t *vd)
 
 	if (dvd == NULL)
 		return;
-
-	dprintf("removing disk %s, devid %s\n",
-	    vd->vdev_path ? vd->vdev_path : "<none>",
-	    vd->vdev_devid ? vd->vdev_devid : "<none>");
 
 	if (dvd->vd_minor != NULL)
 		ddi_devid_str_free(dvd->vd_minor);
@@ -340,6 +384,10 @@ vdev_disk_io_start(zio_t *zio)
 static void
 vdev_disk_io_done(zio_t *zio)
 {
+	vdev_t *vd = zio->io_vd;
+	vdev_disk_t *dvd = vd->vdev_tsd;
+	int state;
+
 	vdev_queue_io_done(zio);
 
 	if (zio->io_type == ZIO_TYPE_WRITE)
@@ -347,6 +395,21 @@ vdev_disk_io_done(zio_t *zio)
 
 	if (zio_injection_enabled && zio->io_error == 0)
 		zio->io_error = zio_handle_device_injection(zio->io_vd, EIO);
+
+	/*
+	 * If the device returned EIO, then attempt a DKIOCSTATE ioctl to see if
+	 * the device has been removed.  If this is the case, then we trigger an
+	 * asynchronous removal of the device.
+	 */
+	if (zio->io_error == EIO) {
+		state = DKIO_NONE;
+		if (ldi_ioctl(dvd->vd_lh, DKIOCSTATE, (intptr_t)&state,
+		    FKIOCTL, kcred, NULL) == 0 &&
+		    state != DKIO_INSERTED) {
+			vd->vdev_remove_wanted = B_TRUE;
+			spa_async_request(zio->io_spa, SPA_ASYNC_REMOVE);
+		}
+	}
 
 	zio_next_stage(zio);
 }

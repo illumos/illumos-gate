@@ -1020,7 +1020,7 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, char *pool_name,
 
 			break;
 
-		case ZFS_PROP_BOOTFS:
+		case ZPOOL_PROP_BOOTFS:
 			/*
 			 * bootfs property value has to be a dataset name and
 			 * the dataset has to be in the same pool as it sets to.
@@ -3568,7 +3568,7 @@ zfs_get_user_props(zfs_handle_t *zhp)
 }
 
 /*
- * Given a comma-separated list of properties, contruct a property list
+ * Given a comma-separated list of properties, construct a property list
  * containing both user-defined and native properties.  This function will
  * return a NULL list if 'all' is specified, which can later be expanded on a
  * per-dataset basis by zfs_expand_proplist().
@@ -3631,7 +3631,8 @@ zfs_get_proplist_common(libzfs_handle_t *hdl, char *fields,
 		 */
 		c = s[len];
 		s[len] = '\0';
-		prop = zfs_name_to_prop_common(s, type);
+		prop = type == ZFS_TYPE_POOL ? zpool_name_to_prop(s) :
+		    zfs_name_to_prop(s);
 
 		if (prop != ZFS_PROP_INVAL &&
 		    !zfs_prop_valid_for_type(prop, type))

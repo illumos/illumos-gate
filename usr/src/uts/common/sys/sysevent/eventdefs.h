@@ -51,6 +51,7 @@ extern "C" {
 #define	EC_DEV_REMOVE	"EC_dev_remove"	/* device remove event class */
 #define	EC_DEV_BRANCH	"EC_dev_branch"	/* device tree branch event class */
 #define	EC_FM		"EC_fm"		/* FMA error report event */
+#define	EC_ZFS		"EC_zfs"	/* ZFS event */
 
 /*
  * The following event class is reserved for exclusive use
@@ -214,6 +215,17 @@ extern "C" {
 #define	ESC_ACPIEV_WARN			"ESC_acpiev_warn"
 #define	ESC_ACPIEV_LOW			"ESC_acpiev_low"
 #define	ESC_ACPIEV_STATE_CHANGE		"ESC_acpiev_state_change"
+
+/*
+ * ZFS subclass definitions.  supporting attributes (name/value paris) are found
+ * in sys/fs/zfs.h
+ */
+#define	ESC_ZFS_RESILVER_START	"ESC_ZFS_resilver_start"
+#define	ESC_ZFS_RESILVER_FINISH	"ESC_ZFS_resilver_finish"
+#define	ESC_ZFS_VDEV_REMOVE	"ESC_ZFS_vdev_remove"
+#define	ESC_ZFS_POOL_DESTROY	"ESC_ZFS_pool_destroy"
+#define	ESC_ZFS_VDEV_CLEAR	"ESC_ZFS_vdev_clear"
+#define	ESC_ZFS_VDEV_CHECK	"ESC_ZFS_vdev_check"
 
 #ifdef	__cplusplus
 }

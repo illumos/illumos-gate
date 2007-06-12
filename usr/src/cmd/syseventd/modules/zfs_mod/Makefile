@@ -24,10 +24,19 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-MODULE = zfs-diagnosis
-CLASS = common
-SRCS = zfs_de.c
+LIBRARY=	zfs_mod
 
-include ../../Makefile.plugin
+include ../Makefile.com
 
-LDLIBS += -luutil -lzfs
+LDLIBS += -lzfs -ldevid
+
+.KEEP_STATE:
+
+all: $(DYNLIB)
+
+install: all				\
+	$(ROOTLIBSYSEVENTDIR)		\
+	$(ROOTLIBDIR)			\
+	$(ROOTLIBS)
+
+include ../Makefile.targ

@@ -81,11 +81,11 @@ char _depends_on[]	= "misc/scsi misc/cmlb";
  * Define the interconnect type, to allow the driver to distinguish
  * between parallel SCSI (sd) and fibre channel (ssd) behaviors.
  *
- * This is really for backward compatability. In the future, the driver
+ * This is really for backward compatibility. In the future, the driver
  * should actually check the "interconnect-type" property as reported by
  * the HBA; however at present this property is not defined by all HBAs,
  * so we will use this #define (1) to permit the driver to run in
- * backward-compatability mode; and (2) to print a notification message
+ * backward-compatibility mode; and (2) to print a notification message
  * if an FC HBA does not support the "interconnect-type" property.  The
  * behavior of the driver will be to assume parallel SCSI behaviors unless
  * the "interconnect-type" property is defined by the HBA **AND** has a
@@ -136,7 +136,7 @@ static	char *sd_config_list		= "sd-config-list";
 #if (defined(__fibre))
 /*
  * These #defines are to avoid namespace collisions that occur because this
- * code is currently used to compile two seperate driver modules: sd and ssd.
+ * code is currently used to compile two separate driver modules: sd and ssd.
  * All global variables need to be treated this way (even if declared static)
  * in order to allow the debugger to resolve the names properly.
  * It is anticipated that in the near future the ssd module will be obsoleted,
@@ -539,7 +539,7 @@ static sd_tunables tst_properties = {
 };
 #endif
 
-/* This is similiar to the ANSI toupper implementation */
+/* This is similar to the ANSI toupper implementation */
 #define	SD_TOUPPER(C)	(((C) >= 'a' && (C) <= 'z') ? (C) - 'a' + 'A' : (C))
 
 /*
@@ -797,7 +797,7 @@ static int sd_pm_idletime = 1;
 #if (defined(__fibre))
 /*
  * These #defines are to avoid namespace collisions that occur because this
- * code is currently used to compile two seperate driver modules: sd and ssd.
+ * code is currently used to compile two separate driver modules: sd and ssd.
  * All function names need to be treated this way (even if declared static)
  * in order to allow the debugger to resolve the names properly.
  * It is anticipated that in the near future the ssd module will be obsoleted,
@@ -1674,7 +1674,7 @@ struct sd_sense_info {
 };
 
 /*
- * Table of function pointers for iostart-side routines. Seperate "chains"
+ * Table of function pointers for iostart-side routines. Separate "chains"
  * of layered function calls are formed by placing the function pointers
  * sequentially in the desired order. Functions are called according to an
  * incrementing table index ordering. The last function in each chain must
@@ -1683,9 +1683,9 @@ struct sd_sense_info {
  *
  * Note: It may seem more natural to organize both the iostart and iodone
  * functions together, into an array of structures (or some similar
- * organization) with a common index, rather than two seperate arrays which
+ * organization) with a common index, rather than two separate arrays which
  * must be maintained in synchronization. The purpose of this division is
- * to achiece improved performance: individual arrays allows for more
+ * to achieve improved performance: individual arrays allows for more
  * effective cache line utilization on certain platforms.
  */
 
@@ -2139,7 +2139,7 @@ _init(void)
 	sd_label = mod_modname(&modlinkage);
 
 	err = ddi_soft_state_init(&sd_state, sizeof (struct sd_lun),
-		SD_MAXUNIT);
+	    SD_MAXUNIT);
 
 	if (err != 0) {
 		return (err);
@@ -2481,9 +2481,9 @@ sdprobe(dev_info_t *devi)
 			 */
 
 			if (sd_dtype_optical_bind  < 0) {
-			    sd_dtype_optical_bind = ddi_prop_get_int
-				(DDI_DEV_T_ANY,	devi,	0,
-				"optical-device-bind",	1);
+				sd_dtype_optical_bind = ddi_prop_get_int
+				    (DDI_DEV_T_ANY, devi, 0,
+				    "optical-device-bind", 1);
 			}
 
 			if (sd_dtype_optical_bind == 0) {
@@ -3611,11 +3611,11 @@ sd_process_sdconf_file(struct sd_lun *un)
  *
  *    This function reads the data list from the sd.conf file and pulls
  *    the values that can have numeric values as arguments and places
- *    the values in the apropriate sd_tunables member.
+ *    the values in the appropriate sd_tunables member.
  *    Since the order of the data list members varies across platforms
  *    This function reads them from the data list in a platform specific
  *    order and places them into the correct sd_tunable member that is
- *    a consistant across all platforms.
+ *    consistent across all platforms.
  */
 static void
 sd_get_tunables_from_conf(struct sd_lun *un, int flags, int *data_list,
@@ -4024,7 +4024,7 @@ sd_set_vers1_properties(struct sd_lun *un, int flags, sd_tunables *prop_list)
 	if (flags & SD_CONF_BSET_NO_READ_HEADER) {
 		un->un_f_cfg_no_read_header = TRUE;
 		SD_INFO(SD_LOG_ATTACH_DETACH, un,
-			    "sd_set_vers1_properties: no_read_header set\n");
+		    "sd_set_vers1_properties: no_read_header set\n");
 	}
 	if (flags & SD_CONF_BSET_READ_CD_XD4) {
 		un->un_f_cfg_read_cd_xd4 = TRUE;
@@ -4054,7 +4054,7 @@ sd_set_vers1_properties(struct sd_lun *un, int flags, sd_tunables *prop_list)
 		ASSERT(prop_list != NULL);
 		if (prop_list->sdt_not_rdy_retries) {
 			un->un_notready_retry_count =
-				prop_list->sdt_not_rdy_retries;
+			    prop_list->sdt_not_rdy_retries;
 			SD_INFO(SD_LOG_ATTACH_DETACH, un,
 			    "sd_set_vers1_properties: not ready retry count"
 			    " set to %d\n", un->un_notready_retry_count);
@@ -4074,8 +4074,8 @@ sd_set_vers1_properties(struct sd_lun *un, int flags, sd_tunables *prop_list)
 		case CTYPE_CCS:
 			un->un_ctype = prop_list->sdt_ctype;
 			SD_INFO(SD_LOG_ATTACH_DETACH, un,
-				"sd_set_vers1_properties: ctype set to "
-				"CTYPE_CCS\n");
+			    "sd_set_vers1_properties: ctype set to "
+			    "CTYPE_CCS\n");
 			break;
 		case CTYPE_ROD:		/* RW optical */
 			un->un_ctype = prop_list->sdt_ctype;
@@ -4095,7 +4095,7 @@ sd_set_vers1_properties(struct sd_lun *un, int flags, sd_tunables *prop_list)
 	if (flags & SD_CONF_BSET_BSY_RETRY_COUNT) {
 		ASSERT(prop_list != NULL);
 		un->un_busy_retry_count =
-			prop_list->sdt_busy_retries;
+		    prop_list->sdt_busy_retries;
 		SD_INFO(SD_LOG_ATTACH_DETACH, un,
 		    "sd_set_vers1_properties: "
 		    "busy retry count set to %d\n",
@@ -4106,7 +4106,7 @@ sd_set_vers1_properties(struct sd_lun *un, int flags, sd_tunables *prop_list)
 	if (flags & SD_CONF_BSET_RST_RETRIES) {
 		ASSERT(prop_list != NULL);
 		un->un_reset_retry_count =
-			prop_list->sdt_reset_retries;
+		    prop_list->sdt_reset_retries;
 		SD_INFO(SD_LOG_ATTACH_DETACH, un,
 		    "sd_set_vers1_properties: "
 		    "reset retry count set to %d\n",
@@ -4117,7 +4117,7 @@ sd_set_vers1_properties(struct sd_lun *un, int flags, sd_tunables *prop_list)
 	if (flags & SD_CONF_BSET_RSV_REL_TIME) {
 		ASSERT(prop_list != NULL);
 		un->un_reserve_release_time =
-			prop_list->sdt_reserv_rel_time;
+		    prop_list->sdt_reserv_rel_time;
 		SD_INFO(SD_LOG_ATTACH_DETACH, un,
 		    "sd_set_vers1_properties: "
 		    "reservation release timeout set to %d\n",
@@ -4177,7 +4177,7 @@ sd_set_vers1_properties(struct sd_lun *un, int flags, sd_tunables *prop_list)
 /*
  *   Function: sd_is_lsi()
  *
- *   Description: Check for lsi devices, step throught the static device
+ *   Description: Check for lsi devices, step through the static device
  *	table to match vid/pid.
  *
  *   Args: un - ptr to sd_lun
@@ -5691,8 +5691,8 @@ sd_pm_idletimeout_handler(void *arg)
 		un->un_pm_idle_timeid = NULL;
 	} else {
 		un->un_pm_idle_timeid =
-			timeout(sd_pm_idletimeout_handler, un,
-			(drv_usectohz((clock_t)300000))); /* 300 ms. */
+		    timeout(sd_pm_idletimeout_handler, un,
+		    (drv_usectohz((clock_t)300000))); /* 300 ms. */
 	}
 	mutex_exit(&un->un_pm_mutex);
 	mutex_exit(SD_MUTEX(un));
@@ -6509,7 +6509,7 @@ sd_unit_attach(dev_info_t *devi)
 
 	if (un->un_f_is_fibre == TRUE) {
 		if (scsi_ifgetcap(SD_ADDRESS(un), "scsi-version", 1) ==
-			SCSI_VERSION_3) {
+		    SCSI_VERSION_3) {
 			switch (un->un_interconnect_type) {
 			case SD_INTERCONNECT_FIBRE:
 			case SD_INTERCONNECT_SSA:
@@ -6530,7 +6530,7 @@ sd_unit_attach(dev_info_t *devi)
 
 	/*
 	 * Set un_retry_count with SD_RETRY_COUNT, this is ok for Sparc
-	 * with seperate binary for sd and ssd.
+	 * with separate binary for sd and ssd.
 	 *
 	 * x86 has 1 binary, un_retry_count is set base on connection type.
 	 * The hardcoded values will go away when Sparc uses 1 binary
@@ -6552,7 +6552,7 @@ sd_unit_attach(dev_info_t *devi)
 	 */
 	un->un_notready_retry_count =
 	    ISCD(un) ? CD_NOT_READY_RETRY_COUNT(un)
-			: DISK_NOT_READY_RETRY_COUNT(un);
+	    : DISK_NOT_READY_RETRY_COUNT(un);
 
 	/*
 	 * Set the busy retry count to the default value of un_retry_count.
@@ -6603,16 +6603,16 @@ sd_unit_attach(dev_info_t *devi)
 		un->un_f_allow_bus_device_reset = TRUE;
 	} else {
 		if (ddi_getprop(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
-			"allow-bus-device-reset", 1) != 0) {
+		    "allow-bus-device-reset", 1) != 0) {
 			un->un_f_allow_bus_device_reset = TRUE;
 			SD_INFO(SD_LOG_ATTACH_DETACH, un,
-			"sd_unit_attach: un:0x%p Bus device reset enabled\n",
-				un);
+			    "sd_unit_attach: un:0x%p Bus device reset "
+			    "enabled\n", un);
 		} else {
 			un->un_f_allow_bus_device_reset = FALSE;
 			SD_INFO(SD_LOG_ATTACH_DETACH, un,
-			"sd_unit_attach: un:0x%p Bus device reset disabled\n",
-				un);
+			    "sd_unit_attach: un:0x%p Bus device reset "
+			    "disabled\n", un);
 		}
 	}
 
@@ -7197,11 +7197,12 @@ sd_unit_attach(dev_info_t *devi)
 	 * register or not.
 	 */
 	if (un->un_f_is_fibre) {
-	    if (strcmp(un->un_node_type, DDI_NT_BLOCK_CHAN)) {
-		sd_init_event_callbacks(un);
-		SD_TRACE(SD_LOG_ATTACH_DETACH, un,
-		    "sd_unit_attach: un:0x%p event callbacks inserted", un);
-	    }
+		if (strcmp(un->un_node_type, DDI_NT_BLOCK_CHAN)) {
+			sd_init_event_callbacks(un);
+			SD_TRACE(SD_LOG_ATTACH_DETACH, un,
+			    "sd_unit_attach: un:0x%p event callbacks inserted",
+			    un);
+		}
 	}
 #endif
 
@@ -7324,7 +7325,7 @@ cmlb_attach_failed:
 	}
 
 	if (un->un_f_is_fibre == FALSE) {
-	    (void) scsi_ifsetcap(SD_ADDRESS(un), "auto-rqsense", 0, 1);
+		(void) scsi_ifsetcap(SD_ADDRESS(un), "auto-rqsense", 0, 1);
 	}
 
 spinup_failed:
@@ -7746,8 +7747,8 @@ sd_unit_detach(dev_info_t *devi)
 	 */
 	if (un->un_f_is_fibre == TRUE) {
 		if ((un->un_insert_event != NULL) &&
-			(ddi_remove_event_handler(un->un_insert_cb_id) !=
-				DDI_SUCCESS)) {
+		    (ddi_remove_event_handler(un->un_insert_cb_id) !=
+		    DDI_SUCCESS)) {
 			/*
 			 * Note: We are returning here after having done
 			 * substantial cleanup above. This is consistent
@@ -7755,14 +7756,14 @@ sd_unit_detach(dev_info_t *devi)
 			 * be the right thing to do.
 			 */
 			SD_ERROR(SD_LOG_ATTACH_DETACH, un,
-				"sd_dr_detach: Cannot cancel insert event\n");
+			    "sd_dr_detach: Cannot cancel insert event\n");
 			goto err_remove_event;
 		}
 		un->un_insert_event = NULL;
 
 		if ((un->un_remove_event != NULL) &&
-			(ddi_remove_event_handler(un->un_remove_cb_id) !=
-				DDI_SUCCESS)) {
+		    (ddi_remove_event_handler(un->un_remove_cb_id) !=
+		    DDI_SUCCESS)) {
 			/*
 			 * Note: We are returning here after having done
 			 * substantial cleanup above. This is consistent
@@ -7770,7 +7771,7 @@ sd_unit_detach(dev_info_t *devi)
 			 * be the right thing to do.
 			 */
 			SD_ERROR(SD_LOG_ATTACH_DETACH, un,
-				"sd_dr_detach: Cannot cancel remove event\n");
+			    "sd_dr_detach: Cannot cancel remove event\n");
 			goto err_remove_event;
 		}
 		un->un_remove_event = NULL;
@@ -8270,7 +8271,7 @@ sd_cache_control(struct sd_lun *un, int rcd_flag, int wce_flag)
 	 * will fail.  mode_cache_scsi3 is a superset of mode_caching.
 	 */
 	buflen = hdrlen + MODE_BLK_DESC_LENGTH +
-		sizeof (struct mode_cache_scsi3);
+	    sizeof (struct mode_cache_scsi3);
 
 	header = kmem_zalloc(buflen, KM_SLEEP);
 
@@ -8332,8 +8333,8 @@ sd_cache_control(struct sd_lun *un, int rcd_flag, int wce_flag)
 		 * length of the sense data returned.
 		 */
 		sbuflen =  hdrlen + MODE_BLK_DESC_LENGTH +
-				sizeof (struct mode_page) +
-				(int)mode_caching_page->mode_page.length;
+		    sizeof (struct mode_page) +
+		    (int)mode_caching_page->mode_page.length;
 
 		/*
 		 * Set the caching bits as requested.
@@ -8353,7 +8354,7 @@ sd_cache_control(struct sd_lun *un, int rcd_flag, int wce_flag)
 		 * drive supports it.
 		 */
 		save_pg = mode_caching_page->mode_page.ps ?
-				SD_SAVE_PAGE : SD_DONTSAVE_PAGE;
+		    SD_SAVE_PAGE : SD_DONTSAVE_PAGE;
 
 		/* Clear reserved bits before mode select. */
 		mode_caching_page->mode_page.ps = 0;
@@ -8964,7 +8965,7 @@ sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 		cp = &un->un_ocmap.chkd[0];
 		while (cp < &un->un_ocmap.chkd[OCSIZE]) {
 			if (*cp != (uchar_t)0) {
-			    break;
+				break;
 			}
 			cp++;
 		}
@@ -9116,7 +9117,7 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 		if (un->un_state == SD_STATE_OFFLINE) {
 			if (un->un_f_is_fibre == FALSE) {
 				scsi_log(SD_DEVINFO(un), sd_label,
-					CE_WARN, "offline\n");
+				    CE_WARN, "offline\n");
 			}
 			mutex_exit(SD_MUTEX(un));
 			cmlb_invalidate(un->un_cmlbhandle,
@@ -9838,7 +9839,7 @@ sdawrite(dev_t dev, struct aio_req *aio, cred_t *cred_p)
  *                                     +----> SCSA ---->+
  *
  *
- * This code is based upon the following presumtions:
+ * This code is based upon the following presumptions:
  *
  *   - iostart and iodone functions operate on buf(9S) structures. These
  *     functions perform the necessary operations on the buf(9S) and pass
@@ -9903,7 +9904,7 @@ static int	sd_taskq_maxalloc = SD_TASKQ_MAXALLOC;
 /*
  * The following task queue is being created for the write part of
  * read-modify-write of non-512 block size devices.
- * Limit the number of threads to 1 for now. This number has been choosen
+ * Limit the number of threads to 1 for now. This number has been chosen
  * considering the fact that it applies only to dvd ram drives/MO drives
  * currently. Performance for which is not main criteria at this stage.
  * Note: It needs to be explored if we can use a single taskq in future
@@ -10487,7 +10488,7 @@ sd_uscsi_iodone(int index, struct sd_lun *un, struct buf *bp)
 /*
  *    Function: sd_mapblockaddr_iostart
  *
- * Description: Verify request lies withing the partition limits for
+ * Description: Verify request lies within the partition limits for
  *		the indicated minor device.  Issue "overrun" buf if
  *		request would exceed partition range.  Converts
  *		partition-relative block address to absolute.
@@ -10610,7 +10611,7 @@ sd_mapblockaddr_iostart(int index, struct sd_lun *un, struct buf *bp)
 		ASSERT(bp->b_bcount >= resid);
 
 		bp = sd_bioclone_alloc(bp, count, blocknum,
-			(int (*)(struct buf *)) sd_mapblockaddr_iodone);
+		    (int (*)(struct buf *)) sd_mapblockaddr_iodone);
 		xp = SD_GET_XBUF(bp); /* Update for 'new' bp! */
 		ASSERT(xp != NULL);
 	}
@@ -11756,7 +11757,7 @@ sd_setup_rw_pkt(struct sd_lun *un,
 					 */
 					blockcount -=
 					    SD_BYTES2TGTBLOCKS(un,
-						return_pktp->pkt_resid);
+					    return_pktp->pkt_resid);
 				}
 
 				cdbp = (union scsi_cdb *)return_pktp->pkt_cdbp;
@@ -11767,7 +11768,7 @@ sd_setup_rw_pkt(struct sd_lun *un,
 				 */
 				cdbp->scc_cmd = cp->sc_grpmask |
 				    ((bp->b_flags & B_READ) ?
-					SCMD_READ : SCMD_WRITE);
+				    SCMD_READ : SCMD_WRITE);
 
 				SD_FILL_SCSI1_LUN(un, return_pktp);
 
@@ -12738,7 +12739,7 @@ sd_start_cmds(struct sd_lun *un, struct buf *immed_bp)
 		if ((un->un_state != SD_STATE_SUSPENDED) &&
 		    (un->un_state != SD_STATE_PM_CHANGING)) {
 			New_state(un, SD_STATE_NORMAL);
-		    }
+		}
 
 		xp = SD_GET_XBUF(bp);
 		ASSERT(xp != NULL);
@@ -13012,8 +13013,8 @@ got_pkt:
 				SD_UPDATE_KSTATS(un, kstat_runq_exit, bp);
 				bp = sd_mark_rqs_idle(un, xp);
 				sd_retry_command(un, bp, SD_RETRIES_STANDARD,
-					NULL, NULL, EIO, SD_BSY_TIMEOUT / 500,
-					kstat_waitq_enter);
+				    NULL, NULL, EIO, SD_BSY_TIMEOUT / 500,
+				    kstat_waitq_enter);
 				goto exit;
 			}
 
@@ -13081,7 +13082,7 @@ got_pkt:
 			 * for this condition?
 			 */
 			sd_set_retry_bp(un, bp, SD_BSY_TIMEOUT / 500,
-				kstat_runq_back_to_waitq);
+			    kstat_runq_back_to_waitq);
 			goto exit;
 
 		case TRAN_FATAL_ERROR:
@@ -13180,8 +13181,8 @@ sd_return_command(struct sd_lun *un, struct buf *bp)
 	 * Note:x86: check for the "sdrestart failed" case.
 	 */
 	if (((xp->xb_pkt_flags & SD_XB_USCSICMD) != SD_XB_USCSICMD) &&
-		(geterror(bp) == 0) && (xp->xb_dma_resid != 0) &&
-		(xp->xb_pktp->pkt_resid == 0)) {
+	    (geterror(bp) == 0) && (xp->xb_dma_resid != 0) &&
+	    (xp->xb_pktp->pkt_resid == 0)) {
 
 		if (sd_setup_next_xfer(un, bp, pktp, xp) != 0) {
 			/*
@@ -13407,7 +13408,7 @@ sd_return_failed_command_no_restart(struct sd_lun *un, struct buf *bp,
  *		   is queued for a delayed retry. May be NULL if no kstat
  *		   update is desired.
  *
- *     Context: May be called from interupt context.
+ *     Context: May be called from interrupt context.
  */
 
 static void
@@ -13639,7 +13640,7 @@ sd_retry_command(struct sd_lun *un, struct buf *bp, int retry_check_flag,
 		xp->xb_ua_retry_count++;
 		SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un,
 		    "sd_retry_command: retry count:%d\n",
-			xp->xb_ua_retry_count);
+		    xp->xb_ua_retry_count);
 		break;
 
 	case SD_RETRIES_BUSY:
@@ -14220,22 +14221,22 @@ sd_alloc_rqs(struct scsi_device *devp, struct sd_lun *un)
 		switch (scsi_ifgetcap(SD_ADDRESS(un), "auto-rqsense", 1)) {
 		case 0:
 			SD_INFO(SD_LOG_ATTACH_DETACH, un,
-				"sd_alloc_rqs: HBA supports ARQ\n");
+			    "sd_alloc_rqs: HBA supports ARQ\n");
 			/*
 			 * ARQ is supported by this HBA but currently is not
 			 * enabled. Attempt to enable it and if successful then
 			 * mark this instance as ARQ enabled.
 			 */
 			if (scsi_ifsetcap(SD_ADDRESS(un), "auto-rqsense", 1, 1)
-				== 1) {
+			    == 1) {
 				/* Successfully enabled ARQ in the HBA */
 				SD_INFO(SD_LOG_ATTACH_DETACH, un,
-					"sd_alloc_rqs: ARQ enabled\n");
+				    "sd_alloc_rqs: ARQ enabled\n");
 				un->un_f_arq_enabled = TRUE;
 			} else {
 				/* Could not enable ARQ in the HBA */
 				SD_INFO(SD_LOG_ATTACH_DETACH, un,
-				"sd_alloc_rqs: failed ARQ enable\n");
+				    "sd_alloc_rqs: failed ARQ enable\n");
 				un->un_f_arq_enabled = FALSE;
 			}
 			break;
@@ -14245,7 +14246,7 @@ sd_alloc_rqs(struct scsi_device *devp, struct sd_lun *un)
 			 * Just mark ARQ as enabled for this instance.
 			 */
 			SD_INFO(SD_LOG_ATTACH_DETACH, un,
-				"sd_alloc_rqs: ARQ already enabled\n");
+			    "sd_alloc_rqs: ARQ already enabled\n");
 			un->un_f_arq_enabled = TRUE;
 			break;
 		default:
@@ -14254,7 +14255,7 @@ sd_alloc_rqs(struct scsi_device *devp, struct sd_lun *un)
 			 * instance.
 			 */
 			SD_INFO(SD_LOG_ATTACH_DETACH, un,
-				"sd_alloc_rqs: HBA does not support ARQ\n");
+			    "sd_alloc_rqs: HBA does not support ARQ\n");
 			un->un_f_arq_enabled = FALSE;
 			break;
 		}
@@ -14304,7 +14305,7 @@ sd_free_rqs(struct sd_lun *un)
 /*
  *    Function: sd_reduce_throttle
  *
- * Description: Reduces the maximun # of outstanding commands on a
+ * Description: Reduces the maximum # of outstanding commands on a
  *		target to the current number of outstanding commands.
  *		Queues a tiemout(9F) callback to restore the limit
  *		after a specified interval has elapsed.
@@ -14344,7 +14345,7 @@ sd_reduce_throttle(struct sd_lun *un, int throttle_type)
 			}
 
 			if (un->un_ncmds_in_transport > 0) {
-			    un->un_throttle = un->un_ncmds_in_transport;
+				un->un_throttle = un->un_ncmds_in_transport;
 			}
 
 		} else {
@@ -14423,9 +14424,10 @@ sd_restore_throttle(void *arg)
 				    (throttle < un->un_saved_throttle) ?
 				    throttle : un->un_saved_throttle;
 				if (un->un_throttle < un->un_saved_throttle) {
-				    un->un_reset_throttle_timeid =
-					timeout(sd_restore_throttle,
-					un, SD_QFULL_THROTTLE_RESET_INTERVAL);
+					un->un_reset_throttle_timeid =
+					    timeout(sd_restore_throttle,
+					    un,
+					    SD_QFULL_THROTTLE_RESET_INTERVAL);
 				}
 			}
 		}
@@ -14565,11 +14567,16 @@ sdintr(struct scsi_pkt *pktp)
 #endif
 
 	/*
-	 * If pkt_reason is CMD_DEV_GONE, just fail the command
+	 * If pkt_reason is CMD_DEV_GONE, fail the command, and update the media
+	 * state if needed.
 	 */
 	if (pktp->pkt_reason == CMD_DEV_GONE) {
 		scsi_log(SD_DEVINFO(un), sd_label, CE_CONT,
-			    "Device is gone\n");
+		    "Device is gone\n");
+		if (un->un_mediastate != DKIO_DEV_GONE) {
+			un->un_mediastate = DKIO_DEV_GONE;
+			cv_broadcast(&un->un_state_cv);
+		}
 		sd_return_failed_command(un, bp, EIO);
 		goto exit;
 	}
@@ -14682,7 +14689,7 @@ sdintr(struct scsi_pkt *pktp)
 		} else if (xp->xb_pkt_flags & SD_XB_USCSICMD) {
 			SD_UPDATE_B_RESID(bp, pktp);
 			SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un,
-				"sdintr: returning uscsi command\n");
+			    "sdintr: returning uscsi command\n");
 		} else {
 			goto not_successful;
 		}
@@ -15320,7 +15327,7 @@ sense_failed:
 	 */
 	sd_retry_command(un, bp, SD_RETRIES_STANDARD,
 	    sd_print_sense_failed_msg, msgp, EIO,
-		un->un_f_is_fibre?drv_usectohz(100000):(clock_t)0, NULL);
+	    un->un_f_is_fibre?drv_usectohz(100000):(clock_t)0, NULL);
 #else
 	sd_retry_command(un, bp, SD_RETRIES_STANDARD,
 	    sd_print_sense_failed_msg, msgp, EIO, SD_RETRY_DELAY, NULL);
@@ -15566,7 +15573,7 @@ sd_print_sense_msg(struct sd_lun *un, struct buf *bp, void *arg, int code)
 	sensep = xp->xb_sense_data;
 
 	if (scsi_sense_info_uint64(sensep, SENSE_LENGTH,
-		(uint64_t *)&err_blkno)) {
+	    (uint64_t *)&err_blkno)) {
 		/*
 		 * We retrieved the error block number from the information
 		 * portion of the sense data.
@@ -15657,7 +15664,7 @@ sd_sense_key_no_sense(struct sd_lun *un, struct buf *bp,
 	SD_UPDATE_ERRSTATS(un, sd_softerrs);
 
 	sd_retry_command(un, bp, SD_RETRIES_STANDARD, sd_print_sense_msg,
-		&si, EIO, (clock_t)0, NULL);
+	    &si, EIO, (clock_t)0, NULL);
 }
 
 
@@ -15803,21 +15810,21 @@ sd_sense_key_not_ready(struct sd_lun *un,
 			 */
 			if (un->un_f_is_fibre == TRUE) {
 				if (((sd_level_mask & SD_LOGMASK_DIAG) ||
-					(xp->xb_retry_count > 0)) &&
-					(un->un_startstop_timeid == NULL)) {
+				    (xp->xb_retry_count > 0)) &&
+				    (un->un_startstop_timeid == NULL)) {
 					scsi_log(SD_DEVINFO(un), sd_label,
-					CE_WARN, "logical unit not ready, "
-					"resetting disk\n");
+					    CE_WARN, "logical unit not ready, "
+					    "resetting disk\n");
 					sd_reset_target(un, pktp);
 				}
 			} else {
 				if (((sd_level_mask & SD_LOGMASK_DIAG) ||
-					(xp->xb_retry_count >
-					un->un_reset_retry_count)) &&
-					(un->un_startstop_timeid == NULL)) {
+				    (xp->xb_retry_count >
+				    un->un_reset_retry_count)) &&
+				    (un->un_startstop_timeid == NULL)) {
 					scsi_log(SD_DEVINFO(un), sd_label,
-					CE_WARN, "logical unit not ready, "
-					"resetting disk\n");
+					    CE_WARN, "logical unit not ready, "
+					    "resetting disk\n");
 					sd_reset_target(un, pktp);
 				}
 			}
@@ -16856,8 +16863,8 @@ sd_pkt_status_check_condition(struct sd_lun *un, struct buf *bp,
 		 * when SD_RETRY_DELAY change in sddef.h
 		 */
 		sd_retry_command(un, bp, SD_RETRIES_STANDARD, NULL, NULL, EIO,
-			un->un_f_is_fibre?drv_usectohz(100000):(clock_t)0,
-			NULL);
+		    un->un_f_is_fibre?drv_usectohz(100000):(clock_t)0,
+		    NULL);
 #else
 		sd_retry_command(un, bp, SD_RETRIES_STANDARD, NULL, NULL,
 		    EIO, SD_RETRY_DELAY, NULL);
@@ -17821,13 +17828,13 @@ sd_send_scsi_START_STOP_UNIT(struct sd_lun *un, int flag, int path_flag)
 		case STATUS_CHECK:
 			if (ucmd_buf.uscsi_rqstatus == STATUS_GOOD) {
 				switch (scsi_sense_key(
-						(uint8_t *)&sense_buf)) {
+				    (uint8_t *)&sense_buf)) {
 				case KEY_ILLEGAL_REQUEST:
 					status = ENOTSUP;
 					break;
 				case KEY_NOT_READY:
 					if (scsi_sense_asc(
-						    (uint8_t *)&sense_buf)
+					    (uint8_t *)&sense_buf)
 					    == 0x3A) {
 						status = ENXIO;
 					}
@@ -18111,7 +18118,7 @@ sd_send_scsi_TEST_UNIT_READY(struct sd_lun *un, int flag)
 			}
 			if ((ucmd_buf.uscsi_rqstatus == STATUS_GOOD) &&
 			    (scsi_sense_key((uint8_t *)&sense_buf) ==
-				KEY_NOT_READY) &&
+			    KEY_NOT_READY) &&
 			    (scsi_sense_asc((uint8_t *)&sense_buf) == 0x3A)) {
 				status = ENXIO;
 			}
@@ -18200,7 +18207,7 @@ sd_send_scsi_PERSISTENT_RESERVE_IN(struct sd_lun *un, uchar_t  usr_cmd,
 		case STATUS_CHECK:
 			if ((ucmd_buf.uscsi_rqstatus == STATUS_GOOD) &&
 			    (scsi_sense_key((uint8_t *)&sense_buf) ==
-				KEY_ILLEGAL_REQUEST)) {
+			    KEY_ILLEGAL_REQUEST)) {
 				status = ENOTSUP;
 			}
 			break;
@@ -18345,7 +18352,7 @@ sd_send_scsi_PERSISTENT_RESERVE_OUT(struct sd_lun *un, uchar_t usr_cmd,
 		case STATUS_CHECK:
 			if ((ucmd_buf.uscsi_rqstatus == STATUS_GOOD) &&
 			    (scsi_sense_key((uint8_t *)&sense_buf) ==
-				KEY_ILLEGAL_REQUEST)) {
+			    KEY_ILLEGAL_REQUEST)) {
 				status = ENOTSUP;
 			}
 			break;
@@ -18493,7 +18500,7 @@ sd_send_scsi_SYNCHRONIZE_CACHE_biodone(struct buf *bp)
 		case STATUS_CHECK:
 			if ((uscmd->uscsi_rqstatus == STATUS_GOOD) &&
 			    (scsi_sense_key(sense_buf) ==
-				KEY_ILLEGAL_REQUEST)) {
+			    KEY_ILLEGAL_REQUEST)) {
 				/* Ignore Illegal Request error */
 				mutex_enter(SD_MUTEX(un));
 				un->un_f_sync_cache_supported = FALSE;
@@ -18627,7 +18634,7 @@ sd_send_scsi_GET_CONFIGURATION(struct sd_lun *un, struct uscsi_cmd *ucmdbuf,
  *    Function: sd_send_scsi_feature_GET_CONFIGURATION
  *
  * Description: Issues the get configuration command to the device to
- *              retrieve a specfic feature. Called from
+ *              retrieve a specific feature. Called from
  *		sd_check_for_writable_cd & sd_set_mmc_caps.
  *   Arguments: un
  *              ucmdbuf
@@ -19934,7 +19941,7 @@ skip_ready_valid:
 			 * the drive speed. Thus EINVAL would be returned
 			 * if a set request was made for an mmc device.
 			 * We no longer support get or set speed for
-			 * mmc but need to remain consistant with regard
+			 * mmc but need to remain consistent with regard
 			 * to the error code returned.
 			 */
 			err = EINVAL;
@@ -20030,7 +20037,7 @@ skip_ready_valid:
 			if (!un->un_f_sync_cache_supported ||
 			    !un->un_f_write_cache_enabled) {
 				err = un->un_f_sync_cache_supported ?
-					0 : ENOTSUP;
+				    0 : ENOTSUP;
 				mutex_exit(SD_MUTEX(un));
 				if ((flag & FKIOCTL) && dkc != NULL &&
 				    dkc->dkc_callback != NULL) {
@@ -20135,7 +20142,7 @@ skip_ready_valid:
 			mutex_exit(SD_MUTEX(un));
 
 			err = sd_cache_control(un, SD_CACHE_NOCHANGE,
-				SD_CACHE_ENABLE);
+			    SD_CACHE_ENABLE);
 
 			mutex_enter(SD_MUTEX(un));
 
@@ -20194,7 +20201,7 @@ sd_dkio_ctrl_info(dev_t dev, caddr_t arg, int flag)
 	}
 
 	info = (struct dk_cinfo *)
-		kmem_zalloc(sizeof (struct dk_cinfo), KM_SLEEP);
+	    kmem_zalloc(sizeof (struct dk_cinfo), KM_SLEEP);
 
 	switch (un->un_ctype) {
 	case CTYPE_CDROM:
@@ -20302,8 +20309,8 @@ sd_get_media_info(dev_t dev, caddr_t arg, int flag)
 		/* Allow SCMD_GET_CONFIGURATION to MMC devices only */
 		if (un->un_f_mmc_cap == TRUE) {
 			rtn = sd_send_scsi_GET_CONFIGURATION(un, &com, rqbuf,
-				SENSE_LENGTH, out_data, SD_PROFILE_HEADER_LEN,
-				SD_PATH_STANDARD);
+			    SENSE_LENGTH, out_data, SD_PROFILE_HEADER_LEN,
+			    SD_PATH_STANDARD);
 
 			if (rtn) {
 				/*
@@ -21395,17 +21402,17 @@ sd_mhdioc_inresv(dev_t dev, caddr_t arg, int flag)
  * SCSI-2
  * The cluster software takes ownership of a multi-hosted disk by issuing the
  * MHIOCTKOWN ioctl to the disk driver. It releases ownership by issuing the
- * MHIOCRELEASE ioctl.Closely related is the MHIOCENFAILFAST ioctl -- a cluster,
- * just after taking ownership of the disk with the MHIOCTKOWN ioctl then issues
- * the MHIOCENFAILFAST ioctl.  This ioctl "enables failfast" in the driver. The
- * meaning of failfast is that if the driver (on this host) ever encounters the
- * scsi error return code RESERVATION_CONFLICT from the device, it should
- * immediately panic the host. The motivation for this ioctl is that if this
- * host does encounter reservation conflict, the underlying cause is that some
- * other host of the cluster has decided that this host is no longer in the
- * cluster and has seized control of the disks for itself. Since this host is no
- * longer in the cluster, it ought to panic itself. The MHIOCENFAILFAST ioctl
- * does two things:
+ * MHIOCRELEASE ioctl.  Closely related is the MHIOCENFAILFAST ioctl -- a
+ * cluster, just after taking ownership of the disk with the MHIOCTKOWN ioctl
+ * then issues the MHIOCENFAILFAST ioctl.  This ioctl "enables failfast" in the
+ * driver. The meaning of failfast is that if the driver (on this host) ever
+ * encounters the scsi error return code RESERVATION_CONFLICT from the device,
+ * it should immediately panic the host. The motivation for this ioctl is that
+ * if this host does encounter reservation conflict, the underlying cause is
+ * that some other host of the cluster has decided that this host is no longer
+ * in the cluster and has seized control of the disks for itself. Since this
+ * host is no longer in the cluster, it ought to panic itself. The
+ * MHIOCENFAILFAST ioctl does two things:
  *	(a) it sets a flag that will cause any returned RESERVATION_CONFLICT
  *      error to panic the host
  *      (b) it sets up a periodic timer to test whether this host still has
@@ -22498,7 +22505,7 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 
 			if (sd_send_polled_RQS(un) == SD_FAILURE) {
 				SD_INFO(SD_LOG_DUMP, un,
-					"sddump: sd_send_polled_RQS failed\n");
+				    "sddump: sd_send_polled_RQS failed\n");
 			}
 			mutex_enter(SD_MUTEX(un));
 		}
@@ -22530,8 +22537,8 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 			tgt_blkno = tgt_byte_offset / un->un_tgt_blocksize;
 			tgt_nblk =
 			    ((tgt_byte_offset + tgt_byte_count +
-				(un->un_tgt_blocksize - 1)) /
-				un->un_tgt_blocksize) - tgt_blkno;
+			    (un->un_tgt_blocksize - 1)) /
+			    un->un_tgt_blocksize) - tgt_blkno;
 
 			/*
 			 * Invoke the routine which is going to do read part
@@ -22604,8 +22611,8 @@ sddump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 
 #if defined(__i386) || defined(__amd64)
 		blkno = oblkno +
-			((wr_bp->b_bcount - dma_resid) /
-			    un->un_tgt_blocksize);
+		    ((wr_bp->b_bcount - dma_resid) /
+		    un->un_tgt_blocksize);
 		nblk = dma_resid / un->un_tgt_blocksize;
 
 		if (wr_pktp) {
@@ -23025,7 +23032,7 @@ sd_ddi_scsi_poll(struct scsi_pkt *pkt)
 
 			} else if ((sensep != NULL) &&
 			    (scsi_sense_key(sensep) ==
-				KEY_UNIT_ATTENTION)) {
+			    KEY_UNIT_ATTENTION)) {
 				/* Unit Attention - try again */
 				busy_count += (SD_SEC_TO_CSEC - 1); /* 1 */
 				continue;
@@ -24453,7 +24460,7 @@ sr_read_tocentry(dev_t dev, caddr_t data, int flag)
 			 * READ HEADER command failed, since this is
 			 * obsoleted in one spec, its better to return
 			 * -1 for an invlid track so that we can still
-			 * recieve the rest of the TOC data.
+			 * receive the rest of the TOC data.
 			 */
 			entry->cdte_datamode = (uchar_t)-1;
 		}
@@ -26486,7 +26493,7 @@ sd_setup_next_xfer(struct sd_lun *un, struct buf *bp,
 /*
  *    Function: sd_panic_for_res_conflict
  *
- * Description: Call panic with a string formated with "Reservation Conflict"
+ * Description: Call panic with a string formatted with "Reservation Conflict"
  *		and a human readable identifier indicating the SD instance
  *		that experienced the reservation conflict.
  *
@@ -26526,7 +26533,7 @@ static uint_t   sd_fault_injection_on = 0;
  *              faultinjection ioctls to inject errors into the
  *              layer model
  *
- *   Arguments: cmd	- the ioctl cmd recieved
+ *   Arguments: cmd	- the ioctl cmd received
  *		arg	- the arguments from user and returns
  */
 
@@ -26878,7 +26885,7 @@ sd_faultinjection(struct scsi_pkt *pktp)
 
 	/* if injection is off return */
 	if (sd_fault_injection_on == 0 ||
-		un->sd_fi_fifo_start == un->sd_fi_fifo_end) {
+	    un->sd_fi_fifo_start == un->sd_fi_fifo_end) {
 		mutex_exit(SD_MUTEX(un));
 		return;
 	}
@@ -27164,7 +27171,7 @@ sd_faultinjection(struct scsi_pkt *pktp)
  *     Firewire hard disks now have partition kstats
  *
  *      ------------------------------------------------------
- *       removable media    hotplugable    |   kstat
+ *       removable media    hotpluggable   |   kstat
  *      ------------------------------------------------------
  *             false          false        |    Yes
  *             false          true         |    Yes
@@ -27366,7 +27373,7 @@ sd_set_unit_attributes(struct sd_lun *un, dev_info_t *devi)
 		 */
 		un->un_f_pkstats_enabled = (ddi_prop_get_int(DDI_DEV_T_ANY,
 		    SD_DEVINFO(un), DDI_PROP_DONTPASS,
-			"enable-partition-kstats", 1));
+		    "enable-partition-kstats", 1));
 
 		/*
 		 * Check if HBA has set the "pm-capable" property.

@@ -41,3 +41,5 @@ ereport.fs.zfs.device.version_mismatch=10
 fault.fs.zfs.pool=11
 fault.fs.zfs.device=12
 ereport.fs.zfs.pool.hostname_mismatch=13
+fault.fs.zfs.vdev.io=14
+fault.fs.zfs.vdev.checksum=15

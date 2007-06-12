@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,13 +91,20 @@ extern "C" {
  *	ioctl(ld, LOFI_GET_MAXMINOR, &li);
  *	maxminor = li.li_minor;
  *
+ * If the 'li_force' flag is set for any of the LOFI_UNMAP_* commands, then if
+ * the device is busy, the underlying vnode will be closed, and any subsequent
+ * operations will fail.  It will behave as if the device had been forcibly
+ * removed, so the DKIOCSTATE ioctl will return DKIO_DEV_GONE.  When the device
+ * is last closed, it will be torn down.
+ *
  * Oh, and last but not least: these ioctls are totally private and only
  * for use by lofiadm(1M).
  *
  */
 
 struct lofi_ioctl {
-	uint32_t li_minor;
+	uint32_t 	li_minor;
+	boolean_t	li_force;
 	char	li_filename[MAXPATHLEN + 1];
 };
 
@@ -134,9 +140,13 @@ extern uint32_t lofi_max_files;
 	((vtype == VREG) || (vtype == VBLK) || (vtype == VCHR))
 
 struct lofi_state {
-	char	*ls_filename;	/* filename to open */
-	size_t	ls_filename_sz;
-	struct vnode	*ls_vp; /* open vnode */
+	char		*ls_filename;	/* filename to open */
+	size_t		ls_filename_sz;
+	struct vnode	*ls_vp;		/* open vnode */
+	kmutex_t	ls_vp_lock;	/* protects ls_vp */
+	kcondvar_t	ls_vp_cv;	/* signal changes to ls_vp */
+	uint32_t	ls_vp_iocount;	/* # pending I/O requests */
+	boolean_t	ls_vp_closereq;	/* force close requested */
 	u_offset_t	ls_vp_size;
 	uint32_t	ls_blk_open;
 	uint32_t	ls_chr_open;

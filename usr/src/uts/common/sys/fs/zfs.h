@@ -54,7 +54,7 @@ typedef enum {
 
 /*
  * Properties are identified by these constants and must be added to the
- * end of this list to ensure that external conumsers are not affected
+ * end of this list to ensure that external consumers are not affected
  * by the change. The property list also determines how 'zfs get' will
  * display them.  If you make any changes to this list, be sure to update
  * the property table in usr/src/common/zfs/zfs_prop.c.
@@ -96,10 +96,15 @@ typedef enum {
 	ZFS_PROP_XATTR,
 	ZFS_PROP_NUMCLONES,		/* not exposed to the user */
 	ZFS_PROP_COPIES,
-	ZFS_PROP_BOOTFS
+	ZPOOL_PROP_BOOTFS,
+	ZPOOL_PROP_AUTOREPLACE,
+	ZPOOL_PROP_NAME
 } zfs_prop_t;
 
 typedef zfs_prop_t zpool_prop_t;
+
+#define	ZPOOL_PROP_CONT		ZFS_PROP_CONT
+#define	ZPOOL_PROP_INVAL	ZFS_PROP_INVAL
 
 #define	ZFS_PROP_VALUE		"value"
 #define	ZFS_PROP_SOURCE		"source"
@@ -123,17 +128,18 @@ boolean_t zfs_prop_user(const char *);
 int zfs_prop_readonly(zfs_prop_t);
 const char *zfs_prop_default_string(zfs_prop_t);
 const char *zfs_prop_to_name(zfs_prop_t);
-const char *zpool_prop_to_name(zfs_prop_t);
+const char *zpool_prop_to_name(zpool_prop_t);
 uint64_t zfs_prop_default_numeric(zfs_prop_t);
 int zfs_prop_inheritable(zfs_prop_t);
 int zfs_prop_string_to_index(zfs_prop_t, const char *, uint64_t *);
 int zfs_prop_index_to_string(zfs_prop_t, uint64_t, const char **);
+uint64_t zpool_prop_default_numeric(zpool_prop_t);
 
 /*
  * Property Iterator
  */
 typedef zfs_prop_t (*zfs_prop_f)(zfs_prop_t, void *);
-typedef zfs_prop_f zpool_prop_f;
+typedef zpool_prop_t (*zpool_prop_f)(zpool_prop_t, void *);
 extern zfs_prop_t zfs_prop_iter(zfs_prop_f, void *, boolean_t);
 extern zpool_prop_t zpool_prop_iter(zpool_prop_f, void *, boolean_t);
 
@@ -201,7 +207,6 @@ extern zpool_prop_t zpool_prop_iter(zpool_prop_f, void *, boolean_t);
 #define	ZPOOL_CONFIG_DTL		"DTL"
 #define	ZPOOL_CONFIG_STATS		"stats"
 #define	ZPOOL_CONFIG_WHOLE_DISK		"whole_disk"
-#define	ZPOOL_CONFIG_OFFLINE		"offline"
 #define	ZPOOL_CONFIG_ERRCOUNT		"error_count"
 #define	ZPOOL_CONFIG_NOT_PRESENT	"not_present"
 #define	ZPOOL_CONFIG_SPARES		"spares"
@@ -210,6 +215,17 @@ extern zpool_prop_t zpool_prop_iter(zpool_prop_f, void *, boolean_t);
 #define	ZPOOL_CONFIG_HOSTID		"hostid"
 #define	ZPOOL_CONFIG_HOSTNAME		"hostname"
 #define	ZPOOL_CONFIG_TIMESTAMP		"timestamp" /* not stored on disk */
+#define	ZPOOL_CONFIG_UNSPARE		"unspare"
+#define	ZPOOL_CONFIG_PHYS_PATH		"phys_path"
+/*
+ * The persistent vdev state is stored as separate values rather than a single
+ * 'vdev_state' entry.  This is because a device can be in multiple states, such
+ * as offline and degraded.
+ */
+#define	ZPOOL_CONFIG_OFFLINE		"offline"
+#define	ZPOOL_CONFIG_FAULTED		"faulted"
+#define	ZPOOL_CONFIG_DEGRADED		"degraded"
+#define	ZPOOL_CONFIG_REMOVED		"removed"
 
 #define	VDEV_TYPE_ROOT			"root"
 #define	VDEV_TYPE_MIRROR		"mirror"
@@ -243,10 +259,14 @@ typedef enum vdev_state {
 	VDEV_STATE_UNKNOWN = 0,	/* Uninitialized vdev			*/
 	VDEV_STATE_CLOSED,	/* Not currently open			*/
 	VDEV_STATE_OFFLINE,	/* Not allowed to open			*/
+	VDEV_STATE_REMOVED,	/* Explicitly removed from system	*/
 	VDEV_STATE_CANT_OPEN,	/* Tried to open, but failed		*/
+	VDEV_STATE_FAULTED,	/* External request to fault device	*/
 	VDEV_STATE_DEGRADED,	/* Replicated vdev with unhealthy kids	*/
 	VDEV_STATE_HEALTHY	/* Presumed good			*/
 } vdev_state_t;
+
+#define	VDEV_STATE_ONLINE	VDEV_STATE_HEALTHY
 
 /*
  * vdev aux states.  When a vdev is in the CANT_OPEN state, the aux field
@@ -262,7 +282,8 @@ typedef enum vdev_aux {
 	VDEV_AUX_BAD_LABEL,	/* the label is OK but invalid		*/
 	VDEV_AUX_VERSION_NEWER,	/* on-disk version is too new		*/
 	VDEV_AUX_VERSION_OLDER,	/* on-disk version is too old		*/
-	VDEV_AUX_SPARED		/* hot spare used in another pool	*/
+	VDEV_AUX_SPARED,	/* hot spare used in another pool	*/
+	VDEV_AUX_ERR_EXCEEDED	/* too many errors			*/
 } vdev_aux_t;
 
 /*
@@ -369,8 +390,7 @@ typedef enum zfs_ioc {
 	ZFS_IOC_POOL_LOG_HISTORY,
 	ZFS_IOC_VDEV_ADD,
 	ZFS_IOC_VDEV_REMOVE,
-	ZFS_IOC_VDEV_ONLINE,
-	ZFS_IOC_VDEV_OFFLINE,
+	ZFS_IOC_VDEV_SET_STATE,
 	ZFS_IOC_VDEV_ATTACH,
 	ZFS_IOC_VDEV_DETACH,
 	ZFS_IOC_VDEV_SETPATH,
@@ -426,6 +446,39 @@ typedef enum {
 #define	ZPOOL_HIST_RECORD	"history record"
 #define	ZPOOL_HIST_TIME		"history time"
 #define	ZPOOL_HIST_CMD		"history command"
+
+/*
+ * Flags for ZFS_IOC_VDEV_SET_STATE
+ */
+#define	ZFS_ONLINE_CHECKREMOVE	0x1
+#define	ZFS_ONLINE_UNSPARE	0x2
+#define	ZFS_ONLINE_FORCEFAULT	0x4
+#define	ZFS_OFFLINE_TEMPORARY	0x1
+
+/*
+ * Sysevent payload members.  ZFS will generate the following sysevents with the
+ * given payloads:
+ *
+ *	ESC_ZFS_RESILVER_START
+ *	ESC_ZFS_RESILVER_END
+ *	ESC_ZFS_POOL_DESTROY
+ *
+ *		ZFS_EV_POOL_NAME	DATA_TYPE_STRING
+ *		ZFS_EV_POOL_GUID	DATA_TYPE_UINT64
+ *
+ *	ESC_ZFS_VDEV_REMOVE
+ *	ESC_ZFS_VDEV_CLEAR
+ *	ESC_ZFS_VDEV_CHECK
+ *
+ *		ZFS_EV_POOL_NAME	DATA_TYPE_STRING
+ *		ZFS_EV_POOL_GUID	DATA_TYPE_UINT64
+ *		ZFS_EV_VDEV_PATH	DATA_TYPE_STRING	(optional)
+ *		ZFS_EV_VDEV_GUID	DATA_TYPE_UINT64
+ */
+#define	ZFS_EV_POOL_NAME	"pool_name"
+#define	ZFS_EV_POOL_GUID	"pool_guid"
+#define	ZFS_EV_VDEV_PATH	"vdev_path"
+#define	ZFS_EV_VDEV_GUID	"vdev_guid"
 
 #ifdef	__cplusplus
 }

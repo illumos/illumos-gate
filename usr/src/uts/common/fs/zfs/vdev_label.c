@@ -62,7 +62,7 @@
  * or a device was added, we want to update all the labels such that we can deal
  * with fatal failure at any point.  To this end, each disk has two labels which
  * are updated before and after the uberblock is synced.  Assuming we have
- * labels and an uberblock with the following transacation groups:
+ * labels and an uberblock with the following transaction groups:
  *
  *              L1          UB          L2
  *           +------+    +------+    +------+
@@ -209,6 +209,10 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 		VERIFY(nvlist_add_string(nv, ZPOOL_CONFIG_DEVID,
 		    vd->vdev_devid) == 0);
 
+	if (vd->vdev_physpath != NULL)
+		VERIFY(nvlist_add_string(nv, ZPOOL_CONFIG_PHYS_PATH,
+		    vd->vdev_physpath) == 0);
+
 	if (vd->vdev_nparity != 0) {
 		ASSERT(strcmp(vd->vdev_ops->vdev_op_type,
 		    VDEV_TYPE_RAIDZ) == 0);
@@ -285,9 +289,18 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 		if (vd->vdev_offline && !vd->vdev_tmpoffline)
 			VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_OFFLINE,
 			    B_TRUE) == 0);
-		else
-			(void) nvlist_remove(nv, ZPOOL_CONFIG_OFFLINE,
-			    DATA_TYPE_UINT64);
+		if (vd->vdev_faulted)
+			VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_FAULTED,
+			    B_TRUE) == 0);
+		if (vd->vdev_degraded)
+			VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_DEGRADED,
+			    B_TRUE) == 0);
+		if (vd->vdev_removed)
+			VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_REMOVED,
+			    B_TRUE) == 0);
+		if (vd->vdev_unspare)
+			VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_UNSPARE,
+			    B_TRUE) == 0);
 	}
 
 	return (nv);
@@ -496,7 +509,7 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 		/*
 		 * If this is a replacement, then we want to fallthrough to the
 		 * rest of the code.  If we're adding a spare, then it's already
-		 * labelled appropriately and we can just return.
+		 * labeled appropriately and we can just return.
 		 */
 		if (reason == VDEV_LABEL_SPARE)
 			return (0);
@@ -605,7 +618,7 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
 
 	/*
 	 * If this vdev hasn't been previously identified as a spare, then we
-	 * mark it as such only if a) we are labelling it as a spare, or b) it
+	 * mark it as such only if a) we are labeling it as a spare, or b) it
 	 * exists as a spare elsewhere in the system.
 	 */
 	if (error == 0 && !vd->vdev_isspare &&

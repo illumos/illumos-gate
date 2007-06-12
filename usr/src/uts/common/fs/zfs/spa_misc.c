@@ -590,12 +590,14 @@ spa_config_held(spa_t *spa, krw_t rw)
 uint64_t
 spa_vdev_enter(spa_t *spa)
 {
+	mutex_enter(&spa_namespace_lock);
+
 	/*
-	 * Suspend scrub activity while we mess with the config.
+	 * Suspend scrub activity while we mess with the config.  We must do
+	 * this after acquiring the namespace lock to avoid a 3-way deadlock
+	 * with spa_scrub_stop() and the scrub thread.
 	 */
 	spa_scrub_suspend(spa);
-
-	mutex_enter(&spa_namespace_lock);
 
 	spa_config_enter(spa, RW_WRITER, spa);
 

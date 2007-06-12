@@ -19,9 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
+ */
+
+/*
  * lofiadm - administer lofi(7d). Very simple, add and remove file<->device
  * associations, and display status. All the ioctls are private between
  * lofi and lofiadm, and so are very simple - device information is
@@ -222,10 +224,12 @@ add_mapping(int lfd, const char *devicename, const char *filename)
  * filename otherwise.
  */
 static void
-delete_mapping(int lfd, const char *devicename, const char *filename)
+delete_mapping(int lfd, const char *devicename, const char *filename,
+    boolean_t force)
 {
 	struct lofi_ioctl li;
 
+	li.li_force = force;
 	if (devicename == NULL) {
 		/* delete by filename */
 		(void) strcpy(li.li_filename, filename);
@@ -286,13 +290,14 @@ main(int argc, char *argv[])
 	int	minor;
 	int	fd = -1;
 	static char *lofictl = "/dev/" LOFI_CTL_NAME;
+	boolean_t force = B_FALSE;
 
 	pname = getpname(argv[0]);
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "a:d:")) != EOF) {
+	while ((c = getopt(argc, argv, "a:d:f")) != EOF) {
 		switch (c) {
 		case 'a':
 			addflag = 1;
@@ -333,6 +338,9 @@ main(int argc, char *argv[])
 				devicename = optarg;
 			else
 				filename = optarg;
+			break;
+		case 'f':
+			force = B_TRUE;
 			break;
 		case '?':
 		default:
@@ -389,7 +397,7 @@ main(int argc, char *argv[])
 	if (addflag)
 		add_mapping(lfd, devicename, filename);
 	else if (deleteflag)
-		delete_mapping(lfd, devicename, filename);
+		delete_mapping(lfd, devicename, filename, force);
 	else if (filename || devicename)
 		print_one_mapping(lfd, devicename, filename);
 	else

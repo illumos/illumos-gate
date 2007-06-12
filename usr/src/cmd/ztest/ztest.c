@@ -435,82 +435,82 @@ process_options(int argc, char **argv)
 	    "v:s:a:m:r:R:d:t:g:i:k:p:f:VET:P:z:h")) != EOF) {
 		value = 0;
 		switch (opt) {
-		    case 'v':
-		    case 's':
-		    case 'a':
-		    case 'm':
-		    case 'r':
-		    case 'R':
-		    case 'd':
-		    case 't':
-		    case 'g':
-		    case 'i':
-		    case 'k':
-		    case 'T':
-		    case 'P':
-		    case 'z':
+		case 'v':
+		case 's':
+		case 'a':
+		case 'm':
+		case 'r':
+		case 'R':
+		case 'd':
+		case 't':
+		case 'g':
+		case 'i':
+		case 'k':
+		case 'T':
+		case 'P':
+		case 'z':
 			value = nicenumtoull(optarg);
 		}
 		switch (opt) {
-		    case 'v':
+		case 'v':
 			zopt_vdevs = value;
 			break;
-		    case 's':
+		case 's':
 			zopt_vdev_size = MAX(SPA_MINDEVSIZE, value);
 			break;
-		    case 'a':
+		case 'a':
 			zopt_ashift = value;
 			break;
-		    case 'm':
+		case 'm':
 			zopt_mirrors = value;
 			break;
-		    case 'r':
+		case 'r':
 			zopt_raidz = MAX(1, value);
 			break;
-		    case 'R':
+		case 'R':
 			zopt_raidz_parity = MIN(MAX(value, 1), 2);
 			break;
-		    case 'd':
+		case 'd':
 			zopt_datasets = MAX(1, value);
 			break;
-		    case 't':
+		case 't':
 			zopt_threads = MAX(1, value);
 			break;
-		    case 'g':
+		case 'g':
 			zio_gang_bang = MAX(SPA_MINBLOCKSIZE << 1, value);
 			break;
-		    case 'i':
+		case 'i':
 			zopt_init = value;
 			break;
-		    case 'k':
+		case 'k':
 			zopt_killrate = value;
 			break;
-		    case 'p':
+		case 'p':
 			zopt_pool = strdup(optarg);
 			break;
-		    case 'f':
+		case 'f':
 			zopt_dir = strdup(optarg);
 			break;
-		    case 'V':
+		case 'V':
 			zopt_verbose++;
 			break;
-		    case 'E':
+		case 'E':
 			zopt_init = 0;
 			break;
-		    case 'T':
+		case 'T':
 			zopt_time = value;
 			break;
-		    case 'P':
+		case 'P':
 			zopt_passtime = MAX(1, value);
 			break;
-		    case 'z':
+		case 'z':
 			zio_zil_fail_shift = MIN(value, 16);
 			break;
-		    case 'h':
+		case 'h':
 			usage(B_TRUE);
 			break;
-		    case '?':
-		    default:
+		case '?':
+		default:
 			usage(B_FALSE);
 			break;
 		}
@@ -2616,7 +2616,7 @@ ztest_fault_inject(ztest_args_t *za)
 		if (ztest_random(10) < 6)
 			(void) vdev_offline(spa, guid0, B_TRUE);
 		else
-			(void) vdev_online(spa, guid0);
+			(void) vdev_online(spa, guid0, B_FALSE, NULL);
 	}
 
 	/*

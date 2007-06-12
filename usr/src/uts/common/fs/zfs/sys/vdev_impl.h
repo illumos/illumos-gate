@@ -140,7 +140,7 @@ struct vdev {
 	txg_list_t	vdev_ms_list;	/* per-txg dirty metaslab lists	*/
 	txg_list_t	vdev_dtl_list;	/* per-txg dirty DTL lists	*/
 	txg_node_t	vdev_txg_node;	/* per-txg dirty vdev linkage	*/
-	uint8_t		vdev_reopen_wanted; /* async reopen wanted?	*/
+	boolean_t	vdev_remove_wanted; /* async remove wanted?	*/
 	list_node_t	vdev_dirty_node; /* config dirty list		*/
 	uint64_t	vdev_deflate_ratio; /* deflation ratio (x512)	*/
 
@@ -151,14 +151,17 @@ struct vdev {
 	space_map_obj_t	vdev_dtl;	/* dirty time log on-disk state	*/
 	txg_node_t	vdev_dtl_node;	/* per-txg dirty DTL linkage	*/
 	uint64_t	vdev_wholedisk;	/* true if this is a whole disk */
-	uint64_t	vdev_offline;	/* device taken offline?	*/
+	uint64_t	vdev_offline;	/* persistent offline state	*/
+	uint64_t	vdev_faulted;	/* persistent faulted state	*/
+	uint64_t	vdev_degraded;	/* persistent degraded state	*/
+	uint64_t	vdev_removed;	/* persistent removed state	*/
 	uint64_t	vdev_nparity;	/* number of parity devices for raidz */
 	char		*vdev_path;	/* vdev path (if any)		*/
 	char		*vdev_devid;	/* vdev devid (if any)		*/
+	char		*vdev_physpath;	/* vdev device path (if any)	*/
 	uint64_t	vdev_fault_arg; /* fault injection paramater	*/
 	int		vdev_fault_mask; /* zio types to fault		*/
 	uint8_t		vdev_fault_mode; /* fault injection mode	*/
-	uint8_t		vdev_cache_active; /* vdev_cache and vdev_queue	*/
 	uint8_t		vdev_tmpoffline; /* device taken offline temporarily? */
 	uint8_t		vdev_detached;	/* device detached?		*/
 	uint64_t	vdev_isspare;	/* was a hot spare */
@@ -167,6 +170,9 @@ struct vdev {
 	uint64_t	vdev_not_present; /* not present during import	*/
 	hrtime_t	vdev_last_try;	/* last reopen time		*/
 	boolean_t	vdev_nowritecache; /* true if flushwritecache failed */
+	uint64_t	vdev_unspare;	/* unspare when resilvering done */
+	boolean_t	vdev_checkremove; /* temporary online test	*/
+	boolean_t	vdev_forcefault; /* force online fault		*/
 
 	/*
 	 * For DTrace to work in userland (libzpool) context, these fields must

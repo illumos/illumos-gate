@@ -181,6 +181,8 @@ static prop_desc_t zfs_prop_table[] = {
 	    "1 | 2 | 3", "COPIES", B_TRUE, B_TRUE },
 	{ "bootfs", prop_type_string,	0,	NULL,	prop_default,
 	    ZFS_TYPE_POOL, "<filesystem>", "BOOTFS", B_FALSE, B_TRUE },
+	{ "autoreplace", prop_type_boolean,	0,	NULL, prop_default,
+	    ZFS_TYPE_POOL, "on | off", "REPLACE", B_FALSE, B_TRUE },
 };
 
 #define	ZFS_PROP_COUNT	((sizeof (zfs_prop_table))/(sizeof (prop_desc_t)))
@@ -242,6 +244,12 @@ zpool_prop_iter(zpool_prop_f func, void *cb, boolean_t show_all)
 
 zfs_proptype_t
 zfs_prop_get_type(zfs_prop_t prop)
+{
+	return (zfs_prop_table[prop].pd_proptype);
+}
+
+zfs_proptype_t
+zpool_prop_get_type(zfs_prop_t prop)
 {
 	return (zfs_prop_table[prop].pd_proptype);
 }
@@ -365,8 +373,20 @@ zfs_prop_default_string(zfs_prop_t prop)
 	return (zfs_prop_table[prop].pd_strdefault);
 }
 
+const char *
+zpool_prop_default_string(zpool_prop_t prop)
+{
+	return (zfs_prop_table[prop].pd_strdefault);
+}
+
 uint64_t
 zfs_prop_default_numeric(zfs_prop_t prop)
+{
+	return (zfs_prop_table[prop].pd_numdefault);
+}
+
+uint64_t
+zpool_prop_default_numeric(zpool_prop_t prop)
 {
 	return (zfs_prop_table[prop].pd_numdefault);
 }
@@ -382,7 +402,7 @@ zfs_prop_readonly(zfs_prop_t prop)
 
 /*
  * Given a dataset property ID, returns the corresponding name.
- * Assuming the zfs dataset propety ID is valid.
+ * Assuming the zfs dataset property ID is valid.
  */
 const char *
 zfs_prop_to_name(zfs_prop_t prop)
@@ -392,7 +412,7 @@ zfs_prop_to_name(zfs_prop_t prop)
 
 /*
  * Given a pool property ID, returns the corresponding name.
- * Assuming the pool propety ID is valid.
+ * Assuming the pool property ID is valid.
  */
 const char *
 zpool_prop_to_name(zpool_prop_t prop)

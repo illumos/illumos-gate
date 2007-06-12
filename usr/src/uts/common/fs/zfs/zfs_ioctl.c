@@ -439,7 +439,9 @@ zfs_ioc_pool_scrub(zfs_cmd_t *zc)
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
+	spa_config_enter(spa, RW_READER, FTAG);
 	error = spa_scrub(spa, zc->zc_cookie, B_FALSE);
+	spa_config_exit(spa, FTAG);
 
 	spa_close(spa, FTAG);
 
@@ -618,28 +620,35 @@ zfs_ioc_vdev_remove(zfs_cmd_t *zc)
 }
 
 static int
-zfs_ioc_vdev_online(zfs_cmd_t *zc)
+zfs_ioc_vdev_set_state(zfs_cmd_t *zc)
 {
 	spa_t *spa;
 	int error;
+	vdev_state_t newstate = VDEV_STATE_UNKNOWN;
 
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
-	error = vdev_online(spa, zc->zc_guid);
-	spa_close(spa, FTAG);
-	return (error);
-}
+	switch (zc->zc_cookie) {
+	case VDEV_STATE_ONLINE:
+		error = vdev_online(spa, zc->zc_guid, zc->zc_obj, &newstate);
+		break;
 
-static int
-zfs_ioc_vdev_offline(zfs_cmd_t *zc)
-{
-	spa_t *spa;
-	int istmp = zc->zc_cookie;
-	int error;
+	case VDEV_STATE_OFFLINE:
+		error = vdev_offline(spa, zc->zc_guid, zc->zc_obj);
+		break;
 
-	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
-		return (error);
-	error = vdev_offline(spa, zc->zc_guid, istmp);
+	case VDEV_STATE_FAULTED:
+		error = vdev_fault(spa, zc->zc_guid);
+		break;
+
+	case VDEV_STATE_DEGRADED:
+		error = vdev_degrade(spa, zc->zc_guid);
+		break;
+
+	default:
+		error = EINVAL;
+	}
+	zc->zc_cookie = newstate;
 	spa_close(spa, FTAG);
 	return (error);
 }
@@ -1096,7 +1105,7 @@ zfs_ioc_pool_set_props(zfs_cmd_t *zc)
 		}
 
 		switch (prop) {
-		case ZFS_PROP_BOOTFS:
+		case ZPOOL_PROP_BOOTFS:
 			/*
 			 * A bootable filesystem can not be on a RAIDZ pool
 			 * nor a striped pool with more than 1 device.
@@ -1115,8 +1124,8 @@ zfs_ioc_pool_set_props(zfs_cmd_t *zc)
 
 			VERIFY(nvpair_value_string(elem, &strval) == 0);
 			if (strval == NULL || strval[0] == '\0') {
-				objnum =
-				    zfs_prop_default_numeric(ZFS_PROP_BOOTFS);
+				objnum = zpool_prop_default_numeric(
+				    ZPOOL_PROP_BOOTFS);
 				break;
 			}
 
@@ -1126,9 +1135,6 @@ zfs_ioc_pool_set_props(zfs_cmd_t *zc)
 			objnum = dmu_objset_id(os);
 			dmu_objset_close(os);
 			break;
-
-		default:
-			error = EINVAL;
 		}
 
 		if (error)
@@ -1137,10 +1143,11 @@ zfs_ioc_pool_set_props(zfs_cmd_t *zc)
 	if (error == 0) {
 		if (reset_bootfs) {
 			VERIFY(nvlist_remove(nvl,
-			    zpool_prop_to_name(ZFS_PROP_BOOTFS),
+			    zpool_prop_to_name(ZPOOL_PROP_BOOTFS),
 			    DATA_TYPE_STRING) == 0);
 			VERIFY(nvlist_add_uint64(nvl,
-			    zpool_prop_to_name(ZFS_PROP_BOOTFS), objnum) == 0);
+			    zpool_prop_to_name(ZPOOL_PROP_BOOTFS),
+			    objnum) == 0);
 		}
 		error = spa_set_props(spa, nvl);
 	}
@@ -1565,23 +1572,24 @@ zfs_ioc_clear(zfs_cmd_t *zc)
 	spa_t *spa;
 	vdev_t *vd;
 	int error;
+	uint64_t txg;
 
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
-	spa_config_enter(spa, RW_WRITER, FTAG);
+	txg = spa_vdev_enter(spa);
 
 	if (zc->zc_guid == 0) {
 		vd = NULL;
 	} else if ((vd = spa_lookup_by_guid(spa, zc->zc_guid)) == NULL) {
-		spa_config_exit(spa, FTAG);
+		(void) spa_vdev_exit(spa, NULL, txg, ENODEV);
 		spa_close(spa, FTAG);
 		return (ENODEV);
 	}
 
 	vdev_clear(spa, vd);
 
-	spa_config_exit(spa, FTAG);
+	(void) spa_vdev_exit(spa, NULL, txg, 0);
 
 	spa_close(spa, FTAG);
 
@@ -1620,8 +1628,7 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_pool_log_history,	zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_vdev_add,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_vdev_remove,		zfs_secpolicy_config,	pool_name },
-	{ zfs_ioc_vdev_online,		zfs_secpolicy_config,	pool_name },
-	{ zfs_ioc_vdev_offline,		zfs_secpolicy_config,	pool_name },
+	{ zfs_ioc_vdev_set_state,	zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_vdev_attach,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_vdev_detach,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_vdev_setpath,		zfs_secpolicy_config,	pool_name },

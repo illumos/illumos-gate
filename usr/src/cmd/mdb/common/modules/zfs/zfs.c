@@ -1117,6 +1117,12 @@ do_print_vdev(uintptr_t addr, int flags, int depth, int stats,
 		case VDEV_STATE_HEALTHY:
 			state = "HEALTHY";
 			break;
+		case VDEV_STATE_REMOVED:
+			state = "REMOVED";
+			break;
+		case VDEV_STATE_FAULTED:
+			state = "FAULTED";
+			break;
 		default:
 			state = "UNKNOWN";
 			break;

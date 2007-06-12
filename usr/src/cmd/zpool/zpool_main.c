@@ -383,6 +383,10 @@ state_to_name(vdev_stat_t *vs)
 			return (gettext("UNAVAIL"));
 	case VDEV_STATE_OFFLINE:
 		return (gettext("OFFLINE"));
+	case VDEV_STATE_REMOVED:
+		return (gettext("REMOVED"));
+	case VDEV_STATE_FAULTED:
+		return (gettext("FAULTED"));
 	case VDEV_STATE_DEGRADED:
 		return (gettext("DEGRADED"));
 	case VDEV_STATE_HEALTHY:
@@ -950,9 +954,10 @@ print_import_config(const char *name, nvlist_t *nv, int namewidth, int depth)
 	    (uint64_t **)&vs, &c) == 0);
 
 	(void) printf("\t%*s%-*s", depth, "", namewidth - depth, name);
+	(void) printf("  %s", state_to_name(vs));
 
 	if (vs->vs_aux != 0) {
-		(void) printf("  %-8s  ", state_to_name(vs));
+		(void) printf("  ");
 
 		switch (vs->vs_aux) {
 		case VDEV_AUX_OPEN_FAILED:
@@ -971,12 +976,14 @@ print_import_config(const char *name, nvlist_t *nv, int namewidth, int depth)
 			(void) printf(gettext("newer version"));
 			break;
 
+		case VDEV_AUX_ERR_EXCEEDED:
+			(void) printf(gettext("too many errors"));
+			break;
+
 		default:
 			(void) printf(gettext("corrupted data"));
 			break;
 		}
-	} else {
-		(void) printf("  %s", state_to_name(vs));
 	}
 	(void) printf("\n");
 
@@ -1083,6 +1090,12 @@ show_import(nvlist_t *config)
 		(void) printf(gettext("status: The pool was last accessed by "
 		    "another system.\n"));
 		break;
+	case ZPOOL_STATUS_FAULTED_DEV_R:
+	case ZPOOL_STATUS_FAULTED_DEV_NR:
+		(void) printf(gettext("status: One or more devices are "
+		    "faulted.\n"));
+		break;
+
 	default:
 		/*
 		 * No other status can be seen when importing pools.
@@ -2307,7 +2320,6 @@ zpool_do_detach(int argc, char **argv)
 /*
  * zpool online <pool> <device> ...
  */
-/* ARGSUSED */
 int
 zpool_do_online(int argc, char **argv)
 {
@@ -2315,6 +2327,7 @@ zpool_do_online(int argc, char **argv)
 	char *poolname;
 	zpool_handle_t *zhp;
 	int ret = 0;
+	vdev_state_t newstate;
 
 	/* check options */
 	while ((c = getopt(argc, argv, "t")) != -1) {
@@ -2345,12 +2358,25 @@ zpool_do_online(int argc, char **argv)
 	if ((zhp = zpool_open(g_zfs, poolname)) == NULL)
 		return (1);
 
-	for (i = 1; i < argc; i++)
-		if (zpool_vdev_online(zhp, argv[i]) == 0)
-			(void) printf(gettext("Bringing device %s online\n"),
-			    argv[i]);
-		else
+	for (i = 1; i < argc; i++) {
+		if (zpool_vdev_online(zhp, argv[i], 0, &newstate) == 0) {
+			if (newstate != VDEV_STATE_HEALTHY) {
+				(void) printf(gettext("warning: device '%s' "
+				    "onlined, but remains in faulted state\n"),
+				    argv[i]);
+				if (newstate == VDEV_STATE_FAULTED)
+					(void) printf(gettext("use 'zpool "
+					    "clear' to restore a faulted "
+					    "device\n"));
+				else
+					(void) printf(gettext("use 'zpool "
+					    "replace' to replace devices "
+					    "that are no longer present\n"));
+			}
+		} else {
 			ret = 1;
+		}
+	}
 
 	if (!ret) {
 		zpool_log_history(g_zfs, argc + optind, argv - optind, poolname,
@@ -2413,12 +2439,10 @@ zpool_do_offline(int argc, char **argv)
 	if ((zhp = zpool_open(g_zfs, poolname)) == NULL)
 		return (1);
 
-	for (i = 1; i < argc; i++)
-		if (zpool_vdev_offline(zhp, argv[i], istmp) == 0)
-			(void) printf(gettext("Bringing device %s offline\n"),
-			    argv[i]);
-		else
+	for (i = 1; i < argc; i++) {
+		if (zpool_vdev_offline(zhp, argv[i], istmp) != 0)
 			ret = 1;
+	}
 
 	if (!ret) {
 		zpool_log_history(g_zfs, argc + optind, argv - optind, poolname,
@@ -2732,6 +2756,10 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 			}
 			break;
 
+		case VDEV_AUX_ERR_EXCEEDED:
+			(void) printf(gettext("too many errors"));
+			break;
+
 		default:
 			(void) printf(gettext("corrupted data"));
 			break;
@@ -2966,6 +2994,26 @@ status_callback(zpool_handle_t *zhp, void *data)
 		(void) printf(gettext("action: Access the pool from a system "
 		    "running more recent software, or\n\trestore the pool from "
 		    "backup.\n"));
+		break;
+
+	case ZPOOL_STATUS_FAULTED_DEV_R:
+		(void) printf(gettext("status: One or more devices are "
+		    "faulted in response to persistent errors.\n\tSufficient "
+		    "replicas exist for the pool to continue functioning "
+		    "in a\n\tdegraded state.\n"));
+		(void) printf(gettext("action: Replace the faulted device, "
+		    "or use 'zpool clear' to mark the device\n\trepaired.\n"));
+		break;
+
+	case ZPOOL_STATUS_FAULTED_DEV_NR:
+		(void) printf(gettext("status: One or more devices are "
+		    "faulted in response to persistent errors.  There are "
+		    "insufficient replicas for the pool to\n\tcontinue "
+		    "functioning.\n"));
+		(void) printf(gettext("action: Destroy and re-create the pool "
+		    "from a backup source.  Manually marking the device\n"
+		    "\trepaired using 'zpool clear' may allow some data "
+		    "to be recovered.\n"));
 		break;
 
 	default:
@@ -3261,7 +3309,7 @@ zpool_do_upgrade(int argc, char **argv)
 		(void) printf(gettext(" 4   zpool history\n"));
 		(void) printf(gettext(" 5   Compression using the gzip "
 		    "algorithm\n"));
-		(void) printf(gettext(" 6   bootfs pool property "));
+		(void) printf(gettext(" 6   pool properties "));
 		(void) printf(gettext("\nFor more information on a particular "
 		    "version, including supported releases, see:\n\n"));
 		(void) printf("http://www.opensolaris.org/os/community/zfs/"

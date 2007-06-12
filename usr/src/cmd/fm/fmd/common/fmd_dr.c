@@ -132,8 +132,17 @@ fmd_dr_event(sysevent_t *sep)
 void
 fmd_dr_init(void)
 {
-	const char *drsubclass = ESC_DR_AP_STATE_CHANGE;
-	const char *devsubclass = EC_SUB_ALL;
+	const char *dr_subclasses[] = {
+	    ESC_DR_AP_STATE_CHANGE
+	};
+	const char *zfs_subclasses[] = {
+	    ESC_ZFS_VDEV_CLEAR,
+	    ESC_ZFS_VDEV_REMOVE,
+	    ESC_ZFS_POOL_DESTROY
+	};
+	const char *dev_subclasses[] = {
+	    EC_SUB_ALL
+	};
 
 	if (geteuid() != 0)
 		return; /* legacy sysevent mechanism is still root-only */
@@ -141,12 +150,17 @@ fmd_dr_init(void)
 	if ((fmd.d_dr_hdl = sysevent_bind_handle(fmd_dr_event)) == NULL)
 		fmd_error(EFMD_EXIT, "failed to bind handle for DR sysevent");
 
-	if (sysevent_subscribe_event(fmd.d_dr_hdl, EC_DR, &drsubclass, 1) == -1)
-		fmd_error(EFMD_EXIT, "failed to subscribe to DR sysevent");
+	if (sysevent_subscribe_event(fmd.d_dr_hdl, EC_DR,
+	    dr_subclasses, sizeof (dr_subclasses) / sizeof (char *)) == -1)
+		fmd_error(EFMD_EXIT, "failed to subscribe to DR sysevents");
 
 	if (sysevent_subscribe_event(fmd.d_dr_hdl, EC_DEVFS,
-	    &devsubclass, 1) == -1)
-		fmd_error(EFMD_EXIT, "failed to subscribe to devfs sysevent");
+	    dev_subclasses, sizeof (dev_subclasses) / sizeof (char *)) == -1)
+		fmd_error(EFMD_EXIT, "failed to subscribe to devfs sysevents");
+
+	if (sysevent_subscribe_event(fmd.d_dr_hdl, EC_ZFS,
+	    zfs_subclasses, sizeof (zfs_subclasses) / sizeof (char *)) == -1)
+		fmd_error(EFMD_EXIT, "failed to subscribe to ZFS sysevents");
 }
 
 void

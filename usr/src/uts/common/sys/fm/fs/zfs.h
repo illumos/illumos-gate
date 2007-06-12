@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +67,8 @@ extern "C" {
 #define	FM_EREPORT_PAYLOAD_ZFS_PREV_STATE	"prev_state"
 
 #define	FM_RESOURCE_OK				"ok"
+#define	FM_RESOURCE_REMOVED			"removed"
+#define	FM_RESOURCE_AUTOREPLACE			"autoreplace"
 
 #ifdef	__cplusplus
 }

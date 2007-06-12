@@ -862,10 +862,12 @@ is_spare(zpool_handle_t *zhp, uint64_t guid)
 }
 
 /*
- * Bring the specified vdev online
+ * Bring the specified vdev online.   The 'flags' parameter is a set of the
+ * ZFS_ONLINE_* flags.
  */
 int
-zpool_vdev_online(zpool_handle_t *zhp, const char *path)
+zpool_vdev_online(zpool_handle_t *zhp, const char *path, int flags,
+    vdev_state_t *newstate)
 {
 	zfs_cmd_t zc = { 0 };
 	char msg[1024];
@@ -885,17 +887,22 @@ zpool_vdev_online(zpool_handle_t *zhp, const char *path)
 	if (avail_spare || is_spare(zhp, zc.zc_guid) == B_TRUE)
 		return (zfs_error(hdl, EZFS_ISSPARE, msg));
 
-	if (ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_VDEV_ONLINE, &zc) == 0)
-		return (0);
+	zc.zc_cookie = VDEV_STATE_ONLINE;
+	zc.zc_obj = flags;
 
-	return (zpool_standard_error(hdl, errno, msg));
+
+	if (ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_VDEV_SET_STATE, &zc) != 0)
+		return (zpool_standard_error(hdl, errno, msg));
+
+	*newstate = zc.zc_cookie;
+	return (0);
 }
 
 /*
  * Take the specified vdev offline
  */
 int
-zpool_vdev_offline(zpool_handle_t *zhp, const char *path, int istmp)
+zpool_vdev_offline(zpool_handle_t *zhp, const char *path, boolean_t istmp)
 {
 	zfs_cmd_t zc = { 0 };
 	char msg[1024];
@@ -915,9 +922,10 @@ zpool_vdev_offline(zpool_handle_t *zhp, const char *path, int istmp)
 	if (avail_spare || is_spare(zhp, zc.zc_guid) == B_TRUE)
 		return (zfs_error(hdl, EZFS_ISSPARE, msg));
 
-	zc.zc_cookie = istmp;
+	zc.zc_cookie = VDEV_STATE_OFFLINE;
+	zc.zc_obj = istmp ? ZFS_OFFLINE_TEMPORARY : 0;
 
-	if (ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_VDEV_OFFLINE, &zc) == 0)
+	if (ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_VDEV_SET_STATE, &zc) == 0)
 		return (0);
 
 	switch (errno) {
@@ -931,6 +939,63 @@ zpool_vdev_offline(zpool_handle_t *zhp, const char *path, int istmp)
 	default:
 		return (zpool_standard_error(hdl, errno, msg));
 	}
+}
+
+/*
+ * Mark the given vdev faulted.
+ */
+int
+zpool_vdev_fault(zpool_handle_t *zhp, uint64_t guid)
+{
+	zfs_cmd_t zc = { 0 };
+	char msg[1024];
+	libzfs_handle_t *hdl = zhp->zpool_hdl;
+
+	(void) snprintf(msg, sizeof (msg),
+	    dgettext(TEXT_DOMAIN, "cannot fault %llu"), guid);
+
+	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
+	zc.zc_guid = guid;
+	zc.zc_cookie = VDEV_STATE_FAULTED;
+
+	if (ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_VDEV_SET_STATE, &zc) == 0)
+		return (0);
+
+	switch (errno) {
+	case EBUSY:
+
+		/*
+		 * There are no other replicas of this device.
+		 */
+		return (zfs_error(hdl, EZFS_NOREPLICAS, msg));
+
+	default:
+		return (zpool_standard_error(hdl, errno, msg));
+	}
+
+}
+
+/*
+ * Mark the given vdev degraded.
+ */
+int
+zpool_vdev_degrade(zpool_handle_t *zhp, uint64_t guid)
+{
+	zfs_cmd_t zc = { 0 };
+	char msg[1024];
+	libzfs_handle_t *hdl = zhp->zpool_hdl;
+
+	(void) snprintf(msg, sizeof (msg),
+	    dgettext(TEXT_DOMAIN, "cannot degrade %llu"), guid);
+
+	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
+	zc.zc_guid = guid;
+	zc.zc_cookie = VDEV_STATE_DEGRADED;
+
+	if (ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_VDEV_SET_STATE, &zc) == 0)
+		return (0);
+
+	return (zpool_standard_error(hdl, errno, msg));
 }
 
 /*
@@ -1232,6 +1297,29 @@ zpool_clear(zpool_handle_t *zhp, const char *path)
 }
 
 /*
+ * Similar to zpool_clear(), but takes a GUID (used by fmd).
+ */
+int
+zpool_vdev_clear(zpool_handle_t *zhp, uint64_t guid)
+{
+	zfs_cmd_t zc = { 0 };
+	char msg[1024];
+	libzfs_handle_t *hdl = zhp->zpool_hdl;
+
+	(void) snprintf(msg, sizeof (msg),
+	    dgettext(TEXT_DOMAIN, "cannot clear errors for %llx"),
+	    guid);
+
+	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
+	zc.zc_guid = guid;
+
+	if (ioctl(hdl->libzfs_fd, ZFS_IOC_CLEAR, &zc) == 0)
+		return (0);
+
+	return (zpool_standard_error(hdl, errno, msg));
+}
+
+/*
  * Iterate over all zvols in a given pool by walking the /dev/zvol/dsk/<pool>
  * hierarchy.
  */
@@ -1492,6 +1580,8 @@ zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv)
 	char *path, *devid;
 	uint64_t value;
 	char buf[64];
+	vdev_stat_t *vs;
+	uint_t vsc;
 
 	if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NOT_PRESENT,
 	    &value) == 0) {
@@ -1502,7 +1592,16 @@ zpool_vdev_name(libzfs_handle_t *hdl, zpool_handle_t *zhp, nvlist_t *nv)
 		path = buf;
 	} else if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0) {
 
-		if (zhp != NULL &&
+		/*
+		 * If the device is dead (faulted, offline, etc) then don't
+		 * bother opening it.  Otherwise we may be forcing the user to
+		 * open a misbehaving device, which can have undesirable
+		 * effects.
+		 */
+		if ((nvlist_lookup_uint64_array(nv, ZPOOL_CONFIG_STATS,
+		    (uint64_t **)&vs, &vsc) != 0 ||
+		    vs->vs_state >= VDEV_STATE_DEGRADED) &&
+		    zhp != NULL &&
 		    nvlist_lookup_string(nv, ZPOOL_CONFIG_DEVID, &devid) == 0) {
 			/*
 			 * Determine if the current path is correct.
@@ -1684,7 +1783,7 @@ zpool_upgrade(zpool_handle_t *zhp)
  *
  * 'pool' is B_TRUE if we are logging a command for 'zpool'; B_FALSE
  * otherwise ('zfs').  'pool_create' is B_TRUE if we are logging the creation
- * of the pool; B_FALSE otherwise.  'path' is the pathanme containing the
+ * of the pool; B_FALSE otherwise.  'path' is the pathname containing the
  * poolname.  'argc' and 'argv' are used to construct the command string.
  */
 void
@@ -2121,6 +2220,37 @@ zpool_set_prop(zpool_handle_t *zhp, const char *propname, const char *propval)
 	return (ret);
 }
 
+uint64_t
+zpool_get_prop_int(zpool_handle_t *zhp, zpool_prop_t prop)
+{
+	uint64_t value;
+	nvlist_t *nvp;
+
+	if (zpool_get_version(zhp) < ZFS_VERSION_BOOTFS)
+		return (0);
+
+	if (zhp->zpool_props == NULL && zpool_get_all_props(zhp))
+		return (zpool_prop_default_numeric(prop));
+
+	switch (prop) {
+	case ZPOOL_PROP_AUTOREPLACE:
+		if (nvlist_lookup_nvlist(zhp->zpool_props,
+		    zpool_prop_to_name(prop), &nvp) != 0) {
+			value = zpool_prop_default_numeric(prop);
+		} else {
+			VERIFY(nvlist_lookup_uint64(nvp, ZFS_PROP_VALUE,
+			    &value) == 0);
+		}
+		return (value);
+		break;
+
+	default:
+		assert(0);
+	}
+
+	return (0);
+}
+
 int
 zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *propbuf,
     size_t proplen, zfs_source_t *srctype)
@@ -2140,22 +2270,16 @@ zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *propbuf,
 		return (zfs_error(zhp->zpool_hdl, EZFS_BADVERSION, msg));
 	}
 
-	if (zhp->zpool_props == NULL && zpool_get_all_props(zhp))
+	if (zhp->zpool_props == NULL && zpool_get_all_props(zhp) &&
+	    prop != ZPOOL_PROP_NAME)
 		return (zfs_error(zhp->zpool_hdl, EZFS_POOLPROPS, msg));
 
-	/*
-	 * the "name" property is special cased
-	 */
-	if (!zfs_prop_valid_for_type(prop, ZFS_TYPE_POOL) &&
-	    prop != ZFS_PROP_NAME)
-		return (-1);
-
 	switch (prop) {
-	case ZFS_PROP_NAME:
+	case ZPOOL_PROP_NAME:
 		(void) strlcpy(propbuf, zhp->zpool_name, proplen);
 		break;
 
-	case ZFS_PROP_BOOTFS:
+	case ZPOOL_PROP_BOOTFS:
 		if (nvlist_lookup_nvlist(zhp->zpool_props,
 		    zpool_prop_to_name(prop), &nvp) != 0) {
 			strvalue = (char *)zfs_prop_default_string(prop);
@@ -2171,7 +2295,22 @@ zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *propbuf,
 			if (strlen(strvalue) >= proplen)
 				return (-1);
 		}
-		(void) strcpy(propbuf, strvalue);
+		(void) strlcpy(propbuf, strvalue, proplen);
+		break;
+
+	case ZPOOL_PROP_AUTOREPLACE:
+		if (nvlist_lookup_nvlist(zhp->zpool_props,
+		    zpool_prop_to_name(prop), &nvp) != 0) {
+			value = zpool_prop_default_numeric(prop);
+			src = ZFS_SRC_DEFAULT;
+		} else {
+			VERIFY(nvlist_lookup_uint64(nvp,
+			    ZFS_PROP_SOURCE, &value) == 0);
+			src = value;
+			VERIFY(nvlist_lookup_uint64(nvp, ZFS_PROP_VALUE,
+			    &value) == 0);
+		}
+		(void) strlcpy(propbuf, value ? "on" : "off", proplen);
 		break;
 
 	default:

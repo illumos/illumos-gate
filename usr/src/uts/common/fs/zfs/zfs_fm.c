@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,9 +117,11 @@ zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
 
 	/*
 	 * Ignore any errors from I/Os that we are going to retry anyway - we
-	 * only generate errors from the final failure.
+	 * only generate errors from the final failure.  Checksum errors are
+	 * generated after the pipeline stage responsible for retrying the I/O
+	 * (VDEV_IO_ASSESS), so this only applies to standard I/O errors.
 	 */
-	if (zio && zio_should_retry(zio))
+	if (zio && zio_should_retry(zio) && zio->io_error != ECKSUM)
 		return;
 
 	/*
@@ -292,13 +294,8 @@ zfs_ereport_post(const char *subclass, spa_t *spa, vdev_t *vd, zio_t *zio,
 #endif
 }
 
-/*
- * The 'resource.fs.zfs.ok' event is an internal signal that the associated
- * resource (pool or disk) has been identified by ZFS as healthy.  This will
- * then trigger the DE to close the associated case, if any.
- */
-void
-zfs_post_ok(spa_t *spa, vdev_t *vd)
+static void
+zfs_post_common(spa_t *spa, vdev_t *vd, const char *name)
 {
 #ifdef _KERNEL
 	nvlist_t *resource;
@@ -308,7 +305,7 @@ zfs_post_ok(spa_t *spa, vdev_t *vd)
 		return;
 
 	(void) snprintf(class, sizeof (class), "%s.%s.%s", FM_RSRC_RESOURCE,
-	    ZFS_ERROR_CLASS, FM_RESOURCE_OK);
+	    ZFS_ERROR_CLASS, name);
 	VERIFY(nvlist_add_uint8(resource, FM_VERSION, FM_RSRC_VERSION) == 0);
 	VERIFY(nvlist_add_string(resource, FM_CLASS, class) == 0);
 	VERIFY(nvlist_add_uint64(resource,
@@ -321,4 +318,38 @@ zfs_post_ok(spa_t *spa, vdev_t *vd)
 
 	fm_nvlist_destroy(resource, FM_NVA_FREE);
 #endif
+}
+
+/*
+ * The 'resource.fs.zfs.ok' event is an internal signal that the associated
+ * resource (pool or disk) has been identified by ZFS as healthy.  This will
+ * then trigger the DE to close the associated case, if any.
+ */
+void
+zfs_post_ok(spa_t *spa, vdev_t *vd)
+{
+	zfs_post_common(spa, vd, FM_RESOURCE_OK);
+}
+
+/*
+ * The 'resource.fs.zfs.removed' event is an internal signal that the given vdev
+ * has been removed from the system.  This will cause the DE to ignore any
+ * recent I/O errors, inferring that they are due to the asynchronous device
+ * removal.
+ */
+void
+zfs_post_remove(spa_t *spa, vdev_t *vd)
+{
+	zfs_post_common(spa, vd, FM_RESOURCE_REMOVED);
+}
+
+/*
+ * The 'resource.fs.zfs.autoreplace' event is an internal signal that the pool
+ * has the 'autoreplace' property set, and therefore any broken vdevs will be
+ * handled by higher level logic, and no vdev fault should be generated.
+ */
+void
+zfs_post_autoreplace(spa_t *spa, vdev_t *vd)
+{
+	zfs_post_common(spa, vd, FM_RESOURCE_AUTOREPLACE);
 }

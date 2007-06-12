@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,9 +27,12 @@
 
 /*
  * The ZFS retire agent is responsible for managing hot spares across all pools.
- * When we see a device fault, we try to open the associated pool and look for
- * any hot spares.  We iterate over any available hot spares and attempt a
- * 'zpool replace' for each one.
+ * When we see a device fault or a device removal, we try to open the associated
+ * pool and look for any hot spares.  We iterate over any available hot spares
+ * and attempt a 'zpool replace' for each one.
+ *
+ * For vdevs diagnosed as faulty, the agent is also responsible for proactively
+ * marking the vdev FAULTY (for I/O errors) or DEGRADED (for checksum errors).
  */
 
 #include <fm/fmd_api.h>
@@ -37,6 +40,7 @@
 #include <sys/fm/protocol.h>
 #include <sys/fm/fs/zfs.h>
 #include <libzfs.h>
+#include <string.h>
 
 /*
  * Find a pool with a matching GUID.
@@ -87,104 +91,210 @@ find_vdev(nvlist_t *nv, uint64_t search)
 	return (NULL);
 }
 
+/*
+ * Given a (pool, vdev) GUID pair, find the matching pool and vdev.
+ */
+static zpool_handle_t *
+find_by_guid(libzfs_handle_t *zhdl, uint64_t pool_guid, uint64_t vdev_guid,
+    nvlist_t **vdevp)
+{
+	find_cbdata_t cb;
+	zpool_handle_t *zhp;
+	nvlist_t *config, *nvroot;
+
+	/*
+	 * Find the corresponding pool and make sure the vdev still exists.
+	 */
+	cb.cb_guid = pool_guid;
+	if (zpool_iter(zhdl, find_pool, &cb) != 1)
+		return (NULL);
+
+	zhp = cb.cb_zhp;
+	config = zpool_get_config(zhp, NULL);
+	if (nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
+	    &nvroot) != 0) {
+		zpool_close(zhp);
+		return (NULL);
+	}
+
+	if ((*vdevp = find_vdev(nvroot, vdev_guid)) == NULL) {
+		zpool_close(zhp);
+		return (NULL);
+	}
+
+	return (zhp);
+}
+
+/*
+ * Given a vdev, attempt to replace it with every known spare until one
+ * succeeds.
+ */
+static void
+replace_with_spare(zpool_handle_t *zhp, nvlist_t *vdev)
+{
+	nvlist_t *config, *nvroot, *replacement;
+	nvlist_t **spares;
+	uint_t s, nspares;
+	char *dev_name;
+
+	config = zpool_get_config(zhp, NULL);
+	if (nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
+	    &nvroot) != 0)
+		return;
+
+	/*
+	 * Find out if there are any hot spares available in the pool.
+	 */
+	if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
+	    &spares, &nspares) != 0)
+		return;
+
+	if (nvlist_alloc(&replacement, NV_UNIQUE_NAME, 0) != 0)
+		return;
+
+	if (nvlist_add_string(replacement, ZPOOL_CONFIG_TYPE,
+	    VDEV_TYPE_ROOT) != 0) {
+		nvlist_free(replacement);
+		return;
+	}
+
+	dev_name = zpool_vdev_name(NULL, zhp, vdev);
+
+	/*
+	 * Try to replace each spare, ending when we successfully
+	 * replace it.
+	 */
+	for (s = 0; s < nspares; s++) {
+		char *spare_name;
+
+		if (nvlist_lookup_string(spares[s], ZPOOL_CONFIG_PATH,
+		    &spare_name) != 0)
+			continue;
+
+		if (nvlist_add_nvlist_array(replacement,
+		    ZPOOL_CONFIG_CHILDREN, &spares[s], 1) != 0)
+			continue;
+
+		if (zpool_vdev_attach(zhp, dev_name, spare_name,
+		    replacement, B_TRUE) == 0)
+			break;
+	}
+
+	free(dev_name);
+	nvlist_free(replacement);
+}
+
 /*ARGSUSED*/
 static void
 zfs_retire_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
     const char *class)
 {
 	uint64_t pool_guid, vdev_guid;
-	char *dev_name;
 	zpool_handle_t *zhp;
-	nvlist_t *resource, *config, *nvroot;
-	nvlist_t *vdev;
-	nvlist_t **spares, **faults;
-	uint_t s, nspares, f, nfaults;
-	nvlist_t *replacement;
-	find_cbdata_t cb;
+	nvlist_t *resource, *fault;
+	nvlist_t **faults;
+	uint_t f, nfaults;
 	libzfs_handle_t *zhdl = fmd_hdl_getspecific(hdl);
+	boolean_t fault_device, degrade_device;
+	boolean_t is_repair;
+	char *scheme;
+	nvlist_t *vdev;
 
 	/*
-	 * Get information from the fault.
+	 * If this is a resource notifying us of device removal, then simply
+	 * check for an available spare and continue.
+	 */
+	if (strcmp(class, "resource.fs.zfs.removed") == 0) {
+		if (nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_ZFS_POOL_GUID,
+		    &pool_guid) != 0 ||
+		    nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_ZFS_VDEV_GUID,
+		    &vdev_guid) != 0)
+			return;
+
+		if ((zhp = find_by_guid(zhdl, pool_guid, vdev_guid,
+		    &vdev)) == NULL)
+			return;
+
+		if (fmd_prop_get_int32(hdl, "spare_on_remove"))
+			replace_with_spare(zhp, vdev);
+		zpool_close(zhp);
+		return;
+	}
+
+	if (strcmp(class, "list.repaired") == 0)
+		is_repair = B_TRUE;
+	else
+		is_repair = B_FALSE;
+
+	/*
+	 * We subscribe to zfs faults as well as all repair events.
 	 */
 	if (nvlist_lookup_nvlist_array(nvl, FM_SUSPECT_FAULT_LIST,
 	    &faults, &nfaults) != 0)
 		return;
 
 	for (f = 0; f < nfaults; f++) {
-		if (nvlist_lookup_nvlist(faults[f], FM_FAULT_RESOURCE,
+		fault = faults[f];
+
+		fault_device = B_FALSE;
+		degrade_device = B_FALSE;
+
+		/*
+		 * While we subscribe to fault.fs.zfs.*, we only take action
+		 * for faults targeting a specific vdev (open failure or SERD
+		 * failure).
+		 */
+		if (fmd_nvl_class_match(hdl, fault, "fault.fs.zfs.vdev.io"))
+			fault_device = B_TRUE;
+		else if (fmd_nvl_class_match(hdl, fault,
+		    "fault.fs.zfs.vdev.checksum"))
+			degrade_device = B_TRUE;
+		else if (fmd_nvl_class_match(hdl, fault, "fault.fs.zfs.device"))
+			fault_device = B_FALSE;
+		else
+			continue;
+
+		if (nvlist_lookup_nvlist(fault, FM_FAULT_RESOURCE,
 		    &resource) != 0 ||
-		    nvlist_lookup_uint64(resource, FM_FMRI_ZFS_POOL,
+		    nvlist_lookup_string(resource, FM_FMRI_SCHEME,
+		    &scheme) != 0)
+			continue;
+
+		if (strcmp(scheme, FM_FMRI_SCHEME_ZFS) != 0)
+			continue;
+
+		if (nvlist_lookup_uint64(resource, FM_FMRI_ZFS_POOL,
 		    &pool_guid) != 0 ||
 		    nvlist_lookup_uint64(resource, FM_FMRI_ZFS_VDEV,
 		    &vdev_guid) != 0)
 			continue;
 
+		if ((zhp = find_by_guid(zhdl, pool_guid, vdev_guid,
+		    &vdev)) == NULL)
+			continue;
+
 		/*
-		 * From the pool guid and vdev guid, get the pool name and
-		 * device name.
+		 * If this is a repair event, then mark the vdev as repaired and
+		 * continue.
 		 */
-		cb.cb_guid = pool_guid;
-		if (zpool_iter(zhdl, find_pool, &cb) != 1)
-			continue;
-
-		zhp = cb.cb_zhp;
-		config = zpool_get_config(zhp, NULL);
-		if (nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
-		    &nvroot) != 0) {
-			zpool_close(zhp);
-			continue;
-		}
-
-		if ((vdev = find_vdev(nvroot, vdev_guid)) == NULL) {
+		if (is_repair) {
+			(void) zpool_vdev_clear(zhp, vdev_guid);
 			zpool_close(zhp);
 			continue;
 		}
 
 		/*
-		 * Find out if there are any hot spares available in the pool.
+		 * Actively fault the device if needed.
 		 */
-		if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
-		    &spares, &nspares) != 0) {
-			zpool_close(zhp);
-			continue;
-		}
-
-		if (nvlist_alloc(&replacement, NV_UNIQUE_NAME, 0) != 0) {
-			zpool_close(zhp);
-			continue;
-		}
-
-		if (nvlist_add_string(replacement, ZPOOL_CONFIG_TYPE,
-		    VDEV_TYPE_ROOT) != 0) {
-			nvlist_free(replacement);
-			zpool_close(zhp);
-			continue;
-		}
-
-		dev_name = zpool_vdev_name(zhdl, zhp, vdev);
+		if (fault_device)
+			(void) zpool_vdev_fault(zhp, vdev_guid);
+		if (degrade_device)
+			(void) zpool_vdev_degrade(zhp, vdev_guid);
 
 		/*
-		 * Try to replace each spare, ending when we successfully
-		 * replace it.
+		 * Attempt to substitute a hot spare.
 		 */
-		for (s = 0; s < nspares; s++) {
-			char *spare_name;
-
-			if (nvlist_lookup_string(spares[s], ZPOOL_CONFIG_PATH,
-			    &spare_name) != 0)
-				continue;
-
-			if (nvlist_add_nvlist_array(replacement,
-			    ZPOOL_CONFIG_CHILDREN, &spares[s], 1) != 0)
-				continue;
-
-			if (zpool_vdev_attach(zhp, dev_name, spare_name,
-			    replacement, B_TRUE) == 0)
-				break;
-		}
-
-		free(dev_name);
-		nvlist_free(replacement);
+		replace_with_spare(zhp, vdev);
 		zpool_close(zhp);
 	}
 }
@@ -198,6 +308,7 @@ static const fmd_hdl_ops_t fmd_ops = {
 };
 
 static const fmd_prop_t fmd_props[] = {
+	{ "spare_on_remove", FMD_TYPE_BOOL, "true" },
 	{ NULL, 0, NULL }
 };
 

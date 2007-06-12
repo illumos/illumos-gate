@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@ typedef enum {
 } zfs_proptype_t;
 
 zfs_proptype_t zfs_prop_get_type(zfs_prop_t);
+zfs_proptype_t zpool_prop_get_type(zpool_prop_t);
 size_t zfs_prop_width(zfs_prop_t, boolean_t *);
 
 #ifdef	__cplusplus

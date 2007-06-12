@@ -1519,25 +1519,6 @@ zio_vdev_io_assess(zio_t *zio)
 		return;
 	}
 
-	if (zio->io_error != 0 && zio->io_error != ECKSUM &&
-	    !(zio->io_flags & ZIO_FLAG_SPECULATIVE) && vd) {
-		/*
-		 * Poor man's hotplug support.  Even if we're done retrying this
-		 * I/O, try to reopen the vdev to see if it's still attached.
-		 * To avoid excessive thrashing, we only try it once a minute.
-		 * This also has the effect of detecting when missing devices
-		 * have come back, by polling the device once a minute.
-		 *
-		 * We need to do this asynchronously because we can't grab
-		 * all the necessary locks way down here.
-		 */
-		if (gethrtime() - vd->vdev_last_try > 60ULL * NANOSEC) {
-			vd->vdev_last_try = gethrtime();
-			tvd->vdev_reopen_wanted = 1;
-			spa_async_request(vd->vdev_spa, SPA_ASYNC_REOPEN);
-		}
-	}
-
 	zio_next_stage(zio);
 }
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -352,6 +352,18 @@ vdev_cache_write(zio_t *zio)
 }
 
 void
+vdev_cache_purge(vdev_t *vd)
+{
+	vdev_cache_t *vc = &vd->vdev_cache;
+	vdev_cache_entry_t *ve;
+
+	mutex_enter(&vc->vc_lock);
+	while ((ve = avl_first(&vc->vc_offset_tree)) != NULL)
+		vdev_cache_evict(vc, ve);
+	mutex_exit(&vc->vc_lock);
+}
+
+void
 vdev_cache_init(vdev_t *vd)
 {
 	vdev_cache_t *vc = &vd->vdev_cache;
@@ -371,12 +383,8 @@ void
 vdev_cache_fini(vdev_t *vd)
 {
 	vdev_cache_t *vc = &vd->vdev_cache;
-	vdev_cache_entry_t *ve;
 
-	mutex_enter(&vc->vc_lock);
-	while ((ve = avl_first(&vc->vc_offset_tree)) != NULL)
-		vdev_cache_evict(vc, ve);
-	mutex_exit(&vc->vc_lock);
+	vdev_cache_purge(vd);
 
 	avl_destroy(&vc->vc_offset_tree);
 	avl_destroy(&vc->vc_lastused_tree);

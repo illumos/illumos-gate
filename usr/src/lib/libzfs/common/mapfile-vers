@@ -116,6 +116,7 @@ SUNWprivate_1.1 {
 	zpool_get_history;
 	zpool_get_name;
 	zpool_get_prop;
+	zpool_get_prop_int;
 	zpool_get_proplist;
 	zpool_get_root;
 	zpool_get_space_total;
@@ -144,7 +145,10 @@ SUNWprivate_1.1 {
 	zpool_unmount_datasets;
 	zpool_upgrade;
 	zpool_vdev_attach;
+	zpool_vdev_clear;
+	zpool_vdev_degrade;
 	zpool_vdev_detach;
+	zpool_vdev_fault;
 	zpool_vdev_name;
 	zpool_vdev_offline;
 	zpool_vdev_online;

@@ -158,14 +158,20 @@ extern int zpool_add(zpool_handle_t *, nvlist_t *);
  * Functions to manipulate pool and vdev state
  */
 extern int zpool_scrub(zpool_handle_t *, pool_scrub_type_t);
+extern int zpool_clear(zpool_handle_t *, const char *);
 
-extern int zpool_vdev_online(zpool_handle_t *, const char *);
-extern int zpool_vdev_offline(zpool_handle_t *, const char *, int);
-extern int zpool_vdev_attach(zpool_handle_t *, const char *, const char *,
-    nvlist_t *, int);
+extern int zpool_vdev_online(zpool_handle_t *, const char *, int,
+    vdev_state_t *);
+extern int zpool_vdev_offline(zpool_handle_t *, const char *, boolean_t);
+extern int zpool_vdev_attach(zpool_handle_t *, const char *,
+    const char *, nvlist_t *, int);
 extern int zpool_vdev_detach(zpool_handle_t *, const char *);
 extern int zpool_vdev_remove(zpool_handle_t *, const char *);
-extern int zpool_clear(zpool_handle_t *, const char *);
+
+extern int zpool_vdev_fault(zpool_handle_t *, uint64_t);
+extern int zpool_vdev_degrade(zpool_handle_t *, uint64_t);
+extern int zpool_vdev_clear(zpool_handle_t *, uint64_t);
+
 extern nvlist_t *zpool_find_vdev(zpool_handle_t *, const char *, boolean_t *);
 extern int zpool_label_disk(libzfs_handle_t *, zpool_handle_t *, char *);
 
@@ -173,8 +179,9 @@ extern int zpool_label_disk(libzfs_handle_t *, zpool_handle_t *, char *);
  * Functions to manage pool properties
  */
 extern int zpool_set_prop(zpool_handle_t *, const char *, const char *);
-extern int zpool_get_prop(zpool_handle_t *, zfs_prop_t, char *,
+extern int zpool_get_prop(zpool_handle_t *, zpool_prop_t, char *,
 	size_t proplen, zfs_source_t *);
+extern uint64_t zpool_get_prop_int(zpool_handle_t *, zpool_prop_t);
 extern const char *zpool_prop_to_name(zpool_prop_t);
 extern const char *zpool_prop_values(zpool_prop_t);
 
@@ -197,6 +204,8 @@ typedef enum {
 	ZPOOL_STATUS_FAILING_DEV,	/* device experiencing errors */
 	ZPOOL_STATUS_VERSION_NEWER,	/* newer on-disk version */
 	ZPOOL_STATUS_HOSTID_MISMATCH,	/* last accessed by another system */
+	ZPOOL_STATUS_FAULTED_DEV_R,	/* faulted device with replicas */
+	ZPOOL_STATUS_FAULTED_DEV_NR,	/* faulted device with no replicas */
 
 	/*
 	 * The following are not faults per se, but still an error possibly
@@ -372,7 +381,7 @@ extern int zfs_share(zfs_handle_t *);
 extern int zfs_unshare(zfs_handle_t *);
 
 /*
- * Protocol-specifc share support functions.
+ * Protocol-specific share support functions.
  */
 extern boolean_t zfs_is_shared_nfs(zfs_handle_t *, char **);
 extern int zfs_share_nfs(zfs_handle_t *);

@@ -330,8 +330,8 @@ extern void spa_async_resume(spa_t *spa);
 extern spa_t *spa_inject_addref(char *pool);
 extern void spa_inject_delref(spa_t *spa);
 
-#define	SPA_ASYNC_REOPEN	0x01
-#define	SPA_ASYNC_REPLACE_DONE	0x02
+#define	SPA_ASYNC_REMOVE	0x01
+#define	SPA_ASYNC_RESILVER_DONE	0x02
 #define	SPA_ASYNC_SCRUB		0x04
 #define	SPA_ASYNC_RESILVER	0x08
 #define	SPA_ASYNC_CONFIG_UPDATE	0x10
@@ -452,6 +452,8 @@ extern void spa_log_error(spa_t *spa, struct zio *zio);
 extern void zfs_ereport_post(const char *class, spa_t *spa, vdev_t *vd,
     struct zio *zio, uint64_t stateoroffset, uint64_t length);
 extern void zfs_post_ok(spa_t *spa, vdev_t *vd);
+extern void zfs_post_remove(spa_t *spa, vdev_t *vd);
+extern void zfs_post_autoreplace(spa_t *spa, vdev_t *vd);
 extern uint64_t spa_get_errlog_size(spa_t *spa);
 extern int spa_get_errlog(spa_t *spa, void *uaddr, size_t *count);
 extern void spa_errlog_rotate(spa_t *spa);
@@ -468,6 +470,9 @@ extern int spa_set_props(spa_t *spa, nvlist_t *nvp);
 extern int spa_get_props(spa_t *spa, nvlist_t **nvp);
 extern void spa_clear_bootfs(spa_t *spa, uint64_t obj, dmu_tx_t *tx);
 extern boolean_t spa_has_bootfs(spa_t *spa);
+
+/* asynchronous event notification */
+extern void spa_event_notify(spa_t *spa, vdev_t *vdev, const char *name);
 
 #ifdef ZFS_DEBUG
 #define	dprintf_bp(bp, fmt, ...) do {				\

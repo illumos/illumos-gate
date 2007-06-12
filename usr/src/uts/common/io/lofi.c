@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +58,14 @@
  * (fdformat doesn't work because it really wants to know the type of floppy
  * controller to talk to, and that didn't seem easy to fake. Or possibly even
  * necessary, since we have mkfs_pcfs now).
+ *
+ * Normally, a lofi device cannot be detached if it is open (i.e. busy).  To
+ * support simulation of hotplug events, an optional force flag is provided.
+ * If a lofi device is open when a force detach is requested, then the
+ * underlying file is closed and any subsequent operations return EIO.  When the
+ * device is closed for the last time, it will be cleaned up at that time.  In
+ * addition, the DKIOCSTATE ioctl will return DKIO_DEV_GONE when the device is
+ * detached but not removed.
  *
  * Known problems:
  *
@@ -207,7 +215,38 @@ mark_closed(struct lofi_state *lsp, int otyp)
 	}
 }
 
-/*ARGSUSED3*/
+static void
+lofi_free_handle(dev_t dev, minor_t minor, struct lofi_state *lsp,
+    cred_t *credp)
+{
+	dev_t	newdev;
+	char	namebuf[50];
+
+	if (lsp->ls_vp) {
+		(void) VOP_CLOSE(lsp->ls_vp, lsp->ls_openflag, 1, 0, credp);
+		VN_RELE(lsp->ls_vp);
+		lsp->ls_vp = NULL;
+	}
+
+	newdev = makedevice(getmajor(dev), minor);
+	(void) ddi_prop_remove(newdev, lofi_dip, SIZE_PROP_NAME);
+	(void) ddi_prop_remove(newdev, lofi_dip, NBLOCKS_PROP_NAME);
+
+	(void) snprintf(namebuf, sizeof (namebuf), "%d", minor);
+	ddi_remove_minor_node(lofi_dip, namebuf);
+	(void) snprintf(namebuf, sizeof (namebuf), "%d,raw", minor);
+	ddi_remove_minor_node(lofi_dip, namebuf);
+
+	kmem_free(lsp->ls_filename, lsp->ls_filename_sz);
+	taskq_destroy(lsp->ls_taskq);
+	if (lsp->ls_kstat) {
+		kstat_delete(lsp->ls_kstat);
+		mutex_destroy(&lsp->ls_kstat_lock);
+	}
+	ddi_soft_state_free(lofi_statep, minor);
+}
+
+/*ARGSUSED*/
 static int
 lofi_open(dev_t *devp, int flag, int otyp, struct cred *credp)
 {
@@ -244,6 +283,11 @@ lofi_open(dev_t *devp, int flag, int otyp, struct cred *credp)
 		return (EINVAL);
 	}
 
+	if (lsp->ls_vp == NULL) {
+		mutex_exit(&lofi_lock);
+		return (ENXIO);
+	}
+
 	if (mark_opened(lsp, otyp) == -1) {
 		mutex_exit(&lofi_lock);
 		return (EINVAL);
@@ -253,16 +297,13 @@ lofi_open(dev_t *devp, int flag, int otyp, struct cred *credp)
 	return (0);
 }
 
-/*ARGSUSED3*/
+/*ARGSUSED*/
 static int
 lofi_close(dev_t dev, int flag, int otyp, struct cred *credp)
 {
 	minor_t	minor;
 	struct lofi_state *lsp;
 
-#ifdef lint
-	flag = flag;
-#endif
 	mutex_enter(&lofi_lock);
 	minor = getminor(dev);
 	lsp = ddi_get_soft_state(lofi_statep, minor);
@@ -271,6 +312,13 @@ lofi_close(dev_t dev, int flag, int otyp, struct cred *credp)
 		return (EINVAL);
 	}
 	mark_closed(lsp, otyp);
+
+	/*
+	 * If we have forcibly closed the underlying device, and this is the
+	 * last close, then tear down the rest of the device.
+	 */
+	if (minor != 0 && lsp->ls_vp == NULL && !is_opened(lsp))
+		lofi_free_handle(dev, minor, lsp, credp);
 	mutex_exit(&lofi_lock);
 	return (0);
 }
@@ -312,7 +360,9 @@ lofi_strategy_task(void *arg)
 	 * we have the rw_lock. So instead we page, unless it's not
 	 * mapable or it's a character device.
 	 */
-	if (((lsp->ls_vp->v_flag & VNOMAP) == 0) &&
+	if (lsp->ls_vp == NULL || lsp->ls_vp_closereq) {
+		error = EIO;
+	} else if (((lsp->ls_vp->v_flag & VNOMAP) == 0) &&
 	    (lsp->ls_vp->v_type != VCHR)) {
 		/*
 		 * segmap always gives us an 8K (MAXBSIZE) chunk, aligned on
@@ -400,6 +450,12 @@ lofi_strategy_task(void *arg)
 		kstat_runq_exit(kioptr);
 		mutex_exit(lsp->ls_kstat->ks_lock);
 	}
+
+	mutex_enter(&lsp->ls_vp_lock);
+	if (--lsp->ls_vp_iocount == 0)
+		cv_broadcast(&lsp->ls_vp_cv);
+	mutex_exit(&lsp->ls_vp_lock);
+
 	bioerror(bp, error);
 	biodone(bp);
 }
@@ -422,6 +478,14 @@ lofi_strategy(struct buf *bp)
 	 * queues were incredibly easy so they win.
 	 */
 	lsp = ddi_get_soft_state(lofi_statep, getminor(bp->b_edev));
+	mutex_enter(&lsp->ls_vp_lock);
+	if (lsp->ls_vp == NULL || lsp->ls_vp_closereq) {
+		bioerror(bp, EIO);
+		biodone(bp);
+		mutex_exit(&lsp->ls_vp_lock);
+		return (0);
+	}
+
 	offset = bp->b_lblkno * DEV_BSIZE;	/* offset within file */
 	if (offset == lsp->ls_vp_size) {
 		/* EOF */
@@ -433,13 +497,18 @@ lofi_strategy(struct buf *bp)
 			bioerror(bp, ENXIO);
 		}
 		biodone(bp);
+		mutex_exit(&lsp->ls_vp_lock);
 		return (0);
 	}
 	if (offset > lsp->ls_vp_size) {
 		bioerror(bp, ENXIO);
 		biodone(bp);
+		mutex_exit(&lsp->ls_vp_lock);
 		return (0);
 	}
+	lsp->ls_vp_iocount++;
+	mutex_exit(&lsp->ls_vp_lock);
+
 	if (lsp->ls_kstat) {
 		mutex_enter(lsp->ls_kstat->ks_lock);
 		kstat_waitq_enter(KSTAT_IO_PTR(lsp->ls_kstat));
@@ -720,15 +789,15 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 	struct lofi_state *lsp;
 	struct lofi_ioctl *klip;
 	int	error;
-	char	namebuf[50];
 	struct vnode *vp;
 	int64_t	Nblocks_prop_val;
 	int64_t	Size_prop_val;
 	vattr_t	vattr;
 	int	flag;
 	enum vtype v_type;
-	dev_t	newdev;
 	int zalloced = 0;
+	dev_t	newdev;
+	char	namebuf[50];
 
 	klip = copy_in_lofi_ioctl(ulip, ioctl_flag);
 	if (klip == NULL)
@@ -846,6 +915,9 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 		lsp->ls_kstat->ks_lock = &lsp->ls_kstat_lock;
 		kstat_install(lsp->ls_kstat);
 	}
+	cv_init(&lsp->ls_vp_cv, NULL, CV_DRIVER, NULL);
+	mutex_init(&lsp->ls_vp_lock, NULL, MUTEX_DRIVER, NULL);
+
 	/*
 	 * save open mode so file can be closed properly and vnode counts
 	 * updated correctly.
@@ -911,8 +983,6 @@ lofi_unmap_file(dev_t dev, struct lofi_ioctl *ulip, int byfilename,
 	struct lofi_state *lsp;
 	struct lofi_ioctl *klip;
 	minor_t	minor;
-	char	namebuf[20];
-	dev_t	newdev;
 
 	klip = copy_in_lofi_ioctl(ulip, ioctl_flag);
 	if (klip == NULL)
@@ -930,38 +1000,51 @@ lofi_unmap_file(dev_t dev, struct lofi_ioctl *ulip, int byfilename,
 		return (ENXIO);
 	}
 	lsp = ddi_get_soft_state(lofi_statep, minor);
-	if (lsp == NULL) {
+	if (lsp == NULL || lsp->ls_vp == NULL) {
 		mutex_exit(&lofi_lock);
 		free_lofi_ioctl(klip);
 		return (ENXIO);
 	}
+
 	if (is_opened(lsp)) {
+		/*
+		 * If the 'force' flag is set, then we forcibly close the
+		 * underlying file.  Subsequent operations will fail, and the
+		 * DKIOCSTATE ioctl will return DKIO_DEV_GONE.  When the device
+		 * is last closed, the device will be cleaned up appropriately.
+		 *
+		 * This is complicated by the fact that we may have outstanding
+		 * dispatched I/Os.  Rather than having a single mutex to
+		 * serialize all I/O, we keep a count of the number of
+		 * outstanding I/O requests, as well as a flag to indicate that
+		 * no new I/Os should be dispatched.  We set the flag, wait for
+		 * the number of outstanding I/Os to reach 0, and then close the
+		 * underlying vnode.
+		 */
+		if (klip->li_force) {
+			mutex_enter(&lsp->ls_vp_lock);
+			lsp->ls_vp_closereq = B_TRUE;
+			while (lsp->ls_vp_iocount > 0)
+				cv_wait(&lsp->ls_vp_cv, &lsp->ls_vp_lock);
+			(void) VOP_CLOSE(lsp->ls_vp, lsp->ls_openflag, 1, 0,
+			    credp);
+			VN_RELE(lsp->ls_vp);
+			lsp->ls_vp = NULL;
+			cv_broadcast(&lsp->ls_vp_cv);
+			mutex_exit(&lsp->ls_vp_lock);
+			mutex_exit(&lofi_lock);
+			klip->li_minor = minor;
+			(void) copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
+			free_lofi_ioctl(klip);
+			return (0);
+		}
 		mutex_exit(&lofi_lock);
 		free_lofi_ioctl(klip);
 		return (EBUSY);
 	}
-	/*
-	 * Use saved open mode to properly update vnode counts
-	 */
-	(void) VOP_CLOSE(lsp->ls_vp, lsp->ls_openflag, 1, 0, credp);
-	VN_RELE(lsp->ls_vp);
-	lsp->ls_vp = NULL;
-	newdev = makedevice(getmajor(dev), minor);
-	(void) ddi_prop_remove(newdev, lofi_dip, SIZE_PROP_NAME);
-	(void) ddi_prop_remove(newdev, lofi_dip, NBLOCKS_PROP_NAME);
 
-	(void) snprintf(namebuf, sizeof (namebuf), "%d", minor);
-	ddi_remove_minor_node(lofi_dip, namebuf);
-	(void) snprintf(namebuf, sizeof (namebuf), "%d,raw", minor);
-	ddi_remove_minor_node(lofi_dip, namebuf);
+	lofi_free_handle(dev, minor, lsp, credp);
 
-	kmem_free(lsp->ls_filename, lsp->ls_filename_sz);
-	taskq_destroy(lsp->ls_taskq);
-	if (lsp->ls_kstat) {
-		kstat_delete(lsp->ls_kstat);
-		mutex_destroy(&lsp->ls_kstat_lock);
-	}
-	ddi_soft_state_free(lofi_statep, minor);
 	klip->li_minor = minor;
 	mutex_exit(&lofi_lock);
 	(void) copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
@@ -973,7 +1056,7 @@ lofi_unmap_file(dev_t dev, struct lofi_ioctl *ulip, int byfilename,
  * get the filename given the minor number, or the minor number given
  * the name.
  */
-/*ARGSUSED3*/
+/*ARGSUSED*/
 static int
 lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
     struct cred *credp, int ioctl_flag)
@@ -983,9 +1066,6 @@ lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
 	int	error;
 	minor_t	minor;
 
-#ifdef lint
-	dev = dev;
-#endif
 	klip = copy_in_lofi_ioctl(ulip, ioctl_flag);
 	if (klip == NULL)
 		return (EFAULT);
@@ -1089,6 +1169,13 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 	if (lsp == NULL)
 		return (ENXIO);
 
+	/*
+	 * We explicitly allow DKIOCSTATE, but all other ioctls should fail with
+	 * EIO as if the device was no longer present.
+	 */
+	if (lsp->ls_vp == NULL && cmd != DKIOCSTATE)
+		return (EIO);
+
 	/* these are for faking out utilities like newfs */
 	switch (cmd) {
 	case DKIOCGVTOC:
@@ -1125,11 +1212,34 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 			return (EFAULT);
 		return (0);
 	case DKIOCSTATE:
-		/* the file is always there */
-		dkstate = DKIO_INSERTED;
-		error = ddi_copyout(&dkstate, (void *)arg,
-		    sizeof (enum dkio_state), flag);
-		if (error)
+		/*
+		 * Normally, lofi devices are always in the INSERTED state.  If
+		 * a device is forcefully unmapped, then the device transitions
+		 * to the DKIO_DEV_GONE state.
+		 */
+		if (ddi_copyin((void *)arg, &dkstate, sizeof (dkstate),
+		    flag) != 0)
+			return (EFAULT);
+
+		mutex_enter(&lsp->ls_vp_lock);
+		while ((dkstate == DKIO_INSERTED && lsp->ls_vp != NULL) ||
+		    (dkstate == DKIO_DEV_GONE && lsp->ls_vp == NULL)) {
+			/*
+			 * By virtue of having the device open, we know that
+			 * 'lsp' will remain valid when we return.
+			 */
+			if (!cv_wait_sig(&lsp->ls_vp_cv,
+			    &lsp->ls_vp_lock)) {
+				mutex_exit(&lsp->ls_vp_lock);
+				return (EINTR);
+			}
+		}
+
+		dkstate = (lsp->ls_vp != NULL ? DKIO_INSERTED : DKIO_DEV_GONE);
+		mutex_exit(&lsp->ls_vp_lock);
+
+		if (ddi_copyout(&dkstate, (void *)arg,
+		    sizeof (dkstate), flag) != 0)
 			return (EFAULT);
 		return (0);
 	default:

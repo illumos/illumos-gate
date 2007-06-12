@@ -72,6 +72,7 @@ extern "C" {
 #include <sys/zfs_debug.h>
 #include <sys/sdt.h>
 #include <sys/kstat.h>
+#include <sys/sysevent/eventdefs.h>
 
 /*
  * Debugging
@@ -151,7 +152,7 @@ _NOTE(CONSTCOND) } while (0)
 #endif
 
 /*
- * Dtrace SDT probes have different signatures in userland than they do in
+ * DTrace SDT probes have different signatures in userland than they do in
  * kernel.  If they're being used in kernel code, re-define them out of
  * existence for their counterparts in libzpool.
  */
