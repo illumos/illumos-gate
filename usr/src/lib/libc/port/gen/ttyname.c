@@ -143,7 +143,6 @@ static spcl_t special_case[] = {
 	"/dev/tty", 0, 0, 0,
 	"/dev/console", 0, 0, 0,
 	"/dev/conslog", 0, 0, 0,
-	"/dev/syscon", 0, 0, 0,
 	"/dev/systty", 0, 0, 0,
 	"/dev/wscons", 0, 0, 0
 };
@@ -294,9 +293,8 @@ _ttyname_common(struct stat64 *fsp, char *buffer, uint_t match_mask)
 			}
 		} else {
 			found = srch_dir(srch_dirs[dirno], match_mask,
-				((strcmp(srch_dirs[dirno].name,
-				dev_dir.name) == 0) ?
-				MAX_SRCH_DEPTH : 1), 0, fsp);
+			    ((strcmp(srch_dirs[dirno].name, dev_dir.name)
+			    == 0) ? MAX_SRCH_DEPTH : 1), 0, fsp);
 		}
 		dirno++;
 	}
@@ -372,9 +370,8 @@ ispts(struct stat64 *fsb, int match_mask)
 	if (match_mask == MATCH_MM) {
 		if (stb.st_rdev == fsb->st_rdev)
 			return (buf);
-	} else if (stb.st_rdev == fsb->st_rdev &&
-		stb.st_dev == fsb->st_dev &&
-		stb.st_ino == fsb->st_ino)
+	} else if (stb.st_rdev == fsb->st_rdev && stb.st_dev == fsb->st_dev &&
+	    stb.st_ino == fsb->st_ino)
 			return (buf);
 
 	return (NULL);
@@ -435,8 +432,8 @@ ispty(struct stat64 *fsb, int match_mask)
 		if (stb.st_rdev == fsb->st_rdev)
 			return (buf);
 	} else if (stb.st_rdev == fsb->st_rdev &&
-		stb.st_dev == fsb->st_dev &&
-		stb.st_ino == fsb->st_ino)
+	    stb.st_dev == fsb->st_dev &&
+	    stb.st_ino == fsb->st_ino)
 			return (buf);
 
 	return (NULL);
@@ -543,12 +540,19 @@ srch_dir(const entry_t path,	/* current path */
 			continue;
 
 		/*
+		 * skip "/dev/syscon" because it may be an invalid link after
+		 * single user mode.
+		 */
+		if (strcmp(file_name, "/dev/syscon") == 0)
+			continue;
+
+		/*
 		 * if a file is a directory and we are not too deep, recurse
 		 */
 		if ((tsb.st_mode & S_IFMT) == S_IFDIR)
 			if (depth < MAX_SRCH_DEPTH)
 				found = srch_dir(file, match_mask, depth+1,
-						skip_dirs, fsb);
+				    skip_dirs, fsb);
 			else
 				continue;
 
@@ -569,7 +573,7 @@ srch_dir(const entry_t path,	/* current path */
 				(void) strcpy(rbuf, file.name);
 				found = 1;
 			} else if ((flag & (MATCH_MM | MATCH_FS)) ==
-					(MATCH_MM | MATCH_FS)) {
+			    (MATCH_MM | MATCH_FS)) {
 
 				/*
 				 * no (inodes do not match), but save the name
@@ -732,9 +736,8 @@ get_pri_dirs(void)
 					char buf[256];
 					/* LINTED variable format specifier */
 					(void) snprintf(buf, sizeof (buf),
-						_libc_gettext(
-"ERROR: Entry '%s' in /etc/ttysrch ignored.\n"),
-						vec->name);
+					    _libc_gettext(
+"ERROR: Entry '%s' in /etc/ttysrch ignored.\n"), vec->name);
 					(void) write(tfd, buf, strlen(buf));
 					(void) close(tfd);
 				}
