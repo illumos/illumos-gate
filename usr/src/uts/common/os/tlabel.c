@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,6 +97,7 @@ labelalloc(const bslabel_t *val, uint32_t doi, int flag)
 	if (lab != NULL) {
 		lab->tsl_ref = 1;
 		lab->tsl_doi = doi;
+		lab->tsl_flags = 0;
 		if (val == NULL)
 			bzero(&lab->tsl_label, sizeof (bslabel_t));
 		else

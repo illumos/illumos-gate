@@ -940,27 +940,31 @@ tsol_receive_local(const mblk_t *mp, const void *addr, uchar_t version,
 		}
 
 	/*
-	 * If this is a private address and the connection is SLP for private
-	 * addresses, then the only thing that matters is the label on the
-	 * zone, which is the same as the label on the connection.  We don't
-	 * care (and don't have to care) about the tnrhdb.
+	 * If this is a packet from a labeled sender, verify the
+	 * label on the packet matches the connection label.
 	 */
-	} else if (!shared_addr) {
+	} else {
+		if (plabel->tsl_doi != conn_plabel->tsl_doi ||
+		    !blequal(label, conn_label)) {
+			DTRACE_PROBE3(tx__ip__log__drop__receivelocal__mac__slp,
+			    char *,
+			    "packet mp(1) failed label match to SLP conn(2)",
+			    mblk_t *, mp, conn_t *, connp);
+			return (B_FALSE);
+		}
 		/*
-		 * Since this is a zone-specific address, we know that any MLP
-		 * case should have been handled up above.  That means this
-		 * connection must not be MLP for zone-specific addresses.  We
-		 * assert that to be true.
+		 * No further checks will be needed if this is a zone-
+		 * specific address because (1) The process for bringing up
+		 * the interface ensures the zone's label is within the zone-
+		 * specific address's valid label range; (2) For cases where
+		 * the conn is bound to the unspecified addresses, ip fanout
+		 * logic ensures conn's zoneid equals the dest addr's zoneid;
+		 * (3) Mac-exempt and mlp logic above already handle all
+		 * cases where the zone label may not be the same as the
+		 * conn label.
 		 */
-		ASSERT(connp->conn_mlp_type == mlptSingle ||
-		    connp->conn_mlp_type == mlptShared);
-		if (plabel->tsl_doi == conn_plabel->tsl_doi &&
-		    blequal(label, conn_label))
+		if (!shared_addr)
 			return (B_TRUE);
-		DTRACE_PROBE3(tx__ip__log__drop__receivelocal__mac__slp,
-		    char *, "packet mp(1) fails exactly SLP match conn(2)",
-		    mblk_t *, mp, conn_t *, connp);
-		return (B_FALSE);
 	}
 
 	tp = find_tpc(addr, version, B_FALSE);
