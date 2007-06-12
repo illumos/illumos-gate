@@ -862,12 +862,11 @@ typedef struct _nxge_ipp_kstat {
 	kstat_named_t	sop_miss;
 	kstat_named_t	dfifo_ue;
 	kstat_named_t	ecc_err_cnt;
-	kstat_named_t	dfifo_perr;
+	kstat_named_t	pfifo_perr;
 	kstat_named_t	pfifo_over;
 	kstat_named_t	pfifo_und;
 	kstat_named_t	bad_cs_cnt;
 	kstat_named_t	pkt_dis_cnt;
-	kstat_named_t	cs_fail;
 } nxge_ipp_kstat_t, *p_nxge_ipp_kstat_t;
 
 typedef	struct _nxge_zcp_kstat {

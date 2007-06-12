@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -344,7 +344,7 @@ nxge_fm_init(p_nxge_t nxgep, ddi_device_acc_attr_t *reg_attr,
 	if (nxgep->fm_capabilities) {
 		reg_attr->devacc_attr_access = DDI_FLAGERR_ACC;
 		desc_attr->devacc_attr_access = DDI_FLAGERR_ACC;
-		dma_attr->dma_attr_flags = DDI_DMA_FLAGERR;
+		dma_attr->dma_attr_flags |= DDI_DMA_FLAGERR;
 
 		/* Register capabilities with IO Fault Services */
 		ddi_fm_init(nxgep->dip, &nxgep->fm_capabilities, &iblk);
@@ -362,7 +362,7 @@ nxge_fm_init(p_nxge_t nxgep, ddi_device_acc_attr_t *reg_attr,
 		 */
 		reg_attr->devacc_attr_access = DDI_DEFAULT_ACC;
 		desc_attr->devacc_attr_access = DDI_DEFAULT_ACC;
-		dma_attr->dma_attr_flags = 0;
+		dma_attr->dma_attr_flags &= ~DDI_DMA_FLAGERR;
 	}
 }
 

@@ -151,21 +151,21 @@ static nxge_param_t	nxge_param_arr[] = {
 	/*
 	 * min	max	value	old	hw-name	conf-name
 	 */
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_DONT_SHOW,
 		0, 999, 1000, 0, "instance", "instance"},
 
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_DONT_SHOW,
 		0, 999, 1000, 0, "main-instance", "main_instance"},
 
 	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
 		0, 3, 0, 0, "function-number", "function_number"},
 
 	/* Partition Id */
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_DONT_SHOW,
 		0, 8, 0, 0, "partition-id", "partition_id"},
 
 	/* Read Write Permission Mode */
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ | NXGE_PARAM_DONT_SHOW,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_DONT_SHOW,
 		0, 2, 0, 0, "read-write-mode", "read_write_mode"},
 
 	{ nxge_param_get_fw_ver, NULL, NXGE_PARAM_READ,
@@ -173,17 +173,17 @@ static nxge_param_t	nxge_param_arr[] = {
 
 	/* hw cfg types */
 	/* control the DMA config of Neptune/NIU */
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_DONT_SHOW,
 		CFG_DEFAULT, CFG_CUSTOM, CFG_DEFAULT, CFG_DEFAULT,
 		"niu-cfg-type", "niu_cfg_type"},
 
 	/* control the TXDMA config of the Port controlled by tx-quick-cfg */
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_DONT_SHOW,
 		CFG_DEFAULT, CFG_CUSTOM, CFG_NOT_SPECIFIED, CFG_DEFAULT,
 		"tx-qcfg-type", "tx_qcfg_type"},
 
 	/* control the RXDMA config of the Port controlled by rx-quick-cfg */
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_DONT_SHOW,
 		CFG_DEFAULT, CFG_CUSTOM, CFG_NOT_SPECIFIED, CFG_DEFAULT,
 		"rx-qcfg-type", "rx_qcfg_type"},
 
@@ -192,7 +192,7 @@ static nxge_param_t	nxge_param_arr[] = {
 		0, 1, 0, 0, "master-cfg-enable", "master_cfg_enable"},
 
 	{ nxge_param_get_mac, nxge_param_set_mac,
-		NXGE_PARAM_RW | NXGE_PARAM_DONT_SHOW,
+		NXGE_PARAM_DONT_SHOW,
 		0, 1, 0, 0, "master-cfg-value", "master_cfg_value"},
 
 	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
@@ -225,59 +225,66 @@ static nxge_param_t	nxge_param_arr[] = {
 	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_DONT_SHOW,
 		0, 1, 0, 0, "adv-10hdx-cap", "adv_10hdx_cap"},
 
-	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_DONT_SHOW,
 		0, 1, 0, 0, "adv-asmpause-cap",	"adv_asmpause_cap"},
 
 	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
 		0, 1, 0, 0, "adv-pause-cap", "adv_pause_cap"},
 
-	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_DONT_SHOW,
 		0, 1, 0, 0, "use-int-xcvr", "use_int_xcvr"},
 
-	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_DONT_SHOW,
 		0, 1, 1, 1, "enable-ipg0", "enable_ipg0"},
 
-	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_DONT_SHOW,
 		0, 255,	8, 8, "ipg0", "ipg0"},
 
-	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_DONT_SHOW,
 		0, 255,	8, 8, "ipg1", "ipg1"},
 
-	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
+	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_DONT_SHOW,
 		0, 255,	4, 4, "ipg2", "ipg2"},
 
 	{ nxge_param_get_mac, nxge_param_set_mac, NXGE_PARAM_MAC_RW,
 		0, 1, 0, 0, "accept-jumbo", "accept_jumbo"},
 
 	/* Transmit DMA channels */
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ |
+		NXGE_PARAM_READ_PROP | NXGE_PARAM_DONT_SHOW,
 		0, 3, 0, 0, "tx-dma-weight", "tx_dma_weight"},
 
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ |
+		NXGE_PARAM_READ_PROP | NXGE_PARAM_DONT_SHOW,
 		0, 31, 0, 0, "tx-dma-channels-begin", "tx_dma_channels_begin"},
 
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ |
+		NXGE_PARAM_READ_PROP | NXGE_PARAM_DONT_SHOW,
 		0, 32, 0, 0, "tx-dma-channels", "tx_dma_channels"},
 	{ nxge_param_get_txdma_info, NULL,
-		NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
+		NXGE_PARAM_READ | NXGE_PARAM_READ_PROP | NXGE_PARAM_DONT_SHOW,
 		0, 32, 0, 0, "tx-dma-info", "tx_dma_info"},
 
 	/* Receive DMA channels */
 	{ nxge_param_get_generic, NULL,
-		NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
+		NXGE_PARAM_READ | NXGE_PARAM_READ_PROP | NXGE_PARAM_DONT_SHOW,
 		0, 31, 0, 0, "rx-dma-channels-begin", "rx_dma_channels_begin"},
 
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ |
+		NXGE_PARAM_READ_PROP | NXGE_PARAM_DONT_SHOW,
 		0, 32, 0, 0, "rx-dma-channels",	"rx_dma_channels"},
 
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ |
+		NXGE_PARAM_READ_PROP | NXGE_PARAM_DONT_SHOW,
 		0, 65535, PT_DRR_WT_DEFAULT_10G, 0,
 		"rx-drr-weight", "rx_drr_weight"},
 
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ | NXGE_PARAM_READ_PROP,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ |
+		NXGE_PARAM_READ_PROP | NXGE_PARAM_DONT_SHOW,
 		0, 1, 1, 0, "rx-full-header", "rx_full_header"},
 
-	{ nxge_param_get_rxdma_info, NULL, NXGE_PARAM_READ,
+	{ nxge_param_get_rxdma_info, NULL, NXGE_PARAM_READ |
+		NXGE_PARAM_DONT_SHOW,
 		0, 32, 0, 0, "rx-dma-info", "rx_dma_info"},
 
 	{ nxge_param_get_rxdma_info, NULL,
@@ -290,7 +297,8 @@ static nxge_param_t	nxge_param_arr[] = {
 		NXGE_RCR_MIN, NXGE_RCR_MAX, NXGE_RCR_DEFAULT, 0,
 		"rx-rcr-size", "rx_rcr_size"},
 
-	{ nxge_param_get_generic, nxge_param_set_port_rdc, NXGE_PARAM_RXDMA_RW,
+	{ nxge_param_get_generic, nxge_param_set_port_rdc,
+		NXGE_PARAM_RXDMA_RW | NXGE_PARAM_DONT_SHOW,
 		0, 15, 0, 0, "default-port-rdc", "default_port_rdc"},
 
 	{ nxge_param_get_generic, nxge_param_rx_intr_time, NXGE_PARAM_RXDMA_RW,
@@ -302,85 +310,98 @@ static nxge_param_t	nxge_param_arr[] = {
 		RXDMA_RCR_PTHRES_DEFAULT, 0,
 		"rxdma-intr-pkts", "rxdma_intr_pkts"},
 
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ_PROP,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ_PROP |
+		NXGE_PARAM_DONT_SHOW,
 		0, 8, 0, 0, "rx-rdc-grps-begin", "rx_rdc_grps_begin"},
 
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ_PROP,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ_PROP |
+		NXGE_PARAM_DONT_SHOW,
 		0, 8, 0, 0, "rx-rdc-grps", "rx_rdc_grps"},
 
-	{ nxge_param_get_generic, nxge_param_set_grp_rdc, NXGE_PARAM_RXDMA_RW,
+	{ nxge_param_get_generic, nxge_param_set_grp_rdc,
+		NXGE_PARAM_RXDMA_RW | NXGE_PARAM_DONT_SHOW,
 		0, 15, 0, 0, "default-grp0-rdc", "default_grp0_rdc"},
 
-	{ nxge_param_get_generic, nxge_param_set_grp_rdc, NXGE_PARAM_RXDMA_RW,
+	{ nxge_param_get_generic, nxge_param_set_grp_rdc,
+		NXGE_PARAM_RXDMA_RW | NXGE_PARAM_DONT_SHOW,
 		0, 15,	2, 0, "default-grp1-rdc", "default_grp1_rdc"},
 
-	{ nxge_param_get_generic, nxge_param_set_grp_rdc, NXGE_PARAM_RXDMA_RW,
+	{ nxge_param_get_generic, nxge_param_set_grp_rdc,
+		NXGE_PARAM_RXDMA_RW | NXGE_PARAM_DONT_SHOW,
 		0, 15, 4, 0, "default-grp2-rdc", "default_grp2_rdc"},
 
-	{ nxge_param_get_generic, nxge_param_set_grp_rdc, NXGE_PARAM_RXDMA_RW,
+	{ nxge_param_get_generic, nxge_param_set_grp_rdc,
+		NXGE_PARAM_RXDMA_RW | NXGE_PARAM_DONT_SHOW,
 		0, 15, 6, 0, "default-grp3-rdc", "default_grp3_rdc"},
 
-	{ nxge_param_get_generic, nxge_param_set_grp_rdc, NXGE_PARAM_RXDMA_RW,
+	{ nxge_param_get_generic, nxge_param_set_grp_rdc,
+		NXGE_PARAM_RXDMA_RW | NXGE_PARAM_DONT_SHOW,
 		0, 15, 8, 0, "default-grp4-rdc", "default_grp4_rdc"},
 
-	{ nxge_param_get_generic, nxge_param_set_grp_rdc, NXGE_PARAM_RXDMA_RW,
+	{ nxge_param_get_generic, nxge_param_set_grp_rdc,
+		NXGE_PARAM_RXDMA_RW | NXGE_PARAM_DONT_SHOW,
 		0, 15, 10, 0, "default-grp5-rdc", "default_grp5_rdc"},
 
-	{ nxge_param_get_generic, nxge_param_set_grp_rdc, NXGE_PARAM_RXDMA_RW,
+	{ nxge_param_get_generic, nxge_param_set_grp_rdc,
+		NXGE_PARAM_RXDMA_RW | NXGE_PARAM_DONT_SHOW,
 		0, 15, 12, 0, "default-grp6-rdc", "default_grp6_rdc"},
 
-	{ nxge_param_get_generic, nxge_param_set_grp_rdc, NXGE_PARAM_RXDMA_RW,
+	{ nxge_param_get_generic, nxge_param_set_grp_rdc,
+		NXGE_PARAM_RXDMA_RW | NXGE_PARAM_DONT_SHOW,
 		0, 15, 14, 0, "default-grp7-rdc", "default_grp7_rdc"},
 
 	{ nxge_param_get_rxdma_rdcgrp_info, NULL,
-		NXGE_PARAM_READ | NXGE_PARAM_CMPLX,
+		NXGE_PARAM_READ | NXGE_PARAM_CMPLX | NXGE_PARAM_DONT_SHOW,
 		0, 8, 0, 0, "rdc-groups-info", "rdc_groups_info"},
 
 	/* Logical device groups */
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ | NXGE_PARAM_DONT_SHOW,
 		0, 63, 0, 0, "start-ldg", "start_ldg"},
 
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ | NXGE_PARAM_DONT_SHOW,
 		0, 64, 0, 0, "max-ldg", "max_ldg" },
 
 	/* MAC table information */
 	{ nxge_param_get_mac_rdcgrp, nxge_param_set_mac_rdcgrp,
-		NXGE_PARAM_L2CLASS_CFG,
+		NXGE_PARAM_L2CLASS_CFG | NXGE_PARAM_DONT_SHOW,
 		0, 31, 0, 0, "mac-2rdc-grp", "mac_2rdc_grp"},
 
 	/* VLAN table information */
 	{ nxge_param_get_vlan_rdcgrp, nxge_param_set_vlan_rdcgrp,
-		NXGE_PARAM_L2CLASS_CFG,
+		NXGE_PARAM_L2CLASS_CFG | NXGE_PARAM_DONT_SHOW,
 		0, 31, 0, 0, "vlan-2rdc-grp", "vlan_2rdc_grp"},
 
 	{ nxge_param_get_generic, NULL,
-		NXGE_PARAM_READ_PROP | NXGE_PARAM_READ | NXGE_PARAM_PROP_ARR32,
+		NXGE_PARAM_READ_PROP | NXGE_PARAM_READ |
+		NXGE_PARAM_PROP_ARR32 | NXGE_PARAM_DONT_SHOW,
 		0, 0x0ffff, 0x0ffff, 0, "fcram-part-cfg", "fcram_part_cfg"},
 
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_CLASS_RWS,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_CLASS_RWS |
+		NXGE_PARAM_DONT_SHOW,
 		0, 0x10, 0xa, 0, "fcram-access-ratio", "fcram_access_ratio"},
 
-	{ nxge_param_get_generic, NULL, NXGE_PARAM_CLASS_RWS,
+	{ nxge_param_get_generic, NULL, NXGE_PARAM_CLASS_RWS |
+		NXGE_PARAM_DONT_SHOW,
 		0, 0x10, 0xa, 0, "tcam-access-ratio", "tcam_access_ratio"},
 
 	{ nxge_param_get_generic, nxge_param_tcam_enable,
-		NXGE_PARAM_CLASS_RWS,
+		NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
 		0, 0x1, 0x0, 0, "tcam-enable", "tcam_enable"},
 
 	{ nxge_param_get_generic, nxge_param_hash_lookup_enable,
-		NXGE_PARAM_CLASS_RWS,
+		NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
 		0, 0x01, 0x0, 0, "hash-lookup-enable", "hash_lookup_enable"},
 
 	{ nxge_param_get_generic, nxge_param_llc_snap_enable,
-		NXGE_PARAM_CLASS_RWS,
+		NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
 		0, 0x01, 0x01, 0, "llc-snap-enable", "llc_snap_enable"},
 
 	{ nxge_param_get_generic, nxge_param_fflp_hash_init,
-		NXGE_PARAM_CLASS_RWS,
+		NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
 		0, ALL_FF_32, ALL_FF_32, 0, "h1-init-value", "h1_init_value"},
 
 	{ nxge_param_get_generic,	nxge_param_fflp_hash_init,
-		NXGE_PARAM_CLASS_RWS,
+		NXGE_PARAM_CLASS_RWS | NXGE_PARAM_DONT_SHOW,
 		0, 0x0ffff, 0x0ffff, 0, "h2-init-value", "h2_init_value"},
 
 	{ nxge_param_get_generic, nxge_param_set_ether_usr,
@@ -470,40 +491,46 @@ static nxge_param_t	nxge_param_arr[] = {
 		"class-opt-ipv6-sctp",	"class_opt_ipv6_sctp"},
 
 	{ nxge_param_get_debug_flag, nxge_param_set_nxge_debug_flag,
-		NXGE_PARAM_RW,
+		NXGE_PARAM_RW | NXGE_PARAM_DONT_SHOW,
 		0ULL, ALL_FF_64, 0ULL, 0ULL,
 		"nxge-debug-flag", "nxge_debug_flag"},
 
 	{ nxge_param_get_debug_flag, nxge_param_set_npi_debug_flag,
-		NXGE_PARAM_RW,
+		NXGE_PARAM_RW | NXGE_PARAM_DONT_SHOW,
 		0ULL, ALL_FF_64, 0ULL, 0ULL,
 		"npi-debug-flag", "npi_debug_flag"},
 
-	{ nxge_param_dump_tdc, NULL, NXGE_PARAM_READ,
+	{ nxge_param_dump_tdc, NULL, NXGE_PARAM_READ | NXGE_PARAM_DONT_SHOW,
 		0, 0x0fffffff, 0x0fffffff, 0, "dump-tdc", "dump_tdc"},
 
-	{ nxge_param_dump_rdc, NULL, NXGE_PARAM_READ,
+	{ nxge_param_dump_rdc, NULL, NXGE_PARAM_READ | NXGE_PARAM_DONT_SHOW,
 		0, 0x0fffffff, 0x0fffffff, 0, "dump-rdc", "dump_rdc"},
 
-	{ nxge_param_dump_mac_regs, NULL, NXGE_PARAM_READ,
+	{ nxge_param_dump_mac_regs, NULL, NXGE_PARAM_READ |
+		NXGE_PARAM_DONT_SHOW,
 		0, 0x0fffffff, 0x0fffffff, 0, "dump-mac-regs", "dump_mac_regs"},
 
-	{ nxge_param_dump_ipp_regs, NULL, NXGE_PARAM_READ,
+	{ nxge_param_dump_ipp_regs, NULL, NXGE_PARAM_READ |
+		NXGE_PARAM_DONT_SHOW,
 		0, 0x0fffffff, 0x0fffffff, 0, "dump-ipp-regs", "dump_ipp_regs"},
 
-	{ nxge_param_dump_fflp_regs, NULL, NXGE_PARAM_READ,
+	{ nxge_param_dump_fflp_regs, NULL, NXGE_PARAM_READ |
+		NXGE_PARAM_DONT_SHOW,
 		0, 0x0fffffff, 0x0fffffff, 0,
 		"dump-fflp-regs", "dump_fflp_regs"},
 
-	{ nxge_param_dump_vlan_table, NULL, NXGE_PARAM_READ,
+	{ nxge_param_dump_vlan_table, NULL, NXGE_PARAM_READ |
+		NXGE_PARAM_DONT_SHOW,
 		0, 0x0fffffff, 0x0fffffff, 0,
 		"dump-vlan-table", "dump_vlan_table"},
 
-	{ nxge_param_dump_rdc_table, NULL, NXGE_PARAM_READ,
+	{ nxge_param_dump_rdc_table, NULL, NXGE_PARAM_READ |
+		NXGE_PARAM_DONT_SHOW,
 		0, 0x0fffffff, 0x0fffffff, 0,
 		"dump-rdc-table", "dump_rdc_table"},
 
-	{ nxge_param_dump_ptrs,	NULL, NXGE_PARAM_READ,
+	{ nxge_param_dump_ptrs,	NULL, NXGE_PARAM_READ |
+		NXGE_PARAM_DONT_SHOW,
 		0, 0x0fffffff, 0x0fffffff, 0, "dump-ptrs", "dump_ptrs"},
 
 	{  NULL, NULL, NXGE_PARAM_READ | NXGE_PARAM_DONT_SHOW,
@@ -2362,7 +2389,9 @@ nxge_nd_getset(p_nxge_t nxgep, queue_t *q, caddr_t param, p_mblk_t mp)
 			mp2 = mp2->b_cont;
 		}
 
-		err = (*nde->nde_get_pfi)(nxgep, q, mp1, nde->nde_data);
+		if (nde->nde_get_pfi) {
+			err = (*nde->nde_get_pfi)(nxgep, q, mp1, nde->nde_data);
+		}
 
 		if (!err) {
 			size_t	size_out = 0;

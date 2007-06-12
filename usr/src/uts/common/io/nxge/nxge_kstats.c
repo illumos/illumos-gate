@@ -220,11 +220,11 @@ typedef enum {
 	IPP_STAT_SOP_MISS,
 	IPP_STAT_DFIFO_UE,
 	IPP_STAT_ECC_ERR,
+	IPP_STAT_PFIFO_PERR,
 	IPP_STAT_PFIFO_OVER,
 	IPP_STAT_PFIFO_UND,
 	IPP_STAT_BAD_CS,
 	IPP_STAT_BAD_DIS,
-	IPP_STAT_CS_FAIL,
 	IPP_STAT_END
 } nxge_ipp_stat_index_t;
 
@@ -233,11 +233,11 @@ nxge_kstat_index_t nxge_ipp_stats[] = {
 	{IPP_STAT_SOP_MISS, KSTAT_DATA_ULONG, "rxipp_sop_miss"},
 	{IPP_STAT_DFIFO_UE, KSTAT_DATA_ULONG, "rxipp_dfifo_ue"},
 	{IPP_STAT_ECC_ERR, KSTAT_DATA_ULONG, "rxipp_ecc_err"},
+	{IPP_STAT_PFIFO_PERR, KSTAT_DATA_ULONG, "rxipp_pfifo_perr"},
 	{IPP_STAT_PFIFO_OVER, KSTAT_DATA_ULONG, "rxipp_pfifo_over"},
 	{IPP_STAT_PFIFO_UND, KSTAT_DATA_ULONG, "rxipp_pfifo_und"},
 	{IPP_STAT_BAD_CS, KSTAT_DATA_ULONG, "rxipp_bad_cs"},
 	{IPP_STAT_BAD_DIS, KSTAT_DATA_ULONG, "rxipp_bad_dis"},
-	{IPP_STAT_CS_FAIL, KSTAT_DATA_ULONG, "rxipp_cs_fail"},
 	{IPP_STAT_END, NULL, NULL}
 };
 
@@ -776,21 +776,21 @@ nxge_ipp_stat_update(kstat_t *ksp, int rw)
 		statsp->sop_miss = ipp_kstatsp->sop_miss.value.ul;
 		statsp->dfifo_ue = ipp_kstatsp->dfifo_ue.value.ul;
 		statsp->ecc_err_cnt = ipp_kstatsp->ecc_err_cnt.value.ul;
+		statsp->pfifo_perr = ipp_kstatsp->pfifo_perr.value.ul;
 		statsp->pfifo_over = ipp_kstatsp->pfifo_over.value.ul;
 		statsp->pfifo_und = ipp_kstatsp->pfifo_und.value.ul;
 		statsp->bad_cs_cnt = ipp_kstatsp->bad_cs_cnt.value.ul;
 		statsp->pkt_dis_cnt = ipp_kstatsp->pkt_dis_cnt.value.ul;
-		statsp->bad_cs_cnt = ipp_kstatsp->cs_fail.value.ul;
 	} else {
 		ipp_kstatsp->eop_miss.value.ul = statsp->eop_miss;
 		ipp_kstatsp->sop_miss.value.ul = statsp->sop_miss;
 		ipp_kstatsp->dfifo_ue.value.ul = statsp->dfifo_ue;
 		ipp_kstatsp->ecc_err_cnt.value.ul = statsp->ecc_err_cnt;
+		ipp_kstatsp->pfifo_perr.value.ul = statsp->pfifo_perr;
 		ipp_kstatsp->pfifo_over.value.ul = statsp->pfifo_over;
 		ipp_kstatsp->pfifo_und.value.ul = statsp->pfifo_und;
 		ipp_kstatsp->bad_cs_cnt.value.ul = statsp->bad_cs_cnt;
 		ipp_kstatsp->pkt_dis_cnt.value.ul = statsp->pkt_dis_cnt;
-		ipp_kstatsp->cs_fail.value.ul = statsp->bad_cs_cnt;
 	}
 	NXGE_DEBUG_MSG((nxgep, KST_CTL, "<== nxge_ipp_stat_update"));
 	return (0);
