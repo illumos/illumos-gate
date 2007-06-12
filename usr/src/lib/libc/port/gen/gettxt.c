@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +33,8 @@
 #pragma weak gettxt = _gettxt
 
 #include "synonyms.h"
+#include "libc.h"
+#include <mtlib.h>
 #include <ctype.h>
 #include <string.h>
 #include <locale.h>
@@ -46,172 +47,165 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
+#include <thread.h>
 #include "../i18n/_locale.h"
 #include "../i18n/_loc_path.h"
 
-#define	MAXDB	10	/* maximum number of data bases per program */
 #define	MESSAGES 	"/LC_MESSAGES/"
 #define	DB_NAME_LEN	15
 
-char 	*handle_return(const char *);
+#define	handle_return(s)	\
+	((char *)((s) != NULL && *(s) != '\0' ? (s) : not_found))
 
-/* support multiple versions of a package */
+extern char cur_cat[];
+extern rwlock_t _rw_cur_cat;
 
-char	*Msgdb = (char *)NULL;
+static mutex_t	gettxt_lock = DEFAULTMUTEX;
+static const char	*not_found = "Message not found!!\n";
+static const char	*loc_C = "C";
 
-static	char	*saved_locale = NULL;
-static  const	char	*not_found = "Message not found!!\n";
-
-static	struct	db_info {
+struct db_list {
 	char	db_name[DB_NAME_LEN];	/* name of the message file */
 	uintptr_t	addr;		/* virtual memory address */
-	size_t  length;
-} *db_info;
+	struct db_list	*next;
+};
 
-static	int	db_count;   	/* number of currently accessible data bases */
+struct db_cache {
+	char	*loc;
+	struct db_list	*info;
+	struct db_cache	*next;
+};
+
+static struct db_cache	*db_cache;
 
 char *
 gettxt(const char *msg_id, const char *dflt_str)
 {
-	char  msgfile[DB_NAME_LEN];	/* name of static shared library */
-	int   msgnum;			/* message number */
-	char  pathname[PATH_MAX];	/* full pathname to message file */
-	int   i;
-	int   new_locale = 0;
-	int   fd;
-	struct stat64 sb;
+	struct db_cache	*dbc;
+	struct db_list	*dbl;
+	char 	msgfile[DB_NAME_LEN];	/* name of static shared library */
+	int	msgnum;			/* message number */
+	char	pathname[PATH_MAX];	/* full pathname to message file */
+	int	fd;
+	struct stat64	sb;
 	void	*addr;
-	char   *tokp;
-	size_t   name_len;
+	char	*tokp;
+	size_t	name_len;
 	char	*curloc;
 
-	if ((msg_id == NULL) || (*msg_id == NULL)) {
+	if ((msg_id == NULL) || (*msg_id == '\0')) {
 		return (handle_return(dflt_str));
 	}
 
-	/* first time called, allocate space */
-	if (!db_info) {
-		if ((db_info = (struct db_info *) \
-		    malloc(MAXDB * sizeof (struct db_info))) == NULL)
-			return (handle_return(dflt_str));
-	}
-
 	/* parse msg_id */
-
 	if (((tokp = strchr(msg_id, ':')) == NULL) || *(tokp+1) == '\0')
 		return (handle_return(dflt_str));
 	if ((name_len = (tokp - msg_id)) >= DB_NAME_LEN)
 		return (handle_return(dflt_str));
-	if (name_len) {
+	if (name_len > 0) {
 		(void) strncpy(msgfile, msg_id, name_len);
 		msgfile[name_len] = '\0';
 	} else {
-		if (Msgdb && strlen(Msgdb) < DB_NAME_LEN)
-			(void) strcpy(msgfile, Msgdb);
-		else {
-			char *p;
-			p = (char *)setcat((const char *)0);
-			if ((p != NULL) && strlen(p) < DB_NAME_LEN)
-				(void) strcpy(msgfile, p);
-			else
-				return (handle_return(dflt_str));
-		}
-	}
-	while (*++tokp)
-		if (!isdigit(*tokp))
+		lrw_rdlock(&_rw_cur_cat);
+		if (cur_cat == NULL || *cur_cat == '\0') {
+			lrw_unlock(&_rw_cur_cat);
 			return (handle_return(dflt_str));
-	msgnum = atoi(msg_id + name_len + 1);
-
-	/* Has locale been changed? */
-
-	curloc = setlocale(LC_MESSAGES, NULL);
-	if (saved_locale != NULL && strcmp(curloc, saved_locale) == 0) {
-		for (i = 0; i < db_count; i++)
-			if (strcmp(db_info[i].db_name, msgfile) == 0)
-				break;
-	} else { /* new locale - clear everything */
-		if (saved_locale)
-			free(saved_locale);
+		}
 		/*
-		 * allocate at least 2 bytes, so that we can copy "C"
-		 * without re-allocating the saved_locale.
+		 * We know the following strcpy is safe.
 		 */
-		if ((saved_locale = malloc(strlen(curloc)+2)) == NULL)
-			return (handle_return(dflt_str));
-		(void) strcpy(saved_locale, curloc);
-		for (i = 0; i < db_count; i++) {
-			(void) munmap((void *)db_info[i].addr,
-			    db_info[i].length);
-			(void) strcpy(db_info[i].db_name, "");
-			new_locale++;
-		}
-		db_count = 0;
+		(void) strcpy(msgfile, cur_cat);
+		lrw_unlock(&_rw_cur_cat);
 	}
-	if (new_locale || i == db_count) {
-		if (db_count == MAXDB)
+	while (*++tokp) {
+		if (!isdigit((unsigned char)*tokp))
 			return (handle_return(dflt_str));
-		if (snprintf(pathname, sizeof (pathname),
-			_DFLT_LOC_PATH "%s" MESSAGES "%s",
-			saved_locale, msgfile) >= sizeof (pathname)) {
+	}
+	msgnum = atoi(msg_id + name_len + 1);
+	curloc = setlocale(LC_MESSAGES, NULL);
+
+	lmutex_lock(&gettxt_lock);
+
+try_C:
+	dbc = db_cache;
+	while (dbc) {
+		if (strcmp(curloc, dbc->loc) == 0) {
+			dbl = dbc->info;
+			while (dbl) {
+				if (strcmp(msgfile, dbl->db_name) == 0) {
+					/* msgfile found */
+					lmutex_unlock(&gettxt_lock);
+					goto msgfile_found;
+				}
+				dbl = dbl->next;
+			}
+			/* not found */
+			break;
+		}
+		dbc = dbc->next;
+	}
+	if (dbc == NULL) {
+		/* new locale */
+		if ((dbc = lmalloc(sizeof (struct db_cache))) == NULL) {
+			lmutex_unlock(&gettxt_lock);
 			return (handle_return(dflt_str));
 		}
-		if ((fd = open(pathname, O_RDONLY)) == -1 ||
-			fstat64(fd, &sb) == -1 ||
-				(addr = mmap(0, (size_t)sb.st_size,
-					PROT_READ, MAP_SHARED,
-						fd, 0)) == MAP_FAILED) {
-			if (fd != -1)
-				(void) close(fd);
-			if (strcmp(saved_locale, "C") == 0)
-				return (handle_return(dflt_str));
-
-			/* Change locale to C */
-
-			if (snprintf(pathname, sizeof (pathname),
-				_DFLT_LOC_PATH "C" MESSAGES "%s",
-				msgfile) >= sizeof (pathname)) {
-				return (handle_return(dflt_str));
-			}
-
-			for (i = 0; i < db_count; i++) {
-				(void) munmap((void *)db_info[i].addr,
-							db_info[i].length);
-				(void) strcpy(db_info[i].db_name, "");
-			}
-			db_count = 0;
-			if ((fd = open(pathname, O_RDONLY)) != -1 &&
-				fstat64(fd, &sb) != -1 &&
-					(addr = mmap(0, (size_t)sb.st_size,
-						PROT_READ, MAP_SHARED,
-						fd, 0)) != MAP_FAILED) {
-				(void) strcpy(saved_locale, "C");
-			} else {
-				if (fd != -1)
-					(void) close(fd);
-				return (handle_return(dflt_str));
-			}
+		if ((dbc->loc = lmalloc(strlen(curloc) + 1)) == NULL) {
+			lfree(dbc, sizeof (struct db_cache));
+			lmutex_unlock(&gettxt_lock);
+			return (handle_return(dflt_str));
 		}
+		dbc->info = NULL;
+		(void) strcpy(dbc->loc, curloc);
+		/* connect dbc to the dbc list */
+		dbc->next = db_cache;
+		db_cache = dbc;
+	}
+	if ((dbl = lmalloc(sizeof (struct db_list))) == NULL) {
+		lmutex_unlock(&gettxt_lock);
+		return (handle_return(dflt_str));
+	}
+
+	if (snprintf(pathname, sizeof (pathname),
+	    _DFLT_LOC_PATH "%s" MESSAGES "%s", dbc->loc, msgfile) >=
+	    sizeof (pathname)) {
+		lfree(dbl, sizeof (struct db_list));
+		lmutex_unlock(&gettxt_lock);
+		return (handle_return(dflt_str));
+	}
+	if ((fd = open(pathname, O_RDONLY)) == -1 ||
+	    fstat64(fd, &sb) == -1 ||
+	    (addr = mmap(NULL, (size_t)sb.st_size, PROT_READ, MAP_SHARED,
+	    fd, 0L)) == MAP_FAILED) {
 		if (fd != -1)
 			(void) close(fd);
+		lfree(dbl, sizeof (struct db_list));
 
-		/* save file name, memory address, fd and size */
-
-		(void) strcpy(db_info[db_count].db_name, msgfile);
-		db_info[db_count].addr = (uintptr_t)addr;
-		db_info[db_count].length = (size_t)sb.st_size;
-		i = db_count;
-		db_count++;
+		if (strcmp(dbc->loc, "C") == 0) {
+			lmutex_unlock(&gettxt_lock);
+			return (handle_return(dflt_str));
+		}
+		/* Change locale to C */
+		curloc = (char *)loc_C;
+		goto try_C;
 	}
+	(void) close(fd);
+
+	/* save file name, memory address, fd and size */
+	(void) strcpy(dbl->db_name, msgfile);
+	dbl->addr = (uintptr_t)addr;
+
+	/* connect dbl to the dbc->info list */
+	dbl->next = dbc->info;
+	dbc->info = dbl;
+
+	lmutex_unlock(&gettxt_lock);
+
+msgfile_found:
 	/* check if msgnum out of domain */
-	if (msgnum <= 0 || msgnum > *(int *)(db_info[i].addr))
+	if (msgnum <= 0 || msgnum > *(int *)dbl->addr)
 		return (handle_return(dflt_str));
 	/* return pointer to message */
-	return ((char *)(db_info[i].addr + *(int *)(db_info[i].addr
-		+ msgnum * sizeof (int))));
-}
-
-char *
-handle_return(const char *dflt_str)
-{
-	return ((char *)(dflt_str && *dflt_str ? dflt_str : not_found));
+	return ((char *)(dbl->addr +
+	    *(int *)(dbl->addr + msgnum * sizeof (int))));
 }

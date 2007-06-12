@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,8 +73,8 @@ struct db_info {
 /* Minimum number of open catalogues */
 #define	MINDB		3
 
-static char cur_cat[DB_NAME_LEN];
-static rwlock_t _rw_cur_cat = DEFAULTRWLOCK;
+char cur_cat[DB_NAME_LEN];
+rwlock_t _rw_cur_cat = DEFAULTRWLOCK;
 
 
 /*
@@ -151,8 +151,8 @@ load_db(const char *curloc, const char *catname, int *err)
 	}
 	db->flag = DB_OPEN;
 	if (snprintf(pathname, sizeof (pathname),
-		_DFLT_LOC_PATH "%s" MESSAGES "%s",
-		db->saved_locale, db->db_name) >= sizeof (pathname)) {
+	    _DFLT_LOC_PATH "%s" MESSAGES "%s",
+	    db->saved_locale, db->db_name) >= sizeof (pathname)) {
 		/*
 		 * We won't set err here, because an invalid locale is not
 		 * the fatal condition, but we can fall back to "C"
@@ -161,9 +161,9 @@ load_db(const char *curloc, const char *catname, int *err)
 		return (NULL);
 	}
 	if ((fd = open(pathname, O_RDONLY)) != -1 &&
-		fstat64(fd, &sb) != -1 &&
-		(addr = mmap(0, (size_t)sb.st_size, PROT_READ, MAP_SHARED,
-			fd, 0)) != MAP_FAILED) {
+	    fstat64(fd, &sb) != -1 &&
+	    (addr = mmap(0, (size_t)sb.st_size, PROT_READ, MAP_SHARED,
+	    fd, 0)) != MAP_FAILED) {
 		db->flag |= DB_EXIST;
 		db->addr = (uintptr_t)addr;
 		db->length = (size_t)sb.st_size;
@@ -180,7 +180,7 @@ static void
 unload_db(struct db_info *db)
 {
 	if ((db->flag & (DB_OPEN|DB_EXIST)) ==
-		(DB_OPEN|DB_EXIST)) {
+	    (DB_OPEN|DB_EXIST)) {
 		(void) munmap((caddr_t)db->addr, db->length);
 	}
 	db->flag = 0;
@@ -213,8 +213,8 @@ lookup_cache(struct db_info *db, const char *curloc, const char *catname)
 			continue;
 		if (strcmp(db->db_name, catname) == 0) {
 			if (curloc == NULL ||
-				(db->saved_locale != NULL &&
-				strcmp(db->saved_locale, curloc) == 0)) {
+			    (db->saved_locale != NULL &&
+			    strcmp(db->saved_locale, curloc) == 0)) {
 				return (db);
 			}
 		}
@@ -240,7 +240,7 @@ static char *
 msg(struct db_info *db, int id)
 {
 	return ((char *)(db->addr + *(int *)(db->addr +
-			id * sizeof (int))));
+	    id * sizeof (int))));
 }
 
 /*
