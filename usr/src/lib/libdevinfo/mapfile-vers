@@ -210,6 +210,7 @@ SUNWprivate_1.1 {
 	finddev_readdir;
 	finddev_close;
 	finddev_next;
+	di_flags;
     local:
 	*;
 };

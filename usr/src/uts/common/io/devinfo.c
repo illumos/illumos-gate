@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1713,6 +1713,7 @@ di_copynode(struct di_stack *dsp, struct di_state *st)
 	me->node_class = node->devi_node_class;
 	me->attributes = node->devi_node_attributes;
 	me->state = node->devi_state;
+	me->flags = node->devi_flags;
 	me->node_state = node->devi_node_state;
 	me->next_vhci = 0;		/* Filled up by build_vhci_list. */
 	me->top_phci = 0;		/* Filled up by build_phci_list. */

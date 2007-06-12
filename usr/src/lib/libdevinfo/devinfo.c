@@ -271,6 +271,14 @@ di_init_impl(const char *phys_path, uint_t flag,
 	(void) close(fd);
 
 	dap = DI_ALL(pa);
+	if (dap->version != DI_SNAPSHOT_VERSION) {
+		DPRINTF((DI_ERR, "wrong snapshot version "
+		    "(expected=%d, actual=%d)\n",
+		    DI_SNAPSHOT_VERSION, dap->version));
+		free(pa);
+		errno = ESTALE;
+		return (DI_NODE_NIL);
+	}
 	if (dap->top_devinfo == 0) {	/* phys_path not found */
 		DPRINTF((DI_ERR, "%s not found\n", phys_path));
 		free(pa);
@@ -982,6 +990,12 @@ ddi_node_state_t
 di_node_state(di_node_t node)
 {
 	return (DI_NODE(node)->node_state);
+}
+
+uint_t
+di_flags(di_node_t node)
+{
+	return (DI_NODE(node)->flags);
 }
 
 ddi_devid_t

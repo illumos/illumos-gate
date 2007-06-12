@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,7 +98,8 @@ extern "C" {
 #define	MAX_PTR_IN_PRV	5
 #define	DI_SNAPSHOT_VERSION_0	0	/* reserved */
 #define	DI_SNAPSHOT_VERSION_1	1	/* reserved */
-#define	DI_SNAPSHOT_VERSION	DI_SNAPSHOT_VERSION_1	/* current version */
+#define	DI_SNAPSHOT_VERSION_2	2	/* reserved */
+#define	DI_SNAPSHOT_VERSION	DI_SNAPSHOT_VERSION_2	/* current version */
 #define	DI_PRIVDATA_VERSION_0	10	/* Start from 10 so caller must set */
 #define	DI_BIG_ENDIAN		0	/* reserved */
 #define	DI_LITTLE_ENDIAN	1	/* reserved */
@@ -277,6 +277,12 @@ struct di_node {	/* useful info to export for each tree node */
 	di_off_t top_phci;
 	di_off_t next_phci;
 	uint32_t multipath_component;	/* stores MDI_COMPONENT_* value. */
+
+	/*
+	 * devi_flags field
+	 */
+	uint32_t flags;
+	uint32_t di_pad2;	/* 4 byte padding for 32bit x86 app. */
 };
 
 /*
