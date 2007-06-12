@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -173,13 +172,16 @@ prtconf_devinfo(void)
 	}
 
 	if (opts.o_forcecache) {
-		if (opts.o_verbose || dbg.d_forceload) {
+		if (dbg.d_forceload) {
 			exit(_error(NULL, "option combination not supported"));
 		}
 		if (strcmp(rootpath, "/") != 0) {
 			exit(_error(NULL, "invalid root path for option"));
 		}
 		flag = DINFOCACHE;
+	} else if (opts.o_verbose) {
+		flag |= (DINFOPROP | DINFOMINOR |
+		    DINFOPRIVDATA | DINFOPATH | DINFOLYR);
 	}
 
 	if (dbg.d_forceload) {
@@ -187,8 +189,6 @@ prtconf_devinfo(void)
 	}
 
 	if (opts.o_verbose) {
-		flag |= (DINFOPROP | DINFOMINOR | DINFOPRIVDATA | DINFOPATH | \
-		    DINFOLYR);
 		init_priv_data(&fetch);
 		root_node = di_init_impl(rootpath, flag, &fetch);
 
@@ -225,8 +225,8 @@ prtconf_devinfo(void)
 		target_node = find_target_node(root_node);
 		if (target_node == DI_NODE_NIL) {
 			(void) fprintf(stderr, "%s: "
-					"invalid device path specified\n",
-					opts.o_progname);
+			    "invalid device path specified\n",
+			    opts.o_progname);
 			exit(1);
 		}
 
@@ -263,14 +263,14 @@ prtconf_devinfo(void)
 			 * them as well
 			 */
 			(void) di_walk_node(target_node, DI_WALK_CLDFIRST,
-					    (void *)1,
-					    (int (*)(di_node_t, void *))
-					    node_display_set);
+			    (void *)1,
+			    (int (*)(di_node_t, void *))
+			    node_display_set);
 		}
 	}
 
 	(void) di_walk_node(root_node, DI_WALK_CLDFIRST, devlink_hdl,
-				dump_devs);
+	    dump_devs);
 
 	if (devlink_hdl != NULL)
 		(void) di_devlink_fini(&devlink_hdl);
@@ -328,7 +328,7 @@ find_target_node(di_node_t root_node)
 	}
 
 	(void) di_walk_node(root_node, DI_WALK_CLDFIRST, &target,
-				i_find_target_node);
+	    i_find_target_node);
 	return (target);
 }
 
@@ -1009,7 +1009,7 @@ dump_minor_data_paths(int ilev, di_minor_t minor,
 		/* display the device minor node information */
 		indent_to_level(ilev + 1);
 		(void) printf("spectype=%s type=%s\n",
-				(spec_type == S_IFBLK) ? "blk" : "chr", type);
+		    (spec_type == S_IFBLK) ? "blk" : "chr", type);
 
 		/* display all the devlinks for this device minor node */
 		(void) di_devlink_walk(devlink_hdl, NULL, path,
@@ -1069,7 +1069,7 @@ create_minor_list(di_node_t node)
 		minor_prev = minor_head;
 		minor_walk = minor_ptr(minor_head);
 		while ((minor_walk != DI_MINOR_NIL) &&
-			(dev > di_minor_devt(minor_walk))) {
+		    (dev > di_minor_devt(minor_walk))) {
 			minor_prev = minor_walk;
 			minor_walk = minor_ptr(minor_walk);
 		}
@@ -1286,14 +1286,14 @@ dump_minor_data(int ilev, di_node_t node, di_devlink_handle_t devlink_hdl)
 		/* display the device minor node information */
 		indent_to_level(ilev);
 		(void) printf("dev=(%u,%u)\n",
-				(uint_t)major(devt), (uint_t)minor(devt));
+		    (uint_t)major(devt), (uint_t)minor(devt));
 
 		minor_next = minor;
 		do {
 			/* display device minor node path info */
 			minor_displayed_set(minor_next);
 			dump_minor_data_paths(ilev + 1, minor_next,
-						devlink_hdl);
+			    devlink_hdl);
 
 			/* get a pointer to the next node */
 			minor_next = minor_ptr(minor_next);
@@ -1330,7 +1330,7 @@ dump_minor_data(int ilev, di_node_t node, di_devlink_handle_t devlink_hdl)
 		indent_to_level(ilev);
 		(void) di_lnode_devt(lnode, &devt);
 		(void) printf("dev=(%u,%u)\n",
-				(uint_t)major(devt), (uint_t)minor(devt));
+		    (uint_t)major(devt), (uint_t)minor(devt));
 
 		indent_to_level(ilev + 1);
 		(void) printf("dev_path=<clone>\n");
@@ -1611,10 +1611,10 @@ do_prom_version64(void)
 	struct openprom_opr64 *opr = (struct openprom_opr64 *)opp->oprom_array;
 
 	static const char msg[] =
-		"NOTICE: The firmware on this system does not support the "
-		"64-bit OS.\n"
-		"\tPlease upgrade to at least the following version:\n"
-		"\t\t%s\n\n";
+	    "NOTICE: The firmware on this system does not support the "
+	    "64-bit OS.\n"
+	    "\tPlease upgrade to at least the following version:\n"
+	    "\t\t%s\n\n";
 
 	if (promopen(O_RDONLY))  {
 		(void) fprintf(stderr, "Cannot open openprom device\n");
@@ -1665,17 +1665,17 @@ do_productinfo(void)
 
 	if (opts.o_verbose) {
 		dump_prodinfo(promh, root, root_propv, "root",
-				NUM_ELEMENTS(root_propv));
+		    NUM_ELEMENTS(root_propv));
 
 		/* Get model and version properties under node "openprom" */
 		next_node = find_node_by_name(promh, root, "openprom");
 		if (next_node != DI_NODE_NIL)
 			dump_prodinfo(promh, next_node, oprom_prop,
-				"openprom", NUM_ELEMENTS(oprom_prop));
+			    "openprom", NUM_ELEMENTS(oprom_prop));
 
 	} else
 		dump_prodinfo(promh, root, root_prop, "root",
-				NUM_ELEMENTS(root_prop));
+		    NUM_ELEMENTS(root_prop));
 	di_prom_fini(promh);
 	di_fini(root);
 	return (0);
@@ -1692,7 +1692,7 @@ find_node_by_name(di_prom_handle_t promh, di_node_t parent,
 	while (next_node != DI_NODE_NIL) {
 		next_node = di_sibling_node(next_node);
 		(void) get_propval_by_name(promh, next_node, "name",
-						&prop_valp);
+		    &prop_valp);
 		if (strcmp((char *)prop_valp, node_name) == 0)
 			return (next_node);
 	}
@@ -1708,7 +1708,7 @@ get_propval_by_name(di_prom_handle_t promh, di_node_t node, const char *name,
 	uchar_t *bufp;
 
 	len = di_prom_prop_lookup_bytes(promh, node, name,
-		(uchar_t **)&bufp);
+	    (uchar_t **)&bufp);
 	if (len != -1) {
 		*valp = (uchar_t *)malloc(len);
 		(void) memcpy(*valp, bufp, len);
@@ -1726,7 +1726,7 @@ dump_prodinfo(di_prom_handle_t promh, di_node_t node, const char **propstr,
 
 	for (index1 = 0; index1 < num; index1++) {
 		len = get_propval_by_name(promh, node, propstr[index1],
-					&prop_valp);
+		    &prop_valp);
 		if (len != -1) {
 			if (strcmp(node_name, "root"))
 				(void) printf("%s ", node_name);
@@ -1734,7 +1734,7 @@ dump_prodinfo(di_prom_handle_t promh, di_node_t node, const char **propstr,
 			(void) printf("%s: ", propstr[index1]);
 
 			if (print_composite_string((const char *)
-				propstr[index1], (char *)prop_valp, len)) {
+			    propstr[index1], (char *)prop_valp, len)) {
 				free(prop_valp);
 				continue;
 			}
@@ -1754,7 +1754,7 @@ dump_prodinfo(di_prom_handle_t promh, di_node_t node, const char **propstr,
 					(void) putchar('.');
 				if (endswap)
 					out = prop_valp[index +
-					(3 - 2 * (index % 4))] & 0xff;
+					    (3 - 2 * (index % 4))] & 0xff;
 				else
 					out = prop_valp[index] & 0xff;
 				(void) printf("%02x", out);
