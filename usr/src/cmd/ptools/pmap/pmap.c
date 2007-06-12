@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -629,7 +629,7 @@ make_name(struct ps_prochandle *Pr, uintptr_t addr, const char *mapname,
 		 * real path to the file.
 		 */
 		if (getzonenamebyid(pi->pr_zoneid, zname,
-			sizeof (zname)) != -1 && strcmp(zname, "global") != 0 &&
+		    sizeof (zname)) != -1 && strcmp(zname, "global") != 0 &&
 		    zone_get_zonepath(zname, zpath, sizeof (zpath)) == Z_OK) {
 			(void) strncat(zpath, "/root",
 			    MAXPATHLEN - strlen(zpath));
@@ -648,14 +648,24 @@ make_name(struct ps_prochandle *Pr, uintptr_t addr, const char *mapname,
 	}
 
 	if (Pstate(Pr) != PS_DEAD && *mapname != '\0') {
-		(void) snprintf(fname, sizeof (fname), "/proc/%d/object/%s",
-			(int)Psp->pr_pid, mapname);
-		if (stat(fname, &statb) == 0) {
-			dev_t dev = statb.st_dev;
-			ino_t ino = statb.st_ino;
-			(void) snprintf(buf, bufsz, "dev:%lu,%lu ino:%lu",
-				(ulong_t)major(dev), (ulong_t)minor(dev), ino);
+		(void) snprintf(fname, sizeof (fname), "/proc/%d/path/%s",
+		    (int)Psp->pr_pid, mapname);
+		len = readlink(fname, buf, bufsz - 1);
+		if (len >= 0) {
+			buf[len] = '\0';
 			return (buf);
+		} else { /* there is no path and readlink() error */
+			(void) snprintf(fname, sizeof (fname),
+			    "/proc/%d/object/%s", (int)Psp->pr_pid, mapname);
+			if (stat(fname, &statb) == 0) {
+				dev_t dev = statb.st_dev;
+				ino_t ino = statb.st_ino;
+				(void) snprintf(buf, bufsz,
+				    "dev:%lu,%lu ino:%lu",
+				    (ulong_t)major(dev),
+				    (ulong_t)minor(dev), ino);
+				return (buf);
+			}
 		}
 	}
 
@@ -1189,10 +1199,10 @@ look_xmap_nopgsz(void *data,
 	} else if (prev_vaddr + prev_size == pmp->pr_vaddr &&
 	    prev_mflags == pmp->pr_mflags &&
 	    ((prev_mflags & MA_ISM) ||
-		prev_offset + prev_size == pmp->pr_offset) &&
+	    prev_offset + prev_size == pmp->pr_offset) &&
 	    ((lname == NULL && prev_lname == NULL) ||
-		(lname != NULL && prev_lname != NULL &&
-		    strcmp(lname, prev_lname) == 0))) {
+	    (lname != NULL && prev_lname != NULL &&
+	    strcmp(lname, prev_lname) == 0))) {
 		prev_size += pmp->pr_size;
 		prev_rss += pmp->pr_rss * kperpage;
 		prev_anon += ANON(pmp) * kperpage;
@@ -1325,7 +1335,7 @@ gather_map(void *ignored, const prmap_t *map, const char *objname)
 
 	/* Skip mappings which are outside the range specified by -A */
 	if (!address_in_range(map->pr_vaddr,
-		map->pr_vaddr + map->pr_size, map->pr_pagesize))
+	    map->pr_vaddr + map->pr_size, map->pr_pagesize))
 		return (0);
 
 	data = nextmap();
@@ -1346,7 +1356,7 @@ gather_xmap(void *ignored, const prxmap_t *xmap, const char *objname,
 
 	/* Skip mappings which are outside the range specified by -A */
 	if (!address_in_range(xmap->pr_vaddr,
-		xmap->pr_vaddr + xmap->pr_size, xmap->pr_pagesize))
+	    xmap->pr_vaddr + xmap->pr_size, xmap->pr_pagesize))
 		return (0);
 
 	data = nextmap();
