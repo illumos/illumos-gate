@@ -88,7 +88,7 @@ install: mapfiles closedbins sgs .WAIT $(SUBDIRS) pkg_all .WAIT _msg
 	@cd pkgdefs/SUNW0on; pwd; $(MAKE) _msg
 	@rm -rf "$(ROOT)/catalog"
 
-mapfiles:
+mapfiles: bldtools
 	@cd common/mapfiles; pwd; $(MAKE) install
 
 clean clobber: $(SUBDIRS) head pkgdefs
@@ -145,12 +145,16 @@ sgs: rootdirs .WAIT sysheaders userheaders .WAIT \
 	libheaders ucbheaders cmdheaders
 
 #
-# top-level setup target to setup the development environment
-# this includes headers and tools.  for open-only builds (i.e.:
-# source trees w/o usr/closed), this also depends on the closedbins
-# target (above) in order to properly seed the proto area
+# Top-level setup target to setup the development environment that includes
+# headers, tools and generated mapfiles.  For open-only builds (i.e.: source
+# trees w/o usr/closed), this also depends on the closedbins target (above)
+# in order to properly seed the proto area.  Note, although the tools are
+# dependent on a number of constant mapfiles, the tools themselves are
+# required to build the generated mapfiles.
 #
-setup: mapfiles closedbins sgs
+setup: bldtools mapfiles
+
+bldtools: closedbins sgs
 	@cd tools; pwd; $(MAKE) install
 
 # /var/mail/:saved is a special case because of the colon in the name.
