@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@
 #include <sys/model.h>
 #include <sys/uio.h>
 #include <sys/corectl.h>
+#include <sys/machelf.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -105,7 +106,7 @@ typedef struct uarg {
 	uintptr_t thrptr;
 	char	*emulator;
 	char	*brandname;
-	auxv32_t *brand_auxp;	/* starting user addr of brand auxvs on stack */
+	char	*auxp_brand_phdr; /* addr of brand phdr auxv on user stack */
 } uarg_t;
 
 /*
@@ -224,6 +225,27 @@ extern int execopen(struct vnode **vpp, int *fdp);
 extern int execclose(int fd);
 extern void setregs(uarg_t *);
 extern void exec_set_sp(size_t);
+
+/*
+ * Utility functions for branded process executing
+ */
+#if !defined(_ELF32_COMPAT)
+/*
+ * When compiling 64-bit kernels we don't want these definitions included
+ * when compiling the 32-bit compatability elf code in the elfexec module.
+ */
+extern int elfexec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
+    long *, int, caddr_t, cred_t *, int);
+extern int mapexec_brand(vnode_t *, uarg_t *, Ehdr *, Addr *,
+    intptr_t *, caddr_t, int *, caddr_t *, caddr_t *, size_t *);
+#endif /* !_ELF32_COMPAT */
+
+#if defined(_LP64)
+extern int elf32exec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
+    long *, int, caddr_t, cred_t *, int);
+extern int mapexec32_brand(vnode_t *, uarg_t *, Elf32_Ehdr *, Elf32_Addr *,
+    intptr_t *, caddr_t, int *, caddr_t *, caddr_t *, size_t *);
+#endif	/* _LP64 */
 
 /*
  * Utility functions for exec module core routines:

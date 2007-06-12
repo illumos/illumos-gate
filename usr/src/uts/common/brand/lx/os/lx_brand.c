@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,10 +45,8 @@
 #include <sys/termios.h>
 #include <sys/sunddi.h>
 #include <sys/ddi.h>
-#include <sys/exec.h>
 #include <sys/vnode.h>
 #include <sys/pathname.h>
-#include <sys/machelf.h>
 #include <sys/auxv.h>
 #include <sys/priv.h>
 #include <sys/regset.h>
@@ -578,19 +576,13 @@ lx_copy_procdata(proc_t *child, proc_t *parent)
 	child->p_brand_data = cpd;
 }
 
-#if defined(_ELF32_COMPAT)
 /*
  * Currently, only 32-bit branded ELF executables are supported.
  */
-#define	elfexec elf32exec
-#define	mapexec_brand mapexec32_brand
-#endif /* __amd64 */
-
-extern int elfexec(vnode_t *vp, execa_t *uap, uarg_t *args,
-    intpdata_t *idatap, int level, long *execsz, int setid, caddr_t exec_file,
-    cred_t *cred, int brand_action);
-extern int mapexec_brand(vnode_t *, uarg_t *, Ehdr *ehdr, Elf32_Addr *,
-    intptr_t *, caddr_t, int *, caddr_t *, caddr_t *, size_t *);
+#if defined(_LP64)
+#define	elfexec			elf32exec
+#define	mapexec_brand		mapexec32_brand
+#endif /* _LP64 */
 
 /*
  * Exec routine called by elfexec() to load 32-bit Linux binaries.
@@ -602,8 +594,8 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 {
 	int		error;
 	vnode_t		*nvp;
-	auxv32_t	phdr_auxv = { AT_SUN_BRAND_PHDR, 0 };
-	Ehdr		ehdr;
+	auxv32_t	phdr_auxv32 = { AT_SUN_BRAND_PHDR, 0 };
+	Elf32_Ehdr	ehdr;
 	Elf32_Addr	uphdr_vaddr;
 	intptr_t	voffset;
 	int		interp;
@@ -735,8 +727,9 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	 * least try to keep /proc's view of the aux vector consistent with
 	 * what's on the process stack.
 	 */
-	phdr_auxv.a_un.a_val = edp->ed_phdr;
-	if (copyout(&phdr_auxv, args->brand_auxp, sizeof (phdr_auxv)) == -1)
+	phdr_auxv32.a_un.a_val = edp->ed_phdr;
+	if (copyout(&phdr_auxv32, args->auxp_brand_phdr,
+	    sizeof (phdr_auxv32)) == -1)
 		return (EFAULT);
 
 	/*

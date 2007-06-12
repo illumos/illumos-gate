@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -167,7 +167,7 @@ dtrace_safe_phdr(Phdr *phdrp, struct uarg *args, uintptr_t base)
  * Map in the executable pointed to by vp. Returns 0 on success.
  */
 int
-mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Elf32_Addr *uphdr_vaddr,
+mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
     intptr_t *voffset, caddr_t exec_file, int *interp, caddr_t *bssbase,
     caddr_t *brkbase, size_t *brksize)
 {
@@ -228,7 +228,7 @@ mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Elf32_Addr *uphdr_vaddr,
 	if (uphdr != NULL) {
 		*uphdr_vaddr = uphdr->p_vaddr;
 	} else {
-		*uphdr_vaddr = (Elf32_Addr)-1;
+		*uphdr_vaddr = (Addr)-1;
 	}
 
 	kmem_free(phdrbase, phdrsize);
@@ -286,13 +286,6 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 
 	ASSERT(p->p_model == DATAMODEL_ILP32 || p->p_model == DATAMODEL_LP64);
 
-	if ((level < 2) &&
-	    (brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
-		return (BROP(p)->b_elfexec(vp, uap, args,
-		    idatap, level + 1, execsz, setid, exec_file, cred,
-		    brand_action));
-	}
-
 	bigwad = kmem_alloc(sizeof (struct bigwad), KM_SLEEP);
 	ehdrp = &bigwad->ehdr;
 	dlnp = bigwad->dl_name;
@@ -337,6 +330,21 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	args->to_model = DATAMODEL_ILP32;
 	*execsz = btopr(SINCR) + btopr(SSIZE) + btopr(NCARGS-1);
 #endif	/* _LP64 */
+
+	/*
+	 * We delay invoking the brand callback until we've figured out
+	 * what kind of elf binary we're trying to run, 32-bit or 64-bit.
+	 * We do this because now the brand library can just check
+	 * args->to_model to see if the target is 32-bit or 64-bit without
+	 * having do duplicate all the code above.
+	 */
+	if ((level < 2) &&
+	    (brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
+		kmem_free(bigwad, sizeof (struct bigwad));
+		return (BROP(p)->b_elfexec(vp, uap, args,
+		    idatap, level + 1, execsz, setid, exec_file, cred,
+		    brand_action));
+	}
 
 	/*
 	 * Determine aux size now so that stack can be built
@@ -707,8 +715,10 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 			 * Reserve space for the brand-private aux vector entry,
 			 * and record the user addr of that space.
 			 */
-			args->brand_auxp = (auxv32_t *)((char *)args->stackend +
-			    ((char *)&aux->a_type - (char *)bigwad->elfargs));
+			args->auxp_brand_phdr =
+			    (char *)((char *)args->stackend +
+			    ((char *)&aux->a_type -
+			    (char *)bigwad->elfargs));
 			ADDAUX(aux, AT_SUN_BRAND_PHDR, 0)
 		}
 
