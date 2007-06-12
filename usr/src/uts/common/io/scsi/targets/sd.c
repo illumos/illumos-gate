@@ -13454,7 +13454,9 @@ sd_retry_command(struct sd_lun *un, struct buf *bp, int retry_check_flag,
 
 	/*
 	 * If we are suspended, then put the command onto head of the
-	 * wait queue since we don't want to start more commands.
+	 * wait queue since we don't want to start more commands, and
+	 * clear the un_retry_bp. Next time when we are resumed, will
+	 * handle the command in the wait queue.
 	 */
 	switch (un->un_state) {
 	case SD_STATE_SUSPENDED:
@@ -13463,6 +13465,10 @@ sd_retry_command(struct sd_lun *un, struct buf *bp, int retry_check_flag,
 		un->un_waitq_headp = bp;
 		if (un->un_waitq_tailp == NULL) {
 			un->un_waitq_tailp = bp;
+		}
+		if (bp == un->un_retry_bp) {
+			un->un_retry_bp = NULL;
+			un->un_retry_statp = NULL;
 		}
 		SD_UPDATE_KSTATS(un, kstat_waitq_enter, bp);
 		SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un, "sd_retry_command: "
