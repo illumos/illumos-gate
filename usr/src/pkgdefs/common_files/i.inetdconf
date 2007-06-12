@@ -352,6 +352,14 @@ inetd_remove xaudio <<EOF
 ^[# 	]*xaudio[ 	]*stream
 EOF
 
+# Remove CDE rpc services
+inetd_remove cde <<EOF
+^[# 	]*dtspc[ 	]*stream
+^[# 	]*100083/1[ 	]*tli
+^[# 	]*100068/2-[45][ 	]*dgram
+^# Sun ToolTalk Database Server
+EOF
+
 # End of setup, now process the file
 while read src dest
 do
