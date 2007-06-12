@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1376,8 +1375,10 @@ bmap_set_bn(struct vnode *vp, u_offset_t off, daddr32_t bn)
 	 * Fetch the first indirect block.
 	 */
 	nb = ip->i_ib[NIADDR - j];
-	if (nb == 0)
+	if (nb == 0) {
 		err = ufs_fault(ITOV(ip), "ufs_set_bn: nb == UFS_HOLE");
+		return (err);
+	}
 
 	/*
 	 * Fetch through the indirect blocks.
@@ -1398,11 +1399,18 @@ bmap_set_bn(struct vnode *vp, u_offset_t off, daddr32_t bn)
 		shft -= nindirshift;		/* sh / nindir */
 		i = (tbn >> shft) & nindiroffset; /* (tbn / sh) % nindir */
 
+		nb = bap[i];
+		if (nb == 0) {
+			err = ufs_fault(ITOV(ip), "ufs_set_bn: nb == UFS_HOLE");
+			return (err);
+		}
+
 		if (j == NIADDR) {
 			bap[i] = bn;
 			bdrwrite(bp);
 			return (0);
 		}
+
 		brelse(bp);
 	}
 	return (0);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -637,7 +636,7 @@ free(struct inode *ip, daddr_t bno, off_t size, int flags)
 	 * fallocate'd files will have negative block address.
 	 * So negate it again to get original block address.
 	 */
-	if (bno < 0 && bno % fs->fs_bsize == 0 && bno != UFS_HOLE) {
+	if (bno < 0 && (bno % fs->fs_frag == 0) && bno != UFS_HOLE) {
 		bno = -bno;
 	}
 
@@ -1590,7 +1589,7 @@ ufs_allocsp(struct vnode *vp, struct flock64 *lp, cred_t *cr)
 		rw_enter(&ufsvfsp->vfs_dqrwlock, RW_READER);
 		rw_enter(&ip->i_contents, RW_WRITER);
 
-		for (i = start; (i < len) && (lblkno(fs, i) < NDADDR);
+		for (i = start; (i < (start + len)) && (lblkno(fs, i) < NDADDR);
 		    i += fs->fs_bsize) {
 			berr = bmap_write(ip, i, fs->fs_bsize, BI_FALLOCATE,
 			    &allocblk, cr);
@@ -1606,7 +1605,8 @@ ufs_allocsp(struct vnode *vp, struct flock64 *lp, cred_t *cr)
 
 			if (allocblk) {
 				totblks++;
-				ip->i_size += fs->fs_bsize;
+				if (i >= ip->i_size)
+					ip->i_size += fs->fs_bsize;
 			}
 		}
 
@@ -1631,7 +1631,7 @@ ufs_allocsp(struct vnode *vp, struct flock64 *lp, cred_t *cr)
 	rw_enter(&ip->i_contents, RW_WRITER);
 
 	/* Now go about fallocating necessary indirect blocks */
-	for (i = istart; i < len; i += fs->fs_bsize) {
+	for (i = istart; i < (start + len); i += fs->fs_bsize) {
 		berr = bmap_write(ip, i, fs->fs_bsize, BI_FALLOCATE,
 		    &allocblk, cr);
 		if (berr) {
@@ -1654,7 +1654,9 @@ ufs_allocsp(struct vnode *vp, struct flock64 *lp, cred_t *cr)
 			undo->next = ib_undo;
 			ib_undo = undo;
 			totblks++;
-			ip->i_size += fs->fs_bsize;
+
+			if (i >= ip->i_size)
+				ip->i_size += fs->fs_bsize;
 		}
 		cnt++;
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -807,7 +807,7 @@ typedef struct ufsvfs {
 #define	INOHASH(ino)	(((int)ino) & (inohsz - 1))
 
 #define	ISFALLOCBLK(ip, bn)	\
-	(((bn) < 0) && ((bn) % ip->i_fs->fs_bsize == 0) && \
+	(((bn) < 0) && ((bn) % ip->i_fs->fs_frag == 0) && \
 	((ip)->i_cflags & IFALLOCATE && (bn) != UFS_HOLE))
 
 union ihead {
