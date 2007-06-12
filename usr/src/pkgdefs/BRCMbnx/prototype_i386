@@ -44,6 +44,9 @@
 #
 # source locations relative to the prototype file
 #
-# BRCMbnx
+# Broadcom NetXtreme II NIC driver
 #
+f none kernel/drv/bnx		0755	root	sys
 d none kernel/drv/amd64		0755	root	sys
+f none kernel/drv/amd64/bnx	0755	root	sys
+
