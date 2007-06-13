@@ -437,7 +437,8 @@ process_linkprop_init(linkprop_db_state_t *lsp, char *buf,
 		 * values from listp.
 		 */
 		for (lvp = lip->li_val, valcnt = 0;
-		    lvp != NULL; lvp = lvp->lv_nextval, valcnt++);
+		    lvp != NULL; lvp = lvp->lv_nextval, valcnt++)
+			;
 
 		propval = malloc(sizeof (char *) * valcnt);
 		if (propval == NULL) {
@@ -880,7 +881,7 @@ do_set_zone(const char *link, val_desc_t *vdp, uint_t val_cnt)
 		return (status);
 
 	/* Do nothing if setting to current value */
-	zid_new = (zoneid_t)vdp->vd_val;
+	zid_new = (intptr_t)(void *)vdp->vd_val;
 	if (zid_new == zid_old)
 		return (DLADM_STATUS_OK);
 
@@ -963,7 +964,7 @@ do_check_zone(prop_desc_t *pdp, char **prop_val, uint_t val_cnt,
 	if (vdp == NULL)
 		return (DLADM_STATUS_NOMEM);
 
-	vdp->vd_val = (void *)zid;
+	vdp->vd_val = (void *)(uintptr_t)zid;
 	*vdpp = vdp;
 	return (DLADM_STATUS_OK);
 }

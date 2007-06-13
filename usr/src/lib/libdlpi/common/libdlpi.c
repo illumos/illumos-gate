@@ -42,6 +42,8 @@
 #include <alloca.h>
 #include <sys/sysmacros.h>
 #include <ctype.h>
+#include <net/if_types.h>
+#include <netinet/arp.h>
 #include <libdlpi.h>
 #include <libintl.h>
 #include <libinetutil.h>
@@ -586,7 +588,7 @@ dlpi_send(dlpi_handle_t dh, const void *daddrp, size_t daddrlen,
 	if (dip->dli_oflags & DLPI_RAW)
 		return (i_dlpi_strputmsg(dip->dli_fd, NULL, msgbuf, msglen, 0));
 
-	if (daddrp == NULL || daddrlen > DLPI_PHYSADDR_MAX)
+	if ((daddrlen > 0 && daddrp == NULL) || daddrlen > DLPI_PHYSADDR_MAX)
 		return (DLPI_EINVAL);
 
 	DLPI_MSG_CREATE(req, DL_UNITDATA_REQ);
@@ -763,6 +765,80 @@ dlpi_style(dlpi_handle_t dh)
 	dlpi_impl_t	*dip = (dlpi_impl_t *)dh;
 
 	return (dip->dli_style);
+}
+
+uint_t
+dlpi_arptype(uint_t dlpitype)
+{
+	switch (dlpitype) {
+
+	case DL_ETHER:
+		return (ARPHRD_ETHER);
+
+	case DL_FRAME:
+		return (ARPHRD_FRAME);
+
+	case DL_ATM:
+		return (ARPHRD_ATM);
+
+	case DL_IPATM:
+		return (ARPHRD_IPATM);
+
+	case DL_HDLC:
+		return (ARPHRD_HDLC);
+
+	case DL_FC:
+		return (ARPHRD_FC);
+
+	case DL_CSMACD:				/* ieee 802 networks */
+	case DL_TPB:
+	case DL_TPR:
+	case DL_METRO:
+	case DL_FDDI:
+		return (ARPHRD_IEEE802);
+
+	case DL_IB:
+		return (ARPHRD_IB);
+
+	case DL_IPV4:
+	case DL_IPV6:
+		return (ARPHRD_TUNNEL);
+	}
+
+	return (0);
+}
+
+uint_t
+dlpi_iftype(uint_t dlpitype)
+{
+	switch (dlpitype) {
+
+	case DL_ETHER:
+		return (IFT_ETHER);
+
+	case DL_ATM:
+		return (IFT_ATM);
+
+	case DL_CSMACD:
+		return (IFT_ISO88023);
+
+	case DL_TPB:
+		return (IFT_ISO88024);
+
+	case DL_TPR:
+		return (IFT_ISO88025);
+
+	case DL_FDDI:
+		return (IFT_FDDI);
+
+	case DL_IB:
+		return (IFT_IB);
+
+	case DL_OTHER:
+		return (IFT_OTHER);
+	}
+
+	return (0);
 }
 
 /*
@@ -1094,6 +1170,8 @@ i_dlpi_strgetmsg(int fd, int msec, dlpi_msg_t *dlreplyp, t_uscalar_t dlreqprim,
 
 		switch (poll(&pfd, 1, msec)) {
 			default:
+				if (pfd.revents & POLLHUP)
+					return (DL_SYSERR);
 				break;
 			case 0:
 				return (DLPI_ETIMEDOUT);

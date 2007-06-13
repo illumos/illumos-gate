@@ -101,58 +101,6 @@ static category_map_entry_t category_map[] = {
 };
 
 /*
- * dlpi_to_arp(): converts DLPI datalink types into ARP datalink types
- *
- *   input: uint_t: the DLPI datalink type
- *  output: uint_t: the ARP datalink type (0 if no corresponding code)
- *
- *    note: this function does not belong in this library, but it's here until
- *	    dhcpagent is ported over to libdlpi.  It should move to libdlpi
- *	    instead.
- */
-
-uint_t
-dlpi_to_arp(uint_t dlpi_type)
-{
-	switch (dlpi_type) {
-
-	case DL_ETHER:
-		return (ARPHRD_ETHER);
-
-	case DL_FRAME:
-		return (ARPHRD_FRAME);
-
-	case DL_ATM:
-		return (ARPHRD_ATM);
-
-	case DL_IPATM:
-		return (ARPHRD_IPATM);
-
-	case DL_HDLC:
-		return (ARPHRD_HDLC);
-
-	case DL_FC:
-		return (ARPHRD_FC);
-
-	case DL_CSMACD:				/* ieee 802 networks */
-	case DL_TPB:
-	case DL_TPR:
-	case DL_METRO:
-	case DL_FDDI:
-		return (ARPHRD_IEEE802);
-
-	case DL_IB:
-		return (ARPHRD_IB);
-
-	case DL_IPV4:
-	case DL_IPV6:
-		return (ARPHRD_TUNNEL);
-	}
-
-	return (0);
-}
-
-/*
  * inittab_load(): returns all inittab entries with the specified criteria
  *
  *   input: uchar_t: the categories the consumer is interested in
@@ -571,7 +519,7 @@ get_mac_addr(const char *str, int *ierrnop, uint16_t *hwret, int hwtype,
 			(void) memcpy(outbuf, dlinfo.di_physaddr, maclen);
 			dlpi_close(dh);
 			if (hwtype == -1)
-				hwtype = dlpi_to_arp(dlinfo.di_mactype);
+				hwtype = dlpi_arptype(dlinfo.di_mactype);
 		}
 	}
 	if (hwtype == -1)

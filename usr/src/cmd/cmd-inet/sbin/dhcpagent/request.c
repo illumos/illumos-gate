@@ -971,7 +971,8 @@ dhcp_acknak_common(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
 	dhcp_smach_t	*dsmp;
 	boolean_t	isv6 = (fd == v6_sock_fd);
 
-	if ((plp = recv_pkt(fd, get_max_mtu(isv6), isv6, B_FALSE)) == NULL)
+	plp = recv_pkt(fd, get_max_mtu(isv6), isv6, B_FALSE, NULL);
+	if (plp == NULL)
 		return;
 
 	pif = lookup_pif_by_index(plp->ifindex, isv6);
@@ -1078,7 +1079,7 @@ dhcp_acknak_lif(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
 	uint_t		xid;
 	dhcp_smach_t	*dsmp;
 
-	if ((plp = recv_pkt(fd, lif->lif_max, B_FALSE, B_FALSE)) == NULL)
+	if ((plp = recv_pkt(fd, lif->lif_max, B_FALSE, B_FALSE, NULL)) == NULL)
 		return;
 
 	recv_type = pkt_recv_type(plp);

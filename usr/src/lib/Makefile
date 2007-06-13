@@ -482,7 +482,7 @@ libinetcfg:	libnsl libsocket libdevinfo
 libkmf:		libcryptoutil pkcs11 openssl
 libnsl:		libmd5 libscf
 libmapid:	libresolv
-libuuid:	libsocket
+libuuid:	libdlpi libdladm 
 libinetutil:	libsocket
 libsecdb:	libnsl
 libsasl:	libgss libsocket pkcs11 libmd

@@ -2561,13 +2561,14 @@ do_show_linkprop(int argc, char **argv)
 static void
 show_linkprop_onelink(void *arg, const char *link)
 {
-	int			i, fd;
-	char			linkname[MAXPATHLEN];
+	int			i;
+	int			retval;
 	char			*buf;
 	dladm_status_t		status;
 	prop_list_t		*proplist = NULL;
 	show_linkprop_state_t	*statep;
 	const char		*savep;
+	dlpi_handle_t		dh;
 
 	statep = (show_linkprop_state_t *)arg;
 	savep = statep->ls_link;
@@ -2580,9 +2581,8 @@ show_linkprop_onelink(void *arg, const char *link)
 	 * if there are no open links, the retrieval of link properties
 	 * (below) will proceed slowly unless we hold the link open.
 	 */
-	(void) snprintf(linkname, MAXPATHLEN, "/dev/%s", link);
-	if ((fd = open(linkname, O_RDWR)) < 0) {
-		warn("cannot open %s: %s", link, strerror(errno));
+	if ((retval = dlpi_open(link, &dh, 0)) != DLPI_SUCCESS) {
+		warn("cannot open %s: %s", link, dlpi_strerror(retval));
 		statep->ls_status = DLADM_STATUS_NOTFOUND;
 		return;
 	}
@@ -2609,7 +2609,7 @@ show_linkprop_onelink(void *arg, const char *link)
 		if (status != DLADM_STATUS_OK)
 			warn_dlerr(status, "show-linkprop failed for %s", link);
 	}
-	(void) close(fd);
+	dlpi_close(dh);
 	free(buf);
 	statep->ls_link = savep;
 }

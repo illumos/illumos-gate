@@ -986,7 +986,7 @@ send_pkt_internal(dhcp_smach_t *dsmp)
 		n_bytes = sendmsg(v6_sock_fd, &msg, 0);
 	} else {
 		if (dsmp->dsm_using_dlpi) {
-			n_bytes = dlpi_sendto(pif->pif_dlpi_fd, dpkt->pkt,
+			n_bytes = dlpi_sendto(pif->pif_dlpi_hd, dpkt->pkt,
 			    dpkt->pkt_cur_len, &dsmp->dsm_send_dest.v4,
 			    pif->pif_daddr, pif->pif_dlen);
 			/* dlpi_sendto calls putmsg */
@@ -1319,15 +1319,16 @@ sock_recvpkt(int fd, PKT_LIST *plp)
 /*
  * recv_pkt(): receives a single DHCP packet on a given file descriptor.
  *
- *   input: int: the file descriptor to receive the packet
+ *   input: int: if not using dlpi, the file descriptor to receive the packet
  *	    int: the maximum packet size to allow
  *	    boolean_t: B_TRUE for IPv6
  *	    boolean_t: B_TRUE if using DLPI
+ *	    void *: if using DLPI, structure that has DLPI handle
  *  output: PKT_LIST *: the received packet
  */
 
 PKT_LIST *
-recv_pkt(int fd, int mtu, boolean_t isv6, boolean_t isdlpi)
+recv_pkt(int fd, int mtu, boolean_t isv6, boolean_t isdlpi, dhcp_pif_t *arg)
 {
 	PKT_LIST	*plp;
 	ssize_t		retval;
@@ -1355,7 +1356,9 @@ recv_pkt(int fd, int mtu, boolean_t isv6, boolean_t isdlpi)
 		}
 	} else {
 		if (isdlpi) {
-			retval = dlpi_recvfrom(fd, plp->pkt, mtu,
+			dhcp_pif_t	*pif = arg;
+
+			retval = dlpi_recvfrom(pif->pif_dlpi_hd, plp->pkt, mtu,
 			    (struct sockaddr_in *)&plp->pktfrom,
 			    (struct sockaddr_in *)&plp->pktto);
 		} else {

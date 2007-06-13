@@ -22,42 +22,10 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-# There really should be only one SUNWprivate version.
-# Don't add any more.  Add new private symbols to SUNWprivate_1.2
+include ../Makefile.com
+include ../../Makefile.lib.64
 
-SUNWprivate_1.2 {
-    global:
-	dhcp_options_scan;
-	dhcpv6_find_option;
-	dhcpv6_pkt_option;
-} SUNWprivate_1.1;
-
-SUNWprivate_1.1 {
-    global:
-	dhcpmsg;
-	dhcpmsg_fini;
-	dhcpmsg_init;
-	dsym_close_parser;
-	dsym_free_classes;
-	dsym_free_fields;
-	dsym_get_cat_id;
-	dsym_get_code_ranges;
-	dsym_get_type_id;
-	dsym_init_parser;
-	dsym_parse_field;
-	dsym_parser;
-	inittab_decode;
-	inittab_decode_e;
-	inittab_encode;
-	inittab_encode_e;
-	inittab_getbycode;
-	inittab_getbyname;
-	inittab_load;
-	inittab_type_to_size;
-	inittab_verify;
-    local:
-	*;
-};
+install: all $(ROOTLIBS64) $(ROOTLINKS64)

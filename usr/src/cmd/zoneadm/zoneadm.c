@@ -66,6 +66,7 @@
 #include <limits.h>
 #include <dirent.h>
 #include <uuid/uuid.h>
+#include <libdlpi.h>
 
 #include <fcntl.h>
 #include <door.h>
@@ -147,7 +148,6 @@ struct cmd {
 
 static int cleanup_zonepath(char *, boolean_t);
 
-extern int ifname_open(char *);
 
 static int help_func(int argc, char *argv[]);
 static int ready_func(int argc, char *argv[]);
@@ -2836,7 +2836,7 @@ verify_handle(int cmd_num, zone_dochandle_t handle, char *argv[])
 	int err;
 	boolean_t in_alt_root;
 	zone_iptype_t iptype;
-	int fd;
+	dlpi_handle_t dh;
 
 	in_alt_root = zonecfg_in_alt_root();
 	if (in_alt_root)
@@ -2907,19 +2907,21 @@ verify_handle(int cmd_num, zone_dochandle_t handle, char *argv[])
 				    nwiftab.zone_nwif_physical);
 				break;
 			}
+
 			/*
-			 * Verify that the physical interface can
-			 * be opened
+			 * Verify that the physical interface can be opened.
 			 */
-			fd = ifname_open(nwiftab.zone_nwif_physical);
-			if (fd == -1) {
+			err = dlpi_open(nwiftab.zone_nwif_physical, &dh, 0);
+			if (err != DLPI_SUCCESS) {
 				(void) fprintf(stderr,
 				    gettext("WARNING: skipping network "
-				    "interface '%s' which cannot be opened.\n"),
-				    nwiftab.zone_nwif_physical);
+				    "interface '%s' which cannot be opened: "
+				    "dlpi error (%s).\n"),
+				    nwiftab.zone_nwif_physical,
+				    dlpi_strerror(err));
 				break;
 			} else {
-				(void) close(fd);
+				dlpi_close(dh);
 			}
 			/*
 			 * Verify whether the physical interface is already

@@ -47,6 +47,7 @@ extern "C" {
 #include <netinet/dhcp.h>
 #include <dhcpagent_ipc.h>
 #include <libinetutil.h>
+#include <libdlpi.h>
 
 #include "common.h"
 #include "util.h"
@@ -64,24 +65,14 @@ struct dhcp_pif_s {
 	uchar_t		pif_hwtype;	/* type of link-layer */
 	boolean_t	pif_isv6;
 	boolean_t	pif_running;	/* interface is running */
-	int		pif_dlpi_fd;
+	dlpi_handle_t 	pif_dlpi_hd;	/* dlpi handle */
 	int		pif_dlpi_count;
 	iu_event_id_t	pif_dlpi_id;	/* event id for ack/nak/offer */
 	uint_t		pif_hold_count;	/* reference count */
 
-	/*
-	 * The destination address is the broadcast address of the interface,
-	 * in DLPI terms (which means it includes both a link-layer broadcast
-	 * address and a SAP, and the order depends on the requirements of the
-	 * underlying driver).  We store it as a token like this because it's
-	 * generally how we need to use it.
-	 */
+	uchar_t		*pif_daddr;	/* our L2 destination address */
+	uchar_t		pif_dlen;	/* our L2 destination address len */
 
-	uchar_t		*pif_daddr;	/* our destination address */
-	uchar_t		pif_dlen;	/* our destination address len */
-
-	uint_t		pif_saplen;	/* the SAP len */
-	boolean_t	pif_sap_before;	/* does SAP come before address? */
 	char		pif_name[LIFNAMSIZ];
 };
 

@@ -238,7 +238,7 @@ failed:
  * dhcp_collect_dlpi(): collects incoming OFFERs, ACKs, and NAKs via DLPI.
  *
  *   input: iu_eh_t *: unused
- *	    int: the file descriptor the mesage arrived on
+ *	    int: unused
  *	    short: unused
  *	    iu_event_id_t: the id of this event callback with the handler
  *	    void *: the physical interface that received the message
@@ -257,7 +257,7 @@ dhcp_collect_dlpi(iu_eh_t *eh, int fd, short events, iu_event_id_t id,
 	dhcp_smach_t	*dsmp;
 	uint_t		xid;
 
-	if ((plp = recv_pkt(fd, pif->pif_max, B_FALSE, B_TRUE)) == NULL)
+	if ((plp = recv_pkt(fd, pif->pif_max, B_FALSE, B_TRUE, pif)) == NULL)
 		return;
 
 	recv_type = pkt_recv_type(plp);

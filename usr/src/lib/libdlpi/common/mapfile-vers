@@ -27,12 +27,14 @@
 
 SUNW_1.1 {	# first release of libdlpi, Solaris 11 
     global:
+	dlpi_arptype;
         dlpi_bind;
         dlpi_close;
         dlpi_disabmulti;
         dlpi_enabmulti;
         dlpi_fd;
         dlpi_get_physaddr;
+	dlpi_iftype;
         dlpi_info;
         dlpi_linkname;
         dlpi_mactype;

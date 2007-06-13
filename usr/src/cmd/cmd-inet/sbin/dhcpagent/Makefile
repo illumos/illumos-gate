@@ -30,7 +30,7 @@ ROOTFS_PROG = $(PROG)
 DEFAULTFILES = dhcpagent.dfl
 
 LOCOBJS = adopt.o agent.o async.o bound.o class_id.o defaults.o   \
-	  dlpi_io.o dlprims.o inform.o init_reboot.o interface.o ipc_action.o \
+	  dlpi_io.o inform.o init_reboot.o interface.o ipc_action.o \
 	  packet.o release.o renew.o request.o script_handler.o select.o \
 	  states.o util.o
 COMDIR  = $(SRC)/common/net/dhcp
@@ -49,7 +49,7 @@ XGETFLAGS += -a -x dhcpagent.xcl
 #
 
 CPPFLAGS  += -I$(COMDIR) -D_XOPEN_SOURCE=500 -D__EXTENSIONS__
-LDLIBS    += -lxnet -lnvpair -ldhcpagent -ldhcputil -linetutil -ldevinfo
+LDLIBS    += -lxnet -lnvpair -ldhcpagent -ldhcputil -linetutil -ldevinfo -ldlpi
 
 # Disable warnings that affect all XPG applications.
 LINTFLAGS += -erroff=E_INCONS_ARG_DECL2 -erroff=E_INCONS_VAL_TYPE_DECL2

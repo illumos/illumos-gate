@@ -32,6 +32,7 @@ HDRS =		libdladm.h libdladm_impl.h libdllink.h libdlaggr.h	\
 HDRDIR =	common
 
 SUBDIRS =	$(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
 POFILE =	libdladm.po
 MSGFILES =	common/libdladm.c common/linkprop.c common/secobj.c	\

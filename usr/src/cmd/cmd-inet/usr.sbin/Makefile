@@ -146,7 +146,7 @@ $(K5PROGS)		:=	CPPFLAGS += -I$(SRC)/head \
 LDLIBS +=	$(K5LIBS)
 $(TSNETPROG)		:=	LDLIBS += $(ZLAZYLOAD) -ltsnet $(ZNOLAZYLOAD)
 
-in.rarpd		:=	LDLIBS += -linetutil
+in.rarpd		:=	LDLIBS += -linetutil -ldlpi
 route			:=	CPPFLAGS += -DNDEBUG
 gettable in.comsat	:=	LDFLAGS += $(MAPFILE.NGB:%=-M%)
 

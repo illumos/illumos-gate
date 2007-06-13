@@ -145,7 +145,7 @@ make_stable_duid(const char *physintf, size_t *duidlen)
 	if (dlpi_open(physintf, &dh, 0) == DLPI_SUCCESS &&
 	    dlpi_info(dh, &dlinfo, 0) == DLPI_SUCCESS &&
 	    (len = dlinfo.di_physaddrlen) > 0 &&
-	    (arptype = dlpi_to_arp(dlinfo.di_mactype) != 0)) {
+	    (arptype = dlpi_arptype(dlinfo.di_mactype) != 0)) {
 		duid_llt_t *dllt;
 		time_t now;
 

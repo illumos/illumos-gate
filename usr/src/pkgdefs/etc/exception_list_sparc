@@ -89,6 +89,8 @@ usr/include/libdlwlan.h		sparc
 usr/include/libdlwlan_impl.h	sparc
 lib/libdladm.so			sparc
 lib/llib-ldladm.ln		sparc
+lib/sparcv9/libdladm.so		sparc
+lib/sparcv9/llib-ldladm.ln	sparc
 lib/llib-ldladm			sparc
 #
 # Installed in the proto area for building those things

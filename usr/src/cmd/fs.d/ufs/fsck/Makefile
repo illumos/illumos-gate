@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/fs.d/ufs/fsck/Makefile
@@ -45,24 +44,17 @@ UFSOBJS=	ufs_subr.o ufs_tables.o
 UFSSRCS=	$(UFSOBJS:%.o=$(UFSDIR)/%.c)
 ROLLDIR=	../roll_log
 
-AVLDIR=		../../../../common/avl
-AVLOBJS=	avl.o
-AVLSRCS=	$(AVLOBJS:%.o=$(AVLDIR)/%.c)
-
-OBJS=		$(FSCKOBJS) $(UFSOBJS) $(ROLLOBJS) $(AVLOBJS) $(FSLIB)
-SRCS=		$(FSCKSRCS) $(UFSSRCS) $(ROLLSRCS) $(AVLSRCS) $(FSLIBSRC)
+OBJS=		$(FSCKOBJS) $(UFSOBJS) $(ROLLOBJS) $(FSLIB)
+SRCS=		$(FSCKSRCS) $(UFSSRCS) $(ROLLSRCS) $(FSLIBSRC)
 
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE -I../../ -I../../../../lib/libadm/inc
-LDLIBS +=	-lefi
+LDLIBS +=	-lefi -lavl
 
 $(LIBPROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS) $(CTFMERGE_HOOK)
 		$(POST_PROCESS)
 
 %.o:	$(UFSDIR)/%.c
-	$(COMPILE.c) $< $(CTFCONVERT_HOOK)
-
-%.o:	$(AVLDIR)/%.c
 	$(COMPILE.c) $< $(CTFCONVERT_HOOK)
 
 # Use DEVLINTFLAGS and the definition of LINT.c below for development
@@ -88,7 +80,7 @@ DEVLINTFLAGS =	-errtags=yes -U__PRAGMA_REDEFINE_EXTNAME \
 lint:	lint_SRCS
 
 clean:     
-	$(RM) $(FSCKOBJS) $(UFSOBJS) $(AVLOBJS)
+	$(RM) $(FSCKOBJS) $(UFSOBJS)
 
 cscope.out tags: FRC
 	$(XREF) -f -x $@

@@ -160,6 +160,8 @@ extern int dlpi_send(dlpi_handle_t, const void *, size_t, const void *, size_t,
     const dlpi_sendinfo_t *);
 extern int dlpi_fd(dlpi_handle_t);
 extern int dlpi_set_timeout(dlpi_handle_t, int);
+extern uint_t dlpi_arptype(uint_t);
+extern uint_t dlpi_iftype(uint_t);
 
 /*
  * These are Consolidation Private interfaces and are subject to change.

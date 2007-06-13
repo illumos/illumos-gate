@@ -111,9 +111,6 @@ extern char		*inittab_decode(const dhcp_symbol_t *, const uchar_t *,
 extern char		*inittab_decode_e(const dhcp_symbol_t *,
 			    const uchar_t *, uint16_t, boolean_t, int *);
 
-/* temporary; should be in libdlpi */
-extern uint_t		dlpi_to_arp(uint_t);
-
 #ifdef	__cplusplus
 }
 #endif

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -48,12 +48,10 @@
 #include	<stdio_ext.h>
 #include	<stdarg.h>
 #include	<string.h>
-#include	<ctype.h>
 #include	<fcntl.h>
 #include	<sys/types.h>
 #include	<dirent.h>
 #include	<syslog.h>
-#include	<signal.h>
 #include	<netdb.h>
 #include	<errno.h>
 #include	<sys/socket.h>
@@ -63,13 +61,12 @@
 #include	<netinet/in.h>
 #include	<arpa/inet.h>
 #include	<stropts.h>
-#include	<sys/dlpi.h>
 #include	<libinetutil.h>
+#include	<libdlpi.h>
 #include	<net/if_types.h>
 #include	<net/if_dl.h>
 
 #define	BOOTDIR		"/tftpboot"	/* boot files directory */
-#define	DEVDIR		"/dev"		/* devices directory */
 #define	DEVIP		"/dev/ip"	/* path to ip driver */
 #define	DEVARP		"/dev/arp"	/* path to arp driver */
 
@@ -95,12 +92,12 @@ struct	ifdev {
  * Physical network device
  */
 struct	rarpdev {
-	char		device[IFNAMSIZ];
-	int		unit;
-	int		fd;
-	uchar_t		*lladdr;		/* mac address of interface */
-	int		ifaddrlen;		/* mac address length */
-	int		ifsaplen;		/* indicates dlsap format */
+	char		device[DLPI_LINKNAME_MAX];
+	uint_t		unit;
+	dlpi_handle_t	dh_rarp;
+	uchar_t		physaddr[DLPI_PHYSADDR_MAX];
+						/* mac address of interface */
+	uint_t		physaddrlen;		/* mac address length */
 	int		ifrarplen;		/* size of rarp data packet */
 	struct ifdev	*ifdev;			/* private interface info */
 	struct rarpdev	*next;			/* list of managed devices */
@@ -127,7 +124,6 @@ static struct rarpdev	*rarpdev_head;
 static char	*cmdname;		/* command name from argv[0] */
 static int	dflag = 0;		/* enable diagnostics */
 static int	aflag = 0;		/* start rarpd on all interfaces */
-static char	*alarmmsg;		/* alarm() error message */
 
 static void	getintf(void);
 static struct rarpdev *find_device(ifspec_t *);
@@ -137,18 +133,16 @@ static void	rarp_request(struct rarpdev *, struct arphdr *,
 		    uchar_t *);
 static void	add_arp(struct rarpdev *, uchar_t *, uchar_t *);
 static void	arp_request(struct rarpdev *, struct arphdr *, uchar_t *);
-static int	rarp_open(struct rarpdev *, ushort_t);
 static void	do_delay_write(void *);
 static void	delay_write(struct rarpdev *, struct rarpreply *);
-static int	rarp_write(int, struct rarpreply *);
 static int	mightboot(ipaddr_t);
 static void	get_ifdata(char *, int, ipaddr_t *, ipaddr_t *);
 static int	get_ipaddr(struct rarpdev *, uchar_t *, uchar_t *, ipaddr_t *);
-static void	sigalarm(int);
 static int	strioctl(int, int, int, int, char *);
 static void	usage();
-static void	syserr(char *);
-static void	error(char *, ...);
+static void	syserr(const char *);
+/*PRINTFLIKE1*/
+static void	error(const char *, ...);
 static void	debug(char *, ...);
 
 extern	int	optind;
@@ -180,7 +174,7 @@ main(int argc, char *argv[])
 	}
 
 	if ((!aflag && (argc - optind) != 2) ||
-					(aflag && (argc - optind) != 0)) {
+	    (aflag && (argc - optind) != 0)) {
 		usage();
 		/* NOTREACHED */
 	}
@@ -223,7 +217,7 @@ main(int argc, char *argv[])
 
 	if (aflag) {
 		/*
-		 * Get each interface name and load rarpdev list
+		 * Get each interface name and load rarpdev list.
 		 */
 		getintf();
 	} else {
@@ -232,10 +226,10 @@ main(int argc, char *argv[])
 		char		buf[IFNAMSIZ + 1];
 
 		/*
-		 * Load specified device as only element of the list
+		 * Load specified device as only element of the list.
 		 */
 		rarpdev_head = (struct rarpdev *)calloc(1,
-						sizeof (struct rarpdev));
+		    sizeof (struct rarpdev));
 		if (rarpdev_head == NULL) {
 			error("out of memory");
 		}
@@ -255,8 +249,9 @@ main(int argc, char *argv[])
 			    sizeof (ifdev->ldevice), "%s%d:",
 			    ifsp.ifsp_devnm, ifsp.ifsp_ppa);
 			ifdev->lunit = ifsp.ifsp_lun;
-		} else
+		} else {
 			ifdev->lunit = -1; /* no logical unit */
+		}
 		(void) strlcpy(rarpdev_head->device, ifsp.ifsp_devnm,
 		    sizeof (rarpdev_head->device));
 		rarpdev_head->unit = ifsp.ifsp_ppa;
@@ -266,7 +261,7 @@ main(int argc, char *argv[])
 	}
 
 	/*
-	 * Initialize each rarpdev
+	 * Initialize each rarpdev.
 	 */
 	for (rdev = rarpdev_head; rdev != NULL; rdev = rdev->next) {
 		init_rarpdev(rdev);
@@ -277,16 +272,16 @@ main(int argc, char *argv[])
 	(void) mutex_init(&debug_mutex, USYNC_THREAD, NULL);
 
 	/*
-	 * Start delayed processing thread
+	 * Start delayed processing thread.
 	 */
 	(void) thr_create(NULL, NULL, (void *(*)(void *))do_delay_write, NULL,
 	    THR_NEW_LWP, NULL);
 
 	/*
-	 * Start RARP processing for each device
+	 * Start RARP processing for each device.
 	 */
 	for (rdev = rarpdev_head; rdev != NULL; rdev = rdev->next) {
-		if (rdev->fd != -1) {
+		if (rdev->dh_rarp != NULL) {
 			(void) thr_create(NULL, NULL,
 			    (void *(*)(void *))do_rarp, (void *)rdev,
 			    THR_NEW_LWP, NULL);
@@ -337,7 +332,7 @@ getintf(void)
 		syserr("SIOCGIFCONF");
 
 	/*
-	 * Initialize a rarpdev for each interface
+	 * Initialize a rarpdev for each interface.
 	 */
 	for (ifr = ifconf.ifc_req; ifconf.ifc_len > 0;
 	    ifr++, ifconf.ifc_len -= sizeof (struct ifreq)) {
@@ -358,7 +353,7 @@ getintf(void)
 			error("ifparse_ifspec failed");
 
 		/*
-		 * Look for an existing device for logical interfaces
+		 * Look for an existing device for logical interfaces.
 		 */
 		if ((rdev = find_device(&ifsp)) == NULL) {
 			rdev = calloc(1, sizeof (struct rarpdev));
@@ -406,22 +401,56 @@ find_device(ifspec_t *specp)
 static void
 init_rarpdev(struct rarpdev *rdev)
 {
-	char *dev;
-	int unit;
-	struct ifdev *ifdev;
+	char 		*dev;
+	int 		unit;
+	struct ifdev 	*ifdev;
+	int		retval;
+	char		*str = NULL;
+	uint_t		physaddrlen = DLPI_PHYSADDR_MAX;
+	char		linkname[DLPI_LINKNAME_MAX];
+	dlpi_handle_t	dh;
 
+	(void) snprintf(linkname, DLPI_LINKNAME_MAX, "%s%d", rdev->device,
+	    rdev->unit);
 	/*
 	 * Open datalink provider and get our mac address.
 	 */
-	rdev->fd = rarp_open(rdev, ETHERTYPE_REVARP);
+	if ((retval = dlpi_open(linkname, &dh, 0)) != DLPI_SUCCESS) {
+		error("cannot open link %s: %s", linkname,
+		    dlpi_strerror(retval));
+	}
+
+	if ((retval = dlpi_bind(dh, ETHERTYPE_REVARP, NULL)) != DLPI_SUCCESS) {
+		dlpi_close(dh);
+		error("dlpi_bind failed: %s", dlpi_strerror(retval));
+	}
 
 	/*
-	 * rarp_open may fail on certain types of interfaces
+	 * Save our mac address.
 	 */
-	if (rdev->fd < 0) {
-		rdev->fd = -1;
-		return;
+	if ((retval = dlpi_get_physaddr(dh, DL_CURR_PHYS_ADDR, rdev->physaddr,
+	    &physaddrlen)) != DLPI_SUCCESS) {
+		dlpi_close(dh);
+		error("dlpi_get_physaddr failed: %s", dlpi_strerror(retval));
 	}
+
+	rdev->physaddrlen = physaddrlen;
+	rdev->ifrarplen = sizeof (struct arphdr) + (2 * sizeof (ipaddr_t)) +
+	    (2 * physaddrlen);
+
+	if (dflag) {
+		str = _link_ntoa(rdev->physaddr, str,
+		    rdev->physaddrlen, IFT_OTHER);
+		if (str != NULL) {
+			debug("device %s physical address %s", linkname, str);
+			free(str);
+		}
+	}
+
+	/*
+	 * Assign dlpi handle to rdev.
+	 */
+	rdev->dh_rarp = dh;
 
 	/*
 	 * Get the IP address and netmask from directory service for
@@ -429,7 +458,7 @@ init_rarpdev(struct rarpdev *rdev)
 	 */
 	for (ifdev = rdev->ifdev; ifdev != NULL; ifdev = ifdev->next) {
 		/*
-		 * If lunit == -1 then this is the primary interface name
+		 * If lunit == -1 then this is the primary interface name.
 		 */
 		if (ifdev->lunit == -1) {
 			dev = rdev->device;
@@ -451,100 +480,61 @@ init_rarpdev(struct rarpdev *rdev)
 static void
 do_rarp(void *buf)
 {
-	struct rarpdev *rdev = (struct rarpdev *)buf;
-	struct strbuf ctl;
-	char	ctlbuf[BUFSIZE];
-	struct strbuf data;
-	char	databuf[BUFSIZE];
+	struct rarpdev *rdev = buf;
 	char	*cause;
 	struct arphdr *ans;
-	uchar_t	*shost;
-	int	flags, ret;
-	union	DL_primitives	*dlp;
-	uchar_t	*laddrp;
+	uchar_t *shost;
+	uint_t	saddrlen;
+	size_t	anslen = rdev->ifrarplen;
 	char	*str = NULL;
+	int	retval;
 
-	/*
-	 * Sanity check; if we hit this limit, ctlbuf/databuf needs
-	 * to be malloc'ed.
-	 */
-	if ((sizeof (ctlbuf) < (DL_UNITDATA_IND_SIZE + rdev->ifaddrlen)) ||
-	    (sizeof (databuf) < rdev->ifrarplen))
-		error("unsupported media");
-
-	if (((shost = (uchar_t *)malloc(rdev->ifaddrlen)) == NULL) ||
-	    ((ans = (struct arphdr *)malloc(rdev->ifrarplen)) == NULL))
+	if (((shost = malloc(rdev->physaddrlen)) == NULL) ||
+	    ((ans = malloc(rdev->ifrarplen)) == NULL))
 		syserr("malloc");
 
 	if (dflag) {
-		str = _link_ntoa(rdev->lladdr, str, rdev->ifaddrlen, IFT_OTHER);
+		str = _link_ntoa(rdev->physaddr, str, rdev->physaddrlen,
+		    IFT_OTHER);
 		if (str != NULL) {
-			debug("starting rarp service on device %s%d address %s",
-			    rdev->device, rdev->unit, str);
+			debug("starting rarp service on device %s%d physical"
+			    " address %s", rdev->device, rdev->unit, str);
 			free(str);
 		}
 	}
 
 	/*
-	 * read RARP packets and respond to them.
+	 * Read RARP packets and respond to them.
 	 */
 	for (;;) {
-		ctl.len = 0;
-		ctl.maxlen = BUFSIZE;
-		ctl.buf = ctlbuf;
-		data.len = 0;
-		data.maxlen = BUFSIZE;
-		data.buf = databuf;
-		flags = 0;
-
-		if ((ret = getmsg(rdev->fd, &ctl, &data, &flags)) < 0)
-			syserr("getmsg");
-
-		/*
-		 * Validate DL_UNITDATA_IND.
-		 */
-		/* LINTED pointer */
-		dlp = (union DL_primitives *)ctlbuf;
-
-		(void) memcpy(ans, databuf, rdev->ifrarplen);
-
-		cause = NULL;
-		if (ctl.len == 0)
-			cause = "missing control part of message";
-		else if (ctl.len < 0)
-			cause = "short control part of message";
-		else if (dlp->dl_primitive != DL_UNITDATA_IND)
-			cause = "not unitdata_ind";
-		else if (ret & MORECTL)
-			cause = "MORECTL flag";
-		else if (ret & MOREDATA)
-			cause = "MOREDATA flag";
-		else if (ctl.len < DL_UNITDATA_IND_SIZE)
-			cause = "short unitdata_ind";
-		else if (data.len < rdev->ifrarplen)
-			cause = "short arp";
-		else if (ans->ar_hrd != htons(ARPHRD_ETHER))
-			cause = "hrd";
-		else if (ans->ar_pro != htons(ETHERTYPE_IP))
-			cause = "pro";
-		else if (ans->ar_hln != rdev->ifaddrlen)
-			cause = "hln";
-		else if (ans->ar_pln != sizeof (ipaddr_t))
-			cause = "pln";
-		if (cause) {
-			if (dflag)
-				debug("receive check failed: cause: %s",
-					cause);
+		saddrlen = DLPI_PHYSADDR_MAX;
+		retval = dlpi_recv(rdev->dh_rarp, shost,
+		    &saddrlen, ans, &anslen, -1, NULL);
+		if (retval == DLPI_ETIMEDOUT) {
 			continue;
+		} else if (retval != DLPI_SUCCESS) {
+			error("error in dlpi_recv %s: %s", rdev->dh_rarp,
+			    dlpi_strerror(retval));
 		}
 
-		/*
-		 * Good request.
-		 * Pick out the mac source address of this RARP request.
-		 */
-		laddrp = (uchar_t *)ctlbuf +
-		    dlp->unitdata_ind.dl_src_addr_offset;
-		(void) memcpy(shost, laddrp, ans->ar_hln);
+		cause = NULL;
+
+		if (anslen < rdev->ifrarplen)
+			cause = "short packet";
+		else if (ans->ar_hrd != htons(ARPHRD_ETHER))
+			cause = "hardware type not Ethernet";
+		else if (ans->ar_pro != htons(ETHERTYPE_IP))
+			cause = "protocol type not IP";
+		else if (ans->ar_hln != rdev->physaddrlen)
+			cause = "unexpected hardware address length";
+		else if (ans->ar_pln != sizeof (ipaddr_t))
+			cause = "unexpected protocol address length";
+		if (cause != NULL) {
+			if (dflag)
+				debug("RARP packet received but "
+				    "discarded: %s", cause);
+			continue;
+		}
 
 		/*
 		 * Handle the request.
@@ -574,7 +564,6 @@ do_rarp(void *buf)
 			break;
 		}
 	}
-	/* NOTREACHED */
 }
 
 /*
@@ -587,6 +576,7 @@ rarp_request(struct rarpdev *rdev, struct arphdr *rp, uchar_t *shost)
 	struct	rarpreply	*rrp;
 	uchar_t			*shap, *thap, *spap, *tpap;
 	char			*str = NULL;
+	int			retval;
 
 	shap = (uchar_t *)rp + sizeof (struct arphdr);
 	spap = shap + rp->ar_hln;
@@ -594,7 +584,7 @@ rarp_request(struct rarpdev *rdev, struct arphdr *rp, uchar_t *shost)
 	tpap = thap + rp->ar_hln;
 
 	if (dflag) {
-		str = _link_ntoa(thap, str, rdev->ifaddrlen, IFT_OTHER);
+		str = _link_ntoa(thap, str, rdev->physaddrlen, IFT_OTHER);
 		if (str != NULL) {
 			debug("RARP_REQUEST for %s", str);
 			free(str);
@@ -602,22 +592,22 @@ rarp_request(struct rarpdev *rdev, struct arphdr *rp, uchar_t *shost)
 	}
 
 	/*
-	 * third party lookups are rare and wonderful
+	 * Third party lookups are rare and wonderful.
 	 */
-	if ((memcmp(shap, thap, rdev->ifaddrlen) != 0) ||
-	    (memcmp(shap, shost, rdev->ifaddrlen) != 0)) {
+	if ((memcmp(shap, thap, rdev->physaddrlen) != 0) ||
+	    (memcmp(shap, shost, rdev->physaddrlen) != 0)) {
 		if (dflag)
 			debug("weird (3rd party lookup)");
 	}
 
 	/*
-	 * fill in given parts of reply packet
+	 * Fill in given parts of reply packet.
 	 */
-	(void) memcpy(shap, rdev->lladdr, rdev->ifaddrlen);
+	(void) memcpy(shap, rdev->physaddr, rdev->physaddrlen);
 
 	/*
 	 * If a good address is stored in our lookup tables, return it
-	 * immediately or after a delay.  Store it our kernel's ARP cache.
+	 * immediately or after a delay.  Store it in our kernel's ARP cache.
 	 */
 	if (get_ipaddr(rdev, thap, tpap, &spa))
 		return;
@@ -634,12 +624,12 @@ rarp_request(struct rarpdev *rdev, struct arphdr *rp, uchar_t *shost)
 		debug("good lookup, maps to %s", inet_ntoa(addr));
 	}
 
-	rrp = (struct rarpreply *)calloc(1, sizeof (struct rarpreply) +
-	    rdev->ifaddrlen + rdev->ifrarplen);
+	rrp = calloc(1, sizeof (struct rarpreply) + rdev->physaddrlen +
+	    rdev->ifrarplen);
 	if (rrp == NULL)
 		error("out of memory");
 	rrp->lldest = (uchar_t *)rrp + sizeof (struct rarpreply);
-	rrp->arprep = rrp->lldest + rdev->ifaddrlen;
+	rrp->arprep = rrp->lldest + rdev->physaddrlen;
 
 	/*
 	 * Create rarpreply structure.
@@ -647,7 +637,7 @@ rarp_request(struct rarpdev *rdev, struct arphdr *rp, uchar_t *shost)
 	(void) gettimeofday(&rrp->tv, NULL);
 	rrp->tv.tv_sec += 3;	/* delay */
 	rrp->rdev = rdev;
-	(void) memcpy(rrp->lldest, shost, rdev->ifaddrlen);
+	(void) memcpy(rrp->lldest, shost, rdev->physaddrlen);
 	(void) memcpy(rrp->arprep, rp, rdev->ifrarplen);
 
 	/*
@@ -656,10 +646,13 @@ rarp_request(struct rarpdev *rdev, struct arphdr *rp, uchar_t *shost)
 	 */
 	(void) memcpy(&tpa, tpap, sizeof (ipaddr_t));
 	if (mightboot(ntohl(tpa))) {
-		if (rarp_write(rdev->fd, rrp) < 0)
-			syslog(LOG_ERR, "Bad rarp_write:  %m");
-		if (dflag)
+		retval = dlpi_send(rdev->dh_rarp, rrp->lldest,
+		    rdev->physaddrlen, rrp->arprep, rdev->ifrarplen, NULL);
+		if (retval != DLPI_SUCCESS) {
+			error("dlpi_send failed: %s", dlpi_strerror(retval));
+		} else if (dflag) {
 			debug("immediate reply sent");
+		}
 		(void) free(rrp);
 	} else {
 		delay_write(rdev, rrp);
@@ -677,7 +670,7 @@ add_arp(struct rarpdev *rdev, uchar_t *ip, uchar_t *laddr)
 	int	fd;
 
 	/*
-	 * Common part of query or set
+	 * Common part of query or set.
 	 */
 	(void) memset(&ar, 0, sizeof (ar));
 	ar.xarp_pa.ss_family = AF_INET;
@@ -691,10 +684,10 @@ add_arp(struct rarpdev *rdev, uchar_t *ip, uchar_t *laddr)
 		syserr(DEVARP);
 
 	/*
-	 * Set the entry
+	 * Set the entry.
 	 */
-	(void) memcpy(LLADDR(&ar.xarp_ha), laddr, rdev->ifaddrlen);
-	ar.xarp_ha.sdl_alen = rdev->ifaddrlen;
+	(void) memcpy(LLADDR(&ar.xarp_ha), laddr, rdev->physaddrlen);
+	ar.xarp_ha.sdl_alen = rdev->physaddrlen;
 	ar.xarp_ha.sdl_family = AF_LINK;
 	(void) strioctl(fd, SIOCDXARP, -1, sizeof (struct xarpreq),
 	    (char *)&ar);
@@ -716,7 +709,7 @@ arp_request(struct rarpdev *rdev, struct arphdr *rp, uchar_t *shost)
 	struct	rarpreply	*rrp;
 	struct ifdev		*ifdev;
 	uchar_t			*shap, *thap, *spap, *tpap;
-	int			ret;
+	int			retval;
 
 	shap = (uchar_t *)rp + sizeof (struct arphdr);
 	spap = shap + rp->ar_hln;
@@ -734,321 +727,31 @@ arp_request(struct rarpdev *rdev, struct arphdr *rp, uchar_t *shost)
 		return;
 
 	rp->ar_op = ARPOP_REPLY;
-	(void) memcpy(shap, rdev->lladdr, rdev->ifaddrlen);
+	(void) memcpy(shap, rdev->physaddr, rdev->physaddrlen);
 	(void) memcpy(spap, &ifdev->ipaddr, sizeof (ipaddr_t));
-	(void) memcpy(thap, rdev->lladdr, rdev->ifaddrlen);
+	(void) memcpy(thap, rdev->physaddr, rdev->physaddrlen);
 
 	add_arp(rdev, tpap, thap);
 
 	/*
 	 * Create rarp reply structure.
 	 */
-	rrp = (struct rarpreply *)calloc(1, sizeof (struct rarpreply) +
-	    rdev->ifaddrlen + rdev->ifrarplen);
+	rrp = calloc(1, sizeof (struct rarpreply) + rdev->physaddrlen +
+	    rdev->ifrarplen);
 	if (rrp == NULL)
 		error("out of memory");
 	rrp->lldest = (uchar_t *)rrp + sizeof (struct rarpreply);
-	rrp->arprep = rrp->lldest + rdev->ifaddrlen;
+	rrp->arprep = rrp->lldest + rdev->physaddrlen;
 	rrp->rdev = rdev;
 
-	(void) memcpy(rrp->lldest, shost, rdev->ifaddrlen);
+	(void) memcpy(rrp->lldest, shost, rdev->physaddrlen);
 	(void) memcpy(rrp->arprep, rp, rdev->ifrarplen);
 
-	ret = rarp_write(rdev->fd, rrp);
+	retval = dlpi_send(rdev->dh_rarp, rrp->lldest, rdev->physaddrlen,
+	    rrp->arprep, rdev->ifrarplen, NULL);
 	free(rrp);
-	if (ret < 0)
-		error("rarp_write error");
-}
-
-/*
- * OPEN the datalink provider device, ATTACH to the unit,
- * and BIND to the revarp type.
- * Return the resulting descriptor.
- *
- * MT-UNSAFE
- */
-static int
-rarp_open(struct rarpdev *rarpdev, ushort_t type)
-{
-	register int fd;
-	char	path[MAXPATHL];
-	union DL_primitives *dlp;
-	char	buf[BUFSIZE];
-	struct	strbuf	ctl;
-	int	flags;
-	uchar_t	*eap;
-	char	*device = rarpdev->device;
-	int	unit = rarpdev->unit;
-	char	*str = NULL;
-
-	/*
-	 * Prefix the device name with "/dev/" if it doesn't
-	 * start with a "/" .
-	 */
-	if (*device == '/')
-		(void) snprintf(path, sizeof (path), "%s", device);
-	else
-		(void) snprintf(path, sizeof (path), "%s/%s", DEVDIR, device);
-
-	/*
-	 * Open the datalink provider.
-	 */
-	if ((fd = open(path, O_RDWR)) < 0)
-		syserr(path);
-
-	/*
-	 * Issue DL_INFO_REQ and check DL_INFO_ACK for sanity.
-	 */
-	/* LINTED pointer */
-	dlp = (union DL_primitives *)buf;
-	dlp->info_req.dl_primitive = DL_INFO_REQ;
-
-	ctl.buf = (char *)dlp;
-	ctl.len = DL_INFO_REQ_SIZE;
-
-	if (putmsg(fd, &ctl, NULL, 0) < 0)
-		syserr("putmsg");
-
-	(void) signal(SIGALRM, sigalarm);
-
-	alarmmsg = "DL_INFO_REQ failed: timeout waiting for DL_INFO_ACK";
-	(void) alarm(10);
-
-	ctl.buf = (char *)dlp;
-	ctl.len = 0;
-	ctl.maxlen = BUFSIZE;
-	flags = 0;
-	if (getmsg(fd, &ctl, NULL, &flags) < 0)
-		syserr("getmsg");
-
-	(void) alarm(0);
-	(void) signal(SIGALRM, SIG_DFL);
-
-	/*
-	 * Validate DL_INFO_ACK reply.
-	 */
-	if (ctl.len < sizeof (ulong_t))
-		error("DL_INFO_REQ failed:  short reply to DL_INFO_REQ");
-
-	if (dlp->dl_primitive != DL_INFO_ACK)
-		error("DL_INFO_REQ failed:  dl_primitive 0x%lx received",
-			dlp->dl_primitive);
-
-	if (ctl.len < DL_INFO_ACK_SIZE)
-		error("DL_INFO_REQ failed:  short info_ack:  %d bytes",
-			ctl.len);
-
-	if (dlp->info_ack.dl_version != DL_VERSION_2)
-		error("DL_INFO_ACK:  incompatible version:  %lu",
-			dlp->info_ack.dl_version);
-
-	if (dlp->info_ack.dl_sap_length != -2) {
-		if (dflag)
-			debug(
-"%s%d DL_INFO_ACK:  incompatible dl_sap_length:  %ld",
-				device, unit, dlp->info_ack.dl_sap_length);
-		(void) close(fd);
-		return (-1);
-	}
-
-	if ((dlp->info_ack.dl_service_mode & DL_CLDLS) == 0) {
-		if (dflag)
-			debug(
-"%s%d DL_INFO_ACK:  incompatible dl_service_mode:  0x%lx",
-				device, unit, dlp->info_ack.dl_service_mode);
-		(void) close(fd);
-		return (-1);
-	}
-
-	rarpdev->ifsaplen = dlp->info_ack.dl_sap_length;
-	rarpdev->ifaddrlen = dlp->info_ack.dl_addr_length -
-	    abs(rarpdev->ifsaplen);
-	rarpdev->ifrarplen = sizeof (struct arphdr) +
-	    (2 * sizeof (ipaddr_t)) + (2 * rarpdev->ifaddrlen);
-
-	/*
-	 * Issue DL_ATTACH_REQ.
-	 */
-	/* LINTED pointer */
-	dlp = (union DL_primitives *)buf;
-	dlp->attach_req.dl_primitive = DL_ATTACH_REQ;
-	dlp->attach_req.dl_ppa = unit;
-
-	ctl.buf = (char *)dlp;
-	ctl.len = DL_ATTACH_REQ_SIZE;
-
-	if (putmsg(fd, &ctl, NULL, 0) < 0)
-		syserr("putmsg");
-
-	(void) signal(SIGALRM, sigalarm);
-	alarmmsg = "DL_ATTACH_REQ failed: timeout waiting for DL_OK_ACK";
-
-	(void) alarm(10);
-
-	ctl.buf = (char *)dlp;
-	ctl.len = 0;
-	ctl.maxlen = BUFSIZE;
-	flags = 0;
-	if (getmsg(fd, &ctl, NULL, &flags) < 0)
-		syserr("getmsg");
-
-	(void) alarm(0);
-	(void) signal(SIGALRM, SIG_DFL);
-
-	/*
-	 * Validate DL_OK_ACK reply.
-	 */
-	if (ctl.len < sizeof (ulong_t))
-		error("DL_ATTACH_REQ failed:  short reply to attach request");
-
-	if (dlp->dl_primitive == DL_ERROR_ACK)
-		error("DL_ATTACH_REQ failed:  dl_errno %lu unix_errno %lu",
-			dlp->error_ack.dl_errno, dlp->error_ack.dl_unix_errno);
-
-	if (dlp->dl_primitive != DL_OK_ACK)
-		error("DL_ATTACH_REQ failed:  dl_primitive 0x%lx received",
-			dlp->dl_primitive);
-
-	if (ctl.len < DL_OK_ACK_SIZE)
-		error("attach failed:  short ok_ack:  %d bytes",
-			ctl.len);
-
-	/*
-	 * Issue DL_BIND_REQ.
-	 */
-	/* LINTED pointer */
-	dlp = (union DL_primitives *)buf;
-	dlp->bind_req.dl_primitive = DL_BIND_REQ;
-	dlp->bind_req.dl_sap = type;
-	dlp->bind_req.dl_max_conind = 0;
-	dlp->bind_req.dl_service_mode = DL_CLDLS;
-	dlp->bind_req.dl_conn_mgmt = 0;
-	dlp->bind_req.dl_xidtest_flg = 0;
-
-	ctl.buf = (char *)dlp;
-	ctl.len = DL_BIND_REQ_SIZE;
-
-	if (putmsg(fd, &ctl, NULL, 0) < 0)
-		syserr("putmsg");
-
-	(void) signal(SIGALRM, sigalarm);
-
-	alarmmsg = "DL_BIND_REQ failed:  timeout waiting for DL_BIND_ACK";
-	(void) alarm(10);
-
-	ctl.buf = (char *)dlp;
-	ctl.len = 0;
-	ctl.maxlen = BUFSIZE;
-	flags = 0;
-	if (getmsg(fd, &ctl, NULL, &flags) < 0)
-		syserr("getmsg");
-
-	(void) alarm(0);
-	(void) signal(SIGALRM, SIG_DFL);
-
-	/*
-	 * Validate DL_BIND_ACK reply.
-	 */
-	if (ctl.len < sizeof (ulong_t))
-		error("DL_BIND_REQ failed:  short reply");
-
-	if (dlp->dl_primitive == DL_ERROR_ACK)
-		error("DL_BIND_REQ failed:  dl_errno %lu unix_errno %lu",
-			dlp->error_ack.dl_errno, dlp->error_ack.dl_unix_errno);
-
-	if (dlp->dl_primitive != DL_BIND_ACK)
-		error("DL_BIND_REQ failed:  dl_primitive 0x%lx received",
-			dlp->dl_primitive);
-
-	if (ctl.len < DL_BIND_ACK_SIZE)
-		error(
-"DL_BIND_REQ failed:  short bind acknowledgement received");
-
-	if (dlp->bind_ack.dl_sap != type)
-		error(
-"DL_BIND_REQ failed:  returned dl_sap %lu != requested sap %d",
-			dlp->bind_ack.dl_sap, type);
-
-	/*
-	 * Issue DL_PHYS_ADDR_REQ to get our local mac address.
-	 */
-	/* LINTED pointer */
-	dlp = (union DL_primitives *)buf;
-	dlp->physaddr_req.dl_primitive = DL_PHYS_ADDR_REQ;
-	dlp->physaddr_req.dl_addr_type = DL_CURR_PHYS_ADDR;
-
-	ctl.buf = (char *)dlp;
-	ctl.len = DL_PHYS_ADDR_REQ_SIZE;
-
-	if (putmsg(fd, &ctl, NULL, 0) < 0)
-		syserr("putmsg");
-
-	(void) signal(SIGALRM, sigalarm);
-
-	alarmmsg =
-	    "DL_PHYS_ADDR_REQ failed:  timeout waiting for DL_PHYS_ADDR_ACK";
-	(void) alarm(10);
-
-	ctl.buf = (char *)dlp;
-	ctl.len = 0;
-	ctl.maxlen = BUFSIZE;
-	flags = 0;
-	if (getmsg(fd, &ctl, NULL, &flags) < 0)
-		syserr("getmsg");
-
-	(void) alarm(0);
-	(void) signal(SIGALRM, SIG_DFL);
-
-	/*
-	 * Validate DL_PHYS_ADDR_ACK reply.
-	 */
-	if (ctl.len < sizeof (ulong_t))
-		error("DL_PHYS_ADDR_REQ failed:  short reply");
-
-	if (dlp->dl_primitive == DL_ERROR_ACK)
-		error("DL_PHYS_ADDR_REQ failed:  dl_errno %lu unix_errno %lu",
-			dlp->error_ack.dl_errno, dlp->error_ack.dl_unix_errno);
-
-	if (dlp->dl_primitive != DL_PHYS_ADDR_ACK)
-		error("DL_PHYS_ADDR_REQ failed:  dl_primitive 0x%lx received",
-			dlp->dl_primitive);
-
-	if (ctl.len < DL_PHYS_ADDR_ACK_SIZE)
-		error("DL_PHYS_ADDR_REQ failed:  short ack received");
-
-	if (dlp->physaddr_ack.dl_addr_length != rarpdev->ifaddrlen) {
-		if (dflag)
-			debug(
-"%s%d DL_PHYS_ADDR_ACK failed:  incompatible dl_addr_length:  %lu",
-			device, unit, dlp->physaddr_ack.dl_addr_length);
-		(void) close(fd);
-		return (-1);
-	}
-
-	/*
-	 * Save our mac address.
-	 */
-	if ((rarpdev->lladdr = (uchar_t *)malloc(rarpdev->ifaddrlen)) == NULL) {
-		if (dflag)
-			debug(" %s%d malloc failed: %d bytes", device,
-			    unit, rarpdev->ifaddrlen);
-		(void) close(fd);
-		return (-1);
-	}
-
-	eap = (uchar_t *)dlp + dlp->physaddr_ack.dl_addr_offset;
-	(void) memcpy(rarpdev->lladdr, eap, dlp->physaddr_ack.dl_addr_length);
-
-	if (dflag) {
-		str = _link_ntoa(rarpdev->lladdr, str, rarpdev->ifaddrlen,
-		    IFT_OTHER);
-		if (str != NULL) {
-			debug("device %s%d lladdress %s", device, unit, str);
-			free(str);
-		}
-	}
-
-	return (fd);
+	if (retval != DLPI_SUCCESS)
+		error("dlpi_send failed: %s", dlpi_strerror(retval));
 }
 
 /* ARGSUSED */
@@ -1057,6 +760,7 @@ do_delay_write(void *buf)
 {
 	struct	timeval		tv;
 	struct	rarpreply	*rrp;
+	struct	rarpdev		*rdev;
 	int			err;
 
 	for (;;) {
@@ -1068,6 +772,7 @@ do_delay_write(void *buf)
 
 		(void) mutex_lock(&delay_mutex);
 		rrp = delay_list;
+		rdev = rrp->rdev;
 		delay_list = delay_list->next;
 		(void) mutex_unlock(&delay_mutex);
 
@@ -1075,12 +780,13 @@ do_delay_write(void *buf)
 		if (tv.tv_sec < rrp->tv.tv_sec)
 			(void) sleep(rrp->tv.tv_sec - tv.tv_sec);
 
-		if (rarp_write(rrp->rdev->fd, rrp) < 0)
-			error("rarp_write error");
+		err = dlpi_send(rdev->dh_rarp, rrp->lldest, rdev->physaddrlen,
+		    rrp->arprep, rdev->ifrarplen, NULL);
+		if (err != DLPI_SUCCESS)
+			error("dlpi_send failed: %s", dlpi_strerror(err));
 
 		(void) free(rrp);
 	}
-	/* NOTREACHED */
 }
 
 /* ARGSUSED */
@@ -1101,43 +807,6 @@ delay_write(struct rarpdev *rdev, struct rarpreply *rrp)
 	(void) mutex_unlock(&delay_mutex);
 
 	(void) sema_post(&delay_sema);
-}
-
-static int
-rarp_write(int fd, struct rarpreply *rrp)
-{
-	struct	strbuf	ctl, data;
-	union	DL_primitives	*dlp;
-	char	ctlbuf[BUFSIZE];
-	ushort_t etype = ETHERTYPE_REVARP;
-	int	ifaddrlen = rrp->rdev->ifaddrlen;
-
-	/*
-	 * Construct DL_UNITDATA_REQ.
-	 */
-	/* LINTED pointer */
-	dlp = (union DL_primitives *)ctlbuf;
-	ctl.len = DL_UNITDATA_REQ_SIZE + ifaddrlen + abs(rrp->rdev->ifsaplen);
-	ctl.buf = ctlbuf;
-	data.len = rrp->rdev->ifrarplen;
-	data.buf = (char *)rrp->arprep;
-	if (ctl.len > sizeof (ctlbuf))
-		return (-1);
-
-	dlp->unitdata_req.dl_primitive = DL_UNITDATA_REQ;
-	dlp->unitdata_req.dl_dest_addr_length = ifaddrlen +
-	    abs(rrp->rdev->ifsaplen);
-	dlp->unitdata_req.dl_dest_addr_offset = DL_UNITDATA_REQ_SIZE;
-	dlp->unitdata_req.dl_priority.dl_min = 0;
-	dlp->unitdata_req.dl_priority.dl_max = 0;
-	(void) memcpy(ctlbuf + DL_UNITDATA_REQ_SIZE, rrp->lldest, ifaddrlen);
-	(void) memcpy(ctlbuf + DL_UNITDATA_REQ_SIZE + ifaddrlen, &etype,
-	    sizeof (etype));
-
-	/*
-	 * Send DL_UNITDATA_REQ.
-	 */
-	return (putmsg(fd, &ctl, &data, 0));
 }
 
 /*
@@ -1180,7 +849,7 @@ mightboot(ipaddr_t ipa)
 
 	(void) closedir(dirp);
 
-	return (dp? 1: 0);
+	return ((dp != NULL) ? 1 : 0);
 }
 
 /*
@@ -1207,25 +876,25 @@ get_ifdata(char *dev, int unit, ipaddr_t *ipp, ipaddr_t *maskp)
 	 */
 	(void) snprintf(ifr.ifr_name, sizeof (ifr.ifr_name), "%s%d", dev, unit);
 	if (strioctl(fd, SIOCGIFADDR, -1, sizeof (struct ifreq),
-		(char *)&ifr) < 0)
+	    (char *)&ifr) < 0)
 		syserr("SIOCGIFADDR");
 	*ipp = (ipaddr_t)ntohl(sin->sin_addr.s_addr);
 
 	if (dflag)
-		debug("device %s%d address %s",
-			dev, unit, inet_ntoa(sin->sin_addr));
+		debug("device %s%d address %s", dev, unit,
+		    inet_ntoa(sin->sin_addr));
 
 	/*
 	 * Ask IP for our netmask.
 	 */
 	if (strioctl(fd, SIOCGIFNETMASK, -1, sizeof (struct ifreq),
-		(char *)&ifr) < 0)
+	    (char *)&ifr) < 0)
 		syserr("SIOCGIFNETMASK");
 	*maskp = (ipaddr_t)ntohl(sin->sin_addr.s_addr);
 
 	if (dflag)
-		debug("device %s%d subnet mask %s",
-			dev, unit, inet_ntoa(sin->sin_addr));
+		debug("device %s%d subnet mask %s", dev, unit,
+		    inet_ntoa(sin->sin_addr));
 
 	/*
 	 * Thankyou ip.
@@ -1248,16 +917,15 @@ get_ipaddr(struct rarpdev *rdev, uchar_t *laddr, uchar_t *ipp, ipaddr_t *ipaddr)
 	char	**p;
 	struct ifdev *ifdev;
 
-	if (rdev->ifaddrlen != ETHERADDRL) {
+	if (rdev->physaddrlen != ETHERADDRL) {
 		if (dflag)
-			debug("%s %s", " can not map non 6 byte hardware ",
+			debug("%s %s", " cannot map non 6 byte hardware ",
 			    "address to IP address");
 		return (1);
 	}
 
 	/*
-	 * Translate mac address to hostname
-	 * and IP address.
+	 * Translate mac address to hostname and IP address.
 	 */
 	if (ether_ntohost(host, (struct ether_addr *)laddr) != 0 ||
 	    !(hp = gethostbyname_r(host, &res, hbuffer, sizeof (hbuffer),
@@ -1282,19 +950,17 @@ get_ipaddr(struct rarpdev *rdev, uchar_t *laddr, uchar_t *ipp, ipaddr_t *ipaddr)
 				(void) memcpy(&daddr, &netnum,
 				    sizeof (ipaddr_t));
 				if (ifdev->lunit == -1)
-					debug(
-"trying physical netnum %s mask %x",
-					inet_ntoa(daddr),
-					ifdev->if_netmask);
+					debug("trying physical netnum %s"
+					    " mask %x", inet_ntoa(daddr),
+					    ifdev->if_netmask);
 				else
-					debug(
-"trying logical %d netnum %s mask %x",
-					ifdev->lunit,
-					inet_ntoa(daddr),
-					ifdev->if_netmask);
+					debug("trying logical %d netnum %s"
+					    " mask %x", ifdev->lunit,
+					    inet_ntoa(daddr),
+					    ifdev->if_netmask);
 			}
 			if ((ntohl(addr.s_addr) & ifdev->if_netmask) ==
-							ifdev->if_netnum) {
+			    ifdev->if_netnum) {
 				/*
 				 * Return the correct IP address.
 				 */
@@ -1316,13 +982,6 @@ get_ipaddr(struct rarpdev *rdev, uchar_t *laddr, uchar_t *ipp, ipaddr_t *ipaddr)
 	return (1);
 }
 
-/*ARGSUSED*/
-void
-sigalarm(int i)
-{
-	error(alarmmsg);
-}
-
 static int
 strioctl(int fd, int cmd, int timout, int len, char *dp)
 {
@@ -1336,14 +995,13 @@ strioctl(int fd, int cmd, int timout, int len, char *dp)
 }
 
 static void
-usage()
+usage(void)
 {
 	error("Usage:  %s [ -ad ] device unit", cmdname);
 }
 
 static void
-syserr(s)
-char	*s;
+syserr(const char *s)
 {
 	char buf[256];
 	int status = 1;
@@ -1354,9 +1012,8 @@ char	*s;
 	thr_exit(&status);
 }
 
-/*PRINTFLIKE1*/
 static void
-error(char *fmt, ...)
+error(const char *fmt, ...)
 {
 	char buf[256];
 	va_list ap;

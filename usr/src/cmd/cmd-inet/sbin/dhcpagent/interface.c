@@ -28,7 +28,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <net/if.h>
-#include <sys/dlpi.h>
 #include <stdlib.h>
 #include <sys/sockio.h>
 #include <netinet/in.h>
@@ -37,10 +36,12 @@
 #include <unistd.h>
 #include <search.h>
 #include <libdevinfo.h>
+#include <libdlpi.h>
 #include <netinet/if_ether.h>
 #include <arpa/inet.h>
 #include <dhcpmsg.h>
 #include <dhcp_inittab.h>
+#include <stropts.h>
 
 #include "agent.h"
 #include "interface.h"
@@ -88,7 +89,7 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 	}
 
 	pif->pif_isv6 = isv6;
-	pif->pif_dlpi_fd = -1;
+	pif->pif_dlpi_hd = NULL;
 	pif->pif_dlpi_id = -1;
 	pif->pif_hold_count = 1;
 	pif->pif_running = B_TRUE;
@@ -102,9 +103,9 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 
 	/* We do not use DLPI with DHCPv6 */
 	if (!isv6) {
-		uint32_t		buf[DLPI_BUF_MAX / sizeof (uint32_t)];
-		dl_info_ack_t		*dlia = (dl_info_ack_t *)buf;
-		caddr_t			dl_addr;
+		int			rc;
+		dlpi_handle_t		dh;
+		dlpi_info_t		dlinfo;
 
 		/*
 		 * Do the allocations necessary for IPv4 DHCP.
@@ -117,15 +118,31 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 		 */
 
 		/* step 1 */
-		pif->pif_dlpi_fd = dhcp_dlpi_open(pname, dlia, sizeof (buf),
-		    ETHERTYPE_IP);
-		if (pif->pif_dlpi_fd == -1) {
+		if ((rc = dlpi_open(pname, &dh, 0)) != DLPI_SUCCESS) {
+			dhcpmsg(MSG_ERROR, "insert_pif: dlpi_open: %s",
+			    dlpi_strerror(rc));
+			*error = DHCP_IPC_E_INVIF;
+			goto failure;
+		}
+		pif->pif_dlpi_hd = dh;
+
+		if ((rc = dlpi_bind(dh, ETHERTYPE_IP, NULL)) != DLPI_SUCCESS) {
+			dhcpmsg(MSG_ERROR, "insert_pif: dlpi_bind: %s",
+			    dlpi_strerror(rc));
 			*error = DHCP_IPC_E_INVIF;
 			goto failure;
 		}
 
 		/* step 2 */
-		pif->pif_max = dlia->dl_max_sdu;
+		rc = dlpi_info(pif->pif_dlpi_hd, &dlinfo, 0);
+		if (rc != DLPI_SUCCESS) {
+			dhcpmsg(MSG_ERROR, "insert_pif: dlpi_info: %s",
+			    dlpi_strerror(rc));
+			*error = DHCP_IPC_E_INVIF;
+			goto failure;
+		}
+
+		pif->pif_max = dlinfo.di_max_sdu;
 		if (pif->pif_max < DHCP_DEF_MAX_SIZE) {
 			dhcpmsg(MSG_ERROR, "insert_pif: %s does not have a "
 			    "large enough maximum SDU to support DHCP "
@@ -136,9 +153,8 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 		}
 
 		/* step 3 */
-		pif->pif_hwtype = dlpi_to_arp(dlia->dl_mac_type);
-		pif->pif_hwlen  = dlia->dl_addr_length -
-		    abs(dlia->dl_sap_length);
+		pif->pif_hwtype = dlpi_arptype(dlinfo.di_mactype);
+		pif->pif_hwlen  = dlinfo.di_physaddrlen;
 
 		dhcpmsg(MSG_DEBUG, "insert_pif: %s: sdumax %u, hwtype %d, "
 		    "hwlen %d", pname, pif->pif_max, pif->pif_hwtype,
@@ -155,30 +171,24 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 			}
 		}
 
+		(void) memcpy(pif->pif_hwaddr, dlinfo.di_physaddr,
+		    pif->pif_hwlen);
+
 		/*
-		 * depending on the DLPI device, the sap and hardware addresses
-		 * can be in either order within the dlsap address; find the
-		 * location of the hardware address using dl_sap_length.  see
-		 * the DLPI specification for more on this braindamage.
+		 * step 5
+		 * Some media types has no broadcast address.
 		 */
-
-		dl_addr = (caddr_t)dlia + dlia->dl_addr_offset;
-		if (dlia->dl_sap_length > 0) {
-			pif->pif_sap_before = B_TRUE;
-			dl_addr += dlia->dl_sap_length;
+		if ((pif->pif_dlen = dlinfo.di_bcastaddrlen) != 0) {
+			pif->pif_daddr = malloc(pif->pif_dlen);
+			if (pif->pif_daddr == NULL) {
+				dhcpmsg(MSG_ERR, "insert_pif: cannot allocate "
+				    "pif_daddr for %s", pname);
+				*error = DHCP_IPC_E_MEMORY;
+				goto failure;
+			}
 		}
-
-		(void) memcpy(pif->pif_hwaddr, dl_addr, pif->pif_hwlen);
-
-		/* step 5 */
-		pif->pif_saplen = abs(dlia->dl_sap_length);
-		pif->pif_daddr  = build_broadcast_dest(dlia, &pif->pif_dlen);
-		if (pif->pif_daddr == NULL) {
-			dhcpmsg(MSG_ERR, "insert_pif: cannot allocate "
-			    "pif_daddr for %s", pname);
-			*error = DHCP_IPC_E_MEMORY;
-			goto failure;
-		}
+		(void) memcpy(pif->pif_daddr, dlinfo.di_bcastaddr,
+		    pif->pif_dlen);
 
 		/* Close the DLPI stream until actually needed */
 		close_dlpi_pif(pif);
@@ -343,22 +353,35 @@ lookup_pif_by_name(const char *pname, boolean_t isv6)
 boolean_t
 open_dlpi_pif(dhcp_pif_t *pif)
 {
-	if (pif->pif_dlpi_fd == -1) {
-		uint32_t		buf[DLPI_BUF_MAX / sizeof (uint32_t)];
-		dl_info_ack_t		*dlia = (dl_info_ack_t *)buf;
+	int		rc;
+	dlpi_handle_t	dh;
 
-		pif->pif_dlpi_fd = dhcp_dlpi_open(pif->pif_name, dlia,
-		    sizeof (buf), ETHERTYPE_IP);
-		if (pif->pif_dlpi_fd == -1)
-			return (B_FALSE);
-		set_packet_filter(pif->pif_dlpi_fd, dhcp_filter, NULL, "DHCP");
-		pif->pif_dlpi_id = iu_register_event(eh, pif->pif_dlpi_fd,
-		    POLLIN, dhcp_collect_dlpi, pif);
-		if (pif->pif_dlpi_id == -1) {
-			(void) dhcp_dlpi_close(pif->pif_dlpi_fd);
-			pif->pif_dlpi_fd = -1;
+	if (pif->pif_dlpi_hd == NULL) {
+		if ((rc = dlpi_open(pif->pif_name, &dh, 0)) != DLPI_SUCCESS) {
+			dhcpmsg(MSG_ERROR, "open_dlpi_pif: dlpi_open: %s",
+			    dlpi_strerror(rc));
 			return (B_FALSE);
 		}
+
+		if ((rc = dlpi_bind(dh, ETHERTYPE_IP, NULL)) != DLPI_SUCCESS) {
+			dhcpmsg(MSG_ERROR, "open_dlpi_pif: dlpi_bind: %s",
+			    dlpi_strerror(rc));
+			dlpi_close(dh);
+			return (B_FALSE);
+		}
+
+		if (!(set_packet_filter(dh, dhcp_filter, NULL, "DHCP"))) {
+			dlpi_close(dh);
+			return (B_FALSE);
+		}
+		pif->pif_dlpi_id = iu_register_event(eh, dlpi_fd(dh), POLLIN,
+		    dhcp_collect_dlpi, pif);
+		if (pif->pif_dlpi_id == -1) {
+			dlpi_close(dh);
+			return (B_FALSE);
+		}
+
+		pif->pif_dlpi_hd = dh;
 	}
 	pif->pif_dlpi_count++;
 	return (B_TRUE);
@@ -384,9 +407,9 @@ close_dlpi_pif(dhcp_pif_t *pif)
 		(void) iu_unregister_event(eh, pif->pif_dlpi_id, NULL);
 		pif->pif_dlpi_id = -1;
 	}
-	if (pif->pif_dlpi_fd != -1) {
-		(void) dhcp_dlpi_close(pif->pif_dlpi_fd);
-		pif->pif_dlpi_fd = -1;
+	if (pif->pif_dlpi_hd != NULL) {
+		dlpi_close(pif->pif_dlpi_hd);
+		pif->pif_dlpi_hd = NULL;
 	}
 }
 
