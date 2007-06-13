@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -944,10 +944,13 @@ call_again:
 			 * We want to delay here because we likely
 			 * got a refused connection.
 			 */
-			if (p->cku_err.re_errno != 0)
-				break;
+			if (p->cku_err.re_errno == 0)
+				p->cku_err.re_errno = EIO;
 
-			/* fall thru */
+			RPCLOG(1, "clnt_cots_kcallit: transport failed: %d\n",
+			    p->cku_err.re_errno);
+
+			break;
 
 		default:
 			/*
@@ -2132,9 +2135,17 @@ use_new_conn:
 
 	cm_entry->x_tidu_size = tidu_size;
 
-	if (cm_entry->x_early_disc)
+	if (cm_entry->x_early_disc) {
+		/*
+		 * We need to check if a disconnect request has come
+		 * while we are connected, if so, then we need to
+		 * set rpcerr->re_status appropriately before returning
+		 * NULL to caller.
+		 */
+		if (rpcerr->re_status == RPC_SUCCESS)
+			rpcerr->re_status = RPC_XPRTFAILED;
 		cm_entry->x_connected = FALSE;
-	else
+	} else
 		cm_entry->x_connected = connected;
 
 	/*
@@ -2154,12 +2165,14 @@ use_new_conn:
 	cm_entry->x_thread = FALSE;
 	cv_broadcast(&cm_entry->x_conn_cv);
 
-	mutex_exit(&connmgr_lock);
-
 	if (cm_entry->x_connected == FALSE) {
+		mutex_exit(&connmgr_lock);
 		connmgr_release(cm_entry);
 		return (NULL);
 	}
+
+	mutex_exit(&connmgr_lock);
+
 	return (cm_entry);
 }
 
@@ -2240,9 +2253,17 @@ connmgr_wrapconnect(
 		mutex_enter(&connmgr_lock);
 
 
-		if (cm_entry->x_early_disc)
+		if (cm_entry->x_early_disc) {
+			/*
+			 * We need to check if a disconnect request has come
+			 * while we are connected, if so, then we need to
+			 * set rpcerr->re_status appropriately before returning
+			 * NULL to caller.
+			 */
+			if (rpcerr->re_status == RPC_SUCCESS)
+				rpcerr->re_status = RPC_XPRTFAILED;
 			cm_entry->x_connected = FALSE;
-		else
+		} else
 			cm_entry->x_connected = connected;
 
 		/*
