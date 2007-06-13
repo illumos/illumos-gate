@@ -3408,7 +3408,13 @@ zone_create(const char *zone_name, const char *zone_root,
 	 */
 	zone->zone_match = match;
 	if (is_system_labeled() && !(zone->zone_flags & ZF_IS_SCRATCH)) {
-		error = zone_set_label(zone, label, doi);
+		/* Fail if requested to set doi to anything but system's doi */
+		if (doi != 0 && doi != default_doi) {
+			zone_free(zone);
+			return (set_errno(EINVAL));
+		}
+		/* Always apply system's doi to the zone */
+		error = zone_set_label(zone, label, default_doi);
 		if (error != 0) {
 			zone_free(zone);
 			return (set_errno(error));

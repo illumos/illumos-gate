@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * From	"tsol_tndb_parser.c	7.24	01/09/05 SMI; TSOL 2.x"
@@ -222,8 +222,8 @@ tsol_sgetzcent(const char *instr, int *errp, char **errstrp)
 	}
 	instr = nextf + 1;
 
-	/* Not in the entry, but should be */
-	zc->zc_doi = 1;
+	/* The kernel will apply the system doi to the zone label later */
+	zc->zc_doi = 0;
 
 	/* Field three: get match flag */
 	errno = 0;
