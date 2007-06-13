@@ -29,6 +29,7 @@
 #include <sys/ib/clients/rds/rdsib_debug.h>
 #include <sys/types.h>
 #include <sys/sunddi.h>
+#include <sys/dlpi.h>
 
 /*
  * RDS Path MAP
@@ -76,44 +77,38 @@ typedef struct rds_node_record_s {
 	struct rds_node_record_s	*prevp;
 } rds_node_record_t;
 
+char			sc_device_name[MAXNAMELEN] = "NotInitialized";
 kmutex_t		rds_pathmap_lock;
 rds_node_record_t	*rds_pathmap = NULL;
 
-static boolean_t
-rds_validate_interface(rds_path_t *path)
+#define	RDS_VALIDATE_PATH(p)						\
+	if ((p->local.iftype != DL_IB) || (p->remote.iftype != DL_IB))	\
+		return
+
+#define	isalpha(ch)	(((ch) >= 'a' && (ch) <= 'z') || \
+			((ch) >= 'A' && (ch) <= 'Z'))
+
+/*
+ * Called by SC to register the Sun Cluster device name
+ */
+void
+rds_clif_name(char *name)
 {
-	char			devname[MAXNAMELEN];
-	uint_t			instance;
+	int	i;
 
-	/* separate devname and instance number */
-	if (ddi_parse(path->local.ifname, devname, &instance) != DDI_SUCCESS) {
-		RDS_DPRINTF2("rds_validate_interface",
-		    "local: %s is not right", path->local.ifname);
-		return (B_FALSE);
+	ASSERT(name != NULL);
+
+	mutex_enter(&rds_pathmap_lock);
+
+	/* extract the device name from the interface name */
+	i = strlen(name) - 1;
+	while ((i >= 0) && (!isalpha(name[i]))) i--;
+	if (i >= 0) {
+		(void) strncpy(sc_device_name, name, i + 1);
+		sc_device_name[i + 1] = '\0';
 	}
 
-	/* don't care if it is not IPoIB interface */
-	if (strcmp(devname, "ibd") != 0) {
-		RDS_DPRINTF2("rds_validate_interface",
-		    "local: %s is not IB interface", devname);
-		return (B_FALSE);
-	}
-
-	/* separate devname and instance number */
-	if (ddi_parse(path->remote.ifname, devname, &instance) != DDI_SUCCESS) {
-		RDS_DPRINTF2("rds_validate_interface",
-		    "remote: %s is not right", path->remote.ifname);
-		return (B_FALSE);
-	}
-
-	/* don't care if it is not IPoIB interface */
-	if (strcmp(devname, "ibd") != 0) {
-		RDS_DPRINTF2("rds_validate_interface",
-		    "remote: %s is not IB interface", devname);
-		return (B_FALSE);
-	}
-
-	return (B_TRUE);
+	mutex_exit(&rds_pathmap_lock);
 }
 
 /*
@@ -127,11 +122,8 @@ rds_path_up(rds_path_t *path)
 
 	ASSERT(path != NULL);
 
-	/* don't care if it is not IPoIB interface */
-	if (rds_validate_interface(path) == B_FALSE) {
-		RDS_DPRINTF2("rds_path_up", "NOT IB interface");
-		return;
-	}
+	/* ignore if the end points are not of type DL_IB */
+	RDS_VALIDATE_PATH(path);
 
 	mutex_enter(&rds_pathmap_lock);
 
@@ -197,11 +189,8 @@ rds_path_down(rds_path_t *path)
 
 	ASSERT(path != NULL);
 
-	/* don't care if it is not IPoIB interface */
-	if (rds_validate_interface(path) == B_FALSE) {
-		RDS_DPRINTF2("rds_path_down", "NOT IB interface");
-		return;
-	}
+	/* ignore if the end points are not of type DL_IB */
+	RDS_VALIDATE_PATH(path);
 
 	mutex_enter(&rds_pathmap_lock);
 
@@ -275,7 +264,7 @@ int
 rds_sc_path_lookup(ipaddr_t *localip, ipaddr_t *remip)
 {
 	rds_node_record_t	*p;
-	rds_path_record_t	*p1;
+	rds_path_record_t	*p1, *p1downp;
 
 	mutex_enter(&rds_pathmap_lock);
 
@@ -297,71 +286,49 @@ rds_sc_path_lookup(ipaddr_t *localip, ipaddr_t *remip)
 	*localip = p1->libd_ip;
 	*remip = p1->ribd_ip;
 
+	/*
+	 * But next time, we want to use a different path record so move this
+	 * path record to the end.
+	 */
+	p1downp = p1->downp;
+	if (p1downp != NULL) {
+		p->downp = p1downp;
+		p1downp->up = NULL;
+
+		/* walk down to the last path record */
+		while (p1downp->downp != NULL) {
+			p1downp = p1downp->downp;
+		}
+
+		/* Attach the first path record to the end */
+		p1downp->downp = p1;
+		p1->up = p1downp;
+		p1->downp = NULL;
+	}
+
 	mutex_exit(&rds_pathmap_lock);
 
 	return (1);
 }
 
 boolean_t
-rds_if_lookup_by_name(char *if_name)
+rds_if_lookup_by_name(char *devname)
 {
-	rds_node_record_t	*p;
-	rds_path_record_t	*p1;
-	char			devname[MAXNAMELEN];
-	uint_t			instance;
-
-	if (ddi_parse(if_name, devname, &instance) != DDI_SUCCESS) {
-		RDS_DPRINTF2("rds_if_lookup_by_name",
-		    "if_name: %s is not right", if_name);
-		return (B_FALSE);
-	}
-
 	mutex_enter(&rds_pathmap_lock);
-
-	if (rds_pathmap == NULL) {
-		/* SC is not configured */
-		RDS_DPRINTF2("rds_if_lookup_by_name", "Pathmap is NULL");
-		mutex_exit(&rds_pathmap_lock);
-		return (B_FALSE);
-	}
 
 	/*
 	 * Sun Cluster always names its interconnect virtual network interface
 	 * as clprivnetx, so  return TRUE if there is atleast one node record
 	 * and the interface name is clprivnet something.
 	 */
-	if (strcmp(devname, "clprivnet") == 0) {
+	if (strcmp(devname, sc_device_name) == 0) {
 		/* clprivnet address */
 		mutex_exit(&rds_pathmap_lock);
 		return (B_TRUE);
 	}
 
-	p = rds_pathmap;
-
-	while (p != NULL) {
-		p1 = p->downp;
-		while ((p1 != NULL) && strcmp(if_name, p1->lifname)) {
-			p1 = p1->downp;
-		}
-
-		/* we found a match */
-		if (p1 != NULL)
-			break;
-		/* go to the next node record */
-		p = p->nextp;
-	}
-
 	mutex_exit(&rds_pathmap_lock);
-
-	if (p == NULL) {
-		/* no match */
-		RDS_DPRINTF2("rds_if_lookup_by_name",
-		    "Interface: %s not found", if_name);
-		return (B_FALSE);
-	}
-
-	/* Found a matching node record */
-	return (B_TRUE);
+	return (B_FALSE);
 }
 
 boolean_t

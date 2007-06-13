@@ -353,7 +353,7 @@ rds_free_send_pool(rds_ep_t *ep)
 }
 
 int
-rds_init_send_pool(rds_ep_t *ep)
+rds_init_send_pool(rds_ep_t *ep, ib_guid_t hca_guid)
 {
 	uint8_t		*mp;
 	rds_buf_t	*bp;
@@ -375,12 +375,13 @@ rds_init_send_pool(rds_ep_t *ep)
 	spool = &ep->ep_sndpool;
 
 	ASSERT(spool->pool_memp == NULL);
+	ASSERT(ep->ep_hca_guid == 0);
 
 	/* get the hcap for the HCA hosting this channel */
-	hcap = rds_get_hcap(rdsib_statep, ep->ep_hca_guid);
+	hcap = rds_get_hcap(rdsib_statep, hca_guid);
 	if (hcap == NULL) {
 		RDS_DPRINTF2("rds_init_send_pool", "HCA (0x%llx) not found",
-		    ep->ep_hca_guid);
+		    hca_guid);
 		return (-1);
 	}
 

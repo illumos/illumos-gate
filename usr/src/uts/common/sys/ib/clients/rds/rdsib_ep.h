@@ -300,12 +300,14 @@ typedef struct rds_session_s {
 	struct rds_ep_s		session_dataep;
 	struct rds_ep_s		session_ctrlep;
 	uint_t			session_failover;
-	krwlock_t		session_portmap_lock;
-	uint8_t			session_portmap[RDS_PORT_MAP_SIZE];
+	krwlock_t		session_local_portmap_lock;
+	krwlock_t		session_remote_portmap_lock;
+	uint8_t			session_local_portmap[RDS_PORT_MAP_SIZE];
+	uint8_t			session_remote_portmap[RDS_PORT_MAP_SIZE];
 } rds_session_t;
 
 /* defined in rds_ep.c */
-int rds_ep_init(rds_ep_t *ep);
+int rds_ep_init(rds_ep_t *ep, ib_guid_t hca_guid);
 rds_session_t *rds_session_create(rds_state_t *statep, ipaddr_t destip,
     ipaddr_t srcip, ibt_cm_req_rcv_t *reqp, uint8_t type);
 int rds_session_init(rds_session_t *sp);

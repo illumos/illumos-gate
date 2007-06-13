@@ -50,7 +50,6 @@ static	sin_t	sin_null;	/* Zero address for quick clears */
 #define	isalpha(ch)	(((ch) >= 'a' && (ch) <= 'z') || \
 			((ch) >= 'A' && (ch) <= 'Z'))
 
-
 /*
  * Just pass the ioctl to IP and the result to the caller.
  */
@@ -149,37 +148,38 @@ rds_is_ib_interface(char *name)
 {
 
 	char		dev_path[MAXPATHLEN];
+	char		devname[MAXNAMELEN];
 	ldi_handle_t	lh;
 	dl_info_ack_t	info;
 	int		ret = 0;
-	int		i = 0;
-
-	(void) strcpy(dev_path, "/dev/");
+	int		i;
 
 	/*
 	 * ibd devices are only style 2 devices
 	 * so we will open only style 2 devices
 	 * by ignoring the ppa
 	 */
-	while (isalpha(name[i])) {
-		i++;
-	}
-
-	if (i == 0) {
-		/*
-		 * null name.
-		 */
+	i = strlen(name) - 1;
+	while ((i >= 0) && (!isalpha(name[i]))) i--;
+	if (i < 0) {
+		/* Invalid interface name, no alphabet */
 		return (-1);
 	}
+	(void) strncpy(devname, name, i + 1);
+	devname[i + 1] = '\0';
 
-	if (strncmp("lo", name, i) == 0) {
+	if (strcmp("lo", devname) == 0) {
 		/*
 		 * loopback interface is considered RDS capable
 		 */
 		return (0);
 	}
 
-	(void) strncat((dev_path + sizeof ("/dev/") -1), name, i);
+	(void) strncpy(dev_path, "/dev/", MAXPATHLEN);
+	if (strlcat(dev_path, devname, MAXPATHLEN) >= MAXPATHLEN) {
+		/* string overflow */
+		return (-1);
+	}
 
 	ret = ldi_open_by_name(dev_path, FREAD|FWRITE, kcred, &lh, rds_li);
 	if (ret != 0) {
@@ -193,7 +193,7 @@ rds_is_ib_interface(char *name)
 	}
 
 	if (info.dl_mac_type != DL_IB &&
-	    !rds_transport_ops->rds_transport_if_lookup_by_name(name)) {
+	    !rds_transport_ops->rds_transport_if_lookup_by_name(devname)) {
 		return (-1);
 	}
 

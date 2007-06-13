@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,9 +36,10 @@ extern "C" {
 #include <net/if.h>
 
 typedef struct rds_path_endpoint_s {
-	char		*ifname;
+	uint32_t	iftype;
 	ipaddr_t	ipaddr;
 	ipaddr_t	node_ipaddr;
+	char		*ifname;
 } rds_path_endpoint_t;
 
 typedef struct rds_path_s {
@@ -46,6 +47,7 @@ typedef struct rds_path_s {
 	rds_path_endpoint_t	remote;
 } rds_path_t;
 
+extern void rds_clif_name(char *name);
 extern void rds_path_up(struct rds_path_s *path);
 extern void rds_path_down(struct rds_path_s *path);
 

@@ -92,105 +92,190 @@ extern int rds_get_ibaddr(ipaddr_t, ipaddr_t, ib_gid_t *, ib_gid_t *);
 extern boolean_t rds_islocal(ipaddr_t addr);
 extern uint_t rds_wc_signal;
 
+#define	RDS_GET_IBADDR_SUCCESS(ret, lgid, rgid)				\
+	((ret == 0) && (lgid.gid_prefix != 0) &&			\
+	    (lgid.gid_guid != 0) && (rgid.gid_prefix != 0) &&		\
+	    (rgid.gid_guid != 0))
+
+#define	RDS_LOOPBACK	0
+#define	RDS_LOCAL	1
+#define	RDS_REMOTE	2
+
 static uint8_t
-rds_is_port_marked(rds_session_t *sp, in_port_t port)
+rds_is_port_marked(rds_session_t *sp, in_port_t port, uint_t qualifier)
 {
 	uint8_t	ret;
 
-	if (sp != NULL) {
-		rw_enter(&sp->session_portmap_lock, RW_READER);
-		ret = (sp->session_portmap[port/8] & (1 << (port % 8)));
-		rw_exit(&sp->session_portmap_lock);
-	} else {
-		rw_enter(&rds_local_portmap_lock, RW_READER);
-		ret = (rds_local_portmap[port/8] & (1 << (port % 8)));
-		rw_exit(&rds_local_portmap_lock);
+	switch (qualifier) {
+	case RDS_LOOPBACK: /* loopback */
+		rw_enter(&rds_loopback_portmap_lock, RW_READER);
+		ret = (rds_loopback_portmap[port/8] & (1 << (port % 8)));
+		rw_exit(&rds_loopback_portmap_lock);
+		break;
+
+	case RDS_LOCAL: /* Session local */
+		ASSERT(sp != NULL);
+		rw_enter(&sp->session_local_portmap_lock, RW_READER);
+		ret = (sp->session_local_portmap[port/8] & (1 << (port % 8)));
+		rw_exit(&sp->session_local_portmap_lock);
+		break;
+
+	case RDS_REMOTE: /* Session remote */
+		ASSERT(sp != NULL);
+		rw_enter(&sp->session_remote_portmap_lock, RW_READER);
+		ret = (sp->session_remote_portmap[port/8] & (1 << (port % 8)));
+		rw_exit(&sp->session_remote_portmap_lock);
+		break;
 	}
 
 	return (ret);
 }
 
 static uint8_t
-rds_check_n_mark_port(rds_session_t *sp, in_port_t port)
+rds_check_n_mark_port(rds_session_t *sp, in_port_t port, uint_t qualifier)
 {
 	uint8_t	ret;
 
-	if (sp != NULL) {
-		rw_enter(&sp->session_portmap_lock, RW_WRITER);
-		ret = (sp->session_portmap[port/8] & (1 << (port % 8)));
+	switch (qualifier) {
+	case RDS_LOOPBACK: /* loopback */
+		rw_enter(&rds_loopback_portmap_lock, RW_WRITER);
+		ret = (rds_loopback_portmap[port/8] & (1 << (port % 8)));
 		if (!ret) {
 			/* port is not marked, mark it */
-			sp->session_portmap[port/8] =
-			    sp->session_portmap[port/8] | (1 << (port % 8));
+			rds_loopback_portmap[port/8] =
+			    rds_loopback_portmap[port/8] | (1 << (port % 8));
 		}
-		rw_exit(&sp->session_portmap_lock);
-	} else {
-		rw_enter(&rds_local_portmap_lock, RW_WRITER);
-		ret = (rds_local_portmap[port/8] & (1 << (port % 8)));
+		rw_exit(&rds_loopback_portmap_lock);
+		break;
+
+	case RDS_LOCAL: /* Session local */
+		ASSERT(sp != NULL);
+		rw_enter(&sp->session_local_portmap_lock, RW_WRITER);
+		ret = (sp->session_local_portmap[port/8] & (1 << (port % 8)));
 		if (!ret) {
 			/* port is not marked, mark it */
-			rds_local_portmap[port/8] =
-			    rds_local_portmap[port/8] | (1 << (port % 8));
+			sp->session_local_portmap[port/8] =
+			    sp->session_local_portmap[port/8] |
+			    (1 << (port % 8));
 		}
-		rw_exit(&rds_local_portmap_lock);
+		rw_exit(&sp->session_local_portmap_lock);
+		break;
+
+	case RDS_REMOTE: /* Session remote */
+		ASSERT(sp != NULL);
+		rw_enter(&sp->session_remote_portmap_lock, RW_WRITER);
+		ret = (sp->session_remote_portmap[port/8] & (1 << (port % 8)));
+		if (!ret) {
+			/* port is not marked, mark it */
+			sp->session_remote_portmap[port/8] =
+			    sp->session_remote_portmap[port/8] |
+			    (1 << (port % 8));
+		}
+		rw_exit(&sp->session_remote_portmap_lock);
+		break;
 	}
 
 	return (ret);
 }
 
 static uint8_t
-rds_check_n_unmark_port(rds_session_t *sp, in_port_t port)
+rds_check_n_unmark_port(rds_session_t *sp, in_port_t port, uint_t qualifier)
 {
 	uint8_t	ret;
 
-	if (sp != NULL) {
-		rw_enter(&sp->session_portmap_lock, RW_WRITER);
-		ret = (sp->session_portmap[port/8] & (1 << (port % 8)));
+	switch (qualifier) {
+	case RDS_LOOPBACK: /* loopback */
+		rw_enter(&rds_loopback_portmap_lock, RW_WRITER);
+		ret = (rds_loopback_portmap[port/8] & (1 << (port % 8)));
 		if (ret) {
 			/* port is marked, unmark it */
-			sp->session_portmap[port/8] =
-			    sp->session_portmap[port/8] & ~(1 << (port % 8));
+			rds_loopback_portmap[port/8] =
+			    rds_loopback_portmap[port/8] & ~(1 << (port % 8));
 		}
-		rw_exit(&sp->session_portmap_lock);
-	} else {
-		rw_enter(&rds_local_portmap_lock, RW_WRITER);
-		ret = (rds_local_portmap[port/8] & (1 << (port % 8)));
+		rw_exit(&rds_loopback_portmap_lock);
+		break;
+
+	case RDS_LOCAL: /* Session local */
+		ASSERT(sp != NULL);
+		rw_enter(&sp->session_local_portmap_lock, RW_WRITER);
+		ret = (sp->session_local_portmap[port/8] & (1 << (port % 8)));
 		if (ret) {
 			/* port is marked, unmark it */
-			rds_local_portmap[port/8] =
-			    rds_local_portmap[port/8] & ~(1 << (port % 8));
+			sp->session_local_portmap[port/8] =
+			    sp->session_local_portmap[port/8] &
+			    ~(1 << (port % 8));
 		}
-		rw_exit(&rds_local_portmap_lock);
+		rw_exit(&sp->session_local_portmap_lock);
+		break;
+
+	case RDS_REMOTE: /* Session remote */
+		ASSERT(sp != NULL);
+		rw_enter(&sp->session_remote_portmap_lock, RW_WRITER);
+		ret = (sp->session_remote_portmap[port/8] & (1 << (port % 8)));
+		if (ret) {
+			/* port is marked, unmark it */
+			sp->session_remote_portmap[port/8] =
+			    sp->session_remote_portmap[port/8] &
+			    ~(1 << (port % 8));
+		}
+		rw_exit(&sp->session_remote_portmap_lock);
+		break;
 	}
 
 	return (ret);
 }
 
 static void
-rds_mark_all_ports(rds_session_t *sp)
+rds_mark_all_ports(rds_session_t *sp, uint_t qualifier)
 {
-	if (sp != NULL) {
-		rw_enter(&sp->session_portmap_lock, RW_WRITER);
-		(void) memset(sp->session_portmap, 0xFF, RDS_PORT_MAP_SIZE);
-		rw_exit(&sp->session_portmap_lock);
-	} else {
-		rw_enter(&rds_local_portmap_lock, RW_WRITER);
-		(void) memset(rds_local_portmap, 0xFF, RDS_PORT_MAP_SIZE);
-		rw_exit(&rds_local_portmap_lock);
+	switch (qualifier) {
+	case RDS_LOOPBACK: /* loopback */
+		rw_enter(&rds_loopback_portmap_lock, RW_WRITER);
+		(void) memset(rds_loopback_portmap, 0xFF, RDS_PORT_MAP_SIZE);
+		rw_exit(&rds_loopback_portmap_lock);
+		break;
+
+	case RDS_LOCAL: /* Session local */
+		ASSERT(sp != NULL);
+		rw_enter(&sp->session_local_portmap_lock, RW_WRITER);
+		(void) memset(sp->session_local_portmap, 0xFF,
+		    RDS_PORT_MAP_SIZE);
+		rw_exit(&sp->session_local_portmap_lock);
+		break;
+
+	case RDS_REMOTE: /* Session remote */
+		ASSERT(sp != NULL);
+		rw_enter(&sp->session_remote_portmap_lock, RW_WRITER);
+		(void) memset(sp->session_remote_portmap, 0xFF,
+		    RDS_PORT_MAP_SIZE);
+		rw_exit(&sp->session_remote_portmap_lock);
+		break;
 	}
 }
 
 static void
-rds_unmark_all_ports(rds_session_t *sp)
+rds_unmark_all_ports(rds_session_t *sp, uint_t qualifier)
 {
-	if (sp != NULL) {
-		rw_enter(&sp->session_portmap_lock, RW_WRITER);
-		bzero(sp->session_portmap, RDS_PORT_MAP_SIZE);
-		rw_exit(&sp->session_portmap_lock);
-	} else {
-		rw_enter(&rds_local_portmap_lock, RW_WRITER);
-		bzero(rds_local_portmap, RDS_PORT_MAP_SIZE);
-		rw_exit(&rds_local_portmap_lock);
+	switch (qualifier) {
+	case RDS_LOOPBACK: /* loopback */
+		rw_enter(&rds_loopback_portmap_lock, RW_WRITER);
+		bzero(rds_loopback_portmap, RDS_PORT_MAP_SIZE);
+		rw_exit(&rds_loopback_portmap_lock);
+		break;
+
+	case RDS_LOCAL: /* Session local */
+		ASSERT(sp != NULL);
+		rw_enter(&sp->session_local_portmap_lock, RW_WRITER);
+		bzero(sp->session_local_portmap, RDS_PORT_MAP_SIZE);
+		rw_exit(&sp->session_local_portmap_lock);
+		break;
+
+	case RDS_REMOTE: /* Session remote */
+		ASSERT(sp != NULL);
+		rw_enter(&sp->session_remote_portmap_lock, RW_WRITER);
+		bzero(sp->session_remote_portmap, RDS_PORT_MAP_SIZE);
+		rw_exit(&sp->session_remote_portmap_lock);
+		break;
 	}
 }
 
@@ -228,8 +313,8 @@ rds_session_lkup(rds_state_t *statep, ipaddr_t remoteip, ib_guid_t node_guid)
 	ASSERT(rw_lock_held(&statep->rds_sessionlock));
 	sp = statep->rds_sessionlistp;
 	while (sp) {
-		if ((sp->session_rgid.gid_guid == node_guid) ||
-		    (sp->session_remip == remoteip)) {
+		if ((sp->session_remip == remoteip) || ((node_guid != 0) &&
+		    (sp->session_rgid.gid_guid == node_guid))) {
 			break;
 		}
 
@@ -252,19 +337,23 @@ rds_ep_fini(rds_ep_t *ep)
 	/* free recv pool */
 	rds_free_recv_pool(ep);
 
+	mutex_enter(&ep->ep_lock);
+	ep->ep_hca_guid = 0;
+	mutex_exit(&ep->ep_lock);
+
 	RDS_DPRINTF3("rds_ep_fini", "Return EP(%p)", ep);
 }
 
 /* Assumes SP write lock is held */
 int
-rds_ep_init(rds_ep_t *ep)
+rds_ep_init(rds_ep_t *ep, ib_guid_t hca_guid)
 {
 	uint_t		ret;
 
 	RDS_DPRINTF3("rds_ep_init", "Enter: EP(%p) Type: %d", ep, ep->ep_type);
 
 	/* send pool */
-	ret = rds_init_send_pool(ep);
+	ret = rds_init_send_pool(ep, hca_guid);
 	if (ret != 0) {
 		RDS_DPRINTF2(LABEL, "EP(%p): rds_init_send_pool failed: %d",
 		    ep, ret);
@@ -283,6 +372,7 @@ rds_ep_init(rds_ep_t *ep)
 	/* reset the ep state */
 	mutex_enter(&ep->ep_lock);
 	ep->ep_state = RDS_EP_STATE_UNCONNECTED;
+	ep->ep_hca_guid = hca_guid;
 	ep->ep_lbufid = NULL;
 	ep->ep_rbufid = NULL;
 	ep->ep_segfbp = NULL;
@@ -348,13 +438,24 @@ int
 rds_session_init(rds_session_t *sp)
 {
 	int		ret;
+	rds_hca_t	*hcap;
+	ib_guid_t	hca_guid;
 
 	RDS_DPRINTF2("rds_session_init", "Enter: SP(0x%p)", sp);
 
 	/* CALLED WITH SESSION WRITE LOCK */
 
+	hcap = rds_gid_to_hcap(rdsib_statep, sp->session_lgid);
+	if (hcap == NULL) {
+		RDS_DPRINTF1("rds_session_init", "SGID is on an uninitialized "
+		    "HCA: %llx", sp->session_lgid.gid_guid);
+		return (-1);
+	}
+
+	hca_guid = hcap->hca_guid;
+
 	/* allocate and initialize the ctrl channel */
-	ret = rds_ep_init(&sp->session_ctrlep);
+	ret = rds_ep_init(&sp->session_ctrlep, hca_guid);
 	if (ret != 0) {
 		RDS_DPRINTF2(LABEL, "SP(%p): Ctrl EP(%p) initialization "
 		    "failed", sp, &sp->session_ctrlep);
@@ -364,13 +465,17 @@ rds_session_init(rds_session_t *sp)
 	RDS_DPRINTF2(LABEL, "SP(%p) Control EP(%p)", sp, &sp->session_ctrlep);
 
 	/* allocate and initialize the data channel */
-	ret = rds_ep_init(&sp->session_dataep);
+	ret = rds_ep_init(&sp->session_dataep, hca_guid);
 	if (ret != 0) {
 		RDS_DPRINTF2(LABEL, "SP(%p): Data EP(%p) initialization "
 		    "failed", sp, &sp->session_dataep);
 		rds_ep_fini(&sp->session_ctrlep);
 		return (-1);
 	}
+
+	/* Clear the portmaps */
+	rds_unmark_all_ports(sp, RDS_LOCAL);
+	rds_unmark_all_ports(sp, RDS_REMOTE);
 
 	RDS_DPRINTF2(LABEL, "SP(%p) Data EP(%p)", sp, &sp->session_dataep);
 
@@ -442,6 +547,10 @@ rds_session_reinit(rds_session_t *sp, ib_gid_t lgid)
 
 	sp->session_lgid = lgid;
 
+	/* Clear the portmaps */
+	rds_unmark_all_ports(sp, RDS_LOCAL);
+	rds_unmark_all_ports(sp, RDS_REMOTE);
+
 	RDS_DPRINTF2("rds_session_reinit", "Return: SP(0x%p)", sp);
 
 	return (0);
@@ -468,7 +577,6 @@ rds_session_connect(rds_session_t *sp)
 	bzero(&pattr, sizeof (ibt_path_attr_t));
 	pattr.pa_dgids = &rgid;
 	pattr.pa_sgid = lgid;
-	pattr.pa_sd_flags = IBT_NO_SDATA;
 	pattr.pa_num_dgids = 1;
 	ret = ibt_get_paths(rdsib_statep->rds_ibhdl, IBT_PATH_NO_FLAGS,
 	    &pattr, 1, &pinfo, NULL);
@@ -663,7 +771,8 @@ rds_destroy_session(rds_session_t *sp)
 
 	/* session */
 	rw_destroy(&sp->session_lock);
-	rw_destroy(&sp->session_portmap_lock);
+	rw_destroy(&sp->session_local_portmap_lock);
+	rw_destroy(&sp->session_remote_portmap_lock);
 
 	/* free the session */
 	kmem_free(sp, sizeof (rds_session_t));
@@ -695,7 +804,7 @@ rds_failover_session(void *arg)
 		rw_exit(&sp->session_lock);
 		return;
 	}
-	sp->session_failover++;
+	sp->session_failover = 1;
 	rw_exit(&sp->session_lock);
 
 	/*
@@ -717,22 +826,30 @@ rds_failover_session(void *arg)
 			    myip, remip);
 		}
 		/* check if we have (new) path from the source to destination */
+		lgid.gid_prefix = 0;
+		lgid.gid_guid = 0;
+		rgid.gid_prefix = 0;
+		rgid.gid_guid = 0;
 		ret = rds_get_ibaddr(htonl(myip), htonl(remip), &lgid, &rgid);
-		if (ret == 0) {
+		if (RDS_GET_IBADDR_SUCCESS(ret, lgid, rgid)) {
 			break;
 		}
 
-		RDS_DPRINTF1(LABEL, "rds_get_ibaddr failed: %d", ret);
+		RDS_DPRINTF1(LABEL, "rds_get_ibaddr failed, ret: %d "
+		    "lgid: %llx:%llx rgid: %llx:%llx", lgid.gid_prefix,
+		    lgid.gid_guid, rgid.gid_prefix, rgid.gid_guid);
+
 		/* wait 1 sec before re-trying */
 		delay(drv_usectohz(1000000));
 		cnt++;
-	} while (cnt < 3);
+	} while (cnt < 5);
 
-	if (ret != 0) {
+	if (!RDS_GET_IBADDR_SUCCESS(ret, lgid, rgid)) {
 		rw_enter(&sp->session_lock, RW_WRITER);
 		if (sp->session_type == RDS_SESSION_ACTIVE) {
 			rds_session_fini(sp);
 			sp->session_state = RDS_SESSION_STATE_FAILED;
+			sp->session_failover = 0;
 			RDS_DPRINTF3("rds_failover_session",
 			    "SP(%p) State RDS_SESSION_STATE_FAILED", sp);
 		} else {
@@ -766,6 +883,7 @@ rds_failover_session(void *arg)
 	if (ret != 0) {
 		rds_session_fini(sp);
 		sp->session_state = RDS_SESSION_STATE_FAILED;
+		sp->session_failover = 0;
 		RDS_DPRINTF3("rds_failover_session",
 		    "SP(%p) State RDS_SESSION_STATE_FAILED", sp);
 		rw_exit(&sp->session_lock);
@@ -814,11 +932,13 @@ rds_cleanup_passive_session(void *arg)
 	if (sp->session_state == RDS_SESSION_STATE_CLOSED) {
 		rds_session_fini(sp);
 		sp->session_state = RDS_SESSION_STATE_FINI;
+		sp->session_failover = 0;
 		RDS_DPRINTF3("rds_cleanup_passive_session",
 		    "SP(%p) State RDS_SESSION_STATE_FINI", sp);
 	} else if (sp->session_state == RDS_SESSION_STATE_ERROR) {
 		rds_session_fini(sp);
 		sp->session_state = RDS_SESSION_STATE_FAILED;
+		sp->session_failover = 0;
 		RDS_DPRINTF3("rds_cleanup_passive_session",
 		    "SP(%p) State RDS_SESSION_STATE_FAILED", sp);
 	}
@@ -860,6 +980,7 @@ rds_passive_session_fini(rds_session_t *sp)
 	mutex_exit(&ep->ep_lock);
 
 	rds_session_fini(sp);
+	sp->session_failover = 0;
 
 	RDS_DPRINTF2("rds_passive_session_fini", "Return: SP (%p)", sp);
 }
@@ -908,6 +1029,7 @@ rds_close_sessions(void *arg)
 			    "SP(%p) State RDS_SESSION_STATE_CLOSED", sp);
 			rds_session_fini(sp);
 			sp->session_state = RDS_SESSION_STATE_FINI;
+			sp->session_failover = 0;
 			RDS_DPRINTF3("rds_close_sessions",
 			    "SP(%p) State RDS_SESSION_STATE_FINI", sp);
 			break;
@@ -928,6 +1050,7 @@ rds_close_sessions(void *arg)
 		case RDS_SESSION_STATE_CLOSED:
 			rds_session_fini(sp);
 			sp->session_state = RDS_SESSION_STATE_FINI;
+			sp->session_failover = 0;
 			RDS_DPRINTF3("rds_close_sessions",
 			    "SP(%p) State RDS_SESSION_STATE_FINI", sp);
 			break;
@@ -990,6 +1113,7 @@ rds_session_open(rds_session_t *sp)
 		rw_enter(&sp->session_lock, RW_WRITER);
 		rds_session_fini(sp);
 		sp->session_state = RDS_SESSION_STATE_FAILED;
+		sp->session_failover = 0;
 		RDS_DPRINTF3("rds_session_open",
 		    "SP(%p) State RDS_SESSION_STATE_FAILED", sp);
 		rw_exit(&sp->session_lock);
@@ -1014,7 +1138,6 @@ rds_session_create(rds_state_t *statep, ipaddr_t localip, ipaddr_t remip,
 	rds_session_t	*newp, *oldp;
 	rds_ep_t	*dataep, *ctrlep;
 	rds_bufpool_t	*pool;
-	rds_hca_t	*hcap;
 	int		ret;
 
 	RDS_DPRINTF2("rds_session_create", "Enter: 0x%p 0x%x 0x%x",
@@ -1037,7 +1160,8 @@ rds_session_create(rds_state_t *statep, ipaddr_t localip, ipaddr_t remip,
 	RDS_DPRINTF3("rds_session_create",
 	    "SP(%p) State RDS_SESSION_STATE_CREATED", newp);
 	rw_init(&newp->session_lock, NULL, RW_DRIVER, NULL);
-	rw_init(&newp->session_portmap_lock, NULL, RW_DRIVER, NULL);
+	rw_init(&newp->session_local_portmap_lock, NULL, RW_DRIVER, NULL);
+	rw_init(&newp->session_remote_portmap_lock, NULL, RW_DRIVER, NULL);
 
 	/* Initialize data endpoint */
 	dataep = &newp->session_dataep;
@@ -1086,7 +1210,8 @@ rds_session_create(rds_state_t *statep, ipaddr_t localip, ipaddr_t remip,
 		/* A session to this destination exists */
 		rw_exit(&statep->rds_sessionlock);
 		rw_destroy(&newp->session_lock);
-		rw_destroy(&newp->session_portmap_lock);
+		rw_destroy(&newp->session_local_portmap_lock);
+		rw_destroy(&newp->session_remote_portmap_lock);
 		mutex_destroy(&dataep->ep_lock);
 		mutex_destroy(&ctrlep->ep_lock);
 		kmem_free(newp, sizeof (rds_session_t));
@@ -1112,10 +1237,17 @@ rds_session_create(rds_state_t *statep, ipaddr_t localip, ipaddr_t remip,
 		}
 
 		/* Get the gids for the source and destination ip addrs */
+		lgid.gid_prefix = 0;
+		lgid.gid_guid = 0;
+		rgid.gid_prefix = 0;
+		rgid.gid_guid = 0;
 		ret = rds_get_ibaddr(ntohl(localip1), ntohl(remip1),
 		    &lgid, &rgid);
-		if (ret != 0) {
-			RDS_DPRINTF1(LABEL, "rds_get_ibaddr failed: %d", ret);
+		if (!RDS_GET_IBADDR_SUCCESS(ret, lgid, rgid)) {
+			RDS_DPRINTF1(LABEL, "rds_get_ibaddr failed, ret: %d "
+			    "lgid: %llx:%llx rgid: %llx:%llx", lgid.gid_prefix,
+			    lgid.gid_guid, rgid.gid_prefix, rgid.gid_guid);
+
 			RDS_SESSION_TRANSITION(newp, RDS_SESSION_STATE_FAILED);
 			return (NULL);
 		}
@@ -1137,19 +1269,6 @@ rds_session_create(rds_state_t *statep, ipaddr_t localip, ipaddr_t remip,
 			newp->session_rgid = reqp->req_prim_addr.av_dgid;
 			newp->session_lgid = reqp->req_prim_addr.av_sgid;
 		}
-
-		hcap = rds_gid_to_hcap(statep, newp->session_lgid);
-		if (hcap == NULL) {
-			RDS_DPRINTF1(LABEL, "SGID is on an uninitialized "
-			    "HCA: %llx", newp->session_lgid.gid_guid);
-			newp->session_state = RDS_SESSION_STATE_FAILED;
-			RDS_DPRINTF3("rds_session_create",
-			    "SP(%p) State RDS_SESSION_STATE_FAILED", newp);
-			rw_exit(&newp->session_lock);
-			return (NULL);
-		}
-		dataep->ep_hca_guid = hcap->hca_guid;
-		ctrlep->ep_hca_guid = hcap->hca_guid;
 	}
 	rw_exit(&newp->session_lock);
 
@@ -1161,24 +1280,23 @@ rds_session_create(rds_state_t *statep, ipaddr_t localip, ipaddr_t remip,
 void
 rds_handle_control_message(rds_session_t *sp, rds_ctrl_pkt_t *cpkt)
 {
-	cpkt->rcp_port = cpkt->rcp_port;
 	RDS_DPRINTF4("rds_handle_control_message", "Enter: SP(%p) code: %d "
 	    "port: %d", sp, cpkt->rcp_code, cpkt->rcp_port);
 
 	switch (cpkt->rcp_code) {
 	case RDS_CTRL_CODE_STALL:
 		RDS_INCR_STALLS_RCVD();
-		(void) rds_check_n_mark_port(sp, cpkt->rcp_port);
+		(void) rds_check_n_mark_port(sp, cpkt->rcp_port, RDS_REMOTE);
 		break;
 	case RDS_CTRL_CODE_UNSTALL:
 		RDS_INCR_UNSTALLS_RCVD();
-		(void) rds_check_n_unmark_port(sp, cpkt->rcp_port);
+		(void) rds_check_n_unmark_port(sp, cpkt->rcp_port, RDS_REMOTE);
 		break;
 	case RDS_CTRL_CODE_STALL_PORTS:
-		rds_mark_all_ports(sp);
+		rds_mark_all_ports(sp, RDS_REMOTE);
 		break;
 	case RDS_CTRL_CODE_UNSTALL_PORTS:
-		rds_unmark_all_ports(sp);
+		rds_unmark_all_ports(sp, RDS_REMOTE);
 		break;
 	case RDS_CTRL_CODE_HEARTBEAT:
 		break;
@@ -1191,8 +1309,8 @@ rds_handle_control_message(rds_session_t *sp, rds_ctrl_pkt_t *cpkt)
 	RDS_DPRINTF4("rds_handle_control_message", "Return");
 }
 
-void
-rds_post_control_message(rds_session_t *sp, rds_ctrl_pkt_t *cpkt)
+int
+rds_post_control_message(rds_session_t *sp, uint8_t code, in_port_t port)
 {
 	ibt_send_wr_t	wr;
 	rds_ep_t	*ep;
@@ -1201,21 +1319,21 @@ rds_post_control_message(rds_session_t *sp, rds_ctrl_pkt_t *cpkt)
 	int		ret;
 
 	RDS_DPRINTF4("rds_post_control_message", "Enter: SP(%p) Code: %d "
-	    "Port: %d", sp, cpkt->rcp_code, cpkt->rcp_port);
+	    "Port: %d", sp, code, port);
 
 	ep = &sp->session_ctrlep;
 
 	bp = rds_get_send_buf(ep, 1);
 	if (bp == NULL) {
 		RDS_DPRINTF2(LABEL, "No buffers available to send control "
-		    "message: SP(%p) Code: %d Port: %d", sp, cpkt->rcp_code,
-		    cpkt->rcp_port);
-		return;
+		    "message: SP(%p) Code: %d Port: %d", sp, code,
+		    port);
+		return (-1);
 	}
 
 	cp = (rds_ctrl_pkt_t *)(uintptr_t)bp->buf_ds.ds_va;
-	cp->rcp_code = cpkt->rcp_code;
-	cp->rcp_port = cpkt->rcp_port;
+	cp->rcp_code = code;
+	cp->rcp_port = port;
 	bp->buf_ds.ds_len = RDS_CTRLPKT_SIZE;
 
 	wr.wr_id = (uintptr_t)bp;
@@ -1232,122 +1350,80 @@ rds_post_control_message(rds_session_t *sp, rds_ctrl_pkt_t *cpkt)
 		    "%d", ep, ret);
 		bp->buf_state = RDS_SNDBUF_FREE;
 		rds_free_send_buf(ep, bp, NULL, 1, B_FALSE);
-		return;
+		return (-1);
 	}
 
 	RDS_DPRINTF4("rds_post_control_message", "Return SP(%p) Code: %d "
-	    "Port: %d", sp, cpkt->rcp_code, cpkt->rcp_port);
+	    "Port: %d", sp, code, port);
+
+	return (0);
 }
 
 void
-rds_send_control_message(void *arg)
+rds_stall_port(rds_session_t *sp, in_port_t port, uint_t qualifier)
 {
-	rds_buf_t	*bp;
-	rds_ctrl_pkt_t	*cp;
+	int		ret;
+
+	RDS_DPRINTF4("rds_stall_port", "Enter: SP(%p) Port %d", sp, port);
+
+	RDS_INCR_STALLS_TRIGGERED();
+
+	if (!rds_check_n_mark_port(sp, port, qualifier)) {
+
+		if (sp != NULL) {
+			ret = rds_post_control_message(sp,
+			    RDS_CTRL_CODE_STALL, port);
+			if (ret != 0) {
+				(void) rds_check_n_unmark_port(sp, port,
+				    qualifier);
+				return;
+			}
+			RDS_INCR_STALLS_SENT();
+		}
+	} else {
+		RDS_DPRINTF3(LABEL,
+		    "Port %d is already in stall state", port);
+	}
+
+	RDS_DPRINTF4("rds_stall_port", "Return: SP(%p) Port %d", sp, port);
+}
+
+void
+rds_resume_port(in_port_t port)
+{
 	rds_session_t	*sp;
 	uint_t		ix;
+	int		ret;
 
-	RDS_DPRINTF4("rds_send_control_message", "Enter");
+	RDS_DPRINTF4("rds_resume_port", "Enter: Port %d", port);
 
-	bp = (rds_buf_t *)arg;
-	cp = (rds_ctrl_pkt_t *)(uintptr_t)bp->buf_ds.ds_va;
+	RDS_INCR_UNSTALLS_TRIGGERED();
 
-	/* send the stall message on all sessions */
+	/* resume loopback traffic */
+	(void) rds_check_n_unmark_port(NULL, port, RDS_LOOPBACK);
+
+	/* send unstall messages to resume the remote traffic */
 	rw_enter(&rdsib_statep->rds_sessionlock, RW_READER);
 
 	sp = rdsib_statep->rds_sessionlistp;
 	for (ix = 0; ix < rdsib_statep->rds_nsessions; ix++) {
 		ASSERT(sp != NULL);
-		if (sp->session_state == RDS_SESSION_STATE_CONNECTED) {
-			rds_post_control_message(sp, cp);
+		if ((sp->session_state == RDS_SESSION_STATE_CONNECTED) &&
+		    (rds_check_n_unmark_port(sp, port, RDS_LOCAL))) {
+				ret = rds_post_control_message(sp,
+				    RDS_CTRL_CODE_UNSTALL, port);
+				if (ret != 0) {
+					(void) rds_check_n_mark_port(sp, port,
+					    RDS_LOCAL);
+				} else {
+					RDS_INCR_UNSTALLS_SENT();
+				}
 		}
 
 		sp = sp->session_nextp;
 	}
 
 	rw_exit(&rdsib_statep->rds_sessionlock);
-
-	/* free the arg */
-	rds_free_buf(&rds_cpool, bp, 1);
-
-	RDS_DPRINTF4("rds_send_control_message", "Return");
-}
-
-void
-rds_stall_port(in_port_t port)
-{
-	rds_ctrl_pkt_t	*cpkt;
-	rds_buf_t	*bp;
-	uint_t		ix;
-
-	RDS_DPRINTF4("rds_stall_port", "Enter: Port %d", port);
-
-	RDS_INCR_STALLS_TRIGGERED();
-	if (!rds_check_n_mark_port(NULL, port)) {
-
-		bp = rds_get_buf(&rds_cpool, 1, &ix);
-		if (bp == NULL) {
-			RDS_DPRINTF2(LABEL, "No buffers available "
-			    "to send control message: Code: %d "
-			    "Local Port: %d", RDS_CTRL_CODE_STALL, port);
-			(void) rds_check_n_unmark_port(NULL, port);
-			return;
-		}
-
-		cpkt = (rds_ctrl_pkt_t *)(uintptr_t)bp->buf_ds.ds_va;
-		cpkt->rcp_code = RDS_CTRL_CODE_STALL;
-		cpkt->rcp_port = port;
-#if 0
-		/*
-		 * Taskq runs at some later point in time and the port may
-		 * not be in stall state anymore at that time.
-		 */
-		(void) ddi_taskq_dispatch(rds_taskq,
-		    rds_send_control_message, (void *)bp, DDI_SLEEP);
-#else
-		rds_send_control_message((void *)bp);
-#endif
-		RDS_INCR_STALLS_SENT();
-	} else {
-		RDS_DPRINTF3(LABEL,
-		    "Port %d is already in stall state", port);
-	}
-
-	RDS_DPRINTF4("rds_stall_port", "Return: Port %d", port);
-}
-
-void
-rds_resume_port(in_port_t port)
-{
-	rds_ctrl_pkt_t	*cpkt;
-	rds_buf_t	*bp;
-	uint_t		ix;
-
-	RDS_DPRINTF4("rds_resume_port", "Enter: Port %d", port);
-
-	RDS_INCR_UNSTALLS_TRIGGERED();
-	if (rds_check_n_unmark_port(NULL, port)) {
-
-		bp = rds_get_buf(&rds_cpool, 1, &ix);
-		if (bp == NULL) {
-			RDS_DPRINTF2(LABEL, "No buffers available "
-			    "to send control message: Code: %d "
-			    "Local Port: %d", RDS_CTRL_CODE_UNSTALL, port);
-			(void) rds_check_n_mark_port(NULL, port);
-			return;
-		}
-
-		/* send control message to resume the port for remote traffic */
-		cpkt = (rds_ctrl_pkt_t *)(uintptr_t)bp->buf_ds.ds_va;
-		cpkt->rcp_code = RDS_CTRL_CODE_UNSTALL;
-		cpkt->rcp_port = port;
-		(void) ddi_taskq_dispatch(rds_taskq,
-		    rds_send_control_message, (void *)bp, DDI_SLEEP);
-		RDS_INCR_UNSTALLS_SENT();
-	} else {
-		RDS_DPRINTF5(LABEL,
-		    "Port %d is not stalled anymore", port);
-	}
 
 	RDS_DPRINTF4("rds_resume_port", "Return: Port %d", port);
 }
@@ -1517,10 +1593,11 @@ rds_deliver_loopback_msg(uio_t *uiop, ipaddr_t recvip, ipaddr_t sendip,
 		if (ret == ENOSPC) {
 			/*
 			 * The message is delivered but cannot take more,
-			 * stall the port, if it is not already stalled
+			 * stop further loopback traffic to this port
 			 */
-			RDS_DPRINTF2(LABEL, "Port %d NO SPACE", recvport);
-			rds_stall_port(recvport);
+			RDS_DPRINTF3("rds_deliver_loopback_msg",
+			    "Port %d NO SPACE", recvport);
+			rds_stall_port(NULL, recvport, RDS_LOOPBACK);
 		} else {
 			RDS_DPRINTF2(LABEL, "Loopback message: port %d -> "
 			    "port %d failed: %d", sendport, recvport, ret);
@@ -1588,7 +1665,7 @@ rds_resend_messages(void *arg)
 			    "Expected State: %d", sp, sp->session_state,
 			    RDS_SESSION_STATE_CONNECTED);
 		}
-		sp->session_failover--;
+		sp->session_failover = 0;
 		rw_exit(&sp->session_lock);
 		return;
 	}
@@ -1676,7 +1753,7 @@ rds_resend_messages(void *arg)
 		    "Expected State: %d", sp, sp->session_state,
 		    RDS_SESSION_STATE_CONNECTED);
 	}
-	sp->session_failover--;
+	sp->session_failover = 0;
 	rw_exit(&sp->session_lock);
 
 	RDS_DPRINTF2("rds_resend_messages", "Return: SP(%p)", sp);
@@ -1757,8 +1834,8 @@ rds_ep_sendmsg(rds_ep_t *ep, uio_t *uiop, in_port_t sendport,
 	RDS_DPRINTF4("rds_ep_sendmsg", "Enter: EP(%p) sendport: %d recvport: "
 	    "%d", ep, sendport, recvport);
 
-	/* make sure the port is not stalled */
-	if (rds_is_port_marked(ep->ep_sp, recvport)) {
+	/* make sure the remote port is not stalled */
+	if (rds_is_port_marked(ep->ep_sp, recvport, RDS_REMOTE)) {
 		RDS_DPRINTF2(LABEL, "SP(%p) Port:%d is in stall state",
 		    ep->ep_sp, recvport);
 		RDS_INCR_EWOULDBLOCK();
@@ -1779,7 +1856,6 @@ rds_sendmsg(uio_t *uiop, ipaddr_t sendip, ipaddr_t recvip, in_port_t sendport,
 {
 	rds_session_t	*sp;
 	ib_gid_t	lgid, rgid;
-	rds_hca_t	*hcap;
 	int		ret;
 
 	RDS_DPRINTF4("rds_sendmsg", "Enter: uiop: 0x%p, srcIP: 0x%x destIP: "
@@ -1800,7 +1876,7 @@ rds_sendmsg(uio_t *uiop, ipaddr_t sendip, ipaddr_t recvip, in_port_t sendport,
 	/* Is this a loopback message? */
 	if ((sp == NULL) && (rds_islocal(recvip))) {
 		/* make sure the port is not stalled */
-		if (rds_is_port_marked(NULL, recvport)) {
+		if (rds_is_port_marked(NULL, recvport, RDS_LOOPBACK)) {
 			RDS_DPRINTF2(LABEL, "Local Port:%d is in stall state",
 			    recvport);
 			RDS_INCR_EWOULDBLOCK();
@@ -1889,11 +1965,19 @@ rds_sendmsg(uio_t *uiop, ipaddr_t sendip, ipaddr_t recvip, in_port_t sendport,
 			}
 
 			/* Resolve the IP addresses */
+			lgid.gid_prefix = 0;
+			lgid.gid_guid = 0;
+			rgid.gid_prefix = 0;
+			rgid.gid_guid = 0;
 			ret = rds_get_ibaddr(htonl(sendip1), htonl(recvip1),
 			    &lgid, &rgid);
-			if (ret != 0) {
-				RDS_DPRINTF1(LABEL, "rds_get_ibaddr failed: %d",
-				    ret);
+			if (!RDS_GET_IBADDR_SUCCESS(ret, lgid, rgid)) {
+				RDS_DPRINTF1("rds_sendmsg",
+				    "rds_get_ibaddr failed, ret: %d "
+				    "lgid: %llx:%llx rgid: %llx:%llx",
+				    lgid.gid_prefix, lgid.gid_guid,
+				    rgid.gid_prefix, rgid.gid_guid);
+
 				rw_enter(&sp->session_lock, RW_WRITER);
 				if (sp->session_type == RDS_SESSION_ACTIVE) {
 					sp->session_state =
@@ -1917,20 +2001,6 @@ rds_sendmsg(uio_t *uiop, ipaddr_t sendip, ipaddr_t recvip, in_port_t sendport,
 			if (sp->session_type == RDS_SESSION_ACTIVE) {
 				sp->session_lgid = lgid;
 				sp->session_rgid = rgid;
-				hcap = rds_gid_to_hcap(rdsib_statep, lgid);
-				if (hcap == NULL) {
-					RDS_DPRINTF1(LABEL, "REQ received on "
-					    "an uninitialized HCA: %llx",
-					    sp->session_lgid.gid_guid);
-					sp->session_state =
-					    RDS_SESSION_STATE_FAILED;
-					RDS_DPRINTF3("rds_sendmsg",
-					    "SP(%p) State "
-					    "RDS_SESSION_STATE_FAILED", sp);
-					rw_exit(&sp->session_lock);
-					return (ENOMEM);
-				}
-
 				ret = rds_session_init(sp);
 				if (ret != 0) {
 					RDS_DPRINTF2("rds_sendmsg",
@@ -1950,19 +2020,21 @@ rds_sendmsg(uio_t *uiop, ipaddr_t sendip, ipaddr_t recvip, in_port_t sendport,
 				rds_session_open(sp);
 
 			} else {
-				RDS_DPRINTF2(LABEL, "SP(%p): state changed "
-				    "to %d", sp, sp->session_state);
+				RDS_DPRINTF2("rds_sendmsg",
+				    "SP(%p): type changed to %d",
+				    sp, sp->session_type);
 				rw_exit(&sp->session_lock);
 				return (ENOMEM);
 			}
 		} else {
-			RDS_DPRINTF2(LABEL, "SP(%p): Session state %d changed",
+			RDS_DPRINTF2("rds_sendmsg",
+			    "SP(%p): Session state %d changed",
 			    sp, sp->session_state);
 			rw_exit(&sp->session_lock);
 			return (ENOMEM);
 		}
 	} else {
-		RDS_DPRINTF2(LABEL, "SP(%p): Session is in %d state",
+		RDS_DPRINTF2("rds_sendmsg", "SP(%p): Session is in %d state",
 		    sp, sp->session_state);
 		rw_exit(&sp->session_lock);
 		return (ENOMEM);
@@ -1975,7 +2047,7 @@ rds_sendmsg(uio_t *uiop, ipaddr_t sendip, ipaddr_t recvip, in_port_t sendport,
 		ret = rds_ep_sendmsg(&sp->session_dataep, uiop, sendport,
 		    recvport);
 	} else {
-		RDS_DPRINTF2(LABEL, "SP(%p): state(%d) not connected",
+		RDS_DPRINTF2("rds_sendmsg", "SP(%p): state(%d) not connected",
 		    sp, sp->session_state);
 		rw_exit(&sp->session_lock);
 	}
@@ -2065,11 +2137,11 @@ rds_received_msg(rds_ep_t *ep, rds_buf_t *bp)
 		if (ret == ENOSPC) {
 			/*
 			 * The message is delivered but cannot take more,
-			 * stall the port
+			 * stop further remote messages coming to this port
 			 */
-			RDS_DPRINTF2(LABEL, "Port %d NO SPACE",
+			RDS_DPRINTF3("rds_received_msg", "Port %d NO SPACE",
 			    pktp->dh_recvport);
-			rds_stall_port(pktp->dh_recvport);
+			rds_stall_port(ep->ep_sp, pktp->dh_recvport, RDS_LOCAL);
 		} else {
 			RDS_DPRINTF1(LABEL, "rds_deliver_new_msg returned: %d",
 			    ret);

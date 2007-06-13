@@ -43,6 +43,7 @@
 #include <inet/arp.h>
 #include <sys/modctl.h>
 #include <sys/ib/ib_types.h>
+#include <sys/ib/clients/rds/rdsib_ib.h>
 #include <sys/ib/clients/rds/rdsib_arp.h>
 #include <sys/ib/clients/rds/rdsib_debug.h>
 
@@ -51,8 +52,6 @@ extern int rds_pr_lookup(rds_streams_t *rdss, rds_ipx_addr_t *dst_addr,
     rds_pr_comp_func_t func);
 extern void rds_pr_arp_ack(mblk_t *mp);
 extern void rds_prwqn_delete(rds_prwqn_t *wqnp);
-
-extern ddi_taskq_t	*rds_taskq;
 
 /*
  * rds_get_ibaddr_complete
@@ -170,7 +169,7 @@ rds_lrput(queue_t *q, mblk_t *mp)
 			break;
 		default:
 			RDS_DPRINTF1(LABEL, "lrput: got unknown msg <0x%x>\n",
-			mp->b_datap->db_type);
+			    mp->b_datap->db_type);
 			ASSERT(0);
 			break;
 	}
@@ -354,7 +353,7 @@ rds_get_ibaddr_impl(void *arg)
 	rds_ipx_addr_t		srcaddr, destaddr;
 	int			ret;
 
-	RDS_DPRINTF4("rds_get_ibaddr", "Enter: src: 0x%x dest: 0x%x",
+	RDS_DPRINTF4("rds_get_ibaddr_impl", "Enter: src: 0x%x dest: 0x%x",
 	    argsp->srcip, argsp->destip);
 
 	rdss = (rds_streams_t *)kmem_zalloc(sizeof (rds_streams_t), KM_SLEEP);
@@ -403,14 +402,20 @@ rds_get_ibaddr_impl(void *arg)
 	cv_signal(&argsp->cv);
 	mutex_exit(&argsp->lock);
 
-	RDS_DPRINTF4("rds_get_ibaddr", "Return");
+	RDS_DPRINTF4("rds_get_ibaddr_impl", "Return");
 }
 
+/*
+ * Return 0 for SUCCESS
+ * Return NON-ZERO for FAILURE
+ */
 int
 rds_get_ibaddr(ipaddr_t srcip, ipaddr_t destip, ib_gid_t *sgid, ib_gid_t *dgid)
 {
-	rds_get_ibaddr_args_t *argsp;
-	int		ret;
+	rds_get_ibaddr_args_t	*argsp;
+	ibt_path_info_t		pinfo;
+	ibt_path_attr_t		pattr;
+	int			ret;
 
 	RDS_DPRINTF4("rds_get_ibaddr", "Enter: src: 0x%x dest: 0x%x", srcip,
 	    destip);
@@ -422,20 +427,48 @@ rds_get_ibaddr(ipaddr_t srcip, ipaddr_t destip, ib_gid_t *sgid, ib_gid_t *dgid)
 	mutex_init(&argsp->lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&argsp->cv, NULL, CV_DRIVER, NULL);
 
+	/*
+	 * To prevent cv_signal to be called before cv_wait grab the lock
+	 * before taskq_dispatch
+	 */
+	mutex_enter(&argsp->lock);
+
 	ret = ddi_taskq_dispatch(rds_taskq, rds_get_ibaddr_impl,
 	    (void *)argsp, DDI_NOSLEEP);
 	if (ret != DDI_SUCCESS) {
 		RDS_DPRINTF1(LABEL, "Taskq dispatch failed");
+		mutex_exit(&argsp->lock);
+		cv_destroy(&argsp->cv);
+		mutex_destroy(&argsp->lock);
+		kmem_free(argsp, sizeof (rds_get_ibaddr_args_t));
 		return (ret);
 	}
 
-	mutex_enter(&argsp->lock);
+	/* wait here for rds_get_ibaddr_impl to complete */
 	cv_wait(&argsp->cv, &argsp->lock);
 	mutex_exit(&argsp->lock);
 
 	ret = argsp->ret;
 	*sgid = argsp->sgid;
 	*dgid = argsp->dgid;
+
+	if (ret == 0) {
+		/*
+		 * Sometimes arp returns the gids from the cache even when
+		 * the port is down. So, check here if there is actually an
+		 * available path to the destination
+		 */
+		bzero(&pattr, sizeof (ibt_path_attr_t));
+		pattr.pa_dgids = &argsp->dgid;
+		pattr.pa_sgid = argsp->sgid;
+		pattr.pa_num_dgids = 1;
+		ret = ibt_get_paths(rdsib_statep->rds_ibhdl, IBT_PATH_NO_FLAGS,
+		    &pattr, 1, &pinfo, NULL);
+		if (ret != IBT_SUCCESS) {
+			RDS_DPRINTF2("rds_get_ibaddr",
+			    "ibt_get_paths failed: %d", ret);
+		}
+	}
 
 	cv_destroy(&argsp->cv);
 	mutex_destroy(&argsp->lock);

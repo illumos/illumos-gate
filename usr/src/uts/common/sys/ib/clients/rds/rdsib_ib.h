@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -117,10 +117,10 @@ extern uint_t		rds_poll_percent_full;
 extern uint_t		rds_wc_signal;
 extern uint_t		rds_waittime_ms;
 
-/* local port map */
+/* loopback port map */
 #define			RDS_PORT_MAP_SIZE	8192
-extern krwlock_t	rds_local_portmap_lock;
-extern uint8_t		rds_local_portmap[RDS_PORT_MAP_SIZE];
+extern krwlock_t	rds_loopback_portmap_lock;
+extern uint8_t		rds_loopback_portmap[RDS_PORT_MAP_SIZE];
 
 extern ddi_taskq_t	*rds_taskq;
 extern uint_t		rds_rx_pkts_pending_hwm; /* readonly */

@@ -193,11 +193,12 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 	rw_enter(&sp->session_lock, RW_WRITER);
 
 	/* catch peer-to-peer case as soon as possible */
-	if (sp->session_state == RDS_SESSION_STATE_CREATED) {
+	if ((sp->session_state == RDS_SESSION_STATE_CREATED) ||
+	    (sp->session_state == RDS_SESSION_STATE_INIT)) {
 		/* Check possible peer-to-peer case here */
 		if (sp->session_type != RDS_SESSION_PASSIVE) {
-			RDS_DPRINTF2(LABEL, "SP(%p) Peer-peer connection "
-			    "handling", sp);
+			RDS_DPRINTF2("rds_handle_cm_req",
+			    "SP(%p) Peer-peer connection handling", sp);
 			if (lgid.gid_guid > rgid.gid_guid) {
 				/* this node is active so reject this request */
 				rw_exit(&sp->session_lock);
@@ -205,7 +206,6 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 			} else {
 				/* this node is passive, change the session */
 				sp->session_type = RDS_SESSION_PASSIVE;
-				sp->session_myip = cmp.cmp_remip;
 				sp->session_lgid = lgid;
 				sp->session_rgid = rgid;
 			}
@@ -261,6 +261,9 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 		 * Initialize both channels, we accept this connection
 		 * only if both channels are initialized
 		 */
+		sp->session_type = RDS_SESSION_PASSIVE;
+		sp->session_lgid = lgid;
+		sp->session_rgid = rgid;
 		sp->session_state = RDS_SESSION_STATE_CREATED;
 		RDS_DPRINTF3("rds_handle_cm_req", "SP(%p) State "
 		    "RDS_SESSION_STATE_CREATED", sp);
@@ -279,10 +282,37 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 
 		/* FALLTHRU */
 	case RDS_SESSION_STATE_INIT:
-		if (cmp.cmp_eptype == RDS_EP_TYPE_CTRL) {
-			ep = &sp->session_ctrlep;
-		} else {
+		/*
+		 * When re-using an existing session, make sure the
+		 * session is still through the same HCA. Otherwise, the
+		 * memory registrations have to moved to the new HCA.
+		 */
+		if (cmp.cmp_eptype == RDS_EP_TYPE_DATA) {
+			if (sp->session_lgid.gid_guid != lgid.gid_guid) {
+				RDS_DPRINTF2("rds_handle_cm_req",
+				    "Existing Session but different gid "
+				    "existing: 0x%llx, new: 0x%llx, "
+				    "sending an MRA",
+				    sp->session_lgid.gid_guid, lgid.gid_guid);
+				(void) ibt_cm_delay(IBT_CM_DELAY_REQ,
+				    evp->cm_session_id, 10000000 /* 10 sec */,
+				    NULL, 0);
+				ret = rds_session_reinit(sp, lgid);
+				if (ret != 0) {
+					rds_session_fini(sp);
+					sp->session_state =
+					    RDS_SESSION_STATE_FAILED;
+					sp->session_failover = 0;
+					RDS_DPRINTF3("rds_failover_session",
+					    "SP(%p) State "
+					    "RDS_SESSION_STATE_FAILED", sp);
+					rw_exit(&sp->session_lock);
+					return (IBT_CM_REJECT);
+				}
+			}
 			ep = &sp->session_dataep;
+		} else {
+			ep = &sp->session_ctrlep;
 		}
 
 		break;
@@ -293,10 +323,11 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 		return (IBT_CM_REJECT);
 	}
 
+	sp->session_failover = 0; /* reset any previous value */
 	if (cmp.cmp_failover) {
 		RDS_DPRINTF2("rds_handle_cm_req",
 		    "SP(%p) Failover Session (BP %p)", sp, cmp.cmp_last_bufid);
-		sp->session_failover = cmp.cmp_failover;
+		sp->session_failover = 1;
 	}
 
 	mutex_enter(&ep->ep_lock);
@@ -312,7 +343,8 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 		 * greater port guid becomes active and the
 		 * other becomes passive.
 		 */
-		RDS_DPRINTF2(LABEL, "EP(%p) Peer-peer connection handling", ep);
+		RDS_DPRINTF2("rds_handle_cm_req",
+		    "EP(%p) Peer-peer connection handling", ep);
 		if (lgid.gid_guid > rgid.gid_guid) {
 			/* this node is active so reject this request */
 			mutex_exit(&ep->ep_lock);

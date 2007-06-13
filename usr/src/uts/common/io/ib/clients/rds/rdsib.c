@@ -62,7 +62,7 @@ extern void rdsib_close_ib();
 extern void rds_resume_port(in_port_t port);
 extern int rds_sendmsg(uio_t *uiop, ipaddr_t sendip, ipaddr_t recvip,
     in_port_t sendport, in_port_t recvport, zoneid_t zoneid);
-extern boolean_t rds_if_lookup_by_name(char *if_name);
+extern boolean_t rds_if_lookup_by_name(char *devname);
 
 rds_transport_ops_t rds_ib_transport_ops = {
 	rdsib_open_ib,
@@ -74,8 +74,8 @@ rds_transport_ops_t rds_ib_transport_ops = {
 
 /* global */
 rds_state_t	*rdsib_statep = NULL;
-krwlock_t	rds_local_portmap_lock;
-uint8_t		rds_local_portmap[RDS_PORT_MAP_SIZE];
+krwlock_t	rds_loopback_portmap_lock;
+uint8_t		rds_loopback_portmap[RDS_PORT_MAP_SIZE];
 ddi_taskq_t	*rds_taskq = NULL;
 dev_info_t	*rdsib_dev_info = NULL;
 uint_t		rds_rx_pkts_pending_hwm;
@@ -157,8 +157,8 @@ rdsib_init()
 	rw_init(&rdsib_statep->rds_sessionlock, NULL, RW_DRIVER, NULL);
 	rw_init(&rdsib_statep->rds_hca_lock, NULL, RW_DRIVER, NULL);
 
-	rw_init(&rds_local_portmap_lock, NULL, RW_DRIVER, NULL);
-	bzero(rds_local_portmap, RDS_PORT_MAP_SIZE);
+	rw_init(&rds_loopback_portmap_lock, NULL, RW_DRIVER, NULL);
+	bzero(rds_loopback_portmap, RDS_PORT_MAP_SIZE);
 
 	mutex_init(&rds_dpool.pool_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&rds_dpool.pool_cv, NULL, CV_DRIVER, NULL);
@@ -188,7 +188,7 @@ rdsib_fini()
 	cv_destroy(&rds_cpool.pool_cv);
 	mutex_destroy(&rds_cpool.pool_lock);
 
-	rw_destroy(&rds_local_portmap_lock);
+	rw_destroy(&rds_loopback_portmap_lock);
 
 	rw_destroy(&rdsib_statep->rds_hca_lock);
 	rw_destroy(&rdsib_statep->rds_sessionlock);

@@ -155,7 +155,7 @@ rds_bufpool_t		rds_cpool; /* ctrl pool */
 /* defined in rds_buf.c */
 int rds_init_recv_caches(rds_state_t *statep);
 void rds_free_recv_caches(rds_state_t *statep);
-int rds_init_send_pool(struct rds_ep_s *ep);
+int rds_init_send_pool(struct rds_ep_s *ep, ib_guid_t hca_guid);
 int rds_reinit_send_pool(struct rds_ep_s *ep, ib_guid_t hca_guid);
 void rds_free_send_pool(struct rds_ep_s *ep);
 int rds_init_recv_pool(struct rds_ep_s *ep);
