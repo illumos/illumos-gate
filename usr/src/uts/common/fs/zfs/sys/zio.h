@@ -303,6 +303,7 @@ extern zio_t *zio_write_phys(zio_t *pio, vdev_t *vd, uint64_t offset,
 extern int zio_alloc_blk(spa_t *spa, uint64_t size, blkptr_t *new_bp,
     blkptr_t *old_bp, uint64_t txg);
 extern void zio_free_blk(spa_t *spa, blkptr_t *bp, uint64_t txg);
+extern void zio_flush_vdev(spa_t *spa, uint64_t vdev, zio_t **zio);
 
 extern int zio_wait(zio_t *zio);
 extern void zio_nowait(zio_t *zio);

@@ -538,23 +538,6 @@ zil_add_vdev(zilog_t *zilog, uint64_t vdev)
 	}
 }
 
-/* start an async flush of the write cache for this vdev */
-void
-zil_flush_vdev(spa_t *spa, uint64_t vdev, zio_t **zio)
-{
-	vdev_t *vd;
-
-	if (*zio == NULL)
-		*zio = zio_root(spa, NULL, NULL, ZIO_FLAG_CANFAIL);
-
-	vd = vdev_lookup_top(spa, vdev);
-	ASSERT(vd);
-
-	(void) zio_nowait(zio_ioctl(*zio, spa, vd, DKIOCFLUSHWRITECACHE,
-	    NULL, NULL, ZIO_PRIORITY_NOW,
-	    ZIO_FLAG_CANFAIL | ZIO_FLAG_DONT_RETRY));
-}
-
 void
 zil_flush_vdevs(zilog_t *zilog)
 {
@@ -574,14 +557,14 @@ zil_flush_vdevs(zilog_t *zilog)
 		for (j = 0; j < 8; j++) {
 			if (b & (1 << j)) {
 				vdev = (i << 3) + j;
-				zil_flush_vdev(spa, vdev, &zio);
+				zio_flush_vdev(spa, vdev, &zio);
 			}
 		}
 		zilog->zl_vdev_bmap[i] = 0;
 	}
 
 	while ((zv = list_head(&zilog->zl_vdev_list)) != NULL) {
-		zil_flush_vdev(spa, zv->vdev, &zio);
+		zio_flush_vdev(spa, zv->vdev, &zio);
 		list_remove(&zilog->zl_vdev_list, zv);
 		kmem_free(zv, sizeof (zil_vdev_t));
 	}

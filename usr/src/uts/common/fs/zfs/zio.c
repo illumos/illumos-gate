@@ -1810,3 +1810,29 @@ zio_free_blk(spa_t *spa, blkptr_t *bp, uint64_t txg)
 
 	spa_config_exit(spa, FTAG);
 }
+
+/*
+ * start an async flush of the write cache for this vdev
+ */
+void
+zio_flush_vdev(spa_t *spa, uint64_t vdev, zio_t **zio)
+{
+	vdev_t *vd;
+
+	/*
+	 * Lock out configuration changes.
+	 */
+	spa_config_enter(spa, RW_READER, FTAG);
+
+	if (*zio == NULL)
+		*zio = zio_root(spa, NULL, NULL, ZIO_FLAG_CANFAIL);
+
+	vd = vdev_lookup_top(spa, vdev);
+	ASSERT(vd);
+
+	(void) zio_nowait(zio_ioctl(*zio, spa, vd, DKIOCFLUSHWRITECACHE,
+	    NULL, NULL, ZIO_PRIORITY_NOW,
+	    ZIO_FLAG_CANFAIL | ZIO_FLAG_DONT_RETRY));
+
+	spa_config_exit(spa, FTAG);
+}
