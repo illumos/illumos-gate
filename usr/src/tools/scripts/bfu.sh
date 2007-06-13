@@ -3337,6 +3337,33 @@ remove_properties() {
 	rm -f $tmpbootenvrc
 }
 
+rbac_cleanup()
+{
+# This is a copy of the RBAC portions of the SUNWcsr postinstall
+# We need to ensure that the RBAC profiles are self-consistent
+# as refinements are made that add granularity to the profiles
+
+	print "Cleaning up old RBAC profiles... \c"
+	auth_attr=$rootprefix/etc/security/auth_attr
+	exec_attr=$rootprefix/etc/security/exec_attr
+
+	if [ -f $auth_attr ]; then
+		sed '/^solaris\.\*/d' $auth_attr > /tmp/a.$$
+		cp /tmp/a.$$ $auth_attr
+		rm -f /tmp/a.$$
+	fi
+
+	if [ -f $exec_attr ]; then
+		sed -e '/^Network Security.*sbin\/ipsec.*/ D' \
+		-e '/^Network Security.*sbin\/ike.*/ D' \
+		-e '/^Network Security.*inet\/in\.iked.*/ D' \
+		-e '/^Network Security.*inet\/cert.*/ D' $exec_attr > /tmp/e.$$
+		cp /tmp/e.$$ $exec_attr
+		rm -f /tmp/e.$$
+	fi
+	print "\n"
+}
+
 enable_crypto_unlimited()
 {
 # This is a "copy" of the SUNWcry* postinstall scripts.
@@ -6877,6 +6904,9 @@ mondo_loop() {
 
 	# Cleanup old Kerberos mechanisms
 	cleanup_kerberos_mechanisms
+
+	# Cleanup old RBAC profiles
+	rbac_cleanup
 
 	# Fix network datalink configuration
 	if [ $zone = global -a $need_datalink = yes ]; then

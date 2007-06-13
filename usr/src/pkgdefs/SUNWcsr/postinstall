@@ -71,6 +71,16 @@ if [ -f $AUTH_ATTR ] ; then
 	rm -f /tmp/a.$$
 fi
 
+EXEC_ATTR=$BASEDIR/etc/security/exec_attr
+if [ -f $EXEC_ATTR ] ; then
+	sed -e '/^Network Security.*sbin\/ipsec.*/ D' \
+	    -e '/^Network Security.*sbin\/ike.*/ D' \
+	    -e '/^Network Security.*inet\/in\.iked.*/ D' \
+	    -e '/^Network Security.*inet\/cert.*/ D' $EXEC_ATTR > /tmp/e.$$
+	cp /tmp/e.$$ $EXEC_ATTR
+	rm -f /tmp/e.$$
+fi
+
 INITTAB=$BASEDIR/etc/inittab
 if [ -f $INITTAB -a -n "$SUNW_PKG_INSTALL_ZONENAME" -a \
     "$SUNW_PKG_INSTALL_ZONENAME" != "global" ]; then

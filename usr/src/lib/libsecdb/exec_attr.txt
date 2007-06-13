@@ -195,14 +195,14 @@ Network Management:suser:cmd:::/usr/sbin/snoop:uid=0
 Network Management:suser:cmd:::/usr/sbin/spray:euid=0
 Network Link Security:solaris:cmd:::/sbin/dladm:euid=dladm;egid=sys;\
 	privs=sys_net_config,net_rawaccess,proc_audit
-Network IPsec Management:solaris:cmd:::/usr/lib/inet/certdb:euid=0
-Network IPsec Management:solaris:cmd:::/usr/lib/inet/certlocal:euid=0
-Network IPsec Management:solaris:cmd:::/usr/lib/inet/certrldb:euid=0
+Network IPsec Management:solaris:cmd:::/usr/lib/inet/certdb:euid=0;privs=none
+Network IPsec Management:solaris:cmd:::/usr/lib/inet/certlocal:euid=0;privs=none
+Network IPsec Management:solaris:cmd:::/usr/lib/inet/certrldb:euid=0;privs=none
 Network IPsec Management:solaris:cmd:::/usr/lib/inet/in.iked:euid=0
-Network IPsec Management:solaris:cmd:::/usr/sbin/ikeadm:euid=0
-Network IPsec Management:solaris:cmd:::/usr/sbin/ikecert:euid=0
-Network IPsec Management:solaris:cmd:::/usr/sbin/ipsecconf:euid=0
-Network IPsec Management:solaris:cmd:::/usr/sbin/ipseckey:uid=0
+Network IPsec Management:solaris:cmd:::/usr/sbin/ikeadm:euid=0;privs=file_dac_write
+Network IPsec Management:solaris:cmd:::/usr/sbin/ikecert:euid=0;privs=none
+Network IPsec Management:solaris:cmd:::/usr/sbin/ipsecconf:euid=0;privs=sys_ip_config
+Network IPsec Management:solaris:cmd:::/usr/sbin/ipseckey:uid=0;privs=sys_ip_config
 Network IPsec Management:solaris:cmd:::/usr/sbin/ipsecalgs:privs=sys_ip_config
 Network IPsec Management:suser:cmd:::/usr/lib/inet/certdb:euid=0
 Network IPsec Management:suser:cmd:::/usr/lib/inet/certlocal:euid=0
