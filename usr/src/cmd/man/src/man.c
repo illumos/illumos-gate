@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1986-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -245,7 +244,7 @@ static void more(char **, int);
 static void cleanup(char **);
 static void bye(int);
 static char **split(char *, char);
-static void fullpaths(struct man_node *);
+static void fullpaths(struct man_node **);
 static void lower(char *);
 static int cmp(const void *, const void *);
 static void manual(struct man_node *, char *);
@@ -262,6 +261,7 @@ static int get_manconfig(FILE *, char *);
 static void	malloc_error(void);
 static int	sgmlcheck(const char *);
 static char *map_section(char *, char *);
+static void free_manp(struct man_node *manp);
 
 /*
  * This flag is used when the SGML-to-troff converter
@@ -457,7 +457,7 @@ doargs:
 	}
 	free(pathv);
 
-	fullpaths(manpage);
+	fullpaths(&manpage);
 
 	if (catmando) {
 		catman(manpage, argv+optind, argc-optind);
@@ -1274,33 +1274,72 @@ split(char *s1, char sep)
  */
 
 static void
-fullpaths(struct man_node *manp)
+fullpaths(struct man_node **manp_head)
 {
-	char *cwd;
+	char *cwd = NULL;
 	char *p;
+	char cwd_gotten = 0;
+	struct man_node *manp = *manp_head;
 	struct man_node *b;
+	struct man_node *prev = NULL;
 
-	if ((cwd = getcwd(NULL, MAXPATHLEN+1)) == (char *)NULL) {
-		perror("getcwd");
-		exit(1);
-	}
 	for (b = manp; b != NULL; b = b->next) {
-		if (*(b->path) == '/')
+		if (*(b->path) == '/') {
+			prev = b;
 			continue;
-		if ((p = malloc(strlen(b->path)+strlen(cwd)+2)) == NULL) {
-			malloc_error();
 		}
-		(void) sprintf(p, "%s/%s", cwd, b->path);
-		/*
-		 * resetting b->path
-		 */
-		free(b->path);
-		b->path = p;
+
+		/* try to get cwd if haven't already */
+		if (!cwd_gotten) {
+			cwd = getcwd(NULL, MAXPATHLEN+1);
+			cwd_gotten = 1;
+		}
+
+		if (cwd) {
+			/* case: relative manpath with cwd: make absolute */
+			if ((p = malloc(strlen(b->path)+strlen(cwd)+2)) ==
+			    NULL) {
+				malloc_error();
+			}
+			(void) sprintf(p, "%s/%s", cwd, b->path);
+			/*
+			 * resetting b->path
+			 */
+			free(b->path);
+			b->path = p;
+		} else {
+			/* case: relative manpath but no cwd: omit path entry */
+			if (prev)
+				prev->next = b->next;
+			else
+				*manp_head = b->next;
+
+			free_manp(b);
+		}
 	}
 	/*
 	 * release memory allocated by getcwd()
 	 */
 	free(cwd);
+}
+
+/*
+ * Free a man_node structure and its contents
+ */
+
+static void
+free_manp(struct man_node *manp)
+{
+	char **p;
+
+	free(manp->path);
+	p = manp->secv;
+	while ((p != NULL) && (*p != NULL)) {
+		free(*p);
+		p++;
+	}
+	free(manp->secv);
+	free(manp);
 }
 
 
