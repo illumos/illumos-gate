@@ -263,6 +263,9 @@ PSARC 2004/619: RULE W2: usr/lib/amd64/watchmalloc.so.1
 4480868: RULE W3: lib/libctf.so.1
 4480868: RULE W3: lib/libdevice.so.1
 4480868: RULE W3: lib/libdhcpagent.so.1
+6549358: RULE W3: lib/libdladm.so.1
+6549358: RULE W3: lib/amd64/libdladm.so.1
+6549358: RULE W3: lib/sparcv9/libdladm.so.1
 4480868: RULE W3: usr/lib/libdhcpsvc.so.1
 4480868: RULE W3: lib/libdhcputil.so.1
 4480868: RULE W3: lib/libdoor.so.1
