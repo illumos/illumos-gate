@@ -308,8 +308,8 @@ retry:
 			struct passwd *pw = getpwnam(arg);
 			if (pw == NULL) {
 				(void) fprintf(stderr,
-					"%s: invalid username: %s\n",
-					command, arg);
+				    "%s: invalid username: %s\n",
+				    command, arg);
 				retc = 1;
 				continue;
 			}
@@ -440,6 +440,25 @@ ctsort(ctid_t ctid, ps_t *p)
 	pp->start.tv_sec = st.st_ctime;
 	insertchild(pp, p);
 
+	pp->zoneid = ct_status_get_zoneid(hdl);
+	/*
+	 * In a zlogin <zonename>, the contract belongs to the
+	 * global zone and the shell opened belongs to <zonename>.
+	 * If the -c and -z zonename flags are used together, then
+	 * we need to adjust the zoneid in the contract's ps_t as 
+	 * follows:
+	 * 
+	 * ptree -c -z <zonename> --> zoneid == p->zoneid
+	 * ptree -c -z global     --> zoneid == pp->zoneid
+	 *
+	 * The approach assumes that no tool can create processes in
+	 * different zones under the same contract. If this is
+	 * possible, ptree will need to refactor how it builds
+	 * its internal tree of ps_t's
+	 */
+	if (zflag && p->zoneid != pp->zoneid &&
+	    (zoneid == p->zoneid || zoneid == pp->zoneid))
+		pp->zoneid = p->zoneid;
 	if (ct_status_get_state(hdl) == CTS_OWNED) {
 		pp->ppid = ct_status_get_holder(hdl);
 		prsort(pp);
@@ -463,7 +482,8 @@ prsort(ps_t *p)
 		pp = ps[n];
 
 		if (pp != NULL && p != pp && p->ppid == pp->pid) {
-			if (cflag && p->pid >= 0 && p->ctid != pp->ctid) {
+			if (cflag && p->pid >= 0 &&
+			    p->ctid != -1 && p->ctid != pp->ctid) {
 				ctsort(p->ctid, p);
 			} else {
 				insertchild(pp, p);
