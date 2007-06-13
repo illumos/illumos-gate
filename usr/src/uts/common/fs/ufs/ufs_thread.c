@@ -152,14 +152,18 @@ ufs_thread_suspend(struct ufs_q *uq)
 			cv_wait(&uq->uq_cv, &uq->uq_mutex);
 		}
 
+		uq->uq_flags |= (UQ_SUSPEND | UQ_WAIT);
+
 		/*
 		 * wait for the thread to suspend itself
 		 */
-		uq->uq_flags |= UQ_SUSPEND;
+		if ((uq->uq_flags & UQ_SUSPENDED) == 0 &&
+		    (uq->uq_threadp != NULL)) {
+			cv_broadcast(&uq->uq_cv);
+		}
+
 		while (((uq->uq_flags & UQ_SUSPENDED) == 0) &&
 		    (uq->uq_threadp != NULL)) {
-			uq->uq_flags |= UQ_WAIT;
-			cv_broadcast(&uq->uq_cv);
 			cv_wait(&uq->uq_cv, &uq->uq_mutex);
 		}
 	}
@@ -566,16 +570,19 @@ void
 ufs_sync_with_thread(struct ufs_q *uq)
 {
 	mutex_enter(&uq->uq_mutex);
-	uq->uq_flags |= UQ_WAIT;
+
 	/*
-	 * Someone other than the thread we're interested in might
-	 * send a signal, so make sure the thread's given an
-	 * acknowledgement.
+	 * Wake up delete thread to free up space.
 	 */
-	while ((uq->uq_threadp != NULL) && (uq->uq_flags & UQ_WAIT)) {
+	if ((uq->uq_flags & UQ_WAIT) == 0) {
+		uq->uq_flags |= UQ_WAIT;
 		cv_broadcast(&uq->uq_cv);
+	}
+
+	while ((uq->uq_threadp != NULL) && (uq->uq_flags & UQ_WAIT)) {
 		cv_wait(&uq->uq_cv, &uq->uq_mutex);
 	}
+
 	mutex_exit(&uq->uq_mutex);
 }
 
@@ -593,9 +600,23 @@ ufs_delete_drain_wait(struct ufsvfs *ufsvfsp, int dolockfs)
 {
 	struct ufs_q *uq = &ufsvfsp->vfs_delete;
 	int	error;
+	struct ufs_q    *delq = &ufsvfsp->vfs_delete;
+	struct ufs_delq_info *delq_info = &ufsvfsp->vfs_delete_info;
 
-	(void) ufs_delete_drain(ufsvfsp->vfs_vfs, 0, dolockfs);
-	ufs_sync_with_thread(uq);
+	/*
+	 * If there is something on delq or delete thread
+	 * working on delq.
+	 */
+	mutex_enter(&delq->uq_mutex);
+	if (delq_info->delq_unreclaimed_files > 0) {
+		mutex_exit(&delq->uq_mutex);
+		(void) ufs_delete_drain(ufsvfsp->vfs_vfs, 0, dolockfs);
+		ufs_sync_with_thread(uq);
+	} else {
+		ASSERT(delq_info->delq_unreclaimed_files == 0);
+		mutex_exit(&delq->uq_mutex);
+		return;
+	}
 
 	/*
 	 * Commit any outstanding transactions to make sure
