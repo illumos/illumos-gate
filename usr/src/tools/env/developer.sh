@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -138,7 +138,7 @@ UT_NO_USAGE_TRACKING="1"; export UT_NO_USAGE_TRACKING
 #
 #BUILD_TOOLS=/opt;				export BUILD_TOOLS
 #ONBLD_TOOLS=/opt/onbld;			export ONBLD_TOOLS
-#SPRO_ROOT=/opt/SUNspro;			export SPRO_ROOT
+#SPRO_ROOT=/opt/SUNWspro;			export SPRO_ROOT
 
 # This goes along with lint - it is a series of the form "A [y|n]" which
 # means "go to directory A and run 'make lint'" Then mail me (y) the

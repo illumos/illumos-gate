@@ -560,7 +560,7 @@ spec_open(struct vnode **vpp, int flag, struct cred *cr)
 	ASSERT((dip == NULL) || i_ddi_devi_attached(dip));
 #endif  /* DEBUG */
 
-	if ((error = secpolicy_spec_open(cr, cvp, flag)) != 0)
+	if ((error = secpolicy_spec_open(cr, vp, flag)) != 0)
 		return (error);
 
 	maj = getmajor(dev);

@@ -227,6 +227,7 @@ SUBDIRS += \
 	hal		\
 	libshare	\
 	libipmi		\
+	libexacct/demo	\
 	$($(MACH)_SUBDIRS)
 
 sparc_SUBDIRS= .WAIT	\
@@ -503,7 +504,7 @@ libwanboot:	libnvpair libresolv libnsl libsocket libdevinfo libinetutil \
 		libdhcputil openssl
 libwanbootutil:	libnsl
 pam_modules:	libproject passwdutil $(SMARTCARD)
-libscf:		libuutil libmd
+libscf:		libuutil libmd libgen
 libinetsvc:	libscf
 librestart:	libuutil libscf
 ../cmd/sgs/libdl:	../cmd/sgs/libconv
@@ -517,6 +518,7 @@ libzpool:	libavl libumem libnvpair
 libsec:		libavl
 brand:		libc libsocket
 libshare:	libscf libzfs libuuid libfsmgt libsecdb
+libexacct/demo:	libexacct libproject libsocket libnsl
 
 #
 # The reason this rule checks for the existence of the
