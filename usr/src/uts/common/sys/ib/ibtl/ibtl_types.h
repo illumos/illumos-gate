@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,10 +95,23 @@ typedef enum ibt_selector_e {
  */
 typedef enum ibt_srate_e {
 	IBT_SRATE_NOT_SPECIFIED	= 0,
-	IBT_SRATE_1X		= 2,
-	IBT_SRATE_4X		= 3,
-	IBT_SRATE_12X		= 4
+	IBT_SRATE_2		= 2,	/*  1X SDR i.e 2.5 Gbps */
+	IBT_SRATE_10		= 3,	/*  4X SDR or 1X QDR i.e 10 Gbps */
+	IBT_SRATE_30		= 4,	/* 12X SDR i.e 30 Gbps */
+
+	IBT_SRATE_5		= 5,	/*  1X DDR i.e  5 Gbps */
+	IBT_SRATE_20		= 6,	/*  4X DDR or 8X SDR i.e 20 Gbps */
+	IBT_SRATE_40		= 7,	/*  8X DDR or 4X QDR i.e 40 Gbps */
+
+	IBT_SRATE_60		= 8,	/* 12X DDR i.e 60 Gbps */
+	IBT_SRATE_80		= 9,	/*  8X QDR i.e 80 Gbps */
+	IBT_SRATE_120		= 10	/* 12X QDR i.e 120 Gbps */
 } ibt_srate_t;
+
+/* retain old definition to be compatible with older bits. */
+#define	IBT_SRATE_1X	IBT_SRATE_2
+#define	IBT_SRATE_4X	IBT_SRATE_10
+#define	IBT_SRATE_12X	IBT_SRATE_30
 
 /*
  * Static rate request type.

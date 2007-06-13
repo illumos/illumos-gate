@@ -702,7 +702,7 @@ ibcm_process_get_paths(void *tq_arg)
 			    (retval != IBT_GIDS_NOT_FOUND)) {
 				IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_paths:"
 				    " Invalid DGIDs specified w/ APM Flag");
-				    goto path_error2;
+				goto path_error2;
 			}
 			IBTF_DPRINTF_L3(cmlog, "ibcm_process_get_paths: "
 			    "Found %d Comp DGID", dnum);
@@ -2024,7 +2024,7 @@ ibcm_fillin_loopbackinfo(ibtl_cm_port_list_t *sl, uint8_t index,
 	paths->pi_prim_cep_path.cep_adds_vect.av_src_path = 0;
 	paths->pi_prim_cep_path.cep_adds_vect.av_sgid_ix = sl->p_sgid_ix;
 	paths->pi_prim_cep_path.cep_adds_vect.av_port_num =
-	paths->pi_prim_cep_path.cep_hca_port_num = sl->p_port_num;
+	    paths->pi_prim_cep_path.cep_hca_port_num = sl->p_port_num;
 	paths->pi_prim_cep_path.cep_timeout = 0; /* To be filled in by CM. */
 	paths->pi_path_mtu = sl->p_mtu;		/* MTU */
 	paths->pi_prim_pkt_lt = 0;		/* Packet Life Time. */
@@ -2131,13 +2131,9 @@ ibcm_update_cep_info(sa_path_record_t *prec_resp, ibtl_cm_port_list_t *sl,
 		return (IBT_INVALID_PARAM);
 	}
 
-	switch (prec_resp->Rate) {
-	case IBT_SRATE_1X:
-	case IBT_SRATE_4X:
-	case IBT_SRATE_12X:
+	if (prec_resp->Rate) {
 		cep_p->cep_adds_vect.av_srate = prec_resp->Rate;
-		break;
-	default:
+	} else {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_update_cep_info: SRate (%d) from "
 		    "pathrecord is invalid, reject it.", prec_resp->Rate);
 		return (ibt_get_module_failure(IBT_FAILURE_IBSM, 0));
@@ -2475,7 +2471,8 @@ ibcm_saa_service_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 						/* Rec not found for Alt. */
 						for (j = 0; j < n_gids; j++) {
 							if (gidp[j].gid_prefix
-							== p_gid.gid_prefix) {
+							    ==
+							    p_gid.gid_prefix) {
 								a_gid = gidp[j];
 								break;
 							}
