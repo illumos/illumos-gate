@@ -3066,7 +3066,7 @@ pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 	pclass = pci_config_get8(config_handle, PCI_CONF_BASCLASS);
 	psubclass = pci_config_get8(config_handle, PCI_CONF_SUBCLASS);
 
-	if (!sub_sid)	/* XXX - different from pcicfg.e */
+	if (!sub_vid)
 		(void) sprintf(buffer, "%s%x,%x", nprefix, vid, did);
 	else
 		(void) sprintf(buffer, "%s%x,%x", nprefix, sub_vid, sub_sid);
@@ -3123,23 +3123,26 @@ pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
 	 */
 
 	do {
-		/* pci[ex]VVVV,DDDD.SSSS.ssss.RR */
-		(void) sprintf(buffer, "%s%x,%x.%x.%x.%x", pprefix,  vid, did,
-					sub_vid, sub_sid, revid);
-		compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
-		(void) strcpy(compat[n++], buffer);
+		if (sub_vid) {
+		    /* pci[ex]VVVV,DDDD.SSSS.ssss.RR */
+		    (void) sprintf(buffer, "%s%x,%x.%x.%x.%x", pprefix,
+			vid, did, sub_vid, sub_sid, revid);
+		    compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
+		    (void) strcpy(compat[n++], buffer);
 
-		/* pci[ex]VVVV,DDDD.SSSS.ssss */
-		(void) sprintf(buffer, "%s%x,%x.%x.%x", pprefix,  vid, did,
+		    /* pci[ex]VVVV,DDDD.SSSS.ssss */
+		    (void) sprintf(buffer, "%s%x,%x.%x.%x", pprefix,  vid, did,
 					sub_vid, sub_sid);
-		compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
-		(void) strcpy(compat[n++], buffer);
+		    compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
+		    (void) strcpy(compat[n++], buffer);
 
-		/* pciSSSS.ssss  -> not created for PCIe as per PCIe bindings */
-		if (!pcie_dev && pcicfg_do_legacy_props) {
+		    /* pciSSSS.ssss  -> not created for PCIe as per PCIe */
+		    /* binding to IEEE 1275 spec.			 */
+		    if (!pcie_dev && pcicfg_do_legacy_props) {
 			(void) sprintf(buffer, "pci%x,%x", sub_vid, sub_sid);
 			compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
 			(void) strcpy(compat[n++], buffer);
+		    }
 		}
 
 		/* pci[ex]VVVV,DDDD.RR */
