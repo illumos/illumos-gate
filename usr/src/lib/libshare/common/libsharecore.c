@@ -854,6 +854,7 @@ sa_parse_legacy_options(sa_group_t group, char *options, char *proto)
 	int ret = SA_INVALID_PROTOCOL;
 	sa_group_t parent;
 	int using_dummy = B_FALSE;
+	char *pvalue;
 
 	/*
 	 * if "group" is NULL, this is just a parse without saving
@@ -872,7 +873,7 @@ sa_parse_legacy_options(sa_group_t group, char *options, char *proto)
 
 	if (using_dummy) {
 	    /* Since this is a dummy parse, cleanup and quit here */
-	    (void) _sa_free_dummy_share(group);
+	    (void) _sa_free_dummy_share(parent);
 	    return (ret);
 	}
 	/*
@@ -891,24 +892,29 @@ sa_parse_legacy_options(sa_group_t group, char *options, char *proto)
 			popt != NULL;
 			popt = sa_get_next_property(popt)) {
 			char *tag;
-			char *value1;
-			char *value2;
+			char *value;
 
 			tag = sa_get_property_attr(popt, "type");
 			if (tag != NULL) {
 			    prop = sa_get_property(localoptions, tag);
 			    if (prop != NULL) {
-				value1 = sa_get_property_attr(popt, "value");
-				value2 = sa_get_property_attr(prop, "value");
-				if (value1 != NULL && value2 != NULL &&
-				    strcmp(value1, value2) == 0) {
-				    /* remove the property from the child */
-				    (void) _sa_remove_property(prop);
+				value = sa_get_property_attr(popt, "value");
+				pvalue = sa_get_property_attr(prop, "value");
+				if (value != NULL && pvalue != NULL &&
+				    strcmp(value, pvalue) == 0) {
+					/*
+					 * Remove the property from the
+					 * child. While we removed it, we
+					 * don't need to reset as we do
+					 * below since we always search
+					 * from the beginning.
+					 */
+					(void) _sa_remove_property(prop);
 				}
-				if (value1 != NULL)
-				    sa_free_attr_string(value1);
-				if (value2 != NULL)
-				    sa_free_attr_string(value2);
+				if (value != NULL)
+				    sa_free_attr_string(value);
+				if (pvalue != NULL)
+				    sa_free_attr_string(pvalue);
 			    }
 			    sa_free_attr_string(tag);
 			}
@@ -937,27 +943,34 @@ sa_parse_legacy_options(sa_group_t group, char *options, char *proto)
 			sa_security_t security;
 			tag = sa_get_property_attr(prop, "type");
 			if (tag != NULL) {
+			    sa_property_t nextpopt = NULL;
+
 			    security = sa_get_security(group, tag, proto);
 			    sa_free_attr_string(tag);
+			    /* prop's value only changes outside this loop */
+			    pvalue = sa_get_property_attr(prop, "value");
 			    for (popt = sa_get_property(security, NULL);
 				popt != NULL;
-				popt = sa_get_next_property(popt)) {
-				char *value1;
-				char *value2;
+				popt = nextpopt) {
+				char *value;
+				/*
+				 * Need to get the next prop now since
+				 * we could break the list during removal.
+				 */
+				nextpopt = sa_get_next_property(popt);
 
 				/* remove duplicates from this level */
-				value1 = sa_get_property_attr(popt, "value");
-				value2 = sa_get_property_attr(prop, "value");
-				if (value1 != NULL && value2 != NULL &&
-				    strcmp(value1, value2) == 0) {
-				    /* remove the property from the child */
-				    (void) _sa_remove_property(prop);
+				value = sa_get_property_attr(popt, "value");
+				if (value != NULL && pvalue != NULL &&
+				    strcmp(value, pvalue) == 0) {
+					/* remove the property from the child */
+					(void) _sa_remove_property(popt);
 				}
-				if (value1 != NULL)
-				    sa_free_attr_string(value1);
-				if (value2 != NULL)
-				    sa_free_attr_string(value2);
+				if (value != NULL)
+				    sa_free_attr_string(value);
 			    }
+			    if (pvalue != NULL)
+				sa_free_attr_string(pvalue);
 			}
 		    }
 		    (void) sa_destroy_optionset(localoptions);
