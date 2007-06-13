@@ -28,7 +28,6 @@
 # This script configures IP routing.
 
 . /lib/svc/share/smf_include.sh
-. /lib/svc/share/net_include.sh
 
 #
 # In a shared-IP zone we need this service to be up, but all of the work
@@ -61,11 +60,6 @@ nawk '/^ipv[46]-routing [.]*/ { print $2 }'  | /usr/bin/grep "current=enabled"`
 if [ -n "$dynamic_routing_test" ]; then
 	dynamic_routing="true"
 fi
-
-#
-# Add a static route for IPv6 multicast packets.
-#
-update_v6_multicast_route
 
 #
 # Configure default IPv4 routers using the local "/etc/defaultrouter"

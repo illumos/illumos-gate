@@ -456,7 +456,7 @@ ilm_update_add(ilm_t *ilm, ilg_stat_t ilgstat, slist_t *ilg_flist,
 	}
 
 	/* send the state change report */
-	if ((ill->ill_phyint->phyint_flags & PHYI_LOOPBACK) == 0) {
+	if (!IS_LOOPBACK(ill)) {
 		if (isv6)
 			mld_statechange(ilm, fmode, flist);
 		else
@@ -512,7 +512,7 @@ ilm_update_del(ilm_t *ilm, boolean_t isv6)
 		return (0);
 	}
 
-	if ((ill->ill_phyint->phyint_flags & PHYI_LOOPBACK) == 0) {
+	if (!IS_LOOPBACK(ill)) {
 		if (isv6)
 			mld_statechange(ilm, fmode, flist);
 		else
@@ -606,7 +606,7 @@ ip_addmulti(ipaddr_t group, ipif_t *ipif, ilg_stat_t ilgstat,
 		return (ret);
 	}
 
-	if ((ill->ill_phyint->phyint_flags & PHYI_LOOPBACK) == 0)
+	if (!IS_LOOPBACK(ill))
 		igmp_joingroup(ilm);
 
 	if (ilm_numentries_v6(ill, &v6group) > 1)
@@ -697,7 +697,7 @@ ip_addmulti_v6(const in6_addr_t *v6group, ill_t *ill, int orig_ifindex,
 		return (ret);
 	}
 
-	if ((ill->ill_phyint->phyint_flags & PHYI_LOOPBACK) == 0)
+	if (!IS_LOOPBACK(ill))
 		mld_joingroup(ilm);
 
 	/*
@@ -883,7 +883,7 @@ ip_delmulti(ipaddr_t group, ipif_t *ipif, boolean_t no_ilg, boolean_t leaving)
 		return (ret);
 	}
 
-	if ((ill->ill_phyint->phyint_flags & PHYI_LOOPBACK) == 0)
+	if (!IS_LOOPBACK(ill))
 		igmp_leavegroup(ilm);
 
 	ilm_delete(ilm);
@@ -977,7 +977,7 @@ ip_delmulti_v6(const in6_addr_t *v6group, ill_t *ill, int orig_ifindex,
 		return (ret);
 	}
 
-	if ((ill->ill_phyint->phyint_flags & PHYI_LOOPBACK) == 0)
+	if (!IS_LOOPBACK(ill))
 		mld_leavegroup(ilm);
 
 	ilm_delete(ilm);
@@ -1261,7 +1261,7 @@ ill_create_squery(ill_t *ill, ipaddr_t ipaddr, uint32_t addrlen,
 	area_t	*area;
 
 	mp = ill_arp_alloc(ill, (uchar_t *)&ip_aresq_template,
-				(caddr_t)&ipaddr);
+	    (caddr_t)&ipaddr);
 	if (!mp) {
 		freemsg(mp_tail);
 		return (NULL);
@@ -1364,7 +1364,7 @@ ill_create_dl(ill_t *ill, uint32_t dl_primitive, uint32_t length,
 	}
 	}
 	ip1dbg(("ill_create_dl: addr_len %d, addr_off %d\n",
-		*addr_lenp, *addr_offp));
+	    *addr_lenp, *addr_offp));
 	return (mp);
 }
 
@@ -1890,7 +1890,7 @@ ip_opt_check(conn_t *connp, ipaddr_t group, ipaddr_t src, ipaddr_t ifaddr,
 	ASSERT(!(ifaddr != INADDR_ANY && ifindexp != NULL && *ifindexp != 0));
 	if (ifaddr != INADDR_ANY) {
 		ipif = ipif_lookup_addr(ifaddr, NULL, zoneid,
-			CONNP_TO_WQ(connp), first_mp, func, &err, ipst);
+		    CONNP_TO_WQ(connp), first_mp, func, &err, ipst);
 		if (err != 0 && err != EINPROGRESS)
 			err = EADDRNOTAVAIL;
 	} else if (ifindexp != NULL && *ifindexp != 0) {
@@ -2231,7 +2231,7 @@ ip_set_srcfilter(conn_t *connp, struct group_filter *gf,
 	 * So we need to translate here.
 	 */
 	ilg->ilg_fmode = (infmode == MCAST_INCLUDE) ?
-		    MODE_IS_INCLUDE : MODE_IS_EXCLUDE;
+	    MODE_IS_INCLUDE : MODE_IS_EXCLUDE;
 
 	/*
 	 * Save copy of ilg's filter state to pass to other functions,
@@ -2614,7 +2614,7 @@ ip_extract_msfilter(queue_t *q, mblk_t *mp, ipif_t **ipifpp, ipsq_func_t func)
 				err = EADDRNOTAVAIL;
 		} else {
 			ipif = ipif_lookup_addr(v4addr, NULL, zoneid, q, mp,
-						func, &err, ipst);
+			    func, &err, ipst);
 		}
 	} else {
 		boolean_t isv6 = B_FALSE;

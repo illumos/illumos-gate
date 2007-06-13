@@ -236,6 +236,7 @@ extern	ipif_t	*ipif_lookup_group_v6(const in6_addr_t *, zoneid_t,
     ip_stack_t *);
 extern  ipif_t	*ipif_lookup_interface(ipaddr_t, ipaddr_t,
     queue_t *, mblk_t *, ipsq_func_t, int *, ip_stack_t *);
+extern	ipif_t	*ipif_lookup_multicast(ip_stack_t *, zoneid_t, boolean_t);
 extern	ipif_t	*ipif_lookup_remote(ill_t *, ipaddr_t, zoneid_t);
 extern	ipif_t	*ipif_lookup_onlink_addr(ipaddr_t, zoneid_t, ip_stack_t *);
 extern	ipif_t	*ipif_lookup_seqid(ill_t *, uint_t);

@@ -83,7 +83,16 @@ ipif_lookup_interface_v6(const in6_addr_t *if_addr, const in6_addr_t *dst,
     queue_t *q, mblk_t *mp, ipsq_func_t func, int *error, ip_stack_t *ipst);
 
 /*
- * ipif_lookup_group_v6
+ * These two functions, ipif_lookup_group_v6() and ill_lookup_group_v6(),
+ * are called when an application does not specify an interface to be
+ * used for multicast traffic.  It calls ire_lookup_multi_v6() to look
+ * for an interface route for the specified multicast group.  Doing
+ * this allows the administrator to add prefix routes for multicast to
+ * indicate which interface to be used for multicast traffic in the above
+ * scenario.  The route could be for all multicast (ff00::/8), for a single
+ * multicast group (a /128 route) or anything in between.  If there is no
+ * such multicast route, we just find any multicast capable interface and
+ * return it.
  */
 ipif_t *
 ipif_lookup_group_v6(const in6_addr_t *group, zoneid_t zoneid, ip_stack_t *ipst)
@@ -92,29 +101,38 @@ ipif_lookup_group_v6(const in6_addr_t *group, zoneid_t zoneid, ip_stack_t *ipst)
 	ipif_t	*ipif;
 
 	ire = ire_lookup_multi_v6(group, zoneid, ipst);
-	if (ire == NULL)
-		return (NULL);
-	ipif = ire->ire_ipif;
-	ipif_refhold(ipif);
-	ire_refrele(ire);
-	return (ipif);
+	if (ire != NULL) {
+		ipif = ire->ire_ipif;
+		ipif_refhold(ipif);
+		ire_refrele(ire);
+		return (ipif);
+	}
+
+	return (ipif_lookup_multicast(ipst, zoneid, B_TRUE));
 }
 
-/*
- * ill_lookup_group_v6
- */
 ill_t *
 ill_lookup_group_v6(const in6_addr_t *group, zoneid_t zoneid, ip_stack_t *ipst)
 {
 	ire_t	*ire;
 	ill_t	*ill;
+	ipif_t	*ipif;
 
 	ire = ire_lookup_multi_v6(group, zoneid, ipst);
-	if (ire == NULL)
+	if (ire != NULL) {
+		ill = ire->ire_ipif->ipif_ill;
+		ill_refhold(ill);
+		ire_refrele(ire);
+		return (ill);
+	}
+
+	ipif = ipif_lookup_multicast(ipst, zoneid, B_TRUE);
+	if (ipif == NULL)
 		return (NULL);
-	ill = ire->ire_ipif->ipif_ill;
+
+	ill = ipif->ipif_ill;
 	ill_refhold(ill);
-	ire_refrele(ire);
+	ipif_refrele(ipif);
 	return (ill);
 }
 
@@ -165,7 +183,7 @@ ipif_lookup_interface_v6(const in6_addr_t *if_addr, const in6_addr_t *dst,
 					mutex_exit(&ill->ill_lock);
 					rw_exit(&ipst->ips_ill_g_lock);
 					ipsq_enq(ipsq, q, mp, func, NEW_OP,
-						ill);
+					    ill);
 					mutex_exit(&ipsq->ipsq_lock);
 					RELEASE_CONN_LOCK(q);
 					*error = EINPROGRESS;
@@ -243,7 +261,7 @@ repeat:
 					mutex_exit(&ill->ill_lock);
 					rw_exit(&ipst->ips_ill_g_lock);
 					ipsq_enq(ipsq, q, mp, func, NEW_OP,
-						ill);
+					    ill);
 					mutex_exit(&ipsq->ipsq_lock);
 					RELEASE_CONN_LOCK(q);
 					*error = EINPROGRESS;
@@ -747,7 +765,7 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 	    mask,				/* mask */
 	    /* src address assigned by the caller? */
 	    (((flags & RTF_SETSRC) && !IN6_IS_ADDR_UNSPECIFIED(src_addr)) ?
-		src_addr : NULL),
+	    src_addr : NULL),
 	    gw_addr,				/* gateway address */
 	    &gw_ire->ire_max_frag,
 	    NULL,				/* no Fast Path header */
@@ -1376,7 +1394,7 @@ ipif_ndp_up(ipif_t *ipif, const in6_addr_t *addr)
 	nce_t		*mnce = NULL;
 
 	ip1dbg(("ipif_ndp_up(%s:%u)\n",
-		ipif->ipif_ill->ill_name, ipif->ipif_id));
+	    ipif->ipif_ill->ill_name, ipif->ipif_id));
 
 	/*
 	 * ND not supported on XRESOLV interfaces. If ND support (multicast)
@@ -1916,7 +1934,7 @@ rule_interface(cand_t *bc, cand_t *cc, const dstinfo_t *dstinfo,
 
 	cc->cand_matchedinterface = (cc->cand_ill == dstill ||
 	    (dstill->ill_group != NULL &&
-		dstill->ill_group == cc->cand_ill->ill_group));
+	    dstill->ill_group == cc->cand_ill->ill_group));
 	cc->cand_matchedinterface_set = B_TRUE;
 
 	if (bc->cand_matchedinterface == cc->cand_matchedinterface)
@@ -2794,7 +2812,7 @@ ipif_up_done_v6(ipif_t *ipif)
 	ip_stack_t	*ipst = ill->ill_ipst;
 
 	ip1dbg(("ipif_up_done_v6(%s:%u)\n",
-		ipif->ipif_ill->ill_name, ipif->ipif_id));
+	    ipif->ipif_ill->ill_name, ipif->ipif_id));
 
 	/* Check if this is a loopback interface */
 	if (ipif->ipif_ill->ill_wq == NULL)
@@ -2812,7 +2830,7 @@ ipif_up_done_v6(ipif_t *ipif)
 	 * we are writer
 	 */
 	for (tmp_ipif = ill->ill_ipif; tmp_ipif;
-		tmp_ipif = tmp_ipif->ipif_next) {
+	    tmp_ipif = tmp_ipif->ipif_next) {
 		if (((tmp_ipif->ipif_flags &
 		    (IPIF_NOXMIT|IPIF_ANYCAST|IPIF_NOLOCAL|IPIF_DEPRECATED)) ||
 		    !(tmp_ipif->ipif_flags & IPIF_UP)) ||
@@ -2842,7 +2860,7 @@ ipif_up_done_v6(ipif_t *ipif)
 		return (EINVAL);
 	}
 
-	if (ill->ill_phyint->phyint_flags & PHYI_LOOPBACK) {
+	if (IS_LOOPBACK(ill)) {
 		/*
 		 * lo0:1 and subsequent ipifs were marked IRE_LOCAL in
 		 * ipif_lookup_on_name(), but in the case of zones we can have
@@ -3007,7 +3025,7 @@ ipif_up_done_v6(ipif_t *ipif)
 		if (isdup == NULL) {
 			ip1dbg(("ipif_up_done_v6: creating if IRE %d for %s",
 			    IRE_IF_NORESOLVER, inet_ntop(AF_INET6, &v6addr,
-				buf2, sizeof (buf2))));
+			    buf2, sizeof (buf2))));
 
 			*irep++ = ire_create_v6(
 			    &prefix_addr,		/* 2002:: */

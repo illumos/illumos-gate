@@ -1766,6 +1766,10 @@ typedef struct ill_lso_capab_s ill_lso_capab_t;
 	(((ill)->ill_phyint->phyint_flags & (PHYI_LOOPBACK|PHYI_VIRTUAL)) == \
 	PHYI_VIRTUAL))
 
+/* Is this a loopback ILL? */
+#define	IS_LOOPBACK(ill) \
+	((ill)->ill_phyint->phyint_flags & PHYI_LOOPBACK)
+
 /*
  * IP Lower level Structure.
  * Instance data structure in ip_open when there is a device below us.

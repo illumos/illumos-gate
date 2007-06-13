@@ -23,7 +23,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # This is third phase of TCP/IP startup/configuration.  This script
@@ -32,7 +32,6 @@
 #
 
 . /lib/svc/share/smf_include.sh
-. /lib/svc/share/net_include.sh
 
 case "$1" in
 'start')
@@ -237,31 +236,6 @@ if /usr/bin/grep '# Added by DHCP$' /etc/inet/hosts >/dev/null 2>&1; then
 	}' /etc/inet/hosts > /tmp/hosts.$$
 	mv_file /tmp/hosts.$$ /etc/inet/hosts 444
 fi
-
-#
-# Add a static route for multicast packets out our default interface.
-# The default interface is the interface that corresponds to the node name.
-# Run in background subshell to avoid waiting for name service.
-#
-
-(
-if [ "$_INIT_NET_STRATEGY" = "dhcp" ]; then
-	mcastif=`/sbin/dhcpinfo Yiaddr` || mcastif=$_INIT_UTS_NODENAME
-else
-	mcastif=$_INIT_UTS_NODENAME
-fi
-
-echo "Setting default IPv4 interface for multicast:" \
-    "add net 224.0/4: gateway $mcastif"
-
-/usr/sbin/route -n add -interface 224.0/4 -gateway "$mcastif" >/dev/null
-) &
-
-#
-# NWAM-triggered interface changes may necessitate updating IPv6 multicast
-# route.
-#
-update_v6_multicast_route
 
 if [ -z "$SMF_FMRI" ] || [ "$SMF_FMRI" = "svc:/network/physical:nwam" ]; then
         exit 0
