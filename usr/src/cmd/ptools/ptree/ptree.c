@@ -445,11 +445,11 @@ ctsort(ctid_t ctid, ps_t *p)
 	 * In a zlogin <zonename>, the contract belongs to the
 	 * global zone and the shell opened belongs to <zonename>.
 	 * If the -c and -z zonename flags are used together, then
-	 * we need to adjust the zoneid in the contract's ps_t as 
+	 * we need to adjust the zoneid in the contract's ps_t as
 	 * follows:
-	 * 
+	 *
 	 * ptree -c -z <zonename> --> zoneid == p->zoneid
-	 * ptree -c -z global     --> zoneid == pp->zoneid
+	 * ptree -c -z global	  --> zoneid == pp->zoneid
 	 *
 	 * The approach assumes that no tool can create processes in
 	 * different zones under the same contract. If this is
