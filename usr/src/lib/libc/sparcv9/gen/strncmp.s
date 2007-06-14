@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,15 +18,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1997,1998 by Sun Microsystems, Inc.
- * All rights reserved.
- *
- *	.seg	"data"
- *	.asciz	"@(#)strncmp.s 1.2 89/08/16"
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-.ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 	.file	"%M%"
 
@@ -58,7 +55,7 @@
 	ENTRY(strncmp)
 	save	%sp, -SA(WINDOWSIZE), %sp
 	cmp	%i2, 8
-	blu,a,pn	%xcc, .cmp_bytes	! for small counts go do bytes
+	blu,a,pn %xcc, .cmp_bytes	! for small counts go do bytes
 	sub	%i0, %i1, %i0		! delay slot, get diff from s1 - s2
 	andcc	%i0, 3, %g0		! is s1 aligned
 1:	bz,pn	%icc, .iss2		! if so go check s2
@@ -97,7 +94,7 @@
 	sub	%i0, %i1, %i0
 2:
 	deccc	4, %i2			! n >= 4 ?
-	bgeu,pt	%xcc, 3f
+	bgeu,a,pt %xcc, 3f
 	lduw	[%i1], %i3		! delay slot
 	dec	%i1			! reset s2
 	inc	%i0			! reset s1 diff
@@ -147,7 +144,7 @@
 	sub	%i0, %i1, %i0
 3:
 	deccc	4, %i2			! n >= 4 ?
-	bgeu,pt	%xcc, 4f
+	bgeu,a,pt %xcc, 4f
 	lduw	[%i1], %i3		! delay slot
 	dec	3, %i1			! reset s2
 	inc	3, %i0			! reset s1 diff
@@ -191,7 +188,7 @@
 	sub	%i0, %i1, %i0
 4:
 	deccc	4, %i2			! n >= 4 ?
-	bgeu,pt	%xcc, 5f
+	bgeu,a,pt %xcc, 5f
 	lduw	[%i1], %i3		! delay slot
 	dec	2, %i1			! reset s2
 	inc	2, %i0			! reset s1 diff
@@ -229,7 +226,10 @@
 
 .w4cmp:	sub	%i0, %i1, %i0
 	lduw	[%i1], %i5		! read a word from s1
-5:
+5:	cmp	%i2, 0
+	be,a,pn	%xcc, .doneq
+	nop
+	lduw	[%i1], %i5		! read a word from s1
 	deccc	4, %i2			! n >= 4 ?
 	bcs,a,pn %xcc, .cmp_bytes	! do a byte at a time if n < 4
 	inc	4, %i2
@@ -244,8 +244,8 @@
 1:	xor	%l3, %i4, %l3
 	and	%l3, %l7, %l3
 	cmp	%l3, %l7
-	be,a,pt	%icc, 5b
-	lduw	[%i1], %i5
+	be,pt	%icc, 5b
+	nop
 
 	andcc	%i4, %l0, %g0		! check if first byte was zero
 	bnz,pt	%icc, 1f
