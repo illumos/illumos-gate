@@ -1065,7 +1065,7 @@ eri_setup_mac_address(struct eri *erip, dev_info_t *dip)
 	    "mac-address", &prop, &prop_len) == DDI_PROP_SUCCESS) {
 		if (prop_len >= ETHERADDRL) {
 			bcopy(prop, erip->ouraddr, ETHERADDRL);
-			kmem_free(prop, prop_len);
+			ddi_prop_free(prop);
 			return;
 		}
 		ddi_prop_free(prop);
