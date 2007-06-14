@@ -5175,6 +5175,17 @@ ipsec_conf_add(boolean_t just_check, boolean_t smf_managed)
 		if (ret != 0) {
 			warnx(gettext("form_ipsec_conf error"));
 			(void) print_cmd_buf(stderr, NOERROR);
+			/* Reset globals before trying the next rule. */
+			if (shp != NULL) {
+				freehostent(shp);
+				shp = NULL;
+			}
+			if (dhp != NULL) {
+				freehostent(dhp);
+				dhp = NULL;
+			}
+			splen = 0;
+			dplen = 0;
 			continue;
 		}
 
@@ -5339,6 +5350,7 @@ bail:
 	(void) fflush(stdout);
 #endif
 	if (!good_rules) {
+		nuke_adds();
 		(void) restore_all_signals();
 		(void) unlock(lfd);
 		EXIT_OK("Policy file does not contain any valid rules.");
@@ -5351,6 +5363,7 @@ bail:
 
 	if (num_rules != good_rules) {
 		/* This is an error */
+		nuke_adds();
 		(void) restore_all_signals();
 		(void) unlock(lfd);
 		EXIT_BADCONFIG2("%d policy rule(s) contained errors.",
