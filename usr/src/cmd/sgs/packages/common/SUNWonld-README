@@ -1242,3 +1242,5 @@ Bugid   Risk Synopsis
 5006034 need ?E mapfile feature extension (D)
 6561987 data vac_conflict faults on lipthread libthread libs in s10.
 6565476 rtld symbol version check prevents GNU ld binary from running
+6567670 ld(1) symbol size/section size verification uncovers Haskell
+	compiler inconsistency

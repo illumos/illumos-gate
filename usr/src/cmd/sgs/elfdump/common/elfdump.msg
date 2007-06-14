@@ -91,9 +91,9 @@
 @ MSG_ERR_BADSYM4	"%s: %s: bad symbol entry: %s: must be defined in \
 			 a non-SHF_TLS section\n"
 @ MSG_ERR_BADSYM5	"%s: %s: bad symbol entry: %s: invalid shndx: %d\n"
-@ MSG_ERR_BADSYM6	"%s: %s: bad symbol entry: %s: section[%d] size: %lld: \
-			 symbol (address %#llx, size %lld) lies outside \
-			 of containing section\n"
+@ MSG_ERR_BADSYM6	"%s: %s: bad symbol entry: %s: section[%d] \
+			 size: %#llx: symbol (address %#llx, size %#llx) \
+			 lies outside of containing section\n"
 
 @ MSG_ERR_RELBADSYMNDX	"%s: bad symbol reference %d: from relocation \
 			 entry: %d\n"

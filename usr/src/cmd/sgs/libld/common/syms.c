@@ -1611,6 +1611,48 @@ compare(const void * sdpp1, const void * sdpp2)
 
 
 /*
+ * Issue a MSG_SYM_BADADDR error from ld_sym_process(). This error
+ * is issued when a symbol address/size is not contained by the
+ * target section.
+ *
+ * Such objects are at least partially corrupt, and the user would
+ * be well advised to be skeptical of them, and to ask their compiler
+ * supplier to fix the problem. However, a distinction needs to be
+ * made between symbols that reference readonly text, and those that
+ * access writable data. Other than throwing off profiling results,
+ * the readonly section case is less serious. We have encountered
+ * such objects in the field. In order to allow existing objects
+ * to continue working, we issue a warning rather than a fatal error
+ * if the symbol is against readonly text. Other cases are fatal.
+ */
+static void
+issue_badaddr_msg(Ifl_desc *ifl, Ofl_desc *ofl, Sym_desc *sdp,
+    Sym *sym, Word shndx)
+{
+	Lword	flag;
+	Error	err;
+	const char *msg;
+
+	if ((sdp->sd_isc->is_shdr->sh_flags & (SHF_WRITE | SHF_ALLOC)) ==
+	    SHF_ALLOC) {
+		msg = MSG_INTL(MSG_SYM_BADADDR_ROTXT);
+		flag = FLG_OF_WARN;
+		err = ERR_WARNING;
+	} else {
+		msg = MSG_INTL(MSG_SYM_BADADDR);
+		flag = FLG_OF_FATAL;
+		err = ERR_FATAL;
+	}
+
+	eprintf(ofl->ofl_lml, err, msg, demangle(sdp->sd_name),
+	    ifl->ifl_name, shndx, sdp->sd_isc->is_name,
+	    EC_XWORD(sdp->sd_isc->is_shdr->sh_size),
+	    EC_XWORD(sym->st_value), EC_XWORD(sym->st_size));
+	ofl->ofl_flags |= flag;
+}
+
+
+/*
  * Process the symbol table for the specified input file.  At this point all
  * input sections from this input file have been assigned an input section
  * descriptor which is saved in the `ifl_isdesc' array.
@@ -1897,14 +1939,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 * If they don't, the ELF file is corrupt.
 			 */
 			if (etype_rel && SYM_LOC_BADADDR(sdp, sym, type)) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_SYM_BADADDR),
-				    demangle(sdp->sd_name), ifl->ifl_name,
-				    shndx, sdp->sd_isc->is_name,
-				    EC_XWORD(sdp->sd_isc->is_shdr->sh_size),
-				    EC_XWORD(sym->st_value),
-				    EC_XWORD(sym->st_size));
-				ofl->ofl_flags |= FLG_OF_FATAL;
+				issue_badaddr_msg(ifl, ofl, sdp, sym, shndx);
 				continue;
 			}
 
@@ -2163,14 +2198,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 
 			if (SYM_LOC_BADADDR(sdp, tsym,
 			    ELF_ST_TYPE(tsym->st_info))) {
-				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_SYM_BADADDR),
-				    demangle(sdp->sd_name), ifl->ifl_name,
-				    tsym->st_shndx, sdp->sd_isc->is_name,
-				    EC_XWORD(sdp->sd_isc->is_shdr->sh_size),
-				    EC_XWORD(tsym->st_value),
-				    EC_XWORD(tsym->st_size));
-				ofl->ofl_flags |= FLG_OF_FATAL;
+				issue_badaddr_msg(ifl, ofl, sdp,
+				    tsym, tsym->st_shndx);
 				continue;
 			}
 		}
