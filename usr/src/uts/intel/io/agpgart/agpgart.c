@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -773,6 +773,9 @@ lyr_get_info(agp_kern_info_t *info, agp_registered_dev_t *agp_regdev)
 		 */
 		prealloc_size = prealloc_size - info->agpki_apersize - 4;
 		info->agpki_presize = prealloc_size;
+		AGPDB_PRINT2((CE_NOTE,
+		    "lyr_get_info: prealloc_size = %ldKB, apersize = %dMB",
+		    prealloc_size, info->agpki_apersize));
 		break;
 	case ARC_INTELAGP:
 	case ARC_AMD64AGP:
@@ -856,7 +859,7 @@ lyr_i8xx_add_to_gtt(uint32_t pg_offset, keytable_ent_t *keyent,
 	gttseg.igs_npage = npages;
 	gttseg.igs_type = keyent->kte_type;
 	gttseg.igs_phyaddr = (uint32_t *)kmem_zalloc
-		    (sizeof (uint32_t) * gttseg.igs_npage, KM_SLEEP);
+	    (sizeof (uint32_t) * gttseg.igs_npage, KM_SLEEP);
 
 	addrp = gttseg.igs_phyaddr;
 	for (i = 0; i < npages; i++, addrp++) {
@@ -1539,7 +1542,7 @@ agp_dealloc_mem(agpgart_softstate_t *st, keytable_ent_t	*entryp)
 		 * gart table exsits here.
 		 */
 		if (st->asoft_opened)
-		    (void) agp_unbind_key(st, entryp);
+			(void) agp_unbind_key(st, entryp);
 	}
 	if (entryp->kte_refcnt) {
 		AGPDB_PRINT2((CE_WARN,
@@ -1814,11 +1817,11 @@ agp_v2_setup(uint32_t tstatus, uint32_t mstatus, uint32_t mode)
 	 * set SBA if all three support it
 	 */
 	sba = (tstatus & AGPSTAT_SBA) & (mstatus & AGPSTAT_SBA)
-		& (mode & AGPSTAT_SBA);
+	    & (mode & AGPSTAT_SBA);
 
 	/* set OVER4G  if all three support it */
 	over4g = (tstatus & AGPSTAT_OVER4G) & (mstatus & AGPSTAT_OVER4G)
-		& (mode & AGPSTAT_OVER4G);
+	    & (mode & AGPSTAT_OVER4G);
 
 	/*
 	 * FW - fast write
@@ -1829,7 +1832,7 @@ agp_v2_setup(uint32_t tstatus, uint32_t mstatus, uint32_t mode)
 	 * set FW if all three support it
 	 */
 	fw = (tstatus & AGPSTAT_FW) & (mstatus & AGPSTAT_FW)
-		& (mode & AGPSTAT_FW);
+	    & (mode & AGPSTAT_FW);
 
 	/*
 	 * figure out the max rate
@@ -1842,7 +1845,7 @@ agp_v2_setup(uint32_t tstatus, uint32_t mstatus, uint32_t mode)
 	 * ----------------------------------------------
 	 */
 	rate = (tstatus & AGPSTAT_RATE_MASK) & (mstatus & AGPSTAT_RATE_MASK)
-		& (mode & AGPSTAT_RATE_MASK);
+	    & (mode & AGPSTAT_RATE_MASK);
 	if (rate & AGP2_RATE_4X)
 		rate = AGP2_RATE_4X;
 	else if (rate & AGP2_RATE_2X)
@@ -1911,7 +1914,7 @@ agp_v3_setup(uint32_t tstatus, uint32_t mstatus, uint32_t mode)
 
 	/* Set OVER4G if all three support it */
 	over4g = (tstatus & AGPSTAT_OVER4G) & (mstatus & AGPSTAT_OVER4G)
-		& (mode & AGPSTAT_OVER4G);
+	    & (mode & AGPSTAT_OVER4G);
 
 	/*
 	 * FW - fast write
@@ -1922,7 +1925,7 @@ agp_v3_setup(uint32_t tstatus, uint32_t mstatus, uint32_t mode)
 	 * Always set FW in AGP 3.0
 	 */
 	fw = (tstatus & AGPSTAT_FW) & (mstatus & AGPSTAT_FW)
-		& (mode & AGPSTAT_FW);
+	    & (mode & AGPSTAT_FW);
 
 	/*
 	 * Figure out the max rate
@@ -1937,7 +1940,7 @@ agp_v3_setup(uint32_t tstatus, uint32_t mstatus, uint32_t mode)
 	 * ----------------------------------------------
 	 */
 	rate = (tstatus & AGPSTAT_RATE_MASK) & (mstatus & AGPSTAT_RATE_MASK)
-		& (mode & AGPSTAT_RATE_MASK);
+	    & (mode & AGPSTAT_RATE_MASK);
 	if (rate & AGP3_RATE_8X)
 		rate = AGP3_RATE_8X;
 	else
@@ -2331,13 +2334,13 @@ alloc_gart_table(agpgart_softstate_t *st)
 	}
 
 	if (ret = ddi_dma_mem_alloc(st->gart_dma_handle,
-		    table_size,
-		    &gart_dev_acc_attr,
-		    DDI_DMA_CONSISTENT,
-		    DDI_DMA_SLEEP, NULL,
-		    &st->gart_vbase,
-		    &st->gart_size,
-		    &st->gart_dma_acc_handle)) {
+	    table_size,
+	    &gart_dev_acc_attr,
+	    DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP, NULL,
+	    &st->gart_vbase,
+	    &st->gart_size,
+	    &st->gart_dma_acc_handle)) {
 		AGPDB_PRINT2((CE_WARN,
 		    "alloc_gart_table: ddi_dma_mem_alloc failed"));
 		goto err2;
@@ -2345,11 +2348,11 @@ alloc_gart_table(agpgart_softstate_t *st)
 	}
 
 	ret = ddi_dma_addr_bind_handle(st->gart_dma_handle,
-		    NULL, st->gart_vbase,
-		    table_size,
-		    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-		    DDI_DMA_SLEEP, NULL,
-		    &cookie,  &num_cookies);
+	    NULL, st->gart_vbase,
+	    table_size,
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+	    DDI_DMA_SLEEP, NULL,
+	    &cookie,  &num_cookies);
 
 	st->gart_pbase = cookie.dmac_address;
 
@@ -2516,7 +2519,7 @@ agpgart_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	instance = ddi_get_instance(dip);
 
 	if (ddi_soft_state_zalloc(agpgart_glob_soft_handle, instance)
-		    != DDI_SUCCESS) {
+	    != DDI_SUCCESS) {
 		AGPDB_PRINT2((CE_WARN,
 		    "agpgart_attach: soft state zalloc failed"));
 		goto err1;
@@ -2555,8 +2558,8 @@ agpgart_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	softstate->asoft_table = kmem_zalloc(
-			AGP_MAXKEYS * (sizeof (keytable_ent_t)),
-			KM_SLEEP);
+	    AGP_MAXKEYS * (sizeof (keytable_ent_t)),
+	    KM_SLEEP);
 
 	return (DDI_SUCCESS);
 err4:
@@ -3070,7 +3073,10 @@ ioctl_agpgart_bind(agpgart_softstate_t  *st, void  *arg, int flags)
 		if (AGP_PAGES2KB(bind_info.agpb_pgstart) <
 		    st->asoft_info.agpki_presize) {
 			AGPDB_PRINT2((CE_WARN,
-			    "ioctl_agpgart_bind: bind to prealloc area"));
+			    "ioctl_agpgart_bind: bind to prealloc area "
+			    "pgstart = %dKB < presize = %ldKB",
+			    AGP_PAGES2KB(bind_info.agpb_pgstart),
+			    st->asoft_info.agpki_presize));
 			return (EINVAL);
 		}
 	}
@@ -3352,8 +3358,8 @@ _init(void)
 	int ret = DDI_SUCCESS;
 
 	ret = ddi_soft_state_init(&agpgart_glob_soft_handle,
-		    sizeof (agpgart_softstate_t),
-		    AGPGART_MAX_INSTANCES);
+	    sizeof (agpgart_softstate_t),
+	    AGPGART_MAX_INSTANCES);
 
 	if (ret != 0) {
 		AGPDB_PRINT2((CE_WARN,

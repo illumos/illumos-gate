@@ -1,4 +1,25 @@
 /*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -13,7 +34,7 @@ extern "C" {
 #endif
 
 /*
- * This AGP memory type is required by some hadrware like i810 video
+ * This AGP memory type is required by some hardware like i810 video
  * card, which need physical contiguous pages to setup hardware cursor.
  * Usually, several tens of kilo bytes are needed in this case.
  * We use DDI DMA interfaces to allocate such memory in agpgart driver,
@@ -65,10 +86,15 @@ extern "C" {
 #define	INTEL_BR_855GM			0x35808086 /* include 852GM/PM */
 #define	INTEL_BR_855PM			0x33408086
 #define	INTEL_BR_865			0x25708086
-#define	INTEL_BR_910			0x25808086
-#define	INTEL_BR_910M			0x25908086
+#define	INTEL_BR_915			0x25808086
+#define	INTEL_BR_915GM			0x25908086
 #define	INTEL_BR_945			0x27708086
 #define	INTEL_BR_945GM			0x27a08086
+#define	INTEL_BR_946GZ			0x29708086
+#define	INTEL_BR_965G1			0x29808086
+#define	INTEL_BR_965Q			0x29908086
+#define	INTEL_BR_965G2			0x29a08086
+#define	INTEL_BR_965GM			0x2a008086
 
 /* AGP common register offset in pci configuration space */
 #define	AGP_CONF_MISC			0x51 /* one byte */
@@ -119,10 +145,15 @@ extern "C" {
 #define	INTEL_IGD_845G			0x25628086
 #define	INTEL_IGD_855GM			0x35828086
 #define	INTEL_IGD_865G			0x25728086
-#define	INTEL_IGD_910			0x25828086
-#define	INTEL_IGD_910M			0x25928086
+#define	INTEL_IGD_915			0x25828086
+#define	INTEL_IGD_915GM			0x25928086
 #define	INTEL_IGD_945			0x27728086
 #define	INTEL_IGD_945GM			0x27a28086
+#define	INTEL_IGD_946GZ			0x29728086
+#define	INTEL_IGD_965G1			0x29828086
+#define	INTEL_IGD_965Q			0x29928086
+#define	INTEL_IGD_965G2			0x29a28086
+#define	INTEL_IGD_965GM			0x2a028086
 #define	I8XX_CONF_GMADR			0x10 /* offset in PCI config space */
 #define	I915_CONF_GMADR			0x18 /* offset in PCI config space */
 #define	I8XX_CONF_GC			0x52 /* offset in PCI config space */

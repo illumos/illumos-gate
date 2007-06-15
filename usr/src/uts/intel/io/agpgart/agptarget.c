@@ -1,4 +1,25 @@
 /*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -311,7 +332,7 @@ i8xx_biosmem_detect(agp_target_softstate_t *softstate)
 		}
 		break;
 	case INTEL_BR_865:
-	case INTEL_BR_910M:
+	case INTEL_BR_915GM:
 		memval = pci_config_get8(softstate->tsoft_pcihdl, I8XX_CONF_GC);
 		switch (memval & I8XX_GC_MODE_MASK) {
 		case I8XX_GC_MODE1:
@@ -321,7 +342,7 @@ i8xx_biosmem_detect(agp_target_softstate_t *softstate)
 			kbytes = 8 * 1024; /* 8M preallocated memory */
 			break;
 		/*
-		 * There is no option for 16M in 910GM datasheet,
+		 * There is no option for 16M in 915GM datasheet,
 		 * but some BIOS add this option for 16M support.
 		 */
 		case I8XX_GC_MODE4:
@@ -331,9 +352,14 @@ i8xx_biosmem_detect(agp_target_softstate_t *softstate)
 			kbytes = 0; /* an unexpected case */
 		}
 		break;
-	case INTEL_BR_910:
+	case INTEL_BR_915:
 	case INTEL_BR_945:
 	case INTEL_BR_945GM:
+	case INTEL_BR_946GZ:
+	case INTEL_BR_965G1:
+	case INTEL_BR_965G2:
+	case INTEL_BR_965Q:
+	case INTEL_BR_965GM:
 		memval = pci_config_get8(softstate->tsoft_pcihdl, I8XX_CONF_GC);
 		switch (memval & I8XX_GC_MODE_MASK) {
 		case I8XX_GC_MODE1:
@@ -350,6 +376,9 @@ i8xx_biosmem_detect(agp_target_softstate_t *softstate)
 		kbytes = 0;
 	}
 
+	TARGETDB_PRINT2((CE_NOTE,
+	    "i8xx_biosmem_detect: %ldKB BIOS pre-allocated memory detected",
+	    kbytes));
 	return (kbytes);
 }
 

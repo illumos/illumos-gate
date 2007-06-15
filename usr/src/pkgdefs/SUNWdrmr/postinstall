@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,6 +37,7 @@ BRALIAS="\
 	\"pci8086,2582\" \
 	\"pci8086,2592\" \
 	\"pci8086,2772\" \
+	\"pci8086,27a2\" \
 	\"pci8086,3582\" \
 	"
 DRVPERM='* 0644 root sys'

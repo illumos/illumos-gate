@@ -41,12 +41,32 @@
 #include <sys/agp/agpdefs.h>
 #include <sys/agp/agpmaster_io.h>
 
-#define	I8XX_MMIO_REGSET	2
-#define	I8XX_FB_REGSET		1
-#define	I8XX_PTE_OFFSET		0x10000
-#define	I8XX_PGTBL_CTL		0x2020
-#define	I915_GTTADDR_BAR	4
-#define	I915_FB_REGSET		3
+#define	PGTBL_CTL	0x2020	/* Page table control register */
+#define	I8XX_FB_BAR	1
+#define	I8XX_MMIO_BAR	2
+#define	I8XX_PTE_OFFSET	0x10000
+#define	I915_MMADR	1	/* mem-mapped registers BAR */
+#define	I915_GMADR	3	/* graphics mem BAR */
+#define	I915_GTTADDR	4	/* GTT BAR */
+#define	I965_GTTMMADR	1	/* mem-mapped registers BAR + GTT */
+#define	I965_GMADR	2	/* graphics mem BAR */
+/* In 965 1MB GTTMMADR, GTT reside in the latter 512KB */
+#define	I965_GTT_OFFSET	0x80000
+#define	GTT_SIZE_MASK	0xe
+#define	GTT_512KB	(0 << 1)
+#define	GTT_256KB	(1 << 1)
+#define	GTT_128KB	(2 << 1)
+
+#define	MMIO_BASE(x)	(x)->agpm_data.agpm_gtt.gtt_mmio_base
+#define	MMIO_HANDLE(x)	(x)->agpm_data.agpm_gtt.gtt_mmio_handle
+#define	GTT_ADDR(x)	(x)->agpm_data.agpm_gtt.gtt_addr
+#define	APER_BASE(x)	(x)->agpm_data.agpm_gtt.gtt_info.igd_aperbase
+
+#define	AGPM_WRITE(x, off, val) \
+    ddi_put32(MMIO_HANDLE(x), (uint32_t *)(MMIO_BASE(x) + (off)), (val));
+
+#define	AGPM_READ(x, off) \
+    ddi_get32(MMIO_HANDLE(x), (uint32_t *)(MMIO_BASE(x) + (off)));
 
 #ifdef DEBUG
 #define	CONFIRM(value) ASSERT(value)
@@ -61,13 +81,21 @@ int agpm_debug = 0;
  * Whether it is a Intel integrated graphics card
  */
 #define	IS_IGD(agpmaster) ((agpmaster->agpm_dev_type == DEVICE_IS_I810) || \
-		    (agpmaster->agpm_dev_type == DEVICE_IS_I830))
+	(agpmaster->agpm_dev_type == DEVICE_IS_I830))
 
 
-#define	IS_INTEL_9XX(agpmaster) ((agpmaster->agpm_id == INTEL_IGD_910) || \
-		    (agpmaster->agpm_id == INTEL_IGD_910M) || \
-		    (agpmaster->agpm_id == INTEL_IGD_945) || \
-		    (agpmaster->agpm_id == INTEL_IGD_945GM))
+/* Intel 915 and 945 series */
+#define	IS_INTEL_915(agpmaster) ((agpmaster->agpm_id == INTEL_IGD_915) || \
+	(agpmaster->agpm_id == INTEL_IGD_915GM) || \
+	(agpmaster->agpm_id == INTEL_IGD_945) || \
+	(agpmaster->agpm_id == INTEL_IGD_945GM))
+
+/* Intel 965 series */
+#define	IS_INTEL_965(agpmaster) ((agpmaster->agpm_id == INTEL_IGD_946GZ) || \
+	(agpmaster->agpm_id == INTEL_IGD_965G1) || \
+	(agpmaster->agpm_id == INTEL_IGD_965Q) || \
+	(agpmaster->agpm_id == INTEL_IGD_965G2) || \
+	(agpmaster->agpm_id == INTEL_IGD_965GM))
 
 static struct modlmisc modlmisc = {
 	&mod_miscops, "AGP master interfaces v%I%"
@@ -131,9 +159,8 @@ agpmaster_detach(agp_master_softc_t **master_softcp)
 
 	/* intel integrated device */
 	if (IS_IGD(master_softc)) {
-		if (master_softc->agpm_data.agpm_gtt.gtt_mmio_handle != NULL) {
-			ddi_regs_map_free(
-			    &master_softc->agpm_data.agpm_gtt.gtt_mmio_handle);
+		if (MMIO_HANDLE(master_softc) != NULL) {
+			ddi_regs_map_free(&MMIO_HANDLE(master_softc));
 		}
 	}
 
@@ -142,6 +169,118 @@ agpmaster_detach(agp_master_softc_t **master_softcp)
 
 	return;
 
+}
+
+/*
+ * 965 has a fixed GTT table size (512KB), so check to see the actual aperture
+ * size. Aperture size = GTT table size * 1024.
+ */
+static off_t
+i965_apersize(agp_master_softc_t *agpmaster)
+{
+	off_t apersize;
+
+	apersize = AGPM_READ(agpmaster, PGTBL_CTL);
+	AGPM_DEBUG((CE_NOTE, "i965_apersize: PGTBL_CTL = %lx", apersize));
+	switch (apersize & GTT_SIZE_MASK) {
+	case GTT_512KB:
+		apersize = 512;
+		break;
+	case GTT_256KB:
+		apersize = 256;
+		break;
+	case GTT_128KB:
+		apersize = 128;
+		break;
+	default:
+		AGPM_DEBUG((CE_WARN,
+		    "i965_apersize: invalid GTT size in PGTBL_CTL"));
+	}
+	apersize = MB2BYTES(apersize);
+	return (apersize);
+}
+
+#define	CHECK_STATUS(status)	\
+    if (status != DDI_SUCCESS) { \
+	    AGPM_DEBUG((CE_WARN, \
+		"set_gtt_mmio: regs_map_setup error")); \
+	    return (-1); \
+}
+/*
+ * Set gtt_addr, gtt_mmio_base, igd_apersize, igd_aperbase and igd_devid
+ * according to chipset.
+ */
+static int
+set_gtt_mmio(dev_info_t *devi, agp_master_softc_t *agpmaster, ddi_acc_handle_t
+    pci_acc_hdl)
+{
+	off_t apersize;
+	uint32_t value;
+	off_t conf_off; /* offset in PCI conf space for aperture */
+	int status;
+
+	if (IS_INTEL_965(agpmaster)) {
+		status = ddi_regs_map_setup(devi, I965_GTTMMADR,
+		    &MMIO_BASE(agpmaster), 0, 0, &i8xx_dev_access,
+		    &MMIO_HANDLE(agpmaster));
+		CHECK_STATUS(status);
+		GTT_ADDR(agpmaster) = MMIO_BASE(agpmaster) + I965_GTT_OFFSET;
+
+		conf_off = I915_CONF_GMADR;
+		apersize = i965_apersize(agpmaster);
+		/* make this the last line, to clear follow-up status check */
+		status = DDI_SUCCESS;
+
+	} else if (IS_INTEL_915(agpmaster)) {
+		status = ddi_regs_map_setup(devi, I915_GTTADDR,
+		    &GTT_ADDR(agpmaster), 0, 0, &i8xx_dev_access,
+		    &MMIO_HANDLE(agpmaster));
+		CHECK_STATUS(status);
+
+		status = ddi_regs_map_setup(devi, I915_MMADR,
+		    &MMIO_BASE(agpmaster), 0, 0, &i8xx_dev_access,
+		    &MMIO_HANDLE(agpmaster));
+		CHECK_STATUS(status);
+
+		conf_off = I915_CONF_GMADR;
+		status = ddi_dev_regsize(devi, I915_GMADR, &apersize);
+	} else {
+		/* I8XX series */
+		status = ddi_regs_map_setup(devi, I8XX_MMIO_BAR,
+		    &MMIO_BASE(agpmaster), 0, 0, &i8xx_dev_access,
+		    &MMIO_HANDLE(agpmaster));
+		CHECK_STATUS(status);
+
+		GTT_ADDR(agpmaster) = MMIO_BASE(agpmaster) + I8XX_PTE_OFFSET;
+		conf_off = I8XX_CONF_GMADR;
+		status = ddi_dev_regsize(devi, I8XX_FB_BAR, &apersize);
+		CHECK_STATUS(status);
+	}
+
+	/*
+	 * if memory size is smaller than a certain value, it means
+	 * the register set number for graphics memory range might
+	 * be wrong
+	 */
+	if (status != DDI_SUCCESS || apersize < 0x400000) {
+		AGPM_DEBUG((CE_WARN,
+		    "set_gtt_mmio: ddi_dev_regsize error"));
+		return (-1);
+	}
+
+	agpmaster->agpm_data.agpm_gtt.gtt_info.igd_apersize =
+	    BYTES2MB(apersize);
+
+	/* get GTT base */
+	value = pci_config_get32(pci_acc_hdl, conf_off);
+
+	APER_BASE(agpmaster) = value & GTT_BASE_MASK;
+	agpmaster->agpm_data.agpm_gtt.gtt_info.igd_devid =
+	    agpmaster->agpm_id;
+	AGPM_DEBUG((CE_NOTE, "set_gtt_mmio: aperbase = %x, apersize = %lx, "
+	    "gtt_addr = %p, mmio_base = %p", APER_BASE(agpmaster), apersize,
+	    (void *)GTT_ADDR(agpmaster), (void *)MMIO_BASE(agpmaster)));
+	return (0);
 }
 
 /*
@@ -157,8 +296,6 @@ agpmaster_attach(dev_info_t *devi, agp_master_softc_t **master_softcp,
 	int instance;
 	int status;
 	agp_master_softc_t *agpmaster;
-	uint32_t value;
-	off_t reg_size;
 	char buf[80];
 
 
@@ -172,68 +309,11 @@ agpmaster_attach(dev_info_t *devi, agp_master_softc_t **master_softcp,
 	agpmaster->agpm_acc_hdl = pci_acc_hdl;
 
 	if (!detect_i8xx_device(agpmaster)) {
-		/* map mmio register set */
-		if (IS_INTEL_9XX(agpmaster)) {
-			status = ddi_regs_map_setup(devi, I915_GTTADDR_BAR,
-			    &agpmaster->agpm_data.agpm_gtt.gtt_mmio_base,
-			    0, 0, &i8xx_dev_access,
-			    &agpmaster->agpm_data.agpm_gtt.gtt_mmio_handle);
-		} else {
-			status = ddi_regs_map_setup(devi, I8XX_MMIO_REGSET,
-			    &agpmaster->agpm_data.agpm_gtt.gtt_mmio_base,
-			    0, 0, &i8xx_dev_access,
-			    &agpmaster->agpm_data.agpm_gtt.gtt_mmio_handle);
-		}
-
-		if (status != DDI_SUCCESS) {
-			AGPM_DEBUG((CE_WARN,
-			    "agpmaster_attach: ddi_regs_map_setup failed"));
+		/* Intel 8XX, 915, 945 and 965 series */
+		if (set_gtt_mmio(devi, agpmaster, pci_acc_hdl) != 0)
 			goto fail;
-		}
-		/* get GTT range base offset */
-		if (IS_INTEL_9XX(agpmaster)) {
-			agpmaster->agpm_data.agpm_gtt.gtt_addr =
-			    agpmaster->agpm_data.agpm_gtt.gtt_mmio_base;
-		} else
-			agpmaster->agpm_data.agpm_gtt.gtt_addr =
-			    agpmaster->agpm_data.agpm_gtt.gtt_mmio_base +
-			    I8XX_PTE_OFFSET;
-
-		/* get graphics memory size */
-		if (IS_INTEL_9XX(agpmaster)) {
-			status = ddi_dev_regsize(devi, I915_FB_REGSET,
-			    &reg_size);
-		} else
-			status = ddi_dev_regsize(devi, I8XX_FB_REGSET,
-			    &reg_size);
-		/*
-		 * if memory size is smaller than a certain value, it means
-		 * the register set number for graphics memory range might
-		 * be wrong
-		 */
-		if (status != DDI_SUCCESS || reg_size < 0x400000) {
-			AGPM_DEBUG((CE_WARN,
-			    "agpmaster_attach: ddi_dev_regsize error"));
-			goto fail;
-		}
-
-		agpmaster->agpm_data.agpm_gtt.gtt_info.igd_apersize =
-		    BYTES2MB(reg_size);
-		if (IS_INTEL_9XX(agpmaster)) {
-			value = pci_config_get32(pci_acc_hdl,
-			    I915_CONF_GMADR);
-		} else
-			value = pci_config_get32(pci_acc_hdl,
-			    I8XX_CONF_GMADR);
-
-		agpmaster->agpm_data.agpm_gtt.gtt_info.igd_aperbase =
-		    value & GTT_BASE_MASK;
-		agpmaster->agpm_data.agpm_gtt.gtt_info.igd_devid =
-		    agpmaster->agpm_id;
 	} else if (detect_agp_devcice(agpmaster, pci_acc_hdl)) {
-		/*
-		 * non IGD or AGP devices, AMD64 gart
-		 */
+		/* non IGD or AGP devices, AMD64 gart */
 		AGPM_DEBUG((CE_WARN,
 		    "agpmaster_attach: neither IGD or AGP devices exists"));
 		agpmaster_detach(&agpmaster);
@@ -345,10 +425,7 @@ agpmaster_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred,
 		/* enables page table */
 		addr = (base & GTT_BASE_MASK) | GTT_TABLE_VALID;
 
-		ddi_put32(softc->agpm_data.agpm_gtt.gtt_mmio_handle,
-		    (uint32_t *)(softc->agpm_data.agpm_gtt.gtt_mmio_base +
-		    I8XX_PGTBL_CTL),
-		    addr);
+		AGPM_WRITE(softc, PGTBL_CTL, addr);
 		break;
 	case I8XX_GET_INFO:
 		if (!(mode & FKIOCTL)) {
@@ -400,10 +477,7 @@ agpmaster_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *cred,
 		CONFIRM(IS_IGD(softc));
 
 		if (softc->agpm_dev_type == DEVICE_IS_I810)
-			ddi_put32(softc->agpm_data.agpm_gtt.gtt_mmio_handle,
-			    (uint32_t *)
-			    (softc->agpm_data.agpm_gtt.gtt_mmio_base +
-			    I8XX_PGTBL_CTL), 0);
+			AGPM_WRITE(softc, PGTBL_CTL, 0);
 		/*
 		 * may need to clear all gtt entries here for i830 series,
 		 * but may not be necessary
@@ -466,10 +540,15 @@ detect_i8xx_device(agp_master_softc_t *master_softc)
 	case INTEL_IGD_845G:
 	case INTEL_IGD_855GM:
 	case INTEL_IGD_865G:
-	case INTEL_IGD_910:
-	case INTEL_IGD_910M:
+	case INTEL_IGD_915:
+	case INTEL_IGD_915GM:
 	case INTEL_IGD_945:
 	case INTEL_IGD_945GM:
+	case INTEL_IGD_946GZ:
+	case INTEL_IGD_965G1:
+	case INTEL_IGD_965G2:
+	case INTEL_IGD_965GM:
+	case INTEL_IGD_965Q:
 		master_softc->agpm_dev_type = DEVICE_IS_I830;
 		break;
 	default:		/* unknown id */
@@ -568,8 +647,6 @@ i8xx_remove_from_gtt(gtt_impl_t *gtt, igd_gtt_seg_t seg)
 
 	for (i = seg.igs_pgstart; i < (seg.igs_pgstart + seg.igs_npage); i++) {
 		ddi_put32(gtt->gtt_mmio_handle,
-		    (uint32_t *)(gtt->gtt_addr +
-		    i * sizeof (uint32_t)),
-		    0);
+		    (uint32_t *)(gtt->gtt_addr + i * sizeof (uint32_t)), 0);
 	}
 }
