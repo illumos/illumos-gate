@@ -67,6 +67,7 @@ static const char rcsid[] = "@(#)$Id: ip_fil_solaris.c,v 2.62.2.19 2005/07/13 21
 
 static	int	frzerostats __P((caddr_t, ipf_stack_t *));
 static	int	fr_setipfloopback __P((int, ipf_stack_t *));
+static	int	fr_enableipf __P((ipf_stack_t *, netstack_t *, int));
 static	int	fr_send_ip __P((fr_info_t *fin, mblk_t *m, mblk_t **mp));
 static	int	ipf_nic_event_v4 __P((hook_event_token_t, hook_data_t,
     netstack_t *));
@@ -569,20 +570,7 @@ int *rp;
 
 			RWLOCK_EXIT(&ifs->ifs_ipf_global);
 			WRITE_ENTER(&ifs->ifs_ipf_global);
-			if (enable) {
-				if (ifs->ifs_fr_running > 0)
-					error = 0;
-				else
-					error = iplattach(ifs, ns);
-				if (error == 0)
-					ifs->ifs_fr_running = 1;
-				else
-					(void) ipldetach(ifs);
-			} else {
-				error = ipldetach(ifs);
-				if (error == 0)
-					ifs->ifs_fr_running = -1;
-			}
+			error = fr_enableipf(ifs, ns, enable);
 		}
 		break;
 	case SIOCIPFSET :
@@ -773,6 +761,40 @@ int *rp;
 	}
 	RWLOCK_EXIT(&ifs->ifs_ipf_global);
 	netstack_rele(ifs->ifs_netstack);
+	return error;
+}
+
+
+static int fr_enableipf(ifs, ns, enable)
+ipf_stack_t *ifs;
+netstack_t *ns;
+int enable;
+{
+	int error;
+
+	if (enable) {
+		if (ifs->ifs_fr_running > 0)
+			error = 0;
+		else
+			error = iplattach(ifs, ns);
+		if (error == 0) {
+			if (ifs->ifs_fr_timer_id == NULL) {
+				int hz = drv_usectohz(500000);
+
+				ifs->ifs_fr_timer_id = timeout(fr_slowtimer,
+							       (void *)ifs,
+							       hz);
+			}
+			ifs->ifs_fr_running = 1;
+		} else {
+			(void) ipldetach(ifs);
+		}
+	} else {
+		error = ipldetach(ifs);
+		if (error == 0)
+			ifs->ifs_fr_running = -1;
+	}
+
 	return error;
 }
 

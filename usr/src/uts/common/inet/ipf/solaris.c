@@ -394,9 +394,6 @@ ipf_stack_init(netstackid_t stackid, netstack_t *ns)
 	 */
 	WRITE_ENTER(&ifs->ifs_ipf_global);
 	ipftuneable_alloc(ifs);
-	ifs->ifs_fr_timer_id = timeout(fr_slowtimer, (void *)ifs,
-	    drv_usectohz(500000));
-
 	RWLOCK_EXIT(&ifs->ifs_ipf_global);
 
 	/* Limit to global stack */
