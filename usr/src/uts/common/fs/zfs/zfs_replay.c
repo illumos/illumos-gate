@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,6 +104,10 @@ zfs_replay_create(zfsvfs_t *zfsvfs, lr_create_t *lr, boolean_t byteswap)
 	ZFS_TIME_DECODE(&va.va_ctime, lr->lr_crtime);
 	va.va_nblocks = lr->lr_gen;
 
+	error = dmu_object_info(zfsvfs->z_os, lr->lr_foid, NULL);
+	if (error != ENOENT)
+		goto out;
+
 	switch ((int)lr->lr_common.lrc_txtype) {
 	case TX_CREATE:
 		error = VOP_CREATE(ZTOV(dzp), name, &va, 0, 0, &vp, kcred, 0);
@@ -122,6 +126,7 @@ zfs_replay_create(zfsvfs_t *zfsvfs, lr_create_t *lr, boolean_t byteswap)
 		error = ENOTSUP;
 	}
 
+out:
 	if (error == 0 && vp != NULL)
 		VN_RELE(vp);
 

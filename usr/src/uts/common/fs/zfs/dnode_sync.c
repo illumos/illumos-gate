@@ -494,6 +494,7 @@ dnode_sync_free(dnode_t *dn, dmu_tx_t *tx)
 	dn->dn_type = DMU_OT_NONE;
 	dn->dn_maxblkid = 0;
 	dn->dn_allocated_txg = 0;
+	dn->dn_free_txg = 0;
 	mutex_exit(&dn->dn_mtx);
 
 	ASSERT(dn->dn_object != DMU_META_DNODE_OBJECT);

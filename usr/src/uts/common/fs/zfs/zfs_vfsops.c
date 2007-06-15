@@ -1011,6 +1011,12 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 		zfsvfs->z_unmounted1 = B_TRUE;
 
 		/*
+		 * Ensure that z_unmounted1 reaches global visibility
+		 * before z_op_cnt.
+		 */
+		membar_producer();
+
+		/*
 		 * Wait for all zfs threads to leave zfs.
 		 * Grabbing a rwlock as reader in all vops and
 		 * as writer here doesn't work because it too easy to get
