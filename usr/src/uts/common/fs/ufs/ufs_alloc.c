@@ -980,8 +980,22 @@ alloccg(struct inode *ip, int cg, daddr_t bpref, int size)
 	int allocsiz;
 	int i;
 
-	if (fs->fs_cs(fs, cg).cs_nbfree == 0 && size == fs->fs_bsize)
-		return (0);
+	/*
+	 * Searching for space could be time expensive so do some
+	 * up front checking to verify that there is actually space
+	 * available (free blocks or free frags).
+	 */
+	if (fs->fs_cs(fs, cg).cs_nbfree == 0) {
+		if (size == fs->fs_bsize)
+			return (0);
+
+		/*
+		 * If there are not enough free frags then return.
+		 */
+		if (fs->fs_cs(fs, cg).cs_nffree < numfrags(fs, size))
+			return (0);
+	}
+
 	bp = UFS_BREAD(ufsvfsp, ip->i_dev, (daddr_t)fsbtodb(fs, cgtod(fs, cg)),
 	    (int)fs->fs_cgsize);
 
