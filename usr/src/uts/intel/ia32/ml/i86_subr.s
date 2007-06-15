@@ -664,6 +664,79 @@ __cpuid_insn(struct cpuid_regs *regs)
 #endif	/* __i386 */
 #endif	/* __lint */
 
+#if defined(__lint)
+
+/*ARGSUSED*/
+void
+i86_monitor(volatile uint32_t *addr, uint32_t extensions, uint32_t hints)
+{ return; }
+
+#else   /* __lint */
+
+#if defined(__amd64)
+
+	ENTRY_NP(i86_monitor)
+	pushq	%rbp
+	movq	%rsp, %rbp
+	movq	%rdi, %rax		/* addr */
+	movq	%rsi, %rcx		/* extensions */
+	/* rdx contains input arg3: hints */
+	.byte	0x0f, 0x01, 0xc8	/* monitor */
+	leave
+	ret
+	SET_SIZE(i86_monitor)
+
+#elif defined(__i386)
+
+ENTRY_NP(i86_monitor)
+	pushl	%ebp
+	movl	%esp, %ebp
+	movl	0x4(%esp),%eax		/* addr */
+	movl	0x8(%esp),%ecx		/* extensions */
+	movl	0xc(%esp),%edx		/* hints */
+	.byte	0x0f, 0x01, 0xc8	/* monitor */
+	leave
+	ret
+	SET_SIZE(i86_monitor)
+
+#endif	/* __i386 */
+#endif	/* __lint */
+
+#if defined(__lint)
+
+/*ARGSUSED*/
+void
+i86_mwait(uint32_t data, uint32_t extensions)
+{ return; }
+
+#else	/* __lint */
+
+#if defined(__amd64)
+
+	ENTRY_NP(i86_mwait)
+	pushq	%rbp
+	movq	%rsp, %rbp
+	movq	%rdi, %rax		/* data */
+	movq	%rsi, %rcx		/* extensions */
+	.byte	0x0f, 0x01, 0xc9	/* mwait */
+	leave
+	ret
+	SET_SIZE(i86_mwait)
+
+#elif defined(__i386)
+
+	ENTRY_NP(i86_mwait)
+	pushl	%ebp
+	movl	%esp, %ebp
+	movl	0x4(%esp),%eax		/* data */
+	movl	0x8(%esp),%ecx		/* extensions */
+	.byte	0x0f, 0x01, 0xc9	/* mwait */
+	leave
+	ret
+	SET_SIZE(i86_mwait)
+
+#endif	/* __i386 */
+#endif	/* __lint */
 
 #if defined(__lint)
 

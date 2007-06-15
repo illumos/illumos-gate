@@ -237,6 +237,9 @@ mp_startup_init(int cpun)
 	ASSERT(cpun < NCPU && cpu[cpun] == NULL);
 
 	cp = kmem_zalloc(sizeof (*cp), KM_SLEEP);
+	if (x86_feature & X86_MWAIT)
+		cp->cpu_m.mcpu_mwait = mach_alloc_mwait(CPU);
+
 	procp = curthread->t_procp;
 
 	mutex_enter(&cpu_lock);
@@ -1302,6 +1305,13 @@ mp_startup(void)
 		    cp->cpu_id, new_x86_feature, FMT_X86_FEATURE);
 		cmn_err(CE_WARN, "cpu%d feature mismatch", cp->cpu_id);
 	}
+
+	/*
+	 * We do not support cpus with mixed monitor/mwait support if the
+	 * boot cpu supports monitor/mwait.
+	 */
+	if ((x86_feature & ~new_x86_feature) & X86_MWAIT)
+		panic("unsupported mixed cpu monitor/mwait support detected");
 
 	/*
 	 * We could be more sophisticated here, and just mark the CPU

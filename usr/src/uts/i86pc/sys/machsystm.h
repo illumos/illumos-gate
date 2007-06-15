@@ -56,6 +56,7 @@ extern "C" {
 extern void mach_cpu_idle(void);
 extern void mach_cpu_halt(char *);
 extern int mach_cpu_start(cpu_t *, void *);
+extern uint32_t *mach_alloc_mwait(cpu_t *cp);
 
 extern int Cpudelay;
 extern void setcpudelay(void);

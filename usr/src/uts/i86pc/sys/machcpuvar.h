@@ -103,9 +103,14 @@ struct	machcpu {
 	uint64_t	mcpu_gdtpa;	/* xen: GDT in physical address */
 
 	uint16_t mcpu_intr_pending;	/* xen: pending interrupt levels */
+
+	volatile uint32_t *mcpu_mwait;	/* MONITOR/MWAIT buffer */
 };
 
 #define	NINTR_THREADS	(LOCK_LEVEL-1)	/* number of interrupt threads */
+#define	MWAIT_HALTED	(1)		/* mcpu_mwait set when halting */
+#define	MWAIT_RUNNING	(0)		/* mcpu_mwait set to wakeup */
+#define	MWAIT_WAKEUP(cpu)	(*((cpu)->cpu_m.mcpu_mwait) = MWAIT_RUNNING);
 
 #endif	/* _ASM */
 

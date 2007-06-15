@@ -115,6 +115,15 @@ uint_t enable486;
 const char CyrixInstead[] = "CyrixInstead";
 
 /*
+ * monitor/mwait info.
+ */
+struct mwait_info {
+	size_t		mon_min;	/* min size to avoid missed wakeups */
+	size_t		mon_max;	/* size to avoid false wakeups */
+	uint32_t	support;	/* processor support of monitor/mwait */
+};
+
+/*
  * These constants determine how many of the elements of the
  * cpuid we cache in the cpuid_info data structure; the
  * remaining elements are accessible via the cpuid instruction.
@@ -168,6 +177,8 @@ struct cpuid_info {
 	uint32_t cpi_chiprev;		/* See X86_CHIPREV_* in x86_archext.h */
 	const char *cpi_chiprevstr;	/* May be NULL if chiprev unknown */
 	uint32_t cpi_socket;		/* Chip package/socket type */
+
+	struct mwait_info cpi_mwait;	/* fn 5: monitor/mwait info */
 };
 
 
@@ -290,6 +301,29 @@ static const struct amd_rev_mapent {
 	 */
 	{ 0xf, 0x60, 0x6f, 0x0, 0xf, X86_CHIPREV_AMD_F_REV_G, "G", 1 },
 };
+
+/*
+ * Info for monitor/mwait idle loop.
+ *
+ * See cpuid section of "Intel 64 and IA-32 Architectures Software Developer's
+ * Manual Volume 2A: Instruction Set Reference, A-M" #25366-022US, November
+ * 2006.
+ * See MONITOR/MWAIT section of "AMD64 Architecture Programmer's Manual
+ * Documentation Updates" #33633, Rev 2.05, December 2006.
+ */
+#define	MWAIT_SUPPORT		(0x00000001)	/* mwait supported */
+#define	MWAIT_EXTENSIONS	(0x00000002)	/* extenstion supported */
+#define	MWAIT_ECX_INT_ENABLE	(0x00000004)	/* ecx 1 extension supported */
+#define	MWAIT_SUPPORTED(cpi)	((cpi)->cpi_std[1].cp_ecx & CPUID_INTC_ECX_MON)
+#define	MWAIT_INT_ENABLE(cpi)	((cpi)->cpi_std[5].cp_ecx & 0x2)
+#define	MWAIT_EXTENSION(cpi)	((cpi)->cpi_std[5].cp_ecx & 0x1)
+#define	MWAIT_SIZE_MIN(cpi)	BITX((cpi)->cpi_std[5].cp_eax, 15, 0)
+#define	MWAIT_SIZE_MAX(cpi)	BITX((cpi)->cpi_std[5].cp_ebx, 15, 0)
+/*
+ * Number of sub-cstates for a given c-state.
+ */
+#define	MWAIT_NUM_SUBC_STATES(cpi, c_state)			\
+	BITX((cpi)->cpi_std[5].cp_edx, c_state + 3, c_state)
 
 static void
 synth_amd_info(struct cpuid_info *cpi)
@@ -695,6 +729,10 @@ cpuid_pass1(cpu_t *cpu)
 	}
 	if (cp->cp_edx & CPUID_INTC_EDX_DE)
 		feature |= X86_DE;
+	if (cp->cp_ecx & CPUID_INTC_ECX_MON) {
+		cpi->cpi_mwait.support |= MWAIT_SUPPORT;
+		feature |= X86_MWAIT;
+	}
 
 	if (feature & X86_PAE)
 		cpi->cpi_pabits = 36;
@@ -1064,9 +1102,31 @@ cpuid_pass2(cpu_t *cpu)
 						*dp++ = p[i];
 			}
 			break;
+
 		case 3:	/* Processor serial number, if PSN supported */
+			break;
+
 		case 4:	/* Deterministic cache parameters */
+			break;
+
 		case 5:	/* Monitor/Mwait parameters */
+
+			/*
+			 * check cpi_mwait.support which was set in cpuid_pass1
+			 */
+			if (!(cpi->cpi_mwait.support & MWAIT_SUPPORT))
+				break;
+
+			cpi->cpi_mwait.mon_min = (size_t)MWAIT_SIZE_MIN(cpi);
+			cpi->cpi_mwait.mon_max = (size_t)MWAIT_SIZE_MAX(cpi);
+			if (MWAIT_EXTENSION(cpi)) {
+				cpi->cpi_mwait.support |= MWAIT_EXTENSIONS;
+				if (MWAIT_INT_ENABLE(cpi))
+					cpi->cpi_mwait.support |=
+					    MWAIT_ECX_INT_ENABLE;
+			}
+			break;
+
 		default:
 			break;
 		}
@@ -2779,7 +2839,7 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 	 * create a child node for cpu identified as 'cpu_id'
 	 */
 	cpu_devi = ddi_add_child(cpu_nex_devi, "cpu", DEVI_SID_NODEID,
-		cpu_id);
+	    cpu_id);
 	if (cpu_devi == NULL) {
 		mutex_exit(&cpu_node_lock);
 		return;
@@ -2818,7 +2878,7 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 	/* vendor-id */
 
 	(void) ndi_prop_update_string(DDI_DEV_T_NONE, cpu_devi,
-		"vendor-id", cpi->cpi_vendorstr);
+	    "vendor-id", cpi->cpi_vendorstr);
 
 	if (cpi->cpi_maxeax == 0) {
 		mutex_exit(&cpu_node_lock);
@@ -2829,11 +2889,11 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 	 * family, model, and step
 	 */
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
-		"family", CPI_FAMILY(cpi));
+	    "family", CPI_FAMILY(cpi));
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
-		"cpu-model", CPI_MODEL(cpi));
+	    "cpu-model", CPI_MODEL(cpi));
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
-		"stepping-id", CPI_STEP(cpi));
+	    "stepping-id", CPI_STEP(cpi));
 
 	/* type */
 
@@ -2847,7 +2907,7 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 	}
 	if (create)
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
-			"type", CPI_TYPE(cpi));
+		    "type", CPI_TYPE(cpi));
 
 	/* ext-family */
 
@@ -2879,7 +2939,7 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 	}
 	if (create)
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
-			"ext-model", CPI_MODEL_XTD(cpi));
+		    "ext-model", CPI_MODEL_XTD(cpi));
 
 	/* generation */
 
@@ -2939,9 +2999,9 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 	}
 	if (create) {
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
-			"chunks", CPI_CHUNKS(cpi));
+		    "chunks", CPI_CHUNKS(cpi));
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
-			"apic-id", CPI_APIC_ID(cpi));
+		    "apic-id", CPI_APIC_ID(cpi));
 		if (cpi->cpi_chipid >= 0) {
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
 			    "chip#", cpi->cpi_chipid);
@@ -2986,9 +3046,9 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 	}
 	if (create) {
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
-			"ext-cpuid-features", CPI_FEATURES_XTD_EDX(cpi));
+		    "ext-cpuid-features", CPI_FEATURES_XTD_EDX(cpi));
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
-			"ext-cpuid-features-ecx", CPI_FEATURES_XTD_ECX(cpi));
+		    "ext-cpuid-features-ecx", CPI_FEATURES_XTD_ECX(cpi));
 	}
 
 	/*
@@ -3102,4 +3162,11 @@ getl2cacheinfo(cpu_t *cpu, int *csz, int *lsz, int *assoc)
 		break;
 	}
 	return (l2i->l2i_ret);
+}
+
+size_t
+cpuid_get_mwait_size(cpu_t *cpu)
+{
+	ASSERT(cpuid_checkpass(cpu, 2));
+	return (cpu->cpu_m.mcpu_cpi->cpi_mwait.mon_max);
 }

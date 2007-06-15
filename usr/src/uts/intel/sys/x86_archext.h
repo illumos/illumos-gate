@@ -365,12 +365,13 @@ typedef	struct	mtrrvar {
 #define	X86_CX16	0x00080000
 #define	X86_CMP		0x00100000
 #define	X86_TSCP	0x00200000
+#define	X86_MWAIT	0x00400000
 #define	X86_CPUID	0x01000000
 
 #define	FMT_X86_FEATURE						\
 	"\20"							\
 	"\31cpuid"						\
-	"\26tscp\25cmp\24cx16\23sse3\22nx\21asysc"		\
+	"\27mwait\26tscp\25cmp\24cx16\23sse3\22nx\21asysc"	\
 	"\20htt\17sse2\16sse\15sep\14pat\13cx8\12pae\11mca"	\
 	"\10mmx\7cmov\6de\5pge\4mtrr\3msr\2tsc\1lgpg"
 
@@ -581,6 +582,7 @@ extern void add_cpunode2devtree(processorid_t, struct cpuid_info *);
 
 extern void cpuid_get_addrsize(struct cpu *, uint_t *, uint_t *);
 extern uint_t cpuid_get_dtlb_nent(struct cpu *, size_t);
+extern size_t cpuid_get_mwait_size(struct cpu *cpu);
 
 extern uint_t workaround_errata(struct cpu *);
 

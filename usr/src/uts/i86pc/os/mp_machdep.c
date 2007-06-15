@@ -38,13 +38,16 @@
 #include <sys/x86_archext.h>
 #include <sys/cpupart.h>
 #include <sys/cpuvar.h>
+#include <sys/cpu.h>
 #include <sys/pghw.h>
 #include <sys/disp.h>
 #include <sys/archsystm.h>
 #include <sys/machsystm.h>
+#include <sys/sysmacros.h>
 #include <sys/param.h>
 #include <sys/promif.h>
 #include <sys/mach_intr.h>
+#include <vm/hat_i86.h>
 
 #define	OFFSETOF(s, m)		(size_t)(&(((s *)0)->m))
 
@@ -73,6 +76,8 @@ static hrtime_t dummy_hrtime(void);
 static void dummy_scalehrtime(hrtime_t *);
 static void cpu_idle(void);
 static void cpu_wakeup(cpu_t *, int);
+static void cpu_idle_mwait(void);
+static void cpu_wakeup_mwait(cpu_t *, int);
 /*
  *	External reference functions
  */
@@ -143,6 +148,11 @@ static ushort_t mach_ver[4] = {0, 0, 0, 0};
  * no work to do.
  */
 int	idle_cpu_use_hlt = 1;
+
+/*
+ * If non-zero, idle cpus will use mwait if available to halt instead of hlt.
+ */
+int	idle_cpu_prefer_mwait = 1;
 
 
 /*ARGSUSED*/
@@ -422,6 +432,172 @@ cpu_wakeup(cpu_t *cpu, int bound)
 		poke_cpu(cpu_found);
 }
 
+/*
+ * Idle the present CPU until awoken via touching its monitored line
+ */
+static void
+cpu_idle_mwait(void)
+{
+	volatile uint32_t	*mcpu_mwait = CPU->cpu_m.mcpu_mwait;
+	cpu_t			*cpup = CPU;
+	processorid_t		cpun = cpup->cpu_id;
+	cpupart_t		*cp = cpup->cpu_part;
+	int			hset_update = 1;
+
+	/*
+	 * Set our mcpu_mwait here, so we can tell if anyone trys to
+	 * wake us between now and when we call mwait.  No other cpu will
+	 * attempt to set our mcpu_mwait until we add ourself to the haltset.
+	 */
+	*mcpu_mwait = MWAIT_HALTED;
+
+	/*
+	 * If this CPU is online, and there's multiple CPUs
+	 * in the system, then we should notate our halting
+	 * by adding ourselves to the partition's halted CPU
+	 * bitmap. This allows other CPUs to find/awaken us when
+	 * work becomes available.
+	 */
+	if (cpup->cpu_flags & CPU_OFFLINE || ncpus == 1)
+		hset_update = 0;
+
+	/*
+	 * Add ourselves to the partition's halted CPUs bitmask
+	 * and set our HALTED flag, if necessary.
+	 *
+	 * When a thread becomes runnable, it is placed on the queue
+	 * and then the halted cpuset is checked to determine who
+	 * (if anyone) should be awoken. We therefore need to first
+	 * add ourselves to the halted cpuset, and and then check if there
+	 * is any work available.
+	 *
+	 * Note that memory barriers after updating the HALTED flag
+	 * are not necessary since an atomic operation (updating the bitmap)
+	 * immediately follows. On x86 the atomic operation acts as a
+	 * memory barrier for the update of cpu_disp_flags.
+	 */
+	if (hset_update) {
+		cpup->cpu_disp_flags |= CPU_DISP_HALTED;
+		CPUSET_ATOMIC_ADD(cp->cp_mach->mc_haltset, cpun);
+	}
+
+	/*
+	 * Check to make sure there's really nothing to do.
+	 * Work destined for this CPU may become available after
+	 * this check. We'll be notified through the clearing of our
+	 * bit in the halted CPU bitmask, and a write to our mcpu_mwait.
+	 *
+	 * disp_anywork() checks disp_nrunnable, so we do not have to later.
+	 */
+	if (disp_anywork()) {
+		if (hset_update) {
+			cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
+			CPUSET_ATOMIC_DEL(cp->cp_mach->mc_haltset, cpun);
+		}
+		return;
+	}
+
+	/*
+	 * We're on our way to being halted.
+	 * To avoid a lost wakeup, arm the monitor before checking if another
+	 * cpu wrote to mcpu_mwait to wake us up.
+	 */
+	i86_monitor(mcpu_mwait, 0, 0);
+	if (*mcpu_mwait == MWAIT_HALTED) {
+		tlb_going_idle();
+		i86_mwait(0, 0);
+		tlb_service();
+	}
+
+	/*
+	 * We're no longer halted
+	 */
+	if (hset_update) {
+		cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
+		CPUSET_ATOMIC_DEL(cp->cp_mach->mc_haltset, cpun);
+	}
+}
+
+/*
+ * If "cpu" is halted in mwait, then wake it up clearing its halted bit in
+ * advance.  Otherwise, see if other CPUs in the cpu partition are halted and
+ * need to be woken up so that they can steal the thread we placed on this CPU.
+ * This function is only used on MP systems.
+ */
+static void
+cpu_wakeup_mwait(cpu_t *cp, int bound)
+{
+	cpupart_t	*cpu_part;
+	uint_t		cpu_found;
+	int		result;
+
+	cpu_part = cp->cpu_part;
+
+	/*
+	 * Clear the halted bit for that CPU since it will be woken up
+	 * in a moment.
+	 */
+	if (CPU_IN_SET(cpu_part->cp_mach->mc_haltset, cp->cpu_id)) {
+		/*
+		 * Clear the halted bit for that CPU since it will be
+		 * poked in a moment.
+		 */
+		CPUSET_ATOMIC_DEL(cpu_part->cp_mach->mc_haltset, cp->cpu_id);
+		/*
+		 * We may find the current CPU present in the halted cpuset
+		 * if we're in the context of an interrupt that occurred
+		 * before we had a chance to clear our bit in cpu_idle().
+		 * Waking ourself is obviously unnecessary, since if
+		 * we're here, we're not halted.
+		 *
+		 * monitor/mwait wakeup via writing to our cache line is
+		 * harmless and less expensive than always checking if we
+		 * are waking ourself which is an uncommon case.
+		 */
+		MWAIT_WAKEUP(cp);	/* write to monitored line */
+		return;
+	} else {
+		/*
+		 * This cpu isn't halted, but it's idle or undergoing a
+		 * context switch. No need to awaken anyone else.
+		 */
+		if (cp->cpu_thread == cp->cpu_idle_thread ||
+		    cp->cpu_disp_flags & CPU_DISP_DONTSTEAL)
+			return;
+	}
+
+	/*
+	 * No need to wake up other CPUs if the thread we just enqueued
+	 * is bound.
+	 */
+	if (bound)
+		return;
+
+
+	/*
+	 * See if there's any other halted CPUs. If there are, then
+	 * select one, and awaken it.
+	 * It's possible that after we find a CPU, somebody else
+	 * will awaken it before we get the chance.
+	 * In that case, look again.
+	 */
+	do {
+		CPUSET_FIND(cpu_part->cp_mach->mc_haltset, cpu_found);
+		if (cpu_found == CPUSET_NOTINSET)
+			return;
+
+		ASSERT(cpu_found >= 0 && cpu_found < NCPU);
+		CPUSET_ATOMIC_XDEL(cpu_part->cp_mach->mc_haltset, cpu_found,
+		    result);
+	} while (result < 0);
+
+	/*
+	 * Do not check if cpu_found is ourself as monitor/mwait wakeup is
+	 * cheap.
+	 */
+	MWAIT_WAKEUP(cpu[cpu_found]);	/* write to monitored line */
+}
+
 void (*cpu_pause_handler)(volatile char *) = NULL;
 
 static int
@@ -474,7 +650,7 @@ mach_get_platform(int owner)
 	clt_opsp = (void **)mach_set[owner];
 	if (mach_ver[owner] == (ushort_t)PSM_INFO_VER01)
 		total_ops = sizeof (struct psm_ops_ver01) /
-				sizeof (void (*)(void));
+		    sizeof (void (*)(void));
 	else if (mach_ver[owner] == (ushort_t)PSM_INFO_VER01_1)
 		/* no psm_notify_func */
 		total_ops = OFFSETOF(struct psm_ops, psm_notify_func) /
@@ -534,16 +710,16 @@ mach_construct_info()
 	if (conflict_owner) {
 		/* remove all psm modules except uppc */
 		cmn_err(CE_WARN,
-			"Conflicts detected on the following PSM modules:");
+		    "Conflicts detected on the following PSM modules:");
 		mutex_enter(&psmsw_lock);
 		for (swp = psmsw->psw_forw; swp != psmsw; swp = swp->psw_forw) {
 			if (swp->psw_infop->p_owner == conflict_owner)
 				cmn_err(CE_WARN, "%s ",
-					swp->psw_infop->p_mach_idstring);
+				    swp->psw_infop->p_mach_idstring);
 		}
 		mutex_exit(&psmsw_lock);
 		cmn_err(CE_WARN,
-			"Setting the system back to SINGLE processor mode!");
+		    "Setting the system back to SINGLE processor mode!");
 		cmn_err(CE_WARN,
 		    "Please edit /etc/mach to remove the invalid PSM module.");
 		return;
@@ -604,12 +780,56 @@ mach_init()
 
 	/*
 	 * Initialize the dispatcher's function hooks
-	 * to enable CPU halting when idle
+	 * to enable CPU halting when idle.
+	 * Do not use monitor/mwait if idle_cpu_use_hlt is not set(spin idle).
+	 * Allocate monitor/mwait buffer for cpu0.
 	 */
-	if (idle_cpu_use_hlt)
-		idle_cpu = cpu_idle;
+	if (idle_cpu_use_hlt) {
+		if ((x86_feature & X86_MWAIT) && idle_cpu_prefer_mwait) {
+			CPU->cpu_m.mcpu_mwait = mach_alloc_mwait(CPU);
+			idle_cpu = cpu_idle_mwait;
+		} else {
+			idle_cpu = cpu_idle;
+		}
+	}
 
 	mach_smpinit();
+}
+
+/*
+ * Return a pointer to memory suitable for monitor/mwait use.  Memory must be
+ * aligned as specified by cpuid (a cache line size).
+ */
+uint32_t *
+mach_alloc_mwait(cpu_t *cp)
+{
+	size_t		mwait_size = cpuid_get_mwait_size(cp);
+	uint32_t	*ret;
+
+	if (mwait_size < sizeof (uint32_t) || !ISP2(mwait_size))
+		panic("Can't handle mwait size %ld", (long)mwait_size);
+
+	/*
+	 * kmem_alloc() returns cache line size aligned data for mwait_size
+	 * allocations.  mwait_size is currently cache line sized.  Neither
+	 * of these implementation details are guarantied to be true in the
+	 * future.
+	 *
+	 * First try allocating mwait_size as kmem_alloc() currently returns
+	 * correctly aligned memory.  If kmem_alloc() does not return
+	 * mwait_size aligned memory, then use mwait_size ROUNDUP.
+	 */
+	ret = kmem_zalloc(mwait_size, KM_SLEEP);
+	if (ret == (uint32_t *)P2ROUNDUP((uintptr_t)ret, mwait_size)) {
+		*ret = MWAIT_RUNNING;
+		return (ret);
+	} else {
+		kmem_free(ret, mwait_size);
+		ret = kmem_zalloc(mwait_size * 2, KM_SLEEP);
+		ret = (uint32_t *)P2ROUNDUP((uintptr_t)ret, mwait_size);
+		*ret = MWAIT_RUNNING;
+		return (ret);
+	}
 }
 
 static void
@@ -674,7 +894,10 @@ mach_smpinit(void)
 	 * when a thread becomes runnable.
 	 */
 	if (idle_cpu_use_hlt)
-		disp_enq_thread = cpu_wakeup;
+		if ((x86_feature & X86_MWAIT) && idle_cpu_prefer_mwait)
+			disp_enq_thread = cpu_wakeup_mwait;
+		else
+			disp_enq_thread = cpu_wakeup;
 
 	if (pops->psm_disable_intr)
 		psm_disable_intr = pops->psm_disable_intr;
@@ -684,11 +907,11 @@ mach_smpinit(void)
 	psm_get_ipivect = pops->psm_get_ipivect;
 
 	(void) add_avintr((void *)NULL, XC_HI_PIL, xc_serv, "xc_hi_intr",
-		(*pops->psm_get_ipivect)(XC_HI_PIL, PSM_INTR_IPI_HI),
-		(caddr_t)X_CALL_HIPRI, NULL, NULL, NULL);
+	    (*pops->psm_get_ipivect)(XC_HI_PIL, PSM_INTR_IPI_HI),
+	    (caddr_t)X_CALL_HIPRI, NULL, NULL, NULL);
 	(void) add_avintr((void *)NULL, XC_MED_PIL, xc_serv, "xc_med_intr",
-		(*pops->psm_get_ipivect)(XC_MED_PIL, PSM_INTR_IPI_LO),
-		(caddr_t)X_CALL_MEDPRI, NULL, NULL, NULL);
+	    (*pops->psm_get_ipivect)(XC_MED_PIL, PSM_INTR_IPI_LO),
+	    (caddr_t)X_CALL_MEDPRI, NULL, NULL, NULL);
 
 	(void) (*pops->psm_get_ipivect)(XC_CPUPOKE_PIL, PSM_INTR_POKE);
 }
@@ -1089,7 +1312,7 @@ mach_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 	switch (intr_op) {
 	case PSM_INTR_OP_CHECK_MSI:
 		*result = hdlp->ih_type & ~(DDI_INTR_TYPE_MSI |
-			    DDI_INTR_TYPE_MSIX);
+		    DDI_INTR_TYPE_MSIX);
 		break;
 	case PSM_INTR_OP_ALLOC_VECTORS:
 		if (hdlp->ih_type == DDI_INTR_TYPE_FIXED)
