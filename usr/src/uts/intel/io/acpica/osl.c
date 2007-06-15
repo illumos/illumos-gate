@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -221,9 +221,9 @@ AcpiOsTableOverride(ACPI_TABLE_HEADER *ExistingTable,
 
 #ifdef	DEBUG
 	cmn_err(CE_NOTE, "!acpica: table [%s] v%d OEM ID [%s]"
-		    " OEM TABLE ID [%s] OEM rev %x",
-		    signature, ExistingTable->Revision, oemid, oemtableid,
-		    ExistingTable->OemRevision);
+	    " OEM TABLE ID [%s] OEM rev %x",
+	    signature, ExistingTable->Revision, oemid, oemtableid,
+	    ExistingTable->OemRevision);
 #endif
 
 	/* File name format is "signature_oemid_oemtableid.dat" */
@@ -487,7 +487,7 @@ AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS PhysicalAddress,
 {
 	/* FUTUREWORK: test PhysicalAddress for > 32 bits */
 	*LogicalAddress = psm_map_new((paddr_t)PhysicalAddress,
-		(size_t)Size, PSM_PROT_WRITE | PSM_PROT_READ);
+	    (size_t)Size, PSM_PROT_WRITE | PSM_PROT_READ);
 
 	return (*LogicalAddress == NULL ? AE_NO_MEMORY : AE_OK);
 }
@@ -557,7 +557,7 @@ AcpiOsInstallInterruptHandler(UINT32 InterruptNumber,
 #endif
 
 	retval = add_avintr(NULL, SCI_IPL, (avfunc)acpi_wrapper_isr,
-				"ACPI SCI", sci_vect, NULL, NULL, NULL, NULL);
+	    "ACPI SCI", sci_vect, NULL, NULL, NULL, NULL);
 	if (retval) {
 		acpi_intr_hooked = 1;
 		return (AE_OK);
@@ -576,7 +576,7 @@ AcpiOsRemoveInterruptHandler(UINT32 InterruptNumber,
 #endif
 	if (acpi_intr_hooked) {
 		rem_avintr(NULL, LOCK_LEVEL - 1, (avfunc)acpi_wrapper_isr,
-				InterruptNumber);
+		    InterruptNumber);
 		acpi_intr_hooked = 0;
 	}
 	return (AE_OK);
@@ -607,7 +607,7 @@ AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK  Function,
 		 * Create taskqs for event handling
 		 */
 		if (init_event_queues() != AE_OK)
-		    return (AE_ERROR);
+			return (AE_ERROR);
 	}
 
 	if (ddi_taskq_dispatch(osl_eventq[Type], Function, Context,
@@ -696,7 +696,7 @@ AcpiOsReadPort(ACPI_IO_ADDRESS Address, UINT32 *Value, UINT32 Width)
 	p = osl_io_find_perm(Address);
 	if (p && (p->perm & OSL_IO_READ) == 0) {
 		cmn_err(CE_WARN, "!AcpiOsReadPort: %lx %u not permitted",
-			    (long)Address, Width);
+		    (long)Address, Width);
 		*Value = 0xffffffff;
 		return (AE_ERROR);
 	}
@@ -713,7 +713,7 @@ AcpiOsReadPort(ACPI_IO_ADDRESS Address, UINT32 *Value, UINT32 Width)
 		break;
 	default:
 		cmn_err(CE_WARN, "!AcpiOsReadPort: %lx %u failed",
-			    (long)Address, Width);
+		    (long)Address, Width);
 		return (AE_BAD_PARAMETER);
 	}
 	return (AE_OK);
@@ -814,18 +814,15 @@ AcpiOsReadPciConfiguration(ACPI_PCI_ID *PciId, UINT32 Register,
 	switch (Width) {
 	case 8:
 		*((UINT64 *)Value) = (UINT64)(*pci_getb_func)
-					(PciId->Bus, PciId->Device,
-						PciId->Function, Register);
+		    (PciId->Bus, PciId->Device, PciId->Function, Register);
 		break;
 	case 16:
 		*((UINT64 *)Value) = (UINT64)(*pci_getw_func)
-					(PciId->Bus, PciId->Device,
-						PciId->Function, Register);
+		    (PciId->Bus, PciId->Device, PciId->Function, Register);
 		break;
 	case 32:
 		*((UINT64 *)Value) = (UINT64)(*pci_getl_func)
-					(PciId->Bus, PciId->Device,
-						PciId->Function, Register);
+		    (PciId->Bus, PciId->Device, PciId->Function, Register);
 		break;
 	case 64:
 	default:
@@ -856,15 +853,15 @@ AcpiOsWritePciConfiguration(ACPI_PCI_ID *PciId, UINT32 Register,
 	switch (Width) {
 	case 8:
 		(*pci_putb_func)(PciId->Bus, PciId->Device, PciId->Function,
-					Register, (uint8_t)Value);
+		    Register, (uint8_t)Value);
 		break;
 	case 16:
 		(*pci_putw_func)(PciId->Bus, PciId->Device, PciId->Function,
-					Register, (uint16_t)Value);
+		    Register, (uint16_t)Value);
 		break;
 	case 32:
 		(*pci_putl_func)(PciId->Bus, PciId->Device, PciId->Function,
-					Register, (uint32_t)Value);
+		    Register, (uint32_t)Value);
 		break;
 	case 64:
 	default:
@@ -888,10 +885,9 @@ AcpiOsWritePciConfiguration(ACPI_PCI_ID *PciId, UINT32 Register,
  * all 0 when ACPI CA can't figure them out.
  *
  * Some BIOSes implement _BBN() by reading PCI config space
- * one bus #0 - which means that we'll recurse when we attempt
+ * on bus #0 - which means that we'll recurse when we attempt
  * to create the devinfo-to-ACPI map.  If Derive is called during
- * create_d2a_map or with bus #0, we don't translate the bus # and
- * return.
+ * create_d2a_map, we don't translate the bus # and return.
  */
 void
 AcpiOsDerivePciId(ACPI_HANDLE rhandle, ACPI_HANDLE chandle,
@@ -903,10 +899,9 @@ AcpiOsDerivePciId(ACPI_HANDLE rhandle, ACPI_HANDLE chandle,
 
 
 	/*
-	 * See above - avoid recursing during create_d2a_map,
-	 * and never translate bus# 0.
+	 * See above - avoid recursing during create_d2a_map.
 	 */
-	if ((creating_d2a_map) || ((*PciId)->Bus == 0))
+	if (creating_d2a_map)
 		return;
 
 	/*
@@ -1126,7 +1121,7 @@ acpica_find_pcibus(int busno, ACPI_HANDLE *rh)
 
 				/* Decree _BBN == n from PCI<n> */
 				if (AcpiGetName(busobj, ACPI_SINGLE_NAME, &rb)
-					    != AE_OK) {
+				    != AE_OK) {
 					return (AE_ERROR);
 				}
 				bbn = ((char *)rb.Pointer)[3] - '0';
@@ -1203,7 +1198,8 @@ hexdig(int c)
 	int x = ((c < 'a') || (c > 'z')) ? c : (c - ' ');
 	int j = sizeof (hextab);
 
-	while (--j && (x != hextab[j]));
+	while (--j && (x != hextab[j])) {
+	}
 	return (j);
 }
 
@@ -1238,7 +1234,7 @@ acpica_eval_int(ACPI_HANDLE dev, char *method, int *rint)
 	rb.Pointer = &ro;
 	rb.Length = sizeof (ro);
 	if ((status = AcpiEvaluateObjectTyped(dev, method, NULL, &rb,
-						ACPI_TYPE_INTEGER)) == AE_OK)
+	    ACPI_TYPE_INTEGER)) == AE_OK)
 		*rint = ro.Integer.Value;
 
 	return (status);
@@ -1369,7 +1365,7 @@ new_d2a_entry(dev_info_t *dip, ACPI_HANDLE acpiobj, int bus, int dev, int func)
 		if (AcpiGetName(acpiobj, ACPI_FULL_PATHNAME, &rb) == AE_OK) {
 
 			cmn_err(CE_NOTE, "d2a entry: %s %s %d/0x%x/%d",
-				pathname, (char *)rb.Pointer, bus, dev, func);
+			    pathname, (char *)rb.Pointer, bus, dev, func);
 			AcpiOsFree(rb.Pointer);
 		}
 	}
