@@ -26535,12 +26535,12 @@ send:
 
 		DTRACE_PROBE4(ip4__physical__out__start, ill_t *, NULL,
 		    ill_t *, ire->ire_ipif->ipif_ill, ipha_t *, ipha1,
-		    mblk_t *, mp);
+		    mblk_t *, ipsec_mp);
 		FW_HOOKS(ipst->ips_ip4_physical_out_event,
 		    ipst->ips_ipv4firewall_physical_out,
-		    NULL, ire->ire_ipif->ipif_ill, ipha1, mp, mp, ipst);
-		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
-		if (mp == NULL)
+		    NULL, ire->ire_ipif->ipif_ill, ipha1, ipsec_mp, mp, ipst);
+		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, ipsec_mp);
+		if (ipsec_mp == NULL)
 			goto drop_pkt;
 
 		ip1dbg(("ip_wput_ipsec_out: calling ip_xmit_v4\n"));

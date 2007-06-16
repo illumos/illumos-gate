@@ -43,6 +43,8 @@
 #include <sys/kmem.h>
 #include <sys/param.h>
 #include <sys/socket.h>
+#include <sys/strsubr.h>
+#include <sys/pattr.h>
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
@@ -54,6 +56,7 @@
 #include <inet/mi.h>
 #include <inet/mib2.h>
 #include <inet/ip.h>
+#include <inet/ip_impl.h>
 #include <inet/ip6.h>
 #include <inet/ip_ndp.h>
 #include <inet/arp.h>
@@ -99,6 +102,7 @@ static ire_t   	*ire_round_robin(irb_t *, zoneid_t, ire_ftable_args_t *,
     ip_stack_t *);
 static void		ire_del_host_redir(ire_t *, char *);
 static boolean_t	ire_find_best_route(struct radix_node *, void *);
+static int	ip_send_align_hcksum_flags(mblk_t *, ill_t *);
 
 /*
  * Lookup a route in forwarding table. A specific lookup is indicated by
@@ -1219,11 +1223,14 @@ route_to_dst(const struct sockaddr *dst_addr, zoneid_t zoneid, ip_stack_t *ipst)
  * to a specified V4 dst (which may be onlink or offlink). The ifindex may or
  * may not be 0. A non-null ifindex indicates IP Filter has stipulated
  * an outgoing interface and requires the nexthop to be on that interface.
- * IP WILL NOT DO  the following to the data packet before sending it out:
+ * IP WILL NOT DO the following to the data packet before sending it out:
  *	a. manipulate ttl
- *	b. checksuming
- *	c. ipsec work
- *	d. fragmentation
+ *	b. ipsec work
+ *	c. fragmentation
+ *
+ * If the packet has been prepared for hardware checksum then it will be
+ * passed off to ip_send_align_cksum() to check that the flags set on the
+ * packet are in alignment with the capabilities of the new outgoing NIC.
  *
  * Return values:
  *	0:		IP was able to send of the data pkt
@@ -1370,12 +1377,12 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 	}
 
 	ASSERT(ire->ire_type != IRE_CACHE || ire->ire_nce != NULL);
+
 	/*
 	 * If needed, we will create the ire cache entry for the
 	 * nexthop, resolve its link-layer address and then send
-	 * the packet out without ttl, checksumming, IPSec processing.
+	 * the packet out without ttl or IPSec processing.
 	 */
-
 	switch (ire->ire_type) {
 	case IRE_IF_NORESOLVER:
 	case IRE_CACHE:
@@ -1406,6 +1413,12 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 		}
 		break;
 	}
+
+	if (DB_CKSUMFLAGS(mp)) {
+		if (ip_send_align_hcksum_flags(mp, ire_to_ill(ire_cache)))
+			goto cleanup;
+	}
+
 	/*
 	 * Now that we have the ire cache entry of the nexthop, call
 	 * ip_xmit_v4() to trigger mac addr resolution
@@ -1413,6 +1426,7 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 	 */
 
 	value = ip_xmit_v4(mp, ire_cache, NULL, B_FALSE);
+cleanup:
 	ire_refrele(ire_cache);
 	/*
 	 * At this point, the reference for these have already been
@@ -1454,6 +1468,248 @@ discard:
 	netstack_rele(ns);
 	return (value);
 }
+
+
+/*
+ * We don't check for dohwcksum in here because it should be being used
+ * elsewhere to control what flags are being set on the mblk.  That is,
+ * if DB_CKSUMFLAGS() is non-zero then we assume dohwcksum to be true
+ * for this packet.
+ *
+ * This function assumes that it is *only* being called for TCP or UDP
+ * packets and nothing else.
+ */
+static int
+ip_send_align_hcksum_flags(mblk_t *mp, ill_t *ill)
+{
+	int illhckflags;
+	int mbhckflags;
+	uint16_t *up;
+	uint32_t cksum;
+	ipha_t *ipha;
+	ip6_t *ip6;
+	int proto;
+	int ipversion;
+	int length;
+	int start;
+	ip6_pkt_t ipp;
+
+	mbhckflags = DB_CKSUMFLAGS(mp);
+	ASSERT(mbhckflags != 0);
+	ASSERT(mp->b_datap->db_type == M_DATA);
+	/*
+	 * Since this function only knows how to manage the hardware checksum
+	 * issue, reject and packets that have flags set on the aside from
+	 * checksum related attributes as we cannot necessarily safely map
+	 * that packet onto the new NIC.  Packets that can be potentially
+	 * dropped here include those marked for LSO.
+	 */
+	if ((mbhckflags &
+	    ~(HCK_FULLCKSUM|HCK_PARTIALCKSUM|HCK_IPV4_HDRCKSUM)) != 0) {
+		DTRACE_PROBE2(pbr__incapable, (mblk_t *), mp, (ill_t *), ill);
+		freemsg(mp);
+		return (-1);
+	}
+
+	ipha = (ipha_t *)mp->b_rptr;
+
+	/*
+	 * Find out what the new NIC is capable of, if anything, and
+	 * only allow it to be used with M_DATA mblks being sent out.
+	 */
+	if (ILL_HCKSUM_CAPABLE(ill)) {
+		illhckflags = ill->ill_hcksum_capab->ill_hcksum_txflags;
+	} else {
+		/*
+		 * No capabilities, so turn off everything.
+		 */
+		illhckflags = 0;
+		(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0, 0, 0);
+		mp->b_datap->db_struioflag &= ~STRUIO_IP;
+	}
+
+	DTRACE_PROBE4(pbr__info__a, (mblk_t *), mp, (ill_t *), ill,
+	    uint32_t, illhckflags, uint32_t, mbhckflags);
+	/*
+	 * This block of code that looks for the position of the TCP/UDP
+	 * checksum is early in this function because we need to know
+	 * what needs to be blanked out for the hardware checksum case.
+	 *
+	 * That we're in this function implies that the packet is either
+	 * TCP or UDP on Solaris, so checks are made for one protocol and
+	 * if that fails, the other is therefore implied.
+	 */
+	ipversion = IPH_HDR_VERSION(ipha);
+
+	if (ipversion == IPV4_VERSION) {
+		proto = ipha->ipha_protocol;
+		if (proto == IPPROTO_TCP) {
+			up = IPH_TCPH_CHECKSUMP(ipha, IP_SIMPLE_HDR_LENGTH);
+		} else {
+			up = IPH_UDPH_CHECKSUMP(ipha, IP_SIMPLE_HDR_LENGTH);
+		}
+	} else {
+		uint8_t lasthdr;
+
+		/*
+		 * Nothing I've seen indicates that IPv6 checksum'ing
+		 * precludes the presence of extension headers, so we
+		 * can't just look at the next header value in the IPv6
+		 * packet header to see if it is TCP/UDP.
+		 */
+		ip6 = (ip6_t *)ipha;
+		(void) memset(&ipp, 0, sizeof (ipp));
+		start = ip_find_hdr_v6(mp, ip6, &ipp, &lasthdr);
+		proto = lasthdr;
+
+		if (proto == IPPROTO_TCP) {
+			up = IPH_TCPH_CHECKSUMP(ipha, start);
+		} else {
+			up = IPH_UDPH_CHECKSUMP(ipha, start);
+		}
+	}
+
+	/*
+	 * The first case here is easiest:
+	 * mblk hasn't asked for full checksum, but the card supports it.
+	 *
+	 * In addition, check for IPv4 header capability.  Note that only
+	 * the mblk flag is checked and not ipversion.
+	 */
+	if ((((illhckflags & HCKSUM_INET_FULL_V4) && (ipversion == 4)) ||
+	    (((illhckflags & HCKSUM_INET_FULL_V6) && (ipversion == 6)))) &&
+	    ((mbhckflags & (HCK_FULLCKSUM|HCK_PARTIALCKSUM)) != 0)) {
+		int newflags = HCK_FULLCKSUM;
+
+		if ((mbhckflags & HCK_IPV4_HDRCKSUM) != 0) {
+			if ((illhckflags & HCKSUM_IPHDRCKSUM) != 0) {
+				newflags |= HCK_IPV4_HDRCKSUM;
+			} else {
+				/*
+				 * Rather than call a function, just inline
+				 * the computation of the basic IPv4 header.
+				 */
+				cksum = (ipha->ipha_dst >> 16) +
+				    (ipha->ipha_dst & 0xFFFF) +
+				    (ipha->ipha_src >> 16) +
+				    (ipha->ipha_src & 0xFFFF);
+				IP_HDR_CKSUM(ipha, cksum,
+				    ((uint32_t *)ipha)[0],
+				    ((uint16_t *)ipha)[4]);
+			}
+		}
+
+		*up = 0;
+		(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0,
+		    newflags, 0);
+		return (0);
+	}
+
+	DTRACE_PROBE2(pbr__info__b, int, ipversion, int, proto);
+
+	/*
+	 * Start calculating the pseudo checksum over the IP packet header.
+	 * Although the final pseudo checksum used by TCP/UDP consists of
+	 * more than just the address fields, we can use the result of
+	 * adding those together a little bit further down for IPv4.
+	 */
+	if (ipversion == IPV4_VERSION) {
+		cksum = (ipha->ipha_dst >> 16) + (ipha->ipha_dst & 0xFFFF) +
+		    (ipha->ipha_src >> 16) + (ipha->ipha_src & 0xFFFF);
+		start = IP_SIMPLE_HDR_LENGTH;
+		length = ntohs(ipha->ipha_length);
+		DTRACE_PROBE3(pbr__info__e, uint32_t, ipha->ipha_src,
+		    uint32_t, ipha->ipha_dst, int, cksum);
+	} else {
+		uint16_t *pseudo;
+
+		pseudo = (uint16_t *)&ip6->ip6_src;
+
+		/* calculate pseudo-header checksum */
+		cksum = pseudo[0] + pseudo[1] + pseudo[2] + pseudo[3] +
+		    pseudo[4] + pseudo[5] + pseudo[6] + pseudo[7] +
+		    pseudo[8] + pseudo[9] + pseudo[10] + pseudo[11] +
+		    pseudo[12] + pseudo[13] + pseudo[14] + pseudo[15];
+
+		length = ntohs(ip6->ip6_plen) + sizeof (ip6_t);
+	}
+
+	/* Fold the initial sum */
+	cksum = (cksum & 0xffff) + (cksum >> 16);
+
+	/*
+	 * If the packet was asking for an IPv4 header checksum to be
+	 * calculated but the interface doesn't support that, fill it in
+	 * using our pseudo checksum as a starting point.
+	 */
+	if (((mbhckflags & HCK_IPV4_HDRCKSUM) != 0) &&
+	    ((illhckflags & HCKSUM_IPHDRCKSUM) == 0)) {
+		/*
+		 * IP_HDR_CKSUM uses the 2rd arg to the macro in a destructive
+		 * way so pass in a copy of the checksum calculated thus far.
+		 */
+		uint32_t ipsum = cksum;
+
+		DB_CKSUMFLAGS(mp) &= ~HCK_IPV4_HDRCKSUM;
+
+		IP_HDR_CKSUM(ipha, ipsum, ((uint32_t *)ipha)[0],
+		    ((uint16_t *)ipha)[4]);
+	}
+
+	DTRACE_PROBE3(pbr__info__c, int, start, int, length, int, cksum);
+
+	if (proto == IPPROTO_TCP) {
+		cksum += IP_TCP_CSUM_COMP;
+	} else {
+		cksum += IP_UDP_CSUM_COMP;
+	}
+	cksum += htons(length - start);
+	cksum = (cksum & 0xffff) + (cksum >> 16);
+
+	/*
+	 * For TCP/UDP, we either want to setup the packet for partial
+	 * checksum or we want to do it all ourselves because the NIC
+	 * offers no support for either partial or full checksum.
+	 */
+	if ((illhckflags & HCKSUM_INET_PARTIAL) != 0) {
+		/*
+		 * The only case we care about here is if the mblk was
+		 * previously set for full checksum offload.  If it was
+		 * marked for partial (and the NIC does partial), then
+		 * we have nothing to do.  Similarly if the packet was
+		 * not set for partial or full, we do nothing as this
+		 * is cheaper than more work to set something up.
+		 */
+		if ((mbhckflags & HCK_FULLCKSUM) != 0) {
+			uint32_t offset;
+
+			if (proto == IPPROTO_TCP) {
+				offset = TCP_CHECKSUM_OFFSET;
+			} else {
+				offset = UDP_CHECKSUM_OFFSET;
+			}
+			*up = cksum;
+
+			DTRACE_PROBE3(pbr__info__f, int, length - start, int,
+			    cksum, int, offset);
+
+			(void) hcksum_assoc(mp, NULL, NULL, start,
+			    start + offset, length, 0,
+			    DB_CKSUMFLAGS(mp) | HCK_PARTIALCKSUM, 0);
+		}
+
+	} else if (mbhckflags & (HCK_FULLCKSUM|HCK_PARTIALCKSUM)) {
+		DB_CKSUMFLAGS(mp) &= ~(HCK_PARTIALCKSUM|HCK_FULLCKSUM);
+
+		*up = 0;
+		*up = IP_CSUM(mp, start, cksum);
+	}
+
+	DTRACE_PROBE4(pbr__info__d, (mblk_t *), mp, (ipha_t *), ipha,
+	    (uint16_t *), up, int, cksum);
+	return (0);
+}
+
 
 /* ire_walk routine invoked for ip_ire_report for each IRE. */
 void

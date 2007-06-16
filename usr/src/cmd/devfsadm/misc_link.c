@@ -204,6 +204,9 @@ static devfsadm_remove_t misc_remove_cbt[] = {
 	},
 	{ "enclosure", "^es/ses[0-9]+$", RM_POST,
 		ILEVEL_0, devfsadm_rm_all
+	},
+	{ "pseudo", "^pfil$",
+	    RM_PRE | RM_ALWAYS, ILEVEL_0, devfsadm_rm_all
 	}
 };
 

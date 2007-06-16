@@ -1765,8 +1765,16 @@ frdest_t *fdp;
 		inj_data.ni_physical = net_routeto(net_data_p, sinp);
 	}
 
-	/* disable hardware checksum */
-	DB_CKSUMFLAGS(mb) = 0;
+	/*
+	 * Clear the hardware checksum flags from packets that we are doing
+	 * input processing on as leaving them set will cause the outgoing
+	 * NIC (if it supports hardware checksum) to calculate them anew,
+	 * using the old (correct) checksums as the pseudo value to start
+	 * from.
+	 */
+	if (fin->fin_out == 0) {
+		DB_CKSUMFLAGS(mb) = 0;
+	}
 
 	*mpp = mb;
 
