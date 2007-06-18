@@ -192,10 +192,9 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		/* ---- default to LUN 0 ---- */
 		(void) tgt_find_value_int(x, XML_ELEMENT_LUN, &lun);
 
-		/* ---- read in current paramaters ---- */
+		/* ---- read in current parameters ---- */
 		snprintf(path, sizeof (path), "%s/%s/%s%d", target_basedir,
 		    iscsi, PARAMBASE, lun);
-printf("%s\n", path);
 		if ((xml_fd = open(path, O_RDONLY)) < 0) {
 			xml_rtn_msg(&msg, ERR_OPEN_PARAM_FILE_FAILED);
 			return (msg);
@@ -261,7 +260,7 @@ printf("%s\n", path);
 
 		/* ---- update the parameter node with new size ---- */
 		if ((c = tgt_node_alloc(XML_ELEMENT_SIZE, Uint64, &new_lu_size))
-			== False) {
+		    == False) {
 			xml_rtn_msg(&msg, ERR_NO_MEM);
 			return (msg);
 		}
