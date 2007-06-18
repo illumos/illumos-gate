@@ -817,6 +817,12 @@ mondo_recover_proc(uint16_t cpuid, int bn)
 				 */
 				continue;
 			}
+			if (tsbep->tte_tag.tag_invalid != 0) {
+				/*
+				 * Invalid tag, ingnore this entry.
+				 */
+				continue;
+			}
 			CHEETAH_LIVELOCK_STATSET(proc_tte, tsbe_tte);
 			idsr = getidsr();
 			if ((idsr & (IDSR_NACK_BIT(bn) |
@@ -850,7 +856,7 @@ next_tsbinfo:
 			tsbinfop = NULL;
 		}
 	} while (tsbinfop != NULL ||
-			((tsbp == ktsb_base) && !tried_kernel_tsb));
+	    ((tsbp == ktsb_base) && !tried_kernel_tsb));
 
 	CHEETAH_LIVELOCK_STAT(proc_tsb_fullscan);
 	CHEETAH_LIVELOCK_MAXSTAT(proc_claimed, pages_claimed);
@@ -979,7 +985,8 @@ done:
 	CHEETAH_LIVELOCK_ENTRY_SET(histp, recovery_time, \
 	    (end_hrt -  begin_hrt));
 
-	while (cas32(&sendmondo_in_recover, 1, 0) != 1);
+	while (cas32(&sendmondo_in_recover, 1, 0) != 1)
+		;
 
 	return (retval);
 }
