@@ -2576,6 +2576,8 @@ nxge_set_hw_mac_class_config(p_nxge_t nxgep)
 
 	for (i = 0; i < NXGE_MAX_MACS; i++) {
 		p_class_cfgp->mac_host_info[i].flag = 0;
+		p_class_cfgp->mac_host_info[i].rdctbl =
+		    p_cfgp->def_mac_rxdma_grpid;
 	}
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0, prop,

@@ -3266,6 +3266,8 @@ nxge_altmac_set(p_nxge_t nxgep, uint8_t *maddr, mac_addr_slot_t slot)
 	uint8_t addrn;
 	uint8_t portn;
 	npi_mac_addr_t altmac;
+	hostinfo_t mac_rdc;
+	p_nxge_class_pt_cfg_t clscfgp;
 
 	altmac.w2 = ((uint16_t)maddr[0] << 8) | ((uint16_t)maddr[1] & 0x0ff);
 	altmac.w1 = ((uint16_t)maddr[2] << 8) | ((uint16_t)maddr[3] & 0x0ff);
@@ -3277,6 +3279,21 @@ nxge_altmac_set(p_nxge_t nxgep, uint8_t *maddr, mac_addr_slot_t slot)
 	if (npi_mac_altaddr_entry(nxgep->npi_handle, OP_SET, portn,
 		addrn, &altmac) != NPI_SUCCESS)
 		return (EIO);
+
+	/*
+	 * Set the rdc table number for the host info entry
+	 * for this mac address slot.
+	 */
+	clscfgp = (p_nxge_class_pt_cfg_t)&nxgep->class_config;
+	mac_rdc.value = 0;
+	mac_rdc.bits.w0.rdc_tbl_num = clscfgp->mac_host_info[addrn].rdctbl;
+	mac_rdc.bits.w0.mac_pref = clscfgp->mac_host_info[addrn].mpr_npr;
+
+	if (npi_mac_hostinfo_entry(nxgep->npi_handle, OP_SET,
+	    nxgep->function_num, addrn, &mac_rdc) != NPI_SUCCESS) {
+		return (EIO);
+	}
+
 	/*
 	 * Enable comparison with the alternate MAC address.
 	 * While the first alternate addr is enabled by bit 1 of register
