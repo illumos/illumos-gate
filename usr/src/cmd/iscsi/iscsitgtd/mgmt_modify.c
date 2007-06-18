@@ -40,6 +40,7 @@
 #include <netdb.h>
 #include <libzfs.h>
 #include <priv.h>
+#include <libgen.h>
 
 #include <iscsitgt_impl.h>
 #include "queue.h"
@@ -104,9 +105,9 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 {
 	char		*msg		= NULL;
 	char		*name		= NULL;
-	char		*iscsi;
+	char		iscsi_path[MAXPATHLEN];
+	char		*iscsi		= NULL;
 	char		*prop		= NULL;
-	char		size_str[16];
 	char		path[MAXPATHLEN];
 	char		*m;
 	char		buf[512];		/* one sector size block */
@@ -143,6 +144,17 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		}
 	}
 
+	/*
+	 * Under base dir, file 'target name' is a symbolic link
+	 * to the real directory 'IQN name' which stores params and back
+	 * storage. Therefore we can easily get IQN name from target
+	 * name by read the symbolic link content.
+	 */
+	snprintf(path, sizeof (path), "%s/%s", target_basedir, name);
+	bzero(iscsi_path, sizeof (iscsi_path));
+	readlink(path, iscsi_path, sizeof (iscsi_path));
+	iscsi = basename(iscsi_path);
+
 	/* ---- Finished with these so go ahead and release the memory ---- */
 	free(name);
 
@@ -177,17 +189,13 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		}
 		new_lu_size /= 512LL;
 
-		if (tgt_find_value_str(x, XML_ELEMENT_INAME, &iscsi) == False) {
-			xml_rtn_msg(&msg, ERR_TARGCFG_MISSING_INAME);
-			return (msg);
-		}
-
 		/* ---- default to LUN 0 ---- */
 		(void) tgt_find_value_int(x, XML_ELEMENT_LUN, &lun);
 
 		/* ---- read in current paramaters ---- */
 		snprintf(path, sizeof (path), "%s/%s/%s%d", target_basedir,
 		    iscsi, PARAMBASE, lun);
+printf("%s\n", path);
 		if ((xml_fd = open(path, O_RDONLY)) < 0) {
 			xml_rtn_msg(&msg, ERR_OPEN_PARAM_FILE_FAILED);
 			return (msg);
@@ -252,9 +260,8 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		}
 
 		/* ---- update the parameter node with new size ---- */
-		snprintf(size_str, sizeof (size_str), "0x%llx", new_lu_size);
-		if ((c = tgt_node_alloc(XML_ELEMENT_SIZE, Uint64, size_str)) ==
-		    False) {
+		if ((c = tgt_node_alloc(XML_ELEMENT_SIZE, Uint64, &new_lu_size))
+			== False) {
 			xml_rtn_msg(&msg, ERR_NO_MEM);
 			return (msg);
 		}
@@ -287,9 +294,9 @@ modify_target(tgt_node_t *x, ucred_t *cred)
 		/* ---- send updates to current initiators via ASC/ASCQ ---- */
 		iscsi_capacity_change(iscsi, lun);
 
-		free(iscsi);
 		prop = NULL;
 		tgt_node_free(node);
+		change_made = True;
 	}
 
 	if (tgt_find_value_str(x, XML_ELEMENT_TPGT, &prop) == True) {
