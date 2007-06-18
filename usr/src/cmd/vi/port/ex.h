@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +68,7 @@ extern "C" {
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <libintl.h>
 
 #define MULTI_BYTE_MAX MB_LEN_MAX
 #define FTYPE(A)	(A.st_mode)
@@ -212,6 +212,7 @@ extern	 struct	option options[vi_NOPTS + 1];
  */
 var bool multibyte;
 var	bool	aiflag;		/* Append/change/insert with autoindent */
+var	bool	tagflg;		/* set for -t option and :tag command */
 var	bool	anymarks;	/* We have used '[a-z] */
 var	int	chng;		/* Warn "No write" */
 var	unsigned char	*Command;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,7 +115,7 @@ error(str, i)
 	unsigned char *str;
 	int i;
 {
-
+	tagflg = 0;
 	errcnt++;
 	noerror(str, i);
 }
@@ -155,7 +155,7 @@ error(str, i)
 	unsigned char *str;
 	int i;
 {
-
+	tagflg = 0;
 	errcnt++;
 	error0();
 	merror(str, i);
@@ -503,7 +503,7 @@ resetflav(void)
 void
 serror(unsigned char *str, unsigned char *cp)
 {
-
+	tagflg = 0;
 	error0();
 	smerror(str, cp);
 	error1(str);
