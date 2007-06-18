@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +63,24 @@ extern "C" {
  *			then it needs to be freed.
  *
  *			AES_ECB_MODE, AES_CBC_MODE, or AES_CTR_MODE
+ *			AES_CCM_MODE
+ *
+ * ac_ccm_mac_len:	Stores length of the MAC in CCM mode.
+ * ac_ccm_mac_buf:	Stores the intermediate value for MAC in CCM encrypt.
+ *			In CCM decrypt, stores the input MAC value.
+ * ac_ccm_data_len:	Length of the plaintext for CCM mode encrypt, or
+ *			length of the ciphertext for CCM mode decrypt.
+ * ac_ccm_processed_data_len:
+ *			Length of processed plaintext in CCM mode encrypt,
+ *			or length of processed ciphertex for CCM mode decrypt.
+ * ac_ccm_processed_mac_len:
+ *			Length of MAC data accumulated in CCM mode decrypt.
+ *
+ * ac_ccm_pt_buf:	Only used in CCM mode decrypt.  It stores the
+ *			decrypted plaintext to be returned when
+ *			MAC verification succeeds in decrypt_final.
+ *			Memory for this should be allocated in the AES module.
+ *
  */
 typedef struct aes_ctx {
 	void *ac_keysched;
@@ -75,6 +92,13 @@ typedef struct aes_ctx {
 	uint8_t *ac_lastp;
 	uint8_t *ac_copy_to;
 	uint32_t ac_flags;
+	size_t ac_ccm_mac_len;
+	uint64_t ac_ccm_mac_buf[2];
+	uint64_t ac_ccm_data_len;
+	size_t ac_ccm_processed_data_len;
+	size_t ac_ccm_processed_mac_len;
+	uint8_t *ac_ccm_pt_buf;
+	uint64_t ac_ccm_mac_input_buf[2];
 } aes_ctx_t;
 
 /*
@@ -90,12 +114,24 @@ typedef struct aes_ctx {
 #define	AES_ECB_MODE			0x00000002
 #define	AES_CBC_MODE			0x00000004
 #define	AES_CTR_MODE			0x00000008
+#define	AES_CCM_MODE			0x00000010
 
 /* CK_AES_CTR_PARAMS provides parameters to the CKM_AES_CTR mechanism */
 typedef struct CK_AES_CTR_PARAMS {
 	ulong_t	ulCounterBits;
 	uchar_t *cb;
 } CK_AES_CTR_PARAMS;
+
+/* CK_AES_CCM_PARAMS provides parameters to the CKM_AES_CCM mechanism */
+typedef struct CK_AES_CCM_PARAMS {
+	ulong_t ulMACSize;
+	ulong_t ulNonceSize;
+	ulong_t ulAuthDataSize;
+	ulong_t ulDataSize; /* used for plaintext or ciphertext */
+	uchar_t *nonce;
+	uchar_t *authData;
+} CK_AES_CCM_PARAMS;
+
 
 #ifdef _KERNEL
 /* needed for 32-bit applications running on 64-bit kernels */
@@ -105,11 +141,28 @@ typedef struct CK_AES_CTR_PARAMS32 {
 } CK_AES_CTR_PARAMS32;
 #endif /* _KERNEL */
 
+#ifdef _KERNEL
+/* needed for 32-bit applications running on 64-bit kernels */
+typedef struct CK_AES_CCM_PARAMS32 {
+	uint32_t ulMACSize;
+	uint32_t ulNonceSize;
+	uint32_t ulAuthDataSize;
+	uint32_t ulDataSize;
+	caddr32_t nonce;
+	caddr32_t authData;
+} CK_AES_CCM_PARAMS32;
+#endif /* _KERNEL */
+
 extern int aes_encrypt_contiguous_blocks(aes_ctx_t *, char *, size_t,
     crypto_data_t *);
 extern int aes_decrypt_contiguous_blocks(aes_ctx_t *, char *, size_t,
     crypto_data_t *);
 extern int aes_counter_final(aes_ctx_t *, crypto_data_t *);
+extern int aes_ccm_init(aes_ctx_t *, unsigned char *, size_t,
+    unsigned char *, size_t);
+extern int aes_ccm_validate_args(CK_AES_CCM_PARAMS *, boolean_t);
+extern int aes_ccm_encrypt_final(aes_ctx_t *, crypto_data_t *);
+extern int aes_ccm_decrypt_final(aes_ctx_t *, crypto_data_t *);
 
 #ifdef	__cplusplus
 }

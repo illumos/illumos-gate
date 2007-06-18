@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,7 +64,8 @@ typedef enum aes_mech_type {
 	AES_ECB_MECH_INFO_TYPE,		/* SUN_CKM_AES_ECB */
 	AES_CBC_MECH_INFO_TYPE,		/* SUN_CKM_AES_CBC */
 	AES_CBC_PAD_MECH_INFO_TYPE,	/* SUN_CKM_AES_CBC_PAD */
-	AES_CTR_MECH_INFO_TYPE		/* SUN_CKM_AES_CTR */
+	AES_CTR_MECH_INFO_TYPE,		/* SUN_CKM_AES_CTR */
+	AES_CCM_MECH_INFO_TYPE		/* SUN_CKM_AES_CCM */
 } aes_mech_type_t;
 
 /*
@@ -96,6 +97,11 @@ static crypto_mech_info_t aes_mech_info_tab[] = {
 	{SUN_CKM_AES_CTR, AES_CTR_MECH_INFO_TYPE,
 	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
 	    CRYPTO_FG_DECRYPT | CRYPTO_FG_DECRYPT_ATOMIC,
+	    AES_MIN_KEY_BYTES, AES_MAX_KEY_BYTES, CRYPTO_KEYSIZE_UNIT_IN_BYTES},
+	/* AES_CCM */
+	{SUN_CKM_AES_CCM, AES_CCM_MECH_INFO_TYPE,
+	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
+	    CRYPTO_FG_DECRYPT | CRYPTO_FG_DECRYPT_ATOMIC,
 	    AES_MIN_KEY_BYTES, AES_MAX_KEY_BYTES, CRYPTO_KEYSIZE_UNIT_IN_BYTES}
 };
 
@@ -110,10 +116,14 @@ static crypto_control_ops_t aes_control_ops = {
 	aes_provider_status
 };
 
-static int aes_common_init(crypto_ctx_t *, crypto_mechanism_t *,
+static int aes_encrypt_init(crypto_ctx_t *, crypto_mechanism_t *,
     crypto_key_t *, crypto_spi_ctx_template_t, crypto_req_handle_t);
+static int aes_decrypt_init(crypto_ctx_t *, crypto_mechanism_t *,
+    crypto_key_t *, crypto_spi_ctx_template_t, crypto_req_handle_t);
+static int aes_common_init(crypto_ctx_t *, crypto_mechanism_t *,
+    crypto_key_t *, crypto_spi_ctx_template_t, crypto_req_handle_t, boolean_t);
 static int aes_common_init_ctx(aes_ctx_t *, crypto_spi_ctx_template_t *,
-    crypto_mechanism_t *, crypto_key_t *, int);
+    crypto_mechanism_t *, crypto_key_t *, int, boolean_t);
 static int aes_encrypt_final(crypto_ctx_t *, crypto_data_t *,
     crypto_req_handle_t);
 static int aes_decrypt_final(crypto_ctx_t *, crypto_data_t *,
@@ -136,12 +146,12 @@ static int aes_decrypt_atomic(crypto_provider_handle_t, crypto_session_id_t,
     crypto_data_t *, crypto_spi_ctx_template_t, crypto_req_handle_t);
 
 static crypto_cipher_ops_t aes_cipher_ops = {
-	aes_common_init,
+	aes_encrypt_init,
 	aes_encrypt,
 	aes_encrypt_update,
 	aes_encrypt_final,
 	aes_encrypt_atomic,
-	aes_common_init,
+	aes_decrypt_init,
 	aes_decrypt,
 	aes_decrypt_update,
 	aes_decrypt_final,
@@ -270,6 +280,11 @@ aes_check_mech_param(crypto_mechanism_t *mechanism)
 		    mechanism->cm_param_len != sizeof (CK_AES_CTR_PARAMS))
 			rv = CRYPTO_MECHANISM_PARAM_INVALID;
 		break;
+	case AES_CCM_MECH_INFO_TYPE:
+		if (mechanism->cm_param != NULL &&
+		    mechanism->cm_param_len != sizeof (CK_AES_CCM_PARAMS))
+			rv = CRYPTO_MECHANISM_PARAM_INVALID;
+		break;
 	default:
 		rv = CRYPTO_MECHANISM_INVALID;
 	}
@@ -318,13 +333,29 @@ aes_provider_status(crypto_provider_handle_t provider, uint_t *status)
 	*status = CRYPTO_PROVIDER_READY;
 }
 
+static int
+aes_encrypt_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
+    crypto_key_t *key, crypto_spi_ctx_template_t template,
+    crypto_req_handle_t req) {
+	return (aes_common_init(ctx, mechanism, key, template, req, B_TRUE));
+}
+
+static int
+aes_decrypt_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
+    crypto_key_t *key, crypto_spi_ctx_template_t template,
+    crypto_req_handle_t req) {
+	return (aes_common_init(ctx, mechanism, key, template, req, B_FALSE));
+}
+
+
+
 /*
  * KCF software provider encrypt entry points.
  */
 static int
 aes_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
     crypto_key_t *key, crypto_spi_ctx_template_t template,
-    crypto_req_handle_t req)
+    crypto_req_handle_t req, boolean_t is_encrypt_init)
 {
 
 /* EXPORT DELETE START */
@@ -350,7 +381,8 @@ aes_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 	if ((aes_ctx = kmem_zalloc(sizeof (aes_ctx_t), kmflag)) == NULL)
 		return (CRYPTO_HOST_MEMORY);
 
-	rv = aes_common_init_ctx(aes_ctx, template, mechanism, key, kmflag);
+	rv = aes_common_init_ctx(aes_ctx, template, mechanism, key, kmflag,
+	    is_encrypt_init);
 	if (rv != CRYPTO_SUCCESS) {
 		kmem_free(aes_ctx, sizeof (aes_ctx_t));
 		return (rv);
@@ -438,7 +470,8 @@ aes_cipher_update_uio(aes_ctx_t *aes_ctx, crypto_data_t *input,
 	 */
 	for (vec_idx = 0; vec_idx < uiop->uio_iovcnt &&
 	    offset >= uiop->uio_iov[vec_idx].iov_len;
-	    offset -= uiop->uio_iov[vec_idx++].iov_len);
+	    offset -= uiop->uio_iov[vec_idx++].iov_len)
+		;
 	if (vec_idx == uiop->uio_iovcnt) {
 		/*
 		 * The caller specified an offset that is larger than the
@@ -509,7 +542,8 @@ aes_cipher_update_mp(aes_ctx_t *aes_ctx, crypto_data_t *input,
 	 * Jump to the first mblk_t containing data to be processed.
 	 */
 	for (mp = input->cd_mp; mp != NULL && offset >= MBLKL(mp);
-	    offset -= MBLKL(mp), mp = mp->b_cont);
+	    offset -= MBLKL(mp), mp = mp->b_cont)
+		;
 	if (mp == NULL) {
 		/*
 		 * The caller specified an offset that is larger than the
@@ -555,6 +589,7 @@ aes_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 /* EXPORT DELETE START */
 
 	aes_ctx_t *aes_ctx;
+	size_t saved_length, saved_offset, length_needed;
 
 	ASSERT(ctx->cc_provider_private != NULL);
 	aes_ctx = ctx->cc_provider_private;
@@ -562,8 +597,13 @@ aes_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 	/*
 	 * For block ciphers, plaintext must be a multiple of AES block size.
 	 * This test is only valid for ciphers whose blocksize is a power of 2.
+	 * Even though AES CCM mode is a block cipher, it does not
+	 * require the plaintext to be a multiple of AES block size.
+	 * The length requirement for AES CCM mode has already been checked
+	 * at init time
 	 */
 	if (((aes_ctx->ac_flags & AES_CTR_MODE) == 0) &&
+	    ((aes_ctx->ac_flags & AES_CCM_MODE) == 0) &&
 	    (plaintext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
 		return (CRYPTO_DATA_LEN_RANGE);
 
@@ -573,15 +613,54 @@ aes_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 	 * We need to just return the length needed to store the output.
 	 * We should not destroy the context for the following case.
 	 */
-	if (ciphertext->cd_length < plaintext->cd_length) {
-		ciphertext->cd_length = plaintext->cd_length;
+	if (aes_ctx->ac_flags & AES_CCM_MODE) {
+		length_needed = plaintext->cd_length + aes_ctx->ac_ccm_mac_len;
+	} else {
+		length_needed = plaintext->cd_length;
+	}
+
+	if (ciphertext->cd_length < length_needed) {
+		ciphertext->cd_length = length_needed;
 		return (CRYPTO_BUFFER_TOO_SMALL);
 	}
+
+	saved_length = ciphertext->cd_length;
+	saved_offset = ciphertext->cd_offset;
 
 	/*
 	 * Do an update on the specified input data.
 	 */
 	ret = aes_encrypt_update(ctx, plaintext, ciphertext, req);
+	if (ret != CRYPTO_SUCCESS) {
+		return (ret);
+	}
+
+	/*
+	 * For CCM mode, aes_ccm_encrypt_final() will take care of any
+	 * left-over unprocessed data, and compute the MAC
+	 */
+	if (aes_ctx->ac_flags & AES_CCM_MODE) {
+		/*
+		 * aes_ccm_encrypt_final() will compute the MAC and append
+		 * it to existing ciphertext. So, need to adjust the left over
+		 * length value accordingly
+		 */
+
+		/* order of following 2 lines MUST not be reversed */
+		ciphertext->cd_offset = ciphertext->cd_length;
+		ciphertext->cd_length = saved_length - ciphertext->cd_length;
+		ret = aes_ccm_encrypt_final(aes_ctx, ciphertext);
+		if (ret != CRYPTO_SUCCESS) {
+			return (ret);
+		}
+
+		if (plaintext != ciphertext) {
+			ciphertext->cd_length =
+			    ciphertext->cd_offset - saved_offset;
+		}
+		ciphertext->cd_offset = saved_offset;
+	}
+
 	ASSERT(aes_ctx->ac_remainder_len == 0);
 	(void) aes_free_context(ctx);
 
@@ -601,25 +680,42 @@ aes_decrypt(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 /* EXPORT DELETE START */
 
 	aes_ctx_t *aes_ctx;
+	off_t saved_offset;
+	size_t saved_length;
 
 	ASSERT(ctx->cc_provider_private != NULL);
 	aes_ctx = ctx->cc_provider_private;
 
 	/*
-	 * For block ciphers, ciphertext must be a multiple of AES block size.
+	 * For block ciphers, plaintext must be a multiple of AES block size.
 	 * This test is only valid for ciphers whose blocksize is a power of 2.
+	 * Even though AES CCM mode is a block cipher, it does not
+	 * require the plaintext to be a multiple of AES block size.
+	 * The length requirement for AES CCM mode has already been checked
+	 * at init time
 	 */
 	if (((aes_ctx->ac_flags & AES_CTR_MODE) == 0) &&
-	    (ciphertext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
-		return (CRYPTO_ENCRYPTED_DATA_LEN_RANGE);
+	    ((aes_ctx->ac_flags & AES_CCM_MODE) == 0) &&
+	    (plaintext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
+		return (CRYPTO_DATA_LEN_RANGE);
 
 	AES_ARG_INPLACE(ciphertext, plaintext);
 
 	/*
 	 * We need to just return the length needed to store the output.
 	 * We should not destroy the context for the following case.
+	 *
+	 * For AES CCM mode, size of the plaintext will be MAC_SIZE
+	 * smaller than size of the cipher text.
 	 */
-	if (plaintext->cd_length < ciphertext->cd_length) {
+	if (aes_ctx->ac_flags & AES_CCM_MODE) {
+		if (plaintext->cd_length < aes_ctx->ac_ccm_data_len) {
+			plaintext->cd_length = - aes_ctx->ac_ccm_data_len;
+			return (CRYPTO_BUFFER_TOO_SMALL);
+		}
+		saved_offset = plaintext->cd_offset;
+		saved_length = plaintext->cd_length;
+	} else if (plaintext->cd_length < ciphertext->cd_length) {
 		plaintext->cd_length = ciphertext->cd_length;
 		return (CRYPTO_BUFFER_TOO_SMALL);
 	}
@@ -628,7 +724,39 @@ aes_decrypt(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 	 * Do an update on the specified input data.
 	 */
 	ret = aes_decrypt_update(ctx, ciphertext, plaintext, req);
+	if (ret != CRYPTO_SUCCESS) {
+		goto cleanup;
+	}
+
+	if (aes_ctx->ac_flags & AES_CCM_MODE) {
+		ASSERT(aes_ctx->ac_ccm_processed_data_len
+		    == aes_ctx->ac_ccm_data_len);
+		ASSERT(aes_ctx->ac_ccm_processed_mac_len
+		    == aes_ctx->ac_ccm_mac_len);
+
+		/* order of following 2 lines MUST not be reversed */
+		plaintext->cd_offset = plaintext->cd_length;
+		plaintext->cd_length = saved_length - plaintext->cd_length;
+
+		ret = aes_ccm_decrypt_final(aes_ctx, plaintext);
+		if (ret == CRYPTO_SUCCESS) {
+			if (plaintext != ciphertext) {
+				plaintext->cd_length =
+				    plaintext->cd_offset - saved_offset;
+			}
+		} else {
+			plaintext->cd_length = saved_length;
+		}
+
+		plaintext->cd_offset = saved_offset;
+	}
+
 	ASSERT(aes_ctx->ac_remainder_len == 0);
+
+cleanup:
+	if (aes_ctx->ac_ccm_pt_buf) {
+		kmem_free(aes_ctx->ac_ccm_pt_buf, aes_ctx->ac_ccm_data_len);
+	}
 	(void) aes_free_context(ctx);
 
 /* EXPORT DELETE END */
@@ -664,6 +792,7 @@ aes_encrypt_update(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 
 	saved_offset = ciphertext->cd_offset;
 	saved_length = ciphertext->cd_length;
+
 
 	/*
 	 * Do the AES update on the specified input data.
@@ -802,23 +931,28 @@ aes_encrypt_final(crypto_ctx_t *ctx, crypto_data_t *data,
 		return (CRYPTO_ARGUMENTS_BAD);
 	}
 
-	/*
-	 * There must be no unprocessed plaintext.
-	 * This happens if the length of the last data is
-	 * not a multiple of the AES block length.
-	 */
-	if (aes_ctx->ac_remainder_len > 0) {
-		if ((aes_ctx->ac_flags & AES_CTR_MODE) == 0)
-			return (CRYPTO_DATA_LEN_RANGE);
-		else {
+	if (aes_ctx->ac_flags & AES_CTR_MODE) {
+		if (aes_ctx->ac_remainder_len > 0) {
 			ret = aes_counter_final(aes_ctx, data);
 			if (ret != CRYPTO_SUCCESS)
 				return (ret);
 		}
-	}
-
-	if ((aes_ctx->ac_flags & AES_CTR_MODE) == 0)
 		data->cd_length = 0;
+	} else if (aes_ctx->ac_flags & AES_CCM_MODE) {
+		ret = aes_ccm_encrypt_final(aes_ctx, data);
+		if (ret != CRYPTO_SUCCESS) {
+			return (ret);
+		}
+	} else {
+		/*
+		 * There must be no unprocessed plaintext.
+		 * This happens if the length of the last data is
+		 * not a multiple of the AES block length.
+		 */
+		if (aes_ctx->ac_remainder_len > 0) {
+			return (CRYPTO_DATA_LEN_RANGE);
+		}
+	}
 
 	(void) aes_free_context(ctx);
 
@@ -837,6 +971,8 @@ aes_decrypt_final(crypto_ctx_t *ctx, crypto_data_t *data,
 
 	aes_ctx_t *aes_ctx;
 	int ret;
+	off_t saved_offset;
+	size_t saved_length;
 
 	ASSERT(ctx->cc_provider_private != NULL);
 	aes_ctx = ctx->cc_provider_private;
@@ -862,8 +998,42 @@ aes_decrypt_final(crypto_ctx_t *ctx, crypto_data_t *data,
 		}
 	}
 
+	if (aes_ctx->ac_flags & AES_CCM_MODE) {
+		/*
+		 * This is where all the plaintext is returned, make sure
+		 * the plaintext buffer is big enough
+		 */
+		size_t pt_len = aes_ctx->ac_ccm_data_len;
+		if (data->cd_length < pt_len) {
+			data->cd_length = pt_len;
+			return (CRYPTO_BUFFER_TOO_SMALL);
+		}
+
+		ASSERT(aes_ctx->ac_ccm_processed_data_len == pt_len);
+		ASSERT(aes_ctx->ac_ccm_processed_mac_len
+		    == aes_ctx->ac_ccm_mac_len);
+		saved_offset = data->cd_offset;
+		saved_length = data->cd_length;
+		ret = aes_ccm_decrypt_final(aes_ctx, data);
+		if (ret == CRYPTO_SUCCESS) {
+			data->cd_length = data->cd_offset - saved_offset;
+		} else {
+			data->cd_length = saved_length;
+		}
+
+		data->cd_offset = saved_offset;
+		if (ret != CRYPTO_SUCCESS) {
+			return (ret);
+		}
+	}
+
+
 	if ((aes_ctx->ac_flags & AES_CTR_MODE) == 0)
 		data->cd_length = 0;
+
+	if (aes_ctx->ac_ccm_pt_buf != NULL) {
+		kmem_free(aes_ctx->ac_ccm_pt_buf, aes_ctx->ac_ccm_data_len);
+	}
 
 	(void) aes_free_context(ctx);
 
@@ -886,7 +1056,8 @@ aes_encrypt_atomic(crypto_provider_handle_t provider,
 
 	AES_ARG_INPLACE(plaintext, ciphertext);
 
-	if (mechanism->cm_type != AES_CTR_MECH_INFO_TYPE) {
+	if ((mechanism->cm_type != AES_CTR_MECH_INFO_TYPE) &&
+	    (mechanism->cm_type != AES_CCM_MECH_INFO_TYPE)) {
 		/*
 		 * Plaintext must be a multiple of AES block size.
 		 * This test only works for non-padded mechanisms
@@ -908,9 +1079,19 @@ aes_encrypt_atomic(crypto_provider_handle_t provider,
 	bzero(&aes_ctx, sizeof (aes_ctx_t));
 
 	ret = aes_common_init_ctx(&aes_ctx, template, mechanism, key,
-	    crypto_kmflag(req));
+	    crypto_kmflag(req), B_TRUE);
 	if (ret != CRYPTO_SUCCESS)
 		return (ret);
+
+	if (mechanism->cm_type == AES_CCM_MECH_INFO_TYPE) {
+		size_t length_needed
+		    = plaintext->cd_length + aes_ctx.ac_ccm_mac_len;
+		if (ciphertext->cd_length < length_needed) {
+			ciphertext->cd_length = length_needed;
+			return (CRYPTO_BUFFER_TOO_SMALL);
+		}
+	}
+
 
 	saved_offset = ciphertext->cd_offset;
 	saved_length = ciphertext->cd_length;
@@ -936,20 +1117,24 @@ aes_encrypt_atomic(crypto_provider_handle_t provider,
 	}
 
 	if (ret == CRYPTO_SUCCESS) {
-		if (mechanism->cm_type != AES_CTR_MECH_INFO_TYPE) {
+		if (mechanism->cm_type == AES_CCM_MECH_INFO_TYPE) {
+			ret = aes_ccm_encrypt_final(&aes_ctx, ciphertext);
+			if (ret != CRYPTO_SUCCESS)
+				goto out;
 			ASSERT(aes_ctx.ac_remainder_len == 0);
-			if (plaintext != ciphertext)
-				ciphertext->cd_length =
-				    ciphertext->cd_offset - saved_offset;
-		} else {
+		} else if (mechanism->cm_type == AES_CTR_MECH_INFO_TYPE) {
 			if (aes_ctx.ac_remainder_len > 0) {
 				ret = aes_counter_final(&aes_ctx, ciphertext);
 				if (ret != CRYPTO_SUCCESS)
 					goto out;
 			}
-			if (plaintext != ciphertext)
-				ciphertext->cd_length =
-				    ciphertext->cd_offset - saved_offset;
+		} else {
+			ASSERT(aes_ctx.ac_remainder_len == 0);
+		}
+
+		if (plaintext != ciphertext) {
+			ciphertext->cd_length =
+			    ciphertext->cd_offset - saved_offset;
 		}
 	} else {
 		ciphertext->cd_length = saved_length;
@@ -979,21 +1164,30 @@ aes_decrypt_atomic(crypto_provider_handle_t provider,
 
 	AES_ARG_INPLACE(ciphertext, plaintext);
 
-	if (mechanism->cm_type != AES_CTR_MECH_INFO_TYPE) {
-		/*
-		 * Ciphertext must be a multiple of AES block size.
-		 * This test only works for non-padded mechanisms
-		 * when blocksize is 2^N.
-		 */
-		if ((ciphertext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
-			return (CRYPTO_DATA_LEN_RANGE);
-	}
+	/*
+	 * For block ciphers, ciphertext must be a multiple of AES block size.
+	 * This test is only valid for non-padded mechanisms
+	 * when blocksize is 2^N
+	 * Even though AES CCM mode is a block cipher, it does not
+	 * require the plaintext to be a multiple of AES block size.
+	 * The length requirement for AES CCM mode will be checked
+	 * at init time
+	 */
+	if ((mechanism->cm_type != AES_CTR_MECH_INFO_TYPE) &&
+	    (mechanism->cm_type != AES_CCM_MECH_INFO_TYPE) &&
+	    ((ciphertext->cd_length & (AES_BLOCK_LEN - 1)) != 0))
+		return (CRYPTO_DATA_LEN_RANGE);
 
-	/* return length needed to store the output */
-	if (plaintext->cd_length < ciphertext->cd_length) {
+	/*
+	 * return length needed to store the output, length requirement
+	 * for AES CCM mode can not be determined until later
+	 */
+	if ((plaintext->cd_length < ciphertext->cd_length) &&
+	    (mechanism->cm_type != AES_CCM_MECH_INFO_TYPE)) {
 		plaintext->cd_length = ciphertext->cd_length;
 		return (CRYPTO_BUFFER_TOO_SMALL);
 	}
+
 
 	if ((ret = aes_check_mech_param(mechanism)) != CRYPTO_SUCCESS)
 		return (ret);
@@ -1001,9 +1195,18 @@ aes_decrypt_atomic(crypto_provider_handle_t provider,
 	bzero(&aes_ctx, sizeof (aes_ctx_t));
 
 	ret = aes_common_init_ctx(&aes_ctx, template, mechanism, key,
-	    crypto_kmflag(req));
+	    crypto_kmflag(req), B_FALSE);
 	if (ret != CRYPTO_SUCCESS)
 		return (ret);
+
+	/* check length requirement for AES CCM mode now */
+	if (mechanism->cm_type == AES_CCM_MECH_INFO_TYPE) {
+		if (plaintext->cd_length < aes_ctx.ac_ccm_data_len) {
+			plaintext->cd_length = aes_ctx.ac_ccm_data_len;
+			ret = CRYPTO_BUFFER_TOO_SMALL;
+			goto out;
+		}
+	}
 
 	saved_offset = plaintext->cd_offset;
 	saved_length = plaintext->cd_length;
@@ -1029,7 +1232,21 @@ aes_decrypt_atomic(crypto_provider_handle_t provider,
 	}
 
 	if (ret == CRYPTO_SUCCESS) {
-		if (mechanism->cm_type != AES_CTR_MECH_INFO_TYPE) {
+		if (mechanism->cm_type == AES_CCM_MECH_INFO_TYPE) {
+			ASSERT(aes_ctx.ac_ccm_processed_data_len
+			    == aes_ctx.ac_ccm_data_len);
+			ASSERT(aes_ctx.ac_ccm_processed_mac_len
+			    == aes_ctx.ac_ccm_mac_len);
+			ret = aes_ccm_decrypt_final(&aes_ctx, plaintext);
+			ASSERT(aes_ctx.ac_remainder_len == 0);
+			if ((ret == CRYPTO_SUCCESS) &&
+			    (ciphertext != plaintext)) {
+				plaintext->cd_length =
+				    plaintext->cd_offset - saved_offset;
+			} else {
+				plaintext->cd_length = saved_length;
+			}
+		} else if (mechanism->cm_type != AES_CTR_MECH_INFO_TYPE) {
 			ASSERT(aes_ctx.ac_remainder_len == 0);
 			if (ciphertext != plaintext)
 				plaintext->cd_length =
@@ -1055,6 +1272,10 @@ out:
 		kmem_free(aes_ctx.ac_keysched, aes_ctx.ac_keysched_len);
 	}
 
+	if (aes_ctx.ac_ccm_pt_buf != NULL) {
+		kmem_free(aes_ctx.ac_ccm_pt_buf, aes_ctx.ac_ccm_data_len);
+	}
+
 	return (ret);
 }
 
@@ -1076,7 +1297,8 @@ aes_create_ctx_template(crypto_provider_handle_t provider,
 
 	if (mechanism->cm_type != AES_ECB_MECH_INFO_TYPE &&
 	    mechanism->cm_type != AES_CBC_MECH_INFO_TYPE &&
-	    mechanism->cm_type != AES_CTR_MECH_INFO_TYPE)
+	    mechanism->cm_type != AES_CTR_MECH_INFO_TYPE &&
+	    mechanism->cm_type != AES_CCM_MECH_INFO_TYPE)
 		return (CRYPTO_MECHANISM_INVALID);
 
 	if ((keysched = aes_alloc_keysched(&size,
@@ -1130,7 +1352,8 @@ aes_free_context(crypto_ctx_t *ctx)
 /* ARGSUSED */
 static int
 aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
-    crypto_mechanism_t *mechanism, crypto_key_t *key, int kmflag)
+    crypto_mechanism_t *mechanism, crypto_key_t *key, int kmflag,
+    boolean_t is_encrypt_init)
 {
 	int rv = CRYPTO_SUCCESS;
 
@@ -1138,6 +1361,7 @@ aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
 
 	void *keysched;
 	size_t size;
+	CK_AES_CCM_PARAMS *ccm_param = NULL;
 
 	aes_ctx->ac_flags = 0;
 
@@ -1239,6 +1463,33 @@ aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
 
 		aes_ctx->ac_lastp = (uint8_t *)&aes_ctx->ac_iv[0];
 		aes_ctx->ac_flags |= AES_CTR_MODE;
+	} else if (mechanism->cm_type == AES_CCM_MECH_INFO_TYPE) {
+		if (mechanism->cm_param != NULL) {
+			int rc;
+
+			ccm_param = (CK_AES_CCM_PARAMS *)mechanism->cm_param;
+
+			if ((rc = aes_ccm_validate_args(ccm_param,
+			    is_encrypt_init)) != 0) {
+				return (rc);
+			}
+
+			aes_ctx->ac_ccm_mac_len = ccm_param->ulMACSize;
+			if (is_encrypt_init) {
+				aes_ctx->ac_ccm_data_len
+				    = ccm_param->ulDataSize;
+			} else {
+				aes_ctx->ac_ccm_data_len =
+				    ccm_param->ulDataSize
+				    - aes_ctx->ac_ccm_mac_len;
+				aes_ctx->ac_ccm_processed_mac_len = 0;
+			}
+			aes_ctx->ac_ccm_processed_data_len = 0;
+
+			aes_ctx->ac_flags |= AES_CCM_MODE;
+		} else {
+			return (CRYPTO_MECHANISM_PARAM_INVALID);
+		}
 	} else {
 		aes_ctx->ac_flags |= AES_ECB_MODE;
 	}
@@ -1250,8 +1501,10 @@ aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
 		 * Initialize key schedule.
 		 * Key length is stored in the key.
 		 */
-		if ((rv = init_keysched(key, keysched)) != CRYPTO_SUCCESS)
+		if ((rv = init_keysched(key, keysched)) != CRYPTO_SUCCESS) {
 			kmem_free(keysched, size);
+			return (rv);
+		}
 
 		aes_ctx->ac_flags |= AES_PROVIDER_OWNS_KEY_SCHEDULE;
 		aes_ctx->ac_keysched_len = size;
@@ -1259,6 +1512,27 @@ aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
 		keysched = template;
 	}
 	aes_ctx->ac_keysched = keysched;
+
+	/* process the nonce and associated data if it is AES CCM mode */
+	if (mechanism->cm_type == AES_CCM_MECH_INFO_TYPE) {
+		if (aes_ccm_init(aes_ctx, ccm_param->nonce,
+		    ccm_param->ulNonceSize, ccm_param->authData,
+		    ccm_param->ulAuthDataSize) != 0) {
+			bzero(keysched, size);
+			kmem_free(keysched, size);
+			return (CRYPTO_MECHANISM_PARAM_INVALID);
+		}
+		if (!is_encrypt_init) {
+			/* allocate buffer for storing decrypted plaintext */
+			aes_ctx->ac_ccm_pt_buf =
+			    kmem_alloc(aes_ctx->ac_ccm_data_len, kmflag);
+			if (aes_ctx->ac_ccm_pt_buf == NULL) {
+				bzero(keysched, size);
+				kmem_free(keysched, size);
+				return (CRYPTO_HOST_MEMORY);
+			}
+		}
+	}
 
 /* EXPORT DELETE END */
 

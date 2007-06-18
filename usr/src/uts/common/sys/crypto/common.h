@@ -110,6 +110,7 @@ typedef uint32_t crypto_keysize_unit_t;
 #define	SUN_CKM_AES_CBC			"CKM_AES_CBC"
 #define	SUN_CKM_AES_ECB			"CKM_AES_ECB"
 #define	SUN_CKM_AES_CTR			"CKM_AES_CTR"
+#define	SUN_CKM_AES_CCM			"CKM_AES_CCM"
 #define	SUN_CKM_RC4			"CKM_RC4"
 #define	SUN_CKM_RSA_PKCS		"CKM_RSA_PKCS"
 #define	SUN_CKM_RSA_X_509		"CKM_RSA_X_509"
