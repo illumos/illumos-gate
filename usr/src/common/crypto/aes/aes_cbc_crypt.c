@@ -1206,7 +1206,7 @@ aes_ccm_format_initial_blocks(uchar_t *nonce, ulong_t nonceSize,
     ulong_t authDataSize, uint8_t *b0, aes_ctx_t *aes_ctx)
 {
 /* EXPORT DELETE START */
-	size_t payloadSize;
+	uint64_t payloadSize;
 	uint8_t t, q, have_adata = 0;
 	size_t limit;
 	int i, j, k;

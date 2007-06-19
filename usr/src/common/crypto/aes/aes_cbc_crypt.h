@@ -94,7 +94,7 @@ typedef struct aes_ctx {
 	uint32_t ac_flags;
 	size_t ac_ccm_mac_len;
 	uint64_t ac_ccm_mac_buf[2];
-	uint64_t ac_ccm_data_len;
+	size_t ac_ccm_data_len;
 	size_t ac_ccm_processed_data_len;
 	size_t ac_ccm_processed_mac_len;
 	uint8_t *ac_ccm_pt_buf;

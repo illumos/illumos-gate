@@ -710,7 +710,7 @@ aes_decrypt(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 	 */
 	if (aes_ctx->ac_flags & AES_CCM_MODE) {
 		if (plaintext->cd_length < aes_ctx->ac_ccm_data_len) {
-			plaintext->cd_length = - aes_ctx->ac_ccm_data_len;
+			plaintext->cd_length = aes_ctx->ac_ccm_data_len;
 			return (CRYPTO_BUFFER_TOO_SMALL);
 		}
 		saved_offset = plaintext->cd_offset;
