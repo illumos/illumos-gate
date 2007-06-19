@@ -685,9 +685,9 @@ pa_tid32(pr_context_t *context, int status, int flag)
 
 		get_Hname(ip_addr, hostname, sizeof (hostname));
 		(void) snprintf(buf, sizeof (buf), "%d %d %s",
-			major_32(dev_maj_min),
-			minor_32(dev_maj_min),
-			hostname);
+		    major_32(dev_maj_min),
+		    minor_32(dev_maj_min),
+		    hostname);
 		return (pa_print(context, &uval, flag));
 	}
 
@@ -695,10 +695,9 @@ pa_tid32(pr_context_t *context, int status, int flag)
 	if ((ipstring = inet_ntoa(ia)) == NULL)
 		return (-1);
 
-	(void) snprintf(buf, sizeof (buf), "%d %d %s",
-		major_32(dev_maj_min),
-		minor_32(dev_maj_min),
-		ipstring);
+	(void) snprintf(buf, sizeof (buf), "%d %d %s", major_32(dev_maj_min),
+	    minor_32(dev_maj_min),
+	    ipstring);
 
 	return (pa_print(context, &uval, flag));
 }
@@ -743,9 +742,8 @@ pa_tid32_ex(pr_context_t *context, int status, int flag)
 		if (!(context->format & PRF_RAWM)) {
 			get_Hname(ip_addr[0], hostname, sizeof (hostname));
 			(void) snprintf(buf, sizeof (buf), "%d %d %s",
-				major_32(dev_maj_min),
-				minor_32(dev_maj_min),
-				hostname);
+			    major_32(dev_maj_min), minor_32(dev_maj_min),
+			    hostname);
 			return (pa_print(context, &uval, flag));
 		}
 
@@ -754,9 +752,7 @@ pa_tid32_ex(pr_context_t *context, int status, int flag)
 			return (-1);
 
 		(void) snprintf(buf, sizeof (buf), "%d %d %s",
-			major_32(dev_maj_min),
-			minor_32(dev_maj_min),
-			ipstring);
+		    major_32(dev_maj_min), minor_32(dev_maj_min), ipstring);
 
 		return (pa_print(context, &uval, flag));
 	} else {
@@ -765,9 +761,8 @@ pa_tid32_ex(pr_context_t *context, int status, int flag)
 		if (!(context->format & PRF_RAWM)) {
 			get_Hname_ex(ip_addr, hostname, sizeof (hostname));
 			(void) snprintf(buf, sizeof (buf), "%d %d %s",
-				major_32(dev_maj_min),
-				minor_32(dev_maj_min),
-				hostname);
+			    major_32(dev_maj_min), minor_32(dev_maj_min),
+			    hostname);
 			return (pa_print(context, &uval, flag));
 		}
 
@@ -775,9 +770,7 @@ pa_tid32_ex(pr_context_t *context, int status, int flag)
 		    sizeof (tbuf));
 
 		(void) snprintf(buf, sizeof (buf), "%d %d %s",
-			major_32(dev_maj_min),
-			minor_32(dev_maj_min),
-			tbuf);
+		    major_32(dev_maj_min), minor_32(dev_maj_min), tbuf);
 
 		return (pa_print(context, &uval, flag));
 	}
@@ -817,8 +810,7 @@ pa_ip_addr(pr_context_t *context, int status, int flag)
 
 		if (!(context->format & PRF_RAWM)) {
 			get_Hname(ip_addr[0], hostname, sizeof (hostname));
-			(void) snprintf(buf, sizeof (buf), "%s",
-				hostname);
+			(void) snprintf(buf, sizeof (buf), "%s", hostname);
 			return (pa_print(context, &uval, flag));
 		}
 
@@ -826,8 +818,7 @@ pa_ip_addr(pr_context_t *context, int status, int flag)
 		if ((ipstring = inet_ntoa(ia)) == NULL)
 			return (-1);
 
-		(void) snprintf(buf, sizeof (buf), "%s",
-			ipstring);
+		(void) snprintf(buf, sizeof (buf), "%s", ipstring);
 
 		return (pa_print(context, &uval, flag));
 	} else {
@@ -878,9 +869,7 @@ pa_tid64(pr_context_t *context, int status, int flag)
 
 		get_Hname(ip_addr, hostname, sizeof (hostname));
 		(void) snprintf(buf, sizeof (buf), "%d %d %s",
-			major_64(dev_maj_min),
-			minor_64(dev_maj_min),
-			hostname);
+		    major_64(dev_maj_min), minor_64(dev_maj_min), hostname);
 		return (pa_print(context, &uval, flag));
 	}
 
@@ -889,9 +878,7 @@ pa_tid64(pr_context_t *context, int status, int flag)
 		return (-1);
 
 	(void) snprintf(buf, sizeof (buf), "%d %d %s",
-		major_64(dev_maj_min),
-		minor_64(dev_maj_min),
-		ipstring);
+	    major_64(dev_maj_min), minor_64(dev_maj_min), ipstring);
 
 	return (pa_print(context, &uval, flag));
 }
@@ -937,9 +924,8 @@ pa_tid64_ex(pr_context_t *context, int status, int flag)
 			get_Hname(ip_addr[0], hostname, sizeof (hostname));
 			uval.string_val = buf;
 			(void) snprintf(buf, sizeof (buf), "%d %d %s",
-				major_64(dev_maj_min),
-				minor_64(dev_maj_min),
-				hostname);
+			    major_64(dev_maj_min), minor_64(dev_maj_min),
+			    hostname);
 			return (pa_print(context, &uval, flag));
 		}
 
@@ -948,9 +934,7 @@ pa_tid64_ex(pr_context_t *context, int status, int flag)
 			return (-1);
 
 		(void) snprintf(buf, sizeof (buf), "%d %d %s",
-			major_64(dev_maj_min),
-			minor_64(dev_maj_min),
-			ipstring);
+		    major_64(dev_maj_min), minor_64(dev_maj_min), ipstring);
 
 		return (pa_print(context, &uval, flag));
 	} else {
@@ -959,9 +943,8 @@ pa_tid64_ex(pr_context_t *context, int status, int flag)
 		if (!(context->format & PRF_RAWM)) {
 			get_Hname_ex(ip_addr, hostname, sizeof (hostname));
 			(void) snprintf(buf, sizeof (buf), "%d %d %s",
-				major_64(dev_maj_min),
-				minor_64(dev_maj_min),
-				hostname);
+			    major_64(dev_maj_min), minor_64(dev_maj_min),
+			    hostname);
 			return (pa_print(context, &uval, flag));
 		}
 
@@ -969,9 +952,7 @@ pa_tid64_ex(pr_context_t *context, int status, int flag)
 		    sizeof (tbuf));
 
 		(void) snprintf(buf, sizeof (buf), "%d %d %s",
-			major_64(dev_maj_min),
-			minor_64(dev_maj_min),
-			tbuf);
+		    major_64(dev_maj_min), minor_64(dev_maj_min), tbuf);
 
 		return (pa_print(context, &uval, flag));
 	}
@@ -1003,8 +984,10 @@ findfieldwidth(char basicunit, char howtoprint)
 		if (fwidth[i].basic_unit == basicunit) {
 			for (j = 0; j <= 4; j++) {
 				if (fwidth[i].pwidth[j].print_base ==
-					howtoprint)
-				return (fwidth[i].pwidth[j].field_width);
+				    howtoprint) {
+					return (
+					    fwidth[i].pwidth[j].field_width);
+				}
 			}
 			/*
 			 * if we got here, then we didn't get what we were after
@@ -1283,7 +1266,9 @@ eventmodifier2string(ushort_t emodifier, char *modstring, size_t modlen)
 	 * TRANSLATION_NOTE
 	 * These abbreviations represent the event modifier field of the
 	 * header token.  To gain a better understanding of each modifier,
-	 * read the SunShield BSM Guide, part no. 802-1965-xx.
+	 * read
+	 * System Administration Guide: Security Services >> Solaris Auditing
+	 * at http://docs.sun.com.
 	 */
 
 	static struct em_map_ent em_map[] = {
@@ -1754,7 +1739,7 @@ pa_putstr_xml(pr_context_t *context, int printable, char *str, size_t len)
 		 */
 		do {
 			err = pr_printf(context, "\\%03o",
-				(unsigned char)*str++);
+			    (unsigned char)*str++);
 		} while (err == 0 && --len != 0);
 		return (err);
 	}
@@ -1811,7 +1796,7 @@ pa_putstr(pr_context_t *context, int printable, char *str, size_t len)
 	if (!printable) {
 		do {
 			err = pr_printf(context, "\\%03o",
-				(unsigned char)*str++);
+			    (unsigned char)*str++);
 		} while (err == 0 && --len != 0);
 		return (err);
 	}
@@ -2180,52 +2165,58 @@ pa_pw_uid_gr_gid(pr_context_t *context, int status, int flag)
 			returnstat = pa_gr_uid(context, returnstat, flag);
 			break;
 		case CLASS_OBJ:
-		    returnstat = pr_adr_u_int32(context, &value, 1);
-		    if (returnstat != 0)
-			return (returnstat);
-
-		    if (!(context->format & PRF_RAWM)) {
-			uval.uvaltype = PRA_STRING;
-			uval.string_val = gettext("mask");
-			returnstat = pa_print(context, &uval, flag);
-		    } else {
-			uval.uvaltype = PRA_UINT32;
-			uval.uint32_val = value;
-			if ((returnstat = pa_print(context, &uval, flag)) != 0)
+			returnstat = pr_adr_u_int32(context, &value, 1);
+			if (returnstat != 0)
 				return (returnstat);
-		    }
-		    break;
+
+			if (!(context->format & PRF_RAWM)) {
+				uval.uvaltype = PRA_STRING;
+				uval.string_val = gettext("mask");
+				returnstat = pa_print(context, &uval, flag);
+			} else {
+				uval.uvaltype = PRA_UINT32;
+				uval.uint32_val = value;
+				if ((returnstat =
+				    pa_print(context, &uval, flag)) != 0) {
+					return (returnstat);
+				}
+			}
+			break;
 		case OTHER_OBJ:
-		    returnstat = pr_adr_u_int32(context, &value, 1);
-		    if (returnstat != 0)
-			return (returnstat);
-
-		    if (!(context->format & PRF_RAWM)) {
-			uval.uvaltype = PRA_STRING;
-			uval.string_val = gettext("other");
-			returnstat = pa_print(context, &uval, flag);
-		    } else {
-			uval.uvaltype = PRA_UINT32;
-			uval.uint32_val = value;
-			if ((returnstat = pa_print(context, &uval, flag)) != 0)
+			returnstat = pr_adr_u_int32(context, &value, 1);
+			if (returnstat != 0)
 				return (returnstat);
-		    }
-		    break;
+
+			if (!(context->format & PRF_RAWM)) {
+				uval.uvaltype = PRA_STRING;
+				uval.string_val = gettext("other");
+				returnstat = pa_print(context, &uval, flag);
+			} else {
+				uval.uvaltype = PRA_UINT32;
+				uval.uint32_val = value;
+				if ((returnstat =
+				    pa_print(context, &uval, flag)) != 0) {
+					return (returnstat);
+				}
+			}
+			break;
 		default:
-		    returnstat = pr_adr_u_int32(context, &value, 1);
-		    if (returnstat != 0)
-			return (returnstat);
-
-		    if (!(context->format & PRF_RAWM)) {
-			uval.uvaltype = PRA_STRING;
-			uval.string_val = gettext("unrecognized");
-			returnstat = pa_print(context, &uval, flag);
-		    } else {
-			uval.uvaltype = PRA_UINT32;
-			uval.uint32_val = value;
-			if ((returnstat = pa_print(context, &uval, flag)) != 0)
+			returnstat = pr_adr_u_int32(context, &value, 1);
+			if (returnstat != 0)
 				return (returnstat);
-		    }
+
+			if (!(context->format & PRF_RAWM)) {
+				uval.uvaltype = PRA_STRING;
+				uval.string_val = gettext("unrecognized");
+				returnstat = pa_print(context, &uval, flag);
+			} else {
+				uval.uvaltype = PRA_UINT32;
+				uval.uint32_val = value;
+				if ((returnstat =
+				    pa_print(context, &uval, flag)) != 0) {
+					return (returnstat);
+				}
+			}
 	}
 
 	if ((returnstat = close_tag(context, TAG_ACLVAL)) != 0)

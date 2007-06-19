@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,8 +65,9 @@ init_tokens(void)
 	/*
 	 * TRANSLATION_NOTE
 	 * These names refer to different type of audit tokens.
-	 * To gain a better understanding of each token, read the
-	 * SunShield BSM Guide, part no. 802-1965-xx.
+	 * To gain a better understanding of each token, read
+	 * System Administration Guide: Security Services >> Solaris Auditing
+	 * at http://docs.sun.com.
 	 */
 
 	(void) gettext("file");	/* to force out the translation note */
