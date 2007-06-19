@@ -161,11 +161,13 @@ get_usage(zfs_help_t idx)
 {
 	switch (idx) {
 	case HELP_CLONE:
-		return (gettext("\tclone <snapshot> <filesystem|volume>\n"));
+		return (gettext("\tclone [-p] <snapshot> "
+		    "<filesystem|volume>\n"));
 	case HELP_CREATE:
-		return (gettext("\tcreate [[-o property=value] ... ] "
+		return (gettext("\tcreate [-p] [[-o property=value] ... ] "
 		    "<filesystem>\n"
-		    "\tcreate [-s] [-b blocksize] [[-o property=value] ...]\n"
+		    "\tcreate [-ps] [-b blocksize] [[-o property=value] "
+		    "...]\n"
 		    "\t    -V <size> <volume>\n"));
 	case HELP_DESTROY:
 		return (gettext("\tdestroy [-rRf] "
@@ -197,6 +199,7 @@ get_usage(zfs_help_t idx)
 	case HELP_RENAME:
 		return (gettext("\trename <filesystem|volume|snapshot> "
 		    "<filesystem|volume|snapshot>\n"
+		    "\trename -p <filesystem|volume> <filesystem|volume>\n"
 		    "\trename -r <snapshot> <snapshot>"));
 	case HELP_ROLLBACK:
 		return (gettext("\trollback [-rRf] <snapshot>\n"));
@@ -345,58 +348,86 @@ usage(boolean_t requested)
 }
 
 /*
- * zfs clone <fs, snap, vol> fs
+ * zfs clone [-p] <snap> <fs | vol>
  *
  * Given an existing dataset, create a writable copy whose initial contents
  * are the same as the source.  The newly created dataset maintains a
  * dependency on the original; the original cannot be destroyed so long as
  * the clone exists.
+ *
+ * The '-p' flag creates all the non-existing ancestors of the target first.
  */
 static int
 zfs_do_clone(int argc, char **argv)
 {
 	zfs_handle_t *zhp;
+	boolean_t parents = B_FALSE;
 	int ret;
+	int c;
 
 	/* check options */
-	if (argc > 1 && argv[1][0] == '-') {
-		(void) fprintf(stderr, gettext("invalid option '%c'\n"),
-		    argv[1][1]);
-		usage(B_FALSE);
+	while ((c = getopt(argc, argv, "p")) != -1) {
+		switch (c) {
+		case 'p':
+			parents = B_TRUE;
+			break;
+		case '?':
+			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
+			    optopt);
+			usage(B_FALSE);
+		}
 	}
 
+	argc -= optind;
+	argv += optind;
+
 	/* check number of arguments */
-	if (argc < 2) {
+	if (argc < 1) {
 		(void) fprintf(stderr, gettext("missing source dataset "
 		    "argument\n"));
 		usage(B_FALSE);
 	}
-	if (argc < 3) {
+	if (argc < 2) {
 		(void) fprintf(stderr, gettext("missing target dataset "
 		    "argument\n"));
 		usage(B_FALSE);
 	}
-	if (argc > 3) {
+	if (argc > 2) {
 		(void) fprintf(stderr, gettext("too many arguments\n"));
 		usage(B_FALSE);
 	}
 
 	/* open the source dataset */
-	if ((zhp = zfs_open(g_zfs, argv[1], ZFS_TYPE_SNAPSHOT)) == NULL)
+	if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_SNAPSHOT)) == NULL)
 		return (1);
 
+	if (parents && zfs_name_valid(argv[1], ZFS_TYPE_FILESYSTEM |
+	    ZFS_TYPE_VOLUME)) {
+		/*
+		 * Now create the ancestors of the target dataset.  If the
+		 * target already exists and '-p' option was used we should not
+		 * complain.
+		 */
+		if (zfs_dataset_exists(g_zfs, argv[1], ZFS_TYPE_FILESYSTEM |
+		    ZFS_TYPE_VOLUME))
+			return (0);
+		if (zfs_create_ancestors(g_zfs, argv[1]) != 0)
+			return (1);
+	}
+
 	/* pass to libzfs */
-	ret = zfs_clone(zhp, argv[2], NULL);
+	ret = zfs_clone(zhp, argv[1], NULL);
 
 	/* create the mountpoint if necessary */
 	if (ret == 0) {
-		zfs_handle_t *clone = zfs_open(g_zfs, argv[2], ZFS_TYPE_ANY);
+		zfs_handle_t *clone = zfs_open(g_zfs, argv[1], ZFS_TYPE_ANY);
 		if (clone != NULL) {
 			if ((ret = zfs_mount(clone, NULL, 0)) == 0)
 				ret = zfs_share(clone);
 			zfs_close(clone);
 		}
-		zpool_log_history(g_zfs, argc, argv, argv[2], B_FALSE, B_FALSE);
+		zpool_log_history(g_zfs, argc + optind, argv - optind, argv[1],
+		    B_FALSE, B_FALSE);
 	}
 
 	zfs_close(zhp);
@@ -405,8 +436,8 @@ zfs_do_clone(int argc, char **argv)
 }
 
 /*
- * zfs create [-o prop=value] ... fs
- * zfs create [-s] [-b blocksize] [-o prop=value] ... -V vol size
+ * zfs create [-p] [-o prop=value] ... fs
+ * zfs create [-ps] [-b blocksize] [-o prop=value] ... -V vol size
  *
  * Create a new dataset.  This command can be used to create filesystems
  * and volumes.  Snapshot creation is handled by 'zfs snapshot'.
@@ -415,6 +446,8 @@ zfs_do_clone(int argc, char **argv)
  * The '-s' flag applies only to volumes, and indicates that we should not try
  * to set the reservation for this volume.  By default we set a reservation
  * equal to the size for any volume.
+ *
+ * The '-p' flag creates all the non-existing ancestors of the target first.
  */
 static int
 zfs_do_create(int argc, char **argv)
@@ -424,6 +457,7 @@ zfs_do_create(int argc, char **argv)
 	uint64_t volsize;
 	int c;
 	boolean_t noreserve = B_FALSE;
+	boolean_t parents = B_FALSE;
 	int ret = 1;
 	nvlist_t *props = NULL;
 	uint64_t intval;
@@ -438,7 +472,7 @@ zfs_do_create(int argc, char **argv)
 	}
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":V:b:so:")) != -1) {
+	while ((c = getopt(argc, argv, ":V:b:so:p")) != -1) {
 		switch (c) {
 		case 'V':
 			type = ZFS_TYPE_VOLUME;
@@ -457,6 +491,9 @@ zfs_do_create(int argc, char **argv)
 				goto error;
 			}
 			volsize = intval;
+			break;
+		case 'p':
+			parents = B_TRUE;
 			break;
 		case 'b':
 			if (zfs_nicestrtonum(g_zfs, optarg, &intval) != 0) {
@@ -541,6 +578,20 @@ zfs_do_create(int argc, char **argv)
 			nvlist_free(props);
 			return (1);
 		}
+	}
+
+	if (parents && zfs_name_valid(argv[0], type)) {
+		/*
+		 * Now create the ancestors of target dataset.  If the target
+		 * already exists and '-p' option was used we should not
+		 * complain.
+		 */
+		if (zfs_dataset_exists(g_zfs, argv[0], type)) {
+			ret = 0;
+			goto error;
+		}
+		if (zfs_create_ancestors(g_zfs, argv[0]) != 0)
+			goto error;
 	}
 
 	/* pass to libzfs */
@@ -1476,9 +1527,13 @@ zfs_do_list(int argc, char **argv)
 }
 
 /*
- * zfs rename [-r] <fs | snap | vol> <fs | snap | vol>
+ * zfs rename <fs | snap | vol> <fs | snap | vol>
+ * zfs rename -p <fs | vol> <fs | vol>
+ * zfs rename -r <snap> <snap>
  *
  * Renames the given dataset to another of the same type.
+ *
+ * The '-p' flag creates all the non-existing ancestors of the target first.
  */
 /* ARGSUSED */
 static int
@@ -1487,13 +1542,17 @@ zfs_do_rename(int argc, char **argv)
 	zfs_handle_t *zhp;
 	int c;
 	int ret;
-	int recurse = 0;
+	boolean_t recurse = B_FALSE;
+	boolean_t parents = B_FALSE;
 
 	/* check options */
-	while ((c = getopt(argc, argv, "r")) != -1) {
+	while ((c = getopt(argc, argv, "pr")) != -1) {
 		switch (c) {
+		case 'p':
+			parents = B_TRUE;
+			break;
 		case 'r':
-			recurse = 1;
+			recurse = B_TRUE;
 			break;
 		case '?':
 		default:
@@ -1522,14 +1581,28 @@ zfs_do_rename(int argc, char **argv)
 		usage(B_FALSE);
 	}
 
+	if (recurse && parents) {
+		(void) fprintf(stderr, gettext("-p and -r options are mutually "
+		    "exclusive\n"));
+		usage(B_FALSE);
+	}
+
 	if (recurse && strchr(argv[0], '@') == 0) {
 		(void) fprintf(stderr, gettext("source dataset for recursive "
 		    "rename must be a snapshot\n"));
 		usage(B_FALSE);
 	}
 
-	if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_ANY)) == NULL)
+	if ((zhp = zfs_open(g_zfs, argv[0], parents ? ZFS_TYPE_FILESYSTEM |
+	    ZFS_TYPE_VOLUME : ZFS_TYPE_ANY)) == NULL)
 		return (1);
+
+	/* If we were asked and the name looks good, try to create ancestors. */
+	if (parents && zfs_name_valid(argv[1], zfs_get_type(zhp)) &&
+	    zfs_create_ancestors(g_zfs, argv[1]) != 0) {
+		zfs_close(zhp);
+		return (1);
+	}
 
 	ret = (zfs_rename(zhp, argv[1], recurse) != 0);
 
@@ -1857,7 +1930,7 @@ zfs_do_set(int argc, char **argv)
 static int
 zfs_do_snapshot(int argc, char **argv)
 {
-	int recursive = B_FALSE;
+	boolean_t recursive = B_FALSE;
 	int ret;
 	char c;
 

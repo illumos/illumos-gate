@@ -343,12 +343,13 @@ extern int zfs_iter_snapshots(zfs_handle_t *, zfs_iter_f, void *);
  */
 extern int zfs_create(libzfs_handle_t *, const char *, zfs_type_t,
     nvlist_t *);
+extern int zfs_create_ancestors(libzfs_handle_t *, const char *);
 extern int zfs_destroy(zfs_handle_t *);
 extern int zfs_destroy_snaps(zfs_handle_t *, char *);
 extern int zfs_clone(zfs_handle_t *, const char *, nvlist_t *);
 extern int zfs_snapshot(libzfs_handle_t *, const char *, boolean_t);
 extern int zfs_rollback(zfs_handle_t *, zfs_handle_t *, int);
-extern int zfs_rename(zfs_handle_t *, const char *, int);
+extern int zfs_rename(zfs_handle_t *, const char *, boolean_t);
 extern int zfs_send(zfs_handle_t *, const char *, int);
 extern int zfs_receive(libzfs_handle_t *, const char *, int, int, int,
     boolean_t, int);
@@ -363,6 +364,8 @@ extern int zfs_name_valid(const char *, zfs_type_t);
 extern int zfs_disable(zfs_handle_t *);
 extern int zfs_enable(zfs_handle_t *);
 extern zfs_handle_t *zfs_path_to_zhandle(libzfs_handle_t *, char *, zfs_type_t);
+extern boolean_t zfs_dataset_exists(libzfs_handle_t *, const char *,
+    zfs_type_t);
 
 /*
  * Mount support functions.

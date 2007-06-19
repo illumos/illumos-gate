@@ -37,6 +37,8 @@ SUNWprivate_1.1 {
 	zfs_clone;
 	zfs_close;
 	zfs_create;
+	zfs_create_ancestors;
+	zfs_dataset_exists;
 	zfs_destroy;
 	zfs_destroy_snaps;
 	zfs_expand_proplist;

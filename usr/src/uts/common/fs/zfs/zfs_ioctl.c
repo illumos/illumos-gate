@@ -1415,7 +1415,7 @@ zfs_ioc_rollback(zfs_cmd_t *zc)
 static int
 zfs_ioc_rename(zfs_cmd_t *zc)
 {
-	int recursive = zc->zc_cookie & 1;
+	boolean_t recursive = zc->zc_cookie & 1;
 
 	zc->zc_value[sizeof (zc->zc_value) - 1] = '\0';
 	if (dataset_namecheck(zc->zc_value, NULL, NULL) != 0)

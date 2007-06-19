@@ -51,6 +51,7 @@
 #include "zfs_prop.h"
 #include "libzfs_impl.h"
 
+static int create_parents(libzfs_handle_t *, char *, int);
 static int zvol_create_link_common(libzfs_handle_t *, const char *, int);
 
 /*
@@ -1990,12 +1991,16 @@ parent_name(const char *path, char *buf, size_t buflen)
 }
 
 /*
- * Checks to make sure that the given path has a parent, and that it exists.  We
- * also fetch the 'zoned' property, which is used to validate property settings
- * when creating new datasets.
+ * If accept_ancestor is false, then check to make sure that the given path has
+ * a parent, and that it exists.  If accept_ancestor is true, then find the
+ * closest existing ancestor for the given path.  In prefixlen return the
+ * length of already existing prefix of the given path.  We also fetch the
+ * 'zoned' property, which is used to validate property settings when creating
+ * new datasets.
  */
 static int
-check_parents(libzfs_handle_t *hdl, const char *path, uint64_t *zoned)
+check_parents(libzfs_handle_t *hdl, const char *path, uint64_t *zoned,
+    boolean_t accept_ancestor, int *prefixlen)
 {
 	zfs_cmd_t zc = { 0 };
 	char parent[ZFS_MAXNAMELEN];
@@ -2026,16 +2031,22 @@ check_parents(libzfs_handle_t *hdl, const char *path, uint64_t *zoned)
 	}
 
 	/* check to see if the parent dataset exists */
-	if ((zhp = make_dataset_handle(hdl, parent)) == NULL) {
-		switch (errno) {
-		case ENOENT:
+	while ((zhp = make_dataset_handle(hdl, parent)) == NULL) {
+		if (errno == ENOENT && accept_ancestor) {
+			/*
+			 * Go deeper to find an ancestor, give up on top level.
+			 */
+			if (parent_name(parent, parent, sizeof (parent)) != 0) {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "no such pool '%s'"), zc.zc_name);
+				return (zfs_error(hdl, EZFS_NOENT, errbuf));
+			}
+		} else if (errno == ENOENT) {
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "parent does not exist"));
 			return (zfs_error(hdl, EZFS_NOENT, errbuf));
-
-		default:
+		} else
 			return (zfs_standard_error(hdl, errno, errbuf));
-		}
 	}
 
 	*zoned = zfs_prop_get_int(zhp, ZFS_PROP_ZONED);
@@ -2056,6 +2067,56 @@ check_parents(libzfs_handle_t *hdl, const char *path, uint64_t *zoned)
 	}
 
 	zfs_close(zhp);
+	if (prefixlen != NULL)
+		*prefixlen = strlen(parent);
+	return (0);
+}
+
+/*
+ * Finds whether the dataset of the given type(s) exists.
+ */
+boolean_t
+zfs_dataset_exists(libzfs_handle_t *hdl, const char *path, zfs_type_t types)
+{
+	zfs_handle_t *zhp;
+
+	if (!zfs_validate_name(hdl, path, types))
+		return (B_FALSE);
+
+	/*
+	 * Try to get stats for the dataset, which will tell us if it exists.
+	 */
+	if ((zhp = make_dataset_handle(hdl, path)) != NULL) {
+		int ds_type = zhp->zfs_type;
+
+		zfs_close(zhp);
+		if (types & ds_type)
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+/*
+ * Creates non-existing ancestors of the given path.
+ */
+int
+zfs_create_ancestors(libzfs_handle_t *hdl, const char *path)
+{
+	int prefix;
+	uint64_t zoned;
+	char *path_copy;
+	int rc;
+
+	if (check_parents(hdl, path, &zoned, B_TRUE, &prefix) != 0)
+		return (-1);
+
+	if ((path_copy = strdup(path)) != NULL) {
+		rc = create_parents(hdl, path_copy, prefix);
+		free(path_copy);
+	}
+	if (path_copy == NULL || rc != 0)
+		return (-1);
+
 	return (0);
 }
 
@@ -2081,7 +2142,7 @@ zfs_create(libzfs_handle_t *hdl, const char *path, zfs_type_t type,
 		return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
 
 	/* validate parents exist */
-	if (check_parents(hdl, path, &zoned) != 0)
+	if (check_parents(hdl, path, &zoned, B_FALSE, NULL) != 0)
 		return (-1);
 
 	/*
@@ -2092,7 +2153,7 @@ zfs_create(libzfs_handle_t *hdl, const char *path, zfs_type_t type,
 	 * first try to see if the dataset exists.
 	 */
 	(void) strlcpy(zc.zc_name, path, sizeof (zc.zc_name));
-	if (ioctl(hdl->libzfs_fd, ZFS_IOC_OBJSET_STATS, &zc) == 0) {
+	if (zfs_dataset_exists(hdl, zc.zc_name, ZFS_TYPE_ANY)) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 		    "dataset already exists"));
 		return (zfs_error(hdl, EZFS_EXISTS, errbuf));
@@ -2364,7 +2425,7 @@ zfs_clone(zfs_handle_t *zhp, const char *target, nvlist_t *props)
 		return (zfs_error(hdl, EZFS_INVALIDNAME, errbuf));
 
 	/* validate parents exist */
-	if (check_parents(hdl, target, &zoned) != 0)
+	if (check_parents(hdl, target, &zoned, B_FALSE, NULL) != 0)
 		return (-1);
 
 	(void) parent_name(target, parent, sizeof (parent));
@@ -2933,7 +2994,7 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 
 		/* Make sure destination fs does not exist */
 		*strchr(zc.zc_name, '@') = '\0';
-		if (ioctl(hdl->libzfs_fd, ZFS_IOC_OBJSET_STATS, &zc) == 0) {
+		if (zfs_dataset_exists(hdl, zc.zc_name, ZFS_TYPE_ANY)) {
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "destination '%s' exists"), zc.zc_name);
 			return (zfs_error(hdl, EZFS_EXISTS, errbuf));
@@ -3253,7 +3314,7 @@ zfs_iter_dependents(zfs_handle_t *zhp, boolean_t allowrecursion,
  * Renames the given dataset.
  */
 int
-zfs_rename(zfs_handle_t *zhp, const char *target, int recursive)
+zfs_rename(zfs_handle_t *zhp, const char *target, boolean_t recursive)
 {
 	int ret;
 	zfs_cmd_t zc = { 0 };
@@ -3319,7 +3380,7 @@ zfs_rename(zfs_handle_t *zhp, const char *target, int recursive)
 		uint64_t unused;
 
 		/* validate parents */
-		if (check_parents(hdl, target, &unused) != 0)
+		if (check_parents(hdl, target, &unused, B_FALSE, NULL) != 0)
 			return (-1);
 
 		(void) parent_name(target, parent, sizeof (parent));
