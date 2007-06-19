@@ -139,6 +139,8 @@ f none opt/onbld/man/man1/sccscheck.1 644 root bin
 f none opt/onbld/man/man1/sccscp.1 644 root bin
 f none opt/onbld/man/man1/sccsmv.1 644 root bin
 f none opt/onbld/man/man1/sccsrm.1 644 root bin
+f none opt/onbld/man/man1/signit.1 644 root bin
+f none opt/onbld/man/man1/signproto.1 644 root bin
 f none opt/onbld/man/man1/webrev.1 644 root bin
 f none opt/onbld/man/man1/ws.1 644 root bin
 f none opt/onbld/man/man1/wsdiff.1 644 root bin
