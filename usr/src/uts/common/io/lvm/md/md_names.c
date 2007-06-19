@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2440,11 +2440,9 @@ md_validate_devid(
 }
 
 /*
- * md_getdevname - Allows getting a device name from the database.
- *		   A pointer to a character array is passed in for
- *		   the device name to be built in. Also the max_size
- *		   is the maximum number of characters which can be put
- *		   in the devname[].
+ * md_getdevname
+ *
+ * Wrapper for md_getdevname_common()
  */
 int
 md_getdevname(
@@ -2454,6 +2452,29 @@ md_getdevname(
 	md_dev64_t	dev,	/* (alt. key 2) use this if key == KEYWILD */
 	char	*devname,	/* char array to put device name in */
 	size_t	max_size	/* size of char array */
+)
+{
+	return (md_getdevname_common(setno, side, key, dev, devname,
+	    max_size, MD_WAIT_LOCK));
+}
+
+/*
+ * md_getdevname_common
+ *		   Allows getting a device name from the database.
+ *		   A pointer to a character array is passed in for
+ *		   the device name to be built in. Also the max_size
+ *		   is the maximum number of characters which can be put
+ *		   in the devname[].
+ */
+int
+md_getdevname_common(
+	set_t	setno,		/* which set to get name from */
+	side_t	side,		/* (key 1) side number */
+	mdkey_t	key,		/* (key 2) key provided by md_setdevname() */
+	md_dev64_t	dev,	/* (alt. key 2) use this if key == KEYWILD */
+	char	*devname,	/* char array to put device name in */
+	size_t	max_size,	/* size of char array */
+	int	try_lock	/* whether to spin on the namespace lock */
 )
 {
 	struct nm_next_hdr	*nh;
@@ -2472,7 +2493,14 @@ md_getdevname(
 		return (ENOENT);
 	}
 
-	rw_enter(&nm_lock.lock, RW_READER);
+	if (try_lock) {
+		if (rw_tryenter(&nm_lock.lock, RW_READER) == 0) {
+			/* Cannot obtain the lock without blocking */
+			return (EAGAIN);
+		}
+	} else {
+		rw_enter(&nm_lock.lock, RW_READER);
+	}
 
 	if ((nh = get_first_record(setno, 0, NM_NOTSHARED)) == NULL) {
 		rw_exit(&nm_lock.lock);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -613,6 +613,10 @@ typedef struct md_resync_thds_cnt {
 #define	MD_INC_ABR_COUNT	"inc abr count"
 #define	MD_DEC_ABR_COUNT	"dec abr count"
 
+/* md_getdevname_common flags for namespace lock */
+#define	MD_WAIT_LOCK	0
+#define	MD_NOWAIT_LOCK	1
+
 /* Externals from md.c */
 extern int	md_snarf_db_set(set_t setno, md_error_t *ep);
 extern void	get_info(struct dk_cinfo *, minor_t);
@@ -774,6 +778,8 @@ extern mdkey_t	md_setdevname(set_t, side_t, mdkey_t, char *, minor_t, char *,
 			set_t, md_error_t *);
 extern int	md_getdevname(set_t, side_t, mdkey_t, md_dev64_t, char *,
 		    size_t);
+extern int	md_getdevname_common(set_t, side_t, mdkey_t, md_dev64_t, char *,
+		    size_t, int);
 extern int	md_gethspinfo(set_t, side_t, mdkey_t, char *, hsp_t *,
 		    char *);
 extern int	md_getkeyfromdev(set_t, side_t, md_dev64_t, mdkey_t *, int *);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3039,8 +3039,8 @@ md_devname(
 		ASSERT(size >= MD_MAX_CTDLEN);
 	}
 
-	err = md_getdevname(setno, mddb_getsidenum(setno),
-		0, dev, buf, size);
+	err = md_getdevname_common(setno, mddb_getsidenum(setno),
+		0, dev, buf, size, MD_NOWAIT_LOCK);
 	if (err) {
 		if (err == ENOENT) {
 			(void) sprintf(buf, "(Unavailable)");
