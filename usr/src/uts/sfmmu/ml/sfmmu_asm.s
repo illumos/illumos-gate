@@ -3680,14 +3680,7 @@ tsb_suspend:
 	 */
 	stx %g1,[%o2]				/* put tte into *ttep */
 	brgez,a,pn %g1, 8f			/* if tte invalid goto 8: */
-	  sub	%g0, 1, %o0			/* output = -1 (PFN_INVALID) */
-	TTETOPFN(%g1, %o0, vatopfn_l3, %g2, %g3, %g4)
-	/*
-	 * o0 = PFN return value PFN_INVALID, PFN_SUSPENDED, or pfn#
-	 * o1 = sfmmup
-	 * o2 = ttep
-	 * g1 = pfn
-	 */
+	  sub	%g0, 1, %o0			/* output = PFN_INVALID */
 	sub	%g0, 2, %o0			/* output = PFN_SUSPENDED */
 8:
 	retl
