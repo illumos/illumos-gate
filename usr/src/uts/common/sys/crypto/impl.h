@@ -76,6 +76,7 @@ typedef	struct kcf_stats {
 	kstat_named_t	ks_maxthrs;
 	kstat_named_t	ks_swq_njobs;
 	kstat_named_t	ks_swq_maxjobs;
+	kstat_named_t	ks_taskq_threads;
 	kstat_named_t	ks_taskq_minalloc;
 	kstat_named_t	ks_taskq_maxalloc;
 } kcf_stats_t;
@@ -97,6 +98,20 @@ typedef struct kcf_sched_info {
 	/* taskq used to dispatch crypto requests */
 	taskq_t	*ks_taskq;
 } kcf_sched_info_t;
+
+/*
+ * pd_irefcnt approximates the number of inflight requests to the
+ * provider. Though we increment this counter during registration for
+ * other purposes, that base value is mostly same across all providers.
+ * So, it is a good measure of the load on a provider when it is not
+ * in a busy state. Once a provider notifies it is busy, requests
+ * backup in the taskq. So, we use tq_nalloc in that case which gives
+ * the number of task entries in the task queue. Note that we do not
+ * acquire any locks here as it is not critical to get the exact number
+ * and the lock contention may be too costly for this code path.
+ */
+#define	KCF_PROV_LOAD(pd)	((pd)->pd_state != KCF_PROV_BUSY ?	\
+	(pd)->pd_irefcnt : (pd)->pd_sched_info.ks_taskq->tq_nalloc)
 
 #define	KCF_PROV_INCRSTATS(pd, error)	{				\
 	(pd)->pd_sched_info.ks_ndispatches++;				\

@@ -169,11 +169,8 @@ kcf_get_hardware_provider(crypto_mech_type_t mech_type_1,
 			goto out;
 		}
 		/*
-		 * Find the least loaded real provider. tq_nalloc gives
-		 * the number of task entries in the task queue. We do
-		 * not acquire tq_lock here as it is not critical to
-		 * get the exact number and the lock contention may be
-		 * too costly for this code path.
+		 * Find the least loaded real provider. KCF_PROV_LOAD gives
+		 * the load (number of pending requests) of the provider.
 		 */
 		mutex_enter(&old->pd_lock);
 		p = old->pd_provider_list;
@@ -214,7 +211,7 @@ kcf_get_hardware_provider(crypto_mech_type_t mech_type_1,
 				continue;
 			}
 
-			len = provider->pd_sched_info.ks_taskq->tq_nalloc;
+			len = KCF_PROV_LOAD(provider);
 			if (len < gqlen) {
 				gqlen = len;
 				gpd = provider;
@@ -292,11 +289,8 @@ kcf_get_hardware_provider_nomech(offset_t offset_1, offset_t offset_2,
 			goto out;
 		}
 		/*
-		 * Find the least loaded real provider. tq_nalloc gives
-		 * the number of task entries in the task queue. We do
-		 * not acquire tq_lock here as it is not critical to
-		 * get the exact number and the lock contention may be
-		 * too costly for this code path.
+		 * Find the least loaded real provider. KCF_PROV_LOAD gives
+		 * the load (number of pending requests) of the provider.
 		 */
 		mutex_enter(&old->pd_lock);
 		p = old->pd_provider_list;
@@ -325,7 +319,7 @@ kcf_get_hardware_provider_nomech(offset_t offset_1, offset_t offset_2,
 				continue;
 			}
 
-			len = provider->pd_sched_info.ks_taskq->tq_nalloc;
+			len = KCF_PROV_LOAD(provider);
 			if (len < gqlen) {
 				gqlen = len;
 				gpd = provider;
@@ -468,11 +462,8 @@ kcf_get_mech_provider(crypto_mech_type_t mech_type, kcf_mech_entry_t **mepp,
 		/* there is at least one provider */
 
 		/*
-		 * Find the least loaded provider. tq_nalloc gives
-		 * the number of task entries in the task queue. We do
-		 * not acquire tq_lock here as it is not critical to
-		 * get the exact number and the lock contention may be
-		 * too costly for this code path.
+		 * Find the least loaded real provider. KCF_PROV_LOAD gives
+		 * the load (number of pending requests) of the provider.
 		 */
 		while (prov_chain != NULL) {
 			pd = prov_chain->pm_prov_desc;
@@ -481,13 +472,12 @@ kcf_get_mech_provider(crypto_mech_type_t mech_type, kcf_mech_entry_t **mepp,
 			    !KCF_IS_PROV_USABLE(pd) ||
 			    IS_PROVIDER_TRIED(pd, triedl) ||
 			    (call_restrict &&
-				(pd->pd_flags & KCF_PROV_RESTRICTED))) {
+			    (pd->pd_flags & KCF_PROV_RESTRICTED))) {
 				prov_chain = prov_chain->pm_next;
 				continue;
 			}
 
-			if ((len = pd->pd_sched_info.ks_taskq->tq_nalloc)
-			    < gqlen) {
+			if ((len = KCF_PROV_LOAD(pd)) < gqlen) {
 				gqlen = len;
 				gpd = pd;
 			}
@@ -581,13 +571,13 @@ kcf_get_dual_provider(crypto_mechanism_t *mech1, crypto_mechanism_t *mech2,
 		 */
 		while (prov_chain != NULL) {
 			pd = prov_chain->pm_prov_desc;
-			len = pd->pd_sched_info.ks_taskq->tq_nalloc;
+			len = KCF_PROV_LOAD(pd);
 
 			if (!IS_FG_SUPPORTED(prov_chain, fg1) ||
 			    !KCF_IS_PROV_USABLE(pd) ||
 			    IS_PROVIDER_TRIED(pd, triedl) ||
 			    (call_restrict &&
-				(pd->pd_flags & KCF_PROV_RESTRICTED))) {
+			    (pd->pd_flags & KCF_PROV_RESTRICTED))) {
 				prov_chain = prov_chain->pm_next;
 				continue;
 			}

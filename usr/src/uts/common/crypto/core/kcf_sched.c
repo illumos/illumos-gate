@@ -80,8 +80,9 @@ static kcf_stats_t kcf_ksdata = {
 	{ "max threads in pool",	KSTAT_DATA_UINT32},
 	{ "requests in gswq",		KSTAT_DATA_UINT32},
 	{ "max requests in gswq",	KSTAT_DATA_UINT32},
-	{ "minalloc for taskq",		KSTAT_DATA_UINT32},
-	{ "maxalloc for taskq",		KSTAT_DATA_UINT32}
+	{ "threads for HW taskq",	KSTAT_DATA_UINT32},
+	{ "minalloc for HW taskq",	KSTAT_DATA_UINT32},
+	{ "maxalloc for HW taskq",	KSTAT_DATA_UINT32}
 };
 
 static kstat_t *kcf_misc_kstat = NULL;
@@ -118,7 +119,6 @@ kcf_new_ctx(crypto_call_req_t *crq, kcf_provider_desc_t *pd,
 
 	/* initialize the context for the consumer */
 	kcf_ctx->kc_refcnt = 1;
-	kcf_ctx->kc_need_signal = B_FALSE;
 	kcf_ctx->kc_req_chain_first = NULL;
 	kcf_ctx->kc_req_chain_last = NULL;
 	kcf_ctx->kc_secondctx = NULL;
@@ -316,18 +316,35 @@ process_req_hwp(void *ireq)
 		error = common_submit_request(sreq->sn_provider, ctx,
 		    sreq->sn_params, sreq);
 	} else {
+		kcf_context_t *ictx;
 		ASSERT(ctype == CRYPTO_ASYNCH);
-
-		mutex_enter(&areq->an_lock);
-		areq->an_state = REQ_INPROGRESS;
-		mutex_exit(&areq->an_lock);
 
 		/*
 		 * We are in the per-hardware provider thread context and
 		 * hence can sleep. Note that the caller would have done
 		 * a taskq_dispatch(..., TQ_NOSLEEP) and would have returned.
 		 */
-		ctx = areq->an_context ? &areq->an_context->kc_glbl_ctx : NULL;
+		ctx = (ictx = areq->an_context) ? &ictx->kc_glbl_ctx : NULL;
+
+		mutex_enter(&areq->an_lock);
+		/*
+		 * We need to maintain ordering for multi-part requests.
+		 * an_is_my_turn is set to B_TRUE initially for a request
+		 * when it is enqueued and there are no other requests
+		 * for that context. It is set later from kcf_aop_done() when
+		 * the request before us in the chain of requests for the
+		 * context completes. We get signaled at that point.
+		 */
+		if (ictx != NULL) {
+			ASSERT(ictx->kc_prov_desc == areq->an_provider);
+
+			while (areq->an_is_my_turn == B_FALSE) {
+				cv_wait(&areq->an_turn_cv, &areq->an_lock);
+			}
+		}
+		areq->an_state = REQ_INPROGRESS;
+		mutex_exit(&areq->an_lock);
+
 		error = common_submit_request(areq->an_provider, ctx,
 		    &areq->an_params, areq);
 	}
@@ -568,7 +585,7 @@ kcf_resubmit_request(kcf_areq_node_t *areq)
 		taskq_t *taskq = new_pd->pd_sched_info.ks_taskq;
 
 		if (taskq_dispatch(taskq, process_req_hwp, areq, TQ_NOSLEEP) ==
-			    (taskqid_t)0) {
+		    (taskqid_t)0) {
 			error = CRYPTO_HOST_MEMORY;
 		} else {
 			error = CRYPTO_QUEUED;
@@ -654,13 +671,9 @@ kcf_submit_request(kcf_provider_desc_t *pd, crypto_ctx_t *ctx,
 				if (taskq->tq_nalloc >= crypto_taskq_maxalloc) {
 					taskq_wait(taskq);
 				}
-				if (taskq_dispatch(taskq, process_req_hwp,
-				    sreq, TQ_SLEEP) == (taskqid_t)0) {
-					error = CRYPTO_HOST_MEMORY;
-					KCF_PROV_REFRELE(sreq->sn_provider);
-					kmem_cache_free(kcf_sreq_cache, sreq);
-					goto done;
-				}
+
+				(void) taskq_dispatch(taskq, process_req_hwp,
+				    sreq, TQ_SLEEP);
 			}
 
 			/*
@@ -1077,20 +1090,17 @@ kcf_svc_do_run(void)
 		 * is_my_turn is set to B_TRUE initially for a request when
 		 * it is enqueued and there are no other requests
 		 * for that context.  Note that a thread sleeping on
-		 * kc_in_use_cv is not counted as an idle thread. This is
+		 * an_turn_cv is not counted as an idle thread. This is
 		 * because we define an idle thread as one that sleeps on the
 		 * global queue waiting for new requests.
 		 */
-		mutex_enter(&ictx->kc_in_use_lock);
+		mutex_enter(&req->an_lock);
 		while (req->an_is_my_turn == B_FALSE) {
-			ictx->kc_need_signal = B_TRUE;
 			KCF_ATOMIC_INCR(kcfpool->kp_blockedthreads);
-			cv_wait(&ictx->kc_in_use_cv, &ictx->kc_in_use_lock);
+			cv_wait(&req->an_turn_cv, &req->an_lock);
 			KCF_ATOMIC_DECR(kcfpool->kp_blockedthreads);
 		}
-		mutex_exit(&ictx->kc_in_use_lock);
 
-		mutex_enter(&req->an_lock);
 		req->an_state = REQ_INPROGRESS;
 		mutex_exit(&req->an_lock);
 
@@ -1141,6 +1151,7 @@ kcf_areq_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	areq->an_type = CRYPTO_ASYNCH;
 	mutex_init(&areq->an_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&areq->an_done, NULL, CV_DEFAULT, NULL);
+	cv_init(&areq->an_turn_cv, NULL, CV_DEFAULT, NULL);
 
 	return (0);
 }
@@ -1154,6 +1165,7 @@ kcf_areq_cache_destructor(void *buf, void *cdrarg)
 	ASSERT(areq->an_refcnt == 0);
 	mutex_destroy(&areq->an_lock);
 	cv_destroy(&areq->an_done);
+	cv_destroy(&areq->an_turn_cv);
 }
 
 /*
@@ -1166,7 +1178,6 @@ kcf_context_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	kcf_context_t *kctx = (kcf_context_t *)buf;
 
 	mutex_init(&kctx->kc_in_use_lock, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&kctx->kc_in_use_cv, NULL, CV_DEFAULT, NULL);
 
 	return (0);
 }
@@ -1179,7 +1190,6 @@ kcf_context_cache_destructor(void *buf, void *cdrarg)
 
 	ASSERT(kctx->kc_refcnt == 0);
 	mutex_destroy(&kctx->kc_in_use_lock);
-	cv_destroy(&kctx->kc_in_use_cv);
 }
 
 /*
@@ -1331,18 +1341,11 @@ kcf_aop_done(kcf_areq_node_t *areq, int error)
 		 */
 		mutex_enter(&ictx->kc_in_use_lock);
 		nextreq = areq->an_ctxchain_next;
-		ASSERT(nextreq != NULL || ictx->kc_need_signal == B_FALSE);
-
 		if (nextreq != NULL) {
+			mutex_enter(&nextreq->an_lock);
 			nextreq->an_is_my_turn = B_TRUE;
-			/*
-			 * Currently, the following case happens
-			 * only for software providers.
-			 */
-			if (ictx->kc_need_signal) {
-				cv_broadcast(&ictx->kc_in_use_cv);
-				ictx->kc_need_signal = B_FALSE;
-			}
+			cv_signal(&nextreq->an_turn_cv);
+			mutex_exit(&nextreq->an_lock);
 		}
 
 		ictx->kc_req_chain_first = nextreq;
@@ -1833,6 +1836,7 @@ kcf_misc_kstat_update(kstat_t *ksp, int rw)
 	ks_data->ks_maxthrs.value.ui32 = kcf_maxthreads;
 	ks_data->ks_swq_njobs.value.ui32 = gswq->gs_njobs;
 	ks_data->ks_swq_maxjobs.value.ui32 = gswq->gs_maxjobs;
+	ks_data->ks_taskq_threads.value.ui32 = crypto_taskq_threads;
 	ks_data->ks_taskq_minalloc.value.ui32 = crypto_taskq_minalloc;
 	ks_data->ks_taskq_maxalloc.value.ui32 = crypto_taskq_maxalloc;
 

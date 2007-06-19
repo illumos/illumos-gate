@@ -44,10 +44,12 @@
 #include <sys/disp.h>
 #include <sys/kstat.h>
 #include <sys/policy.h>
+#include <sys/cpuvar.h>
 
 /*
  * minalloc and maxalloc values to be used for taskq_create().
  */
+int crypto_taskq_threads = CRYPTO_TASKQ_THREADS;
 int crypto_taskq_minalloc = CYRPTO_TASKQ_MIN;
 int crypto_taskq_maxalloc = CRYPTO_TASKQ_MAX;
 
@@ -245,16 +247,16 @@ crypto_register_provider(crypto_provider_info_t *info,
 
 	/*
 	 * We create a taskq only for a hardware provider. The global
-	 * software queue is used for software providers. The taskq
-	 * is limited to one thread since tasks are guaranteed to be
-	 * executed in the order they are scheduled, if nthreads == 1. We
-	 * pass TASKQ_PREPOPULATE flag to keep some entries cached to
-	 * improve performance.
+	 * software queue is used for software providers. We handle ordering
+	 * of multi-part requests in the taskq routine. So, it is safe to
+	 * have multiple threads for the taskq. We pass TASKQ_PREPOPULATE flag
+	 * to keep some entries cached to improve performance.
 	 */
 	if (prov_desc->pd_prov_type == CRYPTO_HW_PROVIDER)
 		prov_desc->pd_sched_info.ks_taskq = taskq_create("kcf_taskq",
-		    1, minclsyspri, crypto_taskq_minalloc,
-		    crypto_taskq_maxalloc, TASKQ_PREPOPULATE);
+		    crypto_taskq_threads, minclsyspri,
+		    crypto_taskq_minalloc, crypto_taskq_maxalloc,
+		    TASKQ_PREPOPULATE);
 	else
 		prov_desc->pd_sched_info.ks_taskq = NULL;
 

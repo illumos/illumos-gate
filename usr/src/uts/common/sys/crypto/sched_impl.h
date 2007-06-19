@@ -185,6 +185,7 @@ typedef struct kcf_areq_node {
 	/* next in chain of requests for context */
 	struct kcf_areq_node	*an_ctxchain_next;
 
+	kcondvar_t		an_turn_cv;
 	boolean_t		an_is_my_turn;
 	boolean_t		an_isdual;	/* for internal reuse */
 
@@ -291,7 +292,6 @@ typedef struct kcf_global_swq {
 typedef struct kcf_context {
 	crypto_ctx_t		kc_glbl_ctx;
 	uint_t			kc_refcnt;
-	kcondvar_t		kc_in_use_cv;
 	kmutex_t		kc_in_use_lock;
 	/*
 	 * kc_req_chain_first and kc_req_chain_last are used to chain
@@ -300,7 +300,6 @@ typedef struct kcf_context {
 	 */
 	kcf_areq_node_t		*kc_req_chain_first;
 	kcf_areq_node_t		*kc_req_chain_last;
-	boolean_t		kc_need_signal;	/* Initialized to B_FALSE */
 	kcf_provider_desc_t	*kc_prov_desc;	/* Prov. descriptor */
 	kcf_provider_desc_t	*kc_sw_prov_desc;	/* Prov. descriptor */
 	kcf_mech_entry_t	*kc_mech;
@@ -455,12 +454,15 @@ typedef struct kcf_ntfy_elem {
  * take around eight cpus to load a hardware provider (This is true for
  * at least one product) and a kernel client may come from different
  * low-priority interrupt levels. We will have CYRPTO_TASKQ_MIN number
- * of cached taskq entries. These are just reasonable estimates and
- * might need to change in future.
+ * of cached taskq entries. The CRYPTO_TASKQ_MAX number is based on
+ * a throughput of 1GB/s using 512-byte buffers. These are just
+ * reasonable estimates and might need to change in future.
  */
+#define	CRYPTO_TASKQ_THREADS	8
 #define	CYRPTO_TASKQ_MIN	64
-#define	CRYPTO_TASKQ_MAX	1024
+#define	CRYPTO_TASKQ_MAX	2 * 1024 * 1024
 
+extern int crypto_taskq_threads;
 extern int crypto_taskq_minalloc;
 extern int crypto_taskq_maxalloc;
 extern kcf_global_swq_t *gswq;
