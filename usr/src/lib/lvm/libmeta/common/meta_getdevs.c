@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +48,7 @@ meta_getminor(md_dev64_t dev64)
 		if (getenv("META_DEBUG"))
 			(void) printf(
 			    "meta_getminor called with 32 bit dev: 0x%llx\n",
-				dev64);
+			    dev64);
 		return ((minor_t)(dev64 & MAXMIN32));
 	}
 }
@@ -67,7 +67,7 @@ meta_getmajor(md_dev64_t dev64)
 		if (getenv("META_DEBUG"))
 			(void) printf(
 			    "meta_getmajor called with 32 bit dev: 0x%llx\n",
-			dev64);
+			    dev64);
 		return ((major_t)((dev64 >> NBITSMINOR32) & MAXMAJ32));
 	}
 }
@@ -503,7 +503,7 @@ meta_get_names(
 	if (gn.size > 0) {
 		/* malloc minor number buffer to be filled by ioctl */
 		if ((minors = (minor_t *)malloc(
-				gn.size * sizeof (minor_t))) == 0) {
+		    gn.size * sizeof (minor_t))) == 0) {
 			return (ENOMEM);
 		}
 		gn.minors = (uintptr_t)minors;
@@ -518,12 +518,28 @@ meta_get_names(
 
 			/* get name */
 			np = metamnumname(&sp, *m_ptr,
-				((options & PRINT_FAST) ? 1 : 0), ep);
+			    ((options & PRINT_FAST) ? 1 : 0), ep);
+
+			/*
+			 * np can be NULL if the /dev/md namespace entries
+			 * do not exist. This could happen on a metaset
+			 * take due to devfsadmd not having created them.
+			 * Therefore, with disksets and a null np, assume
+			 * devfsadmd has not run and so tell it to run
+			 * for the specific device that is missing.
+			 * The call to meta_update_devtree does not return
+			 * until the /dev/md links have been created.
+			 */
+			if (np == NULL && !metaislocalset(sp)) {
+				(void) meta_update_devtree(*m_ptr);
+				np = metamnumname(&sp, *m_ptr,
+				    ((options & PRINT_FAST) ? 1 : 0), ep);
+			}
+
 			if (np == NULL)
 				goto out;
 
-			tailpp = meta_namelist_append_wrapper(
-				tailpp, np);
+			tailpp = meta_namelist_append_wrapper(tailpp, np);
 
 			/* next device */
 			m_ptr++;
