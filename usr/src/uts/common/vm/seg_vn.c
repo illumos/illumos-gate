@@ -1441,7 +1441,8 @@ retry:
 				uint_t vpprot;
 				page_t *anon_pl[1+1], *pp;
 				caddr_t addr;
-				ulong_t anon_idx = 0;
+				ulong_t old_idx = svd->anon_index;
+				ulong_t new_idx = 0;
 
 				/*
 				 * The softlock count might be non zero
@@ -1466,7 +1467,7 @@ retry:
 				 */
 				while (i-- > 0) {
 					if (ap = anon_get_ptr(amp->ahp,
-					    anon_idx)) {
+					    old_idx)) {
 						error = anon_getpage(&ap,
 						    &vpprot, anon_pl, PAGESIZE,
 						    seg, addr, S_READ,
@@ -1498,12 +1499,13 @@ retry:
 							goto out;
 						}
 						(void) anon_set_ptr(
-						    newsvd->amp->ahp, anon_idx,
+						    newsvd->amp->ahp, new_idx,
 						    newap, ANON_SLEEP);
 						page_unlock(pp);
 					}
 					addr += PAGESIZE;
-					anon_idx++;
+					old_idx++;
+					new_idx++;
 				}
 			} else {	/* common case */
 				if (seg->s_szc != 0) {
