@@ -85,6 +85,7 @@ struct dk_cinfo {
 #define	DKC_DIRECT	20	/* Intel direct attached device i.e. IDE */
 #define	DKC_PCMCIA_MEM	21	/* PCMCIA memory disk-like type */
 #define	DKC_PCMCIA_ATA	22	/* PCMCIA AT Attached type */
+#define	DKC_VBD		23	/* virtual block device */
 
 /*
  * Sun reserves up through 1023
