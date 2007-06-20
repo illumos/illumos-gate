@@ -9,7 +9,7 @@
  */
 
 /*
- * Copyright 1994-2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 1994-2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -531,6 +531,7 @@ store(from, lmtprcpts)
 	FILE *bfp, *hfp;
 	char *btn, *htn;
 	int in_header_section;
+	int newfd;
 
 	bfd = -1;
 	hfd = -1;
@@ -700,6 +701,14 @@ store(from, lmtprcpts)
 		}
 	}
 
+	if ((newfd = dup(bfd)) >= 0) {
+		fclose(bfp);
+		bfd = newfd;
+	}
+	if ((newfd = dup(hfd)) >= 0) {
+		fclose(hfp);
+		hfd = newfd;
+	}
 	(void) time(&tval);
 	(void) snprintf(unix_from_line, sizeof (unix_from_line), "From %s %s",
 	    from, ctime(&tval));
