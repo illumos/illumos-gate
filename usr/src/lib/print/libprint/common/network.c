@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +48,7 @@
 #include <network.h>
 #include <misc.h>
 
-static int read_wait_time_sec = 60;
+static int read_wait_time_sec = 300;
 static int write_wait_time_sec = 10;
 
 /*
