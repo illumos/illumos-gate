@@ -571,7 +571,7 @@ setdscr(struct ssd *ssd)
 			}
 
 #if defined(__amd64)
-			if (pcb->pcb_flags & RUPDATE_PENDING) {
+			if (pcb->pcb_rupdate == 1) {
 				if (ssd->sel == pcb->pcb_ds ||
 				    ssd->sel == pcb->pcb_es ||
 				    ssd->sel == pcb->pcb_fs ||

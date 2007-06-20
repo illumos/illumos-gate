@@ -995,7 +995,7 @@ loop:
 		/*
 		 * We are done if segment registers do not need updating.
 		 */
-		if ((tp->t_lwp->lwp_pcb.pcb_flags & RUPDATE_PENDING) == 0)
+		if (tp->t_lwp->lwp_pcb.pcb_rupdate == 0)
 			return (1);
 
 		if (update_sregs(rp, tp->t_lwp)) {
@@ -1013,7 +1013,7 @@ loop:
 			tp->t_sig_check = 1;
 			cli();
 		}
-		tp->t_lwp->lwp_pcb.pcb_flags &= ~RUPDATE_PENDING;
+		tp->t_lwp->lwp_pcb.pcb_rupdate = 0;
 
 #endif	/* __amd64 */
 		return (1);

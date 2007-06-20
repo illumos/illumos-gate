@@ -1554,11 +1554,11 @@ _lwp_rtt:
 #if defined(DEBUG)
 	/*
 	 * If we were to run lwp_savectx at this point -without-
-	 * RUPDATE_PENDING being set, we'd end up sampling the hardware
+	 * pcb_rupdate being set to 1, we'd end up sampling the hardware
 	 * state left by the previous running lwp, rather than setting
 	 * the values requested by the lwp creator.  Bad.
 	 */
-	testl	$RUPDATE_PENDING, PCB_FLAGS(%r14)
+	testb	$0x1, PCB_RUPDATE(%r14)
 	jne	1f
 	leaq	_no_pending_updates(%rip), %rdi
 	movl	$__LINE__, %esi
@@ -1566,7 +1566,7 @@ _lwp_rtt:
 	xorl	%eax, %eax
 	call	panic
 _no_pending_updates:
-	.string	"locore.s:%d lwp_rtt(lwp %p) but no RUPDATE_PENDING"
+	.string	"locore.s:%d lwp_rtt(lwp %p) but pcb_rupdate != 1"
 1:
 #endif
 

@@ -135,6 +135,7 @@ _klwp
 	lwp_pcb.pcb_flags	PCB_FLAGS
 	lwp_pcb.pcb_fpu.fpu_regs LWP_FPU_REGS
 	lwp_pcb.pcb_fpu.fpu_flags LWP_FPU_FLAGS
+	lwp_pcb.pcb_rupdate	PCB_RUPDATE
 
 pcb	PCBSIZE
 	pcb_drstat

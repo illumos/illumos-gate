@@ -442,7 +442,7 @@ getgregs(klwp_t *lwp, gregset_t grp)
 	grp[REG_GSBASE] = pcb->pcb_gsbase;
 	if (thisthread)
 		kpreempt_disable();
-	if (pcb->pcb_flags & RUPDATE_PENDING) {
+	if (pcb->pcb_rupdate == 1) {
 		grp[REG_DS] = pcb->pcb_ds;
 		grp[REG_ES] = pcb->pcb_es;
 		grp[REG_FS] = pcb->pcb_fs;
@@ -478,7 +478,7 @@ getgregs32(klwp_t *lwp, gregset32_t grp)
 
 	if (thisthread)
 		kpreempt_disable();
-	if (pcb->pcb_flags & RUPDATE_PENDING) {
+	if (pcb->pcb_rupdate == 1) {
 		grp[GS] = (uint16_t)pcb->pcb_gs;
 		grp[FS] = (uint16_t)pcb->pcb_fs;
 		grp[DS] = (uint16_t)pcb->pcb_ds;
@@ -712,7 +712,7 @@ setgregs(klwp_t *lwp, gregset_t grp)
 		/*
 		 * Ensure that we go out via update_sregs
 		 */
-		pcb->pcb_flags |= RUPDATE_PENDING;
+		pcb->pcb_rupdate = 1;
 		lwptot(lwp)->t_post_sys = 1;
 		if (thisthread)
 			kpreempt_enable();
@@ -757,7 +757,7 @@ setgregs(klwp_t *lwp, gregset_t grp)
 		/*
 		 * Ensure that we go out via update_sregs
 		 */
-		pcb->pcb_flags |= RUPDATE_PENDING;
+		pcb->pcb_rupdate = 1;
 		lwptot(lwp)->t_post_sys = 1;
 		if (thisthread)
 			kpreempt_enable();

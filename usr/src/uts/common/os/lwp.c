@@ -1650,9 +1650,8 @@ forklwp(klwp_t *lwp, proc_t *cp, id_t lwpid)
 
 	/* fix up child's lwp */
 
-#if defined(__i386) || defined(__amd64)
-	clwp->lwp_pcb.pcb_flags = clwp->lwp_pcb.pcb_flags & RUPDATE_PENDING;
-#elif defined(__sparc)
+	clwp->lwp_pcb.pcb_flags = 0;
+#if defined(__sparc)
 	clwp->lwp_pcb.pcb_step = STEP_NONE;
 #endif
 	clwp->lwp_cursig = 0;

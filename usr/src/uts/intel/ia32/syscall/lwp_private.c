@@ -72,12 +72,12 @@ lwp_setprivate(klwp_t *lwp, int which, uintptr_t base)
 	 * of zero for %fs and %gs to use the 64-bit fs_base and gs_base
 	 * respectively.
 	 */
-	if ((pcb->pcb_flags & RUPDATE_PENDING) == 0) {
+	if (pcb->pcb_rupdate == 0) {
 		pcb->pcb_ds = rp->r_ds;
 		pcb->pcb_es = rp->r_es;
 		pcb->pcb_fs = rp->r_fs;
 		pcb->pcb_gs = rp->r_gs;
-		pcb->pcb_flags |= RUPDATE_PENDING;
+		pcb->pcb_rupdate = 1;
 		t->t_post_sys = 1;
 	}
 	ASSERT(t->t_post_sys);
@@ -167,7 +167,7 @@ lwp_getprivate(klwp_t *lwp, int which, uintptr_t base)
 	case _LWP_FSBASE:
 		if ((sbase = pcb->pcb_fsbase) != 0) {
 			if (lwp_getdatamodel(lwp) == DATAMODEL_NATIVE) {
-				if (pcb->pcb_flags & RUPDATE_PENDING) {
+				if (pcb->pcb_rupdate == 1) {
 					if (pcb->pcb_fs == 0)
 						break;
 				} else {
@@ -175,7 +175,7 @@ lwp_getprivate(klwp_t *lwp, int which, uintptr_t base)
 						break;
 				}
 			} else {
-				if (pcb->pcb_flags & RUPDATE_PENDING) {
+				if (pcb->pcb_rupdate == 1) {
 					if (pcb->pcb_fs == LWPFS_SEL)
 						break;
 				} else {
@@ -189,7 +189,7 @@ lwp_getprivate(klwp_t *lwp, int which, uintptr_t base)
 	case _LWP_GSBASE:
 		if ((sbase = pcb->pcb_gsbase) != 0) {
 			if (lwp_getdatamodel(lwp) == DATAMODEL_NATIVE) {
-				if (pcb->pcb_flags & RUPDATE_PENDING) {
+				if (pcb->pcb_rupdate == 1) {
 					if (pcb->pcb_gs == 0)
 						break;
 				} else {
@@ -197,7 +197,7 @@ lwp_getprivate(klwp_t *lwp, int which, uintptr_t base)
 						break;
 				}
 			} else {
-				if (pcb->pcb_flags & RUPDATE_PENDING) {
+				if (pcb->pcb_rupdate == 1) {
 					if (pcb->pcb_gs == LWPGS_SEL)
 						break;
 				} else {

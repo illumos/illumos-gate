@@ -174,8 +174,8 @@
 /*
  * Check to see if a simple (direct) return is possible i.e.
  *
- *	if ((t->t_post_sys_ast | syscalltrace |
- *	    (lwp->lwp_pcb.pcb_flags & RUPDATE_PENDING)) != 0)
+ *	if (t->t_post_sys_ast | syscalltrace |
+ *	    lwp->lwp_pcb.pcb_rupdate == 1)
  *		do full version	;
  *
  * Preconditions:
@@ -187,8 +187,7 @@
  */
 #define	CHECK_POSTSYS_NE(t, ltmp, rtmp)			\
 	movq	T_LWP(t), ltmp;				\
-	movl	PCB_FLAGS(ltmp), rtmp;			\
-	andl	$RUPDATE_PENDING, rtmp;			\
+	movzbl	PCB_RUPDATE(ltmp), rtmp;		\
 	ORL_SYSCALLTRACE(rtmp);				\
 	orl	T_POST_SYS_AST(t), rtmp;		\
 	cmpl	$0, rtmp
@@ -226,7 +225,7 @@
  * Postconditions (if assertion is true):
  *	-none-
  *
- * ASSERT((lwp->lwp_pcb.pcb_flags & RUPDATE_PENDING) == 0);
+ * ASSERT(lwp->lwp_pcb.pcb_rupdate == 0);
  *
  * If this is false, it meant that we returned to userland without
  * updating the segment registers as we were supposed to.
@@ -234,7 +233,7 @@
  * Note that we must ensure no interrupts or other traps intervene
  * between entering privileged mode and performing the assertion,
  * otherwise we may perform a context switch on the thread, which
- * will end up setting the RUPDATE_PENDING bit again.
+ * will end up setting pcb_rupdate to 1 again.
  */
 #if defined(DEBUG)
 
@@ -247,7 +246,7 @@ __codesel_msg:
 	.string	"syscall_asm_amd64.s:%d rp->r_cs [%ld] != %ld"
 
 __no_rupdate_msg:
-	.string	"syscall_asm_amd64.s:%d lwp %p, pcb_flags & RUPDATE_PENDING != 0"
+	.string	"syscall_asm_amd64.s:%d lwp %p, pcb_rupdate != 0"
 
 #endif	/* !__lint */
 
@@ -265,7 +264,7 @@ __no_rupdate_msg:
 7:
 
 #define	ASSERT_NO_RUPDATE_PENDING(lwp)			\
-	testl	$RUPDATE_PENDING, PCB_FLAGS(lwp);	\
+	testb	$0x1, PCB_RUPDATE(lwp);			\
 	je	8f;					\
 	movq	lwp, %rdx;				\
 	leaq	__no_rupdate_msg(%rip), %rdi;		\
