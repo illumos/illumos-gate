@@ -470,7 +470,7 @@ dbuf_read_impl(dmu_buf_impl_t *db, zio_t *zio, uint32_t *flags)
 	if (db->db_blkid == DB_BONUS_BLKID) {
 		ASSERT3U(db->db_dnode->dn_bonuslen, ==, db->db.db_size);
 		db->db.db_data = zio_buf_alloc(DN_MAX_BONUSLEN);
-		arc_space_consume(512);
+		arc_space_consume(DN_MAX_BONUSLEN);
 		if (db->db.db_size < DN_MAX_BONUSLEN)
 			bzero(db->db.db_data, DN_MAX_BONUSLEN);
 		bcopy(DN_BONUS(db->db_dnode->dn_phys), db->db.db_data,
