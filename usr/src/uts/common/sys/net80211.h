@@ -364,6 +364,7 @@ struct ieee80211com {
 	timeout_id_t		ic_watchdog_timer;	/* watchdog timer */
 	/* Cipher state/configuration. */
 	struct ieee80211_crypto_state	ic_crypto;
+	const struct ieee80211_cipher *ic_ciphers[IEEE80211_CIPHER_MAX];
 
 	kmutex_t		ic_doorlock;
 	char			ic_wpadoor[MAX_IEEE80211STR];

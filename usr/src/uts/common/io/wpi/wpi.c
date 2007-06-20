@@ -511,7 +511,7 @@ wpi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * use software WEP for the current version.
 	 */
 	ic->ic_caps = IEEE80211_C_SHPREAMBLE | IEEE80211_C_TXPMGT |
-	    IEEE80211_C_PMGT;
+	    IEEE80211_C_PMGT | IEEE80211_C_SHSLOT;
 
 	/* set supported .11b and .11g rates */
 	ic->ic_sup_rates[IEEE80211_MODE_11B] = wpi_rateset_11b;
@@ -734,7 +734,7 @@ wpi_alloc_dma_mem(wpi_sc_t *sc, size_t memsize, ddi_dma_attr_t *dma_attr_p,
 	 * Allocate handle
 	 */
 	err = ddi_dma_alloc_handle(sc->sc_dip, dma_attr_p,
-		    DDI_DMA_SLEEP, NULL, &dma_p->dma_hdl);
+	    DDI_DMA_SLEEP, NULL, &dma_p->dma_hdl);
 	if (err != DDI_SUCCESS) {
 		dma_p->dma_hdl = NULL;
 		return (DDI_FAILURE);
@@ -1253,8 +1253,9 @@ wpi_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		if (ic->ic_fixed_rate == IEEE80211_FIXED_RATE_NONE) {
 			sc->sc_flags |= WPI_F_RATE_AUTO_CTL;
 			/* set rate to some reasonable initial value */
-			for (i = in->in_rates.ir_nrates - 1;
-			    i > 0 && IEEE80211_RATE(i) > 72; i--);
+			i = in->in_rates.ir_nrates - 1;
+			while (i > 0 && IEEE80211_RATE(i) > 72)
+				i--;
 			in->in_txrate = i;
 		} else {
 			sc->sc_flags &= ~WPI_F_RATE_AUTO_CTL;
@@ -1934,7 +1935,7 @@ wpi_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	if ((wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK) ==
 	    IEEE80211_FC0_TYPE_MGT) {
 		/* mgmt frames are sent at the lowest available bit-rate */
-		rate = in->in_rates.ir_rates[0];
+		rate = 2;
 	} else {
 		if (ic->ic_fixed_rate != IEEE80211_FIXED_RATE_NONE) {
 			rate = ic->ic_fixed_rate;

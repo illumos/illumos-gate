@@ -75,7 +75,7 @@ ieee80211_send_setup(ieee80211com_t *ic, ieee80211_node_t *in,
 			break;
 		default:
 			ieee80211_err("ieee80211_send_setup: "
-				"Invalid mode %u\n", ic->ic_opmode);
+			    "Invalid mode %u\n", ic->ic_opmode);
 			return;
 		}
 	} else {
@@ -86,7 +86,7 @@ ieee80211_send_setup(ieee80211com_t *ic, ieee80211_node_t *in,
 	}
 	*(uint16_t *)&wh->i_dur[0] = 0;	/* set duration */
 	*(uint16_t *)&wh->i_seq[0] =	/* set sequence number */
-		LE_16(in->in_txseqs[0] << IEEE80211_SEQ_SEQ_SHIFT);
+	    LE_16(in->in_txseqs[0] << IEEE80211_SEQ_SEQ_SHIFT);
 	in->in_txseqs[0]++;		/* increase sequence number by 1 */
 }
 
@@ -110,7 +110,7 @@ ieee80211_mgmt_output(ieee80211com_t *ic, ieee80211_node_t *in, mblk_t *mp,
 
 	wh = (struct ieee80211_frame *)mp->b_rptr;
 	ieee80211_send_setup(ic, in, wh, IEEE80211_FC0_TYPE_MGT | type,
-		ic->ic_macaddr, in->in_macaddr, in->in_bssid);
+	    ic->ic_macaddr, in->in_macaddr, in->in_bssid);
 	if (in->in_challenge != NULL)
 		wh->i_fc[1] |= IEEE80211_FC1_WEP;
 
@@ -147,8 +147,8 @@ ieee80211_send_nulldata(ieee80211_node_t *in)
 
 	wh = (struct ieee80211_frame *)m->b_rptr;
 	ieee80211_send_setup(ic, in, wh,
-		IEEE80211_FC0_TYPE_DATA | IEEE80211_FC0_SUBTYPE_NODATA,
-		ic->ic_macaddr, in->in_macaddr, in->in_bssid);
+	    IEEE80211_FC0_TYPE_DATA | IEEE80211_FC0_SUBTYPE_NODATA,
+	    ic->ic_macaddr, in->in_macaddr, in->in_bssid);
 	/* NB: power management bit is never sent by an AP */
 	if ((in->in_flags & IEEE80211_NODE_PWR_MGT) &&
 	    ic->ic_opmode != IEEE80211_M_HOSTAP)
@@ -156,10 +156,10 @@ ieee80211_send_nulldata(ieee80211_node_t *in)
 	m->b_wptr = m->b_rptr + sizeof (struct ieee80211_frame);
 
 	ieee80211_dbg(IEEE80211_MSG_DEBUG | IEEE80211_MSG_DUMPPKTS, "net80211: "
-		"send null data frame on channel %u, pwr mgt %s\n",
-		ieee80211_macaddr_sprintf(in->in_macaddr),
-		ieee80211_chan2ieee(ic, ic->ic_curchan),
-		wh->i_fc[1] & IEEE80211_FC1_PWR_MGT ? "ena" : "dis");
+	    "send null data frame on channel %u, pwr mgt %s\n",
+	    ieee80211_macaddr_sprintf(in->in_macaddr),
+	    ieee80211_chan2ieee(ic, ic->ic_curchan),
+	    wh->i_fc[1] & IEEE80211_FC1_PWR_MGT ? "ena" : "dis");
 
 	(void) (*ic->ic_xmit)(ic, m, IEEE80211_FC0_TYPE_MGT);
 
@@ -181,7 +181,7 @@ ieee80211_encap(ieee80211com_t *ic, mblk_t *mp, ieee80211_node_t *in)
 	wh = (struct ieee80211_frame *)mp->b_rptr;
 	*(uint16_t *)wh->i_dur = 0;
 	*(uint16_t *)wh->i_seq =
-		LE_16(in->in_txseqs[0] << IEEE80211_SEQ_SEQ_SHIFT);
+	    LE_16(in->in_txseqs[0] << IEEE80211_SEQ_SEQ_SHIFT);
 	in->in_txseqs[0]++;
 
 	if (ic->ic_flags & IEEE80211_F_PRIVACY)
@@ -315,10 +315,10 @@ ieee80211_send_probereq(ieee80211_node_t *in,
 	 *	[tlv] user-specified ie's
 	 */
 	mp = ieee80211_getmgtframe(&frm,
-		2 + IEEE80211_NWID_LEN
-		+ 2 + IEEE80211_RATE_SIZE +
-		+ 2 + IEEE80211_XRATE_SIZE
-		+ optielen);
+	    2 + IEEE80211_NWID_LEN
+	    + 2 + IEEE80211_RATE_SIZE +
+	    + 2 + IEEE80211_XRATE_SIZE
+	    + optielen);
 	if (mp == NULL)
 		return (ENOMEM);
 
@@ -334,13 +334,13 @@ ieee80211_send_probereq(ieee80211_node_t *in,
 
 	wh = (struct ieee80211_frame *)mp->b_rptr;
 	ieee80211_send_setup(ic, in, wh,
-		IEEE80211_FC0_TYPE_MGT | IEEE80211_FC0_SUBTYPE_PROBE_REQ,
-		sa, da, bssid);
+	    IEEE80211_FC0_TYPE_MGT | IEEE80211_FC0_SUBTYPE_PROBE_REQ,
+	    sa, da, bssid);
 
 	ieee80211_dbg(IEEE80211_MSG_DEBUG | IEEE80211_MSG_DUMPPKTS,
-		"[%s] send probe req on channel %u\n",
-		ieee80211_macaddr_sprintf(wh->i_addr1),
-		ieee80211_chan2ieee(ic, ic->ic_curchan));
+	    "[%s] send probe req on channel %u\n",
+	    ieee80211_macaddr_sprintf(wh->i_addr1),
+	    ieee80211_chan2ieee(ic, ic->ic_curchan));
 
 	(void) (*ic->ic_xmit)(ic, mp, IEEE80211_FC0_TYPE_MGT);
 	return (0);
@@ -384,21 +384,21 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 		 *	[tlv] WME (optional)
 		 */
 		mp = ieee80211_getmgtframe(&frm,
-			8			/* time stamp  */
-			+ sizeof (uint16_t)	/* beacon interval  */
-			+ sizeof (uint16_t)	/* capability  */
-			+ 2 + IEEE80211_NWID_LEN
-			+ 2 + IEEE80211_RATE_SIZE
-			+ 2 + IEEE80211_FH_LEN
-			+ 2 + IEEE80211_IBSS_LEN
-			+ 2 + IEEE80211_ERP_LEN
-			+ 2 + IEEE80211_XRATE_SIZE
-			+ (ic->ic_flags & IEEE80211_F_WPA ?
-				2 * sizeof (struct ieee80211_ie_wpa) : 0)
-						/* [tlv] WPA  */
-			+ (ic->ic_flags & IEEE80211_F_WME ?
-				sizeof (struct ieee80211_wme_param) : 0));
-						/* [tlv] WME  */
+		    8			/* time stamp  */
+		    + sizeof (uint16_t)	/* beacon interval  */
+		    + sizeof (uint16_t)	/* capability  */
+		    + 2 + IEEE80211_NWID_LEN
+		    + 2 + IEEE80211_RATE_SIZE
+		    + 2 + IEEE80211_FH_LEN
+		    + 2 + IEEE80211_IBSS_LEN
+		    + 2 + IEEE80211_ERP_LEN
+		    + 2 + IEEE80211_XRATE_SIZE
+		    + (ic->ic_flags & IEEE80211_F_WPA ?
+		    2 * sizeof (struct ieee80211_ie_wpa) : 0)
+					/* [tlv] WPA  */
+		    + (ic->ic_flags & IEEE80211_F_WME ?
+		    sizeof (struct ieee80211_wme_param) : 0));
+					/* [tlv] WME  */
 		if (mp == NULL)
 			return (ENOMEM);
 
@@ -419,9 +419,9 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 			*frm++ = in->in_fhdwell & 0x00ff;
 			*frm++ = (in->in_fhdwell >> 8) & 0x00ff;
 			*frm++ = IEEE80211_FH_CHANSET(
-				ieee80211_chan2ieee(ic, ic->ic_curchan));
+			    ieee80211_chan2ieee(ic, ic->ic_curchan));
 			*frm++ = IEEE80211_FH_CHANPAT(
-				ieee80211_chan2ieee(ic, ic->ic_curchan));
+			    ieee80211_chan2ieee(ic, ic->ic_curchan));
 			*frm++ = in->in_fhindex;
 		} else {
 			*frm++ = IEEE80211_ELEMID_DSPARMS;
@@ -462,10 +462,10 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 			key = NULL;
 
 		mp = ieee80211_getmgtframe(&frm,
-			3 * sizeof (uint16_t)
-			+ (has_challenge && status == IEEE80211_STATUS_SUCCESS ?
-				sizeof (uint16_t) + IEEE80211_CHALLENGE_LEN : 0)
-			+ (key != NULL ? key->wk_cipher->ic_header : 0));
+		    3 * sizeof (uint16_t)
+		    + (has_challenge && status == IEEE80211_STATUS_SUCCESS ?
+		    sizeof (uint16_t) + IEEE80211_CHALLENGE_LEN : 0)
+		    + (key != NULL ? key->wk_cipher->ic_header : 0));
 		if (mp == NULL)
 			return (ENOMEM);
 
@@ -473,8 +473,8 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 			frm += key->wk_cipher->ic_header;
 
 		((uint16_t *)frm)[0] =
-			(is_shared_key) ? LE_16(IEEE80211_AUTH_ALG_SHARED)
-					: LE_16(IEEE80211_AUTH_ALG_OPEN);
+		    (is_shared_key) ? LE_16(IEEE80211_AUTH_ALG_SHARED)
+		    : LE_16(IEEE80211_AUTH_ALG_OPEN);
 		((uint16_t *)frm)[1] = LE_16(arg);	/* sequence number */
 		((uint16_t *)frm)[2] = LE_16(status);	/* status */
 
@@ -515,12 +515,12 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 		 *	[tlv] user-specified ie's
 		 */
 		mp = ieee80211_getmgtframe(&frm,
-			sizeof (uint16_t)
-			+ sizeof (uint16_t) + IEEE80211_ADDR_LEN
-			+ 2 + IEEE80211_NWID_LEN
-			+ 2 + IEEE80211_RATE_SIZE
-			+ 2 + IEEE80211_XRATE_SIZE
-			+ ic->ic_opt_ie_len);
+		    sizeof (uint16_t)
+		    + sizeof (uint16_t) + IEEE80211_ADDR_LEN
+		    + 2 + IEEE80211_NWID_LEN
+		    + 2 + IEEE80211_RATE_SIZE
+		    + 2 + IEEE80211_XRATE_SIZE
+		    + ic->ic_opt_ie_len);
 		if (mp == NULL)
 			return (ENOMEM);
 
@@ -530,6 +530,12 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 			capinfo &= ~IEEE80211_CAPINFO_SHORT_SLOTTIME;
 		} else {
 			capinfo |= IEEE80211_CAPINFO_SHORT_SLOTTIME;
+		}
+		if (!(in->in_capinfo & IEEE80211_CAPINFO_SHORT_PREAMBLE) ||
+		    !(ic->ic_caps & IEEE80211_C_SHPREAMBLE)) {
+			capinfo &= ~IEEE80211_CAPINFO_SHORT_PREAMBLE;
+		} else {
+			capinfo |= IEEE80211_CAPINFO_SHORT_PREAMBLE;
 		}
 		*(uint16_t *)frm = LE_16(capinfo);
 		frm += 2;
@@ -566,9 +572,9 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 		 *	[tlv] WME (if enabled and STA enabled)
 		 */
 		mp = ieee80211_getmgtframe(&frm,
-			3 * sizeof (uint16_t)
-			+ 2 + IEEE80211_RATE_SIZE
-			+ 2 + IEEE80211_XRATE_SIZE);
+		    3 * sizeof (uint16_t)
+		    + 2 + IEEE80211_RATE_SIZE
+		    + 2 + IEEE80211_XRATE_SIZE);
 		if (mp == NULL)
 			return (ENOMEM);
 
@@ -598,8 +604,8 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 
 	default:
 		ieee80211_dbg(IEEE80211_MSG_ANY,
-			"[%s] invalid mgmt frame type %u\n",
-			ieee80211_macaddr_sprintf(in->in_macaddr), type);
+		    "[%s] invalid mgmt frame type %u\n",
+		    ieee80211_macaddr_sprintf(in->in_macaddr), type);
 		return (EINVAL);
 	} /* type */
 	ret = ieee80211_mgmt_output(ic, in, mp, type, timer);
@@ -639,19 +645,19 @@ ieee80211_beacon_alloc(ieee80211com_t *ic, ieee80211_node_t *in,
 	 * NB: we allocate the max space required for the TIM bitmap.
 	 */
 	rs = &in->in_rates;
-	pktlen =  8				/* time stamp */
-		+ sizeof (uint16_t)		/* beacon interval */
-		+ sizeof (uint16_t)		/* capabilities */
-		+ 2 + in->in_esslen		/* ssid */
-		+ 2 + IEEE80211_RATE_SIZE	/* supported rates */
-		+ 2 + 1				/* DS parameters */
-		+ 2 + 4 + ic->ic_tim_len	/* DTIM/IBSSPARMS */
-		+ 2 + 1				/* ERP */
-		+ 2 + IEEE80211_XRATE_SIZE;
+	pktlen =  8			/* time stamp */
+	    + sizeof (uint16_t)		/* beacon interval */
+	    + sizeof (uint16_t)		/* capabilities */
+	    + 2 + in->in_esslen		/* ssid */
+	    + 2 + IEEE80211_RATE_SIZE	/* supported rates */
+	    + 2 + 1			/* DS parameters */
+	    + 2 + 4 + ic->ic_tim_len	/* DTIM/IBSSPARMS */
+	    + 2 + 1			/* ERP */
+	    + 2 + IEEE80211_XRATE_SIZE;
 	m = ieee80211_getmgtframe(&frm, pktlen);
 	if (m == NULL) {
 		ieee80211_dbg(IEEE80211_MSG_ANY, "ieee80211_beacon_alloc: "
-			"cannot get buf; size %u\n", pktlen);
+		    "cannot get buf; size %u\n", pktlen);
 		IEEE80211_UNLOCK(ic);
 		return (NULL);
 	}
@@ -687,7 +693,7 @@ ieee80211_beacon_alloc(ieee80211com_t *ic, ieee80211_node_t *in,
 		bo->bo_tim_len = 0;
 	} else {
 		struct ieee80211_tim_ie *tie =
-			(struct ieee80211_tim_ie *)frm;
+		    (struct ieee80211_tim_ie *)frm;
 
 		tie->tim_ie = IEEE80211_ELEMID_TIM;
 		tie->tim_len = 4;	/* length */
@@ -710,7 +716,7 @@ ieee80211_beacon_alloc(ieee80211com_t *ic, ieee80211_node_t *in,
 
 	wh = (struct ieee80211_frame *)m->b_rptr;
 	wh->i_fc[0] = IEEE80211_FC0_VERSION_0 | IEEE80211_FC0_TYPE_MGT |
-		IEEE80211_FC0_SUBTYPE_BEACON;
+	    IEEE80211_FC0_SUBTYPE_BEACON;
 	wh->i_fc[1] = IEEE80211_FC1_DIR_NODS;
 	*(uint16_t *)wh->i_dur = 0;
 	IEEE80211_ADDR_COPY(wh->i_addr1, wifi_bcastaddr);

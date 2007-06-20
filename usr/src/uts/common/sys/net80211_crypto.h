@@ -217,8 +217,10 @@ struct ieee80211_crypto_state {
 
 void ieee80211_crypto_attach(struct ieee80211com *ic);
 void ieee80211_crypto_detach(struct ieee80211com *ic);
-void ieee80211_crypto_register(const struct ieee80211_cipher *);
-void ieee80211_crypto_unregister(const struct ieee80211_cipher *);
+void ieee80211_crypto_register(struct ieee80211com *ic,
+    const struct ieee80211_cipher *);
+void ieee80211_crypto_unregister(struct ieee80211com *ic,
+    const struct ieee80211_cipher *);
 void ieee80211_crypto_resetkey(struct ieee80211com *, struct ieee80211_key *,
 	ieee80211_keyix);
 

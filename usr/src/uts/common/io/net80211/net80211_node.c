@@ -106,10 +106,10 @@ ieee80211_node_lateattach(ieee80211com_t *ic)
 	ic->ic_tim_len = howmany(IEEE80211_AID_MAX, 8) * sizeof (uint8_t);
 
 	ieee80211_node_table_init(ic, &ic->ic_sta, "station",
-		IEEE80211_INACT_INIT, IEEE80211_WEP_NKID,
-		ieee80211_timeout_stations);
+	    IEEE80211_INACT_INIT, IEEE80211_WEP_NKID,
+	    ieee80211_timeout_stations);
 	ieee80211_node_table_init(ic, &ic->ic_scan, "scan",
-		IEEE80211_INACT_SCAN, 0, ieee80211_timeout_scan_candidates);
+	    IEEE80211_INACT_SCAN, 0, ieee80211_timeout_scan_candidates);
 
 	ieee80211_reset_bss(ic);
 }
@@ -200,13 +200,13 @@ ieee80211_reset_scan(ieee80211com_t *ic)
 	if (ic->ic_des_chan != IEEE80211_CHAN_ANYC) {
 		(void) memset(im->im_chan_scan, 0, sizeof (im->im_chan_scan));
 		ieee80211_setbit(im->im_chan_scan,
-			ieee80211_chan2ieee(ic, ic->ic_des_chan));
+		    ieee80211_chan2ieee(ic, ic->ic_des_chan));
 	} else {
 		bcopy(ic->ic_chan_active, im->im_chan_scan,
-			sizeof (ic->ic_chan_active));
+		    sizeof (ic->ic_chan_active));
 	}
 	ieee80211_dbg(IEEE80211_MSG_SCAN, "ieee80211_reset_scan(): "
-		"start chan %u\n", ieee80211_chan2ieee(ic, ic->ic_curchan));
+	    "start chan %u\n", ieee80211_chan2ieee(ic, ic->ic_curchan));
 }
 
 /*
@@ -224,10 +224,10 @@ ieee80211_begin_scan(ieee80211com_t *ic, boolean_t reset)
 	if (ic->ic_opmode != IEEE80211_M_HOSTAP)
 		ic->ic_flags |= IEEE80211_F_ASCAN;
 	ieee80211_dbg(IEEE80211_MSG_SCAN,
-		"begin %s scan in %s mode on channel %u\n",
-		(ic->ic_flags & IEEE80211_F_ASCAN) ?  "active" : "passive",
-		ieee80211_phymode_name[ic->ic_curmode],
-		ieee80211_chan2ieee(ic, ic->ic_curchan));
+	    "begin %s scan in %s mode on channel %u\n",
+	    (ic->ic_flags & IEEE80211_F_ASCAN) ?  "active" : "passive",
+	    ieee80211_phymode_name[ic->ic_curmode],
+	    ieee80211_chan2ieee(ic, ic->ic_curchan));
 
 	/*
 	 * Clear scan state and flush any previously seen AP's.
@@ -272,18 +272,18 @@ ieee80211_next_scan(ieee80211com_t *ic)
 		if (ieee80211_isset(im->im_chan_scan,
 		    ieee80211_chan2ieee(ic, chan))) {
 			ieee80211_clrbit(im->im_chan_scan,
-				ieee80211_chan2ieee(ic, chan));
+			    ieee80211_chan2ieee(ic, chan));
 			ieee80211_dbg(IEEE80211_MSG_SCAN,
-				"ieee80211_next_scan: chan %d->%d\n",
-				ieee80211_chan2ieee(ic, ic->ic_curchan),
-				ieee80211_chan2ieee(ic, chan));
+			    "ieee80211_next_scan: chan %d->%d\n",
+			    ieee80211_chan2ieee(ic, ic->ic_curchan),
+			    ieee80211_chan2ieee(ic, chan));
 			ic->ic_curchan = chan;
 			/*
 			 * drivers should do this as needed,
 			 * for now maintain compatibility
 			 */
 			ic->ic_bss->in_rates =
-				ic->ic_sup_rates[ieee80211_chan2mode(ic, chan)];
+			    ic->ic_sup_rates[ieee80211_chan2mode(ic, chan)];
 			IEEE80211_UNLOCK(ic);
 			ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
 			return;
@@ -318,7 +318,7 @@ ieee80211_create_ibss(ieee80211com_t *ic, struct ieee80211_channel *chan)
 
 	IEEE80211_LOCK_ASSERT(ic);
 	ieee80211_dbg(IEEE80211_MSG_SCAN, "ieee80211_create_ibss: "
-		"creating ibss\n");
+	    "creating ibss\n");
 
 	/*
 	 * Create the station/neighbor table.  Note that for adhoc
@@ -365,8 +365,8 @@ ieee80211_create_ibss(ieee80211com_t *ic, struct ieee80211_channel *chan)
 		break;
 	default:
 		ieee80211_err("ieee80211_create_ibss(): "
-			"wrong opmode %u to creat IBSS, abort\n",
-			ic->ic_opmode);
+		    "wrong opmode %u to creat IBSS, abort\n",
+		    ic->ic_opmode);
 		ieee80211_free_node(in);
 		return;
 	}
@@ -515,8 +515,8 @@ ieee80211_cancel_scan(ieee80211com_t *ic)
 {
 	IEEE80211_LOCK(ic);
 	ieee80211_dbg(IEEE80211_MSG_SCAN, "ieee80211_cancel_scan()"
-		"end %s scan\n",
-		(ic->ic_flags & IEEE80211_F_ASCAN) ?  "active" : "passive");
+	    "end %s scan\n",
+	    (ic->ic_flags & IEEE80211_F_ASCAN) ?  "active" : "passive");
 	ic->ic_flags &= ~(IEEE80211_F_SCAN | IEEE80211_F_ASCAN);
 	cv_broadcast(&((ieee80211_impl_t *)ic->ic_private)->im_scan_cv);
 	IEEE80211_UNLOCK(ic);
@@ -551,7 +551,7 @@ ieee80211_end_scan(ieee80211com_t *ic)
 	in = list_head(&nt->nt_node);
 	if (in == NULL && (ic->ic_flags & IEEE80211_F_WPA) == 0) {
 		ieee80211_dbg(IEEE80211_MSG_SCAN, "ieee80211_end_scan: "
-			"no scan candidate\n");
+		    "no scan candidate\n");
 	notfound:
 		if (ic->ic_opmode == IEEE80211_M_IBSS &&
 		    (ic->ic_flags & IEEE80211_F_IBSSON) &&
@@ -644,15 +644,15 @@ ieee80211_ibss_merge(ieee80211_node_t *in)
 	}
 	if (ieee80211_match_bss(ic, in) != 0) {	/* capabilities mismatch */
 		ieee80211_dbg(IEEE80211_MSG_ASSOC, "ieee80211_ibss_merge: "
-			" merge failed, capabilities mismatch\n");
+		    " merge failed, capabilities mismatch\n");
 		return (B_FALSE);
 	}
 	ieee80211_dbg(IEEE80211_MSG_ASSOC, "ieee80211_ibss_merge: "
-		"new bssid %s: %s preamble, %s slot time%s\n",
-		ieee80211_macaddr_sprintf(in->in_bssid),
-		(ic->ic_flags & IEEE80211_F_SHPREAMBLE) ? "short" : "long",
-		(ic->ic_flags & IEEE80211_F_SHSLOT) ? "short" : "long",
-		(ic->ic_flags&IEEE80211_F_USEPROT) ? ", protection" : "");
+	    "new bssid %s: %s preamble, %s slot time%s\n",
+	    ieee80211_macaddr_sprintf(in->in_bssid),
+	    (ic->ic_flags & IEEE80211_F_SHPREAMBLE) ? "short" : "long",
+	    (ic->ic_flags & IEEE80211_F_SHSLOT) ? "short" : "long",
+	    (ic->ic_flags&IEEE80211_F_USEPROT) ? ", protection" : "");
 	ieee80211_sta_join(ic, ieee80211_ref_node(in));
 	return (B_TRUE);
 }
@@ -697,6 +697,7 @@ ieee80211_sta_join(ieee80211com_t *ic, ieee80211_node_t *selbs)
 	}
 	ic->ic_curmode = ieee80211_chan2mode(ic, selbs->in_chan);
 	ic->ic_curchan = selbs->in_chan;
+	ic->ic_phytype = selbs->in_phytype;
 	/*
 	 * Set the erp state (mostly the slot time) to deal with
 	 * the auto-select case; this should be redundant if the
@@ -809,9 +810,9 @@ ieee80211_setup_node(ieee80211com_t *ic, ieee80211_node_table_t *nt,
 	int32_t hash;
 
 	ieee80211_dbg(IEEE80211_MSG_NODE, "ieee80211_setup_node(): "
-		"%p<%s> in %s table\n", in,
-		ieee80211_macaddr_sprintf(macaddr),
-		(nt != NULL) ? nt->nt_name : "NULL");
+	    "%p<%s> in %s table\n", in,
+	    ieee80211_macaddr_sprintf(macaddr),
+	    (nt != NULL) ? nt->nt_name : "NULL");
 
 	in->in_ic = ic;
 	IEEE80211_ADDR_COPY(in->in_macaddr, macaddr);
@@ -866,7 +867,7 @@ ieee80211_tmp_node(ieee80211com_t *ic, const uint8_t *macaddr)
 	in = ic->ic_node_alloc(ic);
 	if (in != NULL) {
 		ieee80211_dbg(IEEE80211_MSG_NODE, "ieee80211_tmp_node: "
-			"%p<%s>\n", in, ieee80211_macaddr_sprintf(macaddr));
+		    "%p<%s>\n", in, ieee80211_macaddr_sprintf(macaddr));
 
 		IEEE80211_ADDR_COPY(in->in_macaddr, macaddr);
 		IEEE80211_ADDR_COPY(in->in_bssid, ic->ic_bss->in_bssid);
@@ -875,7 +876,7 @@ ieee80211_tmp_node(ieee80211com_t *ic, const uint8_t *macaddr)
 		/* NB: required by ieee80211_fix_rate */
 		ieee80211_node_setchan(ic, in, ic->ic_bss->in_chan);
 		ieee80211_crypto_resetkey(ic, &in->in_ucastkey,
-			IEEE80211_KEYIX_NONE);
+		    IEEE80211_KEYIX_NONE);
 
 		in->in_table = NULL;		/* NB: pedantic */
 		in->in_ic = ic;
@@ -992,7 +993,7 @@ ieee80211_fakeup_adhoc_node(ieee80211_node_table_t *nt, const uint8_t *macaddr)
 	ieee80211_node_t *in;
 
 	ieee80211_dbg(IEEE80211_MSG_NODE, "ieee80211_fakeup_adhoc_node: "
-		"mac<%s>\n", ieee80211_macaddr_sprintf(macaddr));
+	    "mac<%s>\n", ieee80211_macaddr_sprintf(macaddr));
 	in = ieee80211_dup_bss(nt, macaddr);
 	if (in != NULL) {
 		/* no rate negotiation; just dup */
@@ -1040,15 +1041,15 @@ ieee80211_add_scan(ieee80211com_t *ic, const struct ieee80211_scanparams *sp,
 	ieee80211_node_t *in;
 	boolean_t newnode = B_FALSE;
 
-	in = ieee80211_find_node(nt, wh->i_addr2);
+	in = ieee80211_find_node(nt, wh->i_addr3);
 	if (in == NULL) {
 		/*
 		 * Create a new entry.
 		 */
-		in = ieee80211_alloc_node(ic, nt, wh->i_addr2);
+		in = ieee80211_alloc_node(ic, nt, wh->i_addr3);
 		if (in == NULL) {
 			ieee80211_dbg(IEEE80211_MSG_ANY, "ieee80211_add_scan: "
-				"alloc node failed\n");
+			    "alloc node failed\n");
 			return;
 		}
 		/*
@@ -1106,7 +1107,7 @@ ieee80211_add_scan(ieee80211com_t *ic, const struct ieee80211_scanparams *sp,
 
 	/* NB: must be after in_chan is setup */
 	(void) ieee80211_setup_rates(in, sp->rates, sp->xrates,
-		IEEE80211_F_DOSORT);
+	    IEEE80211_F_DOSORT);
 
 	if (!newnode)
 		ieee80211_free_node(in);
@@ -1134,7 +1135,7 @@ ieee80211_init_neighbor(ieee80211_node_t *in, const struct ieee80211_frame *wh,
 
 	/* NB: must be after in_chan is setup */
 	(void) ieee80211_setup_rates(in, sp->rates, sp->xrates,
-		IEEE80211_F_DOSORT);
+	    IEEE80211_F_DOSORT);
 }
 
 /*
@@ -1234,9 +1235,9 @@ ieee80211_find_txnode(ieee80211com_t *ic, const uint8_t *daddr)
 				(void) ieee80211_ref_node(in);
 		} else {
 			ieee80211_dbg(IEEE80211_MSG_OUTPUT,
-				"ieee80211_find_txnode: "
-				"[%s] no node, discard frame\n",
-				ieee80211_macaddr_sprintf(daddr));
+			    "ieee80211_find_txnode: "
+			    "[%s] no node, discard frame\n",
+			    ieee80211_macaddr_sprintf(daddr));
 		}
 	}
 	return (in);
@@ -1292,9 +1293,9 @@ ieee80211_node_reclaim(ieee80211_node_table_t *nt, ieee80211_node_t *in)
 
 	IEEE80211_NODE_LOCK_ASSERT(nt);
 	ieee80211_dbg(IEEE80211_MSG_NODE, "node_reclaim: "
-		" remove %p<%s> from %s table, refcnt %d\n",
-		in, ieee80211_macaddr_sprintf(in->in_macaddr), nt->nt_name,
-		ieee80211_node_refcnt(in));
+	    " remove %p<%s> from %s table, refcnt %d\n",
+	    in, ieee80211_macaddr_sprintf(in->in_macaddr), nt->nt_name,
+	    ieee80211_node_refcnt(in));
 
 	if (ieee80211_node_decref_nv(in) != 0) {
 		/*
@@ -1323,7 +1324,7 @@ ieee80211_free_allnodes_locked(ieee80211_node_table_t *nt)
 	ieee80211_node_t *in;
 
 	ieee80211_dbg(IEEE80211_MSG_NODE, "ieee80211_free_allnodes_locked(): "
-		"free all nodes in %s table\n", nt->nt_name);
+	    "free all nodes in %s table\n", nt->nt_name);
 
 	in = list_head(&nt->nt_node);
 	while (in != NULL) {
@@ -1384,13 +1385,13 @@ ieee80211_timeout_stations(ieee80211_node_table_t *nt)
 
 	IEEE80211_LOCK_ASSERT(ic);
 	isadhoc = (ic->ic_opmode == IEEE80211_M_IBSS ||
-		ic->ic_opmode == IEEE80211_M_AHDEMO);
+	    ic->ic_opmode == IEEE80211_M_AHDEMO);
 	IEEE80211_SCAN_LOCK(nt);
 	gen = ++nt->nt_scangen;
 restart:
 	IEEE80211_NODE_LOCK(nt);
 	for (in = list_head(&nt->nt_node); in != NULL;
-		in = list_next(&nt->nt_node, in)) {
+	    in = list_next(&nt->nt_node, in)) {
 		if (in->in_scangen == gen)	/* previously handled */
 			continue;
 		in->in_scangen = gen;
@@ -1413,7 +1414,7 @@ restart:
 			if (0 < in->in_inact &&
 			    in->in_inact <= im->im_inact_probe) {
 				ieee80211_dbg(IEEE80211_MSG_NODE, "net80211: "
-					"probe station due to inactivity\n");
+				    "probe station due to inactivity\n");
 				IEEE80211_NODE_UNLOCK(nt);
 				IEEE80211_UNLOCK(ic);
 				(void) ieee80211_send_nulldata(in);
@@ -1423,8 +1424,8 @@ restart:
 		}
 		if (in->in_inact <= 0) {
 			ieee80211_dbg(IEEE80211_MSG_NODE, "net80211: "
-				"station timed out due to inact (refcnt %u)\n",
-				ieee80211_node_refcnt(in));
+			    "station timed out due to inact (refcnt %u)\n",
+			    ieee80211_node_refcnt(in));
 			/*
 			 * Send a deauthenticate frame and drop the station.
 			 * This is somewhat complicated due to reference counts
@@ -1444,8 +1445,8 @@ restart:
 			if (in->in_associd != 0) {
 				IEEE80211_UNLOCK(ic);
 				IEEE80211_SEND_MGMT(ic, in,
-					IEEE80211_FC0_SUBTYPE_DEAUTH,
-					IEEE80211_REASON_AUTH_EXPIRE);
+				    IEEE80211_FC0_SUBTYPE_DEAUTH,
+				    IEEE80211_REASON_AUTH_EXPIRE);
 				IEEE80211_LOCK(ic);
 			}
 			ieee80211_node_leave(ic, in);
@@ -1473,6 +1474,10 @@ ieee80211_iterate_nodes(ieee80211_node_table_t *nt, ieee80211_iter_func *f,
 	IEEE80211_NODE_LOCK(nt);
 	in = list_head(&nt->nt_node);
 	while (in != NULL) {
+		if (in->in_chan == IEEE80211_CHAN_ANYC) {
+			in = list_next(&nt->nt_node, in);
+			continue;
+		}
 		(void) ieee80211_ref_node(in);
 		IEEE80211_NODE_UNLOCK(nt);
 		(*f)(arg, in);
@@ -1522,7 +1527,7 @@ ieee80211_node_table_init(ieee80211com_t *ic, ieee80211_node_table_t *nt,
 	int i;
 
 	ieee80211_dbg(IEEE80211_MSG_NODE, "ieee80211_node_table_init():"
-		"%s table, inact %d\n", name, inact);
+	    "%s table, inact %d\n", name, inact);
 
 	nt->nt_ic = ic;
 	nt->nt_name = name;
@@ -1535,10 +1540,10 @@ ieee80211_node_table_init(ieee80211com_t *ic, ieee80211_node_table_t *nt,
 	mutex_init(&nt->nt_nodelock, NULL, MUTEX_DRIVER, NULL);
 
 	list_create(&nt->nt_node, sizeof (ieee80211_node_t),
-		offsetof(ieee80211_node_t, in_node));
+	    offsetof(ieee80211_node_t, in_node));
 	for (i = 0; i < IEEE80211_NODE_HASHSIZE; i++) {
 		list_create(&nt->nt_hash[i], sizeof (ieee80211_node_t),
-			offsetof(ieee80211_node_t, in_hash));
+		    offsetof(ieee80211_node_t, in_hash));
 	}
 }
 
@@ -1551,7 +1556,7 @@ void
 ieee80211_node_table_reset(ieee80211_node_table_t *nt)
 {
 	ieee80211_dbg(IEEE80211_MSG_NODE, "ieee80211_node_table_reset(): "
-		"%s table\n", nt->nt_name);
+	    "%s table\n", nt->nt_name);
 
 	IEEE80211_NODE_LOCK(nt);
 	nt->nt_inact_timer = 0;
