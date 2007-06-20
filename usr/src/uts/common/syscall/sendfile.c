@@ -289,7 +289,7 @@ sendvec_chunk64(file_t *fp, u_offset_t *fileoff, struct ksendfilevec64 *sfv,
 			 * locked; but since we got it from an open file the
 			 * contents will be valid during the time of access.
 			 */
-			if (VN_CMP(vp, readvp)) {
+			if (vn_compare(vp, readvp)) {
 				releasef(sfv->sfv_fd);
 				return (EINVAL);
 			}
@@ -637,7 +637,7 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 			 * contents will be valid during the time of access.
 			 */
 
-			if (VN_CMP(vp, readvp)) {
+			if (vn_compare(vp, readvp)) {
 				releasef(sfv->sfv_fd);
 				freemsg(head);
 				return (EINVAL);
@@ -903,6 +903,7 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 			int segmapit = 0;
 			file_t	*ffp;
 			vnode_t	*readvp;
+			struct vnode *realvp;
 			size_t	size;
 			caddr_t	ptr;
 
@@ -915,6 +916,8 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 			}
 
 			readvp = ffp->f_vnode;
+			if (VOP_REALVP(readvp, &realvp) == 0)
+				readvp = realvp;
 			if (readvp->v_type != VREG) {
 				releasef(sfv->sfv_fd);
 				return (EINVAL);
@@ -926,7 +929,7 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 			 * locked; but since we got it from an open file the
 			 * contents will be valid during the time of access.
 			 */
-			if (VN_CMP(vp, readvp)) {
+			if (vn_compare(vp, readvp)) {
 				releasef(sfv->sfv_fd);
 				return (EINVAL);
 			}
