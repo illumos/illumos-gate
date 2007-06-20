@@ -79,7 +79,7 @@ static int aiostart(void);
 static void alio_cleanup(aio_t *, aiocb_t **, int, int);
 static int (*check_vp(struct vnode *, int))(vnode_t *, struct aio_req *,
     cred_t *);
-static void lio_set_error(aio_req_t *);
+static void lio_set_error(aio_req_t *, int portused);
 static aio_t *aio_aiop_alloc();
 static int aio_req_alloc(aio_req_t **, aio_result_t *);
 static int aio_lio_alloc(aio_lio_t **);
@@ -750,7 +750,7 @@ aiowaitn(void *uiocb, uint_t nent, uint_t *nwait, timespec_t *timout)
 
 		if ((cnt < waitcnt) && blocking) {
 			int rval = cv_waituntil_sig(&aiop->aio_waitcv,
-				&aiop->aio_mutex, rqtp, timecheck);
+			    &aiop->aio_mutex, rqtp, timecheck);
 			if (rval > 0)
 				continue;
 			if (rval < 0) {
@@ -1015,8 +1015,8 @@ aiosuspend(
 						    (aiocb64_32_t *)(uintptr_t)
 						    *ucbp32++) == NULL)
 							continue;
-						    reqp = aio_req_done(
-							&cbp64->aio_resultp);
+						reqp = aio_req_done(
+						    &cbp64->aio_resultp);
 					}
 
 				}
@@ -1054,7 +1054,7 @@ aiosuspend(
 			 */
 			mutex_exit(&aiop->aio_cleanupq_mutex);
 			rv = cv_waituntil_sig(&aiop->aio_waitcv,
-				&aiop->aio_mutex, rqtp, timecheck);
+			    &aiop->aio_mutex, rqtp, timecheck);
 			/*
 			 * we have to drop aio_mutex and
 			 * grab it in the right order.
@@ -1228,6 +1228,7 @@ alio(
 	int		aio_port;
 	int		aio_thread;
 	port_kevent_t	*pkevtp = NULL;
+	int		portused = 0;
 	port_notify_t	pnotify;
 	int		event;
 
@@ -1268,6 +1269,7 @@ alio(
 			return (error);
 		}
 		lio_head_port = pnotify.portnfy_port;
+		portused = 1;
 	}
 
 	/*
@@ -1499,7 +1501,7 @@ alio(
 				aio_notsupported++;
 			else
 				aio_errors++;
-			lio_set_error(reqp);
+			lio_set_error(reqp, portused);
 		} else {
 			clear_active_fd(aiocb->aio_fildes);
 		}
@@ -2224,7 +2226,8 @@ aiorw(
 	if (error) {
 		releasef(fd);
 		mutex_enter(&aiop->aio_mutex);
-		aio_deq(&aiop->aio_portpending, reqp);
+		if (aio_use_port)
+			aio_deq(&aiop->aio_portpending, reqp);
 		aio_req_free(aiop, reqp);
 		aiop->aio_pending--;
 		if (aiop->aio_flags & AIO_REQ_BLOCK)
@@ -2241,7 +2244,7 @@ aiorw(
  * set error for a list IO entry that failed.
  */
 static void
-lio_set_error(aio_req_t *reqp)
+lio_set_error(aio_req_t *reqp, int portused)
 {
 	aio_t *aiop = curproc->p_aio;
 
@@ -2249,7 +2252,8 @@ lio_set_error(aio_req_t *reqp)
 		return;
 
 	mutex_enter(&aiop->aio_mutex);
-	aio_deq(&aiop->aio_portpending, reqp);
+	if (portused)
+		aio_deq(&aiop->aio_portpending, reqp);
 	aiop->aio_pending--;
 	/* request failed, AIO_PHYSIODONE set to aviod physio cleanup. */
 	reqp->aio_req_flags |= AIO_PHYSIODONE;
@@ -2475,7 +2479,7 @@ aio_aiop_alloc(void)
 	if (aiop) {
 		mutex_init(&aiop->aio_mutex, NULL, MUTEX_DEFAULT, NULL);
 		mutex_init(&aiop->aio_cleanupq_mutex, NULL, MUTEX_DEFAULT,
-									NULL);
+		    NULL);
 		mutex_init(&aiop->aio_portq_mutex, NULL, MUTEX_DEFAULT, NULL);
 	}
 	return (aiop);
@@ -2645,8 +2649,8 @@ aio_cleanup_thread(aio_t *aiop)
 		 * If the process is not exiting, it must be doing forkall().
 		 */
 		if ((poked == 0) &&
-			((!rqclnup && (AS_ISUNMAPWAIT(as) == 0)) ||
-					(aiop->aio_pending == 0))) {
+		    ((!rqclnup && (AS_ISUNMAPWAIT(as) == 0)) ||
+		    (aiop->aio_pending == 0))) {
 			aiop->aio_flags &= ~(AIO_CLEANUP | AIO_CLEANUP_PORT);
 			cvp = &as->a_cv;
 			rqclnup = 0;
@@ -2676,7 +2680,7 @@ aio_cleanup_thread(aio_t *aiop)
 				aiop->aio_flags |= AIO_REQ_BLOCK;
 				while (aiop->aio_pending != 0)
 					cv_wait(&aiop->aio_cleanupcv,
-						&aiop->aio_mutex);
+					    &aiop->aio_mutex);
 				mutex_exit(&aiop->aio_mutex);
 				exit_flag = 1;
 				continue;
@@ -2722,8 +2726,8 @@ aio_cleanup_thread(aio_t *aiop)
 				 * locked resources.
 				 */
 				if ((aiop->aio_rqclnup ||
-					(AS_ISUNMAPWAIT(as) != 0)) &&
-					(aiop->aio_flags & AIO_CLEANUP) == 0)
+				    (AS_ISUNMAPWAIT(as) != 0)) &&
+				    (aiop->aio_flags & AIO_CLEANUP) == 0)
 					break;
 				poked = !cv_wait_sig(cvp, &as->a_contents);
 				if (AS_ISUNMAPWAIT(as) == 0)
@@ -2928,6 +2932,7 @@ alioLF(
 	int		aio_port;
 	int		aio_thread;
 	port_kevent_t	*pkevtp = NULL;
+	int		portused = 0;
 	port_notify32_t	pnotify;
 	int		event;
 
@@ -2971,6 +2976,7 @@ alioLF(
 			return (error);
 		}
 		lio_head_port = pnotify.portnfy_port;
+		portused = 1;
 	}
 
 	/*
@@ -3209,7 +3215,7 @@ alioLF(
 				aio_notsupported++;
 			else
 				aio_errors++;
-			lio_set_error(reqp);
+			lio_set_error(reqp, portused);
 		} else {
 			clear_active_fd(aiocb->aio_fildes);
 		}
@@ -3399,6 +3405,7 @@ alio32(
 	int		aio_port;
 	int		aio_thread;
 	port_kevent_t	*pkevtp = NULL;
+	int		portused = 0;
 #ifdef	_LP64
 	port_notify32_t	pnotify;
 #else
@@ -3448,6 +3455,7 @@ alio32(
 			return (error);
 		}
 		lio_head_port = pnotify.portnfy_port;
+		portused = 1;
 	}
 
 	/*
@@ -3706,7 +3714,7 @@ alio32(
 				aio_notsupported++;
 			else
 				aio_errors++;
-			lio_set_error(reqp);
+			lio_set_error(reqp, portused);
 		} else {
 			clear_active_fd(aiocb->aio_fildes);
 		}

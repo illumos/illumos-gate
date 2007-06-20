@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -517,8 +517,8 @@ aiowait(struct timeval *uwait)
 
 		if (uwait->tv_sec > 0 || uwait->tv_usec > 0) {
 			hrtend = gethrtime() +
-				(hrtime_t)uwait->tv_sec * NANOSEC +
-				(hrtime_t)uwait->tv_usec * (NANOSEC / MICROSEC);
+			    (hrtime_t)uwait->tv_sec * NANOSEC +
+			    (hrtime_t)uwait->tv_usec * (NANOSEC / MICROSEC);
 			twait = *uwait;
 			wait = &twait;
 			timedwait++;
@@ -611,7 +611,7 @@ aiowait(struct timeval *uwait)
 				hres += (NANOSEC / MICROSEC) - 1;
 				wait->tv_sec = hres / NANOSEC;
 				wait->tv_usec =
-					(hres % NANOSEC) / (NANOSEC / MICROSEC);
+				    (hres % NANOSEC) / (NANOSEC / MICROSEC);
 			}
 		} else {
 			ASSERT(kresultp == NULL && uresultp == NULL);
@@ -871,7 +871,7 @@ _aio_create_worker(aio_req_t *reqp, int mode)
 
 	(void) pthread_sigmask(SIG_SETMASK, &maskset, &oset);
 	error = thr_create(NULL, AIOSTKSIZE, func, aiowp,
-		THR_DAEMON | THR_SUSPENDED, &aiowp->work_tid);
+	    THR_DAEMON | THR_SUSPENDED, &aiowp->work_tid);
 	(void) pthread_sigmask(SIG_SETMASK, &oset, NULL);
 	if (error) {
 		if (reqp) {
@@ -1140,15 +1140,34 @@ _aio_finish_request(aio_worker_t *aiowp, ssize_t retval, int error)
 			error = ECANCELED;
 		}
 		if (!POSIX_AIO(reqp)) {
+			int notify;
 			sig_mutex_unlock(&aiowp->work_qlock1);
 			sig_mutex_lock(&__aio_mutex);
 			if (reqp->req_state == AIO_REQ_INPROGRESS)
 				reqp->req_state = AIO_REQ_DONE;
-			_aio_req_done_cnt++;
-			_aio_set_result(reqp, retval, error);
-			if (error == ECANCELED)
+			/*
+			 * If it was canceled, this request will not be
+			 * added to done list. Just free it.
+			 */
+			if (error == ECANCELED) {
 				_aio_outstand_cnt--;
+				_aio_req_free(reqp);
+			} else {
+				_aio_set_result(reqp, retval, error);
+				_aio_req_done_cnt++;
+			}
+			/*
+			 * Notify any thread that may have blocked
+			 * because it saw an outstanding request.
+			 */
+			notify = 0;
+			if (_aio_outstand_cnt == 0 && _aiowait_flag) {
+				notify = 1;
+			}
 			sig_mutex_unlock(&__aio_mutex);
+			if (notify) {
+				(void) _kaio(AIONOTIFY);
+			}
 		} else {
 			if (reqp->req_state == AIO_REQ_INPROGRESS)
 				reqp->req_state = AIO_REQ_DONE;
@@ -1188,7 +1207,7 @@ static void
 send_notification(notif_param_t *npp)
 {
 	extern int __sigqueue(pid_t pid, int signo,
-		/* const union sigval */ void *value, int si_code, int block);
+	    /* const union sigval */ void *value, int si_code, int block);
 
 	if (npp->np_signo)
 		(void) __sigqueue(__pid, npp->np_signo, npp->np_user,
