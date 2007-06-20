@@ -282,17 +282,17 @@ sctp_set_rtoinfo(sctp_t *sctp, const void *invalp, uint_t inlen)
 	 */
 	if (srto->srto_initial != 0 &&
 	    (!ispriv && (srto->srto_initial < sctps->sctps_rto_initialg_low ||
-		srto->srto_initial > sctps->sctps_rto_initialg_high))) {
+	    srto->srto_initial > sctps->sctps_rto_initialg_high))) {
 		return (EINVAL);
 	}
 	if (srto->srto_max != 0 &&
 	    (!ispriv && (srto->srto_max < sctps->sctps_rto_maxg_low ||
-		srto->srto_max > sctps->sctps_rto_maxg_high))) {
+	    srto->srto_max > sctps->sctps_rto_maxg_high))) {
 		return (EINVAL);
 	}
 	if (srto->srto_min != 0 &&
 	    (!ispriv && (srto->srto_min < sctps->sctps_rto_ming_low ||
-		srto->srto_min > sctps->sctps_rto_ming_high))) {
+	    srto->srto_min > sctps->sctps_rto_ming_high))) {
 		return (EINVAL);
 	}
 
@@ -370,8 +370,8 @@ sctp_set_assocparams(sctp_t *sctp, const void *invalp, uint_t inlen)
 	}
 	if (sap->sasoc_cookie_life != 0 &&
 	    (sap->sasoc_cookie_life < sctps->sctps_cookie_life_low ||
-		sap->sasoc_cookie_life > sctps->sctps_cookie_life_high)) {
-			return (EINVAL);
+	    sap->sasoc_cookie_life > sctps->sctps_cookie_life_high)) {
+		return (EINVAL);
 	}
 
 	if (sap->sasoc_asocmaxrxt > 0) {
@@ -423,18 +423,18 @@ sctp_set_initmsg(sctp_t *sctp, const void *invalp, uint_t inlen)
 	}
 	if (si->sinit_max_instreams != 0 &&
 	    (si->sinit_max_instreams < sctps->sctps_max_in_streams_low ||
-		si->sinit_max_instreams > sctps->sctps_max_in_streams_high)) {
+	    si->sinit_max_instreams > sctps->sctps_max_in_streams_high)) {
 		return (EINVAL);
 	}
 	if (si->sinit_max_attempts != 0 &&
 	    (si->sinit_max_attempts < sctps->sctps_max_init_retr_low ||
-		si->sinit_max_attempts > sctps->sctps_max_init_retr_high)) {
+	    si->sinit_max_attempts > sctps->sctps_max_init_retr_high)) {
 		return (EINVAL);
 	}
 	if (si->sinit_max_init_timeo != 0 &&
 	    (secpolicy_ip_config(sctp->sctp_credp, B_TRUE) != 0 &&
-		(si->sinit_max_init_timeo < sctps->sctps_rto_maxg_low ||
-		si->sinit_max_init_timeo > sctps->sctps_rto_maxg_high))) {
+	    (si->sinit_max_init_timeo < sctps->sctps_rto_maxg_low ||
+	    si->sinit_max_init_timeo > sctps->sctps_rto_maxg_high))) {
 		return (EINVAL);
 	}
 	if (si->sinit_num_ostreams != 0)
@@ -528,12 +528,12 @@ sctp_set_peer_addr_params(sctp_t *sctp, const void *invalp, uint_t inlen)
 
 	if (spp->spp_hbinterval && spp->spp_hbinterval != UINT32_MAX &&
 	    (spp->spp_hbinterval < sctps->sctps_heartbeat_interval_low ||
-		spp->spp_hbinterval > sctps->sctps_heartbeat_interval_high)) {
+	    spp->spp_hbinterval > sctps->sctps_heartbeat_interval_high)) {
 		return (EINVAL);
 	}
 	if (spp->spp_pathmaxrxt &&
 	    (spp->spp_pathmaxrxt < sctps->sctps_pp_max_retr_low ||
-		spp->spp_pathmaxrxt > sctps->sctps_pp_max_retr_high)) {
+	    spp->spp_pathmaxrxt > sctps->sctps_pp_max_retr_high)) {
 		return (EINVAL);
 	}
 	if (spp->spp_pathmaxrxt && sctp->sctp_faddrs) {
@@ -692,6 +692,11 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 
 	RUN_SCTP(sctp);
 
+	if (connp->conn_state_flags & CONN_CLOSING) {
+		WAKE_SCTP(sctp);
+		return (EINVAL);
+	}
+
 	switch (level) {
 	case SOL_SOCKET:
 		switch (name) {
@@ -819,7 +824,7 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 			ev->sctp_partial_delivery_event =
 			    ONOFF(sctp->sctp_recvpdevnt);
 			ev->sctp_adaption_layer_event =
-				ONOFF(sctp->sctp_recvalevnt);
+			    ONOFF(sctp->sctp_recvalevnt);
 			*optlen = sizeof (struct sctp_event_subscribe);
 			break;
 		}
@@ -1143,6 +1148,11 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 
 	RUN_SCTP(sctp);
 
+	if (connp->conn_state_flags & CONN_CLOSING) {
+		WAKE_SCTP(sctp);
+		return (EINVAL);
+	}
+
 	switch (level) {
 	case SOL_SOCKET:
 		if (inlen < sizeof (int32_t)) {
@@ -1337,7 +1347,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			sctp->sctp_recvpdevnt =
 			    ONOFF(ev->sctp_partial_delivery_event);
 			sctp->sctp_recvalevnt =
-				ONOFF(ev->sctp_adaption_layer_event);
+			    ONOFF(ev->sctp_adaption_layer_event);
 			break;
 		}
 		case SCTP_ADD_ADDR:
@@ -1444,9 +1454,8 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 
 			if (secpolicy_ip(sctp->sctp_credp, OP_CONFIG,
 			    B_TRUE) == 0) {
-				ipif =
-				    ipif_lookup_onlink_addr(addr,
-					connp->conn_zoneid, ipst);
+				ipif = ipif_lookup_onlink_addr(addr,
+				    connp->conn_zoneid, ipst);
 				if (ipif == NULL) {
 					retval = EHOSTUNREACH;
 					break;

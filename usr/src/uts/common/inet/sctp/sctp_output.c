@@ -244,7 +244,8 @@ sctp_sendmsg(sctp_t *sctp, mblk_t *mp, int flags)
 	RUN_SCTP(sctp);
 
 	/* Reject any new data requests if we are shutting down */
-	if (sctp->sctp_state > SCTPS_ESTABLISHED) {
+	if (sctp->sctp_state > SCTPS_ESTABLISHED ||
+	    (sctp->sctp_connp->conn_state_flags & CONN_CLOSING)) {
 		error = EPIPE;
 		goto unlock_done;
 	}
@@ -508,7 +509,7 @@ try_next:
 			size_t len = MBLKL(mdblk->b_cont);
 			if ((count > 0) &&
 			    ((len > fp->sfa_pmss - sizeof (*sdc)) ||
-				(len <= count))) {
+			    (len <= count))) {
 				count -= sizeof (*sdc);
 				count = chunksize = count - (count & 0x3);
 			} else {

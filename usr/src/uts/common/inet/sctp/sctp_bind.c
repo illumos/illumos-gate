@@ -128,7 +128,8 @@ sctp_listen(sctp_t *sctp)
 	 * TCP handles listen() increasing the backlog, need to check
 	 * if it should be handled here too
 	 */
-	if (sctp->sctp_state > SCTPS_BOUND) {
+	if (sctp->sctp_state > SCTPS_BOUND ||
+	    (sctp->sctp_connp->conn_state_flags & CONN_CLOSING)) {
 		WAKE_SCTP(sctp);
 		return (EINVAL);
 	}
@@ -143,7 +144,7 @@ sctp_listen(sctp_t *sctp)
 
 		WAKE_SCTP(sctp);
 		if ((ret = sctp_bind(sctp, (struct sockaddr *)&ss,
-			sizeof (ss))) != 0)
+		    sizeof (ss))) != 0)
 			return (ret);
 		RUN_SCTP(sctp)
 	}
@@ -153,7 +154,7 @@ sctp_listen(sctp_t *sctp)
 	sctp->sctp_last_secret_update = lbolt64;
 	bzero(sctp->sctp_old_secret, SCTP_SECRET_LEN);
 	tf = &sctps->sctps_listen_fanout[SCTP_LISTEN_HASH(
-					    ntohs(sctp->sctp_lport))];
+	    ntohs(sctp->sctp_lport))];
 	sctp_listen_hash_insert(tf, sctp);
 	WAKE_SCTP(sctp);
 	return (0);
@@ -177,7 +178,8 @@ sctp_bind(sctp_t *sctp, struct sockaddr *sa, socklen_t len)
 
 	RUN_SCTP(sctp);
 
-	if (sctp->sctp_state > SCTPS_BOUND) {
+	if (sctp->sctp_state > SCTPS_BOUND ||
+	    (sctp->sctp_connp->conn_state_flags & CONN_CLOSING)) {
 		err = EINVAL;
 		goto done;
 	}
@@ -265,7 +267,8 @@ sctp_bind_add(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 	if (!caller_hold_lock)
 		RUN_SCTP(sctp);
 
-	if (sctp->sctp_state > SCTPS_ESTABLISHED) {
+	if (sctp->sctp_state > SCTPS_ESTABLISHED ||
+	    (sctp->sctp_connp->conn_state_flags & CONN_CLOSING)) {
 		if (!caller_hold_lock)
 			WAKE_SCTP(sctp);
 		return (EINVAL);
@@ -389,7 +392,8 @@ sctp_bind_del(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 	if (!caller_hold_lock)
 		RUN_SCTP(sctp);
 
-	if (sctp->sctp_state > SCTPS_ESTABLISHED) {
+	if (sctp->sctp_state > SCTPS_ESTABLISHED ||
+	    (sctp->sctp_connp->conn_state_flags & CONN_CLOSING)) {
 		if (!caller_hold_lock)
 			WAKE_SCTP(sctp);
 		return (EINVAL);
@@ -626,7 +630,7 @@ sctp_bindi(sctp_t *sctp, in_port_t port, boolean_t bind_to_req_port_only,
 			sctp->sctp_sctph->sh_sport = lport;
 
 			ASSERT(&sctps->sctps_bind_fanout[
-				    SCTP_BIND_HASH(port)] == tbf);
+			    SCTP_BIND_HASH(port)] == tbf);
 			sctp_bind_hash_insert(tbf, sctp, 1);
 
 			mutex_exit(&tbf->tf_lock);

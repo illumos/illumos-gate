@@ -187,7 +187,7 @@ sctp_create_eager(sctp_t *psctp)
 	sctp_stack_t	*sctps = psctp->sctp_sctps;
 
 	if ((connp = ipcl_conn_create(IPCL_SCTPCONN, KM_NOSLEEP,
-		    sctps->sctps_netstack)) == NULL) {
+	    sctps->sctps_netstack)) == NULL) {
 		return (NULL);
 	}
 
@@ -494,6 +494,12 @@ sctp_closei_local(sctp_t *sctp)
 	mblk_t	*mp;
 	ire_t	*ire = NULL;
 	conn_t	*connp = sctp->sctp_connp;
+
+	/* Sanity check, don't do the same thing twice.  */
+	if (connp->conn_state_flags & CONN_CLOSING) {
+		ASSERT(sctp->sctp_state == SCTPS_IDLE);
+		return;
+	}
 
 	/* Stop and free the timers */
 	sctp_free_faddr_timers(sctp);
@@ -1154,7 +1160,7 @@ sctp_icmp_error(sctp_t *sctp, mblk_t *mp)
 			 * SCTP_ALIGN.
 			 */
 			fp->sfa_pmss = (new_mtu - sctp->sctp_hdr_len) &
-				~(SCTP_ALIGN - 1);
+			    ~(SCTP_ALIGN - 1);
 			fp->pmtu_discovered = 1;
 
 			break;
@@ -1261,7 +1267,7 @@ sctp_icmp_error_ipv6(sctp_t *sctp, mblk_t *mp)
 
 		/* Make sure that sfa_pmss is a multiple of SCTP_ALIGN. */
 		fp->sfa_pmss = (new_mtu - sctp->sctp_hdr6_len) &
-			~(SCTP_ALIGN - 1);
+		    ~(SCTP_ALIGN - 1);
 		fp->pmtu_discovered = 1;
 
 		break;
@@ -1375,7 +1381,7 @@ sctp_create(void *sctp_ulpd, sctp_t *parent, int family, int flags,
 		}
 	}
 	if ((sctp_connp = ipcl_conn_create(IPCL_SCTPCONN, sleep,
-		    sctps->sctps_netstack)) == NULL) {
+	    sctps->sctps_netstack)) == NULL) {
 		netstack_rele(sctps->sctps_netstack);
 		SCTP_KSTAT(sctps, sctp_conn_create);
 		return (NULL);
@@ -1434,7 +1440,7 @@ sctp_create(void *sctp_ulpd, sctp_t *parent, int family, int flags,
 	sctp->sctp_cansleep = ((flags & SCTP_CAN_BLOCK) == SCTP_CAN_BLOCK);
 
 	sctp->sctp_mss = sctps->sctps_initial_mtu - ((family == AF_INET6) ?
-		sctp->sctp_hdr6_len : sctp->sctp_hdr_len);
+	    sctp->sctp_hdr6_len : sctp->sctp_hdr_len);
 
 	if (psctp != NULL) {
 		RUN_SCTP(psctp);
@@ -1587,7 +1593,7 @@ sctp_g_q_create(sctp_stack_t *sctps)
 	}
 
 	cr = zone_get_kcred(netstackid_to_zoneid(
-				sctps->sctps_netstack->netstack_stackid));
+	    sctps->sctps_netstack->netstack_stackid));
 	ASSERT(cr != NULL);
 	/*
 	 * We set the sctp default queue to IPv6 because IPv4 falls
@@ -1731,7 +1737,7 @@ sctp_g_q_inactive(sctp_stack_t *sctps)
 
 	if (servicing_interrupt()) {
 		(void) taskq_dispatch(sctp_taskq, sctp_g_q_close,
-			    (void *) sctps, TQ_SLEEP);
+		    (void *) sctps, TQ_SLEEP);
 	} else {
 		sctp_g_q_close(sctps);
 	}
@@ -1916,7 +1922,7 @@ sctp_rq_tq_init(sctp_stack_t *sctps)
 	 */
 	sctps->sctps_recvq_tq_list =
 	    kmem_zalloc(sctps->sctps_recvq_tq_list_max_sz * sizeof (taskq_t *),
-		KM_SLEEP);
+	    KM_SLEEP);
 	sctps->sctps_recvq_tq_list[0] = taskq_create("sctp_def_recvq_taskq",
 	    MIN(sctp_recvq_tq_thr_max, MAX(sctp_recvq_tq_thr_min, ncpus)),
 	    minclsyspri, sctp_recvq_tq_task_min, sctp_recvq_tq_task_max,
@@ -1965,7 +1971,7 @@ sctp_inc_taskq(sctp_stack_t *sctps)
 		return;
 	}
 	ASSERT(sctps->sctps_recvq_tq_list[
-		    sctps->sctps_recvq_tq_list_cur_sz] == NULL);
+	    sctps->sctps_recvq_tq_list_cur_sz] == NULL);
 	sctps->sctps_recvq_tq_list[sctps->sctps_recvq_tq_list_cur_sz] = tq;
 	atomic_add_32(&sctps->sctps_recvq_tq_list_cur_sz, 1);
 	mutex_exit(&sctps->sctps_rq_tq_lock);

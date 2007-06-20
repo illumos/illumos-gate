@@ -409,7 +409,7 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 		break;
 	default:
 		dprint(1, ("sctp_connect: unknown family %d\n",
-			dst->sa_family));
+		    dst->sa_family));
 		return (EAFNOSUPPORT);
 	}
 
@@ -418,7 +418,8 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 
 	RUN_SCTP(sctp);
 
-	if (sctp->sctp_family != dst->sa_family) {
+	if (sctp->sctp_family != dst->sa_family ||
+	    (sctp->sctp_connp->conn_state_flags & CONN_CLOSING)) {
 		WAKE_SCTP(sctp);
 		return (EINVAL);
 	}
@@ -468,7 +469,7 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 		 */
 		sctp_conn_hash_remove(sctp);
 		tbf = &sctps->sctps_conn_fanout[SCTP_CONN_HASH(sctps,
-						    sctp->sctp_ports)];
+		    sctp->sctp_ports)];
 		mutex_enter(&tbf->tf_lock);
 		lsctp = sctp_lookup(sctp, &dstaddr, tbf, &sctp->sctp_ports,
 		    SCTPS_COOKIE_WAIT);
