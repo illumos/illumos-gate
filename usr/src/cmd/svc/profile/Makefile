@@ -55,7 +55,17 @@ PROFILESRCS = \
 
 PROFILES = $(PROFILESRCS:%=$(ROOTPROFILE)/%)
 
-install: $(PROFILES)
+PROFILES_open = generic_open.xml inetd_generic.xml
+PROFILES_limited = generic_limited_net.xml
+CHECK_OPEN = check_open
+CHECK_LMTD = check_limited
+
+COMM =	/usr/bin/comm
+TEE =	/usr/bin/tee
+TEST =	/usr/bin/test
+LISTSVCS = listsvcs.pl
+
+install: all $(PROFILES)
 	$(RM) $(ROOTPROFILE)/platform.xml
 	# SUNW,Sun-Fire-V890
 	$(RM) $(ROOTPROFILE)/platform_SUNW,Sun-Fire-V890.xml
@@ -72,4 +82,25 @@ install: $(PROFILES)
 $(ROOTPROFILE)/%: %
 	$(INS.file)
 
-all lint clobber clean _msg:
+all:	$(CHECK_OPEN) $(CHECK_LMTD)
+
+#
+#	Enforce consistency between open and limited profiles per README
+#
+$(CHECK_OPEN) :=	PROFILES_CHECKED = open
+$(CHECK_OPEN) :=	PROFILES_COVERING = limited
+$(CHECK_LMTD) :=	PROFILES_CHECKED = limited
+$(CHECK_LMTD) :=	PROFILES_COVERING = open
+$(CHECK_OPEN) $(CHECK_LMTD): \
+	$(LISTSVCS) $(PROFILES_open) $(PROFILES_limited)
+	@$(ECHO) Check for enabled $(PROFILES_CHECKED) services \
+		not covered by $(PROFILES_COVERING) profile
+	@$(PERL) -w $(LISTSVCS) -e $(PROFILES_$(PROFILES_CHECKED)) > $@.enabled
+	@$(PERL) -w $(LISTSVCS) $(PROFILES_$(PROFILES_COVERING)) > $@.all
+	@$(COMM) -23 $@.enabled $@.all | $(TEE) $@.notcovered
+	@$(TEST) ! -s $@.notcovered && $(TOUCH) $@
+
+lint _msg:
+
+clobber clean:
+	$(RM) $(CHECK_OPEN)* $(CHECK_LMTD)*

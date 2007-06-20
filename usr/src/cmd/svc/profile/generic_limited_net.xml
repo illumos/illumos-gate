@@ -136,9 +136,6 @@
   <service name='system/power' version='1' type='service'>
     <instance name='default' enabled='true'/>
   </service>
-  <service name='network/pfil' version='1' type='service'>
-    <instance name='default' enabled='true' />
-  </service>
 
   <service name='network/dhcp-server' version='1' type='service'>
     <instance name='default' enabled='false' />
@@ -241,9 +238,6 @@
   <service name='network/talk' version='1' type='service'>
     <instance name='default' enabled='false'/>
   </service>
-  <service name='application/x11/xfs' version='1' type='service'>
-    <instance name='default' enabled='false'/>
-  </service>
 
   <!--
 	default inetd(1M) RPC services enabled
@@ -302,6 +296,9 @@
   <service name='application/cde-printinfo' version='1' type='service'>
     <instance name='default' enabled='true' />
   </service>
+  <service name='network/rpc/cde-ttdbserver' version='1' type='service'>
+    <instance name='tcp' enabled='true' />
+  </service>
   <service name='application/graphical-login/cde-login' version='1'
     type='service'>
     <instance name='default' enabled='true' />
@@ -315,6 +312,9 @@
   -->
   <service name='network/cde-spc' version='1' type='service'>
      <instance name='default' enabled='false' />
+  </service>
+  <service name='application/x11/xfs' version='1' type='service'>
+    <instance name='default' enabled='false'/>
   </service>
 
 </service_bundle>
