@@ -691,9 +691,9 @@ i86_monitor(volatile uint32_t *addr, uint32_t extensions, uint32_t hints)
 ENTRY_NP(i86_monitor)
 	pushl	%ebp
 	movl	%esp, %ebp
-	movl	0x4(%esp),%eax		/* addr */
-	movl	0x8(%esp),%ecx		/* extensions */
-	movl	0xc(%esp),%edx		/* hints */
+	movl	0x8(%ebp),%eax		/* addr */
+	movl	0xc(%ebp),%ecx		/* extensions */
+	movl	0x10(%ebp),%edx		/* hints */
 	.byte	0x0f, 0x01, 0xc8	/* monitor */
 	leave
 	ret
@@ -728,8 +728,8 @@ i86_mwait(uint32_t data, uint32_t extensions)
 	ENTRY_NP(i86_mwait)
 	pushl	%ebp
 	movl	%esp, %ebp
-	movl	0x4(%esp),%eax		/* data */
-	movl	0x8(%esp),%ecx		/* extensions */
+	movl	0x8(%ebp),%eax		/* data */
+	movl	0xc(%ebp),%ecx		/* extensions */
 	.byte	0x0f, 0x01, 0xc9	/* mwait */
 	leave
 	ret
