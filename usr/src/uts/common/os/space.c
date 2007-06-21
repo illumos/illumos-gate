@@ -213,12 +213,6 @@ dev_t	rconsdev;
 dev_t	uconsdev = NODEV;
 
 /*
- * This flag, when set marks rconsvp in a transition state.
- */
-
-int	cn_conf;
-
-/*
  * Flag whether console fb output is using PROM/PROM emulation
  * terminal emulator, or is using the kernel terminal emulator.
  */

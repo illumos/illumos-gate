@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,8 +84,6 @@ extern int	cons_tem_disable;
  */
 extern struct vnode *wsconsvp;	/* vnode for redirecting ws cons access */
 extern struct vnode *rwsconsvp;	/* vnode for underlying workstation console */
-
-extern int cn_conf;
 
 /*
  * Generic console ioctls.
