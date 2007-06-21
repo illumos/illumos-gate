@@ -58,6 +58,9 @@
 #include <sys/promif.h>		/* prom_printf */
 #include "pcie_pwr.h"
 #include "px_pci.h"
+#ifdef	PX_PLX
+#include "pxb_plx.h"
+#endif	/* PX_PLX */
 
 #if defined(DEBUG)
 #define	DBG pxb_dbg
@@ -184,9 +187,15 @@ static int pxb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd);
 static int pxb_info(dev_info_t *dip, ddi_info_cmd_t infocmd,
     void *arg, void **result);
 static int pxb_pwr_setup(dev_info_t *dip);
-static int plx_pwr_disable(dev_info_t *dip);
 static int pxb_pwr_init_and_raise(dev_info_t *dip, pcie_pwr_t *pwr_p);
 static void pxb_pwr_teardown(dev_info_t *dip);
+
+/* PLX specific functions */
+#ifdef	PX_PLX
+static int plx_pwr_disable(dev_info_t *dip);
+static void plx_ro_disable(pxb_devstate_t *pxb);
+#endif	/* PX_PLX */
+
 
 /* Hotplug related functions */
 static int pxb_pciehpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle);
@@ -366,7 +375,7 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	pxb->pxb_config_handle = config_handle;
 	pxb->pxb_init_flags |= PXB_INIT_CONFIG_HANDLE;
 
-	/* Save the vnedor id and device id */
+	/* Save the vendor id and device id */
 	pxb->pxb_vendor_id = pci_config_get16(config_handle, PCI_CONF_VENID);
 	pxb->pxb_device_id = pci_config_get16(config_handle, PCI_CONF_DEVID);
 	pxb->pxb_rev_id = pci_config_get8(config_handle, PCI_CONF_REVID);
@@ -477,6 +486,11 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	secondary = pci_config_get8(config_handle, PCI_BCNF_SECBUS);
 	bus_num = (secondary << 8) | primary;
 	pci_config_put16(config_handle, PCI_BCNF_PRIBUS, bus_num);
+
+	/*
+	 * Disable PLX Special Relaxed Ordering
+	 */
+	plx_ro_disable(pxb);
 
 	if ((pxb->pxb_device_id == PXB_DEVICE_PLX_8532) &&
 	    (pxb->pxb_rev_id <= PXB_DEVICE_PLX_AA_REV))
@@ -1588,6 +1602,7 @@ static int pxb_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 	return (ddi_prop_op(dev, dip, prop_op, flags, name, valuep, lengthp));
 }
 
+#ifdef PX_PLX
 /*
  * Disable PM for PLX 8532 switch. Transitioning one port on
  * this switch to low power causes links on other ports on the
@@ -1609,6 +1624,7 @@ plx_pwr_disable(dev_info_t *dip)
 	pwr_p->pwr_flags = PCIE_NO_CHILD_PM;
 	return (DDI_SUCCESS);
 }
+#endif /* PX_PLX */
 
 /*
  * Power management related initialization specific to px_pci.
@@ -1974,19 +1990,25 @@ pxb_id_props(pxb_devstate_t *pxb)
 	uint16_t cap_ptr;
 	uint8_t fic = 0;	/* 1 = first in chassis device */
 
+	/*
+	 * Identify first in chassis.  In the special case of a Sun branded
+	 * PLX device, it obviously is first in chassis.  Otherwise, in the
+	 * general case, look for an Expansion Slot Register and check its
+	 * first-in-chassis bit.
+	 */
+#ifdef	PX_PLX
 	if ((pxb->pxb_vendor_id == PXB_VENDOR_SUN) &&
-		((pxb->pxb_device_id == PXB_DEVICE_PLX_PCIX) ||
-		(pxb->pxb_device_id == PXB_DEVICE_PLX_PCIE)))
+	    ((pxb->pxb_device_id == PXB_DEVICE_PLX_PCIX) ||
+	    (pxb->pxb_device_id == PXB_DEVICE_PLX_PCIE))) {
 		fic = 1;
-	else {
-		/* look for Expansion Slot Reg and first-in-chassis bit */
-		if ((PCI_CAP_LOCATE(pxb->pxb_config_handle, PCI_CAP_ID_SLOT_ID,
-			&cap_ptr)) != DDI_FAILURE) {
-			uint8_t esr = PCI_CAP_GET8(pxb->pxb_config_handle, NULL,
-				cap_ptr, PCI_CAP_ID_REGS_OFF);
-			if (PCI_CAPSLOT_FIC(esr))
-				fic = 1;
-		}
+	}
+#endif	/* PX_PLX */
+	if ((fic == 0) && ((PCI_CAP_LOCATE(pxb->pxb_config_handle,
+	    PCI_CAP_ID_SLOT_ID, &cap_ptr)) != DDI_FAILURE)) {
+		uint8_t esr = PCI_CAP_GET8(pxb->pxb_config_handle, NULL,
+		    cap_ptr, PCI_CAP_ID_REGS_OFF);
+		if (PCI_CAPSLOT_FIC(esr))
+			fic = 1;
 	}
 
 	if ((PCI_CAP_LOCATE(pxb->pxb_config_handle,
@@ -2117,3 +2139,32 @@ body:
 	va_end(ap);
 }
 #endif
+
+#ifdef PX_PLX
+/*
+ * Disable PLX specific relaxed ordering mode.  Due to PLX
+ * erratum #6, use of this mode with Cut-Through Cancellation
+ * can result in dropped Completion type packets.
+ */
+static void
+plx_ro_disable(pxb_devstate_t *pxb)
+{
+	uint32_t		val;
+	ddi_acc_handle_t	hdl = pxb->pxb_config_handle;
+
+	switch (pxb->pxb_device_id) {
+	case PXB_DEVICE_PLX_8533:
+	case PXB_DEVICE_PLX_8548:
+		/*
+		 * Clear the Relaxed Ordering Mode bit of the Egress
+		 * Performance Counter register on 8533 and 8548 switches.
+		 */
+		val = pci_config_get32(hdl, PLX_EGRESS_PERFCTR_OFFSET);
+		if (val & PLX_RO_MODE_BIT) {
+			val ^= PLX_RO_MODE_BIT;
+			pci_config_put32(hdl, PLX_EGRESS_PERFCTR_OFFSET, val);
+		}
+		break;
+	}
+}
+#endif /* PX_PLX */

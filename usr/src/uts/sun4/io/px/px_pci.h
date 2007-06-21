@@ -152,18 +152,6 @@ extern void *pxb_state;
 #define	PXB_INIT_BLOCK			0x40
 #define	PXB_INIT_FM			0x80
 
-/* PLX Vendor/Device IDs for PLX HW workaround */
-#define	PXB_VENDOR_PLX			0x10B5
-#define	PXB_DEVICE_PLX_8532		0x8532
-#define	PXB_DEVICE_PLX_8516		0x8516
-
-/* Last known bad rev for MSI and other issues */
-#define	PXB_DEVICE_PLX_AA_REV		0xAA
-
-#define	PXB_VENDOR_SUN			0x108E
-#define	PXB_DEVICE_PLX_PCIX		0x9010
-#define	PXB_DEVICE_PLX_PCIE		0x9020
-
 #define	PXB_HOTPLUG_INTR_PRI		(LOCK_LEVEL - 1)
 
 /* functionality checks */
