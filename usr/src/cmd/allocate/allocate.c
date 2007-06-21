@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,73 +63,64 @@ static void
 usage(int func)
 {
 	if (system_labeled) {
-		char *use[9];
+		char *use[6];
 
 		use[0] = gettext("allocate [-s] [-w] [-U uname] [-z zonename] "
-		    "[-F] device");
-		use[1] = gettext("allocate [-s] [-w] [-U uname] [-z zonename] "
-		    "[-F] -g dev_type");
-		use[2] = gettext("deallocate [-s] [-w] [-z zonename] "
-		    "[-F] device");
-		use[3] = gettext("deallocate [-s] [-w] [-z zonename] "
-		    "[-F] -g dev_type");
-		use[4] = gettext("deallocate [-s] [-w] [-z zonename] -I");
-		use[5] = gettext("list_devices [-s] [-U uid] [-z zonename] "
-		    "[-a] -l [device]");
-		use[6] = gettext("list_devices [-s] [-U uid] [-z zonename] "
-		    "[-a] -n [device]");
-		use[7] = gettext("list_devices [-s] [-U uid] [-z zonename] "
-		    "[-a] -u [device]");
-		use[8] = gettext("list_devices [-s] -d dev_type");
+		    "[-F] device|-g dev-type");
+		use[1] = gettext("deallocate [-s] [-w] [-z zonename] "
+		    "[-F] device|-c dev-class|-g dev-type");
+		use[2] = gettext("deallocate [-s] [-w] [-z zonename] -I");
+		use[3] = gettext("list_devices [-s] [-U uid] [-z zonename] "
+		    "[-a [-w]] -l|-n|-u [device]");
+		use[4] = gettext("list_devices [-s] [-U uid] [-z zonename] "
+		    "[-a [-w]] [-l|-n|-u] -c dev-class");
+		use[5] = gettext("list_devices [-s] -d [dev-type]");
 
 		switch (func) {
 			case 0:
-				(void) fprintf(stderr, "%s\n%s\n",
-				    use[0], use[1]);
+				(void) fprintf(stderr, "%s\n", use[0]);
 				break;
 			case 1:
-				(void) fprintf(stderr, "%s\n%s\n%s\n",
-				    use[2], use[3], use[4]);
+				(void) fprintf(stderr, "%s\n%s\n",
+				    use[1], use[2]);
 				break;
 			case 2:
-				(void) fprintf(stderr, "%s\n%s\n%s\n%s\n",
-				    use[5], use[6], use[7], use[8]);
+				(void) fprintf(stderr, "%s\n%s\n%s\n",
+				    use[3], use[4], use[5]);
 				break;
 			default:
 				(void) fprintf(stderr,
-				    "%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
+				    "%s\n%s\n%s\n%s\n%s\n%s\n",
 				    use[0], use[1], use[2], use[3], use[4],
-				    use[5], use[6], use[7], use[8]);
+				    use[5]);
 		}
 	} else {
-		char *use[7];
+		char *use[5];
 
-		use[0] = gettext("allocate [-s] [-U uname] [-F] device");
-		use[1] = gettext("allocate [-s] [-U uname] -g dev_type");
-		use[2] = gettext("deallocate [-s] [-F] device");
-		use[3] = gettext("deallocate [-s] -I");
-		use[4] = gettext("list_devices [-s] [-U uid] -l [device]");
-		use[5] = gettext("list_devices [-s] [-U uid] -n [device]");
-		use[6] = gettext("list_devices [-s] [-U uid] -u [device]");
+		use[0] = gettext("allocate "
+		    "[-s] [-U uname] [-F] device|-g dev-type");
+		use[1] = gettext("deallocate [-s] [-F] device|-c dev-class");
+		use[2] = gettext("deallocate [-s] -I");
+		use[3] = gettext("list_devices "
+		    "[-s] [-U uid] -l|-n|-u [device]");
+		use[4] = gettext("list_devices "
+		    "[-s] [-U uid] [-l|-n|-u] -c dev-class");
 
 		switch (func) {
 			case 0:
-				(void) fprintf(stderr, "%s\n%s\n",
-				    use[0], use[1]);
+				(void) fprintf(stderr, "%s\n", use[0]);
 				break;
 			case 1:
 				(void) fprintf(stderr, "%s\n%s\n",
-				    use[2], use[3]);
+				    use[1], use[2]);
 				break;
 			case 2:
-				(void) fprintf(stderr, "%s\n%s\n%s\n",
-				    use[4], use[5], use[6]);
+				(void) fprintf(stderr, "%s\n%s\n",
+				    use[3], use[4]);
 				break;
 			default:
-				(void) fprintf(stderr,
-				    "%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
-					use[0], use[1], use[2], use[3], use[4],
-					use[5], use[6]);
+				(void) fprintf(stderr, "%s\n%s\n%s\n%s\n%s\n",
+				    use[0], use[1], use[2], use[3], use[4]);
 		}
 	}
 	exit(1);
@@ -352,10 +343,11 @@ main(int argc, char *argv[], char *envp[])
 	}
 
 	if (func == 0) {	/* allocate */
-		while ((c = getopt(argc, argv, "gswz:FU:")) != -1) {
+		while ((c = getopt(argc, argv, "g:swz:FU:")) != -1) {
 			switch (c) {
 			case 'g':
 				optflg |= TYPE;
+				device = optarg;
 				break;
 			case 's':
 				optflg |= SILENT;
@@ -392,21 +384,33 @@ main(int argc, char *argv[], char *envp[])
 		/*
 		 * allocate(1) must be supplied with one device argument
 		 */
-		if ((argc - optind) != 1) {
+		if (device && ((argc - optind) >= 1))
 			usage(func);
-		} else {
+		if (device == NULL) {
+			if ((argc - optind) != 1)
+				usage(func);
 			device = argv[optind];
 		}
 	}
 
 	else if (func == 1) {	/* deallocate */
-		while ((c = getopt(argc, argv, "gswz:FI")) != -1) {
+		while ((c = getopt(argc, argv, "c:g:swz:FI")) != -1) {
 			switch (c) {
-			case 'g':
-				if (system_labeled)
-					optflg |= TYPE;
-				else
+			case 'c':
+				if (optflg & (TYPE | FORCE_ALL))
 					usage(func);
+				optflg |= CLASS;
+				device = optarg;
+				break;
+			case 'g':
+				if (system_labeled) {
+					if (optflg & (CLASS | FORCE_ALL))
+						usage(func);
+					optflg |= TYPE;
+					device = optarg;
+				} else {
+					usage(func);
+				}
 				break;
 			case 's':
 				optflg |= SILENT;
@@ -428,9 +432,13 @@ main(int argc, char *argv[], char *envp[])
 				}
 				break;
 			case 'F':
+				if (optflg & FORCE_ALL)
+					usage(func);
 				optflg |= FORCE;
 				break;
 			case 'I':
+				if (optflg & (CLASS | TYPE | FORCE))
+					usage(func);
 				optflg |= FORCE_ALL;
 				break;
 			case '?':
@@ -439,31 +447,22 @@ main(int argc, char *argv[], char *envp[])
 			}
 		}
 
-		if ((optflg & FORCE) && (optflg & FORCE_ALL))
-			usage(func);
-
-		if (system_labeled && ((optflg & FORCE_ALL) && (optflg & TYPE)))
-			usage(func);
-
 		/*
 		 * deallocate(1) must be supplied with one device
 		 * argument unless the '-I' argument is supplied
 		 */
-		if (!(optflg & FORCE_ALL)) {
-			if ((argc - optind) != 1) {
+		if (device || (optflg & FORCE_ALL)) {
+			if ((argc - optind) >= 1)
 				usage(func);
-			} else {
-				device = argv[optind];
-			}
-		} else {
-			if ((argc - optind) >= 1) {
+		} else if (device == NULL) {
+			if ((argc - optind) != 1)
 				usage(func);
-			}
+			device = argv[optind];
 		}
 	}
 
 	else if (func == 2) {	/* list_devices */
-		while ((c = getopt(argc, argv, "adlnsuwz:U:")) != -1) {
+		while ((c = getopt(argc, argv, "ac:dlnsuwz:U:")) != -1) {
 			switch (c) {
 			case 'a':
 				if (system_labeled) {
@@ -471,39 +470,55 @@ main(int argc, char *argv[], char *envp[])
 					 * list auths, cleaning programs,
 					 * labels.
 					 */
+					if (optflg & LISTDEFS)
+						usage(func);
 					optflg |= LISTATTRS;
 				} else {
 					usage(func);
 				}
 				break;
+			case 'c':
+				optflg |= CLASS;
+				device = optarg;
+				break;
 			case 'd':
 				if (system_labeled) {
 					/*
-					 * list devalloc_defaults
+					 * List devalloc_defaults
+					 * This cannot used with anything other
+					 * than -s.
 					 */
+					if (optflg & (LISTATTRS | CLASS |
+					    LISTALL | LISTFREE | LISTALLOC |
+					    WINDOWING | ZONENAME | USERID))
+						usage(func);
 					optflg |= LISTDEFS;
 				} else {
 					usage(func);
 				}
 				break;
 			case 'l':
+				if (optflg & (LISTFREE | LISTALLOC | LISTDEFS))
+					usage(func);
 				optflg |= LISTALL;
 				break;
 			case 'n':
+				if (optflg & (LISTALL | LISTALLOC | LISTDEFS))
+					usage(func);
 				optflg |= LISTFREE;
 				break;
 			case 's':
 				optflg |= SILENT;
 				break;
 			case 'u':
+				if (optflg & (LISTALL | LISTFREE | LISTDEFS))
+					usage(func);
 				optflg |= LISTALLOC;
 				break;
 			case 'w':
 				if (system_labeled) {
-					/*
-					 * Private interface for use by
-					 * list_devices GUI
-					 */
+					if (optflg & LISTDEFS)
+						usage(func);
 					optflg |= WINDOWING;
 				} else {
 					usage(func);
@@ -511,6 +526,8 @@ main(int argc, char *argv[], char *envp[])
 				break;
 			case 'z':
 				if (system_labeled) {
+					if (optflg & LISTDEFS)
+						usage(func);
 					optflg |= ZONENAME;
 					zonename = optarg;
 				} else {
@@ -518,6 +535,8 @@ main(int argc, char *argv[], char *envp[])
 				}
 				break;
 			case 'U':
+				if (optflg & LISTDEFS)
+					usage(func);
 				optflg |= USERID;
 				uid = atoi(optarg);
 				break;
@@ -528,31 +547,26 @@ main(int argc, char *argv[], char *envp[])
 		}
 
 		if (system_labeled) {
-			if (((optflg & LISTALL) && (optflg & LISTFREE)) ||
-			    ((optflg & LISTALL) && (optflg & LISTALLOC)) ||
-			    ((optflg & LISTFREE) && (optflg & LISTALLOC)) ||
-			    ((optflg & LISTDEFS) &&
-			    (optflg & (LISTATTRS | LISTALL | LISTFREE |
-			    LISTALLOC | USERID | WINDOWING | ZONENAME))) ||
-			    (!(optflg & (LISTALL | LISTFREE | LISTALLOC |
-			    LISTDEFS | WINDOWING))))
+			if (!(optflg & (LISTALL | LISTFREE | LISTALLOC |
+			    LISTDEFS | WINDOWING))) {
+				if (!(optflg & CLASS))
+					usage(func);
+			}
+		} else if (!(optflg & (LISTALL | LISTFREE | LISTALLOC))) {
+			if (!(optflg & CLASS))
 				usage(func);
-		} else if (((optflg & LISTALL) && (optflg & LISTFREE)) ||
-		    ((optflg & LISTALL) && (optflg & LISTALLOC)) ||
-		    ((optflg & LISTFREE) && (optflg & LISTALLOC)) ||
-		    (!(optflg & (LISTALL | LISTFREE | LISTALLOC)))) {
-			usage(func);
 		}
 
 		/*
-		 * list_devices(1) takes an optional device argument
+		 * list_devices(1) takes an optional device argument.
 		 */
-		if ((argc - optind) == 1) {
-			device = argv[optind];
-		} else {
-			if ((argc - optind) > 1) {
+		if (device && ((argc - optind) >= 1))
+			usage(func);
+		if (device == NULL) {
+			if ((argc - optind) == 1)
+				device = argv[optind];
+			else if ((argc - optind) > 1)
 				usage(func);
-			}
 		}
 	}
 

@@ -76,10 +76,9 @@ extern void print_error(int, char *);
 #endif	/* DEBUG */
 
 #define	DEV_ERRORED(sbuf)	(((sbuf).st_mode & ~S_IFMT) == ALLOC_ERR_MODE)
-#define	DEV_INVALID(sbuf)	(((sbuf).st_mode & ~S_IFMT) == ALLOC_INVALID)
-#define	DEV_ALLOCATED(sbuf)	((sbuf).st_uid != ALLOC_UID || \
+#define	DEV_ALLOCATED(sbuf)	((sbuf).st_uid != DA_UID || \
 			!(((sbuf).st_mode & ~S_IFMT) == DEALLOC_MODE || \
-			DEV_ERRORED(sbuf) || DEV_INVALID(sbuf)))
+			DEV_ERRORED(sbuf)))
 
 #define	ALLOC_CLEAN		"-A"
 #define	DEALLOC_CLEAN		"-D"
@@ -120,7 +119,7 @@ struct dev_names {
 };
 
 static int _dev_file_name(struct state_file *, devmap_t *);
-static int lock_dev(char *);
+static int lock_dev(char *, struct stat *);
 static int _check_label(devalloc_t *, char *, uid_t, int);
 static int create_znode(char *, struct zone_path *, devmap_t *);
 static int remove_znode(char *, devmap_t *);
@@ -271,9 +270,9 @@ print_dev_attrs(int optflag, devalloc_t *da, devmap_t *dm,
 	}
 	(void) printf("%s", KV_DELIMITER);
 	if (optflag & WINDOWING) {
-		if (DEV_INVALID(fip->fi_stat))
-			(void) printf("owner=/INVALID:%s%s", fip->fi_message,
-			    KV_DELIMITER);
+		if ((fip->fi_message != NULL) &&
+		    (strcmp(fip->fi_message, DAOPT_CLASS) == 0))
+			(void) printf("owner=/FREE%s", KV_DELIMITER);
 		else if (DEV_ERRORED(fip->fi_stat))
 			(void) printf("owner=/ERROR%s", KV_DELIMITER);
 		else if (!DEV_ALLOCATED(fip->fi_stat))
@@ -315,6 +314,7 @@ _list_device(int optflag, uid_t uid, devalloc_t *da, char *zonename)
 	struct file_info	fi;
 	struct state_file	sf;
 
+	fi.fi_message = NULL;
 	setdmapent();
 	if ((dm = getdmapnam(da->da_devname)) == NULL) {
 		enddmapent();
@@ -323,6 +323,17 @@ _list_device(int optflag, uid_t uid, devalloc_t *da, char *zonename)
 		return (NODMAPERR);
 	}
 	enddmapent();
+
+	if ((optflag & CLASS) &&
+	    (!(optflag & (LISTALL | LISTFREE | LISTALLOC)))) {
+		fi.fi_message = DAOPT_CLASS;
+		if (optflag & LISTATTRS)
+			print_dev_attrs(optflag, da, dm, &fi);
+		else
+			print_dev(dm);
+		goto out;
+	}
+
 	if (system_labeled) {
 		if ((error = _dev_file_name(&sf, dm)) != 0) {
 			freedmapent(dm);
@@ -483,6 +494,7 @@ int
 list_devices(int optflag, uid_t uid, char *device, char *zonename)
 {
 	int		error = 0;
+	char		*class = NULL;
 	da_defs_t	*da_defs;
 	devalloc_t	*da;
 
@@ -490,7 +502,6 @@ list_devices(int optflag, uid_t uid, char *device, char *zonename)
 		/*
 		 * Private interface for GUI.
 		 */
-		(void) lock_dev(NULL);
 		(void) puts(DA_DB_LOCK);
 		return (0);
 	}
@@ -539,17 +550,36 @@ list_devices(int optflag, uid_t uid, char *device, char *zonename)
 			return (error);
 		}
 	}
+	/*
+	 * Lock the database to make sure no body writes to it while we are
+	 * reading.
+	 */
+	(void) lock_dev(NULL, NULL);
 	setdaent();
 	if (device) {
-		/*
-		 * list this device
-		 */
-		if ((da = getdanam(device)) == NULL) {
-			enddaent();
-			return (NODAERR);
+		if (optflag & CLASS) {
+			/*
+			 * list all devices of this class.
+			 */
+			while ((da = getdaent()) != NULL) {
+				class =	 kva_match(da->da_devopts, DAOPT_CLASS);
+				if (class && (strcmp(class, device) == 0)) {
+					(void) _list_device(optflag, uid, da,
+					    zonename);
+				}
+				freedaent(da);
+			}
+		} else {
+			/*
+			 * list this device
+			 */
+			if ((da = getdanam(device)) == NULL) {
+				enddaent();
+				return (NODAERR);
+			}
+			error = _list_device(optflag, uid, da, zonename);
+			freedaent(da);
 		}
-		error = _list_device(optflag, uid, da, zonename);
-		freedaent(da);
 	} else {
 		/*
 		 * list all devices
@@ -609,24 +639,63 @@ _newdac(char *file, uid_t owner, gid_t group, o_mode_t mode)
 	return (err);
 }
 
+/*
+ * lock_dev -
+ *	locks a section of DA_DB_LOCK.
+ *	returns lock fd if successful, else -1 on error.
+ */
 static int
-lock_dev(char *file)
+lock_dev(char *file, struct stat *statbuf)
 {
-	int	lockfd = -1;
+	static int	lockfd = -1;
+	int		ret;
+	int		count = 0;
+	int		retry = 10;
+	off_t		size = 0;
+	off_t		offset;
+	char		*lockfile;
 
-	if ((file == NULL) || system_labeled)
-		file = DA_DEV_LOCK;
-	dprintf("locking %s\n", file);
-	if ((lockfd = open(file, O_RDWR | O_CREAT, 0600)) == -1) {
+	if (system_labeled)
+		lockfile = DA_DB_LOCK;
+	else
+		lockfile = file;
+
+	if (statbuf) {
+		offset = statbuf->st_rdev;
+		dprintf("locking %s\n", file);
+	} else {
+		offset = 0;
+		dprintf("locking %s\n", lockfile);
+	}
+	if ((lockfd == -1) &&
+	    (lockfd = open(lockfile, O_RDWR | O_CREAT, 0600)) == -1) {
 		dperror("lock_dev: cannot open lock file");
-		return (DEVLKERR);
+		return (-1);
 	}
-	if (lockf(lockfd, F_TLOCK, 0) == -1) {
-		dperror("lock_dev: cannot set lock");
-		return (DEVLKERR);
+	if (system_labeled) {
+		(void) _newdac(lockfile, DA_UID, DA_GID, 0600);
+		if (lseek(lockfd, offset, SEEK_SET) == -1) {
+			dperror("lock_dev: cannot position lock file");
+			return (-1);
+		}
+		size = 1;
+	}
+	errno = 0;
+	while (retry) {
+		count++;
+		ret = lockf(lockfd, F_TLOCK, size);
+		if (ret == 0)
+			return (lockfd);
+		if ((errno != EACCES) && (errno != EAGAIN)) {
+			dperror("lock_dev: cannot set lock");
+			return (-1);
+		}
+		retry--;
+		(void) sleep(count);
+		errno = 0;
 	}
 
-	return (0);
+	return (-1);
 }
 
 int
@@ -644,7 +713,7 @@ mk_alloc(devmap_t *list, uid_t uid, struct zone_path *zpath)
 	for (; *file != NULL; file++) {
 		dprintf("Allocating %s\n", *file);
 		if ((error = _newdac(*file, uid, gid, mode)) != 0) {
-			(void) _newdac(*file, ALLOC_ERRID, ALLOC_GID,
+			(void) _newdac(*file, ALLOC_ERRID, DA_GID,
 			    ALLOC_ERR_MODE);
 			break;
 		}
@@ -659,7 +728,7 @@ mk_alloc(devmap_t *list, uid_t uid, struct zone_path *zpath)
 			if ((error = _newdac(zpath->path[i], uid, gid,
 			    mode)) != 0) {
 				(void) _newdac(zpath->path[i], ALLOC_ERRID,
-				    ALLOC_GID, ALLOC_ERR_MODE);
+				    DA_GID, ALLOC_ERR_MODE);
 				break;
 			}
 		}
@@ -791,7 +860,7 @@ mk_unalloc(int optflag, devmap_t *list)
 			dperror("");
 			error = CNTFRCERR;
 		}
-		status = _newdac(*file, ALLOC_UID, ALLOC_GID, DEALLOC_MODE);
+		status = _newdac(*file, DA_UID, DA_GID, DEALLOC_MODE);
 		if (error == 0)
 			error = status;
 
@@ -812,7 +881,7 @@ mk_error(devmap_t *list)
 		return (NODMAPERR);
 	for (; *file != NULL; file++) {
 		dprintf("Putting %s in error state\n", *file);
-		status = _newdac(*file, ALLOC_ERRID, ALLOC_GID, ALLOC_ERR_MODE);
+		status = _newdac(*file, ALLOC_ERRID, DA_GID, ALLOC_ERR_MODE);
 	}
 
 	return (status);
@@ -928,7 +997,7 @@ exec_clean(int optflag, char *devname, char *path, uid_t uid, char *zonename,
 
 int
 _deallocate_dev(int optflag, devalloc_t *da, devmap_t *dm_in, uid_t uid,
-    char *zonename)
+    char *zonename, int *lock_fd)
 {
 	int			bytes = 0;
 	int			error = 0;
@@ -1021,11 +1090,15 @@ _deallocate_dev(int optflag, devalloc_t *da, devmap_t *dm_in, uid_t uid,
 		}
 	}
 	/* All checks passed, time to lock and deallocate */
-	if ((error = lock_dev(fname)) != 0)
+	if ((*lock_fd = lock_dev(fname, &stat_buf)) == -1) {
+		error = DEVLKERR;
 		goto out;
+	}
 	if (system_labeled) {
 		devzone = kva_match(da->da_devopts, DAOPT_ZONE);
-		if (devzone && (strcmp(devzone, GLOBAL_ZONENAME) != 0)) {
+		if (devzone == NULL) {
+			devzone = GLOBAL_ZONENAME;
+		} else if (strcmp(devzone, GLOBAL_ZONENAME) != 0) {
 			if ((remove_znode(devzone, dm) != 0) &&
 			    !(optflag & FORCE)) {
 				error = ZONEERR;
@@ -1038,9 +1111,9 @@ _deallocate_dev(int optflag, devalloc_t *da, devmap_t *dm_in, uid_t uid,
 			goto out;
 	}
 	if (system_labeled == 0) {
-		if ((error = _newdac(fname, ALLOC_UID, ALLOC_GID,
+		if ((error = _newdac(fname, DA_UID, DA_GID,
 		    DEALLOC_MODE)) != 0) {
-			(void) _newdac(file_name, ALLOC_UID, ALLOC_GID,
+			(void) _newdac(file_name, DA_UID, DA_GID,
 			    ALLOC_ERR_MODE);
 			goto out;
 		}
@@ -1068,7 +1141,8 @@ out:
 }
 
 int
-_allocate_dev(int optflag, uid_t uid, devalloc_t *da, char *zonename)
+_allocate_dev(int optflag, uid_t uid, devalloc_t *da, char *zonename,
+	int *lock_fd)
 {
 	int			i;
 	int			bytes = 0;
@@ -1159,7 +1233,7 @@ _allocate_dev(int optflag, uid_t uid, devalloc_t *da, char *zonename)
 			else
 				dealloc_optflag = FORCE;
 			if (_deallocate_dev(dealloc_optflag, da, dm, uid,
-			    zonename)) {
+			    zonename, lock_fd)) {
 				dprintf("Couldn't force deallocate device %s\n",
 				    da->da_devname);
 				error = CNTFRCERR;
@@ -1174,8 +1248,10 @@ _allocate_dev(int optflag, uid_t uid, devalloc_t *da, char *zonename)
 		}
 	}
 	/* All checks passed, time to lock and allocate */
-	if ((error = lock_dev(fname)) != 0)
+	if ((*lock_fd = lock_dev(fname, &stat_buf)) == -1) {
+		error = DEVLKERR;
 		goto out;
+	}
 	if (system_labeled) {
 		/*
 		 * Run the cleaning program; it also mounts allocated
@@ -1183,17 +1259,33 @@ _allocate_dev(int optflag, uid_t uid, devalloc_t *da, char *zonename)
 		 */
 		error = exec_clean(optflag, da->da_devname, da->da_devexec, uid,
 		    zonename, ALLOC_CLEAN);
-		if ((error != 0) && (error != CLEAN_MOUNT)) {
-			error = CLEANERR;
-			(void) mk_error(dm);
-			goto out;
+		if (error != DEVCLEAN_OK) {
+			switch (error) {
+			case DEVCLEAN_ERROR:
+			case DEVCLEAN_SYSERR:
+				dprintf("allocate: "
+				    "Error in device clean program %s\n",
+				    da->da_devexec);
+				error = CLEANERR;
+				(void) mk_error(dm);
+				goto out;
+			case DEVCLEAN_BADMOUNT:
+				dprintf("allocate: Failed to mount device %s\n",
+				    da->da_devexec);
+				goto out;
+			case DEVCLEAN_MOUNTOK:
+				break;
+			default:
+				error = 0;
+				goto out;
+			}
 		}
 		/*
 		 * If not mounted, create zonelinks, if this is not the
 		 * global zone.
 		 */
 		if ((strcmp(zonename, GLOBAL_ZONENAME) != 0) &&
-		    (error != CLEAN_MOUNT)) {
+		    (error != DEVCLEAN_MOUNTOK)) {
 			if (create_znode(zonename, &zpath, dm) != 0) {
 				error = ZONEERR;
 				goto out;
@@ -1211,7 +1303,7 @@ _allocate_dev(int optflag, uid_t uid, devalloc_t *da, char *zonename)
 	if (system_labeled == 0) {
 		if ((error = _newdac(file_name, uid, getgid(),
 		    ALLOC_MODE)) != 0) {
-			(void) _newdac(file_name, ALLOC_UID, ALLOC_GID,
+			(void) _newdac(file_name, DA_UID, DA_GID,
 			    ALLOC_ERR_MODE);
 			goto out;
 		}
@@ -1257,6 +1349,7 @@ allocate(int optflag, uid_t uid, char *device, char *zonename)
 {
 	int		count = 0;
 	int		error = 0;
+	int		lock_fd = -1;
 	devalloc_t	*da;
 	struct dev_names dnms;
 
@@ -1277,7 +1370,8 @@ allocate(int optflag, uid_t uid, char *device, char *zonename)
 				continue;
 			}
 			dprintf("trying to allocate %s\n", da->da_devname);
-			error = _allocate_dev(optflag, uid, da, zonename);
+			error = _allocate_dev(optflag, uid, da, zonename,
+			    &lock_fd);
 			if (system_labeled && (error == 0)) {
 				/*
 				 * we need to record in device_allocate the
@@ -1302,7 +1396,7 @@ allocate(int optflag, uid_t uid, char *device, char *zonename)
 			return (LOGINDEVPERMERR);
 		}
 		dprintf("trying to allocate %s\n", da->da_devname);
-		error = _allocate_dev(optflag, uid, da, zonename);
+		error = _allocate_dev(optflag, uid, da, zonename, &lock_fd);
 		/*
 		 * we need to record in device_allocate the label (zone name)
 		 * at which this device is being allocated. store this device
@@ -1311,8 +1405,12 @@ allocate(int optflag, uid_t uid, char *device, char *zonename)
 		if (system_labeled && (error == 0))
 			_store_devnames(&count, &dnms, zonename, da, 0);
 		freedaent(da);
+		if (error == DEVCLEAN_BADMOUNT)
+			error = 0;
 	}
 	enddaent();
+	if (lock_fd != -1)
+		(void) close(lock_fd);
 	/*
 	 * add to device_allocate labels (zone names) for the devices we
 	 * allocated.
@@ -1329,6 +1427,8 @@ deallocate(int optflag, uid_t uid, char *device, char *zonename)
 {
 	int		count = 0;
 	int		error = 0;
+	int		lock_fd = -1;
+	char		*class = NULL;
 	devalloc_t	*da;
 	struct dev_names dnms;
 
@@ -1352,7 +1452,7 @@ deallocate(int optflag, uid_t uid, char *device, char *zonename)
 			}
 			dprintf("trying to deallocate %s\n", da->da_devname);
 			error = _deallocate_dev(optflag, da, NULL, uid,
-			    zonename);
+			    zonename, &lock_fd);
 			if (system_labeled && (error == 0)) {
 				/*
 				 * we need to remove this device's allocation
@@ -1364,7 +1464,7 @@ deallocate(int optflag, uid_t uid, char *device, char *zonename)
 			freedaent(da);
 			error = 0;
 		}
-	} else if (system_labeled && optflag & TYPE) {
+	} else if (system_labeled && (optflag & TYPE)) {
 		/*
 		 * deallocate all devices of this type
 		 */
@@ -1375,7 +1475,7 @@ deallocate(int optflag, uid_t uid, char *device, char *zonename)
 			}
 			dprintf("trying to deallocate %s\n", da->da_devname);
 			error = _deallocate_dev(optflag, da, NULL, uid,
-			    zonename);
+			    zonename, &lock_fd);
 			if (error == 0) {
 				/*
 				 * we need to remove this device's allocation
@@ -1386,6 +1486,31 @@ deallocate(int optflag, uid_t uid, char *device, char *zonename)
 			}
 			freedaent(da);
 			error = 0;
+		}
+	} else if (system_labeled && (optflag & CLASS)) {
+		/*
+		 * deallocate all devices of this class (for sunray)
+		 */
+		while ((da = getdaent()) != NULL) {
+			class =  kva_match(da->da_devopts, DAOPT_CLASS);
+			if (class && (strcmp(class, device) == 0)) {
+				dprintf("trying to deallocate %s\n",
+				    da->da_devname);
+				error = _deallocate_dev(optflag, da, NULL, uid,
+				    zonename, &lock_fd);
+				if (error == 0) {
+					/*
+					 * we need to remove this device's
+					 * allocation label (zone name) from
+					 * device_allocate. store this device
+					 * name.
+					 */
+					_store_devnames(&count, &dnms, zonename,
+					    da, 0);
+				}
+				error = 0;
+			}
+			freedaent(da);
 		}
 	} else if (!(optflag & TYPE)) {
 		/*
@@ -1400,7 +1525,8 @@ deallocate(int optflag, uid_t uid, char *device, char *zonename)
 			return (LOGINDEVPERMERR);
 		}
 		dprintf("trying to deallocate %s\n", da->da_devname);
-		error = _deallocate_dev(optflag, da, NULL, uid, zonename);
+		error = _deallocate_dev(optflag, da, NULL, uid, zonename,
+		    &lock_fd);
 		if (system_labeled && (error == 0)) {
 			/*
 			 * we need to remove this device's allocation label
@@ -1410,8 +1536,12 @@ deallocate(int optflag, uid_t uid, char *device, char *zonename)
 			_store_devnames(&count, &dnms, zonename, da, 0);
 		}
 		freedaent(da);
+		if (error == DEVCLEAN_BADMOUNT)
+			error = 0;
 	}
 	enddaent();
+	if (lock_fd != -1)
+		(void) close(lock_fd);
 	/*
 	 * remove from device_allocate labels (zone names) for the devices we
 	 * deallocated.
@@ -1607,7 +1737,7 @@ create_znode(char *zonename, struct zone_path *zpath, devmap_t *list)
 			(void) strcpy(dstlinkdir, "/dev");
 			(void) strncat(dstlinkdir, linkdir, MAXPATHLEN);
 			(void) snprintf(srclinkdir, MAXPATHLEN, "%s/root%s",
-				zonepath, tmpfile);
+			    zonepath, tmpfile);
 			(void) symlink(dstlinkdir, srclinkdir);
 			*p = '/';
 			(void) strncat(dstlinkdir, p, MAXPATHLEN);

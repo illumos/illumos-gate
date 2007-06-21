@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,27 +35,33 @@ extern "C" {
 
 /* Option Flags */
 #define	LISTATTRS	0x00000001	/* -a */
-#define	LISTDEFS	0x00000002	/* -d */
-#define	TYPE		0x00000004	/* -g */
-#define	LISTALL		0x00000008	/* -l */
-#define	LISTFREE	0x00000010	/* -n */
-#define	SILENT		0x00000020	/* -s */
-#define	LISTALLOC 	0x00000040	/* -u */
-#define	WINDOWING	0x00000080	/* -w */
-#define	ZONENAME	0x00000100	/* -z */
-#define	BOOT		0x00000200	/* -B */
-#define	FORCE		0x00000400	/* -F */
-#define	FORCE_ALL 	0x00000800	/* -I */
-#define	USERID		0x00001000	/* -U for list_devices */
-#define	USERNAME	0x00002000	/* -U for allocate */
+#define	CLASS		0x00000002	/* -c */
+#define	LISTDEFS	0x00000004	/* -d */
+#define	TYPE		0x00000008	/* -g */
+#define	LISTALL		0x00000010	/* -l */
+#define	LISTFREE	0x00000020	/* -n */
+#define	SILENT		0x00000040	/* -s */
+#define	LISTALLOC 	0x00000080	/* -u */
+#define	WINDOWING	0x00000100	/* -w */
+#define	ZONENAME	0x00000200	/* -z */
+#define	BOOT		0x00000400	/* -B */
+#define	FORCE		0x00000800	/* -F */
+#define	FORCE_ALL 	0x00001000	/* -I */
+#define	USERID		0x00002000	/* -U for list_devices */
+#define	USERNAME	0x00004000	/* -U for allocate */
 
-/* Misc. */
+/* Device clean program exit codes */
 
-#define	CLEAN_MOUNT		11	/* Also defined in disk_clean.sh */
+#define	DEVCLEAN_OK		0
+#define	DEVCLEAN_ERROR		1
+#define	DEVCLEAN_SYSERR		2
+#define	DEVCLEAN_BADMOUNT	3
+#define	DEVCLEAN_MOUNTOK	4
 
+/* Error/Exit codes */
 #define	ALLOCUERR		1
 #define	CHOWNERR		2
-#define	CLEANERR		3
+/* Skip 3 to avoid conflict with DEVCLEAN_BADMOUNT */
 #define	CNTDEXECERR		4
 #define	CNTFRCERR		5
 #define	DACACCERR		6
@@ -78,9 +84,10 @@ extern "C" {
 #define	SETACLERR		23
 #define	UAUTHERR		24
 #define	ZONEERR			25
+#define	CLEANERR		26
 
-#define	ALLOC_ERR_MODE  0100
-#define	ALLOC_INVALID	0700
+#define	ALLOC_ERRID		(uid_t)2	/* bin */
+#define	ALLOC_ERR_MODE		0100
 
 /* Functions */
 extern int allocate(int optflg, uid_t uid, char *device, char *zonename);

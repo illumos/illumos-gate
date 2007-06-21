@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,16 +35,19 @@ extern "C" {
 #include <stdio.h>
 #include <secdb.h>
 
-/*
- * These are unsupported, SUN-private interfaces.
- */
 
 #define	DAOPT_AUTHS	"auths"
+#define	DAOPT_CLASS	"class"
 #define	DAOPT_CSCRIPT	"cleanscript"
 #define	DAOPT_MINLABEL	"minlabel"
 #define	DAOPT_MAXLABEL	"maxlabel"
+#define	DAOPT_XDISPLAY	"xdpy"
 #define	DAOPT_ZONE	"zone"
 #define	DA_RESERVED	"reserved"
+
+/*
+ * These are unsupported, SUN-private interfaces.
+ */
 
 typedef struct {
 	char	*da_devname;

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -849,6 +849,11 @@ int
 _da_lock_devdb(char *rootdir)
 {
 	int		lockfd = -1;
+	int		ret;
+	int		count = 0;
+	int		retry = 10;
+	int		retry_sleep;
+	uint_t		seed;
 	char		*lockfile;
 	char		path[MAXPATHLEN];
 	int		size = sizeof (path);
@@ -873,14 +878,27 @@ _da_lock_devdb(char *rootdir)
 		(void) close(lockfd);
 		return (-1);
 	}
-	if (lockf(lockfd, F_TLOCK, 0) == -1) {
-		/* cannot set lock */
-		(void) close(lockfd);
-		return (-1);
+	errno = 0;
+	while (retry > 0) {
+		count++;
+		seed = (uint_t)gethrtime();
+		ret = lockf(lockfd, F_TLOCK, 0);
+		if (ret == 0) {
+			(void) utime(lockfile, NULL);
+			return (lockfd);
+		}
+		if ((errno != EACCES) && (errno != EAGAIN)) {
+			/* cannot set lock */
+			(void) close(lockfd);
+			return (-1);
+		}
+		retry--;
+		retry_sleep = rand_r(&seed)/((RAND_MAX + 2)/3) + count;
+		(void) sleep(retry_sleep);
+		errno = 0;
 	}
-	(void) utime(lockfile, NULL);
 
-	return (lockfd);
+	return (-1);
 }
 
 /*
@@ -1160,10 +1178,10 @@ da_update_device(da_args *dargs)
 	int		tafd = -1, tmfd = -1;
 	int		lockfd = -1;
 	char		*rootdir = NULL;
-	char		*apathp = NULL, *mpathp = NULL, *dapathp = NULL,
-			*dmpathp = NULL;
-	char		apath[MAXPATHLEN], mpath[MAXPATHLEN],
-			dapath[MAXPATHLEN], dmpath[MAXPATHLEN];
+	char		*apathp = NULL, *mpathp = NULL;
+	char		*dapathp = NULL, *dmpathp = NULL;
+	char		apath[MAXPATHLEN], mpath[MAXPATHLEN];
+	char		dapath[MAXPATHLEN], dmpath[MAXPATHLEN];
 	FILE		*tafp = NULL, *tmfp = NULL, *dafp = NULL;
 	struct stat	dastat;
 	devinfo_t	*devinfo;
@@ -1620,12 +1638,11 @@ da_remove_list(devlist_t *dlist, char *link, int type, char *devname, int size)
 				if (plen == 0) {
 					slen =
 					    snprintf(current->devinfo.devlist,
-						nlen, "%s", lname);
+					    nlen, "%s", lname);
 				} else {
 					slen =
 					    snprintf(current->devinfo.devlist +
-						plen, nlen - plen, " %s",
-						lname);
+					    plen, nlen - plen, " %s", lname);
 				}
 				plen = plen + slen + 1;
 			}

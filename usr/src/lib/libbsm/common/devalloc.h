@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,9 @@ extern "C" {
 
 #define	DA_UID			(uid_t)0	/* root */
 #define	DA_GID			(gid_t)3	/* sys */
+#define	ALLOC_MODE		0600
+#define	DEALLOC_MODE    	0000
+
 #define	LOGINDEVPERM		"/etc/logindevperm"
 #define	DA_DB_LOCK		"/etc/security/.da_db_lock"
 #define	DA_DEV_LOCK		"/etc/security/.da_dev_lock"
@@ -78,12 +81,6 @@ extern "C" {
 
 #define	DA_ANYUSER		"*"
 #define	DA_NOUSER		"@"
-
-#define	ALLOC_UID	(uid_t)0	/* root */
-#define	ALLOC_GID	(gid_t)3	/* sys */
-#define	ALLOC_ERRID	(uid_t)2	/* bin */
-#define	ALLOC_MODE	0600
-#define	DEALLOC_MODE    0000
 
 #define	DA_SILENT		0x00000001
 #define	DA_VERBOSE		0x00000002
