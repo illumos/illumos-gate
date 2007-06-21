@@ -1430,7 +1430,7 @@ rtsock_event(iu_eh_t *ehp, int fd, short events, iu_event_id_t id, void *arg)
 			 */
 			if (!dsmp->dsm_isv6) {
 				dhcpmsg(MSG_VERBOSE, "rtsock_event: %s has no "
-				    "LIFs left; restarting", dsmp->dsm_name);
+				    "LIFs left", dsmp->dsm_name);
 				dhcp_restart(dsmp);
 			}
 		} else {

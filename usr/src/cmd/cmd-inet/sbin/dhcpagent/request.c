@@ -607,6 +607,9 @@ select_best(dhcp_smach_t *dsmp)
 static void
 accept_v4_acknak(dhcp_smach_t *dsmp, PKT_LIST *plp)
 {
+	/* Account for received and processed messages */
+	dsmp->dsm_received++;
+
 	if (*plp->opts[CD_DHCP_TYPE]->value == ACK) {
 		if (dsmp->dsm_state != INFORM_SENT &&
 		    dsmp->dsm_state != INFORMATION &&
@@ -659,7 +662,7 @@ accept_v4_acknak(dhcp_smach_t *dsmp, PKT_LIST *plp)
 	if (plp->opts[CD_SERVER_ID] == NULL ||
 	    plp->opts[CD_SERVER_ID]->len != sizeof (ipaddr_t)) {
 		dhcpmsg(MSG_ERROR, "accept_v4_acknak: ACK with no valid "
-		    "server id, restarting DHCP on %s", dsmp->dsm_name);
+		    "server id on %s", dsmp->dsm_name);
 		dsmp->dsm_bad_offers++;
 		free_pkt_entry(plp);
 		dhcp_restart(dsmp);
@@ -699,6 +702,17 @@ accept_v6_message(dhcp_smach_t *dsmp, PKT_LIST *plp, const char *pname,
 	const char *estr, *msg;
 	uint_t msglen;
 	int status;
+
+	/* Account for received and processed messages */
+	dsmp->dsm_received++;
+
+	/* We don't yet support Reconfigure at all. */
+	if (recv_type == DHCPV6_MSG_RECONFIGURE) {
+		dhcpmsg(MSG_VERBOSE, "accept_v6_message: ignored Reconfigure "
+		    "on %s", dsmp->dsm_name);
+		free_pkt_entry(plp);
+		return;
+	}
 
 	/*
 	 * All valid DHCPv6 messages must have our Client ID specified.
@@ -861,8 +875,7 @@ accept_v6_message(dhcp_smach_t *dsmp, PKT_LIST *plp, const char *pname,
 				    "dhcp_bound failed for %s", dsmp->dsm_name);
 				(void) remove_hostconf(dsmp->dsm_name,
 				    dsmp->dsm_isv6);
-				if (dsmp->dsm_state != INFORM_SENT)
-					dhcp_restart(dsmp);
+				dhcp_restart(dsmp);
 			}
 		} else {
 			dhcpmsg(MSG_WARNING, "accept_v6_message: Reply: %s",
@@ -903,7 +916,7 @@ accept_v6_message(dhcp_smach_t *dsmp, PKT_LIST *plp, const char *pname,
 		free_pkt_entry(plp);
 		if (dsmp->dsm_leases == NULL) {
 			dhcpmsg(MSG_VERBOSE, "accept_v6_message: %s has no "
-			    "leases left; restarting", dsmp->dsm_name);
+			    "leases left", dsmp->dsm_name);
 			dhcp_restart(dsmp);
 		} else if (dsmp->dsm_lif_wait == 0) {
 			(void) set_smach_state(dsmp, BOUND);
@@ -988,13 +1001,6 @@ dhcp_acknak_common(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
 	if (!isv6 && !pkt_v4_match(recv_type, DHCP_PACK|DHCP_PNAK)) {
 		dhcpmsg(MSG_VERBOSE, "dhcp_acknak_common: ignored %s packet "
 		    "received via broadcast on %s", pname, pif->pif_name);
-		free_pkt_entry(plp);
-		return;
-	}
-
-	if (isv6 && recv_type == DHCPV6_MSG_RECONFIGURE) {
-		dhcpmsg(MSG_VERBOSE, "dhcp_acknak_common: ignored v6 "
-		    "Reconfigure received via %s", pif->pif_name);
 		free_pkt_entry(plp);
 		return;
 	}
@@ -1117,7 +1123,9 @@ dhcp_acknak_lif(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
 }
 
 /*
- * dhcp_restart(): restarts DHCP (from INIT) on a given state machine
+ * dhcp_restart(): restarts DHCP (from INIT) on a given state machine, but only
+ *		   if we're leasing addresses.  Doesn't restart for information-
+ *		   only interfaces.
  *
  *   input: dhcp_smach_t *: the state machine to restart DHCP on
  *  output: void
@@ -1126,6 +1134,9 @@ dhcp_acknak_lif(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
 void
 dhcp_restart(dhcp_smach_t *dsmp)
 {
+	if (dsmp->dsm_state == INFORM_SENT || dsmp->dsm_state == INFORMATION)
+		return;
+
 	/*
 	 * As we're returning to INIT state, we need to discard any leases we
 	 * may have, and (for v4) canonize the LIF.  There's a bit of tension
@@ -1143,6 +1154,9 @@ dhcp_restart(dhcp_smach_t *dsmp)
 		(void) set_smach_state(dsmp, INIT);
 		dsmp->dsm_dflags |= DHCP_IF_FAILED;
 		ipc_action_finish(dsmp, DHCP_IPC_E_MEMORY);
+	} else {
+		dhcpmsg(MSG_DEBUG, "dhcp_restart: restarting DHCP on %s",
+		    dsmp->dsm_name);
 	}
 }
 

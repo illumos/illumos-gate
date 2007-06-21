@@ -294,8 +294,7 @@ stop_release_decline(dhcp_smach_t *dsmp, unsigned int n_requests)
 
 			if (dsmp->dsm_leases == NULL) {
 				dhcpmsg(MSG_VERBOSE, "stop_release_decline: "
-				    "%s has no leases left; restarting",
-				    dsmp->dsm_name);
+				    "%s has no leases left", dsmp->dsm_name);
 				dhcp_restart(dsmp);
 			}
 			return (B_TRUE);

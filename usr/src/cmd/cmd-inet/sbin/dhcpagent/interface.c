@@ -428,7 +428,7 @@ pif_status(dhcp_pif_t *pif, boolean_t isup)
 	dhcp_smach_t *dsmp;
 
 	pif->pif_running = isup;
-	dhcpmsg(LOG_DEBUG, "interface %s has %s", pif->pif_name,
+	dhcpmsg(MSG_DEBUG, "interface %s has %s", pif->pif_name,
 	    isup ? "come back up" : "gone down");
 	for (lif = pif->pif_lifs; lif != NULL; lif = lif->lif_next) {
 		for (dsmp = lif->lif_smachs; dsmp != NULL;

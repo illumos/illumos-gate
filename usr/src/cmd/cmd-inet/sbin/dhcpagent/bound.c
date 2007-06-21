@@ -215,6 +215,7 @@ dhcp_bound(dhcp_smach_t *dsmp, PKT_LIST *ack)
 
 	case PRE_BOUND:
 	case BOUND:
+	case INFORMATION:
 		/* This is just a duplicate ack; silently ignore it */
 		return (B_TRUE);
 

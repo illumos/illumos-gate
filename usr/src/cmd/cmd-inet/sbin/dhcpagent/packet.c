@@ -1451,7 +1451,6 @@ pkt_smach_enqueue(dhcp_smach_t *dsmp, PKT_LIST *plp)
 
 	/* add to front of list */
 	insque(plp, &dsmp->dsm_recv_pkt_list);
-	dsmp->dsm_received++;
 }
 
 /*

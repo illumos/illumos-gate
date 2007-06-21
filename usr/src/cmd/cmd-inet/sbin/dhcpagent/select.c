@@ -308,6 +308,9 @@ dhcp_collect_dlpi(iu_eh_t *eh, int fd, short events, iu_event_id_t id,
 		return;
 	}
 
+	/* See also accept_v[46]_message; account for processed packets. */
+	dsmp->dsm_received++;
+
 	if (pkt_v4_match(recv_type, DHCP_PACK)) {
 		if (!dhcp_bound(dsmp, plp)) {
 			dhcpmsg(MSG_WARNING, "dhcp_collect_dlpi: dhcp_bound "
@@ -318,6 +321,8 @@ dhcp_collect_dlpi(iu_eh_t *eh, int fd, short events, iu_event_id_t id,
 		dhcpmsg(MSG_VERBOSE, "dhcp_collect_dlpi: %s on %s",
 		    pname, dsmp->dsm_name);
 	} else if (pkt_v4_match(recv_type, DHCP_PNAK)) {
+		dhcpmsg(MSG_VERBOSE, "dhcp_collect_dlpi: %s on %s",
+		    pname, dsmp->dsm_name);
 		free_pkt_entry(plp);
 		dhcp_restart(dsmp);
 	} else {
