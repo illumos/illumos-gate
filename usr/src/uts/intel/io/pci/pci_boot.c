@@ -92,6 +92,7 @@ static void add_bus_range_prop(int);
 static void add_bus_slot_names_prop(int);
 static void add_ppb_ranges_prop(int);
 static void add_bus_available_prop(int);
+static void fix_ppb_res(uchar_t);
 static void alloc_res_array();
 static void create_ioapic_node(int bus, int dev, int fn, ushort_t vendorid,
     ushort_t deviceid);
@@ -131,37 +132,37 @@ pci_root_subbus(int bus, uchar_t *subbus)
 	    rp = ACPI_NEXT_RESOURCE(rp)) {
 
 		switch (rp->Type) {
-		    case ACPI_RESOURCE_TYPE_ADDRESS16:
-			    if (rp->Data.Address.ResourceType
-				    != ACPI_BUS_NUMBER_RANGE)
-				    continue;
-			    *subbus = (uchar_t)rp->Data.Address16.Maximum;
-			    dcmn_err(CE_NOTE, "Address16,subbus=%d\n", *subbus);
-			    break;
-		    case ACPI_RESOURCE_TYPE_ADDRESS32:
-			    if (rp->Data.Address.ResourceType
-				    != ACPI_BUS_NUMBER_RANGE)
-				    continue;
-			    *subbus = (uchar_t)rp->Data.Address32.Maximum;
-			    dcmn_err(CE_NOTE, "Address32,subbus=%d\n", *subbus);
-			    break;
-		    case ACPI_RESOURCE_TYPE_ADDRESS64:
-			    if (rp->Data.Address.ResourceType
-				!= ACPI_BUS_NUMBER_RANGE)
-				    continue;
-			    *subbus = (uchar_t)rp->Data.Address64.Maximum;
-			    dcmn_err(CE_NOTE, "Address64,subbus=%d\n", *subbus);
-			    break;
-		    case ACPI_RESOURCE_TYPE_EXTENDED_ADDRESS64:
-			    if (rp->Data.Address.ResourceType
-				    != ACPI_BUS_NUMBER_RANGE)
-				    continue;
-			    *subbus = (uchar_t)rp->Data.ExtAddress64.Maximum;
-			    dcmn_err(CE_NOTE, "ExtAdr64,subbus=%d\n", *subbus);
-			    break;
-		    default:
-			    dcmn_err(CE_NOTE, "rp->Type=%d\n", rp->Type);
-			    continue;
+		case ACPI_RESOURCE_TYPE_ADDRESS16:
+			if (rp->Data.Address.ResourceType !=
+			    ACPI_BUS_NUMBER_RANGE)
+				continue;
+			*subbus = (uchar_t)rp->Data.Address16.Maximum;
+			dcmn_err(CE_NOTE, "Address16,subbus=%d\n", *subbus);
+			break;
+		case ACPI_RESOURCE_TYPE_ADDRESS32:
+			if (rp->Data.Address.ResourceType !=
+			    ACPI_BUS_NUMBER_RANGE)
+				continue;
+			*subbus = (uchar_t)rp->Data.Address32.Maximum;
+			dcmn_err(CE_NOTE, "Address32,subbus=%d\n", *subbus);
+			break;
+		case ACPI_RESOURCE_TYPE_ADDRESS64:
+			if (rp->Data.Address.ResourceType !=
+			    ACPI_BUS_NUMBER_RANGE)
+				continue;
+			*subbus = (uchar_t)rp->Data.Address64.Maximum;
+			dcmn_err(CE_NOTE, "Address64,subbus=%d\n", *subbus);
+			break;
+		case ACPI_RESOURCE_TYPE_EXTENDED_ADDRESS64:
+			if (rp->Data.Address.ResourceType !=
+			    ACPI_BUS_NUMBER_RANGE)
+				continue;
+			*subbus = (uchar_t)rp->Data.ExtAddress64.Maximum;
+			dcmn_err(CE_NOTE, "ExtAdr64,subbus=%d\n", *subbus);
+			break;
+		default:
+			dcmn_err(CE_NOTE, "rp->Type=%d\n", rp->Type);
+			continue;
 		}
 
 		/* found the bus-range resource */
@@ -404,9 +405,98 @@ remove_used_resources()
 	if (status == DDI_PROP_SUCCESS) {
 		for (bus = 0; bus <= pci_bios_nbus; bus++)
 			remove_resource_range(&pci_bus_res[bus].mem_space,
-				    narray, ncount / 2);
+			    narray, ncount / 2);
 		ddi_prop_free(narray);
 	}
+}
+
+/*
+ * Assign i/o resources to unconfigured hotplug bridges after the first pass.
+ * It must be after the first pass in order to use the ports left over after
+ * accounting for i/o resources of bridges that have been configured by bios.
+ * We are expecting unconfigured bridges to be empty bridges otherwise
+ * this resource assignment needs to be done at an earlier stage.
+ */
+static void
+fix_ppb_res(uchar_t secbus)
+{
+	uchar_t bus, dev, func;
+	uint_t io_base, io_limit, io_size = 0x1000;
+	uint64_t addr = 0;
+	int *regp = NULL, rv;
+	uint_t reglen;
+	dev_info_t *dip;
+
+	dip = pci_bus_res[secbus].dip;
+	/* some entries may be empty due to discontiguous bus numbering */
+	if (dip == NULL)
+		return;
+
+	if (ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "pci-hotplug-type", INBAND_HPC_NONE) == INBAND_HPC_NONE)
+		return;
+
+	rv = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "reg", &regp, &reglen);
+	if (rv != DDI_PROP_SUCCESS || reglen == 0) {
+		/* panic to enforce proper calling order */
+		cmn_err(CE_PANIC, "reg property unset for bus %d\n", secbus);
+		return;
+	}
+
+	func = (uchar_t)((regp[0] >> 8) & 0x7);
+	dev = (uchar_t)((regp[0] >> 11) & 0x1f);
+	bus = (uchar_t)((regp[0] >> 16) & 0xff);
+	ASSERT(bus == pci_bus_res[secbus].par_bus);
+
+	/*
+	 * io_base >= io_limit means that the bridge was not configured
+	 * This may have been set by the bios or by add_ppb_props()
+	 */
+	io_base = pci_getb(bus, dev, func, PCI_BCNF_IO_BASE_LOW);
+	io_limit = pci_getb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW);
+	ASSERT(io_base != 0xff && io_limit != 0xff);
+
+	io_base = (io_base & 0xf0) << 8;
+	io_limit = ((io_limit & 0xf0) << 8) | 0xfff;
+	if (io_base < io_limit && io_base != 0)
+		return;
+
+	if (ddi_get_child(dip) != NULL) {
+		cmn_err(CE_WARN, "detected unsupported configuration: "
+		    "non-empty bridge (bus 0x%x, dev 0x%x, func 0x%x) without "
+		    "I/O resources assigned by bios for secondary bus 0x%x\n",
+		    bus, dev, func, secbus);
+		goto IOFAIL;
+	}
+
+	if (pci_bus_res[bus].io_ports != NULL)
+		addr = memlist_find(&pci_bus_res[bus].io_ports, io_size,
+		    0x1000);
+
+	ASSERT(addr <= 0xf000);
+	if (addr == 0) {
+		cmn_err(CE_WARN, "out of I/O resources on bridge: bus 0x%x, "
+		    "dev 0x%x, func 0x%x, for secondary bus 0x%x\n",
+		    bus, dev, func, secbus);
+		goto IOFAIL;
+	}
+
+	memlist_insert(&pci_bus_res[secbus].io_ports, addr, io_size);
+	io_base = addr;
+	io_limit = addr + io_size - 1;
+	pci_putb(bus, dev, func, PCI_BCNF_IO_BASE_LOW,
+	    (uint8_t)((io_base >> 8) & 0xf0));
+	pci_putb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW,
+	    (uint8_t)((io_limit >> 8) & 0xf0));
+
+	add_ppb_ranges_prop(secbus);
+	return;
+
+	/*NOTREACHED*/
+IOFAIL:
+	cmn_err(CE_WARN, "devices under bridge bus 0x%x, dev 0x%x, func 0x%x "
+	    "will not be assigned I/O ports\n", bus, dev, func);
 }
 
 void
@@ -425,7 +515,7 @@ pci_reprogram(void)
 		if (pci_bus_res[i].par_bus == (uchar_t)-1) {
 			uchar_t subbus;
 			if (pci_root_subbus(i, &subbus) == AE_OK)
-			    pci_bus_res[i].sub_bus = subbus;
+				pci_bus_res[i].sub_bus = subbus;
 			add_bus_range_prop(i);
 		}
 	}
@@ -444,8 +534,10 @@ pci_reprogram(void)
 
 	for (i = 0; i <= pci_bios_nbus; i++) {
 		/* configure devices not configured by bios */
-		if (pci_reconfig)
+		if (pci_reconfig) {
+			fix_ppb_res(i);
 			enumerate_bus_devs(i, CONFIG_NEW);
+		}
 		/* All dev programmed, so we can create available prop */
 		add_bus_available_prop(i);
 	}
@@ -1475,8 +1567,8 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 
 	/* add the hard-decode, aliased address spaces for 8514 */
 	if ((baseclass == PCI_CLASS_DISPLAY) &&
-		(subclass == PCI_DISPLAY_VGA) &&
-		(progclass & PCI_DISPLAY_IF_8514)) {
+	    (subclass == PCI_DISPLAY_VGA) &&
+	    (progclass & PCI_DISPLAY_IF_8514)) {
 
 		/* hard decode 0x2e8 */
 		regs[nreg].pci_phys_hi = assigned[nasgn].pci_phys_hi =
@@ -1568,11 +1660,31 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	 * no resources available. This applies to io, memory, and
 	 * prefetchable memory.
 	 */
-	/* io range */
-	val = (uint_t)pci_getb(bus, dev, func, PCI_BCNF_IO_BASE_LOW);
-	io_range[0] = ((val & 0xf0) << 8);
-	val = (uint_t)pci_getb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW);
-	io_range[1]  = ((val & 0xf0) << 8) | 0xFFF;
+
+	/*
+	 * io range
+	 * We determine i/o windows that are left unconfigured by bios
+	 * through its i/o enable bit as Microsoft recommends OEMs to do.
+	 * If it is unset, we disable i/o and mark it for reconfiguration in
+	 * later passes by setting the base > limit
+	 */
+	val = (uint_t)pci_getw(bus, dev, func, PCI_CONF_COMM);
+	if (val & PCI_COMM_IO) {
+		val = (uint_t)pci_getb(bus, dev, func, PCI_BCNF_IO_BASE_LOW);
+		io_range[0] = ((val & 0xf0) << 8);
+		val = (uint_t)pci_getb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW);
+		io_range[1]  = ((val & 0xf0) << 8) | 0xFFF;
+	} else {
+		io_range[0] = 0x9fff;
+		io_range[1] = 0x1000;
+		pci_putb(bus, dev, func, PCI_BCNF_IO_BASE_LOW,
+		    (uint8_t)((io_range[0] >> 8) & 0xf0));
+		pci_putb(bus, dev, func, PCI_BCNF_IO_LIMIT_LOW,
+		    (uint8_t)((io_range[1] >> 8) & 0xf0));
+		pci_putw(bus, dev, func, PCI_BCNF_IO_BASE_HI, 0);
+		pci_putw(bus, dev, func, PCI_BCNF_IO_LIMIT_HI, 0);
+	}
+
 	if (io_range[0] != 0 && io_range[0] < io_range[1]) {
 		memlist_insert(&pci_bus_res[secbus].io_ports,
 		    (uint64_t)io_range[0],
