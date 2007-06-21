@@ -1638,8 +1638,24 @@ kobj_export_ksyms(struct module *mp)
 	/*
 	 * Free the old section headers -- we'll never need them again.
 	 */
-	if (!(mp->flags & KOBJ_PRIM))
+	if (!(mp->flags & KOBJ_PRIM)) {
+		uint_t	shn;
+		Shdr	*shp;
+
+		for (shn = 1; shn < omp->hdr.e_shnum; shn++) {
+			shp = (Shdr *)(omp->shdrs + shn * omp->hdr.e_shentsize);
+			switch (shp->sh_type) {
+			case SHT_RELA:
+			case SHT_REL:
+				if (shp->sh_addr != 0) {
+					kobj_free((void *)shp->sh_addr,
+					    shp->sh_size);
+				}
+				break;
+			}
+		}
 		kobj_free(omp->shdrs, omp->hdr.e_shentsize * omp->hdr.e_shnum);
+	}
 	/*
 	 * Discard the old symbol table and our copy of the module strucure.
 	 */
