@@ -498,7 +498,7 @@ fmd_fmri_expand(nvlist_t *nvl)
 #endif
 	int rc;
 
-	if (mem_fmri_get_unum(nvl, &unum) < 0)
+	if ((mem_fmri_get_unum(nvl, &unum) < 0) || (*unum == '\0'))
 		return (fmd_fmri_set_errno(EINVAL));
 
 	if ((rc = nvlist_lookup_string_array(nvl, FM_FMRI_MEM_SERIAL_ID,
