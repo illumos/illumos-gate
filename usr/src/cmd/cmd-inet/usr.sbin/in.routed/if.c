@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1993
@@ -508,8 +508,9 @@ iflookup(in_addr_t addr)
 				/* Look for the longest approximate match. */
 				if (on_net(addr, ifp->int_net, ifp->int_mask) &&
 				    (maybe == NULL ||
-					ifp->int_mask > maybe->int_mask))
+				    ifp->int_mask > maybe->int_mask)) {
 					maybe = ifp;
+				}
 			}
 		}
 
@@ -626,6 +627,10 @@ check_dst(in_addr_t addr)
 		return (addr != 0 && addr != IN_LOOPBACKNET);
 	}
 
+	/* Must not allow destination to be link local address. */
+	if (IN_LINKLOCAL(addr))
+		return (_B_FALSE);
+
 	return (IN_CLASSB(addr) || IN_CLASSC(addr));
 }
 
@@ -702,14 +707,14 @@ check_remote(struct interface *ifp)
 
 	/* do not worry about other kinds */
 	if (!(ifp->int_state & IS_REMOTE))
-	    return (_B_TRUE);
+		return (_B_TRUE);
 
 	rt = rtfind(ifp->int_addr);
 	if (rt != NULL &&
 	    rt->rt_ifp != NULL &&
-	    on_net(ifp->int_addr,
-		rt->rt_ifp->int_net, rt->rt_ifp->int_mask))
+	    on_net(ifp->int_addr, rt->rt_ifp->int_net, rt->rt_ifp->int_mask)) {
 		return (_B_TRUE);
+	}
 
 	/*
 	 * the gateway cannot be reached directly from one of our
@@ -759,8 +764,8 @@ ifdel(struct interface *ifp)
 	resurrected = _B_FALSE;
 	if (!(ifp->int_state & IS_DUP) &&
 	    (wire.if_new = check_dup(ifp->int_name, ifp->int_addr,
-		ifp->int_dstaddr, ifp->int_mask, ifp->int_if_flags,
-		_B_TRUE)) != NULL &&
+	    ifp->int_dstaddr, ifp->int_mask, ifp->int_if_flags,
+	    _B_TRUE)) != NULL &&
 	    !IS_IFF_QUIET(wire.if_new->int_if_flags)) {
 
 		trace_act("promoting duplicate %s in place of %s",
@@ -881,8 +886,8 @@ if_bad(struct interface *ifp, boolean_t recurse)
 	/* If we can find a replacement, then pick it up. */
 	if (!(ifp->int_state & IS_DUP) &&
 	    (wire.if_new = check_dup(ifp->int_name, ifp->int_addr,
-		ifp->int_dstaddr, ifp->int_mask, ifp->int_if_flags,
-		_B_TRUE)) != NULL &&
+	    ifp->int_dstaddr, ifp->int_mask, ifp->int_if_flags,
+	    _B_TRUE)) != NULL &&
 	    !IS_IFF_QUIET(wire.if_new->int_if_flags)) {
 		trace_act("promoting duplicate %s in place of %s",
 		    wire.if_new->int_name, ifp->int_name);
@@ -1003,7 +1008,7 @@ ifscan(void)
 	last_ifscan = now;
 	ifscan_timer.tv_sec = now.tv_sec +
 	    (supplier || tot_interfaces != 1 ?
-		CHECK_ACT_INTERVAL : CHECK_QUIET_INTERVAL);
+	    CHECK_ACT_INTERVAL : CHECK_QUIET_INTERVAL);
 
 	/* mark all interfaces so we can get rid of those that disappear */
 	for (ifp = ifnet; ifp != NULL; ifp = ifp->int_next)
@@ -1109,6 +1114,10 @@ calculate_lifc_len:
 			}
 			continue;
 		}
+
+		/* Ignore interface with IPv4 link local address. */
+		if (IN_LINKLOCAL(ntohl(ifs.int_addr)))
+			continue;
 
 		/* Get the interface index. */
 		if (ioctl(sock, SIOCGLIFINDEX, lifrp) == -1) {
@@ -1301,15 +1310,15 @@ calculate_lifc_len:
 			    ifs.int_name,
 			    addrname(ifs.int_addr, ifs.int_mask, 1),
 			    ((ifs.int_if_flags & IFF_POINTOPOINT) ?
-				"-->" : ""),
+			    "-->" : ""),
 			    ((ifs.int_if_flags & IFF_POINTOPOINT) ?
-				naddr_ntoa(ifs.int_dstaddr) : ""),
+			    naddr_ntoa(ifs.int_dstaddr) : ""),
 			    ifp->int_name,
 			    addrname(ifp->int_addr, ifp->int_mask, 1),
 			    ((ifp->int_if_flags & IFF_POINTOPOINT) ?
-				"-->" : ""),
+			    "-->" : ""),
 			    ((ifp->int_if_flags & IFF_POINTOPOINT) ?
-				naddr_ntoa(ifp->int_dstaddr) : ""));
+			    naddr_ntoa(ifp->int_dstaddr) : ""));
 			ifs.int_state |= IS_DUP;
 		} else {
 			ifs.int_state &= ~IS_DUP;
@@ -1330,11 +1339,11 @@ calculate_lifc_len:
 
 			if ((ifp->int_phys == NULL && ifindex != 0) ||
 			    (ifp->int_phys != NULL &&
-				ifp->int_phys->phyi_index != ifindex) ||
+			    ifp->int_phys->phyi_index != ifindex) ||
 			    0 != ((ifp->int_if_flags ^ ifs.int_if_flags)
-				& (IFF_BROADCAST | IFF_LOOPBACK |
-				IFF_POINTOPOINT | IFF_MULTICAST |
-				IFF_ROUTER | IFF_NORTEXCH | IFF_NOXMIT)) ||
+			    & (IFF_BROADCAST | IFF_LOOPBACK |
+			    IFF_POINTOPOINT | IFF_MULTICAST |
+			    IFF_ROUTER | IFF_NORTEXCH | IFF_NOXMIT)) ||
 			    ifp->int_addr != ifs.int_addr ||
 			    ifp->int_brdaddr != ifs.int_brdaddr ||
 			    ifp->int_dstaddr != ifs.int_dstaddr ||
@@ -1523,16 +1532,16 @@ calculate_lifc_len:
 				if (on_net(ifp->int_addr,
 				    ifp1->int_net, ifp1->int_mask) ||
 				    on_net(ifp1->int_addr,
-					ifp->int_net, ifp->int_mask)) {
+				    ifp->int_net, ifp->int_mask)) {
 					writelog(LOG_INFO,
 					    "possible netmask problem"
 					    " between %s:%s and %s:%s",
 					    ifp->int_name,
 					    addrname(htonl(ifp->int_net),
-						ifp->int_mask, 1),
+					    ifp->int_mask, 1),
 					    ifp1->int_name,
 					    addrname(htonl(ifp1->int_net),
-						ifp1->int_mask, 1));
+					    ifp1->int_mask, 1));
 					complaints |= COMP_NETMASK;
 				}
 			}
@@ -1730,7 +1739,7 @@ check_net_syn(struct interface *ifp)
 		if (rt != NULL &&
 		    0 == (rt->rt_state & RS_NO_NET_SYN) &&
 		    (!(rt->rt_state & RS_NET_SYN) ||
-			rt->rt_metric > ifp->int_metric)) {
+		    rt->rt_metric > ifp->int_metric)) {
 			rtdelete(rt);
 			rt = NULL;
 		}

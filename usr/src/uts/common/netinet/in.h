@@ -353,6 +353,9 @@ struct in_addr {
 #define	IN_PRIVATE16_NET	0xc0a80000U	/* 192.168/16 */
 #define	IN_PRIVATE16_MASK	0xffff0000U
 
+/* RFC 3927 IPv4 link local address (i in host byte-order) */
+#define	IN_LINKLOCAL(i)		(((i) & IN_AUTOCONF_MASK) == IN_AUTOCONF_NET)
+
 /* Well known 6to4 Relay Router Anycast address defined in RFC 3068 */
 #if !defined(_XPG4_2) || !defined(__EXTENSIONS__)
 #define	INADDR_6TO4RRANYCAST	0xc0586301U 	/* 192.88.99.1 */

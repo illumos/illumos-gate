@@ -378,8 +378,8 @@ ag_check(in_addr_t dst,
 		    (ag->ag_dst_h & ag_cors->ag_mask) == ag_cors->ag_dst_h &&
 		    ((ag_cors->ag_nhop == ag->ag_nhop &&
 		    (ag_cors->ag_ifp == ag->ag_ifp))||
-			(ag->ag_state & AGS_FINE_GATE) ||
-			(ag_cors->ag_state & AGS_CORS_GATE))) {
+		    (ag->ag_state & AGS_FINE_GATE) ||
+		    (ag_cors->ag_state & AGS_CORS_GATE))) {
 			/*
 			 * If the suppressed target was redundant,
 			 * then mark the suppressor redundant.
@@ -1428,9 +1428,11 @@ sync_kern(void)
 			    (IRE_BROADCAST | IRE_CACHE | IRE_LOCAL))
 				continue;
 
-			/* ignore multicast addresses */
-			if (IN_MULTICAST(ntohl(rp->ipRouteDest)))
+			/* ignore multicast and link local addresses */
+			if (IN_MULTICAST(ntohl(rp->ipRouteDest)) ||
+			    IN_LINKLOCAL(ntohl(rp->ipRouteDest))) {
 				continue;
+			}
 
 
 #ifdef DEBUG_KERNEL_ROUTE_READ
@@ -1514,11 +1516,12 @@ hash_clean:
 			 */
 			if ((k->k_state & (KS_CHECK|KS_DELETED)) == KS_CHECK) {
 
-				if (!(k->k_state & KS_DYNAMIC))
-				    writelog(LOG_WARNING,
-					"%s --> %s disappeared from kernel",
-					addrname(k->k_dst, k->k_mask, 0),
-					naddr_ntoa(k->k_gate));
+				if (!(k->k_state & KS_DYNAMIC)) {
+					writelog(LOG_WARNING,
+					    "%s --> %s disappeared from kernel",
+					    addrname(k->k_dst, k->k_mask, 0),
+					    naddr_ntoa(k->k_gate));
+				}
 				del_static(k->k_dst, k->k_mask, k->k_gate,
 				    k->k_ifp, 1);
 
@@ -1615,7 +1618,7 @@ read_rt(void)
 			if (ifscan_timer.tv_sec-now.tv_sec >=
 			    CHECK_BAD_INTERVAL || ifp == NULL ||
 			    ((ifp->int_if_flags ^ m.ifm.ifm_flags) &
-				IFF_UP) != 0)
+			    IFF_UP) != 0)
 				ifscan_timer.tv_sec = now.tv_sec;
 			continue;
 		} else {
@@ -1653,8 +1656,9 @@ read_rt(void)
 		strp += snprintf(strp, sizeof (str) - (strp - str), ": %s",
 		    addrname(S_ADDR(INFO_DST(&info)), mask, 0));
 
-		if (IN_MULTICAST(ntohl(S_ADDR(INFO_DST(&info))))) {
-			trace_act("ignore multicast %s", str);
+		if (IN_MULTICAST(ntohl(S_ADDR(INFO_DST(&info)))) ||
+		    IN_LINKLOCAL(ntohl(S_ADDR(INFO_DST(&info))))) {
+			trace_act("ignore multicast/link local %s", str);
 			continue;
 		}
 
@@ -2116,7 +2120,7 @@ fix_kern(void)
 					rdisc_suppress(k->k_ifp);
 				kern_ioctl(k, RTM_ADD,
 				    ((0 != (k->k_state & (KS_GATEWAY |
-					KS_DYNAMIC))) ? RTF_GATEWAY : 0));
+				    KS_DYNAMIC))) ? RTF_GATEWAY : 0));
 			} else if (k->k_state & KS_CHANGE) {
 				/*
 				 * Should be using RTM_CHANGE here, but
@@ -2129,7 +2133,7 @@ fix_kern(void)
 				kern_ioctl(k,  RTM_DELETE, 0);
 				kern_ioctl(k, RTM_ADD,
 				    ((0 != (k->k_state & (KS_GATEWAY |
-					KS_DYNAMIC))) ? RTF_GATEWAY : 0));
+				    KS_DYNAMIC))) ? RTF_GATEWAY : 0));
 			}
 			k->k_state &= ~(KS_ADD|KS_CHANGE|KS_DEL_ADD);
 

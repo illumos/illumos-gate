@@ -87,10 +87,11 @@ receiving_interface(struct msghdr *msg, boolean_t findremote)
 				if (ifp1->int_addr == from->sin_addr.s_addr)
 					return (ifp1);
 				if ((ifp2 == NULL ||
-					(ifp2->int_state & IS_ALIAS)) &&
+				    (ifp2->int_state & IS_ALIAS)) &&
 				    on_net(from->sin_addr.s_addr, ifp1->int_net,
-					ifp1->int_mask))
+				    ifp1->int_mask)) {
 					ifp2 = ifp1;
+				}
 			}
 			if (ifp2 != NULL)
 				ifp = ifp2;
@@ -387,8 +388,9 @@ input(struct sockaddr_in *from,		/* received from this IP address */
 				if ((ifp->int_state & IS_NO_RIPV1_OUT) &&
 				    rip->rip_vers == RIPv1) {
 					if (!(ifp->int_state & IS_PM_RDISC)) {
-					    trace_pkt("ignore; sending RIPv2");
-					    return;
+						trace_pkt("ignore; sending "
+						    "RIPv2");
+						return;
 					}
 
 					v12buf.n->n_family = RIP_AF_INET;
@@ -595,7 +597,8 @@ rte_done:
 			    cc, naddr_ntoa(FROM_NADDR));
 		}
 
-		if ((ntohl(FROM_NADDR) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET) {
+		if ((gate >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET ||
+		    IN_LINKLOCAL(gate)) {
 			msglim(&bad_router, FROM_NADDR,
 			    "discard RIP response from bad source address %s",
 			    naddr_ntoa(FROM_NADDR));
@@ -1301,7 +1304,7 @@ get_peer_info(in_addr_t from)
 	if (ph_num_peers >= hash_table_sizes[ph_index] * 5 &&
 	    hash_table_sizes[ph_index + 1] != 0 &&
 	    (ph_pp = calloc(hash_table_sizes[ph_index + 1],
-		sizeof (peer_hashes[0]))) != NULL) {
+	    sizeof (peer_hashes[0]))) != NULL) {
 		ph2_pp = peer_hashes;
 		for (i = hash_table_sizes[ph_index] - 1; i >= 0; i--) {
 			for (php = ph2_pp[i]; php != NULL; php = pnhp) {
