@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,18 +115,19 @@ __s_api_printResult(ns_ldap_result_t *result)
 	curEntry = result->entry;
 	for (i = 0; i < result->entries_count; i++) {
 
-	    (void) printf("entry %d has attr_count = %d \n", i,
-				curEntry->attr_count);
-	    for (j = 0; j < curEntry->attr_count; j++) {
-		(void) printf("entry %d has attr_pair[%d] = %s \n", i, j,
-		curEntry->attr_pair[j]->attrname);
-		for (k = 0; k < 20 && curEntry->attr_pair[j]->attrvalue[k]; k++)
-		(void) printf(
-			"entry %d has attr_pair[%d]->attrvalue[%d] = %s \n",
-			i, j, k, curEntry->attr_pair[j]->attrvalue[k]);
-	    }
-	    (void) printf("\n--------------------------------------\n");
-	    curEntry = curEntry->next;
+		(void) printf("entry %d has attr_count = %d \n", i,
+		    curEntry->attr_count);
+		for (j = 0; j < curEntry->attr_count; j++) {
+			(void) printf("entry %d has attr_pair[%d] = %s \n",
+			    i, j, curEntry->attr_pair[j]->attrname);
+			for (k = 0; k < 20 &&
+			    curEntry->attr_pair[j]->attrvalue[k]; k++)
+				(void) printf("entry %d has attr_pair[%d]->"
+				    "attrvalue[%d] = %s \n", i, j, k,
+				    curEntry->attr_pair[j]->attrvalue[k]);
+		}
+		(void) printf("\n--------------------------------------\n");
+		curEntry = curEntry->next;
 	}
 	return (1);
 }
@@ -156,7 +157,7 @@ __s_api_getSearchScope(
 #endif
 	if (*searchScope == 0) {
 		if ((rc = __ns_ldap_getParam(NS_LDAP_SEARCH_SCOPE_P,
-			&paramVal, errorp)) != NS_LDAP_SUCCESS) {
+		    &paramVal, errorp)) != NS_LDAP_SUCCESS) {
 			return (rc);
 		}
 		if (paramVal && *paramVal)
@@ -181,9 +182,9 @@ __s_api_getSearchScope(
 			break;
 		default:
 			(void) snprintf(errmsg, sizeof (errmsg),
-				gettext("Invalid search scope!"));
+			    gettext("Invalid search scope!"));
 			MKERROR(LOG_ERR, *errorp, NS_CONFIG_FILE,
-				strdup(errmsg), NS_LDAP_CONFIG);
+			    strdup(errmsg), NS_LDAP_CONFIG);
 			return (NS_LDAP_CONFIG);
 	}
 
@@ -222,7 +223,7 @@ __ns_ldap_dupAuth(const ns_cred_t *authp)
 	}
 	if (authp->cred.unix_cred.userID) {
 		ap->cred.unix_cred.userID =
-			strdup(authp->cred.unix_cred.userID);
+		    strdup(authp->cred.unix_cred.userID);
 		if (ap->cred.unix_cred.userID == NULL) {
 			(void) __ns_ldap_freeCred(&ap);
 			return (NULL);
@@ -230,7 +231,7 @@ __ns_ldap_dupAuth(const ns_cred_t *authp)
 	}
 	if (authp->cred.unix_cred.passwd) {
 		ap->cred.unix_cred.passwd =
-			strdup(authp->cred.unix_cred.passwd);
+		    strdup(authp->cred.unix_cred.passwd);
 		if (ap->cred.unix_cred.passwd == NULL) {
 			(void) __ns_ldap_freeCred(&ap);
 			return (NULL);
@@ -238,7 +239,7 @@ __ns_ldap_dupAuth(const ns_cred_t *authp)
 	}
 	if (authp->cred.cert_cred.nickname) {
 		ap->cred.cert_cred.nickname =
-			strdup(authp->cred.cert_cred.nickname);
+		    strdup(authp->cred.cert_cred.nickname);
 		if (ap->cred.cert_cred.nickname == NULL) {
 			(void) __ns_ldap_freeCred(&ap);
 			return (NULL);
@@ -273,25 +274,25 @@ __ns_ldap_freeCred(ns_cred_t ** credp)
 	ap = *credp;
 	if (ap->hostcertpath) {
 		(void) memset(ap->hostcertpath, 0,
-			strlen(ap->hostcertpath));
+		    strlen(ap->hostcertpath));
 		free(ap->hostcertpath);
 	}
 
 	if (ap->cred.unix_cred.userID) {
 		(void) memset(ap->cred.unix_cred.userID, 0,
-			strlen(ap->cred.unix_cred.userID));
+		    strlen(ap->cred.unix_cred.userID));
 		free(ap->cred.unix_cred.userID);
 	}
 
 	if (ap->cred.unix_cred.passwd) {
 		(void) memset(ap->cred.unix_cred.passwd, 0,
-			strlen(ap->cred.unix_cred.passwd));
+		    strlen(ap->cred.unix_cred.passwd));
 		free(ap->cred.unix_cred.passwd);
 	}
 
 	if (ap->cred.cert_cred.nickname) {
 		(void) memset(ap->cred.cert_cred.nickname, 0,
-			strlen(ap->cred.cert_cred.nickname));
+		    strlen(ap->cred.cert_cred.nickname));
 		free(ap->cred.cert_cred.nickname);
 	}
 
@@ -310,6 +311,7 @@ __ns_ldap_freeCred(ns_cred_t ** credp)
  * INPUT:		service
  * OUTPUT:		DN, error
  */
+typedef int (*pf)(const char *, char **, ns_ldap_error_t **);
 int
 __s_api_getDNs(
 	char *** DN,
@@ -321,6 +323,7 @@ __s_api_getDNs(
 	char	**dns = NULL;
 	int	rc = 0;
 	int	i, len;
+	pf	prepend_auto2dn = __s_api_prepend_automountmapname_to_dn;
 
 #ifdef DEBUG
 	(void) fprintf(stderr, "__s_api_getDNs START\n");
@@ -333,7 +336,7 @@ __s_api_getDNs(
 		char errmsg[MAXERROR];
 
 		(void) snprintf(errmsg, sizeof (errmsg),
-			gettext("BaseDN not defined"));
+		    gettext("BaseDN not defined"));
 		MKERROR(LOG_ERR, *error, NS_CONFIG_FILE, strdup(errmsg),
 		    NS_LDAP_CONFIG);
 		return (NS_LDAP_CONFIG);
@@ -355,22 +358,22 @@ __s_api_getDNs(
 	} else {
 		for (i = 0; ns_def_map[i].service != NULL; i++) {
 			if (strcasecmp(service,
-				ns_def_map[i].service) == 0) {
+			    ns_def_map[i].service) == 0) {
 
 				len = strlen((char *)*paramVal) +
-					strlen(ns_def_map[i].rdn) + 1;
+				    strlen(ns_def_map[i].rdn) + 1;
 				dns[0] = (char *)
-					calloc(len, sizeof (char));
+				    calloc(len, sizeof (char));
 				if (dns[0] == NULL) {
 					(void) __ns_ldap_freeParam(
-						&paramVal);
+					    &paramVal);
 					free(dns);
 					return (NS_LDAP_MEMORY);
 				}
 				(void) strcpy(dns[0],
-					ns_def_map[i].rdn);
+				    ns_def_map[i].rdn);
 				(void) strcat(dns[0],
-					(char *)*paramVal);
+				    (char *)*paramVal);
 				break;
 			}
 		}
@@ -381,24 +384,40 @@ __s_api_getDNs(
 
 			if (strchr(service, '=') == NULL) {
 			    /* automount entries */
-			    if (strncasecmp(service, "auto_", 5) == 0) {
-				buffer = strdup(p);
-				if (!buffer) {
-				    free(dns);
-				    (void) __ns_ldap_freeParam(&paramVal);
-				    return (NS_LDAP_MEMORY);
-				}
-				rc = __s_api_prepend_automountmapname_to_dn(
-					service, &buffer, error);
-				if (rc != NS_LDAP_SUCCESS) {
-				    free(dns);
-				    free(buffer);
-				    (void) __ns_ldap_freeParam(&paramVal);
-				    return (rc);
-				}
-			    } else {
+				if (strncasecmp(service, "auto_", 5) == 0) {
+					buffer = strdup(p);
+					if (!buffer) {
+						free(dns);
+						(void) __ns_ldap_freeParam(
+						    &paramVal);
+						return (NS_LDAP_MEMORY);
+					}
+					/* shorten name to avoid cstyle error */
+					rc = prepend_auto2dn(
+					    service, &buffer, error);
+					if (rc != NS_LDAP_SUCCESS) {
+						free(dns);
+						free(buffer);
+						(void) __ns_ldap_freeParam(
+						    &paramVal);
+						return (rc);
+					}
+				} else {
 				/* strlen("nisMapName")+"="+","+'\0' = 13 */
-				buflen = strlen(service) + strlen(p) + 13;
+					buflen = strlen(service) + strlen(p) +
+					    13;
+					buffer = (char *)malloc(buflen);
+					if (buffer == NULL) {
+						free(dns);
+						(void) __ns_ldap_freeParam(
+						    &paramVal);
+						return (NS_LDAP_MEMORY);
+					}
+					(void) snprintf(buffer, buflen,
+					    "nisMapName=%s,%s", service, p);
+				}
+			} else {
+				buflen = strlen(service) + strlen(p) + 2;
 				buffer = (char *)malloc(buflen);
 				if (buffer == NULL) {
 					free(dns);
@@ -406,18 +425,7 @@ __s_api_getDNs(
 					return (NS_LDAP_MEMORY);
 				}
 				(void) snprintf(buffer, buflen,
-				    "nisMapName=%s,%s", service, p);
-			    }
-			} else {
-			    buflen = strlen(service) + strlen(p) + 2;
-			    buffer = (char *)malloc(buflen);
-			    if (buffer == NULL) {
-				free(dns);
-				(void) __ns_ldap_freeParam(&paramVal);
-				return (NS_LDAP_MEMORY);
-			    }
-			    (void) snprintf(buffer, buflen,
-					"%s,%s", service, p);
+				    "%s,%s", service, p);
 			}
 			dns[0] = buffer;
 		}
@@ -519,10 +527,10 @@ parseDN(
 		 */
 		for (i = 0; ns_def_map[i].service != NULL; i++) {
 			if (ns_def_map[i].SSDtoUse_service &&
-				strcasecmp(service,
-				ns_def_map[i].service) == 0) {
+			    strcasecmp(service,
+			    ns_def_map[i].service) == 0) {
 				SSD_service =
-				ns_def_map[i].SSDtoUse_service;
+				    ns_def_map[i].SSDtoUse_service;
 				break;
 			}
 		}
@@ -742,14 +750,14 @@ __s_api_getServers(
 	*servers = NULL;
 	/* get profile version number */
 	if ((rc = __ns_ldap_getParam(NS_LDAP_FILE_VERSION_P,
-			&paramVal, error)) != NS_LDAP_SUCCESS)
+	    &paramVal, error)) != NS_LDAP_SUCCESS)
 		return (rc);
 
 	if (paramVal == NULL || *paramVal == NULL) {
 		(void) snprintf(errmsg, sizeof (errmsg),
-				gettext("No file version"));
+		    gettext("No file version"));
 		MKERROR(LOG_INFO, *error, NS_CONFIG_FILE, strdup(errmsg),
-			NS_LDAP_CONFIG);
+		    NS_LDAP_CONFIG);
 		return (NS_LDAP_CONFIG);
 	}
 
@@ -762,7 +770,7 @@ __s_api_getServers(
 	paramVal = NULL;
 
 	if ((rc = __ns_ldap_getParam(NS_LDAP_SERVERS_P,
-			&paramVal, error)) != NS_LDAP_SUCCESS)
+	    &paramVal, error)) != NS_LDAP_SUCCESS)
 		return (rc);
 
 	/*
@@ -770,12 +778,12 @@ __s_api_getServers(
 	 * empty.
 	 */
 	if ((paramVal == NULL || (char *)*paramVal == NULL) &&
-		version == 1) {
+	    version == 1) {
 		str = NULL_OR_STR(__s_api_get_configname(NS_LDAP_SERVERS_P));
 		(void) snprintf(errmsg, sizeof (errmsg),
-			gettext("Unable to retrieve the '%s' list"), str);
+		    gettext("Unable to retrieve the '%s' list"), str);
 		MKERROR(LOG_WARNING, *error, NS_CONFIG_FILE, strdup(errmsg),
-			NS_LDAP_CONFIG);
+		    NS_LDAP_CONFIG);
 		return (NS_LDAP_CONFIG);
 	}
 
@@ -798,7 +806,7 @@ __s_api_getServers(
 
 	/* Get preferred server list and sort servers based on that. */
 	if ((rc = __ns_ldap_getParam(NS_LDAP_SERVER_PREF_P,
-			&paramVal, error)) != NS_LDAP_SUCCESS) {
+	    &paramVal, error)) != NS_LDAP_SUCCESS) {
 		if (*servers)
 			__s_api_free2dArray(*servers);
 		*servers = NULL;
@@ -810,7 +818,7 @@ __s_api_getServers(
 		void **val = NULL;
 
 		if ((rc =  __ns_ldap_getParam(NS_LDAP_PREF_ONLY_P,
-			&val, error)) != NS_LDAP_SUCCESS) {
+		    &val, error)) != NS_LDAP_SUCCESS) {
 				if (*servers)
 					__s_api_free2dArray(*servers);
 				*servers = NULL;
@@ -822,14 +830,14 @@ __s_api_getServers(
 		paramVal = NULL;
 		if (prefServers) {
 			if (val != NULL && (*val) != NULL &&
-					*(int *)val[0] == 1)
+			    *(int *)val[0] == 1)
 				sortServers = sortServerPref(*servers,
-					prefServers, B_FALSE, version,
-					&err);
+				    prefServers, B_FALSE, version,
+				    &err);
 			else
 				sortServers = sortServerPref(*servers,
-					prefServers, B_TRUE, version,
-					&err);
+				    prefServers, B_TRUE, version,
+				    &err);
 			if (sortServers) {
 				if (*servers)
 					free(*servers);
@@ -852,14 +860,14 @@ __s_api_getServers(
 	if (*servers == NULL) {
 		if (err == NS_LDAP_CONFIG) {
 		str = NULL_OR_STR(__s_api_get_configname(
-				NS_LDAP_SERVERS_P));
+		    NS_LDAP_SERVERS_P));
 		str1 = NULL_OR_STR(__s_api_get_configname(
-				NS_LDAP_SERVER_PREF_P));
+		    NS_LDAP_SERVER_PREF_P));
 			(void) snprintf(errmsg, sizeof (errmsg),
-				gettext("Unable to generate a new server list "
-				"based on '%s' and/or '%s'"), str, str1);
+			    gettext("Unable to generate a new server list "
+			    "based on '%s' and/or '%s'"), str, str1);
 			MKERROR(LOG_WARNING, *error, NS_CONFIG_FILE,
-				strdup(errmsg), err);
+			    strdup(errmsg), err);
 			return (err);
 		}
 		return (NS_LDAP_MEMORY);
@@ -1121,7 +1129,7 @@ __s_api_removeBadServers(char ** Servers)
 			 * server list. Log a warning.
 			 */
 			syslog(LOG_WARNING, "libsldap: could "
-				"not remove %s from servers list", *host);
+			    "not remove %s from servers list", *host);
 		}
 	}
 }
@@ -1157,7 +1165,8 @@ __s_api_cp2dArray(char **inarray)
 	if (inarray == NULL)
 		return (NULL);
 
-	for (count = 0; inarray[count] != NULL; count++);
+	for (count = 0; inarray[count] != NULL; count++)
+		;
 
 	newarray = (char **)calloc(count + 1, sizeof (char *));
 	if (newarray == NULL)
@@ -1216,7 +1225,7 @@ __s_api_toFollowReferrals(const int flags,
 
 	/* Either NS_LDAP_NOREF or NS_LDAP_FOLLOWREF not both */
 	if ((flags & (NS_LDAP_NOREF | NS_LDAP_FOLLOWREF)) ==
-			(NS_LDAP_NOREF | NS_LDAP_FOLLOWREF)) {
+	    (NS_LDAP_NOREF | NS_LDAP_FOLLOWREF)) {
 		return (NS_LDAP_INVALID_PARAM);
 	}
 
@@ -1229,7 +1238,7 @@ __s_api_toFollowReferrals(const int flags,
 			iflags = flags;
 	} else {
 		rc = __ns_ldap_getParam(NS_LDAP_SEARCH_REF_P,
-					&paramVal, errorp);
+		    &paramVal, errorp);
 		if (rc != NS_LDAP_SUCCESS)
 			return (rc);
 		if (paramVal == NULL || *paramVal == NULL) {
@@ -1285,11 +1294,11 @@ __s_api_addRefInfo(ns_referral_info_t **head, char *url,
 	 * 2. LDAP URL which can not be parsed
 	 */
 	if (!ldap_is_ldap_url(url) ||
-		ldap_url_parse_nodn(url, &ludp) != 0) {
+	    ldap_url_parse_nodn(url, &ludp) != 0) {
 		(void) snprintf(errmsg, MAXERROR, "%s: %s",
-			gettext("Invalid or non-LDAP URL when"
-				" processing referrals URL"),
-			url);
+		    gettext("Invalid or non-LDAP URL when"
+		    " processing referrals URL"),
+		    url);
 		syslog(LOG_ERR, "libsldap: %s", errmsg);
 		if (ludp)
 				ldap_free_urldesc(ludp);
@@ -1297,7 +1306,7 @@ __s_api_addRefInfo(ns_referral_info_t **head, char *url,
 	}
 
 	ref = (ns_referral_info_t *)calloc(1,
-		sizeof (ns_referral_info_t));
+	    sizeof (ns_referral_info_t));
 	if (ref == NULL) {
 		ldap_free_urldesc(ludp);
 		return (NS_LDAP_MEMORY);
@@ -1311,23 +1320,23 @@ __s_api_addRefInfo(ns_referral_info_t **head, char *url,
 	 */
 	if ((ludp->lud_port == 0) && (ludp->lud_host == NULL)) {
 		if (ld == NULL) {
-		    (void) snprintf(errmsg, MAXERROR, "%s: %s",
-				gettext("no LDAP handle when"
-					" processing referrals URL"),
-				url);
+			(void) snprintf(errmsg, MAXERROR, "%s: %s",
+			    gettext("no LDAP handle when"
+			    " processing referrals URL"),
+			    url);
 			syslog(LOG_WARNING, "libsldap: %s", errmsg);
 			ldap_free_urldesc(ludp);
 			free(ref);
 			return (NS_LDAP_SUCCESS);
 		} else {
 			(void) ldap_get_option(ld, LDAP_OPT_HOST_NAME,
-								&ld_defhost);
+			    &ld_defhost);
 			if (ld_defhost == NULL) {
 				(void) snprintf(errmsg, MAXERROR, "%s: %s",
-					gettext("not able to retrieve default "
-						"host when processing "
-						"referrals URL"),
-					url);
+				    gettext("not able to retrieve default "
+				    "host when processing "
+				    "referrals URL"),
+				    url);
 				syslog(LOG_WARNING, "libsldap: %s", errmsg);
 				ldap_free_urldesc(ludp);
 				free(ref);
@@ -1349,7 +1358,7 @@ __s_api_addRefInfo(ns_referral_info_t **head, char *url,
 		 * and "[" & "]" for possible ipV6 addressing
 		 */
 		hostlen = strlen(ludp->lud_host) +
-			sizeof (MAXPORTNUMBER_STR) + 4;
+		    sizeof (MAXPORTNUMBER_STR) + 4;
 		ref->refHost = (char *)malloc(hostlen);
 		if (ref->refHost == NULL) {
 			ldap_free_urldesc(ludp);
@@ -1367,19 +1376,19 @@ __s_api_addRefInfo(ns_referral_info_t **head, char *url,
 			tmp = strstr(url, ludp->lud_host);
 			if (tmp && (tmp > url) && *(tmp - 1) == '[') {
 				(void) snprintf(ref->refHost, hostlen,
-					"[%s]:%d",
-					ludp->lud_host,
-					ludp->lud_port);
+				    "[%s]:%d",
+				    ludp->lud_host,
+				    ludp->lud_port);
 			} else {
 				(void) snprintf(ref->refHost, hostlen,
-					"%s:%d",
-					ludp->lud_host,
-					ludp->lud_port);
+				    "%s:%d",
+				    ludp->lud_host,
+				    ludp->lud_port);
 			}
 		} else {
 			/* serverAddr = host */
 			(void) snprintf(ref->refHost, hostlen, "%s",
-				ludp->lud_host);
+			    ludp->lud_host);
 		}
 	}
 
@@ -1428,8 +1437,8 @@ __s_api_addRefInfo(ns_referral_info_t **head, char *url,
 
 	/* insert the referral info */
 	if (*head) {
-		for (tmpref = *head; tmpref->next;
-			tmpref = tmpref->next);
+		for (tmpref = *head; tmpref->next; tmpref = tmpref->next)
+			;
 		tmpref->next = ref;
 	} else
 		*head = ref;
@@ -1501,7 +1510,7 @@ __s_api_get_SSD_from_SSDtoUse_service(const char *service,
 
 #ifdef DEBUG
 	(void) fprintf(stderr,
-		"__s_api_get_SSD_from_SSDtoUse_service START\n");
+	    "__s_api_get_SSD_from_SSDtoUse_service START\n");
 #endif
 
 	if (SSDlist == NULL || errorp == NULL)
@@ -1535,7 +1544,7 @@ __s_api_get_SSD_from_SSDtoUse_service(const char *service,
 
 	if (auto_service) {
 		rc = __ns_ldap_getSearchDescriptors(
-			"automount", SSDlist, errorp);
+		    "automount", SSDlist, errorp);
 		if (rc != NS_LDAP_SUCCESS)
 			return (rc);
 		else {
@@ -1547,14 +1556,14 @@ __s_api_get_SSD_from_SSDtoUse_service(const char *service,
 				 *
 				 */
 				rc = __s_api_prepend_automountmapname(
-					service,
-					SSDlist,
-					errorp);
+				    service,
+				    SSDlist,
+				    errorp);
 
 				if (rc != NS_LDAP_SUCCESS) {
-				    (void) __ns_ldap_freeSearchDescriptors(
-						SSDlist);
-				    *SSDlist = NULL;
+					(void) __ns_ldap_freeSearchDescriptors(
+					    SSDlist);
+					*SSDlist = NULL;
 				}
 
 				return (rc);
@@ -1568,8 +1577,8 @@ __s_api_get_SSD_from_SSDtoUse_service(const char *service,
 	 */
 	for (i = 0; ns_def_map[i].service != NULL; i++) {
 		if (ns_def_map[i].SSDtoUse_service &&
-			strcasecmp(service,
-			ns_def_map[i].service) == 0) {
+		    strcasecmp(service,
+		    ns_def_map[i].service) == 0) {
 			found = TRUE;
 			SSD_service = ns_def_map[i].SSDtoUse_service;
 			break;
@@ -1584,7 +1593,7 @@ __s_api_get_SSD_from_SSDtoUse_service(const char *service,
 	 * component is defined in the SSDs
 	 */
 	rc = __ns_ldap_getSearchDescriptors(SSD_service,
-		SSDlist, errorp);
+	    SSDlist, errorp);
 	if (rc != NS_LDAP_SUCCESS) {
 		return (rc);
 	} else {
@@ -1594,7 +1603,7 @@ __s_api_get_SSD_from_SSDtoUse_service(const char *service,
 		/* check to see if filter defined in SSD */
 		for (sdlist = *SSDlist; *sdlist; sdlist++) {
 			if ((*sdlist)->filter &&
-				strlen((*sdlist)->filter) > 0) {
+			    strlen((*sdlist)->filter) > 0) {
 				filter_found = TRUE;
 				break;
 			}
@@ -1603,13 +1612,13 @@ __s_api_get_SSD_from_SSDtoUse_service(const char *service,
 			(void) __ns_ldap_freeSearchDescriptors(SSDlist);
 			*SSDlist = NULL;
 			(void) snprintf(errmsg, sizeof (errmsg),
-				gettext("Service search descriptor for "
-					"service '%s' contains filter, "
-					"which can not be used for "
-					"service '%s'."),
-					SSD_service, service);
+			    gettext("Service search descriptor for "
+			    "service '%s' contains filter, "
+			    "which can not be used for "
+			    "service '%s'."),
+			    SSD_service, service);
 			MKERROR(LOG_WARNING, *errorp, NS_CONFIG_FILE,
-				strdup(errmsg), NS_LDAP_CONFIG);
+			    strdup(errmsg), NS_LDAP_CONFIG);
 			return (NS_LDAP_CONFIG);
 		}
 
@@ -1656,7 +1665,7 @@ __s_api_isipv4(char *addr)
 	}
 
 	if ((seg == 3 && port == 0 && digit > 0 && digit < 4) ||
-		(seg == 4 && port == 1 && digit > 0))
+	    (seg == 4 && port == 1 && digit > 0))
 		return (1);
 
 	return (0);
@@ -1789,7 +1798,7 @@ __s_api_ishost(char *addr)
 	}
 
 	if ((port == 0 && (seg || alpha || digit)) ||
-		(port == 1 && alpha == 0 && digit))
+	    (port == 1 && alpha == 0 && digit))
 		return (1);
 
 	return (0);
@@ -1816,7 +1825,7 @@ int __s_api_prepend_automountmapname(
 
 	for (i = 0; ssdlist[i] != NULL; i++) {
 		rc = __s_api_prepend_automountmapname_to_dn(
-			service, &ssdlist[i]->basedn, errorp);
+		    service, &ssdlist[i]->basedn, errorp);
 
 		if (rc != NS_LDAP_SUCCESS)
 			return (rc);
@@ -1872,7 +1881,7 @@ __s_api_prepend_automountmapname_to_dn(
 
 		/* Find mapped attribute name of auto_xxx first */
 		mappedattrs = __ns_ldap_getMappedAttributes(
-			service, default_automountmapname);
+		    service, default_automountmapname);
 		/*
 		 * if mapped attribute name of auto_xxx is not found,
 		 * find the mapped attribute name of automount
@@ -1911,12 +1920,12 @@ __s_api_prepend_automountmapname_to_dn(
 				__s_api_free2dArray(mappedattrs);
 
 				(void) sprintf(errstr,
-					gettext(
-					"Attribute automountMapName is "
-					"mapped to an empty string.\n"));
+				    gettext(
+				    "Attribute automountMapName is "
+				    "mapped to an empty string.\n"));
 
 				MKERROR(LOG_WARNING, *errorp, NS_CONFIG_SYNTAX,
-					strdup(errstr), NULL);
+				    strdup(errstr), NULL);
 
 				return (NS_LDAP_CONFIG);
 			}
@@ -1934,7 +1943,7 @@ __s_api_prepend_automountmapname_to_dn(
 	}
 
 	(void) snprintf(buffer, len, "%s=%s,%s",
-			automountmapname, service, *dn);
+	    automountmapname, service, *dn);
 
 	buffer[len-1] = '\0';
 
@@ -1957,24 +1966,24 @@ __s_api_set_passwd_status(int errnum, char *errmsg)
 {
 	if (errmsg) {
 		if (errnum ==
-			LDAP_INVALID_CREDENTIALS) {
+		    LDAP_INVALID_CREDENTIALS) {
 			/*
 			 * case 1 (Bind):
 			 * password expired
 			 */
 			if (strstr(errmsg,
-				NS_PWDERR_EXPIRED))
+			    NS_PWDERR_EXPIRED))
 				return (NS_PASSWD_EXPIRED);
 		}
 
 		if (errnum ==
-			LDAP_UNWILLING_TO_PERFORM) {
+		    LDAP_UNWILLING_TO_PERFORM) {
 			/*
 			 * case 1.1 (Bind):
 			 * password expired
 			 */
 			if (strstr(errmsg,
-				NS_PWDERR_EXPIRED))
+			    NS_PWDERR_EXPIRED))
 				return (NS_PASSWD_EXPIRED);
 
 			/*
@@ -1982,7 +1991,7 @@ __s_api_set_passwd_status(int errnum, char *errmsg)
 			 * Account inactivated
 			 */
 			if (strstr(errmsg,
-				NS_PWDERR_ACCT_INACTIVATED))
+			    NS_PWDERR_ACCT_INACTIVATED))
 				return (NS_PASSWD_EXPIRED);
 
 
@@ -1992,19 +2001,19 @@ __s_api_set_passwd_status(int errnum, char *errmsg)
 			 * password; only admin can change it
 			 */
 			if (strstr(errmsg,
-				NS_PWDERR_CHANGE_NOT_ALLOW))
+			    NS_PWDERR_CHANGE_NOT_ALLOW))
 				return (NS_PASSWD_CHANGE_NOT_ALLOWED);
 		}
 
 		if (errnum ==
-			LDAP_CONSTRAINT_VIOLATION) {
+		    LDAP_CONSTRAINT_VIOLATION) {
 			/*
 			 * case 4 (Bind):
 			 * the user account is locked due to
 			 * too many login failures.
 			 */
 			if (strstr(errmsg,
-				NS_PWDERR_MAXTRIES))
+			    NS_PWDERR_MAXTRIES))
 				return (NS_PASSWD_RETRY_EXCEEDED);
 			/*
 			 * case 5 (Modify passwd):
@@ -2013,7 +2022,7 @@ __s_api_set_passwd_status(int errnum, char *errmsg)
 			 * minimum
 			 */
 			if (strstr(errmsg,
-				NS_PWDERR_INVALID_SYNTAX))
+			    NS_PWDERR_INVALID_SYNTAX))
 				return (NS_PASSWD_TOO_SHORT);
 			/*
 			 * case 6 (Modify passwd):
@@ -2021,7 +2030,7 @@ __s_api_set_passwd_status(int errnum, char *errmsg)
 			 * that of attribute cn, sn, or uid ...
 			 */
 			if (strstr(errmsg,
-				NS_PWDERR_TRIVIAL_PASSWD))
+			    NS_PWDERR_TRIVIAL_PASSWD))
 				return (NS_PASSWD_INVALID_SYNTAX);
 			/*
 			 * case 7 (Modify passwd):
@@ -2029,7 +2038,7 @@ __s_api_set_passwd_status(int errnum, char *errmsg)
 			 * in history list
 			 */
 			if (strstr(errmsg,
-				NS_PWDERR_IN_HISTORY))
+			    NS_PWDERR_IN_HISTORY))
 				return (NS_PASSWD_IN_HISTORY);
 			/*
 			 * case 8 (Modify passwd):
@@ -2038,7 +2047,7 @@ __s_api_set_passwd_status(int errnum, char *errmsg)
 			 * age
 			 */
 			if (strstr(errmsg,
-				NS_PWDERR_WITHIN_MIN_AGE))
+			    NS_PWDERR_WITHIN_MIN_AGE))
 				return (NS_PASSWD_WITHIN_MIN_AGE);
 		}
 
@@ -2064,7 +2073,7 @@ __s_api_contain_passwd_control_oid(char **oids)
 
 	for (oid = oids; *oid; oid++) {
 		if (strcmp(*oid, LDAP_CONTROL_PWEXPIRED) == 0 ||
-			strcmp(*oid, LDAP_CONTROL_PWEXPIRING) == 0) {
+		    strcmp(*oid, LDAP_CONTROL_PWEXPIRING) == 0) {
 			return (1);
 		}
 	}
@@ -2143,11 +2152,11 @@ __s_api_get_canonical_name(ns_ldap_entry_t *entry, ns_ldap_attr_t *attrptr,
 
 	/* "values" is read-only */
 	if ((values = __ns_ldap_getAttr(entry, "dn")) == NULL ||
-				values[0] == NULL)
+	    values[0] == NULL)
 		return (NULL);
 
 	if ((rdn = ldap_explode_dn(values[0], 0)) == NULL ||
-				rdn[0] == NULL)
+	    rdn[0] == NULL)
 		return (NULL);
 
 	if ((attrs = ldap_explode_rdn(rdn[0], 0)) == NULL) {
@@ -2177,8 +2186,8 @@ __s_api_get_canonical_name(ns_ldap_entry_t *entry, ns_ldap_attr_t *attrptr,
 		 */
 		for (i = 0; i < attrptr->value_count; i++) {
 			if (attrptr->attrvalue[i] &&
-				(*cmp)(rdn_attr_value,
-					attrptr->attrvalue[i]) == 0) {
+			    (*cmp)(rdn_attr_value,
+			    attrptr->attrvalue[i]) == 0) {
 				/* RDN "cn" value matches the "cn" value */
 				value = attrptr->attrvalue[i];
 				break;
@@ -2224,7 +2233,7 @@ __s_api_removeServer(const char *server)
 	(void) memset(space.s_b, 0, DOORBUFFERSIZE);
 
 	adata = (sizeof (ldap_call_t) + strlen(ireq) +
-			strlen(NS_CACHE_ADDR_IP) + 1);
+	    strlen(NS_CACHE_ADDR_IP) + 1);
 	adata += strlen(DOORLINESEP) + 1;
 	adata += strlen(server) + 1;
 
@@ -2234,10 +2243,10 @@ __s_api_removeServer(const char *server)
 	if (strlcpy(space.s_d.ldap_call.ldap_u.domainname, ireq, len) >= len)
 		return (-1);
 	if (strlcat(space.s_d.ldap_call.ldap_u.domainname,
-		NS_CACHE_ADDR_IP, len) >= len)
+	    NS_CACHE_ADDR_IP, len) >= len)
 		return (-1);
 	if (strlcat(space.s_d.ldap_call.ldap_u.domainname, DOORLINESEP, len) >=
-			len)
+	    len)
 		return (-1);
 	if (strlcat(space.s_d.ldap_call.ldap_u.domainname, server, len) >= len)
 		return (-1);
@@ -2252,4 +2261,20 @@ __s_api_removeServer(const char *server)
 	}
 
 	return (rc);
+}
+
+void
+__s_api_free_server_info(ns_server_info_t *sinfo) {
+	if (sinfo->server) {
+		free(sinfo->server);
+		sinfo->server = NULL;
+	}
+	if (sinfo->serverFQDN) {
+		free(sinfo->serverFQDN);
+		sinfo->serverFQDN = NULL;
+	}
+	__s_api_free2dArray(sinfo->saslMechanisms);
+	sinfo->saslMechanisms = NULL;
+	__s_api_free2dArray(sinfo->controls);
+	sinfo->controls = NULL;
 }

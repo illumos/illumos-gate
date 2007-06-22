@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -267,15 +267,15 @@ getldap_get_cacheData_stat(int max, int current, char **output)
 	*output = NULL;
 
 	len = hdr0_len + hdr1_len + hdr2_len +
-		3 * strlen(DOORLINESEP) + 21;
+	    3 * strlen(DOORLINESEP) + 21;
 	*output = malloc(len);
 	if (*output == NULL)
 		return (-1);
 
 	(void) snprintf(*output, len, "%s%s%s%10d%s%s%10d%s",
-		gettext(C_HEADER0), DOORLINESEP,
-		gettext(C_HEADER1), max, DOORLINESEP,
-		gettext(C_HEADER2), current, DOORLINESEP);
+	    gettext(C_HEADER0), DOORLINESEP,
+	    gettext(C_HEADER1), max, DOORLINESEP,
+	    gettext(C_HEADER2), current, DOORLINESEP);
 
 	return (NS_LDAP_SUCCESS);
 }
@@ -398,12 +398,12 @@ getldap_cache_op(cache_op_t op, cache_type_t type,
 			return (-1);
 
 		return (getldap_get_cacheData_stat(CACHE_HASH_MAX_ENTRY,
-				entry_num, to));
+		    entry_num, to));
 		break;
 
 	default:
 		logit("getldap_cache_op(): "
-			"invalid operation code (%d).\n", op);
+		    "invalid operation code (%d).\n", op);
 		return (-1);
 		break;
 	}
@@ -486,7 +486,7 @@ sync_current_with_update_copy(server_info_t *info)
 		info->sinfo[0].hostname = strdup(info->sinfo[1].hostname);
 	if (info->sinfo[1].rootDSE_data)
 		info->sinfo[0].rootDSE_data =
-				strdup(info->sinfo[1].rootDSE_data);
+		    strdup(info->sinfo[1].rootDSE_data);
 	if (info->sinfo[1].errormsg)
 		info->sinfo[0].errormsg = strdup(info->sinfo[1].errormsg);
 
@@ -523,8 +523,8 @@ getldap_get_rootDSE(void *arg)
 	/* initialize the server info element */
 	(void) mutex_lock(&serverInfo->mutex[1]);
 	serverInfo->sinfo[1].type	= INFO_RW_UNKNOWN;
-	serverInfo->sinfo[1].info_status
-				= INFO_STATUS_UNKNOWN;
+	serverInfo->sinfo[1].info_status =
+	    INFO_STATUS_UNKNOWN;
 	/*
 	 * When the sever list is refreshed over and over,
 	 * this function is called each time it is refreshed.
@@ -533,11 +533,11 @@ getldap_get_rootDSE(void *arg)
 	 */
 	(void) mutex_lock(&serverInfo->mutex[0]);
 	serverInfo->sinfo[1].prev_server_status =
-		serverInfo->sinfo[0].server_status;
+	    serverInfo->sinfo[0].server_status;
 	(void) mutex_unlock(&serverInfo->mutex[0]);
 
 	serverInfo->sinfo[1].server_status =
-			INFO_SERVER_UNKNOWN;
+	    INFO_SERVER_UNKNOWN;
 	if (serverInfo->sinfo[1].rootDSE_data)
 		free(serverInfo->sinfo[1].rootDSE_data);
 	serverInfo->sinfo[1].rootDSE_data	= NULL;
@@ -547,22 +547,22 @@ getldap_get_rootDSE(void *arg)
 	(void) mutex_unlock(&serverInfo->mutex[1]);
 
 	if ((ld = ldap_init(serverInfo->sinfo[1].addr,
-		LDAP_PORT)) == NULL ||
+	    LDAP_PORT)) == NULL ||
 		/* SKIP ldap data base to prevent recursion */
 		/* in gethostbyname when resolving hostname */
-		0 != ldap_set_option(ld, LDAP_X_OPT_DNS_SKIPDB, "ldap")) {
+	    0 != ldap_set_option(ld, LDAP_X_OPT_DNS_SKIPDB, "ldap")) {
 
 		(void) mutex_lock(&serverInfo->mutex[1]);
 		serverInfo->sinfo[1].server_status =
-				INFO_SERVER_ERROR;
+		    INFO_SERVER_ERROR;
 		serverInfo->sinfo[1].info_status =
-				INFO_STATUS_ERROR;
+		    INFO_STATUS_ERROR;
 		serverInfo->sinfo[1].errormsg =
-				strdup(gettext("ldap_init failed"));
+		    strdup(gettext("ldap_init failed"));
 
 		if (current_admin.debug_level >= DBG_ALL) {
 			logit("getldap_get_rootDSE: %s.\n",
-			serverInfo->sinfo[1].errormsg);
+			    serverInfo->sinfo[1].errormsg);
 		}
 		(void) mutex_unlock(&serverInfo->mutex[1]);
 		/*
@@ -573,9 +573,9 @@ getldap_get_rootDSE(void *arg)
 		thr_exit((void *) -1);
 	}
 	ldap_set_option(ld,
-			LDAP_OPT_PROTOCOL_VERSION, &ldapVersion);
+	    LDAP_OPT_PROTOCOL_VERSION, &ldapVersion);
 	ldap_set_option(ld,
-			LDAP_X_OPT_CONNECT_TIMEOUT, &tcptimeout);
+	    LDAP_X_OPT_CONNECT_TIMEOUT, &tcptimeout);
 
 	/* currently, only interested in two attributes */
 	attrs[0] = "supportedControl";
@@ -590,8 +590,8 @@ getldap_get_rootDSE(void *arg)
 	tv.tv_usec = 0;
 
 	rc = ldap_search_ext_s(ld, "", LDAP_SCOPE_BASE,
-		"(objectclass=*)",
-		attrs, 0, NULL, NULL, &tv, 0, &resultMsg);
+	    "(objectclass=*)",
+	    attrs, 0, NULL, NULL, &tv, 0, &resultMsg);
 
 	switch (rc) {
 		/* If successful, the root DSE was found. */
@@ -603,21 +603,21 @@ getldap_get_rootDSE(void *arg)
 		 */
 		default:
 			ldap_get_option(ld,
-				LDAP_OPT_ERROR_NUMBER, &ldaperrno);
+			    LDAP_OPT_ERROR_NUMBER, &ldaperrno);
 			(void) snprintf(errmsg, sizeof (errmsg),
-				gettext(ldap_err2string(ldaperrno)));
+			    gettext(ldap_err2string(ldaperrno)));
 			if (current_admin.debug_level >= DBG_ALL) {
 			logit("getldap_get_rootDSE: Root DSE not found."
-					" %s is not an LDAPv3 server (%s).\n",
-					serverInfo->sinfo[1].addr, errmsg);
+			    " %s is not an LDAPv3 server (%s).\n",
+			    serverInfo->sinfo[1].addr, errmsg);
 			}
 			(void) mutex_lock(&serverInfo->mutex[1]);
 			serverInfo->sinfo[1].errormsg
-					= strdup(errmsg);
+			    = strdup(errmsg);
 			serverInfo->sinfo[1].info_status
-						= INFO_STATUS_ERROR;
+			    = INFO_STATUS_ERROR;
 			serverInfo->sinfo[1].server_status
-						= INFO_SERVER_ERROR;
+			    = INFO_SERVER_ERROR;
 			(void) mutex_unlock(&serverInfo->mutex[1]);
 			if (resultMsg)
 				ldap_msgfree(resultMsg);
@@ -635,14 +635,14 @@ getldap_get_rootDSE(void *arg)
 	if ((e = ldap_first_entry(ld, resultMsg)) != NULL) {
 		/* calculate length of root DSE data */
 		for (a = ldap_first_attribute(ld, e, &ber);
-			a != NULL;
-			a = ldap_next_attribute(ld, e, ber)) {
+		    a != NULL;
+		    a = ldap_next_attribute(ld, e, ber)) {
 
 			if ((vals = ldap_get_values(ld, e, a)) != NULL) {
 				for (i = 0; vals[i] != NULL; i++) {
 					len +=  strlen(a) +
-					strlen(vals[i]) +
-					strlen(DOORLINESEP) +1;
+					    strlen(vals[i]) +
+					    strlen(DOORLINESEP) +1;
 				}
 				ldap_value_free(vals);
 			}
@@ -658,25 +658,26 @@ getldap_get_rootDSE(void *arg)
 				/* make it an empty string first */
 				*rootDSE = '\0';
 				for (a = ldap_first_attribute(ld, e, &ber);
-					a != NULL;
-					a = ldap_next_attribute(
-						ld, e, ber)) {
+				    a != NULL;
+				    a = ldap_next_attribute(
+				    ld, e, ber)) {
 
 					if ((vals = ldap_get_values(
-						ld, e, a)) != NULL) {
+					    ld, e, a)) != NULL) {
 						for (i = 0; vals[i] != NULL;
-							i++) {
+						    i++) {
 							int len;
 
 							len = strlen(a) +
-							strlen(vals[i]) +
-							strlen(DOORLINESEP) + 2;
+							    strlen(vals[i]) +
+							    strlen(DOORLINESEP)
+							    + 2;
 							(void) snprintf(
-								rootDSE +
-								strlen(rootDSE),
-								len, "%s=%s%s",
-								a, vals[i],
-								DOORLINESEP);
+							    rootDSE +
+							    strlen(rootDSE),
+							    len, "%s=%s%s",
+							    a, vals[i],
+							    DOORLINESEP);
 						}
 						ldap_value_free(vals);
 					}
@@ -693,22 +694,22 @@ getldap_get_rootDSE(void *arg)
 	(void) mutex_lock(&serverInfo->mutex[1]);
 	if (len == 0) {
 		serverInfo->sinfo[1].errormsg =
-			strdup(gettext("No root DSE data returned."));
+		    strdup(gettext("No root DSE data returned."));
 		if (current_admin.debug_level >= DBG_ALL) {
 			logit("getldap_get_rootDSE: %s.\n",
-				serverInfo->sinfo[1].errormsg);
+			    serverInfo->sinfo[1].errormsg);
 		}
 		serverInfo->sinfo[1].type
-				= INFO_RW_UNKNOWN;
+		    = INFO_RW_UNKNOWN;
 		serverInfo->sinfo[1].info_status
-				= INFO_STATUS_ERROR;
+		    = INFO_STATUS_ERROR;
 		serverInfo->sinfo[1].server_status 	= INFO_SERVER_ERROR;
 		exitrc = -1;
 	} else {
 		/* assume writeable, i.e., can do modify */
 		serverInfo->sinfo[1].type	= INFO_RW_WRITEABLE;
 		serverInfo->sinfo[1].server_status
-			= INFO_SERVER_UP;
+		    = INFO_SERVER_UP;
 		serverInfo->sinfo[1].info_status	= INFO_STATUS_NEW;
 		/* remove the last DOORLINESEP */
 		*(rootDSE+strlen(rootDSE)-1) = '\0';
@@ -739,8 +740,8 @@ getldap_get_rootDSE(void *arg)
 		(void) kill(ppid, SIGUSR1);
 		if (current_admin.debug_level >= DBG_ALL) {
 			logit("getldap_get_rootDSE(): "
-				"SIGUSR1 signal sent to "
-				"parent process(%ld).\n", ppid);
+			    "SIGUSR1 signal sent to "
+			    "parent process(%ld).\n", ppid);
 		}
 		signal_done = TRUE;
 	}
@@ -767,7 +768,7 @@ getldap_init_serverInfo(server_info_t **head)
 
 	if (rc != NS_LDAP_SUCCESS) {
 		logit("getldap_init_serverInfo: "
-			"__s_api_getServers failed.\n");
+		    "__s_api_getServers failed.\n");
 		if (errorp)
 			__ns_ldap_freeError(&errorp);
 		return (-1);
@@ -776,7 +777,7 @@ getldap_init_serverInfo(server_info_t **head)
 		info = (server_info_t *)calloc(1, sizeof (server_info_t));
 		if (info == NULL) {
 			logit("getldap_init_serverInfo: "
-				"not enough memory.\n");
+			    "not enough memory.\n");
 			exitrc = NS_LDAP_MEMORY;
 			break;
 		}
@@ -791,14 +792,14 @@ getldap_init_serverInfo(server_info_t **head)
 		info->sinfo[0].addr		= strdup(servers[i]);
 		if (info->sinfo[0].addr == NULL) {
 			logit("getldap_init_serverInfo: "
-				"not enough memory.\n");
+			    "not enough memory.\n");
 			exitrc = NS_LDAP_MEMORY;
 			break;
 		}
 		info->sinfo[1].addr		= strdup(servers[i]);
 		if (info->sinfo[1].addr == NULL) {
 			logit("getldap_init_serverInfo: "
-				"not enough memory.\n");
+			    "not enough memory.\n");
 			exitrc = NS_LDAP_MEMORY;
 			break;
 		}
@@ -815,9 +816,9 @@ getldap_init_serverInfo(server_info_t **head)
 		 * profile is refreshed, all servers are good.
 		 */
 		info->sinfo[0].prev_server_status =
-					INFO_SERVER_UP;
+		    INFO_SERVER_UP;
 		info->sinfo[1].prev_server_status =
-					INFO_SERVER_UP;
+		    INFO_SERVER_UP;
 		info->sinfo[0].hostname		= NULL;
 		info->sinfo[1].hostname		= NULL;
 		info->sinfo[0].rootDSE_data	= NULL;
@@ -847,7 +848,7 @@ getldap_destroy_serverInfo(server_info_t *head)
 
 	if (head == NULL) {
 		logit("getldap_destroy_serverInfo: "
-			"invalid serverInfo list.\n");
+		    "invalid serverInfo list.\n");
 		return (-1);
 	}
 
@@ -892,7 +893,7 @@ getldap_set_serverInfo(server_info_t *head,
 
 	if (head == NULL) {
 		logit("getldap_set_serverInfo: "
-			"invalid serverInfo list.\n");
+		    "invalid serverInfo list.\n");
 		return (-1);
 	}
 
@@ -900,7 +901,7 @@ getldap_set_serverInfo(server_info_t *head,
 	if (reset_bindtime == 1) {
 		tcptimeout = NS_DEFAULT_BIND_TIMEOUT * 1000;
 		(void) __ns_ldap_getParam(NS_LDAP_BIND_TIME_P,
-			&paramVal, &error);
+		    &paramVal, &error);
 		if (paramVal != NULL && *paramVal != NULL) {
 			/* convert to milliseconds */
 			tcptimeout = **((int **)paramVal);
@@ -913,7 +914,7 @@ getldap_set_serverInfo(server_info_t *head,
 		/* get search timeout value */
 		search_timeout = NS_DEFAULT_SEARCH_TIMEOUT;
 		(void) __ns_ldap_getParam(NS_LDAP_SEARCH_TIME_P,
-			&paramVal, &error);
+		    &paramVal, &error);
 		if (paramVal != NULL && *paramVal != NULL) {
 			search_timeout = **((int **)paramVal);
 			(void) __ns_ldap_freeParam(&paramVal);
@@ -928,23 +929,23 @@ getldap_set_serverInfo(server_info_t *head,
 
 	if (num_threads == 0) {
 		logit("getldap_set_serverInfo: "
-			"empty serverInfo list.\n");
+		    "empty serverInfo list.\n");
 		return (-1);
 	}
 
 	tid = (thread_t *) calloc(1, sizeof (thread_t) * num_threads);
 	if (tid == NULL) {
 		logit("getldap_set_serverInfo: "
-			"No memory to create thread ID list.\n");
+		    "No memory to create thread ID list.\n");
 		return (-1);
 	}
 
 	for (info = head, i = 0; info; info = info->next, i++) {
 		if (thr_create(NULL, 0,
-			(void *(*)(void*))getldap_get_rootDSE,
-			(void *)info, 0, &tid[i])) {
+		    (void *(*)(void*))getldap_get_rootDSE,
+		    (void *)info, 0, &tid[i])) {
 			logit("getldap_set_serverInfo: "
-				"can not create thread %d.\n", i + 1);
+			    "can not create thread %d.\n", i + 1);
 			for (j = 0; j < i; j++)
 				(void) thr_join(tid[j], NULL, NULL);
 			free(tid);
@@ -1094,13 +1095,19 @@ getldap_ip2hostname(char *ipaddr, char **hostname) {
  *                    as NS_CACHE_NEXT.
  *   addrtype:
  *   NS_CACHE_ADDR_IP: return server address as is, this is default.
- *   NS_CACHE_ADDR_HOSTNAME: return server addess as FQDN format, only
- *                           self credential case requires such format.
+ *   NS_CACHE_ADDR_HOSTNAME: return both server address and its FQDN format,
+ *			only self credential case requires such format.
  * output:
  *   a buffer containing server info in the following format:
- *   serveraddress DOORLINESEP [ attr=value [DOORLINESEP attr=value ]...]
- *   for example: ( here | used as DOORLINESEP for visual purposes)
- *   1.2.3.4|supportedControl=1.1.1.1|supportedSASLmechanisms=EXTERNAL
+ *   serveraddress DOORLINESEP [ serveraddress FQDN DOORLINESEP ]
+ *   [ attr=value [DOORLINESEP attr=value ]...]
+ *   For example: ( here | used as DOORLINESEP for visual purposes)
+ *   1) simple bind and sasl/DIGEST-MD5 bind :
+ *   1.2.3.4|supportedControl=1.1.1.1|supportedSASLmechanisms=EXTERNAL|
+ *   supportedSASLmechanisms=GSSAPI
+ *   2) sasl/GSSAPI bind (self credential):
+ *   1.2.3.4|foo.sun.com|supportedControl=1.1.1.1|
+ *   supportedSASLmechanisms=EXTERNAL|supportedSASLmechanisms=GSSAPI
  *   NOTE: caller should free this buffer when done using it
  */
 static int
@@ -1114,7 +1121,7 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 	char 		req_new[] = NS_CACHE_NEW;
 	char 		addr_type[] = NS_CACHE_ADDR_IP;
 	int		matched = FALSE, len, rc = 0;
-	char		*ret_addr = NULL;
+	char		*ret_addr = NULL, *ret_addrFQDN = NULL;
 
 	if (current_admin.debug_level >= DBG_ALL) {
 		logit("getldap_get_serverInfo()...\n");
@@ -1122,7 +1129,7 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 
 	if (input == NULL || output == NULL) {
 		logit("getldap_get_serverInfo: "
-			"No input or output buffer.\n");
+		    "No input or output buffer.\n");
 		return (-1);
 	}
 
@@ -1131,7 +1138,7 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 
 	if (head == NULL) {
 		logit("getldap_get_serverInfo: "
-			"invalid serverInfo list.\n");
+		    "invalid serverInfo list.\n");
 		return (-1);
 	}
 	/*
@@ -1147,7 +1154,7 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 		input[strlen(NS_CACHE_NEW)] = '\0';
 		/* skip acion type flag, addr type flag and DOORLINESEP */
 		addr = input + strlen(DOORLINESEP) + strlen(NS_CACHE_NEW)
-			+ strlen(NS_CACHE_ADDR_IP);
+		    + strlen(NS_CACHE_ADDR_IP);
 	}
 	/*
 	 * if NS_CACHE_NEW,
@@ -1156,7 +1163,7 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 	 * beginning of the list
 	 */
 	if ((strcmp(req, NS_CACHE_NEW) == 0) ||
-		(head->sinfo[0].info_status == INFO_STATUS_NEW))
+	    (head->sinfo[0].info_status == INFO_STATUS_NEW))
 		matched = TRUE;
 	for (info = head; info; info = info->next) {
 		/*
@@ -1173,7 +1180,7 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 		(void) mutex_lock(&info->mutex[0]);
 
 		if (matched == FALSE &&
-			strcmp(info->sinfo[0].addr, addr) == 0) {
+		    strcmp(info->sinfo[0].addr, addr) == 0) {
 			matched = TRUE;
 			if (strcmp(req, NS_CACHE_NORESP) == 0) {
 
@@ -1182,7 +1189,7 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 				 * don't bother
 				 */
 				if (info->sinfo[0].server_status ==
-						INFO_SERVER_REMOVED) {
+				    INFO_SERVER_REMOVED) {
 					(void) mutex_unlock(&info->mutex[0]);
 					continue;
 				}
@@ -1192,9 +1199,9 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 				 * give this server one more chance
 				 */
 				if (info->sinfo[0].info_status ==
-						INFO_STATUS_NEW &&
-					info->sinfo[0].server_status  ==
-							INFO_SERVER_UP) {
+				    INFO_STATUS_NEW &&
+				    info->sinfo[0].server_status  ==
+				    INFO_SERVER_UP) {
 					server = info;
 					break;
 				} else {
@@ -1214,9 +1221,9 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 					 * list.
 					 */
 					info->sinfo[0].prev_server_status =
-						info->sinfo[0].server_status;
+					    info->sinfo[0].server_status;
 					info->sinfo[0].server_status  =
-						INFO_SERVER_REMOVED;
+					    INFO_SERVER_REMOVED;
 					/*
 					 * make sure this will be seen
 					 * if a user query the server
@@ -1224,7 +1231,7 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 					 * -g option
 					 */
 					info->sinfo[1].server_status  =
-						INFO_SERVER_REMOVED;
+					    INFO_SERVER_REMOVED;
 					*svr_removed = TRUE;
 					(void) mutex_unlock(&info->mutex[0]);
 					continue;
@@ -1241,14 +1248,14 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 		if (matched) {
 			if (strcmp(req, NS_CACHE_WRITE) == 0) {
 				if (info->sinfo[0].type ==
-					INFO_RW_WRITEABLE &&
-					info->sinfo[0].server_status  ==
-						INFO_SERVER_UP) {
+				    INFO_RW_WRITEABLE &&
+				    info->sinfo[0].server_status  ==
+				    INFO_SERVER_UP) {
 					server = info;
 					break;
 				}
 			} else if (info->sinfo[0].server_status ==
-					INFO_SERVER_UP) {
+			    INFO_SERVER_UP) {
 				server = info;
 				break;
 			}
@@ -1267,35 +1274,44 @@ getldap_get_serverInfo(server_info_t *head, char *input,
 			 */
 			if (server->sinfo[0].hostname == NULL) {
 				rc = getldap_ip2hostname(server->sinfo[0].addr,
-					&server->sinfo[0].hostname);
+				    &server->sinfo[0].hostname);
 				if (rc != NS_LDAP_SUCCESS) {
 					(void) mutex_unlock(&info->mutex[0]);
 					return (rc);
 				}
 				if (current_admin.debug_level >= DBG_ALL) {
 					logit("getldap_get_serverInfo: "
-						"%s is converted to %s\n",
-						server->sinfo[0].addr,
-						server->sinfo[0].hostname);
+					    "%s is converted to %s\n",
+					    server->sinfo[0].addr,
+					    server->sinfo[0].hostname);
 				}
 			}
-			ret_addr = server->sinfo[0].hostname;
+			ret_addr = server->sinfo[0].addr;
+			ret_addrFQDN = server->sinfo[0].hostname;
 
 		} else
 			ret_addr = server->sinfo[0].addr;
 
 
 		len = strlen(ret_addr) +
-			strlen(server->sinfo[0].rootDSE_data) +
-			strlen(DOORLINESEP) + 1;
+		    strlen(server->sinfo[0].rootDSE_data) +
+		    strlen(DOORLINESEP) + 1;
+		if (ret_addrFQDN != NULL)
+			len += strlen(ret_addrFQDN) + strlen(DOORLINESEP);
 		*output = (char *)malloc(len);
 		if (*output == NULL) {
 			(void) mutex_unlock(&info->mutex[0]);
 			return (NS_LDAP_MEMORY);
 		}
-		(void) snprintf(*output, len, "%s%s%s",
-			ret_addr, DOORLINESEP,
-			server->sinfo[0].rootDSE_data);
+		if (ret_addrFQDN == NULL)
+			(void) snprintf(*output, len, "%s%s%s",
+			    ret_addr, DOORLINESEP,
+			    server->sinfo[0].rootDSE_data);
+		else
+			(void) snprintf(*output, len, "%s%s%s%s%s",
+			    ret_addr, DOORLINESEP,
+			    ret_addrFQDN, DOORLINESEP,
+			    server->sinfo[0].rootDSE_data);
 		server->sinfo[0].info_status = INFO_STATUS_OLD;
 		(void) mutex_unlock(&info->mutex[0]);
 		return (NS_LDAP_SUCCESS);
@@ -1343,15 +1359,15 @@ getldap_format_refresh_time(char **output, time_t *prev, time_t *next)
 	}
 
 	len = hdr1_len + hdr2_len + strlen(nbuf) +
-			strlen(pbuf) + 2 * strlen(DOORLINESEP) + 1;
+	    strlen(pbuf) + 2 * strlen(DOORLINESEP) + 1;
 
 	*output = malloc(len);
 	if (*output == NULL)
 		return (-1);
 
 	(void) snprintf(*output, len, "%s%s%s%s%s%s",
-		gettext(TIME_HEADER1), pbuf, DOORLINESEP,
-		gettext(TIME_HEADER2), nbuf, DOORLINESEP);
+	    gettext(TIME_HEADER1), pbuf, DOORLINESEP,
+	    gettext(TIME_HEADER2), nbuf, DOORLINESEP);
 
 	return (NS_LDAP_SUCCESS);
 }
@@ -1390,7 +1406,7 @@ getldap_get_server_stat(server_info_t *head, char **output,
 
 	if (head == NULL) {
 		logit("getldap_get_server_stat: "
-			"invalid serverInfo list.\n");
+		    "invalid serverInfo list.\n");
 		return (-1);
 	}
 
@@ -1409,7 +1425,7 @@ getldap_get_server_stat(server_info_t *head, char **output,
 
 	/* insert header string and refresh time info */
 	(void) snprintf(*output, len1, "%s%s%s",
-		gettext(S_HEADER), DOORLINESEP, output1);
+	    gettext(S_HEADER), DOORLINESEP, output1);
 
 	for (info = head; info; info = info->next) {
 
@@ -1450,12 +1466,12 @@ getldap_get_server_stat(server_info_t *head, char **output,
 		}
 
 		len += format_len + strlen(status) +
-			strlen(info->sinfo[1].addr) +
-			strlen(DOORLINESEP);
+		    strlen(info->sinfo[1].addr) +
+		    strlen(DOORLINESEP);
 		if (info->sinfo[1].errormsg != NULL)
 			len += error_len +
-				strlen(info->sinfo[1].errormsg) +
-				strlen(DOORLINESEP);
+			    strlen(info->sinfo[1].errormsg) +
+			    strlen(DOORLINESEP);
 
 		tmpptr = (char *)realloc(*output, len);
 		if (tmpptr == NULL) {
@@ -1470,15 +1486,15 @@ getldap_get_server_stat(server_info_t *head, char **output,
 		/* insert server IP addr or name and status */
 		len1 = len - strlen(*output);
 		(void) snprintf(*output + strlen(*output), len1,
-			gettext(S_FORMAT), info->sinfo[1].addr,
-				status, DOORLINESEP);
+		    gettext(S_FORMAT), info->sinfo[1].addr,
+		    status, DOORLINESEP);
 		/* insert error message if any */
 		len1 = len - strlen(*output);
 		if (info->sinfo[1].errormsg != NULL)
 			(void) snprintf(*output + strlen(*output), len1,
-				gettext(S_ERROR),
-					info->sinfo[1].errormsg,
-					DOORLINESEP);
+			    gettext(S_ERROR),
+			    info->sinfo[1].errormsg,
+			    DOORLINESEP);
 
 		(void) mutex_unlock(&info->mutex[1]);
 
@@ -1512,9 +1528,9 @@ getldap_get_refresh_stat(char **output)
 
 	/* get configured cache TTL */
 	if ((__ns_ldap_getParam(NS_LDAP_CACHETTL_P,
-		&paramVal, &errorp) == NS_LDAP_SUCCESS) &&
-		paramVal != NULL &&
-		(char *)*paramVal != NULL) {
+	    &paramVal, &errorp) == NS_LDAP_SUCCESS) &&
+	    paramVal != NULL &&
+	    (char *)*paramVal != NULL) {
 			cache_ttl = atol((char *)*paramVal);
 	} else {
 		if (errorp)
@@ -1528,20 +1544,20 @@ getldap_get_refresh_stat(char **output)
 
 	if (cache_ttl == 0) {
 		len = hdr0_len + hdr1_len +
-			2 * strlen(DOORLINESEP) + 1;
+		    2 * strlen(DOORLINESEP) + 1;
 		*output = malloc(len);
 		if (*output == NULL)
 			return (-1);
 		(void) snprintf(*output, len, "%s%s%s%s",
-			gettext(R_HEADER0), DOORLINESEP,
-			gettext(R_HEADER1), DOORLINESEP);
+		    gettext(R_HEADER0), DOORLINESEP,
+		    gettext(R_HEADER1), DOORLINESEP);
 	} else {
 
 		/* get configuration expiration time */
 		if ((__ns_ldap_getParam(NS_LDAP_EXP_P,
-			&paramVal, &errorp) == NS_LDAP_SUCCESS) &&
-			paramVal != NULL &&
-			(char *)*paramVal != NULL) {
+		    &paramVal, &errorp) == NS_LDAP_SUCCESS) &&
+		    paramVal != NULL &&
+		    (char *)*paramVal != NULL) {
 				expire = (time_t)atol((char *)*paramVal);
 		} else {
 			if (errorp)
@@ -1556,20 +1572,20 @@ getldap_get_refresh_stat(char **output)
 
 		/* format previous and next refresh time */
 		(void) getldap_format_refresh_time(&output1,
-			&prev_refresh_time, &expire);
+		    &prev_refresh_time, &expire);
 		if (output1 == NULL)
 			return (-1);
 
 		len = hdr0_len + strlen(output1) +
-				2 * strlen(DOORLINESEP) + 1;
+		    2 * strlen(DOORLINESEP) + 1;
 		*output = malloc(len);
 		if (*output == NULL) {
 			free(output1);
 			return (-1);
 		}
 		(void) snprintf(*output, len, "%s%s%s%s",
-			gettext(R_HEADER0), DOORLINESEP,
-			output1, DOORLINESEP);
+		    gettext(R_HEADER0), DOORLINESEP,
+		    output1, DOORLINESEP);
 		free(output1);
 	}
 
@@ -1589,17 +1605,17 @@ getldap_get_cacheTTL()
 	}
 
 	if ((rc = __ns_ldap_getParam(NS_LDAP_CACHETTL_P,
-		&paramVal, &error)) != NS_LDAP_SUCCESS) {
+	    &paramVal, &error)) != NS_LDAP_SUCCESS) {
 		if (error != NULL && error->message != NULL)
 			logit("Error: Unable to get configuration "
-				"refresh TTL: %s\n",
-				error->message);
+			    "refresh TTL: %s\n",
+			    error->message);
 		else {
 			char *tmp;
 
 			__ns_ldap_err2str(rc, &tmp);
 			logit("Error: Unable to get configuration "
-				"refresh TTL: %s\n", tmp);
+			    "refresh TTL: %s\n", tmp);
 		}
 		(void) __ns_ldap_freeParam(&paramVal);
 		(void) __ns_ldap_freeError(&error);
@@ -1679,8 +1695,8 @@ getldap_set_refresh_ttl(server_info_t *head, int *refresh_ttl,
 
 	if (!head || !refresh_ttl || !no_gd_server) {
 		logit("getldap_set_refresh_ttl: head is "
-			"NULL or refresh_ttl is NULL or "
-			"no_gd_server is NULL");
+		    "NULL or refresh_ttl is NULL or "
+		    "no_gd_server is NULL");
 		(void) mutex_unlock(&refresh_mutex);
 		return (-1);
 	}
@@ -1691,7 +1707,7 @@ getldap_set_refresh_ttl(server_info_t *head, int *refresh_ttl,
 	 */
 	if (current_admin.debug_level >= DBG_SERVER_LIST_REFRESH) {
 		logit("getldap_set_refresh_ttl:(1) refresh ttl is %d "
-			"seconds\n", *refresh_ttl);
+		    "seconds\n", *refresh_ttl);
 	}
 	if (*refresh_ttl == 0) {
 		num_walked_ok = 0;
@@ -1712,10 +1728,10 @@ getldap_set_refresh_ttl(server_info_t *head, int *refresh_ttl,
 		refresh_ttl_max = getldap_get_cacheTTL();
 		if (current_admin.debug_level >= DBG_SERVER_LIST_REFRESH) {
 			logit("getldap_set_refresh_ttl:(2) refresh ttl is %d "
-				"seconds\n", *refresh_ttl);
+			    "seconds\n", *refresh_ttl);
 			logit("getldap_set_refresh_ttl:(2) max ttl is %d, "
-				"min ttl is %d seconds\n",
-				refresh_ttl_max, refresh_ttl_min);
+			    "min ttl is %d seconds\n",
+			    refresh_ttl_max, refresh_ttl_min);
 		}
 		if (refresh_ttl_max <= 0)
 			refresh_ttl_max = REFRESHTTL_MAX;
@@ -1732,10 +1748,10 @@ getldap_set_refresh_ttl(server_info_t *head, int *refresh_ttl,
 			*refresh_ttl = (refresh_ttl_max + refresh_ttl_min) / 2;
 		if (current_admin.debug_level >= DBG_SERVER_LIST_REFRESH) {
 			logit("getldap_set_refresh_ttl:(3) refresh ttl is %d "
-				"seconds\n", *refresh_ttl);
+			    "seconds\n", *refresh_ttl);
 			logit("getldap_set_refresh_ttl:(3) max ttl is %d, "
-				"min ttl is %d seconds\n",
-				refresh_ttl_max, refresh_ttl_min);
+			    "min ttl is %d seconds\n",
+			    refresh_ttl_max, refresh_ttl_min);
 		}
 	}
 
@@ -1756,9 +1772,9 @@ getldap_set_refresh_ttl(server_info_t *head, int *refresh_ttl,
 		 * refresh. Treat that UNKNOWN status as up
 		 */
 		if (info->sinfo[0].prev_server_status
-				== INFO_SERVER_UP ||
-			info->sinfo[0].prev_server_status
-				== INFO_SERVER_UNKNOWN)
+		    == INFO_SERVER_UP ||
+		    info->sinfo[0].prev_server_status
+		    == INFO_SERVER_UNKNOWN)
 			num_prev_good_servers++;
 		(void) mutex_unlock(&info->mutex[0]);
 	}
@@ -1780,7 +1796,7 @@ getldap_set_refresh_ttl(server_info_t *head, int *refresh_ttl,
 		}
 		if (current_admin.debug_level >= DBG_SERVER_LIST_REFRESH) {
 			logit("getldap_set_refresh_ttl:(4) refresh ttl is %d "
-				"seconds\n", *refresh_ttl);
+			    "seconds\n", *refresh_ttl);
 		}
 	} else if (num_good_servers == 0) {
 		/*
@@ -1792,7 +1808,7 @@ getldap_set_refresh_ttl(server_info_t *head, int *refresh_ttl,
 		num_walked_ok = 0;
 		if (current_admin.debug_level >= DBG_SERVER_LIST_REFRESH) {
 			logit("getldap_set_refresh_ttl:(5) refresh ttl is %d "
-				"seconds\n", *refresh_ttl);
+			    "seconds\n", *refresh_ttl);
 		}
 	} else if (num_prev_good_servers > num_good_servers) {
 		/*
@@ -1805,13 +1821,13 @@ getldap_set_refresh_ttl(server_info_t *head, int *refresh_ttl,
 			*refresh_ttl = refresh_ttl_min;
 		num_walked_ok = 0;
 		logit("getldap_set_refresh_ttl:(6) refresh ttl is %d "
-			"seconds\n", *refresh_ttl);
+		    "seconds\n", *refresh_ttl);
 
 	}
 
 	if (current_admin.debug_level >= DBG_SERVER_LIST_REFRESH) {
 		logit("getldap_set_refresh_ttl:(7) refresh ttl is %d seconds\n",
-			*refresh_ttl);
+		    *refresh_ttl);
 	}
 	(void) mutex_unlock(&refresh_mutex);
 	return (0);
@@ -1909,7 +1925,7 @@ getldap_serverInfo_op(info_op_t op, char *input, char **output)
 		 */
 		refresh_ttl = 0;
 		(void) getldap_set_refresh_ttl(serverInfo,
-				&refresh_ttl, &no_server_good);
+		    &refresh_ttl, &no_server_good);
 		sec_to_refresh = refresh_ttl;
 
 		/* statistics: previous refresh time */
@@ -1994,7 +2010,7 @@ getldap_serverInfo_op(info_op_t op, char *input, char **output)
 			 * set cache manager server list TTL
 			 */
 			(void) getldap_set_refresh_ttl(serverInfo,
-				&refresh_ttl, &no_server_good);
+			    &refresh_ttl, &no_server_good);
 			/*
 			 * if no good server found,
 			 * tell the server info refresh thread
@@ -2009,11 +2025,11 @@ getldap_serverInfo_op(info_op_t op, char *input, char **output)
 				sec_to_refresh = refresh_ttl;
 			}
 			if (current_admin.debug_level >=
-				DBG_SERVER_LIST_REFRESH) {
+			    DBG_SERVER_LIST_REFRESH) {
 				logit("getldap_serverInfo_op("
-				"INFO_OP_REFRESH):"
-				" seconds refresh: %d second(s)....\n",
-				sec_to_refresh);
+				    "INFO_OP_REFRESH):"
+				    " seconds refresh: %d second(s)....\n",
+				    sec_to_refresh);
 			}
 			(void) mutex_unlock(&info_mutex);
 		}
@@ -2037,14 +2053,14 @@ getldap_serverInfo_op(info_op_t op, char *input, char **output)
 			if (sec_to_refresh == 0) {
 				sec_to_refresh = refresh_ttl;
 				timeout.tv_sec = time(NULL) +
-					REFRESH_DELAY_WHEN_NO_SERVER;
+				    REFRESH_DELAY_WHEN_NO_SERVER;
 				sleeptime = REFRESH_DELAY_WHEN_NO_SERVER;
 				if (current_admin.debug_level >=
-					DBG_SERVER_LIST_REFRESH) {
+				    DBG_SERVER_LIST_REFRESH) {
 					logit("getldap_serverInfo_op("
-					"INFO_OP_REFRESH_WAIT):"
-					" entering no-server "
-					"refresh loop...\n");
+					    "INFO_OP_REFRESH_WAIT):"
+					    " entering no-server "
+					    "refresh loop...\n");
 				}
 			} else {
 				timeout.tv_sec = time(NULL) + sec_to_refresh;
@@ -2056,14 +2072,14 @@ getldap_serverInfo_op(info_op_t op, char *input, char **output)
 			next_refresh = timeout.tv_sec;
 
 			if (current_admin.debug_level >=
-				DBG_SERVER_LIST_REFRESH) {
+			    DBG_SERVER_LIST_REFRESH) {
 				logit("getldap_serverInfo_op("
-				"INFO_OP_REFRESH_WAIT):"
-				" about to sleep for %d second(s)...\n",
-				sleeptime);
+				    "INFO_OP_REFRESH_WAIT):"
+				    " about to sleep for %d second(s)...\n",
+				    sleeptime);
 			}
 			err = cond_timedwait(&info_cond,
-				&info_mutex, &timeout);
+			    &info_mutex, &timeout);
 		}
 		(void) cond_destroy(&info_cond);
 		(void) mutex_unlock(&info_mutex);
@@ -2089,7 +2105,7 @@ getldap_serverInfo_op(info_op_t op, char *input, char **output)
 			break;
 		} else
 			(void) getldap_get_serverInfo(serverInfo_old,
-				input, output, &server_removed);
+			    input, output, &server_removed);
 		(void) rw_unlock(&info_lock_old);
 
 		/*
@@ -2111,7 +2127,7 @@ getldap_serverInfo_op(info_op_t op, char *input, char **output)
 			(void) mutex_lock(&info_mutex);
 
 			(void) getldap_set_refresh_ttl(serverInfo,
-				&refresh_ttl, &no_server_good);
+			    &refresh_ttl, &no_server_good);
 
 			/*
 			 * if no good server found, need to go into
@@ -2158,13 +2174,13 @@ getldap_serverInfo_op(info_op_t op, char *input, char **output)
 		(void) rw_rdlock(&info_lock);
 		if (serverInfo) {
 			(void) getldap_get_server_stat(serverInfo,
-				output, &prev_refresh, &next_refresh);
+			    output, &prev_refresh, &next_refresh);
 		}
 		(void) rw_unlock(&info_lock);
 		break;
 	default:
 		logit("getldap_serverInfo_op(): "
-			"invalid operation code (%d).\n", op);
+		    "invalid operation code (%d).\n", op);
 		return (-1);
 		break;
 	}
@@ -2213,15 +2229,15 @@ getldap_getserver(ldap_return_t *out, ldap_call_t *in)
 	/* make sure the request is valid */
 	req[0] = (in->ldap_u.servername)[0];
 	if ((req[0] != '\0') &&
-		(strcmp(req, NS_CACHE_NEW) != 0) &&
-		(strcmp(req, NS_CACHE_NORESP)  != 0) &&
-		(strcmp(req, NS_CACHE_NEXT)    != 0) &&
-		(strcmp(req, NS_CACHE_WRITE)   != 0)) {
+	    (strcmp(req, NS_CACHE_NEW) != 0) &&
+	    (strcmp(req, NS_CACHE_NORESP)  != 0) &&
+	    (strcmp(req, NS_CACHE_NEXT)    != 0) &&
+	    (strcmp(req, NS_CACHE_WRITE)   != 0)) {
 		return;
 	}
 
 	(void) getldap_serverInfo_op(INFO_OP_GETSERVER,
-			in->ldap_u.domainname, &outstr);
+	    in->ldap_u.domainname, &outstr);
 
 	if (outstr == NULL)
 		return;
@@ -2238,7 +2254,7 @@ getldap_getserver(ldap_return_t *out, ldap_call_t *in)
 			logit("getldap_getserver: got server %s\n", outstr);
 		} else
 			logit("getldap_getserver: Missing %s."
-				" Internal error\n", DOORLINESEP);
+			    " Internal error\n", DOORLINESEP);
 	}
 	free(outstr);
 	out->ldap_return_code = SUCCESS;
@@ -2263,7 +2279,7 @@ getldap_get_cacheData(ldap_return_t *out, ldap_call_t *in)
 
 	/* make sure the request is valid */
 	if (strncmp(in->ldap_u.servername,
-		NS_CACHE_DN2DOMAIN, strlen(NS_CACHE_DN2DOMAIN)) == 0)
+	    NS_CACHE_DN2DOMAIN, strlen(NS_CACHE_DN2DOMAIN)) == 0)
 		datatype = CACHE_MAP_DN2DOMAIN;
 
 	if (datatype == CACHE_MAP_UNKNOWN)
@@ -2277,7 +2293,7 @@ getldap_get_cacheData(ldap_return_t *out, ldap_call_t *in)
 		return;
 
 	(void) getldap_cache_op(CACHE_OP_FIND, datatype,
-			instr, &outstr);
+	    instr, &outstr);
 
 	if (outstr == NULL)
 		return;
@@ -2308,7 +2324,7 @@ getldap_set_cacheData(ldap_return_t *out, ldap_call_t *in)
 
 	/* make sure the request is valid */
 	if (strncmp(in->ldap_u.servername,
-		NS_CACHE_DN2DOMAIN, strlen(NS_CACHE_DN2DOMAIN)) == 0)
+	    NS_CACHE_DN2DOMAIN, strlen(NS_CACHE_DN2DOMAIN)) == 0)
 		datatype = CACHE_MAP_DN2DOMAIN;
 
 	if (datatype == CACHE_MAP_UNKNOWN)
@@ -2330,7 +2346,7 @@ getldap_set_cacheData(ldap_return_t *out, ldap_call_t *in)
 		return;
 
 	rc = getldap_cache_op(CACHE_OP_ADD, datatype,
-			instr1, &instr2);
+	    instr1, &instr2);
 	if (rc != NS_LDAP_SUCCESS)
 		return;
 
@@ -2421,16 +2437,16 @@ update_from_profile()
 		(void) rw_unlock(&ldap_lock);
 
 		if ((rc = __ns_ldap_getParam(NS_LDAP_PROFILE_P,
-			&paramVal, &error)) != NS_LDAP_SUCCESS) {
+		    &paramVal, &error)) != NS_LDAP_SUCCESS) {
 			if (error != NULL && error->message != NULL)
 				logit("Error: Unable to  profile name: %s\n",
-					error->message);
+				    error->message);
 			else {
 				char *tmp;
 
 				__ns_ldap_err2str(rc, &tmp);
 				logit("Error: Unable to  profile name: %s\n",
-					tmp);
+				    tmp);
 			}
 			(void) __ns_ldap_freeParam(&paramVal);
 			(void) __ns_ldap_freeError(&error);
@@ -2471,13 +2487,13 @@ update_from_profile()
 				    "Error: Unable to refresh profile:%s:"
 				    " %s\n", profile, error->message);
 				logit("Error: Unable to refresh profile:"
-					"%s:%s\n", profile, error->message);
+				    "%s:%s\n", profile, error->message);
 			} else {
 				syslog(LOG_ERR, "Error: Unable to refresh "
-					"from profile:%s. (error=%d)\n",
-					profile, rc);
+				    "from profile:%s. (error=%d)\n",
+				    profile, rc);
 				logit("Error: Unable to refresh from profile "
-					"%s (error=%d)\n", profile, rc);
+				    "%s (error=%d)\n", profile, rc);
 			}
 
 			(void) __ns_ldap_freeError(&error);
@@ -2510,15 +2526,15 @@ update_from_profile()
 		 */
 		if (ptr->paramList[NS_LDAP_CACHETTL_P].ns_pc)
 			current_admin.ldap_stat.ldap_ttl =
-			atol(ptr->paramList[NS_LDAP_CACHETTL_P].ns_pc);
+			    atol(ptr->paramList[NS_LDAP_CACHETTL_P].ns_pc);
 
 		if (current_admin.debug_level >= DBG_PROFILE_REFRESH) {
 			logit("update_from_profile: reset profile TTL to %d"
-				"  seconds\n",
-				current_admin.ldap_stat.ldap_ttl);
+			    "  seconds\n",
+			    current_admin.ldap_stat.ldap_ttl);
 			logit("update_from_profile: expire time %ld "
-				"seconds\n",
-				ptr->paramList[NS_LDAP_EXP_P].ns_tm);
+			    "seconds\n",
+			    ptr->paramList[NS_LDAP_EXP_P].ns_tm);
 		}
 
 		/* set ptr as current_config */
@@ -2527,7 +2543,7 @@ update_from_profile()
 	} else {
 		__s_api_destroy_config(ptr);
 		logit("Error: downloaded profile failed to pass "
-			"crosscheck (%s).\n", errstr);
+		    "crosscheck (%s).\n", errstr);
 		syslog(LOG_ERR, "ldap_cachemgr: %s", errstr);
 		rc = -1;
 	}
@@ -2551,10 +2567,10 @@ getldap_init()
 	(void) rw_wrlock(&ldap_lock);
 	if ((error = __ns_ldap_LoadConfiguration()) != NULL) {
 		logit("Error: Unable to read '%s': %s\n",
-			NSCONFIGFILE, error->message);
+		    NSCONFIGFILE, error->message);
 		(void) fprintf(stderr,
-			gettext("\nError: Unable to read '%s': %s\n"),
-			NSCONFIGFILE, error->message);
+		    gettext("\nError: Unable to read '%s': %s\n"),
+		    NSCONFIGFILE, error->message);
 		__ns_ldap_freeError(&error);
 		(void) rw_unlock(&ldap_lock);
 		return (-1);
@@ -2568,7 +2584,7 @@ getldap_init()
 
 	/* initialize the data cache */
 	(void) getldap_cache_op(CACHE_OP_CREATE,
-			0, NULL, NULL);
+	    0, NULL, NULL);
 
 	return (0);
 }
@@ -2626,9 +2642,9 @@ perform_update(void)
 		 */
 		buf[19] = '\0'; /* null terminated the buffer */
 		if (__ns_ldap_setParam(NS_LDAP_CACHETTL_P,
-			lltostr((long long)current_admin.ldap_stat.ldap_ttl,
-			    &buf[19]),
-			&error) != NS_LDAP_SUCCESS) {
+		    lltostr((long long)current_admin.ldap_stat.ldap_ttl,
+		    &buf[19]),
+		    &error) != NS_LDAP_SUCCESS) {
 			logit("Error: __ns_ldap_setParam failed, status: %d "
 			    "message: %s\n", error->status, error->message);
 			(void)  __ns_ldap_freeError(&error);
@@ -2657,7 +2673,7 @@ perform_update(void)
 
 		/* flush the data cache */
 		(void) getldap_cache_op(CACHE_OP_DELETE,
-				0, NULL, NULL);
+		    0, NULL, NULL);
 
 		/* statistics: previous refresh time */
 		prev_refresh_time = tp.tv_sec;
@@ -2669,14 +2685,14 @@ perform_update(void)
 			(void)  __ns_ldap_freeError(&error);
 			if (rc1 != NS_LDAP_SUCCESS) {
 				logit("Error: Check on self credential "
-					"prerquesites failed: %d\n",
-					rc1);
+				    "prerquesites failed: %d\n",
+				    rc1);
 				exit(rc1);
 			}
 		}
 	} else {
 		logit("Error: Failed to get self credential configuration %d\n",
-					rc1);
+		    rc1);
 			exit(rc1);
 	}
 
@@ -2753,23 +2769,23 @@ getldap_refresh()
 						first_time = 0;
 						(void) rw_unlock(&ldap_lock);
 						(void) cond_init(&cond,
-							NULL, NULL);
+						    NULL, NULL);
 						(void) mutex_lock(&sighuplock);
 						timeout.tv_sec =
-							CACHESLEEPTIME;
+						    CACHESLEEPTIME;
 						timeout.tv_nsec = 0;
 						if (dbg_level >=
-							DBG_PROFILE_REFRESH) {
-						    logit("getldap_refresh: "
-						    "(1)about to sleep for %d "
-						    "seconds\n",
-						    CACHESLEEPTIME);
+						    DBG_PROFILE_REFRESH) {
+							logit("getldap_refresh:"
+							    "(1)about to sleep"
+							    " for %d seconds\n",
+							    CACHESLEEPTIME);
 						}
 						err = cond_reltimedwait(&cond,
-							&sighuplock, &timeout);
+						    &sighuplock, &timeout);
 						(void) cond_destroy(&cond);
 						(void) mutex_unlock(
-							&sighuplock);
+						    &sighuplock);
 						/*
 						 * if woke up by
 						 * getldap_revalidate(),
@@ -2784,14 +2800,15 @@ getldap_refresh()
 							 * don't do update
 							 */
 							if (load_config())
-							    perform_update();
+								perform_update
+								    ();
 							continue;
 						}
 					}
 					sleeptime = expire - tp.tv_sec;
 					if (dbg_level >= DBG_PROFILE_REFRESH) {
-					    logit("getldap_refresh: expire time"
-						" = %ld\n", expire);
+						logit("getldap_refresh: expire "
+						    "time = %ld\n", expire);
 					}
 
 				}
@@ -2815,7 +2832,7 @@ getldap_refresh()
 			timeout.tv_sec = sleeptime;
 			timeout.tv_nsec = 0;
 			err = cond_reltimedwait(&cond,
-				&sighuplock, &timeout);
+			    &sighuplock, &timeout);
 			(void) cond_destroy(&cond);
 			(void) mutex_unlock(&sighuplock);
 		}
@@ -2858,7 +2875,7 @@ getldap_lookup(ldap_return_t *out, ldap_call_t *in)
 
 	(void) rw_rdlock(&ldap_lock);
 	if ((error = __ns_ldap_LoadDoorInfo(&configinfo, in->ldap_u.domainname))
-		!= NULL) {
+	    != NULL) {
 		if (error != NULL && error->message != NULL)
 			logit("Error: ldap_lookup: %s\n", error->message);
 		(void) __ns_ldap_freeError(&error);
@@ -2869,7 +2886,7 @@ getldap_lookup(ldap_return_t *out, ldap_call_t *in)
 	} else {
 		out->ldap_bufferbytesused = sizeof (ldap_return_t);
 		(void) strncpy(out->ldap_u.config,
-			configinfo.str, configinfo.len);
+		    configinfo.str, configinfo.len);
 		out->ldap_return_code = SUCCESS;
 		out->ldap_errno = 0;
 	}

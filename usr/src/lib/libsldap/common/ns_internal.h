@@ -667,6 +667,7 @@ typedef struct ns_ldap_cookie {
  */
 typedef struct ns_server_info {
 	char	*server;
+	char	*serverFQDN;
 	char 	**controls;
 	char	**saslMechanisms;
 } ns_server_info_t;
@@ -820,6 +821,7 @@ int		__s_api_append_default_basedn(
 			ns_ldap_error_t ** errorp);
 int		__s_api_removeServer(const char *server);
 void		__s_api_removeBadServers(char **server);
+void		__s_api_free_server_info(ns_server_info_t *sinfo);
 
 /* internal referrals APIs */
 int 		__s_api_toFollowReferrals(const int flags,
