@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -618,9 +618,9 @@ remove_tempfile(void)
 	}
 
 	if (tempfilename[0] != '\0') {
-		do
+		do {
 			ret = remove(tempfilename);
-		while (ret == -1 && errno == EINTR);
+		} while (ret == -1 && errno == EINTR);
 		if (ret == -1)
 			warn(gettext("Could not remove temporary file"));
 		tempfilename[0] = '\0';
@@ -666,9 +666,9 @@ start_private_repository(engine_state_t *est)
 	} else if (est->sc_repo_pid == -1)
 		uu_die(gettext("Attempt to fork failed"));
 
-	do
+	do {
 		pid = waitpid(est->sc_repo_pid, &stat, 0);
-	while (pid == -1 && errno == EINTR);
+	} while (pid == -1 && errno == EINTR);
 
 	if (pid == -1)
 		uu_die(gettext("Could not waitpid() for repository server"));
@@ -787,8 +787,10 @@ repository_teardown(void)
 		scf_service_destroy(cur_svc);
 		scf_scope_destroy(cur_scope);
 		scf_handle_destroy(g_hndl);
+		cur_inst = NULL;
+		cur_svc = NULL;
+		cur_scope = NULL;
 		g_hndl = NULL;
-
 		lscf_cleanup();
 	}
 }
