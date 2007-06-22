@@ -298,6 +298,7 @@ libdisasm_ins2str(mdb_disasm_t *dp, mdb_tgt_t *t, mdb_tgt_as_t as,
 {
 	dis_handle_t *dhp = dp->dis_data;
 	dis_buf_t db = { 0 };
+	const char *p;
 
 	/*
 	 * Set the libdisasm data to point to our buffer.  This will be
@@ -308,7 +309,7 @@ libdisasm_ins2str(mdb_disasm_t *dp, mdb_tgt_t *t, mdb_tgt_as_t as,
 
 	dis_set_data(dhp, &db);
 
-	if (strcmp(mdb_tgt_name(t), "proc") == 0) {
+	if ((p = mdb_tgt_name(t)) != NULL && strcmp(p, "proc") == 0) {
 		/* check for ELF ET_REL type; turn on NOIMMSYM if so */
 
 		GElf_Ehdr 	leh;
