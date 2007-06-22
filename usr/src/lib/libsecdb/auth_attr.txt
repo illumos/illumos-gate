@@ -30,6 +30,8 @@
 solaris.:::All Solaris Authorizations::help=AllSolAuthsHeader.html
 solaris.grant:::Grant All Solaris Authorizations::help=PriAdmin.html
 #
+solaris.admin.idmap.rules:::Manage Identity Mapping Rules::help=IdmapRules.html
+#
 solaris.audit.:::Audit Management::help=AuditHeader.html
 solaris.audit.config:::Configure Auditing::help=AuditConfig.html
 solaris.audit.read:::Read Audit Trail::help=AuditRead.html
@@ -90,6 +92,7 @@ solaris.smf.manage.bind:::Manage DNS Service States::help=BindStates.html
 solaris.smf.manage.cron:::Manage Cron Service States::help=SmfCronStates.html
 solaris.smf.manage.hal:::Manage HAL Service States::help=SmfHALStates.html
 solaris.smf.manage.ipsec:::Manage IPsec Service States::help=SmfIPsecStates.html
+solaris.smf.manage.idmap:::Manage Identity Mapping Service States::help=SmfIdmapStates.html
 solaris.smf.manage.name-service-cache:::Manage Name Service Cache Daemon Service States::help=SmfNscdStates.html
 solaris.smf.manage.nwam:::Manage Network Auto-Magic Service States::help=SmfNWAMStates.html
 solaris.smf.manage.power:::Manage Power Management Service States::help=SmfPowerStates.html
@@ -104,6 +107,7 @@ solaris.smf.value.:::Change Values of SMF Service Properties::help=SmfValueHeade
 solaris.smf.value.ipsec:::Change Values of SMF IPsec Properties::help=SmfValueIPsec.html
 solaris.smf.value.nwam:::Change Values of SMF Network Auto-Magic Properties::help=SmfValueNWAM.html
 solaris.smf.value.routing:::Change Values of SMF Routing Properties::help=SmfValueRouting.html
+solaris.smf.value.idmap:::Change Values of SMF Identity Mapping Service Properties::help=SmfValueIdmap.html
 #
 solaris.system.:::Machine Administration::help=SysHeader.html
 solaris.system.date:::Set Date & Time::help=SysDate.html

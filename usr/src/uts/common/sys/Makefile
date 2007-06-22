@@ -257,6 +257,7 @@ CHKHDRS=			\
 	ia.h			\
 	iapriocntl.h		\
 	id32.h			\
+	idmap.h 		\
 	ieeefp.h		\
 	id_space.h		\
 	instance.h		\
@@ -281,6 +282,7 @@ CHKHDRS=			\
 	kcpc.h			\
 	kdi.h			\
 	kdi_impl.h		\
+	kidmap.h		\
 	klwp.h			\
 	kmdb.h			\
 	kmem.h			\

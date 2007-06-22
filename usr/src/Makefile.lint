@@ -152,6 +152,7 @@ COMMON_SUBDIRS = \
 	cmd/head \
 	cmd/hostid \
 	cmd/hostname \
+	cmd/idmap \
 	cmd/init \
 	cmd/intrstat \
 	cmd/ipcrm \
@@ -329,6 +330,7 @@ COMMON_SUBDIRS = \
 	lib/libexacct \
 	lib/libgen \
 	lib/libgss \
+	lib/libidmap \
 	lib/libinetcfg \
 	lib/libinetsvc \
 	lib/libinetutil \

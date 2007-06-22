@@ -226,6 +226,8 @@ SUBDIRS += \
 	policykit	\
 	hal		\
 	libshare	\
+	libsqlite	\
+	libidmap	\
 	libipmi		\
 	libexacct/demo	\
 	$($(MACH)_SUBDIRS)
@@ -277,6 +279,7 @@ MSGSUBDIRS=		\
 	libdiskmgt	\
 	libdladm	\
 	libgss		\
+	libidmap	\
 	libinetcfg	\
 	libipmp		\
 	libnsl		\
@@ -373,6 +376,7 @@ HDRSUBDIRS=		\
 	libsec		\
 	libslp		\
 	libsmedia	\
+	libsqlite	\
 	libsysevent	\
 	libtecla	\
 	libtnf		\
@@ -400,6 +404,7 @@ HDRSUBDIRS=		\
 	libmapid	\
 	libkrb5		\
 	libshare	\
+	libidmap	\
 	$($(MACH)_HDRSUBDIRS)
 
 $(CLOSED_BUILD)HDRSUBDIRS += \
@@ -479,6 +484,7 @@ libefi:		libuuid
 libfstyp:	libnvpair
 $(CLOSED_BUILD)$(CLOSED)/lib/libelfsign: \
 			$(CLOSED)/lib/libike libcryptoutil pkcs11
+libidmap:	libnsl
 libinetcfg:	libnsl libsocket libdevinfo
 libkmf:		libcryptoutil pkcs11 openssl
 libnsl:		libmd5 libscf

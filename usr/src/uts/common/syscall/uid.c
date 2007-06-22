@@ -59,7 +59,7 @@ setuid(uid_t uid)
 		return (set_errno(EINVAL));
 
 	if (uid > MAXUID) {
-		if (ksid_lookup(uid, &ksid) != 0)
+		if (ksid_lookupbyuid(uid, &ksid) != 0)
 			return (set_errno(EINVAL));
 		ksp = &ksid;
 	} else {
@@ -178,7 +178,7 @@ seteuid(uid_t uid)
 		return (set_errno(EINVAL));
 
 	if (uid > MAXUID) {
-		if (ksid_lookup(uid, &ksid) != 0)
+		if (ksid_lookupbyuid(uid, &ksid) != 0)
 			return (set_errno(EINVAL));
 		ksp = &ksid;
 	} else {
@@ -252,7 +252,7 @@ setreuid(uid_t ruid, uid_t euid)
 		return (set_errno(EINVAL));
 
 	if (euid != -1 && euid > MAXUID) {
-		if (ksid_lookup(euid, &ksid) != 0)
+		if (ksid_lookupbyuid(euid, &ksid) != 0)
 			return (set_errno(EINVAL));
 		ksp = &ksid;
 	} else {

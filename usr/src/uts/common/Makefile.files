@@ -1042,6 +1042,11 @@ CRYPTMOD_OBJS += cryptmod.o
 KB_OBJS +=	kbd.o		keytables.o
 
 #
+#			ID mapping module
+#
+IDMAP_OBJS +=	idmap_mod.o	idmap_kapi.o	idmap_xdr.o	idmap_cache.o
+
+#
 #			scheduling class modules
 #
 RT_OBJS +=		rt.o

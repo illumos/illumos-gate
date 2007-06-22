@@ -423,6 +423,7 @@ OTHERS=  \
 	/var/adm/exacct \
 	/var/adm/log \
 	/var/adm/sa \
+	/var/idmap \
 	/var/mail \
 	/var/spool/lp \
 	/var/tmp
@@ -517,6 +518,9 @@ $(SYM.ROOT.SYS:%=$(ROOT)%):=	GROUP= sys
 
 $(ROOT)/var/adm \
 $(ROOT)/var/adm/sa :=		DIRMODE= 775
+
+$(ROOT)/var/idmap :=		OWNER= daemon
+$(ROOT)/var/idmap :=		GROUP= daemon
 
 $(ROOT)/dev/term:=		GROUP= root
 

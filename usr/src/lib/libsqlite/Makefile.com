@@ -46,8 +46,8 @@ OBJECTS = \
 
 include $(SRC)/lib/Makefile.lib
 
-SRCDIR = src
-TOOLDIR = tool
+SRCDIR = ../src
+TOOLDIR = ../tool
 LIBS = $(RELOC) $(LINTLIB)
 
 $(LINTLIB) :=	SRCS = $(LINTSRC)
@@ -85,10 +85,10 @@ SRCS = \
 	$(SRCDIR)/where.c	\
 	$(SRCDIR)/trigger.c
 
-MYCPPFLAGS = -D_REENTRANT -DTHREADSAFE=1 -DHAVE_USLEEP=1 -I. -I$(SRCDIR)
+MYCPPFLAGS = -D_REENTRANT -DTHREADSAFE=1 -DHAVE_USLEEP=1 -I. -I.. -I$(SRCDIR)
 CPPFLAGS += $(MYCPPFLAGS)
 
-MAPFILE = mapfile-sqlite
+MAPFILE = ../mapfile-sqlite
 
 # Header files used by all library source files.
 #
@@ -99,7 +99,7 @@ HDR = \
 	opcodes.h		\
 	$(SRCDIR)/os.h		\
 	parse.h			\
-	sqlite.h		\
+	../sqlite.h		\
 	$(SRCDIR)/sqliteInt.h	\
 	$(SRCDIR)/vdbe.h	\
 	$(SRCDIR)/vdbeInt.h
@@ -138,8 +138,8 @@ $(NATIVETARGETS) :=	CPPFLAGS = $(MYCPPFLAGS)
 $(NATIVETARGETS) :=	LDFLAGS =
 $(NATIVETARGETS) :=	LDLIBS = -lc
 
-$(OBJS) shell.o :=		CFLAGS += $(CTF_FLAGS)
-$(OBJS) shell.o :=		CTFCONVERT_POST = $(CTFCONVERT_O)
+$(OBJS) :=		CFLAGS += $(CTF_FLAGS)
+$(OBJS) :=		CTFCONVERT_POST = $(CTFCONVERT_O)
 
 TCLBASE = /usr/sfw
 TCLVERS = tcl8.3
@@ -169,30 +169,28 @@ CLEANFILES += \
 	parse_tmp.out	\
 	parse_tmp.y	\
 	parse.c		\
-	parse.h		\
-	shell.o		\
-	sqlite		\
-	sqlite.h
+	parse.h		
 
 ENCODING  = ISO8859
+
+LINTSRC=    ../llib-lsqlite
+
 
 .PARALLEL: $(OBJS) $(OBJS:%.o=%-native.o)
 .KEEP_STATE:
 
-SQLITE = sqlite
-
-ROOTLIBSVCBIN = $(ROOT)/lib/svc/bin
-ROOTSQLITE = $(ROOTLIBSVCBIN)/$(SQLITE)
-
 # This is the default Makefile target.  The objects listed here
 # are what get build when you type just "make" with no arguments.
 #
-all:		$(LIBS) $(SQLITE)
-install:	all $(ROOTSQLITE)
+all:		$(LIBS)
+install:	all $(ROOTLIBDIR)/$(RELOC) $(ROOTLIBDIR)/$(NATIVERELOC) \
+		$(ROOTLIBDIR)/llib-lsqlite.ln
 
-$(ROOTSQLITE)	:= FILEMODE = 555
+$(ROOTLIBDIR)/$(RELOC)		:= FILEMODE= 644
+$(ROOTLIBDIR)/$(NATIVERELOC)	:= FILEMODE= 644
+$(ROOTLIBDIR)/llib-lsqlite.ln	:= FILEMODE= 644
 
-$(ROOTLIBSVCBIN)/%: %
+$(ROOTLIBDIR)/%: %
 	$(INS.file)
 
 $(OBJS) $(OBJS:%.o=%-native.o): $(HDR)
@@ -205,15 +203,6 @@ $(RELOC): objs .WAIT $(OBJS)
 
 $(NATIVERELOC):	objs .WAIT $(OBJS:%.o=%-native.o)
 	$(LD) -r $(MAPFILE:%=-M%) -o $(NATIVERELOC) $(OBJS:%.o=%-native.o)
-
-#
-# we don't want this output different every time, so we just suppress it
-#
-sqlite.h: $(SRCDIR)/sqlite.h.in
-	@echo "Generating $@"; \
-	 sed -e 's"--VERS--"$(SQLITE_VERSION)-$(VERSION)"' \
-	    -e s/--ENCODING--/$(ENCODING)/ \
-	    $(SRCDIR)/sqlite.h.in > $@
 
 opcodes.h: $(SRCDIR)/vdbe.c
 	@echo "Generating $@"; \
@@ -245,14 +234,6 @@ lemon-build:	lemon.o $(TOOLDIR)/lempar.c
 	$(LN) -s $(TOOLDIR)/lempar.c lempar.c
 	$(RM) lemon-build
 	$(CP) lemon lemon-build
-
-shell.o: sqlite.h
-
-sqlite:	shell.o $(RELOC)
-	$(LINK.c) -o sqlite shell.o \
-	    $(MAPFILE.NES:%=-M%) $(MAPFILE.NED:%=-M%) $(RELOC)
-	$(CTFMERGE) -t -L VERSION -o $@ shell.o $(RELOC)
-	$(POST_PROCESS)
 
 testfixture: FRC
 	@if [ -f $(TCLBASE)/include/tcl.h ]; then \

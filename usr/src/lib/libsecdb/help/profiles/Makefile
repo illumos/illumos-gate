@@ -69,7 +69,9 @@ HTMLENTS = \
 	RtZFSFileSysMngmnt.html \
 	RtZFSStorageMngmnt.html \
 	RtZoneMngmnt.html \
-	RtDefault.html
+	RtDefault.html \
+	RtIdmapMngmnt.html \
+	RtIdmapNameRulesMngmnt.html
 
 
 HELPDIR =	$(ROOT)/usr/lib/help

@@ -90,7 +90,10 @@ HTMLENTS = \
 	NetworkHeader.html \
 	WifiConfig.html \
 	WifiWep.html \
-	LinkSecurity.html
+	LinkSecurity.html \
+	IdmapRules.html \
+	SmfIdmapStates.html \
+	SmfValueIdmap.html
 
 HELPDIR=$(ROOT)/usr/lib/help
 AUTHDIR=$(HELPDIR)/auths

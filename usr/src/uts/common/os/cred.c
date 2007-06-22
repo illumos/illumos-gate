@@ -60,6 +60,7 @@
 #include <sys/zone.h>
 #include <sys/tsol/label.h>
 #include <sys/sid.h>
+#include <sys/idmap.h>
 
 typedef struct ephidmap_data {
 	uid_t		min_uid, last_uid;
@@ -89,7 +90,7 @@ static int get_c2audit_load(void);
  * Start with an invalid value for atomic increments.
  */
 static ephidmap_data_t ephemeral_data = {
-	MAXUID, MAXUID, MAXUID, MAXUID
+	MAXUID, IDMAP_WK__MAX_UID, MAXUID, IDMAP_WK__MAX_GID
 };
 
 static boolean_t hasephids = B_FALSE;
@@ -122,7 +123,7 @@ cred_init(void)
 	}
 
 	cred_cache = kmem_cache_create("cred_cache", crsize, 0,
-		NULL, NULL, NULL, NULL, NULL, 0);
+	    NULL, NULL, NULL, NULL, NULL, 0);
 
 	/*
 	 * dummycr is used to copy initial state for creds.
@@ -528,7 +529,7 @@ crcmp(const cred_t *cr1, const cred_t *cr2)
 	    cr1->cr_ngroups == cr2->cr_ngroups &&
 	    cr1->cr_zone == cr2->cr_zone &&
 	    bcmp(cr1->cr_groups, cr2->cr_groups,
-		    cr1->cr_ngroups * sizeof (gid_t)) == 0) {
+	    cr1->cr_ngroups * sizeof (gid_t)) == 0) {
 		return (!priv_isequalset(&CR_OEPRIV(cr1), &CR_OEPRIV(cr2)));
 	}
 	return (1);
@@ -970,14 +971,16 @@ boolean_t
 valid_ephemeral_uid(uid_t id)
 {
 	membar_consumer();
-	return (id > ephemeral_data.min_uid && id <= ephemeral_data.last_uid);
+	return (id < IDMAP_WK__MAX_UID ||
+	    (id > ephemeral_data.min_uid && id <= ephemeral_data.last_uid));
 }
 
 boolean_t
 valid_ephemeral_gid(gid_t id)
 {
 	membar_consumer();
-	return (id > ephemeral_data.min_gid && id <= ephemeral_data.last_gid);
+	return (id < IDMAP_WK__MAX_GID ||
+	    (id > ephemeral_data.min_gid && id <= ephemeral_data.last_gid));
 }
 
 int

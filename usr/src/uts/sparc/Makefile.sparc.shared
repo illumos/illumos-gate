@@ -377,6 +377,7 @@ MISC_KMODS	+= ibcm
 MISC_KMODS	+= ibdm
 MISC_KMODS	+= ibmf
 MISC_KMODS	+= ibtl
+MISC_KMODS	+= idmap
 MISC_KMODS	+= hook
 MISC_KMODS	+= neti
 MISC_KMODS	+= ctf 

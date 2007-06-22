@@ -94,7 +94,7 @@ $(PMTMO_FILE) pmtmo_file: $(PATCH_MAKEUP_TABLE)
 COMMON_HDRDIRS= common/des common/fs common/gssapi common/inet common/net \
 	common/netinet common/nfs common/rpc common/sys common/vm \
 	common/c2 common/pcmcia/sys common/rpcsvc common/inet/kssl \
-	common/inet/nca common/inet/ipf/netinet common/ipp \
+	common/inet/nca common/inet/ipf/netinet common/ipp common/idmap \
 	common/sharefs
 
 # These aren't the only headers in closed.  But the other directories
@@ -118,6 +118,7 @@ all_h: FRC
 	@cd common/rpc; pwd; $(MAKE) $@
 	@cd common/rpcsvc; pwd; $(MAKE) $@
 	@cd common/gssapi; pwd; $(MAKE) $@
+	@cd common/idmap; pwd; $(MAKE) $@
 
 ONC_FILES=	common/io/timod.c \
 		common/os/sig.c \

@@ -345,6 +345,10 @@ $(OBJS_DIR)/%.o:		$(KMECHKRB5_BASE)/profile/%.c
 	$(COMPILE.c) $(KGSSDFLAGS) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/idmap/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -1178,6 +1182,9 @@ $(LINTS_DIR)/%.ln:		$(KMECHKRB5_BASE)/krb5/os/%.c
 
 $(LINTS_DIR)/%.ln:		$(KMECHKRB5_BASE)/mech/%.c
 	@($(LHEAD) $(LINT.c) $(KGSSDFLAGS) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/idmap/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))

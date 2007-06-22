@@ -54,7 +54,8 @@
 # Ignore everything under trees that may be resynched from outside ON.
 #
 ./src/cmd/perl
-./src/cmd/svc/configd/sqlite
+./src/cmd/sqlite
+./src/lib/libsqlite
 ./src/cmd/tcpd
 ./src/common/openssl
 ./src/grub

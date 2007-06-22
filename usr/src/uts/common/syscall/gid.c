@@ -53,7 +53,7 @@ setgid(gid_t gid)
 		return (set_errno(EINVAL));
 
 	if (gid > MAXUID) {
-		if (ksid_lookup(gid, &ksid) != 0)
+		if (ksid_lookupbygid(gid, &ksid) != 0)
 			return (set_errno(EINVAL));
 		ksp = &ksid;
 	} else {
@@ -137,7 +137,7 @@ setegid(gid_t gid)
 		return (set_errno(EINVAL));
 
 	if (gid > MAXUID) {
-		if (ksid_lookup(gid, &ksid) != 0)
+		if (ksid_lookupbygid(gid, &ksid) != 0)
 			return (set_errno(EINVAL));
 		ksp = &ksid;
 	} else {
@@ -205,7 +205,7 @@ setregid(gid_t rgid, gid_t egid)
 		return (set_errno(EINVAL));
 
 	if (egid != -1 && egid > MAXUID) {
-		if (ksid_lookup(egid, &ksid) != 0)
+		if (ksid_lookupbygid(egid, &ksid) != 0)
 			return (set_errno(EINVAL));
 		ksp = &ksid;
 	} else {

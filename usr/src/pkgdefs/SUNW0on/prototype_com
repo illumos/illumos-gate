@@ -254,6 +254,9 @@ f none usr/lib/help/auths/locale/LinkSecurity.html 444 root bin
 f none usr/lib/help/auths/locale/MailHeader.html 0444 root bin
 f none usr/lib/help/auths/locale/MailQueue.html 0444 root bin
 f none usr/lib/help/auths/locale/DevCDRW.html 0444 root bin
+f none usr/lib/help/auths/locale/IdmapRules.html 0444 root bin
+f none usr/lib/help/auths/locale/SmfIdmapStates.html 0444 root bin
+f none usr/lib/help/auths/locale/SmfValueIdmap.html 0444 root bin
 d none usr/lib/help/profiles 755 root bin
 d none usr/lib/help/profiles/locale 755 root bin
 f none usr/lib/help/profiles/locale/RtAll.html 444 root bin
@@ -297,6 +300,8 @@ f none usr/lib/help/profiles/locale/RtDatAdmin.html 444 root bin
 f none usr/lib/help/profiles/locale/RtZFSFileSysMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtZFSStorageMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtZoneMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtIdmapMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtIdmapNameRulesMngmnt.html 444 root bin
 #
 #
 # OCF Messages

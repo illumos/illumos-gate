@@ -57,6 +57,8 @@ Network Link Security:::Manage network link security:auths=solaris.network.link.
 Network IPsec Management:::Manage IPsec and IKE:auths=solaris.smf.manage.ipsec,solaris.smf.value.ipsec;help=RtNetIPsec.html
 Name Service Management:::Non-security name service scripts/commands:help=RtNameServiceAdmin.html
 Name Service Security:::Security related name service scripts/commands:help=RtNameServiceSecure.html
+Idmap Service Management:::Manage Identity Mapping Service:auths=solaris.smf.manage.idmap,solaris.smf.value.idmap;help=RtIdmapMngmnt.html
+Idmap Name Mapping Management:::Manage Name-based Mapping Rules of Identity Mapping Service:auths=solaris.admin.idmap.rules;help=RtIdmapNameRulesMngmnt.html
 Object Access Management:::Change ownership and permission on files:help=RtObAccessMngmnt.html
 Process Management:::Manage current processes and processors:auths=solaris.smf.manage.cron,solaris.smf.manage.power;help=RtProcManagement.html
 Rights Delegation:::Delegate ability to assign rights to users and roles:auths=solaris.role.delegate,solaris.profmgr.delegate,solaris.grant;help=RtRightsDelegate.html

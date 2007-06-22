@@ -51,20 +51,6 @@ extern "C" {
 #define	SIDSYS_SID2ID	0
 #define	SIDSYS_ID2SID	1
 
-typedef struct domsid {
-	uint_t	ds_rid;
-	char	ds_dom[1];
-} domsid_t;
-
-typedef struct sidmap_call {
-	int	sc_type;
-	union	sc_val_u {
-		uid_t		sc_id;
-		domsid_t	sc_sid;
-	} sc_val;
-} sidmap_call_t;
-
-
 #ifdef _KERNEL
 /* Domains are stored in AVL trees so we can share them among SIDs */
 typedef struct ksiddomain {
@@ -100,8 +86,6 @@ typedef struct ksidlist {
 	ksid_t		ksl_sids[1];	/* Allocate ksl_nsid times */
 } ksidlist_t;
 
-#define	KSIDLIST_MEM(n)	(sizeof (ksidlist_t) + ((n) - 1) * sizeof (ksid_t))
-
 typedef struct credsid {
 	uint_t		kr_ref;			/* Reference count */
 	ksid_t		kr_sidx[KSID_COUNT];	/* User, group, default owner */
@@ -111,7 +95,8 @@ typedef struct credsid {
 const char *ksid_getdomain(ksid_t *);
 uint_t ksid_getrid(ksid_t *);
 
-int ksid_lookup(uid_t, ksid_t *);
+int ksid_lookupbyuid(uid_t, ksid_t *);
+int ksid_lookupbygid(gid_t, ksid_t *);
 void ksid_rele(ksid_t *);
 
 credsid_t *kcrsid_alloc(void);
@@ -131,9 +116,6 @@ void ksidlist_hold(ksidlist_t *);
 ksiddomain_t *ksid_lookupdomain(const char *);
 
 ksidlist_t *kcrsid_gidstosids(int, gid_t *);
-
-int idmap_call_byid(uid_t, ksid_t *);
-uid_t idmap_call_bysid(ksid_t *);
 
 #else
 

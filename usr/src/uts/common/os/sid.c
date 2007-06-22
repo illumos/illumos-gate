@@ -38,6 +38,10 @@
 #include <sys/sid.h>
 #include <sys/sysmacros.h>
 #include <sys/systm.h>
+#include <sys/kidmap.h>
+#include <sys/idmap.h>
+
+#define	KSIDLIST_MEM(n)	(sizeof (ksidlist_t) + ((n) - 1) * sizeof (ksid_t))
 
 static kmutex_t sid_lock;
 static avl_tree_t sid_tree;
@@ -185,16 +189,30 @@ ksid_getrid(ksid_t *ks)
 }
 
 int
-ksid_lookup(uid_t id, ksid_t *res)
+ksid_lookupbyuid(uid_t id, ksid_t *res)
 {
-	uid_t tmp;
+	const char *sid_prefix;
 
-	if (idmap_call_byid(id, res) == -1)
+	if (kidmap_getsidbyuid(id, &sid_prefix, &res->ks_rid) != IDMAP_SUCCESS)
 		return (-1);
 
-	tmp = idmap_call_bysid(res);
-	if (tmp != id)
-		cmn_err(CE_WARN, "The idmapper has gone bonkers");
+	res->ks_domain = ksid_lookupdomain(sid_prefix);
+
+	res->ks_id = id;
+
+	return (0);
+}
+
+int
+ksid_lookupbygid(gid_t id, ksid_t *res)
+{
+	const char *sid_prefix;
+
+	if (kidmap_getsidbygid(id, &sid_prefix, &res->ks_rid) != IDMAP_SUCCESS)
+		return (-1);
+
+	res->ks_domain = ksid_lookupdomain(sid_prefix);
+
 	res->ks_id = id;
 
 	return (0);
@@ -376,7 +394,7 @@ kcrsid_gidstosids(int ngrp, gid_t *grp)
 	for (i = 0; i < ngrp; i++) {
 		if (grp[i] > MAXUID) {
 			list->ksl_neid++;
-			if (ksid_lookup(grp[i], &list->ksl_sids[i]) != 0) {
+			if (ksid_lookupbygid(grp[i], &list->ksl_sids[i]) != 0) {
 				while (--i >= 0)
 					ksid_rele(&list->ksl_sids[i]);
 				cnt = 0;

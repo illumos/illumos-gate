@@ -112,6 +112,7 @@
 #include <sys/rctl_impl.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
+#include <sys/sid.h>
 #include <sys/signal.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>

@@ -191,6 +191,7 @@ COMMON_SUBDIRS=		\
 	hostname	\
 	hwdata		\
 	id		\
+	idmap		\
 	infocmp		\
 	init		\
 	initpkg		\
@@ -349,6 +350,7 @@ COMMON_SUBDIRS=		\
 	spell		\
 	spline		\
 	split		\
+	sqlite		\
 	srchtxt		\
 	ssh		\
 	stat		\
@@ -565,6 +567,7 @@ MSGSUBDIRS=		\
 	head		\
 	hostname	\
 	id		\
+	idmap		\
 	isaexec		\
 	iscsi		\
 	join		\
@@ -820,6 +823,7 @@ MANIFEST_SUBDIRS=			\
 	fs.d/cachefs			\
 	fs.d/nfs/svc			\
 	gss/gssd			\
+	idmap/idmapd			\
 	krb5/kadmin/server		\
 	krb5/krb5kdc			\
 	krb5/kwarn			\

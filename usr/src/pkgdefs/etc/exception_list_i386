@@ -835,3 +835,24 @@ usr/sbin/amd64/sharemgr			i386
 # Private/Internal u8_textprep header file. Do not ship.
 #
 usr/include/sys/u8_textprep_data.h	i386
+#
+# libidmap is private, so the compilation links and lint libraries are
+# not delivered
+#
+usr/lib/llib-lidmap			i386
+usr/lib/libidmap.so			i386
+usr/lib/llib-lidmap.ln			i386
+usr/lib/amd64/libidmap.so		i386
+usr/lib/amd64/llib-lidmap.ln		i386
+usr/include/idmap.h			i386
+usr/include/sys/idmap.h			i386
+usr/include/sys/kidmap.h		i386
+#
+# SQLite is private, used by SMF (svc.configd) and idmapd
+#
+usr/lib/libsqlite-native.o		i386
+usr/lib/libsqlite.o			i386
+usr/lib/llib-lsqlite.ln			i386
+usr/include/sqlite			i386
+usr/include/sqlite/sqlite-misc.h	i386
+usr/include/sqlite/sqlite.h		i386

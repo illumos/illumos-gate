@@ -436,6 +436,7 @@ e preserve var/adm/utmpx 644 root bin
 e preserve var/adm/wtmpx 644 adm adm
 d none var/audit 755 root sys
 d none var/cron 755 root sys
+d none var/idmap 755 daemon daemon
 d none var/inet 755 root sys
 d none var/ld 755 root bin
 s none var/ld/32=.
@@ -524,6 +525,7 @@ f manifest var/svc/manifest/system/coreadm.xml 0444 root sys
 f manifest var/svc/manifest/system/cron.xml 0444 root sys
 f manifest var/svc/manifest/system/cryptosvc.xml 0444 root sys
 f manifest var/svc/manifest/system/identity.xml 0444 root sys
+f manifest var/svc/manifest/system/idmap.xml 0444 root sys
 f manifest var/svc/manifest/system/keymap.xml 0444 root sys
 f manifest var/svc/manifest/system/manifest-import.xml 0444 root sys
 f manifest var/svc/manifest/system/name-service-cache.xml 0444 root sys

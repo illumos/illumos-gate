@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,7 +50,7 @@ $(NATIVE_BUILD)OBJS = $(MYOBJS:%.o=%-native.o)
 
 ROOTCMDDIR=	$(ROOT)/lib/svc/bin
 
-MYCPPFLAGS = -I. -I../common -I../../../common/svc -D_REENTRANT
+MYCPPFLAGS = -I. -I../common -I../../../common/svc -I$(ROOT)/usr/include/sqlite -D_REENTRANT
 CPPFLAGS += $(MYCPPFLAGS)
 CFLAGS	+= -v
 MYLDLIBS = -lumem -luutil
@@ -79,10 +79,9 @@ FILEMODE = 0555
 OWNER = root
 GROUP = sys
 
-SQLITEDIR = sqlite
-LIBSQLITE = $(SQLITEDIR)/libsqlite.o
-$(NATIVE_BUILD)LIBSQLITE = $(SQLITEDIR)/libsqlite-native.o
-SQLITELINT = $(SQLITEDIR)/llib-lsqlite.ln
+LIBSQLITE = $(ROOT)/usr/lib/libsqlite.o
+$(NATIVE_BUILD)LIBSQLITE = $(ROOT)/usr/lib/libsqlite-native.o
+SQLITELINT = $(ROOT)/usr/lib/llib-lsqlite.ln
 
 OBJS += $(LIBSQLITE)
 
@@ -100,19 +99,7 @@ native: FRC
 	@cd $(LIBUUTIL)/native; pwd; $(MAKE) $(MFLAGS) install
 	@NATIVE_BUILD= $(MAKE) $(MFLAGS) all
 
-$(SQLITEDIR): FRC
-	@cd $(SQLITEDIR); pwd; $(MAKE) $(TARGET)
-
-$(SQLITEDIR)/libsqlite.o: FRC
-	@cd $(SQLITEDIR); pwd; $(MAKE) all
-
-$(SQLITEDIR)/libsqlite-native.o: FRC
-	@cd $(SQLITEDIR); pwd; $(MAKE) native
-
-$(SQLITEDIR)/llib-lsqlite.ln: FRC
-	@cd $(SQLITEDIR); pwd; $(MAKE) llib-lsqlite.ln
-
-$(PROG): $(LIBSQLITE) $(OBJS)
+$(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS) $(CTFMERGE_HOOK)
 	$(POST_PROCESS)
 
@@ -123,16 +110,16 @@ $(PROG): $(LIBSQLITE) $(OBJS)
 $(ROOTCMDDIR)/%: %.sh
 	$(INS.rename)
 
-install: all $(SQLITEDIR) $(ROOTCMD) $(ROOTVARSADMFILE) $(ROOTSCRIPTFILE)
+install: all $(ROOTCMD) $(ROOTVARSADMFILE) $(ROOTSCRIPTFILE)
 
 clean: FRC
 	$(RM) $(MYOBJS) $(MYOBJS:%.o=%-native.o)
 
-clobber: $(SQLITEDIR)
+clobber:
 
 lint:   lint_SRCS
 
-lint_SRCS: $(SQLITELINT)
+lint_SRCS:
 
 include ../../Makefile.targ
 
