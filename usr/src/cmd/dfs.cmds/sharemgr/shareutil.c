@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,39 +46,49 @@ int
 add_opt(struct options **optlistp, char *optarg, int unset)
 {
 	struct options *newopt, *tmp, *optlist;
+	char *optname;
+	char *optvalue;
 
 	optlist = *optlistp;
 	newopt = (struct options *)malloc(sizeof (struct options));
-	if (newopt != NULL) {
-		char *optname;
-		char *optvalue;
+	if (newopt == NULL)
+		return (OPT_ADD_MEMORY);
 
-		/* extract property/value pair */
-		optname = optarg;
-		if (!unset) {
-		    optvalue = strchr(optname, '=');
-		    if (optvalue == NULL) {
+	/* extract property/value pair */
+	optname = optarg;
+	if (!unset) {
+		optvalue = strchr(optname, '=');
+		if (optvalue == NULL) {
 			free(newopt);
 			return (OPT_ADD_SYNTAX);
-		    }
-		    *optvalue++ = '\0'; /* separate the halves */
-		} else {
-		    optvalue = NULL;
 		}
-
-		newopt->optname = optname;
-		newopt->optvalue = optvalue;
-		newopt->next = NULL;
-		if (optlist == NULL) {
-			optlist = newopt;
-		} else {
-			for (tmp = optlist; tmp->next != NULL;
-			    tmp = tmp->next) {
-			}
-			tmp->next = newopt;
-		}
-		*optlistp = optlist;
-		return (OPT_ADD_OK);
+		*optvalue++ = '\0'; /* separate the halves */
+	} else {
+		optvalue = NULL;
 	}
-	return (OPT_ADD_MEMORY);
+
+	newopt->optname = optname;
+	newopt->optvalue = optvalue;
+	newopt->next = NULL;
+	if (optlist == NULL) {
+		optlist = newopt;
+	} else {
+		for (tmp = optlist; tmp->next != NULL;
+		    tmp = tmp->next) {
+			/*
+			 * Check to see if this is a duplicate
+			 * value. We want to replace the first
+			 * instance with the second.
+			 */
+			if (strcmp(tmp->optname, optname) == 0) {
+				tmp->optvalue = optvalue;
+				free(newopt);
+				goto done;
+			}
+		}
+		tmp->next = newopt;
+	}
+done:
+	*optlistp = optlist;
+	return (OPT_ADD_OK);
 }

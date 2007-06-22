@@ -829,22 +829,26 @@ sa_init(int init_service)
 					verifydefgroupopts(handle);
 				}
 
-			if (updatelegacy == B_TRUE) {
-				sablocksigs(&old);
-				getlegacyconfig((sa_handle_t)handle,
-				    SA_LEGACY_DFSTAB, &handle->tree);
-				if (stat(SA_LEGACY_DFSTAB, &st) >= 0)
-					set_legacy_timestamp(handle->tree,
-					    SA_LEGACY_DFSTAB,
-					    TSTAMP(st.st_ctim));
-				saunblocksigs(&old);
-				/* Safe to unlock now to allow others to run */
-				(void) lockf(lockfd, F_ULOCK, 0);
-				(void) close(lockfd);
+				if (updatelegacy == B_TRUE) {
+					sablocksigs(&old);
+					getlegacyconfig((sa_handle_t)handle,
+					    SA_LEGACY_DFSTAB, &handle->tree);
+					if (stat(SA_LEGACY_DFSTAB, &st) >= 0)
+						set_legacy_timestamp(
+						    handle->tree,
+						    SA_LEGACY_DFSTAB,
+						    TSTAMP(st.st_ctim));
+					saunblocksigs(&old);
+					/*
+					 * Safe to unlock now to allow
+					 * others to run
+					 */
+					(void) lockf(lockfd, F_ULOCK, 0);
+					(void) close(lockfd);
+				}
+				legacy |= sa_get_zfs_shares(handle, "zfs");
+				legacy |= gettransients(handle, &handle->tree);
 			}
-			legacy |= sa_get_zfs_shares(handle, "zfs");
-			legacy |= gettransients(handle, &handle->tree);
-		}
 		}
 	}
 	return ((sa_handle_t)handle);

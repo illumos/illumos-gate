@@ -1161,8 +1161,16 @@ parse_dfstab(sa_handle_t handle, char *dfstab, xmlNodePtr root)
 				1);
 			continue;
 		    }
-		    /* its the same group but could have changed options */
-		    oldprops = sa_proto_legacy_format(list->fstype, share, 0);
+			/*
+			 * It is the same group but could have changed
+			 * options. Make sure we include the group's
+			 * properties so we don't end up moving them to
+			 * the share inadvertantly. The last arg being
+			 * true says to get the inherited properties as well
+			 * as the local properties.
+			 */
+		    oldprops = sa_proto_legacy_format(list->fstype, share,
+			B_TRUE);
 		    if (oldprops != NULL) {
 			if (list->options != NULL &&
 				strcmp(oldprops, list->options) != 0) {

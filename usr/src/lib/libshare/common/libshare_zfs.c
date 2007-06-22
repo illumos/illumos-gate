@@ -605,72 +605,73 @@ sa_get_zfs_shares(sa_handle_t handle, char *groupname)
 		return (SA_SYSTEM_ERR);
 
 	zfsgroup = find_or_create_group(handle, groupname, "nfs", &err);
-	if (zfsgroup != NULL) {
+	if (zfsgroup == NULL)
+		return (legacy);
+
+	/*
+	 * need to walk the mounted ZFS pools and datasets to
+	 * find shares that are possible.
+	 */
+	get_all_filesystems((sa_handle_impl_t)handle, &zlist, &count);
+	qsort(zlist, count, sizeof (void *), mountpoint_compare);
+
+	group = zfsgroup;
+	for (i = 0; i < count; i++) {
+		char *dataset;
+
+		source = ZFS_SRC_ALL;
+		/* If no mountpoint, skip. */
+		if (zfs_prop_get(zlist[i], ZFS_PROP_MOUNTPOINT,
+		    mountpoint, sizeof (mountpoint), NULL, NULL, 0,
+		    B_FALSE) != 0)
+			continue;
+
 		/*
-		 * need to walk the mounted ZFS pools and datasets to
-		 * find shares that are possible.
+		 * zfs_get_name value must not be freed. It is just a
+		 * pointer to a value in the handle.
 		 */
-		get_all_filesystems((sa_handle_impl_t)handle, &zlist, &count);
-		qsort(zlist, count, sizeof (void *), mountpoint_compare);
+		if ((dataset = (char *)zfs_get_name(zlist[i])) == NULL)
+			continue;
 
-		group = zfsgroup;
-		for (i = 0; i < count; i++) {
-			char *dataset;
+		/*
+		 * only deal with "mounted" file systems since
+		 * unmounted file systems can't actually be shared.
+		 */
 
-			source = ZFS_SRC_ALL;
-			if (zfs_prop_get(zlist[i], ZFS_PROP_MOUNTPOINT,
-			    mountpoint, sizeof (mountpoint), NULL, NULL, 0,
-			    B_FALSE) != 0) {
-				/* no mountpoint */
-				continue;
+		if (!zfs_is_mounted(zlist[i], NULL))
+			continue;
+
+		if (zfs_prop_get(zlist[i], ZFS_PROP_SHARENFS, shareopts,
+		    sizeof (shareopts), &source, sourcestr,
+		    ZFS_MAXPROPLEN, B_FALSE) == 0 &&
+		    strcmp(shareopts, "off") != 0) {
+			/* it is shared so add to list */
+			share = sa_find_share(handle, mountpoint);
+			err = SA_OK;
+			if (share != NULL) {
+				/*
+				 * A zfs file system had been shared
+				 * through traditional methods
+				 * (share/dfstab or added to a non-zfs
+				 * group.  Now it has been added to a
+				 * ZFS group via the zfs
+				 * command. Remove from previous
+				 * config and setup with current
+				 * options.
+				 */
+				err = sa_remove_share(share);
+				share = NULL;
 			}
-
-			/*
-			 * zfs_get_name value must not be freed. It is just a
-			 * pointer to a value in the handle.
-			 */
-			if ((dataset = (char *)zfs_get_name(zlist[i])) == NULL)
-				continue;
-
-			/*
-			 * only deal with "mounted" file systems since
-			 * unmounted file systems can't actually be shared.
-			 */
-
-			if (!zfs_is_mounted(zlist[i], NULL))
-				continue;
-
-			if (zfs_prop_get(zlist[i], ZFS_PROP_SHARENFS, shareopts,
-			    sizeof (shareopts), &source, sourcestr,
-			    ZFS_MAXPROPLEN, B_FALSE) == 0 &&
-			    strcmp(shareopts, "off") != 0) {
-				/* it is shared so add to list */
-				share = sa_find_share(handle, mountpoint);
-				err = SA_OK;
-				if (share != NULL) {
-					/*
-					 * A zfs file system had been shared
-					 * through traditional methods
-					 * (share/dfstab or added to a non-zfs
-					 * group.  Now it has been added to a
-					 * ZFS group via the zfs
-					 * command. Remove from previous
-					 * config and setup with current
-					 * options.
-					 */
-					err = sa_remove_share(share);
-					share = NULL;
-				}
-				if (err == SA_OK) {
-					if (source & ZFS_SRC_INHERITED) {
-						err = zfs_inherited(handle,
-						    share, sourcestr,
-						    shareopts, mountpoint);
-					} else {
-						group = _sa_create_zfs_group(
-						    zfsgroup, dataset);
-						if (group == NULL) {
-							static int err = 0;
+			if (err == SA_OK) {
+				if (source & ZFS_SRC_INHERITED) {
+					err = zfs_inherited(handle,
+					    share, sourcestr,
+					    shareopts, mountpoint);
+				} else {
+					group = _sa_create_zfs_group(
+					    zfsgroup, dataset);
+					if (group == NULL) {
+						static int err = 0;
 						/*
 						 * there is a problem,
 						 * but we can't do
@@ -679,18 +680,18 @@ sa_get_zfs_shares(sa_handle_t handle, char *groupname)
 						 * issue a warning an
 						 * move on.
 						 */
-							zfs_grp_error(err);
-							err = 1;
-							continue;
-						}
-						set_node_attr(group, "zfs",
-						    "true");
-						share = _sa_add_share(group,
-						    mountpoint,
-						    SA_SHARE_TRANSIENT, &err);
-						err = zfs_notinherited(group,
-						    mountpoint, shareopts);
+						zfs_grp_error(err);
+						err = 1;
+						continue;
 					}
+					set_node_attr(group, "zfs",
+					    "true");
+					/*
+					 * Add share with local opts via
+					 * zfs_notinherited.
+					 */
+					err = zfs_notinherited(group,
+					    mountpoint, shareopts);
 				}
 			}
 		}

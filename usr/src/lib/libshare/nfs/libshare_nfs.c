@@ -1517,19 +1517,56 @@ out:	if (f != NULL)
 }
 
 /*
+ * check_public(group, skipshare)
+ *
+ * Check the group for any shares that have the public property
+ * enabled. We skip "skipshare" since that is the one we are
+ * working with. This is a separate function to make handling
+ * subgroups simpler. Returns true if there is a share with public.
+ */
+static int
+check_public(sa_group_t group, sa_share_t skipshare)
+{
+	int exists = B_FALSE;
+	sa_share_t share;
+	sa_optionset_t opt;
+	sa_property_t prop;
+	char *shared;
+
+	for (share = sa_get_share(group, NULL); share != NULL;
+	    share = sa_get_next_share(share)) {
+		if (share == skipshare)
+			continue;
+
+		opt = sa_get_optionset(share, "nfs");
+		if (opt == NULL)
+			continue;
+		prop = sa_get_property(opt, "public");
+		if (prop == NULL)
+			continue;
+		shared = sa_get_share_attr(share, "shared");
+		if (shared != NULL) {
+			exists = strcmp(shared, "true") == 0;
+			sa_free_attr_string(shared);
+			if (exists == B_TRUE)
+				break;
+		}
+	}
+
+	return (exists);
+}
+
+/*
  * public_exists(share)
  *
  * check to see if public option is set on any other share than the
- * one specified.
+ * one specified. Need to check zfs sub-groups as well as the top
+ * level groups.
  */
 static int
 public_exists(sa_share_t skipshare)
 {
-	sa_share_t share;
 	sa_group_t group;
-	sa_optionset_t opt;
-	sa_property_t prop;
-	int exists = 0;
 	sa_handle_t handle;
 
 	group = sa_get_parent_group(skipshare);
@@ -1542,29 +1579,21 @@ public_exists(sa_share_t skipshare)
 
 	for (group = sa_get_group(handle, NULL); group != NULL;
 	    group = sa_get_next_group(group)) {
-		for (share = sa_get_share(group, NULL); share != NULL;
-		    share = sa_get_next_share(share)) {
-			if (share == skipshare)
-				continue;
-			opt = sa_get_optionset(share, "nfs");
-			if (opt != NULL) {
-				prop = sa_get_property(opt, "public");
-				if (prop != NULL) {
-					char *shared;
-					shared = sa_get_share_attr(share,
-					    "shared");
-					if (shared != NULL) {
-						exists = strcmp(shared,
-						    "true") == 0;
-						sa_free_attr_string(shared);
-						goto out;
-					}
-				}
+		/* Walk any ZFS subgroups as well as all standard groups */
+		if (sa_group_is_zfs(group)) {
+			sa_group_t subgroup;
+			for (subgroup = sa_get_sub_group(group);
+			    subgroup != NULL;
+			    subgroup = sa_get_next_group(subgroup)) {
+				if (check_public(subgroup, skipshare))
+					return (B_TRUE);
 			}
+		} else {
+			if (check_public(group, skipshare))
+				return (B_TRUE);
 		}
 	}
-out:
-	return (exists);
+	return (B_FALSE);
 }
 
 /*
@@ -1586,6 +1615,7 @@ nfs_enable_share(sa_share_t share)
 	sa_property_t prop;
 	char *path;
 	int err = SA_OK;
+	int i;
 
 	/* Don't drop core if the NFS module isn't loaded. */
 	(void) signal(SIGSYS, SIG_IGN);
@@ -1625,8 +1655,6 @@ nfs_enable_share(sa_share_t share)
 	export.ex_path = path;
 	export.ex_pathlen = strlen(path) + 1;
 
-	sp = calloc(num_secinfo, sizeof (struct secinfo));
-
 	if (opt != NULL)
 		err = fill_export_from_optionset(&export, opt);
 
@@ -1643,103 +1671,100 @@ nfs_enable_share(sa_share_t share)
 		goto out;
 	}
 
+	sp = calloc(num_secinfo, sizeof (struct secinfo));
 	if (sp == NULL) {
-		/* failed to alloc memory */
-		(void) printf("NFS: no memory for security\n");
 		err = SA_NO_MEMORY;
-	} else {
-		int i;
-		export.ex_secinfo = sp;
-		/* get default secinfo */
-		export.ex_seccnt = num_secinfo;
-		/*
-		 * since we must have one security option defined, we
-		 * init to the default and then override as we find
-		 * defined security options. This handles the case
-		 * where we have no defined options but we need to set
-		 * up one.
-		 */
-		sp[0].s_window = DEF_WIN;
-		sp[0].s_rootnames = NULL;
-		/* setup a default in case no properties defined */
-		if (nfs_getseconfig_default(&sp[0].s_secinfo)) {
-			(void) printf(dgettext(TEXT_DOMAIN,
-			    "NFS: nfs_getseconfig_default: failed to "
-			    "get default security mode\n"));
-			err = SA_CONFIG_ERR;
-		}
-		if (secoptlist != NULL) {
-			for (i = 0, prop = sa_get_property(secoptlist, NULL);
-			    prop != NULL && i < num_secinfo;
-			    prop = sa_get_next_property(prop), i++) {
-				char *sectype;
-
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "NFS: NFS: no memory for security\n"));
+		goto out;
+	}
+	export.ex_secinfo = sp;
+	/* get default secinfo */
+	export.ex_seccnt = num_secinfo;
+	/*
+	 * since we must have one security option defined, we
+	 * init to the default and then override as we find
+	 * defined security options. This handles the case
+	 * where we have no defined options but we need to set
+	 * up one.
+	 */
+	sp[0].s_window = DEF_WIN;
+	sp[0].s_rootnames = NULL;
+	/* setup a default in case no properties defined */
+	if (nfs_getseconfig_default(&sp[0].s_secinfo)) {
+		(void) printf(dgettext(TEXT_DOMAIN,
+		    "NFS: nfs_getseconfig_default: failed to "
+		    "get default security mode\n"));
+		err = SA_CONFIG_ERR;
+	}
+	if (secoptlist != NULL) {
+		for (i = 0, prop = sa_get_property(secoptlist, NULL);
+		    prop != NULL && i < num_secinfo;
+		    prop = sa_get_next_property(prop), i++) {
+			char *sectype;
 				sectype = sa_get_property_attr(prop, "type");
-				/*
-				 * if sectype is NULL, we probably
-				 * have a memory problem and can't get
-				 * the correct values. Rather than
-				 * exporting with incorrect security,
-				 * don't share it.
-				 */
-				if (sectype == NULL) {
-					err = SA_NO_MEMORY;
-					(void) printf(dgettext(TEXT_DOMAIN,
-					    "NFS: Cannot share %s: "
-					    "no memory\n"), path);
-					goto out;
-				}
-				sec = (sa_security_t)sa_get_derived_security(
-				    share, sectype, "nfs", 1);
-				sp[i].s_window = DEF_WIN;
-				sp[i].s_rootcnt = 0;
-				sp[i].s_rootnames = NULL;
-
-				(void) fill_security_from_secopts(&sp[i], sec);
-				if (sec != NULL)
-					sa_free_derived_security(sec);
-				if (sectype != NULL)
-					sa_free_attr_string(sectype);
-			}
-		}
-		/*
-		 * when we get here, we can do the exportfs system call and
-		 * initiate thinsg. We probably want to enable the nfs.server
-		 * service first if it isn't running within SMF.
-		 */
-		/* check nfs.server status and start if needed */
-
-		/* now add the share to the internal tables */
-		printarg(path, &export);
-		/*
-		 * call the exportfs system call which is implemented
-		 * via the nfssys() call as the EXPORTFS subfunction.
-		 */
-		if ((err = exportfs(path, &export)) < 0) {
-			err = SA_SYSTEM_ERR;
-			switch (errno) {
-			case EREMOTE:
+			/*
+			 * if sectype is NULL, we probably
+			 * have a memory problem and can't get
+			 * the correct values. Rather than
+			 * exporting with incorrect security,
+			 * don't share it.
+			 */
+			if (sectype == NULL) {
+				err = SA_NO_MEMORY;
 				(void) printf(dgettext(TEXT_DOMAIN,
-				    "NFS: Cannot share remote "
-				    "filesystem: %s\n"), path);
-				break;
-			case EPERM:
-				if (getzoneid() != GLOBAL_ZONEID) {
-					(void) printf(dgettext(TEXT_DOMAIN,
-					    "NFS: Cannot share filesystems "
-					    "in non-global zones: %s\n"), path);
-					err = SA_NOT_SUPPORTED;
-					break;
-				}
-				err = SA_NO_PERMISSION;
-				/* FALLTHROUGH */
-			default:
+				    "NFS: Cannot share %s: "
+				    "no memory\n"), path);
+				goto out;
+			}
+			sec = (sa_security_t)sa_get_derived_security(
+			    share, sectype, "nfs", 1);
+			sp[i].s_window = DEF_WIN;
+			sp[i].s_rootcnt = 0;
+			sp[i].s_rootnames = NULL;
+				(void) fill_security_from_secopts(&sp[i], sec);
+			if (sec != NULL)
+				sa_free_derived_security(sec);
+			if (sectype != NULL)
+				sa_free_attr_string(sectype);
+		}
+	}
+	/*
+	 * when we get here, we can do the exportfs system call and
+	 * initiate thinsg. We probably want to enable the nfs.server
+	 * service first if it isn't running within SMF.
+	 */
+	/* check nfs.server status and start if needed */
+	/* now add the share to the internal tables */
+	printarg(path, &export);
+	/*
+	 * call the exportfs system call which is implemented
+	 * via the nfssys() call as the EXPORTFS subfunction.
+	 */
+	if ((err = exportfs(path, &export)) < 0) {
+		err = SA_SYSTEM_ERR;
+		switch (errno) {
+		case EREMOTE:
+			(void) printf(dgettext(TEXT_DOMAIN,
+			    "NFS: Cannot share remote "
+			    "filesystem: %s\n"), path);
+			break;
+		case EPERM:
+			if (getzoneid() != GLOBAL_ZONEID) {
+				(void) printf(dgettext(TEXT_DOMAIN,
+				    "NFS: Cannot share filesystems "
+				    "in non-global zones: %s\n"), path);
+				err = SA_NOT_SUPPORTED;
 				break;
 			}
-		} else {
-			/* update sharetab with an add/modify */
-			(void) sa_update_sharetab(share, "nfs");
+			err = SA_NO_PERMISSION;
+			/* FALLTHROUGH */
+		default:
+			break;
 		}
+	} else {
+		/* update sharetab with an add/modify */
+		(void) sa_update_sharetab(share, "nfs");
 	}
 
 	if (err == SA_OK) {
