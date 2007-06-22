@@ -24,8 +24,17 @@
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-SUBDIRS = chip hostbridge pcibus motherboard niu platform-cpu xaui xfp
+MODULE = xfp
+ARCH = sun4v
+CLASS = arch
+XFPSRCS = xfp.c
 
+UTILDIR = ../xaui
 
-include ../../../Makefile.subdirs
+MODULESRCS = $(XFPSRCS)
+
+include ../../Makefile.plugin
+
+CPPFLAGS += -I$(UTILDIR)

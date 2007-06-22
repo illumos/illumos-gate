@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@ extern "C" {
 
 #define	NIU_VERSION	TOPO_VERSION
 #define	NIUFN_MAX	2
+#define	XAUI_MAX	1	/* max number of XAUIs per niufn */
 
 static int niu_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
 		    topo_instance_t, void *, void *);
@@ -57,12 +58,8 @@ static const topo_modops_t niu_ops =
 const topo_modinfo_t niu_info =
 	{NIU, FM_FMRI_SCHEME_HC, NIU_VERSION, &niu_ops};
 
-static const topo_pgroup_info_t niu_auth_pgroup = {
-	FM_FMRI_AUTHORITY,
-	TOPO_STABILITY_PRIVATE,
-	TOPO_STABILITY_PRIVATE,
-	1
-};
+static const topo_pgroup_info_t io_pgroup =
+	{ TOPO_PGROUP_IO, TOPO_STABILITY_PRIVATE, TOPO_STABILITY_PRIVATE, 1 };
 
 /*ARGSUSED*/
 void
@@ -77,7 +74,7 @@ _topo_init(topo_mod_t *mod, topo_version_t version)
 
 	if (topo_mod_register(mod, &niu_info, TOPO_VERSION) < 0) {
 		topo_mod_dprintf(mod, "niu registration failed: %s\n",
-			topo_mod_errmsg(mod));
+		    topo_mod_errmsg(mod));
 		return; /* mod errno already set */
 	}
 	topo_mod_dprintf(mod, "NIU enumr initd\n");
@@ -88,7 +85,63 @@ _topo_fini(topo_mod_t *mod)
 {
 	topo_mod_unregister(mod);
 }
+static int
+devprop_set(tnode_t *tn, di_node_t dn,
+	const char *tpgrp, const char *tpnm, topo_mod_t *mod)
+{
+	char *path;
+	int err, e;
 
+	if ((path = di_devfs_path(dn)) == NULL) {
+		topo_mod_dprintf(mod, "NULL di_devfs_path.\n");
+		return (topo_mod_seterrno(mod, ETOPO_PROP_NOENT));
+	}
+	e = topo_prop_set_string(tn, tpgrp, tpnm, TOPO_PROP_IMMUTABLE,
+	    path, &err);
+	di_devfs_path_free(path);
+	if (e != 0)
+		return (topo_mod_seterrno(mod, err));
+	return (0);
+}
+/*ARGSUSED*/
+static int
+driverprop_set(tnode_t *tn, di_node_t dn,
+	const char *tpgrp, const char *tpnm, topo_mod_t *mod)
+{
+	char *dnm;
+	int err;
+
+	if ((dnm = di_driver_name(dn)) == NULL)
+		return (0);
+	if (topo_prop_set_string(tn,
+	    tpgrp, tpnm, TOPO_PROP_IMMUTABLE, dnm, &err) < 0)
+		return (topo_mod_seterrno(mod, err));
+	return (0);
+}
+/*ARGSUSED*/
+static int
+moduleprop_set(tnode_t *tn, di_node_t dn,
+	const char *tpgrp, const char *tpnm, topo_mod_t *mod)
+{
+	nvlist_t *module;
+	char *dnm;
+	int err;
+
+	if ((dnm = di_driver_name(dn)) == NULL)
+		return (0);
+
+	if ((module = topo_mod_modfmri(mod, FM_MOD_SCHEME_VERSION, dnm))
+	    == NULL)
+		return (0); /* driver maybe detached, return success */
+
+	if (topo_prop_set_fmri(tn, tpgrp, tpnm, TOPO_PROP_IMMUTABLE, module,
+	    &err) < 0) {
+		nvlist_free(module);
+		return (topo_mod_seterrno(mod, err));
+	}
+	nvlist_free(module);
+	return (0);
+}
 static tnode_t *
 niu_tnode_create(topo_mod_t *mod, tnode_t *parent,
     const char *name, topo_instance_t i, void *priv)
@@ -99,7 +152,7 @@ niu_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	nvlist_t *auth = topo_mod_auth(mod, parent);
 
 	fmri = topo_mod_hcfmri(mod, parent, FM_HC_SCHEME_VERSION, name, i,
-		NULL, auth, NULL, NULL, NULL);
+	    NULL, auth, NULL, NULL, NULL);
 	nvlist_free(auth);
 
 	if (fmri == NULL) {
@@ -122,15 +175,43 @@ niu_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	nvlist_free(fmri);
 	topo_node_setspecific(ntn, priv);
 
-	if (topo_pgroup_create(ntn, &niu_auth_pgroup, &err) == 0) {
-		(void) topo_prop_inherit(ntn, FM_FMRI_AUTHORITY,
-		    FM_FMRI_AUTH_PRODUCT, &err);
-		(void) topo_prop_inherit(ntn, FM_FMRI_AUTHORITY,
-		    FM_FMRI_AUTH_CHASSIS, &err);
-		(void) topo_prop_inherit(ntn, FM_FMRI_AUTHORITY,
-		    FM_FMRI_AUTH_SERVER, &err);
+	if (topo_pgroup_create(ntn, &io_pgroup, &err) == 0) {
+		(void) devprop_set(ntn, priv, TOPO_PGROUP_IO, TOPO_IO_DEV, mod);
+		(void) driverprop_set(ntn, priv, TOPO_PGROUP_IO, TOPO_IO_DRIVER,
+		    mod);
+		(void) moduleprop_set(ntn, priv, TOPO_PGROUP_IO, TOPO_IO_MODULE,
+		    mod);
 	}
 	return (ntn);
+}
+static int
+niu_asru_set(tnode_t *tn, di_node_t dn, topo_mod_t *mod)
+{
+	char *path;
+	nvlist_t *fmri;
+	int e;
+
+	if ((path = di_devfs_path(dn)) != NULL) {
+		fmri = topo_mod_devfmri(mod, FM_DEV_SCHEME_VERSION, path, NULL);
+		if (fmri == NULL) {
+			topo_mod_dprintf(mod,
+			    "dev:///%s fmri creation failed.\n", path);
+			di_devfs_path_free(path);
+			return (-1);
+		}
+		di_devfs_path_free(path);
+	} else {
+		topo_mod_dprintf(mod, "NULL di_devfs_path.\n");
+		if (topo_prop_get_fmri(tn, TOPO_PGROUP_PROTOCOL,
+		    TOPO_PROP_RESOURCE, &fmri, &e) < 0)
+			return (topo_mod_seterrno(mod, e));
+	}
+	if (topo_node_asru_set(tn, fmri, 0, &e) < 0) {
+		nvlist_free(fmri);
+		return (topo_mod_seterrno(mod, e));
+	}
+	nvlist_free(fmri);
+	return (0);
 }
 
 /*ARGSUSED*/
@@ -141,7 +222,7 @@ niu_declare(tnode_t *parent, const char *name, topo_instance_t i,
 	tnode_t *ntn;
 	int err;
 
-	if ((ntn = niu_tnode_create(mod, parent, name, 0, NULL)) == NULL) {
+	if ((ntn = niu_tnode_create(mod, parent, name, 0, priv)) == NULL) {
 		topo_mod_dprintf(mod, "%s ntn = NULL\n", name);
 		return (NULL);
 	}
@@ -152,8 +233,12 @@ niu_declare(tnode_t *parent, const char *name, topo_instance_t i,
 	if (topo_node_label_set(ntn, NULL, &err) < 0) {
 		topo_mod_dprintf(mod, "niu label error %d\n", err);
 	}
+	/* set ASRU */
+	(void) niu_asru_set(ntn, priv, mod);
+
 	return (ntn);
 }
+
 
 /*ARGSUSED*/
 static tnode_t *
@@ -171,6 +256,17 @@ niufn_declare(tnode_t *parent, const char *name, topo_instance_t i,
 	/* inherit parent's label */
 	(void) topo_node_label_set(ntn, NULL, &err);
 
+	/* set ASRU */
+	(void) niu_asru_set(ntn, priv, mod);
+
+	if (topo_node_range_create(mod, ntn, XAUI,
+	    0, XAUI_MAX) < 0) {
+		topo_node_unbind(ntn);
+		topo_mod_dprintf(mod, "child_range_add of XAUI"
+		    "failed: %s\n",
+		    topo_strerror(topo_mod_errno(mod)));
+		return (NULL); /* mod_errno already set */
+	}
 	return (ntn);
 }
 
@@ -179,30 +275,46 @@ niufn_instantiate(tnode_t *parent, const char *name, di_node_t pnode,
 	topo_mod_t *mod)
 {
 	di_node_t sib;
-	int i = 0;
+	tnode_t *ntn;
+	topo_instance_t inst;
 
 	if (strcmp(name, NIUFN) != 0) {
 		topo_mod_dprintf(mod,
 		    "Currently only know how to enumerate %s components.\n",
-			NIUFN);
+		    NIUFN);
 		return (0);
 	}
 
 	sib = di_child_node(pnode);
 	while (sib != DI_NODE_NIL) {
-		topo_mod_dprintf(mod, "Found NIUFN node %d\n", i);
-		if (niufn_declare(parent, NIUFN, i, sib, mod) == NULL) {
+		inst = di_instance(sib);
+		if ((ntn = niufn_declare(parent, NIUFN, inst, sib, mod))
+		    == NULL) {
 			topo_mod_dprintf(mod, "Enumeration of %s=%d "
-				"failed: %s\n", NIUFN, i,
-				topo_strerror(topo_mod_errno(mod)));
+			    "failed: %s\n", NIUFN, inst,
+			    topo_strerror(topo_mod_errno(mod)));
 			return (-1);
 		}
+		if (topo_mod_enumerate(mod,
+		    ntn, XAUI, XAUI, inst, inst, sib) != 0) {
+			return (topo_mod_seterrno(mod, EMOD_PARTIAL_ENUM));
+		}
 		sib = di_sibling_node(sib);
-		i++;
 	}
 	return (0);
 }
 
+static topo_mod_t *
+xaui_enum_load(topo_mod_t *mp)
+{
+	topo_mod_t *rp = NULL;
+
+	if ((rp = topo_mod_load(mp, XAUI, TOPO_VERSION)) == NULL) {
+		topo_mod_dprintf(mp,
+		    "%s enumerator could not load %s enum.\n", NIU, XAUI);
+	}
+	return (rp);
+}
 /*ARGSUSED*/
 static int
 niu_enum(topo_mod_t *mod, tnode_t *rnode, const char *name,
@@ -223,33 +335,38 @@ niu_enum(topo_mod_t *mod, tnode_t *rnode, const char *name,
 		topo_mod_dprintf(mod, "devinfo init failed.");
 		return (-1);
 	}
+	/*
+	 * Load XAUI Enum
+	 */
+	if (xaui_enum_load(mod) == NULL)
+		return (-1);
+
 	dnode = di_drv_first_node("niumx", devtree);
 	if (dnode != DI_NODE_NIL) {
-		topo_mod_dprintf(mod, "Found NIU node.\n");
 		niun = niu_declare(rnode, name, 0, dnode, mod);
 		if (niun == NULL) {
 			topo_mod_dprintf(mod, "Enumeration of niu failed: %s\n",
-				topo_strerror(topo_mod_errno(mod)));
+			    topo_strerror(topo_mod_errno(mod)));
 			return (-1); /* mod_errno already set */
 		}
 		if (topo_node_range_create(mod, niun, NIUFN,
-			0, NIUFN_MAX) < 0) {
+		    0, NIUFN_MAX) < 0) {
 			topo_node_unbind(niun);
 			topo_mod_dprintf(mod, "child_range_add of NIUFN"
-				"failed: %s\n",
-				topo_strerror(topo_mod_errno(mod)));
+			    "failed: %s\n",
+			    topo_strerror(topo_mod_errno(mod)));
 			return (-1); /* mod_errno already set */
 		}
 		if (niufn_instantiate(niun, NIUFN, dnode, mod) < 0) {
 			topo_mod_dprintf(mod, "Enumeration of niufn "
-				"failed %s\n",
-				topo_strerror(topo_mod_errno(mod)));
+			    "failed %s\n",
+			    topo_strerror(topo_mod_errno(mod)));
 		}
 	}
 	if (di_drv_next_node(dnode) != DI_NODE_NIL)
 		topo_mod_dprintf(mod,
-			"Currently only know how to enumerate one niu "
-			"components.\n");
+		    "Currently only know how to enumerate one niu "
+		    "components.\n");
 
 	return (0);
 }
