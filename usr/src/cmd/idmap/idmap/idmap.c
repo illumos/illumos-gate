@@ -2096,7 +2096,6 @@ main(int argc, char *argv[]) {
 			return (1);
 	}
 
-	idmap_set_verbose(FALSE);
 	rc = run_engine(argc - 1, argv + 1);
 
 	if (batch_mode) {

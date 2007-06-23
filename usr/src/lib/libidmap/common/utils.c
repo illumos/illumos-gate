@@ -41,8 +41,6 @@
 
 static struct timeval TIMEOUT = { 25, 0 };
 
-extern int __idmap_verbose;
-
 idmap_retcode
 _udt_extend_batch(idmap_udt_handle_t *udthandle, int opnum) {
 	idmap_update_op	*tmplist;
@@ -105,10 +103,6 @@ _iter_get_next_list(int type, idmap_iter_t *iter,
 
 	CLIENT		*clnt;
 	enum clnt_stat	clntstat;
-	const char	*me = "_iter_get_next_list";
-
-	if (__idmap_verbose)
-		(void) fprintf(stdout, "%s\n", me);
 
 	iter->next = 0;
 	iter->retlist = NULL;
@@ -119,7 +113,6 @@ _iter_get_next_list(int type, idmap_iter_t *iter,
 		xdr_free(xdr_res_proc, (caddr_t)*list);
 	} else {
 		if ((*list = malloc(valsize)) == NULL) {
-			(void) fprintf(stderr, gettext("Out of memory\n"));
 			errno = ENOMEM;
 			return (IDMAP_ERR_MEMORY);
 		}
@@ -132,8 +125,6 @@ _iter_get_next_list(int type, idmap_iter_t *iter,
 		TIMEOUT);
 	if (clntstat != RPC_SUCCESS) {
 		free(*list);
-		if (__idmap_verbose)
-			clnt_perror(clnt, me);
 		return (IDMAP_ERR_RPC);
 	}
 	iter->retlist = *list;

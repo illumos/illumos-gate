@@ -133,9 +133,6 @@ extern idmap_stat idmap_string2stat(const char *);
 /* internal status to protocol status */
 extern idmap_stat idmap_stat4prot(idmap_stat);
 
-/* enable/disable verbose mode for API */
-extern void idmap_set_verbose(boolean_t);
-
 #ifdef __cplusplus
 }
 #endif

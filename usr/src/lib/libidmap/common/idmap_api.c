@@ -45,8 +45,6 @@ static struct timeval TIMEOUT = { 25, 0 };
 
 static int idmap_stat2errno(idmap_stat);
 
-int __idmap_verbose;
-
 #define	__ITER_CREATE(itera, argu, handl, ityp)\
 	if (handl == NULL) {\
 		errno = EINVAL;\
@@ -54,16 +52,12 @@ int __idmap_verbose;
 	}\
 	itera = calloc(1, sizeof (*itera));\
 	if (itera == NULL) {\
-		if (__idmap_verbose)\
-			(void) fprintf(stderr, gettext("Out of memory\n"));\
 		errno = ENOMEM;\
 		return (IDMAP_ERR_MEMORY);\
 	}\
 	argu = calloc(1, sizeof (*argu));\
 	if (argu == NULL) {\
 		free(itera);\
-		if (__idmap_verbose)\
-			(void) fprintf(stderr, gettext("Out of memory\n"));\
 		errno = ENOMEM;\
 		return (IDMAP_ERR_MEMORY);\
 	}\
@@ -86,16 +80,10 @@ int __idmap_verbose;
 
 #define	__ITER_CHECK(itera, ityp)\
 	if (itera == NULL) {\
-		if (__idmap_verbose)\
-			(void) fprintf(stderr,\
-				gettext("%s: Iterator is null\n"), me);\
 		errno = EINVAL;\
 		return (IDMAP_ERR_ARG);\
 	}\
 	if (itera->type != ityp) {\
-		if (__idmap_verbose)\
-			(void) fprintf(stderr,\
-				gettext("%s: Invalid iterator\n"), me);\
 		errno = EINVAL;\
 		return (IDMAP_ERR_ARG);\
 	}
@@ -110,18 +98,6 @@ int __idmap_verbose;
 void
 idmap_free(void *ptr) {
 	free(ptr);
-}
-
-
-/*
- * Verbose on/off switch (Private)
- *
- * Input:
- * on - TRUE=on, FALSE=off
- */
-void
-idmap_set_verbose(boolean_t on) {
-	__idmap_verbose = (on == B_TRUE)?1:0;
 }
 
 
@@ -143,8 +119,6 @@ idmap_init(idmap_handle_t **handle) {
 
 	clnt = clnt_door_create(IDMAP_PROG, IDMAP_V1, 0);
 	if (clnt == NULL) {
-		if (__idmap_verbose)
-			clnt_pcreateerror("clnt_door_create");
 		free(hptr);
 		return (IDMAP_ERR_RPC);
 	}
@@ -198,16 +172,12 @@ idmap_fini(idmap_handle_t *handle) {
 idmap_stat
 idmap_udt_create(idmap_handle_t *handle, idmap_udt_handle_t **udthandle) {
 	idmap_udt_handle_t	*tmp;
-	const char		*me = "idmap_udt_create";
 
 	if (handle == NULL || udthandle == NULL) {
 		errno = EINVAL;
 		return (IDMAP_ERR_ARG);
 	}
 	if ((tmp = calloc(1, sizeof (*tmp))) == NULL) {
-		if (__idmap_verbose)
-			(void) fprintf(stderr,
-				gettext("%s: Out of memory\n"), me);
 		errno = ENOMEM;
 		return (IDMAP_ERR_MEMORY);
 	}
@@ -233,12 +203,8 @@ idmap_udt_commit(idmap_udt_handle_t *udthandle) {
 	CLIENT			*clnt;
 	enum clnt_stat		clntstat;
 	idmap_retcode		retcode;
-	const char		*me = "idmap_udt_commit";
 
 	if (udthandle == NULL) {
-		if (__idmap_verbose)
-			(void) fprintf(stderr,
-				gettext("%s: Invalid handle\n"), me);
 		errno = EINVAL;
 		return (IDMAP_ERR_ARG);
 	}
@@ -248,8 +214,6 @@ idmap_udt_commit(idmap_udt_handle_t *udthandle) {
 		(xdrproc_t)xdr_idmap_retcode, (caddr_t)&retcode,
 		TIMEOUT);
 	if (clntstat != RPC_SUCCESS) {
-		if (__idmap_verbose)
-			clnt_perror(clnt, "IDMAP_UPDATE");
 		return (IDMAP_ERR_RPC);
 	}
 	if (retcode != IDMAP_SUCCESS)
@@ -489,7 +453,6 @@ idmap_iter_next_namerule(idmap_iter_t *iter, char **windomain,
 	idmap_namerules_res		*namerules;
 	idmap_list_namerules_1_argument	*arg;
 	idmap_retcode			retcode;
-	const char			*me = "idmap_iter_next_namerule";
 
 	if (windomain)
 		*windomain = NULL;
@@ -524,9 +487,6 @@ idmap_iter_next_namerule(idmap_iter_t *iter, char **windomain,
 
 		if (IDMAP_ERROR(namerules->retcode)) {
 			retcode  = namerules->retcode;
-			if (__idmap_verbose)
-				(void) fprintf(stderr,
-				gettext("Server returned failure\n"));
 			xdr_free(xdr_idmap_namerules_res, (caddr_t)namerules);
 			free(namerules);
 			iter->retlist = NULL;
@@ -540,9 +500,6 @@ idmap_iter_next_namerule(idmap_iter_t *iter, char **windomain,
 		return (IDMAP_SUCCESS);
 
 	if (iter->next >= namerules->rules.rules_len) {
-		if (__idmap_verbose)
-			(void) fprintf(stderr,
-				gettext("%s: Invalid result\n"), me);
 		return (IDMAP_ERR_ARG);
 	}
 
@@ -632,7 +589,6 @@ idmap_iter_next_mapping(idmap_iter_t *iter, char **sidprefix,
 	idmap_list_mappings_1_argument	*arg;
 	idmap_retcode			retcode;
 	char				*str;
-	const char			*me = "idmap_iter_next_mapping";
 
 	if (sidprefix)
 		*sidprefix = NULL;
@@ -671,9 +627,6 @@ idmap_iter_next_mapping(idmap_iter_t *iter, char **sidprefix,
 
 		if (IDMAP_ERROR(mappings->retcode)) {
 			retcode  = mappings->retcode;
-			if (__idmap_verbose)
-				(void) fprintf(stderr,
-				gettext("Server returned failure\n"));
 			xdr_free(xdr_idmap_mappings_res, (caddr_t)mappings);
 			free(mappings);
 			iter->retlist = NULL;
@@ -687,22 +640,18 @@ idmap_iter_next_mapping(idmap_iter_t *iter, char **sidprefix,
 		return (IDMAP_SUCCESS);
 
 	if (iter->next >= mappings->mappings.mappings_len) {
-		if (__idmap_verbose)
-			(void) fprintf(stderr,
-				gettext("%s: Invalid result\n"), me);
 		return (IDMAP_ERR_ARG);
 	}
 
 	if (sidprefix) {
 		str = mappings->mappings.mappings_val[iter->next].id1.
 			idmap_id_u.sid.prefix;
-		if (str)
+		if (str) {
 			*sidprefix = strdup(str);
-		else
-			*sidprefix = strdup("<sidprefix missing>");
-		if (*sidprefix == NULL) {
-			retcode = IDMAP_ERR_MEMORY;
-			goto errout;
+			if (*sidprefix == NULL) {
+				retcode = IDMAP_ERR_MEMORY;
+				goto errout;
+			}
 		}
 	}
 	if (rid)
@@ -797,7 +746,6 @@ idmap_iter_destroy(idmap_iter_t *iter) {
 idmap_stat
 idmap_get_create(idmap_handle_t *handle, idmap_get_handle_t **gh) {
 	idmap_get_handle_t	*tmp;
-	const char		*me = "idmap_get_create";
 
 	/* sanity checks */
 	if (handle == NULL || gh == NULL) {
@@ -807,9 +755,6 @@ idmap_get_create(idmap_handle_t *handle, idmap_get_handle_t **gh) {
 
 	/* allocate the handle */
 	if ((tmp = calloc(1, sizeof (*tmp))) == NULL) {
-		if (__idmap_verbose)
-			(void) fprintf(stderr,
-				gettext("%s: Out of memory\n"), me);
 		errno = ENOMEM;
 		return (IDMAP_ERR_MEMORY);
 	}
@@ -1145,8 +1090,6 @@ idmap_get_mappings(idmap_get_handle_t *gh) {
 		(caddr_t)&res,
 		TIMEOUT);
 	if (clntstat != RPC_SUCCESS) {
-		if (__idmap_verbose)
-			clnt_perror(clnt, "IDMAP_GET_MAPPED_IDS");
 		retcode = IDMAP_ERR_RPC;
 		goto out;
 	}
@@ -1238,12 +1181,8 @@ idmap_get_w2u_mapping(idmap_handle_t *handle,
 	idmap_mappings_res	result;
 	idmap_retcode		retcode, rc;
 	idmap_utf8str		*str;
-	const char		*me = "idmap_get_w2u_mapping";
 
 	if (handle == NULL) {
-		if (__idmap_verbose)
-			(void) fprintf(stderr,
-				gettext("%s: Invalid handle\n"), me);
 		errno = EINVAL;
 		return (IDMAP_ERR_ARG);
 	}
@@ -1297,8 +1236,6 @@ idmap_get_w2u_mapping(idmap_handle_t *handle,
 		TIMEOUT);
 
 	if (clntstat != RPC_SUCCESS) {
-		if (__idmap_verbose)
-			clnt_perror(clnt, "IDMAP_GET_MAPPED_ID_BY_NAME");
 		return (IDMAP_ERR_RPC);
 	}
 
@@ -1346,12 +1283,8 @@ idmap_get_u2w_mapping(idmap_handle_t *handle,
 	idmap_mappings_res	result;
 	idmap_retcode		retcode, rc;
 	idmap_utf8str		*str;
-	const char		*me = "idmap_get_u2w_mapping";
 
 	if (handle == NULL) {
-		if (__idmap_verbose)
-			(void) fprintf(stderr,
-				gettext("%s: Invalid handle\n"), me);
 		errno = EINVAL;
 		return (IDMAP_ERR_ARG);
 	}
@@ -1396,8 +1329,6 @@ idmap_get_u2w_mapping(idmap_handle_t *handle,
 		TIMEOUT);
 
 	if (clntstat != RPC_SUCCESS) {
-		if (__idmap_verbose)
-			clnt_perror(clnt, "IDMAP_GET_MAPPED_ID_BY_NAME");
 		return (IDMAP_ERR_RPC);
 	}
 
@@ -1609,7 +1540,7 @@ idmap_stat2string(idmap_handle_t *handle, idmap_stat status) {
 
 	for (i = 0; stattable[i].msg; i++) {
 		if (stattable[i].retcode == status)
-			return (stattable[i].msg);
+			return (gettext(stattable[i].msg));
 	}
 	return (gettext("Unknown error"));
 }

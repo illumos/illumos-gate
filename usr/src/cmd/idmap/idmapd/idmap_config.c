@@ -60,7 +60,7 @@ errmess(char *format, va_list ap)
 {
 /*LINTED: E_SEC_PRINTF_VAR_FMT*/
 	(void) vsnprintf(errmess_buf, sizeof (errmess_buf), format, ap);
-	(void) strlcat(errmess_buf, gettext(".\n"), sizeof (errmess_buf));
+	(void) strlcat(errmess_buf, "\n", sizeof (errmess_buf));
 
 #if IDMAP_CFG_DEBUG
 	(void) fprintf(stderr, errmess_buf);
@@ -83,10 +83,9 @@ idmap_scf_error(char *format, ...)
 {
 	const char *scf_message;
 	char *new_format;
-	char *sep;
+	char *sep = ": ";
 	va_list ap;
 
-	sep = gettext(": ");
 	va_start(ap, format);
 
 	scf_message = scf_strerror(scf_error());

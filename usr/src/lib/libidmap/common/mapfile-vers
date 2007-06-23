@@ -45,7 +45,6 @@ SUNWprivate {
 	idmap_stat2string;
 	idmap_string2stat;
 	idmap_stat4prot;
-	idmap_set_verbose;
 	idmap_str2utf8;
 	idmap_utf82str;
 	idmap_iter_namerules;
