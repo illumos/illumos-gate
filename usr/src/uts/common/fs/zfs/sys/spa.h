@@ -415,7 +415,6 @@ extern uint64_t spa_version(spa_t *spa);
 extern int spa_state(spa_t *spa);
 extern uint64_t spa_freeze_txg(spa_t *spa);
 struct metaslab_class;
-extern struct metaslab_class *spa_metaslab_class_select(spa_t *spa);
 extern uint64_t spa_get_alloc(spa_t *spa);
 extern uint64_t spa_get_space(spa_t *spa);
 extern uint64_t spa_get_dspace(spa_t *spa);

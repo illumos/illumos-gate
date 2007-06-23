@@ -119,6 +119,7 @@ spa_activate(spa_t *spa)
 	spa->spa_state = POOL_STATE_ACTIVE;
 
 	spa->spa_normal_class = metaslab_class_create();
+	spa->spa_log_class = metaslab_class_create();
 
 	for (t = 0; t < ZIO_TYPES; t++) {
 		spa->spa_zio_issue_taskq[t] = taskq_create("spa_zio_issue",
@@ -184,6 +185,9 @@ spa_deactivate(spa_t *spa)
 
 	metaslab_class_destroy(spa->spa_normal_class);
 	spa->spa_normal_class = NULL;
+
+	metaslab_class_destroy(spa->spa_log_class);
+	spa->spa_log_class = NULL;
 
 	/*
 	 * If this was part of an import or the open otherwise failed, we may
@@ -1565,7 +1569,7 @@ spa_reset(char *pool)
  */
 
 /*
- * Add capacity to a storage pool.
+ * Add a device to a storage pool.
  */
 int
 spa_vdev_add(spa_t *spa, nvlist_t *nvroot)
@@ -1707,6 +1711,7 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 	vdev_t *rvd = spa->spa_root_vdev;
 	vdev_t *oldvd, *newvd, *newrootvd, *pvd, *tvd;
 	vdev_ops_t *pvops;
+	int is_log;
 
 	txg = spa_vdev_enter(spa);
 
@@ -1734,6 +1739,13 @@ spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot, int replacing)
 
 	if ((error = vdev_create(newrootvd, txg, replacing)) != 0)
 		return (spa_vdev_exit(spa, newrootvd, txg, error));
+
+	/*
+	 * Spares can't replace logs
+	 */
+	is_log = oldvd->vdev_islog;
+	if (is_log && newvd->vdev_isspare)
+		return (spa_vdev_exit(spa, newrootvd, txg, ENOTSUP));
 
 	if (!replacing) {
 		/*

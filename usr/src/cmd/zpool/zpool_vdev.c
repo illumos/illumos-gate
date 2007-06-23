@@ -382,7 +382,7 @@ is_whole_disk(const char *arg)
  * 	xxx		Shorthand for /dev/dsk/xxx
  */
 static nvlist_t *
-make_leaf_vdev(const char *arg)
+make_leaf_vdev(const char *arg, uint64_t is_log)
 {
 	char path[MAXPATHLEN];
 	struct stat64 statbuf;
@@ -465,6 +465,7 @@ make_leaf_vdev(const char *arg)
 	verify(nvlist_alloc(&vdev, NV_UNIQUE_NAME, 0) == 0);
 	verify(nvlist_add_string(vdev, ZPOOL_CONFIG_PATH, path) == 0);
 	verify(nvlist_add_string(vdev, ZPOOL_CONFIG_TYPE, type) == 0);
+	verify(nvlist_add_uint64(vdev, ZPOOL_CONFIG_IS_LOG, is_log) == 0);
 	if (strcmp(type, VDEV_TYPE_DISK) == 0)
 		verify(nvlist_add_uint64(vdev, ZPOOL_CONFIG_WHOLE_DISK,
 		    (uint64_t)wholedisk) == 0);
@@ -544,6 +545,7 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 	char *type;
 	replication_level_t lastrep, rep, *ret;
 	boolean_t dontreport;
+	uint64_t is_log;
 
 	ret = safe_malloc(sizeof (replication_level_t));
 
@@ -552,9 +554,20 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 
 	lastrep.zprl_type = NULL;
 	for (t = 0; t < toplevels; t++) {
+		uint64_t is_log = B_FALSE;
+
 		nv = top[t];
 
-		verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE, &type) == 0);
+		/*
+		 * For separate logs we ignore the top level vdev replication
+		 * constraints.
+		 */
+		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_LOG, &is_log);
+		if (is_log)
+			continue;
+
+		verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE,
+		    &type) == 0);
 		if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
 		    &child, &children) != 0) {
 			/*
@@ -588,7 +601,7 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 			}
 
 			/*
-			 * The 'dontreport' variable indicatest that we've
+			 * The 'dontreport' variable indicates that we've
 			 * already reported an error for this spec, so don't
 			 * bother doing it again.
 			 */
@@ -609,7 +622,7 @@ get_replication(nvlist_t *nvroot, boolean_t fatal)
 				    ZPOOL_CONFIG_TYPE, &childtype) == 0);
 
 				/*
-				 * If this is a a replacing or spare vdev, then
+				 * If this is a replacing or spare vdev, then
 				 * get the real first child of the vdev.
 				 */
 				if (strcmp(childtype,
@@ -798,6 +811,14 @@ check_replication(nvlist_t *config, nvlist_t *newroot)
 	 */
 	if ((nvlist_lookup_nvlist_array(newroot, ZPOOL_CONFIG_CHILDREN,
 	    &child, &children) != 0) || (children == 0)) {
+		free(current);
+		return (0);
+	}
+
+	/*
+	 * If all we have is logs then there's no replication level to check.
+	 */
+	if (num_logs(newroot) == children) {
 		free(current);
 		return (0);
 	}
@@ -1050,7 +1071,6 @@ check_in_use(nvlist_t *config, nvlist_t *nv, int force, int isreplacing,
 			if ((ret = check_in_use(config, child[c], force,
 			    isreplacing, B_TRUE)) != 0)
 				return (ret);
-
 	return (0);
 }
 
@@ -1081,6 +1101,12 @@ is_grouping(const char *type, int *mindev)
 		return (VDEV_TYPE_SPARE);
 	}
 
+	if (strcmp(type, "log") == 0) {
+		if (mindev != NULL)
+			*mindev = 1;
+		return (VDEV_TYPE_LOG);
+	}
+
 	return (NULL);
 }
 
@@ -1094,13 +1120,18 @@ nvlist_t *
 construct_spec(int argc, char **argv)
 {
 	nvlist_t *nvroot, *nv, **top, **spares;
-	int t, toplevels, mindev, nspares;
+	int t, toplevels, mindev, nspares, nlogs;
 	const char *type;
+	uint64_t is_log;
+	boolean_t seen_logs;
 
 	top = NULL;
 	toplevels = 0;
 	spares = NULL;
 	nspares = 0;
+	nlogs = 0;
+	is_log = B_FALSE;
+	seen_logs = B_FALSE;
 
 	while (argc > 0) {
 		nv = NULL;
@@ -1113,12 +1144,45 @@ construct_spec(int argc, char **argv)
 			nvlist_t **child = NULL;
 			int c, children = 0;
 
-			if (strcmp(type, VDEV_TYPE_SPARE) == 0 &&
-			    spares != NULL) {
-				(void) fprintf(stderr, gettext("invalid vdev "
-				    "specification: 'spare' can be "
-				    "specified only once\n"));
-				return (NULL);
+			if (strcmp(type, VDEV_TYPE_SPARE) == 0) {
+				if (spares != NULL) {
+					(void) fprintf(stderr,
+					    gettext("invalid vdev "
+					    "specification: 'spare' can be "
+					    "specified only once\n"));
+					return (NULL);
+				}
+				is_log = B_FALSE;
+			}
+
+			if (strcmp(type, VDEV_TYPE_LOG) == 0) {
+				if (seen_logs) {
+					(void) fprintf(stderr,
+					    gettext("invalid vdev "
+					    "specification: 'log' can be "
+					    "specified only once\n"));
+					return (NULL);
+				}
+				seen_logs = B_TRUE;
+				is_log = B_TRUE;
+				argc--;
+				argv++;
+				/*
+				 * A log is not a real grouping device.
+				 * We just set is_log and continue.
+				 */
+				continue;
+			}
+
+			if (is_log) {
+				if (strcmp(type, VDEV_TYPE_MIRROR) != 0) {
+					(void) fprintf(stderr,
+					    gettext("invalid vdev "
+					    "specification: unsupported 'log' "
+					    "device: %s\n"), type);
+					return (NULL);
+				}
+				nlogs++;
 			}
 
 			for (c = 1; c < argc; c++) {
@@ -1129,7 +1193,8 @@ construct_spec(int argc, char **argv)
 				    children * sizeof (nvlist_t *));
 				if (child == NULL)
 					zpool_no_memory();
-				if ((nv = make_leaf_vdev(argv[c])) == NULL)
+				if ((nv = make_leaf_vdev(argv[c], B_FALSE))
+				    == NULL)
 					return (NULL);
 				child[children - 1] = nv;
 			}
@@ -1153,6 +1218,8 @@ construct_spec(int argc, char **argv)
 				    0) == 0);
 				verify(nvlist_add_string(nv, ZPOOL_CONFIG_TYPE,
 				    type) == 0);
+				verify(nvlist_add_uint64(nv,
+				    ZPOOL_CONFIG_IS_LOG, is_log) == 0);
 				if (strcmp(type, VDEV_TYPE_RAIDZ) == 0) {
 					verify(nvlist_add_uint64(nv,
 					    ZPOOL_CONFIG_NPARITY,
@@ -1171,8 +1238,10 @@ construct_spec(int argc, char **argv)
 			 * We have a device.  Pass off to make_leaf_vdev() to
 			 * construct the appropriate nvlist describing the vdev.
 			 */
-			if ((nv = make_leaf_vdev(argv[0])) == NULL)
+			if ((nv = make_leaf_vdev(argv[0], is_log)) == NULL)
 				return (NULL);
+			if (is_log)
+				nlogs++;
 			argc--;
 			argv++;
 		}
@@ -1188,6 +1257,12 @@ construct_spec(int argc, char **argv)
 		(void) fprintf(stderr, gettext("invalid vdev "
 		    "specification: at least one toplevel vdev must be "
 		    "specified\n"));
+		return (NULL);
+	}
+
+	if (seen_logs && nlogs == 0) {
+		(void) fprintf(stderr, gettext("invalid vdev specification: "
+		    "log requires at least 1 device\n"));
 		return (NULL);
 	}
 

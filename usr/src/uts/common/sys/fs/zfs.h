@@ -152,13 +152,14 @@ extern zpool_prop_t zpool_prop_iter(zpool_prop_f, void *, boolean_t);
 #define	ZFS_VERSION_4			4ULL
 #define	ZFS_VERSION_5			5ULL
 #define	ZFS_VERSION_6			6ULL
+#define	ZFS_VERSION_7			7ULL
 /*
  * When bumping up ZFS_VERSION, make sure GRUB ZFS understand the on-disk
  * format change. Go to usr/src/grub/grub-0.95/stage2/{zfs-include/, fsys_zfs*},
  * and do the appropriate changes.
  */
-#define	ZFS_VERSION			ZFS_VERSION_6
-#define	ZFS_VERSION_STRING		"6"
+#define	ZFS_VERSION			ZFS_VERSION_7
+#define	ZFS_VERSION_STRING		"7"
 
 /*
  * Symbolic names for the changes that caused a ZFS_VERSION switch.
@@ -181,6 +182,7 @@ extern zpool_prop_t zpool_prop_iter(zpool_prop_f, void *, boolean_t);
 #define	ZFS_VERSION_ZPOOL_HISTORY	ZFS_VERSION_4
 #define	ZFS_VERSION_GZIP_COMPRESSION	ZFS_VERSION_5
 #define	ZFS_VERSION_BOOTFS		ZFS_VERSION_6
+#define	ZFS_VERSION_SLOGS		ZFS_VERSION_7
 
 /*
  * The following are configuration names used in the nvlist describing a pool's
@@ -217,6 +219,7 @@ extern zpool_prop_t zpool_prop_iter(zpool_prop_f, void *, boolean_t);
 #define	ZPOOL_CONFIG_TIMESTAMP		"timestamp" /* not stored on disk */
 #define	ZPOOL_CONFIG_UNSPARE		"unspare"
 #define	ZPOOL_CONFIG_PHYS_PATH		"phys_path"
+#define	ZPOOL_CONFIG_IS_LOG		"is_log"
 /*
  * The persistent vdev state is stored as separate values rather than a single
  * 'vdev_state' entry.  This is because a device can be in multiple states, such
@@ -235,6 +238,7 @@ extern zpool_prop_t zpool_prop_iter(zpool_prop_f, void *, boolean_t);
 #define	VDEV_TYPE_FILE			"file"
 #define	VDEV_TYPE_MISSING		"missing"
 #define	VDEV_TYPE_SPARE			"spare"
+#define	VDEV_TYPE_LOG			"log"
 
 /*
  * This is needed in userland to report the minimum necessary device size.

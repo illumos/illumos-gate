@@ -70,7 +70,8 @@ zpool_name_valid(libzfs_handle_t *hdl, boolean_t isopen, const char *pool)
 	if (ret == 0 && !isopen &&
 	    (strncmp(pool, "mirror", 6) == 0 ||
 	    strncmp(pool, "raidz", 5) == 0 ||
-	    strncmp(pool, "spare", 5) == 0)) {
+	    strncmp(pool, "spare", 5) == 0 ||
+	    strcmp(pool, "log") == 0)) {
 		zfs_error_aux(hdl,
 		    dgettext(TEXT_DOMAIN, "name is reserved"));
 		return (B_FALSE);
@@ -581,13 +582,14 @@ zpool_add(zpool_handle_t *zhp, nvlist_t *nvroot)
 
 		case ENOTSUP:
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "pool must be upgraded to add raidz2 vdevs"));
+			    "pool must be upgraded to add these vdevs"));
 			(void) zfs_error(hdl, EZFS_BADVERSION, msg);
 			break;
 
 		case EDOM:
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "root pool can not have multiple vdevs"));
+			    "root pool can not have multiple vdevs"
+			    " or separate logs"));
 			(void) zfs_error(hdl, EZFS_POOL_NOTSUP, msg);
 			break;
 
@@ -1028,7 +1030,7 @@ is_replacing_spare(nvlist_t *search, nvlist_t *tgt, int which)
 
 /*
  * Attach new_disk (fully described by nvroot) to old_disk.
- * If 'replacing' is specified, tne new disk will replace the old one.
+ * If 'replacing' is specified, the new disk will replace the old one.
  */
 int
 zpool_vdev_attach(zpool_handle_t *zhp,
@@ -1039,7 +1041,7 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 	int ret;
 	nvlist_t *tgt;
 	boolean_t avail_spare;
-	uint64_t val;
+	uint64_t val, is_log;
 	char *path;
 	nvlist_t **child;
 	uint_t children;
@@ -1115,13 +1117,21 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 		/*
 		 * Can't attach to or replace this type of vdev.
 		 */
-		if (replacing)
-			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "cannot replace a replacing device"));
-		else
+		if (replacing) {
+			is_log = B_FALSE;
+			(void) nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_IS_LOG,
+			    &is_log);
+			if (is_log)
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "cannot replace a log with a spare"));
+			else
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "cannot replace a replacing device"));
+		} else {
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "can only attach to mirrors and top-level "
 			    "disks"));
+		}
 		(void) zfs_error(hdl, EZFS_BADTARGET, msg);
 		break;
 

@@ -397,7 +397,8 @@ state_to_name(vdev_stat_t *vs)
 }
 
 void
-print_vdev_tree(zpool_handle_t *zhp, const char *name, nvlist_t *nv, int indent)
+print_vdev_tree(zpool_handle_t *zhp, const char *name, nvlist_t *nv, int indent,
+    boolean_t print_logs)
 {
 	nvlist_t **child;
 	uint_t c, children;
@@ -411,8 +412,16 @@ print_vdev_tree(zpool_handle_t *zhp, const char *name, nvlist_t *nv, int indent)
 		return;
 
 	for (c = 0; c < children; c++) {
+		uint64_t is_log = B_FALSE;
+
+		(void) nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_LOG,
+		    &is_log);
+		if ((is_log && !print_logs) || (!is_log && print_logs))
+			continue;
+
 		vname = zpool_vdev_name(g_zfs, zhp, child[c]);
-		print_vdev_tree(zhp, vname, child[c], indent + 2);
+		print_vdev_tree(zhp, vname, child[c], indent + 2,
+		    B_FALSE);
 		free(vname);
 	}
 }
@@ -500,8 +509,17 @@ zpool_do_add(int argc, char **argv)
 		(void) printf(gettext("would update '%s' to the following "
 		    "configuration:\n"), zpool_get_name(zhp));
 
-		print_vdev_tree(zhp, poolname, poolnvroot, 0);
-		print_vdev_tree(zhp, NULL, nvroot, 0);
+		/* print original main pool and new tree */
+		print_vdev_tree(zhp, poolname, poolnvroot, 0, B_FALSE);
+		print_vdev_tree(zhp, NULL, nvroot, 0, B_FALSE);
+
+		/* Do the same for the logs */
+		if (num_logs(poolnvroot) > 0) {
+			print_vdev_tree(zhp, "logs", poolnvroot, 0, B_TRUE);
+			print_vdev_tree(zhp, NULL, nvroot, 0, B_TRUE);
+		} else if (num_logs(nvroot) > 0) {
+			print_vdev_tree(zhp, "logs", nvroot, 0, B_TRUE);
+		}
 
 		ret = 0;
 	} else {
@@ -726,7 +744,9 @@ zpool_do_create(int argc, char **argv)
 		(void) printf(gettext("would create '%s' with the "
 		    "following layout:\n\n"), poolname);
 
-		print_vdev_tree(NULL, poolname, nvroot, 0);
+		print_vdev_tree(NULL, poolname, nvroot, 0, B_FALSE);
+		if (num_logs(nvroot) > 0)
+			print_vdev_tree(NULL, "logs", nvroot, 0, B_TRUE);
 
 		ret = 0;
 	} else {
@@ -939,7 +959,8 @@ max_width(zpool_handle_t *zhp, nvlist_t *nv, int depth, int max)
  * pool, printing out the name and status for each one.
  */
 void
-print_import_config(const char *name, nvlist_t *nv, int namewidth, int depth)
+print_import_config(const char *name, nvlist_t *nv, int namewidth, int depth,
+    boolean_t print_logs)
 {
 	nvlist_t **child;
 	uint_t c, children;
@@ -992,9 +1013,16 @@ print_import_config(const char *name, nvlist_t *nv, int namewidth, int depth)
 		return;
 
 	for (c = 0; c < children; c++) {
+		uint64_t is_log = B_FALSE;
+
+		(void) nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_LOG,
+		    &is_log);
+		if ((is_log && !print_logs) || (!is_log && print_logs))
+			continue;
+
 		vname = zpool_vdev_name(g_zfs, NULL, child[c]);
 		print_import_config(vname, child[c],
-		    namewidth, depth + 2);
+		    namewidth, depth + 2, B_FALSE);
 		free(vname);
 	}
 
@@ -1170,7 +1198,12 @@ show_import(nvlist_t *config)
 	namewidth = max_width(NULL, nvroot, 0, 0);
 	if (namewidth < 10)
 		namewidth = 10;
-	print_import_config(name, nvroot, namewidth, 0);
+
+	print_import_config(name, nvroot, namewidth, 0, B_FALSE);
+	if (num_logs(nvroot) > 0) {
+		(void) printf(gettext("\tlogs\n"));
+		print_import_config(name, nvroot, namewidth, 0, B_TRUE);
+	}
 
 	if (reason == ZPOOL_STATUS_BAD_GUID_SUM) {
 		(void) printf(gettext("\n\tAdditional devices are known to "
@@ -2673,7 +2706,7 @@ find_spare(zpool_handle_t *zhp, void *data)
  */
 void
 print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
-    int namewidth, int depth, boolean_t isspare)
+    int namewidth, int depth, boolean_t isspare, boolean_t print_logs)
 {
 	nvlist_t **child;
 	uint_t c, children;
@@ -2777,9 +2810,15 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 	(void) printf("\n");
 
 	for (c = 0; c < children; c++) {
+		uint64_t is_log = B_FALSE;
+
+		(void) nvlist_lookup_uint64(child[c], ZPOOL_CONFIG_IS_LOG,
+		    &is_log);
+		if ((is_log && !print_logs) || (!is_log && print_logs))
+			continue;
 		vname = zpool_vdev_name(g_zfs, zhp, child[c]);
 		print_status_config(zhp, vname, child[c],
-		    namewidth, depth + 2, isspare);
+		    namewidth, depth + 2, isspare, B_FALSE);
 		free(vname);
 	}
 }
@@ -2834,7 +2873,7 @@ print_spares(zpool_handle_t *zhp, nvlist_t **spares, uint_t nspares,
 	for (i = 0; i < nspares; i++) {
 		name = zpool_vdev_name(g_zfs, zhp, spares[i]);
 		print_status_config(zhp, name, spares[i],
-		    namewidth, 2, B_TRUE);
+		    namewidth, 2, B_TRUE, B_FALSE);
 		free(name);
 	}
 }
@@ -3045,7 +3084,10 @@ status_callback(zpool_handle_t *zhp, void *data)
 		(void) printf(gettext("\t%-*s  %-8s %5s %5s %5s\n"), namewidth,
 		    "NAME", "STATE", "READ", "WRITE", "CKSUM");
 		print_status_config(zhp, zpool_get_name(zhp), nvroot,
-		    namewidth, 0, B_FALSE);
+		    namewidth, 0, B_FALSE, B_FALSE);
+		if (num_logs(nvroot) > 0)
+			print_status_config(zhp, "logs", nvroot, namewidth, 0,
+			    B_FALSE, B_TRUE);
 
 		if (nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
 		    &spares, &nspares) == 0)
@@ -3221,6 +3263,12 @@ upgrade_one(zpool_handle_t *zhp, void *data)
 	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION,
 	    &version) == 0);
 
+	if (strcmp("log", zpool_get_name(zhp)) == 0) {
+		(void) printf(gettext("'log' is now a reserved word\n"
+		    "Pool 'log' must be renamed using export and import"
+		    " to upgrade.\n"));
+		return (1);
+	}
 	if (version == ZFS_VERSION) {
 		(void) printf(gettext("Pool '%s' is already formatted "
 		    "using the current version.\n"), zpool_get_name(zhp));
@@ -3310,7 +3358,8 @@ zpool_do_upgrade(int argc, char **argv)
 		(void) printf(gettext(" 5   Compression using the gzip "
 		    "algorithm\n"));
 		(void) printf(gettext(" 6   pool properties "));
-		(void) printf(gettext("\nFor more information on a particular "
+		(void) printf(gettext(" 7   Separate intent log devices\n"));
+		(void) printf(gettext("For more information on a particular "
 		    "version, including supported releases, see:\n\n"));
 		(void) printf("http://www.opensolaris.org/os/community/zfs/"
 		    "version/N\n\n");

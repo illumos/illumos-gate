@@ -296,7 +296,7 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 	(void) ddi_strtoul(hw_serial, NULL, 10, &hostid);
 	if (hostid != 0) {
 		VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_HOSTID,
-			hostid) == 0);
+		    hostid) == 0);
 	}
 	VERIFY(nvlist_add_string(config, ZPOOL_CONFIG_HOSTNAME,
 	    utsname.nodename) == 0);
@@ -308,6 +308,9 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 		    vd->vdev_guid) == 0);
 		if (vd->vdev_isspare)
 			VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_IS_SPARE,
+			    1ULL) == 0);
+		if (vd->vdev_islog)
+			VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_IS_LOG,
 			    1ULL) == 0);
 		vd = vd->vdev_top;		/* label contains top config */
 	}

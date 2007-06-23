@@ -253,6 +253,8 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 		    vd->vdev_ashift) == 0);
 		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_ASIZE,
 		    vd->vdev_asize) == 0);
+		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_IS_LOG,
+		    vd->vdev_islog) == 0);
 	}
 
 	if (vd->vdev_dtl.smo_object != 0)
@@ -865,6 +867,14 @@ vdev_sync_labels(vdev_t *vd, int l, uint64_t txg)
 
 	if (*good_writes == 0 && error == 0)
 		error = ENODEV;
+
+	/*
+	 * Failure to write a label can be fatal for a
+	 * top level vdev. We don't want this for slogs
+	 * as we use the main pool if they go away.
+	 */
+	if (vd->vdev_islog)
+		error = 0;
 
 	kmem_free(good_writes, sizeof (uint64_t));
 

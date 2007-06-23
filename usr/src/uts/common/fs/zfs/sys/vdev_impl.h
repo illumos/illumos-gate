@@ -143,6 +143,7 @@ struct vdev {
 	boolean_t	vdev_remove_wanted; /* async remove wanted?	*/
 	list_node_t	vdev_dirty_node; /* config dirty list		*/
 	uint64_t	vdev_deflate_ratio; /* deflation ratio (x512)	*/
+	uint64_t	vdev_islog;	/* is an intent log device	*/
 
 	/*
 	 * Leaf vdev state.
@@ -164,7 +165,7 @@ struct vdev {
 	uint8_t		vdev_fault_mode; /* fault injection mode	*/
 	uint8_t		vdev_tmpoffline; /* device taken offline temporarily? */
 	uint8_t		vdev_detached;	/* device detached?		*/
-	uint64_t	vdev_isspare;	/* was a hot spare */
+	uint64_t	vdev_isspare;	/* was a hot spare		*/
 	vdev_queue_t	vdev_queue;	/* I/O deadline schedule queue	*/
 	vdev_cache_t	vdev_cache;	/* physical block cache		*/
 	uint64_t	vdev_not_present; /* not present during import	*/

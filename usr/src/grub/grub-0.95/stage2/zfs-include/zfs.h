@@ -35,7 +35,8 @@
 #define	ZFS_VERSION_4			4ULL
 #define	ZFS_VERSION_5			5ULL
 #define	ZFS_VERSION_6			6ULL
-#define	ZFS_VERSION			ZFS_VERSION_6
+#define	ZFS_VERSION_7			7ULL
+#define	ZFS_VERSION			ZFS_VERSION_7
 
 /*
  * The following are configuration names used in the nvlist describing a pool's

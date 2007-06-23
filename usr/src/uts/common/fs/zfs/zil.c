@@ -595,11 +595,8 @@ zil_lwb_write_done(zio_t *zio)
 	zio_buf_free(lwb->lwb_buf, lwb->lwb_sz);
 	mutex_enter(&zilog->zl_lock);
 	lwb->lwb_buf = NULL;
-	if (zio->io_error) {
+	if (zio->io_error)
 		zilog->zl_log_error = B_TRUE;
-		mutex_exit(&zilog->zl_lock);
-		return;
-	}
 	mutex_exit(&zilog->zl_lock);
 }
 
@@ -627,7 +624,7 @@ zil_lwb_write_init(zilog_t *zilog, lwb_t *lwb)
 		lwb->lwb_zio = zio_rewrite(zilog->zl_root_zio, zilog->zl_spa,
 		    ZIO_CHECKSUM_ZILOG, 0, &lwb->lwb_blk, lwb->lwb_buf,
 		    lwb->lwb_sz, zil_lwb_write_done, lwb,
-		    ZIO_PRIORITY_LOG_WRITE, ZIO_FLAG_MUSTSUCCEED, &zb);
+		    ZIO_PRIORITY_LOG_WRITE, ZIO_FLAG_CANFAIL, &zb);
 	}
 }
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,8 +47,9 @@ extern void metaslab_fini(metaslab_t *msp);
 extern void metaslab_sync(metaslab_t *msp, uint64_t txg);
 extern void metaslab_sync_done(metaslab_t *msp, uint64_t txg);
 
-extern int metaslab_alloc(spa_t *spa, uint64_t psize, blkptr_t *bp,
-    int ncopies, uint64_t txg, blkptr_t *hintbp, boolean_t hintbp_avoid);
+extern int metaslab_alloc(spa_t *spa, metaslab_class_t *mc, uint64_t psize,
+    blkptr_t *bp, int ncopies, uint64_t txg, blkptr_t *hintbp,
+    boolean_t hintbp_avoid);
 extern void metaslab_free(spa_t *spa, const blkptr_t *bp, uint64_t txg,
     boolean_t now);
 extern int metaslab_claim(spa_t *spa, const blkptr_t *bp, uint64_t txg);

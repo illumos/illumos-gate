@@ -41,6 +41,7 @@ extern "C" {
 void *safe_malloc(size_t);
 char *safe_strdup(const char *);
 void zpool_no_memory(void);
+uint_t num_logs(nvlist_t *nv);
 
 /*
  * Virtual device functions

@@ -746,7 +746,7 @@ spa_guid_exists(uint64_t pool_guid, uint64_t device_guid)
 				break;
 
 			/*
-			 * Check any devices we may in the process of adding.
+			 * Check any devices we may be in the process of adding.
 			 */
 			if (spa->spa_pending_vdev) {
 				if (vdev_lookup_by_guid(spa->spa_pending_vdev,
@@ -961,16 +961,6 @@ uint64_t
 spa_freeze_txg(spa_t *spa)
 {
 	return (spa->spa_freeze_txg);
-}
-
-/*
- * In the future, this may select among different metaslab classes
- * depending on the zdp.  For now, there's no such distinction.
- */
-metaslab_class_t *
-spa_metaslab_class_select(spa_t *spa)
-{
-	return (spa->spa_normal_class);
 }
 
 /*

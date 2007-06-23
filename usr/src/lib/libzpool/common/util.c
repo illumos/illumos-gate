@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,8 +73,10 @@ show_vdev_stats(const char *desc, nvlist_t *nv, int indent)
 	uint_t c, children;
 	vdev_stat_t *vs;
 	uint64_t sec;
+	uint64_t is_log = 0;
 	char used[6], avail[6];
 	char rops[6], wops[6], rbytes[6], wbytes[6], rerr[6], werr[6], cerr[6];
+	char *prefix = "";
 
 	if (indent == 0) {
 		(void) printf("                     "
@@ -85,6 +87,10 @@ show_vdev_stats(const char *desc, nvlist_t *nv, int indent)
 
 	VERIFY(nvlist_lookup_uint64_array(nv, ZPOOL_CONFIG_STATS,
 	    (uint64_t **)&vs, &c) == 0);
+	(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_LOG, &is_log);
+
+	if (is_log)
+		prefix = "log ";
 
 	sec = MAX(1, vs->vs_timestamp / NANOSEC);
 
@@ -98,9 +104,10 @@ show_vdev_stats(const char *desc, nvlist_t *nv, int indent)
 	nicenum(vs->vs_write_errors, werr);
 	nicenum(vs->vs_checksum_errors, cerr);
 
-	(void) printf("%*s%*s%*s%*s %5s %5s %5s %5s %5s %5s %5s\n",
+	(void) printf("%*s%s%*s%*s%*s %5s %5s %5s %5s %5s %5s %5s\n",
 	    indent, "",
-	    indent - 19 - (vs->vs_space ? 0 : 12), desc,
+	    prefix,
+	    indent + strlen(prefix) - 19 - (vs->vs_space ? 0 : 12), desc,
 	    vs->vs_space ? 6 : 0, vs->vs_space ? used : "",
 	    vs->vs_space ? 6 : 0, vs->vs_space ? avail : "",
 	    rops, wops, rbytes, wbytes, rerr, werr, cerr);

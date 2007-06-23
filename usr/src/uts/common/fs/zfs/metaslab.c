@@ -714,11 +714,10 @@ metaslab_group_alloc(metaslab_group_t *mg, uint64_t size, uint64_t txg,
  * Allocate a block for the specified i/o.
  */
 static int
-metaslab_alloc_dva(spa_t *spa, uint64_t psize, dva_t *dva, int d,
-    dva_t *hintdva, uint64_t txg, boolean_t hintdva_avoid)
+metaslab_alloc_dva(spa_t *spa, metaslab_class_t *mc, uint64_t psize,
+    dva_t *dva, int d, dva_t *hintdva, uint64_t txg, boolean_t hintdva_avoid)
 {
 	metaslab_group_t *mg, *rotor;
-	metaslab_class_t *mc;
 	vdev_t *vd;
 	int dshift = 3;
 	int all_zero;
@@ -727,8 +726,6 @@ metaslab_alloc_dva(spa_t *spa, uint64_t psize, dva_t *dva, int d,
 	uint64_t distance;
 
 	ASSERT(!DVA_IS_VALID(&dva[d]));
-
-	mc = spa_metaslab_class_select(spa);
 
 	/*
 	 * Start at the rotor and loop through all mgs until we find something.
@@ -764,12 +761,20 @@ metaslab_alloc_dva(spa_t *spa, uint64_t psize, dva_t *dva, int d,
 	} else {
 		mg = mc->mc_rotor;
 	}
-	rotor = mg;
 
+	/*
+	 * If the hint put us into the wrong class, just follow the rotor.
+	 */
+	if (mg->mg_class != mc)
+		mg = mc->mc_rotor;
+
+	rotor = mg;
 top:
 	all_zero = B_TRUE;
 	do {
 		vd = mg->mg_vd;
+
+		ASSERT(mg->mg_class == mc);
 
 		distance = vd->vdev_asize >> dshift;
 		if (distance <= (1ULL << vd->vdev_ms_shift))
@@ -963,20 +968,23 @@ metaslab_claim_dva(spa_t *spa, const dva_t *dva, uint64_t txg)
 }
 
 int
-metaslab_alloc(spa_t *spa, uint64_t psize, blkptr_t *bp, int ndvas,
-    uint64_t txg, blkptr_t *hintbp, boolean_t hintbp_avoid)
+metaslab_alloc(spa_t *spa, metaslab_class_t *mc, uint64_t psize, blkptr_t *bp,
+    int ndvas, uint64_t txg, blkptr_t *hintbp, boolean_t hintbp_avoid)
 {
 	dva_t *dva = bp->blk_dva;
 	dva_t *hintdva = hintbp->blk_dva;
 	int d;
 	int error = 0;
 
+	if (mc->mc_rotor == NULL)	/* no vdevs in this class */
+		return (ENOSPC);
+
 	ASSERT(ndvas > 0 && ndvas <= spa_max_replication(spa));
 	ASSERT(BP_GET_NDVAS(bp) == 0);
 	ASSERT(hintbp == NULL || ndvas <= BP_GET_NDVAS(hintbp));
 
 	for (d = 0; d < ndvas; d++) {
-		error = metaslab_alloc_dva(spa, psize, dva, d, hintdva,
+		error = metaslab_alloc_dva(spa, mc, psize, dva, d, hintdva,
 		    txg, hintbp_avoid);
 		if (error) {
 			for (d--; d >= 0; d--) {

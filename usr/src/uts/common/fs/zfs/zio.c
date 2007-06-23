@@ -1236,7 +1236,7 @@ zio_write_allocate_gang_member_done(zio_t *zio)
 }
 
 static void
-zio_write_allocate_gang_members(zio_t *zio)
+zio_write_allocate_gang_members(zio_t *zio, metaslab_class_t *mc)
 {
 	blkptr_t *bp = zio->io_bp;
 	dva_t *dva = bp->blk_dva;
@@ -1255,7 +1255,8 @@ zio_write_allocate_gang_members(zio_t *zio)
 	gsize = SPA_GANGBLOCKSIZE;
 	gbps_left = SPA_GBH_NBLKPTRS;
 
-	error = metaslab_alloc(spa, gsize, bp, gbh_ndvas, txg, NULL, B_FALSE);
+	error = metaslab_alloc(spa, mc, gsize, bp, gbh_ndvas, txg, NULL,
+	    B_FALSE);
 	if (error == ENOSPC)
 		panic("can't allocate gang block header");
 	ASSERT(error == 0);
@@ -1281,7 +1282,7 @@ zio_write_allocate_gang_members(zio_t *zio)
 		maxalloc = MIN(maxalloc, resid);
 
 		while (resid <= maxalloc * gbps_left) {
-			error = metaslab_alloc(spa, maxalloc, gbp, ndvas,
+			error = metaslab_alloc(spa, mc, maxalloc, gbp, ndvas,
 			    txg, bp, B_FALSE);
 			if (error == 0)
 				break;
@@ -1336,23 +1337,25 @@ zio_write_allocate_gang_members(zio_t *zio)
 static void
 zio_dva_allocate(zio_t *zio)
 {
+	spa_t *spa = zio->io_spa;
+	metaslab_class_t *mc = spa->spa_normal_class;
 	blkptr_t *bp = zio->io_bp;
 	int error;
 
 	ASSERT(BP_IS_HOLE(bp));
 	ASSERT3U(BP_GET_NDVAS(bp), ==, 0);
 	ASSERT3U(zio->io_ndvas, >, 0);
-	ASSERT3U(zio->io_ndvas, <=, spa_max_replication(zio->io_spa));
+	ASSERT3U(zio->io_ndvas, <=, spa_max_replication(spa));
 
 	/* For testing, make some blocks above a certain size be gang blocks */
 	if (zio->io_size >= zio_gang_bang && (lbolt & 0x3) == 0) {
-		zio_write_allocate_gang_members(zio);
+		zio_write_allocate_gang_members(zio, mc);
 		return;
 	}
 
 	ASSERT3U(zio->io_size, ==, BP_GET_PSIZE(bp));
 
-	error = metaslab_alloc(zio->io_spa, zio->io_size, bp, zio->io_ndvas,
+	error = metaslab_alloc(spa, mc, zio->io_size, bp, zio->io_ndvas,
 	    zio->io_txg, NULL, B_FALSE);
 
 	if (error == 0) {
@@ -1360,7 +1363,7 @@ zio_dva_allocate(zio_t *zio)
 	} else if (error == ENOSPC) {
 		if (zio->io_size == SPA_MINBLOCKSIZE)
 			panic("really, truly out of space");
-		zio_write_allocate_gang_members(zio);
+		zio_write_allocate_gang_members(zio, mc);
 		return;
 	} else {
 		zio->io_error = error;
@@ -1775,9 +1778,15 @@ zio_alloc_blk(spa_t *spa, uint64_t size, blkptr_t *new_bp, blkptr_t *old_bp,
 	}
 
 	/*
-	 * We were passed the previous log blocks dva_t in bp->blk_dva[0].
+	 * We were passed the previous log block's DVA in bp->blk_dva[0].
+	 * We use that as a hint for which vdev to allocate from next.
 	 */
-	error = metaslab_alloc(spa, size, new_bp, 1, txg, old_bp, B_TRUE);
+	error = metaslab_alloc(spa, spa->spa_log_class, size,
+	    new_bp, 1, txg, old_bp, B_TRUE);
+
+	if (error)
+		error = metaslab_alloc(spa, spa->spa_normal_class, size,
+		    new_bp, 1, txg, old_bp, B_TRUE);
 
 	if (error == 0) {
 		BP_SET_LSIZE(new_bp, size);

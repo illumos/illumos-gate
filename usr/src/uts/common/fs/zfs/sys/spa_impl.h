@@ -89,6 +89,7 @@ struct spa {
 	taskq_t		*spa_zio_intr_taskq[ZIO_TYPES];
 	dsl_pool_t	*spa_dsl_pool;
 	metaslab_class_t *spa_normal_class;	/* normal data class */
+	metaslab_class_t *spa_log_class;	/* intent log data class */
 	uint64_t	spa_first_txg;		/* first txg after spa_open() */
 	uint64_t	spa_final_txg;		/* txg of export/destroy */
 	uint64_t	spa_freeze_txg;		/* freeze pool at this txg */

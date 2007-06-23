@@ -336,7 +336,7 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 {
 	vdev_ops_t *ops;
 	char *type;
-	uint64_t guid = 0;
+	uint64_t guid = 0, islog, nparity;
 	vdev_t *vd;
 
 	ASSERT(spa_config_held(spa, RW_WRITER));
@@ -371,7 +371,53 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	if (ops != &vdev_root_ops && spa->spa_root_vdev == NULL)
 		return (EINVAL);
 
+	/*
+	 * Determine whether we're a log vdev.
+	 */
+	islog = 0;
+	(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_IS_LOG, &islog);
+	if (islog && spa_version(spa) < ZFS_VERSION_SLOGS)
+		return (ENOTSUP);
+
+	/*
+	 * Set the nparity property for RAID-Z vdevs.
+	 */
+	nparity = -1ULL;
+	if (ops == &vdev_raidz_ops) {
+		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NPARITY,
+		    &nparity) == 0) {
+			/*
+			 * Currently, we can only support 2 parity devices.
+			 */
+			if (nparity == 0 || nparity > 2)
+				return (EINVAL);
+			/*
+			 * Older versions can only support 1 parity device.
+			 */
+			if (nparity == 2 &&
+			    spa_version(spa) < ZFS_VERSION_RAID6)
+				return (ENOTSUP);
+		} else {
+			/*
+			 * We require the parity to be specified for SPAs that
+			 * support multiple parity levels.
+			 */
+			if (spa_version(spa) >= ZFS_VERSION_RAID6)
+				return (EINVAL);
+			/*
+			 * Otherwise, we default to 1 parity device for RAID-Z.
+			 */
+			nparity = 1;
+		}
+	} else {
+		nparity = 0;
+	}
+	ASSERT(nparity != -1ULL);
+
 	vd = vdev_alloc_common(spa, id, guid, ops);
+
+	vd->vdev_islog = islog;
+	vd->vdev_nparity = nparity;
 
 	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &vd->vdev_path) == 0)
 		vd->vdev_path = spa_strdup(vd->vdev_path);
@@ -380,41 +426,6 @@ vdev_alloc(spa_t *spa, vdev_t **vdp, nvlist_t *nv, vdev_t *parent, uint_t id,
 	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PHYS_PATH,
 	    &vd->vdev_physpath) == 0)
 		vd->vdev_physpath = spa_strdup(vd->vdev_physpath);
-
-	/*
-	 * Set the nparity propery for RAID-Z vdevs.
-	 */
-	if (ops == &vdev_raidz_ops) {
-		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NPARITY,
-		    &vd->vdev_nparity) == 0) {
-			/*
-			 * Currently, we can only support 2 parity devices.
-			 */
-			if (vd->vdev_nparity > 2)
-				return (EINVAL);
-			/*
-			 * Older versions can only support 1 parity device.
-			 */
-			if (vd->vdev_nparity == 2 &&
-			    spa_version(spa) < ZFS_VERSION_RAID6)
-				return (ENOTSUP);
-
-		} else {
-			/*
-			 * We require the parity to be specified for SPAs that
-			 * support multiple parity levels.
-			 */
-			if (spa_version(spa) >= ZFS_VERSION_RAID6)
-				return (EINVAL);
-
-			/*
-			 * Otherwise, we default to 1 parity device for RAID-Z.
-			 */
-			vd->vdev_nparity = 1;
-		}
-	} else {
-		vd->vdev_nparity = 0;
-	}
 
 	/*
 	 * Set the whole_disk property.  If it's not specified, leave the value
@@ -611,6 +622,9 @@ vdev_top_transfer(vdev_t *svd, vdev_t *tvd)
 
 	tvd->vdev_deflate_ratio = svd->vdev_deflate_ratio;
 	svd->vdev_deflate_ratio = 0;
+
+	tvd->vdev_islog = svd->vdev_islog;
+	svd->vdev_islog = 0;
 }
 
 static void
@@ -706,7 +720,7 @@ vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 {
 	spa_t *spa = vd->vdev_spa;
 	objset_t *mos = spa->spa_meta_objset;
-	metaslab_class_t *mc = spa_metaslab_class_select(spa);
+	metaslab_class_t *mc;
 	uint64_t m;
 	uint64_t oldc = vd->vdev_ms_count;
 	uint64_t newc = vd->vdev_asize >> vd->vdev_ms_shift;
@@ -719,6 +733,11 @@ vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 	dprintf("%s oldc %llu newc %llu\n", vdev_description(vd), oldc, newc);
 
 	ASSERT(oldc <= newc);
+
+	if (vd->vdev_islog)
+		mc = spa->spa_log_class;
+	else
+		mc = spa->spa_normal_class;
 
 	if (vd->vdev_mg == NULL)
 		vd->vdev_mg = metaslab_group_create(mc, vd);
@@ -1850,31 +1869,42 @@ vdev_scrub_stat_update(vdev_t *vd, pool_scrub_type_t type, boolean_t complete)
 void
 vdev_space_update(vdev_t *vd, int64_t space_delta, int64_t alloc_delta)
 {
-	ASSERT(vd == vd->vdev_top);
 	int64_t dspace_delta = space_delta;
+	spa_t *spa = vd->vdev_spa;
+	vdev_t *rvd = spa->spa_root_vdev;
 
-	do {
-		if (vd->vdev_ms_count) {
-			/*
-			 * If this is a top-level vdev, apply the
-			 * inverse of its psize-to-asize (ie. RAID-Z)
-			 * space-expansion factor.  We must calculate
-			 * this here and not at the root vdev because
-			 * the root vdev's psize-to-asize is simply the
-			 * max of its childrens', thus not accurate
-			 * enough for us.
-			 */
-			ASSERT((dspace_delta & (SPA_MINBLOCKSIZE-1)) == 0);
-			dspace_delta = (dspace_delta >> SPA_MINBLOCKSHIFT) *
-			    vd->vdev_deflate_ratio;
-		}
+	ASSERT(vd == vd->vdev_top);
+	ASSERT(rvd == vd->vdev_parent);
+	ASSERT(vd->vdev_ms_count != 0);
 
-		mutex_enter(&vd->vdev_stat_lock);
-		vd->vdev_stat.vs_space += space_delta;
-		vd->vdev_stat.vs_alloc += alloc_delta;
-		vd->vdev_stat.vs_dspace += dspace_delta;
-		mutex_exit(&vd->vdev_stat_lock);
-	} while ((vd = vd->vdev_parent) != NULL);
+	/*
+	 * Apply the inverse of the psize-to-asize (ie. RAID-Z) space-expansion
+	 * factor.  We must calculate this here and not at the root vdev
+	 * because the root vdev's psize-to-asize is simply the max of its
+	 * childrens', thus not accurate enough for us.
+	 */
+	ASSERT((dspace_delta & (SPA_MINBLOCKSIZE-1)) == 0);
+	dspace_delta = (dspace_delta >> SPA_MINBLOCKSHIFT) *
+	    vd->vdev_deflate_ratio;
+
+	mutex_enter(&vd->vdev_stat_lock);
+	vd->vdev_stat.vs_space += space_delta;
+	vd->vdev_stat.vs_alloc += alloc_delta;
+	vd->vdev_stat.vs_dspace += dspace_delta;
+	mutex_exit(&vd->vdev_stat_lock);
+
+	/*
+	 * Don't count non-normal (e.g. intent log) space as part of
+	 * the pool's capacity.
+	 */
+	if (vd->vdev_mg->mg_class != spa->spa_normal_class)
+		return;
+
+	mutex_enter(&rvd->vdev_stat_lock);
+	rvd->vdev_stat.vs_space += space_delta;
+	rvd->vdev_stat.vs_alloc += alloc_delta;
+	rvd->vdev_stat.vs_dspace += dspace_delta;
+	mutex_exit(&rvd->vdev_stat_lock);
 }
 
 /*
@@ -1956,7 +1986,7 @@ vdev_propagate_state(vdev_t *vd)
 			    VDEV_AUX_CORRUPT_DATA);
 	}
 
-	if (vd->vdev_parent)
+	if (vd->vdev_parent && !vd->vdev_islog)
 		vdev_propagate_state(vd->vdev_parent);
 }
 

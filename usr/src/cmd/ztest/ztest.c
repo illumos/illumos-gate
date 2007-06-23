@@ -594,7 +594,7 @@ make_vdev_raidz(size_t size, int r)
 }
 
 static nvlist_t *
-make_vdev_mirror(size_t size, int r, int m)
+make_vdev_mirror(size_t size, int log, int r, int m)
 {
 	nvlist_t *mirror, **child;
 	int c;
@@ -612,6 +612,7 @@ make_vdev_mirror(size_t size, int r, int m)
 	    VDEV_TYPE_MIRROR) == 0);
 	VERIFY(nvlist_add_nvlist_array(mirror, ZPOOL_CONFIG_CHILDREN,
 	    child, m) == 0);
+	VERIFY(nvlist_add_uint64(mirror, ZPOOL_CONFIG_IS_LOG, log) == 0);
 
 	for (c = 0; c < m; c++)
 		nvlist_free(child[c]);
@@ -622,7 +623,7 @@ make_vdev_mirror(size_t size, int r, int m)
 }
 
 static nvlist_t *
-make_vdev_root(size_t size, int r, int m, int t)
+make_vdev_root(size_t size, int log, int r, int m, int t)
 {
 	nvlist_t *root, **child;
 	int c;
@@ -632,7 +633,7 @@ make_vdev_root(size_t size, int r, int m, int t)
 	child = umem_alloc(t * sizeof (nvlist_t *), UMEM_NOFAIL);
 
 	for (c = 0; c < t; c++)
-		child[c] = make_vdev_mirror(size, r, m);
+		child[c] = make_vdev_mirror(size, log, r, m);
 
 	VERIFY(nvlist_alloc(&root, NV_UNIQUE_NAME, 0) == 0);
 	VERIFY(nvlist_add_string(root, ZPOOL_CONFIG_TYPE, VDEV_TYPE_ROOT) == 0);
@@ -780,7 +781,7 @@ ztest_spa_create_destroy(ztest_args_t *za)
 	/*
 	 * Attempt to create using a bad file.
 	 */
-	nvroot = make_vdev_root(0, 0, 0, 1);
+	nvroot = make_vdev_root(0, 0, 0, 0, 1);
 	error = spa_create("ztest_bad_file", nvroot, NULL);
 	nvlist_free(nvroot);
 	if (error != ENOENT)
@@ -789,7 +790,7 @@ ztest_spa_create_destroy(ztest_args_t *za)
 	/*
 	 * Attempt to create using a bad mirror.
 	 */
-	nvroot = make_vdev_root(0, 0, 2, 1);
+	nvroot = make_vdev_root(0, 0, 0, 2, 1);
 	error = spa_create("ztest_bad_mirror", nvroot, NULL);
 	nvlist_free(nvroot);
 	if (error != ENOENT)
@@ -800,7 +801,7 @@ ztest_spa_create_destroy(ztest_args_t *za)
 	 * what's in the nvroot; we should fail with EEXIST.
 	 */
 	(void) rw_rdlock(&ztest_shared->zs_name_lock);
-	nvroot = make_vdev_root(0, 0, 0, 1);
+	nvroot = make_vdev_root(0, 0, 0, 0, 1);
 	error = spa_create(za->za_pool, nvroot, NULL);
 	nvlist_free(nvroot);
 	if (error != EEXIST)
@@ -841,7 +842,12 @@ ztest_vdev_add_remove(ztest_args_t *za)
 
 	spa_config_exit(spa, FTAG);
 
-	nvroot = make_vdev_root(zopt_vdev_size, zopt_raidz, zopt_mirrors, 1);
+	/*
+	 * Make 1/4 of the devices be log devices.
+	 */
+	nvroot = make_vdev_root(zopt_vdev_size,
+	    ztest_random(4) == 0, zopt_raidz, zopt_mirrors, 1);
+
 	error = spa_vdev_add(spa, nvroot);
 	nvlist_free(nvroot);
 
@@ -2819,17 +2825,27 @@ ztest_verify_blocks(char *pool)
 	char zdb[MAXPATHLEN + MAXNAMELEN + 20];
 	char zbuf[1024];
 	char *bin;
+	char *ztest;
+	char *isa;
+	int isalen;
 	FILE *fp;
 
 	(void) realpath(getexecname(), zdb);
 
 	/* zdb lives in /usr/sbin, while ztest lives in /usr/bin */
 	bin = strstr(zdb, "/usr/bin/");
+	ztest = strstr(bin, "/ztest");
+	isa = bin + 8;
+	isalen = ztest - isa;
+	isa = strdup(isa);
 	/* LINTED */
-	(void) sprintf(bin, "/usr/sbin/zdb -bc%s%s -U -O %s %s",
+	(void) sprintf(bin, "/usr/sbin%.*s/zdb -bc%s%s -U -O %s %s",
+	    isalen,
+	    isa,
 	    zopt_verbose >= 3 ? "s" : "",
 	    zopt_verbose >= 4 ? "v" : "",
 	    ztest_random(2) == 0 ? "pre" : "post", pool);
+	free(isa);
 
 	if (zopt_verbose >= 5)
 		(void) printf("Executing %s\n", strstr(zdb, "zdb "));
@@ -3279,7 +3295,7 @@ ztest_init(char *pool)
 	 */
 	(void) spa_destroy(pool);
 	ztest_shared->zs_vdev_primaries = 0;
-	nvroot = make_vdev_root(zopt_vdev_size, zopt_raidz, zopt_mirrors, 1);
+	nvroot = make_vdev_root(zopt_vdev_size, 0, zopt_raidz, zopt_mirrors, 1);
 	error = spa_create(pool, nvroot, NULL);
 	nvlist_free(nvroot);
 

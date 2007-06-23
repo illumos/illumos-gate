@@ -932,11 +932,11 @@ dump_object(objset_t *os, uint64_t object, int verbosity, int *print_header)
 
 	if (doi.doi_checksum != ZIO_CHECKSUM_INHERIT || verbosity >= 6)
 		(void) snprintf(aux + strlen(aux), sizeof (aux), " (K=%s)",
-		zio_checksum_table[doi.doi_checksum].ci_name);
+		    zio_checksum_table[doi.doi_checksum].ci_name);
 
 	if (doi.doi_compress != ZIO_COMPRESS_INHERIT || verbosity >= 6)
 		(void) snprintf(aux + strlen(aux), sizeof (aux), " (Z=%s)",
-		zio_compress_table[doi.doi_compress].ci_name);
+		    zio_compress_table[doi.doi_compress].ci_name);
 
 	(void) printf("%10lld  %3u  %5s  %5s  %5s  %5s  %s%s\n",
 	    (u_longlong_t)object, doi.doi_indirection, iblk, dblk, lsize,
@@ -1441,8 +1441,7 @@ zdb_blkptr_cb(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
 		    (u_longlong_t)zb->zb_objset,
 		    (u_longlong_t)zb->zb_object,
 		    (u_longlong_t)blkid2offset(bc->bc_dnode,
-			zb->zb_level, zb->zb_blkid),
-		    blkbuf);
+		    zb->zb_level, zb->zb_blkid), blkbuf);
 	}
 
 	zdb_count_block(spa, zcb, bp, type);
@@ -1457,11 +1456,11 @@ dump_block_stats(spa_t *spa)
 	zdb_cb_t zcb = { 0 };
 	traverse_blk_cache_t dummy_cache = { 0 };
 	zdb_blkstats_t *zb, *tzb;
-	uint64_t alloc, space;
+	uint64_t alloc, space, logalloc;
+	vdev_t *rvd = spa->spa_root_vdev;
 	int leaks = 0;
 	int advance = zdb_advance;
-	int flags;
-	int e;
+	int c, e, flags;
 
 	zcb.zcb_cache = &dummy_cache;
 
@@ -1549,17 +1548,27 @@ dump_block_stats(spa_t *spa)
 	alloc = spa_get_alloc(spa);
 	space = spa_get_space(spa);
 
+	/*
+	 * Log blocks allocated from a separate log device don't count
+	 * as part of the normal pool space; factor them in here.
+	 */
+	logalloc = 0;
+
+	for (c = 0; c < rvd->vdev_children; c++)
+		if (rvd->vdev_child[c]->vdev_islog)
+			logalloc += rvd->vdev_child[c]->vdev_stat.vs_alloc;
+
 	tzb = &zcb.zcb_type[ZB_TOTAL][DMU_OT_TOTAL];
 
-	if (tzb->zb_asize == alloc) {
+	if (tzb->zb_asize == alloc + logalloc) {
 		(void) printf("\n\tNo leaks (block sum matches space"
 		    " maps exactly)\n");
 	} else {
 		(void) printf("block traversal size %llu != alloc %llu "
 		    "(leaked %lld)\n",
 		    (u_longlong_t)tzb->zb_asize,
-		    (u_longlong_t)alloc,
-		    (u_longlong_t)(alloc - tzb->zb_asize));
+		    (u_longlong_t)alloc + logalloc,
+		    (u_longlong_t)(alloc + logalloc - tzb->zb_asize));
 		leaks = 1;
 	}
 
