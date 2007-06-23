@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -452,7 +451,7 @@ zsattach(dev_info_t *dev, ddi_attach_cmd_t cmd)
 		 * Property for ignoring DCD.
 		 * We switch between 'a' and 'b' ports for this device.
 		 */
-		static char *prop = "port-a-ignore-cd";
+		static char prop[] = "port-a-ignore-cd";
 
 		/*
 		 * For this channel, set the hardware address, allocate the
@@ -553,7 +552,7 @@ zsattach(dev_info_t *dev, ddi_attach_cmd_t cmd)
 		    &zs_iblock, (ddi_idevice_cookie_t *)0,
 		    zsintr, (caddr_t)0) != DDI_SUCCESS) {
 			cmn_err(CE_PANIC,
-				"cannot set second stage zs interrupt");
+			    "cannot set second stage zs interrupt");
 			/*NOTREACHED*/
 		}
 
@@ -668,14 +667,14 @@ zsattach(dev_info_t *dev, ddi_attach_cmd_t cmd)
 		 */
 		(void) strcpy(name, "a");
 		if (ddi_create_internal_pathname(dev, name, S_IFCHR,
-			ddi_get_instance(dev) * 2) == DDI_FAILURE) {
+		    ddi_get_instance(dev) * 2) == DDI_FAILURE) {
 			ddi_remove_minor_node(dev, NULL);
 			return (DDI_FAILURE);
 		}
 
 		(void) strcpy(name, "b");
 		if (ddi_create_internal_pathname(dev, name, S_IFCHR,
-			(ddi_get_instance(dev) * 2) + 1) == DDI_FAILURE) {
+		    (ddi_get_instance(dev) * 2) + 1) == DDI_FAILURE) {
 			ddi_remove_minor_node(dev, NULL);
 			return (DDI_FAILURE);
 		}
@@ -698,7 +697,7 @@ zsattach(dev_info_t *dev, ddi_attach_cmd_t cmd)
 
 	(void) sprintf(name, "zsc%d", current_chip);
 	zs->intrstats = kstat_create("zs", current_chip, name, "controller",
-		KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
+	    KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
 	if (zs->intrstats) {
 		kstat_install(zs->intrstats);
 	}
