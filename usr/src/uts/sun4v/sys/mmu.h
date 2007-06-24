@@ -58,6 +58,11 @@ extern "C" {
 #define	MMU_PCONTEXT		0x08 /* primary context number */
 #define	MMU_SCONTEXT		0x10 /* secondary context number */
 
+#define	MMU_PCONTEXT0		MMU_PCONTEXT	/* primary context# 0 */
+#define	MMU_PCONTEXT1		0x108		/* primary context# 1 */
+#define	MMU_SCONTEXT0		MMU_SCONTEXT	/* secondary context# 0 */
+#define	MMU_SCONTEXT1		0x110		/* secondary context# 1 */
+
 /*
  * Pseudo Synchronous Fault Status Register Layout
  *
@@ -145,6 +150,13 @@ extern "C" {
 #define	MAX_NCTXS_BITS			16	/* sun4v max. contexts bits */
 #define	MIN_NCTXS_BITS			2
 #define	MAX_NCTXS	(1ull << MAX_NCTXS_BITS)
+
+/*
+ * MIN_NCONTEXTS and MIN_NTSBS are the minimum number of contexts and tsbs
+ * necessary for shared context support.
+ */
+#define	MIN_NSHCONTEXTS			1
+#define	MIN_NTSBS			4
 
 #ifdef	__cplusplus
 }

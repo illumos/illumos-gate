@@ -195,6 +195,10 @@ hat_kern_setup(void)
 		}
 	}
 
+	if (!shctx_on || disable_shctx) {
+		sfmmu_patch_shctx();
+	}
+
 	/*
 	 * The 8K-indexed kernel TSB space is used to hold
 	 * translations below...
@@ -1212,9 +1216,6 @@ sfmmu_tsb_xalloc(vmem_t *vmp, void *inaddr, size_t size, int vmflag,
 	    NULL, NULL, vmflag)) == NULL))
 		return (NULL);
 
-	/* If we ever don't want TSB slab-sized pages, this will panic */
-	ASSERT(((uintptr_t)addr & (tsb_slab_size - 1)) == 0);
-
 	if (page_resv(npages, vmflag & VM_KMFLAGS) == 0) {
 		if (inaddr == NULL)
 			vmem_xfree(vmp, addr, size);
@@ -1287,8 +1288,6 @@ sfmmu_tsb_segkmem_free(vmem_t *vmp, void *inaddr, size_t size)
 	pgcnt_t npages = btopr(size);
 	pgcnt_t pgs_left = npages;
 	page_t *rootpp = NULL;
-
-	ASSERT(((uintptr_t)addr & (tsb_slab_size - 1)) == 0);
 
 	hat_unload(kas.a_hat, addr, size, HAT_UNLOAD_UNLOCK);
 

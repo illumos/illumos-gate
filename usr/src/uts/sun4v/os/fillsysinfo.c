@@ -65,6 +65,8 @@ uint64_t ncpu_guest_max;
 void fill_cpu(md_t *, mde_cookie_t);
 
 static uint64_t get_mmu_ctx_bits(md_t *, mde_cookie_t);
+static uint64_t get_mmu_tsbs(md_t *, mde_cookie_t);
+static uint64_t	get_mmu_shcontexts(md_t *, mde_cookie_t);
 static uint64_t get_cpu_pagesizes(md_t *, mde_cookie_t);
 static char *construct_isalist(md_t *, mde_cookie_t, char **);
 static void set_at_flags(char *, int, char **);
@@ -307,7 +309,6 @@ found:
 void
 cpu_setup_common(char **cpu_module_isa_set)
 {
-	extern int disable_delay_tlb_flush, delay_tlb_flush;
 	extern int mmu_exported_pagesize_mask;
 	int nocpus, i;
 	size_t ra_limit;
@@ -328,12 +329,6 @@ cpu_setup_common(char **cpu_module_isa_set)
 
 	if (use_page_coloring) {
 		do_pg_coloring = 1;
-		if (use_virtual_coloring) {
-			/*
-			 * XXX Sun4v cpus don't have virtual caches
-			 */
-			do_virtual_coloring = 1;
-		}
 	}
 
 	/*
@@ -343,6 +338,14 @@ cpu_setup_common(char **cpu_module_isa_set)
 	 * Do not expect the MMU page sizes mask to be more than 32-bit.
 	 */
 	mmu_exported_pagesize_mask = (int)get_cpu_pagesizes(mdp, cpulist[0]);
+
+	/*
+	 * Get the number of contexts and tsbs supported.
+	 */
+	if (get_mmu_shcontexts(mdp, cpulist[0]) >= MIN_NSHCONTEXTS &&
+	    get_mmu_tsbs(mdp, cpulist[0]) >= MIN_NTSBS) {
+		shctx_on = 1;
+	}
 
 	for (i = 0; i < nocpus; i++)
 		fill_cpu(mdp, cpulist[i]);
@@ -428,12 +431,6 @@ cpu_setup_common(char **cpu_module_isa_set)
 	 * timestamping.  The sun4v require use of %stick.
 	 */
 	traptrace_use_stick = 1;
-
-	/*
-	 * sun4v provides demap_all
-	 */
-	if (!disable_delay_tlb_flush)
-		delay_tlb_flush = 1;
 }
 
 /*
@@ -453,6 +450,39 @@ get_mmu_ctx_bits(md_t *mdp, mde_cookie_t cpu_node_cookie)
 		    "returned by MD", ctx_bits);
 
 	return (ctx_bits);
+}
+
+/*
+ * Get the number of tsbs from MD. If absent the default value is 0.
+ */
+static uint64_t
+get_mmu_tsbs(md_t *mdp, mde_cookie_t cpu_node_cookie)
+{
+	uint64_t number_tsbs;
+
+	if (md_get_prop_val(mdp, cpu_node_cookie, "mmu-max-#tsbs",
+	    &number_tsbs))
+		number_tsbs = 0;
+
+	return (number_tsbs);
+}
+
+/*
+ * Get the number of shared contexts from MD. This property more accurately
+ * describes the total number of contexts available, not just "shared contexts".
+ * If absent the default value is 1,
+ *
+ */
+static uint64_t
+get_mmu_shcontexts(md_t *mdp, mde_cookie_t cpu_node_cookie)
+{
+	uint64_t number_contexts;
+
+	if (md_get_prop_val(mdp, cpu_node_cookie, "mmu-#shared-contexts",
+	    &number_contexts))
+		number_contexts = 0;
+
+	return (number_contexts);
 }
 
 /*

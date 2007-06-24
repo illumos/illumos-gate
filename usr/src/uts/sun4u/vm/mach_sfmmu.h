@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,19 @@ extern "C" {
 
 
 #ifdef _ASM
+
+/*
+ * This macro is used to set private secondary context register in
+ * sfmmu_alloc_ctx().
+ * Input:
+ * cnum : cnum
+ * arg2 : unused
+ */
+#define	SET_SECCTX(cnum, arg2, tmp1, tmp2)			\
+	mov	MMU_SCONTEXT, tmp1;				\
+	sethi	%hi(FLUSH_ADDR), tmp2;				\
+	stxa	cnum, [tmp1]ASI_MMU_CTX;			\
+	flush	tmp2
 
 /*
  * This macro is used in the MMU code to check if TL should be lowered from
@@ -737,6 +750,12 @@ label/**/1:								\
 	retry				/* retry faulted instruction */	;\
 label/**/1:								\
 	/* END CSTYLED */
+
+/*
+ * Macro to get SCD shared hme map on sun4v platforms
+ * (not applicable to sun4u platforms)
+ */
+#define	GET_SCDSHMERMAP(tsbarea, hmeblkpa, hatid, hmemisc)
 
 #ifndef TRAPTRACE
 /*

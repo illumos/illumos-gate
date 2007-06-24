@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,6 +66,7 @@
  * External routines and data structures
  */
 extern void	sfmmu_cache_flushcolor(int, pfn_t);
+extern uint_t	mmu_page_sizes;
 
 /*
  * Static routines
@@ -79,10 +80,10 @@ caddr_t	textva, datava;
 tte_t	ktext_tte, kdata_tte;		/* ttes for kernel text and data */
 
 int	enable_bigktsb = 1;
+int	shtsb4m_first = 0;
 
 tte_t bigktsb_ttes[MAX_BIGKTSB_TTES];
 int bigktsb_nttes = 0;
-
 
 /*
  * Controls the logic which enables the use of the
@@ -321,27 +322,27 @@ sfmmu_clear_utsbinfo()
 }
 
 /*
- * Invalidate machine specific TSB information, indicates all TSB memory
- * is being freed by hat_swapout().
- */
-void
-sfmmu_invalidate_tsbinfo(sfmmu_t *sfmmup)
-{
-	ASSERT(sfmmup->sfmmu_tsb != NULL &&
-	    sfmmup->sfmmu_tsb->tsb_flags & TSB_SWAPPED);
-
-	sfmmup->sfmmu_hvblock.hv_tsb_info_pa = (uint64_t)-1;
-	sfmmup->sfmmu_hvblock.hv_tsb_info_cnt = 0;
-}
-
-/*
  * Set machine specific TSB information
  */
 void
 sfmmu_setup_tsbinfo(sfmmu_t *sfmmup)
 {
-	struct tsb_info *tsbinfop;
-	hv_tsb_info_t *tdp;
+	struct tsb_info		*tsbinfop;
+	hv_tsb_info_t		*tdp;
+	int			i;
+	int			j;
+	int			scd = 0;
+	int			tsbord[NHV_TSB_INFO];
+
+#ifdef DEBUG
+	ASSERT(max_mmu_ctxdoms > 0);
+	if (sfmmup != ksfmmup) {
+		/* Process should have INVALID_CONTEXT on all MMUs. */
+		for (i = 0; i < max_mmu_ctxdoms; i++) {
+			ASSERT(sfmmup->sfmmu_ctxs[i].cnum == INVALID_CONTEXT);
+		}
+	}
+#endif
 
 	tsbinfop = sfmmup->sfmmu_tsb;
 	if (tsbinfop == NULL) {
@@ -349,29 +350,91 @@ sfmmu_setup_tsbinfo(sfmmu_t *sfmmup)
 		sfmmup->sfmmu_hvblock.hv_tsb_info_cnt = 0;
 		return;
 	}
-	tdp = &sfmmup->sfmmu_hvblock.hv_tsb_info[0];
-	sfmmup->sfmmu_hvblock.hv_tsb_info_pa = va_to_pa(tdp);
-	sfmmup->sfmmu_hvblock.hv_tsb_info_cnt = 1;
-	tdp->hvtsb_idxpgsz = TTE8K;
-	tdp->hvtsb_assoc = 1;
-	tdp->hvtsb_ntte = TSB_ENTRIES(tsbinfop->tsb_szc);
-	tdp->hvtsb_ctx_index = 0;
-	tdp->hvtsb_pgszs = tsbinfop->tsb_ttesz_mask;
-	tdp->hvtsb_rsvd = 0;
-	tdp->hvtsb_pa = tsbinfop->tsb_pa;
-	if ((tsbinfop = tsbinfop->tsb_next) == NULL)
-		return;
-	sfmmup->sfmmu_hvblock.hv_tsb_info_cnt++;
-	tdp++;
-	tdp->hvtsb_idxpgsz = TTE4M;
-	tdp->hvtsb_assoc = 1;
-	tdp->hvtsb_ntte = TSB_ENTRIES(tsbinfop->tsb_szc);
-	tdp->hvtsb_ctx_index = 0;
-	tdp->hvtsb_pgszs = tsbinfop->tsb_ttesz_mask;
-	tdp->hvtsb_rsvd = 0;
-	tdp->hvtsb_pa = tsbinfop->tsb_pa;
-	/* Only allow for 2 TSBs */
-	ASSERT(tsbinfop->tsb_next == NULL);
+
+	ASSERT(sfmmup != ksfmmup || sfmmup->sfmmu_scdp == NULL);
+	ASSERT(sfmmup->sfmmu_scdp == NULL ||
+	    sfmmup->sfmmu_scdp->scd_sfmmup->sfmmu_tsb != NULL);
+
+	tsbord[0] = 0;
+	if (sfmmup->sfmmu_scdp == NULL) {
+		tsbord[1] = 1;
+	} else {
+		struct tsb_info *scd8ktsbp =
+		    sfmmup->sfmmu_scdp->scd_sfmmup->sfmmu_tsb;
+		ulong_t shared_4mttecnt = 0;
+		ulong_t priv_4mttecnt = 0;
+		int scd4mtsb = (scd8ktsbp->tsb_next != NULL);
+
+		for (i = TTE4M; i < MMU_PAGE_SIZES; i++) {
+			if (scd4mtsb) {
+				shared_4mttecnt +=
+				    sfmmup->sfmmu_scdismttecnt[i] +
+				    sfmmup->sfmmu_scdrttecnt[i];
+			}
+			if (tsbinfop->tsb_next != NULL) {
+				priv_4mttecnt += sfmmup->sfmmu_ttecnt[i] +
+				    sfmmup->sfmmu_ismttecnt[i];
+			}
+		}
+		if (tsbinfop->tsb_next == NULL) {
+			if (shared_4mttecnt) {
+				tsbord[1] = 2;
+				tsbord[2] = 1;
+			} else {
+				tsbord[1] = 1;
+				tsbord[2] = 2;
+			}
+		} else if (priv_4mttecnt) {
+			if (shared_4mttecnt) {
+				tsbord[1] = shtsb4m_first ? 2 : 1;
+				tsbord[2] = 3;
+				tsbord[3] = shtsb4m_first ? 1 : 2;
+			} else {
+				tsbord[1] = 1;
+				tsbord[2] = 2;
+				tsbord[3] = 3;
+			}
+		} else if (shared_4mttecnt) {
+			tsbord[1] = 3;
+			tsbord[2] = 2;
+			tsbord[3] = 1;
+		} else {
+			tsbord[1] = 2;
+			tsbord[2] = 1;
+			tsbord[3] = 3;
+		}
+	}
+
+	ASSERT(tsbinfop != NULL);
+	for (i = 0; tsbinfop != NULL && i < NHV_TSB_INFO; i++) {
+		if (i == 0) {
+			tdp = &sfmmup->sfmmu_hvblock.hv_tsb_info[i];
+			sfmmup->sfmmu_hvblock.hv_tsb_info_pa = va_to_pa(tdp);
+		}
+
+
+		j = tsbord[i];
+
+		tdp = &sfmmup->sfmmu_hvblock.hv_tsb_info[j];
+
+		ASSERT(tsbinfop->tsb_ttesz_mask != 0);
+		tdp->hvtsb_idxpgsz = lowbit(tsbinfop->tsb_ttesz_mask) - 1;
+		tdp->hvtsb_assoc = 1;
+		tdp->hvtsb_ntte = TSB_ENTRIES(tsbinfop->tsb_szc);
+		tdp->hvtsb_ctx_index = scd;
+		tdp->hvtsb_pgszs = tsbinfop->tsb_ttesz_mask;
+		tdp->hvtsb_rsvd = 0;
+		tdp->hvtsb_pa = tsbinfop->tsb_pa;
+
+		tsbinfop = tsbinfop->tsb_next;
+		if (tsbinfop == NULL && !scd && sfmmup->sfmmu_scdp != NULL) {
+			tsbinfop =
+			    sfmmup->sfmmu_scdp->scd_sfmmup->sfmmu_tsb;
+			scd = 1;
+		}
+	}
+	sfmmup->sfmmu_hvblock.hv_tsb_info_cnt = i;
+	ASSERT(tsbinfop == NULL);
 }
 
 /*

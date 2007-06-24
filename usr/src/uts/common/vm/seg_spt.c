@@ -633,10 +633,10 @@ segspt_free_pages(struct seg *seg, caddr_t addr, size_t len)
 
 	npages = btop(len);
 
-	hat_flags = HAT_UNLOAD_UNLOCK;
+	hat_flags = HAT_UNLOAD_UNLOCK | HAT_UNLOAD_UNMAP;
 	if ((hat_supported(HAT_DYNAMIC_ISM_UNMAP, (void *)0)) ||
 	    (sptd->spt_flags & SHM_PAGEABLE)) {
-		hat_flags = HAT_UNLOAD;
+		hat_flags = HAT_UNLOAD_UNMAP;
 	}
 
 	hat_unload(seg->s_as->a_hat, addr, len, hat_flags);
@@ -679,7 +679,7 @@ segspt_free_pages(struct seg *seg, caddr_t addr, size_t len)
 		 * permanent lock on it and invalidate the page.
 		 */
 		if ((sptd->spt_flags & SHM_PAGEABLE) == 0) {
-			if (hat_flags == HAT_UNLOAD)
+			if (hat_flags == HAT_UNLOAD_UNMAP)
 				pp = page_lookup(vp, off, SE_EXCL);
 			else {
 				if ((pp = page_find(vp, off)) == NULL) {

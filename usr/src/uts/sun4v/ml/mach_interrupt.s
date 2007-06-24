@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,8 @@
 #include <sys/machasi.h>
 #include <sys/scb.h>
 #include <sys/error.h>
+#include <sys/mmu.h>
+#include <vm/hat_sfmmu.h>
 #define	INTR_REPORT_SIZE	64
 
 #ifdef TRAPTRACE
@@ -75,7 +77,7 @@ cpu_mondo(void)
 	mov	CPU_MONDO_Q_TL, %g4	
 	ldxa	[%g4]ASI_QUEUE, %g7	! %g7 = tail ptr 
 	cmp	%g6, %g7
-	be,pn	%xcc, 0f		! head == tail
+	be,pn	%xcc, 3f		! head == tail
 	nop
 	
 	CPU_ADDR(%g1,%g2)
@@ -133,18 +135,64 @@ cpu_mondo(void)
 	 */
 	set	KERNELBASE, %g4
 	cmp	%g5, %g4
-	bl,a,pn	%xcc, 1f		! branch if bad %pc
-	nop
+	bl,pn	%xcc, 2f		! branch if bad %pc
+	  nop
+	
 
+	/*
+	 * If this platform supports shared contexts and we are jumping
+	 * to OBP code, then we need to invalidate both contexts to prevent OBP
+	 * from corrupting the shared context registers.
+	 *
+	 * If shared contexts are not supported then the next two instructions
+	 * will be patched with:
+	 *
+	 * jmp       %g5
+	 * nop
+	 *
+	 */
+	.global sfmmu_shctx_cpu_mondo_patch
+sfmmu_shctx_cpu_mondo_patch:
+	set	OFW_START_ADDR, %g4	! Check if this a call into OBP?
+	cmp	%g5, %g4
+	bl,pt %xcc, 1f
+	  nop
+	set	OFW_END_ADDR, %g4	
+	cmp	%g5, %g4
+	bg,pn %xcc, 1f		
+	  nop
+	mov	MMU_PCONTEXT, %g3
+	ldxa	[%g3]ASI_MMU_CTX, %g4
+	cmp	%g4, INVALID_CONTEXT	! Check if we are in kernel mode
+	ble,pn %xcc, 1f			! or the primary context is invalid
+	  nop
+	set	INVALID_CONTEXT, %g4	! Invalidate contexts - compatability
+	stxa    %g4, [%g3]ASI_MMU_CTX	! mode ensures shared contexts are also
+	mov     MMU_SCONTEXT, %g3	! invalidated.
+	stxa    %g4, [%g3]ASI_MMU_CTX
+	membar  #Sync
+	mov	%o0, %g3		! save output regs
+	mov	%o1, %g4
+	mov	%o5, %g6
+	clr	%o0			! Invalidate tsbs, set ntsb = 0
+	clr	%o1			! and HV_TSB_INFO_PA = 0
+	mov	MMU_TSB_CTXNON0, %o5
+	ta	FAST_TRAP		! set TSB info for user process
+	brnz,a,pn %o0, ptl1_panic
+	  mov	PTL1_BAD_HCALL, %g1
+	mov	%g3, %o0		! restore output regs
+	mov	%g4, %o1
+	mov	%g6, %o5
+1:
 	jmp	%g5			! jump to traphandler
 	nop
-1:
+2:
 	! invalid trap handler, discard it for now
 	set	cpu_mondo_inval, %g4
 	ldx	[%g4], %g5
 	inc	%g5
 	stx	%g5, [%g4]
-0:
+3:
 	retry
 	/* Never Reached */
 	SET_SIZE(cpu_mondo)

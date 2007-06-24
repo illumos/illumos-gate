@@ -113,20 +113,6 @@
 #endif
 
 /*
- * This macro is used to update per cpu mmu stats in perf critical
- * paths. It is only enabled in debug kernels or if SFMMU_STAT_GATHER
- * is defined.
- */
-#if defined(DEBUG) || defined(SFMMU_STAT_GATHER)
-#define	HAT_PERCPU_DBSTAT(stat)			\
-	mov	stat, %g1			;\
-	ba	stat_mmu			;\
-	rd	%pc, %g7
-#else
-#define	HAT_PERCPU_DBSTAT(stat)
-#endif /* DEBUG || SFMMU_STAT_GATHER */
-
-/*
  * This first set are funneled to trap() with %tt as the type.
  * Trap will then either panic or send the user a signal.
  */
@@ -953,7 +939,6 @@ tt1_dtlbmiss:
 #define	DTLB_MISS(table_name)						;\
 	.global	table_name/**/_dtlbmiss					;\
 table_name/**/_dtlbmiss:						;\
-	HAT_PERCPU_DBSTAT(TSBMISS_DTLBMISS) /* 3 instr ifdef DEBUG */	;\
 	GET_MMU_D_PTAGACC_CTXTYPE(%g2, %g3)	/* 8 instr */		;\
 	cmp	%g3, INVALID_CONTEXT					;\
 	ble,pn	%xcc, sfmmu_kdtlb_miss					;\
@@ -998,7 +983,6 @@ tt1_itlbmiss:
 #define	ITLB_MISS(table_name)						 \
 	.global	table_name/**/_itlbmiss					;\
 table_name/**/_itlbmiss:						;\
-	HAT_PERCPU_DBSTAT(TSBMISS_ITLBMISS) /* 3 instr ifdef DEBUG */	;\
 	GET_MMU_I_PTAGACC_CTXTYPE(%g2, %g3)	/* 8 instr */		;\
 	cmp	%g3, INVALID_CONTEXT					;\
 	ble,pn	%xcc, sfmmu_kitlb_miss					;\
@@ -2779,20 +2763,6 @@ trace_dataprot:
 	ba,pt	%xcc, .mmu_exception_end
 	mov	T_DATA_EXCEPTION, %g1
 	SET_SIZE(.dmmu_exception)
-/*
- * expects offset into tsbmiss area in %g1 and return pc in %g7
- */
-stat_mmu:
-	CPU_INDEX(%g5, %g6)
-	sethi	%hi(tsbmiss_area), %g6
-	sllx	%g5, TSBMISS_SHIFT, %g5
-	or	%g6, %lo(tsbmiss_area), %g6
-	add	%g6, %g5, %g6		/* g6 = tsbmiss area */
-	ld	[%g6 + %g1], %g5
-	add	%g5, 1, %g5
-	jmp	%g7 + 4
-	st	%g5, [%g6 + %g1]
-
 
 /*
  * fast_trap_done, fast_trap_done_chk_intr:

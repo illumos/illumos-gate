@@ -474,7 +474,6 @@ void
 cpu_setup(void)
 {
 	extern int at_flags;
-	extern int disable_delay_tlb_flush, delay_tlb_flush;
 	extern int cpc_has_overflow_intr;
 
 	/*
@@ -507,8 +506,6 @@ cpu_setup(void)
 
 	if (use_page_coloring) {
 		do_pg_coloring = 1;
-		if (use_virtual_coloring)
-			do_virtual_coloring = 1;
 	}
 
 	isa_list =
@@ -551,12 +548,6 @@ cpu_setup(void)
 	 * Cheetah has a performance counter overflow interrupt
 	 */
 	cpc_has_overflow_intr = 1;
-
-	/*
-	 * Use cheetah flush-all support
-	 */
-	if (!disable_delay_tlb_flush)
-		delay_tlb_flush = 1;
 
 #if defined(CPU_IMP_DUAL_PAGESIZE)
 	/*

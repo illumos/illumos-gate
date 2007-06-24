@@ -52,7 +52,7 @@ extern "C" {
 /*
  * Hypervisor TSB info
  */
-#define	NHV_TSB_INFO	2
+#define	NHV_TSB_INFO	4
 
 #ifndef _ASM
 
@@ -65,6 +65,20 @@ struct hv_tsb_block {
 #endif /* _ASM */
 
 #ifdef _ASM
+
+/*
+ * This macro is used to set private/shared secondary context register in
+ * sfmmu_alloc_ctx().
+ * Input:
+ * cnum     = cnum
+ * is_shctx = sfmmu private/shared flag (0: private, 1: shared)
+ */
+#define	SET_SECCTX(cnum, is_shctx, tmp1, tmp2)				\
+	mov	MMU_SCONTEXT, tmp1;					\
+	movrnz	is_shctx, MMU_SCONTEXT1, tmp1;				\
+	sethi   %hi(FLUSH_ADDR), tmp2;					\
+	stxa    cnum, [tmp1]ASI_MMU_CTX;  /* set 2nd ctx reg. */	\
+	flush   tmp2;							\
 
 /*
  * This macro is used in the MMU code to check if TL should be lowered from
@@ -382,10 +396,13 @@ label/**/2:								\
 
 
 /*
- * Load TSB base register into a dedicated scratchpad register.
+ * Load TSB base register into a dedicated scratchpad register
+ * for private contexts.
+ * Load TSB base register to TSBMISS area for shared contexts.
  * This register contains utsb_pabase in bits 63:13, and TSB size
  * code in bits 2:0.
  *
+ * For private context
  * In:
  *   tsbreg = value to load (ro)
  *   regnum = constant or register
@@ -399,7 +416,24 @@ label/**/2:								\
 	stxa	tsbreg, [tmp1]ASI_SCRATCHPAD	/* save tsbreg */
 
 /*
- * Get TSB base register from the scratchpad
+ * Load TSB base register to TSBMISS area for shared contexts.
+ * This register contains utsb_pabase in bits 63:13, and TSB size
+ * code in bits 2:0.
+ *
+ * In:
+ *   tsbmiss = pointer to tsbmiss area
+ *   tsbmissoffset = offset to right tsb pointer
+ *   tsbreg = value to load (ro)
+ * Out:
+ *   Specified tsbmiss area updated
+ *
+ */
+#define	SET_UTSBREG_SHCTX(tsbmiss, tsbmissoffset, tsbreg)		\
+	stx	tsbreg, [tsbmiss + tsbmissoffset]	/* save tsbreg */
+
+/*
+ * Get TSB base register from the scratchpad for
+ * private contexts
  *
  * In:
  *   regnum = constant or register
@@ -410,6 +444,20 @@ label/**/2:								\
 #define	GET_UTSBREG(regnum, tsbreg)					\
 	mov	regnum, tsbreg;						\
 	ldxa	[tsbreg]ASI_SCRATCHPAD, tsbreg
+
+/*
+ * Get TSB base register from the scratchpad for
+ * shared contexts
+ *
+ * In:
+ *   tsbmiss = pointer to tsbmiss area
+ *   tsbmissoffset = offset to right tsb pointer
+ *   tsbreg = scratch
+ * Out:
+ *   tsbreg = tsbreg from the specified scratchpad register
+ */
+#define	GET_UTSBREG_SHCTX(tsbmiss, tsbmissoffset, tsbreg)		\
+	ldx	[tsbmiss + tsbmissoffset], tsbreg
 
 
 /*
@@ -562,6 +610,125 @@ label/**/1:								\
 	retry				/* retry faulted instruction */	\
 	/* END CSTYLED */
 
+
+/*
+ * Get the location in the 3rd TSB of the tsbe for this fault.
+ * The 3rd TSB corresponds to the shared context, and is used
+ * for 8K - 512k pages.
+ *
+ * In:
+ *   tagacc = tag access register (not clobbered)
+ *   tsbe   = TSB base register
+ *   tmp1, tmp2 = scratch registers
+ * Out:
+ *   tsbe = pointer to the tsbe in the 3rd TSB
+ */
+#define	GET_3RD_TSBE_PTR(tagacc, tsbe, tmp1, tmp2)		\
+	and	tsbe, TSB_SOFTSZ_MASK, tmp2;	/* tmp2=szc */		\
+	andn	tsbe, TSB_SOFTSZ_MASK, tsbe;	/* tsbbase */		\
+	mov	TSB_ENTRIES(0), tmp1;	/* nentries in TSB size 0 */	\
+	sllx	tmp1, tmp2, tmp1;	/* tmp1 = nentries in TSB */	\
+	sub	tmp1, 1, tmp1;		/* mask = nentries - 1 */	\
+	srlx	tagacc, MMU_PAGESHIFT, tmp2; 				\
+	and	tmp2, tmp1, tmp1;	/* tsbent = virtpage & mask */	\
+	sllx	tmp1, TSB_ENTRY_SHIFT, tmp1;	/* entry num --> ptr */	\
+	add	tsbe, tmp1, tsbe	/* add entry offset to TSB base */
+
+
+/*
+ * Get the location in the 4th TSB of the tsbe for this fault.
+ * The 4th TSB is for the shared context. It is used for 4M - 256M pages.
+ *
+ * In:
+ *   tagacc = tag access register (not clobbered)
+ *   tsbe   = TSB base register
+ *   tmp1, tmp2 = scratch registers
+ * Out:
+ *   tsbe = pointer to the tsbe in the 4th TSB
+ */
+#define	GET_4TH_TSBE_PTR(tagacc, tsbe, tmp1, tmp2)		\
+	and	tsbe, TSB_SOFTSZ_MASK, tmp2;	/* tmp2=szc */		\
+	andn	tsbe, TSB_SOFTSZ_MASK, tsbe;	/* tsbbase */		\
+	mov	TSB_ENTRIES(0), tmp1;	/* nentries in TSB size 0 */	\
+	sllx	tmp1, tmp2, tmp1;	/* tmp1 = nentries in TSB */	\
+	sub	tmp1, 1, tmp1;		/* mask = nentries - 1 */	\
+	srlx	tagacc, MMU_PAGESHIFT4M, tmp2; 				\
+	and	tmp2, tmp1, tmp1;	/* tsbent = virtpage & mask */	\
+	sllx	tmp1, TSB_ENTRY_SHIFT, tmp1;	/* entry num --> ptr */	\
+	add	tsbe, tmp1, tsbe	/* add entry offset to TSB base */
+
+/*
+ * Copy the sfmmu_region_map or scd_region_map to the tsbmiss
+ * shmermap or scd_shmermap, from sfmmu_load_mmustate.
+ */
+#define	SET_REGION_MAP(rgn_map, tsbmiss_map, cnt, tmp, label)		\
+	/* BEGIN CSTYLED */						\
+label:									;\
+	ldx	[rgn_map], tmp						;\
+	dec	cnt							;\
+	add	rgn_map, CLONGSIZE, rgn_map				;\
+	stx	tmp, [tsbmiss_map]					;\
+	brnz,pt	cnt, label						;\
+	  add	tsbmiss_map, CLONGSIZE, tsbmiss_map			\
+	/* END CSTYLED */
+
+/*
+ * If there is no scd, then zero the tsbmiss scd_shmermap,
+ * from sfmmu_load_mmustate.
+ */
+#define	ZERO_REGION_MAP(tsbmiss_map, cnt, label)			\
+	/* BEGIN CSTYLED */						\
+label:									;\
+	dec	cnt							;\
+	stx	%g0, [tsbmiss_map]					;\
+	brnz,pt	cnt, label						;\
+	  add	tsbmiss_map, CLONGSIZE, tsbmiss_map			\
+	/* END CSTYLED */
+
+/*
+ * Set hmemisc to 1 if the shared hme is also part of an scd.
+ * In:
+ *   tsbarea = tsbmiss area (not clobbered)
+ *   hmeblkpa  = hmeblkpa +  hmentoff + SFHME_TTE (not clobbered)
+ *   hmentoff = hmentoff + SFHME_TTE = tte offset(clobbered)
+ * Out:
+ *   use_shctx = 1 if shme is in scd and 0 otherwise
+ */
+#define	GET_SCDSHMERMAP(tsbarea, hmeblkpa, hmentoff, use_shctx)		      \
+	/* BEGIN CSTYLED */						      \
+	sub	hmeblkpa, hmentoff, hmentoff	/* hmentofff = hmeblkpa */   ;\
+	add	hmentoff, HMEBLK_TAG, hmentoff				     ;\
+	ldxa	[hmentoff]ASI_MEM, hmentoff	/* read 1st part of tag */   ;\
+	and	hmentoff, HTAG_RID_MASK, hmentoff	/* mask off rid */   ;\
+	and	hmentoff, BT_ULMASK, use_shctx	/* mask bit index */	     ;\
+	srlx	hmentoff, BT_ULSHIFT, hmentoff	/* extract word */	     ;\
+	sllx	hmentoff, CLONGSHIFT, hmentoff	/* index */		     ;\
+	add	tsbarea, hmentoff, hmentoff		/* add to tsbarea */ ;\
+	ldx	[hmentoff + TSBMISS_SCDSHMERMAP], hmentoff	/* scdrgn */ ;\
+	srlx	hmentoff, use_shctx, use_shctx				     ;\
+	and	use_shctx, 0x1, use_shctx      				      \
+	/* END CSTYLED */
+
+/*
+ * 1. Get ctx1. The traptype is supplied by caller.
+ * 2. If iTSB miss, store in MMFSA_I_CTX
+ * 3. if dTSB miss, store in MMFSA_D_CTX
+ * 4. Thus the [D|I]TLB_STUFF will work as expected.
+ */
+#define	SAVE_CTX1(traptype, ctx1, tmp, label)				\
+	/* BEGIN CSTYLED */						\
+	mov	MMU_SCONTEXT1, tmp					;\
+	ldxa	[tmp]ASI_MMU_CTX, ctx1					;\
+	MMU_FAULT_STATUS_AREA(tmp)					;\
+	cmp     traptype, FAST_IMMU_MISS_TT				;\
+	be,a,pn %icc, label						;\
+	  stx	ctx1, [tmp + MMFSA_I_CTX] 				;\
+	cmp     traptype, T_INSTR_MMU_MISS				;\
+	be,a,pn %icc, label						;\
+	  stx	ctx1, [tmp + MMFSA_I_CTX]				;\
+	stx	ctx1, [tmp + MMFSA_D_CTX]				;\
+label:
+	/* END CSTYLED */
 
 #endif /* _ASM */
 

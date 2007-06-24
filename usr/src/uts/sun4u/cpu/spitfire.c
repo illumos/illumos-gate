@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -451,8 +451,6 @@ cpu_setup(void)
 
 	if (use_page_coloring) {
 		do_pg_coloring = 1;
-		if (use_virtual_coloring)
-			do_virtual_coloring = 1;
 	}
 
 	/*

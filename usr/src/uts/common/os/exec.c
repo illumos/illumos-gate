@@ -623,6 +623,7 @@ gexec(
 		args->stk_prot &= ~PROT_EXEC;
 
 	args->execswp = eswp; /* Save execsw pointer in uarg for exec_func */
+	args->ex_vp = vp;
 
 	/*
 	 * Traditionally, the setid flags told the sub processes whether
@@ -1819,6 +1820,7 @@ exec_args(execa_t *uap, uarg_t *args, intpdata_t *intp, void **auxvpp)
 	if (p->p_model == DATAMODEL_ILP32)
 		as->a_userlimit = (caddr_t)USERLIMIT32;
 	(void) hat_setup(as->a_hat, HAT_ALLOC);
+	hat_join_srd(as->a_hat, args->ex_vp);
 
 	/*
 	 * Finally, write out the contents of the new stack.

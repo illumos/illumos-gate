@@ -73,7 +73,7 @@ sfmmu_getctx_sec()
 
 /* ARGSUSED */
 void
-sfmmu_setctx_sec(int ctx)
+sfmmu_setctx_sec(uint_t ctx)
 {}
 
 /* ARGSUSED */
@@ -154,8 +154,8 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
         ta      FAST_TRAP
         brz,pt  %o0, 5f
           nop
-        ba      panic_bad_hcall
-          mov   MMU_DEMAP_ALL, %o1
+     	ba ptl1_panic		/* bad HV call */
+	  mov	PTL1_BAD_RAISE_TSBEXCP, %g1
 5:	
 	mov	%g3, %o0
 	mov	%g4, %o1
@@ -245,17 +245,17 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	stxa	%o0, [%o1]ASI_MMU_CTX		/* set 2nd context reg. */
 	flush	%o4
 
-	/*
-	 * if the routine is entered with intr enabled, then enable intr now.
-	 * otherwise, keep intr disabled, return without enabing intr.
-	 * %g1 - old intr state
-	 */
-	btst	PSTATE_IE, %g1
-	bnz,a,pt %icc, 2f
-	wrpr	%g0, %g1, %pstate		/* enable interrupts */
-2:	retl
-	nop
-	SET_SIZE(sfmmu_setctx_sec)
+        /*
+         * if the routine is entered with intr enabled, then enable intr now.
+         * otherwise, keep intr disabled, return without enabing intr.
+         * %g1 - old intr state
+         */
+        btst    PSTATE_IE, %g1
+        bnz,a,pt %icc, 2f
+        wrpr    %g0, %g1, %pstate               /* enable interrupts */
+2:      retl
+        nop
+        SET_SIZE(sfmmu_setctx_sec)
 
 	/*
 	 * set ktsb_phys to 1 if the processor supports ASI_QUAD_LDD_PHYS.
@@ -285,9 +285,36 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 	sethi	%hi(ksfmmup), %o3
 	ldx	[%o3 + %lo(ksfmmup)], %o3
 	cmp	%o3, %o0
-	be,pn	%xcc, 3f			! if kernel as, do nothing
+	be,pn	%xcc, 7f			! if kernel as, do nothing
+	  nop
+	
+	set     MMU_SCONTEXT, %o3
+        ldxa    [%o3]ASI_MMU_CTX, %o5
+	
+	cmp	%o5, INVALID_CONTEXT		! ctx is invalid?
+	bne,pt	%icc, 1f
 	  nop
 
+	CPU_TSBMISS_AREA(%o2, %o3)		! %o2 = tsbmiss area
+	stx	%o0, [%o2 + TSBMISS_UHATID]
+	stx	%g0, [%o2 +  TSBMISS_SHARED_UHATID]
+#ifdef DEBUG
+	/* check if hypervisor/hardware should handle user TSB */
+	sethi	%hi(hv_use_non0_tsb), %o2
+	ld	[%o2 + %lo(hv_use_non0_tsb)], %o2
+	brz,pn	%o2, 0f
+	nop
+#endif /* DEBUG */
+	clr	%o0				! ntsb = 0 for invalid ctx
+	clr	%o1				! HV_TSB_INFO_PA = 0 if inv ctx
+	mov	MMU_TSB_CTXNON0, %o5
+	ta	FAST_TRAP			! set TSB info for user process
+	brnz,a,pn %o0, panic_bad_hcall
+	mov	MMU_TSB_CTXNON0, %o1
+0:
+	retl
+	  nop
+1:		
 	/*
 	 * We need to set up the TSB base register, tsbmiss
 	 * area, and pass the TSB information into the hypervisor
@@ -307,52 +334,106 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 2:
 	SET_UTSBREG(SCRATCHPAD_UTSBREG2, %o2, %o3)
 
+        /* make 3rd and 4th TSB */
+	CPU_TSBMISS_AREA(%o4, %o3)		! %o4 = tsbmiss area
+
+	ldx	[%o0 + SFMMU_SCDP], %g2		! %g2 = sfmmu_scd
+	brz,pt	%g2, 3f
+	  mov	-1, %o2				! use -1 if no third TSB
+
+	ldx	[%g2 + SCD_SFMMUP], %g3		! %g3 = scdp->scd_sfmmup
+	ldx	[%g3 + SFMMU_TSB], %o1		! %o1 = first scd tsbinfo
+	brz,pn %o1, 9f
+	  nop					! panic if no third TSB
+
+	/* make 3rd UTSBREG */
+	MAKE_UTSBREG(%o1, %o2, %o3)		! %o2 = user tsbreg
+3:
+	SET_UTSBREG_SHCTX(%o4, TSBMISS_TSBSCDPTR, %o2)
+
+	brz,pt	%g2, 4f
+	  mov	-1, %o2				! use -1 if no 3rd or 4th TSB
+
+	brz,pt	%o1, 4f
+	  mov	-1, %o2				! use -1 if no 3rd or 4th TSB
+	ldx	[%o1 + TSBINFO_NEXTPTR], %g2	! %g2 = second scd tsbinfo
+	brz,pt	%g2, 4f
+	  mov	-1, %o2				! use -1 if no 4th TSB
+
+	/* make 4th UTSBREG */
+	MAKE_UTSBREG(%g2, %o2, %o3)		! %o2 = user tsbreg
+4:
+	SET_UTSBREG_SHCTX(%o4, TSBMISS_TSBSCDPTR4M, %o2)
+
 #ifdef DEBUG
 	/* check if hypervisor/hardware should handle user TSB */
 	sethi	%hi(hv_use_non0_tsb), %o2
 	ld	[%o2 + %lo(hv_use_non0_tsb)], %o2
-	brz,pn	%o2, 5f
+	brz,pn	%o2, 6f
 	nop
 #endif /* DEBUG */
 	CPU_ADDR(%o2, %o4)	! load CPU struct addr to %o2 using %o4
 	ldub    [%o2 + CPU_TSTAT_FLAGS], %o1	! load cpu_tstat_flag to %o1
-    
-        /*
-         * %o0 = sfmmup
-	 * %o2 = returned sfmmu cnum on this CPU
-	 * %o4 = scratch
-         */
-	SFMMU_CPU_CNUM(%o0, %o2, %o4)
 
-	mov	%o5, %o4			! preserve %o5 for resume
 	mov	%o0, %o3			! preserve %o0
 	btst	TSTAT_TLB_STATS, %o1
-	bnz,a,pn %icc, 4f			! ntsb = 0 if TLB stats enabled
+	bnz,a,pn %icc, 5f			! ntsb = 0 if TLB stats enabled
 	  clr	%o0
-	cmp	%o2, INVALID_CONTEXT
-	be,a,pn	%icc, 4f
-	  clr	%o0				! ntsb = 0 for invalid ctx
+	
 	ldx	[%o3 + SFMMU_HVBLOCK + HV_TSB_INFO_CNT], %o0
-4:
-	ldx	[%o3 + SFMMU_HVBLOCK + HV_TSB_INFO_PA], %o1
+5:
+	ldx	[%o3 + SFMMU_HVBLOCK + HV_TSB_INFO_PA], %o1	
 	mov	MMU_TSB_CTXNON0, %o5
 	ta	FAST_TRAP			! set TSB info for user process
 	brnz,a,pn %o0, panic_bad_hcall
 	mov	MMU_TSB_CTXNON0, %o1
 	mov	%o3, %o0			! restore %o0
-	mov	%o4, %o5			! restore %o5
-5:
+6:
 	ldx	[%o0 + SFMMU_ISMBLKPA], %o1	! copy members of sfmmu
-	CPU_TSBMISS_AREA(%o2, %o3)		! we need to access from
+	CPU_TSBMISS_AREA(%o2, %o3)		! %o2 = tsbmiss area
 	stx	%o1, [%o2 + TSBMISS_ISMBLKPA]	! sfmmu_tsb_miss into the
-	lduh	[%o0 + SFMMU_FLAGS], %o3	! per-CPU tsbmiss area.
+	ldub	[%o0 + SFMMU_TTEFLAGS], %o3	! per-CPU tsbmiss area.
+	ldub	[%o0 + SFMMU_RTTEFLAGS], %o4
+	ldx	[%o0 + SFMMU_SRDP], %o1
 	stx	%o0, [%o2 + TSBMISS_UHATID]
-	stuh	%o3, [%o2 + TSBMISS_HATFLAGS]
+	stub	%o3, [%o2 + TSBMISS_UTTEFLAGS]
+	stub	%o4,  [%o2 + TSBMISS_URTTEFLAGS]
+	stx	%o1, [%o2 +  TSBMISS_SHARED_UHATID]
+	brz,pn	%o1, 7f				! check for sfmmu_srdp
+	  add	%o0, SFMMU_HMERMAP, %o1
+	add	%o2, TSBMISS_SHMERMAP, %o2
+	mov	SFMMU_HMERGNMAP_WORDS, %o3
+						! set tsbmiss shmermap
+	SET_REGION_MAP(%o1, %o2, %o3, %o4, load_shme_mmustate)
 
-3:	retl
+	ldx	[%o0 + SFMMU_SCDP], %o4		! %o4 = sfmmu_scd
+	CPU_TSBMISS_AREA(%o2, %o3)		! %o2 = tsbmiss area
+	mov	SFMMU_HMERGNMAP_WORDS, %o3
+	brnz,pt	%o4, 8f				! check for sfmmu_scdp else
+	  add	%o2, TSBMISS_SCDSHMERMAP, %o2	! zero tsbmiss scd_shmermap
+	ZERO_REGION_MAP(%o2, %o3, zero_scd_mmustate)
+7:
+	retl
 	nop
-	SET_SIZE(sfmmu_load_mmustate)
+8:						! set tsbmiss scd_shmermap
+	add	%o4, SCD_HMERMAP, %o1
+	SET_REGION_MAP(%o1, %o2, %o3, %o4, load_scd_mmustate)
+	retl
+	  nop
+9:
+	sethi   %hi(panicstr), %g1		! panic if no 3rd TSB  
+        ldx     [%g1 + %lo(panicstr)], %g1                             
+        tst     %g1
+	                                                   
+        bnz,pn  %xcc, 7b                                            
+          nop                                                            
+                                                                        
+        sethi   %hi(sfmmu_panic10), %o0                                 
+        call    panic                                                 
+          or      %o0, %lo(sfmmu_panic10), %o0                         
 
+	SET_SIZE(sfmmu_load_mmustate)
+	
 #endif /* lint */
 
 #if defined(lint)

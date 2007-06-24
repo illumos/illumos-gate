@@ -104,6 +104,7 @@ typedef struct uarg {
 	struct execsw *execswp;
 	uintptr_t entry;
 	uintptr_t thrptr;
+	vnode_t	*ex_vp;
 	char	*emulator;
 	char	*brandname;
 	char	*auxp_brand_phdr; /* addr of brand phdr auxv on user stack */

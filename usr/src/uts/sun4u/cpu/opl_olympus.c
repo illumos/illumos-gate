@@ -493,7 +493,6 @@ void
 cpu_setup(void)
 {
 	extern int at_flags;
-	extern int disable_delay_tlb_flush, delay_tlb_flush;
 	extern int cpc_has_overflow_intr;
 	uint64_t cpu0_log;
 	extern	 uint64_t opl_cpu0_err_log;
@@ -536,8 +535,6 @@ cpu_setup(void)
 
 	if (use_page_coloring) {
 		do_pg_coloring = 1;
-		if (use_virtual_coloring)
-			do_virtual_coloring = 1;
 	}
 
 	isa_list =
@@ -577,12 +574,6 @@ cpu_setup(void)
 	 * SPARC64-VI has a performance counter overflow interrupt
 	 */
 	cpc_has_overflow_intr = 1;
-
-	/*
-	 * Use SPARC64-VI flush-all support
-	 */
-	if (!disable_delay_tlb_flush)
-		delay_tlb_flush = 1;
 
 	/*
 	 * Declare that this architecture/cpu combination does not support
@@ -920,7 +911,7 @@ mmu_check_page_sizes(sfmmu_t *sfmmup, uint64_t *ttecnt)
 	 * the two most used page sizes changes and we're using
 	 * large pages in this process.
 	 */
-	if (sfmmup->sfmmu_flags & HAT_LGPG_FLAGS) {
+	if (SFMMU_LGPGS_INUSE(sfmmup)) {
 		/* Sort page sizes. */
 		for (i = 0; i < mmu_page_sizes; i++) {
 			sortcnt[i] = ttecnt[i];

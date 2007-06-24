@@ -195,6 +195,9 @@ static struct seg *segvn_split_seg(struct seg *, caddr_t);
 static int segvn_claim_pages(struct seg *, struct vpage *, u_offset_t,
     ulong_t, uint_t);
 
+static void segvn_hat_rgn_unload_callback(caddr_t, caddr_t, caddr_t,
+    size_t, void *, u_offset_t);
+
 static int segvn_pp_lock_anonpages(page_t *, int);
 static void segvn_pp_unlock_anonpages(page_t *, int);
 
@@ -297,6 +300,8 @@ ulong_t segvn_faultvnmpss_align_err3;
 ulong_t segvn_faultvnmpss_align_err4;
 ulong_t segvn_faultvnmpss_align_err5;
 ulong_t	segvn_vmpss_pageio_deadlk_err;
+
+int segvn_use_regions = 1;
 
 /*
  * Segvn supports text replication optimization for NUMA platforms. Text
@@ -407,6 +412,21 @@ segvn_init(void)
 	if (segvn_maxpgszc == 0 || segvn_maxpgszc > maxszc)
 		segvn_maxpgszc = maxszc;
 
+	if (segvn_use_regions && !hat_supported(HAT_SHARED_REGIONS, NULL))
+		segvn_use_regions = 0;
+
+	/*
+	 * For now shared regions and text replication segvn support
+	 * are mutually exclusive. This is acceptable because
+	 * currently significant benefit from text replication was
+	 * only observed on AMD64 NUMA platforms (due to relatively
+	 * small L2$ size) and currently we don't support shared
+	 * regions on x86.
+	 */
+	if (segvn_use_regions && !segvn_disable_textrepl) {
+		segvn_disable_textrepl = 1;
+	}
+
 	if (lgrp_optimizations() && textrepl_size_thresh != (size_t)-1 &&
 	    !segvn_disable_textrepl) {
 		ulong_t i;
@@ -476,8 +496,8 @@ segvn_create(struct seg *seg, void *argsp)
 	int error = 0;
 	size_t pgsz;
 	lgrp_mem_policy_t mpolicy = LGRP_MEM_POLICY_DEFAULT;
+	int use_rgn = 0;
 	int trok = 0;
-
 
 	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
 
@@ -493,6 +513,12 @@ segvn_create(struct seg *seg, void *argsp)
 	if (a->amp != NULL && a->vp != NULL) {
 		panic("segvn_create anon_map");
 		/*NOTREACHED*/
+	}
+
+	if (a->type == MAP_PRIVATE && (a->flags & MAP_TEXT) &&
+	    a->vp != NULL && a->prot == (PROT_USER | PROT_READ | PROT_EXEC) &&
+	    segvn_use_regions) {
+		use_rgn = 1;
 	}
 
 	/* MAP_NORESERVE on a MAP_SHARED segment is meaningless. */
@@ -548,8 +574,13 @@ segvn_create(struct seg *seg, void *argsp)
 
 	/*
 	 * Reserve any mapping structures that may be required.
+	 *
+	 * Don't do it for segments that may use regions. It's currently a
+	 * noop in the hat implementations anyway.
 	 */
-	hat_map(seg->s_as->a_hat, seg->s_base, seg->s_size, HAT_MAP);
+	if (!use_rgn) {
+		hat_map(seg->s_as->a_hat, seg->s_base, seg->s_size, HAT_MAP);
+	}
 
 	if (a->cred) {
 		cred = a->cred;
@@ -571,10 +602,15 @@ segvn_create(struct seg *seg, void *argsp)
 					seg, swresv, 0);
 			}
 			crfree(cred);
-			hat_unload(seg->s_as->a_hat, seg->s_base,
-				seg->s_size, HAT_UNLOAD_UNMAP);
+			if (!use_rgn) {
+				hat_unload(seg->s_as->a_hat, seg->s_base,
+				    seg->s_size, HAT_UNLOAD_UNMAP);
+			}
 			return (error);
 		}
+		/*
+		 * svntr_hashtab will be NULL if we support shared regions.
+		 */
 		trok = ((a->flags & MAP_TEXT) &&
 		    (seg->s_size > textrepl_size_thresh ||
 			(a->flags & _MAP_TEXTREPL)) &&
@@ -582,6 +618,8 @@ segvn_create(struct seg *seg, void *argsp)
 		    a->type == MAP_PRIVATE && swresv == 0 &&
 		    !(a->flags & MAP_NORESERVE) &&
 		    seg->s_as != &kas && a->vp->v_type == VREG);
+
+		ASSERT(!trok || !use_rgn);
 	}
 
 	/*
@@ -590,7 +628,7 @@ segvn_create(struct seg *seg, void *argsp)
 	 * explicit anon_map structure was supplied (e.g., SystemV shared
 	 * memory) or if we'll use text replication for this segment.
 	 */
-	if (a->amp == NULL && !trok) {
+	if (a->amp == NULL && !use_rgn && !trok) {
 		struct seg *pseg, *nseg;
 		struct segvn_data *psvd, *nsvd;
 		lgrp_mem_policy_t ppolicy, npolicy;
@@ -730,6 +768,8 @@ segvn_create(struct seg *seg, void *argsp)
 	svd->pageadvice = 0;
 	svd->flags = (ushort_t)a->flags;
 	svd->softlockcnt = 0;
+	svd->rcookie = HAT_INVALID_REGION_COOKIE;
+
 	if (a->szc != 0 && a->vp != NULL) {
 		segvn_setvnode_mpss(a->vp);
 	}
@@ -858,6 +898,7 @@ segvn_create(struct seg *seg, void *argsp)
 				ASSERT(seg->s_szc == 0);
 				ASSERT(!IS_VMODSORT(pp->p_vnode));
 
+				ASSERT(use_rgn == 0);
 				hat_memload(seg->s_as->a_hat, addr, pp,
 					svd->prot & ~PROT_WRITE, hat_flag);
 
@@ -881,6 +922,15 @@ segvn_create(struct seg *seg, void *argsp)
 	if (svd->type == MAP_SHARED)
 		(void) lgrp_shm_policy_set(mpolicy, svd->amp, svd->anon_index,
 		    svd->vp, svd->offset, seg->s_size);
+
+	if (use_rgn) {
+		ASSERT(!trok);
+		ASSERT(svd->amp == NULL);
+		svd->rcookie = hat_join_region(seg->s_as->a_hat, seg->s_base,
+		    seg->s_size, (void *)svd->vp, svd->offset, svd->prot,
+		    (uchar_t)seg->s_szc, segvn_hat_rgn_unload_callback,
+		    HAT_REGION_TEXT);
+	}
 
 	ASSERT(!trok || !(svd->prot & PROT_WRITE));
 	svd->tr_state = trok ? SEGVN_TR_INIT : SEGVN_TR_OFF;
@@ -909,6 +959,11 @@ segvn_concat(struct seg *seg1, struct seg *seg2, int amp_cat)
 	ASSERT(seg1->s_as && seg2->s_as && seg1->s_as == seg2->s_as);
 	ASSERT(AS_WRITE_HELD(seg1->s_as, &seg1->s_as->a_lock));
 	ASSERT(seg1->s_ops == seg2->s_ops);
+
+	if (HAT_IS_REGION_COOKIE_VALID(svd1->rcookie) ||
+	    HAT_IS_REGION_COOKIE_VALID(svd2->rcookie)) {
+		return (-1);
+	}
 
 	/* both segments exist, try to merge them */
 #define	incompat(x)	(svd1->x != svd2->x)
@@ -968,26 +1023,22 @@ segvn_concat(struct seg *seg1, struct seg *seg2, int amp_cat)
 		if ((nvpage = kmem_zalloc(nvpsize, KM_NOSLEEP)) == NULL) {
 			return (-2);
 		}
+
 		if (vpage1 != NULL) {
 			bcopy(vpage1, nvpage, vpgtob(npages1));
-		}
-		if (vpage2 != NULL) {
-			bcopy(vpage2, nvpage + npages1, vpgtob(npages2));
-		}
-		for (vp = nvpage; vp < nvpage + npages1; vp++) {
-			if (svd2->pageprot && !svd1->pageprot) {
+		} else {
+			for (vp = nvpage; vp < nvpage + npages1; vp++) {
 				VPP_SETPROT(vp, svd1->prot);
-			}
-			if (svd2->pageadvice && !svd1->pageadvice) {
 				VPP_SETADVICE(vp, svd1->advice);
 			}
 		}
-		for (vp = nvpage + npages1;
-		    vp < nvpage + npages1 + npages2; vp++) {
-			if (svd1->pageprot && !svd2->pageprot) {
+
+		if (vpage2 != NULL) {
+			bcopy(vpage2, nvpage + npages1, vpgtob(npages2));
+		} else {
+			for (vp = nvpage + npages1;
+			    vp < nvpage + npages1 + npages2; vp++) {
 				VPP_SETPROT(vp, svd2->prot);
-			}
-			if (svd1->pageadvice && !svd2->pageadvice) {
 				VPP_SETADVICE(vp, svd2->advice);
 			}
 		}
@@ -1126,6 +1177,10 @@ segvn_extend_prev(seg1, seg2, a, swresv)
 	 */
 	ASSERT(seg1->s_as && AS_WRITE_HELD(seg1->s_as, &seg1->s_as->a_lock));
 
+	if (HAT_IS_REGION_COOKIE_VALID(svd1->rcookie)) {
+		return (-1);
+	}
+
 	/* second segment is new, try to extend first */
 	/* XXX - should also check cred */
 	if (svd1->vp != a->vp || svd1->maxprot != a->maxprot ||
@@ -1183,6 +1238,7 @@ segvn_extend_prev(seg1, seg2, a, swresv)
 		ANON_LOCK_EXIT(&amp1->a_rwlock);
 	}
 	if (svd1->vpage != NULL) {
+		struct vpage *vp, *evp;
 		new_vpage =
 		    kmem_zalloc(vpgtob(seg_pages(seg1) + seg_pages(seg2)),
 			KM_NOSLEEP);
@@ -1191,14 +1247,11 @@ segvn_extend_prev(seg1, seg2, a, swresv)
 		bcopy(svd1->vpage, new_vpage, vpgtob(seg_pages(seg1)));
 		kmem_free(svd1->vpage, vpgtob(seg_pages(seg1)));
 		svd1->vpage = new_vpage;
-		if (svd1->pageprot) {
-			struct vpage *vp, *evp;
 
-			vp = new_vpage + seg_pages(seg1);
-			evp = vp + seg_pages(seg2);
-			for (; vp < evp; vp++)
-				VPP_SETPROT(vp, a->prot);
-		}
+		vp = new_vpage + seg_pages(seg1);
+		evp = vp + seg_pages(seg2);
+		for (; vp < evp; vp++)
+			VPP_SETPROT(vp, a->prot);
 	}
 	size = seg2->s_size;
 	seg_free(seg2);
@@ -1235,6 +1288,10 @@ segvn_extend_next(
 	 * since the address space is "write" locked.
 	 */
 	ASSERT(seg2->s_as && AS_WRITE_HELD(seg2->s_as, &seg2->s_as->a_lock));
+
+	if (HAT_IS_REGION_COOKIE_VALID(svd2->rcookie)) {
+		return (-1);
+	}
 
 	/* first segment is new, try to extend second */
 	/* XXX - should also check cred */
@@ -1288,6 +1345,7 @@ segvn_extend_next(
 		ANON_LOCK_EXIT(&amp2->a_rwlock);
 	}
 	if (svd2->vpage != NULL) {
+		struct vpage *vp, *evp;
 		new_vpage =
 		    kmem_zalloc(vpgtob(seg_pages(seg1) + seg_pages(seg2)),
 			KM_NOSLEEP);
@@ -1301,14 +1359,11 @@ segvn_extend_next(
 		    vpgtob(seg_pages(seg2)));
 		kmem_free(svd2->vpage, vpgtob(seg_pages(seg2)));
 		svd2->vpage = new_vpage;
-		if (svd2->pageprot) {
-			struct vpage *vp, *evp;
 
-			vp = new_vpage;
-			evp = vp + seg_pages(seg1);
-			for (; vp < evp; vp++)
-				VPP_SETPROT(vp, a->prot);
-		}
+		vp = new_vpage;
+		evp = vp + seg_pages(seg1);
+		for (; vp < evp; vp++)
+			VPP_SETPROT(vp, a->prot);
 	}
 	size = seg1->s_size;
 	seg_free(seg1);
@@ -1379,10 +1434,14 @@ segvn_dup(struct seg *seg, struct seg *newseg)
 	newsvd->flags = svd->flags;
 	newsvd->softlockcnt = 0;
 	newsvd->policy_info = svd->policy_info;
+	newsvd->rcookie = HAT_INVALID_REGION_COOKIE;
+
 	if ((amp = svd->amp) == NULL || svd->tr_state == SEGVN_TR_ON) {
 		/*
 		 * Not attaching to a shared anon object.
 		 */
+		ASSERT(!HAT_IS_REGION_COOKIE_VALID(svd->rcookie) ||
+		    svd->tr_state == SEGVN_TR_OFF);
 		if (svd->tr_state == SEGVN_TR_ON) {
 			ASSERT(newsvd->vp != NULL && amp != NULL);
 			newsvd->tr_state = SEGVN_TR_INIT;
@@ -1392,6 +1451,8 @@ segvn_dup(struct seg *seg, struct seg *newseg)
 		newsvd->amp = NULL;
 		newsvd->anon_index = 0;
 	} else {
+		/* regions for now are only used on pure vnode segments */
+		ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 		ASSERT(svd->tr_state == SEGVN_TR_OFF);
 		newsvd->tr_state = SEGVN_TR_OFF;
 		if (svd->type == MAP_SHARED) {
@@ -1555,6 +1616,12 @@ retry:
 		    newsvd->maxprot, newsvd->type, newsvd->cred);
 	}
 out:
+	if (error == 0 && HAT_IS_REGION_COOKIE_VALID(svd->rcookie)) {
+		ASSERT(newsvd->amp == NULL);
+		ASSERT(newsvd->tr_state == SEGVN_TR_OFF);
+		newsvd->rcookie = svd->rcookie;
+		hat_dup_region(newseg->s_as->a_hat, newsvd->rcookie);
+	}
 	return (error);
 }
 
@@ -1564,6 +1631,30 @@ out:
  * those pages actually processed by the HAT
  */
 extern int free_pages;
+
+static void
+segvn_hat_rgn_unload_callback(caddr_t saddr, caddr_t eaddr, caddr_t r_saddr,
+    size_t r_size, void *r_obj, u_offset_t r_objoff)
+{
+	u_offset_t off;
+	size_t len;
+	vnode_t *vp = (vnode_t *)r_obj;
+
+	ASSERT(eaddr > saddr);
+	ASSERT(saddr >= r_saddr);
+	ASSERT(saddr < r_saddr + r_size);
+	ASSERT(eaddr > r_saddr);
+	ASSERT(eaddr <= r_saddr + r_size);
+	ASSERT(vp != NULL);
+
+	if (!free_pages) {
+		return;
+	}
+
+	len = eaddr - saddr;
+	off = (saddr - r_saddr) + r_objoff;
+	free_vp_pages(vp, off, len);
+}
 
 static void
 segvn_hat_unload_callback(hat_callback_t *cb)
@@ -1582,7 +1673,6 @@ segvn_hat_unload_callback(hat_callback_t *cb)
 	free_vp_pages(svd->vp, svd->offset + off, len);
 }
 
-
 static int
 segvn_unmap(struct seg *seg, caddr_t addr, size_t len)
 {
@@ -1599,7 +1689,6 @@ segvn_unmap(struct seg *seg, caddr_t addr, size_t len)
 	size_t nsize;
 	size_t oswresv;
 	int reclaim = 1;
-	int unmap = 1;
 
 	/*
 	 * We don't need any segment level locks for "segvn" data
@@ -1641,7 +1730,19 @@ retry:
 		int err;
 		if (!IS_P2ALIGNED(addr, pgsz) || !IS_P2ALIGNED(len, pgsz)) {
 			ASSERT(seg->s_base != addr || seg->s_size != len);
-			if (svd->tr_state == SEGVN_TR_INIT) {
+			if (HAT_IS_REGION_COOKIE_VALID(svd->rcookie)) {
+				ASSERT(svd->amp == NULL);
+				ASSERT(svd->tr_state == SEGVN_TR_OFF);
+				hat_leave_region(seg->s_as->a_hat,
+				    svd->rcookie, HAT_REGION_TEXT);
+				svd->rcookie = HAT_INVALID_REGION_COOKIE;
+				/*
+				 * could pass a flag to segvn_demote_range()
+				 * below to tell it not to do any unloads but
+				 * this case is rare enough to not bother for
+				 * now.
+				 */
+			} else if (svd->tr_state == SEGVN_TR_INIT) {
 				svd->tr_state = SEGVN_TR_OFF;
 			} else if (svd->tr_state == SEGVN_TR_ON) {
 				ASSERT(svd->amp != NULL);
@@ -1671,25 +1772,35 @@ retry:
 			return (error);
 	}
 
-	if (svd->tr_state == SEGVN_TR_INIT) {
-		svd->tr_state = SEGVN_TR_OFF;
+	/*
+	 * Remove any page locks set through this mapping.
+	 * If text replication is not off no page locks could have been
+	 * established via this mapping.
+	 */
+	if (svd->tr_state == SEGVN_TR_OFF) {
+		(void) segvn_lockop(seg, addr, len, 0, MC_UNLOCK, NULL, 0);
+	}
+
+	if (HAT_IS_REGION_COOKIE_VALID(svd->rcookie)) {
+		ASSERT(svd->amp == NULL);
+		ASSERT(svd->tr_state == SEGVN_TR_OFF);
+		ASSERT(svd->type == MAP_PRIVATE);
+		hat_leave_region(seg->s_as->a_hat, svd->rcookie,
+		    HAT_REGION_TEXT);
+		svd->rcookie = HAT_INVALID_REGION_COOKIE;
 	} else if (svd->tr_state == SEGVN_TR_ON) {
 		ASSERT(svd->amp != NULL);
 		ASSERT(svd->pageprot == 0 && !(svd->prot & PROT_WRITE));
 		segvn_textunrepl(seg, 1);
 		ASSERT(svd->amp == NULL && svd->tr_state == SEGVN_TR_OFF);
-		unmap = 0;
-	}
-
-	/*
-	 * Remove any page locks set through this mapping.
-	 */
-	(void) segvn_lockop(seg, addr, len, 0, MC_UNLOCK, NULL, 0);
-
-	if (unmap) {
+	} else {
+		if (svd->tr_state != SEGVN_TR_OFF) {
+			ASSERT(svd->tr_state == SEGVN_TR_INIT);
+			svd->tr_state = SEGVN_TR_OFF;
+		}
 		/*
 		 * Unload any hardware translations in the range to be taken
-		 * out.  Use a callback to invoke free_vp_pages() effectively.
+		 * out. Use a callback to invoke free_vp_pages() effectively.
 		 */
 		if (svd->vp != NULL && free_pages != 0) {
 			callback.hcb_data = seg;
@@ -1892,6 +2003,7 @@ retry:
 	nsvd->offset = svd->offset + (uintptr_t)(nseg->s_base - seg->s_base);
 	nsvd->swresv = 0;
 	nsvd->softlockcnt = 0;
+	ASSERT(nsvd->rcookie == HAT_INVALID_REGION_COOKIE);
 
 	if (svd->vp != NULL) {
 		VN_HOLD(nsvd->vp);
@@ -2032,6 +2144,8 @@ segvn_free(struct seg *seg)
 	 */
 	ASSERT(seg->s_as && AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock));
 	ASSERT(svd->tr_state == SEGVN_TR_OFF);
+
+	ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 
 	/*
 	 * Be sure to unlock pages. XXX Why do things get free'ed instead
@@ -2294,7 +2408,12 @@ segvn_softunlock(struct seg *seg, caddr_t addr, size_t len, enum seg_rw rw)
 	if ((amp = svd->amp) != NULL)
 		anon_index = svd->anon_index + seg_page(seg, addr);
 
-	hat_unlock(seg->s_as->a_hat, addr, len);
+	if (HAT_IS_REGION_COOKIE_VALID(svd->rcookie)) {
+		ASSERT(svd->tr_state == SEGVN_TR_OFF);
+		hat_unlock_region(seg->s_as->a_hat, addr, len, svd->rcookie);
+	} else {
+		hat_unlock(seg->s_as->a_hat, addr, len);
+	}
 	for (adr = addr; adr < addr + len; adr += PAGESIZE) {
 		if (amp != NULL) {
 			ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
@@ -2453,6 +2572,7 @@ segvn_faultpage(
 
 	ASSERT(SEGVN_READ_HELD(seg->s_as, &svd->lock));
 	ASSERT(seg->s_szc == 0);
+	ASSERT(svd->tr_state != SEGVN_TR_INIT);
 
 	/*
 	 * Initialize protection value for this page.
@@ -2616,6 +2736,7 @@ segvn_faultpage(
 				mutex_exit(&p->p_lock);
 			}
 
+			ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 			hat_memload(hat, addr, pp, prot, hat_flag);
 
 			if (!(hat_flag & HAT_LOAD_LOCK))
@@ -2740,7 +2861,12 @@ segvn_faultpage(
 				prot &= ~PROT_WRITE;
 		}
 
-		hat_memload(hat, addr, opp, prot & vpprot, hat_flag);
+		ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE ||
+		    (!svd->pageprot && svd->prot == (prot & vpprot)));
+		ASSERT(amp == NULL ||
+		    svd->rcookie == HAT_INVALID_REGION_COOKIE);
+		hat_memload_region(hat, addr, opp, prot & vpprot, hat_flag,
+		    svd->rcookie);
 
 		if (!(hat_flag & HAT_LOAD_LOCK))
 			page_unlock(opp);
@@ -2750,6 +2876,8 @@ segvn_faultpage(
 		}
 		return (0);
 	}
+
+	ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 
 	hat_setref(opp);
 
@@ -2784,6 +2912,7 @@ segvn_faultpage(
 		 * after unloading our translation.
 		 */
 		if (hat_page_is_mapped(opp)) {
+			ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 			hat_unload(seg->s_as->a_hat, addr, PAGESIZE,
 				HAT_UNLOAD);
 		}
@@ -2872,6 +3001,7 @@ segvn_faultpage(
 			prot &= ~PROT_WRITE;
 	}
 
+	ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 	hat_memload(hat, addr, pp, prot, hat_flag);
 
 	if (!(hat_flag & HAT_LOAD_LOCK))
@@ -3642,6 +3772,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 	ASSERT(SEGVN_LOCK_HELD(seg->s_as, &svd->lock));
 	ASSERT(seg->s_szc < NBBY * sizeof (int));
 	ASSERT(type != F_SOFTLOCK || lpgeaddr - a == maxpgsz);
+	ASSERT(svd->tr_state != SEGVN_TR_INIT);
 
 	VM_STAT_COND_ADD(type == F_SOFTLOCK, segvnvmstats.fltvnpages[0]);
 	VM_STAT_COND_ADD(type != F_SOFTLOCK, segvnvmstats.fltvnpages[1]);
@@ -3962,6 +4093,8 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				 * p_szc can't be changed for locked
 				 * swapfs pages.
 				 */
+				ASSERT(svd->rcookie ==
+				    HAT_INVALID_REGION_COOKIE);
 				hat_memload_array(hat, a, pgsz, ppa, prot,
 				    hat_flag);
 
@@ -3976,9 +4109,12 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				goto next;
 			}
 
+			ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE ||
+			    (!svd->pageprot && svd->prot == (prot & vpprot)));
+
 			pfn = page_pptonum(ppa[0]);
 			/*
-			 * hat_page_demote() needs an EXCl lock on one of
+			 * hat_page_demote() needs an SE_EXCL lock on one of
 			 * constituent page_t's and it decreases root's p_szc
 			 * last. This means if root's p_szc is equal szc and
 			 * all its constituent pages are locked
@@ -4036,14 +4172,16 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				SEGVN_UPDATE_MODBITS(ppa, pages, rw,
 				    prot, vpprot);
 				if (!xhat) {
-					hat_memload_array(hat, a, pgsz, ppa,
-					    prot & vpprot, hat_flag);
+					hat_memload_array_region(hat, a, pgsz,
+					    ppa, prot & vpprot, hat_flag,
+					    svd->rcookie);
 				} else {
 					/*
 					 * avoid large xhat mappings to FS
 					 * pages so that hat_page_demote()
 					 * doesn't need to check for xhat
 					 * large mappings.
+					 * Don't use regions with xhats.
 					 */
 					for (i = 0; i < pages; i++) {
 						hat_memload(hat,
@@ -4149,14 +4287,15 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				    prot, vpprot);
 				if (upgrdfail && segvn_anypgsz_vnode) {
 					/* SOFTLOCK case */
-					hat_memload_array(hat, a, pgsz,
-					    ppa, prot & vpprot, hat_flag);
+					hat_memload_array_region(hat, a, pgsz,
+					    ppa, prot & vpprot, hat_flag,
+					    svd->rcookie);
 				} else {
 					for (i = 0; i < pages; i++) {
-						hat_memload(hat,
+						hat_memload_region(hat,
 						    a + (i << PAGESHIFT),
 						    ppa[i], prot & vpprot,
-						    hat_flag);
+						    hat_flag, svd->rcookie);
 					}
 				}
 				if (!(hat_flag & HAT_LOAD_LOCK)) {
@@ -4214,8 +4353,8 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				}
 				SEGVN_UPDATE_MODBITS(ppa, pages, rw,
 				    prot, vpprot);
-				hat_memload_array(hat, a, pgsz, ppa,
-				    prot & vpprot, hat_flag);
+				hat_memload_array_region(hat, a, pgsz, ppa,
+				    prot & vpprot, hat_flag, svd->rcookie);
 				mutex_exit(szcmtx);
 				if (!(hat_flag & HAT_LOAD_LOCK)) {
 					for (i = 0; i < pages; i++) {
@@ -4267,13 +4406,15 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 				ASSERT(type == F_SOFTLOCK);
 				for (i = 0; i < pages; i++) {
 					ASSERT(ppa[i]->p_szc < szc);
-					hat_memload(hat, a + (i << PAGESHIFT),
-					    ppa[i], prot & vpprot, hat_flag);
+					hat_memload_region(hat,
+					    a + (i << PAGESHIFT),
+					    ppa[i], prot & vpprot, hat_flag,
+					    svd->rcookie);
 				}
 			} else {
 				ASSERT(pplist != NULL || type == F_SOFTLOCK);
-				hat_memload_array(hat, a, pgsz, ppa,
-				    prot & vpprot, hat_flag);
+				hat_memload_array_region(hat, a, pgsz, ppa,
+				    prot & vpprot, hat_flag, svd->rcookie);
 			}
 			if (!(hat_flag & HAT_LOAD_LOCK)) {
 				for (i = 0; i < pages; i++) {
@@ -4452,6 +4593,7 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 	ASSERT(type != F_SOFTUNLOCK);
 	ASSERT(IS_P2ALIGNED(a, maxpgsz));
 	ASSERT(!brkcow || svd->tr_state == SEGVN_TR_OFF);
+	ASSERT(svd->tr_state != SEGVN_TR_INIT);
 
 	ASSERT(SEGVN_LOCK_HELD(seg->s_as, &svd->lock));
 
@@ -4559,6 +4701,7 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			if (lgrp_optimizations())
 				page_migrate(seg, a, ppa, pages);
 
+			ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 			if (type == F_SOFTLOCK && svd->vp == NULL) {
 				/*
 				 * All pages in ppa array belong to the same
@@ -4769,6 +4912,7 @@ segvn_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t len,
 	int brkcow = BREAK_COW_SHARE(rw, type, svd->type);
 
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
+	ASSERT(svd->amp == NULL || svd->rcookie == HAT_INVALID_REGION_COOKIE);
 
 	/*
 	 * First handle the easy stuff
@@ -4788,6 +4932,8 @@ segvn_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t len,
 		return (0);
 	}
 
+	ASSERT(svd->tr_state == SEGVN_TR_OFF ||
+	    !HAT_IS_REGION_COOKIE_VALID(svd->rcookie));
 	if (brkcow == 0) {
 		if (svd->tr_state == SEGVN_TR_INIT) {
 			SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_WRITER);
@@ -4804,6 +4950,13 @@ segvn_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t len,
 		}
 	} else if (svd->tr_state != SEGVN_TR_OFF) {
 		SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_WRITER);
+
+		if (rw == S_WRITE && svd->tr_state != SEGVN_TR_OFF) {
+			ASSERT(!svd->pageprot && !(svd->prot & PROT_WRITE));
+			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+			return (FC_PROT);
+		}
+
 		if (svd->tr_state == SEGVN_TR_ON) {
 			ASSERT(svd->vp != NULL && svd->amp != NULL);
 			segvn_textunrepl(seg, 0);
@@ -4848,6 +5001,26 @@ top:
 			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 			return (FC_PROT);	/* illegal access type */
 		}
+	}
+
+	if (brkcow && HAT_IS_REGION_COOKIE_VALID(svd->rcookie)) {
+		/* this must be SOFTLOCK S_READ fault */
+		ASSERT(svd->amp == NULL);
+		ASSERT(svd->tr_state == SEGVN_TR_OFF);
+		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+		SEGVN_LOCK_ENTER(seg->s_as, &svd->lock, RW_WRITER);
+		if (HAT_IS_REGION_COOKIE_VALID(svd->rcookie)) {
+			/*
+			 * this must be the first ever non S_READ_NOCOW
+			 * softlock for this segment.
+			 */
+			ASSERT(svd->softlockcnt == 0);
+			hat_leave_region(seg->s_as->a_hat, svd->rcookie,
+			    HAT_REGION_TEXT);
+			svd->rcookie = HAT_INVALID_REGION_COOKIE;
+		}
+		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+		goto top;
 	}
 
 	/*
@@ -4917,6 +5090,7 @@ top:
 	 * Check to see if we need to allocate an anon_map structure.
 	 */
 	if (svd->amp == NULL && (svd->vp == NULL || brkcow)) {
+		ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 		/*
 		 * Drop the "read" lock on the segment and acquire
 		 * the "write" version since we have to allocate the
@@ -4977,6 +5151,7 @@ top:
 
 	page = seg_page(seg, addr);
 	if (amp != NULL) {
+		ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 		anon_index = svd->anon_index + page;
 
 		if (type == F_PROT && rw == S_READ &&
@@ -5379,9 +5554,13 @@ slow:
 				 * for migration, so they will get migrated
 				 * properly on fault
 				 */
+				ASSERT(amp == NULL ||
+				    svd->rcookie == HAT_INVALID_REGION_COOKIE);
 				if ((prot & PROT_READ) && !PP_ISMIGRATE(pp)) {
-					hat_memload(hat, seg->s_base + diff,
-						pp, prot, hat_flag);
+					hat_memload_region(hat,
+					    seg->s_base + diff,
+					    pp, prot, hat_flag,
+					    svd->rcookie);
 				}
 			}
 			if (amp != NULL)
@@ -5466,6 +5645,7 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 	size_t pgsz;
 	pgcnt_t pgcnt;
 	anon_sync_obj_t cookie;
+	int unload_done = 0;
 
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
 
@@ -5500,12 +5680,20 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 		}
 	}
 
-	if (svd->tr_state == SEGVN_TR_INIT) {
+	if (HAT_IS_REGION_COOKIE_VALID(svd->rcookie)) {
+		ASSERT(svd->amp == NULL);
+		ASSERT(svd->tr_state == SEGVN_TR_OFF);
+		hat_leave_region(seg->s_as->a_hat, svd->rcookie,
+		    HAT_REGION_TEXT);
+		svd->rcookie = HAT_INVALID_REGION_COOKIE;
+		unload_done = 1;
+	} else if (svd->tr_state == SEGVN_TR_INIT) {
 		svd->tr_state = SEGVN_TR_OFF;
 	} else if (svd->tr_state == SEGVN_TR_ON) {
 		ASSERT(svd->amp != NULL);
 		segvn_textunrepl(seg, 0);
 		ASSERT(svd->amp == NULL && svd->tr_state == SEGVN_TR_OFF);
+		unload_done = 1;
 	}
 
 	if ((prot & PROT_WRITE) && svd->type == MAP_SHARED &&
@@ -5513,7 +5701,6 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 		ASSERT(vn_is_mapped(svd->vp, V_WRITE));
 		segvn_inval_trcache(svd->vp);
 	}
-
 	if (seg->s_szc != 0) {
 		int err;
 		pgsz = page_get_pagesize(seg->s_szc);
@@ -5590,7 +5777,7 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 		}
 	}
 
-	if (addr == seg->s_base && len == seg->s_size && svd->pageprot == 0) {
+	if (addr == seg->s_base && len == seg->s_size && svd->vpage == NULL) {
 		if (svd->prot == prot) {
 			SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
 			return (0);			/* all done */
@@ -5613,6 +5800,7 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 		 * the operation.
 		 */
 		segvn_vpage(seg);
+		svd->pageprot = 1;
 		if ((amp = svd->amp) != NULL) {
 			anon_idx = svd->anon_index + seg_page(seg, addr);
 			ASSERT(seg->s_szc == 0 ||
@@ -5699,6 +5887,10 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 		 * the translations to the things we've updated so far.
 		 */
 		if (svp != evp) {
+			if (unload_done) {
+				SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+				return (IE_NOMEM);
+			}
 			len = (svp - &svd->vpage[seg_page(seg, addr)]) *
 			    PAGESIZE;
 			ASSERT(seg->s_szc == 0 || IS_P2ALIGNED(len, pgsz));
@@ -5710,10 +5902,16 @@ segvn_setprot(struct seg *seg, caddr_t addr, size_t len, uint_t prot)
 		}
 	} else {
 		segvn_vpage(seg);
+		svd->pageprot = 1;
 		evp = &svd->vpage[seg_page(seg, addr + len)];
 		for (svp = &svd->vpage[seg_page(seg, addr)]; svp < evp; svp++) {
 			VPP_SETPROT(svp, prot);
 		}
+	}
+
+	if (unload_done) {
+		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
+		return (0);
 	}
 
 	if (((prot & PROT_WRITE) != 0 &&
@@ -5848,7 +6046,13 @@ segvn_setpagesize(struct seg *seg, caddr_t addr, size_t len, uint_t szc)
 		}
 	}
 
-	if (svd->tr_state == SEGVN_TR_INIT) {
+	if (HAT_IS_REGION_COOKIE_VALID(svd->rcookie)) {
+		ASSERT(svd->amp == NULL);
+		ASSERT(svd->tr_state == SEGVN_TR_OFF);
+		hat_leave_region(seg->s_as->a_hat, svd->rcookie,
+		    HAT_REGION_TEXT);
+		svd->rcookie = HAT_INVALID_REGION_COOKIE;
+	} else if (svd->tr_state == SEGVN_TR_INIT) {
 		svd->tr_state = SEGVN_TR_OFF;
 	} else if (svd->tr_state == SEGVN_TR_ON) {
 		ASSERT(svd->amp != NULL);
@@ -5924,6 +6128,7 @@ segvn_setpagesize(struct seg *seg, caddr_t addr, size_t len, uint_t szc)
 		if (err != 0) {
 			return (err);
 		}
+		ASSERT(nsvd->rcookie == HAT_INVALID_REGION_COOKIE);
 		err = segvn_concat(seg, nseg, 1);
 		if (err == -1) {
 			return (EINVAL);
@@ -6028,27 +6233,34 @@ segvn_clrszc(struct seg *seg)
 	struct anon *ap, *oldap;
 	uint_t prot = svd->prot, vpprot;
 	int pageflag = 0;
-	int unmap = 1;
 
 	ASSERT(AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock) ||
 	    SEGVN_WRITE_HELD(seg->s_as, &svd->lock));
+	ASSERT(svd->softlockcnt == 0);
 
 	if (vp == NULL && amp == NULL) {
+		ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 		seg->s_szc = 0;
 		return (0);
 	}
 
-	if (svd->tr_state == SEGVN_TR_INIT) {
-		svd->tr_state = SEGVN_TR_OFF;
+	if (HAT_IS_REGION_COOKIE_VALID(svd->rcookie)) {
+		ASSERT(svd->amp == NULL);
+		ASSERT(svd->tr_state == SEGVN_TR_OFF);
+		hat_leave_region(seg->s_as->a_hat, svd->rcookie,
+		    HAT_REGION_TEXT);
+		svd->rcookie = HAT_INVALID_REGION_COOKIE;
 	} else if (svd->tr_state == SEGVN_TR_ON) {
 		ASSERT(svd->amp != NULL);
 		segvn_textunrepl(seg, 1);
 		ASSERT(svd->amp == NULL && svd->tr_state == SEGVN_TR_OFF);
 		amp = NULL;
-		unmap = 0;
-	}
+	} else {
+		if (svd->tr_state != SEGVN_TR_OFF) {
+			ASSERT(svd->tr_state == SEGVN_TR_INIT);
+			svd->tr_state = SEGVN_TR_OFF;
+		}
 
-	if (unmap) {
 		/*
 		 * do HAT_UNLOAD_UNMAP since we are changing the pagesize.
 		 * unload argument is 0 when we are freeing the segment
@@ -6223,6 +6435,7 @@ segvn_split_seg(struct seg *seg, caddr_t addr)
 
 	ASSERT(addr >= seg->s_base);
 	ASSERT(addr <= seg->s_base + seg->s_size);
+	ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 
 	if (addr == seg->s_base || addr == seg->s_base + seg->s_size)
 		return (seg);
@@ -6236,6 +6449,7 @@ segvn_split_seg(struct seg *seg, caddr_t addr)
 	nseg->s_data = (void *)nsvd;
 	nseg->s_szc = seg->s_szc;
 	*nsvd = *svd;
+	ASSERT(nsvd->rcookie == HAT_INVALID_REGION_COOKIE);
 	nsvd->seg = nseg;
 	rw_init(&nsvd->lock, NULL, RW_DEFAULT, NULL);
 
@@ -6369,6 +6583,7 @@ segvn_demote_range(
 	ASSERT(seg->s_base != addr || seg->s_size != len);
 	ASSERT(addr >= seg->s_base && eaddr <= seg->s_base + seg->s_size);
 	ASSERT(svd->softlockcnt == 0);
+	ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 	ASSERT(szcvec == 0 || (flag == SDR_END && svd->type == MAP_SHARED));
 
 	CALC_LPG_REGION(pgsz, seg, addr, len, lpgaddr, lpgeaddr);
@@ -7328,6 +7543,7 @@ segvn_lockop(struct seg *seg, caddr_t addr, size_t len,
 	 * by lazily testing for its existence.
 	 */
 	if (op == MC_LOCK && svd->amp == NULL && svd->vp == NULL) {
+		ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 		svd->amp = anonmap_alloc(seg->s_size, 0, ANON_SLEEP);
 		svd->amp->a_szc = seg->s_szc;
 	}
@@ -7681,7 +7897,8 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 	 * if don't need to do lgroup optimizations on this system
 	 */
 
-	if ((behav == MADV_SEQUENTIAL && seg->s_szc != 0) ||
+	if ((behav == MADV_SEQUENTIAL &&
+	    (seg->s_szc != 0 || HAT_IS_REGION_COOKIE_VALID(svd->rcookie))) ||
 	    (!lgrp_optimizations() && (behav == MADV_ACCESS_DEFAULT ||
 	    behav == MADV_ACCESS_LWP || behav == MADV_ACCESS_MANY))) {
 		SEGVN_LOCK_EXIT(seg->s_as, &svd->lock);
@@ -7834,6 +8051,7 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 			 * detection in segvn_fault
 			 */
 			ASSERT(seg->s_szc == 0);
+			ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 			hat_unload(seg->s_as->a_hat, addr, len,
 				HAT_UNLOAD);
 			/* FALLTHROUGH */
@@ -7931,6 +8149,15 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 			 */
 			if (already_set || svd->type == MAP_SHARED)
 				break;
+
+			if (HAT_IS_REGION_COOKIE_VALID(svd->rcookie)) {
+				ASSERT(svd->amp == NULL);
+				ASSERT(svd->tr_state == SEGVN_TR_OFF);
+				ASSERT(svd->softlockcnt == 0);
+				hat_leave_region(seg->s_as->a_hat, svd->rcookie,
+				    HAT_REGION_TEXT);
+				svd->rcookie = HAT_INVALID_REGION_COOKIE;
+			}
 
 			/*
 			 * Split off new segment if advice only applies to a
@@ -8053,6 +8280,7 @@ segvn_advise(struct seg *seg, caddr_t addr, size_t len, uint_t behav)
 			break;
 		case MADV_SEQUENTIAL:
 			ASSERT(seg->s_szc == 0);
+			ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 			hat_unload(seg->s_as->a_hat, addr, len, HAT_UNLOAD);
 			/* FALLTHROUGH */
 		case MADV_NORMAL:
@@ -8091,7 +8319,6 @@ segvn_vpage(struct seg *seg)
 	 * and the advice from the segment itself to the individual pages.
 	 */
 	if (svd->vpage == NULL) {
-		svd->pageprot = 1;
 		svd->pageadvice = 1;
 		svd->vpage = kmem_zalloc(seg_pages(seg) * sizeof (struct vpage),
 		    KM_SLEEP);
@@ -8724,6 +8951,7 @@ segvn_textrepl(struct seg *seg)
 	ASSERT(SEGVN_WRITE_HELD(seg->s_as, &svd->lock));
 	ASSERT(p != NULL);
 	ASSERT(svd->tr_state == SEGVN_TR_INIT);
+	ASSERT(!HAT_IS_REGION_COOKIE_VALID(svd->rcookie));
 	ASSERT(svd->flags & MAP_TEXT);
 	ASSERT(svd->type == MAP_PRIVATE);
 	ASSERT(vp != NULL && svd->amp == NULL);
@@ -8991,6 +9219,7 @@ segvn_textunrepl(struct seg *seg, int unload_unmap)
 	ASSERT(AS_WRITE_HELD(seg->s_as, &seg->s_as->a_lock) ||
 	    SEGVN_WRITE_HELD(seg->s_as, &svd->lock));
 	ASSERT(svd->tr_state == SEGVN_TR_ON);
+	ASSERT(!HAT_IS_REGION_COOKIE_VALID(svd->rcookie));
 	ASSERT(svd->amp != NULL);
 	ASSERT(svd->amp->refcnt >= 1);
 	ASSERT(svd->anon_index == 0);
@@ -9185,6 +9414,7 @@ segvn_trupdate_seg(struct seg *seg,
 	ASSERT(seg->s_data == (void *)svd);
 	ASSERT(seg->s_szc == svntrp->tr_szc);
 	ASSERT(svd->tr_state == SEGVN_TR_ON);
+	ASSERT(!HAT_IS_REGION_COOKIE_VALID(svd->rcookie));
 	ASSERT(svd->amp != NULL);
 	ASSERT(svd->tr_policy_info.mem_policy == LGRP_MEM_POLICY_NEXT_SEG);
 	ASSERT(svd->tr_policy_info.mem_lgrpid != LGRP_NONE);

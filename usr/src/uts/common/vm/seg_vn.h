@@ -103,6 +103,7 @@ typedef struct	segvn_data {
 	ushort_t flags;		/* flags - from sys/mman.h */
 	ssize_t	softlockcnt;	/* # of pages SOFTLOCKED in seg */
 	lgrp_mem_policy_info_t policy_info; /* memory allocation policy */
+	hat_region_cookie_t rcookie;	/* region for hat calls */
 	lgrp_mem_policy_info_t tr_policy_info; /* memory allocation for TR */
 	struct	seg *seg;	/* pointer back to seg */
 	struct	segvn_data *svn_trnext; /* textrepl list next link */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -151,9 +151,9 @@ mmu_init_large_pages(size_t ism_pagesize)
 	if (cpu_impl_dual_pgsz == 0) {	/* disable_dual_pgsz flag */
 		pan_disable_large_pages = ((1 << TTE32M) | (1 << TTE256M));
 		mmu_disable_ism_large_pages = ((1 << TTE64K) |
-			(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
+		    (1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 		mmu_disable_auto_data_large_pages = ((1 << TTE64K) |
-			(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
+		    (1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 		return;
 	}
 
@@ -161,29 +161,29 @@ mmu_init_large_pages(size_t ism_pagesize)
 	case MMU_PAGESIZE4M:
 		pan_disable_large_pages = (1 << TTE256M);
 		mmu_disable_ism_large_pages = ((1 << TTE64K) |
-			(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
+		    (1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 		mmu_disable_auto_data_large_pages = ((1 << TTE64K) |
-			(1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
+		    (1 << TTE512K) | (1 << TTE32M) | (1 << TTE256M));
 		break;
 	case MMU_PAGESIZE32M:
 		pan_disable_large_pages = (1 << TTE256M);
 		mmu_disable_ism_large_pages = ((1 << TTE64K) |
-			(1 << TTE512K) | (1 << TTE256M));
+		    (1 << TTE512K) | (1 << TTE256M));
 		mmu_disable_auto_data_large_pages = ((1 << TTE64K) |
-			(1 << TTE512K) | (1 << TTE4M) | (1 << TTE256M));
+		    (1 << TTE512K) | (1 << TTE4M) | (1 << TTE256M));
 		adjust_data_maxlpsize(ism_pagesize);
 		break;
 	case MMU_PAGESIZE256M:
 		pan_disable_large_pages = (1 << TTE32M);
 		mmu_disable_ism_large_pages = ((1 << TTE64K) |
-			(1 << TTE512K) | (1 << TTE32M));
+		    (1 << TTE512K) | (1 << TTE32M));
 		mmu_disable_auto_data_large_pages = ((1 << TTE64K) |
-			(1 << TTE512K) | (1 << TTE4M) | (1 << TTE32M));
+		    (1 << TTE512K) | (1 << TTE4M) | (1 << TTE32M));
 		adjust_data_maxlpsize(ism_pagesize);
 		break;
 	default:
 		cmn_err(CE_WARN, "Unrecognized mmu_ism_pagesize value 0x%lx",
-			ism_pagesize);
+		    ism_pagesize);
 		break;
 	}
 }
@@ -262,24 +262,37 @@ mmu_fixup_large_pages(struct hat *hat, uint64_t *ttecnt, uint8_t *tmp_pgsz)
 	/*
 	 * Don't program 2nd dtlb for kernel and ism hat
 	 */
-	ASSERT(hat->sfmmu_ismhat == NULL);
+	ASSERT(hat->sfmmu_ismhat == 0);
 	ASSERT(hat != ksfmmup);
 	ASSERT(cpu_impl_dual_pgsz == 1);
 
-	ASSERT((!SFMMU_FLAGS_ISSET(hat, HAT_32M_FLAG)) ||
-		(!SFMMU_FLAGS_ISSET(hat, HAT_256M_FLAG)));
+	ASSERT(!SFMMU_TTEFLAGS_ISSET(hat, HAT_32M_FLAG) ||
+	    !SFMMU_TTEFLAGS_ISSET(hat, HAT_256M_FLAG));
+	ASSERT(!SFMMU_TTEFLAGS_ISSET(hat, HAT_256M_FLAG) ||
+	    !SFMMU_TTEFLAGS_ISSET(hat, HAT_32M_FLAG));
+	ASSERT(!SFMMU_FLAGS_ISSET(hat, HAT_32M_ISM) ||
+	    !SFMMU_FLAGS_ISSET(hat, HAT_256M_ISM));
+	ASSERT(!SFMMU_FLAGS_ISSET(hat, HAT_256M_ISM) ||
+	    !SFMMU_FLAGS_ISSET(hat, HAT_32M_ISM));
 
-	if ((SFMMU_FLAGS_ISSET(hat, HAT_32M_FLAG)) || (ttecnt[TTE32M] != 0)) {
+	if (SFMMU_TTEFLAGS_ISSET(hat, HAT_32M_FLAG) ||
+	    (ttecnt[TTE32M] != 0) ||
+	    SFMMU_FLAGS_ISSET(hat, HAT_32M_ISM)) {
+
 		spgsz = pgsz1;
 		pgsz1 = TTE32M;
 		if (pgsz0 == TTE32M)
 			pgsz0 = spgsz;
-	} else if ((SFMMU_FLAGS_ISSET(hat, HAT_256M_FLAG)) ||
-	    (ttecnt[TTE256M] != 0)) {
+
+	} else if (SFMMU_TTEFLAGS_ISSET(hat, HAT_256M_FLAG) ||
+	    (ttecnt[TTE256M] != 0) ||
+	    SFMMU_FLAGS_ISSET(hat, HAT_256M_ISM)) {
+
 		spgsz = pgsz1;
 		pgsz1 = TTE256M;
 		if (pgsz0 == TTE256M)
 			pgsz0 = spgsz;
+
 	} else if ((pgsz1 == TTE512K) || (pgsz1 == TTE4M)) {
 		if ((pgsz0 != TTE512K) && (pgsz0 != TTE4M)) {
 			spgsz = pgsz0;
@@ -470,7 +483,7 @@ mmu_check_page_sizes(sfmmu_t *sfmmup, uint64_t *ttecnt)
 	 * large pages in this process, except for Panther 32M/256M pages,
 	 * which the Panther T16 does not support.
 	 */
-	if (sfmmup->sfmmu_flags & HAT_LGPG_FLAGS) {
+	if (SFMMU_LGPGS_INUSE(sfmmup)) {
 		/* Sort page sizes. */
 		for (i = 0; i < mmu_page_sizes; i++) {
 			sortcnt[i] = ttecnt[i];
@@ -569,7 +582,7 @@ mmu_init_kernel_pgsz(struct hat *hat)
 
 	hat->sfmmu_cext = new_cext_primary;
 	kcontextreg = ((uint64_t)new_cext_nucleus << CTXREG_NEXT_SHIFT) |
-		((uint64_t)new_cext_primary << CTXREG_EXT_SHIFT);
+	    ((uint64_t)new_cext_primary << CTXREG_EXT_SHIFT);
 }
 
 size_t
@@ -604,7 +617,7 @@ mmu_get_kernel_lpsize(size_t lpsize)
 
 		if (lpsize == TTEBYTES(p_lpgsz->tte) &&
 		    (heaplp_use_dt512 == -1 ||
-			heaplp_use_dt512 == p_lpgsz->use_dt512)) {
+		    heaplp_use_dt512 == p_lpgsz->use_dt512)) {
 
 			tte = p_lpgsz->tte;
 			heaplp_use_dt512 = p_lpgsz->use_dt512;

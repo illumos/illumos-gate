@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,7 +86,7 @@ sfmmu_getctx_sec()
 
 /* ARGSUSED */
 void
-sfmmu_setctx_sec(int ctx)
+sfmmu_setctx_sec(uint_t ctx)
 {}
 
 /* ARGSUSED */
@@ -509,9 +509,9 @@ sfmmu_load_mmustate(sfmmu_t *sfmmup)
 6:	ldx	[%o0 + SFMMU_ISMBLKPA], %o1	! copy members of sfmmu
 	CPU_TSBMISS_AREA(%o2, %o3)		! we need to access from
 	stx	%o1, [%o2 + TSBMISS_ISMBLKPA]	! sfmmu_tsb_miss into the
-	lduh	[%o0 + SFMMU_FLAGS], %o3	! per-CPU tsbmiss area.
+	ldub	[%o0 + SFMMU_TTEFLAGS], %o3	! per-CPU tsbmiss area.
 	stx	%o0, [%o2 + TSBMISS_UHATID]
-	stuh	%o3, [%o2 + TSBMISS_HATFLAGS]
+	stub	%o3, [%o2 + TSBMISS_UTTEFLAGS]
 
 3:	retl
 	  nop

@@ -1676,7 +1676,7 @@ kcage_cageout()
 	int last_pass;
 	int pages_skipped;
 	int shared_skipped;
-	uint_t shared_level = 8;
+	ulong_t shared_level = 8;
 	pgcnt_t nfreed;
 #ifdef KCAGE_STATS
 	clock_t scan_start;
@@ -1807,7 +1807,7 @@ again:
 			}
 
 			KCAGE_STAT_SET_SCAN(kt_skiplevel, shared_level);
-			if (hat_page_getshare(pp) > shared_level) {
+			if (hat_page_checkshare(pp, shared_level)) {
 				page_unlock(pp);
 				pages_skipped = 1;
 				shared_skipped = 1;

@@ -144,6 +144,8 @@ cpu_setup(void)
 	 * Niagara has a performance counter overflow interrupt
 	 */
 	cpc_has_overflow_intr = 1;
+
+	shctx_on = 0;
 }
 
 #define	MB(n)	((n) * 1024 * 1024)

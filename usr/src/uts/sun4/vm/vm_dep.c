@@ -52,20 +52,17 @@
 
 /*
  * These variables are set by module specific config routines.
- * They are only set by modules which will use physical cache page coloring
- * and/or virtual cache page coloring.
+ * They are only set by modules which will use physical cache page coloring.
  */
 int do_pg_coloring = 0;
-int do_virtual_coloring = 0;
 
 /*
  * These variables can be conveniently patched at kernel load time to
- * prevent do_pg_coloring or do_virtual_coloring from being enabled by
+ * prevent do_pg_coloring from being enabled by
  * module specific config routines.
  */
 
 int use_page_coloring = 1;
-int use_virtual_coloring = 1;
 
 /*
  * initialized by page_coloring_init()

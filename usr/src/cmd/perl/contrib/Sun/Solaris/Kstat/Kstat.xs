@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -489,6 +489,10 @@ save_sfmmu_global_stat(HV *self, kstat_t *kp, int strip_str)
 	SAVE_INT32(self, sfmmugp, sf_tsb_alloc);
 	SAVE_INT32(self, sfmmugp, sf_tsb_allocfail);
 	SAVE_INT32(self, sfmmugp, sf_tsb_sectsb_create);
+	SAVE_INT32(self, sfmmugp, sf_scd_1sttsb_alloc);
+	SAVE_INT32(self, sfmmugp, sf_scd_2ndtsb_alloc);
+	SAVE_INT32(self, sfmmugp, sf_scd_1sttsb_allocfail);
+	SAVE_INT32(self, sfmmugp, sf_scd_2ndtsb_allocfail);
 	SAVE_INT32(self, sfmmugp, sf_tteload8k);
 	SAVE_INT32(self, sfmmugp, sf_tteload64k);
 	SAVE_INT32(self, sfmmugp, sf_tteload512k);
@@ -530,6 +534,11 @@ save_sfmmu_global_stat(HV *self, kstat_t *kp, int strip_str)
 	SAVE_INT32(self, sfmmugp, sf_user_vtop);
 	SAVE_INT32(self, sfmmugp, sf_ctx_inv);
 	SAVE_INT32(self, sfmmugp, sf_tlb_reprog_pgsz);
+	SAVE_INT32(self, sfmmugp, sf_region_remap_demap);
+	SAVE_INT32(self, sfmmugp, sf_create_scd);
+	SAVE_INT32(self, sfmmugp, sf_join_scd);
+	SAVE_INT32(self, sfmmugp, sf_leave_scd);
+	SAVE_INT32(self, sfmmugp, sf_destroy_scd);
 }
 #endif
 

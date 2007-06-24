@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -798,7 +798,17 @@ have_win:
 	sethi	%hi(FLUSH_ADDR), %g3
 	stxa	%g2, [%g1]ASI_MMU_CTX
 	flush	%g3				! flush required by immu
-
+	!
+	! If shared context support is not enabled, then the next five
+	! instructions will be patched with nop instructions.
+	!
+	.global sfmmu_shctx_user_rtt_patch
+sfmmu_shctx_user_rtt_patch:
+	mov	MMU_SCONTEXT1, %g1
+	ldxa	[%g1]ASI_MMU_CTX, %g2
+	mov	MMU_PCONTEXT1, %g1
+	stxa	%g2, [%g1]ASI_MMU_CTX
+	flush	%g3
 	!
 	! setup trap regs
 	!

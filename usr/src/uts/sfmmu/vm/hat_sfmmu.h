@@ -72,6 +72,7 @@ extern "C" {
 #include <sys/ksynch.h>
 
 typedef struct hat sfmmu_t;
+typedef struct sf_scd sf_scd_t;
 
 /*
  * SFMMU attributes for hat_memload/hat_devload
@@ -186,7 +187,8 @@ typedef struct hat_lock {
  */
 typedef struct ism_map {
 	uintptr_t	imap_seg;  	/* base va + sz of ISM segment */
-	ushort_t	imap_vb_shift;	/* mmu_pageshift for ism page size */
+	uchar_t		imap_vb_shift;	/* mmu_pageshift for ism page size */
+	uchar_t		imap_rid;	/* region id for ism */
 	ushort_t	imap_hatflags;	/* primary ism page size */
 	uint_t		imap_sz_mask;	/* mmu_pagemask for ism page size */
 	sfmmu_t		*imap_ismhat; 	/* hat id of dummy ISM as */
@@ -263,6 +265,239 @@ struct tsb_info {
 #define	TSB_RELOC_FLAG		0x1
 #define	TSB_FLUSH_NEEDED	0x2
 #define	TSB_SWAPPED	0x4
+#define	TSB_SHAREDCTX		0x8
+
+#endif	/* !_ASM */
+
+/*
+ * Data structures for shared hmeblk support.
+ */
+
+/*
+ * Do not increase the maximum number of ism/hme regions without checking first
+ * the impact on ism_map_t, TSB miss area, hblk tag and region id type in
+ * sf_region structure.
+ * Initially, shared hmes will only be used for the main text segment
+ * therefore this value will be set to 64, it will be increased when shared
+ * libraries are included.
+ */
+
+#define	SFMMU_MAX_HME_REGIONS		(64)
+#define	SFMMU_HMERGNMAP_WORDS		BT_BITOUL(SFMMU_MAX_HME_REGIONS)
+
+#define	SFMMU_PRIVATE	0
+#define	SFMMU_SHARED	1
+
+#ifndef _ASM
+
+#define	SFMMU_MAX_ISM_REGIONS		(64)
+#define	SFMMU_ISMRGNMAP_WORDS		BT_BITOUL(SFMMU_MAX_ISM_REGIONS)
+
+#define	SFMMU_RGNMAP_WORDS	(SFMMU_HMERGNMAP_WORDS + SFMMU_ISMRGNMAP_WORDS)
+
+#define	SFMMU_MAX_REGION_BUCKETS	(128)
+#define	SFMMU_MAX_SRD_BUCKETS		(2048)
+
+typedef struct sf_hmeregion_map {
+	ulong_t	bitmap[SFMMU_HMERGNMAP_WORDS];
+} sf_hmeregion_map_t;
+
+typedef struct sf_ismregion_map {
+	ulong_t	bitmap[SFMMU_ISMRGNMAP_WORDS];
+} sf_ismregion_map_t;
+
+typedef union sf_region_map_u {
+	struct _h_rmap_s {
+		sf_hmeregion_map_t hmeregion_map;
+		sf_ismregion_map_t ismregion_map;
+	} h_rmap_s;
+	ulong_t	bitmap[SFMMU_RGNMAP_WORDS];
+} sf_region_map_t;
+
+#define	SF_RGNMAP_ZERO(map) {				\
+	int _i;						\
+	for (_i = 0; _i < SFMMU_RGNMAP_WORDS; _i++) {	\
+		(map).bitmap[_i] = 0;			\
+	}						\
+}
+
+/*
+ * Returns 1 if map1 and map2 are equal.
+ */
+#define	SF_RGNMAP_EQUAL(map1, map2, rval)	{		\
+	int _i;							\
+	for (_i = 0; _i < SFMMU_RGNMAP_WORDS; _i++) {		\
+		if ((map1)->bitmap[_i] != (map2)->bitmap[_i])	\
+			break;					\
+	}							\
+	if (_i < SFMMU_RGNMAP_WORDS)				\
+		rval = 0;					\
+	else							\
+		rval = 1;					\
+}
+
+#define	SF_RGNMAP_ADD(map, r)		BT_SET((map).bitmap, r)
+#define	SF_RGNMAP_DEL(map, r)		BT_CLEAR((map).bitmap, r)
+#define	SF_RGNMAP_TEST(map, r)		BT_TEST((map).bitmap, r)
+
+/*
+ * Tests whether map2 is a subset of map1, returns 1 if
+ * this assertion is true.
+ */
+#define	SF_RGNMAP_IS_SUBSET(map1, map2, rval)	{		\
+	int _i;							\
+	for (_i = 0; _i < SFMMU_RGNMAP_WORDS; _i++) {		\
+		if (((map1)->bitmap[_i]	& (map2)->bitmap[_i])	\
+		    != (map2)->bitmap[_i])  {	 		\
+			break;					\
+		}						\
+	}							\
+	if (_i < SFMMU_RGNMAP_WORDS)		 		\
+		rval = 0;					\
+	else							\
+		rval = 1;					\
+}
+
+#define	SF_SCD_INCR_REF(scdp) {						\
+	atomic_add_32((volatile uint32_t *)&(scdp)->scd_refcnt, 1);	\
+}
+
+#define	SF_SCD_DECR_REF(srdp, scdp) {				\
+	sf_region_map_t _scd_rmap = (scdp)->scd_region_map;	\
+	if (!atomic_add_32_nv(					\
+	    (volatile uint32_t *)&(scdp)->scd_refcnt, -1)) {	\
+		sfmmu_destroy_scd((srdp), (scdp), &_scd_rmap);	\
+	}							\
+}
+
+/*
+ * A sfmmup link in the link list of sfmmups that share the same region.
+ */
+typedef struct sf_rgn_link {
+	sfmmu_t	*next;
+	sfmmu_t *prev;
+} sf_rgn_link_t;
+
+/*
+ * rgn_flags values.
+ */
+#define	SFMMU_REGION_HME	0x1
+#define	SFMMU_REGION_ISM	0x2
+#define	SFMMU_REGION_FREE	0x8
+
+#define	SFMMU_REGION_TYPE_MASK	(0x3)
+
+/*
+ * sf_region defines a text or (D)ISM segment which map
+ * the same underlying physical object.
+ */
+typedef struct sf_region {
+	caddr_t			rgn_saddr;   /* base addr of attached seg */
+	size_t			rgn_size;    /* size of attached seg */
+	void			*rgn_obj;    /* the underlying object id */
+	u_offset_t		rgn_objoff;  /* offset in the object mapped */
+	uchar_t			rgn_perm;    /* PROT_READ/WRITE/EXEC */
+	uchar_t			rgn_pgszc;   /* page size of the region */
+	uchar_t			rgn_flags;   /* region type, free flag */
+	uchar_t			rgn_id;
+	int			rgn_refcnt;  /* # of hats sharing the region */
+	/* callback function for hat_unload_callback */
+	hat_rgn_cb_func_t	rgn_cb_function;
+	struct sf_region	*rgn_hash;   /* hash chain linking the rgns */
+	kmutex_t		rgn_mutex;   /* protect region sfmmu list */
+	/* A link list of processes attached to this region */
+	sfmmu_t			*rgn_sfmmu_head;
+	ulong_t			rgn_ttecnt[MMU_PAGE_SIZES];
+	uint16_t		rgn_hmeflags; /* rgn tte size flags */
+} sf_region_t;
+
+#define	rgn_next	rgn_hash
+
+/* srd */
+typedef struct sf_shared_region_domain {
+	vnode_t			*srd_evp;	/* executable vnode */
+	/* hme region table */
+	sf_region_t		*srd_hmergnp[SFMMU_MAX_HME_REGIONS];
+	/* ism region table */
+	sf_region_t		*srd_ismrgnp[SFMMU_MAX_ISM_REGIONS];
+	/* hash chain linking srds */
+	struct sf_shared_region_domain *srd_hash;
+	/* pointer to the next free hme region */
+	sf_region_t		*srd_hmergnfree;
+	/* pointer to the next free ism region */
+	sf_region_t		*srd_ismrgnfree;
+	/* id of next ism rgn created */
+	uint16_t		srd_next_ismrid;
+	/* pointer of next hme region created */
+	uint16_t		srd_next_hmerid;
+	uint16_t		srd_ismbusyrgns; /* # of ism rgns in use */
+	uint16_t		srd_hmebusyrgns; /* # of hme rgns in use */
+	int			srd_refcnt;	 /* # of procs in the srd */
+	kmutex_t		srd_mutex;	 /* sync add/remove rgns */
+	kmutex_t		srd_scd_mutex;
+	sf_scd_t		*srd_scdp;	 /* list of scds in srd */
+	/* hash of regions associated with the same executable */
+	sf_region_t		*srd_rgnhash[SFMMU_MAX_REGION_BUCKETS];
+} sf_srd_t;
+
+typedef struct sf_srd_bucket {
+	kmutex_t	srdb_lock;
+	sf_srd_t	*srdb_srdp;
+} sf_srd_bucket_t;
+
+/*
+ * The value of SFMMU_L1_HMERLINKS and SFMMU_L2_HMERLINKS will be increased
+ * to 16 when the use of shared hmes for shared libraries is enabled.
+ */
+
+#define	SFMMU_L1_HMERLINKS		(8)
+#define	SFMMU_L2_HMERLINKS		(8)
+#define	SFMMU_L1_HMERLINKS_SHIFT	(3)
+#define	SFMMU_L1_HMERLINKS_MASK		(SFMMU_L1_HMERLINKS - 1)
+#define	SFMMU_L2_HMERLINKS_MASK		(SFMMU_L2_HMERLINKS - 1)
+#define	SFMMU_L1_HMERLINKS_SIZE		\
+	(SFMMU_L1_HMERLINKS * sizeof (sf_rgn_link_t *))
+#define	SFMMU_L2_HMERLINKS_SIZE		\
+	(SFMMU_L2_HMERLINKS * sizeof (sf_rgn_link_t))
+
+#if (SFMMU_L1_HMERLINKS * SFMMU_L2_HMERLINKS < SFMMU_MAX_HME_REGIONS)
+#error Not Enough HMERLINKS
+#endif
+
+/*
+ * This macro grabs hat lock and allocates level 2 hat chain
+ * associated with a shme rgn. In the majority of cases, the macro
+ * is called with alloc = 0, and lock = 0.
+ */
+#define	SFMMU_HMERID2RLINKP(sfmmup, rid, lnkp, alloc, lock)		\
+{									\
+	int _l1ix = ((rid) >> SFMMU_L1_HMERLINKS_SHIFT) &		\
+	    SFMMU_L1_HMERLINKS_MASK;					\
+	int _l2ix = ((rid) & SFMMU_L2_HMERLINKS_MASK);			\
+	hatlock_t *_hatlockp;						\
+	lnkp = (sfmmup)->sfmmu_hmeregion_links[_l1ix];			\
+	if (lnkp != NULL) {						\
+		lnkp = &lnkp[_l2ix];					\
+	} else if (alloc && lock) {					\
+		lnkp = kmem_zalloc(SFMMU_L2_HMERLINKS_SIZE, KM_SLEEP);	\
+		_hatlockp = sfmmu_hat_enter(sfmmup);			\
+		if ((sfmmup)->sfmmu_hmeregion_links[_l1ix] != NULL) {	\
+			sfmmu_hat_exit(_hatlockp);			\
+			kmem_free(lnkp, SFMMU_L2_HMERLINKS_SIZE);	\
+			lnkp = (sfmmup)->sfmmu_hmeregion_links[_l1ix];	\
+			ASSERT(lnkp != NULL);				\
+		} else {						\
+			(sfmmup)->sfmmu_hmeregion_links[_l1ix] = lnkp;	\
+			sfmmu_hat_exit(_hatlockp);			\
+		}							\
+		lnkp = &lnkp[_l2ix];					\
+	} else if (alloc) {						\
+		lnkp = kmem_zalloc(SFMMU_L2_HMERLINKS_SIZE, KM_SLEEP);	\
+		ASSERT((sfmmup)->sfmmu_hmeregion_links[_l1ix] == NULL);	\
+		(sfmmup)->sfmmu_hmeregion_links[_l1ix] = lnkp;		\
+		lnkp = &lnkp[_l2ix];					\
+	}								\
+}
 
 /*
  * Per-MMU context domain kstats.
@@ -390,25 +625,40 @@ struct hat {
 	void		*sfmmu_xhat_provider;	/* NULL for CPU hat */
 	cpuset_t	sfmmu_cpusran;	/* cpu bit mask for efficient xcalls */
 	struct	as	*sfmmu_as;	/* as this hat provides mapping for */
-	ulong_t		sfmmu_ttecnt[MMU_PAGE_SIZES]; /* per sz tte counts */
-	ulong_t		sfmmu_ismttecnt[MMU_PAGE_SIZES]; /* est. ism ttes */
+	/* per pgsz private ttecnt + shme rgns ttecnt for rgns not in SCD */
+	ulong_t		sfmmu_ttecnt[MMU_PAGE_SIZES];
+	/* shme rgns ttecnt for rgns in SCD */
+	ulong_t		sfmmu_scdrttecnt[MMU_PAGE_SIZES];
+	/* est. ism ttes that are NOT in a SCD */
+	ulong_t		sfmmu_ismttecnt[MMU_PAGE_SIZES];
+	/* ttecnt for isms that are in a SCD */
+	ulong_t		sfmmu_scdismttecnt[MMU_PAGE_SIZES];
+	/* inflate tsb0 to allow for large page alloc failure in region */
+	ulong_t		sfmmu_tsb0_4minflcnt;
 	union _h_un {
 		ism_blk_t	*sfmmu_iblkp;  /* maps to ismhat(s) */
 		ism_ment_t	*sfmmu_imentp; /* ism hat's mapping list */
 	} h_un;
 	uint_t		sfmmu_free:1;	/* hat to be freed - set on as_free */
 	uint_t		sfmmu_ismhat:1;	/* hat is dummy ism hatid */
-	uint_t		sfmmu_ctxflushed:1;	/* ctx has been flushed */
+	uint_t		sfmmu_scdhat:1;	/* hat is dummy scd hatid */
 	uchar_t		sfmmu_rmstat;	/* refmod stats refcnt */
 	ushort_t	sfmmu_clrstart;	/* start color bin for page coloring */
 	ushort_t	sfmmu_clrbin;	/* per as phys page coloring bin */
 	ushort_t	sfmmu_flags;	/* flags */
+	uchar_t		sfmmu_tteflags;	/* pgsz flags */
+	uchar_t		sfmmu_rtteflags; /* pgsz flags for SRD hmes */
 	struct tsb_info	*sfmmu_tsb;	/* list of per as tsbs */
 	uint64_t	sfmmu_ismblkpa; /* pa of sfmmu_iblkp, or -1 */
 	lock_t		sfmmu_ctx_lock;	/* sync ctx alloc and invalidation */
 	kcondvar_t	sfmmu_tsb_cv;	/* signals TSB swapin or relocation */
 	uchar_t		sfmmu_cext;	/* context page size encoding */
 	uint8_t		sfmmu_pgsz[MMU_PAGE_SIZES];  /* ranking for MMU */
+	sf_srd_t	*sfmmu_srdp;
+	sf_scd_t	*sfmmu_scdp;	/* scd this address space belongs to */
+	sf_region_map_t	sfmmu_region_map;
+	sf_rgn_link_t	*sfmmu_hmeregion_links[SFMMU_L1_HMERLINKS];
+	sf_rgn_link_t	sfmmu_scd_link;	/* link to scd or pending queue */
 #ifdef sun4v
 	struct hv_tsb_block sfmmu_hvblock;
 #endif
@@ -426,6 +676,39 @@ struct hat {
 
 #define	sfmmu_iblk	h_un.sfmmu_iblkp
 #define	sfmmu_iment	h_un.sfmmu_imentp
+
+#define	sfmmu_hmeregion_map	sfmmu_region_map.h_rmap_s.hmeregion_map
+#define	sfmmu_ismregion_map	sfmmu_region_map.h_rmap_s.ismregion_map
+
+#define	SF_RGNMAP_ISNULL(sfmmup)	\
+	(sfrgnmap_isnull(&(sfmmup)->sfmmu_region_map))
+#define	SF_HMERGNMAP_ISNULL(sfmmup)	\
+	(sfhmergnmap_isnull(&(sfmmup)->sfmmu_hmeregion_map))
+
+struct sf_scd {
+	sfmmu_t		*scd_sfmmup;	/* shared context hat */
+	/* per pgsz ttecnt for shme rgns in SCD */
+	ulong_t		scd_rttecnt[MMU_PAGE_SIZES];
+	uint_t		scd_refcnt;	/* address spaces attached to scd */
+	sf_region_map_t scd_region_map; /* bit mask of attached segments */
+	sf_scd_t	*scd_next;	/* link pointers for srd_scd list */
+	sf_scd_t	*scd_prev;
+	sfmmu_t 	*scd_sf_list;	/* list of doubly linked hat structs */
+	kmutex_t 	scd_mutex;
+	/*
+	 * Link used to add an scd to the sfmmu_iment list.
+	 */
+	ism_ment_t	scd_ism_links[SFMMU_MAX_ISM_REGIONS];
+};
+
+#define	scd_hmeregion_map	scd_region_map.h_rmap_s.hmeregion_map
+#define	scd_ismregion_map	scd_region_map.h_rmap_s.ismregion_map
+
+#define	scd_hmeregion_map	scd_region_map.h_rmap_s.hmeregion_map
+#define	scd_ismregion_map	scd_region_map.h_rmap_s.ismregion_map
+
+extern int disable_shctx;
+extern int shctx_on;
 
 /*
  * bit mask for managing vac conflicts on large pages.
@@ -510,63 +793,39 @@ struct ctx_trace {
 	(ASSERT(sfmmu_hat_lock_held((sfmmup))), \
 	(sfmmup)->sfmmu_flags |= (flags))
 
-/*
- * sfmmu HAT flags
- */
-#define	HAT_64K_FLAG	0x01
-#define	HAT_512K_FLAG	0x02
-#define	HAT_4M_FLAG	0x04
-#define	HAT_32M_FLAG	0x08
-#define	HAT_256M_FLAG	0x10
-#define	HAT_4MTEXT_FLAG	0x80
-#define	HAT_SWAPPED	0x100	/* swapped out */
-#define	HAT_SWAPIN	0x200	/* swapping in */
-#define	HAT_BUSY	0x400	/* replacing TSB(s) */
-#define	HAT_ISMBUSY	0x800	/* adding/removing/traversing ISM maps */
+#define	SFMMU_TTEFLAGS_ISSET(sfmmup, flags) \
+	((((sfmmup)->sfmmu_tteflags | (sfmmup)->sfmmu_rtteflags) & (flags)) == \
+	    (flags))
 
-#define	HAT_LGPG_FLAGS						\
-	(HAT_64K_FLAG | HAT_512K_FLAG | HAT_4M_FLAG |		\
-	    HAT_32M_FLAG | HAT_256M_FLAG)
-
-#define	HAT_FLAGS_MASK						\
-	(HAT_LGPG_FLAGS | HAT_4MTEXT_FLAG | HAT_SWAPPED |	\
-	    HAT_SWAPIN | HAT_BUSY | HAT_ISMBUSY)
 
 /*
- * Context flags
+ * sfmmu tte HAT flags, must fit in 8 bits
  */
-#define	CTX_FREE_FLAG		0x1
-#define	CTX_FLAGS_MASK		0x1
-
-#define	CTX_SET_FLAGS(ctx, flag)					\
-{									\
-	uint32_t old, new;						\
-									\
-	do {								\
-		new = old = (ctx)->ctx_flags;				\
-		new &= CTX_FLAGS_MASK;					\
-		new |= flag;						\
-		new = cas32(&(ctx)->ctx_flags, old, new);		\
-	} while (new != old);						\
-}
-
-#define	CTX_CLEAR_FLAGS(ctx, flag)					\
-{									\
-	uint32_t old, new;						\
-									\
-	do {								\
-		new = old = (ctx)->ctx_flags;				\
-		new &= CTX_FLAGS_MASK & ~(flag);			\
-		new = cas32(&(ctx)->ctx_flags, old, new);		\
-	} while (new != old);						\
-}
-
-#define	ctxtoctxnum(ctx)	((ushort_t)((ctx) - ctxs))
+#define	HAT_CHKCTX1_FLAG 0x1
+#define	HAT_64K_FLAG	(0x1 << TTE64K)
+#define	HAT_512K_FLAG	(0x1 << TTE512K)
+#define	HAT_4M_FLAG	(0x1 << TTE4M)
+#define	HAT_32M_FLAG	(0x1 << TTE32M)
+#define	HAT_256M_FLAG	(0x1 << TTE256M)
 
 /*
- * Defines needed for ctx stealing.
+ * sfmmu HAT flags, 16 bits at the moment.
  */
-#define	GET_CTX_RETRY_CNT	100
+#define	HAT_4MTEXT_FLAG		0x01
+#define	HAT_32M_ISM		0x02
+#define	HAT_256M_ISM		0x04
+#define	HAT_SWAPPED		0x08 /* swapped out */
+#define	HAT_SWAPIN		0x10 /* swapping in */
+#define	HAT_BUSY		0x20 /* replacing TSB(s) */
+#define	HAT_ISMBUSY		0x40 /* adding/removing/traversing ISM maps */
+
+#define	HAT_CTX1_FLAG   	0x100 /* ISM imap hatflag for ctx1 */
+#define	HAT_JOIN_SCD		0x200 /* region is joining scd */
+#define	HAT_ALLCTX_INVALID	0x400 /* all per-MMU ctxs are invalidated */
+
+#define	SFMMU_LGPGS_INUSE(sfmmup)					\
+	(((sfmmup)->sfmmu_tteflags | (sfmmup)->sfmmu_rtteflags) ||	\
+	    ((sfmmup)->sfmmu_iblk != NULL))
 
 /*
  * Starting with context 0, the first NUM_LOCKED_CTXS contexts
@@ -657,31 +916,71 @@ struct pa_hment {
  * without checking those routines.  See HTAG_SFMMUPSZ define.
  */
 
+/*
+ * In private hmeblks hblk_rid field must be SFMMU_INVALID_RID.
+ */
 typedef union {
 	struct {
-		uint64_t	hblk_basepg: 51, /* hme_blk base pg # */
-				hblk_rehash: 13; /* rehash number */
-		sfmmu_t		*sfmmup;
+		uint64_t	hblk_basepg: 51,	/* hme_blk base pg # */
+				hblk_rehash: 3,		/* rehash number */
+				hblk_rid: 10;		/* hme_blk region id */
+		void		*hblk_id;
 	} hblk_tag_un;
 	uint64_t		htag_tag[2];
 } hmeblk_tag;
 
-#define	htag_id		hblk_tag_un.sfmmup
+#define	htag_id		hblk_tag_un.hblk_id
 #define	htag_bspage	hblk_tag_un.hblk_basepg
 #define	htag_rehash	hblk_tag_un.hblk_rehash
+#define	htag_rid	hblk_tag_un.hblk_rid
+
+#endif /* !_ASM */
+
+#define	HTAG_REHASH_SHIFT	10
+#define	HTAG_MAX_RID	(((0x1 << HTAG_REHASH_SHIFT) - 1))
+#define	HTAG_RID_MASK	HTAG_MAX_RID
+
+/* used for tagging all per sfmmu (i.e. non SRD) private hmeblks */
+#define	SFMMU_INVALID_SHMERID	HTAG_MAX_RID
+
+#if SFMMU_INVALID_SHMERID < SFMMU_MAX_HME_REGIONS
+#error SFMMU_INVALID_SHMERID < SFMMU_MAX_HME_REGIONS
+#endif
+
+#define	SFMMU_IS_SHMERID_VALID(rid)	((rid) != SFMMU_INVALID_SHMERID)
+
+/* ISM regions */
+#define	SFMMU_INVALID_ISMRID	0xff
+
+#if SFMMU_INVALID_ISMRID < SFMMU_MAX_ISM_REGIONS
+#error SFMMU_INVALID_ISMRID < SFMMU_MAX_ISM_REGIONS
+#endif
+
+#define	SFMMU_IS_ISMRID_VALID(rid)	((rid) != SFMMU_INVALID_ISMRID)
+
 
 #define	HTAGS_EQ(tag1, tag2)	(((tag1.htag_tag[0] ^ tag2.htag_tag[0]) | \
 				(tag1.htag_tag[1] ^ tag2.htag_tag[1])) == 0)
+
+/*
+ * this macro must only be used for comparing tags in shared hmeblks.
+ */
+#define	HTAGS_EQ_SHME(hmetag, tag, hrmap)				\
+	(((hmetag).htag_rid != SFMMU_INVALID_SHMERID) &&	        \
+	(((((hmetag).htag_tag[0] ^ (tag).htag_tag[0]) &			\
+		~HTAG_RID_MASK) |	        			\
+	    ((hmetag).htag_tag[1] ^ (tag).htag_tag[1])) == 0) &&	\
+	SF_RGNMAP_TEST(hrmap, hmetag.htag_rid))
+
 #define	HME_REHASH(sfmmup)						\
 	((sfmmup)->sfmmu_ttecnt[TTE512K] != 0 ||			\
 	(sfmmup)->sfmmu_ttecnt[TTE4M] != 0 ||				\
 	(sfmmup)->sfmmu_ttecnt[TTE32M] != 0 ||				\
 	(sfmmup)->sfmmu_ttecnt[TTE256M] != 0)
 
-#endif /* !_ASM */
-
 #define	NHMENTS		8		/* # of hments in an 8k hme_blk */
 					/* needs to be multiple of 2 */
+
 #ifndef	_ASM
 
 #ifdef	HBLK_TRACE
@@ -730,8 +1029,8 @@ struct hblk_lockcnt_audit {
  */
 
 struct hme_blk_misc {
-	ushort_t locked_cnt;	/* HAT_LOAD_LOCK ref cnt */
-	uint_t	notused:10;
+	uint_t	notused:25;
+	uint_t	shared_bit:1;	/* set for SRD shared hmeblk */
 	uint_t	xhat_bit:1;	/* set for an xhat hme_blk */
 	uint_t	shadow_bit:1;	/* set for a shadow hme_blk */
 	uint_t	nucleus_bit:1;	/* set for a nucleus hme_blk */
@@ -760,6 +1059,8 @@ struct hme_blk {
 		uint_t		hblk_shadow_mask;
 	} hblk_un;
 
+	uint_t		hblk_lckcnt;
+
 #ifdef	HBLK_TRACE
 	kmutex_t	hblk_audit_lock;	/* lock to protect index */
 	uint_t		hblk_audit_index;	/* index into audit_cache */
@@ -769,7 +1070,7 @@ struct hme_blk {
 	struct sf_hment hblk_hme[1];	/* hment array */
 };
 
-#define	hblk_lckcnt	hblk_misc.locked_cnt
+#define	hblk_shared	hblk_misc.shared_bit
 #define	hblk_xhat_bit   hblk_misc.xhat_bit
 #define	hblk_shw_bit	hblk_misc.shadow_bit
 #define	hblk_nuc_bit	hblk_misc.nucleus_bit
@@ -778,7 +1079,7 @@ struct hme_blk {
 #define	hblk_vcnt	hblk_un.hblk_counts.hblk_validcnt
 #define	hblk_shw_mask	hblk_un.hblk_shadow_mask
 
-#define	MAX_HBLK_LCKCNT	0xFFFF
+#define	MAX_HBLK_LCKCNT	0xFFFFFFFF
 #define	HMEBLK_ALIGN	0x8		/* hmeblk has to be double aligned */
 
 #ifdef	HBLK_TRACE
@@ -864,7 +1165,6 @@ struct hmehash_bucket {
 
 #endif /* !_ASM */
 
-/* Proc Count Project */
 #define	SFMMU_PGCNT_MASK	0x3f
 #define	SFMMU_PGCNT_SHIFT	6
 #define	INVALID_MMU_ID		-1
@@ -881,7 +1181,7 @@ struct hmehash_bucket {
  * bits.
  */
 #define	HTAG_SFMMUPSZ		0	/* Not really used for LP64 */
-#define	HTAG_REHASHSZ		13
+#define	HTAG_BSPAGE_SHIFT	13
 
 /*
  * Assembly routines need to be able to get to ttesz
@@ -917,6 +1217,9 @@ struct hmehash_bucket {
 
 #define	tte_to_vaddr(hmeblkp, tte)	((caddr_t)(get_hblk_base(hmeblkp) \
 	+ (TTEBYTES(TTE_CSZ(&tte)) * (tte).tte_hmenum)))
+
+#define	tte_to_evaddr(hmeblkp, ttep)	((caddr_t)(get_hblk_base(hmeblkp) \
+	+ (TTEBYTES(TTE_CSZ(ttep)) * ((ttep)->tte_hmenum + 1))))
 
 #define	vaddr_to_vshift(hblktag, vaddr, shwsz)				\
 	((((uintptr_t)(vaddr) >> MMU_PAGESHIFT) - (hblktag.htag_bspage)) >>\
@@ -980,6 +1283,9 @@ struct hmehash_bucket {
 #define	KHMEHASH_SZ		khmehash_num
 #define	HMENT_HASHAVELEN	4
 #define	HBLK_RANGE_SHIFT	MMU_PAGESHIFT64K /* shift for HBLK_BS_MASK */
+#define	HBLK_MIN_TTESZ		1
+#define	HBLK_MIN_BYTES		MMU_PAGESIZE64K
+#define	HBLK_MIN_SHIFT		MMU_PAGESHIFT64K
 #define	MAX_HASHCNT		5
 #define	DEFAULT_MAX_HASHCNT	3
 
@@ -999,12 +1305,12 @@ struct hmehash_bucket {
 #define	HME_HASH_REHASH(ttesz)						\
 	(((ttesz) < TTE512K)? 1 : (ttesz))
 
-#define	HME_HASH_FUNCTION(hatid, vaddr, shift)				\
-	((hatid != KHATID)?						\
-	(&uhme_hash[ (((uintptr_t)(hatid) ^	\
-	    ((uintptr_t)vaddr >> (shift))) & UHMEHASH_SZ) ]):		\
-	(&khme_hash[ (((uintptr_t)(hatid) ^	\
-	    ((uintptr_t)vaddr >> (shift))) & KHMEHASH_SZ) ]))
+#define	HME_HASH_FUNCTION(hatid, vaddr, shift)				     \
+	((((void *)hatid) != ((void *)KHATID)) ?			     \
+	(&uhme_hash[ (((uintptr_t)(hatid) ^ ((uintptr_t)vaddr >> (shift))) & \
+	    UHMEHASH_SZ) ]):						     \
+	(&khme_hash[ (((uintptr_t)(hatid) ^ ((uintptr_t)vaddr >> (shift))) & \
+	    KHMEHASH_SZ) ]))
 
 /*
  * This macro will traverse a hmeblk hash link list looking for an hme_blk
@@ -1067,7 +1373,6 @@ struct hmehash_bucket {
 		}							\
 	}
 
-
 #define	SFMMU_HASH_LOCK(hmebp)						\
 		(mutex_enter(&hmebp->hmehash_mutex))
 
@@ -1091,7 +1396,13 @@ struct hmehash_bucket {
 
 #define	astosfmmu(as)		((as)->a_hat)
 #define	hblktosfmmu(hmeblkp)	((sfmmu_t *)(hmeblkp)->hblk_tag.htag_id)
+#define	hblktosrd(hmeblkp)	((sf_srd_t *)(hmeblkp)->hblk_tag.htag_id)
 #define	sfmmutoas(sfmmup)	((sfmmup)->sfmmu_as)
+
+#define	sfmmutohtagid(sfmmup, rid)			   \
+	(((rid) == SFMMU_INVALID_SHMERID) ? (void *)(sfmmup) : \
+	(void *)((sfmmup)->sfmmu_srdp))
+
 /*
  * We use the sfmmu data structure to keep the per as page coloring info.
  */
@@ -1256,29 +1567,32 @@ struct tsbe {
 struct tsbmiss {
 	sfmmu_t			*ksfmmup;	/* kernel hat id */
 	sfmmu_t			*usfmmup;	/* user hat id */
+	sf_srd_t		*usrdp;		/* user's SRD hat id */
 	struct tsbe		*tsbptr;	/* hardware computed ptr */
 	struct tsbe		*tsbptr4m;	/* hardware computed ptr */
+	struct tsbe		*tsbscdptr;	/* hardware computed ptr */
+	struct tsbe		*tsbscdptr4m;	/* hardware computed ptr */
 	uint64_t		ismblkpa;
 	struct hmehash_bucket	*khashstart;
 	struct hmehash_bucket	*uhashstart;
 	uint_t			khashsz;
 	uint_t			uhashsz;
 	uint16_t 		dcache_line_mask; /* used to flush dcache */
-	uint16_t		hat_flags;
-	uint32_t		itlb_misses;
-	uint32_t		dtlb_misses;
+	uchar_t			uhat_tteflags;	/* private page sizes */
+	uchar_t			uhat_rtteflags;	/* SHME pagesizes */
 	uint32_t		utsb_misses;
 	uint32_t		ktsb_misses;
 	uint16_t		uprot_traps;
 	uint16_t		kprot_traps;
-
 	/*
 	 * scratch[0] -> TSB_TAGACC
 	 * scratch[1] -> TSBMISS_HMEBP
 	 * scratch[2] -> TSBMISS_HATID
 	 */
 	uintptr_t		scratch[3];
-	uint8_t			pad[0x10];
+	ulong_t		shmermap[SFMMU_HMERGNMAP_WORDS];	/* 8 bytes */
+	ulong_t		scd_shmermap[SFMMU_HMERGNMAP_WORDS];	/* 8 bytes */
+	uint8_t		pad[48];			/* pad to 64 bytes */
 };
 
 /*
@@ -1311,10 +1625,9 @@ struct kpmtsbm {
 	uintptr_t	pad[1];
 };
 
-extern uint_t  tsb_slab_size;
-extern uint_t  tsb_slab_shift;
-extern uint_t  tsb_slab_ttesz;
-extern uint_t  tsb_slab_pamask;
+extern size_t	tsb_slab_size;
+extern uint_t	tsb_slab_shift;
+extern size_t	tsb_slab_mask;
 
 #endif /* !_ASM */
 
@@ -1336,7 +1649,12 @@ extern uint_t  tsb_slab_pamask;
 #define	TSB_MIN_SZCODE		TSB_8K_SZCODE	/* min. supported TSB size */
 #define	TSB_MIN_OFFSET_MASK	(TSB_OFFSET_MASK(TSB_MIN_SZCODE))
 
-#define	UTSB_MAX_SZCODE		TSB_1M_SZCODE /* max. supported TSB size */
+#ifdef sun4v
+#define	UTSB_MAX_SZCODE		TSB_256M_SZCODE /* max. supported TSB size */
+#else /* sun4u */
+#define	UTSB_MAX_SZCODE		TSB_1M_SZCODE	/* max. supported TSB size */
+#endif /* sun4v */
+
 #define	UTSB_MAX_OFFSET_MASK	(TSB_OFFSET_MASK(UTSB_MAX_SZCODE))
 
 #define	TSB_FREEMEM_MIN		0x1000		/* 32 mb */
@@ -1351,6 +1669,12 @@ extern uint_t  tsb_slab_pamask;
 #define	TSB_1M_SZCODE		7		/* 64k entries */
 #define	TSB_2M_SZCODE		8		/* 128k entries */
 #define	TSB_4M_SZCODE		9		/* 256k entries */
+#define	TSB_8M_SZCODE		10		/* 512k entries */
+#define	TSB_16M_SZCODE		11		/* 1M entries */
+#define	TSB_32M_SZCODE		12		/* 2M entries */
+#define	TSB_64M_SZCODE		13		/* 4M entries */
+#define	TSB_128M_SZCODE		14		/* 8M entries */
+#define	TSB_256M_SZCODE		15		/* 16M entries */
 #define	TSB_ENTRY_SHIFT		4	/* each entry = 128 bits = 16 bytes */
 #define	TSB_ENTRY_SIZE		(1 << 4)
 #define	TSB_START_SIZE		9
@@ -1479,6 +1803,19 @@ extern uint_t  tsb_slab_pamask;
 	sethi	%hi(0x1000000), reg
 
 /*
+ * This macro constructs a SPARC V9 "jmpl <source reg>, %g0"
+ * instruction, with the source register specified by the jump_reg_number.
+ * The jmp opcode [24:19] = 11 1000 and source register is bits [18:14].
+ * The instruction is returned in reg. The macro is used to patch in a jmpl
+ * instruction at runtime.
+ */
+#define	MAKE_JMP_INSTR(jump_reg_number, reg, tmp)	\
+	sethi	%hi(0x81c00000), reg;			\
+	mov	jump_reg_number, tmp;			\
+	sll	tmp, 14, tmp;				\
+	or	reg, tmp, reg
+
+/*
  * Macro to get hat per-MMU cnum on this CPU.
  * sfmmu - In, pass in "sfmmup" from the caller.
  * cnum	- Out, return 'cnum' to the caller
@@ -1513,7 +1850,7 @@ extern uint_t  tsb_slab_pamask;
 #define	CPU_TSBMISS_AREA(tsbmiss, tmp1)					\
 	CPU_INDEX(tmp1, tsbmiss);		/* tmp1 = cpu idx */	\
 	sethi	%hi(tsbmiss_area), tsbmiss;	/* tsbmiss base ptr */	\
-	sllx    tmp1, TSBMISS_SHIFT, tmp1;	/* byte offset */	\
+	mulx    tmp1, TSBMISS_SIZE, tmp1;	/* byte offset */	\
 	or	tsbmiss, %lo(tsbmiss_area), tsbmiss;			\
 	add	tsbmiss, tmp1, tsbmiss		/* tsbmiss area of CPU */
 
@@ -1756,7 +2093,7 @@ extern void	sfmmu_init_tsbs(void);
 extern caddr_t  sfmmu_ktsb_alloc(caddr_t);
 extern int	sfmmu_getctx_pri(void);
 extern int	sfmmu_getctx_sec(void);
-extern void	sfmmu_setctx_sec(int);
+extern void	sfmmu_setctx_sec(uint_t);
 extern void	sfmmu_inv_tsb(caddr_t, uint_t);
 extern void	sfmmu_init_ktsbinfo(void);
 extern int	sfmmu_setup_4lp(void);
@@ -1773,7 +2110,7 @@ extern int	hat_page_relocate(page_t **, page_t **, spgcnt_t *);
 extern int	sfmmu_get_ppvcolor(struct page *);
 extern int	sfmmu_get_addrvcolor(caddr_t);
 extern int	sfmmu_hat_lock_held(sfmmu_t *);
-extern void	sfmmu_alloc_ctx(sfmmu_t *, int, struct cpu *);
+extern int	sfmmu_alloc_ctx(sfmmu_t *, int, struct cpu *, int);
 
 /*
  * Functions exported to xhat_sfmmu.c
@@ -1821,7 +2158,7 @@ extern uint_t		mml_shift;
 extern uint_t		hblk_alloc_dynamic;
 extern struct tsbmiss	tsbmiss_area[NCPU];
 extern struct kpmtsbm	kpmtsbm_area[NCPU];
-extern int		tsb_max_growsize;
+
 #ifndef sun4v
 extern int		dtlb_resv_ttenum;
 extern caddr_t		utsb_vabase;
@@ -1839,6 +2176,7 @@ extern uint_t		disable_auto_text_large_pages;
 extern pfn_t		sfmmu_kpm_vatopfn(caddr_t);
 extern void		sfmmu_kpm_patch_tlbm(void);
 extern void		sfmmu_kpm_patch_tsbm(void);
+extern void		sfmmu_patch_shctx(void);
 extern void		sfmmu_kpm_load_tsb(caddr_t, tte_t *, int);
 extern void		sfmmu_kpm_unload_tsb(caddr_t, int);
 extern void		sfmmu_kpm_tsbmtl(short *, uint_t *, int);
@@ -1922,6 +2260,12 @@ struct sfmmu_global_stat {
 	int		sf_tsb_allocfail;	/* # times TSB alloc fail */
 	int		sf_tsb_sectsb_create;	/* # times second TSB added */
 
+	int		sf_scd_1sttsb_alloc;	/* # SCD 1st TSB allocations */
+	int		sf_scd_2ndtsb_alloc;	/* # SCD 2nd TSB allocations */
+	int		sf_scd_1sttsb_allocfail; /* # SCD 1st TSB alloc fail */
+	int		sf_scd_2ndtsb_allocfail; /* # SCD 2nd TSB alloc fail */
+
+
 	int		sf_tteload8k;		/* calls to sfmmu_tteload */
 	int		sf_tteload64k;		/* calls to sfmmu_tteload */
 	int		sf_tteload512k;		/* calls to sfmmu_tteload */
@@ -1973,6 +2317,13 @@ struct sfmmu_global_stat {
 	int		sf_ctx_inv;		/* #times invalidate MMU ctx */
 
 	int		sf_tlb_reprog_pgsz;	/* # times switch TLB pgsz */
+
+	int		sf_region_remap_demap;	/* # times shme remap demap */
+
+	int		sf_create_scd;		/* # times SCD is created */
+	int		sf_join_scd;		/* # process joined scd */
+	int		sf_leave_scd;		/* # process left scd */
+	int		sf_destroy_scd;		/* # times SCD is destroyed */
 };
 
 struct sfmmu_tsbsize_stat {
@@ -1986,6 +2337,12 @@ struct sfmmu_tsbsize_stat {
 	int		sf_tsbsz_1m;
 	int		sf_tsbsz_2m;
 	int		sf_tsbsz_4m;
+	int		sf_tsbsz_8m;
+	int		sf_tsbsz_16m;
+	int		sf_tsbsz_32m;
+	int		sf_tsbsz_64m;
+	int		sf_tsbsz_128m;
+	int		sf_tsbsz_256m;
 };
 
 struct sfmmu_percpu_stat {

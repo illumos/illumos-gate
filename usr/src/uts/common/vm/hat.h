@@ -80,6 +80,8 @@ typedef struct hat_callback {
 	void	*hcb_data;
 } hat_callback_t;
 
+typedef void *hat_region_cookie_t;
+
 #ifdef	_KERNEL
 
 /*
@@ -205,9 +207,16 @@ void	hat_thread_exit(kthread_t *);
 void	hat_memload(struct hat *, caddr_t, struct page *, uint_t, uint_t);
 void	hat_memload_array(struct hat *, caddr_t, size_t, struct page **,
 		uint_t, uint_t);
+void	hat_memload_region(struct hat *, caddr_t, struct page *, uint_t,
+		uint_t, hat_region_cookie_t);
+void	hat_memload_array_region(struct hat *, caddr_t, size_t, struct page **,
+		uint_t, uint_t, hat_region_cookie_t);
 
 void	hat_devload(struct hat *, caddr_t, size_t, pfn_t, uint_t, int);
+
 void	hat_unlock(struct hat *, caddr_t, size_t);
+void	hat_unlock_region(struct hat *, caddr_t, size_t, hat_region_cookie_t);
+
 void	hat_unload(struct hat *, caddr_t, size_t, uint_t);
 void	hat_unload_callback(struct hat *, caddr_t, size_t, uint_t,
 		hat_callback_t *);
@@ -293,6 +302,7 @@ uint_t	hat_page_getattr(struct page *, uint_t);
 int	hat_pageunload(struct page *, uint_t);
 uint_t	hat_pagesync(struct page *, uint_t);
 ulong_t	hat_page_getshare(struct page *);
+int	hat_page_checkshare(struct page *, ulong_t);
 faultcode_t hat_softlock(struct hat *, caddr_t, size_t *,
 			struct page **, uint_t);
 void	hat_page_demote(struct page *);
@@ -303,7 +313,8 @@ void	hat_page_demote(struct page *);
 enum hat_features {
 	HAT_SHARED_PT,		/* Shared page tables */
 	HAT_DYNAMIC_ISM_UNMAP,	/* hat_pageunload() handles ISM pages */
-	HAT_VMODSORT		/* support for VMODSORT flag of vnode */
+	HAT_VMODSORT,		/* support for VMODSORT flag of vnode */
+	HAT_SHARED_REGIONS	/* shared regions support */
 };
 
 int hat_supported(enum hat_features, void *);
@@ -445,6 +456,7 @@ void	hat_setstat(struct as *, caddr_t, size_t, uint_t);
  */
 #define	HAT_DUP_ALL		1
 #define	HAT_DUP_COW		2
+#define	HAT_DUP_SRD		3
 
 
 /*
@@ -599,6 +611,28 @@ extern struct hrmstat **hrm_hashtab;
  */
 void	hat_enter(struct hat *);
 void	hat_exit(struct hat *);
+
+typedef void (*hat_rgn_cb_func_t)(caddr_t, caddr_t, caddr_t,
+    size_t, void *, u_offset_t);
+
+void			hat_join_srd(struct hat *, vnode_t *);
+
+hat_region_cookie_t	hat_join_region(struct hat *, caddr_t, size_t, void *,
+			    u_offset_t, uchar_t, uchar_t, hat_rgn_cb_func_t,
+			    uint_t);
+void			hat_leave_region(struct hat *, hat_region_cookie_t,
+			    uint_t);
+void			hat_dup_region(struct hat *, hat_region_cookie_t);
+
+#define	HAT_INVALID_REGION_COOKIE	((hat_region_cookie_t)-1)
+#define	HAT_IS_REGION_COOKIE_VALID(c)	((c) != HAT_INVALID_REGION_COOKIE)
+
+/* hat_join_region() flags */
+
+#define	HAT_REGION_TEXT	0x1	/* passed by segvn */
+#define	HAT_REGION_ISM	0x2	/* for hat_share()/hat_unshare() */
+
+#define	HAT_REGION_TYPE_MASK	(0x7)
 
 #endif /* _KERNEL */
 

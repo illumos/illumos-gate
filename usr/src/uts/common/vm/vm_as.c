@@ -783,6 +783,7 @@ as_dup(struct as *as, struct as **outas)
 	AS_SETBUSY(newas);
 	mutex_exit(&newas->a_contents);
 
+	(void) hat_dup(as->a_hat, newas->a_hat, NULL, 0, HAT_DUP_SRD);
 
 	for (seg = AS_SEGFIRST(as); seg != NULL; seg = AS_SEGNEXT(as, seg)) {
 

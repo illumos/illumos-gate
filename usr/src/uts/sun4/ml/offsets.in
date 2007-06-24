@@ -209,6 +209,7 @@ ism_blk	ISMBLK_SIZE
 ism_map_t	ISM_MAP_SZ
 	imap_seg	IMAP_SEG
 	imap_vb_shift	IMAP_VB_SHIFT
+	imap_rid	IMAP_RID
 	imap_hatflags	IMAP_HATFLAGS
 	imap_sz_mask	IMAP_SZ_MASK
 	imap_ismhat	IMAP_ISMHAT

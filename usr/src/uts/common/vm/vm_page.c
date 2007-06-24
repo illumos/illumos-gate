@@ -6188,7 +6188,7 @@ page_share_cnt(page_t *pp)
 int
 page_isshared(page_t *pp)
 {
-	return (hat_page_getshare(pp) > 1);
+	return (hat_page_checkshare(pp, 1));
 }
 
 int

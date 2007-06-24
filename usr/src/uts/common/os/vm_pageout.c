@@ -950,7 +950,7 @@ checkpage(struct page *pp, int whichhand)
 	 */
 top:
 	if ((PP_ISKAS(pp)) || (PP_ISFREE(pp)) ||
-	    (hat_page_getshare(pp) > po_share) || PAGE_LOCKED(pp)) {
+	    hat_page_checkshare(pp, po_share) || PAGE_LOCKED(pp)) {
 		return (-1);
 	}
 

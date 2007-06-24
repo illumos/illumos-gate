@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,7 +104,7 @@ hash_done:
  * {
  *	uint_t hmeshift = HME_HASH_SHIFT(rehash);
  *	uint64_t bspage = HME_HASH_BSPAGE(va, hmeshift);
- *	return (rehash | (bspage << HTAG_REHASHSZ));
+ *	return (rehash | (bspage << HTAG_BSPAGE_SHIFT));
  * }
  */
 
@@ -127,8 +127,10 @@ bspage:	/* TTE_PAGE_SHIFT in %g5 */				\
 	sllx	%g6, %g5, %g5;					\
 								\
 	/* BSPAGE in %g5 */					\
-	sllx	%g5, HTAG_REHASHSZ, %g5;			\
-	or	%g5, %g3, %g5
+	sllx	%g5, HTAG_BSPAGE_SHIFT, %g5;			\
+	sllx	%g3, HTAG_REHASH_SHIFT, %g6;			\
+	or	%g6, SFMMU_INVALID_SHMERID, %g6;		\
+	or	%g5, %g6, %g5
 
 /*
  * uint64_t

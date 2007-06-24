@@ -675,16 +675,16 @@ startup_init(void)
 	 * behavior.)
 	 */
 	char		sync_str[] =
-		"warning @ warning off : sync "
-		"%%tl-c %%tstate h# %p x! "
-		"%%g1 h# %p x! %%g2 h# %p x! %%g3 h# %p x! "
-		"%%g4 h# %p x! %%g5 h# %p x! %%g6 h# %p x! "
-		"%%g7 h# %p x! %%o0 h# %p x! %%o1 h# %p x! "
-		"%%o2 h# %p x! %%o3 h# %p x! %%o4 h# %p x! "
-		"%%o5 h# %p x! %%o6 h# %p x! %%o7 h# %p x! "
-		"%%tl-c %%tpc h# %p x! %%tl-c %%tnpc h# %p x! "
-		"%%y h# %p l! %%tl-c %%tt h# %p x! "
-		"sync ; warning !";
+	    "warning @ warning off : sync "
+	    "%%tl-c %%tstate h# %p x! "
+	    "%%g1 h# %p x! %%g2 h# %p x! %%g3 h# %p x! "
+	    "%%g4 h# %p x! %%g5 h# %p x! %%g6 h# %p x! "
+	    "%%g7 h# %p x! %%o0 h# %p x! %%o1 h# %p x! "
+	    "%%o2 h# %p x! %%o3 h# %p x! %%o4 h# %p x! "
+	    "%%o5 h# %p x! %%o6 h# %p x! %%o7 h# %p x! "
+	    "%%tl-c %%tpc h# %p x! %%tl-c %%tnpc h# %p x! "
+	    "%%y h# %p l! %%tl-c %%tt h# %p x! "
+	    "sync ; warning !";
 
 	/*
 	 * 20 == num of %p substrings
@@ -716,16 +716,16 @@ startup_init(void)
 	 * core file later.
 	 */
 	(void) sprintf((char *)bp, sync_str,
-		(void *)&sync_reg_buf.r_tstate, (void *)&sync_reg_buf.r_g1,
-		(void *)&sync_reg_buf.r_g2, (void *)&sync_reg_buf.r_g3,
-		(void *)&sync_reg_buf.r_g4, (void *)&sync_reg_buf.r_g5,
-		(void *)&sync_reg_buf.r_g6, (void *)&sync_reg_buf.r_g7,
-		(void *)&sync_reg_buf.r_o0, (void *)&sync_reg_buf.r_o1,
-		(void *)&sync_reg_buf.r_o2, (void *)&sync_reg_buf.r_o3,
-		(void *)&sync_reg_buf.r_o4, (void *)&sync_reg_buf.r_o5,
-		(void *)&sync_reg_buf.r_o6, (void *)&sync_reg_buf.r_o7,
-		(void *)&sync_reg_buf.r_pc, (void *)&sync_reg_buf.r_npc,
-		(void *)&sync_reg_buf.r_y, (void *)&sync_tt);
+	    (void *)&sync_reg_buf.r_tstate, (void *)&sync_reg_buf.r_g1,
+	    (void *)&sync_reg_buf.r_g2, (void *)&sync_reg_buf.r_g3,
+	    (void *)&sync_reg_buf.r_g4, (void *)&sync_reg_buf.r_g5,
+	    (void *)&sync_reg_buf.r_g6, (void *)&sync_reg_buf.r_g7,
+	    (void *)&sync_reg_buf.r_o0, (void *)&sync_reg_buf.r_o1,
+	    (void *)&sync_reg_buf.r_o2, (void *)&sync_reg_buf.r_o3,
+	    (void *)&sync_reg_buf.r_o4, (void *)&sync_reg_buf.r_o5,
+	    (void *)&sync_reg_buf.r_o6, (void *)&sync_reg_buf.r_o7,
+	    (void *)&sync_reg_buf.r_pc, (void *)&sync_reg_buf.r_npc,
+	    (void *)&sync_reg_buf.r_y, (void *)&sync_tt);
 	prom_interpret(bp, 0, 0, 0, 0, 0);
 	add_vx_handler("sync", 1, (void (*)(cell_t *))sync_handler);
 }
@@ -1146,7 +1146,7 @@ startup_memlist(void)
 
 		for (mnode = 1; mnode < max_mem_nodes; mnode++) {
 			alloc_base = alloc_page_freelists(mnode, alloc_base,
-				ecache_alignsize);
+			    ecache_alignsize);
 		}
 		PRM_DEBUG(alloc_base);
 	}
@@ -1177,8 +1177,8 @@ startup_memlist(void)
 		 * because there was not enough space within the nucleus.
 		 */
 		kpmptable_sz = (kpm_smallpages == 0) ?
-				sizeof (kpm_hlk_t) * kpmp_table_sz :
-				sizeof (kpm_shlk_t) * kpmp_stable_sz;
+		    sizeof (kpm_hlk_t) * kpmp_table_sz :
+		    sizeof (kpm_shlk_t) * kpmp_stable_sz;
 
 		alloc_sz = roundup(kpmptable_sz, alloc_alignsize);
 		alloc_base = (caddr_t)roundup((uintptr_t)alloc_base,
@@ -2158,7 +2158,7 @@ startup_vm(void)
 	 * kpm segment
 	 */
 	segmap_kpm = kpm_enable &&
-		segmap_kpm && PAGESIZE == MAXBSIZE;
+	    segmap_kpm && PAGESIZE == MAXBSIZE;
 
 	if (kpm_enable) {
 		rw_enter(&kas.a_lock, RW_WRITER);
@@ -2617,12 +2617,12 @@ memseg_list_add(struct memseg *memsegp)
 
 	if (kpm_enable) {
 		memsegp->nextpa = (memsegp->next) ?
-			va_to_pa(memsegp->next) : MSEG_NULLPTR_PA;
+		    va_to_pa(memsegp->next) : MSEG_NULLPTR_PA;
 
 		if (prev_memsegp != &memsegs) {
 			struct memseg *msp;
 			msp = (struct memseg *)((caddr_t)prev_memsegp -
-				offsetof(struct memseg, next));
+			    offsetof(struct memseg, next));
 			msp->nextpa = va_to_pa(memsegp);
 		} else {
 			memsegspa = va_to_pa(memsegs);
@@ -2722,14 +2722,14 @@ kphysm_init(page_t *pp, struct memseg *memsegp, pgcnt_t npages,
 						msp->kpm_pages =
 						    (kpm_page_t *)kpm_pp - 1;
 						kpm_pp = (uintptr_t)
-							((kpm_page_t *)kpm_pp
-							+ nelem - 1);
+						    ((kpm_page_t *)kpm_pp
+						    + nelem - 1);
 					} else {
 						msp->kpm_spages =
 						    (kpm_spage_t *)kpm_pp - 1;
 						kpm_pp = (uintptr_t)
-							((kpm_spage_t *)kpm_pp
-							+ nelem - 1);
+						    ((kpm_spage_t *)kpm_pp
+						    + nelem - 1);
 					}
 					nelem_used += nelem - 1;
 
@@ -2738,14 +2738,14 @@ kphysm_init(page_t *pp, struct memseg *memsegp, pgcnt_t npages,
 						msp->kpm_pages =
 						    (kpm_page_t *)kpm_pp;
 						kpm_pp = (uintptr_t)
-							((kpm_page_t *)kpm_pp
-							+ nelem);
+						    ((kpm_page_t *)kpm_pp
+						    + nelem);
 					} else {
 						msp->kpm_spages =
 						    (kpm_spage_t *)kpm_pp;
 						kpm_pp = (uintptr_t)
-							((kpm_spage_t *)
-							kpm_pp + nelem);
+						    ((kpm_spage_t *)
+						    kpm_pp + nelem);
 					}
 					nelem_used += nelem;
 				}
@@ -2754,11 +2754,11 @@ kphysm_init(page_t *pp, struct memseg *memsegp, pgcnt_t npages,
 				if (kpm_smallpages == 0) {
 					msp->kpm_pages = (kpm_page_t *)kpm_pp;
 					kpm_pp = (uintptr_t)
-						((kpm_page_t *)kpm_pp + nelem);
+					    ((kpm_page_t *)kpm_pp + nelem);
 				} else {
 					msp->kpm_spages = (kpm_spage_t *)kpm_pp;
 					kpm_pp = (uintptr_t)
-						((kpm_spage_t *)kpm_pp + nelem);
+					    ((kpm_spage_t *)kpm_pp + nelem);
 				}
 				nelem_used = nelem;
 			}
@@ -2823,9 +2823,9 @@ kvm_init(void)
 	(void) segkmem_create(&kvalloc);
 
 	if (kmem64_base) {
-	    (void) seg_attach(&kas, (caddr_t)kmem64_base,
-		(size_t)(kmem64_end - kmem64_base), &kmem64);
-	    (void) segkmem_create(&kmem64);
+		(void) seg_attach(&kas, (caddr_t)kmem64_base,
+		    (size_t)(kmem64_end - kmem64_base), &kmem64);
+		(void) segkmem_create(&kmem64);
 	}
 
 	/*
@@ -2874,7 +2874,9 @@ char obp_tte_str[] =
 	"h# %x constant HMEBP_HBLK "
 	"h# %x constant HMEBUCKET_SIZE "
 	"h# %x constant HTAG_SFMMUPSZ "
-	"h# %x constant HTAG_REHASHSZ "
+	"h# %x constant HTAG_BSPAGE_SHIFT "
+	"h# %x constant HTAG_REHASH_SHIFT "
+	"h# %x constant SFMMU_INVALID_SHMERID "
 	"h# %x constant mmu_hashcnt "
 	"h# %p constant uhme_hash "
 	"h# %p constant khme_hash "
@@ -2949,8 +2951,10 @@ char obp_tte_str[] =
 	"; "
 
 	": HME_HASH_TAG ( sfmmup rehash addr -- hblktag ) "
-	"   over HME_HASH_SHIFT HME_HASH_BSPAGE      ( sfmmup rehash bspage ) "
-	"   HTAG_REHASHSZ << or nip		     ( hblktag ) "
+	"   over HME_HASH_SHIFT HME_HASH_BSPAGE  ( sfmmup rehash bspage ) "
+	"   HTAG_BSPAGE_SHIFT <<		 ( sfmmup rehash htag-bspage )"
+	"   swap HTAG_REHASH_SHIFT << or	 ( sfmmup htag-bspage-rehash )"
+	"   SFMMU_INVALID_SHMERID or nip	 ( hblktag ) "
 	"; "
 
 	": HBLK_TO_TTEP ( hmeblkp addr -- ttep ) "
@@ -3023,7 +3027,9 @@ create_va_to_tte(void)
 	    OFFSET(struct hmehash_bucket, hmeh_nextpa),
 	    sizeof (struct hmehash_bucket),
 	    HTAG_SFMMUPSZ,
-	    HTAG_REHASHSZ,
+	    HTAG_BSPAGE_SHIFT,
+	    HTAG_REHASH_SHIFT,
+	    SFMMU_INVALID_SHMERID,
 	    mmu_hashcnt,
 	    (caddr_t)va_to_pa((caddr_t)uhme_hash),
 	    (caddr_t)va_to_pa((caddr_t)khme_hash),
@@ -3136,8 +3142,8 @@ do_prom_version_check(void)
 	pnode_t node;
 	char buf[64];
 	static char drev[] = "Down-rev firmware detected%s\n"
-		"\tPlease upgrade to the following minimum version:\n"
-		"\t\t%s\n";
+	    "\tPlease upgrade to the following minimum version:\n"
+	    "\t\t%s\n";
 
 	i = prom_version_check(buf, sizeof (buf), &node);
 

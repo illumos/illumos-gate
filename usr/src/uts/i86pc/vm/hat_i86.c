@@ -1466,6 +1466,14 @@ hat_memload(
 		panic("unexpected hati_load_common() failure");
 }
 
+/* ARGSUSED */
+void
+hat_memload_region(struct hat *hat, caddr_t addr, struct page *pp,
+    uint_t attr, uint_t flags, hat_region_cookie_t rcookie)
+{
+	hat_memload(hat, addr, pp, attr, flags);
+}
+
 /*
  * Load the given array of page structs using large pages when possible
  */
@@ -1557,6 +1565,15 @@ hat_memload_array(
 		va += pgsize;
 		pgindx += mmu_btop(pgsize);
 	}
+}
+
+/* ARGSUSED */
+void
+hat_memload_array_region(struct hat *hat, caddr_t addr, size_t len,
+    struct page **pps, uint_t attr, uint_t flags,
+    hat_region_cookie_t rcookie)
+{
+	hat_memload_array(hat, addr, len, pps, attr, flags);
 }
 
 /*
@@ -1711,6 +1728,14 @@ hat_unlock(hat_t *hat, caddr_t addr, size_t len)
 	}
 	if (ht)
 		htable_release(ht);
+}
+
+/* ARGSUSED */
+void
+hat_unlock_region(struct hat *sfmmup, caddr_t addr, size_t len,
+    hat_region_cookie_t rcookie)
+{
+	panic("No shared region support on x86");
 }
 
 /*
@@ -3512,6 +3537,16 @@ hat_page_getshare(page_t *pp)
 }
 
 /*
+ * Return 1 the number of mappings exceeds sh_thresh. Return 0
+ * otherwise.
+ */
+int
+hat_page_checkshare(page_t *pp, ulong_t sh_thresh)
+{
+	return (hat_page_getshare(pp) > sh_thresh);
+}
+
+/*
  * hat_softlock isn't supported anymore
  */
 /*ARGSUSED*/
@@ -3545,6 +3580,9 @@ hat_supported(enum hat_features feature, void *arg)
 
 	case HAT_VMODSORT:
 		return (1);
+
+	case HAT_SHARED_REGIONS:
+		return (0);
 
 	default:
 		panic("hat_supported() - unknown feature");
@@ -3846,6 +3884,43 @@ hati_update_pte(htable_t *ht, uint_t entry, x86pte_t expected, x86pte_t new)
 
 	return (0);
 }
+
+/* ARGSUSED */
+void
+hat_join_srd(struct hat *sfmmup, vnode_t *evp)
+{
+}
+
+/* ARGSUSED */
+hat_region_cookie_t
+hat_join_region(struct hat *sfmmup,
+    caddr_t r_saddr,
+    size_t r_size,
+    void *r_obj,
+    u_offset_t r_objoff,
+    uchar_t r_perm,
+    uchar_t r_pgszc,
+    hat_rgn_cb_func_t r_cb_function,
+    uint_t flags)
+{
+	panic("No shared region support on x86");
+	return (HAT_INVALID_REGION_COOKIE);
+}
+
+/* ARGSUSED */
+void
+hat_leave_region(struct hat *sfmmup, hat_region_cookie_t rcookie, uint_t flags)
+{
+	panic("No shared region support on x86");
+}
+
+/* ARGSUSED */
+void
+hat_dup_region(struct hat *sfmmup, hat_region_cookie_t rcookie)
+{
+	panic("No shared region support on x86");
+}
+
 
 /*
  * Kernel Physical Mapping (kpm) facility

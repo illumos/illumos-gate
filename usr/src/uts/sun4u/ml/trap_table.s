@@ -112,20 +112,6 @@
 #endif
 
 /*
- * This macro is used to update per cpu mmu stats in perf critical
- * paths. It is only enabled in debug kernels or if SFMMU_STAT_GATHER
- * is defined.
- */
-#if defined(DEBUG) || defined(SFMMU_STAT_GATHER)
-#define	HAT_PERCPU_DBSTAT(stat)			\
-	mov	stat, %g1			;\
-	ba	stat_mmu			;\
-	rd	%pc, %g7
-#else
-#define	HAT_PERCPU_DBSTAT(stat)
-#endif /* DEBUG || SFMMU_STAT_GATHER */
-
-/*
  * This first set are funneled to trap() with %tt as the type.
  * Trap will then either panic or send the user a signal.
  */
@@ -1081,7 +1067,6 @@ tt1_dtlbmiss:
 #define	DTLB_MISS(table_name)						;\
 	.global	table_name/**/_dtlbmiss					;\
 table_name/**/_dtlbmiss:						;\
-	HAT_PERCPU_DBSTAT(TSBMISS_DTLBMISS) /* 3 instr ifdef DEBUG */	;\
 	mov	MMU_TAG_ACCESS, %g6		/* select tag acc */	;\
 	ldxa	[%g0]ASI_DMMU_TSB_8K, %g1	/* g1 = tsbe ptr */	;\
 	ldxa	[%g6]ASI_DMMU, %g2		/* g2 = tag access */	;\
@@ -1097,7 +1082,7 @@ table_name/**/_dtlbmiss:						;\
 	ldda	[%g1]ASI_QUAD_LDD_PHYS, %g4	/* g4 = tag, %g5 data */;\
 	cmp	%g4, %g7						;\
 	bne,pn	%xcc, sfmmu_tsb_miss_tt		/* no 4M TSB, miss */	;\
-	  mov	%g0, %g3			/* clear 4M tsbe ptr */	;\
+	  mov	-1, %g3			/* set 4M tsbe ptr to -1 */	;\
 	TT_TRACE(trace_tsbhit)		/* 2 instr ifdef TRAPTRACE */	;\
 	stxa	%g5, [%g0]ASI_DTLB_IN	/* trapstat expects TTE */	;\
 	retry				/* in %g5 */			;\
@@ -1110,12 +1095,14 @@ table_name/**/_dtlbmiss:						;\
 	unimp	0							;\
 	unimp	0							;\
 	unimp	0							;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
 	.align 128
 #else /* UTSB_PHYS */
 #define	DTLB_MISS(table_name)						;\
 	.global	table_name/**/_dtlbmiss					;\
 table_name/**/_dtlbmiss:						;\
-	HAT_PERCPU_DBSTAT(TSBMISS_DTLBMISS) /* 3 instr ifdef DEBUG */	;\
 	mov	MMU_TAG_ACCESS, %g6		/* select tag acc */	;\
 	ldxa	[%g0]ASI_DMMU_TSB_8K, %g1	/* g1 = tsbe ptr */	;\
 	ldxa	[%g6]ASI_DMMU, %g2		/* g2 = tag access */	;\
@@ -1129,7 +1116,7 @@ table_name/**/_dtlbmiss:						;\
 	ldda	[%g1]ASI_NQUAD_LD, %g4	/* g4 = tag, %g5 data */	;\
 	cmp	%g4, %g7						;\
 	bne,pn	%xcc, sfmmu_tsb_miss_tt		/* no 4M TSB, miss */	;\
-	  mov	%g0, %g3		/* clear 4M tsbe ptr */		;\
+	  mov	-1, %g3		/* set 4M tsbe ptr to -1 */		;\
 	TT_TRACE(trace_tsbhit)		/* 2 instr ifdef TRAPTRACE */	;\
 	stxa	%g5, [%g0]ASI_DTLB_IN	/* trapstat expects TTE */	;\
 	retry				/* in %g5 */			;\
@@ -1138,12 +1125,15 @@ table_name/**/_dtlbmiss:						;\
 	unimp	0							;\
 	unimp	0							;\
 	unimp	0							;\
-	unimp	0							;\
-	unimp	0							;\
-	unimp	0							;\
-	unimp	0							;\
-	unimp	0							;\
-	unimp	0							;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
 	.align 128
 #endif /* UTSB_PHYS */
 
@@ -1169,7 +1159,6 @@ tt1_itlbmiss:
 #define	ITLB_MISS(table_name)						 \
 	.global	table_name/**/_itlbmiss					;\
 table_name/**/_itlbmiss:						;\
-	HAT_PERCPU_DBSTAT(TSBMISS_ITLBMISS) /* 3 instr ifdef DEBUG */	;\
 	mov	MMU_TAG_ACCESS, %g6		/* select tag acc */	;\
 	ldxa	[%g0]ASI_IMMU_TSB_8K, %g1	/* g1 = tsbe ptr */	;\
 	ldxa	[%g6]ASI_IMMU, %g2		/* g2 = tag access */	;\
@@ -1185,7 +1174,7 @@ table_name/**/_itlbmiss:						;\
 	ldda	[%g1]ASI_QUAD_LDD_PHYS, %g4 /* g4 = tag, g5 = data */	;\
 	cmp	%g4, %g7						;\
 	bne,pn	%xcc, sfmmu_tsb_miss_tt	/* br if 8k ptr miss */		;\
-	  mov	%g0, %g3		/* no 4M TSB */			;\
+	  mov	-1, %g3		/* set 4M TSB ptr to -1 */		;\
 	andcc	%g5, TTE_EXECPRM_INT, %g0 /* check execute bit */	;\
 	bz,pn	%icc, exec_fault					;\
 	  nop								;\
@@ -1198,12 +1187,14 @@ table_name/**/_itlbmiss:						;\
 	unimp	0							;\
 	unimp	0							;\
 	unimp	0							;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
 	.align 128
 #else /* UTSB_PHYS */
 #define	ITLB_MISS(table_name)						 \
 	.global	table_name/**/_itlbmiss					;\
 table_name/**/_itlbmiss:						;\
-	HAT_PERCPU_DBSTAT(TSBMISS_ITLBMISS) /* 3 instr ifdef DEBUG */	;\
 	mov	MMU_TAG_ACCESS, %g6		/* select tag acc */	;\
 	ldxa	[%g0]ASI_IMMU_TSB_8K, %g1	/* g1 = tsbe ptr */	;\
 	ldxa	[%g6]ASI_IMMU, %g2		/* g2 = tag access */	;\
@@ -1217,7 +1208,7 @@ table_name/**/_itlbmiss:						;\
 	ldda	[%g1]ASI_NQUAD_LD, %g4	/* g4 = tag, g5 = data */	;\
 	cmp	%g4, %g7						;\
 	bne,pn	%xcc, sfmmu_tsb_miss_tt	/* br if 8k ptr miss */		;\
-	  mov	%g0, %g3		/* no 4M TSB */			;\
+	  mov	-1, %g3		/* set 4M TSB ptr to -1 */		;\
 	andcc	%g5, TTE_EXECPRM_INT, %g0 /* check execute bit */	;\
 	bz,pn	%icc, exec_fault					;\
 	  nop								;\
@@ -1229,9 +1220,12 @@ table_name/**/_itlbmiss:						;\
 	unimp	0							;\
 	unimp	0							;\
 	unimp	0							;\
-	unimp	0							;\
-	unimp	0							;\
-	unimp	0							;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
+        unimp   0                                                       ;\
 	.align 128
 #endif /* UTSB_PHYS */
 
@@ -2924,21 +2918,6 @@ trace_dataprot:
 	nop
 
 #endif /* TRAPTRACE */
-
-/*
- * expects offset into tsbmiss area in %g1 and return pc in %g7
- */
-stat_mmu:
-	CPU_INDEX(%g5, %g6)
-	sethi	%hi(tsbmiss_area), %g6
-	sllx	%g5, TSBMISS_SHIFT, %g5
-	or	%g6, %lo(tsbmiss_area), %g6
-	add	%g6, %g5, %g6		/* g6 = tsbmiss area */
-	ld	[%g6 + %g1], %g5
-	add	%g5, 1, %g5
-	jmp	%g7 + 4
-	st	%g5, [%g6 + %g1]
-
 
 /*
  * fast_trap_done, fast_trap_done_chk_intr:

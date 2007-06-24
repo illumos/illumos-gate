@@ -270,9 +270,7 @@ extern int cpu_setsize;		/* Maximum ecache setsize of configured cpus */
  * VM
  */
 extern int do_pg_coloring;
-extern int do_virtual_coloring;
 extern int use_page_coloring;
-extern int use_virtual_coloring;
 extern uint_t vac_colors_mask;
 
 extern caddr_t get_mmfsa_scratchpad(void);

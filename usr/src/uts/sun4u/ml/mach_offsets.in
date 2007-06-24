@@ -18,7 +18,7 @@
 \
 \ CDDL HEADER END
 \
-\ Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+\ Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
 \ offsets.in: input file to produce assym.h using the stabs program
@@ -103,7 +103,7 @@ hat	HAT_SIZE
 	sfmmu_cpusran
 	sfmmu_tsb
 	sfmmu_ismblkpa
-	sfmmu_flags
+	sfmmu_tteflags
 	sfmmu_cext
 	sfmmu_ctx_lock
 	sfmmu_ctxs
@@ -118,20 +118,19 @@ sfmmu_global_stat HATSTAT_SIZE
 sf_hment	SFHME_SIZE	SFHME_SHIFT
 	hme_tte		SFHME_TTE
 
-tsbmiss		TSBMISS_SIZE TSBMISS_SHIFT
-	tsbptr		TSBMISS_TSBPTR
-	tsbptr4m	TSBMISS_TSBPTR4M
+tsbmiss		TSBMISS_SIZE
 	ksfmmup		TSBMISS_KHATID
 	usfmmup		TSBMISS_UHATID
-	khashsz		TSBMISS_KHASHSZ
-	khashstart	TSBMISS_KHASHSTART
-	dcache_line_mask	TSBMISS_DMASK
-	uhashsz		TSBMISS_UHASHSZ
-	uhashstart	TSBMISS_UHASHSTART
-	hat_flags	TSBMISS_HATFLAGS
+	tsbptr		TSBMISS_TSBPTR
+	tsbptr4m	TSBMISS_TSBPTR4M
 	ismblkpa	TSBMISS_ISMBLKPA
-	itlb_misses	TSBMISS_ITLBMISS
-	dtlb_misses	TSBMISS_DTLBMISS
+	khashstart	TSBMISS_KHASHSTART
+	uhashstart	TSBMISS_UHASHSTART
+	khashsz		TSBMISS_KHASHSZ
+	uhashsz		TSBMISS_UHASHSZ
+	dcache_line_mask	TSBMISS_DMASK
+	uhat_tteflags	TSBMISS_UTTEFLAGS
+	uhat_rtteflags	TSBMISS_URTTEFLAGS
 	utsb_misses	TSBMISS_UTSBMISS
 	ktsb_misses	TSBMISS_KTSBMISS
 	uprot_traps	TSBMISS_UPROTS
@@ -141,8 +140,6 @@ tsbmiss		TSBMISS_SIZE TSBMISS_SHIFT
 \#define	TSB_TAGACC	(0 * TSBMISS_SCRATCH_INCR)
 \#define	TSBMISS_HMEBP	(1 * TSBMISS_SCRATCH_INCR)
 \#define	TSBMISS_HATID	(2 * TSBMISS_SCRATCH_INCR)
-\#define	TSBMISS_XMMURET	(3 * TSBMISS_SCRATCH_INCR)
-\#define	TSBMISS_XMMUPTR	(4 * TSBMISS_SCRATCH_INCR)
 
 kpmtsbm		KPMTSBM_SIZE KPMTSBM_SHIFT
 	vbase		KPMTSBM_VBASE
