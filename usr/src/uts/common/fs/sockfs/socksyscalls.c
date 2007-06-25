@@ -2476,7 +2476,9 @@ sosendfile64(file_t *fp, file_t *rfp, const struct ksendfilevec64 *sfv,
 	va.va_mask = AT_SIZE;
 	error = VOP_GETATTR(fvp, &va, 0, kcred);
 	va_size = va.va_size;
-	if ((error != 0) || (va_size == 0) || (sfv_off >= va_size)) {
+	if (error == 0 && sfv_off >= va_size)
+		error = EINVAL;
+	if (error != 0) {
 		VOP_RWUNLOCK(fvp, V_WRITELOCK_FALSE, NULL);
 		goto out;
 	}
