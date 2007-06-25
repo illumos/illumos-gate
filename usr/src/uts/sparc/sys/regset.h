@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -312,6 +311,7 @@ typedef struct fpu32	fpregset32_t;
 
 #endif	/* _SYSCALL32 */
 
+#if defined(_KERNEL) || defined(_KMDB)
 /*
  * The ABI uses struct fpu, so we use this to describe the kernel's view of the
  * fpu.
@@ -329,10 +329,8 @@ typedef struct {
 	uint8_t		fpu_q_entrysize;
 	uint8_t		fpu_en;			/* flag signifying fpu in use */
 } kfpu_t;
+#endif /* _KERNEL || _KMDB */
 
-#endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
-
-#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 /*
  * The following structure is for associating extra register state with
  * the ucontext structure and is kept within the uc_mcontext filler area.
