@@ -2719,14 +2719,13 @@ aio_cleanup_thread(aio_t *aiop)
 			 */
 			while (poked == 0) {
 				/*
-				 * we need to handle cleanup requests
-				 * that come in after we had just cleaned up,
-				 * so that we do cleanup of any new aio
-				 * requests that got completed and have
-				 * locked resources.
+				 * The clean up requests that came in
+				 * after we had just cleaned up, couldn't
+				 * be causing the unmap thread to block - as
+				 * unmap event happened first.
+				 * Let aio_done() wake us up if it sees a need.
 				 */
-				if ((aiop->aio_rqclnup ||
-				    (AS_ISUNMAPWAIT(as) != 0)) &&
+				if (aiop->aio_rqclnup &&
 				    (aiop->aio_flags & AIO_CLEANUP) == 0)
 					break;
 				poked = !cv_wait_sig(cvp, &as->a_contents);

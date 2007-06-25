@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -208,8 +208,10 @@ aio_done(struct buf *bp)
 	int portevpend;
 	void (*func)();
 	int use_port = 0;
+	int reqp_flags = 0;
 
 	p = bp->b_proc;
+	as = p->p_as;
 	reqp = (aio_req_t *)bp->b_forw;
 	fd = reqp->aio_req_fd;
 
@@ -239,6 +241,7 @@ aio_done(struct buf *bp)
 	ASSERT(reqp->aio_req_flags & AIO_PENDING);
 	aiop->aio_pending--;
 	reqp->aio_req_flags &= ~AIO_PENDING;
+	reqp_flags = reqp->aio_req_flags;
 	if ((pkevp = reqp->aio_req_portkev) != NULL) {
 		/* Event port notification is desired for this transaction */
 		if (reqp->aio_req_flags & AIO_CLOSE_PORT) {
@@ -262,7 +265,6 @@ aio_done(struct buf *bp)
 			 * aio_cleanup_thread() is waiting for completion of
 			 * transactions.
 			 */
-			as = p->p_as;
 			mutex_enter(&as->a_contents);
 			aio_deq(&aiop->aio_portpending, reqp);
 			aio_enq(&aiop->aio_portcleanupq, reqp, 0);
@@ -288,10 +290,8 @@ aio_done(struct buf *bp)
 		pollqflag = (reqp->aio_req_flags & AIO_POLL);
 		if (cleanupqflag | pollqflag) {
 
-			if (cleanupqflag) {
-				as = p->p_as;
+			if (cleanupqflag)
 				mutex_enter(&as->a_contents);
-			}
 
 			/*
 			 * requests with their AIO_POLL bit set are put
@@ -389,6 +389,18 @@ aio_done(struct buf *bp)
 
 	mutex_exit(&aiop->aio_mutex);
 	mutex_exit(&aiop->aio_portq_mutex);
+
+	/*
+	 * Could the cleanup thread be waiting for AIO with locked
+	 * resources to finish?
+	 * Ideally in that case cleanup thread should block on cleanupcv,
+	 * but there is a window, where it could miss to see a new aio
+	 * request that sneaked in.
+	 */
+	mutex_enter(&as->a_contents);
+	if ((reqp_flags & AIO_PAGELOCKDONE) && AS_ISUNMAPWAIT(as))
+		cv_broadcast(&as->a_cv);
+	mutex_exit(&as->a_contents);
 
 	if (sigev)
 		aio_sigev_send(p, sigev);
