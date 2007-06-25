@@ -34,7 +34,7 @@
 BASEPREFIX=`echo $BASEDIR | /usr/bin/sed "s/[\/\ ]/_/g"`
 POOLMANIFEST=`echo pools.xml"$BASEPREFIX" | /usr/bin/cut -c 1-256`
 
-/usr/bin/rm /tmp/${POOLMANIFEST}
+/usr/bin/rm -f /tmp/${POOLMANIFEST}
 if [ ! -f ${PKG_INSTALL_ROOT}/var/svc/manifest/system/pools.xml ]; then
 	/usr/bin/touch /tmp/${POOLMANIFEST}
 fi
