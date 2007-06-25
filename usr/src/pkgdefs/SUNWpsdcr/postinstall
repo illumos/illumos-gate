@@ -30,6 +30,7 @@ EXIT=0
 
 ARCH="`uname -p`"
 NAMEMAJOR="$BASEDIR/etc/name_to_major"
+DRIVER_ALIASES="$BASEDIR/etc/driver_aliases"
 #
 # Routine to remove current entries for a device in /devices,
 # /dev, and /etc/path_to_inst.
@@ -120,7 +121,8 @@ if [ "$modnum" = "0" ]; then
 fi
 
 # add alias if necessary for Lucent PCI modem
-if [ "${ARCH}" = "i386" ]; then
+lucent_alias=`grep -c pci11c1,480 ${DRIVER_ALIASES}`
+if [ "${ARCH}" = "i386" -a "$lucent_alias" = "0" ]; then
 	/usr/sbin/update_drv -b "${BASEDIR}" -a -i '"pci11c1,480"' asy
 fi
 
