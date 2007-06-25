@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,10 +36,12 @@ LDDBGLIBDIR =	$(LDDBGLIBDIR64)
 CONVLIBDIR =	$(CONVLIBDIR64)
 LINTFLAGS64 +=	$(VAR_LINTFLAGS64)
 
-ROOTCCSBINPROG= $(ROOTCCSBINPROG64)
+VAR_SGSBINPROG= $(VAR_SGSBINPROG64)
+VAR_SGSCCSLINK= $(VAR_SGSCCSLINK64)
 
 include		../Makefile.targ
 include		../../Makefile.sub.64
 
 install \
-package:	$(ROOTCCSBINPROG64)
+package:	$(VAR_SGSBINPROG64)
+

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +28,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "ldefs.c"
+#include "ldefs.h"
 #include <limits.h>
 
 /*
@@ -51,10 +49,10 @@ getl(CHR *p)
 		if (t >= &p[BUF_SIZ])
 			error("definitions too long");
 		if (c == ' ' || c == '\t') {
-		    if (!blank) {
-			blank = 1;
-			u = t;
-		    }
+			if (!blank) {
+				blank = 1;
+				u = t;
+			}
 		} else
 			blank = 0;
 
@@ -165,7 +163,7 @@ int
 alpha(int c)
 {
 	return ('a' <= c && c <= 'z' ||
-		'A' <= c && c <= 'Z');
+	    'A' <= c && c <= 'Z');
 }
 
 int
@@ -202,7 +200,8 @@ scopy(CHR *s, CHR *t)
 {
 	CHR *i;
 	i = t;
-	while (*i++ = *s++);
+	while (*i++ = *s++)
+		/* EMPTY */;
 }
 
 /*
@@ -241,7 +240,8 @@ slength(CHR *s)
 	int n;
 	CHR *t;
 	t = s;
-	for (n = 0; *t++; n++);
+	for (n = 0; *t++; n++)
+		/* EMPTY */;
 	return (n);
 }
 
@@ -289,12 +289,12 @@ ctrans(CHR **ss)
 		int dd;
 		warning("\\x is ANSI C hex escape");
 		if (digit((dd = *++*ss)) ||
-			('a' <= dd && dd <= 'f') ||
-			('A' <= dd && dd <= 'F')) {
+		    ('a' <= dd && dd <= 'f') ||
+		    ('A' <= dd && dd <= 'F')) {
 			c = 0;
 			while (digit(dd) ||
-				('A' <= dd && dd <= 'F') ||
-				('a' <= dd && dd <= 'f')) {
+			    ('A' <= dd && dd <= 'F') ||
+			    ('a' <= dd && dd <= 'f')) {
 				if (digit(dd))
 					c = c*16 + dd - '0';
 				else if (dd >= 'a')
@@ -340,7 +340,7 @@ cclinter(int sw)
 	if (i) {
 		for (j = 1; j < ncg; j++) {
 			if ((symbol[j] && cindex[j] != i) ||
-				(!symbol[j] && cindex[j] == i))
+			    (!symbol[j] && cindex[j] == i))
 				break;
 		}
 	}
@@ -401,12 +401,12 @@ usescape(int c)
 	case 'x': {
 		int dd;
 		if (digit((dd = gch())) ||
-			('A' <= dd && dd <= 'F') ||
-			('a' <= dd && dd <= 'f')) {
+		    ('A' <= dd && dd <= 'F') ||
+		    ('a' <= dd && dd <= 'f')) {
 			c = 0;
 			while (digit(dd) ||
-				('A' <= dd && dd <= 'F') ||
-				('a' <= dd && dd <= 'f')) {
+			    ('A' <= dd && dd <= 'F') ||
+			    ('a' <= dd && dd <= 'f')) {
 				if (digit(dd))
 					c = c*16 + dd - '0';
 				else if (dd >= 'a')
@@ -414,8 +414,8 @@ usescape(int c)
 				else
 					c = c*16 + 10 + dd - 'A';
 				if (!digit(peek) &&
-					!('A' <= peek && peek <= 'F') &&
-					!('a' <= peek && peek <= 'f'))
+				    !('A' <= peek && peek <= 'F') &&
+				    !('a' <= peek && peek <= 'f'))
 					break;
 				dd = gch();
 			}
@@ -467,7 +467,7 @@ cpycom(CHR *p)
 		(void) fprintf(fout, "\n# line %d\n", yyline);
 	else
 		(void) fprintf(fout,
-			"\n# line %d \"%s\"\n", yyline, sargv[optind]);
+		    "\n# line %d \"%s\"\n", yyline, sargv[optind]);
 
 	(void) putc(*t++, fout);
 	(void) putc(*t++, fout);
@@ -489,7 +489,8 @@ cpycom(CHR *p)
 		while (c == '*') {
 			(void) putc((char)c, fout);
 			if ((c = gch()) == '/') {
-				while ((c = gch()) == ' ' || c == '\t');
+				while ((c = gch()) == ' ' || c == '\t')
+					/* EMPTY */;
 				if (!space(c))
 					error("unacceptable statement");
 				prev = '\n';
@@ -521,7 +522,7 @@ cpyact(void)
 		(void) fprintf(fout, "\n# line %d\n", yyline);
 	else
 		(void) fprintf(fout,
-			"\n# line %d \"%s\"\n", yyline, sargv[optind]);
+		    "\n# line %d \"%s\"\n", yyline, sargv[optind]);
 
 	while (!eof) {
 		c = gch();
@@ -566,7 +567,7 @@ cpyact(void)
 					if ((c = gch()) == '/') {
 						(void) putc('/', fout);
 						while ((c = gch()) == ' ' ||
-							c == '\t' || c == '\n')
+						    c == '\t' || c == '\n')
 							(void) putwc(c, fout);
 						goto swt;
 					}
@@ -631,7 +632,7 @@ gch(void)
 		if (no_input) {
 			if (!yyline)
 				error("Cannot read from -- %s",
-				sargv[optind]);
+				    sargv[optind]);
 			if (optind < sargc-1) {
 				yyline = 0;
 				if (fin != stdin)
@@ -639,7 +640,7 @@ gch(void)
 				fin = fopen(sargv[++optind], "r");
 				if (fin == NULL)
 					error("Cannot open file -- %s",
-					sargv[optind]);
+					    sargv[optind]);
 				peek = getwc(fin);
 			} else
 				break;
@@ -667,7 +668,7 @@ mn2(int a, int d, int c)
 	if (tptr >= treesize) {
 		tptr++;
 		error("Parse tree too big %s",
-			(treesize == TREESIZE ? "\nTry using %e num" : ""));
+		    (treesize == TREESIZE ? "\nTry using %e num" : ""));
 	}
 	if (d >= treesize) {
 		error("Parse error");
@@ -714,7 +715,7 @@ mn1(int a, int d)
 	if (tptr >= treesize) {
 		tptr++;
 		error("Parse tree too big %s",
-		(treesize == TREESIZE ? "\nTry using %e num" : ""));
+		    (treesize == TREESIZE ? "\nTry using %e num" : ""));
 	}
 	name[tptr] = a;
 	left[tptr] = d;
@@ -757,7 +758,7 @@ mn0(int a)
 	if (tptr >= treesize) {
 		tptr++;
 		error("Parse tree too big %s",
-			(treesize == TREESIZE ? "\nTry using %e num" : ""));
+		    (treesize == TREESIZE ? "\nTry using %e num" : ""));
 	}
 
 	name[tptr] = a;
@@ -893,8 +894,8 @@ sect1dump(void)
 				allprint(i);
 				(void) putchar(' ');
 				iswprint(ctable[i]) ?
-					(void) putwc(ctable[i], stdout) :
-					(void) printf("%d", ctable[i]);
+				    (void) putwc(ctable[i], stdout) :
+				    (void) printf("%d", ctable[i]);
 				(void) putchar('\n');
 			}
 		}
@@ -917,7 +918,7 @@ treedump(void)
 	for (t = 0; t < tptr; t++) {
 		(void) printf("%4d ", t);
 		parent[t] ? (void) printf("p=%4d", parent[t]) :
-			(void) printf("      ");
+		    (void) printf("      ");
 		(void) printf("  ");
 		if (!ISOPERATOR(name[t])) {
 			allprint(name[t]);

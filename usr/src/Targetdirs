@@ -419,6 +419,7 @@ OTHERS=  \
 	/etc/mail/cf/ostype  \
 	/etc/mail/cf/sh  \
 	/usr/lib/sa  \
+	/usr/share/lib/ccs \
 	/usr/share/lib/tmac  \
 	/var/adm/exacct \
 	/var/adm/log \

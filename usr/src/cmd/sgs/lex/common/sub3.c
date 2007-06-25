@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,7 +41,7 @@
 #include	<stdlib.h>
 #include	<widec.h>
 #include	<search.h>
-#include	"ldefs.c"
+#include	"ldefs.h"
 
 /*
  * "lchar" stands for linearized character.  It is a variant of
@@ -138,17 +136,17 @@ remch(wchar_t c)
 	 */
 	if (!handleeuc) {
 		if (!isascii(c))
-		    if (iswprint(c))
-			warning(
+			if (iswprint(c))
+				warning(
 "Non-ASCII character '%wc' in pattern; use -w or -e lex option.", c);
-		    else warning(
+			else warning(
 "Non-ASCII character of value %#x in pattern; use -w or -e lex option.", c);
 		/* In any case, we don't need to construct ncgidtbl[]. */
 		return;
 	}
 
 	lsearch(&lc, yycgidtbl,
-		(size_t *)&ncgidtbl, sizeof (lchar), cmplc);
+	    (size_t *)&ncgidtbl, sizeof (lchar), cmplc);
 }
 
 void
@@ -214,14 +212,16 @@ yycgid(wchar_t c)
 	while (last >= 0) {
 		int i = (first+last)/2;
 		if (lc == yycgidtbl[i])
-		    return (2*i);	/* lc  exactly matches an element. */
+			return (2*i);	/* lc exactly matches an element. */
 		else if (yycgidtbl[i] < lc) {
-			if (lc < yycgidtbl[i+1])
-			    return (2*i+1); /* lc is in between two elements. */
+			if (lc < yycgidtbl[i+1]) {
+				/* lc is in between two elements */
+				return (2*i+1);
+			}
 			else
-			    first = i + 1;
+				first = i + 1;
 		} else
-		    last = i - 1;
+			last = i - 1;
 	}
 	error(
 	"system error in yycgid():binary search failed for c=0x%04x\n", c);
@@ -243,20 +243,21 @@ repbycgid(void)
 		c = name[i];
 		if (!ISOPERATOR(c)) {
 		/* If not an operator, it must be a char.  */
-		    name[i] = yycgid((wchar_t)c); /* So replace it. */
+			name[i] = yycgid((wchar_t)c); /* So replace it. */
 #ifdef DEBUG
-		    if (debug) {
-			    printf("name[%d]:'%c'->%d;\n", i, c, name[i]);
-		    }
+			if (debug) {
+				printf("name[%d]:'%c'->%d;\n", i, c, name[i]);
+			}
 #endif
 		} else if (c == RSTR) {
 			c = right[i];
 			right[i] = yycgid((wchar_t)c);
 #ifdef DEBUG
-		    if (debug) {
-			    printf(
-			    "name[%d].right:'%c'->%d;\n", i, c, right[i]);
-		    }
+			if (debug) {
+				printf(
+				    "name[%d].right:'%c'->%d;\n",
+				    i, c, right[i]);
+			}
 #endif
 		} else if ((c == RCCL) || (c == RNCCL)) {
 			CHR cc, *s;
@@ -308,7 +309,7 @@ repbycgid(void)
 					low = yycgid(*s++);
 					high = yycgid(*s++);
 					for (i = low; i <= high; ++i)
-					    setsymbol(i);
+						setsymbol(i);
 				} else {
 					setsymbol(yycgid(cc));
 				}
@@ -318,12 +319,12 @@ repbycgid(void)
 			s = ccptr;
 			m = 0;
 			for (j = 0; j < ncg; ++j)
-			    if (symbol[j]) {
-				    ccltoken[m++] = (CHR)j;
+				if (symbol[j]) {
+					ccltoken[m++] = (CHR)j;
 #ifdef DEBUG
-				    if (debug) printf("%d, ", j);
+					if (debug) printf("%d, ", j);
 #endif
-			    }
+				}
 
 #ifdef DEBUG
 			if (debug) printf("}\n");
@@ -333,13 +334,14 @@ repbycgid(void)
 			while (ccp < ccptr && scomp(ccltoken, ccp) != 0)
 				ccp++;
 			if (ccp < ccptr) {  /* character class found in ccl */
-			    left[i] = (int)ccp;
+				left[i] = (int)ccp;
 			} else { /* not in ccl, add it */
-			    left[i] = (int)ccptr;
-			    scopy(ccltoken, ccptr);
-			    ccptr += slength(ccltoken) + 1;
-			    if (ccptr > ccl + CCLSIZE)
-				error("Too many large character classes");
+				left[i] = (int)ccptr;
+				scopy(ccltoken, ccptr);
+				ccptr += slength(ccltoken) + 1;
+				if (ccptr > ccl + CCLSIZE)
+					error(
+					"Too many large character classes");
 			}
 			cclinter(c == RCCL);
 		} else if (c == DOT) {
@@ -361,7 +363,8 @@ repbycgid(void)
 				}
 				*ccptr++ = 0;
 				if (ccptr > ccl + CCLSIZE)
-				    error("Too many large character classes");
+					error(
+					"Too many large character classes");
 			}
 			/* Mimic mn1(RCCL,psave)... */
 			name[i] = RCCL;

@@ -57,10 +57,14 @@ ROOTLIBSVCBIN=		$(ROOT)/lib/svc/bin
 ROOTLIBSVCMETHOD=	$(ROOT)/lib/svc/method
 
 ROOTSHLIB=	$(ROOT)/usr/share/lib
+ROOTSHLIBCCS=	$(ROOTSHLIB)/ccs
 ROOTSBIN=	$(ROOT)/sbin
 ROOTUSRSBIN=	$(ROOT)/usr/sbin
 ROOTETC=	$(ROOT)/etc
 ROOTCCSBIN=	$(ROOT)/usr/ccs/bin
+ROOTCCSBIN64=	$(ROOTCCSBIN)/$(MACH64)
+ROOTCCSBINLINKDIR=	$(ROOT)/../../bin
+ROOTCCSBINLINKDIR64=	$(ROOT)../../../bin/$(MACH)
 ROOTUSRKVM=	$(ROOT)/usr/kvm
 ROOTXPG4=	$(ROOT)/usr/xpg4
 ROOTXPG4BIN=	$(ROOT)/usr/xpg4/bin
@@ -149,6 +153,9 @@ ROOTSBINPROG=	$(PROG:%=$(ROOTSBIN)/%)
 ROOTUSRSBINPROG=$(PROG:%=$(ROOTUSRSBIN)/%)
 ROOTETCPROG=	$(PROG:%=$(ROOTETC)/%)
 ROOTCCSBINPROG=	$(PROG:%=$(ROOTCCSBIN)/%)
+ROOTCCSBINPROG64=	  $(PROG:%=$(ROOTCCSBIN64)/%)
+ROOTCCSBINLINK=$(PROG:%=  $(ROOTCCSBINLINKDIR)/%)
+ROOTCCSBINLINK64=$(PROG:%=$(ROOTCCSBINLINKDIR64)/%)
 ROOTUSRKVMPROG=	$(PROG:%=$(ROOTUSRKVM)/%)
 ROOTXPG4PROG=	$(XPG4PROG:%=$(ROOTXPG4BIN)/%)
 ROOTXPG4PROG32=	$(XPG4PROG:%=$(ROOTXPG4BIN32)/%)
@@ -172,6 +179,18 @@ ROOTMAN3FILES=	$(MAN3FILES:%=$(ROOTMAN3)/%)
 $(ROOTMAN3FILES) := FILEMODE= 444
 $(ROOTMAN3FILES) := OWNER= root
 $(ROOTMAN3FILES) := GROUP= bin
+
+# Symlink rules for /usr/ccs/bin commands. Note, those commands under
+# the rule of the linker area, are controlled by a different set of 
+# rules defined in $(SRC)/cmd/sgs/Makefile.var.
+
+INS.ccsbinlink= \
+	$(RM) $(ROOTCCSBINPROG); \
+	$(SYMLINK) ../../bin/$(PROG) $(ROOTCCSBINPROG)
+
+INS.ccsbinlink64= \
+	$(RM) $(ROOTCCSBINPROG64); \
+	$(SYMLINK) ../../../bin/$(MACH64)/$(PROG) $(ROOTCCSBINPROG64)
 
 ROOTETCDEFAULT=	$(ROOTETC)/default
 ROOTETCDEFAULTFILES=	$(DEFAULTFILES:%.dfl=$(ROOTETCDEFAULT)/%)
@@ -287,9 +306,6 @@ $(ROOTETC)/%: %
 $(ROOTETCDEFAULT)/%:	%.dfl
 	$(INS.rename)
 
-$(ROOTCCSBIN)/%: %
-	$(INS.file)
-
 $(ROOTUSRKVM)/%: %
 	$(INS.file)
 
@@ -388,6 +404,16 @@ $(ROOTSVCPLATFORMSUN4U)/%: %
 
 $(ROOTSVCPLATFORMSUN4V)/%: %
 	$(INS.file)
+
+# Install rule for gprof, yacc, and lex dependency files
+$(ROOTSHLIBCCS)/%: ../common/%
+	$(INS.file)
+
+$(ROOTCCSBINLINKDIR)/%: %
+	$(INS.ccsbinlink)
+
+$(ROOTCCSBINLINKDIR64)/%: %
+	$(INS.ccsbinlink64)
 
 $(ROOTMAN1)/%: %.sunman
 	$(INS.rename)

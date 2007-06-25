@@ -28,20 +28,14 @@
 
 all:		$(PROG)
 
-install \
-package:	all $(ROOTCCSBINPROG)
+package \
+install:	all $(VAR_SGSBINPROG) $(VAR_SGSCCSLINK)
 
 %.o:		../common/%.c
 		$(COMPILE.c) $<
 		$(POST_PROCESS_O)
 
 $(PROG):	$(MAPFILES)
-
-$(ROOTCCSBIN)/%: %
-		$(INS.file)
-
-$(ROOTCCSBIN64)/%: %
-		$(INS.file)
 
 clean:
 		$(RM) $(OBJS) $(CLEANFILES)

@@ -55,12 +55,18 @@ f none $SGSDIR/usr/bin/amd64/crle=usr/bin/amd64/crle 555 root bin
 f none $SGSDIR/usr/bin/amd64/moe=usr/bin/amd64/moe 555 root bin
 f none $SGSDIR/usr/bin/amd64/pvs=usr/bin/amd64/pvs 555 root bin
 d none $SGSDIR/usr/ccs/bin/amd64 755 root bin
-f none $SGSDIR/usr/ccs/bin/amd64/dump=usr/ccs/bin/amd64/dump 0555 root bin
-f none $SGSDIR/usr/ccs/bin/amd64/elfdump=usr/ccs/bin/amd64/elfdump 0555 root bin
-f none $SGSDIR/usr/ccs/bin/amd64/ld=usr/ccs/bin/amd64/ld 755 root bin
-f none $SGSDIR/usr/ccs/bin/amd64/nm=usr/ccs/bin/amd64/nm 0555 root bin
-f none $SGSDIR/usr/ccs/bin/amd64/mcs=usr/ccs/bin/amd64/mcs 0555 root bin
-l none $SGSDIR/usr/ccs/bin/amd64/strip=../../../../usr/ccs/bin/amd64/mcs
+f none $SGSDIR/usr/bin/amd64/dump=usr/bin/amd64/dump 0555 root bin
+s none $SGSDIR/usr/ccs/bin/amd64/dump=../../../bin/amd64/dump
+f none $SGSDIR/usr/bin/amd64/elfdump=usr/bin/amd64/elfdump 0555 root bin
+s none $SGSDIR/usr/ccs/bin/amd64/elfdump=../../../bin/amd64/elfdump
+f none $SGSDIR/usr/bin/amd64/ld=usr/bin/amd64/ld 755 root bin
+s none $SGSDIR/usr/ccs/bin/amd64/ld=../../../bin/amd64/ld
+f none $SGSDIR/usr/bin/amd64/nm=usr/bin/amd64/nm 0555 root bin
+s none $SGSDIR/usr/ccs/bin/amd64/nm=../../../bin/amd64/nm
+f none $SGSDIR/usr/bin/amd64/mcs=usr/bin/amd64/mcs 0555 root bin
+s none $SGSDIR/usr/ccs/bin/amd64/mcs=../../../bin/amd64/mcs
+l none $SGSDIR/usr/bin/amd64/strip=./mcs
+s none $SGSDIR/usr/ccs/bin/amd64/strip=../../../bin/amd64/strip
 !include prototype_i386_ext_usr_lib
 d none $SGSDIR/usr/lib/link_audit/amd64 755 root bin
 s none $SGSDIR/usr/lib/link_audit/64=amd64

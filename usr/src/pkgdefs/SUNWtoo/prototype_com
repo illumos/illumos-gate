@@ -61,8 +61,10 @@ l none usr/bin/truss=../../usr/lib/isaexec
 f none usr/bin/whocalls 755 root bin
 d none usr/ccs 755 root bin
 d none usr/ccs/bin 755 root bin
-f none usr/ccs/bin/ld 755 root bin
-f none usr/ccs/bin/regcmp 555 root bin
+f none usr/bin/ld 755 root bin
+s none usr/ccs/bin/ld=../../bin/ld
+f none usr/bin/regcmp 555 root bin
+s none usr/ccs/bin/regcmp=../../bin/regcmp
 d none usr/ccs/lib 755 root bin
 s none usr/ccs/lib/link_audit=../../lib/link_audit
 d none usr/lib 755 root bin

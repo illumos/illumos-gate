@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,7 +28,7 @@ PROG=	dis
 OBJS=	dis_target.o dis_main.o dis_util.o dis_list.o
 SRCS=	$(OBJS:%.o=%.c)
 
-include ../Makefile.cmd
+include 	../Makefile.cmd
 
 LDLIBS += -ldisasm -luutil -lelf
 
@@ -40,7 +40,7 @@ $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-install: all $(ROOTCCSBINPROG)
+install: all $(ROOTPROG) $(ROOTCCSBINLINK)
 
 clean:
 	$(RM) $(OBJS) $(PROG)

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,12 +19,11 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1992,1998-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
 # and their location on the development machine when building the package.
@@ -39,43 +37,63 @@
 i pkginfo
 i copyright
 i depend
-
 #
 # source locations relative to the prototype file
 #
 # SUNWbtool
 #
-
 d none usr 0755 root sys
 d none usr/bin 755 root bin
 f none usr/bin/rpcgen 555 root bin
 d none usr/ccs 0755 root bin
 d none usr/ccs/bin 0755 root bin
-f none usr/ccs/bin/ar 0555 root bin
-f none usr/ccs/bin/dis 0555 root bin
-f none usr/ccs/bin/dump 0555 root bin
-f none usr/ccs/bin/elfdump 0555 root bin
-f none usr/ccs/bin/error 0555 root bin
-f none usr/ccs/bin/gprof 0555 root bin
-f none usr/ccs/bin/gprof.flat.blurb 0444 root bin
-f none usr/ccs/bin/gprof.callg.blurb 0444 root bin
-f none usr/ccs/bin/lari 0555 root bin
-f none usr/ccs/bin/lex 0555 root bin
-f none usr/ccs/bin/ncform 0644 root bin
-f none usr/ccs/bin/nrform 0644 root bin
-f none usr/ccs/bin/nceucform 0644 root bin
-f none usr/ccs/bin/lorder 0555 root bin
-f none usr/ccs/bin/mcs 0555 root bin
-f none usr/ccs/bin/nm 0555 root bin
-f none usr/ccs/bin/prof 0555 root bin
-f none usr/ccs/bin/ranlib 0555 root bin
-f none usr/ccs/bin/size 0555 root bin
-l none usr/ccs/bin/strip=../../../usr/ccs/bin/mcs
-f none usr/ccs/bin/symorder 0555 root bin
-f none usr/ccs/bin/tsort 0555 root bin
-f none usr/ccs/bin/unifdef 0555 root bin
-f none usr/ccs/bin/yacc 0555 root bin
-f none usr/ccs/bin/yaccpar 0644 root bin
+f none usr/bin/ar 0555 root bin
+s none usr/ccs/bin/ar=../../bin/ar
+f none usr/bin/dis 0555 root bin
+s none usr/ccs/bin/dis=../../bin/dis
+f none usr/bin/dump 0555 root bin
+s none usr/ccs/bin/dump=../../bin/dump
+f none usr/bin/elfdump 0555 root bin
+s none usr/ccs/bin/elfdump=../../bin/elfdump
+f none usr/bin/error 0555 root bin
+s none usr/ccs/bin/error=../../bin/error
+f none usr/bin/gprof 0555 root bin
+s none usr/ccs/bin/gprof=../../bin/gprof
+d none usr/share 755 root sys
+d none usr/share/lib 755 root sys
+d none usr/share/lib/ccs 755 root bin
+f none usr/share/lib/ccs/gprof.flat.blurb 0444 root bin
+f none usr/share/lib/ccs/gprof.callg.blurb 0444 root bin
+f none usr/bin/lari 0555 root bin
+s none usr/ccs/bin/lari=../../bin/lari
+f none usr/bin/lex 0555 root bin
+s none usr/ccs/bin/lex=../../bin/lex
+f none usr/share/lib/ccs/ncform 0644 root bin
+f none usr/share/lib/ccs/nrform 0644 root bin
+f none usr/share/lib/ccs/nceucform 0644 root bin
+f none usr/bin/lorder 0555 root bin
+s none usr/ccs/bin/lorder=../../bin/lorder
+f none usr/bin/mcs 0555 root bin
+s none usr/ccs/bin/mcs=../../bin/mcs
+f none usr/bin/nm 0555 root bin
+s none usr/ccs/bin/nm=../../bin/nm
+f none usr/bin/prof 0555 root bin
+s none usr/ccs/bin/prof=../../bin/prof
+f none usr/bin/ranlib 0555 root bin
+s none usr/ccs/bin/ranlib=../../bin/ranlib
+f none usr/bin/size 0555 root bin
+s none usr/ccs/bin/size=../../bin/size
+l none usr/bin/strip=../bin/mcs
+s none usr/ccs/bin/strip=../../bin/strip
+f none usr/bin/symorder 0555 root bin
+s none usr/ccs/bin/symorder=../../bin/symorder
+f none usr/bin/tsort 0555 root bin
+s none usr/ccs/bin/tsort=../../bin/tsort
+f none usr/bin/unifdef 0555 root bin
+s none usr/ccs/bin/unifdef=../../bin/unifdef
+f none usr/bin/yacc 0555 root bin
+s none usr/ccs/bin/yacc=../../bin/yacc
+f none usr/share/lib/ccs/yaccpar 0644 root bin
 d none usr/lib 755 root bin
 d none usr/ccs/lib 0755 root bin
 f none usr/lib/llib-ll 0644 root bin

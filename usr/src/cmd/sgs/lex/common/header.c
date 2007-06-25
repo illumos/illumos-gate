@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +28,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "ldefs.c"
+#include "ldefs.h"
 
 static void rhd1(void);
 static void chd1(void);
@@ -167,12 +165,12 @@ chd1(void)
 		(void) fprintf(fout, "#ifndef __cplusplus\n");
 		(void) fprintf(fout, "%s%d%s\n",
 "# define input() (((yytchar=yysptr>yysbuf?U(*--yysptr):getwc(yyin))==",
-		ctable['\n'],
+		    ctable['\n'],
 "?(yylineno++,yytchar):yytchar)==EOF?0:yytchar)");
 		(void) fprintf(fout, "#else\n");
 		(void) fprintf(fout, "%s%d%s\n",
 "# define lex_input() (((yytchar=yysptr>yysbuf?U(*--yysptr):getwc(yyin))==",
-		ctable['\n'],
+		    ctable['\n'],
 "?(yylineno++,yytchar):yytchar)==EOF?0:yytchar)");
 		(void) fprintf(fout, "#endif\n");
 		(void) fprintf(fout,
@@ -203,12 +201,12 @@ chd1(void)
 		(void) fprintf(fout, "#ifndef __cplusplus\n");
 		(void) fprintf(fout, "%s%d%s\n",
 "# define input() (((yytchar=yysptr>yysbuf?U(*--yysptr):getc(yyin))==",
-		ctable['\n'],
+		    ctable['\n'],
 "?(yylineno++,yytchar):yytchar)==EOF?0:yytchar)");
 		(void) fprintf(fout, "#else\n");
 		(void) fprintf(fout, "%s%d%s\n",
 "# define lex_input() (((yytchar=yysptr>yysbuf?U(*--yysptr):getc(yyin))==",
-		ctable['\n'],
+		    ctable['\n'],
 "?(yylineno++,yytchar):yytchar)==EOF?0:yytchar)");
 		(void) fprintf(fout, "#endif\n");
 		fprintf(fout, "#define ECHO fprintf(yyout, \"%%s\",yytext)\n");
@@ -239,10 +237,10 @@ chd1(void)
 				(void) fprintf(fout,
 				"wchar_t * yywtext = yy_twbuf;\n");
 				(void) fprintf(fout,
-						"int yytextsz = YYLMAX;\n");
+				    "int yytextsz = YYLMAX;\n");
 				(void) fprintf(fout, "#ifndef YYTEXTSZINC\n");
 				(void) fprintf(fout,
-					"#define YYTEXTSZINC 100\n");
+				    "#define YYTEXTSZINC 100\n");
 				(void) fprintf(fout, "#endif\n");
 			}
 		} else {
@@ -263,10 +261,10 @@ chd1(void)
 				(void) fprintf(fout,
 				"char * yytext = yy_tbuf;\n");
 				(void) fprintf(fout,
-					"int yytextsz = YYLMAX;\n");
+				    "int yytextsz = YYLMAX;\n");
 				(void) fprintf(fout, "#ifndef YYTEXTSZINC\n");
 				(void) fprintf(fout,
-					"#define YYTEXTSZINC 100\n");
+				    "#define YYTEXTSZINC 100\n");
 				(void) fprintf(fout, "#endif\n");
 			}
 		}
@@ -372,7 +370,8 @@ statistics(void)
 {
 	(void) fprintf(errorf,
 "%d/%d nodes(%%e), %d/%d positions(%%p), %d/%d (%%n), %ld transitions,\n",
-	tptr, treesize, nxtpos-positions, maxpos, stnum + 1, nstates, rcount);
+	    tptr, treesize, nxtpos-positions, maxpos, stnum + 1, nstates,
+	    rcount);
 	(void) fprintf(errorf,
 	"%d/%d packed char classes(%%k), ", pcptr-pchar, pchlen);
 	if (optim)

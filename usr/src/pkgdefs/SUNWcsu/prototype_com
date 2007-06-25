@@ -28,7 +28,7 @@
 # The 'pkgmk' command uses this file to identify the contents of a package
 # and their location on the development machine when building the package.
 # Can be created via a text editor or through use of the 'pkgproto' command.
-#
+
 
 #!search <pathname pathname ...>	# where to find pkg objects
 #!include <filename>			# include another 'prototype' file
@@ -308,7 +308,8 @@ f none usr/bin/xargs 555 root bin
 f none usr/bin/xstr 555 root bin
 d none usr/ccs 0755 root bin
 d none usr/ccs/bin 0755 root bin
-f none usr/ccs/bin/m4 0555 root bin
+f none usr/bin/m4 0555 root bin
+s none usr/ccs/bin/m4=../../bin/m4
 d none usr/demo 755 root bin
 d none usr/games 755 root bin
 d none usr/kernel 755 root sys

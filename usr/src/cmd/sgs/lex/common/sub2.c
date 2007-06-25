@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +28,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "ldefs.c"
+#include "ldefs.h"
 
 static void add(int **array, int n);
 static void follow(int v);
@@ -80,8 +78,9 @@ cfoll(int v)
 				for (j = 1; j < ncg; j++)
 					if (symbol[j]) {
 						for (k = 0; p + k < pcptr; k++)
-						    if (cindex[j] == *(p + k))
-							break;
+							if (cindex[j] ==
+							    *(p + k))
+								break;
 						if (p + k >= pcptr)
 							*pcptr++ = cindex[j];
 					}
@@ -163,7 +162,7 @@ add(int **array, int n)
 	if (nxtpos >= positions+maxpos)
 		error(
 		"Too many positions %s",
-		(maxpos == MAXPOS ? "\nTry using %p num" : ""));
+		    (maxpos == MAXPOS ? "\nTry using %p num" : ""));
 }
 
 static void
@@ -367,8 +366,9 @@ cgoto(void)
 					q = (CHR *)left[curpos];
 					while (*q) {
 						for (j = 1; j < ncg; j++)
-						    if (cindex[j] == *q)
-							symbol[j] = TRUE;
+							if (cindex[j] == *q)
+								symbol[j] =
+								    TRUE;
 						q++;
 					}
 					break;
@@ -384,7 +384,7 @@ cgoto(void)
 				default:
 					warning(
 					"bad switch cgoto %d state %d",
-					curpos, s);
+					    curpos, s);
 					break;
 #endif
 				}
@@ -420,8 +420,8 @@ cgoto(void)
 					if (stnum+1 >= nstates) {
 						stnum++;
 						error("Too many states %s",
-						(nstates == NSTATES ?
-						"\nTry using %n num":""));
+						    (nstates == NSTATES ?
+						    "\nTry using %n num":""));
 					}
 					add(state, ++stnum);
 #ifdef DEBUG
@@ -465,8 +465,8 @@ nextstate(int s, int c)
 		curpos = *pos++;
 		j = name[curpos];
 		if ((!ISOPERATOR(j)) && j == c ||
-			j == RSTR && c == right[curpos] ||
-			j == RCCL && member(c, (CHR *) left[curpos])) {
+		    j == RSTR && c == right[curpos] ||
+		    j == RCCL && member(c, (CHR *) left[curpos])) {
 			f = foll[curpos];
 			number = *f;
 			newpos = f+1;
@@ -549,7 +549,7 @@ packtrans(int st, CHR *tch, int *tst, int cnt, int tryit)
 			} else {
 				fprintf(stderr,
 "lex`sub2`packtran: tch[%d] out of bounds (%d)\n",
-				i, tch[i]);
+				    i, tch[i]);
 			}
 		}
 		for (i = 0; i < cnt; i++) {
@@ -577,7 +577,7 @@ packtrans(int st, CHR *tch, int *tst, int cnt, int tryit)
 				if (temp[i] != -1) {
 					cwork[k] = i;
 					swork[k++] =
-					(temp[i] == -2 ? -1 : temp[i]);
+					    (temp[i] == -2 ? -1 : temp[i]);
 				}
 			cwork[k] = 0;
 #ifdef PC
@@ -623,8 +623,8 @@ packtrans(int st, CHR *tch, int *tst, int cnt, int tryit)
 			}
 			/* ach[j] == nchar[p] */
 			if (ast[j] != nexts[++p] ||
-				ast[j] == -1 ||
-				(cpackflg[st] && ach[j] != match[ach[j]]))
+			    ast[j] == -1 ||
+			    (cpackflg[st] && ach[j] != match[ach[j]]))
 				diff++;
 			j++;
 		}
@@ -645,7 +645,7 @@ packtrans(int st, CHR *tch, int *tst, int cnt, int tryit)
 #ifdef DEBUG
 	if (debug)
 		(void) printf("select st %d for st %d diff %d\n",
-			cmin, st, cval);
+		    cmin, st, cval);
 #endif
 #ifdef PS
 	if (cmin != -1) { /* if we can use st cmin */
@@ -671,8 +671,8 @@ packtrans(int st, CHR *tch, int *tst, int cnt, int tryit)
 			}
 			/* ach[j] == nchar[p-1] */
 			if (ast[j] != nexts[p] ||
-				ast[j] == -1 ||
-				(cpackflg[st] && ach[j] != match[ach[j]])) {
+			    ast[j] == -1 ||
+			    (cpackflg[st] && ach[j] != match[ach[j]])) {
 				k++;
 				nchar[nptr] = ach[j];
 				nexts[++nptr] = ast[j];
@@ -708,7 +708,7 @@ nopack:
 		if (nptr > ntrans)
 			error(
 			"Too many transitions %s",
-			(ntrans == NTRANS ? "\nTry using %a num" : ""));
+			    (ntrans == NTRANS ? "\nTry using %a num" : ""));
 }
 
 #ifdef DEBUG
@@ -841,8 +841,9 @@ acompute(int s)
 	for (i = 0; i < k; i++)
 		if (temp[i] != 0) {
 			ratfor ?
-			fprintf(fout, "data vstop(%d)/%d/\n", aptr, temp[i]) :
-			fprintf(fout, "%d,\n", temp[i]);
+			    fprintf(fout, "data vstop(%d)/%d/\n",
+			    aptr, temp[i]) :
+			    fprintf(fout, "%d,\n", temp[i]);
 #ifdef DEBUG
 			if (debug)
 				(void) printf("%d ", temp[i]);
@@ -851,8 +852,8 @@ acompute(int s)
 		}
 	for (i = 0; i < n; i++) { /* copy fall back actions - all neg */
 		ratfor ?
-		fprintf(fout, "data vstop(%d)/%d/\n", aptr, neg[i]) :
-		fprintf(fout, "%d,\n", neg[i]);
+		    fprintf(fout, "data vstop(%d)/%d/\n", aptr, neg[i]) :
+		    fprintf(fout, "%d,\n", neg[i]);
 		aptr++;
 #ifdef DEBUG
 		if (debug)
@@ -864,7 +865,7 @@ acompute(int s)
 		(void) putchar('\n');
 #endif
 	ratfor ? fprintf(fout, "data vstop (%d)/0/\n", aptr) :
-		fprintf(fout, "0, \n");
+	    fprintf(fout, "0, \n");
 	aptr++;
 }
 
@@ -955,7 +956,7 @@ layout(void)
 		if (debug)
 			(void) printf(
 			"bot,top %d, %d startup begins %d\n",
-			bot, top, startup);
+			    bot, top, startup);
 #endif
 		if (chset) {
 			do {
@@ -971,7 +972,7 @@ layout(void)
 #if DEBUG
 			if (debug)
 				(void) printf(" startup will be %d\n",
-				startup);
+				    startup);
 #endif
 			/* have found place */
 			for (j = bot; j <= top; j++) {
@@ -979,7 +980,7 @@ layout(void)
 				if (ctable[nchar[j]] <= 0)
 					(void) printf(
 					"j %d nchar %d ctable.nch %d\n",
-					j, nchar[j], ctable[nchar[k]]);
+					    j, nchar[j], ctable[nchar[k]]);
 				verify[k] = i + 1;	/* state number + 1 */
 				advance[k] = nexts[j+1]+1;
 				if (yytop < k)
@@ -1111,7 +1112,7 @@ layout(void)
 	for (i = 0; i < casecount; i += 8) {
 		for (j = 0; j < 8; j++)
 			(void) fprintf(fout, "%d,", i+j < NACTIONS ?
-				extra[i+j] : 0);
+			    extra[i+j] : 0);
 		(void) putc('\n', fout);
 	}
 	(void) fprintf(fout, "0};\n");
@@ -1179,7 +1180,7 @@ bprint(char *a, char *s, int n)
 			k = i+j;
 			if (k < n)
 				(void) fprintf(fout,
-					", %s (%d)/%d/", s, k, a[k]);
+				    ", %s (%d)/%d/", s, k, a[k]);
 		}
 		(void) putc('\n', fout);
 	}

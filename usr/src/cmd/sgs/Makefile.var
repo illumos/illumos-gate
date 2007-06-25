@@ -31,7 +31,9 @@
 # pre-processor flags, linker flags are different among the releases.  This
 # file is used to specify such flags. 
 # 
-# This file is included by the ./Makefile.com.
+# This file is included by ./Makefile.com, but may also be included directly
+# in the case where the utility is relying on the contents of 
+# ../../Makefile.com.
 # 
 # This file should be the only file which is different among the presently
 # maintained release workspaces and the files that generate the link-editors
@@ -123,13 +125,12 @@ VAR_POUND_3=		$(POUND_SIGN)
 #
 # VAR_AVLDIR - directory to find avl.c in.
 #
-# The avl.c is under usr/src/common/avl in Solaris10 (and later), but
-# in earlier releases it is not present (problem to be solved).
+# The avl.c file is under usr/src/common/avl in Solaris 10 (and later),
+# but in earlier releases it is not present (problem to be solved).
 #
-#
-# The avl.h and avl_impl.h are under usr/src/uts/common/sys in Solaris10
-# (and later).  They are under usr/src/cmd/sgs/tools/common/sys in 
-# Solaris 9 and earlier.
+# The avl.h and avl_impl.h files are under usr/src/uts/common/sys in
+# Solaris 10 (and later). They are under usr/src/cmd/sgs/tools/common/sys
+# in Solaris 9 and earlier.
 #
 # For Solaris 9 and earlier releases, we will have our own copy of the
 # files avl.c, avl.h and avl_impl.h until these files are back ported into
@@ -141,10 +142,27 @@ VAR_AVLINCDIR=
 #
 # VAR_DTRDIR - directory to find dtrace_data.c in.
 #
-# The dtrace_data.c is under usr/src/common/dtrace in Solaris 11 (and later),
-# but in earlier releases was maintained as separate files under sgs/rtld.
+# In Solaris 10 and earlier releases, dtrace_data.c was maintained as separate
+# files under sgs/rtld.  This file is now under usr/src/common/dtrace.
 #
 VAR_DTRDIR=             $(SRCBASE)/common/dtrace
+
+#
+# VAR_SGSBINPROG
+#
+# For Solaris 10 and earlier releases, the SGS components were installed in
+# /usr/ccs/bin.  These components are now installed in /usr/bin with associated
+# symbolic links for compatibility. For previous behavior, set the VAR_SGSBIN*
+# variables to the appropriate ROOTCCSBIN* rule and set the VAR_SGSCCSLINK*
+# rules to null.
+#
+VAR_SGSBIN=		$(ROOTBIN)
+VAR_SGSBINPROG=		$(ROOTPROG)
+VAR_SGSBIN64=		$(ROOTBIN64)
+VAR_SGSBINPROG64=	$(ROOTPROG64)
+
+VAR_SGSCCSLINK=		$(ROOTCCSBINLINK)
+VAR_SGSCCSLINK64=	$(ROOTCCSBINLINK64)
 
 #
 # ld

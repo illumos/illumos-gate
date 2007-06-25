@@ -19,15 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 COMOBJS=	y1.o y2.o y3.o y4.o
-WHATOBJS=	whatdir.o
-POBJECTS=	$(COMOBJS) $(WHATOBJS)
+POBJECTS=	$(COMOBJS)
 POBJS=		$(POBJECTS:%=objs/%)
 
 OBJECTS=	libmai.o libzer.o
@@ -44,7 +43,6 @@ SRCDIR =	../common
 # from objects
 #
 SRCS=		$(COMOBJS:%.o=../common/%.c) \
-		$(WHATOBJS:%.o=../../whatdir/common/%.c) \
 		$(OBJECTS:%.o=../common/%.c)
 
 LIBS =          $(DYNLIB) $(LINTLIB)
@@ -68,9 +66,10 @@ CFLAGS += $(CCVERBOSE)
 CFLAGS64 += $(CCVERBOSE)
 
 $(LINTLIB):=	LINTFLAGS = -nvx
-$(ROOTCCSBINPROG):= FILEMODE = 0555
+$(ROOTPROG):= FILEMODE = 0555
 
-ROOTYACCPAR=	$(YACCPAR:%=$(ROOTCCSBIN)/%)
+ROOTYACCPAR=	$(YACCPAR:%=$(ROOTSHLIBCCS)/%)
+
 ROOTLINTDIR=	$(ROOTLIBDIR)
 ROOTLINT=	$(LINTSRCS:../common/%=$(ROOTLINTDIR)/%)
 

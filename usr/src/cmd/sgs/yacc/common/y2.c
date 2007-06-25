@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,7 +60,7 @@ char *infile;				/* input file name 		*/
 static int numbval;			/* value of an input number 	*/
 static int toksize = NAMESIZE;
 static wchar_t *tokname;	/* input token name		*/
-char *parser = NULL;		/* location of common parser 	*/
+char *parser = PARSER;		/* location of common parser 	*/
 
 static void finact(void);
 static wchar_t *cstash(wchar_t *);
@@ -998,7 +997,7 @@ defin(int t, wchar_t *s)
  *	Do not translate \\x, ANSI C.
  */
 			(void) warning(1, gettext(
-				"\\x is ANSI C hex escape"));
+			    "\\x is ANSI C hex escape"));
 			if (iswxdigit(s[i]))
 				while (iswxdigit(s[i])) {
 					int tmpval;
@@ -1029,9 +1028,9 @@ defin(int t, wchar_t *s)
  *	This message is passed to error() function.
  *	Do not translate \\xnnnnnnnn and %#x.
  */
-			    error(gettext(
-			    " \\xnnnnnnnn exceed %#x"),
-			    LWCHAR_MAX);
+				error(gettext(
+				    " \\xnnnnnnnn exceed %#x"),
+				    LWCHAR_MAX);
 			if (val == 0)
 /*
  * TRANSLATION_NOTE  -- This is a message from yacc.
@@ -1066,28 +1065,29 @@ defout()
 		if (*cp == L' ')	/* literals */
 		{
 			(void) fprintf(fdebug, "\t\"%ws\",\t%d,\n",
-				tokset[i].name + 1, tokset[i].value);
+			    tokset[i].name + 1, tokset[i].value);
 			continue;	/* was cp++ */
 		}
 
 		for (; (c = *cp) != 0; ++cp) {
 			if (iswlower(c) || iswupper(c) ||
-				iswdigit(c) || c == L'_') /* EMPTY */;
+			    iswdigit(c) || c == L'_')
+				/* EMPTY */;
 			else
 				goto nodef;
-			}
+		}
 
 		(void) fprintf(fdebug,
-			"\t\"%ws\",\t%d,\n", tokset[i].name,
-			tokset[i].value);
+		    "\t\"%ws\",\t%d,\n", tokset[i].name,
+		    tokset[i].value);
 		(void) fprintf(ftable,
-			"# define %ws %d\n", tokset[i].name,
-			tokset[i].value);
+		    "# define %ws %d\n", tokset[i].name,
+		    tokset[i].value);
 		if (fdefine != NULL)
 			(void) fprintf(fdefine,
-				"# define %ws %d\n",
-				tokset[i].name,
-				tokset[i].value);
+			    "# define %ws %d\n",
+			    tokset[i].name,
+			    tokset[i].value);
 
 	nodef:;
 	}
@@ -1128,7 +1128,7 @@ begin:
 	case L'<':  /* get, and look up, a type name (union member name) */
 		i = 0;
 		while ((c = getwc(finput)) != L'>' &&
-				c != EOF && c != L'\n') {
+		    c != EOF && c != L'\n') {
 			tokname[i] = c;
 			if (++i >= toksize)
 				exp_tokname();
@@ -1192,19 +1192,19 @@ begin:
 			numbval = c - L'0';
 			base = (c == L'0') ? 8 : 10;
 			for (c = getwc(finput);
-					iswdigit(c);
-					c = getwc(finput)) {
+			    iswdigit(c);
+			    c = getwc(finput)) {
 				numbval = numbval*base + c - L'0';
 				}
 			(void) ungetwc(c, finput);
 			return (NUMBER);
 		} else if (iswlower(c) || iswupper(c) ||
-				c == L'_' || c == L'.' ||
-				c == L'$') {
+		    c == L'_' || c == L'.' ||
+		    c == L'$') {
 			i = 0;
 			while (iswlower(c) || iswupper(c) ||
-					iswdigit(c) || c == L'_' ||
-					c == L'.' || c == L'$') {
+			    iswdigit(c) || c == L'_' ||
+			    c == L'.' || c == L'$') {
 				tokname[i] = c;
 				if (reserve && iswupper(c))
 					tokname[i] = towlower(c);
@@ -1243,8 +1243,8 @@ begin:
 		if (!wscmp(tokname, L"union"))
 			return (UNION);
 		error(gettext(
-		"invalid escape, or illegal reserved word: %ws"),
-		tokname);
+		    "invalid escape, or illegal reserved word: %ws"),
+		    tokname);
 		}
 
 	/* look ahead to distinguish IDENTIFIER from C_IDENTIFIER */
@@ -1279,9 +1279,9 @@ fdtype(int t)
 		v = TYPE(toklev[t]);
 	if (v <= 0)
 		error(gettext(
-			"must specify type for %ws"),
-			(t >= NTBASE) ? nontrst[t-NTBASE].name:
-			tokset[t].name);
+		    "must specify type for %ws"),
+		    (t >= NTBASE) ? nontrst[t-NTBASE].name:
+		    tokset[t].name);
 	return (v);
 }
 
@@ -1325,7 +1325,7 @@ cpyunion()
 	(void) fprintf(ftable, "#ifdef __cplusplus\n\tYYSTYPE\n#endif\n");
 	if (fdefine)
 		(void) fprintf(fdefine,
-			"#ifdef __cplusplus\n\tYYSTYPE\n#endif\n");
+		    "#ifdef __cplusplus\n\tYYSTYPE\n#endif\n");
 
 	level = 0;
 	for (;;) {
@@ -1467,7 +1467,8 @@ swt:
 		s = 1;
 		tok = -1;
 		argument = 1;
-		while ((c = getwc(finput)) == L' ' || c == L'\t') /* NULL */;
+		while ((c = getwc(finput)) == L' ' || c == L'\t')
+			/* NULL */;
 		if (c == L'<') { /* type description */
 			(void) ungetwc(c, finput);
 			if (gettok() != TYPENAME)
@@ -1487,7 +1488,7 @@ swt:
 				if (tok < 0)
 					tok = fdtype(*prdptr[nprod]);
 				(void) fprintf(faction,
-					".%ws", typeset[tok]);
+				    ".%ws", typeset[tok]);
 			}
 			goto loop;
 		}
@@ -1516,10 +1517,12 @@ swt:
 			else
 				id_sw = 0;
 			while ((c = getwc(finput)) == L' ' ||
-				c == L'\t') /* NULL */;
+			    c == L'\t')
+				/* NULL */;
 			if (c == L'#') {
 				while ((c = getwc(finput)) == L' ' ||
-					c == L'\t') /* NULL */;
+				    c == L'\t')
+					/* NULL */;
 				if (iswdigit(c)) {
 					m = 0;
 					while (iswdigit(c)) {
@@ -1543,7 +1546,7 @@ swt:
 				if (prdptr[nprod][i] == t)
 					if (++same == argument) {
 						(void) fprintf(faction,
-							"yypvt[-%d]", offset-i);
+						    "yypvt[-%d]", offset-i);
 						if (ntypes) {
 							if (tok < 0)
 								tok =
@@ -1568,7 +1571,7 @@ swt:
  */
 			warning(1, gettext(
 	"Illegal character '$' in Ansi C symbol: %ws$%ws."),
-				id_name, tokname);
+			    id_name, tokname);
 
 			if (id_sw == 1)
 				--nnonter;
@@ -1592,8 +1595,8 @@ swt:
  *	Do not translate $%d.
  */
 				error(gettext(
-				"Illegal use of $%d"),
-				j + offset);
+				    "Illegal use of $%d"),
+				    j + offset);
 			}
 			(void) fprintf(faction, "yypvt[-%d]", -j);
 			if (ntypes) { /* put out the proper tag */
@@ -1604,12 +1607,12 @@ swt:
  *	Do not translate $%d.
  */
 					error(gettext(
-					"must specify type of $%d"),
-					j + offset);
+					    "must specify type of $%d"),
+					    j + offset);
 				if (tok < 0)
 					tok = fdtype(prdptr[nprod][j+offset]);
 				(void) fprintf(faction,
-					".%ws", typeset[tok]);
+				    ".%ws", typeset[tok]);
 			}
 			goto swt;
 		}
@@ -1806,7 +1809,7 @@ lrprnt()	/* print out the left and right hand sides */
 				 */
 				idx2 = wslen(rhstext)*2;
 				p = m_rhs = (wchar_t *)
-					malloc((idx2 + 1)*sizeof (wchar_t));
+				    malloc((idx2 + 1)*sizeof (wchar_t));
 				if (m_rhs == NULL)
 /*
  * TRANSLATION_NOTE  -- This is a message from yacc.
@@ -1829,7 +1832,7 @@ lrprnt()	/* print out the left and right hand sides */
 						int tmp_l = idx2-1;
 						int cnt = 0;
 						while (tmp_l >= 0 &&
-						rhstext[tmp_l] == '\\') {
+						    rhstext[tmp_l] == '\\') {
 							cnt++;
 							tmp_l--;
 						}
@@ -1864,17 +1867,17 @@ static void
 beg_debug()	/* dump initial sequence for fdebug file */
 {
 	(void) fprintf(fdebug,
-		"typedef struct\n");
+	    "typedef struct\n");
 	(void) fprintf(fdebug,
-		"#ifdef __cplusplus\n\tyytoktype\n");
+	    "#ifdef __cplusplus\n\tyytoktype\n");
 	(void) fprintf(fdebug, "#endif\n{\n");
 	(void) fprintf(fdebug,
-		"#ifdef __cplusplus\nconst\n#endif\n");
+	    "#ifdef __cplusplus\nconst\n#endif\n");
 	(void) fprintf(fdebug, "char *t_name; int t_val; } yytoktype;\n");
 	(void) fprintf(fdebug,
-		"#ifndef YYDEBUG\n#\tdefine YYDEBUG\t%d", gen_testing);
+	    "#ifndef YYDEBUG\n#\tdefine YYDEBUG\t%d", gen_testing);
 	(void) fprintf(fdebug, "\t/*%sallow debugging */\n#endif\n\n",
-		gen_testing ? " " : " don't ");
+	    gen_testing ? " " : " don't ");
 	(void) fprintf(fdebug, "#if YYDEBUG\n\nyytoktype yytoks[] =\n{\n");
 }
 
@@ -1885,7 +1888,7 @@ end_toks()	/* finish yytoks array, get ready for yyred's strings */
 	(void) fprintf(fdebug, "\t\"-unknown-\",\t-1\t/* ends search */\n");
 	(void) fprintf(fdebug, "};\n\n");
 	(void) fprintf(fdebug,
-		"#ifdef __cplusplus\nconst\n#endif\n");
+	    "#ifdef __cplusplus\nconst\n#endif\n");
 	(void) fprintf(fdebug, "char * yyreds[] =\n{\n");
 	(void) fprintf(fdebug, "\t\"-no such reduction-\",\n");
 }
@@ -1910,7 +1913,7 @@ exp_tokname()
 {
 	toksize += NAMESIZE;
 	tokname = (wchar_t *)
-		realloc((char *)tokname, sizeof (wchar_t) * toksize);
+	    realloc((char *)tokname, sizeof (wchar_t) * toksize);
 }
 
 
@@ -1927,7 +1930,7 @@ exp_prod()
 	prdptr = (int **) realloc((char *)prdptr, sizeof (int *) * (nprodsz+2));
 	levprd  = (int *)  realloc((char *)levprd, sizeof (int) * (nprodsz+2));
 	had_act = (wchar_t *)
-		realloc((char *)had_act, sizeof (wchar_t) * (nprodsz+2));
+	    realloc((char *)had_act, sizeof (wchar_t) * (nprodsz+2));
 	for (i = nprodsz-NPROD; i < nprodsz+2; ++i)
 		had_act[i] = 0;
 
@@ -1983,7 +1986,7 @@ exp_nonterm()
 	nnontersz += NNONTERM;
 
 	nontrst = (NTSYMB *)
-		realloc((char *)nontrst, sizeof (TOKSYMB) * nnontersz);
+	    realloc((char *)nontrst, sizeof (TOKSYMB) * nnontersz);
 	if (nontrst == NULL)
 /*
  * TRANSLATION_NOTE  -- This is a message from yacc.
@@ -2088,5 +2091,5 @@ put_prefix_define(char *pre)
 
 	for (i = 0; syms[i]; i++)
 		fprintf(ftable, "#define\tyy%s\t%s%s\n",
-			syms[i], pre, syms[i]);
+		    syms[i], pre, syms[i]);
 }

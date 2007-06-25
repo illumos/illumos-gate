@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2005 Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/sgs/m4/i386/Makefile
 #
@@ -33,6 +31,7 @@ PROG=		m4
 XPG4PROG=	m4
 
 include 	../../../Makefile.cmd
+include		../../../sgs/Makefile.var
 
 COBJS=		m4.o  m4ext.o  m4macs.o
 
@@ -79,7 +78,7 @@ $(XPG4OBJS):	m4objs.xpg4
 m4objs m4objs.xpg4:
 		-@mkdir -p $@
 
-install:	all $(ROOTCCSBINPROG) $(ROOTXPG4PROG)
+install:	all $(VAR_SGSBINPROG) $(ROOTXPG4PROG) $(VAR_SGSCCSLINK)
 
 clean:
 		$(RM) $(ALLOBJS) $(CLEANFILES)

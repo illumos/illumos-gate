@@ -71,13 +71,20 @@ f none $SGSDIR/usr/bin/sotruss=usr/bin/sotruss 755 root bin
 f none $SGSDIR/usr/bin/whocalls=usr/bin/whocalls 755 root bin
 d none $SGSDIR/usr/ccs 755 root bin
 d none $SGSDIR/usr/ccs/bin 755 root bin
-f none $SGSDIR/usr/ccs/bin/dump=usr/ccs/bin/dump 0555 root bin
-f none $SGSDIR/usr/ccs/bin/elfdump=usr/ccs/bin/elfdump 0555 root bin
-f none $SGSDIR/usr/ccs/bin/lari=usr/ccs/bin/lari 0555 root bin
-f none $SGSDIR/usr/ccs/bin/ld=usr/ccs/bin/ld 755 root bin
-f none $SGSDIR/usr/ccs/bin/nm=usr/ccs/bin/nm 0555 root bin
-f none $SGSDIR/usr/ccs/bin/mcs=usr/ccs/bin/mcs 0555 root bin
-l none $SGSDIR/usr/ccs/bin/strip=../../../usr/ccs/bin/mcs
+f none $SGSDIR/usr/bin/dump=usr/bin/dump 0555 root bin
+s none $SGSDIR/usr/ccs/bin/dump=../../bin/dump
+f none $SGSDIR/usr/bin/elfdump=usr/bin/elfdump 0555 root bin
+s none $SGSDIR/usr/ccs/bin/elfdump=../../bin/elfdump
+f none $SGSDIR/usr/bin/lari=usr/bin/lari 0555 root bin
+s none $SGSDIR/usr/ccs/bin/lari=../../bin/lari
+f none $SGSDIR/usr/bin/ld=usr/bin/ld 755 root bin
+s none $SGSDIR/usr/ccs/bin/ld=../../bin/ld
+f none $SGSDIR/usr/bin/nm=usr/bin/nm 0555 root bin
+s none $SGSDIR/usr/ccs/bin/nm=../../bin/nm
+f none $SGSDIR/usr/bin/mcs=usr/bin/mcs 0555 root bin
+s none $SGSDIR/usr/ccs/bin/mcs=../../bin/mcs
+l none $SGSDIR/usr/bin/strip=./mcs
+s none $SGSDIR/usr/ccs/bin/strip=../../bin/strip
 d none $SGSDIR/usr/include 755 root bin
 f none $SGSDIR/usr/include/dlfcn.h=usr/include/dlfcn.h 644 root bin
 f none $SGSDIR/usr/include/libelf.h=usr/include/libelf.h 644 root bin

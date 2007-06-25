@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,9 +28,6 @@
 $(PROG): objs .WAIT $(POBJS)
 	$(LINK.c) $(POBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
-
-$(ROOTCCSBIN)/%: ../common/%
-	$(INS.file)
 
 # conditional assignment of default permissions for the installed
 # DYNLIB/DYNLIBCCC.  Set here and in Makefile.mach, instead of Makefile.lib,
@@ -75,10 +72,6 @@ $(DYNLIBCCC): pics .WAIT $$(PICS)
 	$(POST_PROCESS_SO)
 
 objs/%_w.o pics/%_w.o objs/%_e.o pics/%_e.o:	../common/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
-
-objs/%.o pics/%.o:	../../whatdir/common/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 

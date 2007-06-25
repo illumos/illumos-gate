@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,9 +46,6 @@ $(PROG):	$(OBJS) $(MAPFILE)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
 
-$(ROOTCCSBIN64)/%: %
-		$(INS.file)
-
 all:		$(PROG)
 
 clean:
@@ -57,8 +54,8 @@ clean:
 delete:
 		$(RM) $(PROG)
 
-install \
-package:	all $(ROOTCCSBINPROG)
+package \
+install:        all $(VAR_SGSBINPROG) $(VAR_SGSCCSLINK)
 
 .PARALLEL:	$(LINTOUT32) $(LINTOUT64)
 

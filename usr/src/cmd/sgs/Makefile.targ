@@ -20,12 +20,25 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
+# Standard install rules
+# The VAR_SGSBIN and VAR_SGSBIN64 install rules included here are applicable
+# to Solaris 10 and earlier releases. For post Solaris 10 releases, the 
+# standard ROOTBIN and ROOTBIN64 rules defined in ../Makefile.cmd are used.
+# The new rules here are included to allow for easier backporting. Making
+# the appropriate updates in ./Makefile.var, will allow the SGS components
+# to be installed in /usr/ccs/bin rather than the current /usr/bin.
+#
+$(VAR_SGSBIN)/%: %
+	$(INS.file)
+
+$(VAR_SGSBIN64)/%: %
+	$(INS.file)
 
 ################################################################################
 #

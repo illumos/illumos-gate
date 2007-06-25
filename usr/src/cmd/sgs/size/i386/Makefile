@@ -2,10 +2,9 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
-#
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+# 
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
@@ -22,7 +21,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1998 by Sun Microsystems, Inc.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # cmd/sgs/size/i386/Makefile
 #
@@ -64,7 +64,7 @@ $(PROG):	$(OBJS)
 		$(POST_PROCESS)
 
 package \
-install:	all $(ROOTCCSBINPROG)
+install:	all $(ROOTPROG) $(ROOTCCSBINLINK)
 
 clean:
 		$(RM) $(OBJS) $(CLEANFILES)

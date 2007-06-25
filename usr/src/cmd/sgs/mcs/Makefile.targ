@@ -20,17 +20,20 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
+ROOTSTRIPFILEPROG=      $(STRIPFILE:%=$(ROOTCCSBIN)/%)
+ROOTSTRIPFILEPROG64=    $(STRIPFILE:%=$(ROOTCCSBIN64)/%)
+
 %.o:		../common/%.c
 		$(COMPILE.c) $<
 		$(POST_PROCESS_O)
 
-all:		$(PROG)
+all:		$(PROG) $(STRIPFILE)
 
 clean:
 		$(RM) $(CLEANFILES)
@@ -38,20 +41,25 @@ clean:
 delete:
 		$(RM) $(PROG)
 
-install \
-package:	all $(ROOTCCSBINPROG) $(ROOTLINKS)
-
 lint:		$(LINTOUT32) $(SGSLINTOUT)
 
 $(PROG):	$(OBJS)
 		$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 		$(POST_PROCESS)
 
-$(ROOTLINKS):	$(ROOTCCSBINPROG)
-		$(RM) $@
-		$(LN) $(ROOTCCSBINPROG) $@
+$(STRIPFILE):
 
-$(ROOTCCSBIN64)/%: %
+$(ROOTLINKS):	$(VAR_SGSBINPROG)
+		$(RM) $@
+		$(LN) $(VAR_SGSBINPROG) $@
+
+$(STRIPSYMLINK): $(RM) $(ROOTSTRIPFILEPROG)
+		$(SYMLINK) ../../bin/$(STRIPFILE) $(ROOTSTRIPFILEPROG)
+
+$(STRIPSYMLINK64): $(RM) $(ROOTSTRIPFILEPROG64)
+		$(SYMLINK) ../../bin/$(MACH)/$(STRIPFILE) $(ROOTSTRIPFILEPROG64)
+
+$(ROOTBIN64)/%: %
 		$(INS.file)
 
 include		$(SRC)/cmd/Makefile.targ

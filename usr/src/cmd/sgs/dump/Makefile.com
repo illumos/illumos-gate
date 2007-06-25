@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,10 +37,6 @@ SRCS=		$(COMOBJS:%.o=../common/%.c)
 
 OBJS =		$(COMOBJS)
 .PARALLEL:	$(OBJS)
-
-
-ROOTCCSBIN64=		$(ROOTCCSBIN)/$(MACH64)
-ROOTCCSBINPROG64=	$(PROG:%=$(ROOTCCSBIN64)/%)
 
 CPPFLAGS +=	-D__EXTENSIONS__
 LLDFLAGS =	'$(LDPASS)-R$$ORIGIN/../../lib'

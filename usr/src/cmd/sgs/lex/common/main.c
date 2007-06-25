@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,11 +37,6 @@
 #include <limits.h>
 
 static wchar_t  L_INITIAL[] = {'I', 'N', 'I', 'T', 'I', 'A', 'L', 0};
-
-char run_directory[PATH_MAX];
-char current_work_directory[PATH_MAX];
-extern int find_run_directory(char *, char *, char *, char **, char *);
-
 static void get1core(void);
 static void free1core(void);
 static void get2core(void);
@@ -224,30 +217,14 @@ main(int argc, char **argv)
 #ifdef DEBUG
 	free3core();
 #endif
-	if (path == NULL) {
-		current_work_directory[0] = '.';
-		current_work_directory[1] = '\0';
-		if (find_run_directory(sargv[0],
-		    current_work_directory,
-		    run_directory,
-		    (char **)0,
-		    getenv("PATH")) != 0) {
-			(void) fprintf(stderr,
-			"Error in finding run directory. Using default %s\n",
-			    current_work_directory);
-			path = current_work_directory;
-		} else {
-			path = run_directory;
-		}
-	}
 
 	if (handleeuc) {
 		if (ratfor)
 			error("Ratfor is not supported by -w or -e option.");
-		(void) strcat(path, "/nceucform");
+		path = EUCNAME;
 	}
 	else
-		(void) strcat(path, ratfor ? "/nrform" : "/ncform");
+		path = ratfor ? RATNAME : CNAME;
 
 	fother = fopen(path, "r");
 	if (fother == NULL)
@@ -370,5 +347,5 @@ void
 yyerror(char *s)
 {
 	(void) fprintf(stderr,
-		"\"%s\":line %d: Error: %s\n", sargv[optind], yyline, s);
+	    "\"%s\":line %d: Error: %s\n", sargv[optind], yyline, s);
 }

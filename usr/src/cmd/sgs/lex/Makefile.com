@@ -19,15 +19,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 MACHOBJS=	main.o sub1.o sub2.o sub3.o header.o parser.o
-WHATOBJS=	whatdir.o
-POBJECTS=	$(MACHOBJS) $(WHATOBJS)
+POBJECTS=	$(MACHOBJS)
 POBJS=		$(POBJECTS:%=objs/%)
 
 LIBRARY=	libl.a
@@ -50,7 +49,6 @@ C99MODE=	$(C99_ENABLE)
 # from objects
 #
 SRCS=		$(MACHOBJS:%.o=../common/%.c) \
-		$(WHATOBJS:%.o=../../whatdir/common/%.c) \
 		$(LIBOBJS:%.o=../common/%.c)
 
 LIBS =          $(DYNLIB) $(LINTLIB)
@@ -77,9 +75,10 @@ LINTFLAGS=	-ax
 LINTPOUT=	lintp.out
 
 $(LINTLIB):=	LINTFLAGS = -nvx
-$(ROOTCCSBINPROG):= FILEMODE = 0555
+$(ROOTPROG):=	FILEMODE = 0555
 
-ROOTFORMS=	$(FORMS:%=$(ROOTCCSBIN)/%)
+ROOTFORMS=	$(FORMS:%=$(ROOTSHLIBCCS)/%)
+
 ROOTLINTDIR=	$(ROOTLIBDIR)
 ROOTLINT=	$(LINTSRCS:../common/%=$(ROOTLINTDIR)/%)
 

@@ -6769,6 +6769,17 @@ mondo_loop() {
 	rm -f $root/usr/include/sys/i2o/*
 	rmdir $root/usr/include/sys/i2o/ 2>/dev/null
 
+	#
+	# Remove /usr/ccs/bin dependency files that now live in
+	# /usr/share/lib/ccs
+	#
+	rm -f $usr/ccs/bin/gprof.callg.blurb
+	rm -f $usr/ccs/bin/gprof.flat.blurb
+	rm -f $usr/ccs/bin/nceucform
+	rm -f $usr/ccs/bin/ncform
+	rm -f $usr/ccs/bin/nrform
+	rm -f $usr/ccs/bin/yaccpar
+
 	# End of pre-archive extraction hacks.
 
 	if [ $diskless = no -a $zone = global ]; then

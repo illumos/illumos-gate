@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +32,6 @@
 #include <stdlib.h>
 #include "gprof.h"
 
-extern int find_run_directory(char *, char *, char *, char **, char *);
 void print_demangled_name(int, nltype *);
 void striped_name(char *, nltype **);
 
@@ -852,23 +850,10 @@ printblurb(char *blurbname)
 {
 	FILE	*blurbfile;
 	int	input;
-	char	blurb_directory[MAXPATHLEN];
-	char	cwd[MAXPATHLEN];
 
-	cwd[0] = '.';
-	cwd[1] = '\0';
-
-	if (find_run_directory(prog_name, cwd, blurb_directory,
-	    NULL, getenv("PATH")) != 0) {
-		(void) fprintf(stderr, "Error in finding run directory.");
-		return;
-	} else {
-		(void) strcat(blurb_directory, blurbname);
-	}
-
-	blurbfile = fopen(blurb_directory, "r");
+	blurbfile = fopen(blurbname, "r");
 	if (blurbfile == NULL) {
-		perror(blurb_directory);
+		perror(blurbname);
 		return;
 	}
 
@@ -929,7 +914,7 @@ does_clash(nltype **nlp, int ndx, int nnames)
 	 * same as next (if there's one) ?
 	 */
 	if ((ndx < (nnames - 1)) &&
-			    (strcmp(nlp[ndx]->name, nlp[ndx+1]->name) == 0)) {
+	    (strcmp(nlp[ndx]->name, nlp[ndx+1]->name) == 0)) {
 		return (TRUE);
 	}
 
@@ -972,7 +957,7 @@ printindex()
 	for (mi = &modules; mi; mi = mi->next) {
 		for (index = 0; index < mi->nname; index++) {
 			if (zflag == 0 && (mi->nl[index]).ncall == 0 &&
-						(mi->nl[index]).time == 0) {
+			    (mi->nl[index]).time == 0) {
 				continue;
 			}
 
@@ -1019,18 +1004,18 @@ printindex()
 
 				if (j < nnames) {
 					if (does_clash(namesortnlp,
-								j, nnames)) {
+					    j, nnames)) {
 						(void) printf(
 						    "%6.6s %*d:%-*.*s",
-							peterbuffer,
-							IDFMT(nlp->module->id),
-							nlp->module->id,
-							NMFMT(nlp->module->id),
-							NMFMT(nlp->module->id),
-							nlp->name);
+						    peterbuffer,
+						    IDFMT(nlp->module->id),
+						    nlp->module->id,
+						    NMFMT(nlp->module->id),
+						    NMFMT(nlp->module->id),
+						    nlp->name);
 					} else {
-						(void) printf("%6.6s %-19.19s",
-						    peterbuffer, nlp->name);
+					(void) printf("%6.6s %-19.19s",
+					    peterbuffer, nlp->name);
 					}
 				} else {
 					(void) printf("%6.6s ", peterbuffer);

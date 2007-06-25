@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,10 +37,6 @@ i386_ARCH =	$(VAR_I386_ARCH)
 sparc_ARCH =	sparc
 
 ARCH =		$($(MACH)_ARCH)
-
-ROOTCCSBIN64 =	$(ROOTCCSBIN)/$(MACH64)
-ROOTCCSBINPROG64 = \
-		$(PROG:%=$(ROOTCCSBIN64)/%)
 
 # Establish any global flags.
 

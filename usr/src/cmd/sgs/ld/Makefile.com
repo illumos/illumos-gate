@@ -68,9 +68,6 @@ SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n ld_msg
 SRCS=		$(MACHOBJS:%.o=%.c)  $(COMOBJS:%.o=../common/%.c)  $(BLTDATA)
 LINTSRCS=	$(SRCS) ../common/lintsup.c
 
-ROOTCCSBIN=	$(ROOT)/usr/ccs/bin
-ROOTCCSBINPROG=	$(PROG:%=$(ROOTCCSBIN)/%)
-
 CLEANFILES +=	$(BLTFILES)
 
 FILEMODE=	0755

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,11 +107,6 @@ static int *pempty;		/* vector of nonterminals nontrivially	*/
 				/* deriving e				*/
 extern int nprodsz;
 
-static char *sav_argv0;
-char run_directory[MAXPATHLEN];
-char current_work_directory[MAXPATHLEN];
-extern int find_run_directory(char *, char *, char *, char **, char *);
-
 int
 main(int argc, char *argv[])
 {
@@ -122,7 +116,6 @@ main(int argc, char *argv[])
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	sav_argv0 = argv[0];
 	setup(argc, argv); 		/* initialize and read productions */
 	TBITSET = NWORDS(ntoksz*LKFACTOR);
 	tbitset = NWORDS(ntokens*LKFACTOR);
@@ -176,7 +169,7 @@ mktbls()
 	 */
 #define	INIT_LSIZE	nnontersz*LKFACTOR
 	tmp_lset = (int *)
-		calloc((size_t)(TBITSET * (INIT_LSIZE+1)), sizeof (int));
+	    calloc((size_t)(TBITSET * (INIT_LSIZE+1)), sizeof (int));
 	if (tmp_lset == NULL)
 /*
  * TRANSLATION_NOTE  -- This is a message from yacc.
@@ -198,7 +191,7 @@ mktbls()
 	 * For wsets
 	 */
 	tmp_lset = (int *)
-		calloc((size_t)(TBITSET * (nnontersz+1)), sizeof (int));
+	    calloc((size_t)(TBITSET * (nnontersz+1)), sizeof (int));
 	if (tmp_lset == NULL)
 		error(gettext(
 		"could not allocate lookset array"));
@@ -251,30 +244,6 @@ others()
 	int c, i, j;
 	int tmpline;
 
-	/* This  routine has been "stolen" from the driver */
-	if (parser == NULL) {
-		current_work_directory[0] = '.';
-		current_work_directory[1] = '\0';
-		if (find_run_directory(sav_argv0,
-				current_work_directory,
-				run_directory,
-				(char **)0,
-				getenv("PATH")) != 0) {
-/*
- * TRANSLATION_NOTE  -- This is a message from yacc.
- *	This message is passed to warning() function.
- *	This warning is issued when yacc could not find
- *	the directory where the parser is.
- */
-			(void) warning(0, gettext(
-			"Error in finding run directory. Using default"));
-			parser = PARSER;
-		} else {
-			strcat(run_directory, "/yaccpar");
-			parser = run_directory;
-		}
-	}
-
 	finput = fopen(parser, "r");
 	if (finput == NULL)
 /*
@@ -285,7 +254,7 @@ others()
  */
 		error(gettext(
 		"cannot find parser %s"),
-		parser);
+		    parser);
 
 	warray(L"yyr1", levprd, nprod);
 
@@ -342,9 +311,9 @@ others()
 				(void) fclose(faction);
 				if (gen_lines)
 					fprintf(ftable,
-						"\n# line\t%d \"%s\"",
-						tmpline,
-						parser);
+					    "\n# line\t%d \"%s\"",
+					    tmpline,
+					    parser);
 				ZAPFILE(ACTNAME);
 				c = getwc(finput);
 			}
@@ -462,31 +431,31 @@ summary()
 {
 	if (foutput != NULL) {
 		(void) fprintf(foutput,
-			"\n%d/%d terminals, %d/%d nonterminals\n",
-			ntokens, ntoksz, nnonter, nnontersz);
+		    "\n%d/%d terminals, %d/%d nonterminals\n",
+		    ntokens, ntoksz, nnonter, nnontersz);
 		(void) fprintf(foutput,
-			"%d/%d grammar rules, %d/%d states\n",
-			nprod, nprodsz, nstate, nstatesz);
+		    "%d/%d grammar rules, %d/%d states\n",
+		    nprod, nprodsz, nstate, nstatesz);
 		(void) fprintf(foutput,
 		"%d shift/reduce, %d reduce/reduce conflicts reported\n",
-			zzsrconf, zzrrconf);
+		    zzsrconf, zzrrconf);
 		(void) fprintf(foutput,
-			"%d/%d working sets used\n", zzcwp, wsetsz);
+		    "%d/%d working sets used\n", zzcwp, wsetsz);
 		(void) fprintf(foutput,
-			"memory: states,etc. %" PRIdPTR
-			"/%d, parser %" PRIdPTR "/%d\n",
-			mem-tracemem, new_memsize,
-			memp-amem, new_actsize);
+		    "memory: states,etc. %" PRIdPTR
+		    "/%d, parser %" PRIdPTR "/%d\n",
+		    mem-tracemem, new_memsize,
+		    memp-amem, new_actsize);
 		(void) fprintf(foutput,
-			"%d/%d distinct lookahead sets\n", nlset, lsetsize);
+		    "%d/%d distinct lookahead sets\n", nlset, lsetsize);
 		(void) fprintf(foutput,
-			"%d extra closures\n", zzclose - 2*nstate);
+		    "%d extra closures\n", zzclose - 2*nstate);
 		(void) fprintf(foutput,
-			"%d shift entries, %d exceptions\n", zzacent, zzexcp);
+		    "%d shift entries, %d exceptions\n", zzacent, zzexcp);
 		(void) fprintf(foutput,
-			"%d goto entries\n", zzgoent);
+		    "%d goto entries\n", zzgoent);
 		(void) fprintf(foutput,
-			"%d entries saved by goto default\n", zzgobest);
+		    "%d entries saved by goto default\n", zzgobest);
 	}
 	if (zzsrconf != 0 || zzrrconf != 0) {
 /*
@@ -497,7 +466,7 @@ summary()
  *	this message means in English.
  */
 		(void) fprintf(stderr, gettext(
-			"\nconflicts: "));
+		    "\nconflicts: "));
 		if (zzsrconf)
 			(void) fprintf(stderr, "%d shift/reduce", zzsrconf);
 		if (zzsrconf && zzrrconf)
@@ -530,7 +499,7 @@ error(char *s, ...)
  *	passed to error() function.
  */
 		(void) fprintf(stderr, gettext(
-			"command line: fatal: "));
+		    "command line: fatal: "));
 	else {
 		(void) fprintf(stderr, "\"%s\", ", infile);
 /*
@@ -539,8 +508,8 @@ error(char *s, ...)
  *	passed to error() function.
  */
 		(void) fprintf(stderr, gettext(
-			"line %d: fatal: "),
-			lineno);
+		    "line %d: fatal: "),
+		    lineno);
 	}
 	(void) vfprintf(stderr, s, ap);
 	(void) fprintf(stderr, "\n");
@@ -572,7 +541,7 @@ warning(int flag, char *s, ...)
  *	passed to warning() function.
  */
 		(void) fprintf(stderr, gettext(
-			"warning: "));
+		    "warning: "));
 	else
 /*
  * TRANSLATION_NOTE  -- This is a message from yacc.
@@ -580,8 +549,8 @@ warning(int flag, char *s, ...)
  *	passed to warning() function.
  */
 		(void) fprintf(stderr, gettext(
-			"line %d: warning: "),
-			lineno);
+		    "line %d: warning: "),
+		    lineno);
 	(void) vfprintf(stderr, s, ap);
 	(void) fprintf(stderr, "\n");
 	va_end(ap);
@@ -687,7 +656,7 @@ cpres()
  */
 			error(gettext(
 			"undefined nonterminal: %ws"),
-			nontrst[i].name);
+			    nontrst[i].name);
 		}
 	}
 	pres[i] = ptrpy;
@@ -708,7 +677,7 @@ cpres()
  */
 		error(gettext(
 		"internal Yacc error: pyield %d"),
-		ptrpy-&pyield[nprod]);
+		    ptrpy-&pyield[nprod]);
 }
 
 static int indebug = 0;
@@ -745,7 +714,7 @@ cpfir()
 			for (s = pres[i]; s < t; ++s) {
 				for (p = *s; (ch = (*p-NTBASE)) >= 0; ++p) {
 					changes |= setunion(wsets[i].ws.lset,
-							wsets[ch].ws.lset);
+					    wsets[ch].ws.lset);
 					if (!pempty[ch])
 						break;
 				}
@@ -794,8 +763,7 @@ state(int c)
 	size1 = p2 - p1; /* size of state */
 
 	for (i = (c >= NTBASE) ? ntstates[c-NTBASE] : tstates[c];
-			i != 0;
-			i = mstates[i]) {
+	    i != 0; i = mstates[i]) {
 		/* get ith state */
 		q1 = pstate[i];
 		q2 = pstate[i+1];
@@ -933,7 +901,7 @@ cempty()
  */
 			error(gettext(
 			"nonterminal %ws never derives any token string"),
-			nontrst[i].name);
+			    nontrst[i].name);
 		}
 	}
 
@@ -958,8 +926,8 @@ again:
 		/* not known to be empty */
 		if (pempty[*prdptr[i]-NTBASE] == WHOKNOWS) {
 			for (p = prdptr[i]+1;
-				*p >= NTBASE && pempty[*p-NTBASE] == EMPTY;
-				++p);
+			    *p >= NTBASE && pempty[*p-NTBASE] == EMPTY; ++p)
+				/* EMPTY */;
 			/* we have a nontrivially empty nonterminal */
 			if (*p < 0) {
 				pempty[*prdptr[i]-NTBASE] = EMPTY;
@@ -1028,8 +996,8 @@ stagen()
 			NTLOOP(j) {
 				if (temp1[j])
 					(void) fprintf(foutput,
-						"%ws %d, ", nontrst[j].name,
-						temp1[j]);
+					    "%ws %d, ", nontrst[j].name,
+					    temp1[j]);
 			}
 			(void) fprintf(foutput, "\n");
 		}
@@ -1105,13 +1073,13 @@ closure(int i)
 						}
 						/* nonterminal symbol */
 						(void) setunion(clset.lset,
-						pfirst[ch-NTBASE]->lset);
+						    pfirst[ch-NTBASE]->lset);
 						if (!pempty[ch-NTBASE])
 							break;
 					}
 					if (ch <= 0)
 						(void) setunion(clset.lset,
-								v->ws.lset);
+						    v->ws.lset);
 				}
 			}
 
@@ -1128,7 +1096,7 @@ closure(int i)
 						if (nolook)
 							goto nexts;
 						if (setunion(v->ws.lset,
-							clset.lset))
+						    clset.lset))
 							v->flag = work = 1;
 						goto nexts;
 					}
@@ -1144,7 +1112,7 @@ closure(int i)
 					work = 1;
 					SETLOOP(k)
 						wsets[cwp].ws.lset[k] =
-							clset.lset[k];
+						    clset.lset[k];
 				}
 				WSBUMP(cwp);
 				nexts:;
@@ -1210,7 +1178,7 @@ exp_lkst()
 	lookbase = lkst;
 	lsetsize += LSETSIZE;
 	tmp_lset = (int *)
-		calloc((size_t)(TBITSET * (lsetsize-LSETSIZE)), sizeof (int));
+	    calloc((size_t)(TBITSET * (lsetsize-LSETSIZE)), sizeof (int));
 	if (tmp_lset == NULL)
 /*
  * TRANSLATION_NOTE  -- This is a message from yacc.
@@ -1254,7 +1222,7 @@ exp_wsets()
 
 	wsetsz += WSETSIZE;
 	tmp_lset = (int *)
-		calloc((size_t)(TBITSET * (wsetsz-WSETSIZE)), sizeof (int));
+	    calloc((size_t)(TBITSET * (wsetsz-WSETSIZE)), sizeof (int));
 	if (tmp_lset == NULL)
 /*
  * TRANSLATION_NOTE  -- This is a message from yacc.
@@ -1290,14 +1258,14 @@ exp_states()
 	nstatesz += NSTATES;
 
 	pstate = (ITEM **)
-		realloc((char *)pstate, sizeof (ITEM *)*(nstatesz+2));
+	    realloc((char *)pstate, sizeof (ITEM *)*(nstatesz+2));
 	mstates = (int *)realloc((char *)mstates, sizeof (int)*nstatesz);
 	defact = (int *)realloc((char *)defact, sizeof (int)*nstatesz);
 	tystate = (int *)realloc((char *)tystate, sizeof (int)*nstatesz);
 	indgo = (int *)realloc((char *)indgo, sizeof (int)*nstatesz);
 
 	if ((*pstate == NULL) || (tystate == NULL) || (defact == NULL) ||
-		(indgo == NULL) || (mstates == NULL))
+	    (indgo == NULL) || (mstates == NULL))
 /*
  * TRANSLATION_NOTE  -- This is a message from yacc.
  *	This message is passed to error() function.

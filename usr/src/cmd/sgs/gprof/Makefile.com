@@ -2,10 +2,9 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
-#
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
 # See the License for the specific language governing permissions
@@ -22,7 +21,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/sgs/gprof/Makefile.com
@@ -32,12 +31,10 @@ include 	../../../Makefile.cmd
 
 COMOBJS=	gprof.o arcs.o dfn.o lookup.o calls.o \
 		printgprof.o printlist.o readelf.o
-WHATOBJS=	whatdir.o
 
-OBJS=		$(COMOBJS) $(WHATOBJS)
+OBJS=		$(COMOBJS)
 BLURBS=		gprof.callg.blurb gprof.flat.blurb
-SRCS=		$(COMOBJS:%.o=../common/%.c) \
-		$(WHATOBJS:%.o=../../whatdir/common/%.c)
+SRCS=		$(COMOBJS:%.o=../common/%.c)
 
 INCLIST=	-I../common -I../../include -I../../include/$(MACH)
 DEFLIST=	-DELF_OBJ -DELF
@@ -48,16 +45,10 @@ LDLIBS +=	../../sgsdemangler/`mach`/libdemangle.a
 LINTFLAGS +=	$(LDLIBS)
 CLEANFILES +=	$(LINTOUT)
 
-ROOTCCSBLURB=	$(BLURBS:%=$(ROOTCCSBIN)/%)
+ROOTLIBBLURB=	$(BLURBS:%=$(ROOTSHLIBCCS)/%)
 
-$(ROOTCCSBLURB) :=	FILEMODE=	444
-
-$(ROOTCCSBIN)/%: ../common/%
-		$(INS.file)
+$(ROOTLIBBLURB) :=	FILEMODE=	444
 
 %.o:		../common/%.c
-		$(COMPILE.c) $<
-
-%.o:		../../whatdir/common/%.c
 		$(COMPILE.c) $<
 .PARALLEL: $(OBJS)
