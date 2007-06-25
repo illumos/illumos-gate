@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -172,7 +172,7 @@ extern void cmd_mem_case_restore(fmd_hdl_t *, cmd_case_t *, fmd_case_t *,
 extern char *cmd_mem_serdnm_create(fmd_hdl_t *, const char *, const char *);
 extern char *cmd_page_serdnm_create(fmd_hdl_t *, const char *, uint64_t);
 extern void cmd_mem_retirestat_create(fmd_hdl_t *, fmd_stat_t *, const char *,
-    uint64_t);
+    uint64_t, const char *);
 extern int cmd_mem_thresh_check(fmd_hdl_t *, uint_t);
 extern ulong_t cmd_mem_get_phys_pages(fmd_hdl_t *);
 

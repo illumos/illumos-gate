@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -97,11 +97,23 @@ cmd_mem_case_restore(fmd_hdl_t *hdl, cmd_case_t *cc, fmd_case_t *cp,
 
 void
 cmd_mem_retirestat_create(fmd_hdl_t *hdl, fmd_stat_t *st, const char *unum,
-    uint64_t value)
+    uint64_t value, const char *prefix)
 {
 	char *c;
 
-	(void) snprintf(st->fmds_name, sizeof (st->fmds_name), "r%s", unum);
+	/*
+	 * Prior to Niagara-2, every bank had to have at least two dimms; it
+	 * was therefore impossible for the retirestat of a bank to ever have
+	 * the same name (strcmp() == 0) as that of a dimm.
+	 *
+	 * Niagara-2 and VF, in "single channel mode" , retrieve an entire
+	 * cache line from a single dimm.  We therefore use a different
+	 * prefix to name the bank retirestat vs. the dimm retirestat,
+	 * or else the DE will abort trying to register a duplicate stat name
+	 * with fmd.
+	 */
+	(void) snprintf(st->fmds_name, sizeof (st->fmds_name), "%s%s",
+	    prefix, unum);
 	(void) snprintf(st->fmds_desc, sizeof (st->fmds_desc),
 	    "retirements for %s", unum);
 	st->fmds_type = FMD_TYPE_UINT64;

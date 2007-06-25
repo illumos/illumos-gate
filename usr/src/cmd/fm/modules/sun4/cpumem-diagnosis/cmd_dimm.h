@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,6 +85,8 @@ extern "C" {
 #define	CMD_DIMM_VERSION	CMD_DIMM_VERSION_1
 
 #define	CMD_DIMM_VERSIONED(dimm)	((dimm)->dimm_version & 1)
+
+#define	CMD_DIMM_STAT_PREFIX		"d"	/* d = dimm */
 
 typedef struct cmd_dimm_0 {
 	cmd_header_t dimm0_header;	/* Nodetype must be CMD_NT_DIMM */

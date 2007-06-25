@@ -208,7 +208,8 @@ cmd_dimm_create(fmd_hdl_t *hdl, nvlist_t *asru)
 
 	dimm_attach_to_bank(hdl, dimm);
 
-	cmd_mem_retirestat_create(hdl, &dimm->dimm_retstat, dimm->dimm_unum, 0);
+	cmd_mem_retirestat_create(hdl, &dimm->dimm_retstat, dimm->dimm_unum, 0,
+	    CMD_DIMM_STAT_PREFIX);
 
 	cmd_list_append(&cmd.cmd_dimms, dimm);
 	cmd_dimm_dirty(hdl, dimm);
@@ -352,7 +353,7 @@ cmd_dimm_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 		dimm_attach_to_bank(hdl, dimm);
 
 		cmd_mem_retirestat_create(hdl, &dimm->dimm_retstat,
-		    dimm->dimm_unum, dimm->dimm_nretired);
+		    dimm->dimm_unum, dimm->dimm_nretired, CMD_DIMM_STAT_PREFIX);
 
 		cmd_list_append(&cmd.cmd_dimms, dimm);
 	}
