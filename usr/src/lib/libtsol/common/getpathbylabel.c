@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,13 +118,17 @@ static void
 tsol_mlist_free(struct mntlist *mlist)
 {
 	struct mntlist *mlp;
+	struct mntlist *oldmlp;
 
-	for (mlp = mlist; mlp; mlp = mlp->mntl_next) {
+	mlp = mlist;
+	while (mlp) {
 		struct mnttab *mnt = mlp->mntl_mnt;
 
 		if (mnt)
 			tsol_mnt_free(mnt);
-		free(mlp);
+		oldmlp = mlp;
+		mlp = mlp->mntl_next;
+		free(oldmlp);
 	}
 }
 
@@ -338,42 +342,42 @@ getnfspathbyautofs(struct mntlist *mlist, zoneid_t zoneid,
 	}
 }
 
-	/*
-	 * Find the pathname for the entry in mlist that corresponds to the
-	 * file named by path (i.e., that names a mount table entry for the
-	 * file system in which path lies).
-	 *
-	 * Return 0 is there an error.
-	 */
-	static int
-	getglobalpath(const char *path, zoneid_t zoneid, struct mntlist *mlist,
-	    char *globalpath)
-	{
-		struct mntlist *mlp;
-		char		lofspath[MAXPATHLEN];
-		char		zonepath[MAXPATHLEN];
-		int		longestmatch;
-		struct	mnttab	*mountmatch;
+/*
+ * Find the pathname for the entry in mlist that corresponds to the
+ * file named by path (i.e., that names a mount table entry for the
+ * file system in which path lies).
+ *
+ * Return 0 is there an error.
+ */
+static int
+getglobalpath(const char *path, zoneid_t zoneid, struct mntlist *mlist,
+    char *globalpath)
+{
+	struct mntlist *mlp;
+	char		lofspath[MAXPATHLEN];
+	char		zonepath[MAXPATHLEN];
+	int		longestmatch;
+	struct	mnttab	*mountmatch;
 
-		if (zoneid != GLOBAL_ZONEID) {
-			char	*prefix;
+	if (zoneid != GLOBAL_ZONEID) {
+		char	*prefix;
 
-			if ((prefix = getzonerootbyid(zoneid)) == NULL) {
-				return (0);
-			}
-			(void) strncpy(zonepath, prefix, MAXPATHLEN);
-			(void) strlcpy(globalpath, prefix, MAXPATHLEN);
-			(void) strlcat(globalpath, path, MAXPATHLEN);
-			free(prefix);
-		} else {
-			(void) strlcpy(globalpath, path, MAXPATHLEN);
+		if ((prefix = getzonerootbyid(zoneid)) == NULL) {
+			return (0);
 		}
+		(void) strncpy(zonepath, prefix, MAXPATHLEN);
+		(void) strlcpy(globalpath, prefix, MAXPATHLEN);
+		(void) strlcat(globalpath, path, MAXPATHLEN);
+		free(prefix);
+	} else {
+		(void) strlcpy(globalpath, path, MAXPATHLEN);
+	}
 
-		for (;;) {
-			longestmatch = 0;
-			for (mlp = mlist; mlp; mlp = mlp->mntl_next) {
-				struct mnttab *mnt = mlp->mntl_mnt;
-				int	len;
+	for (;;) {
+		longestmatch = 0;
+		for (mlp = mlist; mlp; mlp = mlp->mntl_next) {
+			struct mnttab *mnt = mlp->mntl_mnt;
+			int	len;
 
 			if (subpath(globalpath, mnt->mnt_mountp) != 0)
 				continue;
@@ -460,7 +464,8 @@ getnfspathbyautofs(struct mntlist *mlist, zoneid_t zoneid,
  */
 char *
 getpathbylabel(const char *path_name, char *resolved_path, size_t bufsize,
-    const bslabel_t *sl) {
+    const bslabel_t *sl)
+{
 	char		ret_path[MAXPATHLEN];	/* pathname to return */
 	zoneid_t	zoneid;
 	struct mntlist *mlist;
