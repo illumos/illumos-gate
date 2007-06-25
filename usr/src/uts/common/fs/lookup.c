@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -213,6 +212,7 @@ lookuppnvp(
 	vnode_t *startvp;
 	vnode_t *zonevp = curproc->p_zone->zone_rootvp;		/* zone root */
 	int must_be_directory = 0;
+	boolean_t retry_with_kcred = B_FALSE;
 
 	CPU_STATS_ADDQ(CPU, sys, namei, 1);
 	nlink = 0;
@@ -325,6 +325,15 @@ checkforroot:
 			vfs_unlock(vfsp);
 			VN_RELE(cvp);
 			cvp = NULL;
+			/*
+			 * Crossing mount points. For eg: We are doing
+			 * a lookup of ".." for file systems root vnode
+			 * mounted here, and VOP_LOOKUP() (with covered vnode)
+			 * will be on underlying file systems mount point
+			 * vnode. Set retry_with_kcred flag as we might end
+			 * up doing VOP_LOOKUP() with kcred if required.
+			 */
+			retry_with_kcred = B_TRUE;
 			goto checkforroot;
 		}
 	}
@@ -344,7 +353,26 @@ checkforroot:
 	 * Perform a lookup in the current directory.
 	 */
 	error = VOP_LOOKUP(vp, component, &tvp, pnp, lookup_flags,
-		rootvp, cr);
+	    rootvp, cr);
+
+	/*
+	 * Retry with kcred - If crossing mount points & error is EACCES.
+	 *
+	 * If we are crossing mount points here and doing ".." lookup,
+	 * VOP_LOOKUP() might fail if the underlying file systems
+	 * mount point has no execute permission. In cases like these,
+	 * we retry VOP_LOOKUP() by giving as much privilage as possible
+	 * by passing kcred credentials.
+	 *
+	 * In case of hierarchical file systems, passing kcred still may
+	 * or may not work.
+	 * For eg: UFS FS --> Mount NFS FS --> Again mount UFS on some
+	 *			directory inside NFS FS.
+	 */
+	if ((error == EACCES) && retry_with_kcred)
+		error = VOP_LOOKUP(vp, component, &tvp, pnp, lookup_flags,
+		    rootvp, zone_kcred());
+
 	cvp = tvp;
 	if (error) {
 		cvp = NULL;
@@ -525,7 +553,7 @@ checkforroot:
 #ifdef C2_AUDIT
 				if (audit_active)
 					(void) audit_savepath(pnp, cvp,
-						EINVAL, cr);
+					    EINVAL, cr);
 #endif
 				pn_setlast(pnp);
 				VN_RELE(vp);
