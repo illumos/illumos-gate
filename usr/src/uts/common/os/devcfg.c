@@ -2184,6 +2184,10 @@ find_child_by_addr(dev_info_t *pdip, char *caddr)
 {
 	dev_info_t	*dip;
 
+	/* return NULL if called without a unit-address */
+	if ((caddr == NULL) || (*caddr == '\0'))
+		return (NULL);
+
 	/* attempt search without changing state of preceding siblings */
 	dip = find_sibling(ddi_get_child(pdip), NULL, caddr,
 	    FIND_NODE_BY_ADDR, NULL);
