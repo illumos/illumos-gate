@@ -152,9 +152,8 @@ typedef struct {
  * Driver chip operation parameters
  */
 #define	RGE_CYCLIC_PERIOD	(1000000000)	/* ~1s */
-#define	RGE_LINK_SETTLE_TIME	(20000000000)	/* ~20.0s */
 #define	CHIP_RESET_LOOP		1000
-#define	PHY_RESET_LOOP		1000
+#define	PHY_RESET_LOOP		10
 #define	STATS_DUMP_LOOP		1000
 #define	RXBUFF_FREE_LOOP	1000
 #define	RGE_RX_INT_TIME		128

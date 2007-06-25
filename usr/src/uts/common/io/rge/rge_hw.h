@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,10 +44,12 @@ extern "C" {
  * Driver support device
  */
 #define	VENDOR_ID_REALTECK		0x10EC
-#define	DEVICE_ID_8169			0x8169
-#define	DEVICE_ID_8110			0x8110
-#define	DEVICE_ID_8168			0x8168
-#define	DEVICE_ID_8111			0x8111
+#define	DEVICE_ID_8169			0x8169	/* PCI */
+#define	DEVICE_ID_8110			0x8169	/* PCI */
+#define	DEVICE_ID_8168			0x8168	/* PCI-E */
+#define	DEVICE_ID_8111			0x8168	/* PCI-E */
+#define	DEVICE_ID_8169SC		0x8167	/* PCI */
+#define	DEVICE_ID_8110SC		0x8167	/* PCI */
 
 #define	RGE_REGISTER_MAX		0x0100
 
@@ -163,6 +165,7 @@ extern "C" {
 #define	MAC_VER_8169S_D			0x00800000
 #define	MAC_VER_8169S_E			0x04000000
 #define	MAC_VER_8169SB			0x10000000
+#define	MAC_VER_8169SC			0x18000000
 #define	MAC_VER_8168			0x20000000
 #define	MAC_VER_8168B_B			0x30000000
 #define	MAC_VER_8168B_C			0x38000000
@@ -440,12 +443,15 @@ extern "C" {
 #define	PHY_GBESR_REG			0x0f
 
 #define	PHY_1F_REG			0x1f
+#define	PHY_1D_REG			0x1d
 #define	PHY_1C_REG			0x1c
 #define	PHY_1B_REG			0x1b
 #define	PHY_18_REG			0x18
 #define	PHY_15_REG			0x15
+#define	PHY_13_REG			0x13
 #define	PHY_12_REG			0x12
 #define	PHY_0E_REG			0x0e
+#define	PHY_0C_REG			0x0c
 #define	PHY_0B_REG			0x0b
 
 /*

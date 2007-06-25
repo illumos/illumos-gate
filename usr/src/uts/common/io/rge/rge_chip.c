@@ -255,7 +255,7 @@ rge_mii_get16(rge_t *rgep, uintptr_t mii)
 	 * Waiting for PHY reading OK
 	 */
 	for (i = 0; i < PHY_RESET_LOOP; i++) {
-		drv_usecwait(100);
+		drv_usecwait(1000);
 		val32 = rge_reg_get32(rgep, PHY_ACCESS_REG);
 		if (val32 & PHY_ACCESS_WR_FLAG)
 			return ((uint16_t)(val32 & 0xffff));
@@ -284,7 +284,7 @@ rge_mii_put16(rge_t *rgep, uintptr_t mii, uint16_t data)
 	 * Waiting for PHY writing OK
 	 */
 	for (i = 0; i < PHY_RESET_LOOP; i++) {
-		drv_usecwait(100);
+		drv_usecwait(1000);
 		val32 = rge_reg_get32(rgep, PHY_ACCESS_REG);
 		if (!(val32 & PHY_ACCESS_WR_FLAG))
 			return;
@@ -312,7 +312,7 @@ rge_ephy_put16(rge_t *rgep, uintptr_t emii, uint16_t data)
 	 * Waiting for PHY writing OK
 	 */
 	for (i = 0; i < PHY_RESET_LOOP; i++) {
-		drv_usecwait(100);
+		drv_usecwait(1000);
 		val32 = rge_reg_get32(rgep, EPHY_ACCESS_REG);
 		if (!(val32 & EPHY_ACCESS_WR_FLAG))
 			return;
@@ -450,7 +450,7 @@ rge_phy_reset(rge_t *rgep)
 	 */
 	control = rge_mii_get16(rgep, MII_CONTROL);
 	rge_mii_put16(rgep, MII_CONTROL, control | MII_CONTROL_RESET);
-	for (count = 0; ++count < 1000; ) {
+	for (count = 0; count < 5; count++) {
 		drv_usecwait(100);
 		control = rge_mii_get16(rgep, MII_CONTROL);
 		if (BIC(control, MII_CONTROL_RESET))
@@ -715,6 +715,22 @@ rge_phy_init(rge_t *rgep)
 		rge_mii_put16(rgep, PHY_1F_REG, 0x0000);
 		break;
 
+	case MAC_VER_8169SC:
+		rge_mii_put16(rgep, PHY_1F_REG, 0x0001);
+		rge_mii_put16(rgep, PHY_ANER_REG, 0x0078);
+		rge_mii_put16(rgep, PHY_ANNPRR_REG, 0x05dc);
+		rge_mii_put16(rgep, PHY_GBCR_REG, 0x2672);
+		rge_mii_put16(rgep, PHY_GBSR_REG, 0x6a14);
+		rge_mii_put16(rgep, PHY_0B_REG, 0x7cb0);
+		rge_mii_put16(rgep, PHY_0C_REG, 0xdb80);
+		rge_mii_put16(rgep, PHY_1B_REG, 0xc414);
+		rge_mii_put16(rgep, PHY_1C_REG, 0xef03);
+		rge_mii_put16(rgep, PHY_1D_REG, 0x3dc8);
+		rge_mii_put16(rgep, PHY_1F_REG, 0x0003);
+		rge_mii_put16(rgep, PHY_13_REG, 0x0600);
+		rge_mii_put16(rgep, PHY_1F_REG, 0x0000);
+		break;
+
 	case MAC_VER_8168:
 		rge_mii_put16(rgep, PHY_1F_REG, 0x0001);
 		rge_mii_put16(rgep, PHY_ANER_REG, 0x00aa);
@@ -778,8 +794,18 @@ rge_chip_ident(rge_t *rgep)
 
 	/* set pci latency timer */
 	if (chip->mac_ver == MAC_VER_8169 ||
-	    chip->mac_ver == MAC_VER_8169S_D)
+	    chip->mac_ver == MAC_VER_8169S_D ||
+	    chip->mac_ver == MAC_VER_8169SC)
 		pci_config_put8(rgep->cfg_handle, PCI_CONF_LATENCY_TIMER, 0x40);
+
+	if (chip->mac_ver == MAC_VER_8169SC) {
+		val16 = rge_reg_get16(rgep, RT_CONFIG_1_REG);
+		val16 &= 0x0300;
+		if (val16 == 0x1)	/* 66Mhz PCI */
+			pci_config_put32(rgep->cfg_handle, 0x7c, 0x00ff00ff);
+		else if (val16 == 0x0) /* 33Mhz PCI */
+			pci_config_put32(rgep->cfg_handle, 0x7c, 0x00ffff00);
+	}
 
 	/*
 	 * PCIE chipset require the Rx buffer start address must be
@@ -1035,12 +1061,6 @@ rge_chip_init(rge_t *rgep)
 	rge_reg_put16(rgep, RESV_E2_REG, 0x282a);
 
 	/*
-	 * Return to normal network/host communication mode
-	 */
-	rge_reg_clr8(rgep, RT_93c46_COMMOND_REG, RT_93c46_MODE_CONFIG);
-	drv_usecwait(20);
-
-	/*
 	 * Set multicast register
 	 */
 	hashp = (uint32_t *)rgep->mcast_hash;
@@ -1056,6 +1076,12 @@ rge_chip_init(rge_t *rgep)
 	rge_reg_put32(rgep, RX_PKT_MISS_COUNT_REG, 0);
 	rge_reg_put32(rgep, TIMER_INT_REG, TIMER_INT_NONE);
 	rge_reg_put32(rgep, TIMER_COUNT_REG, 0);
+
+	/*
+	 * Return to normal network/host communication mode
+	 */
+	rge_reg_clr8(rgep, RT_93c46_COMMOND_REG, RT_93c46_MODE_CONFIG);
+	drv_usecwait(20);
 }
 
 /*
@@ -1215,10 +1241,21 @@ rge_set_multi_addr(rge_t *rgep)
 	uint32_t *hashp;
 
 	hashp = (uint32_t *)rgep->mcast_hash;
+
+	/*
+	 * Change to config register write enable mode
+	 */
+	if (rgep->chipid.mac_ver == MAC_VER_8169SC)
+		rge_reg_set8(rgep, RT_93c46_COMMOND_REG, RT_93c46_MODE_CONFIG);
+
 	rge_reg_put32(rgep, MULTICAST_0_REG, RGE_BSWAP_32(hashp[0]));
 	rge_reg_put32(rgep, MULTICAST_4_REG, RGE_BSWAP_32(hashp[1]));
-	rge_reg_set8(rgep, RT_COMMAND_REG,
-	    RT_COMMAND_RX_ENABLE | RT_COMMAND_TX_ENABLE);
+
+	/*
+	 * Return to normal network/host communication mode
+	 */
+	if (rgep->chipid.mac_ver == MAC_VER_8169SC)
+		rge_reg_clr8(rgep, RT_93c46_COMMOND_REG, RT_93c46_MODE_CONFIG);
 }
 
 static void rge_set_promisc(rge_t *rgep);
@@ -1231,9 +1268,6 @@ rge_set_promisc(rge_t *rgep)
 		rge_reg_set32(rgep, RX_CONFIG_REG, RX_ACCEPT_ALL_PKT);
 	else
 		rge_reg_clr32(rgep, RX_CONFIG_REG, RX_ACCEPT_ALL_PKT);
-
-	rge_reg_set8(rgep, RT_COMMAND_REG,
-	    RT_COMMAND_RX_ENABLE | RT_COMMAND_TX_ENABLE);
 }
 
 /*
