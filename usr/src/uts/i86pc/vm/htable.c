@@ -1432,9 +1432,13 @@ htable_walk(
 	 * Find the level of the largest pagesize used by this HAT.
 	 */
 	max_mapped_level = 0;
-	for (l = 1; l <= mmu.max_page_level; ++l)
-		if (hat->hat_pages_mapped[l] != 0)
-			max_mapped_level = l;
+	if (hat->hat_ism_pgcnt > 0) {
+		max_mapped_level = mmu.max_page_level;
+	} else {
+		for (l = 1; l <= mmu.max_page_level; ++l)
+			if (hat->hat_pages_mapped[l] != 0)
+				max_mapped_level = l;
+	}
 
 	while (va < eaddr && va >= *vaddr) {
 		ASSERT(!IN_VA_HOLE(va));
@@ -1456,20 +1460,13 @@ htable_walk(
 			}
 
 			/*
-			 * The ht is never NULL at the top level since
-			 * the top level htable is created in hat_alloc().
-			 */
-			ASSERT(l < TOP_LEVEL(hat));
-
-			/*
 			 * No htable covers the address. If there is no
 			 * larger page size that could cover it, we
 			 * skip to the start of the next page table.
 			 */
-			if (l >= max_mapped_level) {
+			ASSERT(l < TOP_LEVEL(hat));
+			if (l >= max_mapped_level)
 				va = NEXT_ENTRY_VA(va, l + 1);
-				break;
-			}
 		}
 	}
 
