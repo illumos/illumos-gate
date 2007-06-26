@@ -39,7 +39,7 @@
 #include <scfutil.h>
 #include <libzfs.h>
 #include <sharefs/share.h>
-#include "sharetab.h"
+#include <sharefs/sharetab.h>
 
 #ifdef	__cplusplus
 extern "C" {
