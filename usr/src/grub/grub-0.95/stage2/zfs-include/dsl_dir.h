@@ -44,7 +44,8 @@ typedef struct dsl_dir_phys {
 	/* Administrative reservation setting */
 	uint64_t dd_reserved;
 	uint64_t dd_props_zapobj;
-	uint64_t dd_pad[21]; /* pad out to 256 bytes for good measure */
+	uint64_t dd_deleg_zapobj;	/* dataset permissions */
+	uint64_t dd_pad[20]; /* pad out to 256 bytes for good measure */
 } dsl_dir_phys_t;
 
 #endif /* _SYS_DSL_DIR_H */

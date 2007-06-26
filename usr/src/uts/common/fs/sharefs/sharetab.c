@@ -40,6 +40,7 @@
 #include <sys/vtrace.h>
 #include <sys/cmn_err.h>
 #include <sys/atomic.h>
+#include <sys/policy.h>
 
 #include <sharefs/sharefs.h>
 
@@ -173,13 +174,12 @@ sharefs_remove(share_t *sh, sharefs_lens_t *shl)
 	 * Now walk down the hash table and find the entry to free!
 	 */
 	for (p = NULL, s = sht->s_buckets[iHash].ssh_sh;
-			s != NULL;
-			s = s->sh_next) {
+	    s != NULL; s = s->sh_next) {
 		/*
 		 * We need exact matches.
 		 */
 		if (strcmp(sh->sh_path, s->sh_path) == 0 &&
-				strlen(s->sh_path) == iPath) {
+		    strlen(s->sh_path) == iPath) {
 			if (p) {
 				p->sh_next = s->sh_next;
 			} else {
@@ -269,14 +269,11 @@ sharefs_add(share_t *sh, sharefs_lens_t *shl)
 
 	if (shl) {
 		sh->sh_size = shl->shl_path + shl->shl_res +
-			shl->shl_fstype + shl->shl_opts +
-			shl->shl_descr;
+		    shl->shl_fstype + shl->shl_opts + shl->shl_descr;
 	} else {
 		sh->sh_size = strlen(sh->sh_path) +
-			strlen(sh->sh_res) +
-			strlen(sh->sh_fstype) +
-			strlen(sh->sh_opts) +
-			strlen(sh->sh_descr);
+		    strlen(sh->sh_res) + strlen(sh->sh_fstype) +
+		    strlen(sh->sh_opts) + strlen(sh->sh_descr);
 	}
 
 	/*
@@ -289,8 +286,7 @@ sharefs_add(share_t *sh, sharefs_lens_t *shl)
 	 * Now walk down the hash table and add the new entry!
 	 */
 	for (p = NULL, s = sht->s_buckets[iHash].ssh_sh;
-			s != NULL;
-			s = s->sh_next) {
+	    s != NULL; s = s->sh_next) {
 		/*
 		 * We need exact matches.
 		 *
@@ -299,7 +295,7 @@ sharefs_add(share_t *sh, sharefs_lens_t *shl)
 		 * being asked to replace an existing entry.
 		 */
 		if (strcmp(sh->sh_path, s->sh_path) == 0 &&
-				strlen(s->sh_path) == iPath) {
+		    strlen(s->sh_path) == iPath) {
 			if (p) {
 				p->sh_next = sh;
 			} else {
@@ -365,7 +361,7 @@ sharefs_sharetab_init(void)
 }
 
 int
-sharefs(enum sharefs_sys_op opcode, share_t *sh_in, uint32_t iMaxLen)
+sharefs_impl(enum sharefs_sys_op opcode, share_t *sh_in, uint32_t iMaxLen)
 {
 	int		error = 0;
 	size_t		len;
@@ -407,8 +403,7 @@ sharefs(enum sharefs_sys_op opcode, share_t *sh_in, uint32_t iMaxLen)
 	 * Initialize the data pointers.
 	 */
 	STRUCT_INIT(u_sh, model);
-	if (copyin(sh_in, STRUCT_BUF(u_sh),
-			STRUCT_SIZE(u_sh))) {
+	if (copyin(sh_in, STRUCT_BUF(u_sh), STRUCT_SIZE(u_sh))) {
 		return (set_errno(EFAULT));
 	}
 
@@ -467,4 +462,13 @@ cleanup:
 	}
 
 	return ((error != 0) ? set_errno(error) : 0);
+}
+
+int
+sharefs(enum sharefs_sys_op opcode, share_t *sh_in, uint32_t iMaxLen)
+{
+	if (secpolicy_sys_config(CRED(), B_FALSE) != 0)
+		return (set_errno(EPERM));
+
+	return (sharefs_impl(opcode, sh_in, iMaxLen));
 }

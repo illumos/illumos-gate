@@ -63,6 +63,7 @@ extern "C" {
 #include <time.h>
 #include <sys/note.h>
 #include <sys/types.h>
+#include <sys/cred.h>
 #include <sys/sysmacros.h>
 #include <sys/bitmap.h>
 #include <sys/resource.h>
@@ -249,6 +250,11 @@ extern int rw_tryenter(krwlock_t *rwlp, krw_t rw);
 extern int rw_tryupgrade(krwlock_t *rwlp);
 extern void rw_exit(krwlock_t *rwlp);
 #define	rw_downgrade(rwlp) do { } while (0)
+
+extern uid_t crgetuid(cred_t *cr);
+extern gid_t crgetgid(cred_t *cr);
+extern int crgetngroups(cred_t *cr);
+extern gid_t *crgetgroups(cred_t *cr);
 
 /*
  * Condition variables
@@ -448,6 +454,11 @@ extern int kobj_read_file(struct _buf *file, char *buf, unsigned size,
     unsigned off);
 extern void kobj_close_file(struct _buf *file);
 extern int kobj_get_filesize(struct _buf *file, uint64_t *size);
+extern int zfs_secpolicy_snapshot_perms(const char *name, cred_t *cr);
+extern int zfs_secpolicy_rename_perms(const char *from, const char *to,
+    cred_t *cr);
+extern int zfs_secpolicy_destroy_perms(const char *name, cred_t *cr);
+extern zoneid_t getzoneid(void);
 
 #ifdef	__cplusplus
 }

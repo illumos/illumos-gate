@@ -864,8 +864,6 @@ const struct ioc {
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_POOL_GET_HISTORY,	"ZFS_IOC_POOL_GET_HISTORY",
 		"zfs_cmd_t" },
-	{ (uint_t)ZFS_IOC_POOL_LOG_HISTORY,	"ZFS_IOC_POOL_LOG_HISTORY",
-		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_VDEV_ADD,		"ZFS_IOC_VDEV_ADD",
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_VDEV_REMOVE,		"ZFS_IOC_VDEV_REMOVE",
@@ -925,6 +923,14 @@ const struct ioc {
 	{ (uint_t)ZFS_IOC_POOL_SET_PROPS,	"ZFS_IOC_POOL_SET_PROPS",
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_POOL_GET_PROPS,	"ZFS_IOC_POOL_GET_PROPS",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_SET_FSACL,		"ZFS_IOC_SET_FSACL",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_GET_FSACL,		"ZFS_IOC_GET_FSACL",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_ISCSI_PERM_CHECK,	"ZFS_IOC_ISCSI_PERM_CHECK",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_SHARE,		"ZFS_IOC_SHARE",
 		"zfs_cmd_t" },
 
 	/* kssl ioctls */

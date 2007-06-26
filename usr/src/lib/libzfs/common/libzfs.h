@@ -35,6 +35,9 @@
 #include <sys/types.h>
 #include <sys/varargs.h>
 #include <sys/fs/zfs.h>
+#include <sys/avl.h>
+#include <libuutil.h>
+#include <ucred.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -101,8 +104,51 @@ enum {
 	EZFS_OPENFAILED,	/* open of device failed */
 	EZFS_NOCAP,		/* couldn't get capacity */
 	EZFS_LABELFAILED,	/* write of label failed */
+	EZFS_ISCSISVCUNAVAIL,	/* iscsi service unavailable */
+	EZFS_BADWHO,		/* invalid permission who */
+	EZFS_BADPERM,		/* invalid permission */
+	EZFS_BADPERMSET,	/* invalid permission set name */
+	EZFS_PERMSET_CIRCULAR,	/* circular dependency on permset */
+	EZFS_NODELEGATION,	/* delegated administration is disabled */
+	EZFS_PERMRDONLY,	/* pemissions are readonly */
 	EZFS_UNKNOWN
 };
+
+/*
+ * The following data structures are all part
+ * of the zfs_allow_t data structure which is
+ * used for printing 'allow' permissions.
+ * It is a linked list of zfs_allow_t's which
+ * then contain avl tree's for user/group/sets/...
+ * and each one of the entries in those trees have
+ * avl tree's for the permissions they belong to and
+ * whether they are local,descendent or local+descendent
+ * permissions.  The AVL trees are used primarily for
+ * sorting purposes, but also so that we can quickly find
+ * a given user and or permission.
+ */
+typedef struct zfs_perm_node {
+	avl_node_t z_node;
+	char z_pname[MAXPATHLEN];
+} zfs_perm_node_t;
+
+typedef struct zfs_allow_node {
+	avl_node_t z_node;
+	char z_key[MAXPATHLEN];		/* name, such as joe */
+	avl_tree_t z_localdescend;	/* local+descendent perms */
+	avl_tree_t z_local;		/* local permissions */
+	avl_tree_t z_descend;		/* descendent permissions */
+} zfs_allow_node_t;
+
+typedef struct zfs_allow {
+	struct zfs_allow *z_next;
+	char z_setpoint[MAXPATHLEN];
+	avl_tree_t z_sets;
+	avl_tree_t z_crperms;
+	avl_tree_t z_user;
+	avl_tree_t z_group;
+	avl_tree_t z_everyone;
+} zfs_allow_t;
 
 /*
  * Basic handle types
@@ -247,14 +293,16 @@ extern nvlist_t *zpool_find_import(libzfs_handle_t *, int, char **);
 /*
  * Miscellaneous pool functions
  */
+struct zfs_cmd;
+
 extern char *zpool_vdev_name(libzfs_handle_t *, zpool_handle_t *, nvlist_t *);
 extern int zpool_upgrade(zpool_handle_t *);
 extern int zpool_get_history(zpool_handle_t *, nvlist_t **);
-extern void zpool_log_history(libzfs_handle_t *, int, char **, const char *,
-    boolean_t, boolean_t);
+extern void zpool_stage_history(libzfs_handle_t *, int, char **,
+    boolean_t zfs_cmd, boolean_t pool_create);
 extern void zpool_obj_to_path(zpool_handle_t *, uint64_t, uint64_t, char *,
     size_t len);
-
+extern int zfs_ioctl(libzfs_handle_t *, int, struct zfs_cmd *);
 /*
  * Basic handle manipulations.  These functions do not create or destroy the
  * underlying datasets, only the references to them.
@@ -368,6 +416,16 @@ extern boolean_t zfs_dataset_exists(libzfs_handle_t *, const char *,
     zfs_type_t);
 
 /*
+ * dataset permission functions.
+ */
+extern int zfs_perm_set(zfs_handle_t *, nvlist_t *);
+extern int zfs_perm_remove(zfs_handle_t *, nvlist_t *);
+extern int zfs_build_perms(zfs_handle_t *, char *, char *,
+    zfs_deleg_who_type_t, zfs_deleg_inherit_t, nvlist_t **nvlist_t);
+extern int zfs_perm_get(zfs_handle_t *, zfs_allow_t **);
+extern void zfs_free_allows(zfs_allow_t *);
+
+/*
  * Mount support functions.
  */
 extern boolean_t is_mounted(libzfs_handle_t *, const char *special, char **);
@@ -393,6 +451,9 @@ extern int zfs_unshareall_nfs(zfs_handle_t *);
 extern boolean_t zfs_is_shared_iscsi(zfs_handle_t *);
 extern int zfs_share_iscsi(zfs_handle_t *);
 extern int zfs_unshare_iscsi(zfs_handle_t *);
+extern int zfs_iscsi_perm_check(libzfs_handle_t *, char *, ucred_t *);
+extern int zfs_deleg_share_nfs(libzfs_handle_t *, char *, char *,
+    void *, void *, int, boolean_t);
 
 /*
  * When dealing with nvlists, verify() is extremely useful

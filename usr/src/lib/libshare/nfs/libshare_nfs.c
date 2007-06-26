@@ -49,6 +49,7 @@
 #include "libshare_nfs.h"
 #include <rpcsvc/daemon_utils.h>
 #include <nfs/nfs.h>
+#include <nfs/nfssys.h>
 
 /* should really be in some global place */
 #define	DEF_WIN	30000
@@ -56,12 +57,13 @@
 
 int debug = 0;
 
+#define	NFS_SERVER_SVC	"svc:/network/nfs/server:default"
 
 /* internal functions */
 static int nfs_init();
 static void nfs_fini();
 static int nfs_enable_share(sa_share_t);
-static int nfs_disable_share(char *);
+static int nfs_disable_share(sa_share_t, char *);
 static int nfs_validate_property(sa_property_t, sa_optionset_t);
 static int nfs_validate_security_mode(char *);
 static int nfs_is_security_opt(char *);
@@ -1616,6 +1618,7 @@ nfs_enable_share(sa_share_t share)
 	char *path;
 	int err = SA_OK;
 	int i;
+	int iszfs;
 
 	/* Don't drop core if the NFS module isn't loaded. */
 	(void) signal(SIGSYS, SIG_IGN);
@@ -1625,6 +1628,7 @@ nfs_enable_share(sa_share_t share)
 	if (path == NULL)
 		return (SA_NO_SUCH_PATH);
 
+	iszfs = sa_path_is_zfs(path);
 	/*
 	 * find the optionsets and security sets.  There may not be
 	 * any or there could be one or two for each of optionset and
@@ -1741,18 +1745,67 @@ nfs_enable_share(sa_share_t share)
 	 * call the exportfs system call which is implemented
 	 * via the nfssys() call as the EXPORTFS subfunction.
 	 */
-	if ((err = exportfs(path, &export)) < 0) {
+	if (iszfs) {
+		struct exportfs_args ea;
+		share_t sh;
+		char *str;
+		priv_set_t *priv_effective;
+		int privileged;
+
+		/*
+		 * If we aren't a privileged user
+		 * and NFS server service isn't running
+		 * then print out an error message
+		 * and return EPERM
+		 */
+
+		priv_effective = priv_allocset();
+		(void) getppriv(PRIV_EFFECTIVE, priv_effective);
+
+		privileged = (priv_isfullset(priv_effective) == B_TRUE);
+		priv_freeset(priv_effective);
+
+		if (!privileged &&
+		    (str = smf_get_state(NFS_SERVER_SVC)) != NULL) {
+			err = 0;
+			if (strcmp(str, SCF_STATE_STRING_ONLINE) != 0) {
+				(void) printf(dgettext(TEXT_DOMAIN,
+				    "NFS: Cannot share remote "
+				    "filesystem: %s\n"), path);
+				(void) printf(dgettext(TEXT_DOMAIN,
+				    "NFS: Service needs to be enabled "
+				    "by a privileged user\n"));
+				err = SA_SYSTEM_ERR;
+				errno = EPERM;
+			}
+			free(str);
+		}
+
+		if (err == 0) {
+			ea.dname = path;
+			ea.uex = &export;
+
+			sa_sharetab_fill_zfs(share, &sh, "nfs");
+			err = sa_share_zfs(share, path, &sh, &ea, B_TRUE);
+			sa_emptyshare(&sh);
+		}
+	} else {
+		err = exportfs(path, &export);
+	}
+
+	if (err < 0) {
 		err = SA_SYSTEM_ERR;
 		switch (errno) {
 		case EREMOTE:
 			(void) printf(dgettext(TEXT_DOMAIN,
-			    "NFS: Cannot share remote "
-			    "filesystem: %s\n"), path);
+			    "NFS: Cannot share filesystems "
+			    "in non-global zones: %s\n"), path);
+			err = SA_NOT_SUPPORTED;
 			break;
 		case EPERM:
 			if (getzoneid() != GLOBAL_ZONEID) {
 				(void) printf(dgettext(TEXT_DOMAIN,
-				    "NFS: Cannot share filesystems "
+				    "NFS: Cannot share file systems "
 				    "in non-global zones: %s\n"), path);
 				err = SA_NOT_SUPPORTED;
 				break;
@@ -1764,7 +1817,9 @@ nfs_enable_share(sa_share_t share)
 		}
 	} else {
 		/* update sharetab with an add/modify */
-		(void) sa_update_sharetab(share, "nfs");
+		if (!iszfs) {
+			(void) sa_update_sharetab(share, "nfs");
+		}
 	}
 
 	if (err == SA_OK) {
@@ -1817,38 +1872,56 @@ out:
  * done? We only do basic errors for now.
  */
 static int
-nfs_disable_share(char *share)
+nfs_disable_share(sa_share_t share, char *path)
 {
 	int err;
 	int ret = SA_OK;
+	int iszfs;
 
-	if (share != NULL) {
-		err = exportfs(share, NULL);
+
+	if (path != NULL) {
+		iszfs = sa_path_is_zfs(path);
+
+		if (iszfs) {
+			struct exportfs_args ea;
+			share_t sh = { 0 };
+
+			ea.dname = path;
+			ea.uex = NULL;
+			sh.sh_path = path;
+			sh.sh_fstype = "nfs";
+
+			err = sa_share_zfs(share, path, &sh, &ea, B_FALSE);
+		} else
+			err = exportfs(path, NULL);
 		if (err < 0) {
 			/*
-			 * TBD: only an error in some cases - need
-			 * better analysis
+			 * TBD: only an error in some
+			 * cases - need better analysis
 			 */
+
 			switch (errno) {
 			case EPERM:
 			case EACCES:
 				ret = SA_NO_PERMISSION;
-				if (getzoneid() != GLOBAL_ZONEID)
+				if (getzoneid() != GLOBAL_ZONEID) {
 					ret = SA_NOT_SUPPORTED;
+				}
 				break;
 			case EINVAL:
 			case ENOENT:
 				ret = SA_NO_SUCH_PATH;
-				break;
+			break;
 			default:
 				ret = SA_SYSTEM_ERR;
-				break;
+			break;
 			}
 		}
 		if (ret == SA_OK || ret == SA_NO_SUCH_PATH) {
-			(void) sa_delete_sharetab(share, "nfs");
+			if (!iszfs)
+				(void) sa_delete_sharetab(path, "nfs");
 			/* just in case it was logged */
-			(void) nfslogtab_deactivate(share);
+			(void) nfslogtab_deactivate(path);
 		}
 	}
 	return (ret);

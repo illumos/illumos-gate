@@ -1367,10 +1367,10 @@ sa_disable_share(sa_share_t share, char *protocol)
 	shared = sa_get_share_attr(share, "shared");
 
 	if (protocol != NULL) {
-		ret = sa_proto_unshare(protocol, path);
+		ret = sa_proto_unshare(share, protocol, path);
 	} else {
 		/* need to do all protocols */
-		ret = sa_proto_unshare("nfs", path);
+		ret = sa_proto_unshare(share, "nfs", path);
 	}
 	if (ret == SA_OK)
 		(void) sa_set_share_attr(share, "shared", NULL);

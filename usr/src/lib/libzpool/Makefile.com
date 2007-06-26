@@ -54,6 +54,7 @@ LIBS +=		$(LINTLIB)
 INCS += -I../common
 INCS += -I../../../uts/common/fs/zfs
 INCS += -I../../../common/zfs
+INCS += -I../../../common
 
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 

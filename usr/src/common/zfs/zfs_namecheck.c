@@ -44,7 +44,9 @@
 #endif
 
 #include <sys/param.h>
+#include <sys/nvpair.h>
 #include "zfs_namecheck.h"
+#include "zfs_deleg.h"
 
 static int
 valid_char(char c)
@@ -90,6 +92,32 @@ snapshot_namecheck(const char *path, namecheck_err_t *why, char *what)
 	return (0);
 }
 
+
+/*
+ * Permissions set name must start with the letter '@' followed by the
+ * same character restrictions as snapshot names, except that the name
+ * cannot exceed 64 characters.
+ */
+int
+permset_namecheck(const char *path, namecheck_err_t *why, char *what)
+{
+	if (strlen(path) >= ZFS_PERMSET_MAXLEN) {
+		if (why)
+			*why = NAME_ERR_TOOLONG;
+		return (-1);
+	}
+
+	if (path[0] != '@') {
+		if (why) {
+			*why = NAME_ERR_NO_AT;
+			*what = path[0];
+		}
+		return (-1);
+	}
+
+	return (snapshot_namecheck(&path[1], why, what));
+}
+
 /*
  * Dataset names must be of the following form:
  *
@@ -114,6 +142,7 @@ dataset_namecheck(const char *path, namecheck_err_t *why, char *what)
 	 * If ZFS_MAXNAMELEN value is changed, make sure to cleanup all
 	 * places using MAXNAMELEN.
 	 */
+
 	if (strlen(path) >= MAXNAMELEN) {
 		if (why)
 			*why = NAME_ERR_TOOLONG;

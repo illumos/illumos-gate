@@ -38,6 +38,8 @@
 #include <libscf.h>
 #include <scfutil.h>
 #include <libzfs.h>
+#include <sharefs/share.h>
+#include "sharetab.h"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -58,7 +60,7 @@ struct sa_plugin_ops {
 	int	(*sa_init)();
 	void	(*sa_fini)();
 	int	(*sa_share)(sa_share_t);	/* start sharing */
-	int	(*sa_unshare)(char *);	/* stop sharing */
+	int	(*sa_unshare)(sa_share_t, char *);	/* stop sharing */
 	int	(*sa_valid_prop)(sa_property_t, sa_optionset_t);
 	int	(*sa_valid_space)(char *);	/* is name valid optionspace? */
 	int	(*sa_security_prop)(char *);	/* property is security */
@@ -91,7 +93,7 @@ typedef struct propertylist {
 } property_list_t;
 
 extern int sa_proto_share(char *, sa_share_t);
-extern int sa_proto_unshare(char *, char *);
+extern int sa_proto_unshare(sa_share_t, char *, char *);
 extern int sa_proto_valid_prop(char *, sa_property_t, sa_optionset_t);
 extern int sa_proto_security_prop(char *, char *);
 extern int sa_proto_legacy_opts(char *, sa_group_t, char *);
@@ -113,10 +115,15 @@ extern int sa_delete_share(scfutilhandle_t *, sa_group_t, sa_share_t);
 extern int sa_delete_instance(scfutilhandle_t *, char *);
 extern int sa_create_pgroup(scfutilhandle_t *, char *);
 extern int sa_delete_pgroup(scfutilhandle_t *, char *);
+extern void sa_fillshare(sa_share_t share, char *proto, struct share *sh);
+extern void sa_emptyshare(struct share *sh);
 
 /* ZFS functions */
 extern int sa_get_zfs_shares(sa_handle_t, char *);
 extern int sa_zfs_update(sa_share_t);
+extern int sa_share_zfs(sa_share_t, char *, share_t *, void *, boolean_t);
+extern int sa_sharetab_fill_zfs(sa_share_t share, struct share *sh,
+    char *proto);
 
 /* plugin specific functions */
 extern int proto_plugin_init();

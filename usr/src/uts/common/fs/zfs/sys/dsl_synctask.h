@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,7 @@ extern "C" {
 struct dsl_pool;
 
 typedef int (dsl_checkfunc_t)(void *, void *, dmu_tx_t *);
-typedef void (dsl_syncfunc_t)(void *, void *, dmu_tx_t *);
+typedef void (dsl_syncfunc_t)(void *, void *, cred_t *, dmu_tx_t *);
 
 typedef struct dsl_sync_task {
 	list_node_t dst_node;
@@ -46,6 +46,7 @@ typedef struct dsl_sync_task {
 	dsl_syncfunc_t *dst_syncfunc;
 	void *dst_arg1;
 	void *dst_arg2;
+	cred_t *dst_cr;
 	int dst_err;
 } dsl_sync_task_t;
 

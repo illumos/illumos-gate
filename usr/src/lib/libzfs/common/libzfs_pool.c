@@ -409,7 +409,7 @@ zpool_create(libzfs_handle_t *hdl, const char *pool, nvlist_t *nvroot,
 	if (altroot != NULL)
 		(void) strlcpy(zc.zc_value, altroot, sizeof (zc.zc_value));
 
-	if (ioctl(hdl->libzfs_fd, ZFS_IOC_POOL_CREATE, &zc) != 0) {
+	if (zfs_ioctl(hdl, ZFS_IOC_POOL_CREATE, &zc) != 0) {
 		zcmd_free_nvlists(&zc);
 
 		switch (errno) {
@@ -451,7 +451,6 @@ zpool_create(libzfs_handle_t *hdl, const char *pool, nvlist_t *nvroot,
 			return (zpool_standard_error(hdl, errno, msg));
 		}
 	}
-
 	zcmd_free_nvlists(&zc);
 
 	/*
@@ -493,7 +492,7 @@ zpool_destroy(zpool_handle_t *zhp)
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 
-	if (ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_POOL_DESTROY, &zc) != 0) {
+	if (zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_POOL_DESTROY, &zc) != 0) {
 		(void) snprintf(msg, sizeof (msg), dgettext(TEXT_DOMAIN,
 		    "cannot destroy '%s'"), zhp->zpool_name);
 
@@ -547,7 +546,7 @@ zpool_add(zpool_handle_t *zhp, nvlist_t *nvroot)
 		return (-1);
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 
-	if (ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_VDEV_ADD, &zc) != 0) {
+	if (zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_VDEV_ADD, &zc) != 0) {
 		switch (errno) {
 		case EBUSY:
 			/*
@@ -621,7 +620,7 @@ zpool_export(zpool_handle_t *zhp)
 
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 
-	if (ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_POOL_EXPORT, &zc) != 0)
+	if (zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_POOL_EXPORT, &zc) != 0)
 		return (zpool_standard_error_fmt(zhp->zpool_hdl, errno,
 		    dgettext(TEXT_DOMAIN, "cannot export '%s'"),
 		    zhp->zpool_name));
@@ -675,7 +674,7 @@ zpool_import(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 		return (-1);
 
 	ret = 0;
-	if (ioctl(hdl->libzfs_fd, ZFS_IOC_POOL_IMPORT, &zc) != 0) {
+	if (zfs_ioctl(hdl, ZFS_IOC_POOL_IMPORT, &zc) != 0) {
 		char desc[1024];
 		if (newname == NULL)
 			(void) snprintf(desc, sizeof (desc),
@@ -705,6 +704,7 @@ zpool_import(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 		ret = -1;
 	} else {
 		zpool_handle_t *zhp;
+
 		/*
 		 * This should never fail, but play it safe anyway.
 		 */
@@ -714,7 +714,9 @@ zpool_import(libzfs_handle_t *hdl, nvlist_t *config, const char *newname,
 			ret = zpool_create_zvol_links(zhp);
 			zpool_close(zhp);
 		}
+
 	}
+
 
 	zcmd_free_nvlists(&zc);
 	return (ret);
@@ -733,7 +735,7 @@ zpool_scrub(zpool_handle_t *zhp, pool_scrub_type_t type)
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	zc.zc_cookie = type;
 
-	if (ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_POOL_SCRUB, &zc) == 0)
+	if (zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_POOL_SCRUB, &zc) == 0)
 		return (0);
 
 	(void) snprintf(msg, sizeof (msg),
@@ -893,7 +895,7 @@ zpool_vdev_online(zpool_handle_t *zhp, const char *path, int flags,
 	zc.zc_obj = flags;
 
 
-	if (ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_VDEV_SET_STATE, &zc) != 0)
+	if (zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_VDEV_SET_STATE, &zc) != 0)
 		return (zpool_standard_error(hdl, errno, msg));
 
 	*newstate = zc.zc_cookie;
@@ -927,7 +929,7 @@ zpool_vdev_offline(zpool_handle_t *zhp, const char *path, boolean_t istmp)
 	zc.zc_cookie = VDEV_STATE_OFFLINE;
 	zc.zc_obj = istmp ? ZFS_OFFLINE_TEMPORARY : 0;
 
-	if (ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_VDEV_SET_STATE, &zc) == 0)
+	if (zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_VDEV_SET_STATE, &zc) == 0)
 		return (0);
 
 	switch (errno) {
@@ -1105,7 +1107,7 @@ zpool_vdev_attach(zpool_handle_t *zhp,
 	if (zcmd_write_src_nvlist(hdl, &zc, nvroot, NULL) != 0)
 		return (-1);
 
-	ret = ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_VDEV_ATTACH, &zc);
+	ret = zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_VDEV_ATTACH, &zc);
 
 	zcmd_free_nvlists(&zc);
 
@@ -1206,7 +1208,7 @@ zpool_vdev_detach(zpool_handle_t *zhp, const char *path)
 
 	verify(nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_GUID, &zc.zc_guid) == 0);
 
-	if (ioctl(hdl->libzfs_fd, ZFS_IOC_VDEV_DETACH, &zc) == 0)
+	if (zfs_ioctl(hdl, ZFS_IOC_VDEV_DETACH, &zc) == 0)
 		return (0);
 
 	switch (errno) {
@@ -1261,7 +1263,7 @@ zpool_vdev_remove(zpool_handle_t *zhp, const char *path)
 
 	verify(nvlist_lookup_uint64(tgt, ZPOOL_CONFIG_GUID, &zc.zc_guid) == 0);
 
-	if (ioctl(hdl->libzfs_fd, ZFS_IOC_VDEV_REMOVE, &zc) == 0)
+	if (zfs_ioctl(hdl, ZFS_IOC_VDEV_REMOVE, &zc) == 0)
 		return (0);
 
 	return (zpool_standard_error(hdl, errno, msg));
@@ -1300,7 +1302,7 @@ zpool_clear(zpool_handle_t *zhp, const char *path)
 		    &zc.zc_guid) == 0);
 	}
 
-	if (ioctl(hdl->libzfs_fd, ZFS_IOC_CLEAR, &zc) == 0)
+	if (zfs_ioctl(hdl, ZFS_IOC_CLEAR, &zc) == 0)
 		return (0);
 
 	return (zpool_standard_error(hdl, errno, msg));
@@ -1780,11 +1782,10 @@ zpool_upgrade(zpool_handle_t *zhp)
 	libzfs_handle_t *hdl = zhp->zpool_hdl;
 
 	(void) strcpy(zc.zc_name, zhp->zpool_name);
-	if (ioctl(hdl->libzfs_fd, ZFS_IOC_POOL_UPGRADE, &zc) != 0)
+	if (zfs_ioctl(hdl, ZFS_IOC_POOL_UPGRADE, &zc) != 0)
 		return (zpool_standard_error_fmt(hdl, errno,
 		    dgettext(TEXT_DOMAIN, "cannot upgrade '%s'"),
 		    zhp->zpool_name));
-
 	return (0);
 }
 
@@ -1797,39 +1798,32 @@ zpool_upgrade(zpool_handle_t *zhp)
  * poolname.  'argc' and 'argv' are used to construct the command string.
  */
 void
-zpool_log_history(libzfs_handle_t *hdl, int argc, char **argv, const char *path,
-	boolean_t pool, boolean_t pool_create)
+zpool_stage_history(libzfs_handle_t *hdl, int argc, char **argv,
+    boolean_t zfs_cmd, boolean_t pool_create)
 {
-	char cmd_buf[HIS_MAX_RECORD_LEN];
-	char *dspath;
-	zfs_cmd_t zc = { 0 };
+	char *cmd_buf;
 	int i;
 
+	if (hdl->libzfs_log_str != NULL) {
+		free(hdl->libzfs_log_str);
+	}
+
+	if ((hdl->libzfs_log_str = zfs_alloc(hdl, HIS_MAX_RECORD_LEN)) == NULL)
+		return;
+
+	hdl->libzfs_log_type =
+	    (pool_create == B_TRUE) ? LOG_CMD_POOL_CREATE : LOG_CMD_NORMAL;
+	cmd_buf = hdl->libzfs_log_str;
+
 	/* construct the command string */
-	(void) strcpy(cmd_buf, pool ? "zpool" : "zfs");
-	for (i = 0; i < argc; i++) {
+	(void) strlcpy(cmd_buf, zfs_cmd ? "zfs" : "zpool",
+	    HIS_MAX_RECORD_LEN);
+	for (i = 1; i < argc; i++) {
 		if (strlen(cmd_buf) + 1 + strlen(argv[i]) > HIS_MAX_RECORD_LEN)
 			break;
-		(void) strcat(cmd_buf, " ");
-		(void) strcat(cmd_buf, argv[i]);
+		(void) strlcat(cmd_buf, " ", HIS_MAX_RECORD_LEN);
+		(void) strlcat(cmd_buf, argv[i], HIS_MAX_RECORD_LEN);
 	}
-
-	/* figure out the poolname */
-	dspath = strpbrk(path, "/@");
-	if (dspath == NULL) {
-		(void) strcpy(zc.zc_name, path);
-	} else {
-		(void) strncpy(zc.zc_name, path, dspath - path);
-		zc.zc_name[dspath-path] = '\0';
-	}
-
-	zc.zc_history = (uint64_t)(uintptr_t)cmd_buf;
-	zc.zc_history_len = strlen(cmd_buf);
-
-	/* overloading zc_history_offset */
-	zc.zc_history_offset = pool_create;
-
-	(void) ioctl(hdl->libzfs_fd, ZFS_IOC_POOL_LOG_HISTORY, &zc);
 }
 
 /*
@@ -2221,7 +2215,7 @@ zpool_set_prop(zpool_handle_t *zhp, const char *propname, const char *propval)
 	if (zcmd_write_src_nvlist(zhp->zpool_hdl, &zc, nvl, NULL) != 0)
 		return (-1);
 
-	ret = ioctl(zhp->zpool_hdl->libzfs_fd, ZFS_IOC_POOL_SET_PROPS, &zc);
+	ret = zfs_ioctl(zhp->zpool_hdl, ZFS_IOC_POOL_SET_PROPS, &zc);
 	zcmd_free_nvlists(&zc);
 
 	if (ret)
@@ -2308,6 +2302,7 @@ zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *propbuf,
 		(void) strlcpy(propbuf, strvalue, proplen);
 		break;
 
+	case ZPOOL_PROP_DELEGATION:
 	case ZPOOL_PROP_AUTOREPLACE:
 		if (nvlist_lookup_nvlist(zhp->zpool_props,
 		    zpool_prop_to_name(prop), &nvp) != 0) {

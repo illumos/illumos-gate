@@ -85,6 +85,7 @@
 static int (*iscsitgt_zfs_share)(const char *);
 static int (*iscsitgt_zfs_unshare)(const char *);
 static int (*iscsitgt_zfs_is_shared)(const char *);
+static int (*iscsitgt_svc_online)();
 
 #pragma init(zfs_iscsi_init)
 static void
@@ -99,10 +100,13 @@ zfs_iscsi_init(void)
 	    (iscsitgt_zfs_unshare = (int (*)(const char *))dlsym(libiscsitgt,
 	    "iscsitgt_zfs_unshare")) == NULL ||
 	    (iscsitgt_zfs_is_shared = (int (*)(const char *))dlsym(libiscsitgt,
-	    "iscsitgt_zfs_is_shared")) == NULL) {
+	    "iscsitgt_zfs_is_shared")) == NULL ||
+	    (iscsitgt_svc_online = (int (*)(const char *))dlsym(libiscsitgt,
+	    "iscsitgt_svc_online")) == NULL) {
 		iscsitgt_zfs_share = NULL;
 		iscsitgt_zfs_unshare = NULL;
 		iscsitgt_zfs_is_shared = NULL;
+		iscsitgt_svc_online = NULL;
 	}
 }
 
@@ -284,6 +288,9 @@ zfs_mount(zfs_handle_t *zhp, const char *options, int flags)
 		if (errno == EBUSY) {
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
 			    "mountpoint or dataset is busy"));
+		} else if (errno == EPERM) {
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "Insufficient privileges"));
 		} else {
 			zfs_error_aux(hdl, strerror(errno));
 		}
@@ -793,8 +800,15 @@ remove_mountpoint(zfs_handle_t *zhp)
 boolean_t
 zfs_is_shared_iscsi(zfs_handle_t *zhp)
 {
-	return (iscsitgt_zfs_is_shared != NULL &&
-	    iscsitgt_zfs_is_shared(zhp->zfs_name) != 0);
+
+	/*
+	 * If iscsi deamon isn't running then we aren't shared
+	 */
+	if (iscsitgt_svc_online && iscsitgt_svc_online() == 1)
+		return (0);
+	else
+		return (iscsitgt_zfs_is_shared != NULL &&
+		    iscsitgt_zfs_is_shared(zhp->zfs_name) != 0);
 }
 
 int
@@ -812,9 +826,20 @@ zfs_share_iscsi(zfs_handle_t *zhp)
 	    strcmp(shareopts, "off") == 0)
 		return (0);
 
-	if (iscsitgt_zfs_share == NULL || iscsitgt_zfs_share(dataset) != 0)
-		return (zfs_error_fmt(hdl, EZFS_SHAREISCSIFAILED,
+	if (iscsitgt_zfs_share == NULL || iscsitgt_zfs_share(dataset) != 0) {
+		int error = EZFS_SHAREISCSIFAILED;
+
+		/*
+		 * If service isn't availabele and EPERM was
+		 * returned then use special error.
+		 */
+		if (iscsitgt_svc_online && errno == EPERM &&
+		    (iscsitgt_svc_online() != 0))
+			error = EZFS_ISCSISVCUNAVAIL;
+
+		return (zfs_error_fmt(hdl, error,
 		    dgettext(TEXT_DOMAIN, "cannot share '%s'"), dataset));
+	}
 
 	return (0);
 }
@@ -836,9 +861,13 @@ zfs_unshare_iscsi(zfs_handle_t *zhp)
 	 * we should return success in that case.
 	 */
 	if (iscsitgt_zfs_unshare == NULL ||
-	    (iscsitgt_zfs_unshare(dataset) != 0 && errno != ENODEV))
+	    (iscsitgt_zfs_unshare(dataset) != 0 && errno != ENODEV)) {
+		if (errno == EPERM)
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "Insufficient privileges to unshare iscsi"));
 		return (zfs_error_fmt(hdl, EZFS_UNSHAREISCSIFAILED,
 		    dgettext(TEXT_DOMAIN, "cannot unshare '%s'"), dataset));
+	}
 
 	return (0);
 }
@@ -991,7 +1020,8 @@ zvol_cb(const char *dataset, void *data)
 	    (zhp = zfs_open(hdl, dataset, ZFS_TYPE_VOLUME)) == NULL)
 		return (0);
 
-	(void) zfs_unshare_iscsi(zhp);
+	if (zfs_unshare_iscsi(zhp) != 0)
+		return (-1);
 
 	zfs_close(zhp);
 

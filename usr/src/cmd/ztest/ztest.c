@@ -1089,7 +1089,7 @@ ztest_vdev_LUN_growth(ztest_args_t *za)
 
 /* ARGSUSED */
 static void
-ztest_create_cb(objset_t *os, void *arg, dmu_tx_t *tx)
+ztest_create_cb(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx)
 {
 	/*
 	 * Create the directory object.

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,6 +160,16 @@ dsl_prop_get_ds(dsl_dir_t *dd, const char *propname,
 	rw_exit(&dd->dd_pool->dp_config_rwlock);
 
 	return (err);
+}
+
+/*
+ * Get property when config lock is already held.
+ */
+int dsl_prop_get_ds_locked(dsl_dir_t *dd, const char *propname,
+    int intsz, int numints, void *buf, char *setpoint)
+{
+	ASSERT(RW_LOCK_HELD(&dd->dd_pool->dp_config_rwlock));
+	return (dsl_prop_get_impl(dd, propname, intsz, numints, buf, setpoint));
 }
 
 int
@@ -316,7 +326,7 @@ struct prop_set_arg {
 
 
 static void
-dsl_prop_set_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+dsl_prop_set_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dir_t *dd = arg1;
 	struct prop_set_arg *psa = arg2;
@@ -324,6 +334,8 @@ dsl_prop_set_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	uint64_t zapobj = dd->dd_phys->dd_props_zapobj;
 	uint64_t intval;
 	int isint;
+	char valbuf[32];
+	char *valstr;
 
 	isint = (dodefault(psa->name, 8, 1, &intval) == 0);
 
@@ -345,6 +357,17 @@ dsl_prop_set_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 		dsl_prop_changed_notify(dd->dd_pool,
 		    dd->dd_object, psa->name, intval, TRUE);
 	}
+	if (isint) {
+		(void) snprintf(valbuf, sizeof (valbuf),
+		    "%lld", (longlong_t)intval);
+		valstr = valbuf;
+	} else {
+		valstr = (char *)psa->buf;
+	}
+	spa_history_internal_log((psa->numints == 0) ? LOG_DS_INHERIT :
+	    LOG_DS_PROPSET, dd->dd_pool->dp_spa, tx, cr,
+	    "%s=%s dataset = %llu", psa->name, valstr,
+	    dd->dd_phys->dd_head_dataset_obj);
 }
 
 int

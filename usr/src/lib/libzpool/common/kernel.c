@@ -800,3 +800,45 @@ z_compress_level(void *dst, size_t *dstlen, const void *src, size_t srclen,
 
 	return (ret);
 }
+
+uid_t
+crgetuid(cred_t *cr)
+{
+	return (0);
+}
+
+gid_t
+crgetgid(cred_t *cr)
+{
+	return (0);
+}
+
+int
+crgetngroups(cred_t *cr)
+{
+	return (0);
+}
+
+gid_t *
+crgetgroups(cred_t *cr)
+{
+	return (NULL);
+}
+
+int
+zfs_secpolicy_snapshot_perms(const char *name, cred_t *cr)
+{
+	return (0);
+}
+
+int
+zfs_secpolicy_rename_perms(const char *from, const char *to, cred_t *cr)
+{
+	return (0);
+}
+
+int
+zfs_secpolicy_destroy_perms(const char *name, cred_t *cr)
+{
+	return (0);
+}

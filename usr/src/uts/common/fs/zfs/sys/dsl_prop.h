@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,8 @@ int dsl_prop_get(const char *ddname, const char *propname,
 int dsl_prop_get_integer(const char *ddname, const char *propname,
     uint64_t *valuep, char *setpoint);
 int dsl_prop_get_all(objset_t *os, nvlist_t **nvp);
+int dsl_prop_get_ds_locked(dsl_dir_t *dd, const char *propname,
+    int intsz, int numints, void *buf, char *setpoint);
 
 int dsl_prop_set(const char *ddname, const char *propname,
     int intsz, int numints, const void *buf);

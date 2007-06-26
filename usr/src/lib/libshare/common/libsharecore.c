@@ -1832,12 +1832,12 @@ sa_free_derived_security(sa_security_t security)
  */
 
 /*
- * fillshare(share, proto, sh)
+ * sa_fillshare(share, proto, sh)
  *
  * Fill the struct share with values obtained from the share object.
  */
-static void
-fillshare(sa_share_t share, char *proto, struct share *sh)
+void
+sa_fillshare(sa_share_t share, char *proto, struct share *sh)
 {
 	char *groupname = NULL;
 	char *value;
@@ -1916,13 +1916,13 @@ fillshare(sa_share_t share, char *proto, struct share *sh)
 }
 
 /*
- * emptyshare(sh)
+ * sa_emptyshare(sh)
  *
  * Free the strings in the non-NULL members of sh.
  */
 
-static void
-emptyshare(struct share *sh)
+void
+sa_emptyshare(struct share *sh)
 {
 	if (sh->sh_path != NULL)
 	    free(sh->sh_path);
@@ -1962,9 +1962,9 @@ sa_update_sharetab(sa_share_t share, char *proto)
 		/*
 		 * Fill in share structure and send it to the kernel.
 		 */
-		(void) fillshare(share, proto, &sh);
+		(void) sa_fillshare(share, proto, &sh);
 		(void) sharefs(SHAREFS_ADD, &sh);
-		emptyshare(&sh);
+		sa_emptyshare(&sh);
 		sa_free_attr_string(path);
 	}
 

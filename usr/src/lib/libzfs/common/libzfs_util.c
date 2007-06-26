@@ -133,6 +133,10 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		return (dgettext(TEXT_DOMAIN, "unshare(1M) failed"));
 	case EZFS_SHARENFSFAILED:
 		return (dgettext(TEXT_DOMAIN, "share(1M) failed"));
+	case EZFS_ISCSISVCUNAVAIL:
+		return (dgettext(TEXT_DOMAIN,
+		    "iscsitgt service need to be enabled by "
+		    "a privileged user"));
 	case EZFS_DEVLINKS:
 		return (dgettext(TEXT_DOMAIN, "failed to create /dev links"));
 	case EZFS_PERM:
@@ -176,6 +180,21 @@ libzfs_error_description(libzfs_handle_t *hdl)
 		    "disk capacity information could not be retrieved"));
 	case EZFS_LABELFAILED:
 		return (dgettext(TEXT_DOMAIN, "write of label failed"));
+	case EZFS_BADWHO:
+		return (dgettext(TEXT_DOMAIN, "invalid user/group"));
+	case EZFS_BADPERM:
+		return (dgettext(TEXT_DOMAIN, "invalid permission"));
+	case EZFS_BADPERMSET:
+		return (dgettext(TEXT_DOMAIN, "invalid permission set name"));
+	case EZFS_PERMSET_CIRCULAR:
+		return (dgettext(TEXT_DOMAIN,
+		    "Cannot define a permission set in terms of itself"));
+	case EZFS_NODELEGATION:
+		return (dgettext(TEXT_DOMAIN, "delegated administration is "
+		    "disabled on pool"));
+	case EZFS_PERMRDONLY:
+		return (dgettext(TEXT_DOMAIN, "snapshot permissions cannot be"
+		    " modified"));
 	case EZFS_UNKNOWN:
 		return (dgettext(TEXT_DOMAIN, "unknown error"));
 	default:
@@ -256,6 +275,10 @@ zfs_common_error(libzfs_handle_t *hdl, int error, const char *fmt,
 		zfs_verror(hdl, EZFS_PERM, fmt, ap);
 		return (-1);
 
+	case ECANCELED:
+		zfs_verror(hdl, EZFS_NODELEGATION, fmt, ap);
+		return (-1);
+
 	case EIO:
 		zfs_verror(hdl, EZFS_IO, fmt, ap);
 		return (-1);
@@ -315,11 +338,14 @@ zfs_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 		    "dataset is busy"));
 		zfs_verror(hdl, EZFS_BUSY, fmt, ap);
 		break;
-
+	case EROFS:
+		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+		    "snapshot permissions cannot be modified"));
+		zfs_verror(hdl, EZFS_PERMRDONLY, fmt, ap);
+		break;
 	case ENAMETOOLONG:
 		zfs_verror(hdl, EZFS_NAMETOOLONG, fmt, ap);
 		break;
-
 	default:
 		zfs_error_aux(hdl, strerror(errno));
 		zfs_verror(hdl, EZFS_UNKNOWN, fmt, ap);
@@ -388,6 +414,11 @@ zpool_standard_error_fmt(libzfs_handle_t *hdl, int error, const char *fmt, ...)
 	case EINVAL:
 		zfs_verror(hdl, EZFS_POOL_INVALARG, fmt, ap);
 		break;
+
+	case ENOSPC:
+	case EDQUOT:
+		zfs_verror(hdl, EZFS_NOSPC, fmt, ap);
+		return (-1);
 
 	default:
 		zfs_error_aux(hdl, strerror(error));
@@ -537,6 +568,8 @@ libzfs_fini(libzfs_handle_t *hdl)
 	if (hdl->libzfs_sharetab)
 		(void) fclose(hdl->libzfs_sharetab);
 	zfs_uninit_libshare(hdl);
+	if (hdl->libzfs_log_str)
+		(void) free(hdl->libzfs_log_str);
 	namespace_clear(hdl);
 	free(hdl);
 }
@@ -851,4 +884,22 @@ libzfs_print_one_property(const char *name, libzfs_get_cbdata_t *cbp,
 	}
 
 	(void) printf("\n");
+}
+
+int
+zfs_ioctl(libzfs_handle_t *hdl, int request, zfs_cmd_t *zc)
+{
+	int error;
+
+	zc->zc_history = (uint64_t)(uintptr_t)hdl->libzfs_log_str;
+	zc->zc_history_offset = hdl->libzfs_log_type;
+	error = ioctl(hdl->libzfs_fd, request, zc);
+	if (hdl->libzfs_log_str) {
+		free(hdl->libzfs_log_str);
+		hdl->libzfs_log_str = NULL;
+	}
+	zc->zc_history = 0;
+	zc->zc_history_offset = 0;
+
+	return (error);
 }

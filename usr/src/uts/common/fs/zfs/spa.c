@@ -721,6 +721,8 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		spa_config_exit(spa, FTAG);
 	}
 
+	spa->spa_delegation = zfs_prop_default_numeric(ZPOOL_PROP_DELEGATION);
+
 	error = zap_lookup(spa->spa_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
 	    DMU_POOL_PROPS, sizeof (uint64_t), 1, &spa->spa_pool_props_object);
 
@@ -740,6 +742,10 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		    spa->spa_pool_props_object,
 		    zpool_prop_to_name(ZPOOL_PROP_AUTOREPLACE),
 		    sizeof (uint64_t), 1, &autoreplace);
+		(void) zap_lookup(spa->spa_meta_objset,
+		    spa->spa_pool_props_object,
+		    zpool_prop_to_name(ZPOOL_PROP_DELEGATION),
+		    sizeof (uint64_t), 1, &spa->spa_delegation);
 	}
 
 	/*
@@ -1258,6 +1264,7 @@ spa_create(const char *pool, nvlist_t *nvroot, const char *altroot)
 	dmu_tx_commit(tx);
 
 	spa->spa_bootfs = zpool_prop_default_numeric(ZPOOL_PROP_BOOTFS);
+	spa->spa_delegation = zfs_prop_default_numeric(ZPOOL_PROP_DELEGATION);
 	spa->spa_sync_on = B_TRUE;
 	txg_sync_start(spa->spa_dsl_pool);
 
@@ -2957,7 +2964,7 @@ spa_sync_config_object(spa_t *spa, dmu_tx_t *tx)
 }
 
 static void
-spa_sync_props(void *arg1, void *arg2, dmu_tx_t *tx)
+spa_sync_props(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	spa_t *spa = arg1;
 	nvlist_t *nvp = arg2;
@@ -2982,13 +2989,23 @@ spa_sync_props(void *arg1, void *arg2, dmu_tx_t *tx)
 	nvpair = NULL;
 	while ((nvpair = nvlist_next_nvpair(nvp, nvpair))) {
 		switch (zpool_name_to_prop(nvpair_name(nvpair))) {
+		case ZPOOL_PROP_DELEGATION:
+			VERIFY(nvlist_lookup_uint64(nvp,
+			    nvpair_name(nvpair), &intval) == 0);
+			VERIFY(zap_update(mos,
+			    spa->spa_pool_props_object,
+			    nvpair_name(nvpair), 8, 1,
+			    &intval, tx) == 0);
+			spa->spa_delegation = intval;
+			break;
 		case ZPOOL_PROP_BOOTFS:
 			VERIFY(nvlist_lookup_uint64(nvp,
 			    nvpair_name(nvpair), &spa->spa_bootfs) == 0);
+			intval = spa->spa_bootfs;
 			VERIFY(zap_update(mos,
 			    spa->spa_pool_props_object,
 			    zpool_prop_to_name(ZPOOL_PROP_BOOTFS), 8, 1,
-			    &spa->spa_bootfs, tx) == 0);
+			    &intval, tx) == 0);
 			break;
 
 		case ZPOOL_PROP_AUTOREPLACE:
@@ -3000,6 +3017,10 @@ spa_sync_props(void *arg1, void *arg2, dmu_tx_t *tx)
 			    &intval, tx) == 0);
 			break;
 		}
+		spa_history_internal_log(LOG_POOL_PROPSET,
+		    spa, tx, cr, "%s %lld %s",
+		    nvpair_name(nvpair), intval,
+		    spa->spa_name);
 	}
 }
 

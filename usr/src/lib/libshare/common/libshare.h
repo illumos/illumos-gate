@@ -216,7 +216,7 @@ extern int sa_delete_sharetab(char *, char *);
 /* ZFS functions */
 extern int sa_zfs_is_shared(sa_handle_t, char *);
 extern int sa_group_is_zfs(sa_group_t);
-
+extern int sa_path_is_zfs(char *);
 
 /* SA Handle specific functions */
 extern sa_handle_t sa_find_group_handle(sa_group_t);

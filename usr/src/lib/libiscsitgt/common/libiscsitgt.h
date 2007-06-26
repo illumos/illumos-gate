@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -565,6 +565,11 @@ void iscsit_list_tpgt_free(iscsit_tpgt_t *t);
  */
 iscsit_admin_t *iscsit_list_adm(iscsit_handle_t h);
 void iscsit_list_adm_free(iscsit_admin_t *t);
+
+/*
+ * Misc functions
+ */
+int iscsitgt_svc_online();
 
 #ifdef __cplusplus
 }

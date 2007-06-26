@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <priv.h>
 #include <syslog.h>
+#include <libzfs.h>
 
 #include <iscsitgt_impl.h>
 #include "utility.h"
@@ -94,20 +95,36 @@ remove_zfs(tgt_node_t *x, ucred_t *cred)
 {
 	char		*prop;
 	char		*msg		= NULL;
-	tgt_node_t	*targ		= NULL;
+	tgt_node_t		*targ = NULL;
 	const priv_set_t	*eset;
-
-	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
-	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
-	    ucred_geteuid(cred) != 0) {
-		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
-		return (msg);
-	}
+	libzfs_handle_t		*zh = NULL;
 
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &prop) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		return (msg);
 	}
+
+	if ((zh = libzfs_init()) == NULL) {
+		xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+		free(prop);
+		return (msg);
+	}
+
+	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
+	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
+	    ucred_geteuid(cred) != 0) {
+		/*
+		 * See if user has ZFS dataset permissions to do operation
+		 */
+		if (zfs_iscsi_perm_check(zh, prop, cred) != 0) {
+			xml_rtn_msg(&msg, ERR_NO_PERMISSION);
+			free(prop);
+			libzfs_fini(zh);
+			return (msg);
+		}
+	}
+
+	libzfs_fini(zh);
 
 	while ((targ = tgt_node_next(targets_config, XML_ELEMENT_TARG, targ))
 	    != NULL) {

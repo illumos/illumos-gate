@@ -32,6 +32,7 @@
 #include <libgen.h>
 #include <libintl.h>
 #include <libuutil.h>
+#include <libnvpair.h>
 #include <locale.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -45,8 +46,10 @@
 #include <sys/mnttab.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
+#include <sys/avl.h>
 
 #include <libzfs.h>
+#include <libuutil.h>
 
 #include "zfs_iter.h"
 #include "zfs_util.h"
@@ -72,6 +75,8 @@ static int zfs_do_unshare(int argc, char **argv);
 static int zfs_do_send(int argc, char **argv);
 static int zfs_do_receive(int argc, char **argv);
 static int zfs_do_promote(int argc, char **argv);
+static int zfs_do_allow(int argc, char **argv);
+static int zfs_do_unallow(int argc, char **argv);
 
 /*
  * These libumem hooks provide a reasonable set of defaults for the allocator's
@@ -106,7 +111,9 @@ typedef enum {
 	HELP_SHARE,
 	HELP_SNAPSHOT,
 	HELP_UNMOUNT,
-	HELP_UNSHARE
+	HELP_UNSHARE,
+	HELP_ALLOW,
+	HELP_UNALLOW
 } zfs_help_t;
 
 typedef struct zfs_command {
@@ -150,6 +157,10 @@ static zfs_command_t command_table[] = {
 	{ NULL },
 	{ "send",	zfs_do_send,		HELP_SEND		},
 	{ "receive",	zfs_do_receive,		HELP_RECEIVE		},
+	{ NULL },
+	{ "allow",	zfs_do_allow,		HELP_ALLOW		},
+	{ NULL },
+	{ "unallow",	zfs_do_unallow,		HELP_UNALLOW		},
 };
 
 #define	NCOMMAND	(sizeof (command_table) / sizeof (command_table[0]))
@@ -220,6 +231,47 @@ get_usage(zfs_help_t idx)
 	case HELP_UNSHARE:
 		return (gettext("\tunshare [-f] -a\n"
 		    "\tunshare [-f] <filesystem|mountpoint>\n"));
+	case HELP_ALLOW:
+		return (gettext("\tallow [-l][-d] <everyone|user|group>[,"
+		    "<everyone|user|group>...]\n\t    "
+		    "<perm>|@<setname>[,<perm>|@<setname>...]\n\t"
+		    "    <filesystem|volume\n"
+		    "\tallow [-l] [-d] -u <user> "
+		    "<perm>|@<setname>[,<perm>|@<setname>...]\n\t"
+		    "    <filesystem|volume>\n"
+		    "\tallow [-l] [-d] -g <group> "
+		    "<perm>|@<setname>[,<perm>|@<setname>...]\n\t"
+		    "    <filesystem|volume>\n"
+		    "\tallow [-l] [-d] -e "
+		    "<perm>|@<setname>[,<perm>|@<setname>...]\n\t"
+		    "    <filesystem|volume>\n"
+		    "\tallow -c "
+		    "<perm>|@<setname>[,<perm>|@<setname>...]\n\t"
+		    "    <filesystem|volume>\n"
+		    "\tallow -s @setname "
+		    "<perm>|@<setname>[,<perm>|@<setname>...]\n\t"
+		    "    <filesystem|volume>\n"));
+
+	case HELP_UNALLOW:
+		return (gettext("\tunallow [-r][-l][-d] <everyone|user|group>[,"
+		    "<everyone|user|group>...] \n\t    "
+		    "[<perm>|@<setname>[,<perm>|@<setname>...]]\n\t"
+		    "    <filesystem|volume>\n"
+		    "\tunallow [-r][-l][-d] -u user "
+		    "[<perm>|@<setname>[,<perm>|@<setname>...]]\n\t"
+		    "    <filesystem|volume>\n"
+		    "\tunallow [-r][-l][-d] -g group "
+		    "[<perm>|@<setname>[,<perm>|@<setname>...]]\n\t"
+		    "    <filesystem|volume>\n"
+		    "\tunallow [-r][-l][-d] -e "
+		    "[<perm>|@<setname>[,<perm>|@<setname>...]]\n\t"
+		    "    <filesystem|volume>\n"
+		    "\tunallow [-r] -c "
+		    "[<perm>|@<setname>[,<perm>|@<setname>...]]\n\t"
+		    "    <filesystem|volume>\n"
+		    "\tunallow [-r] -s @setname "
+		    "[<perm>|@<setname>[,<perm>|@<setname>...]]\n\t"
+		    "    <filesystem|volume> \n\t"));
 	}
 
 	abort();
@@ -426,8 +478,6 @@ zfs_do_clone(int argc, char **argv)
 				ret = zfs_share(clone);
 			zfs_close(clone);
 		}
-		zpool_log_history(g_zfs, argc + optind, argv - optind, argv[1],
-		    B_FALSE, B_FALSE);
 	}
 
 	zfs_close(zhp);
@@ -597,11 +647,6 @@ zfs_do_create(int argc, char **argv)
 	/* pass to libzfs */
 	if (zfs_create(g_zfs, argv[0], type, props) != 0)
 		goto error;
-
-	if (propval != NULL)
-		*(propval - 1) = '=';
-	zpool_log_history(g_zfs, argc + optind, argv - optind, argv[0],
-	    B_FALSE, B_FALSE);
 
 	if ((zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_ANY)) == NULL)
 		goto error;
@@ -848,9 +893,6 @@ zfs_do_destroy(int argc, char **argv)
 		if (ret) {
 			(void) fprintf(stderr,
 			    gettext("no snapshots destroyed\n"));
-		} else {
-			zpool_log_history(g_zfs, argc + optind, argv - optind,
-			    argv[0], B_FALSE, B_FALSE);
 		}
 		return (ret != 0);
 	}
@@ -890,7 +932,6 @@ zfs_do_destroy(int argc, char **argv)
 		return (1);
 	}
 
-
 	if (cb.cb_error ||
 	    zfs_iter_dependents(zhp, B_FALSE, destroy_callback, &cb) != 0) {
 		zfs_close(zhp);
@@ -901,11 +942,10 @@ zfs_do_destroy(int argc, char **argv)
 	 * Do the real thing.  The callback will close the handle regardless of
 	 * whether it succeeds or not.
 	 */
+
 	if (destroy_callback(zhp, &cb) != 0)
 		return (1);
 
-	zpool_log_history(g_zfs, argc + optind, argv - optind, argv[0],
-	    B_FALSE, B_FALSE);
 
 	return (0);
 }
@@ -1181,20 +1221,14 @@ zfs_do_get(int argc, char **argv)
  * useful for setting a property on a hierarchy-wide basis, regardless of any
  * local modifications for each dataset.
  */
-typedef struct inherit_cbdata {
-	char		*cb_propname;
-	boolean_t	cb_any_successful;
-} inherit_cbdata_t;
 
 static int
 inherit_callback(zfs_handle_t *zhp, void *data)
 {
-	inherit_cbdata_t *cbp = data;
+	char *propname = data;
 	int ret;
 
-	ret = zfs_prop_inherit(zhp, cbp->cb_propname);
-	if (ret == 0)
-		cbp->cb_any_successful = B_TRUE;
+	ret = zfs_prop_inherit(zhp, propname);
 	return (ret != 0);
 }
 
@@ -1204,7 +1238,7 @@ zfs_do_inherit(int argc, char **argv)
 	boolean_t recurse = B_FALSE;
 	int c;
 	zfs_prop_t prop;
-	inherit_cbdata_t cb;
+	char *propname;
 	int ret;
 
 	/* check options */
@@ -1234,43 +1268,35 @@ zfs_do_inherit(int argc, char **argv)
 		usage(B_FALSE);
 	}
 
-	cb.cb_propname = argv[0];
+	propname = argv[0];
 	argc--;
 	argv++;
 
-	if ((prop = zfs_name_to_prop(cb.cb_propname)) != ZFS_PROP_INVAL) {
+	if ((prop = zfs_name_to_prop(propname)) != ZFS_PROP_INVAL) {
 		if (zfs_prop_readonly(prop)) {
 			(void) fprintf(stderr, gettext(
 			    "%s property is read-only\n"),
-			    cb.cb_propname);
+			    propname);
 			return (1);
 		}
 		if (!zfs_prop_inheritable(prop)) {
 			(void) fprintf(stderr, gettext("'%s' property cannot "
-			    "be inherited\n"), cb.cb_propname);
+			    "be inherited\n"), propname);
 			if (prop == ZFS_PROP_QUOTA ||
 			    prop == ZFS_PROP_RESERVATION)
 				(void) fprintf(stderr, gettext("use 'zfs set "
-				    "%s=none' to clear\n"), cb.cb_propname);
+				    "%s=none' to clear\n"), propname);
 			return (1);
 		}
-	} else if (!zfs_prop_user(cb.cb_propname)) {
-		(void) fprintf(stderr, gettext(
-		    "invalid property '%s'\n"),
-		    cb.cb_propname);
+	} else if (!zfs_prop_user(propname)) {
+		(void) fprintf(stderr, gettext("invalid property '%s'\n"),
+		    propname);
 		usage(B_FALSE);
 	}
 
-	cb.cb_any_successful = B_FALSE;
-
 	ret = zfs_for_each(argc, argv, recurse,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, NULL, NULL,
-	    inherit_callback, &cb, B_FALSE);
-
-	if (cb.cb_any_successful) {
-		zpool_log_history(g_zfs, argc + optind + 1, argv - optind - 1,
-		    argv[0], B_FALSE, B_FALSE);
-	}
+	    inherit_callback, propname, B_FALSE);
 
 	return (ret);
 }
@@ -1606,10 +1632,6 @@ zfs_do_rename(int argc, char **argv)
 
 	ret = (zfs_rename(zhp, argv[1], recurse) != 0);
 
-	if (!ret)
-		zpool_log_history(g_zfs, argc + optind, argv - optind, argv[1],
-		    B_FALSE, B_FALSE);
-
 	zfs_close(zhp);
 	return (ret);
 }
@@ -1650,8 +1672,6 @@ zfs_do_promote(int argc, char **argv)
 
 	ret = (zfs_promote(zhp) != 0);
 
-	if (!ret)
-		zpool_log_history(g_zfs, argc, argv, argv[1], B_FALSE, B_FALSE);
 
 	zfs_close(zhp);
 	return (ret);
@@ -1820,11 +1840,6 @@ zfs_do_rollback(int argc, char **argv)
 	 */
 	ret = zfs_rollback(zhp, snap, force);
 
-	if (!ret) {
-		zpool_log_history(g_zfs, argc + optind, argv - optind, argv[0],
-		    B_FALSE, B_FALSE);
-	}
-
 out:
 	zfs_close(snap);
 	zfs_close(zhp);
@@ -1843,7 +1858,6 @@ out:
 typedef struct set_cbdata {
 	char		*cb_propname;
 	char		*cb_value;
-	boolean_t	cb_any_successful;
 } set_cbdata_t;
 
 static int
@@ -1864,7 +1878,6 @@ set_callback(zfs_handle_t *zhp, void *data)
 		}
 		return (1);
 	}
-	cbp->cb_any_successful = B_TRUE;
 	return (0);
 }
 
@@ -1902,7 +1915,6 @@ zfs_do_set(int argc, char **argv)
 
 	*cb.cb_value = '\0';
 	cb.cb_value++;
-	cb.cb_any_successful = B_FALSE;
 
 	if (*cb.cb_propname == '\0') {
 		(void) fprintf(stderr,
@@ -1910,13 +1922,9 @@ zfs_do_set(int argc, char **argv)
 		usage(B_FALSE);
 	}
 
+
 	ret = zfs_for_each(argc - 2, argv + 2, B_FALSE,
 	    ZFS_TYPE_ANY, NULL, NULL, set_callback, &cb, B_FALSE);
-
-	if (cb.cb_any_successful) {
-		*(cb.cb_value - 1) = '=';
-		zpool_log_history(g_zfs, argc, argv, argv[2], B_FALSE, B_FALSE);
-	}
 
 	return (ret);
 }
@@ -1963,10 +1971,6 @@ zfs_do_snapshot(int argc, char **argv)
 	ret = zfs_snapshot(g_zfs, argv[0], recursive);
 	if (ret && recursive)
 		(void) fprintf(stderr, gettext("no snapshots were created\n"));
-	if (!ret) {
-		zpool_log_history(g_zfs, argc + optind, argv - optind, argv[0],
-		    B_FALSE, B_FALSE);
-	}
 	return (ret != 0);
 }
 
@@ -2117,12 +2121,386 @@ zfs_do_receive(int argc, char **argv)
 	err = zfs_receive(g_zfs, argv[0], isprefix, verbose, dryrun, force,
 	    STDIN_FILENO);
 
-	if (!err) {
-		zpool_log_history(g_zfs, argc + optind, argv - optind, argv[0],
-		    B_FALSE, B_FALSE);
+	return (err != 0);
+}
+
+typedef struct allow_cb {
+	int  a_permcnt;
+	size_t a_treeoffset;
+} allow_cb_t;
+
+static void
+zfs_print_perms(avl_tree_t *tree)
+{
+	zfs_perm_node_t *permnode;
+
+	permnode = avl_first(tree);
+	while (permnode != NULL) {
+		(void) printf("%s", permnode->z_pname);
+		permnode = AVL_NEXT(tree, permnode);
+		if (permnode)
+			(void) printf(",");
+		else
+			(void) printf("\n");
+	}
+}
+
+/*
+ * Iterate over user/groups/everyone/... and the call perm_iter
+ * function to print actual permission when tree has >0 nodes.
+ */
+static void
+zfs_iter_perms(avl_tree_t *tree, const char *banner, allow_cb_t *cb)
+{
+	zfs_allow_node_t *item;
+	avl_tree_t *ptree;
+
+	item = avl_first(tree);
+	while (item) {
+		ptree = (void *)((char *)item + cb->a_treeoffset);
+		if (avl_numnodes(ptree)) {
+			if (cb->a_permcnt++ == 0)
+				(void) printf("%s\n", banner);
+			(void) printf("\t%s", item->z_key);
+			/*
+			 * Avoid an extra space being printed
+			 * for "everyone" which is keyed with a null
+			 * string
+			 */
+			if (item->z_key[0] != '\0')
+				(void) printf(" ");
+			zfs_print_perms(ptree);
+		}
+		item = AVL_NEXT(tree, item);
+	}
+}
+
+#define	LINES "-------------------------------------------------------------\n"
+static int
+zfs_print_allows(char *ds)
+{
+	zfs_allow_t *curperms, *perms;
+	zfs_handle_t *zhp;
+	allow_cb_t allowcb = { 0 };
+	char banner[MAXPATHLEN];
+
+	if (ds[0] == '-')
+		usage(B_FALSE);
+
+	if (strrchr(ds, '@')) {
+		(void) fprintf(stderr, gettext("Snapshots don't have 'allow'"
+		    " permissions\n"));
+		return (1);
+	}
+	if ((zhp = zfs_open(g_zfs, ds, ZFS_TYPE_ANY)) == NULL)
+		return (1);
+
+	if (zfs_perm_get(zhp, &perms)) {
+		(void) fprintf(stderr,
+		    gettext("Failed to retrieve 'allows' on %s\n"), ds);
+		zfs_close(zhp);
+		return (1);
 	}
 
-	return (err != 0);
+	zfs_close(zhp);
+
+	if (perms != NULL)
+		(void) printf("%s", LINES);
+	for (curperms = perms; curperms; curperms = curperms->z_next) {
+
+		(void) snprintf(banner, sizeof (banner),
+		    "Permission sets on (%s)", curperms->z_setpoint);
+		allowcb.a_treeoffset =
+		    offsetof(zfs_allow_node_t, z_localdescend);
+		allowcb.a_permcnt = 0;
+		zfs_iter_perms(&curperms->z_sets, banner, &allowcb);
+
+		(void) snprintf(banner, sizeof (banner),
+		    "Create time permissions on (%s)", curperms->z_setpoint);
+		allowcb.a_treeoffset =
+		    offsetof(zfs_allow_node_t, z_localdescend);
+		allowcb.a_permcnt = 0;
+		zfs_iter_perms(&curperms->z_crperms, banner, &allowcb);
+
+
+		(void) snprintf(banner, sizeof (banner),
+		    "Local permissions on (%s)", curperms->z_setpoint);
+		allowcb.a_treeoffset = offsetof(zfs_allow_node_t, z_local);
+		allowcb.a_permcnt = 0;
+		zfs_iter_perms(&curperms->z_user, banner, &allowcb);
+		zfs_iter_perms(&curperms->z_group, banner, &allowcb);
+		zfs_iter_perms(&curperms->z_everyone, banner, &allowcb);
+
+		(void) snprintf(banner, sizeof (banner),
+		    "Descendent permissions on (%s)", curperms->z_setpoint);
+		allowcb.a_treeoffset = offsetof(zfs_allow_node_t, z_descend);
+		allowcb.a_permcnt = 0;
+		zfs_iter_perms(&curperms->z_user, banner, &allowcb);
+		zfs_iter_perms(&curperms->z_group, banner, &allowcb);
+		zfs_iter_perms(&curperms->z_everyone, banner, &allowcb);
+
+		(void) snprintf(banner, sizeof (banner),
+		    "Local+Descendent permissions on (%s)",
+		    curperms->z_setpoint);
+		allowcb.a_treeoffset =
+		    offsetof(zfs_allow_node_t, z_localdescend);
+		allowcb.a_permcnt = 0;
+		zfs_iter_perms(&curperms->z_user, banner, &allowcb);
+		zfs_iter_perms(&curperms->z_group, banner, &allowcb);
+		zfs_iter_perms(&curperms->z_everyone, banner, &allowcb);
+
+		(void) printf("%s", LINES);
+	}
+	zfs_free_allows(perms);
+	return (0);
+}
+
+#define	ALLOWOPTIONS "ldcsu:g:e"
+#define	UNALLOWOPTIONS "ldcsu:g:er"
+
+/*
+ * Validate options, and build necessary datastructure to display/remove/add
+ * permissions.
+ * Returns 0 - If permissions should be added/removed
+ * Returns 1 - If permissions should be displayed.
+ * Returns -1 - on failure
+ */
+int
+parse_allow_args(int *argc, char **argv[], boolean_t unallow,
+    char **ds, int *recurse, nvlist_t **zperms)
+{
+	int c;
+	char *options = unallow ? UNALLOWOPTIONS : ALLOWOPTIONS;
+	zfs_deleg_inherit_t deleg_type = ZFS_DELEG_NONE;
+	zfs_deleg_who_type_t who_type = ZFS_DELEG_WHO_UNKNOWN;
+	char *who;
+	char *perms = NULL;
+	zfs_handle_t *zhp;
+
+	while ((c = getopt(*argc, *argv, options)) != -1) {
+		switch (c) {
+		case 'l':
+			if (who_type == ZFS_DELEG_CREATE ||
+			    who_type == ZFS_DELEG_NAMED_SET)
+				usage(B_FALSE);
+
+			deleg_type |= ZFS_DELEG_PERM_LOCAL;
+			break;
+		case 'd':
+			if (who_type == ZFS_DELEG_CREATE ||
+			    who_type == ZFS_DELEG_NAMED_SET)
+				usage(B_FALSE);
+
+			deleg_type |= ZFS_DELEG_PERM_DESCENDENT;
+			break;
+		case 'r':
+			*recurse = B_TRUE;
+			break;
+		case 'c':
+			if (who_type != ZFS_DELEG_WHO_UNKNOWN)
+				usage(B_FALSE);
+			if (deleg_type)
+				usage(B_FALSE);
+			who_type = ZFS_DELEG_CREATE;
+			break;
+		case 's':
+			if (who_type != ZFS_DELEG_WHO_UNKNOWN)
+				usage(B_FALSE);
+			if (deleg_type)
+				usage(B_FALSE);
+			who_type = ZFS_DELEG_NAMED_SET;
+			break;
+		case 'u':
+			if (who_type != ZFS_DELEG_WHO_UNKNOWN)
+				usage(B_FALSE);
+			who_type = ZFS_DELEG_USER;
+			who = optarg;
+			break;
+		case 'g':
+			if (who_type != ZFS_DELEG_WHO_UNKNOWN)
+				usage(B_FALSE);
+			who_type = ZFS_DELEG_GROUP;
+			who = optarg;
+			break;
+		case 'e':
+			if (who_type != ZFS_DELEG_WHO_UNKNOWN)
+				usage(B_FALSE);
+			who_type = ZFS_DELEG_EVERYONE;
+			break;
+		default:
+			usage(B_FALSE);
+			break;
+		}
+	}
+
+	if (deleg_type == 0)
+		deleg_type = ZFS_DELEG_PERM_LOCALDESCENDENT;
+
+	*argc -= optind;
+	*argv += optind;
+
+	if (unallow == B_FALSE && *argc == 1) {
+		/*
+		 * Only print permissions if no options were processed
+		 */
+		if (optind == 1)
+			return (1);
+		else
+			usage(B_FALSE);
+	}
+
+	/*
+	 * initialize variables for zfs_build_perms based on number
+	 * of arguments.
+	 * 3 arguments ==>	zfs [un]allow joe perm,perm,perm <dataset> or
+	 *			zfs [un]allow -s @set1 perm,perm <dataset>
+	 * 2 arguments ==>	zfs [un]allow -c perm,perm <dataset> or
+	 *			zfs [un]allow -u|-g <name> perm <dataset> or
+	 *			zfs [un]allow -e perm,perm <dataset>
+	 *			zfs unallow joe <dataset>
+	 *			zfs unallow -s @set1 <dataset>
+	 * 1 argument  ==>	zfs [un]allow -e <dataset> or
+	 *			zfs [un]allow -c <dataset>
+	 */
+
+	switch (*argc) {
+	case 3:
+		perms = (*argv)[1];
+		who = (*argv)[0];
+		*ds = (*argv)[2];
+
+		/*
+		 * advance argc/argv for do_allow cases.
+		 * for do_allow case make sure who have a know who type
+		 * and its not a permission set.
+		 */
+		if (unallow == B_TRUE) {
+			*argc -= 2;
+			*argv += 2;
+		} else if (who_type != ZFS_DELEG_WHO_UNKNOWN &&
+		    who_type != ZFS_DELEG_NAMED_SET)
+			usage(B_FALSE);
+		break;
+
+	case 2:
+		if (unallow == B_TRUE && (who_type == ZFS_DELEG_EVERYONE ||
+		    who_type == ZFS_DELEG_CREATE || who != NULL)) {
+			perms = (*argv)[0];
+			*ds = (*argv)[1];
+		} else {
+			if (unallow == B_FALSE &&
+			    (who_type == ZFS_DELEG_WHO_UNKNOWN ||
+			    who_type == ZFS_DELEG_NAMED_SET))
+				usage(B_FALSE);
+			else if (who_type == ZFS_DELEG_WHO_UNKNOWN ||
+			    who_type == ZFS_DELEG_NAMED_SET)
+				who = (*argv)[0];
+			else if (who_type != ZFS_DELEG_NAMED_SET)
+				perms = (*argv)[0];
+			*ds = (*argv)[1];
+		}
+		if (unallow == B_TRUE) {
+			(*argc)--;
+			(*argv)++;
+		}
+		break;
+
+	case 1:
+		if (unallow == B_FALSE)
+			usage(B_FALSE);
+		if (who == NULL && who_type != ZFS_DELEG_CREATE &&
+		    who_type != ZFS_DELEG_EVERYONE)
+			usage(B_FALSE);
+		*ds = (*argv)[0];
+		break;
+
+	default:
+		usage(B_FALSE);
+	}
+
+	if (strrchr(*ds, '@')) {
+		(void) fprintf(stderr,
+		    gettext("Can't set or remove 'allow' permissions "
+		    "on snapshots.\n"));
+			return (-1);
+	}
+
+	if ((zhp = zfs_open(g_zfs, *ds, ZFS_TYPE_ANY)) == NULL)
+		return (-1);
+
+	if ((zfs_build_perms(zhp, who, perms,
+	    who_type, deleg_type, zperms)) != 0) {
+		zfs_close(zhp);
+		return (-1);
+	}
+	zfs_close(zhp);
+	return (0);
+}
+
+static int
+zfs_do_allow(int argc, char **argv)
+{
+	char *ds;
+	nvlist_t *zperms = NULL;
+	zfs_handle_t *zhp;
+	int unused;
+	int ret;
+
+	if ((ret = parse_allow_args(&argc, &argv, B_FALSE, &ds,
+	    &unused, &zperms)) == -1)
+		return (1);
+
+	if (ret == 1)
+		return (zfs_print_allows(argv[0]));
+
+	if ((zhp = zfs_open(g_zfs, ds, ZFS_TYPE_ANY)) == NULL)
+		return (1);
+
+	if (zfs_perm_set(zhp, zperms)) {
+		zfs_close(zhp);
+		nvlist_free(zperms);
+		return (1);
+	}
+	nvlist_free(zperms);
+	zfs_close(zhp);
+
+	return (0);
+}
+
+static int
+unallow_callback(zfs_handle_t *zhp, void *data)
+{
+	nvlist_t *nvp = (nvlist_t *)data;
+	int error;
+
+	error = zfs_perm_remove(zhp, nvp);
+	if (error) {
+		(void) fprintf(stderr, gettext("Failed to remove permissions "
+		    "on %s\n"), zfs_get_name(zhp));
+	}
+	return (error);
+}
+
+static int
+zfs_do_unallow(int argc, char **argv)
+{
+	int recurse = B_FALSE;
+	char *ds;
+	int error;
+	nvlist_t *zperms = NULL;
+
+	if (parse_allow_args(&argc, &argv, B_TRUE,
+	    &ds, &recurse, &zperms) == -1)
+		return (1);
+
+	error = zfs_for_each(argc, argv, recurse,
+	    ZFS_TYPE_FILESYSTEM|ZFS_TYPE_VOLUME, NULL,
+	    NULL, unallow_callback, (void *)zperms, B_FALSE);
+
+	if (zperms)
+		nvlist_free(zperms);
+
+	return (error);
 }
 
 typedef struct get_all_cbdata {
@@ -3143,6 +3521,34 @@ do_volcheck(boolean_t isinit)
 	return (zpool_iter(g_zfs, volcheck, &isinit) ? 1 : 0);
 }
 
+static int
+find_command_idx(char *command, int *idx)
+{
+	int i;
+
+	for (i = 0; i < NCOMMAND; i++) {
+		if (command_table[i].name == NULL)
+			continue;
+
+		if (strcmp(command, command_table[i].name) == 0) {
+			*idx = i;
+			return (0);
+		}
+	}
+	return (1);
+}
+
+zfs_prop_t
+propset_cb(zfs_prop_t prop, void *data)
+{
+	char *cmdname = (char *)data;
+
+	if (strcmp(cmdname, zfs_prop_to_name(prop)) == 0)
+		return (prop);
+
+	return (ZFS_PROP_CONT);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -3150,6 +3556,8 @@ main(int argc, char **argv)
 	int i;
 	char *progname;
 	char *cmdname;
+	char *str;
+	boolean_t found = B_FALSE;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -3161,6 +3569,8 @@ main(int argc, char **argv)
 		    "initialize ZFS library\n"));
 		return (1);
 	}
+
+	zpool_stage_history(g_zfs, argc, argv, B_TRUE, B_FALSE);
 
 	libzfs_print_on_error(g_zfs, B_TRUE);
 
@@ -3220,18 +3630,41 @@ main(int argc, char **argv)
 		/*
 		 * Run the appropriate command.
 		 */
-		for (i = 0; i < NCOMMAND; i++) {
-			if (command_table[i].name == NULL)
-				continue;
-
-			if (strcmp(cmdname, command_table[i].name) == 0) {
-				current_command = &command_table[i];
-				ret = command_table[i].func(argc - 1, argv + 1);
-				break;
-			}
+		if (find_command_idx(cmdname, &i) == 0) {
+			current_command = &command_table[i];
+			ret = command_table[i].func(argc - 1, argv + 1);
+			found = B_TRUE;
 		}
 
-		if (i == NCOMMAND) {
+		/*
+		 * Check and see if they are doing property=value
+		 */
+		if (found == B_FALSE &&
+		    ((str = strchr(cmdname, '=')) != NULL)) {
+			*str = '\0';
+			if (zfs_prop_iter(propset_cb, cmdname,
+			    B_FALSE) != ZFS_PROP_INVAL)
+				found = B_TRUE;
+
+			if (found == B_FALSE && zfs_prop_user(cmdname))
+				found = B_TRUE;
+
+			if (found == B_TRUE &&
+			    find_command_idx("set", &i) == 0) {
+				*str = '=';
+				current_command = &command_table[i];
+				ret = command_table[i].func(argc, argv);
+			} else {
+				(void) fprintf(stderr,
+				    gettext("invalid property '%s'\n"),
+				    cmdname);
+				found = B_TRUE;
+				ret = 1;
+			}
+
+		}
+
+		if (found == B_FALSE) {
 			(void) fprintf(stderr, gettext("unrecognized "
 			    "command '%s'\n"), cmdname);
 			usage(B_FALSE);

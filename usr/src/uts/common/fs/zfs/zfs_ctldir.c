@@ -63,6 +63,7 @@
 #include <sys/gfs.h>
 #include <sys/stat.h>
 #include <sys/dmu.h>
+#include <sys/dsl_deleg.h>
 #include <sys/mount.h>
 
 typedef struct {
@@ -411,7 +412,7 @@ zfsctl_snapshot_zname(vnode_t *vp, const char *name, int len, char *zname)
 	return (0);
 }
 
-static int
+int
 zfsctl_unmount_snap(vnode_t *dvp, const char *name, int force, cred_t *cr)
 {
 	zfsctl_snapdir_t *sdp = dvp->v_data;
@@ -514,10 +515,13 @@ zfsctl_snapdir_rename(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
 	err = zfsctl_snapshot_zname(sdvp, snm, MAXNAMELEN, from);
 	if (err)
 		return (err);
-	err = zfs_secpolicy_write(from, cr);
+
+	err = zfsctl_snapshot_zname(tdvp, tnm, MAXNAMELEN, to);
 	if (err)
 		return (err);
 
+	if (err = zfs_secpolicy_rename_perms(from, to, cr))
+		return (err);
 	/*
 	 * Cannot move snapshots out of the snapdir.
 	 */
@@ -526,10 +530,6 @@ zfsctl_snapdir_rename(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
 
 	if (strcmp(snm, tnm) == 0)
 		return (0);
-
-	err = zfsctl_snapshot_zname(tdvp, tnm, MAXNAMELEN, to);
-	if (err)
-		return (err);
 
 	mutex_enter(&sdp->sd_lock);
 
@@ -559,13 +559,13 @@ zfsctl_snapdir_remove(vnode_t *dvp, char *name, vnode_t *cwd, cred_t *cr)
 	err = zfsctl_snapshot_zname(dvp, name, MAXNAMELEN, snapname);
 	if (err)
 		return (err);
-	err = zfs_secpolicy_write(snapname, cr);
-	if (err)
+
+	if (err = zfs_secpolicy_destroy_perms(snapname, cr))
 		return (err);
 
 	mutex_enter(&sdp->sd_lock);
 
-	err = zfsctl_unmount_snap(dvp, name, 0, cr);
+	err = zfsctl_unmount_snap(dvp, name, MS_FORCE, cr);
 	if (err) {
 		mutex_exit(&sdp->sd_lock);
 		return (err);
@@ -574,6 +574,35 @@ zfsctl_snapdir_remove(vnode_t *dvp, char *name, vnode_t *cwd, cred_t *cr)
 	err = dmu_objset_destroy(snapname);
 
 	mutex_exit(&sdp->sd_lock);
+
+	return (err);
+}
+
+/* ARGSUSED */
+static int
+zfsctl_snapdir_mkdir(vnode_t *dvp, char *dirname, vattr_t *vap, vnode_t  **vpp,
+    cred_t *cr)
+{
+	zfsvfs_t *zfsvfs = dvp->v_vfsp->vfs_data;
+	char name[MAXNAMELEN];
+	int err;
+	static enum symfollow follow = NO_FOLLOW;
+	static enum uio_seg seg = UIO_SYSSPACE;
+
+	dmu_objset_name(zfsvfs->z_os, name);
+
+	*vpp = NULL;
+
+	err = zfs_secpolicy_snapshot_perms(name, cr);
+	if (err)
+		return (err);
+
+	if (err == 0) {
+		err = dmu_objset_snapshot(name, dirname, B_FALSE);
+		if (err)
+			return (err);
+		err = lookupnameat(dirname, seg, follow, NULL, vpp, dvp);
+	}
 
 	return (err);
 }
@@ -796,6 +825,7 @@ static const fs_operation_def_t zfsctl_tops_snapdir[] = {
 	{ VOPNAME_ACCESS,	{ .vop_access = zfsctl_common_access }	},
 	{ VOPNAME_RENAME,	{ .vop_rename = zfsctl_snapdir_rename }	},
 	{ VOPNAME_RMDIR,	{ .vop_rmdir = zfsctl_snapdir_remove }	},
+	{ VOPNAME_MKDIR,	{ .vop_mkdir = zfsctl_snapdir_mkdir }	},
 	{ VOPNAME_READDIR,	{ .vop_readdir = gfs_vop_readdir }	},
 	{ VOPNAME_LOOKUP,	{ .vop_lookup = zfsctl_snapdir_lookup }	},
 	{ VOPNAME_SEEK,		{ .vop_seek = fs_seek }			},

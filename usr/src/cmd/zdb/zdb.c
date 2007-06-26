@@ -700,6 +700,8 @@ dump_dsl_dir(objset_t *os, uint64_t object, void *data, size_t size)
 	(void) printf("\t\treserved = %s\n", resv);
 	(void) printf("\t\tprops_zapobj = %llu\n",
 	    (u_longlong_t)dd->dd_props_zapobj);
+	(void) printf("\t\tdeleg_zapobj = %llu\n",
+	    (u_longlong_t)dd->dd_deleg_zapobj);
 }
 
 /*ARGSUSED*/
@@ -888,6 +890,7 @@ static object_viewer_t *object_viewer[DMU_OT_NUMTYPES] = {
 	dump_uint8,		/* SPA history			*/
 	dump_uint64,		/* SPA history offsets		*/
 	dump_zap,		/* Pool properties		*/
+	dump_zap,		/* DSL permissions		*/
 };
 
 static void

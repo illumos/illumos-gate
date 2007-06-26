@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,6 +27,7 @@
 
 SUNWprivate_1.1 {
     global:
+	iscsitgt_svc_online;
     	iscsitgt_zfs_is_shared;
     	iscsitgt_zfs_share;
 	iscsitgt_zfs_unshare;

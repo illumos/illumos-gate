@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,7 +42,8 @@ SRCS =		$(OBJECTS:%.o=$(SRCDIR)/%.c)
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-I/usr/include/libxml2 -I$(SRCDIR)
+CPPFLAGS +=	-I/usr/include/libxml2 -I$(SRCDIR) \
+    -I../../../cmd/iscsi/iscsitgtd
 
 .KEEP_STATE:
 

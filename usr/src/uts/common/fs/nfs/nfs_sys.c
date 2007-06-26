@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
@@ -75,6 +75,19 @@ size_t nfs4_dss_buflen = 0;
 /* This filled in by nfssrv:_init() */
 int (*nfs_srv_dss_func)(char *, size_t) = NULL;
 
+int
+nfs_export(void *arg)
+{
+	STRUCT_DECL(exportfs_args, ea);
+
+	if (!INGLOBALZONE(curproc))
+		return (set_errno(EPERM));
+	STRUCT_INIT(ea, get_udatamodel());
+	if (copyin(arg, STRUCT_BUF(ea), STRUCT_SIZE(ea)))
+		return (set_errno(EFAULT));
+
+	return (exportfs(STRUCT_BUF(ea), get_udatamodel(), CRED()));
+}
 
 int
 nfssys(enum nfssys_op opcode, void *arg)
@@ -189,15 +202,7 @@ nfssys(enum nfssys_op opcode, void *arg)
 	}
 
 	case EXPORTFS: { /* export a file system */
-		STRUCT_DECL(exportfs_args, ea);
-
-		if (!INGLOBALZONE(curproc))
-			return (set_errno(EPERM));
-		STRUCT_INIT(ea, get_udatamodel());
-		if (copyin(arg, STRUCT_BUF(ea), STRUCT_SIZE(ea)))
-			return (set_errno(EFAULT));
-
-		error = exportfs(STRUCT_BUF(ea), get_udatamodel(), CRED());
+		error = nfs_export(arg);
 		break;
 	}
 

@@ -335,11 +335,15 @@ replay_incremental_check(void *arg1, void *arg2, dmu_tx_t *tx)
 
 /* ARGSUSED */
 static void
-replay_incremental_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+replay_incremental_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
 	ds->ds_phys->ds_flags |= DS_FLAG_INCONSISTENT;
+
+	spa_history_internal_log(LOG_DS_REPLAY_INC_SYNC,
+	    ds->ds_dir->dd_pool->dp_spa, tx, cr, "dataset = %lld",
+	    ds->ds_phys->ds_dir_obj);
 }
 
 /* ARGSUSED */
@@ -367,7 +371,7 @@ replay_full_check(void *arg1, void *arg2, dmu_tx_t *tx)
 }
 
 static void
-replay_full_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+replay_full_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dir_t *dd = arg1;
 	struct drr_begin *drrb = arg2;
@@ -379,7 +383,6 @@ replay_full_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	*cp = '\0';
 	dsobj = dsl_dataset_create_sync(dd, strrchr(drrb->drr_toname, '/') + 1,
 	    NULL, tx);
-	*cp = '@';
 
 	VERIFY(0 == dsl_dataset_open_obj(dd->dd_pool, dsobj, NULL,
 	    DS_MODE_EXCLUSIVE, FTAG, &ds));
@@ -389,6 +392,12 @@ replay_full_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
 	ds->ds_phys->ds_flags |= DS_FLAG_INCONSISTENT;
+
+	spa_history_internal_log(LOG_DS_REPLAY_FULL_SYNC,
+	    ds->ds_dir->dd_pool->dp_spa, tx, cr, "dataset = %lld",
+	    ds->ds_phys->ds_dir_obj);
+
+	*cp = '@';
 
 	dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, FTAG);
 }
@@ -411,7 +420,7 @@ replay_end_check(void *arg1, void *arg2, dmu_tx_t *tx)
 }
 
 static void
-replay_end_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+replay_end_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	objset_t *os = arg1;
 	struct drr_begin *drrb = arg2;
@@ -420,7 +429,7 @@ replay_end_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 
 	snapname = strchr(drrb->drr_toname, '@') + 1;
 
-	dsl_dataset_snapshot_sync(os, snapname, tx);
+	dsl_dataset_snapshot_sync(os, snapname, cr, tx);
 
 	/* set snapshot's creation time and guid */
 	hds = os->os->os_dsl_dataset;
@@ -433,6 +442,10 @@ replay_end_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	ds->ds_phys->ds_creation_time = drrb->drr_creation_time;
 	ds->ds_phys->ds_guid = drrb->drr_toguid;
 	ds->ds_phys->ds_flags &= ~DS_FLAG_INCONSISTENT;
+
+	/* log the end of the receive */
+	spa_history_internal_log(LOG_DS_RECEIVE, ds->ds_dir->dd_pool->dp_spa,
+	    tx, cr, "dataset = %llu", ds->ds_phys->ds_dir_obj);
 
 	dsl_dataset_close(ds, DS_MODE_PRIMARY, FTAG);
 

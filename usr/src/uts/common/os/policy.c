@@ -296,7 +296,7 @@ priv_policy_errmsg(const cred_t *cr, int priv, const char *msg)
 		}
 
 		curthread->t_pdmsg = mprintf(fmt, cmd, me->p_pid, pname,
-			    cr->cr_uid, curthread->t_sysnum, msg, sym, off);
+		    cr->cr_uid, curthread->t_sysnum, msg, sym, off);
 
 		curthread->t_post_sys = 1;
 	} else {
@@ -412,7 +412,7 @@ secpolicy_require_set(const cred_t *cr, const priv_set_t *req, const char *msg)
 	priv_set_t pset;
 
 	if (req == PRIV_FULLSET ? HAS_ALLPRIVS(cr) : priv_issubset(req,
-							    &CR_OEPRIV(cr))) {
+	    &CR_OEPRIV(cr))) {
 		return (0);
 	}
 
@@ -438,7 +438,7 @@ secpolicy_require_set(const cred_t *cr, const priv_set_t *req, const char *msg)
 				if (pfound != -1) {
 					/* Multiple missing privs */
 					priv_policy_errmsg(cr, PRIV_MULTIPLE,
-								    msg);
+					    msg);
 					return (EACCES);
 				}
 				pfound = priv;
@@ -598,6 +598,37 @@ secpolicy_fs_common(cred_t *cr, vnode_t *mvp, const vfs_t *vfsp,
 	return (PRIV_POLICY(cr, PRIV_SYS_MOUNT, allzone, EPERM, NULL));
 }
 
+void
+secpolicy_fs_mount_clearopts(cred_t *cr, struct vfs *vfsp)
+{
+	boolean_t amsuper = HAS_ALLZONEPRIVS(cr);
+
+	/*
+	 * check; if we don't have either "nosuid" or
+	 * both "nosetuid" and "nodevices", then we add
+	 * "nosuid"; this depends on how the current
+	 * implementation works (it first checks nosuid).  In a
+	 * zone, a user with all zone privileges can mount with
+	 * "setuid" but never with "devices".
+	 */
+	if (!vfs_optionisset(vfsp, MNTOPT_NOSUID, NULL) &&
+	    (!vfs_optionisset(vfsp, MNTOPT_NODEVICES, NULL) ||
+	    !vfs_optionisset(vfsp, MNTOPT_NOSETUID, NULL))) {
+		if (crgetzoneid(cr) == GLOBAL_ZONEID || !amsuper)
+			vfs_setmntopt(vfsp, MNTOPT_NOSUID, NULL, 0);
+		else
+			vfs_setmntopt(vfsp, MNTOPT_NODEVICES, NULL, 0);
+	}
+	/*
+	 * If we're not the local super user, we set the "restrict"
+	 * option to indicate to automountd that this mount should
+	 * be handled with care.
+	 */
+	if (!amsuper)
+		vfs_setmntopt(vfsp, MNTOPT_RESTRICT, NULL, 0);
+
+}
+
 extern vnode_t *rootvp;
 extern vfs_t *rootvfs;
 
@@ -621,33 +652,9 @@ secpolicy_fs_mount(cred_t *cr, vnode_t *mvp, struct vfs *vfsp)
 	error = secpolicy_fs_common(cr, mvp, vfsp, &needoptchk);
 
 	if (error == 0 && needoptchk) {
-		boolean_t amsuper = HAS_ALLZONEPRIVS(cr);
-
-		/*
-		 * Third check; if we don't have either "nosuid" or
-		 * both "nosetuid" and "nodevices", then we add
-		 * "nosuid"; this depends on how the current
-		 * implementation works (it first checks nosuid).  In a
-		 * zone, a user with all zone privileges can mount with
-		 * "setuid" but never with "devices".
-		 */
-		if (!vfs_optionisset(vfsp, MNTOPT_NOSUID, NULL) &&
-		    (!vfs_optionisset(vfsp, MNTOPT_NODEVICES, NULL) ||
-		    !vfs_optionisset(vfsp, MNTOPT_NOSETUID, NULL))) {
-			if (crgetzoneid(cr) == GLOBAL_ZONEID || !amsuper)
-				vfs_setmntopt(vfsp, MNTOPT_NOSUID, NULL, 0);
-			else
-				vfs_setmntopt(vfsp, MNTOPT_NODEVICES, NULL, 0);
-		}
-		/*
-		 * If we're not the local super user, we set the "restrict"
-		 * option to indicate to automountd that this mount should
-		 * be handled with care.
-		 */
-		if (!amsuper)
-			vfs_setmntopt(vfsp, MNTOPT_RESTRICT, NULL, 0);
-
+		secpolicy_fs_mount_clearopts(cr, vfsp);
 	}
+
 	return (error);
 }
 
@@ -943,7 +950,7 @@ secpolicy_setid_setsticky_clear(vnode_t *vp, vattr_t *vap, const vattr_t *ovap,
 	 */
 	if (vp->v_type != VDIR && (vap->va_mode & S_ISVTX) != 0 &&
 	    secpolicy_vnode_stky_modify(cr) != 0) {
-	    vap->va_mode &= ~S_ISVTX;
+		vap->va_mode &= ~S_ISVTX;
 	}
 
 	/*
@@ -952,7 +959,7 @@ secpolicy_setid_setsticky_clear(vnode_t *vp, vattr_t *vap, const vattr_t *ovap,
 	 */
 	if ((vap->va_mode & S_ISGID) != 0 &&
 	    secpolicy_vnode_setids_setgids(cr, ovap->va_gid) != 0) {
-	    vap->va_mode &= ~S_ISGID;
+		vap->va_mode &= ~S_ISGID;
 	}
 
 	return (0);

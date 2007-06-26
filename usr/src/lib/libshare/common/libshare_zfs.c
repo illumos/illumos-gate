@@ -254,7 +254,7 @@ get_zfs_dataset(sa_handle_impl_t impl_handle, char *path)
 
 		/* canmount must be set */
 		canmount[0] = '\0';
-		if (!zfs_prop_get(zlist[i], ZFS_PROP_CANMOUNT, canmount,
+		if (zfs_prop_get(zlist[i], ZFS_PROP_CANMOUNT, canmount,
 		    sizeof (canmount), NULL, NULL, 0, B_FALSE) != 0 ||
 		    strcmp(canmount, "off") == 0)
 			continue;
@@ -913,4 +913,77 @@ sa_path_is_zfs(char *path)
 	if (fstype != NULL)
 		sa_free_fstype(fstype);
 	return (ret);
+}
+
+int
+sa_sharetab_fill_zfs(sa_share_t share, share_t *sh, char *proto)
+{
+	char *path;
+
+	path = sa_get_share_attr(share, "path");
+	if (path != NULL) {
+		(void) memset(sh, 0, sizeof (sh));
+		(void) sa_fillshare(share, proto, sh);
+		return (0);
+	} else
+		return (1);
+}
+
+#define	SMAX(i, j)	\
+	if ((j) > (i)) { \
+		(i) = (j); \
+	}
+
+int
+sa_share_zfs(sa_share_t share, char *path, share_t *sh,
+    void *exportdata, boolean_t on)
+{
+	libzfs_handle_t *libhandle;
+	sa_group_t group;
+	sa_handle_t sahandle;
+	char *dataset;
+	int err = EINVAL;
+	int i, j;
+
+	/*
+	 * First find the dataset name
+	 */
+	if ((group = sa_get_parent_group(share)) == NULL)  {
+		return (SA_SYSTEM_ERR);
+	}
+	if ((sahandle = sa_find_group_handle(group)) == NULL) {
+		return (SA_SYSTEM_ERR);
+	}
+
+	if ((dataset = get_zfs_dataset(sahandle, path)) == NULL) {
+		return (SA_SYSTEM_ERR);
+	}
+
+	libhandle = libzfs_init();
+	if (libhandle != NULL) {
+
+		i = (sh->sh_path ? strlen(sh->sh_path) : 0);
+		sh->sh_size = i;
+
+		j = (sh->sh_res ? strlen(sh->sh_res) : 0);
+		sh->sh_size += j;
+		SMAX(i, j);
+
+		j = (sh->sh_fstype ? strlen(sh->sh_fstype) : 0);
+		sh->sh_size += j;
+		SMAX(i, j);
+
+		j = (sh->sh_opts ? strlen(sh->sh_opts) : 0);
+		sh->sh_size += j;
+		SMAX(i, j);
+
+		j = (sh->sh_descr ? strlen(sh->sh_descr) : 0);
+		sh->sh_size += j;
+		SMAX(i, j);
+		err = zfs_deleg_share_nfs(libhandle, dataset, path,
+		    exportdata, sh, i, on);
+		libzfs_fini(libhandle);
+	}
+	free(dataset);
+	return (err);
 }

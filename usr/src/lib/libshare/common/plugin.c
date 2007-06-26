@@ -240,13 +240,13 @@ sa_proto_share(char *proto, sa_share_t share)
  */
 
 int
-sa_proto_unshare(char *proto, char *path)
+sa_proto_unshare(sa_share_t share, char *proto, char *path)
 {
 	struct sa_plugin_ops *ops = find_protocol(proto);
 	int ret = SA_INVALID_PROTOCOL;
 
 	if (ops != NULL && ops->sa_unshare != NULL)
-	    ret = ops->sa_unshare(path);
+	    ret = ops->sa_unshare(share, path);
 	return (ret);
 }
 

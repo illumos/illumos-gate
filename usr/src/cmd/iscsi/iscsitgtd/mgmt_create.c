@@ -450,17 +450,30 @@ create_zfs(tgt_node_t *x, ucred_t *cred)
 	xmlTextReaderPtr	r;
 	const priv_set_t	*eset;
 
-	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
-	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
-	    ucred_geteuid(cred) != 0) {
-		xml_rtn_msg(&msg, ERR_NO_PERMISSION);
-		goto error;
-	}
-
 	if (tgt_find_value_str(x, XML_ELEMENT_NAME, &dataset) == False) {
 		xml_rtn_msg(&msg, ERR_SYNTAX_MISSING_NAME);
 		goto error;
 	}
+
+	if (((zh = libzfs_init()) == NULL) ||
+	    ((zfsh = zfs_open(zh, dataset, ZFS_TYPE_ANY)) == NULL)) {
+		xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
+		goto error;
+	}
+
+	eset = ucred_getprivset(cred, PRIV_EFFECTIVE);
+	if (eset != NULL ? !priv_ismember(eset, PRIV_SYS_CONFIG) :
+	    ucred_geteuid(cred) != 0) {
+
+		/*
+		 * See if user has ZFS dataset permissions to do operation
+		 */
+		if (zfs_iscsi_perm_check(zh, dataset, cred) != 0) {
+			xml_rtn_msg(&msg, ERR_NO_PERMISSION);
+			goto error;
+		}
+	}
+
 
 	while ((dnode = tgt_node_next(targets_config, XML_ELEMENT_TARG,
 	    dnode)) != NULL) {
@@ -468,12 +481,6 @@ create_zfs(tgt_node_t *x, ucred_t *cred)
 			xml_rtn_msg(&msg, ERR_LUN_EXISTS);
 			goto error;
 		}
-	}
-
-	if (((zh = libzfs_init()) == NULL) ||
-	    ((zfsh = zfs_open(zh, dataset, ZFS_TYPE_ANY)) == NULL)) {
-		xml_rtn_msg(&msg, ERR_INTERNAL_ERROR);
-		goto error;
 	}
 
 	prop_len = 1024;

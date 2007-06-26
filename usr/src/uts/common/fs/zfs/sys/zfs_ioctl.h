@@ -31,6 +31,7 @@
 #include <sys/cred.h>
 #include <sys/dmu.h>
 #include <sys/zio.h>
+#include <sys/dsl_deleg.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -109,11 +110,19 @@ typedef struct zinject_record {
 	uint32_t	zi_error;
 	uint64_t	zi_type;
 	uint32_t	zi_freq;
+	uint32_t	zi_pad;	/* pad out to 64 bit alignment */
 } zinject_record_t;
 
 #define	ZINJECT_NULL		0x1
 #define	ZINJECT_FLUSH_ARC	0x2
 #define	ZINJECT_UNLOAD_SPA	0x4
+
+typedef struct zfs_share {
+	uint64_t	z_exportdata;
+	uint64_t	z_sharedata;
+	uint64_t	z_sharetype;	/* 0 = share, 1 = unshare */
+	uint64_t	z_sharemax;  /* max length of share string */
+} zfs_share_t;
 
 typedef struct zfs_cmd {
 	char		zc_name[MAXPATHLEN];
@@ -127,20 +136,16 @@ typedef struct zfs_cmd {
 	uint64_t	zc_cred;
 	uint64_t	zc_dev;
 	uint64_t	zc_objset_type;
-	uint64_t	zc_history;	/* really (char *) */
-	uint64_t	zc_history_len;
+	uint64_t	zc_perm_action;
+	uint64_t 	zc_history;	/* really (char *) */
+	uint64_t 	zc_history_len;
 	uint64_t	zc_history_offset;
 	uint64_t	zc_obj;
+	zfs_share_t	zc_share;
 	dmu_objset_stats_t zc_objset_stats;
 	struct drr_begin zc_begin_record;
 	zinject_record_t zc_inject_record;
 } zfs_cmd_t;
-
-typedef struct zfs_create_data {
-	cred_t		*zc_cred;
-	dev_t		zc_dev;
-	nvlist_t	*zc_props;
-} zfs_create_data_t;
 
 #define	ZVOL_MAX_MINOR	(1 << 16)
 #define	ZFS_MIN_MINOR	(ZVOL_MAX_MINOR + 1)
@@ -149,7 +154,10 @@ typedef struct zfs_create_data {
 
 extern dev_info_t *zfs_dip;
 
-extern int zfs_secpolicy_write(const char *dataset, cred_t *cr);
+extern int zfs_secpolicy_snapshot_perms(const char *name, cred_t *cr);
+extern int zfs_secpolicy_rename_perms(const char *from,
+    const char *to, cred_t *cr);
+extern int zfs_secpolicy_destroy_perms(const char *name, cred_t *cr);
 extern int zfs_busy(void);
 extern int zfs_unmount_snap(char *, void *);
 

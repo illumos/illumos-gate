@@ -53,6 +53,7 @@
 #include <sys/zfs_ioctl.h>
 
 #include "zfs_prop.h"
+#include "zfs_deleg.h"
 
 #if defined(_KERNEL)
 #include <sys/systm.h>
@@ -79,110 +80,131 @@ typedef struct {
 	const char	*pd_colname;
 	boolean_t	pd_rightalign;
 	boolean_t	pd_visible;
+	const char	*pd_perm;
 } prop_desc_t;
 
 static prop_desc_t zfs_prop_table[] = {
 	{ "type",	prop_type_string,	0,	NULL,	prop_readonly,
 	    ZFS_TYPE_ANY, "filesystem | volume | snapshot", "TYPE", B_TRUE,
-	    B_TRUE },
+	    B_TRUE, ZFS_DELEG_PERM_NONE },
 	{ "creation",	prop_type_number,	0,	NULL,	prop_readonly,
-	    ZFS_TYPE_ANY, "<date>", "CREATION", B_FALSE, B_TRUE },
+	    ZFS_TYPE_ANY, "<date>", "CREATION", B_FALSE, B_TRUE,
+	    ZFS_DELEG_PERM_NONE },
 	{ "used",	prop_type_number,	0,	NULL,	prop_readonly,
-	    ZFS_TYPE_ANY, "<size>",	"USED", B_TRUE, B_TRUE },
+	    ZFS_TYPE_ANY, "<size>",	"USED", B_TRUE, B_TRUE,
+	    ZFS_DELEG_PERM_NONE },
 	{ "available",	prop_type_number,	0,	NULL,	prop_readonly,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, "<size>", "AVAIL", B_TRUE,
-	    B_TRUE },
+	    B_TRUE, ZFS_DELEG_PERM_NONE },
 	{ "referenced",	prop_type_number,	0,	NULL,	prop_readonly,
 	    ZFS_TYPE_ANY,
-	    "<size>", "REFER", B_TRUE, B_TRUE },
+	    "<size>", "REFER", B_TRUE, B_TRUE, ZFS_DELEG_PERM_NONE },
 	{ "compressratio", prop_type_number,	0,	NULL,	prop_readonly,
 	    ZFS_TYPE_ANY, "<1.00x or higher if compressed>", "RATIO", B_TRUE,
-	    B_TRUE },
+	    B_TRUE, ZFS_DELEG_PERM_NONE },
 	{ "mounted",	prop_type_boolean,	0,	NULL,	prop_readonly,
-	    ZFS_TYPE_FILESYSTEM, "yes | no | -", "MOUNTED", B_TRUE, B_TRUE },
+	    ZFS_TYPE_FILESYSTEM, "yes | no | -", "MOUNTED", B_TRUE, B_TRUE,
+	    ZFS_DELEG_PERM_NONE },
 	{ "origin",	prop_type_string,	0,	NULL,	prop_readonly,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, "<snapshot>", "ORIGIN",
-	    B_FALSE, B_TRUE },
+	    B_FALSE, B_TRUE, ZFS_DELEG_PERM_NONE },
 	{ "quota",	prop_type_number,	0,	NULL,	prop_default,
-	    ZFS_TYPE_FILESYSTEM, "<size> | none", "QUOTA", B_TRUE, B_TRUE },
+	    ZFS_TYPE_FILESYSTEM, "<size> | none", "QUOTA", B_TRUE, B_TRUE,
+	    ZFS_DELEG_PERM_QUOTA },
 	{ "reservation", prop_type_number,	0,	NULL,	prop_default,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
-	    "<size> | none", "RESERV", B_TRUE, B_TRUE },
+	    "<size> | none", "RESERV", B_TRUE, B_TRUE,
+	    ZFS_DELEG_PERM_RESERVATION },
 	{ "volsize",	prop_type_number,	0,	NULL,	prop_default,
-	    ZFS_TYPE_VOLUME, "<size>", "VOLSIZE", B_TRUE, B_TRUE },
+	    ZFS_TYPE_VOLUME, "<size>", "VOLSIZE", B_TRUE, B_TRUE,
+	    ZFS_DELEG_PERM_VOLSIZE },
 	{ "volblocksize", prop_type_number,	8192,	NULL,	prop_readonly,
 	    ZFS_TYPE_VOLUME, "512 to 128k, power of 2",	"VOLBLOCK", B_TRUE,
-	    B_TRUE },
+	    B_TRUE, ZFS_DELEG_PERM_NONE },
 	{ "recordsize",	prop_type_number,	SPA_MAXBLOCKSIZE,	NULL,
 	    prop_inherit,
 	    ZFS_TYPE_FILESYSTEM,
-	    "512 to 128k, power of 2", "RECSIZE", B_TRUE, B_TRUE },
+	    "512 to 128k, power of 2", "RECSIZE", B_TRUE, B_TRUE,
+	    ZFS_DELEG_PERM_RECORDSIZE },
 	{ "mountpoint",	prop_type_string,	0,	"/",	prop_inherit,
 	    ZFS_TYPE_FILESYSTEM,
-	    "<path> | legacy | none", "MOUNTPOINT", B_FALSE, B_TRUE },
+	    "<path> | legacy | none", "MOUNTPOINT", B_FALSE, B_TRUE,
+	    ZFS_DELEG_PERM_MOUNTPOINT },
 	{ "sharenfs",	prop_type_string,	0,	"off",	prop_inherit,
 	    ZFS_TYPE_FILESYSTEM,
-	    "on | off | share(1M) options", "SHARENFS", B_FALSE, B_TRUE },
+	    "on | off | share(1M) options", "SHARENFS", B_FALSE, B_TRUE,
+	    ZFS_DELEG_PERM_SHARENFS },
 	{ "checksum",	prop_type_index,	ZIO_CHECKSUM_DEFAULT,	"on",
 	    prop_inherit,	ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
 	    "on | off | fletcher2 | fletcher4 | sha256", "CHECKSUM", B_TRUE,
-	    B_TRUE },
+	    B_TRUE, ZFS_DELEG_PERM_CHECKSUM },
 	{ "compression", prop_type_index,	ZIO_COMPRESS_DEFAULT,	"off",
 	    prop_inherit,	ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
-	    "on | off | lzjb | gzip | gzip-[1-9]", "COMPRESS", B_TRUE, B_TRUE },
+	    "on | off | lzjb | gzip | gzip-[1-9]", "COMPRESS", B_TRUE, B_TRUE,
+	    ZFS_DELEG_PERM_COMPRESSION },
 	{ "atime",	prop_type_boolean,	1,	NULL,	prop_inherit,
 	    ZFS_TYPE_FILESYSTEM,
-	    "on | off", "ATIME", B_TRUE, B_TRUE },
+	    "on | off", "ATIME", B_TRUE, B_TRUE, ZFS_DELEG_PERM_ATIME },
 	{ "devices",	prop_type_boolean,	1,	NULL,	prop_inherit,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT,
-	    "on | off", "DEVICES", B_TRUE, B_TRUE },
+	    "on | off", "DEVICES", B_TRUE, B_TRUE, ZFS_DELEG_PERM_DEVICES },
 	{ "exec",	prop_type_boolean,	1,	NULL,	prop_inherit,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT,
-	    "on | off", "EXEC", B_TRUE, B_TRUE },
+	    "on | off", "EXEC", B_TRUE, B_TRUE, ZFS_DELEG_PERM_EXEC },
 	{ "setuid",	prop_type_boolean,	1,	NULL,	prop_inherit,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT, "on | off", "SETUID",
-	    B_TRUE, B_TRUE },
+	    B_TRUE, B_TRUE, ZFS_DELEG_PERM_SETUID },
 	{ "readonly",	prop_type_boolean,	0,	NULL,	prop_inherit,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
-	    "on | off", "RDONLY", B_TRUE, B_TRUE },
+	    "on | off", "RDONLY", B_TRUE, B_TRUE, ZFS_DELEG_PERM_READONLY },
 	{ "zoned",	prop_type_boolean,	0,	NULL,	prop_inherit,
 	    ZFS_TYPE_FILESYSTEM,
-	    "on | off", "ZONED", B_TRUE, B_TRUE },
+	    "on | off", "ZONED", B_TRUE, B_TRUE, ZFS_DELEG_PERM_ZONED },
 	{ "snapdir",	prop_type_index,	ZFS_SNAPDIR_HIDDEN, "hidden",
 	    prop_inherit,
 	    ZFS_TYPE_FILESYSTEM,
-	    "hidden | visible", "SNAPDIR", B_TRUE, B_TRUE },
+	    "hidden | visible", "SNAPDIR", B_TRUE, B_TRUE,
+	    ZFS_DELEG_PERM_SNAPDIR },
 	{ "aclmode", prop_type_index,	ZFS_ACL_GROUPMASK, "groupmask",
 	    prop_inherit, ZFS_TYPE_FILESYSTEM,
-	    "discard | groupmask | passthrough", "ACLMODE", B_TRUE, B_TRUE },
+	    "discard | groupmask | passthrough", "ACLMODE", B_TRUE,
+	    B_TRUE, ZFS_DELEG_PERM_ACLMODE },
 	{ "aclinherit", prop_type_index,	ZFS_ACL_SECURE,	"secure",
 	    prop_inherit, ZFS_TYPE_FILESYSTEM,
 	    "discard | noallow | secure | passthrough", "ACLINHERIT", B_TRUE,
-	    B_TRUE },
+	    B_TRUE, ZFS_DELEG_PERM_ACLINHERIT },
 	{ "createtxg",	prop_type_number,	0,	NULL,	prop_readonly,
-	    ZFS_TYPE_ANY, NULL, NULL, B_FALSE, B_FALSE },
+	    ZFS_TYPE_ANY, NULL, NULL, B_FALSE, B_FALSE, ZFS_DELEG_PERM_NONE },
 	{ "name",	prop_type_string,	0,	NULL,	prop_readonly,
-	    ZFS_TYPE_ANY, NULL, "NAME", B_FALSE, B_FALSE },
+	    ZFS_TYPE_ANY, NULL, "NAME", B_FALSE, B_FALSE, ZFS_DELEG_PERM_NONE },
 	{ "canmount",	prop_type_boolean,	1,	NULL,	prop_default,
 	    ZFS_TYPE_FILESYSTEM,
-	    "on | off", "CANMOUNT", B_TRUE, B_TRUE },
+	    "on | off", "CANMOUNT", B_TRUE, B_TRUE, ZFS_DELEG_PERM_CANMOUNT },
 	{ "shareiscsi",	prop_type_string,	0,	"off",	prop_inherit,
 	    ZFS_TYPE_ANY,
-	    "on | off | type=<type>", "SHAREISCSI", B_FALSE, B_TRUE },
+	    "on | off | type=<type>", "SHAREISCSI", B_FALSE, B_TRUE,
+	    ZFS_DELEG_PERM_SHAREISCSI },
 	{ "iscsioptions", prop_type_string,	0,	NULL,	prop_inherit,
-	    ZFS_TYPE_VOLUME, NULL, "ISCSIOPTIONS", B_FALSE, B_FALSE },
+	    ZFS_TYPE_VOLUME, NULL, "ISCSIOPTIONS", B_FALSE, B_FALSE,
+	    ZFS_DELEG_PERM_NONE },
 	{ "xattr",	prop_type_boolean,	1,	NULL,	prop_inherit,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT,
-	    "on | off", "XATTR", B_TRUE, B_TRUE },
+	    "on | off", "XATTR", B_TRUE, B_TRUE, ZFS_DELEG_PERM_XATTR },
 	{ "numclones", prop_type_number,	0,	NULL,	prop_readonly,
-	    ZFS_TYPE_SNAPSHOT, NULL, NULL, B_FALSE, B_FALSE },
+	    ZFS_TYPE_SNAPSHOT, NULL, NULL, B_FALSE, B_FALSE,
+	    ZFS_DELEG_PERM_NONE },
 	{ "copies",	prop_type_index,	1,	"1",	prop_inherit,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
-	    "1 | 2 | 3", "COPIES", B_TRUE, B_TRUE },
+	    "1 | 2 | 3", "COPIES", B_TRUE, B_TRUE, ZFS_DELEG_PERM_COPIES },
 	{ "bootfs", prop_type_string,	0,	NULL,	prop_default,
-	    ZFS_TYPE_POOL, "<filesystem>", "BOOTFS", B_FALSE, B_TRUE },
+	    ZFS_TYPE_POOL, "<filesystem>", "BOOTFS", B_FALSE,
+	    B_TRUE, ZFS_DELEG_PERM_NONE },
 	{ "autoreplace", prop_type_boolean,	0,	NULL, prop_default,
-	    ZFS_TYPE_POOL, "on | off", "REPLACE", B_FALSE, B_TRUE },
+	    ZFS_TYPE_POOL, "on | off", "REPLACE", B_FALSE, B_TRUE,
+	    ZFS_DELEG_PERM_NONE },
+	{ "delegation", prop_type_boolean,	1,	NULL,	prop_default,
+	    ZFS_TYPE_POOL, "on | off", "DELEGATION", B_TRUE,
+	    B_TRUE, ZFS_DELEG_PERM_NONE }
 };
 
 #define	ZFS_PROP_COUNT	((sizeof (zfs_prop_table))/(sizeof (prop_desc_t)))
@@ -291,8 +313,9 @@ zfs_name_to_prop_cb(zfs_prop_t prop, void *cb_data)
 {
 	const char *propname = cb_data;
 
-	if (propname_match(propname, prop, strlen(propname)))
+	if (propname_match(propname, prop, strlen(propname))) {
 		return (prop);
+	}
 
 	return (ZFS_PROP_CONT);
 }
@@ -326,6 +349,12 @@ zpool_prop_t
 zpool_name_to_prop(const char *propname)
 {
 	return (zfs_name_to_prop_common(propname, ZFS_TYPE_POOL));
+}
+
+const char *
+zfs_prop_perm(zfs_prop_t prop)
+{
+	return (zfs_prop_table[prop].pd_perm);
 }
 
 /*

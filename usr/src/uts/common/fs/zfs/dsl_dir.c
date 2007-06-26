@@ -31,14 +31,17 @@
 #include <sys/dsl_dir.h>
 #include <sys/dsl_prop.h>
 #include <sys/dsl_synctask.h>
+#include <sys/dsl_deleg.h>
 #include <sys/spa.h>
 #include <sys/zap.h>
 #include <sys/zio.h>
 #include <sys/arc.h>
+#include <sys/sunddi.h>
 #include "zfs_namecheck.h"
 
 static uint64_t dsl_dir_estimated_space(dsl_dir_t *dd);
-static void dsl_dir_set_reservation_sync(void *arg1, void *arg2, dmu_tx_t *tx);
+static void dsl_dir_set_reservation_sync(void *arg1, void *arg2,
+    cred_t *cr, dmu_tx_t *tx);
 
 
 /* ARGSUSED */
@@ -461,7 +464,7 @@ dsl_dir_destroy_check(void *arg1, void *arg2, dmu_tx_t *tx)
 }
 
 void
-dsl_dir_destroy_sync(void *arg1, void *tag, dmu_tx_t *tx)
+dsl_dir_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dir_t *dd = arg1;
 	objset_t *mos = dd->dd_pool->dp_meta_objset;
@@ -472,12 +475,13 @@ dsl_dir_destroy_sync(void *arg1, void *tag, dmu_tx_t *tx)
 
 	/* Remove our reservation. */
 	val = 0;
-	dsl_dir_set_reservation_sync(dd, &val, tx);
+	dsl_dir_set_reservation_sync(dd, &val, cr, tx);
 	ASSERT3U(dd->dd_used_bytes, ==, 0);
 	ASSERT3U(dd->dd_phys->dd_reserved, ==, 0);
 
 	VERIFY(0 == zap_destroy(mos, dd->dd_phys->dd_child_dir_zapobj, tx));
 	VERIFY(0 == zap_destroy(mos, dd->dd_phys->dd_props_zapobj, tx));
+	VERIFY(0 == dsl_deleg_destroy(mos, dd->dd_phys->dd_deleg_zapobj, tx));
 	VERIFY(0 == zap_remove(mos,
 	    dd->dd_parent->dd_phys->dd_child_dir_zapobj, dd->dd_myname, tx));
 
@@ -904,7 +908,6 @@ dsl_dir_diduse_space(dsl_dir_t *dd,
 	}
 }
 
-/* ARGSUSED */
 static int
 dsl_dir_set_quota_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
@@ -935,8 +938,9 @@ dsl_dir_set_quota_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	return (err);
 }
 
+/* ARGSUSED */
 static void
-dsl_dir_set_quota_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+dsl_dir_set_quota_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dir_t *dd = arg1;
 	uint64_t *quotap = arg2;
@@ -947,6 +951,10 @@ dsl_dir_set_quota_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	mutex_enter(&dd->dd_lock);
 	dd->dd_phys->dd_quota = new_quota;
 	mutex_exit(&dd->dd_lock);
+
+	spa_history_internal_log(LOG_DS_QUOTA, dd->dd_pool->dp_spa,
+	    tx, cr, "%lld dataset = %llu ",
+	    (longlong_t)new_quota, dd->dd_phys->dd_head_dataset_obj);
 }
 
 int
@@ -970,7 +978,6 @@ dsl_dir_set_quota(const char *ddname, uint64_t quota)
 	return (err);
 }
 
-/* ARGSUSED */
 static int
 dsl_dir_set_reservation_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
@@ -1011,8 +1018,9 @@ dsl_dir_set_reservation_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	return (0);
 }
 
+/* ARGSUSED */
 static void
-dsl_dir_set_reservation_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+dsl_dir_set_reservation_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dir_t *dd = arg1;
 	uint64_t *reservationp = arg2;
@@ -1033,6 +1041,10 @@ dsl_dir_set_reservation_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 		/* Roll up this additional usage into our ancestors */
 		dsl_dir_diduse_space(dd->dd_parent, delta, 0, 0, tx);
 	}
+
+	spa_history_internal_log(LOG_DS_RESERVATION, dd->dd_pool->dp_spa,
+	    tx, cr, "%lld dataset = %llu",
+	    (longlong_t)new_reservation, dd->dd_phys->dd_head_dataset_obj);
 }
 
 int
@@ -1084,7 +1096,7 @@ struct renamearg {
 	const char *mynewname;
 };
 
-/* ARGSUSED */
+/*ARGSUSED*/
 static int
 dsl_dir_rename_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
@@ -1125,7 +1137,7 @@ dsl_dir_rename_check(void *arg1, void *arg2, dmu_tx_t *tx)
 }
 
 static void
-dsl_dir_rename_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+dsl_dir_rename_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dir_t *dd = arg1;
 	struct renamearg *ra = arg2;
@@ -1164,6 +1176,9 @@ dsl_dir_rename_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	err = zap_add(mos, ra->newparent->dd_phys->dd_child_dir_zapobj,
 	    dd->dd_myname, 8, 1, &dd->dd_object, tx);
 	ASSERT3U(err, ==, 0);
+
+	spa_history_internal_log(LOG_DS_RENAME, dd->dd_pool->dp_spa,
+	    tx, cr, "dataset = %llu", dd->dd_phys->dd_head_dataset_obj);
 }
 
 int
@@ -1188,7 +1203,6 @@ dsl_dir_rename(dsl_dir_t *dd, const char *newname)
 		err = EEXIST;
 		goto out;
 	}
-
 
 	err = dsl_sync_task_do(dd->dd_pool,
 	    dsl_dir_rename_check, dsl_dir_rename_sync, dd, &ra, 3);

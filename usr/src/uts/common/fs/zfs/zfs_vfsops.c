@@ -31,7 +31,6 @@
 #include <sys/sysmacros.h>
 #include <sys/kmem.h>
 #include <sys/pathname.h>
-#include <sys/acl.h>
 #include <sys/vnode.h>
 #include <sys/vfs.h>
 #include <sys/vfs_opreg.h>
@@ -46,6 +45,7 @@
 #include <sys/dmu.h>
 #include <sys/dsl_prop.h>
 #include <sys/dsl_dataset.h>
+#include <sys/dsl_deleg.h>
 #include <sys/spa.h>
 #include <sys/zap.h>
 #include <sys/varargs.h>
@@ -53,6 +53,7 @@
 #include <sys/atomic.h>
 #include <sys/mkdev.h>
 #include <sys/modctl.h>
+#include <sys/refstr.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/zfs_ctldir.h>
 #include <sys/bootconf.h>
@@ -884,8 +885,42 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 
 	osname = spn.pn_path;
 
-	if ((error = secpolicy_fs_mount(cr, mvp, vfsp)) != 0)
-		goto out;
+	/*
+	 * Check for mount privilege?
+	 *
+	 * If we don't have privilege then see if
+	 * we have local permission to allow it
+	 */
+	error = secpolicy_fs_mount(cr, mvp, vfsp);
+	if (error) {
+		error = dsl_deleg_access(osname, ZFS_DELEG_PERM_MOUNT, cr);
+		if (error == 0) {
+			vattr_t		vattr;
+
+			/*
+			 * Make sure user is the owner of the mount point
+			 * or has sufficient privileges.
+			 */
+
+			vattr.va_mask = AT_UID;
+
+			if (VOP_GETATTR(mvp, &vattr, 0, cr)) {
+				goto out;
+			}
+
+			if (error = secpolicy_vnode_owner(cr, vattr.va_uid)) {
+				goto out;
+			}
+
+			if (error = VOP_ACCESS(mvp, VWRITE, 0, cr)) {
+				goto out;
+			}
+
+			secpolicy_fs_mount_clearopts(cr, vfsp);
+		} else {
+			goto out;
+		}
+	}
 
 	/*
 	 * Refuse to mount a filesystem if we are in a local zone and the
@@ -992,9 +1027,13 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 	zfsvfs_t *zfsvfs = vfsp->vfs_data;
 	int ret;
 
-	if ((ret = secpolicy_fs_unmount(cr, vfsp)) != 0)
-		return (ret);
-
+	ret = secpolicy_fs_unmount(cr, vfsp);
+	if (ret) {
+		ret = dsl_deleg_access((char *)refstr_value(vfsp->vfs_resource),
+		    ZFS_DELEG_PERM_MOUNT, cr);
+		if (ret)
+			return (ret);
+	}
 
 	(void) dnlc_purge_vfsp(vfsp, 0);
 
@@ -1003,8 +1042,9 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 	 * dataset itself.
 	 */
 	if (zfsvfs->z_ctldir != NULL &&
-	    (ret = zfsctl_umount_snapshots(vfsp, fflag, cr)) != 0)
+	    (ret = zfsctl_umount_snapshots(vfsp, fflag, cr)) != 0) {
 		return (ret);
+	}
 
 	if (fflag & MS_FORCE) {
 		vfsp->vfs_flag |= VFS_UNMOUNTED;

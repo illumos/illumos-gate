@@ -25,6 +25,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/cred.h>
 #include <sys/zfs_context.h>
 #include <sys/dmu_objset.h>
 #include <sys/dsl_dir.h>
@@ -32,6 +33,7 @@
 #include <sys/dsl_prop.h>
 #include <sys/dsl_pool.h>
 #include <sys/dsl_synctask.h>
+#include <sys/dsl_deleg.h>
 #include <sys/dnode.h>
 #include <sys/dbuf.h>
 #include <sys/zvol.h>
@@ -40,6 +42,7 @@
 #include <sys/zap.h>
 #include <sys/zil.h>
 #include <sys/dmu_impl.h>
+#include <sys/zfs_ioctl.h>
 
 
 spa_t *
@@ -443,14 +446,14 @@ dmu_objset_create_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 }
 
 struct oscarg {
-	void (*userfunc)(objset_t *os, void *arg, dmu_tx_t *tx);
+	void (*userfunc)(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx);
 	void *userarg;
 	dsl_dataset_t *clone_parent;
 	const char *lastname;
 	dmu_objset_type_t type;
 };
 
-/* ARGSUSED */
+/*ARGSUSED*/
 static int
 dmu_objset_create_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
@@ -478,11 +481,12 @@ dmu_objset_create_check(void *arg1, void *arg2, dmu_tx_t *tx)
 		if (oa->clone_parent->ds_phys->ds_num_children == 0)
 			return (EINVAL);
 	}
+
 	return (0);
 }
 
 static void
-dmu_objset_create_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+dmu_objset_create_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dir_t *dd = arg1;
 	struct oscarg *oa = arg2;
@@ -506,15 +510,24 @@ dmu_objset_create_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 		    ds, bp, oa->type, tx);
 
 		if (oa->userfunc)
-			oa->userfunc(&osi->os, oa->userarg, tx);
+			oa->userfunc(&osi->os, oa->userarg, cr, tx);
 	}
+
+	/*
+	 * Create create time permission if any?
+	 */
+	dsl_deleg_set_create_perms(ds->ds_dir, tx, cr);
+
+	spa_history_internal_log(LOG_DS_CREATE, dd->dd_pool->dp_spa,
+	    tx, cr, "dataset = %llu", dsobj);
+
 	dsl_dataset_close(ds, DS_MODE_STANDARD | DS_MODE_READONLY, FTAG);
 }
 
 int
 dmu_objset_create(const char *name, dmu_objset_type_t type,
     objset_t *clone_parent,
-    void (*func)(objset_t *os, void *arg, dmu_tx_t *tx), void *arg)
+    void (*func)(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx), void *arg)
 {
 	dsl_dir_t *pdd;
 	const char *tail;
@@ -536,6 +549,7 @@ dmu_objset_create(const char *name, dmu_objset_type_t type,
 	oa.userarg = arg;
 	oa.lastname = tail;
 	oa.type = type;
+
 	if (clone_parent != NULL) {
 		/*
 		 * You can't clone to a different type.
@@ -598,6 +612,7 @@ struct snaparg {
 	dsl_sync_task_group_t *dstg;
 	char *snapname;
 	char failed[MAXPATHLEN];
+	boolean_t checkperms;
 };
 
 static int
@@ -609,6 +624,15 @@ dmu_objset_snapshot_one(char *name, void *arg)
 	int err;
 
 	(void) strcpy(sn->failed, name);
+
+	/*
+	 * Check permissions only when requested.  This only applies when
+	 * doing a recursive snapshot.  The permission checks for the starting
+	 * dataset have already been performed in zfs_secpolicy_snapshot()
+	 */
+	if (sn->checkperms == B_TRUE &&
+	    (err = zfs_secpolicy_snapshot_perms(name, CRED())))
+		return (err);
 
 	err = dmu_objset_open(name, DMU_OST_ANY, DS_MODE_STANDARD, &os);
 	if (err != 0)
@@ -665,9 +689,11 @@ dmu_objset_snapshot(char *fsname, char *snapname, boolean_t recursive)
 	sn.snapname = snapname;
 
 	if (recursive) {
+		sn.checkperms = B_TRUE;
 		err = dmu_objset_find(fsname,
 		    dmu_objset_snapshot_one, &sn, DS_FIND_CHILDREN);
 	} else {
+		sn.checkperms = B_FALSE;
 		err = dmu_objset_snapshot_one(fsname, &sn);
 	}
 

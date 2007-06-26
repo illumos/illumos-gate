@@ -150,6 +150,7 @@ struct spa {
 	kmutex_t	spa_props_lock;		/* property lock */
 	uint64_t	spa_pool_props_object;	/* object for properties */
 	uint64_t	spa_bootfs;		/* default boot filesystem */
+	boolean_t	spa_delegation;		/* delegation on/off */
 	/*
 	 * spa_refcnt must be the last element because it changes size based on
 	 * compilation options.  In order for the MDB module to function

@@ -62,10 +62,14 @@ SUNWprivate {
 	sa_commit_properties;
 	sa_parse_legacy_options;
 	sa_zfs_is_shared;
+	sa_share_zfs;
+	sa_path_is_zfs;
 	sa_get_derived_optionset;
 	sa_move_share;
 	sa_group_is_zfs;
 	sa_update_config;
+	sa_sharetab_fill_zfs;
+	sa_emptyshare;
 	sa_get_share_attr;
 	sa_create_optionset;
 	sa_valid_property;

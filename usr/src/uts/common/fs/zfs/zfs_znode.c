@@ -306,10 +306,6 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 	ASSERT(zfsvfs->z_root != 0);
 
 	/*
-	 * Create the per mount vop tables.
-	 */
-
-	/*
 	 * Initialize zget mutex's
 	 */
 	for (i = 0; i != ZFS_OBJ_MTX_SZ; i++)
@@ -1088,8 +1084,8 @@ zfs_create_fs(objset_t *os, cred_t *cr, dmu_tx_t *tx)
 	vattr.va_mask = AT_MODE|AT_UID|AT_GID|AT_TYPE;
 	vattr.va_type = VDIR;
 	vattr.va_mode = S_IFDIR|0755;
-	vattr.va_uid = 0;
-	vattr.va_gid = 3;
+	vattr.va_uid = crgetuid(cr);
+	vattr.va_gid = crgetgid(cr);
 
 	rootzp = kmem_cache_alloc(znode_cache, KM_SLEEP);
 	rootzp->z_zfsvfs = &zfsvfs;

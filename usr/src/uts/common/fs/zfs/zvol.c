@@ -219,16 +219,17 @@ zvol_minor_lookup(const char *name)
 	return (zv);
 }
 
+/* ARGSUSED */
 void
-zvol_create_cb(objset_t *os, void *arg, dmu_tx_t *tx)
+zvol_create_cb(objset_t *os, void *arg, cred_t *cr, dmu_tx_t *tx)
 {
-	zfs_create_data_t *zc = arg;
+	nvlist_t *nvprops = arg;
 	int error;
 	uint64_t volblocksize, volsize;
 
-	VERIFY(nvlist_lookup_uint64(zc->zc_props,
+	VERIFY(nvlist_lookup_uint64(nvprops,
 	    zfs_prop_to_name(ZFS_PROP_VOLSIZE), &volsize) == 0);
-	if (nvlist_lookup_uint64(zc->zc_props,
+	if (nvlist_lookup_uint64(nvprops,
 	    zfs_prop_to_name(ZFS_PROP_VOLBLOCKSIZE), &volblocksize) != 0)
 		volblocksize = zfs_prop_default_numeric(ZFS_PROP_VOLBLOCKSIZE);
 
@@ -236,9 +237,9 @@ zvol_create_cb(objset_t *os, void *arg, dmu_tx_t *tx)
 	 * These properites must be removed from the list so the generic
 	 * property setting step won't apply to them.
 	 */
-	VERIFY(nvlist_remove_all(zc->zc_props,
+	VERIFY(nvlist_remove_all(nvprops,
 	    zfs_prop_to_name(ZFS_PROP_VOLSIZE)) == 0);
-	(void) nvlist_remove_all(zc->zc_props,
+	(void) nvlist_remove_all(nvprops,
 	    zfs_prop_to_name(ZFS_PROP_VOLBLOCKSIZE));
 
 	error = dmu_object_claim(os, ZVOL_OBJ, DMU_OT_ZVOL, volblocksize,

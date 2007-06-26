@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,7 @@
 #include <sys/dsl_pool.h>
 #include <sys/dsl_dir.h>
 #include <sys/dsl_synctask.h>
+#include <sys/cred.h>
 
 #define	DST_AVG_BLKSHIFT 14
 
@@ -67,6 +68,7 @@ dsl_sync_task_create(dsl_sync_task_group_t *dstg,
 	dst->dst_syncfunc = syncfunc;
 	dst->dst_arg1 = arg1;
 	dst->dst_arg2 = arg2;
+	dst->dst_cr = CRED();
 	list_insert_tail(&dstg->dstg_tasks, dst);
 
 	dstg->dstg_space += blocks_modified << DST_AVG_BLKSHIFT;
@@ -171,7 +173,8 @@ dsl_sync_task_group_sync(dsl_sync_task_group_t *dstg, dmu_tx_t *tx)
 		 */
 		for (dst = list_head(&dstg->dstg_tasks); dst;
 		    dst = list_next(&dstg->dstg_tasks, dst)) {
-			dst->dst_syncfunc(dst->dst_arg1, dst->dst_arg2, tx);
+			dst->dst_syncfunc(dst->dst_arg1, dst->dst_arg2,
+			    dst->dst_cr, tx);
 		}
 	}
 	rw_exit(&dstg->dstg_pool->dp_config_rwlock);

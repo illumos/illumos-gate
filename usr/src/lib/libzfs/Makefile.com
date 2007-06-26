@@ -28,7 +28,7 @@
 LIBRARY= libzfs.a
 VERS= .1
 
-OBJS_SHARED= zfs_namecheck.o zfs_prop.o
+OBJS_SHARED= zfs_namecheck.o zfs_prop.o zfs_deleg.o
 OBJS_COMMON= libzfs_dataset.o libzfs_util.o libzfs_graph.o libzfs_mount.o \
 	libzfs_pool.o libzfs_changelist.o libzfs_config.o libzfs_import.o \
 	libzfs_status.o
@@ -49,7 +49,7 @@ INCS += -I../../../common/zfs
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
-LDLIBS +=	-lc -lm -ldevinfo -ldevid -lgen -lnvpair -luutil -lefi
+LDLIBS +=	-lc -lm -ldevinfo -ldevid -lgen -lnvpair -luutil -lavl -lefi
 CPPFLAGS +=	$(INCS) -D_REENTRANT
 
 SRCS=	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\

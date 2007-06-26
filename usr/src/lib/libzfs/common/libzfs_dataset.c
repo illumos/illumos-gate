@@ -41,6 +41,12 @@
 #include <sys/mntent.h>
 #include <sys/mnttab.h>
 #include <sys/mount.h>
+#include <sys/avl.h>
+#include <priv.h>
+#include <pwd.h>
+#include <grp.h>
+#include <stddef.h>
+#include <ucred.h>
 
 #include <sys/spa.h>
 #include <sys/zio.h>
@@ -50,6 +56,7 @@
 #include "zfs_namecheck.h"
 #include "zfs_prop.h"
 #include "libzfs_impl.h"
+#include "zfs_deleg.h"
 
 static int create_parents(libzfs_handle_t *, char *, int);
 static int zvol_create_link_common(libzfs_handle_t *, const char *, int);
@@ -307,16 +314,25 @@ zfs_handle_t *
 make_dataset_handle(libzfs_handle_t *hdl, const char *path)
 {
 	zfs_handle_t *zhp = calloc(sizeof (zfs_handle_t), 1);
+	char *logstr;
 
 	if (zhp == NULL)
 		return (NULL);
 
 	zhp->zfs_hdl = hdl;
 
+	/*
+	 * Preserve history log string.
+	 * any changes performed here will be
+	 * logged as an internal event.
+	 */
+	logstr = zhp->zfs_hdl->libzfs_log_str;
+	zhp->zfs_hdl->libzfs_log_str = NULL;
 top:
 	(void) strlcpy(zhp->zfs_name, path, sizeof (zhp->zfs_name));
 
 	if (get_stats(zhp) != 0) {
+		zhp->zfs_hdl->libzfs_log_str = logstr;
 		free(zhp);
 		return (NULL);
 	}
@@ -356,6 +372,7 @@ top:
 		 * never existed.
 		 */
 		if (ioctl(hdl->libzfs_fd, ZFS_IOC_DESTROY, &zc) == 0) {
+			zhp->zfs_hdl->libzfs_log_str = logstr;
 			free(zhp);
 			errno = ENOENT;
 			return (NULL);
@@ -382,6 +399,7 @@ top:
 	else
 		abort();	/* we should never see any other types */
 
+	zhp->zfs_hdl->libzfs_log_str = logstr;
 	return (zhp);
 }
 
@@ -1120,6 +1138,742 @@ error:
 	return (NULL);
 }
 
+static int
+zfs_get_perm_who(const char *who, zfs_deleg_who_type_t *who_type,
+    uint64_t *ret_who)
+{
+	struct passwd *pwd;
+	struct group *grp;
+	uid_t id;
+
+	if (*who_type == ZFS_DELEG_EVERYONE || *who_type == ZFS_DELEG_CREATE ||
+	    *who_type == ZFS_DELEG_NAMED_SET) {
+		*ret_who = -1;
+		return (0);
+	}
+	if (who == NULL && !(*who_type == ZFS_DELEG_EVERYONE))
+		return (EZFS_BADWHO);
+
+	if (*who_type == ZFS_DELEG_WHO_UNKNOWN &&
+	    strcmp(who, "everyone") == 0) {
+		*ret_who = -1;
+		*who_type = ZFS_DELEG_EVERYONE;
+		return (0);
+	}
+
+	pwd = getpwnam(who);
+	grp = getgrnam(who);
+
+	if ((*who_type == ZFS_DELEG_USER) && pwd) {
+		*ret_who = pwd->pw_uid;
+	} else if ((*who_type == ZFS_DELEG_GROUP) && grp) {
+		*ret_who = grp->gr_gid;
+	} else if (pwd) {
+		*ret_who = pwd->pw_uid;
+		*who_type = ZFS_DELEG_USER;
+	} else if (grp) {
+		*ret_who = grp->gr_gid;
+		*who_type = ZFS_DELEG_GROUP;
+	} else {
+		char *end;
+
+		id = strtol(who, &end, 10);
+		if (errno != 0 || *end != '\0') {
+			return (EZFS_BADWHO);
+		} else {
+			*ret_who = id;
+			if (*who_type == ZFS_DELEG_WHO_UNKNOWN)
+				*who_type = ZFS_DELEG_USER;
+		}
+	}
+
+	return (0);
+}
+
+static void
+zfs_perms_add_to_nvlist(nvlist_t *who_nvp, char *name, nvlist_t *perms_nvp)
+{
+	if (perms_nvp != NULL) {
+		verify(nvlist_add_nvlist(who_nvp,
+		    name, perms_nvp) == 0);
+	} else {
+		verify(nvlist_add_boolean(who_nvp, name) == 0);
+	}
+}
+
+static void
+helper(zfs_deleg_who_type_t who_type, uint64_t whoid, char *whostr,
+    zfs_deleg_inherit_t inherit, nvlist_t *who_nvp, nvlist_t *perms_nvp,
+    nvlist_t *sets_nvp)
+{
+	boolean_t do_perms, do_sets;
+	char name[ZFS_MAX_DELEG_NAME];
+
+	do_perms = (nvlist_next_nvpair(perms_nvp, NULL) != NULL);
+	do_sets = (nvlist_next_nvpair(sets_nvp, NULL) != NULL);
+
+	if (!do_perms && !do_sets)
+		do_perms = do_sets = B_TRUE;
+
+	if (do_perms) {
+		zfs_deleg_whokey(name, who_type, inherit,
+		    (who_type == ZFS_DELEG_NAMED_SET) ?
+		    whostr : (void *)&whoid);
+		zfs_perms_add_to_nvlist(who_nvp, name, perms_nvp);
+	}
+	if (do_sets) {
+		zfs_deleg_whokey(name, toupper(who_type), inherit,
+		    (who_type == ZFS_DELEG_NAMED_SET) ?
+		    whostr : (void *)&whoid);
+		zfs_perms_add_to_nvlist(who_nvp, name, sets_nvp);
+	}
+}
+
+static void
+zfs_perms_add_who_nvlist(nvlist_t *who_nvp, uint64_t whoid, void *whostr,
+    nvlist_t *perms_nvp, nvlist_t *sets_nvp,
+    zfs_deleg_who_type_t who_type, zfs_deleg_inherit_t inherit)
+{
+	if (who_type == ZFS_DELEG_NAMED_SET || who_type == ZFS_DELEG_CREATE) {
+		helper(who_type, whoid, whostr, 0,
+		    who_nvp, perms_nvp, sets_nvp);
+	} else {
+		if (inherit & ZFS_DELEG_PERM_LOCAL) {
+			helper(who_type, whoid, whostr, ZFS_DELEG_LOCAL,
+			    who_nvp, perms_nvp, sets_nvp);
+		}
+		if (inherit & ZFS_DELEG_PERM_DESCENDENT) {
+			helper(who_type, whoid, whostr, ZFS_DELEG_DESCENDENT,
+			    who_nvp, perms_nvp, sets_nvp);
+		}
+	}
+}
+
+/*
+ * Construct nvlist to pass down to kernel for setting/removing permissions.
+ *
+ * The nvlist is constructed as a series of nvpairs with an optional embedded
+ * nvlist of permissions to remove or set.  The topmost nvpairs are the actual
+ * base attribute named stored in the dsl.
+ * Arguments:
+ *
+ * whostr:   is a comma separated list of users, groups, or a single set name.
+ *           whostr may be null for everyone or create perms.
+ * who_type: is the type of entry in whostr.  Typically this will be
+ *           ZFS_DELEG_WHO_UNKNOWN.
+ * perms:    comman separated list of permissions.  May be null if user
+ *           is requested to remove permissions by who.
+ * inherit:  Specifies the inheritance of the permissions.  Will be either
+ *           ZFS_DELEG_PERM_LOCAL and/or  ZFS_DELEG_PERM_DESCENDENT.
+ * nvp       The constructed nvlist to pass to zfs_perm_set().
+ *           The output nvp will look something like this.
+ *              ul$1234 -> {create ; destroy }
+ *              Ul$1234 -> { @myset }
+ *              s-$@myset - { snapshot; checksum; compression }
+ */
+int
+zfs_build_perms(zfs_handle_t *zhp, char *whostr, char *perms,
+    zfs_deleg_who_type_t who_type, zfs_deleg_inherit_t inherit, nvlist_t **nvp)
+{
+	nvlist_t *who_nvp;
+	nvlist_t *perms_nvp = NULL;
+	nvlist_t *sets_nvp = NULL;
+	char errbuf[1024];
+	char *who_tok;
+	int error;
+
+	*nvp = NULL;
+
+	if (perms) {
+		/* Make sure permission string doesn't have an '=' sign in it */
+		if (strchr(perms, '=') != NULL) {
+			(void) snprintf(errbuf, sizeof (errbuf),
+			    dgettext(TEXT_DOMAIN,
+			    "permissions can't contain equal sign : '%s'"),
+			    perms);
+			return (zfs_error(zhp->zfs_hdl, EZFS_BADPERM, errbuf));
+		}
+
+		if ((error = nvlist_alloc(&perms_nvp,
+		    NV_UNIQUE_NAME, 0)) != 0) {
+			return (1);
+		}
+		if ((error = nvlist_alloc(&sets_nvp,
+		    NV_UNIQUE_NAME, 0)) != 0) {
+			nvlist_free(perms_nvp);
+			return (1);
+		}
+	}
+
+	if ((error = nvlist_alloc(&who_nvp, NV_UNIQUE_NAME, 0)) != 0) {
+		if (perms_nvp)
+			nvlist_free(perms_nvp);
+		if (sets_nvp)
+			nvlist_free(sets_nvp);
+		return (1);
+	}
+
+	if (who_type == ZFS_DELEG_NAMED_SET) {
+		namecheck_err_t why;
+		char what;
+
+		if ((error = permset_namecheck(whostr, &why, &what)) != 0) {
+			switch (why) {
+			case NAME_ERR_NO_AT:
+				zfs_error_aux(zhp->zfs_hdl,
+				    dgettext(TEXT_DOMAIN,
+				    "set definition must begin with an '@' "
+				    "character"));
+			}
+			return (zfs_error(zhp->zfs_hdl,
+			    EZFS_BADPERMSET, whostr));
+		}
+	}
+
+	/*
+	 * Build up nvlist(s) of permissions.  Two nvlists are maintained.
+	 * The first nvlist perms_nvp will have normal permissions and the
+	 * other sets_nvp will have only permssion set names in it.
+	 */
+
+
+	while (perms && *perms != '\0') {
+		char *value;
+		char *perm_name;
+		nvlist_t *update_nvp;
+		int  perm_num;
+		char canonical_name[64];
+		char *canonicalp = canonical_name;
+
+
+		update_nvp = perms_nvp;
+
+		perm_num = getsubopt(&perms, zfs_deleg_perm_tab, &value);
+		if (perm_num == -1) {
+			zfs_prop_t prop;
+
+			prop = zfs_name_to_prop(value);
+			if (prop != ZFS_PROP_INVAL) {
+				(void) snprintf(canonical_name,
+				    sizeof (canonical_name), "%s",
+				    zfs_prop_to_name(prop));
+				perm_num = getsubopt(&canonicalp,
+				    zfs_deleg_perm_tab, &value);
+			}
+		}
+		if (perm_num != -1) {
+			perm_name = zfs_deleg_perm_tab[perm_num];
+		} else {  /* check and see if permission is a named set */
+			if (value[0] == '@') {
+
+				/*
+				 * make sure permssion set isn't defined
+				 * in terms of itself. ie.
+				 * @set1 = create,destroy,@set1
+				 */
+				if (who_type == ZFS_DELEG_NAMED_SET &&
+				    strcmp(value, whostr) == 0) {
+					nvlist_free(who_nvp);
+					nvlist_free(perms_nvp);
+					if (sets_nvp)
+						nvlist_free(sets_nvp);
+					(void) snprintf(errbuf,
+					    sizeof (errbuf),
+					    dgettext(TEXT_DOMAIN,
+					    "Invalid permission %s"), value);
+					return (zfs_error(zhp->zfs_hdl,
+					    EZFS_PERMSET_CIRCULAR, errbuf));
+				}
+				update_nvp = sets_nvp;
+				perm_name = value;
+			} else {
+				nvlist_free(who_nvp);
+				nvlist_free(perms_nvp);
+				if (sets_nvp)
+					nvlist_free(sets_nvp);
+				return (zfs_error(zhp->zfs_hdl,
+				    EZFS_BADPERM, value));
+			}
+		}
+		verify(nvlist_add_boolean(update_nvp, perm_name) == 0);
+	}
+
+	if (whostr && who_type != ZFS_DELEG_CREATE) {
+		who_tok = strtok(whostr, ",");
+		if (who_tok == NULL) {
+			nvlist_free(who_nvp);
+			nvlist_free(perms_nvp);
+			if (sets_nvp)
+				nvlist_free(sets_nvp);
+			(void) snprintf(errbuf, sizeof (errbuf),
+			    dgettext(TEXT_DOMAIN, "Who string is NULL"),
+			    whostr);
+			return (zfs_error(zhp->zfs_hdl, EZFS_BADWHO, errbuf));
+		}
+	}
+
+	/*
+	 * Now create the nvlist(s)
+	 */
+	do {
+		uint64_t who_id;
+
+		error = zfs_get_perm_who(who_tok, &who_type,
+		    &who_id);
+		if (error) {
+			nvlist_free(who_nvp);
+			nvlist_free(perms_nvp);
+			if (sets_nvp)
+				nvlist_free(sets_nvp);
+			(void) snprintf(errbuf, sizeof (errbuf),
+			    dgettext(TEXT_DOMAIN,
+			    "Unable to determine uid/gid for "
+			    "%s "), who_tok);
+			return (zfs_error(zhp->zfs_hdl, EZFS_BADWHO, errbuf));
+		}
+
+		/*
+		 * add entries for both local and descendent when required
+		 */
+
+		zfs_perms_add_who_nvlist(who_nvp, who_id, who_tok,
+		    perms_nvp, sets_nvp, who_type, inherit);
+
+	} while (who_tok = strtok(NULL, ","));
+	*nvp = who_nvp;
+	return (0);
+}
+
+static int
+zfs_perm_set_common(zfs_handle_t *zhp, nvlist_t *nvp, boolean_t unset)
+{
+	zfs_cmd_t zc = { 0 };
+	int error;
+	size_t sz;
+	char errbuf[1024];
+
+	(void) snprintf(errbuf, sizeof (errbuf),
+	    dgettext(TEXT_DOMAIN, "Cannot update 'allows' for '%s'"),
+	    zhp->zfs_name);
+
+	if (zcmd_write_src_nvlist(zhp->zfs_hdl, &zc, nvp, &sz))
+		return (-1);
+
+	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
+	zc.zc_perm_action = unset;
+
+	error = zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_SET_FSACL, &zc);
+	if (error && errno == ENOTSUP) {
+		(void) snprintf(errbuf, sizeof (errbuf),
+		    gettext("Pool must be upgraded to use 'allow/unallow'"));
+		zcmd_free_nvlists(&zc);
+		return (zfs_error(zhp->zfs_hdl, EZFS_BADVERSION, errbuf));
+	} else if (error) {
+		return (zfs_standard_error(zhp->zfs_hdl, errno, errbuf));
+	}
+	zcmd_free_nvlists(&zc);
+
+	return (error);
+}
+
+int
+zfs_perm_set(zfs_handle_t *zhp, nvlist_t *nvp)
+{
+	return (zfs_perm_set_common(zhp, nvp, B_FALSE));
+}
+
+int
+zfs_perm_remove(zfs_handle_t *zhp, nvlist_t *perms)
+{
+	return (zfs_perm_set_common(zhp, perms, B_TRUE));
+}
+
+static int
+perm_compare(const void *arg1, const void *arg2)
+{
+	const zfs_perm_node_t *node1 = arg1;
+	const zfs_perm_node_t *node2 = arg2;
+	int ret;
+
+	ret = strcmp(node1->z_pname, node2->z_pname);
+
+	if (ret > 0)
+		return (1);
+	if (ret < 0)
+		return (-1);
+	else
+		return (0);
+}
+
+static void
+zfs_destroy_perm_tree(avl_tree_t *tree)
+{
+	zfs_perm_node_t *permnode;
+	void *cookie;
+
+	cookie = NULL;
+	while ((permnode = avl_destroy_nodes(tree,  &cookie)) != NULL) {
+		avl_remove(tree, permnode);
+		free(permnode);
+	}
+}
+
+static void
+zfs_destroy_tree(avl_tree_t *tree)
+{
+	zfs_allow_node_t *allownode;
+	void *cookie;
+
+	cookie = NULL;
+	while ((allownode = avl_destroy_nodes(tree, &cookie)) != NULL) {
+		zfs_destroy_perm_tree(&allownode->z_localdescend);
+		zfs_destroy_perm_tree(&allownode->z_local);
+		zfs_destroy_perm_tree(&allownode->z_descend);
+		avl_remove(tree, allownode);
+		free(allownode);
+	}
+}
+
+void
+zfs_free_allows(zfs_allow_t *allow)
+{
+	zfs_allow_t *allownext;
+	zfs_allow_t *freeallow;
+
+	allownext = allow;
+	while (allownext) {
+		zfs_destroy_tree(&allownext->z_sets);
+		zfs_destroy_tree(&allownext->z_crperms);
+		zfs_destroy_tree(&allownext->z_user);
+		zfs_destroy_tree(&allownext->z_group);
+		zfs_destroy_tree(&allownext->z_everyone);
+		freeallow = allownext;
+		allownext = allownext->z_next;
+		free(freeallow);
+	}
+}
+
+static zfs_allow_t *
+zfs_alloc_perm_tree(zfs_handle_t *zhp, zfs_allow_t *prev, char *setpoint)
+{
+	zfs_allow_t *ptree;
+
+	if ((ptree = zfs_alloc(zhp->zfs_hdl,
+	    sizeof (zfs_allow_t))) == NULL) {
+		return (NULL);
+	}
+
+	(void) strlcpy(ptree->z_setpoint, setpoint, sizeof (ptree->z_setpoint));
+	avl_create(&ptree->z_sets,
+	    perm_compare, sizeof (zfs_allow_node_t),
+	    offsetof(zfs_allow_node_t, z_node));
+	avl_create(&ptree->z_crperms,
+	    perm_compare, sizeof (zfs_allow_node_t),
+	    offsetof(zfs_allow_node_t, z_node));
+	avl_create(&ptree->z_user,
+	    perm_compare, sizeof (zfs_allow_node_t),
+	    offsetof(zfs_allow_node_t, z_node));
+	avl_create(&ptree->z_group,
+	    perm_compare, sizeof (zfs_allow_node_t),
+	    offsetof(zfs_allow_node_t, z_node));
+	avl_create(&ptree->z_everyone,
+	    perm_compare, sizeof (zfs_allow_node_t),
+	    offsetof(zfs_allow_node_t, z_node));
+
+	if (prev)
+		prev->z_next = ptree;
+	ptree->z_next = NULL;
+	return (ptree);
+}
+
+/*
+ * Add permissions to the appropriate AVL permission tree.
+ * The appropriate tree may not be the requested tree.
+ * For example if ld indicates a local permission, but
+ * same permission also exists as a descendent permission
+ * then the permission will be removed from the descendent
+ * tree and add the the local+descendent tree.
+ */
+static int
+zfs_coalesce_perm(zfs_handle_t *zhp, zfs_allow_node_t *allownode,
+    char *perm, char ld)
+{
+	zfs_perm_node_t pnode, *permnode, *permnode2;
+	zfs_perm_node_t *newnode;
+	avl_index_t where, where2;
+	avl_tree_t *tree, *altree;
+
+	(void) strlcpy(pnode.z_pname, perm, sizeof (pnode.z_pname));
+
+	if (ld == ZFS_DELEG_NA) {
+		tree =  &allownode->z_localdescend;
+		altree = &allownode->z_descend;
+	} else if (ld == ZFS_DELEG_LOCAL) {
+		tree = &allownode->z_local;
+		altree = &allownode->z_descend;
+	} else {
+		tree = &allownode->z_descend;
+		altree = &allownode->z_local;
+	}
+	permnode = avl_find(tree, &pnode, &where);
+	permnode2 = avl_find(altree, &pnode, &where2);
+
+	if (permnode2) {
+		avl_remove(altree, permnode2);
+		free(permnode2);
+		if (permnode == NULL) {
+			tree =  &allownode->z_localdescend;
+		}
+	}
+
+	/*
+	 * Now insert new permission in either requested location
+	 * local/descendent or into ld when perm will exist in both.
+	 */
+	if (permnode == NULL) {
+		if ((newnode = zfs_alloc(zhp->zfs_hdl,
+		    sizeof (zfs_perm_node_t))) == NULL) {
+			return (-1);
+		}
+		*newnode = pnode;
+		avl_add(tree, newnode);
+	}
+	return (0);
+}
+/*
+ * Uggh, this is going to be a bit complicated.
+ * we have an nvlist coming out of the kernel that
+ * will indicate where the permission is set and then
+ * it will contain allow of the various "who's", and what
+ * their permissions are.  To further complicate this
+ * we will then have to coalesce the local,descendent
+ * and local+descendent permissions where appropriate.
+ * The kernel only knows about a permission as being local
+ * or descendent, but not both.
+ *
+ * In order to make this easier for zfs_main to deal with
+ * a series of AVL trees will be used to maintain
+ * all of this, primarily for sorting purposes as well
+ * as the ability to quickly locate a specific entry.
+ *
+ * What we end up with are tree's for sets, create perms,
+ * user, groups and everyone.  With each of those trees
+ * we have subtrees for local, descendent and local+descendent
+ * permissions.
+ */
+int
+zfs_perm_get(zfs_handle_t *zhp, zfs_allow_t **zfs_perms)
+{
+	zfs_cmd_t zc = { 0 };
+	int error;
+	nvlist_t *nvlist;
+	nvlist_t *permnv, *sourcenv;
+	nvpair_t *who_pair, *source_pair;
+	nvpair_t *perm_pair;
+	char errbuf[1024];
+	zfs_allow_t *zallowp, *newallowp;
+	char  ld;
+	char *nvpname;
+	uid_t	uid;
+	gid_t	gid;
+	avl_tree_t *tree;
+	avl_index_t where;
+
+	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
+
+	if (zcmd_alloc_dst_nvlist(zhp->zfs_hdl, &zc, 0) != 0)
+		return (-1);
+
+	while (ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_GET_FSACL, &zc) != 0) {
+		if (errno == ENOMEM) {
+			if (zcmd_expand_dst_nvlist(zhp->zfs_hdl, &zc) != 0) {
+				zcmd_free_nvlists(&zc);
+				return (-1);
+			}
+		} else if (errno == ENOTSUP) {
+			zcmd_free_nvlists(&zc);
+			(void) snprintf(errbuf, sizeof (errbuf),
+			    gettext("Pool must be upgraded to use 'allow'"));
+			return (zfs_error(zhp->zfs_hdl,
+			    EZFS_BADVERSION, errbuf));
+		} else {
+			zcmd_free_nvlists(&zc);
+			return (-1);
+		}
+	}
+
+	if (zcmd_read_dst_nvlist(zhp->zfs_hdl, &zc, &nvlist) != 0) {
+		zcmd_free_nvlists(&zc);
+		return (-1);
+	}
+
+	zcmd_free_nvlists(&zc);
+
+	source_pair = nvlist_next_nvpair(nvlist, NULL);
+
+	if (source_pair == NULL) {
+		*zfs_perms = NULL;
+		return (0);
+	}
+
+	*zfs_perms = zfs_alloc_perm_tree(zhp, NULL, nvpair_name(source_pair));
+	if (*zfs_perms == NULL) {
+		return (0);
+	}
+
+	zallowp = *zfs_perms;
+
+	for (;;) {
+		struct passwd *pwd;
+		struct group *grp;
+		zfs_allow_node_t *allownode;
+		zfs_allow_node_t  findallownode;
+		zfs_allow_node_t *newallownode;
+
+		(void) strlcpy(zallowp->z_setpoint,
+		    nvpair_name(source_pair),
+		    sizeof (zallowp->z_setpoint));
+
+		if ((error = nvpair_value_nvlist(source_pair, &sourcenv)) != 0)
+			goto abort;
+
+		/*
+		 * Make sure nvlist is composed correctly
+		 */
+		if (zfs_deleg_verify_nvlist(sourcenv)) {
+			goto abort;
+		}
+
+		who_pair = nvlist_next_nvpair(sourcenv, NULL);
+		if (who_pair == NULL) {
+			goto abort;
+		}
+
+		do {
+			error = nvpair_value_nvlist(who_pair, &permnv);
+			if (error) {
+				goto abort;
+			}
+
+			/*
+			 * First build up the key to use
+			 * for looking up in the various
+			 * who trees.
+			 */
+			ld = nvpair_name(who_pair)[1];
+			nvpname = nvpair_name(who_pair);
+			switch (nvpair_name(who_pair)[0]) {
+			case ZFS_DELEG_USER:
+			case ZFS_DELEG_USER_SETS:
+				tree = &zallowp->z_user;
+				uid = atol(&nvpname[3]);
+				pwd = getpwuid(uid);
+				(void) snprintf(findallownode.z_key,
+				    sizeof (findallownode.z_key), "user %s",
+				    (pwd) ? pwd->pw_name :
+				    &nvpair_name(who_pair)[3]);
+				break;
+			case ZFS_DELEG_GROUP:
+			case ZFS_DELEG_GROUP_SETS:
+				tree = &zallowp->z_group;
+				gid = atol(&nvpname[3]);
+				grp = getgrgid(gid);
+				(void) snprintf(findallownode.z_key,
+				    sizeof (findallownode.z_key), "group %s",
+				    (grp) ? grp->gr_name :
+				    &nvpair_name(who_pair)[3]);
+				break;
+			case ZFS_DELEG_CREATE:
+			case ZFS_DELEG_CREATE_SETS:
+				tree = &zallowp->z_crperms;
+				(void) strlcpy(findallownode.z_key, "",
+				    sizeof (findallownode.z_key));
+				break;
+			case ZFS_DELEG_EVERYONE:
+			case ZFS_DELEG_EVERYONE_SETS:
+				(void) snprintf(findallownode.z_key,
+				    sizeof (findallownode.z_key), "everyone");
+				tree = &zallowp->z_everyone;
+				break;
+			case ZFS_DELEG_NAMED_SET:
+			case ZFS_DELEG_NAMED_SET_SETS:
+				(void) snprintf(findallownode.z_key,
+				    sizeof (findallownode.z_key), "%s",
+				    &nvpair_name(who_pair)[3]);
+				tree = &zallowp->z_sets;
+				break;
+			}
+
+			/*
+			 * Place who in tree
+			 */
+			allownode = avl_find(tree, &findallownode, &where);
+			if (allownode == NULL) {
+				if ((newallownode = zfs_alloc(zhp->zfs_hdl,
+				    sizeof (zfs_allow_node_t))) == NULL) {
+					goto abort;
+				}
+				avl_create(&newallownode->z_localdescend,
+				    perm_compare,
+				    sizeof (zfs_perm_node_t),
+				    offsetof(zfs_perm_node_t, z_node));
+				avl_create(&newallownode->z_local,
+				    perm_compare,
+				    sizeof (zfs_perm_node_t),
+				    offsetof(zfs_perm_node_t, z_node));
+				avl_create(&newallownode->z_descend,
+				    perm_compare,
+				    sizeof (zfs_perm_node_t),
+				    offsetof(zfs_perm_node_t, z_node));
+				(void) strlcpy(newallownode->z_key,
+				    findallownode.z_key,
+				    sizeof (findallownode.z_key));
+				avl_insert(tree, newallownode, where);
+				allownode = newallownode;
+			}
+
+			/*
+			 * Now iterate over the permissions and
+			 * place them in the appropriate local,
+			 * descendent or local+descendent tree.
+			 *
+			 * The permissions are added to the tree
+			 * via zfs_coalesce_perm().
+			 */
+			perm_pair = nvlist_next_nvpair(permnv, NULL);
+			if (perm_pair == NULL)
+				goto abort;
+			do {
+				if (zfs_coalesce_perm(zhp, allownode,
+				    nvpair_name(perm_pair), ld) != 0)
+					goto abort;
+			} while (perm_pair = nvlist_next_nvpair(permnv,
+			    perm_pair));
+		} while (who_pair = nvlist_next_nvpair(sourcenv, who_pair));
+
+		source_pair = nvlist_next_nvpair(nvlist, source_pair);
+		if (source_pair == NULL)
+			break;
+
+		/*
+		 * allocate another node from the link list of
+		 * zfs_allow_t structures
+		 */
+		newallowp = zfs_alloc_perm_tree(zhp, zallowp,
+		    nvpair_name(source_pair));
+		if (newallowp == NULL) {
+			goto abort;
+		}
+		zallowp = newallowp;
+	}
+	nvlist_free(nvlist);
+	return (0);
+abort:
+	zfs_free_allows(*zfs_perms);
+	nvlist_free(nvlist);
+	return (-1);
+}
+
 /*
  * Given a property name and value, set the property for the given dataset.
  */
@@ -1174,7 +1928,7 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 	if (zcmd_write_src_nvlist(hdl, &zc, nvl, NULL) != 0)
 		goto error;
 
-	ret = ioctl(hdl->libzfs_fd, ZFS_IOC_SET_PROP, &zc);
+	ret = zfs_ioctl(hdl, ZFS_IOC_SET_PROP, &zc);
 
 	if (ret != 0) {
 		switch (errno) {
@@ -1283,8 +2037,7 @@ zfs_prop_inherit(zfs_handle_t *zhp, const char *propname)
 		(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 		(void) strlcpy(zc.zc_value, propname, sizeof (zc.zc_value));
 
-		if (ioctl(zhp->zfs_hdl->libzfs_fd,
-		    ZFS_IOC_SET_PROP, &zc) != 0)
+		if (zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_SET_PROP, &zc) != 0)
 			return (zfs_standard_error(hdl, errno, errbuf));
 
 		return (0);
@@ -1336,8 +2089,7 @@ zfs_prop_inherit(zfs_handle_t *zhp, const char *propname)
 	if ((ret = changelist_prefix(cl)) != 0)
 		goto error;
 
-	if ((ret = ioctl(zhp->zfs_hdl->libzfs_fd,
-	    ZFS_IOC_SET_PROP, &zc)) != 0) {
+	if ((ret = zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_SET_PROP, &zc)) != 0) {
 		return (zfs_standard_error(hdl, errno, errbuf));
 	} else {
 
@@ -2220,7 +2972,7 @@ zfs_create(libzfs_handle_t *hdl, const char *path, zfs_type_t type,
 	nvlist_free(props);
 
 	/* create the dataset */
-	ret = ioctl(hdl->libzfs_fd, ZFS_IOC_CREATE, &zc);
+	ret = zfs_ioctl(hdl, ZFS_IOC_CREATE, &zc);
 
 	if (ret == 0 && type == ZFS_TYPE_VOLUME) {
 		ret = zvol_create_link(hdl, path);
@@ -2292,10 +3044,13 @@ zfs_destroy(zfs_handle_t *zhp)
 
 	if (ZFS_IS_VOLUME(zhp)) {
 		/*
-		 * Unconditionally unshare this zvol ignoring failure as it
-		 * indicates only that the volume wasn't shared initially.
+		 * If user doesn't have permissions to unshare volume, then
+		 * abort the request.  This would only happen for a
+		 * non-privileged user.
 		 */
-		(void) zfs_unshare_iscsi(zhp);
+		if (zfs_unshare_iscsi(zhp) != 0) {
+			return (-1);
+		}
 
 		if (zvol_remove_link(zhp->zfs_hdl, zhp->zfs_name) != 0)
 			return (-1);
@@ -2305,7 +3060,7 @@ zfs_destroy(zfs_handle_t *zhp)
 		zc.zc_objset_type = DMU_OST_ZFS;
 	}
 
-	if (ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_DESTROY, &zc) != 0) {
+	if (zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_DESTROY, &zc) != 0) {
 		return (zfs_standard_error_fmt(zhp->zfs_hdl, errno,
 		    dgettext(TEXT_DOMAIN, "cannot destroy '%s'"),
 		    zhp->zfs_name));
@@ -2379,7 +3134,7 @@ zfs_destroy_snaps(zfs_handle_t *zhp, char *snapname)
 	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 	(void) strlcpy(zc.zc_value, snapname, sizeof (zc.zc_value));
 
-	ret = ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_DESTROY_SNAPS, &zc);
+	ret = zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_DESTROY_SNAPS, &zc);
 	if (ret != 0) {
 		char errbuf[1024];
 
@@ -2454,7 +3209,7 @@ zfs_clone(zfs_handle_t *zhp, const char *target, nvlist_t *props)
 
 	(void) strlcpy(zc.zc_name, target, sizeof (zc.zc_name));
 	(void) strlcpy(zc.zc_value, zhp->zfs_name, sizeof (zc.zc_value));
-	ret = ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_CREATE, &zc);
+	ret = zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_CREATE, &zc);
 
 	zcmd_free_nvlists(&zc);
 
@@ -2605,7 +3360,7 @@ zfs_promote(zfs_handle_t *zhp)
 	(void) strlcpy(zc.zc_value, zhp->zfs_dmustats.dds_clone_of,
 	    sizeof (zc.zc_value));
 	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
-	ret = ioctl(hdl->libzfs_fd, ZFS_IOC_PROMOTE, &zc);
+	ret = zfs_ioctl(hdl, ZFS_IOC_PROMOTE, &zc);
 
 	if (ret != 0) {
 		int save_errno = errno;
@@ -2704,15 +3459,21 @@ zfs_snapshot(libzfs_handle_t *hdl, const char *path, boolean_t recursive)
 
 	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
 	(void) strlcpy(zc.zc_value, delim+1, sizeof (zc.zc_value));
+	if (ZFS_IS_VOLUME(zhp))
+		zc.zc_objset_type = DMU_OST_ZVOL;
+	else
+		zc.zc_objset_type = DMU_OST_ZFS;
 	zc.zc_cookie = recursive;
-	ret = ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_SNAPSHOT, &zc);
+	ret = zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_SNAPSHOT, &zc);
 
 	/*
 	 * if it was recursive, the one that actually failed will be in
 	 * zc.zc_name.
 	 */
-	(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
-	    "cannot create snapshot '%s@%s'"), zc.zc_name, zc.zc_value);
+	if (ret != 0)
+		(void) snprintf(errbuf, sizeof (errbuf), dgettext(TEXT_DOMAIN,
+		    "cannot create snapshot '%s@%s'"), zc.zc_name, zc.zc_value);
+
 	if (ret == 0 && recursive) {
 		struct createdata cd;
 
@@ -2723,8 +3484,13 @@ zfs_snapshot(libzfs_handle_t *hdl, const char *path, boolean_t recursive)
 	if (ret == 0 && zhp->zfs_type == ZFS_TYPE_VOLUME) {
 		ret = zvol_create_link(zhp->zfs_hdl, path);
 		if (ret != 0) {
-			(void) ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_DESTROY,
-			    &zc);
+			(void) zfs_standard_error(hdl, errno,
+			    dgettext(TEXT_DOMAIN,
+			    "Volume successfully snapshotted, but device links "
+			    "were not created"));
+			free(parent);
+			zfs_close(zhp);
+			return (-1);
 		}
 	}
 
@@ -2815,6 +3581,7 @@ create_parents(libzfs_handle_t *hdl, char *target, int prefixlen)
 	for (cp = target + prefixlen + 1;
 	    cp = strchr(cp, '/'); *cp = '/', cp++) {
 		const char *opname;
+		char *logstr;
 
 		*cp = '\0';
 
@@ -2826,10 +3593,15 @@ create_parents(libzfs_handle_t *hdl, char *target, int prefixlen)
 		}
 
 		opname = dgettext(TEXT_DOMAIN, "create");
+		logstr = hdl->libzfs_log_str;
+		hdl->libzfs_log_str = NULL;
 		if (zfs_create(hdl, target, ZFS_TYPE_FILESYSTEM,
-		    NULL) != 0)
+		    NULL) != 0) {
+			hdl->libzfs_log_str = logstr;
 			goto ancestorerr;
+		}
 
+		hdl->libzfs_log_str = logstr;
 		opname = dgettext(TEXT_DOMAIN, "open");
 		h = zfs_open(hdl, target, ZFS_TYPE_FILESYSTEM);
 		if (h == NULL)
@@ -2985,7 +3757,11 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 					return (-1);
 				}
 			} else {
-				(void) zvol_remove_link(hdl, h->zfs_name);
+				if (zvol_remove_link(hdl, h->zfs_name) != 0) {
+					zfs_close(h);
+					return (-1);
+				}
+
 			}
 		}
 		zfs_close(h);
@@ -3032,7 +3808,7 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 	}
 	if (dryrun)
 		return (0);
-	err = ioctl_err = ioctl(hdl->libzfs_fd, ZFS_IOC_RECVBACKUP, &zc);
+	err = ioctl_err = zfs_ioctl(hdl, ZFS_IOC_RECVBACKUP, &zc);
 	if (ioctl_err != 0) {
 		switch (errno) {
 		case ENODEV:
@@ -3149,6 +3925,7 @@ rollback_destroy(zfs_handle_t *zhp, void *data)
 		    zfs_get_type(zhp) == ZFS_TYPE_SNAPSHOT &&
 		    zfs_prop_get_int(zhp, ZFS_PROP_CREATETXG) >
 		    cbp->cb_create) {
+			char *logstr;
 
 			cbp->cb_dependent = B_TRUE;
 			if (zfs_iter_dependents(zhp, B_FALSE, rollback_destroy,
@@ -3156,10 +3933,13 @@ rollback_destroy(zfs_handle_t *zhp, void *data)
 				cbp->cb_error = 1;
 			cbp->cb_dependent = B_FALSE;
 
+			logstr = zhp->zfs_hdl->libzfs_log_str;
+			zhp->zfs_hdl->libzfs_log_str = NULL;
 			if (zfs_destroy(zhp) != 0)
 				cbp->cb_error = 1;
 			else
 				changelist_remove(zhp, cbp->cb_clp);
+			zhp->zfs_hdl->libzfs_log_str = logstr;
 		}
 	} else {
 		if (zfs_destroy(zhp) != 0)
@@ -3202,8 +3982,7 @@ do_rollback(zfs_handle_t *zhp)
 	 * condition where the user has taken a snapshot since we verified that
 	 * this was the most recent.
 	 */
-	if ((ret = ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_ROLLBACK,
-	    &zc)) != 0) {
+	if ((ret = zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_ROLLBACK, &zc)) != 0) {
 		(void) zfs_standard_error_fmt(zhp->zfs_hdl, errno,
 		    dgettext(TEXT_DOMAIN, "cannot rollback '%s'"),
 		    zhp->zfs_name);
@@ -3465,7 +4244,7 @@ zfs_rename(zfs_handle_t *zhp, const char *target, boolean_t recursive)
 
 	zc.zc_cookie = recursive;
 
-	if ((ret = ioctl(zhp->zfs_hdl->libzfs_fd, ZFS_IOC_RENAME, &zc)) != 0) {
+	if ((ret = zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_RENAME, &zc)) != 0) {
 		/*
 		 * if it was recursive, the one that actually failed will
 		 * be in zc.zc_name
@@ -3540,6 +4319,8 @@ zvol_create_link_common(libzfs_handle_t *hdl, const char *dataset, int ifexists)
 {
 	zfs_cmd_t zc = { 0 };
 	di_devlink_handle_t dhdl;
+	priv_set_t *priv_effective;
+	int privileged;
 
 	(void) strlcpy(zc.zc_name, dataset, sizeof (zc.zc_name));
 
@@ -3576,17 +4357,51 @@ zvol_create_link_common(libzfs_handle_t *hdl, const char *dataset, int ifexists)
 	}
 
 	/*
-	 * Call devfsadm and wait for the links to magically appear.
+	 * If privileged call devfsadm and wait for the links to
+	 * magically appear.
+	 * Otherwise, print out an informational message.
 	 */
-	if ((dhdl = di_devlink_init(ZFS_DRIVER, DI_MAKE_LINK)) == NULL) {
-		zfs_error_aux(hdl, strerror(errno));
-		(void) zfs_error_fmt(hdl, EZFS_DEVLINKS,
-		    dgettext(TEXT_DOMAIN, "cannot create device links "
-		    "for '%s'"), dataset);
-		(void) ioctl(hdl->libzfs_fd, ZFS_IOC_REMOVE_MINOR, &zc);
-		return (-1);
+
+	priv_effective = priv_allocset();
+	(void) getppriv(PRIV_EFFECTIVE, priv_effective);
+	privileged = (priv_isfullset(priv_effective) == B_TRUE);
+	priv_freeset(priv_effective);
+
+	if (privileged) {
+		if ((dhdl = di_devlink_init(ZFS_DRIVER,
+		    DI_MAKE_LINK)) == NULL) {
+			zfs_error_aux(hdl, strerror(errno));
+			(void) zfs_standard_error_fmt(hdl, EZFS_DEVLINKS,
+			    dgettext(TEXT_DOMAIN, "cannot create device links "
+			    "for '%s'"), dataset);
+			(void) ioctl(hdl->libzfs_fd, ZFS_IOC_REMOVE_MINOR, &zc);
+			return (-1);
+		} else {
+			(void) di_devlink_fini(&dhdl);
+		}
 	} else {
-		(void) di_devlink_fini(&dhdl);
+		char pathname[MAXPATHLEN];
+		struct stat64 statbuf;
+		int i;
+
+#define	MAX_WAIT	10
+
+		/*
+		 * This is the poor mans way of waiting for the link
+		 * to show up.  If after 10 seconds we still don't
+		 * have it, then print out a message.
+		 */
+		(void) snprintf(pathname, sizeof (pathname), "/dev/zvol/dsk/%s",
+		    dataset);
+
+		for (i = 0; i != MAX_WAIT; i++) {
+			if (stat64(pathname, &statbuf) == 0)
+				break;
+			(void) sleep(1);
+		}
+		if (i == MAX_WAIT)
+			(void) printf(gettext("%s may not be immediately "
+			    "available\n"), pathname);
 	}
 
 	return (0);
@@ -3916,4 +4731,69 @@ zfs_expand_proplist(zfs_handle_t *zhp, zfs_proplist_t **plp)
 	}
 
 	return (0);
+}
+
+int
+zfs_iscsi_perm_check(libzfs_handle_t *hdl, char *dataset, ucred_t *cred)
+{
+	zfs_cmd_t zc = { 0 };
+	nvlist_t *nvp;
+	size_t sz;
+	gid_t gid;
+	uid_t uid;
+	const gid_t *groups;
+	int group_cnt;
+	int error;
+
+	if (nvlist_alloc(&nvp, NV_UNIQUE_NAME, 0) != 0)
+		return (no_memory(hdl));
+
+	uid = ucred_geteuid(cred);
+	gid = ucred_getegid(cred);
+	group_cnt = ucred_getgroups(cred, &groups);
+
+	if (uid == (uid_t)-1 || gid == (uid_t)-1 || group_cnt == (uid_t)-1)
+		return (1);
+
+	if (nvlist_add_uint32(nvp, ZFS_DELEG_PERM_UID, uid) != 0) {
+		nvlist_free(nvp);
+		return (1);
+	}
+
+	if (nvlist_add_uint32(nvp, ZFS_DELEG_PERM_GID, gid) != 0) {
+		nvlist_free(nvp);
+		return (1);
+	}
+
+	if (nvlist_add_uint32_array(nvp,
+	    ZFS_DELEG_PERM_GROUPS, (uint32_t *)groups, group_cnt) != 0) {
+		nvlist_free(nvp);
+		return (1);
+	}
+	(void) strlcpy(zc.zc_name, dataset, sizeof (zc.zc_name));
+
+	if (zcmd_write_src_nvlist(hdl, &zc, nvp, &sz))
+		return (-1);
+
+	error = ioctl(hdl->libzfs_fd, ZFS_IOC_ISCSI_PERM_CHECK, &zc);
+	nvlist_free(nvp);
+	return (error);
+}
+
+int
+zfs_deleg_share_nfs(libzfs_handle_t *hdl, char *dataset, char *path,
+    void *export, void *sharetab, int sharemax, boolean_t share_on)
+{
+	zfs_cmd_t zc = { 0 };
+	int error;
+
+	(void) strlcpy(zc.zc_name, dataset, sizeof (zc.zc_name));
+	(void) strlcpy(zc.zc_value, path, sizeof (zc.zc_value));
+	zc.zc_share.z_sharedata = (uint64_t)(uintptr_t)sharetab;
+	zc.zc_share.z_exportdata = (uint64_t)(uintptr_t)export;
+	zc.zc_share.z_sharetype = share_on;
+	zc.zc_share.z_sharemax = sharemax;
+
+	error = ioctl(hdl->libzfs_fd, ZFS_IOC_SHARE, &zc);
+	return (error);
 }

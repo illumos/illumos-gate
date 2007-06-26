@@ -23,38 +23,38 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_ZFS_NAMECHECK_H
-#define	_ZFS_NAMECHECK_H
+#ifndef	_ZFS_DELEG_H
+#define	_ZFS_DELEG_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <sys/fs/zfs.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-typedef enum {
-	NAME_ERR_LEADING_SLASH,		/* name begins with leading slash */
-	NAME_ERR_EMPTY_COMPONENT,	/* name contains an empty component */
-	NAME_ERR_TRAILING_SLASH,	/* name ends with a slash */
-	NAME_ERR_INVALCHAR,		/* invalid character found */
-	NAME_ERR_MULTIPLE_AT,		/* multiple '@' characters found */
-	NAME_ERR_NOLETTER,		/* pool doesn't begin with a letter */
-	NAME_ERR_RESERVED,		/* entire name is reserved */
-	NAME_ERR_DISKLIKE,		/* reserved disk name (c[0-9].*) */
-	NAME_ERR_TOOLONG,		/* name is too long */
-	NAME_ERR_NO_AT,			/* permission set is missing '@' */
-} namecheck_err_t;
+#define	ZFS_DELEG_SET_NAME_CHR		'@'		/* set name lead char */
+#define	ZFS_DELEG_FIELD_SEP_CHR		'$'		/* field separator */
 
-#define	ZFS_PERMSET_MAXLEN	64
+/*
+ * Max name length for a delegation attribute
+ */
+#define	ZFS_MAX_DELEG_NAME	128
 
-int pool_namecheck(const char *, namecheck_err_t *, char *);
-int dataset_namecheck(const char *, namecheck_err_t *, char *);
-int dataset_name_hidden(const char *);
-int snapshot_namecheck(const char *, namecheck_err_t *, char *);
-int permset_namecheck(const char *, namecheck_err_t *, char *);
+#define	ZFS_DELEG_LOCAL		'l'
+#define	ZFS_DELEG_DESCENDENT	'd'
+#define	ZFS_DELEG_NA		'-'
+
+extern char *zfs_deleg_perm_tab[];
+int zfs_deleg_type(char *attr);
+
+int zfs_deleg_verify_nvlist(nvlist_t *nvlist);
+void zfs_deleg_whokey(char *attr, char type,
+    char checkflag, void *data);
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _ZFS_NAMECHECK_H */
+#endif	/* _ZFS_DELEG_H */

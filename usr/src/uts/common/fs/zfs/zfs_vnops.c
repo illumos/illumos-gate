@@ -1830,6 +1830,7 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
 	znode_phys_t *pzp = zp->z_phys;
 	int	error;
+	uint64_t links;
 
 	ZFS_ENTER(zfsvfs);
 
@@ -1845,7 +1846,11 @@ zfs_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr)
 	vap->va_gid = zp->z_phys->zp_gid;
 	vap->va_fsid = zp->z_zfsvfs->z_vfs->vfs_dev;
 	vap->va_nodeid = zp->z_id;
-	vap->va_nlink = MIN(pzp->zp_links, UINT32_MAX);	/* nlink_t limit! */
+	if ((vp->v_flag & VROOT) && zfs_show_ctldir(zp))
+		links = pzp->zp_links + 1;
+	else
+		links = pzp->zp_links;
+	vap->va_nlink = MIN(links, UINT32_MAX);	/* nlink_t limit! */
 	vap->va_size = pzp->zp_size;
 	vap->va_rdev = vp->v_rdev;
 	vap->va_seq = zp->z_seq;

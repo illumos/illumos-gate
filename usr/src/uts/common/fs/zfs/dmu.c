@@ -78,7 +78,8 @@ const dmu_object_type_info_t dmu_ot[DMU_OT_NUMTYPES] = {
 	{	zap_byteswap,		TRUE,	"persistent error log"	},
 	{	byteswap_uint8_array,	TRUE,	"SPA history"		},
 	{	byteswap_uint64_array,	TRUE,	"SPA history offsets"	},
-	{	zap_byteswap,	TRUE,	"Pool properties"	},
+	{	zap_byteswap,		TRUE,	"Pool properties"	},
+	{	zap_byteswap,		TRUE,	"DSL permissions"	}
 };
 
 int

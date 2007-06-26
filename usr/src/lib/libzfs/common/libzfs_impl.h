@@ -33,6 +33,7 @@
 #include <sys/fs/zfs.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/zfs_acl.h>
+#include <sys/spa.h>
 #include <sys/nvpair.h>
 
 #include <libuutil.h>
@@ -54,6 +55,8 @@ struct libzfs_handle {
 	int libzfs_desc_active;
 	char libzfs_action[1024];
 	char libzfs_desc[1024];
+	char *libzfs_log_str;
+	int libzfs_log_type;
 	int libzfs_printerr;
 	void *libzfs_sharehdl; /* libshare handle */
 };

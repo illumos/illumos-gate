@@ -38,6 +38,8 @@
 #include <sys/unique.h>
 #include <sys/zfs_context.h>
 #include <sys/zfs_ioctl.h>
+#include <sys/spa.h>
+#include <sys/sunddi.h>
 
 static dsl_checkfunc_t dsl_dataset_destroy_begin_check;
 static dsl_syncfunc_t dsl_dataset_destroy_begin_sync;
@@ -966,7 +968,7 @@ dsl_dataset_rollback_check(void *arg1, void *arg2, dmu_tx_t *tx)
 
 /* ARGSUSED */
 static void
-dsl_dataset_rollback_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+dsl_dataset_rollback_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;
 	objset_t *mos = ds->ds_dir->dd_pool->dp_meta_objset;
@@ -1017,6 +1019,9 @@ dsl_dataset_rollback_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 		dmu_buf_will_dirty(ds->ds_prev->ds_dbuf, tx);
 		ds->ds_prev->ds_phys->ds_unique_bytes = 0;
 	}
+
+	spa_history_internal_log(LOG_DS_ROLLBACK, ds->ds_dir->dd_pool->dp_spa,
+	    tx, cr, "dataset = %llu", ds->ds_object);
 }
 
 /* ARGSUSED */
@@ -1039,13 +1044,17 @@ dsl_dataset_destroy_begin_check(void *arg1, void *arg2, dmu_tx_t *tx)
 
 /* ARGSUSED */
 static void
-dsl_dataset_destroy_begin_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+dsl_dataset_destroy_begin_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;
+	dsl_pool_t *dp = ds->ds_dir->dd_pool;
 
 	/* Mark it as inconsistent on-disk, in case we crash */
 	dmu_buf_will_dirty(ds->ds_dbuf, tx);
 	ds->ds_phys->ds_flags |= DS_FLAG_INCONSISTENT;
+
+	spa_history_internal_log(LOG_DS_DESTROY_BEGIN, dp->dp_spa, tx,
+	    cr, "dataset = %llu", ds->ds_object);
 }
 
 /* ARGSUSED */
@@ -1079,7 +1088,7 @@ dsl_dataset_destroy_check(void *arg1, void *arg2, dmu_tx_t *tx)
 }
 
 static void
-dsl_dataset_destroy_sync(void *arg1, void *tag, dmu_tx_t *tx)
+dsl_dataset_destroy_sync(void *arg1, void *tag, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;
 	uint64_t used = 0, compressed = 0, uncompressed = 0;
@@ -1320,6 +1329,9 @@ dsl_dataset_destroy_sync(void *arg1, void *tag, dmu_tx_t *tx)
 		dsl_dataset_close(ds_prev, DS_MODE_NONE, FTAG);
 
 	spa_clear_bootfs(dp->dp_spa, ds->ds_object, tx);
+	spa_history_internal_log(LOG_DS_DESTROY, dp->dp_spa, tx,
+	    cr, "dataset = %llu", ds->ds_object);
+
 	dsl_dataset_close(ds, DS_MODE_EXCLUSIVE, tag);
 	VERIFY(0 == dmu_object_free(mos, obj, tx));
 
@@ -1365,7 +1377,7 @@ dsl_dataset_snapshot_check(void *arg1, void *arg2, dmu_tx_t *tx)
 }
 
 void
-dsl_dataset_snapshot_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+dsl_dataset_snapshot_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	objset_t *os = arg1;
 	dsl_dataset_t *ds = os->os->os_dsl_dataset;
@@ -1438,6 +1450,9 @@ dsl_dataset_snapshot_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	VERIFY(0 == dsl_dataset_open_obj(dp,
 	    ds->ds_phys->ds_prev_snap_obj, snapname,
 	    DS_MODE_NONE, ds, &ds->ds_prev));
+
+	spa_history_internal_log(LOG_DS_SNAPSHOT, dp->dp_spa, tx, cr,
+	    "dataset = %llu", ds->ds_object);
 }
 
 void
@@ -1554,10 +1569,11 @@ dsl_dataset_snapshot_rename_check(void *arg1, void *arg2, dmu_tx_t *tx)
 }
 
 static void
-dsl_dataset_snapshot_rename_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+dsl_dataset_snapshot_rename_sync(void *arg1, void *arg2,
+    cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dataset_t *ds = arg1;
-	char *newsnapname = arg2;
+	const char *newsnapname = arg2;
 	dsl_dir_t *dd = ds->ds_dir;
 	objset_t *mos = dd->dd_pool->dp_meta_objset;
 	dsl_dataset_t *hds;
@@ -1579,6 +1595,8 @@ dsl_dataset_snapshot_rename_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	    ds->ds_snapname, 8, 1, &ds->ds_object, tx);
 	ASSERT3U(err, ==, 0);
 
+	spa_history_internal_log(LOG_DS_RENAME, dd->dd_pool->dp_spa, tx,
+	    cr, "dataset = %llu", ds->ds_object);
 	dsl_dataset_close(hds, DS_MODE_NONE, FTAG);
 }
 
@@ -1600,6 +1618,16 @@ dsl_snapshot_rename_one(char *name, void *arg)
 	cp = name + strlen(name);
 	*cp = '@';
 	(void) strcpy(cp + 1, ra->oldsnap);
+
+	/*
+	 * For recursive snapshot renames the parent won't be changing
+	 * so we just pass name for both the to/from argument.
+	 */
+	if (err = zfs_secpolicy_rename_perms(name, name, CRED())) {
+		(void) strcpy(ra->failed, name);
+		return (err);
+	}
+
 	err = dsl_dataset_open(name, DS_MODE_READONLY | DS_MODE_STANDARD,
 	    ra->dstg, &ds);
 	if (err == ENOENT) {
@@ -1678,7 +1706,8 @@ dsl_recursive_rename(char *oldname, const char *newname)
 		dsl_dataset_close(ds, DS_MODE_STANDARD, ra->dstg);
 	}
 
-	(void) strcpy(oldname, ra->failed);
+	if (err)
+		(void) strcpy(oldname, ra->failed);
 
 	dsl_sync_task_group_destroy(ra->dstg);
 	kmem_free(ra, sizeof (struct renamearg));
@@ -1743,6 +1772,7 @@ struct promotearg {
 	uint64_t newnext_obj, snapnames_obj;
 };
 
+/* ARGSUSED */
 static int
 dsl_dataset_promote_check(void *arg1, void *arg2, dmu_tx_t *tx)
 {
@@ -1885,7 +1915,7 @@ out:
 }
 
 static void
-dsl_dataset_promote_sync(void *arg1, void *arg2, dmu_tx_t *tx)
+dsl_dataset_promote_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	dsl_dataset_t *hds = arg1;
 	struct promotearg *pa = arg2;
@@ -1967,6 +1997,10 @@ dsl_dataset_promote_sync(void *arg1, void *arg2, dmu_tx_t *tx)
 	dsl_dir_diduse_space(pdd, -pa->used, -pa->comp, -pa->uncomp, tx);
 	dsl_dir_diduse_space(dd, pa->used, pa->comp, pa->uncomp, tx);
 	pivot_ds->ds_phys->ds_unique_bytes = pa->unique;
+
+	/* log history record */
+	spa_history_internal_log(LOG_DS_PROMOTE, dd->dd_pool->dp_spa, tx,
+	    cr, "dataset = %llu", ds->ds_object);
 
 	dsl_dir_close(pdd, FTAG);
 	dsl_dataset_close(pivot_ds, DS_MODE_EXCLUSIVE, FTAG);

@@ -28,8 +28,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/types.h>
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -98,6 +96,7 @@ typedef enum {
 	ZFS_PROP_COPIES,
 	ZPOOL_PROP_BOOTFS,
 	ZPOOL_PROP_AUTOREPLACE,
+	ZPOOL_PROP_DELEGATION,
 	ZPOOL_PROP_NAME
 } zfs_prop_t;
 
@@ -119,6 +118,32 @@ typedef enum {
 
 #define	ZFS_SRC_ALL	0x1f
 
+typedef enum {
+	ZFS_DELEG_WHO_UNKNOWN = 0,
+	ZFS_DELEG_USER = 'u',
+	ZFS_DELEG_USER_SETS = 'U',
+	ZFS_DELEG_GROUP = 'g',
+	ZFS_DELEG_GROUP_SETS = 'G',
+	ZFS_DELEG_EVERYONE = 'e',
+	ZFS_DELEG_EVERYONE_SETS = 'E',
+	ZFS_DELEG_CREATE = 'c',
+	ZFS_DELEG_CREATE_SETS = 'C',
+	ZFS_DELEG_NAMED_SET = 's',
+	ZFS_DELEG_NAMED_SET_SETS = 'S'
+} zfs_deleg_who_type_t;
+
+typedef enum {
+	ZFS_DELEG_NONE = 0,
+	ZFS_DELEG_PERM_LOCAL = 1,
+	ZFS_DELEG_PERM_DESCENDENT = 2,
+	ZFS_DELEG_PERM_LOCALDESCENDENT = 3,
+	ZFS_DELEG_PERM_CREATE = 4
+} zfs_deleg_inherit_t;
+
+#define	ZFS_DELEG_PERM_UID	"uid"
+#define	ZFS_DELEG_PERM_GID	"gid"
+#define	ZFS_DELEG_PERM_GROUPS	"groups"
+
 /*
  * The following functions are shared between libzfs and the kernel.
  */
@@ -134,6 +159,7 @@ int zfs_prop_inheritable(zfs_prop_t);
 int zfs_prop_string_to_index(zfs_prop_t, const char *, uint64_t *);
 int zfs_prop_index_to_string(zfs_prop_t, uint64_t, const char **);
 uint64_t zpool_prop_default_numeric(zpool_prop_t);
+const char *zfs_prop_perm(zfs_prop_t);
 
 /*
  * Property Iterator
@@ -153,13 +179,14 @@ extern zpool_prop_t zpool_prop_iter(zpool_prop_f, void *, boolean_t);
 #define	ZFS_VERSION_5			5ULL
 #define	ZFS_VERSION_6			6ULL
 #define	ZFS_VERSION_7			7ULL
+#define	ZFS_VERSION_8			8ULL
 /*
  * When bumping up ZFS_VERSION, make sure GRUB ZFS understand the on-disk
  * format change. Go to usr/src/grub/grub-0.95/stage2/{zfs-include/, fsys_zfs*},
  * and do the appropriate changes.
  */
-#define	ZFS_VERSION			ZFS_VERSION_7
-#define	ZFS_VERSION_STRING		"7"
+#define	ZFS_VERSION			ZFS_VERSION_8
+#define	ZFS_VERSION_STRING		"8"
 
 /*
  * Symbolic names for the changes that caused a ZFS_VERSION switch.
@@ -183,6 +210,7 @@ extern zpool_prop_t zpool_prop_iter(zpool_prop_f, void *, boolean_t);
 #define	ZFS_VERSION_GZIP_COMPRESSION	ZFS_VERSION_5
 #define	ZFS_VERSION_BOOTFS		ZFS_VERSION_6
 #define	ZFS_VERSION_SLOGS		ZFS_VERSION_7
+#define	ZFS_VERSION_DELEGATED_PERMS	ZFS_VERSION_8
 
 /*
  * The following are configuration names used in the nvlist describing a pool's
@@ -391,7 +419,6 @@ typedef enum zfs_ioc {
 	ZFS_IOC_POOL_FREEZE,
 	ZFS_IOC_POOL_UPGRADE,
 	ZFS_IOC_POOL_GET_HISTORY,
-	ZFS_IOC_POOL_LOG_HISTORY,
 	ZFS_IOC_VDEV_ADD,
 	ZFS_IOC_VDEV_REMOVE,
 	ZFS_IOC_VDEV_SET_STATE,
@@ -421,7 +448,11 @@ typedef enum zfs_ioc {
 	ZFS_IOC_DSOBJ_TO_DSNAME,
 	ZFS_IOC_OBJ_TO_PATH,
 	ZFS_IOC_POOL_SET_PROPS,
-	ZFS_IOC_POOL_GET_PROPS
+	ZFS_IOC_POOL_GET_PROPS,
+	ZFS_IOC_SET_FSACL,
+	ZFS_IOC_GET_FSACL,
+	ZFS_IOC_ISCSI_PERM_CHECK,
+	ZFS_IOC_SHARE
 } zfs_ioc_t;
 
 /*
@@ -450,6 +481,12 @@ typedef enum {
 #define	ZPOOL_HIST_RECORD	"history record"
 #define	ZPOOL_HIST_TIME		"history time"
 #define	ZPOOL_HIST_CMD		"history command"
+#define	ZPOOL_HIST_WHO		"history who"
+#define	ZPOOL_HIST_ZONE		"history zone"
+#define	ZPOOL_HIST_HOST		"history hostname"
+#define	ZPOOL_HIST_TXG		"history txg"
+#define	ZPOOL_HIST_INT_EVENT	"history internal event"
+#define	ZPOOL_HIST_INT_STR	"history internal str"
 
 /*
  * Flags for ZFS_IOC_VDEV_SET_STATE
@@ -483,6 +520,44 @@ typedef enum {
 #define	ZFS_EV_POOL_GUID	"pool_guid"
 #define	ZFS_EV_VDEV_PATH	"vdev_path"
 #define	ZFS_EV_VDEV_GUID	"vdev_guid"
+
+typedef enum history_internal_events {
+	LOG_NO_EVENT = 0,
+	LOG_POOL_CREATE,
+	LOG_POOL_VDEV_ADD,
+	LOG_POOL_REMOVE,
+	LOG_POOL_DESTROY,
+	LOG_POOL_EXPORT,
+	LOG_POOL_IMPORT,
+	LOG_POOL_VDEV_ATTACH,
+	LOG_POOL_VDEV_REPLACE,
+	LOG_POOL_VDEV_DETACH,
+	LOG_POOL_VDEV_ONLINE,
+	LOG_POOL_VDEV_OFFLINE,
+	LOG_POOL_UPGRADE,
+	LOG_POOL_CLEAR,
+	LOG_POOL_SCRUB,
+	LOG_POOL_PROPSET,
+	LOG_DS_CREATE,
+	LOG_DS_CLONE,
+	LOG_DS_DESTROY,
+	LOG_DS_DESTROY_BEGIN,
+	LOG_DS_INHERIT,
+	LOG_DS_PROPSET,
+	LOG_DS_QUOTA,
+	LOG_DS_PERM_UPDATE,
+	LOG_DS_PERM_REMOVE,
+	LOG_DS_PERM_WHO_REMOVE,
+	LOG_DS_PROMOTE,
+	LOG_DS_RECEIVE,
+	LOG_DS_RENAME,
+	LOG_DS_RESERVATION,
+	LOG_DS_REPLAY_INC_SYNC,
+	LOG_DS_REPLAY_FULL_SYNC,
+	LOG_DS_ROLLBACK,
+	LOG_DS_SNAPSHOT,
+	LOG_END
+} history_internal_events_t;
 
 #ifdef	__cplusplus
 }

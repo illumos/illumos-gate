@@ -438,11 +438,28 @@ extern boolean_t spa_has_spare(spa_t *, uint64_t guid);
 extern uint64_t bp_get_dasize(spa_t *spa, const blkptr_t *bp);
 
 /* history logging */
+typedef enum history_log_type {
+	LOG_CMD_POOL_CREATE,
+	LOG_CMD_NORMAL,
+	LOG_INTERNAL
+} history_log_type_t;
+
+typedef struct history_arg {
+	const char *ha_history_str;
+	history_log_type_t ha_log_type;
+	history_internal_events_t ha_event;
+	char ha_zone[MAXPATHLEN];
+} history_arg_t;
+
+extern char *spa_his_ievent_table[];
+
 extern void spa_history_create_obj(spa_t *spa, dmu_tx_t *tx);
 extern int spa_history_get(spa_t *spa, uint64_t *offset, uint64_t *len_read,
     char *his_buf);
 extern int spa_history_log(spa_t *spa, const char *his_buf,
-    uint64_t pool_create);
+    history_log_type_t what);
+void spa_history_internal_log(history_internal_events_t event, spa_t *spa,
+    dmu_tx_t *tx, cred_t *cr, const char *fmt, ...);
 
 /* error handling */
 struct zbookmark;

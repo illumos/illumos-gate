@@ -35,6 +35,7 @@
 #include <strings.h>
 #include <errno.h>
 #include <libscf.h>
+#include <errcode.h>
 
 #include "iscsitgt_impl.h"
 
@@ -55,19 +56,27 @@ iscsitgt_zfs_share(const char *dataset)
 	tgt_buf_add_tag(&str, "create", Tag_End);
 
 	if ((n = tgt_door_call(str, SMF_TEMPORARY)) == NULL) {
-		errno = EINVAL;
+		if (iscsitgt_svc_online() != 0) {
+			errno = EPERM;
+		} else {
+			errno = EINVAL;
+		}
 		free(str);
 		return (-1);
 	}
-	if (strcmp(n->x_name, XML_ELEMENT_ERROR) == 0 &&
-	    tgt_find_value_int(n, XML_ELEMENT_CODE, &code) == True &&
-	    code == 1000) {
-		free(str);
-		tgt_node_free(n);
-		return (0);
-	}
 
-	errno = EINVAL;
+	if (strcmp(n->x_name, XML_ELEMENT_ERROR) == 0 &&
+	    tgt_find_value_int(n, XML_ELEMENT_CODE, &code) == True) {
+		if (code == 1000) {
+			free(str);
+			tgt_node_free(n);
+			return (0);
+		} else {
+			errno = (code == ERR_NO_PERMISSION) ? EPERM : EINVAL;
+		}
+	} else {
+		errno = EINVAL;
+	}
 	free(str);
 	tgt_node_free(n);
 	return (-1);
@@ -94,17 +103,22 @@ iscsitgt_zfs_unshare(const char *dataset)
 		free(str);
 		return (-1);
 	}
+
 	if (strcmp(n->x_name, XML_ELEMENT_ERROR) == 0 &&
-	    tgt_find_value_int(n, XML_ELEMENT_CODE, &code) == True &&
-	    code == 1000) {
-		free(str);
-		tgt_node_free(n);
-		return (0);
+	    tgt_find_value_int(n, XML_ELEMENT_CODE, &code) == True) {
+		if (code == 1000) {
+			free(str);
+			tgt_node_free(n);
+			return (0);
+		} else {
+			errno = (code == ERR_NO_PERMISSION) ? EPERM : EINVAL;
+		}
+	} else {
+		errno = EINVAL;
 	}
 
 	free(str);
 	tgt_node_free(n);
-	errno = EINVAL;
 	return (-1);
 }
 

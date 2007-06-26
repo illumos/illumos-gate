@@ -52,8 +52,8 @@ tgt_door_call(char *str, int smf_flags)
 {
 	tgt_node_t		*n		= NULL;
 	door_arg_t		d;
-	int			s,
-				allocated;
+	int			s;
+	int			allocated;
 	xmlTextReaderPtr	r;
 	char			*door_buf	= NULL;
 
@@ -194,8 +194,8 @@ is_auto_enabled(void)
 static Boolean_t
 check_and_online(int smf_flags)
 {
-	int	i,
-		fd;
+	int	i;
+	int	fd;
 	door_arg_t	d;
 
 	if (!is_online()) {
@@ -244,4 +244,14 @@ check_and_online(int smf_flags)
 		(void) sleep(1);
 	}
 	return (False);
+}
+
+/*
+ * Not using Boolean_t here, since that is a
+ * private type to the library
+ */
+int
+iscsitgt_svc_online()
+{
+	return ((is_online() == True) ? 0 : 1);
 }
