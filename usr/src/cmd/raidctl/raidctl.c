@@ -2904,8 +2904,15 @@ enter_raidctl_lock(int *fd)
 
 	fd0 = open(RAIDCTL_LOCKF, O_CREAT|O_WRONLY, 0600);
 	if (fd0 < 0) {
-		(void) fprintf(stderr, gettext("raidctl:failed to open lockfile"
-		    " '"RAIDCTL_LOCKF"': %s\n"), strerror(errno));
+		if (errno == EACCES) {
+			(void) fprintf(stderr,
+			    gettext("raidctl:must be root to run raidctl"
+			    ": %s\n"), strerror(errno));
+		} else {
+			(void) fprintf(stderr,
+			    gettext("raidctl:failed to open lockfile"
+			    " '"RAIDCTL_LOCKF"': %s\n"), strerror(errno));
+		}
 		return (FAILURE);
 	}
 
