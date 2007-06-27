@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -941,7 +941,9 @@ usba_process_if_descr(usba_reg_state_t *state, boolean_t *requested_if)
 		    "a valid one", new_if_descr->bInterfaceNumber);
 		kmem_free(new_if_descr, sizeof (usb_if_descr_t));
 
-		return (USB_FAILURE);
+		*requested_if = B_FALSE;
+
+		return (USB_SUCCESS);
 	}
 	*requested_if = B_TRUE;
 
