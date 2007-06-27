@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,19 +43,15 @@
  */
 #define	DEFAULT_NRW_TAPE	"/dev/rmt/0n"
 
-static int mtfd;
-static struct mtop mt_com;
-static struct mtget mt_status;
-static void print_config(void);
+static int print_config(int mtfd);
 static char *print_key(short key_code);
 static void printreg(char *, ushort_t, char *);
-static void status(struct mtget *);
-static char *tape;
+static int status(int mtfd, struct mtget *);
 
 /* Pseudo flag for open even if drive is not ready (Unloaded) or reserved */
 #define	O_UNLOAD (O_RDWR | O_NDELAY)
 
-static struct commands {
+static const struct commands {
 	char *c_name;
 	int c_code;
 	int c_oflag;
@@ -80,41 +76,58 @@ static struct commands {
 	{ "release",		MTIOCRELEASE,		O_RDONLY,	0 },
 	{ "forcereserve",	MTIOCFORCERESERVE,	O_UNLOAD,	0 },
 	{ "config",		MTIOCGETDRIVETYPE,	O_UNLOAD,	0 },
+	{ "fssf",		MTFSSF,			O_RDONLY,	1 },
+	{ "bssf",		MTBSSF,			O_RDONLY,	1 },
+	{ "tell",		MTTELL,			O_RDONLY,	0 },
+	{ "seek",		MTSEEK,			O_RDONLY,	1 },
+	{ "load",		MTLOAD,			O_UNLOAD,	0 },
+	{ "lock",		MTLOCK,			O_RDONLY,	0 },
+	{ "unlock",		MTUNLOCK,		O_RDONLY,	0 },
 	{ 0 }
 };
 
-#ifdef sun
-static struct mt_tape_info tapes[] = MT_TAPE_INFO;
-#endif /* sun */
 
 int
 main(int argc, char **argv)
 {
 	char *cp;
-	struct commands *comp;
+	char *tape;
+	int mtfd;
+	struct commands const *comp;
+	struct mtget mt_status;
+	struct mtlop mt_com;
 
 	if (argc > 2 && (equal(argv[1], "-t") || equal(argv[1], "-f"))) {
 		argc -= 2;
 		tape = argv[2];
 		argv += 2;
-	} else
-		if ((tape = getenv("TAPE")) == NULL)
+	} else {
+		tape = getenv("TAPE");
+		if (tape == NULL) {
 			tape = DEFAULT_NRW_TAPE;
+		}
+	}
+
 	if (argc < 2) {
 		(void) fprintf(stderr,
 		    "usage: mt [ -f device ] command [ count ]\n");
-		exit(1);
-	}
-	cp = argv[1];
-	for (comp = com; comp->c_name != NULL; comp++)
-		if (strncmp(cp, comp->c_name, strlen(cp)) == 0)
-			break;
-	if (comp->c_name == NULL) {
-		(void) fprintf(stderr, "mt: unknown command: %s\n", cp);
-		exit(1);
+		return (1);
 	}
 
-	if ((mtfd = open(tape, comp->c_oflag)) < 0) {
+	cp = argv[1];
+	for (comp = com; comp->c_name != NULL; comp++) {
+		if (strncmp(cp, comp->c_name, strlen(cp)) == 0) {
+			break;
+		}
+	}
+
+	if (comp->c_name == NULL) {
+		(void) fprintf(stderr, "mt: unknown command: %s\n", cp);
+		return (1);
+	}
+
+	mtfd = open(tape, comp->c_oflag);
+	if (mtfd < 0) {
 
 		/*
 		 * Provide additional error message decoding since
@@ -122,15 +135,14 @@ main(int argc, char **argv)
 		 */
 		if (errno == EIO) {
 			(void) fprintf(stderr,
-			    "%s: no tape loaded or drive offline\n",
-			    tape);
+			    "%s: no tape loaded or drive offline\n", tape);
 		} else if (errno == EACCES) {
 			(void) fprintf(stderr,
 			    "%s: write protected or reserved.\n", tape);
 		} else {
 			perror(tape);
 		}
-		exit(1);
+		return (1);
 	}
 
 	if (comp->c_code == MTIOCFORCERESERVE ||
@@ -142,7 +154,7 @@ main(int argc, char **argv)
 		 */
 		if (ioctl(mtfd, comp->c_code) < 0) {
 			perror("mt");
-			exit(2);
+			return (2);
 		}
 	} else if (comp->c_code == MTASF) {
 		/*
@@ -153,53 +165,57 @@ main(int argc, char **argv)
 		 */
 		int usecnt;
 		int mt_fileno;
-		struct mtget mt_status;
 
 		usecnt = argc > 2 && comp->c_usecnt;
-		mt_fileno = usecnt ? atoi(argv[2]) : 1;
+		mt_fileno = usecnt ? atol(argv[2]) : 1;
 		if (mt_fileno < 0) {
 			(void) fprintf(stderr, "mt: negative file number\n");
-			exit(1);
+			return (1);
 		}
 		(void) ioctl(mtfd, MTIOCGET, (char *)&mt_status);
 		if (ioctl(mtfd, MTIOCGET, (char *)&mt_status) < 0) {
 			perror("mt");
-			exit(2);
+			return (2);
 		}
 		/*
 		 * Check if device supports reporting current file
 		 * tape file position.  If not, rewind the tape, and
 		 * space forward.
+		 *
+		 * If file number is -1 tape position is unknown!
 		 */
-		if (!(mt_status.mt_flags & MTF_ASF)) {
+		if ((mt_status.mt_flags & MTF_ASF) == 0 ||
+		    (mt_status.mt_fileno == -1)) {
 			/* printf("mt: rewind\n"); */
-			mt_status.mt_fileno = 0;
 			mt_com.mt_count = 1;
 			mt_com.mt_op = MTREW;
-			if (ioctl(mtfd, MTIOCTOP, &mt_com) < 0) {
+			if (ioctl(mtfd, MTIOCLTOP, &mt_com) < 0) {
 				(void) fprintf(stderr, "%s %s %d ",
 				    tape, comp->c_name, mt_fileno);
 				perror("mt");
-				exit(2);
+				return (2);
 			}
+			/* Needed to rewind which worked now correct fileno */
+			mt_status.mt_fileno = 0;
+			mt_status.mt_blkno = 0;
 		}
 		if (mt_fileno < mt_status.mt_fileno) {
 			mt_com.mt_op = MTNBSF;
-			mt_com.mt_count =  mt_status.mt_fileno - mt_fileno;
+			mt_com.mt_count = mt_status.mt_fileno - mt_fileno;
 			/* printf("mt: bsf= %d\n", mt_com.mt_count); */
 		} else {
 			mt_com.mt_op = MTFSF;
 			mt_com.mt_count =  mt_fileno - mt_status.mt_fileno;
 			/* printf("mt: fsf= %d\n", mt_com.mt_count); */
 		}
-		if (ioctl(mtfd, MTIOCTOP, &mt_com) < 0) {
+		if (ioctl(mtfd, MTIOCLTOP, &mt_com) < 0) {
 			(void) fprintf(stderr, "%s %s %d ", tape, comp->c_name,
 			    mt_fileno);
 			perror("failed");
-			exit(2);
+			return (2);
 		}
 	} else if (comp->c_code == MTIOCGETDRIVETYPE) {
-		print_config();
+		return (print_config(mtfd));
 
 	/* Handle regular mag tape ioctls */
 	} else if (comp->c_code != MTNOP) {
@@ -207,31 +223,46 @@ main(int argc, char **argv)
 
 		mt_com.mt_op = comp->c_code;
 		usecnt = argc > 2 && comp->c_usecnt;
-		mt_com.mt_count = (usecnt ? atoi(argv[2]) : 1);
+		mt_com.mt_count = (usecnt ? atoll(argv[2]) : 1);
 		if (mt_com.mt_count < 0) {
-			(void) fprintf(stderr, "mt: negative repeat count\n");
-			exit(1);
+			(void) fprintf(stderr, "mt: negative %s count\n",
+			    comp->c_name);
+			return (1);
 		}
-		if (ioctl(mtfd, MTIOCTOP, &mt_com) < 0) {
-			(void) fprintf(stderr, "%s %s %ld ", tape, comp->c_name,
-			    mt_com.mt_count);
-			perror("failed");
-			exit(2);
+		if (ioctl(mtfd, MTIOCLTOP, &mt_com) < 0) {
+			/*
+			 * If we asked for a seek and it returns a tell
+			 * we attempted to seek more then there was.
+			 */
+			if (mt_com.mt_op == MTTELL &&
+			    comp->c_code == MTSEEK) {
+				(void) printf("partial seek:at block = %llu.\n",
+				    mt_com.mt_count);
+			} else {
+				(void) fprintf(stderr, "%s %s %lld ", tape,
+				    comp->c_name, mt_com.mt_count);
+				perror("failed");
+			}
+			return (2);
 		}
+		if (mt_com.mt_op == MTTELL) {
+			(void) printf("At block = %llu.\n", mt_com.mt_count);
+		}
+
 
 	/* Handle status ioctl */
 	} else {
 		if (ioctl(mtfd, MTIOCGET, (char *)&mt_status) < 0) {
 			perror("mt");
-			exit(2);
+			return (2);
 		}
-		status(&mt_status);
+		return (status(mtfd, &mt_status));
 	}
 	return (0);
 }
 
-static void
-print_config(void)
+static int
+print_config(int mtfd)
 {
 	struct mtdrivetype mdt;
 	struct mtdrivetype_request mdt_req;
@@ -245,7 +276,7 @@ print_config(void)
 
 	if (ioctl(mtfd, MTIOCGETDRIVETYPE, &mdt_req) != 0) {
 		perror("mt config");
-		return;
+		return (2);
 	}
 
 	/*
@@ -306,18 +337,19 @@ print_config(void)
 	(void) printf("%d,%d,%d,%d,%d,%d,%d;\n", mdt.non_motion_timeout,
 	    mdt.io_timeout, mdt.rewind_timeout, mdt.space_timeout,
 	    mdt.load_timeout, mdt.unload_timeout, mdt.erase_timeout);
+
+	return (0);
 }
 
 /*
  * Interpret the status buffer returned
  */
-static void
-status(struct mtget *bp)
+static int
+status(int mtfd, struct mtget *bp)
 {
-	struct mt_tape_info *mt = NULL;
 	struct mtdrivetype mdt;
 	struct mtdrivetype_request mdt_req;
-	char *name = (char *)NULL;
+	const char *name = (char *)NULL;
 
 	/*
 	 * Make a call to MTIOCGETDRIVETYPE ioctl, Also use old method
@@ -332,21 +364,14 @@ status(struct mtget *bp)
 			(void) printf("Unconfigured Drive: ");
 		}
 	} else {
-
-		for (mt = tapes; mt->t_type; mt++) {
-			if (mt->t_type == bp->mt_type) {
-				break;
-			}
-		}
+		perror("mt drivetype");
+		return (2);
 	}
 
 	/* Handle SCSI tape drives specially. */
 	if ((bp->mt_flags & MTF_SCSI)) {
 		if (name == (char *)NULL) {
-			if (mt->t_type == 0)
-				name = "SCSI";
-			else
-				name = mt->t_name;
+			name = "SCSI";
 		}
 
 
@@ -362,21 +387,21 @@ status(struct mtget *bp)
 		}
 	} else {
 		/* Handle non-SCSI drives here. */
-		if (mt->t_type == 0) {
+		if (name == NULL) {
 			(void) printf("unknown tape drive type (0x%x)\n",
-			    bp->mt_type);
-			return;
+			    mdt.type);
+			return (2);
 		}
-		(void) printf("%s tape drive:\n   residual= %ld", mt->t_name,
+		(void) printf("%s tape drive:\n   residual= %ld", name,
 		    bp->mt_resid);
-		printreg("   ds", (ushort_t)bp->mt_dsreg, mt->t_dsbits);
-		printreg("   er", (ushort_t)bp->mt_erreg, mt->t_erbits);
+		printreg("   ds", (ushort_t)bp->mt_dsreg, 0);
+		printreg("   er", (ushort_t)bp->mt_erreg, 0);
 		(void) putchar('\n');
 	}
+	return (0);
 }
 
 
-#ifdef	sun
 /*
  * Define SCSI sense key error messages.
  *
@@ -385,7 +410,7 @@ status(struct mtget *bp)
  * Sun Specifice 'sense' keys- e.g., crap.
  */
 
-static char *standard_sense_keys[16] = {
+static char *sense_keys[] = {
 	"No Additional Sense",		/* 0x00 */
 	"Soft Error",			/* 0x01 */
 	"Not Ready",			/* 0x02 */
@@ -401,10 +426,8 @@ static char *standard_sense_keys[16] = {
 	"Equal Error",			/* 0x0c */
 	"Volume Overflow",		/* 0x0d */
 	"Miscompare Error",		/* 0x0e */
-	"Reserved"			/* 0x0f */
-};
-
-static char *sun_sense_keys[] = {
+	"Reserved",			/* 0x0f */
+#ifdef	sun
 	"fatal",			/* 0x10 */
 	"timeout",			/* 0x11 */
 	"EOF",				/* 0x12 */
@@ -412,7 +435,7 @@ static char *sun_sense_keys[] = {
 	"length error",			/* 0x14 */
 	"BOT",				/* 0x15 */
 	"wrong tape media",		/* 0x16 */
-	0
+#endif
 };
 
 /*
@@ -422,22 +445,16 @@ static char *
 print_key(short key_code)
 {
 	static char unknown[32];
-	short i;
-	if (key_code >= 0 && key_code <= 0x10) {
-		return (standard_sense_keys[key_code]);
+
+	if ((key_code >= 0) &&
+	    (key_code < (sizeof (sense_keys) / sizeof (sense_keys[0])))) {
+		return (sense_keys[key_code]);
 	}
 
-	i = 0;
-	while (sun_sense_keys[i]) {
-		if ((i + 0x10) == key_code) {
-			return (sun_sense_keys[i]);
-		} else i++;
-	}
 	(void) sprintf(unknown, "unknown sense key: 0x%x",
 	    (unsigned int) key_code);
 	return (unknown);
 }
-#endif
 
 
 /*
@@ -449,23 +466,27 @@ printreg(char *s, ushort_t v, char *bits)
 	int i, any = 0;
 	char c;
 
-	if (bits && *bits == 8)
+	if (bits && *bits == 8) {
 		(void) printf("%s = %o", s, v);
-	else
+	} else {
 		(void) printf("%s = %x", s, v);
+	}
 	bits++;
 	if (v && bits) {
 		(void) putchar('<');
 		while ((i = *bits++) != 0) {
 			if (v & (1 << (i-1))) {
-				if (any)
+				if (any) {
 					(void) putchar(',');
+				}
 				any = 1;
-				for (; (c = *bits) > 32; bits++)
+				for (; (c = *bits) > 32; bits++) {
 					(void) putchar(c);
-			} else
+				}
+			} else {
 				for (; *bits > 32; bits++)
 					;
+			}
 		}
 		(void) putchar('>');
 	}

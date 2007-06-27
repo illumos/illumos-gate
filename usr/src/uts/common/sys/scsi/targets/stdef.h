@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 #include <sys/condvar.h>
 #include <sys/kstat.h>
 #include <sys/scsi/scsi_types.h>
+#include <sys/scsi/generic/sense.h>
 #include <sys/mtio.h>
 
 #ifdef	__cplusplus
@@ -585,6 +586,149 @@ struct read_blklim {
 	uchar_t	min_lo;			/* Minimum block length, low byte */
 };
 
+/*
+ * operation codes
+ */
+typedef enum {
+	ST_OP_NIL,
+	ST_OP_CTL,
+	ST_OP_READ,
+	ST_OP_WRITE,
+	ST_OP_WEOF
+}optype;
+
+/*
+ * eof/eot/eom codes.
+ */
+typedef enum {
+	ST_NO_EOF,
+	ST_EOF_PENDING,		/* filemark pending */
+	ST_EOF,			/* at filemark */
+	ST_EOT_PENDING,		/* logical eot pending */
+	ST_EOT,			/* at logical eot */
+	ST_EOM,			/* at physical eot */
+	ST_WRITE_AFTER_EOM	/* flag for allowing writes after EOM */
+}pstatus;
+
+typedef enum { invalid, legacy, logical } posmode;
+
+typedef struct tapepos {
+	uint64_t lgclblkno;
+	int32_t fileno;
+	int32_t blkno;
+	int32_t partition;
+	pstatus eof;			/* eof states */
+	posmode	pmode;
+	char	pad[4];
+}tapepos_t;
+
+/* byte 1 of cdb for type of read position command */
+typedef enum {
+	SHORT_POS	= 0,
+	LONG_POS	= 6,
+	EXT_POS		= 8,
+	NO_POS		= 0xff	/* Drive doesn't support read position */
+} read_p_types;
+
+
+/*
+ * Data returned from the READ POSITION command.
+ */
+
+typedef struct tape_position {
+#if defined(_BIT_FIELDS_HTOL)
+	uchar_t begin_of_part:	1;
+	uchar_t end_of_part:	1;
+	uchar_t blk_cnt_unkwn:	1;
+	uchar_t byte_cnt_unkwn:	1;
+	uchar_t reserved0:	1;
+	uchar_t blk_posi_unkwn:	1;
+	uchar_t posi_err:	1;
+	uchar_t reserved1:	1;
+#elif defined(_BIT_FIELDS_LTOH)
+	uchar_t reserved1:	1;
+	uchar_t posi_err:	1;
+	uchar_t blk_posi_unkwn:	1;
+	uchar_t reserved0:	1;
+	uchar_t byte_cnt_unkwn:	1;
+	uchar_t blk_cnt_unkwn:	1;
+	uchar_t end_of_part:	1;
+	uchar_t begin_of_part:	1;
+#endif
+	uchar_t partition_number;
+	uchar_t reserved2[2];
+	uint32_t host_block;
+	uint32_t media_block;
+	uchar_t reserved3;
+	uchar_t block_in_buff[3];
+	uint32_t byte_in_buff;
+}tape_position_t;
+
+
+typedef struct tape_position_long {
+#if defined(_BIT_FIELDS_HTOL)
+	uint32_t begin_of_part:	1;
+	uint32_t end_of_part:	1;
+	uint32_t reserved0:	2;
+	uint32_t mrk_posi_unkwn:1;
+	uint32_t blk_posi_unkwn:1;
+	uint32_t reserved1:	2;
+#elif defined(_BIT_FIELDS_LTOH)
+	uint32_t reserved1:	2;
+	uint32_t blk_posi_unkwn:1;
+	uint32_t mrk_posi_unkwn:1;
+	uint32_t reserved0:	2;
+	uint32_t end_of_part:   1;
+	uint32_t begin_of_part: 1;
+#endif
+	uint32_t reserved2:	24;
+	uint32_t partition;
+	uint64_t block_number;
+	uint64_t file_number;
+	uint64_t set_number;
+}tape_position_long_t;
+
+typedef struct tape_position_ext {
+#if defined(_BIT_FIELDS_HTOL)
+	uint32_t begin_of_part:	1;
+	uint32_t end_of_part:	1;
+	uint32_t blk_cnt_unkwn:	1;
+	uint32_t byte_cnt_unkwn:1;
+	uint32_t mrk_posi_unkwn:1;
+	uint32_t blk_posi_unkwn:1;
+	uint32_t posi_err:	1;
+	uint32_t reserved0:	1;
+	uint32_t partition:	8;
+	uint32_t parameter_len:	16;
+/* start next word */
+	uint32_t reserved1:	8;
+	uint32_t blks_in_buf:	24;
+#elif defined(_BIT_FIELDS_LTOH)
+	uint32_t parameter_len:	16;
+	uint32_t partition:	8;
+	uint32_t reserved0:	1;
+	uint32_t posi_err:	1;
+	uint32_t blk_posi_unkwn:1;
+	uint32_t mrk_posi_unkwn:1;
+	uint32_t byte_cnt_unkwn:1;
+	uint32_t blk_cnt_unkwn:	1;
+	uint32_t end_of_part:	1;
+	uint32_t begin_of_part:	1;
+/* start next word */
+	uint32_t blks_in_buf:	24;
+	uint32_t reserved1:	8;
+#endif
+	uint64_t host_block;
+	uint64_t media_block;
+	uint64_t byte_in_buf;
+}tape_position_ext_t;
+
+typedef union {
+	tape_position_t srt;
+	tape_position_ext_t ext;
+	tape_position_long_t lng;
+}read_pos_data_t;
+
 #ifdef _KERNEL
 
 #if defined(__i386) || defined(__amd64)
@@ -618,33 +762,24 @@ struct contig_mem {
 #endif /* _KERNEL */
 
 /*
- * eof/eot/eom codes.
- */
-
-typedef enum {
-	ST_NO_EOF,		/* 0x00 */
-	ST_EOF_PENDING,		/* 0x01	filemark pending */
-	ST_EOF,			/* 0x02	at filemark */
-	ST_EOT_PENDING,		/* 0x03	logical eot pending */
-	ST_EOT,			/* 0x04	at logical eot */
-	ST_EOM,			/* 0x05	at physical eot */
-	ST_WRITE_AFTER_EOM	/* 0x06	flag for allowing writes after EOM */
-}media_st;
-
-#define	IN_EOF(un)	(un->un_eof == ST_EOF_PENDING || un->un_eof == ST_EOF)
-
-/*
- * operation codes
+ * driver states..
  */
 typedef enum {
-	ST_OP_NIL,	/* 0 */
-	ST_OP_CTL,	/* 1 */
-	ST_OP_READ,	/* 2 */
-	ST_OP_WRITE,	/* 3 */
-	ST_OP_WEOF	/* 4 */
-}optype;
+	ST_STATE_CLOSED,
+	ST_STATE_OFFLINE,
+	ST_STATE_INITIALIZING,
+	ST_STATE_OPENING,
+	ST_STATE_OPEN_PENDING_IO,
+	ST_STATE_APPEND_TESTING,
+	ST_STATE_OPEN,
+	ST_STATE_RESOURCE_WAIT,
+	ST_STATE_CLOSING,
+	ST_STATE_SENSING,
+	ST_STATE_CLOSE_PENDING_OPEN
+}st_states;
 
-typedef enum { RDWR, RDONLY, WORM, RDWORM, ERROR  } writablity;
+typedef enum { RDWR, RDONLY, WORM, RDWORM, FAILED } writablity;
+
 
 /*
  * Private info for scsi tapes. Pointed to by the un_private pointer
@@ -668,11 +803,9 @@ struct scsi_tape {
 	struct st_drivetype *un_dp;	/* ptr to drive table entry */
 	uint_t	un_dp_size;		/* size of un_dp alloc'ed */
 	caddr_t	un_tmpbuf;		/* buf for append, autodens ops */
-	daddr_t	un_blkno;		/* block # in file (512 byte blocks) */
+	tapepos_t un_pos;		/* Current tape position */
 	int	un_oflags;		/* open flags */
-	int	un_fileno;		/* current file number on tape */
-	int	un_err_fileno;		/* file where error occurred */
-	daddr_t	un_err_blkno;		/* block in file where err occurred */
+	tapepos_t un_err_pos;		/* block in file where err occurred */
 	uint_t	un_err_resid;		/* resid from last error */
 	short	un_fmneeded;		/* filemarks to be written - HP only */
 	dev_t	un_dev;			/* unix device */
@@ -681,9 +814,8 @@ struct scsi_tape {
 	uchar_t	un_density_known;	/* density is known */
 	uchar_t	un_curdens;		/* index into density table */
 	optype	un_lastop;		/* last I/O was: read/write/ctl */
-	media_st un_eof;		/* eof states */
-	uchar_t	un_laststate;		/* last state */
-	uchar_t	un_state;		/* current state */
+	st_states un_laststate;		/* last state */
+	st_states un_state;		/* current state */
 	uchar_t	un_status;		/* status from last sense */
 	uchar_t	un_retry_ct;		/* retry count */
 	uchar_t	un_tran_retry_ct;	/* transport retry count */
@@ -726,21 +858,23 @@ struct scsi_tape {
 	int	un_init_options;  	/* Init time drive options */
 	int	un_save_fileno;		/* Save here for recovery */
 	daddr_t	un_save_blkno;		/* Save here for recovery */
-	uchar_t	un_restore_pos;		/* Indication to do recovery */
-	int	un_suspend_fileno;	/* Save fileno for SUSPEND */
-	daddr_t	un_suspend_blkno;	/* Save blkno for SUSPEND */
+	uchar_t un_restore_pos;		/* Indication to do recovery */
+	tapepos_t un_suspend_pos;	/* Save blkno for SUSPEND */
 	uchar_t	un_silent_skip;		/* to catch short reads */
-	short	un_tids_at_suspend; /* timeouts set at suspend */
-	kcondvar_t	un_tape_busy_cv;	/* busy cv */
-	kcondvar_t	un_suspend_cv;	/* busy cv */
+	short	un_tids_at_suspend;	/* timeouts set at suspend */
+	kcondvar_t un_tape_busy_cv;	/* busy cv */
+	kcondvar_t un_suspend_cv;	/* busy cv */
 					/* restore on close */
 	uchar_t	un_eject_tape_on_failure; /* 1 = eject tape, 0 = don't */
 	uchar_t	un_HeadClean; 		/* support and need head cleaning? */
 	uchar_t	un_rqs_state;		/* see define below */
-	caddr_t	un_uscsi_rqs_buf;	/* uscsi_rqs: buffer for RQS data */
+	struct scsi_extended_sense
+	    *un_uscsi_rqs_buf;		/* uscsi_rqs: buffer for RQS data */
 	uchar_t	un_data_mod;		/* Device required data mod */
 	writablity (*un_wormable) (struct scsi_tape *un); /* worm test fuct */
 	int un_max_cdb_sz;		/* max cdb size to use */
+	read_p_types un_read_pos_type;
+	read_pos_data_t *un_read_pos_data;
 
 #if defined(__i386) || defined(__amd64)
 	ddi_dma_handle_t un_contig_mem_hdl;
@@ -750,7 +884,6 @@ struct scsi_tape {
 	size_t un_max_contig_mem_len;
 	kcondvar_t un_contig_mem_cv;
 #endif
-
 };
 
 
@@ -862,28 +995,13 @@ _NOTE(SCHEME_PROTECTS_DATA("not shared", contig_mem))
 
 
 /*
- * driver states..
- */
-#define	ST_STATE_CLOSED				0
-#define	ST_STATE_OFFLINE			1
-#define	ST_STATE_INITIALIZING			2
-#define	ST_STATE_OPENING			3
-#define	ST_STATE_OPEN_PENDING_IO		4
-#define	ST_STATE_APPEND_TESTING			5
-#define	ST_STATE_OPEN				6
-#define	ST_STATE_RESOURCE_WAIT			7
-#define	ST_STATE_CLOSING			8
-#define	ST_STATE_SENSING			9
-#define	ST_STATE_CLOSE_PENDING_OPEN		10
-
-/*
  * Power management state
  */
 #define	ST_PWR_NORMAL				0
 #define	ST_PWR_SUSPENDED			1
 
 
-
+#define	IN_EOF(pos)	(pos.eof == ST_EOF_PENDING || pos.eof == ST_EOF)
 
 /* un_rqs_state codes */
 
@@ -1065,11 +1183,35 @@ _NOTE(SCHEME_PROTECTS_DATA("not shared", contig_mem))
  * the sign bit set.
  * space_cnt converts backwards counts to negative numbers.
  */
-#define	Isfmk(x)	((x & (1<<24)) != 0)
-#define	Fmk(x)		((1<<24)|((x < 0) ? ((-(x)) | (1<<30)): x))
-#define	Blk(x)		((x < 0)? ((-(x))|(1<<30)): x)
-#define	space_cnt(x)	(((x) & (1<<30))? (-((x)&((1<<24)-1))):(x)&((1<<24)-1))
+#define	SP_BLK		0
+#define	SP_FLM		((1<<24))
+#define	SP_SQFLM	((2<<24))
+#define	SP_EOD		((3<<24))
+#define	SP_BACKSP	((1<<30))
+#define	SP_CMD_MASK	((7<<24))
+#define	SP_CNT_MASK	((1<<24)-1)
 
+/* Macros to assemble space cmds */
+#define	SPACE(cmd, cnt)	((cnt < 0) ? (SP_BACKSP | (-(cnt)) | cmd) : (cmd | cnt))
+#define	Fmk(x)		SPACE(SP_FLM, x)
+#define	Blk(x)		SPACE(SP_BLK, x)
+
+/* Macros to interpret space cmds */
+#define	SPACE_CNT(x)	(((x) & SP_BACKSP)? \
+	(-((x)&(SP_CNT_MASK))):(x)&(SP_CNT_MASK))
+#define	SPACE_TYPE(x)	((x & SP_CMD_MASK)>>24)
+
+
+/* Defines for byte 4 of load/unload cmd */
+#define	LD_UNLOAD	0
+#define	LD_LOAD		1
+#define	LD_RETEN	2
+#define	LD_EOT		4
+#define	LD_HOLD		8
+
+/* Defines for byte 4 of prevent/allow media removal */
+#define	MR_UNLOCK	0
+#define	MR_LOCK		1
 
 #define	GET_SOFT_STATE(dev)						\
 	register struct scsi_tape *un;					\
@@ -1087,19 +1229,46 @@ _NOTE(SCHEME_PROTECTS_DATA("not shared", contig_mem))
 #endif
 
 #ifdef	STDEBUG
-#define	DEBUGGING	((scsi_options & SCSI_DEBUG_TGT) || st_debug > 1)
+#define	DEBUGGING	((scsi_options & SCSI_DEBUG_TGT) || (st_debug & 0xf))
+
+#define	ST_DARGS	st_label, SCSI_DEBUG
 
 
-#define	ST_DEBUG1	if (st_debug >= 1) scsi_log	/* initialization */
+	/* initialization */
+#define	ST_DEBUG1	if ((st_debug & 0xf) >= 1) scsi_log
 #define	ST_DEBUG	ST_DEBUG1
 
-#define	ST_DEBUG2	if (st_debug >= 2) scsi_log	/* errors and UA's */
-#define	ST_DEBUG3	if (st_debug >= 3) scsi_log	/* func calls */
-#define	ST_DEBUG4	if (st_debug >= 4) scsi_log	/* ioctl calls */
-#define	ST_DEBUG5	if (st_debug >= 5) scsi_log
-#define	ST_DEBUG6	if (st_debug >= 6) scsi_log	/* full data tracking */
+	/* errors and UA's */
+#define	ST_DEBUG2	if ((st_debug & 0xf) >= 2) scsi_log
 
-#define	ST_DEBUG_SP	if (st_debug == 10) scsi_log	/* special cases */
+	/* func calls */
+#define	ST_DEBUG3	if ((st_debug & 0xf) >= 3) scsi_log
+
+	/* ioctl calls */
+#define	ST_DEBUG4	if ((st_debug & 0xf) >= 4) scsi_log
+
+#define	ST_DEBUG5	if ((st_debug & 0xf) >= 5) scsi_log
+
+	/* full data tracking */
+#define	ST_DEBUG6	if ((st_debug & 0xf) >= 6) scsi_log
+
+	/* special cases */
+#define	ST_DEBUG_SP	if ((st_debug & 0xf) == 10) scsi_log
+
+	/* Entry Point Functions */
+#define	ST_ENTR(d, fn)	if (st_debug & 0x10) scsi_log(d, ST_DARGS, #fn)
+
+	/* Non-Entry Point Functions */
+#define	ST_FUNC(d, fn)	if (st_debug & 0x20) scsi_log(d, ST_DARGS, #fn)
+
+	/* Space Information */
+#define	ST_SPAC		if (st_debug & 0x40) scsi_log
+
+	/* CDB's sent */
+#define	ST_CDB(d, cmnt, cdb) if (st_debug & 0x180) \
+    st_print_cdb(d, ST_DARGS, cmnt, cdb)
+#define	ST_SENSE(d, cmnt, sense, size) if (st_debug & 0x200) \
+    st_clean_print(d, ST_DARGS, cmnt, sense, size)
 
 #else
 
@@ -1114,6 +1283,12 @@ _NOTE(SCHEME_PROTECTS_DATA("not shared", contig_mem))
 #define	ST_DEBUG6	if (0) scsi_log
 
 #define	ST_DEBUG_SP	if (0) scsi_log /* special cases */
+
+#define	ST_ENTR(d, fn)
+#define	ST_FUNC(d, fn)
+#define	ST_SPAC		if (0) scsi_log
+#define	ST_CDB(d, cmnt, cdb)
+#define	ST_SENSE(d, cmnt, sense, size)
 
 #endif
 

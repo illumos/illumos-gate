@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	Copyright (c) 1983-1989 by AT&T.
@@ -61,6 +61,14 @@ struct mtop32	{
 };
 #endif /* _SYSCALL32 */
 
+/*
+ * structure for MTIOCLTOP - mag tape op command
+ */
+struct mtlop	{
+	short		mt_op;
+	short		pad[3];
+	int64_t		mt_count;
+};
 
 /*
  * values for mt_op
@@ -81,6 +89,12 @@ struct mtop32	{
 #define	MTGRSZ		13	/* get record size */
 #define	MTLOAD		14	/* for loading a tape (use o_delay to open */
 				/* the tape device) */
+#define	MTBSSF		15	/* Backward space to x sequential filemarks */
+#define	MTFSSF		16	/* Forward space to x sequential filemarks */
+#define	MTTELL		17	/* get current logical block position */
+#define	MTSEEK		18	/* position to logical block position */
+#define	MTLOCK		19	/* lock media */
+#define	MTUNLOCK	20	/* unlock media */
 
 /*
  * structure for MTIOCGET - mag tape get status command
@@ -156,13 +170,14 @@ struct mtdrivetype_request32 {
 /*
  * values for mt_flags
  */
-#define	MTF_SCSI	0x01
-#define	MTF_REEL	0x02
-#define	MTF_ASF		0x04
+#define	MTF_SCSI		0x01
+#define	MTF_REEL		0x02
+#define	MTF_ASF			0x04
 
 #define	MTF_TAPE_HEAD_DIRTY	0x08
 #define	MTF_TAPE_CLN_SUPPORTED	0x10
 #define	MTF_WORM_MEDIA		0x20
+#define	MTF_LOGICAL_BLOCK	0x40
 
 /*
  * Constants for mt_type byte (these are somewhat obsolete)
@@ -239,34 +254,6 @@ struct mt_tape_info {
 	char	*t_erbits;	/* "error" register */
 };
 
-/*
- * this table is now obsolete, use MTIOCGETDRIVETYPE ioctl
- *
- * WARNING: this table will be eliminated in some future release
- */
-#define	MT_TAPE_INFO  {\
-{ MT_ISSYSGEN11,	"Sysgen QIC-11",		0, 0 }, \
-{ MT_ISSYSGEN,		"Sysgen QIC-24",		0, 0 }, \
-{ MT_ISMT02,		"Emulex MT-02 QIC-24",		0, 0 }, \
-{ MT_ISVIPER1,		"Archive QIC-150",		0, 0 }, \
-{ MT_ISWANGTEK1,	"Wangtek QIC-150",		0, 0 }, \
-{ MT_ISKENNEDY,		"Kennedy 9612 1/2-inch",	0, 0 }, \
-{ MT_ISANRITSU,		"Anritsu 1/2-inch",		0, 0 }, \
-{ MT_ISHP,		"HP 88780 1/2-inch",		0, 0 }, \
-{ MT_ISEXABYTE,		"Exabyte EXB-8200 8mm",		0, 0 }, \
-{ MT_ISEXB8500,		"Exabyte EXB-8500 8mm",		0, 0 }, \
-{ MT_ISWANGDAT,		"WangDAT 3.81mm",		0, 0 }, \
-{ MT_ISWANGTHS,		"Wangtek 4mm RDAT",		0, 0 }, \
-{ MT_ISPYTHON,		"Archive Python 4mm Helical Scan",	0, 0 }, \
-{ MT_ISSTC,		"STC 1/2\" Cartridge",		0, 0}, \
-{ MT_ISTAND25G,		"Tandberg 2.5 Gig QIC",		0, 0}, \
-{ MT_ISQIC,		"QIC",		0, 0}, \
-{ MT_ISREEL,		"REEL",		0, 0}, \
-{ MT_ISDAT,		"DAT",		0, 0}, \
-{ MT_IS8MM,		"8mm",		0, 0}, \
-{ MT_ISOTHER,		"Other",	0, 0}, \
-{ 0 } \
-}
 
 /* mag tape io control commands */
 #define	MTIOC			('m'<<8)
@@ -286,6 +273,9 @@ struct mt_tape_info {
 #define	MTIOCREADIGNOREILI  	(MTIOC|14)	/* Enable/Disable ILI */
 #define	MTIOCREADIGNOREEOFS 	(MTIOC|15)	/* Enable/Disable Ignore EOF */
 #define	MTIOCSHORTFMK		(MTIOC|16)	/* Enable/Disable Short FMK */
+#define	MTIOCGETPOS		(MTIOC|17)	/* Get drive position */
+#define	MTIOCRESTPOS		(MTIOC|18)	/* Go back to position */
+#define	MTIOCLTOP		(MTIOC|19)	/* do a mag tape op */
 
 /*
  * This state enum is the argument passed to the MTIOCSTATE ioctl.

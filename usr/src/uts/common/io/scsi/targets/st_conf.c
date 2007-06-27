@@ -32,6 +32,7 @@
 #include <sys/kstat.h>
 #include <sys/scsi/targets/stdef.h>
 
+const char st_conf_version[] = "%M% %I% %E%";
 /*
  * General
  * -------

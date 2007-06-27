@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -324,6 +324,7 @@ extern "C" {
  */
 #define	SCMD_READ_ATTRIBUTE	0x8c
 #define	SCMD_WRITE_ATTRIBUTE	0x8d
+#define	SCMD_LOCATE_G4		0x92
 
 /*
  * Define for Group 5 command.
@@ -415,10 +416,13 @@ extern "C" {
 /* 0x8a */ SCMD_WRITE_G4,		"write(16)",			\
 /* 0x8c */ SCMD_READ_ATTRIBUTE,		"read_attribute",		\
 /* 0x8d */ SCMD_WRITE_ATTRIBUTE,	"write_attribute",		\
+/* 0x8f */ SCMD_VERIFY_G4,		"verify(16)",			\
+/* 0x92 */ SCMD_LOCATE_G4,		"locate(16)",			\
 /* 0xa0 */ SCMD_REPORT_LUNS,		"report_luns",			\
 /* 0xa8 */ SCMD_READ_G5,		"read(12)",			\
 /* 0xaa */ SCMD_WRITE_G5,		"write(12)",			\
-/* 0xac */ SCMD_GET_PERFORMANCE,	"get_performance"		\
+/* 0xac */ SCMD_GET_PERFORMANCE,	"get_performance",		\
+/* 0xAF */ SCMD_VERIFY_G5,		"verify(12)"			\
 	/* see cdio.h for additional command-to-string translations */
 
 /* XXX not a command code, does not belong here */
