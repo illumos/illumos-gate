@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -49,11 +49,13 @@ d none usr/platform 755 root sys
 d none usr/platform/SUNW,Sun-Fire-T200 755 root sys
 d none usr/platform/SUNW,Netra-CP3060 755 root sys
 d none usr/platform/SUNW,Sun-Blade-T6300 755 root sys
+d none usr/platform/SUNW,Sun-Blade-T6320 755 root sys
 #
 # create links to sun4v platform
 #
 s none usr/platform/SUNW,Sun-Fire-T200/sbin=../sun4v/sbin
 s none usr/platform/SUNW,Sun-Blade-T6300/sbin=../sun4v/sbin
+s none usr/platform/SUNW,Sun-Blade-T6320/sbin=../sun4v/sbin
 #
 #
 # create lib directory 
@@ -61,6 +63,7 @@ s none usr/platform/SUNW,Sun-Blade-T6300/sbin=../sun4v/sbin
 d none usr/platform/SUNW,Sun-Fire-T200/lib 755 root bin
 d none usr/platform/SUNW,Netra-CP3060/lib 755 root bin
 d none usr/platform/SUNW,Sun-Blade-T6300/lib 755 root bin
+d none usr/platform/SUNW,Sun-Blade-T6320/lib 755 root bin
 #
 # add binary and libraries for prtdiag
 #
@@ -73,10 +76,12 @@ f none usr/platform/SUNW,Netra-CP3060/lib/libprtdiag_psr.so.1 644 root bin
 s none usr/platform/SUNW,Sun-Fire-T200/lib/libpcp.so=../../sun4v/lib/libpcp.so
 s none usr/platform/SUNW,Netra-CP3060/lib/libpcp.so=../../sun4v/lib/libpcp.so
 s none usr/platform/SUNW,Sun-Blade-T6300/lib/libpcp.so=../../sun4v/lib/libpcp.so
+s none usr/platform/SUNW,Sun-Blade-T6320/lib/libpcp.so=../../sun4v/lib/libpcp.so
 
 s none usr/platform/SUNW,Sun-Fire-T200/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 s none usr/platform/SUNW,Netra-CP3060/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 s none usr/platform/SUNW,Sun-Blade-T6300/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
+s none usr/platform/SUNW,Sun-Blade-T6320/lib/libpcp.so.1=../../sun4v/lib/libpcp.so.1
 
 #
 # platform-dependent boot object
@@ -84,6 +89,7 @@ s none usr/platform/SUNW,Sun-Blade-T6300/lib/libpcp.so.1=../../sun4v/lib/libpcp.
 s none usr/platform/SUNW,Sun-Fire-T200/lib/fs=../../sun4v/lib/fs
 s none usr/platform/SUNW,Netra-CP3060/lib/fs=../../sun4v/lib/fs
 s none usr/platform/SUNW,Sun-Blade-T6300/lib/fs=../../sun4v/lib/fs
+s none usr/platform/SUNW,Sun-Blade-T6320/lib/fs=../../sun4v/lib/fs
 #
 # add erie link
 #
@@ -112,4 +118,8 @@ s none usr/platform/SUNW,SPARC-Enterprise-T2000=SUNW,Sun-Fire-T200
 # add stpaul links to individual components
 #
 s none usr/platform/SUNW,Sun-Blade-T6300/lib/libprtdiag_psr.so.1=../../SUNW,Sun-Fire-T200/lib/libprtdiag_psr.so.1
+
+# add glendale links to individual components
+#
+s none usr/platform/SUNW,Sun-Blade-T6320/lib/libprtdiag_psr.so.1=../../SUNW,Sun-Fire-T200/lib/libprtdiag_psr.so.1
 

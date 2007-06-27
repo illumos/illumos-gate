@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,6 +34,7 @@ MODULE	= fs
 PLATLINKS	= SUNW,Sun-Fire-T200
 PLATLINKS	+= SUNW,Netra-CP3060
 PLATLINKS	+= SUNW,Sun-Blade-T6300
+PLATLINKS	+= SUNW,Sun-Blade-T6320
 
 LINKED_DIRS	= $(PLATLINKS:%=$(USR_PLAT_DIR)/%)
 LINKED_LIB_DIRS	= $(PLATLINKS:%=$(USR_PLAT_DIR)/%/lib)

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -63,3 +63,4 @@ s none platform/SUNW,SPARC-Enterprise-T5120=sun4v
 s none platform/SUNW,SPARC-Enterprise-T2000=SUNW,Sun-Fire-T200
 s none platform/SUNW,SPARC-Enterprise-T1000=sun4v
 s none platform/SUNW,Sun-Blade-T6300=sun4v
+s none platform/SUNW,Sun-Blade-T6320=sun4v

@@ -32,6 +32,10 @@ UTSBASE = ..
 
 include Makefile.sun4v
 include Makefile.stpaul
+USR_GLENDALE_DIR	= $(USR_PLAT_DIR)/SUNW,Sun-Blade-T6320
+USR_GLENDALE_SBIN_DIR	= $(USR_GLENDALE_DIR)/sbin
+USR_GLENDALE_LIB_DIR	= $(USR_GLENDALE_DIR)/lib
+
 
 #
 #	The following are SPARC specific (rather than sun4v) specific modules
@@ -182,7 +186,9 @@ install_platforms:	$(ROOT_PSM_DIR) $(USR_PSM_DIR) \
 			$(USR_DESKTOP_DIR) $(USR_DESKTOP_INC_DIR) \
 			$(USR_DESKTOP_SBIN_DIR) $(USR_DESKTOP_LIB_DIR) \
 			$(USR_STPAUL_DIR) $(USR_STPAUL_SBIN_DIR) \
-			$(USR_STPAUL_LIB_DIR)
+			$(USR_STPAUL_LIB_DIR) \
+			$(USR_GLENDALE_DIR) $(USR_GLENDALE_SBIN_DIR) \
+			$(USR_GLENDALE_LIB_DIR) 
 
 #
 # rules for making include, sbin, lib dirs/links in
@@ -194,6 +200,9 @@ $(USR_DESKTOP_INC_DIR):		$(USR_DESKTOP_DIR)
 $(USR_DESKTOP_SBIN_DIR):	$(USR_DESKTOP_DIR)
 	$(INS.slink5)
 
+$(USR_DESKTOP_LIB_DIR):		$(USR_DESKTOP_DIR)
+	-$(INS.dir.root.bin)
+
 $(USR_STPAUL_DIR):		$(USR_SUN4V_PLAT_DIR)
 	-$(INS.dir.root.sys)
 
@@ -203,9 +212,14 @@ $(USR_STPAUL_SBIN_DIR):		$(USR_STPAUL_DIR)
 $(USR_STPAUL_LIB_DIR):		$(USR_STPAUL_DIR)
 	-$(INS.dir.root.bin)
 
-$(USR_DESKTOP_LIB_DIR):		$(USR_DESKTOP_DIR)
-	-$(INS.dir.root.bin)
+$(USR_GLENDALE_DIR):		$(USR_SUN4V_PLAT_DIR)
+	-$(INS.dir.root.sys)
 
+$(USR_GLENDALE_SBIN_DIR):		$(USR_GLENDALE_DIR)
+	$(INS.slink5)
+
+$(USR_GLENDALE_LIB_DIR):		$(USR_GLENDALE_DIR)
+	-$(INS.dir.root.bin)
 #
 #	Full kernel lint target.
 #

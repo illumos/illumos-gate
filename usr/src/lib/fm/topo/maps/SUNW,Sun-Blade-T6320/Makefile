@@ -23,18 +23,12 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 
-sparc_SUBDIRS =	sun4u \
-		sun4v \
-		SUNW,Sun-Fire \
-		SUNW,Sun-Fire-T200 \
-		SUNW,Sun-Fire-15000 \
-		SUNW,SPARC-Enterprise \
-		SUNW,Sun-Blade-T6320
+PLATFORMS = SUNW,Sun-Blade-T6320
+CLASS = platform
+DTDFILE =
+TOPOFILE = Sun-Blade-T6320-hc-topology.xml
+SRCDIR = ../SUNW,Sun-Blade-T6320
 
-i386_SUBDIRS = i86pc
-
-SUBDIRS = $($(MACH)_SUBDIRS)
-
-include ../../Makefile.subdirs
+include ../Makefile.map
