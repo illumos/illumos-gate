@@ -45,6 +45,7 @@ f none kernel/kmdb/sparcv9/lofs 555 root sys
 f none kernel/kmdb/sparcv9/logindmux 555 root sys
 f none kernel/kmdb/sparcv9/md 555 root sys
 f none kernel/kmdb/sparcv9/mdb_ds 555 root sys
+f none kernel/kmdb/sparcv9/mpt 555 root sys
 f none kernel/kmdb/sparcv9/nca 555 root sys
 f none kernel/kmdb/sparcv9/nfs 555 root sys
 s none kernel/kmdb/sparcv9/pcisch=intr

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,6 +62,7 @@ f none usr/lib/mdb/kvm/amd64/lofs.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/logindmux.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/md.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/mdb_ks.so 555 root sys
+f none usr/lib/mdb/kvm/amd64/mpt.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/nca.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/nfs.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/ptm.so 555 root sys
@@ -89,6 +90,7 @@ f none usr/lib/mdb/kvm/lofs.so 555 root sys
 f none usr/lib/mdb/kvm/logindmux.so 555 root sys
 f none usr/lib/mdb/kvm/md.so 555 root sys
 f none usr/lib/mdb/kvm/mdb_ks.so 555 root sys
+f none usr/lib/mdb/kvm/mpt.so 555 root sys
 f none usr/lib/mdb/kvm/nca.so 555 root sys
 f none usr/lib/mdb/kvm/nfs.so 555 root sys
 f none usr/lib/mdb/kvm/ptm.so 555 root sys
