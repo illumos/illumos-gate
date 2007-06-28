@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,9 +36,9 @@
 uint_t	root_phys_addr_lo_mask;
 int64_t timedelta;
 hrtime_t hres_last_tick;
-timestruc_t hrestime;
+volatile timestruc_t hrestime;
 int64_t hrestime_adj;
-int hres_lock;
+volatile int hres_lock;
 uint_t nsec_scale;
 uint_t nsec_shift;
 uint_t adj_shift;

@@ -936,7 +936,7 @@ bind_hwcap(void)
 
 #if defined(_SYSCALL32_IMPL)
 	auxv_hwcap32 = (auxv_hwcap32_include | cpu_hwcap_flags) &
-		~auxv_hwcap32_exclude;
+	    ~auxv_hwcap32_exclude;
 
 #if defined(__amd64)
 	/*
@@ -1343,7 +1343,6 @@ gethrestime(timespec_t *tp)
 #include <sys/machlock.h>
 
 extern int one_sec;
-extern timestruc_t hrestime;
 extern int max_hres_adj;
 
 void

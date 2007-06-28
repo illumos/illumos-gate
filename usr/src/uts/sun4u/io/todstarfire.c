@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997, 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,8 +55,6 @@ static void		todsf_set_power_alarm(timestruc_t);
 static void		todsf_clear_power_alarm(void);
 static uint64_t		todsf_get_cpufrequency(void);
 
-extern	timestruc_t	hrestime;
-
 /*
  * Module linkage information for the kernel.
  */
@@ -78,7 +75,7 @@ _init(void)
 
 		/* Set the string to pass to OBP */
 		(void) sprintf(obp_string, "h# %p unix-gettod",
-				(void *)&ssp_time32);
+		    (void *)&ssp_time32);
 
 		/* Get OBP to get TOD from ssp */
 		prom_interpret(obp_string, 0, 0, 0, 0, 0);

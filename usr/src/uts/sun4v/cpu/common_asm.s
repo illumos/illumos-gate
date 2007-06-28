@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -692,9 +692,9 @@ QRETURN;								\
 
 int64_t timedelta;
 hrtime_t hres_last_tick;
-timestruc_t hrestime;
+volatile timestruc_t hrestime;
 int64_t hrestime_adj;
-int hres_lock;
+volatile int hres_lock;
 uint_t nsec_scale;
 hrtime_t hrtime_base;
 int traptrace_use_stick;

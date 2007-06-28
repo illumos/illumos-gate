@@ -3138,7 +3138,7 @@ hres_tick(void)
 
 int64_t timedelta;
 hrtime_t hres_last_tick;
-timestruc_t hrestime;
+volatile timestruc_t hrestime;
 int64_t hrestime_adj;
 volatile int hres_lock;
 hrtime_t hrtime_base;
