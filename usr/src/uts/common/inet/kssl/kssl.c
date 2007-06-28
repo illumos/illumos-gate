@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,7 +108,7 @@ static struct dev_ops devops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,			/* drv_modops */
-	"Kernel SSL Interface v%I%",	/* drv_linkinfo */
+	"Kernel SSL Interface v1.4",	/* drv_linkinfo */
 	&devops,
 };
 
@@ -570,6 +570,8 @@ kssl_global_init()
 		    "kssl_record_decrypt_failure", KSTAT_DATA_UINT64);
 		kstat_named_init(&kssl_statp->bad_pre_master_secret,
 		    "kssl_bad_pre_master_secret", KSTAT_DATA_UINT64);
+		kstat_named_init(&kssl_statp->internal_errors,
+		    "kssl_internal_errors", KSTAT_DATA_UINT64);
 
 		kstat_install(kssl_ksp);
 	};

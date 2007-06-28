@@ -14987,8 +14987,15 @@ est:
 			/*
 			 * Enqueue all packets when processing an mblk
 			 * from the co queue and also enqueue normal packets.
+			 * For packets which belong to SSL stream do SSL
+			 * processing first.
 			 */
-			tcp_rcv_enqueue(tcp, mp, seg_len);
+			if ((tcp->tcp_kssl_ctx != NULL) &&
+			    (DB_TYPE(mp) == M_DATA)) {
+				tcp_kssl_input(tcp, mp);
+			} else {
+				tcp_rcv_enqueue(tcp, mp, seg_len);
+			}
 		}
 		/*
 		 * Make sure the timer is running if we have data waiting

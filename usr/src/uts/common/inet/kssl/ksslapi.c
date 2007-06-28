@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -426,8 +426,10 @@ kssl_input(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp, boolean_t *more,
 	}
 
 	do {
-		if ((SSL3ContentType)recmp->b_rptr[0] ==
-		    content_application_data) {
+		content_type = (SSL3ContentType)recmp->b_rptr[0];
+
+		switch (content_type) {
+		case content_application_data:
 			/*
 			 * application_data records are decrypted and
 			 * MAC-verified by the stream head, and in the context
@@ -442,7 +444,11 @@ kssl_input(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp, boolean_t *more,
 			}
 			outmp = recmp;
 			kssl_cmd = KSSL_CMD_DELIVER_PROXY;
-		} else {
+			break;
+		case content_change_cipher_spec:
+		case content_alert:
+		case content_handshake:
+		case content_handshake_v2:
 			/*
 			 * If we're past the initial handshake, start letting
 			 * the stream head process all records, in particular
@@ -459,6 +465,10 @@ kssl_input(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp, boolean_t *more,
 				kssl_cmd = kssl_handle_any_record(ssl, recmp,
 				    &outmp, cbfn, arg);
 			}
+			break;
+		default:
+			ssl->activeinput = B_FALSE;
+			goto sendnewalert;
 		}
 
 		/* Priority to Alert messages */
@@ -567,7 +577,7 @@ more:
 			copybp->b_cont = mp->b_cont;
 			if (mp == firstmp) {
 				*mpp = copybp;
-			} else {
+			} else if (prevmp != NULL) {
 				prevmp->b_cont = copybp;
 			}
 			freeb(mp);
@@ -576,7 +586,13 @@ more:
 
 		content_type = (SSL3ContentType)mp->b_rptr[0];
 
-		if (content_type != content_application_data) {
+		switch (content_type) {
+		case content_application_data:
+			break;
+		case content_change_cipher_spec:
+		case content_alert:
+		case content_handshake:
+		case content_handshake_v2:
 			nextmp = mp->b_cont;
 
 			/* Remove this message */
@@ -592,10 +608,12 @@ more:
 			}
 
 			mutex_enter(&ssl->kssl_lock);
+			/* NOTE: This routine could free mp. */
 			kssl_cmd = kssl_handle_any_record(ssl, mp, outmp,
 			    NULL, NULL);
 
 			if (ssl->alert_sendbuf != NULL) {
+				mp = nextmp;
 				goto sendalert;
 			}
 			mutex_exit(&ssl->kssl_lock);
@@ -605,7 +623,11 @@ more:
 			}
 
 			mp = nextmp;
-			continue;
+			continue;	/* to the while loop */
+		default:
+			desc = decode_error;
+			KSSL_COUNTER(internal_errors, 1);
+			goto makealert;
 		}
 
 		version[0] = mp->b_rptr[1];
@@ -616,6 +638,17 @@ more:
 		mp->b_rptr += SSL3_HDR_LEN;
 		recend = mp->b_rptr + rec_sz;
 		real_recend = recend;
+
+		/*
+		 * Check the assumption that each mblk contains exactly
+		 * one complete SSL record. We bail out if the check fails.
+		 */
+		ASSERT(recend == mp->b_wptr);
+		if (recend != mp->b_wptr) {
+			desc = decode_error;
+			KSSL_COUNTER(internal_errors, 1);
+			goto makealert;
+		}
 
 		spec = &ssl->spec[KSSL_READ];
 		mac_sz = spec->mac_hashsz;
@@ -702,11 +735,13 @@ more:
 		}
 		mp->b_wptr = recend;
 
+		DB_FLAGS(mp) |= DBLK_COOKED;
+		KSSL_COUNTER(appdata_record_ins, 1);
+
 		prevmp = mp;
 		mp = mp->b_cont;
 	}
 
-	KSSL_COUNTER(appdata_record_ins, 1);
 	return (kssl_cmd);
 
 makealert:
@@ -816,6 +851,17 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 	mp->b_rptr += rhsz;
 	recend = mp->b_rptr + rec_sz;
 	real_recend = recend;
+
+	/*
+	 * Check the assumption that each mblk contains exactly
+	 * one complete SSL record. We bail out if the check fails.
+	 */
+	ASSERT(recend == mp->b_wptr);
+	if (recend != mp->b_wptr) {
+		desc = decode_error;
+		KSSL_COUNTER(internal_errors, 1);
+		goto sendalert;
+	}
 
 	spec = &ssl->spec[KSSL_READ];
 	mac_sz = spec->mac_hashsz;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -199,6 +199,7 @@ typedef struct kssl_stats {
 	kstat_named_t verify_mac_failure;
 	kstat_named_t record_decrypt_failure;
 	kstat_named_t bad_pre_master_secret;
+	kstat_named_t internal_errors;
 } kssl_stats_t;
 
 extern kssl_stats_t *kssl_statp;
