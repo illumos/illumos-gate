@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +69,7 @@ static void dump_ICS1890(struct mii_info *, int);
 static int getspeed_NS83840(mii_handle_t, int, int *, int *);
 static int getspeed_82553(mii_handle_t, int, int *, int *);
 static int getspeed_ICS1890(mii_handle_t, int, int *, int *);
+static int getspeed_generic(mii_handle_t, int, int *, int *);
 static void postreset_ICS1890(mii_handle_t mac, int phy);
 static void postreset_NS83840(mii_handle_t mac, int phy);
 
@@ -279,6 +279,10 @@ mii_init_phy(mii_handle_t mac, int phy)
 			phydata->description = "Intel 82562 ET";
 			phydata->phy_getspeed = getspeed_82553;
 			break;
+		case INTEL_82562_EM:
+			phydata->description = "Intel 82562 EM";
+			phydata->phy_getspeed = getspeed_82553;
+			break;
 		default:
 			phydata->description = "Unknown INTEL";
 			break;
@@ -303,7 +307,7 @@ mii_init_phy(mii_handle_t mac, int phy)
 	default: /* Non-standard PHYs, that encode weird IDs */
 		phydata->description = "Unknown PHY";
 		phydata->phy_dump = NULL;
-		phydata->phy_getspeed = NULL;
+		phydata->phy_getspeed = getspeed_generic;
 		break;
 	}
 
@@ -963,4 +967,49 @@ postreset_ICS1890(mii_handle_t mac, int phy)
 {
 	/* This device comes up isolated if no link is found */
 	(void) mii_unisolate(mac, phy);
+}
+
+/*
+ * generic getspeed routine
+ */
+static int
+getspeed_generic(mii_handle_t mac, int phy, int *speed, int *fulld)
+{
+	int exten =  mac->mii_read(mac->mii_dip, phy, MII_AN_EXPANSION);
+	if (exten & MII_AN_EXP_LPCANAN) {
+		/*
+		 * Link partner can auto-neg, take speed from LP Ability
+		 * register
+		 */
+		int lpable, anadv, mask;
+
+		lpable = mac->mii_read(mac->mii_dip, phy, MII_AN_LPABLE);
+		anadv = mac->mii_read(mac->mii_dip, phy, MII_AN_ADVERT);
+		mask = anadv & lpable;
+
+		if (mask & MII_ABILITY_100BASE_TX_FD) {
+			*speed = 100;
+			*fulld = 1;
+		} else if (mask & MII_ABILITY_100BASE_T4) {
+			*speed = 100;
+			*fulld = 0;
+		} else if (mask & MII_ABILITY_100BASE_TX) {
+			*speed = 100;
+			*fulld = 0;
+		} else if (mask & MII_ABILITY_10BASE_T_FD) {
+			*speed = 10;
+			*fulld = 1;
+		} else if (mask & MII_ABILITY_10BASE_T) {
+			*speed = 10;
+			*fulld = 0;
+		}
+	} else {
+		/*
+		 * Link partner cannot auto-neg, it would be nice if we
+		 * could figure out what the device selected.  (NWay?)
+		 */
+		*speed = 0;
+		*fulld = 0;
+	}
+	return (MII_SUCCESS);
 }
