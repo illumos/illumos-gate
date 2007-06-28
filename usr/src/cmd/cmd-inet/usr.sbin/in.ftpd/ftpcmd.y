@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1023,6 +1023,14 @@ lprt_done:
 		free($6);
 	}
 
+    | STOU check_login
+	= 	{
+	    char *default_filename = "ftp";
+	    if (log_commands)
+		syslog(LOG_INFO, "STOU");
+	    if ($2 && !restrict_check(default_filename))
+		store(default_filename, "w", 1);
+	}
     | STOU check_login SP pathname CRLF
 	=	{
 	    if (log_commands)
@@ -1763,7 +1771,7 @@ struct tab cmdtab[] =
     {"XPWD", PWD, ARGS, 1, "(return current directory)"},
     {"CDUP", CDUP, ARGS, 1, "(change to parent directory)"},
     {"XCUP", CDUP, ARGS, 1, "(change to parent directory)"},
-    {"STOU", STOU, STR1, 1, "<sp> file-name"},
+    {"STOU", STOU, OSTR, 1, "[ <sp> file-name ]"},
     {"SIZE", SIZE, OSTR, 1, "<sp> path-name"},
     {"MDTM", MDTM, OSTR, 1, "<sp> path-name"},
 #if defined(USE_TLS) || defined(USE_GSS)
