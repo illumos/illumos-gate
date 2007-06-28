@@ -53,13 +53,14 @@ pcibl_t	ata_pciide_blacklist[] = {
 							ATA_BL_NODMA},
 
 	/*
-	 * Ditto for Serverworks CSB5 and CSB6 chips, but we can
-	 * handle DMA.  Also, when emulating OSB4 mode, the simplex
-	 * bit lies!
+	 * Ditto for Serverworks CSB5, CSB6 and BCM5785[HT1000] chips,
+	 * but we can handle DMA.  Also, when emulating OSB4 mode,
+	 * the simplex bit lies!
 	 */
 	{ 0x1166, 0xffff, 0x0212, 0xffff, ATA_BL_BMSTATREG_PIO_BROKEN|
 							ATA_BL_NO_SIMPLEX},
 	{ 0x1166, 0xffff, 0x0213, 0xffff, ATA_BL_BMSTATREG_PIO_BROKEN},
+	{ 0x1166, 0xffff, 0x0214, 0xffff, ATA_BL_BMSTATREG_PIO_BROKEN},
 
 	/*
 	 * On Intel ICH5/ICH5R (SATA controller), the simplex bit lies
