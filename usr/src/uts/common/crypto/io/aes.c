@@ -696,8 +696,9 @@ aes_decrypt(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 	 */
 	if (((aes_ctx->ac_flags & AES_CTR_MODE) == 0) &&
 	    ((aes_ctx->ac_flags & AES_CCM_MODE) == 0) &&
-	    (plaintext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
-		return (CRYPTO_DATA_LEN_RANGE);
+	    (ciphertext->cd_length & (AES_BLOCK_LEN - 1)) != 0) {
+		return (CRYPTO_ENCRYPTED_DATA_LEN_RANGE);
+	}
 
 	AES_ARG_INPLACE(ciphertext, plaintext);
 
@@ -937,7 +938,6 @@ aes_encrypt_final(crypto_ctx_t *ctx, crypto_data_t *data,
 			if (ret != CRYPTO_SUCCESS)
 				return (ret);
 		}
-		data->cd_length = 0;
 	} else if (aes_ctx->ac_flags & AES_CCM_MODE) {
 		ret = aes_ccm_encrypt_final(aes_ctx, data);
 		if (ret != CRYPTO_SUCCESS) {
@@ -952,6 +952,7 @@ aes_encrypt_final(crypto_ctx_t *ctx, crypto_data_t *data,
 		if (aes_ctx->ac_remainder_len > 0) {
 			return (CRYPTO_DATA_LEN_RANGE);
 		}
+		data->cd_length = 0;
 	}
 
 	(void) aes_free_context(ctx);
@@ -1028,8 +1029,10 @@ aes_decrypt_final(crypto_ctx_t *ctx, crypto_data_t *data,
 	}
 
 
-	if ((aes_ctx->ac_flags & AES_CTR_MODE) == 0)
+	if (((aes_ctx->ac_flags & AES_CTR_MODE) == 0) &&
+	    ((aes_ctx->ac_flags & AES_CCM_MODE) == 0)) {
 		data->cd_length = 0;
+	}
 
 	if (aes_ctx->ac_ccm_pt_buf != NULL) {
 		kmem_free(aes_ctx->ac_ccm_pt_buf, aes_ctx->ac_ccm_data_len);
