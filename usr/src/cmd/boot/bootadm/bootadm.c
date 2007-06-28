@@ -2237,6 +2237,16 @@ update_all(char *root, char *opt)
 			bam_rootlen = strlen(rootbuf);
 			if (update_archive(rootbuf, opt) != BAM_SUCCESS)
 				ret = BAM_ERROR;
+			/*
+			 * unmount the lofs mount since there could be
+			 * multiple invocations of bootadm -a update_all
+			 */
+			(void) snprintf(multibt, sizeof (multibt),
+			    "/sbin/umount %s", LOFS_PATCH_MNT);
+			if (exec_cmd(multibt, NULL, 0) != 0) {
+				bam_error(UMOUNT_FAILED, LOFS_PATCH_MNT);
+				ret = BAM_ERROR;
+			}
 		}
 	} else {
 		/*
