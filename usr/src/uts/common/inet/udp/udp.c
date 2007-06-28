@@ -6849,8 +6849,10 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 		}
 	}
 
-	ipha->ipha_fragment_offset_and_flags |=
-	    (uint32_t)htons(ire->ire_frag_flag);
+	if (!CLASSD(dst)) {
+		ipha->ipha_fragment_offset_and_flags |=
+		    (uint32_t)htons(ire->ire_frag_flag);
+	}
 
 	/* Calculate IP header checksum if hardware isn't capable */
 	if (!(DB_CKSUMFLAGS(mp) & HCK_IPV4_HDRCKSUM)) {
