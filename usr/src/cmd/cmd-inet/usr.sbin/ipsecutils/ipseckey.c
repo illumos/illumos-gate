@@ -73,7 +73,7 @@ FILE *debugfile = stdout;
 
 #define	MAX_GET_SIZE	1024
 /*
- * WARN() and ERROR() do the same thing really, with ERROR() the fucntion
+ * WARN() and ERROR() do the same thing really, with ERROR() the function
  * that prints the error buffer needs to be called at the end of a code block
  * This will print out all accumulated errors before bailing. The WARN()
  * macro calls handle_errors() in such a way that it prints the message
@@ -775,6 +775,10 @@ parsekey(char *input, char *ebuf)
 		FATAL(ep, ebuf, gettext("Unexpected end of command line, "
 		    "was expecting a key.\n"));
 	}
+	/* Allow hex values prepended with 0x convention */
+	if ((strnlen(input, sizeof (hexlen)) > 2) &&
+	    (strncasecmp(input, "0x", 2) == 0))
+		input += 2;
 
 	for (i = 0; input[i] != '\0' && input[i] != '/'; i++)
 		hexlen++;
@@ -2146,6 +2150,12 @@ doaddup(int cmd, int satype, char *argv[], char *ebuf)
 				ERROR(ep, ebuf, gettext(
 				    "Can only specify "
 				    "single encryption key.\n"));
+				break;
+			}
+			if (assoc->sadb_sa_encrypt == SADB_EALG_NULL) {
+				FATAL(ep, ebuf, gettext(
+				    "Cannot specify a key with NULL "
+				    "encryption algorithm.\n"));
 				break;
 			}
 			encrypt = parsekey(*argv, ebuf);
