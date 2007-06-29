@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -262,7 +262,9 @@ print_pass(const char *lnname, FILE *fp)
 			if (line.decflag & ~(LSU))
 				info("??? ");
 
-			info("struct %s ", name);
+			info("struct ");
+			if (name[0] != '.')
+				info("%s ", name);
 			if (showids)
 				info("<tag %lu> ", line.type.extra.ty);
 			info("{ \n");
@@ -335,7 +337,7 @@ print_atype(ATYPE *atp, int nargs, ATYPE *args, const char *name)
 		}
 		break;
 	default:
-		info(basetypes[basetype]);
+		info("%s", basetypes[basetype]);
 	};
 
 	print_mods(name, atp, nargs, args, 14);
