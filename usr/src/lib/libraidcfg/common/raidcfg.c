@@ -333,11 +333,11 @@ raidcfg_errstr(int err_code)
 		break;
 	case	STD_IOCTL:
 		ret_val = dgettext(TEXT_DOMAIN,
-			"Request standard IOCTL service.\n");
+		    "Request standard IOCTL service.\n");
 		break;
 	case	ERR_DRIVER_NOT_FOUND:
 		ret_val = dgettext(TEXT_DOMAIN,
-			"Controller device can not be found.\n");
+		    "Controller device can not be found.\n");
 		break;
 	case	ERR_DRIVER_OPEN:
 		ret_val = dgettext(TEXT_DOMAIN, "Can not open controller.\n");
@@ -350,22 +350,22 @@ raidcfg_errstr(int err_code)
 		break;
 	case	ERR_DRIVER_ACROSS:
 		ret_val = dgettext(TEXT_DOMAIN,
-			"Operation across multiple controllers.\n");
+		    "Operation across multiple controllers.\n");
 		break;
 	case	ERR_ARRAY_LEVEL:
 		ret_val = dgettext(TEXT_DOMAIN,
-			"Operation not support with volume of this level.\n");
+		    "Operation not support with volume of this level.\n");
 		break;
 	case	ERR_ARRAY_SIZE:
 		ret_val = dgettext(TEXT_DOMAIN,
-			"Capacity of array out of range.\n");
+		    "Capacity of array out of range.\n");
 		break;
 	case	ERR_ARRAY_STRIPE_SIZE:
 		ret_val = dgettext(TEXT_DOMAIN, "Illegal stripe size.\n");
 		break;
 	case	ERR_ARRAY_CACHE_POLICY:
 		ret_val = dgettext(TEXT_DOMAIN,
-			"Illegal cache-write policy.\n");
+		    "Illegal cache-write policy.\n");
 		break;
 	case	ERR_ARRAY_IN_USE:
 		ret_val = dgettext(TEXT_DOMAIN, "Array or disk in use.\n");
@@ -375,7 +375,7 @@ raidcfg_errstr(int err_code)
 		break;
 	case	ERR_ARRAY_CONFIG:
 		ret_val = dgettext(TEXT_DOMAIN,
-			"Configuration over device node failed.\n");
+		    "Configuration over device node failed.\n");
 		break;
 	case	ERR_ARRAY_DISKNUM:
 		ret_val = dgettext(TEXT_DOMAIN, "Incorrect number of disks.\n");
@@ -388,7 +388,7 @@ raidcfg_errstr(int err_code)
 		break;
 	case	ERR_DISK_STATE:
 		ret_val = dgettext(TEXT_DOMAIN,
-			"Incorrect disk status for current operation.\n");
+		    "Incorrect disk status for current operation.\n");
 		break;
 	case	ERR_DISK_SPACE:
 		ret_val = dgettext(TEXT_DOMAIN, "No enough disk space.\n");
@@ -404,14 +404,14 @@ raidcfg_errstr(int err_code)
 		break;
 	case	ERR_TASK_STATE:
 		ret_val = dgettext(TEXT_DOMAIN,
-			"Incorrect task state for current operation.\n");
+		    "Incorrect task state for current operation.\n");
 		break;
 	case	ERR_OP_ILLEGAL:
 		ret_val = dgettext(TEXT_DOMAIN, "Illegal operation.\n");
 		break;
 	case	ERR_OP_NO_IMPL:
 		ret_val = dgettext(TEXT_DOMAIN,
-			"Operation is not implemented.\n");
+		    "Operation is not implemented.\n");
 		break;
 	case	ERR_OP_FAILED:
 		ret_val = dgettext(TEXT_DOMAIN, "Operation failed.\n");
@@ -436,7 +436,7 @@ raidcfg_errstr(int err_code)
 		break;
 	case	ERR_NOMEM:
 		ret_val = dgettext(TEXT_DOMAIN,
-			"Can not allocate more memory space.\n");
+		    "Can not allocate more memory space.\n");
 		break;
 	case	ERR_PRIV:
 		ret_val = dgettext(TEXT_DOMAIN, "No privilege.\n");
@@ -493,7 +493,7 @@ raidcfg_get_array(int controller_handle, uint64_t target_id, uint64_t lun)
 	while (obj_id > OBJ_NONE) {
 		(void) obj_get_attr(&raid_tab_sys, obj_id, (void **)(&attr));
 		if (attr->tag.idl.target_id == target_id &&
-			attr->tag.idl.lun == lun)
+		    attr->tag.idl.lun == lun)
 			break;
 
 		obj_id = obj_get_sibling(&raid_tab_sys, obj_id);
@@ -570,7 +570,7 @@ raidcfg_open_controller(int handle, char **plugin_err_str)
 	}
 
 	ret = obj_controller_act(&raid_tab_sys, obj_id,
-		ACT_CONTROLLER_OPEN, NULL, plugin_err_str);
+	    ACT_CONTROLLER_OPEN, NULL, plugin_err_str);
 	if (ret < SUCCESS) {
 		(void) mutex_unlock(&raidcfg_mp);
 		return (ret);
@@ -596,7 +596,7 @@ raidcfg_close_controller(int handle, char **plugin_err_str)
 	}
 
 	ret = obj_controller_act(&raid_tab_sys, obj_id,
-		ACT_CONTROLLER_CLOSE, NULL, plugin_err_str);
+	    ACT_CONTROLLER_CLOSE, NULL, plugin_err_str);
 	if (ret < SUCCESS) {
 		(void) mutex_unlock(&raidcfg_mp);
 		return (ret);
@@ -674,7 +674,7 @@ raidcfg_get_attr(int handle, void *attr)
 
 			obj_id = obj_get_controller(&raid_tab_sys, obj_id);
 			ret = obj_get_attr(&raid_tab_sys, obj_id,
-				(void **)(&ctlr_attr));
+			    (void **)(&ctlr_attr));
 			if (ret < SUCCESS) {
 				(void) mutex_unlock(&raidcfg_mp);
 				return (ret);
@@ -682,17 +682,17 @@ raidcfg_get_attr(int handle, void *attr)
 
 			if (src->type == HSP_TYPE_LOCAL) {
 				obj_id = obj_locate_array(&raid_tab_sys,
-					ctlr_attr->controller_id,
-					src->associated_id);
+				    ctlr_attr->controller_id,
+				    src->associated_id);
 				ret = obj_get_attr(&raid_tab_sys, obj_id,
-					(void **)(&array_attr));
+				    (void **)(&array_attr));
 				if (ret < SUCCESS) {
 					(void) mutex_unlock(&raidcfg_mp);
 					return (ret);
 				}
 
 				dst->tag.idl.target_id =
-					array_attr->tag.idl.target_id;
+				    array_attr->tag.idl.target_id;
 				dst->tag.idl.lun = array_attr->tag.idl.lun;
 			}
 		}
@@ -715,14 +715,14 @@ raidcfg_get_attr(int handle, void *attr)
 
 			obj_id = obj_get_controller(&raid_tab_sys, obj_id);
 			ret = obj_get_attr(&raid_tab_sys, obj_id,
-				(void **)(&ctlr_attr));
+			    (void **)(&ctlr_attr));
 			if (ret < SUCCESS) {
 				(void) mutex_unlock(&raidcfg_mp);
 				return (ret);
 			}
 
 			obj_id = obj_locate_disk(&raid_tab_sys,
-				ctlr_attr->controller_id, src->disk_id);
+			    ctlr_attr->controller_id, src->disk_id);
 			if (obj_id <= OBJ_NONE) {
 				dst->tag.cidl.bus = (uint64_t)OBJ_ATTR_NONE;
 				dst->tag.cidl.target_id =
@@ -733,7 +733,7 @@ raidcfg_get_attr(int handle, void *attr)
 			}
 
 			ret = obj_get_attr(&raid_tab_sys, obj_id,
-				(void **)(&disk_attr));
+			    (void **)(&disk_attr));
 			if (ret < SUCCESS) {
 				(void) mutex_unlock(&raidcfg_mp);
 				return (ret);
@@ -864,7 +864,7 @@ raidcfg_set_attr(int handle, uint32_t set_cmd, void *value,
 	}
 
 	ret = raid_obj_op_sys[type].set_attr(&raid_tab_sys,
-		obj_id, set_cmd, value, plugin_err_str);
+	    obj_id, set_cmd, value, plugin_err_str);
 
 	(void) mutex_unlock(&raidcfg_mp);
 	return (ret);
@@ -891,7 +891,7 @@ raidcfg_update_fw(int handle, char *file, char **plugin_err_str)
 	}
 
 	ret = raid_obj_op_sys[OBJ_TYPE_CONTROLLER].act(&raid_tab_sys,
-		obj_id, ACT_CONTROLLER_FLASH_FW, file, plugin_err_str);
+	    obj_id, ACT_CONTROLLER_FLASH_FW, file, plugin_err_str);
 
 	(void) mutex_unlock(&raidcfg_mp);
 	return (ret);
@@ -919,15 +919,15 @@ raidcfg_create_array(int num_of_comps, int *disk_handles,
 	/* convert disk handles into disk object ids; */
 	for (i = 0; i < num_of_comps; ++i) {
 		if (*(disk_handles + i) == OBJ_SEPARATOR_BEGIN ||
-			*(disk_handles + i) == OBJ_SEPARATOR_END) {
+		    *(disk_handles + i) == OBJ_SEPARATOR_END) {
 			*(disk_obj_ids + i) = *(disk_handles + i);
 			continue;
 		}
 
 		*(disk_obj_ids + i) = raid_handle_to_obj(&raid_tab_sys,
-			*(disk_handles + i));
+		    *(disk_handles + i));
 		if (raid_obj_get_type(&raid_tab_sys, *(disk_obj_ids + i)) !=
-			OBJ_TYPE_DISK) {
+		    OBJ_TYPE_DISK) {
 			free(disk_obj_ids);
 			(void) obj_rescan(&raid_tab_sys);
 			(void) mutex_unlock(&raidcfg_mp);
@@ -944,7 +944,7 @@ raidcfg_create_array(int num_of_comps, int *disk_handles,
 		return (obj_id);
 	}
 	(void) raid_obj_clear_status(&raid_tab_sys, obj_id,
-		OBJ_STATUS_CMD_CLEAN);
+	    OBJ_STATUS_CMD_CLEAN);
 
 	array_attr = raid_obj_get_data_ptr(&raid_tab_sys, obj_id);
 	array_attr->array_id = (uint32_t)OBJ_ATTR_NONE;
@@ -955,7 +955,7 @@ raidcfg_create_array(int num_of_comps, int *disk_handles,
 	array_attr->read_policy = CACHE_RD_ON;
 
 	ret = raid_obj_op_sys[OBJ_TYPE_ARRAY].create_obj(&raid_tab_sys, obj_id,
-		num_of_comps, disk_obj_ids, plugin_err_str);
+	    num_of_comps, disk_obj_ids, plugin_err_str);
 	free(disk_obj_ids);
 
 	if (ret < SUCCESS) {
@@ -997,7 +997,7 @@ raidcfg_delete_array(int array_handle, char **plugin_err_str)
 	}
 
 	ret = raid_obj_op_sys[OBJ_TYPE_ARRAY].delete_obj(&raid_tab_sys,
-		array_obj_id, plugin_err_str);
+	    array_obj_id, plugin_err_str);
 	(void) obj_rescan(&raid_tab_sys);
 
 	(void) mutex_unlock(&raidcfg_mp);
@@ -1030,7 +1030,7 @@ raidcfg_set_hsp(int num, raidcfg_hsp_relation_t *hsp_relations,
 	for (i = 0; i < num; ++ i) {
 		if (hsp_relations->array_handle != OBJ_ATTR_NONE) {
 			array_obj_id = raid_handle_to_obj(&raid_tab_sys,
-				hsp_relations[i].array_handle);
+			    hsp_relations[i].array_handle);
 			if (array_obj_id < OBJ_NONE) {
 				free(hsp_relation_objs);
 				(void) mutex_unlock(&raidcfg_mp);
@@ -1042,7 +1042,7 @@ raidcfg_set_hsp(int num, raidcfg_hsp_relation_t *hsp_relations,
 				return (ERR_DEVICE_NOENT);
 			}
 			if (raidcfg_get_type(hsp_relations[i].array_handle) !=
-				OBJ_TYPE_ARRAY) {
+			    OBJ_TYPE_ARRAY) {
 				free(hsp_relation_objs);
 				(void) mutex_unlock(&raidcfg_mp);
 				return (ERR_DEVICE_TYPE);
@@ -1051,7 +1051,7 @@ raidcfg_set_hsp(int num, raidcfg_hsp_relation_t *hsp_relations,
 			array_obj_id = OBJ_ATTR_NONE;
 
 		disk_obj_id = raid_handle_to_obj(&raid_tab_sys,
-			hsp_relations[i].disk_handle);
+		    hsp_relations[i].disk_handle);
 		if (disk_obj_id < OBJ_NONE) {
 			free(hsp_relation_objs);
 			(void) mutex_unlock(&raidcfg_mp);
@@ -1063,7 +1063,7 @@ raidcfg_set_hsp(int num, raidcfg_hsp_relation_t *hsp_relations,
 			return (ERR_DEVICE_NOENT);
 		}
 		if (raidcfg_get_type(hsp_relations[i].disk_handle) !=
-			OBJ_TYPE_DISK) {
+		    OBJ_TYPE_DISK) {
 			free(hsp_relation_objs);
 			(void) mutex_unlock(&raidcfg_mp);
 			return (ERR_DEVICE_TYPE);
@@ -1074,7 +1074,7 @@ raidcfg_set_hsp(int num, raidcfg_hsp_relation_t *hsp_relations,
 	}
 
 	ret = raid_obj_op_sys[OBJ_TYPE_HSP].bind_obj(&raid_tab_sys, num,
-		hsp_relation_objs, plugin_err_str);
+	    hsp_relation_objs, plugin_err_str);
 
 	(void) obj_rescan(&raid_tab_sys);
 	free(hsp_relation_objs);
@@ -1109,7 +1109,7 @@ raidcfg_unset_hsp(int num, raidcfg_hsp_relation_t *hsp_relations,
 	for (i = 0; i < num; ++ i) {
 		if (hsp_relations->array_handle != OBJ_ATTR_NONE) {
 			array_obj_id = raid_handle_to_obj(&raid_tab_sys,
-				hsp_relations[i].array_handle);
+			    hsp_relations[i].array_handle);
 			if (array_obj_id < OBJ_NONE) {
 				free(hsp_relation_objs);
 				(void) mutex_unlock(&raidcfg_mp);
@@ -1121,7 +1121,7 @@ raidcfg_unset_hsp(int num, raidcfg_hsp_relation_t *hsp_relations,
 				return (ERR_DEVICE_NOENT);
 			}
 			if (raidcfg_get_type(hsp_relations[i].array_handle) !=
-				OBJ_TYPE_ARRAY) {
+			    OBJ_TYPE_ARRAY) {
 				free(hsp_relation_objs);
 				(void) mutex_unlock(&raidcfg_mp);
 				return (ERR_DEVICE_TYPE);
@@ -1130,7 +1130,7 @@ raidcfg_unset_hsp(int num, raidcfg_hsp_relation_t *hsp_relations,
 			array_obj_id = OBJ_ATTR_NONE;
 
 		disk_obj_id = raid_handle_to_obj(&raid_tab_sys,
-			hsp_relations[i].disk_handle);
+		    hsp_relations[i].disk_handle);
 		if (disk_obj_id < OBJ_NONE) {
 			free(hsp_relation_objs);
 			(void) mutex_unlock(&raidcfg_mp);
@@ -1142,7 +1142,7 @@ raidcfg_unset_hsp(int num, raidcfg_hsp_relation_t *hsp_relations,
 			return (ERR_DEVICE_NOENT);
 		}
 		if (raidcfg_get_type(hsp_relations[i].disk_handle) !=
-			OBJ_TYPE_DISK) {
+		    OBJ_TYPE_DISK) {
 			free(hsp_relation_objs);
 			(void) mutex_unlock(&raidcfg_mp);
 			return (ERR_DEVICE_TYPE);
@@ -1153,7 +1153,7 @@ raidcfg_unset_hsp(int num, raidcfg_hsp_relation_t *hsp_relations,
 	}
 
 	ret = raid_obj_op_sys[OBJ_TYPE_HSP].unbind_obj(&raid_tab_sys,
-		num, hsp_relation_objs, plugin_err_str);
+	    num, hsp_relation_objs, plugin_err_str);
 
 	(void) obj_rescan(&raid_tab_sys);
 	free(hsp_relation_objs);
@@ -1212,13 +1212,13 @@ raid_space_noalign(raid_obj_tab_t *raid_tab, uint32_t raid_level, int num,
 	/* Find out the maximum available space for all disks */
 	for (i = 0; i < num; ++i) {
 		if ((disk_objs[i] == OBJ_SEPARATOR_BEGIN) ||
-			(disk_objs[i] == OBJ_SEPARATOR_END))
+		    (disk_objs[i] == OBJ_SEPARATOR_END))
 			continue;
 
 		(void) obj_get_attr(raid_tab, disk_objs[i],
-			(void **)(&disk_attr));
+		    (void **)(&disk_attr));
 		obj_id = obj_get_comp(raid_tab, disk_objs[i],
-			OBJ_TYPE_DISK_SEG);
+		    OBJ_TYPE_DISK_SEG);
 		if (obj_id == OBJ_NONE) {
 			arraypart_attrs[i].offset = 0;
 			arraypart_attrs[i].size = disk_attr->capacity;
@@ -1226,7 +1226,7 @@ raid_space_noalign(raid_obj_tab_t *raid_tab, uint32_t raid_level, int num,
 		}
 
 		(void) obj_get_attr(raid_tab, obj_id, (void **)
-			(&diskseg_attr));
+		    (&diskseg_attr));
 		arraypart_attrs[i].offset = 0;
 		arraypart_attrs[i].size = diskseg_attr->offset;
 		offset = diskseg_attr->offset + diskseg_attr->size;
@@ -1234,12 +1234,12 @@ raid_space_noalign(raid_obj_tab_t *raid_tab, uint32_t raid_level, int num,
 		while ((obj_id = obj_get_sibling(raid_tab, obj_id)) !=
 		    OBJ_NONE) {
 			(void) obj_get_attr(raid_tab, obj_id,
-				(void **)(&diskseg_attr));
+			    (void **)(&diskseg_attr));
 			if ((diskseg_attr->offset - offset) >
-				arraypart_attrs[i].size) {
+			    arraypart_attrs[i].size) {
 				arraypart_attrs[i].offset = offset;
-				arraypart_attrs[i].size = diskseg_attr->offset
-					- offset;
+				arraypart_attrs[i].size = diskseg_attr->offset -
+				    offset;
 			}
 
 			offset = diskseg_attr->offset + diskseg_attr->size;
@@ -1247,8 +1247,8 @@ raid_space_noalign(raid_obj_tab_t *raid_tab, uint32_t raid_level, int num,
 
 		if ((disk_attr->capacity - offset) > arraypart_attrs[i].size) {
 			arraypart_attrs[i].offset = offset;
-			arraypart_attrs[i].size = disk_attr->capacity
-				- offset;
+			arraypart_attrs[i].size = disk_attr->capacity -
+			    offset;
 		}
 	}
 
@@ -1320,7 +1320,7 @@ raid_dev_config(cfga_cmd_t cmd, uint32_t controller_id, uint32_t target_id,
 
 	do {
 		cfga_err = config_change_state(cmd, 1, &ap_id, "disable_rcm",
-			NULL, NULL, NULL, 0);
+		    NULL, NULL, NULL, 0);
 		count++;
 	} while (cfga_err != CFGA_OK && count < 2);
 
@@ -1344,14 +1344,14 @@ raid_handle_init()
 
 	raid_handle_sys.handle_num += HANDLER_SLOTS;
 	ptr = realloc(raid_handle_sys.handles,
-		raid_handle_sys.handle_num * sizeof (handle_attr_t));
+	    raid_handle_sys.handle_num * sizeof (handle_attr_t));
 	if (ptr == NULL)
 		return (ERR_NOMEM);
 	raid_handle_sys.handles = ptr;
 
 	/* Clean up the new allocated handles */
 	for (i = raid_handle_sys.handle_num - HANDLER_SLOTS;
-		i < raid_handle_sys.handle_num; ++i) {
+	    i < raid_handle_sys.handle_num; ++i) {
 		raid_handle_sys.handles[i].type = OBJ_TYPE_ALL;
 		raid_handle_sys.handles[i].next = i + 1;
 	}
@@ -1376,10 +1376,10 @@ raid_handle_fini()
 	/* Close all opened controllers */
 	while (i != 0) {
 		if ((raid_handle_sys.handles[i].type == OBJ_TYPE_CONTROLLER) &&
-			(raid_handle_sys.handles[i].fd != 0) &&
-			(raid_handle_sys.handles[i].raid_lib != NULL))
+		    (raid_handle_sys.handles[i].fd != 0) &&
+		    (raid_handle_sys.handles[i].raid_lib != NULL))
 			raid_handle_sys.handles[i].raid_lib->close_controller(
-				raid_handle_sys.handles[i].controller_id, NULL);
+			    raid_handle_sys.handles[i].controller_id, NULL);
 		i = raid_handle_sys.handles[i].next;
 	}
 
@@ -1428,14 +1428,14 @@ raid_handle_delete(raid_obj_handle_t handle)
 	if (i == handle) {
 		if (j != 0)
 			raid_handle_sys.handles[j].next =
-				raid_handle_sys.handles[i].next;
+			    raid_handle_sys.handles[i].next;
 		else
 			raid_handle_sys.used =
-				raid_handle_sys.handles[i].next;
+			    raid_handle_sys.handles[i].next;
 
 		raid_handle_sys.handles[i].type = OBJ_TYPE_ALL;
 		raid_handle_sys.handles[i].next =
-			raid_handle_sys.unused;
+		    raid_handle_sys.unused;
 		raid_handle_sys.unused = i;
 	}
 }
@@ -1446,10 +1446,12 @@ raid_handle_delete_controller_comp(uint32_t controller_id)
 	int i = raid_handle_sys.used, j;
 
 	while (i != 0) {
-	    j = i;
-	    i = raid_handle_sys.handles[i].next;
-	    if ((raid_handle_sys.handles[j].controller_id == controller_id) &&
-		(raid_handle_sys.handles[j].type != OBJ_TYPE_CONTROLLER))
+		j = i;
+		i = raid_handle_sys.handles[i].next;
+		if ((raid_handle_sys.handles[j].controller_id ==
+		    controller_id) &&
+		    (raid_handle_sys.handles[j].type !=
+		    OBJ_TYPE_CONTROLLER))
 		raid_handle_delete(j);
 	}
 }
@@ -1470,34 +1472,34 @@ raid_handle_to_obj(raid_obj_tab_t *raid_tab, raid_obj_handle_t handle)
 		return (OBJ_SYSTEM);
 	case	OBJ_TYPE_CONTROLLER:
 		obj_id = obj_locate_controller(raid_tab,
-			handle_attr->controller_id);
+		    handle_attr->controller_id);
 		break;
 	case	OBJ_TYPE_ARRAY:
 		obj_id = obj_locate_array(raid_tab,
-			handle_attr->controller_id, handle_attr->array_id);
+		    handle_attr->controller_id, handle_attr->array_id);
 		break;
 	case	OBJ_TYPE_HSP:
 		obj_id = obj_locate_hsp(raid_tab,
-			handle_attr->controller_id, handle_attr->disk_id,
-			handle_attr->array_id);
+		    handle_attr->controller_id, handle_attr->disk_id,
+		    handle_attr->array_id);
 		break;
 	case	OBJ_TYPE_DISK:
 		obj_id = obj_locate_disk(raid_tab,
-			handle_attr->controller_id, handle_attr->disk_id);
+		    handle_attr->controller_id, handle_attr->disk_id);
 		break;
 	case	OBJ_TYPE_ARRAY_PART:
 		obj_id = obj_locate_arraypart(raid_tab,
-			handle_attr->controller_id, handle_attr->array_id,
-			handle_attr->disk_id);
+		    handle_attr->controller_id, handle_attr->array_id,
+		    handle_attr->disk_id);
 		break;
 	case	OBJ_TYPE_DISK_SEG:
 		obj_id = obj_locate_diskseg(raid_tab,
-			handle_attr->controller_id,
-			handle_attr->disk_id, handle_attr->seq_id);
+		    handle_attr->controller_id,
+		    handle_attr->disk_id, handle_attr->seq_id);
 		break;
 	case	OBJ_TYPE_TASK:
 		obj_id = obj_locate_task(raid_tab,
-			handle_attr->controller_id, handle_attr->task_id);
+		    handle_attr->controller_id, handle_attr->task_id);
 		break;
 	default:
 		return (ERR_DEVICE_INVALID);
@@ -1536,7 +1538,7 @@ raid_obj_to_handle(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 
 	/* Search for existing handles */
 	for (handle = raid_handle_sys.used; handle != 0;
-		handle = raid_handle_sys.handles[handle].next)
+	    handle = raid_handle_sys.handles[handle].next)
 		if (raid_handle_to_obj(raid_tab, handle) == obj_id)
 			break;
 
@@ -1555,7 +1557,7 @@ raid_obj_to_handle(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 	case OBJ_TYPE_CONTROLLER:
 		controller_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 		raid_handle_sys.handles[handle].controller_id =
-			controller_attr->controller_id;
+		    controller_attr->controller_id;
 		break;
 	case OBJ_TYPE_ARRAY:
 		array_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
@@ -1563,19 +1565,19 @@ raid_obj_to_handle(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 		obj_id = obj_get_controller(raid_tab, obj_id);
 		controller_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 		raid_handle_sys.handles[handle].controller_id =
-			controller_attr->controller_id;
+		    controller_attr->controller_id;
 		break;
 	case OBJ_TYPE_HSP:
 		hsp_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 		raid_handle_sys.handles[handle].array_id =
-			hsp_attr->associated_id;
+		    hsp_attr->associated_id;
 		obj_id = raid_obj_get_container(raid_tab, obj_id);
 		disk_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 		raid_handle_sys.handles[handle].disk_id = disk_attr->disk_id;
 		obj_id = obj_get_controller(raid_tab, obj_id);
 		controller_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 		raid_handle_sys.handles[handle].controller_id =
-			controller_attr->controller_id;
+		    controller_attr->controller_id;
 		break;
 	case OBJ_TYPE_DISK:
 		disk_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
@@ -1583,20 +1585,20 @@ raid_obj_to_handle(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 		obj_id = obj_get_controller(raid_tab, obj_id);
 		controller_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 		raid_handle_sys.handles[handle].controller_id =
-			controller_attr->controller_id;
+		    controller_attr->controller_id;
 		break;
 	case OBJ_TYPE_ARRAY_PART:
 		arraypart_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 		raid_handle_sys.handles[handle].disk_id =
-			arraypart_attr->disk_id;
+		    arraypart_attr->disk_id;
 		obj_id = raid_obj_get_container(raid_tab, obj_id);
 		array_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 		raid_handle_sys.handles[handle].array_id =
-			array_attr->array_id;
+		    array_attr->array_id;
 		obj_id = obj_get_controller(raid_tab, obj_id);
 		controller_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 		raid_handle_sys.handles[handle].controller_id =
-			controller_attr->controller_id;
+		    controller_attr->controller_id;
 		break;
 	case OBJ_TYPE_DISK_SEG:
 		diskseg_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
@@ -1604,11 +1606,11 @@ raid_obj_to_handle(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 		obj_id = raid_obj_get_container(raid_tab, obj_id);
 		disk_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 		raid_handle_sys.handles[handle].disk_id =
-				disk_attr->disk_id;
+		    disk_attr->disk_id;
 		obj_id = obj_get_controller(raid_tab, obj_id);
 		controller_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 		raid_handle_sys.handles[handle].controller_id =
-			controller_attr->controller_id;
+		    controller_attr->controller_id;
 		break;
 	case OBJ_TYPE_TASK:
 		task_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
@@ -1616,7 +1618,7 @@ raid_obj_to_handle(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 		obj_id = obj_get_controller(raid_tab, obj_id);
 		controller_attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 		raid_handle_sys.handles[handle].controller_id =
-			controller_attr->controller_id;
+		    controller_attr->controller_id;
 		break;
 	default:
 		return (ERR_DEVICE_INVALID);
@@ -1638,8 +1640,8 @@ raid_obj_get_lib(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 	attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 	handle = raid_handle_sys.used;
 	while (raid_handle_sys.handles[handle].type != OBJ_TYPE_CONTROLLER ||
-		raid_handle_sys.handles[handle].controller_id !=
-		attr->controller_id)
+	    raid_handle_sys.handles[handle].controller_id !=
+	    attr->controller_id)
 		handle = raid_handle_sys.handles[handle].next;
 
 	if (handle == 0)
@@ -1661,8 +1663,8 @@ raid_obj_set_lib(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 	attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 	handle = raid_handle_sys.used;
 	while (raid_handle_sys.handles[handle].type != OBJ_TYPE_CONTROLLER ||
-		raid_handle_sys.handles[handle].controller_id !=
-		attr->controller_id)
+	    raid_handle_sys.handles[handle].controller_id !=
+	    attr->controller_id)
 		handle = raid_handle_sys.handles[handle].next;
 
 	if (handle == 0)
@@ -1684,8 +1686,8 @@ raid_obj_get_fd(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 	attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 	handle = raid_handle_sys.used;
 	while (raid_handle_sys.handles[handle].type != OBJ_TYPE_CONTROLLER ||
-		raid_handle_sys.handles[handle].controller_id !=
-		attr->controller_id)
+	    raid_handle_sys.handles[handle].controller_id !=
+	    attr->controller_id)
 		handle = raid_handle_sys.handles[handle].next;
 
 	if (handle == 0)
@@ -1706,8 +1708,8 @@ raid_obj_set_fd(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id, int fd)
 	attr = raid_obj_get_data_ptr(raid_tab, obj_id);
 	handle = raid_handle_sys.used;
 	while (raid_handle_sys.handles[handle].type != OBJ_TYPE_CONTROLLER ||
-		raid_handle_sys.handles[handle].controller_id !=
-		attr->controller_id)
+	    raid_handle_sys.handles[handle].controller_id !=
+	    attr->controller_id)
 		handle = raid_handle_sys.handles[handle].next;
 
 	if (handle == 0)
@@ -1740,10 +1742,10 @@ obj_scan_comp(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 		return (ERR_DEVICE_INVALID);
 
 	for (obj_type_cnt = OBJ_SYSTEM; obj_type_cnt < OBJ_TYPE_ALL;
-		++obj_type_cnt) {
+	    ++obj_type_cnt) {
 		if (raid_obj_op_sys[type].compnum != NULL)
 			comp_num = raid_obj_op_sys[type].compnum(
-				raid_tab, obj_id, obj_type_cnt);
+			    raid_tab, obj_id, obj_type_cnt);
 		else
 			comp_num = 0;
 
@@ -1758,7 +1760,7 @@ obj_scan_comp(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 
 		for (i = 0; i < comp_num; ++i) {
 			*(comp_list + i) = raid_obj_create(raid_tab,
-				obj_type_cnt);
+			    obj_type_cnt);
 			if (*(comp_list + i) < SUCCESS) {
 				ret = *(comp_list + i);
 				free(comp_list);
@@ -1766,14 +1768,14 @@ obj_scan_comp(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 			}
 
 			(void) raid_obj_clear_status(raid_tab,
-				*(comp_list + i), OBJ_STATUS_CMD_CLEAN);
+			    *(comp_list + i), OBJ_STATUS_CMD_CLEAN);
 			(void) raid_obj_add_org(raid_tab, *(comp_list + i),
-				obj_id);
+			    obj_id);
 		}
 
 		if (raid_obj_op_sys[type].complist != NULL)
 			raid_obj_op_sys[type].complist(raid_tab,
-				obj_id, comp_num, comp_list, obj_type_cnt);
+			    obj_id, comp_num, comp_list, obj_type_cnt);
 		free(comp_list);
 	}
 
@@ -1891,7 +1893,7 @@ obj_get_attr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id, void **data)
 	if (!(status & OBJ_STATUS_OPENED)) {
 		if (raid_obj_op_sys[type].get_attr == NULL)
 			(void) raid_obj_set_status(raid_tab, obj_id,
-				OBJ_STATUS_OPENED);
+			    OBJ_STATUS_OPENED);
 		else
 			ret = raid_obj_op_sys[type].get_attr(raid_tab, obj_id);
 	}
@@ -2050,7 +2052,7 @@ obj_locate_arraypart(raid_obj_tab_t *raid_tab, uint32_t controller_id,
 		if (attr->disk_id == disk_id)
 			break;
 	} while ((obj_id = obj_get_sibling(raid_tab, obj_id)) >
-		OBJ_NONE);
+	    OBJ_NONE);
 
 	return (obj_id);
 }
@@ -2101,7 +2103,7 @@ obj_locate_task(raid_obj_tab_t *raid_tab, uint32_t controller_id,
 		obj_id2 = obj_get_comp(raid_tab, obj_id, OBJ_TYPE_ARRAY);
 		while (obj_id2 != OBJ_NONE) {
 			task_obj_id = obj_get_comp(raid_tab, obj_id2,
-				OBJ_TYPE_TASK);
+			    OBJ_TYPE_TASK);
 
 			if (task_obj_id < OBJ_NONE)
 				return (task_obj_id);
@@ -2203,7 +2205,7 @@ obj_sys_compnum(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 		char path[MAX_PATH_LEN];
 
 		if (strcmp(dp->d_name, ".") == 0 ||
-			strcmp(dp->d_name, "..") == 0)
+		    strcmp(dp->d_name, "..") == 0)
 			continue;
 
 		if (sscanf(dp->d_name, "c%u", &controller_id) != 1)
@@ -2245,7 +2247,7 @@ obj_sys_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 	}
 	while ((dp = readdir(dir)) != NULL) {
 		if (strcmp(dp->d_name, ".") == 0 ||
-			strcmp(dp->d_name, "..") == 0)
+		    strcmp(dp->d_name, "..") == 0)
 			continue;
 
 		if (sscanf(dp->d_name, "c%u", &controller_id) != 1)
@@ -2259,7 +2261,7 @@ obj_sys_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 	qsort((void *)tmplist, num, sizeof (uint32_t), intcompare);
 	for (i = 0; i < num; i++) {
 		attr = raid_obj_get_data_ptr(raid_tab,
-			*(comp_list + i));
+		    *(comp_list + i));
 
 		if (attr == NULL) {
 			free(tmplist);
@@ -2294,7 +2296,7 @@ obj_controller_compnum(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 		return (ERR_DRIVER_CLOSED);
 
 	ret = raid_lib->compnum(ctl_attrp->controller_id, 0,
-				OBJ_TYPE_CONTROLLER, comp_type);
+	    OBJ_TYPE_CONTROLLER, comp_type);
 
 	return (ret);
 }
@@ -2319,7 +2321,7 @@ obj_controller_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 
 	for (i = 0; i < comp_num; ++i)
 		if (raid_obj_get_type(raid_tab, *(comp_list + i)) !=
-			comp_type)
+		    comp_type)
 			return (ERR_DEVICE_TYPE);
 
 	raid_lib = raid_obj_get_lib(raid_tab, obj_id);
@@ -2333,7 +2335,7 @@ obj_controller_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 		return (ERR_NOMEM);
 
 	ret = raid_lib->complist(ctl_attrp->controller_id, 0,
-		OBJ_TYPE_CONTROLLER, comp_type, comp_num, ids);
+	    OBJ_TYPE_CONTROLLER, comp_type, comp_num, ids);
 	if (ret < SUCCESS) {
 		free(ids);
 		return (ret);
@@ -2402,7 +2404,7 @@ obj_controller_get_attr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 	}
 
 	ret = raid_lib->get_attr(attr->controller_id, OBJ_ATTR_NONE,
-		OBJ_ATTR_NONE, OBJ_TYPE_CONTROLLER, attr);
+	    OBJ_ATTR_NONE, OBJ_TYPE_CONTROLLER, attr);
 	if (ret < SUCCESS)
 		return (ret);
 
@@ -2442,7 +2444,7 @@ obj_controller_act(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 		}
 
 		ret = raid_lib->open_controller(attr->controller_id,
-			plugin_err_str);
+		    plugin_err_str);
 		if (ret == SUCCESS) {
 			(void) raid_obj_set_lib(raid_tab, obj_id, raid_lib);
 			(void) raid_obj_set_fd(raid_tab, obj_id, 1);
@@ -2457,7 +2459,7 @@ obj_controller_act(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 			return (SUCCESS);
 		}
 		ret = raid_lib->close_controller(attr->controller_id,
-			plugin_err_str);
+		    plugin_err_str);
 		if (ret == SUCCESS) {
 			(void) raid_obj_set_fd(raid_tab, obj_id, 0);
 			(void) raid_obj_set_lib(raid_tab, obj_id, NULL);
@@ -2476,7 +2478,7 @@ obj_controller_act(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 
 			/* Open firmware image file */
 			image_fd = open((const char *)prop_list,
-				O_RDONLY | O_NDELAY);
+			    O_RDONLY | O_NDELAY);
 			if (image_fd == -1)
 				return (ERR_OP_FAILED);
 
@@ -2516,7 +2518,7 @@ obj_controller_act(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 			}
 
 			ret = raid_lib->flash_fw(attr->controller_id,
-				filebuf, size, plugin_err_str);
+			    filebuf, size, plugin_err_str);
 		}
 		break;
 	default:
@@ -2540,8 +2542,8 @@ obj_array_compnum(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 		return (ERR_DEVICE_TYPE);
 
 	if (comp_type != OBJ_TYPE_ARRAY_PART &&
-		comp_type != OBJ_TYPE_ARRAY &&
-		comp_type != OBJ_TYPE_TASK)
+	    comp_type != OBJ_TYPE_ARRAY &&
+	    comp_type != OBJ_TYPE_TASK)
 		return (0);
 
 	attr = raid_obj_get_data_ptr(raid_tab, obj_id);
@@ -2563,7 +2565,7 @@ obj_array_compnum(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 		return (ERR_DRIVER_CLOSED);
 
 	ret = raid_lib->compnum(ctl_attrp->controller_id, attr->array_id,
-		OBJ_TYPE_ARRAY, comp_type);
+	    OBJ_TYPE_ARRAY, comp_type);
 
 	return (ret);
 }
@@ -2583,8 +2585,8 @@ obj_array_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 		return (ERR_DEVICE_TYPE);
 
 	if (comp_type != OBJ_TYPE_ARRAY_PART &&
-		comp_type != OBJ_TYPE_ARRAY &&
-		comp_type != OBJ_TYPE_TASK)
+	    comp_type != OBJ_TYPE_ARRAY &&
+	    comp_type != OBJ_TYPE_TASK)
 		return (0);
 
 	if (comp_num <= 0 || comp_list == NULL)
@@ -2592,7 +2594,7 @@ obj_array_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 
 	for (i = 0; i < comp_num; ++i)
 		if (raid_obj_get_type(raid_tab, *(comp_list + i)) !=
-			comp_type)
+		    comp_type)
 			return (ERR_DEVICE_TYPE);
 
 	attr = raid_obj_get_data_ptr(raid_tab, obj_id);
@@ -2618,7 +2620,7 @@ obj_array_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 		return (ERR_NOMEM);
 
 	ret = raid_lib->complist(ctl_attrp->controller_id,
-		attr->array_id, OBJ_TYPE_ARRAY, comp_type, comp_num, ids);
+	    attr->array_id, OBJ_TYPE_ARRAY, comp_type, comp_num, ids);
 
 	if (ret < SUCCESS) {
 		free(ids);
@@ -2695,7 +2697,7 @@ obj_array_get_attr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 		return (ERR_DRIVER_CLOSED);
 
 	ret = raid_lib->get_attr(ctl_attrp->controller_id,
-		attr->array_id, 0, OBJ_TYPE_ARRAY, attr);
+	    attr->array_id, 0, OBJ_TYPE_ARRAY, attr);
 
 	if (ret < SUCCESS)
 		return (ret);
@@ -2721,12 +2723,12 @@ obj_array_set_attr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 	switch (sub_cmd) {
 	case SET_CACHE_WR_PLY:
 		if (*value != CACHE_WR_OFF &&
-			*value != CACHE_WR_ON)
+		    *value != CACHE_WR_ON)
 			return (ERR_OP_ILLEGAL);
 		break;
 	case SET_CACHE_RD_PLY:
 		if (*value != CACHE_RD_OFF &&
-			*value != CACHE_RD_ON)
+		    *value != CACHE_RD_ON)
 			return (ERR_OP_ILLEGAL);
 		break;
 	default:
@@ -2753,7 +2755,7 @@ obj_array_set_attr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 		return (ERR_OP_NO_IMPL);
 
 	ret = raid_lib->set_attr(ctl_attrp->controller_id,
-		attr->array_id, sub_cmd, value, plugin_err_str);
+	    attr->array_id, sub_cmd, value, plugin_err_str);
 
 	return (ret);
 }
@@ -2772,8 +2774,8 @@ obj_disk_compnum(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 		return (ERR_DEVICE_TYPE);
 
 	if (comp_type != OBJ_TYPE_DISK_SEG &&
-		comp_type != OBJ_TYPE_HSP &&
-		comp_type != OBJ_TYPE_TASK)
+	    comp_type != OBJ_TYPE_HSP &&
+	    comp_type != OBJ_TYPE_TASK)
 		return (0);
 	ret = obj_get_attr(raid_tab, obj_id, (void **)(&attr));
 	if ((ret != SUCCESS) || (attr == NULL)) {
@@ -2798,7 +2800,7 @@ obj_disk_compnum(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 		return (ERR_DRIVER_CLOSED);
 
 	ret = raid_lib->compnum(ctl_attrp->controller_id,
-		attr->disk_id, OBJ_TYPE_DISK, comp_type);
+	    attr->disk_id, OBJ_TYPE_DISK, comp_type);
 
 	return (ret);
 }
@@ -2818,8 +2820,8 @@ obj_disk_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 		return (ERR_DEVICE_TYPE);
 
 	if (comp_type != OBJ_TYPE_DISK_SEG &&
-		comp_type != OBJ_TYPE_HSP &&
-		comp_type != OBJ_TYPE_TASK)
+	    comp_type != OBJ_TYPE_HSP &&
+	    comp_type != OBJ_TYPE_TASK)
 		return (0);
 
 	if (comp_num <= 0 || comp_list == NULL)
@@ -2827,7 +2829,7 @@ obj_disk_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 
 	for (i = 0; i < comp_num; ++i)
 		if (raid_obj_get_type(raid_tab, *(comp_list + i)) !=
-			comp_type)
+		    comp_type)
 			return (ERR_DEVICE_TYPE);
 	ret = obj_get_attr(raid_tab, obj_id, (void **)(&attr));
 	if ((ret != SUCCESS) || (attr == NULL)) {
@@ -2856,7 +2858,7 @@ obj_disk_complist(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id,
 		return (ERR_NOMEM);
 
 	ret = raid_lib->complist(ctl_attrp->controller_id,
-		attr->disk_id, OBJ_TYPE_DISK, comp_type, comp_num, ids);
+	    attr->disk_id, OBJ_TYPE_DISK, comp_type, comp_num, ids);
 
 	if (ret < SUCCESS) {
 		free(ids);
@@ -2933,7 +2935,7 @@ obj_disk_get_attr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 		return (ERR_DRIVER_CLOSED);
 
 	ret = raid_lib->get_attr(ctl_attrp->controller_id,
-		attr->disk_id, 0, OBJ_TYPE_DISK, attr);
+	    attr->disk_id, 0, OBJ_TYPE_DISK, attr);
 
 	if (ret < SUCCESS)
 		return (ret);
@@ -3009,8 +3011,8 @@ obj_arraypart_get_attr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 		return (ERR_DRIVER_CLOSED);
 
 	ret = raid_lib->get_attr(ctl_attrp->controller_id,
-		array_attr->array_id, attr->disk_id,
-		OBJ_TYPE_ARRAY_PART, attr);
+	    array_attr->array_id, attr->disk_id,
+	    OBJ_TYPE_ARRAY_PART, attr);
 
 	if (ret < SUCCESS)
 		return (ret);
@@ -3063,7 +3065,7 @@ obj_diskseg_get_attr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 		return (ERR_DRIVER_CLOSED);
 
 	ret = raid_lib->get_attr(ctl_attrp->controller_id,
-		disk_attr->disk_id, attr->seq_no, OBJ_TYPE_DISK_SEG, attr);
+	    disk_attr->disk_id, attr->seq_no, OBJ_TYPE_DISK_SEG, attr);
 
 	if (ret < SUCCESS)
 		return (ret);
@@ -3104,7 +3106,7 @@ obj_task_get_attr(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 		return (ERR_DRIVER_CLOSED);
 
 	ret = raid_lib->get_attr(ctl_attrp->controller_id,
-		attr->task_id, OBJ_ATTR_NONE, OBJ_TYPE_TASK, attr);
+	    attr->task_id, OBJ_ATTR_NONE, OBJ_TYPE_TASK, attr);
 
 	return (ret);
 }
@@ -3130,7 +3132,7 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 
 	/* Check the disk layout expression */
 	if (disk_list[0] != OBJ_SEPARATOR_BEGIN ||
-		disk_list[num_of_comp - 1] != OBJ_SEPARATOR_END)
+	    disk_list[num_of_comp - 1] != OBJ_SEPARATOR_END)
 		return (ERR_ARRAY_LAYOUT);
 	for (i = 0; i < num_of_comp; ++i) {
 		if (disk_list[i] == OBJ_SEPARATOR_BEGIN) {
@@ -3205,20 +3207,20 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 		/* Keep seperators */
 		if (*(disk_list + i) == OBJ_SEPARATOR_BEGIN) {
 			arraypart_attrs[i].disk_id =
-				(uint32_t)OBJ_SEPARATOR_BEGIN;
+			    (uint32_t)OBJ_SEPARATOR_BEGIN;
 			continue;
 		}
 
 		if (*(disk_list + i) == OBJ_SEPARATOR_END) {
 			arraypart_attrs[i].disk_id =
-				(uint32_t)OBJ_SEPARATOR_END;
+			    (uint32_t)OBJ_SEPARATOR_END;
 			continue;
 		}
 
 		disk_cnt++;
 		/* Check if it's a disk */
 		if (raid_obj_get_type(raid_tab, *(disk_list + i)) !=
-			OBJ_TYPE_DISK)
+		    OBJ_TYPE_DISK)
 			return (ERR_DEVICE_TYPE);
 
 		/* Check if it's duplicated with other disks */
@@ -3230,7 +3232,7 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 
 		/* Check disk status */
 		ret = obj_get_attr(raid_tab, *(disk_list + i),
-			(void **)(&disk_attr));
+		    (void **)(&disk_attr));
 		if (ret != SUCCESS)
 			return (ret);
 
@@ -3246,7 +3248,7 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 		if (controller_obj_id == OBJ_NONE) {
 			controller_obj_id = obj_id;
 			ret = obj_get_attr(raid_tab, controller_obj_id,
-				(void **)(&controller_attr));
+			    (void **)(&controller_attr));
 		} else if (obj_id != controller_obj_id) {
 			free(arraypart_attrs);
 			return (ERR_DRIVER_ACROSS);
@@ -3254,7 +3256,7 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 
 		/* Check if the disk contains too many segments */
 		obj_id = obj_get_comp(raid_tab, *(disk_list + i),
-				OBJ_TYPE_DISK_SEG);
+		    OBJ_TYPE_DISK_SEG);
 		j = 0;
 		while (obj_id > OBJ_NONE) {
 			++j;
@@ -3277,7 +3279,7 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 				/* Can not specify capacity for hostraid */
 				if (array_attr->capacity != 0) {
 					free(arraypart_attrs);
-					return (ERR_DISK_SPACE);
+					return (ERR_OP_ILLEGAL);
 				}
 			} else if (min_disk_capacity > disk_attr->capacity) {
 				free(arraypart_attrs);
@@ -3286,7 +3288,7 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 
 			/* Disk should not be used for hostraid */
 			obj_id = obj_get_comp(raid_tab, *(disk_list + i),
-				OBJ_TYPE_DISK_SEG);
+			    OBJ_TYPE_DISK_SEG);
 			if (obj_id < OBJ_NONE) {
 				free(arraypart_attrs);
 				return (obj_id);
@@ -3303,8 +3305,8 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 
 	/* Check if array amount exceeds limit */
 	if (controller_attr->max_array_num <=
-		obj_controller_compnum(raid_tab, controller_obj_id,
-		OBJ_TYPE_ARRAY))
+	    obj_controller_compnum(raid_tab, controller_obj_id,
+	    OBJ_TYPE_ARRAY))
 		return (ERR_ARRAY_AMOUNT);
 
 
@@ -3360,14 +3362,14 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 	(void) memcpy(&array_attr2, array_attr, sizeof (array_attr_t));
 	array_attr2.capacity = OBJ_ATTR_NONE;
 	ret = raid_lib->array_create(controller_attr->controller_id,
-		&array_attr2, num_of_comp, arraypart_attrs, plugin_err_str);
+	    &array_attr2, num_of_comp, arraypart_attrs, plugin_err_str);
 
 	/* If plugin/driver will not calculate space */
 	if (ret == ERR_OP_NO_IMPL) {
 		/* Calculate the maximum capacity */
 		array_attr2.capacity = raid_space_noalign(raid_tab,
-			array_attr2.raid_level, num_of_comp, disk_list,
-			arraypart_attrs);
+		    array_attr2.raid_level, num_of_comp, disk_list,
+		    arraypart_attrs);
 
 		/*
 		 * If controller is capable to allocate space,
@@ -3377,9 +3379,9 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 		if (controller_attr->capability & RAID_CAP_SMART_ALLOC)
 			for (i = 0; i < num_of_comp; ++i) {
 				arraypart_attrs[i].offset =
-					OBJ_ATTR_NONE;
+				    OBJ_ATTR_NONE;
 				arraypart_attrs[i].size =
-					OBJ_ATTR_NONE;
+				    OBJ_ATTR_NONE;
 			}
 
 		/* There's no enough space for specified capacity */
@@ -3408,7 +3410,7 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 
 
 	ret = raid_lib->array_create(controller_attr->controller_id,
-		array_attr, num_of_comp, arraypart_attrs, plugin_err_str);
+	    array_attr, num_of_comp, arraypart_attrs, plugin_err_str);
 	free(arraypart_attrs);
 
 	if (ret != SUCCESS)
@@ -3420,7 +3422,7 @@ obj_array_create(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 	/* unconfig disk minor nodes if it's hostraid */
 	if (controller_attr->capability & RAID_CAP_DISK_TRANS) {
 		diskid_list = (uint32_t *)calloc(num_of_comp,
-			sizeof (uint32_t));
+		    sizeof (uint32_t));
 		if (diskid_list == NULL) {
 			return (ERR_NOMEM);
 		}
@@ -3488,7 +3490,7 @@ obj_array_delete(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 		return (controller_obj_id);
 
 	ret = obj_get_attr(raid_tab, controller_obj_id,
-		(void **)(&controller_attr));
+	    (void **)(&controller_attr));
 	if (ret < SUCCESS) {
 		return (ret);
 	}
@@ -3540,7 +3542,7 @@ obj_array_delete(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 			    LUN(arraypart_attr->disk_id) ==
 			    ARRAY_LUN(array_attr->array_id)) {
 				arraypart_obj_id = obj_get_sibling(raid_tab,
-					arraypart_obj_id);
+				    arraypart_obj_id);
 				continue;
 			}
 
@@ -3557,7 +3559,7 @@ obj_array_delete(raid_obj_tab_t *raid_tab, raid_obj_id_t array_obj_id,
 	}
 
 	ret = raid_lib->array_delete(controller_attr->controller_id,
-		array_attr->array_id, plugin_err_str);
+	    array_attr->array_id, plugin_err_str);
 	if (ret < SUCCESS) {
 		if (disk_ids)
 			free(disk_ids);
@@ -3605,9 +3607,9 @@ obj_hsp_bind(raid_obj_tab_t *raid_tab, int num, raid_obj_id_t *obj_ids,
 		disk_obj_id = *(obj_ids + i * 2 + 1);
 
 		if (raid_obj_get_type(raid_tab, disk_obj_id) != OBJ_TYPE_DISK ||
-			(array_obj_id != OBJ_ATTR_NONE &&
-			raid_obj_get_type(raid_tab, array_obj_id) !=
-			OBJ_TYPE_ARRAY)) {
+		    (array_obj_id != OBJ_ATTR_NONE &&
+		    raid_obj_get_type(raid_tab, array_obj_id) !=
+		    OBJ_TYPE_ARRAY)) {
 			free(hsp_relation);
 			return (ERR_DEVICE_TYPE);
 		}
@@ -3615,19 +3617,19 @@ obj_hsp_bind(raid_obj_tab_t *raid_tab, int num, raid_obj_id_t *obj_ids,
 		/* Get controller attributes */
 		if (controller_obj_id == OBJ_NONE)
 			controller_obj_id = obj_get_controller(raid_tab,
-				disk_obj_id);
+			    disk_obj_id);
 		else if (controller_obj_id != obj_get_controller(raid_tab,
-			disk_obj_id)) {
+		    disk_obj_id)) {
 			free(hsp_relation);
 			return (ERR_DRIVER_ACROSS);
 		}
 
 		ret = obj_get_attr(raid_tab, controller_obj_id,
-			(void **)(&controller_attr));
+		    (void **)(&controller_attr));
 
 		/* Get disk attributes */
 		ret = obj_get_attr(raid_tab,  disk_obj_id,
-			(void **)(&disk_attr));
+		    (void **)(&disk_attr));
 		if (disk_attr->state == DISK_STATE_FAILED) {
 			free(hsp_relation);
 			return (ERR_DISK_STATE);
@@ -3637,12 +3639,12 @@ obj_hsp_bind(raid_obj_tab_t *raid_tab, int num, raid_obj_id_t *obj_ids,
 		if (obj_get_comp(raid_tab, disk_obj_id, OBJ_TYPE_HSP) ==
 		    OBJ_NONE) {
 			obj_id = obj_get_comp(raid_tab, disk_obj_id,
-				OBJ_TYPE_DISK_SEG);
+			    OBJ_TYPE_DISK_SEG);
 			while (obj_id != OBJ_NONE) {
 				ret = obj_get_attr(raid_tab, obj_id,
-					(void **)(&diskseg_attr));
+				    (void **)(&diskseg_attr));
 				if (!(diskseg_attr->state &
-					DISKSEG_STATE_RESERVED)) {
+				    DISKSEG_STATE_RESERVED)) {
 					free(hsp_relation);
 					return (ERR_DISK_NOT_EMPTY);
 				}
@@ -3658,14 +3660,14 @@ obj_hsp_bind(raid_obj_tab_t *raid_tab, int num, raid_obj_id_t *obj_ids,
 			}
 
 			if (raid_obj_get_type(raid_tab, array_obj_id) !=
-				OBJ_TYPE_ARRAY) {
+			    OBJ_TYPE_ARRAY) {
 				free(hsp_relation);
 				return (ERR_DEVICE_TYPE);
 			}
 
 			/* Get array attributes */
 			ret = obj_get_attr(raid_tab, array_obj_id,
-				(void **)(&array_attr));
+			    (void **)(&array_attr));
 			/* RAID 0 array can not use hsp */
 			if (array_attr->raid_level == RAID_LEVEL_0) {
 				free(hsp_relation);
@@ -3674,22 +3676,22 @@ obj_hsp_bind(raid_obj_tab_t *raid_tab, int num, raid_obj_id_t *obj_ids,
 
 			/* If It's belong to another controller */
 			if (controller_obj_id != obj_get_controller(raid_tab,
-				array_obj_id)) {
+			    array_obj_id)) {
 				free(hsp_relation);
 				return (ERR_DRIVER_ACROSS);
 			}
 
 			/* Get an array part attributes */
 			if ((array_attr->raid_level == RAID_LEVEL_10) ||
-				(array_attr->raid_level == RAID_LEVEL_50))
+			    (array_attr->raid_level == RAID_LEVEL_50))
 				obj_id = obj_get_comp(raid_tab, array_obj_id,
-					OBJ_TYPE_ARRAY);
+				    OBJ_TYPE_ARRAY);
 			else
 				obj_id = array_obj_id;
 			obj_id = obj_get_comp(raid_tab, obj_id,
-				OBJ_TYPE_ARRAY_PART);
+			    OBJ_TYPE_ARRAY_PART);
 			ret = obj_get_attr(raid_tab, obj_id,
-				(void **)(&arraypart_attr));
+			    (void **)(&arraypart_attr));
 
 			/* Check if disk space is enough for array */
 			if (arraypart_attr->size > disk_attr->capacity) {
@@ -3698,8 +3700,8 @@ obj_hsp_bind(raid_obj_tab_t *raid_tab, int num, raid_obj_id_t *obj_ids,
 			}
 			if (controller_attr->capability & RAID_CAP_ARRAY_ALIGN)
 				if ((arraypart_attr->size +
-					arraypart_attr->offset) >
-					disk_attr->capacity) {
+				    arraypart_attr->offset) >
+				    disk_attr->capacity) {
 				free(hsp_relation);
 				return (ERR_DISK_SPACE);
 				}
@@ -3721,8 +3723,8 @@ obj_hsp_bind(raid_obj_tab_t *raid_tab, int num, raid_obj_id_t *obj_ids,
 				    (array_obj_id != OBJ_ATTR_NONE)) ||
 				    ((hsp_attr->type == HSP_TYPE_LOCAL) &&
 				    (array_obj_id == OBJ_ATTR_NONE))) {
-				    free(hsp_relation);
-				    return (ERR_OP_ILLEGAL);
+					free(hsp_relation);
+					return (ERR_OP_ILLEGAL);
 				}
 			}
 		}
@@ -3750,7 +3752,7 @@ obj_hsp_bind(raid_obj_tab_t *raid_tab, int num, raid_obj_id_t *obj_ids,
 	}
 
 	ret = raid_lib->hsp_bind(controller_attr->controller_id,
-		j, hsp_relation, plugin_err_str);
+	    j, hsp_relation, plugin_err_str);
 
 	free(hsp_relation);
 	return (ret);
@@ -3786,19 +3788,19 @@ obj_hsp_unbind(raid_obj_tab_t *raid_tab, int num, raid_obj_id_t *obj_ids,
 		/* Get controller attributes */
 		if (controller_obj_id == OBJ_NONE)
 			controller_obj_id = obj_get_controller(raid_tab,
-				disk_obj_id);
+			    disk_obj_id);
 		else if (controller_obj_id != obj_get_controller(raid_tab,
-			disk_obj_id)) {
+		    disk_obj_id)) {
 			free(hsp_relation);
 			return (ERR_DRIVER_ACROSS);
 		}
 
 		ret = obj_get_attr(raid_tab, controller_obj_id,
-			(void **)(&controller_attr));
+		    (void **)(&controller_attr));
 
 		/* Get disk attributes */
 		ret = obj_get_attr(raid_tab,  disk_obj_id,
-			(void **)(&disk_attr));
+		    (void **)(&disk_attr));
 		if (disk_attr->state == DISK_STATE_FAILED) {
 			free(hsp_relation);
 			return (ERR_DISK_STATE);
@@ -3814,18 +3816,18 @@ obj_hsp_unbind(raid_obj_tab_t *raid_tab, int num, raid_obj_id_t *obj_ids,
 
 		if (array_obj_id != OBJ_ATTR_NONE) {
 			if (raid_obj_get_type(raid_tab, array_obj_id) !=
-				OBJ_TYPE_ARRAY) {
+			    OBJ_TYPE_ARRAY) {
 				free(hsp_relation);
 				return (ERR_DEVICE_TYPE);
-				}
+			}
 
 			/* Get array attributes */
 			ret = obj_get_attr(raid_tab, array_obj_id,
-				(void **)(&array_attr));
+			    (void **)(&array_attr));
 
 			/* If It's belong to another controller */
 			if (controller_obj_id != obj_get_controller(raid_tab,
-				array_obj_id)) {
+			    array_obj_id)) {
 				free(hsp_relation);
 				return (ERR_DRIVER_ACROSS);
 			}
@@ -3838,11 +3840,11 @@ obj_hsp_unbind(raid_obj_tab_t *raid_tab, int num, raid_obj_id_t *obj_ids,
 
 			do {
 				(void) obj_get_attr(raid_tab, obj_id,
-					(void **)(&hsp_attr));
+				    (void **)(&hsp_attr));
 
 				if (hsp_attr->associated_id ==
-					array_attr->array_id ||
-					hsp_attr->type == HSP_TYPE_GLOBAL)
+				    array_attr->array_id ||
+				    hsp_attr->type == HSP_TYPE_GLOBAL)
 					break;
 
 				obj_id = obj_get_sibling(raid_tab, obj_id);
@@ -3858,12 +3860,12 @@ obj_hsp_unbind(raid_obj_tab_t *raid_tab, int num, raid_obj_id_t *obj_ids,
 		 * global hsp disk
 		 */
 		if ((obj_id && (array_obj_id != OBJ_ATTR_NONE)) ||
-			(array_obj_id == OBJ_ATTR_NONE)) {
+		    (array_obj_id == OBJ_ATTR_NONE)) {
 			if (array_obj_id != OBJ_ATTR_NONE)
 				hsp_relation[j].array_id = array_attr->array_id;
 			else
 				hsp_relation[j].array_id =
-					(uint32_t)OBJ_ATTR_NONE;
+				    (uint32_t)OBJ_ATTR_NONE;
 			hsp_relation[j].disk_id = disk_attr->disk_id;
 			++ j;
 		} else {
@@ -3884,7 +3886,7 @@ obj_hsp_unbind(raid_obj_tab_t *raid_tab, int num, raid_obj_id_t *obj_ids,
 	}
 
 	ret = raid_lib->hsp_unbind(controller_attr->controller_id,
-		j, hsp_relation, plugin_err_str);
+	    j, hsp_relation, plugin_err_str);
 
 	free(hsp_relation);
 	return (ret);
@@ -4044,7 +4046,7 @@ raid_obj_get_type(raid_obj_tab_t *raid_tab, raid_obj_id_t obj_id)
 		return (ERR_DEVICE_NOENT);
 
 	if ((obj->obj_type_id < OBJ_TYPE_SYSTEM) ||
-		(obj->obj_type_id >= OBJ_TYPE_ALL))
+	    (obj->obj_type_id >= OBJ_TYPE_ALL))
 		return (ERR_DEVICE_INVALID);
 
 	return (obj->obj_type_id);
@@ -4325,7 +4327,7 @@ raid_list_find(raid_list_t *list, raid_obj_id_t obj_id)
 	raid_obj_t *obj;
 
 	for (obj = raid_list_head(list); obj != NULL;
-		obj = raid_list_next(list, obj))
+	    obj = raid_list_next(list, obj))
 			if (obj->obj_id == obj_id)
 				break;
 
@@ -4508,7 +4510,7 @@ raid_plugin_load(char *driver_name)
 		return (NULL);
 
 	(void) snprintf(buf, MAX_PATH_LEN, "%s/%s.so.1",
-		SUPP_PLUGIN_DIR, driver_name);
+	    SUPP_PLUGIN_DIR, driver_name);
 
 	supplib->lib_handle = dlopen(buf, RTLD_LAZY);
 	if (supplib->lib_handle == NULL) {
@@ -4530,7 +4532,7 @@ raid_plugin_load(char *driver_name)
 	}
 
 	if ((sym = dlsym(supplib->lib_handle, "rdcfg_open_controller")) ==
-		NULL) {
+	    NULL) {
 		(void) dlclose(supplib->lib_handle);
 		free(supplib);
 		return (NULL);
@@ -4538,7 +4540,7 @@ raid_plugin_load(char *driver_name)
 		supplib->open_controller = (int(*)(uint32_t, char **))sym;
 
 	if ((sym = dlsym(supplib->lib_handle, "rdcfg_close_controller")) ==
-		NULL) {
+	    NULL) {
 		(void) dlclose(supplib->lib_handle);
 		free(supplib);
 		return (NULL);
@@ -4613,18 +4615,18 @@ raid_find_lib(raid_obj_tab_t *raid_tab, raid_obj_id_t controller_obj_id)
 		return (raid_handle_sys.handles[handle].raid_lib);
 
 	(void) obj_get_attr(raid_tab, controller_obj_id,
-		(void **)(&controller_attr));
+	    (void **)(&controller_attr));
 
 	/* Check if the plugin module is already loaded */
 	driver_name = controller_id_to_driver_name(
-		controller_attr->controller_id);
+	    controller_attr->controller_id);
 	if (driver_name == NULL)
 		return (NULL);
 
 	raid_lib = raid_lib_sys;
 	while (raid_lib != NULL) {
 		if (raid_lib->name != NULL &&
-			strcmp(driver_name, raid_lib->name) == 0)
+		    strcmp(driver_name, raid_lib->name) == 0)
 			return (raid_lib);
 
 		raid_lib = raid_lib->next;

@@ -933,7 +933,7 @@ do_list(char *disk_argp, char **argv, uint32_t optind, uint8_t is_snapshot)
 					} else {
 						ret =
 						    snapshot_ctl(ctl_handle,
-							FALSE, 0, is_snapshot);
+						    FALSE, 0, is_snapshot);
 					}
 					(void) raidcfg_close_controller(
 					    ctl_handle, NULL);
@@ -1071,7 +1071,7 @@ do_delete(uint32_t f_flag, char **argv, uint32_t optind)
 	if (f_flag == FALSE) {
 		(void) fprintf(stdout, gettext("Deleting RAID volume "
 		    "%s will destroy all data it contains, "
-			"proceed (%s/%s)? "), array_argp, yesstr, nostr);
+		    "proceed (%s/%s)? "), array_argp, yesstr, nostr);
 		if (!yes()) {
 			(void) fprintf(stdout, gettext("RAID Volume "
 			    "%s not deleted.\n\n"), array_argp);
@@ -1576,10 +1576,10 @@ snapshot_array(raid_obj_handle_t array_handle, uint8_t indent, uint8_t is_sub,
 			}
 		} else {
 			subarray_handle = raidcfg_list_head(array_handle,
-							    OBJ_TYPE_ARRAY);
+			    OBJ_TYPE_ARRAY);
 			while (subarray_handle > 0) {
 				task_handle = raidcfg_list_head(subarray_handle,
-								OBJ_TYPE_TASK);
+				    OBJ_TYPE_TASK);
 				if (task_handle > 0) {
 					(void) raidcfg_get_attr(task_handle,
 					    &task_attr);
@@ -2688,6 +2688,11 @@ calc_size(char *sizep, uint64_t *valp)
 
 	if (sizep == NULL || valp == NULL) {
 		return (INVALID_ARG);
+	}
+
+	if (is_fully_numeric(sizep) == TRUE) {
+		*valp = atoi(sizep);
+		return (SUCCESS);
 	}
 
 	len = strlen(sizep);
