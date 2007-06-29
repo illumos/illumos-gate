@@ -534,7 +534,7 @@ zpool_add(zpool_handle_t *zhp, nvlist_t *nvroot)
 	(void) snprintf(msg, sizeof (msg), dgettext(TEXT_DOMAIN,
 	    "cannot add to '%s'"), zhp->zpool_name);
 
-	if (zpool_get_version(zhp) < ZFS_VERSION_SPARES &&
+	if (zpool_get_version(zhp) < SPA_VERSION_SPARES &&
 	    nvlist_lookup_nvlist_array(nvroot, ZPOOL_CONFIG_SPARES,
 	    &spares, &nspares) == 0) {
 		zfs_error_aux(hdl, dgettext(TEXT_DOMAIN, "pool must be "
@@ -2183,7 +2183,7 @@ zpool_set_prop(zpool_handle_t *zhp, const char *propname, const char *propval)
 	    dgettext(TEXT_DOMAIN, "cannot set property for '%s'"),
 	    zhp->zpool_name);
 
-	if (zpool_get_version(zhp) < ZFS_VERSION_BOOTFS) {
+	if (zpool_get_version(zhp) < SPA_VERSION_BOOTFS) {
 		zfs_error_aux(zhp->zpool_hdl,
 		    dgettext(TEXT_DOMAIN, "pool must be "
 		    "upgraded to support pool properties"));
@@ -2230,7 +2230,7 @@ zpool_get_prop_int(zpool_handle_t *zhp, zpool_prop_t prop)
 	uint64_t value;
 	nvlist_t *nvp;
 
-	if (zpool_get_version(zhp) < ZFS_VERSION_BOOTFS)
+	if (zpool_get_version(zhp) < SPA_VERSION_BOOTFS)
 		return (0);
 
 	if (zhp->zpool_props == NULL && zpool_get_all_props(zhp))
@@ -2267,7 +2267,7 @@ zpool_get_prop(zpool_handle_t *zhp, zpool_prop_t prop, char *propbuf,
 	(void) snprintf(msg, sizeof (msg), dgettext(TEXT_DOMAIN,
 	    "cannot get property '%s'"), zpool_prop_to_name(prop));
 
-	if (zpool_get_version(zhp) < ZFS_VERSION_BOOTFS) {
+	if (zpool_get_version(zhp) < SPA_VERSION_BOOTFS) {
 		zfs_error_aux(zhp->zpool_hdl,
 		    dgettext(TEXT_DOMAIN, "pool must be "
 		    "upgraded to support pool properties"));

@@ -367,6 +367,44 @@ dump_zap(objset_t *os, uint64_t object, void *data, size_t size)
 	zap_cursor_fini(&zc);
 }
 
+/*ARGSUSED*/
+static void
+dump_zpldir(objset_t *os, uint64_t object, void *data, size_t size)
+{
+	zap_cursor_t zc;
+	zap_attribute_t attr;
+	const char *typenames[] = {
+		/* 0 */ "not specified",
+		/* 1 */ "FIFO",
+		/* 2 */ "Character Device",
+		/* 3 */ "3 (invalid)",
+		/* 4 */ "Directory",
+		/* 5 */ "5 (invalid)",
+		/* 6 */ "Block Device",
+		/* 7 */ "7 (invalid)",
+		/* 8 */ "Regular File",
+		/* 9 */ "9 (invalid)",
+		/* 10 */ "Symbolic Link",
+		/* 11 */ "11 (invalid)",
+		/* 12 */ "Socket",
+		/* 13 */ "Door",
+		/* 14 */ "Event Port",
+		/* 15 */ "15 (invalid)",
+	};
+
+	dump_zap_stats(os, object);
+	(void) printf("\n");
+
+	for (zap_cursor_init(&zc, os, object);
+	    zap_cursor_retrieve(&zc, &attr) == 0;
+	    zap_cursor_advance(&zc)) {
+		(void) printf("\t\t%s = %lld (type: %s)\n",
+		    attr.za_name, ZFS_DIRENT_OBJ(attr.za_first_integer),
+		    typenames[ZFS_DIRENT_TYPE(attr.za_first_integer)]);
+	}
+	zap_cursor_fini(&zc);
+}
+
 static void
 dump_spacemap(objset_t *os, space_map_obj_t *smo, space_map_t *sm)
 {
@@ -878,7 +916,7 @@ static object_viewer_t *object_viewer[DMU_OT_NUMTYPES] = {
 	dump_znode,		/* ZFS znode			*/
 	dump_acl,		/* ZFS ACL			*/
 	dump_uint8,		/* ZFS plain file		*/
-	dump_zap,		/* ZFS directory		*/
+	dump_zpldir,		/* ZFS directory		*/
 	dump_zap,		/* ZFS master node		*/
 	dump_zap,		/* ZFS delete queue		*/
 	dump_uint8,		/* zvol object			*/
@@ -933,13 +971,15 @@ dump_object(objset_t *os, uint64_t object, int verbosity, int *print_header)
 
 	aux[0] = '\0';
 
-	if (doi.doi_checksum != ZIO_CHECKSUM_INHERIT || verbosity >= 6)
+	if (doi.doi_checksum != ZIO_CHECKSUM_INHERIT || verbosity >= 6) {
 		(void) snprintf(aux + strlen(aux), sizeof (aux), " (K=%s)",
 		    zio_checksum_table[doi.doi_checksum].ci_name);
+	}
 
-	if (doi.doi_compress != ZIO_COMPRESS_INHERIT || verbosity >= 6)
+	if (doi.doi_compress != ZIO_COMPRESS_INHERIT || verbosity >= 6) {
 		(void) snprintf(aux + strlen(aux), sizeof (aux), " (Z=%s)",
 		    zio_compress_table[doi.doi_compress].ci_name);
+	}
 
 	(void) printf("%10lld  %3u  %5s  %5s  %5s  %5s  %s%s\n",
 	    (u_longlong_t)object, doi.doi_indirection, iblk, dblk, lsize,

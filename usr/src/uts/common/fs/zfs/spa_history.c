@@ -188,7 +188,7 @@ spa_history_zone()
 /*
  * Write out a history event.
  */
-void
+static void
 spa_history_log_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 {
 	spa_t		*spa = arg1;
@@ -202,9 +202,6 @@ spa_history_log_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	nvlist_t	*nvrecord;
 	char		*record_packed = NULL;
 	int		ret;
-
-	if (history_str == NULL)
-		return;
 
 	/*
 	 * If we have an older pool that doesn't have a command
@@ -279,6 +276,11 @@ spa_history_log_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	nvlist_free(nvrecord);
 	kmem_free(record_packed, reclen);
 	dmu_buf_rele(dbp, FTAG);
+
+	if (hap->ha_log_type == LOG_INTERNAL) {
+		kmem_free((void*)hap->ha_history_str, HIS_MAX_RECORD_LEN);
+		kmem_free(hap, sizeof (history_arg_t));
+	}
 }
 
 /*
@@ -288,6 +290,8 @@ int
 spa_history_log(spa_t *spa, const char *history_str, history_log_type_t what)
 {
 	history_arg_t ha;
+
+	ASSERT(what != LOG_INTERNAL);
 
 	ha.ha_history_str = history_str;
 	ha.ha_log_type = what;
@@ -388,20 +392,27 @@ void
 spa_history_internal_log(history_internal_events_t event, spa_t *spa,
     dmu_tx_t *tx, cred_t *cr, const char *fmt, ...)
 {
-	history_arg_t ha;
+	history_arg_t *hap;
 	char *str;
 	va_list adx;
 
+	hap = kmem_alloc(sizeof (history_arg_t), KM_SLEEP);
 	str = kmem_alloc(HIS_MAX_RECORD_LEN, KM_SLEEP);
 
 	va_start(adx, fmt);
 	(void) vsnprintf(str, HIS_MAX_RECORD_LEN, fmt, adx);
 	va_end(adx);
 
-	ha.ha_log_type = LOG_INTERNAL;
-	ha.ha_history_str = str;
-	ha.ha_event = event;
-	ha.ha_zone[0] = '\0';
-	spa_history_log_sync(spa, &ha, cr, tx);
-	kmem_free(str, HIS_MAX_RECORD_LEN);
+	hap->ha_log_type = LOG_INTERNAL;
+	hap->ha_history_str = str;
+	hap->ha_event = event;
+	hap->ha_zone[0] = '\0';
+
+	if (dmu_tx_is_syncing(tx)) {
+		spa_history_log_sync(spa, hap, cr, tx);
+	} else {
+		dsl_sync_task_do_nowait(spa_get_dsl(spa), NULL,
+		    spa_history_log_sync, spa, hap, 0, tx);
+	}
+	/* spa_history_log_sync() will free hap and str */
 }

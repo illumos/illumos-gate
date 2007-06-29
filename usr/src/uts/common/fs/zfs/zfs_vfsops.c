@@ -628,10 +628,33 @@ zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
 		if (error)
 			goto out;
 
-		zfs_unlinked_drain(zfsvfs);
+		if (!(zfsvfs->z_vfs->vfs_flag & VFS_RDONLY))
+			zfs_unlinked_drain(zfsvfs);
 
 		/*
 		 * Parse and replay the intent log.
+		 *
+		 * Because of ziltest, this must be done after
+		 * zfs_unlinked_drain().  (Further note: ziltest doesn't
+		 * use readonly mounts, where zfs_unlinked_drain() isn't
+		 * called.)  This is because ziltest causes spa_sync()
+		 * to think it's committed, but actually it is not, so
+		 * the intent log contains many txg's worth of changes.
+		 *
+		 * In particular, if object N is in the unlinked set in
+		 * the last txg to actually sync, then it could be
+		 * actually freed in a later txg and then reallocated in
+		 * a yet later txg.  This would write a "create object
+		 * N" record to the intent log.  Normally, this would be
+		 * fine because the spa_sync() would have written out
+		 * the fact that object N is free, before we could write
+		 * the "create object N" intent log record.
+		 *
+		 * But when we are in ziltest mode, we advance the "open
+		 * txg" without actually spa_sync()-ing the changes to
+		 * disk.  So we would see that object N is still
+		 * allocated and in the unlinked set, and there is an
+		 * intent log record saying to allocate it.
 		 */
 		zil_replay(zfsvfs->z_os, zfsvfs, &zfsvfs->z_assign,
 		    zfs_replay_vector);
@@ -652,7 +675,6 @@ out:
 	}
 
 	return (error);
-
 }
 
 void
@@ -716,7 +738,6 @@ str_to_uint64(char *str, uint64_t *objnum)
 	*objnum = num;
 	return (0);
 }
-
 
 /*
  * The boot path passed from the boot loader is in the form of
@@ -817,13 +838,10 @@ out:
 		vfs_unlock(vfsp);
 		ret = (error) ? error : 0;
 		return (ret);
-
 	} else if (why == ROOT_REMOUNT) {
-
 		readonly_changed_cb(vfsp->vfs_data, B_FALSE);
 		vfsp->vfs_flag |= VFS_REMOUNT;
 		return (zfs_refresh_properties(vfsp));
-
 	} else if (why == ROOT_UNMOUNT) {
 		zfs_unregister_callbacks((zfsvfs_t *)vfsp->vfs_data);
 		(void) zfs_sync(vfsp, 0, 0);
@@ -873,9 +891,8 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 * When doing a remount, we simply refresh our temporary properties
 	 * according to those options set in the current VFS options.
 	 */
-	if (uap->flags & MS_REMOUNT) {
+	if (uap->flags & MS_REMOUNT)
 		return (zfs_refresh_properties(vfsp));
-	}
 
 	/*
 	 * Get the objset name (the "special" mount argument).
@@ -1347,6 +1364,70 @@ zfs_busy(void)
 	return (zfs_active_fs_count != 0);
 }
 
+int
+zfs_get_stats(objset_t *os, nvlist_t *nv)
+{
+	int error;
+	uint64_t val;
+
+	error = zap_lookup(os, MASTER_NODE_OBJ, ZPL_VERSION_STR, 8, 1, &val);
+	if (error == 0)
+		dsl_prop_nvlist_add_uint64(nv, ZFS_PROP_VERSION, val);
+
+	return (error);
+}
+
+int
+zfs_set_version(const char *name, uint64_t newvers)
+{
+	int error;
+	objset_t *os;
+	dmu_tx_t *tx;
+	uint64_t curvers;
+
+	/*
+	 * XXX for now, require that the filesystem be unmounted.  Would
+	 * be nice to find the zfsvfs_t and just update that if
+	 * possible.
+	 */
+
+	if (newvers < ZPL_VERSION_INITIAL || newvers > ZPL_VERSION)
+		return (EINVAL);
+
+	error = dmu_objset_open(name, DMU_OST_ZFS, DS_MODE_PRIMARY, &os);
+	if (error)
+		return (error);
+
+	error = zap_lookup(os, MASTER_NODE_OBJ, ZPL_VERSION_STR,
+	    8, 1, &curvers);
+	if (error)
+		goto out;
+	if (newvers < curvers) {
+		error = EINVAL;
+		goto out;
+	}
+
+	tx = dmu_tx_create(os);
+	dmu_tx_hold_zap(tx, MASTER_NODE_OBJ, 0, ZPL_VERSION_STR);
+	error = dmu_tx_assign(tx, TXG_WAIT);
+	if (error) {
+		dmu_tx_abort(tx);
+		goto out;
+	}
+	error = zap_update(os, MASTER_NODE_OBJ, ZPL_VERSION_STR, 8, 1,
+	    &newvers, tx);
+
+	spa_history_internal_log(LOG_DS_UPGRADE,
+	    dmu_objset_spa(os), tx, CRED(),
+	    "oldver=%llu newver=%llu dataset = %llu", curvers, newvers,
+	    dmu_objset_id(os));
+	dmu_tx_commit(tx);
+
+out:
+	dmu_objset_close(os);
+	return (error);
+}
+
 static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	MNTTYPE_ZFS,
@@ -1356,5 +1437,5 @@ static vfsdef_t vfw = {
 };
 
 struct modlfs zfs_modlfs = {
-	&mod_fsops, "ZFS filesystem version " ZFS_VERSION_STRING, &vfw
+	&mod_fsops, "ZFS filesystem version " SPA_VERSION_STRING, &vfw
 };

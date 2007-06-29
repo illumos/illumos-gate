@@ -126,8 +126,10 @@ changelist_prefix(prop_changelist_t *clp)
 				(void) zfs_unshare_iscsi(cn->cn_handle);
 				break;
 			}
-		} else if (zfs_unmount(cn->cn_handle, NULL, clp->cl_flags) != 0)
+		} else if (zfs_unmount(cn->cn_handle, NULL,
+		    clp->cl_flags) != 0) {
 			ret = -1;
+		}
 	}
 
 	return (ret);
@@ -541,6 +543,8 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 	} else if (prop == ZFS_PROP_CANMOUNT) {
 		clp->cl_prop = ZFS_PROP_MOUNTPOINT;
 	} else if (prop == ZFS_PROP_VOLSIZE) {
+		clp->cl_prop = ZFS_PROP_MOUNTPOINT;
+	} else if (prop == ZFS_PROP_VERSION) {
 		clp->cl_prop = ZFS_PROP_MOUNTPOINT;
 	} else {
 		clp->cl_prop = prop;

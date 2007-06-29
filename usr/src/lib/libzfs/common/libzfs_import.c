@@ -682,8 +682,9 @@ error:
  * Return the offset of the given label.
  */
 static uint64_t
-label_offset(size_t size, int l)
+label_offset(uint64_t size, int l)
 {
+	ASSERT(P2PHASE_TYPED(size, sizeof (vdev_label_t), uint64_t) == 0);
 	return (l * sizeof (vdev_label_t) + (l < VDEV_LABELS / 2 ?
 	    0 : size - VDEV_LABELS * sizeof (vdev_label_t)));
 }
@@ -698,19 +699,20 @@ zpool_read_label(int fd, nvlist_t **config)
 	struct stat64 statbuf;
 	int l;
 	vdev_label_t *label;
-	uint64_t state, txg;
+	uint64_t state, txg, size;
 
 	*config = NULL;
 
 	if (fstat64(fd, &statbuf) == -1)
 		return (0);
+	size = P2ALIGN_TYPED(statbuf.st_size, sizeof (vdev_label_t), uint64_t);
 
 	if ((label = malloc(sizeof (vdev_label_t))) == NULL)
 		return (-1);
 
 	for (l = 0; l < VDEV_LABELS; l++) {
 		if (pread(fd, label, sizeof (vdev_label_t),
-		    label_offset(statbuf.st_size, l)) != sizeof (vdev_label_t))
+		    label_offset(size, l)) != sizeof (vdev_label_t))
 			continue;
 
 		if (nvlist_unpack(label->vl_vdev_phys.vp_nvlist,

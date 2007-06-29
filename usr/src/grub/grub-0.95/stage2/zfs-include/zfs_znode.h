@@ -28,6 +28,11 @@
 
 #define	MASTER_NODE_OBJ	1
 #define	ZFS_ROOT_OBJ		"ROOT"
+#define	ZPL_VERSION_STR		"VERSION"
+
+#define	ZPL_VERSION		2ULL
+
+#define	ZFS_DIRENT_OBJ(de) BF64_GET(de, 0, 48)
 
 /*
  * This is the persistent portion of the znode.  It is stored

@@ -1016,11 +1016,11 @@ int
 spa_max_replication(spa_t *spa)
 {
 	/*
-	 * As of ZFS_VERSION == ZFS_VERSION_DITTO_BLOCKS, we are able to
+	 * As of SPA_VERSION == SPA_VERSION_DITTO_BLOCKS, we are able to
 	 * handle BPs with more than one DVA allocated.  Set our max
 	 * replication level accordingly.
 	 */
-	if (spa_version(spa) < ZFS_VERSION_DITTO_BLOCKS)
+	if (spa_version(spa) < SPA_VERSION_DITTO_BLOCKS)
 		return (1);
 	return (MIN(SPA_DVAS_PER_BP, spa_max_replication_override));
 }

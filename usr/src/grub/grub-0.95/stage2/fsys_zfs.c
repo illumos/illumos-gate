@@ -266,8 +266,8 @@ uberblock_verify(uberblock_phys_t *ub, int offset)
 		return (-1);
 
 	if (uber->ub_magic == UBERBLOCK_MAGIC &&
-	    uber->ub_version >= ZFS_VERSION_1 &&
-	    uber->ub_version <= ZFS_VERSION)
+	    uber->ub_version >= SPA_VERSION_1 &&
+	    uber->ub_version <= SPA_VERSION)
 		return (0);
 
 	return (-1);
@@ -292,11 +292,10 @@ find_bestub(uberblock_phys_t *ub_array, int label)
 		if (uberblock_verify(&ub_array[i], offset) == 0) {
 			if (ubbest == NULL) {
 				ubbest = &ub_array[i];
-			} else {
-				if (vdev_uberblock_compare(
-				    &(ub_array[i].ubp_uberblock),
-				    &(ubbest->ubp_uberblock)) > 0)
-					ubbest = &ub_array[i];
+			} else if (vdev_uberblock_compare(
+			    &(ub_array[i].ubp_uberblock),
+			    &(ubbest->ubp_uberblock)) > 0) {
+				ubbest = &ub_array[i];
 			}
 		}
 	}
@@ -700,12 +699,17 @@ static int
 dnode_get_path(dnode_phys_t *mdn, char *path, dnode_phys_t *dn,
     char *stack)
 {
-	uint64_t objnum;
+	uint64_t objnum, version;
 	char *cname, ch;
 
 	if (errnum = dnode_get(mdn, MASTER_NODE_OBJ, DMU_OT_MASTER_NODE,
 	    dn, stack))
 		return (errnum);
+
+	if (errnum = zap_lookup(dn, ZPL_VERSION_STR, &version, stack))
+		return (errnum);
+	if (version > ZPL_VERSION)
+		return (-1);
 
 	if (errnum = zap_lookup(dn, ZFS_ROOT_OBJ, &objnum, stack))
 		return (errnum);
@@ -730,6 +734,7 @@ dnode_get_path(dnode_phys_t *mdn, char *path, dnode_phys_t *dn,
 		if (errnum = zap_lookup(dn, cname, &objnum, stack))
 			return (errnum);
 
+		objnum = ZFS_DIRENT_OBJ(objnum);
 		if (errnum = dnode_get(mdn, objnum, 0, dn, stack))
 			return (errnum);
 

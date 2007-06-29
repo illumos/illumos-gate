@@ -250,7 +250,6 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 	extern int zfsfstype;
 
 	objset_t	*os = zfsvfs->z_os;
-	uint64_t	version = ZPL_VERSION;
 	int		i, error;
 	dmu_object_info_t doi;
 	uint64_t fsid_guid;
@@ -269,19 +268,19 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 		dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT); /* root node */
 		error = dmu_tx_assign(tx, TXG_WAIT);
 		ASSERT3U(error, ==, 0);
-		zfs_create_fs(os, cr, tx);
+		zfs_create_fs(os, cr, ZPL_VERSION, tx);
 		dmu_tx_commit(tx);
 	}
 
-	error = zap_lookup(os, MASTER_NODE_OBJ, ZPL_VERSION_OBJ, 8, 1,
-	    &version);
+	error = zap_lookup(os, MASTER_NODE_OBJ, ZPL_VERSION_STR, 8, 1,
+	    &zfsvfs->z_version);
 	if (error) {
 		return (error);
-	} else if (version != ZPL_VERSION) {
+	} else if (zfsvfs->z_version > ZPL_VERSION) {
 		(void) printf("Mismatched versions:  File system "
 		    "is version %lld on-disk format, which is "
 		    "incompatible with this software version %lld!",
-		    (u_longlong_t)version, ZPL_VERSION);
+		    (u_longlong_t)zfsvfs->z_version, ZPL_VERSION);
 		return (ENOTSUP);
 	}
 
@@ -1040,11 +1039,10 @@ zfs_freesp(znode_t *zp, uint64_t off, uint64_t len, int flag, boolean_t log)
 }
 
 void
-zfs_create_fs(objset_t *os, cred_t *cr, dmu_tx_t *tx)
+zfs_create_fs(objset_t *os, cred_t *cr, uint64_t version, dmu_tx_t *tx)
 {
 	zfsvfs_t	zfsvfs;
 	uint64_t	moid, doid, roid = 0;
-	uint64_t	version = ZPL_VERSION;
 	int		error;
 	znode_t		*rootzp = NULL;
 	vnode_t		*vp;
@@ -1066,7 +1064,7 @@ zfs_create_fs(objset_t *os, cred_t *cr, dmu_tx_t *tx)
 	 * Set starting attributes.
 	 */
 
-	error = zap_update(os, moid, ZPL_VERSION_OBJ, 8, 1, &version, tx);
+	error = zap_update(os, moid, ZPL_VERSION_STR, 8, 1, &version, tx);
 	ASSERT(error == 0);
 
 	/*
@@ -1176,7 +1174,8 @@ zfs_obj_to_path(objset_t *osp, uint64_t obj, char *buf, int len)
 		if (is_xattrdir) {
 			(void) sprintf(component + 1, "<xattrdir>");
 		} else {
-			error = zap_value_search(osp, pobj, obj, component + 1);
+			error = zap_value_search(osp, pobj, obj,
+			    ZFS_DIRENT_OBJ(-1ULL), component + 1);
 			if (error != 0)
 				break;
 		}

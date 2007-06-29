@@ -475,7 +475,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	 * it's not present treat it as the initial version.
 	 */
 	if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION, &version) != 0)
-		version = ZFS_VERSION_INITIAL;
+		version = SPA_VERSION_INITIAL;
 
 	(void) nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_TXG,
 	    &spa->spa_config_txg);
@@ -551,7 +551,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 	/*
 	 * If the pool is newer than the code, we can't open it.
 	 */
-	if (ub->ub_version > ZFS_VERSION) {
+	if (ub->ub_version > SPA_VERSION) {
 		vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
 		    VDEV_AUX_VERSION_NEWER);
 		error = ENOTSUP;
@@ -707,7 +707,7 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 		goto out;
 	}
 	if (error == 0) {
-		ASSERT(spa_version(spa) >= ZFS_VERSION_SPARES);
+		ASSERT(spa_version(spa) >= SPA_VERSION_SPARES);
 		if (load_nvlist(spa, spa->spa_spares_object,
 		    &spa->spa_sparelist) != 0) {
 			vdev_set_state(rvd, B_TRUE, VDEV_STATE_CANT_OPEN,
@@ -1089,7 +1089,7 @@ spa_validate_spares(spa_t *spa, nvlist_t *nvroot, uint64_t crtxg, int mode)
 	 * Make sure the pool is formatted with a version that supports hot
 	 * spares.
 	 */
-	if (spa_version(spa) < ZFS_VERSION_SPARES)
+	if (spa_version(spa) < SPA_VERSION_SPARES)
 		return (ENOTSUP);
 
 	/*
@@ -1164,7 +1164,7 @@ spa_create(const char *pool, nvlist_t *nvroot, const char *altroot)
 	spa_activate(spa);
 
 	spa->spa_uberblock.ub_txg = txg - 1;
-	spa->spa_uberblock.ub_version = ZFS_VERSION;
+	spa->spa_uberblock.ub_version = SPA_VERSION;
 	spa->spa_ubsync = spa->spa_uberblock;
 
 	/*
@@ -1928,7 +1928,7 @@ spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done)
 	}
 
 	ASSERT(pvd->vdev_ops != &vdev_spare_ops ||
-	    spa_version(spa) >= ZFS_VERSION_SPARES);
+	    spa_version(spa) >= SPA_VERSION_SPARES);
 
 	/*
 	 * Only mirror, replacing, and spare vdevs support detach.
@@ -3052,11 +3052,11 @@ spa_sync(spa_t *spa, uint64_t txg)
 	tx = dmu_tx_create_assigned(dp, txg);
 
 	/*
-	 * If we are upgrading to ZFS_VERSION_RAIDZ_DEFLATE this txg,
+	 * If we are upgrading to SPA_VERSION_RAIDZ_DEFLATE this txg,
 	 * set spa_deflate if we have no raid-z vdevs.
 	 */
-	if (spa->spa_ubsync.ub_version < ZFS_VERSION_RAIDZ_DEFLATE &&
-	    spa->spa_uberblock.ub_version >= ZFS_VERSION_RAIDZ_DEFLATE) {
+	if (spa->spa_ubsync.ub_version < SPA_VERSION_RAIDZ_DEFLATE &&
+	    spa->spa_uberblock.ub_version >= SPA_VERSION_RAIDZ_DEFLATE) {
 		int i;
 
 		for (i = 0; i < rvd->vdev_children; i++) {
@@ -3273,9 +3273,9 @@ spa_upgrade(spa_t *spa)
 	 * future version would result in an unopenable pool, this shouldn't be
 	 * possible.
 	 */
-	ASSERT(spa->spa_uberblock.ub_version <= ZFS_VERSION);
+	ASSERT(spa->spa_uberblock.ub_version <= SPA_VERSION);
 
-	spa->spa_uberblock.ub_version = ZFS_VERSION;
+	spa->spa_uberblock.ub_version = SPA_VERSION;
 	vdev_config_dirty(spa->spa_root_vdev);
 
 	spa_config_exit(spa, FTAG);

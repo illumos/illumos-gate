@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -897,17 +897,21 @@ fzap_remove(zap_t *zap, const char *name, dmu_tx_t *tx)
 }
 
 int
-zap_value_search(objset_t *os, uint64_t zapobj, uint64_t value, char *name)
+zap_value_search(objset_t *os, uint64_t zapobj, uint64_t value, uint64_t mask,
+    char *name)
 {
 	zap_cursor_t zc;
 	zap_attribute_t *za;
 	int err;
 
+	if (mask == 0)
+		mask = -1ULL;
+
 	za = kmem_alloc(sizeof (zap_attribute_t), KM_SLEEP);
 	for (zap_cursor_init(&zc, os, zapobj);
 	    (err = zap_cursor_retrieve(&zc, za)) == 0;
 	    zap_cursor_advance(&zc)) {
-		if (za->za_first_integer == value) {
+		if ((za->za_first_integer & mask) == (value & mask)) {
 			(void) strcpy(name, za->za_name);
 			break;
 		}

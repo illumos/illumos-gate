@@ -268,7 +268,7 @@ dsl_dataset_get_snapname(dsl_dataset_t *ds)
 		return (err);
 	headphys = headdbuf->db_data;
 	err = zap_value_search(dp->dp_meta_objset,
-	    headphys->ds_snapnames_zapobj, ds->ds_object, ds->ds_snapname);
+	    headphys->ds_snapnames_zapobj, ds->ds_object, 0, ds->ds_snapname);
 	dmu_buf_rele(headdbuf, FTAG);
 	return (err);
 }

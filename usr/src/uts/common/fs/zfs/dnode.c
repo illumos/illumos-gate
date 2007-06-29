@@ -1181,7 +1181,7 @@ dnode_diduse_space(dnode_t *dn, int64_t delta)
 		ASSERT3U(space, >=, -delta); /* no underflow */
 	}
 	space += delta;
-	if (spa_version(dn->dn_objset->os_spa) < ZFS_VERSION_DNODE_BYTES) {
+	if (spa_version(dn->dn_objset->os_spa) < SPA_VERSION_DNODE_BYTES) {
 		ASSERT((dn->dn_phys->dn_flags & DNODE_FLAG_USED_BYTES) == 0);
 		ASSERT3U(P2PHASE(space, 1<<DEV_BSHIFT), ==, 0);
 		dn->dn_phys->dn_used = space >> DEV_BSHIFT;

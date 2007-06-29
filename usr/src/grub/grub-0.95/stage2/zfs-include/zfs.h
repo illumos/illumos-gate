@@ -29,15 +29,15 @@
 /*
  * On-disk version number.
  */
-#define	ZFS_VERSION_1			1ULL
-#define	ZFS_VERSION_2			2ULL
-#define	ZFS_VERSION_3			3ULL
-#define	ZFS_VERSION_4			4ULL
-#define	ZFS_VERSION_5			5ULL
-#define	ZFS_VERSION_6			6ULL
-#define	ZFS_VERSION_7			7ULL
-#define	ZFS_VERSION_8			8ULL
-#define	ZFS_VERSION			ZFS_VERSION_8
+#define	SPA_VERSION_1			1ULL
+#define	SPA_VERSION_2			2ULL
+#define	SPA_VERSION_3			3ULL
+#define	SPA_VERSION_4			4ULL
+#define	SPA_VERSION_5			5ULL
+#define	SPA_VERSION_6			6ULL
+#define	SPA_VERSION_7			7ULL
+#define	SPA_VERSION_8			8ULL
+#define	SPA_VERSION			SPA_VERSION_8
 
 /*
  * The following are configuration names used in the nvlist describing a pool's

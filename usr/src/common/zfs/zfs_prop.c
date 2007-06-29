@@ -51,6 +51,7 @@
 #include <sys/spa.h>
 #include <sys/zfs_acl.h>
 #include <sys/zfs_ioctl.h>
+#include <sys/zfs_znode.h>
 
 #include "zfs_prop.h"
 #include "zfs_deleg.h"
@@ -204,7 +205,10 @@ static prop_desc_t zfs_prop_table[] = {
 	    ZFS_DELEG_PERM_NONE },
 	{ "delegation", prop_type_boolean,	1,	NULL,	prop_default,
 	    ZFS_TYPE_POOL, "on | off", "DELEGATION", B_TRUE,
-	    B_TRUE, ZFS_DELEG_PERM_NONE }
+	    B_TRUE, ZFS_DELEG_PERM_NONE },
+	{ "version",	prop_type_index,	0,	NULL,	prop_default,
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT, "1 | 2 | current",
+	    "VERSION", B_TRUE, B_TRUE, ZFS_DELEG_PERM_VERSION },
 };
 
 #define	ZFS_PROP_COUNT	((sizeof (zfs_prop_table))/(sizeof (prop_desc_t)))
@@ -517,6 +521,13 @@ static zfs_index_t copies_table[] = {
 	{ NULL }
 };
 
+static zfs_index_t version_table[] = {
+	{ "1",		1 },
+	{ "2",		2 },
+	{ "current",	ZPL_VERSION },
+	{ NULL }
+};
+
 static zfs_index_t *
 zfs_prop_index_table(zfs_prop_t prop)
 {
@@ -533,11 +544,12 @@ zfs_prop_index_table(zfs_prop_t prop)
 		return (acl_inherit_table);
 	case ZFS_PROP_COPIES:
 		return (copies_table);
+	case ZFS_PROP_VERSION:
+		return (version_table);
 	default:
 		return (NULL);
 	}
 }
-
 
 /*
  * Tables of index types, plus functions to convert between the user view

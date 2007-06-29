@@ -153,6 +153,7 @@ uint64_t
 vdev_label_offset(uint64_t psize, int l, uint64_t offset)
 {
 	ASSERT(offset < sizeof (vdev_label_t));
+	ASSERT(P2PHASE_TYPED(psize, sizeof (vdev_label_t), uint64_t) == 0);
 
 	return (offset + l * sizeof (vdev_label_t) + (l < VDEV_LABELS / 2 ?
 	    0 : psize - VDEV_LABELS * sizeof (vdev_label_t)));
@@ -223,7 +224,7 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 		 */
 		ASSERT(vd->vdev_nparity == 1 ||
 		    (vd->vdev_nparity == 2 &&
-		    spa_version(spa) >= ZFS_VERSION_RAID6));
+		    spa_version(spa) >= SPA_VERSION_RAID6));
 
 		/*
 		 * Note that we'll add the nparity tag even on storage pools

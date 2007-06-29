@@ -50,6 +50,7 @@ dsl_sync_task_group_create(dsl_pool_t *dp)
 	list_create(&dstg->dstg_tasks, sizeof (dsl_sync_task_t),
 	    offsetof(dsl_sync_task_t, dst_node));
 	dstg->dstg_pool = dp;
+	dstg->dstg_cr = CRED();
 
 	return (dstg);
 }
@@ -68,7 +69,6 @@ dsl_sync_task_create(dsl_sync_task_group_t *dstg,
 	dst->dst_syncfunc = syncfunc;
 	dst->dst_arg1 = arg1;
 	dst->dst_arg2 = arg2;
-	dst->dst_cr = CRED();
 	list_insert_tail(&dstg->dstg_tasks, dst);
 
 	dstg->dstg_space += blocks_modified << DST_AVG_BLKSHIFT;
@@ -125,6 +125,16 @@ top:
 }
 
 void
+dsl_sync_task_group_nowait(dsl_sync_task_group_t *dstg, dmu_tx_t *tx)
+{
+	uint64_t txg;
+
+	dstg->dstg_nowaiter = B_TRUE;
+	txg = dmu_tx_get_txg(tx);
+	VERIFY(0 == txg_list_add(&dstg->dstg_pool->dp_sync_tasks, dstg, txg));
+}
+
+void
 dsl_sync_task_group_destroy(dsl_sync_task_group_t *dstg)
 {
 	dsl_sync_task_t *dst;
@@ -174,12 +184,15 @@ dsl_sync_task_group_sync(dsl_sync_task_group_t *dstg, dmu_tx_t *tx)
 		for (dst = list_head(&dstg->dstg_tasks); dst;
 		    dst = list_next(&dstg->dstg_tasks, dst)) {
 			dst->dst_syncfunc(dst->dst_arg1, dst->dst_arg2,
-			    dst->dst_cr, tx);
+			    dstg->dstg_cr, tx);
 		}
 	}
 	rw_exit(&dstg->dstg_pool->dp_config_rwlock);
 
 	dsl_dir_tempreserve_clear(tr_cookie, tx);
+
+	if (dstg->dstg_nowaiter)
+		dsl_sync_task_group_destroy(dstg);
 }
 
 int
@@ -196,4 +209,17 @@ dsl_sync_task_do(dsl_pool_t *dp,
 	err = dsl_sync_task_group_wait(dstg);
 	dsl_sync_task_group_destroy(dstg);
 	return (err);
+}
+
+void
+dsl_sync_task_do_nowait(dsl_pool_t *dp,
+    dsl_checkfunc_t *checkfunc, dsl_syncfunc_t *syncfunc,
+    void *arg1, void *arg2, int blocks_modified, dmu_tx_t *tx)
+{
+	dsl_sync_task_group_t *dstg;
+
+	dstg = dsl_sync_task_group_create(dp);
+	dsl_sync_task_create(dstg, checkfunc, syncfunc,
+	    arg1, arg2, blocks_modified);
+	dsl_sync_task_group_nowait(dstg, tx);
 }

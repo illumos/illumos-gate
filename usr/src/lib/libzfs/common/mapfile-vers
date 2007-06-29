@@ -85,6 +85,7 @@ SUNWprivate_1.1 {
 	zfs_prop_iter;
 	zfs_prop_readonly;
 	zfs_prop_set;
+	zfs_prop_string_to_index;
 	zfs_prop_to_name;
 	zfs_prop_user;
 	zfs_prop_valid_for_type;

@@ -97,7 +97,8 @@ typedef enum {
 	ZPOOL_PROP_BOOTFS,
 	ZPOOL_PROP_AUTOREPLACE,
 	ZPOOL_PROP_DELEGATION,
-	ZPOOL_PROP_NAME
+	ZFS_PROP_VERSION,
+	ZPOOL_PROP_NAME			/* XXX must be last! */
 } zfs_prop_t;
 
 typedef zfs_prop_t zpool_prop_t;
@@ -172,45 +173,61 @@ extern zpool_prop_t zpool_prop_iter(zpool_prop_f, void *, boolean_t);
 /*
  * On-disk version number.
  */
-#define	ZFS_VERSION_1			1ULL
-#define	ZFS_VERSION_2			2ULL
-#define	ZFS_VERSION_3			3ULL
-#define	ZFS_VERSION_4			4ULL
-#define	ZFS_VERSION_5			5ULL
-#define	ZFS_VERSION_6			6ULL
-#define	ZFS_VERSION_7			7ULL
-#define	ZFS_VERSION_8			8ULL
+#define	SPA_VERSION_1			1ULL
+#define	SPA_VERSION_2			2ULL
+#define	SPA_VERSION_3			3ULL
+#define	SPA_VERSION_4			4ULL
+#define	SPA_VERSION_5			5ULL
+#define	SPA_VERSION_6			6ULL
+#define	SPA_VERSION_7			7ULL
+#define	SPA_VERSION_8			8ULL
 /*
- * When bumping up ZFS_VERSION, make sure GRUB ZFS understand the on-disk
+ * When bumping up SPA_VERSION, make sure GRUB ZFS understand the on-disk
  * format change. Go to usr/src/grub/grub-0.95/stage2/{zfs-include/, fsys_zfs*},
  * and do the appropriate changes.
  */
-#define	ZFS_VERSION			ZFS_VERSION_8
-#define	ZFS_VERSION_STRING		"8"
+#define	SPA_VERSION			SPA_VERSION_8
+#define	SPA_VERSION_STRING		"8"
 
 /*
- * Symbolic names for the changes that caused a ZFS_VERSION switch.
+ * Symbolic names for the changes that caused a SPA_VERSION switch.
  * Used in the code when checking for presence or absence of a feature.
  * Feel free to define multiple symbolic names for each version if there
  * were multiple changes to on-disk structures during that version.
  *
- * NOTE: When checking the current ZFS_VERSION in your code, be sure
+ * NOTE: When checking the current SPA_VERSION in your code, be sure
  *       to use spa_version() since it reports the version of the
  *       last synced uberblock.  Checking the in-flight version can
  *       be dangerous in some cases.
  */
-#define	ZFS_VERSION_INITIAL		ZFS_VERSION_1
-#define	ZFS_VERSION_DITTO_BLOCKS	ZFS_VERSION_2
-#define	ZFS_VERSION_SPARES		ZFS_VERSION_3
-#define	ZFS_VERSION_RAID6		ZFS_VERSION_3
-#define	ZFS_VERSION_BPLIST_ACCOUNT	ZFS_VERSION_3
-#define	ZFS_VERSION_RAIDZ_DEFLATE	ZFS_VERSION_3
-#define	ZFS_VERSION_DNODE_BYTES		ZFS_VERSION_3
-#define	ZFS_VERSION_ZPOOL_HISTORY	ZFS_VERSION_4
-#define	ZFS_VERSION_GZIP_COMPRESSION	ZFS_VERSION_5
-#define	ZFS_VERSION_BOOTFS		ZFS_VERSION_6
-#define	ZFS_VERSION_SLOGS		ZFS_VERSION_7
-#define	ZFS_VERSION_DELEGATED_PERMS	ZFS_VERSION_8
+#define	SPA_VERSION_INITIAL		SPA_VERSION_1
+#define	SPA_VERSION_DITTO_BLOCKS	SPA_VERSION_2
+#define	SPA_VERSION_SPARES		SPA_VERSION_3
+#define	SPA_VERSION_RAID6		SPA_VERSION_3
+#define	SPA_VERSION_BPLIST_ACCOUNT	SPA_VERSION_3
+#define	SPA_VERSION_RAIDZ_DEFLATE	SPA_VERSION_3
+#define	SPA_VERSION_DNODE_BYTES		SPA_VERSION_3
+#define	SPA_VERSION_ZPOOL_HISTORY	SPA_VERSION_4
+#define	SPA_VERSION_GZIP_COMPRESSION	SPA_VERSION_5
+#define	SPA_VERSION_BOOTFS		SPA_VERSION_6
+#define	ZFS_VERSION_SLOGS		SPA_VERSION_7
+#define	ZFS_VERSION_DELEGATED_PERMS	SPA_VERSION_8
+
+/*
+ * ZPL version - rev'd whenever an incompatible on-disk format change
+ * occurs.  This is independent of SPA/DMU/ZAP versioning.  You must
+ * also update the version_table[] and help message in zfs_prop.c.
+ *
+ * When changing, be sure to teach GRUB how to read the new format!
+ * See usr/src/grub/grub-0.95/stage2/{zfs-include/,fsys_zfs*}
+ */
+#define	ZPL_VERSION_1			1ULL
+#define	ZPL_VERSION_2			2ULL
+#define	ZPL_VERSION			ZPL_VERSION_2
+#define	ZPL_VERSION_STRING		"2"
+
+#define	ZPL_VERSION_INITIAL		ZPL_VERSION_1
+#define	ZPL_VERSION_DIRENT_TYPE		ZPL_VERSION_2
 
 /*
  * The following are configuration names used in the nvlist describing a pool's
@@ -556,6 +573,7 @@ typedef enum history_internal_events {
 	LOG_DS_REPLAY_FULL_SYNC,
 	LOG_DS_ROLLBACK,
 	LOG_DS_SNAPSHOT,
+	LOG_DS_UPGRADE,
 	LOG_END
 } history_internal_events_t;
 

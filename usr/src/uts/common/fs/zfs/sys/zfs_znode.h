@@ -54,23 +54,11 @@ extern "C" {
 /*
  * special attributes for master node.
  */
-
 #define	ZFS_FSID		"FSID"
 #define	ZFS_UNLINKED_SET	"DELETE_QUEUE"
 #define	ZFS_ROOT_OBJ		"ROOT"
-#define	ZPL_VERSION_OBJ		"VERSION"
-#define	ZFS_PROP_BLOCKPERPAGE	"BLOCKPERPAGE"
-#define	ZFS_PROP_NOGROWBLOCKS	"NOGROWBLOCKS"
+#define	ZPL_VERSION_STR		"VERSION"
 
-#define	ZFS_FLAG_BLOCKPERPAGE	0x1
-#define	ZFS_FLAG_NOGROWBLOCKS	0x2
-
-/*
- * ZPL version - rev'd whenever an incompatible on-disk format change
- * occurs.  Independent of SPA/DMU/ZAP versioning.
- */
-
-#define	ZPL_VERSION		1ULL
 
 #define	ZFS_MAX_BLOCKSIZE	(SPA_MAXBLOCKSIZE)
 
@@ -85,14 +73,18 @@ extern "C" {
 #define	ZFS_MAXNAMELEN	(MAXNAMELEN - 1)
 
 /*
+ * Convert mode bits (zp_mode) to BSD-style DT_* values for storing in
+ * the directory entries.
+ */
+#define	IFTODT(mode) (((mode) & S_IFMT) >> 12)
+
+/*
  * The directory entry has the type (currently unused on Solaris) in the
  * top 4 bits, and the object number in the low 48 bits.  The "middle"
  * 12 bits are unused.
  */
 #define	ZFS_DIRENT_TYPE(de) BF64_GET(de, 60, 4)
 #define	ZFS_DIRENT_OBJ(de) BF64_GET(de, 0, 48)
-#define	ZFS_DIRENT_MAKE(type, obj) (((uint64_t)type << 60) | obj)
-
 
 /*
  * This is the persistent portion of the znode.  It is stored
@@ -248,7 +240,7 @@ typedef struct znode {
 
 extern int	zfs_init_fs(zfsvfs_t *, znode_t **, cred_t *);
 extern void	zfs_set_dataprop(objset_t *);
-extern void	zfs_create_fs(objset_t *os, cred_t *cr, dmu_tx_t *tx);
+extern void	zfs_create_fs(objset_t *os, cred_t *cr, uint64_t, dmu_tx_t *tx);
 extern void	zfs_time_stamper(znode_t *, uint_t, dmu_tx_t *);
 extern void	zfs_time_stamper_locked(znode_t *, uint_t, dmu_tx_t *);
 extern void	zfs_grow_blocksize(znode_t *, uint64_t, dmu_tx_t *);
@@ -263,6 +255,8 @@ extern void	zfs_remove_op_tables();
 extern int	zfs_create_op_tables();
 extern int	zfs_sync(vfs_t *vfsp, short flag, cred_t *cr);
 extern dev_t	zfs_cmpldev(uint64_t);
+extern int	zfs_get_stats(objset_t *os, nvlist_t *nv);
+extern int	zfs_set_version(const char *name, uint64_t newvers);
 
 extern void zfs_log_create(zilog_t *zilog, dmu_tx_t *tx, int txtype,
     znode_t *dzp, znode_t *zp, char *name);

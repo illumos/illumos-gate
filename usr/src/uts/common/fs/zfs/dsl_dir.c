@@ -126,17 +126,15 @@ dsl_dir_open_obj(dsl_pool_t *dp, uint64_t ddobj,
 				uint64_t foundobj;
 
 				err = zap_lookup(dp->dp_meta_objset,
-				    dd->dd_parent->dd_phys->
-				    dd_child_dir_zapobj,
+				    dd->dd_parent->dd_phys->dd_child_dir_zapobj,
 				    tail, sizeof (foundobj), 1, &foundobj);
 				ASSERT(err || foundobj == ddobj);
 #endif
 				(void) strcpy(dd->dd_myname, tail);
 			} else {
 				err = zap_value_search(dp->dp_meta_objset,
-				    dd->dd_parent->dd_phys->
-				    dd_child_dir_zapobj,
-				    ddobj, dd->dd_myname);
+				    dd->dd_parent->dd_phys->dd_child_dir_zapobj,
+				    ddobj, 0, dd->dd_myname);
 			}
 			if (err) {
 				dsl_dir_close(dd->dd_parent, dd);

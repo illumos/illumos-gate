@@ -1221,7 +1221,7 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 	    ZPOOL_CONFIG_POOL_STATE, &state) == 0);
 	verify(nvlist_lookup_uint64(config,
 	    ZPOOL_CONFIG_VERSION, &version) == 0);
-	if (version > ZFS_VERSION) {
+	if (version > SPA_VERSION) {
 		(void) fprintf(stderr, gettext("cannot import '%s': pool "
 		    "is formatted using a newer ZFS version\n"), name);
 		return (1);
@@ -3215,6 +3215,8 @@ typedef struct upgrade_cbdata {
 	int	cb_first;
 	int	cb_newer;
 	int	cb_argc;
+	uint64_t cb_numupgraded;
+	uint64_t cb_numsamegraded;
 	char	**cb_argv;
 } upgrade_cbdata_t;
 
@@ -3230,7 +3232,7 @@ upgrade_cb(zpool_handle_t *zhp, void *arg)
 	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION,
 	    &version) == 0);
 
-	if (!cbp->cb_newer && version < ZFS_VERSION) {
+	if (!cbp->cb_newer && version < SPA_VERSION) {
 		if (!cbp->cb_all) {
 			if (cbp->cb_first) {
 				(void) printf(gettext("The following pools are "
@@ -3253,7 +3255,7 @@ upgrade_cb(zpool_handle_t *zhp, void *arg)
 				    "'%s'\n"), zpool_get_name(zhp));
 			}
 		}
-	} else if (cbp->cb_newer && version > ZFS_VERSION) {
+	} else if (cbp->cb_newer && version > SPA_VERSION) {
 		assert(!cbp->cb_all);
 
 		if (cbp->cb_first) {
@@ -3291,7 +3293,7 @@ upgrade_one(zpool_handle_t *zhp, void *data)
 		    " to upgrade.\n"));
 		return (1);
 	}
-	if (version == ZFS_VERSION) {
+	if (version == SPA_VERSION) {
 		(void) printf(gettext("Pool '%s' is already formatted "
 		    "using the current version.\n"), zpool_get_name(zhp));
 		return (0);
@@ -3302,7 +3304,7 @@ upgrade_one(zpool_handle_t *zhp, void *data)
 	if (!ret) {
 		(void) printf(gettext("Successfully upgraded '%s' "
 		    "from version %llu to version %llu\n"), zpool_get_name(zhp),
-		    (u_longlong_t)version, (u_longlong_t)ZFS_VERSION);
+		    (u_longlong_t)version, (u_longlong_t)SPA_VERSION);
 	}
 
 	return (ret != 0);
@@ -3360,8 +3362,8 @@ zpool_do_upgrade(int argc, char **argv)
 		}
 	}
 
-	(void) printf(gettext("This system is currently running ZFS version "
-	    "%llu.\n\n"), ZFS_VERSION);
+	(void) printf(gettext("This system is currently running "
+	    "ZFS pool version %llu.\n\n"), SPA_VERSION);
 	cb.cb_first = B_TRUE;
 	if (showversions) {
 		(void) printf(gettext("The following versions are "
@@ -3461,6 +3463,7 @@ char *hist_event_table[LOG_END] = {
 	"replay_full_sync",
 	"rollback",
 	"snapshot",
+	"filesystem version upgrade",
 };
 
 /*

@@ -71,6 +71,7 @@ extern "C" {
 #define	ZFS_DELEG_PERM_SHAREISCSI	"shareiscsi"
 #define	ZFS_DELEG_PERM_XATTR		"xattr"
 #define	ZFS_DELEG_PERM_COPIES		"copies"
+#define	ZFS_DELEG_PERM_VERSION		"version"
 
 int dsl_deleg_get(const char *ddname, nvlist_t **nvp);
 int dsl_deleg_set(const char *ddname, nvlist_t *nvp, boolean_t unset);

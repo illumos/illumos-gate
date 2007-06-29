@@ -57,6 +57,8 @@
 libzfs_handle_t *g_zfs;
 
 static FILE *mnttab_file;
+static int first_argc;
+static char **first_argv;
 
 static int zfs_do_clone(int argc, char **argv);
 static int zfs_do_create(int argc, char **argv);
@@ -68,6 +70,7 @@ static int zfs_do_mount(int argc, char **argv);
 static int zfs_do_rename(int argc, char **argv);
 static int zfs_do_rollback(int argc, char **argv);
 static int zfs_do_set(int argc, char **argv);
+static int zfs_do_upgrade(int argc, char **argv);
 static int zfs_do_snapshot(int argc, char **argv);
 static int zfs_do_unmount(int argc, char **argv);
 static int zfs_do_share(int argc, char **argv);
@@ -100,6 +103,7 @@ typedef enum {
 	HELP_DESTROY,
 	HELP_GET,
 	HELP_INHERIT,
+	HELP_UPGRADE,
 	HELP_LIST,
 	HELP_MOUNT,
 	HELP_PROMOTE,
@@ -146,6 +150,7 @@ static zfs_command_t command_table[] = {
 	{ "set",	zfs_do_set,		HELP_SET		},
 	{ "get", 	zfs_do_get,		HELP_GET		},
 	{ "inherit",	zfs_do_inherit,		HELP_INHERIT		},
+	{ "upgrade",	zfs_do_upgrade,		HELP_UPGRADE		},
 	{ NULL },
 	{ "mount",	zfs_do_mount,		HELP_MOUNT		},
 	{ NULL },
@@ -191,6 +196,9 @@ get_usage(zfs_help_t idx)
 	case HELP_INHERIT:
 		return (gettext("\tinherit [-r] <property> "
 		    "<filesystem|volume> ...\n"));
+	case HELP_UPGRADE:
+		return (gettext("\tupgrade [-v]\n"
+		    "\tupgrade [-r] [-V version] <-a | filesystem ...>\n"));
 	case HELP_LIST:
 		return (gettext("\tlist [-rH] [-o property[,property]...] "
 		    "[-t type[,type]...]\n"
@@ -1297,6 +1305,208 @@ zfs_do_inherit(int argc, char **argv)
 	ret = zfs_for_each(argc, argv, recurse,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, NULL, NULL,
 	    inherit_callback, propname, B_FALSE);
+
+	return (ret);
+}
+
+typedef struct upgrade_cbdata {
+	uint64_t cb_numupgraded;
+	uint64_t cb_numsamegraded;
+	uint64_t cb_numdowngradefailed;
+	uint64_t cb_version;
+	boolean_t cb_newer;
+	boolean_t cb_foundone;
+	char cb_lastfs[ZFS_MAXNAMELEN];
+} upgrade_cbdata_t;
+
+static int
+same_pool(zfs_handle_t *zhp, const char *name)
+{
+	int len1 = strcspn(name, "/@");
+	const char *zhname = zfs_get_name(zhp);
+	int len2 = strcspn(zhname, "/@");
+
+	if (len1 != len2)
+		return (B_FALSE);
+	return (strncmp(name, zhname, len1) != 0);
+}
+
+static int
+upgrade_list_callback(zfs_handle_t *zhp, void *data)
+{
+	upgrade_cbdata_t *cb = data;
+	int version = zfs_prop_get_int(zhp, ZFS_PROP_VERSION);
+
+	/* list if it's old/new */
+	if ((!cb->cb_newer && version < ZPL_VERSION) ||
+	    (cb->cb_newer && version > SPA_VERSION)) {
+		char *str;
+		if (cb->cb_newer) {
+			str = gettext("The following filesystems are "
+			    "formatted using a newer software version and\n"
+			    "cannot be accessed on the current system.\n\n");
+		} else {
+			str = gettext("The following filesystems are "
+			    "out of date, and can be upgraded.  After being\n"
+			    "upgraded, these filesystems (and any 'zfs send' "
+			    "streams generated from\n"
+			    "subsequent snapshots) will no longer be "
+			    "accessible by older software versions.\n\n");
+		}
+
+		if (!cb->cb_foundone) {
+			(void) puts(str);
+			(void) printf(gettext("VER  FILESYSTEM\n"));
+			(void) printf(gettext("---  ------------\n"));
+			cb->cb_foundone = B_TRUE;
+		}
+
+		(void) printf("%2u   %s\n", version, zfs_get_name(zhp));
+	}
+
+	return (0);
+}
+
+static int
+upgrade_set_callback(zfs_handle_t *zhp, void *data)
+{
+	upgrade_cbdata_t *cb = data;
+	int version = zfs_prop_get_int(zhp, ZFS_PROP_VERSION);
+
+	/* upgrade */
+	if (version < cb->cb_version) {
+		char verstr[16];
+		(void) snprintf(verstr, sizeof (verstr), "%u", cb->cb_version);
+		if (cb->cb_lastfs[0] && !same_pool(zhp, cb->cb_lastfs)) {
+			/*
+			 * If they did "zfs upgrade -a", then we could
+			 * be doing ioctls to different pools.  We need
+			 * to log this history once to each pool.
+			 */
+			zpool_stage_history(g_zfs, first_argc, first_argv,
+			    B_TRUE, B_FALSE);
+		}
+		if (zfs_prop_set(zhp, "version", verstr) == 0)
+			cb->cb_numupgraded++;
+		(void) strcpy(cb->cb_lastfs, zfs_get_name(zhp));
+	} else if (version > cb->cb_version) {
+		/* can't downgrade */
+		(void) printf(gettext("%s: can not be downgraded; "
+		    "it is already at version %u\n"),
+		    zfs_get_name(zhp), version);
+		cb->cb_numdowngradefailed++;
+	} else {
+		cb->cb_numsamegraded++;
+	}
+	return (0);
+}
+
+/*
+ * zfs upgrade
+ * zfs upgrade -v
+ * zfs upgrade [-r] [-V <version>] <-a | filesystem>
+ */
+static int
+zfs_do_upgrade(int argc, char **argv)
+{
+	boolean_t recurse = B_FALSE;
+	boolean_t all = B_FALSE;
+	boolean_t showversions = B_FALSE;
+	int ret;
+	upgrade_cbdata_t cb = { 0 };
+	char c;
+
+	/* check options */
+	while ((c = getopt(argc, argv, "rvV:a")) != -1) {
+		switch (c) {
+		case 'r':
+			recurse = B_TRUE;
+			break;
+		case 'v':
+			showversions = B_TRUE;
+			break;
+		case 'V':
+			if (zfs_prop_string_to_index(ZFS_PROP_VERSION,
+			    optarg, &cb.cb_version) != 0) {
+				(void) fprintf(stderr,
+				    gettext("invalid version %s\n"), optarg);
+				usage(B_FALSE);
+			}
+			break;
+		case 'a':
+			all = B_TRUE;
+			break;
+		case '?':
+		default:
+			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
+			    optopt);
+			usage(B_FALSE);
+		}
+	}
+
+	argc -= optind;
+	argv += optind;
+
+	if ((!all && !argc) && (recurse | cb.cb_version))
+		usage(B_FALSE);
+	if (showversions && (recurse || all || cb.cb_version || argc))
+		usage(B_FALSE);
+	if ((all || argc) && (showversions))
+		usage(B_FALSE);
+	if (all && argc)
+		usage(B_FALSE);
+
+	if (showversions) {
+		/* Show info on available versions. */
+		(void) printf(gettext("The following filesystem versions are "
+		    "supported:\n\n"));
+		(void) printf(gettext("VER  DESCRIPTION\n"));
+		(void) printf("---  -----------------------------------------"
+		    "---------------\n");
+		(void) printf(gettext(" 1   Initial ZFS filesystem version\n"));
+		(void) printf(gettext(" 2   Enhanced directory entries\n"));
+		(void) printf(gettext("\nFor more information on a particular "
+		    "version, including supported releases, see:\n\n"));
+		(void) printf("http://www.opensolaris.org/os/community/zfs/"
+		    "version/zpl/N\n\n");
+		(void) printf(gettext("Where 'N' is the version number.\n"));
+		ret = 0;
+	} else if (argc || all) {
+		/* Upgrade filesystems */
+		if (cb.cb_version == 0)
+			cb.cb_version = ZPL_VERSION;
+		ret = zfs_for_each(argc, argv, recurse, ZFS_TYPE_FILESYSTEM,
+		    NULL, NULL, upgrade_set_callback, &cb, B_TRUE);
+		(void) printf(gettext("%llu filesystems upgraded\n"),
+		    cb.cb_numupgraded);
+		if (cb.cb_numsamegraded) {
+			(void) printf(gettext("%llu filesystems already at "
+			    "this version\n"),
+			    cb.cb_numsamegraded);
+		}
+		if (cb.cb_numdowngradefailed != 0)
+			ret = 1;
+	} else {
+		/* List old-version filesytems */
+		boolean_t found;
+		(void) printf(gettext("This system is currently running "
+		    "ZFS filesystem version %llu.\n\n"), ZPL_VERSION);
+
+		ret = zfs_for_each(0, NULL, B_TRUE, ZFS_TYPE_FILESYSTEM,
+		    NULL, NULL, upgrade_list_callback, &cb, B_TRUE);
+
+		found = cb.cb_foundone;
+		cb.cb_foundone = B_FALSE;
+		cb.cb_newer = B_TRUE;
+
+		ret = zfs_for_each(0, NULL, B_TRUE, ZFS_TYPE_FILESYSTEM,
+		    NULL, NULL, upgrade_list_callback, &cb, B_TRUE);
+
+		if (!cb.cb_foundone && !found) {
+			(void) printf(gettext("All filesystems are "
+			    "formatted with the current version.\n"));
+		}
+	}
 
 	return (ret);
 }
@@ -3563,6 +3773,9 @@ main(int argc, char **argv)
 	(void) textdomain(TEXT_DOMAIN);
 
 	opterr = 0;
+
+	first_argc = argc;
+	first_argv = argv;
 
 	if ((g_zfs = libzfs_init()) == NULL) {
 		(void) fprintf(stderr, gettext("internal error: failed to "

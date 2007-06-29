@@ -898,6 +898,23 @@ zfs_validate_properties(libzfs_handle_t *hdl, zfs_type_t type, char *pool_name,
 		 * Perform some additional checks for specific properties.
 		 */
 		switch (prop) {
+		case ZFS_PROP_VERSION:
+		{
+			int version;
+
+			if (zhp == NULL)
+				break;
+			version = zfs_prop_get_int(zhp, ZFS_PROP_VERSION);
+			if (intval < version) {
+				zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+				    "Can not downgrade; already at version %u"),
+				    version);
+				(void) zfs_error(hdl, EZFS_BADPROP, errbuf);
+				goto error;
+			}
+			break;
+		}
+
 		case ZFS_PROP_RECORDSIZE:
 		case ZFS_PROP_VOLBLOCKSIZE:
 			/* must be power of two within SPA_{MIN,MAX}BLOCKSIZE */
@@ -1640,6 +1657,7 @@ zfs_coalesce_perm(zfs_handle_t *zhp, zfs_allow_node_t *allownode,
 	}
 	return (0);
 }
+
 /*
  * Uggh, this is going to be a bit complicated.
  * we have an nvlist coming out of the kernel that
@@ -2259,20 +2277,6 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 		}
 		break;
 
-	case ZFS_PROP_RECORDSIZE:
-	case ZFS_PROP_COMPRESSION:
-	case ZFS_PROP_ZONED:
-	case ZFS_PROP_CREATION:
-	case ZFS_PROP_COMPRESSRATIO:
-	case ZFS_PROP_REFERENCED:
-	case ZFS_PROP_USED:
-	case ZFS_PROP_CREATETXG:
-	case ZFS_PROP_AVAILABLE:
-	case ZFS_PROP_VOLSIZE:
-	case ZFS_PROP_VOLBLOCKSIZE:
-		*val = getprop_uint64(zhp, prop, source);
-		break;
-
 	case ZFS_PROP_CANMOUNT:
 		*val = getprop_uint64(zhp, prop, source);
 		if (*val == 0)
@@ -2299,10 +2303,20 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 		break;
 
 	default:
-		zfs_error_aux(zhp->zfs_hdl, dgettext(TEXT_DOMAIN,
-		    "cannot get non-numeric property"));
-		return (zfs_error(zhp->zfs_hdl, EZFS_BADPROP,
-		    dgettext(TEXT_DOMAIN, "internal error")));
+		switch (zfs_prop_get_type(prop)) {
+		case prop_type_number:
+		case prop_type_boolean:
+		case prop_type_index:
+			*val = getprop_uint64(zhp, prop, source);
+			break;
+
+		case prop_type_string:
+		default:
+			zfs_error_aux(zhp->zfs_hdl, dgettext(TEXT_DOMAIN,
+			    "cannot get non-numeric property"));
+			return (zfs_error(zhp->zfs_hdl, EZFS_BADPROP,
+			    dgettext(TEXT_DOMAIN, "internal error")));
+		}
 	}
 
 	return (0);
@@ -2360,56 +2374,6 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 		*src = ZFS_SRC_NONE;
 
 	switch (prop) {
-	case ZFS_PROP_ATIME:
-	case ZFS_PROP_READONLY:
-	case ZFS_PROP_SETUID:
-	case ZFS_PROP_ZONED:
-	case ZFS_PROP_DEVICES:
-	case ZFS_PROP_EXEC:
-	case ZFS_PROP_CANMOUNT:
-	case ZFS_PROP_XATTR:
-		/*
-		 * Basic boolean values are built on top of
-		 * get_numeric_property().
-		 */
-		if (get_numeric_property(zhp, prop, src, &source, &val) != 0)
-			return (-1);
-		nicebool(val, propbuf, proplen);
-
-		break;
-
-	case ZFS_PROP_AVAILABLE:
-	case ZFS_PROP_RECORDSIZE:
-	case ZFS_PROP_CREATETXG:
-	case ZFS_PROP_REFERENCED:
-	case ZFS_PROP_USED:
-	case ZFS_PROP_VOLSIZE:
-	case ZFS_PROP_VOLBLOCKSIZE:
-	case ZFS_PROP_NUMCLONES:
-		/*
-		 * Basic numeric values are built on top of
-		 * get_numeric_property().
-		 */
-		if (get_numeric_property(zhp, prop, src, &source, &val) != 0)
-			return (-1);
-		if (literal)
-			(void) snprintf(propbuf, proplen, "%llu",
-			    (u_longlong_t)val);
-		else
-			zfs_nicenum(val, propbuf, proplen);
-		break;
-
-	case ZFS_PROP_COMPRESSION:
-	case ZFS_PROP_CHECKSUM:
-	case ZFS_PROP_SNAPDIR:
-	case ZFS_PROP_ACLMODE:
-	case ZFS_PROP_ACLINHERIT:
-	case ZFS_PROP_COPIES:
-		val = getprop_uint64(zhp, prop, &source);
-		verify(zfs_prop_index_to_string(prop, val, &strval) == 0);
-		(void) strlcpy(propbuf, strval, proplen);
-		break;
-
 	case ZFS_PROP_CREATION:
 		/*
 		 * 'creation' is a time_t stored in the statistics.  We convert
@@ -2466,13 +2430,6 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 			(void) strlcpy(propbuf, str, proplen);
 		}
 
-		break;
-
-	case ZFS_PROP_SHARENFS:
-	case ZFS_PROP_SHAREISCSI:
-	case ZFS_PROP_ISCSIOPTIONS:
-		(void) strlcpy(propbuf, getprop_string(zhp, prop, &source),
-		    proplen);
 		break;
 
 	case ZFS_PROP_ORIGIN:
@@ -2561,7 +2518,42 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 		break;
 
 	default:
-		abort();
+		switch (zfs_prop_get_type(prop)) {
+		case prop_type_number:
+			if (get_numeric_property(zhp, prop, src,
+			    &source, &val) != 0)
+				return (-1);
+			if (literal)
+				(void) snprintf(propbuf, proplen, "%llu",
+				    (u_longlong_t)val);
+			else
+				zfs_nicenum(val, propbuf, proplen);
+			break;
+
+		case prop_type_string:
+			(void) strlcpy(propbuf,
+			    getprop_string(zhp, prop, &source), proplen);
+			break;
+
+		case prop_type_boolean:
+			if (get_numeric_property(zhp, prop, src,
+			    &source, &val) != 0)
+				return (-1);
+			nicebool(val, propbuf, proplen);
+
+			break;
+
+		case prop_type_index:
+			val = getprop_uint64(zhp, prop, &source);
+			if (zfs_prop_index_to_string(prop, val,
+			    &strval) != 0)
+				return (-1);
+			(void) strlcpy(propbuf, strval, proplen);
+			break;
+
+		default:
+			abort();
+		}
 	}
 
 	get_source(zhp, src, source, statbuf, statlen);

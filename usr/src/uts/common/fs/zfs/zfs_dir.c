@@ -516,6 +516,15 @@ zfs_rmnode(znode_t *zp)
 		VN_RELE(ZTOV(xzp));
 }
 
+static uint64_t
+zfs_dirent(znode_t *zp)
+{
+	uint64_t de = zp->z_id;
+	if (zp->z_zfsvfs->z_version >= ZPL_VERSION_DIRENT_TYPE)
+		de |= IFTODT((zp)->z_phys->zp_mode) << 60;
+	return (de);
+}
+
 /*
  * Link zp into dl.  Can only fail if zp has been unlinked.
  */
@@ -552,10 +561,7 @@ zfs_link_create(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag)
 	zfs_time_stamper_locked(dzp, CONTENT_MODIFIED, tx);
 	mutex_exit(&dzp->z_lock);
 
-	/*
-	 * MacOS X will fill in the 4-bit object type here.
-	 */
-	value = ZFS_DIRENT_MAKE(0, zp->z_id);
+	value = zfs_dirent(zp);
 	error = zap_add(zp->z_zfsvfs->z_os, dzp->z_id, dl->dl_name,
 	    8, 1, &value, tx);
 	ASSERT(error == 0);

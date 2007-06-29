@@ -264,7 +264,7 @@ check_status(nvlist_t *config, boolean_t isimport)
 	/*
 	 * Outdated, but usable, version
 	 */
-	if (version < ZFS_VERSION)
+	if (version < SPA_VERSION)
 		return (ZPOOL_STATUS_VERSION_OLDER);
 
 	return (ZPOOL_STATUS_OK);

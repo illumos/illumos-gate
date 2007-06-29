@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -191,11 +191,13 @@ int zap_count(objset_t *ds, uint64_t zapobj, uint64_t *count);
 
 
 /*
- * Returns (in name) the name of the entry whose value
+ * Returns (in name) the name of the entry whose (value & mask)
  * (za_first_integer) is value, or ENOENT if not found.  The string
- * pointed to by name must be at least 256 bytes long.
+ * pointed to by name must be at least 256 bytes long.  If mask==0, the
+ * match must be exact (ie, same as mask=-1ULL).
  */
-int zap_value_search(objset_t *os, uint64_t zapobj, uint64_t value, char *name);
+int zap_value_search(objset_t *os, uint64_t zapobj,
+    uint64_t value, uint64_t mask, char *name);
 
 struct zap;
 struct zap_leaf;
