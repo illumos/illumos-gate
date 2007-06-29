@@ -1715,6 +1715,17 @@ dsl_recursive_rename(char *oldname, const char *newname)
 	return (err);
 }
 
+static int
+dsl_valid_rename(char *oldname, void *arg)
+{
+	int delta = *(int *)arg;
+
+	if (strlen(oldname) + delta >= MAXNAMELEN)
+		return (ENAMETOOLONG);
+
+	return (0);
+}
+
 #pragma weak dmu_objset_rename = dsl_dataset_rename
 int
 dsl_dataset_rename(char *oldname, const char *newname,
@@ -1729,7 +1740,15 @@ dsl_dataset_rename(char *oldname, const char *newname,
 	if (err)
 		return (err);
 	if (tail == NULL) {
-		err = dsl_dir_rename(dd, newname);
+		int delta = strlen(newname) - strlen(oldname);
+
+		/* if we're growing, validate child size lengths */
+		if (delta > 0)
+			err = dmu_objset_find(oldname, dsl_valid_rename,
+			    &delta, DS_FIND_CHILDREN | DS_FIND_SNAPSHOTS);
+
+		if (!err)
+			err = dsl_dir_rename(dd, newname);
 		dsl_dir_close(dd, FTAG);
 		return (err);
 	}
