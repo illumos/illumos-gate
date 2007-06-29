@@ -3792,7 +3792,7 @@ cpu_clearphys(struct async_flt *aflt)
 	int ec_set_size = cpu_ecache_set_size(CPU);
 
 
-	clearphys(P2ALIGN(aflt->flt_addr, lsize), ec_set_size, lsize);
+	clearphys(aflt->flt_addr, ec_set_size, lsize);
 }
 
 #if defined(CPU_IMP_ECACHE_ASSOC)

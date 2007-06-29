@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Assembly code support for the Cheetah module
@@ -363,10 +363,15 @@ scrubphys(uint64_t paddr, int ecache_set_size)
 
 
 #if defined(lint)
-/*
- * clearphys - Pass in the aligned physical memory address
- * that you want to push out, as a ecache_linesize byte block of zeros,
- * from the ecache zero-filled.
+ /*
+ * clearphys - Pass in the physical memory address of the checkblock
+ * that you want to push out, cleared with a recognizable pattern,
+ * from the ecache.
+ *
+ * To ensure that the ecc gets recalculated after the bad data is cleared,
+ * we must write out enough data to fill the w$ line (64 bytes). So we read
+ * in an entire ecache subblock's worth of data, and write it back out.
+ * Then we overwrite the 16 bytes of bad data with the pattern.
  */
 /* ARGSUSED */
 void
@@ -387,12 +392,23 @@ clearphys(uint64_t paddr, int ecache_set_size, int ecache_linesize)
 	stxa	%o3, [%g0]ASI_ESTATE_ERR
 	membar	#Sync
 
-	/* zero the E$ line */
+	/* align address passed with 64 bytes subblock size */
+	mov	CH_ECACHE_SUBBLK_SIZE, %o2
+	andn	%o0, (CH_ECACHE_SUBBLK_SIZE - 1), %g1
+
+	/* move the good data into the W$ */
 1:
 	subcc	%o2, 8, %o2
+	ldxa	[%g1 + %o2]ASI_MEM, %g2
 	bge	1b
-	  stxa	%g0, [%o0 + %o2]ASI_MEM
+	  stxa	%g2, [%g1 + %o2]ASI_MEM
 
+	/* now overwrite the bad data */
+	setx	0xbadecc00badecc01, %g1, %g2
+	stxa	%g2, [%o0]ASI_MEM
+	mov	8, %g1
+	stxa	%g2, [%o0 + %g1]ASI_MEM
+	
 	ECACHE_FLUSH_LINE(%o0, %o1, %o2, %o3)
 	casxa	[%o0]ASI_MEM, %g0, %g0
 	ECACHE_REFLUSH_LINE(%o1, %o2, %o3)
