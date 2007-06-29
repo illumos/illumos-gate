@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,9 +66,10 @@ _pthread_mutexattr_destroy(pthread_mutexattr_t *attr)
 }
 
 /*
- * pthread_mutexattr_setpshared: sets the shared attr to PRIVATE or SHARED.
- * This is equivalent to setting USYNC_PROCESS/USYNC_THREAD flag in
- * mutex_init().
+ * pthread_mutexattr_setpshared: sets the shared attribute
+ * to PTHREAD_PROCESS_PRIVATE or PTHREAD_PROCESS_SHARED.
+ * This is equivalent to setting the USYNC_THREAD/USYNC_PROCESS
+ * flag in mutex_init().
  */
 #pragma weak pthread_mutexattr_setpshared =  _pthread_mutexattr_setpshared
 int
@@ -85,7 +86,7 @@ _pthread_mutexattr_setpshared(pthread_mutexattr_t *attr, int pshared)
 }
 
 /*
- * pthread_mutexattr_getpshared: gets the shared attr.
+ * pthread_mutexattr_getpshared: gets the shared attribute.
  */
 #pragma weak pthread_mutexattr_getpshared =  _pthread_mutexattr_getpshared
 int
@@ -101,7 +102,7 @@ _pthread_mutexattr_getpshared(const pthread_mutexattr_t *attr, int *pshared)
 }
 
 /*
- * pthread_mutexattr_setprioceiling: sets the prioceiling attr.
+ * pthread_mutexattr_setprioceiling: sets the prioceiling attribute.
  */
 #pragma weak pthread_mutexattr_setprioceiling = \
 					_pthread_mutexattr_setprioceiling
@@ -118,8 +119,7 @@ _pthread_mutexattr_setprioceiling(pthread_mutexattr_t *attr, int prioceiling)
 }
 
 /*
- * pthread_mutexattr_getprioceiling: gets the prioceiling attr.
- * Currently unsupported.
+ * pthread_mutexattr_getprioceiling: gets the prioceiling attribute.
  */
 #pragma weak pthread_mutexattr_getprioceiling = \
 					_pthread_mutexattr_getprioceiling
@@ -137,7 +137,6 @@ _pthread_mutexattr_getprioceiling(const pthread_mutexattr_t *attr, int *ceiling)
 
 /*
  * pthread_mutexattr_setprotocol: sets the protocol attribute.
- * Currently unsupported.
  */
 #pragma weak pthread_mutexattr_setprotocol =  _pthread_mutexattr_setprotocol
 int
@@ -157,7 +156,6 @@ _pthread_mutexattr_setprotocol(pthread_mutexattr_t *attr, int protocol)
 
 /*
  * pthread_mutexattr_getprotocol: gets the protocol attribute.
- * Currently unsupported.
  */
 #pragma weak pthread_mutexattr_getprotocol =  _pthread_mutexattr_getprotocol
 int
@@ -173,7 +171,8 @@ _pthread_mutexattr_getprotocol(const pthread_mutexattr_t *attr, int *protocol)
 }
 
 /*
- * pthread_mutexattr_setrobust_np: sets the robustness attr to ROBUST or STALL.
+ * pthread_mutexattr_setrobust_np: sets the robustness attribute
+ * to PTHREAD_MUTEX_ROBUST_NP or PTHREAD_MUTEX_STALL_NP.
  */
 #pragma weak pthread_mutexattr_setrobust_np = \
 					_pthread_mutexattr_setrobust_np
@@ -191,7 +190,7 @@ _pthread_mutexattr_setrobust_np(pthread_mutexattr_t *attr, int robust)
 }
 
 /*
- * pthread_mutexattr_getrobust_np: gets the robustness attr.
+ * pthread_mutexattr_getrobust_np: gets the robustness attribute.
  */
 #pragma weak pthread_mutexattr_getrobust_np = \
 					_pthread_mutexattr_getrobust_np
@@ -208,95 +207,33 @@ _pthread_mutexattr_getrobust_np(const pthread_mutexattr_t *attr, int *robust)
 }
 
 /*
- * pthread_mutex_consistent_np: make an inconsistent mutex consistent.
- * The mutex must have been made inconsistent due to the last owner of it
- * having died. Currently, no validation is done to check if:
- *      - the caller owns the mutex
- * Since this function is supported only for PI/robust locks, to check
- * if the caller owns the mutex, one needs to call the kernel. For now,
- * such extra validation does not seem necessary.
- */
-#pragma weak pthread_mutex_consistent_np = _pthread_mutex_consistent_np
-int
-_pthread_mutex_consistent_np(pthread_mutex_t *pmp)
-{
-	mutex_t *mp = (mutex_t *)pmp;
-
-	/*
-	 * Do this only for an inconsistent, initialized, PI, Robust lock.
-	 * For all other cases, return EINVAL.
-	 */
-	if ((mp->mutex_type & PTHREAD_PRIO_INHERIT) &&
-	    (mp->mutex_type & PTHREAD_MUTEX_ROBUST_NP) &&
-	    (mp->mutex_flag & LOCK_INITED) &&
-	    (mp->mutex_flag & LOCK_OWNERDEAD)) {
-		mp->mutex_flag &= ~LOCK_OWNERDEAD;
-		return (0);
-	}
-	return (EINVAL);
-}
-
-/*
- * pthread_mutex_init: Initializes the mutex object. It copies the
- * pshared attr into type argument and calls mutex_init().
+ * pthread_mutex_init: Initializes the mutex object.  It copies the
+ * various attributes into one type argument and calls mutex_init().
  */
 #pragma weak pthread_mutex_init = _pthread_mutex_init
 int
 _pthread_mutex_init(pthread_mutex_t *mutex, pthread_mutexattr_t *attr)
 {
-	mutex_t *mp = (mutex_t *)mutex;
-	int	type;
-	int	pshared;
-	int	protocol;
-	int	prioceiling = 0;
-	int	robust;
-	int	error;
 	mattr_t *ap;
+	int	type;
+	int	prioceiling = 0;
 
+	/*
+	 * All of the pshared, type, protocol, robust attributes
+	 * translate to bits in the mutex_type field.
+	 */
 	if (attr != NULL) {
 		if ((ap = attr->__pthread_mutexattrp) == NULL)
 			return (EINVAL);
-		pshared = ap->pshared;
-		type = ap->type;
-		protocol = ap->protocol;
-		if (protocol == PTHREAD_PRIO_PROTECT)
+		type = ap->pshared | ap->type | ap->protocol | ap->robustness;
+		if (ap->protocol == PTHREAD_PRIO_PROTECT)
 			prioceiling = ap->prioceiling;
-		robust = ap->robustness;
-		/*
-		 * Support robust mutexes only for PI locks.
-		 */
-		if (robust == PTHREAD_MUTEX_ROBUST_NP &&
-		    protocol != PTHREAD_PRIO_INHERIT)
-			return (EINVAL);
 	} else {
-		pshared = DEFAULT_TYPE;
-		type = PTHREAD_MUTEX_DEFAULT;
-		protocol = PTHREAD_PRIO_NONE;
-		robust = PTHREAD_MUTEX_STALL_NP;
+		type = DEFAULT_TYPE | PTHREAD_MUTEX_DEFAULT |
+		    PTHREAD_PRIO_NONE | PTHREAD_MUTEX_STALL_NP;
 	}
 
-	error = _private_mutex_init(mp, pshared, NULL);
-	if (error == 0) {
-		/*
-		 * Use the same routine to set the protocol, and robustness
-		 * attributes, as that used to set the type attribute, since
-		 * all of these attributes translate to bits in the mutex_type
-		 * field.
-		 *
-		 * Note that robustness is a new bit, not the Solaris robust
-		 * bit - the latter implies USYNC_PROCESS_ROBUST, or
-		 * SHARED,ROBUST together. For POSIX, since robustness is an
-		 * orthogonal attribute, both SHARED,ROBUST and PRIVATE,ROBUST
-		 * should be valid combinations for the future. Hence,
-		 * introduce a new bit in the mutex type field. See
-		 * sys/synch.h or pthread.h. In the future, if we ever
-		 * introduce a USYNC_THREAD_ROBUST, the latter could use this
-		 * new bit...
-		 */
-		_mutex_set_typeattr(mp, type|protocol|robust);
-		mp->mutex_ceiling = (uint8_t)prioceiling;
-	}
-	return (error);
+	return (_private_mutex_init((mutex_t *)mutex, type, &prioceiling));
 }
 
 /*
@@ -353,7 +290,7 @@ _pthread_mutexattr_settype(pthread_mutexattr_t *attr, int type)
 		type = LOCK_ERRORCHECK;
 		break;
 	case PTHREAD_MUTEX_RECURSIVE:
-		type = LOCK_RECURSIVE|LOCK_ERRORCHECK;
+		type = LOCK_RECURSIVE | LOCK_ERRORCHECK;
 		break;
 	default:
 		return (EINVAL);
@@ -364,7 +301,7 @@ _pthread_mutexattr_settype(pthread_mutexattr_t *attr, int type)
 
 /*
  * UNIX98
- * pthread_mutexattr_gettype: gets the type attr.
+ * pthread_mutexattr_gettype: gets the type attribute.
  */
 #pragma weak pthread_mutexattr_gettype =  _pthread_mutexattr_gettype
 int
@@ -383,7 +320,7 @@ _pthread_mutexattr_gettype(const pthread_mutexattr_t *attr, int *typep)
 	case LOCK_ERRORCHECK:
 		type = PTHREAD_MUTEX_ERRORCHECK;
 		break;
-	case LOCK_RECURSIVE|LOCK_ERRORCHECK:
+	case LOCK_RECURSIVE | LOCK_ERRORCHECK:
 		type = PTHREAD_MUTEX_RECURSIVE;
 		break;
 	default:

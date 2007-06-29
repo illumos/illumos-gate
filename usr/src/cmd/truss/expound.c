@@ -27,7 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	_SYSCALL32
@@ -520,9 +519,10 @@ show_cladm(private_t *pri, int code, int function, long offset)
 	}
 }
 
-#define	ALL_LOCK_TYPES	\
-	(USYNC_PROCESS|LOCK_ERRORCHECK|LOCK_RECURSIVE|USYNC_PROCESS_ROBUST|\
-	    LOCK_PRIO_INHERIT|LOCK_PRIO_PROTECT|LOCK_ROBUST_NP)
+#define	ALL_LOCK_TYPES						\
+	(USYNC_PROCESS | LOCK_ERRORCHECK | LOCK_RECURSIVE | 	\
+	LOCK_PRIO_INHERIT | LOCK_PRIO_PROTECT | LOCK_ROBUST | 	\
+	USYNC_PROCESS_ROBUST)
 
 /* return cv and mutex types */
 const char *
@@ -539,14 +539,14 @@ synch_type(private_t *pri, uint_t type)
 		(void) strcat(str, "|LOCK_ERRORCHECK");
 	if (type & LOCK_RECURSIVE)
 		(void) strcat(str, "|LOCK_RECURSIVE");
-	if (type & USYNC_PROCESS_ROBUST)
-		(void) strcat(str, "|USYNC_PROCESS_ROBUST");
 	if (type & LOCK_PRIO_INHERIT)
 		(void) strcat(str, "|LOCK_PRIO_INHERIT");
 	if (type & LOCK_PRIO_PROTECT)
 		(void) strcat(str, "|LOCK_PRIO_PROTECT");
-	if (type & LOCK_ROBUST_NP)
-		(void) strcat(str, "|LOCK_ROBUST_NP");
+	if (type & LOCK_ROBUST)
+		(void) strcat(str, "|LOCK_ROBUST");
+	if (type & USYNC_PROCESS_ROBUST)
+		(void) strcat(str, "|USYNC_PROCESS_ROBUST");
 
 	if ((type &= ~ALL_LOCK_TYPES) != 0)
 		(void) sprintf(str + strlen(str), "|0x%.4X", type);
@@ -5023,7 +5023,7 @@ expound(private_t *pri, long r0, int raw)
 	case SYS_lwp_mutex_lock:
 	case SYS_lwp_mutex_unlock:
 	case SYS_lwp_mutex_trylock:
-	case SYS_lwp_mutex_init:
+	case SYS_lwp_mutex_register:
 		if (pri->sys_nargs > 0)
 			show_mutex(pri, (long)pri->sys_args[0]);
 		break;

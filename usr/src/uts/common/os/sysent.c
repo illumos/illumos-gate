@@ -222,7 +222,7 @@ int	lwp_mutex_timedlock();
 int	lwp_mutex_wakeup();
 int	lwp_mutex_unlock();
 int	lwp_mutex_trylock();
-int	lwp_mutex_init();
+int	lwp_mutex_register();
 int	lwp_rwlock_sys();
 int	lwp_sema_post();
 int	lwp_sema_wait();
@@ -647,7 +647,7 @@ struct sysent sysent[NSYSCALL] =
 			SYSENT_CI("lwp_private", syslwp_private, 3),
 			SYSENT_NOSYS()),
 	/* 167 */ SYSENT_CI("lwp_wait",		lwp_wait,	2),
-	/* 168 */ SYSENT_CI("lwp_mutex_wakeup",	lwp_mutex_wakeup,	1),
+	/* 168 */ SYSENT_CI("lwp_mutex_wakeup",	lwp_mutex_wakeup,	2),
 	/* 169 */ SYSENT_CI("lwp_mutex_lock",	lwp_mutex_lock,		1),
 	/* 170 */ SYSENT_CI("lwp_cond_wait",	lwp_cond_wait,		4),
 	/* 171 */ SYSENT_CI("lwp_cond_signal",	lwp_cond_signal,	1),
@@ -772,7 +772,7 @@ struct sysent sysent[NSYSCALL] =
 	/* 249 */ SYSENT_CI("ntp_adjtime",	ntp_adjtime,	1),
 	/* 250 */ SYSENT_CI("lwp_mutex_unlock",	lwp_mutex_unlock,	1),
 	/* 251 */ SYSENT_CI("lwp_mutex_trylock", lwp_mutex_trylock,	1),
-	/* 252 */ SYSENT_CI("lwp_mutex_init",	lwp_mutex_init,		2),
+	/* 252 */ SYSENT_CI("lwp_mutex_register", lwp_mutex_register,	1),
 	/* 253 */ SYSENT_CI("cladm",		cladm,		3),
 	/* 254 */ SYSENT_CI("uucopy",		uucopy,		3),
 	/* 255 */ SYSENT_CI("umount2",		umount2,	2)
@@ -1031,7 +1031,7 @@ struct sysent sysent32[NSYSCALL] =
 			SYSENT_CI("lwp_private", syslwp_private, 3),
 			SYSENT_NOSYS()),
 	/* 167 */ SYSENT_CI("lwp_wait",		lwp_wait,	2),
-	/* 168 */ SYSENT_CI("lwp_mutex_wakeup",	lwp_mutex_wakeup,	1),
+	/* 168 */ SYSENT_CI("lwp_mutex_wakeup",	lwp_mutex_wakeup,	2),
 	/* 169 */ SYSENT_CI("lwp_mutex_lock",	lwp_mutex_lock,		1),
 	/* 170 */ SYSENT_CI("lwp_cond_wait",	lwp_cond_wait,		4),
 	/* 171 */ SYSENT_CI("lwp_cond_signal",	lwp_cond_signal,	1),
@@ -1118,7 +1118,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 249 */ SYSENT_CI("ntp_adjtime",	ntp_adjtime,	1),
 	/* 250 */ SYSENT_CI("lwp_mutex_unlock",	lwp_mutex_unlock,	1),
 	/* 251 */ SYSENT_CI("lwp_mutex_trylock", lwp_mutex_trylock,	1),
-	/* 252 */ SYSENT_CI("lwp_mutex_init",	lwp_mutex_init,		2),
+	/* 252 */ SYSENT_CI("lwp_mutex_register", lwp_mutex_register,	1),
 	/* 253 */ SYSENT_CI("cladm",		cladm,		3),
 	/* 254 */ SYSENT_CI("uucopy",		uucopy,		3),
 	/* 255 */ SYSENT_CI("umount2",		umount2,	2)

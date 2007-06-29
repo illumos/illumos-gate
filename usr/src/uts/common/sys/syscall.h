@@ -516,7 +516,7 @@ extern "C" {
 #define	SYS_ntp_adjtime		249
 #define	SYS_lwp_mutex_unlock	250
 #define	SYS_lwp_mutex_trylock	251
-#define	SYS_lwp_mutex_init	252
+#define	SYS_lwp_mutex_register	252
 #define	SYS_cladm		253
 #define	SYS_uucopy		254
 #define	SYS_umount2		255

@@ -548,7 +548,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 166 (loadable) */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 167 lwp_wait */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 168 lwp_mutex_unlock  */
+aui_null,	AUE_NULL,	aus_null,	/* 168 lwp_mutex_wakeup  */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 169 lwp_mutex_lock */
 		auf_null,	0,
@@ -717,7 +717,7 @@ aui_null,	AUE_NULL,	aus_null,	/* 250 lwp_mutex_unlock */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 251 lwp_mutex_trylock */
 		auf_null,	0,
-aui_null,	AUE_NULL,	aus_null,	/* 252 lwp_mutex_init */
+aui_null,	AUE_NULL,	aus_null,	/* 252 lwp_mutex_register */
 		auf_null,	0,
 aui_null,	AUE_NULL,	aus_null,	/* 253 cladm */
 		auf_null,	0,

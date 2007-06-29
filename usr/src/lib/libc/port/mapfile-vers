@@ -82,6 +82,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	mq_timedreceive;
 	mq_timedsend;
 	mq_unlink;
+	mutex_consistent;
 	nanosleep;
 	ntohl;
 	ntohs;
@@ -370,7 +371,7 @@ SUNW_1.22 {		# SunOS 5.10 (Solaris 10)
 	pthread_condattr_setclock;
 	pthread_mutexattr_getrobust_np;
 	pthread_mutexattr_setrobust_np;
-	pthread_mutex_consistent_np;
+	pthread_mutex_consistent_np =	NODYNSORT;
 	pthread_mutex_reltimedlock_np;
 	pthread_mutex_timedlock;
 	pthread_rwlock_reltimedrdlock_np;
@@ -1724,6 +1725,8 @@ SUNWprivate_1.1 {
 	_msgctl64;
 	__multi_innetgr;
 	_munlockall;
+	_mutex_consistent =		NODYNSORT;
+	__mutex_consistent =		NODYNSORT;
 	_mutex_destroy =		NODYNSORT;
 	__mutex_destroy;
 	mutex_held;
@@ -1887,7 +1890,7 @@ SUNWprivate_1.1 {
 	_pthread_mutexattr_setpshared;
 	_pthread_mutexattr_setrobust_np;
 	_pthread_mutexattr_settype;
-	_pthread_mutex_consistent_np;
+	_pthread_mutex_consistent_np =	NODYNSORT;
 	_pthread_mutex_destroy =	NODYNSORT;
 	_pthread_mutex_getprioceiling;
 	_pthread_mutex_init;

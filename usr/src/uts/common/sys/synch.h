@@ -131,20 +131,21 @@ typedef struct _lwp_rwlock {
 #define	USYNC_THREAD	0x00		/* private to a process */
 #define	USYNC_PROCESS	0x01		/* shared by processes */
 
-/* Keep the following 3 fields in sync with pthread.h */
-#define	LOCK_NORMAL	0x00		/* same as USYNC_THREAD */
-#define	LOCK_ERRORCHECK	0x02		/* error check lock */
-#define	LOCK_RECURSIVE	0x04		/* recursive lock */
+/* Keep the following values in sync with pthread.h */
+#define	LOCK_NORMAL		0x00		/* same as USYNC_THREAD */
+#define	LOCK_SHARED		0x01		/* same as USYNC_PROCESS */
+#define	LOCK_ERRORCHECK		0x02		/* error check lock */
+#define	LOCK_RECURSIVE		0x04		/* recursive lock */
+#define	LOCK_PRIO_INHERIT	0x10		/* priority inheritance lock */
+#define	LOCK_PRIO_PROTECT	0x20		/* priority ceiling lock */
+#define	LOCK_ROBUST		0x40		/* robust lock */
 
-#define	USYNC_PROCESS_ROBUST	0x08	/* shared by processes robustly */
-
-/* Keep the following 5 fields in sync with pthread.h */
-
-#define	LOCK_PRIO_NONE		0x00
-#define	LOCK_PRIO_INHERIT	0x10
-#define	LOCK_PRIO_PROTECT	0x20
-#define	LOCK_STALL_NP		0x00
-#define	LOCK_ROBUST_NP		0x40
+/*
+ * USYNC_PROCESS_ROBUST is a deprecated historical type.  It is mapped
+ * into (USYNC_PROCESS | LOCK_ROBUST) by mutex_init().  Application code
+ * should be revised to use (USYNC_PROCESS | LOCK_ROBUST) rather than this.
+ */
+#define	USYNC_PROCESS_ROBUST	0x08
 
 /*
  * lwp_mutex_t flags

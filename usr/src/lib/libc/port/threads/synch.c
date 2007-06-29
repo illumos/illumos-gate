@@ -34,11 +34,14 @@
 /*
  * This mutex is initialized to be held by lwp#1.
  * It is used to block a thread that has returned from a mutex_lock()
- * of a PTHREAD_PRIO_INHERIT mutex with an unrecoverable error.
+ * of a LOCK_PRIO_INHERIT mutex with an unrecoverable error.
  */
 mutex_t	stall_mutex = DEFAULTMUTEX;
 
 static int shared_mutex_held(mutex_t *);
+static int mutex_unlock_internal(mutex_t *, int);
+static int mutex_queuelock_adaptive(mutex_t *);
+static void mutex_wakeup_all(mutex_t *);
 
 /*
  * Lock statistics support functions.
@@ -102,16 +105,19 @@ int	thread_queue_spin = 1000;
  */
 #define	mutex_spinners	mutex_ownerpid
 
-void
-_mutex_set_typeattr(mutex_t *mp, int attr)
-{
-	mp->mutex_type |= (uint8_t)attr;
-}
+#define	ALL_ATTRIBUTES				\
+	(LOCK_RECURSIVE | LOCK_ERRORCHECK |	\
+	LOCK_PRIO_INHERIT | LOCK_PRIO_PROTECT |	\
+	LOCK_ROBUST)
 
 /*
- * 'type' can be one of USYNC_THREAD or USYNC_PROCESS, possibly
- * augmented by the flags LOCK_RECURSIVE and/or LOCK_ERRORCHECK,
- * or it can be USYNC_PROCESS_ROBUST with no extra flags.
+ * 'type' can be one of USYNC_THREAD, USYNC_PROCESS, or USYNC_PROCESS_ROBUST,
+ * augmented by zero or more the flags:
+ *	LOCK_RECURSIVE
+ *	LOCK_ERRORCHECK
+ *	LOCK_PRIO_INHERIT
+ *	LOCK_PRIO_PROTECT
+ *	LOCK_ROBUST
  */
 #pragma weak _private_mutex_init = __mutex_init
 #pragma weak mutex_init = __mutex_init
@@ -120,28 +126,62 @@ _mutex_set_typeattr(mutex_t *mp, int attr)
 int
 __mutex_init(mutex_t *mp, int type, void *arg)
 {
-	int error;
+	int basetype = (type & ~ALL_ATTRIBUTES);
+	int error = 0;
 
-	switch (type & ~(LOCK_RECURSIVE|LOCK_ERRORCHECK)) {
-	case USYNC_THREAD:
-	case USYNC_PROCESS:
+	if (basetype == USYNC_PROCESS_ROBUST) {
+		/*
+		 * USYNC_PROCESS_ROBUST is a deprecated historical type.
+		 * We change it into (USYNC_PROCESS | LOCK_ROBUST) but
+		 * retain the USYNC_PROCESS_ROBUST flag so we can return
+		 * ELOCKUNMAPPED when necessary (only USYNC_PROCESS_ROBUST
+		 * mutexes will ever draw ELOCKUNMAPPED).
+		 */
+		type |= (USYNC_PROCESS | LOCK_ROBUST);
+		basetype = USYNC_PROCESS;
+	}
+
+	if (!(basetype == USYNC_THREAD || basetype == USYNC_PROCESS) ||
+	    (type & (LOCK_PRIO_INHERIT | LOCK_PRIO_PROTECT))
+	    == (LOCK_PRIO_INHERIT | LOCK_PRIO_PROTECT)) {
+		error = EINVAL;
+	} else if (type & LOCK_ROBUST) {
+		/*
+		 * Callers of mutex_init() with the LOCK_ROBUST attribute
+		 * are required to pass an initially all-zero mutex.
+		 * Multiple calls to mutex_init() are allowed; all but
+		 * the first return EBUSY.  A call to mutex_init() is
+		 * allowed to make an inconsistent robust lock consistent
+		 * (for historical usage, even though the proper interface
+		 * for this is mutex_consistent()).  Note that we use
+		 * atomic_or_16() to set the LOCK_INITED flag so as
+		 * not to disturb surrounding bits (LOCK_OWNERDEAD, etc).
+		 */
+		extern void _atomic_or_16(volatile uint16_t *, uint16_t);
+		if (!(mp->mutex_flag & LOCK_INITED)) {
+			mp->mutex_type = (uint8_t)type;
+			_atomic_or_16(&mp->mutex_flag, LOCK_INITED);
+			mp->mutex_magic = MUTEX_MAGIC;
+		} else if (type != mp->mutex_type ||
+		    ((type & LOCK_PRIO_PROTECT) &&
+		    mp->mutex_ceiling != (*(int *)arg))) {
+			error = EINVAL;
+		} else if (__mutex_consistent(mp) != 0) {
+			error = EBUSY;
+		}
+		/* register a process robust mutex with the kernel */
+		if (basetype == USYNC_PROCESS)
+			register_lock(mp);
+	} else {
 		(void) _memset(mp, 0, sizeof (*mp));
 		mp->mutex_type = (uint8_t)type;
 		mp->mutex_flag = LOCK_INITED;
-		error = 0;
-		break;
-	case USYNC_PROCESS_ROBUST:
-		if (type & (LOCK_RECURSIVE|LOCK_ERRORCHECK))
-			error = EINVAL;
-		else
-			error = ___lwp_mutex_init(mp, type);
-		break;
-	default:
-		error = EINVAL;
-		break;
-	}
-	if (error == 0)
 		mp->mutex_magic = MUTEX_MAGIC;
+	}
+
+	if (error == 0 && (type & LOCK_PRIO_PROTECT))
+		mp->mutex_ceiling = (uint8_t)(*(int *)arg);
+
 	return (error);
 }
 
@@ -293,7 +333,7 @@ spin_lock_clear(mutex_t *mp)
 
 	mp->mutex_owner = 0;
 	if (atomic_swap_32(&mp->mutex_lockword, 0) & WAITERMASK) {
-		(void) ___lwp_mutex_wakeup(mp);
+		(void) ___lwp_mutex_wakeup(mp, 0);
 		if (self->ul_spin_lock_wakeup != UINT_MAX)
 			self->ul_spin_lock_wakeup++;
 	}
@@ -308,6 +348,7 @@ queue_alloc(void)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
+	mutex_t *mp;
 	void *data;
 	int i;
 
@@ -321,8 +362,11 @@ queue_alloc(void)
 	    == MAP_FAILED)
 		thr_panic("cannot allocate thread queue_head table");
 	udp->queue_head = (queue_head_t *)data;
-	for (i = 0; i < 2 * QHASHSIZE; i++)
-		udp->queue_head[i].qh_lock.mutex_magic = MUTEX_MAGIC;
+	for (i = 0; i < 2 * QHASHSIZE; i++) {
+		mp = &udp->queue_head[i].qh_lock;
+		mp->mutex_flag = LOCK_INITED;
+		mp->mutex_magic = MUTEX_MAGIC;
+	}
 }
 
 #if defined(THREAD_DEBUG)
@@ -688,12 +732,14 @@ unsleep_self(void)
  * Common code for calling the the ___lwp_mutex_timedlock() system call.
  * Returns with mutex_owner and mutex_ownerpid set correctly.
  */
-int
+static int
 mutex_lock_kernel(mutex_t *mp, timespec_t *tsp, tdb_mutex_stats_t *msp)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
+	int mtype = mp->mutex_type;
 	hrtime_t begin_sleep;
+	int acquired;
 	int error;
 
 	self->ul_sp = stkptr();
@@ -711,13 +757,17 @@ mutex_lock_kernel(mutex_t *mp, timespec_t *tsp, tdb_mutex_stats_t *msp)
 	DTRACE_PROBE1(plockstat, mutex__block, mp);
 
 	for (;;) {
-		if ((error = ___lwp_mutex_timedlock(mp, tsp)) != 0) {
-			DTRACE_PROBE2(plockstat, mutex__blocked, mp, 0);
-			DTRACE_PROBE2(plockstat, mutex__error, mp, error);
+		/*
+		 * A return value of EOWNERDEAD or ELOCKUNMAPPED
+		 * means we successfully acquired the lock.
+		 */
+		if ((error = ___lwp_mutex_timedlock(mp, tsp)) != 0 &&
+		    error != EOWNERDEAD && error != ELOCKUNMAPPED) {
+			acquired = 0;
 			break;
 		}
 
-		if (mp->mutex_type & (USYNC_PROCESS | USYNC_PROCESS_ROBUST)) {
+		if (mtype & USYNC_PROCESS) {
 			/*
 			 * Defend against forkall().  We may be the child,
 			 * in which case we don't actually own the mutex.
@@ -726,16 +776,13 @@ mutex_lock_kernel(mutex_t *mp, timespec_t *tsp, tdb_mutex_stats_t *msp)
 			if (mp->mutex_ownerpid == udp->pid) {
 				mp->mutex_owner = (uintptr_t)self;
 				exit_critical(self);
-				DTRACE_PROBE2(plockstat, mutex__blocked, mp, 1);
-				DTRACE_PROBE3(plockstat, mutex__acquire, mp,
-				    0, 0);
+				acquired = 1;
 				break;
 			}
 			exit_critical(self);
 		} else {
 			mp->mutex_owner = (uintptr_t)self;
-			DTRACE_PROBE2(plockstat, mutex__blocked, mp, 1);
-			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
+			acquired = 1;
 			break;
 		}
 	}
@@ -743,6 +790,14 @@ mutex_lock_kernel(mutex_t *mp, timespec_t *tsp, tdb_mutex_stats_t *msp)
 		msp->mutex_sleep_time += gethrtime() - begin_sleep;
 	self->ul_wchan = NULL;
 	self->ul_sp = 0;
+
+	if (acquired) {
+		DTRACE_PROBE2(plockstat, mutex__blocked, mp, 1);
+		DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
+	} else {
+		DTRACE_PROBE2(plockstat, mutex__blocked, mp, 0);
+		DTRACE_PROBE2(plockstat, mutex__error, mp, error);
+	}
 
 	return (error);
 }
@@ -756,18 +811,22 @@ mutex_trylock_kernel(mutex_t *mp)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
+	int mtype = mp->mutex_type;
 	int error;
+	int acquired;
 
 	for (;;) {
-		if ((error = ___lwp_mutex_trylock(mp)) != 0) {
-			if (error != EBUSY) {
-				DTRACE_PROBE2(plockstat, mutex__error, mp,
-				    error);
-			}
+		/*
+		 * A return value of EOWNERDEAD or ELOCKUNMAPPED
+		 * means we successfully acquired the lock.
+		 */
+		if ((error = ___lwp_mutex_trylock(mp)) != 0 &&
+		    error != EOWNERDEAD && error != ELOCKUNMAPPED) {
+			acquired = 0;
 			break;
 		}
 
-		if (mp->mutex_type & (USYNC_PROCESS | USYNC_PROCESS_ROBUST)) {
+		if (mtype & USYNC_PROCESS) {
 			/*
 			 * Defend against forkall().  We may be the child,
 			 * in which case we don't actually own the mutex.
@@ -776,16 +835,21 @@ mutex_trylock_kernel(mutex_t *mp)
 			if (mp->mutex_ownerpid == udp->pid) {
 				mp->mutex_owner = (uintptr_t)self;
 				exit_critical(self);
-				DTRACE_PROBE3(plockstat, mutex__acquire, mp,
-				    0, 0);
+				acquired = 1;
 				break;
 			}
 			exit_critical(self);
 		} else {
 			mp->mutex_owner = (uintptr_t)self;
-			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
+			acquired = 1;
 			break;
 		}
+	}
+
+	if (acquired) {
+		DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
+	} else if (error != EBUSY) {
+		DTRACE_PROBE2(plockstat, mutex__error, mp, error);
 	}
 
 	return (error);
@@ -932,31 +996,42 @@ preempt_unpark(ulwp_t *self, lwpid_t lwpid)
 }
 
 /*
- * Spin for a while, trying to grab the lock.  We know that we
- * failed set_lock_byte(&mp->mutex_lockw) once before coming here.
+ * Spin for a while, trying to grab the lock.
  * If this fails, return EBUSY and let the caller deal with it.
  * If this succeeds, return 0 with mutex_owner set to curthread.
  */
-int
+static int
 mutex_trylock_adaptive(mutex_t *mp)
 {
 	ulwp_t *self = curthread;
+	int error = EBUSY;
 	ulwp_t *ulwp;
 	volatile sc_shared_t *scp;
 	volatile uint8_t *lockp;
 	volatile uint64_t *ownerp;
-	int count, max = self->ul_adaptive_spin;
+	int count;
+	int max;
 
-	ASSERT(!(mp->mutex_type & (USYNC_PROCESS | USYNC_PROCESS_ROBUST)));
+	ASSERT(!(mp->mutex_type & USYNC_PROCESS));
 
-	if (max == 0 || (mp->mutex_spinners >= self->ul_max_spinners))
+	if (MUTEX_OWNER(mp) == self)
 		return (EBUSY);
 
-	lockp = (volatile uint8_t *)&mp->mutex_lockw;
-	ownerp = (volatile uint64_t *)&mp->mutex_owner;
+	/* short-cut, not definitive (see below) */
+	if (mp->mutex_flag & LOCK_NOTRECOVERABLE) {
+		ASSERT(mp->mutex_type & LOCK_ROBUST);
+		DTRACE_PROBE2(plockstat, mutex__error, mp, ENOTRECOVERABLE);
+		return (ENOTRECOVERABLE);
+	}
+
+	if ((max = self->ul_adaptive_spin) == 0 ||
+	    mp->mutex_spinners >= self->ul_max_spinners)
+		max = 1;	/* try at least once */
 
 	DTRACE_PROBE1(plockstat, mutex__spin, mp);
 
+	lockp = (volatile uint8_t *)&mp->mutex_lockw;
+	ownerp = (volatile uint64_t *)&mp->mutex_owner;
 	/*
 	 * This spin loop is unfair to lwps that have already dropped into
 	 * the kernel to sleep.  They will starve on a highly-contended mutex.
@@ -968,14 +1043,11 @@ mutex_trylock_adaptive(mutex_t *mp)
 	 */
 	enter_critical(self);		/* protects ul_schedctl */
 	atomic_inc_32(&mp->mutex_spinners);
-	for (count = 0; count < max; count++) {
+	for (count = 1; count <= max; count++) {
 		if (*lockp == 0 && set_lock_byte(lockp) == 0) {
 			*ownerp = (uintptr_t)self;
-			atomic_dec_32(&mp->mutex_spinners);
-			exit_critical(self);
-			DTRACE_PROBE2(plockstat, mutex__spun, 1, count);
-			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, count);
-			return (0);
+			error = 0;
+			break;
 		}
 		SMT_PAUSE();
 		/*
@@ -1004,16 +1076,39 @@ mutex_trylock_adaptive(mutex_t *mp)
 	atomic_dec_32(&mp->mutex_spinners);
 	exit_critical(self);
 
-	DTRACE_PROBE2(plockstat, mutex__spun, 0, count);
+	if (error == 0 && (mp->mutex_flag & LOCK_NOTRECOVERABLE)) {
+		ASSERT(mp->mutex_type & LOCK_ROBUST);
+		/*
+		 * We shouldn't own the mutex; clear the lock.
+		 */
+		mp->mutex_owner = 0;
+		if (atomic_swap_32(&mp->mutex_lockword, 0) & WAITERMASK)
+			mutex_wakeup_all(mp);
+		error = ENOTRECOVERABLE;
+	}
 
-	return (EBUSY);
+	if (error) {
+		DTRACE_PROBE2(plockstat, mutex__spun, 0, count);
+		if (error != EBUSY) {
+			DTRACE_PROBE2(plockstat, mutex__error, mp, error);
+		}
+	} else {
+		DTRACE_PROBE2(plockstat, mutex__spun, 1, count);
+		DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, count);
+		if (mp->mutex_flag & LOCK_OWNERDEAD) {
+			ASSERT(mp->mutex_type & LOCK_ROBUST);
+			error = EOWNERDEAD;
+		}
+	}
+
+	return (error);
 }
 
 /*
  * Same as mutex_trylock_adaptive(), except specifically for queue locks.
  * The owner field is not set here; the caller (spin_lock_set()) sets it.
  */
-int
+static int
 mutex_queuelock_adaptive(mutex_t *mp)
 {
 	ulwp_t *ulwp;
@@ -1044,71 +1139,93 @@ mutex_queuelock_adaptive(mutex_t *mp)
 
 /*
  * Like mutex_trylock_adaptive(), but for process-shared mutexes.
- * Spin for a while, trying to grab the lock.  We know that we
- * failed set_lock_byte(&mp->mutex_lockw) once before coming here.
+ * Spin for a while, trying to grab the lock.
  * If this fails, return EBUSY and let the caller deal with it.
  * If this succeeds, return 0 with mutex_owner set to curthread
  * and mutex_ownerpid set to the current pid.
  */
-int
+static int
 mutex_trylock_process(mutex_t *mp)
 {
 	ulwp_t *self = curthread;
-	uberdata_t *udp = self->ul_uberdata;
-	int count;
+	int error = EBUSY;
 	volatile uint8_t *lockp;
-	volatile uint64_t *ownerp;
-	volatile int32_t *pidp;
-	pid_t pid, newpid;
-	uint64_t owner, newowner;
+	int count;
+	int max;
 
-	if ((count = ncpus) == 0)
-		count = ncpus = (int)_sysconf(_SC_NPROCESSORS_ONLN);
-	count = (count > 1)? self->ul_adaptive_spin : 0;
+	ASSERT(mp->mutex_type & USYNC_PROCESS);
 
-	ASSERT((mp->mutex_type & ~(LOCK_RECURSIVE|LOCK_ERRORCHECK)) ==
-		USYNC_PROCESS);
-
-	if (count == 0)
+	if (shared_mutex_held(mp))
 		return (EBUSY);
 
+	/* short-cut, not definitive (see below) */
+	if (mp->mutex_flag & LOCK_NOTRECOVERABLE) {
+		ASSERT(mp->mutex_type & LOCK_ROBUST);
+		DTRACE_PROBE2(plockstat, mutex__error, mp, ENOTRECOVERABLE);
+		return (ENOTRECOVERABLE);
+	}
+
+	if (ncpus == 0)
+		ncpus = (int)_sysconf(_SC_NPROCESSORS_ONLN);
+	max = (ncpus > 1)? self->ul_adaptive_spin : 1;
+	if (max == 0)
+		max = 1;	/* try at least once */
+
+	DTRACE_PROBE1(plockstat, mutex__spin, mp);
+
 	lockp = (volatile uint8_t *)&mp->mutex_lockw;
-	ownerp = (volatile uint64_t *)&mp->mutex_owner;
-	pidp = (volatile int32_t *)&mp->mutex_ownerpid;
-	owner = *ownerp;
-	pid = *pidp;
 	/*
 	 * This is a process-shared mutex.
 	 * We cannot know if the owner is running on a processor.
 	 * We just spin and hope that it is on a processor.
 	 */
-	while (--count >= 0) {
-		if (*lockp == 0) {
-			enter_critical(self);
-			if (set_lock_byte(lockp) == 0) {
-				*ownerp = (uintptr_t)self;
-				*pidp = udp->pid;
-				exit_critical(self);
-				DTRACE_PROBE3(plockstat, mutex__acquire, mp,
-				    0, 0);
-				return (0);
-			}
-			exit_critical(self);
-		} else if ((newowner = *ownerp) == owner &&
-		    (newpid = *pidp) == pid) {
-			SMT_PAUSE();
-			continue;
+	enter_critical(self);
+	for (count = 1; count <= max; count++) {
+		if (*lockp == 0 && set_lock_byte(lockp) == 0) {
+			mp->mutex_owner = (uintptr_t)self;
+			mp->mutex_ownerpid = self->ul_uberdata->pid;
+			error = 0;
+			break;
 		}
+		SMT_PAUSE();
+	}
+	exit_critical(self);
+
+	if (error == 0 && (mp->mutex_flag & LOCK_NOTRECOVERABLE)) {
+		ASSERT(mp->mutex_type & LOCK_ROBUST);
 		/*
-		 * The owner of the lock changed; start the count over again.
-		 * This may be too aggressive; it needs testing.
+		 * We shouldn't own the mutex; clear the lock.
 		 */
-		owner = newowner;
-		pid = newpid;
-		count = self->ul_adaptive_spin;
+		mp->mutex_owner = 0;
+		mp->mutex_ownerpid = 0;
+		if (atomic_swap_32(&mp->mutex_lockword, 0) & WAITERMASK) {
+			no_preempt(self);
+			(void) ___lwp_mutex_wakeup(mp, 1);
+			preempt(self);
+		}
+		error = ENOTRECOVERABLE;
 	}
 
-	return (EBUSY);
+	if (error) {
+		DTRACE_PROBE2(plockstat, mutex__spun, 0, count);
+		if (error != EBUSY) {
+			DTRACE_PROBE2(plockstat, mutex__error, mp, error);
+		}
+	} else {
+		DTRACE_PROBE2(plockstat, mutex__spun, 1, count);
+		DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, count);
+		if (mp->mutex_flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED)) {
+			ASSERT(mp->mutex_type & LOCK_ROBUST);
+			if (mp->mutex_flag & LOCK_OWNERDEAD)
+				error = EOWNERDEAD;
+			else if (mp->mutex_type & USYNC_PROCESS_ROBUST)
+				error = ELOCKUNMAPPED;
+			else
+				error = EOWNERDEAD;
+		}
+	}
+
+	return (error);
 }
 
 /*
@@ -1117,7 +1234,7 @@ mutex_trylock_process(mutex_t *mp)
  * The caller of mutex_wakeup() must call __lwp_unpark(lwpid)
  * to wake up the specified lwp.
  */
-lwpid_t
+static lwpid_t
 mutex_wakeup(mutex_t *mp)
 {
 	lwpid_t lwpid = 0;
@@ -1140,11 +1257,73 @@ mutex_wakeup(mutex_t *mp)
 }
 
 /*
+ * Mutex wakeup code for releasing all waiters on a USYNC_THREAD mutex.
+ */
+static void
+mutex_wakeup_all(mutex_t *mp)
+{
+	queue_head_t *qp;
+	int nlwpid = 0;
+	int maxlwps = MAXLWPS;
+	ulwp_t **ulwpp;
+	ulwp_t *ulwp;
+	ulwp_t *prev = NULL;
+	lwpid_t buffer[MAXLWPS];
+	lwpid_t *lwpid = buffer;
+
+	/*
+	 * Walk the list of waiters and prepare to wake up all of them.
+	 * The waiters flag has already been cleared from the mutex.
+	 *
+	 * We keep track of lwpids that are to be unparked in lwpid[].
+	 * __lwp_unpark_all() is called to unpark all of them after
+	 * they have been removed from the sleep queue and the sleep
+	 * queue lock has been dropped.  If we run out of space in our
+	 * on-stack buffer, we need to allocate more but we can't call
+	 * lmalloc() because we are holding a queue lock when the overflow
+	 * occurs and lmalloc() acquires a lock.  We can't use alloca()
+	 * either because the application may have allocated a small
+	 * stack and we don't want to overrun the stack.  So we call
+	 * alloc_lwpids() to allocate a bigger buffer using the mmap()
+	 * system call directly since that path acquires no locks.
+	 */
+	qp = queue_lock(mp, MX);
+	ulwpp = &qp->qh_head;
+	while ((ulwp = *ulwpp) != NULL) {
+		if (ulwp->ul_wchan != mp) {
+			prev = ulwp;
+			ulwpp = &ulwp->ul_link;
+		} else {
+			if (nlwpid == maxlwps)
+				lwpid = alloc_lwpids(lwpid, &nlwpid, &maxlwps);
+			(void) queue_unlink(qp, ulwpp, prev);
+			lwpid[nlwpid++] = ulwp->ul_lwpid;
+		}
+	}
+	mp->mutex_waiters = 0;
+
+	if (nlwpid == 0) {
+		queue_unlock(qp);
+	} else {
+		no_preempt(curthread);
+		queue_unlock(qp);
+		if (nlwpid == 1)
+			(void) __lwp_unpark(lwpid[0]);
+		else
+			(void) __lwp_unpark_all(lwpid, nlwpid);
+		preempt(curthread);
+	}
+
+	if (lwpid != buffer)
+		(void) _private_munmap(lwpid, maxlwps * sizeof (lwpid_t));
+}
+
+/*
  * Spin for a while, testing to see if the lock has been grabbed.
  * If this fails, call mutex_wakeup() to release a waiter.
  */
-lwpid_t
-mutex_unlock_queue(mutex_t *mp)
+static lwpid_t
+mutex_unlock_queue(mutex_t *mp, int release_all)
 {
 	ulwp_t *self = curthread;
 	uint32_t *lockw = &mp->mutex_lockword;
@@ -1168,13 +1347,12 @@ mutex_unlock_queue(mutex_t *mp)
 	 * any of the adaptive code because the waiter bit has been cleared
 	 * and the adaptive code is unreliable in this case.
 	 */
-	if (!(*lockw & WAITERMASK)) {	/* no waiter exists right now */
+	if (release_all || !(*lockw & WAITERMASK)) {
 		mp->mutex_owner = 0;
 		DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
 		if (!(atomic_swap_32(lockw, 0) & WAITERMASK))
-			return (0);	/* still no waiters */
+			return (0);	/* no waiters */
 		no_preempt(self);	/* ensure a prompt wakeup */
-		lwpid = mutex_wakeup(mp);
 	} else {
 		no_preempt(self);	/* ensure a prompt wakeup */
 		lockp = (volatile uint8_t *)&mp->mutex_lockw;
@@ -1217,9 +1395,14 @@ mutex_unlock_queue(mutex_t *mp)
 		 * Wake up some lwp that is waiting for it.
 		 */
 		mp->mutex_waiters = 0;
-		lwpid = mutex_wakeup(mp);
 	}
 
+	if (release_all) {
+		mutex_wakeup_all(mp);
+		lwpid = 0;
+	} else {
+		lwpid = mutex_wakeup(mp);
+	}
 	if (lwpid == 0)
 		preempt(self);
 	return (lwpid);
@@ -1229,8 +1412,8 @@ mutex_unlock_queue(mutex_t *mp)
  * Like mutex_unlock_queue(), but for process-shared mutexes.
  * We tested the waiters field before calling here and it was non-zero.
  */
-void
-mutex_unlock_process(mutex_t *mp)
+static void
+mutex_unlock_process(mutex_t *mp, int release_all)
 {
 	ulwp_t *self = curthread;
 	int count;
@@ -1239,14 +1422,14 @@ mutex_unlock_process(mutex_t *mp)
 	/*
 	 * See the comments in mutex_unlock_queue(), above.
 	 */
-	if ((count = ncpus) == 0)
-		count = ncpus = (int)_sysconf(_SC_NPROCESSORS_ONLN);
-	count = (count > 1)? self->ul_release_spin : 0;
+	if (ncpus == 0)
+		ncpus = (int)_sysconf(_SC_NPROCESSORS_ONLN);
+	count = (ncpus > 1)? self->ul_release_spin : 0;
 	no_preempt(self);
 	mp->mutex_owner = 0;
 	mp->mutex_ownerpid = 0;
 	DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
-	if (count == 0) {
+	if (release_all || count == 0) {
 		/* clear lock, test waiter */
 		if (!(atomic_swap_32(&mp->mutex_lockword, 0) & WAITERMASK)) {
 			/* no waiters now */
@@ -1271,7 +1454,7 @@ mutex_unlock_process(mutex_t *mp)
 		 */
 		mp->mutex_waiters = 0;
 	}
-	(void) ___lwp_mutex_wakeup(mp);
+	(void) ___lwp_mutex_wakeup(mp, release_all);
 	preempt(self);
 }
 
@@ -1296,7 +1479,7 @@ stall(void)
 /*
  * Acquire a USYNC_THREAD mutex via user-level sleep queues.
  * We failed set_lock_byte(&mp->mutex_lockw) before coming here.
- * Returns with mutex_owner set correctly.
+ * If successful, returns with mutex_owner set correctly.
  */
 int
 mutex_lock_queue(ulwp_t *self, tdb_mutex_stats_t *msp, mutex_t *mp,
@@ -1333,8 +1516,6 @@ mutex_lock_queue(ulwp_t *self, tdb_mutex_stats_t *msp, mutex_t *mp,
 	for (;;) {
 		if (set_lock_byte(&mp->mutex_lockw) == 0) {
 			mp->mutex_owner = (uintptr_t)self;
-			DTRACE_PROBE2(plockstat, mutex__blocked, mp, 1);
-			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
 			mp->mutex_waiters = dequeue_self(qp, mp);
 			break;
 		}
@@ -1357,17 +1538,10 @@ mutex_lock_queue(ulwp_t *self, tdb_mutex_stats_t *msp, mutex_t *mp,
 		 */
 		qp = queue_lock(mp, MX);
 		if (self->ul_sleepq == NULL) {
-			if (error) {
-				DTRACE_PROBE2(plockstat, mutex__blocked, mp, 0);
-				DTRACE_PROBE2(plockstat, mutex__error, mp,
-				    error);
+			if (error)
 				break;
-			}
 			if (set_lock_byte(&mp->mutex_lockw) == 0) {
 				mp->mutex_owner = (uintptr_t)self;
-				DTRACE_PROBE2(plockstat, mutex__blocked, mp, 1);
-				DTRACE_PROBE3(plockstat, mutex__acquire, mp,
-				    0, 0);
 				break;
 			}
 			enqueue(qp, self, mp, MX);
@@ -1378,28 +1552,164 @@ mutex_lock_queue(ulwp_t *self, tdb_mutex_stats_t *msp, mutex_t *mp,
 		    self->ul_wchan == mp);
 		if (error) {
 			mp->mutex_waiters = dequeue_self(qp, mp);
-			DTRACE_PROBE2(plockstat, mutex__blocked, mp, 0);
-			DTRACE_PROBE2(plockstat, mutex__error, mp, error);
 			break;
 		}
 	}
-
 	ASSERT(self->ul_sleepq == NULL && self->ul_link == NULL &&
 	    self->ul_wchan == NULL);
 	self->ul_sp = 0;
-
 	queue_unlock(qp);
+
 	if (msp)
 		msp->mutex_sleep_time += gethrtime() - begin_sleep;
 
 	ASSERT(error == 0 || error == EINVAL || error == ETIME);
+
+	if (error == 0 && (mp->mutex_flag & LOCK_NOTRECOVERABLE)) {
+		ASSERT(mp->mutex_type & LOCK_ROBUST);
+		/*
+		 * We shouldn't own the mutex; clear the lock.
+		 */
+		mp->mutex_owner = 0;
+		if (atomic_swap_32(&mp->mutex_lockword, 0) & WAITERMASK)
+			mutex_wakeup_all(mp);
+		error = ENOTRECOVERABLE;
+	}
+
+	if (error) {
+		DTRACE_PROBE2(plockstat, mutex__blocked, mp, 0);
+		DTRACE_PROBE2(plockstat, mutex__error, mp, error);
+	} else {
+		DTRACE_PROBE2(plockstat, mutex__blocked, mp, 1);
+		DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
+		if (mp->mutex_flag & LOCK_OWNERDEAD) {
+			ASSERT(mp->mutex_type & LOCK_ROBUST);
+			error = EOWNERDEAD;
+		}
+	}
+
 	return (error);
+}
+
+static int
+mutex_recursion(mutex_t *mp, int mtype, int try)
+{
+	ASSERT(mutex_is_held(mp));
+	ASSERT(mtype & (LOCK_RECURSIVE|LOCK_ERRORCHECK));
+	ASSERT(try == MUTEX_TRY || try == MUTEX_LOCK);
+
+	if (mtype & LOCK_RECURSIVE) {
+		if (mp->mutex_rcount == RECURSION_MAX) {
+			DTRACE_PROBE2(plockstat, mutex__error, mp, EAGAIN);
+			return (EAGAIN);
+		}
+		mp->mutex_rcount++;
+		DTRACE_PROBE3(plockstat, mutex__acquire, mp, 1, 0);
+		return (0);
+	}
+	if (try == MUTEX_LOCK) {
+		DTRACE_PROBE2(plockstat, mutex__error, mp, EDEADLK);
+		return (EDEADLK);
+	}
+	return (EBUSY);
+}
+
+/*
+ * Register this USYNC_PROCESS|LOCK_ROBUST mutex with the kernel so
+ * it can apply LOCK_OWNERDEAD|LOCK_UNMAPPED if it becomes necessary.
+ * We use tdb_hash_lock here and in the synch object tracking code in
+ * the tdb_agent.c file.  There is no conflict between these two usages.
+ */
+void
+register_lock(mutex_t *mp)
+{
+	uberdata_t *udp = curthread->ul_uberdata;
+	uint_t hash = LOCK_HASH(mp);
+	robust_t *rlp;
+	robust_t **rlpp;
+	robust_t **table;
+
+	if ((table = udp->robustlocks) == NULL) {
+		lmutex_lock(&udp->tdb_hash_lock);
+		if ((table = udp->robustlocks) == NULL) {
+			table = lmalloc(LOCKHASHSZ * sizeof (robust_t *));
+			_membar_producer();
+			udp->robustlocks = table;
+		}
+		lmutex_unlock(&udp->tdb_hash_lock);
+	}
+	_membar_consumer();
+
+	/*
+	 * First search the registered table with no locks held.
+	 * This is safe because the table never shrinks
+	 * and we can only get a false negative.
+	 */
+	for (rlp = table[hash]; rlp != NULL; rlp = rlp->robust_next) {
+		if (rlp->robust_lock == mp)	/* already registered */
+			return;
+	}
+
+	/*
+	 * The lock was not found.
+	 * Repeat the operation with tdb_hash_lock held.
+	 */
+	lmutex_lock(&udp->tdb_hash_lock);
+
+	for (rlpp = &table[hash];
+	    (rlp = *rlpp) != NULL;
+	    rlpp = &rlp->robust_next) {
+		if (rlp->robust_lock == mp) {	/* already registered */
+			lmutex_unlock(&udp->tdb_hash_lock);
+			return;
+		}
+	}
+
+	/*
+	 * The lock has never been registered.
+	 * Register it now and add it to the table.
+	 */
+	(void) ___lwp_mutex_register(mp);
+	rlp = lmalloc(sizeof (*rlp));
+	rlp->robust_lock = mp;
+	_membar_producer();
+	*rlpp = rlp;
+
+	lmutex_unlock(&udp->tdb_hash_lock);
+}
+
+/*
+ * This is called in the child of fork()/forkall() to start over
+ * with a clean slate.  (Each process must register its own locks.)
+ * No locks are needed because all other threads are suspended or gone.
+ */
+void
+unregister_locks(void)
+{
+	uberdata_t *udp = curthread->ul_uberdata;
+	uint_t hash;
+	robust_t **table;
+	robust_t *rlp;
+	robust_t *next;
+
+	if ((table = udp->robustlocks) != NULL) {
+		for (hash = 0; hash < LOCKHASHSZ; hash++) {
+			rlp = table[hash];
+			while (rlp != NULL) {
+				next = rlp->robust_next;
+				lfree(rlp, sizeof (*rlp));
+				rlp = next;
+			}
+		}
+		lfree(table, LOCKHASHSZ * sizeof (robust_t *));
+		udp->robustlocks = NULL;
+	}
 }
 
 /*
  * Returns with mutex_owner set correctly.
  */
-int
+static int
 mutex_lock_internal(mutex_t *mp, timespec_t *tsp, int try)
 {
 	ulwp_t *self = curthread;
@@ -1407,6 +1717,8 @@ mutex_lock_internal(mutex_t *mp, timespec_t *tsp, int try)
 	int mtype = mp->mutex_type;
 	tdb_mutex_stats_t *msp = MUTEX_STATS(mp, udp);
 	int error = 0;
+	uint8_t ceil;
+	int myprio;
 
 	ASSERT(try == MUTEX_TRY || try == MUTEX_LOCK);
 
@@ -1416,184 +1728,86 @@ mutex_lock_internal(mutex_t *mp, timespec_t *tsp, int try)
 	if (msp && try == MUTEX_TRY)
 		tdb_incr(msp->mutex_try);
 
-	if ((mtype & (LOCK_RECURSIVE|LOCK_ERRORCHECK)) && mutex_is_held(mp)) {
-		if (mtype & LOCK_RECURSIVE) {
-			if (mp->mutex_rcount == RECURSION_MAX) {
-				error = EAGAIN;
-			} else {
-				mp->mutex_rcount++;
-				DTRACE_PROBE3(plockstat, mutex__acquire, mp,
-				    1, 0);
-				return (0);
-			}
-		} else if (try == MUTEX_TRY) {
-			return (EBUSY);
-		} else {
-			DTRACE_PROBE2(plockstat, mutex__error, mp, EDEADLK);
-			return (EDEADLK);
-		}
-	}
+	if ((mtype & (LOCK_RECURSIVE|LOCK_ERRORCHECK)) && mutex_is_held(mp))
+		return (mutex_recursion(mp, mtype, try));
 
 	if (self->ul_error_detection && try == MUTEX_LOCK &&
 	    tsp == NULL && mutex_is_held(mp))
 		lock_error(mp, "mutex_lock", NULL, NULL);
 
-	if (mtype &
-	    (USYNC_PROCESS_ROBUST|PTHREAD_PRIO_INHERIT|PTHREAD_PRIO_PROTECT)) {
-		uint8_t ceil;
-		int myprio;
-
-		if (mtype & PTHREAD_PRIO_PROTECT) {
-			ceil = mp->mutex_ceiling;
-			ASSERT(_validate_rt_prio(SCHED_FIFO, ceil) == 0);
-			myprio = real_priority(self);
-			if (myprio > ceil) {
-				DTRACE_PROBE2(plockstat, mutex__error, mp,
-				    EINVAL);
-				return (EINVAL);
-			}
-			if ((error = _ceil_mylist_add(mp)) != 0) {
-				DTRACE_PROBE2(plockstat, mutex__error, mp,
-				    error);
-				return (error);
-			}
-			if (myprio < ceil)
-				_ceil_prio_inherit(ceil);
+	if (mtype & LOCK_PRIO_PROTECT) {
+		ceil = mp->mutex_ceiling;
+		ASSERT(_validate_rt_prio(SCHED_FIFO, ceil) == 0);
+		myprio = real_priority(self);
+		if (myprio > ceil) {
+			DTRACE_PROBE2(plockstat, mutex__error, mp, EINVAL);
+			return (EINVAL);
 		}
-
-		if (mtype & PTHREAD_PRIO_INHERIT) {
-			/* go straight to the kernel */
-			if (try == MUTEX_TRY)
-				error = mutex_trylock_kernel(mp);
-			else	/* MUTEX_LOCK */
-				error = mutex_lock_kernel(mp, tsp, msp);
-			/*
-			 * The kernel never sets or clears the lock byte
-			 * for PTHREAD_PRIO_INHERIT mutexes.
-			 * Set it here for debugging consistency.
-			 */
-			switch (error) {
-			case 0:
-			case EOWNERDEAD:
-				mp->mutex_lockw = LOCKSET;
-				break;
-			}
-		} else if (mtype & USYNC_PROCESS_ROBUST) {
-			/* go straight to the kernel */
-			if (try == MUTEX_TRY)
-				error = mutex_trylock_kernel(mp);
-			else	/* MUTEX_LOCK */
-				error = mutex_lock_kernel(mp, tsp, msp);
-		} else {	/* PTHREAD_PRIO_PROTECT */
-			/*
-			 * Try once at user level before going to the kernel.
-			 * If this is a process shared mutex then protect
-			 * against forkall() while setting mp->mutex_ownerpid.
-			 */
-			if (mtype & (USYNC_PROCESS | USYNC_PROCESS_ROBUST)) {
-				enter_critical(self);
-				if (set_lock_byte(&mp->mutex_lockw) == 0) {
-					mp->mutex_owner = (uintptr_t)self;
-					mp->mutex_ownerpid = udp->pid;
-					exit_critical(self);
-					DTRACE_PROBE3(plockstat,
-					    mutex__acquire, mp, 0, 0);
-				} else {
-					exit_critical(self);
-					error = EBUSY;
-				}
-			} else {
-				if (set_lock_byte(&mp->mutex_lockw) == 0) {
-					mp->mutex_owner = (uintptr_t)self;
-					DTRACE_PROBE3(plockstat,
-					    mutex__acquire, mp, 0, 0);
-				} else {
-					error = EBUSY;
-				}
-			}
-			if (error && try == MUTEX_LOCK)
-				error = mutex_lock_kernel(mp, tsp, msp);
+		if ((error = _ceil_mylist_add(mp)) != 0) {
+			DTRACE_PROBE2(plockstat, mutex__error, mp, error);
+			return (error);
 		}
+		if (myprio < ceil)
+			_ceil_prio_inherit(ceil);
+	}
 
-		if (error) {
-			if (mtype & PTHREAD_PRIO_INHERIT) {
-				switch (error) {
-				case EOWNERDEAD:
-				case ENOTRECOVERABLE:
-					if (mtype & PTHREAD_MUTEX_ROBUST_NP)
-						break;
-					if (error == EOWNERDEAD) {
-						/*
-						 * We own the mutex; unlock it.
-						 * It becomes ENOTRECOVERABLE.
-						 * All waiters are waked up.
-						 */
-						mp->mutex_owner = 0;
-						mp->mutex_ownerpid = 0;
-						DTRACE_PROBE2(plockstat,
-						    mutex__release, mp, 0);
-						mp->mutex_lockw = LOCKCLEAR;
-						(void) ___lwp_mutex_unlock(mp);
-					}
-					/* FALLTHROUGH */
-				case EDEADLK:
-					if (try == MUTEX_LOCK)
-						stall();
-					error = EBUSY;
-					break;
-				}
-			}
-			if ((mtype & PTHREAD_PRIO_PROTECT) &&
-			    error != EOWNERDEAD) {
-				(void) _ceil_mylist_del(mp);
-				if (myprio < ceil)
-					_ceil_prio_waive();
-			}
+	if ((mtype & (USYNC_PROCESS | LOCK_ROBUST))
+	    == (USYNC_PROCESS | LOCK_ROBUST))
+		register_lock(mp);
+
+	if (mtype & LOCK_PRIO_INHERIT) {
+		/* go straight to the kernel */
+		if (try == MUTEX_TRY)
+			error = mutex_trylock_kernel(mp);
+		else	/* MUTEX_LOCK */
+			error = mutex_lock_kernel(mp, tsp, msp);
+		/*
+		 * The kernel never sets or clears the lock byte
+		 * for LOCK_PRIO_INHERIT mutexes.
+		 * Set it here for consistency.
+		 */
+		switch (error) {
+		case 0:
+			mp->mutex_lockw = LOCKSET;
+			break;
+		case EOWNERDEAD:
+		case ELOCKUNMAPPED:
+			mp->mutex_lockw = LOCKSET;
+			/* FALLTHROUGH */
+		case ENOTRECOVERABLE:
+			ASSERT(mtype & LOCK_ROBUST);
+			break;
+		case EDEADLK:
+			if (try == MUTEX_LOCK)
+				stall();
+			error = EBUSY;
+			break;
 		}
 	} else if (mtype & USYNC_PROCESS) {
-		/*
-		 * This is a process shared mutex.  Protect against
-		 * forkall() while setting mp->mutex_ownerpid.
-		 */
-		enter_critical(self);
-		if (set_lock_byte(&mp->mutex_lockw) == 0) {
-			mp->mutex_owner = (uintptr_t)self;
-			mp->mutex_ownerpid = udp->pid;
-			exit_critical(self);
-			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
-		} else {
-			/* try a little harder */
-			exit_critical(self);
-			error = mutex_trylock_process(mp);
-		}
-		if (error && try == MUTEX_LOCK)
+		error = mutex_trylock_process(mp);
+		if (error == EBUSY && try == MUTEX_LOCK)
 			error = mutex_lock_kernel(mp, tsp, msp);
 	} else  {	/* USYNC_THREAD */
-		/* try once */
-		if (set_lock_byte(&mp->mutex_lockw) == 0) {
-			mp->mutex_owner = (uintptr_t)self;
-			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
-		} else {
-			/* try a little harder if we don't own the mutex */
-			error = EBUSY;
-			if (MUTEX_OWNER(mp) != self)
-				error = mutex_trylock_adaptive(mp);
-			if (error && try == MUTEX_LOCK)		/* go park */
-				error = mutex_lock_queue(self, msp, mp, tsp);
-		}
+		error = mutex_trylock_adaptive(mp);
+		if (error == EBUSY && try == MUTEX_LOCK)
+			error = mutex_lock_queue(self, msp, mp, tsp);
 	}
 
 	switch (error) {
+	case 0:
 	case EOWNERDEAD:
 	case ELOCKUNMAPPED:
-		mp->mutex_owner = (uintptr_t)self;
-		DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
-		/* FALLTHROUGH */
-	case 0:
+		if (mtype & LOCK_ROBUST)
+			remember_lock(mp);
 		if (msp)
 			record_begin_hold(msp);
 		break;
 	default:
+		if (mtype & LOCK_PRIO_PROTECT) {
+			(void) _ceil_mylist_del(mp);
+			if (myprio < ceil)
+				_ceil_prio_waive();
+		}
 		if (try == MUTEX_TRY) {
 			if (msp)
 				tdb_incr(msp->mutex_try_fail);
@@ -1619,6 +1833,7 @@ fast_process_lock(mutex_t *mp, timespec_t *tsp, int mtype, int try)
 	 * zero, one, or both of the flags LOCK_RECURSIVE and
 	 * LOCK_ERRORCHECK are set, and that no other flags are set.
 	 */
+	ASSERT((mtype & ~(USYNC_PROCESS|LOCK_RECURSIVE|LOCK_ERRORCHECK)) == 0);
 	enter_critical(self);
 	if (set_lock_byte(&mp->mutex_lockw) == 0) {
 		mp->mutex_owner = (uintptr_t)self;
@@ -1629,23 +1844,11 @@ fast_process_lock(mutex_t *mp, timespec_t *tsp, int mtype, int try)
 	}
 	exit_critical(self);
 
-	if ((mtype & ~USYNC_PROCESS) && shared_mutex_held(mp)) {
-		if (mtype & LOCK_RECURSIVE) {
-			if (mp->mutex_rcount == RECURSION_MAX)
-				return (EAGAIN);
-			mp->mutex_rcount++;
-			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 1, 0);
-			return (0);
-		}
-		if (try == MUTEX_LOCK) {
-			DTRACE_PROBE2(plockstat, mutex__error, mp, EDEADLK);
-			return (EDEADLK);
-		}
-		return (EBUSY);
-	}
+	if ((mtype & (LOCK_RECURSIVE|LOCK_ERRORCHECK)) && shared_mutex_held(mp))
+		return (mutex_recursion(mp, mtype, try));
 
-	/* try a little harder if we don't own the mutex */
-	if (!shared_mutex_held(mp) && mutex_trylock_process(mp) == 0)
+	/* try a little harder */
+	if (mutex_trylock_process(mp) == 0)
 		return (0);
 
 	if (try == MUTEX_LOCK)
@@ -1659,16 +1862,6 @@ fast_process_lock(mutex_t *mp, timespec_t *tsp, int mtype, int try)
 }
 
 static int
-slow_lock(ulwp_t *self, mutex_t *mp, timespec_t *tsp)
-{
-	int error = 0;
-
-	if (MUTEX_OWNER(mp) == self || mutex_trylock_adaptive(mp) != 0)
-		error = mutex_lock_queue(self, NULL, mp, tsp);
-	return (error);
-}
-
-int
 mutex_lock_impl(mutex_t *mp, timespec_t *tsp)
 {
 	ulwp_t *self = curthread;
@@ -1694,21 +1887,8 @@ mutex_lock_impl(mutex_t *mp, timespec_t *tsp)
 			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
 			return (0);
 		}
-		if (mtype && MUTEX_OWNER(mp) == self) {
-			/*
-			 * LOCK_RECURSIVE, LOCK_ERRORCHECK, or both.
-			 */
-			if (mtype & LOCK_RECURSIVE) {
-				if (mp->mutex_rcount == RECURSION_MAX)
-					return (EAGAIN);
-				mp->mutex_rcount++;
-				DTRACE_PROBE3(plockstat, mutex__acquire, mp,
-				    1, 0);
-				return (0);
-			}
-			DTRACE_PROBE2(plockstat, mutex__error, mp, EDEADLK);
-			return (EDEADLK);	/* LOCK_ERRORCHECK */
-		}
+		if (mtype && MUTEX_OWNER(mp) == self)
+			return (mutex_recursion(mp, mtype, MUTEX_LOCK));
 		/*
 		 * We have reached a deadlock, probably because the
 		 * process is executing non-async-signal-safe code in
@@ -1736,30 +1916,18 @@ mutex_lock_impl(mutex_t *mp, timespec_t *tsp)
 	if ((gflags = self->ul_schedctl_called) != NULL &&
 	    (gflags->uf_trs_ted |
 	    (mtype & ~(USYNC_PROCESS|LOCK_RECURSIVE|LOCK_ERRORCHECK))) == 0) {
-
 		if (mtype & USYNC_PROCESS)
 			return (fast_process_lock(mp, tsp, mtype, MUTEX_LOCK));
-
 		if (set_lock_byte(&mp->mutex_lockw) == 0) {
 			mp->mutex_owner = (uintptr_t)self;
 			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
 			return (0);
 		}
-
-		if (mtype && MUTEX_OWNER(mp) == self) {
-			if (mtype & LOCK_RECURSIVE) {
-				if (mp->mutex_rcount == RECURSION_MAX)
-					return (EAGAIN);
-				mp->mutex_rcount++;
-				DTRACE_PROBE3(plockstat, mutex__acquire, mp,
-				    1, 0);
-				return (0);
-			}
-			DTRACE_PROBE2(plockstat, mutex__error, mp, EDEADLK);
-			return (EDEADLK);	/* LOCK_ERRORCHECK */
-		}
-
-		return (slow_lock(self, mp, tsp));
+		if (mtype && MUTEX_OWNER(mp) == self)
+			return (mutex_recursion(mp, mtype, MUTEX_LOCK));
+		if (mutex_trylock_adaptive(mp) != 0)
+			return (mutex_lock_queue(self, NULL, mp, tsp));
+		return (0);
 	}
 
 	/* else do it the long way */
@@ -1808,22 +1976,6 @@ _pthread_mutex_reltimedlock_np(mutex_t *mp, const timespec_t *reltime)
 	return (error);
 }
 
-static int
-slow_trylock(mutex_t *mp, ulwp_t *self)
-{
-	if (MUTEX_OWNER(mp) == self ||
-	    mutex_trylock_adaptive(mp) != 0) {
-		uberdata_t *udp = self->ul_uberdata;
-
-		if (__td_event_report(self, TD_LOCK_TRY, udp)) {
-			self->ul_td_evbuf.eventnum = TD_LOCK_TRY;
-			tdb_event(TD_LOCK_TRY, udp);
-		}
-		return (EBUSY);
-	}
-	return (0);
-}
-
 #pragma weak _private_mutex_trylock = __mutex_trylock
 #pragma weak mutex_trylock = __mutex_trylock
 #pragma weak _mutex_trylock = __mutex_trylock
@@ -1856,17 +2008,8 @@ __mutex_trylock(mutex_t *mp)
 			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
 			return (0);
 		}
-		if (mtype && MUTEX_OWNER(mp) == self) {
-			if (mtype & LOCK_RECURSIVE) {
-				if (mp->mutex_rcount == RECURSION_MAX)
-					return (EAGAIN);
-				mp->mutex_rcount++;
-				DTRACE_PROBE3(plockstat, mutex__acquire, mp,
-				    1, 0);
-				return (0);
-			}
-			return (EDEADLK);	/* LOCK_ERRORCHECK */
-		}
+		if (mtype && MUTEX_OWNER(mp) == self)
+			return (mutex_recursion(mp, mtype, MUTEX_TRY));
 		return (EBUSY);
 	}
 
@@ -1878,29 +2021,23 @@ __mutex_trylock(mutex_t *mp)
 	if ((gflags = self->ul_schedctl_called) != NULL &&
 	    (gflags->uf_trs_ted |
 	    (mtype & ~(USYNC_PROCESS|LOCK_RECURSIVE|LOCK_ERRORCHECK))) == 0) {
-
 		if (mtype & USYNC_PROCESS)
 			return (fast_process_lock(mp, NULL, mtype, MUTEX_TRY));
-
 		if (set_lock_byte(&mp->mutex_lockw) == 0) {
 			mp->mutex_owner = (uintptr_t)self;
 			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
 			return (0);
 		}
-
-		if (mtype && MUTEX_OWNER(mp) == self) {
-			if (mtype & LOCK_RECURSIVE) {
-				if (mp->mutex_rcount == RECURSION_MAX)
-					return (EAGAIN);
-				mp->mutex_rcount++;
-				DTRACE_PROBE3(plockstat, mutex__acquire, mp,
-				    1, 0);
-				return (0);
+		if (mtype && MUTEX_OWNER(mp) == self)
+			return (mutex_recursion(mp, mtype, MUTEX_TRY));
+		if (mutex_trylock_adaptive(mp) != 0) {
+			if (__td_event_report(self, TD_LOCK_TRY, udp)) {
+				self->ul_td_evbuf.eventnum = TD_LOCK_TRY;
+				tdb_event(TD_LOCK_TRY, udp);
 			}
-			return (EBUSY);		/* LOCK_ERRORCHECK */
+			return (EBUSY);
 		}
-
-		return (slow_trylock(mp, self));
+		return (0);
 	}
 
 	/* else do it the long way */
@@ -1908,13 +2045,14 @@ __mutex_trylock(mutex_t *mp)
 }
 
 int
-mutex_unlock_internal(mutex_t *mp)
+mutex_unlock_internal(mutex_t *mp, int retain_robust_flags)
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
 	int mtype = mp->mutex_type;
 	tdb_mutex_stats_t *msp;
-	int error;
+	int error = 0;
+	int release_all;
 	lwpid_t lwpid;
 
 	if ((mtype & LOCK_ERRORCHECK) && !mutex_is_held(mp))
@@ -1932,49 +2070,48 @@ mutex_unlock_internal(mutex_t *mp)
 	if ((msp = MUTEX_STATS(mp, udp)) != NULL)
 		(void) record_hold_time(msp);
 
-	if (mtype &
-	    (USYNC_PROCESS_ROBUST|PTHREAD_PRIO_INHERIT|PTHREAD_PRIO_PROTECT)) {
+	if (!retain_robust_flags && !(mtype & LOCK_PRIO_INHERIT) &&
+	    (mp->mutex_flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED))) {
+		ASSERT(mp->mutex_type & LOCK_ROBUST);
+		mp->mutex_flag &= ~(LOCK_OWNERDEAD | LOCK_UNMAPPED);
+		mp->mutex_flag |= LOCK_NOTRECOVERABLE;
+	}
+	release_all = ((mp->mutex_flag & LOCK_NOTRECOVERABLE) != 0);
+
+	if (mtype & LOCK_PRIO_INHERIT) {
 		no_preempt(self);
 		mp->mutex_owner = 0;
 		mp->mutex_ownerpid = 0;
 		DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
-		if (mtype & PTHREAD_PRIO_INHERIT) {
-			mp->mutex_lockw = LOCKCLEAR;
-			error = ___lwp_mutex_unlock(mp);
-		} else if (mtype & USYNC_PROCESS_ROBUST) {
-			error = ___lwp_mutex_unlock(mp);
-		} else {
-			if (atomic_swap_32(&mp->mutex_lockword, 0) & WAITERMASK)
-				(void) ___lwp_mutex_wakeup(mp);
-			error = 0;
-		}
-		if (mtype & PTHREAD_PRIO_PROTECT) {
-			if (_ceil_mylist_del(mp))
-				_ceil_prio_waive();
-		}
+		mp->mutex_lockw = LOCKCLEAR;
+		error = ___lwp_mutex_unlock(mp);
 		preempt(self);
 	} else if (mtype & USYNC_PROCESS) {
-		if (mp->mutex_lockword & WAITERMASK)
-			mutex_unlock_process(mp);
-		else {
+		if (mp->mutex_lockword & WAITERMASK) {
+			mutex_unlock_process(mp, release_all);
+		} else {
 			mp->mutex_owner = 0;
 			mp->mutex_ownerpid = 0;
 			DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
 			if (atomic_swap_32(&mp->mutex_lockword, 0) &
-			    WAITERMASK) {
+			    WAITERMASK) {  /* a waiter suddenly appeared */
 				no_preempt(self);
-				(void) ___lwp_mutex_wakeup(mp);
+				(void) ___lwp_mutex_wakeup(mp, release_all);
 				preempt(self);
 			}
 		}
-		error = 0;
 	} else {	/* USYNC_THREAD */
-		if ((lwpid = mutex_unlock_queue(mp)) != 0) {
+		if ((lwpid = mutex_unlock_queue(mp, release_all)) != 0) {
 			(void) __lwp_unpark(lwpid);
 			preempt(self);
 		}
-		error = 0;
 	}
+
+	if (mtype & LOCK_ROBUST)
+		forget_lock(mp);
+
+	if ((mtype & LOCK_PRIO_PROTECT) && _ceil_mylist_del(mp))
+		_ceil_prio_waive();
 
 	return (error);
 }
@@ -2046,7 +2183,7 @@ fast_unlock:
 						(void) __lwp_unpark(lwpid);
 					preempt(self);
 				}
-			} else if ((lwpid = mutex_unlock_queue(mp)) != 0) {
+			} else if ((lwpid = mutex_unlock_queue(mp, 0)) != 0) {
 				(void) __lwp_unpark(lwpid);
 				preempt(self);
 			}
@@ -2082,16 +2219,16 @@ fast_unlock:
 				DTRACE_PROBE2(plockstat, mutex__release, mp, 1);
 				return (0);
 			}
-			if (mp->mutex_lockword & WAITERMASK)
-				mutex_unlock_process(mp);
-			else {
+			if (mp->mutex_lockword & WAITERMASK) {
+				mutex_unlock_process(mp, 0);
+			} else {
 				mp->mutex_owner = 0;
 				mp->mutex_ownerpid = 0;
 				DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
 				if (atomic_swap_32(&mp->mutex_lockword, 0) &
 				    WAITERMASK) {
 					no_preempt(self);
-					(void) ___lwp_mutex_wakeup(mp);
+					(void) ___lwp_mutex_wakeup(mp, 0);
 					preempt(self);
 				}
 			}
@@ -2101,7 +2238,7 @@ fast_unlock:
 
 	/* else do it the long way */
 slow_unlock:
-	return (mutex_unlock_internal(mp));
+	return (mutex_unlock_internal(mp, 0));
 }
 
 /*
@@ -2176,7 +2313,7 @@ lmutex_unlock(mutex_t *mp)
 
 		if (msp)
 			(void) record_hold_time(msp);
-		if ((lwpid = mutex_unlock_queue(mp)) != 0) {
+		if ((lwpid = mutex_unlock_queue(mp, 0)) != 0) {
 			(void) __lwp_unpark(lwpid);
 			preempt(self);
 		}
@@ -2259,39 +2396,23 @@ static int
 shared_mutex_held(mutex_t *mparg)
 {
 	/*
-	 * There is an inherent data race in the current ownership design.
-	 * The mutex_owner and mutex_ownerpid fields cannot be set or tested
-	 * atomically as a pair. The original implementation tested each
-	 * field just once. This was exposed to trivial false positives in
-	 * the case of multiple multithreaded processes with thread addresses
-	 * in common. To close the window to an acceptable level we now use a
-	 * sequence of five tests: pid-thr-pid-thr-pid. This ensures that any
-	 * single interruption will still leave one uninterrupted sequence of
-	 * pid-thr-pid tests intact.
-	 *
-	 * It is assumed that all updates are always ordered thr-pid and that
-	 * we have TSO hardware.
+	 * The 'volatile' is necessary to make sure the compiler doesn't
+	 * reorder the tests of the various components of the mutex.
+	 * They must be tested in this order:
+	 *	mutex_lockw
+	 *	mutex_owner
+	 *	mutex_ownerpid
+	 * This relies on the fact that everywhere mutex_lockw is cleared,
+	 * mutex_owner and mutex_ownerpid are cleared before mutex_lockw
+	 * is cleared, and that everywhere mutex_lockw is set, mutex_owner
+	 * and mutex_ownerpid are set after mutex_lockw is set, and that
+	 * mutex_lockw is set or cleared with a memory barrier.
 	 */
 	volatile mutex_t *mp = (volatile mutex_t *)mparg;
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
 
-	if (mp->mutex_ownerpid != udp->pid)
-		return (0);
-
-	if (!MUTEX_OWNED(mp, self))
-		return (0);
-
-	if (mp->mutex_ownerpid != udp->pid)
-		return (0);
-
-	if (!MUTEX_OWNED(mp, self))
-		return (0);
-
-	if (mp->mutex_ownerpid != udp->pid)
-		return (0);
-
-	return (1);
+	return (MUTEX_OWNED(mp, self) && mp->mutex_ownerpid == udp->pid);
 }
 
 /*
@@ -2305,10 +2426,12 @@ shared_mutex_held(mutex_t *mparg)
 #pragma weak _mutex_held = mutex_is_held
 #pragma weak __mutex_held = mutex_is_held
 int
-mutex_is_held(mutex_t *mp)
+mutex_is_held(mutex_t *mparg)
 {
-	if (mp->mutex_type & (USYNC_PROCESS | USYNC_PROCESS_ROBUST))
-		return (shared_mutex_held(mp));
+	volatile mutex_t *mp = (volatile mutex_t *)mparg;
+
+	if (mparg->mutex_type & USYNC_PROCESS)
+		return (shared_mutex_held(mparg));
 	return (MUTEX_OWNED(mp, curthread));
 }
 
@@ -2320,10 +2443,33 @@ mutex_is_held(mutex_t *mp)
 int
 __mutex_destroy(mutex_t *mp)
 {
-	mp->mutex_magic = 0;
-	mp->mutex_flag &= ~LOCK_INITED;
+	if (mp->mutex_type & USYNC_PROCESS)
+		forget_lock(mp);
+	(void) _memset(mp, 0, sizeof (*mp));
 	tdb_sync_obj_deregister(mp);
 	return (0);
+}
+
+#pragma weak mutex_consistent = __mutex_consistent
+#pragma weak _mutex_consistent = __mutex_consistent
+#pragma weak pthread_mutex_consistent_np = __mutex_consistent
+#pragma weak _pthread_mutex_consistent_np = __mutex_consistent
+int
+__mutex_consistent(mutex_t *mp)
+{
+	/*
+	 * Do this only for an inconsistent, initialized robust lock
+	 * that we hold.  For all other cases, return EINVAL.
+	 */
+	if (mutex_is_held(mp) &&
+	    (mp->mutex_type & LOCK_ROBUST) &&
+	    (mp->mutex_flag & LOCK_INITED) &&
+	    (mp->mutex_flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED))) {
+		mp->mutex_flag &= ~(LOCK_OWNERDEAD | LOCK_UNMAPPED);
+		mp->mutex_rcount = 0;
+		return (0);
+	}
+	return (EINVAL);
 }
 
 /*
@@ -2380,21 +2526,37 @@ _pthread_spin_trylock(pthread_spinlock_t *lock)
 int
 _pthread_spin_lock(pthread_spinlock_t *lock)
 {
-	volatile uint8_t *lockp =
-		(volatile uint8_t *)&((mutex_t *)lock)->mutex_lockw;
+	mutex_t *mp = (mutex_t *)lock;
+	ulwp_t *self = curthread;
+	volatile uint8_t *lockp = (volatile uint8_t *)&mp->mutex_lockw;
+	int count = 0;
 
-	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
+	ASSERT(!self->ul_critical || self->ul_bindflags);
+
+	DTRACE_PROBE1(plockstat, mutex__spin, mp);
+
 	/*
 	 * We don't care whether the owner is running on a processor.
 	 * We just spin because that's what this interface requires.
 	 */
 	for (;;) {
+		if (count < INT_MAX)
+			count++;
 		if (*lockp == 0) {	/* lock byte appears to be clear */
-			if (_pthread_spin_trylock(lock) == 0)
-				return (0);
+			no_preempt(self);
+			if (set_lock_byte(lockp) == 0)
+				break;
+			preempt(self);
 		}
 		SMT_PAUSE();
 	}
+	mp->mutex_owner = (uintptr_t)self;
+	if (mp->mutex_type == USYNC_PROCESS)
+		mp->mutex_ownerpid = self->ul_uberdata->pid;
+	preempt(self);
+	DTRACE_PROBE2(plockstat, mutex__spun, 1, count);
+	DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, count);
+	return (0);
 }
 
 #pragma weak pthread_spin_unlock = _pthread_spin_unlock
@@ -2411,6 +2573,148 @@ _pthread_spin_unlock(pthread_spinlock_t *lock)
 	(void) atomic_swap_32(&mp->mutex_lockword, 0);
 	preempt(self);
 	return (0);
+}
+
+#define	INITIAL_LOCKS	8	/* initialial size of ul_heldlocks.array */
+
+/*
+ * Find/allocate an entry for 'lock' in our array of held locks.
+ */
+static mutex_t **
+find_lock_entry(mutex_t *lock)
+{
+	ulwp_t *self = curthread;
+	mutex_t **remembered = NULL;
+	mutex_t **lockptr;
+	uint_t nlocks;
+
+	if ((nlocks = self->ul_heldlockcnt) != 0)
+		lockptr = self->ul_heldlocks.array;
+	else {
+		nlocks = 1;
+		lockptr = &self->ul_heldlocks.single;
+	}
+
+	for (; nlocks; nlocks--, lockptr++) {
+		if (*lockptr == lock)
+			return (lockptr);
+		if (*lockptr == NULL && remembered == NULL)
+			remembered = lockptr;
+	}
+	if (remembered != NULL) {
+		*remembered = lock;
+		return (remembered);
+	}
+
+	/*
+	 * No entry available.  Allocate more space, converting
+	 * the single entry into an array of entries if necessary.
+	 */
+	if ((nlocks = self->ul_heldlockcnt) == 0) {
+		/*
+		 * Initial allocation of the array.
+		 * Convert the single entry into an array.
+		 */
+		self->ul_heldlockcnt = nlocks = INITIAL_LOCKS;
+		lockptr = lmalloc(nlocks * sizeof (mutex_t *));
+		/*
+		 * The single entry becomes the first entry in the array.
+		 */
+		*lockptr = self->ul_heldlocks.single;
+		self->ul_heldlocks.array = lockptr;
+		/*
+		 * Return the next available entry in the array.
+		 */
+		*++lockptr = lock;
+		return (lockptr);
+	}
+	/*
+	 * Reallocate the array, double the size each time.
+	 */
+	lockptr = lmalloc(nlocks * 2 * sizeof (mutex_t *));
+	(void) _memcpy(lockptr, self->ul_heldlocks.array,
+	    nlocks * sizeof (mutex_t *));
+	lfree(self->ul_heldlocks.array, nlocks * sizeof (mutex_t *));
+	self->ul_heldlocks.array = lockptr;
+	self->ul_heldlockcnt *= 2;
+	/*
+	 * Return the next available entry in the newly allocated array.
+	 */
+	*(lockptr += nlocks) = lock;
+	return (lockptr);
+}
+
+/*
+ * Insert 'lock' into our list of held locks.
+ * Currently only used for LOCK_ROBUST mutexes.
+ */
+void
+remember_lock(mutex_t *lock)
+{
+	(void) find_lock_entry(lock);
+}
+
+/*
+ * Remove 'lock' from our list of held locks.
+ * Currently only used for LOCK_ROBUST mutexes.
+ */
+void
+forget_lock(mutex_t *lock)
+{
+	*find_lock_entry(lock) = NULL;
+}
+
+/*
+ * Free the array of held locks.
+ */
+void
+heldlock_free(ulwp_t *ulwp)
+{
+	uint_t nlocks;
+
+	if ((nlocks = ulwp->ul_heldlockcnt) != 0)
+		lfree(ulwp->ul_heldlocks.array, nlocks * sizeof (mutex_t *));
+	ulwp->ul_heldlockcnt = 0;
+	ulwp->ul_heldlocks.array = NULL;
+}
+
+/*
+ * Mark all held LOCK_ROBUST mutexes LOCK_OWNERDEAD.
+ * Called from _thrp_exit() to deal with abandoned locks.
+ */
+void
+heldlock_exit(void)
+{
+	ulwp_t *self = curthread;
+	mutex_t **lockptr;
+	uint_t nlocks;
+	mutex_t *mp;
+
+	if ((nlocks = self->ul_heldlockcnt) != 0)
+		lockptr = self->ul_heldlocks.array;
+	else {
+		nlocks = 1;
+		lockptr = &self->ul_heldlocks.single;
+	}
+
+	for (; nlocks; nlocks--, lockptr++) {
+		/*
+		 * The kernel takes care of transitioning held
+		 * LOCK_PRIO_INHERIT mutexes to LOCK_OWNERDEAD.
+		 * We avoid that case here.
+		 */
+		if ((mp = *lockptr) != NULL &&
+		    mutex_is_held(mp) &&
+		    (mp->mutex_type & (LOCK_ROBUST | LOCK_PRIO_INHERIT)) ==
+		    LOCK_ROBUST) {
+			mp->mutex_rcount = 0;
+			if (!(mp->mutex_flag & LOCK_UNMAPPED))
+				mp->mutex_flag |= LOCK_OWNERDEAD;
+			(void) mutex_unlock_internal(mp, 1);
+		}
+	}
+
+	heldlock_free(self);
 }
 
 #pragma weak cond_init = _cond_init
@@ -2437,7 +2741,7 @@ _cond_init(cond_t *cvp, int type, void *arg)
  * The associated mutex is *not* reacquired before returning.
  * That must be done by the caller of cond_sleep_queue().
  */
-int
+static int
 cond_sleep_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 {
 	ulwp_t *self = curthread;
@@ -2446,6 +2750,7 @@ cond_sleep_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 	lwpid_t lwpid;
 	int signalled;
 	int error;
+	int release_all;
 
 	/*
 	 * Put ourself on the CV sleep queue, unlock the mutex, then
@@ -2460,7 +2765,12 @@ cond_sleep_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 	self->ul_cvmutex = mp;
 	self->ul_cv_wake = (tsp != NULL);
 	self->ul_signalled = 0;
-	lwpid = mutex_unlock_queue(mp);
+	if (mp->mutex_flag & LOCK_OWNERDEAD) {
+		mp->mutex_flag &= ~LOCK_OWNERDEAD;
+		mp->mutex_flag |= LOCK_NOTRECOVERABLE;
+	}
+	release_all = ((mp->mutex_flag & LOCK_NOTRECOVERABLE) != 0);
+	lwpid = mutex_unlock_queue(mp, release_all);
 	for (;;) {
 		set_parking_flag(self, 1);
 		queue_unlock(qp);
@@ -2549,6 +2859,7 @@ cond_wait_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp,
 {
 	ulwp_t *self = curthread;
 	int error;
+	int merror;
 
 	/*
 	 * The old thread library was programmed to defer signals
@@ -2572,14 +2883,11 @@ cond_wait_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp,
 	/*
 	 * Reacquire the mutex.
 	 */
-	if (set_lock_byte(&mp->mutex_lockw) == 0) {
-		mp->mutex_owner = (uintptr_t)self;
-		DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
-	} else if (mutex_trylock_adaptive(mp) != 0) {
-		(void) mutex_lock_queue(self, msp, mp, NULL);
-	}
-
-	if (msp)
+	if ((merror = mutex_trylock_adaptive(mp)) == EBUSY)
+		merror = mutex_lock_queue(self, msp, mp, NULL);
+	if (merror)
+		error = merror;
+	if (msp && (merror == 0 || merror == EOWNERDEAD))
 		record_begin_hold(msp);
 
 	/*
@@ -2595,23 +2903,21 @@ cond_wait_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp,
  * cond_sleep_kernel(): utility function for cond_wait_kernel().
  * See the comment ahead of cond_sleep_queue(), above.
  */
-int
+static int
 cond_sleep_kernel(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 {
 	int mtype = mp->mutex_type;
 	ulwp_t *self = curthread;
 	int error;
 
-	if (mtype & PTHREAD_PRIO_PROTECT) {
-		if (_ceil_mylist_del(mp))
-			_ceil_prio_waive();
-	}
+	if ((mtype & LOCK_PRIO_PROTECT) && _ceil_mylist_del(mp))
+		_ceil_prio_waive();
 
 	self->ul_sp = stkptr();
 	self->ul_wchan = cvp;
 	mp->mutex_owner = 0;
 	mp->mutex_ownerpid = 0;
-	if (mtype & PTHREAD_PRIO_INHERIT)
+	if (mtype & LOCK_PRIO_INHERIT)
 		mp->mutex_lockw = LOCKCLEAR;
 	/*
 	 * ___lwp_cond_wait() returns immediately with EINTR if
@@ -2721,12 +3027,12 @@ cond_wait_common(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 			lock_error(mp, "recursive mutex in cond_wait",
 				cvp, NULL);
 		if (cvp->cond_type & USYNC_PROCESS) {
-			if (!(mtype & (USYNC_PROCESS | USYNC_PROCESS_ROBUST)))
+			if (!(mtype & USYNC_PROCESS))
 				lock_error(mp, "cond_wait", cvp,
 					"condvar process-shared, "
 					"mutex process-private");
 		} else {
-			if (mtype & (USYNC_PROCESS | USYNC_PROCESS_ROBUST))
+			if (mtype & USYNC_PROCESS)
 				lock_error(mp, "cond_wait", cvp,
 					"condvar process-private, "
 					"mutex process-shared");
@@ -2741,8 +3047,8 @@ cond_wait_common(cond_t *cvp, mutex_t *mp, timespec_t *tsp)
 	 */
 	rcount = mp->mutex_rcount;
 	mp->mutex_rcount = 0;
-	if ((mtype & (USYNC_PROCESS | USYNC_PROCESS_ROBUST |
-	    PTHREAD_PRIO_INHERIT | PTHREAD_PRIO_PROTECT)) |
+	if ((mtype &
+	    (USYNC_PROCESS | LOCK_PRIO_INHERIT | LOCK_PRIO_PROTECT)) |
 	    (cvp->cond_type & USYNC_PROCESS))
 		error = cond_wait_kernel(cvp, mp, tsp);
 	else
@@ -3005,10 +3311,10 @@ cond_signal_internal(cond_t *cvp)
 	 * deal properly with spurious wakeups.
 	 */
 	*ulwpp = ulwp->ul_link;
+	ulwp->ul_link = NULL;
 	if (qp->qh_tail == ulwp)
 		qp->qh_tail = prev;
 	qp->qh_qlen--;
-	ulwp->ul_link = NULL;
 
 	mp = ulwp->ul_cvmutex;		/* the mutex he will acquire */
 	ulwp->ul_cvmutex = NULL;
@@ -3036,12 +3342,12 @@ cond_signal_internal(cond_t *cvp)
 }
 
 /*
- * Utility function called from cond_broadcast() and rw_queue_release()
- * to (re)allocate a big buffer to hold the lwpids of all the threads
- * to be set running after they are removed from their sleep queues.
- * Since we are holding a queue lock, we cannot call any function
- * that might acquire a lock.  mmap(), munmap() and lwp_unpark_all()
- * are simple system calls and are safe in this regard.
+ * Utility function called by mutex_wakeup_all(), cond_broadcast(),
+ * and rw_queue_release() to (re)allocate a big buffer to hold the
+ * lwpids of all the threads to be set running after they are removed
+ * from their sleep queues.  Since we are holding a queue lock, we
+ * cannot call any function that might acquire a lock.  mmap(), munmap(),
+ * lwp_unpark_all() are simple system calls and are safe in this regard.
  */
 lwpid_t *
 alloc_lwpids(lwpid_t *lwpid, int *nlwpid_ptr, int *maxlwps_ptr)
@@ -3144,10 +3450,10 @@ cond_broadcast_internal(cond_t *cvp)
 			continue;
 		}
 		*ulwpp = ulwp->ul_link;
+		ulwp->ul_link = NULL;
 		if (qp->qh_tail == ulwp)
 			qp->qh_tail = prev;
 		qp->qh_qlen--;
-		ulwp->ul_link = NULL;
 		mp = ulwp->ul_cvmutex;		/* his mutex */
 		ulwp->ul_cvmutex = NULL;
 		ASSERT(mp != NULL);

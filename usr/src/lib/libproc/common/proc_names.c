@@ -286,7 +286,7 @@ static const char *const systable[] = {
 	"lwp_sigmask",		/* 165 */
 	"lwp_private",		/* 166 */
 	"lwp_wait",		/* 167 */
-	"lwp_mutex_unlock",	/* 168 */
+	"lwp_mutex_wakeup",	/* 168 */
 	"lwp_mutex_lock",	/* 169 */
 	"lwp_cond_wait",	/* 170 */
 	"lwp_cond_signal",	/* 171 */
@@ -370,7 +370,7 @@ static const char *const systable[] = {
 	"ntp_adjtime",		/* 249 */
 	"lwp_mutex_unlock",	/* 250 */
 	"lwp_mutex_trylock",	/* 251 */
-	"lwp_mutex_init",	/* 252 */
+	"lwp_mutex_register",	/* 252 */
 	"cladm",		/* 253 */
 	"uucopy",		/* 254 */
 	"umount2"		/* 255 */

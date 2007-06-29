@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -131,7 +132,7 @@ init_locks_mem()
 	 */
 	for (iiter = 0; iiter < MAXHASH; iiter++) {
 		if (rc = mutex_init(&(shmlockarray->locknode[iiter]),
-		    USYNC_PROCESS_ROBUST, 0)) {
+		    USYNC_PROCESS | LOCK_ROBUST, 0)) {
 			if (rc == EBUSY) {
 				ebusy_cnt++;
 			} else {
@@ -314,14 +315,14 @@ lock_core(int hashval)
 		switch (rc) {
 		case EOWNERDEAD:
 			/*
-			 * Previows lock owner died, resetting lock
+			 * Previous lock owner died, resetting lock
 			 * to recover from error.
 			 */
-			rc = mutex_init(&(shmlockarray->locknode[hashval]),
-			    USYNC_PROCESS_ROBUST, 0);
+			rc = mutex_consistent(
+			    &(shmlockarray->locknode[hashval]));
 			if (rc != 0) {
 				syslog(LOG_ERR,
-				    "mutex_init(): error=%d", rc);
+				    "mutex_consistent(): error=%d", rc);
 				return (0);
 			}
 			rc = mutex_unlock(&(shmlockarray->locknode[hashval]));

@@ -195,6 +195,7 @@ _private_forkx(int flags)
 		self->ul_siginfo.si_signo = 0;
 		udp->pid = _private_getpid();
 		/* reset the library's data structures to reflect one thread */
+		unregister_locks();
 		postfork1_child();
 		restore_signals(self);
 		_postfork_child_handler();
@@ -269,6 +270,7 @@ _private_forkallx(int flags)
 		self->ul_cursig = 0;
 		self->ul_siginfo.si_signo = 0;
 		udp->pid = _private_getpid();
+		unregister_locks();
 		continue_fork(1);
 	} else {
 		continue_fork(0);

@@ -179,7 +179,7 @@ lwpchan_delete_mapping(proc_t *p, caddr_t start, caddr_t end)
 			if (start <= addr && addr < end) {
 				*prev = ent->lwpchan_next;
 				if (ent->lwpchan_pool == LWPCHAN_MPPOOL &&
-				    (ent->lwpchan_type & USYNC_PROCESS_ROBUST))
+				    (ent->lwpchan_type & LOCK_ROBUST))
 					lwp_mutex_cleanup(ent, LOCK_UNMAPPED);
 				kmem_free(ent, sizeof (*ent));
 				atomic_add_32(&lcp->lwpchan_entries, -1);
@@ -335,7 +335,7 @@ lwpchan_destroy_cache(int exec)
 		while (ent != NULL) {
 			next = ent->lwpchan_next;
 			if (ent->lwpchan_pool == LWPCHAN_MPPOOL &&
-			    (ent->lwpchan_type & USYNC_PROCESS_ROBUST))
+			    (ent->lwpchan_type & LOCK_ROBUST))
 				lwp_mutex_cleanup(ent, lockflg);
 			kmem_free(ent, sizeof (*ent));
 			ent = next;
@@ -473,12 +473,12 @@ get_lwpchan(struct as *as, caddr_t addr, int type, lwpchan_t *lwpchan, int pool)
 	 * (segvn_getmemid() does the same for MAP_PRIVATE mappings.)
 	 * The lwpchan cache is used only for process-shared objects.
 	 */
-	if ((type & (USYNC_PROCESS | USYNC_PROCESS_ROBUST)) == 0) {
+	if (!(type & USYNC_PROCESS)) {
 		lwpchan->lc_wchan0 = (caddr_t)as;
 		lwpchan->lc_wchan = addr;
 		return (1);
 	}
-	/* check the lwpchan cache for mapping */
+
 	return (lwpchan_get_mapping(as, addr, type, lwpchan, pool));
 }
 
@@ -744,24 +744,25 @@ retry:
 			error = ENOMEM;
 			goto out;
 		}
-		if (flag & LOCK_OWNERDEAD) {
-			/*
-			 * Return with upimutex held.
-			 */
-			error = EOWNERDEAD;
-		} else if (flag & LOCK_NOTRECOVERABLE) {
+		if (flag & LOCK_NOTRECOVERABLE) {
 			/*
 			 * Since the setting of LOCK_NOTRECOVERABLE
 			 * was done under the high-level upi mutex,
 			 * in lwp_upimutex_unlock(), this flag needs to
 			 * be checked while holding the upi mutex.
-			 * If set, this thread should  return without
-			 * the lock held, and with the right error
-			 * code.
+			 * If set, this thread should return without
+			 * the lock held, and with the right error code.
 			 */
 			upimutex_unlock((upimutex_t *)upimutex, flag);
 			upilocked = 0;
 			error = ENOTRECOVERABLE;
+		} else if (flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED)) {
+			if (flag & LOCK_OWNERDEAD)
+				error = EOWNERDEAD;
+			else if (type & USYNC_PROCESS_ROBUST)
+				error = ELOCKUNMAPPED;
+			else
+				error = EOWNERDEAD;
 		}
 		goto out;
 	}
@@ -884,18 +885,21 @@ retry:
 	/*
 	 * Now, need to read the user-level lp->mutex_flag to do the following:
 	 *
-	 * - if lock is held, check if EOWNERDEAD should be returned
-	 * - if lock isn't held, check if ENOTRECOVERABLE should be returned
+	 * - if lock is held, check if EOWNERDEAD or ELOCKUNMAPPED
+	 *   should be returned.
+	 * - if lock isn't held, check if ENOTRECOVERABLE should
+	 *   be returned.
 	 *
 	 * Now, either lp->mutex_flag is readable or it's not. If not
-	 * readable, the on_fault path will cause a return with EFAULT as
-	 * it should. If it is readable, the state of the flag encodes the
-	 * robustness state of the lock:
+	 * readable, the on_fault path will cause a return with EFAULT
+	 * as it should.  If it is readable, the state of the flag
+	 * encodes the robustness state of the lock:
 	 *
-	 * If the upimutex is locked here, the flag's LOCK_OWNERDEAD setting
-	 * will influence the return code appropriately. If the upimutex is
-	 * not locked here, this could be due to a spurious wake-up or a
-	 * NOTRECOVERABLE event. The flag's setting can be used to distinguish
+	 * If the upimutex is locked here, the flag's LOCK_OWNERDEAD
+	 * or LOCK_UNMAPPED setting will influence the return code
+	 * appropriately.  If the upimutex is not locked here, this
+	 * could be due to a spurious wake-up or a NOTRECOVERABLE
+	 * event.  The flag's setting can be used to distinguish
 	 * between these two events.
 	 */
 	fuword16_noerr(&lp->mutex_flag, &flag);
@@ -911,8 +915,13 @@ retry:
 			upimutex_unlock((upimutex_t *)upimutex, flag);
 			upilocked = 0;
 			error = ENOMEM;
-		} else if (flag & LOCK_OWNERDEAD) {
-			error = EOWNERDEAD;
+		} else if (flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED)) {
+			if (flag & LOCK_OWNERDEAD)
+				error = EOWNERDEAD;
+			else if (type & USYNC_PROCESS_ROBUST)
+				error = ELOCKUNMAPPED;
+			else
+				error = EOWNERDEAD;
 		}
 	} else {
 		/*
@@ -1001,14 +1010,16 @@ lwp_upimutex_unlock(lwp_mutex_t *lp, uint8_t type)
 	mutex_exit(&upibp->upib_lock); /* release for user memory access */
 	upilocked = 1;
 	fuword16_noerr(&lp->mutex_flag, &flag);
-	if (flag & LOCK_OWNERDEAD) {
+	if (flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED)) {
 		/*
 		 * transition mutex to the LOCK_NOTRECOVERABLE state.
 		 */
-		flag &= ~LOCK_OWNERDEAD;
+		flag &= ~(LOCK_OWNERDEAD | LOCK_UNMAPPED);
 		flag |= LOCK_NOTRECOVERABLE;
 		suword16_noerr(&lp->mutex_flag, flag);
 	}
+	if (type & USYNC_PROCESS)
+		suword32_noerr(&lp->mutex_ownerpid, 0);
 	upimutex_unlock((upimutex_t *)upimutex, flag);
 	upilocked = 0;
 out:
@@ -1017,15 +1028,37 @@ out:
 }
 
 /*
- * Mark user mutex state, corresponding to kernel upimutex, as LOCK_OWNERDEAD.
+ * Clear the contents of a user-level mutex; return the flags.
+ * Used only by upi_dead() and lwp_mutex_cleanup(), below.
+ */
+static uint16_t
+lwp_clear_mutex(lwp_mutex_t *lp, uint16_t lockflg)
+{
+	uint16_t flag;
+
+	fuword16_noerr(&lp->mutex_flag, &flag);
+	if ((flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED)) == 0) {
+		flag |= lockflg;
+		suword16_noerr(&lp->mutex_flag, flag);
+	}
+	suword32_noerr((uint32_t *)&lp->mutex_owner, 0);
+	suword32_noerr((uint32_t *)&lp->mutex_owner + 1, 0);
+	suword32_noerr(&lp->mutex_ownerpid, 0);
+	suword8_noerr(&lp->mutex_rcount, 0);
+
+	return (flag);
+}
+
+/*
+ * Mark user mutex state, corresponding to kernel upimutex,
+ * as LOCK_UNMAPPED or LOCK_OWNERDEAD, as appropriate
  */
 static int
-upi_dead(upimutex_t *upip)
+upi_dead(upimutex_t *upip, uint16_t lockflg)
 {
 	label_t ljb;
 	int error = 0;
 	lwp_mutex_t *lp;
-	uint16_t flag;
 
 	if (on_fault(&ljb)) {
 		error = EFAULT;
@@ -1033,9 +1066,8 @@ upi_dead(upimutex_t *upip)
 	}
 
 	lp = upip->upi_vaddr;
-	fuword16_noerr(&lp->mutex_flag, &flag);
-	flag |= LOCK_OWNERDEAD;
-	suword16_noerr(&lp->mutex_flag, flag);
+	(void) lwp_clear_mutex(lp, lockflg);
+	suword8_noerr(&lp->mutex_lockw, 0);
 out:
 	no_fault();
 	return (error);
@@ -1050,10 +1082,12 @@ void
 upimutex_cleanup()
 {
 	kthread_t *t = curthread;
+	uint16_t lockflg = (ttoproc(t)->p_proc_flag & P_PR_EXEC)?
+	    LOCK_UNMAPPED : LOCK_OWNERDEAD;
 	struct upimutex *upip;
 
 	while ((upip = t->t_upimutex) != NULL) {
-		if (upi_dead(upip) != 0) {
+		if (upi_dead(upip, lockflg) != 0) {
 			/*
 			 * If the user object associated with this upimutex is
 			 * unmapped, unlock upimutex with the
@@ -1138,8 +1172,9 @@ lwp_mutex_timedlock(lwp_mutex_t *lp, timespec_t *tsp)
 	if (UPIMUTEX(type)) {
 		no_fault();
 		error = lwp_upimutex_lock(lp, type, UPIMUTEX_BLOCK, &lwpt);
-		if ((error == 0 || error == EOWNERDEAD) &&
-		    (type & USYNC_PROCESS))
+		if ((type & USYNC_PROCESS) &&
+		    (error == 0 ||
+		    error == EOWNERDEAD || error == ELOCKUNMAPPED))
 			(void) suword32(&lp->mutex_ownerpid, p->p_pid);
 		if (tsp && !time_error)	/* copyout the residual time left */
 			error = lwp_timer_copyout(&lwpt, error);
@@ -1160,9 +1195,7 @@ lwp_mutex_timedlock(lwp_mutex_t *lp, timespec_t *tsp)
 	}
 	lwpchan_lock(&lwpchan, LWPCHAN_MPPOOL);
 	locked = 1;
-	fuword8_noerr(&lp->mutex_waiters, &waiters);
-	suword8_noerr(&lp->mutex_waiters, 1);
-	if (type & USYNC_PROCESS_ROBUST) {
+	if (type & LOCK_ROBUST) {
 		fuword16_noerr(&lp->mutex_flag, &flag);
 		if (flag & LOCK_NOTRECOVERABLE) {
 			lwpchan_unlock(&lwpchan, LWPCHAN_MPPOOL);
@@ -1170,6 +1203,8 @@ lwp_mutex_timedlock(lwp_mutex_t *lp, timespec_t *tsp)
 			goto out;
 		}
 	}
+	fuword8_noerr(&lp->mutex_waiters, &waiters);
+	suword8_noerr(&lp->mutex_waiters, 1);
 
 	/*
 	 * If watchpoints are set, they need to be restored, since
@@ -1265,7 +1300,7 @@ lwp_mutex_timedlock(lwp_mutex_t *lp, timespec_t *tsp)
 		locked = 1;
 		fuword8_noerr(&lp->mutex_waiters, &waiters);
 		suword8_noerr(&lp->mutex_waiters, 1);
-		if (type & USYNC_PROCESS_ROBUST) {
+		if (type & LOCK_ROBUST) {
 			fuword16_noerr(&lp->mutex_flag, &flag);
 			if (flag & LOCK_NOTRECOVERABLE) {
 				error = ENOTRECOVERABLE;
@@ -1277,14 +1312,19 @@ lwp_mutex_timedlock(lwp_mutex_t *lp, timespec_t *tsp)
 	if (t->t_mstate == LMS_USER_LOCK)
 		(void) new_mstate(t, LMS_SYSTEM);
 
-	if (!error && (type & (USYNC_PROCESS | USYNC_PROCESS_ROBUST))) {
-		suword32_noerr(&lp->mutex_ownerpid, p->p_pid);
-		if (type & USYNC_PROCESS_ROBUST) {
+	if (error == 0) {
+		if (type & USYNC_PROCESS)
+			suword32_noerr(&lp->mutex_ownerpid, p->p_pid);
+		if (type & LOCK_ROBUST) {
 			fuword16_noerr(&lp->mutex_flag, &flag);
-			if (flag & LOCK_OWNERDEAD)
-				error = EOWNERDEAD;
-			else if (flag & LOCK_UNMAPPED)
-				error = ELOCKUNMAPPED;
+			if (flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED)) {
+				if (flag & LOCK_OWNERDEAD)
+					error = EOWNERDEAD;
+				else if (type & USYNC_PROCESS_ROBUST)
+					error = ELOCKUNMAPPED;
+				else
+					error = EOWNERDEAD;
+			}
 		}
 	}
 	suword8_noerr(&lp->mutex_waiters, waiters);
@@ -1435,7 +1475,7 @@ lwp_release_all(lwpchan_t *lwpchan)
  * lwp resumes and retries to acquire the lock.
  */
 int
-lwp_mutex_wakeup(lwp_mutex_t *lp)
+lwp_mutex_wakeup(lwp_mutex_t *lp, int release_all)
 {
 	proc_t *p = ttoproc(curthread);
 	lwpchan_t lwpchan;
@@ -1489,9 +1529,10 @@ lwp_mutex_wakeup(lwp_mutex_t *lp)
 	 *	   In this case, writing into the waiter bit would cause data
 	 *	   corruption.
 	 */
-	if (lwp_release(&lwpchan, &waiters, 0) == 1) {
+	if (release_all)
+		lwp_release_all(&lwpchan);
+	else if (lwp_release(&lwpchan, &waiters, 0) == 1)
 		suword8_noerr(&lp->mutex_waiters, waiters);
-	}
 	lwpchan_unlock(&lwpchan, LWPCHAN_MPPOOL);
 out:
 	no_fault();
@@ -2804,7 +2845,7 @@ lwp_change_pri(kthread_t *t, pri_t pri, pri_t *t_prip)
 }
 
 /*
- * Clean up a locked a robust mutex
+ * Clean up a locked robust mutex
  */
 static void
 lwp_mutex_cleanup(lwpchan_entry_t *ent, uint16_t lockflg)
@@ -2816,33 +2857,50 @@ lwp_mutex_cleanup(lwpchan_entry_t *ent, uint16_t lockflg)
 	lwp_mutex_t *lp;
 	volatile int locked = 0;
 	volatile int watched = 0;
+	volatile struct upimutex *upimutex = NULL;
+	volatile int upilocked = 0;
 
-	ASSERT(ent->lwpchan_type & USYNC_PROCESS_ROBUST);
+	ASSERT(ent->lwpchan_type & LOCK_ROBUST);
 
 	lp = (lwp_mutex_t *)ent->lwpchan_addr;
 	watched = watch_disable_addr((caddr_t)lp, sizeof (*lp), S_WRITE);
 	if (on_fault(&ljb)) {
 		if (locked)
 			lwpchan_unlock(&ent->lwpchan_lwpchan, LWPCHAN_MPPOOL);
+		if (upilocked)
+			upimutex_unlock((upimutex_t *)upimutex, 0);
 		goto out;
 	}
-	fuword32_noerr(&lp->mutex_ownerpid, (uint32_t *)&owner_pid);
-	if (owner_pid != curproc->p_pid) {
-		goto out;
+	if (ent->lwpchan_type & USYNC_PROCESS) {
+		fuword32_noerr(&lp->mutex_ownerpid, (uint32_t *)&owner_pid);
+		if (owner_pid != curproc->p_pid)
+			goto out;
 	}
-	lwpchan_lock(&ent->lwpchan_lwpchan, LWPCHAN_MPPOOL);
-	locked = 1;
-	fuword16_noerr(&lp->mutex_flag, &flag);
-	if ((flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED)) == 0) {
-		flag |= lockflg;
-		suword16_noerr(&lp->mutex_flag, flag);
+	if (UPIMUTEX(ent->lwpchan_type)) {
+		lwpchan_t lwpchan = ent->lwpchan_lwpchan;
+		upib_t *upibp = &UPI_CHAIN(lwpchan);
+
+		mutex_enter(&upibp->upib_lock);
+		upimutex = upi_get(upibp, &lwpchan);
+		if (upimutex == NULL || upimutex->upi_owner != curthread) {
+			mutex_exit(&upibp->upib_lock);
+			goto out;
+		}
+		mutex_exit(&upibp->upib_lock);
+		upilocked = 1;
+		flag = lwp_clear_mutex(lp, lockflg);
+		suword8_noerr(&lp->mutex_lockw, 0);
+		upimutex_unlock((upimutex_t *)upimutex, flag);
+	} else {
+		lwpchan_lock(&ent->lwpchan_lwpchan, LWPCHAN_MPPOOL);
+		locked = 1;
+		(void) lwp_clear_mutex(lp, lockflg);
+		ulock_clear(&lp->mutex_lockw);
+		fuword8_noerr(&lp->mutex_waiters, &waiters);
+		if (waiters && lwp_release(&ent->lwpchan_lwpchan, &waiters, 0))
+			suword8_noerr(&lp->mutex_waiters, waiters);
+		lwpchan_unlock(&ent->lwpchan_lwpchan, LWPCHAN_MPPOOL);
 	}
-	suword32_noerr(&lp->mutex_ownerpid, 0);
-	ulock_clear(&lp->mutex_lockw);
-	fuword8_noerr(&lp->mutex_waiters, &waiters);
-	if (waiters && lwp_release(&ent->lwpchan_lwpchan, &waiters, 0))
-		suword8_noerr(&lp->mutex_waiters, waiters);
-	lwpchan_unlock(&ent->lwpchan_lwpchan, LWPCHAN_MPPOOL);
 out:
 	no_fault();
 	if (watched)
@@ -2850,70 +2908,41 @@ out:
 }
 
 /*
- * Register the mutex and initialize the mutex if it is not already
+ * Register a process-shared robust mutex in the lwpchan cache.
  */
 int
-lwp_mutex_init(lwp_mutex_t *lp, int type)
+lwp_mutex_register(lwp_mutex_t *lp)
 {
-	proc_t *p = curproc;
 	int error = 0;
-	volatile int locked = 0;
-	volatile int watched = 0;
+	volatile int watched;
 	label_t ljb;
-	uint16_t flag;
+	uint8_t type;
 	lwpchan_t lwpchan;
-	pid_t owner_pid;
 
 	if ((caddr_t)lp >= (caddr_t)USERLIMIT)
 		return (set_errno(EFAULT));
 
-	if (type != USYNC_PROCESS_ROBUST)
-		return (set_errno(EINVAL));
-
 	watched = watch_disable_addr((caddr_t)lp, sizeof (*lp), S_WRITE);
 
 	if (on_fault(&ljb)) {
-		if (locked)
-			lwpchan_unlock(&lwpchan, LWPCHAN_MPPOOL);
 		error = EFAULT;
-		goto out;
-	}
-	/*
-	 * Force Copy-on-write fault if lwp_mutex_t object is
-	 * defined to be MAP_PRIVATE and it was initialized to
-	 * USYNC_PROCESS.
-	 */
-	suword8_noerr(&lp->mutex_type, type);
-	if (!get_lwpchan(curproc->p_as, (caddr_t)lp, type,
-	    &lwpchan, LWPCHAN_MPPOOL)) {
-		error = EFAULT;
-		goto out;
-	}
-	lwpchan_lock(&lwpchan, LWPCHAN_MPPOOL);
-	locked = 1;
-	fuword16_noerr(&lp->mutex_flag, &flag);
-	if (flag & LOCK_INITED) {
-		if (flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED)) {
-			fuword32_noerr(&lp->mutex_ownerpid,
-			    (uint32_t *)&owner_pid);
-			if (owner_pid == p->p_pid) {
-				flag &= ~(LOCK_OWNERDEAD | LOCK_UNMAPPED);
-				suword16_noerr(&lp->mutex_flag, flag);
-				locked = 0;
-				lwpchan_unlock(&lwpchan, LWPCHAN_MPPOOL);
-				goto out;
-			}
-		}
-		error = EBUSY;
 	} else {
-		suword8_noerr(&lp->mutex_waiters, 0);
-		suword8_noerr(&lp->mutex_lockw, 0);
-		suword16_noerr(&lp->mutex_flag, LOCK_INITED);
-		suword32_noerr(&lp->mutex_ownerpid, 0);
+		fuword8_noerr(&lp->mutex_type, &type);
+		if ((type & (USYNC_PROCESS|LOCK_ROBUST))
+		    != (USYNC_PROCESS|LOCK_ROBUST)) {
+			error = EINVAL;
+		} else {
+			/*
+			 * Force Copy-on-write fault if lwp_mutex_t object is
+			 * defined to be MAP_PRIVATE and it was initialized to
+			 * USYNC_PROCESS.
+			 */
+			suword8_noerr(&lp->mutex_type, type);
+			if (!get_lwpchan(curproc->p_as, (caddr_t)lp, type,
+			    &lwpchan, LWPCHAN_MPPOOL))
+				error = EFAULT;
+		}
 	}
-	locked = 0;
-	lwpchan_unlock(&lwpchan, LWPCHAN_MPPOOL);
-out:
 	no_fault();
 	if (watched)
 		watch_enable_addr((caddr_t)lp, sizeof (*lp), S_WRITE);
@@ -2950,8 +2979,9 @@ lwp_mutex_trylock(lwp_mutex_t *lp)
 	if (UPIMUTEX(type)) {
 		no_fault();
 		error = lwp_upimutex_lock(lp, type, UPIMUTEX_TRY, NULL);
-		if ((error == 0 || error == EOWNERDEAD) &&
-		    (type & USYNC_PROCESS))
+		if ((type & USYNC_PROCESS) &&
+		    (error == 0 ||
+		    error == EOWNERDEAD || error == ELOCKUNMAPPED))
 			(void) suword32(&lp->mutex_ownerpid, p->p_pid);
 		if (error)
 			return (set_errno(error));
@@ -2970,8 +3000,8 @@ lwp_mutex_trylock(lwp_mutex_t *lp)
 	}
 	lwpchan_lock(&lwpchan, LWPCHAN_MPPOOL);
 	locked = 1;
-	if (type & USYNC_PROCESS_ROBUST) {
-		fuword16_noerr((uint16_t *)(&lp->mutex_flag), &flag);
+	if (type & LOCK_ROBUST) {
+		fuword16_noerr(&lp->mutex_flag, &flag);
 		if (flag & LOCK_NOTRECOVERABLE) {
 			lwpchan_unlock(&lwpchan, LWPCHAN_MPPOOL);
 			error =  ENOTRECOVERABLE;
@@ -2983,13 +3013,19 @@ lwp_mutex_trylock(lwp_mutex_t *lp)
 
 	if (!ulock_try(&lp->mutex_lockw))
 		error = EBUSY;
-	else if (type & (USYNC_PROCESS | USYNC_PROCESS_ROBUST)) {
-		suword32_noerr(&lp->mutex_ownerpid, p->p_pid);
-		if (type & USYNC_PROCESS_ROBUST) {
-			if (flag & LOCK_OWNERDEAD)
-				error = EOWNERDEAD;
-			else if (flag & LOCK_UNMAPPED)
-				error = ELOCKUNMAPPED;
+	else {
+		if (type & USYNC_PROCESS)
+			suword32_noerr(&lp->mutex_ownerpid, p->p_pid);
+		if (type & LOCK_ROBUST) {
+			fuword16_noerr(&lp->mutex_flag, &flag);
+			if (flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED)) {
+				if (flag & LOCK_OWNERDEAD)
+					error = EOWNERDEAD;
+				else if (type & USYNC_PROCESS_ROBUST)
+					error = ELOCKUNMAPPED;
+				else
+					error = EOWNERDEAD;
+			}
 		}
 	}
 	locked = 0;
@@ -3056,17 +3092,16 @@ lwp_mutex_unlock(lwp_mutex_t *lp)
 	}
 	lwpchan_lock(&lwpchan, LWPCHAN_MPPOOL);
 	locked = 1;
-	if (type & (USYNC_PROCESS | USYNC_PROCESS_ROBUST)) {
-		if (type & USYNC_PROCESS_ROBUST) {
-			fuword16_noerr(&lp->mutex_flag, &flag);
-			if (flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED)) {
-				flag &= ~(LOCK_OWNERDEAD | LOCK_UNMAPPED);
-				flag |= LOCK_NOTRECOVERABLE;
-				suword16_noerr(&lp->mutex_flag, flag);
-			}
+	if (type & LOCK_ROBUST) {
+		fuword16_noerr(&lp->mutex_flag, &flag);
+		if (flag & (LOCK_OWNERDEAD | LOCK_UNMAPPED)) {
+			flag &= ~(LOCK_OWNERDEAD | LOCK_UNMAPPED);
+			flag |= LOCK_NOTRECOVERABLE;
+			suword16_noerr(&lp->mutex_flag, flag);
 		}
-		suword32_noerr(&lp->mutex_ownerpid, 0);
 	}
+	if (type & USYNC_PROCESS)
+		suword32_noerr(&lp->mutex_ownerpid, 0);
 	ulock_clear(&lp->mutex_lockw);
 	/*
 	 * Always wake up an lwp (if any) waiting on lwpchan. The woken lwp will
@@ -3089,7 +3124,7 @@ lwp_mutex_unlock(lwp_mutex_t *lp)
 	 */
 	fuword8_noerr(&lp->mutex_waiters, &waiters);
 	if (waiters) {
-		if ((type & USYNC_PROCESS_ROBUST) &&
+		if ((type & LOCK_ROBUST) &&
 		    (flag & LOCK_NOTRECOVERABLE)) {
 			lwp_release_all(&lwpchan);
 			suword8_noerr(&lp->mutex_waiters, 0);

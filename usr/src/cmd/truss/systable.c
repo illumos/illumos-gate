@@ -27,7 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
@@ -391,7 +390,7 @@ const struct systable systable[] = {
 {"lwp_sigmask",	3, HEX, HEX, SPM, HEX, HEX},			/* 165 */
 {"lwp_private",	3, HEX, NOV, DEC, DEC, HEX},			/* 166 */
 {"lwp_wait",	2, DEC, NOV, DEC, HEX},				/* 167 */
-{"lwp_mutex_wakeup", 1, DEC, NOV, HEX},				/* 168 */
+{"lwp_mutex_wakeup", 2, DEC, NOV, HEX, DEC},			/* 168 */
 {"lwp_mutex_lock", 1, DEC, NOV, HEX},				/* 169 */
 {"lwp_cond_wait", 4, DEC, NOV, HEX, HEX, HEX, DEC},		/* 170 */
 {"lwp_cond_signal", 1, DEC, NOV, HEX},				/* 171 */
@@ -475,7 +474,7 @@ const struct systable systable[] = {
 {"ntp_adjtime",	1, DEC, NOV, HEX},				/* 249 */
 {"lwp_mutex_unlock", 1, DEC, NOV, HEX},				/* 250 */
 {"lwp_mutex_trylock", 1, DEC, NOV, HEX},			/* 251 */
-{"lwp_mutex_init", 2, DEC, NOV, HEX, HEX},			/* 252 */
+{"lwp_mutex_register", 1, DEC, NOV, HEX},			/* 252 */
 {"cladm",	3, DEC, NOV, CLC, CLF, HEX},			/* 253 */
 {"uucopy",	3, DEC, NOV, HEX, HEX, UNS},			/* 254 */
 {"umount2",	2, DEC, NOV, STG, MTF},				/* 255 */

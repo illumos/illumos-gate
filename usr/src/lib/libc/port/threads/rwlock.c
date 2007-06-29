@@ -45,7 +45,7 @@
 /*
  * Find/allocate an entry for rwlp in our array of rwlocks held for reading.
  * We must be deferring signals for this to be safe.
- * Else if we are returning an entry with ul_rdlocks == 0,
+ * Else if we are returning an entry with ul_rdlockcnt == 0,
  * it could be reassigned behind our back in a signal handler.
  */
 static readlock_t *
@@ -59,7 +59,7 @@ rwl_entry(rwlock_t *rwlp)
 	/* we must be deferring signals */
 	ASSERT((self->ul_critical + self->ul_sigdefer) != 0);
 
-	if ((nlocks = self->ul_rdlocks) != 0)
+	if ((nlocks = self->ul_rdlockcnt) != 0)
 		readlockp = self->ul_readlock.array;
 	else {
 		nlocks = 1;
@@ -81,12 +81,12 @@ rwl_entry(rwlock_t *rwlp)
 	 * No entry available.  Allocate more space, converting the single
 	 * readlock_t entry into an array of readlock_t entries if necessary.
 	 */
-	if ((nlocks = self->ul_rdlocks) == 0) {
+	if ((nlocks = self->ul_rdlockcnt) == 0) {
 		/*
 		 * Initial allocation of the readlock_t array.
 		 * Convert the single entry into an array.
 		 */
-		self->ul_rdlocks = nlocks = NLOCKS;
+		self->ul_rdlockcnt = nlocks = NLOCKS;
 		readlockp = lmalloc(nlocks * sizeof (readlock_t));
 		/*
 		 * The single readlock_t becomes the first entry in the array.
@@ -108,7 +108,7 @@ rwl_entry(rwlock_t *rwlp)
 		nlocks * sizeof (readlock_t));
 	lfree(self->ul_readlock.array, nlocks * sizeof (readlock_t));
 	self->ul_readlock.array = readlockp;
-	self->ul_rdlocks *= 2;
+	self->ul_rdlockcnt *= 2;
 	/*
 	 * Return the next available entry in the newly allocated array.
 	 */
@@ -124,9 +124,9 @@ rwl_free(ulwp_t *ulwp)
 {
 	uint_t nlocks;
 
-	if ((nlocks = ulwp->ul_rdlocks) != 0)
+	if ((nlocks = ulwp->ul_rdlockcnt) != 0)
 		lfree(ulwp->ul_readlock.array, nlocks * sizeof (readlock_t));
-	ulwp->ul_rdlocks = 0;
+	ulwp->ul_rdlockcnt = 0;
 	ulwp->ul_readlock.single.rd_rwlock = NULL;
 	ulwp->ul_readlock.single.rd_count = 0;
 }
@@ -157,7 +157,7 @@ _rw_read_held(rwlock_t *rwlp)
 		 * The lock is held for reading by some thread.
 		 * Search our array of rwlocks held for reading for a match.
 		 */
-		if ((nlocks = self->ul_rdlocks) != 0)
+		if ((nlocks = self->ul_rdlockcnt) != 0)
 			readlockp = self->ul_readlock.array;
 		else {
 			nlocks = 1;

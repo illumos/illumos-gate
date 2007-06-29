@@ -127,8 +127,8 @@
 #define	MUTEX_OWNER(mp)	((ulwp_t *)(uintptr_t)(mp)->mutex_owner)
 
 /*
- * Test if a thread owns a USYNC_THREAD mutex.  This is inappropriate
- * for a process-shared (USYNC_PROCESS | USYNC_PROCESS_ROBUST) mutex.
+ * Test if a thread owns a process-private (USYNC_THREAD) mutex.
+ * This is inappropriate for a process-shared (USYNC_PROCESS) mutex.
  * The 'mp' argument must not have side-effects since it is evaluated twice.
  */
 #define	MUTEX_OWNED(mp, thrp)	\
@@ -368,9 +368,11 @@ typedef union {
 #define	MX	0
 #define	CV	1
 #define	FIFOQ	0x10	/* or'ing with FIFOQ asks for FIFO queueing */
-#define	QHASHSIZE		512
-#define	QUEUE_HASH(wchan, type)						\
-	((uint_t)((((uintptr_t)(wchan) >> 3) ^ ((uintptr_t)(wchan) >> 12)) \
+#define	QHASHSHIFT	9			/* number of hashing bits */
+#define	QHASHSIZE	(1 << QHASHSHIFT)	/* power of 2 (1<<9 == 512) */
+#define	QUEUE_HASH(wchan, type)	((uint_t)			\
+	((((uintptr_t)(wchan) >> 3)				\
+	^ ((uintptr_t)(wchan) >> (QHASHSHIFT + 3)))		\
 	& (QHASHSIZE - 1)) + (((type) == MX)? 0 : QHASHSIZE))
 
 extern	queue_head_t	*queue_lock(void *, int);
@@ -542,12 +544,18 @@ typedef struct ulwp {
 	mxchain_t	*ul_mxchain;	/* chain of owned ceiling mutexes */
 	pri_t		ul_epri;	/* effective scheduling priority */
 	pri_t		ul_emappedpri;	/* effective mapped priority */
-	uint_t		ul_rdlocks;	/* # of entries in ul_readlock array */
-					/* 0 means there is but a single lock */
-	union {				/* single rwlock or pointer to array */
+	uint_t		ul_rdlockcnt;	/* # entries in ul_readlock array */
+				/* 0 means there is but a single entry */
+	union {				/* single entry or pointer to array */
 		readlock_t	single;
 		readlock_t	*array;
 	} ul_readlock;
+	uint_t		ul_heldlockcnt;	/* # entries in ul_heldlocks array */
+				/* 0 means there is but a single entry */
+	union {				/* single entry or pointer to array */
+		mutex_t		*single;
+		mutex_t		**array;
+	} ul_heldlocks;
 	/* PROBE_SUPPORT begin */
 	void		*ul_tpdp;
 	/* PROBE_SUPPORT end */
@@ -622,6 +630,26 @@ typedef struct atfork {
 	void (*parent)(void);		/* post-fork parent handler */
 	void (*child)(void);		/* post-fork child handler */
 } atfork_t;
+
+/*
+ * Element in the table of registered process robust locks.
+ * We keep track of these to make sure that we only call
+ * ___lwp_mutex_register() once for each such lock.
+ */
+typedef struct robust {
+	struct robust	*robust_next;
+	mutex_t		*robust_lock;
+} robust_t;
+
+/*
+ * Parameters of the lock registration hash table.
+ */
+#define	LOCKSHIFT	9			/* number of hashing bits */
+#define	LOCKHASHSZ	(1 << LOCKSHIFT)	/* power of 2 (1<<9 == 512) */
+#define	LOCK_HASH(addr)	(uint_t)			\
+	((((uintptr_t)(addr) >> 3)			\
+	^ ((uintptr_t)(addr) >> (LOCKSHIFT + 3)))	\
+	& (LOCKHASHSZ - 1))
 
 /*
  * Make our hot locks reside on private cache lines (64 bytes).
@@ -781,6 +809,7 @@ typedef struct uberdata {
 	ulwp_t	*ulwp_replace_free;
 	ulwp_t	*ulwp_replace_last;
 	atfork_t	*atforklist;	/* circular Q for fork handlers */
+	robust_t	**robustlocks;	/* table of registered robust locks */
 	struct uberdata **tdb_bootstrap;
 	tdb_t	tdb;		/* thread debug interfaces (for libc_db) */
 } uberdata_t;
@@ -910,12 +939,18 @@ typedef struct ulwp32 {
 	caddr32_t	ul_mxchain;	/* chain of owned ceiling mutexes */
 	pri_t		ul_epri;	/* effective scheduling priority */
 	pri_t		ul_emappedpri;	/* effective mapped priority */
-	uint_t		ul_rdlocks;	/* # of entries in ul_readlock array */
-					/* 0 means there is but a single lock */
-	union {				/* single rwlock or pointer to array */
+	uint_t		ul_rdlockcnt;	/* # entries in ul_readlock array */
+				/* 0 means there is but a single entry */
+	union {				/* single entry or pointer to array */
 		readlock32_t	single;
 		caddr32_t	array;
 	} ul_readlock;
+	uint_t		ul_heldlockcnt;	/* # entries in ul_heldlocks array */
+				/* 0 means there is but a single entry */
+	union {				/* single entry or pointer to array */
+		caddr32_t	single;
+		caddr32_t	array;
+	} ul_heldlocks;
 	/* PROBE_SUPPORT begin */
 	caddr32_t	ul_tpdp;
 	/* PROBE_SUPPORT end */
@@ -974,6 +1009,7 @@ typedef struct uberdata32 {
 	caddr32_t	ulwp_replace_free;
 	caddr32_t	ulwp_replace_last;
 	caddr32_t	atforklist;
+	caddr32_t	robustlocks;
 	caddr32_t	tdb_bootstrap;
 	tdb32_t		tdb;
 } uberdata32_t;
@@ -1053,6 +1089,8 @@ extern	void	tls_setup(void);
 extern	void	tls_exit(void);
 extern	void	tls_free(ulwp_t *);
 extern	void	rwl_free(ulwp_t *);
+extern	void	heldlock_exit(void);
+extern	void	heldlock_free(ulwp_t *);
 extern	void	sigacthandler(int, siginfo_t *, void *);
 extern	void	signal_init(void);
 extern	int	sigequalset(const sigset_t *, const sigset_t *);
@@ -1075,6 +1113,10 @@ extern	void	grab_assert_lock(void);
 extern	void	dump_queue_statistics(void);
 extern	void	collect_queue_statistics(void);
 extern	void	record_spin_locks(ulwp_t *);
+extern	void	remember_lock(mutex_t *);
+extern	void	forget_lock(mutex_t *);
+extern	void	register_lock(mutex_t *);
+extern	void	unregister_locks(void);
 #if defined(__sparc)
 extern	void	_flush_windows(void);
 #else
@@ -1083,8 +1125,8 @@ extern	void	_flush_windows(void);
 extern	void	set_curthread(void *);
 
 /*
- * Utility function used by cond_broadcast() and rw_unlock()
- * when waking up many threads (more than MAXLWPS) all at once.
+ * Utility function used when waking up many threads (more than MAXLWPS)
+ * all at once.  See mutex_wakeup_all(), cond_broadcast(), and rw_unlock().
  */
 #define	MAXLWPS	128	/* max remembered lwpids before overflow */
 #define	NEWLWPS	2048	/* max remembered lwpids at first overflow */
@@ -1271,20 +1313,17 @@ extern	int	_private_mutex_unlock(mutex_t *);
 
 extern	int	_mutex_init(mutex_t *, int, void *);
 extern	int	_mutex_destroy(mutex_t *);
+extern	int	_mutex_consistent(mutex_t *);
 extern	int	_mutex_lock(mutex_t *);
 extern	int	_mutex_trylock(mutex_t *);
 extern	int	_mutex_unlock(mutex_t *);
-extern	void	_mutex_set_typeattr(mutex_t *, int);
 extern	int	__mutex_init(mutex_t *, int, void *);
 extern	int	__mutex_destroy(mutex_t *);
+extern	int	__mutex_consistent(mutex_t *);
 extern	int	__mutex_lock(mutex_t *);
 extern	int	__mutex_trylock(mutex_t *);
 extern	int	__mutex_unlock(mutex_t *);
 extern	int	mutex_is_held(mutex_t *);
-extern	int	mutex_lock_internal(mutex_t *, timespec_t *, int);
-extern	int	mutex_trylock_adaptive(mutex_t *);
-extern	int	mutex_queuelock_adaptive(mutex_t *);
-extern	int	mutex_lock_impl(mutex_t *mp, timespec_t *tsp);
 
 extern	int	_cond_init(cond_t *, int, void *);
 extern	int	_cond_wait(cond_t *, mutex_t *);
@@ -1293,8 +1332,6 @@ extern	int	_cond_reltimedwait(cond_t *, mutex_t *, const timespec_t *);
 extern	int	_cond_signal(cond_t *);
 extern	int	_cond_broadcast(cond_t *);
 extern	int	_cond_destroy(cond_t *);
-extern	int	cond_sleep_queue(cond_t *, mutex_t *, timespec_t *);
-extern	int	cond_sleep_kernel(cond_t *, mutex_t *, timespec_t *);
 extern	int	cond_signal_internal(cond_t *);
 extern	int	cond_broadcast_internal(cond_t *);
 
@@ -1344,11 +1381,11 @@ extern	int	get_info_by_policy(int);
 /*
  * System call wrappers (direct interfaces to the kernel)
  */
-extern	int	___lwp_mutex_init(mutex_t *, int);
+extern	int	___lwp_mutex_register(mutex_t *);
 extern	int	___lwp_mutex_trylock(mutex_t *);
 extern	int	___lwp_mutex_timedlock(mutex_t *, timespec_t *);
 extern	int	___lwp_mutex_unlock(mutex_t *);
-extern	int	___lwp_mutex_wakeup(mutex_t *);
+extern	int	___lwp_mutex_wakeup(mutex_t *, int);
 extern	int	___lwp_cond_wait(cond_t *, mutex_t *, timespec_t *, int);
 extern	int	__lwp_cond_signal(lwp_cond_t *);
 extern	int	__lwp_cond_broadcast(lwp_cond_t *);

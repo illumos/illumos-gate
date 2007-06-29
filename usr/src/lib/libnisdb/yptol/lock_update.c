@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,7 +77,7 @@ init_update_locks_mem()
 	 */
 	for (iiter = 0; iiter < MAXHASH; iiter++) {
 		if (rc = mutex_init(&(shmupdatearray->updatenode[iiter]),
-		    USYNC_PROCESS_ROBUST, 0)) {
+		    USYNC_PROCESS | LOCK_ROBUST, 0)) {
 			if (rc == EBUSY) {
 				ebusy_cnt++;
 			} else {
@@ -238,18 +238,18 @@ lock_map_update(map_ctrl *map)
 			 * Previous lock owner died, resetting lock
 			 * to recover from error.
 			 */
-			rc = mutex_init(&(shmupdatearray->updatenode[hashval]),
-			    USYNC_PROCESS_ROBUST, 0);
+			rc = mutex_consistent(
+			    &(shmupdatearray->updatenode[hashval]));
 			if (rc != 0) {
 				logmsg(MSG_NOTIMECHECK, LOG_ERR,
-						"mutex_init(): error=%d", rc);
+					"mutex_consistent(): error=%d", rc);
 				return (FAILURE);
 			}
 			rc = mutex_unlock(
-					&(shmupdatearray->updatenode[hashval]));
+			    &(shmupdatearray->updatenode[hashval]));
 			if (rc != 0) {
 				logmsg(MSG_NOTIMECHECK, LOG_ERR,
-						"mutex_unlock(): error=%d", rc);
+					"mutex_unlock(): error=%d", rc);
 				return (FAILURE);
 			}
 			break;
@@ -366,18 +366,18 @@ try_lock_map_update(map_ctrl *map)
 			 * Previous lock owner died, resetting lock
 			 * to recover from error.
 			 */
-			rc = mutex_init(&(shmupdatearray->updatenode[hashval]),
-			    USYNC_PROCESS_ROBUST, 0);
+			rc = mutex_consistent(
+			    &(shmupdatearray->updatenode[hashval]));
 			if (rc != 0) {
 				logmsg(MSG_NOTIMECHECK, LOG_ERR,
-						"mutex_init(): error=%d", rc);
+					"mutex_consistent(): error=%d", rc);
 				return (rc);
 			}
 			rc = mutex_unlock(
-					&(shmupdatearray->updatenode[hashval]));
+			    &(shmupdatearray->updatenode[hashval]));
 			if (rc != 0) {
 				logmsg(MSG_NOTIMECHECK, LOG_ERR,
-						"mutex_unlock(): error=%d", rc);
+					"mutex_unlock(): error=%d", rc);
 				return (rc);
 			}
 			break;

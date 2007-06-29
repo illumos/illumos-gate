@@ -506,6 +506,8 @@ extern "C" {
 #define	munlockall			_munlockall
 #define	munlock				_munlock
 #define	munmap				_munmap
+#define	_mutex_consistent		__mutex_consistent
+#define	mutex_consistent		__mutex_consistent
 #define	_mutex_destroy			__mutex_destroy
 #define	mutex_destroy			__mutex_destroy
 #define	_mutex_held			__mutex_held

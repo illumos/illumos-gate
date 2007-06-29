@@ -608,19 +608,25 @@ d_ulwp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		prt_addr(ulwp.ul_sleepq, 1),
 		prt_addr(ulwp.ul_cvmutex, 0));
 
-	HD("mxchain               epri       emappedpri rdlocks");
-	mdb_printf(OFFSTR "%s %-10d %-10d %d\n",
+	HD("mxchain               epri       emappedpri");
+	mdb_printf(OFFSTR "%s %-10d %d\n",
 		OFFSET(ul_mxchain),
 		prt_addr(ulwp.ul_mxchain, 1),
 		ulwp.ul_epri,
-		ulwp.ul_emappedpri,
-		ulwp.ul_rdlocks);
+		ulwp.ul_emappedpri);
 
-	HD("rd_rwlock             rd_count              tpdp");
-	mdb_printf(OFFSTR "%s %-21ld %s\n",
-		OFFSET(ul_readlock.single.rd_rwlock),
+	HD("rdlockcnt             rd_rwlock             rd_count");
+	mdb_printf(OFFSTR "%-21d %s %d\n",
+		OFFSET(ul_rdlockcnt),
+		ulwp.ul_rdlockcnt,
 		prt_addr(ulwp.ul_readlock.single.rd_rwlock, 1),
-		ulwp.ul_readlock.single.rd_count,
+		ulwp.ul_readlock.single.rd_count);
+
+	HD("heldlockcnt           heldlocks             tpdp");
+	mdb_printf(OFFSTR "%-21d %s %s\n",
+		OFFSET(ul_heldlockcnt),
+		ulwp.ul_heldlockcnt,
+		prt_addr(ulwp.ul_heldlocks.single, 1),
 		prt_addr(ulwp.ul_tpdp, 0));
 
 	HD("siglink               s'l'spin   s'l'spin2  s'l'sleep  s'l'wakeup");
@@ -815,12 +821,17 @@ d_uberdata(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		prt_addr(uberdata.ulwp_freelist, 1),
 		prt_addr(uberdata.ulwp_lastfree, 0));
 
-	HD("ulwp_replace_free     ulwp_replace_last     atforklist");
-	mdb_printf(OFFSTR "%s %s %s\n",
+	HD("ulwp_replace_free     ulwp_replace_last");
+	mdb_printf(OFFSTR "%s %s\n",
 		OFFSET(ulwp_replace_free),
 		prt_addr(uberdata.ulwp_replace_free, 1),
-		prt_addr(uberdata.ulwp_replace_last, 1),
-		prt_addr(uberdata.atforklist, 0));
+		prt_addr(uberdata.ulwp_replace_last, 0));
+
+	HD("atforklist            robustlocks");
+	mdb_printf(OFFSTR "%s %s\n",
+		OFFSET(atforklist),
+		prt_addr(uberdata.atforklist, 1),
+		prt_addr(uberdata.robustlocks, 0));
 
 	HD("tdb_bootstrap         tdb_sync_addr_hash    tdb_'count tdb_'fail");
 	mdb_printf(OFFSTR "%s %s %-10d %d\n",

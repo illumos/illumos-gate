@@ -216,7 +216,7 @@ lock_error(const mutex_t *mp, const char *who, void *cv, const char *msg)
 		/* EMPTY */;
 	else if (mcopy.mutex_lockw == 0)
 		(void) strcat(buf, "\nthe lock is unowned");
-	else if (!(mcopy.mutex_type & (USYNC_PROCESS|USYNC_PROCESS_ROBUST))) {
+	else if (!(mcopy.mutex_type & USYNC_PROCESS)) {
 		(void) strcat(buf, "\nthe lock owner is ");
 		ultos((uint64_t)mcopy.mutex_owner, 16, buf + strlen(buf));
 	} else {

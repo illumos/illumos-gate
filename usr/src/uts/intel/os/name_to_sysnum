@@ -234,7 +234,7 @@ ntp_gettime		248
 ntp_adjtime		249
 lwp_mutex_unlock	250
 lwp_mutex_trylock	251
-lwp_mutex_init		252
+lwp_mutex_register	252
 cladm			253
 uucopy			254
 umount2			255

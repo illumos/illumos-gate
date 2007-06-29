@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,7 +140,7 @@ remap_buffer(int fd)
 }
 
 static void
-grow_buffer()
+grow_buffer(void)
 {
 	int	fd;
 	if ((fd = open(buffer_name, O_RDWR)) == -1) {
@@ -163,7 +163,7 @@ grow_buffer()
 }
 
 static void
-get_new_strbuf()
+get_new_strbuf(void)
 {
 	bt_lock(&bhp->bh_lock);
 	while (bhp->bh_end + STRBLKSIZE > bhp->bh_size)
@@ -201,7 +201,7 @@ save_str(const char *str)
 
 
 static unsigned int
-get_new_entry()
+get_new_entry(void)
 {
 	unsigned int	new_ent;
 	bt_lock(&bhp->bh_lock);
@@ -216,14 +216,10 @@ get_new_entry()
 
 
 static void
-init_locks()
+init_locks(void)
 {
 	int i;
 
-	/*
-	 * NOTE: I should call _lwp_mutex_init() but it doesn't
-	 *	 yet exist.  see bug#1179352
-	 */
 	(void) memcpy(&bhp->bh_lock, &sharedmutex, sizeof (lwp_mutex_t));
 	for (i = 0; i < DEFBKTS; i++)
 		(void) memcpy(&bhp->bh_bkts[i].bb_lock, &sharedmutex,

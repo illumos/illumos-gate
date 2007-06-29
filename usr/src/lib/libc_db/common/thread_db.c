@@ -2513,7 +2513,8 @@ sync_get_info_common(const td_synchandle_t *sh_p, struct ps_prochandle *ph_p,
 		    &generic_so.lock, sizeof (generic_so.lock)) != PS_OK)
 			return (TD_DBERR);
 		si_p->si_type = TD_SYNC_MUTEX;
-		si_p->si_shared_type = generic_so.lock.mutex_type;
+		si_p->si_shared_type =
+		    (generic_so.lock.mutex_type & USYNC_PROCESS);
 		(void) memcpy(si_p->si_flags, &generic_so.lock.mutex_flag,
 		    sizeof (generic_so.lock.mutex_flag));
 		si_p->si_state.mutex_locked =
@@ -2523,8 +2524,7 @@ sync_get_info_common(const td_synchandle_t *sh_p, struct ps_prochandle *ph_p,
 		si_p->si_rcount = generic_so.lock.mutex_rcount;
 		si_p->si_prioceiling = generic_so.lock.mutex_ceiling;
 		if (si_p->si_state.mutex_locked) {
-			if (si_p->si_shared_type &
-			    (USYNC_PROCESS | USYNC_PROCESS_ROBUST))
+			if (si_p->si_shared_type & USYNC_PROCESS)
 				si_p->si_ownerpid =
 					generic_so.lock.mutex_ownerpid;
 			si_p->si_owner.th_ta_p = sh_p->sh_ta_p;
@@ -2533,7 +2533,8 @@ sync_get_info_common(const td_synchandle_t *sh_p, struct ps_prochandle *ph_p,
 		break;
 	case COND_MAGIC:
 		si_p->si_type = TD_SYNC_COND;
-		si_p->si_shared_type = generic_so.condition.cond_type;
+		si_p->si_shared_type =
+		    (generic_so.condition.cond_type & USYNC_PROCESS);
 		(void) memcpy(si_p->si_flags, generic_so.condition.flags.flag,
 		    sizeof (generic_so.condition.flags.flag));
 		si_p->si_size = sizeof (generic_so.condition);
@@ -2547,7 +2548,8 @@ sync_get_info_common(const td_synchandle_t *sh_p, struct ps_prochandle *ph_p,
 		    != PS_OK)
 			return (TD_DBERR);
 		si_p->si_type = TD_SYNC_SEMA;
-		si_p->si_shared_type = generic_so.semaphore.type;
+		si_p->si_shared_type =
+		    (generic_so.semaphore.type & USYNC_PROCESS);
 		si_p->si_state.sem_count = generic_so.semaphore.count;
 		si_p->si_size = sizeof (generic_so.semaphore);
 		si_p->si_has_waiters =
@@ -2563,7 +2565,8 @@ sync_get_info_common(const td_synchandle_t *sh_p, struct ps_prochandle *ph_p,
 		    &generic_so.rwlock, sizeof (generic_so.rwlock)) != PS_OK)
 			return (TD_DBERR);
 		si_p->si_type = TD_SYNC_RWLOCK;
-		si_p->si_shared_type = generic_so.rwlock.rwlock_type;
+		si_p->si_shared_type =
+		    (generic_so.rwlock.rwlock_type & USYNC_PROCESS);
 		si_p->si_size = sizeof (generic_so.rwlock);
 
 		rwstate = (uint32_t)generic_so.rwlock.rwlock_readers;

@@ -117,6 +117,7 @@ uberdata_t __uberdata = {
 	NULL,			/* ulwp_replace_free */
 	NULL,			/* ulwp_replace_last */
 	NULL,			/* atforklist */
+	NULL,			/* robustlocks */
 	NULL,			/* __tdb_bootstrap */
 	{			/* tdb */
 		NULL,		/* tdb_sync_addr_hash */
@@ -798,8 +799,9 @@ _thrp_exit()
 	}
 	lmutex_unlock(&udp->link_lock);
 
-	tsd_exit();	/* deallocate thread-specific data */
-	tls_exit();	/* deallocate thread-local storage */
+	tsd_exit();		/* deallocate thread-specific data */
+	tls_exit();		/* deallocate thread-local storage */
+	heldlock_exit();	/* deal with left-over held locks */
 
 	/* block all signals to finish exiting */
 	block_all_signals(self);
@@ -1564,6 +1566,7 @@ finish_init()
 	udp->hash_mask = HASHTBLSZ - 1;
 
 	for (i = 0; i < HASHTBLSZ; i++, htp++) {
+		htp->hash_lock.mutex_flag = LOCK_INITED;
 		htp->hash_lock.mutex_magic = MUTEX_MAGIC;
 		htp->hash_cond.cond_magic = COND_MAGIC;
 	}
@@ -1610,6 +1613,7 @@ postfork1_child()
 {
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
+	mutex_t *mp;
 	ulwp_t *next;
 	ulwp_t *ulwp;
 	int i;
@@ -1629,8 +1633,11 @@ postfork1_child()
 	if (udp->queue_head) {
 		(void) _private_memset(udp->queue_head, 0,
 			2 * QHASHSIZE * sizeof (queue_head_t));
-		for (i = 0; i < 2 * QHASHSIZE; i++)
-			udp->queue_head[i].qh_lock.mutex_magic = MUTEX_MAGIC;
+		for (i = 0; i < 2 * QHASHSIZE; i++) {
+			mp = &udp->queue_head[i].qh_lock;
+			mp->mutex_flag = LOCK_INITED;
+			mp->mutex_magic = MUTEX_MAGIC;
+		}
 	}
 
 	/*
@@ -1650,6 +1657,7 @@ postfork1_child()
 		tsd_free(ulwp);
 		tls_free(ulwp);
 		rwl_free(ulwp);
+		heldlock_free(ulwp);
 		ulwp_free(ulwp);
 	}
 	self->ul_forw = self->ul_back = udp->all_lwps = self;
