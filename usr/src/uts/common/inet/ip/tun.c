@@ -2767,19 +2767,21 @@ tun_update_link_mtu(queue_t *q, uint32_t pmtu, boolean_t icmp)
 	/*
 	 * If the pmtu provided came from an ICMP error being passed up
 	 * from below, then the pmtu argument has already been adjusted
-	 * by the IPsec overhead.
+	 * by the IPsec overhead and ip header length.
 	 */
 	if (!icmp && atp->tun_itp != NULL &&
 	    (atp->tun_itp->itp_flags & ITPF_P_ACTIVE))
 		newmtu -= atp->tun_ipsec_overhead;
 
 	if (atp->tun_flags & TUN_L_V4) {
-		newmtu -= sizeof (ipha_t);
+		if (!icmp)
+			newmtu -= sizeof (ipha_t);
 		if (newmtu < IP_MIN_MTU)
 			newmtu = IP_MIN_MTU;
 	} else {
 		ASSERT(atp->tun_flags & TUN_L_V6);
-		newmtu -= sizeof (ip6_t);
+		if (!icmp)
+			newmtu -= sizeof (ip6_t);
 		if (atp->tun_encap_lim > 0)
 			newmtu -= IPV6_TUN_ENCAP_OPT_LEN;
 		if (newmtu < IPV6_MIN_MTU)
@@ -3645,6 +3647,8 @@ icmp_ricmp_err_v4_v4(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 				freemsg(mp);
 				return;
 			}
+			if (outer_hlen < mtu)
+				mtu -= outer_hlen;
 			mutex_enter(&atp->tun_lock);
 			mtu = tun_update_link_mtu(q, mtu, B_TRUE);
 			mutex_exit(&atp->tun_lock);
@@ -3853,6 +3857,8 @@ icmp_ricmp_err_v4_v6(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp, icmp6_t *icmph)
 		uint32_t mtu;
 
 		mtu = ntohl(icmph->icmp6_mtu);
+		if (outer_hlen < mtu)
+			mtu -= outer_hlen;
 		mutex_enter(&atp->tun_lock);
 		mtu = tun_update_link_mtu(q, mtu, B_TRUE);
 		mutex_exit(&atp->tun_lock);
@@ -4008,6 +4014,8 @@ icmp_ricmp_err_v6_v6(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp, icmp6_t *icmph)
 		uint32_t mtu;
 
 		mtu = ntohl(icmph->icmp6_mtu);
+		if (outer_hlen < mtu)
+			mtu -= outer_hlen;
 		mutex_enter(&atp->tun_lock);
 		mtu = tun_update_link_mtu(q, mtu, B_TRUE);
 		mutex_exit(&atp->tun_lock);
@@ -4161,6 +4169,8 @@ icmp_ricmp_err_v6_v4(queue_t *q, mblk_t *mp, mblk_t *ipsec_mp)
 				freemsg(mp);
 				return;
 			}
+			if (outer_hlen < mtu)
+				mtu -= outer_hlen;
 			mutex_enter(&atp->tun_lock);
 			mtu = tun_update_link_mtu(q, mtu, B_TRUE);
 			mutex_exit(&atp->tun_lock);

@@ -1704,6 +1704,64 @@ keep_label:
 }
 
 /*
+ * Name:	tsol_pmtu_adjust()
+ *
+ * Returns the adjusted mtu after removing security option.
+ * Removes/subtracts the option if the packet's cred indicates an unlabeled
+ * sender or if pkt_diff indicates this system enlarged the packet.
+ */
+uint32_t
+tsol_pmtu_adjust(mblk_t *mp, uint32_t mtu, int pkt_diff, int af)
+{
+	int		label_adj = 0;
+	uint32_t	min_mtu = IP_MIN_MTU;
+	tsol_tpc_t	*src_rhtp;
+	void		*src;
+
+	/*
+	 * Note: label_adj is non-positive, indicating the number of
+	 * bytes removed by removing the security option from the
+	 * header.
+	 */
+	if (af == AF_INET6) {
+		ip6_t	*ip6h;
+
+		min_mtu = IPV6_MIN_MTU;
+		ip6h = (ip6_t *)mp->b_rptr;
+		src = &ip6h->ip6_src;
+		if ((src_rhtp = find_tpc(src, IPV6_VERSION, B_FALSE)) == NULL)
+			return (mtu);
+		if (pkt_diff > 0 || src_rhtp->tpc_tp.host_type == UNLABELED) {
+			label_adj = tsol_remove_secopt_v6(
+			    (ip6_t *)mp->b_rptr, MBLKL(mp));
+		}
+	} else {
+		ipha_t    *ipha;
+
+		ASSERT(af == AF_INET);
+		ipha = (ipha_t *)mp->b_rptr;
+		src = &ipha->ipha_src;
+		if ((src_rhtp = find_tpc(src, IPV4_VERSION, B_FALSE)) == NULL)
+			return (mtu);
+		if (pkt_diff > 0 || src_rhtp->tpc_tp.host_type == UNLABELED)
+			label_adj = tsol_remove_secopt(
+			    (ipha_t *)mp->b_rptr, MBLKL(mp));
+	}
+	/*
+	 * Make pkt_diff non-negative and the larger of the bytes
+	 * previously added (if any) or just removed, since label
+	 * addition + subtraction may not be completely idempotent.
+	 */
+	if (pkt_diff < -label_adj)
+		pkt_diff = -label_adj;
+	if (pkt_diff > 0 && pkt_diff < mtu)
+		mtu -= pkt_diff;
+
+	TPC_RELE(src_rhtp);
+	return (MAX(mtu, min_mtu));
+}
+
+/*
  * Name:	tsol_rtsa_init()
  *
  * Normal:	Sanity checks on the route security attributes provided by

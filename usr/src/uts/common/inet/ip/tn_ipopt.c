@@ -990,7 +990,8 @@ tsol_find_secopt_v6(
  * Remove the label option from the hop-by-hop options header if it exists.
  * 'buflen' is the total length of the packet typically b_wptr - b_rptr.
  * Header and data following the label option that is deleted are copied
- * (i.e. slid backward) to the right position.
+ * (i.e. slid backward) to the right position, and returns the number
+ * of bytes removed (as zero or negative number.)
  */
 int
 tsol_remove_secopt_v6(ip6_t *ip6h, int buflen)
@@ -1032,7 +1033,7 @@ tsol_remove_secopt_v6(ip6_t *ip6h, int buflen)
 		    buflen - (IPV6_HDR_LEN + hbhlen));
 		ip6h->ip6_plen = htons(ntohs(ip6h->ip6_plen) - hbhlen);
 		ip6h->ip6_nxt = next_hdr;
-		return (hbhlen);
+		return (-hbhlen);
 	}
 
 	if (after_secopt == NULL) {
@@ -1064,7 +1065,7 @@ tsol_remove_secopt_v6(ip6_t *ip6h, int buflen)
 	ip6hbh[1] -= delta/8;
 	ip6h->ip6_plen = htons(ntohs(ip6h->ip6_plen) - delta);
 
-	return (delta);
+	return (-delta);
 }
 
 /*

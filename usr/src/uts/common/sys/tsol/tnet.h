@@ -84,6 +84,7 @@ extern int tsol_ire_match_gwattr(ire_t *, const ts_label_t *);
 extern int tsol_rtsa_init(rt_msghdr_t *, tsol_rtsecattr_t *, caddr_t);
 extern int tsol_ire_init_gwattr(ire_t *, uchar_t, tsol_gc_t *, tsol_gcgrp_t *);
 extern mblk_t *tsol_ip_forward(ire_t *, mblk_t *);
+extern uint32_t tsol_pmtu_adjust(mblk_t *, uint32_t, int, int);
 
 extern mlp_type_t tsol_mlp_addr_type(zoneid_t, uchar_t, const void *,
     ip_stack_t *);

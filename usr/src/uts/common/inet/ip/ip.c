@@ -3407,13 +3407,30 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 		ire_refrele(ire);
 
 	/*
-	 * Check if we can send back more then 8 bytes in addition
-	 * to the IP header. We will include as much as 64 bytes.
+	 * Check if we can send back more then 8 bytes in addition to
+	 * the IP header.  We try to send 64 bytes of data and the internal
+	 * header in the special cases of ipv4 encapsulated ipv4 or ipv6.
 	 */
 	len_needed = IPH_HDR_LENGTH(ipha);
-	if (ipha->ipha_protocol == IPPROTO_ENCAP &&
-	    (uchar_t *)ipha + len_needed + 1 <= mp->b_wptr) {
-		len_needed += IPH_HDR_LENGTH(((uchar_t *)ipha + len_needed));
+	if (ipha->ipha_protocol == IPPROTO_ENCAP ||
+	    ipha->ipha_protocol == IPPROTO_IPV6) {
+
+		if (!pullupmsg(mp, -1)) {
+			BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
+			freemsg(ipsec_mp);
+			return;
+		}
+		ipha = (ipha_t *)mp->b_rptr;
+
+		if (ipha->ipha_protocol == IPPROTO_ENCAP) {
+			len_needed += IPH_HDR_LENGTH(((uchar_t *)ipha +
+			    len_needed));
+		} else {
+			ip6_t *ip6h = (ip6_t *)((uchar_t *)ipha + len_needed);
+
+			ASSERT(ipha->ipha_protocol == IPPROTO_IPV6);
+			len_needed += ip_hdr_length_v6(mp, ip6h);
+		}
 	}
 	len_needed += ipst->ips_ip_icmp_return;
 	msg_len = msgdsize(mp);
@@ -3421,18 +3438,12 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 		(void) adjmsg(mp, len_needed - msg_len);
 		msg_len = len_needed;
 	}
-	mp1 = allocb(sizeof (icmp_ipha) + len, BPRI_HI);
+	mp1 = allocb_tmpl(sizeof (icmp_ipha) + len, mp);
 	if (mp1 == NULL) {
 		BUMP_MIB(&ipst->ips_icmp_mib, icmpOutErrors);
 		freemsg(ipsec_mp);
 		return;
 	}
-	/*
-	 * On an unlabeled system, dblks don't necessarily have creds.
-	 */
-	ASSERT(!is_system_labeled() || DB_CRED(mp) != NULL);
-	if (DB_CRED(mp) != NULL)
-		mblk_setcred(mp1, DB_CRED(mp));
 	mp1->b_cont = mp;
 	mp = mp1;
 	ASSERT(ipsec_mp->b_datap->db_type == M_CTL &&
@@ -16626,6 +16637,7 @@ ip_rput_other(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 void
 ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 {
+	uint32_t	old_pkt_len;
 	uint32_t	pkt_len;
 	queue_t	*q;
 	uint32_t	sum;
@@ -16649,8 +16661,6 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 			return;
 		}
 	}
-
-	pkt_len = ntohs(ipha->ipha_length);
 
 	/* Adjust the checksum to reflect the ttl decrement. */
 	sum = (int)ipha->ipha_hdr_checksum + IP_HDR_CSUM_TTL_ADJUST;
@@ -16704,7 +16714,7 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 
 	if (mp == NULL)
 		return;
-	pkt_len = ntohs(ipha->ipha_length);
+	old_pkt_len = pkt_len = ntohs(ipha->ipha_length);
 
 	if (is_system_labeled()) {
 		mblk_t *mp1;
@@ -16755,6 +16765,20 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 				return;
 			}
 		}
+		/*
+		 * Handle labeled packet resizing.
+		 *
+		 * If we have added a label, inform ip_wput_frag() of its
+		 * effect on the MTU for ICMP messages.
+		 */
+		if (pkt_len > old_pkt_len) {
+			uint32_t secopt_size;
+
+			secopt_size = pkt_len - old_pkt_len;
+			if (secopt_size < max_frag)
+				max_frag -= secopt_size;
+		}
+
 		ip_wput_frag(ire, mp, IB_PKT, max_frag, 0, GLOBAL_ZONEID, ipst);
 		ip2dbg(("ip_rput_forward:sent to ip_wput_frag\n"));
 		return;
@@ -24396,6 +24420,10 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 	offset = ntohs(ipha->ipha_fragment_offset_and_flags);
 	if (offset & IPH_DF) {
 		BUMP_MIB(mibptr, ipIfStatsOutFragFails);
+		if (is_system_labeled()) {
+			max_frag = tsol_pmtu_adjust(mp, ire->ire_max_frag,
+			    ire->ire_max_frag - max_frag, AF_INET);
+		}
 		/*
 		 * Need to compute hdr checksum if called from ip_wput_ire.
 		 * Note that ip_rput_forward verifies the checksum before
@@ -24410,6 +24438,13 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 		    "don't fragment");
 		return;
 	}
+	/*
+	 * Labeled systems adjust max_frag if they add a label
+	 * to send the correct path mtu.  We need the real mtu since we
+	 * are fragmenting the packet after label adjustment.
+	 */
+	if (is_system_labeled())
+		max_frag = ire->ire_max_frag;
 	if (mctl_present)
 		freeb(first_mp);
 	/*

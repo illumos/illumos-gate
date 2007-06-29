@@ -7258,6 +7258,7 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 	uint16_t	remlen;
 	uint_t		prev_nexthdr_offset;
 	uint_t		used;
+	size_t		old_pkt_len;
 	size_t		pkt_len;
 	uint16_t	ip6_len;
 	uint_t		hdr_len;
@@ -7298,7 +7299,7 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 
 	ip6h = (ip6_t *)mp->b_rptr;
 	ip6_len = ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN;
-	pkt_len = ip6_len;
+	old_pkt_len = pkt_len = ip6_len;
 
 	if (ILL_HCKSUM_CAPABLE(ill) && !mctl_present && dohwcksum)
 		hck_flags = DB_CKSUMFLAGS(mp);
@@ -7584,9 +7585,18 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 		}
 
 		if (pkt_len > ire->ire_max_frag) {
+			int max_frag = ire->ire_max_frag;
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInTooBigErrors);
+			/*
+			 * Handle labeled packet resizing.
+			 */
+			if (is_system_labeled()) {
+				max_frag = tsol_pmtu_adjust(mp, max_frag,
+				    pkt_len - old_pkt_len, AF_INET6);
+			}
+
 			/* Sent by forwarding path, and router is global zone */
-			icmp_pkt2big_v6(WR(q), mp, ire->ire_max_frag,
+			icmp_pkt2big_v6(WR(q), mp, max_frag,
 			    ll_multicast, B_TRUE, GLOBAL_ZONEID, ipst);
 			ire_refrele(ire);
 			return;
