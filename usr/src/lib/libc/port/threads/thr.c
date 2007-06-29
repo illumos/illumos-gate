@@ -1919,17 +1919,12 @@ _thrp_suspend(thread_t tid, uchar_t whystopped)
 	ASSERT((whystopped & ~(TSTP_REGULAR|TSTP_MUTATOR|TSTP_FORK)) == 0);
 
 	/*
-	 * We can't suspend anyone except ourself while a fork is happening.
-	 * This also has the effect of allowing only one suspension at a time.
+	 * We can't suspend anyone except ourself while
+	 * some other thread is performing a fork.
+	 * This also allows only one suspension at a time.
 	 */
-	if (tid != self->ul_lwpid &&
-	    (error = fork_lock_enter("thr_suspend")) != 0) {
-		/*
-		 * Cannot call _thrp_suspend() from a fork handler.
-		 */
-		fork_lock_exit();
-		return (error);
-	}
+	if (tid != self->ul_lwpid)
+		(void) fork_lock_enter(NULL);
 
 	if ((ulwp = find_lwp(tid)) == NULL)
 		error = ESRCH;
@@ -2110,13 +2105,7 @@ _thrp_continue(thread_t tid, uchar_t whystopped)
 	/*
 	 * We single-thread the entire thread suspend/continue mechanism.
 	 */
-	if ((error = fork_lock_enter("thr_continue")) != 0) {
-		/*
-		 * Cannot call _thrp_continue() from a fork handler.
-		 */
-		fork_lock_exit();
-		return (error);
-	}
+	(void) fork_lock_enter(NULL);
 
 	if ((ulwp = find_lwp(tid)) == NULL) {
 		fork_lock_exit();
@@ -2634,18 +2623,11 @@ _thr_suspend_allmutators(void)
 	uberdata_t *udp = self->ul_uberdata;
 	ulwp_t *ulwp;
 	int link_dropped;
-	int error;
 
 	/*
 	 * We single-thread the entire thread suspend/continue mechanism.
 	 */
-	if ((error = fork_lock_enter("thr_suspend_allmutators")) != 0) {
-		/*
-		 * Cannot call _thr_suspend_allmutators() from a fork handler.
-		 */
-		fork_lock_exit();
-		return (error);
-	}
+	(void) fork_lock_enter(NULL);
 
 top:
 	lmutex_lock(&udp->link_lock);
@@ -2711,19 +2693,11 @@ _thr_continue_allmutators()
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
 	ulwp_t *ulwp;
-	int error;
 
 	/*
 	 * We single-thread the entire thread suspend/continue mechanism.
 	 */
-	if ((error = fork_lock_enter("thr_continue_allmutators")) != 0) {
-		/*
-		 * Cannot call _thr_continue_allmutators() from a fork handler.
-		 */
-		fork_lock_exit();
-		return (error);
-	}
-
+	(void) fork_lock_enter(NULL);
 
 	lmutex_lock(&udp->link_lock);
 	if (!suspendedallmutators) {
