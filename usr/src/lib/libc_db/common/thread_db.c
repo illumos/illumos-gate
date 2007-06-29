@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2556,42 +2556,35 @@ sync_get_info_common(const td_synchandle_t *sh_p, struct ps_prochandle *ph_p,
 		si_p->si_data = (psaddr_t)generic_so.semaphore.count;
 		break;
 	case RWL_MAGIC:
+	    {
+		uint32_t rwstate;
+
 		if (trunc && ps_pdread(ph_p, sh_p->sh_unique,
 		    &generic_so.rwlock, sizeof (generic_so.rwlock)) != PS_OK)
 			return (TD_DBERR);
 		si_p->si_type = TD_SYNC_RWLOCK;
 		si_p->si_shared_type = generic_so.rwlock.rwlock_type;
 		si_p->si_size = sizeof (generic_so.rwlock);
-		if (generic_so.rwlock.rwlock_type == USYNC_PROCESS) {
-			uint32_t *rwstate =
-			    (uint32_t *)&si_p->si_state.nreaders;
 
-			if (*rwstate & URW_WRITE_LOCKED) {
-				si_p->si_state.nreaders = -1;
-				si_p->si_is_wlock = 1;
-				si_p->si_owner.th_ta_p = sh_p->sh_ta_p;
-				si_p->si_owner.th_unique =
-					generic_so.rwlock.rwlock_owner;
-			} else if (*rwstate & URW_READERS_MASK)
-				si_p->si_state.nreaders =
-				    *rwstate & URW_READERS_MASK;
-			else
-				si_p->si_state.nreaders = 0;
-			si_p->si_has_waiters = (*rwstate & URW_HAS_WAITERS);
+		rwstate = (uint32_t)generic_so.rwlock.rwlock_readers;
+		if (rwstate & URW_WRITE_LOCKED) {
+			si_p->si_state.nreaders = -1;
+			si_p->si_is_wlock = 1;
+			si_p->si_owner.th_ta_p = sh_p->sh_ta_p;
+			si_p->si_owner.th_unique =
+				generic_so.rwlock.rwlock_owner;
+			if (si_p->si_shared_type & USYNC_PROCESS)
+				si_p->si_ownerpid =
+					generic_so.rwlock.rwlock_ownerpid;
 		} else {
-			si_p->si_state.nreaders = generic_so.rwlock.readers;
-			si_p->si_has_waiters =
-			    generic_so.rwlock.rwlock_mwaiters;
-			if (si_p->si_state.nreaders == -1) {
-				si_p->si_is_wlock = 1;
-				si_p->si_owner.th_ta_p = sh_p->sh_ta_p;
-				si_p->si_owner.th_unique =
-					generic_so.rwlock.rwlock_mowner;
-			}
+			si_p->si_state.nreaders = (rwstate & URW_READERS_MASK);
 		}
+		si_p->si_has_waiters = ((rwstate & URW_HAS_WAITERS) != 0);
+
 		/* this is useless but the old interface provided it */
 		si_p->si_data = (psaddr_t)generic_so.rwlock.readers;
 		break;
+	    }
 	default:
 		return (TD_BADSH);
 	}
@@ -2823,36 +2816,18 @@ __td_sync_get_stats(const td_synchandle_t *sh_p, td_syncstats_t *ss_p)
 	    }
 	case TDB_RWLOCK:
 	    {
-		psaddr_t cond_addr;
-		tdb_sync_stats_t cond_stats;
 		td_rwlock_stats_t *rwsp = &ss_p->ss_un.rwlock;
 
 		ss_p->ss_info.si_type = TD_SYNC_RWLOCK;
 		ss_p->ss_info.si_size = sizeof (rwlock_t);
 		rwsp->rw_rdlock =
 			sync_stats.un.rwlock.rw_rdlock;
-		cond_addr = (psaddr_t)&((rwlock_t *)sh_p->sh_unique)->readercv;
-		if (read_sync_stats(ta_p, hashaddr, cond_addr, &cond_stats)
-		    == TD_OK) {
-			rwsp->rw_rdlock_sleep =
-				cond_stats.un.cond.cond_wait;
-			rwsp->rw_rdlock_sleep_time =
-				cond_stats.un.cond.cond_wait_sleep_time;
-		}
 		rwsp->rw_rdlock_try =
 			sync_stats.un.rwlock.rw_rdlock_try;
 		rwsp->rw_rdlock_try_fail =
 			sync_stats.un.rwlock.rw_rdlock_try_fail;
 		rwsp->rw_wrlock =
 			sync_stats.un.rwlock.rw_wrlock;
-		cond_addr = (psaddr_t)&((rwlock_t *)sh_p->sh_unique)->writercv;
-		if (read_sync_stats(ta_p, hashaddr, cond_addr, &cond_stats)
-		    == TD_OK) {
-			rwsp->rw_wrlock_sleep =
-				cond_stats.un.cond.cond_wait;
-			rwsp->rw_wrlock_sleep_time =
-				cond_stats.un.cond.cond_wait_sleep_time;
-		}
 		rwsp->rw_wrlock_hold_time =
 			sync_stats.un.rwlock.rw_wrlock_hold_time;
 		rwsp->rw_wrlock_try =
@@ -2900,8 +2875,8 @@ out:
  * Change the state of a synchronization variable.
  *	1) mutex lock state set to value
  *	2) semaphore's count set to value
- *	3) writer's lock set to value
- *	4) reader's lock number of readers set to value
+ *	3) writer's lock set by value < 0
+ *	4) reader's lock number of readers set to value >= 0
  * Currently unused by dbx.
  */
 #pragma weak td_sync_setstate = __td_sync_setstate
@@ -2912,6 +2887,7 @@ __td_sync_setstate(const td_synchandle_t *sh_p, long lvalue)
 	int		trunc = 0;
 	td_err_e	return_val;
 	td_so_un_t	generic_so;
+	uint32_t	*rwstate;
 	int		value = (int)lvalue;
 
 	if ((ph_p = ph_lock_sh(sh_p, &return_val)) == NULL)
@@ -2975,18 +2951,12 @@ __td_sync_setstate(const td_synchandle_t *sh_p, long lvalue)
 			return_val = TD_DBERR;
 			break;
 		}
-		if (generic_so.rwlock.rwlock_type == USYNC_PROCESS) {
-			uint32_t *rwstate =
-			    (uint32_t *)&generic_so.rwlock.readers;
-			if (value < 0)
-				*rwstate = URW_WRITE_LOCKED;
-			else if (value > 0)
-				*rwstate = (value & URW_READERS_MASK);
-			else
-				*rwstate = 0;
-		} else
-			generic_so.rwlock.readers = value;
-
+		rwstate = (uint32_t *)&generic_so.rwlock.readers;
+		*rwstate &= URW_HAS_WAITERS;
+		if (value < 0)
+			*rwstate |= URW_WRITE_LOCKED;
+		else
+			*rwstate |= (value & URW_READERS_MASK);
 		if (ps_pdwrite(ph_p, sh_p->sh_unique, &generic_so.rwlock,
 		    sizeof (generic_so.rwlock)) != PS_OK)
 			return_val = TD_DBERR;

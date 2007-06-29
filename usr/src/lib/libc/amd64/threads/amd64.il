@@ -46,25 +46,35 @@
 	xchgb	%al, (%rdi)
 	.end
 
-	.inline	cas32, 0
+	.inline	atomic_cas_32, 0
 	movl	%esi, %eax
 	lock
 	cmpxchgl %edx, (%rdi)
 	.end
 
-	.inline	swap32, 0
+	.inline	atomic_swap_32, 0
 	movl	%esi, %eax
 	xchgl	(%rdi), %eax
 	.end
 
-	.inline	incr32, 0
+	.inline	atomic_inc_32, 0
 	lock
 	incl	(%rdi)
 	.end
 
-	.inline	decr32, 0
+	.inline	atomic_dec_32, 0
 	lock
 	decl	(%rdi)
+	.end
+
+	.inline	atomic_and_32, 0
+	lock
+	andl	%esi, (%rdi)
+	.end
+
+	.inline	atomic_or_32, 0
+	lock
+	orl	%esi, (%rdi)
 	.end
 
 	.inline ht_pause, 0

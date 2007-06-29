@@ -55,12 +55,12 @@
 	 * 32-bit applications that use %g5 as an invariant register.
 	 */
 
-	.inline	cas32, 0
+	.inline	atomic_cas_32, 0
 	.word	0xd5e21009	! cas [%o0], %o1, %o2
 	mov	%o2, %o0
 	.end
 
-	.inline	swap32, 0
+	.inline	atomic_swap_32, 0
 	ld	[%o0], %o2
 1:
 	mov	%o1, %o3
@@ -71,7 +71,7 @@
 	mov	%o3, %o0
 	.end
 
-	.inline	incr32, 0
+	.inline	atomic_inc_32, 0
 	ld	[%o0], %o2
 1:
 	add	%o2, 1, %o3
@@ -81,10 +81,30 @@
 	  mov	%o3, %o2
 	.end
 
-	.inline	decr32, 0
+	.inline	atomic_dec_32, 0
 	ld	[%o0], %o2
 1:
 	sub	%o2, 1, %o3
+	.word	0xd7e2100a	! cas [%o0], %o2, %o3
+	cmp	%o2, %o3
+	bne,a	1b
+	  mov	%o3, %o2
+	.end
+
+	.inline	atomic_and_32, 0
+	ld	[%o0], %o2
+1:
+	and	%o2, %o1, %o3
+	.word	0xd7e2100a	! cas [%o0], %o2, %o3
+	cmp	%o2, %o3
+	bne,a	1b
+	  mov	%o3, %o2
+	.end
+
+	.inline	atomic_or_32, 0
+	ld	[%o0], %o2
+1:
+	or	%o2, %o1, %o3
 	.word	0xd7e2100a	! cas [%o0], %o2, %o3
 	cmp	%o2, %o3
 	bne,a	1b

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -292,7 +292,7 @@ spin_lock_clear(mutex_t *mp)
 	ulwp_t *self = curthread;
 
 	mp->mutex_owner = 0;
-	if (swap32(&mp->mutex_lockword, 0) & WAITERMASK) {
+	if (atomic_swap_32(&mp->mutex_lockword, 0) & WAITERMASK) {
 		(void) ___lwp_mutex_wakeup(mp);
 		if (self->ul_spin_lock_wakeup != UINT_MAX)
 			self->ul_spin_lock_wakeup++;
@@ -569,18 +569,10 @@ queue_slot(queue_head_t *qp, void *wchan, int *more, ulwp_t **prevp)
 }
 
 ulwp_t *
-dequeue(queue_head_t *qp, void *wchan, int *more)
+queue_unlink(queue_head_t *qp, ulwp_t **ulwpp, ulwp_t *prev)
 {
-	ulwp_t **ulwpp;
 	ulwp_t *ulwp;
-	ulwp_t *prev;
 
-	if ((ulwpp = queue_slot(qp, wchan, more, &prev)) == NULL)
-		return (NULL);
-
-	/*
-	 * Dequeue the waiter.
-	 */
 	ulwp = *ulwpp;
 	*ulwpp = ulwp->ul_link;
 	ulwp->ul_link = NULL;
@@ -591,6 +583,17 @@ dequeue(queue_head_t *qp, void *wchan, int *more)
 	ulwp->ul_wchan = NULL;
 
 	return (ulwp);
+}
+
+ulwp_t *
+dequeue(queue_head_t *qp, void *wchan, int *more)
+{
+	ulwp_t **ulwpp;
+	ulwp_t *prev;
+
+	if ((ulwpp = queue_slot(qp, wchan, more, &prev)) == NULL)
+		return (NULL);
+	return (queue_unlink(qp, ulwpp, prev));
 }
 
 /*
@@ -623,16 +626,10 @@ dequeue_self(queue_head_t *qp, void *wchan)
 	    prev = ulwp, ulwpp = &ulwp->ul_link) {
 		if (ulwp == self) {
 			/* dequeue ourself */
-			*ulwpp = self->ul_link;
-			if (qp->qh_tail == self)
-				qp->qh_tail = prev;
-			qp->qh_qlen--;
 			ASSERT(self->ul_wchan == wchan);
+			(void) queue_unlink(qp, ulwpp, prev);
 			self->ul_cvmutex = NULL;
-			self->ul_sleepq = NULL;
-			self->ul_wchan = NULL;
 			self->ul_cv_wake = 0;
-			self->ul_link = NULL;
 			found = 1;
 			break;
 		}
@@ -670,7 +667,6 @@ unsleep_self(void)
 	 * to recursion.  Just manipulate self->ul_critical directly.
 	 */
 	self->ul_critical++;
-	self->ul_writer = 0;
 	while (self->ul_sleepq != NULL) {
 		qp = queue_lock(self->ul_wchan, self->ul_qtype);
 		/*
@@ -679,8 +675,10 @@ unsleep_self(void)
 		 * If so, just loop around and try again.
 		 * dequeue_self() clears self->ul_sleepq.
 		 */
-		if (qp == self->ul_sleepq)
+		if (qp == self->ul_sleepq) {
 			(void) dequeue_self(qp, self->ul_wchan);
+			self->ul_writer = 0;
+		}
 		queue_unlock(qp);
 	}
 	self->ul_critical--;
@@ -969,11 +967,11 @@ mutex_trylock_adaptive(mutex_t *mp)
 	 * programs will not suffer in any case.
 	 */
 	enter_critical(self);		/* protects ul_schedctl */
-	incr32(&mp->mutex_spinners);
+	atomic_inc_32(&mp->mutex_spinners);
 	for (count = 0; count < max; count++) {
 		if (*lockp == 0 && set_lock_byte(lockp) == 0) {
 			*ownerp = (uintptr_t)self;
-			decr32(&mp->mutex_spinners);
+			atomic_dec_32(&mp->mutex_spinners);
 			exit_critical(self);
 			DTRACE_PROBE2(plockstat, mutex__spun, 1, count);
 			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, count);
@@ -1003,7 +1001,7 @@ mutex_trylock_adaptive(mutex_t *mp)
 		    scp->sc_state != SC_ONPROC))
 			break;
 	}
-	decr32(&mp->mutex_spinners);
+	atomic_dec_32(&mp->mutex_spinners);
 	exit_critical(self);
 
 	DTRACE_PROBE2(plockstat, mutex__spun, 0, count);
@@ -1173,8 +1171,8 @@ mutex_unlock_queue(mutex_t *mp)
 	if (!(*lockw & WAITERMASK)) {	/* no waiter exists right now */
 		mp->mutex_owner = 0;
 		DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
-		if (!(swap32(lockw, 0) & WAITERMASK))	/* still no waiters */
-			return (0);
+		if (!(atomic_swap_32(lockw, 0) & WAITERMASK))
+			return (0);	/* still no waiters */
 		no_preempt(self);	/* ensure a prompt wakeup */
 		lwpid = mutex_wakeup(mp);
 	} else {
@@ -1183,7 +1181,8 @@ mutex_unlock_queue(mutex_t *mp)
 		spinp = (volatile uint32_t *)&mp->mutex_spinners;
 		mp->mutex_owner = 0;
 		DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
-		(void) swap32(lockw, WAITER);	/* clear lock, retain waiter */
+		/* clear lock, retain waiter */
+		(void) atomic_swap_32(lockw, WAITER);
 
 		/*
 		 * We spin here fewer times than mutex_trylock_adaptive().
@@ -1249,14 +1248,14 @@ mutex_unlock_process(mutex_t *mp)
 	DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
 	if (count == 0) {
 		/* clear lock, test waiter */
-		if (!(swap32(&mp->mutex_lockword, 0) & WAITERMASK)) {
+		if (!(atomic_swap_32(&mp->mutex_lockword, 0) & WAITERMASK)) {
 			/* no waiters now */
 			preempt(self);
 			return;
 		}
 	} else {
 		/* clear lock, retain waiter */
-		(void) swap32(&mp->mutex_lockword, WAITER);
+		(void) atomic_swap_32(&mp->mutex_lockword, WAITER);
 		lockp = (volatile uint8_t *)&mp->mutex_lockw;
 		while (--count >= 0) {
 			if (*lockp != 0) {
@@ -1945,7 +1944,7 @@ mutex_unlock_internal(mutex_t *mp)
 		} else if (mtype & USYNC_PROCESS_ROBUST) {
 			error = ___lwp_mutex_unlock(mp);
 		} else {
-			if (swap32(&mp->mutex_lockword, 0) & WAITERMASK)
+			if (atomic_swap_32(&mp->mutex_lockword, 0) & WAITERMASK)
 				(void) ___lwp_mutex_wakeup(mp);
 			error = 0;
 		}
@@ -1961,7 +1960,8 @@ mutex_unlock_internal(mutex_t *mp)
 			mp->mutex_owner = 0;
 			mp->mutex_ownerpid = 0;
 			DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
-			if (swap32(&mp->mutex_lockword, 0) & WAITERMASK) {
+			if (atomic_swap_32(&mp->mutex_lockword, 0) &
+			    WAITERMASK) {
 				no_preempt(self);
 				(void) ___lwp_mutex_wakeup(mp);
 				preempt(self);
@@ -2038,7 +2038,7 @@ fast_unlock:
 				/* no waiter exists right now */
 				mp->mutex_owner = 0;
 				DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
-				if (swap32(&mp->mutex_lockword, 0) &
+				if (atomic_swap_32(&mp->mutex_lockword, 0) &
 				    WAITERMASK) {
 					/* a waiter suddenly appeared */
 					no_preempt(self);
@@ -2088,7 +2088,7 @@ fast_unlock:
 				mp->mutex_owner = 0;
 				mp->mutex_ownerpid = 0;
 				DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
-				if (swap32(&mp->mutex_lockword, 0) &
+				if (atomic_swap_32(&mp->mutex_lockword, 0) &
 				    WAITERMASK) {
 					no_preempt(self);
 					(void) ___lwp_mutex_wakeup(mp);
@@ -2408,7 +2408,7 @@ _pthread_spin_unlock(pthread_spinlock_t *lock)
 	mp->mutex_owner = 0;
 	mp->mutex_ownerpid = 0;
 	DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
-	(void) swap32(&mp->mutex_lockword, 0);
+	(void) atomic_swap_32(&mp->mutex_lockword, 0);
 	preempt(self);
 	return (0);
 }
@@ -3035,8 +3035,53 @@ cond_signal_internal(cond_t *cvp)
 	return (error);
 }
 
-#define	MAXLWPS	128	/* max remembered lwpids before overflow */
-#define	NEWLWPS	2048	/* max remembered lwpids at first overflow */
+/*
+ * Utility function called from cond_broadcast() and rw_queue_release()
+ * to (re)allocate a big buffer to hold the lwpids of all the threads
+ * to be set running after they are removed from their sleep queues.
+ * Since we are holding a queue lock, we cannot call any function
+ * that might acquire a lock.  mmap(), munmap() and lwp_unpark_all()
+ * are simple system calls and are safe in this regard.
+ */
+lwpid_t *
+alloc_lwpids(lwpid_t *lwpid, int *nlwpid_ptr, int *maxlwps_ptr)
+{
+	/*
+	 * Allocate NEWLWPS ids on the first overflow.
+	 * Double the allocation each time after that.
+	 */
+	int nlwpid = *nlwpid_ptr;
+	int maxlwps = *maxlwps_ptr;
+	int first_allocation;
+	int newlwps;
+	void *vaddr;
+
+	ASSERT(nlwpid == maxlwps);
+
+	first_allocation = (maxlwps == MAXLWPS);
+	newlwps = first_allocation? NEWLWPS : 2 * maxlwps;
+	vaddr = _private_mmap(NULL, newlwps * sizeof (lwpid_t),
+	    PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, (off_t)0);
+
+	if (vaddr == MAP_FAILED) {
+		/*
+		 * Let's hope this never happens.
+		 * If it does, then we have a terrible
+		 * thundering herd on our hands.
+		 */
+		(void) __lwp_unpark_all(lwpid, nlwpid);
+		*nlwpid_ptr = 0;
+	} else {
+		(void) _memcpy(vaddr, lwpid, maxlwps * sizeof (lwpid_t));
+		if (!first_allocation)
+			(void) _private_munmap(lwpid,
+			    maxlwps * sizeof (lwpid_t));
+		lwpid = vaddr;
+		*maxlwps_ptr = newlwps;
+	}
+
+	return (lwpid);
+}
 
 #pragma weak pthread_cond_broadcast = cond_broadcast_internal
 #pragma weak _pthread_cond_broadcast = cond_broadcast_internal
@@ -3051,16 +3096,15 @@ cond_broadcast_internal(cond_t *cvp)
 	int error = 0;
 	queue_head_t *qp;
 	mutex_t *mp;
-	queue_head_t *mqp;
 	mutex_t *mp_cache = NULL;
-	queue_head_t *mqp_cache = NULL;
+	queue_head_t *mqp = NULL;
 	ulwp_t **ulwpp;
 	ulwp_t *ulwp;
 	ulwp_t *prev = NULL;
-	lwpid_t buffer[MAXLWPS];
-	lwpid_t *lwpid = buffer;
 	int nlwpid = 0;
 	int maxlwps = MAXLWPS;
+	lwpid_t buffer[MAXLWPS];
+	lwpid_t *lwpid = buffer;
 
 	if (csp)
 		tdb_incr(csp->cond_broadcast);
@@ -3085,89 +3129,61 @@ cond_broadcast_internal(cond_t *cvp)
 	 * on-stack buffer, we need to allocate more but we can't call
 	 * lmalloc() because we are holding a queue lock when the overflow
 	 * occurs and lmalloc() acquires a lock.  We can't use alloca()
-	 * either because the application may have allocated a small stack
-	 * and we don't want to overrun the stack.  So we use the mmap()
+	 * either because the application may have allocated a small
+	 * stack and we don't want to overrun the stack.  So we call
+	 * alloc_lwpids() to allocate a bigger buffer using the mmap()
 	 * system call directly since that path acquires no locks.
 	 */
 	qp = queue_lock(cvp, CV);
 	cvp->cond_waiters_user = 0;
 	ulwpp = &qp->qh_head;
 	while ((ulwp = *ulwpp) != NULL) {
-
 		if (ulwp->ul_wchan != cvp) {
 			prev = ulwp;
 			ulwpp = &ulwp->ul_link;
 			continue;
 		}
-
 		*ulwpp = ulwp->ul_link;
 		if (qp->qh_tail == ulwp)
 			qp->qh_tail = prev;
 		qp->qh_qlen--;
 		ulwp->ul_link = NULL;
-
 		mp = ulwp->ul_cvmutex;		/* his mutex */
 		ulwp->ul_cvmutex = NULL;
 		ASSERT(mp != NULL);
-
 		if (ulwp->ul_cv_wake || !MUTEX_OWNED(mp, self)) {
 			ulwp->ul_sleepq = NULL;
 			ulwp->ul_wchan = NULL;
 			ulwp->ul_cv_wake = 0;
-			if (nlwpid == maxlwps) {
-				/*
-				 * Allocate NEWLWPS ids on the first overflow.
-				 * Double the allocation each time after that.
-				 */
-				int newlwps = (lwpid == buffer)? NEWLWPS :
-						2 * maxlwps;
-				void *vaddr = _private_mmap(NULL,
-					newlwps * sizeof (lwpid_t),
-					PROT_READ|PROT_WRITE,
-					MAP_PRIVATE|MAP_ANON, -1, (off_t)0);
-				if (vaddr == MAP_FAILED) {
-					/*
-					 * Let's hope this never happens.
-					 * If it does, then we have a terrible
-					 * thundering herd on our hands.
-					 */
-					(void) __lwp_unpark_all(lwpid, nlwpid);
-					nlwpid = 0;
-				} else {
-					(void) _memcpy(vaddr, lwpid,
-						maxlwps * sizeof (lwpid_t));
-					if (lwpid != buffer)
-						(void) _private_munmap(lwpid,
-						    maxlwps * sizeof (lwpid_t));
-					lwpid = vaddr;
-					maxlwps = newlwps;
-				}
-			}
+			if (nlwpid == maxlwps)
+				lwpid = alloc_lwpids(lwpid, &nlwpid, &maxlwps);
 			lwpid[nlwpid++] = ulwp->ul_lwpid;
 		} else {
 			if (mp != mp_cache) {
-				if (mqp_cache != NULL)
-					queue_unlock(mqp_cache);
-				mqp_cache = queue_lock(mp, MX);
 				mp_cache = mp;
+				if (mqp != NULL)
+					queue_unlock(mqp);
+				mqp = queue_lock(mp, MX);
 			}
-			mqp = mqp_cache;
 			enqueue(mqp, ulwp, mp, MX);
 			mp->mutex_waiters = 1;
 		}
 	}
-	if (mqp_cache != NULL)
-		queue_unlock(mqp_cache);
-	queue_unlock(qp);
-	if (nlwpid) {
+	if (mqp != NULL)
+		queue_unlock(mqp);
+	if (nlwpid == 0) {
+		queue_unlock(qp);
+	} else {
+		no_preempt(self);
+		queue_unlock(qp);
 		if (nlwpid == 1)
 			(void) __lwp_unpark(lwpid[0]);
 		else
 			(void) __lwp_unpark_all(lwpid, nlwpid);
+		preempt(self);
 	}
 	if (lwpid != buffer)
 		(void) _private_munmap(lwpid, maxlwps * sizeof (lwpid_t));
-
 	return (error);
 }
 

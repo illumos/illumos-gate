@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -159,7 +158,7 @@ _preexec_sig_unload(Lc_addr_range_t range[], uint_t count)
 {
 	uberdata_t *udp = curthread->ul_uberdata;
 	int sig;
-	mutex_t *mp;
+	rwlock_t *rwlp;
 	struct sigaction *sap;
 	struct sigaction oact;
 	void (*handler)();
@@ -170,10 +169,10 @@ again:
 		handler = sap->sa_handler;
 		if (handler != SIG_DFL && handler != SIG_IGN &&
 		    in_range(handler, range, count)) {
-			mp = &udp->siguaction[sig].sig_lock;
-			lmutex_lock(mp);
+			rwlp = &udp->siguaction[sig].sig_lock;
+			lrw_wrlock(rwlp);
 			if (handler != sap->sa_handler) {
-				lmutex_unlock(mp);
+				lrw_unlock(rwlp);
 				goto again;
 			}
 			sap->sa_handler = SIG_DFL;
@@ -183,7 +182,7 @@ again:
 			    oact.sa_handler != SIG_DFL &&
 			    oact.sa_handler != SIG_IGN)
 				(void) __sigaction(sig, sap, NULL);
-			lmutex_unlock(mp);
+			lrw_unlock(rwlp);
 		}
 	}
 }

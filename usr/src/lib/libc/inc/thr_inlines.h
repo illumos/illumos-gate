@@ -147,7 +147,7 @@ set_lock_byte(volatile uint8_t *__lockp)
 }
 
 extern __inline__ uint32_t
-swap32(volatile uint32_t *__memory, uint32_t __value)
+atomic_swap_32(volatile uint32_t *__memory, uint32_t __value)
 {
 #if defined(__x86)
 	__asm__ __volatile__(
@@ -174,7 +174,7 @@ swap32(volatile uint32_t *__memory, uint32_t __value)
 }
 
 extern __inline__ uint32_t
-cas32(volatile uint32_t *__memory, uint32_t __cmp, uint32_t __newvalue)
+atomic_cas_32(volatile uint32_t *__memory, uint32_t __cmp, uint32_t __newvalue)
 {
 	uint32_t __oldvalue;
 #if defined(__x86)
@@ -185,7 +185,7 @@ cas32(volatile uint32_t *__memory, uint32_t __cmp, uint32_t __newvalue)
 #elif defined(__sparc)
 	__asm__ __volatile__(
 		"cas [%2], %3, %1"
-		: "=m" (*__memory),  "+r" (__oldvalue)
+		: "=m" (*__memory), "=&r" (__oldvalue)
 		: "r" (__memory), "r" (__cmp), "1" (__newvalue));
 #else
 #error	"port me"
@@ -194,7 +194,7 @@ cas32(volatile uint32_t *__memory, uint32_t __cmp, uint32_t __newvalue)
 }
 
 extern __inline__ void
-incr32(volatile uint32_t *__memory)
+atomic_inc_32(volatile uint32_t *__memory)
 {
 #if defined(__x86)
 	__asm__ __volatile__(
@@ -219,7 +219,7 @@ incr32(volatile uint32_t *__memory)
 }
 
 extern __inline__ void
-decr32(volatile uint32_t *__memory)
+atomic_dec_32(volatile uint32_t *__memory)
 {
 #if defined(__x86)
 	__asm__ __volatile__(
@@ -237,6 +237,58 @@ decr32(volatile uint32_t *__memory)
 		"  mov %1, %0"
 		: "=&r" (__tmp1), "=&r" (__tmp2), "=m" (*__memory)
 		: "r" (__memory)
+		: "cc");
+#else
+#error	"port me"
+#endif
+}
+
+extern __inline__ void
+atomic_and_32(volatile uint32_t *__memory, uint32_t __bits)
+{
+#if defined(__x86)
+	__asm__ __volatile__(
+		"lock; andl %1, %0"
+		: "+m" (*__memory)
+		: "r" (__bits));
+#elif defined(__sparc)
+	uint32_t __tmp1, __tmp2;
+	__asm__ __volatile__(
+		"ld [%3], %0\n\t"
+		"1:\n\t"
+		"and %0, %4, %1\n\t"
+		"cas [%3], %0, %1\n\t"
+		"cmp %0, %1\n\t"
+		"bne,a,pn %%icc, 1b\n\t"
+		"  mov %1, %0"
+		: "=&r" (__tmp1), "=&r" (__tmp2), "=m" (*__memory)
+		: "r" (__memory), "r" (__bits)
+		: "cc");
+#else
+#error	"port me"
+#endif
+}
+
+extern __inline__ void
+atomic_or_32(volatile uint32_t *__memory, uint32_t __bits)
+{
+#if defined(__x86)
+	__asm__ __volatile__(
+		"lock; orl %1, %0"
+		: "+m" (*__memory)
+		: "r" (__bits));
+#elif defined(__sparc)
+	uint32_t __tmp1, __tmp2;
+	__asm__ __volatile__(
+		"ld [%3], %0\n\t"
+		"1:\n\t"
+		"or %0, %4, %1\n\t"
+		"cas [%3], %0, %1\n\t"
+		"cmp %0, %1\n\t"
+		"bne,a,pn %%icc, 1b\n\t"
+		"  mov %1, %0"
+		: "=&r" (__tmp1), "=&r" (__tmp2), "=m" (*__memory)
+		: "r" (__memory), "r" (__bits)
 		: "cc");
 #else
 #error	"port me"

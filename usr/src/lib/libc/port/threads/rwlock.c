@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,6 @@
 
 #include "lint.h"
 #include "thr_uberdata.h"
-
 #include <sys/sdt.h>
 
 #define	TRY_FLAG		0x10
@@ -39,8 +38,15 @@
 
 #define	NLOCKS	4	/* initial number of readlock_t structs allocated */
 
+#define	ASSERT_CONSISTENT_STATE(readers)		\
+	ASSERT(!((readers) & URW_WRITE_LOCKED) ||	\
+		((readers) & ~URW_HAS_WAITERS) == URW_WRITE_LOCKED)
+
 /*
  * Find/allocate an entry for rwlp in our array of rwlocks held for reading.
+ * We must be deferring signals for this to be safe.
+ * Else if we are returning an entry with ul_rdlocks == 0,
+ * it could be reassigned behind our back in a signal handler.
  */
 static readlock_t *
 rwl_entry(rwlock_t *rwlp)
@@ -49,6 +55,9 @@ rwl_entry(rwlock_t *rwlp)
 	readlock_t *remembered = NULL;
 	readlock_t *readlockp;
 	uint_t nlocks;
+
+	/* we must be deferring signals */
+	ASSERT((self->ul_critical + self->ul_sigdefer) != 0);
 
 	if ((nlocks = self->ul_rdlocks) != 0)
 		readlockp = self->ul_readlock.array;
@@ -131,35 +140,40 @@ rwl_free(ulwp_t *ulwp)
 int
 _rw_read_held(rwlock_t *rwlp)
 {
-	ulwp_t *self;
+	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
+	uint32_t readers;
+	ulwp_t *self = curthread;
 	readlock_t *readlockp;
 	uint_t nlocks;
+	int rval = 0;
 
-	/* quick answer */
-	if (rwlp->rwlock_type == USYNC_PROCESS) {
-		if (!((uint32_t)rwlp->rwlock_readers & URW_READERS_MASK))
-			return (0);
-	} else if (rwlp->rwlock_readers <= 0) {
-		return (0);
+	no_preempt(self);
+
+	readers = *rwstate;
+	ASSERT_CONSISTENT_STATE(readers);
+	if (!(readers & URW_WRITE_LOCKED) &&
+	    (readers & URW_READERS_MASK) != 0) {
+		/*
+		 * The lock is held for reading by some thread.
+		 * Search our array of rwlocks held for reading for a match.
+		 */
+		if ((nlocks = self->ul_rdlocks) != 0)
+			readlockp = self->ul_readlock.array;
+		else {
+			nlocks = 1;
+			readlockp = &self->ul_readlock.single;
+		}
+		for (; nlocks; nlocks--, readlockp++) {
+			if (readlockp->rd_rwlock == rwlp) {
+				if (readlockp->rd_count)
+					rval = 1;
+				break;
+			}
+		}
 	}
 
-	/*
-	 * The lock is held for reading by some thread.
-	 * Search our array of rwlocks held for reading for a match.
-	 */
-	self = curthread;
-	if ((nlocks = self->ul_rdlocks) != 0)
-		readlockp = self->ul_readlock.array;
-	else {
-		nlocks = 1;
-		readlockp = &self->ul_readlock.single;
-	}
-
-	for (; nlocks; nlocks--, readlockp++)
-		if (readlockp->rd_rwlock == rwlp)
-			return (readlockp->rd_count? 1 : 0);
-
-	return (0);
+	preempt(self);
+	return (rval);
 }
 
 /*
@@ -171,16 +185,22 @@ _rw_read_held(rwlock_t *rwlp)
 int
 _rw_write_held(rwlock_t *rwlp)
 {
+	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
+	uint32_t readers;
 	ulwp_t *self = curthread;
-	uberdata_t *udp = self->ul_uberdata;
+	int rval;
 
-	if (rwlp->rwlock_type == USYNC_PROCESS)
-		return (((uint32_t)rwlp->rwlock_readers & URW_WRITE_LOCKED) &&
-		    (rwlp->rwlock_ownerpid == udp->pid) &&
-		    (rwlp->rwlock_owner == (uintptr_t)self));
+	no_preempt(self);
 
-	/* USYNC_THREAD */
-	return (rwlp->rwlock_readers == -1 && mutex_is_held(&rwlp->mutex));
+	readers = *rwstate;
+	ASSERT_CONSISTENT_STATE(readers);
+	rval = ((readers & URW_WRITE_LOCKED) &&
+	    rwlp->rwlock_owner == (uintptr_t)self &&
+	    (rwlp->rwlock_type == USYNC_THREAD ||
+	    rwlp->rwlock_ownerpid == self->ul_uberdata->pid));
+
+	preempt(self);
+	return (rval);
 }
 
 #pragma weak rwlock_init = __rwlock_init
@@ -195,19 +215,15 @@ __rwlock_init(rwlock_t *rwlp, int type, void *arg)
 	 * Once reinitialized, we can no longer be holding a read or write lock.
 	 * We can do nothing about other threads that are holding read locks.
 	 */
-	if (rw_read_is_held(rwlp))
-		rwl_entry(rwlp)->rd_count = 0;
+	sigoff(curthread);
+	rwl_entry(rwlp)->rd_count = 0;
+	sigon(curthread);
 	(void) _memset(rwlp, 0, sizeof (*rwlp));
 	rwlp->rwlock_type = (uint16_t)type;
 	rwlp->rwlock_magic = RWL_MAGIC;
-	rwlp->rwlock_readers = 0;
 	rwlp->mutex.mutex_type = (uint8_t)type;
 	rwlp->mutex.mutex_flag = LOCK_INITED;
 	rwlp->mutex.mutex_magic = MUTEX_MAGIC;
-	rwlp->readercv.cond_type = (uint16_t)type;
-	rwlp->readercv.cond_magic = COND_MAGIC;
-	rwlp->writercv.cond_type = (uint16_t)type;
-	rwlp->writercv.cond_magic = COND_MAGIC;
 	return (0);
 }
 
@@ -222,59 +238,191 @@ __rwlock_destroy(rwlock_t *rwlp)
 	 * Once destroyed, we can no longer be holding a read or write lock.
 	 * We can do nothing about other threads that are holding read locks.
 	 */
-	if (rw_read_is_held(rwlp))
-		rwl_entry(rwlp)->rd_count = 0;
+	sigoff(curthread);
+	rwl_entry(rwlp)->rd_count = 0;
+	sigon(curthread);
 	rwlp->rwlock_magic = 0;
 	tdb_sync_obj_deregister(rwlp);
 	return (0);
 }
 
 /*
- * Wake up the next thread sleeping on the rwlock queue and then
+ * Attempt to acquire a readers lock.  Return true on success.
+ */
+static int
+read_lock_try(rwlock_t *rwlp, int ignore_waiters_flag)
+{
+	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
+	uint32_t mask = ignore_waiters_flag?
+		URW_WRITE_LOCKED : (URW_HAS_WAITERS | URW_WRITE_LOCKED);
+	uint32_t readers;
+	ulwp_t *self = curthread;
+
+	no_preempt(self);
+	while (((readers = *rwstate) & mask) == 0) {
+		if (atomic_cas_32(rwstate, readers, readers + 1) == readers) {
+			preempt(self);
+			return (1);
+		}
+	}
+	preempt(self);
+	return (0);
+}
+
+/*
+ * Attempt to release a reader lock.  Return true on success.
+ */
+static int
+read_unlock_try(rwlock_t *rwlp)
+{
+	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
+	uint32_t readers;
+	ulwp_t *self = curthread;
+
+	no_preempt(self);
+	while (((readers = *rwstate) & URW_HAS_WAITERS) == 0) {
+		if (atomic_cas_32(rwstate, readers, readers - 1) == readers) {
+			preempt(self);
+			return (1);
+		}
+	}
+	preempt(self);
+	return (0);
+}
+
+/*
+ * Attempt to acquire a writer lock.  Return true on success.
+ */
+static int
+write_lock_try(rwlock_t *rwlp, int ignore_waiters_flag)
+{
+	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
+	uint32_t mask = ignore_waiters_flag?
+		(URW_WRITE_LOCKED | URW_READERS_MASK) :
+		(URW_HAS_WAITERS | URW_WRITE_LOCKED | URW_READERS_MASK);
+	ulwp_t *self = curthread;
+	uint32_t readers;
+
+	no_preempt(self);
+	while (((readers = *rwstate) & mask) == 0) {
+		if (atomic_cas_32(rwstate, readers, readers | URW_WRITE_LOCKED)
+		    == readers) {
+			preempt(self);
+			return (1);
+		}
+	}
+	preempt(self);
+	return (0);
+}
+
+/*
+ * Attempt to release a writer lock.  Return true on success.
+ */
+static int
+write_unlock_try(rwlock_t *rwlp)
+{
+	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
+	uint32_t readers;
+	ulwp_t *self = curthread;
+
+	no_preempt(self);
+	while (((readers = *rwstate) & URW_HAS_WAITERS) == 0) {
+		if (atomic_cas_32(rwstate, readers, 0) == readers) {
+			preempt(self);
+			return (1);
+		}
+	}
+	preempt(self);
+	return (0);
+}
+
+/*
+ * Wake up thread(s) sleeping on the rwlock queue and then
  * drop the queue lock.  Return non-zero if we wake up someone.
- *
- * This is called whenever a thread releases the lock and whenever a
- * thread successfully or unsuccessfully attempts to acquire the lock.
- * (Basically, whenever the state of the queue might have changed.)
- *
- * We wake up at most one thread.  If there are more threads to be
- * awakened, the next one will be waked up by the thread we wake up.
- * This ensures that queued threads will acquire the lock in priority
- * order and that queued writers will take precedence over queued
- * readers of the same priority.
+ * This is called when a thread releases a lock that appears to have waiters.
  */
 static int
 rw_queue_release(queue_head_t *qp, rwlock_t *rwlp)
 {
+	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
+	uint32_t readers;
+	uint32_t writers;
+	int nlwpid = 0;
+	int maxlwps = MAXLWPS;
+	ulwp_t *self;
+	ulwp_t **ulwpp;
 	ulwp_t *ulwp;
-	int more;
+	ulwp_t *prev = NULL;
+	lwpid_t buffer[MAXLWPS];
+	lwpid_t *lwpid = buffer;
 
-	if (rwlp->rwlock_readers >= 0 && rwlp->rwlock_mwaiters) {
-		/*
-		 * The lock is free or at least is available to readers
-		 * and there are (or might be) waiters on the queue.
-		 */
-		if (rwlp->rwlock_readers != 0 &&
-		    (ulwp = queue_waiter(qp, rwlp)) == NULL)
-			rwlp->rwlock_mwaiters = 0;
-		else if (rwlp->rwlock_readers == 0 || !ulwp->ul_writer) {
-			if ((ulwp = dequeue(qp, rwlp, &more)) == NULL)
-				rwlp->rwlock_mwaiters = 0;
-			else {
-				ulwp_t *self = curthread;
-				lwpid_t lwpid = ulwp->ul_lwpid;
-
-				rwlp->rwlock_mwaiters = (more? 1 : 0);
-				no_preempt(self);
-				queue_unlock(qp);
-				(void) __lwp_unpark(lwpid);
-				preempt(self);
-				return (1);
-			}
-		}
+	readers = *rwstate;
+	ASSERT_CONSISTENT_STATE(readers);
+	if (!(readers & URW_HAS_WAITERS)) {
+		queue_unlock(qp);
+		return (0);
 	}
-	queue_unlock(qp);
-	return (0);
+	readers &= URW_READERS_MASK;
+	writers = 0;
+
+	/*
+	 * Walk the list of waiters and prepare to wake up as
+	 * many readers as we encounter before encountering
+	 * a writer.  If the first thread on the list is a
+	 * writer, stop there and wake it up.
+	 *
+	 * We keep track of lwpids that are to be unparked in lwpid[].
+	 * __lwp_unpark_all() is called to unpark all of them after
+	 * they have been removed from the sleep queue and the sleep
+	 * queue lock has been dropped.  If we run out of space in our
+	 * on-stack buffer, we need to allocate more but we can't call
+	 * lmalloc() because we are holding a queue lock when the overflow
+	 * occurs and lmalloc() acquires a lock.  We can't use alloca()
+	 * either because the application may have allocated a small
+	 * stack and we don't want to overrun the stack.  So we call
+	 * alloc_lwpids() to allocate a bigger buffer using the mmap()
+	 * system call directly since that path acquires no locks.
+	 */
+	ulwpp = &qp->qh_head;
+	while ((ulwp = *ulwpp) != NULL) {
+		if (ulwp->ul_wchan != rwlp) {
+			prev = ulwp;
+			ulwpp = &ulwp->ul_link;
+			continue;
+		}
+		if (ulwp->ul_writer) {
+			if (writers != 0 || readers != 0)
+				break;
+			/* one writer to wake */
+			writers++;
+		} else {
+			if (writers != 0)
+				break;
+			/* at least one reader to wake */
+			readers++;
+			if (nlwpid == maxlwps)
+				lwpid = alloc_lwpids(lwpid, &nlwpid, &maxlwps);
+		}
+		(void) queue_unlink(qp, ulwpp, prev);
+		lwpid[nlwpid++] = ulwp->ul_lwpid;
+	}
+	if (ulwp == NULL)
+		atomic_and_32(rwstate, ~URW_HAS_WAITERS);
+	if (nlwpid == 0) {
+		queue_unlock(qp);
+	} else {
+		self = curthread;
+		no_preempt(self);
+		queue_unlock(qp);
+		if (nlwpid == 1)
+			(void) __lwp_unpark(lwpid[0]);
+		else
+			(void) __lwp_unpark_all(lwpid, nlwpid);
+		preempt(self);
+	}
+	if (lwpid != buffer)
+		(void) _private_munmap(lwpid, maxlwps * sizeof (lwpid_t));
+	return (nlwpid != 0);
 }
 
 /*
@@ -290,11 +438,12 @@ rw_queue_release(queue_head_t *qp, rwlock_t *rwlp)
 int
 shared_rwlock_lock(rwlock_t *rwlp, timespec_t *tsp, int rd_wr)
 {
-	uint32_t *rwstate = (uint32_t *)&rwlp->readers;
-	ulwp_t *self = curthread;
-	uberdata_t *udp = self->ul_uberdata;
+	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
+	mutex_t *mp = &rwlp->mutex;
+	/* LINTED set but not used */
+	uint32_t readers;
 	int try_flag;
-	int error = 0;
+	int error;
 
 	try_flag = (rd_wr & TRY_FLAG);
 	rd_wr &= ~TRY_FLAG;
@@ -305,139 +454,55 @@ shared_rwlock_lock(rwlock_t *rwlp, timespec_t *tsp, int rd_wr)
 	}
 
 	do {
-		if ((error = _private_mutex_lock(&rwlp->mutex)) != 0)
+		if (try_flag && (*rwstate & URW_WRITE_LOCKED)) {
+			error = EBUSY;
 			break;
-
+		}
+		if ((error = _private_mutex_lock(mp)) != 0)
+			break;
 		if (rd_wr == READ_LOCK) {
-			/*
-			 * We are a reader.
-			 */
-
-			if ((*rwstate & ~URW_READERS_MASK) == 0) {
-				(*rwstate)++;
-				(void) _private_mutex_unlock(&rwlp->mutex);
-			} else if (try_flag) {
-				if (*rwstate & URW_WRITE_LOCKED) {
-					error = EBUSY;
-					(void) _private_mutex_unlock(
-					    &rwlp->mutex);
-				} else {
-					/*
-					 * We have a higher priority than any
-					 * queued waiters, or the waiters bit
-					 * may be inaccurate. Only the kernel
-					 * knows for sure.
-					 */
-					rwlp->rwlock_mowner = 0;
-					rwlp->rwlock_mownerpid = 0;
-					error = __lwp_rwlock_tryrdlock(rwlp);
-				}
-			} else {
-				rwlp->rwlock_mowner = 0;
-				rwlp->rwlock_mownerpid = 0;
-				error = __lwp_rwlock_rdlock(rwlp, tsp);
+			if (read_lock_try(rwlp, 0)) {
+				(void) _private_mutex_unlock(mp);
+				break;
 			}
 		} else {
-			/*
-			 * We are a writer.
-			 */
-
-			if (*rwstate == 0) {
-				*rwstate = URW_WRITE_LOCKED;
-				(void) _private_mutex_unlock(&rwlp->mutex);
-			} else if (try_flag) {
-				if (*rwstate & URW_WRITE_LOCKED) {
-					error = EBUSY;
-					(void) _private_mutex_unlock(
-					    &rwlp->mutex);
-				} else {
-					/*
-					 * The waiters bit may be inaccurate.
-					 * Only the kernel knows for sure.
-					 */
-					rwlp->rwlock_mowner = 0;
-					rwlp->rwlock_mownerpid = 0;
-					error = __lwp_rwlock_trywrlock(rwlp);
-				}
-			} else {
-				rwlp->rwlock_mowner = 0;
-				rwlp->rwlock_mownerpid = 0;
-				error = __lwp_rwlock_wrlock(rwlp, tsp);
+			if (write_lock_try(rwlp, 0)) {
+				(void) _private_mutex_unlock(mp);
+				break;
 			}
 		}
-	} while (error == EAGAIN);
-
-	if (error == 0) {
-		if (rd_wr == WRITE_LOCK) {
-			rwlp->rwlock_owner = (uintptr_t)self;
-			rwlp->rwlock_ownerpid = udp->pid;
-		}
-		if (!try_flag) {
-			DTRACE_PROBE3(plockstat, rw__blocked, rwlp, rd_wr, 1);
-		}
-		DTRACE_PROBE2(plockstat, rw__acquire, rwlp, rd_wr);
-	} else if (!try_flag) {
-		DTRACE_PROBE3(plockstat, rw__blocked, rwlp, rd_wr, 0);
-		DTRACE_PROBE3(plockstat, rw__error, rwlp, rd_wr, error);
-	}
-	return (error);
-}
-
-/*
- * Code for unlock of process-shared (USYNC_PROCESS) rwlocks.
- *
- * Note: if the lock appears to have waiters we call __lwp_rwlock_unlock()
- * holding the mutex. This returns with the mutex still held (for us to
- * release).
- */
-int
-shared_rwlock_unlock(rwlock_t *rwlp, int *waked)
-{
-	uint32_t *rwstate = (uint32_t *)&rwlp->readers;
-	int error = 0;
-
-	if ((error = _private_mutex_lock(&rwlp->mutex)) != 0)
-		return (error);
-
-	/* Reset flag used to suggest caller yields. */
-	*waked = 0;
-
-	/* Our right to unlock was checked in __rw_unlock(). */
-	if (*rwstate & URW_WRITE_LOCKED) {
-		rwlp->rwlock_owner = 0;
-		rwlp->rwlock_ownerpid = 0;
-	}
-
-	if ((*rwstate & ~URW_READERS_MASK) == 0) {
-		/* Simple multiple readers, no waiters case. */
-		if (*rwstate > 0)
-			(*rwstate)--;
-	} else if (!(*rwstate & URW_HAS_WAITERS)) {
-		/* Simple no waiters case (i.e. was write locked). */
-		*rwstate = 0;
-	} else {
+		atomic_or_32(rwstate, URW_HAS_WAITERS);
+		readers = *rwstate;
+		ASSERT_CONSISTENT_STATE(readers);
 		/*
-		 * We appear to have waiters so we must call into the kernel.
-		 * If there are waiters a full handoff will occur (rwstate
-		 * will be updated, and one or more threads will be awoken).
+		 * The calls to __lwp_rwlock_*() below will release the mutex,
+		 * so we need a dtrace probe here.
 		 */
-		error = __lwp_rwlock_unlock(rwlp);
+		mp->mutex_owner = 0;
+		DTRACE_PROBE2(plockstat, mutex__release, mp, 0);
+		/*
+		 * The waiters bit may be inaccurate.
+		 * Only the kernel knows for sure.
+		 */
+		if (rd_wr == READ_LOCK) {
+			if (try_flag)
+				error = __lwp_rwlock_tryrdlock(rwlp);
+			else
+				error = __lwp_rwlock_rdlock(rwlp, tsp);
+		} else {
+			if (try_flag)
+				error = __lwp_rwlock_trywrlock(rwlp);
+			else
+				error = __lwp_rwlock_wrlock(rwlp, tsp);
+		}
+	} while (error == EAGAIN || error == EINTR);
 
-		/* Suggest caller yields. */
-		*waked = 1;
-	}
-
-	(void) _private_mutex_unlock(&rwlp->mutex);
-
-	if (error) {
-		DTRACE_PROBE3(plockstat, rw__error, rwlp, 0, error);
-	} else {
-		DTRACE_PROBE2(plockstat, rw__release, rwlp, READ_LOCK);
+	if (!try_flag) {
+		DTRACE_PROBE3(plockstat, rw__blocked, rwlp, rd_wr, error == 0);
 	}
 
 	return (error);
 }
-
 
 /*
  * Common code for rdlock, timedrdlock, wrlock, timedwrlock, tryrdlock,
@@ -446,6 +511,8 @@ shared_rwlock_unlock(rwlock_t *rwlp, int *waked)
 int
 rwlock_lock(rwlock_t *rwlp, timespec_t *tsp, int rd_wr)
 {
+	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
+	uint32_t readers;
 	ulwp_t *self = curthread;
 	queue_head_t *qp;
 	ulwp_t *ulwp;
@@ -456,60 +523,29 @@ rwlock_lock(rwlock_t *rwlp, timespec_t *tsp, int rd_wr)
 	rd_wr &= ~TRY_FLAG;
 	ASSERT(rd_wr == READ_LOCK || rd_wr == WRITE_LOCK);
 
-	/*
-	 * Optimize for the case of having only a single thread.
-	 * (Most likely a traditional single-threaded application.)
-	 * We don't need the protection of queue_lock() in this case.
-	 * We need to defer signals, however (the other form of concurrency).
-	 */
-	if (!self->ul_uberdata->uberflags.uf_mt) {
-		sigoff(self);
-		if (rwlp->rwlock_readers < 0 ||
-		    (rd_wr == WRITE_LOCK && rwlp->rwlock_readers != 0)) {
-			sigon(self);
-			if (try_flag)
-				return (EBUSY);
-			/*
-			 * Sombody other than ourself owns the lock.  (If we
-			 * owned the lock, either for reading or writing, we
-			 * would already have returned EDEADLK in our caller.)
-			 * This can happen only in the child of fork1() when
-			 * some now-defunct thread was holding the lock when
-			 * the fork1() was executed by the current thread.
-			 * In this case, we just fall into the long way
-			 * to block, either forever or with a timeout.
-			 */
-			ASSERT(MUTEX_OWNER(&rwlp->mutex) != self);
-		} else {
-			if (rd_wr == READ_LOCK)
-				rwlp->rwlock_readers++;
-			else {
-				rwlp->rwlock_readers = -1;
-				rwlp->rwlock_mlockw = LOCKSET;
-				rwlp->rwlock_mowner = (uintptr_t)self;
-			}
-			sigon(self);
-			DTRACE_PROBE2(plockstat, rw__acquire, rwlp, rd_wr);
-			return (0);
-		}
-	}
-
 	if (!try_flag) {
 		DTRACE_PROBE2(plockstat, rw__block, rwlp, rd_wr);
 	}
 
-	/*
-	 * Do it the long way.
-	 */
 	qp = queue_lock(rwlp, MX);
+retry:
 	while (error == 0) {
-		if (rwlp->rwlock_readers < 0 ||
-		    (rd_wr == WRITE_LOCK && rwlp->rwlock_readers != 0))
+		if (rd_wr == READ_LOCK) {
+			if (read_lock_try(rwlp, 0))
+				goto out;
+		} else {
+			if (write_lock_try(rwlp, 0))
+				goto out;
+		}
+		atomic_or_32(rwstate, URW_HAS_WAITERS);
+		readers = *rwstate;
+		ASSERT_CONSISTENT_STATE(readers);
+		if ((readers & URW_WRITE_LOCKED) ||
+		    (rd_wr == WRITE_LOCK &&
+		    (readers & URW_READERS_MASK) != 0))
 			/* EMPTY */;	/* somebody holds the lock */
-		else if (!rwlp->rwlock_mwaiters)
-			break;		/* no queued waiters */
 		else if ((ulwp = queue_waiter(qp, rwlp)) == NULL) {
-			rwlp->rwlock_mwaiters = 0;
+			atomic_and_32(rwstate, ~URW_HAS_WAITERS);
 			break;		/* no queued waiters */
 		} else {
 			int our_pri = real_priority(self);
@@ -547,7 +583,6 @@ rwlock_lock(rwlock_t *rwlp, timespec_t *tsp, int rd_wr)
 		 */
 		self->ul_writer = rd_wr;	/* *must* be 0 or 1 */
 		enqueue(qp, self, rwlp, MX);
-		rwlp->rwlock_mwaiters = 1;
 		set_parking_flag(self, 1);
 		queue_unlock(qp);
 		if ((error = __lwp_park(tsp, 0)) == EINTR)
@@ -555,29 +590,26 @@ rwlock_lock(rwlock_t *rwlp, timespec_t *tsp, int rd_wr)
 		self->ul_writer = 0;
 		set_parking_flag(self, 0);
 		qp = queue_lock(rwlp, MX);
-		if (self->ul_sleepq)	/* timeout or spurious wakeup */
-			rwlp->rwlock_mwaiters = dequeue_self(qp, rwlp);
+		if (self->ul_sleepq && dequeue_self(qp, rwlp) == 0)
+			atomic_and_32(rwstate, ~URW_HAS_WAITERS);
 	}
 
 	if (error == 0) {
-		if (rd_wr == READ_LOCK)
-			rwlp->rwlock_readers++;
-		else {
-			rwlp->rwlock_readers = -1;
-			/* make it look like we acquired the embedded mutex */
-			rwlp->rwlock_mlockw = LOCKSET;
-			rwlp->rwlock_mowner = (uintptr_t)self;
+		if (rd_wr == READ_LOCK) {
+			if (!read_lock_try(rwlp, 1))
+				goto retry;
+		} else {
+			if (!write_lock_try(rwlp, 1))
+				goto retry;
 		}
-		if (!try_flag) {
-			DTRACE_PROBE3(plockstat, rw__blocked, rwlp, rd_wr, 1);
-		}
-		DTRACE_PROBE2(plockstat, rw__acquire, rwlp, rd_wr);
-	} else if (!try_flag) {
-		DTRACE_PROBE3(plockstat, rw__blocked, rwlp, rd_wr, 0);
-		DTRACE_PROBE3(plockstat, rw__error, rwlp, rd_wr, error);
 	}
 
-	(void) rw_queue_release(qp, rwlp);
+out:
+	queue_unlock(qp);
+
+	if (!try_flag) {
+		DTRACE_PROBE3(plockstat, rw__blocked, rwlp, rd_wr, error == 0);
+	}
 
 	return (error);
 }
@@ -595,14 +627,19 @@ rw_rdlock_impl(rwlock_t *rwlp, timespec_t *tsp)
 	 * If we already hold a readers lock on this rwlock,
 	 * just increment our reference count and return.
 	 */
+	sigoff(self);
 	readlockp = rwl_entry(rwlp);
 	if (readlockp->rd_count != 0) {
-		if (readlockp->rd_count == READ_LOCK_MAX)
-			return (EAGAIN);
-		readlockp->rd_count++;
-		DTRACE_PROBE2(plockstat, rw__acquire, rwlp, READ_LOCK);
-		return (0);
+		if (readlockp->rd_count == READ_LOCK_MAX) {
+			sigon(self);
+			error = EAGAIN;
+			goto out;
+		}
+		sigon(self);
+		error = 0;
+		goto out;
 	}
+	sigon(self);
 
 	/*
 	 * If we hold the writer lock, bail out.
@@ -611,18 +648,27 @@ rw_rdlock_impl(rwlock_t *rwlp, timespec_t *tsp)
 		if (self->ul_error_detection)
 			rwlock_error(rwlp, "rwlock_rdlock",
 			    "calling thread owns the writer lock");
-		return (EDEADLK);
+		error = EDEADLK;
+		goto out;
 	}
 
-	if (rwlp->rwlock_type == USYNC_PROCESS)		/* kernel-level */
+	if (read_lock_try(rwlp, 0))
+		error = 0;
+	else if (rwlp->rwlock_type == USYNC_PROCESS)	/* kernel-level */
 		error = shared_rwlock_lock(rwlp, tsp, READ_LOCK);
 	else						/* user-level */
 		error = rwlock_lock(rwlp, tsp, READ_LOCK);
 
+out:
 	if (error == 0) {
-		readlockp->rd_count = 1;
+		sigoff(self);
+		rwl_entry(rwlp)->rd_count++;
+		sigon(self);
 		if (rwsp)
 			tdb_incr(rwsp->rw_rdlock);
+		DTRACE_PROBE2(plockstat, rw__acquire, rwlp, READ_LOCK);
+	} else {
+		DTRACE_PROBE3(plockstat, rw__error, rwlp, READ_LOCK, error);
 	}
 
 	return (error);
@@ -691,7 +737,8 @@ rw_wrlock_impl(rwlock_t *rwlp, timespec_t *tsp)
 		if (self->ul_error_detection)
 			rwlock_error(rwlp, "rwlock_wrlock",
 			    "calling thread owns the readers lock");
-		return (EDEADLK);
+		error = EDEADLK;
+		goto out;
 	}
 
 	/*
@@ -701,20 +748,30 @@ rw_wrlock_impl(rwlock_t *rwlp, timespec_t *tsp)
 		if (self->ul_error_detection)
 			rwlock_error(rwlp, "rwlock_wrlock",
 			    "calling thread owns the writer lock");
-		return (EDEADLK);
+		error = EDEADLK;
+		goto out;
 	}
 
-	if (rwlp->rwlock_type == USYNC_PROCESS) {	/* kernel-level */
+	if (write_lock_try(rwlp, 0))
+		error = 0;
+	else if (rwlp->rwlock_type == USYNC_PROCESS)	/* kernel-level */
 		error = shared_rwlock_lock(rwlp, tsp, WRITE_LOCK);
-	} else {					/* user-level */
+	else						/* user-level */
 		error = rwlock_lock(rwlp, tsp, WRITE_LOCK);
-	}
 
-	if (error == 0 && rwsp) {
-		tdb_incr(rwsp->rw_wrlock);
-		rwsp->rw_wrlock_begin_hold = gethrtime();
+out:
+	if (error == 0) {
+		rwlp->rwlock_owner = (uintptr_t)self;
+		if (rwlp->rwlock_type == USYNC_PROCESS)
+			rwlp->rwlock_ownerpid = udp->pid;
+		if (rwsp) {
+			tdb_incr(rwsp->rw_wrlock);
+			rwsp->rw_wrlock_begin_hold = gethrtime();
+		}
+		DTRACE_PROBE2(plockstat, rw__acquire, rwlp, WRITE_LOCK);
+	} else {
+		DTRACE_PROBE3(plockstat, rw__error, rwlp, WRITE_LOCK, error);
 	}
-
 	return (error);
 }
 
@@ -788,24 +845,41 @@ __rw_tryrdlock(rwlock_t *rwlp)
 	 * If we already hold a readers lock on this rwlock,
 	 * just increment our reference count and return.
 	 */
+	sigoff(self);
 	readlockp = rwl_entry(rwlp);
 	if (readlockp->rd_count != 0) {
-		if (readlockp->rd_count == READ_LOCK_MAX)
-			return (EAGAIN);
-		readlockp->rd_count++;
-		DTRACE_PROBE2(plockstat, rw__acquire, rwlp, READ_LOCK);
-		return (0);
+		if (readlockp->rd_count == READ_LOCK_MAX) {
+			sigon(self);
+			error = EAGAIN;
+			goto out;
+		}
+		sigon(self);
+		error = 0;
+		goto out;
 	}
+	sigon(self);
 
-	if (rwlp->rwlock_type == USYNC_PROCESS)		/* kernel-level */
+	if (read_lock_try(rwlp, 0))
+		error = 0;
+	else if (rwlp->rwlock_type == USYNC_PROCESS)	/* kernel-level */
 		error = shared_rwlock_lock(rwlp, NULL, READ_LOCK_TRY);
 	else						/* user-level */
 		error = rwlock_lock(rwlp, NULL, READ_LOCK_TRY);
 
-	if (error == 0)
-		readlockp->rd_count = 1;
-	else if (rwsp)
-		tdb_incr(rwsp->rw_rdlock_try_fail);
+out:
+	if (error == 0) {
+		sigoff(self);
+		rwl_entry(rwlp)->rd_count++;
+		sigon(self);
+		DTRACE_PROBE2(plockstat, rw__acquire, rwlp, READ_LOCK);
+	} else {
+		if (rwsp)
+			tdb_incr(rwsp->rw_rdlock_try_fail);
+		if (error != EBUSY) {
+			DTRACE_PROBE3(plockstat, rw__error, rwlp, READ_LOCK,
+			    error);
+		}
+	}
 
 	return (error);
 }
@@ -822,21 +896,32 @@ __rw_trywrlock(rwlock_t *rwlp)
 	tdb_rwlock_stats_t *rwsp = RWLOCK_STATS(rwlp, udp);
 	int error;
 
-	ASSERT(!curthread->ul_critical || curthread->ul_bindflags);
+	ASSERT(!self->ul_critical || self->ul_bindflags);
 
 	if (rwsp)
 		tdb_incr(rwsp->rw_wrlock_try);
 
-	if (rwlp->rwlock_type == USYNC_PROCESS) {	/* kernel-level */
+	if (write_lock_try(rwlp, 0))
+		error = 0;
+	else if (rwlp->rwlock_type == USYNC_PROCESS)	/* kernel-level */
 		error = shared_rwlock_lock(rwlp, NULL, WRITE_LOCK_TRY);
-	} else {					/* user-level */
+	else						/* user-level */
 		error = rwlock_lock(rwlp, NULL, WRITE_LOCK_TRY);
-	}
-	if (rwsp) {
-		if (error)
-			tdb_incr(rwsp->rw_wrlock_try_fail);
-		else
+
+	if (error == 0) {
+		rwlp->rwlock_owner = (uintptr_t)self;
+		if (rwlp->rwlock_type == USYNC_PROCESS)
+			rwlp->rwlock_ownerpid = udp->pid;
+		if (rwsp)
 			rwsp->rw_wrlock_begin_hold = gethrtime();
+		DTRACE_PROBE2(plockstat, rw__acquire, rwlp, WRITE_LOCK);
+	} else {
+		if (rwsp)
+			tdb_incr(rwsp->rw_wrlock_try_fail);
+		if (error != EBUSY) {
+			DTRACE_PROBE3(plockstat, rw__error, rwlp, WRITE_LOCK,
+			    error);
+		}
 	}
 	return (error);
 }
@@ -848,23 +933,26 @@ __rw_trywrlock(rwlock_t *rwlp)
 int
 __rw_unlock(rwlock_t *rwlp)
 {
+	volatile uint32_t *rwstate = (volatile uint32_t *)&rwlp->rwlock_readers;
+	uint32_t readers;
 	ulwp_t *self = curthread;
 	uberdata_t *udp = self->ul_uberdata;
 	tdb_rwlock_stats_t *rwsp;
-	int32_t lock_count;
-	int waked;
+	queue_head_t *qp;
+	int rd_wr;
+	int waked = 0;
 
-	/* fetch the lock count once; it may change underfoot */
-	lock_count = rwlp->rwlock_readers;
-	if (rwlp->rwlock_type == USYNC_PROCESS) {
-		/* munge it from rwstate */
-		if (lock_count & URW_WRITE_LOCKED)
-			lock_count = -1;
-		else
-			lock_count &= URW_READERS_MASK;
+	readers = *rwstate;
+	ASSERT_CONSISTENT_STATE(readers);
+	if (readers & URW_WRITE_LOCKED) {
+		rd_wr = WRITE_LOCK;
+		readers = 0;
+	} else {
+		rd_wr = READ_LOCK;
+		readers &= URW_READERS_MASK;
 	}
 
-	if (lock_count < 0) {
+	if (rd_wr == WRITE_LOCK) {
 		/*
 		 * Since the writer lock is held, we'd better be
 		 * holding it, else we cannot legitimately be here.
@@ -882,12 +970,18 @@ __rw_unlock(rwlock_t *rwlp)
 				    gethrtime() - rwsp->rw_wrlock_begin_hold;
 			rwsp->rw_wrlock_begin_hold = 0;
 		}
-	} else if (lock_count > 0) {
+		rwlp->rwlock_owner = 0;
+		rwlp->rwlock_ownerpid = 0;
+	} else if (readers > 0) {
 		/*
 		 * A readers lock is held; if we don't hold one, bail out.
 		 */
-		readlock_t *readlockp = rwl_entry(rwlp);
+		readlock_t *readlockp;
+
+		sigoff(self);
+		readlockp = rwl_entry(rwlp);
 		if (readlockp->rd_count == 0) {
+			sigon(self);
 			if (self->ul_error_detection)
 				rwlock_error(rwlp, "rwlock_unlock",
 				    "readers lock held, "
@@ -899,9 +993,10 @@ __rw_unlock(rwlock_t *rwlp)
 		 * just decrement our reference count and return.
 		 */
 		if (--readlockp->rd_count != 0) {
-			DTRACE_PROBE2(plockstat, rw__release, rwlp, READ_LOCK);
-			return (0);
+			sigon(self);
+			goto out;
 		}
+		sigon(self);
 	} else {
 		/*
 		 * This is a usage error.
@@ -912,44 +1007,26 @@ __rw_unlock(rwlock_t *rwlp)
 		return (EPERM);
 	}
 
-	if (rwlp->rwlock_type == USYNC_PROCESS) {	/* kernel-level */
-		(void) shared_rwlock_unlock(rwlp, &waked);
-	} else if (!udp->uberflags.uf_mt) {		/* single threaded */
-		/*
-		 * In the case of having only a single thread, we don't
-		 * need the protection of queue_lock() (this parallels
-		 * the optimization made in rwlock_lock(), above).
-		 * As in rwlock_lock(), we need to defer signals.
-		 */
-		sigoff(self);
-		if (rwlp->rwlock_readers > 0) {
-			rwlp->rwlock_readers--;
-			DTRACE_PROBE2(plockstat, rw__release, rwlp, READ_LOCK);
-		} else {
-			rwlp->rwlock_readers = 0;
-			/* make it look like we released the embedded mutex */
-			rwlp->rwlock_mowner = 0;
-			rwlp->rwlock_mlockw = LOCKCLEAR;
-			DTRACE_PROBE2(plockstat, rw__release, rwlp, WRITE_LOCK);
-		}
-		sigon(self);
-		waked = 0;
-	} else {					/* multithreaded */
-		queue_head_t *qp;
-
+	if (rd_wr == WRITE_LOCK && write_unlock_try(rwlp)) {
+		/* EMPTY */;
+	} else if (rd_wr == READ_LOCK && read_unlock_try(rwlp)) {
+		/* EMPTY */;
+	} else if (rwlp->rwlock_type == USYNC_PROCESS) {
+		(void) _private_mutex_lock(&rwlp->mutex);
+		(void) __lwp_rwlock_unlock(rwlp);
+		(void) _private_mutex_unlock(&rwlp->mutex);
+		waked = 1;
+	} else {
 		qp = queue_lock(rwlp, MX);
-		if (rwlp->rwlock_readers > 0) {
-			rwlp->rwlock_readers--;
-			DTRACE_PROBE2(plockstat, rw__release, rwlp, READ_LOCK);
-		} else {
-			rwlp->rwlock_readers = 0;
-			/* make it look like we released the embedded mutex */
-			rwlp->rwlock_mowner = 0;
-			rwlp->rwlock_mlockw = LOCKCLEAR;
-			DTRACE_PROBE2(plockstat, rw__release, rwlp, WRITE_LOCK);
-		}
+		if (rd_wr == READ_LOCK)
+			atomic_dec_32(rwstate);
+		else
+			atomic_and_32(rwstate, ~URW_WRITE_LOCKED);
 		waked = rw_queue_release(qp, rwlp);
 	}
+
+out:
+	DTRACE_PROBE2(plockstat, rw__release, rwlp, rd_wr);
 
 	/*
 	 * Yield to the thread we just waked up, just in case we might

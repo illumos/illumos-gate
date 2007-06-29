@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved	*/
-
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -2187,7 +2186,7 @@ out:
  *
  * If the first thread is a reader we scan the queue releasing all readers
  * until we hit a writer or the end of the queue. If the first thread is a
- * writer we still need to check for another writer (i.e. URW_WRITE_WANTED).
+ * writer we still need to check for another writer.
  */
 void
 lwp_rwlock_release(lwpchan_t *lwpchan, lwp_rwlock_t *rw)
@@ -2218,9 +2217,7 @@ lwp_rwlock_release(lwpchan_t *lwpchan, lwp_rwlock_t *rw)
 					/* tpp already set for next thread. */
 					continue;
 				} else {
-					rwstate |=
-					    (URW_WRITE_WANTED|URW_HAS_WAITERS);
-
+					rwstate |= URW_HAS_WAITERS;
 					/* We need look no further. */
 					break;
 				}
@@ -2236,8 +2233,11 @@ lwp_rwlock_release(lwpchan_t *lwpchan, lwp_rwlock_t *rw)
 
 					/* tpp already set for next thread. */
 					continue;
-				} else
+				} else {
 					rwstate |= URW_HAS_WAITERS;
+					/* We need look no further. */
+					break;
+				}
 			}
 		}
 		tpp = &tp->t_link;
@@ -2398,54 +2398,42 @@ lwp_rwlock_lock(lwp_rwlock_t *rw, timespec_t *tsp, int rd_wr)
 	/*
 	 * Fetch the current rwlock state.
 	 *
-	 * The possibility of spurious wake-ups or killed waiters means that
-	 * rwstate's URW_HAS_WAITERS and URW_WRITE_WANTED bits may indicate
-	 * false positives. We only fix these if they are important to us.
+	 * The possibility of spurious wake-ups or killed waiters means
+	 * rwstate's URW_HAS_WAITERS bit may indicate false positives.
+	 * We only fix these if they are important to us.
 	 *
 	 * Although various error states can be observed here (e.g. the lock
 	 * is not held, but there are waiters) we assume these are applicaton
 	 * errors and so we take no corrective action.
 	 */
 	fuword32_noerr(&rw->rwlock_readers, &rwstate);
+	/*
+	 * We cannot legitimately get here from user-level
+	 * without URW_HAS_WAITERS being set.
+	 * Set it now to guard against user-level error.
+	 */
+	rwstate |= URW_HAS_WAITERS;
 
 	/*
-	 * If the lock is uncontended we can acquire it here. These tests
-	 * should have already been done at user-level, we just need to be
-	 * sure.
+	 * We can try only if the lock isn't held by a writer.
 	 */
-	if (rd_wr == READ_LOCK) {
-		if ((rwstate & ~URW_READERS_MASK) == 0) {
-			rwstate++;
-			acquired = 1;
-		}
-	} else if (rwstate == 0) {
-		rwstate = URW_WRITE_LOCKED;
-		acquired = 1;
-	}
-
-	/*
-	 * We can only try harder if the lock isn't held by a writer.
-	 */
-	if (!acquired && !(rwstate & URW_WRITE_LOCKED)) {
+	if (!(rwstate & URW_WRITE_LOCKED)) {
 		tp = lwp_queue_waiter(&lwpchan);
 		if (tp == NULL) {
 			/*
 			 * Hmmm, rwstate indicates waiters but there are
 			 * none queued. This could just be the result of a
-			 * spurious wakeup, so let's fix it.
-			 */
-			rwstate &= URW_READERS_MASK;
-
-			/*
-			 * We now have another chance to acquire the lock
-			 * uncontended, but this is the last chance for a
-			 * writer to acquire the lock without blocking.
+			 * spurious wakeup, so let's ignore it.
+			 *
+			 * We now have a chance to acquire the lock
+			 * uncontended, but this is the last chance for
+			 * a writer to acquire the lock without blocking.
 			 */
 			if (rd_wr == READ_LOCK) {
 				rwstate++;
 				acquired = 1;
-			} else if (rwstate == 0) {
-				rwstate = URW_WRITE_LOCKED;
+			} else if ((rwstate & URW_READERS_MASK) == 0) {
+				rwstate |= URW_WRITE_LOCKED;
 				acquired = 1;
 			}
 		} else if (rd_wr == READ_LOCK) {
@@ -2475,7 +2463,7 @@ lwp_rwlock_lock(lwp_rwlock_t *rw, timespec_t *tsp, int rd_wr)
 
 	if (acquired || try_flag || time_error) {
 		/*
-		 * We're not going to block this time!
+		 * We're not going to block this time.
 		 */
 		suword32_noerr(&rw->rwlock_readers, rwstate);
 		lwpchan_unlock(&lwpchan, LWPCHAN_CVPOOL);
@@ -2510,16 +2498,16 @@ lwp_rwlock_lock(lwp_rwlock_t *rw, timespec_t *tsp, int rd_wr)
 	 * We're about to block, so indicate what kind of waiter we are.
 	 */
 	t->t_writer = 0;
-	rwstate |= URW_HAS_WAITERS;
-	if (rd_wr == WRITE_LOCK) {
+	if (rd_wr == WRITE_LOCK)
 		t->t_writer = TRW_WANT_WRITE;
-		rwstate |= URW_WRITE_WANTED;
-	}
 	suword32_noerr(&rw->rwlock_readers, rwstate);
 
 	/*
 	 * Unlock the rwlock's mutex (pagefaults are possible here).
 	 */
+	suword32_noerr((uint32_t *)&mp->mutex_owner, 0);
+	suword32_noerr((uint32_t *)&mp->mutex_owner + 1, 0);
+	suword32_noerr(&mp->mutex_ownerpid, 0);
 	ulock_clear(&mp->mutex_lockw);
 	fuword8_noerr(&mp->mutex_waiters, &mwaiters);
 	if (mwaiters != 0) {
@@ -2622,6 +2610,8 @@ out_drop:
 		lwpchan_lock(&mlwpchan, LWPCHAN_MPPOOL);
 		mlocked = 1;
 	}
+	suword32_noerr((uint32_t *)&mp->mutex_owner, 0);
+	suword32_noerr((uint32_t *)&mp->mutex_owner + 1, 0);
 	suword32_noerr(&mp->mutex_ownerpid, 0);
 	ulock_clear(&mp->mutex_lockw);
 	fuword8_noerr(&mp->mutex_waiters, &mwaiters);

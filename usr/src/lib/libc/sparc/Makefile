@@ -1111,7 +1111,7 @@ TIL=				\
 $(TIL:%=pics/%) := CFLAGS += $(LIBCBASE)/threads/sparc.il
 
 # special kludge for inlines with 'cas':
-pics/synch.o pics/lwp.o := sparc_CFLAGS += -_gcc=-Wa,-xarch=v8plus
+pics/rwlock.o pics/synch.o pics/lwp.o := sparc_CFLAGS += -_gcc=-Wa,-xarch=v8plus
 
 # Files in port/fp subdirectory that need base.il inline template
 IL=				\

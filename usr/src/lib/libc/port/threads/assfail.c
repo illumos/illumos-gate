@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -248,11 +248,13 @@ rwlock_error(const rwlock_t *rp, const char *who, const char *msg)
 {
 	/* take a snapshot of the rwlock before it changes (we hope) */
 	rwlock_t rcopy = *rp;
+	uint32_t rwstate;
 	char buf[800];
 	uberdata_t *udp;
 	ulwp_t *self;
 	lwpid_t lwpid;
 	pid_t pid;
+	int process;
 
 	/* avoid recursion deadlock */
 	if ((self = __curthread()) != NULL) {
@@ -272,6 +274,9 @@ rwlock_error(const rwlock_t *rp, const char *who, const char *msg)
 		pid = _private_getpid();
 	}
 
+	rwstate = (uint32_t)rcopy.rwlock_readers;
+	process = (rcopy.rwlock_type & USYNC_PROCESS);
+
 	(void) strcpy(buf,
 	    "\n*** _THREAD_ERROR_DETECTION: lock usage error detected ***\n");
 	(void) strcat(buf, who);
@@ -283,43 +288,29 @@ rwlock_error(const rwlock_t *rp, const char *who, const char *msg)
 	ultos((uint64_t)(uintptr_t)self, 16, buf + strlen(buf));
 	(void) strcat(buf, " thread-id ");
 	ultos((uint64_t)lwpid, 10, buf + strlen(buf));
-	if (rcopy.rwlock_type & USYNC_PROCESS) {
-		uint32_t *rwstate = (uint32_t *)&rcopy.rwlock_readers;
-
+	if (process) {
 		(void) strcat(buf, " in process ");
 		ultos((uint64_t)pid, 10, buf + strlen(buf));
-
-		if (*rwstate & URW_WRITE_LOCKED) {
-			(void) strcat(buf, "\nthe lock writer owner is ");
-			ultos((uint64_t)rcopy.rwlock_owner, 16,
-			    buf + strlen(buf));
+	}
+	if (rwstate & URW_WRITE_LOCKED) {
+		(void) strcat(buf, "\nthe writer lock owner is ");
+		ultos((uint64_t)rcopy.rwlock_owner, 16,
+		    buf + strlen(buf));
+		if (process) {
 			(void) strcat(buf, " in process ");
 			ultos((uint64_t)rcopy.rwlock_ownerpid, 10,
 			    buf + strlen(buf));
-		} else if (*rwstate & URW_READERS_MASK) {
-			(void) strcat(buf, "\nthe lock is owned by ");
-			ultos((uint64_t)(*rwstate & URW_READERS_MASK), 10,
-			    buf + strlen(buf));
-			(void) strcat(buf, " readers");
-		} else
-			(void) strcat(buf, "\nthe lock is unowned");
-
-		if (*rwstate & URW_HAS_WAITERS) {
-			(void) strcat(buf, "\nand appears to have waiters");
-			if (*rwstate & URW_WRITE_WANTED)
-				(void) strcat(buf,
-				    " (including at least one writer)");
 		}
-	} else if (rcopy.rwlock_readers < 0) {
-		(void) strcat(buf, "\nthe lock writer owner is ");
-		ultos((uint64_t)rcopy.rwlock_mowner, 16, buf + strlen(buf));
-	} else if (rcopy.rwlock_readers > 0) {
-		(void) strcat(buf, "\nthe lock is owned by ");
-		ultos((uint64_t)rcopy.rwlock_readers, 10, buf + strlen(buf));
-		(void) strcat(buf, "readers");
+	} else if (rwstate & URW_READERS_MASK) {
+		(void) strcat(buf, "\nthe reader lock is held by ");
+		ultos((uint64_t)(rwstate & URW_READERS_MASK), 10,
+		    buf + strlen(buf));
+		(void) strcat(buf, " readers");
 	} else {
 		(void) strcat(buf, "\nthe lock is unowned");
 	}
+	if (rwstate & URW_HAS_WAITERS)
+		(void) strcat(buf, "\nand the lock appears to have waiters");
 	(void) strcat(buf, "\n\n");
 	(void) _write(2, buf, strlen(buf));
 	if (udp->uberflags.uf_thread_error_detection >= 2)

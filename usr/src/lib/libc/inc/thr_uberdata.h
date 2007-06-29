@@ -378,6 +378,8 @@ extern	void		queue_unlock(queue_head_t *);
 extern	void		enqueue(queue_head_t *, struct ulwp *, void *, int);
 extern	struct ulwp	*dequeue(queue_head_t *, void *, int *);
 extern	struct ulwp	*queue_waiter(queue_head_t *, void *);
+extern	struct ulwp	*queue_unlink(queue_head_t *,
+				struct ulwp **, struct ulwp *);
 extern	uint8_t		dequeue_self(queue_head_t *, void *);
 extern	void		unsleep_self(void);
 extern	void		spin_lock_set(mutex_t *);
@@ -662,21 +664,21 @@ typedef struct {
 
 
 /*
- * siguaction members have 64-byte size and alignment.
- * We know that sizeof (struct sigaction) is 32 bytes for
- * both _ILP32 and _LP64, so we put the padding in the middle.
+ * siguaction members have 128-byte size and 64-byte alignment.
+ * We know that sizeof (struct sigaction) is 32 bytes for both
+ * _ILP32 and _LP64 and that sizeof (rwlock_t) is 64 bytes.
  */
 typedef struct {
-	mutex_t	sig_lock;
-	char	sig_pad[64 - (sizeof (mutex_t) + sizeof (struct sigaction))];
+	rwlock_t	sig_lock;
 	struct sigaction sig_uaction;
+	char	sig_pad[128 - sizeof (rwlock_t) - sizeof (struct sigaction)];
 } siguaction_t;
 
 #ifdef _SYSCALL32
 typedef struct {
-	mutex_t	sig_lock;
-	char	sig_pad[64 - (sizeof (mutex_t) + sizeof (struct sigaction32))];
+	rwlock_t	sig_lock;
 	struct sigaction32 sig_uaction;
+	char	sig_pad[128 - sizeof (rwlock_t) - sizeof (struct sigaction32)];
 } siguaction32_t;
 #endif	/* _SYSCALL32 */
 
@@ -1080,6 +1082,14 @@ extern	void	_flush_windows(void);
 #endif
 extern	void	set_curthread(void *);
 
+/*
+ * Utility function used by cond_broadcast() and rw_unlock()
+ * when waking up many threads (more than MAXLWPS) all at once.
+ */
+#define	MAXLWPS	128	/* max remembered lwpids before overflow */
+#define	NEWLWPS	2048	/* max remembered lwpids at first overflow */
+extern	lwpid_t	*alloc_lwpids(lwpid_t *, int *, int *);
+
 /* enter a critical section */
 #define	enter_critical(self)	(self->ul_critical++)
 
@@ -1152,6 +1162,9 @@ extern	void	_lwp_start(void);
 extern	void	_lwp_terminate(void);
 extern	void	lmutex_lock(mutex_t *);
 extern	void	lmutex_unlock(mutex_t *);
+extern	void	lrw_rdlock(rwlock_t *);
+extern	void	lrw_wrlock(rwlock_t *);
+extern	void	lrw_unlock(rwlock_t *);
 extern	void	sig_mutex_lock(mutex_t *);
 extern	void	sig_mutex_unlock(mutex_t *);
 extern	int	sig_mutex_trylock(mutex_t *);
@@ -1361,10 +1374,12 @@ extern	int	_private_lwp_mutex_unlock(mutex_t *);
  * inlines
  */
 extern	int		set_lock_byte(volatile uint8_t *);
-extern	uint32_t	swap32(volatile uint32_t *, uint32_t);
-extern	uint32_t	cas32(volatile uint32_t *, uint32_t, uint32_t);
-extern	void		incr32(volatile uint32_t *);
-extern	void		decr32(volatile uint32_t *);
+extern	uint32_t	atomic_swap_32(volatile uint32_t *, uint32_t);
+extern	uint32_t	atomic_cas_32(volatile uint32_t *, uint32_t, uint32_t);
+extern	void		atomic_inc_32(volatile uint32_t *);
+extern	void		atomic_dec_32(volatile uint32_t *);
+extern	void		atomic_and_32(volatile uint32_t *, uint32_t);
+extern	void		atomic_or_32(volatile uint32_t *, uint32_t);
 #if defined(__sparc)
 extern	ulong_t		caller(void);
 extern	ulong_t		getfp(void);
