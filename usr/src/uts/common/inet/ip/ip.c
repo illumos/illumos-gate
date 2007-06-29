@@ -4224,9 +4224,17 @@ ip_add_info(mblk_t *data_mp, ill_t *ill, uint_t flags, zoneid_t zoneid,
 			 * Since a decision has already been made to deliver the
 			 * packet, there is no need to test for SECATTR and
 			 * ZONEONLY.
+			 * When a multicast packet is transmitted
+			 * a cache entry is created for the multicast address.
+			 * When delivering a copy of the packet or when new
+			 * packets are received we do not want to match on the
+			 * cached entry so explicitly match on
+			 * IRE_LOCAL and IRE_LOOPBACK
 			 */
-			ire = ire_ctable_lookup(ipha->ipha_dst, 0, 0, ipif,
-			    zoneid, NULL, MATCH_IRE_ILL_GROUP, ipst);
+			ire = ire_ctable_lookup(ipha->ipha_dst, 0,
+			    IRE_LOCAL | IRE_LOOPBACK,
+			    ipif, zoneid, NULL,
+			    MATCH_IRE_TYPE | MATCH_IRE_ILL_GROUP, ipst);
 			if (ire == NULL) {
 				/*
 				 * packet must have come on a different
@@ -4234,9 +4242,12 @@ ip_add_info(mblk_t *data_mp, ill_t *ill, uint_t flags, zoneid_t zoneid,
 				 * Since a decision has already been made to
 				 * deliver the packet, there is no need to test
 				 * for SECATTR and ZONEONLY.
+				 * Only match on local and broadcast ire's.
+				 * See detailed comment above.
 				 */
-				ire = ire_ctable_lookup(ipha->ipha_dst, 0, 0,
-				    ipif, zoneid, NULL, NULL, ipst);
+				ire = ire_ctable_lookup(ipha->ipha_dst, 0,
+				    IRE_LOCAL | IRE_LOOPBACK, ipif, zoneid,
+				    NULL, MATCH_IRE_TYPE, ipst);
 			}
 
 			if (ire == NULL) {
@@ -4250,7 +4261,6 @@ ip_add_info(mblk_t *data_mp, ill_t *ill, uint_t flags, zoneid_t zoneid,
 
 				pinfo->ip_pkt_match_addr.s_addr = INADDR_ANY;
 			} else {
-				ASSERT(ire->ire_type != IRE_CACHE);
 				pinfo->ip_pkt_match_addr.s_addr =
 				    ire->ire_src_addr;
 				ire_refrele(ire);
