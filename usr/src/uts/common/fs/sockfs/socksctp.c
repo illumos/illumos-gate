@@ -1245,8 +1245,12 @@ sosctp_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 		 * In this case, sosctp_connect() returns EOPNOTSUPP
 		 * while a TCP socket returns ENOTCONN instead.  Catch it
 		 * here to have the same behavior as a TCP socket.
+		 *
+		 * We also need to make sure that the peer address is
+		 * provided before we attempt to do the connect.
 		 */
-		if (so->so_state & SS_ACCEPTCONN) {
+		if ((so->so_state & SS_ACCEPTCONN) ||
+		    msg->msg_name == NULL) {
 			mutex_exit(&so->so_lock);
 			error = ENOTCONN;
 			goto error_nofree;
@@ -1945,7 +1949,7 @@ sosctp_setsockopt(struct sonode *so, int level, int option_name,
 		}
 	}
 	dprint(2, ("sosctp_setsockopt %p (%d) - conn %p %d %d id:%d\n",
-		ss, so->so_type, conn, level, option_name, id));
+	    ss, so->so_type, conn, level, option_name, id));
 
 	ASSERT(ssa == NULL || (ssa != NULL && conn != NULL));
 	if (conn != NULL) {
@@ -2064,12 +2068,12 @@ sosctp_setsockopt(struct sonode *so, int level, int option_name,
 			if (intvalue != 0) {
 				dprintso(so, 1,
 				    ("sosctp_setsockopt: setting 0x%x\n",
-					option_name));
+				    option_name));
 				so->so_options |= option_name;
 			} else {
 				dprintso(so, 1,
 				    ("sosctp_setsockopt: clearing 0x%x\n",
-					option_name));
+				    option_name));
 				so->so_options &= ~option_name;
 			}
 			break;
@@ -2113,7 +2117,7 @@ sosctp_setsockopt(struct sonode *so, int level, int option_name,
 			    error == EINVAL) && handled) {
 				dprintso(so, 1,
 				    ("sosctp_setsockopt: ignoring error %d "
-					"for 0x%x\n", error, option_name));
+				    "for 0x%x\n", error, option_name));
 				error = 0;
 			}
 		}
