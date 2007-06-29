@@ -187,14 +187,6 @@
 	or	data1, tmp, data1
 #endif	/* NIAGARA2_IMPL */
 
-/*
- * Align the data in case of backward copy.
- */
-#define	ALIGN_DATA_BC(data1, data2, rshift, lshift, tmp)	\
-	srlx	data1, rshift, data1				;\
-	sllx	data2, lshift, tmp				;\
-	or	data1, tmp, data1
-
 	ANSI_PRAGMA_WEAK(memmove,function)
 	ANSI_PRAGMA_WEAK(memcpy,function)
 
@@ -202,113 +194,87 @@
 
 	ENTRY(memmove)
 	cmp	%o1, %o0	! if from address is >= to use forward copy
-	bgeu	%ncc, forcpy	! else use backward if ...
+	bgeu,pn	%ncc, forcpy	! else use backward if ...
 	sub	%o0, %o1, %o4	! get difference of two addresses
 	cmp	%o2, %o4	! compare size and difference of addresses
-	bleu	%ncc, forcpy	! if size is bigger, do overlapped copy
-	nop
+	bleu,pn	%ncc, forcpy	! if size is bigger, do overlapped copy
+	add     %o1, %o2, %o5	! get to end of source space
 
         !
         ! an overlapped copy that must be done "backwards"
         !
-.ovbc:  
-	mov	%o0, %o5		! save des address for return val	
-	add     %o1, %o2, %o1           ! get to end of source space
-        add     %o0, %o2, %o0           ! get to end of destination space
-
 .chksize:
-	cmp	%o2, 0x20
-	bgu,pn	%ncc, .dbalign
-	nop
+	cmp	%o2, 8			! less than 8 byte do byte copy
+	blu,pt %ncc, 2f			! else continue
 
-.bytecp:
-	tst	%o2
-	bleu,a,pn %ncc, exitovbc
-	nop
-
-1:
-	dec	%o0			! decrement to address
-	dec	%o1			! decrement from address
-	ldub	[%o1], %o4
-	deccc	%o2
-	bgu,pt	%ncc, 1b
-	stb	%o4, [%o0]
-exitovbc:
-	retl
-	mov	%o5, %o0
-
+	! Now size is bigger than 8
 .dbalign:
-	andcc	%o0, 7, %o3
-	bz	%ncc, .dbbck
-	nop
-					! %o3 has bytes till dst 8 bytes aligned
+	add     %o0, %o2, %g1           ! get to end of dest space
+	andcc	%g1, 7, %o3		! %o3 has bytes till dst 8 bytes aligned
+	bz,a,pn	%ncc, .dbbck		! if dst is not 8 byte aligned: align it
+	andn	%o2, 7, %o3		! %o3 count is multiple of 8 bytes size
 	sub	%o2, %o3, %o2		! update o2 with new count
-2:
-	dec	%o1
-	dec	%o0
-	ldub	[%o1], %o4
-	deccc	%o3
-	bgu,pt	%ncc, 2b
-	stb	%o4, [%o0]
+
+1:	dec	%o5			! decrement source
+	ldub	[%o5], %g1		! load one byte
+	deccc	%o3			! decrement count
+	bgu,pt	%ncc, 1b		! if not done keep copying
+	stb	%g1, [%o5+%o4]		! store one byte into dest
+	andncc	%o2, 7, %o3		! %o3 count is multiple of 8 bytes size
+	bz,pn	%ncc, 2f		! if size < 8, move to byte copy
 
 	! Now Destination is 8 byte aligned
 .dbbck:
-	save	%sp, -SA(MINFRAME), %sp
+	andcc	%o5, 7, %o0		! %o0 has src offset
+	bz,a,pn	%ncc, .dbcopybc		! if src is aligned to fast mem move
+	sub	%o2, %o3, %o2		! Residue bytes in %o2
 
-	andn	%i2, 0x7, %i3		! %i3 count is multiple of 8 bytes size
-	sub	%i2, %i3, %i2		! Residue bytes in %i2
+.cpy_dbwdbc:				! alignment of src is needed
+ 	sub	%o2, 8, %o2             ! set size one loop ahead
+	sll	%o0, 3, %g1		! %g1 is left shift
+	mov	64, %g5			! init %g5 to be 64
+	sub	%g5, %g1, %g5		! %g5 right shift = (64 - left shift)
+	sub	%o5, %o0, %o5		! align the src at 8 bytes.
+	add	%o4, %o0, %o4		! increase difference between src & dst
+	ldx	[%o5], %o1		! load first 8 bytes
+	srlx	%o1, %g5, %o1
+1:	sub	%o5, 8, %o5		! subtract 8 from src
+	ldx	[%o5], %o0		! load 8 byte
+	sllx	%o0, %g1, %o3		! shift loaded 8 bytes left into tmp reg
+	or	%o1, %o3, %o3		! align data
+	stx	%o3, [%o5+%o4]		! store 8 byte
+	subcc	%o2, 8, %o2		! subtract 8 byte from size
+	bg,pt	%ncc, 1b		! if size > 0 continue
+	srlx	%o0, %g5, %o1		! move extra byte for the next use
 
-	andcc	%i1, 7, %g1		! is src aligned on 8 bytes
-					! %g1 has src offset
-	bz	%ncc, .dbcopybc
+	srl	%g1, 3, %o0		! retsote %o0 value for alignment
+	add	%o5, %o0, %o5		! restore src alignment
+	sub	%o4, %o0, %o4		! restore difference between src & dest
+
+ 	ba	2f			! branch to the trailing byte copy
+ 	add	%o2, 8, %o2             ! restore size value
+
+.dbcopybc:				! alignment of src is not needed
+1:	sub	%o5, 8, %o5		! subtract from src
+	ldx	[%o5], %g1		! load 8 bytes
+	subcc	%o3, 8, %o3		! subtract from size
+	bgu,pt	%ncc, 1b		! if size is bigger 0 continue
+	stx	%g1, [%o5+%o4]		! store 8 bytes to destination
+
+	ba	2f
 	nop
 
-	sll	%g1, 3, %o1		! left shift
-	mov	0x40, %g5
-	sub	%g5, %o1, %g5		! right shift = (64 - left shift)
+.bcbyte:
+1:	ldub	[%o5], %g1		! load one byte
+	stb	%g1, [%o5+%o4]		! store one byte
+2:	deccc	%o2			! decrement size
+	bgeu,a,pt %ncc, 1b		! if size is >=0 continue
+	dec	%o5			! decrement from address
 
-.cpy_dbwdbc:
-	sub	%i1, %g1, %i1		! align the src at 8 bytes.
-	ldx	[%i1], %o2
-2:
-	sub	%i0, 0x8, %i0
-	ldx	[%i1-0x8], %o4		! we are at the end
-	ALIGN_DATA_BC(%o2, %o4, %g5, %o1, %o3)
-	stx	%o2, [%i0]
-	mov	%o4, %o2
-	subcc	%i3, 0x8, %i3
-	bgu,pt	%ncc, 2b
-	sub	%i1, 0x8, %i1
-	ba	.bytebc
-	add	%i1, %g1, %i1
-
-.dbcopybc:
-	sub	%i1, 8, %i1
-	sub	%i0, 8, %i0		! we are at the end
-	ldx	[%i1], %o2
-	stx	%o2, [%i0]
-	subcc	%i3, 0x8, %i3
-	bgu,pt	%ncc, .dbcopybc
-	nop
-
-.bytebc:
-	tst	%i2
-	bleu,a,pn %ncc, exitbc
-	nop
-
-1:
-	dec	%i0			! decrement to address
-	dec	%i1			! decrement from address
-	ldub	[%i1], %i4
-	deccc	%i2
-	bgu,pt	%ncc, 1b
-	stb	%i4, [%i0]
-exitbc:
-	ret
-	restore	%i5, %g0, %o0
- 
+.exitbc:				! exit from backward copy
+	retl
+	add	%o5, %o4, %o0		! restore dest addr
 	SET_SIZE(memmove)
-
 
 	ENTRY(memcpy)
 	ENTRY(__align_cpy_1)
