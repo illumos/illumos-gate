@@ -166,6 +166,7 @@ COMMON_SUBDIRS=		\
 	fs.d		\
 	fstyp		\
 	fuser		\
+	fwflash		\
 	gcore		\
 	gencat		\
 	geniconvtbl	\
@@ -553,6 +554,7 @@ MSGSUBDIRS=		\
 	fm		\
 	fold		\
 	fs.d		\
+	fwflash		\
 	geniconvtbl	\
 	genmsg		\
 	getconf		\

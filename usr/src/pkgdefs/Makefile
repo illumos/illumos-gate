@@ -211,6 +211,7 @@ COMMON_SUBDIRS= \
 	SUNWftpu  \
 	SUNWfwdc  \
 	SUNWfwdcu  \
+	SUNWfwflash  \
 	SUNWgssdh  \
 	SUNWgssc  \
 	SUNWgss	\
