@@ -944,6 +944,7 @@ sa_share_zfs(sa_share_t share, char *path, share_t *sh,
 	char *dataset;
 	int err = EINVAL;
 	int i, j;
+	char newpath[MAXPATHLEN];
 
 	/*
 	 * First find the dataset name
@@ -955,8 +956,17 @@ sa_share_zfs(sa_share_t share, char *path, share_t *sh,
 		return (SA_SYSTEM_ERR);
 	}
 
-	if ((dataset = get_zfs_dataset(sahandle, path)) == NULL) {
-		return (SA_SYSTEM_ERR);
+	/*
+	 * If get_zfs_dataset fails, see if it is a subdirectory
+	 */
+	(void) strlcpy(newpath, path, sizeof (newpath));
+	while ((dataset = get_zfs_dataset(sahandle, newpath)) == NULL) {
+		char *p;
+
+		if (p = strrchr(newpath, '/'))
+			*p = '\0';
+		else
+			return (SA_SYSTEM_ERR);
 	}
 
 	libhandle = libzfs_init();
