@@ -45,10 +45,13 @@
 #include <sys/socket.h>
 #include <sys/iscsi_protocol.h>
 
+#include <arpa/inet.h>
+
 #include "iscsi_ffp.h"
 #include "iscsi_cmd.h"
 #include "t10_spc.h"
 #include "utility.h"
+#include "iscsi_provider_impl.h"
 
 static Boolean_t handle_text_msg(iscsi_conn_t *, iscsi_hdr_t *, char *, int);
 static Boolean_t handle_logout_msg(iscsi_conn_t *, iscsi_hdr_t *, char *, int);
@@ -64,10 +67,10 @@ iscsi_full_feature(iscsi_conn_t *c)
 {
 	iscsi_hdr_t	h;
 	Boolean_t	rval		= False;
-	char		debug[128],
-			*ahs		= NULL;
-	int		cc,
-			ahslen;
+	char		debug[128];
+	char		*ahs		= NULL;
+	int		cc;
+	int		ahslen;
 
 	if ((cc = recv(c->c_fd, &h, sizeof (h), MSG_WAITALL)) != sizeof (h)) {
 		if (errno == ECONNRESET) {
@@ -100,8 +103,8 @@ iscsi_full_feature(iscsi_conn_t *c)
 	}
 
 	if ((c->c_state == S5_LOGGED_IN) && (c->c_header_digest == True)) {
-		uint32_t	crc_actual,
-				crc_calculated;
+		uint32_t	crc_actual;
+		uint32_t	crc_calculated;
 
 		(void) recv(c->c_fd, (char *)&crc_actual,
 		    sizeof (crc_actual), MSG_WAITALL);
@@ -208,11 +211,33 @@ handle_task_mgt(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	uint32_t			lun;
 	Boolean_t			lu_reset	= False;
 
-	rsp = (iscsi_scsi_task_mgt_rsp_hdr_t *)calloc(sizeof (*rsp), 1);
-	if (rsp == NULL)
+	if (spc_decode_lu_addr(&hp->lun[0], 8, &lun) == False)
 		return (False);
 
-	if (spc_decode_lu_addr(&hp->lun[0], 8, &lun) == False)
+	if (ISCSI_TASK_COMMAND_ENABLED()) {
+		uiscsiproto_t info;
+
+		info.uip_target_addr = &c->c_target_sockaddr;
+		info.uip_initiator_addr = &c->c_initiator_sockaddr;
+
+		info.uip_target = c->c_sess->s_t_name;
+		info.uip_initiator = c->c_sess->s_i_name;
+		info.uip_lun = lun;
+
+		info.uip_itt = hp->itt;
+		info.uip_ttt = hp->itt;
+
+		info.uip_cmdsn = ntohl(hp->cmdsn);
+		info.uip_statsn = ntohl(hp->expstatsn);
+		info.uip_datasn = ntohl(hp->expdatasn);
+
+		info.uip_datalen = ntoh24(hp->dlength);
+		info.uip_flags = 0;
+
+		ISCSI_TASK_COMMAND(&info);
+	}
+
+	if ((rsp = calloc(1, sizeof (*rsp))) == NULL)
 		return (False);
 
 	rsp->opcode	= ISCSI_OP_SCSI_TASK_MGT_RSP;
@@ -328,16 +353,38 @@ handle_noop_cmd(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	iscsi_nop_out_hdr_t	*hp = (iscsi_nop_out_hdr_t *)p;
 	iscsi_nop_in_hdr_t	*in;
 
+	if (ISCSI_NOP_RECEIVE_ENABLED()) {
+		uiscsiproto_t info;
+
+		info.uip_target_addr = &c->c_target_sockaddr;
+		info.uip_initiator_addr = &c->c_initiator_sockaddr;
+
+		info.uip_target = c->c_sess->s_t_name;
+		info.uip_initiator = c->c_sess->s_i_name;
+		info.uip_lun = 0;
+
+		info.uip_itt = hp->itt;
+		info.uip_ttt = hp->ttt;
+
+		info.uip_cmdsn = ntohl(hp->cmdsn);
+		info.uip_statsn = ntohl(hp->expstatsn);
+		info.uip_datasn = 0;
+
+		info.uip_datalen = ntoh24(hp->dlength);
+		info.uip_flags = hp->flags;
+
+		ISCSI_NOP_RECEIVE(&info);
+	}
+
 	/*
 	 * Just an answer to our ping
 	 */
 	if (hp->ttt != ISCSI_RSVD_TASK_TAG)
 		return (True);
 
-	in = (iscsi_nop_in_hdr_t *)calloc(sizeof (*in), 1);
-	if (in == NULL) {
+	if ((in = calloc(1, sizeof (*in))) == NULL) {
 		queue_prt(c->c_mgmtq, Q_CONN_ERRS,
-		    "CON%x  NopIn -- failed to malloc space for header\n",
+		    "CON%x  NopIn -- failed to malloc space for header",
 		    c->c_num);
 		return (False);
 	}
@@ -371,6 +418,29 @@ handle_scsi_data(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	iscsi_data_hdr_t	*hp = (iscsi_data_hdr_t *)p;
 	int			dlen = ntoh24(hp->dlength);
 	iscsi_cmd_t		*cmd;
+
+	if (ISCSI_DATA_RECEIVE_ENABLED()) {
+		uiscsiproto_t info;
+
+		info.uip_target_addr = &c->c_target_sockaddr;
+		info.uip_initiator_addr = &c->c_initiator_sockaddr;
+
+		info.uip_target = c->c_sess->s_t_name;
+		info.uip_initiator = c->c_sess->s_i_name;
+		info.uip_lun = 0;
+
+		info.uip_itt = hp->itt;
+		info.uip_ttt = hp->itt;
+
+		info.uip_cmdsn = 0;
+		info.uip_statsn = ntohl(hp->expstatsn);
+		info.uip_datasn = ntohl(hp->datasn);
+
+		info.uip_datalen = dlen;
+		info.uip_flags = hp->flags;
+
+		ISCSI_DATA_RECEIVE(&info);
+	}
 
 	if ((cmd = iscsi_cmd_find(c, hp->ttt, FindTTT)) == NULL) {
 		queue_prt(c->c_mgmtq, Q_CONN_ERRS,
@@ -448,8 +518,8 @@ handle_scsi_cmd(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 		 * the order of 140 bytes which means the data must be
 		 * found in the AHS.
 		 */
-		uint16_t	hslen,
-				next_seg;
+		uint16_t	hslen;
+		uint16_t	next_seg;
 		uint8_t		hstyp;
 
 		do {
@@ -502,10 +572,10 @@ handle_scsi_cmd(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 			 * padding). Each segment is padded to a 4 byte
 			 * boundary.
 			 */
-			next_seg	= ((hslen + sizeof (hslen) +
-					    sizeof (hstyp) + 3) & ~3);
-			ahs		+= next_seg;
-			ahslen		-= next_seg;
+			next_seg = ((hslen + sizeof (hslen) +
+			    sizeof (hstyp) + 3) & ~3);
+			ahs += next_seg;
+			ahslen -= next_seg;
 
 		} while (ahslen);
 	}
@@ -516,6 +586,33 @@ handle_scsi_cmd(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	if (spc_decode_lu_addr(&hp->lun[0], sizeof (hp->lun), &cmd->c_lun) ==
 	    False) {
 		return (False);
+	}
+
+	if (ISCSI_SCSI_COMMAND_ENABLED()) {
+		uiscsiproto_t info;
+		uiscsicmd_t uc;
+
+		info.uip_target_addr = &c->c_target_sockaddr;
+		info.uip_initiator_addr = &c->c_initiator_sockaddr;
+
+		info.uip_target = c->c_sess->s_t_name;
+		info.uip_initiator = c->c_sess->s_i_name;
+		info.uip_lun = cmd->c_lun;
+
+		info.uip_itt = hp->itt;
+		info.uip_ttt = ISCSI_RSVD_TASK_TAG;
+
+		info.uip_cmdsn = ntohl(hp->cmdsn);
+		info.uip_statsn = ntohl(hp->expstatsn);
+		info.uip_datasn = 0;
+
+		info.uip_datalen = dlen;
+		info.uip_flags = hp->flags;
+
+		uc.uic_len = cmd->c_scb_len;
+		uc.uic_cdb = cmd->c_scb;
+
+		ISCSI_SCSI_COMMAND(&info, &uc);
 	}
 
 	cmd->c_itt		= hp->itt;
@@ -567,13 +664,40 @@ handle_text_msg(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	char			*text		= NULL;
 	int			text_length	= 0;
 	Boolean_t		release_at_end	= False;
+	int			dlen		= ntoh24(hp->dlength);
+
+	if (ISCSI_TEXT_COMMAND_ENABLED()) {
+		uiscsiproto_t info;
+		char nil = '\0';
+
+		info.uip_initiator = c->c_sess->s_i_name;
+		info.uip_target_addr = &c->c_target_sockaddr;
+		info.uip_initiator_addr = &c->c_initiator_sockaddr;
+
+		info.uip_target = c->c_sess->s_t_name;
+		info.uip_initiator = c->c_sess->s_i_name;
+		info.uip_target = &nil;
+		info.uip_lun = 0;
+
+		info.uip_itt = hp->itt;
+		info.uip_ttt = hp->ttt;
+
+		info.uip_cmdsn = ntohl(hp->cmdsn);
+		info.uip_statsn = ntohl(hp->expstatsn);
+		info.uip_datasn = 0;
+
+		info.uip_datalen = dlen;
+		info.uip_flags = hp->flags;
+
+		ISCSI_TEXT_COMMAND(&info);
+	}
 
 	bzero(&rsp, sizeof (rsp));
 	rsp.opcode	= ISCSI_OP_TEXT_RSP;
 	rsp.itt		= hp->itt;
 
 	queue_prt(c->c_mgmtq, Q_CONN_NONIO, "CON%x  PDU(Text Message)\n",
-			c->c_num);
+	    c->c_num);
 
 	/*
 	 * Need to determine if this incoming text PDU is an initial message
@@ -582,8 +706,7 @@ handle_text_msg(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	if (hp->ttt == ISCSI_RSVD_TASK_TAG) {
 
 		/* ---- Initial text PDU, so parse the incoming data ---- */
-		if (parse_text(c, ntoh24(hp->dlength), &text, &text_length,
-		    NULL) == False) {
+		if (parse_text(c, dlen, &text, &text_length, NULL) == False) {
 			queue_prt(c->c_mgmtq, Q_CONN_ERRS,
 			    "Failed to parse Text\n");
 			if (text) {
@@ -657,6 +780,32 @@ handle_text_msg(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	(void) pthread_mutex_unlock(&c->c_sess->s_mutex);
 	(void) pthread_mutex_unlock(&c->c_mutex);
 
+	if (ISCSI_TEXT_RESPONSE_ENABLED()) {
+		uiscsiproto_t info;
+		char nil = '\0';
+
+		info.uip_target_addr = &c->c_target_sockaddr;
+		info.uip_initiator_addr = &c->c_initiator_sockaddr;
+
+		info.uip_target = c->c_sess->s_t_name;
+		info.uip_initiator = c->c_sess->s_i_name;
+		info.uip_initiator = c->c_sess->s_i_name;
+		info.uip_target = &nil;
+		info.uip_lun = 0;
+
+		info.uip_itt = rsp.itt;
+		info.uip_ttt = rsp.ttt;
+
+		info.uip_cmdsn = ntohl(rsp.expcmdsn);
+		info.uip_statsn = ntohl(rsp.statsn);
+		info.uip_datasn = 0;
+
+		info.uip_datalen = text_length;
+		info.uip_flags = rsp.flags;
+
+		ISCSI_TEXT_RESPONSE(&info);
+	}
+
 	send_iscsi_pkt(c, (iscsi_hdr_t *)&rsp, text);
 
 	if (release_at_end == True) {
@@ -674,48 +823,72 @@ handle_logout_msg(iscsi_conn_t *c, iscsi_hdr_t *p, char *ahs, int ahslen)
 	iscsi_logout_hdr_t	*hp = (iscsi_logout_hdr_t *)p;
 	char			debug[80];
 
-	rsp = (iscsi_logout_rsp_hdr_t *)calloc(sizeof (*rsp), 1);
-	if (rsp) {
+	if (ISCSI_LOGOUT_COMMAND_ENABLED()) {
+		uiscsiproto_t info;
+		char nil = '\0';
 
-		(void) snprintf(debug, sizeof (debug),
-		    "CON%x  PDU(Logout Request)", c->c_num);
-		queue_str(c->c_mgmtq, Q_CONN_NONIO, msg_log, debug);
+		info.uip_target_addr = &c->c_target_sockaddr;
+		info.uip_initiator_addr = &c->c_initiator_sockaddr;
 
-		(void) pthread_mutex_lock(&c->c_mutex);
-		(void) pthread_mutex_lock(&c->c_sess->s_mutex);
-		if (hp->cmdsn > c->c_sess->s_seencmdsn)
-			c->c_sess->s_seencmdsn = htonl(hp->cmdsn);
-		rsp->expcmdsn = htonl(c->c_sess->s_seencmdsn + 1);
-		rsp->maxcmdsn = htonl(iscsi_cmd_window(c) +
-		    c->c_sess->s_seencmdsn);
-		(void) pthread_mutex_unlock(&c->c_sess->s_mutex);
-		(void) pthread_mutex_unlock(&c->c_mutex);
+		info.uip_target = c->c_sess->s_t_name;
+		info.uip_initiator = c->c_sess->s_i_name;
+		info.uip_initiator = c->c_sess->s_i_name;
+		info.uip_target = &nil;
+		info.uip_lun = 0;
 
-		rsp->opcode	= ISCSI_OP_LOGOUT_RSP;
-		rsp->flags	= ISCSI_FLAG_FINAL;
-		rsp->itt	= hp->itt;
-		(void) pthread_mutex_lock(&c->c_mutex);
-		rsp->statsn	= htonl(c->c_statsn++);
-		(void) pthread_mutex_unlock(&c->c_mutex);
+		info.uip_itt = hp->itt;
+		info.uip_ttt = ISCSI_RSVD_TASK_TAG;
 
-		c->c_last_pkg	= (iscsi_hdr_t *)rsp;
+		info.uip_cmdsn = ntohl(hp->cmdsn);
+		info.uip_statsn = ntohl(hp->expstatsn);
+		info.uip_datasn = 0;
 
-		/*
-		 * Call the state transition last. This will send out
-		 * an asynchronous message to shutdown the session and STE.
-		 * Once that's complete a shutdown reply will be sent to
-		 * the transmit connection thread. That will cause another
-		 * transition to T13 which expects to send out this logout
-		 * response.
-		 */
-		if (c->c_state == S7_LOGOUT_REQUESTED)
-			conn_state(c, T10);
-		else
-			conn_state(c, T9);
+		info.uip_datalen = ntoh24(hp->dlength);
+		info.uip_flags = hp->flags;
 
-		return (True);
-	} else
+		ISCSI_LOGOUT_COMMAND(&info);
+	}
+
+	if ((rsp = calloc(1, sizeof (*rsp))) == NULL)
 		return (False);
+
+	(void) snprintf(debug, sizeof (debug),
+	    "CON%x  PDU(Logout Request)", c->c_num);
+	queue_str(c->c_mgmtq, Q_CONN_NONIO, msg_log, debug);
+
+	(void) pthread_mutex_lock(&c->c_mutex);
+	(void) pthread_mutex_lock(&c->c_sess->s_mutex);
+	if (hp->cmdsn > c->c_sess->s_seencmdsn)
+		c->c_sess->s_seencmdsn = htonl(hp->cmdsn);
+	rsp->expcmdsn = htonl(c->c_sess->s_seencmdsn + 1);
+	rsp->maxcmdsn = htonl(iscsi_cmd_window(c) +
+	    c->c_sess->s_seencmdsn);
+	(void) pthread_mutex_unlock(&c->c_sess->s_mutex);
+	(void) pthread_mutex_unlock(&c->c_mutex);
+
+	rsp->opcode	= ISCSI_OP_LOGOUT_RSP;
+	rsp->flags	= ISCSI_FLAG_FINAL;
+	rsp->itt	= hp->itt;
+	(void) pthread_mutex_lock(&c->c_mutex);
+	rsp->statsn	= htonl(c->c_statsn++);
+	(void) pthread_mutex_unlock(&c->c_mutex);
+
+	c->c_last_pkg	= (iscsi_hdr_t *)rsp;
+
+	/*
+	 * Call the state transition last. This will send out
+	 * an asynchronous message to shutdown the session and STE.
+	 * Once that's complete a shutdown reply will be sent to
+	 * the transmit connection thread. That will cause another
+	 * transition to T13 which expects to send out this logout
+	 * response.
+	 */
+	if (c->c_state == S7_LOGOUT_REQUESTED)
+		conn_state(c, T10);
+	else
+		conn_state(c, T9);
+
+	return (True);
 }
 
 /*
@@ -743,10 +916,10 @@ static Boolean_t
 dataout_delayed(iscsi_cmd_t *cmd, msg_type_t type)
 {
 	iscsi_conn_t	*c	= cmd->c_allegiance;
-	int		dlen	= cmd->c_data_len,
-			cc;
-	uint32_t	crc_calc,
-			crc_actual;
+	int		dlen	= cmd->c_data_len;
+	int		cc;
+	uint32_t	crc_calc;
+	uint32_t	crc_actual;
 	char		pad_buf[ISCSI_PAD_WORD_LEN - 1];
 	char		pad_len;
 	char		debug[80];
@@ -889,8 +1062,8 @@ dataout_callback(t10_cmd_t *t, char *data, size_t *xfer)
 {
 	iscsi_cmd_t	*cmd	= (iscsi_cmd_t *)T10_TRANS_ID(t);
 	iscsi_conn_t	*c	= cmd->c_allegiance;
-	int		dlen	= cmd->c_data_len,
-			cc;
+	int		dlen	= cmd->c_data_len;
+	int		cc;
 	char		pad_buf[ISCSI_PAD_WORD_LEN - 1];
 	char		pad_len = 0;
 

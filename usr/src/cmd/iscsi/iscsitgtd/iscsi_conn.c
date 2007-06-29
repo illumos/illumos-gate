@@ -46,6 +46,7 @@
 #include "iscsi_sess.h"
 #include "iscsi_login.h"
 #include "iscsi_ffp.h"
+#include "iscsi_provider_impl.h"
 #include "utility.h"
 #include "target.h"
 #include "port.h"
@@ -74,8 +75,8 @@ void *
 conn_poller(void *v)
 {
 	iscsi_conn_t	*c = (iscsi_conn_t *)v;
-	int		nbytes,
-			pval;
+	int		nbytes;
+	int		pval;
 	nfds_t		nfds = 1;
 	struct pollfd	fds[1];
 	iscsi_state_t	state;
@@ -204,8 +205,8 @@ conn_process(void *v)
 {
 	iscsi_conn_t	*c		= (iscsi_conn_t *)v;
 	iscsi_cmd_t	*cmd;
-	Boolean_t	process		= True,
-			is_last		= False;
+	Boolean_t	process		= True;
+	Boolean_t	is_last		= False;
 	msg_t		*m;
 	void		*thr_status;
 	int		i;
@@ -266,11 +267,11 @@ conn_process(void *v)
 					conn_state(c, T18);
 				else {
 					(void) pthread_mutex_lock(
-						&mgmt->m_resp_mutex);
+					    &mgmt->m_resp_mutex);
 					tgt_buf_add(mgmt->m_u.m_resp,
 					    "connection", NULL);
 					(void) pthread_mutex_unlock(
-						&mgmt->m_resp_mutex);
+					    &mgmt->m_resp_mutex);
 				}
 				queue_message_set(mgmt->m_q, 0,
 				    msg_mgmt_rply, 0);
@@ -495,6 +496,39 @@ iscsi_conn_pkt(iscsi_conn_t *c, iscsi_rsp_hdr_t *in)
 	(void) pthread_mutex_lock(&c->c_sess->s_mutex);
 	in->expcmdsn	= htonl(c->c_sess->s_seencmdsn + 1);
 	in->maxcmdsn	= htonl(iscsi_cmd_window(c) + c->c_sess->s_seencmdsn);
+
+	if (ISCSI_NOP_SEND_ENABLED() || ISCSI_TASK_RESPONSE_ENABLED()) {
+		uiscsiproto_t info;
+
+		info.uip_target_addr = &c->c_target_sockaddr;
+		info.uip_initiator_addr = &c->c_initiator_sockaddr;
+
+		info.uip_target = c->c_sess->s_t_name;
+		info.uip_initiator = c->c_sess->s_i_name;
+		info.uip_lun = 0;
+
+		info.uip_itt = in->itt;
+		info.uip_ttt = ISCSI_RSVD_TASK_TAG;
+
+		info.uip_cmdsn = ntohl(in->expcmdsn);
+		info.uip_statsn = ntohl(in->statsn);
+		info.uip_datasn = 0;
+
+		info.uip_datalen = ntoh24(in->dlength);
+		info.uip_flags = in->flags;
+
+		switch (in->opcode & ISCSI_OPCODE_MASK) {
+		case ISCSI_OP_NOOP_IN:
+			ISCSI_NOP_SEND(&info);
+			break;
+		case ISCSI_OP_SCSI_TASK_MGT_RSP:
+			ISCSI_TASK_RESPONSE(&info);
+			break;
+		default:
+			assert(0);
+		}
+	}
+
 	(void) pthread_mutex_unlock(&c->c_sess->s_mutex);
 	(void) pthread_mutex_unlock(&c->c_mutex);
 
@@ -564,6 +598,30 @@ iscsi_conn_data_rqst(t10_cmd_t *t)
 
 	t10_cmd_shoot_event(t, T10_Cmd_T7);
 	(void) pthread_mutex_unlock(&c->c_mutex);
+
+	if (ISCSI_DATA_REQUEST_ENABLED()) {
+		uiscsiproto_t info;
+
+		info.uip_target_addr = &c->c_target_sockaddr;
+		info.uip_initiator_addr = &c->c_initiator_sockaddr;
+
+		info.uip_target = c->c_sess->s_t_name;
+		info.uip_initiator = c->c_sess->s_i_name;
+		info.uip_lun = cmd->c_lun;
+
+		info.uip_itt = rtt.itt;
+		info.uip_ttt = rtt.ttt;
+
+		info.uip_cmdsn = ntohl(rtt.expcmdsn);
+		info.uip_statsn = c->c_statsn;
+		info.uip_datasn = 0;
+
+		info.uip_datalen = 0;
+		info.uip_flags = rtt.flags;
+
+		ISCSI_DATA_REQUEST(&info);
+	}
+
 	send_iscsi_pkt(c, (iscsi_hdr_t *)&rtt, 0);
 }
 
@@ -657,7 +715,7 @@ iscsi_conn_data_in(t10_cmd_t *t)
  * | iscsi_conn_cmdcmplt -- Send out appropriate completion PDU
  * []----
  */
-void
+static void
 iscsi_conn_cmdcmplt(t10_cmd_t *t)
 {
 	iscsi_cmd_t	*cmd		= (iscsi_cmd_t *)T10_TRANS_ID(t);
@@ -753,6 +811,29 @@ send_datain_pdu(iscsi_conn_t *c, t10_cmd_t *t, uint8_t final_flag)
 	rsp.expcmdsn = htonl(c->c_sess->s_seencmdsn + 1);
 	(void) pthread_mutex_unlock(&c->c_sess->s_mutex);
 
+	if (ISCSI_DATA_SEND_ENABLED()) {
+		uiscsiproto_t info;
+
+		info.uip_target_addr = &c->c_target_sockaddr;
+		info.uip_initiator_addr = &c->c_initiator_sockaddr;
+
+		info.uip_target = c->c_sess->s_t_name;
+		info.uip_initiator = c->c_sess->s_i_name;
+		info.uip_lun = cmd->c_lun;
+
+		info.uip_itt = rsp.itt;
+		info.uip_ttt = rsp.ttt;
+
+		info.uip_cmdsn = ntohl(rsp.expcmdsn);
+		info.uip_statsn = ntohl(rsp.statsn);
+		info.uip_datasn = ntohl(rsp.datasn);
+
+		info.uip_datalen = T10_DATA_LEN(t);
+		info.uip_flags = rsp.flags;
+
+		ISCSI_DATA_SEND(&info);
+	}
+
 	send_iscsi_pkt(c, (iscsi_hdr_t *)&rsp, T10_DATA(t));
 }
 
@@ -815,6 +896,29 @@ send_scsi_rsp(iscsi_conn_t *c, t10_cmd_t *t)
 		rsp.expdatasn	= htonl(cmd->c_datasn);
 	}
 
+	if (ISCSI_SCSI_RESPONSE_ENABLED()) {
+		uiscsiproto_t info;
+
+		info.uip_target_addr = &c->c_target_sockaddr;
+		info.uip_initiator_addr = &c->c_initiator_sockaddr;
+
+		info.uip_target = c->c_sess->s_t_name;
+		info.uip_initiator = c->c_sess->s_i_name;
+		info.uip_lun = cmd->c_lun;
+
+		info.uip_itt = rsp.itt;
+		info.uip_ttt = ISCSI_RSVD_TASK_TAG;
+
+		info.uip_cmdsn = ntohl(rsp.expcmdsn);
+		info.uip_statsn = ntohl(rsp.statsn);
+		info.uip_datasn = ntohl(rsp.expdatasn);
+
+		info.uip_datalen = T10_DATA_LEN(t);
+		info.uip_flags = rsp.flags;
+
+		ISCSI_SCSI_RESPONSE(&info);
+	}
+
 	send_iscsi_pkt(c, (iscsi_hdr_t *)&rsp, auto_sense);
 }
 
@@ -824,6 +928,7 @@ send_async_scsi(iscsi_conn_t *c, int key, int asc, int ascq)
 	iscsi_async_evt_hdr_t		a;
 	struct scsi_extended_sense	s;
 	char				*buf;
+	int				dlen = sizeof (s) + 2;
 
 	bzero(&a, sizeof (a));
 	bzero(&s, sizeof (s));
@@ -842,7 +947,7 @@ send_async_scsi(iscsi_conn_t *c, int key, int asc, int ascq)
 	buf[1] = sizeof (s) & 0xff;
 	bcopy(&s, &buf[2], sizeof (s));
 
-	hton24(a.dlength, sizeof (s) + 2);
+	hton24(a.dlength, dlen);
 	a.opcode	= ISCSI_OP_ASYNC_EVENT;
 	a.flags		= ISCSI_FLAG_FINAL;
 	a.async_event	= ISCSI_ASYNC_EVENT_SCSI_EVENT;
@@ -856,6 +961,29 @@ send_async_scsi(iscsi_conn_t *c, int key, int asc, int ascq)
 
 	queue_prt(c->c_mgmtq, Q_CONN_NONIO,
 	    "CON%x  Sending async scsi sense\n", c->c_num);
+
+	if (ISCSI_ASYNC_SEND_ENABLED()) {
+		uiscsiproto_t info;
+
+		info.uip_target_addr = &c->c_target_sockaddr;
+		info.uip_initiator_addr = &c->c_initiator_sockaddr;
+
+		info.uip_target = c->c_sess->s_t_name;
+		info.uip_initiator = c->c_sess->s_i_name;
+		info.uip_lun = 0;
+
+		info.uip_itt = ISCSI_RSVD_TASK_TAG;
+		info.uip_ttt = ISCSI_RSVD_TASK_TAG;
+
+		info.uip_cmdsn = ntohl(a.expcmdsn);
+		info.uip_statsn = ntohl(a.statsn);
+		info.uip_datasn = 0;
+
+		info.uip_datalen = dlen;
+		info.uip_flags = a.flags;
+
+		ISCSI_ASYNC_SEND(&info);
+	}
 
 	send_iscsi_pkt(c, (iscsi_hdr_t *)&a, buf);
 }
@@ -890,6 +1018,29 @@ send_async_logout(iscsi_conn_t *c)
 
 	queue_prt(c->c_mgmtq, Q_CONN_NONIO,
 	    "CON%x  Sending async logout request\n", c->c_num);
+
+	if (ISCSI_ASYNC_SEND_ENABLED()) {
+		uiscsiproto_t info;
+
+		info.uip_target_addr = &c->c_target_sockaddr;
+		info.uip_initiator_addr = &c->c_initiator_sockaddr;
+
+		info.uip_target = c->c_sess->s_t_name;
+		info.uip_initiator = c->c_sess->s_i_name;
+		info.uip_lun = 0;
+
+		info.uip_itt = ISCSI_RSVD_TASK_TAG;
+		info.uip_ttt = ISCSI_RSVD_TASK_TAG;
+
+		info.uip_cmdsn = ntohl(a.expcmdsn);
+		info.uip_statsn = ntohl(a.statsn);
+		info.uip_datasn = 0;
+
+		info.uip_datalen = 0;
+		info.uip_flags = a.flags;
+
+		ISCSI_ASYNC_SEND(&info);
+	}
 
 	send_iscsi_pkt(c, (iscsi_hdr_t *)&a, 0);
 }
@@ -1143,6 +1294,33 @@ conn_state(iscsi_conn_t *c, iscsi_transition_t t)
 		switch (t) {
 		case T13:
 			if (c->c_last_pkg) {
+				iscsi_logout_rsp_hdr_t *rsp =
+				    (iscsi_logout_rsp_hdr_t *)c->c_last_pkg;
+				assert(rsp->opcode ==
+				    ISCSI_OP_LOGOUT_RSP);
+
+				if (ISCSI_LOGOUT_RESPONSE_ENABLED()) {
+					uiscsiproto_t info;
+					char nil = '\0';
+
+					info.uip_initiator =
+					    c->c_sess->s_i_name;
+					info.uip_target = &nil;
+					info.uip_lun = 0;
+
+					info.uip_itt = rsp->itt;
+					info.uip_ttt = ISCSI_RSVD_TASK_TAG;
+
+					info.uip_cmdsn = ntohl(rsp->expcmdsn);
+					info.uip_statsn = ntohl(rsp->statsn);
+					info.uip_datasn = 0;
+
+					info.uip_datalen = ntoh24(rsp->dlength);
+					info.uip_flags = rsp->flags;
+
+					ISCSI_LOGOUT_RESPONSE(&info);
+				}
+
 				send_iscsi_pkt(c, c->c_last_pkg, NULL);
 				free(c->c_last_pkg);
 			}
@@ -1198,8 +1376,8 @@ conn_state(iscsi_conn_t *c, iscsi_transition_t t)
 void
 send_iscsi_pkt(iscsi_conn_t *c, iscsi_hdr_t *h, char *opt_text)
 {
-	int		dlen	= ntoh24(h->dlength),
-			pad_len;
+	int		dlen	= ntoh24(h->dlength);
+	int		pad_len;
 	uint32_t	crc;
 
 #ifdef ETHEREAL_DEBUG

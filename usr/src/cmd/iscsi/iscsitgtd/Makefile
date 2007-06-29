@@ -50,6 +50,12 @@ $(ROOTSVCSYSTEM)/iscsi_target.xml	:= OWNER = root
 $(ROOTSVCSYSTEM)/iscsi_target.xml	:= GROUP = bin
 $(ROOTSVCSYSTEM)/iscsi_target.xml	:= FILEMODE = 0444
 
+DLIBSRCS = iscsi.d
+
+ROOTDLIBDIR = $(ROOT)/usr/lib/dtrace
+ROOTDLIBS = $(DLIBSRCS:%=$(ROOTDLIBDIR)/%)
+$(ROOTDLIBS) := FILEMODE = 0644
+
 CPPFLAGS += -D_FILE_OFFSET_BITS=64 -I${ISCSICOMMONDIR}
 
 all	:=	TARGET = all
@@ -64,7 +70,7 @@ all:	$(SUBDIRS)
 
 clean clobber lint:	$(SUBDIRS)
 
-install: $(SUBDIRS) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+install: $(SUBDIRS) $(ROOTMANIFEST) $(ROOTDLIBS) $(ROOTSVCMETHOD)
 	-$(RM) $(ROOTUSRSBINPROG)
 	-$(LN) $(ISAEXEC) $(ROOTUSRSBINPROG)
 
@@ -79,7 +85,14 @@ $(POFILE): $(POFILES)
 
 check:	$(CHKMANIFEST)
 
+$(ROOTDLIBDIR):
+	$(INS.dir)
+
+$(ROOTDLIBDIR)/%.d: %.d
+	$(INS.file)
+
+$(ROOTDLIBS): $(ROOTDLIBDIR)
+
 FRC:
 
 include ../../Makefile.targ
-

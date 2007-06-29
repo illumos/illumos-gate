@@ -845,7 +845,7 @@ fasttrap_disable_callbacks(void)
 		cpu_t *cur, *cpu = CPU;
 
 		for (cur = cpu->cpu_next_onln; cur != cpu;
-			cur = cur->cpu_next_onln) {
+		    cur = cur->cpu_next_onln) {
 			rw_enter(&cur->cpu_ft_lock, RW_WRITER);
 		}
 
@@ -853,7 +853,7 @@ fasttrap_disable_callbacks(void)
 		dtrace_return_probe_ptr = NULL;
 
 		for (cur = cpu->cpu_next_onln; cur != cpu;
-			cur = cur->cpu_next_onln) {
+		    cur = cur->cpu_next_onln) {
 			rw_exit(&cur->cpu_ft_lock);
 		}
 	}
@@ -1047,7 +1047,7 @@ fasttrap_pid_getargdesc(void *arg, dtrace_id_t id, void *parg,
 {
 	fasttrap_probe_t *probe = parg;
 	char *str;
-	int i;
+	int i, ndx;
 
 	desc->dtargd_native[0] = '\0';
 	desc->dtargd_xlate[0] = '\0';
@@ -1058,14 +1058,11 @@ fasttrap_pid_getargdesc(void *arg, dtrace_id_t id, void *parg,
 		return;
 	}
 
-	/*
-	 * We only need to set this member if the argument is remapped.
-	 */
-	if (probe->ftp_argmap != NULL)
-		desc->dtargd_mapping = probe->ftp_argmap[desc->dtargd_ndx];
+	ndx = (probe->ftp_argmap != NULL) ?
+	    probe->ftp_argmap[desc->dtargd_ndx] : desc->dtargd_ndx;
 
 	str = probe->ftp_ntypes;
-	for (i = 0; i < desc->dtargd_mapping; i++) {
+	for (i = 0; i < ndx; i++) {
 		str += strlen(str) + 1;
 	}
 

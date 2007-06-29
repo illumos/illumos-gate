@@ -20,20 +20,16 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * ASSERTION:
- *
- * SECTION:
- *
- * NOTES:
- *
+ * ASSERTION: Verify that argN and args[N] variables are properly remapped.
  */
+
 BEGIN
 {
 	/* Timeout after 5 seconds */
@@ -41,16 +37,24 @@ BEGIN
 }
 
 test_prov$1:::place
-/arg0 == 4 && arg1 == 10 && arg2 == 10 && arg3 == 4/
-{
-	exit(0);
-}
-
-test_prov$1:::place
+/arg0 != 4 || arg1 != 10 || arg2 != 10 || arg3 != 4/
 {
 	printf("args are %d, %d, %d, %d; should be 4, 10, 10, 4",
 	    arg0, arg1, arg2, arg3);
 	exit(1);
+}
+
+test_prov$1:::place
+/args[0] != 4 || args[1] != 10 || args[2] != 10 || args[3] != 4/
+{
+	printf("args are %d, %d, %d, %d; should be 4, 10, 10, 4",
+	    args[0], args[1], args[2], args[3]);
+	exit(1);
+}
+
+test_prov$1:::place
+{
+	exit(0);
 }
 
 profile:::tick-1

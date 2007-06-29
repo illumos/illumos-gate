@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -840,13 +840,14 @@ dt_idhash_iter(dt_idhash_t *dhp, dt_idhash_f *func, void *data)
 {
 	dt_ident_t **ids;
 	dt_ident_t *idp;
-	ulong_t i, j;
+	ulong_t i, j, n;
 	int rv;
 
 	if (dhp->dh_tmpl != NULL)
 		dt_idhash_populate(dhp); /* fill hash w/ initial population */
 
-	ids = alloca(sizeof (dt_ident_t *) * dhp->dh_nelems);
+	n = dhp->dh_nelems;
+	ids = alloca(sizeof (dt_ident_t *) * n);
 
 	for (i = 0, j = 0; i < dhp->dh_hashsz; i++) {
 		for (idp = dhp->dh_hash[i]; idp != NULL; idp = idp->di_next)
@@ -855,7 +856,7 @@ dt_idhash_iter(dt_idhash_t *dhp, dt_idhash_f *func, void *data)
 
 	qsort(ids, dhp->dh_nelems, sizeof (dt_ident_t *), dt_idhash_comp);
 
-	for (i = 0; i < dhp->dh_nelems; i++) {
+	for (i = 0; i < n; i++) {
 		if ((rv = func(dhp, ids[i], data)) != 0)
 			return (rv);
 	}

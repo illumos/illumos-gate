@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,7 +54,7 @@ case "$1" in
 
 'stop')
 	# Kill any processes in the service contract
-	smf_kill_contract $2 TERM 1
+	smf_kill_contract $2 TERM
 	[ $? -ne 0 ] && exit 1
 	;;
 

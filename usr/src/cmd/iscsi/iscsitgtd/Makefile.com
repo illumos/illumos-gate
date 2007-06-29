@@ -24,29 +24,39 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# cmd/iscsi/iscsitgtd/Makefile.com
 
-PROG=	iscsitgtd
-OBJS	= main.o mgmt.o mgmt_create.o mgmt_list.o mgmt_modify.o mgmt_remove.o
-OBJS	+= iscsi_authclient.o iscsi_authglue.o iscsi_cmd.o iscsi_conn.o
-OBJS	+= iscsi_crc.o iscsi_ffp.o iscsi_login.o iscsi_sess.o radius.o
-OBJS	+= t10_sam.o t10_spc.o t10_sbc.o t10_raw_if.o t10_ssc.o t10_osd.o
-OBJS	+= util.o util_err.o util_ifname.o util_port.o util_queue.o
-OBJS	+= isns_client.o isns.o
-SRCS=	$(OBJS:%.o=../%.c) $(COMMON_SRCS)
+PROG = iscsitgtd
+
+DSRC = iscsi_provider.d
+DTRACE_HEADER = $(DSRC:%.d=%.h)
+
+COBJS	= main.o mgmt.o mgmt_create.o mgmt_list.o mgmt_modify.o mgmt_remove.o
+COBJS	+= iscsi_authclient.o iscsi_authglue.o iscsi_cmd.o iscsi_conn.o
+COBJS	+= iscsi_crc.o iscsi_ffp.o iscsi_login.o iscsi_sess.o radius.o
+COBJS	+= t10_sam.o t10_spc.o t10_sbc.o t10_raw_if.o t10_ssc.o t10_osd.o
+COBJS	+= util.o util_err.o util_ifname.o util_port.o util_queue.o
+COBJS	+= isns_client.o isns.o
+OBJS=	$(COBJS) $(DSRC:%.d=%.o)
+SRCS=	$(COBJS:%.o=../%.c) $(COMMON_SRCS)
 
 include ../../../Makefile.cmd
 include $(SRC)/cmd/iscsi/Makefile.iscsi
 
-SUFFIX_LINT	= .ln
+CTFMERGE_HOOK = && $(CTFMERGE) -L VERSION -o $@ $(OBJS)
+CTFCONVERT_HOOK = && $(CTFCONVERT_O)
+CFLAGS += $(CTF_FLAGS)
+CFLAGS64 += $(CTF_FLAGS)
+NATIVE_CFLAGS += $(CTF_FLAGS)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-D_LARGEFILE64_SOURCE=1 -I/usr/include/libxml2
 CFLAGS64 +=	$(CCVERBOSE)
 
-GROUP=sys
+SUFFIX_LINT = .ln
 
-CLEANFILES += $(OBJS)
+GROUP = sys
+
+CLEANFILES += $(OBJS) ../$(DTRACE_HEADER)
 
 .KEEP_STATE:
 
@@ -56,23 +66,30 @@ LDLIBS	+= -lumem -luuid -lxml2 -lsocket -lnsl -ldoor -lavl -lmd5 -ladm -lefi
 LDLIBS  +=	-liscsitgt -lzfs -ldlpi
 
 $(PROG): $(OBJS) $(COMMON_OBJS)
-	$(LINK.c) $(OBJS) $(COMMON_OBJS) -o $@ $(LDLIBS)
+	$(LINK.c) $(OBJS) $(COMMON_OBJS) -o $@ $(LDLIBS) $(CTFMERGE_HOOK)
 	$(POST_PROCESS)
 
 lint := LINTFLAGS += -u
 lint := LINTFLAGS64 += -u
 
-# lint: lint_SRCS
 lint: $(SRCS:../%=%$(SUFFIX_LINT))
 
 %$(SUFFIX_LINT): ../%
 	${LINT.c} -I.. ${INCLUDES} -y -c $< && touch $@
 
-%.o:	$(ISCSICOMMONDIR)/%.c
-	$(COMPILE.c) $<
+../%.h:	../%.d
+	$(DTRACE) -xnolibs -h -s $< -o $@
 
-%.o:	../%.c
-	$(COMPILE.c) $<
+%.o:	$(ISCSICOMMONDIR)/%.c ../$(DTRACE_HEADER)
+	$(COMPILE.c) $< $(CTFCONVERT_HOOK)
+	$(POST_PROCESS_O)
+
+%.o:	../%.c ../$(DTRACE_HEADER)
+	$(COMPILE.c) $< $(CTFCONVERT_HOOK)
+	$(POST_PROCESS_O)
+
+%.o:	../%.d $(COBJS)
+	$(COMPILE.d) -xnolibs -s $< $(COBJS)
 
 clean:
 	$(RM) $(CLEANFILES) $(COMMON_OBJS) *$(SUFFIX_LINT)

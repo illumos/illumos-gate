@@ -33,11 +33,13 @@
 #include <unistd.h>
 #include <syslog.h>
 #include <sys/iscsi_protocol.h>
+#include <arpa/inet.h>
 #include <iscsitgt_impl.h>
 #include "queue.h"
 #include "iscsi_conn.h"
 #include "iscsi_sess.h"
 #include "iscsi_login.h"
+#include "iscsi_provider_impl.h"
 #include "utility.h"
 #include "target.h"
 #include "isns_client.h"
@@ -163,6 +165,30 @@ iscsi_handle_login_pkt(iscsi_conn_t *c)
 		    ISCSI_LOGIN_STATUS_INVALID_REQUEST);
 		conn_state(c, T7);
 		return (True);
+	}
+
+	if (ISCSI_LOGIN_COMMAND_ENABLED()) {
+		uiscsiproto_t info;
+		char nil = '\0';
+
+		info.uip_target_addr = &c->c_target_sockaddr;
+		info.uip_initiator_addr = &c->c_initiator_sockaddr;
+
+		info.uip_target = &nil;
+		info.uip_initiator = &nil;
+		info.uip_lun = 0;
+
+		info.uip_itt = lh.itt;
+		info.uip_ttt = ISCSI_RSVD_TASK_TAG;
+
+		info.uip_cmdsn = ntohl(lh.cmdsn);
+		info.uip_statsn = ntohl(lh.expstatsn);
+		info.uip_datasn = 0;
+
+		info.uip_datalen = ntoh24(lh.dlength);
+		info.uip_flags = lh.flags;
+
+		ISCSI_LOGIN_COMMAND(&info);
 	}
 
 	if ((rval = session_alloc(c, lh.isid)) == False) {
@@ -599,6 +625,30 @@ more_text:
 	hton24(rsp->dlength, text_length);
 	if ((rval == True) && (session_validate(c->c_sess) == True)) {
 
+		if (ISCSI_LOGIN_RESPONSE_ENABLED()) {
+			uiscsiproto_t info;
+			char nil = '\0';
+
+			info.uip_target_addr = &c->c_target_sockaddr;
+			info.uip_initiator_addr = &c->c_initiator_sockaddr;
+
+			info.uip_target = &nil;
+			info.uip_initiator = c->c_sess->s_i_name;
+			info.uip_lun = 0;
+
+			info.uip_itt = rsp->itt;
+			info.uip_ttt = ISCSI_RSVD_TASK_TAG;
+
+			info.uip_cmdsn = ntohl(rsp->expcmdsn);
+			info.uip_statsn = ntohl(rsp->statsn);
+			info.uip_datasn = 0;
+
+			info.uip_datalen = text_length;
+			info.uip_flags = rsp->flags;
+
+			ISCSI_LOGIN_RESPONSE(&info);
+		}
+
 		send_iscsi_pkt(c, (iscsi_hdr_t *)rsp, text_rsp);
 
 		if ((lh.flags & ISCSI_FLAG_LOGIN_TRANSIT) &&
@@ -687,6 +737,30 @@ send_login_reject(iscsi_conn_t *c, iscsi_login_hdr_t *lhp, int err_code)
 
 	r->status_class = (err_code >> 8) & 0xff;
 	r->status_detail = err_code & 0xff;
+
+	if (ISCSI_LOGIN_RESPONSE_ENABLED()) {
+		uiscsiproto_t info;
+		char nil = '\0';
+
+		info.uip_target_addr = &c->c_target_sockaddr;
+		info.uip_initiator_addr = &c->c_initiator_sockaddr;
+
+		info.uip_target = &nil;
+		info.uip_initiator = &nil;
+		info.uip_lun = 0;
+
+		info.uip_itt = r->itt;
+		info.uip_ttt = ISCSI_RSVD_TASK_TAG;
+
+		info.uip_cmdsn = ntohl(r->expcmdsn);
+		info.uip_statsn = ntohl(r->statsn);
+		info.uip_datasn = 0;
+
+		info.uip_datalen = ntoh24(r->dlength);
+		info.uip_flags = r->flags;
+
+		ISCSI_LOGIN_RESPONSE(&info);
+	}
 
 	(void) write(c->c_fd, r, sizeof (*r));
 	free(r);

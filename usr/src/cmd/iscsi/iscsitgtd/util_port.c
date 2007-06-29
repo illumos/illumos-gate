@@ -50,18 +50,36 @@ iscsi_conn_t	*conn_head,
 		*conn_tail;
 
 void
-port_init()
+port_init(void)
 {
 	(void) pthread_mutex_init(&port_mutex, NULL);
 	port_conn_num = 0;
 }
 
+void
+canonicalize_sockaddr(struct sockaddr_storage *st)
+{
+	struct in6_addr *addr6 = &((struct sockaddr_in6 *)st)->sin6_addr;
+
+	/*
+	 * If target address is IPv4 mapped IPv6 address convert it to IPv4
+	 * address.
+	 */
+	if (st->ss_family == AF_INET6 &&
+	    (IN6_IS_ADDR_V4MAPPED(addr6) || IN6_IS_ADDR_V4COMPAT(addr6))) {
+		struct in_addr *addr = &((struct sockaddr_in *)st)->sin_addr;
+		IN6_V4MAPPED_TO_INADDR(addr6, addr);
+		st->ss_family = AF_INET;
+	}
+}
+
+
 void *
 port_watcher(void *v)
 {
-	int			s,
-				fd,
-				on = 1;
+	int			s;
+	int			fd;
+	int			on = 1;
 	char			debug[80];
 	struct sockaddr_in	sin_ip;
 	struct sockaddr_in6	sin6_ip;
@@ -70,12 +88,10 @@ port_watcher(void *v)
 	iscsi_conn_t		*conn;
 	port_args_t		*p = (port_args_t *)v;
 	target_queue_t		*q = p->port_mgmtq;
-	int			l,
-				accept_err_sleep = 1;
+	int			l;
+	int			accept_err_sleep = 1;
 	const int		just_say_no = 1;
 	pthread_t		junk;
-	struct in_addr		addr;
-	struct in6_addr		addr6;
 
 	/*
 	 * Try creating an IPv6 socket first
@@ -98,7 +114,7 @@ port_watcher(void *v)
 			    (char *)&on, sizeof (on));
 
 			if ((bind(s, (struct sockaddr *)&sin_ip,
-				sizeof (sin_ip))) < 0) {
+			    sizeof (sin_ip))) < 0) {
 				(void) snprintf(debug, sizeof (debug),
 				    "bind on port %d failed, errno %d",
 				    p->port_num, errno);
@@ -169,8 +185,7 @@ port_watcher(void *v)
 			queue_str(q, Q_GEN_ERRS, msg_status,
 			    "setsockopt NODELAY failed");
 
-		if ((conn = (iscsi_conn_t *)calloc(sizeof (iscsi_conn_t),
-		    1)) == NULL) {
+		if ((conn = calloc(1, sizeof (iscsi_conn_t))) == NULL) {
 			/*
 			 * If we fail to get memory this is all rather
 			 * pointless, since it's unlikely that queue_str
@@ -182,31 +197,20 @@ port_watcher(void *v)
 		}
 
 		/*
-		 * Save initiator sockaddr for future use
+		 * Save initiator address for future use.
 		 */
+		canonicalize_sockaddr(&st);
 		conn->c_initiator_sockaddr = st;
 
+		/*
+		 * Save target address for future use.
+		 */
 		socklen = sizeof (st);
-		if (getsockname(fd, (struct sockaddr *)&st,
-		    &socklen) == 0) {
-			/*
-			 * Save target sockaddr for future use
-			 */
-
-			addr6 = ((struct sockaddr_in6 *)&st)->sin6_addr;
-			if (st.ss_family == AF_INET6 &&
-			    IN6_IS_ADDR_V4MAPPED(&addr6)) {
-				/*
-				 * If target address is IPv4 mapped IPv6 address
-				 * convert it to IPv4 address
-				 */
-				IN6_V4MAPPED_TO_INADDR(&addr6, &addr);
-				((struct sockaddr_in *)&st)->sin_addr = addr;
-				st.ss_family = AF_INET;
-			}
-
-			conn->c_target_sockaddr = st;
-		}
+		if (getsockname(fd, (struct sockaddr *)&st, &socklen) == 0)
+			canonicalize_sockaddr(&st);
+		else
+			st.ss_family = AF_UNSPEC;
+		conn->c_target_sockaddr = st;
 
 		conn->c_fd	= fd;
 		conn->c_mgmtq	= q;
