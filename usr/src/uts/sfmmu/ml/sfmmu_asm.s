@@ -3922,6 +3922,8 @@ tsb_protfault:
 	btst	TSTATE_PRIV, %g5
 	bz,a	ptl1_panic
 	  mov	PTL1_BAD_DTRACE_FLAGS, %g1
+	TSTAT_CHECK_TL1(2f, %g1, %g2);
+2:
 	done
 
 1:
