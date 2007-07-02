@@ -115,6 +115,7 @@ f none usr/include/sys/spl.h 644 root bin
 f none usr/include/sys/traptrace.h 644 root bin
 f none usr/include/sys/tss.h 644 root bin
 f none usr/include/sys/x86_archext.h 644 root bin
+f none usr/include/sys/ucode.h 644 root bin
 d none usr/platform 755 root sys
 d none usr/platform/i86pc 755 root sys
 d none usr/platform/i86pc/include 755 root bin

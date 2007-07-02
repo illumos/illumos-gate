@@ -53,7 +53,8 @@ i386_HDRS=			\
 	fdmedia.h		\
 	mouse.h			\
 	mse.h			\
-	vuidmice.h
+	vuidmice.h		\
+	ucode.h
 
 AVHDRS=				\
 	av/iec61883.h

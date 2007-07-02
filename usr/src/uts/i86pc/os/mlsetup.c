@@ -293,6 +293,11 @@ mlsetup(struct regs *rp)
 
 	ASSERT_STACK_ALIGNED();
 
+	/*
+	 * Fill out cpu_ucode_info.  Update microcode if necessary.
+	 */
+	ucode_check(CPU);
+
 	if (workaround_errata(CPU) != 0)
 		panic("critical workaround(s) missing for boot cpu");
 }

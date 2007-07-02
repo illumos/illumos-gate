@@ -52,6 +52,7 @@ typedef void *cpu_pri_lev_t;
 
 struct cpuid_info;
 struct cmi;
+struct cpu_ucode_info;
 
 struct	machcpu {
 	/* define all the x_call stuff */
@@ -105,6 +106,8 @@ struct	machcpu {
 	uint16_t mcpu_intr_pending;	/* xen: pending interrupt levels */
 
 	volatile uint32_t *mcpu_mwait;	/* MONITOR/MWAIT buffer */
+
+	struct cpu_ucode_info	*mcpu_ucode_info;
 };
 
 #define	NINTR_THREADS	(LOCK_LEVEL-1)	/* number of interrupt threads */

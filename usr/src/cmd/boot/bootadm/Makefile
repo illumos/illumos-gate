@@ -51,10 +51,7 @@ LDLIBS +=	-lnvpair
 # behavior, which causes us to take SIGSEGV on such a write.
 CFLAGS +=	$(XSTRCONST)
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
-
-# Add paths to pick up headers
-CFLAGS +=	-I../../../uts/common
-LINTFLAGS +=	-I../../../uts/common
+CPPFLAGS +=	-I../../../uts/common -I../../../common
 
 all: $(PROG)
 

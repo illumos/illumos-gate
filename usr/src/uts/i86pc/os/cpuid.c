@@ -2016,6 +2016,13 @@ cpuid_getstep(cpu_t *cpu)
 	return (cpu->cpu_m.mcpu_cpi->cpi_step);
 }
 
+uint_t
+cpuid_getsig(struct cpu *cpu)
+{
+	ASSERT(cpuid_checkpass(cpu, 1));
+	return (cpu->cpu_m.mcpu_cpi->cpi_std[1].cp_eax);
+}
+
 uint32_t
 cpuid_getchiprev(struct cpu *cpu)
 {

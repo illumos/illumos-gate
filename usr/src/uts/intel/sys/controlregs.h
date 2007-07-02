@@ -135,6 +135,16 @@ extern "C" {
 #define	MSR_INTC_SEP_ESP 0x175		/* kernel esp MSR */
 #define	MSR_INTC_SEP_EIP 0x176		/* kernel eip MSR */
 
+/* Intel's microcode registers */
+#define	MSR_INTC_UCODE_WRITE		0x79	/* microcode write */
+#define	MSR_INTC_UCODE_REV		0x8b	/* microcode revision */
+#define	INTC_UCODE_REV_SHIFT		32	/* Bits 63:32 */
+
+/* Intel's platform identification */
+#define	MSR_INTC_PLATFORM_ID		0x17
+#define	INTC_PLATFORM_ID_SHIFT		50	/* Bit 52:50 */
+#define	INTC_PLATFORM_ID_MASK		0x7
+
 /* AMD's EFER register */
 
 #define	MSR_AMD_EFER	0xc0000080	/* extended feature enable MSR */

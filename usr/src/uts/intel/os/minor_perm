@@ -151,3 +151,4 @@ wpi:* 0666 root sys
 physmem:* 0600 root sys
 sdp:sdp 0666 root sys
 battery:* 0666 root sys
+ucode:* 0644 root sys

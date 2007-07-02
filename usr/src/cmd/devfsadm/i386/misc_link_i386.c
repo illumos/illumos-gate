@@ -49,6 +49,7 @@ static int agp_process(di_minor_t minor, di_node_t node);
 static int drm_node(di_minor_t minor, di_node_t node);
 static int mc_node(di_minor_t minor, di_node_t node);
 static int xsvc(di_minor_t minor, di_node_t node);
+static int ucode(di_minor_t minor, di_node_t node);
 
 static devfsadm_create_t misc_cbt[] = {
 	{ "vt00", "ddi_display", NULL,
@@ -95,6 +96,9 @@ static devfsadm_create_t misc_cbt[] = {
 	},
 	{ "memory-controller", "ddi_mem_ctrl", NULL,
 	    TYPE_EXACT, ILEVEL_0, mc_node
+	},
+	{ "pseudo", "ddi_pseudo", "ucode",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, ucode,
 	}
 };
 
@@ -135,6 +139,9 @@ static devfsadm_enumerate_t agpmaster_rules[1] =
 
 static devfsadm_remove_t misc_remove_cbt[] = {
 	{ "vt", "vt[0-9][0-9]", RM_PRE|RM_ALWAYS,
+		ILEVEL_0, devfsadm_rm_all
+	},
+	{ "pseudo", "^ucode$", RM_ALWAYS | RM_PRE | RM_HOT,
 		ILEVEL_0, devfsadm_rm_all
 	}
 };
@@ -349,7 +356,7 @@ agp_process(di_minor_t minor, di_node_t node)
 	}
 
 	devfsadm_print(debug_mid, "agp_process: minor=%s node=%s\n",
-		minor_nm, di_node_name(node));
+	    minor_nm, di_node_name(node));
 
 	devfspath = di_devfs_path(node);
 	if (devfspath == NULL) {
@@ -391,7 +398,7 @@ agp_process(di_minor_t minor, di_node_t node)
 	switch (index) {
 	case DRIVER_AGPPSEUDO:
 		devfsadm_print(debug_mid,
-			    "agp_process: psdeudo driver name\n");
+		    "agp_process: psdeudo driver name\n");
 		name = "agpgart";
 		(void) snprintf(I_path, PATH_MAX, "%s", name);
 		devfsadm_print(debug_mid,
@@ -404,26 +411,26 @@ agp_process(di_minor_t minor, di_node_t node)
 		return (DEVFSADM_CONTINUE);
 	case DRIVER_AGPTARGET:
 		devfsadm_print(debug_mid,
-			    "agp_process: target driver name\n");
+		    "agp_process: target driver name\n");
 		rules[0] = agptarget_rules[0];
 		name = "agptarget";
 		break;
 	case DRIVER_CPUGART:
 		devfsadm_print(debug_mid,
-			    "agp_process: cpugart driver name\n");
+		    "agp_process: cpugart driver name\n");
 		rules[0] = cpugart_rules[0];
 		name = "cpugart";
 		break;
 	case DRIVER_AGPMASTER_DRM:
 	case DRIVER_AGPMASTER_VGATEXT:
 		devfsadm_print(debug_mid,
-			    "agp_process: agpmaster driver name\n");
+		    "agp_process: agpmaster driver name\n");
 		rules[0] = agpmaster_rules[0];
 		name = "agpmaster";
 		break;
 	case DRIVER_UNKNOWN:
 		devfsadm_print(debug_mid,
-			    "agp_process: unknown driver name=%s\n", drv_nm);
+		    "agp_process: unknown driver name=%s\n", drv_nm);
 		free(I_path);
 		free(p_path);
 		return (DEVFSADM_CONTINUE);
@@ -440,7 +447,7 @@ agp_process(di_minor_t minor, di_node_t node)
 	(void) snprintf(I_path, PATH_MAX, "agp/%s%s", name, buf);
 
 	devfsadm_print(debug_mid, "agp_process: p_path=%s buf=%s\n",
-		    p_path, buf);
+	    p_path, buf);
 
 	free(buf);
 
@@ -513,7 +520,7 @@ drm_node(di_minor_t minor, di_node_t node)
 	(void) snprintf(I_path, PATH_MAX, "dri/%s%s", name, buf);
 
 	devfsadm_print(debug_mid, "drm_node: p_path=%s buf=%s\n",
-		    p_path, buf);
+	    p_path, buf);
 
 	free(buf);
 
@@ -569,5 +576,17 @@ xsvc(di_minor_t minor, di_node_t node)
 		return (DEVFSADM_CONTINUE);
 
 	(void) devfsadm_mklink(mn, node, minor, 0);
+	return (DEVFSADM_CONTINUE);
+}
+
+/*
+ *	/dev/ucode	->	/devices/pseudo/ucode@0:ucode
+ */
+static int
+ucode(di_minor_t minor, di_node_t node)
+{
+	char *mn;
+
+	(void) devfsadm_mklink("ucode", node, minor, 0);
 	return (DEVFSADM_CONTINUE);
 }

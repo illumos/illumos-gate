@@ -50,9 +50,13 @@
 #include <ftw.h>
 #include <fcntl.h>
 #include <strings.h>
+#include <utime.h>
 #include <sys/systeminfo.h>
 #include <sys/dktp/fdisk.h>
 #include <sys/param.h>
+#if defined(__i386)
+#include <sys/ucode.h>
+#endif
 
 #include <pwd.h>
 #include <grp.h>
@@ -244,6 +248,10 @@ static void append_to_flist(filelist_t *, char *);
 
 #if defined(__sparc)
 static void sparc_abort(void);
+#endif
+
+#if defined(__i386)
+static void ucode_install();
 #endif
 
 /* Menu related sub commands */
@@ -1051,6 +1059,10 @@ bam_archive(
 
 	if (strcmp(subcmd, "update_all") == 0)
 		bam_update_all = 1;
+
+#if defined(__i386)
+	ucode_install(bam_root);
+#endif
 
 	ret = f(bam_root, opt);
 
@@ -4514,3 +4526,49 @@ append_to_flist(filelist_t *flistp, char *s)
 		flistp->tail->next = lp;
 	flistp->tail = lp;
 }
+
+#if defined(__i386)
+
+UCODE_VENDORS;
+
+/*ARGSUSED*/
+static void
+ucode_install(char *root)
+{
+	int i;
+
+	for (i = 0; ucode_vendors[i].filestr != NULL; i++) {
+		int cmd_len = PATH_MAX + 256;
+		char cmd[PATH_MAX + 256];
+		char file[PATH_MAX];
+		char timestamp[PATH_MAX];
+		struct stat fstatus, tstatus;
+		struct utimbuf u_times;
+
+		(void) snprintf(file, PATH_MAX, "%s/%s/%s-ucode.txt",
+		    bam_root, UCODE_INSTALL_PATH, ucode_vendors[i].filestr);
+
+		if (stat(file, &fstatus) != 0 || !(S_ISREG(fstatus.st_mode)))
+			continue;
+
+		(void) snprintf(timestamp, PATH_MAX, "%s.ts", file);
+
+		if (stat(timestamp, &tstatus) == 0 &&
+		    fstatus.st_mtime <= tstatus.st_mtime)
+			continue;
+
+		(void) snprintf(cmd, cmd_len, "/usr/sbin/ucodeadm -i -R "
+		    "%s/%s/%s %s > /dev/null 2>&1", bam_root,
+		    UCODE_INSTALL_PATH, ucode_vendors[i].vendorstr, file);
+		if (system(cmd) != 0)
+			return;
+
+		if (creat(timestamp, S_IRUSR | S_IWUSR) == -1)
+			return;
+
+		u_times.actime = fstatus.st_atime;
+		u_times.modtime = fstatus.st_mtime;
+		(void) utime(timestamp, &u_times);
+	}
+}
+#endif

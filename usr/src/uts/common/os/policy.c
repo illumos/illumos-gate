@@ -1904,3 +1904,14 @@ secpolicy_idmap(const cred_t *cr)
 {
 	return (PRIV_POLICY(cr, PRIV_ALL, B_FALSE, EPERM, NULL));
 }
+
+/*
+ * secpolicy_ucode_update
+ *
+ * Determine if the subject has sufficient privilege to update microcode.
+ */
+int
+secpolicy_ucode_update(const cred_t *scr)
+{
+	return (PRIV_POLICY(scr, PRIV_ALL, B_FALSE, EPERM, NULL));
+}

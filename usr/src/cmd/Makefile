@@ -457,7 +457,8 @@ i386_SUBDIRS=		\
 	biosdev		\
 	diskscan	\
 	OWconfig	\
-	rtc
+	rtc		\
+	ucodeadm
 
 sparc_SUBDIRS=		\
 	cvcd		\
@@ -722,6 +723,9 @@ sparc_MSGSUBDIRS=	\
 	vntsd		\
 	wrsmconf	\
 	wrsmstat
+
+i386_MSGSUBDIRS=	\
+	ucodeadm
 
 #
 # commands that use dcgettext for localized time, LC_TIME

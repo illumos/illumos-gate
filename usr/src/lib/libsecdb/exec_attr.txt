@@ -139,6 +139,7 @@ Maintenance and Repair:suser:cmd:::/usr/sbin/prtconf:euid=0
 Maintenance and Repair:suser:cmd:::/usr/sbin/reboot:uid=0
 Maintenance and Repair:suser:cmd:::/usr/sbin/syslogd:euid=0
 Maintenance and Repair:suser:cmd:::/sbin/bootadm:euid=0
+Maintenance and Repair:solaris:cmd:::/usr/sbin/ucodeadm:privs=all
 Media Backup:suser:cmd:::/usr/bin/mt:euid=0
 Media Backup:suser:cmd:::/usr/lib/fs/ufs/ufsdump:euid=0;gid=sys
 Media Backup:suser:cmd:::/usr/sbin/tar:euid=0

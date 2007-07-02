@@ -113,6 +113,11 @@ LX_AUTOFS_OBJS +=	\
 CORE_OBJS += decompress.o
 
 #
+#	Microcode utilities
+#
+CORE_OBJS += ucode_utils.o
+
+#
 #	Driver modules
 #
 AGPGART_OBJS +=	agpgart.o agp_kstat.o
@@ -145,6 +150,7 @@ PCI_AUTOCONFIG_OBJS += pci_autoconfig.o pci_boot.o pcie_nvidia.o \
 			pci_memlist.o pci_resource.o
 SD_OBJS += sd.o sd_xbuf.o
 STRATEGY_OBJS += strategy.o
+UCODE_OBJS += ucode_drv.o
 VGATEXT_OBJS += vgatext.o vgasubr.o
 
 #

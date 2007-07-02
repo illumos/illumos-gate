@@ -148,6 +148,7 @@ int secpolicy_vnode_setids_setgids(const cred_t *, gid_t);
 int secpolicy_vnode_stky_modify(const cred_t *);
 int secpolicy_zinject(const cred_t *);
 int secpolicy_zfs(const cred_t *);
+int secpolicy_ucode_update(const cred_t *);
 void secpolicy_setid_clear(vattr_t *, cred_t *);
 void secpolicy_fs_mount_clearopts(cred_t *, struct vfs *);
 int secpolicy_setid_setsticky_clear(vnode_t *, vattr_t *,

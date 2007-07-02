@@ -554,6 +554,7 @@ extern uint_t cpuid_getvendor(struct cpu *);
 extern uint_t cpuid_getfamily(struct cpu *);
 extern uint_t cpuid_getmodel(struct cpu *);
 extern uint_t cpuid_getstep(struct cpu *);
+extern uint_t cpuid_getsig(struct cpu *);
 extern uint_t cpuid_get_ncpu_per_chip(struct cpu *);
 extern uint_t cpuid_get_ncore_per_chip(struct cpu *);
 extern int cpuid_get_chipid(struct cpu *);
@@ -583,6 +584,13 @@ extern void add_cpunode2devtree(processorid_t, struct cpuid_info *);
 extern void cpuid_get_addrsize(struct cpu *, uint_t *, uint_t *);
 extern uint_t cpuid_get_dtlb_nent(struct cpu *, size_t);
 extern size_t cpuid_get_mwait_size(struct cpu *cpu);
+
+struct cpu_ucode_info;
+
+extern void ucode_alloc_space(struct cpu *);
+extern void ucode_free_space(struct cpu *);
+extern void ucode_check(struct cpu *);
+extern void ucode_free();
 
 extern uint_t workaround_errata(struct cpu *);
 

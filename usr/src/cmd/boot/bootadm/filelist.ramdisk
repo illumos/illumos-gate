@@ -14,6 +14,8 @@ etc/cluster/nodeid
 kernel
 platform/i86pc/biosint
 platform/i86pc/kernel
+platform/i86pc/ucode/GenuineIntel
+platform/i86pc/ucode/AuthenticAMD
 boot/solaris/bootenv.rc
 boot/solaris/devicedb/master
 boot/acpi/tables

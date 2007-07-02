@@ -373,6 +373,11 @@ mp_startup_init(int cpun)
 	 */
 	cpuid_alloc_space(cp);
 
+	/*
+	 * alloc space for ucode_info
+	 */
+	ucode_alloc_space(cp);
+
 	hat_cpu_online(cp);
 
 #ifdef TRAPTRACE
@@ -461,6 +466,8 @@ mp_startup_fini(struct cpu *cp, int error)
 	hat_cpu_offline(cp);
 
 	cpuid_free_space(cp);
+
+	ucode_free_space(cp);
 
 	if (cp->cpu_m.mcpu_idt != CPU->cpu_m.mcpu_idt)
 		kmem_free(cp->cpu_m.mcpu_idt, sizeof (idt0));
@@ -1187,6 +1194,9 @@ start_other_cpus(int cprboot)
 			CPUSET_DEL(mp_cpus, who);
 	}
 
+	/* Free the space allocated to hold the microcode file */
+	ucode_free();
+
 	affinity_clear();
 
 	if (skipped) {
@@ -1344,6 +1354,11 @@ mp_startup(void)
 	if (dtrace_cpu_init != NULL) {
 		(*dtrace_cpu_init)(cp->cpu_id);
 	}
+
+	/*
+	 * Fill out cpu_ucode_info.  Update microcode if necessary.
+	 */
+	ucode_check(cp);
 
 	mutex_exit(&cpu_lock);
 
