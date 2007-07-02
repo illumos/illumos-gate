@@ -52,6 +52,8 @@
 #include <sys/sunddi.h>
 #include <sys/policy.h>
 #include <sys/zone.h>
+#include <sys/condvar.h>
+#include <sys/thread.h>
 
 /*
  * Administrivia system call.  We provide this in two flavors: one for calling
@@ -62,6 +64,8 @@
 
 extern ksema_t fsflush_sema;
 kmutex_t ualock;
+kcondvar_t uacond;
+kthread_t *ua_shutdown_thread = NULL;
 
 int sys_shutdown = 0;
 
@@ -123,7 +127,6 @@ int
 kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 {
 	int error = 0;
-	int locked = 0;
 	char *buf;
 	size_t buflen = 0;
 	boolean_t invoke_cb = B_FALSE;
@@ -153,13 +156,30 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 	}
 
 	/*
-	 * Serialize these operations on ualock.  If it is held, just return
-	 * as if successful since the system will soon reset or remount.
+	 * Serialize these operations on ualock.  If it is held, the
+	 * system should shutdown, reboot, or remount shortly, unless there is
+	 * an error.  We need a cv rather than just a mutex because proper
+	 * functioning of A_REBOOT relies on being able to interrupt blocked
+	 * userland callers.
+	 *
+	 * We only clear ua_shutdown_thread after A_REMOUNT, because A_SHUTDOWN
+	 * and A_REBOOT should never return.
 	 */
 	if (cmd == A_SHUTDOWN || cmd == A_REBOOT || cmd == A_REMOUNT) {
-		if (!mutex_tryenter(&ualock))
-			return (0);
-		locked = 1;
+		mutex_enter(&ualock);
+		while (ua_shutdown_thread != NULL) {
+			if (cv_wait_sig(&uacond, &ualock) == 0) {
+				/*
+				 * If we were interrupted, leave, and handle
+				 * the signal (or exit, depending on what
+				 * happened)
+				 */
+				mutex_exit(&ualock);
+				return (EINTR);
+			}
+		}
+		ua_shutdown_thread = curthread;
+		mutex_exit(&ualock);
 	}
 
 	switch (cmd) {
@@ -175,7 +195,13 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 		if (p != &p0) {
 			proc_is_exiting(p);
 			if ((error = exitlwps(0)) != 0) {
-				ASSERT(locked);
+				/*
+				 * Another thread in this process also called
+				 * exitlwps().
+				 */
+				mutex_enter(&ualock);
+				ua_shutdown_thread = NULL;
+				cv_signal(&uacond);
 				mutex_exit(&ualock);
 				return (error);
 			}
@@ -274,6 +300,11 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 
 	case A_REMOUNT:
 		(void) VFS_MOUNTROOT(rootvfs, ROOT_REMOUNT);
+		/* Let other threads enter the shutdown path now */
+		mutex_enter(&ualock);
+		ua_shutdown_thread = NULL;
+		cv_signal(&uacond);
+		mutex_exit(&ualock);
 		break;
 
 	case A_FREEZE:
@@ -325,9 +356,6 @@ kadmin(int cmd, int fcn, void *mdep, cred_t *credp)
 	default:
 		error = EINVAL;
 	}
-
-	if (locked)
-		mutex_exit(&ualock);
 
 	return (error);
 }
