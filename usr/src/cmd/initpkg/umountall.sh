@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -68,10 +68,14 @@ MNTTAB=/etc/mnttab
 # /usr/bin/sleep	-k, to sleep after an fuser -c -k on the mountpoint
 # /usr/sbin/fuser	-k, to kill processes keeping a mount point busy
 #
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # In addition, we use /usr/bin/tail if it is available; if not we use
 # slower shell constructs to reverse a file.
 
 PATH=/sbin:/usr/sbin:/usr/bin
+
+DEFERRED_ACTIVATION_PATCH_FLAG="/var/run/.patch_loopback_mode"
+SVC_STARTD="/lib/svc/bin/svc.startd"
 
 # Clear these in case they were already set in our inherited environment.
 FSType=
@@ -171,6 +175,25 @@ ZONENAME=`zonename`
 if [ -z "${RFLAG}${NFLAG}${HFLAG}${FSType}" -a "$ZONENAME" = "global" -a \
     `uname -p` = "i386" -a -x /sbin/bootadm ] ; then
 	/sbin/bootadm -a update_all
+fi
+
+
+#
+# If we are in deferred activation patching, and the caller is 
+# svc.startd, then exit without unmounting any of the remaining 
+# file systems since the call path is from shutdown.  Note that
+# by the time we get here, smf stop methods for nfs, cachefs
+# etc, will have run.  
+#
+if [ -f $DEFERRED_ACTIVATION_PATCH_FLAG ] ; then 
+	ppid=`ps -o ppid= -p $$`	# parent of umountall will be sh
+					# from system()
+
+	ppid=`ps -o ppid= -p $ppid`	# parent of sh will be svc.startd
+	COMM=`ps -o comm= -p $ppid`
+	if [ "$COMM" = "$SVC_STARTD" ] ; then
+		exit
+	fi
 fi
 
 #
