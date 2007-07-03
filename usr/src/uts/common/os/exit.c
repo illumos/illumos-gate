@@ -683,6 +683,22 @@ proc_exit(int why, int what)
 	mutex_enter(&p->p_lock);
 	CL_EXIT(curthread); /* tell the scheduler that curthread is exiting */
 
+	/*
+	 * Have our task accummulate our resource usage data before they
+	 * become contaminated by p_cacct etc., and before we renounce
+	 * membership of the task.
+	 *
+	 * We do this regardless of whether or not task accounting is active.
+	 * This is to avoid having nonsense data reported for this task if
+	 * task accounting is subsequently enabled. The overhead is minimal;
+	 * by this point, this process has accounted for the usage of all its
+	 * LWPs. We nonetheless do the work here, and under the protection of
+	 * pidlock, so that the movement of the process's usage to the task
+	 * happens at the same time as the removal of the process from the
+	 * task, from the point of view of exacct_snapshot_task_usage().
+	 */
+	exacct_update_task_mstate(p);
+
 	hrutime = mstate_aggr_state(p, LMS_USER);
 	hrstime = mstate_aggr_state(p, LMS_SYSTEM);
 	p->p_utime = (clock_t)NSEC_TO_TICK(hrutime) + p->p_cutime;

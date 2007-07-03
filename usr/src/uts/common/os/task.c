@@ -388,6 +388,7 @@ task_create(projid_t projid, zone_t *zone)
 	tk->tk_nlwps = 0;
 	tk->tk_nlwps_ctl = INT_MAX;
 	tk->tk_usage = tu;
+	tk->tk_inherited = kmem_zalloc(sizeof (task_usage_t), KM_SLEEP);
 	tk->tk_proj = project_hold_by_id(projid, zone, PROJECT_HOLD_INSERT);
 	tk->tk_flags = TASK_NORMAL;
 
@@ -618,6 +619,7 @@ task_change(task_t *newtk, proc_t *p)
 
 	task_detach(p);
 	task_begin(newtk, p);
+	exacct_move_mstate(p, oldtk, newtk);
 }
 
 /*
@@ -643,6 +645,7 @@ task_end(task_t *tk)
 
 	project_rele(tk->tk_proj);
 	kmem_free(tk->tk_usage, sizeof (task_usage_t));
+	kmem_free(tk->tk_inherited, sizeof (task_usage_t));
 	if (tk->tk_prevusage != NULL)
 		kmem_free(tk->tk_prevusage, sizeof (task_usage_t));
 	if (tk->tk_zoneusage != NULL)
@@ -861,6 +864,7 @@ task_init(void)
 
 	task0p->tk_tkid = id_alloc(taskid_space);
 	task0p->tk_usage = kmem_zalloc(sizeof (task_usage_t), KM_SLEEP);
+	task0p->tk_inherited = kmem_zalloc(sizeof (task_usage_t), KM_SLEEP);
 	task0p->tk_proj = project_hold_by_id(0, &zone0,
 	    PROJECT_HOLD_INSERT);
 	task0p->tk_flags = TASK_NORMAL;

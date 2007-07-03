@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,6 +99,54 @@ ea_attach_item(ea_object_t *grp, void *buf, size_t bufsz, ea_catalog_t catalog)
 	item = ea_alloc_item(catalog, buf, bufsz);
 	(void) ea_attach_to_group(grp, item);
 	return (item);
+}
+
+/*
+ * exacct_add_task_mstate() and exacct_sub_task_mstate() add and subtract
+ * microstate accounting data and resource usage counters from one task_usage_t
+ * from those supplied in another. These functions do not operate on *all*
+ * members of a task_usage_t: for some (e.g. tu_anctaskid) it would not make
+ * sense.
+ */
+static void
+exacct_add_task_mstate(task_usage_t *tu, task_usage_t *delta)
+{
+	tu->tu_utime  += delta->tu_utime;
+	tu->tu_stime  += delta->tu_stime;
+	tu->tu_minflt += delta->tu_minflt;
+	tu->tu_majflt += delta->tu_majflt;
+	tu->tu_sndmsg += delta->tu_sndmsg;
+	tu->tu_rcvmsg += delta->tu_rcvmsg;
+	tu->tu_ioch   += delta->tu_ioch;
+	tu->tu_iblk   += delta->tu_iblk;
+	tu->tu_oblk   += delta->tu_oblk;
+	tu->tu_vcsw   += delta->tu_vcsw;
+	tu->tu_icsw   += delta->tu_icsw;
+	tu->tu_nsig   += delta->tu_nsig;
+	tu->tu_nswp   += delta->tu_nswp;
+	tu->tu_nscl   += delta->tu_nscl;
+}
+
+/*
+ * See the comments for exacct_add_task_mstate(), above.
+ */
+static void
+exacct_sub_task_mstate(task_usage_t *tu, task_usage_t *delta)
+{
+	tu->tu_utime  -= delta->tu_utime;
+	tu->tu_stime  -= delta->tu_stime;
+	tu->tu_minflt -= delta->tu_minflt;
+	tu->tu_majflt -= delta->tu_majflt;
+	tu->tu_sndmsg -= delta->tu_sndmsg;
+	tu->tu_rcvmsg -= delta->tu_rcvmsg;
+	tu->tu_ioch   -= delta->tu_ioch;
+	tu->tu_iblk   -= delta->tu_iblk;
+	tu->tu_oblk   -= delta->tu_oblk;
+	tu->tu_vcsw   -= delta->tu_vcsw;
+	tu->tu_icsw   -= delta->tu_icsw;
+	tu->tu_nsig   -= delta->tu_nsig;
+	tu->tu_nswp   -= delta->tu_nswp;
+	tu->tu_nscl   -= delta->tu_nscl;
 }
 
 /*
@@ -317,26 +364,43 @@ exacct_snapshot_task_usage(task_t *tk, task_usage_t *tu)
 		tu->tu_nscl	+= p->p_ru.sysc;
 	} while ((p = p->p_tasknext) != tk->tk_memb_list);
 
+	/*
+	 * The resource usage accounted for so far will include that
+	 * contributed by the task's first process. If this process
+	 * came from another task, then its accumulated resource usage
+	 * will include a contribution from work performed there.
+	 * We must therefore subtract any resource usage that was
+	 * inherited with the first process.
+	 */
+	exacct_sub_task_mstate(tu, tk->tk_inherited);
+
 	gethrestime(&ts);
 	tu->tu_finishsec = (uint64_t)(ulong_t)ts.tv_sec;
 	tu->tu_finishnsec = (uint64_t)(ulong_t)ts.tv_nsec;
 }
 
 /*
- * exacct_update_task_mstate() updates the task's microstate accounting
- * statistics with accumulated counters for the exiting process.
+ * void exacct_update_task_mstate(proc_t *)
+ *
+ * Overview
+ *   exacct_update_task_mstate() updates the task usage; it is intended
+ *   to be called from proc_exit().
+ *
+ * Return values
+ *   None.
+ *
+ * Caller's context
+ *   p_lock must be held at entry.
  */
-static void
+void
 exacct_update_task_mstate(proc_t *p)
 {
 	task_usage_t *tu;
 
 	mutex_enter(&p->p_task->tk_usage_lock);
 	tu = p->p_task->tk_usage;
-	mutex_enter(&p->p_lock);
 	tu->tu_utime	+= mstate_aggr_state(p, LMS_USER);
 	tu->tu_stime	+= mstate_aggr_state(p, LMS_SYSTEM);
-	mutex_exit(&p->p_lock);
 	tu->tu_minflt	+= p->p_ru.minflt;
 	tu->tu_majflt	+= p->p_ru.majflt;
 	tu->tu_sndmsg	+= p->p_ru.msgsnd;
@@ -401,11 +465,14 @@ exacct_calculate_task_usage(task_t *tk, task_usage_t *tu, int flag)
 		break;
 	case EW_FINAL:
 		/*
-		 * For final records, we only have to record task's finish
-		 * time because all other stuff has been calculated already.
+		 * For final records, we deduct, from the task's current
+		 * usage, any usage that was inherited with the arrival
+		 * of a process from a previous task. We then record
+		 * the task's finish time.
 		 */
 		mutex_enter(&tk->tk_usage_lock);
 		(void) bcopy(tk->tk_usage, tu, sizeof (task_usage_t));
+		exacct_sub_task_mstate(tu, tk->tk_inherited);
 		mutex_exit(&tk->tk_usage_lock);
 
 		gethrestime(&ts);
@@ -787,7 +854,7 @@ exacct_assemble_proc_record(proc_usage_t *pu, ulong_t *mask,
 	record = ea_alloc_group(EXT_GROUP | EXC_DEFAULT | record_type);
 	for (res = 1, count = 0; res <= AC_PROC_MAX_RES; res++)
 		if (BT_TEST(mask, res))
-		    count += exacct_attach_proc_item(pu, record, res);
+			count += exacct_attach_proc_item(pu, record, res);
 	if (count == 0) {
 		ea_free_object(record, EUP_ALLOC);
 		record = NULL;
@@ -1044,6 +1111,7 @@ exacct_do_commit_proc(ac_info_t *ac_proc, proc_t *p, int wstat)
 	kmem_free(pu->pu_command, strlen(pu->pu_command) + 1);
 	kmem_free(pu, sizeof (proc_usage_t));
 }
+
 /*
  * void exacct_commit_proc(proc_t *, int)
  *
@@ -1072,16 +1140,11 @@ exacct_commit_proc(proc_t *p, int wstat)
 		return;
 	}
 	acg = zone_getspecific(exacct_zone_key, zone);
-	if (zone != global_zone)
-		gacg = zone_getspecific(exacct_zone_key, global_zone);
-	if (acg->ac_task.ac_state == AC_ON ||
-	    (gacg != NULL && gacg->ac_task.ac_state == AC_ON)) {
-		exacct_update_task_mstate(p);
-	}
-
 	exacct_do_commit_proc(&acg->ac_proc, p, wstat);
-	if (p->p_zone != global_zone)
+	if (zone != global_zone) {
+		gacg = zone_getspecific(exacct_zone_key, global_zone);
 		exacct_do_commit_proc(&gacg->ac_proc, p, wstat);
+	}
 }
 
 static int
@@ -1394,4 +1457,70 @@ exacct_init()
 	exacct_queue = system_taskq;
 	exacct_object_cache = kmem_cache_create("exacct_object_cache",
 	    sizeof (ea_object_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
+}
+
+/*
+ * exacct_snapshot_proc_mstate() copies a process's microstate accounting data
+ * and resource usage counters into a given task_usage_t. It differs from
+ * exacct_copy_proc_mstate() in that here a) we are copying to a task_usage_t,
+ * b) p_lock will have been acquired earlier in the call path and c) we
+ * are here including the process's user and system times.
+ */
+static void
+exacct_snapshot_proc_mstate(proc_t *p, task_usage_t *tu)
+{
+	tu->tu_utime  = mstate_aggr_state(p, LMS_USER);
+	tu->tu_stime  = mstate_aggr_state(p, LMS_SYSTEM);
+	tu->tu_minflt = p->p_ru.minflt;
+	tu->tu_majflt = p->p_ru.majflt;
+	tu->tu_sndmsg = p->p_ru.msgsnd;
+	tu->tu_rcvmsg = p->p_ru.msgrcv;
+	tu->tu_ioch   = p->p_ru.ioch;
+	tu->tu_iblk   = p->p_ru.inblock;
+	tu->tu_oblk   = p->p_ru.oublock;
+	tu->tu_vcsw   = p->p_ru.nvcsw;
+	tu->tu_icsw   = p->p_ru.nivcsw;
+	tu->tu_nsig   = p->p_ru.nsignals;
+	tu->tu_nswp   = p->p_ru.nswap;
+	tu->tu_nscl   = p->p_ru.sysc;
+}
+
+/*
+ * void exacct_move_mstate(proc_t *, task_t *, task_t *)
+ *
+ * Overview
+ *   exacct_move_mstate() is called by task_change() and accounts for
+ *   a process's resource usage when it is moved from one task to another.
+ *
+ *   The process's usage at this point is recorded in the new task so
+ *   that it can be excluded from the calculation of resources consumed
+ *   by that task.
+ *
+ *   The resource usage inherited by the new task is also added to the
+ *   aggregate maintained by the old task for processes that have exited.
+ *
+ * Return values
+ *   None.
+ *
+ * Caller's context
+ *   pidlock and p_lock held across exacct_move_mstate().
+ */
+void
+exacct_move_mstate(proc_t *p, task_t *oldtk, task_t *newtk)
+{
+	task_usage_t tu;
+
+	/* Take a snapshot of this process's mstate and RU counters */
+	exacct_snapshot_proc_mstate(p, &tu);
+
+	/*
+	 * Use the snapshot to increment the aggregate usage of the old
+	 * task, and the inherited usage of the new one.
+	 */
+	mutex_enter(&oldtk->tk_usage_lock);
+	exacct_add_task_mstate(oldtk->tk_usage, &tu);
+	mutex_exit(&oldtk->tk_usage_lock);
+	mutex_enter(&newtk->tk_usage_lock);
+	exacct_add_task_mstate(newtk->tk_inherited, &tu);
+	mutex_exit(&newtk->tk_usage_lock);
 }

@@ -70,6 +70,9 @@ typedef struct task {
 	rctl_qty_t	tk_nlwps_ctl;	/* protected by tk_rctls->rcs_lock */
 	rctl_qty_t	tk_cpu_time;	/* accumulated CPU seconds	*/
 	struct zone	*tk_zone;	/* zone task belongs to		*/
+	task_usage_t	*tk_inherited;	/* task resource usage		*/
+					/* inherited with the first	*/
+					/* member process		*/
 } task_t;
 
 extern task_t *task0p;
