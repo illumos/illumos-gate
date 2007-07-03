@@ -348,8 +348,9 @@ bge_receive_ring(bge_t *bgep, recv_ring_t *rrp)
  *	0	found some more - receive them
  *	1..15					none found
  *
- * The routine returns only when a complete scan has been performed
- * without finding any packets to receive.
+ * The routine returns only when a complete scan has been performed either
+ * without finding any packets to receive or BGE_MAXPKT_RCVED packets were
+ * received from ring 0 and other rings (if used) are empty.
  *
  * Note that driver-defined locks may *NOT* be held across calls
  * to gld_recv().
