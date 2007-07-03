@@ -1603,9 +1603,14 @@ nxge_resume(p_nxge_t nxgep)
 	nxge_status_t status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_resume"));
-	nxgep->suspended = DDI_RESUME;
 
-	nxge_global_reset(nxgep);
+	nxgep->suspended = DDI_RESUME;
+	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
+	(void) nxge_rxdma_hw_mode(nxgep, NXGE_DMA_START);
+	(void) nxge_txdma_hw_mode(nxgep, NXGE_DMA_START);
+	(void) nxge_rx_mac_enable(nxgep);
+	(void) nxge_tx_mac_enable(nxgep);
+	nxge_intrs_enable(nxgep);
 	nxgep->suspended = 0;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
