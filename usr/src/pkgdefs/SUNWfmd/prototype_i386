@@ -73,11 +73,6 @@ d none usr/platform/i86pc/lib/fm/topo/plugins 755 root bin
 f none usr/platform/i86pc/lib/fm/topo/plugins/chip.so 555 root bin
 f none usr/platform/i86pc/lib/fm/topo/plugins/hostbridge.so 555 root bin
 f none usr/platform/i86pc/lib/fm/topo/plugins/pcibus.so 555 root bin
-f none usr/platform/i86pc/lib/fm/topo/plugins/sata.so 555 root bin
 d none usr/platform/i86pc/lib/fm/topo/maps 755 root bin
 f none usr/platform/i86pc/lib/fm/topo/maps/i86pc-hc-topology.xml 444 root bin
-f none usr/platform/i86pc/lib/fm/topo/maps/storage-hc-topology.xml 444 root bin
-d none usr/platform/i86pc/lib/fm/fmd 755 root bin
-d none usr/platform/i86pc/lib/fm/fmd/plugins 755 root bin
-f none usr/platform/i86pc/lib/fm/fmd/plugins/sfx4500-disk.so 555 root bin
-f none usr/platform/i86pc/lib/fm/fmd/plugins/sfx4500-disk.conf 644 root bin
+f none usr/platform/i86pc/lib/fm/topo/maps/Sun-Fire-X4500-hc-topology.xml 444 root bin

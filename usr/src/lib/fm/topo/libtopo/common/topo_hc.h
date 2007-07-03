@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@ extern "C" {
 /*
  * Allowable hardware component names for hc FMRIs
  */
+#define	BAY		"bay"
 #define	BRANCH		"branch"
 #define	CMP		"CMP"
 #define	CENTERPLANE	"centerplane"
@@ -63,7 +64,6 @@ extern "C" {
 #define	PCIEX_SWUP	"pciexswu"
 #define	PCIEX_SWDWN	"pciexswd"
 #define	RANK		"rank"
-#define	SATA_PORT	"sata-port"
 #define	SYSTEMBOARD	"systemboard"
 #define	XAUI		"xaui"
 #define	XFP		"xfp"

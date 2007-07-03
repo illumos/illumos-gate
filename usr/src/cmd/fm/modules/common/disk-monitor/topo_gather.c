@@ -45,9 +45,8 @@
 #include <fm/libtopo.h>
 #include <fm/topo_hc.h>
 
-#include "sata.h"
-#include "sfx4500_props.h"
-#include "sfx4500-disk.h"
+#include "disk.h"
+#include "disk_monitor.h"
 #include "topo_gather.h"
 
 #define	TOPO_PGROUP_IO		"io"	/* duplicated from did_props.h */
@@ -131,11 +130,11 @@ dm_fmri_to_diskmon(fmd_hdl_t *hdl, nvlist_t *fmri)
 }
 
 static nvlist_t *
-find_sfx4500_private_pgroup(tnode_t *node)
+find_disk_monitor_private_pgroup(tnode_t *node)
 {
 	int err;
 	nvlist_t *list_of_lists, *nvlp, *dupnvlp;
-	nvlist_t *sfx4500_pgrp = NULL;
+	nvlist_t *disk_monitor_pgrp = NULL;
 	nvpair_t *nvp = NULL;
 	char *pgroup_name;
 
@@ -165,7 +164,7 @@ find_sfx4500_private_pgroup(tnode_t *node)
 
 			if (nonunique_nvlist_lookup_string(nvlp,
 			    TOPO_PROP_GROUP_NAME, &pgroup_name) != 0 ||
-			    strcmp(pgroup_name, SUN_FIRE_X4500_PROPERTIES) != 0)
+			    strcmp(pgroup_name, DISK_MONITOR_PROPERTIES) != 0)
 				continue;
 			else {
 				/*
@@ -174,9 +173,9 @@ find_sfx4500_private_pgroup(tnode_t *node)
 				 * still refer to allocated memory.
 				 */
 				if (nvlist_dup(nvlp, &dupnvlp, 0) == 0)
-					sfx4500_pgrp = dupnvlp;
+					disk_monitor_pgrp = dupnvlp;
 				else
-					sfx4500_pgrp = NULL;
+					disk_monitor_pgrp = NULL;
 				break;
 			}
 		}
@@ -184,7 +183,7 @@ find_sfx4500_private_pgroup(tnode_t *node)
 		nvlist_free(list_of_lists);
 	}
 
-	return (sfx4500_pgrp);
+	return (disk_monitor_pgrp);
 }
 
 /*
@@ -460,10 +459,10 @@ topoprop_indrule_add(indrule_t **indrp, char *sts, char *acts)
 
 
 static int
-topo_add_sata_port(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
+topo_add_bay(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
 {
 	diskmon_t *target_diskp = wdp->target;
-	nvlist_t	*nvlp = find_sfx4500_private_pgroup(node);
+	nvlist_t	*nvlp = find_disk_monitor_private_pgroup(node);
 	nvlist_t	*prop_nvlp;
 	nvpair_t	*nvp = NULL;
 	char		*prop_name, *prop_value;
@@ -554,13 +553,13 @@ topo_add_sata_port(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
 			topo_hdl_strfree(thp, indicator_action);
 		}
 
-		(void) snprintf(pname, PNAME_MAX, SATA_IND_NAME "-%d", i);
-		if (topo_prop_get_string(node, SUN_FIRE_X4500_PROPERTIES,
+		(void) snprintf(pname, PNAME_MAX, BAY_IND_NAME "-%d", i);
+		if (topo_prop_get_string(node, DISK_MONITOR_PROPERTIES,
 		    pname, &indicator_name, &err) != 0)
 			break;
 
-		(void) snprintf(pname, PNAME_MAX, SATA_IND_ACTION "-%d", i);
-		if (topo_prop_get_string(node, SUN_FIRE_X4500_PROPERTIES,
+		(void) snprintf(pname, PNAME_MAX, BAY_IND_ACTION "-%d", i);
+		if (topo_prop_get_string(node, DISK_MONITOR_PROPERTIES,
 		    pname, &indicator_action, &err) != 0)
 			break;
 
@@ -592,14 +591,14 @@ topo_add_sata_port(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
 			topo_hdl_strfree(thp, indrule_actions);
 		}
 
-		(void) snprintf(pname, PNAME_MAX, SATA_INDRULE_STATES "-%d", i);
-		if (topo_prop_get_string(node, SUN_FIRE_X4500_PROPERTIES,
+		(void) snprintf(pname, PNAME_MAX, BAY_INDRULE_STATES "-%d", i);
+		if (topo_prop_get_string(node, DISK_MONITOR_PROPERTIES,
 		    pname, &indrule_states, &err) != 0)
 			break;
 
-		(void) snprintf(pname, PNAME_MAX, SATA_INDRULE_ACTIONS "-%d",
+		(void) snprintf(pname, PNAME_MAX, BAY_INDRULE_ACTIONS "-%d",
 		    i);
-		if (topo_prop_get_string(node, SUN_FIRE_X4500_PROPERTIES,
+		if (topo_prop_get_string(node, DISK_MONITOR_PROPERTIES,
 		    pname, &indrule_actions, &err) != 0)
 			break;
 
@@ -642,10 +641,10 @@ topo_add_sata_port(topo_hdl_t *thp, tnode_t *node, walk_diskmon_t *wdp)
 			continue;
 
 		/* Filter out indicator properties */
-		if (strstr(prop_name, SATA_IND_NAME) != NULL ||
-		    strstr(prop_name, SATA_IND_ACTION) != NULL ||
-		    strstr(prop_name, SATA_INDRULE_STATES) != NULL ||
-		    strstr(prop_name, SATA_INDRULE_ACTIONS) != NULL)
+		if (strstr(prop_name, BAY_IND_NAME) != NULL ||
+		    strstr(prop_name, BAY_IND_ACTION) != NULL ||
+		    strstr(prop_name, BAY_INDRULE_STATES) != NULL ||
+		    strstr(prop_name, BAY_INDRULE_ACTIONS) != NULL)
 			continue;
 
 		if (nonunique_nvlist_lookup_string(prop_nvlp, TOPO_PROP_VAL_VAL,
@@ -723,11 +722,11 @@ static int
 gather_topo_cfg(topo_hdl_t *thp, tnode_t *node, void *arg)
 {
 	char *nodename = topo_node_name(node);
-	if (strcmp(SATA_DISK, nodename) == 0)
+	if (strcmp(DISK, nodename) == 0)
 		return (topo_add_disk(thp, node, (walk_diskmon_t *)arg)
 		    ? TOPO_WALK_ERR : TOPO_WALK_NEXT);
-	else if (strcmp(SATA_PORT, nodename) == 0)
-		return (topo_add_sata_port(thp, node, (walk_diskmon_t *)arg)
+	else if (strcmp(BAY, nodename) == 0)
+		return (topo_add_bay(thp, node, (walk_diskmon_t *)arg)
 		    ? TOPO_WALK_ERR : TOPO_WALK_NEXT);
 
 	return (TOPO_WALK_NEXT);

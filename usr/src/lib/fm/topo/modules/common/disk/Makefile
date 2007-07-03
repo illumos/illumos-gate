@@ -22,19 +22,14 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = cpumem-retire \
-	disk-monitor	\
-	disk-transport	\
-	eversholt 	\
-	io-retire	\
-	ip-transport	\
-	snmp-trapgen	\
-	sp-monitor	\
-	syslog-msgs	\
-	zfs-diagnosis	\
-	zfs-retire
+MODULE = disk
+CLASS = common
 
-include ../../Makefile.subdirs
+MODULESRCS = disk.c
+
+include ../../Makefile.plugin
+
+LDLIBS += -ldevinfo -ldevid -lcfgadm -ldiskstatus
+

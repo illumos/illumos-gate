@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,7 @@
 #include <sys/ddi.h>
 #include <sys/devops.h>
 #include <sys/sunddi.h>
+#include <sys/esunddi.h>
 #include <sys/priv_names.h>
 
 #include <sys/fssnap.h>
@@ -943,21 +944,19 @@ static int
 snap_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
     int flags, char *name, caddr_t valuep, int *lengthp)
 {
-	struct snapshot_id **sidpp;
-	int		length, km_flags;
-	int		nblocks, size;
-	uint64_t	Size, Nblocks;
-	caddr_t		buffer;
 	int		minor;
+	struct snapshot_id **sidpp;
 	dev_t		mdev;
+	dev_info_t	*mdip;
+	int		error;
 
 	minor = getminor(dev);
-	length = *lengthp;		/* Get callers length */
 
 	/* if this is the control device just check for .conf properties */
 	if (minor == SNAP_CTL_MINOR)
 		return (ddi_prop_op(dev, dip, prop_op, flags, name,
-			valuep, lengthp));
+		    valuep, lengthp));
+
 	/* check to see if there is a master device plumbed */
 	sidpp = ddi_get_soft_state(statep, minor);
 	if (sidpp == NULL || *sidpp == NULL) {
@@ -969,75 +968,23 @@ snap_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 
 	if (((*sidpp)->sid_fvp == NULL) || ((*sidpp)->sid_fvp->v_vfsp == NULL))
 		return (ddi_prop_op(dev, dip, prop_op, flags, name,
-			valuep, lengthp));
-	mdev = (*sidpp)->sid_fvp->v_vfsp->vfs_dev;
-
-	/* get size information from the master device. */
-
-	if (strcmp(name, "nblocks") == 0) {
-		nblocks = bdev_size(mdev);
-		*lengthp = sizeof (nblocks);	/* Set callers length */
-	} else if (strcmp(name, "Nblocks") == 0) {
-		Nblocks = bdev_Size(mdev);
-		*lengthp = sizeof (Nblocks);	/* Set callers length */
-	} else if (strcmp(name, "size") == 0) {
-		size = cdev_size(mdev);
-		*lengthp = sizeof (size);	/* Set callers length */
-	} else if (strcmp(name, "Size") == 0) {
-		Size = cdev_Size(mdev);
-		*lengthp = sizeof (Size);	/* Set callers length */
-	} else {	/* not for us */
-		return (ddi_prop_op(dev, dip, prop_op, flags, name,
 		    valuep, lengthp));
+
+	/* hold master device and pass operation down */
+	mdev = (*sidpp)->sid_fvp->v_vfsp->vfs_dev;
+	if (mdip = e_ddi_hold_devi_by_dev(mdev, 0)) {
+
+		/* get size information from the master device. */
+		error = cdev_prop_op(mdev, mdip,
+		    prop_op, flags, name, valuep, lengthp);
+		ddi_release_devi(mdip);
+		if (error == DDI_PROP_SUCCESS)
+			return (error);
 	}
 
-	/*
-	 * If length only request, just return the length.
-	 */
-	if (prop_op == PROP_LEN)  {
-		return (DDI_PROP_SUCCESS);
-	}
+	/* master device did not service the request, try framework */
+	return (ddi_prop_op(dev, dip, prop_op, flags, name, valuep, lengthp));
 
-	/*
-	 * Allocate buffer, if required.  Either way, set `buffer' variable.
-	 */
-	switch (prop_op)  {
-	case PROP_LEN_AND_VAL_ALLOC:
-
-		km_flags = KM_NOSLEEP;
-
-		if (flags & DDI_PROP_CANSLEEP)
-			km_flags = KM_SLEEP;
-
-		buffer = kmem_alloc(*lengthp, km_flags);
-		if (buffer == NULL)  {
-			cmn_err(CE_WARN, "snap_get_prop: no mem for "
-			"property %s.", name);
-			return (DDI_PROP_NO_MEMORY);
-		}
-		*(caddr_t *)valuep = buffer; /* Set callers buf ptr */
-		break;
-
-	case PROP_LEN_AND_VAL_BUF:
-
-		if (*lengthp > length)
-			return (DDI_PROP_BUF_TOO_SMALL);
-
-		buffer = valuep; /* get callers buf ptr */
-		break;
-	}
-
-	if (strcmp(name, "nblocks") == 0) {
-		*((uint_t *)buffer) = nblocks;
-	} else if (strcmp(name, "Nblocks") == 0) {
-		*((uint64_t *)buffer) = Nblocks;
-	} else if (strcmp(name, "size") == 0) {
-		*((uint_t *)buffer) = size;
-	} else if (strcmp(name, "Size") == 0) {
-		*((uint64_t *)buffer) = Size;
-	}
-
-	return (DDI_PROP_SUCCESS);
 }
 
 /*
@@ -1520,7 +1467,7 @@ fssnap_translate(struct snapshot_id **sidpp, struct buf *wbp)
 	 */
 
 	throttle_write = !(taskq_member(cowp->cow_taskq, curthread) ||
-				    tsd_get(bypass_snapshot_throttle_key));
+	    tsd_get(bypass_snapshot_throttle_key));
 
 	/*
 	 * Iterate through all chunks covered by this write and perform the

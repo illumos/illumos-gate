@@ -18,23 +18,24 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = cpumem-retire \
-	disk-monitor	\
-	disk-transport	\
-	eversholt 	\
-	io-retire	\
-	ip-transport	\
-	snmp-trapgen	\
-	sp-monitor	\
-	syslog-msgs	\
-	zfs-diagnosis	\
-	zfs-retire
+# NOTE: The name of the xml file we are building is 'platform'
+# specific, but its build is structured as 'arch' specific since
+# 'uname -i' on all x86 platforms returns i86pc.
 
-include ../../Makefile.subdirs
+ARCH = i86pc
+CLASS = arch
+DTDFILE =
+TOPOFILE = Sun-Fire-X4500-hc-topology.xml
+SRCDIR = ../SUNW,Sun-Fire-X4500
+
+PLATFORM = Sun-Fire-X4500
+TOPOBASE = ../i86pc/i86pc-hc-topology.xml
+
+include ../Makefile.map

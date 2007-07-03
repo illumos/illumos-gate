@@ -5592,6 +5592,17 @@ mondo_loop() {
 		rm -f $platdir/lib/fm/fmd/plugins/cpumem-diagnosis.conf 
 	done
 
+	#
+	# Clean up legacy versions of x4500 FMA modules which may be still
+	# be laying around.  This check may be removed when a sufficient time
+	# has lapsed between the FMA putback as to ensure that no test machines
+	# still have development FMA bits.
+	#
+	rm -f $usr/platform/i86pc/lib/fm/topo/plugins/sata.so
+	rm -f $usr/platform/i86pc/lib/fm/topo/maps/storage-hc-topology.xml
+	rm -f $usr/platform/i86pc/lib/fm/fmd/plugins/sfx4500-disk.so
+	rm -f $usr/platform/i86pc/lib/fm/fmd/plugins/sfx4500-disk.conf
+
 	# Remove pam_unix
 	#
 	rm -f $usr/lib/security/pam_unix.so.1

@@ -27,7 +27,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Sun Fire X4500 Disk Diagnosis Engine
+ * Disk Monitor
  */
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -48,15 +48,15 @@
 #include <sys/fm/io/disk.h>
 #include <fm/libtopo.h>
 
-#include "sfx4500-disk.h"
+#include "disk_monitor.h"
 #include "hotplug_mgr.h"
 #include "schg_mgr.h"
 #include "topo_gather.h"
 #include "dm_platform.h"
 
-#define	THIS_FMD_MODULE_NAME "sfx4500-disk"
+#define	THIS_FMD_MODULE_NAME "disk-monitor"
 
-static enum sfx4500_init_state {
+static enum disk_init_state {
 	INIT_STATE_NONE = 0,
 	STATE_CHANGE_MGR_INITTED = 2,
 	HOTPLUG_MGR_INITTED = 4
@@ -318,8 +318,8 @@ static const fmd_prop_t fmd_props[] = {
 };
 
 static const fmd_hdl_info_t fmd_info = {
-	"Sun Fire X4500 Disk Diagnosis Engine",
-	SFX4500_DISK_MODULE_VERSION,
+	"Disk Monitor",
+	DISK_MONITOR_MODULE_VERSION,
 	&fmd_ops,
 	fmd_props
 };

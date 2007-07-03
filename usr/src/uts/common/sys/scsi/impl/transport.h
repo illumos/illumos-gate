@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -394,6 +394,12 @@ extern void		scsi_hba_nodename_compatible_free(
 				char			*nodename,
 				char			**compatible);
 
+
+extern int		scsi_hba_prop_update_inqstring(
+				struct scsi_device	*devp,
+				char			*name,
+				char			*data,
+				size_t			len);
 
 /*
  * Flags for scsi_hba_attach

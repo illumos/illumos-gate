@@ -837,7 +837,7 @@ ddi_dma_buf_setup(dev_info_t *dip, struct buf *bp, uint_t flags,
 		dmareq.dmar_object.dmao_obj.virt_obj.v_addr = bp->b_un.b_addr;
 		if (bp->b_flags & B_SHADOW) {
 			dmareq.dmar_object.dmao_obj.virt_obj.v_priv =
-							bp->b_shadow;
+			    bp->b_shadow;
 		} else {
 			dmareq.dmar_object.dmao_obj.virt_obj.v_priv = NULL;
 		}
@@ -1090,7 +1090,7 @@ ddi_dma_sync(ddi_dma_handle_t h, off_t o, size_t l, uint_t whom)
 	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)h;
 	dev_info_t *hdip, *dip;
 	int (*funcp)(dev_info_t *, dev_info_t *, ddi_dma_handle_t, off_t,
-		size_t, uint_t);
+	    size_t, uint_t);
 
 	/*
 	 * the DMA nexus driver will set DMP_NOSYNC if the
@@ -1819,47 +1819,64 @@ ddi_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 	mod_flags |= DDI_PROP_TYPE_ANY;
 
 	i = ddi_prop_search_common(dev, dip, prop_op,
-		mod_flags, name, valuep, (uint_t *)lengthp);
+	    mod_flags, name, valuep, (uint_t *)lengthp);
 	if (i == DDI_PROP_FOUND_1275)
 		return (DDI_PROP_SUCCESS);
 	return (i);
 }
 
 /*
- * ddi_prop_op_nblocks: The basic property operator for drivers that maintain
- * size in number of DEV_BSIZE blocks.  Provides a dynamic property
- * implementation for size oriented properties based on nblocks64 values passed
- * in by the driver.  Fallback to ddi_prop_op if the nblocks64 is too large.
- * This interface should not be used with a nblocks64 that represents the
- * driver's idea of how to represent unknown, if nblocks is unknown use
- * ddi_prop_op.
+ * ddi_prop_op_nblocks_blksize: The basic property operator for drivers that
+ * maintain size in number of blksize blocks.  Provides a dynamic property
+ * implementation for size oriented properties based on nblocks64 and blksize
+ * values passed in by the driver.  Fallback to ddi_prop_op if the nblocks64
+ * is too large.  This interface should not be used with a nblocks64 that
+ * represents the driver's idea of how to represent unknown, if nblocks is
+ * unknown use ddi_prop_op.
  */
 int
-ddi_prop_op_nblocks(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
-    int mod_flags, char *name, caddr_t valuep, int *lengthp, uint64_t nblocks64)
+ddi_prop_op_nblocks_blksize(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
+    int mod_flags, char *name, caddr_t valuep, int *lengthp,
+    uint64_t nblocks64, uint_t blksize)
 {
 	uint64_t size64;
+	int	blkshift;
+
+	/* convert block size to shift value */
+	ASSERT(BIT_ONLYONESET(blksize));
+	blkshift = highbit(blksize) - 1;
 
 	/*
 	 * There is no point in supporting nblocks64 values that don't have
 	 * an accurate uint64_t byte count representation.
 	 */
-	if (nblocks64 >= (UINT64_MAX >> DEV_BSHIFT))
+	if (nblocks64 >= (UINT64_MAX >> blkshift))
 		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
 		    name, valuep, lengthp));
 
-	size64 = nblocks64 << DEV_BSHIFT;
-	return (ddi_prop_op_size(dev, dip, prop_op, mod_flags,
-	    name, valuep, lengthp, size64));
+	size64 = nblocks64 << blkshift;
+	return (ddi_prop_op_size_blksize(dev, dip, prop_op, mod_flags,
+	    name, valuep, lengthp, size64, blksize));
 }
 
 /*
- * ddi_prop_op_size: The basic property operator for drivers that maintain size
- * in bytes. Provides a of dynamic property implementation for size oriented
- * properties based on size64 values passed in by the driver.  Fallback to
- * ddi_prop_op if the size64 is too large. This interface should not be used
- * with a size64 that represents the driver's idea of how to represent unknown,
- * if size is unknown use ddi_prop_op.
+ * ddi_prop_op_nblocks: ddi_prop_op_nblocks_blksize with DEV_BSIZE blksize.
+ */
+int
+ddi_prop_op_nblocks(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
+    int mod_flags, char *name, caddr_t valuep, int *lengthp, uint64_t nblocks64)
+{
+	return (ddi_prop_op_nblocks_blksize(dev, dip, prop_op,
+	    mod_flags, name, valuep, lengthp, nblocks64, DEV_BSIZE));
+}
+
+/*
+ * ddi_prop_op_size_blksize: The basic property operator for block drivers that
+ * maintain size in bytes. Provides a of dynamic property implementation for
+ * size oriented properties based on size64 value and blksize passed in by the
+ * driver.  Fallback to ddi_prop_op if the size64 is too large. This interface
+ * should not be used with a size64 that represents the driver's idea of how
+ * to represent unknown, if size is unknown use ddi_prop_op.
  *
  * NOTE: the legacy "nblocks"/"size" properties are treated as 32-bit unsigned
  * integers. While the most likely interface to request them ([bc]devi_size)
@@ -1867,15 +1884,21 @@ ddi_prop_op_nblocks(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
  * can't enforce limitations here without risking regression.
  */
 int
-ddi_prop_op_size(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
-    int mod_flags, char *name, caddr_t valuep, int *lengthp, uint64_t size64)
+ddi_prop_op_size_blksize(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
+    int mod_flags, char *name, caddr_t valuep, int *lengthp, uint64_t size64,
+    uint_t blksize)
 {
 	uint64_t nblocks64;
 	int	callers_length;
 	caddr_t	buffer;
+	int	blkshift;
+
+	/* convert block size to shift value */
+	ASSERT(BIT_ONLYONESET(blksize));
+	blkshift = highbit(blksize) - 1;
 
 	/* compute DEV_BSIZE nblocks value */
-	nblocks64 = lbtodb(size64);
+	nblocks64 = size64 >> blkshift;
 
 	/* get callers length, establish length of our dynamic properties */
 	callers_length = *lengthp;
@@ -1887,6 +1910,8 @@ ddi_prop_op_size(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 	else if ((strcmp(name, "nblocks") == 0) && (nblocks64 < UINT_MAX))
 		*lengthp = sizeof (uint32_t);
 	else if ((strcmp(name, "size") == 0) && (size64 < UINT_MAX))
+		*lengthp = sizeof (uint32_t);
+	else if ((strcmp(name, "blksize") == 0) && (blksize < UINT_MAX))
 		*lengthp = sizeof (uint32_t);
 	else {
 		/* fallback to ddi_prop_op */
@@ -1929,7 +1954,20 @@ ddi_prop_op_size(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 		*((uint32_t *)buffer) = (uint32_t)nblocks64;
 	else if (strcmp(name, "size") == 0)
 		*((uint32_t *)buffer) = (uint32_t)size64;
+	else if (strcmp(name, "blksize") == 0)
+		*((uint32_t *)buffer) = (uint32_t)blksize;
 	return (DDI_PROP_SUCCESS);
+}
+
+/*
+ * ddi_prop_op_size: ddi_prop_op_size_blksize with DEV_BSIZE block size.
+ */
+int
+ddi_prop_op_size(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
+    int mod_flags, char *name, caddr_t valuep, int *lengthp, uint64_t size64)
+{
+	return (ddi_prop_op_size_blksize(dev, dip, prop_op,
+	    mod_flags, name, valuep, lengthp, size64, DEV_BSIZE));
 }
 
 /*
@@ -2111,7 +2149,7 @@ ddi_prop_free(void *datap)
 	 * Get the structure
 	 */
 	pdd = (struct prop_driver_data *)
-		((caddr_t)datap - sizeof (struct prop_driver_data));
+	    ((caddr_t)datap - sizeof (struct prop_driver_data));
 	/*
 	 * Call the free routine to free it
 	 */
@@ -2305,7 +2343,7 @@ ddi_prop_fm_decode_ints(prop_handle_t *ph, void *data, uint_t *nelements)
 	 * Allocated memory to store the decoded value in.
 	 */
 	intp = ddi_prop_decode_alloc((cnt * sizeof (int)),
-		ddi_prop_free_ints);
+	    ddi_prop_free_ints);
 
 	/*
 	 * Decode each element and place it in the space we just allocated
@@ -2379,7 +2417,7 @@ ddi_prop_fm_decode_int64_array(prop_handle_t *ph, void *data, uint_t *nelements)
 	 * Allocate memory to store the decoded value.
 	 */
 	intp = ddi_prop_decode_alloc((cnt * sizeof (int64_t)),
-		ddi_prop_free_ints);
+	    ddi_prop_free_ints);
 
 	/*
 	 * Decode each element and place it in the space allocated
@@ -2445,7 +2483,7 @@ ddi_prop_fm_encode_ints(prop_handle_t *ph, void *data, uint_t nelements)
 	 * Allocate space in the handle to store the encoded int.
 	 */
 	if (ddi_prop_encode_alloc(ph, size * nelements) !=
-		DDI_PROP_SUCCESS)
+	    DDI_PROP_SUCCESS)
 		return (DDI_PROP_NO_MEMORY);
 
 	/*
@@ -2866,7 +2904,7 @@ ddi_prop_fm_decode_bytes(prop_handle_t *ph, void *data, uint_t *nelements)
 	 * Get the size of the encoded array of bytes.
 	 */
 	nbytes = DDI_PROP_BYTES(ph, DDI_PROP_CMD_GET_DSIZE,
-		data, ph->ph_size);
+	    data, ph->ph_size);
 	if (nbytes < DDI_PROP_RESULT_OK) {
 		switch (nbytes) {
 		case DDI_PROP_RESULT_EOF:
@@ -2929,7 +2967,7 @@ ddi_prop_fm_encode_bytes(prop_handle_t *ph, void *data, uint_t nelements)
 	 * Get the size of the encoded array of bytes.
 	 */
 	size = DDI_PROP_BYTES(ph, DDI_PROP_CMD_GET_ESIZE, (uchar_t *)data,
-		nelements);
+	    nelements);
 	if (size < DDI_PROP_RESULT_OK) {
 		switch (size) {
 		case DDI_PROP_RESULT_EOF:
@@ -2950,7 +2988,7 @@ ddi_prop_fm_encode_bytes(prop_handle_t *ph, void *data, uint_t nelements)
 	 * Encode the array of bytes.
 	 */
 	i = DDI_PROP_BYTES(ph, DDI_PROP_CMD_ENCODE, (uchar_t *)data,
-		nelements);
+	    nelements);
 	if (i < DDI_PROP_RESULT_OK) {
 		switch (i) {
 		case DDI_PROP_RESULT_EOF:
@@ -3019,13 +3057,13 @@ ddi_prop_1275_int(prop_handle_t *ph, uint_t cmd, int *data)
 		if (ph->ph_flags & PH_FROM_PROM) {
 			i = MIN(ph->ph_size, PROP_1275_INT_SIZE);
 			if ((int *)ph->ph_cur_pos > ((int *)ph->ph_data +
-				ph->ph_size - i))
+			    ph->ph_size - i))
 				return (DDI_PROP_RESULT_ERROR);
 		} else {
 			if (ph->ph_size < sizeof (int) ||
-			((int *)ph->ph_cur_pos > ((int *)ph->ph_data +
-				ph->ph_size - sizeof (int))))
-			return (DDI_PROP_RESULT_ERROR);
+			    ((int *)ph->ph_cur_pos > ((int *)ph->ph_data +
+			    ph->ph_size - sizeof (int))))
+				return (DDI_PROP_RESULT_ERROR);
 		}
 
 		/*
@@ -3034,9 +3072,9 @@ ddi_prop_1275_int(prop_handle_t *ph, uint_t cmd, int *data)
 		 */
 		if (ph->ph_flags & PH_FROM_PROM) {
 			*data = impl_ddi_prop_int_from_prom(
-				(uchar_t *)ph->ph_cur_pos,
-				(ph->ph_size < PROP_1275_INT_SIZE) ?
-				ph->ph_size : PROP_1275_INT_SIZE);
+			    (uchar_t *)ph->ph_cur_pos,
+			    (ph->ph_size < PROP_1275_INT_SIZE) ?
+			    ph->ph_size : PROP_1275_INT_SIZE);
 		} else {
 			bcopy(ph->ph_cur_pos, data, sizeof (int));
 		}
@@ -3046,7 +3084,7 @@ ddi_prop_1275_int(prop_handle_t *ph, uint_t cmd, int *data)
 		 * bit of undecoded data.
 		 */
 		ph->ph_cur_pos = (uchar_t *)ph->ph_cur_pos +
-			PROP_1275_INT_SIZE;
+		    PROP_1275_INT_SIZE;
 		return (DDI_PROP_RESULT_OK);
 
 	case DDI_PROP_CMD_ENCODE:
@@ -3054,9 +3092,9 @@ ddi_prop_1275_int(prop_handle_t *ph, uint_t cmd, int *data)
 		 * Check that there is room to encoded the data
 		 */
 		if (ph->ph_cur_pos == NULL || ph->ph_size == 0 ||
-			ph->ph_size < PROP_1275_INT_SIZE ||
-			((int *)ph->ph_cur_pos > ((int *)ph->ph_data +
-				ph->ph_size - sizeof (int))))
+		    ph->ph_size < PROP_1275_INT_SIZE ||
+		    ((int *)ph->ph_cur_pos > ((int *)ph->ph_data +
+		    ph->ph_size - sizeof (int))))
 			return (DDI_PROP_RESULT_ERROR);
 
 		/*
@@ -3077,15 +3115,15 @@ ddi_prop_1275_int(prop_handle_t *ph, uint_t cmd, int *data)
 		 * Check that there is encoded data
 		 */
 		if (ph->ph_cur_pos == NULL || ph->ph_size == 0 ||
-				ph->ph_size < PROP_1275_INT_SIZE)
+		    ph->ph_size < PROP_1275_INT_SIZE)
 			return (DDI_PROP_RESULT_ERROR);
 
 
 		if ((caddr_t)ph->ph_cur_pos ==
-				(caddr_t)ph->ph_data + ph->ph_size) {
+		    (caddr_t)ph->ph_data + ph->ph_size) {
 			return (DDI_PROP_RESULT_EOF);
 		} else if ((caddr_t)ph->ph_cur_pos >
-				(caddr_t)ph->ph_data + ph->ph_size) {
+		    (caddr_t)ph->ph_data + ph->ph_size) {
 			return (DDI_PROP_RESULT_EOF);
 		}
 
@@ -3290,7 +3328,7 @@ ddi_prop_1275_string(prop_handle_t *ph, uint_t cmd, char *data)
 
 		n = strlen(data) + 1;
 		if ((char *)ph->ph_cur_pos > ((char *)ph->ph_data +
-				ph->ph_size - n)) {
+		    ph->ph_size - n)) {
 			return (DDI_PROP_RESULT_ERROR);
 		}
 
@@ -3398,9 +3436,9 @@ ddi_prop_1275_bytes(prop_handle_t *ph, uint_t cmd, uchar_t *data,
 		 * Check that there is encoded data
 		 */
 		if (ph->ph_cur_pos == NULL || ph->ph_size == 0 ||
-			ph->ph_size < nelements ||
-			((char *)ph->ph_cur_pos > ((char *)ph->ph_data +
-				ph->ph_size - nelements)))
+		    ph->ph_size < nelements ||
+		    ((char *)ph->ph_cur_pos > ((char *)ph->ph_data +
+		    ph->ph_size - nelements)))
 			return (DDI_PROP_RESULT_ERROR);
 
 		/*
@@ -3419,9 +3457,9 @@ ddi_prop_1275_bytes(prop_handle_t *ph, uint_t cmd, uchar_t *data,
 		 * Check that there is room to encode the data
 		 */
 		if (ph->ph_cur_pos == NULL || ph->ph_size == 0 ||
-			ph->ph_size < nelements ||
-			((char *)ph->ph_cur_pos > ((char *)ph->ph_data +
-				ph->ph_size - nelements)))
+		    ph->ph_size < nelements ||
+		    ((char *)ph->ph_cur_pos > ((char *)ph->ph_data +
+		    ph->ph_size - nelements)))
 			return (DDI_PROP_RESULT_ERROR);
 
 		/*
@@ -3441,11 +3479,11 @@ ddi_prop_1275_bytes(prop_handle_t *ph, uint_t cmd, uchar_t *data,
 		 * Check that there is encoded data
 		 */
 		if (ph->ph_cur_pos == NULL || ph->ph_size == 0 ||
-				ph->ph_size < nelements)
+		    ph->ph_size < nelements)
 			return (DDI_PROP_RESULT_ERROR);
 
 		if ((char *)ph->ph_cur_pos > ((char *)ph->ph_data +
-				ph->ph_size - nelements))
+		    ph->ph_size - nelements))
 			return (DDI_PROP_RESULT_EOF);
 
 		/*
@@ -3863,8 +3901,8 @@ e_ddi_prop_modify(dev_t dev, dev_info_t *dip, int flag,
 	if (!(flag & DDI_PROP_CANSLEEP))
 		flag |= DDI_PROP_DONTSLEEP;
 	return (ddi_prop_update_common(dev, dip,
-		(flag | DDI_PROP_SYSTEM_DEF | DDI_PROP_TYPE_BYTE),
-		name, value, length, ddi_prop_fm_encode_bytes));
+	    (flag | DDI_PROP_SYSTEM_DEF | DDI_PROP_TYPE_BYTE),
+	    name, value, length, ddi_prop_fm_encode_bytes));
 }
 
 
@@ -3891,7 +3929,7 @@ ddi_prop_lookup_common(dev_t match_dev, dev_info_t *dip,
 		return (DDI_PROP_INVAL_ARG);
 
 	ourflags = (flags & DDI_PROP_DONTSLEEP) ? flags :
-		flags | DDI_PROP_CANSLEEP;
+	    flags | DDI_PROP_CANSLEEP;
 
 	/*
 	 * Get the encoded data
@@ -3965,7 +4003,7 @@ ddi_prop_exists(dev_t match_dev, dev_info_t *dip, uint_t flags, char *name)
 	uint_t	x = 0;
 
 	i = ddi_prop_search_common(match_dev, dip, PROP_EXISTS,
-		flags | DDI_PROP_TYPE_MASK, name, NULL, &x);
+	    flags | DDI_PROP_TYPE_MASK, name, NULL, &x);
 	return (i == DDI_PROP_SUCCESS || i == DDI_PROP_FOUND_1275);
 }
 
@@ -4079,7 +4117,7 @@ ddi_prop_lookup_int_array(dev_t match_dev, dev_info_t *dip, uint_t flags,
 		}
 #endif /* DEBUG */
 		flags &= DDI_PROP_DONTPASS | DDI_PROP_NOTPROM |
-		LDI_DEV_T_ANY | DDI_UNBND_DLPI2;
+		    LDI_DEV_T_ANY | DDI_UNBND_DLPI2;
 	}
 
 	return (ddi_prop_lookup_common(match_dev, dip,
@@ -4605,7 +4643,7 @@ impl_ddi_bus_prop_op(dev_t dev, dev_info_t *dip, dev_info_t *ch_dip,
 		 * Call the PROM function to do the copy.
 		 */
 		(void) prom_getprop((pnode_t)DEVI(ch_dip)->devi_nodeid,
-			name, buffer);
+		    name, buffer);
 
 		*lengthp = len; /* return the actual length to the caller */
 		(void) impl_fix_props(dip, ch_dip, name, len, buffer);
@@ -4630,7 +4668,7 @@ ddi_bus_prop_op(dev_t dev, dev_info_t *dip, dev_info_t *ch_dip,
 	int	error;
 
 	error = impl_ddi_bus_prop_op(dev, dip, ch_dip, prop_op, mod_flags,
-				    name, valuep, lengthp);
+	    name, valuep, lengthp);
 
 	if (error == DDI_PROP_SUCCESS || error == DDI_PROP_FOUND_1275 ||
 	    error == DDI_PROP_BUF_TOO_SMALL)
@@ -5246,7 +5284,7 @@ real_callback_run(void *Queue)
 				pending -= count;
 				mutex_enter(&ddi_callback_mutex);
 				(void) callback_insert(funcp, arg, listid,
-					count);
+				    count);
 				cbstats.nc_runouts++;
 			} else {
 				pending--;
@@ -6619,8 +6657,8 @@ int
 i_ddi_devi_get_ppa(dev_info_t *dip)
 {
 	return (ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
-			GLD_DRIVER_PPA, ddi_get_instance(dip)));
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+	    GLD_DRIVER_PPA, ddi_get_instance(dip)));
 }
 
 /*
@@ -6797,12 +6835,12 @@ ddi_dma_buf_bind_handle(ddi_dma_handle_t handle, struct buf *bp,
 		dmareq.dmar_object.dmao_obj.virt_obj.v_addr = bp->b_un.b_addr;
 		if (bp->b_flags & B_SHADOW) {
 			dmareq.dmar_object.dmao_obj.virt_obj.v_priv =
-							bp->b_shadow;
+			    bp->b_shadow;
 			dmareq.dmar_object.dmao_type = DMA_OTYP_BUFVADDR;
 		} else {
 			dmareq.dmar_object.dmao_type =
-				(bp->b_flags & (B_PHYS | B_REMAPPED)) ?
-				DMA_OTYP_BUFVADDR : DMA_OTYP_VADDR;
+			    (bp->b_flags & (B_PHYS | B_REMAPPED)) ?
+			    DMA_OTYP_BUFVADDR : DMA_OTYP_VADDR;
 			dmareq.dmar_object.dmao_obj.virt_obj.v_priv = NULL;
 		}
 
@@ -6902,7 +6940,7 @@ int
 ddi_dma_set_sbus64(ddi_dma_handle_t h, ulong_t burstsizes)
 {
 	return (ddi_dma_mctl(HD, HD, h, DDI_DMA_SET_SBUS64, 0,
-		&burstsizes, 0, 0));
+	    &burstsizes, 0, 0));
 }
 
 int
@@ -7019,7 +7057,7 @@ ddi_regs_map_free(ddi_acc_handle_t *handlep)
 	 * Call my parent to unmap my regs.
 	 */
 	(void) ddi_map(hp->ah_dip, &mr, hp->ah_offset,
-		hp->ah_len, &hp->ah_addr);
+	    hp->ah_len, &hp->ah_addr);
 	/*
 	 * free the handle
 	 */
@@ -7043,22 +7081,22 @@ ddi_device_zero(ddi_acc_handle_t handle, caddr_t dev_addr, size_t bytecount,
 	switch (dev_datasz) {
 	case DDI_DATA_SZ01_ACC:
 		for (b = (uint8_t *)dev_addr;
-			bytecount != 0; bytecount -= 1, b += dev_advcnt)
+		    bytecount != 0; bytecount -= 1, b += dev_advcnt)
 			ddi_put8(handle, b, 0);
 		break;
 	case DDI_DATA_SZ02_ACC:
 		for (w = (uint16_t *)dev_addr;
-			bytecount != 0; bytecount -= 2, w += dev_advcnt)
+		    bytecount != 0; bytecount -= 2, w += dev_advcnt)
 			ddi_put16(handle, w, 0);
 		break;
 	case DDI_DATA_SZ04_ACC:
 		for (l = (uint32_t *)dev_addr;
-			bytecount != 0; bytecount -= 4, l += dev_advcnt)
+		    bytecount != 0; bytecount -= 4, l += dev_advcnt)
 			ddi_put32(handle, l, 0);
 		break;
 	case DDI_DATA_SZ08_ACC:
 		for (ll = (uint64_t *)dev_addr;
-			bytecount != 0; bytecount -= 8, ll += dev_advcnt)
+		    bytecount != 0; bytecount -= 8, ll += dev_advcnt)
 			ddi_put64(handle, ll, 0x0ll);
 		break;
 	default:
@@ -7089,7 +7127,7 @@ ddi_device_copy(
 
 		for (; bytecount != 0; bytecount -= 1) {
 			ddi_put8(dest_handle, b_dst,
-				ddi_get8(src_handle, b_src));
+			    ddi_get8(src_handle, b_src));
 			b_dst += dest_advcnt;
 			b_src += src_advcnt;
 		}
@@ -7100,7 +7138,7 @@ ddi_device_copy(
 
 		for (; bytecount != 0; bytecount -= 2) {
 			ddi_put16(dest_handle, w_dst,
-				ddi_get16(src_handle, w_src));
+			    ddi_get16(src_handle, w_src));
 			w_dst += dest_advcnt;
 			w_src += src_advcnt;
 		}
@@ -7111,7 +7149,7 @@ ddi_device_copy(
 
 		for (; bytecount != 0; bytecount -= 4) {
 			ddi_put32(dest_handle, l_dst,
-				ddi_get32(src_handle, l_src));
+			    ddi_get32(src_handle, l_src));
 			l_dst += dest_advcnt;
 			l_src += src_advcnt;
 		}
@@ -7122,7 +7160,7 @@ ddi_device_copy(
 
 		for (; bytecount != 0; bytecount -= 8) {
 			ddi_put64(dest_handle, ll_dst,
-				ddi_get64(src_handle, ll_src));
+			    ddi_get64(src_handle, ll_src));
 			ll_dst += dest_advcnt;
 			ll_src += src_advcnt;
 		}
@@ -7200,7 +7238,7 @@ i_ddi_devtspectype_to_minorname(dev_info_t *dip, dev_t dev, int spec_type)
 	 * The did layered driver is associated with Sun Cluster.
 	 */
 	ASSERT((ddi_driver_major(dip) == getmajor(dev)) ||
-		(strcmp(ddi_major_to_name(getmajor(dev)), "did") == 0));
+	    (strcmp(ddi_major_to_name(getmajor(dev)), "did") == 0));
 	ASSERT(MUTEX_HELD(&(DEVI(dip)->devi_lock)));
 
 	for (dmdp = DEVI(dip)->devi_minor; dmdp; dmdp = dmdp->next) {
@@ -7396,7 +7434,7 @@ i_ddi_devid_register(dev_info_t *dip, ddi_devid_t devid)
 	if (ndi_prop_update_string(DDI_DEV_T_NONE, dip,
 	    DEVID_PROP_NAME, devid_str) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s%d: devid property update failed",
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 		ddi_devid_str_free(devid_str);
 		return (DDI_FAILURE);
 	}
@@ -7429,11 +7467,11 @@ ddi_devid_register(dev_info_t *dip, ddi_devid_t devid)
 			mutex_exit(&DEVI(dip)->devi_lock);
 		} else {
 			cmn_err(CE_WARN, "%s%d: failed to cache devid",
-				ddi_driver_name(dip), ddi_get_instance(dip));
+			    ddi_driver_name(dip), ddi_get_instance(dip));
 		}
 	} else {
 		cmn_err(CE_WARN, "%s%d: failed to register devid",
-			ddi_driver_name(dip), ddi_get_instance(dip));
+		    ddi_driver_name(dip), ddi_get_instance(dip));
 	}
 	return (rval);
 }
@@ -7596,9 +7634,9 @@ i_ddi_devi_get_devid(dev_t dev, dev_info_t *dip, ddi_devid_t *ret_devid)
 	    DEVID_PROP_NAME, &devidstr) != DDI_PROP_SUCCESS) {
 		if ((dev == DDI_DEV_T_ANY) ||
 		    (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
-			DDI_PROP_DONTPASS, DEVID_PROP_NAME, &devidstr) !=
-			DDI_PROP_SUCCESS)) {
-				return (DDI_FAILURE);
+		    DDI_PROP_DONTPASS, DEVID_PROP_NAME, &devidstr) !=
+		    DDI_PROP_SUCCESS)) {
+			return (DDI_FAILURE);
 		}
 	}
 
@@ -7699,7 +7737,7 @@ ddi_lyr_devid_to_devlist(
 	    retndevs, retdevs) == DDI_SUCCESS) {
 		ASSERT(*retndevs > 0);
 		DDI_DEBUG_DEVID_DEVTS("ddi_lyr_devid_to_devlist",
-			*retndevs, *retdevs);
+		    *retndevs, *retdevs);
 		return (DDI_SUCCESS);
 	}
 
@@ -7711,7 +7749,7 @@ ddi_lyr_devid_to_devlist(
 	    retndevs, retdevs) == DDI_SUCCESS) {
 		ASSERT(*retndevs > 0);
 		DDI_DEBUG_DEVID_DEVTS("ddi_lyr_devid_to_devlist",
-			*retndevs, *retdevs);
+		    *retndevs, *retdevs);
 		return (DDI_SUCCESS);
 	}
 
@@ -7914,7 +7952,7 @@ umem_incr_devlockmem(struct ddi_umem_cookie *cookie)
 	ASSERT(procp);
 
 	if ((ret = i_ddi_incr_locked_memory(procp,
-		cookie->size)) != 0) {
+	    cookie->size)) != 0) {
 		return (ret);
 	}
 	return (0);
@@ -8090,7 +8128,7 @@ umem_lockmemory(caddr_t addr, size_t len, int flags, ddi_umem_cookie_t *cookie,
 			    vp != NULL && vp->v_type == VREG) &&
 			    (SEGOP_GETTYPE(seg, addr) & MAP_SHARED))) {
 				as_pageunlock(as, p->pparray,
-						addr, len, p->s_flags);
+				    addr, len, p->s_flags);
 				AS_LOCK_EXIT(as, &as->a_lock);
 				umem_decr_devlockmem(p);
 				kmem_free(p, sizeof (struct ddi_umem_cookie));
@@ -8123,10 +8161,10 @@ umem_lockmemory(caddr_t addr, size_t len, int flags, ddi_umem_cookie_t *cookie,
 	 */
 	if (driver_callback) {
 		error = as_add_callback(as, umem_lock_undo, p, AS_ALL_EVENT,
-						addr, len, KM_SLEEP);
+		    addr, len, KM_SLEEP);
 		if (error != 0) {
 			as_pageunlock(as, p->pparray,
-					addr, len, p->s_flags);
+			    addr, len, p->s_flags);
 			umem_decr_devlockmem(p);
 			kmem_free(p, sizeof (struct ddi_umem_cookie));
 			*cookie = (ddi_umem_cookie_t)NULL;
@@ -8470,7 +8508,7 @@ ddi_umem_iosetup(ddi_umem_cookie_t cookie, off_t off, size_t len,
 
 	/* If type is KMEM_NON_PAGEABLE procp is NULL */
 	ASSERT((p->type == KMEM_NON_PAGEABLE) ?
-		(p->procp == NULL) : (p->procp != NULL));
+	    (p->procp == NULL) : (p->procp != NULL));
 
 	bp = kmem_alloc(sizeof (struct buf), sleepflag);
 	if (bp == NULL) {
@@ -8596,8 +8634,8 @@ ddi_taskq_create(dev_info_t *dip, const char *name, int nthreads,
 	}
 
 	return ((ddi_taskq_t *)taskq_create_instance(tq_name, nodeid, nthreads,
-		    pri == TASKQ_DEFAULTPRI ? minclsyspri : pri,
-		    nthreads, INT_MAX, TASKQ_PREPOPULATE));
+	    pri == TASKQ_DEFAULTPRI ? minclsyspri : pri,
+	    nthreads, INT_MAX, TASKQ_PREPOPULATE));
 }
 
 void

@@ -52,6 +52,8 @@ SUNWprivate {
 	topo_hdl_strdup;
 	topo_hdl_strfree;
 	topo_hdl_zalloc;
+	topo_list_append;
+	topo_list_delete;
 	topo_method_invoke;
 	topo_method_register;
 	topo_method_unregister;

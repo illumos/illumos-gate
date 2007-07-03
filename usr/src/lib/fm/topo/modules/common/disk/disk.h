@@ -24,32 +24,36 @@
  * Use is subject to license terms.
  */
 
-#ifndef _SFX4500_DISK_H
-#define	_SFX4500_DISK_H
+#ifndef _DISK_H
+#define	_DISK_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
- * Externs for sfx4500-disk
- */
-
-#include <diskmon_conf.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define	SFX4500_DISK_MODULE_VERSION "1.0"
+/* Topo plugin version */
+#define	DISK_VERSION			TOPO_VERSION
 
-#define	E_SUCCESS	0
-#define	E_ERROR		1
+/* Max. number of devices for thumper */
+#define	DEVID_MAX		48
 
-extern cfgdata_t	*config_data;
-extern fmd_hdl_t	*g_fm_hdl;
+/* Properties for binding group */
+#define	TOPO_BINDING_PGROUP		"binding"
+#define	TOPO_BINDING_OCCUPANT		"occupant-path"
 
+/* Properties added to the "storage" pgroup: */
+#define	TOPO_STORAGE_PGROUP		"storage"
+#define	TOPO_STORAGE_LOGICAL_DISK_NAME	"logical-disk"
+#define	TOPO_STORAGE_MODEL		"model"
+#define	TOPO_STORAGE_MANUFACTURER	"manufacturer"
+#define	TOPO_STORAGE_SERIAL_NUM		"serial-number"
+#define	TOPO_STORAGE_FIRMWARE_REV	"firmware-revision"
+#define	TOPO_STORAGE_CAPACITY		"capacity-in-bytes"
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _SFX4500_DISK_H */
+#endif /* _DISK_H */

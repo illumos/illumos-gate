@@ -502,20 +502,18 @@ cpr_alloc_statefile(int alloc_retry)
 
 
 /*
- * lookup device size in blocks,
- * and return available space in bytes
+ * Lookup device size and return available space in bytes.
+ * NOTE: Since prop_op(9E) can't tell the difference between a character
+ * and a block reference, it is ok to ask for "Size" instead of "Nblocks".
  */
 size_t
 cpr_get_devsize(dev_t dev)
 {
 	size_t bytes = 0;
-	int64_t Nblocks;
-	int nblocks;
 
-	if ((Nblocks = bdev_Size(dev)) != -1)
-		bytes = dbtob(Nblocks);
-	else if ((nblocks = bdev_size(dev)) != -1)
-		bytes = dbtob(nblocks);
+	bytes = cdev_Size(dev);
+	if (bytes == 0)
+		bytes = cdev_size(dev);
 
 	if (bytes > CPR_SPEC_OFFSET)
 		bytes -= CPR_SPEC_OFFSET;
@@ -605,7 +603,7 @@ cpr_statefile_ok(vnode_t *vp, int alloc_retry)
 	    MAX(availrmem - swapfs_minfree, 0),
 	    k_anoninfo.ani_mem_resv);
 	CPR_DEBUG(CPR_DEBUG9, "Total available swap: %ld\n",
-		CURRENT_TOTAL_AVAILABLE_SWAP);
+	    CURRENT_TOTAL_AVAILABLE_SWAP);
 
 	/*
 	 * try increasing filesize by 15%

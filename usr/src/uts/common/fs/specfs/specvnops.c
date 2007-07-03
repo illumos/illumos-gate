@@ -279,6 +279,8 @@ spec_size(struct snode *csp)
 	dev_t		dev;
 	dev_info_t	*devi;
 	major_t		maj;
+	uint_t		blksize;
+	int		blkshift;
 
 	ASSERT((csp)->s_commonvp == cvp);	/* must be common node */
 
@@ -365,9 +367,32 @@ spec_size(struct snode *csp)
 		}
 
 		if (size != UNKNOWN_SIZE) {
+			blksize = DEV_BSIZE;		/* default */
+			plen = sizeof (blksize);
+
+			/* try to get dev_t specific "blksize" */
+			if (cdev_prop_op(dev, devi, PROP_LEN_AND_VAL_BUF,
+			    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+			    "blksize", (caddr_t)&blksize, &plen) !=
+			    DDI_PROP_SUCCESS) {
+				/*
+				 * Try for dev_info node "device-blksize".
+				 * If this fails then blksize will still be
+				 * DEV_BSIZE default value.
+				 */
+				(void) cdev_prop_op(DDI_DEV_T_ANY, devi,
+				    PROP_LEN_AND_VAL_BUF,
+				    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+				    "device-blksize", (caddr_t)&blksize, &plen);
+			}
+
+			/* blksize must be a power of two */
+			ASSERT(BIT_ONLYONESET(blksize));
+			blkshift = highbit(blksize) - 1;
+
 			/* convert from block size to byte size */
-			if (size < (MAXOFFSET_T >> DEV_BSHIFT))
-				size = size << DEV_BSHIFT;
+			if (size < (MAXOFFSET_T >> blkshift))
+				size = size << blkshift;
 			else
 				size = UNKNOWN_SIZE;
 		}

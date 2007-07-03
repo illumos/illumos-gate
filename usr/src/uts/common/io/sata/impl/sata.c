@@ -2527,7 +2527,12 @@ sata_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 #endif
 	sata_device_t		sata_device;
 	sata_drive_info_t	*sdinfo;
+	struct sata_id		*sid;
 	sata_hba_inst_t		*sata_hba_inst;
+	char			model[SATA_ID_MODEL_LEN + 1];
+	char			fw[SATA_ID_FW_LEN + 1];
+	char			*vid, *pid;
+	int			i;
 
 	sata_hba_inst = (sata_hba_inst_t *)(hba_tran->tran_hba_private);
 
@@ -2546,9 +2551,10 @@ sata_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		    sata_device.satadev_addr.cport)));
 		return (DDI_FAILURE);
 	}
+	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
+	    sata_device.satadev_addr.cport)));
+
 	if (sata_device.satadev_type == SATA_DTYPE_ATAPICD) {
-		mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
-		    sata_device.satadev_addr.cport)));
 		if (ndi_prop_update_string(DDI_DEV_T_NONE, tgt_dip,
 		    "variant", "atapi") != DDI_PROP_SUCCESS) {
 			SATA_LOG_D((sata_hba_inst, CE_WARN,
@@ -2556,10 +2562,45 @@ sata_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 			    "property could not be created"));
 			return (DDI_FAILURE);
 		}
-		return (DDI_SUCCESS);
 	}
-	mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
-	    sata_device.satadev_addr.cport)));
+
+	/*
+	 * 'Identify Device Data' does not always fit in standard SCSI
+	 * INQUIRY data, so establish INQUIRY_* properties with full-form
+	 * of information.
+	 */
+	sid = &sdinfo->satadrv_id;
+#ifdef	_LITTLE_ENDIAN
+	swab(sid->ai_model, model, SATA_ID_MODEL_LEN);
+	swab(sid->ai_fw, fw, SATA_ID_FW_LEN);
+#else	/* _LITTLE_ENDIAN */
+	bcopy(sid->ai_model, model, SATA_ID_MODEL_LEN);
+	bcopy(sid->ai_fw, fw, SATA_ID_FW_LEN);
+#endif	/* _LITTLE_ENDIAN */
+	model[SATA_ID_MODEL_LEN] = 0;
+	fw[SATA_ID_FW_LEN] = 0;
+
+	/* split model into into vid/pid */
+	for (i = 0, pid = model; i < SATA_ID_MODEL_LEN; i++, pid++)
+		if ((*pid == ' ') || (*pid == '\t'))
+			break;
+	if (i < SATA_ID_MODEL_LEN) {
+		vid = model;
+		*pid++ = 0;		/* terminate vid, establish pid */
+	} else {
+		vid = NULL;		/* vid will stay "ATA     " */
+		pid = model;		/* model is all pid */
+	}
+
+	if (vid)
+		(void) scsi_hba_prop_update_inqstring(sd, INQUIRY_VENDOR_ID,
+		    vid, strlen(vid));
+	if (pid)
+		(void) scsi_hba_prop_update_inqstring(sd, INQUIRY_PRODUCT_ID,
+		    pid, strlen(pid));
+	(void) scsi_hba_prop_update_inqstring(sd, INQUIRY_REVISION_ID,
+	    fw, strlen(fw));
+
 	return (DDI_SUCCESS);
 }
 
@@ -2585,10 +2626,11 @@ sata_scsi_tgt_probe(struct scsi_device *sd, int (*callback)(void))
 		if ((ddi_prop_update_int(DDI_DEV_T_NONE, sd->sd_dev,
 		    "pm-capable", 1)) != DDI_PROP_SUCCESS) {
 			sata_log(sata_hba_inst, CE_WARN,
-			"SATA device at port %d: will not be power-managed ",
-			SCSI_TO_SATA_CPORT(sd->sd_address.a_target));
+			    "SATA device at port %d: "
+			    "will not be power-managed ",
+			    SCSI_TO_SATA_CPORT(sd->sd_address.a_target));
 			SATA_LOG_D((sata_hba_inst, CE_WARN,
-			"failure updating pm-capable property"));
+			    "failure updating pm-capable property"));
 		}
 	}
 	return (rval);
@@ -3295,8 +3337,8 @@ sata_scsi_setcap(struct scsi_address *ap, char *cap, int value, int whom)
 	}
 	mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
 	    sata_device.satadev_addr.cport)));
-	if ((sdinfo = sata_get_device_info(sata_hba_inst, &sata_device))
-		== NULL) {
+	if ((sdinfo = sata_get_device_info(sata_hba_inst,
+	    &sata_device)) == NULL) {
 		/* invalid address */
 		mutex_exit(&(SATA_CPORT_MUTEX(sata_hba_inst,
 		    sata_device.satadev_addr.cport)));
@@ -3317,10 +3359,10 @@ sata_scsi_setcap(struct scsi_address *ap, char *cap, int value, int whom)
 			rval = 1;
 			if (value == 1) {
 				sdinfo->satadrv_features_enabled |=
-					SATA_DEV_F_E_UNTAGGED_QING;
+				    SATA_DEV_F_E_UNTAGGED_QING;
 			} else if (value == 0) {
 				sdinfo->satadrv_features_enabled &=
-					~SATA_DEV_F_E_UNTAGGED_QING;
+				    ~SATA_DEV_F_E_UNTAGGED_QING;
 			} else {
 				rval = -1;
 			}
@@ -3339,10 +3381,10 @@ sata_scsi_setcap(struct scsi_address *ap, char *cap, int value, int whom)
 			rval = 1;
 			if (value == 1) {
 				sdinfo->satadrv_features_enabled |=
-					SATA_DEV_F_E_TAGGED_QING;
+				    SATA_DEV_F_E_TAGGED_QING;
 			} else if (value == 0) {
 				sdinfo->satadrv_features_enabled &=
-					~SATA_DEV_F_E_TAGGED_QING;
+				    ~SATA_DEV_F_E_TAGGED_QING;
 			} else {
 				rval = -1;
 			}
@@ -3371,7 +3413,7 @@ sata_scsi_destroy_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 	if (spx->txlt_buf_dma_handle != NULL) {
 		if (spx->txlt_tmp_buf != NULL)  {
-		    ASSERT(spx->txlt_tmp_buf_handle != 0);
+			ASSERT(spx->txlt_tmp_buf_handle != 0);
 			/*
 			 * Intermediate DMA buffer was allocated.
 			 * Free allocated buffer and associated access handle.
@@ -3686,7 +3728,7 @@ sata_identdev_to_inquiry(sata_hba_inst_t *sata_hba_inst,
 	inq->inq_wbus32 = 0;	/* Supports 32 bit wide data xfers - NO */
 	inq->inq_wbus16 = 0;	/* Supports 16 bit wide data xfers - NO */
 
-#ifdef _LITTLE_ENDIAN
+#ifdef	_LITTLE_ENDIAN
 	/* Swap text fields to match SCSI format */
 	bcopy("ATA     ", inq->inq_vid, 8);		/* Vendor ID */
 	swab(sid->ai_model, inq->inq_pid, 16);		/* Product ID */
@@ -3694,14 +3736,14 @@ sata_identdev_to_inquiry(sata_hba_inst_t *sata_hba_inst,
 		swab(sid->ai_fw, inq->inq_revision, 4);	/* Revision level */
 	else
 		swab(&sid->ai_fw[4], inq->inq_revision, 4);	/* Rev. level */
-#else
-	bcopy(sid->ai_model, inq->inq_vid, 8);		/* Vendor ID */
-	bcopy(&sid->ai_model[8], inq->inq_pid, 16);	/* Product ID */
+#else	/* _LITTLE_ENDIAN */
+	bcopy("ATA     ", inq->inq_vid, 8);		/* Vendor ID */
+	bcopy(sid->ai_model, inq->inq_pid, 16);		/* Product ID */
 	if (strncmp(&sid->ai_fw[4], "    ", 4) == 0)
 		bcopy(sid->ai_fw, inq->inq_revision, 4); /* Revision level */
 	else
 		bcopy(&sid->ai_fw[4], inq->inq_revision, 4); /* Rev. level */
-#endif
+#endif	/* _LITTLE_ENDIAN */
 }
 
 
@@ -3830,7 +3872,7 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 
 	scsipkt->pkt_reason = CMD_CMPLT;
 	scsipkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
-		STATE_SENT_CMD | STATE_GOT_STATUS;
+	    STATE_SENT_CMD | STATE_GOT_STATUS;
 
 	/* Reject not supported request */
 	if (scsipkt->pkt_cdbp[1] & CMDDT) { /* No support for this bit */
@@ -3873,7 +3915,7 @@ sata_txlt_inquiry(sata_pkt_txlate_t *spx)
 			 */
 			uint8_t peripheral_device_type =
 			    sdinfo->satadrv_type == SATA_DTYPE_ATADISK ?
-				DTYPE_DIRECT : DTYPE_RODIRECT;
+			    DTYPE_DIRECT : DTYPE_RODIRECT;
 
 			switch ((uint_t)scsipkt->pkt_cdbp[2]) {
 			case INQUIRY_SUP_VPD_PAGE:
@@ -5738,17 +5780,17 @@ sata_txlt_download_mcode_cmd_completion(sata_pkt_t *sata_pkt)
 			break;
 
 		case SATA_PKT_DEV_ERROR:
-		    if (sata_pkt->satapkt_cmd.satacmd_status_reg &
-			SATA_STATUS_ERR) {
-			/*
-			 * determine dev error reason from error
-			 * reg content
-			 */
-			sata_decode_device_error(spx, sense);
+			if (sata_pkt->satapkt_cmd.satacmd_status_reg &
+			    SATA_STATUS_ERR) {
+				/*
+				 * determine dev error reason from error
+				 * reg content
+				 */
+				sata_decode_device_error(spx, sense);
+				break;
+			}
+			/* No extended sense key - no info available */
 			break;
-		    }
-		    /* No extended sense key - no info available */
-		    break;
 
 		case SATA_PKT_TIMEOUT:
 			/* scsipkt->pkt_reason = CMD_TIMEOUT; */
@@ -6170,7 +6212,7 @@ sata_txlt_lba_out_of_range(sata_pkt_txlate_t *spx)
 
 	scsipkt->pkt_reason = CMD_CMPLT;
 	scsipkt->pkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
-		STATE_SENT_CMD | STATE_GOT_STATUS;
+	    STATE_SENT_CMD | STATE_GOT_STATUS;
 	*scsipkt->pkt_scbp = STATUS_CHECK;
 
 	*scsipkt->pkt_scbp = STATUS_CHECK;
@@ -6586,17 +6628,17 @@ sata_txlt_nodata_cmd_completion(sata_pkt_t *sata_pkt)
 			break;
 
 		case SATA_PKT_DEV_ERROR:
-		    if (sata_pkt->satapkt_cmd.satacmd_status_reg &
-			SATA_STATUS_ERR) {
-			/*
-			 * determine dev error reason from error
-			 * reg content
-			 */
-			sata_decode_device_error(spx, sense);
+			if (sata_pkt->satapkt_cmd.satacmd_status_reg &
+			    SATA_STATUS_ERR) {
+				/*
+				 * determine dev error reason from error
+				 * reg content
+				 */
+				sata_decode_device_error(spx, sense);
+				break;
+			}
+			/* No extended sense key - no info available */
 			break;
-		    }
-		    /* No extended sense key - no info available */
-		    break;
 
 		case SATA_PKT_TIMEOUT:
 			/* scsipkt->pkt_reason = CMD_TIMEOUT; */
@@ -6699,7 +6741,7 @@ sata_build_msense_page_8(sata_drive_info_t *sdinfo, int pcntrl, uint8_t *buf)
 			page->wce = 1;
 	}
 	return (PAGELENGTH_DAD_MODE_CACHE_SCSI3 +
-		sizeof (struct mode_page));
+	    sizeof (struct mode_page));
 }
 
 /*
@@ -7454,7 +7496,7 @@ out:
 					    NUM_SMART_SELFTEST_LOG_ENTRIES - 1;
 				}
 				entry = &selftest_log->
-					smart_selftest_log_entries[index];
+				    smart_selftest_log_entries[index];
 			}
 		}
 done:
@@ -9045,22 +9087,22 @@ sata_show_drive_info(sata_hba_inst_t *sata_hba_inst,
 		cmn_err(CE_CONT, "?\tSATA1 compatible\n");
 	if (sdinfo->satadrv_features_support & SATA_DEV_F_TCQ) {
 		cmn_err(CE_CONT, "?\tQueue depth %d\n",
-			sdinfo->satadrv_queue_depth);
+		    sdinfo->satadrv_queue_depth);
 	}
 
 	if (sdinfo->satadrv_features_support &
-		(SATA_DEV_F_TCQ | SATA_DEV_F_NCQ)) {
+	    (SATA_DEV_F_TCQ | SATA_DEV_F_NCQ)) {
 		(void) sprintf(msg_buf, "\tqueue depth %d\n",
-				sdinfo->satadrv_queue_depth);
+		    sdinfo->satadrv_queue_depth);
 		cmn_err(CE_CONT, "?%s", msg_buf);
 	}
 
 #ifdef __i386
 	(void) sprintf(msg_buf, "\tcapacity = %llu sectors\n",
-		sdinfo->satadrv_capacity);
+	    sdinfo->satadrv_capacity);
 #else
 	(void) sprintf(msg_buf, "\tcapacity = %lu sectors\n",
-		sdinfo->satadrv_capacity);
+	    sdinfo->satadrv_capacity);
 #endif
 	cmn_err(CE_CONT, "?%s", msg_buf);
 }
@@ -9162,7 +9204,7 @@ sata_alloc_local_buffer(sata_pkt_txlate_t *spx, int len)
 	ap.a_lun = 0;
 
 	bp = scsi_alloc_consistent_buf(&ap, NULL, len,
-		B_READ, SLEEP_FUNC, NULL);
+	    B_READ, SLEEP_FUNC, NULL);
 
 	if (bp != NULL) {
 		/* Allocate DMA resources for this buffer */
@@ -9402,10 +9444,10 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 		if (IS_P2ALIGNED(bp->b_un.b_addr,
 		    cur_dma_attr->dma_attr_align)) {
 			rval = ddi_dma_buf_bind_handle(
-					spx->txlt_buf_dma_handle,
-					bp, dma_flags, callback, arg,
-					&spx->txlt_dma_cookie,
-					&spx->txlt_curwin_num_dma_cookies);
+			    spx->txlt_buf_dma_handle,
+			    bp, dma_flags, callback, arg,
+			    &spx->txlt_dma_cookie,
+			    &spx->txlt_curwin_num_dma_cookies);
 		} else { /* Buffer is not aligned */
 
 			int	(*ddicallback)(caddr_t);
@@ -9416,8 +9458,8 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 			    DDI_DMA_DONTWAIT : DDI_DMA_SLEEP;
 
 			SATADBG2(SATA_DBG_DMA_SETUP, spx->txlt_sata_hba_inst,
-				"mis-aligned buffer: addr=0x%p, cnt=%lu",
-				(void *)bp->b_un.b_addr, bp->b_bcount);
+			    "mis-aligned buffer: addr=0x%p, cnt=%lu",
+			    (void *)bp->b_un.b_addr, bp->b_bcount);
 
 			if (bp->b_flags & (B_PAGEIO|B_PHYS))
 				/*
@@ -9430,14 +9472,14 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 
 			/* Buffer may be padded by ddi_dma_mem_alloc()! */
 			rval = ddi_dma_mem_alloc(
-				spx->txlt_buf_dma_handle,
-				bp->b_bcount,
-				&sata_acc_attr,
-				DDI_DMA_STREAMING,
-				ddicallback, NULL,
-				&spx->txlt_tmp_buf,
-				&bufsz,
-				&spx->txlt_tmp_buf_handle);
+			    spx->txlt_buf_dma_handle,
+			    bp->b_bcount,
+			    &sata_acc_attr,
+			    DDI_DMA_STREAMING,
+			    ddicallback, NULL,
+			    &spx->txlt_tmp_buf,
+			    &bufsz,
+			    &spx->txlt_tmp_buf_handle);
 
 			if (rval != DDI_SUCCESS) {
 				/* DMA mapping failed */
@@ -9483,12 +9525,12 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 			}
 
 			rval = ddi_dma_addr_bind_handle(
-				spx->txlt_buf_dma_handle,
-				NULL,
-				spx->txlt_tmp_buf,
-				bufsz, dma_flags, ddicallback, 0,
-				&spx->txlt_dma_cookie,
-				&spx->txlt_curwin_num_dma_cookies);
+			    spx->txlt_buf_dma_handle,
+			    NULL,
+			    spx->txlt_tmp_buf,
+			    bufsz, dma_flags, ddicallback, 0,
+			    &spx->txlt_dma_cookie,
+			    &spx->txlt_curwin_num_dma_cookies);
 		}
 
 		switch (rval) {
@@ -9669,7 +9711,7 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 		for (i = 1; (i < spx->txlt_dma_cookie_list_len) &&
 		    (i < spx->txlt_curwin_num_dma_cookies); i++) {
 			ddi_dma_nextcookie(spx->txlt_buf_dma_handle,
-			&spx->txlt_dma_cookie_list[i]);
+			    &spx->txlt_dma_cookie_list[i]);
 			cur_txfer_len +=
 			    (uint64_t)spx->txlt_dma_cookie_list[i].dmac_size;
 			spx->txlt_curwin_processed_dma_cookies++;
@@ -9705,7 +9747,7 @@ sata_dma_buf_setup(sata_pkt_txlate_t *spx, int flags,
 		/* Fetch the next batch of cookies */
 		for (i = 0, cur_txfer_len = 0; i < req_len; i++) {
 			ddi_dma_nextcookie(spx->txlt_buf_dma_handle,
-			&spx->txlt_dma_cookie_list[i]);
+			    &spx->txlt_dma_cookie_list[i]);
 			cur_txfer_len +=
 			    (uint64_t)spx->txlt_dma_cookie_list[i].dmac_size;
 			spx->txlt_sata_pkt->
@@ -9837,7 +9879,7 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 		}
 		/* Update sata_drive_info */
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
-			DDI_DMA_SYNC_FORKERNEL);
+		    DDI_DMA_SYNC_FORKERNEL);
 		ASSERT(rval == DDI_SUCCESS);
 		bcopy(bp->b_un.b_addr, &sdinfo->satadrv_id,
 		    sizeof (sata_id_t));
@@ -9887,7 +9929,7 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 
 		sdinfo->satadrv_queue_depth = sdinfo->satadrv_id.ai_qdepth;
 		if ((sdinfo->satadrv_features_support & SATA_DEV_F_NCQ) ||
-			(sdinfo->satadrv_features_support & SATA_DEV_F_TCQ))
+		    (sdinfo->satadrv_features_support & SATA_DEV_F_TCQ))
 			++sdinfo->satadrv_queue_depth;
 		rval = SATA_SUCCESS;
 	} else {
@@ -9895,7 +9937,7 @@ sata_fetch_device_identify_data(sata_hba_inst_t *sata_hba_inst,
 		 * Woops, no Identify Data.
 		 */
 		if (rval == SATA_TRAN_BUSY || rval == SATA_TRAN_QUEUE_FULL) {
-		    rval = SATA_RETRY; /* may retry later */
+			rval = SATA_RETRY; /* may retry later */
 		} else if (rval == SATA_TRAN_ACCEPTED) {
 			if (spkt->satapkt_reason == SATA_PKT_DEV_ERROR ||
 			    spkt->satapkt_reason == SATA_PKT_ABORTED ||
@@ -10591,7 +10633,7 @@ sata_hba_event_notify(dev_info_t *dip, sata_device_t *sata_device, int event)
 		 * multiple events occuring before they are processed.
 		 */
 		linkevent = event &
-			(SATA_EVNT_LINK_LOST | SATA_EVNT_LINK_ESTABLISHED);
+		    (SATA_EVNT_LINK_LOST | SATA_EVNT_LINK_ESTABLISHED);
 		if (linkevent) {
 			if (linkevent == (SATA_EVNT_LINK_LOST |
 			    SATA_EVNT_LINK_ESTABLISHED)) {
@@ -12269,7 +12311,7 @@ sata_fetch_smart_data(
 		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
 		    sdinfo->satadrv_addr.cport)));
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
-			DDI_DMA_SYNC_FORKERNEL);
+		    DDI_DMA_SYNC_FORKERNEL);
 		ASSERT(rval == DDI_SUCCESS);
 		bcopy(scmd->satacmd_bp->b_un.b_addr, (uint8_t *)smart_data,
 		    sizeof (struct smart_data));
@@ -12375,7 +12417,7 @@ sata_ext_smart_selftest_read_log(
 		    sdinfo->satadrv_addr.cport)));
 
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
-			DDI_DMA_SYNC_FORKERNEL);
+		    DDI_DMA_SYNC_FORKERNEL);
 		ASSERT(rval == DDI_SUCCESS);
 		bcopy(scmd->satacmd_bp->b_un.b_addr,
 		    (uint8_t *)ext_selftest_log,
@@ -12477,7 +12519,7 @@ sata_smart_selftest_log(
 		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
 		    sdinfo->satadrv_addr.cport)));
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
-			DDI_DMA_SYNC_FORKERNEL);
+		    DDI_DMA_SYNC_FORKERNEL);
 		ASSERT(rval == DDI_SUCCESS);
 		bcopy(scmd->satacmd_bp->b_un.b_addr, (uint8_t *)selftest_log,
 		    sizeof (struct smart_selftest_log));
@@ -12578,7 +12620,7 @@ sata_smart_read_log(
 		    sdinfo->satadrv_addr.cport)));
 
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
-			DDI_DMA_SYNC_FORKERNEL);
+		    DDI_DMA_SYNC_FORKERNEL);
 		ASSERT(rval == DDI_SUCCESS);
 		bcopy(scmd->satacmd_bp->b_un.b_addr, smart_log, log_size * 512);
 		rval = 0;
@@ -12678,7 +12720,7 @@ sata_read_log_ext_directory(
 		mutex_enter(&(SATA_CPORT_MUTEX(sata_hba_inst,
 		    sdinfo->satadrv_addr.cport)));
 		rval = ddi_dma_sync(spx->txlt_buf_dma_handle, 0, 0,
-			DDI_DMA_SYNC_FORKERNEL);
+		    DDI_DMA_SYNC_FORKERNEL);
 		ASSERT(rval == DDI_SUCCESS);
 		bcopy(scmd->satacmd_bp->b_un.b_addr, (uint8_t *)logdir,
 		    sizeof (struct read_log_ext_directory));

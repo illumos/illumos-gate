@@ -18,23 +18,15 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = cpumem-retire \
-	disk-monitor	\
-	disk-transport	\
-	eversholt 	\
-	io-retire	\
-	ip-transport	\
-	snmp-trapgen	\
-	sp-monitor	\
-	syslog-msgs	\
-	zfs-diagnosis	\
-	zfs-retire
+SUBDIRS = disk
 
-include ../../Makefile.subdirs
+.PARALLEL: $(SUBDIRS)
+
+include ../../../Makefile.subdirs

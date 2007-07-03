@@ -19,13 +19,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-sparc_SUBDIRS = sun4u sun4v SUNW,SPARC-Enterprise
-i386_SUBDIRS = i86pc
+sparc_SUBDIRS	= sun4u sun4v SUNW,SPARC-Enterprise
+i386_SUBDIRS	=
 
 SUBDIRS = common $($(MACH)_SUBDIRS)
 

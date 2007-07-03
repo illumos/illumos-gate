@@ -32,7 +32,7 @@
 #include <fm/fmd_api.h>
 #include <sys/fm/protocol.h>
 
-#include "sfx4500-disk.h"
+#include "disk_monitor.h"
 #include "schg_mgr.h"
 #include "hotplug_mgr.h"
 #include "topo_gather.h"

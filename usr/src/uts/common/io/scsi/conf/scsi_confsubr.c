@@ -18,9 +18,8 @@
  *
  * CDDL HEADER END
  */
-
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,8 +60,7 @@ static struct modlinkage modlinkage = {
 };
 
 static void create_inquiry_props(struct scsi_device *);
-static void create_inquiry_property(dev_info_t *, char *, char *, uint_t);
-static int get_inquiry_prop_len(char *, int);
+static int get_inquiry_prop_len(char *, size_t);
 
 static int scsi_check_ss2_LUN_limit(struct scsi_device *);
 static void scsi_establish_LUN_limit(struct scsi_device *);
@@ -225,8 +223,8 @@ scsi_slave_do_rqsense(struct scsi_device *devp, int (*callback)())
 	    (struct buf *)NULL,
 	    (uint_t)SENSE_LENGTH, B_READ, callback, NULL);
 	if (rq_bp == NULL) {
-	    rval = SCSIPROBE_NOMEM;
-	    goto out;
+		rval = SCSIPROBE_NOMEM;
+		goto out;
 	}
 
 	rq_pkt = scsi_init_pkt(ROUTE, (struct scsi_pkt *)NULL,
@@ -234,11 +232,11 @@ scsi_slave_do_rqsense(struct scsi_device *devp, int (*callback)())
 	    callback, NULL);
 
 	if (rq_pkt == NULL) {
-	    if (rq_bp->b_error == 0)
-		rval = SCSIPROBE_NOMEM_CB;
-	    else
-		rval = SCSIPROBE_NOMEM;
-	    goto out;
+		if (rq_bp->b_error == 0)
+			rval = SCSIPROBE_NOMEM_CB;
+		else
+			rval = SCSIPROBE_NOMEM;
+		goto out;
 	}
 	ASSERT(rq_bp->b_error == 0);
 
@@ -258,15 +256,15 @@ scsi_slave_do_rqsense(struct scsi_device *devp, int (*callback)())
 	 * is four bytes in length.
 	 */
 	if (scsi_poll(rq_pkt) < 0) {
-	    rval = SCSIPROBE_FAILURE;
+		rval = SCSIPROBE_FAILURE;
 	}
 
 out:
 	if (rq_pkt) {
-	    scsi_destroy_pkt(rq_pkt);
+		scsi_destroy_pkt(rq_pkt);
 	}
 	if (rq_bp) {
-	    scsi_free_consistent_buf(rq_bp);
+		scsi_free_consistent_buf(rq_bp);
 	}
 
 	return (rval);
@@ -309,12 +307,12 @@ scsi_slave(struct scsi_device *devp, int (*callback)())
 			rval = SCSIPROBE_FAILURE;
 
 		if ((pkt->pkt_state & STATE_ARQ_DONE) == 0) {
-		    if (((struct scsi_status *)pkt->pkt_scbp)->sts_chk)
-			/*
-			 * scanner and processor devices can return a
-			 * check condition here
-			 */
-			rval = scsi_slave_do_rqsense(devp, callback);
+			if (((struct scsi_status *)pkt->pkt_scbp)->sts_chk)
+				/*
+				 * scanner and processor devices can return a
+				 * check condition here
+				 */
+				rval = scsi_slave_do_rqsense(devp, callback);
 		}
 
 		if (rval != SCSIPROBE_EXISTS) {
@@ -339,7 +337,7 @@ scsi_slave(struct scsi_device *devp, int (*callback)())
 	 */
 	if ((pkt->pkt_state & STATE_ARQ_DONE) == 0) {
 		if (((struct scsi_status *)pkt->pkt_scbp)->sts_chk) {
-		    rval = scsi_slave_do_rqsense(devp, callback);
+			rval = scsi_slave_do_rqsense(devp, callback);
 		}
 	}
 
@@ -500,8 +498,8 @@ scsi_hba_probe(struct scsi_device *devp, int (*callback)())
 
 	if (devp->sd_inq == NULL) {
 		devp->sd_inq = (struct scsi_inquiry *)
-			kmem_alloc(SUN_INQSIZE, ((callback == SLEEP_FUNC) ?
-				KM_SLEEP : KM_NOSLEEP));
+		    kmem_alloc(SUN_INQSIZE, ((callback == SLEEP_FUNC) ?
+		    KM_SLEEP : KM_NOSLEEP));
 		if (devp->sd_inq == NULL) {
 			goto out;
 		}
@@ -774,10 +772,9 @@ scsi_get_name(struct scsi_device *devp, char *name, int len)
 void
 create_inquiry_props(struct scsi_device *devp)
 {
-	dev_info_t *devi = devp->sd_dev;
 	struct scsi_inquiry *inq = devp->sd_inq;
 
-	(void) ndi_prop_update_int(DDI_DEV_T_NONE, devi,
+	(void) ndi_prop_update_int(DDI_DEV_T_NONE, devp->sd_dev,
 	    INQUIRY_DEVICE_TYPE, (int)inq->inq_dtype);
 
 	/*
@@ -793,40 +790,50 @@ create_inquiry_props(struct scsi_device *devp)
 	 * stripped of Nulls and spaces.
 	 */
 	if (inq->inq_ansi != 1) {
-		create_inquiry_property(devi, INQUIRY_VENDOR_ID,
-		    inq->inq_vid, (uint_t)sizeof (inq->inq_vid));
+		if (ddi_prop_exists(DDI_DEV_T_NONE, devp->sd_dev,
+		    DDI_PROP_TYPE_STRING, INQUIRY_VENDOR_ID) == 0)
+			(void) scsi_hba_prop_update_inqstring(devp,
+			    INQUIRY_VENDOR_ID,
+			    inq->inq_vid, sizeof (inq->inq_vid));
 
-		create_inquiry_property(devi, INQUIRY_PRODUCT_ID,
-		    inq->inq_pid, (uint_t)sizeof (inq->inq_pid));
+		if (ddi_prop_exists(DDI_DEV_T_NONE, devp->sd_dev,
+		    DDI_PROP_TYPE_STRING, INQUIRY_PRODUCT_ID) == 0)
+			(void) scsi_hba_prop_update_inqstring(devp,
+			    INQUIRY_PRODUCT_ID,
+			    inq->inq_pid, sizeof (inq->inq_pid));
 
-		create_inquiry_property(devi, INQUIRY_REVISION_ID,
-		    inq->inq_revision, (uint_t)sizeof (inq->inq_revision));
+		if (ddi_prop_exists(DDI_DEV_T_NONE, devp->sd_dev,
+		    DDI_PROP_TYPE_STRING, INQUIRY_REVISION_ID) == 0)
+			(void) scsi_hba_prop_update_inqstring(devp,
+			    INQUIRY_REVISION_ID,
+			    inq->inq_revision, sizeof (inq->inq_revision));
 	}
 }
 
 /*
- * Create individual inquiry properties
+ * Create 'inquiry' string properties.  An 'inquiry' string gets special
+ * treatment to trim trailing blanks (etc) and ensure null termination.
  */
-static void
-create_inquiry_property(dev_info_t *devi, char *name, char *data,
-	uint_t length)
+int
+scsi_hba_prop_update_inqstring(struct scsi_device *devp,
+    char *name, char *data, size_t len)
 {
-	int data_len;
+	int	ilen;
+	char	*data_string;
+	int	rv;
 
-	if ((data_len = get_inquiry_prop_len(data, length)) > 0) {
-		char *data_string;
+	ilen = get_inquiry_prop_len(data, len);
+	ASSERT(ilen <= (int)len);
+	if (ilen <= 0)
+		return (DDI_PROP_INVAL_ARG);
 
-		ASSERT(data_len <= length);
-
-		/* ensure null termination */
-		data_string = kmem_zalloc(data_len + 1, KM_SLEEP);
-		bcopy(data, data_string, data_len);
-
-		(void) ndi_prop_update_string(DDI_DEV_T_NONE, devi,
-		    name, data_string);
-
-		kmem_free(data_string, data_len + 1);
-	}
+	/* ensure null termination */
+	data_string = kmem_zalloc(ilen + 1, KM_SLEEP);
+	bcopy(data, data_string, ilen);
+	rv = ndi_prop_update_string(DDI_DEV_T_NONE,
+	    devp->sd_dev, name, data_string);
+	kmem_free(data_string, ilen + 1);
+	return (rv);
 }
 
 /*
@@ -839,7 +846,7 @@ create_inquiry_property(dev_info_t *devi, char *name, char *data,
  * the scsi-2 spec.
  */
 static int
-get_inquiry_prop_len(char *property, int length)
+get_inquiry_prop_len(char *property, size_t length)
 {
 	int retval;
 	int trailer;
@@ -895,7 +902,7 @@ scsi_check_ss2_LUN_limit(struct scsi_device *devp)
 {
 	struct scsi_address	*ap = &(devp->sd_address);
 	dev_info_t		*pdevi =
-			(dev_info_t *)DEVI(devp->sd_dev)->devi_parent;
+	    (dev_info_t *)DEVI(devp->sd_dev)->devi_parent;
 	int			ret_val = 0;	/* default return value */
 	uchar_t			*tgt_list;
 	uint_t			tgt_nelements;

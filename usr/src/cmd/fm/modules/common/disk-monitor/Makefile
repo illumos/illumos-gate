@@ -24,15 +24,14 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-MODULE = sfx4500-disk
-CLASS = arch
-ARCH = i86pc
-SRCS = sfx4500-disk.c diskmon_conf.c topo_gather.c \
-	hotplug_mgr.c dm_platform.c \
-	schg_mgr.c util.c
+MODULE = disk-monitor
+CLASS = common
+SRCS =	disk_monitor.c diskmon_conf.c topo_gather.c \
+	hotplug_mgr.c dm_platform.c schg_mgr.c util.c
 
 include ../../Makefile.plugin
-LINTFLAGS += -I. -I$(SRC)/lib/fm/topo/modules/i86pc/sata -L$(ROOT)/usr/lib/fm
-CFLAGS += -I. -I$(SRC)/lib/fm/topo/modules/i86pc/sata
+
+LINTFLAGS += -I. -I$(SRC)/lib/fm/topo/modules/common/disk -L$(ROOT)/usr/lib/fm
+CFLAGS += -I. -I$(SRC)/lib/fm/topo/modules/common/disk
 LDLIBS += -lsysevent -lnvpair -lsmbios -lcfgadm -ltopo -luutil -lipmi
 LDFLAGS += -L$(ROOT)/usr/lib/fm -R/usr/lib/fm

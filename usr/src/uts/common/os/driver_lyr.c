@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -322,10 +321,10 @@ handle_alloc(vnode_t *vp, struct ldi_ident *ident)
 		mutex_exit(&ldi_handle_hash_lock[index]);
 
 		LDI_ALLOCFREE((CE_WARN, "ldi handle alloc: dup "
-			"lh=0x%p, ident=0x%p, vp=0x%p, drv=%s, minor=0x%x",
-			(void *)*lhpp, (void *)ident, (void *)vp,
-			mod_major_to_name(getmajor(vp->v_rdev)),
-			getminor(vp->v_rdev)));
+		    "lh=0x%p, ident=0x%p, vp=0x%p, drv=%s, minor=0x%x",
+		    (void *)*lhpp, (void *)ident, (void *)vp,
+		    mod_major_to_name(getmajor(vp->v_rdev)),
+		    getminor(vp->v_rdev)));
 
 		kmem_free(lhp, sizeof (struct ldi_handle));
 		return (*lhpp);
@@ -357,10 +356,10 @@ handle_alloc(vnode_t *vp, struct ldi_ident *ident)
 	atomic_add_long(&ldi_handle_hash_count, 1);
 
 	LDI_ALLOCFREE((CE_WARN, "ldi handle alloc: new "
-		"lh=0x%p, ident=0x%p, vp=0x%p, drv=%s, minor=0x%x",
-		(void *)lhp, (void *)ident, (void *)vp,
-		mod_major_to_name(getmajor(vp->v_rdev)),
-		getminor(vp->v_rdev)));
+	    "lh=0x%p, ident=0x%p, vp=0x%p, drv=%s, minor=0x%x",
+	    (void *)lhp, (void *)ident, (void *)vp,
+	    mod_major_to_name(getmajor(vp->v_rdev)),
+	    getminor(vp->v_rdev)));
 
 	mutex_exit(&ldi_handle_hash_lock[index]);
 	return (lhp);
@@ -378,10 +377,10 @@ handle_release(struct ldi_handle *lhp)
 	mutex_enter(&ldi_handle_hash_lock[index]);
 
 	LDI_ALLOCFREE((CE_WARN, "ldi handle release: "
-		"lh=0x%p, ident=0x%p, vp=0x%p, drv=%s, minor=0x%x",
-		(void *)lhp, (void *)lhp->lh_ident, (void *)lhp->lh_vp,
-		mod_major_to_name(getmajor(lhp->lh_vp->v_rdev)),
-		getminor(lhp->lh_vp->v_rdev)));
+	    "lh=0x%p, ident=0x%p, vp=0x%p, drv=%s, minor=0x%x",
+	    (void *)lhp, (void *)lhp->lh_ident, (void *)lhp->lh_vp,
+	    mod_major_to_name(getmajor(lhp->lh_vp->v_rdev)),
+	    getminor(lhp->lh_vp->v_rdev)));
 
 	ASSERT(lhp->lh_ref > 0);
 	if (--lhp->lh_ref > 0) {
@@ -723,10 +722,10 @@ ldi_open_by_vp(vnode_t **vpp, int flag, cred_t *cr,
 		 * open
 		 */
 		LDI_OPENCLOSE((CE_WARN, "%s: lh=0x%p",
-			"ldi clone open", (void *)nlhp));
+		    "ldi clone open", (void *)nlhp));
 	} else {
 		LDI_OPENCLOSE((CE_WARN, "%s: lh=0x%p",
-			"ldi open", (void *)nlhp));
+		    "ldi open", (void *)nlhp));
 	}
 
 	/* Flush back any dirty pages associated with the device. */
@@ -1230,8 +1229,8 @@ ldi_mlink_fp(struct stdata *stp, file_t *fpdown, int lhlink, int type)
 	ASSERT(!servicing_interrupt());
 
 	LDI_STREAMS_LNK((CE_NOTE, "%s: linking streams "
-		"stp=0x%p, fpdown=0x%p", "ldi_mlink_fp",
-		(void *)stp, (void *)fpdown));
+	    "stp=0x%p, fpdown=0x%p", "ldi_mlink_fp",
+	    (void *)stp, (void *)fpdown));
 
 	sp = VTOS(vp);
 	csp = VTOS(sp->s_commonvp);
@@ -1345,8 +1344,8 @@ ldi_munlink_fp(struct stdata *stp, file_t *fpdown, int type)
 	ASSERT((type == LINKNORMAL) || (type == LINKPERSIST));
 
 	LDI_STREAMS_LNK((CE_NOTE, "%s: unlinking streams "
-		"stp=0x%p, fpdown=0x%p", "ldi_munlink_fp",
-		(void *)stp, (void *)fpdown));
+	    "stp=0x%p, fpdown=0x%p", "ldi_munlink_fp",
+	    (void *)stp, (void *)fpdown));
 
 	/*
 	 * NOTE: here we rely on the streams subsystem not allowing
@@ -1406,7 +1405,7 @@ ldi_ident_from_mod(struct modlinkage *modlp, ldi_ident_t *lip)
 	*lip = (ldi_ident_t)ident_alloc(name, NULL, DDI_DEV_T_NONE, major);
 
 	LDI_ALLOCFREE((CE_WARN, "%s: li=0x%p, mod=%s",
-		"ldi_ident_from_mod", (void *)*lip, name));
+	    "ldi_ident_from_mod", (void *)*lip, name));
 
 	return (0);
 }
@@ -1421,7 +1420,7 @@ ldi_ident_from_anon()
 	lip = (ldi_ident_t)ident_alloc("genunix", NULL, DDI_DEV_T_NONE, -1);
 
 	LDI_ALLOCFREE((CE_WARN, "%s: li=0x%p, mod=%s",
-		"ldi_ident_from_anon", (void *)lip, "genunix"));
+	    "ldi_ident_from_anon", (void *)lip, "genunix"));
 
 	return (lip);
 }
@@ -1453,9 +1452,9 @@ ldi_ident_from_stream(struct queue *sq, ldi_ident_t *lip)
 	*lip = (ldi_ident_t)ident_alloc(name, NULL, dev, -1);
 
 	LDI_ALLOCFREE((CE_WARN,
-		"%s: li=0x%p, mod=%s, minor=0x%x, stp=0x%p",
-		"ldi_ident_from_stream", (void *)*lip, name, getminor(dev),
-		(void *)stp));
+	    "%s: li=0x%p, mod=%s, minor=0x%x, stp=0x%p",
+	    "ldi_ident_from_stream", (void *)*lip, name, getminor(dev),
+	    (void *)stp));
 
 	return (0);
 }
@@ -1476,8 +1475,8 @@ ldi_ident_from_dev(dev_t dev, ldi_ident_t *lip)
 	*lip = (ldi_ident_t)ident_alloc(name, NULL, dev, -1);
 
 	LDI_ALLOCFREE((CE_WARN,
-		"%s: li=0x%p, mod=%s, minor=0x%x",
-		"ldi_ident_from_dev", (void *)*lip, name, getminor(dev)));
+	    "%s: li=0x%p, mod=%s, minor=0x%x",
+	    "ldi_ident_from_dev", (void *)*lip, name, getminor(dev)));
 
 	return (0);
 }
@@ -1499,8 +1498,8 @@ ldi_ident_from_dip(dev_info_t *dip, ldi_ident_t *lip)
 	*lip = (ldi_ident_t)ident_alloc(name, dip, DDI_DEV_T_NONE, -1);
 
 	LDI_ALLOCFREE((CE_WARN,
-		"%s: li=0x%p, mod=%s, dip=0x%p",
-		"ldi_ident_from_dip", (void *)*lip, name, (void *)devi));
+	    "%s: li=0x%p, mod=%s, dip=0x%p",
+	    "ldi_ident_from_dip", (void *)*lip, name, (void *)devi));
 
 	return (0);
 }
@@ -1521,8 +1520,8 @@ ldi_ident_from_major(major_t major, ldi_ident_t *lip)
 	*lip = (ldi_ident_t)ident_alloc(name, NULL, DDI_DEV_T_NONE, major);
 
 	LDI_ALLOCFREE((CE_WARN,
-		"%s: li=0x%p, mod=%s",
-		"ldi_ident_from_major", (void *)*lip, name));
+	    "%s: li=0x%p, mod=%s",
+	    "ldi_ident_from_major", (void *)*lip, name));
 
 	return (0);
 }
@@ -1541,8 +1540,8 @@ ldi_ident_release(ldi_ident_t li)
 	name = ident->li_modname;
 
 	LDI_ALLOCFREE((CE_WARN,
-		"%s: li=0x%p, mod=%s",
-		"ldi_ident_release", (void *)li, name));
+	    "%s: li=0x%p, mod=%s",
+	    "ldi_ident_release", (void *)li, name));
 
 	ident_release((struct ldi_ident *)li);
 }
@@ -1553,7 +1552,7 @@ ldi_open_by_dev(dev_t *devp, int otyp, int flag, cred_t *cr,
     ldi_handle_t *lhp, ldi_ident_t li)
 {
 	struct ldi_ident	*lip = (struct ldi_ident *)li;
-	int 			ret;
+	int			ret;
 	vnode_t			*vp;
 
 	/* sanity check required input parameters */
@@ -1580,7 +1579,7 @@ ldi_open_by_name(char *pathname, int flag, cred_t *cr,
     ldi_handle_t *lhp, ldi_ident_t li)
 {
 	struct ldi_ident	*lip = (struct ldi_ident *)li;
-	int 			ret;
+	int			ret;
 	vnode_t			*vp;
 
 	/* sanity check required input parameters */
@@ -1629,7 +1628,7 @@ ldi_close(ldi_handle_t lh, int flag, cred_t *cr)
 {
 	struct ldi_handle	*handlep = (struct ldi_handle *)lh;
 	struct ldi_event	*lep;
-	int 			err = 0;
+	int			err = 0;
 
 	if (lh == NULL)
 		return (EINVAL);
@@ -1740,10 +1739,12 @@ ldi_write(ldi_handle_t lh, struct uio *uiop, cred_t *credp)
 int
 ldi_get_size(ldi_handle_t lh, uint64_t *sizep)
 {
-	int 			otyp;
+	int			otyp;
 	uint_t			value;
 	int64_t			drv_prop64;
 	struct ldi_handle	*handlep = (struct ldi_handle *)lh;
+	uint_t			blksize;
+	int			blkshift;
 
 
 	if ((lh == NULL) || (sizep == NULL))
@@ -1763,28 +1764,68 @@ ldi_get_size(ldi_handle_t lh, uint64_t *sizep)
 
 	if (otyp == OTYP_BLK) {
 		if (ldi_prop_exists(lh,
-			DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "Nblocks")) {
+		    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "Nblocks")) {
 
 			drv_prop64 = ldi_prop_get_int64(lh,
 			    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 			    "Nblocks", 0);
-			*sizep = (uint64_t)ldbtob((uint64_t)drv_prop64);
+			blksize = ldi_prop_get_int(lh,
+			    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+			    "blksize", DEV_BSIZE);
+			if (blksize == DEV_BSIZE)
+				blksize = ldi_prop_get_int(lh, LDI_DEV_T_ANY |
+				    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+				    "device-blksize", DEV_BSIZE);
+
+			/* blksize must be a power of two */
+			ASSERT(BIT_ONLYONESET(blksize));
+			blkshift = highbit(blksize) - 1;
+
+			/*
+			 * We don't support Nblocks values that don't have
+			 * an accurate uint64_t byte count representation.
+			 */
+			if ((uint64_t)drv_prop64 >= (UINT64_MAX >> blkshift))
+				return (DDI_FAILURE);
+
+			*sizep = (uint64_t)
+			    (((u_offset_t)drv_prop64) << blkshift);
 			return (DDI_SUCCESS);
 		}
 
 		if (ldi_prop_exists(lh,
-			DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "nblocks")) {
+		    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "nblocks")) {
 
 			value = ldi_prop_get_int(lh,
 			    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
 			    "nblocks", 0);
-			*sizep = (uint64_t)ldbtob(value);
+			blksize = ldi_prop_get_int(lh,
+			    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+			    "blksize", DEV_BSIZE);
+			if (blksize == DEV_BSIZE)
+				blksize = ldi_prop_get_int(lh, LDI_DEV_T_ANY |
+				    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM,
+				    "device-blksize", DEV_BSIZE);
+
+			/* blksize must be a power of two */
+			ASSERT(BIT_ONLYONESET(blksize));
+			blkshift = highbit(blksize) - 1;
+
+			/*
+			 * We don't support nblocks values that don't have an
+			 * accurate uint64_t byte count representation.
+			 */
+			if ((uint64_t)value >= (UINT64_MAX >> blkshift))
+				return (DDI_FAILURE);
+
+			*sizep = (uint64_t)
+			    (((u_offset_t)value) << blkshift);
 			return (DDI_SUCCESS);
 		}
 	}
 
 	if (ldi_prop_exists(lh,
-		DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "Size")) {
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "Size")) {
 
 		drv_prop64 = ldi_prop_get_int64(lh,
 		    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "Size", 0);
@@ -1793,7 +1834,7 @@ ldi_get_size(ldi_handle_t lh, uint64_t *sizep)
 	}
 
 	if (ldi_prop_exists(lh,
-		DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "size")) {
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "size")) {
 
 		value = ldi_prop_get_int(lh,
 		    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "size", 0);
@@ -2041,7 +2082,7 @@ ldi_putmsg(ldi_handle_t lh, mblk_t *smp)
 
 	/* Send message while honoring flow control */
 	ret = kstrputmsg(handlep->lh_vp, smp, NULL, 0, 0,
-				MSG_BAND | MSG_HOLDSIG | MSG_IGNERROR, 0);
+	    MSG_BAND | MSG_HOLDSIG | MSG_IGNERROR, 0);
 
 	return (ret);
 }
@@ -2075,7 +2116,7 @@ ldi_getmsg(ldi_handle_t lh, mblk_t **rmp, timestruc_t *timeo)
 	pri = 0;
 	*rmp = NULL;
 	ret = kstrgetmsg(handlep->lh_vp,
-				rmp, NULL, &pri, &pflag, timout, &rval);
+	    rmp, NULL, &pri, &pflag, timout, &rval);
 	return (ret);
 }
 
@@ -2302,7 +2343,7 @@ ldi_prop_lookup_string_array(ldi_handle_t lh,
 			 * our callers expect
 			 */
 			if (i_pack_string_array(prop_val, prop_len,
-				&str_array, &nelem) == 0) {
+			    &str_array, &nelem) == 0) {
 
 				*data = str_array;
 				*nelements = nelem;
@@ -2591,8 +2632,8 @@ int
 ldi_prop_exists(ldi_handle_t lh, uint_t flags, char *name)
 {
 	struct ldi_handle	*handlep = (struct ldi_handle *)lh;
-	dev_info_t 		*dip;
-	dev_t 			dev;
+	dev_info_t		*dip;
+	dev_t			dev;
 	int			res, prop_len;
 	struct snode		*csp;
 

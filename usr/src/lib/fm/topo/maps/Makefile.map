@@ -20,13 +20,14 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
 .KEEP_STATE:
-.SUFFIXES: .xml
+.SUFFIXES:
+.SUFFIXES: .xml .xmlgen $(SUFFIXES)
 
 MODCLASS = maps
 
@@ -46,6 +47,14 @@ ROOTTOPOMAPS = $(TOPOFILE:%=$(ROOTTOPOROOT)/%)
 
 install:= FILEMODE =	0444
 
+# The .xmlgen perl file merges the platform specific xml code with the
+# base $TOPOBASE xml file and generates a new xml file. This is 
+# done to avoid having to deal with things like 48 platform specific
+# internal storage bays by hand.
+.xmlgen.xml:
+	$(RM) $@ 
+	$(PERL) $< -p $(PLATFORM) -i $(TOPOBASE) -o $@
+	
 .xml:
 	$(RM) $@
 	$(CAT) $< > $@

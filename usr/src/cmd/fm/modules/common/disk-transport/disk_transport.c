@@ -289,7 +289,7 @@ _fmd_init(fmd_hdl_t *hdl)
 	 * the developer to substitute a faulty device based off all or part of
 	 * an FMRI string.  For example, one could do:
 	 *
-	 * 	setprop simulate "sata-port=4/disk=4	/path/to/sim.so"
+	 * 	setprop simulate "bay=4/disk=4	/path/to/sim.so"
 	 *
 	 * When the transport module encounters an FMRI containing the given
 	 * string, then it will open the simulator file instead of the

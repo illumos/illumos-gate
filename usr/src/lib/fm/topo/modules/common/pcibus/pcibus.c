@@ -418,8 +418,6 @@ declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
 	if (class == PCI_CLASS_BRIDGE && subclass == PCI_BRIDGE_PCI)
 		(void) pci_bridge_declare(mod, fn, din, board, bridge, rc,
 		    depth);
-	else if (class == PCI_CLASS_MASS)
-		(void) topo_mod_enummap(mod, fn, "storage", FM_FMRI_SCHEME_HC);
 }
 
 int

@@ -33,7 +33,8 @@ sparc_SUBDIRS =	sun4u \
 		SUNW,SPARC-Enterprise \
 		SUNW,Sun-Blade-T6320
 
-i386_SUBDIRS = i86pc
+i386_SUBDIRS = i86pc \
+		SUNW,Sun-Fire-X4500
 
 SUBDIRS = $($(MACH)_SUBDIRS)
 

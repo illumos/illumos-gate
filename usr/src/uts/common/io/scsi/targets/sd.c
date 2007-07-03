@@ -1124,7 +1124,6 @@ static void sd_set_vers1_properties(struct sd_lun *un, int flags,
 static void sd_register_devid(struct sd_lun *un, dev_info_t *devi,
     int reservation_flag);
 static int  sd_get_devid(struct sd_lun *un);
-static int  sd_get_serialnum(struct sd_lun *un, uchar_t *wwn, int *len);
 static ddi_devid_t sd_create_devid(struct sd_lun *un);
 static int  sd_write_deviceid(struct sd_lun *un);
 static int  sd_get_devid_page(struct sd_lun *un, uchar_t *wwn, int *len);
@@ -2592,6 +2591,7 @@ sd_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 	int		instance = ddi_get_instance(dip);
 	struct sd_lun	*un;
 	uint64_t	nblocks64;
+	uint_t		dblk;
 
 	/*
 	 * Our dynamic properties are all device specific and size oriented.
@@ -2614,8 +2614,10 @@ sd_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 	(void) cmlb_partinfo(un->un_cmlbhandle, SDPART(dev),
 	    (diskaddr_t *)&nblocks64, NULL, NULL, NULL, (void *)SD_PATH_DIRECT);
 
-	return (ddi_prop_op_nblocks(dev, dip, prop_op, mod_flags,
-	    name, valuep, lengthp, nblocks64));
+	/* report size in target size blocks */
+	dblk = un->un_tgt_blocksize / un->un_sys_blocksize;
+	return (ddi_prop_op_nblocks_blksize(dev, dip, prop_op, mod_flags,
+	    name, valuep, lengthp, nblocks64 / dblk, un->un_tgt_blocksize));
 }
 
 /*
@@ -4561,6 +4563,8 @@ sd_get_virtual_geometry(struct sd_lun *un, cmlb_geom_t *lgeom_p,
 static void
 sd_update_block_info(struct sd_lun *un, uint32_t lbasize, uint64_t capacity)
 {
+	uint_t		dblk;
+
 	if (lbasize != 0) {
 		un->un_tgt_blocksize = lbasize;
 		un->un_f_tgt_blocksize_is_valid	= TRUE;
@@ -4569,6 +4573,32 @@ sd_update_block_info(struct sd_lun *un, uint32_t lbasize, uint64_t capacity)
 	if (capacity != 0) {
 		un->un_blockcount		= capacity;
 		un->un_f_blockcount_is_valid	= TRUE;
+	}
+
+	/*
+	 * Update device capacity properties.
+	 *
+	 *   'device-nblocks'	number of blocks in target's units
+	 *   'device-blksize'	data bearing size of target's block
+	 *
+	 * NOTE: math is complicated by the fact that un_tgt_blocksize may
+	 * not be a power of two for checksumming disks with 520/528 byte
+	 * sectors.
+	 */
+	if (un->un_f_tgt_blocksize_is_valid &&
+	    un->un_f_blockcount_is_valid &&
+	    un->un_sys_blocksize) {
+		dblk = un->un_tgt_blocksize / un->un_sys_blocksize;
+		(void) ddi_prop_update_int64(DDI_DEV_T_NONE, SD_DEVINFO(un),
+		    "device-nblocks", un->un_blockcount / dblk);
+		/*
+		 * To save memory, only define "device-blksize" when its
+		 * value is differnet than the default DEV_BSIZE value.
+		 */
+		if ((un->un_sys_blocksize * dblk) != DEV_BSIZE)
+			(void) ddi_prop_update_int(DDI_DEV_T_NONE,
+			    SD_DEVINFO(un), "device-blksize",
+			    un->un_sys_blocksize * dblk);
 	}
 }
 
@@ -4597,6 +4627,8 @@ sd_register_devid(struct sd_lun *un, dev_info_t *devi, int reservation_flag)
 	uchar_t		*inq83		= NULL;
 	size_t		inq83_len	= MAX_INQUIRY_SIZE;
 	size_t		inq83_resid	= 0;
+	int		dlen, len;
+	char		*sn;
 
 	ASSERT(un != NULL);
 	ASSERT(mutex_owned(SD_MUTEX(un)));
@@ -4656,6 +4688,34 @@ sd_register_devid(struct sd_lun *un, dev_info_t *devi, int reservation_flag)
 				kmem_free(inq80, inq80_len);
 				inq80 = NULL;
 				inq80_len = 0;
+			} else if (ddi_prop_exists(
+			    DDI_DEV_T_NONE, SD_DEVINFO(un),
+			    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+			    INQUIRY_SERIAL_NO) == 0) {
+				/*
+				 * If we don't already have a serial number
+				 * property, do quick verify of data returned
+				 * and define property.
+				 */
+				dlen = inq80_len - inq80_resid;
+				len = (size_t)inq80[3];
+				if ((dlen >= 4) && ((len + 4) <= dlen)) {
+					/*
+					 * Ensure sn termination, skip leading
+					 * blanks, and create property
+					 * 'inquiry-serial-no'.
+					 */
+					sn = (char *)&inq80[4];
+					sn[len] = 0;
+					while (*sn && (*sn == ' '))
+						sn++;
+					if (*sn) {
+						(void) ddi_prop_update_string(
+						    DDI_DEV_T_NONE,
+						    SD_DEVINFO(un),
+						    INQUIRY_SERIAL_NO, sn);
+					}
+				}
 			}
 			mutex_enter(SD_MUTEX(un));
 		}
@@ -25396,6 +25456,12 @@ sr_ejected(struct sd_lun *un)
 		stp = (struct sd_errstats *)un->un_errstats->ks_data;
 		stp->sd_capacity.value.ui64 = 0;
 	}
+
+	/* remove "capacity-of-device" properties */
+	(void) ddi_prop_remove(DDI_DEV_T_NONE, SD_DEVINFO(un),
+	    "device-nblocks");
+	(void) ddi_prop_remove(DDI_DEV_T_NONE, SD_DEVINFO(un),
+	    "device-blksize");
 }
 
 

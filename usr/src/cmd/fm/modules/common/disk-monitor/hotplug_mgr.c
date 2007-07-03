@@ -45,7 +45,7 @@
 #include <libnvpair.h>
 #include <config_admin.h>
 
-#include "sfx4500-disk.h"
+#include "disk_monitor.h"
 #include "hotplug_mgr.h"
 #include "schg_mgr.h"
 #include "dm_platform.h"
@@ -150,7 +150,7 @@ disk_ap_state_to_hotplug_state(diskmon_t *diskp)
 
 	} else {
 		/*
-		 * The SATA libcfgadm plugin adds a
+		 * The sata libcfgadm plugin adds a
 		 * /devices to the phys id; to use it, we must
 		 * prepend this string before the call.
 		 */

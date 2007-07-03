@@ -809,11 +809,23 @@ ddi_prop_op_size(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 	int mod_flags, char *name, caddr_t valuep, int *lengthp,
 	uint64_t size64);
 
+/* ddi_prop_op_size_blksize: like ddi_prop_op_size, in blksize blocks */
+int
+ddi_prop_op_size_blksize(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
+	int mod_flags, char *name, caddr_t valuep, int *lengthp,
+	uint64_t size64, uint_t blksize);
+
 /* ddi_prop_op_nblocks: for drivers that implement size in DEV_BSIZE blocks */
 int
 ddi_prop_op_nblocks(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 	int mod_flags, char *name, caddr_t valuep, int *lengthp,
 	uint64_t nblocks64);
+
+/* ddi_prop_op_nblocks_blksize: like ddi_prop_op_nblocks, in blksize blocks */
+int
+ddi_prop_op_nblocks_blksize(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
+	int mod_flags, char *name, caddr_t valuep, int *lengthp,
+	uint64_t nblocks64, uint_t blksize);
 
 /*
  * Variable length props...

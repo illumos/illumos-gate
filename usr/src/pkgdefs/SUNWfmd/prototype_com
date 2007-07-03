@@ -44,6 +44,7 @@ f none usr/include/fm/fmd_snmp.h 644 root bin
 f none usr/include/fm/libtopo.h 644 root bin
 f none usr/include/fm/topo_mod.h 644 root bin
 f none usr/include/fm/topo_hc.h 644 root bin
+f none usr/include/fm/topo_list.h 644 root bin
 d none usr/lib 755 root bin
 d none usr/lib/fm 755 root bin
 d none usr/lib/fm/dict 755 root bin
@@ -67,6 +68,8 @@ f none usr/lib/fm/fmd/plugins/cpumem-retire.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/cpumem-retire.so 555 root bin
 f none usr/lib/fm/fmd/plugins/disk-transport.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/disk-transport.so 555 root bin
+f none usr/lib/fm/fmd/plugins/disk-monitor.conf 644 root bin
+f none usr/lib/fm/fmd/plugins/disk-monitor.so 555 root bin
 f none usr/lib/fm/fmd/plugins/eft.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/eft.so 555 root bin
 f none usr/lib/fm/fmd/plugins/io-retire.conf 644 root bin
@@ -121,6 +124,9 @@ f none usr/lib/fm/libtopo.so.1 755 root bin
 s none usr/lib/fm/libtopo.so=libtopo.so.1
 f none usr/lib/fm/llib-ltopo 644 root bin
 f none usr/lib/fm/llib-ltopo.ln 644 root bin
+d none usr/lib/fm/topo 755 root bin
+d none usr/lib/fm/topo/plugins 755 root bin
+f none usr/lib/fm/topo/plugins/disk.so 555 root bin
 d none usr/lib/locale 755 root bin
 d none usr/lib/locale/C 755 root bin
 d none usr/lib/locale/C/LC_MESSAGES 755 root bin

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,13 +30,22 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * sata libtopo plugin property consumer
+ * bay/disk libtopo plugin property consumer
  * (creates diskmon configuration objects)
  */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* NOTE: some aspects of this code are still x4500 specific */
+#define	DISK_MONITOR_PROPERTIES	"sfx4500-properties"
+
+/* Properties added to the machine-specific properties pgroup */
+#define	BAY_IND_NAME		"indicator-name"
+#define	BAY_IND_ACTION		"indicator-action"
+#define	BAY_INDRULE_STATES	"indicator-rule-states"
+#define	BAY_INDRULE_ACTIONS	"indicator-rule-actions"
 
 #define	TOPO_SUCCESS		0
 #define	TOPO_WALK_ERROR		1

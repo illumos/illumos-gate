@@ -40,7 +40,7 @@
 #include <fm/fmd_api.h>
 
 #include "util.h"
-#include "sfx4500-disk.h"
+#include "disk_monitor.h"
 
 extern log_class_t g_verbose;
 

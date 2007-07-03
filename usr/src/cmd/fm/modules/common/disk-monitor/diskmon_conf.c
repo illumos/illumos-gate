@@ -40,10 +40,9 @@
 #include <limits.h>
 #include <pthread.h>
 
-#include "sfx4500-disk.h"
+#include "disk_monitor.h"
 #include "util.h"
 #include "topo_gather.h"
-#include "sata.h"
 
 extern log_class_t g_verbose;
 
@@ -102,7 +101,7 @@ conf_error_msg(conf_err_t err, char *buf, int buflen, void *arg)
 		break;
 	case E_INDRULE_REFERENCES_NONEXISTENT_IND_ACTION:
 		(void) snprintf(buf, buflen, "`%c%s': Undefined Indicator in "
-		    SATA_IND_ACTION " property",
+		    BAY_IND_ACTION " property",
 		    (((ind_action_t *)arg)->ind_state == INDICATOR_ON)
 		    ? '+' : '-',
 		    ((ind_action_t *)arg)->ind_name);

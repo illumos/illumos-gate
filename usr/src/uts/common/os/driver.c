@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
@@ -425,11 +423,11 @@ bdev_strategy_tnf_probe(struct buf *bp)
 {
 	/* Kernel probe */
 	TNF_PROBE_5(strategy, "io blockio", /* CSTYLED */,
-		tnf_device,	device,		bp->b_edev,
-		tnf_diskaddr,	block,		bp->b_lblkno,
-		tnf_size,	size,		bp->b_bcount,
-		tnf_opaque,	buf,		bp,
-		tnf_bioflags,	flags,		bp->b_flags);
+	    tnf_device, device, bp->b_edev,
+	    tnf_diskaddr, block, bp->b_lblkno,
+	    tnf_size, size, bp->b_bcount,
+	    tnf_opaque, buf, bp,
+	    tnf_bioflags, flags, bp->b_flags);
 }
 
 int
@@ -469,11 +467,29 @@ bdev_print(dev_t dev, caddr_t str)
 	return ((*cb->cb_print)(dev, str));
 }
 
+/*
+ * Return number of DEV_BSIZE byte blocks.
+ */
 int
 bdev_size(dev_t dev)
 {
-	return (e_ddi_getprop(dev, VBLK, "nblocks",
-	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, -1));
+	uint_t		nblocks;
+	uint_t		blksize;
+
+	if ((nblocks = e_ddi_getprop(dev, VBLK, "nblocks",
+	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, -1)) == -1)
+		return (-1);
+
+	/* Get blksize, default to DEV_BSIZE */
+	if ((blksize = e_ddi_getprop(dev, VBLK, "blksize",
+	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, -1)) == -1)
+		blksize = e_ddi_getprop(DDI_DEV_T_ANY, VBLK, "device-blksize",
+		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, DEV_BSIZE);
+
+	if (blksize >= DEV_BSIZE)
+		return (nblocks * (blksize / DEV_BSIZE));
+	else
+		return (nblocks / (DEV_BSIZE / blksize));
 }
 
 /*
@@ -482,8 +498,23 @@ bdev_size(dev_t dev)
 uint64_t
 bdev_Size(dev_t dev)
 {
-	return (e_ddi_getprop_int64(dev, VBLK, "Nblocks",
-	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, -1));
+	uint64_t	nblocks;
+	uint_t		blksize;
+
+	if ((nblocks = e_ddi_getprop_int64(dev, VBLK, "Nblocks",
+	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, -1)) == -1)
+		return (-1);
+
+	/* Get blksize, default to DEV_BSIZE */
+	if ((blksize = e_ddi_getprop(dev, VBLK, "blksize",
+	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, -1)) == -1)
+		blksize = e_ddi_getprop(DDI_DEV_T_ANY, VBLK, "device-blksize",
+		    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, DEV_BSIZE);
+
+	if (blksize >= DEV_BSIZE)
+		return (nblocks * (blksize / DEV_BSIZE));
+	else
+		return (nblocks / (DEV_BSIZE / blksize));
 }
 
 int
