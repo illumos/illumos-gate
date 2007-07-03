@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -272,7 +272,8 @@ rctladm_modify_action(const char *rctl_name, uint_t enable, uint_t action,
 	if (rctlctl(rctl_name, (rctlblk_t *)gblk, RCTLCTL_GET) == -1)
 		die(gettext("unable to obtain resource control block"));
 
-	if (gblk->rcq_global_flagaction & RCTL_GLOBAL_SYSLOG_NEVER) {
+	if ((gblk->rcq_global_flagaction & RCTL_GLOBAL_SYSLOG_NEVER) &&
+	    (action == RCTL_GLOBAL_SYSLOG)) {
 		warn(gettext("\"syslog\" action not valid for %s\n"),
 		    rctl_name);
 		op_failures++;
