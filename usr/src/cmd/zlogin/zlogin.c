@@ -1553,7 +1553,10 @@ noninteractive_login(char *zonename, const char *user_cmd, zoneid_t zoneid,
 		 * For non-native zones, tell libc where it can find locale
 		 * specific getttext() messages.
 		 */
-		if (access("/native/usr/lib/locale", R_OK) == 0)
+		if (access("/.SUNWnative/usr/lib/locale", R_OK) == 0)
+			(void) bindtextdomain(TEXT_DOMAIN,
+			    "/.SUNWnative/usr/lib/locale");
+		else if (access("/native/usr/lib/locale", R_OK) == 0)
 			(void) bindtextdomain(TEXT_DOMAIN,
 			    "/native/usr/lib/locale");
 

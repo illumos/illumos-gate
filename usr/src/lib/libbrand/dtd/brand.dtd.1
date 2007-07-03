@@ -218,6 +218,25 @@
 <!ATTLIST postclone>
 
 <!--
+  postinstall
+
+    Path to a script that will perform any necessary post-processing on
+    a zone after it has been freshly installed.  This hook will run after the
+    install hook completes and the zone is in the installed state.  The
+    additional arguments are the same as what is passed to the install hook.
+
+    The following replacements are performed:
+
+      %z	Name of zone
+      %R	Root of zone
+      %*	Additional arguments, if any
+
+    It has no attributes.
+-->
+<!ELEMENT postinstall	(#PCDATA) >
+<!ATTLIST postinstall>
+
+<!--
   privilege
 
     Add a privilege to the default, prohibited, or required set for all
@@ -259,6 +278,6 @@
 
 <!ELEMENT brand		(modname, initname, login_cmd, user_cmd, install,
 			installopts, boot, halt, verify_cfg, verify_adm,
-			postclone, privilege+)>
+			postclone, postinstall, privilege+)>
 
 <!ATTLIST brand		name		CDATA #REQUIRED>

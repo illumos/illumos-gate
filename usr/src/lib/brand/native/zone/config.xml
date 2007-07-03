@@ -45,6 +45,7 @@
 	<verify_cfg></verify_cfg>
 	<verify_adm></verify_adm>
 	<postclone>/usr/lib/brand/native/postclone %z %R</postclone>
+	<postinstall></postinstall>
 
 	<privilege set="default" name="contract_event" />
 	<privilege set="default" name="contract_observer" />

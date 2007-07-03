@@ -60,6 +60,7 @@
 #define	DTD_ELEM_MODNAME	((const xmlChar *) "modname")
 #define	DTD_ELEM_MOUNT		((const xmlChar *) "mount")
 #define	DTD_ELEM_POSTCLONE	((const xmlChar *) "postclone")
+#define	DTD_ELEM_POSTINSTALL	((const xmlChar *) "postinstall")
 #define	DTD_ELEM_PRIVILEGE	((const xmlChar *) "privilege")
 #define	DTD_ELEM_SYMLINK	((const xmlChar *) "symlink")
 #define	DTD_ELEM_USER_CMD	((const xmlChar *) "user_cmd")
@@ -527,6 +528,15 @@ brand_get_postclone(brand_handle_t bh, const char *zonename,
 	struct brand_handle *bhp = (struct brand_handle *)bh;
 	return (brand_get_value(bhp, zonename, zoneroot, NULL, NULL,
 	    buf, len, argc, argv, DTD_ELEM_POSTCLONE, B_TRUE, B_TRUE));
+}
+
+int
+brand_get_postinstall(brand_handle_t bh, const char *zonename,
+    const char *zoneroot, char *buf, size_t len, int argc, char **argv)
+{
+	struct brand_handle *bhp = (struct brand_handle *)bh;
+	return (brand_get_value(bhp, zonename, zoneroot, NULL, NULL,
+	    buf, len, argc, argv, DTD_ELEM_POSTINSTALL, B_TRUE, B_TRUE));
 }
 
 int

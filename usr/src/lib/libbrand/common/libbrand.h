@@ -58,6 +58,8 @@ extern int brand_get_halt(brand_handle_t, const char *, const char *,
 extern int brand_get_initname(brand_handle_t, char *, size_t);
 extern int brand_get_install(brand_handle_t, const char *, const char *,
     char *, size_t, int, char **);
+extern int brand_get_postinstall(brand_handle_t, const char *, const char *,
+    char *, size_t, int, char **);
 extern int brand_get_installopts(brand_handle_t, char *, size_t);
 extern int brand_get_login_cmd(brand_handle_t, const char *, char *, size_t);
 extern int brand_get_modname(brand_handle_t, char *, size_t);

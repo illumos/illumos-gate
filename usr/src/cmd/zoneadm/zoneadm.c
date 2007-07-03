@@ -3124,12 +3124,14 @@ static int
 install_func(int argc, char *argv[])
 {
 	char cmdbuf[MAXPATHLEN];
+	char postcmdbuf[MAXPATHLEN];
 	int lockfd;
 	int arg, err, subproc_err;
 	char zonepath[MAXPATHLEN];
 	brand_handle_t bh = NULL;
 	int status;
 	boolean_t nodataset = B_FALSE;
+	boolean_t do_postinstall = B_FALSE;
 	char opts[128];
 
 	if (target_zone == NULL) {
@@ -3161,6 +3163,18 @@ install_func(int argc, char *argv[])
 		zerror("invalid brand configuration: missing install resource");
 		brand_close(bh);
 		return (Z_ERR);
+	}
+
+	(void) strcpy(postcmdbuf, EXEC_PREFIX);
+	if (brand_get_postinstall(bh, target_zone, zonepath,
+	    postcmdbuf + EXEC_LEN, sizeof (postcmdbuf) - EXEC_LEN, 0, NULL)
+	    != 0) {
+		zerror("invalid brand configuration: missing postinstall "
+		    "resource");
+		brand_close(bh);
+		return (Z_ERR);
+	} else if (strlen(postcmdbuf) > EXEC_LEN) {
+		do_postinstall = B_TRUE;
 	}
 
 	(void) strcpy(opts, "?x:");
@@ -3201,11 +3215,16 @@ install_func(int argc, char *argv[])
 			/*
 			 * This option isn't for zoneadm, so append it to
 			 * the command line passed to the brand-specific
-			 * install routine.
+			 * install and postinstall routines.
 			 */
 			if (addopt(cmdbuf, optopt, optarg,
 			    sizeof (cmdbuf)) != Z_OK) {
 				zerror("Install command line too long");
+				return (Z_ERR);
+			}
+			if (addopt(postcmdbuf, optopt, optarg,
+			    sizeof (postcmdbuf)) != Z_OK) {
+				zerror("Post-Install command line too long");
 				return (Z_ERR);
 			}
 			break;
@@ -3217,6 +3236,11 @@ install_func(int argc, char *argv[])
 			if (addopt(cmdbuf, 0, argv[optind],
 			    sizeof (cmdbuf)) != Z_OK) {
 				zerror("Install command line too long");
+				return (Z_ERR);
+			}
+			if (addopt(postcmdbuf, 0, argv[optind],
+			    sizeof (postcmdbuf)) != Z_OK) {
+				zerror("Post-Install command line too long");
 				return (Z_ERR);
 			}
 		}
@@ -3280,6 +3304,18 @@ install_func(int argc, char *argv[])
 		errno = err;
 		zperror2(target_zone, gettext("could not set state"));
 		goto done;
+	}
+
+	if (do_postinstall) {
+		status = do_subproc(postcmdbuf);
+
+		if ((subproc_err =
+		    subproc_status(gettext("brand-specific post-install"),
+		    status, B_FALSE)) != ZONE_SUBPROC_OK) {
+			err = Z_ERR;
+			(void) zone_set_state(target_zone,
+			    ZONE_STATE_INCOMPLETE);
+		}
 	}
 
 done:
