@@ -196,12 +196,12 @@ bge_cfg_set8(bge_t *bgep, bge_regno_t regno, uint8_t bits)
 	uint8_t regval;
 
 	BGE_TRACE(("bge_cfg_set8($%p, 0x%lx, 0x%x)",
-		(void *)bgep, regno, bits));
+	    (void *)bgep, regno, bits));
 
 	regval = pci_config_get8(bgep->cfg_handle, regno);
 
 	BGE_DEBUG(("bge_cfg_set8($%p, 0x%lx, 0x%x): 0x%x => 0x%x",
-		(void *)bgep, regno, bits, regval, regval | bits));
+	    (void *)bgep, regno, bits, regval, regval | bits));
 
 	regval |= bits;
 	pci_config_put8(bgep->cfg_handle, regno, regval);
@@ -216,12 +216,12 @@ bge_cfg_clr8(bge_t *bgep, bge_regno_t regno, uint8_t bits)
 	uint8_t regval;
 
 	BGE_TRACE(("bge_cfg_clr8($%p, 0x%lx, 0x%x)",
-		(void *)bgep, regno, bits));
+	    (void *)bgep, regno, bits));
 
 	regval = pci_config_get8(bgep->cfg_handle, regno);
 
 	BGE_DEBUG(("bge_cfg_clr8($%p, 0x%lx, 0x%x): 0x%x => 0x%x",
-		(void *)bgep, regno, bits, regval, regval & ~bits));
+	    (void *)bgep, regno, bits, regval, regval & ~bits));
 
 	regval &= ~bits;
 	pci_config_put8(bgep->cfg_handle, regno, regval);
@@ -236,12 +236,12 @@ bge_cfg_set16(bge_t *bgep, bge_regno_t regno, uint16_t bits)
 	uint16_t regval;
 
 	BGE_TRACE(("bge_cfg_set16($%p, 0x%lx, 0x%x)",
-		(void *)bgep, regno, bits));
+	    (void *)bgep, regno, bits));
 
 	regval = pci_config_get16(bgep->cfg_handle, regno);
 
 	BGE_DEBUG(("bge_cfg_set16($%p, 0x%lx, 0x%x): 0x%x => 0x%x",
-		(void *)bgep, regno, bits, regval, regval | bits));
+	    (void *)bgep, regno, bits, regval, regval | bits));
 
 	regval |= bits;
 	pci_config_put16(bgep->cfg_handle, regno, regval);
@@ -256,12 +256,12 @@ bge_cfg_clr16(bge_t *bgep, bge_regno_t regno, uint16_t bits)
 	uint16_t regval;
 
 	BGE_TRACE(("bge_cfg_clr16($%p, 0x%lx, 0x%x)",
-		(void *)bgep, regno, bits));
+	    (void *)bgep, regno, bits));
 
 	regval = pci_config_get16(bgep->cfg_handle, regno);
 
 	BGE_DEBUG(("bge_cfg_clr16($%p, 0x%lx, 0x%x): 0x%x => 0x%x",
-		(void *)bgep, regno, bits, regval, regval & ~bits));
+	    (void *)bgep, regno, bits, regval, regval & ~bits));
 
 	regval &= ~bits;
 	pci_config_put16(bgep->cfg_handle, regno, regval);
@@ -278,12 +278,12 @@ bge_cfg_set32(bge_t *bgep, bge_regno_t regno, uint32_t bits)
 	uint32_t regval;
 
 	BGE_TRACE(("bge_cfg_set32($%p, 0x%lx, 0x%x)",
-		(void *)bgep, regno, bits));
+	    (void *)bgep, regno, bits));
 
 	regval = pci_config_get32(bgep->cfg_handle, regno);
 
 	BGE_DEBUG(("bge_cfg_set32($%p, 0x%lx, 0x%x): 0x%x => 0x%x",
-		(void *)bgep, regno, bits, regval, regval | bits));
+	    (void *)bgep, regno, bits, regval, regval | bits));
 
 	regval |= bits;
 	pci_config_put32(bgep->cfg_handle, regno, regval);
@@ -298,12 +298,12 @@ bge_cfg_clr32(bge_t *bgep, bge_regno_t regno, uint32_t bits)
 	uint32_t regval;
 
 	BGE_TRACE(("bge_cfg_clr32($%p, 0x%lx, 0x%x)",
-		(void *)bgep, regno, bits));
+	    (void *)bgep, regno, bits));
 
 	regval = pci_config_get32(bgep->cfg_handle, regno);
 
 	BGE_DEBUG(("bge_cfg_clr32($%p, 0x%lx, 0x%x): 0x%x => 0x%x",
-		(void *)bgep, regno, bits, regval, regval & ~bits));
+	    (void *)bgep, regno, bits, regval, regval & ~bits));
 
 	regval &= ~bits;
 	pci_config_put32(bgep->cfg_handle, regno, regval);
@@ -339,7 +339,7 @@ bge_ind_get32(bge_t *bgep, bge_regno_t regno)
 	val = pci_config_get32(bgep->cfg_handle, PCI_CONF_BGE_RIADR);
 
 	BGE_DEBUG(("bge_ind_get32($%p, 0x%lx) => 0x%x",
-		(void *)bgep, regno, val));
+	    (void *)bgep, regno, val));
 
 	val = LE_32(val);
 
@@ -353,7 +353,7 @@ void
 bge_ind_put32(bge_t *bgep, bge_regno_t regno, uint32_t val)
 {
 	BGE_TRACE(("bge_ind_put32($%p, 0x%lx, 0x%x)",
-		(void *)bgep, regno, val));
+	    (void *)bgep, regno, val));
 
 	val = LE_32(val);
 	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_RIAAR, regno);
@@ -375,7 +375,7 @@ bge_pci_check(bge_t *bgep)
 	pcistatus = pci_config_get16(bgep->cfg_handle, PCI_CONF_STAT);
 	if ((pcistatus & (PCI_STAT_R_MAST_AB | PCI_STAT_R_TARG_AB)) != 0)
 		BGE_DEBUG(("bge_pci_check($%p): PCI status 0x%x",
-			(void *)bgep, pcistatus));
+		    (void *)bgep, pcistatus));
 }
 
 #endif	/* BGE_DEBUGGING */
@@ -416,7 +416,7 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	int i;
 
 	BGE_TRACE(("bge_chip_cfg_init($%p, $%p, %d)",
-		(void *)bgep, (void *)cidp, enable_dma));
+	    (void *)bgep, (void *)cidp, enable_dma));
 
 	/*
 	 * Step 3: save PCI cache line size and subsystem vendor ID
@@ -453,16 +453,16 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	cidp->latency = pci_config_get8(handle, PCI_CONF_LATENCY_TIMER);
 
 	BGE_DEBUG(("bge_chip_cfg_init: %s bus is %s and %s; #INTA is %s",
-		cidp->businfo & PCISTATE_BUS_IS_PCI ? "PCI" : "PCI-X",
-		cidp->businfo & PCISTATE_BUS_IS_FAST ? "fast" : "slow",
-		cidp->businfo & PCISTATE_BUS_IS_32_BIT ? "narrow" : "wide",
-		cidp->businfo & PCISTATE_INTA_STATE ? "high" : "low"));
+	    cidp->businfo & PCISTATE_BUS_IS_PCI ? "PCI" : "PCI-X",
+	    cidp->businfo & PCISTATE_BUS_IS_FAST ? "fast" : "slow",
+	    cidp->businfo & PCISTATE_BUS_IS_32_BIT ? "narrow" : "wide",
+	    cidp->businfo & PCISTATE_INTA_STATE ? "high" : "low"));
 	BGE_DEBUG(("bge_chip_cfg_init: vendor 0x%x device 0x%x revision 0x%x",
-		cidp->vendor, cidp->device, cidp->revision));
+	    cidp->vendor, cidp->device, cidp->revision));
 	BGE_DEBUG(("bge_chip_cfg_init: subven 0x%x subdev 0x%x asic_rev 0x%x",
-		cidp->subven, cidp->subdev, cidp->asic_rev));
+	    cidp->subven, cidp->subdev, cidp->asic_rev));
 	BGE_DEBUG(("bge_chip_cfg_init: clsize %d latency %d command 0x%x",
-		cidp->clsize, cidp->latency, cidp->command));
+	    cidp->clsize, cidp->latency, cidp->command));
 
 	/*
 	 * Step 2 (also step 6): disable and clear interrupts.
@@ -524,9 +524,9 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	 * its interrupt if not.
 	 */
 	mhcr =	MHCR_ENABLE_INDIRECT_ACCESS |
-		MHCR_ENABLE_TAGGED_STATUS_MODE |
-		MHCR_MASK_INTERRUPT_MODE |
-		MHCR_CLEAR_INTERRUPT_INTA;
+	    MHCR_ENABLE_TAGGED_STATUS_MODE |
+	    MHCR_MASK_INTERRUPT_MODE |
+	    MHCR_CLEAR_INTERRUPT_INTA;
 
 	if (bgep->intr_type == DDI_INTR_TYPE_FIXED)
 		mhcr |= MHCR_MASK_PCI_INT_OUTPUT;
@@ -592,7 +592,7 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	 * BCM5715C
 	 */
 	if (!((cidp->device == DEVICE_ID_5714C) ||
-		(cidp->device == DEVICE_ID_5715C))) {
+	    (cidp->device == DEVICE_ID_5715C))) {
 		/*
 		 * Make sure these indirect-access registers are sane
 		 * rather than random after power-up or reset
@@ -607,7 +607,7 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 
 	if (cidp->pci_type == BGE_PCI_E)
 		bge_cfg_clr16(bgep, PCI_CONF_DEV_CTRL,
-				DEV_CTRL_NO_SNOOP | DEV_CTRL_RELAXED);
+		    DEV_CTRL_NO_SNOOP | DEV_CTRL_RELAXED);
 }
 
 #ifdef __amd64
@@ -641,7 +641,7 @@ uint32_t
 bge_reg_get32(bge_t *bgep, bge_regno_t regno)
 {
 	BGE_TRACE(("bge_reg_get32($%p, 0x%lx)",
-		(void *)bgep, regno));
+	    (void *)bgep, regno));
 
 	return (ddi_get32(bgep->io_handle, PIO_ADDR(bgep, regno)));
 }
@@ -653,7 +653,7 @@ void
 bge_reg_put32(bge_t *bgep, bge_regno_t regno, uint32_t data)
 {
 	BGE_TRACE(("bge_reg_put32($%p, 0x%lx, 0x%x)",
-		(void *)bgep, regno, data));
+	    (void *)bgep, regno, data));
 
 	ddi_put32(bgep->io_handle, PIO_ADDR(bgep, regno), data);
 	BGE_PCICHK(bgep);
@@ -668,7 +668,7 @@ bge_reg_set32(bge_t *bgep, bge_regno_t regno, uint32_t bits)
 	uint32_t regval;
 
 	BGE_TRACE(("bge_reg_set32($%p, 0x%lx, 0x%x)",
-		(void *)bgep, regno, bits));
+	    (void *)bgep, regno, bits));
 
 	regval = bge_reg_get32(bgep, regno);
 	regval |= bits;
@@ -684,7 +684,7 @@ bge_reg_clr32(bge_t *bgep, bge_regno_t regno, uint32_t bits)
 	uint32_t regval;
 
 	BGE_TRACE(("bge_reg_clr32($%p, 0x%lx, 0x%x)",
-		(void *)bgep, regno, bits));
+	    (void *)bgep, regno, bits));
 
 	regval = bge_reg_get32(bgep, regno);
 	regval &= ~bits;
@@ -716,7 +716,7 @@ bge_reg_get64(bge_t *bgep, bge_regno_t regno)
 #endif	/* _LITTLE_ENDIAN */
 
 	BGE_TRACE(("bge_reg_get64($%p, 0x%lx) = 0x%016llx",
-		(void *)bgep, regno, regval));
+	    (void *)bgep, regno, regval));
 
 	return (regval);
 }
@@ -728,7 +728,7 @@ static void
 bge_reg_put64(bge_t *bgep, bge_regno_t regno, uint64_t data)
 {
 	BGE_TRACE(("bge_reg_put64($%p, 0x%lx, 0x%016llx)",
-		(void *)bgep, regno, data));
+	    (void *)bgep, regno, data));
 
 #ifdef	_LITTLE_ENDIAN
 	data = ((data >> 32) | (data << 32));
@@ -737,10 +737,10 @@ bge_reg_put64(bge_t *bgep, bge_regno_t regno, uint64_t data)
 #ifdef	__amd64
 	if (bge_get_em64t_type()) {
 		ddi_put32(bgep->io_handle,
-			PIO_ADDR(bgep, regno), (uint32_t)data);
+		    PIO_ADDR(bgep, regno), (uint32_t)data);
 		BGE_PCICHK(bgep);
 		ddi_put32(bgep->io_handle,
-			PIO_ADDR(bgep, regno + 4), (uint32_t)(data >> 32));
+		    PIO_ADDR(bgep, regno + 4), (uint32_t)(data >> 32));
 
 	} else {
 		ddi_put64(bgep->io_handle, PIO_ADDR(bgep, regno), data);
@@ -765,8 +765,8 @@ bge_reg_putrcb(bge_t *bgep, bge_regno_t addr, bge_rcb_t *rcbp)
 	uint64_t *p;
 
 	BGE_TRACE(("bge_reg_putrcb($%p, 0x%lx, 0x%016llx:%04x:%04x:%08x)",
-		(void *)bgep, addr, rcbp->host_ring_addr,
-		rcbp->max_len, rcbp->flags, rcbp->nic_ring_addr));
+	    (void *)bgep, addr, rcbp->host_ring_addr,
+	    rcbp->max_len, rcbp->flags, rcbp->nic_ring_addr));
 
 	ASSERT((addr % sizeof (*rcbp)) == 0);
 
@@ -782,7 +782,7 @@ void
 bge_mbx_put(bge_t *bgep, bge_regno_t regno, uint64_t data)
 {
 	BGE_TRACE(("bge_mbx_put($%p, 0x%lx, 0x%016llx)",
-		(void *)bgep, regno, data));
+	    (void *)bgep, regno, data));
 
 	/*
 	 * Mailbox registers are nominally 64 bits on the 5701, but
@@ -808,9 +808,9 @@ void
 bge_led_mark(bge_t *bgep)
 {
 	uint32_t led_ctrl = LED_CONTROL_OVERRIDE_LINK |
-			    LED_CONTROL_1000MBPS_LED |
-			    LED_CONTROL_100MBPS_LED |
-			    LED_CONTROL_10MBPS_LED;
+	    LED_CONTROL_1000MBPS_LED |
+	    LED_CONTROL_100MBPS_LED |
+	    LED_CONTROL_10MBPS_LED;
 
 	/*
 	 * Blink all three LINK LEDs on simultaneously, then all off,
@@ -845,7 +845,7 @@ bge_nic_setwin(bge_t *bgep, bge_regno_t base)
 	chip_id_t *cidp;
 
 	BGE_TRACE(("bge_nic_setwin($%p, 0x%lx)",
-		(void *)bgep, base));
+	    (void *)bgep, base));
 
 	ASSERT((base & MWBAR_GRANULE_MASK) == 0);
 
@@ -855,12 +855,12 @@ bge_nic_setwin(bge_t *bgep, bge_regno_t base)
 	 */
 	cidp = &bgep->chipid;
 	if ((cidp->device == DEVICE_ID_5714C) ||
-		(cidp->device == DEVICE_ID_5715C)) {
+	    (cidp->device == DEVICE_ID_5715C)) {
 		if (bgep->lastWriteZeroData && (base == (bge_regno_t)0))
 			return;
 		/* Adjust lastWriteZeroData */
 		bgep->lastWriteZeroData = ((base == (bge_regno_t)0) ?
-			B_TRUE : B_FALSE);
+		    B_TRUE : B_FALSE);
 	}
 	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MWBAR, base);
 }
@@ -894,7 +894,7 @@ bge_nic_get32(bge_t *bgep, bge_regno_t addr)
 #endif
 
 	BGE_TRACE(("bge_nic_get32($%p, 0x%lx) = 0x%08x",
-		(void *)bgep, addr, data));
+	    (void *)bgep, addr, data));
 
 	return (data);
 }
@@ -906,7 +906,7 @@ void
 bge_nic_put32(bge_t *bgep, bge_regno_t addr, uint32_t data)
 {
 	BGE_TRACE(("bge_nic_put32($%p, 0x%lx, 0x%08x)",
-		(void *)bgep, addr, data));
+	    (void *)bgep, addr, data));
 
 #if defined(BGE_IPMI_ASF) && !defined(__sparc)
 	if (bgep->asf_enabled && !bgep->asf_wordswapped) {
@@ -949,7 +949,7 @@ bge_nic_get64(bge_t *bgep, bge_regno_t addr)
 			data = ddi_get32(bgep->io_handle, PIO_ADDR(bgep, addr));
 			data <<= 32;
 			data |= ddi_get32(bgep->io_handle,
-				PIO_ADDR(bgep, addr + 4));
+			    PIO_ADDR(bgep, addr + 4));
 		} else {
 			data = ddi_get64(bgep->io_handle, PIO_ADDR(bgep, addr));
 		}
@@ -958,7 +958,7 @@ bge_nic_get64(bge_t *bgep, bge_regno_t addr)
 #endif
 
 	BGE_TRACE(("bge_nic_get64($%p, 0x%lx) = 0x%016llx",
-		(void *)bgep, addr, data));
+	    (void *)bgep, addr, data));
 
 	return (data);
 }
@@ -970,7 +970,7 @@ static void
 bge_nic_put64(bge_t *bgep, bge_regno_t addr, uint64_t data)
 {
 	BGE_TRACE(("bge_nic_put64($%p, 0x%lx, 0x%016llx)",
-		(void *)bgep, addr, data));
+	    (void *)bgep, addr, data));
 
 	bge_nic_setwin(bgep, addr & ~MWBAR_GRANULE_MASK);
 	addr &= MWBAR_GRANULE_MASK;
@@ -979,10 +979,10 @@ bge_nic_put64(bge_t *bgep, bge_regno_t addr, uint64_t data)
 #ifdef	__amd64
 	if (bge_get_em64t_type()) {
 		ddi_put32(bgep->io_handle,
-			PIO_ADDR(bgep, addr), (uint32_t)data);
+		    PIO_ADDR(bgep, addr), (uint32_t)data);
 		BGE_PCICHK(bgep);
 		ddi_put32(bgep->io_handle,
-			PIO_ADDR(bgep, addr + 4), (uint32_t)(data >> 32));
+		    PIO_ADDR(bgep, addr + 4), (uint32_t)(data >> 32));
 	} else {
 		ddi_put64(bgep->io_handle, PIO_ADDR(bgep, addr), data);
 	}
@@ -1006,8 +1006,8 @@ bge_nic_putrcb(bge_t *bgep, bge_regno_t addr, bge_rcb_t *rcbp)
 	uint64_t *p;
 
 	BGE_TRACE(("bge_nic_putrcb($%p, 0x%lx, 0x%016llx:%04x:%04x:%08x)",
-		(void *)bgep, addr, rcbp->host_ring_addr,
-		rcbp->max_len, rcbp->flags, rcbp->nic_ring_addr));
+	    (void *)bgep, addr, rcbp->host_ring_addr,
+	    rcbp->max_len, rcbp->flags, rcbp->nic_ring_addr));
 
 	ASSERT((addr % sizeof (*rcbp)) == 0);
 
@@ -1019,13 +1019,13 @@ bge_nic_putrcb(bge_t *bgep, bge_regno_t addr, bge_rcb_t *rcbp)
 #ifdef	__amd64
 	if (bge_get_em64t_type()) {
 		ddi_put32(bgep->io_handle, PIO_ADDR(bgep, addr),
-			(uint32_t)(*p));
+		    (uint32_t)(*p));
 		ddi_put32(bgep->io_handle, PIO_ADDR(bgep, addr + 4),
-			(uint32_t)(*p >> 32));
+		    (uint32_t)(*p >> 32));
 		ddi_put32(bgep->io_handle, PIO_ADDR(bgep, addr + 8),
-			(uint32_t)(*(p + 1)));
+		    (uint32_t)(*(p + 1)));
 		ddi_put32(bgep->io_handle, PIO_ADDR(bgep, addr + 12),
-			(uint32_t)(*p >> 32));
+		    (uint32_t)(*p >> 32));
 
 	} else {
 		ddi_put64(bgep->io_handle, PIO_ADDR(bgep, addr), *p++);
@@ -1046,17 +1046,17 @@ static void
 bge_nic_zero(bge_t *bgep, bge_regno_t addr, uint32_t nbytes)
 {
 	BGE_TRACE(("bge_nic_zero($%p, 0x%lx, 0x%x)",
-		(void *)bgep, addr, nbytes));
+	    (void *)bgep, addr, nbytes));
 
 	ASSERT((addr & ~MWBAR_GRANULE_MASK) ==
-		((addr+nbytes) & ~MWBAR_GRANULE_MASK));
+	    ((addr+nbytes) & ~MWBAR_GRANULE_MASK));
 
 	bge_nic_setwin(bgep, addr & ~MWBAR_GRANULE_MASK);
 	addr &= MWBAR_GRANULE_MASK;
 	addr += NIC_MEM_WINDOW_OFFSET;
 
 	(void) ddi_device_zero(bgep->io_handle, PIO_ADDR(bgep, addr),
-		nbytes, 1, DDI_DATA_SZ08_ACC);
+	    nbytes, 1, DDI_DATA_SZ08_ACC);
 	BGE_PCICHK(bgep);
 }
 
@@ -1083,7 +1083,7 @@ bge_mii_access(bge_t *bgep, bge_regno_t regno, uint16_t data, uint32_t cmd)
 	uint32_t regval2;
 
 	BGE_TRACE(("bge_mii_access($%p, 0x%lx, 0x%x, 0x%x)",
-		(void *)bgep, regno, data, cmd));
+	    (void *)bgep, regno, data, cmd));
 
 	ASSERT(mutex_owned(bgep->genlock));
 
@@ -1121,8 +1121,8 @@ bge_mii_access(bge_t *bgep, bge_regno_t regno, uint16_t data, uint32_t cmd)
 
 	if (timeout != 100)
 		BGE_REPORT((bgep, "bge_mii_access: cmd 0x%x -- "
-			"MI_COMMS_START set for %d us; 0x%x->0x%x",
-			cmd, 10*(100-timeout), regval1, regval2));
+		    "MI_COMMS_START set for %d us; 0x%x->0x%x",
+		    cmd, 10*(100-timeout), regval1, regval2));
 
 	regval1 = bge_reg_get32(bgep, MI_COMMS_REG);
 	for (timeout = 1000; ; ) {
@@ -1169,8 +1169,8 @@ bge_mii_access(bge_t *bgep, bge_regno_t regno, uint16_t data, uint32_t cmd)
 	 */
 	if (regval2 & MI_COMMS_START) {
 		BGE_REPORT((bgep, "bge_mii_access: cmd 0x%x -- "
-			"MI_COMMS_START set after transaction; 0x%x->0x%x",
-			cmd, regval1, regval2));
+		    "MI_COMMS_START set after transaction; 0x%x->0x%x",
+		    cmd, regval1, regval2));
 		regval2 = regval1;
 	}
 
@@ -1190,7 +1190,7 @@ uint16_t
 bge_mii_get16(bge_t *bgep, bge_regno_t regno)
 {
 	BGE_TRACE(("bge_mii_get16($%p, 0x%lx)",
-		(void *)bgep, regno));
+	    (void *)bgep, regno));
 
 	ASSERT(mutex_owned(bgep->genlock));
 
@@ -1204,7 +1204,7 @@ void
 bge_mii_put16(bge_t *bgep, bge_regno_t regno, uint16_t data)
 {
 	BGE_TRACE(("bge_mii_put16($%p, 0x%lx, 0x%x)",
-		(void *)bgep, regno, data));
+	    (void *)bgep, regno, data));
 
 	ASSERT(mutex_owned(bgep->genlock));
 
@@ -1264,7 +1264,7 @@ bge_seeprom_access(bge_t *bgep, uint32_t cmd, bge_regno_t addr, uint32_t *dp)
 	case BGE_NVTYPE_BUFFERED_FLASH:
 	default:
 		bge_reg_set32(bgep, NVM_CONFIG1_REG,
-				NVM_CFG1_LEGACY_SEEPROM_MODE);
+		    NVM_CFG1_LEGACY_SEEPROM_MODE);
 		break;
 	}
 
@@ -1391,7 +1391,7 @@ bge_flash_access(bge_t *bgep, uint32_t cmd, bge_regno_t addr, uint32_t *dp)
 	case BGE_NVTYPE_BUFFERED_FLASH:
 	default:
 		bge_reg_clr32(bgep, NVM_CONFIG1_REG,
-				NVM_CFG1_LEGACY_SEEPROM_MODE);
+		    NVM_CFG1_LEGACY_SEEPROM_MODE);
 		break;
 	}
 
@@ -1741,7 +1741,7 @@ bge_get_nvmac(bge_t *bgep)
 	uint64_t mac;
 
 	BGE_TRACE(("bge_get_nvmac($%p)",
-		(void *)bgep));
+	    (void *)bgep));
 
 	switch (bgep->chipid.nvtype) {
 	case BGE_NVTYPE_NONE:
@@ -1815,7 +1815,7 @@ bge_nvmem_id(bge_t *bgep)
 	uint32_t config1;
 
 	BGE_TRACE(("bge_nvmem_id($%p)",
-		(void *)bgep));
+	    (void *)bgep));
 
 	switch (bgep->chipid.device) {
 	default:
@@ -2048,6 +2048,23 @@ bge_chip_id_init(bge_t *bgep)
 		dev_ok = B_TRUE;
 		break;
 
+	case DEVICE_ID_5753:
+		cidp->chip_label = 5753;
+		cidp->pci_type = BGE_PCI_E;
+		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_5705;
+		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_5705;
+		cidp->mbuf_hi_water = MBUF_HIWAT_5705;
+		cidp->mbuf_base = bge_mbuf_pool_base_5705;
+		cidp->mbuf_length = bge_mbuf_pool_len_5705;
+		cidp->recv_slots = BGE_RECV_SLOTS_5705;
+		cidp->bge_mlcr_default |= MLCR_MISC_PINS_OUTPUT_ENABLE_1;
+		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_SEND_RINGS_MAX_5705;
+		cidp->flags |= CHIP_FLAG_NO_JUMBO;
+		cidp->statistic_type = BGE_STAT_REG;
+		dev_ok = B_TRUE;
+		break;
+
 	case DEVICE_ID_5755:
 		cidp->chip_label = 5755;
 		cidp->pci_type = BGE_PCI_E;
@@ -2239,7 +2256,7 @@ bge_chip_id_init(bge_t *bgep)
 	    !(cidp->flags & CHIP_FLAG_NO_JUMBO) &&
 	    (cidp->default_mtu > BGE_DEFAULT_MTU) &&
 	    (cidp->default_mtu <= BGE_MAXIMUM_MTU)) {
-	    if (DEVICE_5714_SERIES_CHIPSETS(bgep)) {
+		if (DEVICE_5714_SERIES_CHIPSETS(bgep)) {
 			cidp->mbuf_lo_water_rdma =
 			    RDMA_MBUF_LOWAT_5714_JUMBO;
 			cidp->mbuf_lo_water_rmac =
@@ -2247,7 +2264,7 @@ bge_chip_id_init(bge_t *bgep)
 			cidp->mbuf_hi_water = MBUF_HIWAT_5714_JUMBO;
 			cidp->jumbo_slots = 0;
 			cidp->std_buf_size = BGE_JUMBO_BUFF_SIZE;
-	    } else {
+		} else {
 			cidp->mbuf_lo_water_rdma =
 			    RDMA_MBUF_LOWAT_JUMBO;
 			cidp->mbuf_lo_water_rmac =
@@ -2282,7 +2299,7 @@ bge_chip_id_init(bge_t *bgep)
 	 * doesn't enforce that.
 	 */
 	err = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, bgep->devinfo,
-		DDI_PROP_DONTPASS, knownids_propname, &ids, &i);
+	    DDI_PROP_DONTPASS, knownids_propname, &ids, &i);
 	if (err == DDI_PROP_SUCCESS) {
 		/*
 		 * Got the list; scan for a matching subsystem vendor/device
@@ -2329,18 +2346,18 @@ bge_chip_id_init(bge_t *bgep)
 	 */
 	if (cidp->chip_label == 0)
 		bge_problem(bgep,
-			"Device 'pci%04x,%04x' not recognized (%d?)",
-			cidp->vendor, cidp->device, cidp->device);
+		    "Device 'pci%04x,%04x' not recognized (%d?)",
+		    cidp->vendor, cidp->device, cidp->device);
 	else if (!dev_ok)
 		bge_problem(bgep,
-			"Device 'pci%04x,%04x' (%d) revision %d not supported",
-			cidp->vendor, cidp->device, cidp->chip_label,
-			cidp->revision);
+		    "Device 'pci%04x,%04x' (%d) revision %d not supported",
+		    cidp->vendor, cidp->device, cidp->chip_label,
+		    cidp->revision);
 #if	BGE_DEBUGGING
 	else if (!sys_ok)
 		bge_problem(bgep,
-			"%d-based subsystem 'pci%04x,%04x' not validated",
-			cidp->chip_label, cidp->subven, cidp->subdev);
+		    "%d-based subsystem 'pci%04x,%04x' not validated",
+		    cidp->chip_label, cidp->subven, cidp->subdev);
 #endif
 	else
 		cidp->flags |= CHIP_FLAG_SUPPORTED;
@@ -2391,7 +2408,7 @@ bge_chip_poll_engine(bge_t *bgep, bge_regno_t regno,
 	uint32_t n;
 
 	BGE_TRACE(("bge_chip_poll_engine($%p, 0x%lx, 0x%x, 0x%x)",
-		(void *)bgep, regno, mask, val));
+	    (void *)bgep, regno, mask, val));
 
 	for (n = 200; n; --n) {
 		regval = bge_reg_get32(bgep, regno);
@@ -2432,9 +2449,9 @@ bge_chip_reset_engine(bge_t *bgep, bge_regno_t regno)
 	regval = bge_reg_get32(bgep, regno);
 
 	BGE_TRACE(("bge_chip_reset_engine($%p, 0x%lx)",
-		(void *)bgep, regno));
+	    (void *)bgep, regno));
 	BGE_DEBUG(("bge_chip_reset_engine: 0x%lx before reset = 0x%08x",
-		regno, regval));
+	    regno, regval));
 
 	regval |= STATE_MACHINE_RESET_BIT;
 
@@ -2473,7 +2490,7 @@ bge_chip_reset_engine(bge_t *bgep, bge_regno_t regno)
 					    PCI_CONF_BGE_CLKCTL, val32);
 				}
 				bge_reg_set32(bgep, regno,
-					MISC_CONFIG_GRC_RESET_DISABLE);
+				    MISC_CONFIG_GRC_RESET_DISABLE);
 				regval |= MISC_CONFIG_GRC_RESET_DISABLE;
 			}
 		}
@@ -2509,9 +2526,9 @@ bge_chip_reset_engine(bge_t *bgep, bge_regno_t regno)
 			    (bgep->chipid.chip_label == 5752) ||
 			    (bgep->chipid.chip_label == 5789)) {
 				pci_config_put16(bgep->cfg_handle,
-					PCI_CONF_DEV_CTRL, READ_REQ_SIZE_MAX);
+				    PCI_CONF_DEV_CTRL, READ_REQ_SIZE_MAX);
 				pci_config_put16(bgep->cfg_handle,
-					PCI_CONF_DEV_STUS, DEVICE_ERROR_STUS);
+				    PCI_CONF_DEV_STUS, DEVICE_ERROR_STUS);
 			}
 		}
 
@@ -2545,7 +2562,7 @@ bge_chip_disable_engine(bge_t *bgep, bge_regno_t regno, uint32_t morebits)
 	uint32_t regval;
 
 	BGE_TRACE(("bge_chip_disable_engine($%p, 0x%lx, 0x%x)",
-		(void *)bgep, regno, morebits));
+	    (void *)bgep, regno, morebits));
 
 	switch (regno) {
 	case FTQ_RESET_REG:
@@ -2598,7 +2615,7 @@ bge_chip_enable_engine(bge_t *bgep, bge_regno_t regno, uint32_t morebits)
 	uint32_t regval;
 
 	BGE_TRACE(("bge_chip_enable_engine($%p, 0x%lx, 0x%x)",
-		(void *)bgep, regno, morebits));
+	    (void *)bgep, regno, morebits));
 
 	switch (regno) {
 	case FTQ_RESET_REG:
@@ -2648,13 +2665,13 @@ bge_sync_mac_modes(bge_t *bgep)
 	 */
 	macmode = regval = bge_reg_get32(bgep, ETHERNET_MAC_MODE_REG);
 	if ((bgep->chipid.flags & CHIP_FLAG_SERDES) &&
-		(bgep->param_loop_mode != BGE_LOOP_INTERNAL_MAC))
+	    (bgep->param_loop_mode != BGE_LOOP_INTERNAL_MAC))
 		macmode &= ~ETHERNET_MODE_LINK_POLARITY;
 	else
 		macmode |= ETHERNET_MODE_LINK_POLARITY;
 	macmode &= ~ETHERNET_MODE_PORTMODE_MASK;
 	if ((bgep->chipid.flags & CHIP_FLAG_SERDES) &&
-		(bgep->param_loop_mode != BGE_LOOP_INTERNAL_MAC))
+	    (bgep->param_loop_mode != BGE_LOOP_INTERNAL_MAC))
 		macmode |= ETHERNET_MODE_PORTMODE_TBI;
 	else if (bgep->param_link_speed == 10 || bgep->param_link_speed == 100)
 		macmode |= ETHERNET_MODE_PORTMODE_MII;
@@ -2670,7 +2687,7 @@ bge_sync_mac_modes(bge_t *bgep)
 		macmode &= ~ETHERNET_MODE_MAC_LOOPBACK;
 	bge_reg_put32(bgep, ETHERNET_MAC_MODE_REG, macmode);
 	BGE_DEBUG(("bge_sync_mac_modes($%p) Ethernet MAC mode 0x%x => 0x%x",
-		(void *)bgep, regval, macmode));
+	    (void *)bgep, regval, macmode));
 
 	/*
 	 * ... the Transmit MAC mode ...
@@ -2682,7 +2699,7 @@ bge_sync_mac_modes(bge_t *bgep)
 		macmode &= ~TRANSMIT_MODE_FLOW_CONTROL;
 	bge_reg_put32(bgep, TRANSMIT_MAC_MODE_REG, macmode);
 	BGE_DEBUG(("bge_sync_mac_modes($%p) Transmit MAC mode 0x%x => 0x%x",
-		(void *)bgep, regval, macmode));
+	    (void *)bgep, regval, macmode));
 
 	/*
 	 * ... and the Receive MAC mode
@@ -2694,7 +2711,7 @@ bge_sync_mac_modes(bge_t *bgep)
 		macmode &= ~RECEIVE_MODE_FLOW_CONTROL;
 	bge_reg_put32(bgep, RECEIVE_MAC_MODE_REG, macmode);
 	BGE_DEBUG(("bge_sync_mac_modes($%p) Receive MAC mode 0x%x => 0x%x",
-		(void *)bgep, regval, macmode));
+	    (void *)bgep, regval, macmode));
 }
 
 /*
@@ -2890,7 +2907,7 @@ bge_chip_stop(bge_t *bgep, boolean_t fault)
 	boolean_t ok;
 
 	BGE_TRACE(("bge_chip_stop($%p)",
-		(void *)bgep));
+	    (void *)bgep));
 
 	ASSERT(mutex_owned(bgep->genlock));
 
@@ -2902,14 +2919,14 @@ bge_chip_stop(bge_t *bgep, boolean_t fault)
 	 */
 	for (ok = B_TRUE; (regno = *rbp) != BGE_REGNO_NONE; ++rbp) {
 			if (DEVICE_5704_SERIES_CHIPSETS(bgep))
-			    ok &= bge_chip_disable_engine(bgep, regno, 0);
+				ok &= bge_chip_disable_engine(bgep, regno, 0);
 			else if ((regno != RCV_LIST_SELECTOR_MODE_REG) &&
-				    (regno != DMA_COMPLETION_MODE_REG) &&
-				    (regno != MBUF_CLUSTER_FREE_MODE_REG)&&
-				    (regno != BUFFER_MANAGER_MODE_REG) &&
-				    (regno != MEMORY_ARBITER_MODE_REG))
-					ok &= bge_chip_disable_engine(bgep,
-					    regno, 0);
+			    (regno != DMA_COMPLETION_MODE_REG) &&
+			    (regno != MBUF_CLUSTER_FREE_MODE_REG)&&
+			    (regno != BUFFER_MANAGER_MODE_REG) &&
+			    (regno != MEMORY_ARBITER_MODE_REG))
+				ok &= bge_chip_disable_engine(bgep,
+				    regno, 0);
 	}
 
 	if (!ok && !fault)
@@ -3015,9 +3032,9 @@ bge_poll_firmware(bge_t *bgep)
 
 	magic = bge_nic_get64(bgep, NIC_MEM_GENCOMM);
 	BGE_DEBUG(("bge_poll_firmware($%p): PXE magic 0x%x after %d loops",
-		(void *)bgep, gen, i));
+	    (void *)bgep, gen, i));
 	BGE_DEBUG(("bge_poll_firmware: MAC %016llx, GENCOMM %016llx",
-		mac, magic));
+	    mac, magic));
 
 	return (mac);
 }
@@ -3372,7 +3389,7 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	int retval = DDI_SUCCESS;
 
 	BGE_TRACE(("bge_chip_start($%p)",
-		(void *)bgep));
+	    (void *)bgep));
 
 	ASSERT(mutex_owned(bgep->genlock));
 	ASSERT(bgep->bge_chip_state == BGE_CHIP_RESET);
@@ -3401,7 +3418,7 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * Step 24: set DMA read/write control register
 	 */
 	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_PDRWCR,
-		bgep->chipid.bge_dma_rwctrl);
+	    bgep->chipid.bge_dma_rwctrl);
 
 	/*
 	 * Step 25: Configure DMA endianness -- already done (16/17)
@@ -3409,8 +3426,8 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * Step 27: Indicate Host Stack Up
 	 */
 	bge_reg_set32(bgep, MODE_CONTROL_REG,
-		MODE_HOST_SEND_BDS |
-		MODE_HOST_STACK_UP);
+	    MODE_HOST_SEND_BDS |
+	    MODE_HOST_STACK_UP);
 
 	/*
 	 * Step 28: Configure checksum options:
@@ -3439,26 +3456,26 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * when the chipsets is 5705/5788/5721/5751/5714 and 5715.
 	 */
 	if ((bgep->chipid.mbuf_length != 0) &&
-		(DEVICE_5704_SERIES_CHIPSETS(bgep))) {
+	    (DEVICE_5704_SERIES_CHIPSETS(bgep))) {
 			bge_reg_put32(bgep, MBUF_POOL_BASE_REG,
-				bgep->chipid.mbuf_base);
+			    bgep->chipid.mbuf_base);
 			bge_reg_put32(bgep, MBUF_POOL_LENGTH_REG,
-				bgep->chipid.mbuf_length);
+			    bgep->chipid.mbuf_length);
 			bge_reg_put32(bgep, DMAD_POOL_BASE_REG,
-				DMAD_POOL_BASE_DEFAULT);
+			    DMAD_POOL_BASE_DEFAULT);
 			bge_reg_put32(bgep, DMAD_POOL_LENGTH_REG,
-				DMAD_POOL_LENGTH_DEFAULT);
+			    DMAD_POOL_LENGTH_DEFAULT);
 	}
 
 	/*
 	 * Step 32: configure MAC memory pool watermarks
 	 */
 	bge_reg_put32(bgep, RDMA_MBUF_LOWAT_REG,
-		bgep->chipid.mbuf_lo_water_rdma);
+	    bgep->chipid.mbuf_lo_water_rdma);
 	bge_reg_put32(bgep, MAC_RX_MBUF_LOWAT_REG,
-		bgep->chipid.mbuf_lo_water_rmac);
+	    bgep->chipid.mbuf_lo_water_rmac);
 	bge_reg_put32(bgep, MBUF_HIWAT_REG,
-		bgep->chipid.mbuf_hi_water);
+	    bgep->chipid.mbuf_hi_water);
 
 	/*
 	 * Step 33: configure DMA resource watermarks
@@ -3484,12 +3501,12 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * Steps 37-39: initialise Receive Buffer (Producer) RCBs
 	 */
 	bge_reg_putrcb(bgep, STD_RCV_BD_RING_RCB_REG,
-		&bgep->buff[BGE_STD_BUFF_RING].hw_rcb);
+	    &bgep->buff[BGE_STD_BUFF_RING].hw_rcb);
 	if (DEVICE_5704_SERIES_CHIPSETS(bgep)) {
 		bge_reg_putrcb(bgep, JUMBO_RCV_BD_RING_RCB_REG,
-			&bgep->buff[BGE_JUMBO_BUFF_RING].hw_rcb);
+		    &bgep->buff[BGE_JUMBO_BUFF_RING].hw_rcb);
 		bge_reg_putrcb(bgep, MINI_RCV_BD_RING_RCB_REG,
-			&bgep->buff[BGE_MINI_BUFF_RING].hw_rcb);
+		    &bgep->buff[BGE_MINI_BUFF_RING].hw_rcb);
 	}
 
 	/*
@@ -3515,7 +3532,7 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 		bge_mbx_put(bgep, SEND_RING_HOST_INDEX_REG(ring), 0);
 		bge_mbx_put(bgep, SEND_RING_NIC_INDEX_REG(ring), 0);
 		bge_nic_putrcb(bgep, NIC_MEM_SEND_RING(ring),
-			&bgep->send[ring].hw_rcb);
+		    &bgep->send[ring].hw_rcb);
 	}
 
 	/*
@@ -3528,7 +3545,7 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 		maxring = BGE_RECV_RINGS_MAX_5705;
 	for (ring = 0; ring < maxring; ++ring)
 		bge_nic_putrcb(bgep, NIC_MEM_RECV_RING(ring),
-			&bgep->recv[ring].hw_rcb);
+		    &bgep->recv[ring].hw_rcb);
 
 	/*
 	 * Step 46: initialise Receive Buffer (Producer) Ring indexes
@@ -3571,7 +3588,7 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * and enable Receive List Placement Statistics
 	 */
 	bge_reg_put32(bgep, RCV_LP_CONFIG_REG,
-		RCV_LP_CONFIG(bgep->chipid.rx_rings));
+	    RCV_LP_CONFIG(bgep->chipid.rx_rings));
 	switch (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev)) {
 	case MHCR_CHIP_ASIC_REV_5700:
 	case MHCR_CHIP_ASIC_REV_5701:
@@ -3634,7 +3651,7 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * Step 65: initialise Statistics Coalescing Tick Counter
 	 */
 	bge_reg_put64(bgep, STATUS_BLOCK_HOST_ADDR_REG,
-		bgep->status_block.cookie.dmac_laddress);
+	    bgep->status_block.cookie.dmac_laddress);
 
 	/*
 	 * Steps 66-67: initialise status block & statistics
@@ -3680,14 +3697,14 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * Step 73: Clear & enable MAC statistics
 	 */
 	bge_reg_set32(bgep, ETHERNET_MAC_MODE_REG,
-		ETHERNET_MODE_ENABLE_FHDE |
-		ETHERNET_MODE_ENABLE_RDE |
-		ETHERNET_MODE_ENABLE_TDE);
+	    ETHERNET_MODE_ENABLE_FHDE |
+	    ETHERNET_MODE_ENABLE_RDE |
+	    ETHERNET_MODE_ENABLE_TDE);
 	bge_reg_set32(bgep, ETHERNET_MAC_MODE_REG,
-		ETHERNET_MODE_ENABLE_TX_STATS |
-		ETHERNET_MODE_ENABLE_RX_STATS |
-		ETHERNET_MODE_CLEAR_TX_STATS |
-		ETHERNET_MODE_CLEAR_RX_STATS);
+	    ETHERNET_MODE_ENABLE_TX_STATS |
+	    ETHERNET_MODE_ENABLE_RX_STATS |
+	    ETHERNET_MODE_CLEAR_TX_STATS |
+	    ETHERNET_MODE_CLEAR_RX_STATS);
 
 	/*
 	 * Step 74: configure the MLCR (Miscellaneous Local Control
@@ -3714,13 +3731,13 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 		if (!bge_chip_enable_engine(bgep, DMA_COMPLETION_MODE_REG, 0))
 			retval = DDI_FAILURE;
 	dma_wrprio = (bge_dma_wrprio << DMA_PRIORITY_SHIFT) |
-				ALL_DMA_ATTN_BITS;
+	    ALL_DMA_ATTN_BITS;
 	if (MHCR_CHIP_ASIC_REV(bgep->chipid.asic_rev) ==
-		MHCR_CHIP_ASIC_REV_5755) {
+	    MHCR_CHIP_ASIC_REV_5755) {
 		dma_wrprio |= DMA_STATUS_TAG_FIX_CQ12384;
 	}
 	if (!bge_chip_enable_engine(bgep, WRITE_DMA_MODE_REG,
-			dma_wrprio))
+	    dma_wrprio))
 		retval = DDI_FAILURE;
 	if (!bge_chip_enable_engine(bgep, READ_DMA_MODE_REG,
 	    (bge_dma_rdprio << DMA_PRIORITY_SHIFT) | ALL_DMA_ATTN_BITS))
@@ -3817,7 +3834,7 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 */
 	for (ring = 0; ring < BGE_BUFF_RINGS_USED; ++ring)
 		bge_mbx_put(bgep, bgep->buff[ring].chip_mbx_reg,
-			bgep->buff[ring].rf_next);
+		    bgep->buff[ring].rf_next);
 
 	/*
 	 * MSI bits:The least significant MSI 16-bit word.
@@ -3834,21 +3851,21 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * and FLOW attention signals.
 	 */
 	bge_reg_set32(bgep, ETHERNET_MAC_EVENT_ENABLE_REG,
-		ETHERNET_EVENT_LINK_INT |
-		ETHERNET_STATUS_PCS_ERROR_INT);
+	    ETHERNET_EVENT_LINK_INT |
+	    ETHERNET_STATUS_PCS_ERROR_INT);
 #ifdef BGE_IPMI_ASF
 	if (bgep->asf_enabled) {
 		bge_reg_set32(bgep, MODE_CONTROL_REG,
-			MODE_INT_ON_FLOW_ATTN |
-			MODE_INT_ON_DMA_ATTN |
-			MODE_HOST_STACK_UP|
-			MODE_INT_ON_MAC_ATTN);
+		    MODE_INT_ON_FLOW_ATTN |
+		    MODE_INT_ON_DMA_ATTN |
+		    MODE_HOST_STACK_UP|
+		    MODE_INT_ON_MAC_ATTN);
 	} else {
 #endif
 		bge_reg_set32(bgep, MODE_CONTROL_REG,
-			MODE_INT_ON_FLOW_ATTN |
-			MODE_INT_ON_DMA_ATTN |
-			MODE_INT_ON_MAC_ATTN);
+		    MODE_INT_ON_FLOW_ATTN |
+		    MODE_INT_ON_DMA_ATTN |
+		    MODE_INT_ON_MAC_ATTN);
 #ifdef BGE_IPMI_ASF
 	}
 #endif
@@ -3891,7 +3908,7 @@ bge_status_sync(bge_t *bgep, uint64_t bits, uint64_t *flags)
 	int retval;
 
 	BGE_TRACE(("bge_status_sync($%p, 0x%llx)",
-		(void *)bgep, bits));
+	    (void *)bgep, bits));
 
 	ASSERT(bgep->bge_guard == BGE_GUARD);
 
@@ -3904,7 +3921,7 @@ bge_status_sync(bge_t *bgep, uint64_t bits, uint64_t *flags)
 	*flags = bge_atomic_clr64(&bsp->flags_n_tag, bits);
 
 	BGE_DEBUG(("bge_status_sync($%p, 0x%llx) returning 0x%llx",
-		(void *)bgep, bits, *flags));
+	    (void *)bgep, bits, *flags));
 
 	return (retval);
 }
@@ -4177,9 +4194,9 @@ bge_factotum_error_handler(bge_t *bgep)
 		txrs = bge_reg_get32(bgep, TX_RISC_STATE_REG);
 
 	BGE_DEBUG(("factotum($%p) flow 0x%x rdma 0x%x wdma 0x%x",
-		(void *)bgep, flow, rdma, wdma));
+	    (void *)bgep, flow, rdma, wdma));
 	BGE_DEBUG(("factotum($%p) tmac 0x%x rmac 0x%x rxrs 0x%08x txrs 0x%08x",
-		(void *)bgep, tmac, rmac, rxrs, txrs));
+	    (void *)bgep, tmac, rmac, rxrs, txrs));
 
 	/*
 	 * For now, just clear all the errors ...
@@ -4550,7 +4567,7 @@ bge_chip_peek_cfg(bge_t *bgep, bge_peekpoke_t *ppd)
 	uint64_t regno;
 
 	BGE_TRACE(("bge_chip_peek_cfg($%p, $%p)",
-		(void *)bgep, (void *)ppd));
+	    (void *)bgep, (void *)ppd));
 
 	regno = ppd->pp_acc_offset;
 
@@ -4585,7 +4602,7 @@ bge_chip_poke_cfg(bge_t *bgep, bge_peekpoke_t *ppd)
 	uint64_t regno;
 
 	BGE_TRACE(("bge_chip_poke_cfg($%p, $%p)",
-		(void *)bgep, (void *)ppd));
+	    (void *)bgep, (void *)ppd));
 
 	regno = ppd->pp_acc_offset;
 	regval = ppd->pp_acc_data;
@@ -4619,7 +4636,7 @@ bge_chip_peek_reg(bge_t *bgep, bge_peekpoke_t *ppd)
 	void *regaddr;
 
 	BGE_TRACE(("bge_chip_peek_reg($%p, $%p)",
-		(void *)bgep, (void *)ppd));
+	    (void *)bgep, (void *)ppd));
 
 	regaddr = PIO_ADDR(bgep, ppd->pp_acc_offset);
 
@@ -4654,7 +4671,7 @@ bge_chip_poke_reg(bge_t *bgep, bge_peekpoke_t *ppd)
 	void *regaddr;
 
 	BGE_TRACE(("bge_chip_poke_reg($%p, $%p)",
-		(void *)bgep, (void *)ppd));
+	    (void *)bgep, (void *)ppd));
 
 	regaddr = PIO_ADDR(bgep, ppd->pp_acc_offset);
 	regval = ppd->pp_acc_data;
@@ -4690,7 +4707,7 @@ bge_chip_peek_nic(bge_t *bgep, bge_peekpoke_t *ppd)
 	void *regaddr;
 
 	BGE_TRACE(("bge_chip_peek_nic($%p, $%p)",
-		(void *)bgep, (void *)ppd));
+	    (void *)bgep, (void *)ppd));
 
 	regoff = ppd->pp_acc_offset;
 	bge_nic_setwin(bgep, regoff & ~MWBAR_GRANULE_MASK);
@@ -4730,7 +4747,7 @@ bge_chip_poke_nic(bge_t *bgep, bge_peekpoke_t *ppd)
 	void *regaddr;
 
 	BGE_TRACE(("bge_chip_poke_nic($%p, $%p)",
-		(void *)bgep, (void *)ppd));
+	    (void *)bgep, (void *)ppd));
 
 	regoff = ppd->pp_acc_offset;
 	bge_nic_setwin(bgep, regoff & ~MWBAR_GRANULE_MASK);
@@ -4766,7 +4783,7 @@ static void
 bge_chip_peek_mii(bge_t *bgep, bge_peekpoke_t *ppd)
 {
 	BGE_TRACE(("bge_chip_peek_mii($%p, $%p)",
-		(void *)bgep, (void *)ppd));
+	    (void *)bgep, (void *)ppd));
 
 	ppd->pp_acc_data = bge_mii_get16(bgep, ppd->pp_acc_offset/2);
 }
@@ -4778,7 +4795,7 @@ static void
 bge_chip_poke_mii(bge_t *bgep, bge_peekpoke_t *ppd)
 {
 	BGE_TRACE(("bge_chip_poke_mii($%p, $%p)",
-		(void *)bgep, (void *)ppd));
+	    (void *)bgep, (void *)ppd));
 
 	bge_mii_put16(bgep, ppd->pp_acc_offset/2, ppd->pp_acc_data);
 }
@@ -4795,7 +4812,7 @@ bge_chip_peek_seeprom(bge_t *bgep, bge_peekpoke_t *ppd)
 	int err;
 
 	BGE_TRACE(("bge_chip_peek_seeprom($%p, $%p)",
-		(void *)bgep, (void *)ppd));
+	    (void *)bgep, (void *)ppd));
 
 	err = bge_nvmem_rw32(bgep, BGE_SEE_READ, ppd->pp_acc_offset, &data);
 	ppd->pp_acc_data = err ? ~0ull : data;
@@ -4810,7 +4827,7 @@ bge_chip_poke_seeprom(bge_t *bgep, bge_peekpoke_t *ppd)
 	uint32_t data;
 
 	BGE_TRACE(("bge_chip_poke_seeprom($%p, $%p)",
-		(void *)bgep, (void *)ppd));
+	    (void *)bgep, (void *)ppd));
 
 	data = ppd->pp_acc_data;
 	(void) bge_nvmem_rw32(bgep, BGE_SEE_WRITE, ppd->pp_acc_offset, &data);
@@ -4829,7 +4846,7 @@ bge_chip_peek_flash(bge_t *bgep, bge_peekpoke_t *ppd)
 	int err;
 
 	BGE_TRACE(("bge_chip_peek_flash($%p, $%p)",
-		(void *)bgep, (void *)ppd));
+	    (void *)bgep, (void *)ppd));
 
 	err = bge_nvmem_rw32(bgep, BGE_FLASH_READ, ppd->pp_acc_offset, &data);
 	ppd->pp_acc_data = err ? ~0ull : data;
@@ -4844,7 +4861,7 @@ bge_chip_poke_flash(bge_t *bgep, bge_peekpoke_t *ppd)
 	uint32_t data;
 
 	BGE_TRACE(("bge_chip_poke_flash($%p, $%p)",
-		(void *)bgep, (void *)ppd));
+	    (void *)bgep, (void *)ppd));
 
 	data = ppd->pp_acc_data;
 	(void) bge_nvmem_rw32(bgep, BGE_FLASH_WRITE,
@@ -4862,7 +4879,7 @@ bge_chip_peek_mem(bge_t *bgep, bge_peekpoke_t *ppd)
 	void *vaddr;
 
 	BGE_TRACE(("bge_chip_peek_bge($%p, $%p)",
-		(void *)bgep, (void *)ppd));
+	    (void *)bgep, (void *)ppd));
 
 	vaddr = (void *)(uintptr_t)ppd->pp_acc_offset;
 
@@ -4885,7 +4902,7 @@ bge_chip_peek_mem(bge_t *bgep, bge_peekpoke_t *ppd)
 	}
 
 	BGE_DEBUG(("bge_chip_peek_mem($%p, $%p) peeked 0x%llx from $%p",
-		(void *)bgep, (void *)ppd, regval, vaddr));
+	    (void *)bgep, (void *)ppd, regval, vaddr));
 
 	ppd->pp_acc_data = regval;
 }
@@ -4900,13 +4917,13 @@ bge_chip_poke_mem(bge_t *bgep, bge_peekpoke_t *ppd)
 	void *vaddr;
 
 	BGE_TRACE(("bge_chip_poke_mem($%p, $%p)",
-		(void *)bgep, (void *)ppd));
+	    (void *)bgep, (void *)ppd));
 
 	vaddr = (void *)(uintptr_t)ppd->pp_acc_offset;
 	regval = ppd->pp_acc_data;
 
 	BGE_DEBUG(("bge_chip_poke_mem($%p, $%p) poking 0x%llx at $%p",
-		(void *)bgep, (void *)ppd, regval, vaddr));
+	    (void *)bgep, (void *)ppd, regval, vaddr));
 
 	switch (ppd->pp_acc_size) {
 	case 1:
@@ -5312,7 +5329,7 @@ bge_chip_ioctl(bge_t *bgep, queue_t *wq, mblk_t *mp, struct iocblk *iocp)
 	int cmd;
 
 	BGE_TRACE(("bge_chip_ioctl($%p, $%p, $%p, $%p)",
-		(void *)bgep, (void *)wq, (void *)mp, (void *)iocp));
+	    (void *)bgep, (void *)wq, (void *)mp, (void *)iocp));
 
 	ASSERT(mutex_owned(bgep->genlock));
 
@@ -5430,7 +5447,7 @@ bge_asf_heartbeat(void *arg)
 		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
 	mutex_exit(bgep->genlock);
 	((bge_t *)bgep)->asf_timeout_id = timeout(bge_asf_heartbeat, bgep,
-		drv_usectohz(BGE_ASF_HEARTBEAT_INTERVAL));
+	    drv_usectohz(BGE_ASF_HEARTBEAT_INTERVAL));
 }
 
 
@@ -5440,7 +5457,7 @@ bge_asf_stop_timer(bge_t *bgep)
 	timeout_id_t tmp_id = 0;
 
 	while ((bgep->asf_timeout_id != 0) &&
-		(tmp_id != bgep->asf_timeout_id)) {
+	    (tmp_id != bgep->asf_timeout_id)) {
 		tmp_id = bgep->asf_timeout_id;
 		(void) untimeout(tmp_id);
 	}
@@ -5498,21 +5515,21 @@ bge_asf_pre_reset_operations(bge_t *bgep, uint32_t mode)
 	}
 
 	bge_nic_put32(bgep, BGE_FIRMWARE_MAILBOX,
-		BGE_MAGIC_NUM_FIRMWARE_INIT_DONE);
+	    BGE_MAGIC_NUM_FIRMWARE_INIT_DONE);
 
 	if (bgep->asf_newhandshake) {
 		switch (mode) {
 		case BGE_INIT_RESET:
 			bge_nic_put32(bgep, BGE_DRV_STATE_MAILBOX,
-				BGE_DRV_STATE_START);
+			    BGE_DRV_STATE_START);
 			break;
 		case BGE_SHUTDOWN_RESET:
 			bge_nic_put32(bgep, BGE_DRV_STATE_MAILBOX,
-				BGE_DRV_STATE_UNLOAD);
+			    BGE_DRV_STATE_UNLOAD);
 			break;
 		case BGE_SUSPEND_RESET:
 			bge_nic_put32(bgep, BGE_DRV_STATE_MAILBOX,
-				BGE_DRV_STATE_SUSPEND);
+			    BGE_DRV_STATE_SUSPEND);
 			break;
 		default:
 			break;
@@ -5527,15 +5544,15 @@ bge_asf_post_reset_old_mode(bge_t *bgep, uint32_t mode)
 	switch (mode) {
 	case BGE_INIT_RESET:
 		bge_nic_put32(bgep, BGE_DRV_STATE_MAILBOX,
-			BGE_DRV_STATE_START);
+		    BGE_DRV_STATE_START);
 		break;
 	case BGE_SHUTDOWN_RESET:
 		bge_nic_put32(bgep, BGE_DRV_STATE_MAILBOX,
-			BGE_DRV_STATE_UNLOAD);
+		    BGE_DRV_STATE_UNLOAD);
 		break;
 	case BGE_SUSPEND_RESET:
 		bge_nic_put32(bgep, BGE_DRV_STATE_MAILBOX,
-			BGE_DRV_STATE_SUSPEND);
+		    BGE_DRV_STATE_SUSPEND);
 		break;
 	default:
 		break;
@@ -5549,11 +5566,11 @@ bge_asf_post_reset_new_mode(bge_t *bgep, uint32_t mode)
 	switch (mode) {
 	case BGE_INIT_RESET:
 		bge_nic_put32(bgep, BGE_DRV_STATE_MAILBOX,
-			BGE_DRV_STATE_START_DONE);
+		    BGE_DRV_STATE_START_DONE);
 		break;
 	case BGE_SHUTDOWN_RESET:
 		bge_nic_put32(bgep, BGE_DRV_STATE_MAILBOX,
-			BGE_DRV_STATE_UNLOAD_DONE);
+		    BGE_DRV_STATE_UNLOAD_DONE);
 		break;
 	default:
 		break;

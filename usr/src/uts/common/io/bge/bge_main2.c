@@ -33,7 +33,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "Broadcom Gb Ethernet v0.57";
+static char bge_ident[] = "Broadcom Gb Ethernet v0.58";
 
 /*
  * Property names
@@ -524,7 +524,7 @@ bge_m_start(void *arg)
 #ifdef BGE_IPMI_ASF
 	if (bgep->asf_enabled) {
 		if ((bgep->asf_status == ASF_STAT_RUN) &&
-			(bgep->asf_pseudostop)) {
+		    (bgep->asf_pseudostop)) {
 
 			bgep->bge_mac_state = BGE_MAC_STARTED;
 			mutex_exit(bgep->genlock);
@@ -566,8 +566,8 @@ bge_m_start(void *arg)
 		if (bgep->asf_status != ASF_STAT_RUN) {
 			/* start ASF heart beat */
 			bgep->asf_timeout_id = timeout(bge_asf_heartbeat,
-				(void *)bgep,
-				drv_usectohz(BGE_ASF_HEARTBEAT_INTERVAL));
+			    (void *)bgep,
+			    drv_usectohz(BGE_ASF_HEARTBEAT_INTERVAL));
 			bgep->asf_status = ASF_STAT_RUN;
 		}
 	}
@@ -599,7 +599,7 @@ bge_unicst_set(void *arg, const uint8_t *macaddr, mac_addr_slot_t slot)
 	bge_t *bgep = arg;		/* private device info	*/
 
 	BGE_TRACE(("bge_m_unicst_set($%p, %s)", arg,
-		ether_sprintf((void *)macaddr)));
+	    ether_sprintf((void *)macaddr)));
 	/*
 	 * Remember the new current address in the driver state
 	 * Sync the chip's idea of the address too ...
@@ -659,8 +659,8 @@ bge_unicst_set(void *arg, const uint8_t *macaddr, mac_addr_slot_t slot)
 		if (bgep->asf_status != ASF_STAT_RUN) {
 			/* start ASF heart beat */
 			bgep->asf_timeout_id = timeout(bge_asf_heartbeat,
-				(void *)bgep,
-				drv_usectohz(BGE_ASF_HEARTBEAT_INTERVAL));
+			    (void *)bgep,
+			    drv_usectohz(BGE_ASF_HEARTBEAT_INTERVAL));
 			bgep->asf_status = ASF_STAT_RUN;
 		}
 	}
@@ -864,7 +864,7 @@ bge_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	uint8_t *refp;
 
 	BGE_TRACE(("bge_m_multicst($%p, %s, %s)", arg,
-		(add) ? "add" : "remove", ether_sprintf((void *)mca)));
+	    (add) ? "add" : "remove", ether_sprintf((void *)mca)));
 
 	/*
 	 * Precalculate all required masks, pointers etc ...
@@ -876,7 +876,7 @@ bge_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	refp = &bgep->mcast_refs[index];
 
 	BGE_DEBUG(("bge_m_multicst: hash 0x%x index %d (%d:0x%x) = %d",
-		hash, index, word, bit, *refp));
+	    hash, index, word, bit, *refp));
 
 	/*
 	 * We must set the appropriate bit in the hash map (and the
@@ -1302,7 +1302,7 @@ bge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 		 * Error, reply with a NAK and EINVAL or the specified error
 		 */
 		miocnak(wq, mp, 0, iocp->ioc_error == 0 ?
-			EINVAL : iocp->ioc_error);
+		    EINVAL : iocp->ioc_error);
 		break;
 
 	case IOC_DONE:
@@ -1325,7 +1325,7 @@ bge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 		 * OK, send prepared reply as ACK or NAK
 		 */
 		mp->b_datap->db_type = iocp->ioc_error == 0 ?
-			M_IOCACK : M_IOCNAK;
+		    M_IOCACK : M_IOCNAK;
 		qreply(wq, mp);
 		break;
 	}
@@ -1377,13 +1377,13 @@ bge_alloc_dma_mem(bge_t *bgep, size_t memsize, ddi_device_acc_attr_t *attr_p,
 	int err;
 
 	BGE_TRACE(("bge_alloc_dma_mem($%p, %ld, $%p, 0x%x, $%p)",
-		(void *)bgep, memsize, attr_p, dma_flags, dma_p));
+	    (void *)bgep, memsize, attr_p, dma_flags, dma_p));
 
 	/*
 	 * Allocate handle
 	 */
 	err = ddi_dma_alloc_handle(bgep->devinfo, &dma_attr,
-		DDI_DMA_DONTWAIT, NULL, &dma_p->dma_hdl);
+	    DDI_DMA_DONTWAIT, NULL, &dma_p->dma_hdl);
 	if (err != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
@@ -1391,8 +1391,8 @@ bge_alloc_dma_mem(bge_t *bgep, size_t memsize, ddi_device_acc_attr_t *attr_p,
 	 * Allocate memory
 	 */
 	err = ddi_dma_mem_alloc(dma_p->dma_hdl, memsize, attr_p,
-		dma_flags, DDI_DMA_DONTWAIT, NULL, &va, &dma_p->alength,
-		&dma_p->acc_hdl);
+	    dma_flags, DDI_DMA_DONTWAIT, NULL, &va, &dma_p->alength,
+	    &dma_p->acc_hdl);
 	if (err != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
@@ -1401,11 +1401,11 @@ bge_alloc_dma_mem(bge_t *bgep, size_t memsize, ddi_device_acc_attr_t *attr_p,
 	 */
 	dma_p->mem_va = va;
 	err = ddi_dma_addr_bind_handle(dma_p->dma_hdl, NULL,
-		va, dma_p->alength, dma_flags, DDI_DMA_DONTWAIT, NULL,
-		&dma_p->cookie, &dma_p->ncookies);
+	    va, dma_p->alength, dma_flags, DDI_DMA_DONTWAIT, NULL,
+	    &dma_p->cookie, &dma_p->ncookies);
 
 	BGE_DEBUG(("bge_alloc_dma_mem(): bind %d bytes; err %d, %d cookies",
-		dma_p->alength, err, dma_p->ncookies));
+	    dma_p->alength, err, dma_p->ncookies));
 
 	if (err != DDI_DMA_MAPPED || dma_p->ncookies != 1)
 		return (DDI_FAILURE);
@@ -1501,7 +1501,7 @@ bge_init_buff_ring(bge_t *bgep, uint64_t ring)
 	};
 
 	BGE_TRACE(("bge_init_buff_ring($%p, %d)",
-		(void *)bgep, ring));
+	    (void *)bgep, ring));
 
 	brp = &bgep->buff[ring];
 	nslots = brp->desc.nslots;
@@ -1557,7 +1557,7 @@ bge_fini_buff_ring(bge_t *bgep, uint64_t ring)
 	sw_rbd_t *srbdp;
 
 	BGE_TRACE(("bge_fini_buff_ring($%p, %d)",
-		(void *)bgep, ring));
+	    (void *)bgep, ring));
 
 	brp = &bgep->buff[ring];
 	srbdp = brp->sw_rbds;
@@ -1580,7 +1580,7 @@ bge_init_recv_ring(bge_t *bgep, uint64_t ring)
 	uint32_t nslots;
 
 	BGE_TRACE(("bge_init_recv_ring($%p, %d)",
-		(void *)bgep, ring));
+	    (void *)bgep, ring));
 
 	/*
 	 * The chip architecture requires that receive return rings have
@@ -1589,7 +1589,7 @@ bge_init_recv_ring(bge_t *bgep, uint64_t ring)
 	rrp = &bgep->recv[ring];
 	nslots = rrp->desc.nslots;
 	ASSERT(nslots == 0 || nslots == 512 ||
-		nslots == 1024 || nslots == 2048);
+	    nslots == 1024 || nslots == 2048);
 
 	/*
 	 * Set up the copy of the h/w RCB
@@ -1620,7 +1620,7 @@ bge_fini_recv_ring(bge_t *bgep, uint64_t ring)
 	recv_ring_t *rrp;
 
 	BGE_TRACE(("bge_fini_recv_ring($%p, %d)",
-		(void *)bgep, ring));
+	    (void *)bgep, ring));
 
 	rrp = &bgep->recv[ring];
 	if (rrp->rx_softint)
@@ -1647,7 +1647,7 @@ bge_init_send_ring(bge_t *bgep, uint64_t ring)
 	sw_txbuf_t *txbuf;
 
 	BGE_TRACE(("bge_init_send_ring($%p, %d)",
-		(void *)bgep, ring));
+	    (void *)bgep, ring));
 
 	/*
 	 * The chip architecture requires that host-based send rings
@@ -1737,7 +1737,7 @@ bge_fini_send_ring(bge_t *bgep, uint64_t ring)
 	uint32_t nslots;
 
 	BGE_TRACE(("bge_fini_send_ring($%p, %d)",
-		(void *)bgep, ring));
+	    (void *)bgep, ring));
 
 	srp = &bgep->send[ring];
 	mutex_destroy(srp->tc_lock);
@@ -1860,8 +1860,8 @@ bge_alloc_txbuf_array(bge_t *bgep, send_ring_t *srp)
 	ASSERT((txbuffsize % BGE_SPLIT) == 0);
 	for (split = 0; split < BGE_SPLIT; ++split) {
 		err = bge_alloc_dma_mem(bgep, txbuffsize/BGE_SPLIT,
-			&bge_data_accattr, DDI_DMA_WRITE | BGE_DMA_MODE,
-			&srp->buf[array][split]);
+		    &bge_data_accattr, DDI_DMA_WRITE | BGE_DMA_MODE,
+		    &srp->buf[array][split]);
 		if (err != DDI_SUCCESS) {
 			/* Free the last already allocated OK chunks */
 			for (slot = 0; slot <= split; ++slot)
@@ -1934,7 +1934,7 @@ bge_alloc_bufs(bge_t *bgep)
 	int err;
 
 	BGE_TRACE(("bge_alloc_bufs($%p)",
-		(void *)bgep));
+	    (void *)bgep));
 
 	rxbuffsize = BGE_STD_SLOTS_USED*bgep->chipid.std_buf_size;
 	rxbuffsize += bgep->chipid.jumbo_slots*bgep->chipid.recv_jumbo_size;
@@ -1969,8 +1969,8 @@ bge_alloc_bufs(bge_t *bgep)
 	ASSERT((rxbuffsize % BGE_SPLIT) == 0);
 	for (split = 0; split < BGE_SPLIT; ++split) {
 		err = bge_alloc_dma_mem(bgep, rxbuffsize/BGE_SPLIT,
-			&bge_data_accattr, DDI_DMA_READ | BGE_DMA_MODE,
-			&bgep->rx_buff[split]);
+		    &bge_data_accattr, DDI_DMA_READ | BGE_DMA_MODE,
+		    &bgep->rx_buff[split]);
 		if (err != DDI_SUCCESS)
 			return (DDI_FAILURE);
 	}
@@ -1981,8 +1981,8 @@ bge_alloc_bufs(bge_t *bgep)
 	ASSERT((txbuffsize % BGE_SPLIT) == 0);
 	for (split = 0; split < BGE_SPLIT; ++split) {
 		err = bge_alloc_dma_mem(bgep, txbuffsize/BGE_SPLIT,
-			&bge_data_accattr, DDI_DMA_WRITE | BGE_DMA_MODE,
-			&bgep->tx_buff[split]);
+		    &bge_data_accattr, DDI_DMA_WRITE | BGE_DMA_MODE,
+		    &bgep->tx_buff[split]);
 		if (err != DDI_SUCCESS)
 			return (DDI_FAILURE);
 	}
@@ -1995,8 +1995,8 @@ bge_alloc_bufs(bge_t *bgep)
 	ASSERT((rxdescsize % rx_rings) == 0);
 	for (split = 0; split < rx_rings; ++split) {
 		err = bge_alloc_dma_mem(bgep, rxdescsize/rx_rings,
-			&bge_desc_accattr, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-			&bgep->rx_desc[split]);
+		    &bge_desc_accattr, DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
+		    &bgep->rx_desc[split]);
 		if (err != DDI_SUCCESS)
 			return (DDI_FAILURE);
 	}
@@ -2005,7 +2005,7 @@ bge_alloc_bufs(bge_t *bgep)
 	 * Allocate memory & handles for buffer (producer) descriptor rings
 	 */
 	err = bge_alloc_dma_mem(bgep, rxbuffdescsize, &bge_desc_accattr,
-		DDI_DMA_RDWR | DDI_DMA_CONSISTENT, &bgep->rx_desc[split]);
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, &bgep->rx_desc[split]);
 	if (err != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
@@ -2014,7 +2014,7 @@ bge_alloc_bufs(bge_t *bgep)
 	 * status block, and statistics area
 	 */
 	err = bge_alloc_dma_mem(bgep, txdescsize, &bge_desc_accattr,
-		DDI_DMA_RDWR | DDI_DMA_CONSISTENT, &bgep->tx_desc);
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, &bgep->tx_desc);
 	if (err != DDI_SUCCESS)
 		return (DDI_FAILURE);
 
@@ -2024,14 +2024,14 @@ bge_alloc_bufs(bge_t *bgep)
 	for (split = 0; split < BGE_SPLIT; ++split) {
 		area = bgep->rx_buff[split];
 		bge_slice_chunk(&bgep->buff[BGE_STD_BUFF_RING].buf[split],
-			&area, BGE_STD_SLOTS_USED/BGE_SPLIT,
-			bgep->chipid.std_buf_size);
+		    &area, BGE_STD_SLOTS_USED/BGE_SPLIT,
+		    bgep->chipid.std_buf_size);
 		bge_slice_chunk(&bgep->buff[BGE_JUMBO_BUFF_RING].buf[split],
-			&area, bgep->chipid.jumbo_slots/BGE_SPLIT,
-			bgep->chipid.recv_jumbo_size);
+		    &area, bgep->chipid.jumbo_slots/BGE_SPLIT,
+		    bgep->chipid.recv_jumbo_size);
 		bge_slice_chunk(&bgep->buff[BGE_MINI_BUFF_RING].buf[split],
-			&area, BGE_MINI_SLOTS_USED/BGE_SPLIT,
-			BGE_MINI_BUFF_SIZE);
+		    &area, BGE_MINI_SLOTS_USED/BGE_SPLIT,
+		    BGE_MINI_BUFF_SIZE);
 		ASSERT(area.alength >= 0);
 	}
 
@@ -2039,37 +2039,37 @@ bge_alloc_bufs(bge_t *bgep)
 		area = bgep->tx_buff[split];
 		for (ring = 0; ring < tx_rings; ++ring)
 			bge_slice_chunk(&bgep->send[ring].buf[0][split],
-				&area, BGE_SEND_BUF_NUM/BGE_SPLIT,
-				bgep->chipid.snd_buff_size);
+			    &area, BGE_SEND_BUF_NUM/BGE_SPLIT,
+			    bgep->chipid.snd_buff_size);
 		for (; ring < BGE_SEND_RINGS_MAX; ++ring)
 			bge_slice_chunk(&bgep->send[ring].buf[0][split],
-				&area, 0, bgep->chipid.snd_buff_size);
+			    &area, 0, bgep->chipid.snd_buff_size);
 		ASSERT(area.alength >= 0);
 	}
 
 	for (ring = 0; ring < rx_rings; ++ring)
 		bge_slice_chunk(&bgep->recv[ring].desc, &bgep->rx_desc[ring],
-			bgep->chipid.recv_slots, sizeof (bge_rbd_t));
+		    bgep->chipid.recv_slots, sizeof (bge_rbd_t));
 
 	area = bgep->rx_desc[rx_rings];
 	for (; ring < BGE_RECV_RINGS_MAX; ++ring)
 		bge_slice_chunk(&bgep->recv[ring].desc, &area,
-			0, sizeof (bge_rbd_t));
+		    0, sizeof (bge_rbd_t));
 	bge_slice_chunk(&bgep->buff[BGE_STD_BUFF_RING].desc, &area,
-		BGE_STD_SLOTS_USED, sizeof (bge_rbd_t));
+	    BGE_STD_SLOTS_USED, sizeof (bge_rbd_t));
 	bge_slice_chunk(&bgep->buff[BGE_JUMBO_BUFF_RING].desc, &area,
-		bgep->chipid.jumbo_slots, sizeof (bge_rbd_t));
+	    bgep->chipid.jumbo_slots, sizeof (bge_rbd_t));
 	bge_slice_chunk(&bgep->buff[BGE_MINI_BUFF_RING].desc, &area,
-		BGE_MINI_SLOTS_USED, sizeof (bge_rbd_t));
+	    BGE_MINI_SLOTS_USED, sizeof (bge_rbd_t));
 	ASSERT(area.alength == 0);
 
 	area = bgep->tx_desc;
 	for (ring = 0; ring < tx_rings; ++ring)
 		bge_slice_chunk(&bgep->send[ring].desc, &area,
-			BGE_SEND_SLOTS_USED, sizeof (bge_sbd_t));
+		    BGE_SEND_SLOTS_USED, sizeof (bge_sbd_t));
 	for (; ring < BGE_SEND_RINGS_MAX; ++ring)
 		bge_slice_chunk(&bgep->send[ring].desc, &area,
-			0, sizeof (bge_sbd_t));
+		    0, sizeof (bge_sbd_t));
 	bge_slice_chunk(&bgep->statistics, &area, 1, sizeof (bge_statistics_t));
 	bge_slice_chunk(&bgep->status_block, &area, 1, sizeof (bge_status_t));
 	ASSERT(area.alength == BGE_STATUS_PADDING);
@@ -2088,7 +2088,7 @@ bge_free_bufs(bge_t *bgep)
 	int split;
 
 	BGE_TRACE(("bge_free_bufs($%p)",
-		(void *)bgep));
+	    (void *)bgep));
 
 	bge_free_dma_mem(&bgep->tx_desc);
 	for (split = 0; split < BGE_RECV_RINGS_SPLIT; ++split)
@@ -2114,12 +2114,12 @@ bge_find_mac_address(bge_t *bgep, chip_id_t *cidp)
 	int err;
 
 	BGE_TRACE(("bge_find_mac_address($%p)",
-		(void *)bgep));
+	    (void *)bgep));
 
 	BGE_DEBUG(("bge_find_mac_address: hw_mac_addr %012llx, => %s (%sset)",
-		cidp->hw_mac_addr,
-		ether_sprintf((void *)cidp->vendor_addr.addr),
-		cidp->vendor_addr.set ? "" : "not "));
+	    cidp->hw_mac_addr,
+	    ether_sprintf((void *)cidp->vendor_addr.addr),
+	    cidp->vendor_addr.set ? "" : "not "));
 
 	/*
 	 * The "vendor's factory-set address" may already have
@@ -2137,7 +2137,7 @@ bge_find_mac_address(bge_t *bgep, chip_id_t *cidp)
 	 * make sense of it either way, we'll ignore it.
 	 */
 	err = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, bgep->devinfo,
-		DDI_PROP_DONTPASS, localmac_propname, &ints, &nelts);
+	    DDI_PROP_DONTPASS, localmac_propname, &ints, &nelts);
 	if (err == DDI_PROP_SUCCESS) {
 		if (nelts == ETHERADDRL) {
 			while (nelts--)
@@ -2148,7 +2148,7 @@ bge_find_mac_address(bge_t *bgep, chip_id_t *cidp)
 	}
 
 	err = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, bgep->devinfo,
-		DDI_PROP_DONTPASS, localmac_propname, &bytes, &nelts);
+	    DDI_PROP_DONTPASS, localmac_propname, &bytes, &nelts);
 	if (err == DDI_PROP_SUCCESS) {
 		if (nelts == ETHERADDRL) {
 			while (nelts--)
@@ -2159,8 +2159,8 @@ bge_find_mac_address(bge_t *bgep, chip_id_t *cidp)
 	}
 
 	BGE_DEBUG(("bge_find_mac_address: +local %s (%sset)",
-		ether_sprintf((void *)cidp->vendor_addr.addr),
-		cidp->vendor_addr.set ? "" : "not "));
+	    ether_sprintf((void *)cidp->vendor_addr.addr),
+	    cidp->vendor_addr.set ? "" : "not "));
 
 	/*
 	 * Look up the OBP property "local-mac-address?".  Note that even
@@ -2174,7 +2174,7 @@ bge_find_mac_address(bge_t *bgep, chip_id_t *cidp)
 	nelts = sizeof (propbuf);
 	bzero(propbuf, nelts--);
 	err = ddi_getlongprop_buf(DDI_DEV_T_ANY, bgep->devinfo,
-		DDI_PROP_CANSLEEP, localmac_boolname, propbuf, (int *)&nelts);
+	    DDI_PROP_CANSLEEP, localmac_boolname, propbuf, (int *)&nelts);
 
 	/*
 	 * Now, if the address still isn't set from the hardware (SEEPROM)
@@ -2189,8 +2189,8 @@ bge_find_mac_address(bge_t *bgep, chip_id_t *cidp)
 		}
 
 	BGE_DEBUG(("bge_find_mac_address: +system %s (%sset)",
-		ether_sprintf((void *)cidp->vendor_addr.addr),
-		cidp->vendor_addr.set ? "" : "not "));
+	    ether_sprintf((void *)cidp->vendor_addr.addr),
+	    cidp->vendor_addr.set ? "" : "not "));
 
 	/*
 	 * Finally(!), if there's a valid "mac-address" property (created
@@ -2199,7 +2199,7 @@ bge_find_mac_address(bge_t *bgep, chip_id_t *cidp)
 	 * get confused by the address changing as Solaris takes over!
 	 */
 	err = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, bgep->devinfo,
-		DDI_PROP_DONTPASS, macaddr_propname, &bytes, &nelts);
+	    DDI_PROP_DONTPASS, macaddr_propname, &bytes, &nelts);
 	if (err == DDI_PROP_SUCCESS) {
 		if (nelts == ETHERADDRL) {
 			while (nelts--)
@@ -2210,8 +2210,8 @@ bge_find_mac_address(bge_t *bgep, chip_id_t *cidp)
 	}
 
 	BGE_DEBUG(("bge_find_mac_address: =final %s (%sset)",
-		ether_sprintf((void *)cidp->vendor_addr.addr),
-		cidp->vendor_addr.set ? "" : "not "));
+	    ether_sprintf((void *)cidp->vendor_addr.addr),
+	    cidp->vendor_addr.set ? "" : "not "));
 }
 
 
@@ -2278,7 +2278,7 @@ bge_fm_init(bge_t *bgep)
 		 */
 		if (DDI_FM_ERRCB_CAP(bgep->fm_capabilities))
 			ddi_fm_handler_register(bgep->devinfo,
-			bge_fm_error_cb, (void*) bgep);
+			    bge_fm_error_cb, (void*) bgep);
 	} else {
 		/*
 		 * These fields have to be cleared of FMA if there are no
@@ -2503,7 +2503,7 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	instance = ddi_get_instance(devinfo);
 
 	BGE_GTRACE(("bge_attach($%p, %d) instance %d",
-		(void *)devinfo, cmd, instance));
+	    (void *)devinfo, cmd, instance));
 	BGE_BRKPT(NULL, "bge_attach");
 
 	switch (cmd) {
@@ -2529,9 +2529,9 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Initialize more fields in BGE private data
 	 */
 	bgep->debug = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
-		DDI_PROP_DONTPASS, debug_propname, bge_debug);
+	    DDI_PROP_DONTPASS, debug_propname, bge_debug);
 	(void) snprintf(bgep->ifname, sizeof (bgep->ifname), "%s%d",
-		BGE_DRIVER_NAME, instance);
+	    BGE_DRIVER_NAME, instance);
 
 	/*
 	 * Initialize for fma support
@@ -2572,16 +2572,16 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	value16 = value16 | (PCI_COMM_MAE | PCI_COMM_ME);
 	pci_config_put16(bgep->cfg_handle, PCI_CONF_COMM, value16);
 	mhcrValue = MHCR_ENABLE_INDIRECT_ACCESS |
-		MHCR_ENABLE_TAGGED_STATUS_MODE |
-		MHCR_MASK_INTERRUPT_MODE |
-		MHCR_MASK_PCI_INT_OUTPUT |
-		MHCR_CLEAR_INTERRUPT_INTA |
-		MHCR_ENABLE_ENDIAN_WORD_SWAP |
-		MHCR_ENABLE_ENDIAN_BYTE_SWAP;
+	    MHCR_ENABLE_TAGGED_STATUS_MODE |
+	    MHCR_MASK_INTERRUPT_MODE |
+	    MHCR_MASK_PCI_INT_OUTPUT |
+	    MHCR_CLEAR_INTERRUPT_INTA |
+	    MHCR_ENABLE_ENDIAN_WORD_SWAP |
+	    MHCR_ENABLE_ENDIAN_BYTE_SWAP;
 	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MHCR, mhcrValue);
 	bge_ind_put32(bgep, MEMORY_ARBITER_MODE_REG,
-		bge_ind_get32(bgep, MEMORY_ARBITER_MODE_REG) |
-		MEMORY_ARBITER_ENABLE);
+	    bge_ind_get32(bgep, MEMORY_ARBITER_MODE_REG) |
+	    MEMORY_ARBITER_ENABLE);
 #else
 	mhcrValue = pci_config_get32(bgep->cfg_handle, PCI_CONF_BGE_MHCR);
 #endif
@@ -2620,23 +2620,23 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * has been reset externally and therefore lost them).
 	 */
 	cidp->subven = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
-		DDI_PROP_DONTPASS, subven_propname, cidp->subven);
+	    DDI_PROP_DONTPASS, subven_propname, cidp->subven);
 	cidp->subdev = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
-		DDI_PROP_DONTPASS, subdev_propname, cidp->subdev);
+	    DDI_PROP_DONTPASS, subdev_propname, cidp->subdev);
 	cidp->clsize = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
-		DDI_PROP_DONTPASS, clsize_propname, cidp->clsize);
+	    DDI_PROP_DONTPASS, clsize_propname, cidp->clsize);
 	cidp->latency = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
-		DDI_PROP_DONTPASS, latency_propname, cidp->latency);
+	    DDI_PROP_DONTPASS, latency_propname, cidp->latency);
 	cidp->rx_rings = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
-		DDI_PROP_DONTPASS, rxrings_propname, cidp->rx_rings);
+	    DDI_PROP_DONTPASS, rxrings_propname, cidp->rx_rings);
 	cidp->tx_rings = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
-		DDI_PROP_DONTPASS, txrings_propname, cidp->tx_rings);
+	    DDI_PROP_DONTPASS, txrings_propname, cidp->tx_rings);
 
 	if (bge_jumbo_enable == B_TRUE) {
 		cidp->default_mtu = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
-			DDI_PROP_DONTPASS, default_mtu, BGE_DEFAULT_MTU);
+		    DDI_PROP_DONTPASS, default_mtu, BGE_DEFAULT_MTU);
 		if ((cidp->default_mtu < BGE_DEFAULT_MTU)||
-			(cidp->default_mtu > BGE_MAXIMUM_MTU)) {
+		    (cidp->default_mtu > BGE_MAXIMUM_MTU)) {
 			cidp->default_mtu = BGE_DEFAULT_MTU;
 		}
 	}
@@ -2644,7 +2644,7 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Map operating registers
 	 */
 	err = ddi_regs_map_setup(devinfo, BGE_PCI_OPREGS_RNUMBER,
-		&regs, 0, 0, &bge_reg_accattr, &bgep->io_handle);
+	    &regs, 0, 0, &bge_reg_accattr, &bgep->io_handle);
 	if (err != DDI_SUCCESS) {
 		bge_problem(bgep, "ddi_regs_map_setup() failed");
 		goto attach_fail;
@@ -2690,14 +2690,14 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * interrupts ...
 	 */
 	err = ddi_add_softintr(devinfo, DDI_SOFTINT_LOW, &bgep->drain_id,
-		NULL, NULL, bge_send_drain, (caddr_t)bgep);
+	    NULL, NULL, bge_send_drain, (caddr_t)bgep);
 	if (err != DDI_SUCCESS) {
 		bge_problem(bgep, "ddi_add_softintr() failed");
 		goto attach_fail;
 	}
 	bgep->progress |= PROGRESS_RESCHED;
 	err = ddi_add_softintr(devinfo, DDI_SOFTINT_LOW, &bgep->factotum_id,
-		NULL, NULL, bge_chip_factotum, (caddr_t)bgep);
+	    NULL, NULL, bge_chip_factotum, (caddr_t)bgep);
 	if (err != DDI_SUCCESS) {
 		bge_problem(bgep, "ddi_add_softintr() failed");
 		goto attach_fail;
@@ -2712,7 +2712,7 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	}
 
 	BGE_DEBUG(("%s: ddi_intr_get_supported_types() returned: %x",
-		bgep->ifname, intr_types));
+	    bgep->ifname, intr_types));
 
 	if ((intr_types & DDI_INTR_TYPE_MSI) && bgep->chipid.msi_enabled) {
 		if (bge_add_intrs(bgep, DDI_INTR_TYPE_MSI) != DDI_SUCCESS) {
@@ -2720,7 +2720,7 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 			    "trying FIXED interrupt type\n");
 		} else {
 			BGE_DEBUG(("%s: Using MSI interrupt type",
-				bgep->ifname));
+			    bgep->ifname));
 			bgep->intr_type = DDI_INTR_TYPE_MSI;
 			bgep->progress |= PROGRESS_HWINT;
 		}
@@ -2970,7 +2970,7 @@ bge_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 #ifdef BGE_IPMI_ASF
 	mutex_enter(bgep->genlock);
 	if (bgep->asf_enabled && ((bgep->asf_status == ASF_STAT_RUN) ||
-		(bgep->asf_status == ASF_STAT_RUN_INIT))) {
+	    (bgep->asf_status == ASF_STAT_RUN_INIT))) {
 
 		bge_asf_update_status(bgep);
 		if (bgep->asf_status == ASF_STAT_RUN) {
@@ -3139,7 +3139,7 @@ bge_add_intrs(bge_t *bgep, int	intr_type)
 
 	if (actual < count) {
 		BGE_DEBUG(("%s: Requested: %d, Received: %d",
-			bgep->ifname, count, actual));
+		    bgep->ifname, count, actual));
 	}
 
 	bgep->intr_cnt = actual;
@@ -3178,7 +3178,7 @@ bge_add_intrs(bge_t *bgep, int	intr_type)
 	}
 
 	if ((ret = ddi_intr_get_cap(bgep->htable[0], &bgep->intr_cap))
-		!= DDI_SUCCESS) {
+	    != DDI_SUCCESS) {
 		bge_error(bgep, "ddi_intr_get_cap() failed %d\n", ret);
 
 		for (i = 0; i < actual; i++) {
