@@ -105,13 +105,13 @@ static char *noxattr_cancel[] = { MNTOPT_XATTR, NULL };
 static char *xattr_cancel[] = { MNTOPT_NOXATTR, NULL };
 
 /*
- * MNTOPT_DEFAULT was removed from MNTOPT_XATTR, since the
- * default value is now determined by the xattr property.
+ * MO_DEFAULT is not used since the default value is determined
+ * by the equivalent property.
  */
 static mntopt_t mntopts[] = {
 	{ MNTOPT_NOXATTR, noxattr_cancel, NULL, 0, NULL },
 	{ MNTOPT_XATTR, xattr_cancel, NULL, 0, NULL },
-	{ MNTOPT_NOATIME, noatime_cancel, NULL, MO_DEFAULT, NULL },
+	{ MNTOPT_NOATIME, noatime_cancel, NULL, 0, NULL },
 	{ MNTOPT_ATIME, atime_cancel, NULL, 0, NULL }
 };
 
@@ -354,57 +354,6 @@ acl_inherit_changed_cb(void *arg, uint64_t newval)
 }
 
 static int
-zfs_refresh_properties(vfs_t *vfsp)
-{
-	zfsvfs_t *zfsvfs = vfsp->vfs_data;
-
-	/*
-	 * Remount operations default to "rw" unless "ro" is explicitly
-	 * specified.
-	 */
-	if (vfs_optionisset(vfsp, MNTOPT_RO, NULL)) {
-		readonly_changed_cb(zfsvfs, B_TRUE);
-	} else {
-		if (!dmu_objset_is_snapshot(zfsvfs->z_os))
-			readonly_changed_cb(zfsvfs, B_FALSE);
-		else if (vfs_optionisset(vfsp, MNTOPT_RW, NULL))
-			return (EROFS);
-	}
-
-	if (vfs_optionisset(vfsp, MNTOPT_NOSUID, NULL)) {
-		devices_changed_cb(zfsvfs, B_FALSE);
-		setuid_changed_cb(zfsvfs, B_FALSE);
-	} else {
-		if (vfs_optionisset(vfsp, MNTOPT_NODEVICES, NULL))
-			devices_changed_cb(zfsvfs, B_FALSE);
-		else if (vfs_optionisset(vfsp, MNTOPT_DEVICES, NULL))
-			devices_changed_cb(zfsvfs, B_TRUE);
-
-		if (vfs_optionisset(vfsp, MNTOPT_NOSETUID, NULL))
-			setuid_changed_cb(zfsvfs, B_FALSE);
-		else if (vfs_optionisset(vfsp, MNTOPT_SETUID, NULL))
-			setuid_changed_cb(zfsvfs, B_TRUE);
-	}
-
-	if (vfs_optionisset(vfsp, MNTOPT_NOEXEC, NULL))
-		exec_changed_cb(zfsvfs, B_FALSE);
-	else if (vfs_optionisset(vfsp, MNTOPT_EXEC, NULL))
-		exec_changed_cb(zfsvfs, B_TRUE);
-
-	if (vfs_optionisset(vfsp, MNTOPT_ATIME, NULL))
-		atime_changed_cb(zfsvfs, B_TRUE);
-	else if (vfs_optionisset(vfsp, MNTOPT_NOATIME, NULL))
-		atime_changed_cb(zfsvfs, B_FALSE);
-
-	if (vfs_optionisset(vfsp, MNTOPT_XATTR, NULL))
-		xattr_changed_cb(zfsvfs, B_TRUE);
-	else if (vfs_optionisset(vfsp, MNTOPT_NOXATTR, NULL))
-		xattr_changed_cb(zfsvfs, B_FALSE);
-
-	return (0);
-}
-
-static int
 zfs_register_callbacks(vfs_t *vfsp)
 {
 	struct dsl_dataset *ds = NULL;
@@ -415,6 +364,7 @@ zfs_register_callbacks(vfs_t *vfsp)
 	int exec, do_exec = FALSE;
 	int devices, do_devices = FALSE;
 	int xattr, do_xattr = FALSE;
+	int atime, do_atime = FALSE;
 	int error = 0;
 
 	ASSERT(vfsp);
@@ -471,6 +421,13 @@ zfs_register_callbacks(vfs_t *vfsp)
 		xattr = B_TRUE;
 		do_xattr = B_TRUE;
 	}
+	if (vfs_optionisset(vfsp, MNTOPT_NOATIME, NULL)) {
+		atime = B_FALSE;
+		do_atime = B_TRUE;
+	} else if (vfs_optionisset(vfsp, MNTOPT_ATIME, NULL)) {
+		atime = B_TRUE;
+		do_atime = B_TRUE;
+	}
 
 	/*
 	 * Register property callbacks.
@@ -515,6 +472,8 @@ zfs_register_callbacks(vfs_t *vfsp)
 		devices_changed_cb(zfsvfs, devices);
 	if (do_xattr)
 		xattr_changed_cb(zfsvfs, xattr);
+	if (do_atime)
+		atime_changed_cb(zfsvfs, atime);
 
 	return (0);
 
@@ -841,7 +800,11 @@ out:
 	} else if (why == ROOT_REMOUNT) {
 		readonly_changed_cb(vfsp->vfs_data, B_FALSE);
 		vfsp->vfs_flag |= VFS_REMOUNT;
-		return (zfs_refresh_properties(vfsp));
+
+		/* refresh mount options */
+		zfs_unregister_callbacks(vfsp->vfs_data);
+		return (zfs_register_callbacks(vfsp));
+
 	} else if (why == ROOT_UNMOUNT) {
 		zfs_unregister_callbacks((zfsvfs_t *)vfsp->vfs_data);
 		(void) zfs_sync(vfsp, 0, 0);
@@ -886,13 +849,6 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 */
 	if ((uap->flags & MS_DATA) && uap->datalen > 0)
 		return (EINVAL);
-
-	/*
-	 * When doing a remount, we simply refresh our temporary properties
-	 * according to those options set in the current VFS options.
-	 */
-	if (uap->flags & MS_REMOUNT)
-		return (zfs_refresh_properties(vfsp));
 
 	/*
 	 * Get the objset name (the "special" mount argument).
@@ -946,6 +902,17 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	if (!INGLOBALZONE(curproc) &&
 	    (!zone_dataset_visible(osname, &canwrite) || !canwrite)) {
 		error = EPERM;
+		goto out;
+	}
+
+	/*
+	 * When doing a remount, we simply refresh our temporary properties
+	 * according to those options set in the current VFS options.
+	 */
+	if (uap->flags & MS_REMOUNT) {
+		/* refresh mount options */
+		zfs_unregister_callbacks(vfsp->vfs_data);
+		error = zfs_register_callbacks(vfsp);
 		goto out;
 	}
 
