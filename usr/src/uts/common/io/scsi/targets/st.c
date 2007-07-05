@@ -5361,7 +5361,8 @@ exit_free:
 	 * update the position as the user must do this to validate the
 	 * position for data protection.
 	 */
-	if ((uscmd->uscsi_cdb[0] == SCMD_SPACE) &&
+	if ((uscmd->uscsi_cdb != NULL) &&
+	    (uscmd->uscsi_cdb[0] == SCMD_SPACE) &&
 	    (un->un_pos.pmode != invalid)) {
 		uchar_t status = un->un_status;
 		(void) st_update_block_pos(un);
