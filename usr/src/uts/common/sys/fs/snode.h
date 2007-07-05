@@ -85,7 +85,7 @@ struct snode {
 	/* These fields are protected by s_lock */
 	struct devplcy *s_plcy;		/* device node open policy (cs only) */
 	u_offset_t s_size;		/* block device size in bytes */
-	ushort_t s_flag;		/* flags, see below */
+	uint_t	s_flag;			/* flags, see below */
 	dev_t	s_fsid;			/* file system identifier */
 	time_t  s_atime;		/* time of last access */
 	time_t  s_mtime;		/* time of last modification */
