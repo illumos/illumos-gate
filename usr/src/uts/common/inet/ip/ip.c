@@ -18483,6 +18483,9 @@ ip_snmp_get_mib2_ip_traffic_stats(queue_t *q, mblk_t *mpctl, ip_stack_t *ipst)
 	    (int)optp->level, (int)optp->name, (int)optp->len));
 	qreply(q, mpctl);
 
+	if (mp2ctl == NULL)
+		return (NULL);
+
 	return (ip_snmp_get_mib2_ip(q, mp2ctl, &global_ip_mib, ipst));
 }
 
