@@ -58,6 +58,7 @@
 
 #if defined(_KERNEL)
 #include <sys/systm.h>
+#include <util/qsort.h>
 #else
 #include <stdlib.h>
 #include <string.h>
@@ -235,6 +236,35 @@ zfs_prop_is_visible(zfs_prop_t prop)
 }
 
 /*
+ * A comparison function we can use to order indexes into the
+ * zfs_prop_table[]
+ */
+static int
+zfs_prop_compare(const void *p1, const void *p2)
+{
+	int i, j;
+	prop_attr_t iattr, jattr;
+
+	i = *((int *)p1);
+	j = *((int *)p2);
+
+	iattr = zfs_prop_table[i].pd_attr;
+	jattr = zfs_prop_table[j].pd_attr;
+
+	/* first, sort by whether the property is readonly or not */
+	if (iattr != prop_readonly &&
+	    jattr == prop_readonly)
+		return (1);
+	if (iattr == prop_readonly &&
+	    jattr != prop_readonly)
+		return (-1);
+
+	/* otherwise, sort by the property name */
+	return (strcmp(zfs_prop_table[i].pd_name,
+	    zfs_prop_table[j].pd_name));
+}
+
+/*
  * Iterate over all properties, calling back into the specified function
  * for each property. We will continue to iterate until we either
  * reach the end or the callback function something other than
@@ -242,15 +272,26 @@ zfs_prop_is_visible(zfs_prop_t prop)
  */
 zfs_prop_t
 zfs_prop_iter_common(zfs_prop_f func, void *cb, zfs_type_t type,
-    boolean_t show_all)
+    boolean_t show_all, boolean_t ordered)
 {
 	int i;
+	int order[ZFS_PROP_COUNT];
+
+	for (int j = 0; j < ZFS_PROP_COUNT; j++) {
+		order[j] = j;
+	}
+
+
+	if (ordered) {
+		qsort((void *)order, ZFS_PROP_COUNT, sizeof (zfs_prop_t),
+		    zfs_prop_compare);
+	}
 
 	for (i = 0; i < ZFS_PROP_COUNT; i++) {
-		if (zfs_prop_valid_for_type(i, type) &&
-		    (zfs_prop_is_visible(i) || show_all)) {
-			if (func(i, cb) != ZFS_PROP_CONT)
-				return (i);
+		if (zfs_prop_valid_for_type(order[i], type) &&
+		    (zfs_prop_is_visible(order[i]) || show_all)) {
+			if (func(order[i], cb) != ZFS_PROP_CONT)
+				return (order[i]);
 		}
 	}
 	return (ZFS_PROP_CONT);
@@ -259,13 +300,22 @@ zfs_prop_iter_common(zfs_prop_f func, void *cb, zfs_type_t type,
 zfs_prop_t
 zfs_prop_iter(zfs_prop_f func, void *cb, boolean_t show_all)
 {
-	return (zfs_prop_iter_common(func, cb, ZFS_TYPE_ANY, show_all));
+	return (zfs_prop_iter_common(func, cb, ZFS_TYPE_ANY, show_all,
+	    B_FALSE));
+}
+
+zfs_prop_t
+zfs_prop_iter_ordered(zfs_prop_f func, void *cb, boolean_t show_all)
+{
+	return (zfs_prop_iter_common(func, cb, ZFS_TYPE_ANY, show_all,
+	    B_TRUE));
 }
 
 zpool_prop_t
 zpool_prop_iter(zpool_prop_f func, void *cb, boolean_t show_all)
 {
-	return (zfs_prop_iter_common(func, cb, ZFS_TYPE_POOL, show_all));
+	return (zfs_prop_iter_common(func, cb, ZFS_TYPE_POOL, show_all,
+	    B_FALSE));
 }
 
 zfs_proptype_t
@@ -333,7 +383,7 @@ zfs_name_to_prop_common(const char *propname, zfs_type_t type)
 	zfs_prop_t prop;
 
 	prop = zfs_prop_iter_common(zfs_name_to_prop_cb, (void *)propname,
-	    type, B_TRUE);
+	    type, B_TRUE, B_FALSE);
 	return (prop == ZFS_PROP_CONT ? ZFS_PROP_INVAL : prop);
 }
 

@@ -380,7 +380,7 @@ usage(boolean_t requested)
 		    "PROPERTY", "EDIT", "INHERIT", "VALUES");
 
 		/* Iterate over all properties */
-		(void) zfs_prop_iter(usage_prop_cb, fp, B_FALSE);
+		(void) zfs_prop_iter_ordered(usage_prop_cb, fp, B_FALSE);
 
 		(void) fprintf(fp, gettext("\nSizes are specified in bytes "
 		    "with standard units such as K, M, G, etc.\n"));

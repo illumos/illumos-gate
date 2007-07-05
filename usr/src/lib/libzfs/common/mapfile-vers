@@ -83,6 +83,7 @@ SUNWprivate_1.1 {
 	zfs_prop_inheritable;
 	zfs_prop_is_string;
 	zfs_prop_iter;
+	zfs_prop_iter_ordered;
 	zfs_prop_readonly;
 	zfs_prop_set;
 	zfs_prop_string_to_index;

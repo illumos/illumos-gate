@@ -168,6 +168,7 @@ const char *zfs_prop_perm(zfs_prop_t);
 typedef zfs_prop_t (*zfs_prop_f)(zfs_prop_t, void *);
 typedef zpool_prop_t (*zpool_prop_f)(zpool_prop_t, void *);
 extern zfs_prop_t zfs_prop_iter(zfs_prop_f, void *, boolean_t);
+extern zfs_prop_t zfs_prop_iter_ordered(zfs_prop_f, void *, boolean_t);
 extern zpool_prop_t zpool_prop_iter(zpool_prop_f, void *, boolean_t);
 
 /*

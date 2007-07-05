@@ -111,7 +111,8 @@ int zfs_expand_proplist_common(libzfs_handle_t *, zfs_proplist_t **,
     zfs_type_t);
 int zfs_get_proplist_common(libzfs_handle_t *, char *, zfs_proplist_t **,
     zfs_type_t);
-zfs_prop_t zfs_prop_iter_common(zfs_prop_f, void *, zfs_type_t, boolean_t);
+zfs_prop_t zfs_prop_iter_common(zfs_prop_f, void *, zfs_type_t, boolean_t,
+    boolean_t);
 zfs_prop_t zfs_name_to_prop_common(const char *, zfs_type_t);
 
 nvlist_t *zfs_validate_properties(libzfs_handle_t *, zfs_type_t, char *,

@@ -4609,7 +4609,7 @@ zfs_expand_proplist_common(libzfs_handle_t *hdl, zfs_proplist_t **plp,
 		exp.hdl = hdl;
 
 		if (zfs_prop_iter_common(zfs_expand_proplist_cb, &exp, type,
-		    B_FALSE) == ZFS_PROP_INVAL)
+		    B_FALSE, B_FALSE) == ZFS_PROP_INVAL)
 			return (-1);
 
 		/*
