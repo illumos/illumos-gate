@@ -26,12 +26,15 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <stdio.h>
 #include <libzfs.h>
 #include <string.h>
 #include <strings.h>
 #include <libshare.h>
 #include "libshare_impl.h"
 #include <libintl.h>
+#include <sys/mnttab.h>
+#include <sys/mntent.h>
 
 extern sa_share_t _sa_add_share(sa_group_t, char *, int, int *);
 extern sa_group_t _sa_create_zfs_group(sa_group_t, char *);
@@ -221,6 +224,35 @@ mountpoint_compare(const void *a, const void *b)
 }
 
 /*
+ * return legacy mountpoint.  Caller provides space for mountpoint.
+ */
+int
+get_legacy_mountpoint(char *path, char *mountpoint, size_t len)
+{
+	FILE *fp;
+	struct mnttab entry;
+
+	if ((fp = fopen(MNTTAB, "r")) == NULL) {
+		return (1);
+	}
+
+	while (getmntent(fp, &entry) == 0) {
+
+		if (entry.mnt_fstype == NULL ||
+		    strcmp(entry.mnt_fstype, MNTTYPE_ZFS) != 0)
+			continue;
+
+		if (strcmp(entry.mnt_mountp, path) == 0) {
+			(void) strlcpy(mountpoint, entry.mnt_special, len);
+			(void) fclose(fp);
+			return (0);
+		}
+	}
+	(void) fclose(fp);
+	return (1);
+}
+
+/*
  * get_zfs_dataset(impl_handle, path)
  *
  * get the name of the ZFS dataset the path is equivalent to.  The
@@ -229,7 +261,8 @@ mountpoint_compare(const void *a, const void *b)
  */
 
 static char *
-get_zfs_dataset(sa_handle_impl_t impl_handle, char *path)
+get_zfs_dataset(sa_handle_impl_t impl_handle, char *path,
+    boolean_t search_mnttab)
 {
 	size_t i, count = 0;
 	char *dataset = NULL;
@@ -249,8 +282,19 @@ get_zfs_dataset(sa_handle_impl_t impl_handle, char *path)
 
 		/* mountpoint must be a path */
 		if (strcmp(mountpoint, ZFS_MOUNTPOINT_NONE) == 0 ||
-		    strcmp(mountpoint, ZFS_MOUNTPOINT_LEGACY) == 0)
+		    strcmp(mountpoint, ZFS_MOUNTPOINT_LEGACY) == 0) {
+			/*
+			 * Search mmttab for mountpoint
+			 */
+
+			if (search_mnttab == B_TRUE &&
+			    get_legacy_mountpoint(path, mountpoint,
+			    sizeof (mountpoint)) == 0) {
+				dataset = mountpoint;
+				break;
+			}
 			continue;
+		}
 
 		/* canmount must be set */
 		canmount[0] = '\0';
@@ -323,7 +367,7 @@ sa_zfs_is_shared(sa_handle_t sahandle, char *path)
 	char shareopts[ZFS_MAXPROPLEN];
 	libzfs_handle_t *libhandle;
 
-	dataset = get_zfs_dataset((sa_handle_t)sahandle, path);
+	dataset = get_zfs_dataset((sa_handle_t)sahandle, path, B_FALSE);
 	if (dataset != NULL) {
 		libhandle = libzfs_init();
 		if (libhandle != NULL) {
@@ -738,7 +782,7 @@ sa_zfs_set_sharenfs(sa_group_t group, char *path, int on)
 		impl_handle = (sa_handle_impl_t)sa_find_group_handle(group);
 		assert(impl_handle != NULL);
 		if (impl_handle != NULL)
-			dataset = get_zfs_dataset(impl_handle, path);
+			dataset = get_zfs_dataset(impl_handle, path, B_FALSE);
 		else
 			ret = SA_SYSTEM_ERR;
 
@@ -808,7 +852,7 @@ sa_zfs_update(sa_group_t group)
 					    group);
 					if (impl_handle != NULL)
 						dataset = get_zfs_dataset(
-						    impl_handle, path);
+						    impl_handle, path, B_FALSE);
 					else
 						ret = SA_SYSTEM_ERR;
 
@@ -945,6 +989,7 @@ sa_share_zfs(sa_share_t share, char *path, share_t *sh,
 	int err = EINVAL;
 	int i, j;
 	char newpath[MAXPATHLEN];
+	char *pathp;
 
 	/*
 	 * First find the dataset name
@@ -959,14 +1004,29 @@ sa_share_zfs(sa_share_t share, char *path, share_t *sh,
 	/*
 	 * If get_zfs_dataset fails, see if it is a subdirectory
 	 */
-	(void) strlcpy(newpath, path, sizeof (newpath));
-	while ((dataset = get_zfs_dataset(sahandle, newpath)) == NULL) {
+
+	pathp = path;
+	while ((dataset = get_zfs_dataset(sahandle, pathp, B_TRUE)) == NULL) {
 		char *p;
 
-		if (p = strrchr(newpath, '/'))
-			*p = '\0';
-		else
+		if (pathp == path) {
+			(void) strlcpy(newpath, path, sizeof (newpath));
+			pathp = newpath;
+		}
+
+		/*
+		 * chop off part of path, but if we are at root then
+		 * make sure path is a /
+		 */
+		if ((strlen(pathp) > 1) && (p = strrchr(pathp, '/'))) {
+			if (pathp == p) {
+				*(p + 1) = '\0';  /* skip over /, root case */
+			} else {
+				*p = '\0';
+			}
+		} else {
 			return (SA_SYSTEM_ERR);
+		}
 	}
 
 	libhandle = libzfs_init();
