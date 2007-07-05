@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -281,6 +281,7 @@ descend(char *curname, int curfd, int *retcode, dev_t device)
 	char			*ebase0, *ebase;
 	struct stat		stb, stb1;
 	int			i, j, ret, fd, tmpflg;
+	int			follow_symlinks;
 	blkcnt_t		blocks = 0;
 	off_t			curoff = 0;
 	ptrdiff_t		offset;
@@ -303,10 +304,8 @@ descend(char *curname, int curfd, int *retcode, dev_t device)
 	 * If a -H was specified, don't follow symlinks if the file is
 	 * not a command line argument.
 	 */
-	if (((Lflg == 0) && (Hflg == 0)) || ((Hflg) && !(cmdarg))) {
-		i = fstatat(curfd, curname, &stb, AT_SYMLINK_NOFOLLOW);
-		j = 0;
-	} else {
+	follow_symlinks = (Lflg || (Hflg && cmdarg));
+	if (follow_symlinks) {
 		i = fstatat(curfd, curname, &stb, 0);
 		j = fstatat(curfd, curname, &stb1, AT_SYMLINK_NOFOLLOW);
 
@@ -317,6 +316,9 @@ descend(char *curname, int curfd, int *retcode, dev_t device)
 		if (Hflg) {
 			cmdarg = 0;
 		}
+	} else {
+		i = fstatat(curfd, curname, &stb, AT_SYMLINK_NOFOLLOW);
+		j = 0;
 	}
 
 	if ((i < 0) || (j < 0)) {
@@ -355,7 +357,7 @@ descend(char *curname, int curfd, int *retcode, dev_t device)
 	 * symbolic link, we need to keep track of all inodes when -L
 	 * is specified.
 	 */
-	if ((Lflg) || ((stb.st_mode & S_IFMT) == S_IFDIR) ||
+	if (Lflg || ((stb.st_mode & S_IFMT) == S_IFDIR) ||
 	    (stb.st_nlink > 1)) {
 		int rc;
 		if ((rc = add_tnode(&tree, stb.st_dev, stb.st_ino)) != 1) {
@@ -380,9 +382,13 @@ descend(char *curname, int curfd, int *retcode, dev_t device)
 	blocks = stb.st_blocks;
 	/*
 	 * If there are extended attributes on the current file, add their
-	 * block usage onto the block count.
+	 * block usage onto the block count.  Note: Since pathconf() always
+	 * follows symlinks, only test for extended attributes using pathconf()
+	 * if we are following symlinks or the current file is not a symlink.
 	 */
-	if (curname && pathconf(curname, _PC_XATTR_EXISTS) == 1) {
+	if (curname && (follow_symlinks ||
+	    ((stb.st_mode & S_IFMT) != S_IFLNK)) &&
+	    pathconf(curname, _PC_XATTR_EXISTS) == 1) {
 		if ((fd = attropen(curname, ".", O_RDONLY)) < 0) {
 			if (rflg)
 				perror(gettext(
