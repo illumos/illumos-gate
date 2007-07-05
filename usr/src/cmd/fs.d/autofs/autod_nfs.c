@@ -251,7 +251,7 @@ mount_nfs(
 		for (mp = mfs; mp; mp = mp->mfs_next) {
 			if (self_check(mp->mfs_host)) {
 				err = loopbackmount(mp->mfs_dir,
-					mntpnt, me->map_mntopts, overlay);
+				    mntpnt, me->map_mntopts, overlay);
 				if (err) {
 					mp->mfs_ignore = 1;
 				} else {
@@ -274,10 +274,10 @@ mount_nfs(
 	if (err) {
 		cached = strcmp(me->map_mounter, MNTTYPE_CACHEFS) == 0;
 		err = nfsmount(mfs, mntpnt, me->map_mntopts,
-				cached, overlay, uid, alp);
+		    cached, overlay, uid, alp);
 		if (err && trace > 1) {
 			trace_prt(1, "	Couldn't mount %s:%s, err=%d\n",
-				mfs->mfs_host, mfs->mfs_dir, err);
+			    mfs->mfs_host, mfs->mfs_dir, err);
 		}
 	}
 	free_mfs(mfs);
@@ -320,8 +320,8 @@ get_mysubnet_servers(struct mapfs *mfs_in)
 			 * protocol family. If so skip it
 			 */
 			if (((strcmp(nconf->nc_protofmly, NC_INET6) == 0) ||
-				(strcmp(nconf->nc_protofmly, NC_INET) == 0)) &&
-				(nconf->nc_semantics == NC_TPI_CLTS)) {
+			    (strcmp(nconf->nc_protofmly, NC_INET) == 0)) &&
+			    (nconf->nc_semantics == NC_TPI_CLTS)) {
 			} else
 				continue;
 
@@ -343,13 +343,13 @@ get_mysubnet_servers(struct mapfs *mfs_in)
 			for (i = 0; i < retaddrs->n_cnt; i++, nb++) {
 				memset(&areq.sa_addr, 0, sizeof (areq.sa_addr));
 				memcpy(&areq.sa_addr, nb->buf, MIN(nb->len,
-					sizeof (areq.sa_addr)));
+				    sizeof (areq.sa_addr)));
 				if (res = subnet_test(af, &areq)) {
 					p = add_mfs(mfs, DIST_MYNET,
-						&mfs_head, &mfs_tail);
+					    &mfs_head, &mfs_tail);
 					if (!p) {
 						netdir_free(retaddrs,
-							ND_ADDRLIST);
+						    ND_ADDRLIST);
 						endnetconfig(nc);
 						return (NULL);
 					}
@@ -358,8 +358,8 @@ get_mysubnet_servers(struct mapfs *mfs_in)
 			}  /* end of every host */
 			if (trace > 2) {
 				trace_prt(1, "get_mysubnet_servers: host=%s "
-					"netid=%s res=%s\n", mfs->mfs_host,
-					nconf->nc_netid, res == 1?"SUC":"FAIL");
+				    "netid=%s res=%s\n", mfs->mfs_host,
+				    nconf->nc_netid, res == 1?"SUC":"FAIL");
 			}
 
 			netdir_free(retaddrs, ND_ADDRLIST);
@@ -421,7 +421,7 @@ sort_servers(struct mapfs *mfs_in, int timeout)
 		}
 
 		syslog(LOG_ERR, "servers %s not responding: %s",
-			buff, clnt_sperrno(clnt_stat));
+		    buff, clnt_sperrno(clnt_stat));
 	}
 
 	return (m1);
@@ -441,7 +441,7 @@ add_mfs(struct mapfs *mfs, int distance, struct mapfs **mfs_head,
 	for (tmp = *mfs_head; tmp; tmp = tmp->mfs_next)
 		if ((strcmp(tmp->mfs_host, mfs->mfs_host) == 0 &&
 		    strcmp(tmp->mfs_dir, mfs->mfs_dir) == 0) ||
-			mfs->mfs_ignore)
+		    mfs->mfs_ignore)
 			return (*mfs_head);
 	new = (struct mapfs *)malloc(sizeof (struct mapfs));
 	if (!new) {
@@ -580,7 +580,7 @@ enum_servers(struct mapent *me, char *preferred)
 	}
 	if (trace > 2 && m1)
 		trace_prt(1, "	enum_servers: pref/self found, %s\n",
-			m1->mfs_host);
+		    m1->mfs_host);
 
 	/*
 	 * look for entries on this subnet
@@ -643,7 +643,7 @@ nfsmount(
 	int loglevel;
 	struct mnttab m;
 	struct nfs_args *argp = NULL, *head = NULL, *tail = NULL,
-		*prevhead, *prevtail;
+	    *prevhead, *prevtail;
 	int flags;
 	struct fhstatus fhs;
 	struct timeval timeout;
@@ -710,7 +710,7 @@ nfsmount(
 		if (verbose)
 			syslog(LOG_WARNING,
 		    "mount on %s is cached and will not be replicated.",
-			mntpnt);
+			    mntpnt);
 		replicated = 0;
 	}
 	if (replicated)
@@ -721,13 +721,13 @@ nfsmount(
 	if (trace > 1) {
 		if (replicated)
 			trace_prt(1, "	nfsmount: replicated mount on %s %s:\n",
-				mntpnt, opts);
+			    mntpnt, opts);
 		else
 			trace_prt(1, "	nfsmount: standard mount on %s %s:\n",
-				mntpnt, opts);
+			    mntpnt, opts);
 		for (mfs = mfs_in; mfs; mfs = mfs->mfs_next)
 			trace_prt(1, "	  %s:%s\n",
-				mfs->mfs_host, mfs->mfs_dir);
+			    mfs->mfs_host, mfs->mfs_dir);
 	}
 
 	/*
@@ -790,7 +790,7 @@ nfsmount(
 	 */
 	if (hasmntopt(&m, "sec=") != NULL) {
 		if ((str_opt(&m, MNTOPT_SEC,
-			&mfssnego_init.nfs_flavor)) == -1) {
+		    &mfssnego_init.nfs_flavor)) == -1) {
 			syslog(LOG_ERR, "nfsmount: no memory");
 			return (NFSERR_IO);
 		}
@@ -804,7 +804,7 @@ nfsmount(
 			return (NFSERR_IO);
 		}
 		if (nfs_getseconfig_byname(mfssnego_init.nfs_flavor,
-			&mfssnego_init.nfs_sec)) {
+		    &mfssnego_init.nfs_sec)) {
 			syslog(loglevel,
 			    "error getting %s information from %s",
 			    mfssnego_init.nfs_flavor, NFSSEC_CONF);
@@ -822,7 +822,7 @@ nextentry:
 		nfsvers = 0;	/* "unspecified" */
 	if (set_versrange(nfsvers, &vers, &versmin) != 0) {
 		syslog(LOG_ERR, "Incorrect NFS version specified for %s",
-			mntpnt);
+		    mntpnt);
 		last_error = NFSERR_NOENT;
 		goto ret;
 	}
@@ -876,8 +876,8 @@ nextentry:
 			    nfs_port != mfs->mfs_port) {
 
 				syslog(LOG_ERR, "nfsmount: port (%u) in nfs URL"
-					" not the same as port (%d) in port "
-					"option\n", mfs->mfs_port, nfs_port);
+				    " not the same as port (%d) in port "
+				    "option\n", mfs->mfs_port, nfs_port);
 				last_error = NFSERR_IO;
 				goto out;
 
@@ -902,7 +902,7 @@ nextentry:
 			}
 
 			argp = (struct nfs_args *)
-				malloc(sizeof (struct nfs_args));
+			    malloc(sizeof (struct nfs_args));
 
 			if (!argp) {
 				if (path != dir)
@@ -960,6 +960,7 @@ nextentry:
 
 				argp->flags |= NFSMNT_PUBLIC;
 
+				vers = pubvers;
 				mfs->mfs_args = argp;
 				mfs->mfs_version = pubvers;
 				mfs->mfs_nconf = nconf;
@@ -1005,15 +1006,15 @@ nextentry:
 
 		if ((mfs->mfs_flags & MFS_FH_VIA_WEBNFS) ==  0) {
 			i = pingnfs(host, get_retry(opts) + 1, &vers, versmin,
-				0, FALSE, NULL, nfs_proto);
+			    0, FALSE, NULL, nfs_proto);
 			if (i != RPC_SUCCESS) {
 				if (i == RPC_PROGVERSMISMATCH) {
 					syslog(loglevel, "server %s: NFS "
-						"protocol version mismatch",
-						host);
+					    "protocol version mismatch",
+					    host);
 				} else {
 					syslog(loglevel, "server %s not "
-						"responding", host);
+					    "responding", host);
 				}
 				mfs->mfs_ignore = 1;
 				last_error = NFSERR_NOENT;
@@ -1022,15 +1023,15 @@ nextentry:
 			if (nfsvers != 0 && nfsvers != vers) {
 				if (nfs_proto == NULL)
 					syslog(loglevel,
-						"NFS version %d "
-						"not supported by %s",
-						nfsvers, host);
+					    "NFS version %d "
+					    "not supported by %s",
+					    nfsvers, host);
 				else
 					syslog(loglevel,
-						"NFS version %d "
-						"with proto %s "
-						"not supported by %s",
-						nfsvers, nfs_proto, host);
+					    "NFS version %d "
+					    "with proto %s "
+					    "not supported by %s",
+					    nfsvers, nfs_proto, host);
 				mfs->mfs_ignore = 1;
 				last_error = NFSERR_NOENT;
 				continue;
@@ -1188,7 +1189,7 @@ retry:
 			    (mfs->mfs_flags & MFS_FH_VIA_WEBNFS)) {
 
 				copts = malloc(strlen(opts) +
-					strlen(",public")+1);
+				    strlen(",public")+1);
 
 				if (copts == NULL) {
 					syslog(LOG_ERR, "nfsmount: no memory");
@@ -1205,7 +1206,7 @@ retry:
 			}
 
 			last_error = mount_generic(remname, MNTTYPE_CACHEFS,
-				copts, mntpnt, overlay);
+			    copts, mntpnt, overlay);
 
 			if (copts != opts)
 				free(copts);
@@ -1224,7 +1225,7 @@ retry:
 			 * Allocate nfs_args structure
 			 */
 			argp = (struct nfs_args *)
-				malloc(sizeof (struct nfs_args));
+			    malloc(sizeof (struct nfs_args));
 
 			if (!argp) {
 				syslog(LOG_ERR, "nfsmount: no memory");
@@ -1282,28 +1283,30 @@ retry:
 		 * used.
 		 */
 		if ((mfs->mfs_flags & MFS_FH_VIA_WEBNFS) == 0 &&
-			nfsvers != NFS_V4) {
-		    timeout.tv_usec = 0;
-		    timeout.tv_sec = rpc_timeout;
-		    rpc_stat = RPC_TIMEDOUT;
+		    nfsvers != NFS_V4) {
+			timeout.tv_usec = 0;
+			timeout.tv_sec = rpc_timeout;
+			rpc_stat = RPC_TIMEDOUT;
 
-		    /* Create the client handle. */
+			/* Create the client handle. */
 
-		    if (trace > 1) {
-			trace_prt(1, "  nfsmount: Get mount version: request "
-			    "vers=%d min=%d\n", vers, versmin);
-		    }
-
-		    while ((cl = clnt_create_vers(host, MOUNTPROG, &outvers,
-			versmin, vers, "udp")) == NULL) {
-			if (trace > 4) {
-			    trace_prt(1,
-			    "  nfsmount: Can't get mount version: rpcerr=%d\n",
-			    rpc_createerr.cf_stat);
+			if (trace > 1) {
+				trace_prt(1,
+				    "  nfsmount: Get mount version: request "
+				    "vers=%d min=%d\n", vers, versmin);
 			}
-			if (rpc_createerr.cf_stat == RPC_UNKNOWNHOST ||
-			    rpc_createerr.cf_stat == RPC_TIMEDOUT)
-				break;
+
+			while ((cl = clnt_create_vers(host, MOUNTPROG, &outvers,
+			    versmin, vers, "udp")) == NULL) {
+				if (trace > 4) {
+					trace_prt(1,
+					    "  nfsmount: Can't get mount "
+					    "version: rpcerr=%d\n",
+					    rpc_createerr.cf_stat);
+				}
+				if (rpc_createerr.cf_stat == RPC_UNKNOWNHOST ||
+				    rpc_createerr.cf_stat == RPC_TIMEDOUT)
+					break;
 
 			/*
 			 * backoff and return lower version to retry the ping.
@@ -1312,97 +1315,103 @@ retry:
 			 * is handled in clnt_create_vers(). It's not done to
 			 * stay in sync with the nfs mount command.
 			 */
-			vers--;
-			if (vers < versmin)
-				break;
-			if (trace > 4) {
-			    trace_prt(1, "  nfsmount: Try version=%d\n", vers);
-			}
-		    }
-
-		    if (cl == NULL) {
-			free(argp);
-			head = prevhead;
-			tail = prevtail;
-			if (tail)
-				tail->nfs_ext_u.nfs_extB.next = NULL;
-			last_error = NFSERR_NOENT;
-
-			if (rpc_createerr.cf_stat != RPC_UNKNOWNHOST &&
-			    rpc_createerr.cf_stat != RPC_PROGVERSMISMATCH &&
-			    retries-- > 0) {
-				DELAY(delay)
-				goto retry;
+				vers--;
+				if (vers < versmin)
+					break;
+				if (trace > 4) {
+					trace_prt(1,
+					    "  nfsmount: Try version=%d\n",
+					    vers);
+				}
 			}
 
-			syslog(loglevel, "%s %s", host,
-				clnt_spcreateerror("server not responding"));
-			skipentry = 1;
-			mfs->mfs_ignore = 1;
-			continue;
-		    }
-		    if (trace > 1) {
-			trace_prt(1, "	nfsmount: mount version=%d\n", outvers);
-		    }
+			if (cl == NULL) {
+				free(argp);
+				head = prevhead;
+				tail = prevtail;
+				if (tail)
+					tail->nfs_ext_u.nfs_extB.next = NULL;
+				last_error = NFSERR_NOENT;
+
+				if (rpc_createerr.cf_stat != RPC_UNKNOWNHOST &&
+				    rpc_createerr.cf_stat !=
+				    RPC_PROGVERSMISMATCH &&
+				    retries-- > 0) {
+					DELAY(delay);
+					goto retry;
+				}
+
+				syslog(loglevel, "%s %s", host,
+				    clnt_spcreateerror(
+				    "server not responding"));
+				skipentry = 1;
+				mfs->mfs_ignore = 1;
+				continue;
+			}
+			if (trace > 1) {
+				trace_prt(1,
+				    "	nfsmount: mount version=%d\n", outvers);
+			}
 #ifdef MALLOC_DEBUG
-		    add_alloc("CLNT_HANDLE", cl, 0, __FILE__, __LINE__);
-		    add_alloc("AUTH_HANDLE", cl->cl_auth, 0,
-			__FILE__, __LINE__);
+			add_alloc("CLNT_HANDLE", cl, 0, __FILE__, __LINE__);
+			add_alloc("AUTH_HANDLE", cl->cl_auth, 0,
+			    __FILE__, __LINE__);
 #endif
 
-		    if (__clnt_bindresvport(cl) < 0) {
-			free(argp);
-			head = prevhead;
-			tail = prevtail;
-			if (tail)
-				tail->nfs_ext_u.nfs_extB.next = NULL;
-			last_error = NFSERR_NOENT;
+			if (__clnt_bindresvport(cl) < 0) {
+				free(argp);
+				head = prevhead;
+				tail = prevtail;
+				if (tail)
+					tail->nfs_ext_u.nfs_extB.next = NULL;
+				last_error = NFSERR_NOENT;
 
-			if (retries-- > 0) {
+				if (retries-- > 0) {
+					destroy_auth_client_handle(cl);
+					DELAY(delay);
+					goto retry;
+				}
+
+				syslog(loglevel, "mount %s: %s", host,
+				    "Couldn't bind to reserved port");
 				destroy_auth_client_handle(cl);
-				DELAY(delay);
-				goto retry;
+				skipentry = 1;
+				mfs->mfs_ignore = 1;
+				continue;
 			}
 
-			syslog(loglevel, "mount %s: %s", host,
-				"Couldn't bind to reserved port");
-			destroy_auth_client_handle(cl);
-			skipentry = 1;
-			mfs->mfs_ignore = 1;
-			continue;
-		    }
-
 #ifdef MALLOC_DEBUG
-		    drop_alloc("AUTH_HANDLE", cl->cl_auth, __FILE__, __LINE__);
+			drop_alloc("AUTH_HANDLE", cl->cl_auth,
+			    __FILE__, __LINE__);
 #endif
-		    AUTH_DESTROY(cl->cl_auth);
-		    if ((cl->cl_auth = authsys_create_default()) == NULL) {
-			free(argp);
-			head = prevhead;
-			tail = prevtail;
-			if (tail)
-				tail->nfs_ext_u.nfs_extB.next = NULL;
-			last_error = NFSERR_NOENT;
+			AUTH_DESTROY(cl->cl_auth);
+			if ((cl->cl_auth = authsys_create_default()) == NULL) {
+				free(argp);
+				head = prevhead;
+				tail = prevtail;
+				if (tail)
+					tail->nfs_ext_u.nfs_extB.next = NULL;
+				last_error = NFSERR_NOENT;
 
-			if (retries-- > 0) {
+				if (retries-- > 0) {
+					destroy_auth_client_handle(cl);
+					DELAY(delay);
+					goto retry;
+				}
+
+				syslog(loglevel, "mount %s: %s", host,
+				    "Failed creating default auth handle");
 				destroy_auth_client_handle(cl);
-				DELAY(delay);
-				goto retry;
+				skipentry = 1;
+				mfs->mfs_ignore = 1;
+				continue;
 			}
-
-			syslog(loglevel, "mount %s: %s", host,
-				"Failed creating default auth handle");
-			destroy_auth_client_handle(cl);
-			skipentry = 1;
-			mfs->mfs_ignore = 1;
-			continue;
-		    }
 #ifdef MALLOC_DEBUG
-		    add_alloc("AUTH_HANDLE", cl->cl_auth, 0,
-			__FILE__, __LINE__);
+			add_alloc("AUTH_HANDLE", cl->cl_auth, 0,
+			    __FILE__, __LINE__);
 #endif
 		} else
-		    cl = NULL;
+			cl = NULL;
 
 		/*
 		 * set security options
@@ -1493,276 +1502,300 @@ retry:
 		}
 
 		posix = (nfsvers != NFS_V4 &&
-				hasmntopt(&m, MNTOPT_POSIX) != NULL) ? 1 : 0;
+		    hasmntopt(&m, MNTOPT_POSIX) != NULL) ? 1 : 0;
 
 		if ((mfs->mfs_flags & MFS_FH_VIA_WEBNFS) == 0 &&
-			nfsvers != NFS_V4) {
-		    bool_t give_up_on_mnt;
-		    bool_t got_mnt_error;
+		    nfsvers != NFS_V4) {
+			bool_t give_up_on_mnt;
+			bool_t got_mnt_error;
 		/*
 		 * If we started with a URL, if first byte of path is not "/",
 		 * then the mount will likely fail, so we should try again
 		 * with a prepended "/".
 		 */
-		    if (mfs->mfs_flags & MFS_ALLOC_DIR && *dir != '/')
-			give_up_on_mnt = FALSE;
-		    else
-			give_up_on_mnt = TRUE;
+			if (mfs->mfs_flags & MFS_ALLOC_DIR && *dir != '/')
+				give_up_on_mnt = FALSE;
+			else
+				give_up_on_mnt = TRUE;
 
-		    got_mnt_error = FALSE;
+			got_mnt_error = FALSE;
 
 try_mnt_slash:
-		    if (got_mnt_error == TRUE) {
-			int i, l;
+			if (got_mnt_error == TRUE) {
+				int i, l;
 
-			give_up_on_mnt = TRUE;
-			l = strlen(dir);
-
-			/*
-			 * Insert a "/" to front of mfs_dir.
-			 */
-			for (i = l; i > 0; i--)
-				dir[i] = dir[i-1];
-
-			dir[0] = '/';
-		    }
-
-		    /* Get fhandle of remote path from server's mountd */
-
-		    switch (outvers) {
-		    case MOUNTVERS:
-			if (posix) {
-				free(argp);
-				head = prevhead;
-				tail = prevtail;
-				if (tail)
-					tail->nfs_ext_u.nfs_extB.next = NULL;
-				last_error = NFSERR_NOENT;
-				syslog(loglevel, "can't get posix info for %s",
-					host);
-				destroy_auth_client_handle(cl);
-				skipentry = 1;
-				mfs->mfs_ignore = 1;
-				continue;
-			}
-		    /* FALLTHRU */
-		    case MOUNTVERS_POSIX:
-			if (nfsvers == NFS_V3) {
-				free(argp);
-				head = prevhead;
-				tail = prevtail;
-				if (tail)
-					tail->nfs_ext_u.nfs_extB.next = NULL;
-				last_error = NFSERR_NOENT;
-				syslog(loglevel,
-					"%s doesn't support NFS Version 3",
-					host);
-				destroy_auth_client_handle(cl);
-				skipentry = 1;
-				mfs->mfs_ignore = 1;
-				continue;
-			}
-			rpc_stat = clnt_call(cl, MOUNTPROC_MNT,
-				xdr_dirpath, (caddr_t)&dir,
-				xdr_fhstatus, (caddr_t)&fhs, timeout);
-			if (rpc_stat != RPC_SUCCESS) {
-
-				if (give_up_on_mnt == FALSE) {
-					got_mnt_error = TRUE;
-					goto try_mnt_slash;
-				}
+				give_up_on_mnt = TRUE;
+				l = strlen(dir);
 
 				/*
-				 * Given the way "clnt_sperror" works, the "%s"
-				 * immediately following the "not responding"
-				 * is correct.
+				 * Insert a "/" to front of mfs_dir.
 				 */
-				free(argp);
-				head = prevhead;
-				tail = prevtail;
-				if (tail)
-					tail->nfs_ext_u.nfs_extB.next = NULL;
-				last_error = NFSERR_NOENT;
+				for (i = l; i > 0; i--)
+					dir[i] = dir[i-1];
 
-				if (retries-- > 0) {
-					destroy_auth_client_handle(cl);
-					DELAY(delay);
-					goto retry;
-				}
-
-				if (trace > 3) {
-				    trace_prt(1,
-					"  nfsmount: mount RPC failed for %s\n",
-					host);
-				}
-				syslog(loglevel, "%s server not responding%s",
-				    host, clnt_sperror(cl, ""));
-				destroy_auth_client_handle(cl);
-				skipentry = 1;
-				mfs->mfs_ignore = 1;
-				continue;
-			}
-			if ((errno = fhs.fhs_status) != MNT_OK)  {
-
-				if (give_up_on_mnt == FALSE) {
-					got_mnt_error = TRUE;
-					goto try_mnt_slash;
-				}
-
-				free(argp);
-				head = prevhead;
-				tail = prevtail;
-				if (tail)
-					tail->nfs_ext_u.nfs_extB.next = NULL;
-				if (errno == EACCES) {
-					status = NFSERR_ACCES;
-				} else {
-					syslog(loglevel, "%s: %m", host);
-					status = NFSERR_IO;
-				}
-				if (trace > 3) {
-				    trace_prt(1, "  nfsmount: mount RPC gave"
-					" %d for %s:%s\n",
-					errno, host, dir);
-				}
-				last_error = status;
-				destroy_auth_client_handle(cl);
-				skipentry = 1;
-				mfs->mfs_ignore = 1;
-				continue;
-			}
-			argp->fh = malloc((sizeof (fhandle)));
-			if (!argp->fh) {
-				syslog(LOG_ERR, "nfsmount: no memory");
-				last_error = NFSERR_IO;
-				destroy_auth_client_handle(cl);
-				goto out;
-			}
-			(void) memcpy(argp->fh, &fhs.fhstatus_u.fhs_fhandle,
-				sizeof (fhandle));
-			break;
-		    case MOUNTVERS3:
-			posix = 0;
-			(void) memset((char *)&res3, '\0', sizeof (res3));
-			rpc_stat = clnt_call(cl, MOUNTPROC_MNT,
-				xdr_dirpath, (caddr_t)&dir,
-				xdr_mountres3, (caddr_t)&res3, timeout);
-			if (rpc_stat != RPC_SUCCESS) {
-
-				if (give_up_on_mnt == FALSE) {
-					got_mnt_error = TRUE;
-					goto try_mnt_slash;
-				}
-
-				/*
-				 * Given the way "clnt_sperror" works, the "%s"
-				 * immediately following the "not responding"
-				 * is correct.
-				 */
-				free(argp);
-				head = prevhead;
-				tail = prevtail;
-				if (tail)
-					tail->nfs_ext_u.nfs_extB.next = NULL;
-				last_error = NFSERR_NOENT;
-
-				if (retries-- > 0) {
-					destroy_auth_client_handle(cl);
-					DELAY(delay);
-					goto retry;
-				}
-
-				if (trace > 3) {
-				    trace_prt(1,
-					"  nfsmount: mount RPC failed for %s\n",
-					host);
-				}
-				syslog(loglevel, "%s server not responding%s",
-				    remname, clnt_sperror(cl, ""));
-				destroy_auth_client_handle(cl);
-				skipentry = 1;
-				mfs->mfs_ignore = 1;
-				continue;
-			}
-			if ((errno = res3.fhs_status) != MNT_OK)  {
-
-				if (give_up_on_mnt == FALSE) {
-					got_mnt_error = TRUE;
-					goto try_mnt_slash;
-				}
-
-				free(argp);
-				head = prevhead;
-				tail = prevtail;
-				if (tail)
-					tail->nfs_ext_u.nfs_extB.next = NULL;
-				if (errno == EACCES) {
-					status = NFSERR_ACCES;
-				} else {
-					syslog(loglevel, "%s: %m", remname);
-					status = NFSERR_IO;
-				}
-				if (trace > 3) {
-				    trace_prt(1, "  nfsmount: mount RPC gave"
-					" %d for %s:%s\n",
-					errno, host, dir);
-				}
-				last_error = status;
-				destroy_auth_client_handle(cl);
-				skipentry = 1;
-				mfs->mfs_ignore = 1;
-				continue;
+				dir[0] = '/';
 			}
 
-			/*
-			 *  Negotiate the security flavor for nfs_mount
-			 */
-			auths =
-		    res3.mountres3_u.mountinfo.auth_flavors.auth_flavors_val;
-			count =
-		    res3.mountres3_u.mountinfo.auth_flavors.auth_flavors_len;
+			/* Get fhandle of remote path from server's mountd */
 
-			if (sec_opt) {
-				for (i = 0; i < count; i++)
-					if (auths[i] == nfs_sec.sc_nfsnum) {
-						break;
-					}
-				if (i >= count) {
-					syslog(LOG_ERR,
-				    "%s: does not support security \"%s\"\n",
-					    remname, nfs_sec.sc_name);
-					clnt_freeres(cl, xdr_mountres3,
-					    (caddr_t)&res3);
+			switch (outvers) {
+			case MOUNTVERS:
+				if (posix) {
 					free(argp);
 					head = prevhead;
 					tail = prevtail;
 					if (tail)
-				tail->nfs_ext_u.nfs_extB.next = NULL;
-					last_error = NFSERR_IO;
+						tail->nfs_ext_u.nfs_extB.next =
+						    NULL;
+					last_error = NFSERR_NOENT;
+					syslog(loglevel,
+					    "can't get posix info for %s",
+					    host);
 					destroy_auth_client_handle(cl);
 					skipentry = 1;
 					mfs->mfs_ignore = 1;
 					continue;
 				}
-			} else {
-				if (count > 0) {
+		    /* FALLTHRU */
+			case MOUNTVERS_POSIX:
+				if (nfsvers == NFS_V3) {
+					free(argp);
+					head = prevhead;
+					tail = prevtail;
+					if (tail)
+						tail->nfs_ext_u.nfs_extB.next =
+						    NULL;
+					last_error = NFSERR_NOENT;
+					syslog(loglevel,
+					    "%s doesn't support NFS Version 3",
+					    host);
+					destroy_auth_client_handle(cl);
+					skipentry = 1;
+					mfs->mfs_ignore = 1;
+					continue;
+				}
+				rpc_stat = clnt_call(cl, MOUNTPROC_MNT,
+				    xdr_dirpath, (caddr_t)&dir,
+				    xdr_fhstatus, (caddr_t)&fhs, timeout);
+				if (rpc_stat != RPC_SUCCESS) {
+
+					if (give_up_on_mnt == FALSE) {
+						got_mnt_error = TRUE;
+						goto try_mnt_slash;
+					}
+
+				/*
+				 * Given the way "clnt_sperror" works, the "%s"
+				 * immediately following the "not responding"
+				 * is correct.
+				 */
+					free(argp);
+					head = prevhead;
+					tail = prevtail;
+					if (tail)
+						tail->nfs_ext_u.nfs_extB.next =
+						    NULL;
+					last_error = NFSERR_NOENT;
+
+					if (retries-- > 0) {
+						destroy_auth_client_handle(cl);
+						DELAY(delay);
+						goto retry;
+					}
+
+					if (trace > 3) {
+						trace_prt(1,
+						    "  nfsmount: mount RPC "
+						    "failed for %s\n",
+						    host);
+					}
+					syslog(loglevel,
+					    "%s server not responding%s",
+					    host, clnt_sperror(cl, ""));
+					destroy_auth_client_handle(cl);
+					skipentry = 1;
+					mfs->mfs_ignore = 1;
+					continue;
+				}
+				if ((errno = fhs.fhs_status) != MNT_OK)  {
+
+					if (give_up_on_mnt == FALSE) {
+						got_mnt_error = TRUE;
+						goto try_mnt_slash;
+					}
+
+					free(argp);
+					head = prevhead;
+					tail = prevtail;
+					if (tail)
+						tail->nfs_ext_u.nfs_extB.next =
+						    NULL;
+					if (errno == EACCES) {
+						status = NFSERR_ACCES;
+					} else {
+						syslog(loglevel, "%s: %m",
+						    host);
+						status = NFSERR_IO;
+					}
+					if (trace > 3) {
+						trace_prt(1,
+						    "  nfsmount: mount RPC gave"
+						    " %d for %s:%s\n",
+						    errno, host, dir);
+					}
+					last_error = status;
+					destroy_auth_client_handle(cl);
+					skipentry = 1;
+					mfs->mfs_ignore = 1;
+					continue;
+				}
+				argp->fh = malloc((sizeof (fhandle)));
+				if (!argp->fh) {
+					syslog(LOG_ERR, "nfsmount: no memory");
+					last_error = NFSERR_IO;
+					destroy_auth_client_handle(cl);
+					goto out;
+				}
+				(void) memcpy(argp->fh,
+				    &fhs.fhstatus_u.fhs_fhandle,
+				    sizeof (fhandle));
+				break;
+			case MOUNTVERS3:
+				posix = 0;
+				(void) memset((char *)&res3, '\0',
+				    sizeof (res3));
+				rpc_stat = clnt_call(cl, MOUNTPROC_MNT,
+				    xdr_dirpath, (caddr_t)&dir,
+				    xdr_mountres3, (caddr_t)&res3, timeout);
+				if (rpc_stat != RPC_SUCCESS) {
+
+					if (give_up_on_mnt == FALSE) {
+						got_mnt_error = TRUE;
+						goto try_mnt_slash;
+					}
+
+				/*
+				 * Given the way "clnt_sperror" works, the "%s"
+				 * immediately following the "not responding"
+				 * is correct.
+				 */
+					free(argp);
+					head = prevhead;
+					tail = prevtail;
+					if (tail)
+						tail->nfs_ext_u.nfs_extB.next =
+						    NULL;
+					last_error = NFSERR_NOENT;
+
+					if (retries-- > 0) {
+						destroy_auth_client_handle(cl);
+						DELAY(delay);
+						goto retry;
+					}
+
+					if (trace > 3) {
+						trace_prt(1,
+						    "  nfsmount: mount RPC "
+						    "failed for %s\n",
+						    host);
+					}
+					syslog(loglevel,
+					    "%s server not responding%s",
+					    remname, clnt_sperror(cl, ""));
+					destroy_auth_client_handle(cl);
+					skipentry = 1;
+					mfs->mfs_ignore = 1;
+					continue;
+				}
+				if ((errno = res3.fhs_status) != MNT_OK)  {
+
+					if (give_up_on_mnt == FALSE) {
+						got_mnt_error = TRUE;
+						goto try_mnt_slash;
+					}
+
+					free(argp);
+					head = prevhead;
+					tail = prevtail;
+					if (tail)
+						tail->nfs_ext_u.nfs_extB.next =
+						    NULL;
+					if (errno == EACCES) {
+						status = NFSERR_ACCES;
+					} else {
+						syslog(loglevel, "%s: %m",
+						    remname);
+						status = NFSERR_IO;
+					}
+					if (trace > 3) {
+						trace_prt(1,
+						    "  nfsmount: mount RPC gave"
+						    " %d for %s:%s\n",
+						    errno, host, dir);
+					}
+					last_error = status;
+					destroy_auth_client_handle(cl);
+					skipentry = 1;
+					mfs->mfs_ignore = 1;
+					continue;
+				}
+
+			/*
+			 *  Negotiate the security flavor for nfs_mount
+			 */
+				auths = res3.mountres3_u.mountinfo.
+				    auth_flavors.auth_flavors_val;
+				count = res3.mountres3_u.mountinfo.
+				    auth_flavors.auth_flavors_len;
+
+				if (sec_opt) {
+					for (i = 0; i < count; i++)
+						if (auths[i] ==
+						    nfs_sec.sc_nfsnum) {
+							break;
+						}
+					if (i >= count) {
+						syslog(LOG_ERR,
+						    "%s: does not support "
+						    "security \"%s\"\n",
+						    remname, nfs_sec.sc_name);
+						clnt_freeres(cl, xdr_mountres3,
+						    (caddr_t)&res3);
+						free(argp);
+						head = prevhead;
+						tail = prevtail;
+						if (tail)
+							tail->nfs_ext_u.
+							    nfs_extB.next =
+							    NULL;
+						last_error = NFSERR_IO;
+						destroy_auth_client_handle(cl);
+						skipentry = 1;
+						mfs->mfs_ignore = 1;
+						continue;
+					}
+				} else if (count > 0) {
 					for (i = 0; i < count; i++) {
-					    if (!(scerror =
-				nfs_getseconfig_bynumber(auths[i], &nfs_sec))) {
-						sec_opt++;
-						break;
-					    }
+						if (!(scerror =
+						    nfs_getseconfig_bynumber(
+						    auths[i], &nfs_sec))) {
+							sec_opt++;
+							break;
+						}
 					}
 					if (i >= count) {
 						if (nfs_syslog_scerr(scerror,
-								scerror_msg)
-							!= -1) {
+						    scerror_msg)
+						    != -1) {
 							syslog(LOG_ERR,
-			"%s cannot be mounted because it is shared with "
-			"security flavor %d which %s",
-							remname,
-							auths[i-1],
-							scerror_msg);
+							    "%s cannot be "
+							    "mounted because it"
+							    " is shared with "
+							    "security flavor %d"
+							    " which %s",
+							    remname,
+							    auths[i-1],
+							    scerror_msg);
 						}
 						clnt_freeres(cl, xdr_mountres3,
 						    (caddr_t)&res3);
@@ -1770,46 +1803,50 @@ try_mnt_slash:
 						head = prevhead;
 						tail = prevtail;
 						if (tail)
-					tail->nfs_ext_u.nfs_extB.next = NULL;
+							tail->nfs_ext_u.
+							    nfs_extB.next =
+							    NULL;
 						last_error = NFSERR_IO;
 						destroy_auth_client_handle(cl);
 						skipentry = 1;
 						mfs->mfs_ignore = 1;
 						continue;
-					}
+						}
 				}
-			}
 
-			fh3.fh3_length =
-			    res3.mountres3_u.mountinfo.fhandle.fhandle3_len;
-			(void) memcpy(fh3.fh3_u.data,
-			    res3.mountres3_u.mountinfo.fhandle.fhandle3_val,
-			    fh3.fh3_length);
-			clnt_freeres(cl, xdr_mountres3,
-			    (caddr_t)&res3);
-			argp->fh = malloc(sizeof (nfs_fh3));
-			if (!argp->fh) {
-				syslog(LOG_ERR, "nfsmount: no memory");
-				last_error = NFSERR_IO;
+				fh3.fh3_length =
+				    res3.mountres3_u.mountinfo.fhandle.
+				    fhandle3_len;
+				(void) memcpy(fh3.fh3_u.data,
+				    res3.mountres3_u.mountinfo.fhandle.
+				    fhandle3_val,
+				    fh3.fh3_length);
+				clnt_freeres(cl, xdr_mountres3,
+				    (caddr_t)&res3);
+				argp->fh = malloc(sizeof (nfs_fh3));
+				if (!argp->fh) {
+					syslog(LOG_ERR, "nfsmount: no memory");
+					last_error = NFSERR_IO;
+					destroy_auth_client_handle(cl);
+					goto out;
+				}
+				(void) memcpy(argp->fh, &fh3, sizeof (nfs_fh3));
+				break;
+			default:
+				free(argp);
+				head = prevhead;
+				tail = prevtail;
+				if (tail)
+					tail->nfs_ext_u.nfs_extB.next = NULL;
+				last_error = NFSERR_NOENT;
+				syslog(loglevel,
+				    "unknown MOUNT version %ld on %s",
+				    vers, remname);
 				destroy_auth_client_handle(cl);
-				goto out;
-			}
-			(void) memcpy(argp->fh, &fh3, sizeof (nfs_fh3));
-			break;
-		    default:
-			free(argp);
-			head = prevhead;
-			tail = prevtail;
-			if (tail)
-				tail->nfs_ext_u.nfs_extB.next = NULL;
-			last_error = NFSERR_NOENT;
-			syslog(loglevel, "unknown MOUNT version %ld on %s",
-			    vers, remname);
-			destroy_auth_client_handle(cl);
-			skipentry = 1;
-			mfs->mfs_ignore = 1;
-			continue;
-		    } /* switch */
+				skipentry = 1;
+				mfs->mfs_ignore = 1;
+				continue;
+			} /* switch */
 		}
 		if (nfsvers == NFS_V4) {
 			argp->fh = strdup(dir);
@@ -1855,13 +1892,13 @@ try_mnt_slash:
 			if (nfsvers == NFS_V4) {
 				enum clnt_stat cstat;
 				argp->addr = get_server_stuff(SERVER_ADDR,
-					host, NFS_PROGRAM, nfsvers, NULL,
-					&nconf, nfs_proto, thisport, NULL,
-					NULL, TRUE, NULL, &cstat);
+				    host, NFS_PROGRAM, nfsvers, NULL,
+				    &nconf, nfs_proto, thisport, NULL,
+				    NULL, TRUE, NULL, &cstat);
 			} else {
 				argp->addr = get_addr(host, NFS_PROGRAM,
-					nfsvers, &nconf, nfs_proto,
-					thisport, NULL);
+				    nfsvers, &nconf, nfs_proto,
+				    thisport, NULL);
 			}
 
 			if (argp->addr == NULL) {
@@ -1945,7 +1982,7 @@ try_mnt_slash:
 		 */
 		if (mfssnego.snego_done) {
 			memcpy(&nfs_sec, &mfssnego.nfs_sec,
-				sizeof (seconfig_t));
+			    sizeof (seconfig_t));
 		} else if (!sec_opt) {
 			/*
 			 * Get default security mode.
@@ -1993,64 +2030,70 @@ try_mnt_slash:
 		 * talking RPCBIND. Otherwise, assume that firewalls
 		 * prevent us from doing that.
 		 */
-		    if ((mfs->mfs_flags & MFS_FH_VIA_WEBNFS) == 0 &&
-				nfsvers != NFS_V4) {
+			if ((mfs->mfs_flags & MFS_FH_VIA_WEBNFS) == 0 &&
+			    nfsvers != NFS_V4) {
 			syncaddr = get_the_stuff(SERVER_ADDR, host, RPCBPROG,
-				RPCBVERS, NULL, nconf, 0, NULL, NULL, FALSE,
-				NULL, NULL);
-		    }
-
-		    if (syncaddr != NULL) {
-			/* for flags in sec_data */
-			secflags |= AUTH_F_RPCTIMESYNC;
-		    } else {
-			struct nd_hostserv hs;
-			int error;
-
-			hs.h_host = host;
-			hs.h_serv = "timserver";
-			error = netdir_getbyname(nconf, &hs, &retaddrs);
-
-			if (error != ND_OK && nfs_sec.sc_rpcnum == AUTH_DH) {
-				syslog(loglevel,
-				"%s: secure: no time service\n", host);
-				free_knconf(argp->knconf);
-				netbuf_free(argp->addr);
-				freenetconfigent(nconf);
-				if (argp->hostname)
-					free(argp->hostname);
-				free(argp->fh);
-				free(argp);
-				head = prevhead;
-				tail = prevtail;
-				if (tail)
-					tail->nfs_ext_u.nfs_extB.next = NULL;
-				last_error = NFSERR_IO;
-				destroy_auth_client_handle(cl);
-				skipentry = 1;
-				mfs->mfs_ignore = 1;
-				continue;
+			    RPCBVERS, NULL, nconf, 0, NULL, NULL, FALSE,
+			    NULL, NULL);
 			}
 
-			if (error == ND_OK)
-			    syncaddr = retaddrs->n_addrs;
+			if (syncaddr != NULL) {
+				/* for flags in sec_data */
+				secflags |= AUTH_F_RPCTIMESYNC;
+			} else {
+				struct nd_hostserv hs;
+				int error;
+
+				hs.h_host = host;
+				hs.h_serv = "timserver";
+				error = netdir_getbyname(nconf, &hs, &retaddrs);
+
+				if (error != ND_OK &&
+				    nfs_sec.sc_rpcnum == AUTH_DH) {
+					syslog(loglevel,
+					    "%s: secure: no time service\n",
+					    host);
+					free_knconf(argp->knconf);
+					netbuf_free(argp->addr);
+					freenetconfigent(nconf);
+					if (argp->hostname)
+						free(argp->hostname);
+					free(argp->fh);
+					free(argp);
+					head = prevhead;
+					tail = prevtail;
+					if (tail)
+						tail->nfs_ext_u.nfs_extB.next =
+						    NULL;
+					last_error = NFSERR_IO;
+					destroy_auth_client_handle(cl);
+					skipentry = 1;
+					mfs->mfs_ignore = 1;
+					continue;
+				}
+
+				if (error == ND_OK)
+					syncaddr = retaddrs->n_addrs;
 
 			/*
 			 * For potential usage by NFS V4 when AUTH_DH
 			 * is negotiated via SECINFO in the kernel.
 			 */
-			if (nfsvers == NFS_V4 && syncaddr &&
+				if (nfsvers == NFS_V4 && syncaddr &&
 				    host2netname(netname, host, NULL)) {
-			    argp->syncaddr = malloc(sizeof (struct netbuf));
-			    argp->syncaddr->buf = malloc(syncaddr->len);
-			    (void) memcpy(argp->syncaddr->buf,
-					syncaddr->buf, syncaddr->len);
-			    argp->syncaddr->len = syncaddr->len;
-			    argp->syncaddr->maxlen = syncaddr->maxlen;
-			    argp->netname = strdup(netname);
-			    argp->flags |= NFSMNT_SECURE;
-			}
-		    } /* syncaddr */
+					argp->syncaddr =
+					    malloc(sizeof (struct netbuf));
+					argp->syncaddr->buf =
+					    malloc(syncaddr->len);
+					(void) memcpy(argp->syncaddr->buf,
+					    syncaddr->buf, syncaddr->len);
+					argp->syncaddr->len = syncaddr->len;
+					argp->syncaddr->maxlen =
+					    syncaddr->maxlen;
+					argp->netname = strdup(netname);
+					argp->flags |= NFSMNT_SECURE;
+				}
+			} /* syncaddr */
 		} /* AUTH_DH */
 
 		/*
@@ -2071,9 +2114,9 @@ try_mnt_slash:
 		 * in the sec_data structure via nfs_clnt_secdata().
 		 */
 		if (!(secdata = nfs_clnt_secdata(&nfs_sec, host, argp->knconf,
-					syncaddr, secflags))) {
+		    syncaddr, secflags))) {
 			syslog(LOG_ERR,
-				"errors constructing security related data\n");
+			    "errors constructing security related data\n");
 			if (secflags & AUTH_F_RPCTIMESYNC)
 				netbuf_free(syncaddr);
 			else if (retaddrs)
@@ -2127,7 +2170,7 @@ try_mnt_slash:
 			argp->flags |= NFSMNT_ACDIRMIN;
 			argp->flags |= NFSMNT_ACREGMIN;
 			argp->acdirmin = argp->acregmin = argp->acdirmax
-				= argp->acregmax;
+			    = argp->acregmax;
 		} else {
 			if (nopt(&m, MNTOPT_ACREGMIN, &argp->acregmin)) {
 				argp->flags |= NFSMNT_ACREGMIN;
@@ -2155,7 +2198,7 @@ try_mnt_slash:
 				netbuf_free(argp->addr);
 				freenetconfigent(nconf);
 				nfs_free_secdata(
-					argp->nfs_ext_u.nfs_extB.secdata);
+				    argp->nfs_ext_u.nfs_extB.secdata);
 				if (argp->syncaddr)
 					netbuf_free(argp->syncaddr);
 				if (argp->netname)
@@ -2206,7 +2249,7 @@ try_mnt_slash:
 		if (hasmntopt(&m, MNTOPT_LLOCK))
 			argp->flags |= NFSMNT_LLOCK;
 		if (!(argp->flags & NFSMNT_LLOCK) && nfsvers == NFS_VERSION &&
-			remote_lock(host, argp->fh)) {
+		    remote_lock(host, argp->fh)) {
 			syslog(loglevel, "No network locking on %s : "
 			"contact admin to install server change", host);
 			argp->flags |= NFSMNT_LLOCK;
@@ -2349,10 +2392,10 @@ try_mnt_slash:
 	 */
 	if (alp == NULL) {
 		if (mount(mnttabtext, mntpnt, flags | MS_DATA, fstype,
-			head, sizeof (*head), mopts, MAX_MNTOPT_STR) < 0) {
+		    head, sizeof (*head), mopts, MAX_MNTOPT_STR) < 0) {
 			if (trace > 1)
 				trace_prt(1, "	Mount of %s on %s: %d\n",
-					mnttabtext, mntpnt, errno);
+				    mnttabtext, mntpnt, errno);
 			if (errno != EBUSY || verbose)
 				syslog(LOG_ERR,
 				"Mount of %s on %s: %m", mnttabtext, mntpnt);
@@ -2364,7 +2407,7 @@ try_mnt_slash:
 		if (stat(mntpnt, &stbuf) == 0) {
 			if (trace > 1) {
 				trace_prt(1, "	mount %s dev=%x rdev=%x OK\n",
-				mnttabtext, stbuf.st_dev, stbuf.st_rdev);
+				    mnttabtext, stbuf.st_dev, stbuf.st_rdev);
 			}
 		} else {
 			if (trace > 1) {
@@ -2376,21 +2419,21 @@ try_mnt_slash:
 	} else {
 		alp->action.action = AUTOFS_MOUNT_RQ;
 		alp->action.action_list_entry_u.mounta.spec =
-			strdup(mnttabtext);
+		    strdup(mnttabtext);
 		alp->action.action_list_entry_u.mounta.dir = strdup(mntpnt);
 		alp->action.action_list_entry_u.mounta.flags =
-			flags | MS_DATA;
+		    flags | MS_DATA;
 		alp->action.action_list_entry_u.mounta.fstype =
-			strdup(fstype);
+		    strdup(fstype);
 		alp->action.action_list_entry_u.mounta.dataptr = (char *)head;
 		alp->action.action_list_entry_u.mounta.datalen =
-			sizeof (*head);
+		    sizeof (*head);
 		mntopts = malloc(strlen(mopts) + 1);
 		strcpy(mntopts, mopts);
 		mntopts[strlen(mopts)] = '\0';
 		alp->action.action_list_entry_u.mounta.optptr = mntopts;
 		alp->action.action_list_entry_u.mounta.optlen =
-			strlen(mntopts) + 1;
+		    strlen(mntopts) + 1;
 		last_error = NFS_OK;
 		goto ret;
 	}
@@ -3057,8 +3100,13 @@ get_the_stuff(
 			    }
 			    break;
 		    case NFS_V4:
+			    tv.tv_sec = 10;
+			    tv.tv_usec = 0;
+			    cs = clnt_call(cl, NULLPROC, xdr_void, 0,
+				xdr_void, 0, tv);
+			    if (cs != RPC_SUCCESS)
+				    goto done;
 			    *fhp = strdup(fspath);
-			    cs = RPC_SUCCESS;
 			    break;
 		    }
 		    break;
@@ -3211,8 +3259,8 @@ get_pubfh(char *hostname, rpcvers_t vers, mfs_snego_t *mfssnego,
 	enum clnt_stat cstat;
 
 	return (get_server_stuff(SERVER_FH, hostname, NFS_PROGRAM, vers,
-		mfssnego, nconfp, proto, port, tinfo, fhp, get_pubfh, fspath,
-		&cstat));
+	    mfssnego, nconfp, proto, port, tinfo, fhp, get_pubfh, fspath,
+	    &cstat));
 }
 
 static enum clnt_stat
@@ -3222,7 +3270,7 @@ get_ping(char *hostname, rpcprog_t prog, rpcvers_t vers,
 	enum clnt_stat cstat;
 
 	(void) get_server_stuff(SERVER_PING, hostname, prog, vers, NULL, nconfp,
-		NULL, port, NULL, NULL, direct_to_server, NULL, &cstat);
+	    NULL, port, NULL, NULL, direct_to_server, NULL, &cstat);
 
 	return (cstat);
 }
@@ -3250,8 +3298,8 @@ get_server_stuff(
 
 	if (nconfp && *nconfp)
 		return (get_the_stuff(type_of_stuff, hostname, prog, vers,
-			mfssnego, *nconfp, port, tinfo, fhp, direct_to_server,
-			fspath, cstatp));
+		    mfssnego, *nconfp, port, tinfo, fhp, direct_to_server,
+		    fspath, cstatp));
 
 
 	/*
@@ -3288,8 +3336,8 @@ get_server_stuff(
 			}
 
 			nb = get_the_stuff(type_of_stuff, hostname, prog, vers,
-				mfssnego, nconf, port, tinfo, fhp,
-				direct_to_server, fspath, cstatp);
+			    mfssnego, nconf, port, tinfo, fhp,
+			    direct_to_server, fspath, cstatp);
 
 			if (*cstatp == RPC_SUCCESS)
 				break;
@@ -3305,34 +3353,39 @@ get_server_stuff(
 retry:
 		while (nconf = getnetpath(nc)) {
 			if (nconf->nc_flag & NC_VISIBLE) {
-			    if (nthtry == FIRST_TRY) {
-				if ((nconf->nc_semantics == NC_TPI_COTS_ORD) ||
-					(nconf->nc_semantics == NC_TPI_COTS)) {
-				    if (port == 0)
-					break;
-				    if ((strcmp(nconf->nc_protofmly,
-					NC_INET) == 0 ||
-					strcmp(nconf->nc_protofmly,
-					NC_INET6) == 0) &&
-					(strcmp(nconf->nc_proto, NC_TCP) == 0))
-					break;
+				if (nthtry == FIRST_TRY) {
+					if ((nconf->nc_semantics ==
+					    NC_TPI_COTS_ORD) ||
+					    (nconf->nc_semantics ==
+					    NC_TPI_COTS)) {
+						if (port == 0)
+							break;
+						if ((strcmp(nconf->nc_protofmly,
+						    NC_INET) == 0 ||
+						    strcmp(nconf->nc_protofmly,
+						    NC_INET6) == 0) &&
+						    (strcmp(nconf->nc_proto,
+						    NC_TCP) == 0))
+							break;
+					}
 				}
-			    }
-			    if (nthtry == SECOND_TRY) {
-				if (nconf->nc_semantics == NC_TPI_CLTS) {
-				    if (port == 0)
-					break;
-				    if ((strcmp(nconf->nc_protofmly,
-					NC_INET) == 0 ||
-					strcmp(nconf->nc_protofmly,
-					NC_INET6) == 0) &&
-					(strcmp(nconf->nc_proto, NC_UDP) == 0))
-					break;
+				if (nthtry == SECOND_TRY) {
+					if (nconf->nc_semantics ==
+					    NC_TPI_CLTS) {
+						if (port == 0)
+							break;
+						if ((strcmp(nconf->nc_protofmly,
+						    NC_INET) == 0 ||
+						    strcmp(nconf->nc_protofmly,
+						    NC_INET6) == 0) &&
+						    (strcmp(nconf->nc_proto,
+						    NC_UDP) == 0))
+							break;
+					}
 				}
-			    }
 			}
-		    } /* while */
-		    if (nconf == NULL) {
+		} /* while */
+		if (nconf == NULL) {
 			if (++nthtry <= MNT_PREF_LISTLEN) {
 				endnetpath(nc);
 				if ((nc = setnetpath()) == NULL)
@@ -3340,7 +3393,7 @@ retry:
 				goto retry;
 			} else
 				goto done;
-		    } else {
+		} else {
 			nb = get_the_stuff(type_of_stuff, hostname, prog, vers,
 			    mfssnego, nconf, port, tinfo, fhp, direct_to_server,
 			    fspath, cstatp);
@@ -3351,7 +3404,7 @@ retry:
 				 * (nconf == NULL).
 				 */
 				goto retry;
-		    }
+		}
 	} /* if !proto */
 
 	/*
@@ -3519,68 +3572,72 @@ pingnfs(
 	 */
 	if (trace > 1)
 		trace_prt(1, "	ping: %s timeout=%ld request vers=%d min=%d\n",
-				hostname, rpc_to_new.tv_sec, versmax, versmin);
+		    hostname, rpc_to_new.tv_sec, versmax, versmin);
 
 	if (usepub == FALSE) {
-	    do {
-		/*
-		 * If NFSv4, then we do the same thing as is used
-		 * for public filehandles so that we avoid rpcbind
-		 */
-		if (vers_to_try == NFS_V4) {
-			if (trace > 4) {
-				trace_prt(1, "  pingnfs: Trying ping via "
-					"\"circuit_v\"\n");
-				}
-
-			if ((cl = clnt_create_service_timed(hostname, "nfs",
-							    NFS_PROGRAM,
-							    vers_to_try,
-							    port, "circuit_v",
-							    &rpc_to_new))
-			    != NULL) {
-				outvers = vers_to_try;
-				break;
-			}
-			if (trace > 4) {
-				trace_prt(1, "  pingnfs: Can't ping via "
-					"\"circuit_v\" %s: RPC error=%d\n",
-					hostname, rpc_createerr.cf_stat);
-			}
-
-		} else {
-			if ((cl = clnt_create_vers_timed(hostname, NFS_PROGRAM,
-				&outvers, versmin, vers_to_try,
-				"datagram_v", &rpc_to_new))
-				!= NULL)
-				break;
-			if (trace > 4) {
-				trace_prt(1, "  pingnfs: Can't ping via "
-					"\"datagram_v\"%s: RPC error=%d\n",
-					hostname, rpc_createerr.cf_stat);
-			}
-			if (rpc_createerr.cf_stat == RPC_UNKNOWNHOST ||
-				rpc_createerr.cf_stat == RPC_TIMEDOUT)
-				break;
-			if (rpc_createerr.cf_stat == RPC_PROGNOTREGISTERED) {
+		do {
+			/*
+			 * If NFSv4, then we do the same thing as is used
+			 * for public filehandles so that we avoid rpcbind
+			 */
+			if (vers_to_try == NFS_V4) {
 				if (trace > 4) {
-					trace_prt(1, "  pingnfs: Trying ping "
-						"via \"circuit_v\"\n");
+				trace_prt(1, "  pingnfs: Trying ping via "
+				    "\"circuit_v\"\n");
 				}
-				if ((cl = clnt_create_vers_timed(hostname,
-					NFS_PROGRAM, &outvers,
-					versmin, vers_to_try,
-					"circuit_v", &rpc_to_new)) != NULL)
+
+				cl = clnt_create_service_timed(hostname, "nfs",
+				    NFS_PROGRAM, vers_to_try,
+				    port, "circuit_v", &rpc_to_new);
+				if (cl != NULL) {
+					outvers = vers_to_try;
+					break;
+				}
+				if (trace > 4) {
+					trace_prt(1,
+					    "  pingnfs: Can't ping via "
+					    "\"circuit_v\" %s: RPC error=%d\n",
+					    hostname, rpc_createerr.cf_stat);
+				}
+
+			} else {
+				cl = clnt_create_vers_timed(hostname,
+				    NFS_PROGRAM, &outvers, versmin, vers_to_try,
+				    "datagram_v", &rpc_to_new);
+				if (cl != NULL)
 					break;
 				if (trace > 4) {
-					trace_prt(1, "  pingnfs: Can't ping "
-						"via \"circuit_v\" %s: "
-						"RPC error=%d\n",
-						hostname,
-						rpc_createerr.cf_stat);
+					trace_prt(1,
+					    "  pingnfs: Can't ping via "
+					    "\"datagram_v\"%s: RPC error=%d\n",
+					    hostname, rpc_createerr.cf_stat);
+				}
+				if (rpc_createerr.cf_stat == RPC_UNKNOWNHOST ||
+				    rpc_createerr.cf_stat == RPC_TIMEDOUT)
+					break;
+				if (rpc_createerr.cf_stat ==
+				    RPC_PROGNOTREGISTERED) {
+					if (trace > 4) {
+						trace_prt(1,
+						    "  pingnfs: Trying ping "
+						    "via \"circuit_v\"\n");
+					}
+					cl = clnt_create_vers_timed(hostname,
+					    NFS_PROGRAM, &outvers,
+					    versmin, vers_to_try,
+					    "circuit_v", &rpc_to_new);
+					if (cl != NULL)
+						break;
+					if (trace > 4) {
+						trace_prt(1,
+						    "  pingnfs: Can't ping "
+						    "via \"circuit_v\" %s: "
+						    "RPC error=%d\n",
+						    hostname,
+						    rpc_createerr.cf_stat);
+					}
 				}
 			}
-		}
 
 		/*
 		 * backoff and return lower version to retry the ping.
@@ -3589,46 +3646,46 @@ pingnfs(
 		 * in clnt_create_vers(). It's not done to stay in sync
 		 * with the nfs mount command.
 		 */
-		    vers_to_try--;
-		    if (vers_to_try < versmin)
-			    break;
-		    if (versp != NULL) {	/* recheck the cache */
-			    *versp = vers_to_try;
-			    if (trace > 4) {
-				trace_prt(1,
-				    "  pingnfs: check cache: vers=%d\n",
-				    *versp);
-			    }
-			    switch (cache_check(hostname, versp, proto)) {
-			    case GOODHOST:
-				    if (hostname != hostpart)
-					    free(hostname);
-				    return (RPC_SUCCESS);
-			    case DEADHOST:
-				    if (hostname != hostpart)
-					    free(hostname);
-				    return (RPC_TIMEDOUT);
-			    case NOHOST:
-			    default:
-				    break;
-			    }
-		    }
-		    if (trace > 4) {
-			trace_prt(1, "  pingnfs: Try version=%d\n",
-				vers_to_try);
-		    }
-	    } while (cl == NULL);
+			vers_to_try--;
+			if (vers_to_try < versmin)
+				break;
+			if (versp != NULL) {	/* recheck the cache */
+				*versp = vers_to_try;
+				if (trace > 4) {
+					trace_prt(1,
+					    "  pingnfs: check cache: vers=%d\n",
+					    *versp);
+				}
+				switch (cache_check(hostname, versp, proto)) {
+				case GOODHOST:
+					if (hostname != hostpart)
+						free(hostname);
+					return (RPC_SUCCESS);
+				case DEADHOST:
+					if (hostname != hostpart)
+						free(hostname);
+					return (RPC_TIMEDOUT);
+				case NOHOST:
+				default:
+					break;
+				}
+			}
+			if (trace > 4) {
+				trace_prt(1, "  pingnfs: Try version=%d\n",
+				    vers_to_try);
+			}
+		} while (cl == NULL);
 
 
-	    if (cl == NULL) {
-		    if (verbose)
-			    syslog(LOG_ERR, "pingnfs: %s%s",
+		if (cl == NULL) {
+			if (verbose)
+				syslog(LOG_ERR, "pingnfs: %s%s",
 				    hostname, clnt_spcreateerror(""));
-		    clnt_stat = rpc_createerr.cf_stat;
-	    } else {
-		    clnt_destroy(cl);
-		    clnt_stat = RPC_SUCCESS;
-	    }
+			clnt_stat = rpc_createerr.cf_stat;
+		} else {
+			clnt_destroy(cl);
+			clnt_stat = RPC_SUCCESS;
+		}
 
 	} else {
 		for (vers_to_try = versmax; vers_to_try >= versmin;
@@ -3638,11 +3695,11 @@ pingnfs(
 
 			if (trace > 4) {
 				trace_prt(1, "  pingnfs: Try version=%d "
-					"using get_ping()\n", vers_to_try);
+				    "using get_ping()\n", vers_to_try);
 			}
 
 			clnt_stat = get_ping(hostname, NFS_PROGRAM,
-				vers_to_try, &nconf, port, TRUE);
+			    vers_to_try, &nconf, port, TRUE);
 
 			if (nconf != NULL)
 				freenetconfigent(nconf);
@@ -3656,8 +3713,8 @@ pingnfs(
 
 	if (trace > 1)
 		clnt_stat == RPC_SUCCESS ?
-			trace_prt(1, "	pingnfs OK: nfs version=%d\n", outvers):
-			trace_prt(1, "	pingnfs FAIL: can't get nfs version\n");
+		    trace_prt(1, "	pingnfs OK: nfs version=%d\n", outvers):
+		    trace_prt(1, "	pingnfs FAIL: can't get nfs version\n");
 
 	if (clnt_stat == RPC_SUCCESS) {
 		cache_enter(hostname, versmax, outvers, proto, GOODHOST);
@@ -4082,7 +4139,7 @@ is_nfs_port(char *opts)
 	 * If daemon is nfsd, return nfs
 	 */
 	if (getservbyport_r(nfs_port, NULL, &sv, buf, 256) == &sv &&
-		strcmp(sv.s_name, "nfsd") == 0)
+	    strcmp(sv.s_name, "nfsd") == 0)
 		return (1);
 
 	/*
@@ -4103,14 +4160,14 @@ destroy_auth_client_handle(CLIENT *cl)
 		if (cl->cl_auth) {
 #ifdef MALLOC_DEBUG
 			drop_alloc("AUTH_HANDLE", cl->cl_auth,
-				__FILE__, __LINE__);
+			    __FILE__, __LINE__);
 #endif
 			AUTH_DESTROY(cl->cl_auth);
 			cl->cl_auth = NULL;
 		}
 #ifdef MALLOC_DEBUG
 		drop_alloc("CLNT_HANDLE", cl,
-			__FILE__, __LINE__);
+		    __FILE__, __LINE__);
 #endif
 		clnt_destroy(cl);
 	}
@@ -4158,8 +4215,8 @@ static void
 trace_portmap_cache()
 {
 	syslog(LOG_ERR, "portmap_cache: accesses=%d lookups=%d hits=%d\n",
-		portmap_cache_accesses, portmap_cache_lookups,
-		portmap_cache_hits);
+	    portmap_cache_accesses, portmap_cache_lookups,
+	    portmap_cache_hits);
 }
 
 /*
@@ -4170,9 +4227,9 @@ static void
 trace_host_cache()
 {
 	syslog(LOG_ERR,
-		"host_cache: accesses=%d lookups=%d deadhits=%d goodhits=%d\n",
-		host_cache_accesses, host_cache_lookups, deadhost_cache_hits,
-		goodhost_cache_hits);
+	    "host_cache: accesses=%d lookups=%d deadhits=%d goodhits=%d\n",
+	    host_cache_accesses, host_cache_lookups, deadhost_cache_hits,
+	    goodhost_cache_hits);
 }
 #endif /* CACHE_DEBUG */
 
@@ -4233,16 +4290,16 @@ read_default_nfs(void)
 		 * If so, reset to compiled-in defaults
 		 */
 		if (vers_min_default > vers_max_default ||
-			vers_min_default < NFS_VERSMIN ||
-			vers_max_default > NFS_VERSMAX) {
+		    vers_min_default < NFS_VERSMIN ||
+		    vers_max_default > NFS_VERSMAX) {
 			if (trace > 1) {
 				trace_prt(1,
 	"  read_default: version minimum/maximum incorrectly configured\n");
 				trace_prt(1,
 "  read_default: config is min=%d, max%d. Resetting to min=%d, max%d\n",
-					vers_min_default, vers_max_default,
-					NFS_VERSMIN_DEFAULT,
-					NFS_VERSMAX_DEFAULT);
+				    vers_min_default, vers_max_default,
+				    NFS_VERSMIN_DEFAULT,
+				    NFS_VERSMAX_DEFAULT);
 			}
 			vers_min_default = NFS_VERSMIN_DEFAULT;
 			vers_max_default = NFS_VERSMAX_DEFAULT;
