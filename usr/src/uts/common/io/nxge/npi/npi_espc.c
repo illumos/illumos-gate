@@ -41,7 +41,7 @@ npi_espc_pio_enable(npi_handle_t handle)
 npi_status_t
 npi_espc_pio_disable(npi_handle_t handle)
 {
-	NXGE_REG_WR64(handle, ESPC_PIO_EN_REG, 0);
+	NXGE_REG_WR64(handle, ESPC_REG_ADDR(ESPC_PIO_EN_REG), 0);
 	return (NPI_SUCCESS);
 }
 
