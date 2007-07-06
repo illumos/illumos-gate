@@ -1990,7 +1990,8 @@ zfs_prop_set(zfs_handle_t *zhp, const char *propname, const char *propval)
 
 		case ENOTSUP:
 			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
-			    "pool must be upgraded to allow gzip compression"));
+			    "pool must be upgraded to set this "
+			    "property or value"));
 			(void) zfs_error(hdl, EZFS_BADVERSION, errbuf);
 			break;
 
@@ -3005,6 +3006,12 @@ zfs_create(libzfs_handle_t *hdl, const char *path, zfs_type_t type,
 
 			return (zfs_error(hdl, EZFS_BADPROP, errbuf));
 
+		case ENOTSUP:
+			zfs_error_aux(hdl, dgettext(TEXT_DOMAIN,
+			    "pool must be upgraded to set this "
+			    "property or value"));
+			return (zfs_error(hdl, EZFS_BADVERSION, errbuf));
+
 #ifdef _ILP32
 		case EOVERFLOW:
 			/*
@@ -3559,9 +3566,13 @@ create_parents(libzfs_handle_t *hdl, char *target, int prefixlen)
 
 	/* make sure prefix exists */
 	cp = strchr(target + prefixlen, '/');
-	*cp = '\0';
-	h = zfs_open(hdl, target, ZFS_TYPE_FILESYSTEM);
-	*cp = '/';
+	if (cp == NULL) {
+		h = zfs_open(hdl, target, ZFS_TYPE_FILESYSTEM);
+	} else {
+		*cp = '\0';
+		h = zfs_open(hdl, target, ZFS_TYPE_FILESYSTEM);
+		*cp = '/';
+	}
 	if (h == NULL)
 		return (-1);
 	zfs_close(h);
@@ -3886,7 +3897,7 @@ zfs_receive(libzfs_handle_t *hdl, const char *tosnap, int isprefix,
 		zfs_nicenum(bytes, buf1, sizeof (buf1));
 		zfs_nicenum(bytes/delta, buf2, sizeof (buf1));
 
-		(void) printf("received %sb stream in %lu seconds (%sb/sec)\n",
+		(void) printf("received %sB stream in %lu seconds (%sB/sec)\n",
 		    buf1, delta, buf2);
 	}
 

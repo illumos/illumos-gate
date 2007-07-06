@@ -683,16 +683,8 @@ dsl_snapshots_destroy(char *fsname, char *snapname)
 	struct destroyarg da;
 	dsl_sync_task_t *dst;
 	spa_t *spa;
-	char *cp;
 
-	cp = strchr(fsname, '/');
-	if (cp) {
-		*cp = '\0';
-		err = spa_open(fsname, &spa, FTAG);
-		*cp = '/';
-	} else {
-		err = spa_open(fsname, &spa, FTAG);
-	}
+	err = spa_open(fsname, &spa, FTAG);
 	if (err)
 		return (err);
 	da.dstg = dsl_sync_task_group_create(spa_get_dsl(spa));
@@ -710,8 +702,7 @@ dsl_snapshots_destroy(char *fsname, char *snapname)
 		dsl_dataset_t *ds = dst->dst_arg1;
 		if (dst->dst_err) {
 			dsl_dataset_name(ds, fsname);
-			cp = strchr(fsname, '@');
-			*cp = '\0';
+			*strchr(fsname, '@') = '\0';
 		}
 		/*
 		 * If it was successful, destroy_sync would have
@@ -1452,7 +1443,7 @@ dsl_dataset_snapshot_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	    DS_MODE_NONE, ds, &ds->ds_prev));
 
 	spa_history_internal_log(LOG_DS_SNAPSHOT, dp->dp_spa, tx, cr,
-	    "dataset = %llu", ds->ds_object);
+	    "dataset = %llu", dsobj);
 }
 
 void
@@ -1668,14 +1659,7 @@ dsl_recursive_rename(char *oldname, const char *newname)
 	cp = strchr(fsname, '@');
 	*cp = '\0';
 
-	cp = strchr(fsname, '/');
-	if (cp) {
-		*cp = '\0';
-		err = spa_open(fsname, &spa, FTAG);
-		*cp = '/';
-	} else {
-		err = spa_open(fsname, &spa, FTAG);
-	}
+	err = spa_open(fsname, &spa, FTAG);
 	if (err) {
 		kmem_free(fsname, len + 1);
 		return (err);

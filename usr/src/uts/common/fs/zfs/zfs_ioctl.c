@@ -130,8 +130,7 @@ static void
 zfs_log_history(zfs_cmd_t *zc)
 {
 	spa_t *spa;
-	char poolname[MAXNAMELEN];
-	char *buf, *cp;
+	char *buf;
 
 	if (zc->zc_history == NULL)
 		return;
@@ -149,12 +148,7 @@ zfs_log_history(zfs_cmd_t *zc)
 
 	buf[HIS_MAX_RECORD_LEN -1] = '\0';
 
-	(void) strlcpy(poolname, zc->zc_name, sizeof (poolname));
-	cp = strpbrk(poolname, "/@");
-	if (cp != NULL)
-		*cp = '\0';
-
-	if (spa_open(poolname, &spa, FTAG) != 0) {
+	if (spa_open(zc->zc_name, &spa, FTAG) != 0) {
 		kmem_free(buf, HIS_MAX_RECORD_LEN);
 		return;
 	}
@@ -1258,19 +1252,9 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 			    nvpair_value_uint64(elem, &intval) == 0 &&
 			    intval >= ZIO_COMPRESS_GZIP_1 &&
 			    intval <= ZIO_COMPRESS_GZIP_9) {
-				char buf[MAXNAMELEN];
 				spa_t *spa;
-				const char *p;
 
-				if ((p = strchr(name, '/')) == NULL) {
-					p = name;
-				} else {
-					bcopy(name, buf, p - name);
-					buf[p - name] = '\0';
-					p = buf;
-				}
-
-				if (spa_open(p, &spa, FTAG) == 0) {
+				if (spa_open(name, &spa, FTAG) == 0) {
 					if (spa_version(spa) <
 					    SPA_VERSION_GZIP_COMPRESSION) {
 						spa_close(spa, FTAG);
@@ -1281,6 +1265,21 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 				}
 			}
 			break;
+
+		case ZFS_PROP_COPIES:
+		{
+			spa_t *spa;
+
+			if (spa_open(name, &spa, FTAG) == 0) {
+				if (spa_version(spa) <
+				    SPA_VERSION_DITTO_BLOCKS) {
+					spa_close(spa, FTAG);
+					return (ENOTSUP);
+				}
+				spa_close(spa, FTAG);
+			}
+			break;
+		}
 		}
 		if ((error = zfs_secpolicy_setprop(name, prop, cr)) != 0)
 			return (error);

@@ -182,7 +182,8 @@ kmem_cache_t *spa_buffer_pool;
 int spa_mode;
 
 #ifdef ZFS_DEBUG
-int zfs_flags = ~0;
+/* Everything except dprintf is on by default in debug builds */
+int zfs_flags = ~ZFS_DEBUG_DPRINTF;
 #else
 int zfs_flags = 0;
 #endif
@@ -211,11 +212,26 @@ spa_lookup(const char *name)
 {
 	spa_t search, *spa;
 	avl_index_t where;
+	char c;
+	char *cp;
 
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 
+	/*
+	 * If it's a full dataset name, figure out the pool name and
+	 * just use that.
+	 */
+	cp = strpbrk(name, "/@");
+	if (cp) {
+		c = *cp;
+		*cp = '\0';
+	}
+
 	search.spa_name = (char *)name;
 	spa = avl_find(&spa_namespace_avl, &search, &where);
+
+	if (cp)
+		*cp = c;
 
 	return (spa);
 }

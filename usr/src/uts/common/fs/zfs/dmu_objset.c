@@ -668,20 +668,12 @@ dmu_objset_snapshot(char *fsname, char *snapname, boolean_t recursive)
 {
 	dsl_sync_task_t *dst;
 	struct snaparg sn = { 0 };
-	char *cp;
 	spa_t *spa;
 	int err;
 
 	(void) strcpy(sn.failed, fsname);
 
-	cp = strchr(fsname, '/');
-	if (cp) {
-		*cp = '\0';
-		err = spa_open(fsname, &spa, FTAG);
-		*cp = '/';
-	} else {
-		err = spa_open(fsname, &spa, FTAG);
-	}
+	err = spa_open(fsname, &spa, FTAG);
 	if (err)
 		return (err);
 
