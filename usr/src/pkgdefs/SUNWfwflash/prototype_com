@@ -42,4 +42,4 @@ i depend
 # fwflash
 d none usr 0755 root sys
 d none usr/sbin 0755 root bin
-f none usr/sbin/fwflash 0544 root bin
+f none usr/sbin/fwflash 0555 root bin
