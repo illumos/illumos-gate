@@ -150,6 +150,10 @@ struct cpuid_info {
 	uint_t cpi_ncpu_per_chip;	/* fn 1: %ebx: logical cpu count */
 	uint8_t cpi_cacheinfo[16];	/* fn 2: intel-style cache desc */
 	uint_t cpi_ncache;		/* fn 2: number of elements */
+	uint_t cpi_ncpu_shr_last_cache;	/* fn 4: %eax: ncpus sharing cache */
+	id_t cpi_last_lvl_cacheid;	/* fn 4: %eax: derived cache id */
+	uint_t cpi_std_4_size;		/* fn 4: number of fn 4 elements */
+	struct cpuid_regs **cpi_std_4;	/* fn 4: %ecx == 0 .. fn4_size */
 	struct cpuid_regs cpi_std[NMAX_CPI_STD];	/* 0 .. 5 */
 	/*
 	 * extended function information
@@ -207,6 +211,27 @@ static struct cpuid_info cpuid_info0;
 
 #define	CPI_MAXEAX_MAX		0x100		/* sanity control */
 #define	CPI_XMAXEAX_MAX		0x80000100
+#define	CPI_FN4_ECX_MAX		0x20		/* sanity: max fn 4 levels */
+
+/*
+ * Function 4 (Deterministic Cache Parameters) macros
+ * Defined by Intel Application Note AP-485
+ */
+#define	CPI_NUM_CORES(regs)		BITX((regs)->cp_eax, 31, 26)
+#define	CPI_NTHR_SHR_CACHE(regs)	BITX((regs)->cp_eax, 25, 14)
+#define	CPI_FULL_ASSOC_CACHE(regs)	BITX((regs)->cp_eax, 9, 9)
+#define	CPI_SELF_INIT_CACHE(regs)	BITX((regs)->cp_eax, 8, 8)
+#define	CPI_CACHE_LVL(regs)		BITX((regs)->cp_eax, 7, 5)
+#define	CPI_CACHE_TYPE(regs)		BITX((regs)->cp_eax, 4, 0)
+
+#define	CPI_CACHE_WAYS(regs)		BITX((regs)->cp_ebx, 31, 22)
+#define	CPI_CACHE_PARTS(regs)		BITX((regs)->cp_ebx, 21, 12)
+#define	CPI_CACHE_COH_LN_SZ(regs)	BITX((regs)->cp_ebx, 11, 0)
+
+#define	CPI_CACHE_SETS(regs)		BITX((regs)->cp_ecx, 31, 0)
+
+#define	CPI_PREFCH_STRIDE(regs)		BITX((regs)->cp_edx, 9, 0)
+
 
 /*
  * A couple of shorthand macros to identify "later" P6-family chips
@@ -409,7 +434,20 @@ cpuid_alloc_space(cpu_t *cpu)
 void
 cpuid_free_space(cpu_t *cpu)
 {
+	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
+	int i;
+
 	ASSERT(cpu->cpu_id != 0);
+
+	/*
+	 * Free up any function 4 related dynamic storage
+	 */
+	for (i = 1; i < cpi->cpi_std_4_size; i++)
+		kmem_free(cpi->cpi_std_4[i], sizeof (struct cpuid_regs));
+	if (cpi->cpi_std_4_size > 0)
+		kmem_free(cpi->cpi_std_4,
+		    cpi->cpi_std_4_size * sizeof (struct cpuid_regs *));
+
 	kmem_free(cpu->cpu_m.mcpu_cpi, sizeof (*cpu->cpu_m.mcpu_cpi));
 }
 
@@ -895,6 +933,9 @@ cpuid_pass1(cpu_t *cpu)
 			break;
 		}
 
+		/*
+		 * Derive the number of cores per chip
+		 */
 		switch (cpi->cpi_vendor) {
 		case X86_VENDOR_Intel:
 			if (cpi->cpi_maxeax < 4) {
@@ -1049,6 +1090,25 @@ cpuid_pass2(cpu_t *cpu)
 	 */
 	for (n = 2, cp = &cpi->cpi_std[2]; n < nmax; n++, cp++) {
 		cp->cp_eax = n;
+
+		/*
+		 * CPUID function 4 expects %ecx to be initialized
+		 * with an index which indicates which cache to return
+		 * information about. The OS is expected to call function 4
+		 * with %ecx set to 0, 1, 2, ... until it returns with
+		 * EAX[4:0] set to 0, which indicates there are no more
+		 * caches.
+		 *
+		 * Here, populate cpi_std[4] with the information returned by
+		 * function 4 when %ecx == 0, and do the rest in cpuid_pass3()
+		 * when dynamic memory allocation becomes available.
+		 *
+		 * Note: we need to explicitly initialize %ecx here, since
+		 * function 4 may have been previously invoked.
+		 */
+		if (n == 4)
+			cp->cp_ecx = 0;
+
 		(void) __cpuid_insn(cp);
 		platform_cpuid_mangle(cpi->cpi_vendor, n, cp);
 		switch (n) {
@@ -1126,7 +1186,6 @@ cpuid_pass2(cpu_t *cpu)
 					    MWAIT_ECX_INT_ENABLE;
 			}
 			break;
-
 		default:
 			break;
 		}
@@ -1582,82 +1641,162 @@ fabricate_brandstr(struct cpuid_info *cpi)
  * becomes available on cpu0, and as part of mp_startup() on
  * the other cpus.
  *
- * Fixup the brand string.
+ * Fixup the brand string, and collect any information from cpuid
+ * that requires dynamicically allocated storage to represent.
  */
 /*ARGSUSED*/
 void
 cpuid_pass3(cpu_t *cpu)
 {
+	int	i, max, shft, level, size;
+	struct cpuid_regs regs;
+	struct cpuid_regs *cp;
 	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
 
 	ASSERT(cpi->cpi_pass == 2);
 
-	if ((cpi->cpi_xmaxeax & 0x80000000) == 0) {
-		fabricate_brandstr(cpi);
-		goto pass3_done;
+	/*
+	 * Function 4: Deterministic cache parameters
+	 *
+	 * Take this opportunity to detect the number of threads
+	 * sharing the last level cache, and construct a corresponding
+	 * cache id. The respective cpuid_info members are initialized
+	 * to the default case of "no last level cache sharing".
+	 */
+	cpi->cpi_ncpu_shr_last_cache = 1;
+	cpi->cpi_last_lvl_cacheid = cpu->cpu_id;
+
+	if (cpi->cpi_maxeax >= 4 && cpi->cpi_vendor == X86_VENDOR_Intel) {
+
+		/*
+		 * Find the # of elements (size) returned by fn 4, and along
+		 * the way detect last level cache sharing details.
+		 */
+		bzero(&regs, sizeof (regs));
+		cp = &regs;
+		for (i = 0, max = 0; i < CPI_FN4_ECX_MAX; i++) {
+			cp->cp_eax = 4;
+			cp->cp_ecx = i;
+
+			(void) __cpuid_insn(cp);
+
+			if (CPI_CACHE_TYPE(cp) == 0)
+				break;
+			level = CPI_CACHE_LVL(cp);
+			if (level > max) {
+				max = level;
+				cpi->cpi_ncpu_shr_last_cache =
+				    CPI_NTHR_SHR_CACHE(cp) + 1;
+			}
+		}
+		cpi->cpi_std_4_size = size = i;
+
+		/*
+		 * Allocate the cpi_std_4 array. The first element
+		 * references the regs for fn 4, %ecx == 0, which
+		 * cpuid_pass2() stashed in cpi->cpi_std[4].
+		 */
+		if (size > 0) {
+			cpi->cpi_std_4 =
+			    kmem_alloc(size * sizeof (cp), KM_SLEEP);
+			cpi->cpi_std_4[0] = &cpi->cpi_std[4];
+
+			/*
+			 * Allocate storage to hold the additional regs
+			 * for function 4, %ecx == 1 .. cpi_std_4_size.
+			 *
+			 * The regs for fn 4, %ecx == 0 has already
+			 * been allocated as indicated above.
+			 */
+			for (i = 1; i < size; i++) {
+				cp = cpi->cpi_std_4[i] =
+				    kmem_zalloc(sizeof (regs), KM_SLEEP);
+				cp->cp_eax = 4;
+				cp->cp_ecx = i;
+
+				(void) __cpuid_insn(cp);
+			}
+		}
+		/*
+		 * Determine the number of bits needed to represent
+		 * the number of CPUs sharing the last level cache.
+		 *
+		 * Shift off that number of bits from the APIC id to
+		 * derive the cache id.
+		 */
+		shft = 0;
+		for (i = 1; i < cpi->cpi_ncpu_shr_last_cache; i <<= 1)
+			shft++;
+		cpi->cpi_last_lvl_cacheid = CPI_APIC_ID(cpi) >> shft;
 	}
 
 	/*
-	 * If we successfully extracted a brand string from the cpuid
-	 * instruction, clean it up by removing leading spaces and
-	 * similar junk.
+	 * Now fixup the brand string
 	 */
-	if (cpi->cpi_brandstr[0]) {
-		size_t maxlen = sizeof (cpi->cpi_brandstr);
-		char *src, *dst;
-
-		dst = src = (char *)cpi->cpi_brandstr;
-		src[maxlen - 1] = '\0';
-		/*
-		 * strip leading spaces
-		 */
-		while (*src == ' ')
-			src++;
-		/*
-		 * Remove any 'Genuine' or "Authentic" prefixes
-		 */
-		if (strncmp(src, "Genuine ", 8) == 0)
-			src += 8;
-		if (strncmp(src, "Authentic ", 10) == 0)
-			src += 10;
-
-		/*
-		 * Now do an in-place copy.
-		 * Map (R) to (r) and (TM) to (tm).
-		 * The era of teletypes is long gone, and there's
-		 * -really- no need to shout.
-		 */
-		while (*src != '\0') {
-			if (src[0] == '(') {
-				if (strncmp(src + 1, "R)", 2) == 0) {
-					(void) strncpy(dst, "(r)", 3);
-					src += 3;
-					dst += 3;
-					continue;
-				}
-				if (strncmp(src + 1, "TM)", 3) == 0) {
-					(void) strncpy(dst, "(tm)", 4);
-					src += 4;
-					dst += 4;
-					continue;
-				}
-			}
-			*dst++ = *src++;
-		}
-		*dst = '\0';
-
-		/*
-		 * Finally, remove any trailing spaces
-		 */
-		while (--dst > cpi->cpi_brandstr)
-			if (*dst == ' ')
-				*dst = '\0';
-			else
-				break;
-	} else
+	if ((cpi->cpi_xmaxeax & 0x80000000) == 0) {
 		fabricate_brandstr(cpi);
+	} else {
 
-pass3_done:
+		/*
+		 * If we successfully extracted a brand string from the cpuid
+		 * instruction, clean it up by removing leading spaces and
+		 * similar junk.
+		 */
+		if (cpi->cpi_brandstr[0]) {
+			size_t maxlen = sizeof (cpi->cpi_brandstr);
+			char *src, *dst;
+
+			dst = src = (char *)cpi->cpi_brandstr;
+			src[maxlen - 1] = '\0';
+			/*
+			 * strip leading spaces
+			 */
+			while (*src == ' ')
+				src++;
+			/*
+			 * Remove any 'Genuine' or "Authentic" prefixes
+			 */
+			if (strncmp(src, "Genuine ", 8) == 0)
+				src += 8;
+			if (strncmp(src, "Authentic ", 10) == 0)
+				src += 10;
+
+			/*
+			 * Now do an in-place copy.
+			 * Map (R) to (r) and (TM) to (tm).
+			 * The era of teletypes is long gone, and there's
+			 * -really- no need to shout.
+			 */
+			while (*src != '\0') {
+				if (src[0] == '(') {
+					if (strncmp(src + 1, "R)", 2) == 0) {
+						(void) strncpy(dst, "(r)", 3);
+						src += 3;
+						dst += 3;
+						continue;
+					}
+					if (strncmp(src + 1, "TM)", 3) == 0) {
+						(void) strncpy(dst, "(tm)", 4);
+						src += 4;
+						dst += 4;
+						continue;
+					}
+				}
+				*dst++ = *src++;
+			}
+			*dst = '\0';
+
+			/*
+			 * Finally, remove any trailing spaces
+			 */
+			while (--dst > cpi->cpi_brandstr)
+				if (*dst == ' ')
+					*dst = '\0';
+				else
+					break;
+		} else
+			fabricate_brandstr(cpi);
+	}
 	cpi->cpi_pass = 3;
 }
 
@@ -2007,6 +2146,20 @@ cpuid_get_ncore_per_chip(cpu_t *cpu)
 {
 	ASSERT(cpuid_checkpass(cpu, 1));
 	return (cpu->cpu_m.mcpu_cpi->cpi_ncore_per_chip);
+}
+
+uint_t
+cpuid_get_ncpu_sharing_last_cache(cpu_t *cpu)
+{
+	ASSERT(cpuid_checkpass(cpu, 2));
+	return (cpu->cpu_m.mcpu_cpi->cpi_ncpu_shr_last_cache);
+}
+
+id_t
+cpuid_get_last_lvl_cacheid(cpu_t *cpu)
+{
+	ASSERT(cpuid_checkpass(cpu, 2));
+	return (cpu->cpu_m.mcpu_cpi->cpi_last_lvl_cacheid);
 }
 
 uint_t

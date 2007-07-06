@@ -38,8 +38,8 @@
 #include <sys/x86_archext.h>
 #include <sys/cpupart.h>
 #include <sys/cpuvar.h>
+#include <sys/cmt.h>
 #include <sys/cpu.h>
-#include <sys/pghw.h>
 #include <sys/disp.h>
 #include <sys/archsystm.h>
 #include <sys/machsystm.h>
@@ -174,6 +174,11 @@ pg_plat_hw_shared(cpu_t *cp, pghw_type_t hw)
 			return (1);
 		else
 			return (0);
+	case PGHW_CACHE:
+		if (cpuid_get_ncpu_sharing_last_cache(cp) > 1)
+			return (1);
+		else
+			return (0);
 	default:
 		return (0);
 	}
@@ -207,6 +212,8 @@ pg_plat_hw_instance_id(cpu_t *cpu, pghw_type_t hw)
 	switch (hw) {
 	case PGHW_IPIPE:
 		return (cpuid_get_coreid(cpu));
+	case PGHW_CACHE:
+		return (cpuid_get_last_lvl_cacheid(cpu));
 	case PGHW_CHIP:
 		return (cpuid_get_chipid(cpu));
 	default:
@@ -220,6 +227,7 @@ pg_plat_hw_level(pghw_type_t hw)
 	int i;
 	static pghw_type_t hw_hier[] = {
 		PGHW_IPIPE,
+		PGHW_CACHE,
 		PGHW_CHIP,
 		PGHW_NUM_COMPONENTS
 	};
@@ -229,6 +237,37 @@ pg_plat_hw_level(pghw_type_t hw)
 			return (i);
 	}
 	return (-1);
+}
+
+/*
+ * Return 1 if CMT load balancing policies should be
+ * implemented across instances of the specified hardware
+ * sharing relationship.
+ */
+int
+pg_plat_cmt_load_bal_hw(pghw_type_t hw)
+{
+	if (hw == PGHW_IPIPE ||
+	    hw == PGHW_FPU ||
+	    hw == PGHW_CHIP ||
+	    hw == PGHW_CACHE)
+		return (1);
+	else
+		return (0);
+}
+
+
+/*
+ * Return 1 if thread affinity polices should be implemented
+ * for instances of the specifed hardware sharing relationship.
+ */
+int
+pg_plat_cmt_affinity_hw(pghw_type_t hw)
+{
+	if (hw == PGHW_CACHE)
+		return (1);
+	else
+		return (0);
 }
 
 id_t

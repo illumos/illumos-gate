@@ -28,7 +28,7 @@
 #include <sys/types.h>
 #include <sys/machsystm.h>
 #include <sys/cmp.h>
-#include <sys/pghw.h>
+#include <sys/cmt.h>
 
 /*
  * Note: For now assume the chip ID as 0 for all the cpus until additional
@@ -152,6 +152,36 @@ pg_plat_hw_level(pghw_type_t hw)
 			return (i);
 	}
 	return (-1);
+}
+
+/*
+ * Return 1 if CMT load balancing policies should be
+ * implemented across instances of the specified hardware
+ * sharing relationship.
+ */
+int
+pg_plat_cmt_load_bal_hw(pghw_type_t hw)
+{
+	if (hw == PGHW_IPIPE ||
+	    hw == PGHW_FPU ||
+	    hw == PGHW_CHIP)
+		return (1);
+	else
+		return (0);
+}
+
+
+/*
+ * Return 1 if thread affinity polices should be implemented
+ * for instances of the specifed hardware sharing relationship.
+ */
+int
+pg_plat_cmt_affinity_hw(pghw_type_t hw)
+{
+	if (hw == PGHW_CACHE)
+		return (1);
+	else
+		return (0);
 }
 
 id_t

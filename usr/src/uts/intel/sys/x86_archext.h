@@ -557,6 +557,8 @@ extern uint_t cpuid_getstep(struct cpu *);
 extern uint_t cpuid_getsig(struct cpu *);
 extern uint_t cpuid_get_ncpu_per_chip(struct cpu *);
 extern uint_t cpuid_get_ncore_per_chip(struct cpu *);
+extern uint_t cpuid_get_ncpu_sharing_last_cache(struct cpu *);
+extern id_t cpuid_get_last_lvl_cacheid(struct cpu *);
 extern int cpuid_get_chipid(struct cpu *);
 extern id_t cpuid_get_coreid(struct cpu *);
 extern int cpuid_get_clogid(struct cpu *);

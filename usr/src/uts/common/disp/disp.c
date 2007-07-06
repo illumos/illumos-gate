@@ -745,7 +745,7 @@ reschedule:
 			cpup->cpu_chosen_level = -1;
 		}
 		TRACE_1(TR_FAC_DISP, TR_DISP_END,
-			"disp_end:tid %p", tp);
+		    "disp_end:tid %p", tp);
 		return (tp);
 	}
 
@@ -806,7 +806,7 @@ reschedule:
 
 	ASSERT(tp != NULL);
 	TRACE_1(TR_FAC_DISP, TR_DISP_END,
-		"disp_end:tid %p", tp);
+	    "disp_end:tid %p", tp);
 
 	if (disp_ratify(tp, kpq) == NULL)
 		goto reschedule;
@@ -973,7 +973,7 @@ thread_on_queue(kthread_t *tp)
 			kthread_t	*rp;
 
 			ASSERT(dq->dq_last == NULL ||
-				dq->dq_last->t_link == NULL);
+			    dq->dq_last->t_link == NULL);
 			for (rp = dq->dq_first; rp; rp = rp->t_link)
 				if (tp == rp) {
 					disp_lock_exit_high(&dp->disp_lock);
@@ -1093,7 +1093,7 @@ cpu_resched(cpu_t *cp, pri_t tpri)
 static cpu_t *
 cmt_balance(kthread_t *tp, cpu_t *cp)
 {
-	int		hint, i, cpu;
+	int		hint, i, cpu, nsiblings;
 	int		self = 0;
 	group_t		*cmt_pgs, *siblings;
 	pg_cmt_t	*pg, *pg_tmp, *tpg = NULL;
@@ -1117,19 +1117,22 @@ cmt_balance(kthread_t *tp, cpu_t *cp)
 	do {
 		pg = GROUP_ACCESS(cmt_pgs, level);
 
+		siblings = pg->cmt_siblings;
+		nsiblings = GROUP_SIZE(siblings);	/* self inclusive */
+		if (nsiblings == 1)
+			continue;	/* nobody to balance against */
+
 		pg_nrun = pg->cmt_nrunning;
 		if (self &&
 		    bitset_in_set(&pg->cmt_cpus_actv_set, CPU->cpu_seqid))
 			pg_nrun--;	/* Ignore curthread's effect */
 
-		siblings = pg->cmt_siblings;
 		hint = pg->cmt_hint;
-
 		/*
 		 * Check for validity of the hint
 		 * It should reference a valid sibling
 		 */
-		if (hint >= GROUP_SIZE(siblings))
+		if (hint >= nsiblings)
 			hint = pg->cmt_hint = 0;
 		else
 			pg->cmt_hint++;
@@ -1140,7 +1143,7 @@ cmt_balance(kthread_t *tp, cpu_t *cp)
 		 */
 		i = hint;
 		do {
-			ASSERT(i < GROUP_SIZE(siblings));
+			ASSERT(i < nsiblings);
 			pg_tmp = GROUP_ACCESS(siblings, i);
 
 			/*
@@ -1155,7 +1158,7 @@ cmt_balance(kthread_t *tp, cpu_t *cp)
 				break;
 			}
 
-			if (++i >= GROUP_SIZE(siblings))
+			if (++i >= nsiblings)
 				i = 0;
 		} while (i != hint);
 
@@ -1172,7 +1175,7 @@ cmt_balance(kthread_t *tp, cpu_t *cp)
 		if (pg_nrun > tpg_nrun ||
 		    (pg_nrun == tpg_nrun &&
 		    (GROUP_SIZE(&tpg->cmt_cpus_actv) >
-			GROUP_SIZE(&pg->cmt_cpus_actv)))) {
+		    GROUP_SIZE(&pg->cmt_cpus_actv)))) {
 			break;
 		}
 		tpg = NULL;
@@ -1324,7 +1327,7 @@ setbackdq(kthread_t *tp)
 
 	DTRACE_SCHED3(enqueue, kthread_t *, tp, disp_t *, dp, int, 0);
 	TRACE_3(TR_FAC_DISP, TR_BACKQ, "setbackdq:pri %d cpu %p tid %p",
-		tpri, cp, tp);
+	    tpri, cp, tp);
 
 #ifndef NPROBE
 	/* Kernel probe */
@@ -1983,7 +1986,7 @@ disp_getwork(cpu_t *cp)
 				 * don't steal it.
 				 */
 				if ((ocp->cpu_disp_flags &
-					CPU_DISP_DONTSTEAL) &&
+				    CPU_DISP_DONTSTEAL) &&
 				    ocp->cpu_disp->disp_nrunnable == 1)
 					continue;
 

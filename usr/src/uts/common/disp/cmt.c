@@ -214,43 +214,14 @@ pg_cmt_free(pg_t *pg)
 }
 
 /*
- * Return 1 if CMT load balancing policies should be
- * implemented across instances of the specified hardware
- * sharing relationship.
- */
-static int
-pg_cmt_load_bal_hw(pghw_type_t hw)
-{
-	if (hw == PGHW_IPIPE ||
-	    hw == PGHW_FPU ||
-	    hw == PGHW_CHIP)
-		return (1);
-	else
-		return (0);
-}
-
-/*
- * Return 1 if thread affinity polices should be implemented
- * for instances of the specifed hardware sharing relationship.
- */
-static int
-pg_cmt_affinity_hw(pghw_type_t hw)
-{
-	if (hw == PGHW_CACHE)
-		return (1);
-	else
-		return (0);
-}
-
-/*
  * Return 1 if CMT scheduling policies should be impelmented
  * for the specified hardware sharing relationship.
  */
 static int
 pg_cmt_hw(pghw_type_t hw)
 {
-	return (pg_cmt_load_bal_hw(hw) ||
-	    pg_cmt_affinity_hw(hw));
+	return (pg_plat_cmt_load_bal_hw(hw) ||
+	    pg_plat_cmt_affinity_hw(hw));
 }
 
 /*
@@ -336,7 +307,7 @@ pg_cmt_cpu_init(cpu_t *cp)
 		/*
 		 * Build a lineage of CMT PGs for load balancing
 		 */
-		if (pg_cmt_load_bal_hw(hw)) {
+		if (pg_plat_cmt_load_bal_hw(hw)) {
 			level = pghw_level(hw);
 			cpu_cmt_hier[level] = pg;
 			if (level > max_level)
@@ -660,7 +631,7 @@ pg_cmt_cpu_active(cpu_t *cp)
 		 * for balancing with it's siblings.
 		 */
 		if (GROUP_SIZE(&pg->cmt_cpus_actv) == 1 &&
-		    pg_cmt_load_bal_hw(((pghw_t *)pg)->pghw_hw)) {
+		    pg_plat_cmt_load_bal_hw(((pghw_t *)pg)->pghw_hw)) {
 			err = group_add(pg->cmt_siblings, pg, GRP_NORESIZE);
 			ASSERT(err == 0);
 		}
@@ -715,7 +686,7 @@ pg_cmt_cpu_inactive(cpu_t *cp)
 		 * load was balanced, remove it as a balancing candidate.
 		 */
 		if (GROUP_SIZE(&pg->cmt_cpus_actv) == 0 &&
-		    pg_cmt_load_bal_hw(((pghw_t *)pg)->pghw_hw)) {
+		    pg_plat_cmt_load_bal_hw(((pghw_t *)pg)->pghw_hw)) {
 			err = group_remove(pg->cmt_siblings, pg, GRP_NORESIZE);
 			ASSERT(err == 0);
 		}

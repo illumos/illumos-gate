@@ -29,7 +29,7 @@
 #include <sys/machsystm.h>
 #include <sys/x_call.h>
 #include <sys/cmp.h>
-#include <sys/pghw.h>
+#include <sys/cmt.h>
 #include <sys/debug.h>
 #include <sys/disp.h>
 #include <sys/cheetahregs.h>
@@ -99,7 +99,7 @@ cmp_error_resteer(processorid_t cpuid)
 	int i;
 
 	if (!cmp_cpu_is_cmp(cpuid))
-	    return;
+		return;
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	chipid = cpunodes[cpuid].portid;
@@ -236,6 +236,36 @@ pg_plat_hw_level(pghw_type_t hw)
 			return (i);
 	}
 	return (-1);
+}
+
+/*
+ * Return 1 if CMT load balancing policies should be
+ * implemented across instances of the specified hardware
+ * sharing relationship.
+ */
+int
+pg_plat_cmt_load_bal_hw(pghw_type_t hw)
+{
+	if (hw == PGHW_IPIPE ||
+	    hw == PGHW_FPU ||
+	    hw == PGHW_CHIP)
+		return (1);
+	else
+		return (0);
+}
+
+
+/*
+ * Return 1 if thread affinity polices should be implemented
+ * for instances of the specifed hardware sharing relationship.
+ */
+int
+pg_plat_cmt_affinity_hw(pghw_type_t hw)
+{
+	if (hw == PGHW_CACHE)
+		return (1);
+	else
+		return (0);
 }
 
 id_t

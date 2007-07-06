@@ -66,6 +66,9 @@ void		pg_cmt_load(cpu_t *, int);
 void		pg_cmt_cpu_startup(cpu_t *);
 int		pg_cmt_can_migrate(cpu_t *, cpu_t *);
 
+int		pg_plat_cmt_load_bal_hw(pghw_type_t);
+int		pg_plat_cmt_affinity_hw(pghw_type_t);
+
 #endif	/* !_KERNEL && !_KMEMUSER */
 
 #ifdef	__cplusplus
