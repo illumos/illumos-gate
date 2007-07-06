@@ -1485,7 +1485,6 @@ static CK_OBJECT_HANDLE pk11_get_cipher_key(EVP_CIPHER_CTX *ctx,
 	{
 	CK_RV rv;
 	CK_OBJECT_HANDLE h_key = CK_INVALID_HANDLE;
-	CK_ULONG found;
 	CK_OBJECT_CLASS obj_key = CKO_SECRET_KEY;
 	CK_ULONG ul_key_attr_count = 6;
 	char tmp_buf[20];
@@ -1518,59 +1517,14 @@ static CK_OBJECT_HANDLE pk11_get_cipher_key(EVP_CIPHER_CTX *ctx,
 	a_key_template[5].pValue = (void *) key;
 	a_key_template[5].ulValueLen = (unsigned long) ctx->key_len;
 
-	/*
-	 * As stated in v2.20, 11.7 Object Management Function, in section for
-	 * C_FindObjectsInit(), at most one search operation may be active at
-	 * a given time in a given session. Therefore, we must group these
-	 * three calls in one atomic operation.
-	 */
-	CRYPTO_w_lock(CRYPTO_LOCK_PK11_ENGINE);
-	rv = pFuncList->C_FindObjectsInit(session, a_key_template, 
-		ul_key_attr_count);
-
+	rv = pFuncList->C_CreateObject(session, 
+		a_key_template, ul_key_attr_count, &h_key);
 	if (rv != CKR_OK)
 		{
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
-		PK11err(PK11_F_GET_CIPHER_KEY, PK11_R_FINDOBJECTSINIT);
+		PK11err(PK11_F_GET_CIPHER_KEY, PK11_R_CREATEOBJECT);
 		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
 		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
 		goto err;
-		}
-
-	rv = pFuncList->C_FindObjects(session, &h_key, 1, &found);
-
-	if (rv != CKR_OK)
-		{
-		CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
-		PK11err(PK11_F_GET_CIPHER_KEY, PK11_R_FINDOBJECTS);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
-		goto err;
-		}
-
-	rv = pFuncList->C_FindObjectsFinal(session);
-	CRYPTO_w_unlock(CRYPTO_LOCK_PK11_ENGINE);
-
-	if (rv != CKR_OK)
-		{
-		PK11err(PK11_F_GET_CIPHER_KEY, PK11_R_FINDOBJECTSFINAL);
-		snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-		ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
-		goto err;
-		}
-
-	if (found == 0)
-		{
-		rv = pFuncList->C_CreateObject(session, 
-			a_key_template, ul_key_attr_count, &h_key);
-		if (rv != CKR_OK)
-			{
-			PK11err(PK11_F_GET_CIPHER_KEY, 
-				PK11_R_CREATEOBJECT);
-			snprintf(tmp_buf, sizeof (tmp_buf), "%lx", rv);
-			ERR_add_error_data(2, "PK11 CK_RV=0X", tmp_buf);
-			goto err;
-			}
 		}
 
 	/* Save the key information used in this session.
@@ -1783,9 +1737,17 @@ static int
 pk11_digest_cleanup(EVP_MD_CTX *ctx)
 	{
 	PK11_CIPHER_STATE *state = ctx->md_data;
+	unsigned char buf[EVP_MAX_MD_SIZE];
 
 	if (state != NULL && state->sp != NULL)
 		{
+		/*
+		 * If state->sp is not NULL then pk11_digest_final() has not
+		 * been called yet. We must call it now to free any memory
+		 * that might have been allocated in the token when
+		 * pk11_digest_init() was called.
+		 */
+		pk11_digest_final(ctx,buf);
 		pk11_return_session(state->sp);
 		state->sp = NULL;
 		}
