@@ -599,8 +599,8 @@ getnexttoken(char *next, char **nextp, char **tokenpp, char *tchar)
 	}
 	tokenp = cp;			/* start of token */
 	while (*cp != '\0' && *cp != '\n' && *cp != ' ' && *cp != '\t' &&
-		*cp != ':' && *cp != '=' && *cp != '&' &&
-		*cp != '|' && *cp != ';') {
+	    *cp != ':' && *cp != '=' && *cp != '&' &&
+	    *cp != '|' && *cp != ';') {
 		cp++;			/* point to next character */
 	}
 	/*
@@ -613,7 +613,7 @@ getnexttoken(char *next, char **nextp, char **tokenpp, char *tchar)
 		while (*++cp1 == ' ' || *cp1 == '\t')
 			;
 		if (*cp1 == '=' || *cp1 == ':' || *cp1 == '&' || *cp1 == '|' ||
-			*cp1 == ';' || *cp1 == '\n' || *cp1 == '\0') {
+		    *cp1 == ';' || *cp1 == '\n' || *cp1 == '\0') {
 			*cp = NULL;	/* terminate token */
 			cp = cp1;
 		}
@@ -938,11 +938,11 @@ i_devfs_add_perm_entry(nvlist_t *nvl, struct mperm *mp)
 	if (err != 0)
 		return (err);
 
-	err = nvlist_add_int32(nvl, "uid", (int32_t)mp->mp_uid);
+	err = nvlist_add_uint32(nvl, "uid", mp->mp_uid);
 	if (err != 0)
 		return (err);
 
-	err = nvlist_add_int32(nvl, "gid", (int32_t)mp->mp_gid);
+	err = nvlist_add_uint32(nvl, "gid", mp->mp_gid);
 	return (err);
 }
 
