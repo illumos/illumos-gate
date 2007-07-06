@@ -23,13 +23,14 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lpsched.h"
+#include <syslog.h>
 
 static int	max_requests_needing_form_mounted ( FSTATUS * );
 static int	max_requests_needing_pwheel_mounted ( char * );
@@ -138,6 +139,15 @@ check_form_alert(FSTATUS *pfs, _FORM *pf)
 	 * be NO alert active.
 	 */
 
+	syslog(LOG_DEBUG, "check_form_alert:\n");
+	if (pfs) 
+		syslog(LOG_DEBUG, "check_form_alert: pfs->name <%s>\n",
+			(pfs->form->name != NULL) ? pfs->form->name : "null");
+	if (pf)
+		syslog(LOG_DEBUG, "check_form_alert: pf->name <%s>\n",
+			(pf->name != NULL) ? pf->name : "null");
+
+
 	if (pf) {
 		if ((trigger = pf->alert.Q) <= 0)
 			trigger = 1;
@@ -187,14 +197,9 @@ check_form_alert(FSTATUS *pfs, _FORM *pf)
 #undef	NALERT
 
 Return:	if (pf) {
-		/*
-		 * Watch it! We may be adding a new form, so there
-		 * may be nothing to toss out.
-		 */
-		if (pfs->form->name)
-			free_form (pfs->form);
 
-		*(pfs->form) = *pf;
+		 pfs->form = pf; 
+
 		pfs->trigger = trigger;
 	}
 
@@ -282,14 +287,8 @@ check_pwheel_alert(PWSTATUS *ppws, PWHEEL *ppw)
 #undef	NALERT
 
 Return:	if (ppw) {
-		/*
-		 * Watch it! We may be adding a new print wheel, so there
-		 * may be nothing to toss out.
-		 */
-		if (ppws->pwheel->name)
-			freepwheel (ppws->pwheel);
 
-		*(ppws->pwheel) = *ppw;
+		ppws->pwheel = ppw;
 		ppws->trigger = trigger;
 	}
 
