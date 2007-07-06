@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sparc/sbp2/Makefile
@@ -117,7 +117,7 @@ WARLOCK_CMD	= $(WLCMD_DIR)/$(MODULE).wlcmd
 
 warlock: $(WARLOCK_OK)
 
-$(WARLOCK_OK):	$(WARLOCK_OUT)
+$(WARLOCK_OK):	$(WARLOCK_OUT) $(WARLOCK_CMD)
 	$(WARLOCK) -c $(WARLOCK_CMD) $(WARLOCK_OUT) \
 		-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@

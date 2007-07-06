@@ -106,7 +106,6 @@ include $(UTSBASE)/sparc/Makefile.targ
 WARLOCK		= warlock
 WLCC		= wlcc
 TOUCH		= touch
-SCCS		= sccs
 TEST		= test
 
 #
@@ -126,31 +125,28 @@ warlock: $(WARLOCK_TARGETS)
 
 warlock_alone: $(WARLOCK_OK)
 
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
-warlock_with_esp: st_with_esp.wlcmd $(WARLOCK_OUT) scsi_files esp_files \
-	warlock_ddi.files
+warlock_with_esp: $(WLCMD_DIR)/st_with_esp.wlcmd $(WARLOCK_OUT) scsi_files \
+	esp_files warlock_ddi.files
 	$(WARLOCK) -c $(WLCMD_DIR)/st_with_esp.wlcmd \
 		$(WARLOCK_OUT) ../esp/esp $(SCSI_FILES)  \
 		-l ../warlock/ddi_dki_impl.ll
 
-warlock_with_fas: st_with_fas.wlcmd $(WARLOCK_OUT) scsi_files fas_files \
-	warlock_ddi.files
+warlock_with_fas: $(WLCMD_DIR)/st_with_fas.wlcmd $(WARLOCK_OUT) scsi_files \
+	fas_files warlock_ddi.files
 	$(WARLOCK) -c $(WLCMD_DIR)/st_with_fas.wlcmd \
 		$(WARLOCK_OUT) \
 		../fas/fas ../fas/fas_callbacks \
 		$(SCSI_FILES)  \
 		-l ../warlock/ddi_dki_impl.ll
 
-warlock_with_isp: st_with_isp.wlcmd $(WARLOCK_OUT) scsi_files isp_files \
-	warlock_ddi.files
+warlock_with_isp: $(WLCMD_DIR)/st_with_isp.wlcmd $(WARLOCK_OUT) scsi_files \
+	isp_files warlock_ddi.files
 	$(WARLOCK) -c $(WLCMD_DIR)/st_with_isp.wlcmd \
 		$(WARLOCK_OUT) $(CLOSED)/uts/sparc/isp/isp $(SCSI_FILES)  \
 		-l ../warlock/ddi_dki_impl.ll
 
-warlock_with_glm: st_with_glm.wlcmd $(WARLOCK_OUT) scsi_files glm_files \
-	warlock_ddi.files
+warlock_with_glm: $(WLCMD_DIR)/st_with_glm.wlcmd $(WARLOCK_OUT) scsi_files \
+	glm_files warlock_ddi.files
 	$(WARLOCK) -c $(WLCMD_DIR)/st_with_glm.wlcmd \
 		$(WARLOCK_OUT) $(CLOSED)/uts/sparc/glm/glm $(SCSI_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
@@ -170,7 +166,7 @@ isp_files:
 glm_files:
 	@cd $(CLOSED)/uts/sparc/glm; pwd; $(MAKE) warlock
 
-st.ok: st.wlcmd st.ll st_conf.ll  scsi_files warlock_ddi.files
+st.ok: $(WLCMD_DIR)/st.wlcmd st.ll st_conf.ll  scsi_files warlock_ddi.files
 	$(WARLOCK) -c $(WLCMD_DIR)/st.wlcmd $(WARLOCK_OUT) $(SCSI_FILES) \
 	-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@

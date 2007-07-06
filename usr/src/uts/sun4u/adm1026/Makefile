@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -86,36 +85,3 @@ install:	$(INSTALL_DEPS)
 #       Include common targets.
 #
 include $(UTSBASE)/sun4u/Makefile.targ
-
-#
-#       Defines for local commands.
-#
-WLCC		= wlcc
-TOUCH		= touch
-WARLOCK		= warlock
-SCCS		= sccs
-TEST		= test
-
-
-#
-#       Warlock targets
-#
-
-ADM1026_FILES = $(ADM1026_OBJS:%.o=%.ll)
-
-warlock: $(MODULE).ok
-
-%.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
-
-%.ok: $(ADM1026_FILES) adm1026.wlcmd warlock_ddi.files
-	$(WARLOCK) -c ./adm1026.wlcmd \
-	$(ADM1026_FILES) \
-	-l ../../sparc/warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/sun4u/io/i2c/clients/%.c
-	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
-
-warlock_ddi.files:
-	cd ../../sparc/warlock; pwd; $(MAKE) warlock

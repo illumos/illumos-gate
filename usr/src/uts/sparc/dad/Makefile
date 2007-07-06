@@ -112,7 +112,6 @@ include	$(UTSBASE)/sparc/Makefile.targ
 WARLOCK		= warlock
 WLCC		= wlcc
 TOUCH		= touch
-SCCS		= sccs
 TEST		= test
 
 #
@@ -130,16 +129,14 @@ warlock: warlock_alone
 
 warlock_alone: $(WARLOCK_OK)
 
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
 dada_files:
 	@cd $(UTSBASE)/sparc/dada; pwd; $(MAKE) warlock
 
 cmlb_files:
 	@cd $(UTSBASE)/sparc/cmlb; pwd; $(MAKE) warlock
 
-$(WARLOCK_OK): dad.wlcmd $(WARLOCK_OUT)  dada_files warlock_ddi.files cmlb_files dad.wlcmd
+$(WARLOCK_OK): $(WLCMD_DIR)/dad.wlcmd $(WARLOCK_OUT) dada_files \
+	warlock_ddi.files cmlb_files
 	$(WARLOCK) -c $(WLCMD_DIR)/dad.wlcmd $(WARLOCK_OUT) -l $(DADA_FILES) \
 	-l $(CMLB_FILES) \
 	-l $(UTSBASE)/sparc/warlock/ddi_dki_impl.ll

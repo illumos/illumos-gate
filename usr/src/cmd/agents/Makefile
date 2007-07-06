@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,8 +35,8 @@
 #	all - compile everything
 #	install - create installation directories and copy files
 #	package - create packages in installation directory
-#	clean - remove all .o's, binaries, libraries, detritus
-#	clobber - make clean plus removing sources. Forces sccs get
+#	clean - remove all intermediate files
+#	clobber - make clean plus removing deliverable files
 #	lint - run lint on the source files
 #
 #########################################################
@@ -71,7 +71,7 @@ all	:=		TARGET = all
 clean	:=		TARGET = clean
 install	:=		TARGET = install
 lint	:=		TARGET = lint
-realclobber :=		TARGET = realclobber
+clobber :=		TARGET = clobber
 
 SUBDIRS = snmp $(AGENTS)
 
@@ -113,12 +113,10 @@ install: $(ROOTDIRS) $(SUBDIRS)
 
 clean: $(SUBDIRS)
 
+clobber: $(SUBDIRS)
+
 # Need a lint target for Solaris2.6 integration.
 
 lint:  $(SUBDIRS)
-
-# We need a real make clobber with sccs clean.
-
-realclobber: $(SUBDIRS)
 
 include $(SRC)/cmd/Makefile.targ

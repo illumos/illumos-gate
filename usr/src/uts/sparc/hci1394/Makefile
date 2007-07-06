@@ -21,7 +21,7 @@
 #
 # uts/sparc/hci1394/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -122,7 +122,6 @@ include $(UTSBASE)/sparc/Makefile.targ
 WARLOCK		= warlock
 WLCC		= wlcc
 TOUCH		= touch
-SCCS		= sccs
 TEST		= test
 
 #
@@ -132,10 +131,8 @@ S1394_FILES = $(S1394_OBJS:%.o= -l ../s1394/%.ll)
 
 warlock: $(WARLOCK_OK)
 
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
-$(WARLOCK_OK): $(WARLOCK_OUT) s1394.files warlock_ddi.files hci1394.wlcmd
+$(WARLOCK_OK): $(WARLOCK_OUT) s1394.files warlock_ddi.files \
+	$(WLCMD_DIR)/hci1394.wlcmd
 	$(WARLOCK) -c $(WLCMD_DIR)/hci1394.wlcmd \
 		$(WARLOCK_OUT) $(S1394_FILES) \
 		-l ../warlock/ddi_dki_impl.ll

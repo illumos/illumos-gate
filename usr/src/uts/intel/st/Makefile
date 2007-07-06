@@ -109,7 +109,6 @@ include $(UTSBASE)/intel/Makefile.targ
 WARLOCK		= warlock
 WLCC		= wlcc
 TOUCH		= touch
-SCCS		= sccs
 TEST		= test
 
 #
@@ -125,13 +124,11 @@ warlock: $(WARLOCK_TARGETS)
 
 warlock_alone: $(WARLOCK_OK)
 
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
 scsi_files:
 	@cd ../scsi; pwd; $(MAKE) warlock
 
-$(WARLOCK_OK): 	st.wlcmd $(WARLOCK_OUT)  scsi_files warlock_ddi.files
+$(WARLOCK_OK): 	$(WLCMD_DIR)/st.wlcmd $(WARLOCK_OUT) scsi_files \
+	warlock_ddi.files
 	$(WARLOCK) -c $(WLCMD_DIR)/st.wlcmd $(WARLOCK_OUT) $(SCSI_FILES) \
 	-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@
@@ -139,8 +136,8 @@ $(WARLOCK_OK): 	st.wlcmd $(WARLOCK_OUT)  scsi_files warlock_ddi.files
 %.ll: $(UTSBASE)/common/io/scsi/targets/%.c
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
 
-warlock_with_glm: st_with_glm.wlcmd $(WARLOCK_OUT) scsi_files glm_files \
-	warlock_ddi.files
+warlock_with_glm: $(WLCMD_DIR)/st_with_glm.wlcmd $(WARLOCK_OUT) scsi_files \
+	glm_files warlock_ddi.files
 	$(WARLOCK) -c $(WLCMD_DIR)/st_with_glm.wlcmd \
 		$(WARLOCK_OUT) $(CLOSED)/uts/intel/glm/glm $(SCSI_FILES) \
 		-l ../warlock/ddi_dki_impl.ll

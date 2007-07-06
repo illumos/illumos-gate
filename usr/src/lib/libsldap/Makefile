@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -87,29 +87,5 @@ EXPORT_SRC:
 		< Makefile > Makefile+
 	$(MV) Makefile+ Makefile
 	$(CHMOD) 444 Makefile common/ns_crypt.c
-
-# This target cleans up the SCCS files as well as the plain src.
-EXPORT_WS:
-	$(RM) -f common/ns_crypt.c+ Makefile+
-
-	sccs edit common/ns_crypt.c
-	sed -e "/EXPORT DELETE START/,/EXPORT DELETE END/d" \
-		< ns_crypt.c > common/ns_crypt.c+
-	sccs unedit common/ns_crypt.c
-	$(RM) -f common/ns_crypt.c ns_crypt.c
-	$(RM) -f common/SCCS/s.ns_crypt.c
-	$(MV) common/ns_crypt.c+ common/ns_crypt.c
-	sccs create common/ns_crypt.c
-	$(RM) common/,ns_crypt.c
-
-	sccs edit Makefile
-	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	sccs unedit Makefile
-	$(RM) -f Makefile
-	$(RM) -f SCCS/s.Makefile
-	$(MV) Makefile+ Makefile
-	sccs create Makefile
-	$(RM) ,Makefile
 
 # EXPORT DELETE END

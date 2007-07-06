@@ -21,7 +21,7 @@
 #
 # uts/sparc/ohci/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -47,7 +47,6 @@ WARLOCK_OK	= $(MODULE).ok
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io/usb/hcd/openhci
 WLCMD_DIR       = $(UTSBASE)/common/io/warlock
-	
 
 #
 #	Include common rules.
@@ -112,7 +111,6 @@ include $(UTSBASE)/sparc/Makefile.targ
 WARLOCK		= warlock
 WLCC		= wlcc
 TOUCH		= touch
-SCCS		= sccs
 TEST		= test
 
 #
@@ -122,10 +120,8 @@ USBA_FILES = $(USBA_OBJS:%.o= -l ../usba/%.ll)
 
 warlock: $(WARLOCK_OK)
 
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
-$(WARLOCK_OK): $(WARLOCK_OUT) ohci.wlcmd warlock_ddi.files usba.files
+$(WARLOCK_OK): $(WARLOCK_OUT) $(WLCMD_DIR)/ohci.wlcmd warlock_ddi.files \
+	usba.files
 	$(WARLOCK) -c $(WLCMD_DIR)/ohci.wlcmd  $(WARLOCK_OUT) \
 	$(USBA_FILES) \
 	-l ../warlock/ddi_dki_impl.ll

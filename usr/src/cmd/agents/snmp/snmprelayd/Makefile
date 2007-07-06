@@ -28,9 +28,6 @@
 
 include ../../Makefile.vars
 
-# OPTIONAL_INCLUDE_FILE:sh = /bin/sh ../../misc.sh ../../../cmd/Makefile.cmd
-# include $(OPTIONAL_INCLUDE_FILE)
-
 MANIFEST = snmpdx.xml
 SVCMETHOD = svc-snmpdx
 
@@ -151,7 +148,7 @@ $(CONFRULE) := FILEMODE = 0644
 $(CONFLOC)/snmpdx.acl := FILEMODE = 0600
 $(CONFRULE) := GROUP = sys
 
-CLOBBERFILES= y.tab.c
+CLOBBERFILES += y.tab.c $(BINPROG)
 
 all: $(SOURCES.h) $(BINPROG) $(CONFIG_FILES)
 
@@ -216,15 +213,8 @@ gen:
 	$(RM) $(AGENT)_tree.c
 	$(RM) $(AGENT)_trap.c
 
-
 clean:
-	$(RM) $(OBJECTS) $(BINPROG)
-	$(RM) $(BIN)/config.lex.c $(BIN)/config.c
-
-realclobber: clean
-	sccs clean
-
-# OPTIONAL_INCLUDE_FILE:sh = /bin/sh ../../misc.sh ../../../cmd/Makefile.targ
-# include $(OPTIONAL_INCLUDE_FILE)
+	$(RM) $(OBJECTS)
+	$(RM) $(BIN)/config.lex.c $(BIN)/config.c $(BIN)/config.o
 
 include $(SRC)/cmd/Makefile.targ

@@ -21,7 +21,7 @@
 #
 # uts/sparc/fas/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the fas driver kernel module.
@@ -106,7 +106,6 @@ include $(UTSBASE)/sparc/Makefile.targ
 WARLOCK		= warlock
 WLCC		= wlcc
 TOUCH		= touch
-SCCS		= sccs
 TEST		= test
 
 #
@@ -116,10 +115,7 @@ SCSI_FILES = $(SCSI_OBJS:%.o= -l ../scsi/%.ll)
 
 warlock: $(WARLOCK_OK)
 
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
-$(WARLOCK_OK): $(WARLOCK_OUT) fas.wlcmd warlock_ddi.files \
+$(WARLOCK_OK): $(WARLOCK_OUT) $(WLCMD_DIR)/fas.wlcmd warlock_ddi.files \
 	scsi.files
 	$(WARLOCK) -c $(WLCMD_DIR)/fas.wlcmd $(WARLOCK_OUT) \
 	../warlock/scsi.ll \

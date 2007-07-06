@@ -21,7 +21,7 @@
 #
 # uts/sparc/mixer/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the audio mixer (mixer)
@@ -115,7 +115,6 @@ include $(UTSBASE)/sparc/Makefile.targ
 #
 #	Defines for local commands.
 #
-SCCS		= sccs
 TEST		= test
 WLCC		= wlcc
 TOUCH		= touch
@@ -127,14 +126,11 @@ WARLOCK 	= warlock
 AUDIO_SUP_FILES = $(AUDIO_SUP_OBJS:%.o=$(UTSBASE)/sparc/audiosup/%.ll)
 AMSRC2_FILES = $(AMSRC2_OBJS:%.o=$(UTSBASE)/sparc/amsrc2/%.ll)
 
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
 warlock:	$(WARLOCK_OK)
 
 $(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files \
 	warlock_audiosup.files warlock_amsrc2.files \
-	warlock_standalone mixer_with_audiosup.wlcmd 
+	warlock_standalone $(WLCMD_DIR)/mixer_with_audiosup.wlcmd 
 	$(WARLOCK) -c $(WLCMD_DIR)/mixer_with_audiosup.wlcmd $(WARLOCK_OUT) \
 	$(AUDIO_SUP_FILES) $(AMSRC2_FILES) \
 	-l ../warlock/ddi_dki_impl.ll
@@ -146,8 +142,7 @@ $(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files \
 %.ll: $(UTSBASE)/common/io/audio/sada/mixer/%.c
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
 
-warlock_standalone:  $(WARLOCK_OUT) warlock_ddi.files \
-	mixer.wlcmd
+warlock_standalone:  $(WARLOCK_OUT) warlock_ddi.files $(WLCMD_DIR)/mixer.wlcmd
 	$(WARLOCK) -c $(WLCMD_DIR)/mixer.wlcmd $(WARLOCK_OUT) \
 	-l ../warlock/ddi_dki_impl.ll
 

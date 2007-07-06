@@ -110,7 +110,6 @@ include $(UTSBASE)/sparc/Makefile.targ
 WARLOCK		= warlock
 WLCC		= wlcc
 TOUCH		= touch
-SCCS		= sccs
 TEST		= test
 
 #
@@ -127,10 +126,7 @@ CMLB_FILES = $(CMLB_OBJS:%.o=-l ../cmlb/%.ll)
 
 warlock: $(WARLOCK_OK) warlock_with_usba
 
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
-$(WARLOCK_OK): $(WARLOCK_OUT) scsa2usb.wlcmd warlock_ddi.files \
+$(WARLOCK_OK): $(WARLOCK_OUT) $(WLCMD_DIR)/scsa2usb.wlcmd warlock_ddi.files \
 	scsi.files
 	$(WARLOCK) -c $(WLCMD_DIR)/scsa2usb.wlcmd $(WARLOCK_OUT)  \
 		../warlock/scsi.ll \
@@ -144,9 +140,9 @@ $(WARLOCK_OK): $(WARLOCK_OUT) scsa2usb.wlcmd warlock_ddi.files \
 		$(UTSBASE)/common/sys/usb/scsa2usb/scsa2usb.h
 	$(WLCC)  $(CPPFLAGS) -DDEBUG -o $@ $<
 
-warlock_with_usba: scsa2usb_with_usba.wlcmd  $(WARLOCK_OUT) usba_files \
-	ohci_files ehci_files uhci_files warlock_ddi.files sd.files st.files \
-	scsi.files cmlb.files
+warlock_with_usba: $(WLCMD_DIR)/scsa2usb_with_usba.wlcmd  $(WARLOCK_OUT) \
+	usba_files ohci_files ehci_files uhci_files warlock_ddi.files sd.files \
+	st.files scsi.files cmlb.files
 	$(WARLOCK) -c $(WLCMD_DIR)/scsa2usb_with_usba.wlcmd \
 		$(USBA_FILES) $(OHCI_FILES) $(EHCI_FILES) $(UHCI_FILES) \
 		$(SD_FILES) \

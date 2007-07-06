@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -106,7 +106,6 @@ include $(UTSBASE)/intel/Makefile.targ
 WARLOCK		= warlock
 WLCC		= wlcc
 TOUCH		= touch
-SCCS		= sccs
 TEST		= test
 
 #
@@ -116,10 +115,8 @@ USBA_FILES = $(USBA_OBJS:%.o= -l ../usba/%.ll)
 
 warlock: $(WARLOCK_OK)
 
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
-$(WARLOCK_OK): $(WARLOCK_OUT) ehci.wlcmd warlock_ddi.files usba.files
+$(WARLOCK_OK): $(WARLOCK_OUT) $(WLCMD_DIR)/ehci.wlcmd warlock_ddi.files \
+	usba.files
 	$(WARLOCK) -c $(WLCMD_DIR)/ehci.wlcmd  $(WARLOCK_OUT) \
 	$(USBA_FILES) \
 	-l ../warlock/ddi_dki_impl.ll

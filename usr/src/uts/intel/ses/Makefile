@@ -105,16 +105,12 @@ include $(UTSBASE)/intel/Makefile.targ
 WARLOCK		= warlock
 WLCC		= wlcc
 TOUCH		= touch
-SCCS		= sccs
 TEST		= test
 
 #
 # Warlock targets
 #
 SCSI_FILES	= $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
-
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
 
 WARLOCK_TARGETS	= $(WARLOCK_OK)
 $(CLOSED_BUILD)WARLOCK_TARGETS += warlock_with_glm
@@ -123,7 +119,7 @@ warlock: $(WARLOCK_TARGETS)
 
 # XXX FIX ME: why only ses.ll?
 
-$(WARLOCK_OK): $(MODULE).wlcmd $(WARLOCK_OUT)
+$(WARLOCK_OK): $(WLCMD_DIR)/$(MODULE).wlcmd $(WARLOCK_OUT)
 	@cd ../warlock; $(MAKE) warlock
 	@cd ../scsi; $(MAKE) warlock
 	$(WARLOCK) -c $(WLCMD_DIR)/$(MODULE).wlcmd ses.ll \
@@ -135,7 +131,7 @@ $(WARLOCK_OK): $(MODULE).wlcmd $(WARLOCK_OUT)
 %.ll: $(UTSBASE)/common/io/scsi/targets/%.c
 	$(WLCC) $(CPPFLAGS) -o $@ $<
 
-warlock_with_glm: ses_with_glm.wlcmd $(WARLOCK_OUT) glm_files
+warlock_with_glm: $(WLCMD_DIR)/ses_with_glm.wlcmd $(WARLOCK_OUT) glm_files
 	@cd ../warlock; $(MAKE) warlock
 	@cd ../scsi; $(MAKE) warlock
 	@cd $(CLOSED)/uts/intel/glm; $(MAKE) warlock;

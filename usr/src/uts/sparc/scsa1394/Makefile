@@ -115,7 +115,6 @@ include $(UTSBASE)/sparc/Makefile.targ
 WARLOCK		= warlock
 WLCC		= wlcc
 TOUCH		= touch
-SCCS		= sccs
 TEST		= test
 
 #
@@ -128,11 +127,8 @@ CMLB_FILES = $(CMLB_OBJS:%.o=-l ../cmlb/%.ll)
 
 warlock: $(WARLOCK_OK)
 
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
-$(WARLOCK_OK): $(WARLOCK_OUT) sbp2.files warlock_ddi.files scsa1394.wlcmd \
-	sd.files scsi.files cmlb.files
+$(WARLOCK_OK): $(WARLOCK_OUT) sbp2.files warlock_ddi.files \
+	$(WLCMD_DIR)/scsa1394.wlcmd sd.files scsi.files cmlb.files
 	$(WARLOCK) -c $(WLCMD_DIR)/scsa1394.wlcmd $(WARLOCK_OUT) $(SD_FILES) \
 		$(SCSI_FILES) \
 		$(CMLB_FILES) \

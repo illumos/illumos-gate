@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -112,15 +112,11 @@ include $(UTSBASE)/sparc/Makefile.targ
 WARLOCK         = warlock
 WLCC            = wlcc
 TOUCH           = touch
-SCCS            = sccs
 TEST            = test
 
 warlock: $(WARLOCK_OK)
 
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
-$(WARLOCK_OK): $(WARLOCK_OUT) warlock_ddi.files ibtl.wlcmd
+$(WARLOCK_OK): $(WARLOCK_OUT) warlock_ddi.files $(WLCMD_DIR)/ibtl.wlcmd
 	$(WARLOCK) -c $(WLCMD_DIR)/ibtl.wlcmd $(WARLOCK_OUT) -l \
 	../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@

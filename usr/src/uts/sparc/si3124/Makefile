@@ -109,20 +109,16 @@ include $(UTSBASE)/sparc/Makefile.targ
 WARLOCK		= warlock
 WLCC		= wlcc
 TOUCH		= touch
-SCCS		= sccs
 TEST		= test
 
 SD_FILES = $(SD_OBJS:%.o=../sd/%.ll)
 SATA_FILES = $(SATA_OBJS:%.o=-l ../sata/%.ll)
 SCSI_FILES = $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
 CMLB_FILES = $(CMLB_OBJS:%.o=-l ../cmlb/%.ll)
- 
+
 warlock: $(WARLOCK_OK)
 
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
-$(WARLOCK_OK): si3124.wlcmd $(WARLOCK_OUT)  warlock_ddi.files \
+$(WARLOCK_OK): $(WLCMD_DIR)/si3124.wlcmd $(WARLOCK_OUT) warlock_ddi.files \
 	sata.files scsi.files sd.files cmlb.files
 	$(WARLOCK) -c $(WLCMD_DIR)/si3124.wlcmd $(WARLOCK_OUT) \
 	$(SD_FILES) \
@@ -137,7 +133,7 @@ $(WARLOCK_OK): si3124.wlcmd $(WARLOCK_OUT)  warlock_ddi.files \
 
 sata.files:
 	@cd ../sata; pwd; $(MAKE) warlock
- 
+
 scsi.files:
 	@cd ../scsi; pwd; $(MAKE) warlock
 

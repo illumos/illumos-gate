@@ -103,7 +103,6 @@ include $(UTSBASE)/intel/Makefile.targ
 #
 #	Defines for local commands.
 #
-SCCS		= sccs
 TEST		= test
 WLCC		= wlcc
 TOUCH		= touch
@@ -116,12 +115,8 @@ AUDIO_SUP_FILES = $(AUDIO_SUP_OBJS:%.o=$(UTSBASE)/intel/audiosup/%.ll)
 AMSRC1_FILES = $(AMSRC1_OBJS:%.o=$(CLOSED)/uts/intel/amsrc1/%.ll)
 AMSRC2_FILES = $(AMSRC2_OBJS:%.o=$(UTSBASE)/intel/amsrc2/%.ll)
 
-
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
 WARLOCK_TARGETS = $(WARLOCK_OUT) warlock_ddi.files warlock_audiosup.files \
-	warlock_standalone mixer_with_audiosup.wlcmd
+	warlock_standalone $(WLCMD_DIR)/mixer_with_audiosup.wlcmd
 
 $(CLOSED_BUILD)WARLOCK_CLOSED = warlock_closed
 
@@ -142,7 +137,7 @@ warlock_closed: $(WARLOCK_TARGETS) warlock_amsrc1.files
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
 
 warlock_standalone:  $(WARLOCK_OUT) warlock_ddi.files \
-	mixer.wlcmd
+	$(WLCMD_DIR)/mixer.wlcmd
 	$(WARLOCK) -c $(WLCMD_DIR)/mixer.wlcmd $(WARLOCK_OUT) \
 	-l ../warlock/ddi_dki_impl.ll
 

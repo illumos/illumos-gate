@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sparc/audiots/Makefile
@@ -114,17 +114,10 @@ include $(UTSBASE)/sparc/Makefile.targ
 #
 #	Defines for local commands.
 #
-SCCS		= sccs
 TEST		= test
 WLCC		= wlcc
 TOUCH		= touch
 WARLOCK 	= warlock
-
-#
-#	Mapfile target
-#
-mapfile:
-	$(TEST) -f $@ || $(SCCS) get $@
 
 #
 #	Warlock targets
@@ -136,15 +129,11 @@ MIXER_FILES = $(MIXER_OBJS:%.o=$(UTSBASE)/sparc/mixer/%.ll)
 AUDIO_SUP_FILES = $(AUDIO_SUP_OBJS:%.o=$(UTSBASE)/sparc/audiosup/%.ll)
 AMSRC2_FILES = $(AMSRC2_OBJS:%.o=$(UTSBASE)/sparc/amsrc2/%.ll)
 
-
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
 warlock:	$(WARLOCK_OK)
 
 $(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files warlock_standalone \
 	warlock_audiosup.files warlock_mixer.files warlock_amsrc2.files \
-	audiots_with_sada.wlcmd warlock_standalone
+	$(WLCMD_DIR)/audiots_with_sada.wlcmd warlock_standalone
 	$(WARLOCK) -c $(WLCMD_DIR)/audiots_with_sada.wlcmd $(WARLOCK_OUT) \
 	$(MIXER_FILES) $(AUDIO_SUP_FILES) $(AMSRC2_FILES) \
 	-l ../warlock/ddi_dki_impl.ll
@@ -153,7 +142,7 @@ $(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files warlock_standalone \
 %.ll: $(UTSBASE)/common/io/audio/sada/drv/audiots/%.c
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
 
-warlock_standalone: $(WARLOCK_OUT) warlock_ddi.files audiots.wlcmd
+warlock_standalone: $(WARLOCK_OUT) warlock_ddi.files $(WLCMD_DIR)/audiots.wlcmd
 	$(WARLOCK) -c $(WLCMD_DIR)/audiots.wlcmd $(WARLOCK_OUT) \
 	-l ../warlock/ddi_dki_impl.ll
 

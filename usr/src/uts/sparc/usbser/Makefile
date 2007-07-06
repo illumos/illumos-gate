@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sparc/usbser/Makefile
@@ -104,7 +104,6 @@ include $(UTSBASE)/sparc/Makefile.targ
 #	Defines for local commands.
 #
 WLCC		= wlcc
-SCCS		= sccs
 TOUCH		= touch
 WARLOCK		= warlock
 TEST		= test
@@ -112,15 +111,12 @@ TEST		= test
 #
 #	Warlock
 #
-WARLOCK_CMD	= $(MODULE).wlcmd
-
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
+WARLOCK_CMD	= $(WLCMD_DIR)/$(MODULE).wlcmd
 
 warlock: $(WARLOCK_OK)
 
 $(WARLOCK_OK):	$(WARLOCK_OUT) $(WARLOCK_CMD) warlock_ddi.files
-	$(WARLOCK) -c $(WLCMD_DIR)/$(WARLOCK_CMD) $(WARLOCK_OUT) \
+	$(WARLOCK) -c $(WARLOCK_CMD) $(WARLOCK_OUT) \
 		-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@
 

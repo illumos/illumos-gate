@@ -116,7 +116,6 @@ browser		:= CFLAGS += -xsb
 WARLOCK		= warlock
 WLCC		= wlcc
 TOUCH		= touch
-SCCS		= sccs
 TEST		= test
 
 #
@@ -129,16 +128,13 @@ warlock: warlock_alone
 
 warlock_alone: $(WARLOCK_OK)
 
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
 scsi_files:
 	@cd ../scsi; pwd; $(MAKE) warlock
 
 cmlb_files:
 	 @cd ../cmlb; pwd; $(MAKE) warlock
 
-$(WARLOCK_OK): ssd.wlcmd $(WARLOCK_OUT) scsi.files cmlb_files
+$(WARLOCK_OK): $(WLCMD_DIR)/ssd.wlcmd $(WARLOCK_OUT) scsi.files cmlb_files
 	$(WARLOCK) -c $(WLCMD_DIR)/ssd.wlcmd $(WARLOCK_OUT) \
 	$(SCSI_FILES) $(CMLB_FILES) \
 	-l ../warlock/ddi_dki_impl.ll

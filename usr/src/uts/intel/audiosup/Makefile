@@ -21,7 +21,7 @@
 #
 # uts/intel/audiosup/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the audio support (audiosup)
@@ -96,27 +96,17 @@ include $(UTSBASE)/intel/Makefile.targ
 #
 #	Defines for local commands.
 #
-SCCS		= sccs
 TEST		= test
 WLCC		= wlcc
 TOUCH		= touch
 WARLOCK 	= warlock
 
 #
-#	Mapfile target
-#
-mapfile:
-	$(TEST) -f $@ || $(SCCS) get $@
-
-#
 #	Warlock targets
 #
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
 warlock:	$(WARLOCK_OK)
 
-$(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files audiosup.wlcmd
+$(WARLOCK_OK):	$(WARLOCK_OUT) warlock_ddi.files $(WLCMD_DIR)/audiosup.wlcmd
 	$(WARLOCK) -c $(WLCMD_DIR)/audiosup.wlcmd $(WARLOCK_OUT) \
 	-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $(WARLOCK_OK)

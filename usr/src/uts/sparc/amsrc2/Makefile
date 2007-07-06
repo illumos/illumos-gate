@@ -20,7 +20,7 @@
 #
 # uts/sparc/amsrc2/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the audio mixer
@@ -111,7 +111,6 @@ include $(UTSBASE)/sparc/Makefile.targ
 WARLOCK		= warlock
 WLCC		= wlcc
 TOUCH		= touch
-SCCS		= sccs
 TEST		= test
 
 #
@@ -129,6 +128,3 @@ $(WARLOCK_OK):	$(WARLOCK_OUT)
 
 %.ll:	$(UTSBASE)/common/io/audio/sada/amsrc2/%.c main.c
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
-
-%.wlcmd main.c:
-	$(TEST) -f $@ || $(SCCS) get $@

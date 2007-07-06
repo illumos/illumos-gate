@@ -46,7 +46,6 @@ CFLAGS += -I../../common/sys -I../../sun/sys/scsi -D_KERNEL
 WARLOCK		= warlock
 WLCC		= wlcc
 TOUCH		= touch
-SCCS		= sccs
 TEST		= test
 
 include $(UTSBASE)/intel/Makefile.intel
@@ -66,70 +65,70 @@ warlock.ok: ddi_dki_impl.ll scsi.ll
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
 
 warlock.usb:
-	@cd ../usba; make clean; $(MAKE) warlock
-	@cd ../ohci; make clean; $(MAKE) warlock
-	@cd ../uhci; make clean; $(MAKE) warlock
-	@cd ../ehci; make clean; $(MAKE) warlock
-	@cd ../hid; make clean; $(MAKE) warlock
-	@cd ../scsa2usb; make clean; $(MAKE) warlock
-	@cd ../usb_ac; make clean; $(MAKE) warlock
-	@cd ../usb_as; make clean; $(MAKE) warlock
-	@cd ../usb_ah; make clean; $(MAKE) warlock
-	@cd ../ugen; make clean; $(MAKE) warlock
-	@cd ../usb_mid; make clean; $(MAKE) warlock
-	@cd ../usbprn; make clean; $(MAKE) warlock
-	@cd ../usbser; make clean; $(MAKE) warlock
-	@cd ../usbsksp; make clean; $(MAKE) warlock
-	@cd ../usbsprl; make clean; $(MAKE) warlock
-	@cd ../usbsacm; make clean; $(MAKE) warlock
-	@cd ../usbskel; make clean; $(MAKE) warlock
+	@cd ../usba; $(MAKE) clean; $(MAKE) warlock
+	@cd ../ohci; $(MAKE) clean; $(MAKE) warlock
+	@cd ../uhci; $(MAKE) clean; $(MAKE) warlock
+	@cd ../ehci; $(MAKE) clean; $(MAKE) warlock
+	@cd ../hid; $(MAKE) clean; $(MAKE) warlock
+	@cd ../scsa2usb; $(MAKE) clean; $(MAKE) warlock
+	@cd ../usb_ac; $(MAKE) clean; $(MAKE) warlock
+	@cd ../usb_as; $(MAKE) clean; $(MAKE) warlock
+	@cd ../usb_ah; $(MAKE) clean; $(MAKE) warlock
+	@cd ../ugen; $(MAKE) clean; $(MAKE) warlock
+	@cd ../usb_mid; $(MAKE) clean; $(MAKE) warlock
+	@cd ../usbprn; $(MAKE) clean; $(MAKE) warlock
+	@cd ../usbser; $(MAKE) clean; $(MAKE) warlock
+	@cd ../usbsksp; $(MAKE) clean; $(MAKE) warlock
+	@cd ../usbsprl; $(MAKE) clean; $(MAKE) warlock
+	@cd ../usbsacm; $(MAKE) clean; $(MAKE) warlock
+	@cd ../usbskel; $(MAKE) clean; $(MAKE) warlock
 $(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/usbser_edge; \
-		make clean; $(MAKE) warlock
+		$(MAKE) clean; $(MAKE) warlock
 
 warlock.scsi:
-	@cd ../sd; make clean; $(MAKE) warlock
-	@cd ../ses; make clean; $(MAKE) warlock
-	@cd ../st; make clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/glm; make clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/mpt; make clean; $(MAKE) warlock
+	@cd ../sd; $(MAKE) clean; $(MAKE) warlock
+	@cd ../ses; $(MAKE) clean; $(MAKE) warlock
+	@cd ../st; $(MAKE) clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/glm; $(MAKE) clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/mpt; $(MAKE) clean; $(MAKE) warlock
 
 
 warlock.1394:
-	@cd ../s1394; make clean; $(MAKE) warlock
-	@cd ../hci1394; make clean; $(MAKE) warlock
-	@cd ../scsa1394; make clean; $(MAKE) warlock
-	@cd ../av1394; make clean; $(MAKE) warlock
+	@cd ../s1394; $(MAKE) clean; $(MAKE) warlock
+	@cd ../hci1394; $(MAKE) clean; $(MAKE) warlock
+	@cd ../scsa1394; $(MAKE) clean; $(MAKE) warlock
+	@cd ../av1394; $(MAKE) clean; $(MAKE) warlock
 
 warlock.ecpp:
-	@cd ../ecpp; make clean; $(MAKE) warlock
+	@cd ../ecpp; $(MAKE) clean; $(MAKE) warlock
 
 warlock.audio:
-	@cd ../audiosup; make clean; $(MAKE) warlock
-	@cd ../mixer; make clean; $(MAKE) warlock
-	@cd ../amsrc2; make clean; $(MAKE) warlock
-	@cd ../../intel/audio810; make clean; $(MAKE) warlock
-	@cd ../../intel/audiohd; make clean; $(MAKE) warlock
-	@cd ../../intel/audioixp; make clean; $(MAKE) warlock
-	@cd ../usb_ac; make clean; $(MAKE) warlock
-	@cd ../usb_as; make clean; $(MAKE) warlock
-	@cd ../usb_ah; make clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/amsrc1; make clean; $(MAKE) warlock
+	@cd ../audiosup; $(MAKE) clean; $(MAKE) warlock
+	@cd ../mixer; $(MAKE) clean; $(MAKE) warlock
+	@cd ../amsrc2; $(MAKE) clean; $(MAKE) warlock
+	@cd ../../intel/audio810; $(MAKE) clean; $(MAKE) warlock
+	@cd ../../intel/audiohd; $(MAKE) clean; $(MAKE) warlock
+	@cd ../../intel/audioixp; $(MAKE) clean; $(MAKE) warlock
+	@cd ../usb_ac; $(MAKE) clean; $(MAKE) warlock
+	@cd ../usb_as; $(MAKE) clean; $(MAKE) warlock
+	@cd ../usb_ah; $(MAKE) clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/amsrc1; $(MAKE) clean; $(MAKE) warlock
 $(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/audiovia823x; \
-		make clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/audioens; make clean; $(MAKE) warlock
+		$(MAKE) clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/audioens; $(MAKE) clean; $(MAKE) warlock
 
 warlock.ib:
-	@cd ../ibmf; make clean; $(MAKE) warlock
-	@cd ../ib; make clean; $(MAKE) warlock
-	@cd ../ibtl; make clean; $(MAKE) warlock
-	@cd ../ibcm; make clean; $(MAKE) warlock
-	@cd ../ibd; make clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/tavor; make clean; $(MAKE) warlock
-$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/daplt; make clean; $(MAKE) warlock
+	@cd ../ibmf; $(MAKE) clean; $(MAKE) warlock
+	@cd ../ib; $(MAKE) clean; $(MAKE) warlock
+	@cd ../ibtl; $(MAKE) clean; $(MAKE) warlock
+	@cd ../ibcm; $(MAKE) clean; $(MAKE) warlock
+	@cd ../ibd; $(MAKE) clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/tavor; $(MAKE) clean; $(MAKE) warlock
+$(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/daplt; $(MAKE) clean; $(MAKE) warlock
 
 warlock.sata:
-	@cd ../sata; make clean; $(MAKE) warlock
-	@cd ../si3124; make clean; $(MAKE) warlock
-	@cd ../ahci; make clean; $(MAKE) warlock
+	@cd ../sata; $(MAKE) clean; $(MAKE) warlock
+	@cd ../si3124; $(MAKE) clean; $(MAKE) warlock
+	@cd ../ahci; $(MAKE) clean; $(MAKE) warlock
 $(CLOSED_BUILD)	@cd $(CLOSED)/uts/intel/marvell88sx; \
-		make clean; $(MAKE) warlock
+		$(MAKE) clean; $(MAKE) warlock

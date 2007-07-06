@@ -20,7 +20,7 @@
 #
 #
 # uts/intel/usb_ia/Makefile
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -101,7 +101,6 @@ include $(UTSBASE)/intel/Makefile.targ
 WARLOCK		= warlock
 WLCC		= wlcc
 TOUCH		= touch
-SCCS		= sccs
 TEST		= test
 
 #
@@ -114,10 +113,7 @@ EHCI_FILES = $(EHCI_OBJS:%.o=../ehci/%.ll)
 
 warlock: $(WARLOCK_OK) warlock_with_usba
 
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
-$(WARLOCK_OK): $(WARLOCK_OUT) usb_ia.wlcmd warlock_ddi.files
+$(WARLOCK_OK): $(WARLOCK_OUT) $(WLCMD_DIR)/usb_ia.wlcmd warlock_ddi.files
 	$(WARLOCK) -c $(WLCMD_DIR)/usb_ia.wlcmd $(WARLOCK_OUT)  \
 		-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@
@@ -126,8 +122,8 @@ $(WARLOCK_OK): $(WARLOCK_OUT) usb_ia.wlcmd warlock_ddi.files
 		$(UTSBASE)/common/sys/usb/usb_ia/usb_iavar.h
 	$(WLCC)  $(CPPFLAGS) -DDEBUG -o $@ $<
 
-warlock_with_usba: usb_ia_with_usba.wlcmd  $(WARLOCK_OUT) usba_files \
-	ohci_files ehci_files uhci_files warlock_ddi.files
+warlock_with_usba: $(WLCMD_DIR)/usb_ia_with_usba.wlcmd $(WARLOCK_OUT) \
+	usba_files ohci_files ehci_files uhci_files warlock_ddi.files
 	$(WARLOCK) -c $(WLCMD_DIR)/usb_ia_with_usba.wlcmd \
 		$(USBA_FILES) $(OHCI_FILES) $(EHCI_FILES) $(UHCI_FILES) \
 		$(WARLOCK_OUT) \

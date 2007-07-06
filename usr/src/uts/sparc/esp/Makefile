@@ -21,7 +21,7 @@
 #
 # uts/sparc/esp/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -105,7 +105,6 @@ include $(UTSBASE)/sparc/Makefile.targ
 #
 WARLOCK		= warlock
 WLCC		= wlcc
-SCCS		= sccs
 TOUCH		= touch
 TEST		= test
 
@@ -116,10 +115,8 @@ SCSI_FILES = $(SCSI_OBJS:%.o= -l ../scsi/%.ll)
 
 warlock: $(WARLOCK_OK)
 
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
-$(WARLOCK_OK): $(WARLOCK_OUT) esp.wlcmd warlock_ddi.files scsi.files
+$(WARLOCK_OK): $(WARLOCK_OUT) $(WLCMD_DIR)/esp.wlcmd warlock_ddi.files \
+	scsi.files
 	$(WARLOCK) -c $(WLCMD_DIR)/esp.wlcmd $(WARLOCK_OUT) \
 	../warlock/scsi.ll \
 	-l ../warlock/ddi_dki_impl.ll \

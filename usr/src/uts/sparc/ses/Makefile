@@ -103,7 +103,6 @@ include $(UTSBASE)/sparc/Makefile.targ
 WARLOCK		= warlock
 WLCC		= wlcc
 TOUCH		= touch
-SCCS		= sccs
 TEST		= test
 
 #
@@ -114,16 +113,12 @@ TEST		= test
 SES_FILES	= $(MODULE).ll
 SCSI_FILES	= $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
 
-%.wlcmd:
-	cd $(WLCMD_DIR); $(TEST) -f $@  || $(SCCS) get $@
-
-
 WARLOCK_TARGETS	= $(WARLOCK_OK) warlock_with_esp.ok warlock_with_fas.ok
 $(CLOSED_BUILD)WARLOCK_TARGETS += warlock_with_isp.ok warlock_with_glm.ok
 
 warlock: $(WARLOCK_TARGETS)
 
-$(WARLOCK_OK): $(MODULE).wlcmd $(SES_FILES)
+$(WARLOCK_OK): $(WLCMD_DIR)/$(MODULE).wlcmd $(SES_FILES)
 	@cd ../warlock; $(MAKE) warlock
 	@cd ../scsi; $(MAKE) warlock
 	$(WARLOCK) -c $(WLCMD_DIR)/$(MODULE).wlcmd $(SES_FILES) ../warlock/scsi.ll \
@@ -131,7 +126,7 @@ $(WARLOCK_OK): $(MODULE).wlcmd $(SES_FILES)
 	        $(SCSI_FILES)
 	@ $(TOUCH) $@
 
-warlock_with_esp.ok: ses_with_esp.wlcmd $(SES_FILES)
+warlock_with_esp.ok: $(WLCMD_DIR)/ses_with_esp.wlcmd $(SES_FILES)
 	@cd ../warlock; $(MAKE) warlock
 	@cd ../scsi; $(MAKE) warlock
 	@cd ../esp; $(MAKE) warlock;
@@ -141,7 +136,7 @@ warlock_with_esp.ok: ses_with_esp.wlcmd $(SES_FILES)
 	        $(SCSI_FILES)
 	@ $(TOUCH) $@
 
-warlock_with_fas.ok: ses_with_fas.wlcmd $(SES_FILES)
+warlock_with_fas.ok: $(WLCMD_DIR)/ses_with_fas.wlcmd $(SES_FILES)
 	@cd ../warlock; $(MAKE) warlock
 	@cd ../scsi; $(MAKE) warlock
 	@cd ../fas; $(MAKE) warlock;
@@ -152,7 +147,7 @@ warlock_with_fas.ok: ses_with_fas.wlcmd $(SES_FILES)
 	        $(SCSI_FILES)
 	@ $(TOUCH) $@
 
-warlock_with_isp.ok: ses_with_isp.wlcmd $(SES_FILES)
+warlock_with_isp.ok: $(WLCMD_DIR)/ses_with_isp.wlcmd $(SES_FILES)
 	@cd ../warlock; $(MAKE) warlock
 	@cd ../scsi; $(MAKE) warlock
 	@cd $(CLOSED)/uts/sparc/isp; $(MAKE) warlock;
@@ -163,7 +158,7 @@ warlock_with_isp.ok: ses_with_isp.wlcmd $(SES_FILES)
 	        $(SCSI_FILES)
 	@ $(TOUCH) $@
 
-warlock_with_glm.ok: ses_with_glm.wlcmd $(SES_FILES)
+warlock_with_glm.ok: $(WLCMD_DIR)/ses_with_glm.wlcmd $(SES_FILES)
 	@cd ../warlock; $(MAKE) warlock
 	@cd ../scsi; $(MAKE) warlock
 	@cd $(CLOSED)/uts/sparc/glm; $(MAKE) warlock;
