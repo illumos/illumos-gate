@@ -403,8 +403,14 @@ brand_get_value(struct brand_handle *bhp, const char *zonename,
 			break;
 	}
 
-	if (node == NULL)
-		return (-1);
+	if (node == NULL) {
+		if (optional) {
+			buf[0] = '\0';
+			return (0);
+		} else {
+			return (-1);
+		}
+	}
 
 	if ((content = xmlNodeGetContent(node)) == NULL)
 		return (-1);

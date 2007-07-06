@@ -276,8 +276,8 @@
 		directory in which the configuration file is stored.
 -->
 
-<!ELEMENT brand		(modname, initname, login_cmd, user_cmd, install,
-			installopts, boot, halt, verify_cfg, verify_adm,
-			postclone, postinstall, privilege+)>
+<!ELEMENT brand		(modname?, initname, login_cmd, user_cmd, install,
+			installopts?, boot?, halt?, verify_cfg?, verify_adm?,
+			postclone?, postinstall?, privilege+)>
 
 <!ATTLIST brand		name		CDATA #REQUIRED>
