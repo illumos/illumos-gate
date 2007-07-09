@@ -94,7 +94,7 @@ extern "C" {
 #define	DL_CONTROL_REQ		0x112	/* Device specific control request */
 #define	DL_CONTROL_ACK		0x113	/* Device specific control ack */
 #define	DL_PASSIVE_REQ		0x114	/* Allow access to aggregated link */
-#define DL_INTR_MODE_REQ	0x115	/* Request Rx processing in INTR mode */
+#define	DL_INTR_MODE_REQ	0x115	/* Request Rx processing in INTR mode */
 
 /*
  * Primitives used for Connectionless Service
@@ -1646,7 +1646,7 @@ union DL_primitives {
 #define	DL_CONTROL_REQ_SIZE	sizeof (dl_control_req_t)
 #define	DL_CONTROL_ACK_SIZE	sizeof (dl_control_ack_t)
 #define	DL_PASSIVE_REQ_SIZE	sizeof (dl_passive_req_t)
-#define DL_INTR_MODE_REQ_SIZE	sizeof (dl_intr_mode_req_t)
+#define	DL_INTR_MODE_REQ_SIZE	sizeof (dl_intr_mode_req_t)
 
 #ifdef	_KERNEL
 /*
