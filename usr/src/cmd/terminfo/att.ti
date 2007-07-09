@@ -3281,6 +3281,8 @@ xtermm|xterm terminal emulator (monocrome) @(#)xterm.ti 1.3,
 	sgr0=\E[m^O, smacs=^N, smcup=\E@0\E[?4s\E[?4h\E@1,
 	smso=\E[7m, tbc=\E[3g,
 	getm=\E[%p1%dY, kmous=\E[^_, reqmp=\E[492Z,
+	smkx=\E[?1h\E=, rmkx=\E[?1l\E>,
+
 #
 # color xterm
 #
