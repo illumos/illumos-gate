@@ -604,10 +604,10 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 	if (cksum->cksum_flags) {
 		if (cksum->cksum_flags & HCK_IPV4_HDRCKSUM)
 			((struct e1000_data_desc *)first_data_desc)->
-				upper.fields.popts |= E1000_TXD_POPTS_IXSM;
+			    upper.fields.popts |= E1000_TXD_POPTS_IXSM;
 		if (cksum->cksum_flags & HCK_PARTIALCKSUM)
 			((struct e1000_data_desc *)first_data_desc)->
-				upper.fields.popts |= E1000_TXD_POPTS_TXSM;
+			    upper.fields.popts |= E1000_TXD_POPTS_TXSM;
 	}
 
 	/*
@@ -1095,14 +1095,14 @@ e1000g_fill_82544_desc(uint64_t Address,
 	}
 	safe_terminator =
 	    (uint32_t)((((uint32_t)Address & 0x7) +
-		(Length & 0xF)) & 0xF);
+	    (Length & 0xF)) & 0xF);
 	/*
 	 * if it does not fall between 0x1 to 0x4 and 0x9 to 0xC then
 	 * return
 	 */
 	if (safe_terminator == 0 ||
 	    (safe_terminator > 4 &&
-		safe_terminator < 9) ||
+	    safe_terminator < 9) ||
 	    (safe_terminator > 0xC && safe_terminator <= 0xF)) {
 		desc_array->Descriptor[0].Address = Address;
 		desc_array->Descriptor[0].Length = Length;
@@ -1249,11 +1249,11 @@ e1000g_tx_bind(struct e1000g *Adapter, PTX_SW_PACKET packet, mblk_t *mp)
 #endif
 	case USE_DMA:
 		if ((mystat = ddi_dma_addr_bind_handle(
-			packet->tx_dma_handle, NULL,
-			(caddr_t)mp->b_rptr, len,
-			DDI_DMA_WRITE | DDI_DMA_STREAMING,
-			DDI_DMA_DONTWAIT, 0, &dma_cookie,
-			&ncookies)) != DDI_DMA_MAPPED) {
+		    packet->tx_dma_handle, NULL,
+		    (caddr_t)mp->b_rptr, len,
+		    DDI_DMA_WRITE | DDI_DMA_STREAMING,
+		    DDI_DMA_DONTWAIT, 0, &dma_cookie,
+		    &ncookies)) != DDI_DMA_MAPPED) {
 
 			e1000g_log(Adapter, CE_WARN,
 			    "Couldn't bind mblk buffer to Tx DMA handle: "
@@ -1538,13 +1538,13 @@ e1000g_82547_tx_move_tail_work(e1000g_tx_ring_t *tx_ring)
 		if (eop) {
 			if ((Adapter->link_duplex == HALF_DUPLEX) &&
 			    e1000_82547_fifo_workaround(&Adapter->Shared,
-				length) != E1000_SUCCESS) {
+			    length) != E1000_SUCCESS) {
 				if (tx_ring->timer_enable_82547) {
 					ASSERT(tx_ring->timer_id_82547 == 0);
 					tx_ring->timer_id_82547 =
 					    timeout(e1000g_82547_timeout,
-						(void *)Adapter,
-						drv_usectohz(10000));
+					    (void *)tx_ring,
+					    drv_usectohz(10000));
 				}
 				return;
 

@@ -53,9 +53,9 @@
 #define	E1000_RX_INTPT_TIME	128
 #define	E1000_RX_PKT_CNT	8
 
-static char ident[] = "Intel PRO/1000 Ethernet 5.1.9";
+static char ident[] = "Intel PRO/1000 Ethernet 5.1.10";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.1.9";
+static char e1000g_version[] = "Driver Ver. 5.1.10";
 
 /*
  * Proto types for DDI entry points
@@ -740,6 +740,12 @@ e1000g_set_driver_params(struct e1000g *Adapter)
 
 	if (hw->mac_type == e1000_82571)
 		hw->laa_is_present = B_TRUE;
+
+#ifdef __sparc
+	Adapter->strip_crc = B_TRUE;
+#else
+	Adapter->strip_crc = B_FALSE;
+#endif
 
 	/* Get conf file properties */
 	e1000g_getparam(Adapter);
@@ -3578,12 +3584,6 @@ again:
 	case E1000G_LB_EXTERNAL_100:
 	case E1000G_LB_EXTERNAL_10:
 	case E1000G_LB_INTERNAL_PHY:
-#ifndef __sparc
-		/* Enable the CRC stripping for loopback */
-		reg_rctl = E1000_READ_REG(hw, RCTL);
-		reg_rctl |= E1000_RCTL_SECRC;
-		E1000_WRITE_REG(hw, RCTL, reg_rctl);
-#endif
 		/* Wait for link up */
 		for (i = (PHY_FORCE_TIME * 2); i > 0; i--)
 			msec_delay(100);

@@ -291,10 +291,10 @@ SetupReceiveStructures(struct e1000g *Adapter)
 	    E1000_RCTL_LPE |		/* Large Packet Enable bit */
 	    (Adapter->Shared.mc_filter_type << E1000_RCTL_MO_SHIFT) |
 	    E1000_RCTL_RDMTS_HALF |
-#ifdef __sparc
-	    E1000_RCTL_SECRC |		/* Strip Ethernet CRC */
-#endif
 	    E1000_RCTL_LBM_NO;		/* Loopback Mode = none */
+
+	if (Adapter->strip_crc)
+		reg_val |= E1000_RCTL_SECRC;    /* Strip Ethernet CRC */
 
 	switch (Adapter->Shared.max_frame_size) {
 	case ETHERMAX:
@@ -635,9 +635,9 @@ e1000g_receive(struct e1000g *Adapter)
 		    *((unsigned char *)rx_buf->address + length - 1);
 
 		if (TBI_ACCEPT(&Adapter->Shared,
-			current_desc->status,
-			current_desc->errors,
-			current_desc->length, LastByte)) {
+		    current_desc->status,
+		    current_desc->errors,
+		    current_desc->length, LastByte)) {
 
 			AcceptFrame = B_TRUE;
 			mutex_enter(&Adapter->TbiCntrMutex);
@@ -687,6 +687,31 @@ e1000g_receive(struct e1000g *Adapter)
 			 * and less error prone...
 			 */
 			goto rx_drop;
+		}
+
+		/*
+		 * If the Ethernet CRC is not stripped by the hardware,
+		 * we need to strip it before sending it up to the stack.
+		 */
+		if (end_of_packet && !Adapter->strip_crc) {
+			if (length > CRC_LENGTH) {
+				length -= CRC_LENGTH;
+			} else {
+				/*
+				 * If the fragment is smaller than the CRC,
+				 * drop this fragment, do the processing of
+				 * the end of the packet.
+				 */
+				ASSERT(Adapter->rx_mblk_tail != NULL);
+				Adapter->rx_mblk_tail->b_wptr -=
+				    CRC_LENGTH - length;
+				Adapter->rx_packet_len -=
+				    CRC_LENGTH - length;
+
+				QUEUE_POP_HEAD(&rx_ring->recv_list);
+
+				goto rx_end_of_packet;
+			}
 		}
 
 		need_copy = B_TRUE;
@@ -768,8 +793,8 @@ rx_copy:
 			 * do this.. Yack but no other way
 			 */
 			if ((nmp =
-				allocb(length + E1000G_IPALIGNROOM,
-				    BPRI_MED)) == NULL) {
+			    allocb(length + E1000G_IPALIGNROOM,
+			    BPRI_MED)) == NULL) {
 				/*
 				 * The system has no buffers available
 				 * to send up the incoming packet, hence
@@ -813,23 +838,23 @@ rx_copy:
 			 *  IP checksum offload
 			 */
 			if (!(current_desc->status &
-				E1000_RXD_STAT_IXSM)) {
+			    E1000_RXD_STAT_IXSM)) {
 				/*
 				 * Check TCP/UDP checksum
 				 */
 				if ((current_desc->status &
-					E1000_RXD_STAT_TCPCS) &&
+				    E1000_RXD_STAT_TCPCS) &&
 				    !(current_desc->errors &
-					E1000_RXD_ERR_TCPE))
+				    E1000_RXD_ERR_TCPE))
 					cksumflags |= HCK_FULLCKSUM |
-						HCK_FULLCKSUM_OK;
+					    HCK_FULLCKSUM_OK;
 				/*
 				 * Check IP Checksum
 				 */
 				if ((current_desc->status &
-					E1000_RXD_STAT_IPCS) &&
+				    E1000_RXD_STAT_IPCS) &&
 				    !(current_desc->errors &
-					E1000_RXD_ERR_IPE))
+				    E1000_RXD_ERR_IPE))
 					cksumflags |= HCK_IPV4_HDRCKSUM;
 			}
 		}
@@ -868,6 +893,7 @@ rx_copy:
 			goto rx_next_desc;
 		}
 
+rx_end_of_packet:
 		/*
 		 * Found packet with EOP
 		 * Process the last fragment.

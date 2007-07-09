@@ -190,6 +190,7 @@ check_add_drv()
 	"pci8086,10bc"
 	"pci8086,10c4"
 	"pci8086,10c5"
+	"pci8086,10d5"
 	"pciex8086,1049"
 	"pciex8086,104a"
 	"pciex8086,104b"
@@ -212,5 +213,6 @@ check_add_drv()
 	"pciex8086,10bb"
 	"pciex8086,10bc"
 	"pciex8086,10c4"
-	"pciex8086,10c5"' \
+	"pciex8086,10c5" 
+	"pciex8086,10d5"' \
 	-m '* 0666 root root' e1000g

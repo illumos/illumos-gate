@@ -910,6 +910,7 @@ typedef struct e1000g {
 	timeout_id_t WatchDogTimer_id;
 	timeout_id_t link_tid;
 	boolean_t link_complete;
+	boolean_t strip_crc;
 
 	/*
 	 * The e1000g_timeout_lock must be held when updateing the

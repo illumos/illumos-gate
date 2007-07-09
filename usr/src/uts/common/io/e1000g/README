@@ -509,3 +509,9 @@ Notes on packaging:
   This version has the following fix:
    6507422 Dynamic Reconfiguration detach fails for e1000g
 
+5.1.10
+======
+  This version has the following fix:
+   6490623 Some networking problems with Solaris_b44_64 domU(using solaris_b44_64 dom0)
+   6510396 system panicked in e1000g_82547_timeout
+   6554976 e1000g driver does not support 10D5 device - Sun Pentwater PEM quad port
