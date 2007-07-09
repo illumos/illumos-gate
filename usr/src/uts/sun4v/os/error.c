@@ -74,10 +74,17 @@ int	aft_panic = 0;		/* panic (not reboot) on fatal usermode AFLT */
 int	aft_testfatal = 0;	/* force all AFTs to panic immediately */
 
 /*
- * Used for vbsc hostshutdown (power-off buton)
+ * Used for vbsc hostshutdown (power-off button)
  */
 int	err_shutdown_triggered = 0;	/* only once */
 uint64_t err_shutdown_inum = 0;	/* used to pull the trigger */
+
+/*
+ * Used to print NRE/RE via system variable or kmdb
+ */
+int		printerrh = 0;		/* see /etc/system */
+static void	errh_er_print(errh_er_t *, const char *);
+kmutex_t	errh_print_lock;
 
 /*
  * Defined in bus_func.c but initialised in error_init
@@ -116,6 +123,10 @@ process_resumable_error(struct regs *rp, uint32_t head_offset,
 		bzero(&errh_flt, sizeof (errh_async_flt_t));
 		bcopy((char *)head_va, &(errh_flt.errh_er),
 		    sizeof (errh_er_t));
+
+		mcpup->cpu_rq_lastre = head_va;
+		if (printerrh)
+			errh_er_print(&errh_flt.errh_er, "RQ");
 
 		/* Increment the queue head */
 		head_offset += Q_ENTRY_SIZE;
@@ -214,6 +225,10 @@ process_nonresumable_error(struct regs *rp, uint64_t flags,
 
 		bcopy((char *)head_va, &(errh_flt.errh_er),
 		    sizeof (errh_er_t));
+
+		mcpup->cpu_nrq_lastnre = head_va;
+		if (printerrh)
+			errh_er_print(&errh_flt.errh_er, "NRQ");
 
 		/* Increment the queue head */
 		head_offset += Q_ENTRY_SIZE;
@@ -766,6 +781,9 @@ error_init(void)
 	 */
 	mutex_init(&bfd_lock, NULL, MUTEX_SPIN, (void *)PIL_15);
 
+	/* Only allow one cpu at a time to dump errh errors. */
+	mutex_init(&errh_print_lock, NULL, MUTEX_SPIN, (void *)PIL_15);
+
 	node = prom_rootnode();
 	if ((node == OBP_NONODE) || (node == OBP_BADNODE)) {
 		cmn_err(CE_CONT, "error_init: node 0x%x\n", (uint_t)node);
@@ -849,4 +867,45 @@ errh_handle_asr(errh_async_flt_t *errh_fltp)
 	default:
 		break;
 	}
+}
+
+/*
+ * Dump the error packet
+ */
+/*ARGSUSED*/
+static void
+errh_er_print(errh_er_t *errh_erp, const char *queue)
+{
+	typedef union {
+		uint64_t w;
+		uint16_t s[4];
+	} errhp_t;
+	errhp_t *p = (errhp_t *)errh_erp;
+	int i;
+
+	mutex_enter(&errh_print_lock);
+	switch (errh_erp->desc) {
+	case ERRH_DESC_UCOR_RE:
+		cmn_err(CE_CONT, "\nResumable Uncorrectable Error ");
+		break;
+	case ERRH_DESC_PR_NRE:
+		cmn_err(CE_CONT, "\nNonresumable Precise Error ");
+		break;
+	case ERRH_DESC_DEF_NRE:
+		cmn_err(CE_CONT, "\nNonresumable Deferred Error ");
+		break;
+	default:
+		cmn_err(CE_CONT, "\nError packet ");
+		break;
+	}
+	cmn_err(CE_CONT, "received on %s\n", queue);
+
+	/*
+	 * Print Q_ENTRY_SIZE bytes of epacket with 8 bytes per line
+	 */
+	for (i = Q_ENTRY_SIZE; i > 0; i -= 8, ++p) {
+		cmn_err(CE_CONT, "%016lx: %04x %04x %04x %04x\n", (uint64_t)p,
+		    p->s[0], p->s[1], p->s[2], p->s[3]);
+	}
+	mutex_exit(&errh_print_lock);
 }

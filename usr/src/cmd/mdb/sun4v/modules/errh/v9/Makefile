@@ -26,5 +26,22 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-SUBDIRS = errh ldc mdesc unix vdsk
-include ../../Makefile.subdirs
+MODULE = errh.so
+MDBTGT = kvm
+
+MODSRCS = errh.c
+
+include ../../../../../Makefile.cmd
+include ../../../../../Makefile.cmd.64
+include ../../../../sparc/Makefile.sparcv9
+include ../../../Makefile.sun4v
+include ../../../../Makefile.module
+
+MODSRCS_DIR = ../
+
+CPPFLAGS += -DMP -D_MACHDEP
+CPPFLAGS += -Dsun4v
+CPPFLAGS += -I$(SRC)/uts/sun4
+CPPFLAGS += -I$(SRC)/uts/sun4v
+CPPFLAGS += -I$(SRC)/uts/sparc/v9
+CPPFLAGS += -I$(SRC)/cmd/mdb/common

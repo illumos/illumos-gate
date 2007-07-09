@@ -34,6 +34,8 @@
 #include <sys/machpcb.h>
 #include <sys/privregs.h>
 #include <sys/machlock.h>
+#include <sys/async.h>
+#include <sys/error.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -161,6 +163,8 @@ struct	machcpu {
 	uint64_t	cpu_rq_size;	/* resumable Q size */
 	uint64_t	cpu_nrq_base_pa;	/* nonresumable Q base PA */
 	uint64_t	cpu_nrq_size;		/* nonresumable Q size */
+	errh_er_t	*cpu_rq_lastre;		/* most recent RE */
+	errh_er_t	*cpu_nrq_lastnre;	/* most recent NRE */
 	caddr_t		mondo_data;		/* send mondo data */
 	uint64_t	mondo_data_ra;		/* mono data pa */
 	uint16_t	*cpu_list;		/* uint16_t [NCPU] */

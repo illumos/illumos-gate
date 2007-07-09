@@ -26,5 +26,5 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-SUBDIRS = errh ldc mdesc unix vdsk
-include ../../Makefile.subdirs
+SUBDIRS = v9
+include ../../../Makefile.subdirs
