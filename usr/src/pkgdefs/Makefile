@@ -136,6 +136,7 @@ i386_SUBDIRS= \
 	SUNWpsdcr  \
 	SUNWpsdir  \
 	SUNWpsh \
+	SUNWralink \
 	SUNWrmodr \
 	SUNWrmodu \
 	SUNWrtls \

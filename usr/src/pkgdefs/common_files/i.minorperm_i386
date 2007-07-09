@@ -116,6 +116,7 @@ clone:ipw               0600 root sys 0666 root sys     /dev/ipw
 clone:iwi               0600 root sys 0666 root sys     /dev/iwi
 clone:pcwl              0600 root sys 0666 root sys     /dev/pcwl
 clone:pcan              0600 root sys 0666 root sys     /dev/pcan
+clone:ral		0600 root sys 0666 root sys	/dev/ral
 clone:wpi		0600 root sys 0666 root sys	/dev/wpi
 bge:*			0600 root sys 0666 root sys	/dev/bge*
 rge:*			0600 root sys 0666 root sys	/dev/rge*
@@ -130,6 +131,7 @@ ipw:*                   0600 root sys 0666 root sys     /dev/ipw*
 iwi:*                   0600 root sys 0666 root sys     /dev/iwi*
 pcwl:*                  0600 root sys 0666 root sys     /dev/pcwl*
 pcan:*                  0600 root sys 0666 root sys     /dev/pcan*
+ral:*			0600 root sys 0666 root sys	/dev/ral*
 wpi:*			0600 root sys 0666 root sys	/dev/wpi*
 EOF
 }
@@ -261,6 +263,7 @@ clone:ipw
 clone:iwi
 clone:pcwl
 clone:pcan
+clone:ral
 clone:wpi
 bge:*
 rge:*
@@ -275,6 +278,7 @@ ipw:*
 iwi:*
 pcwl:*
 pcan:*
+ral:*
 wpi:*
 bmc:bmc
 dld:*
