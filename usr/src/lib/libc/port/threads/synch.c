@@ -996,12 +996,12 @@ preempt_unpark(ulwp_t *self, lwpid_t lwpid)
 }
 
 /*
- * Spin for a while, trying to grab the lock.
+ * Spin for a while (if 'tryhard' is true), trying to grab the lock.
  * If this fails, return EBUSY and let the caller deal with it.
  * If this succeeds, return 0 with mutex_owner set to curthread.
  */
 static int
-mutex_trylock_adaptive(mutex_t *mp)
+mutex_trylock_adaptive(mutex_t *mp, int tryhard)
 {
 	ulwp_t *self = curthread;
 	int error = EBUSY;
@@ -1024,7 +1024,8 @@ mutex_trylock_adaptive(mutex_t *mp)
 		return (ENOTRECOVERABLE);
 	}
 
-	if ((max = self->ul_adaptive_spin) == 0 ||
+	if (!tryhard ||
+	    (max = self->ul_adaptive_spin) == 0 ||
 	    mp->mutex_spinners >= self->ul_max_spinners)
 		max = 1;	/* try at least once */
 
@@ -1139,13 +1140,13 @@ mutex_queuelock_adaptive(mutex_t *mp)
 
 /*
  * Like mutex_trylock_adaptive(), but for process-shared mutexes.
- * Spin for a while, trying to grab the lock.
+ * Spin for a while (if 'tryhard' is true), trying to grab the lock.
  * If this fails, return EBUSY and let the caller deal with it.
  * If this succeeds, return 0 with mutex_owner set to curthread
  * and mutex_ownerpid set to the current pid.
  */
 static int
-mutex_trylock_process(mutex_t *mp)
+mutex_trylock_process(mutex_t *mp, int tryhard)
 {
 	ulwp_t *self = curthread;
 	int error = EBUSY;
@@ -1167,7 +1168,7 @@ mutex_trylock_process(mutex_t *mp)
 
 	if (ncpus == 0)
 		ncpus = (int)_sysconf(_SC_NPROCESSORS_ONLN);
-	max = (ncpus > 1)? self->ul_adaptive_spin : 1;
+	max = (tryhard && ncpus > 1)? self->ul_adaptive_spin : 1;
 	if (max == 0)
 		max = 1;	/* try at least once */
 
@@ -1784,11 +1785,11 @@ mutex_lock_internal(mutex_t *mp, timespec_t *tsp, int try)
 			break;
 		}
 	} else if (mtype & USYNC_PROCESS) {
-		error = mutex_trylock_process(mp);
+		error = mutex_trylock_process(mp, try == MUTEX_LOCK);
 		if (error == EBUSY && try == MUTEX_LOCK)
 			error = mutex_lock_kernel(mp, tsp, msp);
 	} else  {	/* USYNC_THREAD */
-		error = mutex_trylock_adaptive(mp);
+		error = mutex_trylock_adaptive(mp, try == MUTEX_LOCK);
 		if (error == EBUSY && try == MUTEX_LOCK)
 			error = mutex_lock_queue(self, msp, mp, tsp);
 	}
@@ -1847,12 +1848,11 @@ fast_process_lock(mutex_t *mp, timespec_t *tsp, int mtype, int try)
 	if ((mtype & (LOCK_RECURSIVE|LOCK_ERRORCHECK)) && shared_mutex_held(mp))
 		return (mutex_recursion(mp, mtype, try));
 
-	/* try a little harder */
-	if (mutex_trylock_process(mp) == 0)
-		return (0);
-
-	if (try == MUTEX_LOCK)
+	if (try == MUTEX_LOCK) {
+		if (mutex_trylock_process(mp, 1) == 0)
+			return (0);
 		return (mutex_lock_kernel(mp, tsp, NULL));
+	}
 
 	if (__td_event_report(self, TD_LOCK_TRY, udp)) {
 		self->ul_td_evbuf.eventnum = TD_LOCK_TRY;
@@ -1925,7 +1925,7 @@ mutex_lock_impl(mutex_t *mp, timespec_t *tsp)
 		}
 		if (mtype && MUTEX_OWNER(mp) == self)
 			return (mutex_recursion(mp, mtype, MUTEX_LOCK));
-		if (mutex_trylock_adaptive(mp) != 0)
+		if (mutex_trylock_adaptive(mp, 1) != 0)
 			return (mutex_lock_queue(self, NULL, mp, tsp));
 		return (0);
 	}
@@ -2030,14 +2030,11 @@ __mutex_trylock(mutex_t *mp)
 		}
 		if (mtype && MUTEX_OWNER(mp) == self)
 			return (mutex_recursion(mp, mtype, MUTEX_TRY));
-		if (mutex_trylock_adaptive(mp) != 0) {
-			if (__td_event_report(self, TD_LOCK_TRY, udp)) {
-				self->ul_td_evbuf.eventnum = TD_LOCK_TRY;
-				tdb_event(TD_LOCK_TRY, udp);
-			}
-			return (EBUSY);
+		if (__td_event_report(self, TD_LOCK_TRY, udp)) {
+			self->ul_td_evbuf.eventnum = TD_LOCK_TRY;
+			tdb_event(TD_LOCK_TRY, udp);
 		}
-		return (0);
+		return (EBUSY);
 	}
 
 	/* else do it the long way */
@@ -2279,7 +2276,7 @@ lmutex_lock(mutex_t *mp)
 		if (set_lock_byte(&mp->mutex_lockw) == 0) {
 			mp->mutex_owner = (uintptr_t)self;
 			DTRACE_PROBE3(plockstat, mutex__acquire, mp, 0, 0);
-		} else if (mutex_trylock_adaptive(mp) != 0) {
+		} else if (mutex_trylock_adaptive(mp, 1) != 0) {
 			(void) mutex_lock_queue(self, msp, mp, NULL);
 		}
 
@@ -2883,7 +2880,7 @@ cond_wait_queue(cond_t *cvp, mutex_t *mp, timespec_t *tsp,
 	/*
 	 * Reacquire the mutex.
 	 */
-	if ((merror = mutex_trylock_adaptive(mp)) == EBUSY)
+	if ((merror = mutex_trylock_adaptive(mp, 1)) == EBUSY)
 		merror = mutex_lock_queue(self, msp, mp, NULL);
 	if (merror)
 		error = merror;
