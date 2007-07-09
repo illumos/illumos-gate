@@ -646,6 +646,7 @@ put_nvlist(zfs_cmd_t *zc, nvlist_t *nvl)
 	if (size > zc->zc_nvlist_dst_size) {
 		error = ENOMEM;
 	} else {
+		packed = kmem_alloc(size, KM_SLEEP);
 		VERIFY(nvlist_pack(nvl, &packed, &size, NV_ENCODE_NATIVE,
 		    KM_SLEEP) == 0);
 		error = xcopyout(packed, (void *)(uintptr_t)zc->zc_nvlist_dst,

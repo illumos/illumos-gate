@@ -254,6 +254,9 @@ spa_history_log_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 		    history_str) == 0);
 	}
 
+	VERIFY(nvlist_size(nvrecord, &reclen, NV_ENCODE_XDR) == 0);
+	record_packed = kmem_alloc(reclen, KM_SLEEP);
+
 	VERIFY(nvlist_pack(nvrecord, &record_packed, &reclen,
 	    NV_ENCODE_XDR, KM_SLEEP) == 0);
 
