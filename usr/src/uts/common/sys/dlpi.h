@@ -94,7 +94,7 @@ extern "C" {
 #define	DL_CONTROL_REQ		0x112	/* Device specific control request */
 #define	DL_CONTROL_ACK		0x113	/* Device specific control ack */
 #define	DL_PASSIVE_REQ		0x114	/* Allow access to aggregated link */
-
+#define DL_INTR_MODE_REQ	0x115	/* Request Rx processing in INTR mode */
 
 /*
  * Primitives used for Connectionless Service
@@ -1151,6 +1151,15 @@ typedef struct {
 } dl_passive_req_t;
 
 /*
+ *	DL_INTR_MODE_REQ, M_PROTO type
+ */
+typedef struct {
+	t_uscalar_t	dl_primitive;
+	t_uscalar_t	dl_sap;
+	t_uscalar_t	dl_imode;	/* intr mode: 0 off  1 on */
+} dl_intr_mode_req_t;
+
+/*
  *	CONNECTION-ORIENTED SERVICE PRIMITIVES
  */
 
@@ -1570,6 +1579,7 @@ union DL_primitives {
 	dl_control_req_t	control_req;
 	dl_control_ack_t	control_ack;
 	dl_passive_req_t	passive_req;
+	dl_intr_mode_req_t	intr_mode_req;
 };
 
 #define	DL_INFO_REQ_SIZE	sizeof (dl_info_req_t)
@@ -1636,6 +1646,7 @@ union DL_primitives {
 #define	DL_CONTROL_REQ_SIZE	sizeof (dl_control_req_t)
 #define	DL_CONTROL_ACK_SIZE	sizeof (dl_control_ack_t)
 #define	DL_PASSIVE_REQ_SIZE	sizeof (dl_passive_req_t)
+#define DL_INTR_MODE_REQ_SIZE	sizeof (dl_intr_mode_req_t)
 
 #ifdef	_KERNEL
 /*
