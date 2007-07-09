@@ -259,6 +259,7 @@ sfmmu_map_prom_mappings(struct translation *trans_root, size_t ntrans_root)
 	uint_t	attr;
 	page_t *pp;
 	extern struct memlist *virt_avail;
+	char buf[256];
 
 	ttep = &tte;
 	for (i = 0, promt = trans_root; i < ntrans_root; i++, promt++) {
@@ -283,7 +284,8 @@ sfmmu_map_prom_mappings(struct translation *trans_root, size_t ntrans_root)
 			 * because a user process might use the same
 			 * virtual addresses
 			 */
-			cmn_err(CE_PANIC, "map_prom: global translation");
+			prom_panic("sfmmu_map_prom_mappings: global"
+			    " translation");
 			TTE_SET_LOFLAGS(ttep, TTE_GLB_INT, 0);
 		}
 #endif
@@ -309,20 +311,21 @@ sfmmu_map_prom_mappings(struct translation *trans_root, size_t ntrans_root)
 			 */
 			if (address_in_memlist(virt_avail, (uint64_t)vaddr,
 			    size)) {
-				cmn_err(CE_PANIC, "map_prom: inconsistent "
-				    "translation/avail lists");
+				prom_panic("sfmmu_map_prom_mappings:"
+				    " inconsistent translation/avail lists");
 			}
 
 			pfn = basepfn + mmu_btop(offset);
 			if (pf_is_memory(pfn)) {
 				if (attr & SFMMU_UNCACHEPTTE) {
-					cmn_err(CE_PANIC, "map_prom: "
-					    "uncached prom memory page");
+					prom_panic("sfmmu_map_prom_mappings:"
+					    " uncached prom memory page");
 				}
 			} else {
 				if (!(attr & SFMMU_SIDEFFECT)) {
-					cmn_err(CE_PANIC, "map_prom: prom "
-					    "i/o page without side-effect");
+					prom_panic("sfmmu_map_prom_mappings:"
+					    " prom i/o page without"
+					    " side-effect");
 				}
 			}
 
@@ -332,15 +335,15 @@ sfmmu_map_prom_mappings(struct translation *trans_root, size_t ntrans_root)
 			if (vaddr >= kmem64_base &&
 			    vaddr < kmem64_aligned_end) {
 #if !defined(C_OBP)
-				cmn_err(CE_PANIC,
-				    "unexpected kmem64 prom mapping\n");
+				prom_panic("sfmmu_map_prom_mappings:"
+				    " unexpected kmem64 prom mapping");
 #else	/* !C_OBP */
 				size_t mapsz;
 
 				if (ptob(pfn) !=
 				    kmem64_pabase + (vaddr - kmem64_base)) {
-					cmn_err(CE_PANIC,
-					    "unexpected kmem64 prom mapping\n");
+					prom_panic("sfmmu_map_prom_mappings:"
+					    " unexpected kmem64 prom mapping");
 				}
 
 				mapsz = kmem64_aligned_end - vaddr;
@@ -363,11 +366,12 @@ sfmmu_map_prom_mappings(struct translation *trans_root, size_t ntrans_root)
 				 * Verify they are equal
 				 */
 				if (pfn != oldpfn) {
-					cmn_err(CE_PANIC, "map_prom: mapping "
-					    "conflict (va=0x%p pfn=%p, "
-					    "oldpfn=%p)",
-					    (void *)vaddr, (void *)pfn,
-					    (void *)oldpfn);
+					(void) snprintf(buf, sizeof (buf),
+					"sfmmu_map_prom_mappings: mapping"
+					" conflict (va = 0x%p, pfn = 0x%p,"
+					" oldpfn = 0x%p)", (void *)vaddr,
+					    (void *)pfn, (void *)oldpfn);
+					prom_panic(buf);
 				}
 				size -= MMU_PAGESIZE;
 				offset += MMU_PAGESIZE;
@@ -376,9 +380,11 @@ sfmmu_map_prom_mappings(struct translation *trans_root, size_t ntrans_root)
 
 			pp = page_numtopp_nolock(pfn);
 			if ((pp != NULL) && PP_ISFREE((page_t *)pp)) {
-				cmn_err(CE_PANIC, "map_prom: "
-				    "prom-mapped page (va 0x%p, pfn 0x%p) "
-				    "on free list", (void *)vaddr, (void *)pfn);
+				(void) snprintf(buf, sizeof (buf),
+				"sfmmu_map_prom_mappings: prom-mapped"
+				" page (va = 0x%p, pfn = 0x%p) on free list",
+				    (void *)vaddr, (void *)pfn);
+				prom_panic(buf);
 			}
 
 			sfmmu_memtte(ttep, pfn, attr, TTE8K);
@@ -417,7 +423,7 @@ sfmmu_map_prom_mappings(struct translation *trans_root, size_t ntrans_root)
 		}
 		map_prom_lpcount[pszc] =
 		    ((caddr_t)P2ROUNDUP((uintptr_t)kmem64_end, psize) -
-			kmem64_base) >> TTE_PAGE_SHIFT(pszc);
+		    kmem64_base) >> TTE_PAGE_SHIFT(pszc);
 	}
 }
 
