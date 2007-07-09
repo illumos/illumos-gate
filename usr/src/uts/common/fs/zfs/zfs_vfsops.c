@@ -877,7 +877,7 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 
 			vattr.va_mask = AT_UID;
 
-			if (VOP_GETATTR(mvp, &vattr, 0, cr)) {
+			if (error = VOP_GETATTR(mvp, &vattr, 0, cr)) {
 				goto out;
 			}
 
