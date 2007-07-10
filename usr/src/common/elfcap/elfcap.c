@@ -166,6 +166,9 @@ static const char Hw1_i_mon[] =		"MON";
 static const char Hw1_i_cx16[] =	"CX16";
 static const char Hw1_i_ahf[] =		"AHF";
 static const char Hw1_i_tscp[] =	"TSCP";
+static const char Hw1_i_amd_sse4a[] =	"AMD_SSE4A";
+static const char Hw1_i_popcnt[] =	"POPCNT";
+static const char Hw1_i_amd_lzcnt[] =	"AMD_LZCNT";
 #elif	CAP_LOWERCASE
 static const char Hw1_i_fpu[] =		"fpu";
 static const char Hw1_i_tsc[] =		"tsc";
@@ -186,6 +189,9 @@ static const char Hw1_i_mon[] =		"mon";
 static const char Hw1_i_cx16[] =	"cx16";
 static const char Hw1_i_ahf[] =		"ahf";
 static const char Hw1_i_tscp[] = 	"tscp";
+static const char Hw1_i_amd_sse4a[] = 	"amd_sse4a";
+static const char Hw1_i_popcnt[] = 	"popcnt";
+static const char Hw1_i_amd_lzcnt[] = 	"amd_lzcnt";
 #else
 #error	"Hardware Capabilities (intel) - what case do you want?"
 #endif
@@ -215,7 +221,12 @@ static const Cap_desc hw1_i[] = {
 	{ AV_386_MON,		Hw1_i_mon,	sizeof (Hw1_i_mon) - 1 },
 	{ AV_386_CX16,		Hw1_i_cx16,	sizeof (Hw1_i_cx16) - 1 },
 	{ AV_386_AHF,		Hw1_i_ahf,	sizeof (Hw1_i_ahf) - 1 },
-	{ AV_386_TSCP,		Hw1_i_tscp,	sizeof (Hw1_i_tscp) - 1 }
+	{ AV_386_TSCP,		Hw1_i_tscp,	sizeof (Hw1_i_tscp) - 1 },
+	{ AV_386_AMD_SSE4A,	Hw1_i_amd_sse4a,
+						sizeof (Hw1_i_amd_sse4a) - 1 },
+	{ AV_386_POPCNT,	Hw1_i_popcnt,	sizeof (Hw1_i_popcnt) - 1 },
+	{ AV_386_AMD_LZCNT,	Hw1_i_amd_lzcnt,
+						sizeof (Hw1_i_amd_lzcnt) - 1 }
 };
 static const uint_t hw1_i_num = sizeof (hw1_i) / sizeof (Cap_desc);
 

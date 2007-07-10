@@ -61,10 +61,13 @@ extern "C" {
 #define	AV_386_CX16		0x10000	/* cmpxchg16b insn */
 #define	AV_386_AHF		0x20000	/* lahf/sahf insns */
 #define	AV_386_TSCP		0x40000	/* rdtscp instruction */
+#define	AV_386_AMD_SSE4A	0x80000	/* AMD's SSE4A insns */
+#define	AV_386_POPCNT		0x100000 /* POPCNT insn */
+#define	AV_386_AMD_LZCNT	0x200000 /* AMD's LZCNT insn */
 
 #define	FMT_AV_386							\
 	"\20"								\
-	"\23tscp\22ahf\21cx16"						\
+	"\26amd_lzcnt\25popcnt\24amd_sse4a\23tscp\22ahf\21cx16"		\
 	"\20mon\17sse3\16pause\15sse2\14sse\13fxsr\12amd3dx\11amd3d"	\
 	"\10amdmmx\7mmx\6cmov\5amdsysc\4sep\3cx8\2tsc\1fpu"
 

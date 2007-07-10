@@ -106,10 +106,11 @@ extern "C" {
 						/* 0x00010000 - reserved */
 						/* 0x00020000 - reserved */
 #define	CPUID_INTC_ECX_DCA	0x00040000	/* direct cache access */
+#define	CPUID_INTC_ECX_POPCNT	0x00800000	/* POPCNT insn */
 
 #define	FMT_CPUID_INTC_ECX					\
 	"\20"							\
-	"\30\23dca"						\
+	"\30popcnt\23dca"					\
 	"\20\17etprd\16cx16\13cid\12ssse3\11tm2"		\
 	"\10est\7smx\6vmx\5dscpl\4mon\1sse3"
 
@@ -163,10 +164,12 @@ extern "C" {
 #define	CPUID_AMD_ECX_SVM	0x00000004	/* AMD: secure VM */
 #define	CPUID_AMD_ECX_EAS	0x00000008	/* extended apic space */
 #define	CPUID_AMD_ECX_CR8D	0x00000010	/* AMD: 32-bit mov %cr8 */
+#define	CPUID_AMD_ECX_LZCNT	0x00000020	/* AMD: LZCNT insn */
+#define	CPUID_AMD_ECX_SSE4A	0x00000040	/* AMD: SSE4A insns */
 
 #define	FMT_CPUID_AMD_ECX					\
 	"\20"							\
-	"\5cr8d\3svm\2lcmplgcy\1ahf64"
+	"\7sse4a\6lzcnt\5cr8d\3svm\2lcmplgcy\1ahf64"
 
 /*
  * Intel now seems to have claimed part of the "extended" function
@@ -366,12 +369,13 @@ typedef	struct	mtrrvar {
 #define	X86_CMP		0x00100000
 #define	X86_TSCP	0x00200000
 #define	X86_MWAIT	0x00400000
+#define	X86_SSE4A	0x00800000
 #define	X86_CPUID	0x01000000
 
 #define	FMT_X86_FEATURE						\
 	"\20"							\
 	"\31cpuid"						\
-	"\27mwait\26tscp\25cmp\24cx16\23sse3\22nx\21asysc"	\
+	"\30sse4a\27mwait\26tscp\25cmp\24cx16\23sse3\22nx\21asysc"\
 	"\20htt\17sse2\16sse\15sep\14pat\13cx8\12pae\11mca"	\
 	"\10mmx\7cmov\6de\5pge\4mtrr\3msr\2tsc\1lgpg"
 

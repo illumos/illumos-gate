@@ -865,6 +865,11 @@ cpuid_pass1(cpu_t *cpu)
 			if (cp->cp_edx & CPUID_AMD_EDX_NX)
 				feature |= X86_NX;
 
+			if ((cpi->cpi_vendor == X86_VENDOR_AMD) &&
+			    (cpi->cpi_std[1].cp_edx & CPUID_INTC_EDX_FXSR) &&
+			    (cp->cp_ecx & CPUID_AMD_ECX_SSE4A))
+				feature |= X86_SSE4A;
+
 			/*
 			 * If both the HTT and CMP_LGCY bits are set,
 			 * then we're not actually HyperThreaded.  Read
@@ -1860,7 +1865,8 @@ cpuid_pass4(cpu_t *cpu)
 			hwcap_flags |= AV_386_SSE2;
 		if (*ecx & CPUID_INTC_ECX_SSE3)
 			hwcap_flags |= AV_386_SSE3;
-
+		if (*ecx & CPUID_INTC_ECX_POPCNT)
+			hwcap_flags |= AV_386_POPCNT;
 		if (*edx & CPUID_INTC_EDX_FPU)
 			hwcap_flags |= AV_386_FPU;
 		if (*edx & CPUID_INTC_EDX_MMX)
@@ -1914,6 +1920,8 @@ cpuid_pass4(cpu_t *cpu)
 		case X86_VENDOR_AMD:
 			if ((x86_feature & X86_TSCP) == 0)
 				*edx &= ~CPUID_AMD_EDX_TSCP;
+			if ((x86_feature & X86_SSE4A) == 0)
+				*ecx &= ~CPUID_AMD_ECX_SSE4A;
 			break;
 
 		default:
@@ -1954,6 +1962,10 @@ cpuid_pass4(cpu_t *cpu)
 				hwcap_flags |= AV_386_TSCP;
 			if (*ecx & CPUID_AMD_ECX_AHF64)
 				hwcap_flags |= AV_386_AHF;
+			if (*ecx & CPUID_AMD_ECX_SSE4A)
+				hwcap_flags |= AV_386_AMD_SSE4A;
+			if (*ecx & CPUID_AMD_ECX_LZCNT)
+				hwcap_flags |= AV_386_AMD_LZCNT;
 			break;
 
 		case X86_VENDOR_Intel:

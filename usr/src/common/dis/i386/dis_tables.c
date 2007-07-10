@@ -102,6 +102,7 @@ enum {
 	MO,		/* memory only (no registers) */
 	PREF,
 	SWAPGS,
+	MONITOR_MWAIT,
 	R,
 	RA,
 	SEG,
@@ -191,6 +192,8 @@ enum {
 	XMMXMM,		/* SIMD 			xmm/mem	-> mm */
 	XMMMX,		/* SIMD 			mm	-> xmm */
 	XMMXM,		/* SIMD 			xmm	-> mm */
+        XMMX2I,		/* SIMD				xmm -> xmm, imm, imm */
+        XMM2I,		/* SIMD				xmm, imm, imm */
 	XMMFENCE,	/* SIMD lfence or mfence */
 	XMMSFNC		/* SIMD sfence (none or mem) */
 };
@@ -447,7 +450,7 @@ const instable_t dis_op0F00[8] = {
  */
 const instable_t dis_op0F01[8] = {
 
-/*  [0]  */	TNSZ("sgdt",MO,6),	TNSZ("sidt",MO,6), 	TNSZ("lgdt",MO,6),	TNSZ("lidt",MO,6),
+/*  [0]  */	TNSZ("sgdt",MO,6),	TNSZ("sidt",MONITOR_MWAIT,6), TNSZ("lgdt",MO,6),	TNSZ("lidt",MO,6),
 /*  [4]  */	TNSZ("smsw",M,2),	INVALID, 		TNSZ("lmsw",M,2),	TNS("invlpg",SWAPGS),
 };
 
@@ -584,7 +587,7 @@ const instable_t dis_opSIMDdata16[256] = {
 
 /*  [70]  */	TNSZ("pshufd",XMMP,16),	INVALID,		INVALID,		INVALID,
 /*  [74]  */	TNSZ("pcmpeqb",XMM,16),	TNSZ("pcmpeqw",XMM,16),	TNSZ("pcmpeqd",XMM,16),	INVALID,
-/*  [78]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [78]  */	TNSZ("extrq",XMM2I,16),	TNSZ("extrq",XMM,16), INVALID,		INVALID,
 /*  [7C]  */	INVALID,		INVALID,		TNSZ("movd",XMM3MXS,4),	TNSZ("movdqa",XMMS,16),
 
 /*  [80]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -644,7 +647,7 @@ const instable_t dis_opSIMDrepnz[256] = {
 
 /*  [20]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [24]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [28]  */	INVALID,		INVALID,		TNSZ("cvtsi2sd",XMM3MX,4),INVALID,
+/*  [28]  */	INVALID,		INVALID,		TNSZ("cvtsi2sd",XMM3MX,4),TNSZ("movntsd",XMMMS,8),
 /*  [2C]  */	TNSZ("cvttsd2si",XMMXM3,8),TNSZ("cvtsd2si",XMMXM3,8),INVALID,		INVALID,
 
 /*  [30]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -669,7 +672,7 @@ const instable_t dis_opSIMDrepnz[256] = {
 
 /*  [70]  */	TNSZ("pshuflw",XMMP,16),INVALID,		INVALID,		INVALID,
 /*  [74]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [78]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [78]  */	TNSZ("insertq",XMMX2I,16),TNSZ("insertq",XMM,8),INVALID,		INVALID,
 /*  [7C]  */	INVALID,		INVALID,		INVALID,		INVALID,
 
 /*  [80]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -729,7 +732,7 @@ const instable_t dis_opSIMDrepz[256] = {
 
 /*  [20]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [24]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [28]  */	INVALID,		INVALID,		TNSZ("cvtsi2ss",XMM3MX,4),INVALID,
+/*  [28]  */	INVALID,		INVALID,		TNSZ("cvtsi2ss",XMM3MX,4),TNSZ("movntss",XMMMS,4),
 /*  [2C]  */	TNSZ("cvttss2si",XMMXM3,4),TNSZ("cvtss2si",XMMXM3,4),INVALID,		INVALID,
 
 /*  [30]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -774,8 +777,8 @@ const instable_t dis_opSIMDrepz[256] = {
 
 /*  [B0]  */	INVALID,		INVALID,		INVALID,		INVALID,
 /*  [B4]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [B8]  */	INVALID,		INVALID,		INVALID,		INVALID,
-/*  [BC]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [B8]  */	TS("popcnt",MRw),	INVALID,		INVALID,		INVALID,
+/*  [BC]  */	INVALID,		TS("lzcnt",MRw),	INVALID,		INVALID,
 
 /*  [C0]  */	INVALID,		INVALID,		TNSZ("cmpss",XMMP,4),	INVALID,
 /*  [C4]  */	INVALID,		INVALID,		INVALID,		INVALID,
@@ -841,7 +844,7 @@ const instable_t dis_op0F[16][16] = {
 }, {
 /*  [70]  */	TNSZ("pshufw",MMOPM,8),	TNS("psrXXX",MR),	TNS("psrXXX",MR),	TNS("psrXXX",MR),
 /*  [74]  */	TNSZ("pcmpeqb",MMO,8),	TNSZ("pcmpeqw",MMO,8),	TNSZ("pcmpeqd",MMO,8),	TNS("emms",NORM),
-/*  [78]  */	INVALID,		INVALID,		INVALID,		INVALID,
+/*  [78]  */	TNS("INVALID",XMMO),	TNS("INVALID",XMMO),	INVALID,		INVALID,
 /*  [7C]  */	INVALID,		INVALID,		TNSZ("movd",MMOS,4),	TNSZ("movq",MMOS,8),
 }, {
 /*  [80]  */	TNS("jo",D),		TNS("jno",D),		TNS("jb",D),		TNS("jae",D),
@@ -861,7 +864,7 @@ const instable_t dis_op0F[16][16] = {
 }, {
 /*  [B0]  */	TNS("cmpxchgb",RMw),	TS("cmpxchg",RMw),	TS("lss",MR),		TS("btr",RMw),
 /*  [B4]  */	TS("lfs",MR),		TS("lgs",MR),		TS("movzb",MOVZ),	TNS("movzwl",MOVZ),
-/*  [B8]  */	INVALID,		INVALID,		IND(dis_op0FBA),	TS("btc",RMw),
+/*  [B8]  */	TNS("INVALID",MRw),	INVALID,		IND(dis_op0FBA),	TS("btc",RMw),
 /*  [BC]  */	TS("bsf",MRw),		TS("bsr",MRw),		TS("movsb",MOVZ),	TNS("movswl",MOVZ),
 }, {
 /*  [C0]  */	TNS("xaddb",XADDB),	TS("xadd",RMw),		TNSZ("cmpps",XMMOPM,16),TNS("movnti",RM),
@@ -1685,6 +1688,29 @@ dtrace_get_operand(dis86_t *x, uint_t mode, uint_t r_m, int wbit, int opindex)
 }
 
 /*
+ * Similar, but for 2 operands plus two immediates.
+ */
+#define	FOUROPERAND(x, mode, reg, r_m, rex_prefix, wbit, w2, immsize) { \
+		dtrace_get_modrm(x, &mode, &reg, &r_m);			\
+		dtrace_rex_adjust(rex_prefix, mode, &reg, &r_m);	\
+		dtrace_get_operand(x, mode, r_m, wbit, 2);		\
+		dtrace_get_operand(x, REG_ONLY, reg, w2, 3);		\
+		dtrace_imm_opnd(x, wbit, immsize, 1);			\
+		dtrace_imm_opnd(x, wbit, immsize, 0);			\
+}
+
+/*
+ * 1 operands plus two immediates.
+ */
+#define	ONEOPERAND_TWOIMM(x, mode, reg, r_m, rex_prefix, wbit, immsize) { \
+		dtrace_get_modrm(x, &mode, &reg, &r_m);			\
+		dtrace_rex_adjust(rex_prefix, mode, &reg, &r_m);	\
+		dtrace_get_operand(x, mode, r_m, wbit, 2);		\
+		dtrace_imm_opnd(x, wbit, immsize, 1);			\
+		dtrace_imm_opnd(x, wbit, immsize, 0);			\
+}
+
+/*
  * Dissassemble a single x86 or amd64 instruction.
  *
  * Mode determines the default operating mode (SIZE16, SIZE32 or SIZE64)
@@ -1739,7 +1765,7 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 	x->d86_numopnds = 0;
 	x->d86_seg_prefix = NULL;
 	x->d86_mnem[0] = 0;
-	for (i = 0; i < 3; ++i) {
+	for (i = 0; i < 4; ++i) {
 		x->d86_opnd[i].d86_opnd[0] = 0;
 		x->d86_opnd[i].d86_prefix[0] = 0;
 		x->d86_opnd[i].d86_value_size = 0;
@@ -2024,6 +2050,27 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 			opnd_size_prefix = 0;
 			if (opnd_size == SIZE16)
 				opnd_size = SIZE32;
+		}
+		break;
+	case MRw:
+		if (rep_prefix) {
+			if (rep_prefix == 0xf3) {
+
+				/*
+				 * Calculate our offset in dis_op0F
+				 */
+				if ((uintptr_t)dp - (uintptr_t)dis_op0F
+				    > sizeof (dis_op0F))
+					goto error;
+
+				off = ((uintptr_t)dp - (uintptr_t)dis_op0F) /
+				    sizeof (instable_t);
+
+				dp = (instable_t *)&dis_opSIMDrepz[off];
+				rep_prefix = 0;
+			} else {
+				goto error;
+			}
 		}
 		break;
 	}
@@ -2339,6 +2386,26 @@ just_mem:
 		wbit = BYTE_OPND;
 		goto just_mem;
 
+	case MONITOR_MWAIT:
+		if (mode == 3) {
+			if (r_m == 0) {
+#ifdef DIS_TEXT
+				(void) strncpy(x->d86_mnem, "monitor", OPLEN);
+#endif
+				NOMEM;
+				break;
+			} else if (r_m == 1) {
+#ifdef DIS_TEXT
+				(void) strncpy(x->d86_mnem, "mwait", OPLEN);
+#endif
+				NOMEM;
+				break;
+			} else {
+				goto error;
+			}
+		}
+		/*FALLTHROUGH*/
+
 	case MO:
 		/* Similar to M, but only memory (no direct registers) */
 		wbit = LONG_OPND;
@@ -2648,6 +2715,17 @@ xmmprm:
 			x->d86_numopnds = 2;
 		}
 #endif
+		break;
+
+	case XMMX2I:
+		FOUROPERAND(x, mode, reg, r_m, rex_prefix, XMM_OPND, XMM_OPND,
+		    1);
+		NOMEM;
+		break;
+
+	case XMM2I:
+		ONEOPERAND_TWOIMM(x, mode, reg, r_m, rex_prefix, XMM_OPND, 1);
+		NOMEM;
 		break;
 
 	/* immediate operand to accumulator */
