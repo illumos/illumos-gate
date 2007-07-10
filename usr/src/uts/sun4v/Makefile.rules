@@ -127,6 +127,13 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4v/io/niumx/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4v/io/n2rng/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:                $(UTSBASE)/sun4v/io/n2rng/%.s
+	$(COMPILE.s) -o $@ $<
+
 $(OBJS_DIR)/%.o:		$(SRC)/common/atomic/sparcv9/%.s
 	$(COMPILE.s) -o $@ $<
 
@@ -179,6 +186,12 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4v/io/glvc/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4v/io/glvc/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4v/io/n2rng/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4v/io/n2rng/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4v/ml/%.s

@@ -121,6 +121,9 @@ N2PIUPC_OBJS	+= n2piupc.o n2piupc_tables.o n2piupc_kstats.o \
 			n2piupc_biterr.o n2piupc_asm.o
 TRAPSTAT_OBJS	+= trapstat.o
 NIUMX_OBJS	+= niumx.o
+N2RNG_OBJS	+= n2rng.o n2rng_debug.o n2rng_hcall.o n2rng_kcf.o \
+		   n2rng_entp_algs.o n2rng_entp_setup.o n2rng_kstat.o \
+		   n2rng_provider.o
 
 #
 # 			CPU/Memory Error Injector (memtest) sun4v driver

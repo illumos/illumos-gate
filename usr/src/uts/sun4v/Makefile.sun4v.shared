@@ -338,6 +338,7 @@ DRV_KMODS	+= niumx
 DRV_KMODS	+= ntwdt
 DRV_KMODS	+= nxge
 DRV_KMODS	+= n2piupc
+DRV_KMODS	+= n2rng
 DRV_KMODS	+= px
 DRV_KMODS	+= qcn
 DRV_KMODS	+= rootnex
@@ -354,7 +355,6 @@ DRV_KMODS	+= vsw
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= memtest
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= ncp
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= n2cp
-$(CLOSED_BUILD)CLOSED_DRV_KMODS	+= n2rng
 
 #
 #	Exec Class Modules (/kernel/exec):
