@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -246,7 +246,7 @@ int
 datamsg(unsigned char db_type)
 {
 	return (db_type == M_DATA || db_type == M_PROTO ||
-		db_type == M_PCPROTO || db_type == M_DELAY);
+	    db_type == M_PCPROTO || db_type == M_DELAY);
 }
 
 /*
@@ -300,7 +300,9 @@ drv_getparm(unsigned int parm, void *valuep)
 		*(proc_t **)valuep = p;
 		break;
 	case PPGRP:
+		mutex_enter(&p->p_lock);
 		*(pid_t *)valuep = p->p_pgrp;
+		mutex_exit(&p->p_lock);
 		break;
 	case LBOLT:
 		*(clock_t *)valuep = lbolt;
