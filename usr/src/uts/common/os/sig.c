@@ -1369,15 +1369,16 @@ psig(void)
 		 * signal so that sendsig() will succeed.
 		 */
 		if (sigismember(&p->p_siginfo, sig)) {
+			sip = &lwp->lwp_siginfo;
 			if (sqp) {
-				bcopy(&sqp->sq_info, &lwp->lwp_siginfo,
-				    sizeof (k_siginfo_t));
-				sip = &lwp->lwp_siginfo;
-			} else if (sig == SIGPROF &&
-			    t->t_rprof != NULL &&
-			    t->t_rprof->rp_anystate &&
-			    lwp->lwp_siginfo.si_signo == SIGPROF) {
-				sip = &lwp->lwp_siginfo;
+				bcopy(&sqp->sq_info, sip, sizeof (*sip));
+			} else if (sig == SIGPROF && sip->si_signo == SIGPROF &&
+			    t->t_rprof != NULL && t->t_rprof->rp_anystate) {
+				/* EMPTY */;
+			} else {
+				bzero(sip, sizeof (*sip));
+				sip->si_signo = sig;
+				sip->si_code = SI_NOINFO;
 			}
 		}
 

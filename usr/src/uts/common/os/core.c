@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -25,7 +26,6 @@
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -696,9 +696,11 @@ core(int sig, int ext)
 	ASSERT(lwp->lwp_cursig == sig);
 	lwp->lwp_cursig = 0;
 	lwp->lwp_extsig = 0;
-	if (lwp->lwp_curinfo == NULL)
+	if (lwp->lwp_curinfo == NULL) {
 		bzero(&lwp->lwp_siginfo, sizeof (k_siginfo_t));
-	else {
+		lwp->lwp_siginfo.si_signo = sig;
+		lwp->lwp_siginfo.si_code = SI_NOINFO;
+	} else {
 		bcopy(&lwp->lwp_curinfo->sq_info,
 		    &lwp->lwp_siginfo, sizeof (k_siginfo_t));
 		siginfofree(lwp->lwp_curinfo);
