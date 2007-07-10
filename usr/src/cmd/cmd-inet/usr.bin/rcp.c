@@ -53,13 +53,13 @@
 #include <sys/sysmacros.h>
 #include <sys/wait.h>
 #include <aclutils.h>
+#include <sys/varargs.h>
 
 /*
  * It seems like Berkeley got these from pathnames.h?
  */
 #define	_PATH_RSH	"/usr/bin/rsh"
 #define	_PATH_CP	"/usr/bin/cp"
-#define	_PATH_BSHELL	"/usr/bin/sh"
 
 #define	ACL_FAIL	1
 #define	ACL_OK		0
@@ -100,7 +100,7 @@ static void toremote(char *, int, char **);
 static void tolocal(int, char **);
 static void verifydir(char *);
 static int okname(char *);
-static int susystem(char *);
+static int susystem(char *, char **);
 static void rsource(char *, struct stat *);
 static int sendacl(int);
 static int recvacl(int, int, int);
@@ -110,6 +110,7 @@ static int zclose(int);
 static int notzero(char *, int);
 static BUF *allocbuf(BUF *, int, int);
 static void error(char *fmt, ...);
+static void addargs(char **, ...);
 
 /*
  * As a 32 bit application, we can only transfer (2gb - 1) i.e 0x7FFFFFFF
@@ -124,6 +125,7 @@ static void error(char *fmt, ...);
 #include <kcmd.h>
 
 #define	NULLBUF	(BUF *) 0
+#define	MAXARGS	10	/* Number of arguments passed to execv() */
 
 static int sock;
 static char *cmd, *cmd_orig, *cmd_sunw_orig;
@@ -417,7 +419,7 @@ main(int argc, char *argv[])
 		 * cmd_sunw_orig that are used to hold different incantations
 		 * of rcp.
 		 */
-		cmdsiz = MAX(sizeof ("-x rcp  -r -p -d -k ") +
+		cmdsiz = MAX(sizeof ("-x rcp -r -p -d -k ") +
 		    strlen(krb_realm != NULL ? krb_realm : ""),
 		    sizeof (RCP_ACL " -r -p -z -d"));
 
@@ -431,7 +433,6 @@ main(int argc, char *argv[])
 
 		(void) snprintf(cmd, cmdsiz, "%srcp %s%s%s%s%s",
 			encrypt_flag ? "-x " : "",
-
 			iamrecursive ? " -r" : "", pflag ? " -p" : "",
 			targetshouldbedirectory ? " -d" : "",
 			krb_realm != NULL ? " -k " : "",
@@ -507,6 +508,7 @@ toremote(char *targ, int argc, char *argv[])
 	size_t buffersize;
 	char bp[RCP_BUFSIZE];
 	krb5_creds *cred;
+	char *arglist[MAXARGS+1];
 	buffersize = RCP_BUFSIZE;
 
 	*targ++ = 0;
@@ -543,20 +545,20 @@ toremote(char *targ, int argc, char *argv[])
 					errs++;
 					continue;
 				}
-				(void) snprintf(bp, buffersize,
-				    "%s %s -l %s -n %s %s '%s%s%s:%s'",
-				    _PATH_RSH, host, suser, cmd, src,
+				(void) snprintf(bp, buffersize, "'%s%s%s:%s'",
 				    tuser ? tuser : "", tuser ? "@" : "",
 				    thost, targ);
+				(void) addargs(arglist, "rsh", host, "-l",
+				    suser, "-n", cmd, src, bp, (char *)NULL);
 			} else {
 				host = removebrackets(argv[i]);
-				(void) snprintf(bp, buffersize,
-					"%s %s -n %s %s '%s%s%s:%s'",
-					_PATH_RSH, host, cmd, src,
-					tuser ? tuser : "", tuser ? "@" : "",
-					thost, targ);
+				(void) snprintf(bp, buffersize, "'%s%s%s:%s'",
+				    tuser ? tuser : "", tuser ? "@" : "",
+				    thost, targ);
+				(void) addargs(arglist, "rsh", host, "-n", cmd,
+				    src, bp, (char *)NULL);
 			}
-			if (susystem(bp) == -1)
+			if (susystem(_PATH_RSH, arglist) == -1)
 				errs++;
 		} else {			/* local to remote */
 			if (rem == -1) {
@@ -747,16 +749,16 @@ tolocal(int argc, char *argv[])
 	size_t buffersize;
 	char bp[RCP_BUFSIZE];
 	krb5_creds *cred;
+	char *arglist[MAXARGS+1];
 	buffersize = RCP_BUFSIZE;
 
 	for (i = 0; i < argc - 1; i++) {
 		if (!(src = colon(argv[i]))) {	/* local to local */
-			(void) snprintf(bp, buffersize, "%s%s%s%s %s %s",
-			    _PATH_CP, iamrecursive ? " -r" : "",
-			    pflag ? " -p" : "",
-			    zflag ? " -z" : "",
-			    argv[i], argv[argc - 1]);
-			if (susystem(bp) == -1)
+			(void) addargs(arglist, "cp",
+			    iamrecursive ? "-r" : "", pflag ? "-p" : "",
+			    zflag ? "-z" : "", argv[i], argv[argc - 1],
+			    (char *)NULL);
+			if (susystem(_PATH_CP, arglist) == -1)
 				errs++;
 			continue;
 		}
@@ -997,7 +999,7 @@ removebrackets(char *str)
 }
 
 static int
-susystem(char *s)
+susystem(char *path, char **arglist)
 {
 	int status, pid, w;
 	register void (*istat)(), (*qstat)();
@@ -1044,7 +1046,7 @@ susystem(char *s)
 		 * This shell does not inherit the additional privilege
 		 * we have in our Permitted set.
 		 */
-		(void) execl(_PATH_BSHELL, "sh", "-c", s, (char *)0);
+		(void) execv(path, arglist);
 		_exit(127);
 	}
 	/*
@@ -2203,4 +2205,19 @@ error(char *fmt, ...)
 	(void) desrcpwrite(rem, buf, strlen(buf));
 	if (iamremote == 0)
 		(void) write(2, buf + 1, strlen(buf + 1));
+}
+
+static void
+addargs(char **arglist, ...)
+{
+	va_list ap;
+	int i = 0;
+	char *pm;
+
+	va_start(ap, arglist);
+	while (i < MAXARGS && (pm = va_arg(ap, char *)) != NULL)
+		if (strcmp(pm, ""))
+			arglist[i++] = pm;
+	arglist[i] = NULL;
+	va_end(ap);
 }
