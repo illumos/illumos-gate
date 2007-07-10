@@ -37,6 +37,7 @@
 #include <sys/zfs_znode.h>
 #include <sys/zfs_dir.h>
 #include <sys/zil.h>
+#include <sys/zil_impl.h>
 #include <sys/byteorder.h>
 #include <sys/policy.h>
 #include <sys/stat.h>
@@ -206,15 +207,15 @@ zfs_log_rename(zilog_t *zilog, dmu_tx_t *tx, int txtype,
  */
 ssize_t zfs_immediate_write_sz = 32768;
 
+#define	ZIL_MAX_LOG_DATA (SPA_MAXBLOCKSIZE - sizeof (zil_trailer_t) - \
+    sizeof (lr_write_t))
+
 void
 zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
-	znode_t *zp, offset_t off, ssize_t len, int ioflag)
+	znode_t *zp, offset_t off, ssize_t resid, int ioflag)
 {
-	itx_t *itx;
-	uint64_t seq;
-	lr_write_t *lr;
 	itx_wr_state_t write_state;
-	int err;
+	boolean_t slogging;
 
 	if (zilog == NULL || zp->z_unlinked)
 		return;
@@ -223,10 +224,10 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	 * Writes are handled in three different ways:
 	 *
 	 * WR_INDIRECT:
-	 *    If the write is greater than zfs_immediate_write_sz then
-	 *    later *if* we need to log the write then dmu_sync() is used
-	 *    to immediately write the block and it's block pointer is put
-	 *    in the log record.
+	 *    If the write is greater than zfs_immediate_write_sz and there are
+	 *    no separate logs in this pool then later *if* we need to log the
+	 *    write then dmu_sync() is used to immediately write the block and
+	 *    its block pointer is put in the log record.
 	 * WR_COPIED:
 	 *    If we know we'll immediately be committing the
 	 *    transaction (FDSYNC (O_DSYNC)), the we allocate a larger
@@ -236,39 +237,56 @@ zfs_log_write(zilog_t *zilog, dmu_tx_t *tx, int txtype,
 	 *    flush the write later then a buffer is allocated and
 	 *    we retrieve the data using the dmu.
 	 */
-	if (len > zfs_immediate_write_sz)
+	slogging = spa_has_slogs(zilog->zl_spa);
+	if (resid > zfs_immediate_write_sz && !slogging)
 		write_state = WR_INDIRECT;
 	else if (ioflag & FDSYNC)
 		write_state = WR_COPIED;
 	else
 		write_state = WR_NEED_COPY;
 
-	itx = zil_itx_create(txtype, sizeof (*lr) +
-	    (write_state == WR_COPIED ? len : 0));
-	lr = (lr_write_t *)&itx->itx_lr;
-	if (write_state == WR_COPIED) {
-		err = dmu_read(zp->z_zfsvfs->z_os, zp->z_id, off, len, lr + 1);
-		if (err) {
+	while (resid) {
+		itx_t *itx;
+		lr_write_t *lr;
+		ssize_t len;
+
+		/*
+		 * If there are slogs and the write would overflow the largest
+		 * block, then because we don't want to use the main pool
+		 * to dmu_sync, we have to split the write.
+		 */
+		if (slogging && resid > ZIL_MAX_LOG_DATA)
+			len = SPA_MAXBLOCKSIZE >> 1;
+		else
+			len = resid;
+
+		itx = zil_itx_create(txtype, sizeof (*lr) +
+		    (write_state == WR_COPIED ? len : 0));
+		lr = (lr_write_t *)&itx->itx_lr;
+		if (write_state == WR_COPIED && dmu_read(zp->z_zfsvfs->z_os,
+		    zp->z_id, off, len, lr + 1) != 0) {
 			kmem_free(itx, offsetof(itx_t, itx_lr) +
 			    itx->itx_lr.lrc_reclen);
 			itx = zil_itx_create(txtype, sizeof (*lr));
 			lr = (lr_write_t *)&itx->itx_lr;
 			write_state = WR_NEED_COPY;
 		}
+
+		itx->itx_wr_state = write_state;
+		lr->lr_foid = zp->z_id;
+		lr->lr_offset = off;
+		lr->lr_length = len;
+		lr->lr_blkoff = 0;
+		BP_ZERO(&lr->lr_blkptr);
+
+		itx->itx_private = zp->z_zfsvfs;
+
+		itx->itx_sync = (zp->z_sync_cnt != 0);
+		zp->z_last_itx = zil_itx_assign(zilog, itx, tx);
+
+		off += len;
+		resid -= len;
 	}
-
-	itx->itx_wr_state = write_state;
-	lr->lr_foid = zp->z_id;
-	lr->lr_offset = off;
-	lr->lr_length = len;
-	lr->lr_blkoff = 0;
-	BP_ZERO(&lr->lr_blkptr);
-
-	itx->itx_private = zp->z_zfsvfs;
-
-	itx->itx_sync = (zp->z_sync_cnt != 0);
-	seq = zil_itx_assign(zilog, itx, tx);
-	zp->z_last_itx = seq;
 }
 
 /*

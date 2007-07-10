@@ -44,6 +44,7 @@
 #include <sys/dsl_dir.h>
 #include <sys/dsl_prop.h>
 #include <sys/fs/zfs.h>
+#include <sys/metaslab_impl.h>
 
 /*
  * SPA locking
@@ -1122,4 +1123,15 @@ spa_fini(void)
 
 	cv_destroy(&spa_namespace_cv);
 	mutex_destroy(&spa_namespace_lock);
+}
+
+/*
+ * Return whether this pool has slogs. No locking needed.
+ * It's not a problem if the wrong answer is returned as it's only for
+ * performance and not correctness
+ */
+boolean_t
+spa_has_slogs(spa_t *spa)
+{
+	return (spa->spa_log_class->mc_rotor != NULL);
 }
