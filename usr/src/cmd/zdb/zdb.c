@@ -51,6 +51,9 @@
 #include <sys/dmu_traverse.h>
 #include <sys/zio_checksum.h>
 #include <sys/zio_compress.h>
+#undef ZFS_MAXNAMELEN
+#undef verify
+#include <libzfs.h>
 
 const char cmdname[] = "zdb";
 uint8_t dump_opt[256];
@@ -62,6 +65,7 @@ uint64_t *zopt_object = NULL;
 int zopt_objects = 0;
 int zdb_advance = ADVANCE_PRE;
 zbookmark_t zdb_noread = { 0, 0, ZB_NO_LEVEL, 0 };
+libzfs_handle_t *g_zfs;
 
 /*
  * These libumem hooks provide a reasonable set of defaults for the allocator's
@@ -83,12 +87,13 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "Usage: %s [-udibcsvLU] [-O order] [-B os:obj:level:blkid] "
+	    "Usage: %s [-udibcsvLUe] [-O order] [-B os:obj:level:blkid] "
 	    "dataset [object...]\n"
 	    "       %s -C [pool]\n"
 	    "       %s -l dev\n"
-	    "       %s -R vdev:offset:size:flags\n",
-	    cmdname, cmdname, cmdname, cmdname);
+	    "       %s -R vdev:offset:size:flags\n"
+	    "       %s [-p path_to_vdev_dir]\n",
+	    cmdname, cmdname, cmdname, cmdname, cmdname);
 
 	(void) fprintf(stderr, "	-u uberblock\n");
 	(void) fprintf(stderr, "	-d datasets\n");
@@ -107,6 +112,8 @@ usage(void)
 	    "simulate bad block\n");
 	(void) fprintf(stderr, "        -R read and display block from a"
 	    "device\n");
+	(void) fprintf(stderr, "        -e Pool is exported/destroyed\n");
+	(void) fprintf(stderr, "	-p <Path to vdev dir> (use with -e)\n");
 	(void) fprintf(stderr, "Specify an option more than once (e.g. -bb) "
 	    "to make only that option verbose\n");
 	(void) fprintf(stderr, "Default is to dump everything non-verbosely\n");
@@ -2058,6 +2065,128 @@ out:
 	free(dup);
 }
 
+static boolean_t
+nvlist_string_match(nvlist_t *config, char *name, char *tgt)
+{
+	char *s;
+
+	verify(nvlist_lookup_string(config, name, &s) == 0);
+	return (strcmp(s, tgt) == 0);
+}
+
+static boolean_t
+nvlist_uint64_match(nvlist_t *config, char *name, uint64_t tgt)
+{
+	uint64_t val;
+
+	verify(nvlist_lookup_uint64(config, name, &val) == 0);
+	return (val == tgt);
+}
+
+static boolean_t
+vdev_child_guid_match(nvlist_t *vdev, uint64_t guid)
+{
+	nvlist_t **child;
+	uint_t c, children;
+
+	verify(nvlist_lookup_nvlist_array(vdev, ZPOOL_CONFIG_CHILDREN,
+	    &child, &children) == 0);
+	for (c = 0; c < children; ++c)
+		if (nvlist_uint64_match(child[c], ZPOOL_CONFIG_GUID, guid))
+			return (B_TRUE);
+	return (B_FALSE);
+}
+
+static boolean_t
+vdev_child_string_match(nvlist_t *vdev, char *tgt)
+{
+	nvlist_t **child;
+	uint_t c, children;
+
+	verify(nvlist_lookup_nvlist_array(vdev, ZPOOL_CONFIG_CHILDREN,
+	    &child, &children) == 0);
+	for (c = 0; c < children; ++c) {
+		if (nvlist_string_match(child[c], ZPOOL_CONFIG_PATH, tgt) ||
+		    nvlist_string_match(child[c], ZPOOL_CONFIG_DEVID, tgt))
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+static boolean_t
+vdev_guid_match(nvlist_t *config, uint64_t guid)
+{
+	nvlist_t *nvroot;
+
+	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
+	    &nvroot) == 0);
+
+	return (nvlist_uint64_match(nvroot, ZPOOL_CONFIG_GUID, guid) ||
+	    vdev_child_guid_match(nvroot, guid));
+}
+
+static boolean_t
+vdev_string_match(nvlist_t *config, char *tgt)
+{
+	nvlist_t *nvroot;
+
+	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
+	    &nvroot) == 0);
+
+	return (vdev_child_string_match(nvroot, tgt));
+}
+
+static boolean_t
+pool_match(nvlist_t *config, char *tgt)
+{
+	uint64_t guid = strtoull(tgt, NULL, 0);
+
+	if (guid != 0) {
+		return (
+		    nvlist_uint64_match(config, ZPOOL_CONFIG_POOL_GUID, guid) ||
+		    vdev_guid_match(config, guid));
+	} else {
+		return (
+		    nvlist_string_match(config, ZPOOL_CONFIG_POOL_NAME, tgt) ||
+		    vdev_string_match(config, tgt));
+	}
+}
+
+static int
+find_exported_zpool(char *pool_id, nvlist_t **configp, char *vdev_dir)
+{
+	nvlist_t *pools;
+	int error = ENOENT;
+	nvlist_t *match = NULL;
+
+	if (vdev_dir != NULL)
+		pools = zpool_find_import(g_zfs, 1, &vdev_dir);
+	else
+		pools = zpool_find_import(g_zfs, 0, NULL);
+
+	if (pools != NULL) {
+		nvpair_t *elem = NULL;
+
+		while ((elem = nvlist_next_nvpair(pools, elem)) != NULL) {
+			verify(nvpair_value_nvlist(elem, configp) == 0);
+			if (pool_match(*configp, pool_id)) {
+				if (match != NULL) {
+					(void) fatal(
+					    "More than one matching pool - "
+					    "specify guid/devid/device path.");
+				} else {
+					match = *configp;
+					error = 0;
+				}
+			}
+		}
+	}
+
+	*configp = error ? NULL : match;
+
+	return (error);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -2070,13 +2199,15 @@ main(int argc, char **argv)
 	int verbose = 0;
 	int error;
 	int flag, set;
+	int exported = 0;
+	char *vdev_dir = NULL;
 
 	(void) setrlimit(RLIMIT_NOFILE, &rl);
 	(void) enable_extended_FILE_stdio(-1, -1);
 
 	dprintf_setup(&argc, argv);
 
-	while ((c = getopt(argc, argv, "udibcsvCLO:B:UlR")) != -1) {
+	while ((c = getopt(argc, argv, "udibcsvCLO:B:UlRep:")) != -1) {
 		switch (c) {
 		case 'u':
 		case 'd':
@@ -2139,13 +2270,23 @@ main(int argc, char **argv)
 		case 'U':
 			spa_config_dir = "/tmp";
 			break;
+		case 'e':
+			exported = 1;
+			break;
+		case 'p':
+			vdev_dir = optarg;
+			break;
 		default:
 			usage();
 			break;
 		}
 	}
 
+	if (vdev_dir != NULL && exported == 0)
+		(void) fatal("-p option requires use of -e\n");
+
 	kernel_init(FREAD);
+	g_zfs = libzfs_init();
 
 	/*
 	 * Disable vdev caching.  If we don't do this, live pool traversal
@@ -2200,11 +2341,25 @@ main(int argc, char **argv)
 	if (dump_opt['C'])
 		dump_config(argv[0]);
 
-	if (strchr(argv[0], '/') != NULL) {
-		error = dmu_objset_open(argv[0], DMU_OST_ANY,
-		    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
+	if (exported == 0) {
+		if (strchr(argv[0], '/') != NULL) {
+			error = dmu_objset_open(argv[0], DMU_OST_ANY,
+			    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
+		} else {
+			error = spa_open(argv[0], &spa, FTAG);
+		}
 	} else {
-		error = spa_open(argv[0], &spa, FTAG);
+		/*
+		 * Check to see if the name refers to an exported zpool
+		 */
+		nvlist_t *exported_conf = NULL;
+
+		error = find_exported_zpool(argv[0], &exported_conf, vdev_dir);
+		if (error == 0) {
+			error = spa_import(argv[0], exported_conf, vdev_dir);
+			if (error == 0)
+				error = spa_open(argv[0], &spa, FTAG);
+		}
 	}
 
 	if (error)
@@ -2231,6 +2386,7 @@ main(int argc, char **argv)
 		spa_close(spa, FTAG);
 	}
 
+	libzfs_fini(g_zfs);
 	kernel_fini();
 
 	return (0);

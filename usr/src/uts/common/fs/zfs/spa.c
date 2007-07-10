@@ -1294,9 +1294,6 @@ spa_import(const char *pool, nvlist_t *config, const char *altroot)
 	nvlist_t **spares;
 	uint_t nspares;
 
-	if (!(spa_mode & FWRITE))
-		return (EROFS);
-
 	/*
 	 * If a pool with this name exists, return failure.
 	 */
@@ -1368,7 +1365,8 @@ spa_import(const char *pool, nvlist_t *config, const char *altroot)
 	/*
 	 * Update the config cache to include the newly-imported pool.
 	 */
-	spa_config_update(spa, SPA_CONFIG_UPDATE_POOL);
+	if (spa_mode & FWRITE)
+		spa_config_update(spa, SPA_CONFIG_UPDATE_POOL);
 
 	/*
 	 * Resilver anything that's out of date.
