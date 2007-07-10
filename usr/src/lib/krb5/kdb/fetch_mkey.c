@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -124,6 +124,14 @@ krb5_db_fetch_mkey(context, mname, etype, fromkeyboard, twice, keyfile,
 		if (retval)
 			return retval;
 	}
+
+	/*
+	 * Solaris Kerberos: If the enc type is unknown then we revert back to
+	 * the default enc type since we don't have the luxury of finding this
+	 * in the stash file when reading the password from the keyboard.
+	 */
+	if (etype == ENCTYPE_UNKNOWN)
+		etype = DEFAULT_KDC_ENCTYPE;
 	retval = krb5_c_string_to_key(context, etype, &pwd, salt?salt:&scratch,
 				      key);
 

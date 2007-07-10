@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -415,7 +415,7 @@ cleanup:
     }
     if (master_salt.data)
 	free(master_salt.data);
-    krb5_free_keyblock_contents(util_context, rblock.key);
+    krb5_free_keyblock(util_context, rblock.key);
     krb5_free_keyblock_contents(util_context, &mkey);
     (void) krb5_db_fini(util_context);
 

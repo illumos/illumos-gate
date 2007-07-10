@@ -275,6 +275,13 @@ int pam_sm_authenticate(pam_handle_t *pamh, int flags,
 
 	if (expire_pw) {
 		(void) time(&now);
+		/*
+		 * The local system time could actually be later than the
+		 * system time of the KDC we are authenticating to.  We expire
+		 * w/the local system time minus clockskew so that we are
+		 * assured that it is expired on this login, not the next.
+		 */
+		now -= context->clockskew;
 		kadm5_userprinc.pw_expiration = now;
 		mask |= KADM5_PW_EXPIRATION;
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -507,17 +507,6 @@ main(int argc, char *argv[])
 		(void) enable_extended_FILE_stdio(-1, -1);
 	}
 
-	if (!nofork && (ret = daemon(0, 0))) {
-		ret = errno;
-		krb5_klog_syslog(LOG_ERR,
-		    gettext("Cannot detach from tty: %s"),
-		    error_message(ret));
-		fprintf(stderr, gettext("%s: Cannot detach from tty: %s\n"),
-		    whoami, error_message(ret));
-		krb5_klog_close(context);
-		exit(1);
-	}
-
 	if (ret = krb5_init_context(&context)) {
 		fprintf(stderr,
 		    gettext("%s: %s while initializing context, aborting\n"),
@@ -883,6 +872,17 @@ main(int argc, char *argv[])
 		    error_message(ret));
 		fprintf(stderr,
 		    gettext("%s: %s while initializing, aborting\n"),
+		    whoami, error_message(ret));
+		krb5_klog_close(context);
+		exit(1);
+	}
+
+	if (!nofork && (ret = daemon(0, 0))) {
+		ret = errno;
+		krb5_klog_syslog(LOG_ERR,
+		    gettext("Cannot detach from tty: %s"),
+		    error_message(ret));
+		fprintf(stderr, gettext("%s: Cannot detach from tty: %s\n"),
 		    whoami, error_message(ret));
 		krb5_klog_close(context);
 		exit(1);

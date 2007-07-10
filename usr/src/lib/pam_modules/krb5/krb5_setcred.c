@@ -138,8 +138,14 @@ pam_sm_setcred(
 				return (PAM_SYSTEM_ERR);
 			}
 		} else {
-				err = PAM_CRED_UNAVAIL;
-				goto out;
+			/*
+			 * This could mean that we are not the account authority
+			 * for the authenticated user.  Therefore we should
+			 * return PAM_IGNORE in order to not affect the
+			 * login process of said user.
+			 */
+			err = PAM_IGNORE;
+			goto out;
 		}
 
 	} else {  /* pam_get_data success */

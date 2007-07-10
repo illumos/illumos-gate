@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -263,6 +263,13 @@ kadm5_ret_t kadm5_init(char *client_name, char *pass,
      *
      * kdb_init_master's third argument is "from_keyboard".
      */
+    /*
+     * Solaris Kerberos: Setting to an unknown enc type will make the function
+     * read the encryption type in the stash file instead of assumming that it
+     * is the default type.
+     */
+    if (handle->params.enctype == DEFAULT_KDC_ENCTYPE)
+	handle->params.enctype = ENCTYPE_UNKNOWN;
     ret = kdb_init_master(handle, handle->params.realm,
 			  (handle->api_version == KADM5_API_VERSION_1 ?
 			   ((pass == NULL) || !(strlen(pass))) :
@@ -275,6 +282,11 @@ kadm5_ret_t kadm5_init(char *client_name, char *pass,
 	free(handle);
 	return ret;
     }
+    /*
+     * Solaris Kerberos: We used the enc type that was discovered in the stash
+     * file to associate with the other magic principals in the database.
+     */
+    handle->params.enctype = handle->master_keyblock.enctype;
     
     ret = kdb_init_hist(handle, handle->params.realm);
     if (ret) {

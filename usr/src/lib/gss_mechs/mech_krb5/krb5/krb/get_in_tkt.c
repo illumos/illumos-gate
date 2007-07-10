@@ -1,9 +1,9 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"$
 
 /*
  * lib/krb5/krb/get_in_tkt.c
@@ -69,6 +69,7 @@
 
  */
 
+#define	max(a, b)	((a) > (b) ? (a) : (b))
 
 /* some typedef's for the function args to make things look a bit cleaner */
 
@@ -320,6 +321,11 @@ verify_as_reply(krb5_context 		context,
 	|| ((request->till != 0) &&
 	    (as_reply->enc_part2->times.endtime > request->till))
 	|| ((request->kdc_options & KDC_OPT_RENEWABLE) &&
+	    /*
+	     * Solaris Kerberos: Here we error only if renewable_ok was not set.
+	     */
+	    !(request->kdc_options & KDC_OPT_RENEWABLE_OK) &&
+	    (as_reply->enc_part2->flags & KDC_OPT_RENEWABLE) &&
 	    (request->rtime != 0) &&
 	    (as_reply->enc_part2->times.renew_till > request->rtime))
 	|| ((request->kdc_options & KDC_OPT_RENEWABLE_OK) &&
@@ -327,6 +333,16 @@ verify_as_reply(krb5_context 		context,
 	    (as_reply->enc_part2->flags & KDC_OPT_RENEWABLE) &&
 	    (request->till != 0) &&
 	    (as_reply->enc_part2->times.renew_till > request->till))
+	    /*
+	     * Solaris Kerberos: renew_till should never be greater than till or
+	     * rtime.
+	     */
+	|| ((request->kdc_options & KDC_OPT_RENEWABLE_OK) &&
+	    (as_reply->enc_part2->flags & KDC_OPT_RENEWABLE) &&
+	    (request->till != 0) &&
+	    (request->rtime != 0) &&
+	    (as_reply->enc_part2->times.renew_till > max(request->till,
+	     request->rtime)))
 	)
 	return KRB5_KDCREP_MODIFIED;
 

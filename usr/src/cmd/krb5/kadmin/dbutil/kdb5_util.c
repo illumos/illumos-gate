@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -486,7 +486,13 @@ static int open_db_and_mkey()
 	    gettext("while reading master key"));
 	com_err(progname, 0,
 	    gettext("Warning: proceeding without master key"));
-	exit_status++;
+	/*
+	 * Solaris Kerberos: We don't want to count as an error if for instance
+	 * the stash file is not present and we are trying to automate
+	 * propagation, which really doesn't need a master key to do so.
+	 */
+	if (retval != KRB5_KDB_CANTREAD_STORED)
+		exit_status++;
 	return(0);
     }
     if ((retval = krb5_db_verify_master_key(util_context, master_princ, 
