@@ -95,7 +95,8 @@ int agpm_debug = 0;
 	(agpmaster->agpm_id == INTEL_IGD_965G1) || \
 	(agpmaster->agpm_id == INTEL_IGD_965Q) || \
 	(agpmaster->agpm_id == INTEL_IGD_965G2) || \
-	(agpmaster->agpm_id == INTEL_IGD_965GM))
+	(agpmaster->agpm_id == INTEL_IGD_965GM) || \
+	(agpmaster->agpm_id == INTEL_IGD_965GME))
 
 static struct modlmisc modlmisc = {
 	&mod_miscops, "AGP master interfaces v%I%"
@@ -548,6 +549,7 @@ detect_i8xx_device(agp_master_softc_t *master_softc)
 	case INTEL_IGD_965G1:
 	case INTEL_IGD_965G2:
 	case INTEL_IGD_965GM:
+	case INTEL_IGD_965GME:
 	case INTEL_IGD_965Q:
 		master_softc->agpm_dev_type = DEVICE_IS_I830;
 		break;

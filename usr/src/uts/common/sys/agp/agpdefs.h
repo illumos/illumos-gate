@@ -95,6 +95,7 @@ extern "C" {
 #define	INTEL_BR_965Q			0x29908086
 #define	INTEL_BR_965G2			0x29a08086
 #define	INTEL_BR_965GM			0x2a008086
+#define	INTEL_BR_965GME			0x2a108086
 
 /* AGP common register offset in pci configuration space */
 #define	AGP_CONF_MISC			0x51 /* one byte */
@@ -154,6 +155,7 @@ extern "C" {
 #define	INTEL_IGD_965Q			0x29928086
 #define	INTEL_IGD_965G2			0x29a28086
 #define	INTEL_IGD_965GM			0x2a028086
+#define	INTEL_IGD_965GME		0x2a128086
 #define	I8XX_CONF_GMADR			0x10 /* offset in PCI config space */
 #define	I915_CONF_GMADR			0x18 /* offset in PCI config space */
 #define	I8XX_CONF_GC			0x52 /* offset in PCI config space */
