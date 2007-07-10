@@ -81,14 +81,17 @@ tagstring() {
 # non-DEBUG packages.
 #
 # usage: normal_build [-O]
-# -O	OpenSolaris delivery build.  Put the proto area, BFU archives,
-#	and packages in -open directories.  Use skeleton closed
-#	binaries.  Skip the package build (until 6414822 is fixed).
+# -O	OpenSolaris delivery build.  Put the proto area and
+#	(eventually) packages in -open directories.  Use skeleton
+#	closed binaries.  Don't generate archives--that needs to be
+#	done later, after we've generated the closed binaries.  Also
+#	skip the package build (until 6414822 is fixed).
 #
 
 normal_build() {
 
-	orig_p_FLAG=$p_FLAG
+	typeset orig_p_FLAG="$p_FLAG"
+	typeset orig_a_FLAG="$a_FLAG"
 
 	suffix=""
 	open_only=""
@@ -98,6 +101,7 @@ normal_build() {
 			suffix="-open"
 			open_only="open-only"
 			p_FLAG=n
+			a_FLAG=n
 			;;
 		esac
 	done
@@ -107,13 +111,13 @@ normal_build() {
 	if [ "$F_FLAG" = "n" ]; then
 		set_non_debug_build_flags
 		mytag=`tagstring "non-DEBUG" "$open_only"`
-		build "$mytag" "$suffix-nd" $MULTI_PROTO
+		build "$mytag" "$suffix-nd" "$MULTI_PROTO"
 		if [ "$build_ok" = "y" -a "$X_FLAG" = "y" -a \
 		    "$p_FLAG" = "y" ]; then
 			copy_ihv_pkgs non-DEBUG -nd
 		fi
 	else
-		echo "\n==== No non-DEBUG $open_only build ====\n" >> $LOGFILE
+		echo "\n==== No non-DEBUG $open_only build ====\n" >> "$LOGFILE"
 	fi
 
 	# non-DEBUG build ends
@@ -123,19 +127,20 @@ normal_build() {
 	if [ "$D_FLAG" = "y" ]; then
 		set_debug_build_flags
 		mytag=`tagstring "DEBUG" "$open_only"`
-		build "$mytag" "$suffix" $MULTI_PROTO
+		build "$mytag" "$suffix" "$MULTI_PROTO"
 		if [ "$build_ok" = "y" -a "$X_FLAG" = "y" -a \
 		    "$p_FLAG" = "y" ]; then
 			copy_ihv_pkgs DEBUG ""
 		fi
 
 	else
-		echo "\n==== No DEBUG $open_only build ====\n" >> $LOGFILE
+		echo "\n==== No DEBUG $open_only build ====\n" >> "$LOGFILE"
 	fi
 
 	# DEBUG build ends
 
-	p_FLAG=$orig_p_FLAG
+	p_FLAG="$orig_p_FLAG"
+	a_FLAG="$orig_a_FLAG"
 }
 
 #
@@ -346,6 +351,36 @@ myheaders() {
 }
 
 #
+# Wrapper over commands that generate BFU archives.  The entire
+# command output gets written to LOGFILE, and any unexpected messages
+# are written to the mail message.  Returns with the status of the
+# original command.
+#
+makebfu_filt() {
+	typeset tmplog
+	typeset errors
+	typeset cmd
+	integer cmd_stat
+
+	cmd="$1"
+	shift
+	tmplog="$TMPDIR/$cmd.out"
+	errors="$TMPDIR/$cmd-errors"
+	$cmd $* > "$tmplog" 2>&1
+	cmd_stat=$?
+	cat "$tmplog" >> "$LOGFILE"
+	grep -v "^Creating .* archive:" "$tmplog" | grep -v "^Making" | \
+	    grep -v "^$" | sort -u > "$errors"
+	if [[ -s "$errors" ]]; then
+		echo "\n==== cpio archives build errors ($LABEL) ====\n" \
+		    >> "$mail_msg_file"
+		cat "$errors" >> "$mail_msg_file"
+	fi
+	rm -f "$tmplog" "$errors"
+	return $cmd_stat
+}
+
+#
 # Function to do the build, including cpio archive and package generation.
 # usage: build LABEL SUFFIX MULTIPROTO
 # - LABEL is used to tag build output.
@@ -512,17 +547,7 @@ build() {
 	if [ "$a_FLAG" = "y" -a "$this_build_ok" = "y" ]; then
 		echo "\n==== Creating $LABEL cpio archives at `date` ====\n" \
 			>> $LOGFILE
-		makebfu_file="${TMPDIR}/makebfu"
-		rm -f ${makebfu_file}
-		makebfu 2>&1 | \
-			tee -a ${makebfu_file} >> $LOGFILE
-		echo "\n==== cpio archives build errors ($LABEL) ====\n" \
-			>> $mail_msg_file
-		grep -v "^Creating .* archive:" ${makebfu_file} | \
-			grep -v "^Making" | \
-			grep -v "^$" | \
-			sort | uniq >> $mail_msg_file
-		rm -f ${makebfu_file}
+		makebfu_filt makebfu
 		# hack for test folks
 		if [ -z "`echo $PARENT_WS|egrep '^\/ws\/'`" ]; then
 			X=/net/`uname -n`${CPIODIR}
@@ -2118,15 +2143,18 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	fi
 
 	echo "Generating closed binaries tarball(s)..." >> $LOGFILE
+	closed_basename=on-closed-bins
 	if [ "$D_FLAG" = y ]; then
-		bindrop $ROOT $ROOT-open >>$LOGFILE 2>&1
+		bindrop "$ROOT" "$ROOT-open" "$closed_basename" \
+		    >>"$LOGFILE" 2>&1
 		if [ $? -ne 0 ]; then
 			echo "Couldn't create DEBUG closed binaries." |
 			    tee -a $mail_msg_file >> $LOGFILE
 		fi
 	fi
 	if [ "$F_FLAG" = n ]; then
-		bindrop -n $ROOT-nd $ROOT-open-nd >>$LOGFILE 2>&1
+		bindrop -n "$ROOT-nd" "$ROOT-open-nd" "$closed_basename-nd" \
+		    >>"$LOGFILE" 2>&1
 		if [ $? -ne 0 ]; then
 			echo "Couldn't create non-DEBUG closed binaries." |
 			    tee -a $mail_msg_file >> $LOGFILE
@@ -2153,19 +2181,21 @@ if [ "$O_FLAG" = y -a "$build_ok" = y ]; then
 	sdrop >>$LOGFILE 2>&1
 	if [ $? -ne 0 ]; then
 		echo "Couldn't create source tarball." |
-			tee -a $mail_msg_file >> $LOGFILE
+		    tee -a "$mail_msg_file" >> "$LOGFILE"
 	fi
 
 	echo "Generating BFU tarball(s)..." >> $LOGFILE
 	if [ "$D_FLAG" = y ]; then
-		bfudrop nightly-open >>$LOGFILE 2>&1
+		makebfu_filt bfudrop "$ROOT-open" \
+		    "$closed_basename.$MACH.tar.bz2" nightly-osol
 		if [ $? -ne 0 ]; then
 			echo "Couldn't create DEBUG archives tarball." |
 			    tee -a $mail_msg_file >> $LOGFILE
 		fi
 	fi
 	if [ "$F_FLAG" = n ]; then
-		bfudrop nightly-open-nd >>$LOGFILE 2>&1
+		makebfu_filt bfudrop -n "$ROOT-open-nd" \
+		    "$closed_basename-nd.$MACH.tar.bz2" nightly-osol-nd
 		if [ $? -ne 0 ]; then
 			echo "Couldn't create non-DEBUG archives tarball." |
 			    tee -a $mail_msg_file >> $LOGFILE

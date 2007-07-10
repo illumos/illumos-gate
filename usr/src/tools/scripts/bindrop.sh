@@ -32,10 +32,10 @@
 # Engineering.
 #
 
-usage="bindrop [-n] full-root open-root"
+usage="bindrop [-n] full-root open-root basename"
 
 isa=`uname -p`
-if [ $isa = sparc ]; then
+if [[ "$isa" = sparc ]]; then
 	isa_short=s
 else
 	isa_short=x
@@ -55,14 +55,18 @@ ekurl=http://nana.eng/pub/nv
 
 PATH="$PATH:/usr/bin:/usr/sfw/bin"
 
-fail() {
-	echo $*
+function fail {
+	print -u2 "bindrop: $@"
 	exit 1
 }
 
-[ -n "$SRC" ] || fail "Please set SRC."
-[ -n "$CODEMGR_WS" ] || fail "Please set CODEMGR_WS."
-[ -d $nipath ] || fail "Can't find RE-signed packages ($nipath)."
+function warn {
+	print -u2 "bindrop: warning: $@"
+}
+
+[[ -n "$SRC" ]] || fail "SRC must be set."
+[[ -n "$CODEMGR_WS" ]] || fail "CODEMGR_WS must be set."
+[[ -d "$nipath" ]] || fail "can't find RE-signed packages ($nipath)."
 
 #
 # Create the README from boilerplate and the contents of the closed
@@ -70,13 +74,14 @@ fail() {
 #
 # usage: mkreadme targetdir
 #
-mkreadme () {
-	targetdir=$1
-	readme=README.ON-BINARIES.$isa
+function mkreadme {
+	typeset targetdir="$1"
+	typeset readme="README.ON-BINARIES.$isa"
+
 	sed -e s/@ISA@/$isa/ -e s/@DELIVERY@/ON-BINARIES/ \
-	    $SRC/tools/opensolaris/README.binaries.tmpl > $targetdir/$readme
-	(cd $targetdir; find $dir -type f -print | \
-	    sort >> $targetdir/$readme)
+	    "$SRC/tools/opensolaris/README.binaries.tmpl" > "$targetdir/$readme"
+	(cd "$targetdir"; find "$rootdir" -type f -print | \
+	    sort >> "$targetdir/$readme")
 }
 
 nondebug=n
@@ -86,41 +91,45 @@ while getopts n flag; do
 		nondebug=y
 		;;
 	?)
-		echo "usage: $usage"
+		print -u2 "usage: $usage"
 		exit 1
 		;;
 	esac
 done
 shift $(($OPTIND - 1))
 
-[ $# -eq 2 ] || fail "usage: $usage"
-
-full=$1
-open=$2
-
-dir=root_$isa
-if [ $nondebug = y ]; then
-	dir=root_$isa-nd
+if [[ $# -ne 3 ]]; then
+	print -u2 "usage: $usage"
+	exit 1
 fi
 
-[ -d "$full" ] || fail "bindrop: can't find $full."
-[ -d "$open" ] || fail "bindrop: can't find $open."
+full="$1"
+open="$2"
+tarfile="$CODEMGR_WS/$3.$isa.tar"
+
+rootdir="root_$isa"
+if [[ "$nondebug" = y ]]; then
+	rootdir="root_$isa-nd"
+fi
+
+[[ -d "$full" ]] || fail "can't find $full."
+[[ -d "$open" ]] || fail "can't find $open."
 
 tmpdir=$(mktemp -dt bindropXXXXX)
-[ -n "$tmpdir" ] || fail "Can't create temporary directory."
-mkdir -p $tmpdir/closed/$dir || exit 1
+[[ -n "$tmpdir" ]] || fail "can't create temporary directory."
+mkdir -p "$tmpdir/closed/$rootdir" || exit 1
 
 #
 # This will hold a temp list of directories that must be kept, even if
 # empty.
 #
 needdirs=$(mktemp -t needdirsXXXXX)
-[ -n "$needdirs" ] || fail "Can't create temporary directory list file."
+[[ -n "$needdirs" ]] || fail "can't create temporary directory list file."
 
 #
 # Copy the full tree into a temp directory.
 #
-(cd $full; tar cf - .) | (cd $tmpdir/closed/$dir; tar xpf -)
+(cd "$full"; tar cf - .) | (cd "$tmpdir/closed/$rootdir"; tar xpf -)
 
 #
 # Remove internal ON crypto signing certs
@@ -261,20 +270,20 @@ delete="$delete
 	usr/sbin/pcitool
 "
 for f in $delete; do
-	rm -rf $tmpdir/closed/$dir/$f
+	rm -rf "$tmpdir/closed/$rootdir/$f"
 done
 
 #
 # Remove files that the open tree already has.
 #
-rmfiles=`(cd $open; find . -type f -print -o -type l -print)`
-(cd $tmpdir/closed/$dir; rm -f $rmfiles)
+(cd "$open"; find . -type f -print -o -type l -print) > "$tmpdir/deleteme"
+(cd "$tmpdir/closed/$rootdir"; cat "$tmpdir/deleteme" | xargs rm -f)
 
 #
 # Remove any header files.  If they're in the closed tree, they're
 # probably not freely redistributable.
 #
-(cd $tmpdir/closed/$dir; find . -name \*.h -exec rm -f {} \;)
+(cd "$tmpdir/closed/$rootdir"; find . -name \*.h -exec rm -f {} \;)
 
 #
 # Remove empty directories that the open tree doesn't need.
@@ -283,9 +292,9 @@ rmfiles=`(cd $open; find . -type f -print -o -type l -print)`
 # are specified in the open packages; save that list to a temporary
 # file $needdirs.
 #
-(cd $SRC/pkgdefs; \
+(cd "$SRC/pkgdefs"; \
 	find . -name prototype\* -exec grep "^d" {} \; | awk '{print $3}' > \
-	$needdirs)
+	"$needdirs")
 #
 # Step 2: go to our closed directory, and find all the subdirectories,
 # filtering out the ones needed by the open packages (saved in that
@@ -295,11 +304,11 @@ rmfiles=`(cd $open; find . -type f -print -o -type l -print)`
 # only want to delete empty directories--so redirect the complaints to
 # /dev/null.
 #
-(cd $tmpdir/closed/$dir; \
+(cd "$tmpdir/closed/$rootdir"; \
 	find * -type d -print | /usr/xpg4/bin/grep -xv -f $needdirs | \
 	sort -r | xargs -l rmdir 2>/dev/null )
 
-rm $needdirs
+rm "$needdirs"
 
 #
 # Up above we removed the files that were already in the open tree.
@@ -307,8 +316,8 @@ rm $needdirs
 # an open build, so restore them here.
 #
 
-mkclosed $isa $full $tmpdir/closed/$dir || \
-    fail "Can't restore minimal binaries."
+mkclosed "$isa" "$full" "$tmpdir/closed/$rootdir" || \
+    fail "can't restore minimal binaries."
 
 #
 # Replace the crypto binaries with ones that have been signed by RE.
@@ -365,24 +374,24 @@ linkedfiles="
 	kernel/crypto/sparcv9/des
 "
 
-if [ $isa = sparc ]; then
+if [[ "$isa" = sparc ]]; then
 	cfiles="$cfiles $csfiles"
 else
 	cfiles="$cfiles $cxfiles"
 fi
 
 # Extract $pkgfiles from $pkg (no-op if they're empty).
-pkgextract()
+function pkgextract
 {
-	[ -d $nipath/$pkg ] || fail "$nipath/$pkg doesn't exist."
+	[[ -d "$nipath/$pkg" ]] || fail "$nipath/$pkg doesn't exist."
 	if [[ -n "$pkg" && -n "$pkgfiles" ]]; then
-		archive=$nipath/$pkg/archive/none.bz2
-		bzcat $archive | \
-		    (cd $tmpdir/closed/$dir; cpio -idum $pkgfiles)
+		archive="$nipath/$pkg/archive/none.bz2"
+		bzcat "$archive" | \
+		    (cd "$tmpdir/closed/$rootdir"; cpio -idum $pkgfiles)
 		# Doesn't look like we can rely on $? here.
 		for f in $pkgfiles; do
-			[ -f $tmpdir/closed/$dir/$f ] || 
-			    echo "Warning: can't extract $f from $archive."
+			[[ -f "$tmpdir/closed/$rootdir/$f" ]] || 
+			    warn "can't extract $f from $archive."
 		done
 	fi
 }
@@ -390,9 +399,9 @@ pkgextract()
 pkg=""
 pkgfiles=""
 for cf in $cfiles; do
-	if [[ $cf = SUNW* ]]; then
+	if [[ "$cf" = SUNW* ]]; then
 		pkgextract
-		pkg=$cf
+		pkg="$cf"
 		pkgfiles=""
 		continue
 	else
@@ -403,9 +412,9 @@ pkgextract			# last package in $cfiles
 
 # Patch up the crypto hard links.
 for f in $linkedfiles; do
-	[ -f $tmpdir/closed/$dir/$f ] || continue
-	link=`echo $f | sed -e s=crypto=misc=`
-	(cd $tmpdir/closed/$dir; rm $link; ln $f $link)
+	[[ -f "$tmpdir/closed/$rootdir/$f" ]] || continue
+	link=$(print $f | sed -e s=crypto=misc=)
+	(cd "$tmpdir/closed/$rootdir"; rm "$link"; ln "$f" "$link")
 done
 
 #
@@ -416,25 +425,25 @@ done
 # (e.g., older) Encryption Kit.
 #
 wgeterrs=/tmp/wget$$
-latest_RE_signed_EK=`wget -O - $ekurl 2>$wgeterrs | \
+latest_RE_signed_EK=$(wget -O - "$ekurl" 2>"$wgeterrs" | \
     nawk -F "\"" \
 '/HREF=\"crypt.nv.crypt_[^m]+\"/ { name = $2 } 
-END {print name}'`
+END {print name}')
 
-if [ -z "$latest_RE_signed_EK" ]; then
-	echo "Can't find RE-signed Encryption Kit binaries."
-	echo "wget errors:"
-	cat $wgeterrs
-	rm $wgeterrs
+if [[ -z "$latest_RE_signed_EK" ]]; then
+	print -u2 "bindrop: can't find RE-signed Encryption Kit binaries."
+	print -u2 "wget errors:"
+	cat "$wgeterrs" >&2
+	rm "$wgeterrs"
 	exit 1
 fi
-rm $wgeterrs
+rm "$wgeterrs"
 
-echo "latest RE signed EK cpio archive: $latest_RE_signed_EK"
+print "latest RE signed EK cpio archive: $latest_RE_signed_EK"
 
-mkdir $tmpdir/EK
-(cd $tmpdir/EK; \
-    wget -O - $ekurl/$latest_RE_signed_EK 2>/dev/null | cpio -idum)
+mkdir "$tmpdir/EK"
+(cd "$tmpdir/EK"; \
+    wget -O - "$ekurl/$latest_RE_signed_EK" 2>/dev/null | cpio -idum)
 
 cfiles="
 	SUNWcry
@@ -464,7 +473,7 @@ csfiles="
 	platform/sun4v/kernel/crypto/sparcv9/arcfour2048
 "
 
-if [ $isa = sparc ]; then
+if [[ "$isa" = sparc ]]; then
 	cfiles="$cfiles $csfiles"
 else
 	cfiles="$cfiles $cxfiles"
@@ -474,9 +483,9 @@ nipath="$tmpdir/EK/Encryption_11/$isa/Packages"
 pkg=""
 pkgfiles=""
 for cf in $cfiles; do
-	if [[ $cf = SUNW* ]]; then
+	if [[ "$cf" = SUNW* ]]; then
 		pkgextract
-		pkg=$cf
+		pkg="$cf"
 		pkgfiles=""
 		continue
 	else
@@ -489,18 +498,15 @@ pkgextract	# last package in $cfiles
 # Add binary license files.
 #
 
-cp -p $SRC/tools/opensolaris/BINARYLICENSE.txt $tmpdir/closed || \
-    fail "Can't add BINARYLICENSE.txt"
-mkreadme $tmpdir/closed
-cp -p $CODEMGR_WS/THIRDPARTYLICENSE.ON-BINARIES $tmpdir/closed || \
-    fail "Can't add THIRDPARTYLICENSE.BFU-ARCHIVES."
+cp -p "$SRC/tools/opensolaris/BINARYLICENSE.txt" "$tmpdir/closed" || \
+    fail "can't add BINARYLICENSE.txt"
+mkreadme "$tmpdir/closed"
+cp -p "$CODEMGR_WS/THIRDPARTYLICENSE.ON-BINARIES" "$tmpdir/closed" || \
+    fail "can't add THIRDPARTYLICENSE.ON-BINARIES."
 
-tarfile=on-closed-bins.$isa.tar
-if [ $nondebug = y ] ; then
-	tarfile=on-closed-bins-nd.$isa.tar
-fi
-tarfile=$CODEMGR_WS/$tarfile
-(cd $tmpdir; tar cf $tarfile closed) || fail "Can't create $tarfile."
-bzip2 -f $tarfile || fail "Can't compress $tarfile".
+(cd "$tmpdir"; tar cf "$tarfile" closed) || fail "can't create $tarfile."
+bzip2 -f "$tarfile" || fail "can't compress $tarfile".
 
-rm -rf $tmpdir
+rm -rf "$tmpdir"
+
+exit 0
