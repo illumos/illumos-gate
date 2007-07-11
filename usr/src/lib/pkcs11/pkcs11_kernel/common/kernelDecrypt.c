@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,7 +83,7 @@ kernel_decrypt_init(kernel_session_t *session_p, kernel_object_t *key_p,
 			}
 			/* KEF key lengths are expressed in bits */
 			decrypt_init.di_key.ck_length =
-				OBJ_SEC(key_p)->sk_value_len << 3;
+			    OBJ_SEC(key_p)->sk_value_len << 3;
 
 		} else if (key_p->key_type == CKK_RSA) {
 			if (get_rsa_private_key(key_p, &decrypt_init.di_key) !=
@@ -99,6 +98,7 @@ kernel_decrypt_init(kernel_session_t *session_p, kernel_object_t *key_p,
 	}
 
 	decrypt_init.di_session = session_p->k_session;
+	session_p->decrypt.mech = *pMechanism;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 	ses_lock_held = B_FALSE;
 	decrypt_init.di_mech.cm_type = k_mech_type;
@@ -186,6 +186,7 @@ kernel_decrypt(kernel_session_t *session_p, CK_BYTE_PTR pEncryptedData,
 {
 	crypto_decrypt_t decrypt;
 	boolean_t ses_lock_held = B_FALSE;
+	boolean_t inplace;
 	CK_RV rv;
 	int r;
 
@@ -214,13 +215,29 @@ kernel_decrypt(kernel_session_t *session_p, CK_BYTE_PTR pEncryptedData,
 	}
 
 	decrypt.cd_session = session_p->k_session;
+
+	/*
+	 * Certain mechanisms, where the length of the plaintext is
+	 * same as the transformed ciphertext, can be optimized
+	 * by the kernel into an in-place operation. Unfortunately,
+	 * some applications use a plaintext buffer that is larger
+	 * than it needs to be. We fix that here.
+	 */
+	inplace = INPLACE_MECHANISM(session_p->decrypt.mech.mechanism);
+	if (ulEncryptedData < *pulDataLen && inplace) {
+		decrypt.cd_datalen = ulEncryptedData;
+	} else {
+		decrypt.cd_datalen = *pulDataLen;
+	}
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 	ses_lock_held = B_FALSE;
 
-	decrypt.cd_datalen = *pulDataLen;
 	decrypt.cd_databuf = (char *)pData;
 	decrypt.cd_encrlen = ulEncryptedData;
 	decrypt.cd_encrbuf = (char *)pEncryptedData;
+	decrypt.cd_flags = inplace && pData != NULL &&
+	    decrypt.cd_datalen == decrypt.cd_encrlen ?
+	    CRYPTO_INPLACE_OPERATION : 0;
 
 	while ((r = ioctl(kernel_fd, CRYPTO_DECRYPT, &decrypt)) < 0) {
 		if (errno != EINTR)

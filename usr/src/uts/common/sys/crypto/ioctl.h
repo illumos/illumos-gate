@@ -223,6 +223,9 @@ typedef struct crypto_logout32 {
 #define	CRYPTO_LOGIN			CRYPTO(40)
 #define	CRYPTO_LOGOUT			CRYPTO(41)
 
+/* flag for encrypt and decrypt operations */
+#define	CRYPTO_INPLACE_OPERATION	0x00000001
+
 /*
  * Cryptographic Ioctls
  */
@@ -233,6 +236,7 @@ typedef struct crypto_encrypt {
 	caddr_t			ce_databuf;
 	size_t			ce_encrlen;
 	caddr_t			ce_encrbuf;
+	uint_t			ce_flags;
 } crypto_encrypt_t;
 
 typedef struct crypto_encrypt_init {
@@ -265,6 +269,7 @@ typedef struct crypto_decrypt {
 	caddr_t			cd_encrbuf;
 	size_t			cd_datalen;
 	caddr_t			cd_databuf;
+	uint_t			cd_flags;
 } crypto_decrypt_t;
 
 typedef struct crypto_decrypt_init {
@@ -493,6 +498,7 @@ typedef struct crypto_encrypt32 {
 	caddr32_t		ce_databuf;
 	size32_t		ce_encrlen;
 	caddr32_t		ce_encrbuf;
+	uint32_t		ce_flags;
 } crypto_encrypt32_t;
 
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
@@ -533,6 +539,7 @@ typedef struct crypto_decrypt32 {
 	caddr32_t		cd_encrbuf;
 	size32_t		cd_datalen;
 	caddr32_t		cd_databuf;
+	uint32_t		cd_flags;
 } crypto_decrypt32_t;
 
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4

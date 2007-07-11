@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,7 +102,7 @@ C_EncryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 				goto clean_exit;
 			}
 			encrypt_init.ei_key.ck_length =
-				OBJ_SEC(key_p)->sk_value_len << 3;
+			    OBJ_SEC(key_p)->sk_value_len << 3;
 
 		} else if (key_p->key_type == CKK_RSA) {
 			if (get_rsa_public_key(key_p, &encrypt_init.ei_key) !=
@@ -118,6 +117,7 @@ C_EncryptInit(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	}
 
 	encrypt_init.ei_session = session_p->k_session;
+	session_p->encrypt.mech = *pMechanism;
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 	ses_lock_held = B_FALSE;
 	encrypt_init.ei_mech.cm_type = k_mech_type;
@@ -167,6 +167,7 @@ C_Encrypt(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 	CK_RV rv;
 	kernel_session_t *session_p;
 	boolean_t ses_lock_held = B_FALSE;
+	boolean_t inplace;
 	crypto_encrypt_t encrypt;
 	int r;
 
@@ -219,13 +220,29 @@ C_Encrypt(CK_SESSION_HANDLE hSession, CK_BYTE_PTR pData, CK_ULONG ulDataLen,
 	}
 
 	encrypt.ce_session = session_p->k_session;
+
+	/*
+	 * Certain mechanisms, where the length of the ciphertext is
+	 * same as the transformed plaintext, can be optimized
+	 * by the kernel into an in-place operation. Unfortunately,
+	 * some applications use a ciphertext buffer that is larger
+	 * than it needs to be. We fix that here.
+	 */
+	inplace = INPLACE_MECHANISM(session_p->encrypt.mech.mechanism);
+	if (ulDataLen < *pulEncryptedDataLen && inplace) {
+		encrypt.ce_encrlen = ulDataLen;
+	} else {
+		encrypt.ce_encrlen = *pulEncryptedDataLen;
+	}
 	(void) pthread_mutex_unlock(&session_p->session_mutex);
 	ses_lock_held = B_FALSE;
 
 	encrypt.ce_datalen = ulDataLen;
 	encrypt.ce_databuf = (char *)pData;
-	encrypt.ce_encrlen = *pulEncryptedDataLen;
 	encrypt.ce_encrbuf = (char *)pEncryptedData;
+	encrypt.ce_flags = inplace && pEncryptedData != NULL &&
+	    encrypt.ce_encrlen == encrypt.ce_datalen ?
+	    CRYPTO_INPLACE_OPERATION : 0;
 
 	while ((r = ioctl(kernel_fd, CRYPTO_ENCRYPT, &encrypt)) < 0) {
 		if (errno != EINTR)

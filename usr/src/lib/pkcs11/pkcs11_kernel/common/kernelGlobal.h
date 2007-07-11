@@ -68,6 +68,10 @@ extern int kernel_fd;
 #define	FIRMWARE_VERSION_MAJOR	0
 #define	FIRMWARE_VERSION_MINOR	0
 
+#define	INPLACE_MECHANISM(m)	((m) == CKM_DES_ECB || (m) == CKM_DES_CBC || \
+	(m) == CKM_DES3_ECB || (m) == CKM_DES3_CBC || (m) == CKM_AES_ECB || \
+	(m) == CKM_AES_CBC || (m) == CKM_RC4 || (m) == CKM_BLOWFISH_CBC)
+
 CK_RV crypto2pkcs11_error_number(uint_t);
 CK_RV kernel_mech(CK_MECHANISM_TYPE, crypto_mech_type_t *);
 unsigned char *get_symmetric_key_value(kernel_object_t *);

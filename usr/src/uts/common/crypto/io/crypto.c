@@ -251,7 +251,7 @@ static struct dev_ops devops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops,					/* drv_modops */
-	"Cryptographic Library Interface v%I%",	/* drv_linkinfo */
+	"Cryptographic Library Interface v1.47",	/* drv_linkinfo */
 	&devops,
 };
 
@@ -975,7 +975,7 @@ get_provider_list(dev_t dev, caddr_t arg, int mode, int *rval)
 
 		crypto_free_provider_list(entries, count);
 		if (copyout(STRUCT_BUF(get_list), arg,
-			STRUCT_SIZE(get_list)) != 0) {
+		    STRUCT_SIZE(get_list)) != 0) {
 			return (EFAULT);
 		}
 		return (0);
@@ -2447,6 +2447,7 @@ cipher(dev_t dev, caddr_t arg, int mode,
 	crypto_ctx_t **ctxpp;
 	crypto_data_t data, encr;
 	size_t datalen, encrlen, need = 0;
+	boolean_t do_inplace;
 	char *encrbuf;
 	int error = 0;
 	int rv;
@@ -2486,7 +2487,9 @@ cipher(dev_t dev, caddr_t arg, int mode,
 		goto release_minor;
 	}
 
-	need = datalen + encrlen;
+	do_inplace = (STRUCT_FGET(encrypt, ce_flags) &
+	    CRYPTO_INPLACE_OPERATION) != 0;
+	need = do_inplace ? datalen : datalen + encrlen;
 	if ((rv = crypto_buffer_check(need)) != CRYPTO_SUCCESS) {
 		need = 0;
 		goto release_minor;
@@ -2501,7 +2504,12 @@ cipher(dev_t dev, caddr_t arg, int mode,
 		goto release_minor;
 	}
 
-	INIT_RAW_CRYPTO_DATA(encr, encrlen);
+	if (do_inplace) {
+		/* set out = in for in-place */
+		encr = data;
+	} else {
+		INIT_RAW_CRYPTO_DATA(encr, encrlen);
+	}
 
 	session_id = STRUCT_FGET(encrypt, ce_session);
 
@@ -2512,7 +2520,11 @@ cipher(dev_t dev, caddr_t arg, int mode,
 	ctxpp = (single == crypto_encrypt_single) ?
 	    &sp->sd_encr_ctx : &sp->sd_decr_ctx;
 
-	rv = (single)(*ctxpp, &data, &encr, NULL);
+	/* in-place is specified by setting output NULL */
+	if (do_inplace)
+		rv = (single)(*ctxpp, &encr, NULL, NULL);
+	else
+		rv = (single)(*ctxpp, &data, &encr, NULL);
 	if (KCF_CONTEXT_DONE(rv))
 		*ctxpp = NULL;
 
@@ -2548,7 +2560,7 @@ release_minor:
 	if (data.cd_raw.iov_base != NULL)
 		kmem_free(data.cd_raw.iov_base, datalen);
 
-	if (encr.cd_raw.iov_base != NULL)
+	if (!do_inplace && encr.cd_raw.iov_base != NULL)
 		kmem_free(encr.cd_raw.iov_base, encrlen);
 
 	if (error != 0)
