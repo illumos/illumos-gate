@@ -314,10 +314,14 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 	zio->io_parent = pio;
 	zio->io_spa = spa;
 	zio->io_txg = txg;
+	zio->io_flags = flags;
 	if (bp != NULL) {
 		zio->io_bp = bp;
 		zio->io_bp_copy = *bp;
 		zio->io_bp_orig = *bp;
+		if (dmu_ot[BP_GET_TYPE(bp)].ot_metadata ||
+		    BP_GET_LEVEL(bp) != 0)
+			zio->io_flags |= ZIO_FLAG_METADATA;
 	}
 	zio->io_done = done;
 	zio->io_private = private;
@@ -327,7 +331,8 @@ zio_create(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 	zio->io_pipeline = pipeline;
 	zio->io_async_stages = ZIO_ASYNC_PIPELINE_STAGES;
 	zio->io_timestamp = lbolt64;
-	zio->io_flags = flags;
+	if (pio != NULL)
+		zio->io_flags |= (pio->io_flags & ZIO_FLAG_METADATA);
 	mutex_init(&zio->io_lock, NULL, MUTEX_DEFAULT, NULL);
 	zio_push_transform(zio, data, size, size);
 

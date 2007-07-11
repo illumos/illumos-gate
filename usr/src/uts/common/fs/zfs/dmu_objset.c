@@ -779,7 +779,6 @@ dmu_objset_sync(objset_impl_t *os, zio_t *pio, dmu_tx_t *tx)
 	zio_t *zio;
 	list_t *list;
 	dbuf_dirty_record_t *dr;
-	int zio_flags;
 
 	dprintf_ds(os->os_dsl_dataset, "txg=%llu\n", tx->tx_txg);
 
@@ -803,9 +802,6 @@ dmu_objset_sync(objset_impl_t *os, zio_t *pio, dmu_tx_t *tx)
 	zb.zb_object = 0;
 	zb.zb_level = -1;
 	zb.zb_blkid = 0;
-	zio_flags = ZIO_FLAG_MUSTSUCCEED;
-	if (dmu_ot[DMU_OT_OBJSET].ot_metadata || zb.zb_level != 0)
-		zio_flags |= ZIO_FLAG_METADATA;
 	if (BP_IS_OLDER(os->os_rootbp, tx->tx_txg))
 		dsl_dataset_block_kill(os->os_dsl_dataset,
 		    os->os_rootbp, pio, tx);
@@ -813,7 +809,8 @@ dmu_objset_sync(objset_impl_t *os, zio_t *pio, dmu_tx_t *tx)
 	    os->os_md_compress,
 	    dmu_get_replication_level(os, &zb, DMU_OT_OBJSET),
 	    tx->tx_txg, os->os_rootbp, os->os_phys_buf, ready, killer, os,
-	    ZIO_PRIORITY_ASYNC_WRITE, zio_flags, &zb);
+	    ZIO_PRIORITY_ASYNC_WRITE, ZIO_FLAG_MUSTSUCCEED | ZIO_FLAG_METADATA,
+	    &zb);
 
 	/*
 	 * Sync meta-dnode - the parent IO for the sync is the root block
