@@ -44,29 +44,6 @@
 extern "C" {
 #endif
 
-/* #define AAC_DEBUG	0 */
-
-#ifdef AAC_DEBUG
-extern void aac_print_fib(struct aac_fib *);
-#define	AACDB_PRINT(fmt)		cmn_err fmt
-#define	AACDB_PRINT_FUNC() \
-	AACDB_PRINT((CE_NOTE, "**%s called**", "" /* __func__ */))
-#define	AACDB_PRINT_FIB(x)		aac_print_fib(x)
-#define	AACDB_PRINT_SCMD(x)		aac_print_scmd(x)
-#define	AACDB_PRINT_AIF(x)		aac_print_aif(x)
-#define	DBCALLED(lev) \
-	do { \
-_NOTE(CONSTCOND) if (lev <= AAC_DEBUG) \
-			AACDB_PRINT_FUNC(); \
-_NOTE(CONSTCOND) } while (0)
-#else
-#define	AACDB_PRINT(fmt)
-#define	AACDB_PRINT_FIB(x)
-#define	AACDB_PRINT_SCMD(x)
-#define	AACDB_PRINT_AIF(x)
-#define	DBCALLED(lev)
-#endif /* AAC_DEBUG */
-
 #define	AAC_ROUNDUP(x, y)		(((x) + (y) - 1) / (y) * (y))
 
 #define	AAC_TYPE_DEVO			1
@@ -80,7 +57,7 @@ _NOTE(CONSTCOND) } while (0)
 
 #define	AAC_DRIVER_MAJOR_VERSION	2
 #define	AAC_DRIVER_MINOR_VERSION	1
-#define	AAC_DRIVER_BUGFIX_LEVEL		13
+#define	AAC_DRIVER_BUGFIX_LEVEL		14
 #define	AAC_DRIVER_TYPE			AAC_TYPE_RELEASE
 
 #define	STR(s)				# s
@@ -239,6 +216,7 @@ struct aac_softstate {
 	uint32_t map_size_min;	/* minimum size of PCI mem that must be */
 				/* mapped to address the card */
 	int flags;		/* firmware features enabled */
+	int instance;
 	dev_info_t *devinfo_p;
 
 	/* DMA attributes */
@@ -247,7 +225,8 @@ struct aac_softstate {
 
 	/* PCI spaces */
 	ddi_acc_handle_t pci_mem_handle;
-	char *pci_mem_base_addr;
+	char *pci_mem_base_vaddr;
+	uint32_t pci_mem_base_paddr;
 
 	struct aac_interface aac_if;	/* adapter hardware interface */
 
@@ -312,6 +291,15 @@ struct aac_softstate {
 	int aifq_filled;
 	struct aac_fib_context *fibctx;
 	int devcfg_wait_on;		/* AIF event waited for rescan */
+
+#ifdef DEBUG
+	/* UART trace printf variables */
+	uint32_t debug_flags;		/* debug print flags bitmap */
+	uint32_t debug_fw_flags;	/* FW debug flags */
+	uint32_t debug_buf_offset;	/* offset from DPMEM start */
+	uint32_t debug_buf_size;	/* FW debug buffer size in bytes */
+	uint32_t debug_header_size;	/* size of debug header */
+#endif
 };
 
 /* aac_cmd flags */
@@ -359,6 +347,63 @@ struct aac_cmd {
 	 */
 	struct aac_fib fib;	/* FIB for this IO command */
 };
+
+#ifdef DEBUG
+
+#define	AACDB_FLAGS_MASK		0x0000ffff
+#define	AACDB_FLAGS_KERNEL_PRINT	0x00000001
+#define	AACDB_FLAGS_FW_PRINT		0x00000002
+
+#define	AACDB_FLAGS_MISC		0x00000004
+#define	AACDB_FLAGS_FUNC1		0x00000008
+#define	AACDB_FLAGS_FUNC2		0x00000010
+#define	AACDB_FLAGS_SCMD		0x00000020
+#define	AACDB_FLAGS_AIF			0x00000040
+#define	AACDB_FLAGS_FIB			0x00000080
+#define	AACDB_FLAGS_IOCTL		0x00000100
+
+extern uint32_t aac_debug_flags;
+extern int aac_dbflag_on(struct aac_softstate *, int);
+extern void aac_printf(struct aac_softstate *, uint_t, const char *, ...);
+extern void aac_print_fib(struct aac_softstate *, struct aac_fib *);
+
+#define	AACDB_PRINT(s, lev, ...) { \
+	if (aac_dbflag_on((s), AACDB_FLAGS_MISC)) \
+		aac_printf((s), (lev), __VA_ARGS__); }
+
+#define	AACDB_PRINT_IOCTL(s, ...) { \
+	if (aac_dbflag_on((s), AACDB_FLAGS_IOCTL)) \
+		aac_printf((s), CE_NOTE, __VA_ARGS__); }
+
+#define	AACDB_PRINT_TRAN(s, ...) { \
+	if (aac_dbflag_on((s), AACDB_FLAGS_SCMD)) \
+		aac_printf((s), CE_NOTE, __VA_ARGS__); }
+
+#define	DBCALLED(s, n) { \
+	if (aac_dbflag_on((s), AACDB_FLAGS_FUNC ## n)) \
+		aac_printf((s), CE_NOTE, "--- %s() called ---", __func__); }
+
+#define	AACDB_PRINT_SCMD(s, x) { \
+	if (aac_dbflag_on((s), AACDB_FLAGS_SCMD)) aac_print_scmd((s), (x)); }
+
+#define	AACDB_PRINT_AIF(s, x) { \
+	if (aac_dbflag_on((s), AACDB_FLAGS_AIF)) aac_print_aif((s), (x)); }
+
+#define	AACDB_PRINT_FIB(s, x) { \
+	if (aac_dbflag_on((s), AACDB_FLAGS_FIB)) aac_print_fib((s), (x)); }
+
+#else /* DEBUG */
+
+#define	AACDB_PRINT(s, lev, ...)
+#define	AACDB_PRINT_IOCTL(s, ...)
+#define	AACDB_PRINT_TRAN(s, ...)
+#define	AACDB_PRINT_FUNC(s)
+#define	AACDB_PRINT_FIB(s, x)
+#define	AACDB_PRINT_SCMD(s, x)
+#define	AACDB_PRINT_AIF(s, x)
+#define	DBCALLED(s, n)
+
+#endif /* DEBUG */
 
 #ifdef	__cplusplus
 }

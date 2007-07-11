@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -49,3 +49,15 @@ current FreeBSD aac driver.
 
 Adaptec approves Sun's intention to open source the aac RAID driver for
 commercial Solaris and the Open Solaris community.
+
+aac driver 2.1.14
+===================
+UART trace support is added in this release:
+        The driver can now make output through the firmware UART trace. You
+        have to set AAC_DEBUG and the appropriate flags in aac_debug_flags, at
+        least AACDB_FLAGS_FW_PRINT to enable the UART trace and any other flags
+	to enable the output class you want to see.
+	To use the tip utility to connect to the UART daughter card, a configu-
+	ration line as below should be added to /etc/remote:
+	aac:\
+		:dv=/dev/term/a:br#115200:el=^C^S^Q^U^D:ie=%$:oe=^D:
