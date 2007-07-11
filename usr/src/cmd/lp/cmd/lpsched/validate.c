@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -601,7 +601,7 @@ _validate(RSTATUS *prs, PSTATUS *pps, PSTATUS *stop_pps, char **prefixp,
 	 * where the request is outside the printer label range.
 	 */
 	{
-		register CANDIDATE	*pcend2;
+		register CANDIDATE	*pcend2 = pcend;
 
 		if (is_system_labeled()) {
 			for (pcend2 = pc = arena; pc < pcend; pc++) {
