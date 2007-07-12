@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -176,7 +176,13 @@ extern uint_t getisax(uint32_t *, uint_t);
 #define	AT_SUN_EMULATOR		2018
 
 #define	AT_SUN_BRANDNAME	2019
-#define	AT_SUN_BRAND_PHDR	2020	/* Brand executable's phdr */
+
+/*
+ * Aux vectors available for brand modules.
+ */
+#define	AT_SUN_BRAND_AUX1	2020
+#define	AT_SUN_BRAND_AUX2	2021
+#define	AT_SUN_BRAND_AUX3	2022
 
 /*
  * The kernel is in a better position to determine whether a process needs to

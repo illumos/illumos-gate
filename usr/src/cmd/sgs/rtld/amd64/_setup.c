@@ -214,7 +214,13 @@ _setup(Boot * ebp, Dyn * ld_dyn)
 		reladdr += relaent;
 	}
 
+	/*
+	 * If an emulation library is being used, use that as the linker's
+	 * effective executable name. The real executable is not linked by this
+	 * linker.
+	 */
 	if (_emulator != NULL) {
+		_execname = _emulator;
 		rtld_flags2 |= RT_FL2_BRANDED;
 	}
 

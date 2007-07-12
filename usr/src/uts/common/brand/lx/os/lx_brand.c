@@ -594,7 +594,11 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 {
 	int		error;
 	vnode_t		*nvp;
-	auxv32_t	phdr_auxv32 = { AT_SUN_BRAND_PHDR, 0 };
+	auxv32_t	phdr_auxv32[3] = {
+	    { AT_SUN_BRAND_LX_PHDR, 0 },
+	    { AT_SUN_BRAND_AUX2, 0 },
+	    { AT_SUN_BRAND_AUX3, 0 }
+	};
 	Elf32_Ehdr	ehdr;
 	Elf32_Addr	uphdr_vaddr;
 	intptr_t	voffset;
@@ -636,7 +640,7 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 
 	if (error = mapexec_brand(vp, args, &ehdr, &uphdr_vaddr, &voffset,
 	    exec_file, &interp, &env.ex_bssbase, &env.ex_brkbase,
-	    &env.ex_brksize))
+	    &env.ex_brksize, NULL))
 		return (error);
 
 	/*
@@ -672,7 +676,7 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 			return (error);
 		}
 		if (error = mapexec_brand(nvp, args, &ehdr, &uphdr_vaddr,
-		    &voffset, exec_file, &interp, NULL, NULL, NULL)) {
+		    &voffset, exec_file, &interp, NULL, NULL, NULL, NULL)) {
 			VN_RELE(nvp);
 			return (error);
 		}
@@ -727,8 +731,8 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	 * least try to keep /proc's view of the aux vector consistent with
 	 * what's on the process stack.
 	 */
-	phdr_auxv32.a_un.a_val = edp->ed_phdr;
-	if (copyout(&phdr_auxv32, args->auxp_brand_phdr,
+	phdr_auxv32[0].a_un.a_val = edp->ed_phdr;
+	if (copyout(&phdr_auxv32, args->auxp_brand,
 	    sizeof (phdr_auxv32)) == -1)
 		return (EFAULT);
 
@@ -750,7 +754,7 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	for (i = 0; i < __KERN_NAUXV_IMPL; i++) {
 		if (up->u_auxv[i].a_type == AT_ENTRY)
 			up->u_auxv[i].a_un.a_val = edp->ed_entry;
-		if (up->u_auxv[i].a_type == AT_SUN_BRAND_PHDR)
+		if (up->u_auxv[i].a_type == AT_SUN_BRAND_LX_PHDR)
 			up->u_auxv[i].a_un.a_val = edp->ed_phdr;
 	}
 

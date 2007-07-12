@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -237,7 +237,7 @@ lx_ldb_client_init(struct ps_prochandle *php)
 		return (NULL);
 	}
 
-	phdr_addr = Pgetauxval(php, AT_SUN_BRAND_PHDR);
+	phdr_addr = Pgetauxval(php, AT_SUN_BRAND_LX_PHDR);
 
 	if (ps_pread(php, phdr_addr, &phdr, sizeof (phdr)) != PS_OK) {
 		ps_plog("lx_ldb_client_init: couldn't read phdr at %x\n",

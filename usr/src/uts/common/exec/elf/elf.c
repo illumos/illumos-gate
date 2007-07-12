@@ -169,7 +169,7 @@ dtrace_safe_phdr(Phdr *phdrp, struct uarg *args, uintptr_t base)
 int
 mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
     intptr_t *voffset, caddr_t exec_file, int *interp, caddr_t *bssbase,
-    caddr_t *brkbase, size_t *brksize)
+    caddr_t *brkbase, size_t *brksize, uintptr_t *lddatap)
 {
 	size_t		len;
 	struct vattr	vat;
@@ -184,6 +184,9 @@ mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
 	uintptr_t	lddata;
 	long		execsz;
 	intptr_t	minaddr;
+
+	if (lddatap != NULL)
+		*lddatap = NULL;
 
 	if (error = execpermissions(vp, &vat, args)) {
 		uprintf("%s: Cannot execute %s\n", exec_file, args->pathname);
@@ -203,6 +206,8 @@ mapexec_brand(vnode_t *vp, uarg_t *args, Ehdr *ehdr, Addr *uphdr_vaddr,
 		kmem_free(phdrbase, phdrsize);
 		return (ENOEXEC);
 	}
+	if (lddatap != NULL)
+		*lddatap = lddata;
 
 	if (error = mapelfexec(vp, ehdr, nphdrs, phdrbase, &uphdr, &dynphdr,
 	    &junk, &dtrphdr, NULL, bssbase, brkbase, voffset, &minaddr,
@@ -455,10 +460,10 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	if ((brand_action != EBA_NATIVE) && (PROC_IS_BRANDED(p))) {
 		branded = 1;
 		/*
-		 * We will be adding 2 entries to the aux vector.  One for
-		 * the branded binary's phdr and one for the brandname.
+		 * We will be adding 4 entries to the aux vectors.  One for
+		 * the the brandname and 3 for the brand specific aux vectors.
 		 */
-		args->auxsize += 2 * sizeof (aux_entry_t);
+		args->auxsize += 4 * sizeof (aux_entry_t);
 	}
 
 	aux = bigwad->elfargs;
@@ -578,7 +583,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		if (error && dlnp != bigwad->dl_name) {
 			/* new kernel, old user-level */
 			error = lookupname(dlnp -= 4, UIO_SYSSPACE, FOLLOW,
-				NULLVPP, &nvp);
+			    NULLVPP, &nvp);
 		}
 		if (error) {
 			uprintf("%s: Cannot find %s\n", exec_file, dlnp);
@@ -712,14 +717,16 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 #endif
 		if (branded) {
 			/*
-			 * Reserve space for the brand-private aux vector entry,
+			 * Reserve space for the brand-private aux vectors,
 			 * and record the user addr of that space.
 			 */
-			args->auxp_brand_phdr =
+			args->auxp_brand =
 			    (char *)((char *)args->stackend +
 			    ((char *)&aux->a_type -
 			    (char *)bigwad->elfargs));
-			ADDAUX(aux, AT_SUN_BRAND_PHDR, 0)
+			ADDAUX(aux, AT_SUN_BRAND_AUX1, 0)
+			ADDAUX(aux, AT_SUN_BRAND_AUX2, 0)
+			ADDAUX(aux, AT_SUN_BRAND_AUX3, 0)
 		}
 
 		ADDAUX(aux, AT_NULL, 0)
@@ -1150,7 +1157,7 @@ mapelfexec(
 			offset = phdr->p_offset;
 			if (((uintptr_t)offset & PAGEOFFSET) ==
 			    ((uintptr_t)addr & PAGEOFFSET) &&
-				(!(vp->v_flag & VNOMAP))) {
+			    (!(vp->v_flag & VNOMAP))) {
 				page = 1;
 			} else {
 				page = 0;
@@ -1169,8 +1176,8 @@ mapelfexec(
 				if (zfodsz > tlen) {
 					curproc->p_brkpageszc =
 					    page_szc(map_pgsz(MAPPGSZ_HEAP,
-						curproc, addr + phdr->p_filesz +
-						tlen, zfodsz - tlen, 0));
+					    curproc, addr + phdr->p_filesz +
+					    tlen, zfodsz - tlen, 0));
 				}
 			}
 

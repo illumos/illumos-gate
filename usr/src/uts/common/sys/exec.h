@@ -107,7 +107,7 @@ typedef struct uarg {
 	vnode_t	*ex_vp;
 	char	*emulator;
 	char	*brandname;
-	char	*auxp_brand_phdr; /* addr of brand phdr auxv on user stack */
+	char	*auxp_brand; /* address of first brand auxv on user stack */
 } uarg_t;
 
 /*
@@ -238,15 +238,15 @@ extern void exec_set_sp(size_t);
 extern int elfexec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
     long *, int, caddr_t, cred_t *, int);
 extern int mapexec_brand(vnode_t *, uarg_t *, Ehdr *, Addr *,
-    intptr_t *, caddr_t, int *, caddr_t *, caddr_t *, size_t *);
+    intptr_t *, caddr_t, int *, caddr_t *, caddr_t *, size_t *, uintptr_t *);
 #endif /* !_ELF32_COMPAT */
 
 #if defined(_LP64)
 extern int elf32exec(vnode_t *, execa_t *, uarg_t *, intpdata_t *, int,
     long *, int, caddr_t, cred_t *, int);
 extern int mapexec32_brand(vnode_t *, uarg_t *, Elf32_Ehdr *, Elf32_Addr *,
-    intptr_t *, caddr_t, int *, caddr_t *, caddr_t *, size_t *);
-#endif	/* _LP64 */
+    intptr_t *, caddr_t, int *, caddr_t *, caddr_t *, size_t *, uintptr_t *);
+#endif  /* _LP64 */
 
 /*
  * Utility functions for exec module core routines:

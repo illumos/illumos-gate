@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,6 +76,9 @@ extern "C" {
 #define	LX_VERSION		LX_VERSION_1
 
 #define	LX_ATTR_RESTART_INIT	ZONE_ATTR_BRAND_ATTRS
+
+/* Aux vector containing phdr of linux executable, used by lx_librtld_db */
+#define	AT_SUN_BRAND_LX_PHDR	AT_SUN_BRAND_AUX1
 
 #ifndef	_ASM
 
