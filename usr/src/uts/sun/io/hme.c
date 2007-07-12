@@ -31,30 +31,31 @@
 
 #include	<sys/types.h>
 #include	<sys/debug.h>
-#include	<sys/stropts.h>
 #include	<sys/stream.h>
 #include	<sys/cmn_err.h>
-#include	<sys/vtrace.h>
 #include	<sys/kmem.h>
 #include	<sys/crc32.h>
-#include	<sys/ddi.h>
-#include	<sys/sunddi.h>
+#include	<sys/modctl.h>
+#include	<sys/conf.h>
 #include	<sys/strsun.h>
-#include	<sys/stat.h>
-#include	<sys/cpu.h>
 #include	<sys/kstat.h>
 #include	<inet/common.h>
 #include	<inet/mi.h>
 #include	<inet/nd.h>
+#include	<sys/pattr.h>
 #include	<sys/dlpi.h>
+#include	<sys/strsubr.h>
+#include	<sys/mac.h>
+#include	<sys/mac_ether.h>
 #include	<sys/ethernet.h>
+#include	<sys/pci.h>
+#include	<sys/policy.h>
+#include	<sys/ddi.h>
+#include	<sys/sunddi.h>
 #include	<sys/hme_phy.h>
 #include	<sys/hme_mac.h>
 #include	<sys/hme.h>
-#include	<sys/pci.h>
-#include	<sys/policy.h>
 
-typedef int	(*fptri_t)();
 typedef void	(*fptrv_t)();
 
 typedef enum {
@@ -89,8 +90,7 @@ typedef enum {
 	DISPLAY_MSG	= 28,
 	LATECOLL_MSG	= 29,
 	MIFPOLL_MSG	= 30,
-	LINKPULSE_MSG	= 31,
-	EXIT_MSG	= 32
+	LINKPULSE_MSG	= 31
 } msg_t;
 
 msg_t	hme_debug_level =	NO_MSG;
@@ -127,8 +127,7 @@ static char	*msg_string[] = {
 	"DISPLAY	"
 	"LATECOLL_MSG	",
 	"MIFPOLL_MSG	",
-	"LINKPULSE_MSG	",
-	"EXIT_MSG	"
+	"LINKPULSE_MSG	"
 };
 
 #define	SEVERITY_NONE	0
@@ -140,22 +139,12 @@ static char	*msg_string[] = {
 #define	FEPS_URUN_BUG
 #define	HME_CODEVIOL_BUG
 
-/* temp: stats from adb */
-static int hme_reinit_txhung;
-static int hme_reinit_fatal;
-static int hme_reinit_jabber;
-
 #define	KIOIP	KSTAT_INTR_PTR(hmep->hme_intrstats)
 
 /*
  * The following variables are used for checking fixes in Sbus/FEPS 2.0
  */
 static	int	hme_urun_fix = 0;	/* Bug fixed in Sbus/FEPS 2.0 */
-
-/*
- * Initialize hmestruplock and hmewenlock just once during attach
- */
-static	uint_t init_once = 0;
 
 /*
  * The following variables are used for configuring various features
@@ -253,8 +242,6 @@ static	int	hme_adv_10hdx_cap = HME_NOTUSR | 0;
 /*
  * All strings used by hme messaging functions
  */
-static	char *link_down_msg =
-	"No response from Ethernet network : Link down -- cable problem?";
 
 static	char *busy_msg =
 	"Driver is BUSY with upper layer";
@@ -294,9 +281,6 @@ static  char *lether_addr_msg =
 
 static  char *add_intr_fail_msg =
 	"ddi_add_intr(9F) failed";
-
-static  char *create_minor_node_fail_msg =
-	"ddi_create_minor_node(9F) failed";
 
 static  char *mregs_4global_reg_fail_msg =
 	"ddi_regs_map_setup(9F) for global reg failed";
@@ -347,9 +331,6 @@ static  char *mregs_4config_fail_msg =
 
 static  char *attach_fail_msg =
 	"Attach entry point failed";
-
-static  char *attach_bad_cmd_msg =
-	"Attach entry point rcv'd a bad command";
 
 static  char *detach_bad_cmd_msg =
 	"Detach entry point rcv'd a bad command";
@@ -421,53 +402,19 @@ static  char *autoneg_speed_bad_msg =
  */
 static	int hmeattach(dev_info_t *, ddi_attach_cmd_t);
 static	int hmedetach(dev_info_t *, ddi_detach_cmd_t);
-static	int hmeinit_xfer_params(struct hme *);
+static	boolean_t hmeinit_xfer_params(struct hme *);
 static	uint_t hmestop(struct hme *);
 static	void hmestatinit(struct hme *);
 static	int hmeallocthings(struct hme *);
 static	void hmefreebufs(struct hme *);
 static  void *hmeallocb(size_t, uint_t);
 static	void hmeget_hm_rev_property(struct hme *);
-static	int hmeopen(queue_t *, dev_t *, int, int, cred_t *);
-static	int hmeclose(queue_t *);
-static	int hmewput(queue_t *, mblk_t *);
-static	int hmewsrv(queue_t *);
-static	void hmeproto(queue_t *, mblk_t *);
-static	struct hme *hme_set_ppa(struct hmestr *, queue_t *);
-static	void hmeioctl(queue_t *, mblk_t *);
-static	void hme_dl_ioc_hdr_info(queue_t *, mblk_t *);
-static	void hmeareq(queue_t *, mblk_t *);
-static	void hmedreq(queue_t *, mblk_t *);
-static	void hmedodetach(struct hmestr *);
-static	void hmebreq(queue_t *, mblk_t *);
-static	void hmeubreq(queue_t *, mblk_t *);
-static	void hmeireq(queue_t *, mblk_t *);
-static	void hmeponreq(queue_t *, mblk_t *);
-static	void hmepoffreq(queue_t *, mblk_t *);
-static	void hmeemreq(queue_t *, mblk_t *);
-static	void hmedmreq(queue_t *, mblk_t *);
-static	void hmepareq(queue_t *, mblk_t *);
-static	void hmespareq(queue_t *, mblk_t *);
-static	void hmeudreq(queue_t *, mblk_t *);
-static	void hmenreq(queue_t *, mblk_t *);
-static	void hmenotify_ind(struct hme *, uint32_t);
-static	int hmestart(queue_t *, mblk_t *, struct hme *);
-static	uint_t hmeintr();
-static	void hmewenable(struct hme *);
+static	boolean_t hmestart(struct hme *, mblk_t *);
+static	uint_t hmeintr(caddr_t);
 static	void hmereclaim(struct hme *);
 static	int hmeinit(struct hme *);
 static	void hmeuninit(struct hme *hmep);
-static	char *hme_ether_sprintf(struct ether_addr *);
-static	mblk_t *hmeaddudind(struct hme *, mblk_t *, struct ether_addr *,
-	struct ether_addr *, int, uint32_t);
-static	struct hmestr *hmeaccept(struct hmestr *, struct hme *, int,
-	struct ether_addr *);
-static	struct hmestr *hmepaccept(struct hmestr *, struct hme *, int,
-	struct	ether_addr *);
-static	void hmesetipq(struct hme *);
-static	int hmemcmatch(struct hmestr *, struct ether_addr *);
-static	void hmesendup(struct hme *, mblk_t *, struct hmestr *(*)());
-static 	void hmeread(struct hme *, volatile struct hme_rmd *);
+static 	mblk_t *hmeread(struct hme *, volatile struct hme_rmd *, uint32_t);
 static	void hmesavecntrs(struct hme *);
 static	void hme_fatal_err(struct hme *, uint_t);
 static	void hme_nonfatal_err(struct hme *, uint_t);
@@ -498,29 +445,57 @@ static	int hme_check_txhung(struct hme *hmep);
 static	void hme_check_link(void *);
 
 static	void hme_init_xcvr_info(struct hme *);
-static	void hme_display_transceiver(struct hme *hmep);
 static	void hme_disable_link_pulse(struct hme *);
 static	void hme_force_speed(void *);
 static	void hme_get_autoinfo(struct hme *);
 static	int hme_try_auto_negotiation(struct hme *);
 static	void hme_try_speed(void *);
 static	void hme_link_now_up(struct hme *);
-static	void hme_display_linkup(struct hme *hmep, uint32_t speed);
 static	void hme_setup_mac_address(struct hme *, dev_info_t *);
 
 static	void hme_nd_free(caddr_t *nd_pparam);
 static	int hme_nd_getset(queue_t *q, caddr_t nd_param, MBLKP mp);
 static	boolean_t hme_nd_load(caddr_t *nd_pparam, char *name,
-				pfi_t get_pfi, pfi_t set_pfi, caddr_t data);
+    pfi_t get_pfi, pfi_t set_pfi, caddr_t data);
 
 static void hme_fault_msg(char *, uint_t, struct hme *, uint_t,
-			msg_t, char *, ...);
+    msg_t, char *, ...);
 
 static void hme_check_acc_handle(char *, uint_t, struct hme *,
-				ddi_acc_handle_t);
+    ddi_acc_handle_t);
 
 static void hme_check_dma_handle(char *, uint_t, struct hme *,
-				ddi_dma_handle_t);
+    ddi_dma_handle_t);
+
+/*
+ * Nemo (GLDv3) Functions.
+ */
+static int	hme_m_stat(void *, uint_t, uint64_t *);
+static int	hme_m_start(void *);
+static void	hme_m_stop(void *);
+static int	hme_m_promisc(void *, boolean_t);
+static int	hme_m_multicst(void *, boolean_t, const uint8_t *);
+static int	hme_m_unicst(void *, const uint8_t *);
+static mblk_t	*hme_m_tx(void *, mblk_t *);
+static void	hme_m_ioctl(void *, queue_t *, mblk_t *);
+static boolean_t	hme_m_getcapab(void *, mac_capab_t, void *);
+
+static mac_callbacks_t hme_m_callbacks = {
+	MC_IOCTL | MC_GETCAPAB,
+	hme_m_stat,
+	hme_m_start,
+	hme_m_stop,
+	hme_m_promisc,
+	hme_m_multicst,
+	hme_m_unicst,
+	hme_m_tx,
+	NULL,
+	hme_m_ioctl,
+	hme_m_getcapab,
+};
+
+DDI_DEFINE_STREAM_OPS(hme_dev_ops, nulldev, nulldev, hmeattach, hmedetach,
+    nodev, NULL, D_MP, NULL);
 
 #define	HME_FAULT_MSG1(p, s, t, f) \
     hme_fault_msg(__FILE__, __LINE__, (p), (s), (t), (f));
@@ -579,93 +554,6 @@ static void	hme_debug_msg(char *, uint_t, struct hme *, uint_t,
 #define	CHECK_GLOBREG() \
 	hme_check_acc_handle(__FILE__, __LINE__, hmep, hmep->hme_globregh)
 
-#define	DEV_REPORT_FAULT1(p, i, l, f)
-#define	DEV_REPORT_FAULT2(p, i, l, f, a)
-#define	DEV_REPORT_FAULT3(p, i, l, f, a, b)
-#define	DEV_REPORT_FAULT4(p, i, l, f, a, b, c)
-
-#define	ND_BASE		('N' << 8)	/* base */
-#define	ND_GET		(ND_BASE + 0)	/* Get a value */
-#define	ND_SET		(ND_BASE + 1)	/* Set a value */
-
-/*
- * Module linkage structures.
- */
-static	struct	module_info	hmeminfo = {
-	HMEIDNUM,	/* mi_idnum */
-	HMENAME,	/* mi_idname */
-	HMEMINPSZ,	/* mi_minpsz */
-	HMEMAXPSZ,	/* mi_maxpsz */
-	HMEHIWAT,	/* mi_hiwat */
-	HMELOWAT	/* mi_lowat */
-};
-
-static	struct	qinit	hmerinit = {
-	NULL,		/* qi_putp */
-	NULL,		/* qi_srvp */
-	hmeopen,	/* qi_qopen */
-	hmeclose,	/* qi_qclose */
-	NULL,		/* qi_qadmin */
-	&hmeminfo,	/* qi_minfo */
-	NULL		/* qi_mstat */
-};
-
-static	struct	qinit	hmewinit = {
-	hmewput,	/* qi_putp */
-	hmewsrv,	/* qi_srvp */
-	NULL,		/* qi_qopen */
-	NULL,		/* qi_qclose */
-	NULL,		/* qi_qadmin */
-	&hmeminfo,	/* qi_minfo */
-	NULL		/* qi_mstat */
-};
-
-static struct	streamtab	hme_info = {
-	&hmerinit,	/* st_rdinit */
-	&hmewinit,	/* st_wrinit */
-	NULL,		/* st_muxrinit */
-	NULL		/* st_muxwrinit */
-};
-
-static	struct	cb_ops	cb_hme_ops = {
-	nodev,			/* cb_open */
-	nodev,			/* cb_close */
-	nodev,			/* cb_strategy */
-	nodev,			/* cb_print */
-	nodev,			/* cb_dump */
-	nodev,			/* cb_read */
-	nodev,			/* cb_write */
-	nodev,			/* cb_ioctl */
-	nodev,			/* cb_devmap */
-	nodev,			/* cb_mmap */
-	nodev,			/* cb_segmap */
-	nochpoll,		/* cb_chpoll */
-	ddi_prop_op,		/* cb_prop_op */
-	&hme_info,		/* cb_stream */
-	D_MP | D_HOTPLUG,	/* cb_flag */
-	CB_REV,			/* rev */
-	nodev,			/* int (*cb_aread)()  */
-	nodev			/* int (*cb_awrite)() */
-};
-
-static	struct	dev_ops	hme_ops = {
-	DEVO_REV,		/* devo_rev */
-	0,			/* devo_refcnt */
-	ddi_no_info,		/* devo_getinfo */
-	nulldev,		/* devo_identify */
-	nulldev,		/* devo_probe */
-	hmeattach,		/* devo_attach */
-	hmedetach,		/* devo_detach */
-	nodev,			/* devo_reset */
-	&cb_hme_ops,		/* devo_cb_ops */
-	(struct bus_ops *)NULL,	/* devo_bus_ops */
-	NULL			/* devo_power */
-};
-
-#ifndef lint
-char _depends_on[] = "drv/ip";
-#endif /* lint */
-
 /*
  * Claim the device is ultra-capable of burst in the beginning.  Use
  * the value returned by ddi_dma_burstsizes() to actually set the HME
@@ -705,45 +593,17 @@ static ddi_dma_lim_t hme_dma_limits = {
 static uchar_t pci_latency_timer = 0;
 
 /*
- * This is the loadable module wrapper.
- */
-#include <sys/modctl.h>
-
-/*
  * Module linkage information for the kernel.
  */
 static struct modldrv modldrv = {
 	&mod_driverops,	/* Type of module.  This one is a driver */
-	"10/100Mb Ethernet Driver v%I%",
-	&hme_ops,	/* driver ops */
+	"Sun HME 10/100 Mb Ethernet",
+	&hme_dev_ops,	/* driver ops */
 };
 
 static struct modlinkage modlinkage = {
 	MODREV_1, &modldrv, NULL
 };
-
-/*
- * Autoconfiguration lock:  We want to initialize all the global
- * locks at _init().  However, we do not have the cookie required which
- * is returned in ddi_add_intr(), which in turn is usually called at attach
- * time.
- */
-static	kmutex_t	hmeautolock;
-
-/*
- * Linked list of active (inuse) driver Streams.
- */
-static	struct	hmestr	*hmestrup = NULL;
-static	krwlock_t	hmestruplock;
-
-/*
- * Single private "global" lock for the few rare conditions
- * we want single-threaded.
- */
-static	kmutex_t	hmelock;
-static	kmutex_t	hmewenlock;
-
-static	int	hme_device = -1;
 
 /*
  * Internal PHY Id:
@@ -805,66 +665,14 @@ static	int	hme_device = -1;
 /*
  * Ether-type is specifically big-endian, but data region is unknown endian
  */
-
-typedef struct ether_header *eehp;
-
-#define	get_ether_type(ptr) (\
-	(((uchar_t *)&((eehp)ptr)->ether_type)[0] << 8) | \
-	(((uchar_t *)&((eehp)ptr)->ether_type)[1]))
-
-#define	put_ether_type(ptr, value) {\
-	((uchar_t *)(&((eehp)ptr)->ether_type))[0] = \
-	    ((uint_t)value & 0xff00) >> 8; \
-	((uchar_t *)(&((eehp)ptr)->ether_type))[1] = (value & 0xff); }
+#define	get_ether_type(ptr) \
+	(((((uint8_t *)ptr)[12] << 8) | (((uint8_t *)ptr)[13])))
 
 /* <<<<<<<<<<<<<<<<<<<<<<  Configuration Parameters >>>>>>>>>>>>>>>>>>>>> */
 
 #define	BMAC_DEFAULT_JAMSIZE	(0x04)		/* jamsize equals 4 */
 #define	BMAC_LONG_JAMSIZE	(0x10)		/* jamsize equals 0x10 */
 static	int 	jamsize = BMAC_DEFAULT_JAMSIZE;
-
-/*
- * The following code is used for performance metering and debugging;
- * This routine is invoked via "TIME_POINT(label)" macros, which will
- * store the label and a timestamp. This allows to execution sequences
- * and timestamps associated with them.
- */
-
-
-#ifdef	TPOINTS
-/* Time trace points */
-int time_point_active;
-static int time_point_offset, time_point_loc;
-hrtime_t last_time_point;
-#define	POINTS 1024
-int time_points[POINTS];
-#define	TPOINT(x) if (time_point_active) hme_time_point(x);
-void
-hme_time_point(int loc)
-{
-	static hrtime_t time_point_base;
-
-	hrtime_t now;
-
-	now = gethrtime();
-	if (time_point_base == 0) {
-		time_point_base = now;
-		time_point_loc = loc;
-		time_point_offset = 0;
-	} else {
-		time_points[time_point_offset] = loc;
-		time_points[time_point_offset+1] =
-		    (now - last_time_point) / 1000;
-		time_point_offset += 2;
-		if (time_point_offset >= POINTS)
-		    time_point_offset = 0; /* wrap at end */
-		/* time_point_active = 0;  disable at end */
-	}
-	last_time_point = now;
-}
-#else
-#define	TPOINT(x)
-#endif
 
 
 /*
@@ -873,7 +681,7 @@ hme_time_point(int loc)
  */
 
 static uint32_t
-hmeladrf_bit(struct ether_addr *addr)
+hmeladrf_bit(const uint8_t *addr)
 {
 	uint32_t crc;
 
@@ -995,7 +803,7 @@ hme_bb_mii_read(struct hme *hmep, uint8_t regad, uint16_t *datap)
 	PUT_MIFREG(mif_bbopenb, 0);	/* Disable the MII driver */
 
 	if ((hme_internal_phy_id == HME_BB2) ||
-			(hmep->hme_transceiver == HME_EXTERNAL_TRANSCEIVER)) {
+	    (hmep->hme_transceiver == HME_EXTERNAL_TRANSCEIVER)) {
 		GET_BIT_STD(x);
 		GET_BIT_STD(y);		/* <TA> */
 		for (i = 0xf; i >= 0; i--) {	/* <DDDDDDDDDDDDDDDD> */
@@ -1064,7 +872,7 @@ hme_mii_read(struct hme *hmep, uchar_t regad, uint16_t *datap)
 #ifdef	HME_FRM_DEBUG
 	if (!hme_frame_flag) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
-				"Frame Register used for MII");
+		    "Frame Register used for MII");
 		hme_frame_flag = 1;
 	}
 		HME_DEBUG_MSG3(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
@@ -1072,7 +880,7 @@ hme_mii_read(struct hme *hmep, uchar_t regad, uint16_t *datap)
 #endif
 
 	*framerp = HME_MIF_FRREAD | (phyad << HME_MIF_FRPHYAD_SHIFT) |
-					(regad << HME_MIF_FRREGAD_SHIFT);
+	    (regad << HME_MIF_FRREGAD_SHIFT);
 /*
  *	HMEDELAY((*framerp & HME_MIF_FRTA0), HMEMAXRSTDELAY);
  */
@@ -1088,7 +896,7 @@ hme_mii_read(struct hme *hmep, uchar_t regad, uint16_t *datap)
 	} else {
 		*datap = (uint16_t)(frame & HME_MIF_FRDATA);
 		HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
-			"Frame Reg :mii_read: successful:data = %X ", *datap);
+		    "Frame Reg :mii_read: successful:data = %X ", *datap);
 		return (0);
 	}
 
@@ -1108,11 +916,11 @@ hme_mii_write(struct hme *hmep, uint8_t regad, uint16_t data)
 
 	phyad = hmep->hme_phyad;
 	HME_DEBUG_MSG4(hmep,  SEVERITY_UNKNOWN, NAUTONEG_MSG,
-			"FRame Reg :mii_write: phyad = %X \
-			reg = %X data = %X", phyad, regad, data);
+	    "Frame Reg :mii_write: phyad = %X reg = %X data = %X",
+	    phyad, regad, data);
 
 	*framerp = HME_MIF_FRWRITE | (phyad << HME_MIF_FRPHYAD_SHIFT) |
-					(regad << HME_MIF_FRREGAD_SHIFT) | data;
+	    (regad << HME_MIF_FRREGAD_SHIFT) | data;
 /*
  *	HMEDELAY((*framerp & HME_MIF_FRTA0), HMEMAXRSTDELAY);
  */
@@ -1121,12 +929,12 @@ hme_mii_write(struct hme *hmep, uint8_t regad, uint16_t data)
 	CHECK_MIFREG();
 	if ((frame & HME_MIF_FRTA0) == 0) {
 		HME_FAULT_MSG1(hmep, SEVERITY_MID, NAUTONEG_MSG,
-				mif_write_fail_msg);
+		    mif_write_fail_msg);
 	}
 #if HME_DEBUG
 	else {
 		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
-				"Frame Reg :mii_write: successful");
+		    "Frame Reg :mii_write: successful");
 	}
 #endif
 }
@@ -1197,12 +1005,12 @@ hme_select_speed(struct hme *hmep, int speed)
 		case HME_EXTERNAL_TRANSCEIVER:
 			if (hmep->hme_delay == 0) {
 				hme_mii_write(hmep, HME_PHY_BMCR,
-							fdx | PHY_BMCR_100M);
+				    fdx | PHY_BMCR_100M);
 			}
 			break;
 		default:
 			HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, XCVR_MSG,
-					"Default in select speed 100");
+			    "Default in select speed 100");
 			break;
 		}
 		break;
@@ -1218,13 +1026,13 @@ hme_select_speed(struct hme *hmep, int speed)
 			break;
 		default:
 			HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, XCVR_MSG,
-					"Default in select speed 10");
+			    "Default in select speed 10");
 			break;
 		}
 		break;
 	default:
 		HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, XCVR_MSG,
-				"Default in select speed : Neither speed");
+		    "Default in select speed : Neither speed");
 		return (0);
 	}
 
@@ -1266,7 +1074,7 @@ hme_reset_transceiver(struct hme *hmep)
 		hmep->hme_phyad = HME_INTERNAL_PHYAD;
 		hmep->hme_transceiver = HME_INTERNAL_TRANSCEIVER;
 		hme_mii_write(hmep, HME_PHY_BMCR, (PHY_BMCR_ISOLATE |
-				PHY_BMCR_PWRDN | PHY_BMCR_LPBK));
+		    PHY_BMCR_PWRDN | PHY_BMCR_LPBK));
 		if (hme_mii_read(hmep, HME_PHY_BMCR, &control) == 1)
 			goto start_again;
 
@@ -1281,7 +1089,7 @@ hme_reset_transceiver(struct hme *hmep)
 		hmep->hme_phyad = HME_EXTERNAL_PHYAD;
 		hmep->hme_transceiver = HME_EXTERNAL_TRANSCEIVER;
 		hme_mii_write(hmep, HME_PHY_BMCR, (PHY_BMCR_ISOLATE |
-				PHY_BMCR_PWRDN | PHY_BMCR_LPBK));
+		    PHY_BMCR_PWRDN | PHY_BMCR_LPBK));
 		if (hme_mii_read(hmep, HME_PHY_BMCR, &control) == 1)
 			goto start_again;
 
@@ -1307,7 +1115,7 @@ hme_reset_transceiver(struct hme *hmep)
 	while (--n > 0) {
 		if (hme_mii_read(hmep, HME_PHY_BMCR, &control) == 1) {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, XCVR_MSG,
-					xcvr_no_mii_msg);
+			    xcvr_no_mii_msg);
 			goto start_again;
 		}
 		if ((control & PHY_BMCR_RESET) == 0)
@@ -1326,7 +1134,7 @@ hme_reset_transceiver(struct hme *hmep)
 reset_issued:
 
 	HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, PHY_MSG,
-			"reset_trans: reset complete.");
+	    "reset_trans: reset complete.");
 
 	/*
 	 * Get the PHY id registers. We need this to implement work-arounds
@@ -1340,9 +1148,9 @@ reset_issued:
 	(void) hme_mii_read(hmep, HME_PHY_ANAR, &anar);
 
 	hme_init_xcvr_info(hmep);
-	HME_DEBUG_MSG6(hmep, SEVERITY_UNKNOWN, PHY_MSG,
-	"reset_trans: control = %x status = %x idr1 = %x idr2 = %x anar = %x",
-	control, stat, hmep->hme_idr1, hmep->hme_idr2, anar);
+	HME_DEBUG_MSG6(hmep, SEVERITY_UNKNOWN, PHY_MSG, "reset_trans: "
+	    "control = %x status = %x idr1 = %x idr2 = %x anar = %x",
+	    control, stat, hmep->hme_idr1, hmep->hme_idr2, anar);
 
 	hmep->hme_bmcr = control;
 	hmep->hme_anar = anar;
@@ -1355,7 +1163,7 @@ reset_issued:
 	 */
 	if (hmep->hme_transceiver == HME_INTERNAL_TRANSCEIVER) {
 		anar = (PHY_ANAR_TXFDX | PHY_ANAR_10FDX |
-			PHY_ANAR_TX | PHY_ANAR_10 | PHY_SELECTOR);
+		    PHY_ANAR_TX | PHY_ANAR_10 | PHY_SELECTOR);
 	}
 	/*
 	 * Modify control and bmsr based on anar for Rev-C of DP83840.
@@ -1416,7 +1224,7 @@ reset_issued:
 	while (--n > 0) {
 		if (hme_mii_read(hmep, HME_PHY_BMCR, &control) == 1) {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, XCVR_MSG,
-					xcvr_no_mii_msg);
+			    xcvr_no_mii_msg);
 			goto start_again; /* Transceiver does not talk MII */
 		}
 		if ((control & PHY_BMCR_ISOLATE) == 0)
@@ -1424,12 +1232,12 @@ reset_issued:
 		drv_usecwait(HMEWAITPERIOD);
 	}
 	HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, XCVR_MSG,
-			xcvr_isolate_msg);
+	    xcvr_isolate_msg);
 	goto start_again;	/* transceiver reset failure */
 
 setconn:
 	HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, PHY_MSG,
-			"reset_trans: isolate complete.");
+	    "reset_trans: isolate complete.");
 
 	/*
 	 * Work-around for the late-collision problem with 100m cables.
@@ -1439,8 +1247,8 @@ setconn:
 		(void) hme_mii_read(hmep, HME_PHY_CSC, &csc);
 
 		HME_DEBUG_MSG3(hmep, SEVERITY_NONE, LATECOLL_MSG,
-		"hme_reset_trans: CSC read = %x written = %x",
-				csc, csc | PHY_CSCR_FCONN);
+		    "hme_reset_trans: CSC read = %x written = %x",
+		    csc, csc | PHY_CSCR_FCONN);
 
 		hme_mii_write(hmep, HME_PHY_CSC, (csc | PHY_CSCR_FCONN));
 	}
@@ -1494,30 +1302,29 @@ hme_check_transceiver(struct hme *hmep)
 
 	if (hmep->hme_polling_on) {
 		HME_DEBUG_MSG2(hmep, SEVERITY_NONE, XCVR_MSG,
-				"check_trans: polling_on: cfg = %X", cfgsav);
+		    "check_trans: polling_on: cfg = %X", cfgsav);
 
 		if (hmep->hme_transceiver == HME_INTERNAL_TRANSCEIVER) {
 			if ((cfgsav & HME_MIF_CFGM1) && !hme_param_use_intphy) {
 				hme_stop_mifpoll(hmep);
 				hmep->hme_phyad = HME_EXTERNAL_PHYAD;
 				hmep->hme_transceiver =
-						HME_EXTERNAL_TRANSCEIVER;
+				    HME_EXTERNAL_TRANSCEIVER;
 				PUT_MIFREG(mif_cfg, ((cfgsav & ~HME_MIF_CFGPE)
-						| HME_MIF_CFGPS));
+				    | HME_MIF_CFGPS));
 			}
 		} else if (hmep->hme_transceiver == HME_EXTERNAL_TRANSCEIVER) {
 			stat = (GET_MIFREG(mif_bsts) >> 16);
 			if ((stat == 0x00) || (hme_param_use_intphy)) {
 				HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,
-						XCVR_MSG,
-						"Extern Transcvr Disconnected");
+				    XCVR_MSG, "Extern Transcvr Disconnected");
 
 				hme_stop_mifpoll(hmep);
 				hmep->hme_phyad = HME_INTERNAL_PHYAD;
 				hmep->hme_transceiver =
-						HME_INTERNAL_TRANSCEIVER;
-				PUT_MIFREG(mif_cfg, (GET_MIFREG(mif_cfg)
-						& ~HME_MIF_CFGPS));
+				    HME_INTERNAL_TRANSCEIVER;
+				PUT_MIFREG(mif_cfg,
+				    (GET_MIFREG(mif_cfg) & ~HME_MIF_CFGPS));
 			}
 		}
 		CHECK_MIFREG();
@@ -1525,7 +1332,7 @@ hme_check_transceiver(struct hme *hmep)
 	}
 
 	HME_DEBUG_MSG2(hmep, SEVERITY_NONE, XCVR_MSG,
-		"check_trans: polling_off: cfg = %X", cfgsav);
+	    "check_trans: polling_off: cfg = %X", cfgsav);
 
 	cfg = GET_MIFREG(mif_cfg);
 	if ((cfg & HME_MIF_CFGM1) && !hme_param_use_intphy) {
@@ -1553,22 +1360,22 @@ hme_setup_link_default(struct hme *hmep)
 	bmsr = hmep->hme_bmsr;
 	if (hme_param_autoneg & HME_NOTUSR)
 		hme_param_autoneg = HME_NOTUSR |
-					((bmsr & PHY_BMSR_ACFG) ? 1 : 0);
+		    ((bmsr & PHY_BMSR_ACFG) ? 1 : 0);
 	if (hme_param_anar_100T4 & HME_NOTUSR)
 		hme_param_anar_100T4 = HME_NOTUSR |
-					((bmsr & PHY_BMSR_100T4) ? 1 : 0);
+		    ((bmsr & PHY_BMSR_100T4) ? 1 : 0);
 	if (hme_param_anar_100fdx & HME_NOTUSR)
 		hme_param_anar_100fdx = HME_NOTUSR |
-					((bmsr & PHY_BMSR_100FDX) ? 1 : 0);
+		    ((bmsr & PHY_BMSR_100FDX) ? 1 : 0);
 	if (hme_param_anar_100hdx & HME_NOTUSR)
 		hme_param_anar_100hdx = HME_NOTUSR |
-					((bmsr & PHY_BMSR_100HDX) ? 1 : 0);
+		    ((bmsr & PHY_BMSR_100HDX) ? 1 : 0);
 	if (hme_param_anar_10fdx & HME_NOTUSR)
 		hme_param_anar_10fdx = HME_NOTUSR |
-					((bmsr & PHY_BMSR_10FDX) ? 1 : 0);
+		    ((bmsr & PHY_BMSR_10FDX) ? 1 : 0);
 	if (hme_param_anar_10hdx & HME_NOTUSR)
 		hme_param_anar_10hdx = HME_NOTUSR |
-					((bmsr & PHY_BMSR_10HDX) ? 1 : 0);
+		    ((bmsr & PHY_BMSR_10HDX) ? 1 : 0);
 }
 
 static void
@@ -1609,35 +1416,31 @@ hme_setup_link_status(struct hme *hmep)
 
 	if (hmep->hme_link_pulse_disabled) {
 		hme_param_linkup =	1;
-		hmep->hme_link_up =	1;
 		hme_param_speed =	0;
 		hme_param_mode =	0;
-		hmep->link_duplex =	1;
-		hmenotify_ind(hmep, DL_NOTE_LINK_UP);
-		hmenotify_ind(hmep, DL_NOTE_SPEED);
+		hmep->hme_duplex =	LINK_DUPLEX_HALF;
+		mac_link_update(hmep->hme_mh, LINK_STATE_UP);
 		return;
 	}
 
 	if (!hmep->hme_linkup) {
 		hme_param_linkup =	0;
-		hmep->hme_link_up =	0;
-		hmep->link_duplex = 0;
-		hmenotify_ind(hmep, DL_NOTE_LINK_DOWN);
+		hmep->hme_duplex = LINK_DUPLEX_UNKNOWN;
+		mac_link_update(hmep->hme_mh, LINK_STATE_DOWN);
 		return;
 	}
 
 	hme_param_linkup = 1;
-	hmep->hme_link_up = 1;
-	hmenotify_ind(hmep, DL_NOTE_LINK_UP);
-	hmenotify_ind(hmep, DL_NOTE_SPEED);
 
 	if (hmep->hme_fdx == HME_FULL_DUPLEX) {
 		hme_param_mode = 1;
-		hmep->link_duplex = 2;
+		hmep->hme_duplex = LINK_DUPLEX_FULL;
 	} else {
 		hme_param_mode = 0;
-		hmep->link_duplex = 1;
+		hmep->hme_duplex = LINK_DUPLEX_HALF;
 	}
+
+	mac_link_update(hmep->hme_mh, LINK_STATE_UP);
 
 	if (hmep->hme_mode == HME_FORCE_SPEED) {
 		if (hmep->hme_forcespeed == HME_SPEED_100)
@@ -1716,7 +1519,7 @@ hme_setup_link_control(struct hme *hmep)
 			hmep->hme_forcespeed = HME_SPEED_100;
 			hmep->hme_fdx = HME_HALF_DUPLEX;
 			HME_DEBUG_MSG1(hmep, SEVERITY_NONE, NAUTONEG_MSG,
-					"hme_link_control: force 100T4 hdx");
+			    "hme_link_control: force 100T4 hdx");
 
 		} else if (anar_100fdx) {
 			/* 100fdx needs to be checked first for 100BaseFX */
@@ -1727,7 +1530,7 @@ hme_setup_link_control(struct hme *hmep)
 			hmep->hme_forcespeed = HME_SPEED_100;
 			hmep->hme_fdx = HME_HALF_DUPLEX;
 			HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
-					"hme_link_control: force 100 hdx");
+			    "hme_link_control: force 100 hdx");
 		} else if (anar_10hdx) {
 			/* 10hdx needs to be checked first for MII-AUI */
 			/* MII-AUI BugIds 1252776,4032280,4035106,4028558 */
@@ -1742,7 +1545,7 @@ hme_setup_link_control(struct hme *hmep)
 			hmep->hme_forcespeed = HME_SPEED_10;
 			hmep->hme_fdx = HME_HALF_DUPLEX;
 			HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
-					"hme_link_control: force 10 hdx");
+			    "hme_link_control: force 10 hdx");
 		}
 	}
 }
@@ -1795,7 +1598,7 @@ hme_check_link(void *arg)
 	hme_stop_timer(hmep);	/* acquire hme_linklock */
 
 	HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, XCVR_MSG,
-			"link_check entered:");
+	    "link_check entered:");
 	/*
 	 * This condition was added to work around for
 	 * a problem with the Synoptics/Bay 28115 switch.
@@ -1830,8 +1633,7 @@ hme_check_link(void *arg)
 	    (hmep->hme_linkup) && (hme_check_txhung(hmep))) {
 
 		HME_DEBUG_MSG1(hmep, SEVERITY_LOW, XCVR_MSG,
-				"txhung: re-init MAC");
-		hme_reinit_txhung++;
+		    "txhung: re-init MAC");
 		hme_start_timer(hmep, hme_check_link, HME_LINKCHECK_TIMER);
 		(void) hmeinit(hmep);	/* To reset the transceiver and */
 					/* to init the interface */
@@ -1849,16 +1651,15 @@ hme_check_link(void *arg)
 		if (temp != hmep->hme_transceiver) {
 			if (hmep->hme_transceiver == HME_EXTERNAL_TRANSCEIVER) {
 				HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN,
-					XCVR_MSG, ext_xcvr_msg);
+				    XCVR_MSG, ext_xcvr_msg);
 			} else {
 				HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN,
-					XCVR_MSG, int_xcvr_msg);
+				    XCVR_MSG, int_xcvr_msg);
 			}
 		}
 		hmep->hme_linkcheck = 0;
 		hme_start_timer(hmep, hme_check_link, HME_LINKCHECK_TIMER);
-		(void) hmeinit(hmep); /* To reset the transceiver and */
-					/* to init the interface */
+		(void) hmeinit(hmep); /* To reset xcvr and init interface */
 		return;
 	}
 
@@ -1868,23 +1669,22 @@ hme_check_link(void *arg)
 
 		CHECK_MIFREG(); /* Verify */
 		HME_DEBUG_MSG4(hmep, SEVERITY_UNKNOWN, MIFPOLL_MSG,
-				"int_flag = %X old_stat = %X stat = %X",
-			hmep->hme_mifpoll_flag, hmep->hme_mifpoll_data, stat);
+		    "int_flag = %X old_stat = %X stat = %X",
+		    hmep->hme_mifpoll_flag, hmep->hme_mifpoll_data, stat);
 
 		if (!hmep->hme_mifpoll_flag) {
 			if (stat & PHY_BMSR_LNKSTS) {
 				hme_start_timer(hmep, hme_check_link,
-							HME_LINKCHECK_TIMER);
+				    HME_LINKCHECK_TIMER);
 				return;
 			}
 			HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, MIFPOLL_MSG,
-				"hme_check_link:DOWN polled data = %X\n", stat);
+			    "hme_check_link:DOWN polled data = %X\n", stat);
 			hme_stop_mifpoll(hmep);
 
 			temp = (GET_MIFREG(mif_bsts) >> 16);
 			HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, MIFPOLL_MSG,
-				"hme_check_link:after poll-stop: stat = %X",
-									temp);
+			    "hme_check_link:after poll-stop: stat = %X", temp);
 		} else {
 			hmep->hme_mifpoll_flag = 0;
 		}
@@ -1892,36 +1692,35 @@ hme_check_link(void *arg)
 		if (hme_mii_read(hmep, HME_PHY_BMSR, &stat) == 1) {
 		/* Transceiver does not talk mii */
 			hme_start_timer(hmep, hme_check_link,
-					HME_LINKCHECK_TIMER);
+			    HME_LINKCHECK_TIMER);
 			return;
 		}
 
 		if (stat & PHY_BMSR_LNKSTS) {
 			hme_start_timer(hmep, hme_check_link,
-					HME_LINKCHECK_TIMER);
+			    HME_LINKCHECK_TIMER);
 			return;
 		}
 	}
 	HME_DEBUG_MSG3(hmep, SEVERITY_UNKNOWN, MIFPOLL_MSG,
-			"mifpoll_flag = %x first stat = %X",
-			hmep->hme_mifpoll_flag, stat);
+	    "mifpoll_flag = %x first stat = %X", hmep->hme_mifpoll_flag, stat);
 
 	(void) hme_mii_read(hmep, HME_PHY_BMSR, &stat);
 	HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, MIFPOLL_MSG,
-			"second stat = %X", stat);
+	    "second stat = %X", stat);
+
 	/*
 	 * The PHY may have automatically renegotiated link speed and mode.
 	 * Get the new link speed and mode.
 	 */
 	if ((stat & PHY_BMSR_LNKSTS) && hme_autoneg_enable) {
 		if (hmep->hme_mode == HME_AUTO_SPEED) {
-			hmep->hme_linkup_msg = 1;
 			(void) hme_get_autoinfo(hmep);
 			hme_setup_link_status(hmep);
 			hme_start_mifpoll(hmep);
 			if (hmep->hme_fdx != hmep->hme_macfdx) {
 				hme_start_timer(hmep, hme_check_link,
-						HME_LINKCHECK_TIMER);
+				    HME_LINKCHECK_TIMER);
 				(void) hmeinit(hmep);
 				return;
 			}
@@ -1930,8 +1729,6 @@ hme_check_link(void *arg)
 		hme_start_timer(hmep, hme_check_link, HME_LINKCHECK_TIMER);
 		return;
 	}
-	hmep->hme_linkup_msg = 1; /* Enable display of messages */
-
 	/* Reset the PHY and bring up the link */
 	hme_reset_transceiver(hmep);
 }
@@ -1943,31 +1740,6 @@ hme_init_xcvr_info(struct hme *hmep)
 
 	(void) hme_mii_read(hmep, HME_PHY_IDR1, &phy_id1);
 	(void) hme_mii_read(hmep, HME_PHY_IDR2, &phy_id2);
-
-	hmep->xcvr_vendor_id = ((phy_id1 << 0x6) | (phy_id2 >> 10));
-	hmep->xcvr_dev_id = (phy_id2 >>4) & 0x3f;
-	hmep->xcvr_dev_rev =  (phy_id2 & 0xf);
-}
-
-static void
-hme_display_transceiver(struct hme *hmep)
-{
-	switch (hmep->hme_transceiver) {
-	case HME_INTERNAL_TRANSCEIVER:
-		ddi_dev_report_fault(hmep->dip, DDI_SERVICE_RESTORED,
-			DDI_DEVICE_FAULT, int_xcvr_msg);
-		break;
-
-	case HME_EXTERNAL_TRANSCEIVER:
-		ddi_dev_report_fault(hmep->dip, DDI_SERVICE_RESTORED,
-			DDI_EXTERNAL_FAULT, ext_xcvr_msg);
-		break;
-
-	default:
-		ddi_dev_report_fault(hmep->dip, DDI_SERVICE_DEGRADED,
-			DDI_EXTERNAL_FAULT, no_xcvr_msg);
-		break;
-	}
 }
 
 /*
@@ -1983,15 +1755,13 @@ hme_disable_link_pulse(struct hme *hmep)
 	(void) hme_mii_read(hmep, HME_PHY_NICR, &nicr);
 
 	HME_DEBUG_MSG3(hmep, SEVERITY_NONE, LINKPULSE_MSG,
-			"hme_disable_link_pulse: NICR read = %x written = %x",
-			nicr, nicr & ~PHY_NICR_LD);
+	    "hme_disable_link_pulse: NICR read = %x written = %x",
+	    nicr, nicr & ~PHY_NICR_LD);
 
 	hme_mii_write(hmep, HME_PHY_NICR, (nicr & ~PHY_NICR_LD));
 
 	hmep->hme_linkup = 1;
 	hmep->hme_linkcheck = 1;
-	hme_display_transceiver(hmep);
-	hme_display_linkup(hmep, HME_SPEED_10);
 	hme_setup_link_status(hmep);
 	hme_start_mifpoll(hmep);
 	hme_start_timer(hmep, hme_check_link, HME_LINKCHECK_TIMER);
@@ -2005,9 +1775,6 @@ hme_force_speed(void *arg)
 	uint_t		temp;
 	uint16_t	csc;
 
-	HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, PROP_MSG,
-			"hme_force_speed entered");
-
 	hme_stop_timer(hmep);
 	if (hmep->hme_fdx != hmep->hme_macfdx) {
 		hme_start_timer(hmep, hme_check_link, HME_TICKS*5);
@@ -2018,17 +1785,17 @@ hme_force_speed(void *arg)
 	if (temp != hmep->hme_transceiver) {
 		if (hmep->hme_transceiver == HME_EXTERNAL_TRANSCEIVER) {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, XCVR_MSG,
-					ext_xcvr_msg);
+			    ext_xcvr_msg);
 		} else {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, XCVR_MSG,
-					int_xcvr_msg);
+			    int_xcvr_msg);
 		}
 		hme_start_timer(hmep, hme_check_link, HME_TICKS * 10);
 		return;
 	}
 
 	if ((hmep->hme_transceiver == HME_INTERNAL_TRANSCEIVER) &&
-					(hmep->hme_link_pulse_disabled)) {
+	    (hmep->hme_link_pulse_disabled)) {
 		hmep->hme_forcespeed = HME_SPEED_10;
 		hme_disable_link_pulse(hmep);
 		return;
@@ -2045,13 +1812,13 @@ hme_force_speed(void *arg)
 			hme_mii_write(hmep, HME_PHY_BMCR, PHY_BMCR_100M);
 			(void) hme_mii_read(hmep, HME_PHY_CSC, &csc);
 			hme_mii_write(hmep, HME_PHY_CSC,
-						(csc | PHY_CSCR_TXOFF));
+			    (csc | PHY_CSCR_TXOFF));
 			hme_start_timer(hmep, hme_force_speed, 10 * HME_TICKS);
 			return;
 		} else if (hmep->hme_force_linkdown == HME_LINKDOWN_STARTED) {
 			(void) hme_mii_read(hmep, HME_PHY_CSC, &csc);
 			hme_mii_write(hmep, HME_PHY_CSC,
-						(csc & ~PHY_CSCR_TXOFF));
+			    (csc & ~PHY_CSCR_TXOFF));
 			hmep->hme_force_linkdown = HME_LINKDOWN_DONE;
 		}
 	} else {
@@ -2066,10 +1833,9 @@ hme_force_speed(void *arg)
 		(void) hme_mii_read(hmep, HME_PHY_ANLPAR, &anlpar);
 		(void) hme_mii_read(hmep, HME_PHY_ANAR, &anar);
 		HME_DEBUG_MSG5(hmep, SEVERITY_NONE, XCVR_MSG,
-				"hme_force_speed: begin:control ="
-				"  %X stat = %X aner = %X anar = %X"
-				" anlpar = %X",
-				control, stat, aner, anar, anlpar);
+		    "hme_force_speed: begin:control ="
+		    "  %X stat = %X aner = %X anar = %X anlpar = %X",
+		    control, stat, aner, anar, anlpar);
 	}
 #endif
 			hmep->hme_force_linkdown = HME_LINKDOWN_STARTED;
@@ -2099,20 +1865,17 @@ hme_force_speed(void *arg)
 		(void) hme_mii_read(hmep, HME_PHY_ANLPAR, &anlpar);
 		(void) hme_mii_read(hmep, HME_PHY_ANAR, &anar);
 		HME_DEBUG_MSG5(hmep, SEVERITY_NONE, XCVR_MSG,
-				"hme_force_speed:end: control ="
-				"%X stat = %X aner = %X anar = %X anlpar = %X",
-				control, stat, aner, anar, anlpar);
+		    "hme_force_speed:end: control ="
+		    "%X stat = %X aner = %X anar = %X anlpar = %X",
+		    control, stat, aner, anar, anlpar);
 	}
 #endif
 		hmep->hme_linkup = 1;
 		hmep->hme_linkcheck = 1;
 		hmep->hme_ifspeed = hmep->hme_forcespeed;
 		hme_link_now_up(hmep);
-		hme_display_transceiver(hmep);
-		hme_display_linkup(hmep, hmep->hme_forcespeed);
 		hme_setup_link_status(hmep);
 		hme_start_mifpoll(hmep);
-		hmep->hme_linkup_msg = 1; /* Enable display of messages */
 		hme_start_timer(hmep, hme_check_link, HME_LINKCHECK_TIMER);
 	} else {
 		hme_start_timer(hmep, hme_force_speed, HME_TICKS);
@@ -2133,15 +1896,15 @@ hme_get_autoinfo(struct hme *hmep)
 	(void) hme_mii_read(hmep, HME_PHY_ANAR, &anar);
 
 	HME_DEBUG_MSG4(hmep, SEVERITY_NONE, AUTONEG_MSG,
-	"autoinfo: aner = %X anar = %X anlpar = %X", aner, anar, anlpar);
+	    "autoinfo: aner = %X anar = %X anlpar = %X", aner, anar, anlpar);
 
 	hmep->hme_anlpar = anlpar;
 	hmep->hme_aner = aner;
 
 	if (aner & PHY_ANER_LPNW) {
 
-			HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-			"hme_try_autoneg: Link Partner AN able");
+		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
+		    "hme_try_autoneg: Link Partner AN able");
 
 		tmp = anar & anlpar;
 		if (tmp & PHY_ANAR_TXFDX) {
@@ -2160,14 +1923,14 @@ hme_get_autoinfo(struct hme *hmep)
 			if (HME_DP83840) {
 
 				HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,
-						AUTONEG_MSG,
-			"hme_try_autoneg: anar not set with speed selection");
+				    AUTONEG_MSG, "hme_try_autoneg: "
+				    "anar not set with speed selection");
 
 				hmep->hme_fdx = HME_HALF_DUPLEX;
 				(void) hme_mii_read(hmep, HME_PHY_AR, &ar);
 
-				HME_DEBUG_MSG2(hmep, SEVERITY_NONE, AUTONEG_MSG,
-						"ar = %X", ar);
+				HME_DEBUG_MSG2(hmep, SEVERITY_NONE,
+				    AUTONEG_MSG, "ar = %X", ar);
 
 				if (ar & PHY_AR_SPEED10)
 					hmep->hme_tryspeed = HME_SPEED_10;
@@ -2175,13 +1938,13 @@ hme_get_autoinfo(struct hme *hmep)
 					hmep->hme_tryspeed = HME_SPEED_100;
 			} else
 				HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN,
-						AUTONEG_MSG, anar_not_set_msg);
+				    AUTONEG_MSG, anar_not_set_msg);
 		}
 		HME_DEBUG_MSG2(hmep, SEVERITY_NONE, AUTONEG_MSG,
-				" hme_try_autoneg: fdx = %d", hmep->hme_fdx);
+		    " hme_try_autoneg: fdx = %d", hmep->hme_fdx);
 	} else {
 		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-				" hme_try_autoneg: parallel detection done");
+		    " hme_try_autoneg: parallel detection done");
 
 		hmep->hme_fdx = HME_HALF_DUPLEX;
 		if (anlpar & PHY_ANLPAR_TX)
@@ -2191,13 +1954,14 @@ hme_get_autoinfo(struct hme *hmep)
 		else {
 			if (HME_DP83840) {
 				HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,
-						AUTONEG_MSG,
-" hme_try_autoneg: parallel detection: anar not set with speed selection");
+				    AUTONEG_MSG, " hme_try_autoneg: "
+				    "parallel detection: "
+				    "anar not set with speed selection");
 
 				(void) hme_mii_read(hmep, HME_PHY_AR, &ar);
 
-				HME_DEBUG_MSG2(hmep, SEVERITY_NONE, AUTONEG_MSG,
-						"ar = %X", ar);
+				HME_DEBUG_MSG2(hmep, SEVERITY_NONE,
+				    AUTONEG_MSG, "ar = %X", ar);
 
 				if (ar & PHY_AR_SPEED10)
 					hmep->hme_tryspeed = HME_SPEED_10;
@@ -2205,8 +1969,7 @@ hme_get_autoinfo(struct hme *hmep)
 					hmep->hme_tryspeed = HME_SPEED_100;
 			} else
 				HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN,
-						AUTONEG_MSG,
-						par_detect_anar_not_set_msg);
+				    AUTONEG_MSG, par_detect_anar_not_set_msg);
 		}
 	}
 
@@ -2214,8 +1977,6 @@ hme_get_autoinfo(struct hme *hmep)
 	hmep->hme_linkcheck = 1;
 	hmep->hme_ifspeed = hmep->hme_tryspeed;
 	hme_link_now_up(hmep);
-	hme_display_transceiver(hmep);
-	hme_display_linkup(hmep, hmep->hme_tryspeed);
 }
 
 /*
@@ -2245,9 +2006,9 @@ hme_try_auto_negotiation(struct hme *hmep)
 		if ((stat & PHY_BMSR_ACFG) == 0) { /* auto neg. not supported */
 
 			HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
-					" PHY status reg = %X", stat);
+			    " PHY status reg = %X", stat);
 			HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, NAUTONEG_MSG,
-					" Auto-negotiation not supported");
+			    " Auto-negotiation not supported");
 
 			return (hmep->hme_autoneg = HME_HWAN_FAILED);
 		}
@@ -2305,51 +2066,49 @@ hme_try_auto_negotiation(struct hme *hmep)
 		}
 #ifdef	HME_AUTONEG_DEBUG
 		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-				"Auto-negotiation not completed in 5 seconds");
+		    "Auto-negotiation not completed in 5 seconds");
 		HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-				" PHY status reg = %X", stat);
+		    " PHY status reg = %X", stat);
 
 		hme_mii_read(hmep, HME_PHY_BMCR, &control);
 		HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-				" PHY control reg = %x", control);
+		    " PHY control reg = %x", control);
 
 		hme_mii_read(hmep, HME_PHY_ANAR, &anar);
 		HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-				" PHY anar reg = %x", anar);
+		    " PHY anar reg = %x", anar);
 
 		hme_mii_read(hmep, HME_PHY_ANER, &aner);
 		HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-				" PHY aner reg = %x", aner);
+		    " PHY aner reg = %x", aner);
 
 		hme_mii_read(hmep, HME_PHY_ANLPAR, &anlpar);
 		HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-				" PHY anlpar reg = %x", anlpar);
+		    " PHY anlpar reg = %x", anlpar);
 #endif
 		if (HME_DP83840) {
 			(void) hme_mii_read(hmep, HME_PHY_ANER, &aner);
 			if (aner & PHY_ANER_MLF) {
 
 				HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,
-					AUTONEG_MSG,
-					" hme_try_autoneg: MLF Detected"
-					" after 5 seconds");
+				    AUTONEG_MSG,
+				    " hme_try_autoneg: MLF Detected"
+				    " after 5 seconds");
 
-				hmep->hme_linkup_msg = 1;
 				return (hmep->hme_autoneg = HME_HWAN_FAILED);
 			}
 		}
 
-		hmep->hme_linkup_msg = 1; /* Enable display of messages */
 		goto hme_anfail;
 	}
 
 	HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-	"Auto-negotiation completed within %d 100ms time", hmep->hme_delay);
+	    "Auto-negotiate completed within %d 100ms time", hmep->hme_delay);
 
 	(void) hme_mii_read(hmep, HME_PHY_ANER, &aner);
 	if (aner & PHY_ANER_MLF) {
 		HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-				par_detect_msg);
+		    par_detect_msg);
 		goto hme_anfail;
 	}
 
@@ -2363,7 +2122,7 @@ hme_try_auto_negotiation(struct hme *hmep)
 			return (hmep->hme_autoneg = HME_HWAN_INPROGRESS);
 		}
 		HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-			"Link not Up in 10 seconds: stat = %X", stat);
+		    "Link not Up in 10 seconds: stat = %X", stat);
 		goto hme_anfail;
 	} else {
 		hmep->hme_bmsr |= (PHY_BMSR_LNKSTS);
@@ -2379,7 +2138,7 @@ hme_try_auto_negotiation(struct hme *hmep)
 
 hme_anfail:
 	HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, AUTONEG_MSG,
-			"Retry Auto-negotiation.");
+	    "Retry Auto-negotiation.");
 	hme_start_timer(hmep, hme_try_speed, HME_TICKS);
 	return (hmep->hme_autoneg = HME_HWAN_TRY);
 }
@@ -2411,17 +2170,17 @@ hme_try_speed(void *arg)
 	if (temp != hmep->hme_transceiver) {
 		if (hmep->hme_transceiver == HME_EXTERNAL_TRANSCEIVER) {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, XCVR_MSG,
-					ext_xcvr_msg);
+			    ext_xcvr_msg);
 		} else {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, XCVR_MSG,
-					int_xcvr_msg);
+			    int_xcvr_msg);
 		}
 		hme_start_timer(hmep, hme_check_link, 10 * HME_TICKS);
 		return;
 	}
 
 	if ((hmep->hme_transceiver == HME_INTERNAL_TRANSCEIVER) &&
-					(hmep->hme_link_pulse_disabled)) {
+	    (hmep->hme_link_pulse_disabled)) {
 		hmep->hme_tryspeed = HME_SPEED_10;
 		hme_disable_link_pulse(hmep);
 		return;
@@ -2446,12 +2205,10 @@ hme_try_speed(void *arg)
 				hmep->hme_linkup = 1;
 				hmep->hme_linkcheck = 1;
 				hme_link_now_up(hmep);
-				hme_display_transceiver(hmep);
-				hme_display_linkup(hmep, HME_SPEED_100);
 				hme_setup_link_status(hmep);
 				hme_start_mifpoll(hmep);
 				hme_start_timer(hmep, hme_check_link,
-							HME_LINKCHECK_TIMER);
+				    HME_LINKCHECK_TIMER);
 				if (hmep->hme_fdx != hmep->hme_macfdx)
 					(void) hmeinit(hmep);
 			} else
@@ -2466,24 +2223,22 @@ hme_try_speed(void *arg)
 					hmep->hme_linkup = 1;
 					hmep->hme_linkcheck = 1;
 					hmep->hme_ifspeed = HME_SPEED_10;
-					hme_display_transceiver(hmep);
-					hme_display_linkup(hmep, HME_SPEED_10);
 					hme_setup_link_status(hmep);
 					hme_start_mifpoll(hmep);
 					hme_start_timer(hmep, hme_check_link,
-							HME_LINKCHECK_TIMER);
+					    HME_LINKCHECK_TIMER);
 					if (hmep->hme_fdx != hmep->hme_macfdx)
 						(void) hmeinit(hmep);
 				} else {
 					hmep->hme_linkup_10 = 1;
 					hmep->hme_tryspeed = HME_SPEED_100;
 					hmep->hme_force_linkdown =
-							HME_FORCE_LINKDOWN;
+					    HME_FORCE_LINKDOWN;
 					hmep->hme_linkup_cnt = 0;
 					hmep->hme_ntries = HME_NTRIES_LOW;
 					hmep->hme_nlasttries = HME_NTRIES_LOW;
 					hme_start_timer(hmep,
-						hme_try_speed, HME_TICKS);
+					    hme_try_speed, HME_TICKS);
 				}
 
 			} else
@@ -2491,7 +2246,7 @@ hme_try_speed(void *arg)
 			break;
 		default:
 			HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, XCVR_MSG,
-					"Default: Try speed");
+			    "Default: Try speed");
 			break;
 		}
 		return;
@@ -2512,7 +2267,7 @@ hme_try_speed(void *arg)
 			break;
 		default:
 			HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, XCVR_MSG,
-					"Default: Try speed");
+			    "Default: Try speed");
 			break;
 		}
 	}
@@ -2528,9 +2283,8 @@ hme_link_now_up(struct hme *hmep)
 	 * chip and Synoptics 28115 switch.
 	 * Addition Interface Technologies Group (NPG) 8/28/1997.
 	 */
-	if ((HME_QS6612) &&
-		((hmep->hme_tryspeed  == HME_SPEED_100) ||
-		(hmep->hme_forcespeed == HME_SPEED_100))) {
+	if ((HME_QS6612) && ((hmep->hme_tryspeed  == HME_SPEED_100) ||
+	    (hmep->hme_forcespeed == HME_SPEED_100))) {
 		/*
 		 * Addition of a check for 'hmep->hme_forcespeed'
 		 * This is necessary when the autonegotiation is
@@ -2540,7 +2294,7 @@ hme_link_now_up(struct hme *hmep)
 		 */
 		if (hme_mii_read(hmep, HME_PHY_BTXPC, &btxpc) == 0) {
 			hme_mii_write(hmep, HME_PHY_BTXPC,
-				(btxpc | PHY_BTXPC_DSCRAM));
+			    (btxpc | PHY_BTXPC_DSCRAM));
 			drv_usecwait(20);
 			hme_mii_write(hmep, HME_PHY_BTXPC, btxpc);
 		}
@@ -2553,13 +2307,9 @@ _init(void)
 {
 	int	status;
 
-	mutex_init(&hmeautolock, NULL, MUTEX_DRIVER, NULL);
-	mutex_init(&hmelock, NULL, MUTEX_DRIVER, NULL);
-
-	status = mod_install(&modlinkage);
-	if (status != 0) {
-		mutex_destroy(&hmelock);
-		mutex_destroy(&hmeautolock);
+	mac_init_ops(&hme_dev_ops, "hme");
+	if ((status = mod_install(&modlinkage)) != 0) {
+		mac_fini_ops(&hme_dev_ops);
 	}
 	return (status);
 }
@@ -2569,19 +2319,11 @@ _fini(void)
 {
 	int	status;
 
-	status = mod_remove(&modlinkage);
-	if (status != 0)
-		return (status);
-
-	if (init_once) {
-		mutex_destroy(&hmewenlock);
-		rw_destroy(&hmestruplock);
+	if ((status = mod_remove(&modlinkage)) == 0) {
+		mac_fini_ops(&hme_dev_ops);
 	}
-	mutex_destroy(&hmelock);
-	mutex_destroy(&hmeautolock);
 	return (status);
 }
-
 
 int
 _info(struct modinfo *modinfop)
@@ -2625,11 +2367,6 @@ _info(struct modinfo *modinfop)
 #define	CHECK_DMA(handle) \
 	hme_check_dma_handle(__FILE__, __LINE__, hmep, (handle))
 
-#define	HMESAPMATCH(sap, type, flags) ((sap == type) ? 1 : \
-	((flags & HMESALLSAP) ? 1 : \
-	((sap <= ETHERMTU) && (sap >= (t_uscalar_t)0) && \
-	(type <= ETHERMTU)) ? 1 : 0))
-
 /*
  * Ethernet broadcast address definition.
  */
@@ -2640,56 +2377,21 @@ static	struct ether_addr	etherbroadcastaddr = {
 /*
  * MIB II broadcast/multicast packets
  */
-#define	IS_BROADCAST(ehp) \
-		(ether_cmp(&ehp->ether_dhost, &etherbroadcastaddr) == 0)
-#define	IS_MULTICAST(ehp) \
-		((ehp->ether_dhost.ether_addr_octet[0] & 01) == 1)
-#define	BUMP_InNUcast(hmep, ehp) \
-		if (IS_BROADCAST(ehp)) { \
+#define	IS_BROADCAST(pkt) (bcmp(pkt, &etherbroadcastaddr, ETHERADDRL) == 0)
+#define	IS_MULTICAST(pkt) ((pkt[0] & 01) == 1)
+#define	BUMP_InNUcast(hmep, pkt) \
+		if (IS_BROADCAST(pkt)) { \
 			hmep->hme_brdcstrcv++; \
-		} else if (IS_MULTICAST(ehp)) { \
+		} else if (IS_MULTICAST(pkt)) { \
 			hmep->hme_multircv++; \
 		}
-#define	BUMP_OutNUcast(hmep, ehp) \
-		if (IS_BROADCAST(ehp)) { \
+#define	BUMP_OutNUcast(hmep, pkt) \
+		if (IS_BROADCAST(pkt)) { \
 			hmep->hme_brdcstxmt++; \
-		} else if (IS_MULTICAST(ehp)) { \
+		} else if (IS_MULTICAST(pkt)) { \
 			hmep->hme_multixmt++; \
 		}
 
-/*
- * Linked list of hme structures - one per card.
- */
-static struct hme *hmeup = NULL;
-
-/*
- * force the fallback to ddi_dma routines
- */
-
-/*
- * Our DL_INFO_ACK template.
- */
-static	dl_info_ack_t hmeinfoack = {
-	DL_INFO_ACK,				/* dl_primitive */
-	ETHERMTU,				/* dl_max_sdu */
-	0,					/* dl_min_sdu */
-	HMEADDRL,				/* dl_addr_length */
-	DL_ETHER,				/* dl_mac_type */
-	0,					/* dl_reserved */
-	0,					/* dl_current_state */
-	-2,					/* dl_sap_length */
-	DL_CLDLS,				/* dl_service_mode */
-	0,					/* dl_qos_length */
-	0,					/* dl_qos_offset */
-	0,					/* dl_range_length */
-	0,					/* dl_range_offset */
-	DL_STYLE2,				/* dl_provider_style */
-	sizeof (dl_info_ack_t),			/* dl_addr_offset */
-	DL_VERSION_2,				/* dl_version */
-	ETHERADDRL,				/* dl_brdcst_addr_length */
-	sizeof (dl_info_ack_t) + HMEADDRL,	/* dl_brdcst_addr_offset */
-	0					/* dl_growth */
-};
 
 static int
 hme_create_prop_from_kw(dev_info_t *dip, char *vpdname, char *vpdstr)
@@ -2718,23 +2420,23 @@ hme_create_prop_from_kw(dev_info_t *dip, char *vpdname, char *vpdstr)
 		if (strcmp(propstr, "local-mac-address") == 0) {
 			for (i = 0; i < ETHERADDRL; i++)
 				local_mac.ether_addr_octet[i] =
-					(uchar_t)vpdstr[i];
+				    (uchar_t)vpdstr[i];
 			if (ddi_prop_create(DDI_DEV_T_NONE, dip,
-				DDI_PROP_CANSLEEP, propstr,
-				(char *)local_mac.ether_addr_octet, ETHERADDRL)
-				!= DDI_SUCCESS) {
+			    DDI_PROP_CANSLEEP, propstr,
+			    (char *)local_mac.ether_addr_octet, ETHERADDRL)
+			    != DDI_SUCCESS) {
 				HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,
-				AUTOCONFIG_MSG, "hme_create_newvpd_props: \
-				ddi_prop_create error");
+				    AUTOCONFIG_MSG, "hme_create_newvpd_props: "
+				    "ddi_prop_create error");
 				return (DDI_FAILURE);
 			}
 		} else {
 			if (ddi_prop_create(DDI_DEV_T_NONE, dip,
-				DDI_PROP_CANSLEEP, propstr,
-				vpdstr, strlen(vpdstr)+1) != DDI_SUCCESS) {
+			    DDI_PROP_CANSLEEP, propstr, vpdstr,
+			    strlen(vpdstr)+1) != DDI_SUCCESS) {
 				HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,
-				AUTOCONFIG_MSG, "hme_create_newvpd_props: \
-				ddi_prop_create error");
+				    AUTOCONFIG_MSG, "hme_create_newvpd_props: "
+				    "ddi_prop_create error");
 				return (DDI_FAILURE);
 			}
 		}
@@ -2778,16 +2480,16 @@ hme_get_oldvpd_props(dev_info_t *dip, int vpd_base)
 		kw_fieldstr[i] = '\0';
 		if (hme_create_prop_from_kw(dip, kw_namestr, kw_fieldstr)) {
 			HME_DEBUG_MSG2(hmep, SEVERITY_NONE, CONFIG_MSG,
-				"cannot create_prop_from_kw %s", kw_namestr);
+			    "cannot create_prop_from_kw %s", kw_namestr);
 			return (DDI_FAILURE);
 		}
 		kw_ptr += kw_len;
 	} /* next keyword */
 
-	if (ddi_prop_create(DDI_DEV_T_NONE, dip, DDI_PROP_CANSLEEP,
-	"model", "SUNW,cheerio", strlen("SUNW,cheerio")+1) != DDI_SUCCESS) {
+	if (ddi_prop_create(DDI_DEV_T_NONE, dip, DDI_PROP_CANSLEEP, "model",
+	    "SUNW,cheerio", strlen("SUNW,cheerio")+1) != DDI_SUCCESS) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_NONE, AUTOCONFIG_MSG,
-			"hme_get_oldvpd model: ddi_prop_create error");
+		    "hme_get_oldvpd model: ddi_prop_create error");
 		return (DDI_FAILURE);
 	}
 	return (0);
@@ -2812,15 +2514,15 @@ hme_get_newvpd_props(dev_info_t *dip, int vpd_base)
 	maxvpdsize = 1024; /* Real size not known until after it is read */
 
 	vpd_start = (int)((GET_ROM8(&(hmep->hme_romp[vpd_base+1])) & 0xff) |
-		((GET_ROM8(&hmep->hme_romp[vpd_base+2]) & 0xff) << 8)) +3;
+	    ((GET_ROM8(&hmep->hme_romp[vpd_base+2]) & 0xff) << 8)) +3;
 	vpd_start = vpd_base + vpd_start;
 	while (vpd_start < (vpd_base + maxvpdsize)) { /* Get all VPDs */
 		if ((GET_ROM8(&hmep->hme_romp[vpd_start]) & 0xff) != 0x90) {
 			break; /* no VPD found */
 		} else {
 			vpd_len = (int)((GET_ROM8(&hmep->hme_romp[vpd_start
-			+ 1]) & 0xff) | (GET_ROM8(&hmep->hme_romp[vpd_start
-			+ 2]) & 0xff) << 8);
+			    + 1]) & 0xff) | (GET_ROM8(&hmep->hme_romp[vpd_start
+			    + 2]) & 0xff) << 8);
 		}
 		/* Get all keywords in this VPD */
 		kw_start = vpd_start + 3; /* Location of 1st keyword */
@@ -2829,14 +2531,14 @@ hme_get_newvpd_props(dev_info_t *dip, int vpd_base)
 			kw_namestr[0] = GET_ROM8(&hmep->hme_romp[kw_ptr]);
 			kw_namestr[1] = GET_ROM8(&hmep->hme_romp[kw_ptr+1]);
 			kw_namestr[2] = '\0';
-			kw_len = (int)(GET_ROM8(&hmep->hme_romp[kw_ptr+2]) &
-			0xff);
+			kw_len =
+			    (int)(GET_ROM8(&hmep->hme_romp[kw_ptr+2]) & 0xff);
 			for (i = 0, kw_ptr += 3; i < kw_len; i++)
-				kw_fieldstr[i] = GET_ROM8
-					(&hmep->hme_romp[kw_ptr+i]);
+				kw_fieldstr[i] =
+				    GET_ROM8(&hmep->hme_romp[kw_ptr+i]);
 			kw_fieldstr[i] = '\0';
 			if (hme_create_prop_from_kw(dip, kw_namestr,
-				kw_fieldstr)) {
+			    kw_fieldstr)) {
 				HME_DEBUG_MSG2(hmep, SEVERITY_NONE, CONFIG_MSG,
 				"cannot create_prop_from_kw %s", kw_namestr);
 				return (DDI_FAILURE);
@@ -2873,18 +2575,14 @@ hme_get_vpd_props(dev_info_t *dip)
 
 	epromsrchlimit = 4096;
 	for (i = 2; i < epromsrchlimit; i++) {
-		if ((GET_ROM8(&(hmep->hme_romp[i]))
-			& 0xff) == 0x50)	/* 'P' */
-		if ((GET_ROM8(&(hmep->hme_romp[i+1]))
-			& 0xff) == 0x43)	/* 'C' */
-		if ((GET_ROM8(&(hmep->hme_romp[i+2]))
-			& 0xff) == 0x49)	/* 'I' */
-		if ((GET_ROM8(&(hmep->hme_romp[i+3]))
-			& 0xff) == 0x52) {	/* 'R' */
-		vpd_base = (int)((GET_ROM8(&(hmep->hme_romp[i+8]))
-			& 0xff) |
-				(GET_ROM8(&(hmep->hme_romp[i+9]))
-			& 0xff) << 8);
+		/* "PCIR" */
+		if (((GET_ROM8(&(hmep->hme_romp[i])) & 0xff) == 'P') &&
+		    ((GET_ROM8(&(hmep->hme_romp[i+1])) & 0xff) == 'C') &&
+		    ((GET_ROM8(&(hmep->hme_romp[i+2])) & 0xff) == 'I') &&
+		    ((GET_ROM8(&(hmep->hme_romp[i+3])) & 0xff) == 'R')) {
+			vpd_base =
+			    (int)((GET_ROM8(&(hmep->hme_romp[i+8])) & 0xff) |
+			    (GET_ROM8(&(hmep->hme_romp[i+9])) & 0xff) << 8);
 			break; /* VPD pointer found */
 		}
 	}
@@ -2942,9 +2640,9 @@ hmeget_promprops(dev_info_t *dip)
 	 * map configuration space
 	 */
 	if (ddi_regs_map_setup(hmep->dip, 0, (caddr_t *)&cfg_ptr,
-			0, 0, &hmep->hme_dev_attr, &cfg_handle)) {
+	    0, 0, &hmep->hme_dev_attr, &cfg_handle)) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, AUTOCONFIG_MSG,
-			"ddi_map_regs for config space failed");
+		    "ddi_map_regs for config space failed");
 		return (DDI_FAILURE);
 	}
 
@@ -2952,8 +2650,8 @@ hmeget_promprops(dev_info_t *dip)
 	 * Enable bus-master and memory accesses
 	 */
 	ddi_put16(cfg_handle, &cfg_ptr->command,
-		PCI_COMM_SERR_ENABLE | PCI_COMM_PARITY_DETECT |
-		PCI_COMM_MAE | PCI_COMM_ME);
+	    PCI_COMM_SERR_ENABLE | PCI_COMM_PARITY_DETECT |
+	    PCI_COMM_MAE | PCI_COMM_ME);
 
 	/*
 	 * Enable rom accesses
@@ -2963,9 +2661,9 @@ hmeget_promprops(dev_info_t *dip)
 
 
 	if (ddi_regs_map_setup(dip, 2, (caddr_t *)&(hmep->hme_romp), 0, 0,
-				&hmep->hme_dev_attr, &hmep->hme_romh)) {
+	    &hmep->hme_dev_attr, &hmep->hme_romh)) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_NONE, AUTOCONFIG_MSG,
-			"reg mapping failed: Check reg property ");
+		    "reg mapping failed: Check reg property ");
 		if (cfg_ptr)
 			ddi_regs_map_free(&cfg_handle);
 		return (DDI_FAILURE);
@@ -2992,29 +2690,25 @@ hmeget_hm_rev_property(struct hme *hmep)
 	case HME_2P1_REVID:
 	case HME_2P1_REVID_OBP:
 		HME_FAULT_MSG2(hmep, SEVERITY_NONE, DISPLAY_MSG,
-				"SBus 2.1 Found (Rev Id = %x)", hm_rev);
+		    "SBus 2.1 Found (Rev Id = %x)", hm_rev);
 		hmep->hme_mifpoll_enable = 1;
 		hmep->hme_frame_enable = 1;
 		break;
 
 	case HME_2P0_REVID:
 		HME_FAULT_MSG2(hmep, SEVERITY_NONE, DISPLAY_MSG,
-				"SBus 2.0 Found (Rev Id = %x)", hm_rev);
+		    "SBus 2.0 Found (Rev Id = %x)", hm_rev);
 		break;
 
 	case HME_1C0_REVID:
 		HME_FAULT_MSG2(hmep, SEVERITY_NONE, DISPLAY_MSG,
-				"PCI IO 1.0 Found (Rev Id = %x)",
-				hm_rev);
+		    "PCI IO 1.0 Found (Rev Id = %x)", hm_rev);
 		break;
 
 	default:
 		HME_FAULT_MSG3(hmep, SEVERITY_HIGH, DISPLAY_MSG,
-				"%s (Rev Id = %x) Found",
-				(hm_rev == HME_2C0_REVID) ?
-						"PCI IO 2.0" :
-						"Sbus",
-				hm_rev);
+		    "%s (Rev Id = %x) Found",
+		    (hm_rev == HME_2C0_REVID) ? "PCI IO 2.0" : "Sbus", hm_rev);
 		hmep->hme_mifpoll_enable = 1;
 		hmep->hme_frame_enable = 1;
 		hmep->hme_lance_mode_enable = 1;
@@ -3032,6 +2726,7 @@ static int
 hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	struct hme *hmep;
+	mac_register_t *macp = NULL;
 	int 	regno;
 	int hm_rev = 0;
 	int prop_len = sizeof (int);
@@ -3045,10 +2740,8 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		uint8_t j1;
 		uint16_t j2;
 	} *cfg_ptr;
+	boolean_t doinit;
 
-
-	HME_DEBUG_MSG1(NULL, SEVERITY_NONE, ENTER_MSG,
-			"hmeattach:  Entered");
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -3056,30 +2749,19 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	case DDI_RESUME:
 		if ((hmep = ddi_get_driver_private(dip)) == NULL)
-		    return (DDI_FAILURE);
+			return (DDI_FAILURE);
 
 		hmep->hme_flags &= ~HMESUSPENDED;
 		hmep->hme_linkcheck = 0;
-		{
-			struct hmestr	*sqp;
-			int		dohmeinit = 0;
-			rw_enter(&hmestruplock, RW_READER);
-			/* Do hmeinit() only for active interface */
-			for (sqp = hmestrup; sqp; sqp = sqp->sb_nextp) {
-				if (sqp->sb_hmep == hmep) {
-					dohmeinit = 1;
-					break;
-				}
-			}
-			rw_exit(&hmestruplock);
-			if (dohmeinit)
-				(void) hmeinit(hmep);
-		}
+
+		mutex_enter(&hmep->hme_intrlock);
+		doinit = ((hmep->hme_flags & HMESTARTED) != 0);
+		mutex_exit(&hmep->hme_intrlock);
+		if (doinit)
+			(void) hmeinit(hmep);
 		return (DDI_SUCCESS);
 
 	default:
-		HME_DEBUG_MSG1(NULL, SEVERITY_HIGH, INIT_MSG,
-				attach_bad_cmd_msg);
 		return (DDI_FAILURE);
 	}
 
@@ -3101,13 +2783,12 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	ddi_set_driver_private(dip, hmep);
 
-
 	/*
 	 * Reject this device if it's in a slave-only slot.
 	 */
 	if (ddi_slaveonly(dip) == DDI_SUCCESS) {
 		HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, CONFIG_MSG,
-				slave_slot_msg);
+		    slave_slot_msg);
 		goto error_state;
 	}
 
@@ -3122,7 +2803,7 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	if (ddi_dev_nregs(dip, &regno) != (DDI_SUCCESS)) {
 		HME_FAULT_MSG2(hmep, SEVERITY_HIGH, INIT_MSG,
-				ddi_nregs_fail_msg, regno);
+		    ddi_nregs_fail_msg, regno);
 		goto error_state;
 	}
 
@@ -3135,7 +2816,8 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		hmep->hme_cheerio_mode = 1;
 		break;
 	default:
-		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG, bad_num_regs_msg);
+		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
+		    bad_num_regs_msg);
 		goto error_state;
 	}
 
@@ -3143,9 +2825,11 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	hmep->hme_dev_attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
 
 	if (hmep->hme_cheerio_mode)
-	    hmep->hme_dev_attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
+		hmep->hme_dev_attr.devacc_attr_endian_flags =
+		    DDI_STRUCTURE_LE_ACC;
 	else
-	    hmep->hme_dev_attr.devacc_attr_endian_flags = DDI_STRUCTURE_BE_ACC;
+		hmep->hme_dev_attr.devacc_attr_endian_flags =
+		    DDI_STRUCTURE_BE_ACC;
 
 	hmep->hme_dev_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 
@@ -3159,26 +2843,30 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * Map the PCI config space
 		 */
 		if (pci_config_setup(dip, &hmep->pci_config_handle) !=
-			DDI_SUCCESS) {
+		    DDI_SUCCESS) {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, CONFIG_MSG,
-				"pci_config_setup() failed..");
+			    "pci_config_setup() failed..");
 			goto error_state;
 		}
 
 		if (ddi_regs_map_setup(dip, 1,
-				(caddr_t *)&(hmep->hme_globregp), 0, 0,
-				&hmep->hme_dev_attr, &hmep->hme_globregh)) {
+		    (caddr_t *)&(hmep->hme_globregp), 0, 0,
+		    &hmep->hme_dev_attr, &hmep->hme_globregh)) {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, CONFIG_MSG,
-					mregs_4global_reg_fail_msg);
+			    mregs_4global_reg_fail_msg);
 			goto error_unmap;
 		}
 		hmep->hme_etxregh = hmep->hme_erxregh = hmep->hme_bmacregh =
 		    hmep->hme_mifregh = hmep->hme_globregh;
 
-	hmep->hme_etxregp =  (void *)(((caddr_t)hmep->hme_globregp) + 0x2000);
-	hmep->hme_erxregp =  (void *)(((caddr_t)hmep->hme_globregp) + 0x4000);
-	hmep->hme_bmacregp = (void *)(((caddr_t)hmep->hme_globregp) + 0x6000);
-	hmep->hme_mifregp =  (void *)(((caddr_t)hmep->hme_globregp) + 0x7000);
+		hmep->hme_etxregp =
+		    (void *)(((caddr_t)hmep->hme_globregp) + 0x2000);
+		hmep->hme_erxregp =
+		    (void *)(((caddr_t)hmep->hme_globregp) + 0x4000);
+		hmep->hme_bmacregp =
+		    (void *)(((caddr_t)hmep->hme_globregp) + 0x6000);
+		hmep->hme_mifregp =
+		    (void *)(((caddr_t)hmep->hme_globregp) + 0x7000);
 
 		/*
 		 * Get parent pci bridge info.
@@ -3187,7 +2875,7 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		pdrvname = ddi_driver_name(pdip);
 
 		oldLT = pci_config_get8(hmep->pci_config_handle,
-					PCI_CONF_LATENCY_TIMER);
+		    PCI_CONF_LATENCY_TIMER);
 		/*
 		 * Honor value set in /etc/system
 		 * "set hme:pci_latency_timer=0xYY"
@@ -3214,42 +2902,42 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		if (newLT)
 			pci_config_put8(hmep->pci_config_handle,
-				PCI_CONF_LATENCY_TIMER, (uchar_t)newLT);
+			    PCI_CONF_LATENCY_TIMER, (uchar_t)newLT);
 	} else { /* Map register sets */
 		if (ddi_regs_map_setup(dip, 0,
-				(caddr_t *)&(hmep->hme_globregp), 0, 0,
-				&hmep->hme_dev_attr, &hmep->hme_globregh)) {
+		    (caddr_t *)&(hmep->hme_globregp), 0, 0,
+		    &hmep->hme_dev_attr, &hmep->hme_globregh)) {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, CONFIG_MSG,
-					mregs_4global_reg_fail_msg);
+			    mregs_4global_reg_fail_msg);
 			goto error_state;
 		}
 		if (ddi_regs_map_setup(dip, 1,
-				(caddr_t *)&(hmep->hme_etxregp), 0, 0,
-				&hmep->hme_dev_attr, &hmep->hme_etxregh)) {
+		    (caddr_t *)&(hmep->hme_etxregp), 0, 0,
+		    &hmep->hme_dev_attr, &hmep->hme_etxregh)) {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, CONFIG_MSG,
-					mregs_4etx_reg_fail_msg);
+			    mregs_4etx_reg_fail_msg);
 			goto error_unmap;
 		}
 		if (ddi_regs_map_setup(dip, 2,
-				(caddr_t *)&(hmep->hme_erxregp), 0, 0,
-				&hmep->hme_dev_attr, &hmep->hme_erxregh)) {
+		    (caddr_t *)&(hmep->hme_erxregp), 0, 0,
+		    &hmep->hme_dev_attr, &hmep->hme_erxregh)) {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, CONFIG_MSG,
-					mregs_4erx_reg_fail_msg);
+			    mregs_4erx_reg_fail_msg);
 			goto error_unmap;
 		}
 		if (ddi_regs_map_setup(dip, 3,
-				(caddr_t *)&(hmep->hme_bmacregp), 0, 0,
-				&hmep->hme_dev_attr, &hmep->hme_bmacregh)) {
+		    (caddr_t *)&(hmep->hme_bmacregp), 0, 0,
+		    &hmep->hme_dev_attr, &hmep->hme_bmacregh)) {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, CONFIG_MSG,
-					mregs_4bmac_reg_fail_msg);
+			    mregs_4bmac_reg_fail_msg);
 			goto error_unmap;
 		}
 
 		if (ddi_regs_map_setup(dip, 4,
-				(caddr_t *)&(hmep->hme_mifregp), 0, 0,
-				&hmep->hme_dev_attr, &hmep->hme_mifregh)) {
+		    (caddr_t *)&(hmep->hme_mifregp), 0, 0,
+		    &hmep->hme_dev_attr, &hmep->hme_mifregh)) {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, CONFIG_MSG,
-					mregs_4mif_reg_fail_msg);
+			    mregs_4mif_reg_fail_msg);
 			goto error_unmap;
 		}
 	} /* Endif cheerio_mode */
@@ -3266,8 +2954,7 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* NEW routine to get the properties */
 
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, hmep->dip, 0, "hm-rev",
-				(caddr_t)&hm_rev, &prop_len)
-				== DDI_PROP_SUCCESS) {
+	    (caddr_t)&hm_rev, &prop_len) == DDI_PROP_SUCCESS) {
 
 		hmep->asic_rev = hm_rev;
 		hmeget_hm_rev_property(hmep);
@@ -3278,9 +2965,9 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * Get it from revid in config space after mapping it.
 		 */
 		if (ddi_regs_map_setup(hmep->dip, 0, (caddr_t *)&cfg_ptr,
-			0, 0, &hmep->hme_dev_attr, &cfg_handle)) {
+		    0, 0, &hmep->hme_dev_attr, &cfg_handle)) {
 			HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, AUTOCONFIG_MSG,
-			"hmeattach: ddi_map_regs for config space failed");
+			    "hmeattach: ddi_map_regs for config space failed");
 			return (DDI_FAILURE);
 		}
 		/*
@@ -3292,10 +2979,10 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		hm_rev = HME_1C0_REVID | (hm_rev & HME_REV_VERS_MASK);
 		hmep->asic_rev = hm_rev;
 		if (ddi_prop_create(DDI_DEV_T_NONE, dip, DDI_PROP_CANSLEEP,
-			"hm-rev", (caddr_t)&hm_rev, sizeof (hm_rev)) !=
-			DDI_SUCCESS) {
+		    "hm-rev", (caddr_t)&hm_rev, sizeof (hm_rev)) !=
+		    DDI_SUCCESS) {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, AUTOCONFIG_MSG,
-				"hmeattach: ddi_prop_create error for hm_rev");
+			    "hmeattach: ddi_prop_create error for hm_rev");
 		}
 		ddi_regs_map_free(&cfg_handle);
 
@@ -3304,7 +2991,7 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		/* get info via VPD */
 		if (hmeget_promprops(dip)) {
 			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, AUTOCONFIG_MSG,
-			"hmeattach: no promprops");
+			    "hmeattach: no promprops");
 		}
 	}
 
@@ -3313,7 +3000,7 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if (ddi_intr_hilevel(dip, 0)) {
 		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, NFATAL_ERR_MSG,
-			" high-level interrupts are not supported");
+		    " high-level interrupts are not supported");
 		goto error_unmap;
 	}
 
@@ -3326,22 +3013,9 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Initialize mutex's for this device.
 	 */
-	mutex_init(&hmep->hme_xmitlock, NULL, MUTEX_DRIVER,
-		(void *)hmep->hme_cookie);
-	mutex_init(&hmep->hme_intrlock, NULL, MUTEX_DRIVER,
-		(void *)hmep->hme_cookie);
-	mutex_init(&hmep->hme_linklock, NULL, MUTEX_DRIVER,
-		(void *)hmep->hme_cookie);
-
-	mutex_enter(&hmeautolock);
-	if (!init_once) {
-		init_once = 1;
-		rw_init(&hmestruplock, NULL, RW_DRIVER,
-		    (void *)hmep->hme_cookie);
-		mutex_init(&hmewenlock, NULL, MUTEX_DRIVER,
-		    (void *)hmep->hme_cookie);
-	}
-	mutex_exit(&hmeautolock);
+	mutex_init(&hmep->hme_xmitlock, NULL, MUTEX_DRIVER, hmep->hme_cookie);
+	mutex_init(&hmep->hme_intrlock, NULL, MUTEX_DRIVER, hmep->hme_cookie);
+	mutex_init(&hmep->hme_linklock, NULL, MUTEX_DRIVER, hmep->hme_cookie);
 
 	/*
 	 * Quiesce the hardware.
@@ -3354,7 +3028,7 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (ddi_add_intr(dip, 0, (ddi_iblock_cookie_t *)NULL,
 	    (ddi_idevice_cookie_t *)NULL, hmeintr, (caddr_t)hmep)) {
 		HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, CONFIG_MSG,
-				add_intr_fail_msg);
+		    add_intr_fail_msg);
 		goto error_mutex;
 	}
 
@@ -3363,65 +3037,64 @@ hmeattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	hme_setup_mac_address(hmep, dip);
 
-	/*
-	 * Create the filesystem device node.
-	 */
-	if (ddi_create_minor_node(dip, "hme", S_IFCHR,
-		hmep->instance, DDI_NT_NET, CLONE_DEV) == DDI_FAILURE) {
-		HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, CONFIG_MSG,
-				create_minor_node_fail_msg);
-		goto error_intr;
-	}
-
 	if (!hmeinit_xfer_params(hmep))
-		goto error_minor;
+		goto error_intr;
 
 	if (hmeburstsizes(hmep) == DDI_FAILURE) {
 		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG, burst_size_msg);
-		goto error_minor;
+		goto error_intr;
 	}
 
 
-	/* lock hme structure while manipulating link list of hme structs */
-	mutex_enter(&hmelock);
-	hmep->hme_nextp = hmeup;
-	hmeup = hmep;
-	mutex_exit(&hmelock);
-
 	hmestatinit(hmep);
+
+	if ((macp = mac_alloc(MAC_VERSION)) == NULL) {
+		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, CONFIG_MSG,
+		    "mac_alloc failed");
+		goto error_intr;
+	}
+	macp->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
+	macp->m_driver = hmep;
+	macp->m_dip = dip;
+	macp->m_src_addr = hmep->hme_ouraddr.ether_addr_octet;
+	macp->m_callbacks = &hme_m_callbacks;
+	macp->m_min_sdu = 0;
+	macp->m_max_sdu = ETHERMTU;
+	if (mac_register(macp, &hmep->hme_mh) != 0) {
+		mac_free(macp);
+		goto error_intr;
+	}
+
+	mac_free(macp);
+
 	ddi_report_dev(dip);
 	return (DDI_SUCCESS);
 
 	/*
 	 * Failure Exit
 	 */
-error_minor:
-	ddi_remove_minor_node(dip, NULL);
 
 error_intr:
 	if (hmep->hme_cookie)
 		ddi_remove_intr(dip, 0, (ddi_iblock_cookie_t)0);
 
 error_mutex:
-	/*
-	 * hmewenlock and hmestruplock are destroy-ed in _fini()
-	 */
 	mutex_destroy(&hmep->hme_xmitlock);
 	mutex_destroy(&hmep->hme_intrlock);
 	mutex_destroy(&hmep->hme_linklock);
 
 error_unmap:
 	if (hmep->hme_globregh)
-	    ddi_regs_map_free(&hmep->hme_globregh);
+		ddi_regs_map_free(&hmep->hme_globregh);
 	if (hmep->hme_cheerio_mode == 0) {
 		if (hmep->hme_etxregh)
-		    ddi_regs_map_free(&hmep->hme_etxregh);
+			ddi_regs_map_free(&hmep->hme_etxregh);
 		if (hmep->hme_erxregh)
-		    ddi_regs_map_free(&hmep->hme_erxregh);
+			ddi_regs_map_free(&hmep->hme_erxregh);
 		if (hmep->hme_bmacregh)
-		    ddi_regs_map_free(&hmep->hme_bmacregh);
+			ddi_regs_map_free(&hmep->hme_bmacregh);
 		if (hmep->hme_mifregh)
-		    ddi_regs_map_free(&hmep->hme_mifregh);
+			ddi_regs_map_free(&hmep->hme_mifregh);
 	} else {
 		if (hmep->pci_config_handle)
 			(void) pci_config_teardown(&hmep->pci_config_handle);
@@ -3435,15 +3108,13 @@ error_state:
 		ddi_set_driver_private(dip, NULL);
 	}
 
-	HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, EXIT_MSG,
-			"hmeattach:  Unsuccessful Exiting");
 	return (DDI_FAILURE);
 }
 
 static int
 hmedetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	struct hme *hmep, *hmetmp, **prevhmep;
+	struct hme *hmep;
 	int32_t	unval;
 
 	if ((hmep = ddi_get_driver_private(dip)) == NULL)
@@ -3463,7 +3134,12 @@ hmedetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	default:
 		HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, UNINIT_MSG,
-				detach_bad_cmd_msg);
+		    detach_bad_cmd_msg);
+		return (DDI_FAILURE);
+	}
+
+
+	if (mac_unregister(hmep->hme_mh) != 0) {
 		return (DDI_FAILURE);
 	}
 
@@ -3492,21 +3168,41 @@ hmedetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	ddi_remove_intr(dip, 0, (ddi_iblock_cookie_t)0);
 
 	/*
+	 * Unregister kstats.
+	 */
+	if (hmep->hme_ksp != NULL)
+		kstat_delete(hmep->hme_ksp);
+	if (hmep->hme_intrstats != NULL)
+		kstat_delete(hmep->hme_intrstats);
+
+	hmep->hme_ksp = NULL;
+	hmep->hme_intrstats = NULL;
+
+	/*
+	 * Stop asynchronous timer events.
+	 */
+	hme_stop_timer(hmep);
+	mutex_exit(&hmep->hme_linklock);
+
+	/*
 	 * Destroy all mutexes and data structures allocated during
 	 * attach time.
+	 *
+	 * Note: at this time we should be the only thread accessing
+	 * the structures for this instance.
 	 */
 
 	if (hmep->hme_globregh)
 		ddi_regs_map_free(&hmep->hme_globregh);
 	if (hmep->hme_cheerio_mode == 0) {
 		if (hmep->hme_etxregh)
-		    ddi_regs_map_free(&hmep->hme_etxregh);
+			ddi_regs_map_free(&hmep->hme_etxregh);
 		if (hmep->hme_erxregh)
-		    ddi_regs_map_free(&hmep->hme_erxregh);
+			ddi_regs_map_free(&hmep->hme_erxregh);
 		if (hmep->hme_bmacregh)
-		    ddi_regs_map_free(&hmep->hme_bmacregh);
+			ddi_regs_map_free(&hmep->hme_bmacregh);
 		if (hmep->hme_mifregh)
-		    ddi_regs_map_free(&hmep->hme_mifregh);
+			ddi_regs_map_free(&hmep->hme_mifregh);
 	} else {
 		if (hmep->pci_config_handle)
 			(void) pci_config_teardown(&hmep->pci_config_handle);
@@ -3514,82 +3210,48 @@ hmedetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		    hmep->hme_mifregh = hmep->hme_globregh = NULL;
 	}
 
+	mutex_destroy(&hmep->hme_xmitlock);
+	mutex_destroy(&hmep->hme_intrlock);
+	mutex_destroy(&hmep->hme_linklock);
+
+	if (hmep->hme_md_h != NULL) {
+		unval = ddi_dma_unbind_handle(hmep->hme_md_h);
+		if (unval == DDI_FAILURE)
+			HME_FAULT_MSG1(hmep, SEVERITY_HIGH, DDI_MSG,
+			    "dma_unbind_handle failed");
+		ddi_dma_mem_free(&hmep->hme_mdm_h);
+		ddi_dma_free_handle(&hmep->hme_md_h);
+	}
+
+	hmefreebufs(hmep);
+
 	/*
-	 * Remove hmep from the link list of device structures
+	 * dvma handle case.
 	 */
-	mutex_enter(&hmelock);
-	for (prevhmep = &hmeup; (hmetmp = *prevhmep) != NULL;
-		prevhmep = &hmetmp->hme_nextp)
-		if (hmetmp == hmep) {
-			if (hmetmp->hme_ksp)
-				kstat_delete(hmetmp->hme_ksp);
-			if (hmetmp->hme_intrstats)
-				kstat_delete(hmetmp->hme_intrstats);
+	if (hmep->hme_dvmarh != NULL) {
+		dvma_release(hmep->hme_dvmarh);
+		dvma_release(hmep->hme_dvmaxh);
+		hmep->hme_dvmarh = hmep->hme_dvmaxh = NULL;
+	}
 
-			hmetmp->hme_intrstats = NULL;
-			*prevhmep = hmetmp->hme_nextp;
-			hme_stop_timer(hmetmp);
-			mutex_exit(&hmep->hme_linklock);
-			mutex_destroy(&hmetmp->hme_xmitlock);
-			mutex_destroy(&hmetmp->hme_intrlock);
-			mutex_destroy(&hmetmp->hme_linklock);
+	/*
+	 * dma handle case.
+	 */
+	if (hmep->hme_dmarh != NULL) {
+		kmem_free(hmep->hme_dmaxh,
+		    (HME_TMDMAX + HMERPENDING) * (sizeof (ddi_dma_handle_t)));
+		hmep->hme_dmarh = hmep->hme_dmaxh = NULL;
+	}
 
-			if (hmetmp->hme_md_h) {
-				unval = ddi_dma_unbind_handle(hmetmp->hme_md_h);
-				if (unval == DDI_FAILURE)
-					HME_FAULT_MSG1(hmep, SEVERITY_HIGH,
-							DDI_MSG,
-					"dma_unbind_handle failed");
-				ddi_dma_mem_free(&hmetmp->hme_mdm_h);
-				ddi_dma_free_handle(&hmetmp->hme_md_h);
-			}
+	hme_param_cleanup(hmep);
 
-			hmefreebufs(hmetmp);
+	ddi_set_driver_private(dip, NULL);
+	kmem_free(hmep, sizeof (struct hme));
 
-			/*
-			 * dvma handle case.
-			 */
-			if (hmetmp->hme_dvmarh) {
-				(void) dvma_release(hmetmp->hme_dvmarh);
-				(void) dvma_release(hmetmp->hme_dvmaxh);
-				hmetmp->hme_dvmarh = hmetmp->hme_dvmaxh = NULL;
-			}
-
-			/*
-			 * dma handle case.
-			 */
-			if (hmetmp->hme_dmarh) {
-				kmem_free((caddr_t)hmetmp->hme_dmaxh,
-				    (HME_TMDMAX + HMERPENDING) *
-				    (sizeof (ddi_dma_handle_t)));
-				hmetmp->hme_dmarh = hmetmp->hme_dmaxh = NULL;
-			}
-
-			/*
-			 * Generated when there was only dma.
-			 * else HME_FAULT_MSG1(NULL, SEVERITY_HIGH,
-			 *			"expected dmarh");
-			 */
-
-
-			/*
-			 * Reset hme_device to default value(-1) when ndd is
-			 * referencing the instance being detached.
-			 */
-			if (hme_device == hmep->instance)
-				hme_device = -1;
-
-			hme_param_cleanup(hmetmp);
-
-			ddi_set_driver_private(dip, NULL);
-			kmem_free((caddr_t)hmetmp, sizeof (struct hme));
-			break;
-		}
-	mutex_exit(&hmelock);
 	return (DDI_SUCCESS);
 }
 
-static int
+static boolean_t
 hmeinit_xfer_params(struct hme *hmep)
 {
 	int i;
@@ -3605,20 +3267,15 @@ hmeinit_xfer_params(struct hme *hmep)
 
 	dip = hmep->dip;
 
-	HME_DEBUG_MSG1(hmep, SEVERITY_NONE, AUTOCONFIG_MSG,
-			"==> hmeinit_xfer_params");
-
 	for (i = 0; i < A_CNT(hme_param_arr); i++)
 		hmep->hme_param_arr[i] = hme_param_arr[i];
 
 	if (!hmep->hme_g_nd && !hme_param_register(hmep, hmep->hme_param_arr,
-		A_CNT(hme_param_arr))) {
+	    A_CNT(hme_param_arr))) {
 		HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, NDD_MSG,
-				param_reg_fail_msg);
+		    param_reg_fail_msg);
 		return (B_FALSE);
 	}
-
-	hme_param_device = hmep->instance;
 
 	/*
 	 * Set up the start-up values for user-configurable parameters
@@ -3645,10 +3302,9 @@ hmeinit_xfer_params(struct hme *hmep)
 	 * either 10 or 100.
 	 */
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0,
-			"transfer-speed", (caddr_t)&i, &prop_len)
-				== DDI_PROP_SUCCESS) {
+	    "transfer-speed", (caddr_t)&i, &prop_len) == DDI_PROP_SUCCESS) {
 		HME_DEBUG_MSG2(hmep, SEVERITY_LOW, PROP_MSG,
-				"params:  transfer-speed property = %X", i);
+		    "params:  transfer-speed property = %X", i);
 		hme_param_autoneg = 0;	/* force speed */
 		hme_param_anar_100T4 = 0;
 		hme_param_anar_100fdx = 0;
@@ -3666,86 +3322,74 @@ hmeinit_xfer_params(struct hme *hmep)
 	 * Get the parameter values configured in .conf file.
 	 */
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "ipg1",
-				(caddr_t)&hme_ipg1_conf, &prop_len)
-				== DDI_PROP_SUCCESS) {
+	    (caddr_t)&hme_ipg1_conf, &prop_len) == DDI_PROP_SUCCESS) {
 		HME_DEBUG_MSG2(hmep, SEVERITY_LOW, PROP_MSG,
-			"params: hme_ipg1 property = %X", hme_ipg1_conf);
+		    "params: hme_ipg1 property = %X", hme_ipg1_conf);
 		hme_param_ipg1 = hme_ipg1_conf & HME_MASK_8BIT;
 	}
 
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "ipg2",
-				(caddr_t)&hme_ipg2_conf, &prop_len)
-				== DDI_PROP_SUCCESS) {
+	    (caddr_t)&hme_ipg2_conf, &prop_len) == DDI_PROP_SUCCESS) {
 		hme_param_ipg2 = hme_ipg2_conf & HME_MASK_8BIT;
 	}
 
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "use_int_xcvr",
-				(caddr_t)&hme_use_int_xcvr_conf, &prop_len)
-				== DDI_PROP_SUCCESS) {
+	    (caddr_t)&hme_use_int_xcvr_conf, &prop_len) == DDI_PROP_SUCCESS) {
 		hme_param_use_intphy = hme_use_int_xcvr_conf & HME_MASK_1BIT;
 	}
 
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "pace_size",
-				(caddr_t)&hme_pace_count_conf, &prop_len)
-				== DDI_PROP_SUCCESS) {
+	    (caddr_t)&hme_pace_count_conf, &prop_len) == DDI_PROP_SUCCESS) {
 		hme_param_pace_count = hme_pace_count_conf & HME_MASK_8BIT;
 	}
 
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "adv_autoneg_cap",
-				(caddr_t)&hme_autoneg_conf, &prop_len)
-				== DDI_PROP_SUCCESS) {
+	    (caddr_t)&hme_autoneg_conf, &prop_len) == DDI_PROP_SUCCESS) {
 		hme_param_autoneg = hme_autoneg_conf & HME_MASK_1BIT;
 	}
 
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "adv_100T4_cap",
-				(caddr_t)&hme_anar_100T4_conf, &prop_len)
-				== DDI_PROP_SUCCESS) {
+	    (caddr_t)&hme_anar_100T4_conf, &prop_len) == DDI_PROP_SUCCESS) {
 		hme_param_anar_100T4 = hme_anar_100T4_conf & HME_MASK_1BIT;
 	}
 
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "adv_100fdx_cap",
-				(caddr_t)&hme_anar_100fdx_conf, &prop_len)
-				== DDI_PROP_SUCCESS) {
+	    (caddr_t)&hme_anar_100fdx_conf, &prop_len) == DDI_PROP_SUCCESS) {
 		hme_param_anar_100fdx = hme_anar_100fdx_conf & HME_MASK_1BIT;
 	}
 
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "adv_100hdx_cap",
-				(caddr_t)&hme_anar_100hdx_conf, &prop_len)
-				== DDI_PROP_SUCCESS) {
+	    (caddr_t)&hme_anar_100hdx_conf, &prop_len) == DDI_PROP_SUCCESS) {
 		hme_param_anar_100hdx = hme_anar_100hdx_conf & HME_MASK_1BIT;
 	}
 
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "adv_10fdx_cap",
-				(caddr_t)&hme_anar_10fdx_conf, &prop_len)
-				== DDI_PROP_SUCCESS) {
+	    (caddr_t)&hme_anar_10fdx_conf, &prop_len) == DDI_PROP_SUCCESS) {
 		hme_param_anar_10fdx = hme_anar_10fdx_conf & HME_MASK_1BIT;
 	}
 
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "adv_10hdx_cap",
-				(caddr_t)&hme_anar_10hdx_conf, &prop_len)
-				== DDI_PROP_SUCCESS) {
+	    (caddr_t)&hme_anar_10hdx_conf, &prop_len) == DDI_PROP_SUCCESS) {
 		hme_param_anar_10hdx = hme_anar_10hdx_conf & HME_MASK_1BIT;
 	}
 
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "ipg0",
-				(caddr_t)&hme_ipg0_conf, &prop_len)
-				== DDI_PROP_SUCCESS) {
+	    (caddr_t)&hme_ipg0_conf, &prop_len) == DDI_PROP_SUCCESS) {
 		hme_param_ipg0 = hme_ipg0_conf & HME_MASK_5BIT;
 	}
 
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, "lance_mode",
-				(caddr_t)&hme_lance_mode_conf, &prop_len)
-				== DDI_PROP_SUCCESS) {
+	    (caddr_t)&hme_lance_mode_conf, &prop_len) == DDI_PROP_SUCCESS) {
 		hme_param_lance_mode = hme_lance_mode_conf & HME_MASK_1BIT;
 	}
 
 	if (hme_link_pulse_disabled)
 		hmep->hme_link_pulse_disabled = 1;
 	else if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0,
-			"link-pulse-disabled", (caddr_t)&i, &prop_len)
-				== DDI_PROP_SUCCESS) {
+	    "link-pulse-disabled", (caddr_t)&i, &prop_len)
+	    == DDI_PROP_SUCCESS) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, PROP_MSG,
-				"params:  link-pulse-disable property found.");
+		    "params:  link-pulse-disable property found.");
 		hmep->hme_link_pulse_disabled = 1;
 	}
 	return (B_TRUE);
@@ -3778,7 +3422,7 @@ hmestop(struct hme *hmep)
 	HMEDELAY((GET_GLOBREG(reset) == 0), HMEMAXRSTDELAY);
 	if (GET_GLOBREG(reset)) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, UNINIT_MSG,
-				"cannot stop hme - failed to access device");
+		    "cannot stop hme - failed to access device");
 		return (1);
 	}
 
@@ -3795,6 +3439,9 @@ hmestat_kstat_update(kstat_t *ksp, int rw)
 	hmep = (struct hme *)ksp->ks_private;
 	hkp = (struct hmekstat *)ksp->ks_data;
 
+	if (rw != KSTAT_READ)
+		return (EACCES);
+
 	/*
 	 * Update all the stats by reading all the counter registers.
 	 * Counter register stats are not updated till they overflow
@@ -3808,234 +3455,47 @@ hmestat_kstat_update(kstat_t *ksp, int rw)
 
 	hmesavecntrs(hmep);
 
-	if (rw == KSTAT_WRITE) {
-		hmep->hme_ipackets	= hkp->hk_ipackets.value.ul;
-		hmep->hme_ierrors	= hkp->hk_ierrors.value.ul;
-		hmep->hme_opackets	= hkp->hk_opackets.value.ul;
-		hmep->hme_oerrors	= hkp->hk_oerrors.value.ul;
-		hmep->hme_coll		= hkp->hk_coll.value.ul;
+	hkp->hk_cvc.value.ul		= hmep->hme_cvc;
+	hkp->hk_lenerr.value.ul		= hmep->hme_lenerr;
+	hkp->hk_buff.value.ul		= hmep->hme_buff;
+	hkp->hk_missed.value.ul		= hmep->hme_missed;
+	hkp->hk_allocbfail.value.ul	= hmep->hme_allocbfail;
+	hkp->hk_babl.value.ul		= hmep->hme_babl;
+	hkp->hk_tmder.value.ul		= hmep->hme_tmder;
+	hkp->hk_txlaterr.value.ul	= hmep->hme_txlaterr;
+	hkp->hk_rxlaterr.value.ul	= hmep->hme_rxlaterr;
+	hkp->hk_slvparerr.value.ul	= hmep->hme_slvparerr;
+	hkp->hk_txparerr.value.ul	= hmep->hme_txparerr;
+	hkp->hk_rxparerr.value.ul	= hmep->hme_rxparerr;
+	hkp->hk_slverrack.value.ul	= hmep->hme_slverrack;
+	hkp->hk_txerrack.value.ul	= hmep->hme_txerrack;
+	hkp->hk_rxerrack.value.ul	= hmep->hme_rxerrack;
+	hkp->hk_txtagerr.value.ul	= hmep->hme_txtagerr;
+	hkp->hk_rxtagerr.value.ul	= hmep->hme_rxtagerr;
+	hkp->hk_eoperr.value.ul		= hmep->hme_eoperr;
+	hkp->hk_notmds.value.ul		= hmep->hme_notmds;
+	hkp->hk_notbufs.value.ul	= hmep->hme_notbufs;
+	hkp->hk_norbufs.value.ul	= hmep->hme_norbufs;
+	/*
+	 * MIB II kstat variables
+	 */
+	hkp->hk_newfree.value.ul	= hmep->hme_newfree;
 
-		/*
-		 * MIB II kstat variables
-		 */
-		hmep->hme_rcvbytes	= hkp->hk_rcvbytes.value.ul;
-		hmep->hme_xmtbytes	= hkp->hk_xmtbytes.value.ul;
-		hmep->hme_multircv	= hkp->hk_multircv.value.ul;
-		hmep->hme_multixmt	= hkp->hk_multixmt.value.ul;
-		hmep->hme_brdcstrcv	= hkp->hk_brdcstrcv.value.ul;
-		hmep->hme_brdcstxmt	= hkp->hk_brdcstxmt.value.ul;
-		hmep->hme_norcvbuf	= hkp->hk_norcvbuf.value.ul;
-		hmep->hme_noxmtbuf	= hkp->hk_noxmtbuf.value.ul;
+	/*
+	 * Debug kstats
+	 */
+	hkp->hk_inits.value.ul		= hmep->inits;
+	hkp->hk_rxinits.value.ul	= hmep->rxinits;
+	hkp->hk_txinits.value.ul	= hmep->txinits;
+	hkp->hk_dmarh_inits.value.ul	= hmep->dmarh_init;
+	hkp->hk_dmaxh_inits.value.ul	= hmep->dmaxh_init;
+	hkp->hk_phyfail.value.ul	= hmep->phyfail;
 
-#ifdef	kstat
-		hmep->hme_defer		= hkp->hk_defer.value.ul;
-		hmep->hme_fram		= hkp->hk_fram.value.ul;
-		hmep->hme_crc		= hkp->hk_crc.value.ul;
-		hmep->hme_sqerr		= hkp->hk_sqerr.value.ul;
-		hmep->hme_cvc		= hkp->hk_cvc.value.ul;
-		hmep->hme_lenerr	= hkp->hk_lenerr.value.ul;
-		hmep->hme_buff		= hkp->hk_buff.value.ul;
-		hmep->hme_oflo		= hkp->hk_oflo.value.ul;
-		hmep->hme_uflo		= hkp->hk_uflo.value.ul;
-		hmep->hme_missed	= hkp->hk_missed.value.ul;
-		hmep->hme_tlcol		= hkp->hk_tlcol.value.ul;
-		hmep->hme_trtry		= hkp->hk_trtry.value.ul;
-		hmep->hme_fstcol	= hkp->hk_fstcol.value.ul;
-		hmep->hme_nocanput	= hkp->hk_nocanput.value.ul;
-		hmep->hme_allocbfail	= hkp->hk_allocbfail.value.ul;
-		hmep->hme_runt		= hkp->hk_runt.value.ul;
-		hmep->hme_jab		= hkp->hk_jab.value.ul;
-		hmep->hme_babl		= hkp->hk_babl.value.ul;
-		hmep->hme_tmder 	= hkp->hk_tmder.value.ul;
-		hmep->hme_txlaterr	= hkp->hk_txlaterr.value.ul;
-		hmep->hme_rxlaterr	= hkp->hk_rxlaterr.value.ul;
-		hmep->hme_slvparerr	= hkp->hk_slvparerr.value.ul;
-		hmep->hme_txparerr	= hkp->hk_txparerr.value.ul;
-		hmep->hme_rxparerr	= hkp->hk_rxparerr.value.ul;
-		hmep->hme_slverrack	= hkp->hk_slverrack.value.ul;
-		hmep->hme_txerrack	= hkp->hk_txerrack.value.ul;
-		hmep->hme_rxerrack	= hkp->hk_rxerrack.value.ul;
-		hmep->hme_txtagerr	= hkp->hk_txtagerr.value.ul;
-		hmep->hme_rxtagerr	= hkp->hk_rxtagerr.value.ul;
-		hmep->hme_eoperr	= hkp->hk_eoperr.value.ul;
-		hmep->hme_notmds	= hkp->hk_notmds.value.ul;
-		hmep->hme_notbufs	= hkp->hk_notbufs.value.ul;
-		hmep->hme_norbufs	= hkp->hk_norbufs.value.ul;
-		hmep->hme_clsn		= hkp->hk_clsn.value.ul;
-#endif	/* kstat */
-		hmep->hme_newfree	= hkp->hk_newfree.value.ul;
+	/*
+	 * xcvr kstats
+	 */
+	hkp->hk_asic_rev.value.ul	= hmep->asic_rev;
 
-		/*
-		 * PSARC 1997/198 : 64 bit kstats
-		 */
-		hmep->hme_ipackets64	= hkp->hk_ipackets64.value.ull;
-		hmep->hme_opackets64	= hkp->hk_opackets64.value.ull;
-		hmep->hme_rbytes64	= hkp->hk_rbytes64.value.ull;
-		hmep->hme_obytes64	= hkp->hk_obytes64.value.ull;
-
-		/*
-		 * PSARC 1997/247 : RFC 1643
-		 */
-		hmep->hme_align_errors	= hkp->hk_align_errors.value.ul;
-		hmep->hme_fcs_errors	= hkp->hk_fcs_errors.value.ul;
-		/* first collisions */
-		hmep->hme_multi_collisions = hkp->hk_multi_collisions.value.ul;
-		hmep->hme_sqe_errors	= hkp->hk_sqe_errors.value.ul;
-		hmep->hme_defer_xmts	= hkp->hk_defer_xmts.value.ul;
-		/* tx_late_collisions */
-		hmep->hme_ex_collisions	= hkp->hk_ex_collisions.value.ul;
-		hmep->hme_macxmt_errors	= hkp->hk_macxmt_errors.value.ul;
-		hmep->hme_carrier_errors = hkp->hk_carrier_errors.value.ul;
-		hmep->hme_toolong_errors = hkp->hk_toolong_errors.value.ul;
-		hmep->hme_macrcv_errors	= hkp->hk_macrcv_errors.value.ul;
-
-		/*
-		 * RFE's (Request for Enhancement)
-		 */
-		hmep->link_duplex	= hkp->hk_link_duplex.value.ul;
-
-		/*
-		 * Debug Kstats
-		 */
-		hmep->inits		= hkp->hk_inits.value.ul;
-		hmep->rxinits		= hkp->hk_rxinits.value.ul;
-		hmep->txinits		= hkp->hk_txinits.value.ul;
-		hmep->dmarh_init	= hkp->hk_dmarh_inits.value.ul;
-		hmep->dmaxh_init	= hkp->hk_dmaxh_inits.value.ul;
-		hmep->link_down_cnt	= hkp->hk_link_down_cnt.value.ul;
-		hmep->phyfail		= hkp->hk_phyfail.value.ul;
-
-		/*
-		 * I/O bus kstats
-		 * hmep->hme_pci_speed	= hkp->hk_pci_peed.value.ul;
-		 */
-
-		/*
-		 * xcvr kstats
-		 */
-		hmep->xcvr_vendor_id	= hkp->hk_xcvr_vendor_id.value.ul;
-		hmep->asic_rev		= hkp->hk_asic_rev.value.ul;
-
-		/*
-		 * Link Status
-		 */
-		hmep->hme_link_up	= hkp->hk_link_up.value.ul;
-
-		return (0);
-
-	} else {
-		hkp->hk_ipackets.value.ul	= hmep->hme_ipackets;
-		hkp->hk_ierrors.value.ul	= hmep->hme_ierrors;
-		hkp->hk_opackets.value.ul	= hmep->hme_opackets;
-		hkp->hk_oerrors.value.ul	= hmep->hme_oerrors;
-		hkp->hk_coll.value.ul		= hmep->hme_coll;
-		hkp->hk_defer.value.ul		= hmep->hme_defer;
-		hkp->hk_fram.value.ul		= hmep->hme_fram;
-		hkp->hk_crc.value.ul		= hmep->hme_crc;
-		hkp->hk_sqerr.value.ul		= hmep->hme_sqerr;
-		hkp->hk_cvc.value.ul		= hmep->hme_cvc;
-		hkp->hk_lenerr.value.ul		= hmep->hme_lenerr;
-		hkp->hk_ifspeed.value.ull	=
-					hmep->hme_ifspeed * 1000000ULL;
-		hkp->hk_buff.value.ul		= hmep->hme_buff;
-		hkp->hk_oflo.value.ul		= hmep->hme_oflo;
-		hkp->hk_uflo.value.ul		= hmep->hme_uflo;
-		hkp->hk_missed.value.ul		= hmep->hme_missed;
-		hkp->hk_tlcol.value.ul		= hmep->hme_tlcol;
-		hkp->hk_trtry.value.ul		= hmep->hme_trtry;
-		hkp->hk_fstcol.value.ul		= hmep->hme_fstcol;
-		hkp->hk_nocanput.value.ul	= hmep->hme_nocanput;
-		hkp->hk_allocbfail.value.ul	= hmep->hme_allocbfail;
-		hkp->hk_runt.value.ul		= hmep->hme_runt;
-		hkp->hk_jab.value.ul		= hmep->hme_jab;
-		hkp->hk_babl.value.ul		= hmep->hme_babl;
-		hkp->hk_tmder.value.ul		= hmep->hme_tmder;
-		hkp->hk_txlaterr.value.ul	= hmep->hme_txlaterr;
-		hkp->hk_rxlaterr.value.ul	= hmep->hme_rxlaterr;
-		hkp->hk_slvparerr.value.ul	= hmep->hme_slvparerr;
-		hkp->hk_txparerr.value.ul	= hmep->hme_txparerr;
-		hkp->hk_rxparerr.value.ul	= hmep->hme_rxparerr;
-		hkp->hk_slverrack.value.ul	= hmep->hme_slverrack;
-		hkp->hk_txerrack.value.ul	= hmep->hme_txerrack;
-		hkp->hk_rxerrack.value.ul	= hmep->hme_rxerrack;
-		hkp->hk_txtagerr.value.ul	= hmep->hme_txtagerr;
-		hkp->hk_rxtagerr.value.ul	= hmep->hme_rxtagerr;
-		hkp->hk_eoperr.value.ul		= hmep->hme_eoperr;
-		hkp->hk_notmds.value.ul		= hmep->hme_notmds;
-		hkp->hk_notbufs.value.ul	= hmep->hme_notbufs;
-		hkp->hk_norbufs.value.ul	= hmep->hme_norbufs;
-		hkp->hk_clsn.value.ul		= hmep->hme_clsn;
-		/*
-		 * MIB II kstat variables
-		 */
-		hkp->hk_rcvbytes.value.ul	= hmep->hme_rcvbytes;
-		hkp->hk_xmtbytes.value.ul	= hmep->hme_xmtbytes;
-		hkp->hk_multircv.value.ul	= hmep->hme_multircv;
-		hkp->hk_multixmt.value.ul	= hmep->hme_multixmt;
-		hkp->hk_brdcstrcv.value.ul	= hmep->hme_brdcstrcv;
-		hkp->hk_brdcstxmt.value.ul	= hmep->hme_brdcstxmt;
-		hkp->hk_norcvbuf.value.ul	= hmep->hme_norcvbuf;
-		hkp->hk_noxmtbuf.value.ul	= hmep->hme_noxmtbuf;
-
-		hkp->hk_newfree.value.ul	= hmep->hme_newfree;
-
-		/*
-		 * PSARC 1997/198
-		 */
-		hkp->hk_ipackets64.value.ull	= hmep->hme_ipackets64;
-		hkp->hk_opackets64.value.ull	= hmep->hme_opackets64;
-		hkp->hk_rbytes64.value.ull	= hmep->hme_rbytes64;
-		hkp->hk_obytes64.value.ull	= hmep->hme_obytes64;
-
-		/*
-		 * PSARC 1997/247 : RFC 1643
-		 */
-		hkp->hk_align_errors.value.ul = hmep->hme_align_errors;
-		hkp->hk_fcs_errors.value.ul	= hmep->hme_fcs_errors;
-		/* first_collisions */
-		hkp->hk_multi_collisions.value.ul = hmep->hme_multi_collisions;
-		hkp->hk_sqe_errors.value.ul	= hmep->hme_sqe_errors;
-		hkp->hk_defer_xmts.value.ul	= hmep->hme_defer_xmts;
-		/* tx_late_collisions */
-		hkp->hk_ex_collisions.value.ul = hmep->hme_ex_collisions;
-		hkp->hk_macxmt_errors.value.ul = hmep->hme_macxmt_errors;
-		hkp->hk_carrier_errors.value.ul = hmep->hme_carrier_errors;
-		hkp->hk_toolong_errors.value.ul = hmep->hme_toolong_errors;
-		hkp->hk_macrcv_errors.value.ul = hmep->hme_macrcv_errors;
-
-		/*
-		 * RFE's (Request for Enhancements)
-		 */
-		hkp->hk_link_duplex.value.ul	= hmep->link_duplex;
-
-		/*
-		 * Debug kstats
-		 */
-		hkp->hk_inits.value.ul		= hmep->inits;
-		hkp->hk_rxinits.value.ul	= hmep->rxinits;
-		hkp->hk_txinits.value.ul	= hmep->txinits;
-		hkp->hk_dmarh_inits.value.ul	= hmep->dmarh_init;
-		hkp->hk_dmaxh_inits.value.ul	= hmep->dmaxh_init;
-		hkp->hk_link_down_cnt.value.ul	= hmep->link_down_cnt;
-		hkp->hk_phyfail.value.ul	= hmep->phyfail;
-
-		/*
-		 * I/O bus kstats
-		 * hkp->hk_pci_speed.value.ul	= hmep->pci_speed;
-		 */
-
-		/*
-		 * xcvr kstats
-		 */
-		hkp->hk_xcvr_vendor_id.value.ull = hmep->xcvr_vendor_id;
-		hkp->hk_asic_rev.value.ul	= hmep->asic_rev;
-
-		/*
-		 * Link Status
-		 */
-		hkp->hk_link_up.value.ul	= hmep->hme_link_up;
-
-	}
 	return (0);
 }
 
@@ -4049,194 +3509,85 @@ hmestatinit(struct hme *hmep)
 
 	instance = hmep->instance;
 
-#ifdef	kstat
 	if ((ksp = kstat_create("hme", instance,
-		NULL, "net", KSTAT_TYPE_NAMED,
-		sizeof (struct hmekstat) / sizeof (kstat_named_t),
-		KSTAT_FLAG_PERSISTENT)) == NULL) {
-#else
-	if ((ksp = kstat_create("hme", instance,
-	    NULL, "net", KSTAT_TYPE_NAMED,
+	    "driver_info", "net", KSTAT_TYPE_NAMED,
 	    sizeof (struct hmekstat) / sizeof (kstat_named_t), 0)) == NULL) {
-#endif	/* kstat */
 		HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, INIT_MSG,
-				kstat_create_fail_msg);
+		    kstat_create_fail_msg);
 		return;
 	}
 
 	(void) sprintf(buf, "hmec%d", instance);
 	hmep->hme_intrstats = kstat_create("hme", instance, buf, "controller",
-		KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
+	    KSTAT_TYPE_INTR, 1, KSTAT_FLAG_PERSISTENT);
 	if (hmep->hme_intrstats)
 		kstat_install(hmep->hme_intrstats);
 
 	hmep->hme_ksp = ksp;
 	hkp = (struct hmekstat *)ksp->ks_data;
-	kstat_named_init(&hkp->hk_ipackets,		"ipackets",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_ierrors,		"ierrors",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_opackets,		"opackets",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_oerrors,		"oerrors",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_coll,			"collisions",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_defer,		"defer",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_fram,			"framing",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_crc,			"crc",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_sqerr,		"sqe",
-		KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_cvc,			"code_violations",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_lenerr,		"len_errors",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_ifspeed,		"ifspeed",
-		KSTAT_DATA_ULONGLONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_buff,			"buff",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_oflo,			"oflo",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_uflo,			"uflo",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_missed,		"missed",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_tlcol,		"tx_late_collisions",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_trtry,		"retry_error",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_fstcol,		"first_collisions",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_nocanput,		"nocanput",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_allocbfail,		"allocbfail",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_runt,			"runt",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_jab,			"jabber",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_babl,			"babble",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_tmder,		"tmd_error",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_txlaterr,		"tx_late_error",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_rxlaterr,		"rx_late_error",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_slvparerr,		"slv_parity_error",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_txparerr,		"tx_parity_error",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_rxparerr,		"rx_parity_error",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_slverrack,		"slv_error_ack",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_txerrack,		"tx_error_ack",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_rxerrack,		"rx_error_ack",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_txtagerr,		"tx_tag_error",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_rxtagerr,		"rx_tag_error",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_eoperr,		"eop_error",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_notmds,		"no_tmds",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_notbufs,		"no_tbufs",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_norbufs,		"no_rbufs",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_clsn,			"rx_late_collisions",
-		KSTAT_DATA_ULONG);
-
-	/*
-	 * MIB II kstat variables
-	 */
-	kstat_named_init(&hkp->hk_rcvbytes,		"rbytes",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_xmtbytes,		"obytes",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_multircv,		"multircv",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_multixmt,		"multixmt",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_brdcstrcv,		"brdcstrcv",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_brdcstxmt,		"brdcstxmt",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_norcvbuf,		"norcvbuf",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_noxmtbuf,		"noxmtbuf",
-		KSTAT_DATA_ULONG);
-
+	    KSTAT_DATA_ULONG);
 
 	kstat_named_init(&hkp->hk_newfree,		"newfree",
-		KSTAT_DATA_ULONG);
-	/*
-	 * PSARC 1997/198
-	 */
-	kstat_named_init(&hkp->hk_ipackets64,		"ipackets64",
-		KSTAT_DATA_ULONGLONG);
-	kstat_named_init(&hkp->hk_opackets64,		"opackets64",
-		KSTAT_DATA_ULONGLONG);
-	kstat_named_init(&hkp->hk_rbytes64,		"rbytes64",
-		KSTAT_DATA_ULONGLONG);
-	kstat_named_init(&hkp->hk_obytes64,		"obytes64",
-		KSTAT_DATA_ULONGLONG);
-
-	/*
-	 * PSARC 1997/247 : RFC 1643
-	 */
-	kstat_named_init(&hkp->hk_align_errors,		"align_errors",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_fcs_errors,		"fcs_errors",
-		KSTAT_DATA_ULONG);
-	/* first_collisions */
-	kstat_named_init(&hkp->hk_sqe_errors,		"sqe_errors",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_defer_xmts,		"defer_xmts",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_multi_collisions,	"multi_collisions",
-		KSTAT_DATA_ULONG);
-	/* tx_late_collisions */
-	kstat_named_init(&hkp->hk_ex_collisions,	"ex_collisions",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_macxmt_errors,	"macxmt_errors",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_carrier_errors,	"carrier_errors",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_toolong_errors,	"toolong_errors",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_macrcv_errors,	"macrcv_errors",
-		KSTAT_DATA_ULONG);
-
-	/*
-	 * RFE kstats
-	 */
-	kstat_named_init(&hkp->hk_link_duplex,		"link_duplex",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 	/*
 	 * Debugging kstats
 	 */
 	kstat_named_init(&hkp->hk_inits,		"inits",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_rxinits,		"rxinits",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_txinits,		"txinits",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_dmarh_inits,		"dmarh_inits",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_dmaxh_inits,		"dmaxh_inits",
-		KSTAT_DATA_ULONG);
-	kstat_named_init(&hkp->hk_link_down_cnt,	"link_down_cnt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&hkp->hk_phyfail,		"phy_failures",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 	/*
 	 * I/O bus kstats
@@ -4249,422 +3600,28 @@ hmestatinit(struct hme *hmep)
 	/*
 	 * xcvr kstats
 	 */
-	kstat_named_init(&hkp->hk_xcvr_vendor_id,	"xcvr_vendor",
-		KSTAT_DATA_ULONGLONG);
 	kstat_named_init(&hkp->hk_asic_rev,		"asic_rev",
-		KSTAT_DATA_ULONG);
-
-	/*
-	 * Link Status
-	 */
-	kstat_named_init(&hkp->hk_link_up,		"link_up",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 	ksp->ks_update = hmestat_kstat_update;
 	ksp->ks_private = (void *) hmep;
 	kstat_install(ksp);
 }
 
-/*
- * Assorted DLPI V2 routines.
- */
-/* ARGSUSED */
-static int
-hmeopen(queue_t *rq, dev_t *devp, int flag, int sflag, cred_t *credp)
-{
-	struct	hmestr	*sbp;
-	struct	hmestr	**prevsbp;
-	minor_t	minordev;
-
-	ASSERT(sflag != MODOPEN);
-	if (sflag == MODOPEN)
-		return (EINVAL);
-
-	TRACE_1(TR_FAC_BE, TR_BE_OPEN, "hmeopen:  rq %p", rq);
-
-	/*
-	 * Serialize all driver open and closes.
-	 */
-	rw_enter(&hmestruplock, RW_WRITER);
-	mutex_enter(&hmewenlock);
-
-	/*
-	 * Determine minor device number.
-	 */
-	prevsbp = &hmestrup;
-	if (sflag == CLONEOPEN) {
-		minordev = 0;
-		for (; (sbp = *prevsbp) != NULL; prevsbp = &sbp->sb_nextp) {
-			if (minordev < sbp->sb_minor)
-				break;
-			minordev++;
-		}
-		*devp = makedevice(getmajor(*devp), minordev);
-	} else
-		minordev = getminor(*devp);
-
-	if (rq->q_ptr) {
-		goto done;
-	}
-
-	sbp = GETSTRUCT(struct hmestr, 1);
-
-	HME_DEBUG_MSG2(NULL, SEVERITY_NONE, INIT_MSG,
-			"hmeopen: sbp = %X\n", sbp);
-
-	sbp->sb_minor = minordev;
-	sbp->sb_rq = rq;
-	sbp->sb_state = DL_UNATTACHED;
-	sbp->sb_sap = 0;
-	sbp->sb_flags = 0;
-	sbp->sb_hmep = NULL;
-
-	mutex_init(&sbp->sb_lock, NULL, MUTEX_DRIVER, NULL);
-
-	/*
-	 * Link new entry into the list of active entries.
-	 */
-	sbp->sb_nextp = *prevsbp;
-	*prevsbp = sbp;
-
-	rq->q_ptr = WR(rq)->q_ptr = (char *)sbp;
-
-	/*
-	 * Disable automatic enabling of our write service procedure.
-	 * We control this explicitly.
-	 */
-	noenable(WR(rq));
-done:
-	mutex_exit(&hmewenlock);
-	rw_exit(&hmestruplock);
-
-	/* inform framework we are a good citizen */
-	(void) qassociate(rq, -1);
-
-	qprocson(rq);
-	return (0);
-}
-
-static int
-hmeclose(queue_t *rq)
-{
-	struct	hmestr	*sbp;
-	struct	hmestr	**prevsbp;
-
-	TRACE_1(TR_FAC_BE, TR_BE_CLOSE, "hmeclose:  rq %p", rq);
-	ASSERT(rq->q_ptr);
-
-	qprocsoff(rq);
-
-	sbp = (struct hmestr *)rq->q_ptr;
-
-	/*
-	 * Implicit detach Stream from interface.
-	 */
-	if (sbp->sb_hmep) {
-		hmedodetach(sbp);
-		(void) qassociate(rq, -1);
-	}
-
-	rw_enter(&hmestruplock, RW_WRITER);
-	mutex_enter(&hmewenlock);
-
-	/*
-	 * Unlink the per-Stream entry from the active list and free it.
-	 */
-	for (prevsbp = &hmestrup; (sbp = *prevsbp) != NULL;
-		prevsbp = &sbp->sb_nextp)
-		if (sbp == (struct hmestr *)rq->q_ptr)
-			break;
-	ASSERT(sbp);
-	*prevsbp = sbp->sb_nextp;
-
-	mutex_destroy(&sbp->sb_lock);
-	kmem_free((char *)sbp, sizeof (struct hmestr));
-
-	rq->q_ptr = WR(rq)->q_ptr = NULL;
-
-	mutex_exit(&hmewenlock);
-	rw_exit(&hmestruplock);
-	return (0);
-}
-
-static int
-hmewput(queue_t *wq, mblk_t *mp)
-{
-	struct	hmestr	*sbp = (struct hmestr *)wq->q_ptr;
-	struct	hme	*hmep;
-
-	TRACE_1(TR_FAC_BE, TR_BE_WPUT_START,
-		"hmewput start:  wq %p", wq);
-
-	switch (DB_TYPE(mp)) {
-	case M_DATA:		/* "fastpath" */
-		hmep = sbp->sb_hmep;
-
-		if (((sbp->sb_flags & (HMESFAST|HMESRAW)) == 0) ||
-			(sbp->sb_state != DL_IDLE) ||
-			(hmep == NULL)) {
-			merror(wq, mp, EPROTO);
-			break;
-		}
-
-		/*
-		 * If any msgs already enqueued or the interface will
-		 * loop back up the message (due to HMEPROMISC), then
-		 * enqueue the msg.  Otherwise just xmit it directly.
-		 */
-		if (wq->q_first) {
-			(void) putq(wq, mp);
-			hmep->hme_wantw = 1;
-			qenable(wq);
-		} else if ((hmep->promisc_phys_cnt + hmep->promisc_multi_cnt)
-		    != 0) {
-			(void) putq(wq, mp);
-			qenable(wq);
-		} else
-			(void) hmestart(wq, mp, hmep);
-		break;
-
-	case M_PROTO:
-	case M_PCPROTO:
-		/*
-		 * Break the association between the current thread and
-		 * the thread that calls hmeproto() to resolve the
-		 * problem of hmeintr() threads which loop back around
-		 * to call hmeproto and try to recursively acquire
-		 * internal locks.
-		 */
-		(void) putq(wq, mp);
-		qenable(wq);
-		break;
-
-	case M_IOCTL:
-		hmeioctl(wq, mp);
-		break;
-
-	case M_FLUSH:
-		if (*mp->b_rptr & FLUSHW) {
-			flushq(wq, FLUSHALL);
-			*mp->b_rptr &= ~FLUSHW;
-		}
-		if (*mp->b_rptr & FLUSHR)
-			qreply(wq, mp);
-		else
-			freemsg(mp);
-		break;
-
-	default:
-		HME_DEBUG_MSG1(NULL, SEVERITY_HIGH, TX_MSG,
-				"Default in message type");
-		freemsg(mp);
-		break;
-	}
-	TRACE_1(TR_FAC_BE, TR_BE_WPUT_END, "hmewput end:  wq %p", wq);
-	return (0);
-}
-
-/*
- * Enqueue M_PROTO/M_PCPROTO (always) and M_DATA (sometimes) on the wq.
- *
- * Processing of some of the M_PROTO/M_PCPROTO msgs involves acquiring
- * internal locks that are held across upstream putnext calls.
- * Specifically there's the problem of hmeintr() holding hme_intrlock
- * and hmestruplock when it calls putnext() and that thread looping
- * back around to call hmewput and, eventually, hmeinit() to create a
- * recursive lock panic.  There are two obvious ways of solving this
- * problem: (1) have hmeintr() do putq instead of putnext which provides
- * the loopback "cutout" right at the rq, or (2) allow hmeintr() to putnext
- * and put the loopback "cutout" around hmeproto().  We choose the latter
- * for performance reasons.
- *
- * M_DATA messages are enqueued on the wq *only* when the xmit side
- * is out of tbufs or tmds.  Once the xmit resource is available again,
- * wsrv() is enabled and tries to xmit all the messages on the wq.
- */
-static int
-hmewsrv(queue_t *wq)
-{
-	mblk_t	*mp;
-	struct	hmestr	*sbp;
-	struct	hme	*hmep;
-
-	TRACE_1(TR_FAC_BE, TR_BE_WSRV_START, "hmewsrv start:  wq %p", wq);
-
-	sbp = (struct hmestr *)wq->q_ptr;
-	hmep = sbp->sb_hmep;
-
-	while (mp = getq(wq))
-		switch (DB_TYPE(mp)) {
-		case M_DATA:
-			if (hmep) {
-			    if (hmestart(wq, mp, hmep))
-				return (0);
-			} else
-				freemsg(mp);
-			break;
-
-		case M_PROTO:
-		case M_PCPROTO:
-			hmeproto(wq, mp);
-			break;
-
-		default:
-			ASSERT(0);
-			freemsg(mp);
-			break;
-		}
-	TRACE_1(TR_FAC_BE, TR_BE_WSRV_END, "hmewsrv end:  wq %p", wq);
-	return (0);
-}
-
 static void
-hmeproto(queue_t *wq, mblk_t  *mp)
+hme_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 {
-	union	DL_primitives	*dlp;
-	struct	hmestr	*sbp;
-	t_uscalar_t prim;
-
-	sbp = (struct hmestr *)wq->q_ptr;
-	dlp = (union DL_primitives *)mp->b_rptr;
-	prim = dlp->dl_primitive;
-
-	TRACE_2(TR_FAC_BE, TR_BE_PROTO_START,
-		"hmeproto start:  wq %p dlprim %X", wq, prim);
-
-	mutex_enter(&sbp->sb_lock);
-
-	switch (prim) {
-	case DL_UNITDATA_REQ:
-		hmeudreq(wq, mp);
-		break;
-
-	case DL_ATTACH_REQ:
-		hmeareq(wq, mp);
-		break;
-
-	case DL_DETACH_REQ:
-		hmedreq(wq, mp);
-		break;
-
-	case DL_BIND_REQ:
-		hmebreq(wq, mp);
-		break;
-
-	case DL_UNBIND_REQ:
-		hmeubreq(wq, mp);
-		break;
-
-	case DL_INFO_REQ:
-		hmeireq(wq, mp);
-		break;
-
-	case DL_PROMISCON_REQ:
-		hmeponreq(wq, mp);
-		break;
-
-	case DL_PROMISCOFF_REQ:
-		hmepoffreq(wq, mp);
-		break;
-
-	case DL_ENABMULTI_REQ:
-		hmeemreq(wq, mp);
-		break;
-
-	case DL_DISABMULTI_REQ:
-		hmedmreq(wq, mp);
-		break;
-
-	case DL_PHYS_ADDR_REQ:
-		hmepareq(wq, mp);
-		break;
-
-	case DL_SET_PHYS_ADDR_REQ:
-		hmespareq(wq, mp);
-		break;
-
-	case DL_NOTIFY_REQ:
-		hmenreq(wq, mp);
-		break;
-
-	default:
-		dlerrorack(wq, mp, prim, DL_UNSUPPORTED, 0);
-		break;
-	}
-
-	TRACE_2(TR_FAC_BE, TR_BE_PROTO_END,
-		"hmeproto end:  wq %p dlprim %X", wq, prim);
-
-	mutex_exit(&sbp->sb_lock);
-}
-
-static struct hme *
-hme_set_ppa(struct hmestr *sbp, queue_t *wq)
-{
-	struct	hme	*hmep = NULL;
-	int instance;
-
-	if (sbp->sb_hmep)	/* ppa has been selected */
-		return (sbp->sb_hmep);
-
-	instance = hme_device;
-	if (hme_device == -1) {	/* select the first one found */
-		mutex_enter(&hmelock);
-		if (hmeup)
-			instance = hmeup->instance;
-		mutex_exit(&hmelock);
-	}
-
-	if (instance == -1 || qassociate(wq, instance) != 0) {
-		return (NULL);
-	}
-
-	mutex_enter(&hmelock);
-	for (hmep = hmeup; hmep; hmep = hmep->hme_nextp)
-		if (instance == hmep->instance)
-			break;
-	ASSERT(hmep != NULL);
-	mutex_exit(&hmelock);
-
-	sbp->sb_hmep = hmep;
-	return (hmep);
-}
-
-static void
-hmeioctl(queue_t *wq, mblk_t  *mp)
-{
-	struct	iocblk	*iocp = (struct iocblk *)mp->b_rptr;
-	struct	hmestr	*sbp = (struct hmestr *)wq->q_ptr;
-	struct	hme	*hmep = sbp->sb_hmep;
-	struct	hme	*hmep1;
-	hme_ioc_cmd_t	*ioccmdp;
+	struct	hme	*hmep = arg;
+	struct	iocblk	*iocp = (void *)mp->b_rptr;
 	uint32_t old_ipg1, old_ipg2, old_use_int_xcvr, old_autoneg;
-	int32_t old_device;
-	int32_t  new_device;
 	uint32_t old_100T4;
 	uint32_t old_100fdx, old_100hdx, old_10fdx, old_10hdx;
 	uint32_t old_ipg0, old_lance_mode;
-	int error;
 
 	switch (iocp->ioc_cmd) {
-	case DLIOCRAW:		/* raw M_DATA mode */
-		sbp->sb_flags |= HMESRAW;
-		miocack(wq, mp, 0, 0);
-		break;
-
-	case DL_IOC_HDR_INFO:	/* M_DATA "fastpath" info request */
-		hme_dl_ioc_hdr_info(wq, mp);
-		break;
 
 	case HME_ND_GET:
-		hmep = hme_set_ppa(sbp, wq);
-		if (hmep == NULL) {	/* no device present */
-			miocnak(wq, mp, 0, EINVAL);
-			return;
-		}
-		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, NDD_MSG,
-				"hmeioctl:ND_GET");
-		mutex_enter(&hmelock);
+
 		old_autoneg = hme_param_autoneg;
 		old_100T4 = hme_param_anar_100T4;
 		old_100fdx = hme_param_anar_100fdx;
@@ -4686,9 +3643,6 @@ hmeioctl(queue_t *wq, mblk_t  *mp)
 			hme_param_anar_100hdx = old_100hdx;
 			hme_param_anar_10fdx = old_10fdx;
 			hme_param_anar_10hdx = old_10hdx;
-			mutex_exit(&hmelock);
-			HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, NDD_MSG,
-				"hmeioctl:false ret from hme_nd_getset");
 			miocnak(wq, mp, 0, EINVAL);
 			return;
 		}
@@ -4699,22 +3653,10 @@ hmeioctl(queue_t *wq, mblk_t  *mp)
 		hme_param_anar_10fdx = old_10fdx;
 		hme_param_anar_10hdx = old_10hdx;
 
-		mutex_exit(&hmelock);
-
-		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, NDD_MSG,
-				"hmeioctl:true ret from hme_nd_getset");
 		qreply(wq, mp);
 		break;
 
 	case HME_ND_SET:
-		hmep = hme_set_ppa(sbp, wq);
-		if (hmep == NULL) {	/* no device present */
-			miocnak(wq, mp, 0, EINVAL);
-			return;
-		}
-		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, NDD_MSG,
-				"hmeioctl:ND_SET");
-		old_device = hme_param_device;
 		old_ipg0 = hme_param_ipg0;
 		old_lance_mode = hme_param_lance_mode;
 		old_ipg1 = hme_param_ipg1;
@@ -4723,34 +3665,9 @@ hmeioctl(queue_t *wq, mblk_t  *mp)
 		old_autoneg = hme_param_autoneg;
 		hme_param_autoneg = 0xff;
 
-		mutex_enter(&hmelock);
 		if (!hme_nd_getset(wq, hmep->hme_g_nd, mp)) {
 			hme_param_autoneg = old_autoneg;
-			mutex_exit(&hmelock);
 			miocnak(wq, mp, 0, EINVAL);
-			return;
-		}
-		mutex_exit(&hmelock);
-
-		if (old_device != hme_param_device) {
-			new_device = hme_param_device;
-			hme_param_device = old_device;
-			hme_param_autoneg = old_autoneg;
-			if ((new_device == -1) ||
-			    (qassociate(wq, new_device) != 0)) {
-				miocnak(wq, mp, 0, EINVAL);
-				return;
-			}
-			mutex_enter(&hmelock);
-			for (hmep1 = hmeup; hmep1; hmep1 = hmep1->hme_nextp)
-				if (new_device == hmep1->instance)
-					break;
-			mutex_exit(&hmelock);
-			ASSERT(hmep1 != NULL);
-
-			hme_device = new_device;
-			sbp->sb_hmep = hmep1;
-			qreply(wq, mp);
 			return;
 		}
 
@@ -4765,1145 +3682,316 @@ hmeioctl(queue_t *wq, mblk_t  *mp)
 				hmep->hme_linkcheck = 0;
 				(void) hmeinit(hmep);
 			} else if ((old_ipg1 != hme_param_ipg1) ||
-					(old_ipg2 != hme_param_ipg2) ||
-					(old_ipg0 != hme_param_ipg0) ||
-				(old_lance_mode != hme_param_lance_mode)) {
+			    (old_ipg2 != hme_param_ipg2) ||
+			    (old_ipg0 != hme_param_ipg0) ||
+			    (old_lance_mode != hme_param_lance_mode)) {
 				(void) hmeinit(hmep);
 			}
 		}
 		break;
 
-	case HME_IOC:
-		error = miocpullup(mp, sizeof (hme_ioc_cmd_t));
-		if (error != 0) {
-			miocnak(wq, mp, 0, error);
-			return;
-		}
-
-		ioccmdp = (hme_ioc_cmd_t *)mp->b_cont->b_rptr;
-		switch (ioccmdp->hdr.cmd) {
-
-		case HME_IOC_GET_SPEED:
-			ioccmdp->mode = hmep->hme_mode;
-
-			switch (hmep->hme_mode) {
-			case HME_AUTO_SPEED:
-				ioccmdp->speed = hmep->hme_tryspeed;
-				break;
-			case HME_FORCE_SPEED:
-				ioccmdp->speed = hmep->hme_forcespeed;
-				break;
-			default:
-				HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, NDD_MSG,
-						"HME_IOC default get speed");
-				break;
-			}
-
-			miocack(wq, mp, msgsize(mp->b_cont), 0);
-			break;
-
-		case HME_IOC_SET_SPEED:
-			hmep->hme_mode = ioccmdp->mode;
-			hmep->hme_linkup = 0;
-			hmep->hme_delay = 0;
-			hmep->hme_linkup_cnt = 0;
-			hmep->hme_force_linkdown = HME_FORCE_LINKDOWN;
-			ddi_dev_report_fault(hmep->dip, DDI_SERVICE_DEGRADED,
-			    DDI_DEVICE_FAULT, link_down_msg);
-
-			/* Enable display of linkup message */
-			switch (hmep->hme_mode) {
-			case HME_AUTO_SPEED:
-				HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,
-				    IOCTL_MSG,
-				    "ioctl: AUTO_SPEED");
-				hmep->hme_linkup_10 = 0;
-				hmep->hme_tryspeed = HME_SPEED_100;
-				hmep->hme_ntries = HME_NTRIES_LOW;
-				hmep->hme_nlasttries = HME_NTRIES_LOW;
-				hme_try_speed(hmep);
-				break;
-
-			case HME_FORCE_SPEED:
-				HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,
-				    IOCTL_MSG,
-				    "ioctl: FORCE_SPEED");
-
-				hmep->hme_forcespeed = ioccmdp->speed;
-				hme_force_speed(hmep);
-				break;
-			default:
-				HME_DEBUG_MSG1(hmep, SEVERITY_HIGH,
-				    NDD_MSG,
-				    "HME_IOC default set speed");
-				miocnak(wq, mp, 0, EINVAL);
-				return;
-			}
-			miocack(wq, mp, 0, 0);
-			break;
-		default:
-			HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, NDD_MSG,
-			    "HMEIOC default nor s/get speed");
-			miocnak(wq, mp, 0, EINVAL);
-			break;
-		}
-		break;
-
 	default:
-		HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, NDD_MSG,
-				"HME_IOC default command");
 		miocnak(wq, mp, 0, EINVAL);
 		break;
 	}
 }
 
-/*
- * M_DATA "fastpath" info request.
- * Following the M_IOCTL mblk should come a DL_UNITDATA_REQ mblk.
- * We ack with an M_IOCACK pointing to the original DL_UNITDATA_REQ mblk
- * followed by an mblk containing the raw ethernet header corresponding
- * to the destination address.  Subsequently, we may receive M_DATA
- * msgs which start with this header and may send up
- * up M_DATA msgs with b_rptr pointing to a (ulong_t) group address
- * indicator followed by the network-layer data (IP packet header).
- * This is all selectable on a per-Stream basis.
- */
-static void
-hme_dl_ioc_hdr_info(queue_t *wq, mblk_t *mp)
+/*ARGSUSED*/
+static boolean_t
+hme_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
-	mblk_t	*nmp;
-	struct	hmestr	*sbp;
-	struct	hmedladdr	*dlap;
-	dl_unitdata_req_t	*dludp;
-	struct	ether_header	*headerp;
-	struct	hme	*hmep;
-	t_uscalar_t off, len;
-	int error;
-
-	sbp = (struct hmestr *)wq->q_ptr;
-	hmep = sbp->sb_hmep;
-	if (hmep == NULL) {
-		miocnak(wq, mp, 0, EINVAL);
-		return;
-	}
-
-	error = miocpullup(mp, sizeof (dl_unitdata_req_t) + HMEADDRL);
-	if (error != 0) {
-		miocnak(wq, mp, 0, error);
-		return;
-	}
-
-	/*
-	 * Sanity check the DL_UNITDATA_REQ destination address
-	 * offset and length values.
-	 */
-	dludp = (dl_unitdata_req_t *)mp->b_cont->b_rptr;
-	off = dludp->dl_dest_addr_offset;
-	len = dludp->dl_dest_addr_length;
-	if (dludp->dl_primitive != DL_UNITDATA_REQ ||
-	    !MBLKIN(mp->b_cont, off, len) || len != HMEADDRL) {
-		miocnak(wq, mp, 0, EINVAL);
-		return;
-	}
-
-	dlap = (struct hmedladdr *)(mp->b_cont->b_rptr + off);
-
-	/*
-	 * Allocate a new mblk to hold the ether header.
-	 */
-	if ((nmp = allocb(sizeof (struct ether_header), BPRI_MED)) == NULL) {
-		miocnak(wq, mp, 0, ENOMEM);
-		return;
-	}
-	nmp->b_wptr += sizeof (struct ether_header);
-
-	/*
-	 * Fill in the ether header.
-	 */
-	headerp = (struct ether_header *)nmp->b_rptr;
-	ether_bcopy(&dlap->dl_phys, &headerp->ether_dhost);
-	ether_bcopy(&hmep->hme_ouraddr, &headerp->ether_shost);
-	put_ether_type(headerp, dlap->dl_sap);
-
-	/*
-	 * Link new mblk in after the "request" mblks.
-	 */
-	linkb(mp, nmp);
-
-	sbp->sb_flags |= HMESFAST;
-	miocack(wq, mp, msgsize(mp->b_cont), 0);
-}
-
-static void
-hmeareq(queue_t *wq, mblk_t *mp)
-{
-	struct	hmestr	*sbp;
-	union	DL_primitives	*dlp;
-	struct	hme	*hmep = NULL;
-	t_uscalar_t ppa;
-	uint32_t promisc_phys_cnt = 0, promisc_multi_cnt = 0;
-
-	sbp = (struct hmestr *)wq->q_ptr;
-	dlp = (union DL_primitives *)mp->b_rptr;
-
-	if (MBLKL(mp) < DL_ATTACH_REQ_SIZE) {
-		dlerrorack(wq, mp, DL_ATTACH_REQ, DL_BADPRIM, 0);
-		return;
-	}
-
-	if (sbp->sb_state != DL_UNATTACHED) {
-		dlerrorack(wq, mp, DL_ATTACH_REQ, DL_OUTSTATE, 0);
-		return;
-	}
-
-	/*
-	 * Count the number of snoop/promisc modes.
-	 */
-	if (sbp->sb_flags & HMESALLPHYS)
-		promisc_phys_cnt++;
-	if (sbp->sb_flags & HMESALLMULTI)
-		promisc_multi_cnt++;
-
-	ppa = dlp->attach_req.dl_ppa;
-
-	/*
-	 * Valid ppa?
-	 */
-	if (qassociate(wq, ppa) == 0) {
-		mutex_enter(&hmelock);
-		for (hmep = hmeup; hmep; hmep = hmep->hme_nextp) {
-			if (ppa == hmep->instance) {
-				hmep->promisc_phys_cnt += promisc_phys_cnt;
-				hmep->promisc_multi_cnt += promisc_multi_cnt;
-				break;
-			}
-		}
-		mutex_exit(&hmelock);
-		ASSERT(hmep != NULL);
-	}
-
-	if (hmep == NULL) {
-		dlerrorack(wq, mp, dlp->dl_primitive, DL_BADPPA, 0);
-		return;
-	}
-
-	/* Set link to device and update our state. */
-	sbp->sb_hmep = hmep;
-	sbp->sb_state = DL_UNBOUND;
-
-	/*
-	 * Has device been initialized?  Do so if necessary.
-	 * Also check if promiscuous mode is set via the ALLPHYS and
-	 * ALLMULTI flags, for the stream.  If so, initialize the
-	 * interface.
-	 */
-	if (((hmep->hme_flags & HMERUNNING) == 0) ||
-	    (((hmep->promisc_multi_cnt + hmep->promisc_phys_cnt) == 1) &&
-	    ((promisc_multi_cnt + promisc_phys_cnt) > 0)) ||
-	    ((hmep->promisc_phys_cnt == 1) && (promisc_phys_cnt == 1))) {
-		/*
-		 * Initialize the Interrupt mask
-		 * The init will clear upon entry
-		 * and reset upon success.
-		 */
-		hmep->intr_mask = HMEG_MASK_INTR;
-
-		if (hmeinit(hmep)) {
-			dlerrorack(wq, mp, dlp->dl_primitive, DL_INITFAILED, 0);
-			sbp->sb_hmep = NULL;
-			sbp->sb_state = DL_UNATTACHED;
-			(void) qassociate(wq, -1);
-			return;
-		}
-
-		if ((hmep->promisc_phys_cnt == 1) && (promisc_phys_cnt == 1))
-			hmenotify_ind(hmep, DL_NOTE_PROMISC_ON_PHYS);
-	}
-
-	dlokack(wq, mp, DL_ATTACH_REQ);
-}
-
-static void
-hmedreq(queue_t *wq, mblk_t *mp)
-{
-	struct	hmestr	*sbp;
-
-	sbp = (struct hmestr *)wq->q_ptr;
-
-	if (MBLKL(mp) < DL_DETACH_REQ_SIZE) {
-		dlerrorack(wq, mp, DL_DETACH_REQ, DL_BADPRIM, 0);
-		return;
-	}
-
-	if (sbp->sb_state != DL_UNBOUND) {
-		dlerrorack(wq, mp, DL_DETACH_REQ, DL_OUTSTATE, 0);
-		return;
-	}
-
-	hmedodetach(sbp);
-	(void) qassociate(wq, -1);
-	dlokack(wq, mp, DL_DETACH_REQ);
-}
-
-/*
- * Detach a Stream from an interface.
- */
-static void
-hmedodetach(struct  hmestr *sbp)
-{
-	struct	hmestr	*tsbp;
-	struct	hme	*hmep;
-	uint_t	reinit = 0;
-	uint_t	i;
-	uint32_t promisc_phys_cnt = 0, promisc_multi_cnt = 0;
-
-	ASSERT(sbp->sb_hmep);
-
-	hmep = sbp->sb_hmep;
-	sbp->sb_hmep = NULL;
-
-	/* Disable promiscuous mode if on. */
-	if (sbp->sb_flags & HMESALLPHYS) {
-		sbp->sb_flags &= ~HMESALLPHYS;
-		promisc_phys_cnt++;
-		reinit = 1;
-	}
-
-	/* Disable ALLSAP mode if on. */
-	if (sbp->sb_flags & HMESALLSAP) {
-		sbp->sb_flags &= ~HMESALLSAP;
-		reinit = 1;
-	}
-
-	/* Disable ALLMULTI mode if on. */
-	if (sbp->sb_flags & HMESALLMULTI) {
-		sbp->sb_flags &= ~HMESALLMULTI;
-		promisc_multi_cnt++;
-		reinit = 1;
-	}
-
-	/* Disable any Multicast Addresses. */
-
-	for (i = 0; i < NMCHASH; i++) {
-		if (sbp->sb_mctab[i]) {
-			reinit = 1;
-			kmem_free(sbp->sb_mctab[i], sbp->sb_mcsize[i] *
-			    sizeof (struct ether_addr));
-			sbp->sb_mctab[i] = NULL;
-		}
-		sbp->sb_mccount[i] = sbp->sb_mcsize[i] = 0;
-	}
-
-	for (i = 0; i < 4; i++)
-		sbp->sb_ladrf[i] = 0;
-
-	for (i = 0; i < 64; i++)
-		sbp->sb_ladrf_refcnt[i] = 0;
-
-	sbp->sb_state = DL_UNATTACHED;
-
-	/*
-	 * Detach from device structure.
-	 * Uninit the device
-	 * when no other streams are attached to it.
-	 */
-	rw_enter(&hmestruplock, RW_READER);
-	for (tsbp = hmestrup; tsbp; tsbp = tsbp->sb_nextp)
-		if (tsbp->sb_hmep == hmep)
-			break;
-	rw_exit(&hmestruplock);
-
-	hmep->promisc_phys_cnt -= promisc_phys_cnt;
-	hmep->promisc_multi_cnt -= promisc_multi_cnt;
-	if (tsbp == NULL)
-		hmeuninit(hmep);
-	else if (reinit) {
-		if ((((hmep->promisc_multi_cnt + hmep->promisc_phys_cnt)
-		    == 0) && ((promisc_phys_cnt + promisc_multi_cnt) > 0)) ||
-		    ((hmep->promisc_phys_cnt == 0) && (promisc_phys_cnt == 1)))
-			(void) hmeinit(hmep);
-
-		if ((hmep->promisc_phys_cnt == 0) && (promisc_phys_cnt == 1))
-			hmenotify_ind(hmep, DL_NOTE_PROMISC_OFF_PHYS);
-	}
-	hmesetipq(hmep);
-}
-
-static void
-hmebreq(queue_t *wq, mblk_t *mp)
-{
-	struct	hmestr	*sbp;
-	union	DL_primitives	*dlp;
-	struct	hme	*hmep;
-	struct	hmedladdr	hmeaddr;
-	t_uscalar_t sap;
-	t_uscalar_t xidtest;
-
-	sbp = (struct hmestr *)wq->q_ptr;
-
-	if (MBLKL(mp) < DL_BIND_REQ_SIZE) {
-		dlerrorack(wq, mp, DL_BIND_REQ, DL_BADPRIM, 0);
-		return;
-	}
-
-	if (sbp->sb_state != DL_UNBOUND) {
-		dlerrorack(wq, mp, DL_BIND_REQ, DL_OUTSTATE, 0);
-		return;
-	}
-
-	dlp = (union DL_primitives *)mp->b_rptr;
-	if (dlp->bind_req.dl_service_mode != hmeinfoack.dl_service_mode) {
-		dlerrorack(wq, mp, DL_BIND_REQ, DL_UNSUPPORTED, 0);
-		return;
-	}
-
-	hmep = sbp->sb_hmep;
-	sap = dlp->bind_req.dl_sap;
-	xidtest = dlp->bind_req.dl_xidtest_flg;
-
-	ASSERT(hmep);
-
-	if (xidtest) {
-		dlerrorack(wq, mp, DL_BIND_REQ, DL_NOAUTO, 0);
-		return;
-	}
-
-	if (sap > ETHERTYPE_MAX) {
-		dlerrorack(wq, mp, dlp->dl_primitive, DL_BADSAP, 0);
-		return;
-	}
-
-	/*
-	 * Save SAP value for this Stream and change state.
-	 */
-	sbp->sb_sap = sap;
-	sbp->sb_state = DL_IDLE;
-
-	hmeaddr.dl_sap = sap;
-	ether_bcopy(&hmep->hme_ouraddr, &hmeaddr.dl_phys);
-	dlbindack(wq, mp, sap, &hmeaddr, HMEADDRL, 0, 0);
-	hmesetipq(hmep);
-
-}
-
-static void
-hmeubreq(queue_t *wq, mblk_t *mp)
-{
-	struct	hmestr	*sbp;
-
-	sbp = (struct hmestr *)wq->q_ptr;
-
-	if (MBLKL(mp) < DL_UNBIND_REQ_SIZE) {
-		dlerrorack(wq, mp, DL_UNBIND_REQ, DL_BADPRIM, 0);
-		return;
-	}
-
-	if (sbp->sb_state != DL_IDLE) {
-		dlerrorack(wq, mp, DL_UNBIND_REQ, DL_OUTSTATE, 0);
-		return;
-	}
-
-	sbp->sb_state = DL_UNBOUND;
-	sbp->sb_sap = 0;
-
-	dlokack(wq, mp, DL_UNBIND_REQ);
-
-	hmesetipq(sbp->sb_hmep);
-}
-
-static void
-hmeireq(queue_t *wq, mblk_t *mp)
-{
-	struct	hmestr	*sbp;
-	dl_info_ack_t	*dlip;
-	struct	hmedladdr	*dlap;
-	struct	ether_addr	*ep;
-	size_t	size;
-
-	sbp = (struct hmestr *)wq->q_ptr;
-
-	if (MBLKL(mp) < DL_INFO_REQ_SIZE) {
-		dlerrorack(wq, mp, DL_INFO_REQ, DL_BADPRIM, 0);
-		return;
-	}
-
-	/* Exchange current msg for a DL_INFO_ACK. */
-	size = sizeof (dl_info_ack_t) + HMEADDRL + ETHERADDRL;
-	if ((mp = mexchange(wq, mp, size, M_PCPROTO, DL_INFO_ACK)) == NULL)
-		return;
-
-	/* Fill in the DL_INFO_ACK fields and reply. */
-	dlip = (dl_info_ack_t *)mp->b_rptr;
-	*dlip = hmeinfoack;
-	dlip->dl_current_state = sbp->sb_state;
-	dlap = (struct hmedladdr *)(mp->b_rptr + dlip->dl_addr_offset);
-	dlap->dl_sap = sbp->sb_sap;
-	if (sbp->sb_hmep) {
-		ether_bcopy(&sbp->sb_hmep->hme_ouraddr, &dlap->dl_phys);
-	} else {
-		bzero(&dlap->dl_phys, ETHERADDRL);
-	}
-	ep = (struct ether_addr *)(mp->b_rptr + dlip->dl_brdcst_addr_offset);
-	ether_bcopy(&etherbroadcastaddr, ep);
-
-	qreply(wq, mp);
-}
-
-static void
-hmeponreq(queue_t *wq, mblk_t *mp)
-{
-	struct hme *hmep;
-	struct	hmestr	*sbp;
-	uint32_t promisc_phys_cnt = 0, promisc_multi_cnt = 0;
-
-	sbp = (struct hmestr *)wq->q_ptr;
-
-	if (MBLKL(mp) < DL_PROMISCON_REQ_SIZE) {
-		dlerrorack(wq, mp, DL_PROMISCON_REQ, DL_BADPRIM, 0);
-		return;
-	}
-
-	switch (((dl_promiscon_req_t *)mp->b_rptr)->dl_level) {
-	case DL_PROMISC_PHYS:
-		sbp->sb_flags |= HMESALLPHYS;
-		promisc_phys_cnt++;
-		break;
-
-	case DL_PROMISC_SAP:
-		sbp->sb_flags |= HMESALLSAP;
-		break;
-
-	case DL_PROMISC_MULTI:
-		sbp->sb_flags |= HMESALLMULTI;
-		promisc_multi_cnt++;
-		break;
-
+	switch (cap) {
+	case MAC_CAPAB_HCKSUM:
+		*(uint32_t *)cap_data = HCKSUM_INET_PARTIAL;
+		return (B_TRUE);
 	default:
-		dlerrorack(wq, mp, DL_PROMISCON_REQ,
-					DL_NOTSUPPORTED, 0);
-		return;
+		return (B_FALSE);
 	}
-
-	hmep = sbp->sb_hmep;
-	if (hmep) {
-		hmep->promisc_phys_cnt += promisc_phys_cnt;
-		hmep->promisc_multi_cnt += promisc_multi_cnt;
-		if ((((hmep->promisc_multi_cnt + hmep->promisc_phys_cnt)
-		    == 1) && ((promisc_multi_cnt + promisc_phys_cnt) > 0)) ||
-		    ((hmep->promisc_phys_cnt == 1) && (promisc_phys_cnt == 1)))
-			(void) hmeinit(sbp->sb_hmep);
-
-		if ((hmep->promisc_phys_cnt == 1) && (promisc_phys_cnt == 1))
-			hmenotify_ind(hmep, DL_NOTE_PROMISC_ON_PHYS);
-
-		hmesetipq(sbp->sb_hmep);
-	}
-
-	dlokack(wq, mp, DL_PROMISCON_REQ);
 }
 
-static void
-hmepoffreq(queue_t *wq, mblk_t *mp)
+static int
+hme_m_promisc(void *arg, boolean_t on)
 {
-	struct	hme	*hmep;
-	struct	hmestr	*sbp;
-	int	flag;
-	uint32_t promisc_phys_cnt = 0, promisc_multi_cnt = 0;
+	struct hme *hmep = arg;
 
-	sbp = (struct hmestr *)wq->q_ptr;
-
-	if (MBLKL(mp) < DL_PROMISCOFF_REQ_SIZE) {
-		dlerrorack(wq, mp, DL_PROMISCOFF_REQ, DL_BADPRIM, 0);
-		return;
-	}
-
-	switch (((dl_promiscoff_req_t *)mp->b_rptr)->dl_level) {
-	case DL_PROMISC_PHYS:
-		flag = HMESALLPHYS;
-		promisc_phys_cnt++;
-		break;
-
-	case DL_PROMISC_SAP:
-		flag = HMESALLSAP;
-		break;
-
-	case DL_PROMISC_MULTI:
-		flag = HMESALLMULTI;
-		promisc_multi_cnt++;
-		break;
-
-	default:
-		dlerrorack(wq, mp, DL_PROMISCOFF_REQ,
-					DL_NOTSUPPORTED, 0);
-		return;
-	}
-
-	if ((sbp->sb_flags & flag) == 0) {
-		dlerrorack(wq, mp, DL_PROMISCOFF_REQ, DL_NOTENAB, 0);
-		return;
-	}
-
-	sbp->sb_flags &= ~flag;
-	hmep = sbp->sb_hmep;
-
-	if (hmep) {
-		hmep->promisc_phys_cnt -= promisc_phys_cnt;
-		hmep->promisc_multi_cnt -= promisc_multi_cnt;
-		if ((((hmep->promisc_multi_cnt + hmep->promisc_phys_cnt)
-		    == 0) && ((promisc_multi_cnt + promisc_phys_cnt) > 0)) ||
-		    ((hmep->promisc_phys_cnt == 0) && (promisc_phys_cnt == 1)))
-			(void) hmeinit(hmep);
-
-		if ((hmep->promisc_phys_cnt == 0) && (promisc_phys_cnt == 1))
-			hmenotify_ind(hmep, DL_NOTE_PROMISC_OFF_PHYS);
-		hmesetipq(hmep);
-	}
-
-	dlokack(wq, mp, DL_PROMISCOFF_REQ);
+	hmep->hme_promisc = on;
+	(void) hmeinit(hmep);
+	return (0);
 }
 
-/*
- * This is to support unlimited number of members
- * is MC.
- */
-static void
-hmeemreq(queue_t *wq, mblk_t *mp)
+static int
+hme_m_unicst(void *arg, const uint8_t *macaddr)
 {
-	struct	hmestr	*sbp;
-	union	DL_primitives	*dlp;
-	struct	ether_addr	*addrp;
-	t_uscalar_t off;
-	t_uscalar_t len;
-	uint32_t	mchash;
-	struct	ether_addr	*mcbucket;
-	uint32_t	ladrf_bit;
-
-	sbp = (struct hmestr *)wq->q_ptr;
-
-	if (MBLKL(mp) < DL_ENABMULTI_REQ_SIZE) {
-		dlerrorack(wq, mp, DL_ENABMULTI_REQ, DL_BADPRIM, 0);
-		return;
-	}
-
-	if (sbp->sb_state == DL_UNATTACHED) {
-		dlerrorack(wq, mp, DL_ENABMULTI_REQ, DL_OUTSTATE, 0);
-		return;
-	}
-
-	dlp = (union DL_primitives *)mp->b_rptr;
-	len = dlp->enabmulti_req.dl_addr_length;
-	off = dlp->enabmulti_req.dl_addr_offset;
-	addrp = (struct ether_addr *)(mp->b_rptr + off);
-
-	if ((len != ETHERADDRL) ||
-		!MBLKIN(mp, off, len) ||
-		((addrp->ether_addr_octet[0] & 01) == 0)) {
-		dlerrorack(wq, mp, DL_ENABMULTI_REQ, DL_BADADDR, 0);
-		return;
-	}
-
-	/*
-	 * Calculate hash value and bucket.
-	 */
-
-	mchash = MCHASH(addrp);
-	mcbucket = sbp->sb_mctab[mchash];
-
-	/*
-	 * Allocate hash bucket if it's not there.
-	 */
-
-	if (mcbucket == NULL) {
-		sbp->sb_mctab[mchash] = mcbucket =
-		    kmem_alloc(INIT_BUCKET_SIZE * sizeof (struct ether_addr),
-			KM_SLEEP);
-		sbp->sb_mcsize[mchash] = INIT_BUCKET_SIZE;
-	}
-
-	/*
-	 * We no longer bother checking to see if the address is already
-	 * in the table (bugid 1209733).  We won't reinitialize the
-	 * hardware, since we'll find the mc bit is already set.
-	 */
-
-	/*
-	 * Expand table if necessary.
-	 */
-	if (sbp->sb_mccount[mchash] >= sbp->sb_mcsize[mchash]) {
-		struct	ether_addr	*newbucket;
-		uint32_t		newsize;
-
-		newsize = sbp->sb_mcsize[mchash] * 2;
-
-		newbucket = kmem_alloc(newsize * sizeof (struct ether_addr),
-			KM_SLEEP);
-
-		bcopy(mcbucket, newbucket,
-		    sbp->sb_mcsize[mchash] * sizeof (struct ether_addr));
-		kmem_free(mcbucket, sbp->sb_mcsize[mchash] *
-		    sizeof (struct ether_addr));
-
-		sbp->sb_mctab[mchash] = mcbucket = newbucket;
-		sbp->sb_mcsize[mchash] = newsize;
-	}
-
-	/*
-	 * Add address to the table.
-	 */
-	mcbucket[sbp->sb_mccount[mchash]++] = *addrp;
-
-	/*
-	 * If this address's bit was not already set in the local address
-	 * filter, add it and re-initialize the Hardware.
-	 */
-	ladrf_bit = hmeladrf_bit(addrp);
-
-	if (sbp->sb_ladrf_refcnt[ladrf_bit] == 0) {
-		sbp->sb_ladrf[ladrf_bit >> 4] |= 1 << (ladrf_bit & 0xf);
-		(void) hmeinit(sbp->sb_hmep);
-	}
-	sbp->sb_ladrf_refcnt[ladrf_bit]++;
-
-	dlokack(wq, mp, DL_ENABMULTI_REQ);
-}
-
-static void
-hmedmreq(queue_t *wq, mblk_t *mp)
-{
-	struct	hmestr	*sbp;
-	union	DL_primitives	*dlp;
-	struct	ether_addr	*addrp;
-	t_uscalar_t off;
-	t_uscalar_t len;
-	int	i;
-	uint32_t		mchash;
-	struct	ether_addr	*mcbucket;
-
-	sbp = (struct hmestr *)wq->q_ptr;
-
-	if (MBLKL(mp) < DL_DISABMULTI_REQ_SIZE) {
-		dlerrorack(wq, mp, DL_DISABMULTI_REQ, DL_BADPRIM, 0);
-		return;
-	}
-
-	if (sbp->sb_state == DL_UNATTACHED) {
-		dlerrorack(wq, mp, DL_DISABMULTI_REQ, DL_OUTSTATE, 0);
-		return;
-	}
-
-	dlp = (union DL_primitives *)mp->b_rptr;
-	len = dlp->disabmulti_req.dl_addr_length;
-	off = dlp->disabmulti_req.dl_addr_offset;
-	addrp = (struct ether_addr *)(mp->b_rptr + off);
-
-	if ((len != ETHERADDRL) || !MBLKIN(mp, off, len)) {
-		dlerrorack(wq, mp, DL_DISABMULTI_REQ, DL_BADADDR, 0);
-		return;
-	}
-
-	/*
-	 * Calculate hash value, get pointer to hash bucket for this address.
-	 */
-
-	mchash = MCHASH(addrp);
-	mcbucket = sbp->sb_mctab[mchash];
-
-	/*
-	 * Try and delete the address if we can find it.
-	 */
-	if (mcbucket) {
-		for (i = 0; i < sbp->sb_mccount[mchash]; i++) {
-			if (ether_cmp(addrp, &mcbucket[i]) == 0) {
-				uint32_t ladrf_bit;
-
-				/*
-				 * If there's more than one address in this
-				 * bucket, delete the unwanted one by moving
-				 * the last one in the list over top of it;
-				 * otherwise, just free the bucket.
-				 */
-				if (sbp->sb_mccount[mchash] > 1) {
-					mcbucket[i] =
-					    mcbucket[sbp->sb_mccount[mchash]-1];
-				} else {
-					kmem_free(mcbucket,
-					    sbp->sb_mcsize[mchash] *
-					    sizeof (struct ether_addr));
-					sbp->sb_mctab[mchash] = NULL;
-				}
-				sbp->sb_mccount[mchash]--;
-
-				/*
-				 * If this address's bit should no longer be
-				 * set in the local address filter, clear it and
-				 * re-initialize the Hardware
-				 */
-
-				ladrf_bit = hmeladrf_bit(addrp);
-				sbp->sb_ladrf_refcnt[ladrf_bit]--;
-
-				if (sbp->sb_ladrf_refcnt[ladrf_bit] == 0) {
-					sbp->sb_ladrf[ladrf_bit >> 4] &=
-					    ~(1 << (ladrf_bit & 0xf));
-					(void) hmeinit(sbp->sb_hmep);
-				}
-
-				dlokack(wq, mp, DL_DISABMULTI_REQ);
-				return;
-			}
-		}
-	}
-	dlerrorack(wq, mp, DL_DISABMULTI_REQ, DL_NOTENAB, 0);
-}
-
-static void
-hmepareq(queue_t *wq, mblk_t *mp)
-{
-	struct	hmestr	*sbp;
-	union	DL_primitives	*dlp;
-	uint32_t	type;
-	struct	hme	*hmep;
-	struct	ether_addr	addr;
-
-	sbp = (struct hmestr *)wq->q_ptr;
-
-	if (MBLKL(mp) < DL_PHYS_ADDR_REQ_SIZE) {
-		dlerrorack(wq, mp, DL_PHYS_ADDR_REQ, DL_BADPRIM, 0);
-		return;
-	}
-
-	dlp = (union DL_primitives *)mp->b_rptr;
-	type = dlp->physaddr_req.dl_addr_type;
-	hmep = sbp->sb_hmep;
-
-	if (hmep == NULL) {
-		dlerrorack(wq, mp, DL_PHYS_ADDR_REQ, DL_OUTSTATE, 0);
-		return;
-	}
-
-	switch (type) {
-	case DL_FACT_PHYS_ADDR:
-		if (hmep->hme_addrflags & HME_FACTADDR_PRESENT)
-			ether_bcopy(&hmep->hme_factaddr, &addr);
-		else
-			(void) localetheraddr((struct ether_addr *)NULL, &addr);
-		break;
-
-	case DL_CURR_PHYS_ADDR:
-		ether_bcopy(&hmep->hme_ouraddr, &addr);
-		break;
-
-	default:
-		dlerrorack(wq, mp, DL_PHYS_ADDR_REQ, DL_NOTSUPPORTED, 0);
-			return;
-	}
-	dlphysaddrack(wq, mp, &addr, ETHERADDRL);
-}
-
-static void
-hmespareq(queue_t *wq, mblk_t *mp)
-{
-	struct	hmestr	*sbp;
-	union	DL_primitives	*dlp;
-	struct	ether_addr	*addrp;
-	struct	hme	*hmep;
-	t_uscalar_t off, len;
-
-	sbp = (struct hmestr *)wq->q_ptr;
-
-	if (MBLKL(mp) < DL_SET_PHYS_ADDR_REQ_SIZE) {
-		dlerrorack(wq, mp, DL_SET_PHYS_ADDR_REQ, DL_BADPRIM, 0);
-		return;
-	}
-
-	dlp = (union DL_primitives *)mp->b_rptr;
-	len = dlp->set_physaddr_req.dl_addr_length;
-	off = dlp->set_physaddr_req.dl_addr_offset;
-
-	if (!MBLKIN(mp, off, len)) {
-		dlerrorack(wq, mp, DL_SET_PHYS_ADDR_REQ, DL_BADPRIM, 0);
-		return;
-	}
-
-	addrp = (struct ether_addr *)(mp->b_rptr + off);
-
-	/*
-	 * Error if length of address isn't right or the address
-	 * specified is a multicast or broadcast address.
-	 */
-	if ((len != ETHERADDRL) ||
-		((addrp->ether_addr_octet[0] & 01) == 1) ||
-		(ether_cmp(addrp, &etherbroadcastaddr) == 0)) {
-		dlerrorack(wq, mp, DL_SET_PHYS_ADDR_REQ, DL_BADADDR, 0);
-		return;
-	}
-
-	/*
-	 * Error if this stream is not attached to a device.
-	 */
-	if ((hmep = sbp->sb_hmep) == NULL) {
-		dlerrorack(wq, mp, DL_SET_PHYS_ADDR_REQ, DL_OUTSTATE, 0);
-		return;
-	}
+	struct hme *hmep = arg;
 
 	/*
 	 * Set new interface local address and re-init device.
 	 * This is destructive to any other streams attached
 	 * to this device.
 	 */
-	ether_bcopy(addrp, &hmep->hme_ouraddr);
-	(void) hmeinit(sbp->sb_hmep);
-
-	dlokack(wq, mp, DL_SET_PHYS_ADDR_REQ);
-}
-
-static void
-hmeudreq(queue_t *wq, mblk_t *mp)
-{
-	struct	hmestr	*sbp;
-	struct	hme	*hmep;
-	dl_unitdata_req_t	*dludp;
-	mblk_t	*nmp;
-	struct	hmedladdr	*dlap;
-	struct	ether_header	*headerp;
-	t_uscalar_t off, len;
-	t_uscalar_t sap;
-	int	hdrlen;
-
-	sbp = (struct hmestr *)wq->q_ptr;
-	hmep = sbp->sb_hmep;
-
-	if (sbp->sb_state != DL_IDLE) {
-		dlerrorack(wq, mp, DL_UNITDATA_REQ, DL_OUTSTATE, 0);
-		return;
-	}
-
-	dludp = (dl_unitdata_req_t *)mp->b_rptr;
-
-	off = dludp->dl_dest_addr_offset;
-	len = dludp->dl_dest_addr_length;
-
-	/*
-	 * Validate destination address format.
-	 */
-	if (!MBLKIN(mp, off, len) || (len != HMEADDRL)) {
-		dluderrorind(wq, mp, mp->b_rptr + off, len, DL_BADADDR, 0);
-		return;
-	}
-
-	/*
-	 * Error if no M_DATA follows.
-	 */
-	nmp = mp->b_cont;
-	if (nmp == NULL) {
-		dluderrorind(wq, mp, mp->b_rptr + off, len, DL_BADDATA, 0);
-		return;
-	}
-
-	dlap = (struct hmedladdr *)(mp->b_rptr + off);
-	hdrlen = sizeof (struct ether_header);
-
-	/*
-	 * Create ethernet header by either prepending it onto the
-	 * next mblk if possible, or reusing the M_PROTO block if not.
-	 */
-	if ((DB_REF(nmp) == 1) && (MBLKHEAD(nmp) >= hdrlen) &&
-		(((uintptr_t)nmp->b_rptr & 0x1) == 0)) {
-		/*
-		 * Space available for ethernet hdr in M_DATA payload
-		 */
-		nmp->b_rptr -= hdrlen;
-		headerp = (struct ether_header *)nmp->b_rptr;
-		ether_bcopy(&dlap->dl_phys, &headerp->ether_dhost);
-		ether_bcopy(&hmep->hme_ouraddr, &headerp->ether_shost);
-		sap = (uint16_t)((((uchar_t *)(&dlap->dl_sap))[0] << 8) |
-			((uchar_t *)(&dlap->dl_sap))[1]);
-		freeb(mp);
-	} else if ((DB_REF(mp) == 1) && (MBLKSIZE(mp) >= hdrlen)) {
-		/*
-		 * Space available in dl_unitdata_req M_PROTO blk. Reuse it.
-		 */
-		nmp = mp;
-		DB_TYPE(nmp) = M_DATA;
-		nmp->b_rptr = DB_BASE(nmp);
-		nmp->b_wptr = nmp->b_rptr + hdrlen;
-		headerp = (struct ether_header *)nmp->b_rptr;
-		ether_bcopy(&dlap->dl_phys, &headerp->ether_dhost);
-		ether_bcopy(&hmep->hme_ouraddr, &headerp->ether_shost);
-		sap = (uint16_t)((((uchar_t *)(&dlap->dl_sap))[0] << 8) |
-			((uchar_t *)(&dlap->dl_sap))[1]);
-
-	} else {
-		/*
-		 * M_PROTO and M_DATA did not have space for ethernet hdr.
-		 * Allocate new mblk.
-		 */
-		if ((nmp = allocb(hdrlen, BPRI_MED)) == NULL) {
-			HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, DISPLAY_MSG,
-			    "allocb failed\n");
-			return;
-		}
-		headerp = (struct ether_header *)nmp->b_rptr;
-		ether_bcopy(&dlap->dl_phys, &headerp->ether_dhost);
-		ether_bcopy(&hmep->hme_ouraddr, &headerp->ether_shost);
-		sap = (uint16_t)((((uchar_t *)(&dlap->dl_sap))[0] << 8) |
-			((uchar_t *)(&dlap->dl_sap))[1]);
-		nmp->b_wptr = nmp->b_rptr + hdrlen;
-		linkb(nmp, mp->b_cont);
-		freeb(mp);
-	}
-
-
-	/*
-	 * In 802.3 mode, the driver looks at the
-	 * sap field of the DL_BIND_REQ being 0 in addition to the destination
-	 * sap field in the range [0-1500]. If either is true, then the driver
-	 * computes the length of the message, not including initial M_PROTO
-	 * mblk (message block), of all subsequent DL_UNITDATA_REQ messages and
-	 * transmits 802.3 frames that have this value in the MAC frame header
-	 * length field.
-	 */
-	if (sap <= ETHERMTU || (sbp->sb_sap == 0)) {
-		put_ether_type(headerp, (msgsize(nmp) - hdrlen));
-	} else {
-		put_ether_type(headerp, sap);
-	}
-	(void) hmestart(wq, nmp, hmep);
-}
-
-static void
-hmenreq(queue_t *wq, mblk_t *mp)
-{
-	struct	hmestr		*sbp;
-	dl_notify_req_t		*dlip;
-	dl_notify_ind_t		*dlnip;
-	struct	hme		*hmep = NULL;
-	mblk_t			*nmp;
-	uint32_t		dl_notification;
-
-	if (MBLKL(mp) < DL_NOTIFY_REQ_SIZE) {
-		dlerrorack(wq, mp, DL_NOTIFY_REQ, DL_BADPRIM, 0);
-		return;
-	}
-
-	dlip = (dl_notify_req_t *)mp->b_rptr;
-
-	dl_notification = dlip->dl_notifications & (
-				DL_NOTE_PROMISC_ON_PHYS |
-				DL_NOTE_PROMISC_OFF_PHYS |
-				DL_NOTE_LINK_DOWN |
-				DL_NOTE_LINK_UP |
-				DL_NOTE_SPEED);
-
-	sbp = (struct hmestr *)wq->q_ptr;
-
-	if (sbp->sb_state != DL_IDLE) {
-		dlerrorack(wq, mp, DL_NOTIFY_REQ, DL_BADPRIM, 0);
-		return;
-	}
-
-	hmep = sbp->sb_hmep;
-
-	sbp->sb_notifications |= dl_notification;
-
-	dlip->dl_notifications = DL_NOTE_PROMISC_ON_PHYS |
-				DL_NOTE_PROMISC_OFF_PHYS |
-				DL_NOTE_LINK_DOWN |
-				DL_NOTE_LINK_UP |
-				DL_NOTE_SPEED;
-
-	dlip->dl_primitive = DL_NOTIFY_ACK;
-	mp->b_wptr = mp->b_rptr + sizeof (dl_notify_ack_t);
-	qreply(wq, mp);
-
-	while (dl_notification) {
-		if ((nmp = allocb(DL_NOTIFY_IND_SIZE, BPRI_HI)) == NULL)
-			break;
-		nmp->b_datap->db_type = M_PROTO;
-		dlnip = (dl_notify_ind_t *)nmp->b_rptr;
-		dlnip->dl_primitive = DL_NOTIFY_IND;
-		dlnip->dl_notification = 0;
-		dlnip->dl_data = 0;
-		dlnip->dl_addr_length = 0;
-		dlnip->dl_addr_offset = 0;
-		if (dl_notification & DL_NOTE_PROMISC_ON_PHYS) {
-			dl_notification &= ~DL_NOTE_PROMISC_ON_PHYS;
-			if (hmep->promisc_phys_cnt)
-				dlnip->dl_notification =
-				    DL_NOTE_PROMISC_ON_PHYS;
-		} else if (dl_notification & DL_NOTE_PROMISC_OFF_PHYS) {
-			dl_notification &= ~DL_NOTE_PROMISC_OFF_PHYS;
-			if (hmep->promisc_phys_cnt == 0)
-				dlnip->dl_notification =
-				    DL_NOTE_PROMISC_OFF_PHYS;
-		} else if (dl_notification & DL_NOTE_LINK_DOWN) {
-			dl_notification &= ~DL_NOTE_LINK_DOWN;
-			if (!hmep->hme_link_up)
-				dlnip->dl_notification = DL_NOTE_LINK_DOWN;
-		} else if (dl_notification & DL_NOTE_LINK_UP) {
-			dl_notification &= ~DL_NOTE_LINK_UP;
-			if (hmep->hme_link_up)
-				dlnip->dl_notification = DL_NOTE_LINK_UP;
-		} else if (dl_notification & DL_NOTE_SPEED) {
-			dl_notification &= ~DL_NOTE_SPEED;
-			/*
-			 * Report interface speed in Kb/Sec
-			 */
-			dlnip->dl_data = hmep->hme_ifspeed * 1000;
-			dlnip->dl_notification = DL_NOTE_SPEED;
-		}
-		if (dlnip->dl_notification) {
-			nmp->b_wptr = nmp->b_rptr + sizeof (dl_notify_ind_t);
-			qreply(wq, nmp);
-		} else {
-			freemsg(nmp);
-		}
-	}
-
-}
-
-static void
-hmenotify_ind(struct hme *hmep, uint32_t notification)
-{
-	struct	hmestr		*sbp;
-	mblk_t			*mp;
-	dl_notify_ind_t *dlnip;
-
-	for (sbp = hmestrup; sbp; sbp = sbp->sb_nextp) {
-		/*
-		 * Notify streams that are attached to *this* instance only.
-		 */
-		if (sbp->sb_hmep != hmep)
-			continue;
-		if (notification & sbp->sb_notifications) {
-			if ((mp = allocb(DL_NOTIFY_IND_SIZE, BPRI_HI)) == NULL)
-				break;
-			mp->b_datap->db_type = M_PROTO;
-			dlnip = (dl_notify_ind_t *)mp->b_rptr;
-			dlnip->dl_primitive = DL_NOTIFY_IND;
-			dlnip->dl_notification = notification;
-			if (notification == DL_NOTE_SPEED)
-				/*
-				 * Report interface speed in Kb/Sec.
-				 */
-				dlnip->dl_data = hmep->hme_ifspeed * 1000;
-			else
-				dlnip->dl_data = 0;
-			dlnip->dl_addr_length = 0;
-			dlnip->dl_addr_offset = 0;
-			mp->b_wptr = mp->b_rptr + sizeof (dl_notify_ind_t);
-			qreply(WR(sbp->sb_rq), mp);
-		}
-	}
+	mutex_enter(&hmep->hme_intrlock);
+	bcopy(macaddr, &hmep->hme_ouraddr, ETHERADDRL);
+	mutex_exit(&hmep->hme_intrlock);
+	(void) hmeinit(hmep);
+	return (0);
 }
 
 static int
-hmestart_dma(queue_t *wq, mblk_t *mp, struct hme *hmep)
+hme_m_multicst(void *arg, boolean_t add, const uint8_t *macaddr)
+{
+	struct hme	*hmep = arg;
+	uint32_t	ladrf_bit;
+	boolean_t	doinit = B_FALSE;
+
+	/*
+	 * If this address's bit was not already set in the local address
+	 * filter, add it and re-initialize the Hardware.
+	 */
+	ladrf_bit = hmeladrf_bit(macaddr);
+
+	mutex_enter(&hmep->hme_intrlock);
+	if (add) {
+		hmep->hme_ladrf_refcnt[ladrf_bit]++;
+		if (hmep->hme_ladrf_refcnt[ladrf_bit] == 1) {
+			hmep->hme_ladrf[ladrf_bit >> 4] |=
+			    1 << (ladrf_bit & 0xf);
+			hmep->hme_multi++;
+			doinit = B_TRUE;
+		}
+	} else {
+		hmep->hme_ladrf_refcnt[ladrf_bit]--;
+		if (hmep->hme_ladrf_refcnt[ladrf_bit] == 0) {
+			hmep->hme_ladrf[ladrf_bit >> 4] &=
+			    ~(1 << (ladrf_bit & 0xf));
+			doinit = B_TRUE;
+		}
+	}
+	mutex_exit(&hmep->hme_intrlock);
+
+	if (doinit)
+		(void) hmeinit(hmep);
+
+	return (0);
+}
+
+static int
+hme_m_start(void *arg)
+{
+	struct hme *hmep = arg;
+
+
+	mutex_enter(&hmep->hme_intrlock);
+	hmep->hme_flags |= HMESTARTED;
+	mutex_exit(&hmep->hme_intrlock);
+	(void) hmeinit(hmep);
+	return (0);
+}
+
+static void
+hme_m_stop(void *arg)
+{
+	struct hme *hmep = arg;
+
+	mutex_enter(&hmep->hme_intrlock);
+	hmep->hme_flags &= ~HMESTARTED;
+	mutex_exit(&hmep->hme_intrlock);
+	hmeuninit(hmep);
+}
+
+static int
+hme_m_stat(void *arg, uint_t stat, uint64_t *val)
+{
+	struct hme	*hmep = arg;
+
+	mutex_enter(&hmep->hme_xmitlock);
+	if (hmep->hme_flags & HMERUNNING)
+		hmereclaim(hmep);
+	mutex_exit(&hmep->hme_xmitlock);
+
+	hmesavecntrs(hmep);
+
+	switch (stat) {
+	case MAC_STAT_IFSPEED:
+		*val = hmep->hme_ifspeed * 1000000;
+		break;
+	case MAC_STAT_IPACKETS:
+		*val = hmep->hme_ipackets;
+		break;
+	case MAC_STAT_RBYTES:
+		*val = hmep->hme_rbytes;
+		break;
+	case MAC_STAT_IERRORS:
+		*val = hmep->hme_ierrors;
+		break;
+	case MAC_STAT_OPACKETS:
+		*val = hmep->hme_opackets;
+		break;
+	case MAC_STAT_OBYTES:
+		*val = hmep->hme_obytes;
+		break;
+	case MAC_STAT_OERRORS:
+		*val = hmep->hme_oerrors;
+		break;
+	case MAC_STAT_MULTIRCV:
+		*val = hmep->hme_multircv;
+		break;
+	case MAC_STAT_MULTIXMT:
+		*val = hmep->hme_multixmt;
+		break;
+	case MAC_STAT_BRDCSTRCV:
+		*val = hmep->hme_brdcstrcv;
+		break;
+	case MAC_STAT_BRDCSTXMT:
+		*val = hmep->hme_brdcstxmt;
+		break;
+	case MAC_STAT_UNDERFLOWS:
+		*val = hmep->hme_uflo;
+		break;
+	case MAC_STAT_OVERFLOWS:
+		*val = hmep->hme_oflo;
+		break;
+	case MAC_STAT_COLLISIONS:
+		*val = hmep->hme_coll;
+		break;
+	case MAC_STAT_NORCVBUF:
+		*val = hmep->hme_norcvbuf;
+		break;
+	case MAC_STAT_NOXMTBUF:
+		*val = hmep->hme_noxmtbuf;
+		break;
+	case ETHER_STAT_LINK_DUPLEX:
+		*val = hmep->hme_duplex;
+		break;
+	case ETHER_STAT_ALIGN_ERRORS:
+		*val = hmep->hme_align_errors;
+		break;
+	case ETHER_STAT_FCS_ERRORS:
+		*val = hmep->hme_fcs_errors;
+		break;
+	case ETHER_STAT_EX_COLLISIONS:
+		*val = hmep->hme_excol;
+		break;
+	case ETHER_STAT_DEFER_XMTS:
+		*val = hmep->hme_defer_xmts;
+		break;
+	case ETHER_STAT_SQE_ERRORS:
+		*val = hmep->hme_sqe_errors;
+		break;
+	case ETHER_STAT_FIRST_COLLISIONS:
+		*val = hmep->hme_fstcol;
+		break;
+	case ETHER_STAT_TX_LATE_COLLISIONS:
+		*val = hmep->hme_tlcol;
+		break;
+	case ETHER_STAT_TOOLONG_ERRORS:
+		*val = hmep->hme_toolong_errors;
+		break;
+	case ETHER_STAT_TOOSHORT_ERRORS:
+		*val = hmep->hme_runt;
+		break;
+	case ETHER_STAT_XCVR_ADDR:
+		*val = hmep->hme_phyad;
+		break;
+	case ETHER_STAT_XCVR_ID:
+		*val = (hmep->hme_idr1 << 16U) | (hmep->hme_idr2);
+		break;
+	case ETHER_STAT_XCVR_INUSE:
+		switch (hmep->hme_transceiver) {
+		case HME_INTERNAL_TRANSCEIVER:
+			*val = XCVR_100X;
+			break;
+		case HME_NO_TRANSCEIVER:
+			*val = XCVR_NONE;
+			break;
+		default:
+			*val = XCVR_UNDEFINED;
+			break;
+		}
+		break;
+	case ETHER_STAT_CAP_100T4:
+		*val = hme_param_bmsr_100T4;
+		break;
+	case ETHER_STAT_ADV_CAP_100T4:
+		*val = hme_param_anar_100T4 & ~HME_NOTUSR;
+		break;
+	case ETHER_STAT_LP_CAP_100T4:
+		*val = hme_param_anlpar_100T4;
+		break;
+	case ETHER_STAT_CAP_100FDX:
+		*val = hme_param_bmsr_100fdx;
+		break;
+	case ETHER_STAT_ADV_CAP_100FDX:
+		*val = hme_param_anar_100fdx & ~HME_NOTUSR;
+		break;
+	case ETHER_STAT_LP_CAP_100FDX:
+		*val = hme_param_anlpar_100fdx;
+		break;
+	case ETHER_STAT_CAP_100HDX:
+		*val = hme_param_bmsr_100hdx;
+		break;
+	case ETHER_STAT_ADV_CAP_100HDX:
+		*val = hme_param_anar_100hdx & ~HME_NOTUSR;
+		break;
+	case ETHER_STAT_LP_CAP_100HDX:
+		*val = hme_param_anlpar_100hdx;
+		break;
+	case ETHER_STAT_CAP_10FDX:
+		*val = hme_param_bmsr_10fdx;
+		break;
+	case ETHER_STAT_ADV_CAP_10FDX:
+		*val = hme_param_anar_10fdx & ~HME_NOTUSR;
+		break;
+	case ETHER_STAT_LP_CAP_10FDX:
+		*val = hme_param_anlpar_10fdx;
+		break;
+	case ETHER_STAT_CAP_10HDX:
+		*val = hme_param_bmsr_10hdx;
+		break;
+	case ETHER_STAT_ADV_CAP_10HDX:
+		*val = hme_param_anar_10hdx & ~HME_NOTUSR;
+		break;
+	case ETHER_STAT_LP_CAP_10HDX:
+		*val = hme_param_anlpar_10hdx;
+		break;
+	case ETHER_STAT_CAP_AUTONEG:
+		*val = hme_param_bmsr_ancap;
+		break;
+	case ETHER_STAT_ADV_CAP_AUTONEG:
+		*val = hme_param_autoneg & ~HME_NOTUSR;
+		break;
+	case ETHER_STAT_LP_CAP_AUTONEG:
+		*val = hme_param_aner_lpancap;
+		break;
+	default:
+		return (EINVAL);
+	}
+	return (0);
+}
+
+static mblk_t *
+hme_m_tx(void *arg, mblk_t *mp)
+{
+	struct hme *hmep = arg;
+	mblk_t *next;
+
+	while (mp != NULL) {
+		next = mp->b_next;
+		mp->b_next = NULL;
+		if (!hmestart(hmep, mp)) {
+			mp->b_next = next;
+			break;
+		}
+		mp = next;
+	}
+	return (mp);
+}
+
+static boolean_t
+hmestart_dma(struct hme *hmep, mblk_t *mp)
 {
 	volatile	struct	hme_tmd	*tmdp1 = NULL;
 	volatile	struct	hme_tmd	*tmdp2 = NULL;
 	volatile	struct	hme_tmd	*ntmdp = NULL;
-	mblk_t	*nmp = NULL;
 	mblk_t  *bp;
 	uint32_t len1, len2;
 	uint32_t temp_addr;
@@ -5911,26 +3999,28 @@ hmestart_dma(queue_t *wq, mblk_t *mp, struct hme *hmep)
 	ulong_t i, j;
 	ddi_dma_cookie_t c;
 	uint_t cnt;
-	time_t	now;
+	boolean_t retval = B_TRUE;
 
-	TRACE_1(TR_FAC_BE, TR_BE_START_START, "hmestart: wq %p #0705", wq);
+	uint32_t	csflags = 0;
+	uint32_t	flags;
+	uint32_t	start_offset;
+	uint32_t	stuff_offset;
 
-	if (!hmep->hme_linkup) {
-		if ((hmep->hme_linkup_msg) &&
-		    (((now = gethrestime_sec()) - hmep->hme_msg_time) > 10)) {
-			HME_FAULT_MSG1(hmep, SEVERITY_UNKNOWN, TX_MSG,
-			    link_down_msg);
-			hmep->hme_msg_time = now;
+	hcksum_retrieve(mp, NULL, NULL, &start_offset, &stuff_offset,
+	    NULL, NULL, &flags);
+
+	if (flags & HCK_PARTIALCKSUM) {
+		if (get_ether_type(mp->b_rptr) == ETHERTYPE_VLAN) {
+			start_offset += sizeof (struct ether_header) + 4;
+			stuff_offset += sizeof (struct ether_header) + 4;
+		} else {
+			start_offset += sizeof (struct ether_header);
+			stuff_offset += sizeof (struct ether_header);
 		}
-		freemsg(mp);
-		return (0);
+		csflags = HMETMD_CSENABL |
+		    (start_offset << HMETMD_CSSTART_SHIFT) |
+		    (stuff_offset << HMETMD_CSSTUFF_SHIFT);
 	}
-
-	if ((hmep->promisc_phys_cnt + hmep->promisc_multi_cnt) != 0)
-		if ((nmp = dupmsg(mp)) == NULL) {
-			hmep->hme_allocbfail++;
-			hmep->hme_noxmtbuf++;
-		}
 
 	mutex_enter(&hmep->hme_xmitlock);
 
@@ -5968,8 +4058,8 @@ hmestart_dma(queue_t *wq, mblk_t *mp, struct hme *hmep)
 		len2 = 0;
 
 		HME_DEBUG_MSG3(hmep, SEVERITY_UNKNOWN, TX_MSG,
-				"hmestart: 1 buf: len = %ld b_rptr = %p",
-				len1, mp->b_rptr);
+		    "hmestart: 1 buf: len = %ld b_rptr = %p",
+		    len1, mp->b_rptr);
 	} else if ((bp->b_cont == NULL) &&
 	    ((len2 = bp->b_wptr - bp->b_rptr) >= 4)) {
 
@@ -5981,9 +4071,9 @@ hmestart_dma(queue_t *wq, mblk_t *mp, struct hme *hmep)
 		j = tmdp2 - hmep->hme_tmdp;
 
 		HME_DEBUG_MSG5(hmep, SEVERITY_UNKNOWN, TX_MSG,
-				"hmestart: 2 buf: len = %ld b_rptr = %p, "
-				"len = %ld b_rptr = %p",
-				len1, mp->b_rptr, len2, bp->b_rptr);
+		    "hmestart: 2 buf: len = %ld b_rptr = %p, "
+		    "len = %ld b_rptr = %p",
+		    len1, mp->b_rptr, len2, bp->b_rptr);
 	} else {
 		len1 = msgsize(mp);
 		if ((bp = hmeallocb(len1, BPRI_HI)) == NULL) {
@@ -5998,10 +4088,9 @@ hmestart_dma(queue_t *wq, mblk_t *mp, struct hme *hmep)
 		len2 = 0;
 
 		HME_DEBUG_MSG3(hmep, SEVERITY_NONE, TX_MSG,
-			"hmestart: > 1 buf: len = %ld b_rptr = %p",
-			len1, mp->b_rptr);
+		    "hmestart: > 1 buf: len = %ld b_rptr = %p",
+		    len1, mp->b_rptr);
 	}
-
 
 
 	if (ddi_dma_alloc_handle(hmep->dip, &hme_dma_attr, DDI_DMA_DONTWAIT,
@@ -6015,7 +4104,7 @@ hmestart_dma(queue_t *wq, mblk_t *mp, struct hme *hmep)
 	    (caddr_t)mp->b_rptr, len1, DDI_DMA_RDWR, DDI_DMA_DONTWAIT,
 	    NULL, &c, &cnt) != DDI_DMA_MAPPED) {
 		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, TX_MSG,
-				"ddi_dma_addr_bind_handle failed");
+		    "ddi_dma_addr_bind_handle failed");
 		ddi_dma_free_handle(&hmep->hme_dmaxh[i]);
 		goto done;
 	}
@@ -6030,10 +4119,10 @@ hmestart_dma(queue_t *wq, mblk_t *mp, struct hme *hmep)
 	}
 
 	syncval = ddi_dma_sync(hmep->hme_dmaxh[i], (off_t)0, len1,
-		DDI_DMA_SYNC_FORDEV);
+	    DDI_DMA_SYNC_FORDEV);
 	if (syncval == DDI_FAILURE)
 		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, DDI_MSG,
-				"ddi_dma_sync failed");
+		    "ddi_dma_sync failed");
 
 	if (bp) {
 		temp_addr = c.dmac_address;
@@ -6048,7 +4137,7 @@ hmestart_dma(queue_t *wq, mblk_t *mp, struct hme *hmep)
 		    (caddr_t)bp->b_rptr, len2, DDI_DMA_RDWR, DDI_DMA_DONTWAIT,
 		    NULL, &c, &cnt) != DDI_DMA_MAPPED) {
 			HME_FAULT_MSG1(hmep, SEVERITY_HIGH, TX_MSG,
-					"ddi_dma_addr_bind_handle failed");
+			    "ddi_dma_addr_bind_handle failed");
 			ddi_dma_free_handle(&hmep->hme_dmaxh[j]);
 			ddi_dma_free_handle(&hmep->hme_dmaxh[i]);
 			goto done;
@@ -6065,27 +4154,27 @@ hmestart_dma(queue_t *wq, mblk_t *mp, struct hme *hmep)
 			goto done;
 		}
 
-		syncval = ddi_dma_sync(hmep->hme_dmaxh[j], (off_t)0, len2,
-			DDI_DMA_SYNC_FORDEV);
+		syncval = ddi_dma_sync(hmep->hme_dmaxh[j], 0, len2,
+		    DDI_DMA_SYNC_FORDEV);
 		if (syncval == DDI_FAILURE)
 			HME_FAULT_MSG1(hmep, SEVERITY_HIGH, DDI_MSG,
-					"ddi_dma_sync failed");
+			    "ddi_dma_sync failed");
 	}
 
 	if (bp) {
 		PUT_TMD(tmdp2, c.dmac_address, len2, HMETMD_EOP);
 		HMESYNCIOPB(hmep, tmdp2, sizeof (struct hme_tmd),
-			DDI_DMA_SYNC_FORDEV);
+		    DDI_DMA_SYNC_FORDEV);
 
-		PUT_TMD(tmdp1, temp_addr, len1, HMETMD_SOP);
+		PUT_TMD(tmdp1, temp_addr, len1, HMETMD_SOP | csflags);
 		HMESYNCIOPB(hmep, tmdp1, sizeof (struct hme_tmd),
-			DDI_DMA_SYNC_FORDEV);
+		    DDI_DMA_SYNC_FORDEV);
 		mp->b_cont = NULL;
 		hmep->hme_tmblkp[i] = mp;
 		hmep->hme_tmblkp[j] = bp;
 	} else {
 		PUT_TMD(tmdp1, c.dmac_address, len1,
-		    HMETMD_SOP | HMETMD_EOP);
+		    HMETMD_SOP | HMETMD_EOP | csflags);
 		HMESYNCIOPB(hmep, tmdp1, sizeof (struct hme_tmd),
 		    DDI_DMA_SYNC_FORDEV);
 		hmep->hme_tmblkp[i] = mp;
@@ -6097,89 +4186,75 @@ hmestart_dma(queue_t *wq, mblk_t *mp, struct hme *hmep)
 	CHECK_ETXREG();
 
 	mutex_exit(&hmep->hme_xmitlock);
-	TRACE_1(TR_FAC_BE, TR_BE_START_END, "hmestart end:  wq %p #0798", wq);
-
-	if (((hmep->promisc_phys_cnt + hmep->promisc_multi_cnt) != 0) && nmp) {
-		hmesendup(hmep, nmp, hmepaccept);
-	} else if ((!(hmep->promisc_phys_cnt + hmep->promisc_multi_cnt)) &&
-	    nmp) {
-		freemsg(nmp);
-	}
 
 	hmep->hme_starts++;
-	return (0);
+	return (B_TRUE);
 
 bad:
 	mutex_exit(&hmep->hme_xmitlock);
-	if (nmp)
-		freemsg(nmp);
 	freemsg(mp);
-	return (1);
+	return (B_TRUE);
 
 notmds:
 	hmep->hme_notmds++;
-	hmep->hme_wantw = 1;
+	hmep->hme_wantw = B_TRUE;
 	hmep->hme_tnextp = tmdp1;
 	hmereclaim(hmep);
+	retval = B_FALSE;
 done:
 	mutex_exit(&hmep->hme_xmitlock);
-	if (nmp)
-		freemsg(nmp);
 
-	if (!putbq(wq, mp))
-		freemsg(mp);
+	return (retval);
 
-	TRACE_1(TR_FAC_BE, TR_BE_START_END, "hmestart end:  wq %p #0799", wq);
-	return (1);
+
 }
 
 /*
  * Start transmission.
- * Return zero on success,
- * otherwise put msg on wq, set 'want' flag and return nonzero.
+ * Return B_TRUE on success,
+ * otherwise put msg on wq, set 'want' flag and return B_FALSE.
  */
-static int
-hmestart(queue_t *wq, mblk_t *mp, struct hme *hmep)
+static boolean_t
+hmestart(struct hme *hmep, mblk_t *mp)
 {
 	volatile struct hme_tmd *tmdp1 = NULL;
 	volatile struct hme_tmd *tmdp2 = NULL;
 	volatile struct hme_tmd *ntmdp = NULL;
-	mblk_t  *nmp = NULL;
 	mblk_t  *bp;
 	uint32_t len1, len2;
 	uint32_t temp_addr;
 	uint32_t i, j;
 	ddi_dma_cookie_t c;
-	struct ether_header *ehp;
-	time_t	now;
+	boolean_t retval = B_TRUE;
 
-	TRACE_1(TR_FAC_BE, TR_BE_START_START, "hmestart start:  wq %p", wq);
+	uint32_t	csflags = 0;
+	uint32_t	flags;
+	uint32_t	start_offset;
+	uint32_t	stuff_offset;
 
 	/*
 	 * update MIB II statistics
 	 */
-	ehp = (struct ether_header *)mp->b_rptr;
-	BUMP_OutNUcast(hmep, ehp);
+	BUMP_OutNUcast(hmep, mp->b_rptr);
 
 	if (hmep->hme_dvmaxh == NULL)
-		return (hmestart_dma(wq, mp, hmep));
+		return (hmestart_dma(hmep, mp));
 
-	if (!hmep->hme_linkup) {
-		if ((hmep->hme_linkup_msg) &&
-		    (((now = gethrestime_sec()) - hmep->hme_msg_time) > 10)) {
-			ddi_dev_report_fault(hmep->dip, DDI_SERVICE_DEGRADED,
-			    DDI_DEVICE_FAULT, link_down_msg);
-			hmep->hme_msg_time = now;
+	hcksum_retrieve(mp, NULL, NULL, &start_offset, &stuff_offset,
+	    NULL, NULL, &flags);
+
+	if (flags & HCK_PARTIALCKSUM) {
+		if (get_ether_type(mp->b_rptr) == ETHERTYPE_VLAN) {
+			start_offset += sizeof (struct ether_header) + 4;
+			stuff_offset += sizeof (struct ether_header) + 4;
+		} else {
+			start_offset += sizeof (struct ether_header);
+			stuff_offset += sizeof (struct ether_header);
 		}
-		freemsg(mp);
-		return (0);
+		csflags = HMETMD_CSENABL |
+		    (start_offset << HMETMD_CSSTART_SHIFT) |
+		    (stuff_offset << HMETMD_CSSTUFF_SHIFT);
 	}
-
-	if ((hmep->promisc_phys_cnt + hmep->promisc_multi_cnt) != 0)
-		if ((nmp = dupmsg(mp)) == NULL) {
-			hmep->hme_allocbfail++;
-			hmep->hme_noxmtbuf++;
-		}
 
 	mutex_enter(&hmep->hme_xmitlock);
 
@@ -6222,71 +4297,75 @@ hmestart(queue_t *wq, mblk_t *mp, struct hme *hmep)
 
 	len1 = mp->b_wptr - mp->b_rptr;
 	if (bp == NULL) {
-		(void) dvma_kaddr_load(hmep->hme_dvmaxh, (caddr_t)mp->b_rptr,
-			len1, 2 * i, &c);
-		(void) dvma_sync(hmep->hme_dvmaxh, 2 * i, DDI_DMA_SYNC_FORDEV);
+		dvma_kaddr_load(hmep->hme_dvmaxh, (caddr_t)mp->b_rptr,
+		    len1, 2 * i, &c);
+		dvma_sync(hmep->hme_dvmaxh, 2 * i, DDI_DMA_SYNC_FORDEV);
 
-		PUT_TMD(tmdp1, c.dmac_address, len1, HMETMD_SOP | HMETMD_EOP);
-
-		HMESYNCIOPB(hmep, tmdp1, sizeof (struct hme_tmd),
-			DDI_DMA_SYNC_FORDEV);
-		hmep->hme_tmblkp[i] = mp;
-
-	} else {
-
-	if ((bp->b_cont == NULL) &&
-		((len2 = bp->b_wptr - bp->b_rptr) >= 4)) {
-	/*
-	 * Check with HW: The minimum len restriction different
-	 * for 64-bit burst ?
-	 */
-		tmdp2 = ntmdp;
-		if ((ntmdp = NEXTTMD(hmep, tmdp2)) == hmep->hme_tcurp)
-			goto notmds;
-		j = tmdp2 - hmep->hme_tmdp;
-		mp->b_cont = NULL;
-		hmep->hme_tmblkp[i] = mp;
-		hmep->hme_tmblkp[j] = bp;
-		(void) dvma_kaddr_load(hmep->hme_dvmaxh, (caddr_t)mp->b_rptr,
-			len1, 2 * i, &c);
-		(void) dvma_sync(hmep->hme_dvmaxh, 2 * i, DDI_DMA_SYNC_FORDEV);
-
-		temp_addr = c.dmac_address;
-		(void) dvma_kaddr_load(hmep->hme_dvmaxh, (caddr_t)bp->b_rptr,
-			len2, 2 * j, &c);
-		(void) dvma_sync(hmep->hme_dvmaxh, 2 * j, DDI_DMA_SYNC_FORDEV);
-
-		PUT_TMD(tmdp2, c.dmac_address, len2, HMETMD_EOP);
-
-		HMESYNCIOPB(hmep, tmdp2, sizeof (struct hme_tmd),
-			DDI_DMA_SYNC_FORDEV);
-
-		PUT_TMD(tmdp1, temp_addr, len1, HMETMD_SOP);
-
-		HMESYNCIOPB(hmep, tmdp1, sizeof (struct hme_tmd),
-			DDI_DMA_SYNC_FORDEV);
-
-	} else {
-		len1 = msgsize(mp);
-
-		if ((bp = hmeallocb(len1, BPRI_HI)) == NULL) {
-			hmep->hme_allocbfail++;
-			hmep->hme_noxmtbuf++;
-			goto bad;
-		}
-
-		mcopymsg(mp, bp->b_rptr);
-		mp = bp;
-		hmep->hme_tmblkp[i] = mp;
-
-		(void) dvma_kaddr_load(hmep->hme_dvmaxh,
-			(caddr_t)mp->b_rptr, len1, 2 * i, &c);
-		(void) dvma_sync(hmep->hme_dvmaxh, 2 * i,
-			DDI_DMA_SYNC_FORDEV);
 		PUT_TMD(tmdp1, c.dmac_address, len1,
-			HMETMD_SOP | HMETMD_EOP);
+		    HMETMD_SOP | HMETMD_EOP | csflags);
+
 		HMESYNCIOPB(hmep, tmdp1, sizeof (struct hme_tmd),
-			DDI_DMA_SYNC_FORDEV);
+		    DDI_DMA_SYNC_FORDEV);
+		hmep->hme_tmblkp[i] = mp;
+
+	} else {
+
+		if ((bp->b_cont == NULL) &&
+		    ((len2 = bp->b_wptr - bp->b_rptr) >= 4)) {
+			/*
+			 * Check with HW: The minimum len restriction
+			 * different for 64-bit burst ?
+			 */
+			tmdp2 = ntmdp;
+			if ((ntmdp = NEXTTMD(hmep, tmdp2)) == hmep->hme_tcurp)
+				goto notmds;
+			j = tmdp2 - hmep->hme_tmdp;
+			mp->b_cont = NULL;
+			hmep->hme_tmblkp[i] = mp;
+			hmep->hme_tmblkp[j] = bp;
+			dvma_kaddr_load(hmep->hme_dvmaxh, (caddr_t)mp->b_rptr,
+			    len1, 2 * i, &c);
+			dvma_sync(hmep->hme_dvmaxh, 2 * i,
+			    DDI_DMA_SYNC_FORDEV);
+
+			temp_addr = c.dmac_address;
+			dvma_kaddr_load(hmep->hme_dvmaxh, (caddr_t)bp->b_rptr,
+			    len2, 2 * j, &c);
+			dvma_sync(hmep->hme_dvmaxh, 2 * j,
+			    DDI_DMA_SYNC_FORDEV);
+
+			PUT_TMD(tmdp2, c.dmac_address, len2,
+			    HMETMD_EOP | csflags);
+
+			HMESYNCIOPB(hmep, tmdp2, sizeof (struct hme_tmd),
+			    DDI_DMA_SYNC_FORDEV);
+
+			PUT_TMD(tmdp1, temp_addr, len1, HMETMD_SOP | csflags);
+
+			HMESYNCIOPB(hmep, tmdp1, sizeof (struct hme_tmd),
+			    DDI_DMA_SYNC_FORDEV);
+
+		} else {
+			len1 = msgsize(mp);
+
+			if ((bp = hmeallocb(len1, BPRI_HI)) == NULL) {
+				hmep->hme_allocbfail++;
+				hmep->hme_noxmtbuf++;
+				goto bad;
+			}
+
+			mcopymsg(mp, bp->b_rptr);
+			mp = bp;
+			hmep->hme_tmblkp[i] = mp;
+
+			dvma_kaddr_load(hmep->hme_dvmaxh,
+			    (caddr_t)mp->b_rptr, len1, 2 * i, &c);
+			dvma_sync(hmep->hme_dvmaxh, 2 * i,
+			    DDI_DMA_SYNC_FORDEV);
+			PUT_TMD(tmdp1, c.dmac_address, len1,
+			    HMETMD_SOP | HMETMD_EOP | csflags);
+			HMESYNCIOPB(hmep, tmdp1, sizeof (struct hme_tmd),
+			    DDI_DMA_SYNC_FORDEV);
 		}
 	}
 	CHECK_IOPB();
@@ -6296,40 +4375,27 @@ hmestart(queue_t *wq, mblk_t *mp, struct hme *hmep)
 	CHECK_ETXREG();
 
 	HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, TX_MSG,
-			"hmestart:  Transmitted a frame");
+	    "hmestart:  Transmitted a frame");
 
 	mutex_exit(&hmep->hme_xmitlock);
-	TRACE_1(TR_FAC_BE, TR_BE_START_END, "hmestart end:  wq %p", wq);
 
-	if ((hmep->promisc_phys_cnt + hmep->promisc_multi_cnt) && nmp) {
-		hmesendup(hmep, nmp, hmepaccept);
-	} else if ((!(hmep->promisc_phys_cnt + hmep->promisc_multi_cnt)) &&
-	    nmp) {
-		freemsg(nmp);
-	}
 
 	hmep->hme_starts++;
-	return (0);
+	return (B_TRUE);
 bad:
 	mutex_exit(&hmep->hme_xmitlock);
-	if (nmp)
-		freemsg(nmp);
 	freemsg(mp);
-	return (1);
+	return (B_TRUE);
 notmds:
 	hmep->hme_notmds++;
-	hmep->hme_wantw = 1;
+	hmep->hme_wantw = B_TRUE;
 	hmep->hme_tnextp = tmdp1;
 	hmereclaim(hmep);
+	retval = B_FALSE;
 done:
 	mutex_exit(&hmep->hme_xmitlock);
-	if (nmp)
-		freemsg(nmp);
-	if (!putbq(wq, mp))
-		freemsg(mp);
 
-	TRACE_1(TR_FAC_BE, TR_BE_START_END, "hmestart end:  wq %p", wq);
-	return (1);
+	return (retval);
 }
 
 /*
@@ -6372,37 +4438,38 @@ static int hme_palen = 32;
 static int
 hmeinit(struct hme *hmep)
 {
-	struct	hmestr	*sbp;
 	mblk_t		*bp;
-	uint16_t	ladrf[4];
 	uint32_t	i;
 	int		ret;
 	int		alloc_ret;	/* hmeallocthings() return value   */
 	ddi_dma_cookie_t dma_cookie;
 	uint_t dmac_cnt;
 
-	TRACE_1(TR_FAC_BE, TR_BE_INIT_START,
-		"hmeinit start:  hmep %p #0805", hmep);
-
-	while (hmep->hme_flags & HMESUSPENDED)
-		(void) ddi_dev_is_needed(hmep->dip, 0, 1);
-
-	HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, ENTER_MSG, "init:  Entered");
+	/*
+	 * Lock sequence:
+	 *	hme_intrlock, hme_xmitlock.
+	 */
+	mutex_enter(&hmep->hme_intrlock);
 
 	/*
-	 * This should prevent us from clearing any interrupts that may occur by
-	 * temporarily stopping interrupts from occurring for a short time.
-	 * We need to update the interrupt mask later in this function.
+	 * Don't touch the hardware if we are suspended.  But don't
+	 * fail either.  Some time later we may be resumed, and then
+	 * we'll be back here to program the device using the settings
+	 * in the soft state.
+	 */
+	if (hmep->hme_flags & HMESUSPENDED) {
+		mutex_exit(&hmep->hme_intrlock);
+		return (0);
+	}
+
+	/*
+	 * This should prevent us from clearing any interrupts that
+	 * may occur by temporarily stopping interrupts from occurring
+	 * for a short time.  We need to update the interrupt mask
+	 * later in this function.
 	 */
 	PUT_GLOBREG(intmask, ~HMEG_MASK_MIF_INTR);
 
-	/*
-	 * Lock sequence:
-	 *	hme_intrlock, hmestruplock and hme_xmitlock.
-	 */
-
-	mutex_enter(&hmep->hme_intrlock);
-	rw_enter(&hmestruplock, RW_WRITER);
 
 	/*
 	 * Rearranged the mutex acquisition order to solve the deadlock
@@ -6413,7 +4480,7 @@ hmeinit(struct hme *hmep)
 	mutex_enter(&hmep->hme_xmitlock);
 
 	hmep->hme_flags = 0;
-	hmep->hme_wantw = 0;
+	hmep->hme_wantw = B_FALSE;
 	hmep->hme_txhung = 0;
 
 	/*
@@ -6458,20 +4525,18 @@ hmeinit(struct hme *hmep)
 	for (i = 0; i < HMERPENDING; i++) {
 		if ((bp = hmeallocb(HMEBUFSIZE, BPRI_LO)) == NULL) {
 			HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, INIT_MSG,
-					"allocb failed");
+			    "allocb failed");
 			hme_start_timer(hmep, hme_check_link,
-					HME_LINKCHECK_TIMER);
+			    HME_LINKCHECK_TIMER);
 			goto init_fail;
 		}
 
 		/*
 		 * dvma case
 		 */
-		if (hmep->hme_dvmarh) {
-			(void) dvma_kaddr_load(hmep->hme_dvmarh,
-				(caddr_t)bp->b_rptr,
-				(uint_t)HMEBUFSIZE,
-				2 * i, &dma_cookie);
+		if (hmep->hme_dvmarh != NULL) {
+			dvma_kaddr_load(hmep->hme_dvmarh, (caddr_t)bp->b_rptr,
+			    (uint_t)HMEBUFSIZE, 2 * i, &dma_cookie);
 		} else {
 		/*
 		 * dma case
@@ -6482,7 +4547,7 @@ hmeinit(struct hme *hmep)
 				HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
 				"ddi_dma_alloc_handle of bufs failed");
 				hme_start_timer(hmep, hme_check_link,
-					HME_LINKCHECK_TIMER);
+				    HME_LINKCHECK_TIMER);
 				goto init_fail;
 			}
 
@@ -6493,7 +4558,7 @@ hmeinit(struct hme *hmep)
 				HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
 				"ddi_dma_addr_bind_handle of bufs failed");
 				hme_start_timer(hmep, hme_check_link,
-					HME_LINKCHECK_TIMER);
+				    HME_LINKCHECK_TIMER);
 				goto init_fail;
 			}
 			/* apparently they don't handle multiple cookies */
@@ -6501,7 +4566,7 @@ hmeinit(struct hme *hmep)
 				HME_DEBUG_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
 				    "dmarh crossed page boundary - failed");
 				hme_start_timer(hmep, hme_check_link,
-					HME_LINKCHECK_TIMER);
+				    HME_LINKCHECK_TIMER);
 				goto init_fail;
 			}
 		}
@@ -6514,7 +4579,7 @@ hmeinit(struct hme *hmep)
 	 * DMA sync descriptors.
 	 */
 	HMESYNCIOPB(hmep, hmep->hme_rmdp, (HME_RMDMAX * sizeof (struct hme_rmd)
-		+ HME_TMDMAX * sizeof (struct hme_tmd)), DDI_DMA_SYNC_FORDEV);
+	    + HME_TMDMAX * sizeof (struct hme_tmd)), DDI_DMA_SYNC_FORDEV);
 	CHECK_IOPB();
 
 	/*
@@ -6528,13 +4593,8 @@ hmeinit(struct hme *hmep)
 	/*
 	 * Determine if promiscuous mode.
 	 */
-	for (sbp = hmestrup; sbp; sbp = sbp->sb_nextp) {
-		if ((sbp->sb_hmep == hmep) && (sbp->sb_flags & HMESALLPHYS)) {
-			hmep->hme_flags |= HMEPROMISC;
-			break;
-		}
-	}
-
+	if (hmep->hme_promisc)
+		hmep->hme_flags |= HMEPROMISC;
 
 	/*
 	 * This is the right place to initialize MIF !!!
@@ -6620,11 +4680,10 @@ hmeinit(struct hme *hmep)
 	PUT_MACREG(ipg2, hme_param_ipg2);
 
 	HME_DEBUG_MSG3(hmep, SEVERITY_UNKNOWN, IPG_MSG,
-			"hmeinit: ipg1 = %d ipg2 = %d", hme_param_ipg1,
-			hme_param_ipg2);
+	    "hmeinit: ipg1 = %d ipg2 = %d", hme_param_ipg1, hme_param_ipg2);
 	PUT_MACREG(rseed,
-		((hmep->hme_ouraddr.ether_addr_octet[0] << 8) & 0x3) |
-		hmep->hme_ouraddr.ether_addr_octet[1]);
+	    ((hmep->hme_ouraddr.ether_addr_octet[0] << 8) & 0x3) |
+	    hmep->hme_ouraddr.ether_addr_octet[1]);
 
 	/* Initialize the RX_MAC registers */
 
@@ -6632,11 +4691,11 @@ hmeinit(struct hme *hmep)
 	 * Program BigMAC with local individual ethernet address.
 	 */
 	PUT_MACREG(madd2, (hmep->hme_ouraddr.ether_addr_octet[4] << 8) |
-		hmep->hme_ouraddr.ether_addr_octet[5]);
+	    hmep->hme_ouraddr.ether_addr_octet[5]);
 	PUT_MACREG(madd1, (hmep->hme_ouraddr.ether_addr_octet[2] << 8) |
-		hmep->hme_ouraddr.ether_addr_octet[3]);
+	    hmep->hme_ouraddr.ether_addr_octet[3]);
 	PUT_MACREG(madd0, (hmep->hme_ouraddr.ether_addr_octet[0] << 8) |
-		hmep->hme_ouraddr.ether_addr_octet[1]);
+	    hmep->hme_ouraddr.ether_addr_octet[1]);
 
 	/*
 	 * Set up multicast address filter by passing all multicast
@@ -6645,32 +4704,17 @@ hmeinit(struct hme *hmep)
 	 * address filter. The high order three bits select the word,
 	 * while the rest of the bits select the bit within the word.
 	 */
-	bzero(ladrf, 4 * sizeof (uint16_t));
+	PUT_MACREG(hash0, hmep->hme_ladrf[0]);
+	PUT_MACREG(hash1, hmep->hme_ladrf[1]);
+	PUT_MACREG(hash2, hmep->hme_ladrf[2]);
+	PUT_MACREG(hash3, hmep->hme_ladrf[3]);
 
 	/*
-	 * Here we initialize the MC Hash bits
+	 * Configure parameters to support VLAN.  (VLAN encapsulation adds
+	 * four bytes.)
 	 */
-	for (sbp = hmestrup; sbp; sbp = sbp->sb_nextp) {
-		if (sbp->sb_hmep == hmep) {
-			if (sbp->sb_flags & HMESALLMULTI) {
-				for (i = 0; i < 4; i++) {
-					ladrf[i] = 0xffff;
-				}
-				break;	/* All bits are already on */
-			}
-			for (i = 0; i < 4; i++)
-				ladrf[i] |= sbp->sb_ladrf[i];
-		}
-	}
-
-	PUT_MACREG(hash0, ladrf[0]);
-	PUT_MACREG(hash1, ladrf[1]);
-	PUT_MACREG(hash2, ladrf[2]);
-	PUT_MACREG(hash3, ladrf[3]);
-
-	/*
-	 * Set up the address filter now?
-	 */
+	PUT_MACREG(txmax, ETHERMAX + ETHERFCSL + 4);
+	PUT_MACREG(rxmax, ETHERMAX + ETHERFCSL + 4);
 
 	/*
 	 * Initialize HME Global registers, ETX registers and ERX registers.
@@ -6693,15 +4737,13 @@ hmeinit(struct hme *hmep)
 			PUT_ERXREG(rxring, (temp | 4));
 	}
 
-	HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, ERX_MSG,
-			"rxring written = %X",
-			((uint32_t)HMEIOPBIOADDR(hmep, hmep->hme_rmdp)));
-	HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, ERX_MSG,
-			"rxring read = %X",
-			GET_ERXREG(rxring));
+	HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, ERX_MSG, "rxring written = %X",
+	    ((uint32_t)HMEIOPBIOADDR(hmep, hmep->hme_rmdp)));
+	HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, ERX_MSG, "rxring read = %X",
+	    GET_ERXREG(rxring));
 
-	PUT_GLOBREG(config,
-	(hmep->hme_config | (hmep->hme_64bit_xfer << HMEG_CONFIG_64BIT_SHIFT)));
+	PUT_GLOBREG(config, (hmep->hme_config |
+	    (hmep->hme_64bit_xfer << HMEG_CONFIG_64BIT_SHIFT)));
 
 	/*
 	 * Significant performance improvements can be achieved by
@@ -6709,11 +4751,11 @@ hmeinit(struct hme *hmep)
 	 * when we run out of them in hmestart().
 	 */
 	PUT_GLOBREG(intmask,
-			HMEG_MASK_INTR | HMEG_MASK_TINT | HMEG_MASK_TX_ALL);
+	    HMEG_MASK_INTR | HMEG_MASK_TINT | HMEG_MASK_TX_ALL);
 
 	PUT_ETXREG(txring_size, ((HME_TMDMAX -1)>> HMET_RINGSZ_SHIFT));
 	PUT_ETXREG(config, (GET_ETXREG(config) | HMET_CONFIG_TXDMA_EN
-			    | HMET_CONFIG_TXFIFOTH));
+	    | HMET_CONFIG_TXFIFOTH));
 	/* get the rxring size bits */
 	switch (HME_RMDMAX) {
 	case 32:
@@ -6730,15 +4772,19 @@ hmeinit(struct hme *hmep)
 		break;
 	default:
 		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
-				unk_rx_ringsz_msg);
+		    unk_rx_ringsz_msg);
 		goto init_fail;
 	}
 	i |= (HME_FSTBYTE_OFFSET << HMER_CONFIG_FBO_SHIFT)
-			| HMER_CONFIG_RXDMA_EN;
+	    | HMER_CONFIG_RXDMA_EN;
+
+	/* h/w checks start offset in half words */
+	i |= ((sizeof (struct ether_header) / 2) << HMER_RX_CSSTART_SHIFT);
+
 	PUT_ERXREG(config, i);
 
 	HME_DEBUG_MSG2(hmep, SEVERITY_UNKNOWN, INIT_MSG,
-			"erxp->config = %X", GET_ERXREG(config));
+	    "erxp->config = %X", GET_ERXREG(config));
 	/*
 	 * Bug related to the parity handling in ERX. When erxp-config is
 	 * read back.
@@ -6754,8 +4800,8 @@ hmeinit(struct hme *hmep)
 
 		if (GET_ERXREG(config) != i)
 			HME_FAULT_MSG4(hmep, SEVERITY_UNKNOWN, ERX_MSG,
-			"error:temp = %x erxp->config = %x, should be %x",
-				temp, GET_ERXREG(config), i);
+			    "error:temp = %x erxp->config = %x, should be %x",
+			    temp, GET_ERXREG(config), i);
 	}
 
 	/*
@@ -6770,19 +4816,19 @@ hmeinit(struct hme *hmep)
 
 	if (hme_reject_own) {
 		PUT_MACREG(rxcfg,
-			((hmep->hme_flags & HMEPROMISC ? BMAC_RXCFG_PROMIS : 0)\
-				| BMAC_RXCFG_MYOWN | BMAC_RXCFG_HASH));
+		    ((hmep->hme_flags & HMEPROMISC ? BMAC_RXCFG_PROMIS : 0) |
+		    BMAC_RXCFG_MYOWN | BMAC_RXCFG_HASH));
 	} else {
 		PUT_MACREG(rxcfg,
-			((hmep->hme_flags & HMEPROMISC ? BMAC_RXCFG_PROMIS : 0)\
-				| BMAC_RXCFG_HASH));
+		    ((hmep->hme_flags & HMEPROMISC ? BMAC_RXCFG_PROMIS : 0) |
+		    BMAC_RXCFG_HASH));
 	}
 
 	drv_usecwait(10);	/* wait after setting Hash Enable bit */
 
 	if (hme_ngu_enable)
 		PUT_MACREG(txcfg, (hmep->hme_fdx ? BMAC_TXCFG_FDX: 0) |
-								BMAC_TXCFG_NGU);
+		    BMAC_TXCFG_NGU);
 	else
 		PUT_MACREG(txcfg, (hmep->hme_fdx ? BMAC_TXCFG_FDX: 0));
 	hmep->hme_macfdx = hmep->hme_fdx;
@@ -6791,7 +4837,7 @@ hmeinit(struct hme *hmep)
 	i = 0;
 	if ((hme_param_lance_mode) && (hmep->hme_lance_mode_enable))
 		i = ((hme_param_ipg0 & HME_MASK_5BIT) << BMAC_XIFC_IPG0_SHIFT)
-					| BMAC_XIFC_LANCE_ENAB;
+		    | BMAC_XIFC_LANCE_ENAB;
 	if (hmep->hme_transceiver == HME_INTERNAL_TRANSCEIVER)
 		PUT_MACREG(xifc, i | (BMAC_XIFC_ENAB));
 	else
@@ -6804,21 +4850,20 @@ hmeinit(struct hme *hmep)
 	/*
 	 * Update the interrupt mask : this will re-allow interrupts to occur
 	 */
-	PUT_GLOBREG(intmask, hmep->intr_mask);
-	hmewenable(hmep);
+	PUT_GLOBREG(intmask, HMEG_MASK_INTR);
+	mac_tx_update(hmep->hme_mh);
 
 init_fail:
 	/*
 	 * Release the locks in reverse order
 	 */
 	mutex_exit(&hmep->hme_xmitlock);
-	rw_exit(&hmestruplock);
 	mutex_exit(&hmep->hme_intrlock);
 
 	ret = !(hmep->hme_flags & HMERUNNING);
 	if (ret) {
 		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
-				init_fail_gen_msg);
+		    init_fail_gen_msg);
 	}
 
 	/*
@@ -6875,7 +4920,7 @@ hmeburstsizes(struct hme *hmep)
 		hmep->hme_config = HMEG_CONFIG_BURST16;
 
 	HME_DEBUG_MSG2(hmep, SEVERITY_NONE, INIT_MSG,
-			"hme_config = 0x%X", hmep->hme_config);
+	    "hme_config = 0x%X", hmep->hme_config);
 	return (DDI_SUCCESS);
 }
 
@@ -6907,9 +4952,8 @@ hmefreebufs(struct hme *hmep)
 				    hmep->hme_dmaxh[i]);
 				if (freeval == DDI_FAILURE)
 					HME_FAULT_MSG1(hmep, SEVERITY_HIGH,
-							FREE_MSG,
-							"ddi_dma_unbind_handle"
-							" failed");
+					    FREE_MSG, "ddi_dma_unbind_handle"
+					    " failed");
 				ddi_dma_free_handle(&hmep->hme_dmaxh[i]);
 				hmep->hme_dmaxh[i] = NULL;
 			}
@@ -6920,9 +4964,8 @@ hmefreebufs(struct hme *hmep)
 				    hmep->hme_dmarh[i]);
 				if (freeval == DDI_FAILURE)
 					HME_FAULT_MSG1(hmep, SEVERITY_HIGH,
-							FREE_MSG,
-							"ddi_dma_unbind_handle"
-							" failure");
+					    FREE_MSG, "ddi_dma_unbind_handle"
+					    " failure");
 				ddi_dma_free_handle(&hmep->hme_dmarh[i]);
 				hmep->hme_dmarh[i] = NULL;
 			}
@@ -6936,9 +4979,9 @@ hmefreebufs(struct hme *hmep)
 
 	for (i = 0; i < HME_TMDMAX; i++) {
 		if (hmep->hme_tmblkp[i]) {
-			if (hmep->hme_dvmaxh)
+			if (hmep->hme_dvmaxh != NULL)
 				dvma_unload(hmep->hme_dvmaxh,
-						2 * i, DONT_FLUSH);
+				    2 * i, DONT_FLUSH);
 			freeb(hmep->hme_tmblkp[i]);
 			hmep->hme_tmblkp[i] = NULL;
 		}
@@ -6946,9 +4989,9 @@ hmefreebufs(struct hme *hmep)
 
 	for (i = 0; i < HME_RMDMAX; i++) {
 		if (hmep->hme_rmblkp[i]) {
-			if (hmep->hme_dvmarh)
+			if (hmep->hme_dvmarh != NULL)
 				dvma_unload(hmep->hme_dvmarh, 2 * HMERINDEX(i),
-						DDI_DMA_SYNC_FORKERNEL);
+				    DDI_DMA_SYNC_FORKERNEL);
 			freeb(hmep->hme_rmblkp[i]);
 			hmep->hme_rmblkp[i] = NULL;
 		}
@@ -6974,8 +5017,8 @@ hme_start_mifpoll(struct hme *hmep)
 
 	cfg = (GET_MIFREG(mif_cfg) & ~(HME_MIF_CFGPD | HME_MIF_CFGPR));
 	PUT_MIFREG(mif_cfg,
-		(cfg = (cfg | (hmep->hme_phyad << HME_MIF_CFGPD_SHIFT) |
-		(HME_PHY_BMSR << HME_MIF_CFGPR_SHIFT) | HME_MIF_CFGPE)));
+	    (cfg = (cfg | (hmep->hme_phyad << HME_MIF_CFGPD_SHIFT) |
+	    (HME_PHY_BMSR << HME_MIF_CFGPR_SHIFT) | HME_MIF_CFGPE)));
 
 	drv_usecwait(HME_MIF_POLL_DELAY);
 	hmep->hme_polling_on =		1;
@@ -6984,18 +5027,18 @@ hme_start_mifpoll(struct hme *hmep)
 
 	/* Do not poll for Jabber Detect for 100 Mbps speed */
 	if (((hmep->hme_mode == HME_AUTO_SPEED) &&
-		(hmep->hme_tryspeed == HME_SPEED_100)) ||
-		((hmep->hme_mode == HME_FORCE_SPEED) &&
-		(hmep->hme_forcespeed == HME_SPEED_100)))
+	    (hmep->hme_tryspeed == HME_SPEED_100)) ||
+	    ((hmep->hme_mode == HME_FORCE_SPEED) &&
+	    (hmep->hme_forcespeed == HME_SPEED_100)))
 		PUT_MIFREG(mif_imask, ((uint16_t)~(PHY_BMSR_LNKSTS)));
 	else
 		PUT_MIFREG(mif_imask,
-			(uint16_t)~(PHY_BMSR_LNKSTS | PHY_BMSR_JABDET));
+		    (uint16_t)~(PHY_BMSR_LNKSTS | PHY_BMSR_JABDET));
 
 	CHECK_MIFREG();
 	HME_DEBUG_MSG3(hmep, SEVERITY_UNKNOWN, MIFPOLL_MSG,
-		"mifpoll started: mif_cfg = %X mif_bsts = %X",
-		cfg, GET_MIFREG(mif_bsts));
+	    "mifpoll started: mif_cfg = %X mif_bsts = %X",
+	    cfg, GET_MIFREG(mif_bsts));
 }
 
 static void
@@ -7063,53 +5106,51 @@ hmeallocthings(struct hme *hmep)
 	 * Allocate the TMD and RMD descriptors and extra for page alignment.
 	 */
 	size = (HME_RMDMAX * sizeof (struct hme_rmd)
-		+ HME_TMDMAX * sizeof (struct hme_tmd));
+	    + HME_TMDMAX * sizeof (struct hme_tmd));
 	size = ROUNDUP(size, hmep->pagesize) + hmep->pagesize;
 
 	rval = ddi_dma_alloc_handle(hmep->dip, &hme_dma_attr,
-			DDI_DMA_DONTWAIT, 0, &hmep->hme_md_h);
+	    DDI_DMA_DONTWAIT, 0, &hmep->hme_md_h);
 	if (rval != DDI_SUCCESS) {
-	    HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
-		"cannot allocate rmd handle - failed");
-	    return (1);
+		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
+		    "cannot allocate rmd handle - failed");
+		return (1);
 	}
 
 	rval = ddi_dma_mem_alloc(hmep->hme_md_h, size, &hmep->hme_dev_attr,
-			DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, 0,
-			(caddr_t *)&hmep->hme_iopbkbase, &real_len,
-			&hmep->hme_mdm_h);
+	    DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, 0,
+	    (caddr_t *)&hmep->hme_iopbkbase, &real_len, &hmep->hme_mdm_h);
 	if (rval != DDI_SUCCESS) {
-	    HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
-		"cannot allocate trmd dma mem - failed");
-	    ddi_dma_free_handle(&hmep->hme_md_h);
-	    return (1);
+		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
+		    "cannot allocate trmd dma mem - failed");
+		ddi_dma_free_handle(&hmep->hme_md_h);
+		return (1);
 	}
 
 	hmep->hme_iopbkbase = ROUNDUP(hmep->hme_iopbkbase, hmep->pagesize);
 	size = (HME_RMDMAX * sizeof (struct hme_rmd)
-		+ HME_TMDMAX * sizeof (struct hme_tmd));
+	    + HME_TMDMAX * sizeof (struct hme_tmd));
 
 	rval = ddi_dma_addr_bind_handle(hmep->hme_md_h, NULL,
-			(caddr_t)hmep->hme_iopbkbase, size,
-			DDI_DMA_RDWR | DDI_DMA_CONSISTENT,
-			DDI_DMA_DONTWAIT, 0,
-			&hmep->hme_md_c, &cookiec);
+	    (caddr_t)hmep->hme_iopbkbase, size,
+	    DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, 0,
+	    &hmep->hme_md_c, &cookiec);
 	if (rval != DDI_DMA_MAPPED) {
-	    HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
-		"cannot allocate trmd dma - failed");
-	    ddi_dma_mem_free(&hmep->hme_mdm_h);
-	    ddi_dma_free_handle(&hmep->hme_md_h);
-	    return (1);
+		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
+		    "cannot allocate trmd dma - failed");
+		ddi_dma_mem_free(&hmep->hme_mdm_h);
+		ddi_dma_free_handle(&hmep->hme_md_h);
+		return (1);
 	}
 
 	if (cookiec != 1) {
-	    HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
-		"trmds crossed page boundary - failed");
-	    if (ddi_dma_unbind_handle(hmep->hme_md_h) == DDI_FAILURE)
-		return (2);
-	    ddi_dma_mem_free(&hmep->hme_mdm_h);
-	    ddi_dma_free_handle(&hmep->hme_md_h);
-	    return (1);
+		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, INIT_MSG,
+		    "trmds crossed page boundary - failed");
+		if (ddi_dma_unbind_handle(hmep->hme_md_h) == DDI_FAILURE)
+			return (2);
+		ddi_dma_mem_free(&hmep->hme_mdm_h);
+		ddi_dma_free_handle(&hmep->hme_md_h);
+		return (1);
 	}
 
 	hmep->hme_iopbiobase = hmep->hme_md_c.dmac_address;
@@ -7124,21 +5165,21 @@ hmeallocthings(struct hme *hmep)
 	 * device driver.
 	 */
 	if ((dvma_reserve(hmep->dip, &hme_dma_limits, (HME_TMDMAX * 2),
-		&hmep->hme_dvmaxh)) != DDI_SUCCESS) {
-	/*
-	 * Specifically we reserve n (HME_TMDMAX + HME_RMDMAX)
-	 * pagetable entries. Therefore we have 2 ptes for each
-	 * descriptor. Since the ethernet buffers are 1518 bytes
-	 * so they can at most use 2 ptes.
-	 * Will do a ddi_dma_addr_setup for each bufer
-	 */
+	    &hmep->hme_dvmaxh)) != DDI_SUCCESS) {
+		/*
+		 * Specifically we reserve n (HME_TMDMAX + HME_RMDMAX)
+		 * pagetable entries. Therefore we have 2 ptes for each
+		 * descriptor. Since the ethernet buffers are 1518 bytes
+		 * so they can at most use 2 ptes.
+		 * Will do a ddi_dma_addr_setup for each bufer
+		 */
 		/*
 		 * We will now do a dma, due to the fact that
 		 * dvma_reserve failied.
 		 */
 		hmep->hme_dmaxh = (ddi_dma_handle_t *)
 		    kmem_zalloc(((HME_TMDMAX +  HMERPENDING) *
-			(sizeof (ddi_dma_handle_t))), KM_SLEEP);
+		    (sizeof (ddi_dma_handle_t))), KM_SLEEP);
 			hmep->hme_dmarh = hmep->hme_dmaxh + HME_TMDMAX;
 			hmep->hme_dvmaxh = hmep->hme_dvmarh = NULL;
 			hmep->dmaxh_init++;
@@ -7155,8 +5196,8 @@ hmeallocthings(struct hme *hmep)
 			(void) dvma_release(hmep->hme_dvmaxh);
 
 			hmep->hme_dmaxh = (ddi_dma_handle_t *)
-			kmem_zalloc(((HME_TMDMAX +  HMERPENDING) *
-			(sizeof (ddi_dma_handle_t))), KM_SLEEP);
+			    kmem_zalloc(((HME_TMDMAX +  HMERPENDING) *
+			    (sizeof (ddi_dma_handle_t))), KM_SLEEP);
 			hmep->hme_dmarh = hmep->hme_dmaxh + HME_TMDMAX;
 			hmep->hme_dvmaxh = hmep->hme_dvmarh = NULL;
 			hmep->dmaxh_init++;
@@ -7184,15 +5225,20 @@ hmeallocthings(struct hme *hmep)
  *	First check to see if it our device interrupting.
  */
 static uint_t
-hmeintr(struct hme *hmep)
+hmeintr(caddr_t arg)
 {
+	struct hme	*hmep = (void *)arg;
 	uint32_t	hmesbits;
 	uint32_t	mif_status;
 	uint32_t	dummy_read;
 	uint32_t	serviced = DDI_INTR_UNCLAIMED;
 	uint32_t	num_reads = 0;
+	uint32_t	rflags;
+	mblk_t		*mp, *head, **tail;
 
 
+	head = NULL;
+	tail = &head;
 
 	mutex_enter(&hmep->hme_intrlock);
 
@@ -7203,10 +5249,8 @@ hmeintr(struct hme *hmep)
 	hmesbits = GET_GLOBREG(status);
 	CHECK_GLOBREG();
 
-	TRACE_1(TR_FAC_BE, TR_BE_INTR_START, "hmeintr start:  hmep %p", hmep);
-
 	HME_DEBUG_MSG3(hmep, SEVERITY_NONE, INTR_MSG,
-			"hmeintr: start:  hmep %X status = %X", hmep, hmesbits);
+	    "hmeintr: start:  hmep %X status = %X", hmep, hmesbits);
 	/*
 	 * Note: TINT is sometimes enabled in thr hmereclaim()
 	 */
@@ -7229,8 +5273,6 @@ hmeintr(struct hme *hmep)
 				KIOIP->intrs[KSTAT_INTR_HARD]++;
 		}
 		mutex_exit(&hmep->hme_intrlock);
-		TRACE_2(TR_FAC_BE, TR_BE_INTR_END,
-		"hmeintr end: hmep %p serviced %d", hmep, serviced);
 		return (serviced);
 	}
 
@@ -7242,7 +5284,7 @@ hmeintr(struct hme *hmep)
 		mutex_exit(&hmep->hme_intrlock);
 		hmeuninit(hmep);
 		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,  INTR_MSG,
-				"hmeintr: hme not running");
+		    "hmeintr: hme not running");
 		return (serviced);
 	}
 
@@ -7250,21 +5292,20 @@ hmeintr(struct hme *hmep)
 		if (hmesbits & HMEG_STATUS_FATAL_ERR) {
 
 			HME_DEBUG_MSG2(hmep, SEVERITY_MID, INTR_MSG,
-				"hmeintr: fatal error:hmesbits = %X", hmesbits);
+			    "hmeintr: fatal error:hmesbits = %X", hmesbits);
 			if (hmep->hme_intrstats)
 				KIOIP->intrs[KSTAT_INTR_HARD]++;
 			hme_fatal_err(hmep, hmesbits);
 
 			HME_DEBUG_MSG2(hmep, SEVERITY_MID, INTR_MSG,
-				"fatal %x: re-init MAC", hmesbits);
+			    "fatal %x: re-init MAC", hmesbits);
 
 			mutex_exit(&hmep->hme_intrlock);
-			hme_reinit_fatal++;
 			(void) hmeinit(hmep);
 			return (serviced);
 		}
 		HME_DEBUG_MSG2(hmep, SEVERITY_MID, INTR_MSG,
-			"hmeintr: non-fatal error:hmesbits = %X", hmesbits);
+		    "hmeintr: non-fatal error:hmesbits = %X", hmesbits);
 		hme_nonfatal_err(hmep, hmesbits);
 	}
 
@@ -7273,14 +5314,12 @@ hmeintr(struct hme *hmep)
 		if (!(mif_status & PHY_BMSR_LNKSTS)) {
 
 			HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, INTR_MSG,
-				"hmeintr: mif interrupt: Link Down");
+			    "hmeintr: mif interrupt: Link Down");
 
 			if (hmep->hme_intrstats)
 				KIOIP->intrs[KSTAT_INTR_HARD]++;
 
-			hmep->hme_link_up = 0;
 			hme_stop_mifpoll(hmep);
-			hmep->hme_linkup_msg = 1;
 			hmep->hme_mifpoll_flag = 1;
 			mutex_exit(&hmep->hme_intrlock);
 			hme_stop_timer(hmep);
@@ -7313,23 +5352,22 @@ hmeintr(struct hme *hmep)
 		if (mif_status & (PHY_BMSR_JABDET)) {
 
 			HME_DEBUG_MSG1(hmep, SEVERITY_LOW, INTR_MSG,
-					"jabber detected");
+			    "jabber detected");
 
 			/* national phy only defines this at 10 Mbps */
 			if (hme_param_speed == 0) { /* 10 Mbps speed ? */
 				hmep->hme_jab++;
 
-				HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, INTR_MSG,
-				"hmeintr: mif interrupt: Jabber detected");
+				HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN,
+				    INTR_MSG, "mif interrupt: Jabber");
 
 				/* treat jabber like a fatal error */
 				hmep->hme_linkcheck = 0; /* force PHY reset */
 				mutex_exit(&hmep->hme_intrlock);
-				hme_reinit_jabber++;
 				(void) hmeinit(hmep);
 
 				HME_DEBUG_MSG1(hmep, SEVERITY_LOW, INTR_MSG,
-						"jabber: re-init PHY & MAC");
+				    "jabber: re-init PHY & MAC");
 				return (serviced);
 			}
 		}
@@ -7340,7 +5378,7 @@ hmeintr(struct hme *hmep)
 		mutex_enter(&hmep->hme_xmitlock);
 
 		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, TX_MSG,
-				"hmeintr: packet transmitted");
+		    "hmeintr: packet transmitted");
 		hmereclaim(hmep);
 		mutex_exit(&hmep->hme_xmitlock);
 	}
@@ -7360,30 +5398,37 @@ hmeintr(struct hme *hmep)
 		rmdp = hmep->hme_rnextp;
 
 		HME_DEBUG_MSG2(hmep, SEVERITY_NONE, INTR_MSG,
-				"hmeintr: packet received: rmdp = %X", rmdp);
+		    "hmeintr: packet received: rmdp = %X", rmdp);
 
 		/*
 		 * Sync RMD before looking at it.
 		 */
 		HMESYNCIOPB(hmep, rmdp, sizeof (struct hme_rmd),
-			DDI_DMA_SYNC_FORCPU);
+		    DDI_DMA_SYNC_FORKERNEL);
 
 		/*
 		 * Loop through each RMD.
 		 */
-		while (((GET_RMD_FLAGS(rmdp) & HMERMD_OWN) == 0) &&
-			(num_reads++ < HMERPENDING)) {
-			hmeread(hmep, rmdp);
+		while ((((rflags = GET_RMD_FLAGS(rmdp)) & HMERMD_OWN) == 0) &&
+		    (num_reads++ < HMERPENDING)) {
+
+			mp = hmeread(hmep, rmdp, rflags);
+
 			/*
 			 * Increment to next RMD.
 			 */
 			hmep->hme_rnextp = rmdp = NEXTRMD(hmep, rmdp);
 
+			if (mp != NULL) {
+				*tail = mp;
+				tail = &mp->b_next;
+			}
+
 			/*
 			 * Sync the next RMD before looking at it.
 			 */
 			HMESYNCIOPB(hmep, rmdp, sizeof (struct hme_rmd),
-				DDI_DMA_SYNC_FORCPU);
+			    DDI_DMA_SYNC_FORKERNEL);
 		}
 		CHECK_IOPB();
 	}
@@ -7392,8 +5437,10 @@ hmeintr(struct hme *hmep)
 		KIOIP->intrs[KSTAT_INTR_HARD]++;
 
 	mutex_exit(&hmep->hme_intrlock);
-	TRACE_2(TR_FAC_BE, TR_BE_INTR_END,
-	    "hmeintr end:  hmep %p serviced %d", hmep, serviced);
+
+	if (head != NULL)
+		mac_rx(hmep->hme_mh, NULL, head);
+
 	return (serviced);
 }
 
@@ -7415,15 +5462,16 @@ hmereclaim(struct hme *hmep)
 	 */
 	if (hmep->hme_tnextp > hmep->hme_tcurp) {
 		nbytes = ((hmep->hme_tnextp - hmep->hme_tcurp)
-				* sizeof (struct hme_tmd));
-		HMESYNCIOPB(hmep, tmdp, nbytes, DDI_DMA_SYNC_FORCPU);
+		    * sizeof (struct hme_tmd));
+		HMESYNCIOPB(hmep, tmdp, nbytes, DDI_DMA_SYNC_FORKERNEL);
 	} else {
 		nbytes = ((hmep->hme_tmdlimp - hmep->hme_tcurp)
-				* sizeof (struct hme_tmd));
-		HMESYNCIOPB(hmep, tmdp, nbytes, DDI_DMA_SYNC_FORCPU);
+		    * sizeof (struct hme_tmd));
+		HMESYNCIOPB(hmep, tmdp, nbytes, DDI_DMA_SYNC_FORKERNEL);
 		nbytes = ((hmep->hme_tnextp - hmep->hme_tmdp)
-				* sizeof (struct hme_tmd));
-		HMESYNCIOPB(hmep, hmep->hme_tmdp, nbytes, DDI_DMA_SYNC_FORCPU);
+		    * sizeof (struct hme_tmd));
+		HMESYNCIOPB(hmep, hmep->hme_tmdp, nbytes,
+		    DDI_DMA_SYNC_FORKERNEL);
 	}
 	CHECK_IOPB();
 
@@ -7431,32 +5479,30 @@ hmereclaim(struct hme *hmep)
 	 * Loop through each TMD.
 	 */
 	while ((GET_TMD_FLAGS(tmdp) & (HMETMD_OWN)) == 0 &&
-		(tmdp != hmep->hme_tnextp)) {
+	    (tmdp != hmep->hme_tnextp)) {
 
 		/*
 		 * count a chained packet only once.
 		 */
 		if (GET_TMD_FLAGS(tmdp) & (HMETMD_SOP)) {
 			hmep->hme_opackets++;
-			hmep->hme_opackets64++;
 		}
 
 		/*
 		 * MIB II
 		 */
-		hmep->hme_xmtbytes += GET_TMD_FLAGS(tmdp) & HMETMD_BUFSIZE;
-		hmep->hme_obytes64 += GET_TMD_FLAGS(tmdp) & HMETMD_BUFSIZE;
+		hmep->hme_obytes += GET_TMD_FLAGS(tmdp) & HMETMD_BUFSIZE;
 
 		i = tmdp - hmep->hme_tmdp;
 
 		HME_DEBUG_MSG3(hmep, SEVERITY_UNKNOWN, TX_MSG,
-			"reclaim: tmdp = %X index = %d", tmdp, i);
+		    "reclaim: tmdp = %X index = %d", tmdp, i);
 		/*
 		 * dvma handle case.
 		 */
-		if (hmep->hme_dvmaxh)
-			(void) dvma_unload(hmep->hme_dvmaxh, 2 * i,
-						(uint_t)DONT_FLUSH);
+		if (hmep->hme_dvmaxh != NULL)
+			dvma_unload(hmep->hme_dvmaxh, 2 * i,
+			    (uint_t)DONT_FLUSH);
 		/*
 		 * dma handle case.
 		 */
@@ -7465,11 +5511,11 @@ hmereclaim(struct hme *hmep)
 			freeval = ddi_dma_unbind_handle(hmep->hme_dmaxh[i]);
 			if (freeval == DDI_FAILURE)
 				HME_FAULT_MSG1(hmep, SEVERITY_LOW, TX_MSG,
-				"reclaim:ddi_dma_unbind_handle failure");
+				    "reclaim:ddi_dma_unbind_handle failure");
 			ddi_dma_free_handle(&hmep->hme_dmaxh[i]);
 			hmep->hme_dmaxh[i] = NULL;
 		} else HME_FAULT_MSG1(hmep, SEVERITY_HIGH, TX_MSG,
-					"reclaim: expected dmaxh");
+		    "reclaim: expected dmaxh");
 
 		if (hmep->hme_tmblkp[i]) {
 			freeb(hmep->hme_tmblkp[i]);
@@ -7486,10 +5532,10 @@ hmereclaim(struct hme *hmep)
 		hmep->hme_tcurp = tmdp;
 		if (hmep->hme_wantw) {
 			PUT_GLOBREG(intmask,
-			HMEG_MASK_INTR | HMEG_MASK_TINT | HMEG_MASK_TX_ALL);
-			mutex_enter(&hmewenlock);
-			hmewenable(hmep);
-			mutex_exit(&hmewenlock);
+			    HMEG_MASK_INTR | HMEG_MASK_TINT |
+			    HMEG_MASK_TX_ALL);
+			hmep->hme_wantw = B_FALSE;
+			mac_tx_update(hmep->hme_mh);
 		}
 	} else {
 		/*
@@ -7497,298 +5543,10 @@ hmereclaim(struct hme *hmep)
 		 * hmereclaim will get called
 		 */
 		if (hmep->hme_wantw)
-		    PUT_GLOBREG(intmask,
-				GET_GLOBREG(intmask) & ~HMEG_MASK_TX_ALL);
+			PUT_GLOBREG(intmask,
+			    GET_GLOBREG(intmask) & ~HMEG_MASK_TX_ALL);
 	}
 	CHECK_GLOBREG();
-}
-
-
-/*
- * Send packet upstream.
- * Assume mp->b_rptr points to ether_header.
- */
-static void
-hmesendup(struct hme *hmep, mblk_t *mp, struct hmestr *(*acceptfunc)())
-{
-	struct	ether_addr	*dhostp, *shostp;
-	struct	hmestr	*sbp, *nsbp;
-	mblk_t	*nmp;
-	uint32_t isgroupaddr;
-	int type;
-
-	TRACE_0(TR_FAC_BE, TR_BE_SENDUP_START, "hmesendup start");
-
-	dhostp = &((struct ether_header *)mp->b_rptr)->ether_dhost;
-	shostp = &((struct ether_header *)mp->b_rptr)->ether_shost;
-	type = get_ether_type(mp->b_rptr);
-
-	isgroupaddr = dhostp->ether_addr_octet[0] & 01;
-
-	/*
-	 * While holding a reader lock on the linked list of streams structures,
-	 * attempt to match the address criteria for each stream
-	 * and pass up the raw M_DATA ("fastpath") or a DL_UNITDATA_IND.
-	 */
-
-	rw_enter(&hmestruplock, RW_READER);
-
-	if ((sbp = (*acceptfunc)(hmestrup, hmep, type, dhostp)) == NULL) {
-		rw_exit(&hmestruplock);
-		freemsg(mp);
-		TRACE_0(TR_FAC_BE, TR_BE_SENDUP_END, "hmesendup end");
-		return;
-	}
-
-	/*
-	 * Loop on matching open streams until (*acceptfunc)() returns NULL.
-	 */
-	for (; nsbp = (*acceptfunc)(sbp->sb_nextp, hmep, type, dhostp);
-		sbp = nsbp)
-		if (canputnext(sbp->sb_rq))
-			if (nmp = dupmsg(mp)) {
-				if ((sbp->sb_flags & HMESFAST) &&
-							!isgroupaddr) {
-					nmp->b_rptr +=
-						sizeof (struct ether_header);
-					putnext(sbp->sb_rq, nmp);
-				} else if (sbp->sb_flags & HMESRAW)
-					putnext(sbp->sb_rq, nmp);
-				else if ((nmp = hmeaddudind(hmep, nmp, shostp,
-						dhostp, type, isgroupaddr)))
-						putnext(sbp->sb_rq, nmp);
-			} else
-				hmep->hme_allocbfail++;
-		else
-			hmep->hme_nocanput++;
-
-
-	/*
-	 * Do the last one.
-	 */
-	if (canputnext(sbp->sb_rq)) {
-		if ((sbp->sb_flags & HMESFAST) && !isgroupaddr) {
-			mp->b_rptr += sizeof (struct ether_header);
-			putnext(sbp->sb_rq, mp);
-		} else if (sbp->sb_flags & HMESRAW)
-			putnext(sbp->sb_rq, mp);
-		else if ((mp = hmeaddudind(hmep, mp, shostp, dhostp,
-			type, isgroupaddr)))
-			putnext(sbp->sb_rq, mp);
-	} else {
-		freemsg(mp);
-		hmep->hme_nocanput++;
-		hmep->hme_norcvbuf++;
-	}
-
-	rw_exit(&hmestruplock);
-	TRACE_0(TR_FAC_BE, TR_BE_SENDUP_END, "hmesendup end");
-}
-
-/*
- * Test upstream destination sap and address match.
- */
-static struct hmestr *
-hmeaccept(struct hmestr *sbp, struct hme *hmep, int type,
-	struct ether_addr *addrp)
-{
-	t_uscalar_t sap;
-	uint32_t flags;
-
-	for (; sbp; sbp = sbp->sb_nextp) {
-		sap = sbp->sb_sap;
-		flags = sbp->sb_flags;
-
-		if ((sbp->sb_hmep == hmep) && HMESAPMATCH(sap, type, flags))
-			if ((ether_cmp(addrp, &hmep->hme_ouraddr) == 0) ||
-				(ether_cmp(addrp, &etherbroadcastaddr) == 0) ||
-				(flags & HMESALLPHYS) ||
-				hmemcmatch(sbp, addrp))
-				return (sbp);
-	}
-	return (NULL);
-}
-
-/*
- * Test upstream destination sap and address match for HMESALLPHYS only.
- */
-/* ARGSUSED3 */
-static struct hmestr *
-hmepaccept(struct  hmestr *sbp, struct hme *hmep, int type,
-	struct ether_addr *addrp)
-{
-	t_uscalar_t sap;
-	uint32_t flags;
-
-	for (; sbp; sbp = sbp->sb_nextp) {
-		sap = sbp->sb_sap;
-		flags = sbp->sb_flags;
-
-		if ((sbp->sb_hmep == hmep) &&
-			HMESAPMATCH(sap, type, flags) &&
-			(flags & HMESALLPHYS))
-			return (sbp);
-	}
-	return (NULL);
-}
-
-/*
- * Set or clear the device ipq pointer.
- * Assumes IPv4 and IPv6 are HMESFAST.
- */
-static void
-hmesetipq(struct hme *hmep)
-{
-	struct	hmestr	*sbp;
-	int	ok4 = 1;
-	int	ok6 = 1;
-	queue_t	*ip4q = NULL;
-	queue_t	*ip6q = NULL;
-
-	rw_enter(&hmestruplock, RW_READER);
-
-	for (sbp = hmestrup; sbp; sbp = sbp->sb_nextp) {
-		if (sbp->sb_hmep == hmep) {
-			if (sbp->sb_flags & (HMESALLPHYS|HMESALLSAP)) {
-				ok4 = 0;
-				ok6 = 0;
-				break;
-			}
-			if (sbp->sb_sap == ETHERTYPE_IP) {
-				if (ip4q == NULL)
-					ip4q = sbp->sb_rq;
-				else
-					ok4 = 0;
-			}
-			if (sbp->sb_sap == ETHERTYPE_IPV6) {
-				if (ip6q == NULL)
-					ip6q = sbp->sb_rq;
-				else
-					ok6 = 0;
-			}
-		}
-	}
-
-	rw_exit(&hmestruplock);
-
-	if (ok4)
-		hmep->hme_ip4q = ip4q;
-	else
-		hmep->hme_ip4q = NULL;
-	if (ok6)
-		hmep->hme_ip6q = ip6q;
-	else
-		hmep->hme_ip6q = NULL;
-}
-
-/*
- * Prefix msg with a DL_UNITDATA_IND mblk and return the new msg.
- */
-static mblk_t *
-hmeaddudind(struct hme *hmep, mblk_t *mp, struct ether_addr *shostp,
-	struct ether_addr *dhostp, int type, uint32_t isgroupaddr)
-{
-	dl_unitdata_ind_t	*dludindp;
-	struct	hmedladdr	*dlap;
-	mblk_t	*nmp;
-	int	size;
-
-	TRACE_0(TR_FAC_BE, TR_BE_ADDUDIND_START, "hmeaddudind start");
-
-	mp->b_rptr += sizeof (struct ether_header);
-
-	/*
-	 * Allocate an M_PROTO mblk for the DL_UNITDATA_IND.
-	 */
-	size = sizeof (dl_unitdata_ind_t) + HMEADDRL + HMEADDRL;
-	if ((nmp = allocb(HMEHEADROOM + size, BPRI_LO)) == NULL) {
-		hmep->hme_allocbfail++;
-		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, STREAMS_MSG,
-				"allocb failed");
-		freemsg(mp);
-		TRACE_0(TR_FAC_BE, TR_BE_ADDUDIND_END, "hmeaddudind end");
-		return (NULL);
-	}
-	DB_TYPE(nmp) = M_PROTO;
-	nmp->b_wptr = nmp->b_datap->db_lim;
-	nmp->b_rptr = nmp->b_wptr - size;
-
-	/*
-	 * Construct a DL_UNITDATA_IND primitive.
-	 */
-	dludindp = (dl_unitdata_ind_t *)nmp->b_rptr;
-	dludindp->dl_primitive = DL_UNITDATA_IND;
-	dludindp->dl_dest_addr_length = HMEADDRL;
-	dludindp->dl_dest_addr_offset = sizeof (dl_unitdata_ind_t);
-	dludindp->dl_src_addr_length = HMEADDRL;
-	dludindp->dl_src_addr_offset = sizeof (dl_unitdata_ind_t) + HMEADDRL;
-	dludindp->dl_group_address = isgroupaddr;
-
-	dlap = (struct hmedladdr *)(nmp->b_rptr + sizeof (dl_unitdata_ind_t));
-	ether_bcopy(dhostp, &dlap->dl_phys);
-	dlap->dl_sap = (uint16_t)type;
-
-	dlap = (struct hmedladdr *)(nmp->b_rptr + sizeof (dl_unitdata_ind_t)
-		+ HMEADDRL);
-	ether_bcopy(shostp, &dlap->dl_phys);
-	dlap->dl_sap = (uint16_t)type;
-
-	/*
-	 * Link the M_PROTO and M_DATA together.
-	 */
-	nmp->b_cont = mp;
-	TRACE_0(TR_FAC_BE, TR_BE_ADDUDIND_END, "hmeaddudind end");
-	return (nmp);
-}
-
-/*
- * Return TRUE if the given multicast address is one
- * of those that this particular Stream is interested in.
- */
-static int
-hmemcmatch(struct hmestr *sbp, struct ether_addr *addrp)
-{
-	struct	ether_addr *mcbucket;
-	uint32_t mccount;
-	uint32_t mchash;
-	uint32_t i;
-
-	/*
-	 * Return FALSE if not a multicast address.
-	 */
-	if (!(addrp->ether_addr_octet[0] & 01))
-		return (0);
-
-	/*
-	 * Check if all multicasts have been enabled for this Stream
-	 */
-	if (sbp->sb_flags & HMESALLMULTI)
-		return (1);
-
-	/*
-	 * Compute the hash value for the address and
-	 * grab the bucket and the number of entries in the
-	 * bucket.
-	 */
-	mchash = MCHASH(addrp);
-	mcbucket = sbp->sb_mctab[mchash];
-	mccount = sbp->sb_mccount[mchash];
-
-	/*
-	 * Return FALSE if no multicast addresses enabled for this Stream.
-	 */
-
-	if (mccount == 0)
-		return (0);
-
-	/*
-	 * Otherwise, find it in the table.
-	 */
-	if (mcbucket)
-		for (i = 0; i < mccount; i++)
-			if (!ether_cmp(addrp, &mcbucket[i]))
-				return (1);
-	return (0);
 }
 
 /*
@@ -7801,74 +5559,74 @@ hme_fatal_err(struct hme *hmep, uint_t hmesbits)
 
 	if (hmesbits & HMEG_STATUS_SLV_PAR_ERR) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-				"sbus slave parity error");
+		    "sbus slave parity error");
 		hmep->hme_slvparerr++;
 	}
 
 	if (hmesbits & HMEG_STATUS_SLV_ERR_ACK) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-				"sbus slave error ack");
+		    "sbus slave error ack");
 		hmep->hme_slverrack++;
 	}
 
 	if (hmesbits & HMEG_STATUS_TX_TAG_ERR) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-				"tx tag error");
+		    "tx tag error");
 		hmep->hme_txtagerr++;
 		hmep->hme_oerrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_TX_PAR_ERR) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-				"sbus tx parity error");
+		    "sbus tx parity error");
 		hmep->hme_txparerr++;
 		hmep->hme_oerrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_TX_LATE_ERR) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-				"sbus tx late error");
+		    "sbus tx late error");
 		hmep->hme_txlaterr++;
 		hmep->hme_oerrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_TX_ERR_ACK) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-				"sbus tx error ack");
+		    "sbus tx error ack");
 		hmep->hme_txerrack++;
 		hmep->hme_oerrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_EOP_ERR) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-				"chained packet descriptor error");
+		    "chained packet descriptor error");
 		hmep->hme_eoperr++;
 	}
 
 	if (hmesbits & HMEG_STATUS_RX_TAG_ERR) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-				"rx tag error");
+		    "rx tag error");
 		hmep->hme_rxtagerr++;
 		hmep->hme_ierrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_RX_PAR_ERR) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-				"sbus rx parity error");
+		    "sbus rx parity error");
 		hmep->hme_rxparerr++;
 		hmep->hme_ierrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_RX_LATE_ERR) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-				"sbus rx late error");
+		    "sbus rx late error");
 		hmep->hme_rxlaterr++;
 		hmep->hme_ierrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_RX_ERR_ACK) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, FATAL_ERR_MSG,
-				"sbus rx error ack");
+		    "sbus rx error ack");
 		hmep->hme_rxerrack++;
 		hmep->hme_ierrors++;
 	}
@@ -7883,47 +5641,45 @@ hme_nonfatal_err(struct hme *hmep, uint_t hmesbits)
 
 	if (hmesbits & HMEG_STATUS_RX_DROP) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-				"rx pkt dropped/no free descriptor error");
+		    "rx pkt dropped/no free descriptor error");
 		hmep->hme_missed++;
 		hmep->hme_ierrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_DEFTIMR_EXP) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-				"defer timer expired");
-		hmep->hme_defer++;
+		    "defer timer expired");
 		hmep->hme_defer_xmts++;
 	}
 
 	if (hmesbits & HMEG_STATUS_FSTCOLC_EXP) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-				"first collision counter expired");
+		    "first collision counter expired");
 		hmep->hme_fstcol += 256;
 	}
 
 	if (hmesbits & HMEG_STATUS_LATCOLC_EXP) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-				"late collision");
+		    "late collision");
 		hmep->hme_tlcol += 256;
 		hmep->hme_oerrors += 256;
 	}
 
 	if (hmesbits & HMEG_STATUS_EXCOLC_EXP) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-				"retry error");
-		hmep->hme_trtry += 256;
+		    "retry error");
+		hmep->hme_excol += 256;
 		hmep->hme_oerrors += 256;
 	}
 
 	if (hmesbits & HMEG_STATUS_NRMCOLC_EXP) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-				"first collision counter expired");
+		    "first collision counter expired");
 		hmep->hme_coll += 256;
 	}
 
 	if (hmesbits & HMEG_STATUS_MXPKTSZ_ERR) {
-		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-				"babble");
+		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG, "babble");
 		hmep->hme_babl++;
 		hmep->hme_oerrors++;
 	}
@@ -7934,80 +5690,72 @@ hme_nonfatal_err(struct hme *hmep, uint_t hmesbits)
 	 */
 	if (hmesbits & HMEG_STATUS_TXFIFO_UNDR) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-				"tx fifo underflow");
+		    "tx fifo underflow");
 		hmep->hme_uflo++;
 		hmep->hme_oerrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_SQE_TST_ERR) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-				"sqe test error");
-		hmep->hme_sqerr++;
+		    "sqe test error");
 		hmep->hme_sqe_errors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_RCV_CNT_EXP) {
 		if (hmep->hme_rxcv_enable) {
 			HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-					"code violation counter expired");
+			    "code violation counter expired");
 			hmep->hme_cvc += 256;
 		}
 	}
 
 	if (hmesbits & HMEG_STATUS_RXFIFO_OVFL) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-				"rx fifo overflow");
+		    "rx fifo overflow");
 		hmep->hme_oflo++;
 		hmep->hme_ierrors++;
 	}
 
 	if (hmesbits & HMEG_STATUS_LEN_CNT_EXP) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-				"length error counter expired");
+		    "length error counter expired");
 		hmep->hme_lenerr += 256;
 		hmep->hme_ierrors += 256;
 	}
 
 	if (hmesbits & HMEG_STATUS_ALN_CNT_EXP) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-				"rx framing/alignment error");
-		hmep->hme_fram += 256;
+		    "rx framing/alignment error");
 		hmep->hme_align_errors += 256;
 		hmep->hme_ierrors += 256;
 	}
 
 	if (hmesbits & HMEG_STATUS_CRC_CNT_EXP) {
 		HME_DEBUG_MSG1(hmep, SEVERITY_MID, NFATAL_ERR_MSG,
-				"rx crc error");
-		hmep->hme_crc += 256;
+		    "rx crc error");
 		hmep->hme_fcs_errors += 256;
 		hmep->hme_ierrors += 256;
 	}
 }
 
-static void
-hmeread_dma(struct hme *hmep, volatile struct hme_rmd *rmdp)
+static mblk_t *
+hmeread_dma(struct hme *hmep, volatile struct hme_rmd *rmdp, uint32_t rflags)
 {
 	long rmdi;
 	ulong_t	dvma_rmdi;
 	mblk_t	*bp, *nbp;
 	volatile struct	hme_rmd	*nrmdp;
-	struct ether_header	*ehp;
 	t_uscalar_t type;
-	queue_t	*ip4q;
-	queue_t	*ip6q;
 	uint32_t len;
 	int32_t	syncval;
 	long	nrmdi;
-
-	TRACE_0(TR_FAC_BE, TR_BE_READ_START, "hmeread start");
 
 	rmdi = rmdp - hmep->hme_rmdp;
 	bp = hmep->hme_rmblkp[rmdi];
 	nrmdp = NEXTRMD(hmep, hmep->hme_rlastp);
 	hmep->hme_rlastp = nrmdp;
 	nrmdi = nrmdp - hmep->hme_rmdp;
-	len = (GET_RMD_FLAGS(rmdp) & HMERMD_BUFSIZE) >> HMERMD_BUFSIZE_SHIFT;
+	len = (rflags & HMERMD_BUFSIZE) >> HMERMD_BUFSIZE_SHIFT;
 	dvma_rmdi = HMERINDEX(rmdi);
 
 	/*
@@ -8016,8 +5764,8 @@ hmeread_dma(struct hme *hmep, volatile struct hme_rmd *rmdp)
 	 * same for both the cases - reuse the buffer. Update the Buffer
 	 * overflow counter.
 	 */
-	if ((len < ETHERMIN) || (GET_RMD_FLAGS(rmdp) & HMERMD_OVFLOW) ||
-					(len > ETHERMAX)) {
+	if ((len < ETHERMIN) || (rflags & HMERMD_OVFLOW) ||
+	    (len > (ETHERMAX + 4))) {
 		if (len < ETHERMIN)
 			hmep->hme_runt++;
 
@@ -8030,10 +5778,9 @@ hmeread_dma(struct hme *hmep, volatile struct hme_rmd *rmdp)
 		hmep->hme_rmblkp[nrmdi] = bp;
 		hmep->hme_rmblkp[rmdi] = NULL;
 		HMESYNCIOPB(hmep, nrmdp, sizeof (struct hme_rmd),
-			DDI_DMA_SYNC_FORDEV);
+		    DDI_DMA_SYNC_FORDEV);
 		CHECK_IOPB();
-		TRACE_0(TR_FAC_BE, TR_BE_READ_END, "hmeread end");
-		return;
+		return (NULL);
 	}
 
 	/*
@@ -8042,15 +5789,15 @@ hmeread_dma(struct hme *hmep, volatile struct hme_rmd *rmdp)
 
 	if (hmep->hme_dmarh[dvma_rmdi] == NULL) {
 		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, RX_MSG,
-				"read: null handle!");
-		return;
+		    "read: null handle!");
+		return (NULL);
 	}
 
 	syncval = ddi_dma_sync(hmep->hme_dmarh[dvma_rmdi], 0,
 	    len + HME_FSTBYTE_OFFSET, DDI_DMA_SYNC_FORCPU);
 	if (syncval == DDI_FAILURE)
 		HME_FAULT_MSG1(hmep, SEVERITY_HIGH, RX_MSG,
-				"read: ddi_dma_sync failure");
+		    "read: ddi_dma_sync failure");
 	CHECK_DMA(hmep->hme_dmarh[dvma_rmdi]);
 
 	/*
@@ -8066,97 +5813,69 @@ hmeread_dma(struct hme *hmep, volatile struct hme_rmd *rmdp)
 		hmep->hme_rmblkp[nrmdi] = bp;
 		hmep->hme_rmblkp[rmdi] = NULL;
 		HMESYNCIOPB(hmep, nrmdp, sizeof (struct hme_rmd),
-			DDI_DMA_SYNC_FORDEV);
+		    DDI_DMA_SYNC_FORDEV);
 		CHECK_IOPB();
 
 		hmep->hme_ipackets++;
-		hmep->hme_ipackets64++;
 
 		bp = nbp;
 
 		/*  Add the First Byte offset to the b_rptr and copy */
 		bp->b_rptr += HME_FSTBYTE_OFFSET;
 		bp->b_wptr = bp->b_rptr + len;
-		ehp = (struct ether_header *)bp->b_rptr;
 
 		/*
 		 * update MIB II statistics
 		 */
-		BUMP_InNUcast(hmep, ehp);
-		hmep->hme_rcvbytes += len;
-		hmep->hme_rbytes64 += len;
+		BUMP_InNUcast(hmep, bp->b_rptr);
+		hmep->hme_rbytes += len;
 
-		type = get_ether_type(ehp);
-		ip4q = hmep->hme_ip4q;
-		ip6q = hmep->hme_ip6q;
+		type = get_ether_type(bp->b_rptr);
 
-		if ((type == ETHERTYPE_IP) &&
-		    ((ehp->ether_dhost.ether_addr_octet[0] & 01) == 0) &&
-		    (ip4q) && (((struct hmestr *)ip4q->q_ptr)->sb_flags &
-			HMESFAST)) {
-			if (canputnext(ip4q)) {
-				bp->b_rptr += sizeof (struct ether_header);
-				putnext(ip4q, bp);
-			} else {
-				freemsg(bp);
-				hmep->hme_nocanput++;
-				hmep->hme_newfree++;
-			}
-		} else if ((type == ETHERTYPE_IPV6) &&
-		    ((ehp->ether_dhost.ether_addr_octet[0] & 01) == 0) &&
-		    (ip6q) && (((struct hmestr *)ip6q->q_ptr)->sb_flags &
-			HMESFAST)) {
-			if (canputnext(ip6q)) {
-				bp->b_rptr += sizeof (struct ether_header);
-				putnext(ip6q, bp);
-			} else {
-				freemsg(bp);
-				hmep->hme_nocanput++;
-				hmep->hme_newfree++;
-			}
-		} else {
-			/* Strip the PADs for 802.3 */
-			if (type <= ETHERMTU)
-				bp->b_wptr = bp->b_rptr
-						+ sizeof (struct ether_header)
-						+ type;
-			hmesendup(hmep, bp, hmeaccept);
+		/*
+		 * TCP partial checksum in hardware
+		 */
+		if (type == ETHERTYPE_IP || type == ETHERTYPE_IPV6) {
+			uint16_t cksum = ~rflags & HMERMD_CKSUM;
+			uint_t end = len - sizeof (struct ether_header);
+			(void) hcksum_assoc(bp, NULL, NULL, 0,
+			    0, end, cksum, HCK_PARTIALCKSUM, 0);
 		}
+
+		return (bp);
+
 	} else {
 		CLONE_RMD(rmdp, nrmdp);
 		hmep->hme_rmblkp[nrmdi] = bp;
 		hmep->hme_rmblkp[rmdi] = NULL;
 		HMESYNCIOPB(hmep, nrmdp, sizeof (struct hme_rmd),
-					DDI_DMA_SYNC_FORDEV);
+		    DDI_DMA_SYNC_FORDEV);
 		CHECK_IOPB();
 
 		hmep->hme_allocbfail++;
 		hmep->hme_norcvbuf++;
 		HME_DEBUG_MSG1(hmep, SEVERITY_UNKNOWN, RX_MSG,
-				"allocb failure");
+		    "allocb failure");
+
+		return (NULL);
 	}
-	TRACE_0(TR_FAC_BE, TR_BE_READ_END, "hmeread end");
 }
 
-static void
-hmeread(struct hme *hmep, volatile struct hme_rmd *rmdp)
+static mblk_t *
+hmeread(struct hme *hmep, volatile struct hme_rmd *rmdp, uint32_t rflags)
 {
 	long    rmdi;
 	mblk_t  *bp, *nbp;
 	uint_t		dvma_rmdi, dvma_nrmdi;
 	volatile	struct  hme_rmd *nrmdp;
-	struct		ether_header    *ehp;
-	queue_t		*ip4q;
-	queue_t		*ip6q;
 	t_uscalar_t	type;
 	uint32_t len;
+	uint16_t cksum;
 	long    nrmdi;
 	ddi_dma_cookie_t	c;
 
-	TRACE_0(TR_FAC_BE, TR_BE_READ_START, "hmeread start");
 	if (hmep->hme_dvmaxh == NULL) {
-		hmeread_dma(hmep, rmdp);
-		return;
+		return (hmeread_dma(hmep, rmdp, rflags));
 	}
 
 	rmdi = rmdp - hmep->hme_rmdp;
@@ -8172,15 +5891,16 @@ hmeread(struct hme *hmep, volatile struct hme_rmd *rmdp)
 	/*
 	 * HMERMD_OWN has been cleared by the Happymeal hardware.
 	 */
-	len = (GET_RMD_FLAGS(rmdp) & HMERMD_BUFSIZE) >> HMERMD_BUFSIZE_SHIFT;
+	len = (rflags & HMERMD_BUFSIZE) >> HMERMD_BUFSIZE_SHIFT;
+	cksum = ~rflags & HMERMD_CKSUM;
 
 	/*
 	 * check for overflow packet also. The processing is the
 	 * same for both the cases - reuse the buffer. Update the Buffer
 	 * overflow counter.
 	 */
-	if ((len < ETHERMIN) || (GET_RMD_FLAGS(rmdp) & HMERMD_OVFLOW) ||
-					(len > ETHERMAX)) {
+	if ((len < ETHERMIN) || (rflags & HMERMD_OVFLOW) ||
+	    (len > (ETHERMAX + 4))) {
 		if (len < ETHERMIN)
 			hmep->hme_runt++;
 
@@ -8192,12 +5912,11 @@ hmeread(struct hme *hmep, volatile struct hme_rmd *rmdp)
 		hmep->hme_ierrors++;
 		CLONE_RMD(rmdp, nrmdp);
 		HMESYNCIOPB(hmep, nrmdp, sizeof (struct hme_rmd),
-			DDI_DMA_SYNC_FORDEV);
+		    DDI_DMA_SYNC_FORDEV);
 		CHECK_IOPB();
 		hmep->hme_rmblkp[nrmdi] = bp;
 		hmep->hme_rmblkp[rmdi] = NULL;
-		TRACE_0(TR_FAC_BE, TR_BE_READ_END, "hmeread end");
-		return;
+		return (NULL);
 	}
 
 	/*
@@ -8217,12 +5936,11 @@ hmeread(struct hme *hmep, volatile struct hme_rmd *rmdp)
 
 		CLONE_RMD(rmdp, nrmdp);
 		HMESYNCIOPB(hmep, nrmdp, sizeof (struct hme_rmd),
-			DDI_DMA_SYNC_FORDEV);
+		    DDI_DMA_SYNC_FORDEV);
 		CHECK_IOPB();
 		hmep->hme_rmblkp[nrmdi] = bp;
 		hmep->hme_rmblkp[rmdi] = NULL;
 		hmep->hme_ipackets++;
-		hmep->hme_ipackets64++;
 
 		bp = nbp;
 	} else {
@@ -8230,7 +5948,7 @@ hmeread(struct hme *hmep, volatile struct hme_rmd *rmdp)
 		    DDI_DMA_SYNC_FORKERNEL);
 
 		if ((nbp = hmeallocb(HMEBUFSIZE, BPRI_LO))) {
-			(void) dvma_kaddr_load(hmep->hme_dvmarh,
+			dvma_kaddr_load(hmep->hme_dvmarh,
 			    (caddr_t)nbp->b_rptr, HMEBUFSIZE, 2 * dvma_nrmdi,
 			    &c);
 
@@ -8242,7 +5960,6 @@ hmeread(struct hme *hmep, volatile struct hme_rmd *rmdp)
 			hmep->hme_rmblkp[nrmdi] = nbp;
 			hmep->hme_rmblkp[rmdi] = NULL;
 			hmep->hme_ipackets++;
-			hmep->hme_ipackets64++;
 
 			/*
 			 * Add the First Byte offset to the b_rptr
@@ -8250,7 +5967,7 @@ hmeread(struct hme *hmep, volatile struct hme_rmd *rmdp)
 			bp->b_rptr += HME_FSTBYTE_OFFSET;
 			bp->b_wptr = bp->b_rptr + len;
 		} else {
-			(void) dvma_kaddr_load(hmep->hme_dvmarh,
+			dvma_kaddr_load(hmep->hme_dvmarh,
 			    (caddr_t)bp->b_rptr, HMEBUFSIZE, 2 * dvma_nrmdi,
 			    &c);
 			PUT_RMD(nrmdp, c.dmac_address);
@@ -8270,75 +5987,25 @@ hmeread(struct hme *hmep, volatile struct hme_rmd *rmdp)
 	}
 
 	if (bp != NULL) {
-		ehp = (struct ether_header *)bp->b_rptr;
 
 		/*
 		 * update MIB II statistics
 		 */
-		BUMP_InNUcast(hmep, ehp);
-		hmep->hme_rcvbytes += len;
-		hmep->hme_rbytes64 += len;
+		BUMP_InNUcast(hmep, bp->b_rptr);
+		hmep->hme_rbytes += len;
 
-		type = get_ether_type(ehp);
-		ip4q = hmep->hme_ip4q;
-		ip6q = hmep->hme_ip6q;
+		type = get_ether_type(bp->b_rptr);
 
-		if ((type == ETHERTYPE_IP) &&
-		    ((ehp->ether_dhost.ether_addr_octet[0] & 01) == 0) &&
-		    (ip4q) && (((struct hmestr *)ip4q->q_ptr)->sb_flags &
-			HMESFAST)) {
-			if (canputnext(ip4q)) {
-				bp->b_rptr += sizeof (struct ether_header);
-				putnext(ip4q, bp);
-			} else {
-				freemsg(bp);
-				hmep->hme_newfree++;
-				hmep->hme_nocanput++;
-			}
-		} else if ((type == ETHERTYPE_IPV6) &&
-		    ((ehp->ether_dhost.ether_addr_octet[0] & 01) == 0) &&
-		    (ip6q) && (((struct hmestr *)ip6q->q_ptr)->sb_flags &
-			HMESFAST)) {
-			if (canputnext(ip6q)) {
-				bp->b_rptr += sizeof (struct ether_header);
-				putnext(ip6q, bp);
-			} else {
-				freemsg(bp);
-				hmep->hme_newfree++;
-				hmep->hme_nocanput++;
-			}
-		} else {
-			/*
-			 * Strip the PADs for 802.3
-			 */
-			if (type <= ETHERMTU)
-				bp->b_wptr = bp->b_rptr
-				    + sizeof (struct ether_header)
-				    + type;
-			hmesendup(hmep, bp, hmeaccept);
+		/*
+		 * TCP partial checksum in hardware
+		 */
+		if (type == ETHERTYPE_IP || type == ETHERTYPE_IPV6) {
+			uint_t end = len - sizeof (struct ether_header);
+			(void) hcksum_assoc(bp, NULL, NULL, 0,
+			    0, end, cksum, HCK_PARTIALCKSUM, 0);
 		}
 	}
-	TRACE_0(TR_FAC_BE, TR_BE_READ_END, "hmeread end");
-}
-
-/*
- * Start xmit on any msgs previously enqueued on any write queues.
- */
-static void
-hmewenable(struct hme *hmep)
-{
-	struct	hmestr	*sbp;
-	queue_t	*wq;
-
-	/*
-	 * Order of wantw accesses is important.
-	 */
-	do {
-		hmep->hme_wantw = 0;
-		for (sbp = hmestrup; sbp; sbp = sbp->sb_nextp)
-			if ((wq = WR(sbp->sb_rq))->q_first)
-				qenable(wq);
-	} while (hmep->hme_wantw);
+	return (bp);
 }
 
 #ifdef  HME_DEBUG
@@ -8355,14 +6022,12 @@ hme_debug_msg(char *file, uint_t line, struct hme *hmep, uint_t severity,
 		return;
 #endif
 	if (hme_debug_level >= type) {
-		mutex_enter(&hmelock);
 		va_start(ap, fmt);
 		vsprintf(msg_buffer, fmt, ap);
 
 		cmn_err(CE_CONT, "D: %s (%d): %s\n",
-			msg_string[type], line, msg_buffer);
+		    msg_string[type], line, msg_buffer);
 		va_end(ap);
-		mutex_exit(&hmelock);
 	}
 }
 #endif
@@ -8376,31 +6041,24 @@ hme_fault_msg(char *file, uint_t line, struct hme *hmep, uint_t severity,
 	char	msg_buffer[255];
 	va_list	ap;
 
-	mutex_enter(&hmelock);
 	va_start(ap, fmt);
 	(void) vsprintf(msg_buffer, fmt, ap);
 
-	if (hmep == NULL)
+	if (hmep == NULL) {
 		cmn_err(CE_NOTE, "hme : %s", msg_buffer);
 
-	else if ((type == DISPLAY_MSG) && (!hmep->hme_linkup_msg))
-		cmn_err(CE_CONT, "?%s%d : %s\n",
-			ddi_get_name(hmep->dip),
-			hmep->instance,
-			msg_buffer);
-	else if (severity == SEVERITY_HIGH)
-		cmn_err(CE_WARN,
-			"%s%d : %s, SEVERITY_HIGH, %s\n",
-			ddi_get_name(hmep->dip),
-			hmep->instance,
-			msg_buffer, msg_string[type]);
-	else
-		cmn_err(CE_CONT, "%s%d : %s\n",
-			ddi_get_name(hmep->dip),
-			hmep->instance,
-			msg_buffer);
+	} else if (type == DISPLAY_MSG) {
+		cmn_err(CE_CONT, "?%s%d : %s\n", ddi_driver_name(hmep->dip),
+		    hmep->instance, msg_buffer);
+	} else if (severity == SEVERITY_HIGH) {
+		cmn_err(CE_WARN, "%s%d : %s, SEVERITY_HIGH, %s\n",
+		    ddi_driver_name(hmep->dip), hmep->instance,
+		    msg_buffer, msg_string[type]);
+	} else {
+		cmn_err(CE_CONT, "%s%d : %s\n", ddi_driver_name(hmep->dip),
+		    hmep->instance, msg_buffer);
+	}
 	va_end(ap);
-	mutex_exit(&hmelock);
 }
 
 /*
@@ -8418,7 +6076,6 @@ hmesavecntrs(struct hme *hmep)
 	PUT_MACREG(fecnt, 0);
 
 	aecnt = GET_MACREG(aecnt);
-	hmep->hme_fram += aecnt;
 	hmep->hme_align_errors += aecnt;
 	PUT_MACREG(aecnt, 0);
 
@@ -8443,10 +6100,9 @@ hmesavecntrs(struct hme *hmep)
 	PUT_MACREG(ltcnt, 0);
 
 	excnt = GET_MACREG(excnt);
-	hmep->hme_trtry += excnt;
+	hmep->hme_excol += excnt;
 	PUT_MACREG(excnt, 0);
 
-	hmep->hme_crc += fecnt;
 	hmep->hme_fcs_errors += fecnt;
 	hmep->hme_ierrors += (fecnt + aecnt + lecnt);
 	hmep->hme_oerrors += (ltcnt + excnt);
@@ -8495,7 +6151,7 @@ hme_param_register(struct hme *hmep, hmeparam_t *hmepa, int cnt)
 	/* First 4 elements are read-only */
 	for (i = 0; i < 4; i++, hmepa++)
 		if (!hme_nd_load(&hmep->hme_g_nd, hmepa->hme_param_name,
-			(pfi_t)hme_param_get, (pfi_t)0, (caddr_t)hmepa)) {
+		    (pfi_t)hme_param_get, (pfi_t)0, (caddr_t)hmepa)) {
 			(void) hme_nd_free(&hmep->hme_g_nd);
 			return (B_FALSE);
 		}
@@ -8503,9 +6159,8 @@ hme_param_register(struct hme *hmep, hmeparam_t *hmepa, int cnt)
 	for (i = 0; i < 10; i++, hmepa++)
 		if (hmepa->hme_param_name && hmepa->hme_param_name[0]) {
 			if (!hme_nd_load(&hmep->hme_g_nd,
-				hmepa->hme_param_name,
-				(pfi_t)hme_param_get,
-				(pfi_t)hme_param_set, (caddr_t)hmepa)) {
+			    hmepa->hme_param_name, (pfi_t)hme_param_get,
+			    (pfi_t)hme_param_set, (caddr_t)hmepa)) {
 				(void) hme_nd_free(&hmep->hme_g_nd);
 				return (B_FALSE);
 
@@ -8514,7 +6169,7 @@ hme_param_register(struct hme *hmep, hmeparam_t *hmepa, int cnt)
 	/* next 12 elements are read-only */
 	for (i = 0; i < 12; i++, hmepa++)
 		if (!hme_nd_load(&hmep->hme_g_nd, hmepa->hme_param_name,
-			(pfi_t)hme_param_get, (pfi_t)0, (caddr_t)hmepa)) {
+		    (pfi_t)hme_param_get, (pfi_t)0, (caddr_t)hmepa)) {
 			(void) hme_nd_free(&hmep->hme_g_nd);
 			return (B_FALSE);
 		}
@@ -8522,9 +6177,8 @@ hme_param_register(struct hme *hmep, hmeparam_t *hmepa, int cnt)
 	for (i = 0; i < 3; i++, hmepa++)
 		if (hmepa->hme_param_name && hmepa->hme_param_name[0]) {
 			if (!hme_nd_load(&hmep->hme_g_nd,
-				hmepa->hme_param_name,
-				(pfi_t)hme_param_get,
-				(pfi_t)hme_param_set, (caddr_t)hmepa)) {
+			    hmepa->hme_param_name, (pfi_t)hme_param_get,
+			    (pfi_t)hme_param_set, (caddr_t)hmepa)) {
 				(void) hme_nd_free(&hmep->hme_g_nd);
 				return (B_FALSE);
 			}
@@ -8547,7 +6201,7 @@ hme_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp)
 
 	new_value = mi_strtol(value, &end, 10);
 	if (end == value || new_value < hmepa->hme_param_min ||
-		new_value > hmepa->hme_param_max) {
+	    new_value > hmepa->hme_param_max) {
 			return (EINVAL);
 	}
 	hmepa->hme_param_val = new_value;
@@ -8743,28 +6397,6 @@ fill_it:
 }
 
 /*
- * Convert Ethernet address to printable (loggable) representation.
- */
-char *
-hme_ether_sprintf(struct ether_addr *addr)
-{
-	uchar_t *ap = (uchar_t *)addr;
-	int i;
-	static char etherbuf[18];
-	char *cp = etherbuf;
-	static char digits[] = "0123456789abcdef";
-
-	for (i = 0; i < 6; i++) {
-		if (*ap > 0x0f)
-			*cp++ = digits[*ap >> 4];
-		*cp++ = digits[*ap++ & 0xf];
-		*cp++ = ':';
-	}
-	*--cp = 0;
-	return (etherbuf);
-}
-
-/*
  * To set up the mac address for the network interface:
  * The adapter card may support a local mac address which is published
  * in a device node property "local-mac-address". This mac address is
@@ -8791,15 +6423,15 @@ hme_setup_mac_address(struct hme *hmep, dev_info_t *dip)
 	 * If it is present, save it as the "factory-address"
 	 * for this adapter.
 	 */
-	if (ddi_getlongprop(DDI_DEV_T_ANY,
-		dip, DDI_PROP_DONTPASS, "local-mac-address",
-		(caddr_t)&prop, &prop_len) == DDI_PROP_SUCCESS) {
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "local-mac-address",
+	    (caddr_t)&prop, &prop_len) == DDI_PROP_SUCCESS) {
 		if (prop_len == ETHERADDRL) {
 			hmep->hme_addrflags = HME_FACTADDR_PRESENT;
 			ether_bcopy(prop, &hmep->hme_factaddr);
 			HME_FAULT_MSG2(hmep, SEVERITY_NONE, DISPLAY_MSG,
-				lether_addr_msg,
-				hme_ether_sprintf(&hmep->hme_factaddr));
+			    lether_addr_msg,
+			    ether_sprintf(&hmep->hme_factaddr));
 		}
 		kmem_free(prop, prop_len);
 	}
@@ -8808,9 +6440,8 @@ hme_setup_mac_address(struct hme *hmep, dev_info_t *dip)
 	 * Check if the adapter has published "mac-address" property.
 	 * If it is present, use it as the mac address for this device.
 	 */
-	if (ddi_getlongprop(DDI_DEV_T_ANY,
-		dip, DDI_PROP_DONTPASS, "mac-address",
-		(caddr_t)&prop, &prop_len) == DDI_PROP_SUCCESS) {
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "mac-address", (caddr_t)&prop, &prop_len) == DDI_PROP_SUCCESS) {
 		if (prop_len >= ETHERADDRL) {
 			ether_bcopy(prop, &hmep->hme_ouraddr);
 			kmem_free(prop, prop_len);
@@ -8820,14 +6451,14 @@ hme_setup_mac_address(struct hme *hmep, dev_info_t *dip)
 	}
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, 0, "local-mac-address?",
-		(caddr_t)&prop, &prop_len) == DDI_PROP_SUCCESS) {
+	    (caddr_t)&prop, &prop_len) == DDI_PROP_SUCCESS) {
 		if ((strncmp("true", prop, prop_len) == 0) &&
-			(hmep->hme_addrflags & HME_FACTADDR_PRESENT)) {
+		    (hmep->hme_addrflags & HME_FACTADDR_PRESENT)) {
 			hmep->hme_addrflags |= HME_FACTADDR_USE;
 			ether_bcopy(&hmep->hme_factaddr, &hmep->hme_ouraddr);
 			kmem_free(prop, prop_len);
 			HME_FAULT_MSG1(hmep, SEVERITY_NONE, DISPLAY_MSG,
-					lmac_addr_msg);
+			    lmac_addr_msg);
 			return;
 		}
 		kmem_free(prop, prop_len);
@@ -8837,27 +6468,6 @@ hme_setup_mac_address(struct hme *hmep, dev_info_t *dip)
 	 * Get the system ethernet address.
 	 */
 	(void) localetheraddr((struct ether_addr *)NULL, &hmep->hme_ouraddr);
-}
-
-static void
-hme_display_linkup(struct hme *hmep, uint32_t speed)
-{
-	char linkup_msg[64];
-
-	if (speed == HME_SPEED_100)
-		(void) sprintf(linkup_msg, "100 Mbps ");
-	else if (speed == HME_SPEED_10)
-		(void) sprintf(linkup_msg, "10 Mbps ");
-	else
-		linkup_msg[0] = '\0';
-
-	if (hmep->hme_fdx)
-		(void) strcat(linkup_msg, "full duplex link up");
-	else
-		(void) strcat(linkup_msg, "half duplex link up");
-
-	ddi_dev_report_fault(hmep->dip, DDI_SERVICE_RESTORED,
-	    DDI_EXTERNAL_FAULT, linkup_msg);
 }
 
 /* ARGSUSED */
