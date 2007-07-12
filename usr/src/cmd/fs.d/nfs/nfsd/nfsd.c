@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -715,7 +715,14 @@ quiesce(int sig)
 	if (nfs_server_vers_max >= QUIESCE_VERSMIN) {
 		/* Request server quiesce at next shutdown */
 		error = _nfssys(NFS4_SVC_REQUEST_QUIESCE, &id);
-		if (error) {
+
+		/*
+		 * ENOENT is returned if there is no matching SVC pool
+		 * for the id. Possibly because the pool is not yet setup.
+		 * In this case, just exit as if no error. For all other errors,
+		 * just return and allow caller to retry.
+		 */
+		if (error && error != ENOENT) {
 			syslog(LOG_ERR,
 			    "_nfssys(NFS4_SVC_REQUEST_QUIESCE) failed: %s",
 			    strerror(errno));
