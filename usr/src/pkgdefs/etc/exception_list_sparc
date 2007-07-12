@@ -707,18 +707,15 @@ stand/lib/llib-lufs.ln			sparc
 stand/lib/llib-lwanboot.ln		sparc
 stand/lib/llib-lxdr.ln			sparc
 #
-# Private KEF header files
+# Private KCF header files
 #
 usr/include/sys/crypto			sparc
-usr/include/sys/crypto/api.h		sparc
-usr/include/sys/crypto/common.h		sparc
 usr/include/sys/crypto/elfsign.h	sparc
 usr/include/sys/crypto/impl.h		sparc
 usr/include/sys/crypto/ioctl.h		sparc
 usr/include/sys/crypto/ioctladmin.h	sparc
 usr/include/sys/crypto/ops_impl.h	sparc
 usr/include/sys/crypto/sched_impl.h	sparc
-usr/include/sys/crypto/spi.h		sparc
 #
 # The following files are installed in the proto area
 # by the build of libavl (AVL Tree Interface Library).

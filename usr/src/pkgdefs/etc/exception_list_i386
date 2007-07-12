@@ -686,18 +686,15 @@ usr/include/wanboot/key_xdr.h		i386
 usr/include/wanboot/key_util.h		i386
 usr/include/wanboot/wbio.h		i386
 #
-# Private KEF header files
+# Private KCF header files
 #
 usr/include/sys/crypto			i386
-usr/include/sys/crypto/api.h		i386
-usr/include/sys/crypto/common.h		i386
 usr/include/sys/crypto/elfsign.h	i386
 usr/include/sys/crypto/impl.h		i386
 usr/include/sys/crypto/ioctl.h		i386
 usr/include/sys/crypto/ioctladmin.h	i386
 usr/include/sys/crypto/ops_impl.h	i386
 usr/include/sys/crypto/sched_impl.h	i386
-usr/include/sys/crypto/spi.h		i386
 #
 # The following files are installed in the proto area
 # by the build of libavl (AVL Tree Interface Library).

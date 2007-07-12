@@ -588,6 +588,10 @@ f none usr/include/sys/crc32.h 644 root bin
 f none usr/include/sys/cred.h 644 root bin
 f none usr/include/sys/cred_impl.h 644 root bin
 f none usr/include/sys/crtctl.h 644 root bin
+d none usr/include/sys/crypto 755 root bin
+f none usr/include/sys/crypto/api.h 644 root bin
+f none usr/include/sys/crypto/common.h 644 root bin
+f none usr/include/sys/crypto/spi.h 644 root bin
 f none usr/include/sys/cs.h 644 root bin
 f none usr/include/sys/cs_priv.h 644 root bin
 f none usr/include/sys/cs_strings.h 644 root bin
