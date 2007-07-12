@@ -155,7 +155,7 @@ static int ip_squeue_cpu_setup(cpu_setup_t, int, void *);
 
 static void ip_squeue_set_bind(squeue_set_t *);
 static void ip_squeue_set_unbind(squeue_set_t *);
-static squeue_t *ip_find_unused_squeue(squeue_set_t *, cpu_t *, boolean_t);
+static squeue_t *ip_find_unused_squeue(squeue_set_t *, boolean_t);
 static void ip_squeue_clean(void *, mblk_t *, void *);
 static void ip_squeue_clean_ring(ill_t *, ill_rx_ring_t *);
 
@@ -478,7 +478,7 @@ ip_squeue_extend(void *arg)
 	 * is sequential, we need to hold the ill_lock.
 	 */
 	mutex_enter(&ill->ill_lock);
-	sqp = ip_find_unused_squeue(sqs, intr_cpu, B_FALSE);
+	sqp = ip_find_unused_squeue(sqs, B_FALSE);
 	if (sqp == NULL) {
 		/*
 		 * We hit the max limit of squeues allowed per CPU.
@@ -651,7 +651,7 @@ ip_squeue_soft_ring_affinity(void *arg)
 		ASSERT(sqs != NULL);
 		ill_rx_ring = &ill_soft_ring->ill_ring_tbl[i - j];
 
-		sqp = ip_find_unused_squeue(sqs, bind_cpu, B_TRUE);
+		sqp = ip_find_unused_squeue(sqs, B_TRUE);
 		if (sqp == NULL) {
 			/*
 			 * We hit the max limit of squeues allowed per CPU.
@@ -755,7 +755,7 @@ out:
 }
 
 static squeue_t *
-ip_find_unused_squeue(squeue_set_t *sqs, cpu_t *bind_cpu, boolean_t fanout)
+ip_find_unused_squeue(squeue_set_t *sqs, boolean_t fanout)
 {
 	int 		i;
 	squeue_set_t	*best_sqs = NULL;
@@ -763,6 +763,7 @@ ip_find_unused_squeue(squeue_set_t *sqs, cpu_t *bind_cpu, boolean_t fanout)
 	int		min_sq = 0;
 	squeue_t 	*sqp = NULL;
 	char		sqname[64];
+	cpu_t		*bind_cpu;
 
 	/*
 	 * If fanout is set and the passed squeue_set already has some
@@ -784,20 +785,33 @@ ip_find_unused_squeue(squeue_set_t *sqs, cpu_t *bind_cpu, boolean_t fanout)
 			mutex_exit(&sqs->sqs_list[i]->sq_lock);
 		}
 		if (i != sqs->sqs_size) {
-			best_sqs = sqset_global_list[sqset_global_size - 1];
-			min_sq = best_sqs->sqs_size;
+			best_sqs = NULL;
 
-			for (i = sqset_global_size - 2; i >= 0; i--) {
+			for (i = sqset_global_size - 1; i >= 0; i--) {
 				curr_sqs = sqset_global_list[i];
-				if (curr_sqs->sqs_size < min_sq) {
-					best_sqs = curr_sqs;
-					min_sq = curr_sqs->sqs_size;
+				/*
+				 * Check and make sure the CPU that sqs
+				 * is bound to is valid. There could be
+				 * sqs's around whose CPUs could have
+				 * been DR'd out. Also note cpu_lock is
+				 * not held here. It is ok as later we
+				 * do cpu_lock when we access cpu_t
+				 * members.
+				 */
+				if (cpu_get(curr_sqs->sqs_bind) != NULL) {
+					if (best_sqs == NULL) {
+						best_sqs = curr_sqs;
+						min_sq = curr_sqs->sqs_size;
+					} else if (curr_sqs->sqs_size <
+					    min_sq) {
+						best_sqs = curr_sqs;
+						min_sq = curr_sqs->sqs_size;
+					}
 				}
 			}
 
 			ASSERT(best_sqs != NULL);
 			sqs = best_sqs;
-			bind_cpu = cpu[sqs->sqs_bind];
 		}
 	}
 
@@ -824,12 +838,21 @@ ip_find_unused_squeue(squeue_set_t *sqs, cpu_t *bind_cpu, boolean_t fanout)
 			return (NULL);
 		}
 
+		mutex_enter(&cpu_lock);
+		if ((bind_cpu = cpu_get(sqs->sqs_bind)) == NULL) {
+			/* Too bad, CPU got DR'd out, return NULL */
+			mutex_exit(&cpu_lock);
+			mutex_exit(&sqs->sqs_lock);
+			return (NULL);
+		}
+
 		bzero(sqname, sizeof (sqname));
 		(void) snprintf(sqname, sizeof (sqname),
 		    "ip_squeue_cpu_%d/%d/%d", bind_cpu->cpu_seqid,
 		    bind_cpu->cpu_id, sqs->sqs_size);
+		mutex_exit(&cpu_lock);
 
-		sqp = squeue_create(sqname, bind_cpu->cpu_id,
+		sqp = squeue_create(sqname, sqs->sqs_bind,
 		    ip_squeue_worker_wait, minclsyspri);
 
 		ASSERT(sqp != NULL);
@@ -840,12 +863,14 @@ ip_find_unused_squeue(squeue_set_t *sqs, cpu_t *bind_cpu, boolean_t fanout)
 		if (ip_squeue_create_callback != NULL)
 			ip_squeue_create_callback(sqp);
 
-		mutex_enter(&cpu_lock);
-		if (ip_squeue_bind && cpu_is_online(bind_cpu)) {
-			squeue_bind(sqp, -1);
+		if (ip_squeue_bind) {
+			mutex_enter(&cpu_lock);
+			bind_cpu = cpu_get(sqs->sqs_bind);
+			if (bind_cpu != NULL && cpu_is_online(bind_cpu)) {
+				squeue_bind(sqp, -1);
+			}
+			mutex_exit(&cpu_lock);
 		}
-		mutex_exit(&cpu_lock);
-
 		mutex_enter(&sqp->sq_lock);
 	}
 
@@ -1112,7 +1137,7 @@ ip_squeue_set_unbind(squeue_set_t *sqs)
 			if (ill->ill_capabilities & ILL_CAPAB_SOFT_RING) {
 				ASSERT(ring->rr_handle != NULL);
 				ill->ill_dls_capab->ill_dls_unbind(
-					ring->rr_handle);
+				    ring->rr_handle);
 			}
 		}
 		if (!(sqp->sq_state & SQS_BOUND))
