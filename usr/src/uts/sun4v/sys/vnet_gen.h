@@ -69,8 +69,21 @@ extern "C" {
 #define	LDC_TO_VNET(ldcp)  ((ldcp)->portp->vgenp->vnetp)
 #define	LDC_TO_VGEN(ldcp)  ((ldcp)->portp->vgenp)
 
-#define	VGEN_DBLK_SZ		2048	/* data buffer size */
+/* receive thread flags */
+#define	VGEN_WTHR_RUNNING 	0x01	/* worker thread running */
+#define	VGEN_WTHR_DATARCVD 	0x02	/* data received */
+#define	VGEN_WTHR_STOP 		0x04	/* stop worker thread request */
+
 #define	VGEN_LDC_UP_DELAY	100	/* usec delay between ldc_up retries */
+
+#define	VGEN_NUM_VMPOOLS	3	/* number of vio mblk pools */
+
+#define	VGEN_DBLK_SZ_128	128	/* data buffer size 128 bytes */
+#define	VGEN_DBLK_SZ_256	256	/* data buffer size 256 bytes */
+#define	VGEN_DBLK_SZ_2048	2048	/* data buffer size 2K bytes */
+#define	VGEN_NRBUFS		512	/* number of receive bufs */
+
+#define	VGEN_TXDBLK_SZ		2048	/* Tx data buffer size */
 
 /* get the address of next tbuf */
 #define	NEXTTBUF(ldcp, tbufp)	(((tbufp) + 1) == (ldcp)->tbufendp    \
@@ -227,11 +240,13 @@ typedef struct vgen_ldc {
 	/*
 	 * Locks:
 	 * locking hierarchy when more than one lock is held concurrently:
-	 * cblock > txlock > tclock.
+	 * cblock > rxlock > txlock > tclock.
 	 */
 	kmutex_t		cblock;		/* sync callback processing */
-	kmutex_t		txlock;		/* sync transmits */
+	kmutex_t		txlock;		/* protect txd alloc */
 	kmutex_t		tclock;		/* tx reclaim lock */
+	kmutex_t		wrlock;		/* sync transmits */
+	kmutex_t		rxlock;		/* sync reception */
 
 	/* channel info from ldc layer */
 	uint64_t		ldc_id;		/* channel number */
@@ -272,8 +287,7 @@ typedef struct vgen_ldc {
 	uint32_t		next_rxi;	/* next expected recv index */
 	uint32_t		num_rxds;	/* number of rx descriptors */
 	caddr_t			tx_datap;	/* prealloc'd tx data area */
-	vio_mblk_pool_t		*rmp;		/* rx mblk pool */
-	uint32_t		num_rbufs;	/* number of rx bufs */
+	vio_multi_pool_t	vmp;		/* rx mblk pools */
 
 	/* misc */
 	uint32_t		flags;		/* flags */
@@ -282,6 +296,18 @@ typedef struct vgen_ldc {
 	boolean_t		need_mcast_sync; /* sync mcast table with vsw */
 	uint32_t		hretries;	/* handshake retry count */
 	boolean_t		resched_peer;	/* send tx msg to peer */
+	uint32_t		resched_peer_txi; /* tx index to resched peer */
+
+	/* receive thread field */
+	kthread_t		*rcv_thread;	/* receive thread */
+	uint32_t		rcv_thr_flags;	/* receive thread flags */
+	kmutex_t		rcv_thr_lock;	/* lock for receive thread */
+	kcondvar_t		rcv_thr_cv;	/* cond.var for recv thread */
+	mblk_t			*rcv_mhead;	/* received mblks head */
+	mblk_t			*rcv_mtail;	/* received mblks tail */
+	ddi_softint_handle_t	soft_handle;	/* soft intr handle */
+	int			soft_pri;	/* soft int priority */
+	kmutex_t		soft_lock;	/* lock for soft intr handler */
 
 	/* channel statistics */
 	vgen_stats_t		*statsp;	/* channel statistics */

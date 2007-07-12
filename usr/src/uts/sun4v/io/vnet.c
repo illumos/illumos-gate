@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,7 +115,6 @@ uint32_t vnet_ldcwd_interval = VNET_LDCWD_INTERVAL; /* watchdog freq in msec */
 uint32_t vnet_ldcwd_txtimeout = VNET_LDCWD_TXTIMEOUT;  /* tx timeout in msec */
 uint32_t vnet_ldc_mtu = VNET_LDC_MTU;		/* ldc mtu */
 uint32_t vnet_nfdb_hash = VNET_NFDB_HASH;	/* size of fdb hash table */
-uint32_t vnet_nrbufs = VNET_NRBUFS;	/* number of receive buffers */
 
 /*
  * Property names
@@ -168,77 +167,33 @@ static struct modlinkage modlinkage = {
 	MODREV_1, (void *)&modldrv, NULL
 };
 
+#ifdef DEBUG
 
 /*
  * Print debug messages - set to 0xf to enable all msgs
  */
-int _vnet_dbglevel = 0x8;
+int vnet_dbglevel = 0x8;
 
-void
-_vnetdebug_printf(void *arg, const char *fmt, ...)
+static void
+debug_printf(const char *fname, void *arg, const char *fmt, ...)
 {
 	char    buf[512];
 	va_list ap;
 	vnet_t *vnetp = (vnet_t *)arg;
+	char    *bufp = buf;
 
+	if (vnetp == NULL) {
+		(void) sprintf(bufp, "%s: ", fname);
+		bufp += strlen(bufp);
+	} else {
+		(void) sprintf(bufp, "vnet%d:%s: ", vnetp->instance, fname);
+		bufp += strlen(bufp);
+	}
 	va_start(ap, fmt);
-	(void) vsprintf(buf, fmt, ap);
+	(void) vsprintf(bufp, fmt, ap);
 	va_end(ap);
-
-	if (vnetp == NULL)
-		cmn_err(CE_CONT, "%s\n", buf);
-	else
-		cmn_err(CE_CONT, "vnet%d: %s\n", vnetp->instance, buf);
+	cmn_err(CE_CONT, "%s\n", buf);
 }
-
-#ifdef DEBUG
-
-/*
- * NOTE: any changes to the definitions below need corresponding changes in
- * vnet_gen.c
- */
-
-/*
- * debug levels:
- * DBG_LEVEL1:	Function entry/exit tracing
- * DBG_LEVEL2:	Info messages
- * DBG_LEVEL3:	Warning messages
- * DBG_LEVEL4:	Error messages
- */
-
-enum	{ DBG_LEVEL1 = 0x01, DBG_LEVEL2 = 0x02, DBG_LEVEL3 = 0x04,
-	    DBG_LEVEL4 = 0x08 };
-
-#define	DBG1(_s)	do {						\
-			    if ((_vnet_dbglevel & DBG_LEVEL1) != 0) {	\
-					_vnetdebug_printf _s;		\
-			    }					\
-			_NOTE(CONSTCOND) } while (0)
-
-#define	DBG2(_s)	do {						\
-			    if ((_vnet_dbglevel & DBG_LEVEL2) != 0) {	\
-					_vnetdebug_printf _s;		\
-			    }					\
-			_NOTE(CONSTCOND) } while (0)
-
-#define	DWARN(_s)	do {						\
-			    if ((_vnet_dbglevel & DBG_LEVEL3) != 0) {	\
-					_vnetdebug_printf _s;		\
-			    }					\
-			_NOTE(CONSTCOND) } while (0)
-
-#define	DERR(_s)	do {						\
-			    if ((_vnet_dbglevel & DBG_LEVEL4) != 0) {	\
-					_vnetdebug_printf _s;		\
-			    }					\
-			_NOTE(CONSTCOND) } while (0)
-
-#else
-
-#define	DBG1(_s)	if (0)	_vnetdebug_printf _s
-#define	DBG2(_s)	if (0)	_vnetdebug_printf _s
-#define	DWARN(_s)	if (0)	_vnetdebug_printf _s
-#define	DERR(_s)	if (0)	_vnetdebug_printf _s
 
 #endif
 
@@ -248,7 +203,7 @@ _init(void)
 {
 	int status;
 
-	DBG1((NULL, "_init: enter\n"));
+	DBG1(NULL, "enter\n");
 
 	mac_init_ops(&vnetops, "vnet");
 	status = mod_install(&modlinkage);
@@ -256,7 +211,7 @@ _init(void)
 		mac_fini_ops(&vnetops);
 	}
 
-	DBG1((NULL, "_init: exit\n"));
+	DBG1(NULL, "exit(%d)\n", status);
 	return (status);
 }
 
@@ -266,14 +221,14 @@ _fini(void)
 {
 	int status;
 
-	DBG1((NULL, "_fini: enter\n"));
+	DBG1(NULL, "enter\n");
 
 	status = mod_remove(&modlinkage);
 	if (status != 0)
 		return (status);
 	mac_fini_ops(&vnetops);
 
-	DBG1((NULL, "_fini: exit\n"));
+	DBG1(NULL, "exit(%d)\n", status);
 	return (status);
 }
 
@@ -295,13 +250,12 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	vp_tl_t		*vp_tlp;
 	int		instance;
 	int		status;
-	enum		{ AST_init = 0x0, AST_vnet_alloc = 0x1,
-			    AST_mac_alloc = 0x2, AST_read_macaddr = 0x4,
-			    AST_vgen_init = 0x8, AST_vptl_alloc = 0x10,
-			    AST_fdbh_alloc = 0x20 }
-			attach_state;
 	mac_register_t	*vgenmacp = NULL;
 	uint32_t	nfdbh = 0;
+	enum	{ AST_init = 0x0, AST_vnet_alloc = 0x1,
+		AST_mac_alloc = 0x2, AST_read_macaddr = 0x4,
+		AST_vgen_init = 0x8, AST_vptl_alloc = 0x10,
+		AST_fdbh_alloc = 0x20 } attach_state;
 
 	attach_state = AST_init;
 
@@ -315,7 +269,7 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	instance = ddi_get_instance(dip);
-	DBG1((NULL, "vnetattach: instance(%d) enter\n", instance));
+	DBG1(NULL, "instance(%d) enter\n", instance);
 
 	/* allocate vnet_t and mac_t structures */
 	vnetp = kmem_zalloc(sizeof (vnet_t), KM_SLEEP);
@@ -349,7 +303,7 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	status = vgen_init(vnetp, vnetp->dip, (uint8_t *)vnetp->curr_macaddr,
 	    &vgenmacp);
 	if (status != DDI_SUCCESS) {
-		DERR((vnetp, "vgen_init() failed\n"));
+		DERR(vnetp, "vgen_init() failed\n");
 		goto vnet_attach_fail;
 	}
 	attach_state |= AST_vgen_init;
@@ -387,7 +341,7 @@ vnetattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	vnet_headp = vnetp;
 	RW_EXIT(&vnet_rw);
 
-	DBG1((NULL, "vnetattach: instance(%d) exit\n", instance));
+	DBG1(NULL, "instance(%d) exit\n", instance);
 	return (DDI_SUCCESS);
 
 vnet_attach_fail:
@@ -422,7 +376,7 @@ vnetdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	int		rv;
 
 	instance = ddi_get_instance(dip);
-	DBG1((NULL, "vnetdetach: instance(%d) enter\n", instance));
+	DBG1(NULL, "instance(%d) enter\n", instance);
 
 	vnetp = ddi_get_driver_private(dip);
 	if (vnetp == NULL) {
@@ -491,7 +445,7 @@ vnet_m_start(void *arg)
 	mac_register_t	*vp_macp;
 	mac_callbacks_t	*cbp;
 
-	DBG1((vnetp, "vnet_m_start: enter\n"));
+	DBG1(vnetp, "enter\n");
 
 	/*
 	 * NOTE:
@@ -511,7 +465,7 @@ vnet_m_start(void *arg)
 	}
 	RW_EXIT(&vnetp->trwlock);
 
-	DBG1((vnetp, "vnet_m_start: exit\n"));
+	DBG1(vnetp, "exit\n");
 	return (VNET_SUCCESS);
 
 }
@@ -525,7 +479,7 @@ vnet_m_stop(void *arg)
 	mac_register_t	*vp_macp;
 	mac_callbacks_t	*cbp;
 
-	DBG1((vnetp, "vnet_m_stop: enter\n"));
+	DBG1(vnetp, "enter\n");
 
 	WRITE_ENTER(&vnetp->trwlock);
 	for (vp_tlp = vnetp->tlp; vp_tlp != NULL; vp_tlp = vp_tlp->nextp) {
@@ -535,7 +489,7 @@ vnet_m_stop(void *arg)
 	}
 	RW_EXIT(&vnetp->trwlock);
 
-	DBG1((vnetp, "vnet_m_stop: exit\n"));
+	DBG1(vnetp, "exit\n");
 }
 
 /* set the unicast mac address of the device */
@@ -546,11 +500,11 @@ vnet_m_unicst(void *arg, const uint8_t *macaddr)
 
 	vnet_t *vnetp = arg;
 
-	DBG1((vnetp, "vnet_m_unicst: enter\n"));
+	DBG1(vnetp, "enter\n");
 	/*
 	 * NOTE: setting mac address dynamically is not supported.
 	 */
-	DBG1((vnetp, "vnet_m_unicst: exit\n"));
+	DBG1(vnetp, "exit\n");
 
 	return (VNET_FAILURE);
 }
@@ -567,7 +521,7 @@ vnet_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	mac_callbacks_t	*cbp;
 	int rv = VNET_SUCCESS;
 
-	DBG1((vnetp, "vnet_m_multicst: enter\n"));
+	DBG1(vnetp, "enter\n");
 	READ_ENTER(&vnetp->trwlock);
 	for (vp_tlp = vnetp->tlp; vp_tlp != NULL; vp_tlp = vp_tlp->nextp) {
 		if (strcmp(vnetp->vgen_name, vp_tlp->name) == 0) {
@@ -578,7 +532,7 @@ vnet_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 		}
 	}
 	RW_EXIT(&vnetp->trwlock);
-	DBG1((vnetp, "vnet_m_multicst: exit\n"));
+	DBG1(vnetp, "exit(%d)\n", rv);
 	return (rv);
 }
 
@@ -589,11 +543,11 @@ vnet_m_promisc(void *arg, boolean_t on)
 	_NOTE(ARGUNUSED(on))
 
 	vnet_t *vnetp = arg;
-	DBG1((vnetp, "vnet_m_promisc: enter\n"));
+	DBG1(vnetp, "enter\n");
 	/*
 	 * NOTE: setting promiscuous mode is not supported, just return success.
 	 */
-	DBG1((vnetp, "vnet_m_promisc: exit\n"));
+	DBG1(vnetp, "exit\n");
 	return (VNET_SUCCESS);
 }
 
@@ -615,7 +569,7 @@ vnet_m_tx(void *arg, mblk_t *mp)
 	mblk_t *resid_mp;
 
 	vnetp = (vnet_t *)arg;
-	DBG1((vnetp, "vnet_m_tx: enter\n"));
+	DBG1(vnetp, "enter\n");
 	ASSERT(mp != NULL);
 
 	while (mp != NULL) {
@@ -676,7 +630,7 @@ vnet_m_tx(void *arg, mblk_t *mp)
 		mp = next;
 	}
 
-	DBG1((vnetp, "vnet_m_tx: exit\n"));
+	DBG1(vnetp, "exit\n");
 	return (mp);
 }
 
@@ -690,7 +644,7 @@ vnet_m_stat(void *arg, uint_t stat, uint64_t *val)
 	mac_callbacks_t	*cbp;
 	uint64_t val_total = 0;
 
-	DBG1((vnetp, "vnet_m_stat: enter\n"));
+	DBG1(vnetp, "enter\n");
 
 	/*
 	 * get the specified statistic from each transport and return the
@@ -711,7 +665,7 @@ vnet_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 	*val = val_total;
 
-	DBG1((vnetp, "vnet_m_stat: exit\n"));
+	DBG1(vnetp, "exit\n");
 	return (0);
 }
 
@@ -797,8 +751,7 @@ vnet_get_vptl(vnet_t *vnetp, const char *name)
 		}
 		tlp = tlp->nextp;
 	}
-	DWARN((vnetp,
-	    "vnet_get_vptl: can't find vp_tl with name (%s)\n", name));
+	DWARN(vnetp, "can't find vp_tl with name (%s)\n", name);
 	return (NULL);
 }
 
@@ -813,9 +766,8 @@ vnet_read_mac_address(vnet_t *vnetp)
 	rv = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, vnetp->dip,
 		DDI_PROP_DONTPASS, macaddr_propname, &macaddr, &size);
 	if ((rv != DDI_PROP_SUCCESS) || (size != ETHERADDRL)) {
-		DWARN((vnetp,
-		"vnet_read_mac_address: prop_lookup failed (%s) err (%d)\n",
-		macaddr_propname, rv));
+		DWARN(vnetp, "prop_lookup failed(%s) err(%d)\n",
+		    macaddr_propname, rv);
 		return (DDI_FAILURE);
 	}
 	bcopy(macaddr, (caddr_t)vnetp->vendor_addr, ETHERADDRL);
@@ -970,8 +922,7 @@ vnet_add_def_rte(void *arg, mac_tx_t m_tx, void *txarg)
 	WRITE_ENTER(&fdbhp->rwlock);
 
 	if (fdbhp->headp) {
-		DWARN((vnetp,
-		    "vnet_add_def_rte: default rte already exists\n"));
+		DWARN(vnetp, "default rte already exists\n");
 		RW_EXIT(&fdbhp->rwlock);
 		return;
 	}

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,6 @@ extern "C" {
 #define	VNET_LDCWD_INTERVAL	1000		/* watchdog freq in msec */
 #define	VNET_LDCWD_TXTIMEOUT	1000		/* tx timeout in msec */
 #define	VNET_LDC_MTU		64		/* ldc mtu */
-#define	VNET_NRBUFS		512		/* number of receive bufs */
 
 /*
  * vnet proxy transport layer information. There is one instance of this for
@@ -77,8 +76,8 @@ typedef struct fdbf_s {
 	krwlock_t	rwlock;			/* protect the list */
 } fdb_fanout_t;
 
-#define	VNET_NFDB_HASH	4	/* default number of hash queues in fdb */
-#define	VNET_NFDB_HASH_MAX 32	/* max number of hash queues in fdb */
+#define	VNET_NFDB_HASH		64	/* default no. of hash queues in fdb */
+#define	VNET_NFDB_HASH_MAX	128	/* max number of hash queues in fdb */
 
 /* Hash calculation using the mac address */
 #define	MACHASH(a, n)	((*(((uchar_t *)(a)) + 0) ^		\
@@ -109,6 +108,53 @@ typedef struct vnet {
 	fdb_fanout_t		*fdbhp;		/* fdb hash queues */
 	int			nfdb_hash;	/* num fdb hash queues */
 } vnet_t;
+
+
+
+#ifdef DEBUG
+/*
+ * debug levels:
+ * DBG_LEVEL1:	Function entry/exit tracing
+ * DBG_LEVEL2:	Info messages
+ * DBG_LEVEL3:	Warning messages
+ * DBG_LEVEL4:	Error messages
+ */
+
+enum	{ DBG_LEVEL1 = 0x01, DBG_LEVEL2 = 0x02, DBG_WARN = 0x04,
+	    DBG_ERR = 0x08 };
+
+#define	DBG1(...)	do {						\
+			    if ((vnet_dbglevel & DBG_LEVEL1) != 0) {	\
+				debug_printf(__func__, __VA_ARGS__);	\
+			    }						\
+			_NOTE(CONSTCOND) } while (0)
+
+#define	DBG2(...)	do {						\
+			    if ((vnet_dbglevel & DBG_LEVEL2) != 0) {	\
+				debug_printf(__func__, __VA_ARGS__);	\
+			    }						\
+			_NOTE(CONSTCOND) } while (0)
+
+#define	DWARN(...)	do {						\
+			    if ((vnet_dbglevel & DBG_WARN) != 0) {	\
+				debug_printf(__func__, __VA_ARGS__);	\
+			    }						\
+			_NOTE(CONSTCOND) } while (0)
+
+#define	DERR(...)	do {						\
+			    if ((vnet_dbglevel & DBG_ERR) != 0) {	\
+				debug_printf(__func__, __VA_ARGS__);	\
+			    }						\
+			_NOTE(CONSTCOND) } while (0)
+
+#else
+
+#define	DBG1(...)	if (0)	do { } while (0)
+#define	DBG2(...)	if (0)	do { } while (0)
+#define	DWARN(...)	if (0)	do { } while (0)
+#define	DERR(...)	if (0)	do { } while (0)
+
+#endif
 
 #ifdef __cplusplus
 }

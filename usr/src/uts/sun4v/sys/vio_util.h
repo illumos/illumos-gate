@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,12 +117,22 @@ typedef struct vio_mblk_pool {
 	uint32_t		flag;	/* pool-related flags */
 } vio_mblk_pool_t;
 
+typedef struct vio_multi_pool {
+	uint32_t		num_pools;	/* no. of vio mblk pools */
+	uint32_t		tbsz;		/* allocated buffer size */
+	uint32_t		*bufsz_tbl;	/* buffer sizes table */
+	uint32_t		*nbuf_tbl;	/* no. of buffers table */
+	vio_mblk_pool_t		**vmpp;		/* vio mblk pools */
+} vio_multi_pool_t;
+
 int vio_create_mblks(uint64_t num_mblks,
 			size_t mblk_size, vio_mblk_pool_t **);
 int vio_destroy_mblks(vio_mblk_pool_t *);
 mblk_t *vio_allocb(vio_mblk_pool_t *);
 void vio_freeb(void *arg);
-
+int vio_init_multipools(vio_multi_pool_t *vmultip, int num_pools, ...);
+void vio_destroy_multipools(vio_multi_pool_t *vmultip, vio_mblk_pool_t **fvmp);
+mblk_t *vio_multipool_allocb(vio_multi_pool_t *vmultip, size_t size);
 
 #ifdef	__cplusplus
 }
