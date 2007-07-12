@@ -1392,6 +1392,10 @@ sip_dialog_process(_sip_msg_t *sip_msg, sip_dialog_t *sip_dialog)
 			return (error);
 
 		(void) pthread_mutex_lock(&_dialog->sip_dlg_mutex);
+		if (_dialog->sip_dlg_state == SIP_DLG_DESTROYED) {
+			(void) pthread_mutex_unlock(&_dialog->sip_dlg_mutex);
+			return (0);
+		}
 		assert(_dialog->sip_dlg_state == SIP_DLG_EARLY ||
 		    _dialog->sip_dlg_state == SIP_DLG_CONFIRMED);
 		/*
