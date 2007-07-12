@@ -8,7 +8,7 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -153,7 +153,7 @@ setinput(char *source, char *archive)
 			if (terminal == NULL) {
 				int saverr = errno;
 				char *msg =
-					gettext("Cannot open(\"/dev/tty\")");
+				    gettext("Cannot open(\"/dev/tty\")");
 				errno = saverr;
 				perror(msg);
 				terminal = fopen("/dev/null", "r");
@@ -501,6 +501,8 @@ again:
 			return;
 		}
 		if (autoload_tape()) {
+			wantnext = 1;
+			newvol = nextvol;
 			goto gethdr;
 		}
 	}
@@ -585,7 +587,7 @@ with the last volume and work towards the first.\n"));
 	}
 	if ((host != NULL && (mt = rmtopen(magtape, O_RDONLY)) == -1) ||
 	    (host == NULL &&
-		(mt = open(magtape, O_RDONLY|O_LARGEFILE)) == -1)) {
+	    (mt = open(magtape, O_RDONLY|O_LARGEFILE)) == -1)) {
 		int error = errno;
 		(void) fprintf(stderr, gettext("Cannot open %s: %s\n"),
 		    magtape, strerror(error));
@@ -675,11 +677,11 @@ gethdr:
 			if (i > 0)
 				dprintf(stdout, gettext(
 				    "restore skipping %d duplicate records\n"),
-					i);
+				    i);
 			else if (i < 0)
 				dprintf(stdout, gettext(
 				    "restore duplicate record botch (%d)\n"),
-					i);
+				    i);
 			while (--i >= 0)
 				readtape(buf);
 			blksread = savecnt;
@@ -801,17 +803,17 @@ extractfile(char *name)
 	mode = curfile.dip->di_mode;
 
 	uid = curfile.dip->di_suid == UID_LONG ?
-		    curfile.dip->di_uid : (uid_t)curfile.dip->di_suid;
+	    curfile.dip->di_uid : (uid_t)curfile.dip->di_suid;
 	gid = curfile.dip->di_sgid == GID_LONG ?
-		    curfile.dip->di_gid : (gid_t)curfile.dip->di_sgid;
+	    curfile.dip->di_gid : (gid_t)curfile.dip->di_sgid;
 
 	resolve(name, &dfd, &rname);
 	if (dfd != AT_FDCWD) {
 		if (fchdir(dfd) < 0) {
 			saverr = errno;
 			(void) fprintf(stderr, gettext(
-				"%s: unable to set attribute context: %s\n"),
-				rname, strerror(saverr));
+			    "%s: unable to set attribute context: %s\n"),
+			    rname, strerror(saverr));
 			skipfile();
 			(void) close(dfd);
 			return (FAIL);
@@ -858,8 +860,8 @@ extractfile(char *name)
 		getfile(xtrlnkfile, xtrlnkskip);
 		if (pathlen == 0) {
 			vprintf(stdout, gettext(
-				"%s: zero length symbolic link (ignored)\n"),
-				rname);
+			    "%s: zero length symbolic link (ignored)\n"),
+			    rname);
 			result = GOOD;
 			break;
 		}
@@ -1127,7 +1129,7 @@ loop:
 			}
 			(*f2)(clearedbuf, size > tp_bsize ?
 					/* LINTED size <= tp_bsize */
-				(long)tp_bsize : (size_t)size);
+			    (long)tp_bsize : (size_t)size);
 		}
 		if ((size -= tp_bsize) <= 0) {
 			for (i++; i < spcl.c_count; i++)
@@ -1452,7 +1454,7 @@ xtrmap(char *buf, size_t size)
 		}
 
 		increment = d_howmany(
-			((spcl.c_count * tp_bsize * NBBY) + 1), NBBY);
+		    ((spcl.c_count * tp_bsize * NBBY) + 1), NBBY);
 		mapsize = endmap - beginmap + increment;
 		if (mapsize > UINT_MAX) {
 			(void) fprintf(stderr,
@@ -1530,7 +1532,7 @@ top:
 			for (i = 0; i < ntrec; i++)
 				/*LINTED [tbf = malloc()]*/
 				((struct s_spcl *)
-					&tbf[i*tp_bsize])->c_magic = 0;
+				    &tbf[i*tp_bsize])->c_magic = 0;
 			bct = 0;
 			rd = 0;
 			i = 0;
@@ -1581,7 +1583,7 @@ getmore:
 			if (i % tp_bsize != 0)
 				panic(gettext(
 				    "partial block read: %d should be %d\n"),
-					i, ntrec * tp_bsize);
+				    i, ntrec * tp_bsize);
 			numtrec = i / tp_bsize;
 			if (numtrec == 0)
 				/*
@@ -1657,7 +1659,7 @@ nextvol:
 		/* XXX if we do, then we should zero the intervening space */
 		if (rd % tp_bsize != 0)
 			panic(gettext("partial block read: %d should be %d\n"),
-				rd, ntrec * tp_bsize);
+			    rd, ntrec * tp_bsize);
 		bcopy((char *)&endoftapemark, &tbf[rd], (size_t)tp_bsize);
 	}
 	bct = 0;
@@ -1784,7 +1786,7 @@ readhdr(struct s_spcl *b)
 
 	if (gethead(b) == FAIL) {
 		dprintf(stdout, gettext("readhdr fails at %ld blocks\n"),
-			blksread);
+		    blksread);
 		return (FAIL);
 	}
 	return (GOOD);
@@ -1904,7 +1906,7 @@ gethead(struct s_spcl *buf)
 			hostinfo++;
 			if (c_label != NULL &&
 			    strncmp(c_label, spcl.c_label,
-				sizeof (spcl.c_label))
+			    sizeof (spcl.c_label))
 			    != 0) {
 				(void) fprintf(stderr, gettext(
 		    "Incorrect tape label.  Expected `%s', got `%.*s'\n"),
@@ -1928,7 +1930,7 @@ gethead(struct s_spcl *buf)
 
 	default:
 		panic(gettext("%s: unknown inode type %d\n"),
-			"gethead", buf->c_type);
+		    "gethead", buf->c_type);
 		return (FAIL);
 	}
 	if (dflag)
