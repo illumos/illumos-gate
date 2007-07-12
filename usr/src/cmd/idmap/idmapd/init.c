@@ -62,15 +62,13 @@ fini_mapping_system() {
 int
 load_config() {
 	if ((_idmapdstate.cfg = idmap_cfg_init()) == NULL) {
-		idmapdlog(LOG_ERR, "%s: config init failed - %s",
-			me, CHECK_NULL(idmap_cfg_error()));
+		idmapdlog(LOG_ERR, "%s: failed to initialize config", me);
 		return (-1);
 	}
 	if (_idmapdstate.ad != NULL)
 		idmap_ad_free(&_idmapdstate.ad);
 	if (idmap_cfg_load(_idmapdstate.cfg) < 0) {
-		idmapdlog(LOG_ERR, "%s: config load failed - %s",
-			me, CHECK_NULL(idmap_cfg_error()));
+		idmapdlog(LOG_ERR, "%s: failed to load config", me);
 		return (-1);
 	}
 	if (_idmapdstate.cfg->pgcfg.mapping_domain == NULL ||

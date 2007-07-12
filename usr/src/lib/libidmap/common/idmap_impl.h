@@ -61,8 +61,11 @@ struct idmap_udt_handle {
 	struct idmap_handle	*ih;
 	idmap_update_batch	batch;
 	uint64_t		next;
-	char			*lastmsg;
 };
+
+#define	_IDMAP_RESET_UDT_HANDLE(uh) \
+	(void) xdr_free(xdr_idmap_update_batch, (caddr_t)&uh->batch);\
+	uh->next = 0;
 
 typedef struct idmap_get_res {
 	idmap_id_type	idtype;
@@ -79,8 +82,14 @@ struct idmap_get_handle {
 	idmap_mapping_batch	batch;
 	idmap_get_res_t		*retlist;
 	uint64_t		next;
-	char			*lastmsg;
 };
+
+#define	_IDMAP_RESET_GET_HANDLE(gh) \
+	(void) xdr_free(xdr_idmap_mapping_batch, (caddr_t)&gh->batch);\
+	if (gh->retlist) \
+		free(gh->retlist);\
+	gh->retlist = NULL;\
+	gh->next = 0;
 
 struct idmap_iter {
 	struct idmap_handle	*ih;
@@ -101,10 +110,11 @@ typedef struct stat_table {
 
 typedef idmap_retcode	_idmap_stat;
 
-extern idmap_retcode	_udt_extend_batch(idmap_udt_handle_t *, int);
+extern idmap_retcode	_udt_extend_batch(idmap_udt_handle_t *);
 extern idmap_retcode	_get_ids_extend_batch(idmap_get_handle_t *);
 extern idmap_stat	_iter_get_next_list(int, idmap_iter_t *, void *,
 				uchar_t **, size_t, xdrproc_t, xdrproc_t);
+extern idmap_stat	_idmap_rpc2stat(CLIENT *);
 
 #ifdef __cplusplus
 }

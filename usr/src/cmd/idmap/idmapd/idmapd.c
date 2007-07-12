@@ -249,8 +249,7 @@ main(int argc, char **argv)
 	    DAEMON_UID, DAEMON_GID,
 	    PRIV_PROC_AUDIT, PRIV_FILE_DAC_READ,
 	    (char *)NULL) == -1) {
-		(void) idmapdlog(LOG_ERR,
-		    gettext("idmapd: unable to drop privileges"));
+		(void) idmapdlog(LOG_ERR, "idmapd: unable to drop privileges");
 		exit(1);
 	}
 

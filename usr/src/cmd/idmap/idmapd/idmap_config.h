@@ -63,7 +63,6 @@ typedef struct idmap_cfg {
 extern idmap_cfg_t	*idmap_cfg_init();
 extern int		idmap_cfg_fini(idmap_cfg_t *);
 extern int		idmap_cfg_load(idmap_cfg_t *);
-extern char		*idmap_cfg_error();
 
 #ifdef __cplusplus
 }

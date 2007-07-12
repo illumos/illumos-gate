@@ -280,11 +280,14 @@ list_mappings_cb(void *parg, int argc, char **argv, char **colnames) {
 	u2w = argv[5]?strtol(argv[5], &end, 10):0;
 
 	if (w2u > 0 && u2w == 0)
-		result->mappings.mappings_val[cb_data->next].direction = 1;
+		result->mappings.mappings_val[cb_data->next].direction =
+		    IDMAP_DIRECTION_W2U;
 	else if (w2u == 0 && u2w > 0)
-		result->mappings.mappings_val[cb_data->next].direction = 2;
+		result->mappings.mappings_val[cb_data->next].direction =
+		    IDMAP_DIRECTION_U2W;
 	else
-		result->mappings.mappings_val[cb_data->next].direction = 0;
+		result->mappings.mappings_val[cb_data->next].direction =
+		    IDMAP_DIRECTION_BI;
 
 	ptr = &result->mappings.mappings_val[cb_data->next].id1domain;
 	if (idmap_str2utf8(&ptr, argv[6], 0) != IDMAP_SUCCESS)
@@ -409,11 +412,14 @@ list_namerules_cb(void *parg, int argc, char **argv, char **colnames) {
 	u2w_order = argv[7]?strtol(argv[7], &end, 10):0;
 
 	if (w2u_order > 0 && u2w_order == 0)
-		result->rules.rules_val[cb_data->next].direction = 1;
+		result->rules.rules_val[cb_data->next].direction =
+		    IDMAP_DIRECTION_W2U;
 	else if (w2u_order == 0 && u2w_order > 0)
-		result->rules.rules_val[cb_data->next].direction = 2;
+		result->rules.rules_val[cb_data->next].direction =
+		    IDMAP_DIRECTION_U2W;
 	else
-		result->rules.rules_val[cb_data->next].direction = 0;
+		result->rules.rules_val[cb_data->next].direction =
+		    IDMAP_DIRECTION_BI;
 
 	result->lastrowid = strtoll(argv[0], &end, 10);
 	cb_data->next++;
@@ -453,14 +459,14 @@ idmap_list_namerules_1_svc(idmap_namerule rule, uint64_t lastrowid,
 
 	if (rule.direction < 0) {
 		w2ubuf[0] = u2wbuf[0] = 0;
-	} else if (rule.direction == 0) {
+	} else if (rule.direction == IDMAP_DIRECTION_BI) {
 		(void) snprintf(w2ubuf, sizeof (w2ubuf), "AND w2u_order > 0");
 		(void) snprintf(u2wbuf, sizeof (u2wbuf), "AND u2w_order > 0");
-	} else if (rule.direction == 1) {
+	} else if (rule.direction == IDMAP_DIRECTION_W2U) {
 		(void) snprintf(w2ubuf, sizeof (w2ubuf), "AND w2u_order > 0");
 		(void) snprintf(u2wbuf, sizeof (u2wbuf),
 				"AND (u2w_order = 0 OR u2w_order ISNULL)");
-	} else if (rule.direction == 2) {
+	} else if (rule.direction == IDMAP_DIRECTION_U2W) {
 		(void) snprintf(w2ubuf, sizeof (w2ubuf),
 				"AND (w2u_order = 0 OR w2u_order ISNULL)");
 		(void) snprintf(u2wbuf, sizeof (u2wbuf), "AND u2w_order > 0");

@@ -159,7 +159,7 @@ static pthread_mutex_t		qstatelock = PTHREAD_MUTEX_INITIALIZER;
  * List of DSs, needed by the idle connection reaper thread
  */
 static ad_host_t	*host_head = NULL;
-static pthread_t	reaperid = (pthread_t)-1;
+static pthread_t	reaperid = 0;
 static pthread_mutex_t	adhostlock = PTHREAD_MUTEX_INITIALIZER;
 
 /*ARGSUSED*/

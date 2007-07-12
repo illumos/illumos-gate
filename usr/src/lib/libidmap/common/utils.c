@@ -42,7 +42,7 @@
 static struct timeval TIMEOUT = { 25, 0 };
 
 idmap_retcode
-_udt_extend_batch(idmap_udt_handle_t *udthandle, int opnum) {
+_udt_extend_batch(idmap_udt_handle_t *udthandle) {
 	idmap_update_op	*tmplist;
 	size_t		nsize;
 
@@ -61,7 +61,7 @@ _udt_extend_batch(idmap_udt_handle_t *udthandle, int opnum) {
 		udthandle->batch.idmap_update_batch_len += _UDT_SIZE_INCR;
 	}
 	udthandle->batch.idmap_update_batch_val[udthandle->next].opnum =
-		opnum;
+		OP_NONE;
 	return (IDMAP_SUCCESS);
 }
 
@@ -125,8 +125,34 @@ _iter_get_next_list(int type, idmap_iter_t *iter,
 		TIMEOUT);
 	if (clntstat != RPC_SUCCESS) {
 		free(*list);
-		return (IDMAP_ERR_RPC);
+		return (_idmap_rpc2stat(clnt));
 	}
 	iter->retlist = *list;
 	return (IDMAP_SUCCESS);
+}
+
+idmap_stat
+_idmap_rpc2stat(CLIENT *clnt) {
+	/*
+	 * We only deal with door_call(3C) errors here. We look at
+	 * r_err.re_errno instead of r_err.re_status because we need
+	 * to differentiate between RPC failures caused by bad door fd
+	 * and others.
+	 */
+	struct rpc_err r_err;
+	if (clnt) {
+		clnt_geterr(clnt, &r_err);
+		errno = r_err.re_errno;
+		switch (r_err.re_errno) {
+		case ENOMEM:
+			return (IDMAP_ERR_MEMORY);
+		case EBADF:
+			return (IDMAP_ERR_RPC_HANDLE);
+		default:
+			return (IDMAP_ERR_RPC);
+		}
+	}
+
+	/* null handle */
+	return (IDMAP_ERR_RPC_HANDLE);
 }

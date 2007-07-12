@@ -481,7 +481,8 @@ get_namerule_order(char *winname, char *windomain, char *unixname,
 	 * Note that "" has priority over specific names because "" inhibits
 	 * mappings and traditionally deny rules always had higher priority.
 	 */
-	if (direction == 0 || direction == 1) {
+	if (direction != IDMAP_DIRECTION_U2W) {
+		/* bi-directional or from windows to unix */
 		if (winname == NULL)
 			return (IDMAP_ERR_W2U_NAMERULE);
 		else if (unixname == NULL)
@@ -528,10 +529,13 @@ get_namerule_order(char *winname, char *windomain, char *unixname,
 	 * 4. * to ""
 	 * 5. * to winname@domain (or winname)
 	 */
-	if (direction == 0 || direction == 2) {
+	if (direction != IDMAP_DIRECTION_W2U) {
+		/* bi-directional or from unix to windows */
 		if (unixname == NULL || EMPTY_NAME(unixname))
 			return (IDMAP_ERR_U2W_NAMERULE);
 		else if (winname == NULL)
+			return (IDMAP_ERR_U2W_NAMERULE);
+		else if (windomain && *windomain == '*')
 			return (IDMAP_ERR_U2W_NAMERULE);
 		else if (*unixname == '*') {
 			if (*winname == '*')
@@ -669,13 +673,13 @@ rm_namerule(sqlite *db, idmap_namerule *rule) {
 
 	if (rule->direction < 0) {
 		buf[0] = 0;
-	} else if (rule->direction == 0) {
+	} else if (rule->direction == IDMAP_DIRECTION_BI) {
 		(void) snprintf(buf, sizeof (buf), "AND w2u_order > 0"
 				" AND u2w_order > 0");
-	} else if (rule->direction == 1) {
+	} else if (rule->direction == IDMAP_DIRECTION_W2U) {
 		(void) snprintf(buf, sizeof (buf), "AND w2u_order > 0"
 				" AND (u2w_order = 0 OR u2w_order ISNULL)");
-	} else if (rule->direction == 2) {
+	} else if (rule->direction == IDMAP_DIRECTION_U2W) {
 		(void) snprintf(buf, sizeof (buf), "AND u2w_order > 0"
 				" AND (w2u_order = 0 OR w2u_order ISNULL)");
 	}
@@ -810,10 +814,9 @@ lookup_wksids_sid2pid(idmap_mapping *req, idmap_id_res *res) {
 	int i;
 	for (i = 0; wksidstable[i].sidprefix; i++) {
 		if ((strcasecmp(wksidstable[i].sidprefix,
-				req->id1.idmap_id_u.sid.prefix) == 0) &&
-				req->id1.idmap_id_u.sid.rid ==
-				wksidstable[i].rid &&
-				wksidstable[i].direction != 2) {
+		    req->id1.idmap_id_u.sid.prefix) == 0) &&
+		    req->id1.idmap_id_u.sid.rid == wksidstable[i].rid &&
+		    wksidstable[i].direction != IDMAP_DIRECTION_U2W) {
 			switch (req->id2.idtype) {
 			case IDMAP_UID:
 				if (wksidstable[i].is_user == 0)
@@ -846,9 +849,9 @@ lookup_wksids_pid2sid(idmap_mapping *req, idmap_id_res *res, int is_user) {
 	int i;
 	for (i = 0; wksidstable[i].sidprefix; i++) {
 		if (req->id1.idmap_id_u.uid == wksidstable[i].pid &&
-				wksidstable[i].direction != 1 &&
-				(wksidstable[i].is_user < 0 ||
-				is_user == wksidstable[i].is_user)) {
+		    wksidstable[i].direction != IDMAP_DIRECTION_W2U &&
+		    (wksidstable[i].is_user < 0 ||
+		    is_user == wksidstable[i].is_user)) {
 			switch (req->id2.idtype) {
 			case IDMAP_SID:
 				res->id.idmap_id_u.sid.rid =
@@ -939,7 +942,7 @@ lookup_cache_sid2pid(sqlite *cache, idmap_mapping *req, idmap_id_res *res) {
 					res->id.idmap_id_u.uid = pid;
 					res->id.idtype = is_user?
 						IDMAP_UID:IDMAP_GID;
-					res->direction = 0;
+					res->direction = IDMAP_DIRECTION_BI;
 					req->direction |= is_user?
 						_IDMAP_F_EXP_EPH_UID:
 						_IDMAP_F_EXP_EPH_GID;
@@ -976,9 +979,10 @@ out:
 	if (retcode == IDMAP_SUCCESS) {
 		if (values[4])
 			res->direction =
-				(strtol(values[4], &end, 10) == 0)?1:0;
+			    (strtol(values[4], &end, 10) == 0)?
+			    IDMAP_DIRECTION_W2U:IDMAP_DIRECTION_BI;
 		else
-			res->direction = 1;
+			res->direction = IDMAP_DIRECTION_W2U;
 
 		if (values[3]) {
 			str = &req->id2name;
@@ -1306,7 +1310,7 @@ generate_localsid(idmap_mapping *req, idmap_id_res *res, int is_user) {
 		res->id.idmap_id_u.sid.rid =
 			(is_user)?req->id1.idmap_id_u.uid + LOCALRID_MIN:
 			req->id1.idmap_id_u.gid + INT32_MAX + 1;
-		res->direction = 0;
+		res->direction = IDMAP_DIRECTION_BI;
 
 		/*
 		 * Don't update name_cache because local sids don't have
@@ -1558,9 +1562,10 @@ out:
 	if (retcode == IDMAP_SUCCESS) {
 		if (values[1])
 			res->direction =
-				(strtol(values[1], &end, 10) == 0)?1:0;
+			    (strtol(values[1], &end, 10) == 0)?
+			    IDMAP_DIRECTION_W2U:IDMAP_DIRECTION_BI;
 		else
-			res->direction = 1;
+			res->direction = IDMAP_DIRECTION_W2U;
 		str = &req->id2name;
 		retcode = idmap_str2utf8(&str, unixname, 0);
 	}
@@ -1623,19 +1628,19 @@ dynamic_ephemeral_mapping(sqlite *cache, idmap_mapping *req,
 	uid_t		next_pid;
 
 	if (IS_EPHEMERAL(res->id.idmap_id_u.uid)) {
-		res->direction = 0;
+		res->direction = IDMAP_DIRECTION_BI;
 	} else if (res->id.idtype == IDMAP_UID) {
 		if (get_next_eph_uid(&next_pid) != 0)
 			return (IDMAP_ERR_INTERNAL);
 		res->id.idmap_id_u.uid = next_pid;
 		res->id.idtype = IDMAP_UID;
-		res->direction = 0;
+		res->direction = IDMAP_DIRECTION_BI;
 	} else {
 		if (get_next_eph_gid(&next_pid) != 0)
 			return (IDMAP_ERR_INTERNAL);
 		res->id.idmap_id_u.gid = next_pid;
 		res->id.idtype = IDMAP_GID;
-		res->direction = 0;
+		res->direction = IDMAP_DIRECTION_BI;
 	}
 
 	return (IDMAP_SUCCESS);
@@ -1950,9 +1955,10 @@ lookup_cache_pid2sid(sqlite *cache, idmap_mapping *req, idmap_id_res *res,
 
 			if (values[4])
 				res->direction =
-				    (strtol(values[4], &end, 10) == 0)?2:0;
+				    (strtol(values[4], &end, 10) == 0)?
+				    IDMAP_DIRECTION_U2W:IDMAP_DIRECTION_BI;
 			else
-				res->direction = 2;
+				res->direction = IDMAP_DIRECTION_U2W;
 
 			if (getname == 0 || values[2] == NULL)
 				break;
@@ -2259,9 +2265,10 @@ out:
 	if (retcode == IDMAP_SUCCESS) {
 		if (values[2])
 			res->direction =
-				(strtol(values[2], &end, 10) == 0)?2:0;
+			    (strtol(values[2], &end, 10) == 0)?
+			    IDMAP_DIRECTION_U2W:IDMAP_DIRECTION_BI;
 		else
-			res->direction = 2;
+			res->direction = IDMAP_DIRECTION_U2W;
 		str = &req->id2name;
 		retcode = idmap_str2utf8(&str, winname, 0);
 		if (retcode == IDMAP_SUCCESS) {
@@ -2419,69 +2426,70 @@ out:
 	return (retcode);
 }
 
-static void
-copy_id_mapping(idmap_mapping *mapping, idmap_mapping *request)
+static int
+copy_mapping_request(idmap_mapping *mapping, idmap_mapping *request)
 {
+	(void) memset(mapping, 0, sizeof (*mapping));
+
 	mapping->flag = request->flag;
 	mapping->direction = request->direction;
+	mapping->id2.idtype = request->id2.idtype;
 
 	mapping->id1.idtype = request->id1.idtype;
 	if (request->id1.idtype == IDMAP_SID) {
 		mapping->id1.idmap_id_u.sid.rid =
 		    request->id1.idmap_id_u.sid.rid;
-		if (request->id1.idmap_id_u.sid.prefix)
+		if (!EMPTY_STRING(request->id1.idmap_id_u.sid.prefix)) {
 			mapping->id1.idmap_id_u.sid.prefix =
 			    strdup(request->id1.idmap_id_u.sid.prefix);
-		else
-			mapping->id1.idmap_id_u.sid.prefix = NULL;
+			if (mapping->id1.idmap_id_u.sid.prefix == NULL)
+				return (-1);
+		}
 	} else {
 		mapping->id1.idmap_id_u.uid = request->id1.idmap_id_u.uid;
 	}
 
 	mapping->id1domain.idmap_utf8str_len =
 	    request->id1domain.idmap_utf8str_len;
-	if (mapping->id1domain.idmap_utf8str_len)
+	if (mapping->id1domain.idmap_utf8str_len) {
 		mapping->id1domain.idmap_utf8str_val =
 		    strdup(request->id1domain.idmap_utf8str_val);
-	else
-		mapping->id1domain.idmap_utf8str_val = NULL;
+		if (mapping->id1domain.idmap_utf8str_val == NULL)
+			return (-1);
+	}
 
 	mapping->id1name.idmap_utf8str_len  =
 	    request->id1name.idmap_utf8str_len;
-	if (mapping->id1name.idmap_utf8str_len)
+	if (mapping->id1name.idmap_utf8str_len) {
 		mapping->id1name.idmap_utf8str_val =
 		    strdup(request->id1name.idmap_utf8str_val);
-	else
-		mapping->id1name.idmap_utf8str_val = NULL;
-
-	mapping->id2.idtype = request->id2.idtype;
-	if (request->id2.idtype == IDMAP_SID) {
-		mapping->id2.idmap_id_u.sid.rid =
-		    request->id2.idmap_id_u.sid.rid;
-		if (request->id2.idmap_id_u.sid.prefix)
-			mapping->id2.idmap_id_u.sid.prefix =
-			    strdup(request->id2.idmap_id_u.sid.prefix);
-		else
-			mapping->id2.idmap_id_u.sid.prefix = NULL;
-	} else {
-		mapping->id2.idmap_id_u.uid = request->id2.idmap_id_u.uid;
+		if (mapping->id1name.idmap_utf8str_val == NULL)
+			return (-1);
 	}
 
-	mapping->id2domain.idmap_utf8str_len =
-	    request->id2domain.idmap_utf8str_len;
-	if (mapping->id2domain.idmap_utf8str_len)
-		mapping->id2domain.idmap_utf8str_val =
-		    strdup(request->id2domain.idmap_utf8str_val);
-	else
-		mapping->id2domain.idmap_utf8str_val = NULL;
+	/* We don't need the rest of the request i.e request->id2 */
+	return (0);
 
-	mapping->id2name.idmap_utf8str_len =
-	    request->id2name.idmap_utf8str_len;
-	if (mapping->id2name.idmap_utf8str_len)
-		mapping->id2name.idmap_utf8str_val =
-		    strdup(request->id2name.idmap_utf8str_val);
-	else
-		mapping->id2name.idmap_utf8str_val = NULL;
+errout:
+	if (mapping->id1.idmap_id_u.sid.prefix) {
+		free(mapping->id1.idmap_id_u.sid.prefix);
+		mapping->id1.idmap_id_u.sid.prefix = NULL;
+	}
+
+	if (mapping->id1domain.idmap_utf8str_val) {
+		free(mapping->id1domain.idmap_utf8str_val);
+		mapping->id1domain.idmap_utf8str_val = NULL;
+		mapping->id1domain.idmap_utf8str_len = 0;
+	}
+
+	if (mapping->id1name.idmap_utf8str_val) {
+		free(mapping->id1name.idmap_utf8str_val);
+		mapping->id1name.idmap_utf8str_val = NULL;
+		mapping->id1name.idmap_utf8str_len = 0;
+	}
+
+	(void) memset(mapping, 0, sizeof (*mapping));
+	return (-1);
 }
 
 
@@ -2510,7 +2518,10 @@ get_w2u_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
 	}
 
 	/* Copy data from request to result */
-	copy_id_mapping(mapping, request);
+	if (copy_mapping_request(mapping, request) < 0) {
+		retcode = IDMAP_ERR_MEMORY;
+		goto out;
+	}
 
 	winname = mapping->id1name.idmap_utf8str_val;
 	windomain = mapping->id1domain.idmap_utf8str_val;
@@ -2537,7 +2548,7 @@ get_w2u_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
 		windomain = mapping->id1domain.idmap_utf8str_val;
 	}
 
-	if (winname && EMPTY_STRING(mapping->id1.idmap_id_u.sid.prefix)) {
+	if (winname && mapping->id1.idmap_id_u.sid.prefix == NULL) {
 		retcode = lookup_name2sid(cache, winname, windomain,
 			&is_user, &mapping->id1.idmap_id_u.sid.prefix,
 			&mapping->id1.idmap_id_u.sid.rid, mapping);
@@ -2605,7 +2616,10 @@ get_u2w_mapping(sqlite *cache, sqlite *db, idmap_mapping *request,
 	(void) memset(&state, 0, sizeof (state));
 
 	/* Copy data from request to result */
-	copy_id_mapping(mapping, request);
+	if (copy_mapping_request(mapping, request) < 0) {
+		retcode = IDMAP_ERR_MEMORY;
+		goto out;
+	}
 
 	unixname = mapping->id1name.idmap_utf8str_val;
 

@@ -38,7 +38,7 @@
 #include <libintl.h>
 #include <ctype.h>
 #include <errno.h>
-#include "idmap_config.h"
+#include "idmapd.h"
 #include <stdio.h>
 #include <stdarg.h>
 
@@ -47,65 +47,10 @@
 #define	CONFIG_PG "config"
 #define	GENERAL_PG "general"
 
-#define	IDMAP_CFG_DEBUG 0
-
 /* initial length of the array for policy options/attributes: */
 #define	DEF_ARRAY_LENGTH 16
 
-static char errmess_buf [1000] =
-	"Internal error: idmap configuration has not been initialized";
-
-static void
-errmess(char *format, va_list ap)
-{
-/*LINTED: E_SEC_PRINTF_VAR_FMT*/
-	(void) vsnprintf(errmess_buf, sizeof (errmess_buf), format, ap);
-	(void) strlcat(errmess_buf, "\n", sizeof (errmess_buf));
-
-#if IDMAP_CFG_DEBUG
-	(void) fprintf(stderr, errmess_buf);
-	fflush(stderr);
-#endif
-}
-
-
-static void
-idmap_error(char *format, ...)
-{
-	va_list ap;
-	va_start(ap, format);
-	errmess(format, ap);
-	va_end(ap);
-}
-
-static void
-idmap_scf_error(char *format, ...)
-{
-	const char *scf_message;
-	char *new_format;
-	char *sep = ": ";
-	va_list ap;
-
-	va_start(ap, format);
-
-	scf_message = scf_strerror(scf_error());
-	new_format = (char *) malloc(sizeof (char) *
-	    (strlen(format) + strlen(scf_message) + strlen(sep) + 1));
-
-	(void) strcpy(new_format, format);
-	(void) strcat(new_format, sep);
-	(void) strcat(new_format, scf_message);
-
-	errmess(new_format, ap);
-
-	va_end(ap);
-	free(new_format);
-}
-
-char *
-idmap_cfg_error() {
-	return (errmess_buf);
-}
+static const char *me = "idmapd";
 
 /* Check if in the case of failure the original value of *val is preserved */
 static int
@@ -137,8 +82,8 @@ get_val_int(idmap_cfg_t *cfg, char *name, void *val, scf_type_t type)
 		rc = scf_value_get_integer(value, val);
 		break;
 	default:
-		idmap_scf_error(gettext("Internal error: invalid int type %d"),
-		    type);
+		idmapdlog(LOG_ERR, "%s: Invalid scf integer type (%d)",
+		    me, type);
 		rc = -1;
 		break;
 	}
@@ -170,8 +115,7 @@ scf_value2string(scf_value_t *value) {
 			buf_size *= 2;
 			buf = (char *)realloc(buf, buf_size * sizeof (char));
 			if (!buf) {
-				idmap_scf_error(
-					gettext("Not enough memory"));
+				idmapdlog(LOG_ERR, "%s: Out of memory", me);
 				rc = -1;
 				goto destruction;
 			}
@@ -206,15 +150,18 @@ get_val_astring(idmap_cfg_t *cfg, char *name, char **val)
 		goto destruction;
 
 	if (0 > scf_property_get_value(scf_prop, value)) {
-		idmap_scf_error(gettext("Cannot get the astring %s"), name);
+		idmapdlog(LOG_ERR,
+		    "%s: scf_property_get_value(%s) failed: %s",
+		    me, name, scf_strerror(scf_error()));
 		rc = -1;
 		goto destruction;
 	}
 
 	if (!(*val = scf_value2string(value))) {
 		rc = -1;
-		idmap_scf_error(gettext("Cannot retrieve the astring %s"),
-		    name);
+		idmapdlog(LOG_ERR,
+		    "%s: scf_value2string(%s) failed: %s",
+		    me, name, scf_strerror(scf_error()));
 	}
 
 destruction:
@@ -242,12 +189,14 @@ idmap_cfg_load(idmap_cfg_t *cfg)
 	cfg->pgcfg.global_catalog = NULL;
 
 	if (0 > scf_pg_update(cfg->handles.config_pg)) {
-		idmap_scf_error(gettext("Error updating config pg"));
+		idmapdlog(LOG_ERR, "%s: scf_pg_update() failed: %s",
+		    me, scf_strerror(scf_error()));
 		return (-1);
 	}
 
 	if (0 > scf_pg_update(cfg->handles.general_pg)) {
-		idmap_scf_error(gettext("Error updating general pg"));
+		idmapdlog(LOG_ERR, "%s: scf_pg_update() failed: %s",
+		    me, scf_strerror(scf_error()));
 		return (-1);
 	}
 
@@ -262,7 +211,6 @@ idmap_cfg_load(idmap_cfg_t *cfg)
 		return (-1);
 
 	/*
-	 * TBD:
 	 * If there is no mapping_domain in idmap's smf config then
 	 * set it to the joined domain.
 	 * Till domain join is implemented, temporarily set it to
@@ -278,8 +226,8 @@ idmap_cfg_load(idmap_cfg_t *cfg)
 			    cfg->pgcfg.mapping_domain, dname_size);
 		}
 		if (dname_size <= 0) {
-			idmap_scf_error(
-			    gettext("Error obtaining the default domain"));
+			idmapdlog(LOG_ERR,
+			    "%s: unable to get name service domain", me);
 			if (cfg->pgcfg.mapping_domain)
 				free(cfg->pgcfg.mapping_domain);
 			cfg->pgcfg.mapping_domain = NULL;
@@ -302,26 +250,28 @@ idmap_cfg_load(idmap_cfg_t *cfg)
 	return (rc);
 }
 
+/*
+ * Initialize 'cfg'.
+ */
 idmap_cfg_t *
 idmap_cfg_init() {
-	/*
-	 * The following initializes 'cfg'.
-	 */
 
 	/* First the smf repository handles: */
 	idmap_cfg_t *cfg = calloc(1, sizeof (idmap_cfg_t));
 	if (!cfg) {
-		idmap_error(gettext("Not enough memory"));
+		idmapdlog(LOG_ERR, "%s: Out of memory", me);
 		return (NULL);
 	}
 
 	if (!(cfg->handles.main = scf_handle_create(SCF_VERSION))) {
-		idmap_scf_error(gettext("SCF handle not created"));
+		idmapdlog(LOG_ERR, "%s: scf_handle_create() failed: %s",
+		    me, scf_strerror(scf_error()));
 		goto error;
 	}
 
 	if (0 > scf_handle_bind(cfg->handles.main)) {
-		idmap_scf_error(gettext("SCF connection failed"));
+		idmapdlog(LOG_ERR, "%s: scf_handle_bind() failed: %s",
+		    me, scf_strerror(scf_error()));
 		goto error;
 	}
 
@@ -329,7 +279,8 @@ idmap_cfg_init() {
 	    !(cfg->handles.instance = scf_instance_create(cfg->handles.main)) ||
 	    !(cfg->handles.config_pg = scf_pg_create(cfg->handles.main)) ||
 	    !(cfg->handles.general_pg = scf_pg_create(cfg->handles.main))) {
-		idmap_scf_error(gettext("SCF handle creation failed"));
+		idmapdlog(LOG_ERR, "%s: scf handle creation failed: %s",
+		    me, scf_strerror(scf_error()));
 		goto error;
 	}
 
@@ -341,14 +292,16 @@ idmap_cfg_init() {
 		cfg->handles.config_pg,		/* pg */
 		NULL,				/* prop */
 		SCF_DECODE_FMRI_EXACT)) {
-		idmap_scf_error(gettext("SCF fmri decoding failed"));
+		idmapdlog(LOG_ERR, "%s: scf_handle_decode_fmri() failed: %s",
+		    me, scf_strerror(scf_error()));
 		goto error;
 
 	}
 
 	if (0 > scf_service_get_pg(cfg->handles.service,
 		GENERAL_PG, cfg->handles.general_pg)) {
-		idmap_scf_error(gettext("SCF general pg not obtained"));
+		idmapdlog(LOG_ERR, "%s: scf_service_get_pg() failed: %s",
+		    me, scf_strerror(scf_error()));
 		goto error;
 	}
 
