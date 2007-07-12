@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -259,6 +259,7 @@ static	kcondvar_t nfs_server_upordown_cv;
 nvlist_t *rfs4_dss_paths, *rfs4_dss_oldpaths;
 
 int rfs4_dispatch(struct rpcdisp *, struct svc_req *, SVCXPRT *, char *);
+bool_t rfs4_minorvers_mismatch(struct svc_req *, SVCXPRT *, void *);
 
 /*
  * RDMA wait variables.
@@ -1481,8 +1482,14 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 	{
 		bzero(args, disp->dis_argsz);
 		if (!SVC_GETARGS(xprt, disp->dis_xdrargs, args)) {
-			svcerr_decode(xprt);
 			error++;
+			/*
+			 * Check if we are outside our capabilities.
+			 */
+			if (rfs4_minorvers_mismatch(req, xprt, (void *)args))
+				goto done;
+
+			svcerr_decode(xprt);
 			cmn_err(CE_NOTE,
 			    "Failed to decode arguments for %s version %u "
 			    "procedure %s client %s%s",

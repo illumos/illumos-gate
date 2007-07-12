@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,8 @@
 #include <nfs/nfs4.h>
 #include <nfs/nfs_dispatch.h>
 #include <nfs/nfs4_drc.h>
+
+#define	NFS4_MAX_MINOR_VERSION	0
 
 /*
  * This is the duplicate request cache for NFSv4
@@ -527,4 +529,39 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req,
 	}
 
 	return (error);
+}
+
+bool_t
+rfs4_minorvers_mismatch(struct svc_req *req, SVCXPRT *xprt, void *args)
+{
+	COMPOUND4args *argsp;
+	COMPOUND4res res_buf, *resp;
+
+	if (req->rq_vers != 4)
+		return (FALSE);
+
+	argsp = (COMPOUND4args *)args;
+
+	if (argsp->minorversion <= NFS4_MAX_MINOR_VERSION)
+		return (FALSE);
+
+	resp = &res_buf;
+
+	/*
+	 * Form a reply tag by copying over the reqeuest tag.
+	 */
+	resp->tag.utf8string_val =
+	    kmem_alloc(argsp->tag.utf8string_len, KM_SLEEP);
+	resp->tag.utf8string_len = argsp->tag.utf8string_len;
+	bcopy(argsp->tag.utf8string_val, resp->tag.utf8string_val,
+	    resp->tag.utf8string_len);
+	resp->array_len = 0;
+	resp->array = NULL;
+	resp->status = NFS4ERR_MINOR_VERS_MISMATCH;
+	if (!svc_sendreply(xprt,  xdr_COMPOUND4res_srv, (char *)resp)) {
+		DTRACE_PROBE2(nfss__e__minorvers_mismatch,
+		    SVCXPRT *, xprt, char *, resp);
+	}
+	rfs4_compound_free(resp);
+	return (TRUE);
 }
