@@ -587,6 +587,12 @@ cpuid_pass1(cpu_t *cpu)
 			mask_ecx = 0xffffffff;
 		} else if (cpi->cpi_family > 0xf)
 			mask_ecx = 0xffffffff;
+		/*
+		 * We don't support MONITOR/MWAIT if leaf 5 is not available
+		 * to obtain the monitor linesize.
+		 */
+		if (cpi->cpi_maxeax < 5)
+			mask_ecx &= ~CPUID_INTC_ECX_MON;
 		break;
 	case X86_VENDOR_IntelClone:
 	default:
@@ -631,6 +637,12 @@ cpuid_pass1(cpu_t *cpu)
 		 */
 		if (cpi->cpi_family >= 0xf)
 			mask_ecx = 0xffffffff;
+		/*
+		 * We don't support MONITOR/MWAIT if leaf 5 is not available
+		 * to obtain the monitor linesize.
+		 */
+		if (cpi->cpi_maxeax < 5)
+			mask_ecx &= ~CPUID_INTC_ECX_MON;
 		break;
 	case X86_VENDOR_TM:
 		/*
