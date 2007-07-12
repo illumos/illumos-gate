@@ -612,6 +612,15 @@ fail:
 }
 
 /* ARGSUSED */
+/*
+ *    A hardware bug may cause a faked ECCUE(ECC Uncorrectable Error).
+ * This function checks if a ECCUE is real(valid) or not.  It is not
+ * real if rd_ptr == wr_ptr.
+ *    The hardware module that has the bug is used not only by the IPP
+ * FIFO but also by the ZCP FIFO, therefore this function is also
+ * called by nxge_zcp_handle_sys_errors for validating the ZCP FIFO
+ * error.
+ */
 nxge_status_t
 nxge_ipp_eccue_valid_check(p_nxge_t nxgep, boolean_t *valid)
 {
@@ -632,15 +641,12 @@ nxge_ipp_eccue_valid_check(p_nxge_t nxgep, boolean_t *valid)
 	if ((rs = npi_ipp_get_dfifo_rd_ptr(handle, portn, &rd_ptr))
 		!= NPI_SUCCESS)
 		goto fail;
-	if ((rs = npi_ipp_get_dfifo_rd_ptr(handle, portn, &wr_ptr))
+	if ((rs = npi_ipp_get_dfifo_wr_ptr(handle, portn, &wr_ptr))
 		!= NPI_SUCCESS)
 		goto fail;
 
 	if (rd_ptr == wr_ptr) {
-		cmn_err(CE_NOTE,
-			"nxge_ipp_eccue_valid_check: rd_ptr = %d wr_ptr = %d\n",
-			rd_ptr, wr_ptr);
-		*valid = B_FALSE;	/* IPP not stuck */
+		*valid = B_FALSE; /* FIFO not stuck, so it's not a real ECCUE */
 	} else {
 		stall_cnt = 0;
 		while (stall_cnt < 16) {
