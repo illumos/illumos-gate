@@ -154,6 +154,7 @@ static int arc_dead;
  */
 uint64_t zfs_arc_max;
 uint64_t zfs_arc_min;
+uint64_t zfs_arc_meta_limit = 0;
 
 /*
  * Note that buffers can be in one of 5 states:
@@ -2783,6 +2784,11 @@ arc_init(void)
 
 	/* limit meta-data to 1/4 of the arc capacity */
 	arc_meta_limit = arc_c_max / 4;
+
+	/* Allow the tunable to override if it is reasonable */
+	if (zfs_arc_meta_limit > 0 && zfs_arc_meta_limit <= arc_c_max)
+		arc_meta_limit = zfs_arc_meta_limit;
+
 	if (arc_c_min < arc_meta_limit / 2 && zfs_arc_min == 0)
 		arc_c_min = arc_meta_limit / 2;
 
