@@ -65,9 +65,9 @@ vio_create_mblks(uint64_t num_mblks, size_t mblk_size, vio_mblk_pool_t **poolp)
 	vmplp->mblk_size = mblk_size;
 
 	mutex_init(&vmplp->hlock, NULL, MUTEX_DRIVER,
-		DDI_INTR_PRI(DDI_INTR_SOFTPRI_DEFAULT));
+	    DDI_INTR_PRI(DDI_INTR_SOFTPRI_DEFAULT));
 	mutex_init(&vmplp->tlock, NULL, MUTEX_DRIVER,
-		DDI_INTR_PRI(DDI_INTR_SOFTPRI_DEFAULT));
+	    DDI_INTR_PRI(DDI_INTR_SOFTPRI_DEFAULT));
 
 	vmplp->basep = kmem_zalloc(num_mblks * sizeof (vio_mblk_t), KM_SLEEP);
 	vmplp->datap = kmem_zalloc(num_mblks * mblk_size, KM_SLEEP);
@@ -75,7 +75,7 @@ vio_create_mblks(uint64_t num_mblks, size_t mblk_size, vio_mblk_pool_t **poolp)
 
 	/* create a queue of pointers to free vio_mblk_t's */
 	vmplp->quep = kmem_zalloc(vmplp->quelen *
-		sizeof (vio_mblk_t *), KM_SLEEP);
+	    sizeof (vio_mblk_t *), KM_SLEEP);
 	vmplp->head = 0;
 	vmplp->tail =  0;
 
@@ -207,7 +207,7 @@ vio_freeb(void *arg)
 	}
 
 	vmp->mp = desballoc(vmp->datap, vmplp->mblk_size,
-		BPRI_MED, &vmp->reclaim);
+	    BPRI_MED, &vmp->reclaim);
 
 	mutex_enter(&vmplp->tlock);
 	vmplp->quep[vmplp->tail] = vmp;
@@ -245,14 +245,14 @@ vio_init_multipools(vio_multi_pool_t *vmultip, int num_pools, ...)
 	 *	vmpp	  -- sizeof (vio_mblk_pool_t *) * numpools
 	 */
 	vmultip->tbsz = (sizeof (uint32_t) * num_pools) +
-		(sizeof (uint32_t) * num_pools) +
-		(sizeof (vio_mblk_pool_t *) * num_pools);
+	    (sizeof (uint32_t) * num_pools) +
+	    (sizeof (vio_mblk_pool_t *) * num_pools);
 	tbuf = kmem_zalloc(vmultip->tbsz, KM_SLEEP);
 	vmultip->bufsz_tbl = (uint32_t *)tbuf;
 	vmultip->nbuf_tbl = (uint32_t *)(tbuf +
-		(sizeof (uint32_t) * num_pools));
+	    (sizeof (uint32_t) * num_pools));
 	vmultip->vmpp = (vio_mblk_pool_t **)(tbuf +
-		(sizeof (uint32_t) * num_pools * 2));
+	    (sizeof (uint32_t) * num_pools * 2));
 	vmultip->num_pools = num_pools;
 
 	/* initialize the array first */
@@ -267,7 +267,7 @@ vio_init_multipools(vio_multi_pool_t *vmultip, int num_pools, ...)
 
 	for (i = 0; i < vmultip->num_pools; i++) {
 		status = vio_create_mblks(vmultip->nbuf_tbl[i],
-			vmultip->bufsz_tbl[i], &vmultip->vmpp[i]);
+		    vmultip->bufsz_tbl[i], &vmultip->vmpp[i]);
 		if (status != 0) {
 			vio_destroy_multipools(vmultip, &fvmp);
 			/* We expect to free the pools without failure here */

@@ -764,7 +764,7 @@ vnet_read_mac_address(vnet_t *vnetp)
 	int 		rv;
 
 	rv = ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, vnetp->dip,
-		DDI_PROP_DONTPASS, macaddr_propname, &macaddr, &size);
+	    DDI_PROP_DONTPASS, macaddr_propname, &macaddr, &size);
 	if ((rv != DDI_PROP_SUCCESS) || (size != ETHERADDRL)) {
 		DWARN(vnetp, "prop_lookup failed(%s) err(%d)\n",
 		    macaddr_propname, rv);

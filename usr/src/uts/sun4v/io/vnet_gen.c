@@ -683,7 +683,7 @@ vgen_ldcsend(vgen_ldc_t *ldcp, mblk_t *mp)
 	txdp->nbytes = size;
 	txdp->ncookies = tbufp->ncookies;
 	bcopy((tbufp->memcookie), (txdp->memcookie),
-		tbufp->ncookies * sizeof (ldc_mem_cookie_t));
+	    tbufp->ncookies * sizeof (ldc_mem_cookie_t));
 
 	mutex_enter(&ldcp->wrlock);
 	/*
@@ -719,8 +719,8 @@ vgen_ldcsend(vgen_ldc_t *ldcp, mblk_t *mp)
 			if (rv != 0) {
 				/* error: drop the packet */
 				DWARN(vgenp, ldcp, "vgen_send_dring_data "
-				"failed: rv(%d) len(%d)\n",
-					ldcp->ldc_id, rv, size);
+				    "failed: rv(%d) len(%d)\n",
+				    ldcp->ldc_id, rv, size);
 				statsp->oerrors++;
 			} else {
 				ldcp->resched_peer = B_FALSE;
@@ -872,7 +872,7 @@ vgen_multicst(void *arg, boolean_t add, const uint8_t *mca)
 				 */
 				if (vgenp->mccount > 1) {
 					vgenp->mctab[i] =
-						vgenp->mctab[vgenp->mccount-1];
+					    vgenp->mctab[vgenp->mccount-1];
 				}
 				vgenp->mccount--;
 				break;
@@ -1026,8 +1026,10 @@ vgen_port_list_remove(vgen_port_t *portp)
 		if (portp == plistp->tailp)
 			plistp->tailp = plistp->headp;
 	} else {
-		for (prevp = plistp->headp; ((nextp = prevp->nextp) != NULL) &&
-		    (nextp != portp); prevp = nextp);
+		for (prevp = plistp->headp;
+		    ((nextp = prevp->nextp) != NULL) && (nextp != portp);
+		    prevp = nextp)
+			;
 		if (nextp == portp) {
 			prevp->nextp = portp->nextp;
 		}
@@ -1156,7 +1158,7 @@ vgen_mdeg_reg(vgen_t *vgenp)
 	int			i;
 
 	i = ddi_prop_get_int(DDI_DEV_T_ANY, vgenp->vnetdip,
-		DDI_PROP_DONTPASS, reg_propname, -1);
+	    DDI_PROP_DONTPASS, reg_propname, -1);
 	if (i == -1) {
 		return (DDI_FAILURE);
 	}
@@ -1324,8 +1326,8 @@ vgen_add_port(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex)
 		return (DDI_FAILURE);
 
 	num_ldcs = md_scan_dag(mdp, mdex,
-		md_find_name(mdp, channel_propname),
-		md_find_name(mdp, "fwd"), listp);
+	    md_find_name(mdp, channel_propname),
+	    md_find_name(mdp, "fwd"), listp);
 
 	if (num_ldcs <= 0) {
 		DWARN(vgenp, NULL, "can't find %s nodes", channel_propname);
@@ -1568,8 +1570,8 @@ vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id)
 		ldcp->soft_pri = PIL_6;
 
 		status = ddi_intr_add_softint(vgenp->vnetdip,
-			&ldcp->soft_handle, ldcp->soft_pri,
-			vgen_ldc_rcv_softintr, (void *)ldcp);
+		    &ldcp->soft_handle, ldcp->soft_pri,
+		    vgen_ldc_rcv_softintr, (void *)ldcp);
 		if (status != DDI_SUCCESS) {
 			DWARN(vgenp, ldcp, "add_softint failed, rv (%d)\n",
 			    status);
@@ -1577,9 +1579,9 @@ vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id)
 		}
 
 		/*
-		* Initialize the soft_lock with the same priority as
-		* the soft interrupt to protect from the soft interrupt.
-		*/
+		 * Initialize the soft_lock with the same priority as
+		 * the soft interrupt to protect from the soft interrupt.
+		 */
 		mutex_init(&ldcp->soft_lock, NULL, MUTEX_DRIVER,
 		    DDI_INTR_PRI(ldcp->soft_pri));
 		attach_state |= AST_add_softintr;
@@ -1617,8 +1619,8 @@ vgen_ldc_attach(vgen_port_t *portp, uint64_t ldc_id)
 
 	/* allocate receive resources */
 	status = vio_init_multipools(&ldcp->vmp, VGEN_NUM_VMPOOLS,
-		vgen_rbufsz1, vgen_rbufsz2, vgen_rbufsz3,
-		vgen_nrbufs1, vgen_nrbufs2, vgen_nrbufs3);
+	    vgen_rbufsz1, vgen_rbufsz2, vgen_rbufsz3,
+	    vgen_nrbufs1, vgen_nrbufs2, vgen_nrbufs3);
 	if (status != 0) {
 		goto ldc_attach_failed;
 	}
@@ -2064,7 +2066,7 @@ vgen_init_tbufs(vgen_ldc_t *ldcp)
 
 		tbufp = &(ldcp->tbufp[i]);
 		rv = ldc_mem_alloc_handle(ldcp->ldc_handle,
-			&(tbufp->memhandle));
+		    &(tbufp->memhandle));
 		if (rv) {
 			tbufp->memhandle = 0;
 			goto init_tbufs_failed;
@@ -2088,13 +2090,13 @@ vgen_init_tbufs(vgen_ldc_t *ldcp)
 		tbufp->datap = datap;
 
 		if ((ncookies == 0) ||
-			(ncookies > MAX_COOKIES)) {
+		    (ncookies > MAX_COOKIES)) {
 			goto init_tbufs_failed;
 		}
 
 		for (ci = 1; ci < ncookies; ci++) {
 			rv = ldc_mem_nextcookie(tbufp->memhandle,
-				&(tbufp->memcookie[ci]));
+			    &(tbufp->memcookie[ci]));
 			if (rv != 0) {
 				goto init_tbufs_failed;
 			}
@@ -2429,7 +2431,7 @@ vgen_handle_evt_reset(vgen_ldc_t *ldcp, boolean_t flag)
 	ASSERT(MUTEX_HELD(&ldcp->cblock));
 
 	if ((ldcp->portp != vgenp->vsw_portp) &&
-		(vgenp->vsw_portp != NULL)) {
+	    (vgenp->vsw_portp != NULL)) {
 		/*
 		 * modify fdb entry to use vsw-port  as the
 		 * channel is reset and we don't have a direct
@@ -2741,7 +2743,7 @@ uint16_t ver_minor)
 			break;
 		}
 		if ((versions[i].ver_major == ver_major) &&
-			(versions[i].ver_minor == ver_minor)) {
+		    (versions[i].ver_minor == ver_minor)) {
 			return (VGEN_SUCCESS);
 		}
 		i++;
@@ -2770,11 +2772,11 @@ vgen_next_version(vgen_ldc_t *ldcp, vgen_ver_t *verp)
 		 * return success.
 		 */
 		if (((versions[i].ver_major == verp->ver_major) &&
-			(versions[i].ver_minor < verp->ver_minor)) ||
-			(versions[i].ver_major < verp->ver_major)) {
-				verp->ver_major = versions[i].ver_major;
-				verp->ver_minor = versions[i].ver_minor;
-				return (VGEN_SUCCESS);
+		    (versions[i].ver_minor < verp->ver_minor)) ||
+		    (versions[i].ver_major < verp->ver_major)) {
+			verp->ver_major = versions[i].ver_major;
+			verp->ver_minor = versions[i].ver_minor;
+			return (VGEN_SUCCESS);
 		}
 		i++;
 	}
@@ -2915,7 +2917,7 @@ vgen_send_dring_reg(vgen_ldc_t *ldcp)
 
 	/* get dring info msg payload from ldcp->local */
 	bcopy(&(ldcp->local_hparams.dring_cookie), (msg.cookie),
-		sizeof (ldc_mem_cookie_t));
+	    sizeof (ldc_mem_cookie_t));
 	msg.ncookies = ldcp->local_hparams.num_dcookies;
 	msg.num_descriptors = ldcp->local_hparams.num_desc;
 	msg.descriptor_size = ldcp->local_hparams.desc_size;
@@ -3084,7 +3086,7 @@ vgen_handshake_phase2(vgen_ldc_t *ldcp)
 		    LDC_SHADOW_MAP, LDC_MEM_RW, &ldcp->tx_dcookie, &ncookies);
 		if (rv != 0) {
 			DWARN(vgenp, ldcp, "ldc_mem_dring_bind failed "
-				"rv(%x)\n", rv);
+			    "rv(%x)\n", rv);
 			return (rv);
 		}
 		ASSERT(ncookies == 1);
@@ -3093,7 +3095,7 @@ vgen_handshake_phase2(vgen_ldc_t *ldcp)
 
 	/* update local dring_info params */
 	bcopy(&(ldcp->tx_dcookie), &(ldcp->local_hparams.dring_cookie),
-		sizeof (ldc_mem_cookie_t));
+	    sizeof (ldc_mem_cookie_t));
 	ldcp->local_hparams.num_dcookies = ldcp->num_txdcookies;
 	ldcp->local_hparams.num_desc = ldcp->num_txds;
 	ldcp->local_hparams.desc_size = sizeof (vnet_public_desc_t);
@@ -3162,15 +3164,15 @@ vgen_reset_hphase(vgen_ldc_t *ldcp)
 
 	/* set version to the highest version supported */
 	ldcp->local_hparams.ver_major =
-		ldcp->vgen_versions[0].ver_major;
+	    ldcp->vgen_versions[0].ver_major;
 	ldcp->local_hparams.ver_minor =
-		ldcp->vgen_versions[0].ver_minor;
+	    ldcp->vgen_versions[0].ver_minor;
 	ldcp->local_hparams.dev_class = VDEV_NETWORK;
 
 	/* set attr_info params */
 	ldcp->local_hparams.mtu = ETHERMAX;
 	ldcp->local_hparams.addr =
-		vgen_macaddr_strtoul(vgenp->macaddr);
+	    vgen_macaddr_strtoul(vgenp->macaddr);
 	ldcp->local_hparams.addr_type = ADDR_TYPE_MAC;
 	ldcp->local_hparams.xfer_mode = VIO_DRING_MODE;
 	ldcp->local_hparams.ack_freq = 0;	/* don't need acks */
@@ -3350,7 +3352,7 @@ vgen_handshake_done(vgen_ldc_t *ldcp)
 		 * completed successfully.
 		 */
 		status = ((ldcp->hstate & VER_NEGOTIATED) ==
-			VER_NEGOTIATED);
+		    VER_NEGOTIATED);
 		break;
 
 	case VH_PHASE2:
@@ -3359,15 +3361,15 @@ vgen_handshake_done(vgen_ldc_t *ldcp)
 		 * have been exchanged successfully.
 		 */
 		status = (((ldcp->hstate & ATTR_INFO_EXCHANGED) ==
-			ATTR_INFO_EXCHANGED) &&
-			((ldcp->hstate & DRING_INFO_EXCHANGED) ==
-			DRING_INFO_EXCHANGED));
+		    ATTR_INFO_EXCHANGED) &&
+		    ((ldcp->hstate & DRING_INFO_EXCHANGED) ==
+		    DRING_INFO_EXCHANGED));
 		break;
 
 	case VH_PHASE3:
 		/* Phase 3 is done, if rdx msg has been exchanged */
 		status = ((ldcp->hstate & RDX_EXCHANGED) ==
-			RDX_EXCHANGED);
+		    RDX_EXCHANGED);
 		break;
 
 	default:
@@ -3486,9 +3488,9 @@ vgen_handle_version_negotiate(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 				if (vermsg->ver_minor >
 				    versions[idx].ver_minor) {
 					vermsg->ver_minor =
-						versions[idx].ver_minor;
+					    versions[idx].ver_minor;
 					ldcp->peer_hparams.ver_minor =
-						versions[idx].ver_minor;
+					    versions[idx].ver_minor;
 				}
 				break;
 			}
@@ -3531,9 +3533,9 @@ vgen_handle_version_negotiate(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 
 			/* local and peer versions match? */
 			ASSERT((ldcp->local_hparams.ver_major ==
-				ldcp->peer_hparams.ver_major) &&
-				(ldcp->local_hparams.ver_minor ==
-				ldcp->peer_hparams.ver_minor));
+			    ldcp->peer_hparams.ver_major) &&
+			    (ldcp->local_hparams.ver_minor ==
+			    ldcp->peer_hparams.ver_minor));
 
 			/* move to the next phase */
 			vgen_handshake(vh_nextphase(ldcp));
@@ -3563,9 +3565,9 @@ vgen_handle_version_negotiate(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 
 			/* local and peer versions match? */
 			ASSERT((ldcp->local_hparams.ver_major ==
-				ldcp->peer_hparams.ver_major) &&
-				(ldcp->local_hparams.ver_minor ==
-				ldcp->peer_hparams.ver_minor));
+			    ldcp->peer_hparams.ver_major) &&
+			    (ldcp->local_hparams.ver_minor ==
+			    ldcp->peer_hparams.ver_minor));
 
 			/* move to the next phase */
 			vgen_handshake(vh_nextphase(ldcp));
@@ -3601,9 +3603,9 @@ vgen_handle_version_negotiate(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 				/* select next lower version */
 
 				ldcp->local_hparams.ver_major =
-					versions[idx].ver_major;
+				    versions[idx].ver_major;
 				ldcp->local_hparams.ver_minor =
-					versions[idx].ver_minor;
+				    versions[idx].ver_minor;
 				break;
 			}
 
@@ -3611,10 +3613,10 @@ vgen_handle_version_negotiate(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 				/* major version match */
 
 				ldcp->local_hparams.ver_major =
-					versions[idx].ver_major;
+				    versions[idx].ver_major;
 
 				ldcp->local_hparams.ver_minor =
-					versions[idx].ver_minor;
+				    versions[idx].ver_minor;
 				break;
 			}
 
@@ -3780,7 +3782,7 @@ vgen_handle_dring_reg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 		/* dring_info can be rcvd in any of the phases after Phase1 */
 		DWARN(vgenp, ldcp,
 		    "Rcvd DRING_INFO Subtype (%d), Invalid Phase(%u)\n",
-			tagp->vio_subtype, ldcp->hphase);
+		    tagp->vio_subtype, ldcp->hphase);
 		return (VGEN_FAILURE);
 	}
 	switch (tagp->vio_subtype) {
@@ -3816,18 +3818,18 @@ vgen_handle_dring_reg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 				    &(ldcp->peer_hparams.dring_cookie),
 				    sizeof (dcookie));
 				ldcp->peer_hparams.num_desc =
-					msg->num_descriptors;
+				    msg->num_descriptors;
 				ldcp->peer_hparams.desc_size =
-					msg->descriptor_size;
+				    msg->descriptor_size;
 				ldcp->peer_hparams.num_dcookies =
-					msg->ncookies;
+				    msg->ncookies;
 
 				/* set dring_ident for the peer */
 				ldcp->peer_hparams.dring_ident =
-					(uint64_t)ldcp->rxdp;
+				    (uint64_t)ldcp->rxdp;
 				/* return the dring_ident in ack msg */
 				msg->dring_ident =
-					(uint64_t)ldcp->rxdp;
+				    (uint64_t)ldcp->rxdp;
 
 				ldcp->peer_hparams.dring_ready = B_TRUE;
 			}
@@ -3867,7 +3869,7 @@ vgen_handle_dring_reg(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 
 			/* save dring_ident acked by peer */
 			ldcp->local_hparams.dring_ident =
-				msg->dring_ident;
+			    msg->dring_ident;
 		}
 
 		if (vgen_handshake_done(ldcp) == VGEN_SUCCESS) {
@@ -3899,7 +3901,7 @@ vgen_handle_rdx_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 	if (ldcp->hphase != VH_PHASE3) {
 		DWARN(vgenp, ldcp,
 		    "Rcvd RDX_INFO Subtype (%d), Invalid Phase(%u)\n",
-			tagp->vio_subtype, ldcp->hphase);
+		    tagp->vio_subtype, ldcp->hphase);
 		return (VGEN_FAILURE);
 	}
 	switch (tagp->vio_subtype) {
@@ -3990,7 +3992,7 @@ vgen_handle_mcast_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 					if (vgenp->mccount > 1) {
 						int t = vgenp->mccount - 1;
 						vgenp->mctab[i] =
-							vgenp->mctab[t];
+						    vgenp->mctab[t];
 					}
 					vgenp->mccount--;
 					break;
@@ -4146,7 +4148,7 @@ vgen_handle_dring_data_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 	 * and gather data from it.
 	 */
 	DBG1(vgenp, ldcp, "INFO: start(%d), end(%d)\n",
-		start, end);
+	    start, end);
 
 	/* validate rx start and end indeces */
 	if (!(CHECK_RXI(start, ldcp)) || ((end != -1) &&
@@ -4255,8 +4257,8 @@ vgen_handle_dring_data_info(vgen_ldc_t *ldcp, vio_msg_tag_t *tagp)
 			 * restart handshake with peer.
 			 */
 			DWARN(vgenp, ldcp, "next_rxseq(0x%lx)=="
-			"seq_num(0x%lx)\n", ldcp->next_rxseq,
-				dringmsg->seq_num);
+			    "seq_num(0x%lx)\n", ldcp->next_rxseq,
+			    dringmsg->seq_num);
 
 		}
 
@@ -4906,9 +4908,9 @@ static int
 vgen_ldc_txtimeout(vgen_ldc_t *ldcp)
 {
 	if (((ddi_get_lbolt() - ldcp->reclaim_lbolt) >
-		drv_usectohz(vnet_ldcwd_txtimeout * 1000)) &&
-			(vnet_ldcwd_txtimeout) &&
-			(vgen_tx_dring_full(ldcp) == VGEN_SUCCESS)) {
+	    drv_usectohz(vnet_ldcwd_txtimeout * 1000)) &&
+	    (vnet_ldcwd_txtimeout) &&
+	    (vgen_tx_dring_full(ldcp) == VGEN_SUCCESS)) {
 		return (VGEN_SUCCESS);
 	} else {
 		return (VGEN_FAILURE);
@@ -4969,7 +4971,7 @@ vgen_setup_kstats(vgen_ldc_t *ldcp)
 	}
 	size = sizeof (vgen_kstats_t) / sizeof (kstat_named_t);
 	ksp = kstat_create("vnet", instance, name, "net", KSTAT_TYPE_NAMED,
-		size, 0);
+	    size, 0);
 	if (ksp == NULL) {
 		KMEM_FREE(statsp);
 		return (VGEN_FAILURE);
@@ -4977,62 +4979,62 @@ vgen_setup_kstats(vgen_ldc_t *ldcp)
 
 	ldckp = (vgen_kstats_t *)ksp->ks_data;
 	kstat_named_init(&ldckp->ipackets,		"ipackets",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&ldckp->ipackets64,		"ipackets64",
-		KSTAT_DATA_ULONGLONG);
+	    KSTAT_DATA_ULONGLONG);
 	kstat_named_init(&ldckp->ierrors,		"ierrors",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&ldckp->opackets,		"opackets",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&ldckp->opackets64,		"opackets64",
-		KSTAT_DATA_ULONGLONG);
+	    KSTAT_DATA_ULONGLONG);
 	kstat_named_init(&ldckp->oerrors,		"oerrors",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 
 	/* MIB II kstat variables */
 	kstat_named_init(&ldckp->rbytes,		"rbytes",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&ldckp->rbytes64,		"rbytes64",
-		KSTAT_DATA_ULONGLONG);
+	    KSTAT_DATA_ULONGLONG);
 	kstat_named_init(&ldckp->obytes,		"obytes",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&ldckp->obytes64,		"obytes64",
-		KSTAT_DATA_ULONGLONG);
+	    KSTAT_DATA_ULONGLONG);
 	kstat_named_init(&ldckp->multircv,		"multircv",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&ldckp->multixmt,		"multixmt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&ldckp->brdcstrcv,		"brdcstrcv",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&ldckp->brdcstxmt,		"brdcstxmt",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&ldckp->norcvbuf,		"norcvbuf",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&ldckp->noxmtbuf,		"noxmtbuf",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 	/* Tx stats */
 	kstat_named_init(&ldckp->tx_no_desc,		"tx_no_desc",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 	/* Rx stats */
 	kstat_named_init(&ldckp->rx_allocb_fail,	"rx_allocb_fail",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&ldckp->rx_vio_allocb_fail,	"rx_vio_allocb_fail",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&ldckp->rx_lost_pkts,		"rx_lost_pkts",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 	/* Interrupt stats */
 	kstat_named_init(&ldckp->callbacks,		"callbacks",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&ldckp->dring_data_acks,	"dring_data_acks",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&ldckp->dring_stopped_acks,	"dring_stopped_acks",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 	kstat_named_init(&ldckp->dring_data_msgs,	"dring_data_msgs",
-		KSTAT_DATA_ULONG);
+	    KSTAT_DATA_ULONG);
 
 	ksp->ks_update = vgen_kstat_update;
 	ksp->ks_private = (void *)ldcp;
@@ -5183,7 +5185,7 @@ static caddr_t
 vgen_print_ethaddr(uint8_t *a, char *ebuf)
 {
 	(void) sprintf(ebuf,
-		"%x:%x:%x:%x:%x:%x", a[0], a[1], a[2], a[3], a[4], a[5]);
+	    "%x:%x:%x:%x:%x:%x", a[0], a[1], a[2], a[3], a[4], a[5]);
 	return (ebuf);
 }
 
@@ -5315,7 +5317,7 @@ vgen_ldc_rcv_worker(void *arg)
 
 	DBG1(vgenp, ldcp, "enter\n");
 	CALLB_CPR_INIT(&cprinfo, &ldcp->rcv_thr_lock, callb_generic_cpr,
-			"vnet_rcv_thread");
+	    "vnet_rcv_thread");
 	mutex_enter(&ldcp->rcv_thr_lock);
 	ldcp->rcv_thr_flags |= VGEN_WTHR_RUNNING;
 	while (!(ldcp->rcv_thr_flags & VGEN_WTHR_STOP)) {
@@ -5425,7 +5427,7 @@ debug_printf(const char *fname, vgen_t *vgenp,
 
 	if ((vgenp != NULL) && (vgenp->vnetp != NULL)) {
 		(void) sprintf(bufp, "vnet%d:",
-			((vnet_t *)(vgenp->vnetp))->instance);
+		    ((vnet_t *)(vgenp->vnetp))->instance);
 		bufp += strlen(bufp);
 	}
 	if (ldcp != NULL) {
