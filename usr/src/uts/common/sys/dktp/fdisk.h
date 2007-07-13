@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988 AT&T	*/
@@ -45,7 +44,14 @@ extern "C" {
  * driver.  The unix partitions are obtained from the VTOC.
  */
 
-#define	BOOTSZ		446	/* size of boot code in master boot block */
+/*
+ * BOOTSZ was reduced from 446 to 440 bytes to NOT overwrite the Windows
+ * Vista DISKID. Otherwise Vista won't boot from Solaris GRUB in a dual-boot
+ * setup.
+ * The actual size of mboot code is 425 bytes while that of GRUB stage1 is
+ * 423 bytes. So this changes does not harm them.
+ */
+#define	BOOTSZ		440	/* size of boot code in master boot block */
 #define	FD_NUMPART	4	/* number of 'partitions' in fdisk table */
 #define	MBB_MAGIC	0xAA55	/* magic number for mboot.signature */
 #define	DEFAULT_INTLV	4	/* default interleave for testing tracks */
@@ -124,8 +130,10 @@ struct ipart {
  */
 
 struct mboot {	/* master boot block */
-	char    bootinst[BOOTSZ];
-	char    parts[FD_NUMPART * sizeof (struct ipart)];
+	char     bootinst[BOOTSZ];
+	uint32_t win_volserno;
+	uint16_t reserved;
+	char     parts[FD_NUMPART * sizeof (struct ipart)];
 	ushort_t signature;
 };
 
