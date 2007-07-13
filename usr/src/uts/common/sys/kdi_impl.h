@@ -142,6 +142,7 @@ struct kdi {
 };
 
 extern void kdi_softcall(void (*)(void));
+extern void kdi_setsoftint(uint64_t);
 extern int kdi_pread(caddr_t, size_t, uint64_t, size_t *);
 extern int kdi_pwrite(caddr_t, size_t, uint64_t, size_t *);
 extern size_t kdi_range_is_nontoxic(uintptr_t, size_t, int);

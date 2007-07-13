@@ -1552,12 +1552,12 @@ cbe_level14(void)
 
 /* ARGSUSED */
 void
-setsoftint(uint64_t iv_p)
+kdi_setsoftint(uint64_t iv_p)
 {}
 
 #else	/* lint */
 
-	ENTRY_NP(setsoftint)
+	ENTRY_NP(kdi_setsoftint)
 	save	%sp, -SA(MINFRAME), %sp	! get a new window 
 	rdpr	%pstate, %l5
 	andn	%l5, PSTATE_IE, %l1
@@ -1628,7 +1628,7 @@ setsoftint(uint64_t iv_p)
 	wrpr	%g0, %l5, %pstate	! %pstate = saved %pstate (in %l5)
 	ret
 	restore
-	SET_SIZE(setsoftint)
+	SET_SIZE(kdi_setsoftint)
 	
 #endif	/* lint */
 

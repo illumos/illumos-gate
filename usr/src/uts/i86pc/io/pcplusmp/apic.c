@@ -90,10 +90,8 @@ static void	apic_picinit(void);
 static int	apic_cpu_start(processorid_t, caddr_t);
 static int	apic_post_cpu_start(void);
 static void	apic_send_ipi(int cpun, int ipl);
-static void	apic_set_softintr(int softintr);
 static void	apic_set_idlecpu(processorid_t cpun);
 static void	apic_unset_idlecpu(processorid_t cpun);
-static int	apic_softlvl_to_irq(int ipl);
 static int	apic_intr_enter(int ipl, int *vect);
 static void	apic_setspl(int ipl);
 static int	apic_addspl(int ipl, int vector, int min_ipl, int max_ipl);
@@ -212,8 +210,8 @@ static struct	psm_ops apic_ops = {
 	apic_delspl,
 	apic_disable_intr,
 	apic_enable_intr,
-	apic_softlvl_to_irq,
-	apic_set_softintr,
+	(int (*)(int))NULL,		/* psm_softlvl_to_irq */
+	(void (*)(int))NULL,		/* psm_set_softintr */
 
 	apic_set_idlecpu,
 	apic_unset_idlecpu,
@@ -870,28 +868,6 @@ apic_setspl(int ipl)
 }
 
 /*
- * trigger a software interrupt at the given IPL
- */
-static void
-apic_set_softintr(int ipl)
-{
-	int vector;
-	ulong_t flag;
-
-	vector = apic_resv_vector[ipl];
-
-	flag = intr_clear();
-
-	while (get_apic_cmd1() & AV_PENDING)
-		apic_ret();
-
-	/* generate interrupt at vector on itself only */
-	apicadr[APIC_INT_CMD1] = AV_SH_SELF | vector;
-
-	intr_restore(flag);
-}
-
-/*
  * generates an interprocessor interrupt to another CPU
  */
 static void
@@ -1133,25 +1109,6 @@ static int
 apic_delspl(int irqno, int ipl, int min_ipl, int max_ipl)
 {
 	return (apic_delspl_common(irqno, ipl, min_ipl,  max_ipl));
-}
-
-/*
- * Return HW interrupt number corresponding to the given IPL
- */
-/*ARGSUSED*/
-static int
-apic_softlvl_to_irq(int ipl)
-{
-	/*
-	 * Do not use apic to trigger soft interrupt.
-	 * It will cause the system to hang when 2 hardware interrupts
-	 * at the same priority with the softint are already accepted
-	 * by the apic.  Cause the AV_PENDING bit will not be cleared
-	 * until one of the hardware interrupt is eoi'ed.  If we need
-	 * to send an ipi at this time, we will end up looping forever
-	 * to wait for the AV_PENDING bit to clear.
-	 */
-	return (PSM_SV_SOFTWARE);
 }
 
 static int

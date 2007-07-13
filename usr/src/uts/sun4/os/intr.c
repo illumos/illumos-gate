@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,7 @@
 #include <vm/seg_kp.h>
 #include <sys/debug.h>
 #include <sys/cyclic.h>
+#include <sys/kdi_impl.h>
 
 #include <sys/cpu_sgnblk_defs.h>
 
@@ -130,8 +131,31 @@ poke_cpu_intr(caddr_t arg1, caddr_t arg2)
 }
 
 /*
- * siron - primitive for sun/os/softint.c
+ * kmdb uses siron (and thus setsoftint) while the world is stopped in order to
+ * inform its driver component that there's work to be done.  We need to keep
+ * DTrace from instrumenting kmdb's siron and setsoftint.  We duplicate siron,
+ * giving kmdb's version a kdi_ prefix to keep DTrace at bay.  The
+ * implementation of setsoftint is complicated enough that we don't want to
+ * duplicate it, but at the same time we don't want to preclude tracing either.
+ * The meat of setsoftint() therefore goes into kdi_setsoftint, with
+ * setsoftint() implemented as a wrapper.  This allows tracing, while still
+ * providing a way for kmdb to sneak in unmolested.
  */
+void
+kdi_siron(void)
+{
+	if (siron_inum != 0)
+		kdi_setsoftint(siron_inum);
+	else
+		siron_pending = 1;
+}
+
+void
+setsoftint(uint64_t inum)
+{
+	kdi_setsoftint(inum);
+}
+
 void
 siron(void)
 {

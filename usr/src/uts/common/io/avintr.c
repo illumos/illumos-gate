@@ -104,11 +104,22 @@ av_check_softint_pending(av_softinfo_t *infop, boolean_t check_all)
 }
 
 /*
+ * This is the wrapper function which is generally used to set a softint
+ * pending
+ */
+void
+av_set_softint_pending(int pri, av_softinfo_t *infop)
+{
+	kdi_av_set_softint_pending(pri, infop);
+}
+
+/*
+ * This is kmdb's private entry point to setsoftint called from kdi_siron
  * It first sets our av softint pending bit for the current CPU,
  * then it sets the CPU softint pending bit for pri.
  */
 void
-av_set_softint_pending(int pri, av_softinfo_t *infop)
+kdi_av_set_softint_pending(int pri, av_softinfo_t *infop)
 {
 	CPUSET_ATOMIC_ADD(infop->av_pending, CPU->cpu_seqid);
 
@@ -196,7 +207,7 @@ add_avintr(void *intr_id, int lvl, avfunc xxintr, char *name, int vect,
 
 	if ((f = xxintr) == NULL) {
 		printf("Attempt to add null vect for %s on vector %d\n",
-			name, vect);
+		    name, vect);
 		return (0);
 
 	}
@@ -213,7 +224,7 @@ add_avintr(void *intr_id, int lvl, avfunc xxintr, char *name, int vect,
 		if (((hi_pri > LOCK_LEVEL) && (lvl < LOCK_LEVEL)) ||
 		    ((hi_pri < LOCK_LEVEL) && (lvl > LOCK_LEVEL))) {
 			cmn_err(CE_WARN, multilevel2, name, lvl, vect,
-				hi_pri);
+			    hi_pri);
 			return (0);
 		}
 		if ((vecp->avh_lo_pri != lvl) || (hi_pri != lvl))
@@ -286,7 +297,7 @@ add_avsoftintr(void *intr_id, int lvl, avfunc xxintr, char *name,
 
 	if (hdlp->ih_pending == NULL) {
 		hdlp->ih_pending =
-			kmem_zalloc(sizeof (av_softinfo_t), KM_SLEEP);
+		    kmem_zalloc(sizeof (av_softinfo_t), KM_SLEEP);
 	}
 
 	insert_av(intr_id, &softvect[lvl], xxintr, arg1, arg2, NULL, lvl, NULL);
@@ -495,7 +506,7 @@ remove_av(void *intr_id, struct av_head *vectp, avfunc f, int pri_level,
 		ipl = hi_pri;
 	if (target == NULL) {	/* not found */
 		printf("Couldn't remove function %p at %d, %d\n",
-			(void *)f, vect, pri_level);
+		    (void *)f, vect, pri_level);
 		mutex_exit(&av_lock);
 		return;
 	}
@@ -533,6 +544,22 @@ remove_av(void *intr_id, struct av_head *vectp, avfunc f, int pri_level,
 	}
 	mutex_exit(&av_lock);
 	wait_till_seen(ipl);
+}
+
+/*
+ * kmdb uses siron (and thus setsoftint) while the world is stopped in order to
+ * inform its driver component that there's work to be done.  We need to keep
+ * DTrace from instrumenting kmdb's siron and setsoftint.  We duplicate siron,
+ * giving kmdb's version a kdi prefix to keep DTrace at bay.   We also
+ * provide a version of the various setsoftint functions available for kmdb to
+ * use using a kdi_ prefix while the main *setsoftint() functionality is
+ * implemented as a wrapper.  This allows tracing, while still providing a
+ * way for kmdb to sneak in unmolested.
+ */
+void
+kdi_siron(void)
+{
+	(*kdisetsoftint)(1, softlevel1_hdl.ih_pending);
 }
 
 /*

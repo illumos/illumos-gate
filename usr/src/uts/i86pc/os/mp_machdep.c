@@ -48,6 +48,7 @@
 #include <sys/promif.h>
 #include <sys/mach_intr.h>
 #include <vm/hat_i86.h>
+#include <sys/kdi_machimpl.h>
 
 #define	OFFSETOF(s, m)		(size_t)(&(((s *)0)->m))
 
@@ -64,7 +65,6 @@ static uint64_t mach_getcpufreq(void);
 static void mach_fixcpufreq(void);
 static int mach_clkinit(int, int *);
 static void mach_smpinit(void);
-static void mach_set_softintr(int ipl, struct av_softinfo *);
 static int mach_softlvl_to_vect(int ipl);
 static void mach_get_platform(int owner);
 static void mach_construct_info();
@@ -106,6 +106,8 @@ void (*send_dirintf)() 		= return_instr;
 void (*setspl)(int)		= (void (*)(int))return_instr;
 int (*addspl)(int, int, int, int) = (int (*)(int, int, int, int))return_instr;
 int (*delspl)(int, int, int, int) = (int (*)(int, int, int, int))return_instr;
+void (*kdisetsoftint)(int, struct av_softinfo *)=
+	(void (*)(int, struct av_softinfo *))return_instr;
 void (*setsoftint)(int, struct av_softinfo *)=
 	(void (*)(int, struct av_softinfo *))return_instr;
 int (*slvltovect)(int)		= (int (*)(int))return_instr;
@@ -1225,61 +1227,15 @@ mach_clkinit(int preferred_mode, int *set_mode)
 	}
 }
 
+
 /*ARGSUSED*/
-static void
-mach_psm_set_softintr(int ipl, struct av_softinfo *pending)
-{
-	struct psm_ops  *pops;
-
-	/* invoke hardware interrupt					*/
-	pops = mach_set[0];
-	(*pops->psm_set_softintr)(ipl);
-}
-
 static int
 mach_softlvl_to_vect(int ipl)
 {
-	int softvect;
-	struct psm_ops  *pops;
-
-	pops = mach_set[0];
-
-	/* check for null handler for set soft interrupt call		*/
-	if (pops->psm_set_softintr == NULL) {
-		setsoftint = av_set_softint_pending;
-		return (PSM_SV_SOFTWARE);
-	}
-
-	softvect = (*pops->psm_softlvl_to_irq)(ipl);
-	/* check for hardware scheme					*/
-	if (softvect > PSM_SV_SOFTWARE) {
-		setsoftint = mach_psm_set_softintr;
-		return (softvect);
-	}
-
-	if (softvect == PSM_SV_SOFTWARE)
-		setsoftint = av_set_softint_pending;
-	else	/* hardware and software mixed scheme			*/
-		setsoftint = mach_set_softintr;
+	setsoftint = av_set_softint_pending;
+	kdisetsoftint = kdi_av_set_softint_pending;
 
 	return (PSM_SV_SOFTWARE);
-}
-
-static void
-mach_set_softintr(int ipl, struct av_softinfo *pending)
-{
-	struct psm_ops  *pops;
-
-	/* set software pending bits					*/
-	av_set_softint_pending(ipl, pending);
-
-	/*	check if dosoftint will be called at the end of intr	*/
-	if (CPU_ON_INTR(CPU) || (curthread->t_intr))
-		return;
-
-	/* invoke hardware interrupt					*/
-	pops = mach_set[0];
-	(*pops->psm_set_softintr)(ipl);
 }
 
 #ifdef DEBUG
