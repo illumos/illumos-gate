@@ -1442,12 +1442,15 @@ typedef struct zvol_cb {
 static int
 do_zvol_create(zfs_handle_t *zhp, void *data)
 {
-	int ret;
+	int ret = 0;
 
-	if (ZFS_IS_VOLUME(zhp))
+	if (ZFS_IS_VOLUME(zhp)) {
 		(void) zvol_create_link(zhp->zfs_hdl, zhp->zfs_name);
+		ret = zfs_iter_snapshots(zhp, do_zvol_create, NULL);
+	}
 
-	ret = zfs_iter_children(zhp, do_zvol_create, NULL);
+	if (ret == 0)
+		ret = zfs_iter_filesystems(zhp, do_zvol_create, NULL);
 
 	zfs_close(zhp);
 
@@ -1470,7 +1473,7 @@ zpool_create_zvol_links(zpool_handle_t *zhp)
 	    zhp->zpool_name)) == NULL)
 		return (0);
 
-	ret = zfs_iter_children(zfp, do_zvol_create, NULL);
+	ret = zfs_iter_filesystems(zfp, do_zvol_create, NULL);
 
 	zfs_close(zfp);
 	return (ret);
