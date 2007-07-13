@@ -328,9 +328,9 @@ lxpr_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
 	 * for these nodes
 	 */
 	ASSERT(type != LXPR_PID_FD_FD &&
-		type != LXPR_PID_CURDIR &&
-		type != LXPR_PID_ROOTDIR &&
-		type != LXPR_PID_EXE);
+	    type != LXPR_PID_CURDIR &&
+	    type != LXPR_PID_ROOTDIR &&
+	    type != LXPR_PID_EXE);
 
 	if (type == LXPR_KMSG) {
 		if ((err = ldi_close(lxpr->lxpr_cons_ldih, 0, cr)) != 0)
@@ -1407,7 +1407,7 @@ lxpr_read_mounts(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 		 */
 		if (vfslist == NULL ||
 		    strcmp(refstr_value(vfsp->vfs_mntpt),
-			zone->zone_rootpath) != 0) {
+		    zone->zone_rootpath) != 0) {
 			struct vfs *tvfsp;
 			/*
 			 * The root of the zone is not a mount point.  The vfs
@@ -1687,6 +1687,8 @@ static void
 lxpr_read_uptime(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	cpu_t *cp, *cpstart;
+	pid_t p;
+	proc_t *init_proc;
 	int pools_enabled;
 	ulong_t idle_cum = 0;
 	ulong_t cpu_count = 0;
@@ -1694,6 +1696,8 @@ lxpr_read_uptime(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	ulong_t idle_cs;
 	ulong_t up_s;
 	ulong_t up_cs;
+	hrtime_t birthtime;
+	hrtime_t centi_sec = 10000000;  /* 10^7 */
 
 	ASSERT(lxpnp->lxpr_type == LXPR_UPTIME);
 
@@ -1722,12 +1726,15 @@ lxpr_read_uptime(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	} while (cp != cpstart);
 	mutex_exit(&cpu_lock);
 
-	/* Capture lbolt in case it changes */
-	up_cs = lbolt;
-	up_s = up_cs / hz;
-	up_cs %= hz;
-	up_cs *= 100;
-	up_cs /= hz;
+	/* Getting the Zone init process startup time */
+	mutex_enter(&pidlock);
+	p = curproc->p_zone->zone_proc_initpid;
+	init_proc = prfind(p);
+	birthtime = init_proc->p_mstart;
+	mutex_exit(&pidlock);
+	up_cs = (gethrtime() - birthtime) / centi_sec;
+	up_s = up_cs / 100;
+	up_cs %= 100;
 
 	ASSERT(cpu_count > 0);
 	idle_cum /= cpu_count;
@@ -2416,8 +2423,8 @@ lxpr_readdir(vnode_t *dp, uio_t *uiop, cred_t *cr, int *eofp)
 	 * is done on the realvp for these nodes
 	 */
 	ASSERT(type != LXPR_PID_FD_FD &&
-		type != LXPR_PID_CURDIR &&
-		type != LXPR_PID_ROOTDIR);
+	    type != LXPR_PID_CURDIR &&
+	    type != LXPR_PID_ROOTDIR);
 
 	/*
 	 * restrict readdir permission to owner or root
@@ -2588,7 +2595,7 @@ lxpr_readdir_procdir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 
 	/* Finished if we got an error or if we couldn't do all the table */
 	if (error != 0 || ceof == 0)
-	    return (error);
+		return (error);
 
 	/* clear out the dirent buffer */
 	bzero(bp, sizeof (bp));
@@ -2687,7 +2694,7 @@ next:
 	if (eofp)
 		*eofp =
 		    (uiop->uio_offset >=
-			((v.v_proc + PROCDIRFILES + 2) * LXPR_SDSIZE)) ? 1 : 0;
+		    ((v.v_proc + PROCDIRFILES + 2) * LXPR_SDSIZE)) ? 1 : 0;
 
 	return (0);
 }
@@ -2765,7 +2772,7 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 
 	/* Finished if we got an error or if we couldn't do all the table */
 	if (error != 0 || ceof == 0)
-	    return (error);
+		return (error);
 
 	/* clear out the dirent buffer */
 	bzero(bp, sizeof (bp));
@@ -2775,7 +2782,7 @@ lxpr_readdir_fddir(lxpr_node_t *lxpnp, uio_t *uiop, int *eofp)
 	 * all file descriptors have been examined.
 	 */
 	for (; (uresid = uiop->uio_resid) > 0;
-		uiop->uio_offset = uoffset + LXPR_SDSIZE) {
+	    uiop->uio_offset = uoffset + LXPR_SDSIZE) {
 		int reclen;
 		int fd;
 		int len;
@@ -2926,10 +2933,10 @@ lxpr_cmp(vnode_t *vp1, vnode_t *vp2)
 	vnode_t *rvp;
 
 	while (vn_matchops(vp1, lxpr_vnodeops) &&
-		(rvp = VTOLXP(vp1)->lxpr_realvp) != NULL)
+	    (rvp = VTOLXP(vp1)->lxpr_realvp) != NULL)
 		vp1 = rvp;
 	while (vn_matchops(vp2, lxpr_vnodeops) &&
-		(rvp = VTOLXP(vp2)->lxpr_realvp) != NULL)
+	    (rvp = VTOLXP(vp2)->lxpr_realvp) != NULL)
 		vp2 = rvp;
 	if (vn_matchops(vp1, lxpr_vnodeops) || vn_matchops(vp2, lxpr_vnodeops))
 		return (vp1 == vp2);
