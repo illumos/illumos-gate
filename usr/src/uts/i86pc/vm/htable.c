@@ -864,15 +864,16 @@ unlink_ptp(htable_t *higher, htable_t *old, uintptr_t vaddr)
 		    found, expect);
 
 	/*
-	 * When any top level VLP page table entry changes, we must issue
-	 * a reload of cr3 on all processors. Also some CPU types require
-	 * invalidating when inner table entries are invalidated.
+	 * When a top level VLP page table entry changes, we must issue
+	 * a reload of cr3 on all processors.
+	 *
+	 * If we don't need do do that, then we still have to INVLPG against
+	 * an address covered by the inner page table, as the latest processors
+	 * have TLB-like caches for non-leaf page table entries.
 	 */
 	if (!(hat->hat_flags & HAT_FREEING)) {
-		if (higher->ht_flags & HTABLE_VLP)
-			hat_tlb_inval(hat, DEMAP_ALL_ADDR);
-		else if (mmu.inval_nonleaf)
-			hat_tlb_inval(hat, old->ht_vaddr);
+		hat_tlb_inval(hat, (higher->ht_flags & HTABLE_VLP) ?
+		    DEMAP_ALL_ADDR : old->ht_vaddr);
 	}
 
 	HTABLE_DEC(higher->ht_valid_cnt);
@@ -1034,10 +1035,19 @@ htable_lookup(hat_t *hat, uintptr_t vaddr, level_t level)
 	ASSERT(level >= 0);
 	ASSERT(level <= TOP_LEVEL(hat));
 
-	if (level == TOP_LEVEL(hat))
+	if (level == TOP_LEVEL(hat)) {
+#if defined(__amd64)
+		/*
+		 * 32 bit address spaces on 64 bit kernels need to check
+		 * for overflow of the 32 bit address space
+		 */
+		if ((hat->hat_flags & HAT_VLP) && vaddr >= ((uint64_t)1 << 32))
+			return (NULL);
+#endif
 		base = 0;
-	else
+	} else {
 		base = vaddr & LEVEL_MASK(level + 1);
+	}
 
 	hashval = HTABLE_HASH(hat, base, level);
 	HTABLE_ENTER(hashval);
@@ -1431,10 +1441,14 @@ htable_walk(
 	/*
 	 * Find the level of the largest pagesize used by this HAT.
 	 */
-	max_mapped_level = 0;
-	for (l = 1; l <= mmu.max_page_level; ++l)
-		if (hat->hat_pages_mapped[l] != 0)
-			max_mapped_level = l;
+	if (hat->hat_ism_pgcnt > 0) {
+		max_mapped_level = mmu.max_page_level;
+	} else {
+		max_mapped_level = 0;
+		for (l = 1; l <= mmu.max_page_level; ++l)
+			if (hat->hat_pages_mapped[l] != 0)
+				max_mapped_level = l;
+	}
 
 	while (va < eaddr && va >= *vaddr) {
 		ASSERT(!IN_VA_HOLE(va));
@@ -1456,19 +1470,15 @@ htable_walk(
 			}
 
 			/*
-			 * The ht is never NULL at the top level since
-			 * the top level htable is created in hat_alloc().
+			 * No htable at this level for the address. If there
+			 * is no larger page size that could cover it, we can
+			 * skip right to the start of the next page table.
 			 */
 			ASSERT(l < TOP_LEVEL(hat));
-
-			/*
-			 * No htable covers the address. If there is no
-			 * larger page size that could cover it, we
-			 * skip to the start of the next page table.
-			 */
 			if (l >= max_mapped_level) {
 				va = NEXT_ENTRY_VA(va, l + 1);
-				break;
+				if (va >= eaddr)
+					break;
 			}
 		}
 	}
