@@ -133,7 +133,7 @@ typedef enum {
 typedef struct {
 	uchar_t 	dri_destaddr[DLPI_PHYSADDR_MAX];
 	uchar_t 	dri_destaddrlen;
-	dlpi_addrtype_t	dri_dstaddrtype;
+	dlpi_addrtype_t	dri_destaddrtype;
 	size_t  	dri_totmsglen;
 } dlpi_recvinfo_t;
 

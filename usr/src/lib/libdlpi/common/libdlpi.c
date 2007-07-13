@@ -719,7 +719,7 @@ dlpi_recv(dlpi_handle_t dh, void *saddrp, size_t *saddrlenp, void *msgbuf,
 			recvp->dri_destaddrlen = 0;
 		}
 
-		recvp->dri_dstaddrtype = udatap->dl_group_address;
+		recvp->dri_destaddrtype = udatap->dl_group_address;
 		recvp->dri_totmsglen = totmsglen;
 	}
 
