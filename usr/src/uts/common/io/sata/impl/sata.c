@@ -1980,28 +1980,32 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 							    "%d before "
 							    "deactivating "
 							    "the port", cport));
-						}
 
 
-						/*
-						 * Set DEVICE REMOVED state
-						 * in the target node. It
-						 * will prevent access to
-						 * the device even when a
-						 * new device is attached,
-						 * until the old target node
-						 * is released, removed and
-						 * recreated for a new
-						 * device.
-						 */
-						sata_set_device_removed(tdip);
-						/*
-						 * Instruct event daemon to
-						 * try the target node cleanup
-						 * later.
-						 */
+							/*
+							 * Set DEVICE REMOVED
+							 * state in the target
+							 * node. It will
+							 * prevent access to
+							 * the device even when
+							 * a new device is
+							 * attached, until the
+							 * old target node is
+							 * released, removed and
+							 * recreated for a new
+							 * device.
+							 */
+							sata_set_device_removed
+							    (tdip);
+							/*
+							 * Instruct event
+							 * daemon to try the
+							 * target node cleanup
+							 * later.
+							 */
 						sata_set_target_node_cleanup(
 						    sata_hba_inst, cport);
+						}
 					}
 					mutex_enter(&SATA_CPORT_INFO(
 					    sata_hba_inst, cport)->cport_mutex);
