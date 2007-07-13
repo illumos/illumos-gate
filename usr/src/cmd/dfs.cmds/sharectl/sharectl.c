@@ -68,19 +68,19 @@ main(int argc, char *argv[])
 	handle = sa_init(SA_INIT_CONTROL_API);
 
 	while ((c = getopt(argc, argv, "h?")) != EOF) {
-	    switch (c) {
-	    case '?':
-	    case 'h':
-		help = 1;
-		break;
-	    default:
-		(void) printf(gettext("Invalid option: %c\n"), c);
-	    }
+		switch (c) {
+		case '?':
+		case 'h':
+			help = 1;
+			break;
+		default:
+			(void) printf(gettext("Invalid option: %c\n"), c);
+		}
 	}
 	if (optind == argc || help) {
-	    /* no subcommand */
-	    global_help();
-	    exit(0);
+		/* no subcommand */
+		global_help();
+		exit(0);
 	}
 	optind = 1;
 
@@ -101,14 +101,14 @@ sc_get_usage(sc_usage_t index)
 
 	switch (index) {
 	case USAGE_CTL_GET:
-	    ret = gettext("get [-h | -p property ...] proto");
-	    break;
+		ret = gettext("get [-h | -p property ...] proto");
+		break;
 	case USAGE_CTL_SET:
-	    ret = gettext("set [-h] -p property=value ... proto");
-	    break;
+		ret = gettext("set [-h] -p property=value ... proto");
+		break;
 	case USAGE_CTL_STATUS:
-	    ret = gettext("status [-h | proto ...]");
-	    break;
+		ret = gettext("status [-h | proto ...]");
+		break;
 	}
 	return (ret);
 }
@@ -123,81 +123,103 @@ sc_get(sa_handle_t handle, int flags, int argc, char *argv[])
 	int c;
 
 	while ((c = getopt(argc, argv, "?hp:")) != EOF) {
-	    switch (c) {
-	    case 'p':
-		ret = add_opt(&optlist, optarg, 1);
-		if (ret != SA_OK) {
-		    (void) printf(gettext("Problem with property: %s\n"),
-						optarg);
-		    return (SA_NO_MEMORY);
+		switch (c) {
+		case 'p':
+			ret = add_opt(&optlist, optarg, 1);
+			if (ret != SA_OK) {
+				(void) printf(gettext(
+				    "Problem with property: %s\n"), optarg);
+				return (SA_NO_MEMORY);
+			}
+			break;
+		default:
+			(void) printf(gettext("usage: %s\n"),
+			    sc_get_usage(USAGE_CTL_GET));
+			return (SA_SYNTAX_ERR);
+		case '?':
+		case 'h':
+			(void) printf(gettext("usage: %s\n"),
+			    sc_get_usage(USAGE_CTL_GET));
+			return (SA_OK);
+			break;
 		}
-		break;
-	    default:
-		(void) printf(gettext("usage: %s\n"),
-				sc_get_usage(USAGE_CTL_GET));
-		return (SA_SYNTAX_ERR);
-	    case '?':
-	    case 'h':
-		(void) printf(gettext("usage: %s\n"),
-				sc_get_usage(USAGE_CTL_GET));
-		return (SA_OK);
-		break;
-	    }
 	}
 
 	if (optind >= argc) {
-	    (void) printf(gettext("usage: %s\n"), sc_get_usage(USAGE_CTL_GET));
-	    (void) printf(gettext("\tprotocol must be specified.\n"));
-	    return (SA_INVALID_PROTOCOL);
+		(void) printf(gettext("usage: %s\n"),
+		    sc_get_usage(USAGE_CTL_GET));
+		(void) printf(gettext("\tprotocol must be specified.\n"));
+		return (SA_INVALID_PROTOCOL);
 	}
 
 	proto = argv[optind];
 	if (sa_valid_protocol(proto)) {
-	    sa_protocol_properties_t propset;
-	    propset = sa_proto_get_properties(proto);
-	    if (propset != NULL) {
-		sa_property_t prop;
-		char *value;
-		char *name;
-		if (optlist == NULL) {
-		    /* display all known properties for this protocol */
-		    for (prop = sa_get_protocol_property(propset, NULL);
-			prop != NULL;
-			prop = sa_get_next_protocol_property(prop)) {
+		sa_protocol_properties_t propset;
+		propset = sa_proto_get_properties(proto);
+		if (propset != NULL) {
+			sa_property_t prop;
+			char *value;
+			char *name;
 
-			/* get and display the property and value */
-			name = sa_get_property_attr(prop, "type");
-			if (name != NULL) {
-			    value = sa_get_property_attr(prop, "value");
-			    (void) printf(gettext("%s=%s\n"), name,
-						value != NULL ? value : "");
-			}
-			if (value != NULL)
-			    sa_free_attr_string(value);
-			if (name != NULL)
-			    sa_free_attr_string(name);
-		    }
-		} else {
-		    struct options *opt;
-		    /* list the specified option(s) */
-		    for (opt = optlist; opt != NULL; opt = opt->next) {
-			prop = sa_get_protocol_property(propset, opt->optname);
-			if (prop != NULL) {
-			    value = sa_get_property_attr(prop, "value");
-			    (void) printf(gettext("%s=%s\n"), opt->optname,
-					value != NULL ? value : "");
-			    sa_free_attr_string(value);
+			if (optlist == NULL) {
+				/*
+				 * Display all known properties for
+				 * this protocol.
+				 */
+				for (prop = sa_get_protocol_property(propset,
+				    NULL);
+				    prop != NULL;
+				    prop = sa_get_next_protocol_property(
+				    prop)) {
+
+					/*
+					 * Get and display the
+					 * property and value.
+					 */
+					name = sa_get_property_attr(prop,
+					    "type");
+					if (name != NULL) {
+						value = sa_get_property_attr(
+						    prop, "value");
+						(void) printf(gettext(
+						    "%s=%s\n"), name,
+						    value != NULL ? value : "");
+					}
+					if (value != NULL)
+						sa_free_attr_string(value);
+					if (name != NULL)
+						sa_free_attr_string(name);
+				}
 			} else {
-			    (void) printf(gettext("%s: not defined\n"),
-						opt->optname);
-			    ret = SA_NO_SUCH_PROP;
+				struct options *opt;
+				/* list the specified option(s) */
+				for (opt = optlist;
+				    opt != NULL;
+				    opt = opt->next) {
+					prop = sa_get_protocol_property(
+					    propset, opt->optname);
+					if (prop != NULL) {
+						value = sa_get_property_attr(
+						    prop, "value");
+						(void) printf(gettext(
+						    "%s=%s\n"),
+						    opt->optname,
+						    value != NULL ?
+						    value : "");
+						sa_free_attr_string(value);
+					} else {
+						(void) printf(gettext(
+						    "%s: not defined\n"),
+						    opt->optname);
+						ret = SA_NO_SUCH_PROP;
+					}
+				}
 			}
-		    }
 		}
-	    }
 	} else {
-	    (void) printf(gettext("Invalid protocol specified: %s\n"), proto);
-	    ret = SA_INVALID_PROTOCOL;
+		(void) printf(gettext("Invalid protocol specified: %s\n"),
+		    proto);
+		ret = SA_INVALID_PROTOCOL;
 	}
 	return (ret);
 }
@@ -210,85 +232,94 @@ sc_set(sa_handle_t handle, int flags, int argc, char *argv[])
 	struct options *optlist = NULL;
 	int ret = SA_OK;
 	int c;
+	sa_protocol_properties_t propset;
 
 	while ((c = getopt(argc, argv, "?hp:")) != EOF) {
-	    switch (c) {
-	    case 'p':
-		ret = add_opt(&optlist, optarg, 0);
-		if (ret != SA_OK) {
-		    (void) printf(gettext("Problem with property: %s\n"),
-					optarg);
-		    return (SA_NO_MEMORY);
+		switch (c) {
+		case 'p':
+			ret = add_opt(&optlist, optarg, 0);
+			if (ret != SA_OK) {
+				(void) printf(gettext(
+				    "Problem with property: %s\n"), optarg);
+				return (SA_NO_MEMORY);
+			}
+			break;
+		default:
+			(void) printf(gettext("usage: %s\n"),
+			    sc_get_usage(USAGE_CTL_SET));
+			return (SA_SYNTAX_ERR);
+		case '?':
+		case 'h':
+			(void) printf(gettext("usage: %s\n"),
+			    sc_get_usage(USAGE_CTL_SET));
+			return (SA_OK);
+			break;
 		}
-		break;
-	    default:
-		(void) printf(gettext("usage: %s\n"),
-				sc_get_usage(USAGE_CTL_SET));
-		return (SA_SYNTAX_ERR);
-	    case '?':
-	    case 'h':
-		(void) printf(gettext("usage: %s\n"),
-				sc_get_usage(USAGE_CTL_SET));
-		return (SA_OK);
-		break;
-	    }
 	}
 
 	if (optind >= argc) {
-	    (void) printf(gettext("usage: %s\n"),
-				sc_get_usage(USAGE_CTL_SET));
-	    (void) printf(gettext("\tprotocol must be specified.\n"));
-	    return (SA_INVALID_PROTOCOL);
+		(void) printf(gettext("usage: %s\n"),
+		    sc_get_usage(USAGE_CTL_SET));
+		(void) printf(gettext("\tprotocol must be specified.\n"));
+		return (SA_INVALID_PROTOCOL);
 	}
 
 	proto = argv[optind];
-	if (sa_valid_protocol(proto)) {
-	    sa_protocol_properties_t propset;
-	    propset = sa_proto_get_properties(proto);
-	    if (propset != NULL) {
+	if (!sa_valid_protocol(proto)) {
+		(void) printf(gettext("Invalid protocol specified: %s\n"),
+		    proto);
+		return (SA_INVALID_PROTOCOL);
+	}
+	propset = sa_proto_get_properties(proto);
+	if (propset != NULL) {
 		sa_property_t prop;
 		int err;
-
 		if (optlist == NULL) {
-		    (void) printf(gettext("usage: %s\n"),
-				sc_get_usage(USAGE_CTL_SET));
-		    (void) printf(gettext("\tat least one property and value "
-				    "must be specified\n"));
+			(void) printf(gettext("usage: %s\n"),
+			    sc_get_usage(USAGE_CTL_SET));
+			(void) printf(gettext(
+			    "\tat least one property and value "
+			    "must be specified\n"));
 		} else {
-		    struct options *opt;
-		    /* list the specified option(s) */
-		    for (opt = optlist; opt != NULL; opt = opt->next) {
-			prop = sa_get_protocol_property(propset, opt->optname);
-			if (prop != NULL) {
-				/*
-				 * "err" is used in order to prevent
-				 * setting ret to SA_OK if there has
-				 * been a real error. We want to be
-				 * able to return an error status on
-				 * exit in that case. Error messages
-				 * are printed for each error, so we
-				 * only care on exit that there was an
-				 * error and not the specific error
-				 * value.
-				 */
-			    err = sa_set_protocol_property(prop, opt->optvalue);
-			    if (err != SA_OK) {
-				(void) printf(gettext("Could not set property"
-							" %s: %s\n"),
-					opt->optname, sa_errorstr(err));
-				ret = err;
-			    }
-			} else {
-			    (void) printf(gettext("%s: not defined\n"),
-						opt->optname);
-			    ret = SA_NO_SUCH_PROP;
+			struct options *opt;
+			/* list the specified option(s) */
+			for (opt = optlist;
+			    opt != NULL;
+			    opt = opt->next) {
+				prop = sa_get_protocol_property(
+				    propset, opt->optname);
+				if (prop != NULL) {
+					/*
+					 * "err" is used in order to
+					 * prevent setting ret to
+					 * SA_OK if there has been a
+					 * real error. We want to be
+					 * able to return an error
+					 * status on exit in that
+					 * case. Error messages are
+					 * printed for each error, so
+					 * we only care on exit that
+					 * there was an error and not
+					 * the specific error value.
+					 */
+					err = sa_set_protocol_property(
+					    prop, opt->optvalue);
+					if (err != SA_OK) {
+						(void) printf(gettext(
+						    "Could not set property"
+						    " %s: %s\n"),
+						    opt->optname,
+						    sa_errorstr(err));
+						ret = err;
+					}
+				} else {
+					(void) printf(gettext(
+					    "%s: not defined\n"),
+					    opt->optname);
+					ret = SA_NO_SUCH_PROP;
+				}
 			}
-		    }
 		}
-	    }
-	} else {
-	    (void) printf(gettext("Invalid protocol specified: %s\n"), proto);
-	    ret = SA_INVALID_PROTOCOL;
 	}
 	return (ret);
 }
@@ -297,10 +328,11 @@ static void
 show_status(char *proto)
 {
 	char *status;
+
 	status = sa_get_protocol_status(proto);
 	(void) printf("%s\t%s\n", proto, status ? gettext(status) : "-");
 	if (status != NULL)
-	    free(status);
+		free(status);
 }
 
 static int
@@ -308,8 +340,8 @@ valid_proto(char **protos, int num, char *proto)
 {
 	int i;
 	for (i = 0; i < num; i++)
-	    if (strcmp(protos[i], proto) == 0)
-		return (1);
+		if (strcmp(protos[i], proto) == 0)
+			return (1);
 	return (0);
 }
 
@@ -325,40 +357,41 @@ sc_status(sa_handle_t handle, int flags, int argc, char *argv[])
 	int verbose = 0;
 
 	while ((c = getopt(argc, argv, "?hv")) != EOF) {
-	    switch (c) {
-	    case 'v':
-		verbose++;
-		break;
-	    case '?':
-	    case 'h':
-		(void) printf(gettext("usage: %s\n"),
-				sc_get_usage(USAGE_CTL_STATUS));
-		return (SA_OK);
-	    default:
-		(void) printf(gettext("usage: %s\n"),
-				sc_get_usage(USAGE_CTL_STATUS));
-		return (SA_SYNTAX_ERR);
-	    }
+		switch (c) {
+		case 'v':
+			verbose++;
+			break;
+		case '?':
+		case 'h':
+			(void) printf(gettext("usage: %s\n"),
+			    sc_get_usage(USAGE_CTL_STATUS));
+			return (SA_OK);
+		default:
+			(void) printf(gettext("usage: %s\n"),
+			    sc_get_usage(USAGE_CTL_STATUS));
+			return (SA_SYNTAX_ERR);
+		}
 	}
 
 	num_proto = sa_get_protocols(&protos);
 	if (optind == argc) {
-	    /* status for all protocols */
-	    for (i = 0; i < num_proto; i++) {
-		show_status(protos[i]);
-	    }
-	} else {
-	    for (i = optind; i < argc; i++) {
-		if (valid_proto(protos, num_proto, argv[i])) {
-		    show_status(argv[i]);
-		} else {
-		    (void) printf(gettext("Invalid protocol: %s\n"), argv[i]);
-		    ret = SA_INVALID_PROTOCOL;
+		/* status for all protocols */
+		for (i = 0; i < num_proto; i++) {
+			show_status(protos[i]);
 		}
-	    }
+	} else {
+		for (i = optind; i < argc; i++) {
+			if (valid_proto(protos, num_proto, argv[i])) {
+				show_status(argv[i]);
+			} else {
+				(void) printf(gettext("Invalid protocol: %s\n"),
+				    argv[i]);
+				ret = SA_INVALID_PROTOCOL;
+			}
+		}
 	}
 	if (protos != NULL)
-	    free(protos);
+		free(protos);
 	return (ret);
 }
 
@@ -379,7 +412,7 @@ sub_command_help(char *proto)
 	for (i = 0; commands[i].cmdname != NULL; i++) {
 		if (!(commands[i].flags & (CMD_ALIAS|CMD_NODISPLAY)))
 			(void) printf("\t%s\n",
-				sc_get_usage((sc_usage_t)commands[i].cmdidx));
+			    sc_get_usage((sc_usage_t)commands[i].cmdidx));
 	}
 }
 

@@ -73,23 +73,23 @@ main(int argc, char *argv[])
 	 */
 	command = basename(argv[0]);
 	if (strcmp(command, "share") != 0 && strcmp(command, "unshare") != 0) {
-	    while ((c = getopt(argc, argv, "h?")) != EOF) {
-		switch (c) {
-		default:
-		case 'h':
-		case '?':
-		    help = 1;
-		    break;
+		while ((c = getopt(argc, argv, "h?")) != EOF) {
+			switch (c) {
+			default:
+			case 'h':
+			case '?':
+				help = 1;
+				break;
+			}
 		}
-	    }
-	    if (argc == 1)
-		help = 1;
+		if (argc == 1)
+			help = 1;
 	}
 
 	if (strcmp(command, "sharemgr") == 0) {
-	    command = argv[optind];
-	    argv++;
-	    argc--;
+		command = argv[optind];
+		argv++;
+		argc--;
 	}
 
 	if (help) {
