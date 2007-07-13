@@ -1401,24 +1401,24 @@ mem_request(struct ldom_hdl *lhp, uint32_t msg_type, uint64_t pa,
 	if (msg_type == FMA_MEM_REQ_STATUS) {
 		if (respmsg->result == FMA_MEM_RESP_OK) {
 			if (respmsg->status == FMA_MEM_STAT_RETIRED)
-				rc = 0;
+				rc = 0;		/* page is retired */
 			else if (respmsg->status == FMA_MEM_STAT_NOTRETIRED)
-				rc = EIO;
-			else if (respmsg->status == 0x3)	/* pending */
-				rc = EAGAIN;
+				rc = EIO;	/* page is not scheduled */
 		} else if (respmsg->result == FMA_MEM_RESP_FAILURE) {
-			if (respmsg->status == FMA_MEM_STAT_ILLEGAL)
+			if (respmsg->status == FMA_MEM_STAT_NOTRETIRED)
+				rc = EAGAIN;	/* page is scheduled */
+			else if (respmsg->status == FMA_MEM_STAT_ILLEGAL)
 				rc = EINVAL;
 		}
 	} else if (msg_type == FMA_MEM_REQ_RETIRE) {
 		if (respmsg->result == FMA_MEM_RESP_OK) {
 			if (respmsg->status == FMA_MEM_STAT_RETIRED)
-				rc = 0;
+				rc = 0;		/* is successfully retired */
 		} else if (respmsg->result == FMA_MEM_RESP_FAILURE) {
 			if (respmsg->status == FMA_MEM_STAT_RETIRED)
-				rc = EIO;
-			else if (respmsg->status == 0x3)	/* pending */
-				rc = EAGAIN;
+				rc = EIO;	/* is already retired */
+			else if (respmsg->status == FMA_MEM_STAT_NOTRETIRED)
+				rc = EAGAIN;	/* is scheduled to retire */
 			else if (respmsg->status == FMA_MEM_STAT_ILLEGAL)
 				rc = EINVAL;
 		}

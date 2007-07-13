@@ -131,21 +131,21 @@ chip_tnode_create(topo_mod_t *mod, tnode_t *parent,
 
 	if (topo_mod_nvalloc(mod, &auth, NV_UNIQUE_NAME) == 0) {
 		if (topo_prop_get_string(parent, FM_FMRI_AUTHORITY,
-			FM_FMRI_AUTH_PRODUCT, &prod, &err) == 0) {
+		    FM_FMRI_AUTH_PRODUCT, &prod, &err) == 0) {
 			(void) nvlist_add_string(auth, FM_FMRI_AUTH_PRODUCT,
-						prod);
+			    prod);
 			topo_mod_strfree(mod, prod);
 		}
 		if (topo_prop_get_string(parent, FM_FMRI_AUTHORITY,
-			FM_FMRI_AUTH_SERVER, &server, &err) == 0) {
+		    FM_FMRI_AUTH_SERVER, &server, &err) == 0) {
 			(void) nvlist_add_string(auth, FM_FMRI_AUTH_SERVER,
-						server);
+			    server);
 			topo_mod_strfree(mod, server);
 		}
 		if (topo_prop_get_string(parent, FM_FMRI_AUTHORITY,
-			FM_FMRI_AUTH_CHASSIS, &csn, &err) == 0) {
+		    FM_FMRI_AUTH_CHASSIS, &csn, &err) == 0) {
 			(void) nvlist_add_string(auth, FM_FMRI_AUTH_CHASSIS,
-						csn);
+			    csn);
 			topo_mod_strfree(mod, csn);
 		}
 	}
@@ -246,10 +246,9 @@ cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name, md_info_t *chip,
 	}
 	if (min < 0 || max < 0)
 		return (-1);
-	topo_node_range_destroy(rnode, name);
 	if (topo_node_range_create(mod, rnode, name, 0, max+1) < 0) {
 		topo_mod_dprintf(mod, "failed to create cpu range[0,%d]: %s\n",
-					max, topo_mod_errmsg(mod));
+		    max, topo_mod_errmsg(mod));
 		return (-1);
 	}
 
@@ -267,12 +266,11 @@ cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name, md_info_t *chip,
 		/* physical cpuid */
 		pid = mcmp->cpumap_pid;
 		cnode = chip_tnode_create(mod, rnode, name,
-					(topo_instance_t)pid, sbuf,
-					NULL, NULL, NULL);
+		    (topo_instance_t)pid, sbuf, NULL, NULL, NULL);
 		if (cnode == NULL) {
 			topo_mod_dprintf(mod,
-					"failed to create a cpu=%d node: %s\n",
-					pid, topo_mod_errmsg(mod));
+			    "failed to create a cpu=%d node: %s\n",
+			    pid, topo_mod_errmsg(mod));
 			nerr++;
 			continue;
 		}
@@ -307,37 +305,35 @@ chip_create(topo_mod_t *mod, tnode_t *rnode, const char *name,
 
 	topo_mod_dprintf(mod, "enumerating cmp chip\n");
 
-	/* Create the range of chip nodes */
-	for (chipidx = 0, procp = chip->procs; chipidx < chip->nprocs &&
-			procp->serialno != 0; chipidx++, procp++);
-	topo_node_range_destroy(rnode, name);
-	if (topo_node_range_create(mod, rnode, name, 0, chipidx+1) < 0) {
-		topo_mod_dprintf(mod, "failed to create chip range[0,%d]: %s\n",
-					chipidx, topo_mod_errmsg(mod));
-		return (-1);
-	}
-
 	/*
 	 * Create the chip[i] nodes, one for each CMP chip uniquely identified
 	 * by the serial number.
 	 */
 	for (chipidx = 0, procp = chip->procs; chipidx < chip->nprocs;
-		chipidx++, procp++) {
+	    chipidx++, procp++) {
 		if (procp->serialno == 0) {
 			continue;
 		}
 
-		(void) snprintf(sbuf, sizeof (sbuf), "%llx",
-				procp->serialno);
+		if (chipidx > max) {
+			/*
+			 * Step out the allocated range (min, max) specified in
+			 * the xml file. End enumerating the chips
+			 */
+			topo_mod_dprintf(mod,
+			    "chip[%d] is out of the allocated range (%d, %d)\n",
+			    chipidx, min, max);
+			break;
+		}
 
-		topo_mod_dprintf(mod, "enumerating chip [%s]\n", sbuf);
+		(void) snprintf(sbuf, sizeof (sbuf), "%llx", procp->serialno);
+		topo_mod_dprintf(mod, "node chip[%d], sn=%s\n", chipidx, sbuf);
 
 		cnode = chip_tnode_create(mod, rnode, name,
-					(topo_instance_t)chipidx, sbuf,
-					fru, label, NULL);
+		    (topo_instance_t)chipidx, sbuf, fru, label, NULL);
 		if (cnode == NULL) {
 			topo_mod_dprintf(mod, "failed to create a chip node: "
-						"%s\n", topo_mod_errmsg(mod));
+			    "%s\n", topo_mod_errmsg(mod));
 			nerr++;
 			continue;
 		}

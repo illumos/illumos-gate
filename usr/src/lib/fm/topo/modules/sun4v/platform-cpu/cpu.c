@@ -93,7 +93,7 @@ _topo_init(topo_mod_t *mod)
 	if (getenv("TOPOPLATFORMCPUDBG"))
 		topo_mod_setdebug(mod);
 	topo_mod_dprintf(mod, "initializing %s enumerator\n",
-			PLATFORM_CPU_NAME);
+	    PLATFORM_CPU_NAME);
 
 	if ((chip = topo_mod_zalloc(mod, sizeof (md_info_t))) == NULL)
 		return (-1);
@@ -108,7 +108,7 @@ _topo_init(topo_mod_t *mod)
 
 	if (topo_mod_register(mod, &cpu_info, TOPO_VERSION) != 0) {
 		topo_mod_dprintf(mod, "failed to register %s: %s\n",
-				PLATFORM_CPU_NAME, topo_mod_errmsg(mod));
+		    PLATFORM_CPU_NAME, topo_mod_errmsg(mod));
 		cpu_mdesc_fini(mod, chip);
 		topo_mod_free(mod, chip, sizeof (md_info_t));
 		return (-1);
@@ -147,18 +147,26 @@ cpu_present(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	md_info_t *chip = (md_info_t *)topo_mod_getspecific(mod);
 
 	/*
-	 * Support only cpu scheme version 0
+	 * Get the physical cpuid
 	 */
 	if (nvlist_lookup_uint8(in, FM_VERSION, &version) != 0 ||
-	    version > CPU_SCHEME_VERSION0 ||
-	    nvlist_lookup_uint32(in, FM_FMRI_CPU_ID, &cpuid) != 0 ||
-	    nvlist_lookup_uint64(in, FM_FMRI_CPU_SERIAL_ID, &nvlserid) != 0) {
+	    version > FM_CPU_SCHEME_VERSION ||
+	    nvlist_lookup_uint32(in, FM_FMRI_CPU_ID, &cpuid) != 0) {
 		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 	}
 
-	/* Find the cpuid entry */
+	/*
+	 * Find the cpuid entry
+	 * If the input nvl contains a serial number, the cpu is identified
+	 * by a tuple <cpuid, cpuserial>
+	 * Otherwise, the cpu is identified by the <cpuid>.
+	 */
 	if ((mcmp = cpu_find_cpumap(chip, cpuid)) != NULL) {
-		present = nvlserid == mcmp->cpumap_serialno;
+		if (nvlist_lookup_uint64(in, FM_FMRI_CPU_SERIAL_ID, &nvlserid) \
+		    == 0)
+			present = nvlserid == mcmp->cpumap_serialno;
+		else
+			present = 1;
 	}
 
 	/* return the present status */
@@ -216,22 +224,22 @@ cpu_expand(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 
 		/* part number + dash number */
 		len = (frup->part ? strlen(frup->part) : 0) +
-			(frup->dash ? strlen(frup->dash) : 0) + 1;
+		    (frup->dash ? strlen(frup->dash) : 0) + 1;
 		str = cpu_alloc(len);
 		(void) snprintf(str, len, "%s%s",
-				frup->part ? frup->part : MD_STR_BLANK,
-				frup->dash ? frup->dash : MD_STR_BLANK);
+		    frup->part ? frup->part : MD_STR_BLANK,
+		    frup->dash ? frup->dash : MD_STR_BLANK);
 		(void) nvlist_add_string(in, FM_FMRI_HC_PART, str);
 		cpu_free(str, len);
 
 		/* fru name */
 		(void) nvlist_add_string(in, FM_FMRI_CPU_CPUFRU,
-				frup->nac ? frup->nac : MD_STR_BLANK);
+		    frup->nac ? frup->nac : MD_STR_BLANK);
 
 		/* fru serial */
 		in->nvl_nvflag = NV_UNIQUE_NAME_TYPE;
 		(void) nvlist_add_string(in, FM_FMRI_HC_SERIAL_ID,
-			frup->serial ? frup->serial : MD_STR_BLANK);
+		    frup->serial ? frup->serial : MD_STR_BLANK);
 	}
 
 	return (0);
@@ -260,7 +268,7 @@ cpu_unusable(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	}
 	status = ldom_fmri_status(lhp, in);
 	rc = (status == P_FAULTED ||
-		(status == P_OFFLINE && ldom_major_version(lhp) == 1));
+	    (status == P_OFFLINE && ldom_major_version(lhp) == 1));
 	ldom_fini(lhp);
 
 	/* return the unusable status */
@@ -358,7 +366,7 @@ cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name, md_info_t *chip)
 	topo_node_range_destroy(rnode, name);
 	if (topo_node_range_create(mod, rnode, name, 0, max+1) < 0) {
 		topo_mod_dprintf(mod, "failed to create cpu range[0,%d]: %s\n",
-					max, topo_mod_errmsg(mod));
+		    max, topo_mod_errmsg(mod));
 		return (-1);
 	}
 
@@ -368,16 +376,16 @@ cpu_create(topo_mod_t *mod, tnode_t *rnode, const char *name, md_info_t *chip)
 	for (i = 0; i < chip->ncpus; i++) {
 
 		(void) snprintf(sbuf, sizeof (sbuf), "%llx",
-			chip->cpus[i].cpumap_serialno);
+		    chip->cpus[i].cpumap_serialno);
 
 		/* physical cpuid */
 		pid = chip->cpus[i].cpumap_pid;
 		cnode = cpu_tnode_create(mod, rnode, name,
-					(topo_instance_t)pid, sbuf, NULL);
+		    (topo_instance_t)pid, sbuf, NULL);
 		if (cnode == NULL) {
 			topo_mod_dprintf(mod,
-					"failed to create a cpu=%d node: %s\n",
-					pid, topo_mod_errmsg(mod));
+			    "failed to create a cpu=%d node: %s\n",
+			    pid, topo_mod_errmsg(mod));
 			nerr++;
 			continue;
 		}
@@ -399,7 +407,7 @@ cpu_enum(topo_mod_t *mod, tnode_t *rnode, const char *name,
 
 	if (topo_method_register(mod, rnode, cpu_methods) < 0) {
 		topo_mod_dprintf(mod, "topo_method_register failed: %s\n",
-		topo_strerror(topo_mod_errno(mod)));
+		    topo_strerror(topo_mod_errno(mod)));
 		return (-1);
 	}
 
