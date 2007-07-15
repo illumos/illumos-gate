@@ -555,7 +555,7 @@ build() {
 			X=${CPIODIR}
 		fi
 		echo "Archive_directory: ${X}" >${TMPDIR}/f
-		cp ${TMPDIR}/f ${CPIODIR}/../../.${MACH}_wgtrun
+		cp ${TMPDIR}/f $(dirname $(dirname ${CPIODIR}))/.${MACH}_wgtrun
 		rm -f ${TMPDIR}/f
 
 	else
