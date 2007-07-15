@@ -127,13 +127,16 @@ struct ipart {
  * structure to hold master boot block in physical sector 0 of the disk.
  * Note that partitions stuff can't be directly included in the structure
  * because of lameo '386 compiler alignment design.
+ * Alignment issues also force us to have 2 16bit entities for a single
+ * 32bit win_volserno. It is not used anywhere anyway.
  */
 
 struct mboot {	/* master boot block */
-	char     bootinst[BOOTSZ];
-	uint32_t win_volserno;
+	char	bootinst[BOOTSZ];
+	uint16_t win_volserno_lo;
+	uint16_t win_volserno_hi;
 	uint16_t reserved;
-	char     parts[FD_NUMPART * sizeof (struct ipart)];
+	char	parts[FD_NUMPART * sizeof (struct ipart)];
 	ushort_t signature;
 };
 
