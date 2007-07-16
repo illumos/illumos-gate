@@ -42,16 +42,15 @@ else
 fi
 
 #
-# Netinstall server and path to RE-signed packages (for crypto).
-# It might be better to mechanically derive the "Solaris_11" part of
-# the path from RELEASE.  But it's not clear that such a derivation
-# would be reliable.
+# Crypto related binaries need to be signed in order to be loaded.
+# We pull the ongk signed binaries from the gate machine's build
+# at the path below so that the closed-bins tarballs are kept in sync
+# with what we're actually delivering.  We default to pulling out of
+# nightly, but if CRYPTO_BINS_PATH is set, then we pull from that path
+# instead.  This allows us to override with something like
+# /ws/onnv-gate/packages/$isa/snv_XX instead.
 #
-nisrv=${NISRV:-jurassic.eng}
-nipath=/net/$nisrv/export/ni-2/nv/${isa_short}/latest/Solaris_11/Product
-
-# URL to Encryption Kit binaries.
-ekurl=http://nana.eng/pub/nv
+gatepkgs=${CRYPTO_BINS_PATH:-"/ws/onnv-gate/packages/$isa/nightly"}
 
 PATH="$PATH:/usr/bin:/usr/sfw/bin"
 
@@ -66,7 +65,6 @@ function warn {
 
 [[ -n "$SRC" ]] || fail "SRC must be set."
 [[ -n "$CODEMGR_WS" ]] || fail "CODEMGR_WS must be set."
-[[ -d "$nipath" ]] || fail "can't find RE-signed packages ($nipath)."
 
 #
 # Create the README from boilerplate and the contents of the closed
@@ -110,8 +108,10 @@ tarfile="$CODEMGR_WS/$3.$isa.tar"
 rootdir="root_$isa"
 if [[ "$nondebug" = y ]]; then
 	rootdir="root_$isa-nd"
+	gatepkgs="$gatepkgs-nd"
 fi
 
+[[ -d "$gatepkgs" ]] || fail "can't find gate's crypto packages ($gatepkgs)."
 [[ -d "$full" ]] || fail "can't find $full."
 [[ -d "$open" ]] || fail "can't find $open."
 
@@ -320,8 +320,8 @@ mkclosed "$isa" "$full" "$tmpdir/closed/$rootdir" || \
     fail "can't restore minimal binaries."
 
 #
-# Replace the crypto binaries with ones that have been signed by RE.
-# Get these from a local netinstall server.
+# Replace the crypto binaries with ones that have been signed by ongk.
+# Get these from onnv-gate's nightly build
 #
 
 # List of files to copy, in the form "pkgname file [file ...]"
@@ -330,6 +330,8 @@ cfiles="
 	SUNWcsl
 	usr/lib/security/pkcs11_kernel.so.1
 	usr/lib/security/pkcs11_softtoken.so.1
+	SUNWcry
+	usr/lib/security/pkcs11_softtoken_extra.so.1
 "
 # sparc-only
 csfiles="
@@ -347,6 +349,15 @@ csfiles="
 	usr/lib/security/sparcv9/pkcs11_softtoken.so.1
 	SUNWdcar
 	kernel/drv/sparcv9/dca
+	SUNWcry
+	usr/lib/security/sparcv9/pkcs11_softtoken_extra.so.1
+	SUNWcryr
+	kernel/crypto/sparcv9/aes256
+	kernel/crypto/sparcv9/arcfour2048
+	kernel/crypto/sparcv9/blowfish448
+	platform/sun4u-us3/kernel/crypto/sparcv9/aes256
+	platform/sun4u/kernel/crypto/sparcv9/arcfour2048
+	platform/sun4v/kernel/crypto/sparcv9/arcfour2048
 "
 # x86-only
 cxfiles="
@@ -365,6 +376,15 @@ cxfiles="
 	SUNWdcar
 	kernel/drv/dca
 	kernel/drv/amd64/dca
+	SUNWcry
+	usr/lib/security/amd64/pkcs11_softtoken_extra.so.1
+	SUNWcryr
+	kernel/crypto/aes256
+	kernel/crypto/arcfour2048
+	kernel/crypto/blowfish448
+	kernel/crypto/amd64/aes256
+	kernel/crypto/amd64/arcfour2048
+	kernel/crypto/amd64/blowfish448
 "
 # These all have hard links from crypto/foo to misc/foo.
 linkedfiles="
@@ -380,18 +400,17 @@ else
 	cfiles="$cfiles $cxfiles"
 fi
 
-# Extract $pkgfiles from $pkg (no-op if they're empty).
+# Copy $pkgfiles from the gate's build for $pkg
 function pkgextract
 {
-	[[ -d "$nipath/$pkg" ]] || fail "$nipath/$pkg doesn't exist."
+	[[ -d "$gatepkgs/$pkg" ]] || fail "$gatepkgs/$pkg doesn't exist."
 	if [[ -n "$pkg" && -n "$pkgfiles" ]]; then
-		archive="$nipath/$pkg/archive/none.bz2"
-		bzcat "$archive" | \
-		    (cd "$tmpdir/closed/$rootdir"; cpio -idum $pkgfiles)
+		(cd "$gatepkgs/$pkg/reloc" && tar cf - $pkgfiles) | \
+			(cd "$tmpdir/closed/$rootdir"; tar xf - )
 		# Doesn't look like we can rely on $? here.
 		for f in $pkgfiles; do
 			[[ -f "$tmpdir/closed/$rootdir/$f" ]] || 
-			    warn "can't extract $f from $archive."
+				warn "couldn't find $f in $gatepkgs/$pkg"
 		done
 	fi
 }
@@ -416,83 +435,6 @@ for f in $linkedfiles; do
 	link=$(print $f | sed -e s=crypto=misc=)
 	(cd "$tmpdir/closed/$rootdir"; rm "$link"; ln "$f" "$link")
 done
-
-#
-# Copy over the EK (Encryption Kit) binaries.  This is a slightly different
-# procedure than the above code for handling the other crypto binaries, as
-# SUNWcry & SUNWcryr aren't accessible by NFS.
-# We might want to add an option to let the user pick a different
-# (e.g., older) Encryption Kit.
-#
-wgeterrs=/tmp/wget$$
-latest_RE_signed_EK=$(wget -O - "$ekurl" 2>"$wgeterrs" | \
-    nawk -F "\"" \
-'/HREF=\"crypt.nv.crypt_[^m]+\"/ { name = $2 } 
-END {print name}')
-
-if [[ -z "$latest_RE_signed_EK" ]]; then
-	print -u2 "bindrop: can't find RE-signed Encryption Kit binaries."
-	print -u2 "wget errors:"
-	cat "$wgeterrs" >&2
-	rm "$wgeterrs"
-	exit 1
-fi
-rm "$wgeterrs"
-
-print "latest RE signed EK cpio archive: $latest_RE_signed_EK"
-
-mkdir "$tmpdir/EK"
-(cd "$tmpdir/EK"; \
-    wget -O - "$ekurl/$latest_RE_signed_EK" 2>/dev/null | cpio -idum)
-
-cfiles="
-	SUNWcry
-	usr/bin/des
-	usr/lib/security/pkcs11_softtoken_extra.so.1
-"
-cxfiles="
-	SUNWcry
-	usr/lib/security/amd64/pkcs11_softtoken_extra.so.1
-	SUNWcryr
-	kernel/crypto/aes256
-	kernel/crypto/arcfour2048
-	kernel/crypto/blowfish448
-	kernel/crypto/amd64/aes256
-	kernel/crypto/amd64/arcfour2048
-	kernel/crypto/amd64/blowfish448
-"
-csfiles="
-	SUNWcry
-	usr/lib/security/sparcv9/pkcs11_softtoken_extra.so.1
-	SUNWcryr
-	kernel/crypto/sparcv9/aes256
-	kernel/crypto/sparcv9/arcfour2048
-	kernel/crypto/sparcv9/blowfish448
-	platform/sun4u-us3/kernel/crypto/sparcv9/aes256
-	platform/sun4u/kernel/crypto/sparcv9/arcfour2048
-	platform/sun4v/kernel/crypto/sparcv9/arcfour2048
-"
-
-if [[ "$isa" = sparc ]]; then
-	cfiles="$cfiles $csfiles"
-else
-	cfiles="$cfiles $cxfiles"
-fi
-
-nipath="$tmpdir/EK/Encryption_11/$isa/Packages"
-pkg=""
-pkgfiles=""
-for cf in $cfiles; do
-	if [[ "$cf" = SUNW* ]]; then
-		pkgextract
-		pkg="$cf"
-		pkgfiles=""
-		continue
-	else
-		pkgfiles="$pkgfiles $cf"
-	fi
-done
-pkgextract	# last package in $cfiles
 
 #
 # Add binary license files.
