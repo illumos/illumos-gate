@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -195,6 +195,7 @@ void
 pool_lock(void)
 {
 	mutex_enter(&pool_mutex);
+	ASSERT(!pool_lock_held());
 	while (pool_busy_thread != NULL)
 		cv_wait(&pool_busy_cv, &pool_mutex);
 	pool_busy_thread = curthread;
@@ -205,6 +206,7 @@ int
 pool_lock_intr(void)
 {
 	mutex_enter(&pool_mutex);
+	ASSERT(!pool_lock_held());
 	while (pool_busy_thread != NULL) {
 		if (cv_wait_sig(&pool_busy_cv, &pool_mutex) == 0) {
 			cv_signal(&pool_busy_cv);
@@ -227,6 +229,7 @@ void
 pool_unlock(void)
 {
 	mutex_enter(&pool_mutex);
+	ASSERT(pool_lock_held());
 	pool_busy_thread = NULL;
 	cv_signal(&pool_busy_cv);
 	mutex_exit(&pool_mutex);

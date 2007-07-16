@@ -4516,7 +4516,6 @@ zone_enter(zoneid_t zoneid)
 		mutex_exit(&pp->p_lock);
 		mutex_exit(&ct->ct_lock);
 		mutex_exit(&zonehash_lock);
-		pool_unlock();
 		err = EINVAL;
 		goto out;
 	}
@@ -4537,7 +4536,6 @@ zone_enter(zoneid_t zoneid)
 				mutex_exit(&pp->p_lock);
 				mutex_exit(&ct->ct_lock);
 				mutex_exit(&zonehash_lock);
-				pool_unlock();
 				err = EINVAL;
 				goto out;
 			}
