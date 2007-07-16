@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -186,12 +185,12 @@ ufs_iinit(void)
 	 */
 	if (ufs_HW <= ufs_LW) {
 		cmn_err(CE_WARN,
-			    "ufs_HW (%d) <= ufs_LW (%d). Check /etc/system.",
-			    ufs_HW, ufs_LW);
+		    "ufs_HW (%d) <= ufs_LW (%d). Check /etc/system.",
+		    ufs_HW, ufs_LW);
 		ufs_LW = UFS_LW_DEFAULT;
 		ufs_HW = UFS_HW_DEFAULT;
 		cmn_err(CE_CONT, "using defaults, ufs_HW = %d, ufs_LW = %d\n",
-			    ufs_HW, ufs_LW);
+		    ufs_HW, ufs_LW);
 	}
 
 	/*
@@ -200,11 +199,11 @@ ufs_iinit(void)
 	if (ufs_ninode <= 0)
 		ufs_ninode = ncsize;
 	if (ufs_inode_max == 0)
-		ufs_inode_max = (ulong_t)((kmem_maxavail() >> 2) /
-					sizeof (struct inode));
+		ufs_inode_max =
+		    (ulong_t)((kmem_maxavail() >> 2) / sizeof (struct inode));
 	if (ufs_ninode > ufs_inode_max || (ufs_ninode == 0 && ncsize == 0)) {
 		cmn_err(CE_NOTE, "setting ufs_ninode to max value of %ld",
-				ufs_inode_max);
+		    ufs_inode_max);
 		ufs_ninode = ufs_inode_max;
 	}
 	/*
@@ -318,9 +317,9 @@ ihinit(void)
 		mutex_init(&ih_lock[i], NULL, MUTEX_DEFAULT, NULL);
 	}
 	inode_cache = kmem_cache_create("ufs_inode_cache",
-		sizeof (struct inode), 0, ufs_inode_cache_constructor,
-		ufs_inode_cache_destructor, ufs_inode_cache_reclaim,
-		NULL, NULL, 0);
+	    sizeof (struct inode), 0, ufs_inode_cache_constructor,
+	    ufs_inode_cache_destructor, ufs_inode_cache_reclaim,
+	    NULL, NULL, 0);
 }
 
 /*
@@ -700,10 +699,10 @@ ufs_iinactive(struct inode *ip)
 	mutex_enter(&vp->v_lock);
 
 	if (vp->v_count > 1) {
-	    vp->v_count--;  /* release our hold from vn_rele */
-	    mutex_exit(&vp->v_lock);
-	    rw_exit(&ip->i_contents);
-	    return;
+		vp->v_count--;  /* release our hold from vn_rele */
+		mutex_exit(&vp->v_lock);
+		rw_exit(&ip->i_contents);
+		return;
 	}
 	mutex_exit(&vp->v_lock);
 
@@ -784,10 +783,10 @@ ufs_iinactive(struct inode *ip)
 		 */
 		mutex_enter(&vp->v_lock);
 		if (vp->v_count > 1) {
-		    vp->v_count--;  /* release our hold from vn_rele */
-		    mutex_exit(&vp->v_lock);
-		    rw_exit(&ip->i_contents);
-		    return;
+			vp->v_count--;  /* release our hold from vn_rele */
+			mutex_exit(&vp->v_lock);
+			rw_exit(&ip->i_contents);
+			return;
 		}
 		mutex_exit(&vp->v_lock);
 		uq = &ufs_idle_q;
@@ -925,9 +924,9 @@ ufs_iupdat(struct inode *ip, int waitfor)
 		 * UID_LONG since that would've corresponded to -1.
 		 */
 		suid = (ulong_t)ip->i_uid > (ulong_t)USHRT_MAX ?
-			UID_LONG : ip->i_uid;
+		    UID_LONG : ip->i_uid;
 		sgid = (ulong_t)ip->i_gid > (ulong_t)USHRT_MAX ?
-			GID_LONG : ip->i_gid;
+		    GID_LONG : ip->i_gid;
 
 		if ((ip->i_suid != suid) || (ip->i_sgid != sgid)) {
 			ip->i_suid = suid;
@@ -1017,7 +1016,7 @@ ufs_iupdat(struct inode *ip, int waitfor)
 		 */
 		if (waitfor && (flag & IBDWRITE)) {
 			blkflush(ip->i_dev,
-				(daddr_t)fsbtodb(fp, itod(fp, ip->i_number)));
+			    (daddr_t)fsbtodb(fp, itod(fp, ip->i_number)));
 			mutex_enter(&ip->i_tlock);
 			ip->i_flag &= ~IBDWRITE;
 			mutex_exit(&ip->i_tlock);
@@ -1074,7 +1073,7 @@ indirtrunc(struct inode *ip, daddr_t bn, daddr_t lastbn, int level, int flags)
 	 * writing it.
 	 */
 	bp = UFS_BREAD(ufsvfsp,
-			ip->i_dev, (daddr_t)fsbtodb(fs, bn), (int)fs->fs_bsize);
+	    ip->i_dev, (daddr_t)fsbtodb(fs, bn), (int)fs->fs_bsize);
 	if (bp->b_flags & B_ERROR) {
 		brelse(bp);
 		return (0);
@@ -1091,16 +1090,16 @@ indirtrunc(struct inode *ip, daddr_t bn, daddr_t lastbn, int level, int flags)
 			 */
 			if (bp->b_flags & B_DELWRI)
 				TRANS_LOG(ufsvfsp, (caddr_t)bap,
-					ldbtob(bp->b_blkno), bp->b_bcount,
-					bp->b_un.b_addr, bp->b_bcount);
+				    ldbtob(bp->b_blkno), bp->b_bcount,
+				    bp->b_un.b_addr, bp->b_bcount);
 			copy = ngeteblk(fs->fs_bsize);
 			bcopy((caddr_t)bap, (caddr_t)copy->b_un.b_daddr,
-				(uint_t)fs->fs_bsize);
+			    (uint_t)fs->fs_bsize);
 			bzero((caddr_t)&bap[last + 1], zb);
 
 			TRANS_BUF(ufsvfsp,
-				(caddr_t)&bap[last + 1] - (caddr_t)bap,
-				zb, bp, DT_ABZERO);
+			    (caddr_t)&bap[last + 1] - (caddr_t)bap,
+			    zb, bp, DT_ABZERO);
 
 			UFS_BRWRITE(ufsvfsp, bp);
 			bp = copy, bap = bp->b_un.b_daddr;
@@ -1136,8 +1135,8 @@ indirtrunc(struct inode *ip, daddr_t bn, daddr_t lastbn, int level, int flags)
 		last = lastbn % factor;
 		nb = bap[i];
 		if (nb != 0)
-			blocksreleased += indirtrunc(ip, nb, last, level - 1,
-				flags);
+			blocksreleased +=
+			    indirtrunc(ip, nb, last, level - 1, flags);
 	}
 	brelse(bp);
 	return (blocksreleased);
@@ -1175,7 +1174,7 @@ ufs_itrunc(struct inode *oip, u_offset_t length, int flags, cred_t *cr)
 	 * other uses need the reader lock. opendq() holds the writer lock.
 	 */
 	ASSERT((oip->i_mode & IFMT) == IFSHAD ||
-		RW_LOCK_HELD(&ufsvfsp->vfs_dqrwlock));
+	    RW_LOCK_HELD(&ufsvfsp->vfs_dqrwlock));
 	ASSERT(RW_WRITE_HELD(&oip->i_contents));
 	/*
 	 * We only allow truncation of regular files and directories
@@ -1425,7 +1424,7 @@ ufs_itrunc(struct inode *oip, u_offset_t length, int flags, cred_t *cr)
 			if (lastiblock[level] < 0) {
 				ip->i_ib[level] = 0;
 				free(ip, bn, (off_t)fs->fs_bsize,
-					flags | I_IBLK);
+				    flags | I_IBLK);
 				blocksreleased += nblocks;
 			}
 		}
@@ -1505,7 +1504,7 @@ done:
 	oip->i_seq++;
 	/* blocksreleased is >= zero, so this can not fail */
 	(void) chkdq(oip, -blocksreleased, 0, cr, (char **)NULL,
-		(size_t *)NULL);
+	    (size_t *)NULL);
 	return (0);
 }
 

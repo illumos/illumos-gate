@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -139,7 +138,7 @@ ufs_si_store(struct inode *ip, si_t *sp, int puship, cred_t *cr)
 		ip->i_mode = (ip->i_smode & ~0777) |
 		    ((sp->aowner->acl_ic_perm & 07) << 6) |
 		    (((sp->aclass.acl_ismask ? sp->aclass.acl_maskbits :
-			sp->agroup->acl_ic_perm) & 07) << 3) |
+		    sp->agroup->acl_ic_perm) & 07) << 3) |
 		    (sp->aother->acl_ic_perm & 07);
 		TRANS_INODE(ip->i_ufsvfs, ip);
 		ufs_iupdat(ip, 1);
@@ -236,10 +235,10 @@ loop:
 	sip->i_nlink = 1;
 	sip->i_uid = crgetuid(cr);
 	sip->i_suid = (ulong_t)sip->i_uid > (ulong_t)USHRT_MAX ?
-		UID_LONG : sip->i_uid;
+	    UID_LONG : sip->i_uid;
 	sip->i_gid = crgetgid(cr);
 	sip->i_sgid = (ulong_t)sip->i_gid > (ulong_t)USHRT_MAX ?
-		GID_LONG : sip->i_gid;
+	    GID_LONG : sip->i_gid;
 	sip->i_shadow = 0;
 	TRANS_INODE(ufsvfsp, sip);
 	sip->i_ufs_acl = NULL;
@@ -769,7 +768,7 @@ ufs_acl_get(struct inode *ip, vsecattr_t *vsap, int flag, cred_t *cr)
 		aclentp->a_perm = ((ushort_t)(ip->i_mode & 0070)) >> 3;
 		aclentp->a_id = 0;		/* Really undefined */
 		ksort((caddr_t)vsap->vsa_aclentp, vsap->vsa_aclcnt,
-				sizeof (aclent_t), cmp2acls);
+		    sizeof (aclent_t), cmp2acls);
 	}
 
 	return (0);
@@ -1011,14 +1010,14 @@ vsecattr2aclentry(vsecattr_t *vsap, si_t **spp)
 
 	/* Sort & validate the lists on the vsap */
 	ksort((caddr_t)vsap->vsa_aclentp, vsap->vsa_aclcnt,
-			sizeof (aclent_t), cmp2acls);
+	    sizeof (aclent_t), cmp2acls);
 	ksort((caddr_t)vsap->vsa_dfaclentp, vsap->vsa_dfaclcnt,
-			sizeof (aclent_t), cmp2acls);
+	    sizeof (aclent_t), cmp2acls);
 	if ((err = acl_validate(vsap->vsa_aclentp,
-			vsap->vsa_aclcnt, ACL_CHECK)) != 0)
+	    vsap->vsa_aclcnt, ACL_CHECK)) != 0)
 		return (err);
 	if ((err = acl_validate(vsap->vsa_dfaclentp,
-			vsap->vsa_dfaclcnt, DEF_ACL_CHECK)) != 0)
+	    vsap->vsa_dfaclcnt, DEF_ACL_CHECK)) != 0)
 		return (err);
 
 	/* Create new si struct and hang acl's off it */
@@ -1168,12 +1167,12 @@ aclentry2vsecattr(si_t *sp, vsecattr_t *vsap)
 
 		/* Sort the acl list */
 		ksort((caddr_t)vsap->vsa_aclentp, vsap->vsa_aclcnt,
-				sizeof (aclent_t), cmp2acls);
+		    sizeof (aclent_t), cmp2acls);
 		/* Check the acl list */
 		if ((err = acl_validate(vsap->vsa_aclentp,
-				vsap->vsa_aclcnt, ACL_CHECK)) != 0) {
-			kmem_free(vsap->vsa_aclentp, numacls *
-				sizeof (aclent_t));
+		    vsap->vsa_aclcnt, ACL_CHECK)) != 0) {
+			kmem_free(vsap->vsa_aclentp,
+			    numacls * sizeof (aclent_t));
 			vsap->vsa_aclentp = NULL;
 			return (err);
 		}
@@ -1197,8 +1196,8 @@ do_defaults:
 		vsap->vsa_dfaclcnt = numacls;
 
 	if (vsap->vsa_mask & VSA_DFACL) {
-		vsap->vsa_dfaclentp = kmem_zalloc(numacls * sizeof (aclent_t),
-							KM_SLEEP);
+		vsap->vsa_dfaclentp =
+		    kmem_zalloc(numacls * sizeof (aclent_t), KM_SLEEP);
 		aclentp = vsap->vsa_dfaclentp;
 		formvsec(DEF_USER_OBJ, sp->downer, &aclentp);
 		formvsec(DEF_USER, sp->dusers, &aclentp);
@@ -1215,7 +1214,7 @@ do_defaults:
 
 		/* Sort the default acl list */
 		ksort((caddr_t)vsap->vsa_dfaclentp, vsap->vsa_dfaclcnt,
-				sizeof (aclent_t), cmp2acls);
+		    sizeof (aclent_t), cmp2acls);
 		if ((err = acl_validate(vsap->vsa_dfaclentp,
 		    vsap->vsa_dfaclcnt, DEF_ACL_CHECK)) != 0) {
 			if (vsap->vsa_aclentp != NULL)
@@ -1333,7 +1332,7 @@ ufs_si_inherit(struct inode *ip, struct inode *tdp, o_mode_t mode, cred_t *cr)
 	rw_enter(&sp->s_lock, RW_READER);
 
 	ASSERT(((tdp->i_mode & IFMT) == IFDIR) ||
-		((tdp->i_mode & IFMT) == IFATTRDIR));
+	    ((tdp->i_mode & IFMT) == IFATTRDIR));
 
 	mask = ((sp->downer != NULL) ? 1 : 0) |
 	    ((sp->dgroup != NULL) ? 2 : 0) |
@@ -1380,7 +1379,7 @@ ufs_si_inherit(struct inode *ip, struct inode *tdp, o_mode_t mode, cred_t *cr)
 	/* copy default acl if necessary */
 
 	if (((ip->i_mode & IFMT) == IFDIR) ||
-		((ip->i_mode & IFMT) == IFATTRDIR)) {
+	    ((ip->i_mode & IFMT) == IFATTRDIR)) {
 		acl_cpy(sp->downer, (ufs_ic_acl_t *)&tsp->downer);
 		acl_cpy(sp->dgroup, (ufs_ic_acl_t *)&tsp->dgroup);
 		acl_cpy(sp->dother, (ufs_ic_acl_t *)&tsp->dother);
@@ -2038,10 +2037,10 @@ si_cmp(si_t *sp1, si_t *sp2)
 	if (sp1->dclass.acl_ismask != sp2->dclass.acl_ismask)
 		return (1);
 	if (sp1->aclass.acl_ismask &&
-		sp1->aclass.acl_maskbits != sp2->aclass.acl_maskbits)
+	    sp1->aclass.acl_maskbits != sp2->aclass.acl_maskbits)
 		return (1);
 	if (sp1->dclass.acl_ismask &&
-		sp1->dclass.acl_maskbits != sp2->dclass.acl_maskbits)
+	    sp1->dclass.acl_maskbits != sp2->dclass.acl_maskbits)
 		return (1);
 
 	return (0);

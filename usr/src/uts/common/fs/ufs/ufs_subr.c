@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,7 +65,6 @@
 #include <sys/fs/ufs_bio.h>
 #include <sys/fs/ufs_log.h>
 #include <sys/kmem.h>
-#include <sys/vtrace.h>
 #include <sys/policy.h>
 #include <vm/hat.h>
 #include <vm/as.h>
@@ -316,8 +314,7 @@ ufs_update(int flag)
 			mutex_exit(&ufsp->vfs_lock);
 			vfs_unlock(vfsp);
 			(void) ufs_fault(ufsp->vfs_root,
-					"fs = %s update: ro fs mod\n",
-				fs->fs_fsmnt);
+			    "fs = %s update: ro fs mod\n", fs->fs_fsmnt);
 			/*
 			 * XXX:	Why is this a return instead of a continue?
 			 *	This may be an attempt to replace a panic with
@@ -378,7 +375,7 @@ ufs_update(int flag)
 		    error);
 		if (!error) {
 			TRANS_END_SYNC(ufsp, error, TOP_COMMIT_UPDATE,
-					TOP_COMMIT_SIZE);
+			    TOP_COMMIT_SIZE);
 		}
 		curthread->t_flag &= ~T_DONTBLOCK;
 
@@ -468,10 +465,6 @@ ufs_syncip(struct inode *ip, int flags, int waitfor, top_t topid)
 	struct ufsvfs *ufsvfsp = ip->i_ufsvfs;
 	int dotrans = 0;
 
-	TRACE_3(TR_FAC_UFS, TR_UFS_SYNCIP_START,
-		"ufs_syncip_start:vp %p flags %x waitfor %x",
-		vp, flags, waitfor);
-
 	/*
 	 * Return if file system has been forcibly umounted.
 	 */
@@ -490,7 +483,7 @@ ufs_syncip(struct inode *ip, int flags, int waitfor, top_t topid)
 		 * could include meta data changes.
 		 */
 		if ((ip->i_mode & IFMT) == IFSHAD ||
-			ufsvfsp->vfs_qinod == ip) {
+		    ufsvfsp->vfs_qinod == ip) {
 			dotrans = 1;
 			curthread->t_flag |= T_DONTBLOCK;
 			TRANS_BEGIN_ASYNC(ufsvfsp, TOP_PUTPAGE,
@@ -569,10 +562,6 @@ ufs_syncip(struct inode *ip, int flags, int waitfor, top_t topid)
 	}
 
 out:
-	TRACE_2(TR_FAC_UFS, TR_UFS_SYNCIP_END,
-		"ufs_syncip_end:vp %p error %d",
-		vp, error);
-
 	return (error);
 }
 /*
@@ -660,7 +649,7 @@ ufs_sync_indir(struct inode *ip)
 			continue;
 		blkflush(ip->i_dev, (daddr_t)fsbtodb(fs, indirect_blkno));
 		indirect_bp = UFS_BREAD(ufsvfsp, ip->i_dev,
-			(daddr_t)fsbtodb(fs, indirect_blkno), bsize);
+		    (daddr_t)fsbtodb(fs, indirect_blkno), bsize);
 		if (indirect_bp->b_flags & B_ERROR) {
 			brelse(indirect_bp);
 			brelse(bp);
@@ -744,7 +733,7 @@ ufs_indirblk_sync(struct inode *ip, offset_t off)
 	for (; j < NIADDR; j++) {
 		ob = nb;
 		bp = UFS_BREAD(ufsvfsp,
-				ip->i_dev, fsbtodb(fs, ob), fs->fs_bsize);
+		    ip->i_dev, fsbtodb(fs, ob), fs->fs_bsize);
 		if (bp->b_flags & B_ERROR) {
 			brelse(bp);
 			return (EIO);
@@ -933,9 +922,9 @@ ufs_checkclean(struct vfs *vfsp)
 	 * isreclaim == TRUE means can't change the state of fs_reclaim
 	 */
 	isreclaim =
-		((fs->fs_clean == FSLOG) &&
-		(((fs->fs_reclaim & FS_RECLAIM) == 0) ||
-		(fs->fs_reclaim & FS_RECLAIMING)));
+	    ((fs->fs_clean == FSLOG) &&
+	    (((fs->fs_reclaim & FS_RECLAIM) == 0) ||
+	    (fs->fs_reclaim & FS_RECLAIMING)));
 
 	/*
 	 * if fs is busy or can't change the state of fs_reclaim; do nothing
@@ -1094,13 +1083,13 @@ ufs_fbiwrite(struct fbuf *fbp, struct inode *ip, daddr_t bn, long bsize)
 	if (ifmt == IFDIR || ifmt == IFSHAD || ifmt == IFATTRDIR ||
 	    (ip->i_ufsvfs->vfs_qinod == ip)) {
 		TRANS_DELTA(ufsvfsp, ldbtob(bn * (offset_t)(btod(bsize))),
-			fbp->fb_count, DT_FBI, 0, 0);
+		    fbp->fb_count, DT_FBI, 0, 0);
 	}
 	/*
 	 * Inlined version of fbiwrite()
 	 */
 	bp = pageio_setup((struct page *)NULL, fbp->fb_count,
-			ip->i_devvp, B_WRITE);
+	    ip->i_devvp, B_WRITE);
 	bp->b_flags &= ~B_PAGEIO;
 	bp->b_un.b_addr = fbp->fb_addr;
 
@@ -1156,8 +1145,8 @@ ufs_sbwrite(struct ufsvfs *ufsvfsp)
 	 * checksum to force repair
 	 */
 	fs->fs_time = gethrestime_sec();
-	fs->fs_state = fs->fs_clean != FSBAD? FSOKAY - fs->fs_time:
-						-(FSOKAY - fs->fs_time);
+	fs->fs_state = (fs->fs_clean != FSBAD) ?
+	    FSOKAY - fs->fs_time : -(FSOKAY - fs->fs_time);
 	switch (fs->fs_clean) {
 	case FSCLEAN:
 	case FSSTABLE:
@@ -1181,7 +1170,7 @@ ufs_sbwrite(struct ufsvfs *ufsvfsp)
 	 * delta the whole superblock
 	 */
 	TRANS_DELTA(ufsvfsp, ldbtob(SBLOCK), sizeof (struct fs),
-		DT_SB, NULL, 0);
+	    DT_SB, NULL, 0);
 	/*
 	 * retain the incore state of fs_fmod; set the ondisk state to 0
 	 */
@@ -1522,7 +1511,7 @@ isblock(struct fs *fs, uchar_t *cp, daddr_t h)
 	uchar_t mask;
 
 	ASSERT(fs->fs_frag == 8 || fs->fs_frag == 4 || fs->fs_frag == 2 || \
-		    fs->fs_frag == 1);
+	    fs->fs_frag == 1);
 	/*
 	 * ufsvfsp->vfs_lock is held when calling this.
 	 */
@@ -1541,7 +1530,7 @@ isblock(struct fs *fs, uchar_t *cp, daddr_t h)
 	default:
 #ifndef _KERNEL
 		cmn_err(CE_PANIC, "isblock: illegal fs->fs_frag value (%d)",
-			    fs->fs_frag);
+		    fs->fs_frag);
 #endif /* _KERNEL */
 		return (0);
 	}
@@ -1554,7 +1543,7 @@ void
 clrblock(struct fs *fs, uchar_t *cp, daddr_t h)
 {
 	ASSERT(fs->fs_frag == 8 || fs->fs_frag == 4 || fs->fs_frag == 2 || \
-		fs->fs_frag == 1);
+	    fs->fs_frag == 1);
 	/*
 	 * ufsvfsp->vfs_lock is held when calling this.
 	 */
@@ -1574,7 +1563,7 @@ clrblock(struct fs *fs, uchar_t *cp, daddr_t h)
 	default:
 #ifndef _KERNEL
 		cmn_err(CE_PANIC, "clrblock: illegal fs->fs_frag value (%d)",
-			    fs->fs_frag);
+		    fs->fs_frag);
 #endif /* _KERNEL */
 		return;
 	}
@@ -1608,7 +1597,7 @@ isclrblock(struct fs *fs, uchar_t *cp, daddr_t h)
 	default:
 #ifndef _KERNEL
 		cmn_err(CE_PANIC, "isclrblock: illegal fs->fs_frag value (%d)",
-			    fs->fs_frag);
+		    fs->fs_frag);
 #endif /* _KERNEL */
 		break;
 	}
@@ -1622,7 +1611,7 @@ void
 setblock(struct fs *fs, uchar_t *cp, daddr_t h)
 {
 	ASSERT(fs->fs_frag == 8 || fs->fs_frag == 4 || fs->fs_frag == 2 || \
-		    fs->fs_frag == 1);
+	    fs->fs_frag == 1);
 	/*
 	 * ufsvfsp->vfs_lock is held when calling this.
 	 */
@@ -1642,7 +1631,7 @@ setblock(struct fs *fs, uchar_t *cp, daddr_t h)
 	default:
 #ifndef _KERNEL
 		cmn_err(CE_PANIC, "setblock: illegal fs->fs_frag value (%d)",
-			    fs->fs_frag);
+		    fs->fs_frag);
 #endif /* _KERNEL */
 		return;
 	}

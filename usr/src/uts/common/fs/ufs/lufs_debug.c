@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,7 +134,7 @@ top_begin_debug(ml_unit_t *ul, top_t topid, ulong_t size)
 
 	if (ul->un_debug & MT_TRACE)
 		top_trace(DT_BOT, ul->un_dev,
-				(long long)topid, (long)size, (long)0);
+		    (long long)topid, (long)size, (long)0);
 
 	ASSERT(curthread->t_flag & T_DONTBLOCK);
 
@@ -201,7 +200,7 @@ top_delta_debug(
 	 * check for delta contained fully within matamap
 	 */
 	ASSERT((ul->un_matamap == NULL) ||
-		matamap_within(ul->un_matamap, mof, nb));
+	    matamap_within(ul->un_matamap, mof, nb));
 
 	/*
 	 * maintain transaction info

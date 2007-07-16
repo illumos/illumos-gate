@@ -262,7 +262,7 @@ ufs_delete(struct ufsvfs *ufsvfsp, struct inode *ip, int dolockfs)
 	 * not on a trans device or not part of a transaction
 	 */
 	ASSERT(!TRANS_ISTRANS(ufsvfsp) ||
-		((curthread->t_flag & T_DONTBLOCK) == 0));
+	    ((curthread->t_flag & T_DONTBLOCK) == 0));
 
 	/*
 	 * Ignore if deletes are not allowed (wlock/hlock)
@@ -402,8 +402,8 @@ ufs_delete(struct ufsvfs *ufsvfsp, struct inode *ip, int dolockfs)
 	 * release quota resources; can't fail
 	 */
 	(void) chkiq((struct ufsvfs *)vp->v_vfsp->vfs_data,
-		/* change */ -1, ip, (uid_t)ip->i_uid, 0, CRED(),
-		(char **)NULL, (size_t *)NULL);
+	    /* change */ -1, ip, (uid_t)ip->i_uid, 0, CRED(),
+	    (char **)NULL, (size_t *)NULL);
 	dqrele(ip->i_dquot);
 	ip->i_dquot = NULL;
 	ip->i_flag &= ~(IDEL | IDIRECTIO);
@@ -626,7 +626,7 @@ ufs_delete_drain_wait(struct ufsvfs *ufsvfsp, int dolockfs)
 	TRANS_BEGIN_SYNC(ufsvfsp, TOP_COMMIT_UPDATE, TOP_COMMIT_SIZE, error);
 	if (!error) {
 		TRANS_END_SYNC(ufsvfsp, error, TOP_COMMIT_UPDATE,
-			TOP_COMMIT_SIZE);
+		    TOP_COMMIT_SIZE);
 	}
 	curthread->t_flag &= ~T_DONTBLOCK;
 }
@@ -706,9 +706,8 @@ ufs_idle_free(struct inode *ip)
 	if ((ip->i_flag & ISTALE) == 0) {
 		(void) TRANS_SYNCIP(ip, B_ASYNC, I_ASYNC, TOP_SYNCIP_FREE);
 		(void) TRANS_SYNCIP(ip,
-				    (TRANS_ISERROR(ufsvfsp)) ?
-				    B_INVAL | B_FORCE : B_INVAL,
-				    I_ASYNC, TOP_SYNCIP_FREE);
+		    (TRANS_ISERROR(ufsvfsp)) ? B_INVAL | B_FORCE : B_INVAL,
+		    I_ASYNC, TOP_SYNCIP_FREE);
 	}
 
 	/*
@@ -730,20 +729,20 @@ ufs_idle_free(struct inode *ip)
 
 	if (vp->v_count < 2)
 		cmn_err(CE_PANIC,
-			"ufs_idle_free: vnode ref count is less than 2");
+		    "ufs_idle_free: vnode ref count is less than 2");
 
 	vp->v_count--;
 	if ((vp->v_type != VCHR && vn_has_cached_data(vp)) ||
-		vp->v_count != 1 ||
-		ip->i_flag & (IMOD|IMODACC|IACC|ICHG|IUPD|IATTCHG)) {
-			/*
-			 * Another thread has referenced this inode while
-			 * we are trying to free it. Call VN_RELE() to
-			 * release our reference.
-			 */
-			mutex_exit(&vp->v_lock);
-			mutex_exit(ihm);
-			VN_RELE(vp);
+	    vp->v_count != 1 ||
+	    ip->i_flag & (IMOD|IMODACC|IACC|ICHG|IUPD|IATTCHG)) {
+		/*
+		 * Another thread has referenced this inode while
+		 * we are trying to free it. Call VN_RELE() to
+		 * release our reference.
+		 */
+		mutex_exit(&vp->v_lock);
+		mutex_exit(ihm);
+		VN_RELE(vp);
 	} else {
 		/*
 		 * The inode is currently unreferenced and can not
@@ -1093,7 +1092,7 @@ again:
 			if (bp)
 				brelse(bp);
 			bp = UFS_BREAD(ufsvfsp,
-					ufsvfsp->vfs_dev, bno, fs->fs_bsize);
+			    ufsvfsp->vfs_dev, bno, fs->fs_bsize);
 			bp->b_flags |= B_AGE;
 		}
 		if (bp->b_flags & B_ERROR) {
@@ -1179,8 +1178,7 @@ ufs_thread_hlock(void *ignore)
 				mutex_enter(&ufs_hlock.uq_mutex);
 				CALLB_CPR_SAFE_BEGIN(&cprinfo);
 				(void) cv_timedwait(&ufs_hlock.uq_cv,
-							&ufs_hlock.uq_mutex,
-							lbolt + hz);
+				    &ufs_hlock.uq_mutex, lbolt + hz);
 				CALLB_CPR_SAFE_END(&cprinfo,
 				    &ufs_hlock.uq_mutex);
 				mutex_exit(&ufs_hlock.uq_mutex);

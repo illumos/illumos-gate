@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -238,8 +237,8 @@ opendq(
 		 */
 		if (VTOI(vp) != ufsvfsp->vfs_qinod) {
 			cmn_err(CE_WARN, "Previous quota file still in use."
-				" Disable quotas on %s before enabling.\n",
-				VTOI(vp)->i_fs->fs_fsmnt);
+			    " Disable quotas on %s before enabling.\n",
+			    VTOI(vp)->i_fs->fs_fsmnt);
 			VN_RELE(vp);
 			rw_exit(&ufsvfsp->vfs_dqrwlock);
 			return (0);
@@ -272,7 +271,7 @@ opendq(
 				    " from quota file\n");
 			rw_exit(&qip->i_contents);
 			(void) VOP_PUTPAGE(vp, (offset_t)0, (size_t)qip->i_size,
-				    B_INVAL, kcred);
+			    B_INVAL, kcred);
 		} else {
 			rw_exit(&qip->i_contents);
 		}
@@ -638,8 +637,8 @@ setquota(int cmd, uid_t uid, struct ufsvfs *ufsvfsp,
 	qip = ufsvfsp->vfs_qinod;
 	rw_enter(&qip->i_contents, RW_WRITER);
 	(void) ufs_rdwri(UIO_WRITE, FWRITE | FSYNC, qip, (caddr_t)&dqp->dq_dqb,
-		sizeof (struct dqblk), dqoff(uid), UIO_SYSSPACE,
-		(int *)NULL, kcred);
+	    sizeof (struct dqblk), dqoff(uid), UIO_SYSSPACE,
+	    (int *)NULL, kcred);
 	rw_exit(&qip->i_contents);
 
 	(void) VOP_PUTPAGE(ITOV(qip), dqoff(dqp->dq_uid) & ~qip->i_fs->fs_bmask,
@@ -845,7 +844,7 @@ quotasync(struct ufsvfs *ufsvfsp, int do_lock)
 			 * want to wait to avoid deadlock.
 			 */
 			if (rw_tryenter(&ufsvfsp->vfs_dqrwlock,
-					RW_READER) == 0) {
+			    RW_READER) == 0) {
 				mutex_exit(&dqp->dq_lock);
 				continue;
 			}

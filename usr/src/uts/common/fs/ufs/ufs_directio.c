@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,7 +60,6 @@
 #include <sys/debug.h>
 #include <sys/vmsystm.h>
 #include <sys/cmn_err.h>
-#include <sys/vtrace.h>
 #include <sys/filio.h>
 #include <sys/atomic.h>
 
@@ -157,9 +155,9 @@ void
 directio_bufs_init(void)
 {
 	directio_buf_cache = kmem_cache_create("directio_buf_cache",
-		sizeof (struct directio_buf), 0,
-		directio_buf_constructor, directio_buf_destructor,
-		NULL, NULL, NULL, 0);
+	    sizeof (struct directio_buf), 0,
+	    directio_buf_constructor, directio_buf_destructor,
+	    NULL, NULL, NULL, 0);
 }
 
 void
@@ -695,8 +693,8 @@ skip_alloc:
 
 			if (pplist != NULL)
 				spplist = pplist +
-				btop((uintptr_t)iov->iov_base -
-					((uintptr_t)pglck_base & PAGEMASK));
+				    btop((uintptr_t)iov->iov_base -
+				    ((uintptr_t)pglck_base & PAGEMASK));
 			else
 				spplist = NULL;
 
@@ -704,7 +702,7 @@ skip_alloc:
 			 * Kick off the direct write requests
 			 */
 			directio_start(ufsvfsp, ip->i_dev, nbytes, ldbtob(bn),
-				iov->iov_base, S_READ, procp, &tail, spplist);
+			    iov->iov_base, S_READ, procp, &tail, spplist);
 
 			/*
 			 * Adjust pointers and counters
@@ -739,7 +737,7 @@ skip_alloc:
 			rw_exit(&ip->i_contents);
 			rw_enter(&ip->i_contents, RW_WRITER);
 			(void) VOP_PUTPAGE(vp, (offset_t)0, (size_t)0,
-				B_INVAL, cr);
+			    B_INVAL, cr);
 			ufs_directio_kstats.nflushes.value.ui64++;
 			rw_downgrade(&ip->i_contents);
 		}
@@ -806,7 +804,7 @@ directio_hole(struct uio *uio, size_t nbytes)
 	while (error == 0 && phys_uio.uio_resid) {
 		nzero = (int)MIN(phys_iov.iov_len, ufs_directio_zero_len);
 		error = uiomove(ufs_directio_zero_buf, nzero, UIO_READ,
-				&phys_uio);
+		    &phys_uio);
 	}
 	return (error);
 }
@@ -964,7 +962,7 @@ ufs_directio_read(struct inode *ip, uio_t *uio, cred_t *cr, int *statusp)
 		 */
 		pglck_len = (size_t)MIN(pglck_len,  ufsvfsp->vfs_ioclustsz);
 		error = as_pagelock(as, &pplist, pglck_base,
-							pglck_len, S_WRITE);
+		    pglck_len, S_WRITE);
 
 		if (error)
 			break;
@@ -985,7 +983,7 @@ ufs_directio_read(struct inode *ip, uio_t *uio, cred_t *cr, int *statusp)
 
 			if (bn == UFS_HOLE) {
 				nbytes = (size_t)MIN(fs->fs_bsize -
-						(long)blkoff(fs, uoff), nbytes);
+				    (long)blkoff(fs, uoff), nbytes);
 				error = directio_hole(uio, nbytes);
 				/*
 				 * Hole reads are not added to the list
@@ -1003,8 +1001,8 @@ ufs_directio_read(struct inode *ip, uio_t *uio, cred_t *cr, int *statusp)
 				 */
 				if (pplist != NULL)
 					spplist = pplist +
-					btop((uintptr_t)iov->iov_base -
-					((uintptr_t)pglck_base & PAGEMASK));
+					    btop((uintptr_t)iov->iov_base -
+					    ((uintptr_t)pglck_base & PAGEMASK));
 				else
 					spplist = NULL;
 
@@ -1012,8 +1010,8 @@ ufs_directio_read(struct inode *ip, uio_t *uio, cred_t *cr, int *statusp)
 				 * Kick off the direct read requests
 				 */
 				directio_start(ufsvfsp, ip->i_dev, nbytes,
-						ldbtob(bn), iov->iov_base,
-						S_WRITE, procp, &tail, spplist);
+				    ldbtob(bn), iov->iov_base,
+				    S_WRITE, procp, &tail, spplist);
 			}
 
 			if (error)

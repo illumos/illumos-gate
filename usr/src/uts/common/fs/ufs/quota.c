@@ -273,7 +273,7 @@ loop:
 		rw_exit(&qip->i_contents);
 		if ((bn != UFS_HOLE) && !err) {
 			dqp->dq_mof = ldbtob(bn) +
-			(offset_t)(dqoff(uid) & (DEV_BSIZE - 1));
+			    (offset_t)(dqoff(uid) & (DEV_BSIZE - 1));
 		} else {
 			dqp->dq_mof = UFS_HOLE;
 		}

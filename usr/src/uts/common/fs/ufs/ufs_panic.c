@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -468,8 +468,8 @@ ufs_fault_v(vnode_t *vp, char *fmt, va_list adx)
 
 		ufsvfsp->vfs_fs->fs_clean = FSBAD;
 		ASSERT(SEMA_HELD(&ufsvfsp->vfs_bufp->b_sem));
-		ufsvfsp->vfs_bufp->b_flags &= ~(B_ASYNC | B_READ |
-				B_DONE | B_ERROR | B_DELWRI);
+		ufsvfsp->vfs_bufp->b_flags &=
+		    ~(B_ASYNC | B_READ | B_DONE | B_ERROR | B_DELWRI);
 
 		(void) bdev_strategy(ufsvfsp->vfs_bufp);
 		(void) biowait(ufsvfsp->vfs_bufp);
@@ -737,9 +737,8 @@ queue_failure(ufs_failure_t *new)
 
 	cv_broadcast(&ufs_fix.uq_cv);
 
-	DCALL(DBGLVL_MAJOR, cmn_err(CE_WARN, new->uf_panic_str?
-					new->uf_panic_str:
-					"queue_failure: NULL panic str?"));
+	DCALL(DBGLVL_MAJOR, cmn_err(CE_WARN, new->uf_panic_str ?
+	    new->uf_panic_str : "queue_failure: NULL panic str?"));
 	mutex_exit(&ufs_fix.uq_mutex);
 
 	MINOR(("] "));
@@ -841,7 +840,7 @@ ufsfx_mount(struct ufsvfs *ufsvfsp, int flags)
 	ufsvfsp->vfs_fsfx.fx_flags = (flags & UFSMNT_ONERROR_FLGMASK) >> 4;
 
 	MINUTE((": %s: fx_flags:%ld,",
-		ufsvfsp->vfs_fs->fs_fsmnt, ufsvfsp->vfs_fsfx.fx_flags));
+	    ufsvfsp->vfs_fs->fs_fsmnt, ufsvfsp->vfs_fsfx.fx_flags));
 	/*
 	 *	onerror={panic ^ lock only ^ unmount}
 	 */
@@ -858,7 +857,7 @@ ufsfx_mount(struct ufsvfs *ufsvfsp, int flags)
 	} else {
 		ufsvfsp->vfs_fsfx.fx_flags = UFSFX_DEFAULT;
 		ASSERT(ufsvfsp->vfs_fsfx.fx_flags &
-						(UFSMNT_ONERROR_FLGMASK >> 4));
+		    (UFSMNT_ONERROR_FLGMASK >> 4));
 		MINUTE((" DEFAULT"));
 	}
 
@@ -907,8 +906,8 @@ ufsfx_unmount(struct ufsvfs *ufsvfsp)
 			/* XXX if rebooting don't print this? */
 			if (!terminal_state(f->uf_s) && must_unlock_failure) {
 				cmn_err(CE_WARN,
-					"Unmounting %s while error-locked",
-					fs_name(f));
+				    "Unmounting %s while error-locked",
+				    fs_name(f));
 			}
 
 			f->uf_ufsvfsp		= NULL;
@@ -970,8 +969,9 @@ ufsfx_unlockfs(struct ufsvfs *ufsvfsp)
 				if (!informed) {
 					informed = 1;
 					cmn_err(CE_NOTE,
-		    "Unlock of %s succeeded before fs_clean marked FSFIX?",
-							    fs_name(f));
+					    "Unlock of %s succeeded before "
+					    "fs_clean marked FSFIX?",
+					    fs_name(f));
 				}
 
 				/*
@@ -1026,8 +1026,9 @@ ufsfx_lockfs(struct ufsvfs *ufsvfsp)
 
 			default:
 				cmn_err(CE_WARN,
-			"fs %s not in state UF_TRYLCK, UF_LOCKED or UF_FIXING",
-								fs_name(f));
+				    "fs %s not in state "
+				    "UF_TRYLCK, UF_LOCKED or UF_FIXING",
+				    fs_name(f));
 				break;
 
 			case UF_TRYLCK:
@@ -1089,8 +1090,7 @@ ufsfx_thread_fix_failures(void *ignored)
 				mutex_enter(&ufs_fix.uq_mutex);
 				CALLB_CPR_SAFE_BEGIN(&cprinfo);
 				(void) cv_timedwait(&ufs_fix.uq_cv,
-							&ufs_fix.uq_mutex,
-							lbolt + (hz * retry));
+				    &ufs_fix.uq_mutex, lbolt + (hz * retry));
 				CALLB_CPR_SAFE_END(&cprinfo,
 				    &ufs_fix.uq_mutex);
 				mutex_exit(&ufs_fix.uq_mutex);
@@ -1147,8 +1147,8 @@ rescan_q:
 		s = get_state_desc(f->uf_s);
 
 		MINOR((": found%s: %s, \"%s: %s\"\n",
-			    s->ud_attr.terminal? " old": "",
-			    fs_name(f), state_name(f->uf_s), f->uf_panic_str));
+		    s->ud_attr.terminal ? " old" : "",
+		    fs_name(f), state_name(f->uf_s), f->uf_panic_str));
 
 		if (s->ud_attr.terminal) {
 			mutex_exit(&f->uf_mutex);
@@ -1193,10 +1193,8 @@ pester_msg(ufs_failure_t *f, int seriousness)
 	 * XXX if seems too long for this fs, poke administrator
 	 * XXX to run fsck manually (and change retry time?)
 	 */
-	cmn_err(seriousness,
-		"Waiting for repair of %s to %s",
-			    fs_name(f),
-			    f->uf_s & UF_LOCKED? "start": "finish");
+	cmn_err(seriousness, "Waiting for repair of %s to %s",
+	    fs_name(f), f->uf_s & UF_LOCKED ? "start" : "finish");
 	MINUTE(("]"));
 }
 
@@ -1271,7 +1269,7 @@ set_state(ufs_failure_t *f, ufs_failure_states_t new_state)
 		if (!(f->uf_s & UF_PANIC) && !(new_state & UF_PANIC))
 			(void) set_state(f, UF_PANIC);
 		MINOR((": state reset: transition failure (\"%s\"->\"%s\")] ",
-				state_name(f->uf_s), state_name(new_state)));
+		    state_name(f->uf_s), state_name(new_state)));
 		return (sfrc);
 	}
 
@@ -1284,7 +1282,7 @@ set_state(ufs_failure_t *f, ufs_failure_states_t new_state)
 	if (s->ud_attr.at_fail && ufs_fix.uq_threadp &&
 	    curthread == ufs_fix.uq_threadp) {
 		cmn_err(CE_WARN, "set_state: probable recursive panic of %s",
-			fs_name(f));
+		    fs_name(f));
 	}
 	if (need_unlock)
 		mutex_exit(&ufs_fix.uq_mutex);
@@ -1326,7 +1324,7 @@ sf_undef(ufs_failure_t *f, ufsa_t a, ufs_failure_states_t s)
 	sfrc_t rc;
 
 	TRIVIA(("[sf_undef, action is %s, state is %s\n",
-		act_name(a), state_name(s)));
+	    act_name(a), state_name(s)));
 	ASSERT(s == UF_UNDEF);
 
 	/* shouldn't find null failure records or ever set one */
@@ -1487,8 +1485,8 @@ sf_found_queue(ufs_failure_t *f)
 	}
 
 	replica = f->uf_vfs_ufsfxp && f->uf_vfs_ufsfxp->fx_current != NULL &&
-		    f->uf_vfs_ufsfxp->fx_current != f &&
-		    !terminal_state(f->uf_vfs_ufsfxp->fx_current->uf_s);
+	    f->uf_vfs_ufsfxp->fx_current != f &&
+	    !terminal_state(f->uf_vfs_ufsfxp->fx_current->uf_s);
 
 	/*
 	 * copy general flags to this ufs_failure so we don't
@@ -1676,11 +1674,11 @@ sf_set_locked(ufs_failure_t *f)
 
 	if (f->uf_s & UF_TRYLCK) {
 		cmn_err(CE_WARN, "Error-locked %s: \"%s\"",
-				    fs_name(f), f->uf_panic_str);
+		    fs_name(f), f->uf_panic_str);
 
 		if (f->uf_flags & UFSFX_LCKONLY)
 			cmn_err(CE_WARN, "Manual repair of %s required",
-								fs_name(f));
+			    fs_name(f));
 	}
 
 	/*
@@ -1710,8 +1708,8 @@ sf_found_lock_fix_cmn(ufs_failure_t *f, ufs_failure_states_t s)
 	if (s & UF_LOCKED) {
 		ASSERT(MUTEX_HELD(&f->uf_mutex));
 
-		toolong = time > (ufsfx_tune.uft_too_long +
-							f->uf_entered_tm);
+		toolong =
+		    time > (ufsfx_tune.uft_too_long + f->uf_entered_tm);
 		TRIVIA(("%stoolong", !toolong? "not": ""));
 		HIDEOUS((": time:%ld, too long:%ld, entered_tm:%ld ",
 		    time, ufsfx_tune.uft_too_long, f->uf_entered_tm));
@@ -1731,16 +1729,15 @@ sf_found_lock_fix_cmn(ufs_failure_t *f, ufs_failure_states_t s)
 		} else {
 			if (!(f->uf_flags & UFSFX_REPAIR_START)) {
 				cmn_err(CE_WARN, "%s repair of %s not started.",
-						(f->uf_flags & UFSFX_LCKONLY)?
-						"Manual": "Automatic",
-						fs_name(f));
+				    (f->uf_flags & UFSFX_LCKONLY) ?
+				    "Manual" : "Automatic", fs_name(f));
 
 				f->uf_retry = ufsfx_tune.uft_long_err_period;
 			} else {
 				f->uf_retry = ufsfx_tune.uft_long_err_period;
-				cmn_err(CE_WARN,
-		"Repair of %s is not timely; operator attention is required.",
-								    fs_name(f));
+				cmn_err(CE_WARN, "Repair of %s is not timely; "
+				    "operator attention is required.",
+				    fs_name(f));
 			}
 			TRIVIA(("] "));
 			return (rc);
@@ -1797,8 +1794,8 @@ sf_found_lock_fix_cmn(ufs_failure_t *f, ufs_failure_states_t s)
 		if (time > f->uf_entered_tm + toolong) {
 
 			cmn_err(CE_WARN,
-"Repair completion timeout exceeded on %s; manual fsck may be required",
-								    fs_name(f));
+			    "Repair completion timeout exceeded on %s; "
+			    "manual fsck may be required", fs_name(f));
 			f->uf_retry = ufsfx_tune.uft_long_err_period;
 		}
 	}
@@ -1881,7 +1878,7 @@ sf_term_cmn(ufs_failure_t *f, ufsa_t a, ufs_failure_states_t s)
 	sfrc_t		rc = SFRC_FAIL;
 
 	TRIVIA(("[sf_term_cmn, action is %s, state is %s",
-						act_name(a), state_name(s)));
+	    act_name(a), state_name(s)));
 	ASSERT(s & (UF_FIXED | UF_NOTFIX | UF_REPLICA));
 	ASSERT(terminal_state(s));
 
@@ -1895,7 +1892,8 @@ sf_term_cmn(ufs_failure_t *f, ufsa_t a, ufs_failure_states_t s)
 		switch (s) {
 		case UF_NOTFIX:
 		case UF_FIXED:
-		{	int need_lock_vfs;
+		{
+			int need_lock_vfs;
 
 			if (f->uf_ufsvfsp && f->uf_vfs_lockp)
 				need_lock_vfs = !MUTEX_HELD(f->uf_vfs_lockp);
@@ -1919,7 +1917,7 @@ sf_term_cmn(ufs_failure_t *f, ufsa_t a, ufs_failure_states_t s)
 				mutex_exit(f->uf_vfs_lockp);
 
 			cmn_err(CE_NOTE, (s & UF_NOTFIX)? "Could not fix %s":
-				    "%s is now accessible", fs_name(f));
+			    "%s is now accessible", fs_name(f));
 
 			if (s & UF_FIXED) {
 				mutex_enter(&uf_stats.ufst_mutex);
@@ -1939,7 +1937,8 @@ sf_term_cmn(ufs_failure_t *f, ufsa_t a, ufs_failure_states_t s)
 			/* not actually a replica? */
 			if (f->uf_vfs_ufsfxp && f->uf_vfs_ufsfxp->fx_current &&
 			    f->uf_vfs_ufsfxp->fx_current != f &&
-			!terminal_state(f->uf_vfs_ufsfxp->fx_current->uf_s)) {
+			    !terminal_state(
+			    f->uf_vfs_ufsfxp->fx_current->uf_s)) {
 
 				f->uf_orig = f->uf_vfs_ufsfxp->fx_current;
 				f->uf_retry = 0;
@@ -1999,7 +1998,7 @@ sf_panic(
 	sfrc_t	rc = SFRC_FAIL;
 
 	TRIVIA(("[sf_panic, action is %s, prev. state is %s",
-		act_name(a), state_name(f->uf_s)));
+	    act_name(a), state_name(f->uf_s)));
 	ASSERT(s & UF_PANIC);
 
 	switch (a) {
@@ -2161,10 +2160,9 @@ set_lockfs(ufs_failure_t *f, struct lockfs *lfp)
 	if (!LOCKFS_IS_ELOCK(lfp)) {
 		lfp->lf_lock = f->uf_lf.lf_lock = LOCKFS_ELOCK;
 		VN_HOLD(f->uf_ufsvfsp->vfs_root);
-		f->uf_lf_err = ufs__fiolfs(f->uf_ufsvfsp->vfs_root,
-						&f->uf_lf,
-						/* from_user */ 0,
-						/* from_log  */ 0);
+		f->uf_lf_err =
+		    ufs__fiolfs(f->uf_ufsvfsp->vfs_root,
+		    &f->uf_lf, /* from_user */ 0, /* from_log */ 0);
 		VN_RELE(f->uf_ufsvfsp->vfs_root);
 	}
 
@@ -2201,10 +2199,8 @@ lockfs_failure(ufs_failure_t *f)
 			/* onto this fs can cause this errno. */
 
 		MINOR(("ufs_fiolfs(\"%s\") of %s failed: %s (%d)",
-				fs_name(f),
-				lock_name(&f->uf_lf),
-				err_name(error),
-				error));
+		    fs_name(f), lock_name(&f->uf_lf),
+		    err_name(error), error));
 
 		/*
 		 * if can't get lock, then fallback to panic, unless
@@ -2213,8 +2209,8 @@ lockfs_failure(ufs_failure_t *f)
 		 * anyway
 		 */
 
-		s = ((f->uf_flags & UFSFX_LCKUMOUNT) && error != EDEADLK)?
-							UF_UMOUNT: UF_PANIC;
+		s = ((f->uf_flags & UFSFX_LCKUMOUNT) && error != EDEADLK) ?
+		    UF_UMOUNT: UF_PANIC;
 
 		if (!set_state(f, s)) {
 			real_panic(f, " ");
@@ -2247,10 +2243,8 @@ lockfs_failure(ufs_failure_t *f)
 
 	default:	/* some other non-fatal error */
 		MINOR(("lockfs(\"%s\") of %s returned %s (%d)",
-					lock_name(&f->uf_lf),
-					fs_name(f),
-					err_name(f->uf_lf_err),
-					f->uf_lf_err));
+		    lock_name(&f->uf_lf), fs_name(f),
+		    err_name(f->uf_lf_err), f->uf_lf_err));
 
 		f->uf_retry = ufsfx_tune.uft_short_err_period;
 		break;
@@ -2474,7 +2468,7 @@ dump_uf_list(char *msg)
 		printf("\n%s", msg);
 	}
 	printf("\ndump_uf_list:\n\tuq_lowat: %d, uq_ne: %d\n",
-		ufs_fix.uq_lowat, ufs_fix.uq_ne);
+	    ufs_fix.uq_lowat, ufs_fix.uq_ne);
 
 	mutex_enter(&uf_stats.ufst_mutex);
 	printf("\tuf_stats.current_races: %ld\n", uf_stats.ufst_current_races);
@@ -2482,7 +2476,7 @@ dump_uf_list(char *msg)
 	printf("\tuf_stats.num_fixed: %ld\n", uf_stats.ufst_num_fixed);
 	printf("\tuf_stats.cpu_waste: %ld\n", uf_stats.ufst_cpu_waste);
 	printf("\tuf_stats.lock_violations: %ld, unmount_failures: %ld\n",
-		uf_stats.ufst_lock_violations, uf_stats.ufst_unmount_failures);
+	    uf_stats.ufst_lock_violations, uf_stats.ufst_unmount_failures);
 	mutex_exit(&uf_stats.ufst_mutex);
 
 	for (f = ufs_fix.uq_ufhead, i = 1; f; f = f->uf_next, i++) {
@@ -2512,17 +2506,17 @@ dump_uf(ufs_failure_t *f, int i)
 	}
 
 	printf("%d.\t\"%s\" is %s.\n",
-		    i, fs_name(f), state_name(f->uf_s));
+	    i, fs_name(f), state_name(f->uf_s));
 	printf("\t\"%s\"\tAddr: 0x%p\n", f->uf_panic_str, (void *)f);
 	printf("\tNext: 0x%p\t\tPrev: 0x%p\n",
-					(void *)f->uf_next, (void *)f->uf_prev);
+	    (void *)f->uf_next, (void *)f->uf_prev);
 
 	if (f->uf_orig)
 		printf("\tOriginal failure: 0x%p \"%s\"\n",
 		    (void *)f->uf_orig, f->uf_orig->uf_panic_str);
 
 	printf("\tUfsvfs: 0x%p\t\tVfs_lockp: 0x%p\n",
-		    (void *)f->uf_ufsvfsp, (void *)f->uf_vfs_lockp);
+	    (void *)f->uf_ufsvfsp, (void *)f->uf_vfs_lockp);
 	printf("\tVfs_fsfxp: 0x%p\n", (void *)f->uf_vfs_ufsfxp);
 	printf("\tVfs_bufp: 0x%p", (void *)f->uf_bp);
 
@@ -2535,16 +2529,15 @@ dump_uf(ufs_failure_t *f, int i)
 	    f->uf_begin_tm, f->uf_entered_tm, f->uf_end_tm);
 
 	printf("\tFlags: (%d) %s%s%s%s", f->uf_flags,
-		f->uf_flags & UFSFX_LCKONLY?	 "\"lock only\" "	: "",
-		f->uf_flags & UFSFX_LCKUMOUNT?	 "\"lock+unmount\" "	: "",
-		f->uf_flags & UFSFX_REPAIR_START? "\"started repair\" "	: "",
-		f->uf_flags == 0?                "<none>"               : "");
+	    f->uf_flags & UFSFX_LCKONLY?	 "\"lock only\" "	: "",
+	    f->uf_flags & UFSFX_LCKUMOUNT?	 "\"lock+unmount\" "	: "",
+	    f->uf_flags & UFSFX_REPAIR_START? "\"started repair\" "	: "",
+	    f->uf_flags == 0?                "<none>"               : "");
 
 	printf("\tRetry: %ld seconds\n", f->uf_retry);
 
 	printf("\tLockfs:\ttype: %s\terror: %s (%d)\n",
-		lock_name(&f->uf_lf),
-		err_name(f->uf_lf_err), f->uf_lf_err);
+	    lock_name(&f->uf_lf), err_name(f->uf_lf_err), f->uf_lf_err);
 
 }
 #endif /* DEBUG */
@@ -2584,7 +2577,7 @@ ufsfx_get_failure_qlen(void)
 		}
 
 		MINUTE((": found: %s, \"%s: %s\"\n",
-			    fs_name(f), state_name(f->uf_s), f->uf_panic_str));
+		    fs_name(f), state_name(f->uf_s), f->uf_panic_str));
 
 		qlen++;
 		mutex_exit(&f->uf_mutex);

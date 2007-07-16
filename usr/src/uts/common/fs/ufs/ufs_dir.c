@@ -317,7 +317,7 @@ restart:
 		}
 		if (dp->i_cachedir == CD_ENABLED) {
 			switch (dnlc_dir_start(dcap, dp->i_size >>
-				AV_DIRECT_SHIFT)) {
+			    AV_DIRECT_SHIFT)) {
 			case DNOMEM:
 				dp->i_cachedir = CD_DISABLED_NOMEM;
 				ufs_dc_disable_at = gethrtime();
@@ -506,12 +506,12 @@ searchloop:
 				omtime = dp->i_mtime;
 				rw_exit(&dp->i_rwlock);
 				rw_enter(&dp->i_ufsvfs->vfs_dqrwlock,
-						RW_READER);
+				    RW_READER);
 				err = ufs_iget_alloced(dp->i_vfs, ep_ino, ipp,
 				    cr);
 				rw_exit(&dp->i_ufsvfs->vfs_dqrwlock);
 				ufs_tryirwlock(&dp->i_rwlock, RW_READER,
-						retry_disk);
+				    retry_disk);
 				if (indeadlock) {
 					if (!err)
 						VN_RELE(ITOV(*ipp));
@@ -553,7 +553,7 @@ searchloop:
 				}
 			} else {
 				rw_enter(&dp->i_ufsvfs->vfs_dqrwlock,
-						RW_READER);
+				    RW_READER);
 				err = ufs_iget_alloced(dp->i_vfs, ep_ino, ipp,
 				    cr);
 				rw_exit(&dp->i_ufsvfs->vfs_dqrwlock);
@@ -1934,7 +1934,7 @@ ufs_diraddentry(
 	if (slotp->endoff && (slotp->endoff < tdp->i_size)) {
 		if (!TRANS_ISTRANS(tdp->i_ufsvfs)) {
 			(void) ufs_itrunc(tdp, (u_offset_t)slotp->endoff, 0,
-						cr);
+			    cr);
 		}
 	}
 
@@ -2094,7 +2094,7 @@ ufs_dirmakeinode(
 
 	ASSERT(vap != NULL);
 	ASSERT(op == DE_CREATE || op == DE_MKDIR || op == DE_ATTRDIR ||
-		op == DE_SYMLINK);
+	    op == DE_SYMLINK);
 	ASSERT((vap->va_mask & (AT_TYPE|AT_MODE)) == (AT_TYPE|AT_MODE));
 	ASSERT(RW_WRITE_HELD(&tdp->i_rwlock));
 	ASSERT(RW_WRITE_HELD(&tdp->i_contents));
@@ -2125,7 +2125,7 @@ ufs_dirmakeinode(
 	if (ip->i_dquot != NULL) {
 		err = ufs_fault(ITOV(ip),
 		    "ufs_dirmakeinode, ip->i_dquot != NULL: dquot (%s)",
-				    tdp->i_fs->fs_fsmnt);
+		    tdp->i_fs->fs_fsmnt);
 		rw_exit(&ip->i_contents);
 		return (err);
 	}
@@ -2196,10 +2196,10 @@ ufs_dirmakeinode(
 	 *
 	 * where MAXUID was set to 60002.  See notes on this in ufs_inode.c
 	 */
-	ip->i_suid = (ulong_t)ip->i_uid > (ulong_t)USHRT_MAX ?
-		UID_LONG : ip->i_uid;
-	ip->i_sgid = (ulong_t)ip->i_gid > (ulong_t)USHRT_MAX ?
-		GID_LONG : ip->i_gid;
+	ip->i_suid =
+	    (ulong_t)ip->i_uid > (ulong_t)USHRT_MAX ? UID_LONG : ip->i_uid;
+	ip->i_sgid =
+	    (ulong_t)ip->i_gid > (ulong_t)USHRT_MAX ? GID_LONG : ip->i_gid;
 
 	/*
 	 * If we're creating a directory, and the parent directory has the
@@ -2350,8 +2350,8 @@ ufs_dirmakedirect(
 	if (DIRBLKSIZ > dp->i_fs->fs_fsize) {
 		err = ufs_fault(ITOV(dp),
 "ufs_dirmakedirect: bad fs_fsize, DIRBLKSIZ: %d > dp->i_fs->fs_fsize: %d (%s)",
-					DIRBLKSIZ, dp->i_fs->fs_fsize,
-					dp->i_fs->fs_fsmnt);
+		    DIRBLKSIZ, dp->i_fs->fs_fsize,
+		    dp->i_fs->fs_fsmnt);
 		return (err);
 	}
 	ip->i_size = DIRBLKSIZ;
@@ -2645,7 +2645,7 @@ retry:
 			}
 			pep->d_reclen += ep->d_reclen;
 			(void) dnlc_dir_add_space(dcap, extra + ep->d_reclen,
-				(uint64_t)(slot.offset - slot.size));
+			    (uint64_t)(slot.offset - slot.size));
 			/* adjust the previous pointer in the next entry */
 			nep = (struct direct *)((char *)ep + ep->d_reclen);
 			if ((uintptr_t)nep & (DIRBLKSIZ - 1)) {
@@ -2667,7 +2667,7 @@ retry:
 			}
 		} else {
 			(void) dnlc_dir_add_space(dcap, ep->d_reclen,
-			(uint64_t)slot.offset);
+			    (uint64_t)slot.offset);
 		}
 	} else {
 		/*
@@ -2821,7 +2821,7 @@ blkatoff(
 	lbn = (daddr_t)lblkno(fs, offset);
 	bsize = (uint_t)blksize(fs, ip, lbn);
 	err = fbread(ITOV(ip), (offset_t)(offset & fs->fs_bmask),
-			bsize, S_READ, &fbp);
+	    bsize, S_READ, &fbp);
 	if (err) {
 		*fbpp = (struct fbuf *)NULL;
 		return (err);
@@ -3109,7 +3109,7 @@ retry_lock:
 			 * with EAGAIN else we just go back and try.
 			 */
 			if (RW_ISWRITER(&ip->i_rwlock) &&
-					!(RW_WRITE_HELD(&ip->i_rwlock))) {
+			    !(RW_WRITE_HELD(&ip->i_rwlock))) {
 				err = EAGAIN;
 				if (fbp) {
 					fbrelse(fbp, S_OTHER);
@@ -3179,11 +3179,11 @@ ufs_xattrdirempty(struct inode *ip, ino_t parentino, struct cred *cr)
 		 */
 
 		if (dp->d_namlen == 1 && dp->d_name[0] == '.' &&
-				(ino_t)dp->d_ino == parentino)
+		    (ino_t)dp->d_ino == parentino)
 			continue;
 
 		if (dp->d_namlen == 2 && dp->d_name[0] == '.' &&
-			dp->d_name[1] == '.') {
+		    dp->d_name[1] == '.') {
 			continue;
 		}
 		empty = 0;

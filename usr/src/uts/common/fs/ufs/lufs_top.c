@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,7 +65,7 @@ top_delta(
 	ASSERT(ufsvfsp->vfs_dev == ul->un_dev);
 	ASSERT(nb);
 	ASSERT(((ul->un_debug & (MT_TRANSACT|MT_MATAMAP)) == 0) ||
-		top_delta_debug(ul, mof, nb, dtyp));
+	    top_delta_debug(ul, mof, nb, dtyp));
 
 	deltamap_add(ul->un_deltamap, mof, nb, dtyp, func, arg, tp);
 
@@ -88,8 +87,8 @@ top_cancel(ufsvfs_t *ufsvfsp, offset_t mof, off_t nb, int flags)
 	ASSERT(ufsvfsp->vfs_dev == ul->un_dev);
 	ASSERT(nb);
 	ASSERT(((ul->un_debug & (MT_TRANSACT|MT_MATAMAP)) == 0) ||
-		(!(flags & metadata) ||
-		top_delta_debug(ul, mof, nb, DT_CANCEL)));
+	    (!(flags & metadata) ||
+	    top_delta_debug(ul, mof, nb, DT_CANCEL)));
 
 	if (metadata)
 		deltamap_del(ul->un_deltamap, mof, nb);
@@ -336,7 +335,7 @@ retry:
 	mutex_exit(&mtm->mtm_lock);
 
 	ASSERT(((ul->un_debug & MT_TRANSACT) == 0) ||
-		top_begin_debug(ul, topid, size));
+	    top_begin_debug(ul, topid, size));
 }
 
 int tryfail_cnt;
@@ -435,7 +434,7 @@ retry:
 	mutex_exit(&mtm->mtm_lock);
 
 	ASSERT(((ul->un_debug & MT_TRANSACT) == 0) ||
-		top_begin_debug(ul, topid, size));
+	    top_begin_debug(ul, topid, size));
 	return (0);
 }
 
@@ -450,7 +449,7 @@ top_end_sync(ufsvfs_t *ufsvfsp, int *ep, top_t topid, ulong_t size)
 
 	ASSERT(ufsvfsp->vfs_dev == ul->un_dev);
 	ASSERT(((ul->un_debug & MT_TRANSACT) == 0) ||
-		top_end_debug(ul, mtm, topid, size));
+	    top_end_debug(ul, mtm, topid, size));
 
 	mutex_enter(&mtm->mtm_lock);
 	tid = mtm->mtm_tid;
@@ -492,7 +491,7 @@ top_end_sync(ufsvfs_t *ufsvfsp, int *ep, top_t topid, ulong_t size)
 	deltamap_push(ul);
 
 	ASSERT(((ul->un_debug & MT_FORCEROLL) == 0) ||
-		top_roll_debug(ul));
+	    top_roll_debug(ul));
 
 	mtm->mtm_tid = tid + 1;	/* can overflow to 0 */
 
@@ -584,7 +583,7 @@ top_end_async(ufsvfs_t *ufsvfsp, top_t topid, ulong_t size)
 	ASSERT(tp);
 	ASSERT(ufsvfsp->vfs_dev == ul->un_dev);
 	ASSERT(((ul->un_debug & MT_TRANSACT) == 0) ||
-		top_end_debug(ul, mtm, topid, size));
+	    top_end_debug(ul, mtm, topid, size));
 
 	mutex_enter(&mtm->mtm_lock);
 
@@ -731,7 +730,7 @@ top_log(ufsvfs_t *ufsvfsp, char *va, offset_t vamof, off_t nb,
 	}
 
 	ASSERT((ul->un_matamap == NULL) ||
-		matamap_within(ul->un_matamap, vamof, nb));
+	    matamap_within(ul->un_matamap, vamof, nb));
 }
 
 

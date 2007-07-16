@@ -63,7 +63,6 @@
 #include <sys/debug.h>
 #include <sys/vmsystm.h>
 #include <sys/cmn_err.h>
-#include <sys/vtrace.h>
 #include <sys/filio.h>
 #include <sys/policy.h>
 
@@ -249,7 +248,6 @@ static struct dump *dump_info = NULL;
 static int
 ufs_open(struct vnode **vpp, int flag, struct cred *cr)
 {
-	TRACE_1(TR_FAC_UFS, TR_UFS_OPEN, "ufs_open:vpp %p", vpp);
 	return (0);
 }
 
@@ -258,8 +256,6 @@ static int
 ufs_close(struct vnode *vp, int flag, int count, offset_t offset,
 	struct cred *cr)
 {
-	TRACE_1(TR_FAC_UFS, TR_UFS_CLOSE, "ufs_close:vp %p", vp);
-
 	cleanlocks(vp, ttoproc(curthread)->p_pid, 0);
 	cleanshares(vp, ttoproc(curthread)->p_pid);
 
@@ -274,7 +270,7 @@ ufs_close(struct vnode *vp, int flag, int count, offset_t offset,
 		if (ip->i_delaylen) {
 			ins.in_poc.value.ul++;
 			(void) ufs_putpages(vp, ip->i_delayoff, ip->i_delaylen,
-					B_ASYNC | B_FREE, cr);
+			    B_ASYNC | B_FREE, cr);
 			ip->i_delaylen = 0;
 		}
 	}
@@ -294,9 +290,6 @@ ufs_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cr,
 	int intrans = 0;
 
 	ASSERT(RW_READ_HELD(&ip->i_rwlock));
-	TRACE_3(TR_FAC_UFS, TR_UFS_READ_START,
-		"ufs_read_start:vp %p uiop %p ioflag %x",
-		vp, uiop, ioflag);
 
 	/*
 	 * Mandatory locking needs to be done before ufs_lockfs_begin()
@@ -307,7 +300,7 @@ ufs_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cr,
 		 * ufs_getattr ends up being called by chklock
 		 */
 		error = chklock(vp, FREAD, uiop->uio_loffset,
-				uiop->uio_resid, uiop->uio_fmode, ct);
+		    uiop->uio_resid, uiop->uio_fmode, ct);
 		if (error)
 			goto out;
 	}
@@ -379,8 +372,6 @@ ufs_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cr,
 	}
 out:
 
-	TRACE_2(TR_FAC_UFS, TR_UFS_READ_END,
-		"ufs_read_end:vp %p error %d", vp, error);
 	return (error);
 }
 
@@ -410,11 +401,11 @@ ufs_check_rewrite(struct inode *ip, struct uio *uiop, int ioflag)
 	 * checked for sanity, so assume nothing.
 	 */
 	return (((ip->i_mode & IFMT) == IFREG) && !(ioflag & FAPPEND) &&
-		(uiop->uio_loffset >= (offset_t)0) &&
-		(uiop->uio_loffset < ip->i_size) && (uiop->uio_resid > 0) &&
-		((ip->i_size - uiop->uio_loffset) >= uiop->uio_resid) &&
-		!(ioflag & FSYNC) && !bmap_has_holes(ip) &&
-		shared_write);
+	    (uiop->uio_loffset >= (offset_t)0) &&
+	    (uiop->uio_loffset < ip->i_size) && (uiop->uio_resid > 0) &&
+	    ((ip->i_size - uiop->uio_loffset) >= uiop->uio_resid) &&
+	    !(ioflag & FSYNC) && !bmap_has_holes(ip) &&
+	    shared_write);
 }
 
 /*ARGSUSED*/
@@ -431,10 +422,6 @@ ufs_write(struct vnode *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	int exclusive;
 	int rewriteflg;
 	long start_resid = uiop->uio_resid;
-
-	TRACE_3(TR_FAC_UFS, TR_UFS_WRITE_START,
-		"ufs_write_start:vp %p uiop %p ioflag %x",
-		vp, uiop, ioflag);
 
 	ASSERT(RW_LOCK_HELD(&ip->i_rwlock));
 
@@ -456,7 +443,7 @@ retry_mandlock:
 		 * ufs_getattr ends up being called by chklock
 		 */
 		error = chklock(vp, FWRITE, uiop->uio_loffset,
-				uiop->uio_resid, uiop->uio_fmode, ct);
+		    uiop->uio_resid, uiop->uio_fmode, ct);
 		if (error)
 			goto out;
 	}
@@ -477,7 +464,7 @@ retry_mandlock:
 
 		rw_enter(&ip->i_contents, RW_READER);
 		error = ufs_directio_write(ip, uiop, ioflag, 1, cr,
-			&directio_status);
+		    &directio_status);
 		if (directio_status == DIRECTIO_SUCCESS) {
 			uint_t i_flag_save;
 
@@ -619,7 +606,7 @@ retry_mandlock:
 				int terr = 0;
 
 				TRANS_END_SYNC(ufsvfsp, terr, TOP_WRITE_SYNC,
-					resv);
+				    resv);
 				if (error == 0)
 					error = terr;
 			}
@@ -641,8 +628,6 @@ out:
 	if (error == ENOSPC && (start_resid != uiop->uio_resid))
 		error = 0;
 
-	TRACE_2(TR_FAC_UFS, TR_UFS_WRITE_END,
-		"ufs_write_end:vp %p error %d", vp, error);
 	return (error);
 }
 
@@ -768,9 +753,6 @@ wrip(struct inode *ip, struct uio *uio, int ioflag, struct cred *cr)
 
 	fs = ip->i_fs;
 
-	TRACE_1(TR_FAC_UFS, TR_UFS_RWIP_START,
-		"ufs_wrip_start:vp %p", vp);
-
 	ASSERT(RW_WRITE_HELD(&ip->i_contents));
 
 	/* check for valid filetype */
@@ -790,9 +772,6 @@ wrip(struct inode *ip, struct uio *uio, int ioflag, struct cred *cr)
 	if (uio->uio_loffset >= limit) {
 		proc_t *p = ttoproc(curthread);
 
-		TRACE_2(TR_FAC_UFS, TR_UFS_RWIP_END,
-			"ufs_wrip_end:vp %p error %d", vp, EINVAL);
-
 		mutex_enter(&p->p_lock);
 		(void) rctl_action(rctlproc_legacy[RLIMIT_FSIZE], p->p_rctls,
 		    p, RCA_UNSAFE_SIGINFO);
@@ -810,13 +789,9 @@ wrip(struct inode *ip, struct uio *uio, int ioflag, struct cred *cr)
 		limit = MIN(MAXOFF32_T, limit);
 
 	if (uio->uio_loffset < (offset_t)0) {
-		TRACE_2(TR_FAC_UFS, TR_UFS_RWIP_END,
-			"ufs_wrip_end:vp %p error %d", vp, EINVAL);
 		return (EINVAL);
 	}
 	if (uio->uio_resid == 0) {
-		TRACE_2(TR_FAC_UFS, TR_UFS_RWIP_END,
-			"ufs_wrip_end:vp %p error %d", vp, 0);
 		return (0);
 	}
 
@@ -835,13 +810,13 @@ wrip(struct inode *ip, struct uio *uio, int ioflag, struct cred *cr)
 	if (ip->i_flag & IDIRECTIO || ufsvfsp->vfs_forcedirectio) {
 		uio->uio_llimit = limit;
 		error = ufs_directio_write(ip, uio, ioflag, 0, cr,
-			&directio_status);
+		    &directio_status);
 		/*
 		 * If ufs_directio wrote to the file or set the flags,
 		 * we need to update i_seq, but it may be deferred.
 		 */
 		if (start_resid != uio->uio_resid ||
-					(ip->i_flag & (ICHG|IUPD))) {
+		    (ip->i_flag & (ICHG|IUPD))) {
 			i_seq_needed = 1;
 			ip->i_flag |= ISEQ;
 		}
@@ -868,7 +843,7 @@ wrip(struct inode *ip, struct uio *uio, int ioflag, struct cred *cr)
 	 * and we possibly loop below, so save a few cycles.
 	 */
 	if ((type == IFSHAD) ||
-		(rw_owner(&ufsvfsp->vfs_dqrwlock) == curthread)) {
+	    (rw_owner(&ufsvfsp->vfs_dqrwlock) == curthread)) {
 			do_dqrwlock = 0;
 	} else {
 		do_dqrwlock = 1;
@@ -1012,11 +987,11 @@ wrip(struct inode *ip, struct uio *uio, int ioflag, struct cred *cr)
 			 * with zeros.
 			 */
 			error = vpm_data_copy(vp, (off + mapon), (uint_t)n,
-				uio, !pagecreate, &newpage, 0, S_WRITE);
+			    uio, !pagecreate, &newpage, 0, S_WRITE);
 		} else {
 
 			base = segmap_getmapflt(segkmap, vp, (off + mapon),
-					(uint_t)n, !pagecreate, S_WRITE);
+			    (uint_t)n, !pagecreate, S_WRITE);
 
 			/*
 			 * segmap_pagecreate() returns 1 if it calls
@@ -1311,7 +1286,7 @@ out:
 		 * we have eliminated nosync
 		 */
 		if ((ip->i_flag & (IATTCHG|IBDWRITE)) ||
-			((ioflag & FSYNC) && iupdat_flag)) {
+		    ((ioflag & FSYNC) && iupdat_flag)) {
 			ufs_iupdat(ip, 1);
 		}
 	}
@@ -1327,8 +1302,6 @@ out:
 
 	ip->i_flag &= ~(INOACC | ISYNC);
 	ITIMES_NOLOCK(ip);
-	TRACE_2(TR_FAC_UFS, TR_UFS_RWIP_END,
-		"ufs_wrip_end:vp %p error %d", vp, error);
 	return (error);
 }
 
@@ -1354,9 +1327,6 @@ rdip(struct inode *ip, struct uio *uio, int ioflag, cred_t *cr)
 
 	vp = ITOV(ip);
 
-	TRACE_1(TR_FAC_UFS, TR_UFS_RWIP_START,
-		"ufs_rdip_start:vp %p", vp);
-
 	ASSERT(RW_LOCK_HELD(&ip->i_contents));
 
 	ufsvfsp = ip->i_ufsvfs;
@@ -1374,24 +1344,18 @@ rdip(struct inode *ip, struct uio *uio, int ioflag, cred_t *cr)
 	}
 
 	if (uio->uio_loffset > UFS_MAXOFFSET_T) {
-		TRACE_2(TR_FAC_UFS, TR_UFS_RWIP_END,
-			"ufs_rdip_end:vp %p error %d", vp, EINVAL);
 		error = 0;
 		goto out;
 	}
 	if (uio->uio_loffset < (offset_t)0) {
-		TRACE_2(TR_FAC_UFS, TR_UFS_RWIP_END,
-			"ufs_rdip_end:vp %p error %d", vp, EINVAL);
 		return (EINVAL);
 	}
 	if (uio->uio_resid == 0) {
-		TRACE_2(TR_FAC_UFS, TR_UFS_RWIP_END,
-			"ufs_rdip_end:vp %p error %d", vp, 0);
 		return (0);
 	}
 
 	if (!ULOCKFS_IS_NOIACC(ITOUL(ip)) && (fs->fs_ronly == 0) &&
-		(!ufsvfsp->vfs_noatime)) {
+	    (!ufsvfsp->vfs_noatime)) {
 		mutex_enter(&ip->i_tlock);
 		ip->i_flag |= IACC;
 		mutex_exit(&ip->i_tlock);
@@ -1414,7 +1378,7 @@ rdip(struct inode *ip, struct uio *uio, int ioflag, cred_t *cr)
 		mapon = (u_offset_t)(uoff & (offset_t)MAXBOFFSET);
 		on = (u_offset_t)blkoff(fs, uoff);
 		n = MIN((u_offset_t)fs->fs_bsize - on,
-			(u_offset_t)uio->uio_resid);
+		    (u_offset_t)uio->uio_resid);
 
 		diff = ip->i_size - uoff;
 
@@ -1465,10 +1429,10 @@ rdip(struct inode *ip, struct uio *uio, int ioflag, cred_t *cr)
 			 * Copy data.
 			 */
 			error = vpm_data_copy(vp, (off + mapon), (uint_t)n,
-				uio, 1, NULL, 0, S_READ);
+			    uio, 1, NULL, 0, S_READ);
 		} else {
 			base = segmap_getmapflt(segkmap, vp, (off + mapon),
-					(uint_t)n, 1, S_READ);
+			    (uint_t)n, 1, S_READ);
 			error = uiomove(base + mapon, (long)n, UIO_READ, uio);
 		}
 
@@ -1484,7 +1448,7 @@ rdip(struct inode *ip, struct uio *uio, int ioflag, cred_t *cr)
 			if (dofree) {
 				flags = SM_FREE | SM_ASYNC;
 				if ((cache_read_ahead == 0) &&
-					(off > smallfile2))
+				    (off > smallfile2))
 					flags |=  SM_DONTNEED;
 			}
 			/*
@@ -1546,8 +1510,6 @@ out:
 		error = 0;
 	ITIMES(ip);
 
-	TRACE_2(TR_FAC_UFS, TR_UFS_RWIP_END,
-		"ufs_rdip_end:vp %p error %d", vp, error);
 	return (error);
 }
 
@@ -1589,14 +1551,14 @@ ufs_ioctl(
 
 		if (ulp) {
 			TRANS_BEGIN_ASYNC(ufsvfsp, TOP_QUOTA,
-						TOP_SETQUOTA_SIZE(fs));
+			    TOP_SETQUOTA_SIZE(fs));
 		}
 
 		error = quotactl(vp, arg, flag, cr);
 
 		if (ulp) {
 			TRANS_END_ASYNC(ufsvfsp, TOP_QUOTA,
-						TOP_SETQUOTA_SIZE(fs));
+			    TOP_SETQUOTA_SIZE(fs));
 			ufs_lockfs_end(ulp);
 		}
 		return (error);
@@ -1612,7 +1574,7 @@ ufs_ioctl(
 
 			if ((flag & DATAMODEL_MASK) == DATAMODEL_NATIVE) {
 				if (copyin((caddr_t)arg, &lockfs,
-						sizeof (struct lockfs)))
+				    sizeof (struct lockfs)))
 					return (EFAULT);
 			}
 #ifdef _SYSCALL32_IMPL
@@ -1627,17 +1589,17 @@ ufs_ioctl(
 				lockfs.lf_key = (ulong_t)lockfs32.lf_key;
 				lockfs.lf_comlen = (ulong_t)lockfs32.lf_comlen;
 				lockfs.lf_comment =
-					(caddr_t)(uintptr_t)lockfs32.lf_comment;
+				    (caddr_t)(uintptr_t)lockfs32.lf_comment;
 			}
 #endif /* _SYSCALL32_IMPL */
 
 			if (lockfs.lf_comlen) {
 				if (lockfs.lf_comlen > LOCKFS_MAXCOMMENTLEN)
 					return (ENAMETOOLONG);
-				comment = kmem_alloc(lockfs.lf_comlen,
-						KM_SLEEP);
+				comment =
+				    kmem_alloc(lockfs.lf_comlen, KM_SLEEP);
 				if (copyin(lockfs.lf_comment, comment,
-					lockfs.lf_comlen)) {
+				    lockfs.lf_comlen)) {
 					kmem_free(comment, lockfs.lf_comlen);
 					return (EFAULT);
 				}
@@ -1665,7 +1627,8 @@ ufs_ioctl(
 					lockfs32.lf_comlen =
 					    (uint32_t)lockfs.lf_comlen;
 					lockfs32.lf_comment =
-					(uint32_t)(uintptr_t)lockfs.lf_comment;
+					    (uint32_t)(uintptr_t)
+					    lockfs.lf_comment;
 					(void) copyout(&lockfs32, (caddr_t)arg,
 					    sizeof (struct lockfs32));
 				}
@@ -1684,7 +1647,7 @@ ufs_ioctl(
 
 			if ((flag & DATAMODEL_MASK) == DATAMODEL_NATIVE) {
 				if (copyin((caddr_t)arg, &lockfs,
-						sizeof (struct lockfs)))
+				    sizeof (struct lockfs)))
 					return (EFAULT);
 			}
 #ifdef _SYSCALL32_IMPL
@@ -1692,14 +1655,14 @@ ufs_ioctl(
 				struct lockfs32	lockfs32;
 				/* Translate ILP32 lockfs to LP64 lockfs */
 				if (copyin((caddr_t)arg, &lockfs32,
-						sizeof (struct lockfs32)))
+				    sizeof (struct lockfs32)))
 					return (EFAULT);
 				lockfs.lf_lock = (ulong_t)lockfs32.lf_lock;
 				lockfs.lf_flags = (ulong_t)lockfs32.lf_flags;
 				lockfs.lf_key = (ulong_t)lockfs32.lf_key;
 				lockfs.lf_comlen = (ulong_t)lockfs32.lf_comlen;
 				lockfs.lf_comment =
-					(caddr_t)(uintptr_t)lockfs32.lf_comment;
+				    (caddr_t)(uintptr_t)lockfs32.lf_comment;
 			}
 #endif /* _SYSCALL32_IMPL */
 
@@ -1709,11 +1672,11 @@ ufs_ioctl(
 			lockfs.lf_key = lockfs_out.lf_key;
 			lockfs.lf_flags = lockfs_out.lf_flags;
 			lockfs.lf_comlen = MIN(lockfs.lf_comlen,
-				lockfs_out.lf_comlen);
+			    lockfs_out.lf_comlen);
 
 			if ((flag & DATAMODEL_MASK) == DATAMODEL_NATIVE) {
 				if (copyout(&lockfs, (caddr_t)arg,
-						sizeof (struct lockfs)))
+				    sizeof (struct lockfs)))
 					return (EFAULT);
 			}
 #ifdef _SYSCALL32_IMPL
@@ -1725,9 +1688,9 @@ ufs_ioctl(
 				lockfs32.lf_key = (uint32_t)lockfs.lf_key;
 				lockfs32.lf_comlen = (uint32_t)lockfs.lf_comlen;
 				lockfs32.lf_comment =
-					(uint32_t)(uintptr_t)lockfs.lf_comment;
+				    (uint32_t)(uintptr_t)lockfs.lf_comment;
 				if (copyout(&lockfs32, (caddr_t)arg,
-					    sizeof (struct lockfs32)))
+				    sizeof (struct lockfs32)))
 					return (EFAULT);
 			}
 #endif /* _SYSCALL32_IMPL */
@@ -1735,8 +1698,7 @@ ufs_ioctl(
 			if (lockfs.lf_comlen &&
 			    lockfs.lf_comment && lockfs_out.lf_comment)
 				if (copyout(lockfs_out.lf_comment,
-					lockfs.lf_comment,
-					lockfs.lf_comlen))
+				    lockfs.lf_comment, lockfs.lf_comlen))
 					return (EFAULT);
 			return (0);
 
@@ -1755,22 +1717,22 @@ ufs_ioctl(
 				return (0);
 
 			error = ufs_lockfs_begin(ufsvfsp, &ulp,
-					ULOCKFS_SETATTR_MASK);
+			    ULOCKFS_SETATTR_MASK);
 			if (error)
 				return (error);
 
 			if (ulp) {
 				trans_size = (int)TOP_SETATTR_SIZE(VTOI(vp));
 				TRANS_BEGIN_CSYNC(ufsvfsp, issync,
-						TOP_SETATTR, trans_size);
+				    TOP_SETATTR, trans_size);
 			}
 
 			error = ufs_fiosatime(vp, (struct timeval *)arg,
-					flag, cr);
+			    flag, cr);
 
 			if (ulp) {
 				TRANS_END_CSYNC(ufsvfsp, error, issync,
-						TOP_SETATTR, trans_size);
+				    TOP_SETATTR, trans_size);
 				ufs_lockfs_end(ulp);
 			}
 			return (error);
@@ -1792,7 +1754,7 @@ ufs_ioctl(
 			 * inode open
 			 */
 			error = ufs_lockfs_begin(ufsvfsp, &ulp,
-					ULOCKFS_VGET_MASK);
+			    ULOCKFS_VGET_MASK);
 			if (error)
 				return (error);
 
@@ -1831,7 +1793,7 @@ ufs_ioctl(
 			 * Tune the file system (aka setting fs attributes)
 			 */
 			error = ufs_lockfs_begin(ufsvfsp, &ulp,
-					ULOCKFS_SETATTR_MASK);
+			    ULOCKFS_SETATTR_MASK);
 			if (error)
 				return (error);
 
@@ -1960,17 +1922,12 @@ ufs_getattr(struct vnode *vp, struct vattr *vap, int flags,
 	struct ufsvfs *ufsvfsp;
 	int err;
 
-	TRACE_2(TR_FAC_UFS, TR_UFS_GETATTR_START,
-		"ufs_getattr_start:vp %p flags %x", vp, flags);
-
 	if (vap->va_mask == AT_SIZE) {
 		/*
 		 * for performance, if only the size is requested don't bother
 		 * with anything else.
 		 */
 		UFS_GET_ISIZE(&vap->va_size, ip);
-		TRACE_1(TR_FAC_UFS, TR_UFS_GETATTR_END,
-			"ufs_getattr_end:vp %p", vp);
 		return (0);
 	}
 
@@ -2049,8 +2006,6 @@ ufs_getattr(struct vnode *vp, struct vattr *vap, int flags,
 	err = 0;
 
 out:
-	TRACE_1(TR_FAC_UFS, TR_UFS_GETATTR_END, "ufs_getattr_end:vp %p", vp);
-
 	return (err);
 }
 
@@ -2083,9 +2038,6 @@ ufs_setattr(
 	vattr_t oldva;
 	int retry = 1;
 	int indeadlock;
-
-	TRACE_2(TR_FAC_UFS, TR_UFS_SETATTR_START,
-		"ufs_setattr_start:vp %p flags %x", vp, flags);
 
 	/*
 	 * Cannot set these attributes.
@@ -2168,7 +2120,7 @@ again:
 	 */
 	if (vp->v_type == VDIR) {
 		ufs_tryirwlock_trans(&ip->i_rwlock, RW_WRITER, TOP_SETATTR,
-					retry_dir);
+		    retry_dir);
 		if (indeadlock)
 			goto again;
 		dorwlock = 1;
@@ -2193,7 +2145,7 @@ again:
 	 * map the defines.
 	 */
 	error = secpolicy_vnode_setattr(cr, vp, vap, &oldva, flags,
-				ufs_iaccess, ip);
+	    ufs_iaccess, ip);
 	if (error)
 		goto update_inode;
 
@@ -2242,11 +2194,10 @@ again:
 				owner_change = 1;
 
 				(void) chkdq(ip, -blocks, /* force */ 1, cr,
-						(char **)NULL, (size_t *)NULL);
+				    (char **)NULL, (size_t *)NULL);
 				(void) chkiq(ufsvfsp, /* change */ -1, ip,
-						(uid_t)ip->i_uid,
-						/* force */ 1, cr,
-						(char **)NULL, (size_t *)NULL);
+				    (uid_t)ip->i_uid, /* force */ 1, cr,
+				    (char **)NULL, (size_t *)NULL);
 				dqrele(ip->i_dquot);
 			}
 
@@ -2262,12 +2213,10 @@ again:
 				 */
 				ip->i_dquot = getinoquota(ip);
 				(void) chkdq(ip, blocks, /* force */ 1, cr,
-						&errmsg1, &len1);
+				    &errmsg1, &len1);
 				(void) chkiq(ufsvfsp, /* change */ 1,
-						(struct inode *)NULL,
-						(uid_t)ip->i_uid,
-						/* force */ 1, cr,
-						&errmsg2, &len2);
+				    (struct inode *)NULL, (uid_t)ip->i_uid,
+				    /* force */ 1, cr, &errmsg2, &len2);
 			}
 		}
 		if (mask & AT_GID) {
@@ -2387,8 +2336,6 @@ out:
 			kmem_free(errmsg2, len2);
 		goto again;
 	}
-	TRACE_2(TR_FAC_UFS, TR_UFS_SETATTR_END,
-		"ufs_setattr_end:vp %p error %d", vp, error);
 	if (errmsg1 != NULL) {
 		uprintf(errmsg1);
 		kmem_free(errmsg1, len1);
@@ -2406,9 +2353,6 @@ ufs_access(struct vnode *vp, int mode, int flags, struct cred *cr)
 {
 	struct inode *ip = VTOI(vp);
 	int error;
-
-	TRACE_3(TR_FAC_UFS, TR_UFS_ACCESS_START,
-		"ufs_access_start:vp %p mode %x flags %x", vp, mode, flags);
 
 	if (ip->i_ufsvfs == NULL)
 		return (EIO);
@@ -2430,8 +2374,6 @@ ufs_access(struct vnode *vp, int mode, int flags, struct cred *cr)
 
 	rw_exit(&ip->i_contents);
 
-	TRACE_2(TR_FAC_UFS, TR_UFS_ACCESS_END,
-		"ufs_access_end:vp %p error %d", vp, error);
 	return (error);
 }
 
@@ -2444,9 +2386,6 @@ ufs_readlink(struct vnode *vp, struct uio *uiop, struct cred *cr)
 	struct ulockfs *ulp;
 	int error;
 	int fastsymlink;
-
-	TRACE_2(TR_FAC_UFS, TR_UFS_READLINK_START,
-		"ufs_readlink_start:vp %p uiop %p", uiop, vp);
 
 	if (vp->v_type != VLNK) {
 		error = EINVAL;
@@ -2483,8 +2422,8 @@ again:
 				mutex_exit(&ip->i_tlock);
 			}
 			error = uiomove((caddr_t)&ip->i_db[1],
-				MIN(ip->i_size, uiop->uio_resid),
-				UIO_READ, uiop);
+			    MIN(ip->i_size, uiop->uio_resid),
+			    UIO_READ, uiop);
 			ITIMES(ip);
 			++fastsymlink;
 		}
@@ -2579,8 +2518,8 @@ again:
 		if (tflag == 1) {
 			/* now, copy it into the user buffer */
 			error = uiomove((caddr_t)kbuf,
-				MIN(size, uiop->uio_resid),
-				UIO_READ, uiop);
+			    MIN(size, uiop->uio_resid),
+			    UIO_READ, uiop);
 		}
 		rw_exit(&ip->i_contents);
 		rw_exit(&ip->i_rwlock);
@@ -2590,9 +2529,6 @@ out:
 		ufs_lockfs_end(ulp);
 	}
 nolockout:
-	TRACE_2(TR_FAC_UFS, TR_UFS_READLINK_END,
-		"ufs_readlink_end:vp %p error %d", vp, error);
-
 	return (error);
 }
 
@@ -2604,9 +2540,6 @@ ufs_fsync(struct vnode *vp, int syncflag, struct cred *cr)
 	struct ufsvfs *ufsvfsp = ip->i_ufsvfs;
 	struct ulockfs *ulp;
 	int error;
-
-	TRACE_1(TR_FAC_UFS, TR_UFS_FSYNC_START,
-		"ufs_fsync_start:vp %p", vp);
 
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_FSYNC_MASK);
 	if (error)
@@ -2689,8 +2622,6 @@ out:
 	if (ulp) {
 		ufs_lockfs_end(ulp);
 	}
-	TRACE_2(TR_FAC_UFS, TR_UFS_FSYNC_END,
-		"ufs_fsync_end:vp %p error %d", vp, error);
 	return (error);
 }
 
@@ -2717,10 +2648,6 @@ ufs_lookup(struct vnode *dvp, char *nm, struct vnode **vpp,
 	struct ulockfs *ulp;
 	struct vnode *vp;
 	int error;
-
-	TRACE_2(TR_FAC_UFS, TR_UFS_LOOKUP_START,
-		"ufs_lookup_start:dvp %p name %s", dvp, nm);
-
 
 	/*
 	 * Check flags for type of lookup (regular file or attribute file)
@@ -2866,8 +2793,6 @@ fastpath:
 		goto retry_lookup;
 
 out:
-	TRACE_3(TR_FAC_UFS, TR_UFS_LOOKUP_END,
-		"ufs_lookup_end:dvp %p name %s error %d", vpp, nm, error);
 	return (error);
 }
 
@@ -2889,9 +2814,6 @@ ufs_create(struct vnode *dvp, char *name, struct vattr *vap, enum vcexcl excl,
 	int defer_dip_seq_update = 0;	/* need to defer update of dip->i_seq */
 	int retry = 1;
 	int indeadlock;
-
-	TRACE_1(TR_FAC_UFS, TR_UFS_CREATE_START,
-		"ufs_create_start:dvp %p", dvp);
 
 again:
 	ip = VTOI(dvp);
@@ -2931,7 +2853,7 @@ again:
 		 * possible, retries the operation.
 		 */
 		ufs_tryirwlock_trans(&ip->i_rwlock, RW_WRITER, TOP_CREATE,
-					retry_dir);
+		    retry_dir);
 		if (indeadlock)
 			goto again;
 
@@ -2954,12 +2876,11 @@ again:
 			 * Suppress file system full message if we will retry
 			 */
 			error = ufs_direnter_cm(ip, name, DE_CREATE,
-				vap, &xip, cr,
-				(noentry | (retry ? IQUIET : 0)));
+			    vap, &xip, cr, (noentry | (retry ? IQUIET : 0)));
 			if (error == EAGAIN) {
 				if (ulp) {
 					TRANS_END_CSYNC(ufsvfsp, error, issync,
-						TOP_CREATE, trans_size);
+					    TOP_CREATE, trans_size);
 					ufs_lockfs_end(ulp);
 				}
 				goto again;
@@ -3051,17 +2972,17 @@ again:
 					rw_exit(&ip->i_contents);
 					rw_exit(&ufsvfsp->vfs_dqrwlock);
 					ufs_tryirwlock_trans(&ip->i_rwlock,
-							RW_WRITER, TOP_CREATE,
-							retry_file);
+					    RW_WRITER, TOP_CREATE,
+					    retry_file);
 					if (indeadlock) {
 						VN_RELE(ITOV(ip));
 						goto again;
 					}
 					rw_enter(&ufsvfsp->vfs_dqrwlock,
-							RW_READER);
+					    RW_READER);
 					rw_enter(&ip->i_contents, RW_WRITER);
 					(void) ufs_itrunc(ip, (u_offset_t)0, 0,
-								cr);
+					    cr);
 					rw_exit(&ip->i_rwlock);
 				}
 			}
@@ -3151,8 +3072,6 @@ unlock:
 	}
 
 out:
-	TRACE_3(TR_FAC_UFS, TR_UFS_CREATE_END,
-		"ufs_create_end:dvp %p name %s error %d", vpp, name, error);
 	return (error);
 }
 
@@ -3169,9 +3088,6 @@ ufs_remove(struct vnode *vp, char *nm, struct cred *cr)
 	int error;
 	int issync;
 	int trans_size;
-
-	TRACE_1(TR_FAC_UFS, TR_UFS_REMOVE_START,
-		"ufs_remove_start:vp %p", vp);
 
 	/*
 	 * don't let the delete queue get too long
@@ -3219,8 +3135,6 @@ retry_remove:
 		VN_RELE(rmvp);
 	}
 out:
-	TRACE_3(TR_FAC_UFS, TR_UFS_REMOVE_END,
-		"ufs_remove_end:vp %p name %s error %d", vp, nm, error);
 	return (error);
 }
 
@@ -3241,9 +3155,6 @@ ufs_link(struct vnode *tdvp, struct vnode *svp, char *tnm, struct cred *cr)
 	int trans_size;
 	int isdev;
 	int indeadlock;
-
-	TRACE_1(TR_FAC_UFS, TR_UFS_LINK_START,
-		"ufs_link_start:tdvp %p", tdvp);
 
 retry_link:
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_LINK_MASK);
@@ -3300,8 +3211,6 @@ unlock:
 		ufs_lockfs_end(ulp);
 	}
 out:
-	TRACE_2(TR_FAC_UFS, TR_UFS_LINK_END,
-		"ufs_link_end:tdvp %p error %d", tdvp, error);
 	return (error);
 }
 
@@ -3349,10 +3258,6 @@ ufs_rename(
 	krwlock_t *second_lock;
 	krwlock_t *reverse_lock;
 
-	TRACE_1(TR_FAC_UFS, TR_UFS_RENAME_START,
-		"ufs_rename_start:sdvp %p", sdvp);
-
-
 	sdp = VTOI(sdvp);
 	slot.fbp = NULL;
 	ufsvfsp = sdp->i_ufsvfs;
@@ -3387,7 +3292,7 @@ retry_rename:
 		if (error == EAGAIN) {
 			if (ulp) {
 				TRANS_END_CSYNC(ufsvfsp, error, issync,
-					TOP_RENAME, trans_size);
+				    TOP_RENAME, trans_size);
 				ufs_lockfs_end(ulp);
 			}
 			goto retry_rename;
@@ -3436,7 +3341,7 @@ retry_firstlock:
 
 		if (ulp && ULOCKFS_IS_SLOCK(ulp)) {
 			TRANS_END_CSYNC(ufsvfsp, error, issync, TOP_RENAME,
-					trans_size);
+			    trans_size);
 			ufs_lockfs_end(ulp);
 			goto retry_rename;
 
@@ -3462,7 +3367,7 @@ retry_firstlock:
 		rw_exit(first_lock);
 		if (ulp && ULOCKFS_IS_SLOCK(ulp)) {
 			TRANS_END_CSYNC(ufsvfsp, error, issync, TOP_RENAME,
-					trans_size);
+			    trans_size);
 			ufs_lockfs_end(ulp);
 			goto retry_rename;
 
@@ -3702,9 +3607,6 @@ unlock:
 		VN_RELE(ITOV(sip));
 
 out:
-	TRACE_5(TR_FAC_UFS, TR_UFS_RENAME_END,
-		"ufs_rename_end:sdvp %p snm %s tdvp %p tnm %s error %d",
-			sdvp, snm, tdvp, tnm, error);
 	return (error);
 }
 
@@ -3724,9 +3626,6 @@ ufs_mkdir(struct vnode *dvp, char *dirname, struct vattr *vap,
 	int retry = 1;
 
 	ASSERT((vap->va_mask & (AT_TYPE|AT_MODE)) == (AT_TYPE|AT_MODE));
-
-	TRACE_1(TR_FAC_UFS, TR_UFS_MKDIR_START,
-		"ufs_mkdir_start:dvp %p", dvp);
 
 	/*
 	 * Can't make directory in attr hidden dir
@@ -3754,11 +3653,11 @@ again:
 		goto again;
 
 	error = ufs_direnter_cm(ip, dirname, DE_MKDIR, vap, &xip, cr,
-		(retry ? IQUIET : 0));
+	    (retry ? IQUIET : 0));
 	if (error == EAGAIN) {
 		if (ulp) {
 			TRANS_END_CSYNC(ufsvfsp, error, issync, TOP_MKDIR,
-					trans_size);
+			    trans_size);
 			ufs_lockfs_end(ulp);
 		}
 		goto again;
@@ -3785,8 +3684,6 @@ out:
 		goto again;
 	}
 
-	TRACE_2(TR_FAC_UFS, TR_UFS_MKDIR_END,
-		"ufs_mkdir_end:dvp %p error %d", dvp, error);
 	return (error);
 }
 
@@ -3802,9 +3699,6 @@ ufs_rmdir(struct vnode *vp, char *nm, struct vnode *cdir, struct cred *cr)
 	int issync;
 	int trans_size;
 	int indeadlock;
-
-	TRACE_1(TR_FAC_UFS, TR_UFS_RMDIR_START,
-		"ufs_rmdir_start:vp %p", vp);
 
 	/*
 	 * don't let the delete queue get too long
@@ -3823,7 +3717,7 @@ retry_rmdir:
 
 	if (ulp)
 		TRANS_BEGIN_CSYNC(ufsvfsp, issync, TOP_RMDIR,
-					trans_size = TOP_RMDIR_SIZE);
+		    trans_size = TOP_RMDIR_SIZE);
 
 	/*
 	 * ufs_tryirwlock_trans uses rw_tryenter and checks for SLOCK
@@ -3834,12 +3728,12 @@ retry_rmdir:
 	if (indeadlock)
 		goto retry_rmdir;
 	error = ufs_dirremove(ip, nm, (struct inode *)0, cdir, DR_RMDIR, cr,
-									&rmvp);
+	    &rmvp);
 	rw_exit(&ip->i_rwlock);
 
 	if (ulp) {
 		TRANS_END_CSYNC(ufsvfsp, error, issync, TOP_RMDIR,
-				trans_size);
+		    trans_size);
 		ufs_lockfs_end(ulp);
 	}
 
@@ -3853,9 +3747,6 @@ retry_rmdir:
 		VN_RELE(rmvp);
 	}
 out:
-	TRACE_2(TR_FAC_UFS, TR_UFS_RMDIR_END,
-		"ufs_rmdir_end:vp %p error %d", vp, error);
-
 	return (error);
 }
 
@@ -3884,9 +3775,6 @@ ufs_readdir(
 
 	ip = VTOI(vp);
 	ASSERT(RW_READ_HELD(&ip->i_rwlock));
-
-	TRACE_2(TR_FAC_UFS, TR_UFS_READDIR_START,
-		"ufs_readdir_start:vp %p uiop %p", vp, uiop);
 
 	if (uiop->uio_loffset >= MAXOFF32_T) {
 		if (eofp)
@@ -3971,11 +3859,10 @@ nextblk:
 	}
 	incount = 0;
 	idp = (struct direct *)fbp->fb_addr;
-	if (idp->d_ino == 0 && idp->d_reclen == 0 &&
-		idp->d_namlen == 0) {
+	if (idp->d_ino == 0 && idp->d_reclen == 0 && idp->d_namlen == 0) {
 		cmn_err(CE_WARN, "ufs_readdir: bad dir, inumber = %llu, "
-			"fs = %s\n",
-			(u_longlong_t)ip->i_number, ufsvfsp->vfs_fs->fs_fsmnt);
+		    "fs = %s\n",
+		    (u_longlong_t)ip->i_number, ufsvfsp->vfs_fs->fs_fsmnt);
 		fbrelse(fbp, S_OTHER);
 		error = ENXIO;
 		goto update_inode;
@@ -4019,8 +3906,8 @@ nextblk:
 			(void) strncpy(odp->d_name, idp->d_name,
 			    DIRENT64_NAMELEN(this_reclen));
 			outcount += odp->d_reclen;
-			odp = (struct dirent64 *)((intptr_t)odp +
-				    odp->d_reclen);
+			odp = (struct dirent64 *)
+			    ((intptr_t)odp + odp->d_reclen);
 			ASSERT(outcount <= bufsize);
 		}
 		if (idp->d_reclen) {
@@ -4053,7 +3940,7 @@ nextblk:
 		uiop->uio_resid -= outcount;
 		uiop->uio_offset = offset;
 	} else if ((error = uiomove(outbuf, (long)outcount, UIO_READ,
-				    uiop)) == 0)
+	    uiop)) == 0)
 		uiop->uio_offset = offset;
 update_inode:
 	ITIMES(ip);
@@ -4067,8 +3954,6 @@ unlock:
 		ufs_lockfs_end(ulp);
 	}
 out:
-	TRACE_2(TR_FAC_UFS, TR_UFS_READDIR_END,
-		"ufs_readdir_end:vp %p error %d", vp, error);
 	return (error);
 }
 
@@ -4090,9 +3975,6 @@ ufs_symlink(
 	int residual;
 	int ioflag;
 	int retry = 1;
-
-	TRACE_1(TR_FAC_UFS, TR_UFS_SYMLINK_START,
-		"ufs_symlink_start:dvp %p", dvp);
 
 	/*
 	 * No symlinks in attrdirs at this time
@@ -4239,7 +4121,7 @@ unlock:
 		int terr = 0;
 
 		TRANS_END_CSYNC(ufsvfsp, terr, issync, TOP_SYMLINK,
-				trans_size);
+		    trans_size);
 		ufs_lockfs_end(ulp);
 		if (error == 0)
 			error = terr;
@@ -4257,8 +4139,6 @@ unlock:
 	}
 
 out:
-	TRACE_2(TR_FAC_UFS, TR_UFS_SYMLINK_END,
-		"ufs_symlink_end:dvp %p error %d", dvp, error);
 	return (error);
 }
 
@@ -4511,9 +4391,6 @@ ufs_getpage(struct vnode *vp, offset_t off, size_t len, uint_t *protp,
 	int		do_qlock;
 	int		trans_size;
 
-	TRACE_1(TR_FAC_UFS, TR_UFS_GETPAGE_START,
-		"ufs_getpage_start:vp %p", vp);
-
 	ASSERT((uoff & PAGEOFFSET) == 0);
 
 	if (protp)
@@ -4523,7 +4400,7 @@ ufs_getpage(struct vnode *vp, offset_t off, size_t len, uint_t *protp,
 	 * Obey the lockfs protocol
 	 */
 	err = ufs_lockfs_begin_getpage(ufsvfsp, &ulp, seg,
-			rw == S_READ || rw == S_EXEC, protp);
+	    rw == S_READ || rw == S_EXEC, protp);
 	if (err)
 		goto out;
 
@@ -4539,7 +4416,7 @@ ufs_getpage(struct vnode *vp, offset_t off, size_t len, uint_t *protp,
 		trans_size = TOP_GETPAGE_SIZE(ip);
 		if (seg->s_as != &kas) {
 			TRANS_TRY_BEGIN_ASYNC(ufsvfsp, TOP_GETPAGE,
-				trans_size, err)
+			    trans_size, err)
 			if (err == EWOULDBLOCK) {
 				/*
 				 * Use EDEADLK here because the VM code
@@ -4630,8 +4507,9 @@ retrylock:
 			 * don't wait here due to lock order:
 			 * vfs_dqrwlock > i_contents.
 			 */
-			if (do_qlock && rw_tryenter(&ufsvfsp->vfs_dqrwlock,
-							RW_READER) == 0) {
+			if (do_qlock &&
+			    rw_tryenter(&ufsvfsp->vfs_dqrwlock, RW_READER)
+			    == 0) {
 				rw_exit(&ip->i_contents);
 				goto retrylock;
 			}
@@ -4777,7 +4655,7 @@ retrylock:
 	if (plarr && !(has_holes && (rw == S_WRITE || rw == S_CREATE))) {
 
 		ASSERT((protp == NULL) ||
-			!(has_holes && (*protp & PROT_WRITE)));
+		    !(has_holes && (*protp & PROT_WRITE)));
 
 		eoff = pgoff + plsz;
 		while (pgoff < eoff) {
@@ -4842,8 +4720,6 @@ unlock:
 		ufs_lockfs_end(ulp);
 	}
 out:
-	TRACE_2(TR_FAC_UFS, TR_UFS_GETPAGE_END,
-		"ufs_getpage_end:vp %p error %d", vp, err);
 	return (err);
 }
 
@@ -4893,7 +4769,7 @@ ufs_getpage_miss(struct vnode *vp, u_offset_t off, size_t len, struct seg *seg,
 		if ((pp = page_create_va(vp, off, PAGESIZE, PG_WAIT, seg,
 		    addr)) == NULL) {
 			return (ufs_fault(vp,
-				    "ufs_getpage_miss: page_create == NULL"));
+			    "ufs_getpage_miss: page_create == NULL"));
 		}
 
 		if (rw != S_CREATE)
@@ -5083,9 +4959,6 @@ ufs_putpage(struct vnode *vp, offset_t off, size_t len, int flags,
 		return (ufs_fault(vp, "ufs_putpage: bad v_count == 0"));
 	}
 
-	TRACE_1(TR_FAC_UFS, TR_UFS_PUTPAGE_START,
-		"ufs_putpage_start:vp %p", vp);
-
 	/*
 	 * XXX - Why should this check be made here?
 	 */
@@ -5147,8 +5020,6 @@ ufs_putpage(struct vnode *vp, offset_t off, size_t len, int flags,
 	err = ufs_putpages(vp, off, len, flags, cr);
 
 errout:
-	TRACE_2(TR_FAC_UFS, TR_UFS_PUTPAGE_END,
-		"ufs_putpage_end:vp %p error %d", vp, err);
 	return (err);
 }
 
@@ -5244,7 +5115,7 @@ ufs_putpages(
 		 * Search the entire vp list for pages >= off.
 		 */
 		err = pvn_vplist_dirty(vp, (u_offset_t)off, ufs_putapage,
-					flags, cr);
+		    flags, cr);
 	} else {
 		/*
 		 * Loop over all offsets in the range looking for
@@ -5264,11 +5135,11 @@ ufs_putpages(
 			 */
 			if ((flags & B_INVAL) || ((flags & B_ASYNC) == 0)) {
 				pp = page_lookup(vp, io_off,
-					(flags & (B_INVAL | B_FREE)) ?
-					    SE_EXCL : SE_SHARED);
+				    (flags & (B_INVAL | B_FREE)) ?
+				    SE_EXCL : SE_SHARED);
 			} else {
 				pp = page_lookup_nowait(vp, io_off,
-					(flags & B_FREE) ? SE_EXCL : SE_SHARED);
+				    (flags & B_FREE) ? SE_EXCL : SE_SHARED);
 			}
 
 			if (pp == NULL || pvn_getdirty(pp, flags) == 0)
@@ -5356,9 +5227,6 @@ ufs_putapage(
 	int contig;
 
 	ASSERT(RW_LOCK_HELD(&ip->i_contents));
-
-	TRACE_1(TR_FAC_UFS, TR_UFS_PUTAPAGE_START,
-		"ufs_putapage_start:vp %p", vp);
 
 	if (ufsvfsp == NULL) {
 		err = EIO;
@@ -5468,8 +5336,8 @@ ufs_putapage(
 	 * XXX - just a patch for i-mt3.
 	 */
 	if (io_len == 0) {
-		ASSERT(pp->p_offset >= (u_offset_t)(roundup(ip->i_size,
-							    PAGESIZE)));
+		ASSERT(pp->p_offset >=
+		    (u_offset_t)(roundup(ip->i_size, PAGESIZE)));
 		io_len = PAGESIZE;
 	}
 
@@ -5538,8 +5406,6 @@ out:
 	if (lenp)
 		*lenp = io_len;
 out_trace:
-	TRACE_2(TR_FAC_UFS, TR_UFS_PUTAPAGE_END,
-		"ufs_putapage_end:vp %p error %d", vp, err);
 	return (err);
 }
 
@@ -5559,9 +5425,6 @@ ufs_map(struct vnode *vp,
 	struct ufsvfs *ufsvfsp = VTOI(vp)->i_ufsvfs;
 	struct ulockfs *ulp;
 	int error;
-
-	TRACE_1(TR_FAC_UFS, TR_UFS_MAP_START,
-		"ufs_map_start:vp %p", vp);
 
 retry_map:
 	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_MAP_MASK);
@@ -5646,8 +5509,6 @@ unlock:
 		ufs_lockfs_end(ulp);
 	}
 out:
-	TRACE_2(TR_FAC_UFS, TR_UFS_MAP_END,
-		"ufs_map_end:vp %p error %d", vp, error);
 	return (error);
 }
 
@@ -5782,8 +5643,8 @@ ufs_l_pathconf(struct vnode *vp, int cmd, ulong_t *valp, struct cred *cr)
 	case _PC_XATTR_EXISTS:
 		if (vp->v_vfsp->vfs_flag & VFS_XATTR) {
 
-			error = ufs_xattr_getattrdir(vp, &sip, LOOKUP_XATTR,
-							cr);
+			error =
+			    ufs_xattr_getattrdir(vp, &sip, LOOKUP_XATTR, cr);
 			if (error ==  0 && sip != NULL) {
 				/* Start transaction */
 				if (ulp) {
@@ -5796,7 +5657,7 @@ ufs_l_pathconf(struct vnode *vp, int cmd, ulong_t *valp, struct cred *cr)
 				rw_enter(&sip->i_rwlock, RW_WRITER);
 				rw_enter(&sip->i_contents, RW_WRITER);
 				if (ufs_xattrdirempty(sip,
-						sip->i_number, CRED())) {
+				    sip->i_number, CRED())) {
 					rw_enter(&ip->i_contents, RW_WRITER);
 					ufs_unhook_shadow(ip, sip);
 					rw_exit(&ip->i_contents);
@@ -5959,7 +5820,7 @@ ufs_pageio(struct vnode *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 		ASSERT(cpp);
 		contig = 0;
 		if (err = bmap_read(ip, (u_offset_t)(io_off + done_len),
-				    &bn, &contig))
+		    &bn, &contig))
 			break;
 
 		if (bn == UFS_HOLE) {	/* No holey swapfiles */
@@ -6181,11 +6042,11 @@ ufs_dumpctl(vnode_t *vp, int action, int *blkp)
 		 * calculate and allocate space needed according to i_size
 		 */
 		entries = (int)lblkno(fs, blkroundup(fs, ip->i_size));
-		if ((dump_info = (struct dump *)
-		    kmem_alloc(sizeof (struct dump) +
-		    (entries - 1) * sizeof (daddr32_t), KM_NOSLEEP)) == NULL) {
-			    rw_exit(&ip->i_contents);
-			    return (ENOMEM);
+		dump_info = kmem_alloc(sizeof (struct dump) +
+		    (entries - 1) * sizeof (daddr32_t), KM_NOSLEEP);
+		if (dump_info == NULL) {
+			rw_exit(&ip->i_contents);
+			return (ENOMEM);
 		}
 
 		/* Start saving the info */
@@ -6202,8 +6063,7 @@ ufs_dumpctl(vnode_t *vp, int action, int *blkp)
 			int error = 0;
 
 			bp = UFS_BREAD(ufsvfsp,
-				ip->i_dev, fsbtodb(fs, ip->i_ib[i]),
-				fs->fs_bsize);
+			    ip->i_dev, fsbtodb(fs, ip->i_ib[i]), fs->fs_bsize);
 			if (bp->b_flags & B_ERROR)
 				error = EIO;
 			else {
@@ -6305,7 +6165,7 @@ save_dblks(struct inode *ip, struct ufsvfs *ufsvfsp,  daddr32_t *storeblk,
 		if (storeblk - dump_info->dblk >= entries)
 			break;
 		bp = UFS_BREAD(ufsvfsp,
-				ip->i_dev, fsbtodb(fs, dblk[i]), fs->fs_bsize);
+		    ip->i_dev, fsbtodb(fs, dblk[i]), fs->fs_bsize);
 		if (bp->b_flags & B_ERROR) {
 			brelse(bp);
 			return (NULL);
@@ -6331,9 +6191,6 @@ ufs_getsecattr(struct vnode *vp, vsecattr_t *vsap, int flag,
 	ulong_t		vsa_mask = vsap->vsa_mask;
 	int		err = EINVAL;
 
-	TRACE_3(TR_FAC_UFS, TR_UFS_GETSECATTR_START,
-	    "ufs_getsecattr_start:vp %p, vsap %p, flags %x", vp, vsap, flag);
-
 	vsa_mask &= (VSA_ACL | VSA_ACLCNT | VSA_DFACL | VSA_DFACLCNT);
 
 	/*
@@ -6352,8 +6209,6 @@ ufs_getsecattr(struct vnode *vp, vsecattr_t *vsap, int flag,
 		if (ulp)
 			ufs_lockfs_end(ulp);
 	}
-	TRACE_1(TR_FAC_UFS, TR_UFS_GETSECATTR_END,
-	    "ufs_getsecattr_end:vp %p", vp);
 	return (err);
 }
 
@@ -6370,10 +6225,6 @@ ufs_setsecattr(struct vnode *vp, vsecattr_t *vsap, int flag, struct cred *cr)
 	int		trans_size;
 	int		donetrans = 0;
 	int		retry = 1;
-
-
-	TRACE_3(TR_FAC_UFS, TR_UFS_SETSECATTR_START,
-	    "ufs_setsecattr_start:vp %p, vsap %p, flags %x", vp, vsap, flag);
 
 	ASSERT(RW_LOCK_HELD(&ip->i_rwlock));
 
@@ -6428,7 +6279,7 @@ again:
 
 	if (ulp) {
 		TRANS_BEGIN_ASYNC(ufsvfsp, TOP_SETSECATTR,
-			trans_size = TOP_SETSECATTR_SIZE(VTOI(vp)));
+		    trans_size = TOP_SETSECATTR_SIZE(VTOI(vp)));
 		donetrans = 1;
 	}
 
@@ -6492,7 +6343,5 @@ out:
 		rw_enter(&ip->i_rwlock, RW_READER);
 	}
 
-	TRACE_1(TR_FAC_UFS, TR_UFS_SETSECATTR_END,
-	    "ufs_setsecattr_end:vp %p", vp);
 	return (err);
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -224,12 +223,12 @@ ldl_strategy(ml_unit_t *ul, buf_t *pb)
 			 * the un_log mutex resulting in a deadlock.
 			 */
 			if (ufsvfsp->vfs_snapshot) {
-				(void) tsd_set(bypass_snapshot_throttle_key, \
-							(void *)1);
+				(void) tsd_set(bypass_snapshot_throttle_key,
+				    (void *)1);
 				fssnap_strategy(&ufsvfsp->vfs_snapshot, cb);
 
-				(void) tsd_set(bypass_snapshot_throttle_key, \
-							(void *)0);
+				(void) tsd_set(bypass_snapshot_throttle_key,
+				    (void *)0);
 			} else {
 				(void) bdev_strategy(cb);
 			}
@@ -929,7 +928,7 @@ ldl_round_commit(ml_unit_t *ul)
 	 */
 	/* LINTED */
 	st = (sect_trailer_t *)
-		((bp->b_un.b_addr + bcount) - sizeof (*st));
+	    ((bp->b_un.b_addr + bcount) - sizeof (*st));
 	st->st_tid = ul->un_logmap->mtm_tid;
 	st->st_ident = ul->un_tail_ident++;
 
@@ -987,7 +986,7 @@ ldl_has_space(ml_unit_t *ul, mapentry_t *me)
 
 	if (ul->un_head_lof <= ul->un_tail_lof)
 		nfb = (ul->un_head_lof - ul->un_bol_lof) +
-			(ul->un_eol_lof - ul->un_tail_lof);
+		    (ul->un_eol_lof - ul->un_tail_lof);
 	else
 		nfb = ul->un_head_lof - ul->un_tail_lof;
 
@@ -1181,7 +1180,7 @@ ldl_read(
 				return (EIO);
 			}
 			ASSERT(((me->me_flags & ME_ROLL) == 0) ||
-				(bp != ul->un_wrbuf.cb_dirty));
+			    (bp != ul->un_wrbuf.cb_dirty));
 			actual = fetchbuf(ul, bp, rva, rnb, &lof);
 			ASSERT(actual);
 			rva += actual;
@@ -1322,7 +1321,7 @@ ldl_sethead(ml_unit_t *ul, off_t data_lof, uint32_t tid)
 	ldl_savestate(ul);
 
 	ASSERT(((ul->un_logmap->mtm_debug & MT_SCAN) == 0) ||
-		ldl_sethead_debug(ul));
+	    ldl_sethead_debug(ul));
 }
 
 /*

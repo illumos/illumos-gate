@@ -53,7 +53,6 @@
 #include <sys/vmmeter.h>
 #include <sys/vmsystm.h>
 #include <sys/cmn_err.h>
-#include <sys/vtrace.h>
 #include <sys/acct.h>
 #include <sys/dnlc.h>
 #include <sys/swap.h>
@@ -539,14 +538,14 @@ ufs_thaw(struct vfs *vfsp, struct ufsvfs *ufsvfsp, struct ulockfs *ulp)
 			if (error)
 				goto errout;
 			error = ufs_scan_inodes(0, ufs_thaw_wlock,
-					(void *)ufsvfsp, ufsvfsp);
+			    (void *)ufsvfsp, ufsvfsp);
 			if (error)
 				goto errout;
 		}
 		if (ULOCKFS_IS_HLOCK(ulp) || ULOCKFS_IS_ELOCK(ulp)) {
 			error = 0;
 			(void) ufs_scan_inodes(0, ufs_thaw_hlock,
-					(void *)ufsvfsp, ufsvfsp);
+			    (void *)ufsvfsp, ufsvfsp);
 			(void) bfinval(ufsvfsp->vfs_dev, 1);
 		}
 	} else {
@@ -691,7 +690,7 @@ ufs_reconcile_fs(struct vfs *vfsp, struct ufsvfs *ufsvfsp, int errlck)
 		mfs->fs_reclaim &= ~FS_RECLAIM;
 		mfs->fs_reclaim |=  FS_RECLAIMING;
 		ufs_thread_start(&ufsvfsp->vfs_reclaim,
-			ufs_thread_reclaim, vfsp);
+		    ufs_thread_reclaim, vfsp);
 	}
 
 	/* XXX What to do about sparecon? */
@@ -768,7 +767,7 @@ ufs_reconcile_inode(struct inode *ip, void *arg)
 	 * get the dinode
 	 */
 	bp = UFS_BREAD(ip->i_ufsvfs,
-			ip->i_dev, (daddr_t)fsbtodb(fs, itod(fs, ip->i_number)),
+	    ip->i_dev, (daddr_t)fsbtodb(fs, itod(fs, ip->i_number)),
 	    (int)fs->fs_bsize);
 	if (bp->b_flags & B_ERROR) {
 		brelse(bp);
@@ -1047,8 +1046,8 @@ ufs__fiolfs(
 		int needs_sbwrite;
 
 		poll_events |= POLLERR;
-		errlck = LOCKFS_IS_ELOCK(&lfs) || LOCKFS_IS_ROELOCK(&lfs)?
-							RE_ERRLCK: SET_ERRLCK;
+		errlck = LOCKFS_IS_ELOCK(&lfs) || LOCKFS_IS_ROELOCK(&lfs) ?
+		    RE_ERRLCK : SET_ERRLCK;
 
 		needs_unlock = !MUTEX_HELD(&ufsvfsp->vfs_lock);
 		if (needs_unlock)
@@ -1142,7 +1141,7 @@ ufs__fiolfs(
 
 	/* don't allow error lock from user to invoke panic */
 	else if (from_user && errlck == SET_ERRLCK &&
-		!(ufsvfsp->vfs_fsfx.fx_flags & (UFSMNT_ONERROR_PANIC >> 4)))
+	    !(ufsvfsp->vfs_fsfx.fx_flags & (UFSMNT_ONERROR_PANIC >> 4)))
 		(void) ufs_fault(ufsvfsp->vfs_root,
 		    ulp->ul_lockfs.lf_comment && ulp->ul_lockfs.lf_comlen > 0 ?
 		    ulp->ul_lockfs.lf_comment: "user-applied error lock");
@@ -1277,7 +1276,7 @@ ufs_check_lockfs(struct ufsvfs *ufsvfsp, struct ulockfs *ulp, ulong_t mask)
 			sig = cv_wait_sig(&ulp->ul_cv, &ulp->ul_lock);
 			sigunintr(&smask);
 			if ((!sig && (ulp->ul_fs_lock & mask)) ||
-				ufsvfsp->vfs_dontblock)
+			    ufsvfsp->vfs_dontblock)
 				return (EINTR);
 		}
 	}

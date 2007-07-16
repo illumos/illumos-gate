@@ -156,12 +156,12 @@ alloc(struct inode *ip, daddr_t bpref, int size, daddr_t *bnp, cred_t *cr)
 	 * size is guaranteed to be >= zero by our caller.
 	 */
 	(void) chkdq(ip, -(long)btodb(size), 0, cr, (char **)NULL,
-		(size_t *)NULL);
+	    (size_t *)NULL);
 
 nospace:
 	mutex_enter(&ufsvfsp->vfs_lock);
 	if ((lbolt - ufsvfsp->vfs_lastwhinetime) > (hz << 2) &&
-		(!(TRANS_ISTRANS(ufsvfsp)) || !(ip->i_flag & IQUIET))) {
+	    (!(TRANS_ISTRANS(ufsvfsp)) || !(ip->i_flag & IQUIET))) {
 		ufsvfsp->vfs_lastwhinetime = lbolt;
 		cmn_err(CE_NOTE, "alloc: %s: file system full", fs->fs_fsmnt);
 	}
@@ -242,7 +242,7 @@ realloccg(struct inode *ip, daddr_t bprev, daddr_t bpref, int osize,
 	 */
 	request = (fs->fs_optim == FS_OPTTIME) ? fs->fs_bsize : nsize;
 	bno = (daddr_t)hashalloc(ip, cg, (long)bpref, request,
-		(ulong_t (*)())alloccg);
+	    (ulong_t (*)())alloccg);
 	if (bno > 0) {
 		*bnp = bno;
 		if (nsize < request)
@@ -258,15 +258,15 @@ realloccg(struct inode *ip, daddr_t bprev, daddr_t bpref, int osize,
 	 * our caller guarantees nsize >= osize.
 	 */
 	(void) chkdq(ip, -(long)btodb(nsize - osize), 0, cr, (char **)NULL,
-		(size_t *)NULL);
+	    (size_t *)NULL);
 
 nospace:
 	mutex_enter(&ufsvfsp->vfs_lock);
 	if ((lbolt - ufsvfsp->vfs_lastwhinetime) > (hz << 2) &&
-		(!(TRANS_ISTRANS(ufsvfsp)) || !(ip->i_flag & IQUIET))) {
+	    (!(TRANS_ISTRANS(ufsvfsp)) || !(ip->i_flag & IQUIET))) {
 		ufsvfsp->vfs_lastwhinetime = lbolt;
 		cmn_err(CE_NOTE,
-			"realloccg %s: file system full", fs->fs_fsmnt);
+		    "realloccg %s: file system full", fs->fs_fsmnt);
 	}
 	mutex_exit(&ufsvfsp->vfs_lock);
 	return (ENOSPC);
@@ -314,8 +314,8 @@ loop:
 	 */
 	if ((mode != IFSHAD) && (mode != IFATTRDIR)) {
 		err = chkiq((struct ufsvfs *)ITOV(pip)->v_vfsp->vfs_data,
-			/* change */ 1, (struct inode *)NULL, crgetuid(cr), 0,
-			cr, &errmsg, &len);
+		    /* change */ 1, (struct inode *)NULL, crgetuid(cr), 0,
+		    cr, &errmsg, &len);
 		/*
 		 * As we haven't acquired any locks yet, dump the message
 		 * now.
@@ -344,8 +344,8 @@ loop:
 			 * the quota subsystem is already messed up.
 			 */
 			(void) chkiq(ufsvfsp, /* change */ -1,
-				(struct inode *)NULL, crgetuid(cr), 0, cr,
-				(char **)NULL, (size_t *)NULL);
+			    (struct inode *)NULL, crgetuid(cr), 0, cr,
+			    (char **)NULL, (size_t *)NULL);
 		}
 		goto noinodes;
 	}
@@ -357,8 +357,8 @@ loop:
 			 * error return here.
 			 */
 			(void) chkiq(ufsvfsp, /* change */ -1,
-				(struct inode *)NULL, crgetuid(cr), 0, cr,
-				(char **)NULL, (size_t *)NULL);
+			    (struct inode *)NULL, crgetuid(cr), 0, cr,
+			    (char **)NULL, (size_t *)NULL);
 		}
 		ufs_ifree(pip, ino, 0);
 		return (err);
@@ -378,9 +378,9 @@ loop:
 		rw_exit(&ip->i_contents);
 		VN_RELE(ITOV(ip));
 		cmn_err(CE_WARN,
-			"%s: unexpected allocated inode %d, run fsck(1M)%s",
-			fs->fs_fsmnt, (int)ino,
-			(TRANS_ISTRANS(ufsvfsp) ? " -o f" : ""));
+		    "%s: unexpected allocated inode %d, run fsck(1M)%s",
+		    fs->fs_fsmnt, (int)ino,
+		    (TRANS_ISTRANS(ufsvfsp) ? " -o f" : ""));
 		goto loop;
 	}
 
@@ -926,7 +926,7 @@ fragextend(struct inode *ip, int cg, long bprev, int osize, int nsize)
 			return (NULL);
 		}
 		if ((TRANS_ISCANCEL(ufsvfsp, ldbtob(fsbtodb(fs, bprev + i)),
-			fs->fs_fsize))) {
+		    fs->fs_fsize))) {
 			mutex_exit(&ufsvfsp->vfs_lock);
 			brelse(bp);
 			return (NULL);
@@ -1288,7 +1288,7 @@ ialloccg(struct inode *ip, int cg, daddr_t ipref, int mode)
 	if (fs->fs_cs(fs, cg).cs_nifree == 0)
 		return (0);
 	bp = UFS_BREAD(ufsvfsp, ip->i_dev, (daddr_t)fsbtodb(fs, cgtod(fs, cg)),
-		    (int)fs->fs_cgsize);
+	    (int)fs->fs_cgsize);
 
 	cgp = bp->b_un.b_cg;
 	if (bp->b_flags & B_ERROR || !cg_chkmagic(cgp) ||
@@ -1341,7 +1341,7 @@ ialloccg(struct inode *ip, int cg, daddr_t ipref, int mode)
 
 	mutex_exit(&ufsvfsp->vfs_lock);
 	(void) ufs_fault(ITOV(ip), "ialloccg: block not in mapfs = %s",
-							    fs->fs_fsmnt);
+	    fs->fs_fsmnt);
 	return (0);
 gotit:
 	setbit(iused, ipref);
@@ -1404,8 +1404,8 @@ mapsearch(struct ufsvfs *ufsvfsp, struct cg *cgp, daddr_t bpref,
 		 * search the array for a match
 		 */
 		loc = scanc((unsigned)len, (uchar_t *)&cg_blksfree(cgp)[first],
-			(uchar_t *)fragtbl[fs->fs_frag],
-			(int)(1 << (allocsiz - 1 + (fs->fs_frag % NBBY))));
+		    (uchar_t *)fragtbl[fs->fs_frag],
+		    (int)(1 << (allocsiz - 1 + (fs->fs_frag % NBBY))));
 		/*
 		 * match found
 		 */
@@ -1753,7 +1753,7 @@ exit:
 	 * is not already set.
 	 */
 	if ((ip->i_size > MAXOFF32_T) &&
-		!(fs->fs_flags & FSLARGEFILES)) {
+	    !(fs->fs_flags & FSLARGEFILES)) {
 		ASSERT(ufsvfsp->vfs_lfflags & UFS_LARGEFILES);
 		mutex_enter(&ufsvfsp->vfs_lock);
 		fs->fs_flags |= FSLARGEFILES;

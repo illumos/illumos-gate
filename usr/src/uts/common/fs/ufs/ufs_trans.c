@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -223,8 +222,8 @@ ufs_trans_push_si(ufsvfs_t *ufsvfsp, delta_t dtyp, int ignore)
 	fs = ufsvfsp->vfs_fs;
 	mutex_enter(&ufsvfsp->vfs_lock);
 	TRANS_LOG(ufsvfsp, (char *)fs->fs_u.fs_csp,
-		ldbtob(fsbtodb(fs, fs->fs_csaddr)), fs->fs_cssize,
-		(caddr_t)fs->fs_u.fs_csp, fs->fs_cssize);
+	    ldbtob(fsbtodb(fs, fs->fs_csaddr)), fs->fs_cssize,
+	    (caddr_t)fs->fs_u.fs_csp, fs->fs_cssize);
 	mutex_exit(&ufsvfsp->vfs_lock);
 	return (0);
 }
@@ -363,7 +362,7 @@ void
 ufs_trans_mata_si(struct ufsvfs *ufsvfsp, struct fs *fs)
 {
 	TRANS_MATAADD(ufsvfsp, ldbtob(fsbtodb(fs, fs->fs_csaddr)),
-			fs->fs_cssize);
+	    fs->fs_cssize);
 }
 
 /*
@@ -772,7 +771,7 @@ ufs_trans_trunc_resv(
 	resid = size;
 	nchunks = 1;
 	for (; (resv = ufs_log_amt(ip, offset, resid, 1)) > ufs_trans_max_resv;
-		offset = length + (nchunks - 1) * resid) {
+	    offset = length + (nchunks - 1) * resid) {
 		nchunks++;
 		resid = size / nchunks;
 	}
@@ -954,7 +953,7 @@ ufs_trans_write_resv(
 	resid = uio->uio_resid;
 	nchunks = 1;
 	for (; (resv = ufs_log_amt(ip, offset, resid, 0)) > ufs_trans_max_resv;
-		offset = uio->uio_offset + (nchunks - 1) * resid) {
+	    offset = uio->uio_offset + (nchunks - 1) * resid) {
 		nchunks++;
 		resid = uio->uio_resid / nchunks;
 	}

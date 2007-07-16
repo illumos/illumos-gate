@@ -21,7 +21,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -137,7 +137,7 @@ map_put(mt_map_t *mtm)
 	map_free_entries(mtm);
 	ASSERT(map_put_debug(mtm));
 	kmem_free(mtm->mtm_hash,
-		(size_t) (sizeof (mapentry_t *) * mtm->mtm_nhash));
+	    (size_t) (sizeof (mapentry_t *) * mtm->mtm_nhash));
 	mutex_destroy(&mtm->mtm_mutex);
 	mutex_destroy(&mtm->mtm_scan_mutex);
 	cv_destroy(&mtm->mtm_to_roll_cv);
@@ -229,7 +229,7 @@ deltamap_add(
 	mapentry_t	**mep;
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 
 	mutex_enter(&mtm->mtm_mutex);
 
@@ -250,20 +250,20 @@ deltamap_add(
 		mep = MAP_HASH(mof, mtm);
 		for (me = *mep; me; me = me->me_hash) {
 			if (DATAwithinME(mof, hnb, me)) {
-			    if (me->me_func == ufs_trans_push_quota) {
 				/*
 				 * Don't remove quota entries which have
 				 * incremented the ref count (those with a
 				 * ufs_trans_push_quota push function).
 				 * Let logmap_add[_buf] clean them up.
 				 */
-				continue;
-			    }
-			    break;
+				if (me->me_func == ufs_trans_push_quota) {
+					continue;
+				}
+				break;
 			}
 			ASSERT((dtyp == DT_CANCEL) ||
-				(!DATAoverlapME(mof, hnb, me)) ||
-				MEwithinDATA(me, mof, hnb));
+			    (!DATAoverlapME(mof, hnb, me)) ||
+			    MEwithinDATA(me, mof, hnb));
 		}
 
 		if (me) {
@@ -328,7 +328,7 @@ deltamap_add(
 	mutex_exit(&mtm->mtm_mutex);
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 }
 
 /*
@@ -346,7 +346,7 @@ deltamap_remove(mt_map_t *mtm, offset_t mof, off_t nb)
 		return (NULL);
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 
 	mutex_enter(&mtm->mtm_mutex);
 	for (mer = NULL, hnb = 0; nb; nb -= hnb, mof += hnb) {
@@ -374,7 +374,7 @@ deltamap_remove(mt_map_t *mtm, offset_t mof, off_t nb)
 	mutex_exit(&mtm->mtm_mutex);
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 
 	return (mer);
 }
@@ -414,7 +414,7 @@ deltamap_push(ml_unit_t *ul)
 	mt_map_t	*mtm	= ul->un_deltamap;
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 
 	/*
 	 * for every entry in the deltamap
@@ -432,7 +432,7 @@ deltamap_push(ml_unit_t *ul)
 	}
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 }
 
 /*
@@ -443,7 +443,7 @@ int
 logmap_need_commit(mt_map_t *mtm)
 {
 	return ((mtm->mtm_nmet > logmap_maxnme_commit) ||
-		(mtm->mtm_cfrags >= mtm->mtm_cfragmax));
+	    (mtm->mtm_cfrags >= mtm->mtm_cfragmax));
 }
 
 int
@@ -547,7 +547,7 @@ logmap_remove_roll(mt_map_t *mtm, offset_t mof, off_t nb)
 	off_t		savnb	= nb;
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 
 again:
 	if (dolock)
@@ -593,7 +593,7 @@ again:
 	mutex_exit(&mtm->mtm_mutex);
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 
 	if (dolock)
 		rw_exit(&mtm->mtm_rwlock);
@@ -611,7 +611,7 @@ logmap_next_roll(mt_map_t *logmap, offset_t *mofp)
 	mapentry_t *me;
 
 	ASSERT(((logmap->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(logmap));
+	    map_check_linkage(logmap));
 
 	mutex_enter(&logmap->mtm_mutex);
 	for (me = logmap->mtm_next; me != (mapentry_t *)logmap;
@@ -691,7 +691,7 @@ logmap_list_get(
 again:
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 
 	rw_enter(&mtm->mtm_rwlock, rwtype);
 	*age = NULL;
@@ -763,7 +763,7 @@ logmap_list_get_roll(mt_map_t *logmap, offset_t mof, rollbuf_t *rbp)
 
 	ASSERT(RW_LOCK_HELD(&logmap->mtm_rwlock));
 	ASSERT(((logmap->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(logmap));
+	    map_check_linkage(logmap));
 	ASSERT((mof & MAPBLOCKOFF) == 0);
 
 	rbp->rb_crb = NULL;
@@ -830,7 +830,7 @@ out:
 	mutex_exit(&logmap->mtm_mutex);
 
 	ASSERT(((logmap->mtm_debug & MT_SCAN) == 0) ||
-		logmap_logscan_debug(logmap, age));
+	    logmap_logscan_debug(logmap, age));
 	ASSERT(RW_LOCK_HELD(&logmap->mtm_rwlock));
 	return (0); /* success */
 }
@@ -999,12 +999,11 @@ static void
 logmap_abort(ml_unit_t *ul, uint32_t tid)
 {
 	struct mt_map	*mtm = ul->un_logmap;	/* Log map */
-	mapentry_t	*me,
-			**mep;
+	mapentry_t	*me, **mep;
 	int		i;
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 
 	/*
 	 * wait for any outstanding reads to finish; lock out future reads
@@ -1033,7 +1032,7 @@ logmap_abort(ml_unit_t *ul, uint32_t tid)
 		mep = &mtm->mtm_hash[i];
 		while ((me = *mep) != NULL) {
 			if (me->me_tid == tid ||
-				me->me_tid == mtm->mtm_committid) {
+			    me->me_tid == mtm->mtm_committid) {
 				*mep = me->me_hash;
 				me->me_next->me_prev = me->me_prev;
 				me->me_prev->me_next = me->me_next;
@@ -1056,7 +1055,7 @@ logmap_abort(ml_unit_t *ul, uint32_t tid)
 	rw_exit(&mtm->mtm_rwlock);
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 }
 
 static void
@@ -1100,7 +1099,7 @@ logmap_add(
 		logmap_wait_space(mtm, ul, melist);
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 
 	mtm->mtm_ref = 1;
 	mtm->mtm_dirty++;
@@ -1171,8 +1170,8 @@ logmap_add(
 			continue;
 		}
 		ASSERT((va == NULL) ||
-			((mtm->mtm_debug & MT_LOG_WRITE_CHECK) == 0) ||
-			map_check_ldl_write(ul, va, vamof, me));
+		    ((mtm->mtm_debug & MT_LOG_WRITE_CHECK) == 0) ||
+		    map_check_ldl_write(ul, va, vamof, me));
 
 		/*
 		 * put on hash
@@ -1193,7 +1192,7 @@ logmap_add(
 	}
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 	mutex_exit(&ul->un_log_mutex);
 }
 
@@ -1229,7 +1228,7 @@ logmap_add_buf(
 	logmap_wait_space(mtm, ul, melist);
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 
 	mtm->mtm_ref = 1;
 	mtm->mtm_dirty++;
@@ -1375,7 +1374,7 @@ logmap_add_buf(
 			continue;
 		}
 		ASSERT(((mtm->mtm_debug & MT_LOG_WRITE_CHECK) == 0) ||
-			map_check_ldl_write(ul, va, vamof, me));
+		    map_check_ldl_write(ul, va, vamof, me));
 
 		/*
 		 * put on hash
@@ -1396,7 +1395,7 @@ logmap_add_buf(
 	}
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 	mutex_exit(&ul->un_log_mutex);
 }
 
@@ -1411,7 +1410,7 @@ logmap_free_cancel(mt_map_t *mtm, mapentry_t **cancelhead)
 	mapentry_t	**mep;
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 
 again:
 	if (dolock)
@@ -1483,7 +1482,7 @@ again:
 		rw_exit(&mtm->mtm_rwlock);
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 }
 
 
@@ -1597,7 +1596,7 @@ logmap_roll_dev(ml_unit_t *ul)
 
 again:
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 	if (ul->un_flags & (LDL_ERROR|LDL_NOROLL))
 		return;
 
@@ -1632,7 +1631,7 @@ again:
 	(void) ufs_putsummaryinfo(ul->un_dev, ufsvfsp, ufsvfsp->vfs_fs);
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 }
 
 static void
@@ -1708,8 +1707,8 @@ logmap_cancel_delta(ml_unit_t *ul, offset_t mof, int32_t nb, int metadata)
 	if (!(metadata)) {
 		frags = blkoff(ul->un_ufsvfs->vfs_fs, nb);
 		if (frags)
-			mtm->mtm_cfrags += numfrags(ul->un_ufsvfs->vfs_fs,
-				frags);
+			mtm->mtm_cfrags +=
+			    numfrags(ul->un_ufsvfs->vfs_fs, frags);
 	}
 	mutex_exit(&mtm->mtm_mutex);
 
@@ -1729,7 +1728,7 @@ logmap_cancel(ml_unit_t *ul, offset_t mof, off_t nb, int metadata)
 	crb_t		*crb;
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 
 	for (hnb = 0; nb; nb -= hnb, mof += hnb) {
 		hnb = MAPBLOCKSIZE - (mof & MAPBLOCKOFF);
@@ -1770,7 +1769,7 @@ logmap_cancel(ml_unit_t *ul, offset_t mof, off_t nb, int metadata)
 	}
 
 	ASSERT(((mtm->mtm_debug & MT_CHECK_MAP) == 0) ||
-		map_check_linkage(mtm));
+	    map_check_linkage(mtm));
 }
 
 /*
@@ -1857,7 +1856,7 @@ logmap_logscan_add(ml_unit_t *ul, struct delta *dp, off_t lof, size_t *nbp)
 			mtm->mtm_tid++;
 			mtm->mtm_committid = mtm->mtm_tid;
 			ASSERT(((mtm->mtm_debug & MT_SCAN) == 0) ||
-				logmap_logscan_commit_debug(lof, mtm));
+			    logmap_logscan_commit_debug(lof, mtm));
 		}
 		/*
 		 * return #bytes to next sector (next delta header)
@@ -1889,7 +1888,7 @@ logmap_logscan_add(ml_unit_t *ul, struct delta *dp, off_t lof, size_t *nbp)
 		break;
 	default:
 		ASSERT(((mtm->mtm_debug & MT_SCAN) == 0) ||
-			logmap_logscan_add_debug(dp, mtm));
+		    logmap_logscan_add_debug(dp, mtm));
 		break;
 	}
 

@@ -484,7 +484,7 @@ ufs_mountroot(struct vfs *vfsp, enum whymountroot why)
 
 		vp = ((struct ufsvfs *)vfsp->vfs_data)->vfs_devvp;
 		(void) VOP_CLOSE(vp, FREAD|FWRITE, 1,
-			(offset_t)0, CRED());
+		    (offset_t)0, CRED());
 		return (0);
 	}
 	error = vfs_lock(vfsp);
@@ -499,7 +499,7 @@ ufs_mountroot(struct vfs *vfsp, enum whymountroot why)
 		error = VOP_OPEN(&devvp, FREAD|FWRITE, CRED());
 		if (error == 0) {
 			(void) VOP_CLOSE(devvp, FREAD|FWRITE, 1,
-				(offset_t)0, CRED());
+			    (offset_t)0, CRED());
 		} else {
 			doclkset = 0;
 		}
@@ -610,7 +610,7 @@ remountfs(struct vfs *vfsp, dev_t dev, void *raw_argsp, int args_len)
 #define	BOOT_TIME_LIMIT	(180*hz)
 	if (!(flags & UFSMNT_ONERROR_FLGMASK) && lbolt < BOOT_TIME_LIMIT) {
 		cmn_err(CE_WARN, "%s is required to be mounted onerror=%s",
-			ufsvfsp->vfs_fs->fs_fsmnt, UFSMNT_ONERROR_PANIC_STR);
+		    ufsvfsp->vfs_fs->fs_fsmnt, UFSMNT_ONERROR_PANIC_STR);
 		flags |= UFSMNT_ONERROR_PANIC;
 	}
 
@@ -633,11 +633,11 @@ remountfs(struct vfs *vfsp, dev_t dev, void *raw_argsp, int args_len)
 	if (((fspt->fs_magic != FS_MAGIC) &&
 	    (fspt->fs_magic != MTB_UFS_MAGIC)) ||
 	    (fspt->fs_magic == FS_MAGIC &&
-		(fspt->fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
-		fspt->fs_version != UFS_VERSION_MIN)) ||
+	    (fspt->fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
+	    fspt->fs_version != UFS_VERSION_MIN)) ||
 	    (fspt->fs_magic == MTB_UFS_MAGIC &&
-		(fspt->fs_version > MTB_UFS_VERSION_1 ||
-		fspt->fs_version < MTB_UFS_VERSION_MIN)) ||
+	    (fspt->fs_version > MTB_UFS_VERSION_1 ||
+	    fspt->fs_version < MTB_UFS_VERSION_MIN)) ||
 	    fspt->fs_bsize > MAXBSIZE || fspt->fs_frag > MAXFRAG ||
 	    fspt->fs_bsize < sizeof (struct fs) || fspt->fs_bsize < PAGESIZE) {
 		tpt->b_flags |= B_STALE | B_AGE;
@@ -725,7 +725,7 @@ remountfs(struct vfs *vfsp, dev_t dev, void *raw_argsp, int args_len)
 			fsp->fs_reclaim &= ~FS_RECLAIM;
 			fsp->fs_reclaim |=  FS_RECLAIMING;
 			ufs_thread_start(&ufsvfsp->vfs_reclaim,
-				ufs_thread_reclaim, vfsp);
+			    ufs_thread_reclaim, vfsp);
 		}
 	}
 
@@ -913,8 +913,8 @@ mountfs(struct vfs *vfsp, enum whymountroot why, struct vnode *devvp,
 	ufsvfsp->vfs_bufp = tp;
 
 	ufsvfsp->vfs_dirsize = INODESIZE + (4 * ALLOCSIZE) + fsp->fs_fsize;
-	ufsvfsp->vfs_minfrags = (int)((int64_t)fsp->fs_dsize *
-							fsp->fs_minfree / 100);
+	ufsvfsp->vfs_minfrags =
+	    (int)((int64_t)fsp->fs_dsize * fsp->fs_minfree / 100);
 	/*
 	 * if mount allows largefiles, indicate so in ufsvfs
 	 */
@@ -942,8 +942,7 @@ mountfs(struct vfs *vfsp, enum whymountroot why, struct vnode *devvp,
 			 */
 			if (!(vfsp->vfs_flag & VFS_RDONLY)) {
 				cmn_err(CE_WARN, "Error accessing ufs "
-					"log for %s; Please run fsck(1M)",
-					path);
+				    "log for %s; Please run fsck(1M)", path);
 				goto out;
 			}
 		}
@@ -1021,7 +1020,7 @@ mountfs(struct vfs *vfsp, enum whymountroot why, struct vnode *devvp,
 
 		if ((TRANS_ISERROR(ufsvfsp)) ||
 		    (((fsp->fs_state + fsp->fs_time) == FSOKAY) &&
-			fsp->fs_clean == FSLOG && !TRANS_ISTRANS(ufsvfsp))) {
+		    fsp->fs_clean == FSLOG && !TRANS_ISTRANS(ufsvfsp))) {
 			ufsvfsp->vfs_log = NULL;
 			ufsvfsp->vfs_domatamap = 0;
 			error = ENOSPC;
@@ -1030,8 +1029,8 @@ mountfs(struct vfs *vfsp, enum whymountroot why, struct vnode *devvp,
 
 		if (((fsp->fs_state + fsp->fs_time) == FSOKAY) &&
 		    (fsp->fs_clean == FSCLEAN ||
-			fsp->fs_clean == FSSTABLE ||
-			fsp->fs_clean == FSLOG))
+		    fsp->fs_clean == FSSTABLE ||
+		    fsp->fs_clean == FSLOG))
 			fsp->fs_clean = FSSTABLE;
 		else {
 			if (isroot) {
@@ -1185,7 +1184,7 @@ mountfs(struct vfs *vfsp, enum whymountroot why, struct vnode *devvp,
 		 * read only.
 		 */
 		if (!fsp->fs_ronly && (fsp->fs_reclaim &
-			(FS_RECLAIM|FS_RECLAIMING))) {
+		    (FS_RECLAIM|FS_RECLAIMING))) {
 			fsp->fs_reclaim &= ~FS_RECLAIM;
 			fsp->fs_reclaim |=  FS_RECLAIMING;
 			ufs_thread_start(&ufsvfsp->vfs_reclaim,
@@ -1282,8 +1281,8 @@ out:
 			rip->i_flag |= ISTALE;
 			mutex_exit(&rip->i_tlock);
 			cmn_err(CE_WARN,
-		"Timed out while cleaning up after failed mount of %s",
-				path);
+			    "Timed out while cleaning up after "
+			    "failed mount of %s", path);
 		} else {
 
 			/*
@@ -1473,8 +1472,8 @@ ufs_unmount(struct vfs *vfsp, int fflag, struct cred *cr)
 		for (i = 0, ih = ihead; i < inohsz; i++, ih++) {
 			mutex_enter(&ih_lock[i]);
 			for (ip = ih->ih_chain[0];
-					ip != (struct inode *)ih;
-					ip = ip->i_forw) {
+			    ip != (struct inode *)ih;
+			    ip = ip->i_forw) {
 				if (ip->i_ufsvfs != ufsvfsp)
 					continue;
 				if (ip == ufsvfsp->vfs_qinod)
@@ -1524,8 +1523,8 @@ ufs_unmount(struct vfs *vfsp, int fflag, struct cred *cr)
 	for (i = 0, ih = ihead; i < inohsz; i++, ih++) {
 		mutex_enter(&ih_lock[i]);
 		for (inext = 0, ip = ih->ih_chain[0];
-				ip != (struct inode *)ih;
-				ip = inext) {
+		    ip != (struct inode *)ih;
+		    ip = inext) {
 			inext = ip->i_forw;
 			if (ip->i_ufsvfs != ufsvfsp)
 				continue;
@@ -1690,7 +1689,7 @@ out:
 		ufs_thread_continue(&ufsvfsp->vfs_delete);
 		/* restart the reclaim thread */
 		ufs_thread_start(&ufsvfsp->vfs_reclaim, ufs_thread_reclaim,
-				vfsp);
+		    vfsp);
 		/* coordinate with global hlock thread */
 		ufsvfsp->vfs_validfs = UT_MOUNTED;
 		/* check for trans errors during umount */
@@ -1878,8 +1877,7 @@ ufs_sync(struct vfs *vfsp, short flag, struct cred *cr)
 			mutex_exit(&ufsvfsp->vfs_lock);
 			vfs_unlock(vfsp);
 			return (ufs_fault(ufsvfsp->vfs_root,
-					    "fs = %s update: ro fs mod\n",
-					    fs->fs_fsmnt));
+			    "fs = %s update: ro fs mod\n", fs->fs_fsmnt));
 		}
 		fs->fs_fmod = 0;
 		mutex_exit(&ufsvfsp->vfs_lock);
@@ -1952,8 +1950,8 @@ sbupdate(struct vfs *vfsp)
 		if (i + fs->fs_frag > blks)
 			size = (blks - i) * fs->fs_fsize;
 		bp = UFS_GETBLK(ufsvfsp, ufsvfsp->vfs_dev,
-			(daddr_t)(fsbtodb(fs, fs->fs_csaddr + i)),
-			fs->fs_bsize);
+		    (daddr_t)(fsbtodb(fs, fs->fs_csaddr + i)),
+		    fs->fs_bsize);
 		bcopy(space, bp->b_un.b_addr, size);
 		space += size;
 		bp->b_bcount = size;
@@ -2148,8 +2146,8 @@ ufs_remountroot(struct vfs *vfsp)
 	for (i = 0, ih = ihead; i < inohsz; i++, ih++) {
 		mutex_enter(&ih_lock[i]);
 		for (ip = ih->ih_chain[0];
-				ip != (struct inode *)ih;
-				ip = ip->i_forw) {
+		    ip != (struct inode *)ih;
+		    ip = ip->i_forw) {
 			if (ip->i_ufsvfs != ufsvfsp)
 				continue;
 			if (ip == ufsvfsp->vfs_qinod)
@@ -2219,20 +2217,20 @@ ufs_remountroot(struct vfs *vfsp)
 		 * Start the reclaim thread if needed.
 		 */
 		if (!fsp->fs_ronly && (fsp->fs_reclaim &
-			(FS_RECLAIM|FS_RECLAIMING))) {
+		    (FS_RECLAIM|FS_RECLAIMING))) {
 			fsp->fs_reclaim &= ~FS_RECLAIM;
 			fsp->fs_reclaim |= FS_RECLAIMING;
 			ufs_thread_start(&ufsvfsp->vfs_reclaim,
-				ufs_thread_reclaim, vfsp);
+			    ufs_thread_reclaim, vfsp);
 			TRANS_SBWRITE(ufsvfsp, TOP_SBUPDATE_UPDATE);
 			if (sberror = geterror(ufsvfsp->vfs_bufp)) {
 				refstr_t	*mntpt;
 				mntpt = vfs_getmntpoint(vfsp);
 				cmn_err(CE_WARN,
-					"Remountroot failed to update Reclaim"
-					"state for filesystem %s "
-					"Error writing SuperBlock %d",
-					refstr_value(mntpt), error);
+				    "Remountroot failed to update Reclaim"
+				    "state for filesystem %s "
+				    "Error writing SuperBlock %d",
+				    refstr_value(mntpt), error);
 				refstr_rele(mntpt);
 			}
 		}

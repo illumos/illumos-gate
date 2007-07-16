@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +53,6 @@
 #include <sys/vmmeter.h>
 #include <sys/vmsystm.h>
 #include <sys/cmn_err.h>
-#include <sys/vtrace.h>
 #include <sys/filio.h>
 #include <sys/dnlc.h>
 
@@ -459,29 +457,28 @@ ufs_fioffs(
 			ul->un_flags &= ~LDL_NOROLL;
 			logmap_start_roll(ul);
 			if (!fsp->fs_ronly && (fsp->fs_reclaim &
-				(FS_RECLAIM|FS_RECLAIMING))) {
+			    (FS_RECLAIM|FS_RECLAIMING))) {
 				fsp->fs_reclaim &= ~FS_RECLAIM;
 				fsp->fs_reclaim |= FS_RECLAIMING;
 				ufs_thread_start(&ufsvfsp->vfs_reclaim,
-					ufs_thread_reclaim,
-					vp->v_vfsp);
+				    ufs_thread_reclaim, vp->v_vfsp);
 				if (!fsp->fs_ronly) {
 					TRANS_SBWRITE(ufsvfsp,
-						TOP_SBUPDATE_UPDATE);
+					    TOP_SBUPDATE_UPDATE);
 					if (err =
 					    geterror(ufsvfsp->vfs_bufp)) {
 						refstr_t	*mntpt;
 						mntpt = vfs_getmntpoint(
-							vp->v_vfsp);
+						    vp->v_vfsp);
 						cmn_err(CE_NOTE,
-							"Filesystem Flush "
-							"Failed to update "
-							"Reclaim Status for "
-							" %s, Write failed to "
-							"update superblock, "
-							"error %d",
-							refstr_value(mntpt),
-							err);
+						    "Filesystem Flush "
+						    "Failed to update "
+						    "Reclaim Status for "
+						    " %s, Write failed to "
+						    "update superblock, "
+						    "error %d",
+						    refstr_value(mntpt),
+						    err);
 						refstr_rele(mntpt);
 					}
 				}
@@ -618,7 +615,7 @@ ufs_fiotune(struct vnode *vp, struct fiotune *uftp, struct cred *cr)
 	 * Adjust minfrags from minfree
 	 */
 	ufsvfsp->vfs_minfrags = (int)((int64_t)fs->fs_dsize *
-							fs->fs_minfree / 100);
+	    fs->fs_minfree / 100);
 
 	/*
 	 * Write the superblock

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -285,7 +284,7 @@ lufs_snarf(ufsvfs_t *ufsvfsp, struct fs *fs, int ronly)
 	}
 	ebp = (void *)bp->b_un.b_addr;
 	if (!checksum(&ebp->chksum, (int32_t *)bp->b_un.b_addr,
-		fs->fs_bsize)) {
+	    fs->fs_bsize)) {
 		brelse(bp);
 		return (ENODEV);
 	}
@@ -307,7 +306,7 @@ lufs_snarf(ufsvfs_t *ufsvfsp, struct fs *fs, int ronly)
 	 * can require more than a 32-bit field.
 	 */
 	nb = (size_t)(sizeof (ic_extent_block_t) +
-			((ebp->nextents - 1) * sizeof (ic_extent_t)));
+	    ((ebp->nextents - 1) * sizeof (ic_extent_t)));
 	nebp = kmem_alloc(nb, KM_SLEEP);
 	nebp->ic_nextents = ebp->nextents;
 	nebp->ic_nbytes = ebp->nbytes;
@@ -1076,7 +1075,7 @@ recheck:
 		fs->fs_reclaim &= ~FS_RECLAIM;
 		fs->fs_reclaim |=  FS_RECLAIMING;
 		ufs_thread_start(&ufsvfsp->vfs_reclaim,
-					ufs_thread_reclaim, vfsp);
+		    ufs_thread_reclaim, vfsp);
 	} else
 		fs->fs_reclaim |= reclaim;
 
@@ -1225,8 +1224,8 @@ lufs_write_strategy(ml_unit_t *ul, buf_t *bp)
 		va = bp_mapin_common(bp, VM_SLEEP);
 
 		ASSERT(((ul->un_debug & MT_WRITE_CHECK) == 0) ||
-			(ul->un_matamap == NULL)||
-			matamap_within(ul->un_matamap, mof, nb));
+		    (ul->un_matamap == NULL)||
+		    matamap_within(ul->un_matamap, mof, nb));
 
 		/*
 		 * move to logmap
@@ -1256,8 +1255,8 @@ lufs_write_strategy(ml_unit_t *ul, buf_t *bp)
 	 * Check that we are not updating metadata, or if so then via B_PHYS.
 	 */
 	ASSERT((ul->un_matamap == NULL) ||
-		!(matamap_overlap(ul->un_matamap, mof, nb) &&
-		((bp->b_flags & B_PHYS) == 0)));
+	    !(matamap_overlap(ul->un_matamap, mof, nb) &&
+	    ((bp->b_flags & B_PHYS) == 0)));
 
 	ul->un_ufsvfs->vfs_iotstamp = lbolt;
 	logstats.ls_lwrites.value.ui64++;

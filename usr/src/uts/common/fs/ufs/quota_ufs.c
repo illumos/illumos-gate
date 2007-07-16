@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -146,7 +145,7 @@ chkdq(struct inode *ip, long change, int force, struct cred *cr,
 	 * Shadow inodes do not need to hold the vfs_dqrwlock lock.
 	 */
 	ASSERT((ip->i_mode & IFMT) == IFSHAD ||
-		RW_LOCK_HELD(&ufsvfsp->vfs_dqrwlock));
+	    RW_LOCK_HELD(&ufsvfsp->vfs_dqrwlock));
 	ASSERT(RW_WRITE_HELD(&ip->i_contents));
 
 	if (change == 0)
@@ -188,7 +187,7 @@ chkdq(struct inode *ip, long change, int force, struct cred *cr,
 			struct dquot *xdqp;
 
 			error = getdiskquota((uid_t)ip->i_uid, ufsvfsp, 0,
-						&xdqp);
+			    &xdqp);
 			switch (error) {
 			/*
 			 * Either the error was transient or the quota
@@ -322,7 +321,7 @@ chkdq(struct inode *ip, long change, int force, struct cred *cr,
 		/* If the user was not informed yet and the caller	*/
 		/* is the owner of the file				*/
 		if ((dqp->dq_flags & DQ_BLKS) == 0 &&
-			ip->i_uid == crgetruid(cr)) {
+		    ip->i_uid == crgetruid(cr)) {
 			errmsg = msg1;
 			dqp->dq_flags |= DQ_BLKS;
 		}
@@ -336,7 +335,7 @@ chkdq(struct inode *ip, long change, int force, struct cred *cr,
 			dqp->dq_flags |= DQ_MOD;
 			dqp->dq_btimelimit = now +
 			    ((struct ufsvfs *)ITOV(ip)->v_vfsp->vfs_data)
-				->vfs_btimelimit;
+			    ->vfs_btimelimit;
 			if (ip->i_uid == crgetruid(cr)) {
 				errmsg = msg2;
 			}
@@ -344,7 +343,7 @@ chkdq(struct inode *ip, long change, int force, struct cred *cr,
 			/* If the user was not informed yet and the	*/
 			/* caller is the owner of the file		*/
 			if ((dqp->dq_flags & DQ_BLKS) == 0 &&
-				ip->i_uid == crgetruid(cr)) {
+			    ip->i_uid == crgetruid(cr)) {
 				errmsg = msg3;
 				dqp->dq_flags |= DQ_BLKS;
 			}
@@ -390,14 +389,14 @@ out:
 			 * effect of the caller's uprintf().
 			 */
 			*lenp = strlen(errmsg) + 20 + 20 +
-				strlen(ip->i_fs->fs_fsmnt) + 1;
+			    strlen(ip->i_fs->fs_fsmnt) + 1;
 			*uerrp = (char *)kmem_alloc(*lenp, KM_NOSLEEP);
 			if (*uerrp != NULL) {
 				/* errmsg+1 => skip leading ! */
 				(void) sprintf(*uerrp, errmsg+1,
-					(int)ttoproc(curthread)->p_pid,
-					(int)ip->i_uid, (int)ip->i_number,
-					ip->i_fs->fs_fsmnt);
+				    (int)ttoproc(curthread)->p_pid,
+				    (int)ip->i_uid, (int)ip->i_number,
+				    ip->i_fs->fs_fsmnt);
 			}
 		} else {
 			/*
@@ -405,9 +404,9 @@ out:
 			 * message buffer.
 			 */
 			cmn_err(CE_NOTE, errmsg,
-				(int)ttoproc(curthread)->p_pid,
-				(int)ip->i_uid, (int)ip->i_number,
-				ip->i_fs->fs_fsmnt);
+			    (int)ttoproc(curthread)->p_pid,
+			    (int)ip->i_uid, (int)ip->i_number,
+			    ip->i_fs->fs_fsmnt);
 		}
 	}
 	return (error);
@@ -526,7 +525,7 @@ chkiq(struct ufsvfs *ufsvfsp, int change, struct inode *ip, uid_t uid,
 		}
 		error = EDQUOT;
 	} else if (change == 1 && ncurfiles >= dqp->dq_fsoftlimit &&
-			dqp->dq_fsoftlimit) {
+	    dqp->dq_fsoftlimit) {
 		now = gethrestime_sec();
 		if (ncurfiles == dqp->dq_fsoftlimit ||
 		    dqp->dq_ftimelimit == 0) {
@@ -539,7 +538,7 @@ chkiq(struct ufsvfs *ufsvfsp, int change, struct inode *ip, uid_t uid,
 			/* If the user was not informed yet and the	*/
 			/* caller is the owner of the file 		*/
 			if ((dqp->dq_flags & DQ_FILES) == 0 &&
-				uid == crgetruid(cr)) {
+			    uid == crgetruid(cr)) {
 				errmsg = err3;
 				dqp->dq_flags |= DQ_FILES;
 			}
@@ -569,13 +568,13 @@ out:
 			 * effect of the caller's uprintf().
 			 */
 			*lenp = strlen(errmsg) + 20 + 20 +
-				strlen(ufsvfsp->vfs_fs->fs_fsmnt) + 1;
+			    strlen(ufsvfsp->vfs_fs->fs_fsmnt) + 1;
 			*uerrp = (char *)kmem_alloc(*lenp, KM_NOSLEEP);
 			if (*uerrp != NULL) {
 				/* errmsg+1 => skip leading ! */
 				(void) sprintf(*uerrp, errmsg+1,
-					(int)ttoproc(curthread)->p_pid,
-					(int)uid, ufsvfsp->vfs_fs->fs_fsmnt);
+				    (int)ttoproc(curthread)->p_pid,
+				    (int)uid, ufsvfsp->vfs_fs->fs_fsmnt);
 			}
 		} else {
 			/*
@@ -583,8 +582,8 @@ out:
 			 * message buffer.
 			 */
 			cmn_err(CE_NOTE, errmsg,
-				(int)ttoproc(curthread)->p_pid,
-				(int)uid, ufsvfsp->vfs_fs->fs_fsmnt);
+			    (int)ttoproc(curthread)->p_pid,
+			    (int)uid, ufsvfsp->vfs_fs->fs_fsmnt);
 		}
 	}
 	return (error);

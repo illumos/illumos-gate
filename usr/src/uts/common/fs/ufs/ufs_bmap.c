@@ -229,7 +229,7 @@ bmap_read(struct inode *ip, u_offset_t off, daddr_t *bnp, int *lenp)
 	if (lbn < NDADDR) {
 		DOEXTENT(fs, lbn, boff, bnp, lenp,
 		    ip->i_size, &ip->i_db[lbn], NDADDR - lbn, 1,
-			ufsvfsp->vfs_iotransz);
+		    ufsvfsp->vfs_iotransz);
 		return (0);
 	}
 
@@ -267,7 +267,7 @@ bmap_read(struct inode *ip, u_offset_t off, daddr_t *bnp, int *lenp)
 	for (; j <= NIADDR; j++) {
 		ob = nb;
 		bp = UFS_BREAD(ufsvfsp,
-				ip->i_dev, fsbtodb(fs, ob), fs->fs_bsize);
+		    ip->i_dev, fsbtodb(fs, ob), fs->fs_bsize);
 		if (bp->b_flags & B_ERROR) {
 			brelse(bp);
 			return (EIO);
@@ -289,7 +289,7 @@ bmap_read(struct inode *ip, u_offset_t off, daddr_t *bnp, int *lenp)
 	}
 	DOEXTENT(fs, lbn, boff, bnp, lenp, ip->i_size, &bap[i],
 	    MIN(NINDIR(fs) - i, (daddr_t)lblkno(fs, ip->i_size - 1) - lbn + 1),
-		0, ufsvfsp->vfs_iotransz);
+	    0, ufsvfsp->vfs_iotransz);
 	brelse(bp);
 	return (0);
 }
@@ -392,14 +392,14 @@ bmap_write(struct inode	*ip, u_offset_t	off, int size,
 			 * a hold of the old block once we free it until
 			 * the I/O is complete.
 			 */
-			err = fbread(ITOV(ip),
-				    ((offset_t)llbn << fs->fs_bshift),
-					(uint_t)bsize, S_OTHER, &fbp);
+			err =
+			    fbread(ITOV(ip), ((offset_t)llbn << fs->fs_bshift),
+			    (uint_t)bsize, S_OTHER, &fbp);
 			if (err)
 				return (err);
 			pref = blkpref(ip, llbn, (int)llbn, &ip->i_db[0]);
 			err = realloccg(ip, ob, pref, (int)osize, (int)bsize,
-					&nb, cr);
+			    &nb, cr);
 			if (err) {
 				if (fbp)
 					fbrelse(fbp, S_OTHER);
@@ -469,9 +469,9 @@ bmap_write(struct inode	*ip, u_offset_t	off, int size,
 				 */
 				ob = nb;
 				pref = blkpref(ip, lbn, (int)lbn,
-								&ip->i_db[0]);
+				    &ip->i_db[0]);
 				err = realloccg(ip, ob, pref, (int)osize,
-						(int)nsize, &nb, cr);
+				    (int)nsize, &nb, cr);
 				if (err)
 					return (err);
 				if (allocblk)
@@ -546,9 +546,9 @@ bmap_write(struct inode	*ip, u_offset_t	off, int size,
 					}
 					ASSERT(nsize >= osize);
 					(void) chkdq(ip,
-						-(long)btodb(nsize - osize),
-						0, cr, (char **)NULL,
-						(size_t *)NULL);
+					    -(long)btodb(nsize - osize),
+					    0, cr, (char **)NULL,
+					    (size_t *)NULL);
 					return (err);
 				}
 			}
@@ -739,7 +739,7 @@ gotit:
 				if (j < NIADDR) {
 					/* Indirect block */
 					pref = blkpref(ip, lbn, 0,
-						(daddr32_t *)0);
+					    (daddr32_t *)0);
 				} else {
 					/* Data block */
 					pref = blkpref(ip, lbn, i, &bap[0]);
@@ -782,7 +782,7 @@ gotit:
 				 * blocks never point at garbage.
 				 */
 				nbp = UFS_GETBLK(
-					ufsvfsp, dev, fsbtodb(fs, nb), bsize);
+				    ufsvfsp, dev, fsbtodb(fs, nb), bsize);
 
 				clrbuf(nbp);
 				/* XXX Maybe special-case this? */
@@ -838,7 +838,7 @@ gotit:
 				if (isdirquota || (issync &&
 				    lbn < llbn))
 					(void) ufs_fbiwrite(fbp, ip, nb,
-						fs->fs_fsize);
+					    fs->fs_fsize);
 				else
 					fbrelse(fbp, S_WRITE);
 			}
@@ -847,7 +847,7 @@ gotit:
 			 * re-acquire "bp" buf
 			 */
 			bp = UFS_BREAD(ufsvfsp,
-					ip->i_dev, fsbtodb(fs, ob), bsize);
+			    ip->i_dev, fsbtodb(fs, ob), bsize);
 			if (bp->b_flags & B_ERROR) {
 				err = geterror(bp);
 				brelse(bp);
@@ -963,12 +963,12 @@ bmap_has_holes(struct inode *ip)
 		cnt = NDADDR + 1 + dblks;
 	else if (j == NIADDR-1) /* double indirection */
 		cnt = NDADDR + 1 + nindirblks +
-			1 + (dblks + nindiroffset)/nindirblks + dblks;
+		    1 + (dblks + nindiroffset)/nindirblks + dblks;
 	else if (j == NIADDR-2) { /* triple indirection */
 		n = (dblks + nindiroffset)/nindirblks;
 		cnt = NDADDR + 1 + nindirblks +
-			1 + nindirblks + nindirblks*nindirblks +
-			1 + (n + nindiroffset)/nindirblks + n + dblks;
+		    1 + nindirblks + nindirblks*nindirblks +
+		    1 + (n + nindiroffset)/nindirblks + n + dblks;
 	}
 
 	return (mblks < cnt);
@@ -1386,7 +1386,7 @@ bmap_set_bn(struct vnode *vp, u_offset_t off, daddr32_t bn)
 	for (; j <= NIADDR; j++) {
 		ob = nb;
 		bp = UFS_BREAD(ufsvfsp,
-				ip->i_dev, fsbtodb(fs, ob), fs->fs_bsize);
+		    ip->i_dev, fsbtodb(fs, ob), fs->fs_bsize);
 		if (bp->b_flags & B_ERROR) {
 			err = geterror(bp);
 			brelse(bp);
