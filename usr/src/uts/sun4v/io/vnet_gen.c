@@ -1254,15 +1254,25 @@ vgen_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 					 * vsw on dom0.
 					 */
 					vsw_idx = idx;
-					(void) vgen_add_port(vgenp,
+					if (vgen_add_port(vgenp,
 					    resp->added.mdp,
-					    resp->added.mdep[idx]);
+					    resp->added.mdep[idx]) !=
+					    DDI_SUCCESS) {
+						cmn_err(CE_NOTE, "vnet%d Could "
+						    "not initialize virtual "
+						    "switch port.",
+						    ddi_get_instance(vgenp->
+						    vnetdip));
+						mutex_exit(&vgenp->lock);
+						return (MDEG_FAILURE);
+					}
 					break;
 				}
 			}
 		}
-		if (vsw_idx == -1) {
+		if (vsw_idx == -1)
 			DWARN(vgenp, NULL, "can't find vsw_port\n");
+			mutex_exit(&vgenp->lock);
 			return (MDEG_FAILURE);
 		}
 	}
@@ -1270,6 +1280,8 @@ vgen_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 	for (idx = 0; idx < resp->added.nelem; idx++) {
 		if ((vsw_idx != -1) && (vsw_idx == idx)) /* skip vsw_port */
 			continue;
+
+		/* If this port can't be added just skip it. */
 		(void) vgen_add_port(vgenp, resp->added.mdp,
 		    resp->added.mdep[idx]);
 	}
@@ -1300,6 +1312,7 @@ vgen_add_port(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex)
 	int		addrsz;
 	int		num_nodes = 0;
 	int		listsz = 0;
+	int		rv = DDI_SUCCESS;
 	mde_cookie_t	*listp = NULL;
 	uint8_t		*addrp;
 	struct ether_addr	ea;
@@ -1387,12 +1400,17 @@ vgen_add_port(vgen_t *vgenp, md_t *mdp, mde_cookie_t mdex)
 			}
 		}
 	}
-	(void) vgen_port_attach_mdeg(vgenp, (int)port_num, ldc_ids, num_ldcs,
-	    &ea, vsw_port);
+	if (vgen_port_attach_mdeg(vgenp, (int)port_num, ldc_ids, num_ldcs,
+	    &ea, vsw_port) != DDI_SUCCESS) {
+		cmn_err(CE_NOTE, "vnet%d failed to attach port %d remote MAC "
+		    "address %s", ddi_get_instance(vgenp->vnetdip),
+		    (int)port_num, ether_sprintf(&ea));
+		rv = DDI_FAILURE;
+	}
 
 	kmem_free(ldc_ids, num_ldcs * sizeof (uint64_t));
 
-	return (DDI_SUCCESS);
+	return (rv);
 }
 
 /* remove a port from the device */
@@ -1450,7 +1468,11 @@ vgen_port_attach_mdeg(vgen_t *vgenp, int port_num, uint64_t *ldcids,
 	ether_copy(macaddr, &portp->macaddr);
 	for (i = 0; i < num_ids; i++) {
 		DBG2(vgenp, NULL, "ldcid (%lx)\n", ldcids[i]);
-		(void) vgen_ldc_attach(portp, ldcids[i]);
+		if (vgen_ldc_attach(portp, ldcids[i]) == DDI_FAILURE) {
+			rw_destroy(&portp->ldclist.rwlock);
+			vgen_port_detach(portp);
+			return (DDI_FAILURE);
+		}
 	}
 
 	/* link it into the list of ports */
