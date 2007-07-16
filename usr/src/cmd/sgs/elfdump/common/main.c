@@ -130,6 +130,7 @@ detail_usage()
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL21));
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL22));
 	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL23));
+	(void) fprintf(stderr, MSG_INTL(MSG_USAGE_DETAIL24));
 }
 
 /*
@@ -277,12 +278,12 @@ add_match_record(char *argv0, MATCH *data)
 }
 
 static void
-decide(const char *file, Elf *elf, uint_t flags, int wfd)
+decide(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 {
 	if (gelf_getclass(elf) == ELFCLASS64)
-		regular64(file, elf, flags, wfd);
+		regular64(file, fd, elf, flags, wfd);
 	else
-		regular32(file, elf, flags, wfd);
+		regular32(file, fd, elf, flags, wfd);
 }
 
 static void
@@ -412,7 +413,7 @@ archive(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 				archive(name, fd, _elf, flags, wfd);
 				break;
 			case ELF_K_ELF:
-				decide(name, _elf, flags, wfd);
+				decide(name, fd, _elf, flags, wfd);
 				break;
 			default:
 				(void) fprintf(stderr,
@@ -508,6 +509,9 @@ main(int argc, char **argv, char **envp)
 		case 'n':
 			flags |= FLG_NOTE;
 			break;
+		case 'P':
+			flags |= FLG_FAKESHDR;
+			break;
 		case 'p':
 			flags |= FLG_PHDR;
 			break;
@@ -545,7 +549,7 @@ main(int argc, char **argv, char **envp)
 	/*
 	 * Validate any arguments.
 	 */
-	if ((flags & ~(FLG_DEMANGLE | FLG_LONGNAME)) == 0) {
+	if ((flags & ~(FLG_DEMANGLE | FLG_LONGNAME| FLG_FAKESHDR)) == 0) {
 		if (!wname && (match_list == NULL)) {
 			flags |= FLG_EVERYTHING;
 		} else if (!wname || (match_list == NULL)) {
@@ -611,7 +615,7 @@ main(int argc, char **argv, char **envp)
 			archive(file, fd, elf, flags, wfd);
 			break;
 		case ELF_K_ELF:
-			decide(file, elf, flags, wfd);
+			decide(file, fd, elf, flags, wfd);
 			break;
 		default:
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADFILE), file);

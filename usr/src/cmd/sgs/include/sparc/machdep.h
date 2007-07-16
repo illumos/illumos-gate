@@ -200,6 +200,7 @@ extern "C" {
 #define	elf_newehdr		elf64_newehdr
 #define	elf_newphdr		elf64_newphdr
 #define	elf_getshdr		elf64_getshdr
+#define	elf_xlatetom		elf64_xlatetom
 #else	/* Elf32 */
 #define	ELF_R_TYPE		ELF32_R_TYPE
 #define	ELF_R_INFO		ELF32_R_INFO
@@ -221,6 +222,7 @@ extern "C" {
 #define	elf_newehdr		elf32_newehdr
 #define	elf_newphdr		elf32_newphdr
 #define	elf_getshdr		elf32_getshdr
+#define	elf_xlatetom		elf32_xlatetom
 #endif	/* Elf32 */
 
 /*

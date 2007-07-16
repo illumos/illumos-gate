@@ -736,18 +736,18 @@ cap(const char *file, Cache *cache, Word shnum, Word phnum, Ehdr *ehdr,
 	if ((cshdr == 0) && (cphdr_off == 0))
 		return;
 
-	if ((cshdr->sh_entsize == 0) || (cshdr->sh_size == 0)) {
-		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
-		    file, ccache->c_name);
-		return;
-	}
-
 	/*
 	 * Print the hardware/software capabilities section.
 	 */
 	if (cshdr) {
 		Word	ndx, capn;
 		Cap	*cap = (Cap *)ccache->c_data->d_buf;
+
+		if ((cshdr->sh_entsize == 0) || (cshdr->sh_size == 0)) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
+			    file, ccache->c_name);
+			return;
+		}
 
 		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
 		dbg_print(0, MSG_INTL(MSG_ELF_SCN_CAP), ccache->c_name);
@@ -1272,8 +1272,8 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word disp_symndx, Sym *sym)
 #error "STT_NUM has grown. Update addr_symtype[]"
 #endif
 
-	char		index[MAXNDXSIZE], *sec;
-	const char	*symname;
+	char		index[MAXNDXSIZE];
+	const char	*symname, *sec;
 	Versym		verndx;
 	uchar_t		type;
 	Shdr		*tshdr;
@@ -1301,9 +1301,18 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word disp_symndx, Sym *sym)
 	tshdr = 0;
 	sec = NULL;
 
-	if ((state->ehdr->e_type == ET_CORE))
+	if (state->ehdr->e_type == ET_CORE) {
 		sec = (char *)MSG_INTL(MSG_STR_UNKNOWN);
-	else if ((sym->st_shndx < SHN_LORESERVE) &&
+	} else if (state->flags & FLG_FAKESHDR) {
+		/*
+		 * If we are using fake section headers derived from
+		 * the program headers, then the section indexes
+		 * in the symbols do not correspond to these headers.
+		 * The section names are not available, so all we can
+		 * do is to display them in numeric form.
+		 */
+		sec = conv_sym_shndx(sym->st_shndx);
+	} else if ((sym->st_shndx < SHN_LORESERVE) &&
 	    (sym->st_shndx < state->shnum)) {
 		shndx = sym->st_shndx;
 		tshdr = state->cache[shndx].c_shdr;
@@ -1576,8 +1585,9 @@ sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
 			 * is supposed to be adjacent with SUNW_ldynsym coming
 			 * first. Check, and issue a warning if it isn't so.
 			 */
-			if ((ldynsym_state.sym + ldynsym_state.symn)
-			    != dynsym_state.sym)
+			if (((ldynsym_state.sym + ldynsym_state.symn)
+			    != dynsym_state.sym) &&
+			    ((flags & FLG_FAKESHDR) == 0))
 				(void) fprintf(stderr,
 				    MSG_INTL(MSG_ERR_LDYNNOTADJ), file,
 				    ldynsym_state.secname,
@@ -2683,97 +2693,18 @@ sort_shdr_ndx_arr(const void *v1, const void *v2)
 }
 
 
-void
-regular(const char *file, Elf *elf, uint_t flags, int wfd)
+static int
+shdr_cache(const char *file, Elf *elf, Ehdr *ehdr, size_t shstrndx,
+    size_t shnum, Cache **cache_ret)
 {
 	Elf_Scn		*scn;
-	Ehdr		*ehdr;
 	Elf_Data	*data;
-	size_t		ndx, shstrndx, shnum, phnum;
-	Shdr		*nameshdr, *shdr;
+	size_t		ndx;
+	Shdr		*nameshdr;
 	char		*names = 0;
 	Cache		*cache, *_cache;
-	VERSYM_STATE	versym;
 	size_t		*shdr_ndx_arr, shdr_ndx_arr_cnt;
 
-	if ((ehdr = elf_getehdr(elf)) == NULL) {
-		failure(file, MSG_ORIG(MSG_ELF_GETEHDR));
-		return;
-	}
-
-	if (elf_getshnum(elf, &shnum) == 0) {
-		failure(file, MSG_ORIG(MSG_ELF_GETSHNUM));
-		return;
-	}
-
-	if (elf_getshstrndx(elf, &shstrndx) == 0) {
-		failure(file, MSG_ORIG(MSG_ELF_GETSHSTRNDX));
-		return;
-	}
-
-	if (elf_getphnum(elf, &phnum) == 0) {
-		failure(file, MSG_ORIG(MSG_ELF_GETPHNUM));
-		return;
-	}
-
-	if ((scn = elf_getscn(elf, 0)) != NULL) {
-		if ((shdr = elf_getshdr(scn)) == NULL) {
-			failure(file, MSG_ORIG(MSG_ELF_GETSHDR));
-			(void) fprintf(stderr, MSG_INTL(MSG_ELF_ERR_SCN), 0);
-			return;
-		}
-	} else
-		shdr = 0;
-
-	/*
-	 * Print the elf header.
-	 */
-	if (flags & FLG_EHDR)
-		Elf_ehdr(0, ehdr, shdr);
-
-	/*
-	 * If the section headers or program headers have inadequate
-	 * alignment for the class of object, print a warning. libelf
-	 * can handle such files, but programs that use them can crash
-	 * when they dereference unaligned items.
-	 */
-	if (ehdr->e_phoff & (sizeof (Addr) - 1))
-		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADPHDRALIGN), file);
-	if (ehdr->e_shoff & (sizeof (Addr) - 1))
-		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHDRALIGN), file);
-
-	/*
-	 * Print the program headers.
-	 */
-	if ((flags & FLG_PHDR) && (phnum != 0)) {
-		Phdr *phdr;
-
-		if ((phdr = elf_getphdr(elf)) == NULL) {
-			failure(file, MSG_ORIG(MSG_ELF_GETPHDR));
-			return;
-		}
-
-		for (ndx = 0; ndx < phnum; phdr++, ndx++) {
-			if (!match(0, conv_phdr_type(ehdr->e_machine,
-			    phdr->p_type, CONV_FMT_ALTFILE), ndx))
-				continue;
-
-			dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
-			dbg_print(0, MSG_INTL(MSG_ELF_PHDR), EC_WORD(ndx));
-			Elf_phdr(0, ehdr->e_machine, phdr);
-		}
-	}
-
-	/*
-	 * Return now if there are no section, if there's just one section to
-	 * act as an extension of the ELF header, or if only program header
-	 * information was requested.
-	 */
-	if ((shnum <= 1) || (flags && (flags & ~(FLG_EHDR | FLG_PHDR)) == 0)) {
-		if ((ehdr->e_type == ET_CORE) && (flags & FLG_NOTE))
-			note(0, shnum, file);
-		return;
-	}
 
 	/*
 	 * Obtain the .shstrtab data buffer to provide the required section
@@ -2807,11 +2738,11 @@ regular(const char *file, Elf *elf, uint_t flags, int wfd)
 	/*
 	 * Allocate a cache to maintain a descriptor for each section.
 	 */
-	if ((cache = malloc(shnum * sizeof (Cache))) == NULL) {
+	if ((*cache_ret = cache = malloc(shnum * sizeof (Cache))) == NULL) {
 		int err = errno;
 		(void) fprintf(stderr, MSG_INTL(MSG_ERR_MALLOC),
 		    file, strerror(err));
-		return;
+		return (0);
 	}
 
 	*cache = cache_init;
@@ -2836,7 +2767,7 @@ regular(const char *file, Elf *elf, uint_t flags, int wfd)
 		int err = errno;
 		(void) fprintf(stderr, MSG_INTL(MSG_ERR_MALLOC),
 		    file, strerror(err));
-		return;
+		return (0);
 	}
 	shdr_ndx_arr_cnt = 0;
 
@@ -2918,7 +2849,7 @@ regular(const char *file, Elf *elf, uint_t flags, int wfd)
 			int err = errno;
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_MALLOC),
 			    file, strerror(err));
-			return;
+			return (0);
 		}
 		(void) strcpy(_cache->c_name, scnndxnm);
 	}
@@ -3011,13 +2942,154 @@ regular(const char *file, Elf *elf, uint_t flags, int wfd)
 			(void) fprintf(stderr, MSG_INTL(MSG_ELF_ERR_SCNDATA),
 			    EC_WORD(elf_ndxscn(scn)));
 		}
+	}
+
+	return (1);
+}
+
+
+
+void
+regular(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
+{
+	Elf_Scn		*scn;
+	Ehdr		*ehdr;
+	size_t		ndx, shstrndx, shnum, phnum;
+	Shdr		*shdr;
+	Cache		*cache;
+	VERSYM_STATE	versym;
+
+	if ((ehdr = elf_getehdr(elf)) == NULL) {
+		failure(file, MSG_ORIG(MSG_ELF_GETEHDR));
+		return;
+	}
+
+	if (elf_getshnum(elf, &shnum) == 0) {
+		failure(file, MSG_ORIG(MSG_ELF_GETSHNUM));
+		return;
+	}
+
+	if (elf_getshstrndx(elf, &shstrndx) == 0) {
+		failure(file, MSG_ORIG(MSG_ELF_GETSHSTRNDX));
+		return;
+	}
+
+	if (elf_getphnum(elf, &phnum) == 0) {
+		failure(file, MSG_ORIG(MSG_ELF_GETPHNUM));
+		return;
+	}
+	/*
+	 * If the user requested section headers derived from the
+	 * program headers (-P option) and this file doesn't have
+	 * any program headers (i.e. ET_REL), then we can't do it.
+	 */
+	if ((phnum == 0) && (flags & FLG_FAKESHDR)) {
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_PNEEDSPH), file);
+		return;
+	}
+
+
+	if ((scn = elf_getscn(elf, 0)) != NULL) {
+		if ((shdr = elf_getshdr(scn)) == NULL) {
+			failure(file, MSG_ORIG(MSG_ELF_GETSHDR));
+			(void) fprintf(stderr, MSG_INTL(MSG_ELF_ERR_SCN), 0);
+			return;
+		}
+	} else
+		shdr = 0;
+
+	/*
+	 * Print the elf header.
+	 */
+	if (flags & FLG_EHDR)
+		Elf_ehdr(0, ehdr, shdr);
+
+	/*
+	 * If the section headers or program headers have inadequate
+	 * alignment for the class of object, print a warning. libelf
+	 * can handle such files, but programs that use them can crash
+	 * when they dereference unaligned items.
+	 */
+	if (ehdr->e_phoff & (sizeof (Addr) - 1))
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADPHDRALIGN), file);
+	if (ehdr->e_shoff & (sizeof (Addr) - 1))
+		(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHDRALIGN), file);
+
+	/*
+	 * Print the program headers.
+	 */
+	if ((flags & FLG_PHDR) && (phnum != 0)) {
+		Phdr *phdr;
+
+		if ((phdr = elf_getphdr(elf)) == NULL) {
+			failure(file, MSG_ORIG(MSG_ELF_GETPHDR));
+			return;
+		}
+
+		for (ndx = 0; ndx < phnum; phdr++, ndx++) {
+			if (!match(0, conv_phdr_type(ehdr->e_machine,
+			    phdr->p_type, CONV_FMT_ALTFILE), ndx))
+				continue;
+
+			dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
+			dbg_print(0, MSG_INTL(MSG_ELF_PHDR), EC_WORD(ndx));
+			Elf_phdr(0, ehdr->e_machine, phdr);
+		}
+	}
+
+	/*
+	 * Decide how to proceed if there are no sections, if there's just
+	 * one section (the first section can act as an extension of the
+	 * ELF header), or if only program header information was requested.
+	 */
+	if ((shnum <= 1) || (flags && (flags & ~(FLG_EHDR | FLG_PHDR)) == 0)) {
+		/* If a core file, display the note and return */
+		if ((ehdr->e_type == ET_CORE) && (flags & FLG_NOTE)) {
+			note(0, shnum, file);
+			return;
+		}
+
+		/* If only program header info was requested, we're done */
+		if (flags && (flags & ~(FLG_EHDR | FLG_PHDR)) == 0)
+			return;
 
 		/*
-		 * Do we wish to write the section out?
+		 * Section headers are missing. Resort to synthesizing
+		 * section headers from the program headers.
 		 */
-		if (wfd && match(1, _cache->c_name, ndx) && _cache->c_data) {
-			(void) write(wfd, _cache->c_data->d_buf,
-			    _cache->c_data->d_size);
+		if ((flags & FLG_FAKESHDR) == 0) {
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_NOSHDR), file);
+			flags |= FLG_FAKESHDR;
+		}
+	}
+
+	/*
+	 * Generate a cache of section headers and related information
+	 * for use by the rest of elfdump. If requested (or the file
+	 * contains no section headers), we generate a fake set of
+	 * headers from the information accessible from the program headers.
+	 * Otherwise, we use the real section headers contained in the file.
+	 */
+
+	if (flags & FLG_FAKESHDR) {
+		if (fake_shdr_cache(file, fd, elf, ehdr, &cache, &shnum) == 0)
+			return;
+	} else {
+		if (shdr_cache(file, elf, ehdr, shstrndx, shnum, &cache) == 0)
+			return;
+	}
+
+	/*
+	 * If -w was specified, find and write out the section(s) data.
+	 */
+	if (wfd) {
+		for (ndx = 1; ndx < shnum; ndx++) {
+			Cache	*_cache = &cache[ndx];
+
+			if (match(1, _cache->c_name, ndx) && _cache->c_data) {
+				(void) write(wfd, _cache->c_data->d_buf,
+				    _cache->c_data->d_size);
+			}
 		}
 	}
 
@@ -3068,5 +3140,10 @@ regular(const char *file, Elf *elf, uint_t flags, int wfd)
 	if (flags & FLG_UNWIND)
 		unwind(cache, shnum, phnum, ehdr, file, elf);
 
-	free(cache);
+
+	/* Release the memory used to cache section headers */
+	if (flags & FLG_FAKESHDR)
+		fake_shdr_cache_free(cache, shnum);
+	else
+		free(cache);
 }

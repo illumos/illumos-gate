@@ -59,6 +59,7 @@ extern "C" {
 #define	FLG_LONGNAME	0x00100000	/* not done by default */
 #define	FLG_CHECKSUM	0x00200000	/* not done by default */
 #define	FLG_DEMANGLE	0x00400000	/* not done by default */
+#define	FLG_FAKESHDR	0x00800000	/* not done by default */
 #define	FLG_EVERYTHING	0x000fffff
 
 #define	MAXNDXSIZE	10
@@ -91,6 +92,8 @@ extern int		match(int, const char *, int);
 #define	cap			cap64
 #define	checksum		checksum64
 #define	dynamic			dynamic64
+#define	fake_shdr_cache		fake_shdr_cache64
+#define	fake_shdr_cache_free	fake_shdr_cache_free64
 #define	got			got64
 #define	group			group64
 #define	hash			hash64
@@ -113,6 +116,8 @@ extern int		match(int, const char *, int);
 #define	cap			cap32
 #define	checksum		checksum32
 #define	dynamic			dynamic32
+#define	fake_shdr_cache		fake_shdr_cache32
+#define	fake_shdr_cache_free	fake_shdr_cache_free32
 #define	got			got32
 #define	group			group32
 #define	hash			hash32
@@ -133,8 +138,16 @@ extern int		match(int, const char *, int);
 #define	version_need		version_need32
 #endif
 
-extern	void	regular32(const char *, Elf *, uint_t, int);
-extern	void	regular64(const char *, Elf *, uint_t, int);
+extern	int	fake_shdr_cache32(const char *, int, Elf *, Elf32_Ehdr *,
+    Cache **, size_t *);
+extern	int	fake_shdr_cache64(const char *, int, Elf *, Elf64_Ehdr *,
+    Cache **, size_t *);
+
+extern	void	fake_shdr_cache_free32(Cache *, size_t);
+extern	void	fake_shdr_cache_free64(Cache *, size_t);
+
+extern	void	regular32(const char *, int, Elf *, uint_t, int);
+extern	void	regular64(const char *, int, Elf *, uint_t, int);
 
 #ifdef	__cplusplus
 }

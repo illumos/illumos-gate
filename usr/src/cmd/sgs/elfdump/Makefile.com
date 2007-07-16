@@ -33,9 +33,9 @@ include		$(SRC)/cmd/sgs/Makefile.com
 
 COMOBJ =	main.o
 
-COMOBJ32 =	elfdump32.o
+COMOBJ32 =	elfdump32.o fake_shdr32.o
 
-COMOBJ64 =	elfdump64.o
+COMOBJ64 =	elfdump64.o fake_shdr64.o
 
 TOOLOBJ =	leb128.o
 

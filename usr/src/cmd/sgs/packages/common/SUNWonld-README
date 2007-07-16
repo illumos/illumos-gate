@@ -1244,3 +1244,5 @@ Bugid   Risk Synopsis
 6565476 rtld symbol version check prevents GNU ld binary from running
 6567670 ld(1) symbol size/section size verification uncovers Haskell
 	compiler inconsistency
+6530249 elfdump should handle ELF files with no section header table (D)
+	PSARC/2007/395 Add -P option to elfdump

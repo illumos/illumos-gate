@@ -53,25 +53,31 @@
 			 section\n"
 @ MSG_USAGE_DETAIL14	"\t[-n]\t\tdump the contents of the .note section\n"
 @ MSG_USAGE_DETAIL15	"\t[-N name]\tqualify an option with a `name'\n"
-@ MSG_USAGE_DETAIL16	"\t[-p]\t\tdump the program headers\n"
-@ MSG_USAGE_DETAIL17	"\t[-r]\t\tdump the contents of the relocation \
+@ MSG_USAGE_DETAIL16	"\t[-P]\t\tuse program headers to generate \
+			 section headers\n"
+@ MSG_USAGE_DETAIL17	"\t[-p]\t\tdump the program headers\n"
+@ MSG_USAGE_DETAIL18	"\t[-r]\t\tdump the contents of the relocation \
 			 sections\n"
-@ MSG_USAGE_DETAIL18	"\t[-S]\t\tdump the contents of the sort index \
+@ MSG_USAGE_DETAIL19	"\t[-S]\t\tdump the contents of the sort index \
 			 sections\n"
-@ MSG_USAGE_DETAIL19	"\t[-s]\t\tdump the contents of the symbol table \
+@ MSG_USAGE_DETAIL20	"\t[-s]\t\tdump the contents of the symbol table \
 			 sections\n"
-@ MSG_USAGE_DETAIL20	"\t[-u]\t\tdump the contents of a frame unwind \
+@ MSG_USAGE_DETAIL21	"\t[-u]\t\tdump the contents of a frame unwind \
 			 section\n"
-@ MSG_USAGE_DETAIL21	"\t[-v]\t\tdump the contents of the version sections\n"
-@ MSG_USAGE_DETAIL22	"\t[-w file]\twrite the contents of specified section \
+@ MSG_USAGE_DETAIL22	"\t[-v]\t\tdump the contents of the version sections\n"
+@ MSG_USAGE_DETAIL23	"\t[-w file]\twrite the contents of specified section \
 			 to `file'\n"
-@ MSG_USAGE_DETAIL23	"\t[-y]\t\tdump the contents of the .SUNW_syminfo \
+@ MSG_USAGE_DETAIL24	"\t[-y]\t\tdump the contents of the .SUNW_syminfo \
 			 section\n"
 
 # Errors
 
 @ MSG_ERR_BADFILE	"%s: invalid file type\n"
 @ MSG_ERR_BADREL1       "%s: bad relocation entry: %s: relocation requires symbol\n"
+@ MSG_ERR_NOSHDR	"%s: section headers are not present: synthesizing \
+			 from program headers (-P option)\n"
+@ MSG_ERR_PNEEDSPH	"%s: file without program headers is incompatible \
+			 with -P option\n"
 @ MSG_ERR_NOSHSTRSEC	"%s: no header string table section (shstrtab). \
 			 header names are not available\n"
 @ MSG_ERR_SHSTRNULL	"%s: zero size section header string table \
@@ -189,6 +195,7 @@
 
 @ MSG_ERR_MALLOC	"%s: malloc: %s\n"
 @ MSG_ERR_OPEN		"%s: open: %s\n"
+@ MSG_ERR_READ		"%s: read: %s\n"
 
 #
 # SHT_MOVE messages
@@ -241,11 +248,12 @@
 @ MSG_ELF_GETPHNUM	"elf_getphnum"
 @ MSG_ELF_GETSHNUM	"elf_getshnum"
 @ MSG_ELF_GETSHSTRNDX	"elf_getshstrndx"
+@ MSG_ELF_XLATETOM	"elf_xlatetom"
 @ MSG_ELF_ARSYM		"ARSYM"
 
 @ MSG_GOT_SYM		"_GLOBAL_OFFSET_TABLE_"
 
-@ MSG_STR_OPTIONS	"CcdeGgHhiI:klmN:nprSsuvw:y"
+@ MSG_STR_OPTIONS	"CcdeGgHhiI:klmN:nPprSsuvw:y"
 
 @ MSG_STR_EMPTY		""
 
@@ -309,3 +317,25 @@
 @ MSG_NOTE_DESCSZ	"    descsz %#x:"
 @ MSG_NOTE_DESC		"      desc[%d]\t%s"
 @ MSG_NOTE_TOK		"%2.2x "
+
+# Names of fake sections generated from program header data
+@ MSG_PHDRNAM_CAP		".SUNW_cap(phdr)"
+@ MSG_PHDRNAM_DYN		".dynamic(phdr)"
+@ MSG_PHDRNAM_DYNSTR		".dynstr(phdr)"
+@ MSG_PHDRNAM_DYNSYM		".dynsym(phdr)"
+@ MSG_PHDRNAM_FINIARR		".finiarray(phdr)"
+@ MSG_PHDRNAM_HASH		".hash(phdr)"
+@ MSG_PHDRNAM_INITARR		".initarray(phdr)"
+@ MSG_PHDRNAM_INTERP		".interp(phdr)"
+@ MSG_PHDRNAM_LDYNSYM		".SUNW_ldynsym(phdr)"
+@ MSG_PHDRNAM_MOVE		".move(phdr)"
+@ MSG_PHDRNAM_NOTE		".note(phdr)"
+@ MSG_PHDRNAM_PREINITARR	".preinitarray(phdr)"
+@ MSG_PHDRNAM_REL		".rel(phdr)"
+@ MSG_PHDRNAM_RELA		".rela(phdr)"
+@ MSG_PHDRNAM_SYMINFO		".syminfo(phdr)"
+@ MSG_PHDRNAM_SYMSORT		".SUNW_symsort(phdr)"
+@ MSG_PHDRNAM_TLSSORT		".SUNW_tlssort(phdr)"
+@ MSG_PHDRNAM_UNWIND		".eh_frame_hdr(phdr)"
+@ MSG_PHDRNAM_VER		".SUNW_version(phdr)"
+
