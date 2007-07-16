@@ -127,6 +127,7 @@ typedef enum {
 	oHostKeyAlgorithms, oBindAddress, oSmartcardDevice,
 	oClearAllForwardings, oNoHostAuthenticationForLocalhost,
 	oFallBackToRsh, oUseRsh, oConnectTimeout,
+	oServerAliveInterval, oServerAliveCountMax,
 	oDeprecated
 } OpCodes;
 
@@ -213,6 +214,8 @@ static struct {
 	{ "clearallforwardings", oClearAllForwardings },
 	{ "nohostauthenticationforlocalhost", oNoHostAuthenticationForLocalhost },
 	{ "connecttimeout", oConnectTimeout },
+	{ "serveraliveinterval", oServerAliveInterval },
+	{ "serveralivecountmax", oServerAliveCountMax },
 	{ NULL, oBadOption }
 };
 
@@ -739,6 +742,14 @@ parse_int:
 			*intptr = value;
 		break;
 
+	case oServerAliveInterval:
+		intptr = &options->server_alive_interval;
+		goto parse_time;
+
+	case oServerAliveCountMax:
+		intptr = &options->server_alive_count_max;
+		goto parse_int;
+
 	case oDeprecated:
 		debug("%s line %d: Deprecated option \"%s\"",
 		    filename, linenum, keyword);
@@ -875,6 +886,8 @@ initialize_options(Options * options)
 	options->no_host_authentication_for_localhost = - 1;
 	options->fallback_to_rsh = -1;
 	options->use_rsh = -1;
+	options->server_alive_interval = -1;
+	options->server_alive_count_max = -1;
 }
 
 /*
@@ -1005,6 +1018,10 @@ fill_default_options(Options * options)
 		options->fallback_to_rsh = 0;
 	if (options->use_rsh == - 1)
 		options->use_rsh = 0;
+	if (options->server_alive_interval == -1)
+		options->server_alive_interval = 0;
+	if (options->server_alive_count_max == -1)
+		options->server_alive_count_max = 3;
 	/* options->proxy_command should not be set by default */
 	/* options->user will be set in the main program if appropriate */
 	/* options->hostname will be set in the main program if appropriate */

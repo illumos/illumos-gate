@@ -39,7 +39,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1049,16 +1049,13 @@ client_subsystem_reply(int type, u_int32_t seq, void *ctxt)
 }
 
 void
-client_global_request_reply(int type, u_int32_t seq, void *ctxt)
+client_global_request_reply_fwd(int type, u_int32_t seq, void *ctxt)
 {
 	int i;
 
 	i = client_global_request_id++;
-	if (i >= options.num_remote_forwards) {
-		debug("client_global_request_reply: too many replies %d > %d",
-		    i, options.num_remote_forwards);
+	if (i >= options.num_remote_forwards)
 		return;
-	}
 	debug("remote forward %s for: listen %d, connect %s:%d",
 	    type == SSH2_MSG_REQUEST_SUCCESS ? "success" : "failure",
 	    options.remote_forwards[i].port,
