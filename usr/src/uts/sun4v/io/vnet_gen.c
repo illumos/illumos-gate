@@ -1270,7 +1270,7 @@ vgen_mdeg_cb(void *cb_argp, mdeg_result_t *resp)
 				}
 			}
 		}
-		if (vsw_idx == -1)
+		if (vsw_idx == -1) {
 			DWARN(vgenp, NULL, "can't find vsw_port\n");
 			mutex_exit(&vgenp->lock);
 			return (MDEG_FAILURE);
