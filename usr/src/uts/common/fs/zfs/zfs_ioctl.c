@@ -232,9 +232,8 @@ zfs_secpolicy_write_perms(const char *name, const char *perm, cred_t *cr)
 	error = zfs_dozonecheck(name, cr);
 	if (error == 0) {
 		error = secpolicy_zfs(cr);
-		if (error) {
+		if (error)
 			error = dsl_deleg_access(name, perm, cr);
-		}
 	}
 	return (error);
 }
@@ -242,8 +241,6 @@ zfs_secpolicy_write_perms(const char *name, const char *perm, cred_t *cr)
 static int
 zfs_secpolicy_setprop(const char *name, zfs_prop_t prop, cred_t *cr)
 {
-	int error = 0;
-
 	/*
 	 * Check permissions for special properties.
 	 */
@@ -257,14 +254,9 @@ zfs_secpolicy_setprop(const char *name, zfs_prop_t prop, cred_t *cr)
 		break;
 
 	case ZFS_PROP_QUOTA:
-		if (error =
-		    zfs_secpolicy_write_perms(name, ZFS_DELEG_PERM_QUOTA, cr))
-			return (error);
-
 		if (!INGLOBALZONE(curproc)) {
 			uint64_t zoned;
 			char setpoint[MAXNAMELEN];
-			int dslen;
 			/*
 			 * Unprivileged users are allowed to modify the
 			 * quota on things *under* (ie. contained by)
@@ -273,18 +265,13 @@ zfs_secpolicy_setprop(const char *name, zfs_prop_t prop, cred_t *cr)
 			if (dsl_prop_get_integer(name, "zoned", &zoned,
 			    setpoint))
 				return (EPERM);
-			if (!zoned) /* this shouldn't happen */
-				return (EPERM);
-			dslen = strlen(name);
-			if (dslen <= strlen(setpoint))
+			if (!zoned || strlen(name) <= strlen(setpoint))
 				return (EPERM);
 		}
-	default:
-		error = zfs_secpolicy_write_perms(name,
-		    zfs_prop_perm(prop), cr);
+		break;
 	}
 
-	return (error);
+	return (zfs_secpolicy_write_perms(name, zfs_prop_perm(prop), cr));
 }
 
 int
@@ -1176,8 +1163,6 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 {
 	nvpair_t *elem;
 	int error;
-	const char *propname;
-	zfs_prop_t prop;
 	uint64_t intval;
 	char *strval;
 
@@ -1186,10 +1171,10 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 	 */
 	elem = NULL;
 	while ((elem = nvlist_next_nvpair(nvl, elem)) != NULL) {
-		propname = nvpair_name(elem);
+		const char *propname = nvpair_name(elem);
+		zfs_prop_t prop = zfs_name_to_prop(propname);
 
-		if ((prop = zfs_name_to_prop(propname)) ==
-		    ZFS_PROP_INVAL) {
+		if (prop == ZFS_PROP_INVAL) {
 			/*
 			 * If this is a user-defined property, it must be a
 			 * string, and there is no further validation to do.
@@ -1200,49 +1185,18 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 
 			error = zfs_secpolicy_write_perms(name,
 			    ZFS_DELEG_PERM_USERPROP, cr);
-			if (error) {
-				return (EPERM);
-			}
+			if (error)
+				return (error);
 			continue;
 		}
 
+		if ((error = zfs_secpolicy_setprop(name, prop, cr)) != 0)
+			return (error);
+
 		/*
-		 * Check permissions for special properties
+		 * Check that this value is valid for this pool version
 		 */
-
 		switch (prop) {
-		case ZFS_PROP_ZONED:
-			/*
-			 * Disallow setting of 'zoned' from within a local zone.
-			 */
-			if (!INGLOBALZONE(curproc))
-				return (EPERM);
-			break;
-
-		case ZFS_PROP_QUOTA:
-			if (error = zfs_dozonecheck(name, cr))
-				return (error);
-
-			if (!INGLOBALZONE(curproc)) {
-				uint64_t zoned;
-				char setpoint[MAXNAMELEN];
-				int dslen;
-				/*
-				 * Unprivileged users are allowed to modify the
-				 * quota on things *under* (ie. contained by)
-				 * the thing they own.
-				 */
-				if (dsl_prop_get_integer(name, "zoned", &zoned,
-				    setpoint))
-					return (EPERM);
-				if (!zoned) /* this shouldn't happen */
-					return (EPERM);
-				dslen = strlen(name);
-				if (dslen <= strlen(setpoint))
-					return (EPERM);
-			}
-			break;
-
 		case ZFS_PROP_COMPRESSION:
 			/*
 			 * If the user specified gzip compression, make sure
@@ -1282,17 +1236,14 @@ zfs_set_prop_nvlist(const char *name, dev_t dev, cred_t *cr, nvlist_t *nvl)
 			break;
 		}
 		}
-		if ((error = zfs_secpolicy_setprop(name, prop, cr)) != 0)
-			return (error);
 	}
 
 	elem = NULL;
 	while ((elem = nvlist_next_nvpair(nvl, elem)) != NULL) {
-		propname = nvpair_name(elem);
+		const char *propname = nvpair_name(elem);
+		zfs_prop_t prop = zfs_name_to_prop(propname);
 
-		if ((prop = zfs_name_to_prop(propname)) ==
-		    ZFS_PROP_INVAL) {
-
+		if (prop == ZFS_PROP_INVAL) {
 			VERIFY(nvpair_value_string(elem, &strval) == 0);
 			error = dsl_prop_set(name, propname, 1,
 			    strlen(strval) + 1, strval);
@@ -1387,18 +1338,28 @@ zfs_ioc_set_prop(zfs_cmd_t *zc)
 {
 	nvlist_t *nvl;
 	int error;
-	zfs_prop_t prop;
 
 	/*
 	 * If zc_value is set, then this is an attempt to inherit a value.
 	 * Otherwise, zc_nvlist refers to a list of properties to set.
 	 */
 	if (zc->zc_value[0] != '\0') {
-		if (!zfs_prop_user(zc->zc_value) &&
-		    ((prop = zfs_name_to_prop(zc->zc_value)) ==
-		    ZFS_PROP_INVAL ||
-		    !zfs_prop_inheritable(prop)))
-			return (EINVAL);
+		zfs_prop_t prop = zfs_name_to_prop(zc->zc_value);
+
+		if (prop == ZFS_PROP_INVAL) {
+			if (!zfs_prop_user(zc->zc_value))
+				return (EINVAL);
+			error = zfs_secpolicy_write_perms(zc->zc_name,
+			    ZFS_DELEG_PERM_USERPROP,
+			    (cred_t *)(uintptr_t)zc->zc_cred);
+		} else {
+			if (!zfs_prop_inheritable(prop))
+				return (EINVAL);
+			error = zfs_secpolicy_setprop(zc->zc_name,
+			    prop, (cred_t *)(uintptr_t)zc->zc_cred);
+		}
+		if (error)
+			return (error);
 
 		return (dsl_prop_set(zc->zc_name, zc->zc_value, 0, 0, NULL));
 	}
