@@ -610,6 +610,9 @@ MDESCHDRS=			\
 	mdesc.h			\
 	mdesc_impl.h		
 
+CPUDRVHDRS=			\
+	cpudrv.h
+
 CRYPTOHDRS=			\
 	elfsign.h		\
 	ioctl.h			\
@@ -976,6 +979,7 @@ CHECKHDRS=						\
 	$(AUDIOHDRS:%.h=audio/%.check)			\
 	$(BSCHDRS:%.h=%.check)				\
 	$(CHKHDRS:%.h=%.check)				\
+	$(CPUDRVHDRS:%.h=%.check)			\
 	$(CRYPTOHDRS:%.h=crypto/%.check)		\
 	$(DCAMHDRS:%.h=dcam/%.check)			\
 	$(IBHDRS:%.h=ib/%.check)			\

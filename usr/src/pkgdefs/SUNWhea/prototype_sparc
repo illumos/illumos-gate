@@ -250,7 +250,6 @@ f none usr/platform/sun4u/include/sys/todmostek.h 0644 root bin
 f none usr/platform/sun4u/include/sys/tod.h 0644 root bin
 f none usr/platform/sun4u/include/sys/trapstat.h 0644 root bin
 f none usr/platform/sun4u/include/sys/traptrace.h 644 root bin
-f none usr/platform/sun4u/include/sys/us_drv.h 644 root bin
 f none usr/platform/sun4u/include/sys/vis.h 0644 root bin
 f none usr/platform/sun4u/include/sys/vm_machparam.h 644 root bin
 f none usr/platform/sun4u/include/sys/xc_impl.h 644 root bin

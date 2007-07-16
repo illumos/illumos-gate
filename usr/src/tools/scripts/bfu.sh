@@ -6791,6 +6791,11 @@ mondo_loop() {
 	rm -f $usr/ccs/bin/nrform
 	rm -f $usr/ccs/bin/yaccpar
 
+	#
+	# Remove us driver header.
+	#
+	rm -f $usr/platform/sun4u/include/sys/us_drv.h
+
 	# End of pre-archive extraction hacks.
 
 	if [ $diskless = no -a $zone = global ]; then

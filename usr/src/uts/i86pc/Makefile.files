@@ -41,6 +41,7 @@ CORE_OBJS +=			\
 	cmi.o			\
 	confunix.o		\
 	cpuid.o			\
+	cpupm.o			\
 	dis_tables.o		\
 	ddi_impl.o		\
 	dtrace_subr.o		\
@@ -172,6 +173,10 @@ MCAMD_OBJS	+= \
 	mcamd_dimmcfg.o \
 	mcamd_subr.o \
 	mcamd_pcicfg.o
+
+CPUDRV_OBJS	+= cpudrv.o cpudrv_plat.o cpu_acpi.o speedstep.o
+CPUNEX_OBJS	+= cpunex.o
+PPM_OBJS	+= ppm_subr.o ppm.o ppm_plat.o
 
 ROOTNEX_OBJS += rootnex.o
 TZMON_OBJS	+= tzmon.o

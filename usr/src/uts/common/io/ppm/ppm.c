@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,9 +55,9 @@
 #include <sys/ppmio.h>
 #include <sys/sunldi.h>
 #include <sys/ppmvar.h>
-#include <sys/i2c/clients/i2c_gpio.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/ppm_plat.h>
 
 /*
  * Note: When pm_power() is called (directly or indirectly) to change the
@@ -180,11 +180,6 @@ uint_t	ppm_debug = 0;
 #endif
 
 /*
- * This flag disables vcore/vid feature by default.
- */
-uint_t	ppm_do_vcore = 0;
-
-/*
  * Local function prototypes and data
  */
 static boolean_t	ppm_cpr_callb(void *, int);
@@ -192,8 +187,6 @@ static int		ppm_fetset(ppm_domain_t *, uint8_t);
 static int		ppm_fetget(ppm_domain_t *, uint8_t *);
 static int		ppm_gpioset(ppm_domain_t *, int);
 static int		ppm_manage_cpus(dev_info_t *, power_req_t *, int *);
-static int		ppm_change_cpu_power(ppm_dev_t *, int);
-static int		ppm_revert_cpu_power(ppm_dev_t *, int);
 static int		ppm_manage_pci(dev_info_t *, power_req_t *, int *);
 static int		ppm_manage_pcie(dev_info_t *, power_req_t *, int *);
 static int		ppm_manage_fet(dev_info_t *, power_req_t *, int *);
@@ -348,6 +341,28 @@ ppm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ppm_cpr_window_flag = B_FALSE;
 	ppm_cprcb_id = callb_add(ppm_cpr_callb, (void *)NULL,
 	    CB_CL_CPR_PM, "ppm_cpr");
+
+#if defined(__x86)
+	/*
+	 * Register callback so that once CPUs have been added to
+	 * the device tree, ppm can rebuild CPU domains using ACPI
+	 * data.
+	 */
+	cpupm_rebuild_cpu_domains = ppm_rebuild_cpu_domains;
+
+	/*
+	 * Register callback so that the ppm can initialize the
+	 * topspeed for all CPUs in all domains.
+	 */
+	cpupm_init_topspeed = ppm_init_topspeed;
+
+	/*
+	 * Register callback so that whenever max speed throttle requests
+	 * are received, ppm can redefine the high power level for
+	 * all CPUs in the domain.
+	 */
+	cpupm_redefine_topspeed = ppm_redefine_topspeed;
+#endif
 
 	ddi_report_dev(dip);
 	return (DDI_SUCCESS);
@@ -645,6 +660,76 @@ err_bydom:
 		break;
 	}
 
+#if defined(__x86)
+	/*
+	 * Note that these two ioctls exist for test purposes only.
+	 * Unfortunately, there really isn't any other good way of
+	 * unit testing the dynamic redefinition of the top speed as it
+	 * usually occurs due to environmental conditions.
+	 */
+	case PPMGET_NORMAL:
+	case PPMSET_NORMAL:
+	{
+		STRUCT_DECL(ppm_norm, norm);
+		char *path = NULL;
+		struct pm_component *dcomps;
+		struct pm_comp *pm_comp;
+		ppm_dev_t *ppmd;
+		int i;
+
+		STRUCT_INIT(norm, mode);
+		ret = ddi_copyin((caddr_t)arg, STRUCT_BUF(norm),
+		STRUCT_SIZE(norm), mode);
+		if (ret != 0)
+			return (EFAULT);
+
+		/* copyin .path */
+		path = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+		ret = copyinstr(
+		    STRUCT_FGETP(norm, path), path, MAXPATHLEN, NULL);
+		if (ret != 0) {
+			PPMD(D_IOCTL, ("%s: can't copyin path, line(%d)\n",
+			    str, __LINE__))
+			kmem_free(path, MAXPATHLEN);
+			return (EFAULT);
+		}
+
+		domp = ppm_get_domain_by_dev(path);
+		kmem_free(path, MAXPATHLEN);
+
+		if (domp == NULL)
+			return (ENODEV);
+
+		ppmd = domp->devlist;
+		if (cmd == PPMSET_NORMAL) {
+			if (domp->model != PPMD_CPU)
+				return (EINVAL);
+			level = STRUCT_FGET(norm, norm);
+			dcomps = DEVI(ppmd->dip)->devi_pm_components;
+			pm_comp = &dcomps[ppmd->cmpt].pmc_comp;
+			for (i = pm_comp->pmc_numlevels; i > 0; i--) {
+				if (pm_comp->pmc_lvals[i-1] == level)
+					break;
+			}
+			if (i == 0)
+				return (EINVAL);
+
+			ppm_set_topspeed(ppmd, pm_comp->pmc_numlevels - i);
+		}
+
+		level = pm_get_normal_power(ppmd->dip, 0);
+
+		STRUCT_FSET(norm, norm, level);
+		ret = ddi_copyout(STRUCT_BUF(norm), (caddr_t)arg,
+		    STRUCT_SIZE(norm), mode);
+		if (ret != 0) {
+			PPMD(D_IOCTL, ("%s: can't copyout, line(%d)\n",
+			    str, __LINE__))
+			ret = EFAULT;
+		}
+		break;
+	}
+#endif
 	default:
 		PPMD(D_IOCTL, ("%s: unsupported ioctl command(%d)\n", str, cmd))
 		return (EINVAL);
@@ -908,293 +993,6 @@ ppm_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 
 /*
- * PPMDC_CPU_NEXT operation
- */
-int
-ppm_cpu_next(ppm_domain_t *domp, int level)
-{
-#ifdef DEBUG
-	char *str = "ppm_cpu_next";
-#endif
-	ppm_dc_t *dc;
-	int index = level - 1;
-	int ret = 0;
-
-	dc = ppm_lookup_dc(domp, PPMDC_CPU_NEXT);
-	for (; dc && (dc->cmd == PPMDC_CPU_NEXT); dc = dc->next) {
-		switch (dc->method) {
-		case PPMDC_CPUSPEEDKIO:
-			ret = ldi_ioctl(dc->lh, dc->m_un.cpu.iowr,
-			    (intptr_t)index, FWRITE | FKIOCTL, kcred, NULL);
-			if (ret)
-				return (ret);
-			break;
-
-		default:
-			PPMD(D_CPU, ("%s: unsupported method(0x%x)\n",
-			    str, dc->method))
-			return (-1);
-		}
-	}
-	return (ret);
-}
-
-
-/*
- * PPMDC_PRE_CHNG operation
- */
-int
-ppm_cpu_pre_chng(ppm_domain_t *domp, int oldl, int speedup)
-{
-#ifdef DEBUG
-	char *str = "ppm_cpu_pre_chng";
-#endif
-	ppm_dc_t *dc;
-	int lowest;
-	int ret = 0;
-
-	dc = ppm_lookup_dc(domp, PPMDC_PRE_CHNG);
-	for (; dc && (dc->cmd == PPMDC_PRE_CHNG); dc = dc->next) {
-
-		switch (dc->method) {
-		case PPMDC_VCORE:
-			lowest = domp->devlist->lowest;
-			if ((oldl != lowest) || (speedup != 1))
-				break;
-
-			/* raise core voltage */
-			if (ppm_do_vcore > 0) {
-				ret = ldi_ioctl(dc->lh,
-				    dc->m_un.cpu.iowr,
-				    (intptr_t)&dc->m_un.cpu.val,
-				    FWRITE | FKIOCTL, kcred, NULL);
-				if (ret != 0)
-					return (ret);
-				if (dc->m_un.cpu.delay > 0)
-					drv_usecwait(dc->m_un.cpu.delay);
-			}
-			break;
-
-		default:
-			PPMD(D_CPU, ("%s: unsupported method(0x%x)\n",
-			    str, dc->method))
-			return (-1);
-		}
-	}
-
-	return (ret);
-}
-
-
-/*
- * PPMDC_CPU_GO operation
- */
-/* ARGSUSED */
-int
-ppm_cpu_go(ppm_domain_t *domp, int level)
-{
-	ppm_dc_t *dc;
-	int ret = 0;
-
-	dc = ppm_lookup_dc(domp, PPMDC_CPU_GO);
-	ASSERT(dc);
-	switch (dc->method) {
-	case PPMDC_KIO:
-		ret = ldi_ioctl(dc->lh, dc->m_un.kio.iowr,
-		    (intptr_t)dc->m_un.kio.val, FWRITE | FKIOCTL,
-		    kcred, NULL);
-		break;
-	default:
-		return (-1);
-	}
-
-	return (ret);
-}
-
-
-/*
- * PPMDC_POST_CHNG operation
- */
-int
-ppm_cpu_post_chng(ppm_domain_t *domp, int newl, int speedup)
-{
-#ifdef DEBUG
-	char *str = "ppm_cpu_post_chng";
-#endif
-	ppm_dc_t *dc;
-	int	lowest;
-	int ret = 0;
-
-	dc = ppm_lookup_dc(domp, PPMDC_POST_CHNG);
-	for (; dc && (dc->cmd == PPMDC_POST_CHNG); dc = dc->next) {
-
-		switch (dc->method) {
-		case PPMDC_VCORE:
-			lowest = domp->devlist->lowest;
-			if ((newl != lowest) || (speedup != 0))
-				break;
-
-			/* lower core voltage */
-			if (ppm_do_vcore > 0) {
-				ret = ldi_ioctl(dc->lh,
-				    dc->m_un.cpu.iowr,
-				    (intptr_t)&dc->m_un.cpu.val,
-				    FWRITE | FKIOCTL, kcred, NULL);
-				if (ret != 0)
-					return (ret);
-				if (dc->m_un.cpu.delay > 0)
-					drv_usecwait(dc->m_un.cpu.delay);
-			}
-			break;
-
-		default:
-			PPMD(D_CPU, ("%s: unsupported method(0x%x)\n",
-			    str, dc->method))
-			return (-1);
-		}
-	}
-	return (ret);
-}
-
-
-/*
- * The effective cpu estar model is: program all cpus to be ready to go
- * the same next(or new) speed level, program all other system bus resident
- * devices to the same next speed level.  At last, pull the trigger to
- * initiate the speed change for all system bus resident devices
- * simultaneously.
- *
- * On Excalibur, the Safari bus resident devices are Cheetah/Cheetah+ and
- * Schizo.  On Enchilada, the JBus resident devides are Jalapeno(s) and
- * Tomatillo(s).
- */
-static int
-ppm_change_cpu_power(ppm_dev_t *ppmd, int newlevel)
-{
-#ifdef DEBUG
-	char *str = "ppm_change_cpu_power";
-#endif
-	ppm_unit_t *unitp;
-	ppm_domain_t *domp;
-	ppm_dev_t *cpup;
-	dev_info_t *dip;
-	int level, oldlevel;
-	int speedup, incr, lowest, highest;
-	char *chstr;
-	int ret;
-
-	unitp = ddi_get_soft_state(ppm_statep, ppm_inst);
-	ASSERT(unitp);
-	domp = ppmd->domp;
-	cpup = domp->devlist;
-	lowest = cpup->lowest;
-	highest = cpup->highest;
-
-	/*
-	 * Not all cpus may have transitioned to a known level by this time
-	 */
-	oldlevel = (cpup->level == PM_LEVEL_UNKNOWN) ? highest : cpup->level;
-	dip = cpup->dip;
-	ASSERT(dip);
-
-	PPMD(D_CPU, ("%s: old %d, new %d, highest %d, lowest %d\n",
-	    str, oldlevel, newlevel, highest, lowest))
-
-	if (newlevel > oldlevel) {
-		chstr = "UP";
-		speedup = 1;
-		incr = 1;
-	} else if (newlevel < oldlevel) {
-		chstr = "DOWN";
-		speedup = 0;
-		incr = -1;
-	} else
-		return (DDI_SUCCESS);
-
-	/*
-	 * This loop will execute 1x or 2x depending on
-	 * number of times we need to change clock rates
-	 */
-	for (level = oldlevel+incr; level != newlevel+incr; level += incr) {
-		/* bring each cpu to next level */
-		for (; cpup; cpup = cpup->next) {
-			if (cpup->level == level)
-				continue;
-
-			ret = pm_power(cpup->dip, 0, level);
-			PPMD(D_CPU, ("%s: \"%s\", %s to level %d, ret %d\n",
-			    str, cpup->path, chstr, level, ret))
-			if (ret == DDI_SUCCESS) {
-				cpup->level = level;
-				cpup->rplvl = PM_LEVEL_UNKNOWN;
-				continue;
-			}
-
-			/*
-			 * if the driver was unable to lower cpu speed,
-			 * the cpu probably got busy; set the previous
-			 * cpus back to the original level
-			 */
-			if (speedup == 0)
-				ret = ppm_revert_cpu_power(cpup, level + 1);
-			return (ret);
-		}
-		cpup = domp->devlist;
-
-		/*
-		 * set bus resident devices at next speed level
-		 */
-		ret = ppm_cpu_next(domp, level);
-		if (ret != 0) {
-			(void) ppm_revert_cpu_power(cpup, level - incr);
-			return (ret);
-		}
-
-		/*
-		 * platform dependent various operations before
-		 * initiating cpu speed change
-		 */
-		ret = ppm_cpu_pre_chng(domp, level - incr, speedup);
-		if (ret != 0) {
-			(void) ppm_revert_cpu_power(cpup, level - incr);
-			(void) ppm_cpu_next(domp, level - incr);
-			return (ret);
-		}
-
-		/*
-		 * the following 1us delay is actually required for us3i only.
-		 * on us3i system, entering estar mode from full requires
-		 * to set mcu to single fsm state followed by 1us delay
-		 * before trigger actual transition.  The mcu part is
-		 * handled in us_drv, the delay is here.
-		 */
-		if ((oldlevel == highest) && (speedup == 0))
-			drv_usecwait(1);
-
-		/*
-		 * initiate cpu speed change
-		 */
-		ret = ppm_cpu_go(domp, level);
-		if (ret != 0) {
-			(void) ppm_revert_cpu_power(cpup, level - incr);
-			(void) ppm_cpu_next(domp, level - incr);
-			return (ret);
-		}
-
-		/*
-		 * platform dependent operations post cpu speed change
-		 */
-		ret = ppm_cpu_post_chng(domp, level, speedup);
-		if (ret != 0)
-			return (ret);
-
-	}   /* end of looping each level */
-
-	return (DDI_SUCCESS);
-}
-
-
-/*
  * Raise the power level of a subrange of cpus.  Used when cpu driver
  * failed an attempt to lower the power of a cpu (probably because
  * it got busy).  Need to revert the ones we already changed.
@@ -1202,7 +1000,7 @@ ppm_change_cpu_power(ppm_dev_t *ppmd, int newlevel)
  * ecpup = the ppm_dev_t for the cpu which failed to lower power
  * level = power level to reset prior cpus to
  */
-static int
+int
 ppm_revert_cpu_power(ppm_dev_t *ecpup, int level)
 {
 	ppm_dev_t *cpup;
@@ -1220,6 +1018,7 @@ ppm_revert_cpu_power(ppm_dev_t *ecpup, int level)
 	}
 	return (ret);
 }
+
 
 /*
  * ppm_manage_cpus - Process a request to change the power level of a cpu.
@@ -1239,7 +1038,6 @@ ppm_manage_cpus(dev_info_t *dip, power_req_t *reqp, int *result)
 	int change_notify = 0;
 	pm_ppm_devlist_t *devlist = NULL, *p;
 	int		do_rescan = 0;
-	dev_info_t	*rescan_dip;
 
 	*result = DDI_SUCCESS;
 
@@ -1269,30 +1067,8 @@ ppm_manage_cpus(dev_info_t *dip, power_req_t *reqp, int *result)
 		return (DDI_SUCCESS);
 	}
 
-	/*
-	 * This handles the power-on case where cpu power level is
-	 * PM_LEVEL_UNKNOWN.  Per agreement with OBP, cpus always
-	 * boot up at full speed.  In fact, we must not making calls
-	 * into tomtppm or schppm to trigger cpu speed change to a
-	 * different level at early boot time since some cpu may not
-	 * be ready, causing xc_one() to fail silently.
-	 *
-	 * Here we simply call pm_power() to get the power level updated
-	 * in pm and ppm. Had xc_one() failed silently inside us_power()
-	 * at this time we're unaffected.
-	 */
-	if (ppmd->level == PM_LEVEL_UNKNOWN && new == ppmd->highest) {
-		ret = pm_power(dip, 0, new);
-		if (ret != DDI_SUCCESS) {
-			PPMD(D_CPU, ("%s: pm_power() failed to change power "
-			    "level to %d", str, new))
-		} else {
-			ppmd->level = new;
-			ppmd->rplvl = PM_LEVEL_UNKNOWN;
-		}
-		*result = ret;
-		return (ret);
-	}
+	if (ppm_manage_early_cpus(dip, new, result))
+		return (*result);
 
 	if (new == ppmd->level) {
 		PPMD(D_CPU, ("%s: already at power level %d\n", str, new))
@@ -1301,10 +1077,8 @@ ppm_manage_cpus(dev_info_t *dip, power_req_t *reqp, int *result)
 
 	/*
 	 * A request from lower to higher level transition is granted and
-	 * made effective on both cpus. For more than two cpu platform model,
-	 * the following code needs to be modified to remember the rest of
-	 * the unsoliciting cpus to be rescan'ed.
-	 * A request from higher to lower must be agreed by all cpus.
+	 * made effective on all cpus. A request from higher to lower must
+	 * be agreed upon by all cpus.
 	 */
 	ppmd->rplvl = new;
 	for (cpup = ppmd->domp->devlist; cpup; cpup = cpup->next) {
@@ -1318,8 +1092,8 @@ ppm_manage_cpus(dev_info_t *dip, power_req_t *reqp, int *result)
 		}
 
 		/*
-		 * If a single cpu requests power up, honor the request by
-		 * powering up both cpus.
+		 * If a single cpu requests power up, honor the request
+		 * powering up all cpus.
 		 */
 		if (new > old) {
 			PPMD(D_SOME, ("%s: powering up device(%s@%s, %p) "
@@ -1328,8 +1102,6 @@ ppm_manage_cpus(dev_info_t *dip, power_req_t *reqp, int *result)
 			    PM_ADDR(cpup->dip), (void *)cpup->dip,
 			    PM_NAME(dip), PM_ADDR(dip), (void *)dip))
 			do_rescan++;
-			rescan_dip = cpup->dip;
-			break;
 		}
 	}
 
@@ -1365,8 +1137,14 @@ ppm_manage_cpus(dev_info_t *dip, power_req_t *reqp, int *result)
 		}
 		reqp->req.ppm_set_power_req.cookie = (void *) devlist;
 
-		if (do_rescan > 0)
-			pm_rescan(rescan_dip);
+		if (do_rescan > 0) {
+			for (cpup = ppmd->domp->devlist; cpup;
+			    cpup = cpup->next) {
+				if (cpup->dip == dip)
+					continue;
+				pm_rescan(cpup->dip);
+			}
+		}
 	}
 
 	return (ret);
@@ -1842,7 +1620,6 @@ ppm_fetset(ppm_domain_t *domp, uint8_t value)
 	char	*str = "ppm_fetset";
 	int	key;
 	ppm_dc_t *dc;
-	i2c_gpio_t i2c_req;
 	int	ret;
 	clock_t	temp;
 	clock_t delay = 0;
@@ -1858,11 +1635,7 @@ ppm_fetset(ppm_domain_t *domp, uint8_t value)
 	}
 
 	if (key == PPMDC_FET_ON) {
-		if (dc->method == PPMDC_I2CKIO)
-			delay = dc->m_un.i2c.delay;
-		else if (dc->method == PPMDC_KIO)
-			delay = dc->m_un.kio.delay;
-
+		PPM_GET_IO_DELAY(dc, delay);
 		if (delay > 0 && domp->last_off_time > 0) {
 			/*
 			 * provide any delay required before turning on.
@@ -1889,12 +1662,16 @@ ppm_fetset(ppm_domain_t *domp, uint8_t value)
 		}
 	}
 	switch (dc->method) {
-	case PPMDC_I2CKIO:
+#if !defined(__x86)
+	case PPMDC_I2CKIO: {
+		i2c_gpio_t i2c_req;
 		i2c_req.reg_mask = dc->m_un.i2c.mask;
 		i2c_req.reg_val = dc->m_un.i2c.val;
 		ret = ldi_ioctl(dc->lh, dc->m_un.i2c.iowr,
 		    (intptr_t)&i2c_req, FWRITE | FKIOCTL, kcred, NULL);
 		break;
+	}
+#endif
 
 	case PPMDC_KIO:
 		ret = ldi_ioctl(dc->lh, dc->m_un.kio.iowr,
@@ -1926,10 +1703,7 @@ ppm_fetset(ppm_domain_t *domp, uint8_t value)
 
 		/* implement any post op delay. */
 		if (key == PPMDC_FET_ON) {
-			if (dc->method == PPMDC_I2CKIO)
-				delay = dc->m_un.i2c.post_delay;
-			else if (dc->method == PPMDC_KIO)
-				delay = dc->m_un.kio.post_delay;
+			PPM_GET_IO_DELAY(dc, delay);
 			PPMD(D_FET, ("%s : waiting %lu micro seconds "
 			    "after on\n", domp->name, delay))
 			if (delay > 0)
@@ -1949,7 +1723,6 @@ ppm_fetget(ppm_domain_t *domp, uint8_t *lvl)
 {
 	char	*str = "ppm_fetget";
 	ppm_dc_t *dc = domp->dc;
-	i2c_gpio_t i2c_req;
 	uint_t	kio_val;
 	int	off_val;
 	int	ret;
@@ -1966,7 +1739,9 @@ ppm_fetget(ppm_domain_t *domp, uint8_t *lvl)
 	}
 
 	switch (dc->method) {
-	case PPMDC_I2CKIO:
+#if !defined(__x86)
+	case PPMDC_I2CKIO: {
+		i2c_gpio_t i2c_req;
 		i2c_req.reg_mask = dc->m_un.i2c.mask;
 		ret = ldi_ioctl(dc->lh, dc->m_un.i2c.iord,
 		    (intptr_t)&i2c_req, FWRITE | FKIOCTL, kcred, NULL);
@@ -1985,6 +1760,8 @@ ppm_fetget(ppm_domain_t *domp, uint8_t *lvl)
 		    (i2c_req.reg_val == off_val) ? "OFF" : "ON"))
 
 		break;
+	}
+#endif
 
 	case PPMDC_KIO:
 		ret = ldi_ioctl(dc->lh, dc->m_un.kio.iord,
@@ -2390,12 +2167,8 @@ ppm_gpioset(ppm_domain_t *domp, int key)
 	char	*str = "ppm_gpioset";
 #endif
 	ppm_dc_t *dc;
-	i2c_gpio_t i2c_req;
-	int	ret, pio_save;
+	int	ret;
 	clock_t delay = 0;
-	ppm_dev_t *pdev;
-	extern int do_polled_io;
-	extern uint_t cfb_inuse;
 
 	for (dc = domp->dc; dc; dc = dc->next)
 		if (dc->cmd == key)
@@ -2406,10 +2179,7 @@ ppm_gpioset(ppm_domain_t *domp, int key)
 		return (DDI_FAILURE);
 	}
 
-	if (dc->method == PPMDC_I2CKIO)
-		delay = dc->m_un.i2c.delay;
-	else if (dc->method == PPMDC_KIO)
-		delay = dc->m_un.kio.delay;
+	PPM_GET_IO_DELAY(dc, delay);
 	if (delay > 0) {
 		PPMD(D_GPIO, ("%s : waiting %lu micro seconds "
 		    "before change\n", domp->name, delay))
@@ -2417,7 +2187,13 @@ ppm_gpioset(ppm_domain_t *domp, int key)
 	}
 
 	switch (dc->method) {
-	case PPMDC_I2CKIO:
+#if !defined(__x86)
+	case PPMDC_I2CKIO: {
+		i2c_gpio_t i2c_req;
+		ppm_dev_t *pdev;
+		int pio_save;
+		extern int do_polled_io;
+		extern uint_t cfb_inuse;
 		i2c_req.reg_mask = dc->m_un.i2c.mask;
 		i2c_req.reg_val = dc->m_un.i2c.val;
 
@@ -2445,7 +2221,8 @@ ppm_gpioset(ppm_domain_t *domp, int key)
 		    dc->m_un.i2c.val))
 
 		break;
-
+	}
+#endif
 	case PPMDC_KIO:
 		ret = ldi_ioctl(dc->lh, dc->m_un.kio.iowr,
 		    (intptr_t)&(dc->m_un.kio.val), FWRITE | FKIOCTL, kcred,
@@ -2467,10 +2244,7 @@ ppm_gpioset(ppm_domain_t *domp, int key)
 	}
 
 	/* implement any post op delay. */
-	if (dc->method == PPMDC_I2CKIO)
-		delay = dc->m_un.i2c.post_delay;
-	else if (dc->method == PPMDC_KIO)
-		delay = dc->m_un.kio.post_delay;
+	PPM_GET_IO_DELAY(dc, delay);
 	if (delay > 0) {
 		PPMD(D_GPIO, ("%s : waiting %lu micro seconds "
 		    "after change\n", domp->name, delay))

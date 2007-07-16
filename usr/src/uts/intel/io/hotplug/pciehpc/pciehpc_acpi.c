@@ -112,7 +112,7 @@ pciehpc_acpi_hotplug_enabled(dev_info_t *dip)
 	/*
 	 * (1)  Find the ACPI device node for this bus node.
 	 */
-	status = acpica_find_pciobj(dip, &pcibus_obj);
+	status = acpica_get_handle(dip, &pcibus_obj);
 	if (status != AE_OK) {
 		/*
 		 * No ACPI device for this bus node. Assume there is
@@ -208,7 +208,7 @@ pciehpc_acpi_hpc_init(pciehpc_t *ctrl_p)
 	uint16_t slot_methods = 0;
 
 	/* get the ACPI object for the bus node */
-	status = acpica_find_pciobj(ctrl_p->dip, &pcibus_obj);
+	status = acpica_get_handle(ctrl_p->dip, &pcibus_obj);
 	if (status != AE_OK)
 		return (DDI_FAILURE);
 

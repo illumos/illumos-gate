@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,12 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _SYS_US_DRV_H
-#define	_SYS_US_DRV_H
+#ifndef _SYS_CPUDRV_H
+#define	_SYS_CPUDRV_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -40,7 +39,7 @@ extern "C" {
 #ifdef _KERNEL
 
 /*
- * UltraSPARC CPU power management data
+ * CPU power management data
  */
 /*
  * Data related to a particular speed.
@@ -51,12 +50,17 @@ extern "C" {
  * all up_spd's point to the normal speed but this can be changed in future.
  * quant_cnt is the number of ticks when monitoring system will be called
  * next. There are different quant_cnt for different speeds.
+ *
+ * Note that 'speed' has different meaning depending upon the platform.
+ * On SPARC, the speed is really a divisor of the maximum speed (e.g., a speed
+ * of 2 means that it's 1/2 the maximum speed). On x86, speed is a processor
+ * frequency.
  */
-typedef struct us_pm_spd {
-	uint_t			divisor;	/* speed divisor */
+typedef struct cpudrv_pm_spd {
+	uint_t			speed;		/* platform dependent notion */
 	uint_t			quant_cnt;	/* quantum count in ticks */
-	struct us_pm_spd	*down_spd;	/* ptr to next speed down */
-	struct us_pm_spd	*up_spd;	/* ptr to next speed up */
+	struct cpudrv_pm_spd	*down_spd;	/* ptr to next speed down */
+	struct cpudrv_pm_spd	*up_spd;	/* ptr to next speed up */
 	uint_t			idle_hwm;	/* down if idle thread >= hwm */
 	uint_t			idle_lwm;	/* up if idle thread < lwm */
 	uint_t			idle_bhwm_cnt;	/* # of iters idle is < hwm */
@@ -64,50 +68,56 @@ typedef struct us_pm_spd {
 	uint_t			user_hwm;	/* up if user thread > hwm */
 	int			user_lwm;	/* down if user thread <= lwm */
 	int			pm_level;	/* power level for framework */
-} us_pm_spd_t;
+} cpudrv_pm_spd_t;
 
 /*
  * Power management data
  */
-typedef struct us_pm {
-	us_pm_spd_t	*head_spd;	/* ptr to head of speed */
-	us_pm_spd_t	*cur_spd;	/* ptr to current speed */
-	us_pm_spd_t	*targ_spd;	/* target speed when cur_spd */
+typedef struct cpudrv_pm {
+	cpudrv_pm_spd_t	*head_spd;	/* ptr to head of speed */
+	cpudrv_pm_spd_t	*cur_spd;	/* ptr to current speed */
+	cpudrv_pm_spd_t	*targ_spd;	/* target speed when cur_spd */
 					/* is unknown (i.e. NULL) */
 	uint_t		num_spd;	/* number of speeds */
-	uint_t		lastquan_idle;	/* last quantum's CPU_IDLE timestamp */
-	uint_t		lastquan_user;	/* last quantum's CPU_USER timestamp */
+	hrtime_t	lastquan_mstate[NCMSTATES]; /* last quantum's mstate */
 	clock_t		lastquan_lbolt;	/* last quantum's lbolt */
 	int		pm_busycnt;	/* pm_busy_component() count  */
 	taskq_t		*tq;		/* taskq handler for CPU monitor */
-	timeout_id_t	timeout_id;	/* us_pm_monitor()'s timeout_id */
+	timeout_id_t	timeout_id;	/* cpudrv_pm_monitor()'s timeout_id */
 	int		timeout_count;	/* count dispatched timeouts */
 	kmutex_t	timeout_lock;	/* protect timeout_count */
 	kcondvar_t	timeout_cv;	/* wait on timeout_count change */
-} us_pm_t;
+#if defined(__x86)
+	kthread_t	*pm_throttle_thread; /* throttling thread */
+#endif
+} cpudrv_pm_t;
 
 /*
  * Idle & user threads water marks in percentage
  */
-#define	US_PM_IDLE_LWM		8	/* idle low water mark */
-#define	US_PM_IDLE_HWM		98	/* idle high water mark */
-#define	US_PM_USER_HWM		20	/* user high water mark */
-#define	US_PM_IDLE_BUF_ZONE	4	/* buffer zone when going down */
+#if defined(__x86)
+#define	CPUDRV_PM_IDLE_LWM		80	/* idle low water mark */
+#else
+#define	CPUDRV_PM_IDLE_LWM		8	/* idle low water mark */
+#endif
+#define	CPUDRV_PM_IDLE_HWM		98	/* idle high water mark */
+#define	CPUDRV_PM_USER_HWM		20	/* user high water mark */
+#define	CPUDRV_PM_IDLE_BUF_ZONE		4    /* buffer zone when going down */
 
-#define	US_PM_IDLE_BLWM_CNT_MAX	2	/* # of iters idle can be < lwm */
-#define	US_PM_IDLE_BHWM_CNT_MAX	2	/* # of iters idle can be < hwm */
+#define	CPUDRV_PM_IDLE_BLWM_CNT_MAX	2    /* # of iters idle can be < lwm */
+#define	CPUDRV_PM_IDLE_BHWM_CNT_MAX	2    /* # of iters idle can be < hwm */
 
 /*
  * Maximums for creating 'pm-components' property
  */
-#define	US_PM_COMP_MAX_DIG	4	/* max digits in power level */
+#define	CPUDRV_PM_COMP_MAX_DIG	4	/* max digits in power level */
 					/* or divisor */
-#define	US_PM_COMP_MAX_VAL	9999	/* max value in above digits */
+#define	CPUDRV_PM_COMP_MAX_VAL	9999	/* max value in above digits */
 
 /*
  * Component number for calls to PM framework
  */
-#define	US_PM_COMP_NUM		0	/* first component is 0 */
+#define	CPUDRV_PM_COMP_NUM	0	/* first component is 0 */
 
 /*
  * Quantum counts for normal and other clock speeds in terms of ticks.
@@ -121,35 +131,39 @@ typedef struct us_pm {
  *	that we monitor less frequently.
  *
  * We reach a tradeoff between these two requirements by monitoring
- * more frequently when we are in low speed mode (US_PM_QUANT_CNT_OTHR)
+ * more frequently when we are in low speed mode (CPUDRV_PM_QUANT_CNT_OTHR)
  * so we can bring the CPU up without user noticing it. Moreover, at low
  * speed we are not using CPU much so extra code execution should be fine.
  * Since we are in no hurry to bring CPU down and at normal speed and we
  * might really be using the CPU fully, we monitor less frequently
- * (US_PM_QUANT_CNT_NORMAL).
+ * (CPUDRV_PM_QUANT_CNT_NORMAL).
  */
-#define	US_PM_QUANT_CNT_NORMAL	(hz * 5)		/* 5 sec */
-#define	US_PM_QUANT_CNT_OTHR	(hz * 1)		/* 1 sec */
+#define	CPUDRV_PM_QUANT_CNT_NORMAL	(hz * 5)	/* 5 sec */
+#define	CPUDRV_PM_QUANT_CNT_OTHR	(hz * 1)	/* 1 sec */
 
 /*
  * Taskq parameters
  */
-#define	US_PM_TASKQ_THREADS	1	/* # threads to run CPU monitor */
-#define	US_PM_TASKQ_MIN		2	/* min # of taskq entries */
-#define	US_PM_TASKQ_MAX		2	/* max # of taskq entries */
+#define	CPUDRV_PM_TASKQ_THREADS		1    /* # threads to run CPU monitor */
+#define	CPUDRV_PM_TASKQ_MIN		2	/* min # of taskq entries */
+#define	CPUDRV_PM_TASKQ_MAX		2	/* max # of taskq entries */
 
 
 /*
  * Device driver state structure
  */
-typedef struct us_devstate {
+typedef struct cpudrv_devstate {
 	dev_info_t	*dip;		/* devinfo handle */
 	processorid_t	cpu_id;		/* CPU number for this node */
-	us_pm_t		us_pm;		/* power management data */
+	cpudrv_pm_t	cpudrv_pm;	/* power management data */
 	kmutex_t	lock;		/* protects state struct */
-} us_devstate_t;
+#if defined(__x86)
+	void		*acpi_handle;	/* ACPI cache */
+	void		*module_state;  /* CPU module state */
+#endif
+} cpudrv_devstate_t;
 
-
+extern void	*cpudrv_state;
 
 /*
  * Debugging definitions
@@ -167,13 +181,20 @@ typedef struct us_devstate {
 #define	D_PM_MONITOR_VERBOSE	0x00000200
 #define	D_PM_MONITOR_DELAY	0x00000400
 
-extern uint_t	us_drv_debug;
+extern uint_t	cpudrv_debug;
 
 #define	_PRINTF prom_printf
-#define	DPRINTF(flag, args)	if (us_drv_debug & flag) _PRINTF args;
+#define	DPRINTF(flag, args)	if (cpudrv_debug & flag) _PRINTF args;
 #else
 #define	DPRINTF(flag, args)
 #endif /* DEBUG */
+
+extern int cpudrv_pm_change_speed(cpudrv_devstate_t *, cpudrv_pm_spd_t *);
+extern boolean_t cpudrv_pm_get_cpu_id(dev_info_t *, processorid_t *);
+extern boolean_t cpudrv_pm_all_instances_ready(void);
+extern boolean_t cpudrv_pm_is_throttle_thread(cpudrv_pm_t *);
+extern boolean_t cpudrv_pm_init_module(cpudrv_devstate_t *);
+extern void cpudrv_pm_free_module(cpudrv_devstate_t *);
 
 #endif /* _KERNEL */
 
@@ -181,4 +202,4 @@ extern uint_t	us_drv_debug;
 }
 #endif
 
-#endif /* _SYS_US_DRV_H */
+#endif /* _SYS_CPUDRV_H */

@@ -82,11 +82,15 @@ f none platform/i86pc/kernel/drv/amd64/mc-amd 755 root sys
 f none platform/i86pc/kernel/drv/amd64/npe 755 root sys
 f none platform/i86pc/kernel/drv/amd64/pci 755 root sys
 f none platform/i86pc/kernel/drv/amd64/rootnex 755 root sys
+f none platform/i86pc/kernel/drv/cpudrv 755 root sys
+f none platform/i86pc/kernel/drv/cpunex 755 root sys
 f none platform/i86pc/kernel/drv/isa 755 root sys
 f none platform/i86pc/kernel/drv/mc-amd 755 root sys
 f none platform/i86pc/kernel/drv/mc-amd.conf 644 root sys
 f none platform/i86pc/kernel/drv/npe 755 root sys
 f none platform/i86pc/kernel/drv/pci 755 root sys
+f none platform/i86pc/kernel/drv/ppm 755 root sys
+f none platform/i86pc/kernel/drv/ppm.conf 644 root sys
 f none platform/i86pc/kernel/drv/rootnex 755 root sys
 d none platform/i86pc/kernel/mach 755 root sys
 f none platform/i86pc/kernel/mach/pcplusmp 755 root sys
@@ -104,3 +108,6 @@ f none platform/i86pc/kernel/unix 755 root sys
 f none platform/i86pc/multiboot 755 root sys
 d none platform/i86pc/ucode 755 root sys
 v none platform/i86pc/ucode/intel-ucode.txt 444 root sys
+f none platform/i86pc/kernel/drv/amd64/cpudrv 755 root sys
+f none platform/i86pc/kernel/drv/amd64/cpunex 755 root sys
+f none platform/i86pc/kernel/drv/amd64/ppm 755 root sys

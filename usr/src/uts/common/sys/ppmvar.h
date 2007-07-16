@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -265,6 +264,15 @@ typedef struct ppm_domain ppm_domain_t;
 #define	PPMD_PCI66MHZ		0x2000	/* 66mhz PCI slot */
 #define	PPMD_INITCHILD_CLKON	0x4000	/* clk turned on in init_child */
 #define	PPMD_OFFLINE		0x10000	/* domain is not functional */
+#define	PPMD_CPU_READY		0x20000	/* CPU domain can process power call */
+
+struct ppm_domit {
+	char	*name;
+	int	model;
+	int	dflags;
+	int	status;
+};
+extern struct ppm_domit ppm_domit_data[];
 
 /*
  * XXppm driver-specific routines called from common code (s10)
@@ -299,6 +307,10 @@ extern boolean_t	ppm_none_else_holds_power(ppm_domain_t *);
 extern ppm_owned_t	*ppm_add_owned(dev_info_t *, ppm_domain_t *);
 extern void		ppm_lock_one(ppm_dev_t *, power_req_t *, int *);
 extern void		ppm_lock_all(ppm_domain_t *, power_req_t *, int *);
+extern boolean_t	ppm_manage_early_cpus(dev_info_t *, int, int *);
+extern int		ppm_change_cpu_power(ppm_dev_t *, int);
+extern int		ppm_revert_cpu_power(ppm_dev_t *, int);
+extern ppm_dev_t	*ppm_add_dev(dev_info_t *, ppm_domain_t *);
 
 #define	PPM_GET_PRIVATE(dip) \
     DEVI(dip)->devi_pm_ppm_private

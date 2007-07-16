@@ -411,7 +411,7 @@ acpi_translate_pci_irq(dev_info_t *dip, int ipin, int *pci_irqp,
 			break;
 		}
 
-		status = acpica_find_pciobj(parentdip, &pciobj);
+		status = acpica_get_handle(parentdip, &pciobj);
 		if ((status == AE_OK) && psm_node_has_prt(pciobj)) {
 			return (acpi_get_gsiv(curdip, pciobj, curdev, curpin,
 			    pci_irqp, intr_flagp, acpipsmlnkp));

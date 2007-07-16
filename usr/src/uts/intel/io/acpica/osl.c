@@ -35,6 +35,7 @@
 #include <sys/psm.h>
 #include <sys/pci_cfgspace.h>
 #include <sys/ddi.h>
+#include <sys/sunndi.h>
 #include <sys/pci.h>
 #include <sys/kobj.h>
 #include <sys/taskq.h>
@@ -44,32 +45,20 @@
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
 
-extern int (*psm_translate_irq)(dev_info_t *, int);
-
 #define	MAX_DAT_FILE_SIZE	(64*1024)
-
-#define	D2A_INITLEN	20
-static int d2a_len = 0;
-static int d2a_valid = 0;
-static d2a *d2a_table;
-
-static int acpi_has_broken_bbn = -1;
 
 /* local functions */
 static int CompressEisaID(char *np);
 
-static void create_d2a_map(void);
-static void create_d2a_subtree(dev_info_t *dip, ACPI_HANDLE acpiobj, int bus);
-static void new_d2a_entry(dev_info_t *dip, ACPI_HANDLE acpiobj,
-	int bus, int dev, int func);
+static void scan_d2a_map(void);
+static void scan_d2a_subtree(dev_info_t *dip, ACPI_HANDLE acpiobj, int bus);
+static void acpica_tag_devinfo(dev_info_t *dip, ACPI_HANDLE acpiobj);
 
 static int acpica_query_bbn_problem(void);
 static int acpica_find_pcibus(int busno, ACPI_HANDLE *rh);
 static int acpica_eval_hid(ACPI_HANDLE dev, char *method, int *rint);
-
-int acpica_find_pciobj(dev_info_t *dip, ACPI_HANDLE *rh);
-static int acpica_find_pcid2a(ACPI_HANDLE, d2a **);
-int acpica_eval_int(ACPI_HANDLE dev, char *method, int *rint);
+static ACPI_STATUS acpica_set_devinfo(ACPI_HANDLE, dev_info_t *);
+static void acpica_devinfo_handler(ACPI_HANDLE, UINT32, void *);
 
 /*
  * Event queue vars
@@ -84,11 +73,26 @@ ddi_taskq_t *osl_eventq[OSL_EC_BURST_HANDLER+1];
  */
 static char *acpi_table_path = "/boot/acpi/tables/";
 
-/* non-zero while create_d2a_map() is working */
-static int creating_d2a_map = 0;
+/* non-zero while scan_d2a_map() is working */
+static int scanning_d2a_map = 0;
+static int d2a_done = 0;
 
 /* set by acpi_poweroff() in PSMs */
 int acpica_powering_off = 0;
+
+/* CPU mapping data */
+struct cpu_map_item {
+	MADT_PROCESSOR_APIC *mpa;
+	ACPI_HANDLE	obj;
+};
+
+static struct cpu_map_item **cpu_map = NULL;
+static int cpu_map_count = 0;
+static int cpu_map_built = 0;
+
+static int acpi_has_broken_bbn = -1;
+
+#define	D2A_DEBUG
 
 /*
  *
@@ -147,7 +151,6 @@ init_event_queues()
 ACPI_STATUS
 AcpiOsInitialize(void)
 {
-
 	return (AE_OK);
 }
 
@@ -887,48 +890,46 @@ AcpiOsWritePciConfiguration(ACPI_PCI_ID *PciId, UINT32 Register,
  * Some BIOSes implement _BBN() by reading PCI config space
  * on bus #0 - which means that we'll recurse when we attempt
  * to create the devinfo-to-ACPI map.  If Derive is called during
- * create_d2a_map, we don't translate the bus # and return.
+ * scan_d2a_map, we don't translate the bus # and return.
+ *
+ * We get the parent of the OpRegion, which must be a PCI
+ * node, fetch the associated devinfo node and snag the
+ * b/d/f from it.
  */
 void
 AcpiOsDerivePciId(ACPI_HANDLE rhandle, ACPI_HANDLE chandle,
 		ACPI_PCI_ID **PciId)
 {
 	ACPI_HANDLE handle;
-	d2a *d2ap;
-	int devfn;
+	dev_info_t *dip;
+	int bus, device, func, devfn;
 
 
 	/*
-	 * See above - avoid recursing during create_d2a_map.
+	 * See above - avoid recursing during scanning_d2a_map.
 	 */
-	if (creating_d2a_map)
+	if (scanning_d2a_map)
 		return;
 
 	/*
-	 * We start with the parent node of the OpRegion
-	 * and ascend, looking for a matching dip2acpi
-	 * node; once located, we use the bus from the d2a
-	 * node and the device/function return from the _ADR
-	 * method on the ACPI node.
-	 * If we encounter any kind of failure, we just
-	 * return, possibly after updating the bus value
-	 * This is probably always better than nothing.
+	 * Get the OpRegion's parent
 	 */
 	if (AcpiGetParent(chandle, &handle) != AE_OK)
 		return;
 
-	while (handle != rhandle) {
-		if (acpica_find_pcid2a(handle, &d2ap) == AE_OK) {
-			(*PciId)->Bus = d2ap->bus;
-			if (acpica_eval_int(handle, "_ADR", &devfn) == AE_OK) {
-				(*PciId)->Device = (devfn >> 16) & 0xFFFF;
-				(*PciId)->Function = devfn & 0xFFFF;
-			}
-			break;
-		}
-
-		if (AcpiGetParent(handle, &handle) != AE_OK)
-			break;
+	/*
+	 * If we've mapped the ACPI node to the devinfo
+	 * tree, use the devinfo reg property
+	 */
+	if (acpica_get_devinfo(handle, &dip) == AE_OK) {
+		(void) acpica_get_bdf(dip, &bus, &device, &func);
+		(*PciId)->Bus = bus;
+		(*PciId)->Device = device;
+		(*PciId)->Function = func;
+	} else if (acpica_eval_int(handle, "_ADR", &devfn) == AE_OK) {
+		/* no devinfo node - just confirm the d/f */
+		(*PciId)->Device = (devfn >> 16) & 0xFFFF;
+		(*PciId)->Function = devfn & 0xFFFF;
 	}
 }
 
@@ -1224,7 +1225,7 @@ CompressEisaID(char *np)
 	return (myu.retval);
 }
 
-int
+ACPI_STATUS
 acpica_eval_int(ACPI_HANDLE dev, char *method, int *rint)
 {
 	ACPI_STATUS status;
@@ -1285,95 +1286,153 @@ acpica_eval_hid(ACPI_HANDLE dev, char *method, int *rint)
 }
 
 /*
- * Return the d2a node matching this ACPI_HANDLE, if one exists
- */
-int
-acpica_find_pcid2a(ACPI_HANDLE rh, d2a **dp)
-{
-	d2a *d2ap;
-	int i;
-
-	if (d2a_len == 0)
-		create_d2a_map();
-	for (d2ap = d2a_table, i = 0; i < d2a_valid; d2ap++, i++)
-		if (d2ap->acpiobj == rh) {
-			*dp = d2ap;
-			return (AE_OK);
-		}
-
-	return (AE_ERROR);
-}
-
-
-/*
- * Return the ACPI device node matching this dev_info node, if it
- * exists in the ACPI tree.
- */
-int
-acpica_find_pciobj(dev_info_t *dip, ACPI_HANDLE *rh)
-{
-	d2a *d2ap;
-	int i;
-
-	if (d2a_len == 0)
-		create_d2a_map();
-	for (d2ap = d2a_table, i = 0; i < d2a_valid; d2ap++, i++)
-		if (d2ap->dip == dip) {
-			*rh = d2ap->acpiobj;
-			return (AE_OK);
-		}
-
-	return (AE_ERROR);
-}
-
-/*
- * Create a table mapping PCI dips to ACPI objects
+ * Create linkage between devinfo nodes and ACPI nodes
  */
 static void
-new_d2a_entry(dev_info_t *dip, ACPI_HANDLE acpiobj, int bus, int dev, int func)
+acpica_tag_devinfo(dev_info_t *dip, ACPI_HANDLE acpiobj)
 {
-	int newsize;
-	d2a *new_arr, *ep;
+	ACPI_STATUS status;
+	ACPI_BUFFER rb;
 
-	if (d2a_valid >= d2a_len) {
-		/* initially, or re-, allocate array */
+	/*
+	 * Tag the ACPI node with the dip
+	 */
+	status = acpica_set_devinfo(acpiobj, dip);
+	ASSERT(status == AE_OK);
 
-		newsize = (d2a_len ? d2a_len * 2 : D2A_INITLEN);
-		new_arr = kmem_zalloc(newsize * sizeof (d2a), KM_SLEEP);
-		if (d2a_len != 0) {
-			/* realloc: copy data, free old */
-			bcopy(d2a_table, new_arr, d2a_len * sizeof (d2a));
-			kmem_free(d2a_table, d2a_len * sizeof (d2a));
-		}
-		d2a_len = newsize;
-		d2a_table = new_arr;
+	/*
+	 * Tag the devinfo node with the ACPI name
+	 */
+	rb.Pointer = NULL;
+	rb.Length = ACPI_ALLOCATE_BUFFER;
+	if (AcpiGetName(acpiobj, ACPI_FULL_PATHNAME, &rb) == AE_OK) {
+		(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip,
+		    "acpi-namespace", (char *)rb.Pointer);
+		AcpiOsFree(rb.Pointer);
+	} else {
+		cmn_err(CE_WARN, "acpica: could not get ACPI path!");
 	}
-	ep = &d2a_table[d2a_valid++];
-	ep->bus = (unsigned char)bus;
-	ep->dev = (unsigned char)dev;
-	ep->func = (unsigned char)func;
-	ep->dip = dip;
-	ep->acpiobj = acpiobj;
-#ifdef D2ADEBUG
-	{
-		ACPI_BUFFER rb;
-		char pathname[60];
-		ddi_pathname(dip, pathname);
+}
 
+static void
+acpica_add_processor_to_map(UINT32 acpi_id, ACPI_HANDLE obj)
+{
+	int	cpu_id;
+
+	/*
+	 * Special case: if we're a uppc system, there won't be
+	 * a CPU map yet.  So we create one and use the passed-in
+	 * processor as CPU 0
+	 */
+	if (cpu_map == NULL) {
+		cpu_map = kmem_zalloc(sizeof (cpu_map[0]) * NCPU, KM_SLEEP);
+		cpu_map[0] = kmem_zalloc(sizeof (*cpu_map[0]), KM_SLEEP);
+		cpu_map[0]->obj = obj;
+		cpu_map_count = 1;
+		return;
+	}
+
+	for (cpu_id = 0; cpu_id < NCPU; cpu_id++) {
+		if (cpu_map[cpu_id] == NULL)
+			continue;
+
+		if (cpu_map[cpu_id]->mpa->ProcessorId == acpi_id) {
+			cpu_map[cpu_id]->obj = obj;
+			break;
+		}
+	}
+
+}
+
+/*
+ *
+ */
+ACPI_STATUS
+acpica_get_handle_cpu(dev_info_t *dip, ACPI_HANDLE *rh)
+{
+	char	*device_type_prop;
+	int	cpu_id;
+
+	/*
+	 * if "device_type" != "cpu", error
+	 */
+	if ((ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0,
+	    "device_type", &device_type_prop) != DDI_PROP_SUCCESS) ||
+	    (strcmp("cpu", device_type_prop) != 0)) {
+		ddi_prop_free(device_type_prop);
+		return (AE_ERROR);
+	}
+	ddi_prop_free(device_type_prop);
+
+	/*
+	 * if cpu_map itself is NULL, we're a uppc system and
+	 * acpica_build_processor_map() hasn't been called yet.
+	 * So call it here
+	 */
+	if (cpu_map == NULL) {
+		(void) acpica_build_processor_map();
+		if (cpu_map == NULL)
+			return (AE_ERROR);
+	}
+
+	/*
+	 * get 'reg' and get obj from cpu_map
+	 */
+	cpu_id = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "reg", -1);
+	if ((cpu_id < 0) || (cpu_map[cpu_id] == NULL) ||
+	    (cpu_map[cpu_id]->obj == NULL))
+		return (AE_ERROR);
+
+	/*
+	 * tag devinfo and obj
+	 */
+	(void) acpica_tag_devinfo(dip, cpu_map[cpu_id]->obj);
+	*rh = cpu_map[cpu_id]->obj;
+	return (AE_OK);
+}
+
+/*
+ * Determine if this object is a processor
+ */
+static ACPI_STATUS
+acpica_probe_processor(ACPI_HANDLE obj, UINT32 level, void *ctx, void **rv)
+{
+	ACPI_STATUS status;
+	ACPI_OBJECT_TYPE objtype;
+	UINT32 acpi_id;
+	ACPI_BUFFER rb;
+
+	if (AcpiGetType(obj, &objtype) != AE_OK)
+		return (AE_OK);
+
+	if (objtype == ACPI_TYPE_PROCESSOR) {
+		/* process a Processor */
 		rb.Pointer = NULL;
 		rb.Length = ACPI_ALLOCATE_BUFFER;
-		if (AcpiGetName(acpiobj, ACPI_FULL_PATHNAME, &rb) == AE_OK) {
-
-			cmn_err(CE_NOTE, "d2a entry: %s %s %d/0x%x/%d",
-			    pathname, (char *)rb.Pointer, bus, dev, func);
-			AcpiOsFree(rb.Pointer);
+		status = AcpiEvaluateObject(obj, NULL, NULL, &rb);
+		if (status != AE_OK) {
+			cmn_err(CE_WARN, "acpica: error probing Processor");
+			return (status);
 		}
+		ASSERT(((ACPI_OBJECT *)rb.Pointer)->Type ==
+		    ACPI_TYPE_PROCESSOR);
+		acpi_id = ((ACPI_OBJECT *)rb.Pointer)->Processor.ProcId;
+		AcpiOsFree(rb.Pointer);
+	} else if (objtype == ACPI_TYPE_DEVICE) {
+		/* process a processor Device */
+		cmn_err(CE_WARN, "!acpica: probe found a processor Device\n");
+		cmn_err(CE_WARN, "!acpica: no support for processor Devices\n");
+		return (AE_OK);
 	}
-#endif
+
+	acpica_add_processor_to_map(acpi_id, obj);
+	return (AE_OK);
 }
 
+
 static void
-create_d2a_map(void)
+scan_d2a_map(void)
 {
 	dev_info_t *dip, *cdip;
 	ACPI_HANDLE acpiobj;
@@ -1384,7 +1443,7 @@ create_d2a_map(void)
 	if (map_error)
 		return;
 
-	creating_d2a_map = 1;
+	scanning_d2a_map = 1;
 
 	/*
 	 * Find all child-of-root PCI buses, and find their corresponding
@@ -1422,7 +1481,8 @@ create_d2a_map(void)
 			cmn_err(CE_WARN, "Can't get bus number of PCI child?");
 #endif
 			map_error = 1;
-			creating_d2a_map = 0;
+			scanning_d2a_map = 0;
+			d2a_done = 1;
 			return;
 		}
 
@@ -1434,18 +1494,14 @@ create_d2a_map(void)
 			continue;
 		}
 
-		/*
-		 * map this node, with illegal device and fn numbers
-		 * (since, as a PCI root node, it exists on the system
-		 * bus
-		 */
+		acpica_tag_devinfo(dip, acpiobj);
 
-		new_d2a_entry(dip, acpiobj, bus, 32, 8);
-
-		/* call recursive function to enumerate subtrees */
-		create_d2a_subtree(dip, acpiobj, bus);
+		/* call recursively to enumerate subtrees */
+		scan_d2a_subtree(dip, acpiobj, bus);
 	}
-	creating_d2a_map = 0;
+
+	scanning_d2a_map = 0;
+	d2a_done = 1;
 }
 
 /*
@@ -1455,27 +1511,18 @@ create_d2a_map(void)
  * used here only to record in the d2a entry.  Recurse if necessary.
  */
 static void
-create_d2a_subtree(dev_info_t *dip, ACPI_HANDLE acpiobj, int bus)
+scan_d2a_subtree(dev_info_t *dip, ACPI_HANDLE acpiobj, int bus)
 {
 	int acpi_devfn, hid;
 	ACPI_HANDLE acld;
 	dev_info_t *dcld;
 	int dcld_b, dcld_d, dcld_f;
 	int dev, func;
+	char *device_type_prop;
 
 	acld = NULL;
 	while (AcpiGetNextObject(ACPI_TYPE_DEVICE, acpiobj, acld, &acld)
 	    == AE_OK) {
-
-		/*
-		 * Skip ACPI devices that are obviously not PCI, i.e.,
-		 * that have a _HID that is *not* the PCI HID
-		 */
-
-		if (acpica_eval_hid(acld, "_HID", &hid) == AE_OK &&
-		    hid != HID_PCI_BUS && hid != HID_PCI_EXPRESS_BUS)
-			continue;
-
 		/* get the dev/func we're looking for in the devinfo tree */
 		if (acpica_eval_int(acld, "_ADR", &acpi_devfn) != AE_OK)
 			continue;
@@ -1495,10 +1542,17 @@ create_d2a_subtree(dev_info_t *dip, ACPI_HANDLE acpiobj, int bus)
 			bus = dcld_b;
 
 			/* found a match, record it */
-			new_d2a_entry(dcld, acld, bus, dev, func);
+			acpica_tag_devinfo(dcld, acld);
 
-			/* recurse from here to pick up child trees */
-			create_d2a_subtree(dcld, acld, bus);
+			/* if we find a bridge, recurse from here */
+			if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dcld, 0,
+			    "device_type", &device_type_prop) ==
+			    DDI_PROP_SUCCESS) {
+				if ((strcmp("pci", device_type_prop) == 0) ||
+				    (strcmp("pciex", device_type_prop) == 0))
+					scan_d2a_subtree(dcld, acld, bus);
+				ddi_prop_free(device_type_prop);
+			}
 
 			/* done finding a match, so break now */
 			break;
@@ -1509,7 +1563,6 @@ create_d2a_subtree(dev_info_t *dip, ACPI_HANDLE acpiobj, int bus)
 /*
  * Return bus/dev/fn for PCI dip (note: not the parent "pci" node).
  */
-
 int
 acpica_get_bdf(dev_info_t *dip, int *bus, int *device, int *func)
 {
@@ -1532,4 +1585,124 @@ acpica_get_bdf(dev_info_t *dip, int *bus, int *device, int *func)
 		*func = (int)PCI_REG_FUNC_G(pci_rp->pci_phys_hi);
 	ddi_prop_free(pci_rp);
 	return (0);
+}
+
+/*
+ * Return the ACPI device node matching this dev_info node, if it
+ * exists in the ACPI tree.
+ */
+ACPI_STATUS
+acpica_get_handle(dev_info_t *dip, ACPI_HANDLE *rh)
+{
+	ACPI_STATUS status;
+	char *acpiname;
+
+	if (!d2a_done)
+		scan_d2a_map();
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "acpi-namespace", &acpiname) != DDI_PROP_SUCCESS) {
+		return (acpica_get_handle_cpu(dip, rh));
+	}
+
+	status = AcpiGetHandle(NULL, acpiname, rh);
+	ddi_prop_free((void *)acpiname);
+	return (status);
+}
+
+
+
+/*
+ * Manage OS data attachment to ACPI nodes
+ */
+
+/*
+ * Return the (dev_info_t *) associated with the ACPI node.
+ */
+ACPI_STATUS
+acpica_get_devinfo(ACPI_HANDLE obj, dev_info_t **dipp)
+{
+	ACPI_STATUS status;
+	void *ptr;
+
+	status = AcpiGetData(obj, acpica_devinfo_handler, &ptr);
+	if (status == AE_OK)
+		*dipp = (dev_info_t *)ptr;
+
+	return (status);
+}
+
+/*
+ * Set the dev_info_t associated with the ACPI node.
+ */
+static ACPI_STATUS
+acpica_set_devinfo(ACPI_HANDLE obj, dev_info_t *dip)
+{
+	ACPI_STATUS status;
+
+	status = AcpiAttachData(obj, acpica_devinfo_handler, (void *)dip);
+	return (status);
+}
+
+
+/*
+ *
+ */
+void
+acpica_devinfo_handler(ACPI_HANDLE obj, UINT32 func, void *data)
+{
+	/* noop */
+}
+
+
+/*
+ *
+ */
+void
+acpica_map_cpu(processorid_t cpuid, MADT_PROCESSOR_APIC *mpa)
+{
+	struct cpu_map_item *item;
+
+	if (cpu_map == NULL)
+		cpu_map = kmem_zalloc(sizeof (item) * NCPU, KM_SLEEP);
+
+	item = kmem_zalloc(sizeof (*item), KM_SLEEP);
+	item->mpa = mpa;
+	item->obj = NULL;
+	cpu_map[cpuid] = item;
+	cpu_map_count++;
+}
+
+void
+acpica_build_processor_map()
+{
+	ACPI_STATUS status;
+	void *rv;
+
+	/*
+	 * shouldn't be called more than once anyway
+	 */
+	if (cpu_map_built)
+		return;
+
+	/*
+	 * Look for Processor objects
+	 */
+	status = AcpiWalkNamespace(ACPI_TYPE_PROCESSOR,
+	    ACPI_ROOT_OBJECT,
+	    4,
+	    acpica_probe_processor,
+	    NULL,
+	    &rv);
+	ASSERT(status == AE_OK);
+
+	/*
+	 * Look for processor Device objects
+	 */
+	status = AcpiGetDevices("ACPI0007",
+	    acpica_probe_processor,
+	    NULL,
+	    &rv);
+	ASSERT(status == AE_OK);
+	cpu_map_built = 1;
 }

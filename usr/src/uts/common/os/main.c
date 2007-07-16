@@ -367,7 +367,9 @@ main(void)
 	extern void	sysevent_evc_thrinit();
 	extern void	lgrp_main_init(void);
 	extern void	lgrp_main_mp_init(void);
-
+#if defined(__x86)
+	extern void	cpupm_post_startup(void);
+#endif
 	/*
 	 * In the horrible world of x86 in-lines, you can't get symbolic
 	 * structure offsets a la genassym.  This assertion is here so
@@ -546,9 +548,12 @@ main(void)
 		(**initptr)();
 
 	/*
-	 * This must be called after start_other_cpus
+	 * These must be called after start_other_cpus
 	 */
 	pm_cfb_setup_intr();
+#if defined(__x86)
+	cpupm_post_startup();
+#endif
 
 	/*
 	 * Make init process; enter scheduling loop with system process.

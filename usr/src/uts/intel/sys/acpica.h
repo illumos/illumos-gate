@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,9 +56,6 @@ extern unsigned int acpi_options_prop;
 
 extern int acpica_init(void);
 extern void acpica_ec_init(void);
-extern int acpica_eval_int(ACPI_HANDLE, char *, int *);
-extern int acpica_find_pciobj(dev_info_t *, ACPI_HANDLE *);
-extern int acpica_find_pcidip(ACPI_HANDLE, dev_info_t **);
 
 /*
  * acpi_status property values
@@ -68,23 +65,6 @@ extern int acpica_find_pcidip(ACPI_HANDLE, dev_info_t **);
 #define	ACPI_BOOT_BOOTCONF	0x00000010
 
 #define	SCI_IPL	(LOCK_LEVEL-1)
-
-/*
- * Mapping table from dip to ACPI object for PCI nodes that might have
- * _PRT. Note: we keep bus/dev/func, but they're not really used;
- * lookups on this table are from dip to acpiobj. b/d/f are there
- * primarily for debugging ease. For peer/root PCI buses, dev and func
- * are irrelevant, and so are set to bogus illegal values; bus is set to
- * the PCI bus *under* that peer-bus node.
- */
-
-typedef struct dip_to_acpiobj_t {
-	dev_info_t *dip;
-	ACPI_HANDLE acpiobj;
-	unsigned char bus;
-	unsigned char dev;
-	unsigned char func;
-} d2a;
 
 /*
  * definitions of Bus Type
@@ -134,16 +114,20 @@ typedef struct iflag {
 		bustype: 4;
 } iflag_t;
 
-
 /* _HID for PCI bus object */
 #define	HID_PCI_BUS		0x30AD041
 #define	HID_PCI_EXPRESS_BUS	0x080AD041
 
 /*
- * Internal functions
+ * Function prototypes
  */
-extern ACPI_STATUS acpica_get_sci(int *sci_irq, iflag_t *sci_flags);
-extern int acpica_get_bdf(dev_info_t *dip, int *bus, int *device, int *func);
+extern ACPI_STATUS acpica_get_sci(int *, iflag_t *);
+extern int acpica_get_bdf(dev_info_t *, int *, int *, int *);
+extern ACPI_STATUS acpica_get_devinfo(ACPI_HANDLE, dev_info_t **);
+extern ACPI_STATUS acpica_get_handle(dev_info_t *, ACPI_HANDLE *);
+extern ACPI_STATUS acpica_eval_int(ACPI_HANDLE, char *, int *);
+extern void acpica_map_cpu(processorid_t, MADT_PROCESSOR_APIC *);
+extern void acpica_build_processor_map();
 
 #ifdef __cplusplus
 }

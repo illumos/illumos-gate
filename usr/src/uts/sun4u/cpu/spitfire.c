@@ -2820,6 +2820,7 @@ cpu_change_speed(uint64_t new_divisor, uint64_t arg2)
 #ifdef HUMMINGBIRD
 	uint64_t cur_mask, cur_divisor = 0;
 	volatile uint64_t reg;
+	processor_info_t *pi = &(CPU->cpu_type_info);
 	int index;
 
 	if ((new_divisor < HB_FULL_DIV || new_divisor > HB_LOWEST_DIV) ||
@@ -2896,6 +2897,8 @@ cpu_change_speed(uint64_t new_divisor, uint64_t arg2)
 		CHANGE_REFRESH_COUNT(HB_SPEED_UP, cur_divisor, new_divisor);
 	}
 	CPU->cpu_m.divisor = (uchar_t)new_divisor;
+	pi->pi_curr_clock =
+	    (((uint64_t)pi->pi_clock * 1000000) / new_divisor);
 #endif
 }
 

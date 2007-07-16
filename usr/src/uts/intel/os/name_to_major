@@ -123,3 +123,6 @@ lx_audio 242
 physmem 243
 battery 244
 ucode 245
+ppm 246
+cpunex 247
+cpudrv 248

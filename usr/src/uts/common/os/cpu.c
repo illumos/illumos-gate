@@ -2077,6 +2077,8 @@ static struct {
 	kstat_named_t ci_implementation;
 	kstat_named_t ci_brandstr;
 	kstat_named_t ci_core_id;
+	kstat_named_t ci_curr_clock_Hz;
+	kstat_named_t ci_supp_freq_Hz;
 #if defined(__sparcv9)
 	kstat_named_t ci_device_ID;
 	kstat_named_t ci_cpu_fru;
@@ -2089,25 +2091,27 @@ static struct {
 	kstat_named_t ci_clogid;
 #endif
 } cpu_info_template = {
-	{ "state",		KSTAT_DATA_CHAR },
-	{ "state_begin",	KSTAT_DATA_LONG },
-	{ "cpu_type",		KSTAT_DATA_CHAR },
-	{ "fpu_type",		KSTAT_DATA_CHAR },
-	{ "clock_MHz",		KSTAT_DATA_LONG },
-	{ "chip_id",		KSTAT_DATA_LONG },
-	{ "implementation",	KSTAT_DATA_STRING },
-	{ "brand",		KSTAT_DATA_STRING },
-	{ "core_id",		KSTAT_DATA_LONG },
+	{ "state",			KSTAT_DATA_CHAR },
+	{ "state_begin",		KSTAT_DATA_LONG },
+	{ "cpu_type",			KSTAT_DATA_CHAR },
+	{ "fpu_type",			KSTAT_DATA_CHAR },
+	{ "clock_MHz",			KSTAT_DATA_LONG },
+	{ "chip_id",			KSTAT_DATA_LONG },
+	{ "implementation",		KSTAT_DATA_STRING },
+	{ "brand",			KSTAT_DATA_STRING },
+	{ "core_id",			KSTAT_DATA_LONG },
+	{ "current_clock_Hz",		KSTAT_DATA_UINT64 },
+	{ "supported_frequencies_Hz",	KSTAT_DATA_STRING },
 #if defined(__sparcv9)
-	{ "device_ID",		KSTAT_DATA_UINT64 },
-	{ "cpu_fru",		KSTAT_DATA_STRING },
+	{ "device_ID",			KSTAT_DATA_UINT64 },
+	{ "cpu_fru",			KSTAT_DATA_STRING },
 #endif
 #if defined(__x86)
-	{ "vendor_id",		KSTAT_DATA_STRING },
-	{ "family",		KSTAT_DATA_INT32 },
-	{ "model",		KSTAT_DATA_INT32 },
-	{ "stepping",		KSTAT_DATA_INT32 },
-	{ "clog_id",		KSTAT_DATA_INT32 },
+	{ "vendor_id",			KSTAT_DATA_STRING },
+	{ "family",			KSTAT_DATA_INT32 },
+	{ "model",			KSTAT_DATA_INT32 },
+	{ "stepping",			KSTAT_DATA_INT32 },
+	{ "clog_id",			KSTAT_DATA_INT32 },
 #endif
 };
 
@@ -2157,7 +2161,17 @@ cpu_info_kstat_update(kstat_t *ksp, int rw)
 	    cp->cpu_idstr);
 	kstat_named_setstr(&cpu_info_template.ci_brandstr, cp->cpu_brandstr);
 	cpu_info_template.ci_core_id.value.l = pg_plat_get_core_id(cp);
-
+	cpu_info_template.ci_curr_clock_Hz.value.ui64 =
+	    cp->cpu_type_info.pi_curr_clock;
+	if (cp->cpu_type_info.pi_supp_freqs == NULL) {
+		char clkstr[sizeof ("18446744073709551615") + 1]; /* ui64 MAX */
+		(void) snprintf(clkstr, sizeof (clkstr), "%"PRIu64,
+		    cpu_info_template.ci_curr_clock_Hz.value.ui64);
+		kstat_named_setstr(&cpu_info_template.ci_supp_freq_Hz, clkstr);
+	} else {
+		kstat_named_setstr(&cpu_info_template.ci_supp_freq_Hz,
+		    cp->cpu_type_info.pi_supp_freqs);
+	}
 #if defined(__sparcv9)
 	cpu_info_template.ci_device_ID.value.ui64 =
 	    cpunodes[cp->cpu_id].device_id;

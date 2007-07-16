@@ -21,7 +21,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sun4u/sys/Makefile
@@ -101,7 +101,6 @@ HDRS=	\
 	sysiosbus.h		\
 	todmostek.h		\
 	traptrace.h		\
-	us_drv.h		\
 	wci_cmmu.h		\
 	wci_common.h		\
 	wci_offsets.h		\

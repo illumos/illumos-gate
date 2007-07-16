@@ -115,7 +115,7 @@ pci_root_subbus(int bus, uchar_t *subbus)
 		/* non-used bus # */
 		return (AE_ERROR);
 	}
-	if (acpica_find_pciobj(pci_bus_res[bus].dip, &hdl) != AE_OK) {
+	if (acpica_get_handle(pci_bus_res[bus].dip, &hdl) != AE_OK) {
 		cmn_err(CE_WARN, "!No ACPI obj for bus%d, ACPI OFF?\n", bus);
 		return (AE_ERROR);
 	}
@@ -240,7 +240,7 @@ pci_bbn_present(int bus)
 	if (pci_bus_res[bus].dip == NULL)
 		return (0);
 
-	rv = acpica_find_pciobj(pci_bus_res[bus].dip, &hdl);
+	rv = acpica_get_handle(pci_bus_res[bus].dip, &hdl);
 	if (rv != AE_OK)
 		return (-1);
 

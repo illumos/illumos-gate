@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -702,12 +701,13 @@ uint64_t msynd_overwrite[] = {
 void
 cpu_change_speed(uint64_t divisor, uint64_t arg2)
 {
-	bus_config_eclk_t *bceclk;
+	bus_config_eclk_t	*bceclk;
 	uint64_t		reg;
 	uint64_t		oldreg;
 	uint64_t		mreg;
 	uint64_t		val64;
 	int			id = (CPU)->cpu_id;
+	processor_info_t	*pi = &(CPU->cpu_type_info);
 
 #if defined(JALAPENO) && defined(JALAPENO_ERRATA_85)
 	/*
@@ -794,6 +794,8 @@ cpu_change_speed(uint64_t divisor, uint64_t arg2)
 			(void) get_mcu_ctl_reg1();
 		}
 		CPU->cpu_m.divisor = (uchar_t)divisor;
+		pi->pi_curr_clock =
+		    (((uint64_t)pi->pi_clock * 1000000) / divisor);
 		return;
 	}
 	/*

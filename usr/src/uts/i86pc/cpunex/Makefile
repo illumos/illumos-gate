@@ -19,26 +19,62 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/excalibur/Makefile.files
-#
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This Makefile defines all file modules for the directory
-#	uts/sun4u/excalibur and it's children. These are the source files
-#	which are sun4u "implementation architecture" dependent.
+#	This makefile drives the production of the CPU nexus driver
+#	in i86pc systems
 #
 
 #
-#	object lists
+#	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
-# Excalibur specific driver module
-#
-XCALPPM_OBJS	= xcalppm.o ppm_xgsubr.o
+UTSBASE		= ../..
 
 #
-# Miscellaneous
+#	Define the module and object file sets.
 #
-INC_PATH	+= -I$(UTSBASE)/sun4u/excalibur
+MODULE		= cpunex
+OBJECTS		= $(CPUNEX_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(CPUNEX_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
+
+#
+#	Include common rules.
+#
+include $(UTSBASE)/i86pc/Makefile.i86pc
+
+#
+#	Define targets
+#
+ALL_TARGET	= $(BINARY)
+LINT_TARGET	= $(MODULE).lint
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+
+#
+#	Default build targets.
+#
+.KEEP_STATE:
+
+def:		$(DEF_DEPS)
+
+all:		$(ALL_DEPS)
+
+clean:		$(CLEAN_DEPS)
+
+clobber:	$(CLOBBER_DEPS)
+
+lint:		$(LINT_DEPS)
+
+modlintlib:	$(MODLINTLIB_DEPS)
+
+clean.lint:	$(CLEAN_LINT_DEPS)
+
+install:	$(INSTALL_DEPS)
+
+#
+#	Include common targets.
+#
+include $(UTSBASE)/i86pc/Makefile.targ

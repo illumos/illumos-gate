@@ -315,6 +315,8 @@ static int pm_busop_set_power(dev_info_t *,
     void *, pm_bus_power_op_t, void *, void *);
 static int pm_busop_match_request(dev_info_t *, void *);
 static int pm_all_to_normal_nexus(dev_info_t *, pm_canblock_t);
+static void e_pm_set_max_power(dev_info_t *, int, int);
+static int e_pm_get_max_power(dev_info_t *, int);
 
 /*
  * Dependency Processing is done thru a seperate thread.
@@ -3577,6 +3579,37 @@ pm_next_lower_power(pm_component_t *cp, int pwrndx)
 }
 
 /*
+ * Update the maxpower (normal) power of a component. Note that the
+ * component's power level is only changed if it's current power level
+ * is higher than the new max power.
+ */
+int
+pm_update_maxpower(dev_info_t *dip, int comp, int level)
+{
+	PMD_FUNC(pmf, "update_maxpower")
+	int old;
+	int result;
+
+	if (!e_pm_valid_info(dip, NULL) || !e_pm_valid_comp(dip, comp, NULL) ||
+	    !e_pm_valid_power(dip, comp, level)) {
+		PMD(PMD_FAIL, ("%s: validation checks failed for %s@%s(%s#%d) "
+		    "comp=%d level=%d\n", pmf, PM_DEVICE(dip), comp, level))
+		return (DDI_FAILURE);
+	}
+	old = e_pm_get_max_power(dip, comp);
+	e_pm_set_max_power(dip, comp, level);
+
+	if (pm_set_power(dip, comp, level, PM_LEVEL_DOWNONLY,
+	    PM_CANBLOCK_BLOCK, 0, &result) != DDI_SUCCESS) {
+		e_pm_set_max_power(dip, comp, old);
+		PMD(PMD_FAIL, ("%s: %s@%s(%s#%d) pm_set_power failed\n", pmf,
+		    PM_DEVICE(dip)))
+		return (DDI_FAILURE);
+	}
+	return (DDI_SUCCESS);
+}
+
+/*
  * Bring all components of device to normal power
  */
 int
@@ -3869,6 +3902,15 @@ static void
 e_pm_set_max_power(dev_info_t *dip, int component_number, int level)
 {
 	PM_CP(dip, component_number)->pmc_norm_pwr = level;
+}
+
+/*
+ * Get max (previously documented as "normal") power.
+ */
+static int
+e_pm_get_max_power(dev_info_t *dip, int component_number)
+{
+	return (PM_CP(dip, component_number)->pmc_norm_pwr);
 }
 
 /*
@@ -8569,6 +8611,19 @@ pm_busop_set_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 		pm_hold_power(pdip);
 	}
 	PM_LOCK_POWER(dip, &circ);
+	/*
+	 * It's possible that a call was made to pm_update_maxpower()
+	 * on another thread before we took the lock above. So, we need to
+	 * make sure that this request isn't processed after the
+	 * change of power executed on behalf of pm_update_maxpower().
+	 */
+	if (nlevel > pm_get_normal_power(dip, comp)) {
+		PMD(PMD_SET, ("%s: requested level is higher than normal.\n",
+		    pmf))
+		ret = DDI_FAILURE;
+		*iresp = DDI_FAILURE;
+		goto post_notify;
+	}
 	clevel = PM_CURPOWER(dip, comp);
 	PMD(PMD_SET, ("%s: %s@%s(%s#%d), cmp=%d, olvl=%d, nlvl=%d, clvl=%d, "
 	    "dir=%s\n", pmf, PM_DEVICE(dip), comp, bpc->bpc_olevel, nlevel,

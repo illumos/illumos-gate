@@ -560,8 +560,9 @@ uint64_t msynd_overwrite[] = {
 void
 cpu_change_speed(uint64_t divisor, uint64_t arg2)
 {
-	bus_config_eclk_t *bceclk;
+	bus_config_eclk_t	*bceclk;
 	uint64_t		reg;
+	processor_info_t	*pi = &(CPU->cpu_type_info);
 
 	for (bceclk = bus_config_eclk; bceclk->divisor; bceclk++) {
 		if (bceclk->divisor != divisor)
@@ -571,6 +572,8 @@ cpu_change_speed(uint64_t divisor, uint64_t arg2)
 		reg |= bceclk->mask;
 		set_safari_config(reg);
 		CPU->cpu_m.divisor = (uchar_t)divisor;
+		pi->pi_curr_clock =
+		    (((uint64_t)pi->pi_clock * 1000000) / divisor);
 		return;
 	}
 	/*

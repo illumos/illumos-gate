@@ -649,12 +649,14 @@ acpi_probe(char *modname)
 		case APIC_PROCESSOR:
 			mpa = (MADT_PROCESSOR_APIC *) ap;
 			if (mpa->ProcessorEnabled) {
-				if (mpa->LocalApicId == local_ids[0])
+				if (mpa->LocalApicId == local_ids[0]) {
 					proc_ids[0] = mpa->ProcessorId;
-				else if (apic_nproc < NCPU) {
+					acpica_map_cpu(0, mpa);
+				} else if (apic_nproc < NCPU) {
 					local_ids[index] = mpa->LocalApicId;
 					proc_ids[index] = mpa->ProcessorId;
 					CPUSET_ADD(apic_cpumask, index);
+					acpica_map_cpu(index, mpa);
 					index++;
 					apic_nproc++;
 				} else
@@ -810,6 +812,12 @@ acpi_probe(char *modname)
 	 */
 	if (acpica_init() != AE_OK)
 		goto cleanup;
+
+	/*
+	 * Call acpica_build_processor_map() now that we have
+	 * ACPI namesspace access
+	 */
+	acpica_build_processor_map();
 
 	/*
 	 * Squirrel away the SCI and flags for later on

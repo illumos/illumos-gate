@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,7 +40,6 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-
 /*
  * Append address to the device path, if it is set.  Routine
  * ddi_pathname does not look for device address if the node is in
@@ -93,7 +92,8 @@ ppm_prop_free(struct ppm_cdata **cdp)
 	if (cdp) {
 		for (; *cdp; cdp++) {
 			if ((*cdp)->name) {
-			kmem_free((*cdp)->name, strlen((*cdp)->name) + 1);
+				kmem_free((*cdp)->name,
+				    strlen((*cdp)->name) + 1);
 				(*cdp)->name = NULL;
 			}
 			if ((*cdp)->strings) {
@@ -206,12 +206,7 @@ ppm_lookup_hndl(int model, ppm_dc_t *key_dc)
 #define	PPM_PROPNAME_PROP_SUFFIX	"-propname"
 #define	PPM_CTRL_PROP_SUFFIX		"-control"
 
-struct ppm_domit {
-	char	*name;
-	int	model;
-	int	dflags;
-	int	status;
-} ppm_domit_data[] = {
+struct ppm_domit ppm_domit_data[] = {
 	"CPU", PPMD_CPU, PPMD_LOCK_ALL, PPMD_ON,
 	"FET", PPMD_FET, PPMD_LOCK_ONE, PPMD_ON,
 	"PCI", PPMD_PCI, PPMD_LOCK_ONE, PPMD_ON,
@@ -272,7 +267,6 @@ ppm_create_db(dev_info_t *dip)
 	}
 	ppm_prop_free(cdata);
 
-
 	/*
 	 * more per domain property strings in ppm.conf file tell us
 	 * what the nature of domain, how to performe domain control, etc.
@@ -301,7 +295,7 @@ ppm_create_db(dev_info_t *dip)
 		}
 
 		model_namep = modeldata.strings;
-		for (domit_p = ppm_domit_data; domit_p; domit_p++) {
+		for (domit_p = ppm_domit_data; domit_p->name; domit_p++) {
 			if (strcmp(domit_p->name,  *model_namep) == 0) {
 				domp->model = domit_p->model;
 				domp->dflags = domit_p->dflags;
@@ -370,19 +364,16 @@ ppm_create_db(dev_info_t *dip)
 
 		cdata[0] = &dcdata;
 		cdata[1] = NULL;
-		if (err = ppm_get_confdata(cdata, dip)) {
-			PPMD(D_CREATEDB, ("%s: Can't read property %s!\n",
-			    str, dcdata.name))
-			return (ppm_attach_err(cdata, err));
-		}
-
-		for (dc_namep = dcdata.strings; *dc_namep; dc_namep++) {
-			dc = kmem_zalloc(sizeof (*dc), KM_SLEEP);
-			dc->next = domp->dc;
-			domp->dc = dc;
-			err = ppm_parse_dc(dc_namep, domp->dc);
-			if (err != DDI_SUCCESS)
-				return (ppm_attach_err(cdata, err));
+		if (ppm_get_confdata(cdata, dip) == DDI_PROP_SUCCESS) {
+			for (dc_namep = dcdata.strings; *dc_namep;
+			    dc_namep++) {
+				dc = kmem_zalloc(sizeof (*dc), KM_SLEEP);
+				dc->next = domp->dc;
+				domp->dc = dc;
+				err = ppm_parse_dc(dc_namep, domp->dc);
+				if (err != DDI_SUCCESS)
+					return (ppm_attach_err(cdata, err));
+			}
 		}
 		ppm_prop_free(cdata);
 #ifdef	DEBUG
@@ -432,6 +423,7 @@ ppm_parse_pattern(struct ppm_db **dbpp, char *dev_path)
 	char path[MAXNAMELEN];
 	int	wccnt, i;
 	int	wcpos[2];
+	int	pos;
 	char	*cp;
 	ppm_db_t *dbp;
 
@@ -439,12 +431,11 @@ ppm_parse_pattern(struct ppm_db **dbpp, char *dev_path)
 	if ((wccnt = ppm_count_char(path, '*')) > 2)
 		return (NULL);
 
-	cp = path;
-	for (i = 0; i < wccnt; i++, cp++) {
-		for (; *cp; cp++)
+	for (i = 0, cp = path, pos = 0; i < wccnt; i++, cp++, pos++) {
+		for (; *cp; cp++, pos++)
 			if (*cp == '*')
 				break;
-		wcpos[i] = (cp - path);
+		wcpos[i] = pos;
 		PPMD(D_CREATEDB, ("    wildcard #%d, pos %d\n",
 		    (i + 1), wcpos[i]))
 	}
@@ -642,7 +633,7 @@ ppm_add_owned(dev_info_t *dip, ppm_domain_t *domp)
 /*
  * create/init a new ppm device and link into the domain
  */
-static ppm_dev_t *
+ppm_dev_t *
 ppm_add_dev(dev_info_t *dip, ppm_domain_t *domp)
 {
 	char path[MAXNAMELEN];
@@ -769,8 +760,7 @@ ppm_init_cb(dev_info_t *dip)
 	ppm_dc_t	*dc;
 
 	for (domp = ppm_domain_p; domp != NULL; domp = domp->next) {
-		dc = domp->dc;
-		do {
+		for (dc = domp->dc; dc; dc = dc->next) {
 			if (ppm_lookup_hndl(domp->model, dc) != NULL)
 				continue;
 
@@ -780,7 +770,7 @@ ppm_init_cb(dev_info_t *dip)
 				    "be offline.", str, domp->name);
 				break;
 			}
-		} while ((dc = dc->next) != NULL);
+		}
 	}
 }
 
@@ -1049,27 +1039,32 @@ int
 ppm_parse_dc(char **dc_namep, ppm_dc_t *dc)
 {
 	char	*str = "ppm_parse_dc";
-	char	*line = *dc_namep;
+	char	*line;
 	char	*f, *b;
 	char    **dclist;	/* list of ppm_dc_t fields */
 	int	count;		/* the # of '=' indicates the # of items */
-	int	len;
+	size_t	len;		/* length of line being parsed */
+	boolean_t done;
 	int	i;
 	int	err;
+
+	len = strlen(*dc_namep);
+	line = kmem_alloc(len + 1, KM_SLEEP);
+	(void) strcpy(line, *dc_namep);
 
 	count = ppm_count_char(line, '=');
 	ASSERT((count - ppm_count_char(line, ' ')) == 1);
 
 	dclist = (char **)
 	    kmem_zalloc((sizeof (char *) * (count + 1)), KM_SLEEP);
-	for (f = b = line, i = 0; (b != NULL); i++) {
-		b = strchr(f, ' ');
-		len = (b) ? (b - f) : strlen(f);
-		dclist[i] = (char *)kmem_zalloc((len + 1), KM_SLEEP);
-		(void) strncpy(dclist[i], f, len);
-		dclist[i][len] = 0;
-		if (b)
-			f = ++b;
+	for (i = 0, f = b = line, done = B_FALSE; !done; i++, f = ++b) {
+		while (*b != ' ' && *b != 0)
+			b++;
+		if (*b == 0)
+			done = B_TRUE;
+		else
+			*b = 0;
+		dclist[i] = f;
 	}
 
 	for (i = 0; i < count; i++) {
@@ -1173,9 +1168,8 @@ ppm_parse_dc(char **dc_namep, ppm_dc_t *dc)
 		return (-1);
 	}
 
-	for (i = 0; dclist[i]; i++)
-		kmem_free(dclist[i], strlen(dclist[i]) + 1);
 	kmem_free(dclist, sizeof (char *) * (count + 1));
+	kmem_free(line, len + 1);
 
 	return (DDI_SUCCESS);
 }

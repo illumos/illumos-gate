@@ -54,6 +54,11 @@ init_cpu_info(struct cpu *cp)
 	 */
 	pi->pi_clock = (cpunode->clock_freq + 500000) / 1000000;
 
+	/*
+	 * Current frequency in Hz.
+	 */
+	pi->pi_curr_clock = cpunode->clock_freq;
+
 	(void) strcpy(pi->pi_processor_type, "sparcv9");
 	(void) strcpy(pi->pi_fputypes, "sparcv9");
 
