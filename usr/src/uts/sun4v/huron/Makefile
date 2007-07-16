@@ -19,16 +19,16 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4v/ontario/Makefile
+# uts/sun4v/huron/Makefile
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the sun4v ontario platform
+#	This makefile drives the production of the sun4v huron platform
 #	modules.
 #
-#	sun4v ontario implementation architecture dependent
+#	sun4v huron implementation architecture dependent
 #
 
 #
@@ -39,7 +39,11 @@ UTSBASE	= ../..
 #
 #	Include common rules.
 #
-include $(UTSBASE)/sun4v/ontario/Makefile.ontario
+include $(UTSBASE)/sun4v/Makefile.sun4v
+
+USR_PLAT_DIR = $(ROOT)/usr/platform
+
+include $(UTSBASE)/sun4v/Makefile.huron
 
 def		:=	TARGET= def
 all		:=	TARGET= all
@@ -60,47 +64,31 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clobber clean.lint modlist:	$(ONTARIO_KMODS)
-
 lintlib:      unix
 
-modlintlib:   $(ONTARIO_KMODS)
+IMPLEMENTED_PLATFORM	= SUNW,SPARC-Enterprise-T5120
+LINKED_PLATFORMS	= SUNW,SPARC-Enterprise-T5220
 
-IMPLEMENTED_PLATFORM	= SUNW,Sun-Fire-T200
-LINKED_PLATFORMS	= SUNW,Sun-Fire-T1000
-LINKED_PLATFORMS	+= SUNW,SPARC-Enterprise-T1000
-LINKED_PLATFORMS	+= SUNW,Netra-T2000
-LINKED_PLATFORMS	+= SUNW,SPARC-Enterprise-T2000
-PPLINKED_PLATFORMS	= SUNW,Netra-T2000
-PPLINKED_PLATFORMS	+= SUNW,SPARC-Enterprise-T2000
 
-install:	$(ROOT_ONTARIO_DIR) $(USR_ONTARIO_DIR) \
-		$(USR_ONTARIO_SBIN_DIR) \
-		$(USR_ONTARIO_LIB_DIR) \
-		$(ROOT_ONTARIO_LIB_DIR) \
-		$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%) \
-		$(PPLINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%) \
-		.WAIT $(ONTARIO_KMODS)
+$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%): $(USR_PLAT_DIR)
+	$(INS.slink3)
 
-$(ONTARIO_KMODS):	FRC
-	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
+all:
 
-install_h check:	FRC
+install:	$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%)
 
-lint:	modlintlib .WAIT $(LINT_DEPS)
+install_h check:
 
-LINT_LIBS	= $(LINT_LIB) \
-			-L$(ONTARIO_LINT_LIB_DIR) \
-			-L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
-			    $(CLOSED_LINT_KMODS:%=-l%) \
-			-L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
+lint:
 
-lint.platmod:   modlintlib
-	@-$(ECHO) "\n$(IMPLEMENTED_PLATFORM) platform-dependent module: global crosschecks:"
-	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
+clean:
+
+clobber:	clean
+
+modlist:
 
 EXPORT_SRC:
-	$(RM) Makefile+	
+	$(RM) Makefile+ 
 	sed -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
 		< Makefile > Makefile+
 	$(MV) Makefile+ Makefile
@@ -108,6 +96,3 @@ EXPORT_SRC:
 # EXPORT DELETE END
 
 #
-#	Include common targets.
-#
-include $(UTSBASE)/$(PLATFORM)/ontario/Makefile.targ

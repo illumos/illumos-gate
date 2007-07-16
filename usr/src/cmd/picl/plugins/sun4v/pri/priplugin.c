@@ -26,16 +26,20 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <pri.h>
 #include "priplugin.h"
 
 #pragma init(priplugin_register)	/* place in .init section */
 
 picl_nodehdl_t	root_node;
-md_t		*mdp;
+static md_t	*mdp;
 mde_cookie_t	rootnode;
 
 void priplugin_init(void);
 void priplugin_fini(void);
+static void
+event_handler(const char *ename, const void *earg, size_t size, void *cookie);
+static void *priplugin_main(void *);
 
 picld_plugin_reg_t priplugin_reg = {
 	PICLD_PLUGIN_VERSION_1,
@@ -90,45 +94,112 @@ priplugin_init(void)
 {
 	int status;
 
-	pri_debug(LOG_NOTICE, "priplugin: entered\n");
+
+	pri_debug(LOG_NOTICE, "priplugin: mem tree and io label thread "
+	    "being created; callbacks being registered\n");
+
+	/*
+	 * register event_handler for both "sysevent-device-added" and
+	 * and for "sysevent-device-removed" PICL events
+	 */
+	(void) ptree_register_handler(PICLEVENT_SYSEVENT_DEVICE_ADDED,
+	    event_handler, NULL);
+	(void) ptree_register_handler(PICLEVENT_DR_AP_STATE_CHANGE,
+	    event_handler, NULL);
+
+	if ((status = thr_create(NULL, NULL, priplugin_main, NULL, THR_BOUND,
+	    NULL)) < 0) {
+		pri_debug(LOG_NOTICE, "priplugin: can't create main thread: "
+		    "%d\n", status);
+		priplugin_fini();
+	}
+}
+
+/*ARGSUSED*/
+static void *
+priplugin_main(void *arg)
+{
+	int status;
+	uint64_t tok;
+
+	if (pri_init() != 0) {
+		pri_debug(LOG_NOTICE, "priplugin_main: pri_init failed\n");
+		return (NULL);
+	}
+
+	pri_debug(LOG_NOTICE, "priplugin: thread entered\n");
 	status = ptree_get_root(&root_node);
 	if (status != PICL_SUCCESS) {
-		pri_debug(LOG_NOTICE, "priplugin: can't get picl root node\n");
-		return;
+		pri_debug(LOG_NOTICE, "priplugin: can't get picl root "
+		    "node\n");
+		priplugin_fini();
+		return (NULL);
 	}
 
-	mdp = pri_devinit();
-	if (mdp == NULL) {
-		pri_debug(LOG_NOTICE, "priplugin: cannot init pri: %d\n",
-		    errno);
-		return;
+	for (tok = 0; mdp = pri_devinit(&tok, mdp); ) {
+		rootnode = md_root_node(mdp);
+
+		pri_debug(LOG_NOTICE, "priplugin: have root picl and PRI "
+		    "nodes\n");
+
+		status = ptree_walk_tree_by_class(root_node, "memory",
+		    (void *) mdp, add_mem_prop);
+		if (status != PICL_SUCCESS) {
+			pri_debug(LOG_NOTICE, "pri: memory-segments walk "
+			    "failed\n");
+		} else
+			pri_debug(LOG_NOTICE, "pri: success walking memory "
+			    "node\n");
+
+		io_dev_addlabel(mdp);
 	}
 
-	rootnode = md_root_node(mdp);
+	pri_debug(LOG_NOTICE, "priplugin: cannot init pri: " "%d\n", errno);
 
-	pri_debug(LOG_NOTICE, "priplugin: have root picl and PRI nodes\n");
+	priplugin_fini();
 
-	status = ptree_walk_tree_by_class(root_node, "memory",
-	    "memory-segments", add_mem_prop);
-	if (status != PICL_SUCCESS) {
-		pri_debug(LOG_NOTICE, "pri: memory-segments walk failed\n");
-	} else
-		pri_debug(LOG_NOTICE, "pri: success walking memory node\n");
-
-	io_dev_addlabel();
-
-	pri_devfini(mdp);
+	/*NOTREACHED*/
+	return (NULL);
 }
 
 void
 priplugin_fini(void)
 {
+	pri_devfini(mdp);
+	/* unregister the event handler */
+	(void) ptree_unregister_handler(PICLEVENT_SYSEVENT_DEVICE_ADDED,
+	    event_handler, NULL);
+	(void) ptree_unregister_handler(PICLEVENT_DR_AP_STATE_CHANGE,
+	    event_handler, NULL);
 }
 
 void
 priplugin_register(void)
 {
 	picld_plugin_register(&priplugin_reg);
+}
+
+/*
+ * Discovery event handler
+ * respond to the picl events:
+ *      PICLEVENT_SYSEVENT_DEVICE_ADDED
+ *      PICLEVENT_DR_AP_STATE_CHANGE
+ *
+ * We can't do much of anything fancy since the event data doesn't contain
+ * a nac for the device.  Nothing to do for remove - the devtree plug-in
+ * will have removed the node for us.  For add we have to go back and
+ * add labels again.
+ */
+static void
+event_handler(const char *ename, const void *earg, size_t size, void *cookie)
+{
+
+	if ((strcmp(ename, PICLEVENT_SYSEVENT_DEVICE_ADDED) == 0) ||
+	    (strcmp(ename, PICLEVENT_DR_AP_STATE_CHANGE) == 0)) {
+		pri_debug(LOG_NOTICE, "pri: event_handler: caught event "
+		    "%s; adding labels\n", ename);
+		io_dev_addlabel(mdp);
+	}
 }
 
 /*VARARGS2*/

@@ -34,31 +34,28 @@
 #include "priplugin.h"
 
 static void pri_free(void *bufp, size_t size);
-uint64_t *md_bufp;
+static uint64_t *md_bufp = NULL;
 
 md_t *
-pri_devinit(void)
+pri_devinit(uint64_t *tok, md_t *mdp)
 {
-	md_t *mdp;
-	uint64_t tok;
+	uint64_t *new_md_bufp;
 
-	md_bufp = NULL;
-	tok = 0;
 
-	if (pri_init() != -1) {
-		if (pri_get(PRI_GET, &tok, &md_bufp, malloc, pri_free) ==
-		    (ssize_t)-1) {
-			pri_debug(LOG_NOTICE, "pri_devinit: can'r read from "
-			    "the PRI: %d\n", errno);
-		}
-		if (md_bufp == NULL) {
-			pri_debug(LOG_NOTICE, "pri_devinit: pri_get returned"
-			    "NULL buffer!\n");
-		}
-	} else {
-		pri_debug(LOG_NOTICE, "pri_devinit: pri_init failed!\n");
+	if (pri_get(PRI_WAITGET, tok, &new_md_bufp, malloc, pri_free) ==
+	    (ssize_t)-1) {
+		pri_debug(LOG_NOTICE, "pri_devinit: can'r read from "
+		    "the PRI: %d\n", errno);
 	}
-	pri_fini();
+	if (new_md_bufp == NULL) {
+		pri_debug(LOG_NOTICE, "pri_devinit: pri_get returned"
+		    "NULL buffer!\n");
+	}
+	if (mdp)
+		md_fini(mdp);
+	if (md_bufp)
+		free(md_bufp);
+	md_bufp = new_md_bufp;
 
 	pri_debug(LOG_NOTICE, "pri_devinit: done reading PRI\n");
 
@@ -102,4 +99,5 @@ pri_devfini(md_t *mdp)
 	if (md_bufp)
 		free(md_bufp);
 	md_bufp = NULL;
+	pri_fini();
 }

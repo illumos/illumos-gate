@@ -18,25 +18,21 @@
 #
 # CDDL HEADER END
 #
-
+#
 #
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
+#	Global definitions for sun4v Huron implementation specific modules.
+#
 
-sparc_SUBDIRS =	sun4u \
-		sun4v \
-		SUNW,Sun-Fire \
-		SUNW,Sun-Fire-T200 \
-		SUNW,Sun-Fire-15000 \
-		SUNW,SPARC-Enterprise \
-		SUNW,Sun-Blade-T6320 \
-		SUNW,SPARC-Enterprise-T5120
+#
+#	Define directories.
+#
 
-i386_SUBDIRS = i86pc \
-		SUNW,Sun-Fire-X4500
-
-SUBDIRS = $($(MACH)_SUBDIRS)
-
-include ../../Makefile.subdirs
+USR_SUN4V_PLAT_DIR	= $(USR_PLAT_DIR)/$(PLATFORM)
+USR_HURON_DIR		= $(USR_PLAT_DIR)/SUNW,SPARC-Enterprise-T5120
+USR_HURON_SBIN_DIR	= $(USR_HURON_DIR)/sbin
+USR_HURON_LIB_DIR	= $(USR_HURON_DIR)/lib

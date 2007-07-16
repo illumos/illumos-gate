@@ -32,6 +32,7 @@ UTSBASE = ..
 
 include Makefile.sun4v
 include Makefile.stpaul
+include Makefile.huron
 USR_GLENDALE_DIR	= $(USR_PLAT_DIR)/SUNW,Sun-Blade-T6320
 USR_GLENDALE_SBIN_DIR	= $(USR_GLENDALE_DIR)/sbin
 USR_GLENDALE_LIB_DIR	= $(USR_GLENDALE_DIR)/lib
@@ -188,7 +189,9 @@ install_platforms:	$(ROOT_PSM_DIR) $(USR_PSM_DIR) \
 			$(USR_STPAUL_DIR) $(USR_STPAUL_SBIN_DIR) \
 			$(USR_STPAUL_LIB_DIR) \
 			$(USR_GLENDALE_DIR) $(USR_GLENDALE_SBIN_DIR) \
-			$(USR_GLENDALE_LIB_DIR) 
+			$(USR_GLENDALE_LIB_DIR) \
+			$(USR_HURON_DIR) \
+			$(USR_HURON_SBIN_DIR) $(USR_HURON_LIB_DIR)
 
 #
 # rules for making include, sbin, lib dirs/links in
@@ -210,6 +213,15 @@ $(USR_STPAUL_SBIN_DIR):		$(USR_STPAUL_DIR)
 	$(INS.slink5)
 
 $(USR_STPAUL_LIB_DIR):		$(USR_STPAUL_DIR)
+	-$(INS.dir.root.bin)
+
+$(USR_HURON_DIR):		$(USR_SUN4V_PLAT_DIR)
+	-$(INS.dir.root.sys)
+
+$(USR_HURON_SBIN_DIR):		$(USR_HURON_DIR)
+	$(INS.slink5)
+
+$(USR_HURON_LIB_DIR):		$(USR_HURON_DIR)
 	-$(INS.dir.root.bin)
 
 $(USR_GLENDALE_DIR):		$(USR_SUN4V_PLAT_DIR)

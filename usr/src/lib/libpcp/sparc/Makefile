@@ -39,7 +39,8 @@ PLATFORM=sun4v
 LINKED_PLATFORMS = SUNW,Sun-Fire-T200 \
 		SUNW,Netra-CP3060 \
 		SUNW,Sun-Blade-T6300 \
-		SUNW,Sun-Blade-T6320
+		SUNW,Sun-Blade-T6320 \
+		SUNW,SPARC-Enterprise-T5120
 
 
 include ../Makefile.com

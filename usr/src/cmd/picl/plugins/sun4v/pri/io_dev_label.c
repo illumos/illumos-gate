@@ -32,7 +32,6 @@
  * These 3 variable are defined and set in mdescplugin.c
  */
 extern picl_nodehdl_t	root_node;
-extern md_t		*mdp;
 extern mde_cookie_t	rootnode;
 
 static int
@@ -49,14 +48,18 @@ compare_string_propval(picl_nodehdl_t nodeh, const char *pname,
  * and add a reference property to the corresponding fru tree node.
  */
 void
-io_dev_addlabel(void)
+io_dev_addlabel(md_t *mdp)
 {
 	int status, substatus, i, node_count, component_count, busaddr_match;
 	int type_size, nac_size;
 	picl_nodehdl_t platnode, tpn;
 	char busaddr[PICL_PROPNAMELEN_MAX], *p, *q;
+	char path[PICL_PROPNAMELEN_MAX];
 	mde_cookie_t *components;
-	char *type, *nac, *path, *saved_path;
+	char *type, *nac, *pri_path, *saved_path;
+
+	if (mdp == NULL)
+		return;
 
 	/*
 	 * Find and remember the roots of the /frutree and /platform trees.
@@ -125,13 +128,15 @@ io_dev_addlabel(void)
 		} else
 			nac_size = strlen(nac) + 1;
 
-		if (md_get_prop_str(mdp, components[i], "path", &path) ==
+		if (md_get_prop_str(mdp, components[i], "path", &pri_path) ==
 		    -1) {
 			pri_debug(LOG_NOTICE,
 			    "io_add_devlabel: can't get path value for "
 			    "device <%s>\n", type);
 			continue;
 		}
+
+		(void) strlcpy(path, pri_path, sizeof (path));
 
 		pri_debug(LOG_NOTICE, "io_add_devlabel: processing component "
 		    "%d, type <%s>, nac <%s>, path <%s>\n", i, type, nac,
@@ -206,8 +211,8 @@ io_dev_addlabel(void)
 		 * on the device we matched from the PRI path.
 		 */
 		for (status = PICL_SUCCESS; status == PICL_SUCCESS;
-			status = ptree_get_propval_by_name(tpn,
-			    PICL_PROP_PEER, &tpn, sizeof (picl_nodehdl_t))) {
+		    status = ptree_get_propval_by_name(tpn,
+		    PICL_PROP_PEER, &tpn, sizeof (picl_nodehdl_t))) {
 			/*
 			 * Add Labels to peers that have the same bus-addr
 			 * value (ignoring the function numbers.)
@@ -221,19 +226,6 @@ io_dev_addlabel(void)
 				    PICL_PROP_BUS_ADDR,
 				    picl_strerror(substatus));
 			} else {
-				/*
-				 * If the PRI path doesn't include a specific
-				 * function number then don't look for one
-				 * in the bus-addr.  Devices on PCI-X bridges
-				 * may have a function number in the path,
-				 * so don't ignore that.
-				 */
-				if (strchr(saved_path, ',') == NULL) {
-					if ((q = strchr(busaddr, ',')) !=
-					    NULL) {
-						*q = '\0';
-					}
-				}
 				if (strncmp(busaddr, saved_path,
 				    PICL_PROPNAMELEN_MAX) == 0) {
 					add_md_prop(tpn, nac_size,
@@ -295,8 +287,8 @@ find_node_by_string_prop(picl_nodehdl_t rooth, const char *pname,
 
 	for (err = ptree_get_propval_by_name(rooth, PICL_PROP_CHILD, &childh,
 	    sizeof (picl_nodehdl_t)); err != PICL_PROPNOTFOUND;
-		err = ptree_get_propval_by_name(childh, PICL_PROP_PEER,
-		    &childh, sizeof (picl_nodehdl_t))) {
+	    err = ptree_get_propval_by_name(childh, PICL_PROP_PEER,
+	    &childh, sizeof (picl_nodehdl_t))) {
 		if (err != PICL_SUCCESS)
 			return (err);
 
