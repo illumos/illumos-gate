@@ -1240,10 +1240,15 @@ setbackdq(kthread_t *tp)
 		return;
 	}
 
+	if (tp->t_bound_cpu || tp->t_weakbound_cpu)
+		bound = 1;
+	else
+		bound = 0;
+
 	tpri = DISP_PRIO(tp);
 	if (ncpus == 1)
 		cp = tp->t_cpu;
-	else if (!tp->t_bound_cpu && !tp->t_weakbound_cpu) {
+	else if (!bound) {
 		if (tpri >= kpqpri) {
 			setkpdq(tp, SETKP_BACK);
 			return;
@@ -1291,7 +1296,6 @@ setbackdq(kthread_t *tp)
 			cp = disp_lowpri_cpu(tp->t_cpupart->cp_cpulist,
 			    tp->t_lpl, tp->t_pri, NULL);
 		}
-		bound = 0;
 		ASSERT((cp->cpu_flags & CPU_QUIESCED) == 0);
 	} else {
 		/*
@@ -1302,7 +1306,6 @@ setbackdq(kthread_t *tp)
 		 */
 		cp = tp->t_weakbound_cpu ?
 		    tp->t_weakbound_cpu : tp->t_bound_cpu;
-		bound = 1;
 	}
 	/*
 	 * A thread that is ONPROC may be temporarily placed on the run queue
@@ -1411,10 +1414,15 @@ setfrontdq(kthread_t *tp)
 		return;
 	}
 
+	if (tp->t_bound_cpu || tp->t_weakbound_cpu)
+		bound = 1;
+	else
+		bound = 0;
+
 	tpri = DISP_PRIO(tp);
 	if (ncpus == 1)
 		cp = tp->t_cpu;
-	else if (!tp->t_bound_cpu && !tp->t_weakbound_cpu) {
+	else if (!bound) {
 		if (tpri >= kpqpri) {
 			setkpdq(tp, SETKP_FRONT);
 			return;
@@ -1440,7 +1448,6 @@ setfrontdq(kthread_t *tp)
 			cp = disp_lowpri_cpu(tp->t_cpupart->cp_cpulist,
 			    tp->t_lpl, tp->t_pri, NULL);
 		}
-		bound = 0;
 		ASSERT((cp->cpu_flags & CPU_QUIESCED) == 0);
 	} else {
 		/*
@@ -1451,7 +1458,6 @@ setfrontdq(kthread_t *tp)
 		 */
 		cp = tp->t_weakbound_cpu ?
 		    tp->t_weakbound_cpu : tp->t_bound_cpu;
-		bound = 1;
 	}
 
 	/*
