@@ -186,9 +186,6 @@ extern uint64_t ultra_getver(void);
 /*
  * bootup-time
  */
-extern int ncpunode;
-extern int niobus;
-
 extern void segnf_init(void);
 extern void kern_setup1(void);
 extern void startup(void);

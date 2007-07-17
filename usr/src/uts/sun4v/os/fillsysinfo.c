@@ -53,7 +53,6 @@
 #include <sys/bitmap.h>
 #include <sys/intreg.h>
 
-int ncpunode;
 struct cpu_node cpunodes[NCPU];
 
 uint64_t cpu_q_entries;
@@ -69,18 +68,14 @@ static uint64_t get_mmu_tsbs(md_t *, mde_cookie_t);
 static uint64_t	get_mmu_shcontexts(md_t *, mde_cookie_t);
 static uint64_t get_cpu_pagesizes(md_t *, mde_cookie_t);
 static char *construct_isalist(md_t *, mde_cookie_t, char **);
-static void set_at_flags(char *, int, char **);
 static void init_md_broken(md_t *, mde_cookie_t *);
 static int get_l2_cache_info(md_t *, mde_cookie_t, uint64_t *, uint64_t *,
     uint64_t *);
-static id_t get_exec_unit_mapping(md_t *, mde_cookie_t, mde_cookie_t *);
-static int find_exec_unit_id(mde_cookie_t, mde_cookie_t *);
 static void get_q_sizes(md_t *, mde_cookie_t);
 static void get_va_bits(md_t *, mde_cookie_t);
 static size_t get_ra_limit(md_t *);
 
 uint64_t	system_clock_freq;
-int		niobus = 0;
 uint_t		niommu_tsbs = 0;
 
 /* prevent compilation with VAC defined */
@@ -202,14 +197,12 @@ fill_cpu(md_t *mdp, mde_cookie_t cpuc)
 	if (ecache_alignsize == 0)
 		ecache_alignsize = cpunode->ecache_linesize;
 
-	ncpunode++;
 }
 
 void
 empty_cpu(int cpuid)
 {
 	bzero(&cpunodes[cpuid], sizeof (struct cpu_node));
-	ncpunode--;
 }
 
 void
@@ -252,7 +245,8 @@ setup_exec_unit_mappings(md_t *mdp)
 
 			/* ignore nodes with no type */
 			if (md_get_prop_data(mdp, eunit[i], "type",
-				(uint8_t **)&val, &vallen)) continue;
+			    (uint8_t **)&val, &vallen))
+				continue;
 
 			for (p = val; *p != '\0'; p += strlen(p) + 1) {
 				if (strcmp(p, int_str) == 0) {
@@ -404,7 +398,7 @@ cpu_setup_common(char **cpu_module_isa_set)
 	ASSERT(ra_limit != 0);
 
 	kpm_size_shift = (ra_limit & (ra_limit - 1)) != 0 ?
-		highbit(ra_limit) : highbit(ra_limit) - 1;
+	    highbit(ra_limit) : highbit(ra_limit) - 1;
 
 	/*
 	 * No virtual caches on sun4v so size matches size shift
@@ -625,7 +619,7 @@ get_ra_limit(md_t *mdp)
 			cmn_err(CE_PANIC, "mblock in MD wrapped around");
 
 		if (new_limit > ra_limit)
-		    ra_limit = new_limit;
+			ra_limit = new_limit;
 	}
 
 	ASSERT(ra_limit != 0);
@@ -666,7 +660,7 @@ get_single_q_size(md_t *mdp, mde_cookie_t cpu_node_cookie,
 	if (md_get_prop_val(mdp, cpu_node_cookie, qnamep, &entries)) {
 		if (!broken_md_flag)
 			cmn_err(CE_PANIC, "Missing %s property in MD cpu node",
-				qnamep);
+			    qnamep);
 		entries = default_entries;
 	} else {
 		entries = 1 << entries;
@@ -835,7 +829,7 @@ init_md_broken(md_t *mdp, mde_cookie_t *cpulist)
 	}
 
 	if (md_get_prop_val(mdp, platlist[0],
-		"domaining-enabled", &val) == -1 &&
+	    "domaining-enabled", &val) == -1 &&
 	    strcmp(namebuf, "SUNW,UltraSPARC-T1") == 0)
 		broken_md_flag = 1;
 

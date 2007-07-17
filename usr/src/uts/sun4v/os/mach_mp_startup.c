@@ -95,7 +95,7 @@ init_cpu_info(struct cpu *cp)
 		 * On first cpu setup, tell hv we are booting
 		 */
 		mach_set_soft_state(SIS_TRANSITION,
-				&SOLARIS_SOFT_STATE_BOOT_MSG);
+		    &SOLARIS_SOFT_STATE_BOOT_MSG);
 #ifdef	lint
 		cpuid = cpuid;
 #endif	/* lint */
@@ -221,7 +221,7 @@ mp_cpu_configure(int cpuid)
 	kmem_free(listp, listsz);
 
 	/*
-	 * Note: uses cpu_lock to protect cpunodes and ncpunodes
+	 * Note: uses cpu_lock to protect cpunodes
 	 * which will be modified inside of fill_cpu and
 	 * setup_exec_unit_mappings.
 	 */
