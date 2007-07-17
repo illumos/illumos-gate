@@ -309,7 +309,6 @@ configure_mpxio()
 	TMPDRVCONF=/var/run/tmp.$d.conf.$$
 	TMPDRVCONF_MPXIO_ENTRY=/var/run/tmp.$d.conf.mpxioentry.$$;
 
-	echo "Checking mpxio status for driver $d"
 	if delete_mpxio_disable_entries $KDRVCONF $TMPDRVCONF $TMPDRVCONF_MPXIO_ENTRY; then
 
 		if [ -s $TMPDRVCONF_MPXIO_ENTRY ]; then
@@ -360,8 +359,8 @@ get_newbootpath_for_stmsdev() {
 		return 0
 	fi
 
-	cur_bootpath=`eeprom bootpath | \
-	    sed 's/bootpath=[ 	]*//g' | sed 's/[ 	]*$//'`
+	cur_bootpath=`/usr/sbin/eeprom bootpath | \
+	    $SED 's/bootpath=[ 	]*//g' | $SED 's/[ 	]*$//'`
 	if [ "x$cur_bootpath" = "x" ]; then
 		gettext "failed to get bootpath by eeprom\n" 1>&2
 		return 1
@@ -405,8 +404,8 @@ emit_driver_warning_msg() {
 	# of controllers attached to the system.
 
 	echo ""
-	echo "WARNING: stmsboot operates on each supported multipath-capable controller"
-	echo "         detected in a host. In your system, these controllers are"
+	gettext "WARNING: stmsboot operates on each supported multipath-capable controller\n"
+	gettext "         detected in a host. In your system, these controllers are\n\n"
 
 	for WARNDRV in `echo $SUPPORTED_DRIVERS| $SED -e"s,|, ,g"`; do
 		for i in `$STMSBOOTUTIL -D $WARNDRV -n | $SED -e"s,|, ,g"`; do
@@ -415,12 +414,12 @@ emit_driver_warning_msg() {
 	done;
 	
 	echo ""
-	echo "If you do NOT wish to operate on these controllers, please quit stmsboot"
-	echo "and re-invoke with -D { fp | mpt } to specify which controllers you wish"
-	echo "to modify your multipathing configuration for."
+	gettext "If you do NOT wish to operate on these controllers, please quit stmsboot\n"
+	gettext "and re-invoke with -D { fp | mpt } to specify which controllers you wish\n"
+	gettext "to modify your multipathing configuration for.\n"
 
 	echo ""
-	gettext "Do you wish to continue? [y/n] (default: y) " 1>&2
+	gettext "Do you wish to continue? [y/n] (default: y) " 
 	read response
 
 	if [ "x$response" != "x" -a "x$response" != "xY" -a \
@@ -485,7 +484,7 @@ if [ $? -ne 0 ]; then
 	if [ -f /var/svc/manifest/system/device/mpxio-upgrade.xml ]; then
 		$SVCCFG import /var/svc/manifest/system/device/mpxio-upgrade.xml
 		if [ $? -ne 0 ]; then
-			fmt=`gettext "Unable to import %s service"`
+			fmt=`gettext "Unable to import the %s service"`
 			printf "$fmt\n" "$STMSINSTANCE" 1>&2
 			exit 1
 		else
@@ -518,19 +517,19 @@ if [ "x$cmd" = xenable -o "x$cmd" = xdisable -o "x$cmd" = xupdate ]; then
 	ISARMED=`$SVCS -l $STMSINSTANCE |$GREP "enabled.*temporary"`
 	if [ $? -eq 0 ]; then
 		echo ""
-		echo "You need the reboot the system in order to complete"
-		echo "the previous invocation of stmsboot."
+		gettext "You need to reboot the system in order to complete\n"
+		gettext "the previous invocation of stmsboot.\n"
 		echo ""
-		echo "Do you wish to reboot the system now? (y/n, default y) \c"
+		gettext "Do you wish to reboot the system now? (y/n, default y) "
 		read response
 
 		if [ "x$response" = "x" -o "x$response" = "xY" -o \
 		    "x$response" = "xy" ]; then
 			/usr/sbin/reboot
 		else
-			/bin/echo ""
-			/bin/echo "Please reboot this system before continuing"
-			/bin/echo ""
+			echo ""
+			gettext "Please reboot this system before continuing\n"
+			echo ""
 			exit 1
 		fi
 	fi
