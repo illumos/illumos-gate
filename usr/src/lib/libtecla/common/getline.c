@@ -3539,31 +3539,34 @@ static int gl_control_strings(GetLine *gl, const char *term)
  * database.
  */
 #ifdef USE_TERMINFO
-  if(!term || setupterm((char *)term, gl->input_fd, NULL) == ERR) {
-    bad_term = 1;
-  } else {
-    _clr_StringGroup(gl->capmem);
-    gl->left = gl_tigetstr(gl, "cub1");
-    gl->right = gl_tigetstr(gl, "cuf1");
-    gl->up = gl_tigetstr(gl, "cuu1");
-    gl->down = gl_tigetstr(gl, "cud1");
-    gl->home = gl_tigetstr(gl, "home");
-    gl->clear_eol = gl_tigetstr(gl, "el");
-    gl->clear_eod = gl_tigetstr(gl, "ed");
-    gl->u_arrow = gl_tigetstr(gl, "kcuu1");
-    gl->d_arrow = gl_tigetstr(gl, "kcud1");
-    gl->l_arrow = gl_tigetstr(gl, "kcub1");
-    gl->r_arrow = gl_tigetstr(gl, "kcuf1");
-    gl->left_n = gl_tigetstr(gl, "cub");
-    gl->right_n = gl_tigetstr(gl, "cuf");
-    gl->sound_bell = gl_tigetstr(gl, "bel");
-    gl->bold = gl_tigetstr(gl, "bold");
-    gl->underline = gl_tigetstr(gl, "smul");
-    gl->standout = gl_tigetstr(gl, "smso");
-    gl->dim = gl_tigetstr(gl, "dim");
-    gl->reverse = gl_tigetstr(gl, "rev");
-    gl->blink = gl_tigetstr(gl, "blink");
-    gl->text_attr_off = gl_tigetstr(gl, "sgr0");
+  {
+    int errret;
+    if(!term || setupterm((char *)term, gl->input_fd, &errret) == ERR) {
+      bad_term = 1;
+    } else {
+      _clr_StringGroup(gl->capmem);
+      gl->left = gl_tigetstr(gl, "cub1");
+      gl->right = gl_tigetstr(gl, "cuf1");
+      gl->up = gl_tigetstr(gl, "cuu1");
+      gl->down = gl_tigetstr(gl, "cud1");
+      gl->home = gl_tigetstr(gl, "home");
+      gl->clear_eol = gl_tigetstr(gl, "el");
+      gl->clear_eod = gl_tigetstr(gl, "ed");
+      gl->u_arrow = gl_tigetstr(gl, "kcuu1");
+      gl->d_arrow = gl_tigetstr(gl, "kcud1");
+      gl->l_arrow = gl_tigetstr(gl, "kcub1");
+      gl->r_arrow = gl_tigetstr(gl, "kcuf1");
+      gl->left_n = gl_tigetstr(gl, "cub");
+      gl->right_n = gl_tigetstr(gl, "cuf");
+      gl->sound_bell = gl_tigetstr(gl, "bel");
+      gl->bold = gl_tigetstr(gl, "bold");
+      gl->underline = gl_tigetstr(gl, "smul");
+      gl->standout = gl_tigetstr(gl, "smso");
+      gl->dim = gl_tigetstr(gl, "dim");
+      gl->reverse = gl_tigetstr(gl, "rev");
+      gl->blink = gl_tigetstr(gl, "blink");
+      gl->text_attr_off = gl_tigetstr(gl, "sgr0");
+    };
   };
 #elif defined(USE_TERMCAP)
   if(!term || tgetent(gl->tgetent_buf, (char *)term) < 0) {
