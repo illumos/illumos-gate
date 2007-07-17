@@ -1853,7 +1853,8 @@ again:
 	 * If there is a sin/sin6 appended onto the T_OK_ACK use
 	 * that to set the local address. If this is not present
 	 * then we zero out the address and don't set the
-	 * SS_LADDR_VALID bit.
+	 * SS_LADDR_VALID bit. For AF_UNIX endpoints we copy over
+	 * the pathname from the listening socket.
 	 */
 	sinlen = (nso->so_family == AF_INET) ? sizeof (sin_t) : sizeof (sin6_t);
 	if ((nso->so_family == AF_INET) || (nso->so_family == AF_INET6) &&
@@ -1862,10 +1863,17 @@ again:
 		bcopy(ack_mp->b_rptr, nso->so_laddr_sa, sinlen);
 		nso->so_laddr_len = sinlen;
 		nso->so_state |= SS_LADDR_VALID;
+	} else if (nso->so_family == AF_UNIX) {
+		ASSERT(so->so_family == AF_UNIX);
+		nso->so_laddr_len = so->so_laddr_len;
+		ASSERT(nso->so_laddr_len <= nso->so_laddr_maxlen);
+		bcopy(so->so_laddr_sa, nso->so_laddr_sa, nso->so_laddr_len);
+		nso->so_state |= SS_LADDR_VALID;
 	} else {
 		nso->so_laddr_len = so->so_laddr_len;
 		ASSERT(nso->so_laddr_len <= nso->so_laddr_maxlen);
 		bzero(nso->so_laddr_sa, nso->so_addr_size);
+		nso->so_laddr_sa->sa_family = nso->so_family;
 	}
 	freemsg(ack_mp);
 
