@@ -203,7 +203,6 @@ static char		*gettail();
 
 
 static int walkflags = FTW_CHDIR|FTW_PHYS|FTW_ANYERR|FTW_NOLOOP;
-static struct Node	*savetnode;
 static struct Node	*topnode;
 static struct Node	*freenode;	/* next free node we may use later */
 static char		*cpio[] = { "cpio", "-o", 0 };
@@ -291,9 +290,7 @@ main(int argc, char **argv)
 
 	/* allocate enough space for the compiler */
 	topnode = malloc((argc + 1) * sizeof (struct Node));
-	savetnode = malloc((argc + 1) * sizeof (struct Node));
 	(void) memset(topnode, 0, (argc + 1) * sizeof (struct Node));
-	(void) memset(savetnode, 0, (argc + 1) * sizeof (struct Node));
 
 	if (compile(argv + paths, topnode, &action_expression) == 0) {
 		/* no expression, default to -print */
@@ -318,7 +315,6 @@ main(int argc, char **argv)
 		topnode->first.np = savenode;
 		(void) memcpy(topnode->next, &PRINT_NODE, sizeof (struct Node));
 	}
-	(void) memcpy(savetnode, topnode, ((argc + 1) * sizeof (struct Node)));
 
 	while (paths--) {
 		char *curpath;
@@ -361,9 +357,6 @@ main(int argc, char **argv)
 			error = 1;
 		}
 
-		if (paths > 1)
-			(void) memcpy(topnode, savetnode,
-			    ((argc + 1) * sizeof (struct Node)));
 	}
 
 	/* execute any remaining variable length lists */
