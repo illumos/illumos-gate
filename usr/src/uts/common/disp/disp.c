@@ -129,10 +129,15 @@ static cpu_t	*cpu_choose(kthread_t *, pri_t);
  * be sitting on a run queue before it can be stolen by another CPU
  * to reduce migrations.  The interval is in nanoseconds.
  *
- * The nosteal_nsec should be set by a platform code to an appropriate value.
- * Setting it to 0 effectively disables the nosteal 'protection'
+ * The nosteal_nsec should be set by platform code cmp_set_nosteal_interval()
+ * to an appropriate value.  nosteal_nsec is set to NOSTEAL_UNINITIALIZED
+ * here indicating it is uninitiallized.
+ * Setting nosteal_nsec to 0 effectively disables the nosteal 'protection'.
+ *
  */
-hrtime_t nosteal_nsec = -1;
+#define	NOSTEAL_UNINITIALIZED	(-1)
+hrtime_t nosteal_nsec = NOSTEAL_UNINITIALIZED;
+extern void cmp_set_nosteal_interval(void);
 
 id_t	defaultcid;	/* system "default" class; see dispadmin(1M) */
 
@@ -257,6 +262,12 @@ dispinit(void)
 	disp_setup(maxglobpri, 0);
 
 	mutex_exit(&cpu_lock);
+
+	/*
+	 * Platform specific sticky scheduler setup.
+	 */
+	if (nosteal_nsec == NOSTEAL_UNINITIALIZED)
+		cmp_set_nosteal_interval();
 
 	/*
 	 * Get the default class ID; this may be later modified via

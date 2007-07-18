@@ -79,9 +79,6 @@ static void	slave_startup(void);
  */
 #define	CPU_WAKEUP_GRACE_MSEC 1000
 
-extern hrtime_t nosteal_nsec;
-extern void cmp_set_nosteal_interval(void);
-
 #ifdef	TRAPTRACE
 /*
  * This function sets traptrace buffers for all cpus
@@ -189,7 +186,7 @@ warm_flag_set(int cpuid)
 	 */
 	cp = cpu[cpuid];
 	cp->cpu_flags |= CPU_RUNNING | CPU_READY | CPU_EXISTS
-		| CPU_OFFLINE | CPU_QUIESCED;
+	    | CPU_OFFLINE | CPU_QUIESCED;
 	cpu_set_state(cp);
 }
 
@@ -311,7 +308,7 @@ setup_cpu_common(int cpuid)
 	} else {
 		for (tt_index = 0; tt_index < (max_ncpus-1); tt_index++)
 			if (!trap_trace_inuse[tt_index])
-			    break;
+				break;
 		ASSERT(tt_index < max_ncpus - 1);
 		trap_trace_inuse[tt_index] = 1;
 		newbuf = (caddr_t)(ttrace_buf + (tt_index * TRAP_TSIZE));
@@ -416,9 +413,6 @@ setup_cpu_common(int cpuid)
 	 */
 	pghw_physid_create(cp);
 	pg_cpu_init(cp);
-
-	if (nosteal_nsec == -1)
-		cmp_set_nosteal_interval();
 
 	if ((rval = cpu_intrq_setup(cp)) != 0) {
 		return (rval);
