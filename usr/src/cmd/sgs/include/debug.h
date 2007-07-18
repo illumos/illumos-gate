@@ -589,12 +589,14 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
  */
 extern	void	Dbg_args_files(Lm_list *, int, char *);
 extern	void	Dbg_args_flags(Lm_list *, int, int);
+extern	void	Dbg_audit_ignore(Rt_map *);
 extern	void	Dbg_audit_interface(Lm_list *, const char *, const char *);
 extern	void	Dbg_audit_lib(Lm_list *, const char *);
 extern	void	Dbg_audit_object(Lm_list *, const char *, const char *);
 extern	void	Dbg_audit_symval(Lm_list *, const char *, const char *,
 		    const char *, Addr, Addr);
 extern	void	Dbg_audit_skip(Lm_list *, const char *, const char *);
+extern	void	Dbg_audit_terminate(Lm_list *, const char *);
 extern	void	Dbg_audit_version(Lm_list *, const char *, ulong_t);
 
 extern	void	Dbg_bind_global(Rt_map *, Addr, Off, Xword, Pltbindtype,

@@ -80,7 +80,7 @@ _audit_client(Audit_info * aip, Rt_map * almp)
 }
 
 /*
- * la_filter() caller.  Traverses through all audit libraries and call any
+ * la_filter() caller.  Traverse through all audit libraries and call any
  * la_filter() entry points found.  A zero return from an auditor indicates
  * that the filtee should be ignored.
  */
@@ -133,7 +133,7 @@ audit_objfilter(Rt_map *frlmp, const char *ref, Rt_map *felmp, uint_t flags)
 }
 
 /*
- * la_objsearch() caller.  Traverses through all audit libraries and call any
+ * la_objsearch() caller.  Traverse through all audit libraries and call any
  * la_objsearch() entry points found.
  *
  * Effectively any audit library can change the name we're working with, so we
@@ -175,11 +175,11 @@ audit_objsearch(Rt_map *clmp, const char *name, uint_t flags)
 
 	if (auditors && (auditors->ad_flags & LML_TFLG_AUD_OBJSEARCH))
 		nname = _audit_objsearch(&(auditors->ad_list), nname,
-			clmp, flags);
+		    clmp, flags);
 	if (nname && AUDITORS(clmp) &&
 	    (AUDITORS(clmp)->ad_flags & LML_TFLG_AUD_OBJSEARCH))
 		nname = _audit_objsearch(&(AUDITORS(clmp)->ad_list), nname,
-			clmp, flags);
+		    clmp, flags);
 
 	if (appl)
 		rtld_flags &= ~RT_FL_APPLIC;
@@ -189,22 +189,51 @@ audit_objsearch(Rt_map *clmp, const char *name, uint_t flags)
 }
 
 /*
- * la_activity() caller.  Traverses through all audit library and calls any
+ * la_activity() caller.  Traverse through all audit libraries and call any
  * la_activity() entry points found.
  */
 static void
-_audit_activity(List * list, Rt_map * clmp, uint_t flags)
+_audit_activity(List *list, Rt_map *clmp, uint_t flags)
 {
-	Audit_list *	alp;
-	Listnode *	lnp;
+	Audit_list	*alp;
+	Listnode	*lnp;
+	Lm_list		*clml = LIST(clmp);
 
 	for (LIST_TRAVERSE(list, lnp, alp)) {
-		Audit_client *	acp;
+		Audit_client	*acp;
+		Rt_map		*almp = alp->al_lmp;
+		Lm_list		*alml = LIST(almp);
 
 		if (alp->al_activity == 0)
 			continue;
 		if ((acp = _audit_client(AUDINFO(clmp), alp->al_lmp)) == 0)
 			continue;
+
+		/*
+		 * Make sure the audit library only sees one addition/deletion
+		 * at a time.  This ensures the library doesn't see numerous
+		 * events from lazy loading a series of libraries.  Keep track
+		 * of this caller having called an auditor, so that the
+		 * appropriate "consistent" event can be supplied on leaving
+		 * ld.so.1.
+		 */
+		if ((flags == LA_ACT_ADD) || (flags == LA_ACT_DELETE)) {
+
+			if (alml->lm_flags & LML_FLG_AUDITNOTIFY)
+				continue;
+
+			if (alist_append(&(clml->lm_actaudit), &clmp,
+			    sizeof (Rt_map *), AL_CNT_ACTAUDIT) == 0)
+				return;
+
+			alml->lm_flags |= LML_FLG_AUDITNOTIFY;
+
+		} else {
+			if ((alml->lm_flags & LML_FLG_AUDITNOTIFY) == 0)
+				continue;
+
+			alml->lm_flags &= ~LML_FLG_AUDITNOTIFY;
+		}
 
 		leave(LIST(alp->al_lmp));
 		(*alp->al_activity)(&(acp->ac_cookie), flags);
@@ -213,23 +242,9 @@ _audit_activity(List * list, Rt_map * clmp, uint_t flags)
 }
 
 void
-audit_activity(Rt_map * clmp, uint_t flags)
+audit_activity(Rt_map *clmp, uint_t flags)
 {
 	int	appl = 0;
-
-	/*
-	 * We want to trigger the first addition or deletion only.  Ignore any
-	 * consistent calls unless a previous addition or deletion occurred.
-	 */
-	if ((flags == LA_ACT_ADD) || (flags == LA_ACT_DELETE)) {
-		if (rtld_flags & RT_FL_AUNOTIF)
-			return;
-		rtld_flags |= RT_FL_AUNOTIF;
-	} else {
-		if ((rtld_flags & RT_FL_AUNOTIF) == 0)
-			return;
-		rtld_flags &= ~RT_FL_AUNOTIF;
-	}
 
 	if ((rtld_flags & RT_FL_APPLIC) == 0)
 		appl = rtld_flags |= RT_FL_APPLIC;
@@ -248,7 +263,7 @@ audit_activity(Rt_map * clmp, uint_t flags)
  * la_objopen() caller.  Create an audit information structure for the indicated
  * link-map, regardless of an la_objopen() entry point.  This structure is used
  * to supply information to various audit interfaces (see LML_MSK_AUDINFO).
- * Traverses through all audit library and calls any la_objopen() entry points
+ * Traverse through all audit library and call any la_objopen() entry points
  * found.
  */
 static int
@@ -278,7 +293,7 @@ _audit_objopen(List *list, Rt_map *nlmp, Lmid_t lmid, Audit_info *aip,
 
 		leave(LIST(alp->al_lmp));
 		flags = (*alp->al_objopen)((Link_map *)nlmp, lmid,
-			&(acp->ac_cookie));
+		    &(acp->ac_cookie));
 		(void) enter();
 
 		if (flags & LA_FLG_BINDTO)
@@ -349,7 +364,7 @@ audit_objopen(Rt_map *clmp, Rt_map *nlmp)
 
 	aip->ai_cnt = clients;
 	aip->ai_clients = (Audit_client *)((uintptr_t)aip +
-		sizeof (Audit_info));
+	    sizeof (Audit_info));
 
 	if ((rtld_flags & RT_FL_APPLIC) == 0)
 		appl = rtld_flags |= RT_FL_APPLIC;
@@ -371,7 +386,7 @@ audit_objopen(Rt_map *clmp, Rt_map *nlmp)
 }
 
 /*
- * la_objclose() caller.  Traverses through all audit library and calls any
+ * la_objclose() caller.  Traverse through all audit library and call any
  * la_objclose() entry points found.
  */
 void
@@ -413,7 +428,7 @@ audit_objclose(Rt_map * clmp, Rt_map * lmp)
 }
 
 /*
- * la_pltenter() caller.  Traverses through all audit library and calls any
+ * la_pltenter() caller.  Traverse through all audit library and call any
  * la_pltenter() entry points found.  NOTE: this routine is called via the
  * glue code established in elf_plt_trace_write(), the symbol descriptor is
  * created as part of the glue and for 32bit environments the st_name is a
@@ -451,11 +466,13 @@ _audit_pltenter(List *list, Rt_map *rlmp, Rt_map *dlmp, Sym *sym,
 		leave(LIST(alp->al_lmp));
 		sym->st_value = (Addr)(*alp->al_pltenter)(sym, ndx,
 		    &(racp->ac_cookie), &(dacp->ac_cookie), regs,
+		/* BEGIN CSTYLED */
 #if	defined(_ELF64)
 		    flags, name);
 #else
 		    flags);
 #endif
+		/* END CSTYLED */
 		(void) enter();
 
 		DBG_CALL(Dbg_audit_symval(LIST(alp->al_lmp), alp->al_libname,
@@ -494,7 +511,7 @@ audit_pltenter(Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx,
 
 
 /*
- * la_pltexit() caller.  Traverses through all audit library and calls any
+ * la_pltexit() caller.  Traverse through all audit library and call any
  * la_pltexit() entry points found.  See notes above (_audit_pltenter) for
  * discussion on st_name.
  */
@@ -524,11 +541,13 @@ _audit_pltexit(List *list, uintptr_t retval, Rt_map *rlmp, Rt_map *dlmp,
 		leave(LIST(alp->al_lmp));
 		retval = (*alp->al_pltexit)(sym, ndx,
 		    &(racp->ac_cookie), &(dacp->ac_cookie),
+		/* BEGIN CSTYLED */
 #if	defined(_ELF64)
 		    retval, name);
 #else
 		    retval);
 #endif
+		/* END CSTYLED */
 		(void) enter();
 	}
 	return (retval);
@@ -550,10 +569,10 @@ audit_pltexit(uintptr_t retval, Rt_map *rlmp, Rt_map *dlmp, Sym *sym,
 
 	if (auditors && (auditors->ad_flags & LML_TFLG_AUD_PLTEXIT))
 		_retval = _audit_pltexit(&(auditors->ad_list), _retval,
-			rlmp, dlmp, sym, ndx);
+		    rlmp, dlmp, sym, ndx);
 	if (AUDITORS(rlmp) && (AUDITORS(rlmp)->ad_flags & LML_TFLG_AUD_PLTEXIT))
 		_retval = _audit_pltexit(&(AUDITORS(rlmp)->ad_list), _retval,
-			rlmp, dlmp, sym, ndx);
+		    rlmp, dlmp, sym, ndx);
 
 	if (_appl)
 		rtld_flags &= ~RT_FL_APPLIC;
@@ -564,7 +583,7 @@ audit_pltexit(uintptr_t retval, Rt_map *rlmp, Rt_map *dlmp, Sym *sym,
 
 
 /*
- * la_symbind() caller.  Traverses through all audit library and calls any
+ * la_symbind() caller.  Traverse through all audit library and call any
  * la_symbind() entry points found.
  */
 static Addr
@@ -606,11 +625,13 @@ _audit_symbind(List *list, Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx,
 		leave(LIST(alp->al_lmp));
 		sym->st_value = (*alp->al_symbind)(sym, ndx,
 		    &(racp->ac_cookie), &(dacp->ac_cookie),
+		/* BEGIN CSTYLED */
 #if	defined(_ELF64)
 		    &lflags, name);
 #else
 		    &lflags);
 #endif
+		/* END CSTYLED */
 		(void) enter();
 
 		/*
@@ -674,7 +695,7 @@ audit_symbind(Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx, Addr value,
 
 
 /*
- * la_preinit() caller.  Traverses through all audit libraries and calls any
+ * la_preinit() caller.  Traverse through all audit libraries and call any
  * la_preinit() entry points found.
  */
 static void
@@ -723,8 +744,9 @@ audit_preinit(Rt_map *clmp)
  * while your still pointing at it.
  */
 void
-audit_desc_cleanup(Audit_desc *adp, Rt_map *clmp)
+audit_desc_cleanup(Rt_map *clmp)
 {
+	Audit_desc	*adp = AUDITORS(clmp);
 	Audit_list	*alp;
 	Listnode	*lnp, *olnp;
 	Alist		*ghalp = 0;
@@ -746,23 +768,28 @@ audit_desc_cleanup(Audit_desc *adp, Rt_map *clmp)
 	if (olnp)
 		free(olnp);
 
+	free(adp);
+	AUDITORS(clmp) = 0;
+
 	if (ghalp) {
 		Grp_hdl **	ghpp;
 		Aliste		off;
 
-		for (ALIST_TRAVERSE(ghalp, off, ghpp))
+		for (ALIST_TRAVERSE(ghalp, off, ghpp)) {
 			(void) dlclose_intn(*ghpp, clmp);
+		}
 		free(ghalp);
 	}
-	free(adp);
 }
 
 /*
  * Clean up (free) an audit information structure.
  */
 void
-audit_info_cleanup(Audit_info *aip)
+audit_info_cleanup(Rt_map *clmp)
 {
+	Audit_info	*aip = AUDINFO(clmp);
+
 	if (aip == 0)
 		return;
 

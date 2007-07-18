@@ -177,8 +177,8 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
 	 * valid ELF file.
 	 */
 	while ((dirent = readdir(dir)) != NULL) {
-		const char	*file = dirent->d_name;
-		char		*_dst, *_name;
+		const char	*file = dirent->d_name, *oname;
+		char		*_dst;
 		Fdesc		fdesc = { 0 };
 		Rej_desc	_rej = { 0 };
 
@@ -190,21 +190,23 @@ hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
 			continue;
 
 		/*
-		 * Complete the full pathname, and verify its usability.
+		 * Complete the full pathname, and verify its usability.  Note,
+		 * an auditor can supply an alternative name.
 		 */
 		for (_dst = dst, src = file, file = dst; *src; _dst++, src++)
 			*_dst = *src;
 		*_dst = '\0';
 
-		if ((_name = strdup(path)) == NULL) {
+		if ((oname = strdup(path)) == NULL) {
 			error = 1;
 			break;
 		}
 
-		if ((name = load_trace(lml, _name, clmp)) == 0) {
-			free((void *)_name);
+		if (load_trace(lml, &oname, clmp) == 0) {
+			free((void *)oname);
 			continue;
 		}
+		name = oname;
 
 		/*
 		 * Note, all directory entries are processed by find_path(),
@@ -317,7 +319,7 @@ _hwcap_filtees(Pnode **pnpp, Aliste nlmco, Lm_cntl *nlmc, Rt_map *flmp,
 		 */
 		DBG_CALL(Dbg_file_filtee(lml, NAME(flmp), fdp->fd_nname, 0));
 
-		nlmp = load_path(lml, nlmco, fdp->fd_nname, flmp, mode,
+		nlmp = load_path(lml, nlmco, &fdp->fd_nname, flmp, mode,
 		    (flags | FLG_RT_HANDLE), &ghp, fdp, &rej);
 		remove_fdesc(fdp);
 		if (nlmp == 0)
@@ -487,7 +489,7 @@ load_hwcap(Lm_list *lml, Aliste lmco, const char *dir, Rt_map *clmp,
 	 * discard the rest.
 	 */
 	for (ALIST_TRAVERSE(fdalp, off, fdp)) {
-		if ((found == 0) && ((lmp = load_path(lml, lmco, fdp->fd_nname,
+		if ((found == 0) && ((lmp = load_path(lml, lmco, &fdp->fd_nname,
 		    clmp, mode, flags, hdl, fdp, rej)) != 0))
 			found++;
 

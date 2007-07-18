@@ -99,3 +99,21 @@ Dbg_audit_skip(Lm_list *lml, const char *name, const char *lmid)
 
 	dbg_print(lml, MSG_INTL(MSG_AUD_SKIP), name, lmid);
 }
+
+void
+Dbg_audit_terminate(Lm_list *lml, const char *name)
+{
+	if (DBG_NOTCLASS(DBG_C_AUDITING | DBG_C_FILES))
+		return;
+
+	dbg_print(lml, MSG_INTL(MSG_AUD_TERM), name);
+}
+
+void
+Dbg_audit_ignore(Rt_map *lmp)
+{
+	if (DBG_NOTCLASS(DBG_C_AUDITING | DBG_C_FILES))
+		return;
+
+	dbg_print(LIST(lmp), MSG_INTL(MSG_AUD_IGNORE), NAME(lmp));
+}

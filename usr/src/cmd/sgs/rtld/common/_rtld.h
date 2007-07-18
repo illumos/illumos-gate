@@ -143,6 +143,7 @@ typedef enum {
 #define	AL_CNT_LMLISTS	8		/* lm_lists initial alist count */
 #define	AL_CNT_LMNOW	8		/* lm_now initial alist count */
 #define	AL_CNT_RELBIND	20		/* relocation binding alist count */
+#define	AL_CNT_ACTAUDIT	2		/* lm_actaudit alist count */
 
 
 /*
@@ -278,7 +279,7 @@ typedef struct {
 #define	RT_FL_CONFAPP	0x00000400	/* application specific configuration */
 					/*	cache required */
 #define	RT_FL_DEBUGGER	0x00000800	/* a debugger is monitoring us */
-#define	RT_FL_AUNOTIF	0x00001000	/* audit activity going on */
+
 #define	RT_FL_NEWLOCALE	0x00002000	/* message locale has changed */
 #define	RT_FL_NOBAPLT	0x00004000	/* sparc: don't use ba plt's */
 #define	RT_FL_NOAUXFLTR	0x00008000	/* disable auxiliary filters */
@@ -584,14 +585,14 @@ extern void		lm_append(Lm_list *, Aliste, Rt_map *);
 extern void		lm_delete(Lm_list *, Rt_map *);
 extern void		lm_move(Lm_list *, Aliste, Aliste, Lm_cntl *,
 			    Lm_cntl *);
-extern void		load_completion(Rt_map *, Rt_map *);
+extern void		load_completion(Rt_map *);
 extern Rt_map 		*load_hwcap(Lm_list *, Aliste, const char *, Rt_map *,
 			    uint_t, uint_t, Grp_hdl **, Rej_desc *);
-extern Rt_map		*load_path(Lm_list *, Aliste, const char *, Rt_map *,
+extern Rt_map		*load_path(Lm_list *, Aliste, const char **, Rt_map *,
 			    int, uint_t, Grp_hdl **, Fdesc *, Rej_desc *);
 extern Rt_map		*load_one(Lm_list *, Aliste, Pnode *, Rt_map *, int,
 			    uint_t, Grp_hdl **);
-extern const char	*load_trace(Lm_list *, const char *, Rt_map *);
+extern int		load_trace(Lm_list *, const char **, Rt_map *);
 extern caddr_t		nu_map(Lm_list *, caddr_t, size_t, int, int);
 extern void		*malloc(size_t);
 extern void		move_data(Rt_map *);

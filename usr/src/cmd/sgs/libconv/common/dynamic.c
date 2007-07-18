@@ -138,6 +138,7 @@ conv_dyn_flag(Xword flags, int fmt_flags)
 		MSG_DF1_NOHDR_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_DF1_NORELOC_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_DF1_SYMINTPOSE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
+		MSG_DF1_GLOBAUDIT_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 const char *
@@ -169,6 +170,7 @@ conv_dyn_flag1(Xword flags)
 		{ DF_1_EDITED,		MSG_ORIG(MSG_DF1_EDITED) },
 		{ DF_1_NORELOC,		MSG_ORIG(MSG_DF1_NORELOC) },
 		{ DF_1_SYMINTPOSE,	MSG_ORIG(MSG_DF1_SYMINTPOSE) },
+		{ DF_1_GLOBAUDIT,	MSG_ORIG(MSG_DF1_GLOBAUDIT) },
 		{ 0,			0 }
 	};
 	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
@@ -343,8 +345,8 @@ conv_dyn_tag(Xword tag, Half mach, int fmt_flags)
 
 	if (tag <= DT_FLAGS)
 		return (conv_map2str(string, sizeof (string), tag,
-			fmt_flags, ARRAY_NELTS(tags_null), tags_null,
-			tags_null_alt, NULL));
+		    fmt_flags, ARRAY_NELTS(tags_null), tags_null,
+		    tags_null_alt, NULL));
 	DYN_RANGE(DT_PREINIT_ARRAY, tags_preinit_array);
 	DYN_RANGE(DT_SUNW_AUXILIARY, tags_sunw_auxiliary);
 	if (tag == DT_SUNW_STRPAD)

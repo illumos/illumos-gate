@@ -102,6 +102,7 @@ static const mdb_bitmask_t rtflags1_bits[] = {
 	{ MSG_ORIG(MSG_FL1_TLSADD), FL1_RT_TLSADD, FL1_RT_TLSADD },
 	{ MSG_ORIG(MSG_FL1_TLSSTAT), FL1_RT_TLSSTAT, FL1_RT_TLSSTAT },
 	{ MSG_ORIG(MSG_FL1_DIRECT), FL1_RT_DIRECT, FL1_RT_DIRECT},
+	{ MSG_ORIG(MSG_FL1_GLOBAUD), FL1_RT_GLOBAUD, FL1_RT_GLOBAUD},
 
 	{ MSG_ORIG(MSG_LTFL_AUD_PREINIT), LML_TFLG_AUD_PREINIT,
 	    LML_TFLG_AUD_PREINIT },
@@ -283,8 +284,8 @@ Depends(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,
 	 * that are in use.
 	 */
 	if (mdb_vread(&al, sizeof (Alist), addr) == -1) {
-	    mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_STR_ALIST), addr);
-	    return (DCMD_ERR);
+		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_STR_ALIST), addr);
+		return (DCMD_ERR);
 	}
 
 	ucnt = (al.al_next - sizeof (Alist) + sizeof (void *)) / al.al_size;
@@ -886,9 +887,9 @@ _dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		 * element has been initialized.
 		 */
 		ucnt = (al.al_next - sizeof (Alist) + sizeof (void *)) /
-			al.al_size;
+		    al.al_size;
 		tcnt = (al.al_end - sizeof (Alist) + sizeof (void *)) /
-			al.al_size;
+		    al.al_size;
 
 		if (ucnt && (flg & RTLD_FLG_VERBOSE)) {
 			listcalc = (uintptr_t)(&(al.al_data[0]));
@@ -1015,7 +1016,7 @@ dcmd_Lm_list(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (mdb_lookup_by_obj(MSG_ORIG(MSG_STR_LDSO1),
 	    MSG_ORIG(MSG_STR_DYNLMLIST), &gsym) == -1) {
 		mdb_warn(MSG_ORIG(MSG_ERR_SYMFAILED), MSG_ORIG(MSG_STR_LDSO1),
-			MSG_ORIG(MSG_STR_DYNLMLIST));
+		    MSG_ORIG(MSG_STR_DYNLMLIST));
 		return (DCMD_ERR);
 	}
 	if (mdb_vread((void *)&l, sizeof (l), (uintptr_t)gsym.st_value) == -1) {
@@ -1144,8 +1145,8 @@ dcmd_GrpHdl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	addr = (uintptr_t)gh.gh_depends;
 	if (mdb_vread(&al, sizeof (Alist), addr) == -1) {
-	    mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_STR_ALIST), addr);
-	    return (DCMD_ERR);
+		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_STR_ALIST), addr);
+		return (DCMD_ERR);
 	}
 
 	ucnt = (al.al_next - sizeof (Alist) + sizeof (void *)) / al.al_size;
@@ -1331,8 +1332,8 @@ dcmd_Groups(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	addr = (uintptr_t)GROUPS(&rtmap);
 	if (mdb_vread(&al, sizeof (Alist), addr) == -1) {
-	    mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_STR_ALIST), addr);
-	    return (DCMD_ERR);
+		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_STR_ALIST), addr);
+		return (DCMD_ERR);
 	}
 
 	ucnt = (al.al_next - sizeof (Alist) + sizeof (void *)) / al.al_size;
@@ -1399,7 +1400,7 @@ dcmd_ElfDyn(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 	if (mdb_vread(&dyn, sizeof (dyn), addr) == -1) {
 		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_ELFDYN_STR),
-			addr);
+		    addr);
 		return (DCMD_ERR);
 	}
 
@@ -1431,7 +1432,7 @@ dcmd_ElfEhdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (mdb_vread(&ehdr, sizeof (ehdr), addr) == -1) {
 		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_EHDR_STR),
-			addr);
+		    addr);
 		return (DCMD_ERR);
 	}
 
@@ -1490,7 +1491,7 @@ dcmd_ElfPhdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (mdb_vread(&phdr, sizeof (phdr), addr) == -1) {
 		mdb_warn(MSG_ORIG(MSG_ERR_READ), MSG_ORIG(MSG_EPHDR_STR),
-			addr);
+		    addr);
 		return (DCMD_ERR);
 	}
 

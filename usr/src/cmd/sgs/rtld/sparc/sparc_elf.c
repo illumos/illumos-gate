@@ -261,7 +261,7 @@ elf_plt_trace_write(caddr_t addr, Rela *rptr, Rt_map *rlmp, Rt_map *dlmp,
 	 * library that is interested in this binding.
 	 */
 	dyn_plt = (uintptr_t)AUDINFO(rlmp)->ai_dynplts +
-		(pltndx * dyn_plt_ent_size);
+	    (pltndx * dyn_plt_ent_size);
 
 	/*
 	 * Have we initialized this dynamic plt entry yet?  If we haven't do it
@@ -328,7 +328,7 @@ elf_plt_trace_write(caddr_t addr, Rela *rptr, Rt_map *rlmp, Rt_map *dlmp,
 	}
 
 	(void) elf_plt_write((uintptr_t)addr, (uintptr_t)addr,
-		rptr, (uintptr_t)dyn_plt, 0);
+	    rptr, (uintptr_t)dyn_plt, 0);
 	return ((caddr_t)dyn_plt);
 }
 
@@ -447,10 +447,10 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 
 	if ((lml->lm_tflags | FLAGS1(lmp)) & LML_TFLG_AUD_SYMBIND) {
 		ulong_t	symndx = (((uintptr_t)nsym -
-			(uintptr_t)SYMTAB(nlmp)) / SYMENT(nlmp));
+		    (uintptr_t)SYMTAB(nlmp)) / SYMENT(nlmp));
 
 		symval = audit_symbind(lmp, nlmp, nsym, symndx, symval,
-			&sb_flags);
+		    &sb_flags);
 	}
 
 	if (FLAGS(lmp) & FLG_RT_FIXED)
@@ -465,7 +465,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 		    AUDINFO(lmp)->ai_dynplts) {
 			int	fail = 0;
 			ulong_t	symndx = (((uintptr_t)nsym -
-				(uintptr_t)SYMTAB(nlmp)) / SYMENT(nlmp));
+			    (uintptr_t)SYMTAB(nlmp)) / SYMENT(nlmp));
 
 			symval = (ulong_t)elf_plt_trace_write((caddr_t)vaddr,
 			    rptr, lmp, nlmp, nsym, symndx, pltndx,
@@ -478,7 +478,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 			 * to newly bound function.
 			 */
 			pbtype = elf_plt_write((uintptr_t)vaddr,
-				(uintptr_t)vaddr, rptr, symval, pltndx);
+			    (uintptr_t)vaddr, rptr, symval, pltndx);
 		}
 	}
 
@@ -496,7 +496,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	 * link-map know on entry to this routine.
 	 */
 	if (entry)
-		load_completion(llmp, lmp);
+		load_completion(llmp);
 
 	/*
 	 * Some operations like dldump() or dlopen()'ing a relocatable object
@@ -504,7 +504,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	 * objects are initialized also.
 	 */
 	if ((LIST(nlmp)->lm_flags & LML_FLG_RTLDLM) && LIST(nlmp)->lm_init)
-		load_completion(nlmp, 0);
+		load_completion(nlmp);
 
 	/*
 	 * If the object we've bound to is in the process of being initialized
@@ -856,6 +856,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					 * report an error.  Weak references
 					 * may be unresolved.
 					 */
+					/* BEGIN CSTYLED */
 					if (symdef == 0) {
 					    Lm_list	*lml = LIST(lmp);
 
@@ -892,6 +893,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 						continue;
 					    }
 					}
+					/* END CSTYLED */
 
 					/*
 					 * If symbol was found in an object
@@ -1060,7 +1062,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 			break;
 		case R_SPARC_JMP_SLOT:
 			pltndx = ((ulong_t)rel -
-				(uintptr_t)JMPREL(lmp)) / relsiz;
+			    (uintptr_t)JMPREL(lmp)) / relsiz;
 
 			if (FLAGS(lmp) & FLG_RT_FIXED)
 				vaddr = 0;
@@ -1072,8 +1074,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 			    AUDINFO(lmp)->ai_dynplts) {
 				int	fail = 0;
 				ulong_t	symndx = (((uintptr_t)symdef -
-					(uintptr_t)SYMTAB(_lmp)) /
-					SYMENT(_lmp));
+				    (uintptr_t)SYMTAB(_lmp)) / SYMENT(_lmp));
 
 				(void) elf_plt_trace_write((caddr_t)vaddr,
 				    (Rela *)rel, lmp, _lmp, symdef, symndx,

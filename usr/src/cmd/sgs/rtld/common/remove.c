@@ -197,6 +197,8 @@ remove_lml(Lm_list *lml)
 			free(lml->lm_alp);
 		if (lml->lm_lists)
 			free(lml->lm_lists);
+		if (lml->lm_actaudit)
+			free(lml->lm_actaudit);
 
 		/*
 		 * Cleanup any pending RTLDINFO in the case where it was
@@ -298,22 +300,6 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 	}
 
 	/*
-	 * Free the various names, as these were duplicated so that they were
-	 * available in core files.
-	 * The original name is set to the pathname by default (see fullpath()),
-	 * but is overridden if the file is an alternative.  The pathname is set
-	 * to the name by default (see [aout|elf]_new_lm()), but is overridden
-	 * if the fullpath/resolve path differs (see fullpath()).  The original
-	 * name is always duplicated, as it typically exists as a text string
-	 * (see DT_NEEDED pointer) or was passed in from user code.
-	 */
-	if (ORIGNAME(lmp) != PATHNAME(lmp))
-		free(ORIGNAME(lmp));
-	if (PATHNAME(lmp) != NAME(lmp))
-		free(PATHNAME(lmp));
-	free(NAME(lmp));
-
-	/*
 	 * Remove any of this objects filtee infrastructure.  The filtees them-
 	 * selves have already been removed.
 	 */
@@ -339,9 +325,9 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 	if (ELFPRV(lmp))
 		free(ELFPRV(lmp));
 	if (AUDITORS(lmp))
-		audit_desc_cleanup(AUDITORS(lmp), lmp);
+		audit_desc_cleanup(lmp);
 	if (AUDINFO(lmp))
-		audit_info_cleanup(AUDINFO(lmp));
+		audit_info_cleanup(lmp);
 
 	if (CONDVAR(lmp))
 		free(CONDVAR(lmp));
@@ -403,6 +389,24 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 			}
 		}
 	}
+
+	/*
+	 * Finally, free the various names, as these were duplicated so that
+	 * they were available in core files.  This is left until last, to aid
+	 * debugging previous elements of the removal process.
+	 *
+	 * The original name is set to the pathname by default (see fullpath()),
+	 * but is overridden if the file is an alternative.  The pathname is set
+	 * to the name by default (see [aout|elf]_new_lm()), but is overridden
+	 * if the fullpath/resolve path differs (see fullpath()).  The original
+	 * name is always duplicated, as it typically exists as a text string
+	 * (see DT_NEEDED pointer) or was passed in from user code.
+	 */
+	if (ORIGNAME(lmp) != PATHNAME(lmp))
+		free(ORIGNAME(lmp));
+	if (PATHNAME(lmp) != NAME(lmp))
+		free(PATHNAME(lmp));
+	free(NAME(lmp));
 
 	free(lmp);
 }
@@ -1378,8 +1382,10 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 					 * sure the filtees reference count
 					 * gets decremented.
 					 */
-					if (FLAGS(lmp) & FLG_RT_DELETE)
-					    (void) dlclose_core(ghp, lmp, lml);
+					if (FLAGS(lmp) & FLG_RT_DELETE) {
+						(void) dlclose_core(ghp,
+						    lmp, lml);
+					}
 				}
 			}
 		}

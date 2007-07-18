@@ -114,7 +114,7 @@ preload(const char *str, Rt_map *lmp)
 			rtld_flags2 |= RT_FL2_FTL2WARN;
 		if ((pnp = expand_paths(clmp, ptr, PN_SER_EXTLOAD, 0)) != 0)
 			nlmp = load_one(&lml_main, ALO_DATA, pnp, clmp,
-			MODE(lmp), flags, 0);
+			    MODE(lmp), flags, 0);
 		if (pnp)
 			remove_pnode(pnp);
 		if (rtld_flags & RT_FL_SECURE)
@@ -361,7 +361,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 
 	MODE(rlmp) |= (RTLD_LAZY | RTLD_NODELETE | RTLD_GLOBAL | RTLD_WORLD);
 	FLAGS(rlmp) |= (FLG_RT_ANALYZED | FLG_RT_RELOCED | FLG_RT_INITDONE |
-		FLG_RT_INITCLCT | FLG_RT_FINICLCT | FLG_RT_MODESET);
+	    FLG_RT_INITCLCT | FLG_RT_FINICLCT | FLG_RT_MODESET);
 
 	/*
 	 * Initialize the runtime linkers information.
@@ -451,7 +451,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			    (ehdr->e_type == ET_EXEC)) {
 				int	i;
 				Phdr *	_phdr = (Phdr *)((uintptr_t)ADDR(mlmp) +
-					ehdr->e_phoff);
+				    ehdr->e_phoff);
 
 				/*
 				 * We scan the program headers to find the tail
@@ -461,7 +461,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 				for (i = 0; i < ehdr->e_phnum; i++, _phdr++) {
 					if (_phdr->p_type == PT_LOAD)
 						brkbase = _phdr->p_vaddr +
-							_phdr->p_memsz;
+						    _phdr->p_memsz;
 				}
 			}
 
@@ -628,7 +628,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 
 
 			memsize = (lastptr->p_vaddr + lastptr->p_memsz) -
-				S_ALIGN(firstptr->p_vaddr, syspagsz);
+			    S_ALIGN(firstptr->p_vaddr, syspagsz);
 
 			entry = ehdr->e_entry;
 			if (ehdr->e_type == ET_DYN)
@@ -901,11 +901,38 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		 * Any object required auditing (set with a DT_DEPAUDIT dynamic
 		 * entry) that can't be established is fatal.
 		 */
-		if (audit_setup(mlmp, AUDITORS(mlmp), 0) == 0)
-			return (0);
+		if (FLAGS1(mlmp) & FL1_RT_GLOBAUD) {
+			/*
+			 * If this object requires global auditing, use the
+			 * local auditing information to set the global
+			 * auditing descriptor.  The effect is that a
+			 * DT_DEPAUDIT act as an LD_AUDIT.
+			 */
+			if ((auditors == 0) &&
+			    ((auditors = calloc(1, sizeof (Audit_desc))) == 0))
+				return (0);
 
-		FLAGS1(mlmp) |= AUDITORS(mlmp)->ad_flags;
-		lml_main.lm_flags |= LML_FLG_LOCAUDIT;
+			auditors->ad_name = AUDITORS(mlmp)->ad_name;
+			if (audit_setup(mlmp, auditors, 0) == 0)
+				return (0);
+			lml_main.lm_tflags |= auditors->ad_flags;
+
+			/*
+			 * Clear the local auditor information.
+			 */
+			free((void *) AUDITORS(mlmp));
+			AUDITORS(mlmp) = 0;
+
+		} else {
+			/*
+			 * Establish any local auditing.
+			 */
+			if (audit_setup(mlmp, AUDITORS(mlmp), 0) == 0)
+				return (0);
+
+			FLAGS1(mlmp) |= AUDITORS(mlmp)->ad_flags;
+			lml_main.lm_flags |= LML_FLG_LOCAUDIT;
+		}
 	}
 
 	/*
@@ -1048,7 +1075,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * the dynamic executables entry point.
 	 */
 	call_array(PREINITARRAY(mlmp), (uint_t)PREINITARRAYSZ(mlmp), mlmp,
-		SHT_PREINIT_ARRAY);
+	    SHT_PREINIT_ARRAY);
 
 	if (tobj)
 		call_init(tobj, DBG_INIT_SORT);

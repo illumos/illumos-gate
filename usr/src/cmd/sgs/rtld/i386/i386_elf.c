@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -275,9 +275,9 @@ elf_bndr(Rt_map *lmp, ulong_t reloff, caddr_t from)
 
 	if ((lml->lm_tflags | FLAGS1(lmp)) & LML_TFLG_AUD_SYMBIND) {
 		uint_t	symndx = (((uintptr_t)nsym -
-			(uintptr_t)SYMTAB(nlmp)) / SYMENT(nlmp));
+		    (uintptr_t)SYMTAB(nlmp)) / SYMENT(nlmp));
 		symval = audit_symbind(lmp, nlmp, nsym, symndx, symval,
-			&sb_flags);
+		    &sb_flags);
 	}
 
 	if (!(rtld_flags & RT_FL_NOBIND)) {
@@ -290,8 +290,7 @@ elf_bndr(Rt_map *lmp, ulong_t reloff, caddr_t from)
 			int	fail = 0;
 			uint_t	pltndx = reloff / sizeof (Rel);
 			uint_t	symndx = (((uintptr_t)nsym -
-						(uintptr_t)SYMTAB(nlmp)) /
-						SYMENT(nlmp));
+			    (uintptr_t)SYMTAB(nlmp)) / SYMENT(nlmp));
 
 			symval = (ulong_t)elf_plt_trace_write(addr, lmp, nlmp,
 			    nsym, symndx, pltndx, (caddr_t)symval, sb_flags,
@@ -322,7 +321,7 @@ elf_bndr(Rt_map *lmp, ulong_t reloff, caddr_t from)
 	 * link-map know on entry to this routine.
 	 */
 	if (entry)
-		load_completion(llmp, lmp);
+		load_completion(llmp);
 
 	/*
 	 * Some operations like dldump() or dlopen()'ing a relocatable object
@@ -330,7 +329,7 @@ elf_bndr(Rt_map *lmp, ulong_t reloff, caddr_t from)
 	 * objects are initialized also.
 	 */
 	if ((LIST(nlmp)->lm_flags & LML_FLG_RTLDLM) && LIST(nlmp)->lm_init)
-		load_completion(nlmp, 0);
+		load_completion(nlmp);
 
 	/*
 	 * If the object we've bound to is in the process of being initialized
@@ -503,7 +502,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 		    (symdef->st_shndx != SHN_ABS))
 			_pltbgn += basebgn;
 		_pltend = _pltbgn + (((PLTRELSZ(lmp) / relsiz)) *
-			M_PLT_ENTSIZE) + M_PLT_RESERVSZ;
+		    M_PLT_ENTSIZE) + M_PLT_RESERVSZ;
 
 	} else {
 		/*
@@ -651,8 +650,8 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 		 */
 		if ((roffset < ADDR(lmp)) || (roffset > (ADDR(lmp) +
 		    MSIZE(lmp)))) {
-			elf_reloc_bad(lmp, (void *)rel,
-				rtype, roffset, rsymndx);
+			elf_reloc_bad(lmp, (void *)rel, rtype, roffset,
+			    rsymndx);
 			continue;
 		}
 
@@ -774,6 +773,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					 * may be unresolved.
 					 * chkmsg: MSG_INTL(MSG_LDD_SYM_NFOUND)
 					 */
+					/* BEGIN CSTYLED */
 					if (symdef == 0) {
 					    Lm_list	*lml = LIST(lmp);
 
@@ -810,6 +810,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 						continue;
 					    }
 					}
+					/* END CSTYLED */
 
 					/*
 					 * If symbol was found in an object
@@ -938,10 +939,9 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 			    AUDINFO(lmp)->ai_dynplts) {
 				int	fail = 0;
 				int	pltndx = (((ulong_t)rel -
-					(uintptr_t)JMPREL(lmp)) / relsiz);
+				    (uintptr_t)JMPREL(lmp)) / relsiz);
 				int	symndx = (((uintptr_t)symdef -
-					    (uintptr_t)SYMTAB(_lmp)) /
-					    SYMENT(_lmp));
+				    (uintptr_t)SYMTAB(_lmp)) / SYMENT(_lmp));
 
 				(void) elf_plt_trace_write(roffset, lmp, _lmp,
 				    symdef, symndx, pltndx, (caddr_t)value,

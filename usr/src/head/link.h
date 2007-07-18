@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,8 +128,9 @@ extern void	ld_section64();
 #define	LAV_VERSION1		1
 #define	LAV_VERSION2		2
 #define	LAV_VERSION3		3
-#define	LAV_CURRENT		LAV_VERSION3
-#define	LAV_NUM			4
+#define	LAV_VERSION4		4
+#define	LAV_CURRENT		LAV_VERSION4
+#define	LAV_NUM			5
 
 /*
  * Flags that can be or'd into the la_objopen() return code

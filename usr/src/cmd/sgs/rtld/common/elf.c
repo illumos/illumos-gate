@@ -1533,14 +1533,17 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 				}
 
 				/*
-				 * Load the filtee.
+				 * Load the filtee.  Note, an auditor can
+				 * provide an alternative name.
 				 */
-				if ((nlmp = load_path(lml, lmco, filtee, ilmp,
-				    mode, FLG_RT_HANDLE, &ghp, 0, &rej)) == 0) {
+				if ((nlmp = load_path(lml, lmco, &(pnp->p_name),
+				    ilmp, mode, FLG_RT_HANDLE, &ghp, 0,
+				    &rej)) == 0) {
 					file_notfound(LIST(ilmp), filtee, ilmp,
 					    FLG_RT_HANDLE, &rej);
 					remove_rej(&rej);
 				}
+				filtee = pnp->p_name;
 
 				/*
 				 * Establish the filter handle to prevent any
@@ -2300,6 +2303,22 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				if (ld->d_un.d_val & DF_1_ORIGIN)
 					FLAGS1(lmp) |= FL1_RT_RELATIVE;
 #endif
+				/*
+				 * Global auditing is only meaningful when
+				 * specified by the initiating object of the
+				 * process - typically the dynamic executable.
+				 * If this is the initiaiting object, its link-
+				 * map will not yet have been added to the
+				 * link-map list, and consequently the link-map
+				 * list is empty.  (see setup()).
+				 */
+				if (ld->d_un.d_val & DF_1_GLOBAUDIT) {
+					if (lml_main.lm_head == 0)
+						FLAGS1(lmp) |= FL1_RT_GLOBAUD;
+					else
+						DBG_CALL(Dbg_audit_ignore(lmp));
+				}
+
 				/*
 				 * If this object identifies itself as an
 				 * interposer, but relocation processing has

@@ -39,12 +39,14 @@ const char *
 
 void	Dbg_args_files(Lm_list *, int, char *);
 void	Dbg_args_flags(Lm_list *, int, int);
+void	Dbg_audit_ignore(Rt_map *);
 void	Dbg_audit_interface(Lm_list *, const char *, const char *);
 void	Dbg_audit_lib(Lm_list *, const char *);
 void	Dbg_audit_object(Lm_list *, const char *, const char *);
 void	Dbg_audit_symval(Lm_list *, const char *, const char *, const char *,
 	    Addr, Addr);
 void	Dbg_audit_skip(Lm_list *, const char *, const char *);
+void	Dbg_audit_terminate(Lm_list *, const char *);
 void	Dbg_audit_version(Lm_list *, const char *, ulong_t);
 
 void	Dbg_tls_modactivity(Lm_list *, void *, uint_t);

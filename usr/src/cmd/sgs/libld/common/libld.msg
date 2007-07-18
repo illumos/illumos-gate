@@ -1100,6 +1100,7 @@
 @ MSG_ARG_RESCAN	"rescan"
 @ MSG_ARG_NOLDYNSYM	"noldynsym"
 @ MSG_ARG_RELAXRELOC	"relaxreloc"
+@ MSG_ARG_GLOBAUDIT	"globalaudit"
 
 @ MSG_ARG_HELP		"help"
 @ MSG_ARG_GROUP		"group"

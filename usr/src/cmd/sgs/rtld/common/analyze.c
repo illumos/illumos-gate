@@ -915,9 +915,10 @@ trace_so(Rt_map *clmp, Rej_desc *rej, const char *name, const char *path,
 	 * together with all the other information we've gathered.
 	 */
 	if (*name == '/')
-	    (void) printf(MSG_ORIG(MSG_LDD_FIL_PATH), path, str, reject);
+		(void) printf(MSG_ORIG(MSG_LDD_FIL_PATH), path, str, reject);
 	else
-	    (void) printf(MSG_ORIG(MSG_LDD_FIL_EQUIV), name, path, str, reject);
+		(void) printf(MSG_ORIG(MSG_LDD_FIL_EQUIV), name, path, str,
+		    reject);
 }
 
 
@@ -1102,6 +1103,7 @@ is_devinode_loaded(struct stat *status, Lm_list *lml, const char *name,
 				continue;
 
 			if (lml->lm_flags & LML_FLG_TRC_VERBOSE) {
+				/* BEGIN CSTYLED */
 				if (*name == '/')
 				    (void) printf(MSG_ORIG(MSG_LDD_FIL_PATH),
 					name, MSG_ORIG(MSG_STR_EMPTY),
@@ -1111,6 +1113,7 @@ is_devinode_loaded(struct stat *status, Lm_list *lml, const char *name,
 					name, NAME(nlmp),
 					MSG_ORIG(MSG_STR_EMPTY),
 					MSG_ORIG(MSG_STR_EMPTY));
+				/* END CSTYLED */
 			}
 			return (nlmp);
 		}
@@ -1235,9 +1238,11 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 					if (append_alias(nlmp, nname,
 					    &added) == 0)
 						return (0);
+					/* BEGIN CSTYLED */
 					if (added)
 					    DBG_CALL(Dbg_file_skip(LIST(clmp),
 						NAME(nlmp), nname));
+					/* END CSTYLED */
 					fdesc->fd_nname = nname;
 					fdesc->fd_lmp = nlmp;
 					return (1);
@@ -1323,8 +1328,9 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 				 * Trace that this open has succeeded.
 				 */
 				if (lml->lm_flags & LML_FLG_TRC_ENABLE) {
-				    trace_so(clmp, 0, oname, nname,
-					(fdesc->fd_flags & FLG_FD_ALTER), 0);
+					trace_so(clmp, 0, oname, nname,
+					    (fdesc->fd_flags & FLG_FD_ALTER),
+					    0);
 				}
 				return (1);
 			}
@@ -1437,9 +1443,18 @@ _find_file(Lm_list *lml, const char *oname, const char *nname, Rt_map *clmp,
 	if ((lml->lm_tflags | FLAGS1(clmp)) & LML_TFLG_AUD_OBJSEARCH) {
 		char	*aname = audit_objsearch(clmp, nname, dir->p_orig);
 
-		if (aname == 0)
+		if (aname == 0) {
+			DBG_CALL(Dbg_audit_terminate(lml, nname));
 			return (0);
-		nname = aname;
+		}
+
+		/*
+		 * Protect ourselves from auditor mischief, by copying any
+		 * alternative name over the present name (the present name is
+		 * maintained in a static buffer - see elf_get_so());
+		 */
+		if (nname != aname)
+			(void) strncpy((char *)nname, aname, PATH_MAX);
 	}
 	return (file_open(0, lml, oname, nname, clmp, flags, fdesc, rej));
 }
@@ -1865,9 +1880,11 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 /*
  * Trace an attempt to load an object.
  */
-const char *
-load_trace(Lm_list *lml, const char *name, Rt_map *clmp)
+int
+load_trace(Lm_list *lml, const char **oname, Rt_map *clmp)
 {
+	const char	*name = *oname;
+
 	/*
 	 * First generate any ldd(1) diagnostics.
 	 */
@@ -1884,30 +1901,33 @@ load_trace(Lm_list *lml, const char *name, Rt_map *clmp)
 		audit_activity(clmp, LA_ACT_ADD);
 
 	if ((lml->lm_tflags | FLAGS1(clmp)) & LML_TFLG_AUD_OBJSEARCH) {
-		char	*_name;
+		char	*aname = audit_objsearch(clmp, name, LA_SER_ORIG);
 
 		/*
 		 * The auditor can indicate that this object should be ignored.
 		 */
-		if ((_name = audit_objsearch(clmp, name, LA_SER_ORIG)) == 0) {
-			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_GEN_AUDITERM),
-			    name);
+		if (aname == NULL) {
+			DBG_CALL(Dbg_audit_terminate(lml, name));
 			return (0);
 		}
 
 		/*
-		 * The auditor can provide an alternative name.  Provided we
-		 * can duplicate the name, return the new name and free the
-		 * old.  Otherwise, leave the old name for the caller to use
-		 * in any error diagnostic.
+		 * Protect ourselves from auditor mischief, by duplicating any
+		 * alternative name.  The original name has been allocated from
+		 * expand(), so free this allocation before using the audit
+		 * alternative.
 		 */
-		if (_name != name) {
-			if ((_name = strdup(_name)) != NULL)
-				free((void *)name);
-			name = _name;
+		if (name != aname) {
+			if ((aname = strdup(aname)) == NULL) {
+				eprintf(lml, ERR_FATAL,
+				    MSG_INTL(MSG_GEN_AUDITERM), name);
+				return (0);
+			}
+			free((void *)*oname);
+			*oname = aname;
 		}
 	}
-	return (name);
+	return (1);
 }
 
 /*
@@ -2122,9 +2142,10 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 
 			if ((exist = hdl_add(ghp, dlmp1,
 			    (GPD_AVAIL | GPD_ADDEPS))) != 0) {
-				if (exist == ALE_CREATE)
-				    (void) update_mode(dlmp1, MODE(dlmp1),
-					nmode);
+				if (exist == ALE_CREATE) {
+					(void) update_mode(dlmp1, MODE(dlmp1),
+					    nmode);
+				}
 				continue;
 			}
 			free(lmalp);
@@ -2140,17 +2161,21 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
  * handles and any other related additions are all done in one place.
  */
 static Rt_map *
-_load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
+_load_path(Lm_list *lml, Aliste lmco, const char **oname, Rt_map *clmp,
     int nmode, uint_t flags, Grp_hdl ** hdl, Fdesc *nfdp, Rej_desc *rej)
 {
-	Rt_map	*nlmp;
+	Rt_map		*nlmp;
+	const char	*name = *oname;
 
 	if ((nmode & RTLD_NOLOAD) == 0) {
 		/*
 		 * If this isn't a noload request attempt to load the file.
+		 * Note, the name of the file may be changed by an auditor.
 		 */
-		if ((name = load_trace(lml, name, clmp)) == 0)
+		if ((load_trace(lml, oname, clmp)) == 0)
 			return (0);
+
+		name = *oname;
 
 		if ((nlmp = load_so(lml, lmco, name, clmp, flags,
 		    nfdp, rej)) == 0)
@@ -2185,7 +2210,8 @@ _load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
 			if ((lml->lm_flags & LML_FLG_TRC_VERBOSE) &&
 			    ((FLAGS1(clmp) & FL1_RT_LDDSTUB) == 0)) {
 				(void) printf(MSG_INTL(MSG_LDD_FIL_FIND), name,
-					NAME(clmp));
+				    NAME(clmp));
+				/* BEGIN CSTYLED */
 				if (*name == '/')
 				    (void) printf(MSG_ORIG(MSG_LDD_FIL_PATH),
 					name, MSG_ORIG(MSG_STR_EMPTY),
@@ -2195,6 +2221,7 @@ _load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
 					name, NAME(nlmp),
 					MSG_ORIG(MSG_STR_EMPTY),
 					MSG_ORIG(MSG_STR_EMPTY));
+				/* END CSTYLED */
 			}
 		} else {
 			Rej_desc	_rej = { 0 };
@@ -2246,7 +2273,7 @@ _load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
 }
 
 Rt_map *
-load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
+load_path(Lm_list *lml, Aliste lmco, const char **name, Rt_map *clmp,
     int nmode, uint_t flags, Grp_hdl **hdl, Fdesc *cfdp, Rej_desc *rej)
 {
 	Rt_map	*lmp;
@@ -2309,9 +2336,10 @@ load_one(Lm_list *lml, Aliste lmco, Pnode *pnp, Rt_map *clmp, int mode,
 	Rej_desc	rej = { 0 };
 	Pnode   	*tpnp;
 	const char	*name;
-	Rt_map		*tlmp;
 
 	for (tpnp = pnp; tpnp && tpnp->p_name; tpnp = tpnp->p_next) {
+		Rt_map	*tlmp;
+
 		/*
 		 * A Hardware capabilities requirement can itself expand into
 		 * a number of candidates.
@@ -2323,7 +2351,7 @@ load_one(Lm_list *lml, Aliste lmco, Pnode *pnp, Rt_map *clmp, int mode,
 				return (tlmp);
 			}
 		} else {
-			if ((tlmp = load_path(lml, lmco, tpnp->p_name, clmp,
+			if ((tlmp = load_path(lml, lmco, &tpnp->p_name, clmp,
 			    mode, flags, hdl, 0, &rej)) != 0) {
 				remove_rej(&rej);
 				return (tlmp);
@@ -2686,7 +2714,7 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 		sl.sl_imap = clmp;
 		if (sym = SYMINTP(clmp)(&sl, dlmp, binfo)) {
 			ulong_t	dsymndx = (((ulong_t)sym -
-				    (ulong_t)SYMTAB(*dlmp)) / SYMENT(*dlmp));
+			    (ulong_t)SYMTAB(*dlmp)) / SYMENT(*dlmp));
 
 			/*
 			 * Make sure this symbol hasn't explicitly been defined

@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -156,7 +156,7 @@ aout_bndr(caddr_t pc)
 	 * link-map know on entry to this routine.
 	 */
 	if (entry)
-		load_completion(llmp, lmp);
+		load_completion(llmp);
 
 	/*
 	 * If the object we've bound to is in the process of being initialized
@@ -337,76 +337,84 @@ aout_reloc(Rt_map * lmp, uint_t plt)
 		case RELOC_RELATIVE:
 			value += *ra << (32-22);
 			*(long *)ra = (*(long *)ra & ~S_MASK(22)) |
-				((value >> (32 - 22)) & S_MASK(22));
+			    ((value >> (32 - 22)) & S_MASK(22));
 			ra++;
 			value += (*ra & S_MASK(10));
 			*(long *)ra = (*(long *)ra & ~S_MASK(10)) |
-				(value & S_MASK(10));
+			    (value & S_MASK(10));
 			break;
 		case RELOC_8:
 		case RELOC_DISP8:
 			value += *ra & S_MASK(8);
-			if (!S_INRANGE(value, 8))
-			    eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_OVERFLOW),
-				NAME(lmp), (name ? demangle(name) :
-				MSG_INTL(MSG_STR_UNKNOWN)), (int)value, 8,
-				(uint_t)ra);
+			if (!S_INRANGE(value, 8)) {
+				eprintf(lml, ERR_FATAL,
+				    MSG_INTL(MSG_REL_OVERFLOW), NAME(lmp),
+				    (name ? demangle(name) :
+				    MSG_INTL(MSG_STR_UNKNOWN)), (int)value, 8,
+				    (uint_t)ra);
+			}
 			*ra = value;
 			break;
 		case RELOC_LO10:
 		case RELOC_BASE10:
 			value += *ra & S_MASK(10);
 			*(long *)ra = (*(long *)ra & ~S_MASK(10)) |
-				(value & S_MASK(10));
+			    (value & S_MASK(10));
 			break;
 		case RELOC_BASE13:
 		case RELOC_13:
 			value += *ra & S_MASK(13);
 			*(long *)ra = (*(long *)ra & ~S_MASK(13)) |
-				(value & S_MASK(13));
+			    (value & S_MASK(13));
 			break;
 		case RELOC_16:
 		case RELOC_DISP16:
 			value += *ra & S_MASK(16);
-			if (!S_INRANGE(value, 16))
-			    eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_OVERFLOW),
-				NAME(lmp), (name ? demangle(name) :
-				MSG_INTL(MSG_STR_UNKNOWN)), (int)value, 16,
-				(uint_t)ra);
+			if (!S_INRANGE(value, 16)) {
+				eprintf(lml, ERR_FATAL,
+				    MSG_INTL(MSG_REL_OVERFLOW), NAME(lmp),
+				    (name ? demangle(name) :
+				    MSG_INTL(MSG_STR_UNKNOWN)), (int)value, 16,
+				    (uint_t)ra);
+			}
 			*(short *)ra = value;
 			break;
 		case RELOC_22:
 		case RELOC_BASE22:
 			value += *ra & S_MASK(22);
-			if (!S_INRANGE(value, 22))
-			    eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_OVERFLOW),
-				NAME(lmp), (name ? demangle(name) :
-				MSG_INTL(MSG_STR_UNKNOWN)), (int)value, 22,
-				(uint_t)ra);
+			if (!S_INRANGE(value, 22)) {
+				eprintf(lml, ERR_FATAL,
+				    MSG_INTL(MSG_REL_OVERFLOW), NAME(lmp),
+				    (name ? demangle(name) :
+				    MSG_INTL(MSG_STR_UNKNOWN)), (int)value, 22,
+				    (uint_t)ra);
+			}
 			*(long *)ra = (*(long *)ra & ~S_MASK(22)) |
-				(value & S_MASK(22));
+			    (value & S_MASK(22));
 			break;
 		case RELOC_HI22:
 			value += (*ra & S_MASK(22)) << (32 - 22);
 			*(long *)ra = (*(long *)ra & ~S_MASK(22)) |
-				((value >> (32 - 22)) & S_MASK(22));
+			    ((value >> (32 - 22)) & S_MASK(22));
 			break;
 		case RELOC_WDISP22:
 			value += *ra & S_MASK(22);
 			value >>= 2;
-			if (!S_INRANGE(value, 22))
-			    eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_OVERFLOW),
-				NAME(lmp), (name ? demangle(name) :
-				MSG_INTL(MSG_STR_UNKNOWN)), (int)value, 22,
-				(uint_t)ra);
+			if (!S_INRANGE(value, 22)) {
+				eprintf(lml, ERR_FATAL,
+				    MSG_INTL(MSG_REL_OVERFLOW), NAME(lmp),
+				    (name ? demangle(name) :
+				    MSG_INTL(MSG_STR_UNKNOWN)), (int)value, 22,
+				    (uint_t)ra);
+			}
 			*(long *)ra = (*(long *)ra & ~S_MASK(22)) |
-				(value & S_MASK(22));
+			    (value & S_MASK(22));
 			break;
 		case RELOC_WDISP30:
 			value += *ra & S_MASK(30);
 			value >>= 2;
 			*(long *)ra = (*(long *)ra & ~S_MASK(30)) |
-				(value & S_MASK(30));
+			    (value & S_MASK(30));
 			break;
 		case RELOC_32:
 		case RELOC_GLOB_DAT:

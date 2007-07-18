@@ -689,7 +689,10 @@
 @ MSG_AUD_SYM		"audit library %s: %s: symbol: %s: value: 0x%llx %s"
 @ MSG_AUD_SYMNEW	"modified to: 0x%llx"
 
+@ MSG_AUD_IGNORE	"file=%s;  global auditing request ignored: object \
+			 did not initiate process" 
 @ MSG_AUD_SKIP		"file=%s;  skipped: using auditor from %s"
+@ MSG_AUD_TERM		"file=%s;  auditing terminated search"
 
 # GOT Messages
 

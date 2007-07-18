@@ -514,7 +514,7 @@ dlclose_intn(Grp_hdl *ghp, Rt_map *clmp)
 			}
 		}
 	}
-	load_completion(nlmp, clmp);
+	load_completion(nlmp);
 	return (error);
 }
 
@@ -827,7 +827,7 @@ dlmopen_intn(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	 * is computed.  Finally, the debuggers are informed of the link-map
 	 * lists being stable.
 	 */
-	load_completion(dlmp, clmp);
+	load_completion(dlmp);
 
 	return (ghp);
 }
@@ -1295,7 +1295,7 @@ dlsym_intn(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		eprintf(LIST(clmp), ERR_FATAL, nosym_str, name);
 	}
 
-	load_completion(llmp, clmp);
+	load_completion(llmp);
 	return (error);
 }
 

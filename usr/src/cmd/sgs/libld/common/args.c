@@ -1083,6 +1083,9 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			} else if (strcmp(optarg,
 			    MSG_ORIG(MSG_ARG_NOLDYNSYM)) == 0) {
 				ofl->ofl_flags |= FLG_OF_NOLDYNSYM;
+			} else if (strcmp(optarg,
+			    MSG_ORIG(MSG_ARG_GLOBAUDIT)) == 0) {
+				ofl->ofl_dtflags_1 |= DF_1_GLOBAUDIT;
 			/*
 			 * The following options just need validation as they
 			 * are interpreted on the second pass through the
@@ -1090,15 +1093,15 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 			 */
 			} else if (
 			    strncmp(optarg, MSG_ORIG(MSG_ARG_INITARRAY),
-				MSG_ARG_INITARRAY_SIZE) &&
+			    MSG_ARG_INITARRAY_SIZE) &&
 			    strncmp(optarg, MSG_ORIG(MSG_ARG_FINIARRAY),
-				MSG_ARG_FINIARRAY_SIZE) &&
+			    MSG_ARG_FINIARRAY_SIZE) &&
 			    strncmp(optarg, MSG_ORIG(MSG_ARG_PREINITARRAY),
-				MSG_ARG_PREINITARRAY_SIZE) &&
+			    MSG_ARG_PREINITARRAY_SIZE) &&
 			    strncmp(optarg, MSG_ORIG(MSG_ARG_RTLDINFO),
-				MSG_ARG_RTLDINFO_SIZE) &&
+			    MSG_ARG_RTLDINFO_SIZE) &&
 			    strncmp(optarg, MSG_ORIG(MSG_ARG_DTRACE),
-				MSG_ARG_DTRACE_SIZE) &&
+			    MSG_ARG_DTRACE_SIZE) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_ALLEXTRT)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_DFLEXTRT)) &&
 			    strcmp(optarg, MSG_ORIG(MSG_ARG_DIRECT)) &&
@@ -1233,9 +1236,9 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 		case 'Y':
 			if (strncmp(optarg, MSG_ORIG(MSG_ARG_LCOM), 2) == 0) {
 				if (Llibdir)
-				    eprintf(ofl->ofl_lml, ERR_WARNING,
-					MSG_INTL(MSG_ARG_MTONCE),
-					MSG_ORIG(MSG_ARG_CYL));
+					eprintf(ofl->ofl_lml, ERR_WARNING,
+					    MSG_INTL(MSG_ARG_MTONCE),
+					    MSG_ORIG(MSG_ARG_CYL));
 				else
 					Llibdir = optarg + 2;
 			} else if (strncmp(optarg,
@@ -1296,7 +1299,7 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 				    MSG_ORIG(MSG_STR_LD_DYNAMIC)) == 0) {
 					if (ofl->ofl_flags & FLG_OF_DYNAMIC)
 						ofl->ofl_flags |=
-							FLG_OF_DYNLIBS;
+						    FLG_OF_DYNLIBS;
 					else {
 						eprintf(ofl->ofl_lml, ERR_FATAL,
 						    MSG_INTL(MSG_ARG_INCOMP),
@@ -1361,7 +1364,8 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 				} else if (strcmp(optarg,
 				    MSG_ORIG(MSG_ARG_DFLEXTRT)) == 0) {
 					ofl->ofl_flags1 &=
-					~(FLG_OF1_ALLEXRT | FLG_OF1_WEAKEXT);
+					    ~(FLG_OF1_ALLEXRT |
+					    FLG_OF1_WEAKEXT);
 				} else if (strcmp(optarg,
 				    MSG_ORIG(MSG_ARG_DIRECT)) == 0) {
 					ofl->ofl_flags1 |= FLG_OF1_ZDIRECT;

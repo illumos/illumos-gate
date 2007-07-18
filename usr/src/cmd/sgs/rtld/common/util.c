@@ -913,10 +913,10 @@ atexit_fini()
  * and from any internal dl*() requests.
  */
 void
-load_completion(Rt_map *nlmp, Rt_map *clmp)
+load_completion(Rt_map *nlmp)
 {
 	Rt_map	**tobj = 0;
-	Lm_list	*nlml, *clml;
+	Lm_list	*nlml;
 
 	/*
 	 * Establish any .init processing.  Note, in a world of lazy loading,
@@ -938,8 +938,6 @@ load_completion(Rt_map *nlmp, Rt_map *clmp)
 	 */
 	if (nlmp)
 		nlml = LIST(nlmp);
-	if (clmp)
-		clml = LIST(clmp);
 
 	if (nlmp && nlml->lm_init &&
 	    ((nlml != &lml_main) || (rtld_flags2 & RT_FL2_PLMSETUP))) {
@@ -973,12 +971,6 @@ load_completion(Rt_map *nlmp, Rt_map *clmp)
 		}
 		nlml->lm_tls = 0;
 	}
-
-	/*
-	 * Indicate the link-map list is consistent.
-	 */
-	if (clmp && ((clml->lm_tflags | FLAGS1(clmp)) & LML_TFLG_AUD_ACTIVITY))
-		audit_activity(clmp, LA_ACT_CONSISTENT);
 
 	/*
 	 * Fire any .init's.
@@ -3248,6 +3240,8 @@ void
 leave(Lm_list *lml)
 {
 	Lm_list	*elml = lml;
+	Rt_map	**clmpp;
+	Aliste	off;
 
 	/*
 	 * Alert the debuggers that the link-maps are consistent.  Note, in the
@@ -3258,6 +3252,15 @@ leave(Lm_list *lml)
 		elml = &lml_main;
 	if (elml->lm_flags & LML_FLG_DBNOTIF)
 		rd_event(elml, RD_DLACTIVITY, RT_CONSISTENT);
+
+	/*
+	 * Alert any auditors that the link-maps are consistent.
+	 */
+	for (ALIST_TRAVERSE(elml->lm_actaudit, off, clmpp)) {
+		audit_activity(*clmpp, LA_ACT_CONSISTENT);
+
+		(void) alist_delete(elml->lm_actaudit, 0, &off);
+	}
 
 	if (dz_fd != FD_UNAVAIL) {
 		(void) close(dz_fd);

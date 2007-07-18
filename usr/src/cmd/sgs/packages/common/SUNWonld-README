@@ -1082,7 +1082,7 @@ All the above changes are incorporated in the following patches:
 --------------------------------------------------------------------------------
 
 -------------------------------------
-Solaris 10 707 (4th Q-update - s10u4)
+Solaris 10 807 (4th Q-update - s10u4)
 -------------------------------------
 Bugid   Risk Synopsis
 ================================================================================
@@ -1246,3 +1246,6 @@ Bugid   Risk Synopsis
 	compiler inconsistency
 6530249 elfdump should handle ELF files with no section header table (D)
 	PSARC/2007/395 Add -P option to elfdump
+6568745 segfault when using LD_DEBUG with bit_audit library when instrumenting
+	mozilla (D)
+	PSARC/2007/413 Add -zglobalaudit option to ld

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -158,7 +158,7 @@ elf_plt_write(uintptr_t addr, uintptr_t vaddr, void *rptr, uintptr_t symval,
 
 	if (pltndx >= (M64_PLT_NEARPLTS - M_PLT_XNumber)) {
 		*((Sxword *)pltaddr) = (uintptr_t)symval +
-			(uintptr_t)rel->r_addend - vaddr;
+		    (uintptr_t)rel->r_addend - vaddr;
 		DBG_CALL(pltcntfar++);
 		return (PLT_T_FAR);
 	}
@@ -433,10 +433,10 @@ elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
 		 *	VAL64_TO_G1(&elf_plt_trace)
 		 */
 		if (!(reloc_val64_to_g1((Byte *) (dyn_plt + 0x14), dyndata,
-					MSG_ORIG(MSG_SYM_LADYNDATA), lml) &&
-			reloc_val64_to_g1((Byte *) (dyn_plt + 0x30),
-					(Addr *)&elf_plt_trace,
-					MSG_ORIG(MSG_SYM_ELFPLTTRACE), lml))) {
+		    MSG_ORIG(MSG_SYM_LADYNDATA), lml) &&
+		    reloc_val64_to_g1((Byte *) (dyn_plt + 0x30),
+		    (Addr *)&elf_plt_trace, MSG_ORIG(MSG_SYM_ELFPLTTRACE),
+		    lml))) {
 			*fail = 1;
 			return (0);
 		}
@@ -526,9 +526,9 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 
 		pltblockoff = pltoff - (M64_PLT_NEARPLTS * M_PLT_ENTSIZE);
 		pltndx = M64_PLT_NEARPLTS +
-			((pltblockoff / M64_PLT_FBLOCKSZ) * M64_PLT_FBLKCNTS) +
-			((pltblockoff % M64_PLT_FBLOCKSZ) / M64_PLT_FENTSIZE) -
-			M_PLT_XNumber;
+		    ((pltblockoff / M64_PLT_FBLOCKSZ) * M64_PLT_FBLKCNTS) +
+		    ((pltblockoff % M64_PLT_FBLOCKSZ) / M64_PLT_FENTSIZE) -
+		    M_PLT_XNumber;
 		farplt = 1;
 	}
 
@@ -591,10 +591,10 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	if ((lml->lm_tflags | FLAGS1(lmp)) & LML_TFLG_AUD_SYMBIND) {
 		/* LINTED */
 		uint_t	symndx = (uint_t)(((uintptr_t)nsym -
-			(uintptr_t)SYMTAB(nlmp)) / SYMENT(nlmp));
+		    (uintptr_t)SYMTAB(nlmp)) / SYMENT(nlmp));
 
 		symval = audit_symbind(lmp, nlmp, nsym, symndx, symval,
-			&sb_flags);
+		    &sb_flags);
 	}
 
 	if (FLAGS(lmp) & FLG_RT_FIXED)
@@ -610,7 +610,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 			int	fail = 0;
 			/* LINTED */
 			uint_t	symndx = (uint_t)(((uintptr_t)nsym -
-				(uintptr_t)SYMTAB(nlmp)) / SYMENT(nlmp));
+			    (uintptr_t)SYMTAB(nlmp)) / SYMENT(nlmp));
 
 			symval = (ulong_t)elf_plt_trace_write((caddr_t)vaddr,
 			    rptr, lmp, nlmp, nsym, symndx, pltndx,
@@ -623,7 +623,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 			 * to newly bound function.
 			 */
 			pbtype = elf_plt_write((uintptr_t)vaddr,
-				(uintptr_t)vaddr, rptr, symval, pltndx);
+			    (uintptr_t)vaddr, rptr, symval, pltndx);
 		}
 	}
 
@@ -642,7 +642,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	 * link-map know on entry to this routine.
 	 */
 	if (entry)
-		load_completion(llmp, lmp);
+		load_completion(llmp);
 
 	/*
 	 * Some operations like dldump() or dlopen()'ing a relocatable object
@@ -650,7 +650,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	 * objects are initialized also.
 	 */
 	if ((LIST(nlmp)->lm_flags & LML_FLG_RTLDLM) && LIST(nlmp)->lm_init)
-		load_completion(nlmp, 0);
+		load_completion(nlmp);
 
 	/*
 	 * If the object we've bound to is in the process of being initialized
@@ -1099,6 +1099,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 					 * may be unresolved.
 					 * chkmsg: MSG_INTL(MSG_LDD_SYM_NFOUND)
 					 */
+					/* BEGIN CSTYLED */
 					if (symdef == 0) {
 					    Lm_list	*lml = LIST(lmp);
 
@@ -1135,6 +1136,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 						continue;
 					    }
 					}
+					/* END CSTYLED */
 
 					/*
 					 * If symbol was found in an object
@@ -1307,7 +1309,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 			break;
 		case R_SPARC_JMP_SLOT:
 			pltndx = ((uintptr_t)rel -
-				(uintptr_t)JMPREL(lmp)) / relsiz;
+			    (uintptr_t)JMPREL(lmp)) / relsiz;
 
 			if (FLAGS(lmp) & FLG_RT_FIXED)
 				vaddr = 0;
@@ -1320,8 +1322,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 				int	fail = 0;
 				/* LINTED */
 				uint_t	symndx = (uint_t)(((uintptr_t)symdef -
-					(uintptr_t)SYMTAB(_lmp)) /
-					SYMENT(_lmp));
+				    (uintptr_t)SYMTAB(_lmp)) / SYMENT(_lmp));
 
 				(void) elf_plt_trace_write((caddr_t)vaddr,
 				    (Rela *)rel, lmp, _lmp, symdef, symndx,

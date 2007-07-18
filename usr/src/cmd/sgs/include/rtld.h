@@ -279,6 +279,7 @@ struct lm_list {
 	uint_t		lm_tls;		/* new obj that require TLS */
 	uint_t		lm_lmid;	/* unique link-map list identifier, */
 	char		*lm_lmidstr;	/* and associated diagnostic string */
+	Alist		*lm_actaudit;	/* list of pending audit activity */
 	Lc_desc		lm_lcs[CI_MAX];	/* external libc functions */
 };
 
@@ -305,6 +306,7 @@ struct lm_list32 {
 	uint_t		lm_tls;
 	uint_t		lm_lmid;
 	Elf32_Addr	lm_lmidstr;
+	Elf32_Addr	lm_actaudit;
 	Elf32_Addr	lm_lcs[CI_MAX];
 };
 #endif /* _SYSCALL32 */
@@ -342,6 +344,7 @@ struct lm_list32 {
 #define	LML_FLG_NOPENDGLBLAZY	0x00010000	/* no pending, global, lazy */
 						/*	dependencies remain */
 #define	LML_FLG_INTRPOSETSORT	0x00020000	/* interpose tsorting done */
+#define	LML_FLG_AUDITNOTIFY	0x00040000	/* audit consistent required */
 
 #define	LML_FLG_TRC_LDDSTUB	0x00100000	/* identify lddstub */
 #define	LML_FLG_TRC_ENABLE	0x00200000	/* tracing enabled (ldd) */
@@ -688,6 +691,7 @@ typedef struct rt_map32 {
 #define	FL1_RT_TLSADD	0x00010000	/* objects TLS has been registered */
 #define	FL1_RT_TLSSTAT	0x00020000	/* object requires static TLS */
 #define	FL1_RT_DIRECT	0x00040000	/* object has DIRECT bindings enabled */
+#define	FL1_RT_GLOBAUD	0x00080000	/* establish global auditing */
 
 /*
  * The following range of bits are reserved to hold LML_TFLG_AUD_ values
