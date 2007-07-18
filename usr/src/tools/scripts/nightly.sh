@@ -1637,31 +1637,27 @@ trap cleanup_signal 1 2 3 15
 create_lock() {
 	lockf=$1
 	lockvar=$2
-	if [ -f $lockf ]; then
-		basews=`basename $CODEMGR_WS`
-		if read host user pid < $lockf; then
-			if [ "$host" != "$hostname" ]; then
-				echo "$MACH build of $basews apparently" \
-				    "already started by $user on $host as $pid."
-			elif kill -s 0 $pid 2>/dev/null; then
-				echo "$MACH build of $basews already started" \
-				    "by $user as $pid."
-			else
-				# stale lock; clear it out and continue
-				rm -f $lockf
-			fi
-		else
-			echo "$MACH build of $basews already running."
-		fi
-	fi
-	if [ -f $lockf ]; then
-		echo "Lock file is $lockf."
-		exit 1
-	fi
+
 	ldir=`dirname $lockf`
 	[ -d $ldir ] || newdir $ldir || exit 1
 	eval $lockvar=$lockf
-	staffer sh -c "echo $hostname $STAFFER $$ > $lockf" || exit 1
+
+	while ! staffer ln -s $hostname.$STAFFER.$$ $lockf 2> /dev/null; do
+		basews=`basename $CODEMGR_WS`
+		ls -l $lockf | nawk '{print $NF}' | IFS=. read host user pid
+		if [ "$host" != "$hostname" ]; then
+			echo "$MACH build of $basews apparently" \
+			    "already started by $user on $host as $pid."
+			exit 1
+		elif kill -s 0 $pid 2>/dev/null; then
+			echo "$MACH build of $basews already started" \
+			    "by $user as $pid."
+			exit 1
+		else
+			# stale lock; clear it out and try again
+			rm -f $lockf
+		fi
+	done
 }
 
 #
