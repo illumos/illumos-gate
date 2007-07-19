@@ -901,6 +901,27 @@ reapq_add(kthread_t *t)
 		cv_signal(&reaper_cv);	/* wake the reaper */
 	t->t_state = TS_FREE;
 	lock_clear(&t->t_lock);
+
+	/*
+	 * Before we return, we need to grab and drop the thread lock for
+	 * the dead thread.  At this point, the current thread is the idle
+	 * thread, and the dead thread's CPU lock points to the current
+	 * CPU -- and we must grab and drop the lock to synchronize with
+	 * a racing thread walking a blocking chain that the zombie thread
+	 * was recently in.  By this point, that blocking chain is (by
+	 * definition) stale:  the dead thread is not holding any locks, and
+	 * is therefore not in any blocking chains -- but if we do not regrab
+	 * our lock before freeing the dead thread's data structures, the
+	 * thread walking the (stale) blocking chain will die on memory
+	 * corruption when it attempts to drop the dead thread's lock.  We
+	 * only need do this once because there is no way for the dead thread
+	 * to ever again be on a blocking chain:  once we have grabbed and
+	 * dropped the thread lock, we are guaranteed that anyone that could
+	 * have seen this thread in a blocking chain can no longer see it.
+	 */
+	thread_lock(t);
+	thread_unlock(t);
+
 	mutex_exit(&reaplock);
 }
 
@@ -1178,8 +1199,8 @@ thread_unpin()
 	i = intr_passivate(t, itp);
 
 	TRACE_5(TR_FAC_INTR, TR_INTR_PASSIVATE,
-		"intr_passivate:level %d curthread %p (%T) ithread %p (%T)",
-		i, t, t, itp, itp);
+	    "intr_passivate:level %d curthread %p (%T) ithread %p (%T)",
+	    i, t, t, itp, itp);
 
 	/*
 	 * Dissociate the current thread from the interrupted thread's LWP.
