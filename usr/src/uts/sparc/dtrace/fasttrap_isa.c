@@ -176,6 +176,7 @@
 #define	R_I1		25
 #define	R_I2		26
 #define	R_I3		27
+#define	R_I4		28
 
 /*
  * Check the comment in fasttrap.h when changing these offsets or adding
@@ -226,10 +227,21 @@ static ulong_t fasttrap_getreg(struct regs *, uint_t);
 static void fasttrap_putreg(struct regs *, uint_t, ulong_t);
 
 static void
-fasttrap_usdt_args(fasttrap_probe_t *probe, struct regs *rp, int argc,
-    uintptr_t *argv)
+fasttrap_usdt_args(fasttrap_probe_t *probe, struct regs *rp,
+    uint_t fake_restore, int argc, uintptr_t *argv)
 {
 	int i, x, cap = MIN(argc, probe->ftp_nargs);
+	int inc = (fake_restore ? 16 : 0);
+
+	/*
+	 * The only way we'll hit the fake_restore case is if a USDT probe is
+	 * invoked as a tail-call. While it wouldn't be incorrect, we can
+	 * avoid a call to fasttrap_getreg(), and safely use rp->r_sp
+	 * directly since a tail-call can't be made if the invoked function
+	 * would use the argument dump space (i.e. if there were more than
+	 * 6 arguments). We take this shortcut because unconditionally rooting
+	 * around for R_FP (R_SP + 16) would be unnecessarily painful.
+	 */
 
 	if (curproc->p_model == DATAMODEL_NATIVE) {
 		struct frame *fr = (struct frame *)(rp->r_sp + STACK_BIAS);
@@ -239,7 +251,7 @@ fasttrap_usdt_args(fasttrap_probe_t *probe, struct regs *rp, int argc,
 			x = probe->ftp_argmap[i];
 
 			if (x < 6)
-				argv[i] = (&rp->r_o0)[x];
+				argv[i] = fasttrap_getreg(rp, R_O0 + x + inc);
 			else if (fasttrap_fulword(&fr->fr_argd[x], &v) != 0)
 				argv[i] = 0;
 		}
@@ -252,7 +264,7 @@ fasttrap_usdt_args(fasttrap_probe_t *probe, struct regs *rp, int argc,
 			x = probe->ftp_argmap[i];
 
 			if (x < 6)
-				argv[i] = (&rp->r_o0)[x];
+				argv[i] = fasttrap_getreg(rp, R_O0 + x + inc);
 			else if (fasttrap_fuword32(&fr->fr_argd[x], &v) != 0)
 				argv[i] = 0;
 		}
@@ -297,18 +309,47 @@ fasttrap_return_common(struct regs *rp, uintptr_t pc, pid_t pid,
 		fasttrap_probe_t *probe = id->fti_probe;
 
 		if (id->fti_ptype == DTFTP_POST_OFFSETS) {
-			if (probe->ftp_argmap == NULL) {
-				dtrace_probe(probe->ftp_id, rp->r_o0, rp->r_o1,
-				    rp->r_o2, rp->r_o3, rp->r_o4);
-			} else {
+			if (probe->ftp_argmap != NULL && fake_restore) {
 				uintptr_t t[5];
 
-				fasttrap_usdt_args(probe, rp,
+				fasttrap_usdt_args(probe, rp, fake_restore,
+				    sizeof (t) / sizeof (t[0]), t);
+
+				cookie = dtrace_interrupt_disable();
+				DTRACE_CPUFLAG_SET(CPU_DTRACE_FAKERESTORE);
+				dtrace_probe(probe->ftp_id, t[0], t[1],
+				    t[2], t[3], t[4]);
+				DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_FAKERESTORE);
+				dtrace_interrupt_enable(cookie);
+
+			} else if (probe->ftp_argmap != NULL) {
+				uintptr_t t[5];
+
+				fasttrap_usdt_args(probe, rp, fake_restore,
 				    sizeof (t) / sizeof (t[0]), t);
 
 				dtrace_probe(probe->ftp_id, t[0], t[1],
 				    t[2], t[3], t[4]);
+
+			} else if (fake_restore) {
+				uintptr_t arg0 = fasttrap_getreg(rp, R_I0);
+				uintptr_t arg1 = fasttrap_getreg(rp, R_I1);
+				uintptr_t arg2 = fasttrap_getreg(rp, R_I2);
+				uintptr_t arg3 = fasttrap_getreg(rp, R_I3);
+				uintptr_t arg4 = fasttrap_getreg(rp, R_I4);
+
+				cookie = dtrace_interrupt_disable();
+				DTRACE_CPUFLAG_SET(CPU_DTRACE_FAKERESTORE);
+				dtrace_probe(probe->ftp_id, arg0, arg1,
+				    arg2, arg3, arg4);
+				DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_FAKERESTORE);
+				dtrace_interrupt_enable(cookie);
+
+			} else {
+				dtrace_probe(probe->ftp_id, rp->r_o0, rp->r_o1,
+				    rp->r_o2, rp->r_o3, rp->r_o4);
 			}
+
 			continue;
 		}
 

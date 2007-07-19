@@ -826,12 +826,16 @@ dt_modtext(dtrace_hdl_t *dtp, char *p, int isenabled, GElf_Rela *rela,
 		 * of a register into %o7, it's a tail call in leaf context
 		 * so change the call to a retl-like instruction that returns
 		 * to that register value + 8 (rather than the typical %o7 +
-		 * 8). Otherwise we adjust the offset to land on what was
-		 * once the delay slot of the call so we correctly get all
-		 * the arguments.
+		 * 8); the delay slot instruction is left, but should have no
+		 * effect. Otherwise we change the call to be a nop. In the
+		 * first and the last case we adjust the offset to land on what
+		 * was once the delay slot of the call so we correctly get all
+		 * the arguments as they would have been passed in a normal
+		 * function call.
 		 */
 		if (DT_IS_RESTORE(ip[1])) {
 			ip[0] = DT_OP_RET;
+			(*off) += sizeof (ip[0]);
 		} else if (DT_IS_MOV_O7(ip[1])) {
 			ip[0] = DT_MAKE_RETL(DT_RS2(ip[1]));
 		} else {

@@ -45,6 +45,8 @@ f none SUNWdtrt/tst/sparc/pid/tst.branch.d 0444 root bin
 f none SUNWdtrt/tst/sparc/pid/tst.branch.exe 0555 root bin
 f none SUNWdtrt/tst/sparc/pid/tst.embedded.d 0444 root bin
 f none SUNWdtrt/tst/sparc/pid/tst.embedded.exe 0555 root bin  
+d none SUNWdtrt/tst/sparc/usdt 0755 root bin
+f none SUNWdtrt/tst/sparc/usdt/tst.tailcall.ksh 0444 root bin
 d none SUNWdtrt/tst/sparc/ustack 0755 root bin
 f none SUNWdtrt/tst/sparc/ustack/tst.annotated.d 0444 root bin
 f none SUNWdtrt/tst/sparc/ustack/tst.annotated.d.out 0444 root bin
