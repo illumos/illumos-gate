@@ -1589,9 +1589,10 @@ strrput(queue_t *q, mblk_t *bp)
 
 		mutex_enter(&stp->sd_lock);
 		if ((rput_opt & SR_CONSOL_DATA) &&
+		    (q->q_last != NULL) &&
 		    (bp->b_flag & (MSGMARK|MSGDELIM)) == 0) {
 			/*
-			 * Consolidate on M_DATA message onto an M_DATA,
+			 * Consolidate an M_DATA message onto an M_DATA,
 			 * M_PROTO, or M_PCPROTO by merging it with q_last.
 			 * The consolidation does not take place if
 			 * the old message is marked with either of the
@@ -1603,21 +1604,18 @@ strrput(queue_t *q, mblk_t *bp)
 			 * Carry any MSGMARKNEXT  and MSGNOTMARKNEXT from the
 			 * new message to the front of the b_cont chain.
 			 */
-			mblk_t *lbp;
+			mblk_t *lbp = q->q_last;
+			unsigned char db_type = lbp->b_datap->db_type;
 
-			lbp = q->q_last;
-			if (lbp != NULL &&
-			    (lbp->b_datap->db_type == M_DATA ||
-			    lbp->b_datap->db_type == M_PROTO ||
-			    lbp->b_datap->db_type == M_PCPROTO) &&
-			    !(lbp->b_flag & (MSGDELIM|MSGMARK|
-			    MSGMARKNEXT))) {
+			if ((db_type == M_DATA || db_type == M_PROTO ||
+			    db_type == M_PCPROTO) &&
+			    !(lbp->b_flag & (MSGDELIM|MSGMARK|MSGMARKNEXT))) {
 				rmvq_noenab(q, lbp);
 				/*
 				 * The first message in the b_cont list
 				 * tracks MSGMARKNEXT and MSGNOTMARKNEXT.
 				 * We need to handle the case where we
-				 * are appending
+				 * are appending:
 				 *
 				 * 1) a MSGMARKNEXT to a MSGNOTMARKNEXT.
 				 * 2) a MSGMARKNEXT to a plain message.
@@ -8141,8 +8139,63 @@ chkrd:
 static void
 putback(struct stdata *stp, queue_t *q, mblk_t *bp, int band)
 {
+	mblk_t	*qfirst = q->q_first;
 	ASSERT(MUTEX_HELD(&stp->sd_lock));
+
+	if ((stp->sd_rput_opt & SR_CONSOL_DATA) &&
+	    (qfirst != NULL) &&
+	    (qfirst->b_datap->db_type == M_DATA) &&
+	    ((qfirst->b_flag & (MSGMARK|MSGDELIM)) == 0)) {
+		/*
+		 * We use the same logic as defined in strrput()
+		 * but in reverse as we are putting back onto the
+		 * queue and want to retain byte ordering.
+		 * Consolidate an M_DATA message onto an M_DATA,
+		 * M_PROTO, or M_PCPROTO by merging it with q_first.
+		 * The consolidation does not take place if the message
+		 * we are returning to the queue is marked with either
+		 * of the marks or the delim flag or if q_first
+		 * is marked with MSGMARK. The MSGMARK check is needed to
+		 * handle the odd semantics of MSGMARK where essentially
+		 * the whole message is to be treated as marked.
+		 * Carry any MSGMARKNEXT and MSGNOTMARKNEXT from q_first
+		 * to the front of the b_cont chain.
+		 */
+		unsigned char db_type = bp->b_datap->db_type;
+
+		if ((db_type == M_DATA || db_type == M_PROTO ||
+		    db_type == M_PCPROTO) &&
+		    !(bp->b_flag & (MSGMARK|MSGDELIM|MSGMARKNEXT))) {
+			rmvq_noenab(q, qfirst);
+			/*
+			 * The first message in the b_cont list
+			 * tracks MSGMARKNEXT and MSGNOTMARKNEXT.
+			 * We need to handle the case where we
+			 * are appending:
+			 *
+			 * 1) a MSGMARKNEXT to a MSGNOTMARKNEXT.
+			 * 2) a MSGMARKNEXT to a plain message.
+			 * 3) a MSGNOTMARKNEXT to a plain message
+			 * 4) a MSGNOTMARKNEXT to a MSGNOTMARKNEXT
+			 *    message.
+			 *
+			 * Thus we never append a MSGMARKNEXT or
+			 * MSGNOTMARKNEXT to a MSGMARKNEXT message.
+			 */
+			if (qfirst->b_flag & MSGMARKNEXT) {
+				bp->b_flag |= MSGMARKNEXT;
+				bp->b_flag &= ~MSGNOTMARKNEXT;
+				qfirst->b_flag &= ~MSGMARKNEXT;
+			} else if (qfirst->b_flag & MSGNOTMARKNEXT) {
+				bp->b_flag |= MSGNOTMARKNEXT;
+				qfirst->b_flag &= ~MSGNOTMARKNEXT;
+			}
+
+			linkb(bp, qfirst);
+		}
+	}
 	(void) putbq(q, bp);
+
 	/*
 	 * A message may have come in when the sd_lock was dropped in the
 	 * calling routine. If this is the case and STR*ATMARK info was
