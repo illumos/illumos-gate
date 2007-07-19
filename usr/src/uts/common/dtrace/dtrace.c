@@ -607,8 +607,41 @@ dtrace_canstore(uint64_t addr, size_t sz, dtrace_mstate_t *mstate,
 	 * variables.
 	 */
 	if (DTRACE_INRANGE(addr, sz, (uintptr_t)vstate->dtvs_dynvars.dtds_base,
-	    vstate->dtvs_dynvars.dtds_size))
+	    vstate->dtvs_dynvars.dtds_size)) {
+		dtrace_dstate_t *dstate = &vstate->dtvs_dynvars;
+		uintptr_t base = (uintptr_t)dstate->dtds_base +
+		    (dstate->dtds_hashsize * sizeof (dtrace_dynhash_t));
+		uintptr_t chunkoffs;
+
+		/*
+		 * Before we assume that we can store here, we need to make
+		 * sure that it isn't in our metadata -- storing to our
+		 * dynamic variable metadata would corrupt our state.  For
+		 * the range to not include any dynamic variable metadata,
+		 * it must:
+		 *
+		 *	(1) Start above the hash table that is at the base of
+		 *	the dynamic variable space
+		 *
+		 *	(2) Have a starting chunk offset that is beyond the
+		 *	dtrace_dynvar_t that is at the base of every chunk
+		 *
+		 *	(3) Not span a chunk boundary
+		 *
+		 */
+		if (addr < base)
+			return (0);
+
+		chunkoffs = (addr - base) % dstate->dtds_chunksize;
+
+		if (chunkoffs < sizeof (dtrace_dynvar_t))
+			return (0);
+
+		if (chunkoffs + sz > dstate->dtds_chunksize)
+			return (0);
+
 		return (1);
+	}
 
 	/*
 	 * Finally, check the static local and global variables.  These checks
@@ -4527,6 +4560,7 @@ dtrace_dif_emulate(dtrace_difo_t *difo, dtrace_mstate_t *mstate,
 			break;
 		case DIF_OP_RET:
 			rval = regs[rd];
+			pc = textlen;
 			break;
 		case DIF_OP_NOP:
 			break;

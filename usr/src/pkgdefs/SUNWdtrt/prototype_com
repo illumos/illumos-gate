@@ -229,6 +229,7 @@ f none SUNWdtrt/tst/common/assocs/tst.misc.d 0444 root bin
 f none SUNWdtrt/tst/common/assocs/tst.orthogonality.d 0444 root bin
 f none SUNWdtrt/tst/common/assocs/tst.this.d 0444 root bin
 f none SUNWdtrt/tst/common/assocs/tst.valassign.d.out 0444 root bin
+f none SUNWdtrt/tst/common/assocs/tst.invalidref.d 0444 root bin
 d none SUNWdtrt/tst/common/begin 0755 root bin
 f none SUNWdtrt/tst/common/begin/err.D_PDESC_ZERO.begin.d 0444 root bin
 f none SUNWdtrt/tst/common/begin/err.D_PDESC_ZERO.tick.d 0444 root bin
