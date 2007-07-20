@@ -23,7 +23,7 @@
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include $(SRC)/Makefile.master
@@ -242,6 +242,7 @@ COMMON_SUBDIRS= \
 	SUNWixgb \
 	SUNWkrbr \
 	SUNWkrbu \
+	SUNWldskint \
 	SUNWlibsasl \
 	SUNWllc \
 	SUNWllcr\

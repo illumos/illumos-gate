@@ -1,9 +1,9 @@
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 default=0
 timeout=60
-title Solaris Express, Developer Edition
+title Solaris Express Developer Edition
 	kernel /boot/platform/i86pc/kernel/unix -B install_media=cdrom,soldevx=true
 	module /boot/x86.miniroot
 title Solaris Express

@@ -177,11 +177,6 @@
 ./src/cmd/sendmail/src/statusd_shm.h
 
 #
-# Ignore libdiskmgt.h. Used for building but not delivered.
-#
-./src/lib/libdiskmgt/common/libdiskmgt.h
-
-#
 # Ignore files originally supplied by ISC (Internet Software Consortium) 
 # as part of a BIND release.
 #
