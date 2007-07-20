@@ -95,6 +95,7 @@ static void	sctp_conn_cache_init();
 static void	sctp_conn_cache_fini();
 static int	sctp_conn_cache_constructor();
 static void	sctp_conn_cache_destructor();
+static void	sctp_conn_clear(conn_t *);
 void		sctp_g_q_setup(sctp_stack_t *);
 void		sctp_g_q_create(sctp_stack_t *);
 void		sctp_g_q_destroy(sctp_stack_t *);
@@ -196,12 +197,13 @@ sctp_create_eager(sctp_t *psctp)
 	sctp = CONN2SCTP(connp);
 	sctp->sctp_sctps = sctps;
 
-	if ((ack_mp = sctp_timer_alloc(sctp, sctp_ack_timer)) == NULL ||
-	    (hb_mp = sctp_timer_alloc(sctp, sctp_heartbeat_timer)) == NULL) {
+	if ((ack_mp = sctp_timer_alloc(sctp, sctp_ack_timer,
+	    KM_NOSLEEP)) == NULL ||
+	    (hb_mp = sctp_timer_alloc(sctp, sctp_heartbeat_timer,
+	    KM_NOSLEEP)) == NULL) {
 		if (ack_mp != NULL)
 			freeb(ack_mp);
-		netstack_rele(sctps->sctps_netstack);
-		connp->conn_netstack = NULL;
+		sctp_conn_clear(connp);
 		sctp->sctp_sctps = NULL;
 		SCTP_G_Q_REFRELE(sctps);
 		kmem_cache_free(sctp_conn_cache, connp);
@@ -221,8 +223,7 @@ sctp_create_eager(sctp_t *psctp)
 	if (sctp_init_values(sctp, psctp, KM_NOSLEEP) != 0) {
 		freeb(ack_mp);
 		freeb(hb_mp);
-		netstack_rele(sctps->sctps_netstack);
-		connp->conn_netstack = NULL;
+		sctp_conn_clear(connp);
 		sctp->sctp_sctps = NULL;
 		SCTP_G_Q_REFRELE(sctps);
 		kmem_cache_free(sctp_conn_cache, connp);
@@ -661,7 +662,6 @@ sctp_free(conn_t *connp)
 	sctp_t *sctp = CONN2SCTP(connp);
 	int		cnt;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
-	netstack_t	*ns;
 
 	ASSERT(sctps != NULL);
 	/* Unlink it from the global list */
@@ -788,32 +788,11 @@ sctp_free(conn_t *connp)
 	sctp->sctp_v6label_len = 0;
 	sctp->sctp_v4label_len = 0;
 
-	/* Clean up conn_t stuff */
-	connp->conn_policy_cached = B_FALSE;
-	if (connp->conn_latch != NULL) {
-		IPLATCH_REFRELE(connp->conn_latch, connp->conn_netstack);
-		connp->conn_latch = NULL;
-	}
-	if (connp->conn_policy != NULL) {
-		IPPH_REFRELE(connp->conn_policy, connp->conn_netstack);
-		connp->conn_policy = NULL;
-	}
-	if (connp->conn_ipsec_opt_mp != NULL) {
-		freemsg(connp->conn_ipsec_opt_mp);
-		connp->conn_ipsec_opt_mp = NULL;
-	}
-	if (connp->conn_cred != NULL) {
-		crfree(connp->conn_cred);
-		connp->conn_cred = NULL;
-	}
-
 	/* Every sctp_t holds one reference on the default queue */
 	sctp->sctp_sctps = NULL;
 	SCTP_G_Q_REFRELE(sctps);
 
-	ns = connp->conn_netstack;
-	connp->conn_netstack = NULL;
-	netstack_rele(ns);
+	sctp_conn_clear(connp);
 	kmem_cache_free(sctp_conn_cache, connp);
 }
 
@@ -912,22 +891,37 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 	sctp->sctp_sack_gaps = 0;
 	sctp->sctp_sack_toggle = 2;
 
+	/* Only need to do the allocation if there is no "cached" one. */
+	if (sctp->sctp_pad_mp == NULL) {
+		if (sleep == KM_SLEEP) {
+			sctp->sctp_pad_mp = allocb_wait(SCTP_ALIGN, BPRI_MED,
+			    STR_NOSIG, NULL);
+		} else {
+			sctp->sctp_pad_mp = allocb(SCTP_ALIGN, BPRI_MED);
+			if (sctp->sctp_pad_mp == NULL)
+				return (ENOMEM);
+		}
+		bzero(sctp->sctp_pad_mp->b_rptr, SCTP_ALIGN);
+	}
+
 	if (psctp != NULL) {
 		/*
 		 * Inherit from parent
 		 */
-		sctp->sctp_iphc = kmem_zalloc(psctp->sctp_iphc_len,
-		    KM_NOSLEEP);
-		if (sctp->sctp_iphc == NULL)
-			return (ENOMEM);
+		sctp->sctp_iphc = kmem_zalloc(psctp->sctp_iphc_len, sleep);
+		if (sctp->sctp_iphc == NULL) {
+			sctp->sctp_iphc_len = 0;
+			err = ENOMEM;
+			goto failure;
+		}
 		sctp->sctp_iphc_len = psctp->sctp_iphc_len;
 		sctp->sctp_hdr_len = psctp->sctp_hdr_len;
 
-		sctp->sctp_iphc6 = kmem_zalloc(psctp->sctp_iphc6_len,
-		    KM_NOSLEEP);
+		sctp->sctp_iphc6 = kmem_zalloc(psctp->sctp_iphc6_len, sleep);
 		if (sctp->sctp_iphc6 == NULL) {
 			sctp->sctp_iphc6_len = 0;
-			return (ENOMEM);
+			err = ENOMEM;
+			goto failure;
 		}
 		sctp->sctp_iphc6_len = psctp->sctp_iphc6_len;
 		sctp->sctp_hdr6_len = psctp->sctp_hdr6_len;
@@ -1006,10 +1000,10 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 		 * Initialize the header template
 		 */
 		if ((err = sctp_header_init_ipv4(sctp, sleep)) != 0) {
-			return (err);
+			goto failure;
 		}
 		if ((err = sctp_header_init_ipv6(sctp, sleep)) != 0) {
-			return (err);
+			goto failure;
 		}
 
 		/*
@@ -1049,6 +1043,17 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 	sctp->sctp_msgcount = 0;
 
 	return (0);
+
+failure:
+	if (sctp->sctp_iphc != NULL) {
+		kmem_free(sctp->sctp_iphc, sctp->sctp_iphc_len);
+		sctp->sctp_iphc = NULL;
+	}
+	if (sctp->sctp_iphc6 != NULL) {
+		kmem_free(sctp->sctp_iphc6, sctp->sctp_iphc6_len);
+		sctp->sctp_iphc6 = NULL;
+	}
+	return (err);
 }
 
 /*
@@ -1395,12 +1400,12 @@ sctp_create(void *sctp_ulpd, sctp_t *parent, int family, int flags,
 	sctp->sctp_sctps = sctps;
 
 	sctp_connp->conn_ulp_labeled = is_system_labeled();
-	if ((ack_mp = sctp_timer_alloc(sctp, sctp_ack_timer)) == NULL ||
-	    (hb_mp = sctp_timer_alloc(sctp, sctp_heartbeat_timer)) == NULL) {
+	if ((ack_mp = sctp_timer_alloc(sctp, sctp_ack_timer, sleep)) == NULL ||
+	    (hb_mp = sctp_timer_alloc(sctp, sctp_heartbeat_timer,
+	    sleep)) == NULL) {
 		if (ack_mp != NULL)
 			freeb(ack_mp);
-		netstack_rele(sctp_connp->conn_netstack);
-		sctp_connp->conn_netstack = NULL;
+		sctp_conn_clear(sctp_connp);
 		sctp->sctp_sctps = NULL;
 		SCTP_G_Q_REFRELE(sctps);
 		kmem_cache_free(sctp_conn_cache, sctp_connp);
@@ -1430,8 +1435,7 @@ sctp_create(void *sctp_ulpd, sctp_t *parent, int family, int flags,
 	if (sctp_init_values(sctp, psctp, sleep) != 0) {
 		freeb(ack_mp);
 		freeb(hb_mp);
-		netstack_rele(sctp_connp->conn_netstack);
-		sctp_connp->conn_netstack = NULL;
+		sctp_conn_clear(sctp_connp);
 		sctp->sctp_sctps = NULL;
 		SCTP_G_Q_REFRELE(sctps);
 		kmem_cache_free(sctp_conn_cache, sctp_connp);
@@ -1455,8 +1459,7 @@ sctp_create(void *sctp_ulpd, sctp_t *parent, int family, int flags,
 			freeb(ack_mp);
 			freeb(hb_mp);
 			sctp_headers_free(sctp);
-			netstack_rele(sctps->sctps_netstack);
-			sctp_connp->conn_netstack = NULL;
+			sctp_conn_clear(sctp_connp);
 			sctp->sctp_sctps = NULL;
 			SCTP_G_Q_REFRELE(sctps);
 			kmem_cache_free(sctp_conn_cache, sctp_connp);
@@ -1796,10 +1799,6 @@ sctp_stack_init(netstackid_t stackid, netstack_t *ns)
 	/* Initialize SCTP hash arrays. */
 	sctp_hash_init(sctps);
 
-	sctps->sctps_pad_mp = allocb(SCTP_ALIGN, BPRI_MED);
-	bzero(sctps->sctps_pad_mp->b_rptr, SCTP_ALIGN);
-	ASSERT(sctps->sctps_pad_mp);
-
 	if (!sctp_nd_init(sctps)) {
 		sctp_nd_free(sctps);
 	}
@@ -1885,9 +1884,6 @@ sctp_stack_fini(netstackid_t stackid, void *arg)
 
 	sctp_kstat_fini(stackid, sctps->sctps_mibkp);
 	sctps->sctps_mibkp = NULL;
-
-	freeb(sctps->sctps_pad_mp);
-	sctps->sctps_pad_mp = NULL;
 
 	mutex_destroy(&sctps->sctps_g_lock);
 	mutex_destroy(&sctps->sctps_epriv_port_lock);
@@ -2219,12 +2215,6 @@ sctp_conn_cache_constructor(void *buf, void *cdrarg, int kmflags)
 	cv_init(&sctp->sctp_cv, NULL, CV_DEFAULT, NULL);
 	mutex_init(&sctp->sctp_sendq_lock, NULL, MUTEX_DEFAULT, NULL);
 
-	sctp_connp->conn_rq = sctp_connp->conn_wq = NULL;
-	sctp_connp->conn_multicast_loop = IP_DEFAULT_MULTICAST_LOOP;
-	sctp_connp->conn_ulp = IPPROTO_SCTP;
-	mutex_init(&sctp_connp->conn_lock, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&sctp_connp->conn_cv, NULL, CV_DEFAULT, NULL);
-
 	return (0);
 }
 
@@ -2302,14 +2292,21 @@ sctp_conn_cache_destructor(void *buf, void *cdrarg)
 	ASSERT(sctp->sctp_ipp_dstopts == NULL);
 	ASSERT(sctp->sctp_ipp_pathmtu == NULL);
 
+	/*
+	 * sctp_pad_mp can be NULL if the memory allocation fails
+	 * in sctp_init_values() and the conn_t is freed.
+	 */
+	if (sctp->sctp_pad_mp != NULL) {
+		freeb(sctp->sctp_pad_mp);
+		sctp->sctp_pad_mp = NULL;
+	}
+
 	mutex_destroy(&sctp->sctp_reflock);
 	mutex_destroy(&sctp->sctp_lock);
 	mutex_destroy(&sctp->sctp_recvq_lock);
 	cv_destroy(&sctp->sctp_cv);
 	mutex_destroy(&sctp->sctp_sendq_lock);
 
-	mutex_destroy(&sctp_connp->conn_lock);
-	cv_destroy(&sctp_connp->conn_cv);
 }
 
 static void
@@ -2324,4 +2321,32 @@ static void
 sctp_conn_cache_fini()
 {
 	kmem_cache_destroy(sctp_conn_cache);
+}
+
+void
+sctp_conn_init(conn_t *connp)
+{
+	connp->conn_flags = IPCL_SCTPCONN;
+	connp->conn_rq = connp->conn_wq = NULL;
+	connp->conn_multicast_loop = IP_DEFAULT_MULTICAST_LOOP;
+	connp->conn_ulp = IPPROTO_SCTP;
+	connp->conn_state_flags |= CONN_INCIPIENT;
+	mutex_init(&connp->conn_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&connp->conn_cv, NULL, CV_DEFAULT, NULL);
+}
+
+static void
+sctp_conn_clear(conn_t *connp)
+{
+	/* Clean up conn_t stuff */
+	if (connp->conn_latch != NULL)
+		IPLATCH_REFRELE(connp->conn_latch, connp->conn_netstack);
+	if (connp->conn_policy != NULL)
+		IPPH_REFRELE(connp->conn_policy, connp->conn_netstack);
+	if (connp->conn_ipsec_opt_mp != NULL)
+		freemsg(connp->conn_ipsec_opt_mp);
+	mutex_destroy(&connp->conn_lock);
+	cv_destroy(&connp->conn_cv);
+	netstack_rele(connp->conn_netstack);
+	bzero(connp, sizeof (struct conn_s));
 }

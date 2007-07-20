@@ -288,7 +288,7 @@ sctp_sent_list(mblk_t *addr)
 			return (-1);
 		}
 		if (mdb_vread(&mp, sizeof (mp),
-			(uintptr_t)meta.b_cont) == -1) {
+		    (uintptr_t)meta.b_cont) == -1) {
 			return (-1);
 		}
 		for (;;) {
@@ -702,23 +702,23 @@ sctp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (mdb_getopts(argc, argv,
-		'a', MDB_OPT_SETBITS, MDB_SCTP_SHOW_ALL, &opts,
-		'f', MDB_OPT_SETBITS, MDB_SCTP_SHOW_FLAGS, &opts,
-		'h', MDB_OPT_SETBITS, MDB_SCTP_SHOW_HASH, &opts,
-		'o', MDB_OPT_SETBITS, MDB_SCTP_SHOW_OUT, &opts,
-		'i', MDB_OPT_SETBITS, MDB_SCTP_SHOW_IN, &opts,
-		'm', MDB_OPT_SETBITS, MDB_SCTP_SHOW_MISC, &opts,
-		'r', MDB_OPT_SETBITS, MDB_SCTP_SHOW_RTT, &opts,
-		'S', MDB_OPT_SETBITS, MDB_SCTP_SHOW_STATS, &opts,
-		'F', MDB_OPT_SETBITS, MDB_SCTP_SHOW_FLOW, &opts,
-		'H', MDB_OPT_SETBITS, MDB_SCTP_SHOW_HDR, &opts,
-		'p', MDB_OPT_SETBITS, MDB_SCTP_SHOW_PMTUD, &opts,
-		'R', MDB_OPT_SETBITS, MDB_SCTP_SHOW_RXT, &opts,
-		'C', MDB_OPT_SETBITS, MDB_SCTP_SHOW_CONN, &opts,
-		'c', MDB_OPT_SETBITS, MDB_SCTP_SHOW_CLOSE, &opts,
-		'e', MDB_OPT_SETBITS, MDB_SCTP_SHOW_EXT, &opts,
-		'P', MDB_OPT_SETBITS, 1, &paddr,
-		'd', MDB_OPT_SETBITS, MDB_SCTP_DUMP_ADDRS, &opts) != argc) {
+	    'a', MDB_OPT_SETBITS, MDB_SCTP_SHOW_ALL, &opts,
+	    'f', MDB_OPT_SETBITS, MDB_SCTP_SHOW_FLAGS, &opts,
+	    'h', MDB_OPT_SETBITS, MDB_SCTP_SHOW_HASH, &opts,
+	    'o', MDB_OPT_SETBITS, MDB_SCTP_SHOW_OUT, &opts,
+	    'i', MDB_OPT_SETBITS, MDB_SCTP_SHOW_IN, &opts,
+	    'm', MDB_OPT_SETBITS, MDB_SCTP_SHOW_MISC, &opts,
+	    'r', MDB_OPT_SETBITS, MDB_SCTP_SHOW_RTT, &opts,
+	    'S', MDB_OPT_SETBITS, MDB_SCTP_SHOW_STATS, &opts,
+	    'F', MDB_OPT_SETBITS, MDB_SCTP_SHOW_FLOW, &opts,
+	    'H', MDB_OPT_SETBITS, MDB_SCTP_SHOW_HDR, &opts,
+	    'p', MDB_OPT_SETBITS, MDB_SCTP_SHOW_PMTUD, &opts,
+	    'R', MDB_OPT_SETBITS, MDB_SCTP_SHOW_RXT, &opts,
+	    'C', MDB_OPT_SETBITS, MDB_SCTP_SHOW_CONN, &opts,
+	    'c', MDB_OPT_SETBITS, MDB_SCTP_SHOW_CLOSE, &opts,
+	    'e', MDB_OPT_SETBITS, MDB_SCTP_SHOW_EXT, &opts,
+	    'P', MDB_OPT_SETBITS, 1, &paddr,
+	    'd', MDB_OPT_SETBITS, MDB_SCTP_DUMP_ADDRS, &opts) != argc) {
 		return (DCMD_USAGE);
 	}
 
@@ -784,6 +784,7 @@ sctp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    sctp.sctp_recovery_tsn, sctp.sctp_adv_pap);
 		mdb_printf("num_ostr\t%?hu\tostrcntrs\t%?p\n",
 		    sctp.sctp_num_ostr, sctp.sctp_ostrcntrs);
+		mdb_printf("pad_mp\t\t%?p\n", sctp.sctp_pad_mp);
 
 		mdb_printf("%<b>Default Send Parameters%</b>\n");
 		mdb_printf("def_stream\t%?u\tdef_flags\t%?x\n",
@@ -1061,7 +1062,7 @@ find_next_hash_item(fanout_walk_data_t *fw)
 	for (; fw->index < fw->size; fw->index++) {
 		/* read the current hash line for an sctp */
 		if (mdb_vread(&tf, sizeof (tf),
-			(uintptr_t)(fw->fanout + fw->index)) == -1) {
+		    (uintptr_t)(fw->fanout + fw->index)) == -1) {
 			mdb_warn("failed to read tf at %p",
 			    fw->fanout + fw->index);
 			return (NULL);
@@ -1152,7 +1153,7 @@ fanout_walk_step(mdb_walk_state_t *wsp)
 	fanout_init_t *fi = wsp->walk_arg;
 
 	if (mdb_pwalk(fi->nested_walker_name, wsp->walk_callback,
-		wsp->walk_cbdata, wsp->walk_addr) == -1) {
+	    wsp->walk_cbdata, wsp->walk_addr) == -1) {
 		mdb_warn("couldn't walk '%s'for address %p",
 		    fi->nested_walker_name, wsp->walk_addr);
 		return (WALK_ERR);
@@ -1179,7 +1180,7 @@ sctps_walk_step(mdb_walk_state_t *wsp)
 
 	kaddr = wsp->walk_addr + OFFSETOF(sctp_stack_t, sctps_g_list);
 	if (mdb_pwalk("list", wsp->walk_callback,
-		wsp->walk_cbdata, kaddr) == -1) {
+	    wsp->walk_cbdata, kaddr) == -1) {
 		mdb_warn("couldn't walk 'list' for address %p", kaddr);
 		return (WALK_ERR);
 	}
@@ -1358,7 +1359,7 @@ int
 sctp_ill_walk_step(mdb_walk_state_t *wsp)
 {
 	if (mdb_pwalk("sctp_stack_walk_ill", wsp->walk_callback,
-		wsp->walk_cbdata, wsp->walk_addr) == -1) {
+	    wsp->walk_cbdata, wsp->walk_addr) == -1) {
 		mdb_warn("couldn't walk 'sctp_stack_walk_ill' for addr %p",
 		    wsp->walk_addr);
 		return (WALK_ERR);
@@ -1399,7 +1400,7 @@ sctp_stack_ill_walk_init(mdb_walk_state_t *wsp)
 			uaddr = (uintptr_t)&iw.ills[i].sctp_ill_list;
 			offset = uaddr - (uintptr_t)&iw.ills;
 			if (mdb_pwalk("list", wsp->walk_callback,
-				wsp->walk_cbdata, kaddr+offset) == -1) {
+			    wsp->walk_cbdata, kaddr+offset) == -1) {
 				mdb_warn("couldn't walk 'list' for address %p",
 				    kaddr);
 				return (WALK_ERR);
@@ -1413,7 +1414,7 @@ static int
 sctp_stack_ill_walk_step(mdb_walk_state_t *wsp)
 {
 	return (wsp->walk_callback(wsp->walk_addr, wsp->walk_layer,
-		    wsp->walk_cbdata));
+	    wsp->walk_cbdata));
 }
 
 int
@@ -1430,7 +1431,7 @@ int
 sctp_ipif_walk_step(mdb_walk_state_t *wsp)
 {
 	if (mdb_pwalk("sctp_stack_walk_ipif", wsp->walk_callback,
-		wsp->walk_cbdata, wsp->walk_addr) == -1) {
+	    wsp->walk_cbdata, wsp->walk_addr) == -1) {
 		mdb_warn("couldn't walk 'sctp_stack_walk_ipif' for addr %p",
 		    wsp->walk_addr);
 		return (WALK_ERR);
@@ -1471,7 +1472,7 @@ sctp_stack_ipif_walk_init(mdb_walk_state_t *wsp)
 			uaddr = (uintptr_t)&iw.ipifs[i].sctp_ipif_list;
 			offset = uaddr - (uintptr_t)&iw.ipifs;
 			if (mdb_pwalk("list", wsp->walk_callback,
-				wsp->walk_cbdata, kaddr+offset) == -1) {
+			    wsp->walk_cbdata, kaddr+offset) == -1) {
 				mdb_warn("couldn't walk 'list' for address %p",
 				    kaddr);
 				return (WALK_ERR);
@@ -1485,7 +1486,7 @@ static int
 sctp_stack_ipif_walk_step(mdb_walk_state_t *wsp)
 {
 	return (wsp->walk_callback(wsp->walk_addr, wsp->walk_layer,
-		    wsp->walk_cbdata));
+	    wsp->walk_cbdata));
 }
 
 static void

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +34,8 @@ extern "C" {
 
 #define	SCTP_FADDR_RC_TIMER_RESTART(sctp, fp, intvl)			\
 	if ((fp)->rc_timer_mp == NULL) {				\
-		(fp)->rc_timer_mp = sctp_timer_alloc((sctp), sctp_rc_timer); \
+		(fp)->rc_timer_mp = sctp_timer_alloc((sctp), 		\
+		    sctp_rc_timer, KM_NOSLEEP);				\
 	}								\
 	if ((fp)->rc_timer_mp != NULL) {				\
 		((sctpt_t *)((fp)->rc_timer_mp->b_rptr))->sctpt_faddr = fp;  \

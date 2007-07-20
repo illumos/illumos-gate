@@ -655,6 +655,8 @@ typedef struct sctp_s {
 	uint16_t	sctp_num_ostr;
 	uint16_t	*sctp_ostrcntrs;
 
+	mblk_t		*sctp_pad_mp;		/* pad unaligned data chunks */
+
 	/* sendmsg() default parameters */
 	uint16_t	sctp_def_stream;	/* default stream id */
 	uint16_t	sctp_def_flags;		/* default xmit flags */
@@ -968,6 +970,7 @@ extern int	sctp_compare_faddrsets(sctp_faddr_t *, sctp_faddr_t *);
 extern void	sctp_congest_reset(sctp_t *);
 extern void	sctp_conn_hash_insert(sctp_tf_t *, sctp_t *, int);
 extern void	sctp_conn_hash_remove(sctp_t *);
+extern void	sctp_conn_init(conn_t *);
 extern sctp_t	*sctp_conn_match(in6_addr_t *, in6_addr_t *, uint32_t,
 		    zoneid_t, sctp_stack_t *);
 extern sctp_t	*sctp_conn_request(sctp_t *, mblk_t *, uint_t, uint_t,
@@ -1111,7 +1114,7 @@ extern size_t	sctp_supaddr_param_len(sctp_t *);
 extern size_t	sctp_supaddr_param(sctp_t *, uchar_t *);
 
 extern void	sctp_timer(sctp_t *, mblk_t *, clock_t);
-extern mblk_t	*sctp_timer_alloc(sctp_t *, pfv_t);
+extern mblk_t	*sctp_timer_alloc(sctp_t *, pfv_t, int);
 extern void	sctp_timer_call(sctp_t *sctp, mblk_t *);
 extern void	sctp_timer_free(mblk_t *);
 extern void	sctp_timer_stop(mblk_t *);

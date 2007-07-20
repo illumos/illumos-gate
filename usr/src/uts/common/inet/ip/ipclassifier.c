@@ -574,7 +574,7 @@ ipcl_conn_create(uint32_t type, int sleep, netstack_t *ns)
 	case IPCL_SCTPCONN:
 		if ((connp = kmem_cache_alloc(sctp_conn_cache, sleep)) == NULL)
 			return (NULL);
-		connp->conn_flags = IPCL_SCTPCONN;
+		sctp_conn_init(connp);
 		sctps = ns->netstack_sctp;
 		SCTP_G_Q_REFHOLD(sctps);
 		netstack_hold(ns);
@@ -779,12 +779,10 @@ ipcl_hash_remove_locked(conn_t *connp, connf_t	*connfp)
 	ASSERT((connp->conn_flags & IPCL_CL_LISTENER) == 0);
 
 	if ((connp)->conn_next != NULL) {
-		(connp)->conn_next->conn_prev =
-			(connp)->conn_prev;
+		(connp)->conn_next->conn_prev = (connp)->conn_prev;
 	}
 	if ((connp)->conn_prev != NULL) {
-		(connp)->conn_prev->conn_next =
-			(connp)->conn_next;
+		(connp)->conn_prev->conn_next = (connp)->conn_next;
 	} else {
 		connfp->connf_head = (connp)->conn_next;
 	}
@@ -2219,7 +2217,7 @@ ipcl_tcp_lookup_reversed_ipv4(ipha_t *ipha, tcph_t *tcph, int min_state,
 	bcopy(tcph->th_lport, &pports[1], sizeof (uint16_t));
 
 	connfp = &ipst->ips_ipcl_conn_fanout[IPCL_CONN_HASH(ipha->ipha_dst,
-					    ports, ipst)];
+	    ports, ipst)];
 
 	mutex_enter(&connfp->connf_lock);
 	for (tconnp = connfp->connf_head; tconnp != NULL;
@@ -2259,7 +2257,7 @@ ipcl_tcp_lookup_reversed_ipv6(ip6_t *ip6h, tcpha_t *tcpha, int min_state,
 	pports[1] = tcpha->tha_lport;
 
 	connfp = &ipst->ips_ipcl_conn_fanout[IPCL_CONN_HASH_V6(ip6h->ip6_dst,
-					    ports, ipst)];
+	    ports, ipst)];
 
 	mutex_enter(&connfp->connf_lock);
 	for (tconnp = connfp->connf_head; tconnp != NULL;

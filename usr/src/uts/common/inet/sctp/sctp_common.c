@@ -298,8 +298,8 @@ sctp_update_ire(sctp_t *sctp)
 			}
 			if (ire->ire_uinfo.iulp_rtt_sd != 0) {
 				ire->ire_uinfo.iulp_rtt_sd =
-					(ire->ire_uinfo.iulp_rtt_sd +
-					TICK_TO_MSEC(fp->rttvar)) >> 1;
+				    (ire->ire_uinfo.iulp_rtt_sd +
+				    TICK_TO_MSEC(fp->rttvar)) >> 1;
 			} else {
 				ire->ire_uinfo.iulp_rtt_sd =
 				    TICK_TO_MSEC(fp->rttvar +
@@ -560,7 +560,7 @@ sctp_add_faddr(sctp_t *sctp, in6_addr_t *addr, int sleep, boolean_t first)
 
 	if ((faddr = kmem_cache_alloc(sctp_kmem_faddr_cache, sleep)) == NULL)
 		return (ENOMEM);
-	timer_mp = sctp_timer_alloc((sctp), sctp_rexmit_timer);
+	timer_mp = sctp_timer_alloc((sctp), sctp_rexmit_timer, sleep);
 	if (timer_mp == NULL) {
 		kmem_cache_free(sctp_kmem_faddr_cache, faddr);
 		return (ENOMEM);
@@ -926,8 +926,8 @@ sctp_header_init_ipv4(sctp_t *sctp, int sleep)
 	sctp->sctp_ip_hdr_len = sizeof (ipha_t);
 	sctp->sctp_ipha->ipha_length = htons(sizeof (ipha_t) +
 	    sizeof (sctp_hdr_t));
-	sctp->sctp_ipha->ipha_version_and_hdr_length
-		= (IP_VERSION << 4) | IP_SIMPLE_HDR_LENGTH_IN_WORDS;
+	sctp->sctp_ipha->ipha_version_and_hdr_length =
+	    (IP_VERSION << 4) | IP_SIMPLE_HDR_LENGTH_IN_WORDS;
 
 	/*
 	 * These two fields should be zero, and are already set above.
@@ -1836,8 +1836,9 @@ sctp_init_faddr(sctp_t *sctp, sctp_faddr_t *fp, in6_addr_t *addr,
 	if (IN6_IS_ADDR_V4MAPPED(addr)) {
 		fp->isv4 = 1;
 		/* Make sure that sfa_pmss is a multiple of SCTP_ALIGN. */
-		fp->sfa_pmss = (sctps->sctps_initial_mtu - sctp->sctp_hdr_len) &
-			~(SCTP_ALIGN - 1);
+		fp->sfa_pmss =
+		    (sctps->sctps_initial_mtu - sctp->sctp_hdr_len) &
+		    ~(SCTP_ALIGN - 1);
 	} else {
 		fp->isv4 = 0;
 		fp->sfa_pmss =

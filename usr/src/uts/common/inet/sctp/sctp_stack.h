@@ -96,8 +96,6 @@ struct sctp_stack {
 	kmutex_t	sctps_epriv_port_lock;
 	uint_t		sctps_next_port_to_try;
 
-	mblk_t		 *sctps_pad_mp;	/* pad unaligned data chunks */
-
 	/* SCTP bind hash list - all sctp_t with state >= BOUND. */
 	struct sctp_tf_s	*sctps_bind_fanout;
 	/* SCTP listen hash list - all sctp_t with state == LISTEN. */

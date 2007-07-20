@@ -147,14 +147,20 @@ sctp_timer(sctp_t *sctp, mblk_t *mp, clock_t tim)
  * space for sctpt_t.
  */
 mblk_t *
-sctp_timer_alloc(sctp_t *sctp, pfv_t func)
+sctp_timer_alloc(sctp_t *sctp, pfv_t func, int sleep)
 {
 	mblk_t *mp;
 	sctp_tb_t *sctp_tb;
 	sctpt_t	*sctpt;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
-	if ((mp = allocb(sizeof (sctp_t) + sizeof (sctp_tb_t), BPRI_HI))) {
+	if (sleep == KM_SLEEP) {
+		mp = allocb_wait(sizeof (sctp_t) + sizeof (sctp_tb_t), BPRI_HI,
+		    STR_NOSIG, NULL);
+	} else {
+		mp = allocb(sizeof (sctp_t) + sizeof (sctp_tb_t), BPRI_HI);
+	}
+	if (mp != NULL) {
 		mp->b_datap->db_type = M_PCSIG;
 		sctp_tb = (sctp_tb_t *)mp->b_datap->db_base;
 		mp->b_rptr = (uchar_t *)&sctp_tb[1];

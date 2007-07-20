@@ -653,12 +653,13 @@ sctp_add_proto_hdr(sctp_t *sctp, sctp_faddr_t *fp, mblk_t *mp, int sacklen,
  * the specified pad length.
  */
 static mblk_t *
-sctp_get_padding(int pad, sctp_stack_t *sctps)
+sctp_get_padding(sctp_t *sctp, int pad)
 {
 	mblk_t *fill;
 
 	ASSERT(pad < SCTP_ALIGN);
-	if ((fill = dupb(sctps->sctps_pad_mp)) != NULL) {
+	ASSERT(sctp->sctp_pad_mp != NULL);
+	if ((fill = dupb(sctp->sctp_pad_mp)) != NULL) {
 		fill->b_wptr += pad;
 		return (fill);
 	}
@@ -741,7 +742,7 @@ sctp_find_fast_rexmit_mblks(sctp_t *sctp, int *total, sctp_faddr_t **fp)
 				if ((nmp = dupmsg(mp)) == NULL)
 					return (start_mp);
 				if (extra > 0) {
-					fill = sctp_get_padding(extra, sctps);
+					fill = sctp_get_padding(sctp, extra);
 					if (fill != NULL) {
 						linkb(nmp, fill);
 					} else {
@@ -1157,7 +1158,7 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 			ASSERT(sctp->sctp_rtt_tsn == ntohl(sdc->sdh_tsn));
 		}
 		if (extra > 0) {
-			fill = sctp_get_padding(extra, sctps);
+			fill = sctp_get_padding(sctp, extra);
 			if (fill != NULL) {
 				linkb(head, fill);
 				pad = extra;
@@ -1206,7 +1207,7 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 			if ((nmp = dupmsg(mp)) == NULL)
 				break;
 			if (extra > 0) {
-				fill = sctp_get_padding(extra, sctps);
+				fill = sctp_get_padding(sctp, extra);
 				if (fill != NULL) {
 					pad += extra;
 					new_len += extra;
@@ -1871,7 +1872,7 @@ out:
 	if (nmp == NULL)
 		goto restart_timer;
 	if (extra > 0) {
-		fill = sctp_get_padding(extra, sctps);
+		fill = sctp_get_padding(sctp, extra);
 		if (fill != NULL) {
 			linkb(nmp, fill);
 			seglen += extra;
@@ -1936,7 +1937,7 @@ try_bundle:
 			break;
 
 		if (extra > 0) {
-			fill = sctp_get_padding(extra, sctps);
+			fill = sctp_get_padding(sctp, extra);
 			if (fill != NULL) {
 				linkb(nmp, fill);
 			} else {
@@ -2075,7 +2076,6 @@ sctp_rexmit_packet(sctp_t *sctp, mblk_t **meta, mblk_t **mp, sctp_faddr_t *fp,
 	mblk_t		*fill;
 	sctp_data_hdr_t	*sdc;
 	sctp_msg_hdr_t	*mhdr;
-	sctp_stack_t	*sctps = sctp->sctp_sctps;
 
 	sdc = (sctp_data_hdr_t *)(*mp)->b_rptr;
 	seglen = ntohs(sdc->sdh_len);
@@ -2087,7 +2087,7 @@ sctp_rexmit_packet(sctp_t *sctp, mblk_t **meta, mblk_t **mp, sctp_faddr_t *fp,
 	if (nmp == NULL)
 		return (NULL);
 	if (extra > 0) {
-		fill = sctp_get_padding(extra, sctps);
+		fill = sctp_get_padding(sctp, extra);
 		if (fill != NULL) {
 			linkb(nmp, fill);
 			seglen += extra;
@@ -2160,7 +2160,7 @@ try_bundle:
 			break;
 
 		if (extra > 0) {
-			fill = sctp_get_padding(extra, sctps);
+			fill = sctp_get_padding(sctp, extra);
 			if (fill != NULL) {
 				linkb(nmp, fill);
 			} else {
