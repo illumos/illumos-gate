@@ -77,6 +77,7 @@ static void i_ldc_reset_state(ldc_chan_t *ldcp);
 static void i_ldc_reset(ldc_chan_t *ldcp, boolean_t force_reset);
 
 static int i_ldc_get_tx_tail(ldc_chan_t *ldcp, uint64_t *tail);
+static void i_ldc_get_tx_head(ldc_chan_t *ldcp, uint64_t *head);
 static int i_ldc_set_tx_tail(ldc_chan_t *ldcp, uint64_t tail);
 static int i_ldc_set_rx_head(ldc_chan_t *ldcp, uint64_t head);
 static int i_ldc_send_pkt(ldc_chan_t *ldcp, uint8_t pkttype, uint8_t subtype,
@@ -314,7 +315,6 @@ if (ldcdbg & 0x04)	\
 #define	IDX2COOKIE(idx, pg_szc, pg_shift)				\
 	(((pg_szc) << LDC_COOKIE_PGSZC_SHIFT) | ((idx) << (pg_shift)))
 
-
 int
 _init(void)
 {
@@ -384,8 +384,8 @@ int
 _fini(void)
 {
 	int 		rv, status;
-	ldc_chan_t 	*ldcp;
-	ldc_dring_t 	*dringp;
+	ldc_chan_t 	*tmp_ldcp, *ldcp;
+	ldc_dring_t 	*tmp_dringp, *dringp;
 	ldc_mem_info_t 	minfo;
 
 	/* Unlink the driver module from the system */
@@ -395,35 +395,39 @@ _fini(void)
 		return (EIO);
 	}
 
-	/* close and finalize channels */
-	ldcp = ldcssp->chan_list;
-	while (ldcp != NULL) {
-		(void) ldc_close((ldc_handle_t)ldcp);
-		(void) ldc_fini((ldc_handle_t)ldcp);
-
-		ldcp = ldcp->next;
-	}
-
 	/* Free descriptor rings */
 	dringp = ldcssp->dring_list;
 	while (dringp != NULL) {
-		dringp = dringp->next;
+		tmp_dringp = dringp->next;
 
 		rv = ldc_mem_dring_info((ldc_dring_handle_t)dringp, &minfo);
 		if (rv == 0 && minfo.status != LDC_UNBOUND) {
 			if (minfo.status == LDC_BOUND) {
 				(void) ldc_mem_dring_unbind(
-						(ldc_dring_handle_t)dringp);
+				    (ldc_dring_handle_t)dringp);
 			}
 			if (minfo.status == LDC_MAPPED) {
 				(void) ldc_mem_dring_unmap(
-						(ldc_dring_handle_t)dringp);
+				    (ldc_dring_handle_t)dringp);
 			}
 		}
 
 		(void) ldc_mem_dring_destroy((ldc_dring_handle_t)dringp);
+		dringp = tmp_dringp;
 	}
 	ldcssp->dring_list = NULL;
+
+	/* close and finalize channels */
+	ldcp = ldcssp->chan_list;
+	while (ldcp != NULL) {
+		tmp_ldcp = ldcp->next;
+
+		(void) ldc_close((ldc_handle_t)ldcp);
+		(void) ldc_fini((ldc_handle_t)ldcp);
+
+		ldcp = tmp_ldcp;
+	}
+	ldcssp->chan_list = NULL;
 
 	/* Destroy kmem caches */
 	kmem_cache_destroy(ldcssp->memhdl_cache);
@@ -543,7 +547,7 @@ i_ldc_rxq_reconf(ldc_chan_t *ldcp, boolean_t force_reset)
 
 	if (force_reset || (ldcp->tstate & ~TS_IN_RESET) == TS_UP) {
 		rv = hv_ldc_rx_qconf(ldcp->id, ldcp->rx_q_ra,
-			ldcp->rx_q_entries);
+		    ldcp->rx_q_entries);
 		if (rv) {
 			cmn_err(CE_WARN,
 			    "i_ldc_rxq_reconf: (0x%lx) cannot set qconf",
@@ -696,7 +700,7 @@ i_ldc_set_rx_head(ldc_chan_t *ldcp, uint64_t head)
 	}
 
 	cmn_err(CE_WARN, "ldc_rx_set_qhead: (0x%lx) cannot set qhead 0x%lx",
-		ldcp->id, head);
+	    ldcp->id, head);
 	mutex_enter(&ldcp->tx_lock);
 	i_ldc_reset(ldcp, B_TRUE);
 	mutex_exit(&ldcp->tx_lock);
@@ -704,6 +708,39 @@ i_ldc_set_rx_head(ldc_chan_t *ldcp, uint64_t head)
 	return (ECONNRESET);
 }
 
+/*
+ * Returns the tx_head to be used for transfer
+ */
+static void
+i_ldc_get_tx_head(ldc_chan_t *ldcp, uint64_t *head)
+{
+	ldc_msg_t 	*pkt;
+
+	ASSERT(MUTEX_HELD(&ldcp->tx_lock));
+
+	/* get current Tx head */
+	*head = ldcp->tx_head;
+
+	/*
+	 * Reliable mode will use the ACKd head instead of the regular tx_head.
+	 * Also in Reliable mode, advance ackd_head for all non DATA/INFO pkts,
+	 * up to the current location of tx_head. This needs to be done
+	 * as the peer will only ACK DATA/INFO pkts.
+	 */
+	if (ldcp->mode == LDC_MODE_RELIABLE || ldcp->mode == LDC_MODE_STREAM) {
+		while (ldcp->tx_ackd_head != ldcp->tx_head) {
+			pkt = (ldc_msg_t *)(ldcp->tx_q_va + ldcp->tx_ackd_head);
+			if ((pkt->type & LDC_DATA) && (pkt->stype & LDC_INFO)) {
+				break;
+			}
+			/* advance ACKd head */
+			ldcp->tx_ackd_head =
+			    (ldcp->tx_ackd_head + LDC_PACKET_SIZE) %
+			    (ldcp->tx_q_entries << LDC_PACKET_SHIFT);
+		}
+		*head = ldcp->tx_ackd_head;
+	}
+}
 
 /*
  * Returns the tx_tail to be used for transfer
@@ -732,14 +769,11 @@ i_ldc_get_tx_tail(ldc_chan_t *ldcp, uint64_t *tail)
 		return (ECONNRESET);
 	}
 
-	/* In reliable mode, check against last ACKd msg */
-	current_head = (ldcp->mode == LDC_MODE_RELIABLE ||
-		ldcp->mode == LDC_MODE_STREAM)
-		? ldcp->tx_ackd_head : ldcp->tx_head;
+	i_ldc_get_tx_head(ldcp, &current_head);
 
 	/* increment the tail */
 	new_tail = (ldcp->tx_tail + LDC_PACKET_SIZE) %
-		(ldcp->tx_q_entries << LDC_PACKET_SHIFT);
+	    (ldcp->tx_q_entries << LDC_PACKET_SHIFT);
 
 	if (new_tail == current_head) {
 		DWARN(ldcp->id,
@@ -796,10 +830,12 @@ i_ldc_send_pkt(ldc_chan_t *ldcp, uint8_t pkttype, uint8_t subtype,
 	int		rv;
 	ldc_msg_t 	*pkt;
 	uint64_t	tx_tail;
-	uint32_t	curr_seqid = ldcp->last_msg_snt;
+	uint32_t	curr_seqid;
 
 	/* Obtain Tx lock */
 	mutex_enter(&ldcp->tx_lock);
+
+	curr_seqid = ldcp->last_msg_snt;
 
 	/* get the current tail for the message */
 	rv = i_ldc_get_tx_tail(ldcp, &tx_tail);
@@ -833,7 +869,7 @@ i_ldc_send_pkt(ldc_chan_t *ldcp, uint8_t pkttype, uint8_t subtype,
 
 	/* initiate the send by calling into HV and set the new tail */
 	tx_tail = (tx_tail + LDC_PACKET_SIZE) %
-		(ldcp->tx_q_entries << LDC_PACKET_SHIFT);
+	    (ldcp->tx_q_entries << LDC_PACKET_SHIFT);
 
 	rv = i_ldc_set_tx_tail(ldcp, tx_tail);
 	if (rv) {
@@ -955,7 +991,7 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 				 */
 				if (rcvd_ver->minor > ldc_versions[idx].minor)
 					rcvd_ver->minor =
-						ldc_versions[idx].minor;
+					    ldc_versions[idx].minor;
 				bcopy(rcvd_ver, pkt->udata, sizeof (*rcvd_ver));
 
 				break;
@@ -992,7 +1028,7 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 
 		/* initiate the send by calling into HV and set the new tail */
 		tx_tail = (tx_tail + LDC_PACKET_SIZE) %
-			(ldcp->tx_q_entries << LDC_PACKET_SHIFT);
+		    (ldcp->tx_q_entries << LDC_PACKET_SHIFT);
 
 		rv = i_ldc_set_tx_tail(ldcp, tx_tail);
 		if (rv == 0) {
@@ -1024,12 +1060,12 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 	case LDC_ACK:
 		if ((ldcp->tstate & ~TS_IN_RESET) == TS_VREADY) {
 			if (ldcp->version.major != rcvd_ver->major ||
-				ldcp->version.minor != rcvd_ver->minor) {
+			    ldcp->version.minor != rcvd_ver->minor) {
 
 				/* mismatched version - reset connection */
 				DWARN(ldcp->id,
-					"i_ldc_process_VER: (0x%llx) recvd"
-					" ACK ver != sent ACK ver\n", ldcp->id);
+				    "i_ldc_process_VER: (0x%llx) recvd"
+				    " ACK ver != sent ACK ver\n", ldcp->id);
 				i_ldc_reset(ldcp, B_TRUE);
 				mutex_exit(&ldcp->tx_lock);
 				return (ECONNRESET);
@@ -1071,7 +1107,7 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 
 		/* initiate the send by calling into HV and set the new tail */
 		tx_tail = (tx_tail + LDC_PACKET_SIZE) %
-			(ldcp->tx_q_entries << LDC_PACKET_SHIFT);
+		    (ldcp->tx_q_entries << LDC_PACKET_SHIFT);
 
 		rv = i_ldc_set_tx_tail(ldcp, tx_tail);
 		if (rv) {
@@ -1129,10 +1165,9 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 				 */
 				if (rcvd_ver->minor > ldc_versions[idx].minor)
 					rcvd_ver->minor =
-						ldc_versions[idx].minor;
+					    ldc_versions[idx].minor;
 				bcopy(rcvd_ver, pkt->udata, sizeof (*rcvd_ver));
 				break;
-
 			}
 
 			if (rcvd_ver->major > ldc_versions[idx].major) {
@@ -1164,7 +1199,7 @@ i_ldc_process_VER(ldc_chan_t *ldcp, ldc_msg_t *msg)
 
 		/* initiate the send by calling into HV and set the new tail */
 		tx_tail = (tx_tail + LDC_PACKET_SIZE) %
-			(ldcp->tx_q_entries << LDC_PACKET_SHIFT);
+		    (ldcp->tx_q_entries << LDC_PACKET_SHIFT);
 
 		rv = i_ldc_set_tx_tail(ldcp, tx_tail);
 		if (rv == 0) {
@@ -1292,7 +1327,7 @@ i_ldc_process_RTS(ldc_chan_t *ldcp, ldc_msg_t *msg)
 
 	/* initiate the send by calling into HV and set the new tail */
 	tx_tail = (tx_tail + LDC_PACKET_SIZE) %
-		(ldcp->tx_q_entries << LDC_PACKET_SHIFT);
+	    (ldcp->tx_q_entries << LDC_PACKET_SHIFT);
 
 	rv = i_ldc_set_tx_tail(ldcp, tx_tail);
 	if (rv == 0) {
@@ -1518,7 +1553,7 @@ i_ldc_process_data_ACK(ldc_chan_t *ldcp, ldc_msg_t *msg)
 	for (;;) {
 		pkt = (ldc_msg_t *)(ldcp->tx_q_va + tx_head);
 		tx_head = (tx_head + LDC_PACKET_SIZE) %
-			(ldcp->tx_q_entries << LDC_PACKET_SHIFT);
+		    (ldcp->tx_q_entries << LDC_PACKET_SHIFT);
 
 		if (pkt->seqid == msg->ackid) {
 			D2(ldcp->id,
@@ -1836,10 +1871,10 @@ i_ldc_tx_hdlr(caddr_t arg1, caddr_t arg2)
 		notify_client = B_FALSE;
 
 	i_ldc_clear_intr(ldcp, CNEX_TX_INTR);
+	mutex_exit(&ldcp->tx_lock);
 
 	if (notify_client) {
 		ldcp->cb_inprogress = B_TRUE;
-		mutex_exit(&ldcp->tx_lock);
 		mutex_exit(&ldcp->lock);
 		rv = ldcp->cb(notify_event, ldcp->cb_arg);
 		if (rv) {
@@ -1993,7 +2028,7 @@ force_reset:
 
 				/* move the head one position */
 				rx_head = (rx_head + LDC_PACKET_SIZE) %
-				(ldcp->rx_q_entries << LDC_PACKET_SHIFT);
+				    (ldcp->rx_q_entries << LDC_PACKET_SHIFT);
 
 				if (rv = i_ldc_set_rx_head(ldcp, rx_head))
 					break;
@@ -2023,13 +2058,13 @@ force_reset:
 			/*
 			 * Send a NACK due to seqid mismatch
 			 */
-			rv = i_ldc_send_pkt(ldcp, LDC_CTRL, LDC_NACK,
+			rv = i_ldc_send_pkt(ldcp, msg->type, LDC_NACK,
 			    (msg->ctrl & LDC_CTRL_MASK));
 
 			if (rv) {
 				cmn_err(CE_NOTE,
 				    "i_ldc_rx_hdlr: (0x%lx) err sending "
-				    "CTRL/NACK msg\n", ldcp->id);
+				    "CTRL/DATA NACK msg\n", ldcp->id);
 
 				/* if cannot send NACK - reset channel */
 				mutex_enter(&ldcp->tx_lock);
@@ -2101,7 +2136,7 @@ force_reset:
 
 		/* move the head one position */
 		rx_head = (rx_head + LDC_PACKET_SIZE) %
-			(ldcp->rx_q_entries << LDC_PACKET_SHIFT);
+		    (ldcp->rx_q_entries << LDC_PACKET_SHIFT);
 		if (rv = i_ldc_set_rx_head(ldcp, rx_head)) {
 			notify_client = B_TRUE;
 			notify_event = LDC_EVT_RESET;
@@ -2290,18 +2325,27 @@ ldc_init(uint64_t id, ldc_attr_t *attr, ldc_handle_t *handle)
 	/*
 	 * qlen is (mtu * ldc_mtu_msgs) / pkt_payload. If this
 	 * value is smaller than default length of ldc_queue_entries,
-	 * qlen is set to ldc_queue_entries..
+	 * qlen is set to ldc_queue_entries. Ensure that computed
+	 * length is a power-of-two value.
 	 */
 	qlen = (ldcp->mtu * ldc_mtu_msgs) / ldcp->pkt_payload;
+	if (!ISP2(qlen)) {
+		uint64_t	tmp = 1;
+		while (qlen) {
+			qlen >>= 1; tmp <<= 1;
+		}
+		qlen = tmp;
+	}
+
 	ldcp->rx_q_entries =
-		(qlen < ldc_queue_entries) ? ldc_queue_entries : qlen;
+	    (qlen < ldc_queue_entries) ? ldc_queue_entries : qlen;
 	ldcp->tx_q_entries = ldcp->rx_q_entries;
 
-	D1(ldcp->id, "ldc_init: queue length = 0x%llx\n", qlen);
+	D1(ldcp->id, "ldc_init: queue length = 0x%llx\n", ldcp->rx_q_entries);
 
 	/* Create a transmit queue */
 	ldcp->tx_q_va = (uint64_t)
-		contig_mem_alloc(ldcp->tx_q_entries << LDC_PACKET_SHIFT);
+	    contig_mem_alloc(ldcp->tx_q_entries << LDC_PACKET_SHIFT);
 	if (ldcp->tx_q_va == NULL) {
 		cmn_err(CE_WARN,
 		    "ldc_init: (0x%lx) TX queue allocation failed\n",
@@ -2318,7 +2362,7 @@ ldc_init(uint64_t id, ldc_attr_t *attr, ldc_handle_t *handle)
 
 	/* Create a receive queue */
 	ldcp->rx_q_va = (uint64_t)
-		contig_mem_alloc(ldcp->rx_q_entries << LDC_PACKET_SHIFT);
+	    contig_mem_alloc(ldcp->rx_q_entries << LDC_PACKET_SHIFT);
 	if (ldcp->rx_q_va == NULL) {
 		cmn_err(CE_WARN,
 		    "ldc_init: (0x%lx) RX queue allocation failed\n",
@@ -3019,7 +3063,7 @@ ldc_up(ldc_handle_t handle)
 
 	/* initiate the send by calling into HV and set the new tail */
 	tx_tail = (tx_tail + LDC_PACKET_SIZE) %
-		(ldcp->tx_q_entries << LDC_PACKET_SHIFT);
+	    (ldcp->tx_q_entries << LDC_PACKET_SHIFT);
 
 	rv = i_ldc_set_tx_tail(ldcp, tx_tail);
 	if (rv) {
@@ -3303,8 +3347,8 @@ i_ldc_read_raw(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 		return (EIO);
 	}
 	D1(ldcp->id, "ldc_read_raw: (0x%llx) rxh=0x%llx,"
-		" rxt=0x%llx, st=0x%llx\n",
-		ldcp->id, rx_head, rx_tail, ldcp->link_state);
+	    " rxt=0x%llx, st=0x%llx\n",
+	    ldcp->id, rx_head, rx_tail, ldcp->link_state);
 
 	/* reset the channel state if the channel went down */
 	if (ldcp->link_state == LDC_CHANNEL_DOWN ||
@@ -3425,8 +3469,7 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 					*sizep = 0;
 					ldcp->last_msg_rcd = first_fragment - 1;
 					DWARN(DBG_ALL_LDCS, "ldc_read: "
-						"(0x%llx) read timeout",
-						ldcp->id);
+					    "(0x%llx) read timeout", ldcp->id);
 					return (EAGAIN);
 				}
 				*sizep = 0;
@@ -3525,9 +3568,9 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 		if ((msg->type & LDC_DATA) && (msg->stype & LDC_INFO)) {
 
 			uint8_t *msgbuf = (uint8_t *)(
-				(ldcp->mode == LDC_MODE_RELIABLE ||
-				ldcp->mode == LDC_MODE_STREAM)
-				? msg->rdata : msg->udata);
+			    (ldcp->mode == LDC_MODE_RELIABLE ||
+			    ldcp->mode == LDC_MODE_STREAM) ?
+			    msg->rdata : msg->udata);
 
 			D2(ldcp->id,
 			    "ldc_read: (0x%llx) received data msg\n", ldcp->id);
@@ -3562,10 +3605,10 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 					bytes_read = 0;
 					target = target_bufp;
 					curr_head =
-						(curr_head + LDC_PACKET_SIZE)
-						& q_size_mask;
+					    (curr_head + LDC_PACKET_SIZE)
+					    & q_size_mask;
 					if (rv = i_ldc_set_rx_head(ldcp,
-						curr_head))
+					    curr_head))
 						break;
 
 					continue;
@@ -3589,7 +3632,7 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 					first_fragment = msg->seqid;
 
 					if (rv = i_ldc_set_rx_head(ldcp,
-						curr_head))
+					    curr_head))
 						break;
 				}
 			}
@@ -3667,7 +3710,7 @@ i_ldc_read_packet(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 	 * OPTIMIZE: do not send ACK for all msgs - use some frequency
 	 */
 	if ((bytes_read > 0) && (ldcp->mode == LDC_MODE_RELIABLE ||
-		ldcp->mode == LDC_MODE_STREAM)) {
+	    ldcp->mode == LDC_MODE_STREAM)) {
 
 		rv = i_ldc_send_pkt(ldcp, LDC_DATA, LDC_ACK, 0);
 		if (rv && rv != EWOULDBLOCK) {
@@ -3706,14 +3749,14 @@ i_ldc_read_stream(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 	ASSERT(mutex_owned(&ldcp->lock));
 
 	D2(ldcp->id, "i_ldc_read_stream: (0x%llx) buffer size=%d",
-		ldcp->id, *sizep);
+	    ldcp->id, *sizep);
 
 	if (ldcp->stream_remains == 0) {
 		size = ldcp->mtu;
 		rv = i_ldc_read_packet(ldcp,
-			(caddr_t)ldcp->stream_bufferp, &size);
+		    (caddr_t)ldcp->stream_bufferp, &size);
 		D2(ldcp->id, "i_ldc_read_stream: read packet (0x%llx) size=%d",
-			ldcp->id, size);
+		    ldcp->id, size);
 
 		if (rv != 0)
 			return (rv);
@@ -3729,7 +3772,7 @@ i_ldc_read_stream(ldc_chan_t *ldcp, caddr_t target_bufp, size_t *sizep)
 	ldcp->stream_remains -= size;
 
 	D2(ldcp->id, "i_ldc_read_stream: (0x%llx) fill from buffer size=%d",
-		ldcp->id, size);
+	    ldcp->id, size);
 
 	*sizep = size;
 	return (0);
@@ -3861,7 +3904,7 @@ i_ldc_write_raw(ldc_chan_t *ldcp, caddr_t buf, size_t *sizep)
 	tx_tail = ldcp->tx_tail;
 	tx_head = ldcp->tx_head;
 	new_tail = (tx_tail + LDC_PACKET_SIZE) &
-		((ldcp->tx_q_entries-1) << LDC_PACKET_SHIFT);
+	    ((ldcp->tx_q_entries-1) << LDC_PACKET_SHIFT);
 
 	if (new_tail == tx_head) {
 		DWARN(DBG_ALL_LDCS,
@@ -3945,8 +3988,8 @@ i_ldc_write_packet(ldc_chan_t *ldcp, caddr_t buf, size_t *size)
 	ASSERT(MUTEX_HELD(&ldcp->tx_lock));
 
 	ASSERT(ldcp->mode == LDC_MODE_RELIABLE ||
-		ldcp->mode == LDC_MODE_UNRELIABLE ||
-		ldcp->mode == LDC_MODE_STREAM);
+	    ldcp->mode == LDC_MODE_UNRELIABLE ||
+	    ldcp->mode == LDC_MODE_STREAM);
 
 	/* compute mask for increment */
 	txq_size_mask = (ldcp->tx_q_entries - 1) << LDC_PACKET_SHIFT;
@@ -3985,16 +4028,14 @@ i_ldc_write_packet(ldc_chan_t *ldcp, caddr_t buf, size_t *size)
 
 	tx_tail = ldcp->tx_tail;
 	new_tail = (tx_tail + LDC_PACKET_SIZE) %
-		(ldcp->tx_q_entries << LDC_PACKET_SHIFT);
+	    (ldcp->tx_q_entries << LDC_PACKET_SHIFT);
 
 	/*
-	 * Link mode determines whether we use HV Tx head or the
-	 * private protocol head (corresponding to last ACKd pkt) for
-	 * determining how much we can write
+	 * Check to see if the queue is full. The check is done using
+	 * the appropriate head based on the link mode.
 	 */
-	tx_head = (ldcp->mode == LDC_MODE_RELIABLE ||
-		ldcp->mode == LDC_MODE_STREAM)
-		? ldcp->tx_ackd_head : ldcp->tx_head;
+	i_ldc_get_tx_head(ldcp, &tx_head);
+
 	if (new_tail == tx_head) {
 		DWARN(DBG_ALL_LDCS,
 		    "ldc_write: (0x%llx) TX queue is full\n", ldcp->id);
@@ -4006,7 +4047,7 @@ i_ldc_write_packet(ldc_chan_t *ldcp, caddr_t buf, size_t *size)
 	 * Make sure that the LDC Tx queue has enough space
 	 */
 	numavail = (tx_head >> LDC_PACKET_SHIFT) - (tx_tail >> LDC_PACKET_SHIFT)
-		+ ldcp->tx_q_entries - 1;
+	    + ldcp->tx_q_entries - 1;
 	numavail %= ldcp->tx_q_entries;
 
 	if (*size > (numavail * ldcp->pkt_payload)) {
@@ -4028,8 +4069,8 @@ i_ldc_write_packet(ldc_chan_t *ldcp, caddr_t buf, size_t *size)
 		ldcmsg = (ldc_msg_t *)(ldcp->tx_q_va + tx_tail);
 
 		msgbuf = (uint8_t *)((ldcp->mode == LDC_MODE_RELIABLE ||
-			ldcp->mode == LDC_MODE_STREAM)
-			? ldcmsg->rdata : ldcmsg->udata);
+		    ldcp->mode == LDC_MODE_STREAM) ?
+		    ldcmsg->rdata : ldcmsg->udata);
 
 		ldcmsg->type = LDC_DATA;
 		ldcmsg->stype = LDC_INFO;
@@ -4091,16 +4132,16 @@ i_ldc_write_packet(ldc_chan_t *ldcp, caddr_t buf, size_t *size)
 		}
 
 		D1(ldcp->id, "hv_tx_set_tail returns 0x%x (head 0x%x, "
-			"old tail 0x%x, new tail 0x%x, qsize=0x%x)\n",
-			rv, ldcp->tx_head, ldcp->tx_tail, tx_tail,
-			(ldcp->tx_q_entries << LDC_PACKET_SHIFT));
+		    "old tail 0x%x, new tail 0x%x, qsize=0x%x)\n",
+		    rv, ldcp->tx_head, ldcp->tx_tail, tx_tail,
+		    (ldcp->tx_q_entries << LDC_PACKET_SHIFT));
 
 		rv2 = hv_ldc_tx_get_state(ldcp->id,
 		    &tx_head, &tx_tail, &ldcp->link_state);
 
 		D1(ldcp->id, "hv_ldc_tx_get_state returns 0x%x "
-			"(head 0x%x, tail 0x%x state 0x%x)\n",
-			rv2, tx_head, tx_tail, ldcp->link_state);
+		    "(head 0x%x, tail 0x%x state 0x%x)\n",
+		    rv2, tx_head, tx_tail, ldcp->link_state);
 
 		*size = 0;
 	}
@@ -4414,7 +4455,7 @@ ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 
 		/* Allocate the table itself */
 		mtbl->table = (ldc_mte_slot_t *)
-			contig_mem_alloc_align(mtbl->size, MMU_PAGESIZE);
+		    contig_mem_alloc_align(mtbl->size, MMU_PAGESIZE);
 		if (mtbl->table == NULL) {
 
 			/* allocate a page of memory using kmem_alloc */
@@ -4422,7 +4463,7 @@ ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 			mtbl->size = MMU_PAGESIZE;
 			mtbl->contigmem = B_FALSE;
 			mtbl->num_entries = mtbl->num_avail =
-				mtbl->size / sizeof (ldc_mte_slot_t);
+			    mtbl->size / sizeof (ldc_mte_slot_t);
 			DWARN(ldcp->id,
 			    "ldc_mem_bind_handle: (0x%llx) reduced tbl size "
 			    "to %lx entries\n", ldcp->id, mtbl->num_entries);
@@ -4494,12 +4535,12 @@ ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 
 	/* Allocate a memseg structure */
 	memseg = mhdl->memseg =
-		kmem_cache_alloc(ldcssp->memseg_cache, KM_SLEEP);
+	    kmem_cache_alloc(ldcssp->memseg_cache, KM_SLEEP);
 
 	/* Allocate memory to store all pages and cookies */
 	memseg->pages = kmem_zalloc((sizeof (ldc_page_t) * npages), KM_SLEEP);
 	memseg->cookies =
-		kmem_zalloc((sizeof (ldc_mem_cookie_t) * npages), KM_SLEEP);
+	    kmem_zalloc((sizeof (ldc_mem_cookie_t) * npages), KM_SLEEP);
 
 	D2(ldcp->id, "ldc_mem_bind_handle: (0x%llx) processing 0x%llx pages\n",
 	    ldcp->id, npages);
@@ -4603,7 +4644,7 @@ ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 		} else if (i == (npages - 1)) {
 			/* last page */
 			psize =	(((uintptr_t)(vaddr + len)) &
-				    ((uint64_t)(pg_size-1)));
+			    ((uint64_t)(pg_size-1)));
 			if (psize == 0)
 				psize = pg_size;
 			poffset = 0;
@@ -4625,7 +4666,7 @@ ldc_mem_bind_handle(ldc_mem_handle_t mhandle, caddr_t vaddr, size_t len,
 		if (i == 0 || (index != prev_index + 1)) {
 			cookie_idx++;
 			memseg->cookies[cookie_idx].addr =
-				IDX2COOKIE(index, pg_size_code, pg_shift);
+			    IDX2COOKIE(index, pg_size_code, pg_shift);
 			memseg->cookies[cookie_idx].addr |= poffset;
 			memseg->cookies[cookie_idx].size = psize;
 
@@ -5052,7 +5093,7 @@ ldc_mem_copy(ldc_handle_t handle, caddr_t vaddr, uint64_t off, size_t *size,
 				export_caddr = cookie_addr & ~(pg_size - 1);
 				export_poff = cookie_addr & (pg_size - 1);
 				export_psize =
-					min(cookie_size, (pg_size-export_poff));
+				    min(cookie_size, (pg_size-export_poff));
 			} else {
 				export_caddr += pg_size;
 				export_poff = 0;
@@ -5311,12 +5352,12 @@ ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie, uint32_t ccount,
 
 	/* Allocate memseg structure */
 	memseg = mhdl->memseg =
-		kmem_cache_alloc(ldcssp->memseg_cache, KM_SLEEP);
+	    kmem_cache_alloc(ldcssp->memseg_cache, KM_SLEEP);
 
 	/* Allocate memory to store all pages and cookies */
 	memseg->pages =	kmem_zalloc((sizeof (ldc_page_t) * npages), KM_SLEEP);
 	memseg->cookies =
-		kmem_zalloc((sizeof (ldc_mem_cookie_t) * ccount), KM_SLEEP);
+	    kmem_zalloc((sizeof (ldc_mem_cookie_t) * ccount), KM_SLEEP);
 
 	D2(ldcp->id, "ldc_mem_map: (0x%llx) exp_size=0x%llx, map_size=0x%llx,"
 	    "pages=0x%llx\n", ldcp->id, exp_size, map_size, npages);
@@ -5370,7 +5411,7 @@ ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie, uint32_t ccount,
 				cookie_off = cookie[idx].addr & (pg_size - 1);
 				cookie_size =
 				    P2ROUNDUP((cookie_off + cookie[idx].size),
-					pg_size);
+				    pg_size);
 				idx++;
 			}
 
@@ -5400,12 +5441,12 @@ ldc_mem_map(ldc_mem_handle_t mhandle, ldc_mem_cookie_t *cookie, uint32_t ccount,
 				    HAT_UNLOAD_NOSYNC | HAT_UNLOAD_UNLOCK);
 				for (j = 0; j < i; j++) {
 					rv = hv_ldc_unmap(
-							memseg->pages[j].raddr);
+					    memseg->pages[j].raddr);
 					if (rv) {
 						DWARN(ldcp->id,
 						    "ldc_mem_map: (0x%llx) "
 						    "cannot unmap ra=0x%llx\n",
-					    ldcp->id,
+						    ldcp->id,
 						    memseg->pages[j].raddr);
 					}
 				}
@@ -6290,7 +6331,7 @@ i_ldc_dring_acquire_release(ldc_dring_handle_t dhandle,
 	ldcp = dringp->ldcp;
 
 	copy_size = (start <= end) ? (((end - start) + 1) * dringp->dsize) :
-		((dringp->length - start) * dringp->dsize);
+	    ((dringp->length - start) * dringp->dsize);
 
 	/* Calculate the relative offset for the first desc */
 	soff = (start * dringp->dsize);
