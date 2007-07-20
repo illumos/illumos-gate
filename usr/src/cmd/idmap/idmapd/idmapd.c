@@ -288,15 +288,11 @@ init_idmapd() {
 		exit(1);
 	}
 
-	setegid(DAEMON_GID);
-	seteuid(DAEMON_UID);
 	if (init_mapping_system() < 0) {
 		idmapdlog(LOG_ERR,
 		"idmapd: unable to initialize mapping system");
 		exit(1);
 	}
-	seteuid(0);
-	setegid(0);
 
 	xprt = svc_door_create(idmap_prog_1, IDMAP_PROG, IDMAP_V1, 0);
 	if (xprt == NULL) {

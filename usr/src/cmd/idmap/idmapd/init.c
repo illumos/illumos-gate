@@ -38,20 +38,29 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <rpcsvc/daemon_utils.h>
 
 static const char *me = "idmapd";
 
 int
 init_mapping_system() {
+	int rc = 0;
+
 	if (rwlock_init(&_idmapdstate.rwlk_cfg, USYNC_THREAD, NULL) != 0)
 		return (-1);
 	if (load_config() < 0)
 		return (-1);
+
+	(void) setegid(DAEMON_GID);
+	(void) seteuid(DAEMON_UID);
 	if (init_dbs() < 0) {
+		rc = -1;
 		fini_mapping_system();
-		return (-1);
 	}
-	return (0);
+	(void) seteuid(0);
+	(void) setegid(0);
+
+	return (rc);
 }
 
 void

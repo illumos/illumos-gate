@@ -658,7 +658,7 @@ idmap_iter_next_mapping(idmap_iter_t *iter, char **sidprefix,
 	if (sidprefix) {
 		str = mappings->mappings.mappings_val[iter->next].id1.
 			idmap_id_u.sid.prefix;
-		if (str) {
+		if (str && *str != '\0') {
 			*sidprefix = strdup(str);
 			if (*sidprefix == NULL) {
 				retcode = IDMAP_ERR_MEMORY;
@@ -1124,7 +1124,8 @@ idmap_get_mappings(idmap_get_handle_t *gh) {
 			if (gh->retlist[i].rid)
 				*gh->retlist[i].rid = id->idmap_id_u.sid.rid;
 			if (gh->retlist[i].sidprefix) {
-				if (id->idmap_id_u.sid.prefix == NULL) {
+				if (id->idmap_id_u.sid.prefix == NULL ||
+				    *id->idmap_id_u.sid.prefix == '\0') {
 					*gh->retlist[i].sidprefix = NULL;
 					break;
 				}
@@ -1340,7 +1341,8 @@ idmap_get_u2w_mapping(idmap_handle_t *handle,
 
 	if (direction)
 		*direction = mapping->direction;
-	if (sidprefix && mapping->id2.idmap_id_u.sid.prefix) {
+	if (sidprefix && mapping->id2.idmap_id_u.sid.prefix &&
+	    *mapping->id2.idmap_id_u.sid.prefix != '\0') {
 		*sidprefix = strdup(mapping->id2.idmap_id_u.sid.prefix);
 		if (*sidprefix == NULL) {
 			retcode = IDMAP_ERR_MEMORY;
@@ -1404,7 +1406,7 @@ idmap_utf82str(char **out, size_t outsize, idmap_utf8str *in) {
 			return (IDMAP_SUCCESS);
 		if (in->idmap_utf8str_val == NULL)
 			return (IDMAP_ERR_ARG);
-		if (in->idmap_utf8str_val[len - 1] != 0)
+		if (in->idmap_utf8str_val[len - 1] != '\0')
 			len++;
 		*out = calloc(1, len);
 		if (*out == NULL)
@@ -1417,7 +1419,7 @@ idmap_utf82str(char **out, size_t outsize, idmap_utf8str *in) {
 			return (IDMAP_SUCCESS);
 		if (in->idmap_utf8str_val == NULL)
 			return (IDMAP_ERR_ARG);
-		if (in->idmap_utf8str_val[len - 1] != 0)
+		if (in->idmap_utf8str_val[len - 1] != '\0')
 			len++;
 		if (outsize < len)
 			return (IDMAP_ERR_ARG);
@@ -1501,7 +1503,7 @@ static stat_table_t stattable[] = {
 	{IDMAP_ERR_RPC, gettext("RPC error"), EINVAL},
 	{IDMAP_ERR_CLIENT_HANDLE, gettext("Bad client handle"), EINVAL},
 	{IDMAP_ERR_BUSY, gettext("Server is busy"), EBUSY},
-	{IDMAP_ERR_PERMISSION_DENIED, gettext("Permisssion denied"), EACCES},
+	{IDMAP_ERR_PERMISSION_DENIED, gettext("Permission denied"), EACCES},
 	{IDMAP_ERR_NOMAPPING,
 		gettext("Mapping not found or inhibited"), EINVAL},
 	{IDMAP_ERR_NEW_ID_ALLOC_REQD,

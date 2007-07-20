@@ -60,7 +60,7 @@ $(POFILE) := CPPFLAGS += $(INCS)
 CLOBBERFILES += $(IDMAP_PROT_H)
 
 CFLAGS += -v
-LDLIBS += -lsecdb -lnsl -lidmap -lscf -lldap
+LDLIBS += -lsecdb -lnsl -lidmap -lscf -lldap -luuid
 
 $(PROG) := MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
 $(PROG) := LDFLAGS += $(MAPFILES:%=-M%)

@@ -41,16 +41,54 @@
 #include "idmapd.h"
 #include <stdio.h>
 #include <stdarg.h>
+#include <uuid/uuid.h>
 
+#define	MACHINE_SID_LEN	(9 + UUID_LEN/4 * 11)
 #define	FMRI_BASE "svc:/system/idmap"
-
 #define	CONFIG_PG "config"
 #define	GENERAL_PG "general"
-
 /* initial length of the array for policy options/attributes: */
 #define	DEF_ARRAY_LENGTH 16
 
 static const char *me = "idmapd";
+
+static int
+generate_machine_sid(char **machine_sid) {
+	char *p;
+	uuid_t uu;
+	int i, j, len, rlen;
+	uint32_t rid;
+
+	/*
+	 * Generate and split 128-bit UUID into four 32-bit RIDs
+	 * The machine_sid will be of the form S-1-5-N1-N2-N3-N4
+	 * We depart from Windows here, which instead of 128
+	 * bits worth of random numbers uses 96 bits.
+	 */
+
+	*machine_sid = calloc(1, MACHINE_SID_LEN);
+	if (*machine_sid == NULL) {
+		idmapdlog(LOG_ERR, "%s: Out of memory", me);
+		return (-1);
+	}
+	(void) strcpy(*machine_sid, "S-1-5-21");
+	p = *machine_sid + strlen("S-1-5-21");
+	len = MACHINE_SID_LEN - strlen("S-1-5-21");
+
+	uuid_clear(uu);
+	uuid_generate_random(uu);
+
+	for (i = 0; i < UUID_LEN/4; i++) {
+		j = i * 4;
+		rid = (uu[j] << 24) | (uu[j + 1] << 16) |
+			(uu[j + 2] << 8) | (uu[j + 3]);
+		rlen = snprintf(p, len, "-%u", rid);
+		p += rlen;
+		len -= rlen;
+	}
+
+	return (0);
+}
 
 /* Check if in the case of failure the original value of *val is preserved */
 static int
@@ -177,6 +215,96 @@ destruction:
 	return (rc);
 }
 
+static int
+set_val_astring(idmap_cfg_t *cfg, char *name, const char *val)
+{
+	int			rc = 0, i;
+	scf_property_t		*scf_prop = NULL;
+	scf_value_t		*value = NULL;
+	scf_transaction_t	*tx = NULL;
+	scf_transaction_entry_t	*ent = NULL;
+
+	if ((scf_prop = scf_property_create(cfg->handles.main)) == NULL ||
+	    (value = scf_value_create(cfg->handles.main)) == NULL ||
+	    (tx = scf_transaction_create(cfg->handles.main)) == NULL ||
+	    (ent = scf_entry_create(cfg->handles.main)) == NULL) {
+		idmapdlog(LOG_ERR, "%s: Unable to set property %s: %s",
+		    me, name, scf_strerror(scf_error()));
+		rc = -1;
+		goto destruction;
+	}
+
+	for (i = 0; i < MAX_TRIES && rc == 0; i++) {
+		if (scf_transaction_start(tx, cfg->handles.config_pg) == -1) {
+			idmapdlog(LOG_ERR,
+			    "%s: scf_transaction_start(%s) failed: %s",
+			    me, name, scf_strerror(scf_error()));
+			rc = -1;
+			goto destruction;
+		}
+
+		rc = scf_transaction_property_new(tx, ent, name,
+		    SCF_TYPE_ASTRING);
+		if (rc == -1) {
+			idmapdlog(LOG_ERR,
+			    "%s: scf_transaction_property_new() failed: %s",
+			    me, scf_strerror(scf_error()));
+			goto destruction;
+		}
+
+		if (scf_value_set_astring(value, val) == -1) {
+			idmapdlog(LOG_ERR,
+			    "%s: scf_value_set_astring() failed: %s",
+			    me, scf_strerror(scf_error()));
+			rc = -1;
+			goto destruction;
+		}
+
+		if (scf_entry_add_value(ent, value) == -1) {
+			idmapdlog(LOG_ERR,
+			    "%s: scf_entry_add_value() failed: %s",
+			    me, scf_strerror(scf_error()));
+			rc = -1;
+			goto destruction;
+		}
+
+		rc = scf_transaction_commit(tx);
+		if (rc == 0 && i < MAX_TRIES - 1) {
+			/*
+			 * Property group set in scf_transaction_start()
+			 * is not the most recent. Update pg, reset tx and
+			 * retry tx.
+			 */
+			idmapdlog(LOG_WARNING,
+			    "%s: scf_transaction_commit(%s) failed - Retry: %s",
+			    me, name, scf_strerror(scf_error()));
+			if (scf_pg_update(cfg->handles.config_pg) == -1) {
+				idmapdlog(LOG_ERR,
+				    "%s: scf_pg_update() failed: %s",
+				    me, scf_strerror(scf_error()));
+				rc = -1;
+				goto destruction;
+			}
+			scf_transaction_reset(tx);
+		}
+	}
+
+	/* Log failure message if all retries failed */
+	if (rc == 0) {
+		idmapdlog(LOG_ERR,
+		    "%s: scf_transaction_commit(%s) failed: %s",
+		    me, name, scf_strerror(scf_error()));
+		rc = -1;
+	}
+
+destruction:
+	scf_value_destroy(value);
+	scf_entry_destroy(ent);
+	scf_transaction_destroy(tx);
+	scf_property_destroy(scf_prop);
+	return (rc);
+}
+
 int
 idmap_cfg_load(idmap_cfg_t *cfg)
 {
@@ -237,6 +365,18 @@ idmap_cfg_load(idmap_cfg_t *cfg)
 	rc = get_val_astring(cfg, "machine_sid", &cfg->pgcfg.machine_sid);
 	if (rc != 0)
 		return (-1);
+	if (cfg->pgcfg.machine_sid == NULL) {
+		/* If machine_sid not configured, generate one */
+		if (generate_machine_sid(&cfg->pgcfg.machine_sid) < 0)
+			return (-1);
+		rc = set_val_astring(cfg, "machine_sid",
+		    cfg->pgcfg.machine_sid);
+		if (rc < 0) {
+			free(cfg->pgcfg.machine_sid);
+			cfg->pgcfg.machine_sid = NULL;
+			return (-1);
+		}
+	}
 
 	rc = get_val_astring(cfg, "global_catalog", &cfg->pgcfg.global_catalog);
 	if (rc != 0)

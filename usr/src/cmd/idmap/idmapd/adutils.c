@@ -483,9 +483,9 @@ idmap_open_conn(ad_host_t *adh)
 		    &idmap_saslcallback, NULL /* defaults */);
 
 		if (rc != LDAP_SUCCESS) {
-			idmapdlog(LOG_ERR, "Could not authenticate to the "
-			    "LDAP server.  (Check that the host keys are "
-			    "correct?)");
+			idmapdlog(LOG_ERR, "ldap_sasl_interactive_bind_s() "
+			    "to server %s:%d failed. (%s)",
+			    adh->host, adh->port, ldap_err2string(rc));
 			return (rc);
 		}
 	}
