@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 #include <assert.h>
 #include <syslog.h>
 #include <synch.h>
+#include <time.h>
 #include <umem.h>
 
 #include "queue.h"
@@ -40,6 +41,11 @@
 #include "utility.h"
 #include "target.h"
 #include "t10.h"
+
+/*
+ * Constants
+ */
+static const timespec_t usec = {0, 1000};
 
 FILE *qlog = NULL;
 int qlog_lvl = 0;
@@ -137,7 +143,7 @@ queue_message_get(target_queue_t *q)
 	msg_t *m;
 
 	while (sema_wait(&q->q_sema) == -1)
-		(void) sleep(1);
+		(void) nanosleep(&usec, 0);
 	(void) pthread_mutex_lock(&q->q_mutex);
 	m = q->q_head;
 	if (m == NULL) {

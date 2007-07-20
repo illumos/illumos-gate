@@ -48,6 +48,7 @@
 #include <libzfs.h>
 #include <assert.h>
 #include <umem.h>
+#include <time.h>
 
 #include <sys/scsi/generic/sense.h>
 #include <sys/scsi/generic/status.h>
@@ -109,6 +110,11 @@ static int		t10_num;
 static sema_t		t10_sema;
 
 /*
+ * Constants
+ */
+static const timespec_t usec = {0, 1000};
+
+/*
  * []----
  * | t10_init -- called once at the beginning of time to initialize globals
  * []----
@@ -149,11 +155,10 @@ t10_aio_done(void *v)
 				/*
 				 * It's possible for aiowait to return
 				 * prematurely. So, post another semaphore,
-				 * sleep for a second, and try the wait
-				 * again.
+				 * nanosleep for a usec, and try the wait again.
 				 */
 				(void) sema_post(&t10_sema);
-				(void) sleep(1);
+				(void) nanosleep(&usec, 0);
 				continue;
 			} else
 				break;

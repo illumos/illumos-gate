@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -185,11 +185,11 @@ void
 iscsi_cmd_remove(iscsi_conn_t *c, uint32_t statsn)
 {
 	iscsi_cmd_t	*cmd,
+			*cmd_free = NULL,
 			*n;
 
 	(void) pthread_mutex_lock(&c->c_mutex);
 	for (cmd = c->c_cmd_head; cmd; ) {
-
 		/*
 		 * If the StatusSN for this command is less than the incoming
 		 * StatusSN and the command has been freed remove it from
@@ -200,42 +200,56 @@ iscsi_cmd_remove(iscsi_conn_t *c, uint32_t statsn)
 		 * point the next incoming command with a valid expected
 		 * status serial number will free the memory.
 		 */
-		if (sna_lt(cmd->c_statsn, statsn) &&
-		    (cmd->c_state == CmdFree)) {
-
-			if (c->c_cmd_head == cmd) {
-				c->c_cmd_head = cmd->c_next;
-				if (c->c_cmd_head == NULL)
-					c->c_cmd_tail = NULL;
-			} else {
-				n = cmd->c_prev;
-				n->c_next = cmd->c_next;
-				if (cmd->c_next != NULL)
-					cmd->c_next->c_prev = n;
-				else {
-					assert(c->c_cmd_tail == cmd);
-					c->c_cmd_tail = n;
+		if (sna_lt(cmd->c_statsn, statsn)) {
+			if (cmd->c_state == CmdFree) {
+				if (c->c_cmd_head == cmd) {
+					c->c_cmd_head = cmd->c_next;
+					if (c->c_cmd_head == NULL)
+						c->c_cmd_tail = NULL;
+				} else {
+					n = cmd->c_prev;
+					n->c_next = cmd->c_next;
+					if (cmd->c_next != NULL)
+						cmd->c_next->c_prev = n;
+					else {
+						assert(c->c_cmd_tail == cmd);
+						c->c_cmd_tail = n;
+					}
 				}
-			}
 
-			n = cmd->c_next;
-			if (cmd->c_scb_extended)
-				free(cmd->c_scb_extended);
-			if (cmd->c_data_alloc == True) {
-				free(cmd->c_data);
-				cmd->c_data = NULL;
+				/*
+				 * Place on local command free list, to free
+				 * once mutex is released
+				 */
+				n = cmd->c_next;
+				cmd->c_next = cmd_free;
+				cmd_free = cmd;
+				cmd = n;
+				c->c_cmds_active--;
+			} else {
+				cmd = cmd->c_next;
 			}
-			c->c_cmds_active--;
-			umem_cache_free(iscsi_cmd_cache, cmd);
-			cmd = n;
-		} else if (sna_lte(statsn, cmd->c_statsn)) {
-			break;
 		} else {
-			cmd = cmd->c_next;
+			break;
 		}
 	}
 	(void) pthread_mutex_unlock(&c->c_mutex);
 
+	/*
+	 * Deallocate command free list
+	 */
+	cmd = cmd_free;
+	while (cmd != NULL) {
+		n = cmd->c_next;
+		if (cmd->c_scb_extended)
+			free(cmd->c_scb_extended);
+		if (cmd->c_data_alloc == True) {
+			free(cmd->c_data);
+			cmd->c_data = NULL;
+		}
+		umem_cache_free(iscsi_cmd_cache, cmd);
+		cmd = n;
+	}
 }
 
 /*

@@ -81,12 +81,13 @@ conn_poller(void *v)
 	struct pollfd	fds[1];
 	iscsi_state_t	state;
 	target_queue_t	*mgmtq = c->c_mgmtq;
+	Boolean_t	one_time_noop = False;
 
 	fds[0].fd	= c->c_fd;
 	fds[0].events	= POLLIN;
 
 	util_title(c->c_mgmtq, Q_CONN_LOGIN, c->c_num, "Start Poller");
-	while ((pval = poll(fds, nfds, 30 * 1000)) != -1) {
+	while ((pval = poll(fds, nfds, 30 * 1000)) >= 0) {
 
 		/*
 		 * The true asynchronous events are when we're in S5_LOGGED_IN
@@ -157,8 +158,19 @@ conn_poller(void *v)
 				if (iscsi_full_feature(c) == False)
 					goto error;
 
-			} else if (c->c_sess->s_type == SessionNormal) {
-				queue_noop_in(c);
+			} else {
+				/*
+				 * Being S5_LOGGED_IN, and POLLIN not set,
+				 * means the that the poll(,,timer) went off.
+				 * If the session is normal, then queue a single
+				 * NOOP request, but only once per connection.
+				 */
+				if (c->c_sess->s_type == SessionNormal) {
+					if (one_time_noop == False) {
+						queue_noop_in(c);
+						one_time_noop = True;
+					}
+				}
 			}
 			break;
 
