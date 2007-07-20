@@ -650,13 +650,18 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ral/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o: 		$(UTSBASE)/common/io/rge/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/rsm/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o: 		$(UTSBASE)/common/io/rge/%.c
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/rtw/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
+
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/sata/adapters/ahci/%.c
 	$(COMPILE.c) -o $@ $<
@@ -1417,10 +1422,13 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ppp/sppptun/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ral/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/rge/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/rsm/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/rge/%.c
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/rtw/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/sata/adapters/ahci/%.c
