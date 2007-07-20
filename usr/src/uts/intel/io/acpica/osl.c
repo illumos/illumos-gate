@@ -1345,7 +1345,7 @@ acpica_add_processor_to_map(UINT32 acpi_id, ACPI_HANDLE obj)
 }
 
 /*
- *
+ * Return the ACPI device node matching the CPU dev_info node.
  */
 ACPI_STATUS
 acpica_get_handle_cpu(dev_info_t *dip, ACPI_HANDLE *rh)
@@ -1356,9 +1356,11 @@ acpica_get_handle_cpu(dev_info_t *dip, ACPI_HANDLE *rh)
 	/*
 	 * if "device_type" != "cpu", error
 	 */
-	if ((ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0,
-	    "device_type", &device_type_prop) != DDI_PROP_SUCCESS) ||
-	    (strcmp("cpu", device_type_prop) != 0)) {
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0,
+	    "device_type", &device_type_prop) != DDI_PROP_SUCCESS)
+		return (AE_ERROR);
+
+	if (strcmp("cpu", device_type_prop) != 0) {
 		ddi_prop_free(device_type_prop);
 		return (AE_ERROR);
 	}
