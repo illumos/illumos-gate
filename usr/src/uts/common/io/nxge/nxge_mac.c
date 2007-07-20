@@ -28,11 +28,21 @@
 #include <sys/nxge/nxge_impl.h>
 #include <sys/nxge/nxge_mac.h>
 
+#define	LINK_MONITOR_PERIOD	(1000 * 1000)
+#define	LM_WAIT_MULTIPLIER	8
+
 extern uint32_t nxge_no_link_notify;
 extern uint32_t nxge_lb_dbg;
 extern nxge_os_mutex_t	nxge_mdio_lock;
 extern nxge_os_mutex_t	nxge_mii_lock;
 extern boolean_t nxge_jumbo_enable;
+
+typedef enum {
+	CHECK_LINK_RESCHEDULE,
+	CHECK_LINK_STOP
+} check_link_state_t;
+
+static check_link_state_t nxge_check_link_stop(nxge_t *);
 
 /*
  * Ethernet broadcast address definition.
@@ -2461,6 +2471,30 @@ fail:
 	return (status);
 }
 
+static
+check_link_state_t
+nxge_check_link_stop(
+	nxge_t *nxge)
+{
+	/* If the poll has been cancelled, return STOP. */
+	MUTEX_ENTER(&nxge->poll_lock);
+	if (nxge->suspended || nxge->poll_state == LINK_MONITOR_STOPPING) {
+		nxge->poll_state = LINK_MONITOR_STOP;
+		nxge->nxge_link_poll_timerid = 0;
+		cv_broadcast(&nxge->poll_cv);
+		MUTEX_EXIT(&nxge->poll_lock);
+
+		NXGE_DEBUG_MSG((nxge, MAC_CTL,
+		    "nxge_check_%s_link(port<%d>) stopped.",
+		    nxge->mac.portmode == PORT_10G_FIBER ? "10g" : "mii",
+		    nxge->mac.portnum));
+		return (CHECK_LINK_STOP);
+	}
+	MUTEX_EXIT(&nxge->poll_lock);
+
+	return (CHECK_LINK_RESCHEDULE);
+}
+
 /* Check status of MII (MIF or PCS) link */
 
 nxge_status_t
@@ -2474,10 +2508,16 @@ nxge_check_mii_link(p_nxge_t nxgep)
 	uint8_t portn;
 	nxge_link_state_t link_up;
 
+	if (nxgep->nxge_magic != NXGE_MAGIC)
+		return (NXGE_ERROR);
+
+	if (nxge_check_link_stop(nxgep) == CHECK_LINK_STOP)
+		return (NXGE_OK);
+
 	portn = nxgep->mac.portnum;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_check_mii_link port<%d>",
-				portn));
+	    portn));
 
 	mii_regs = NULL;
 
@@ -2530,7 +2570,7 @@ nxge_check_mii_link(p_nxge_t nxgep)
 	bmsr_ints.value = nxgep->bmsr.value ^ bmsr_data.value;
 	nxgep->bmsr.value = bmsr_data.value;
 	if ((status = nxge_mii_check(nxgep, bmsr_data, bmsr_ints, &link_up))
-			!= NXGE_OK)
+	    != NXGE_OK)
 		goto fail;
 
 nxge_check_mii_link_exit:
@@ -2544,7 +2584,7 @@ nxge_check_mii_link_exit:
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_check_mii_link port<%d>",
-				portn));
+	    portn));
 	return (NXGE_OK);
 
 fail:
@@ -2552,8 +2592,8 @@ fail:
 
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_check_mii_link: Failed to check link port<%d>",
-			portn));
+	    "nxge_check_mii_link: Failed to check link port<%d>",
+	    portn));
 	return (status);
 }
 
@@ -2567,10 +2607,16 @@ nxge_check_10g_link(p_nxge_t nxgep)
 	nxge_status_t	status = NXGE_OK;
 	boolean_t	link_up;
 
+	if (nxgep->nxge_magic != NXGE_MAGIC)
+		return (NXGE_ERROR);
+
+	if (nxge_check_link_stop(nxgep) == CHECK_LINK_STOP)
+		return (NXGE_OK);
+
 	portn = nxgep->mac.portnum;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_check_10g_link port<%d>",
-				portn));
+	    portn));
 
 	status = nxge_check_bcm8704_link(nxgep, &link_up);
 
@@ -2607,13 +2653,15 @@ nxge_check_10g_link(p_nxge_t nxgep)
 
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_check_10g_link port<%d>",
-				portn));
+	    portn));
 	return (NXGE_OK);
 
 fail:
+	(void) nxge_check_link_stop(nxgep);
+
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			"nxge_check_10g_link: Failed to check link port<%d>",
-			portn));
+	    "nxge_check_10g_link: Failed to check link port<%d>",
+	    portn));
 	return (status);
 }
 
@@ -2707,8 +2755,8 @@ nxge_link_monitor(p_nxge_t nxgep, link_mon_enable_t enable)
 	nxge_status_t status = NXGE_OK;
 
 	/*
-	 * Make sure that we don't check the link if this happen to
-	 * be not port0 or 1 and it is not BMAC port.
+	 * Return immediately if this is an imaginary XMAC port.
+	 * (At least, we don't have 4-port XMAC cards yet.)
 	 */
 	if ((nxgep->mac.portmode == PORT_10G_FIBER) && (nxgep->mac.portnum > 1))
 		return (NXGE_OK);
@@ -2722,48 +2770,77 @@ nxge_link_monitor(p_nxge_t nxgep, link_mon_enable_t enable)
 		return (NXGE_OK);
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-			"==> nxge_link_monitor port<%d> enable=%d",
-			nxgep->mac.portnum, enable));
+	    "==> nxge_link_monitor port<%d> enable=%d",
+	    nxgep->mac.portnum, enable));
 	if (enable == LINK_MONITOR_START) {
 		if (nxgep->mac.linkchkmode == LINKCHK_INTR) {
 			if ((status = nxge_link_intr(nxgep, LINK_INTR_START))
-							!= NXGE_OK)
+			    != NXGE_OK)
 				goto fail;
 		} else {
+			timeout_id_t timerid;
+
+			if (nxge_check_link_stop(nxgep) == CHECK_LINK_STOP)
+				return (NXGE_OK);
+
 			switch (nxgep->mac.portmode) {
 			case PORT_10G_FIBER:
-				nxgep->nxge_link_poll_timerid = timeout(
-						(fptrv_t)nxge_check_10g_link,
-						nxgep,
-						drv_usectohz(1000 * 1000));
-			break;
+				timerid = timeout((fptrv_t)nxge_check_10g_link,
+				    nxgep,
+				    drv_usectohz(LINK_MONITOR_PERIOD));
+				break;
 
 			case PORT_1G_COPPER:
 			case PORT_1G_FIBER:
-				nxgep->nxge_link_poll_timerid = timeout(
-						(fptrv_t)nxge_check_mii_link,
-						nxgep,
-						drv_usectohz(1000 * 1000));
-			break;
+				timerid = timeout((fptrv_t)nxge_check_mii_link,
+				    nxgep,
+				    drv_usectohz(LINK_MONITOR_PERIOD));
+				break;
 			default:
-				;
+				return (NXGE_ERROR);
 			}
+			MUTEX_ENTER(&nxgep->poll_lock);
+			nxgep->nxge_link_poll_timerid = timerid;
+			MUTEX_EXIT(&nxgep->poll_lock);
 		}
 	} else {
 		if (nxgep->mac.linkchkmode == LINKCHK_INTR) {
 			if ((status = nxge_link_intr(nxgep, LINK_INTR_STOP))
-							!= NXGE_OK)
+			    != NXGE_OK)
 				goto fail;
 		} else {
-			if (nxgep->nxge_link_poll_timerid != 0) {
-				(void) untimeout(nxgep->nxge_link_poll_timerid);
+			clock_t rv;
+
+			MUTEX_ENTER(&nxgep->poll_lock);
+
+			/* If <timerid> == 0, the link monitor has */
+			/* never been started, or just now stopped. */
+			if (nxgep->nxge_link_poll_timerid == 0) {
+				MUTEX_EXIT(&nxgep->poll_lock);
+				return (NXGE_OK);
+			}
+
+			nxgep->poll_state = LINK_MONITOR_STOPPING;
+			rv = cv_timedwait(&nxgep->poll_cv,
+			    &nxgep->poll_lock,
+			    ddi_get_lbolt() +
+			    drv_usectohz(LM_WAIT_MULTIPLIER *
+			    LINK_MONITOR_PERIOD));
+			if (rv == -1) {
+				NXGE_DEBUG_MSG((nxgep, MAC_CTL,
+				    "==> stopping port %d: "
+				    "cv_timedwait(%d) timed out",
+				    nxgep->mac.portnum, nxgep->poll_state));
+				nxgep->poll_state = LINK_MONITOR_STOP;
 				nxgep->nxge_link_poll_timerid = 0;
 			}
+
+			MUTEX_EXIT(&nxgep->poll_lock);
 		}
 	}
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
-			"<== nxge_link_monitor port<%d> enable=%d",
-			nxgep->mac.portnum, enable));
+	    "<== nxge_link_monitor port<%d> enable=%d",
+	    nxgep->mac.portnum, enable));
 	return (NXGE_OK);
 fail:
 	return (status);

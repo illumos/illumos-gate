@@ -437,6 +437,8 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto nxge_attach_fail;
 	}
 
+	nxgep->nxge_magic = NXGE_MAGIC;
+
 	nxgep->drv_state = 0;
 	nxgep->dip = dip;
 	nxgep->instance = instance;
@@ -707,6 +709,8 @@ nxge_unattach(p_nxge_t nxgep)
 	if (nxgep == NULL || nxgep->dev_regs == NULL) {
 		return;
 	}
+
+	nxgep->nxge_magic = 0;
 
 	if (nxgep->nxge_hw_p) {
 		nxge_uninit_common_dev(nxgep);
@@ -1119,8 +1123,12 @@ nxge_setup_mutexes(p_nxge_t nxgep)
 	nxgep->drv_state |= STATE_MDIO_LOCK_INIT;
 	nxgep->drv_state |= STATE_MII_LOCK_INIT;
 
+	cv_init(&nxgep->poll_cv, NULL, CV_DRIVER, NULL);
+	MUTEX_INIT(&nxgep->poll_lock, NULL,
+	    MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
+
 	/*
-	 * Initialize mutex's for this device.
+	 * Initialize mutexes for this device.
 	 */
 	MUTEX_INIT(nxgep->genlock, NULL,
 		MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
@@ -1174,7 +1182,11 @@ nxge_destroy_mutexes(p_nxge_t nxgep)
 	classify_ptr = &nxgep->classifier;
 	MUTEX_DESTROY(&classify_ptr->tcam_lock);
 
-		/* free data structures, based on HW type */
+	/* Destroy all polling resources. */
+	MUTEX_DESTROY(&nxgep->poll_lock);
+	cv_destroy(&nxgep->poll_cv);
+
+	/* free data structures, based on HW type */
 	if (nxgep->niu_type == NEPTUNE) {
 		MUTEX_DESTROY(&classify_ptr->fcram_lock);
 		for (partition = 0; partition < MAX_PARTITION; partition++) {

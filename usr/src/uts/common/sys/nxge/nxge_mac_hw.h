@@ -112,7 +112,8 @@ typedef enum {
 
 typedef	enum {
 	LINK_MONITOR_STOP,
-	LINK_MONITOR_START
+	LINK_MONITOR_START,
+	LINK_MONITOR_STOPPING
 } link_mon_enable_t, *link_mon_enable_pt;
 
 typedef enum {

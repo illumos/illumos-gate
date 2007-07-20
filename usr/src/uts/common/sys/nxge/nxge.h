@@ -662,6 +662,12 @@ struct _nxge_t {
 	uint64_t		niu_min_ver;
 #endif
 	boolean_t		link_notify;
+
+	kmutex_t		poll_lock;
+	kcondvar_t		poll_cv;
+	link_mon_enable_t	poll_state;
+#define	NXGE_MAGIC		0x3ab434e3
+	uint32_t		nxge_magic;
 };
 
 /*
