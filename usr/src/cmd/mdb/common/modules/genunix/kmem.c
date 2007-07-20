@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -297,6 +297,353 @@ kmem_cache(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *argv)
 	    c.cache_flags, c.cache_cflags, c.cache_bufsize, c.cache_buftotal);
 
 	return (DCMD_OK);
+}
+
+typedef struct kmem_slab_usage {
+	int ksu_refcnt;			/* count of allocated buffers on slab */
+} kmem_slab_usage_t;
+
+typedef struct kmem_slab_stats {
+	int ks_slabs;			/* slabs in cache */
+	int ks_partial_slabs;		/* partially allocated slabs in cache */
+	uint64_t ks_unused_buffers;	/* total unused buffers in cache */
+	int ks_buffers_per_slab;	/* buffers per slab */
+	int ks_usage_len;		/* ks_usage array length */
+	kmem_slab_usage_t *ks_usage;	/* partial slab usage */
+	uint_t *ks_bucket;		/* slab usage distribution */
+} kmem_slab_stats_t;
+
+#define	LABEL_WIDTH	11
+static void
+kmem_slabs_print_dist(uint_t *ks_bucket, size_t buffers_per_slab,
+    size_t maxbuckets, size_t minbucketsize)
+{
+	uint64_t total;
+	int buckets;
+	int i;
+	const int *distarray;
+	int complete[2];
+
+	buckets = buffers_per_slab;
+
+	total = 0;
+	for (i = 0; i <= buffers_per_slab; i++)
+		total += ks_bucket[i];
+
+	if (maxbuckets > 1)
+		buckets = MIN(buckets, maxbuckets);
+
+	if (minbucketsize > 1) {
+		/*
+		 * minbucketsize does not apply to the first bucket reserved
+		 * for completely allocated slabs
+		 */
+		buckets = MIN(buckets, 1 + ((buffers_per_slab - 1) /
+		    minbucketsize));
+		if ((buckets < 2) && (buffers_per_slab > 1)) {
+			buckets = 2;
+			minbucketsize = (buffers_per_slab - 1);
+		}
+	}
+
+	/*
+	 * The first printed bucket is reserved for completely allocated slabs.
+	 * Passing (buckets - 1) excludes that bucket from the generated
+	 * distribution, since we're handling it as a special case.
+	 */
+	complete[0] = buffers_per_slab;
+	complete[1] = buffers_per_slab + 1;
+	distarray = mdb_dist_linear(buckets - 1, 1, buffers_per_slab - 1);
+
+	mdb_printf("%*s\n", LABEL_WIDTH, "Allocated");
+	mdb_dist_print_header("Buffers", LABEL_WIDTH, "Slabs");
+
+	mdb_dist_print_bucket(complete, 0, ks_bucket, total, LABEL_WIDTH);
+	/*
+	 * Print bucket ranges in descending order after the first bucket for
+	 * completely allocated slabs, so a person can see immediately whether
+	 * or not there is fragmentation without having to scan possibly
+	 * multiple screens of output. Starting at (buckets - 2) excludes the
+	 * extra terminating bucket.
+	 */
+	for (i = buckets - 2; i >= 0; i--) {
+		mdb_dist_print_bucket(distarray, i, ks_bucket, total,
+		    LABEL_WIDTH);
+	}
+	mdb_printf("\n");
+}
+#undef LABEL_WIDTH
+
+/*ARGSUSED*/
+static int
+kmem_first_slab(uintptr_t addr, const kmem_slab_t *sp, boolean_t *is_slab)
+{
+	*is_slab = B_TRUE;
+	return (WALK_DONE);
+}
+
+/*ARGSUSED*/
+static int
+kmem_first_partial_slab(uintptr_t addr, const kmem_slab_t *sp,
+    boolean_t *is_slab)
+{
+	/*
+	 * The "kmem_partial_slab" walker reports the last full slab if there
+	 * are no partial slabs (for the sake of consumers that require at least
+	 * one callback if there are any buffers in the cache).
+	 */
+	*is_slab = ((sp->slab_refcnt > 0) &&
+	    (sp->slab_refcnt < sp->slab_chunks));
+	return (WALK_DONE);
+}
+
+/*ARGSUSED*/
+static int
+kmem_slablist_stat(uintptr_t addr, const kmem_slab_t *sp,
+    kmem_slab_stats_t *ks)
+{
+	kmem_slab_usage_t *ksu;
+	long unused;
+
+	ks->ks_slabs++;
+	if (ks->ks_buffers_per_slab == 0) {
+		ks->ks_buffers_per_slab = sp->slab_chunks;
+		/* +1 to include a zero bucket */
+		ks->ks_bucket = mdb_zalloc((ks->ks_buffers_per_slab + 1) *
+		    sizeof (*ks->ks_bucket), UM_SLEEP | UM_GC);
+	}
+	ks->ks_bucket[sp->slab_refcnt]++;
+
+	unused = (sp->slab_chunks - sp->slab_refcnt);
+	if (unused == 0) {
+		return (WALK_NEXT);
+	}
+
+	ks->ks_partial_slabs++;
+	ks->ks_unused_buffers += unused;
+
+	if (ks->ks_partial_slabs > ks->ks_usage_len) {
+		kmem_slab_usage_t *usage;
+		int len = ks->ks_usage_len;
+
+		len = (len == 0 ? 16 : len * 2);
+		usage = mdb_zalloc(len * sizeof (kmem_slab_usage_t), UM_SLEEP);
+		if (ks->ks_usage != NULL) {
+			bcopy(ks->ks_usage, usage,
+			    ks->ks_usage_len * sizeof (kmem_slab_usage_t));
+			mdb_free(ks->ks_usage,
+			    ks->ks_usage_len * sizeof (kmem_slab_usage_t));
+		}
+		ks->ks_usage = usage;
+		ks->ks_usage_len = len;
+	}
+
+	ksu = &ks->ks_usage[ks->ks_partial_slabs - 1];
+	ksu->ksu_refcnt = sp->slab_refcnt;
+	return (WALK_NEXT);
+}
+
+static void
+kmem_slabs_header()
+{
+	mdb_printf("%-25s %8s %8s %9s %9s %6s\n",
+	    "", "", "Partial", "", "Unused", "");
+	mdb_printf("%-25s %8s %8s %9s %9s %6s\n",
+	    "Cache Name", "Slabs", "Slabs", "Buffers", "Buffers", "Waste");
+	mdb_printf("%-25s %8s %8s %9s %9s %6s\n",
+	    "-------------------------", "--------", "--------", "---------",
+	    "---------", "------");
+}
+
+int
+kmem_slabs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	kmem_cache_t c;
+	kmem_slab_stats_t stats;
+	mdb_walk_cb_t cb;
+	int pct;
+	int tenths_pct;
+	size_t maxbuckets = 1;
+	size_t minbucketsize = 0;
+	const char *filter = NULL;
+	uint_t opt_v = FALSE;
+	boolean_t verbose = B_FALSE;
+	boolean_t skip = B_FALSE;
+
+	if (mdb_getopts(argc, argv,
+	    'B', MDB_OPT_UINTPTR, &minbucketsize,
+	    'b', MDB_OPT_UINTPTR, &maxbuckets,
+	    'n', MDB_OPT_STR, &filter,
+	    'v', MDB_OPT_SETBITS, TRUE, &opt_v,
+	    NULL) != argc) {
+		return (DCMD_USAGE);
+	}
+
+	if (opt_v || (maxbuckets != 1) || (minbucketsize != 0)) {
+		verbose = 1;
+	}
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		if (mdb_walk_dcmd("kmem_cache", "kmem_slabs", argc,
+		    argv) == -1) {
+			mdb_warn("can't walk kmem_cache");
+			return (DCMD_ERR);
+		}
+		return (DCMD_OK);
+	}
+
+	if (mdb_vread(&c, sizeof (c), addr) == -1) {
+		mdb_warn("couldn't read kmem_cache at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	if ((filter != NULL) && (strstr(c.cache_name, filter) == NULL)) {
+		skip = B_TRUE;
+	}
+
+	if (!verbose && DCMD_HDRSPEC(flags)) {
+		kmem_slabs_header();
+	} else if (verbose && !skip) {
+		if (DCMD_HDRSPEC(flags)) {
+			kmem_slabs_header();
+		} else {
+			boolean_t is_slab = B_FALSE;
+			const char *walker_name;
+			if (opt_v) {
+				cb = (mdb_walk_cb_t)kmem_first_partial_slab;
+				walker_name = "kmem_slab_partial";
+			} else {
+				cb = (mdb_walk_cb_t)kmem_first_slab;
+				walker_name = "kmem_slab";
+			}
+			(void) mdb_pwalk(walker_name, cb, &is_slab, addr);
+			if (is_slab) {
+				kmem_slabs_header();
+			}
+		}
+	}
+
+	if (skip) {
+		return (DCMD_OK);
+	}
+
+	bzero(&stats, sizeof (kmem_slab_stats_t));
+	cb = (mdb_walk_cb_t)kmem_slablist_stat;
+	(void) mdb_pwalk("kmem_slab", cb, &stats, addr);
+
+	if (c.cache_buftotal == 0) {
+		pct = 0;
+		tenths_pct = 0;
+	} else {
+		uint64_t n = stats.ks_unused_buffers * 10000;
+		pct = (int)(n / c.cache_buftotal);
+		tenths_pct = pct - ((pct / 100) * 100);
+		tenths_pct = (tenths_pct + 5) / 10; /* round nearest tenth */
+		if (tenths_pct == 10) {
+			pct += 100;
+			tenths_pct = 0;
+		}
+	}
+
+	pct /= 100;
+	mdb_printf("%-25s %8d %8d %9lld %9lld %3d.%1d%%\n", c.cache_name,
+	    stats.ks_slabs, stats.ks_partial_slabs, c.cache_buftotal,
+	    stats.ks_unused_buffers, pct, tenths_pct);
+
+	if (!verbose) {
+		return (DCMD_OK);
+	}
+
+	if (maxbuckets == 0) {
+		maxbuckets = stats.ks_buffers_per_slab;
+	}
+
+	if (((maxbuckets > 1) || (minbucketsize > 0)) &&
+	    (stats.ks_slabs > 0)) {
+		mdb_printf("\n");
+		kmem_slabs_print_dist(stats.ks_bucket,
+		    stats.ks_buffers_per_slab, maxbuckets, minbucketsize);
+	}
+
+	if (opt_v && (stats.ks_partial_slabs > 0)) {
+		int i;
+		kmem_slab_usage_t *ksu;
+
+		mdb_printf("  %d complete, %d partial",
+		    (stats.ks_slabs - stats.ks_partial_slabs),
+		    stats.ks_partial_slabs);
+		if (stats.ks_partial_slabs > 0) {
+			mdb_printf(" (%d):", stats.ks_buffers_per_slab);
+		}
+		for (i = 0; i < stats.ks_partial_slabs; i++) {
+			ksu = &stats.ks_usage[i];
+			mdb_printf(" %d", ksu->ksu_refcnt);
+		}
+		mdb_printf("\n\n");
+	}
+
+	if (stats.ks_usage_len > 0) {
+		mdb_free(stats.ks_usage,
+		    stats.ks_usage_len * sizeof (kmem_slab_usage_t));
+	}
+
+	return (DCMD_OK);
+}
+
+void
+kmem_slabs_help(void)
+{
+	mdb_printf("%s\n",
+"Display slab usage per kmem cache.\n");
+	mdb_dec_indent(2);
+	mdb_printf("%<b>OPTIONS%</b>\n");
+	mdb_inc_indent(2);
+	mdb_printf("%s",
+"  -n name\n"
+"        name of kmem cache (or matching partial name)\n"
+"  -b maxbins\n"
+"        Print a distribution of allocated buffers per slab using at\n"
+"        most maxbins bins. The first bin is reserved for completely\n"
+"        allocated slabs. Setting maxbins to zero (-b 0) has the same\n"
+"        effect as specifying the maximum allocated buffers per slab\n"
+"        or setting minbinsize to 1 (-B 1).\n"
+"  -B minbinsize\n"
+"        Print a distribution of allocated buffers per slab, making\n"
+"        all bins (except the first, reserved for completely allocated\n"
+"        slabs) at least minbinsize buffers apart.\n"
+"  -v    verbose output: List the allocated buffer count of each partial\n"
+"        slab on the free list in order from front to back to show how\n"
+"        closely the slabs are ordered by usage. For example\n"
+"\n"
+"          10 complete, 3 partial (8): 7 3 1\n"
+"\n"
+"        means there are thirteen slabs with eight buffers each, including\n"
+"        three partially allocated slabs with less than all eight buffers\n"
+"        allocated.\n"
+"\n"
+"        Buffer allocations are always from the front of the partial slab\n"
+"        list. When a buffer is freed from a completely used slab, that\n"
+"        slab is added to the front of the partial slab list. Assuming\n"
+"        that all buffers are equally likely to be freed soon, the\n"
+"        desired order of partial slabs is most-used at the front of the\n"
+"        list and least-used at the back (as in the example above).\n"
+"        However, if a slab contains an allocated buffer that will not\n"
+"        soon be freed, it would be better for that slab to be at the\n"
+"        front where it can get used up. Taking a slab off the partial\n"
+"        slab list (either with all buffers freed or all buffers\n"
+"        allocated) reduces cache fragmentation.\n"
+"\n"
+"Column\t\tDescription\n"
+"\n"
+"Cache Name\t\tname of kmem cache\n"
+"Slabs\t\t\ttotal slab count\n"
+"Partial Slabs\t\tcount of partially allocated slabs on the free list\n"
+"Buffers\t\ttotal buffer count (Slabs * (buffers per slab))\n"
+"Unused Buffers\tcount of unallocated buffers across all partial slabs\n"
+"Waste\t\t\t(Unused Buffers / Buffers) does not include space\n"
+"\t\t\t  for accounting structures (debug mode), slab\n"
+"\t\t\t  coloring (incremental small offsets to stagger\n"
+"\t\t\t  buffer alignment), or the per-CPU magazine layer\n");
 }
 
 static int

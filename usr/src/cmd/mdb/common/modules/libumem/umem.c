@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3635,134 +3635,17 @@ typedef struct umem_malloc_info {
 	uint_t *um_bucket;
 } umem_malloc_info_t;
 
-static const int *
-dist_linear(int buckets, int beg, int end)
-{
-	int *out = mdb_alloc((buckets + 1) * sizeof (*out), UM_SLEEP | UM_GC);
-	int pos;
-	int dist = end - beg + 1;
-
-	for (pos = 0; pos < buckets; pos++)
-		out[pos] = beg + (pos * dist)/buckets;
-	out[buckets] = end + 1;
-
-	return (out);
-}
-
-/*
- * We want the bins to be a constant ratio:
- *
- *	b_0	  = beg;
- *	b_idx	  = b_{idx-1} * r;
- *	b_buckets = end + 1;
- *
- * That is:
- *
- *	       buckets
- *	beg * r        = end
- *
- * Which reduces to:
- *
- *		  buckets ___________________
- *	      r = -------/ ((end + 1) / beg)
- *
- *		  log ((end + 1) / beg)
- *	  log r = ---------------------
- *		         buckets
- *
- *		   (log ((end + 1) / beg)) / buckets
- *	      r = e
- */
-static const int *
-dist_geometric(int buckets, int beg, int end, int minbucketsize)
-{
-#ifdef	_KMDB
-	return (dist_linear(buckets, beg, end));
-#else
-	int *out = mdb_alloc((buckets + 1) * sizeof (*out), UM_SLEEP | UM_GC);
-
-	extern double log(double);
-	extern double exp(double);
-
-	double r;
-	double b;
-	int idx = 0;
-	int last;
-	int begzero;
-
-	if (minbucketsize == 0)
-		minbucketsize = 1;
-
-	if (buckets == 1) {
-		out[0] = beg;
-		out[1] = end + 1;
-		return (out);
-	}
-
-	begzero = (beg == 0);
-	if (begzero)
-		beg = 1;
-
-	r = exp(log((double)(end + 1) / beg) / buckets);
-
-	/*
-	 * We've now computed r, using the previously derived formula.  We
-	 * now need to generate the array of bucket bounds.  There are
-	 * two major variables:
-	 *
-	 *	b	holds b_idx, the current index, as a double.
-	 *	last	holds the integer which goes into out[idx]
-	 *
-	 * Our job is to transform the smooth function b_idx, defined
-	 * above, into integer-sized buckets, with a specified minimum
-	 * bucket size.  Since b_idx is an exponentially growing function,
-	 * any inadequate buckets must be at the beginning.  To deal
-	 * with this, we make buckets of minimum size until b catches up
-	 * with last.
-	 *
-	 * A final wrinkle is that beg *can* be zero.  We compute r and b
-	 * as if beg was 1, then start last as 0.  This can lead to a bit
-	 * of oddness around the 0 bucket, but it's mostly reasonable.
-	 */
-
-	b = last = beg;
-	if (begzero)
-		last = 0;
-
-	for (idx = 0; idx < buckets; idx++) {
-		int next;
-
-		out[idx] = last;
-
-		b *= r;
-		next = (int)b;
-
-		if (next > last + minbucketsize - 1)
-			last = next;
-		else
-			last += minbucketsize;
-	}
-	out[buckets] = end + 1;
-
-	return (out);
-#endif
-}
-
-#define	NCHARS	50
 static void
 umem_malloc_print_dist(uint_t *um_bucket, size_t minmalloc, size_t maxmalloc,
     size_t maxbuckets, size_t minbucketsize, int geometric)
 {
-	size_t um_malloc;
+	uint64_t um_malloc;
 	int minb = -1;
 	int maxb = -1;
 	int buckets;
 	int nbucks;
 	int i;
-	int n;
 	int b;
-	const char *dist = " Distribution ";
-	char dashes[NCHARS + 1];
 	const int *distarray;
 
 	minb = (int)minmalloc;
@@ -3773,8 +3656,6 @@ umem_malloc_print_dist(uint_t *um_bucket, size_t minmalloc, size_t maxmalloc,
 	um_malloc = 0;
 	for (b = minb; b <= maxb; b++)
 		um_malloc += um_bucket[b];
-	if (um_malloc == 0)
-		um_malloc = 1;			/* avoid divide-by-zero */
 
 	if (maxbuckets != 0)
 		buckets = MIN(buckets, maxbuckets);
@@ -3787,46 +3668,18 @@ umem_malloc_print_dist(uint_t *um_bucket, size_t minmalloc, size_t maxmalloc,
 		}
 	}
 
-
 	if (geometric)
-		distarray = dist_geometric(buckets, minb, maxb, minbucketsize);
+		distarray = mdb_dist_geometric(buckets, minb, maxb,
+		    minbucketsize);
 	else
-		distarray = dist_linear(buckets, minb, maxb);
+		distarray = mdb_dist_linear(buckets, minb, maxb);
 
-	n = (NCHARS - strlen(dist)) / 2;
-	(void) memset(dashes, '-', n);
-	dashes[n] = 0;
-
-	mdb_printf("%11s  %s%s%s %s\n",
-	    "malloc size", dashes, dist, dashes, "count");
-
+	mdb_dist_print_header("malloc size", 11, "count");
 	for (i = 0; i < buckets; i++) {
-		int bb = distarray[i];
-		int be = distarray[i+1] - 1;
-		uint64_t amount = 0;
-
-		int nats;
-		char ats[NCHARS + 1], spaces[NCHARS + 1];
-		char range[40];
-
-		for (b = bb; b <= be; b++)
-			amount += um_bucket[b];
-
-		nats = (NCHARS * amount)/um_malloc;
-		(void) memset(ats, '@', nats);
-		ats[nats] = 0;
-		(void) memset(spaces, ' ', NCHARS - nats);
-		spaces[NCHARS - nats] = 0;
-
-		if (bb == be)
-			mdb_snprintf(range, sizeof (range), "%d", bb);
-		else
-			mdb_snprintf(range, sizeof (range), "%d-%d", bb, be);
-		mdb_printf("%11s |%s%s %lld\n", range, ats, spaces, amount);
+		mdb_dist_print_bucket(distarray, i, um_bucket, um_malloc, 11);
 	}
 	mdb_printf("\n");
 }
-#undef NCHARS
 
 /*
  * A malloc()ed buffer looks like:

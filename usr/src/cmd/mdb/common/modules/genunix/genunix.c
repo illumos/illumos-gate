@@ -3354,6 +3354,9 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "kmausers", "?[-ef] [cache ...]", "current medium and large users "
 		"of the kmem allocator", kmausers, kmausers_help },
 	{ "kmem_cache", "?", "print kernel memory caches", kmem_cache },
+	{ "kmem_slabs", "?[-v] [-n cache] [-b maxbins] [-B minbinsize]",
+		"display slab usage per kmem cache",
+		kmem_slabs, kmem_slabs_help },
 	{ "kmem_debug", NULL, "toggle kmem dcmd/walk debugging", kmem_debug },
 	{ "kmem_log", "?[-b]", "dump kmem transaction log", kmem_log },
 	{ "kmem_verify", "?", "check integrity of kmem-managed memory",

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -288,6 +288,11 @@ typedef void (*mdb_callback_f)(void *);
 
 extern void *mdb_callback_add(int, mdb_callback_f, void *);
 extern void mdb_callback_remove(void *);
+
+extern const int *mdb_dist_linear(int, int, int);
+extern const int *mdb_dist_geometric(int, int, int, int);
+extern void mdb_dist_print_header(const char *, int, const char *);
+extern void mdb_dist_print_bucket(const int *, int, uint_t[], uint64_t, int);
 
 extern size_t strlcat(char *, const char *, size_t);
 extern char *strcat(char *, const char *);
