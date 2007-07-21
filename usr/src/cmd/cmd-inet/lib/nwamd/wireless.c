@@ -153,7 +153,13 @@ static boolean_t find_wlan_entry(struct interface *, char *, char *);
 static void free_wireless_lan(struct wireless_lan *);
 static struct wireless_lan *get_specific_lan(void);
 static void get_user_key(struct wireless_lan *);
-static char *get_zenity_response(const char *);
+static int get_user_preference(char *const *, const char *, const char *,
+    struct wireless_lan **, const struct wireless_lan *);
+static char **alloc_argv(int, size_t);
+static void free_argv(char **);
+static char **build_wlanlist_zargv(const struct wireless_lan *, int,
+    const char *, int, const char **, int);
+static char *get_zenity_response(char *const *);
 static boolean_t wlan_autoconf(const char *ifname);
 static int zenity_height(int);
 static boolean_t get_scan_results(void *, dladm_wlan_attr_t *);
@@ -174,6 +180,74 @@ uint_t wlan_scan_interval = 120;
  */
 dladm_wlan_strength_t wireless_scan_level = DLADM_WLAN_STRENGTH_VERY_WEAK;
 
+/*
+ * Some constants for zenity args
+ */
+/*
+ * For a wlan table, command begins with 5 general args:
+ * cmdname (argv[0]), window type (list), title, height, and width.
+ */
+#define	ZENITY_LIST_INIT_ARGS	5
+/*
+ * Columns: index, ESSID, BSSID, Encryption Type, Signal Strength
+ */
+#define	ZENITY_COLUMNS_PER_WLAN	5
+/*
+ * Cap the length of an individual arg at 64 bytes.
+ * Longest args tend to be extra row strings.
+ */
+#define	ZENITY_ARG_LEN		64
+/*
+ * Typical zenity return buffers are index number strings
+ * or extra row strings; 1024 should be sufficient.
+ */
+#define	ZENITY_RTN_BUF_SIZE	1024
+
+/*
+ * Alloc an array of (cnt + 1) pointers, where the first cnt pointers
+ * point to an alloc'd buffer of specified len.  The last pointer in
+ * the array is NULL.
+ */
+static char **
+alloc_argv(int cnt, size_t buflen)
+{
+	int i;
+	char **argv;
+
+	if ((argv = calloc(cnt + 1, sizeof (char *))) == NULL) {
+		syslog(LOG_ERR, "calloc failed: %m");
+		return (NULL);
+	}
+	for (i = 0; i < cnt; i++) {
+		if ((argv[i] = malloc(buflen)) == NULL) {
+			syslog(LOG_ERR, "malloc failed: %m");
+			free_argv(argv);
+			return (NULL);
+		}
+	}
+	argv[cnt] = NULL;
+
+	return (argv);
+}
+
+/*
+ * Free an argv.  Assumes that the first NULL pointer encountered
+ * indicates the end of the array: that is, that the array is null-
+ * terminated and that no other elements are NULL.
+ */
+static void
+free_argv(char **argv)
+{
+	int i = 0;
+
+	if (argv == NULL)
+		return;
+
+	while (argv[i] != NULL)
+		free(argv[i++]);
+	free(argv);
+}
+
 void
 init_mutexes(void)
 {
@@ -189,10 +263,9 @@ init_mutexes(void)
 static void
 get_user_key(struct wireless_lan *wlan)
 {
-	char zenity_cmd[1024];
-	char buf[1024];
-	FILE *zcptr;
 	dladm_secobj_class_t class;
+	int zargc, cur;
+	char **zargv;
 
 	/*
 	 * First, test if we have key stored as secobj. If so,
@@ -206,35 +279,41 @@ get_user_key(struct wireless_lan *wlan)
 		return;
 	}
 
-	(void) snprintf(zenity_cmd, sizeof (zenity_cmd),
-	    "%s --entry --text=\"%s %s\""
-	    " --title=\"%s\" --hide-text", ZENITY,
-	    gettext("Enter key for WiFi network"), wlan->essid,
-	    gettext("Enter key"));
-
 	if (!valid_graphical_user(B_TRUE))
 		return;
 
-	zcptr = popen(zenity_cmd, "r");
-	if (zcptr != NULL) {
-		if (fgets(buf, sizeof (buf), zcptr) != NULL) {
-			wlan->raw_key = strdup(buf);
-			if (wlan->raw_key != NULL) {
-				/* Store key persistently */
-				if (store_key(wlan) != 0) {
-					syslog(LOG_ERR,
-					    "get_user_key: failed to store"
-					    " user specified key");
-				}
-			} else {
-				syslog(LOG_ERR,
-				    "get_user_key: strdup failed");
-			}
-		}
-		(void) pclose(zcptr);
-	} else {
-		syslog(LOG_ERR, "Could not run %s: %m", ZENITY);
+	/*
+	 * build zenity 'entry' argv, with text hidden:
+	 *	'zenity --entry --title=foo --text=bar --hide-text'
+	 * Five args needed.
+	 */
+	zargc = 5;
+	if ((zargv = alloc_argv(zargc, ZENITY_ARG_LEN)) == NULL)
+		return;
+
+	cur = 0;
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, ZENITY);
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--entry");
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--title=%s",
+	    gettext("Enter Key"));
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--text=%s %s",
+	    gettext("Enter key for WiFi network"), wlan->essid);
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--hide-text");
+
+	wlan->raw_key = get_zenity_response(zargv);
+	if (wlan->raw_key == NULL) {
+		dprintf("get_user_key: failed to obtain user-specified key");
+		goto cleanup;
 	}
+
+	/* Store key persistently */
+	if (store_key(wlan) != 0) {
+		syslog(LOG_ERR, "get_user_key: failed to store user-specified "
+		    "key");
+	}
+
+cleanup:
+	free_argv(zargv);
 }
 
 static boolean_t
@@ -1005,24 +1084,102 @@ zenity_height(int rows)
 	return (((rows + 1) * 24) + 125);
 }
 
+/*
+ * Construct an arg vector for zenity which displays a list of wlans.
+ * Additional options may be added at the end of the list of wlans with
+ * the "extra_rows" arg.
+ *
+ * Parameters include:
+ *	lanlist: a linked list of wlans; one row per list node.
+ *	nlans: the number of nodes in lanlist.
+ *	title: the string that should be the zenity window title.
+ *	width: the width of the zenity window.
+ *	extra_rows: pointer to an array of strings; each string will
+ *	    appear on its own row in the table, in the first column
+ *	    of that row.
+ *	nrows: the number of extra row strings.
+ *
+ * A pointer to the arg vector is returned; the caller must free that
+ * memory using free_argv().
+ */
+static char **
+build_wlanlist_zargv(const struct wireless_lan *lanlist, int nlans,
+    const char *title, int width, const char **extra_rows, int nrows)
+{
+	int cur, i, j;
+	int zargc, hdrargc, wlanargc;
+	char **zargv;
+
+	/*
+	 * There are three sections of arguments: the initial args, specifying
+	 * general formatting info; the column titles (one arg per column);
+	 * and the row data (one row per wlan, plus any extra rows; and one
+	 * arg per column per row).
+	 */
+	hdrargc = ZENITY_LIST_INIT_ARGS + ZENITY_COLUMNS_PER_WLAN;
+	wlanargc = (nlans + nrows) * ZENITY_COLUMNS_PER_WLAN;
+	zargc = hdrargc + wlanargc;
+	if ((zargv = alloc_argv(zargc, ZENITY_ARG_LEN)) == NULL)
+		return (NULL);
+
+	/* initial args */
+	cur = 0;
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, ZENITY);
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--list");
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--title=%s", title);
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--height=%d",
+	    zenity_height(nlans + nrows));
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--width=%d", width);
+
+	/* column titles */
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--column=#");
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--column=ESSID");
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--column=BSSID");
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--column=%s",
+	    gettext("Encryption"));
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--column=%s",
+	    gettext("Signal"));
+
+	/* wlan rows */
+	for (i = 0; i < nlans; i++) {
+		(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "%d", i + 1);
+		(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "%s",
+		    lanlist[i].essid);
+		(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "%s",
+		    lanlist[i].bssid);
+		(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "%s",
+		    WLAN_ENC(lanlist[i].sec_mode));
+		(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "%s",
+		    lanlist[i].signal_strength);
+	}
+
+	/* extra rows */
+	for (i = 0; i < nrows; i++) {
+		/* all columns are empty except the first */
+		(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, extra_rows[i]);
+		for (j = 0; j < ZENITY_COLUMNS_PER_WLAN - 1; j++)
+			*zargv[cur++] = '\0';
+	}
+
+	return (zargv);
+}
+
 static return_vals_t
-connect_to_new_wlan(const struct wireless_lan *lanlist, int num,
+connect_to_new_wlan(const struct wireless_lan *lanlist, int nlans,
     const char *ifname)
 {
-	int i, rtn, j = 0;
 	struct interface *intf;
-	struct wireless_lan *reqlan;
-	char buf[2048];
-	char *endbuf = buf;
-	size_t buflen = 0;
-	char zenity_cmd[2048];
-	char *other_str = gettext("Other");
-	char *rescan_str = gettext("Rescan");
+	int i, dlist_cnt;
+	int rtn;
+	char **zargv;
+	const char *title = gettext("Choose WiFi network you wish to activate");
+	const char *extra_rows[2];
+	struct wireless_lan *dlist, *reqlan;
 	boolean_t autoconf = B_FALSE;
 
-	dprintf("connect_to_new_wlan(..., %d, %s)", num, ifname);
+	dprintf("connect_to_new_wlan(..., %d, %s)", nlans, ifname);
 
-	if (num == 0) {
+	if (nlans == 0) {
 		display(gettext("No Wifi networks found; continuing in case "
 		    "you know of any which do not broadcast."));
 	}
@@ -1033,9 +1190,11 @@ connect_to_new_wlan(const struct wireless_lan *lanlist, int num,
 		return (FAILURE);
 	}
 
-	/* build list for display */
-	buf[0] = '\0';
-	for (i = 0; i < num; i++) {
+	/* build list of wlans to be displayed */
+	if ((dlist = calloc(nlans, sizeof (struct wireless_lan))) == NULL)
+		return (FAILURE);
+
+	for (i = 0, dlist_cnt = 0; i < nlans; i++) {
 		if ((lanlist[i].essid == NULL) || (lanlist[i].bssid == NULL)) {
 			syslog(LOG_WARNING, "wifi list entry %d broken: "
 			    "essid %s, bssid %s; ignoring", i,
@@ -1052,42 +1211,22 @@ connect_to_new_wlan(const struct wireless_lan *lanlist, int num,
 			continue;
 		}
 
-		j++;
-		/*
-		 * Zenity uses a space as its delimiter, so put the ESSID in
-		 * quotes so it won't get confused if there is a space in the
-		 * ESSID name.
-		 */
-		if (sizeof (buf) - 1 > buflen) {
-			buflen += snprintf(endbuf, sizeof (buf) - buflen,
-			    "%d '%s' %s %s '%s' ", j,
-			    lanlist[i].essid, lanlist[i].bssid,
-			    WLAN_ENC(lanlist[i].sec_mode),
-			    lanlist[i].signal_strength);
-			endbuf = buf + buflen;
-		}
-	}
-	if (sizeof (buf) - 1 > buflen) {
-		/*
-		 * All columns except the first are empty for the "Other"
-		 * and "Rescan" rows.
-		 */
-		(void) snprintf(endbuf, sizeof (buf) - buflen,
-		    "\"%s\" \"\" \"\" \"\" \"\" \"%s\" \"\" \"\" \"\" \"\"",
-		    other_str, rescan_str);
+		dlist[dlist_cnt++] = lanlist[i];
 	}
 
-	(void) snprintf(zenity_cmd, sizeof (zenity_cmd),
-	    "%s --list --title=\"%s\""
-	    " --height=%d --width=500 --column=\"#\" --column=\"%s\""
-	    " --column=\"%s\" --column=\"%s\" --column=\"%s\""
-	    " %s ", ZENITY, gettext("Choose WiFi network you wish to activate"),
-	    zenity_height(j), "ESSID", "BSSID", gettext("Encryption"),
-	    gettext("Signal"), buf);
+	extra_rows[0] = gettext("Other");
+	extra_rows[1] = gettext("Rescan");
+	/* width = 500 is the result of trial-and-error testing */
+	zargv = build_wlanlist_zargv(dlist, dlist_cnt, title, 500, extra_rows,
+	    sizeof (extra_rows) / sizeof (extra_rows[0]));
+	if (zargv == NULL) {
+		free(dlist);
+		return (FAILURE);
+	}
 
 	/* present list to user and get selection */
-	rtn = get_user_preference(zenity_cmd, other_str, rescan_str, &reqlan,
-	    lanlist);
+	rtn = get_user_preference(zargv, extra_rows[0], extra_rows[1],
+	    &reqlan, dlist);
 	switch (rtn) {
 	case 1:
 		/* user chose "other"; pop-up for specific essid */
@@ -1096,7 +1235,8 @@ connect_to_new_wlan(const struct wireless_lan *lanlist, int num,
 	case 2:
 		/* user chose "Rescan" */
 		(void) scan_wireless_nets(intf);
-		return (TRY_AGAIN);
+		rtn = TRY_AGAIN;
+		goto cleanup;
 	case -1:
 		reqlan = NULL;
 		break;
@@ -1107,7 +1247,8 @@ connect_to_new_wlan(const struct wireless_lan *lanlist, int num,
 
 	if ((reqlan == NULL) || (reqlan->essid == NULL)) {
 		dprintf("did not get user preference; attempting autoconf");
-		return (wlan_autoconf(ifname) ? SUCCESS : FAILURE);
+		rtn = wlan_autoconf(ifname) ? SUCCESS : FAILURE;
+		goto cleanup;
 	}
 	dprintf("get_user_preference() returned essid %s, bssid %s, encr %s",
 	    reqlan->essid, STRING(reqlan->bssid),
@@ -1133,74 +1274,53 @@ connect_to_new_wlan(const struct wireless_lan *lanlist, int num,
 	}
 	free_wireless_lan(reqlan);
 
-	if (!autoconf)
-		return (SUCCESS);
-	return (wlan_autoconf(ifname) ? SUCCESS : FAILURE);
+	if (autoconf)
+		rtn = wlan_autoconf(ifname) ? SUCCESS : FAILURE;
+	else
+		rtn = SUCCESS;
+
+cleanup:
+	free_argv(zargv);
+	free(dlist);
+
+	return (rtn);
 }
 
 struct wireless_lan *
 prompt_for_visited(void)
 {
-	char buf[1024];
-	size_t buflen = 0;
-	char *endbuf = buf;
-	char zenity_cmd[1024];
-	char *select_str = gettext("Select from all available WiFi networks");
-	char *rescan_str = gettext("Rescan");
-	struct wireless_lan *req_conf = NULL, *list;
-	int i = 0;
+	int dlist_cnt;
+	char **zargv;
+	const char *title = gettext("Choose from pre-visited WiFi network");
+	const char *extra_rows[1];
+	struct wireless_lan *req_conf, *dlist;
+	struct visited_wlans *vlp;
+	struct wireless_lan *wlp;
 
-	/* Build zenity command string */
-	buf[0] = '\0';
-	if (visited_wlan_list->total > 0) {
-		struct visited_wlans *vlp;
-		struct wireless_lan *wlp;
-
-		list = calloc(visited_wlan_list->total,
-		    sizeof (struct wireless_lan));
-		if (list == NULL) {
-			syslog(LOG_ERR, "prompt_for_visited: calloc failed");
-			return (NULL);
-		}
-		for (vlp = visited_wlan_list->head;
-		    vlp != NULL; vlp = vlp->next) {
-
-			wlp = vlp->wifi_net;
-			if (wlp->essid == NULL || wlp->bssid == NULL) {
-				dprintf("Invalid essid/bssid values");
-				continue;
-			}
-			i++;
-			if (sizeof (buf) - 1 > buflen) {
-				buflen += snprintf(endbuf,
-				    sizeof (buf) - buflen,
-				    "%d '%s' %s %s '%s' ",
-				    i, wlp->essid, wlp->bssid,
-				    WLAN_ENC(wlp->sec_mode),
-				    wlp->signal_strength);
-				endbuf = buf + buflen;
-			}
-			list[i-1].essid = wlp->essid;
-			list[i-1].bssid = wlp->bssid;
-			list[i-1].sec_mode = wlp->sec_mode;
-			list[i-1].raw_key = wlp->raw_key;
-			list[i-1].cooked_key = wlp->cooked_key;
-			list[i-1].signal_strength = wlp->signal_strength;
-			list[i-1].wl_if_name = wlp->wl_if_name;
-		}
+	/* build list of wlans to be displayed */
+	dlist = calloc(visited_wlan_list->total, sizeof (struct wireless_lan));
+	if (dlist == NULL) {
+		syslog(LOG_ERR, "prompt_for_visited: calloc failed");
+		return (NULL);
 	}
-	if (sizeof (buf) - 1 > buflen) {
-		(void) snprintf(endbuf, sizeof (buf) - buflen,
-		    "\"%s\"", select_str);
+	dlist_cnt = 0;
+	for (vlp = visited_wlan_list->head; vlp != NULL; vlp = vlp->next) {
+		wlp = vlp->wifi_net;
+		if (wlp->essid == NULL || wlp->bssid == NULL) {
+			dprintf("Invalid essid/bssid values");
+			continue;
+		}
+		dlist[dlist_cnt++] = *wlp;
 	}
 
-	(void) snprintf(zenity_cmd, sizeof (zenity_cmd),
-	    "%s --list --title=\"%s\""
-	    " --height=%d --width=670 --column=\"#\" --column=\"%s\""
-	    " --column=\"%s\" --column=\"%s\" --column=\"%s\""
-	    " %s", ZENITY, gettext("Choose from pre-visited WiFi network"),
-	    zenity_height(i), "ESSID", "BSSID", gettext("Encryption"),
-	    gettext("Signal"), buf);
+	extra_rows[0] = gettext("Select from all available WiFi networks");
+	/* width = 670 is the result of trial-and-error testing */
+	zargv = build_wlanlist_zargv(dlist, dlist_cnt, title, 670, extra_rows,
+	    sizeof (extra_rows) / sizeof (extra_rows[0]));
+	if (zargv == NULL) {
+		free(dlist);
+		return (NULL);
+	}
 
 	/*
 	 * If the user doesn't make a choice or something goes wrong
@@ -1210,11 +1330,12 @@ prompt_for_visited(void)
 	 * made from the visited list.  If the user *did* make a choice
 	 * (get_user_preference() returned 0), return the alloc'd struct.
 	 */
-	if (get_user_preference(zenity_cmd, select_str,	rescan_str,
-	    &req_conf, list) != 0)
+	if (get_user_preference(zargv, extra_rows[0], NULL, &req_conf,
+	    dlist) != 0)
 		req_conf = NULL;
 
-	free(list);
+	free(dlist);
+	free_argv(zargv);
 	return (req_conf);
 }
 
@@ -1275,46 +1396,86 @@ already_in_visited_wlan_list(const struct wireless_lan *new_wlan)
 }
 
 static char *
-get_zenity_response(const char *cmd)
+get_zenity_response(char *const *zargv)
 {
-	char buf[1024];
-	size_t buf_len;
-	char *rtnp;
-	FILE *cptr;
-	int ret;
+	int pfds[2];
+	pid_t pid;
+	int status, i;
+	char inbuf[ZENITY_RTN_BUF_SIZE];
+	ssize_t n, bytes_read;
+	char *rtnp = NULL;
 
 	if (!valid_graphical_user(B_TRUE))
 		return (NULL);
 
-	cptr = popen(cmd, "r");
-	if (cptr == NULL) {
-		syslog(LOG_ERR, "Could not run %s: %m", ZENITY);
+	if (pipe(pfds) < 0) {
+		syslog(LOG_ERR, "pipe() failed: %m");
 		return (NULL);
 	}
-	if (fgets(buf, sizeof (buf), cptr) != NULL) {
-		buf_len = strlen(buf);
-		if (buf_len > 0 && buf[buf_len - 1] == '\n')
-			buf[buf_len - 1] = '\0';
-		dprintf("get_zenity_resp: zenity returned '%s'", buf);
+	if ((pid = fork()) < 0) {
+		syslog(LOG_ERR, "fork() failed: %m");
+		return (NULL);
+	} else if (pid == 0) {
+		/*
+		 * child: close read side of pipe, point stdout at write side
+		 */
+		(void) close(pfds[0]);
+		if (dup2(pfds[1], STDOUT_FILENO) < 0) {
+			syslog(LOG_ERR, "dup2() failed: %m");
+			_exit(EXIT_FAILURE);
+		}
+		(void) close(pfds[1]);
+		(void) execv(ZENITY, zargv);
+		syslog(LOG_ERR, "execv() failed: %m");
+		_exit(EXIT_FAILURE);
 	} else {
-		buf[0] = '\0';
-		dprintf("get_zenity_resp: zenity returned nothing");
+		/*
+		 * parent: close write side of pipe, read from read side
+		 * to get zenity output from child.
+		 */
+		(void) close(pfds[1]);
+		(void) waitpid(pid, &status, 0);
+		if (WIFSIGNALED(status) || WIFSTOPPED(status)) {
+			i = WIFSIGNALED(status) ? WTERMSIG(status) :
+			    WSTOPSIG(status);
+			syslog(LOG_ERR, "%s %s with signal %d (%s)",
+			    ZENITY, (WIFSIGNALED(status) ? "terminated" :
+			    "stopped"), i, strsignal(i));
+			return (NULL);
+		}
+		bytes_read = 0;
+		do {
+			n = read(pfds[0], inbuf + bytes_read,
+			    sizeof (inbuf) - bytes_read);
+			if (n < 0) {
+				if (errno != EINTR) {
+					syslog(LOG_ERR, "read() failed: %m");
+					break;
+				}
+			} else {
+				bytes_read += n;
+			}
+			if (bytes_read == sizeof (inbuf)) {
+				bytes_read--;
+				syslog(LOG_WARNING, "get_zenity_response: too "
+				    "much data; input read will be limited to "
+				    "%d bytes", bytes_read);
+				break;
+			}
+		} while (n != 0);
+		(void) close(pfds[0]);
+		if (bytes_read == 0) {
+			syslog(LOG_ERR, "failed to read zenity output");
+			return (NULL);
+		}
+		if (inbuf[bytes_read - 1] == '\n')
+			inbuf[bytes_read - 1] = '\0';
+		else
+			inbuf[bytes_read] = '\0';
+
+		if ((rtnp = strdup(inbuf)) == NULL)
+			syslog(LOG_ERR, "get_zenity_response: strdup failed");
 	}
-	ret = pclose(cptr);
-	/*
-	 * We should probably make sure that those ZENITY_* exit
-	 * environment variables are not set first...
-	 */
-	if (ret == -1 || !WIFEXITED(ret) || (WEXITSTATUS(ret) == 255)) {
-		dprintf("get_zenity_resp: %s did not exit normally", ZENITY);
-		return (NULL);
-	}
-	if (WEXITSTATUS(ret) == 1) {
-		dprintf("get_zenity_resp: user cancelled");
-		return (NULL);
-	}
-	if ((rtnp = strdup(buf)) == NULL)
-		syslog(LOG_ERR, "get_zenity_response: strdup failed");
 
 	return (rtnp);
 }
@@ -1335,8 +1496,8 @@ get_zenity_response(const char *cmd)
  *  2: a compare string ("Rescan") was given, and the user response matched
  *     that string.  *req_lan is undefined.
  */
-int
-get_user_preference(const char *cmd, const char *compare_other,
+static int
+get_user_preference(char *const *zargv, const char *compare_other,
     const char *compare_rescan, struct wireless_lan **req_lan,
     const struct wireless_lan *list)
 {
@@ -1348,11 +1509,11 @@ get_user_preference(const char *cmd, const char *compare_other,
 	assert(req_lan != NULL);
 	wlp = calloc(1, sizeof (struct wireless_lan));
 	if (wlp == NULL) {
-		syslog(LOG_ERR, "malloc failed");
+		syslog(LOG_ERR, "calloc failed");
 		return (-1);
 	}
 
-	response = get_zenity_response(cmd);
+	response = get_zenity_response(zargv);
 	if (response == NULL) {
 		free(wlp);
 		return (-1);
@@ -1428,45 +1589,77 @@ dup_error:
 static struct wireless_lan *
 get_specific_lan(void)
 {
-	char specify_str[1024];
+	int zargc, cur;
+	char **zargv;
 	char *response;
-	struct wireless_lan *wlp;
+	struct wireless_lan *wlp = NULL;
 
 	/*
-	 * TRANSLATION_NOTE: the token "ESSID" should not be translated
-	 * in the phrase below.
+	 * build zenity 'entry' argv to get an ESSID:
+	 *	'zenity --entry --title=foo --text=bar'
+	 * Four args needed.
 	 */
-	(void) snprintf(specify_str, sizeof (specify_str), ZENITY
-	    " --entry --title=\"%s\" --text=\"%s\"",
-	    gettext("Specify WiFi network"), gettext("Enter ESSID"));
-
-	response = get_zenity_response(specify_str);
-	if (response == NULL)
+	zargc = 4;
+	if ((zargv = alloc_argv(zargc, ZENITY_ARG_LEN)) == NULL)
 		return (NULL);
+
+	cur = 0;
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, ZENITY);
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--entry");
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--title=%s",
+	    gettext("Specify WiFi Network"));
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--text=%s %s",
+	    gettext("Enter"), "ESSID");
+
+	response = get_zenity_response(zargv);
+	if (response == NULL)
+		goto cleanup;
+	free_argv(zargv);
 
 	wlp = calloc(1, sizeof (struct wireless_lan));
 	if (wlp == NULL) {
-		syslog(LOG_ERR, "malloc failed: %m");
-		free(response);
-		return (NULL);
+		syslog(LOG_ERR, "calloc failed: %m");
+		goto cleanup;
 	}
 	wlp->essid = response;
-
-	(void) snprintf(specify_str, sizeof (specify_str), ZENITY
-	    " --list --title=\"%s\" --text=\"%s\" --column=\"%s\" none wep wpa",
-	    gettext("Security"), gettext("Enter security"),
-	    gettext("Type"));
-
-	response = get_zenity_response(specify_str);
 	wlp->sec_mode = DLADM_WLAN_SECMODE_NONE;
+
+	/*
+	 * build zenity 'list' argv to get security mode:
+	 *	'zenity --list --title=foo --text=bar --column=baz <3 modes>'
+	 * Eight args needed.
+	 */
+	zargc = 8;
+	if ((zargv = alloc_argv(zargc, ZENITY_ARG_LEN)) == NULL) {
+		/* assume the default security mode, "none" */
+		return (wlp);
+	}
+
+	cur = 0;
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, ZENITY);
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--list");
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--title=%s",
+	    gettext("Security"));
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--text=%s",
+	    gettext("Enter security mode"));
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "--column=%s",
+	    gettext("Type"));
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "None");
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "WEP");
+	(void) snprintf(zargv[cur++], ZENITY_ARG_LEN, "WPA");
+
+	response = get_zenity_response(zargv);
+	/* "none" was set as the default earlier */
 	if (response != NULL) {
 		if (strcmp(response, "wep") == 0)
 			wlp->sec_mode = DLADM_WLAN_SECMODE_WEP;
 		else if (strcmp(response, "wpa") == 0)
 			wlp->sec_mode = DLADM_WLAN_SECMODE_WPA;
 	}
-
+cleanup:
+	free_argv(zargv);
 	free(response);
+
 	return (wlp);
 }
 

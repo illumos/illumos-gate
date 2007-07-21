@@ -62,8 +62,6 @@ extern int lookup_count_property(const char *, const char *, uint64_t *);
 
 /* wireless.c: wifi link handling */
 extern void init_mutexes(void);
-extern int get_user_preference(const char *, const char *, const char *,
-    struct wireless_lan **, const struct wireless_lan *);
 extern boolean_t connect_chosen_lan(struct wireless_lan *, const char *);
 struct wireless_lan *prompt_for_visited(void);
 boolean_t handle_wireless_lan(const char *);

@@ -639,6 +639,7 @@ boolean_t
 start_event_collection(void)
 {
 	int err;
+	boolean_t check_cache = B_TRUE;
 
 	/*
 	 * if these are ever created/destroyed repetitively then we will
@@ -660,7 +661,7 @@ start_event_collection(void)
 		dprintf("scan thread: %d", scan);
 	}
 
-	walk_interface(start_if_info_collect, NULL);
+	walk_interface(start_if_info_collect, &check_cache);
 
 	return (B_TRUE);
 }

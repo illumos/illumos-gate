@@ -1095,12 +1095,20 @@ initialize_interfaces(void)
 /*
  * Walker function used to start info gathering of each interface.
  */
-/* ARGSUSED */
 void
 start_if_info_collect(struct interface *ifp, void *arg)
 {
 	pthread_t if_thr;
 	pthread_attr_t attr;
+
+	/*
+	 * In certain cases we need to refresh the cached flags value as
+	 * it may be stale.  Notably, we can miss a DL_NOTE_LINK_DOWN
+	 * event after we initialize interfaces before the routing thread
+	 * is launched.
+	 */
+	if (arg != NULL && *(boolean_t *)arg)
+		ifp->if_flags = get_ifflags(ifp->if_name, ifp->if_family);
 
 	/*
 	 * Only if the cable of the wired interface is
