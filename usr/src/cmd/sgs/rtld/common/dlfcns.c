@@ -277,7 +277,7 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t flags)
 			ghp->gh_ownlmp = lml->lm_head;
 			ghp->gh_ownlml = lml;
 		} else {
-			uint_t	hflags = GPD_AVAIL;
+			uint_t	hflags = (GPD_DLSYM | GPD_RELOC);
 
 			ghp->gh_ownlmp = nlmp;
 			ghp->gh_ownlml = LIST(nlmp);
@@ -286,7 +286,7 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t flags)
 			 * As an optimization, a handle for ld.so.1 itself
 			 * (required for libdl's filtering mechanism) shouldn't
 			 * search any dependencies of ld.so.1.  Omitting
-			 * GDP_ADDEPS prevents the addition of any ld.so.1
+			 * GPD_ADDEPS prevents the addition of any ld.so.1
 			 * dependencies to this handle.
 			 */
 			if ((flags & GPH_LDSO) == 0)
@@ -331,14 +331,24 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t flags)
 	}
 
 	/*
-	 * If dlopen(..., RTLD_PARENT) add the caller to dependency list so that
-	 * it becomes part of this group.  As we could be opened by different
-	 * parents this test is carried out every time a handle is requested.
-	 * Note that a parent doesn't provide symbols via dlsym() so it also
-	 * isn't necessary to add its dependencies to the handle.
+	 * Keep track of the parent (caller).  If this request stems from a
+	 * dlopen(..., RTLD_PARENT) call, then the parent is made available to
+	 * satisfy relocation bindings.  Note, that individual, explicit,
+	 * direct bindings can also be made to the parent should this object
+	 * have been built defining PARENT symbol references.  Also note that a
+	 * parent doesn't provide symbols to dlsym() requests, so it isn't
+	 * necessary to add the parents dependencies to the handle.
+	 *
+	 * As this object could be opened by different parents, this test is
+	 * carried out every time a handle is requested.
 	 */
-	if ((flags & GPH_PARENT) && clmp) {
-		if (hdl_add(ghp, clmp, GPD_PARENT) == 0)
+	if (clmp) {
+		if (flags & GPH_PARENT)
+			flags = (GPD_PARENT | GPD_RELOC);
+		else
+			flags = GPD_PARENT;
+
+		if (hdl_add(ghp, clmp, flags) == 0)
 			return (0);
 	}
 	return (ghp);
@@ -393,7 +403,8 @@ hdl_initialize(Grp_hdl *ghp, Rt_map *nlmp, int mode, int promote)
 			if ((bdp->b_flags & BND_NEEDED) == 0)
 				continue;
 
-			if (hdl_add(ghp, dlmp, (GPD_AVAIL | GPD_ADDEPS)) == 0)
+			if (hdl_add(ghp, dlmp,
+			    (GPD_DLSYM | GPD_RELOC | GPD_ADDEPS)) == 0)
 				return (0);
 
 			(void) update_mode(dlmp, MODE(dlmp), mode);
@@ -1043,7 +1054,7 @@ dlsym_handle(Grp_hdl * ghp, Slookup * slp, Rt_map ** _lmp, uint_t *binfo)
 		Aliste		off;
 
 		for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
-			if ((gdp->gd_flags & GPD_AVAIL) == 0)
+			if ((gdp->gd_flags & GPD_DLSYM) == 0)
 				continue;
 
 			sl.sl_imap = gdp->gd_depend;
@@ -1068,7 +1079,7 @@ dlsym_handle(Grp_hdl * ghp, Slookup * slp, Rt_map ** _lmp, uint_t *binfo)
 			for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
 				nlmp = gdp->gd_depend;
 
-				if (((gdp->gd_flags & GPD_AVAIL) == 0) ||
+				if (((gdp->gd_flags & GPD_DLSYM) == 0) ||
 				    (LAZY(nlmp) == 0))
 					continue;
 

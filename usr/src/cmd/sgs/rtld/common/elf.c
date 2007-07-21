@@ -1646,7 +1646,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx)
 			 * Look for the symbol in the handles dependencies.
 			 */
 			for (ALIST_TRAVERSE(ghp->gh_depends, off, gdp)) {
-				if ((gdp->gd_flags & GPD_AVAIL) == 0)
+				if ((gdp->gd_flags & GPD_DLSYM) == 0)
 					continue;
 
 				/*

@@ -158,7 +158,8 @@ static const mdb_bitmask_t grhflags_bits[] = {
 };
 
 static const mdb_bitmask_t grdflags_bits[] = {
-	{ MSG_ORIG(MSG_GPD_AVAIL), GPD_AVAIL, GPD_AVAIL },
+	{ MSG_ORIG(MSG_GPD_DLSYM), GPD_DLSYM, GPD_DLSYM },
+	{ MSG_ORIG(MSG_GPD_RELOC), GPD_RELOC, GPD_RELOC },
 	{ MSG_ORIG(MSG_GPD_ADDEPS), GPD_ADDEPS, GPD_ADDEPS },
 	{ MSG_ORIG(MSG_GPD_PARENT), GPD_PARENT, GPD_PARENT },
 	{ MSG_ORIG(MSG_GPD_FILTER), GPD_FILTER, GPD_FILTER },

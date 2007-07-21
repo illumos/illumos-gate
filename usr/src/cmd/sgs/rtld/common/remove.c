@@ -628,7 +628,8 @@ gdp_collect(Alist **ghalpp, Alist **lmalpp, Grp_hdl *ghp1)
 		 * to analyze the parent itself for additional filters or
 		 * deletion.
 		 */
-		if ((gdp->gd_flags & GPD_ADDEPS) == 0)
+		if ((gdp->gd_flags & GPD_PARENT) ||
+		    ((gdp->gd_flags & GPD_ADDEPS) == 0))
 			continue;
 
 		if ((action = alist_test(lmalpp, lmp, sizeof (Rt_map *),
@@ -1249,7 +1250,15 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 
 			lmp = gdp->gd_depend;
 
-			if (FLAGS(lmp) & FLG_RT_DELETE) {
+			/*
+			 * Note, we must never delete a parent.  The parent
+			 * may already be tagged for deletion from a previous
+			 * dlclose(). That dlclose has triggered this dlclose(),
+			 * but the parents deletion is the responsibility of the
+			 * previous dlclose(), not this one.
+			 */
+			if ((FLAGS(lmp) & FLG_RT_DELETE) &&
+			    ((gdp->gd_flags & GPD_PARENT) == 0)) {
 				flag = DBG_DEP_DELETE;
 
 				/*
@@ -1382,7 +1391,9 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 					 * sure the filtees reference count
 					 * gets decremented.
 					 */
-					if (FLAGS(lmp) & FLG_RT_DELETE) {
+					if ((FLAGS(lmp) & FLG_RT_DELETE) &&
+					    ((gdp->gd_flags &
+					    GPD_PARENT) == 0)) {
 						(void) dlclose_core(ghp,
 						    lmp, lml);
 					}
@@ -1420,10 +1431,15 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 		}
 
 		/*
-		 * Traverse each handle dependency.
+		 * Traverse each handle dependency.  Retain the dependencies
+		 * flags to insure we don't delete any parents (the flags
+		 * information is deleted as part of the alist removal that
+		 * occurs before we inspect the object for deletion).
 		 */
 		for (ALIST_TRAVERSE(ghp->gh_depends, off2, gdp)) {
-			if ((gdp->gd_flags & GPD_REMOVE) == 0)
+			uint_t	flags = gdp->gd_flags;
+
+			if ((flags & GPD_REMOVE) == 0)
 				continue;
 
 			lmp = gdp->gd_depend;
@@ -1444,7 +1460,8 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 			/*
 			 * Complete the link-map deletion if appropriate.
 			 */
-			if (FLAGS(lmp) & FLG_RT_DELETE) {
+			if ((FLAGS(lmp) & FLG_RT_DELETE) &&
+			    ((flags & GPD_PARENT) == 0)) {
 				tls_modaddrem(lmp, TM_FLG_MODREM);
 				remove_so(LIST(lmp), lmp);
 			}

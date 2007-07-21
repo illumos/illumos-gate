@@ -418,11 +418,13 @@ typedef struct {
 	uint_t		gd_flags;	/* dependency flags */
 } Grp_desc;
 
-#define	GPD_AVAIL	0x0001		/* dependency available to dlsym() */
-#define	GPD_ADDEPS	0x0002		/* dependencies of this dependency */
+#define	GPD_DLSYM	0x0001		/* dependency available to dlsym() */
+#define	GPD_RELOC	0x0002		/* dependency available to satisfy */
+					/*	relocation binding */
+#define	GPD_ADDEPS	0x0004		/* dependencies of this dependency */
 					/*	should be added to handle */
-#define	GPD_PARENT	0x0004		/* dependency is a parent */
-#define	GPD_FILTER	0x0008		/* dependency is our filter */
+#define	GPD_PARENT	0x0008		/* dependency is a parent */
+#define	GPD_FILTER	0x0010		/* dependency is our filter */
 #define	GPD_REMOVE	0x1000		/* descriptor is a candidate for */
 					/*	removal from the group */
 

@@ -3304,11 +3304,11 @@ leave(Lm_list *lml)
 }
 
 int
-callable(Rt_map * clmp, Rt_map * dlmp, Grp_hdl * ghp)
+callable(Rt_map *clmp, Rt_map *dlmp, Grp_hdl *ghp)
 {
-	Alist *		calp, * dalp;
-	Aliste		cnt1, cnt2;
-	Grp_hdl **	ghpp1, ** ghpp2;
+	Alist		*calp, *dalp;
+	Aliste		off1, off2;
+	Grp_hdl		**ghpp1, **ghpp2;
 
 	/*
 	 * An object can always find symbols within itself.
@@ -3342,7 +3342,7 @@ callable(Rt_map * clmp, Rt_map * dlmp, Grp_hdl * ghp)
 	/*
 	 * Traverse the list of groups the caller is a part of.
 	 */
-	for (ALIST_TRAVERSE(calp, cnt1, ghpp1)) {
+	for (ALIST_TRAVERSE(calp, off1, ghpp1)) {
 		/*
 		 * If we're testing for the ability of two objects to bind to
 		 * each other regardless of a specific group, ignore that group.
@@ -3353,9 +3353,28 @@ callable(Rt_map * clmp, Rt_map * dlmp, Grp_hdl * ghp)
 		/*
 		 * Traverse the list of groups the destination is a part of.
 		 */
-		for (ALIST_TRAVERSE(dalp, cnt2, ghpp2)) {
-			if (*ghpp1 == *ghpp2)
-				return (1);
+		for (ALIST_TRAVERSE(dalp, off2, ghpp2)) {
+			Grp_desc	*gdp;
+			Aliste		off3;
+
+			if (*ghpp1 != *ghpp2)
+				continue;
+
+			/*
+			 * Make sure the relationship between the destination
+			 * and the caller provide symbols for relocation.
+			 * Parents are maintained as callers, but unless the
+			 * destination object was opened with RTLD_PARENT, the
+			 * parent doesn't provide symbols for the destination
+			 * to relocate against.
+			 */
+			for (ALIST_TRAVERSE((*ghpp2)->gh_depends, off3, gdp)) {
+				if (dlmp != gdp->gd_depend)
+					continue;
+
+				if (gdp->gd_flags & GPD_RELOC)
+					return (1);
+			}
 		}
 	}
 	return (0);

@@ -2085,7 +2085,7 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 			continue;
 
 		if ((exist = hdl_add(ghp, nlmp,
-		    (GPD_AVAIL | GPD_ADDEPS))) == 0)
+		    (GPD_DLSYM | GPD_RELOC | GPD_ADDEPS))) == 0)
 			return (0);
 
 		/*
@@ -2141,7 +2141,7 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 				continue;
 
 			if ((exist = hdl_add(ghp, dlmp1,
-			    (GPD_AVAIL | GPD_ADDEPS))) != 0) {
+			    (GPD_DLSYM | GPD_RELOC | GPD_ADDEPS))) != 0) {
 				if (exist == ALE_CREATE) {
 					(void) update_mode(dlmp1, MODE(dlmp1),
 					    nmode);
@@ -2512,21 +2512,47 @@ lookup_sym_direct(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Syminfo *sip,
 	}
 
 	/*
-	 * If we need to direct bind to our parent start looking in each caller
-	 * link map.
+	 * If we need to directly bind to our parent, start looking in each
+	 * callers link map.
 	 */
 	sl = *slp;
 	sl.sl_flags |= LKUP_DIRECT;
 	sym = 0;
 
 	if (sip->si_boundto == SYMINFO_BT_PARENT) {
-		Aliste		off;
-		Bnd_desc **	bdpp;
+		Aliste		off1;
+		Bnd_desc	**bdpp;
+		Grp_hdl		**ghpp;
 
-		for (ALIST_TRAVERSE(CALLERS(clmp), off, bdpp)) {
+		/*
+		 * Determine the parent of this explicit dependency from its
+		 * CALLERS()'s list.
+		 */
+		for (ALIST_TRAVERSE(CALLERS(clmp), off1, bdpp)) {
 			sl.sl_imap = lmp = (*bdpp)->b_caller;
 			if ((sym = SYMINTP(lmp)(&sl, dlmp, binfo)) != 0)
-				break;
+				goto found;
+		}
+
+		/*
+		 * A caller can also be defined as the parent of a dlopen()
+		 * call.  Determine whether this object has any handles.  The
+		 * dependencies maintained with the handle represent the
+		 * explicit dependencies of the dlopen()'ed object, and the
+		 * calling parent.
+		 */
+		for (ALIST_TRAVERSE(HANDLES(clmp), off1, ghpp)) {
+			Grp_hdl		*ghp = *ghpp;
+			Grp_desc	*gdp;
+			Aliste		off2;
+
+			for (ALIST_TRAVERSE(ghp->gh_depends, off2, gdp)) {
+				if ((gdp->gd_flags & GPD_PARENT) == 0)
+					continue;
+				sl.sl_imap = lmp = gdp->gd_depend;
+				if ((sym = SYMINTP(lmp)(&sl, dlmp, binfo)) != 0)
+					goto found;
+			}
 		}
 	} else {
 		/*
@@ -2541,7 +2567,7 @@ lookup_sym_direct(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Syminfo *sip,
 		if (lmp)
 			sym = SYMINTP(lmp)(&sl, dlmp, binfo);
 	}
-
+found:
 	if (sym)
 		*binfo |= DBG_BINFO_DIRECT;
 
