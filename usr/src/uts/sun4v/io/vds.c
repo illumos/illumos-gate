@@ -50,6 +50,7 @@
 #include <sys/vtoc.h>
 #include <sys/vfs.h>
 #include <sys/stat.h>
+#include <sys/scsi/impl/uscsi.h>
 #include <vm/seg_map.h>
 
 /* Virtual disk server initialization flags */
@@ -88,6 +89,12 @@
 /* Flags for writing to a vdisk which is a file */
 #define	VD_FILE_WRITE_FLAGS	SM_ASYNC
 
+/* Number of backup labels */
+#define	VD_FILE_NUM_BACKUP	5
+
+/* Timeout for SCSI I/O */
+#define	VD_SCSI_RDWR_TIMEOUT	30	/* 30 secs */
+
 /*
  * By Solaris convention, slice/partition 2 represents the entire disk;
  * unfortunately, this convention does not appear to be codified.
@@ -118,17 +125,14 @@
 		(((vd)->xfer_mode == 0) ? "null client" :		\
 		    "unsupported client")))
 
-/* For IO to raw disk on file */
-#define	VD_FILE_SLICE_NONE	-1
-
 /* Read disk label from a disk on file */
 #define	VD_FILE_LABEL_READ(vd, labelp) \
-	vd_file_rw(vd, VD_FILE_SLICE_NONE, VD_OP_BREAD, (caddr_t)labelp, \
+	vd_file_rw(vd, VD_SLICE_NONE, VD_OP_BREAD, (caddr_t)labelp, \
 	    0, sizeof (struct dk_label))
 
 /* Write disk label to a disk on file */
 #define	VD_FILE_LABEL_WRITE(vd, labelp)	\
-	vd_file_rw(vd, VD_FILE_SLICE_NONE, VD_OP_BWRITE, (caddr_t)labelp, \
+	vd_file_rw(vd, VD_SLICE_NONE, VD_OP_BWRITE, (caddr_t)labelp, \
 	    0, sizeof (struct dk_label))
 
 /*
@@ -314,6 +318,7 @@ typedef struct vd {
 	boolean_t		file;		/* underlying file */
 	vnode_t			*file_vnode;	/* file vnode */
 	size_t			file_size;	/* file size */
+	ddi_devid_t		file_devid;	/* devid for disk image */
 	struct dk_efi		dk_efi;		/* synthetic for slice type */
 	struct dk_geom		dk_geom;	/* synthetic for slice type */
 	struct vtoc		vtoc;		/* synthetic for slice type */
@@ -374,6 +379,8 @@ static int	vd_open_flags = VD_OPEN_FLAGS;
 
 static uint_t	vd_file_write_flags = VD_FILE_WRITE_FLAGS;
 
+static short	vd_scsi_rdwr_timeout = VD_SCSI_RDWR_TIMEOUT;
+
 /*
  * Supported protocol version pairs, from highest (newest) to lowest (oldest)
  *
@@ -399,8 +406,8 @@ static boolean_t vd_enabled(vd_t *vd);
  * Parameters:
  *	vd		- disk on which the operation is performed.
  *	slice		- slice on which the operation is performed,
- *			  VD_FILE_SLICE_NONE indicates that the operation
- *			  is done on the raw disk.
+ *			  VD_SLICE_NONE indicates that the operation
+ *			  is done using an absolute disk offset.
  *	operation	- operation to execute: read (VD_OP_BREAD) or
  *			  write (VD_OP_BWRITE).
  *	data		- buffer where data are read to or written from.
@@ -424,7 +431,7 @@ vd_file_rw(vd_t *vd, int slice, int operation, caddr_t data, size_t blk,
 	ASSERT(vd->file);
 	ASSERT(len > 0);
 
-	if (slice == VD_FILE_SLICE_NONE) {
+	if (slice == VD_SLICE_NONE) {
 		/* raw disk access */
 		offset = blk * DEV_BSIZE;
 	} else {
@@ -508,6 +515,383 @@ vd_file_rw(vd_t *vd, int slice, int operation, caddr_t data, size_t blk,
 	return (len);
 }
 
+/*
+ * Function:
+ *	vd_file_set_vtoc
+ *
+ * Description:
+ *	Set the vtoc of a disk image by writing the label and backup
+ *	labels into the disk image backend.
+ *
+ * Parameters:
+ *	vd		- disk on which the operation is performed.
+ *	label		- the data to be written.
+ *
+ * Return Code:
+ *	0		- success.
+ *	n > 0		- error, n indicates the errno code.
+ */
+static int
+vd_file_set_vtoc(vd_t *vd, struct dk_label *label)
+{
+	int blk, sec, cyl, head, cnt;
+
+	ASSERT(vd->file);
+
+	if (VD_FILE_LABEL_WRITE(vd, label) < 0) {
+		PR0("fail to write disk label");
+		return (EIO);
+	}
+
+	/*
+	 * Backup labels are on the last alternate cylinder's
+	 * first five odd sectors.
+	 */
+	if (label->dkl_acyl == 0) {
+		PR0("no alternate cylinder, can not store backup labels");
+		return (0);
+	}
+
+	cyl = label->dkl_ncyl  + label->dkl_acyl - 1;
+	head = label->dkl_nhead - 1;
+
+	blk = (cyl * ((label->dkl_nhead * label->dkl_nsect) - label->dkl_apc)) +
+	    (head * label->dkl_nsect);
+
+	/*
+	 * Write the backup labels. Make sure we don't try to write past
+	 * the last cylinder.
+	 */
+	sec = 1;
+
+	for (cnt = 0; cnt < VD_FILE_NUM_BACKUP; cnt++) {
+
+		if (sec >= label->dkl_nsect) {
+			PR0("not enough sector to store all backup labels");
+			return (0);
+		}
+
+		if (vd_file_rw(vd, VD_SLICE_NONE, VD_OP_BWRITE, (caddr_t)label,
+		    blk + sec, sizeof (struct dk_label)) < 0) {
+			PR0("error writing backup label at block %d\n",
+			    blk + sec);
+			return (EIO);
+		}
+
+		PR1("wrote backup label at block %d\n", blk + sec);
+
+		sec += 2;
+	}
+
+	return (0);
+}
+
+/*
+ * Function:
+ *	vd_file_get_devid_block
+ *
+ * Description:
+ *	Return the block number where the device id is stored.
+ *
+ * Parameters:
+ *	vd		- disk on which the operation is performed.
+ *	blkp		- pointer to the block number
+ *
+ * Return Code:
+ *	0		- success
+ *	ENOSPC		- disk has no space to store a device id
+ */
+static int
+vd_file_get_devid_block(vd_t *vd, size_t *blkp)
+{
+	diskaddr_t spc, head, cyl;
+
+	ASSERT(vd->file);
+	ASSERT(vd->vdisk_label == VD_DISK_LABEL_VTOC);
+
+	/* this geometry doesn't allow us to have a devid */
+	if (vd->dk_geom.dkg_acyl < 2) {
+		PR0("not enough alternate cylinder available for devid "
+		    "(acyl=%u)", vd->dk_geom.dkg_acyl);
+		return (ENOSPC);
+	}
+
+	/* the devid is in on the track next to the last cylinder */
+	cyl = vd->dk_geom.dkg_ncyl + vd->dk_geom.dkg_acyl - 2;
+	spc = vd->dk_geom.dkg_nhead * vd->dk_geom.dkg_nsect;
+	head = vd->dk_geom.dkg_nhead - 1;
+
+	*blkp = (cyl * (spc - vd->dk_geom.dkg_apc)) +
+	    (head * vd->dk_geom.dkg_nsect) + 1;
+
+	return (0);
+}
+
+/*
+ * Return the checksum of a disk block containing an on-disk devid.
+ */
+static uint_t
+vd_dkdevid2cksum(struct dk_devid *dkdevid)
+{
+	uint_t chksum, *ip;
+	int i;
+
+	chksum = 0;
+	ip = (uint_t *)dkdevid;
+	for (i = 0; i < ((DEV_BSIZE - sizeof (int)) / sizeof (int)); i++)
+		chksum ^= ip[i];
+
+	return (chksum);
+}
+
+/*
+ * Function:
+ *	vd_file_read_devid
+ *
+ * Description:
+ *	Read the device id stored on a disk image.
+ *
+ * Parameters:
+ *	vd		- disk on which the operation is performed.
+ *	devid		- the return address of the device ID.
+ *
+ * Return Code:
+ *	0		- success
+ *	EIO		- I/O error while trying to access the disk image
+ *	EINVAL		- no valid device id was found
+ *	ENOSPC		- disk has no space to store a device id
+ */
+static int
+vd_file_read_devid(vd_t *vd, ddi_devid_t *devid)
+{
+	struct dk_devid *dkdevid;
+	size_t blk;
+	uint_t chksum;
+	int status, sz;
+
+	if ((status = vd_file_get_devid_block(vd, &blk)) != 0)
+		return (status);
+
+	dkdevid = kmem_zalloc(DEV_BSIZE, KM_SLEEP);
+
+	/* get the devid */
+	if ((vd_file_rw(vd, VD_SLICE_NONE, VD_OP_BREAD, (caddr_t)dkdevid, blk,
+	    DEV_BSIZE)) < 0) {
+		PR0("error reading devid block at %lu", blk);
+		status = EIO;
+		goto done;
+	}
+
+	/* validate the revision */
+	if ((dkdevid->dkd_rev_hi != DK_DEVID_REV_MSB) ||
+	    (dkdevid->dkd_rev_lo != DK_DEVID_REV_LSB)) {
+		PR0("invalid devid found at block %lu (bad revision)", blk);
+		status = EINVAL;
+		goto done;
+	}
+
+	/* compute checksum */
+	chksum = vd_dkdevid2cksum(dkdevid);
+
+	/* compare the checksums */
+	if (DKD_GETCHKSUM(dkdevid) != chksum) {
+		PR0("invalid devid found at block %lu (bad checksum)", blk);
+		status = EINVAL;
+		goto done;
+	}
+
+	/* validate the device id */
+	if (ddi_devid_valid((ddi_devid_t)&dkdevid->dkd_devid) != DDI_SUCCESS) {
+		PR0("invalid devid found at block %lu", blk);
+		status = EINVAL;
+		goto done;
+	}
+
+	PR1("devid read at block %lu", blk);
+
+	sz = ddi_devid_sizeof((ddi_devid_t)&dkdevid->dkd_devid);
+	*devid = kmem_alloc(sz, KM_SLEEP);
+	bcopy(&dkdevid->dkd_devid, *devid, sz);
+
+done:
+	kmem_free(dkdevid, DEV_BSIZE);
+	return (status);
+
+}
+
+/*
+ * Function:
+ *	vd_file_write_devid
+ *
+ * Description:
+ *	Write a device id into disk image.
+ *
+ * Parameters:
+ *	vd		- disk on which the operation is performed.
+ *	devid		- the device ID to store.
+ *
+ * Return Code:
+ *	0		- success
+ *	EIO		- I/O error while trying to access the disk image
+ *	ENOSPC		- disk has no space to store a device id
+ */
+static int
+vd_file_write_devid(vd_t *vd, ddi_devid_t devid)
+{
+	struct dk_devid *dkdevid;
+	uint_t chksum;
+	size_t blk;
+	int status;
+
+	if ((status = vd_file_get_devid_block(vd, &blk)) != 0)
+		return (status);
+
+	dkdevid = kmem_zalloc(DEV_BSIZE, KM_SLEEP);
+
+	/* set revision */
+	dkdevid->dkd_rev_hi = DK_DEVID_REV_MSB;
+	dkdevid->dkd_rev_lo = DK_DEVID_REV_LSB;
+
+	/* copy devid */
+	bcopy(devid, &dkdevid->dkd_devid, ddi_devid_sizeof(devid));
+
+	/* compute checksum */
+	chksum = vd_dkdevid2cksum(dkdevid);
+
+	/* set checksum */
+	DKD_FORMCHKSUM(chksum, dkdevid);
+
+	/* store the devid */
+	if ((status = vd_file_rw(vd, VD_SLICE_NONE, VD_OP_BWRITE,
+	    (caddr_t)dkdevid, blk, DEV_BSIZE)) < 0) {
+		PR0("Error writing devid block at %lu", blk);
+		status = EIO;
+	} else {
+		PR1("devid written at block %lu", blk);
+		status = 0;
+	}
+
+	kmem_free(dkdevid, DEV_BSIZE);
+	return (status);
+}
+
+/*
+ * Function:
+ *	vd_scsi_rdwr
+ *
+ * Description:
+ * 	Read or write to a SCSI disk using an absolute disk offset.
+ *
+ * Parameters:
+ *	vd		- disk on which the operation is performed.
+ *	operation	- operation to execute: read (VD_OP_BREAD) or
+ *			  write (VD_OP_BWRITE).
+ *	data		- buffer where data are read to or written from.
+ *	blk		- starting block for the operation.
+ *	len		- number of bytes to read or write.
+ *
+ * Return Code:
+ *	0		- success
+ *	n != 0		- error.
+ */
+static int
+vd_scsi_rdwr(vd_t *vd, int operation, caddr_t data, size_t blk, size_t len)
+{
+	struct uscsi_cmd ucmd;
+	union scsi_cdb cdb;
+	int nsectors, nblk;
+	int max_sectors;
+	int status, rval;
+
+	ASSERT(!vd->file);
+
+	max_sectors = vd->max_xfer_sz;
+	nblk = (len / DEV_BSIZE);
+
+	if (len % DEV_BSIZE != 0)
+		return (EINVAL);
+
+	/*
+	 * Build and execute the uscsi ioctl.  We build a group0, group1
+	 * or group4 command as necessary, since some targets
+	 * do not support group1 commands.
+	 */
+	while (nblk) {
+
+		bzero(&ucmd, sizeof (ucmd));
+		bzero(&cdb, sizeof (cdb));
+
+		nsectors = (max_sectors < nblk) ? max_sectors : nblk;
+
+		if (blk < (2 << 20) && nsectors <= 0xff) {
+			FORMG0ADDR(&cdb, blk);
+			FORMG0COUNT(&cdb, nsectors);
+			ucmd.uscsi_cdblen = CDB_GROUP0;
+		} else if (blk > 0xffffffff) {
+			FORMG4LONGADDR(&cdb, blk);
+			FORMG4COUNT(&cdb, nsectors);
+			ucmd.uscsi_cdblen = CDB_GROUP4;
+			cdb.scc_cmd |= SCMD_GROUP4;
+		} else {
+			FORMG1ADDR(&cdb, blk);
+			FORMG1COUNT(&cdb, nsectors);
+			ucmd.uscsi_cdblen = CDB_GROUP1;
+			cdb.scc_cmd |= SCMD_GROUP1;
+		}
+
+		ucmd.uscsi_cdb = (caddr_t)&cdb;
+		ucmd.uscsi_bufaddr = data;
+		ucmd.uscsi_buflen = nsectors * DEV_BSIZE;
+		ucmd.uscsi_timeout = vd_scsi_rdwr_timeout;
+		/*
+		 * Set flags so that the command is isolated from normal
+		 * commands and no error message is printed.
+		 */
+		ucmd.uscsi_flags = USCSI_ISOLATE | USCSI_SILENT;
+
+		if (operation == VD_OP_BREAD) {
+			cdb.scc_cmd |= SCMD_READ;
+			ucmd.uscsi_flags |= USCSI_READ;
+		} else {
+			cdb.scc_cmd |= SCMD_WRITE;
+		}
+
+		status = ldi_ioctl(vd->ldi_handle[VD_ENTIRE_DISK_SLICE],
+		    USCSICMD, (intptr_t)&ucmd, (vd_open_flags | FKIOCTL),
+		    kcred, &rval);
+
+		if (status == 0)
+			status = ucmd.uscsi_status;
+
+		if (status != 0)
+			break;
+
+		/*
+		 * Check if partial DMA breakup is required. If so, reduce
+		 * the request size by half and retry the last request.
+		 */
+		if (ucmd.uscsi_resid == ucmd.uscsi_buflen) {
+			max_sectors >>= 1;
+			if (max_sectors <= 0) {
+				status = EIO;
+				break;
+			}
+			continue;
+		}
+
+		if (ucmd.uscsi_resid != 0) {
+			status = EIO;
+			break;
+		}
+
+		blk += nsectors;
+		nblk -= nsectors;
+		data += nsectors * DEV_BSIZE; /* SECSIZE */
+	}
+
+	return (status);
+}
+
 static int
 vd_start_bio(vd_task_t *task)
 {
@@ -523,7 +907,7 @@ vd_start_bio(vd_task_t *task)
 
 	slice = request->slice;
 
-	ASSERT(slice < vd->nslices);
+	ASSERT(slice == VD_SLICE_NONE || slice < vd->nslices);
 	ASSERT((request->operation == VD_OP_BREAD) ||
 	    (request->operation == VD_OP_BWRITE));
 
@@ -538,7 +922,7 @@ vd_start_bio(vd_task_t *task)
 	buf->b_flags		= B_BUSY;
 	buf->b_bcount		= request->nbytes;
 	buf->b_lblkno		= request->addr;
-	buf->b_edev		= vd->dev[slice];
+	buf->b_edev = (slice == VD_SLICE_NONE)? NODEV : vd->dev[slice];
 
 	mtype = (&vd->inband_task == task) ? LDC_SHADOW_MAP : LDC_DIRECT_MAP;
 
@@ -574,9 +958,32 @@ vd_start_bio(vd_task_t *task)
 			status = 0;
 		}
 	} else {
-		status = ldi_strategy(vd->ldi_handle[slice], buf);
-		if (status == 0)
-			return (EINPROGRESS); /* will complete on completionq */
+		if (slice == VD_SLICE_NONE) {
+			/*
+			 * This is not a disk image so it is a real disk. We
+			 * assume that the underlying device driver supports
+			 * USCSICMD ioctls. This is the case of all SCSI devices
+			 * (sd, ssd...).
+			 *
+			 * In the future if we have non-SCSI disks we would need
+			 * to invoke the appropriate function to do I/O using an
+			 * absolute disk offset (for example using DKIOCTL_RWCMD
+			 * for IDE disks).
+			 */
+			rv = vd_scsi_rdwr(vd, request->operation,
+			    buf->b_un.b_addr, request->addr, request->nbytes);
+			if (rv != 0) {
+				request->nbytes = 0;
+				status = EIO;
+			} else {
+				status = 0;
+			}
+		} else {
+			status = ldi_strategy(vd->ldi_handle[slice], buf);
+			if (status == 0)
+				/* will complete on completionq */
+				return (EINPROGRESS);
+		}
 	}
 
 	/* Clean up after error */
@@ -980,16 +1387,17 @@ vd_lbl2cksum(struct dk_label *label)
 	return (sum);
 }
 
+/*
+ * Handle ioctls to a disk slice.
+ */
 static int
 vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 {
 	dk_efi_t *dk_ioc;
-	struct dk_label label;
-	struct vtoc *vtoc;
-	int i;
 
 	switch (vd->vdisk_label) {
 
+	/* ioctls for a slice from a disk with a VTOC label */
 	case VD_DISK_LABEL_VTOC:
 
 		switch (cmd) {
@@ -1001,70 +1409,11 @@ vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 			ASSERT(ioctl_arg != NULL);
 			bcopy(&vd->vtoc, ioctl_arg, sizeof (vd->vtoc));
 			return (0);
-		case DKIOCSVTOC:
-			if (!vd->file)
-				return (ENOTSUP);
-			ASSERT(ioctl_arg != NULL);
-			vtoc = (struct vtoc *)ioctl_arg;
-
-			if (vtoc->v_sanity != VTOC_SANE ||
-			    vtoc->v_sectorsz != DEV_BSIZE ||
-			    vtoc->v_nparts != V_NUMPAR)
-				return (EINVAL);
-
-			bzero(&label, sizeof (label));
-			label.dkl_ncyl = vd->dk_geom.dkg_ncyl;
-			label.dkl_acyl = vd->dk_geom.dkg_acyl;
-			label.dkl_pcyl = vd->dk_geom.dkg_pcyl;
-			label.dkl_nhead = vd->dk_geom.dkg_nhead;
-			label.dkl_nsect = vd->dk_geom.dkg_nsect;
-			label.dkl_intrlv = vd->dk_geom.dkg_intrlv;
-			label.dkl_apc = vd->dk_geom.dkg_apc;
-			label.dkl_rpm = vd->dk_geom.dkg_rpm;
-			label.dkl_write_reinstruct =
-				vd->dk_geom.dkg_write_reinstruct;
-			label.dkl_read_reinstruct =
-				vd->dk_geom.dkg_read_reinstruct;
-
-			label.dkl_vtoc.v_nparts = vtoc->v_nparts;
-			label.dkl_vtoc.v_sanity = vtoc->v_sanity;
-			label.dkl_vtoc.v_version = vtoc->v_version;
-			for (i = 0; i < vtoc->v_nparts; i++) {
-				label.dkl_vtoc.v_timestamp[i] =
-				    vtoc->timestamp[i];
-				label.dkl_vtoc.v_part[i].p_tag =
-				    vtoc->v_part[i].p_tag;
-				label.dkl_vtoc.v_part[i].p_flag =
-				    vtoc->v_part[i].p_flag;
-				label.dkl_map[i].dkl_cylno =
-					vtoc->v_part[i].p_start /
-					(label.dkl_nhead * label.dkl_nsect);
-				label.dkl_map[i].dkl_nblk =
-				    vtoc->v_part[i].p_size;
-			}
-			bcopy(vtoc->v_asciilabel, label.dkl_asciilabel,
-			    LEN_DKL_ASCII);
-			bcopy(vtoc->v_volume, label.dkl_vtoc.v_volume,
-			    LEN_DKL_VVOL);
-			bcopy(vtoc->v_bootinfo, label.dkl_vtoc.v_bootinfo,
-			    sizeof (vtoc->v_bootinfo));
-
-			/* re-compute checksum */
-			label.dkl_magic = DKL_MAGIC;
-			label.dkl_cksum = vd_lbl2cksum(&label);
-
-			/* write label to file */
-			if (VD_FILE_LABEL_WRITE(vd, &label) < 0)
-				return (EIO);
-
-			/* update the cached vdisk VTOC */
-			bcopy(vtoc, &vd->vtoc, sizeof (vd->vtoc));
-
-			return (0);
 		default:
 			return (ENOTSUP);
 		}
 
+	/* ioctls for a slice from a disk with an EFI label */
 	case VD_DISK_LABEL_EFI:
 
 		switch (cmd) {
@@ -1079,6 +1428,188 @@ vd_do_slice_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
 		default:
 			return (ENOTSUP);
 		}
+
+	default:
+		return (ENOTSUP);
+	}
+}
+
+/*
+ * Handle ioctls to a disk image.
+ */
+static int
+vd_do_file_ioctl(vd_t *vd, int cmd, void *ioctl_arg)
+{
+	struct dk_label label;
+	struct dk_geom *geom;
+	struct vtoc *vtoc;
+	int i, rc;
+
+	ASSERT(vd->file);
+	ASSERT(vd->vdisk_label == VD_DISK_LABEL_VTOC);
+
+	switch (cmd) {
+
+	case DKIOCGGEOM:
+		ASSERT(ioctl_arg != NULL);
+		geom = (struct dk_geom *)ioctl_arg;
+
+		if (VD_FILE_LABEL_READ(vd, &label) < 0)
+			return (EIO);
+
+		if (label.dkl_magic != DKL_MAGIC ||
+		    label.dkl_cksum != vd_lbl2cksum(&label))
+			return (EINVAL);
+
+		bzero(geom, sizeof (struct dk_geom));
+		geom->dkg_ncyl = label.dkl_ncyl;
+		geom->dkg_acyl = label.dkl_acyl;
+		geom->dkg_nhead = label.dkl_nhead;
+		geom->dkg_nsect = label.dkl_nsect;
+		geom->dkg_intrlv = label.dkl_intrlv;
+		geom->dkg_apc = label.dkl_apc;
+		geom->dkg_rpm = label.dkl_rpm;
+		geom->dkg_pcyl = label.dkl_pcyl;
+		geom->dkg_write_reinstruct = label.dkl_write_reinstruct;
+		geom->dkg_read_reinstruct = label.dkl_read_reinstruct;
+
+		return (0);
+
+	case DKIOCGVTOC:
+		ASSERT(ioctl_arg != NULL);
+		vtoc = (struct vtoc *)ioctl_arg;
+
+		if (VD_FILE_LABEL_READ(vd, &label) < 0)
+			return (EIO);
+
+		if (label.dkl_magic != DKL_MAGIC ||
+		    label.dkl_cksum != vd_lbl2cksum(&label))
+			return (EINVAL);
+
+		bzero(vtoc, sizeof (struct vtoc));
+
+		vtoc->v_sanity = label.dkl_vtoc.v_sanity;
+		vtoc->v_version = label.dkl_vtoc.v_version;
+		vtoc->v_sectorsz = DEV_BSIZE;
+		vtoc->v_nparts = label.dkl_vtoc.v_nparts;
+
+		for (i = 0; i < vtoc->v_nparts; i++) {
+			vtoc->v_part[i].p_tag =
+			    label.dkl_vtoc.v_part[i].p_tag;
+			vtoc->v_part[i].p_flag =
+			    label.dkl_vtoc.v_part[i].p_flag;
+			vtoc->v_part[i].p_start =
+			    label.dkl_map[i].dkl_cylno *
+			    (label.dkl_nhead * label.dkl_nsect);
+			vtoc->v_part[i].p_size = label.dkl_map[i].dkl_nblk;
+			vtoc->timestamp[i] =
+			    label.dkl_vtoc.v_timestamp[i];
+		}
+		/*
+		 * The bootinfo array can not be copied with bcopy() because
+		 * elements are of type long in vtoc (so 64-bit) and of type
+		 * int in dk_vtoc (so 32-bit).
+		 */
+		vtoc->v_bootinfo[0] = label.dkl_vtoc.v_bootinfo[0];
+		vtoc->v_bootinfo[1] = label.dkl_vtoc.v_bootinfo[1];
+		vtoc->v_bootinfo[2] = label.dkl_vtoc.v_bootinfo[2];
+		bcopy(label.dkl_asciilabel, vtoc->v_asciilabel,
+		    LEN_DKL_ASCII);
+		bcopy(label.dkl_vtoc.v_volume, vtoc->v_volume,
+		    LEN_DKL_VVOL);
+
+		return (0);
+
+	case DKIOCSGEOM:
+		ASSERT(ioctl_arg != NULL);
+		geom = (struct dk_geom *)ioctl_arg;
+
+		if (geom->dkg_nhead == 0 || geom->dkg_nsect == 0)
+			return (EINVAL);
+
+		/*
+		 * The current device geometry is not updated, just the driver
+		 * "notion" of it. The device geometry will be effectively
+		 * updated when a label is written to the device during a next
+		 * DKIOCSVTOC.
+		 */
+		bcopy(ioctl_arg, &vd->dk_geom, sizeof (vd->dk_geom));
+		return (0);
+
+	case DKIOCSVTOC:
+		ASSERT(ioctl_arg != NULL);
+		ASSERT(vd->dk_geom.dkg_nhead != 0 &&
+		    vd->dk_geom.dkg_nsect != 0);
+		vtoc = (struct vtoc *)ioctl_arg;
+
+		if (vtoc->v_sanity != VTOC_SANE ||
+		    vtoc->v_sectorsz != DEV_BSIZE ||
+		    vtoc->v_nparts != V_NUMPAR)
+			return (EINVAL);
+
+		bzero(&label, sizeof (label));
+		label.dkl_ncyl = vd->dk_geom.dkg_ncyl;
+		label.dkl_acyl = vd->dk_geom.dkg_acyl;
+		label.dkl_pcyl = vd->dk_geom.dkg_pcyl;
+		label.dkl_nhead = vd->dk_geom.dkg_nhead;
+		label.dkl_nsect = vd->dk_geom.dkg_nsect;
+		label.dkl_intrlv = vd->dk_geom.dkg_intrlv;
+		label.dkl_apc = vd->dk_geom.dkg_apc;
+		label.dkl_rpm = vd->dk_geom.dkg_rpm;
+		label.dkl_write_reinstruct = vd->dk_geom.dkg_write_reinstruct;
+		label.dkl_read_reinstruct = vd->dk_geom.dkg_read_reinstruct;
+
+		label.dkl_vtoc.v_nparts = V_NUMPAR;
+		label.dkl_vtoc.v_sanity = VTOC_SANE;
+		label.dkl_vtoc.v_version = vtoc->v_version;
+		for (i = 0; i < V_NUMPAR; i++) {
+			label.dkl_vtoc.v_timestamp[i] =
+			    vtoc->timestamp[i];
+			label.dkl_vtoc.v_part[i].p_tag =
+			    vtoc->v_part[i].p_tag;
+			label.dkl_vtoc.v_part[i].p_flag =
+			    vtoc->v_part[i].p_flag;
+			label.dkl_map[i].dkl_cylno =
+			    vtoc->v_part[i].p_start /
+			    (label.dkl_nhead * label.dkl_nsect);
+			label.dkl_map[i].dkl_nblk =
+			    vtoc->v_part[i].p_size;
+		}
+		/*
+		 * The bootinfo array can not be copied with bcopy() because
+		 * elements are of type long in vtoc (so 64-bit) and of type
+		 * int in dk_vtoc (so 32-bit).
+		 */
+		label.dkl_vtoc.v_bootinfo[0] = vtoc->v_bootinfo[0];
+		label.dkl_vtoc.v_bootinfo[1] = vtoc->v_bootinfo[1];
+		label.dkl_vtoc.v_bootinfo[2] = vtoc->v_bootinfo[2];
+		bcopy(vtoc->v_asciilabel, label.dkl_asciilabel,
+		    LEN_DKL_ASCII);
+		bcopy(vtoc->v_volume, label.dkl_vtoc.v_volume,
+		    LEN_DKL_VVOL);
+
+		/* re-compute checksum */
+		label.dkl_magic = DKL_MAGIC;
+		label.dkl_cksum = vd_lbl2cksum(&label);
+
+		/* write label to the disk image */
+		if ((rc = vd_file_set_vtoc(vd, &label)) != 0)
+			return (rc);
+
+		/* update the cached vdisk VTOC */
+		bcopy(vtoc, &vd->vtoc, sizeof (vd->vtoc));
+
+		/*
+		 * The disk geometry may have changed, so we need to write
+		 * the devid (if there is one) so that it is stored at the
+		 * right location.
+		 */
+		if (vd->file_devid != NULL &&
+		    vd_file_write_devid(vd, vd->file_devid) != 0) {
+			PR0("Fail to write devid");
+		}
+
+		return (0);
 
 	default:
 		return (ENOTSUP);
@@ -1100,8 +1631,8 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 		ASSERT(nbytes != 0 && buf != NULL);
 		PR1("Getting \"arg\" data from client");
 		if ((status = ldc_mem_copy(vd->ldc_handle, buf, 0, &nbytes,
-			    request->cookie, request->ncookies,
-			    LDC_COPY_IN)) != 0) {
+		    request->cookie, request->ncookies,
+		    LDC_COPY_IN)) != 0) {
 			PR0("ldc_mem_copy() returned errno %d "
 			    "copying from client", status);
 			return (status);
@@ -1118,13 +1649,17 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 	 * Handle single-slice block devices internally; otherwise, have the
 	 * real driver perform the ioctl()
 	 */
-	if (vd->file || (vd->vdisk_type == VD_DISK_TYPE_SLICE && !vd->pseudo)) {
+	if (vd->file) {
+		if ((status = vd_do_file_ioctl(vd, ioctl->cmd,
+		    (void *)ioctl->arg)) != 0)
+			return (status);
+	} else if (vd->vdisk_type == VD_DISK_TYPE_SLICE && !vd->pseudo) {
 		if ((status = vd_do_slice_ioctl(vd, ioctl->cmd,
-			    (void *)ioctl->arg)) != 0)
+		    (void *)ioctl->arg)) != 0)
 			return (status);
 	} else if ((status = ldi_ioctl(vd->ldi_handle[request->slice],
-		    ioctl->cmd, (intptr_t)ioctl->arg, (vd_open_flags | FKIOCTL),
-		    kcred, &rval)) != 0) {
+	    ioctl->cmd, (intptr_t)ioctl->arg, (vd_open_flags | FKIOCTL),
+	    kcred, &rval)) != 0) {
 		PR0("ldi_ioctl(%s) = errno %d", ioctl->cmd_name, status);
 		return (status);
 	}
@@ -1145,8 +1680,8 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 			(ioctl->copyout)((void *)ioctl->arg, buf);
 
 		if ((status = ldc_mem_copy(vd->ldc_handle, buf, 0, &nbytes,
-			    request->cookie, request->ncookies,
-			    LDC_COPY_OUT)) != 0) {
+		    request->cookie, request->ncookies,
+		    LDC_COPY_OUT)) != 0) {
 			PR0("ldc_mem_copy() returned errno %d "
 			    "copying to client", status);
 			return (status);
@@ -1160,7 +1695,7 @@ vd_do_ioctl(vd_t *vd, vd_dring_payload_t *request, void* buf, vd_ioctl_t *ioctl)
 static int
 vd_ioctl(vd_task_t *task)
 {
-	int			i, status, rc;
+	int			i, status;
 	void			*buf = NULL;
 	struct dk_geom		dk_geom = {0};
 	struct vtoc		vtoc = {0};
@@ -1246,15 +1781,7 @@ vd_ioctl(vd_task_t *task)
 	status = vd_do_ioctl(vd, request, buf, &ioctl[i]);
 	if (request->nbytes)
 		kmem_free(buf, request->nbytes);
-	if (!vd->file && vd->vdisk_type == VD_DISK_TYPE_DISK &&
-	    (request->operation == VD_OP_SET_VTOC ||
-	    request->operation == VD_OP_SET_EFI)) {
-		/* update disk information */
-		rc = vd_read_vtoc(vd->ldi_handle[0], &vd->vtoc,
-		    &vd->vdisk_label);
-		if (rc != 0)
-			PR0("vd_read_vtoc return error %d", rc);
-	}
+
 	PR0("Returning %d", status);
 	return (status);
 }
@@ -1266,21 +1793,26 @@ vd_get_devid(vd_task_t *task)
 	vd_dring_payload_t *request = task->request;
 	vd_devid_t *vd_devid;
 	impl_devid_t *devid;
-	int status, bufid_len, devid_len, len;
+	int status, bufid_len, devid_len, len, sz;
 	int bufbytes;
 
 	PR1("Get Device ID, nbytes=%ld", request->nbytes);
 
 	if (vd->file) {
-		/* no devid for disk on file */
-		return (ENOENT);
-	}
-
-	if (ddi_lyr_get_devid(vd->dev[request->slice],
-	    (ddi_devid_t *)&devid) != DDI_SUCCESS) {
-		/* the most common failure is that no devid is available */
-		PR2("No Device ID");
-		return (ENOENT);
+		if (vd->file_devid == NULL) {
+			PR2("No Device ID");
+			return (ENOENT);
+		} else {
+			sz = ddi_devid_sizeof(vd->file_devid);
+			devid = kmem_alloc(sz, KM_SLEEP);
+			bcopy(vd->file_devid, devid, sz);
+		}
+	} else {
+		if (ddi_lyr_get_devid(vd->dev[request->slice],
+		    (ddi_devid_t *)&devid) != DDI_SUCCESS) {
+			PR2("No Device ID");
+			return (ENOENT);
+		}
 	}
 
 	bufid_len = request->nbytes - sizeof (vd_devid_t) + 1;
@@ -1365,13 +1897,10 @@ vd_process_task(vd_task_t *task)
 		return (ENOTSUP);
 	}
 
-	/* Handle client using absolute disk offsets */
-	if ((vd->vdisk_type == VD_DISK_TYPE_DISK) &&
-	    (request->slice == UINT8_MAX))
-		request->slice = VD_ENTIRE_DISK_SLICE;
-
 	/* Range-check slice */
-	if (request->slice >= vd->nslices) {
+	if (request->slice >= vd->nslices &&
+	    (vd->vdisk_type != VD_DISK_TYPE_DISK ||
+	    request->slice != VD_SLICE_NONE)) {
 		PR0("Invalid \"slice\" %u (max %u) for virtual disk",
 		    request->slice, (vd->nslices - 1));
 		return (EINVAL);
@@ -1382,7 +1911,7 @@ vd_process_task(vd_task_t *task)
 	/* Start the operation */
 	if ((status = vds_operation[i].start(task)) != EINPROGRESS) {
 		PR0("operation : %s returned status %d",
-			vds_operation[i].namep, status);
+		    vds_operation[i].namep, status);
 		request->status = status;	/* op succeeded or failed */
 		return (0);			/* but request completed */
 	}
@@ -1415,8 +1944,8 @@ boolean_t
 vd_msgtype(vio_msg_tag_t *tag, int type, int subtype, int env)
 {
 	return ((tag->vio_msgtype == type) &&
-		(tag->vio_subtype == subtype) &&
-		(tag->vio_subtype_env == env)) ? B_TRUE : B_FALSE;
+	    (tag->vio_subtype == subtype) &&
+	    (tag->vio_subtype_env == env)) ? B_TRUE : B_FALSE;
 }
 
 /*
@@ -1492,7 +2021,7 @@ vd_process_ver_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	ASSERT(msglen >= sizeof (msg->tag));
 
 	if (!vd_msgtype(&msg->tag, VIO_TYPE_CTRL, VIO_SUBTYPE_INFO,
-		VIO_VER_INFO)) {
+	    VIO_VER_INFO)) {
 		return (ENOMSG);	/* not a version message */
 	}
 
@@ -1561,7 +2090,7 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	ASSERT(msglen >= sizeof (msg->tag));
 
 	if (!vd_msgtype(&msg->tag, VIO_TYPE_CTRL, VIO_SUBTYPE_INFO,
-		VIO_ATTR_INFO)) {
+	    VIO_ATTR_INFO)) {
 		PR0("Message is not an attribute message");
 		return (ENOMSG);
 	}
@@ -1635,8 +2164,8 @@ vd_process_attr_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		size_t	max_inband_msglen =
 		    sizeof (vd_dring_inband_msg_t) +
 		    ((max_xfer_bytes/PAGESIZE +
-			((max_xfer_bytes % PAGESIZE) ? 1 : 0))*
-			(sizeof (ldc_mem_cookie_t)));
+		    ((max_xfer_bytes % PAGESIZE) ? 1 : 0))*
+		    (sizeof (ldc_mem_cookie_t)));
 
 		/*
 		 * Set the maximum expected message length to
@@ -1681,7 +2210,7 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	ASSERT(msglen >= sizeof (msg->tag));
 
 	if (!vd_msgtype(&msg->tag, VIO_TYPE_CTRL, VIO_SUBTYPE_INFO,
-		VIO_DRING_REG)) {
+	    VIO_DRING_REG)) {
 		PR0("Message is not a register-dring message");
 		return (ENOMSG);
 	}
@@ -1745,7 +2274,7 @@ vd_process_dring_reg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	ASSERT(reg_msg->ncookies == 1);
 
 	if ((status =
-		ldc_mem_dring_info(vd->dring_handle, &dring_minfo)) != 0) {
+	    ldc_mem_dring_info(vd->dring_handle, &dring_minfo)) != 0) {
 		PR0("ldc_mem_dring_info() returned errno %d", status);
 		if ((status = ldc_mem_dring_unmap(vd->dring_handle)) != 0)
 			PR0("ldc_mem_dring_unmap() returned errno %d", status);
@@ -1801,7 +2330,7 @@ vd_process_dring_unreg_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	ASSERT(msglen >= sizeof (msg->tag));
 
 	if (!vd_msgtype(&msg->tag, VIO_TYPE_CTRL, VIO_SUBTYPE_INFO,
-		VIO_DRING_UNREG)) {
+	    VIO_DRING_UNREG)) {
 		PR0("Message is not an unregister-dring message");
 		return (ENOMSG);
 	}
@@ -1883,7 +2412,7 @@ vd_process_desc_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	ASSERT(msglen >= sizeof (msg->tag));
 
 	if (!vd_msgtype(&msg->tag, VIO_TYPE_DATA, VIO_SUBTYPE_INFO,
-		VIO_DESC_DATA)) {
+	    VIO_DESC_DATA)) {
 		PR1("Message is not an in-band-descriptor message");
 		return (ENOMSG);
 	}
@@ -2028,7 +2557,7 @@ vd_process_dring_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	ASSERT(msglen >= sizeof (msg->tag));
 
 	if (!vd_msgtype(&msg->tag, VIO_TYPE_DATA, VIO_SUBTYPE_INFO,
-		VIO_DRING_DATA)) {
+	    VIO_DRING_DATA)) {
 		PR1("Message is not a dring-data message");
 		return (ENOMSG);
 	}
@@ -2065,7 +2594,7 @@ vd_process_dring_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	PR1("Processing descriptor range, start = %u, end = %u",
 	    dring_msg->start_idx, dring_msg->end_idx);
 	return (vd_process_element_range(vd, dring_msg->start_idx,
-		dring_msg->end_idx, msg, msglen));
+	    dring_msg->end_idx, msg, msglen));
 }
 
 static int
@@ -2153,7 +2682,7 @@ vd_do_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 
 		case VIO_DRING_MODE:	/* expect register-dring message */
 			if ((status =
-				vd_process_dring_reg_msg(vd, msg, msglen)) != 0)
+			    vd_process_dring_reg_msg(vd, msg, msglen)) != 0)
 				return (status);
 
 			/* One dring negotiated, move to that state */
@@ -2183,7 +2712,7 @@ vd_do_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 		 * support using more than one
 		 */
 		if ((status =
-			vd_process_dring_reg_msg(vd, msg, msglen)) != ENOMSG)
+		    vd_process_dring_reg_msg(vd, msg, msglen)) != ENOMSG)
 			return (status);
 
 		/*
@@ -2206,7 +2735,7 @@ vd_do_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 			 * them first
 			 */
 			if ((status = vd_process_dring_msg(vd, msg,
-				    msglen)) != ENOMSG)
+			    msglen)) != ENOMSG)
 				return (status);
 
 			/*
@@ -2280,7 +2809,7 @@ vd_process_msg(vd_t *vd, vio_msg_t *msg, size_t msglen)
 	}
 
 	PR1("\tResulting in state %d (%s)", vd->state,
-		vd_decode_state(vd->state));
+	    vd_decode_state(vd->state));
 
 	/* Send the "ack" or "nack" to the client */
 	PR1("Sending %s",
@@ -2349,14 +2878,14 @@ vd_recv_msg(void *arg)
 		switch (status) {
 		case 0:
 			rv = vd_process_msg(vd, (vio_msg_t *)vd->vio_msgp,
-				msglen);
+			    msglen);
 			/* check if max_msglen changed */
 			if (msgsize != vd->max_msglen) {
 				PR0("max_msglen changed 0x%lx to 0x%lx bytes\n",
 				    msgsize, vd->max_msglen);
 				kmem_free(vd->vio_msgp, msgsize);
 				vd->vio_msgp =
-					kmem_alloc(vd->max_msglen, KM_SLEEP);
+				    kmem_alloc(vd->max_msglen, KM_SLEEP);
 			}
 			if (rv == EINPROGRESS)
 				continue;
@@ -2657,15 +3186,17 @@ vd_setup_file(vd_t *vd)
 	ushort_t	sum;
 	vattr_t		vattr;
 	dev_t		dev;
+	size_t		size;
 	char		*file_path = vd->device_path;
 	char		dev_path[MAXPATHLEN + 1];
+	char		prefix;
 	ldi_handle_t	lhandle;
 	struct dk_cinfo	dk_cinfo;
 	struct dk_label label;
 
 	/* make sure the file is valid */
 	if ((status = lookupname(file_path, UIO_SYSSPACE, FOLLOW,
-		NULLVPP, &vd->file_vnode)) != 0) {
+	    NULLVPP, &vd->file_vnode)) != 0) {
 		PRN("Cannot lookup file(%s) errno %d", file_path, status);
 		return (status);
 	}
@@ -2755,7 +3286,7 @@ vd_setup_file(vd_t *vd)
 			label.dkl_acyl = 0;
 
 		label.dkl_nsect = vd->file_size /
-			(DEV_BSIZE * label.dkl_pcyl);
+		    (DEV_BSIZE * label.dkl_pcyl);
 		label.dkl_ncyl = label.dkl_pcyl - label.dkl_acyl;
 		label.dkl_nhead = 1;
 		label.dkl_write_reinstruct = 0;
@@ -2770,14 +3301,29 @@ vd_setup_file(vd_t *vd)
 		    label.dkl_nhead, label.dkl_nsect);
 		PR0("provided disk size: %ld bytes\n", (uint64_t)
 		    (label.dkl_pcyl *
-			label.dkl_nhead * label.dkl_nsect * DEV_BSIZE));
+		    label.dkl_nhead * label.dkl_nsect * DEV_BSIZE));
+
+		if (vd->file_size < (1ULL << 20)) {
+			size = vd->file_size >> 10;
+			prefix = 'K'; /* Kilobyte */
+		} else if (vd->file_size < (1ULL << 30)) {
+			size = vd->file_size >> 20;
+			prefix = 'M'; /* Megabyte */
+		} else if (vd->file_size < (1ULL << 40)) {
+			size = vd->file_size >> 30;
+			prefix = 'G'; /* Gigabyte */
+		} else {
+			size = vd->file_size >> 40;
+			prefix = 'T'; /* Terabyte */
+		}
 
 		/*
 		 * We must have a correct label name otherwise format(1m) will
 		 * not recognized the disk as labeled.
 		 */
 		(void) snprintf(label.dkl_asciilabel, LEN_DKL_ASCII,
-		    "SUNVDSK cyl %d alt %d hd %d sec %d",
+		    "SUN-DiskImage-%ld%cB cyl %d alt %d hd %d sec %d",
+		    size, prefix,
 		    label.dkl_ncyl, label.dkl_acyl, label.dkl_nhead,
 		    label.dkl_nsect);
 
@@ -2788,23 +3334,22 @@ vd_setup_file(vd_t *vd)
 		label.dkl_vtoc.v_part[2].p_tag = V_BACKUP;
 		label.dkl_map[2].dkl_cylno = 0;
 		label.dkl_map[2].dkl_nblk = label.dkl_ncyl *
-			label.dkl_nhead * label.dkl_nsect;
+		    label.dkl_nhead * label.dkl_nsect;
 		label.dkl_map[0] = label.dkl_map[2];
 		label.dkl_map[0] = label.dkl_map[2];
 		label.dkl_cksum = vd_lbl2cksum(&label);
 
 		/* write default label to file */
-		if (VD_FILE_LABEL_WRITE(vd, &label) < 0) {
+		if ((rval = vd_file_set_vtoc(vd, &label)) != 0) {
 			PRN("Can't write label to %s", file_path);
-			return (EIO);
+			return (rval);
 		}
 	}
 
 	vd->nslices = label.dkl_vtoc.v_nparts;
 
 	/* sector size = block size = DEV_BSIZE */
-	vd->vdisk_size = (label.dkl_pcyl *
-	    label.dkl_nhead * label.dkl_nsect) / DEV_BSIZE;
+	vd->vdisk_size = vd->file_size / DEV_BSIZE;
 	vd->vdisk_type = VD_DISK_TYPE_DISK;
 	vd->vdisk_label = VD_DISK_LABEL_VTOC;
 	vd->max_xfer_sz = maxphys / DEV_BSIZE; /* default transfer size */
@@ -2817,7 +3362,7 @@ vd_setup_file(vd_t *vd)
 	}
 
 	if ((status = ldi_open_by_dev(&dev, OTYP_BLK, FREAD,
-		kcred, &lhandle, vd->vds->ldi_ident)) != 0) {
+	    kcred, &lhandle, vd->vds->ldi_ident)) != 0) {
 		PR0("ldi_open_by_dev() returned errno %d for device %s",
 		    status, dev_path);
 	} else {
@@ -2867,10 +3412,50 @@ vd_setup_file(vd_t *vd)
 		vd->vtoc.v_part[i].p_tag = label.dkl_vtoc.v_part[i].p_tag;
 		vd->vtoc.v_part[i].p_flag = label.dkl_vtoc.v_part[i].p_flag;
 		vd->vtoc.v_part[i].p_start = label.dkl_map[i].dkl_cylno *
-			label.dkl_nhead * label.dkl_nsect;
+		    label.dkl_nhead * label.dkl_nsect;
 		vd->vtoc.v_part[i].p_size = label.dkl_map[i].dkl_nblk;
 		vd->ldi_handle[i] = NULL;
 		vd->dev[i] = NULL;
+	}
+
+	/* Setup devid for the disk image */
+
+	status = vd_file_read_devid(vd, &vd->file_devid);
+
+	if (status == 0) {
+		/* a valid devid was found */
+		return (0);
+	}
+
+	if (status != EINVAL) {
+		/*
+		 * There was an error while trying to read the devid. So this
+		 * disk image may have a devid but we are unable to read it.
+		 */
+		PR0("can not read devid for %s", file_path);
+		vd->file_devid = NULL;
+		return (0);
+	}
+
+	/*
+	 * No valid device id was found so we create one. Note that a failure
+	 * to create a device id is not fatal and does not prevent the disk
+	 * image from being attached.
+	 */
+	PR1("creating devid for %s", file_path);
+
+	if (ddi_devid_init(vd->vds->dip, DEVID_FAB, NULL, 0,
+	    &vd->file_devid) != DDI_SUCCESS) {
+		PR0("fail to create devid for %s", file_path);
+		vd->file_devid = NULL;
+		return (0);
+	}
+
+	/* write devid to the disk image */
+	if (vd_file_write_devid(vd, vd->file_devid) != 0) {
+		PR0("fail to write devid for %s", file_path);
+		ddi_devid_free(vd->file_devid);
+		vd->file_devid = NULL;
 	}
 
 	return (0);
@@ -2928,8 +3513,8 @@ vd_setup_vd(vd_t *vd)
 
 	/* Verify backing device supports dk_cinfo, dk_geom, and vtoc */
 	if ((status = ldi_ioctl(vd->ldi_handle[0], DKIOCINFO,
-		    (intptr_t)&dk_cinfo, (vd_open_flags | FKIOCTL), kcred,
-		    &rval)) != 0) {
+	    (intptr_t)&dk_cinfo, (vd_open_flags | FKIOCTL), kcred,
+	    &rval)) != 0) {
 		PRN("ldi_ioctl(DKIOCINFO) returned errno %d for %s",
 		    status, device_path);
 		return (status);
@@ -2952,9 +3537,9 @@ vd_setup_vd(vd_t *vd)
 	    (status = ldi_ioctl(vd->ldi_handle[0], DKIOCGGEOM,
 	    (intptr_t)&vd->dk_geom, (vd_open_flags | FKIOCTL),
 	    kcred, &rval)) != 0) {
-		    PRN("ldi_ioctl(DKIOCGEOM) returned errno %d for %s",
-			status, device_path);
-		    return (status);
+		PRN("ldi_ioctl(DKIOCGEOM) returned errno %d for %s",
+		    status, device_path);
+		return (status);
 	}
 
 	/* Store the device's max transfer size for return to the client */
@@ -2962,7 +3547,7 @@ vd_setup_vd(vd_t *vd)
 
 	/* Determine if backing device is a pseudo device */
 	if ((dip = ddi_hold_devi_by_instance(getmajor(vd->dev[0]),
-		    dev_to_instance(vd->dev[0]), 0))  == NULL) {
+	    dev_to_instance(vd->dev[0]), 0))  == NULL) {
 		PRN("%s is no longer accessible", device_path);
 		return (EIO);
 	}
@@ -3059,7 +3644,7 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *device_path, uint64_t ldc_id,
 
 	/* Initialize locking */
 	if (ddi_get_soft_iblock_cookie(vds->dip, DDI_SOFTINT_MED,
-		&iblock) != DDI_SUCCESS) {
+	    &iblock) != DDI_SUCCESS) {
 		PRN("Could not get iblock cookie.");
 		return (EIO);
 	}
@@ -3072,14 +3657,14 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *device_path, uint64_t ldc_id,
 	(void) snprintf(tq_name, sizeof (tq_name), "vd_startq%lu", id);
 	PR1("tq_name = %s", tq_name);
 	if ((vd->startq = ddi_taskq_create(vds->dip, tq_name, 1,
-		    TASKQ_DEFAULTPRI, 0)) == NULL) {
+	    TASKQ_DEFAULTPRI, 0)) == NULL) {
 		PRN("Could not create task queue");
 		return (EIO);
 	}
 	(void) snprintf(tq_name, sizeof (tq_name), "vd_completionq%lu", id);
 	PR1("tq_name = %s", tq_name);
 	if ((vd->completionq = ddi_taskq_create(vds->dip, tq_name, 1,
-		    TASKQ_DEFAULTPRI, 0)) == NULL) {
+	    TASKQ_DEFAULTPRI, 0)) == NULL) {
 		PRN("Could not create task queue");
 		return (EIO);
 	}
@@ -3099,7 +3684,7 @@ vds_do_init_vd(vds_t *vds, uint64_t id, char *device_path, uint64_t ldc_id,
 	vd->initialized |= VD_LDC;
 
 	if ((status = ldc_reg_callback(vd->ldc_handle, vd_handle_ldc_events,
-		(caddr_t)vd)) != 0) {
+	    (caddr_t)vd)) != 0) {
 		PRN("Could not initialize LDC channel %lu,"
 		    "reg_callback failed with error %d", ldc_id, status);
 		return (status);
@@ -3240,6 +3825,8 @@ vds_destroy_vd(void *arg)
 		(void) VOP_CLOSE(vd->file_vnode, vd_open_flags, 1,
 		    0, kcred);
 		VN_RELE(vd->file_vnode);
+		if (vd->file_devid != NULL)
+			ddi_devid_free(vd->file_devid);
 	} else {
 		/* Close any open backing-device slices */
 		for (uint_t slice = 0; slice < vd->nslices; slice++) {
@@ -3281,8 +3868,8 @@ vds_do_get_ldc_id(md_t *md, mde_cookie_t vd_node, mde_cookie_t *channel,
 
 	/* Look for channel endpoint child(ren) of the vdisk MD node */
 	if ((num_channels = md_scan_dag(md, vd_node,
-		    md_find_name(md, VD_CHANNEL_ENDPOINT),
-		    md_find_name(md, "fwd"), channel)) <= 0) {
+	    md_find_name(md, VD_CHANNEL_ENDPOINT),
+	    md_find_name(md, "fwd"), channel)) <= 0) {
 		PRN("No \"%s\" found for virtual disk", VD_CHANNEL_ENDPOINT);
 		return (-1);
 	}
@@ -3334,7 +3921,7 @@ vds_add_vd(vds_t *vds, md_t *md, mde_cookie_t vd_node)
 	}
 	PR0("Adding vdisk ID %lu", id);
 	if (md_get_prop_str(md, vd_node, VD_BLOCK_DEVICE_PROP,
-		&device_path) != 0) {
+	    &device_path) != 0) {
 		PRN("Error getting vdisk \"%s\"", VD_BLOCK_DEVICE_PROP);
 		return;
 	}
@@ -3411,13 +3998,13 @@ vds_change_vd(vds_t *vds, md_t *prev_md, mde_cookie_t prev_vd_node,
 
 	/* Determine whether device path has changed */
 	if (md_get_prop_str(prev_md, prev_vd_node, VD_BLOCK_DEVICE_PROP,
-		&prev_dev) != 0) {
+	    &prev_dev) != 0) {
 		PRN("Error getting previous vdisk \"%s\"",
 		    VD_BLOCK_DEVICE_PROP);
 		return;
 	}
 	if (md_get_prop_str(curr_md, curr_vd_node, VD_BLOCK_DEVICE_PROP,
-		&curr_dev) != 0) {
+	    &curr_dev) != 0) {
 		PRN("Error getting current vdisk \"%s\"", VD_BLOCK_DEVICE_PROP);
 		return;
 	}
@@ -3483,7 +4070,7 @@ vds_do_attach(dev_info_t *dip)
 	 * broken that there is no point in continuing.
 	 */
 	if (!ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		VD_REG_PROP)) {
+	    VD_REG_PROP)) {
 		PRN("vds \"%s\" property does not exist", VD_REG_PROP);
 		return (DDI_FAILURE);
 	}
@@ -3503,11 +4090,10 @@ vds_do_attach(dev_info_t *dip)
 		return (DDI_FAILURE);
 	}
 
-
 	vds->dip	= dip;
 	vds->vd_table	= mod_hash_create_ptrhash("vds_vd_table", VDS_NCHAINS,
-							vds_destroy_vd,
-							sizeof (void *));
+	    vds_destroy_vd, sizeof (void *));
+
 	ASSERT(vds->vd_table != NULL);
 
 	if ((status = ldi_ident_from_dip(dip, &vds->ldi_ident)) != 0) {
@@ -3529,7 +4115,7 @@ vds_do_attach(dev_info_t *dip)
 	ispecp->specp = pspecp;
 
 	if (mdeg_register(ispecp, &vd_match, vds_process_md, vds,
-		&vds->mdeg) != MDEG_SUCCESS) {
+	    &vds->mdeg) != MDEG_SUCCESS) {
 		PRN("Unable to register for MD updates");
 		kmem_free(ispecp, sizeof (mdeg_node_spec_t));
 		kmem_free(pspecp, sz);

@@ -81,6 +81,7 @@
 
 #include <sys/cdio.h>
 #include <sys/dktp/fdisk.h>
+#include <sys/dktp/dadkio.h>
 #include <sys/scsi/generic/sense.h>
 #include <sys/scsi/impl/uscsi.h>	/* Needed for defn of USCSICMD ioctl */
 
@@ -571,7 +572,7 @@ vdc_do_attach(dev_info_t *dip)
 	status = vdc_setup_disk_layout(vdc);
 	if (status != 0) {
 		DMSG(vdc, 0, "[%d] Failed to discover disk layout (err%d)",
-			vdc->instance, status);
+		    vdc->instance, status);
 		goto return_status;
 	}
 
@@ -582,13 +583,13 @@ vdc_do_attach(dev_info_t *dip)
 	status = vdc_create_device_nodes(vdc);
 	if (status) {
 		DMSG(vdc, 0, "[%d] Failed to create device nodes",
-				instance);
+		    instance);
 		goto return_status;
 	}
 	status = vdc_create_device_nodes_props(vdc);
 	if (status) {
 		DMSG(vdc, 0, "[%d] Failed to create device nodes"
-				" properties (%d)", instance, status);
+		    " properties (%d)", instance, status);
 		goto return_status;
 	}
 
@@ -642,7 +643,7 @@ vdc_do_ldc_init(vdc_t *vdc)
 
 	if ((status = vdc_get_ldc_id(dip, &ldc_id)) != 0) {
 		DMSG(vdc, 0, "[%d] Failed to get LDC channel ID property",
-				vdc->instance);
+		    vdc->instance);
 		return (EIO);
 	}
 	vdc->ldc_id = ldc_id;
@@ -656,7 +657,7 @@ vdc_do_ldc_init(vdc_t *vdc)
 		status = ldc_init(ldc_id, &ldc_attr, &vdc->ldc_handle);
 		if (status != 0) {
 			DMSG(vdc, 0, "[%d] ldc_init(chan %ld) returned %d",
-					vdc->instance, ldc_id, status);
+			    vdc->instance, ldc_id, status);
 			return (status);
 		}
 		vdc->initialized |= VDC_LDC_INIT;
@@ -664,7 +665,7 @@ vdc_do_ldc_init(vdc_t *vdc)
 	status = ldc_status(vdc->ldc_handle, &ldc_state);
 	if (status != 0) {
 		DMSG(vdc, 0, "[%d] Cannot discover LDC status [err=%d]",
-				vdc->instance, status);
+		    vdc->instance, status);
 		return (status);
 	}
 	vdc->ldc_state = ldc_state;
@@ -674,7 +675,7 @@ vdc_do_ldc_init(vdc_t *vdc)
 		    (caddr_t)vdc);
 		if (status != 0) {
 			DMSG(vdc, 0, "[%d] LDC callback reg. failed (%d)",
-					vdc->instance, status);
+			    vdc->instance, status);
 			return (status);
 		}
 		vdc->initialized |= VDC_LDC_CB;
@@ -690,7 +691,7 @@ vdc_do_ldc_init(vdc_t *vdc)
 		status = ldc_open(vdc->ldc_handle);
 		if (status != 0) {
 			DMSG(vdc, 0, "[%d] ldc_open(chan %ld) returned %d",
-					vdc->instance, vdc->ldc_id, status);
+			    vdc->instance, vdc->ldc_id, status);
 			return (status);
 		}
 		vdc->initialized |= VDC_LDC_OPEN;
@@ -721,7 +722,7 @@ vdc_stop_ldc_connection(vdc_t *vdcp)
 	int	status;
 
 	DMSG(vdcp, 0, ": Resetting connection to vDisk server : state %d\n",
-		vdcp->state);
+	    vdcp->state);
 
 	status = ldc_down(vdcp->ldc_handle);
 	DMSG(vdcp, 0, "ldc_down() = %d\n", status);
@@ -739,8 +740,8 @@ vdc_create_device_nodes_efi(vdc_t *vdc)
 	ddi_remove_minor_node(vdc->dip, "h,raw");
 
 	if (ddi_create_minor_node(vdc->dip, "wd", S_IFBLK,
-		VD_MAKE_DEV(vdc->instance, VD_EFI_WD_SLICE),
-		DDI_NT_BLOCK, 0) != DDI_SUCCESS) {
+	    VD_MAKE_DEV(vdc->instance, VD_EFI_WD_SLICE),
+	    DDI_NT_BLOCK, 0) != DDI_SUCCESS) {
 		cmn_err(CE_NOTE, "[%d] Couldn't add block node 'wd'",
 		    vdc->instance);
 		return (EIO);
@@ -750,8 +751,8 @@ vdc_create_device_nodes_efi(vdc_t *vdc)
 	vdc->initialized |= VDC_MINOR;
 
 	if (ddi_create_minor_node(vdc->dip, "wd,raw", S_IFCHR,
-		VD_MAKE_DEV(vdc->instance, VD_EFI_WD_SLICE),
-		DDI_NT_BLOCK, 0) != DDI_SUCCESS) {
+	    VD_MAKE_DEV(vdc->instance, VD_EFI_WD_SLICE),
+	    DDI_NT_BLOCK, 0) != DDI_SUCCESS) {
 		cmn_err(CE_NOTE, "[%d] Couldn't add block node 'wd,raw'",
 		    vdc->instance);
 		return (EIO);
@@ -767,8 +768,8 @@ vdc_create_device_nodes_vtoc(vdc_t *vdc)
 	ddi_remove_minor_node(vdc->dip, "wd,raw");
 
 	if (ddi_create_minor_node(vdc->dip, "h", S_IFBLK,
-		VD_MAKE_DEV(vdc->instance, VD_EFI_WD_SLICE),
-		DDI_NT_BLOCK, 0) != DDI_SUCCESS) {
+	    VD_MAKE_DEV(vdc->instance, VD_EFI_WD_SLICE),
+	    DDI_NT_BLOCK, 0) != DDI_SUCCESS) {
 		cmn_err(CE_NOTE, "[%d] Couldn't add block node 'h'",
 		    vdc->instance);
 		return (EIO);
@@ -778,8 +779,8 @@ vdc_create_device_nodes_vtoc(vdc_t *vdc)
 	vdc->initialized |= VDC_MINOR;
 
 	if (ddi_create_minor_node(vdc->dip, "h,raw", S_IFCHR,
-		VD_MAKE_DEV(vdc->instance, VD_EFI_WD_SLICE),
-		DDI_NT_BLOCK, 0) != DDI_SUCCESS) {
+	    VD_MAKE_DEV(vdc->instance, VD_EFI_WD_SLICE),
+	    DDI_NT_BLOCK, 0) != DDI_SUCCESS) {
 		cmn_err(CE_NOTE, "[%d] Couldn't add block node 'h,raw'",
 		    vdc->instance);
 		return (EIO);
@@ -858,19 +859,19 @@ vdc_create_device_nodes(vdc_t *vdc)
 		if (ddi_create_minor_node(dip, name, S_IFBLK,
 		    VD_MAKE_DEV(instance, i), DDI_NT_BLOCK, 0) != DDI_SUCCESS) {
 			cmn_err(CE_NOTE, "[%d] Couldn't add block node '%s'",
-				instance, name);
+			    instance, name);
 			return (EIO);
 		}
 
 		/* if any device node is created we set this flag */
 		vdc->initialized |= VDC_MINOR;
 
-		(void) snprintf(name, sizeof (name), "%c%s",
-			'a' + i, ",raw");
+		(void) snprintf(name, sizeof (name), "%c%s", 'a' + i, ",raw");
+
 		if (ddi_create_minor_node(dip, name, S_IFCHR,
 		    VD_MAKE_DEV(instance, i), DDI_NT_BLOCK, 0) != DDI_SUCCESS) {
 			cmn_err(CE_NOTE, "[%d] Couldn't add raw node '%s'",
-				instance, name);
+			    instance, name);
 			return (EIO);
 		}
 	}
@@ -914,7 +915,7 @@ vdc_create_device_nodes_props(vdc_t *vdc)
 
 	if ((vdc->vtoc == NULL) || (vdc->vtoc->v_sanity != VTOC_SANE)) {
 		DMSG(vdc, 0, "![%d] Could not create device node property."
-				" No VTOC available", instance);
+		    " No VTOC available", instance);
 		return (ENXIO);
 	}
 
@@ -932,25 +933,25 @@ vdc_create_device_nodes_props(vdc_t *vdc)
 
 	for (i = 0; i < num_slices; i++) {
 		dev = makedevice(ddi_driver_major(dip),
-			VD_MAKE_DEV(instance, i));
+		    VD_MAKE_DEV(instance, i));
 
 		size = vdc->vtoc->v_part[i].p_size * vdc->vtoc->v_sectorsz;
 		DMSG(vdc, 0, "[%d] sz %ld (%ld Mb)  p_size %lx\n",
-				instance, size, size / (1024 * 1024),
-				vdc->vtoc->v_part[i].p_size);
+		    instance, size, size / (1024 * 1024),
+		    vdc->vtoc->v_part[i].p_size);
 
 		rv = ddi_prop_update_int64(dev, dip, VDC_SIZE_PROP_NAME, size);
 		if (rv != DDI_PROP_SUCCESS) {
 			cmn_err(CE_NOTE, "[%d] Couldn't add '%s' prop of [%ld]",
-				instance, VDC_SIZE_PROP_NAME, size);
+			    instance, VDC_SIZE_PROP_NAME, size);
 			return (EIO);
 		}
 
 		rv = ddi_prop_update_int64(dev, dip, VDC_NBLOCKS_PROP_NAME,
-			lbtodb(size));
+		    lbtodb(size));
 		if (rv != DDI_PROP_SUCCESS) {
 			cmn_err(CE_NOTE, "[%d] Couldn't add '%s' prop [%llu]",
-				instance, VDC_NBLOCKS_PROP_NAME, lbtodb(size));
+			    instance, VDC_NBLOCKS_PROP_NAME, lbtodb(size));
 			return (EIO);
 		}
 	}
@@ -978,7 +979,7 @@ vdc_open(dev_t *dev, int flag, int otyp, cred_t *cred)
 	}
 
 	DMSG(vdc, 0, "minor = %d flag = %x, otyp = %x\n",
-			getminor(*dev), flag, otyp);
+	    getminor(*dev), flag, otyp);
 
 	mutex_enter(&vdc->lock);
 	vdc->open_count++;
@@ -1091,6 +1092,7 @@ vdc_strategy(struct buf *buf)
 	vdc_t	*vdc = NULL;
 	int	instance = VDCUNIT(buf->b_edev);
 	int	op = (buf->b_flags & B_READ) ? VD_OP_BREAD : VD_OP_BWRITE;
+	int	slice;
 
 	if ((vdc = ddi_get_soft_state(vdc_state, instance)) == NULL) {
 		cmn_err(CE_NOTE, "[%d] Couldn't get state structure", instance);
@@ -1106,8 +1108,15 @@ vdc_strategy(struct buf *buf)
 
 	bp_mapin(buf);
 
+	if ((long)buf->b_private == VD_SLICE_NONE) {
+		/* I/O using an absolute disk offset */
+		slice = VD_SLICE_NONE;
+	} else {
+		slice = VDCPART(buf->b_edev);
+	}
+
 	rv = vdc_send_request(vdc, op, (caddr_t)buf->b_un.b_addr,
-	    buf->b_bcount, VDCPART(buf->b_edev), buf->b_lblkno,
+	    buf->b_bcount, slice, buf->b_lblkno,
 	    CB_STRATEGY, buf, (op == VD_OP_BREAD) ? VIO_read_dir :
 	    VIO_write_dir);
 
@@ -1239,9 +1248,8 @@ vdc_init_ver_negotiation(vdc_t *vdc, vio_ver_t ver)
 	    vdc->instance, status);
 	if ((status != 0) || (msglen != sizeof (vio_ver_msg_t))) {
 		DMSG(vdc, 0, "[%d] Failed to send Ver negotiation info: "
-				"id(%lx) rv(%d) size(%ld)",
-				vdc->instance, vdc->ldc_handle,
-				status, msglen);
+		    "id(%lx) rv(%d) size(%ld)", vdc->instance, vdc->ldc_handle,
+		    status, msglen);
 		if (msglen != sizeof (vio_ver_msg_t))
 			status = ENOMSG;
 	}
@@ -1285,7 +1293,7 @@ vdc_ver_negotiation(vdc_t *vdcp)
 	if (vio_msg.tag.vio_msgtype != VIO_TYPE_CTRL ||
 	    vio_msg.tag.vio_subtype == VIO_SUBTYPE_INFO) {
 		DMSG(vdcp, 0, "[%d] Invalid ver negotiation response\n",
-				vdcp->instance);
+		    vdcp->instance);
 		return (EPROTO);
 	}
 
@@ -1334,9 +1342,8 @@ vdc_init_attr_negotiation(vdc_t *vdc)
 
 	if ((status != 0) || (msglen != sizeof (vio_ver_msg_t))) {
 		DMSG(vdc, 0, "[%d] Failed to send Attr negotiation info: "
-				"id(%lx) rv(%d) size(%ld)",
-				vdc->instance, vdc->ldc_handle,
-				status, msglen);
+		    "id(%lx) rv(%d) size(%ld)", vdc->instance, vdc->ldc_handle,
+		    status, msglen);
 		if (msglen != sizeof (vio_ver_msg_t))
 			status = ENOMSG;
 	}
@@ -1380,7 +1387,7 @@ vdc_attr_negotiation(vdc_t *vdcp)
 	if (vio_msg.tag.vio_msgtype != VIO_TYPE_CTRL ||
 	    vio_msg.tag.vio_subtype == VIO_SUBTYPE_INFO) {
 		DMSG(vdcp, 0, "[%d] Invalid attr negotiation response\n",
-				vdcp->instance);
+		    vdcp->instance);
 		return (EPROTO);
 	}
 
@@ -1421,12 +1428,12 @@ vdc_init_dring_negotiate(vdc_t *vdc)
 
 	if (status != 0) {
 		DMSG(vdc, 0, "[%d] Failed to init DRing (status = %d)\n",
-				vdc->instance, status);
+		    vdc->instance, status);
 		return (status);
 	}
 
 	DMSG(vdc, 0, "[%d] Init of descriptor ring completed (status = %d)\n",
-			vdc->instance, status);
+	    vdc->instance, status);
 
 	/* fill in tag */
 	pkt.tag.vio_msgtype = VIO_TYPE_CTRL;
@@ -1444,7 +1451,7 @@ vdc_init_dring_negotiate(vdc_t *vdc)
 	status = vdc_send(vdc, (caddr_t)&pkt, &msglen);
 	if (status != 0) {
 		DMSG(vdc, 0, "[%d] Failed to register DRing (err = %d)",
-				vdc->instance, status);
+		    vdc->instance, status);
 	}
 
 	return (status);
@@ -1487,12 +1494,12 @@ vdc_dring_negotiation(vdc_t *vdcp)
 	if (vio_msg.tag.vio_msgtype != VIO_TYPE_CTRL ||
 	    vio_msg.tag.vio_subtype == VIO_SUBTYPE_INFO) {
 		DMSG(vdcp, 0, "[%d] Invalid Dring negotiation response\n",
-				vdcp->instance);
+		    vdcp->instance);
 		return (EPROTO);
 	}
 
 	return (vdc_handle_dring_reg_msg(vdcp,
-		    (vio_dring_reg_msg_t *)&vio_msg));
+	    (vio_dring_reg_msg_t *)&vio_msg));
 }
 
 
@@ -1586,17 +1593,15 @@ vdc_rdx_exchange(vdc_t *vdcp)
 	status = vdc_wait_for_response(vdcp, &vio_msg);
 	mutex_enter(&vdcp->lock);
 	if (status) {
-		DMSG(vdcp, 0,
-		    "[%d] Failed waiting for RDX response,"
-		    " rv(%d)", vdcp->instance, status);
+		DMSG(vdcp, 0, "[%d] Failed waiting for RDX response, rv(%d)",
+		    vdcp->instance, status);
 		return (status);
 	}
 
 	/* check type and sub_type ... */
 	if (vio_msg.tag.vio_msgtype != VIO_TYPE_CTRL ||
 	    vio_msg.tag.vio_subtype != VIO_SUBTYPE_ACK) {
-		DMSG(vdcp, 0, "[%d] Invalid RDX response\n",
-				vdcp->instance);
+		DMSG(vdcp, 0, "[%d] Invalid RDX response\n", vdcp->instance);
 		return (EPROTO);
 	}
 
@@ -1655,7 +1660,7 @@ loop:
 	case 0:
 		if (len == 0) {
 			DMSG(vdc, 0, "[%d] ldc_read returned 0 bytes with "
-				"no error!\n", vdc->instance);
+			    "no error!\n", vdc->instance);
 			goto loop;
 		}
 
@@ -1867,7 +1872,7 @@ vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id)
 		return (ENOENT);
 	}
 	obp_inst = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-			OBP_REG, -1);
+	    OBP_REG, -1);
 	DMSGX(1, "[%d] OBP inst=%d\n", instance, obp_inst);
 
 	/*
@@ -1896,8 +1901,8 @@ vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id)
 	 * ones are disk nodes.
 	 */
 	num_vdevs = md_scan_dag(mdp, rootnode,
-			md_find_name(mdp, VDC_MD_VDEV_NAME),
-			md_find_name(mdp, "fwd"), listp);
+	    md_find_name(mdp, VDC_MD_VDEV_NAME),
+	    md_find_name(mdp, "fwd"), listp);
 
 	if (num_vdevs <= 0) {
 		cmn_err(CE_NOTE, "No '%s' node found", VDC_MD_VDEV_NAME);
@@ -1910,14 +1915,14 @@ vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id)
 		status = md_get_prop_str(mdp, listp[idx], "name", &node_name);
 		if ((status != 0) || (node_name == NULL)) {
 			cmn_err(CE_NOTE, "Unable to get name of node type '%s'"
-					": err %d", VDC_MD_VDEV_NAME, status);
+			    ": err %d", VDC_MD_VDEV_NAME, status);
 			continue;
 		}
 
 		DMSGX(1, "[%d] Found node '%s'\n", instance, node_name);
 		if (strcmp(VDC_MD_DISK_NAME, node_name) == 0) {
 			status = md_get_prop_val(mdp, listp[idx],
-					VDC_MD_CFG_HDL, &md_inst);
+			    VDC_MD_CFG_HDL, &md_inst);
 			DMSGX(1, "[%d] vdc inst in MD=%lx\n",
 			    instance, md_inst);
 			if ((status == 0) && (md_inst == obp_inst)) {
@@ -1936,20 +1941,20 @@ vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id)
 
 	/* get the channels for this node */
 	num_chans = md_scan_dag(mdp, listp[idx],
-			md_find_name(mdp, VDC_MD_CHAN_NAME),
-			md_find_name(mdp, "fwd"), chanp);
+	    md_find_name(mdp, VDC_MD_CHAN_NAME),
+	    md_find_name(mdp, "fwd"), chanp);
 
 	/* expecting at least one channel */
 	if (num_chans <= 0) {
 		cmn_err(CE_NOTE, "No '%s' node for '%s' port",
-				VDC_MD_CHAN_NAME, VDC_MD_VDEV_NAME);
+		    VDC_MD_CHAN_NAME, VDC_MD_VDEV_NAME);
 		status = ENOENT;
 		goto done;
 
 	} else if (num_chans != 1) {
 		DMSGX(0, "[%d] Expected 1 '%s' node for '%s' port, found %d\n",
-			instance, VDC_MD_CHAN_NAME, VDC_MD_VDEV_NAME,
-			num_chans);
+		    instance, VDC_MD_CHAN_NAME, VDC_MD_VDEV_NAME,
+		    num_chans);
 	}
 
 	/*
@@ -1958,7 +1963,7 @@ vdc_get_ldc_id(dev_info_t *dip, uint64_t *ldc_id)
 	 */
 	if (md_get_prop_val(mdp, chanp[0], VDC_ID_PROP, ldc_id) != 0) {
 		cmn_err(CE_NOTE, "Channel '%s' property not found",
-				VDC_ID_PROP);
+		    VDC_ID_PROP);
 		status = ENOENT;
 	}
 
@@ -1991,7 +1996,7 @@ vdc_do_ldc_up(vdc_t *vdc)
 		switch (status) {
 		case ECONNREFUSED:	/* listener not ready at other end */
 			DMSG(vdc, 0, "[%d] ldc_up(%lx,...) return %d\n",
-					vdc->instance, vdc->ldc_id, status);
+			    vdc->instance, vdc->ldc_id, status);
 			status = 0;
 			break;
 		default:
@@ -2099,22 +2104,22 @@ vdc_init_descriptor_ring(vdc_t *vdc)
 		 */
 		if ((vdc->max_xfer_sz * vdc->block_size) < maxphys) {
 			DMSG(vdc, 0, "[%d] using minimum DRing size\n",
-					vdc->instance);
+			    vdc->instance);
 			vdc->dring_max_cookies = maxphys / PAGESIZE;
 		} else {
 			vdc->dring_max_cookies =
-				(vdc->max_xfer_sz * vdc->block_size) / PAGESIZE;
+			    (vdc->max_xfer_sz * vdc->block_size) / PAGESIZE;
 		}
 		vdc->dring_entry_size = (sizeof (vd_dring_entry_t) +
-				(sizeof (ldc_mem_cookie_t) *
-					(vdc->dring_max_cookies - 1)));
+		    (sizeof (ldc_mem_cookie_t) *
+		    (vdc->dring_max_cookies - 1)));
 		vdc->dring_len = VD_DRING_LEN;
 
 		status = ldc_mem_dring_create(vdc->dring_len,
-				vdc->dring_entry_size, &vdc->ldc_dring_hdl);
+		    vdc->dring_entry_size, &vdc->ldc_dring_hdl);
 		if ((vdc->ldc_dring_hdl == NULL) || (status != 0)) {
 			DMSG(vdc, 0, "[%d] Descriptor ring creation failed",
-					vdc->instance);
+			    vdc->instance);
 			return (status);
 		}
 		vdc->initialized |= VDC_DRING_INIT;
@@ -2123,17 +2128,17 @@ vdc_init_descriptor_ring(vdc_t *vdc)
 	if ((vdc->initialized & VDC_DRING_BOUND) == 0) {
 		DMSG(vdc, 0, "[%d] ldc_mem_dring_bind\n", vdc->instance);
 		vdc->dring_cookie =
-			kmem_zalloc(sizeof (ldc_mem_cookie_t), KM_SLEEP);
+		    kmem_zalloc(sizeof (ldc_mem_cookie_t), KM_SLEEP);
 
 		status = ldc_mem_dring_bind(vdc->ldc_handle, vdc->ldc_dring_hdl,
-				LDC_SHADOW_MAP|LDC_DIRECT_MAP, LDC_MEM_RW,
-				&vdc->dring_cookie[0],
-				&vdc->dring_cookie_count);
+		    LDC_SHADOW_MAP|LDC_DIRECT_MAP, LDC_MEM_RW,
+		    &vdc->dring_cookie[0],
+		    &vdc->dring_cookie_count);
 		if (status != 0) {
 			DMSG(vdc, 0, "[%d] Failed to bind descriptor ring "
-				"(%lx) to channel (%lx) status=%d\n",
-				vdc->instance, vdc->ldc_dring_hdl,
-				vdc->ldc_handle, status);
+			    "(%lx) to channel (%lx) status=%d\n",
+			    vdc->instance, vdc->ldc_dring_hdl,
+			    vdc->ldc_handle, status);
 			return (status);
 		}
 		ASSERT(vdc->dring_cookie_count == 1);
@@ -2153,8 +2158,8 @@ vdc_init_descriptor_ring(vdc_t *vdc)
 
 		/* Allocate the local copy of this dring */
 		vdc->local_dring =
-			kmem_zalloc(vdc->dring_len * sizeof (vdc_local_desc_t),
-						KM_SLEEP);
+		    kmem_zalloc(vdc->dring_len * sizeof (vdc_local_desc_t),
+		    KM_SLEEP);
 		vdc->initialized |= VDC_DRING_LOCAL;
 	}
 
@@ -2170,10 +2175,10 @@ vdc_init_descriptor_ring(vdc_t *vdc)
 		dep->hdr.dstate = VIO_DESC_FREE;
 
 		status = ldc_mem_alloc_handle(vdc->ldc_handle,
-				&vdc->local_dring[i].desc_mhdl);
+		    &vdc->local_dring[i].desc_mhdl);
 		if (status != 0) {
 			DMSG(vdc, 0, "![%d] Failed to alloc mem handle for"
-					" descriptor %d", vdc->instance, i);
+			    " descriptor %d", vdc->instance, i);
 			return (status);
 		}
 		vdc->local_dring[i].is_free = B_TRUE;
@@ -2250,7 +2255,7 @@ vdc_destroy_descriptor_ring(vdc_t *vdc)
 	if (vdc->initialized & VDC_DRING_LOCAL) {
 		DMSG(vdc, 0, "[%d] Freeing Local DRing\n", vdc->instance);
 		kmem_free(vdc->local_dring,
-				vdc->dring_len * sizeof (vdc_local_desc_t));
+		    vdc->dring_len * sizeof (vdc_local_desc_t));
 		vdc->initialized &= ~VDC_DRING_LOCAL;
 	}
 
@@ -2261,7 +2266,7 @@ vdc_destroy_descriptor_ring(vdc_t *vdc)
 			vdc->initialized &= ~VDC_DRING_BOUND;
 		} else {
 			DMSG(vdc, 0, "[%d] Error %d unbinding DRing %lx",
-				vdc->instance, status, vdc->ldc_dring_hdl);
+			    vdc->instance, status, vdc->ldc_dring_hdl);
 		}
 		kmem_free(vdc->dring_cookie, sizeof (ldc_mem_cookie_t));
 	}
@@ -2275,7 +2280,7 @@ vdc_destroy_descriptor_ring(vdc_t *vdc)
 			vdc->initialized &= ~VDC_DRING_INIT;
 		} else {
 			DMSG(vdc, 0, "[%d] Error %d destroying DRing (%lx)",
-				vdc->instance, status, vdc->ldc_dring_hdl);
+			    vdc->instance, status, vdc->ldc_dring_hdl);
 		}
 	}
 }
@@ -2364,7 +2369,7 @@ vdc_send_request(vdc_t *vdcp, int operation, caddr_t addr,
     void *cb_arg, vio_desc_direction_t dir)
 {
 	ASSERT(vdcp != NULL);
-	ASSERT(slice < V_NUMPAR);
+	ASSERT(slice == VD_SLICE_NONE || slice < V_NUMPAR);
 
 	mutex_enter(&vdcp->lock);
 
@@ -2765,7 +2770,7 @@ vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx)
 	dep = ldep->dep;
 	ASSERT(dep != NULL);
 	ASSERT((dep->hdr.dstate == VIO_DESC_DONE) ||
-			(dep->payload.status == ECANCELED));
+	    (dep->payload.status == ECANCELED));
 
 	VDC_MARK_DRING_ENTRY_FREE(vdc, idx);
 
@@ -2795,14 +2800,14 @@ vdc_depopulate_descriptor(vdc_t *vdc, uint_t idx)
 			bcopy(ldep->align_addr, ldep->addr,
 			    dep->payload.nbytes);
 		kmem_free(ldep->align_addr,
-			sizeof (caddr_t) * P2ROUNDUP(ldep->nbytes, 8));
+		    sizeof (caddr_t) * P2ROUNDUP(ldep->nbytes, 8));
 		ldep->align_addr = NULL;
 	}
 
 	rv = ldc_mem_unbind_handle(ldep->desc_mhdl);
 	if (rv != 0) {
 		DMSG(vdc, 0, "?[%d] unbind mhdl 0x%lx @ idx %d failed (%d)",
-				vdc->instance, ldep->desc_mhdl, idx, rv);
+		    vdc->instance, ldep->desc_mhdl, idx, rv);
 		/*
 		 * The error returned by the vDisk server is more informative
 		 * and thus has a higher priority but if it isn't set we ensure
@@ -2879,8 +2884,8 @@ vdc_populate_mem_hdl(vdc_t *vdcp, vdc_local_desc_t *ldep)
 	if (((uint64_t)vaddr & 0x7) != 0) {
 		ASSERT(ldep->align_addr == NULL);
 		ldep->align_addr =
-			kmem_alloc(sizeof (caddr_t) *
-				P2ROUNDUP(nbytes, 8), KM_SLEEP);
+		    kmem_alloc(sizeof (caddr_t) *
+		    P2ROUNDUP(nbytes, 8), KM_SLEEP);
 		DMSG(vdcp, 0, "[%d] Misaligned address %p reallocating "
 		    "(buf=%p nb=%ld op=%d)\n",
 		    vdcp->instance, (void *)vaddr, (void *)ldep->align_addr,
@@ -2892,17 +2897,16 @@ vdc_populate_mem_hdl(vdc_t *vdcp, vdc_local_desc_t *ldep)
 
 	maptype = LDC_IO_MAP|LDC_SHADOW_MAP|LDC_DIRECT_MAP;
 	rv = ldc_mem_bind_handle(mhdl, vaddr, P2ROUNDUP(nbytes, 8),
-		maptype, perm, &dep->payload.cookie[0],
-		&dep->payload.ncookies);
+	    maptype, perm, &dep->payload.cookie[0], &dep->payload.ncookies);
 	DMSG(vdcp, 2, "[%d] bound mem handle; ncookies=%d\n",
-			vdcp->instance, dep->payload.ncookies);
+	    vdcp->instance, dep->payload.ncookies);
 	if (rv != 0) {
 		DMSG(vdcp, 0, "[%d] Failed to bind LDC memory handle "
 		    "(mhdl=%p, buf=%p, err=%d)\n",
 		    vdcp->instance, (void *)mhdl, (void *)vaddr, rv);
 		if (ldep->align_addr) {
 			kmem_free(ldep->align_addr,
-				sizeof (caddr_t) * P2ROUNDUP(nbytes, 8));
+			    sizeof (caddr_t) * P2ROUNDUP(nbytes, 8));
 			ldep->align_addr = NULL;
 		}
 		return (EAGAIN);
@@ -2916,11 +2920,11 @@ vdc_populate_mem_hdl(vdc_t *vdcp, vdc_local_desc_t *ldep)
 		if (rv != 0) {
 			(void) ldc_mem_unbind_handle(mhdl);
 			DMSG(vdcp, 0, "?[%d] Failed to get next cookie "
-					"(mhdl=%lx cnum=%d), err=%d",
-					vdcp->instance, mhdl, i, rv);
+			    "(mhdl=%lx cnum=%d), err=%d",
+			    vdcp->instance, mhdl, i, rv);
 			if (ldep->align_addr) {
 				kmem_free(ldep->align_addr,
-					sizeof (caddr_t) * ldep->nbytes);
+				    sizeof (caddr_t) * ldep->nbytes);
 				ldep->align_addr = NULL;
 			}
 			return (EAGAIN);
@@ -3032,7 +3036,7 @@ vdc_handle_cb(uint64_t event, caddr_t arg)
 
 	if (event & ~(LDC_EVT_UP | LDC_EVT_RESET | LDC_EVT_DOWN | LDC_EVT_READ))
 		DMSG(vdc, 0, "![%d] Unexpected LDC event (%lx) received",
-				vdc->instance, event);
+		    vdc->instance, event);
 
 	return (LDC_SUCCESS);
 }
@@ -3064,16 +3068,16 @@ vdc_wait_for_response(vdc_t *vdcp, vio_msg_t *msgp)
 
 	status = vdc_recv(vdcp, msgp, &nbytes);
 	DMSG(vdcp, 3, "vdc_read() done.. status=0x%x size=0x%x\n",
-		status, (int)nbytes);
+	    status, (int)nbytes);
 	if (status) {
 		DMSG(vdcp, 0, "?[%d] Error %d reading LDC msg\n",
-				vdcp->instance, status);
+		    vdcp->instance, status);
 		return (status);
 	}
 
 	if (nbytes < sizeof (vio_msg_tag_t)) {
 		DMSG(vdcp, 0, "?[%d] Expect %lu bytes; recv'd %lu\n",
-			vdcp->instance, sizeof (vio_msg_tag_t), nbytes);
+		    vdcp->instance, sizeof (vio_msg_tag_t), nbytes);
 		return (ENOMSG);
 	}
 
@@ -3091,11 +3095,11 @@ vdc_wait_for_response(vdc_t *vdcp, vio_msg_t *msgp)
 	if ((msgp->tag.vio_sid != vdcp->session_id) &&
 	    (msgp->tag.vio_subtype_env != VIO_VER_INFO)) {
 		DMSG(vdcp, 0, "[%d] Invalid SID: received 0x%x, "
-				"expected 0x%lx [seq num %lx @ %d]",
-			vdcp->instance, msgp->tag.vio_sid,
-			vdcp->session_id,
-			((vio_dring_msg_t *)msgp)->seq_num,
-			((vio_dring_msg_t *)msgp)->start_idx);
+		    "expected 0x%lx [seq num %lx @ %d]",
+		    vdcp->instance, msgp->tag.vio_sid,
+		    vdcp->session_id,
+		    ((vio_dring_msg_t *)msgp)->seq_num,
+		    ((vio_dring_msg_t *)msgp)->start_idx);
 		return (ENOMSG);
 	}
 	return (0);
@@ -3188,7 +3192,7 @@ vdc_resubmit_backup_dring(vdc_t *vdcp)
 
 	/* all done - now clear up pending dring copy */
 	dring_size = vdcp->local_dring_backup_len *
-		sizeof (vdcp->local_dring_backup[0]);
+	    sizeof (vdcp->local_dring_backup[0]);
 
 	(void) kmem_free(vdcp->local_dring_backup, dring_size);
 
@@ -3278,14 +3282,14 @@ vdc_process_msg_thread(vdc_t *vdcp)
 
 #define	Q(_s)	(vdcp->state == _s) ? #_s :
 		DMSG(vdcp, 3, "state = %d (%s)\n", vdcp->state,
-		Q(VDC_STATE_INIT)
-		Q(VDC_STATE_INIT_WAITING)
-		Q(VDC_STATE_NEGOTIATE)
-		Q(VDC_STATE_HANDLE_PENDING)
-		Q(VDC_STATE_RUNNING)
-		Q(VDC_STATE_RESETTING)
-		Q(VDC_STATE_DETACH)
-		"UNKNOWN");
+		    Q(VDC_STATE_INIT)
+		    Q(VDC_STATE_INIT_WAITING)
+		    Q(VDC_STATE_NEGOTIATE)
+		    Q(VDC_STATE_HANDLE_PENDING)
+		    Q(VDC_STATE_RUNNING)
+		    Q(VDC_STATE_RESETTING)
+		    Q(VDC_STATE_DETACH)
+		    "UNKNOWN");
 
 		switch (vdcp->state) {
 		case VDC_STATE_INIT:
@@ -3412,7 +3416,7 @@ done:
 				if (status) break;
 
 				DMSG(vdcp, 1, "[%d] new pkt(s) available\n",
-					vdcp->instance);
+				    vdcp->instance);
 				status = vdc_process_data_msg(vdcp, &msg);
 				if (status) {
 					DMSG(vdcp, 1, "[%d] process_data_msg "
@@ -3492,7 +3496,7 @@ done:
 			mutex_exit(&vdcp->lock);
 
 			DMSG(vdcp, 0, "[%d] Msg processing thread exiting ..\n",
-				vdcp->instance);
+			    vdcp->instance);
 			thread_exit();
 			break;
 		}
@@ -3547,7 +3551,7 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 	if ((start >= vdcp->dring_len) ||
 	    (end >= vdcp->dring_len) || (end < -1)) {
 		DMSG(vdcp, 0, "[%d] Bogus ACK data : start %d, end %d\n",
-			vdcp->instance, start, end);
+		    vdcp->instance, start, end);
 		mutex_exit(&vdcp->lock);
 		return (EINVAL);
 	}
@@ -3585,7 +3589,7 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 	ldep = &vdcp->local_dring[idx];
 
 	DMSG(vdcp, 1, ": state 0x%x - cb_type 0x%x\n",
-		ldep->dep->hdr.dstate, ldep->cb_type);
+	    ldep->dep->hdr.dstate, ldep->cb_type);
 
 	if (ldep->dep->hdr.dstate == VIO_DESC_DONE) {
 		struct buf *bufp;
@@ -3604,7 +3608,7 @@ vdc_process_data_msg(vdc_t *vdcp, vio_msg_t *msg)
 			bufp = ldep->cb_arg;
 			ASSERT(bufp != NULL);
 			bufp->b_resid =
-				bufp->b_bcount - ldep->dep->payload.nbytes;
+			    bufp->b_bcount - ldep->dep->payload.nbytes;
 			status = ldep->dep->payload.status; /* Future:ntoh */
 			if (status != 0) {
 				DMSG(vdcp, 1, "strategy status=%d\n", status);
@@ -3712,12 +3716,12 @@ vdc_handle_ver_msg(vdc_t *vdc, vio_ver_msg_t *ver_msg)
 
 			status = vdc_send(vdc, (caddr_t)ver_msg, &len);
 			DMSG(vdc, 0, "[%d] Resend VER info (LDC status = %d)\n",
-					vdc->instance, status);
+			    vdc->instance, status);
 			if (len != sizeof (*ver_msg))
 				status = EBADMSG;
 		} else {
-			DMSG(vdc, 0, "[%d] No common version with "
-					"vDisk server", vdc->instance);
+			DMSG(vdc, 0, "[%d] No common version with vDisk server",
+			    vdc->instance);
 			status = ENOTSUP;
 		}
 
@@ -3772,10 +3776,10 @@ vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg)
 		vdc->vdisk_type = attr_msg->vdisk_type;
 
 		DMSG(vdc, 0, "[%d] max_xfer_sz: sent %lx acked %lx\n",
-			vdc->instance, vdc->max_xfer_sz, attr_msg->max_xfer_sz);
+		    vdc->instance, vdc->max_xfer_sz, attr_msg->max_xfer_sz);
 		DMSG(vdc, 0, "[%d] vdisk_block_size: sent %lx acked %x\n",
-			vdc->instance, vdc->block_size,
-			attr_msg->vdisk_block_size);
+		    vdc->instance, vdc->block_size,
+		    attr_msg->vdisk_block_size);
 
 		/*
 		 * We don't know at compile time what the vDisk server will
@@ -3786,19 +3790,19 @@ vdc_handle_attr_msg(vdc_t *vdc, vd_attr_msg_t *attr_msg)
 		 * was garbage.
 		 */
 		if ((attr_msg->max_xfer_sz * attr_msg->vdisk_block_size) <=
-				(PAGESIZE * DEV_BSIZE)) {
+		    (PAGESIZE * DEV_BSIZE)) {
 			vdc->max_xfer_sz = attr_msg->max_xfer_sz;
 			vdc->block_size = attr_msg->vdisk_block_size;
 		} else {
 			DMSG(vdc, 0, "[%d] vds block transfer size too big;"
-				" using max supported by vdc", vdc->instance);
+			    " using max supported by vdc", vdc->instance);
 		}
 
 		if ((attr_msg->xfer_mode != VIO_DRING_MODE) ||
 		    (attr_msg->vdisk_size > INT64_MAX) ||
 		    (attr_msg->vdisk_type > VD_DISK_TYPE_DISK)) {
 			DMSG(vdc, 0, "[%d] Invalid attributes from vds",
-					vdc->instance);
+			    vdc->instance);
 			status = EINVAL;
 			break;
 		}
@@ -3859,7 +3863,7 @@ vdc_handle_dring_reg_msg(vdc_t *vdc, vio_dring_reg_msg_t *dring_msg)
 		/* save the received dring_ident */
 		vdc->dring_ident = dring_msg->dring_ident;
 		DMSG(vdc, 0, "[%d] Received dring ident=0x%lx\n",
-			vdc->instance, vdc->dring_ident);
+		    vdc->instance, vdc->dring_ident);
 		break;
 
 	case VIO_SUBTYPE_NACK:
@@ -3923,10 +3927,10 @@ vdc_verify_seq_num(vdc_t *vdc, vio_dring_msg_t *dring_msg)
 	if ((dring_msg->seq_num <= vdc->seq_num_reply) ||
 	    (dring_msg->seq_num > vdc->seq_num)) {
 		DMSG(vdc, 0, "?[%d] Bogus sequence_number %lu: "
-			"%lu > expected <= %lu (last proc req %lu sent %lu)\n",
-				vdc->instance, dring_msg->seq_num,
-				vdc->seq_num_reply, vdc->seq_num,
-				vdc->req_id_proc, vdc->req_id);
+		    "%lu > expected <= %lu (last proc req %lu sent %lu)\n",
+		    vdc->instance, dring_msg->seq_num,
+		    vdc->seq_num_reply, vdc->seq_num,
+		    vdc->req_id_proc, vdc->req_id);
 		return (VDC_SEQ_NUM_INVALID);
 	}
 	vdc->seq_num_reply = dring_msg->seq_num;
@@ -3992,7 +3996,7 @@ vdc_is_supported_version(vio_ver_msg_t *ver_msg)
 			ver_msg->ver_major = vdc_version[i].major;
 			ver_msg->ver_minor = vdc_version[i].minor;
 			DMSGX(0, "Suggesting major/minor (0x%x/0x%x)\n",
-				ver_msg->ver_major, ver_msg->ver_minor);
+			    ver_msg->ver_major, ver_msg->ver_minor);
 
 			return (B_FALSE);
 		}
@@ -4057,8 +4061,8 @@ vdc_dkio_flush_cb(void *arg)
 	    VDCPART(dk_arg->dev), 0, CB_SYNC, 0, VIO_both_dir);
 	if (rv != 0) {
 		DMSG(vdc, 0, "[%d] DKIOCFLUSHWRITECACHE failed %d : model %x\n",
-			vdc->instance, rv,
-			ddi_model_convert_from(dk_arg->mode & FMODELS));
+		    vdc->instance, rv,
+		    ddi_model_convert_from(dk_arg->mode & FMODELS));
 	}
 
 	/*
@@ -4080,6 +4084,145 @@ vdc_dkio_flush_cb(void *arg)
 
 	/* free the mem that was allocated when the callback was dispatched */
 	kmem_free(arg, sizeof (vdc_dk_arg_t));
+}
+
+/*
+ * Function:
+ * 	vdc_dkio_get_partition()
+ *
+ * Description:
+ *	This function implements the DKIOCGAPART ioctl.
+ *
+ * Arguments:
+ *	dev	- device
+ *	arg	- a pointer to a dk_map[NDKMAP] or dk_map32[NDKMAP] structure
+ *	flag	- ioctl flags
+ */
+static int
+vdc_dkio_get_partition(dev_t dev, caddr_t arg, int flag)
+{
+	struct dk_geom geom;
+	struct vtoc vtoc;
+	union {
+		struct dk_map map[NDKMAP];
+		struct dk_map32 map32[NDKMAP];
+	} data;
+	int i, rv, size;
+
+	rv = vd_process_ioctl(dev, DKIOCGGEOM, (caddr_t)&geom, FKIOCTL);
+	if (rv != 0)
+		return (rv);
+
+	rv = vd_process_ioctl(dev, DKIOCGVTOC, (caddr_t)&vtoc, FKIOCTL);
+	if (rv != 0)
+		return (rv);
+
+	if (vtoc.v_nparts != NDKMAP ||
+	    geom.dkg_nhead == 0 || geom.dkg_nsect == 0)
+		return (EINVAL);
+
+	if (ddi_model_convert_from(flag & FMODELS) == DDI_MODEL_ILP32) {
+
+		for (i = 0; i < NDKMAP; i++) {
+			data.map32[i].dkl_cylno = vtoc.v_part[i].p_start /
+			    (geom.dkg_nhead * geom.dkg_nsect);
+			data.map32[i].dkl_nblk = vtoc.v_part[i].p_size;
+		}
+		size = NDKMAP * sizeof (struct dk_map32);
+
+	} else {
+
+		for (i = 0; i < NDKMAP; i++) {
+			data.map[i].dkl_cylno = vtoc.v_part[i].p_start /
+			    (geom.dkg_nhead * geom.dkg_nsect);
+			data.map[i].dkl_nblk = vtoc.v_part[i].p_size;
+		}
+		size = NDKMAP * sizeof (struct dk_map);
+
+	}
+
+	if (ddi_copyout(&data, arg, size, flag) != 0)
+		return (EFAULT);
+
+	return (0);
+}
+
+/*
+ * Function:
+ * 	vdc_dioctl_rwcmd()
+ *
+ * Description:
+ *	This function implements the DIOCTL_RWCMD ioctl. This ioctl is used
+ *	for DKC_DIRECT disks to read or write at an absolute disk offset.
+ *
+ * Arguments:
+ *	dev	- device
+ *	arg	- a pointer to a dadkio_rwcmd or dadkio_rwcmd32 structure
+ *	flag	- ioctl flags
+ */
+static int
+vdc_dioctl_rwcmd(dev_t dev, caddr_t arg, int flag)
+{
+	struct dadkio_rwcmd32 rwcmd32;
+	struct dadkio_rwcmd rwcmd;
+	struct iovec aiov;
+	struct uio auio;
+	int rw, status;
+	struct buf *buf;
+
+	if (ddi_model_convert_from(flag & FMODELS) == DDI_MODEL_ILP32) {
+		if (ddi_copyin((caddr_t)arg, (caddr_t)&rwcmd32,
+		    sizeof (struct dadkio_rwcmd32), flag)) {
+			return (EFAULT);
+		}
+		rwcmd.cmd = rwcmd32.cmd;
+		rwcmd.flags = rwcmd32.flags;
+		rwcmd.blkaddr = (daddr_t)rwcmd32.blkaddr;
+		rwcmd.buflen = rwcmd32.buflen;
+		rwcmd.bufaddr = (caddr_t)(uintptr_t)rwcmd32.bufaddr;
+	} else {
+		if (ddi_copyin((caddr_t)arg, (caddr_t)&rwcmd,
+		    sizeof (struct dadkio_rwcmd), flag)) {
+			return (EFAULT);
+		}
+	}
+
+	switch (rwcmd.cmd) {
+	case DADKIO_RWCMD_READ:
+		rw = B_READ;
+		break;
+	case DADKIO_RWCMD_WRITE:
+		rw = B_WRITE;
+		break;
+	default:
+		return (EINVAL);
+	}
+
+	bzero((caddr_t)&aiov, sizeof (struct iovec));
+	aiov.iov_base   = rwcmd.bufaddr;
+	aiov.iov_len    = rwcmd.buflen;
+
+	bzero((caddr_t)&auio, sizeof (struct uio));
+	auio.uio_iov    = &aiov;
+	auio.uio_iovcnt = 1;
+	auio.uio_loffset = rwcmd.blkaddr * DEV_BSIZE;
+	auio.uio_resid  = rwcmd.buflen;
+	auio.uio_segflg = flag & FKIOCTL ? UIO_SYSSPACE : UIO_USERSPACE;
+
+	buf = kmem_alloc(sizeof (buf_t), KM_SLEEP);
+	bioinit(buf);
+	/*
+	 * We use the private field of buf to specify that this is an
+	 * I/O using an absolute offset.
+	 */
+	buf->b_private = (void *)VD_SLICE_NONE;
+
+	status = physio(vdc_strategy, buf, dev, rw, vdc_min, &auio);
+
+	biofini(buf);
+	kmem_free(buf, sizeof (buf_t));
+
+	return (status);
 }
 
 /*
@@ -4122,6 +4265,9 @@ static vdc_dk_ioctl_t	dk_ioctl[] = {
 	{VD_OP_SET_EFI,		DKIOCSETEFI,		0,
 		vdc_set_efi_convert},
 
+	/* DIOCTL_RWCMD is converted to a read or a write */
+	{0, DIOCTL_RWCMD,  sizeof (struct dadkio_rwcmd), NULL},
+
 	/*
 	 * These particular ioctls are not sent to the server - vdc fakes up
 	 * the necessary info.
@@ -4129,6 +4275,7 @@ static vdc_dk_ioctl_t	dk_ioctl[] = {
 	{0, DKIOCINFO, sizeof (struct dk_cinfo), vdc_null_copy_func},
 	{0, DKIOCGMEDIAINFO, sizeof (struct dk_minfo), vdc_null_copy_func},
 	{0, USCSICMD,	sizeof (struct uscsi_cmd), vdc_null_copy_func},
+	{0, DKIOCGAPART, 0, vdc_null_copy_func },
 	{0, DKIOCREMOVABLE, 0, vdc_null_copy_func},
 	{0, CDROMREADOFFSET, 0, vdc_null_copy_func}
 };
@@ -4176,7 +4323,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	}
 
 	DMSG(vdc, 0, "[%d] Processing ioctl(%x) for dev %lx : model %x\n",
-		instance, cmd, dev, ddi_model_convert_from(mode & FMODELS));
+	    instance, cmd, dev, ddi_model_convert_from(mode & FMODELS));
 
 	/*
 	 * Validate the ioctl operation to be performed.
@@ -4220,6 +4367,22 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	case USCSICMD:
 		return (ENOTTY);
 
+	case DIOCTL_RWCMD:
+		{
+			if (vdc->cinfo->dki_ctype != DKC_DIRECT)
+				return (ENOTTY);
+
+			return (vdc_dioctl_rwcmd(dev, arg, mode));
+		}
+
+	case DKIOCGAPART:
+		{
+			if (vdc->vdisk_label != VD_DISK_LABEL_VTOC)
+				return (ENOTSUP);
+
+			return (vdc_dkio_get_partition(dev, arg, mode));
+		}
+
 	case DKIOCINFO:
 		{
 			struct dk_cinfo	cinfo;
@@ -4230,7 +4393,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 			cinfo.dki_partition = VDCPART(dev);
 
 			rv = ddi_copyout(&cinfo, (void *)arg,
-					sizeof (struct dk_cinfo), mode);
+			    sizeof (struct dk_cinfo), mode);
 			if (rv != 0)
 				return (EFAULT);
 
@@ -4243,7 +4406,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 				return (ENXIO);
 
 			rv = ddi_copyout(vdc->minfo, (void *)arg,
-					sizeof (struct dk_minfo), mode);
+			    sizeof (struct dk_minfo), mode);
 			if (rv != 0)
 				return (EFAULT);
 
@@ -4303,7 +4466,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 
 			/* put the request on a task queue */
 			rv = taskq_dispatch(system_taskq, vdc_dkio_flush_cb,
-				(void *)dkarg, DDI_SLEEP);
+			    (void *)dkarg, DDI_SLEEP);
 			if (rv == NULL) {
 				/* clean up if dispatch fails */
 				mutex_enter(&vdc->lock);
@@ -4344,7 +4507,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	rv = (iop->convert)(vdc, arg, mem_p, mode, VD_COPYIN);
 	if (rv != 0) {
 		DMSG(vdc, 0, "[%d] convert func returned %d for ioctl 0x%x\n",
-				instance, rv, cmd);
+		    instance, rv, cmd);
 		if (mem_p != NULL)
 			kmem_free(mem_p, alloc_len);
 		return (rv);
@@ -4364,7 +4527,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 		 * that the ioctl is not applicable.
 		 */
 		DMSG(vdc, 0, "[%d] vds returned %d for ioctl 0x%x\n",
-			instance, rv, cmd);
+		    instance, rv, cmd);
 		if (mem_p != NULL)
 			kmem_free(mem_p, alloc_len);
 
@@ -4429,7 +4592,7 @@ vd_process_ioctl(dev_t dev, int cmd, caddr_t arg, int mode)
 	rv = (iop->convert)(vdc, mem_p, arg, mode, VD_COPYOUT);
 	if (rv != 0) {
 		DMSG(vdc, 0, "[%d] convert func returned %d for ioctl 0x%x\n",
-				instance, rv, cmd);
+		    instance, rv, cmd);
 		if (mem_p != NULL)
 			kmem_free(mem_p, alloc_len);
 		return (rv);
@@ -4838,7 +5001,12 @@ vdc_create_fake_geometry(vdc_t *vdc)
 	(void) strcpy(vdc->cinfo->dki_dname, VDC_DRIVER_NAME);
 	/* max_xfer_sz is #blocks so we don't need to divide by DEV_BSIZE */
 	vdc->cinfo->dki_maxtransfer = vdc->max_xfer_sz;
-	vdc->cinfo->dki_ctype = DKC_SCSI_CCS;
+	/*
+	 * We currently set the controller type to DKC_DIRECT for any disk.
+	 * When SCSI support is implemented, we will eventually change this
+	 * type to DKC_SCSI_CCS for disks supporting the SCSI protocol.
+	 */
+	vdc->cinfo->dki_ctype = DKC_DIRECT;
 	vdc->cinfo->dki_flags = DKI_FMTVOL;
 	vdc->cinfo->dki_cnum = 0;
 	vdc->cinfo->dki_addr = 0;
@@ -4894,12 +5062,12 @@ vdc_setup_disk_layout(vdc_t *vdc)
 		vdc->vtoc = kmem_zalloc(sizeof (struct vtoc), KM_SLEEP);
 
 	dev = makedevice(ddi_driver_major(vdc->dip),
-				VD_MAKE_DEV(vdc->instance, 0));
+	    VD_MAKE_DEV(vdc->instance, 0));
 	rv = vd_process_ioctl(dev, DKIOCGVTOC, (caddr_t)vdc->vtoc, FKIOCTL);
 
 	if (rv && rv != ENOTSUP) {
 		DMSG(vdc, 0, "[%d] Failed to get VTOC (err=%d)",
-				vdc->instance, rv);
+		    vdc->instance, rv);
 		return (rv);
 	}
 
@@ -5064,7 +5232,7 @@ vdc_setup_devid(vdc_t *vdc)
 
 	/* build an encapsulated devid based on the returned devid */
 	if (ddi_devid_init(vdc->dip, DEVID_ENCAP, vd_devid->length,
-		vd_devid->id, &vdc->devid) != DDI_SUCCESS) {
+	    vd_devid->id, &vdc->devid) != DDI_SUCCESS) {
 		DMSG(vdc, 1, "[%d] Fail to created devid\n", vdc->instance);
 		kmem_free(vd_devid, bufsize);
 		return (1);

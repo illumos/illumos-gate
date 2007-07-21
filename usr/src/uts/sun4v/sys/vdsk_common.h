@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,6 +106,11 @@ extern "C" {
 #define	VD_OP_SET_EFI 		0x0d	/* Set EFI */
 #define	VD_OP_MASK		0xFF	/* mask of all possible operations */
 #define	VD_OP_COUNT		13	/* Number of operations */
+
+/*
+ * Slice for absolute disk transaction.
+ */
+#define	VD_SLICE_NONE		0xFF
 
 /*
  * EFI disks do not have a slice 7. Actually that slice is used to represent
