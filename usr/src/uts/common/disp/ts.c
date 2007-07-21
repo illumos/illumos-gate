@@ -1320,6 +1320,10 @@ ts_exit(kthread_t *t)
 		 * A thread could be exiting in between clock ticks,
 		 * so we need to calculate how much CPU time it used
 		 * since it was charged last time.
+		 *
+		 * CPU caps are not enforced on exiting processes - it is
+		 * usually desirable to exit as soon as possible to free
+		 * resources.
 		 */
 		thread_lock(t);
 		tspp = (tsproc_t *)t->t_cldata;
@@ -1382,7 +1386,8 @@ ts_preempt(kthread_t *t)
 	 * Do not enforce CPU caps on threads running at a kernel priority
 	 */
 	if (CPUCAPS_ON()) {
-		(void) cpucaps_charge(t, &tspp->ts_caps, CPUCAPS_CHARGE_ONLY);
+		(void) cpucaps_charge(t, &tspp->ts_caps,
+		    CPUCAPS_CHARGE_ENFORCE);
 		if (!(tspp->ts_flags & TSKPRI) && CPUCAPS_ENFORCE(t))
 			return;
 	}
@@ -1509,7 +1514,7 @@ ts_sleep(kthread_t *t)
 	/*
 	 * Account for time spent on CPU before going to sleep.
 	 */
-	(void) CPUCAPS_CHARGE(t, &tspp->ts_caps, CPUCAPS_CHARGE_ONLY);
+	(void) CPUCAPS_CHARGE(t, &tspp->ts_caps, CPUCAPS_CHARGE_ENFORCE);
 
 	flags = tspp->ts_flags;
 	if (t->t_kpri_req) {
@@ -2026,7 +2031,7 @@ ts_yield(kthread_t *t)
 	/*
 	 * Collect CPU usage spent before yielding
 	 */
-	(void) CPUCAPS_CHARGE(t, &tspp->ts_caps, CPUCAPS_CHARGE_ONLY);
+	(void) CPUCAPS_CHARGE(t, &tspp->ts_caps, CPUCAPS_CHARGE_ENFORCE);
 
 	/*
 	 * Clear the preemption control "yield" bit since the user is

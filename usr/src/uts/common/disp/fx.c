@@ -543,6 +543,13 @@ fx_exit(kthread_t *t)
 	thread_lock(t);
 	fxpp = (fxproc_t *)(t->t_cldata);
 
+	/*
+	 * A thread could be exiting in between clock ticks, so we need to
+	 * calculate how much CPU time it used since it was charged last time.
+	 *
+	 * CPU caps are not enforced on exiting processes - it is usually
+	 * desirable to exit as soon as possible to free resources.
+	 */
 	(void) CPUCAPS_CHARGE(t, &fxpp->fx_caps, CPUCAPS_CHARGE_ONLY);
 
 	if (FX_HAS_CB(fxpp)) {
@@ -1115,7 +1122,7 @@ fx_preempt(kthread_t *t)
 	ASSERT(t == curthread);
 	ASSERT(THREAD_LOCK_HELD(curthread));
 
-	(void) CPUCAPS_CHARGE(t, &fxpp->fx_caps, CPUCAPS_CHARGE_ONLY);
+	(void) CPUCAPS_CHARGE(t, &fxpp->fx_caps, CPUCAPS_CHARGE_ENFORCE);
 
 	/*
 	 * Check to see if we're doing "preemption control" here.  If
@@ -1209,7 +1216,7 @@ fx_sleep(kthread_t *t)
 	/*
 	 * Account for time spent on CPU before going to sleep.
 	 */
-	(void) CPUCAPS_CHARGE(t, &fxpp->fx_caps, CPUCAPS_CHARGE_ONLY);
+	(void) CPUCAPS_CHARGE(t, &fxpp->fx_caps, CPUCAPS_CHARGE_ENFORCE);
 
 	if (FX_HAS_CB(fxpp)) {
 		FX_CB_SLEEP(FX_CALLB(fxpp), fxpp->fx_cookie);
@@ -1428,7 +1435,7 @@ fx_yield(kthread_t *t)
 	/*
 	 * Collect CPU usage spent before yielding CPU.
 	 */
-	(void) CPUCAPS_CHARGE(t, &fxpp->fx_caps, CPUCAPS_CHARGE_ONLY);
+	(void) CPUCAPS_CHARGE(t, &fxpp->fx_caps, CPUCAPS_CHARGE_ENFORCE);
 
 	if (FX_HAS_CB(fxpp))  {
 		clock_t new_quantum =  (clock_t)fxpp->fx_pquantum;

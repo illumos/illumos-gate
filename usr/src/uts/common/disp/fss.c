@@ -1799,6 +1799,13 @@ fss_exit(kthread_t *t)
 	mutex_exit(&fsspset->fssps_lock);
 	mutex_exit(&fsspsets_lock);
 
+	/*
+	 * A thread could be exiting in between clock ticks, so we need to
+	 * calculate how much CPU time it used since it was charged last time.
+	 *
+	 * CPU caps are not enforced on exiting processes - it is usually
+	 * desirable to exit as soon as possible to free resources.
+	 */
 	if (CPUCAPS_ON()) {
 		thread_lock(t);
 		fssproc = FSSPROC(t);
@@ -1993,7 +2000,7 @@ fss_preempt(kthread_t *t)
 	 */
 	if (CPUCAPS_ON()) {
 		(void) cpucaps_charge(t, &fssproc->fss_caps,
-		    CPUCAPS_CHARGE_ONLY);
+		    CPUCAPS_CHARGE_ENFORCE);
 
 		if (!(fssproc->fss_flags & FSSKPRI) && CPUCAPS_ENFORCE(t))
 			return;
@@ -2109,7 +2116,7 @@ fss_sleep(kthread_t *t)
 	/*
 	 * Account for time spent on CPU before going to sleep.
 	 */
-	(void) CPUCAPS_CHARGE(t, &fssproc->fss_caps, CPUCAPS_CHARGE_ONLY);
+	(void) CPUCAPS_CHARGE(t, &fssproc->fss_caps, CPUCAPS_CHARGE_ENFORCE);
 
 	fss_inactive(t);
 
@@ -2412,7 +2419,7 @@ fss_yield(kthread_t *t)
 	/*
 	 * Collect CPU usage spent before yielding
 	 */
-	(void) CPUCAPS_CHARGE(t, &fssproc->fss_caps, CPUCAPS_CHARGE_ONLY);
+	(void) CPUCAPS_CHARGE(t, &fssproc->fss_caps, CPUCAPS_CHARGE_ENFORCE);
 
 	/*
 	 * Clear the preemption control "yield" bit since the user is
