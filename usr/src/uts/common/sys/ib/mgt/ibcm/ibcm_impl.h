@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,6 +99,7 @@
 #include <sys/ib/ibtl/impl/ibtl_util.h>
 #include <sys/ib/mgt/ibmf/ibmf.h>
 #include <sys/ib/mgt/ibcm/ibcm_trace.h>
+#include <inet/ip.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -225,6 +226,7 @@ typedef enum ibcm_event_type_e {
 #define	IBCM_MAX_COMIDS		(0x01000000 - 2)
 #define	IBCM_MAX_REQIDS		0xFFFFFFFF
 #define	IBCM_MAX_LOCAL_SIDS	0xFFFFFFFF
+#define	IBCM_MAX_IP_SIDS	0xFFFF
 
 typedef uint32_t ib_com_id_t;	/* CM Communication ID */
 
@@ -1878,6 +1880,9 @@ void		ibcm_free_reqid(ibcm_hca_info_t *hcap, uint32_t reqid);
 ib_svc_id_t	ibcm_alloc_local_sids(int num_sids);
 void		ibcm_free_local_sids(ib_svc_id_t service_id, int num_sids);
 
+ib_svc_id_t	ibcm_alloc_ip_sid();
+void		ibcm_free_ip_sid(ib_svc_id_t sid);
+
 uint64_t	ibcm_generate_tranid(uint8_t event, uint32_t id,
 		    uint32_t cm_tran_priv);
 
@@ -2105,6 +2110,38 @@ _NOTE(READ_ONLY_DATA(ibcm_local_processing_time ibcm_remote_response_time
 #define	IBCM_CPINFO_CAP_RAW		0x0800	/* Raw Datagrams supported */
 #define	IBCM_CPINFO_CAP_UC		0x1000	/* UC supported */
 #define	IBCM_CPINFO_CAP_SIDR		0x2000	/* SIDR supported */
+
+#define	IBCM_V4_PART_OF_V6(v6)	v6.s6_addr32[3]
+/* RDMA CM IP Service's Private Data Format. */
+#ifdef _BIG_ENDIAN
+typedef struct ibcm_ip_pvtdata_s {
+	uint8_t		ip_MajV:4,
+			ip_MinV:4;
+	uint8_t		ip_ipv:4,
+			ip_rsvd:4;	/* 0-3: rsvd, 4-7: ipv */
+	uint16_t	ip_srcport;	/* Source Port */
+	in6_addr_t	ip_srcip;	/* Source IP address. */
+	in6_addr_t	ip_dstip;	/* Remote IP address. */
+#define	ip_srcv4	IBCM_V4_PART_OF_V6(ip_srcip)
+#define	ip_dstv4	IBCM_V4_PART_OF_V6(ip_dstip)
+#define	ip_srcv6	ip_srcip
+#define	ip_dstv6	ip_dstip
+} ibcm_ip_pvtdata_t;
+#else
+typedef struct ibcm_ip_pvtdata_s {
+	uint8_t		ip_MinV:4,
+			ip_MajV:4;
+	uint8_t		ip_rsvd:4,
+			ip_ipv:4;	/* 0-3: rsvd, 4-7: ipv */
+	uint16_t	ip_srcport;	/* Source Port */
+	in6_addr_t	ip_srcip;	/* Source IP address. */
+	in6_addr_t	ip_dstip;	/* Remote IP address. */
+#define	ip_srcv4	IBCM_V4_PART_OF_V6(ip_srcip)
+#define	ip_dstv4	IBCM_V4_PART_OF_V6(ip_dstip)
+#define	ip_srcv6	ip_srcip
+#define	ip_dstv6	ip_dstip
+} ibcm_ip_pvtdata_t;
+#endif
 
 /*
  * for debug purposes

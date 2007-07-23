@@ -329,6 +329,11 @@ rdsib_close_ib()
 		(void) ibt_unbind_all_services(rdsib_statep->rds_srvhdl);
 		(void) ibt_deregister_service(rdsib_statep->rds_ibhdl,
 		    rdsib_statep->rds_srvhdl);
+		(void) ibt_release_ip_sid(rdsib_statep->rds_service_id);
+
+		(void) ibt_unbind_all_services(rdsib_statep->rds_old_srvhdl);
+		(void) ibt_deregister_service(rdsib_statep->rds_ibhdl,
+		    rdsib_statep->rds_old_srvhdl);
 	}
 
 	/* close and destroy all the sessions */

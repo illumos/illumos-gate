@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -353,6 +353,15 @@ ibtl_cm_get_cnt(ibt_path_attr_t *attr, ibt_path_flags_t flags,
 			for (j = 0; j < pinfop->p_sgid_tbl_sz; j++) {
 				gid = pinfop->p_sgid_tbl[j];
 				if (gid.gid_prefix && gid.gid_guid) {
+					if (!(flags & IBT_PATH_APM) &&
+					    attr->pa_sgid.gid_prefix &&
+					    attr->pa_sgid.gid_guid) {
+						if ((attr->pa_sgid.gid_prefix !=
+						    gid.gid_prefix) ||
+						    (attr->pa_sgid.gid_guid !=
+						    gid.gid_guid))
+							continue;
+					}
 					pcount++;
 					if (plistp) {
 						plistp->p_hca_guid = hca_guid;

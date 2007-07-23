@@ -114,6 +114,14 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 	RDS_DPRINTF2(LABEL, "REQ Received: From: %llx:%llx To: %llx:%llx",
 	    rgid.gid_prefix, rgid.gid_guid, lgid.gid_prefix, lgid.gid_guid);
 
+	/* validate service id */
+	if (reqp->req_service_id == RDS_SERVICE_ID) {
+		RDS_DPRINTF0(LABEL, "Version Mismatch: Remote system "
+		    "(GUID: 0x%llx) is running an older version of RDS",
+		    rgid.gid_guid);
+		return (IBT_CM_REJECT);
+	}
+
 	/*
 	 * CM private data brings IP information
 	 * Private data received is a stream of bytes and may not be properly
@@ -126,7 +134,7 @@ rds_handle_cm_req(rds_state_t *statep, ibt_cm_event_t *evp,
 	    cmp.cmp_localip, cmp.cmp_remip, cmp.cmp_eptype);
 
 	if (cmp.cmp_version != RDS_VERSION) {
-		RDS_DPRINTF2(LABEL, "Version Mismatch: Local version: %d "
+		RDS_DPRINTF0(LABEL, "Version Mismatch: Local version: %d "
 		    "Remote version: %d", RDS_VERSION, cmp.cmp_version);
 		return (IBT_CM_REJECT);
 	}
@@ -561,6 +569,12 @@ rds_handle_cm_event_failure(ibt_cm_event_t *evp)
 	    evp->cm_event.failed.cf_code, evp->cm_event.failed.cf_msg,
 	    evp->cm_event.failed.cf_reason);
 
+	if (evp->cm_event.failed.cf_reason == IBT_CM_INVALID_SID) {
+		RDS_DPRINTF0(LABEL,
+		    "Received REJ with reason IBT_CM_INVALID_SID: "
+		    "The remote system could be running an older RDS version");
+	}
+
 	if (evp->cm_channel == NULL) {
 		return (IBT_CM_ACCEPT);
 	}
@@ -665,6 +679,9 @@ rds_cm_handler(void *cm_private, ibt_cm_event_t *eventp,
 	return (ret);
 }
 
+/* This is based on OFED Linux RDS */
+#define	RDS_PORT_NUM	6556
+
 /*
  * Register the wellknown service with service id: RDS_SERVICE_ID
  * Incoming connection requests should arrive on this service id.
@@ -682,11 +699,31 @@ rds_register_service(ibt_clnt_hdl_t rds_ibhdl)
 	srvdesc.sd_handler = rds_cm_handler;
 	srvdesc.sd_flags = IBT_SRV_NO_FLAGS;
 
+	/*
+	 * Register the old service id for backward compatibility
+	 * REQs received on this service id would be rejected
+	 */
 	ret = ibt_register_service(rds_ibhdl, &srvdesc, RDS_SERVICE_ID,
-	    1, &srvhdl, NULL);
+	    1, &rdsib_statep->rds_old_srvhdl, NULL);
 	if (ret != IBT_SUCCESS) {
-		RDS_DPRINTF2(LABEL, "RDS Service Registration Failed: %d",
-		    ret);
+		RDS_DPRINTF2(LABEL,
+		    "RDS Service (0x%llx) Registration Failed: %d",
+		    RDS_SERVICE_ID, ret);
+		return (NULL);
+	}
+
+	/*
+	 * This is the new service id as per:
+	 * Annex A11: RDMA IP CM Service
+	 */
+	rdsib_statep->rds_service_id = ibt_get_ip_sid(IPPROTO_TCP,
+	    RDS_PORT_NUM);
+	ret = ibt_register_service(rds_ibhdl, &srvdesc,
+	    rdsib_statep->rds_service_id, 1, &srvhdl, NULL);
+	if (ret != IBT_SUCCESS) {
+		RDS_DPRINTF2(LABEL,
+		    "RDS Service (0x%llx) Registration Failed: %d",
+		    rdsib_statep->rds_service_id, ret);
 		return (NULL);
 	}
 
@@ -737,6 +774,17 @@ rds_bind_service(rds_state_t *statep)
 			}
 
 			nbinds++;
+
+			/* bind the old service, ignore if it fails */
+			ret = ibt_bind_service(statep->rds_old_srvhdl, gid,
+			    NULL, statep, NULL);
+			if (ret != IBT_SUCCESS) {
+				RDS_DPRINTF2(LABEL, "Bind service for "
+				    "HCA: 0x%llx Port: %d gid %llx:%llx "
+				    "failed: %d", hcap->hca_guid,
+				    hcap->hca_pinfop[jx].p_port_num,
+				    gid.gid_prefix, gid.gid_guid, ret);
+			}
 		}
 		hcap = hcap->hca_nextp;
 	}
@@ -766,11 +814,26 @@ rds_open_rc_channel(rds_ep_t *ep, ibt_path_info_t *pinfo,
 	rds_cm_private_data_t	cmp;
 	uint8_t			hca_port;
 	ibt_channel_hdl_t	hdl;
-	int			ret = 0;
+	ibt_status_t		ret = 0;
+	ibt_ip_cm_info_t	ipcm_info;
 
 	RDS_DPRINTF2("rds_open_rc_channel", "Enter: EP(%p) mode: %d", ep, mode);
 
 	sp = ep->ep_sp;
+
+	bzero(&ipcm_info, sizeof (ibt_ip_cm_info_t));
+	ipcm_info.src_addr.family = AF_INET;
+	ipcm_info.src_addr.un.ip4addr = sp->session_myip;
+	ipcm_info.dst_addr.family = AF_INET;
+	ipcm_info.dst_addr.un.ip4addr = sp->session_remip;
+	ipcm_info.src_port = 6556; /* based on OFED RDS */
+	ret = ibt_format_ip_private_data(&ipcm_info,
+	    sizeof (rds_cm_private_data_t), &cmp);
+	if (ret != IBT_SUCCESS) {
+		RDS_DPRINTF2(LABEL, "SP(%p) EP(%p) ibt_format_ip_private_data "
+		    "failed: %d", sp, ep, ret);
+		return (-1);
+	}
 
 	hca_port = pinfo->pi_prim_cep_path.cep_hca_port_num;
 

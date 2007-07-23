@@ -70,7 +70,7 @@ CFLAGS += $(CCVERBOSE)
 #
 #	depends on misc/ibtl and misc/ibmf
 #
-LDFLAGS	+= -dy -Nmisc/ibtl -Nmisc/ibmf
+LDFLAGS	+= -dy -Nmisc/ibtl -Nmisc/ibmf -Ndrv/ip
 
 #
 # For now, disable these lint checks; maintainers should endeavor

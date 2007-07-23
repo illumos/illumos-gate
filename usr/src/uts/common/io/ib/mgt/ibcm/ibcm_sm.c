@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -953,8 +953,8 @@ ibcm_process_req_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 	ibcm_status_t		state_lookup_status;
 	ibcm_status_t		comid_lookup_status;
 	ibcm_status_t		response;
-	ibcm_req_msg_t		*req_msgp = (ibcm_req_msg_t *)
-					&input_madp[IBCM_MAD_HDR_SIZE];
+	ibcm_req_msg_t		*req_msgp =
+	    (ibcm_req_msg_t *)&input_madp[IBCM_MAD_HDR_SIZE];
 	ibt_cm_reason_t		reject_reason = IBT_CM_SUCCESS;
 	ibcm_state_data_t	*statep;
 	ibcm_state_data_t	*stale_statep = NULL;
@@ -1843,11 +1843,11 @@ ibcm_return_open_data(ibcm_state_data_t *statep, ibcm_rep_msg_t *rep_msgp,
 			    statep->open_return_data->rc_priv_data,
 			    statep->open_return_data->rc_priv_data_len);
 		statep->open_return_data->rc_rdma_ra_in =
-			rep_msgp->rep_resp_resources;
+		    rep_msgp->rep_resp_resources;
 		statep->open_return_data->rc_rdma_ra_out =
-			rep_msgp->rep_initiator_depth;
+		    rep_msgp->rep_initiator_depth;
 		statep->open_return_data->rc_failover_status =
-			rep_msgp->rep_target_delay_plus >> 1 & 3;
+		    rep_msgp->rep_target_delay_plus >> 1 & 3;
 		statep->open_return_data->rc_status = reject_reason;
 
 		mutex_enter(&statep->state_mutex);
@@ -1882,8 +1882,8 @@ ibcm_process_mra_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
     ibcm_mad_addr_t *cm_mad_addr)
 {
 	ibcm_status_t		state_lookup_status;
-	ibcm_mra_msg_t		*mra_msgp = (ibcm_mra_msg_t *)
-					(&input_madp[IBCM_MAD_HDR_SIZE]);
+	ibcm_mra_msg_t		*mra_msgp =
+	    (ibcm_mra_msg_t *)(&input_madp[IBCM_MAD_HDR_SIZE]);
 	ibcm_state_data_t	*statep = NULL;
 	uint8_t			mra_msg;
 
@@ -2065,8 +2065,8 @@ ibcm_process_rtu_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 {
 	timeout_id_t		timer_val;
 	ibcm_status_t		status;
-	ibcm_rtu_msg_t		*rtu_msg = (ibcm_rtu_msg_t *)
-					(&input_madp[IBCM_MAD_HDR_SIZE]);
+	ibcm_rtu_msg_t		*rtu_msg =
+	    (ibcm_rtu_msg_t *)(&input_madp[IBCM_MAD_HDR_SIZE]);
 	ibcm_state_data_t	*statep = NULL;
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_process_rtu_msg:");
@@ -2161,8 +2161,8 @@ ibcm_process_rej_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
     ibcm_mad_addr_t *cm_mad_addr)
 {
 	ibcm_status_t		state_lookup_status;
-	ibcm_rej_msg_t		*rej_msg = (ibcm_rej_msg_t *)
-					(&input_madp[IBCM_MAD_HDR_SIZE]);
+	ibcm_rej_msg_t		*rej_msg =
+	    (ibcm_rej_msg_t *)(&input_madp[IBCM_MAD_HDR_SIZE]);
 	ibcm_state_data_t	*statep = NULL;
 	ib_guid_t		remote_hca_guid;
 	ibcm_conn_state_t	rej_state;
@@ -2353,8 +2353,8 @@ ibcm_process_dreq_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 	void			*priv_data = NULL;
 	ibcm_status_t		state_lookup_status;
 	ib_qpn_t		local_qpn;
-	ibcm_dreq_msg_t		*dreq_msgp = (ibcm_dreq_msg_t *)
-					(&input_madp[IBCM_MAD_HDR_SIZE]);
+	ibcm_dreq_msg_t		*dreq_msgp =
+	    (ibcm_dreq_msg_t *)(&input_madp[IBCM_MAD_HDR_SIZE]);
 	ibcm_state_data_t	*statep = NULL;
 	uint8_t			close_event_type;
 	ibt_cm_status_t		cb_status;
@@ -2730,8 +2730,8 @@ ibcm_process_drep_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
     ibcm_mad_addr_t *cm_mad_addr)
 {
 	ibcm_status_t		state_lookup_status;
-	ibcm_drep_msg_t		*drep_msgp = (ibcm_drep_msg_t *)
-					(&input_madp[IBCM_MAD_HDR_SIZE]);
+	ibcm_drep_msg_t		*drep_msgp =
+	    (ibcm_drep_msg_t *)(&input_madp[IBCM_MAD_HDR_SIZE]);
 	ibcm_state_data_t	*statep = NULL;
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_process_drep_msg:");
@@ -2828,7 +2828,7 @@ ibcm_process_drep_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 			bcopy(drep_msgp->drep_private_data,
 			    statep->close_ret_priv_data,
 			    min(*statep->close_ret_priv_data_len,
-				IBT_DREP_PRIV_DATA_SZ));
+			    IBT_DREP_PRIV_DATA_SZ));
 		}
 
 		mutex_enter(&statep->state_mutex);
@@ -3010,8 +3010,8 @@ void
 ibcm_post_rej_mad(ibcm_state_data_t *statep, ibt_cm_reason_t reject_reason,
     int which_msg, void *addl_rej_info, ibt_priv_data_len_t arej_info_len)
 {
-	ibcm_rej_msg_t	*rej_msg = (ibcm_rej_msg_t *)
-					IBCM_OUT_MSGP(statep->stored_msg);
+	ibcm_rej_msg_t	*rej_msg =
+	    (ibcm_rej_msg_t *)IBCM_OUT_MSGP(statep->stored_msg);
 
 	/* Message printed if connection gets REJed */
 	IBTF_DPRINTF_L3(cmlog, "ibcm_post_rej_mad: "
@@ -3122,8 +3122,8 @@ ibcm_build_n_post_rej_mad(uint8_t *input_madp, ib_com_id_t remote_comid,
 static void
 ibcm_post_rej_ver_mismatch(uint8_t *input_madp, ibcm_mad_addr_t *cm_mad_addr)
 {
-	ibcm_req_msg_t	*req_msgp = (ibcm_req_msg_t *)
-				&input_madp[IBCM_MAD_HDR_SIZE];
+	ibcm_req_msg_t	*req_msgp =
+	    (ibcm_req_msg_t *)&input_madp[IBCM_MAD_HDR_SIZE];
 	ibcm_rej_msg_t	*rej_msg;
 	ibmf_msg_t	*cm_rej_msg;
 	ibcm_mad_addr_t	rej_reply_addr;
@@ -3153,7 +3153,7 @@ ibcm_post_rej_ver_mismatch(uint8_t *input_madp, ibcm_mad_addr_t *cm_mad_addr)
 	rej_msg->rej_addl_rej_info[0] = IBCM_MAD_CLASS_VERSION;
 
 	IBCM_OUT_HDRP(cm_rej_msg)->AttributeID =
-		h2b16(IBCM_INCOMING_REJ + IBCM_ATTR_BASE_ID);
+	    h2b16(IBCM_INCOMING_REJ + IBCM_ATTR_BASE_ID);
 	IBCM_OUT_HDRP(cm_rej_msg)->Status = h2b16(MAD_STATUS_BAD_VERSION);
 
 	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*rej_msg))
@@ -3180,8 +3180,8 @@ ibcm_post_rej_ver_mismatch(uint8_t *input_madp, ibcm_mad_addr_t *cm_mad_addr)
 void
 ibcm_post_rep_mad(ibcm_state_data_t *statep)
 {
-	ibcm_rep_msg_t	*rep_msgp = (ibcm_rep_msg_t *)
-					IBCM_OUT_MSGP(statep->stored_msg);
+	ibcm_rep_msg_t	*rep_msgp =
+	    (ibcm_rep_msg_t *)IBCM_OUT_MSGP(statep->stored_msg);
 	ibmf_msg_t	*mra_msg = NULL;
 	boolean_t	ret = B_FALSE;
 
@@ -4216,7 +4216,7 @@ ibcm_process_tlist()
 			ibcm_timeout_list_hdr = statep->timeout_next;
 
 			if (ibcm_timeout_list_hdr == NULL)
-			    ibcm_timeout_list_tail = NULL;
+				ibcm_timeout_list_tail = NULL;
 
 			statep->timeout_next = NULL;
 
@@ -4230,7 +4230,7 @@ ibcm_process_tlist()
 			ibcm_ud_timeout_list_hdr = ud_statep->ud_timeout_next;
 
 			if (ibcm_ud_timeout_list_hdr == NULL)
-			    ibcm_ud_timeout_list_tail = NULL;
+				ibcm_ud_timeout_list_tail = NULL;
 
 			ud_statep->ud_timeout_next = NULL;
 
@@ -4466,7 +4466,7 @@ ibcm_process_sidr_req_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 	ibcm_svc_bind_t		*svc_bindp;
 	ibcm_svc_bind_t		*tmp_bindp;
 	ibcm_sidr_req_msg_t	*sidr_reqp = (ibcm_sidr_req_msg_t *)
-					(&input_madp[IBCM_MAD_HDR_SIZE]);
+	    (&input_madp[IBCM_MAD_HDR_SIZE]);
 	ibcm_ud_state_data_t	*ud_statep = NULL;
 	ibcm_sidr_srch_t	srch_sidr;
 	ib_pkey_t		pkey;
@@ -4677,7 +4677,7 @@ ibcm_process_sidr_rep_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 	ibcm_status_t		status;
 	ib_svc_id_t		tmp_svc_id;
 	ibcm_sidr_rep_msg_t	*sidr_repp = (ibcm_sidr_rep_msg_t *)
-					(&input_madp[IBCM_MAD_HDR_SIZE]);
+	    (&input_madp[IBCM_MAD_HDR_SIZE]);
 	ibcm_ud_state_data_t	*ud_statep = NULL;
 	ibcm_sidr_srch_t	srch_sidr;
 
@@ -4946,7 +4946,7 @@ ibcm_sidr_timeout_cb(void *arg)
 
 		if (ud_statep->ud_return_data != NULL) {
 			ud_statep->ud_return_data->ud_status =
-				IBT_CM_SREP_TIMEOUT;
+			    IBT_CM_SREP_TIMEOUT;
 			ud_statep->ud_blocking_done = B_TRUE;
 			cv_broadcast(&ud_statep->ud_block_client_cv);
 		}
@@ -5231,7 +5231,7 @@ ibcm_decode_classport_info(ibcm_hca_info_t *hcap, uint8_t *input_madp,
     ibcm_mad_addr_t *cm_mad_addr)
 {
 	ibcm_classportinfo_msg_t *portinfop = (ibcm_classportinfo_msg_t *)
-					(&input_madp[IBCM_MAD_HDR_SIZE]);
+	    (&input_madp[IBCM_MAD_HDR_SIZE]);
 	IBTF_DPRINTF_L5(cmlog, "ibcm_decode_classport_info: (%p, %p, %p)",
 	    hcap, input_madp, cm_mad_addr);
 
@@ -5334,24 +5334,24 @@ ibcm_set_primary_adds_vect(ibcm_state_data_t *statep,
 	if (statep->mode == IBCM_PASSIVE_MODE) {
 		adds_vectp->av_dlid = b2h16(msgp->req_primary_l_port_lid);
 		adds_vectp->av_dgid.gid_prefix =
-			b2h64(msgp->req_primary_l_port_gid.gid_prefix);
+		    b2h64(msgp->req_primary_l_port_gid.gid_prefix);
 		adds_vectp->av_dgid.gid_guid =
-			b2h64(msgp->req_primary_l_port_gid.gid_guid);
+		    b2h64(msgp->req_primary_l_port_gid.gid_guid);
 		adds_vectp->av_sgid.gid_prefix =
-			b2h64(msgp->req_primary_r_port_gid.gid_prefix);
+		    b2h64(msgp->req_primary_r_port_gid.gid_prefix);
 		adds_vectp->av_sgid.gid_guid =
-			b2h64(msgp->req_primary_r_port_gid.gid_guid);
+		    b2h64(msgp->req_primary_r_port_gid.gid_guid);
 		adds_vectp->av_srate = flow_label20_res6_rate6 & 0x3f;
 	} else {
 		adds_vectp->av_dlid = b2h16(msgp->req_primary_r_port_lid);
 		adds_vectp->av_dgid.gid_prefix =
-			b2h64(msgp->req_primary_r_port_gid.gid_prefix);
+		    b2h64(msgp->req_primary_r_port_gid.gid_prefix);
 		adds_vectp->av_dgid.gid_guid =
-			b2h64(msgp->req_primary_r_port_gid.gid_guid);
+		    b2h64(msgp->req_primary_r_port_gid.gid_guid);
 		adds_vectp->av_sgid.gid_prefix =
-			b2h64(msgp->req_primary_l_port_gid.gid_prefix);
+		    b2h64(msgp->req_primary_l_port_gid.gid_prefix);
 		adds_vectp->av_sgid.gid_guid =
-			b2h64(msgp->req_primary_l_port_gid.gid_guid);
+		    b2h64(msgp->req_primary_l_port_gid.gid_guid);
 		adds_vectp->av_srate = statep->local_srate;
 	}
 
@@ -5641,10 +5641,10 @@ ibcm_invoke_qp_modify(ibcm_state_data_t *statep, ibcm_req_msg_t *req_msgp,
 	case IBT_RD_SRV:
 		if (statep->mode == IBCM_ACTIVE_MODE) { /* look at REP msg */
 			IBCM_QPINFO(qp_info).rd.rd_qkey =
-				b2h32(rep_msgp->rep_local_qkey);
+			    b2h32(rep_msgp->rep_local_qkey);
 		} else {
 			IBCM_QPINFO(qp_info).rd.rd_qkey =
-				b2h32(req_msgp->req_local_qkey);
+			    b2h32(req_msgp->req_local_qkey);
 		}
 
 		break;
@@ -5735,6 +5735,7 @@ ibcm_verify_req_gids_and_svcid(ibcm_state_data_t *statep,
 	ib_pkey_t		pkey;
 	uint8_t			port_num;
 	ib_guid_t		hca_guid;
+	ibcm_ip_pvtdata_t	*ip_data;
 
 	/* Verify LID and GID of primary port */
 
@@ -5772,8 +5773,8 @@ ibcm_verify_req_gids_and_svcid(ibcm_state_data_t *statep,
 		hca_guid = statep->hcap->hca_guid;
 
 	} else if (port.hp_base_lid !=
-		(b2h16(cm_req_msgp->req_primary_r_port_lid) &
-		(~((1 << port.hp_lmc) - 1)))) {
+	    (b2h16(cm_req_msgp->req_primary_r_port_lid) &
+	    (~((1 << port.hp_lmc) - 1)))) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_verify_req_gids: statep 0x%p "
 		    "primary port lid invalid (%x, %x, %x)", statep,
 		    port.hp_base_lid,
@@ -5881,6 +5882,126 @@ ibcm_verify_req_gids_and_svcid(ibcm_state_data_t *statep,
 		ibcm_post_rej_mad(statep,
 		    IBT_CM_INVALID_SRV_TYPE, IBT_CM_FAILURE_REQ, NULL, 0);
 		return (IBCM_FAILURE);
+	}
+
+	/*
+	 * Check if ServiceID is in RDMA IP CM SID range, if yes, we parse
+	 * the REQ's Private Data and verify for it's goodness.
+	 */
+	if (((statep->svcid & IB_SID_IPADDR_PREFIX_MASK) == 0) &&
+	    (statep->svcid & IB_SID_IPADDR_PREFIX)) {
+		ibt_ari_ip_t	ari_ip;
+		boolean_t	rdma_rej_mad = B_FALSE;
+
+		if (cm_req_msgp->req_private_data == NULL) {
+			mutex_exit(&ibcm_svc_info_lock);
+
+			IBTF_DPRINTF_L2(cmlog, "ibcm_verify_req_gids_and_svcid:"
+			    " RDMA CM IP REQ Priv Data is NULL");
+
+			/* Send a REJ with CONSUMER REJ */
+			ibcm_post_rej_mad(statep, IBT_CM_CONSUMER,
+			    IBT_CM_FAILURE_REQ, NULL, 0);
+			return (IBCM_FAILURE);
+		}
+		ip_data = (ibcm_ip_pvtdata_t *)cm_req_msgp->req_private_data;
+
+		bzero(&ari_ip, sizeof (ibt_ari_ip_t));
+
+		/* RDMA IP CM Layer Rejects this */
+		if (ip_data->ip_MajV != IBT_CM_IP_MAJ_VER) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_verify_req_gids_and_svcid:"
+			    "IP MajorVer mis-match %d", ip_data->ip_MajV);
+			ari_ip.ip_reason = IBT_ARI_IP_MAJOR_VERSION;
+			ari_ip.ip_suggested_version = IBT_CM_IP_MAJ_VER;
+			ari_ip.ip_suggested = B_TRUE;
+			rdma_rej_mad = B_TRUE;
+		} else if (ip_data->ip_MinV != IBT_CM_IP_MIN_VER) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_verify_req_gids_and_svcid:"
+			    "IP MinorVer mis-match %d", ip_data->ip_MinV);
+			ari_ip.ip_reason = IBT_ARI_IP_MINOR_VERSION;
+			ari_ip.ip_suggested_version = IBT_CM_IP_MIN_VER;
+			ari_ip.ip_suggested = B_TRUE;
+			rdma_rej_mad = B_TRUE;
+		} else if ((ip_data->ip_ipv != IBT_CM_IP_IPV_V4) &&
+		    (ip_data->ip_ipv != IBT_CM_IP_IPV_V6)) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_verify_req_gids_and_svcid:"
+			    " Invalid IPV specified %d", ip_data->ip_ipv);
+			ari_ip.ip_reason = IBT_ARI_IP_IPV;
+			ari_ip.ip_suggested_version = IBT_CM_IP_IPV_V4;
+			ari_ip.ip_suggested = B_TRUE;
+			rdma_rej_mad = B_TRUE;
+		} else {
+			/*
+			 * Validate whether ip_addr specified are non-NULL.
+			 *
+			 * NOTE:
+			 * RDMA ULP which is servicing this SID, should validate
+			 * the correctness of srcip/dstip and accordingly post
+			 * REJ related to ibt_ari_ip_reason_t of
+			 * IBT_ARI_IP_SRC_ADDR, IBT_ARI_IP_DST_ADDR and
+			 * IBT_ARI_IP_UNKNOWN_ADDR.
+			 */
+			if (ip_data->ip_ipv == IBT_CM_IP_IPV_V4) {
+				if (ip_data->ip_srcv4 == 0) {
+					IBTF_DPRINTF_L2(cmlog,
+					    "ibcm_verify_req_gids_and_svcid: "
+					    "Invalid NULL V4 SrcIp specified");
+					rdma_rej_mad = B_TRUE;
+					ari_ip.ip_reason = IBT_ARI_IP_SRC_ADDR;
+					ari_ip.ip_suggested = B_TRUE;
+					ari_ip.ip_suggested_version =
+					    IBT_CM_IP_IPV_V4;
+				} else if (ip_data->ip_dstv4 == 0) {
+					IBTF_DPRINTF_L2(cmlog,
+					    "ibcm_verify_req_gids_and_svcid: "
+					    "Invalid NULL V4 DstIp specified");
+					rdma_rej_mad = B_TRUE;
+					ari_ip.ip_reason = IBT_ARI_IP_DST_ADDR;
+					ari_ip.ip_suggested = B_TRUE;
+					ari_ip.ip_suggested_version =
+					    IBT_CM_IP_IPV_V4;
+				}
+			} else if (ip_data->ip_ipv == IBT_CM_IP_IPV_V6) {
+				if (IN6_IS_ADDR_UNSPECIFIED(
+				    &ip_data->ip_srcv6)) {
+					IBTF_DPRINTF_L2(cmlog,
+					    "ibcm_verify_req_gids_and_svcid: "
+					    "Invalid NULL V6 SrcIp specified");
+					rdma_rej_mad = B_TRUE;
+					ari_ip.ip_reason = IBT_ARI_IP_SRC_ADDR;
+					ari_ip.ip_suggested = B_TRUE;
+					ari_ip.ip_suggested_version =
+					    IBT_CM_IP_IPV_V6;
+				} else if (IN6_IS_ADDR_UNSPECIFIED(
+				    &ip_data->ip_dstv6)) {
+					IBTF_DPRINTF_L2(cmlog,
+					    "ibcm_verify_req_gids_and_svcid: "
+					    "Invalid NULL V6 DstIp specified");
+					rdma_rej_mad = B_TRUE;
+					ari_ip.ip_reason = IBT_ARI_IP_DST_ADDR;
+					ari_ip.ip_suggested = B_TRUE;
+					ari_ip.ip_suggested_version =
+					    IBT_CM_IP_IPV_V6;
+				}
+			}
+			/* TBD: IBT_ARI_IP_UNKNOWN_ADDR */
+		}
+		if (rdma_rej_mad == B_TRUE) {
+			ibt_ari_con_t	cons_rej;
+
+			mutex_exit(&ibcm_svc_info_lock);
+
+			cons_rej.rej_ari_len = 1 + sizeof (ibt_ari_ip_t);
+			cons_rej.rej_ari[0] = 0; /* Rejected by CM Layer */
+			bcopy(&ari_ip, &cons_rej.rej_ari[1],
+			    sizeof (ibt_ari_ip_t));
+			/* Send a REJ with CONSUMER REJ */
+			ibcm_post_rej_mad(statep, IBT_CM_CONSUMER,
+			    IBT_CM_FAILURE_REQ, &cons_rej,
+			    sizeof (ibt_ari_con_t));
+			return (IBCM_FAILURE);
+		}
 	}
 
 	/* find the best "bind" entry that enables this port */
@@ -6139,8 +6260,8 @@ ibcm_cep_state_req(ibcm_state_data_t *statep, ibcm_req_msg_t *cm_req_msgp,
 	clnt_info.priv_data_len = ret_args.cm_ret_len;
 
 	status =
-		ibcm_process_cep_req_cm_hdlr(statep, cb_status,
-		    &clnt_info, reject_reason, arej_len, cm_req_msgp);
+	    ibcm_process_cep_req_cm_hdlr(statep, cb_status,
+	    &clnt_info, reject_reason, arej_len, cm_req_msgp);
 	kmem_free(priv_data, IBT_MAX_PRIV_DATA_SZ);
 	return (status);
 }
@@ -6190,7 +6311,7 @@ ibcm_process_cep_req_cm_hdlr(ibcm_state_data_t *statep,
 	/* client handler gave CM ok */
 	if (cb_status == IBT_CM_ACCEPT) {
 		ibcm_rep_msg_t	*rep_msgp = (ibcm_rep_msg_t *)
-					IBCM_OUT_MSGP(statep->stored_msg);
+		    IBCM_OUT_MSGP(statep->stored_msg);
 
 
 		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*statep))
@@ -6457,6 +6578,22 @@ ibcm_process_cep_req_cm_hdlr(ibcm_state_data_t *statep,
 		    IBT_CM_ADDL_REJ_LEN);
 		bcopy(clnt_info->reply_event->rej.ari_consumer.rej_ari,
 		    &rej_msgp->rej_addl_rej_info, *arej_len);
+
+		/*
+		 * RDMA IP REQ was passed up to the ULP, the ULP decided to do
+		 * a "normal" consumer REJ, by the returning IBT_CM_REJECT in
+		 * the cm handler.
+		 * CM has to do some extra stuff too, it has to
+		 * a) return REJ code 28 (consumer) and b) put 0x1 in the first
+		 * byte of the ARI data, to indicate that this is a RDMA aware
+		 * ULP that is doing a consumer reject.  The ULP should have
+		 * put its consumer specific data into ibt_arej_info_t(9s) at
+		 * byte 1 of the rej_ari[] array.
+		 */
+		if (((statep->svcid & IB_SID_IPADDR_PREFIX_MASK) == 0) &&
+		    (statep->svcid & IB_SID_IPADDR_PREFIX)) {
+			rej_msgp->rej_addl_rej_info[0] = 1;
+		}
 	}
 
 	rej_msgp->rej_msg_type_plus = IBT_CM_FAILURE_REQ << 6;
@@ -6499,9 +6636,9 @@ ibcm_cep_state_rep(ibcm_state_data_t *statep, ibcm_rep_msg_t *cm_rep_msgp,
 		event.cm_session_id = statep;
 
 		IBCM_EVT_REP(event).rep_rdma_ra_in =
-			cm_rep_msgp->rep_resp_resources;
+		    cm_rep_msgp->rep_resp_resources;
 		IBCM_EVT_REP(event).rep_rdma_ra_out =
-			cm_rep_msgp->rep_initiator_depth;
+		    cm_rep_msgp->rep_initiator_depth;
 		IBCM_EVT_REP(event).rep_service_time = ibt_ib2usec(
 		    ((uint8_t *)&(((ibcm_req_msg_t *)IBCM_OUT_MSGP(
 		    statep->stored_msg))->req_starting_psn_plus))[3] >> 3);
@@ -6510,7 +6647,7 @@ ibcm_cep_state_rep(ibcm_state_data_t *statep, ibcm_rep_msg_t *cm_rep_msgp,
 		    2 * statep->pkt_life_time - ibcm_sw_delay;
 
 		IBCM_EVT_REP(event).rep_failover_status =
-			cm_rep_msgp->rep_target_delay_plus >> 1 & 3;
+		    cm_rep_msgp->rep_target_delay_plus >> 1 & 3;
 
 		if (cm_rep_msgp->rep_target_delay_plus & 0x1)
 			IBCM_EVT_REP(event).rep_flags |= IBT_CM_FLOW_CONTROL;
@@ -6674,7 +6811,7 @@ ibcm_process_cep_rep_cm_hdlr(ibcm_state_data_t *statep,
 		if (clnt_info->priv_data_len != 0) {
 			ibcm_rtu_msg_t *rtu_msgp;
 			rtu_msgp = (ibcm_rtu_msg_t *)
-				IBCM_OUT_MSGP(statep->stored_msg);
+			    IBCM_OUT_MSGP(statep->stored_msg);
 			bcopy(clnt_info->priv_data, rtu_msgp->rtu_private_data,
 			    min(IBT_RTU_PRIV_DATA_SZ,
 			    clnt_info->priv_data_len));
@@ -6821,7 +6958,7 @@ ibcm_cep_state_rtu(ibcm_state_data_t *statep, ibcm_rtu_msg_t *cm_rtu_msgp)
 	ibt_status_t	status;
 	ibt_cm_event_t	event;
 	ibcm_rep_msg_t	*rep_msgp = (ibcm_rep_msg_t *)
-					IBCM_OUT_MSGP(statep->stored_msg);
+	    IBCM_OUT_MSGP(statep->stored_msg);
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_cep_state_rtu: statep 0x%p", statep);
 
@@ -7044,7 +7181,7 @@ ibcm_cep_state_rej(ibcm_state_data_t *statep, ibcm_rej_msg_t *rej_msgp,
 		event.cm_event.failed.cf_code = IBT_CM_FAILURE_REJ_RCV;
 		event.cm_event.failed.cf_msg = rej_msgp->rej_msg_type_plus >> 6;
 		event.cm_event.failed.cf_reason =
-			b2h16(rej_msgp->rej_rejection_reason);
+		    b2h16(rej_msgp->rej_rejection_reason);
 
 		IBTF_DPRINTF_L3(cmlog, "ibcm_cep_state_rej: rej_reason = %d",
 		    event.cm_event.failed.cf_reason);
@@ -7519,7 +7656,7 @@ ibcm_process_lap_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 {
 	ibcm_status_t		state_lookup_status;
 	ibcm_lap_msg_t		*lap_msg = (ibcm_lap_msg_t *)
-					(&input_madp[IBCM_MAD_HDR_SIZE]);
+	    (&input_madp[IBCM_MAD_HDR_SIZE]);
 	ibcm_apr_msg_t		*apr_msg;
 	ibcm_state_data_t	*statep = NULL;
 
@@ -7642,7 +7779,7 @@ ibcm_post_stored_apr_mad(ibcm_state_data_t *statep, uint8_t *input_madp)
 	bcopy(apr_msg, IBCM_OUT_MSGP(ibmf_apr_msg), IBCM_MSG_SIZE);
 
 	IBCM_OUT_HDRP(ibmf_apr_msg)->AttributeID =
-		h2b16(IBCM_INCOMING_APR + IBCM_ATTR_BASE_ID);
+	    h2b16(IBCM_INCOMING_APR + IBCM_ATTR_BASE_ID);
 
 	IBCM_OUT_HDRP(ibmf_apr_msg)->TransactionID =
 	    ((ib_mad_hdr_t *)(input_madp))->TransactionID;
@@ -7989,7 +8126,7 @@ ibcm_process_apr_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 {
 	ibcm_status_t		state_lookup_status;
 	ibcm_apr_msg_t		*apr_msg = (ibcm_apr_msg_t *)
-					(&input_madp[IBCM_MAD_HDR_SIZE]);
+	    (&input_madp[IBCM_MAD_HDR_SIZE]);
 	ibcm_state_data_t	*statep = NULL;
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_process_apr_msg:");

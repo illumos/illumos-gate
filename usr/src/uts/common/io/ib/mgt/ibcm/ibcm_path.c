@@ -26,16 +26,13 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ib/mgt/ibcm/ibcm_impl.h>
-#include <sys/ib/ibtl/ibti.h>
+#include <sys/ib/mgt/ibcm/ibcm_arp.h>
 
 /*
  * ibcm_path.c
  *
  * ibt_get_paths() implement the Path Informations related functionality.
  */
-
-/* Externs. */
-extern char	cmlog[];
 
 /* ibcm_saa_service_rec() fills in ServiceID and DGID. */
 typedef struct ibcm_dest_s {
@@ -104,7 +101,6 @@ static ibt_status_t ibcm_process_get_paths(void *tq_arg);
 
 static ibt_status_t ibcm_get_comp_pgids(ib_gid_t, ib_gid_t, ib_guid_t,
     ib_gid_t **, uint_t *);
-
 
 /*
  * Function:
@@ -219,7 +215,7 @@ ibcm_path_cache_init(void)
 
 	timeout_in_hz = drv_usectohz(ibcm_path_cache_timeout * 1000000);
 	path_cachep = kmem_zalloc(cache_size * sizeof (*path_cachep), KM_SLEEP);
-	mutex_init(&ibcm_path_cache_mutex, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&ibcm_path_cache_mutex, NULL, MUTEX_DEFAULT, NULL);
 	mutex_enter(&ibcm_path_cache_mutex);
 	ibcm_path_cache_size = cache_size;
 	ibcm_path_cachep = path_cachep;
@@ -754,105 +750,19 @@ ibcm_process_get_paths(void *tq_arg)
 
 	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*p_arg))
 
-	/* Checkout whether user has specified SGID. */
-	if (p_arg->attr.pa_sgid.gid_prefix && p_arg->attr.pa_sgid.gid_guid) {
-		ibtl_cm_hca_port_t	hport;
+	/*
+	 * Get list of active HCA<->Port list, that matches input specified attr
+	 */
+	IBTF_DPRINTF_L3(cmlog, "ibcm_process_get_paths: Get Paths from \n HCA "
+	    "(%llX:%d), SGID  %llX:%llX", p_arg->attr.pa_hca_guid,
+	    p_arg->attr.pa_hca_port_num, p_arg->attr.pa_sgid.gid_prefix,
+	    p_arg->attr.pa_sgid.gid_guid);
 
-		IBTF_DPRINTF_L3(cmlog, "ibcm_process_get_paths: SGID %llX:%llX",
-		    p_arg->attr.pa_sgid.gid_prefix,
-		    p_arg->attr.pa_sgid.gid_guid);
-
-		/* For the specified SGID, get HCA information. */
-		retval = ibtl_cm_get_hca_port(p_arg->attr.pa_sgid,
-		    p_arg->attr.pa_hca_guid, &hport);
-		if (retval != IBT_SUCCESS) {
-			IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_paths: "
-			    "Get HCA Port Failed: %d", retval);
-			goto path_error;
-		}
-
-		if ((p_arg->attr.pa_hca_port_num != 0) &&
-		    (p_arg->attr.pa_hca_port_num != hport.hp_port)) {
-			IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_paths: "
-			    "Mis-match input HCA PortNum v/s SGID");
-			retval = IBT_HCA_PORT_INVALID;
-			goto path_error;
-		}
-
-		/*
-		 * If a specific MTU is desired, then first check out whether
-		 * this source port is capable of this MTU.
-		 */
-		if (p_arg->attr.pa_mtu.r_mtu) {
-			if ((p_arg->attr.pa_mtu.r_selector == IBT_GT) &&
-			    (p_arg->attr.pa_mtu.r_mtu >= hport.hp_mtu)) {
-
-				IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_paths:"
-				    " Required MTU not available on this Port. "
-				    "Requested IBT_GT 0x%x but avail 0x%x",
-				    p_arg->attr.pa_mtu.r_mtu, hport.hp_mtu);
-
-				retval = IBT_INVALID_PARAM;
-				goto path_error;
-			} else if ((p_arg->attr.pa_mtu.r_selector == IBT_EQU) &&
-			    (p_arg->attr.pa_mtu.r_mtu > hport.hp_mtu)) {
-				IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_paths:"
-				    " Required MTU not available on this Port "
-				    "Requested IBT_EQU to 0x%x but avail 0x%x",
-				    p_arg->attr.pa_mtu.r_mtu, hport.hp_mtu);
-
-				retval = IBT_INVALID_PARAM;
-				goto path_error;
-			}
-		}
-
-		if (p_arg->flags & IBT_PATH_APM) {
-			_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*p_arg))
-			p_arg->attr.pa_hca_guid = hport.hp_hca_guid;
-			_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*p_arg))
-
-			retval = ibtl_cm_get_active_plist(&p_arg->attr,
-			    p_arg->flags, &slistp);
-			if (retval != IBT_SUCCESS) {
-				IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_paths:"
-				    " ibtl_cm_get_active_plist returned error "
-				    " %d", retval);
-				goto path_error;
-			}
-		} else {
-			slistp = kmem_zalloc(sizeof (ibtl_cm_port_list_t),
-			    KM_SLEEP);
-
-			_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*slistp))
-			slistp->p_hca_guid = hport.hp_hca_guid;
-			slistp->p_mtu = hport.hp_mtu;
-			slistp->p_port_num = hport.hp_port;
-			slistp->p_base_lid = hport.hp_base_lid;
-			slistp->p_sgid = p_arg->attr.pa_sgid;
-			slistp->p_sgid_ix = hport.hp_sgid_ix;
-			slistp->p_count = 1;
-			_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*slistp))
-		}
-	} else {
-		/* Source GID is not specified, but so let's find them. */
-		if (p_arg->attr.pa_hca_guid)
-			IBTF_DPRINTF_L3(cmlog, "ibcm_process_get_paths: Get "
-			    "Paths from HCA (%llX)", p_arg->attr.pa_hca_guid);
-		else
-			IBTF_DPRINTF_L3(cmlog, "ibcm_process_get_paths: SRC "
-			    "Point not specified, flags(%X)", p_arg->flags);
-		/*
-		 * Get list of active HCA<->Port list, that matches input
-		 * specified attr.
-		 */
-		retval = ibtl_cm_get_active_plist(&p_arg->attr, p_arg->flags,
-		    &slistp);
-		if (retval != IBT_SUCCESS) {
-			IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_paths: "
-			    "HCA capable of requested source attributes NOT "
-			    "available.");
-			goto path_error;
-		}
+	retval = ibtl_cm_get_active_plist(&p_arg->attr, p_arg->flags, &slistp);
+	if (retval != IBT_SUCCESS) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_paths: HCA capable of "
+		    "requested source attributes NOT available.");
+		goto path_error;
 	}
 
 	IBTF_DPRINTF_L3(cmlog, "ibcm_process_get_paths: HCA (%llX, %d)",
@@ -1392,8 +1302,8 @@ ibcm_get_single_pathrec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 			}
 
 			IBTF_DPRINTF_L3(cmlog, "ibcm_get_single_pathrec: "
-			    "Get %d Path(s) between\n\tSGID(%llX:%llX) "
-			    "DGID(%llX:%llX)", pathrec_req.NumbPath,
+			    "Get %d Path(s) between\nSGID %llX:%llX "
+			    "DGID %llX:%llX", pathrec_req.NumbPath,
 			    pathrec_req.SGID.gid_prefix,
 			    pathrec_req.SGID.gid_guid,
 			    pathrec_req.DGID.gid_prefix,
@@ -2023,8 +1933,8 @@ ibcm_fillin_loopbackinfo(ibtl_cm_port_list_t *sl, uint8_t index,
 	paths->pi_prim_cep_path.cep_adds_vect.av_dlid = sl->p_base_lid;
 	paths->pi_prim_cep_path.cep_adds_vect.av_src_path = 0;
 	paths->pi_prim_cep_path.cep_adds_vect.av_sgid_ix = sl->p_sgid_ix;
-	paths->pi_prim_cep_path.cep_adds_vect.av_port_num =
-	    paths->pi_prim_cep_path.cep_hca_port_num = sl->p_port_num;
+	paths->pi_prim_cep_path.cep_adds_vect.av_port_num = sl->p_port_num;
+	paths->pi_prim_cep_path.cep_hca_port_num = sl->p_port_num;
 	paths->pi_prim_cep_path.cep_timeout = 0; /* To be filled in by CM. */
 	paths->pi_path_mtu = sl->p_mtu;		/* MTU */
 	paths->pi_prim_pkt_lt = 0;		/* Packet Life Time. */
@@ -2471,8 +2381,8 @@ ibcm_saa_service_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 						/* Rec not found for Alt. */
 						for (j = 0; j < n_gids; j++) {
 							if (gidp[j].gid_prefix
-							    ==
-							    p_gid.gid_prefix) {
+							    == p_gid.
+							    gid_prefix) {
 								a_gid = gidp[j];
 								break;
 							}
@@ -3211,6 +3121,1804 @@ get_alt_path_done:
 }
 
 
+
+/*
+ * IP Path API
+ */
+
+typedef struct ibcm_ip_path_tqargs_s {
+	ibt_ip_path_attr_t	attr;
+	ibt_path_info_t		*paths;
+	ibt_path_ip_src_t	*src_ip_p;
+	uint8_t			*num_paths_p;
+	ibt_ip_path_handler_t	func;
+	void			*arg;
+	ibt_path_flags_t	flags;
+	ibt_clnt_hdl_t		ibt_hdl;
+	kmutex_t		ip_lock;
+	kcondvar_t		ip_cv;
+	ibt_status_t		retval;
+	uint_t			len;
+} ibcm_ip_path_tqargs_t;
+
+typedef struct ibcm_ip_dest_s {
+	ib_gid_t	d_gid;
+	uint_t		d_tag;	/* 0 = Unicast, 2 = LoopBack */
+	ibt_ip_addr_t	d_ip;
+} ibcm_ip_dest_t;
+
+/* Holds destination information needed to fill in ibt_path_info_t. */
+typedef struct ibcm_ip_dinfo_s {
+	uint8_t		num_dest;
+	ibcm_ip_dest_t	dest[1];
+} ibcm_ip_dinfo_t;
+
+_NOTE(SCHEME_PROTECTS_DATA("Temporary path storage", ibcm_ip_dinfo_s))
+
+/* Prototype Declarations. */
+static void ibcm_process_get_ip_paths(void *tq_arg);
+static ibt_status_t ibcm_get_ip_spr(ibcm_ip_path_tqargs_t *,
+    ibtl_cm_port_list_t *, ibcm_ip_dinfo_t *, uint8_t *, ibt_path_info_t *);
+static ibt_status_t ibcm_get_ip_mpr(ibcm_ip_path_tqargs_t *,
+    ibtl_cm_port_list_t *, ibcm_ip_dinfo_t *dinfo,
+    uint8_t *, ibt_path_info_t *);
+static ibt_status_t ibcm_fillin_ip_lbpr(ibtl_cm_port_list_t *, uint8_t index,
+    ibcm_ip_dinfo_t *, ibt_path_info_t *);
+
+/*
+ * Perform SA Access to retrieve Path Records.
+ */
+static ibt_status_t
+ibcm_saa_ip_pr(ibcm_ip_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
+    ibcm_ip_dinfo_t *dinfo, uint8_t *max_count)
+{
+	uint8_t		num_path = *max_count;
+	uint8_t		num_path_plus;
+	uint_t		extra, idx, rec_found = 0;
+	ibt_status_t	retval = IBT_SUCCESS;
+	int		dgid_present = 0;
+	uint8_t		i, j;
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_saa_ip_pr(%p, %p, %p, 0x%X, %d)",
+	    p_arg, sl, dinfo, p_arg->flags, *max_count);
+
+	if ((dinfo->num_dest == 0) || (num_path == 0) || (sl == NULL)) {
+		IBTF_DPRINTF_L3(cmlog, "ibcm_saa_ip_pr: Invalid Counters");
+		return (IBT_INVALID_PARAM);
+	}
+
+	/*
+	 * Of the total needed "X" number of paths to "Y" number of destination
+	 * we need to get X/Y plus X%Y extra paths to each destination,
+	 * We do this so that we can choose the required number of path records
+	 * for the specific destination.
+	 */
+	num_path /= dinfo->num_dest;
+	extra = (*max_count % dinfo->num_dest);
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_saa_ip_pr: numpath %d extra %d dest %d",
+	    num_path, extra, dinfo->num_dest);
+
+	/*
+	 * Find out whether we need to get PathRecord that qualifies for a
+	 * LoopBack.
+	 */
+	for (idx = 0; idx < dinfo->num_dest; idx++) {
+		ib_gid_t	dgid = dinfo->dest[idx].d_gid;
+
+		IBTF_DPRINTF_L3(cmlog, "ibcm_saa_ip_pr: DGID[%d]: %llX:%llX",
+		    idx, dgid.gid_prefix, dgid.gid_guid);
+
+		/*
+		 * For loop-back path record, we should NOT contact SA Access.
+		 * But instead we need to "synthesize" a loop back path record.
+		 */
+		for (i = 0; i < sl->p_count; i++) {
+			if ((sl[i].p_sgid.gid_prefix == dgid.gid_prefix) &&
+			    (sl[i].p_sgid.gid_guid == dgid.gid_guid)) {
+
+				dinfo->dest[idx].d_tag = 2;
+
+				/* Yes, it's loop back case. */
+				retval = ibcm_fillin_ip_lbpr(&sl[i], idx,
+				    dinfo, &p_arg->paths[rec_found]);
+				if (retval != IBT_SUCCESS)
+					break;
+
+				/*
+				 * We update only one record for loop-back case.
+				 */
+				rec_found++;
+				if (rec_found == *max_count)
+					break;
+			}
+		}
+		if (rec_found == *max_count)
+			break;
+	}
+
+	for (i = 0; i < dinfo->num_dest; i++)
+		if (dinfo->dest[i].d_tag == 0)
+			dgid_present++;
+
+	num_path_plus = *max_count - rec_found;
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_saa_ip_pr: Recfound: %d, need to find "
+	    "%d, GID present %d", rec_found, num_path_plus, dgid_present);
+
+	if ((dgid_present != 0) && (num_path_plus > 0)) {
+		IBTF_DPRINTF_L3(cmlog, "ibcm_saa_ip_pr: MultiSM=%X, #SRC=%d, "
+		    "Dest=%d", sl->p_multi, sl->p_count, dgid_present);
+
+		if ((sl->p_multi != IBTL_CM_SIMPLE_SETUP) ||
+		    ((dgid_present == 1) && (sl->p_count == 1))) {
+			/*
+			 * Use SinglePathRec if we are dealing w/ MultiSM or
+			 * request is for one SGID to one DGID.
+			 */
+			retval = ibcm_get_ip_spr(p_arg, sl, dinfo,
+			    &num_path_plus, &p_arg->paths[rec_found]);
+		} else {
+			/* MultiPathRec will be used for other queries. */
+			retval = ibcm_get_ip_mpr(p_arg, sl, dinfo,
+			    &num_path_plus, &p_arg->paths[rec_found]);
+		}
+
+		if ((retval != IBT_SUCCESS) && (retval != IBT_INSUFF_DATA))
+			IBTF_DPRINTF_L2(cmlog, "ibcm_saa_ip_pr: "
+			    "Failed to get PathRec: Status %d", retval);
+		else
+			rec_found += num_path_plus;
+	}
+
+	if (rec_found == 0)  {
+		if (retval == IBT_SUCCESS)
+			retval = IBT_PATH_RECORDS_NOT_FOUND;
+	} else if (rec_found != *max_count)
+		retval = IBT_INSUFF_DATA;
+	else if (rec_found != 0)
+		retval = IBT_SUCCESS;
+
+	if ((p_arg->src_ip_p != NULL) && (rec_found != 0)) {
+		for (i = 0; i < rec_found; i++) {
+			for (j = 0; j < sl->p_count; j++) {
+				if (sl[j].p_sgid.gid_guid == p_arg->paths[i].
+				    pi_prim_cep_path.cep_adds_vect.
+				    av_sgid.gid_guid) {
+					bcopy(&sl[j].p_src_ip,
+					    &p_arg->src_ip_p[i].ip_primary,
+					    sizeof (ibt_ip_addr_t));
+				}
+				/* Is Alt Path present */
+				if (p_arg->paths[i].pi_alt_cep_path.
+				    cep_hca_port_num) {
+					if (sl[j].p_sgid.gid_guid ==
+					    p_arg->paths[i].pi_alt_cep_path.
+					    cep_adds_vect.av_sgid.gid_guid) {
+						bcopy(&sl[j].p_src_ip,
+						    &p_arg->src_ip_p[i].
+						    ip_alternate,
+						    sizeof (ibt_ip_addr_t));
+					}
+				}
+			}
+		}
+	}
+	IBTF_DPRINTF_L3(cmlog, "ibcm_saa_ip_pr: done. Status = %d, "
+	    "Found %d/%d Paths", retval, rec_found, *max_count);
+
+	*max_count = rec_found; /* Update the return count. */
+
+	return (retval);
+}
+
+static ibt_status_t
+ibcm_ip_update_pri(sa_path_record_t *pr_resp, ibtl_cm_port_list_t *sl,
+    ibt_path_info_t *paths)
+{
+	ibt_status_t	retval = IBT_SUCCESS;
+	int		s;
+
+	retval = ibcm_update_cep_info(pr_resp, sl, NULL,
+	    &paths->pi_prim_cep_path);
+	if (retval != IBT_SUCCESS)
+		return (retval);
+
+	/* Update some leftovers */
+	paths->pi_prim_pkt_lt = pr_resp->PacketLifeTime;
+	paths->pi_path_mtu = pr_resp->Mtu;
+
+	for (s = 0; s < sl->p_count; s++) {
+		if (pr_resp->SGID.gid_guid == sl[s].p_sgid.gid_guid)
+			paths->pi_hca_guid = sl[s].p_hca_guid;
+	}
+
+	/* Set Alternate Path to invalid state. */
+	paths->pi_alt_cep_path.cep_hca_port_num = 0;
+	paths->pi_alt_cep_path.cep_adds_vect.av_dlid = 0;
+
+	IBTF_DPRINTF_L5(cmlog, "ibcm_ip_update_pri: Path HCA GUID 0x%llX",
+	    paths->pi_hca_guid);
+
+	return (retval);
+}
+
+
+static ibt_status_t
+ibcm_get_ip_spr(ibcm_ip_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
+    ibcm_ip_dinfo_t *dinfo, uint8_t *num_path, ibt_path_info_t *paths)
+{
+	sa_path_record_t	pathrec_req;
+	sa_path_record_t	*pr_resp;
+	ibmf_saa_access_args_t	access_args;
+	uint64_t		c_mask = 0;
+	void			*results_p;
+	uint8_t			num_rec;
+	size_t			length;
+	ibt_status_t		retval;
+	int			i, j, k;
+	int			found, p_fnd;
+	ibt_ip_path_attr_t	*attrp = &p_arg->attr;
+	ibmf_saa_handle_t	saa_handle;
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_spr(%p, %p, %p, %d)",
+	    p_arg, sl, dinfo, *num_path);
+
+	bzero(&pathrec_req, sizeof (sa_path_record_t));
+
+	/* Is Flow Label Specified. */
+	if (attrp->ipa_flow) {
+		pathrec_req.FlowLabel = attrp->ipa_flow;
+		c_mask |= SA_PR_COMPMASK_FLOWLABEL;
+	}
+
+	/* Is HopLimit Specified. */
+	if (p_arg->flags & IBT_PATH_HOP) {
+		pathrec_req.HopLimit = attrp->ipa_hop;
+		c_mask |= SA_PR_COMPMASK_HOPLIMIT;
+	}
+
+	/* Is TClass Specified. */
+	if (attrp->ipa_tclass) {
+		pathrec_req.TClass = attrp->ipa_tclass;
+		c_mask |= SA_PR_COMPMASK_TCLASS;
+	}
+
+	/* Is SL specified. */
+	if (attrp->ipa_sl) {
+		pathrec_req.SL = attrp->ipa_sl;
+		c_mask |= SA_PR_COMPMASK_SL;
+	}
+
+	/* If IBT_PATH_PERF is set, then mark all selectors to BEST. */
+	if (p_arg->flags & IBT_PATH_PERF) {
+		pathrec_req.PacketLifeTimeSelector = IBT_BEST;
+		pathrec_req.MtuSelector = IBT_BEST;
+		pathrec_req.RateSelector = IBT_BEST;
+
+		c_mask |= SA_PR_COMPMASK_PKTLTSELECTOR |
+		    SA_PR_COMPMASK_RATESELECTOR | SA_PR_COMPMASK_MTUSELECTOR;
+	} else {
+		if (attrp->ipa_pkt_lt.p_selector == IBT_BEST) {
+			pathrec_req.PacketLifeTimeSelector = IBT_BEST;
+			c_mask |= SA_PR_COMPMASK_PKTLTSELECTOR;
+		}
+
+		if (attrp->ipa_srate.r_selector == IBT_BEST) {
+			pathrec_req.RateSelector = IBT_BEST;
+			c_mask |= SA_PR_COMPMASK_RATESELECTOR;
+		}
+
+		if (attrp->ipa_mtu.r_selector == IBT_BEST) {
+			pathrec_req.MtuSelector = IBT_BEST;
+			c_mask |= SA_PR_COMPMASK_MTUSELECTOR;
+		}
+	}
+
+	/*
+	 * Honor individual selection of these attributes,
+	 * even if IBT_PATH_PERF is set.
+	 */
+	/* Check out whether Packet Life Time is specified. */
+	if (attrp->ipa_pkt_lt.p_pkt_lt) {
+		pathrec_req.PacketLifeTime =
+		    ibt_usec2ib(attrp->ipa_pkt_lt.p_pkt_lt);
+		pathrec_req.PacketLifeTimeSelector =
+		    attrp->ipa_pkt_lt.p_selector;
+
+		c_mask |= SA_PR_COMPMASK_PKTLT | SA_PR_COMPMASK_PKTLTSELECTOR;
+	}
+
+	/* Is SRATE specified. */
+	if (attrp->ipa_srate.r_srate) {
+		pathrec_req.Rate = attrp->ipa_srate.r_srate;
+		pathrec_req.RateSelector = attrp->ipa_srate.r_selector;
+
+		c_mask |= SA_PR_COMPMASK_RATE | SA_PR_COMPMASK_RATESELECTOR;
+	}
+
+	/* Is MTU specified. */
+	if (attrp->ipa_mtu.r_mtu) {
+		pathrec_req.Mtu = attrp->ipa_mtu.r_mtu;
+		pathrec_req.MtuSelector = attrp->ipa_mtu.r_selector;
+
+		c_mask |= SA_PR_COMPMASK_MTU | SA_PR_COMPMASK_MTUSELECTOR;
+	}
+
+	/* We always get REVERSIBLE paths. */
+	pathrec_req.Reversible = 1;
+	c_mask |= SA_PR_COMPMASK_REVERSIBLE;
+
+	pathrec_req.NumbPath = *num_path;
+	c_mask |= SA_PR_COMPMASK_NUMBPATH;
+
+	p_fnd = found = 0;
+
+	for (i = 0; i < sl->p_count; i++) {
+		/* SGID */
+		pathrec_req.SGID = sl[i].p_sgid;
+		c_mask |= SA_PR_COMPMASK_SGID;
+		saa_handle = sl[i].p_saa_hdl;
+
+		for (k = 0; k < dinfo->num_dest; k++) {
+			if (dinfo->dest[k].d_tag != 0)
+				continue;
+
+			if (pathrec_req.SGID.gid_prefix !=
+			    dinfo->dest[k].d_gid.gid_prefix) {
+				IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_spr: "
+				    "SGID_pfx=%llX DGID_pfx=%llX doesn't match",
+				    pathrec_req.SGID.gid_prefix,
+				    dinfo->dest[k].d_gid.gid_prefix);
+				continue;
+			} else if (pathrec_req.SGID.gid_guid ==
+			    pathrec_req.DGID.gid_guid) {
+				IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_spr: Why "
+				    "LoopBack request came here! GID %llX:%llX",
+				    pathrec_req.SGID.gid_prefix,
+				    pathrec_req.SGID.gid_guid);
+				continue;
+			}
+
+			pathrec_req.DGID = dinfo->dest[k].d_gid;
+			c_mask |= SA_PR_COMPMASK_DGID;
+
+			IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_spr: "
+			    "Get %d Path(s) between\n SGID %llX:%llX "
+			    "DGID %llX:%llX", pathrec_req.NumbPath,
+			    pathrec_req.SGID.gid_prefix,
+			    pathrec_req.SGID.gid_guid,
+			    pathrec_req.DGID.gid_prefix,
+			    pathrec_req.DGID.gid_guid);
+
+			IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_spr: CMask=0x%llX, "
+			    "PKey=0x%X", c_mask, pathrec_req.P_Key);
+
+			/* Contact SA Access to retrieve Path Records. */
+			access_args.sq_attr_id = SA_PATHRECORD_ATTRID;
+			access_args.sq_template = &pathrec_req;
+			access_args.sq_access_type = IBMF_SAA_RETRIEVE;
+			access_args.sq_template_length =
+			    sizeof (sa_path_record_t);
+			access_args.sq_component_mask = c_mask;
+			access_args.sq_callback = NULL;
+			access_args.sq_callback_arg = NULL;
+
+			retval = ibcm_contact_sa_access(saa_handle,
+			    &access_args, &length, &results_p);
+			if (retval != IBT_SUCCESS) {
+				*num_path = 0;
+				return (retval);
+			}
+
+			num_rec = length / sizeof (sa_path_record_t);
+
+			IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_spr: "
+			    "FOUND %d/%d path requested", num_rec, *num_path);
+
+			if ((results_p == NULL) || (num_rec == 0))
+				continue;
+
+			/* Update the PathInfo from the response. */
+			pr_resp = (sa_path_record_t *)results_p;
+			for (j = 0; j < num_rec; j++, pr_resp++) {
+				if ((p_fnd != 0) &&
+				    (p_arg->flags & IBT_PATH_APM)) {
+					IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_spr"
+					    ": Fill Alternate Path");
+					retval = ibcm_update_cep_info(pr_resp,
+					    sl, NULL,
+					    &paths[found - 1].pi_alt_cep_path);
+					if (retval != IBT_SUCCESS)
+						continue;
+
+					/* Update some leftovers */
+					paths[found - 1].pi_alt_pkt_lt =
+					    pr_resp->PacketLifeTime;
+					p_fnd = 0;
+				} else {
+					IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_spr"
+					    ": Fill Primary Path");
+
+					if (found == *num_path)
+						break;
+
+					retval = ibcm_ip_update_pri(pr_resp, sl,
+					    &paths[found]);
+					if (retval != IBT_SUCCESS)
+						continue;
+					p_fnd = 1;
+					found++;
+				}
+
+			}
+			/* Deallocate the memory for results_p. */
+			kmem_free(results_p, length);
+		}
+	}
+
+	if (found == 0)
+		retval = IBT_PATH_RECORDS_NOT_FOUND;
+	else if (found != *num_path)
+		retval = IBT_INSUFF_DATA;
+	else
+		retval = IBT_SUCCESS;
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_spr: done. Status %d, "
+	    "Found %d/%d Paths", retval, found, *num_path);
+
+	*num_path = found;
+
+	return (retval);
+}
+
+
+static ibt_status_t
+ibcm_get_ip_mpr(ibcm_ip_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
+    ibcm_ip_dinfo_t *dinfo, uint8_t *num_path, ibt_path_info_t *paths)
+{
+	sa_multipath_record_t	*mpr_req;
+	sa_path_record_t	*pr_resp;
+	ibmf_saa_access_args_t	access_args;
+	void			*results_p;
+	uint64_t		c_mask = 0;
+	ib_gid_t		*gid_ptr, *gid_s_ptr;
+	size_t			length;
+	int			template_len, found, num_rec;
+	int			i;
+	ibt_status_t		retval;
+	uint8_t			sgid_cnt, dgid_cnt;
+	ibt_ip_path_attr_t	*attrp = &p_arg->attr;
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr(%p, %p, %p, %d)",
+	    attrp, sl, dinfo, *num_path);
+
+	for (i = 0, dgid_cnt = 0; i < dinfo->num_dest; i++) {
+		if (dinfo->dest[i].d_tag == 0)
+			dgid_cnt++;
+	}
+
+	sgid_cnt = sl->p_count;
+
+	if ((sgid_cnt == 0) || (dgid_cnt == 0)) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_get_ip_mpr: sgid_cnt(%d) or"
+		    " dgid_cnt(%d) is zero", sgid_cnt, dgid_cnt);
+		return (IBT_INVALID_PARAM);
+	}
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr: Get %d records between "
+	    "%d Src(s) <=> %d Dest(s)", *num_path, sgid_cnt, dgid_cnt);
+
+	/*
+	 * Calculate the size for multi-path records template, which includes
+	 * constant portion of the multipath record, plus variable size for
+	 * SGID (sgid_cnt) and DGID (dgid_cnt).
+	 */
+	template_len = ((dgid_cnt + sgid_cnt) * sizeof (ib_gid_t)) +
+	    sizeof (sa_multipath_record_t);
+
+	mpr_req = kmem_zalloc(template_len, KM_SLEEP);
+
+	ASSERT(mpr_req != NULL);
+
+	gid_ptr = (ib_gid_t *)(((uchar_t *)mpr_req) +
+	    sizeof (sa_multipath_record_t));
+
+	/* Get the starting pointer where GIDs are stored. */
+	gid_s_ptr = gid_ptr;
+
+	/* SGID */
+	for (i = 0; i < sl->p_count; i++) {
+		*gid_ptr = sl[i].p_sgid;
+
+		IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr: SGID[%d] = %llX:%llX",
+		    i, gid_ptr->gid_prefix, gid_ptr->gid_guid);
+
+		gid_ptr++;
+	}
+
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mpr_req))
+
+	mpr_req->SGIDCount = sgid_cnt;
+	c_mask = SA_MPR_COMPMASK_SGIDCOUNT;
+
+	/* DGIDs */
+	for (i = 0; i < dinfo->num_dest; i++) {
+		if (dinfo->dest[i].d_tag == 0) {
+			*gid_ptr = dinfo->dest[i].d_gid;
+
+			IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr: DGID[%d] = "
+			    "%llX:%llX", i, gid_ptr->gid_prefix,
+			    gid_ptr->gid_guid);
+			gid_ptr++;
+		}
+	}
+
+	mpr_req->DGIDCount = dgid_cnt;
+	c_mask |= SA_MPR_COMPMASK_DGIDCOUNT;
+
+	/* Is Flow Label Specified. */
+	if (attrp->ipa_flow) {
+		mpr_req->FlowLabel = attrp->ipa_flow;
+		c_mask |= SA_MPR_COMPMASK_FLOWLABEL;
+	}
+
+	/* Is HopLimit Specified. */
+	if (p_arg->flags & IBT_PATH_HOP) {
+		mpr_req->HopLimit = attrp->ipa_hop;
+		c_mask |= SA_MPR_COMPMASK_HOPLIMIT;
+	}
+
+	/* Is TClass Specified. */
+	if (attrp->ipa_tclass) {
+		mpr_req->TClass = attrp->ipa_tclass;
+		c_mask |= SA_MPR_COMPMASK_TCLASS;
+	}
+
+	/* Is SL specified. */
+	if (attrp->ipa_sl) {
+		mpr_req->SL = attrp->ipa_sl;
+		c_mask |= SA_MPR_COMPMASK_SL;
+	}
+
+	if (p_arg->flags & IBT_PATH_PERF) {
+		mpr_req->PacketLifeTimeSelector = IBT_BEST;
+		mpr_req->RateSelector = IBT_BEST;
+		mpr_req->MtuSelector = IBT_BEST;
+
+		c_mask |= SA_MPR_COMPMASK_PKTLTSELECTOR |
+		    SA_MPR_COMPMASK_RATESELECTOR | SA_MPR_COMPMASK_MTUSELECTOR;
+	} else {
+		if (attrp->ipa_pkt_lt.p_selector == IBT_BEST) {
+			mpr_req->PacketLifeTimeSelector = IBT_BEST;
+			c_mask |= SA_MPR_COMPMASK_PKTLTSELECTOR;
+		}
+
+		if (attrp->ipa_srate.r_selector == IBT_BEST) {
+			mpr_req->RateSelector = IBT_BEST;
+			c_mask |= SA_MPR_COMPMASK_RATESELECTOR;
+		}
+
+		if (attrp->ipa_mtu.r_selector == IBT_BEST) {
+			mpr_req->MtuSelector = IBT_BEST;
+			c_mask |= SA_MPR_COMPMASK_MTUSELECTOR;
+		}
+	}
+
+	/*
+	 * Honor individual selection of these attributes,
+	 * even if IBT_PATH_PERF is set.
+	 */
+	/* Check out whether Packet Life Time is specified. */
+	if (attrp->ipa_pkt_lt.p_pkt_lt) {
+		mpr_req->PacketLifeTime =
+		    ibt_usec2ib(attrp->ipa_pkt_lt.p_pkt_lt);
+		mpr_req->PacketLifeTimeSelector =
+		    attrp->ipa_pkt_lt.p_selector;
+
+		c_mask |= SA_MPR_COMPMASK_PKTLT |
+		    SA_MPR_COMPMASK_PKTLTSELECTOR;
+	}
+
+	/* Is SRATE specified. */
+	if (attrp->ipa_srate.r_srate) {
+		mpr_req->Rate = attrp->ipa_srate.r_srate;
+		mpr_req->RateSelector = attrp->ipa_srate.r_selector;
+
+		c_mask |= SA_MPR_COMPMASK_RATE |
+		    SA_MPR_COMPMASK_RATESELECTOR;
+	}
+
+	/* Is MTU specified. */
+	if (attrp->ipa_mtu.r_mtu) {
+		mpr_req->Mtu = attrp->ipa_mtu.r_mtu;
+		mpr_req->MtuSelector = attrp->ipa_mtu.r_selector;
+
+		c_mask |= SA_MPR_COMPMASK_MTU |
+		    SA_MPR_COMPMASK_MTUSELECTOR;
+	}
+
+	/* We always get REVERSIBLE paths. */
+	mpr_req->Reversible = 1;
+	c_mask |= SA_MPR_COMPMASK_REVERSIBLE;
+
+	if (p_arg->flags & IBT_PATH_AVAIL) {
+		mpr_req->IndependenceSelector = 1;
+		c_mask |= SA_MPR_COMPMASK_INDEPSEL;
+	}
+
+	/* we will not specify how many records we want. */
+
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*mpr_req))
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr: CMask: %llX Pkey: %X",
+	    c_mask, mpr_req->P_Key);
+
+	/* Contact SA Access to retrieve Path Records. */
+	access_args.sq_attr_id = SA_MULTIPATHRECORD_ATTRID;
+	access_args.sq_access_type = IBMF_SAA_RETRIEVE;
+	access_args.sq_component_mask = c_mask;
+	access_args.sq_template = mpr_req;
+	access_args.sq_template_length = sizeof (sa_multipath_record_t);
+	access_args.sq_callback = NULL;
+	access_args.sq_callback_arg = NULL;
+
+	retval = ibcm_contact_sa_access(sl->p_saa_hdl, &access_args, &length,
+	    &results_p);
+	if (retval != IBT_SUCCESS) {
+		*num_path = 0;  /* Update the return count. */
+		kmem_free(mpr_req, template_len);
+		return (retval);
+	}
+
+	num_rec = length / sizeof (sa_path_record_t);
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr: Found %d Paths", num_rec);
+
+	found = 0;
+	if ((results_p != NULL) && (num_rec > 0)) {
+		/* Update the PathInfo with the response Path Records */
+		pr_resp = (sa_path_record_t *)results_p;
+
+		for (i = 0; i < num_rec; i++) {
+			IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr: "
+			    "P[%d]: SG %llX, DG %llX", i,
+			    pr_resp[i].SGID.gid_guid, pr_resp[i].DGID.gid_guid);
+		}
+
+		if (p_arg->flags & IBT_PATH_APM) {
+			sa_path_record_t *p_resp = NULL, *a_resp = NULL;
+			int		p_found = 0, a_found = 0;
+			ib_gid_t	p_sg, a_sg, p_dg, a_dg;
+			int		s_spec;
+
+			s_spec =
+			    p_arg->attr.ipa_src_ip.family != AF_UNSPEC ? 1 : 0;
+
+			p_sg = gid_s_ptr[0];
+			if (sgid_cnt > 1)
+				a_sg = gid_s_ptr[1];
+			else
+				a_sg = p_sg;
+
+			IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr: P_SG: %llX, "
+			    "A_SG: %llX", p_sg.gid_guid, a_sg.gid_guid);
+
+			p_dg = gid_s_ptr[sgid_cnt];
+			if (dgid_cnt > 1)
+				a_dg = gid_s_ptr[sgid_cnt + 1];
+			else
+				a_dg = p_dg;
+
+			IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr: P_DG: %llX, "
+			    "A_DG: %llX", p_dg.gid_guid, a_dg.gid_guid);
+
+			/*
+			 * If SGID and/or DGID is specified by user, make sure
+			 * he gets his primary-path on those node points.
+			 */
+			for (i = 0; i < num_rec; i++, pr_resp++) {
+				IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr: "
+				    "PF %d, AF %d,\n\t\t P[%d] = SG: %llX, "
+				    "DG: %llX", p_found, a_found, i,
+				    pr_resp->SGID.gid_guid,
+				    pr_resp->DGID.gid_guid);
+
+				if ((!p_found) &&
+				    (p_dg.gid_guid == pr_resp->DGID.gid_guid)) {
+					IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr"
+					    ": Pri DGID Match.. ");
+					if ((s_spec == 0) || (p_sg.gid_guid ==
+					    pr_resp->SGID.gid_guid)) {
+						p_found = 1;
+						p_resp = pr_resp;
+						IBTF_DPRINTF_L3(cmlog,
+						    "ibcm_get_ip_mpr: "
+						    "Primary Path Found");
+
+						if (a_found)
+							break;
+						else
+							continue;
+					}
+					IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr"
+					    ": Pri SGID Don't Match.. ");
+				}
+
+				if ((!a_found) &&
+				    (a_dg.gid_guid == pr_resp->DGID.gid_guid)) {
+					IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr"
+					    ": Alt DGID Match.. ");
+					if ((s_spec == 0) || (a_sg.gid_guid ==
+					    pr_resp->SGID.gid_guid)) {
+						a_found = 1;
+						a_resp = pr_resp;
+
+						IBTF_DPRINTF_L3(cmlog,
+						    "ibcm_get_ip_mpr:"
+						    "Alternate Path Found ");
+
+						if (p_found)
+							break;
+						else
+							continue;
+					}
+					IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr"
+					    ": Alt SGID Don't Match.. ");
+				}
+			}
+
+			if ((p_found == 0) && (a_found == 0)) {
+				IBTF_DPRINTF_L2(cmlog, "ibcm_get_ip_mpr: Path "
+				    "to desired node points NOT Available.");
+				retval = IBT_PATH_RECORDS_NOT_FOUND;
+				goto get_ip_mpr_end;
+			}
+
+			if ((p_resp == NULL) && (a_resp != NULL)) {
+				p_resp = a_resp;
+				a_resp = NULL;
+			}
+
+			/* Fill in Primary Path */
+			retval = ibcm_ip_update_pri(p_resp, sl, &paths[found]);
+			if (retval != IBT_SUCCESS)
+				goto get_ip_mpr_end;
+
+			/* Fill in Alternate Path */
+			if (a_resp != NULL) {
+				/* a_resp will point to AltPathInfo buffer. */
+				retval = ibcm_update_cep_info(a_resp, sl,
+				    NULL, &paths[found].pi_alt_cep_path);
+				if (retval != IBT_SUCCESS)
+					goto get_ip_mpr_end;
+
+				/* Update some leftovers */
+				paths[found].pi_alt_pkt_lt =
+				    a_resp->PacketLifeTime;
+			} else {
+				IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr: "
+				    "Alternate Path NOT Available.");
+				retval = IBT_INSUFF_DATA;
+			}
+			found++;
+		} else {	/* If NOT APM */
+			for (i = 0; i < num_rec; i++, pr_resp++) {
+				IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr: "
+				    "DGID(%llX)", pr_resp->DGID.gid_guid);
+
+				/* Fill in Primary Path */
+				retval = ibcm_ip_update_pri(pr_resp, sl,
+				    &paths[found]);
+				if (retval != IBT_SUCCESS)
+					continue;
+
+				if (++found == *num_path)
+					break;
+			}
+		}
+get_ip_mpr_end:
+		kmem_free(results_p, length);
+	}
+	kmem_free(mpr_req, template_len);
+
+	if (found == 0)
+		retval = IBT_PATH_RECORDS_NOT_FOUND;
+	else if (found != *num_path)
+		retval = IBT_INSUFF_DATA;
+	else
+		retval = IBT_SUCCESS;
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_mpr: Done (status %d). "
+	    "Found %d/%d Paths", retval, found, *num_path);
+
+	*num_path = found;	/* Update the return count. */
+
+	return (retval);
+}
+
+
+/*
+ * Here we "synthesize" loop back path record information.
+ *
+ * Currently the synthesize values are assumed as follows:
+ *    SLID, DLID = Base LID from Query HCA Port.
+ *    FlowLabel, HopLimit, TClass = 0, as GRH is False.
+ *    RawTraffic = 0.
+ *    P_Key = first valid one in P_Key table as obtained from Query HCA Port.
+ *    SL = as from Query HCA Port.
+ *    MTU = from Query HCA Port.
+ *    Rate = 2 (arbitrary).
+ *    PacketLifeTime = 0 (4.096 usec).
+ */
+static ibt_status_t
+ibcm_fillin_ip_lbpr(ibtl_cm_port_list_t *sl, uint8_t idx,
+    ibcm_ip_dinfo_t *dinfo, ibt_path_info_t *paths)
+{
+	IBTF_DPRINTF_L3(cmlog, "ibcm_fillin_ip_lbpr(%p, %p)", sl, dinfo);
+
+	/* Synthesize path record with appropriate loop back information. */
+	paths->pi_prim_cep_path.cep_pkey_ix =
+	    ibtl_cm_get_1st_full_pkey_ix(sl->p_hca_guid, sl->p_port_num);
+	paths->pi_hca_guid = sl->p_hca_guid;
+	paths->pi_prim_cep_path.cep_adds_vect.av_dgid = dinfo->dest[idx].d_gid;
+	paths->pi_prim_cep_path.cep_adds_vect.av_sgid = sl->p_sgid;
+	paths->pi_prim_cep_path.cep_adds_vect.av_srate	= IBT_SRATE_1X;
+	paths->pi_prim_cep_path.cep_adds_vect.av_srvl	= 0; /* SL */
+
+	paths->pi_prim_cep_path.cep_adds_vect.av_send_grh = B_FALSE;
+	paths->pi_prim_cep_path.cep_adds_vect.av_flow	= 0;
+	paths->pi_prim_cep_path.cep_adds_vect.av_tclass	= 0;
+	paths->pi_prim_cep_path.cep_adds_vect.av_hop 	= 0;
+
+	/* SLID and DLID will be equal to BLID. */
+	paths->pi_prim_cep_path.cep_adds_vect.av_dlid = sl->p_base_lid;
+	paths->pi_prim_cep_path.cep_adds_vect.av_src_path = 0;
+	paths->pi_prim_cep_path.cep_adds_vect.av_sgid_ix = sl->p_sgid_ix;
+	paths->pi_prim_cep_path.cep_adds_vect.av_port_num = sl->p_port_num;
+	paths->pi_prim_cep_path.cep_hca_port_num = sl->p_port_num;
+	paths->pi_prim_cep_path.cep_timeout = 0; /* To be filled in by CM. */
+	paths->pi_path_mtu = sl->p_mtu;		/* MTU */
+	paths->pi_prim_pkt_lt = 0;		/* Packet Life Time. */
+	paths->pi_alt_pkt_lt = 0;		/* Packet Life Time. */
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_fillin_ip_lbpr: HCA %llX:%d \n "
+	    "SGID %llX:%llX DGID %llX:%llX", paths->pi_hca_guid,
+	    paths->pi_prim_cep_path.cep_hca_port_num, sl->p_sgid.gid_prefix,
+	    sl->p_sgid.gid_guid, dinfo->dest[idx].d_gid.gid_prefix,
+	    dinfo->dest[idx].d_gid.gid_guid);
+
+	/* Set Alternate Path to invalid state. */
+	paths->pi_alt_cep_path.cep_hca_port_num = 0;
+	paths->pi_alt_cep_path.cep_adds_vect.av_dlid = 0;
+
+	return (IBT_SUCCESS);
+}
+
+static void
+ibcm_process_get_ip_paths(void *tq_arg)
+{
+	ibcm_ip_path_tqargs_t	*p_arg = (ibcm_ip_path_tqargs_t *)tq_arg;
+	ibcm_ip_dinfo_t		*dinfo = NULL;
+	int			len = 0;
+	uint8_t			max_paths, num_path;
+	ib_gid_t		*d_gids_p = NULL;
+	ib_gid_t		sgid, dgid1, dgid2;
+	ibt_status_t		retval = IBT_SUCCESS;
+	ibtl_cm_port_list_t	*sl = NULL;
+	uint_t			dnum = 0;
+	uint_t			i;
+	ibcm_hca_info_t		*hcap;
+	ibmf_saa_handle_t	saa_handle;
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_process_get_ip_paths(%p, 0x%X) ",
+	    p_arg, p_arg->flags);
+
+	max_paths = num_path = p_arg->attr.ipa_max_paths;
+
+	/*
+	 * Prepare the Source and Destination GID list based on the input
+	 * attributes.  We contact ARP module to perform IP to MAC
+	 * i.e. GID conversion.  We use this GID for path look-up.
+	 *
+	 * If APM is requested and if multiple Dest IPs are specified, check
+	 * out whether they are companion to each other.  But, if only one
+	 * Dest IP is specified, then it is beyond our scope to verify that
+	 * the companion port GID obtained has IP-Service enabled.
+	 */
+	dgid1.gid_prefix = dgid1.gid_guid = 0;
+	sgid.gid_prefix = sgid.gid_guid = 0;
+	if ((p_arg->attr.ipa_src_ip.family != AF_UNSPEC) &&
+	    (!(p_arg->flags & IBT_PATH_APM))) {
+		ibt_path_attr_t		attr;
+
+		retval = ibcm_arp_get_ibaddr(p_arg->attr.ipa_src_ip.un.ip4addr,
+		    p_arg->attr.ipa_dst_ip[0].un.ip4addr, &sgid, &dgid1);
+		if (retval) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_ip_paths: "
+			    "ibcm_arp_get_ibaddr() failed: %d", retval);
+			goto ippath_error;
+		}
+
+		bzero(&attr, sizeof (ibt_path_attr_t));
+		attr.pa_hca_guid = p_arg->attr.ipa_hca_guid;
+		attr.pa_hca_port_num = p_arg->attr.ipa_hca_port_num;
+		attr.pa_sgid = sgid;
+		bcopy(&p_arg->attr.ipa_mtu, &attr.pa_mtu,
+		    sizeof (ibt_mtu_req_t));
+		bcopy(&p_arg->attr.ipa_srate, &attr.pa_srate,
+		    sizeof (ibt_srate_req_t));
+		bcopy(&p_arg->attr.ipa_pkt_lt, &attr.pa_pkt_lt,
+		    sizeof (ibt_pkt_lt_req_t));
+		retval = ibtl_cm_get_active_plist(&attr, p_arg->flags, &sl);
+		if (retval == IBT_SUCCESS) {
+			bcopy(&p_arg->attr.ipa_src_ip, &sl->p_src_ip,
+			    sizeof (ibt_ip_addr_t));
+		} else {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_ip_paths: "
+			    "ibtl_cm_get_active_plist: Failed %d", retval);
+			goto ippath_error;
+		}
+	} else {
+		/*
+		 * Get list of active HCA-Port list, that matches input
+		 * specified attr.
+		 */
+		retval = ibcm_arp_get_srcip_plist(&p_arg->attr, p_arg->flags,
+		    &sl);
+		if (retval != IBT_SUCCESS) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_ip_paths: "
+			    "ibcm_arp_get_srcip_plist: Failed %d", retval);
+			goto ippath_error;
+		}
+
+		sl->p_src_ip.un.ip4addr = htonl(sl->p_src_ip.un.ip4addr);
+		/*
+		 * Accumulate all destination information.
+		 * Get GID info for the specified input ip-addr.
+		 */
+		retval = ibcm_arp_get_ibaddr(sl->p_src_ip.un.ip4addr,
+		    p_arg->attr.ipa_dst_ip[0].un.ip4addr, NULL, &dgid1);
+		if (retval) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_ip_paths: "
+			    "ibcm_arp_get_ibaddr() failed: %d", retval);
+			goto ippath_error1;
+		}
+	}
+	IBTF_DPRINTF_L4(cmlog, "ibcm_process_get_ip_paths: SrcIP %lX DstIP %lX",
+	    sl->p_src_ip.un.ip4addr,
+	    htonl(p_arg->attr.ipa_dst_ip[0].un.ip4addr));
+
+	IBTF_DPRINTF_L4(cmlog, "ibcm_process_get_ip_paths: SGID %llX:%llX, "
+	    "DGID0: %llX:%llX", sl->p_sgid.gid_prefix, sl->p_sgid.gid_guid,
+	    dgid1.gid_prefix, dgid1.gid_guid);
+
+	len = p_arg->attr.ipa_ndst + 1;
+	len = (len * sizeof (ibcm_ip_dest_t)) + sizeof (ibcm_ip_dinfo_t);
+	dinfo = kmem_zalloc(len, KM_SLEEP);
+
+	dinfo->dest[0].d_gid = dgid1;
+	bcopy(&p_arg->attr.ipa_dst_ip[0], &dinfo->dest[0].d_ip,
+	    sizeof (ibt_ip_addr_t));
+
+	i = 1;
+	if (p_arg->attr.ipa_ndst > 1) {
+		/* Get DGID for all specified Dest IP Addr */
+		for (; i < p_arg->attr.ipa_ndst; i++) {
+			retval = ibcm_arp_get_ibaddr(sl->p_src_ip.un.ip4addr,
+			    p_arg->attr.ipa_dst_ip[i].un.ip4addr, NULL, &dgid2);
+			if (retval) {
+				IBTF_DPRINTF_L2(cmlog,
+				    "ibcm_process_get_ip_paths: "
+				    "ibcm_arp_get_ibaddr failed: %d", retval);
+				goto ippath_error2;
+			}
+			dinfo->dest[i].d_gid = dgid2;
+
+			IBTF_DPRINTF_L4(cmlog, "ibcm_process_get_ip_paths: "
+			    "DGID%d: %llX:%llX", i, dgid2.gid_prefix,
+			    dgid2.gid_guid);
+			bcopy(&p_arg->attr.ipa_dst_ip[i], &dinfo->dest[i].d_ip,
+			    sizeof (ibt_ip_addr_t));
+		}
+
+		if (p_arg->flags & IBT_PATH_APM) {
+			dgid2 = dinfo->dest[1].d_gid;
+
+			retval = ibcm_get_comp_pgids(dgid1, dgid2, 0,
+			    &d_gids_p, &dnum);
+			if ((retval != IBT_SUCCESS) &&
+			    (retval != IBT_GIDS_NOT_FOUND)) {
+				IBTF_DPRINTF_L2(cmlog,
+				    "ibcm_process_get_ip_paths: "
+				    "Invalid DGIDs specified w/ APM Flag");
+				goto ippath_error2;
+			}
+			IBTF_DPRINTF_L3(cmlog, "ibcm_process_get_ip_paths: "
+			    "Found %d Comp DGID", dnum);
+
+			if (dnum) {
+				dinfo->dest[i].d_gid = d_gids_p[0];
+				dinfo->dest[i].d_ip.family = AF_UNSPEC;
+				i++;
+			}
+		}
+	}
+
+	/* "i" will get us num_dest count. */
+	dinfo->num_dest = i;
+
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*p_arg))
+
+	/*
+	 * IBTF allocates memory for path_info & src_ip in case of
+	 * Async Get IP Paths
+	 */
+	if (p_arg->func) {   /* Do these only for Async Get Paths */
+		p_arg->paths = kmem_zalloc(sizeof (ibt_path_info_t) * max_paths,
+		    KM_SLEEP);
+		if (p_arg->src_ip_p == NULL)
+			p_arg->src_ip_p = kmem_zalloc(
+			    sizeof (ibt_path_ip_src_t) * max_paths, KM_SLEEP);
+	}
+
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*p_arg))
+
+	IBTF_DPRINTF_L3(cmlog, "ibcm_process_get_ip_paths: HCA (%llX, %d)",
+	    sl->p_hca_guid, sl->p_port_num);
+
+	hcap = ibcm_find_hca_entry(sl->p_hca_guid);
+	if (hcap == NULL) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_ip_paths: "
+		    "NO HCA found");
+		retval = IBT_HCA_BUSY_DETACHING;
+		goto ippath_error2;
+	}
+
+	/* Get SA Access Handle. */
+	for (i = 0; i < sl->p_count; i++) {
+		if (i == 0) {
+			/* Validate whether this HCA supports APM */
+			if ((p_arg->flags & IBT_PATH_APM) &&
+			    (!(hcap->hca_caps & IBT_HCA_AUTO_PATH_MIG))) {
+				IBTF_DPRINTF_L2(cmlog,
+				    "ibcm_process_get_ip_paths: HCA (%llX): "
+				    "APM NOT SUPPORTED", sl[i].p_hca_guid);
+				retval = IBT_APM_NOT_SUPPORTED;
+				goto ippath_error3;
+			}
+		}
+
+		saa_handle = ibcm_get_saa_handle(hcap, sl[i].p_port_num);
+		if (saa_handle == NULL) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_ip_paths: "
+			    "SAA HDL NULL, HCA (%llX:%d) NOT ACTIVE",
+			    sl[i].p_hca_guid, sl[i].p_port_num);
+			retval = IBT_HCA_PORT_NOT_ACTIVE;
+			goto ippath_error3;
+		}
+		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*sl))
+		sl[i].p_saa_hdl = saa_handle;
+		_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*sl))
+	}
+
+	/* Get Path Records. */
+	retval = ibcm_saa_ip_pr(p_arg, sl, dinfo, &num_path);
+
+ippath_error3:
+	ibcm_dec_hca_acc_cnt(hcap);
+
+ippath_error2:
+	if (dinfo && len)
+		kmem_free(dinfo, len);
+
+ippath_error1:
+	if (sl)
+		ibtl_cm_free_active_plist(sl);
+
+ippath_error:
+	if ((retval != IBT_SUCCESS) && (retval != IBT_INSUFF_DATA))
+		num_path = 0;
+
+	if (p_arg->num_paths_p != NULL)
+		*p_arg->num_paths_p = num_path;
+
+	if (p_arg->func) {   /* Do these only for Async Get Paths */
+		ibt_path_info_t *tmp_path_p;
+
+		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*p_arg))
+		p_arg->retval = retval;
+		_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*p_arg))
+
+		if (retval == IBT_INSUFF_DATA) {
+			/*
+			 * We allocated earlier memory based on "max_paths",
+			 * but we got lesser path-records, so re-adjust that
+			 * buffer so that caller can free the correct memory.
+			 */
+			tmp_path_p = kmem_alloc(
+			    sizeof (ibt_path_info_t) * num_path, KM_SLEEP);
+
+			bcopy(p_arg->paths, tmp_path_p,
+			    num_path * sizeof (ibt_path_info_t));
+
+			kmem_free(p_arg->paths,
+			    sizeof (ibt_path_info_t) * max_paths);
+		} else if (retval != IBT_SUCCESS) {
+			if (p_arg->paths)
+				kmem_free(p_arg->paths,
+				    sizeof (ibt_path_info_t) * max_paths);
+			if (p_arg->src_ip_p)
+				kmem_free(p_arg->src_ip_p,
+				    sizeof (ibt_path_ip_src_t) * max_paths);
+			tmp_path_p = NULL;
+		} else {
+			tmp_path_p = p_arg->paths;
+		}
+		(*(p_arg->func))(p_arg->arg, retval, tmp_path_p, num_path,
+		    p_arg->src_ip_p);
+
+		cv_destroy(&p_arg->ip_cv);
+		mutex_destroy(&p_arg->ip_lock);
+		len = p_arg->len;
+		if (p_arg && len)
+			kmem_free(p_arg, len);
+	} else {
+		mutex_enter(&p_arg->ip_lock);
+		p_arg->retval = retval;
+		cv_signal(&p_arg->ip_cv);
+		mutex_exit(&p_arg->ip_lock);
+	}
+
+	IBTF_DPRINTF_L2(cmlog, "ibcm_process_get_ip_paths: done: status %d, "
+	    "Found %d/%d Path Records", retval, num_path, max_paths);
+}
+
+
+static ibt_status_t
+ibcm_val_ipattr(ibt_ip_path_attr_t *attrp, ibt_path_flags_t flags)
+{
+	uint_t			i;
+
+	if (attrp == NULL) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_val_ipattr: IP Path Attr is NULL");
+		return (IBT_INVALID_PARAM);
+	}
+
+	IBTF_DPRINTF_L2(cmlog, "ibcm_val_ipattr: Inputs are: HCA %llX:%d, "
+	    "Maxpath= %d, Flags= 0x%X, #Dest %d", attrp->ipa_hca_guid,
+	    attrp->ipa_hca_port_num, attrp->ipa_max_paths, flags,
+	    attrp->ipa_ndst);
+
+	/*
+	 * Validate Path Flags.
+	 * IBT_PATH_AVAIL & IBT_PATH_PERF are mutually exclusive.
+	 */
+	if ((flags & IBT_PATH_AVAIL) && (flags & IBT_PATH_PERF)) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_val_ipattr: Invalid Flags: 0x%X,"
+		    "\n\t AVAIL and PERF flags specified together", flags);
+		return (IBT_INVALID_PARAM);
+	}
+
+	/*
+	 * Validate number of records requested.
+	 *
+	 * Max_paths of "0" is invalid.
+	 * Max_paths <= IBT_MAX_SPECIAL_PATHS, if AVAIL or PERF is set.
+	 */
+	if (attrp->ipa_max_paths == 0) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_val_ipattr: Invalid max_paths %d",
+		    attrp->ipa_max_paths);
+		return (IBT_INVALID_PARAM);
+	}
+
+	if ((flags & (IBT_PATH_AVAIL | IBT_PATH_PERF)) &&
+	    (attrp->ipa_max_paths > IBT_MAX_SPECIAL_PATHS)) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_val_ipattr: MaxPaths that can be "
+		    "requested is <%d> \n when IBT_PATH_AVAIL or IBT_PATH_PERF"
+		    " flag is specified.", IBT_MAX_SPECIAL_PATHS);
+		return (IBT_INVALID_PARAM);
+	}
+
+	/* Only 2 destinations can be specified w/ APM flag. */
+	if ((flags & IBT_PATH_APM) && (attrp->ipa_ndst > 2)) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_val_ipattr: Max #Dest is 2, with "
+		    "APM flag");
+		return (IBT_INVALID_PARAM);
+	}
+
+	/* Validate the destination info */
+	if ((attrp->ipa_ndst == 0) || (attrp->ipa_ndst == NULL)) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_val_ipattr: DstIP Not provided "
+		    "dst_ip %p, ndst %d", attrp->ipa_dst_ip, attrp->ipa_ndst);
+		return (IBT_INVALID_PARAM);
+	}
+
+	/* Validate destination IP */
+	for (i = 0; i < attrp->ipa_ndst; i++) {
+		ibt_ip_addr_t	dst_ip = attrp->ipa_dst_ip[i];
+
+		IBTF_DPRINTF_L3(cmlog, "ibcm_val_ipattr: DstIP[%d]:= family %d "
+		    "IP %lX", i, dst_ip.family, htonl(dst_ip.un.ip4addr));
+
+		if (dst_ip.family == AF_UNSPEC) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_val_ipattr: ERROR: "
+			    "Invalid DstIP specified");
+			return (IBT_INVALID_PARAM);
+		}
+	}
+
+	IBTF_DPRINTF_L4(cmlog, "ibcm_val_ipattr: SrcIP: family %d, IP %lX",
+	    attrp->ipa_src_ip.family, htonl(attrp->ipa_src_ip.un.ip4addr));
+
+	return (IBT_SUCCESS);
+}
+
+
+static ibt_status_t
+ibcm_get_ip_path(ibt_clnt_hdl_t ibt_hdl, ibt_path_flags_t flags,
+    ibt_ip_path_attr_t *attrp, ibt_path_info_t *paths, uint8_t *num_path_p,
+    ibt_path_ip_src_t *src_ip_p, ibt_ip_path_handler_t func, void  *arg)
+{
+	ibcm_ip_path_tqargs_t	*path_tq;
+	int		sleep_flag = ((func == NULL) ? KM_SLEEP : KM_NOSLEEP);
+	uint_t		len, ret;
+	ibt_status_t	retval;
+
+	IBTF_DPRINTF_L4(cmlog, "ibcm_get_ip_path(%p, %X, %p, %p, %p %p %p %p)",
+	    ibt_hdl, flags, attrp, paths, num_path_p, src_ip_p, func, arg);
+
+	retval = ibcm_val_ipattr(attrp, flags);
+	if (retval != IBT_SUCCESS)
+		return (retval);
+
+	len = (attrp->ipa_ndst * sizeof (ibt_ip_addr_t)) +
+	    sizeof (ibcm_ip_path_tqargs_t);
+	path_tq = kmem_zalloc(len, sleep_flag);
+	if (path_tq == NULL) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_get_ip_path: "
+		    "Unable to allocate memory for local usage.");
+		return (IBT_INSUFF_KERNEL_RESOURCE);
+	}
+
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*path_tq))
+	mutex_init(&path_tq->ip_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&path_tq->ip_cv, NULL, CV_DRIVER, NULL);
+	bcopy(attrp, &path_tq->attr, sizeof (ibt_ip_path_attr_t));
+
+	path_tq->attr.ipa_dst_ip = (ibt_ip_addr_t *)(((uchar_t *)path_tq) +
+	    sizeof (ibcm_ip_path_tqargs_t));
+	bcopy(attrp->ipa_dst_ip, path_tq->attr.ipa_dst_ip,
+	    sizeof (ibt_ip_addr_t) * attrp->ipa_ndst);
+
+	/* Ignore IBT_PATH_AVAIL flag, if only one path is requested. */
+	if ((flags & IBT_PATH_AVAIL) && (attrp->ipa_max_paths == 1)) {
+		flags &= ~IBT_PATH_AVAIL;
+
+		IBTF_DPRINTF_L4(cmlog, "ibcm_get_ip_path: Ignoring "
+		    "IBT_PATH_AVAIL flag, as only ONE path info is requested.");
+	}
+
+	path_tq->flags = flags;
+	path_tq->ibt_hdl = ibt_hdl;
+	path_tq->paths = paths;
+	path_tq->src_ip_p = src_ip_p;
+	path_tq->num_paths_p = num_path_p;
+	path_tq->func = func;
+	path_tq->arg = arg;
+	path_tq->len = len;
+
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*path_tq))
+
+	sleep_flag = ((func == NULL) ? TQ_SLEEP : TQ_NOSLEEP);
+	mutex_enter(&path_tq->ip_lock);
+	ret = taskq_dispatch(ibcm_taskq, ibcm_process_get_ip_paths, path_tq,
+	    sleep_flag);
+	if (ret == 0) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_get_ip_path: Failed to dispatch "
+		    "the TaskQ");
+		mutex_exit(&path_tq->ip_lock);
+		cv_destroy(&path_tq->ip_cv);
+		mutex_destroy(&path_tq->ip_lock);
+		kmem_free(path_tq, len);
+		retval = IBT_INSUFF_KERNEL_RESOURCE;
+	} else {
+		if (func != NULL) {		/* Non-Blocking */
+			IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_path: NonBlocking");
+			retval = IBT_SUCCESS;
+			mutex_exit(&path_tq->ip_lock);
+		} else {		/* Blocking */
+			IBTF_DPRINTF_L3(cmlog, "ibcm_get_ip_path: Blocking");
+			cv_wait(&path_tq->ip_cv, &path_tq->ip_lock);
+			retval = path_tq->retval;
+			mutex_exit(&path_tq->ip_lock);
+			cv_destroy(&path_tq->ip_cv);
+			mutex_destroy(&path_tq->ip_lock);
+			kmem_free(path_tq, len);
+		}
+	}
+
+	return (retval);
+}
+
+
+ibt_status_t
+ibt_aget_ip_paths(ibt_clnt_hdl_t ibt_hdl, ibt_path_flags_t flags,
+    ibt_ip_path_attr_t *attrp, ibt_ip_path_handler_t func, void  *arg)
+{
+	IBTF_DPRINTF_L3(cmlog, "ibt_aget_ip_paths(%p, 0x%X, %p, %p, %p)",
+	    ibt_hdl, flags, attrp, func, arg);
+
+	if (func == NULL) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_aget_ip_paths: Function Pointer is "
+		    "NULL - ERROR ");
+		return (IBT_INVALID_PARAM);
+	}
+
+	/* path info will be allocated in ibcm_process_get_ip_paths() */
+	return (ibcm_get_ip_path(ibt_hdl, flags, attrp, NULL, NULL,
+	    NULL, func, arg));
+}
+
+
+ibt_status_t
+ibt_get_ip_paths(ibt_clnt_hdl_t ibt_hdl, ibt_path_flags_t flags,
+    ibt_ip_path_attr_t *attrp, ibt_path_info_t *paths, uint8_t *num_paths_p,
+    ibt_path_ip_src_t *src_ip_p)
+{
+	IBTF_DPRINTF_L3(cmlog, "ibt_get_ip_paths(%p, 0x%X, %p, %p, %p, %p)",
+	    ibt_hdl, flags, attrp, paths, num_paths_p, src_ip_p);
+
+	if (paths == NULL) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_paths: Path Info Pointer is "
+		    "NULL - ERROR ");
+		return (IBT_INVALID_PARAM);
+	}
+
+	if (num_paths_p != NULL)
+		*num_paths_p = 0;
+
+	return (ibcm_get_ip_path(ibt_hdl, flags, attrp, paths, num_paths_p,
+	    src_ip_p, NULL, NULL));
+}
+
+
+ibt_status_t
+ibt_get_ip_alt_path(ibt_channel_hdl_t rc_chan, ibt_path_flags_t flags,
+    ibt_alt_ip_path_attr_t *attrp, ibt_alt_path_info_t *api_p)
+{
+	sa_multipath_record_t	*mpr_req;
+	sa_path_record_t	*pr_resp;
+	ibmf_saa_access_args_t	access_args;
+	ibt_qp_query_attr_t	qp_attr;
+	ibtl_cm_hca_port_t	c_hp, n_hp;
+	ibcm_hca_info_t		*hcap;
+	void			*results_p;
+	uint64_t		c_mask = 0;
+	ib_gid_t		*gid_ptr = NULL;
+	ib_gid_t		*sgids_p = NULL,  *dgids_p = NULL;
+	ib_gid_t		cur_dgid, cur_sgid;
+	ib_gid_t		new_dgid, new_sgid;
+	ibmf_saa_handle_t	saa_handle;
+	size_t			length;
+	int			i, j, template_len, rec_found;
+	uint_t			snum = 0, dnum = 0, num_rec;
+	ibt_status_t		retval;
+	ib_mtu_t		prim_mtu;
+
+	IBTF_DPRINTF_L3(cmlog, "ibt_get_ip_alt_path(%p, %x, %p, %p)",
+	    rc_chan, flags, attrp, api_p);
+
+	/* validate channel */
+	if (IBCM_INVALID_CHANNEL(rc_chan)) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_alt_path: invalid channel");
+		return (IBT_CHAN_HDL_INVALID);
+	}
+
+	if (api_p == NULL) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_alt_path: invalid attribute:"
+		    " AltPathInfo can't be NULL");
+		return (IBT_INVALID_PARAM);
+	}
+
+	retval = ibt_query_qp(rc_chan, &qp_attr);
+	if (retval != IBT_SUCCESS) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_alt_path: ibt_query_qp(%p) "
+		    "failed %d", rc_chan, retval);
+		return (retval);
+	}
+
+	if (qp_attr.qp_info.qp_trans != IBT_RC_SRV) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_alt_path: "
+		    "Invalid Channel type: Applicable only to RC Channel");
+		return (IBT_CHAN_SRV_TYPE_INVALID);
+	}
+
+	cur_dgid =
+	    qp_attr.qp_info.qp_transport.rc.rc_path.cep_adds_vect.av_dgid;
+	cur_sgid =
+	    qp_attr.qp_info.qp_transport.rc.rc_path.cep_adds_vect.av_sgid;
+	prim_mtu = qp_attr.qp_info.qp_transport.rc.rc_path_mtu;
+
+	/* If optional attributes are specified, validate them. */
+	if (attrp) {
+		/* Get SGID and DGID for the specified input ip-addr */
+		retval = ibcm_arp_get_ibaddr(attrp->apa_src_ip.un.ip4addr,
+		    attrp->apa_dst_ip.un.ip4addr, &new_sgid, &new_dgid);
+		if (retval) {
+			IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_alt_path: "
+			    "ibcm_arp_get_ibaddr() failed: %d", retval);
+			return (retval);
+		}
+	} else {
+		new_dgid.gid_prefix = 0;
+		new_dgid.gid_guid = 0;
+		new_sgid.gid_prefix = 0;
+		new_sgid.gid_guid = 0;
+	}
+
+	if ((new_dgid.gid_prefix != 0) && (new_sgid.gid_prefix != 0) &&
+	    (new_dgid.gid_prefix != new_sgid.gid_prefix)) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_alt_path: Specified SGID's "
+		    "SNprefix (%llX) doesn't match with \n specified DGID's "
+		    "SNprefix: %llX", new_sgid.gid_prefix, new_dgid.gid_prefix);
+		return (IBT_INVALID_PARAM);
+	}
+
+	/* For the specified SGID, get HCA information. */
+	retval = ibtl_cm_get_hca_port(cur_sgid, 0, &c_hp);
+	if (retval != IBT_SUCCESS) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_alt_path: "
+		    "Get HCA Port Failed: %d", retval);
+		return (retval);
+	}
+
+	hcap = ibcm_find_hca_entry(c_hp.hp_hca_guid);
+	if (hcap == NULL) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_alt_path: NO HCA found");
+		return (IBT_HCA_BUSY_DETACHING);
+	}
+
+	/* Validate whether this HCA support APM */
+	if (!(hcap->hca_caps & IBT_HCA_AUTO_PATH_MIG)) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_alt_path: "
+		    "HCA (%llX) - APM NOT SUPPORTED ", c_hp.hp_hca_guid);
+		retval = IBT_APM_NOT_SUPPORTED;
+		goto get_ip_alt_path_done;
+	}
+
+	/* Get Companion Port GID of the current Channel's SGID */
+	if ((new_sgid.gid_guid == 0) || ((new_sgid.gid_guid != 0) &&
+	    (new_sgid.gid_guid != cur_sgid.gid_guid))) {
+		IBTF_DPRINTF_L3(cmlog, "ibt_get_ip_alt_path: SRC: "
+		    "Get Companion PortGids for - %llX:%llX",
+		    cur_sgid.gid_prefix, cur_sgid.gid_guid);
+
+		retval = ibcm_get_comp_pgids(cur_sgid, new_sgid,
+		    c_hp.hp_hca_guid, &sgids_p, &snum);
+		if (retval != IBT_SUCCESS)
+			goto get_ip_alt_path_done;
+	}
+
+	/* Get Companion Port GID of the current Channel's DGID */
+	if ((new_dgid.gid_guid == 0) || ((new_dgid.gid_guid != 0) &&
+	    (new_dgid.gid_guid != cur_dgid.gid_guid))) {
+
+		IBTF_DPRINTF_L3(cmlog, "ibt_get_ip_alt_path: DEST: "
+		    "Get Companion PortGids for - %llX:%llX",
+		    cur_dgid.gid_prefix, cur_dgid.gid_guid);
+
+		retval = ibcm_get_comp_pgids(cur_dgid, new_dgid, 0, &dgids_p,
+		    &dnum);
+		if (retval != IBT_SUCCESS)
+			goto get_ip_alt_path_done;
+	}
+
+	if ((new_dgid.gid_guid == 0) || (new_sgid.gid_guid == 0)) {
+		if (new_sgid.gid_guid == 0) {
+			for (i = 0; i < snum; i++) {
+				if (new_dgid.gid_guid == 0) {
+					for (j = 0; j < dnum; j++) {
+						if (sgids_p[i].gid_prefix ==
+						    dgids_p[j].gid_prefix) {
+							new_dgid = dgids_p[j];
+							new_sgid = sgids_p[i];
+
+							goto get_ip_alt_proceed;
+						}
+					}
+					/*  Current DGID */
+					if (sgids_p[i].gid_prefix ==
+					    cur_dgid.gid_prefix) {
+						new_sgid = sgids_p[i];
+						goto get_ip_alt_proceed;
+					}
+				} else {
+					if (sgids_p[i].gid_prefix ==
+					    new_dgid.gid_prefix) {
+						new_sgid = sgids_p[i];
+						goto get_ip_alt_proceed;
+					}
+				}
+			}
+			/* Current SGID */
+			if (new_dgid.gid_guid == 0) {
+				for (j = 0; j < dnum; j++) {
+					if (cur_sgid.gid_prefix ==
+					    dgids_p[j].gid_prefix) {
+						new_dgid = dgids_p[j];
+
+						goto get_ip_alt_proceed;
+					}
+				}
+			}
+		} else if (new_dgid.gid_guid == 0) {
+			for (i = 0; i < dnum; i++) {
+				if (dgids_p[i].gid_prefix ==
+				    new_sgid.gid_prefix) {
+					new_dgid = dgids_p[i];
+					goto get_ip_alt_proceed;
+				}
+			}
+			/* Current DGID */
+			if (cur_dgid.gid_prefix == new_sgid.gid_prefix) {
+				goto get_ip_alt_proceed;
+			}
+		}
+		/*
+		 * hmm... No Companion Ports available.
+		 * so we will be using current or specified attributes only.
+		 */
+	}
+
+get_ip_alt_proceed:
+	if (new_sgid.gid_guid != 0) {
+		retval = ibtl_cm_get_hca_port(new_sgid, 0, &n_hp);
+		if (retval != IBT_SUCCESS) {
+			IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_alt_path: "
+			    "Get HCA Port Failed: %d", retval);
+			goto get_ip_alt_path_done;
+		}
+	}
+
+	/* Calculate the size for multi-path records template */
+	template_len = (2 * sizeof (ib_gid_t)) + sizeof (sa_multipath_record_t);
+
+	mpr_req = kmem_zalloc(template_len, KM_SLEEP);
+
+	ASSERT(mpr_req != NULL);
+
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*mpr_req))
+
+	gid_ptr = (ib_gid_t *)(((uchar_t *)mpr_req) +
+	    sizeof (sa_multipath_record_t));
+
+	/* SGID */
+	if (new_sgid.gid_guid == 0)
+		*gid_ptr = cur_sgid;
+	else
+		*gid_ptr = new_sgid;
+
+	IBTF_DPRINTF_L3(cmlog, "ibt_get_ip_alt_path: Get Path Between "
+	    " SGID : %llX:%llX", gid_ptr->gid_prefix, gid_ptr->gid_guid);
+
+	gid_ptr++;
+
+	/* DGID */
+	if (new_dgid.gid_guid == 0)
+		*gid_ptr = cur_dgid;
+	else
+		*gid_ptr = new_dgid;
+
+	IBTF_DPRINTF_L3(cmlog, "ibt_get_ip_alt_path:\t\t    DGID : %llX:%llX",
+	    gid_ptr->gid_prefix, gid_ptr->gid_guid);
+
+	mpr_req->SGIDCount = 1;
+	c_mask = SA_MPR_COMPMASK_SGIDCOUNT;
+
+	mpr_req->DGIDCount = 1;
+	c_mask |= SA_MPR_COMPMASK_DGIDCOUNT;
+
+	/* Is Flow Label Specified. */
+	if (attrp) {
+		if (attrp->apa_flow) {
+			mpr_req->FlowLabel = attrp->apa_flow;
+			c_mask |= SA_MPR_COMPMASK_FLOWLABEL;
+		}
+
+		/* Is HopLimit Specified. */
+		if (flags & IBT_PATH_HOP) {
+			mpr_req->HopLimit = attrp->apa_hop;
+			c_mask |= SA_MPR_COMPMASK_HOPLIMIT;
+		}
+
+		/* Is TClass Specified. */
+		if (attrp->apa_tclass) {
+			mpr_req->TClass = attrp->apa_tclass;
+			c_mask |= SA_MPR_COMPMASK_TCLASS;
+		}
+
+		/* Is SL specified. */
+		if (attrp->apa_sl) {
+			mpr_req->SL = attrp->apa_sl;
+			c_mask |= SA_MPR_COMPMASK_SL;
+		}
+
+		if (flags & IBT_PATH_PERF) {
+			mpr_req->PacketLifeTimeSelector = IBT_BEST;
+			mpr_req->RateSelector = IBT_BEST;
+
+			c_mask |= SA_MPR_COMPMASK_PKTLTSELECTOR |
+			    SA_MPR_COMPMASK_RATESELECTOR;
+		} else {
+			if (attrp->apa_pkt_lt.p_selector == IBT_BEST) {
+				mpr_req->PacketLifeTimeSelector = IBT_BEST;
+				c_mask |= SA_MPR_COMPMASK_PKTLTSELECTOR;
+			}
+
+			if (attrp->apa_srate.r_selector == IBT_BEST) {
+				mpr_req->RateSelector = IBT_BEST;
+				c_mask |= SA_MPR_COMPMASK_RATESELECTOR;
+			}
+		}
+
+		/*
+		 * Honor individual selection of these attributes,
+		 * even if IBT_PATH_PERF is set.
+		 */
+		/* Check out whether Packet Life Time is specified. */
+		if (attrp->apa_pkt_lt.p_pkt_lt) {
+			mpr_req->PacketLifeTime =
+			    ibt_usec2ib(attrp->apa_pkt_lt.p_pkt_lt);
+			mpr_req->PacketLifeTimeSelector =
+			    attrp->apa_pkt_lt.p_selector;
+
+			c_mask |= SA_MPR_COMPMASK_PKTLT |
+			    SA_MPR_COMPMASK_PKTLTSELECTOR;
+		}
+
+		/* Is SRATE specified. */
+		if (attrp->apa_srate.r_srate) {
+			mpr_req->Rate = attrp->apa_srate.r_srate;
+			mpr_req->RateSelector = attrp->apa_srate.r_selector;
+
+			c_mask |= SA_MPR_COMPMASK_RATE |
+			    SA_MPR_COMPMASK_RATESELECTOR;
+		}
+	}
+
+	/* Alt PathMTU can be GT or EQU to current channel's Pri PathMTU */
+
+	/* P_Key must be same as that of primary path */
+	retval = ibt_index2pkey_byguid(c_hp.hp_hca_guid, c_hp.hp_port,
+	    qp_attr.qp_info.qp_transport.rc.rc_path.cep_pkey_ix,
+	    &mpr_req->P_Key);
+	if (retval != IBT_SUCCESS) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_alt_path: PKeyIdx2Pkey "
+		    "Failed: %d", retval);
+		goto get_ip_alt_path_done;
+	}
+	c_mask |= SA_MPR_COMPMASK_PKEY;
+
+	mpr_req->Reversible = 1;	/* We always get REVERSIBLE paths. */
+	mpr_req->IndependenceSelector = 1;
+	c_mask |= SA_MPR_COMPMASK_REVERSIBLE | SA_MPR_COMPMASK_INDEPSEL;
+
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*mpr_req))
+
+	IBTF_DPRINTF_L3(cmlog, "ibt_get_ip_alt_path: CMask: 0x%llX", c_mask);
+
+	/* NOTE: We will **NOT** specify how many records we want. */
+
+	IBTF_DPRINTF_L3(cmlog, "ibt_get_ip_alt_path: Primary: MTU %d, PKey[%d]="
+	    "0x%X\n\tSGID = %llX:%llX, DGID = %llX:%llX", prim_mtu,
+	    qp_attr.qp_info.qp_transport.rc.rc_path.cep_pkey_ix, mpr_req->P_Key,
+	    cur_sgid.gid_prefix, cur_sgid.gid_guid, cur_dgid.gid_prefix,
+	    cur_dgid.gid_guid);
+
+	/* Get SA Access Handle. */
+	if (new_sgid.gid_guid != 0)
+		saa_handle = ibcm_get_saa_handle(hcap, n_hp.hp_port);
+	else
+		saa_handle = ibcm_get_saa_handle(hcap, c_hp.hp_port);
+	if (saa_handle == NULL) {
+		retval = IBT_HCA_PORT_NOT_ACTIVE;
+		goto get_ip_alt_path_done;
+	}
+
+	/* Contact SA Access to retrieve Path Records. */
+	access_args.sq_attr_id = SA_MULTIPATHRECORD_ATTRID;
+	access_args.sq_access_type = IBMF_SAA_RETRIEVE;
+	access_args.sq_component_mask = c_mask;
+	access_args.sq_template = mpr_req;
+	access_args.sq_template_length = sizeof (sa_multipath_record_t);
+	access_args.sq_callback = NULL;
+	access_args.sq_callback_arg = NULL;
+
+	retval = ibcm_contact_sa_access(saa_handle, &access_args, &length,
+	    &results_p);
+	if (retval != IBT_SUCCESS) {
+		goto get_ip_alt_path_done;
+	}
+
+	num_rec = length / sizeof (sa_path_record_t);
+
+	kmem_free(mpr_req, template_len);
+
+	IBTF_DPRINTF_L3(cmlog, "ibt_get_ip_alt_path: Found %d Paths", num_rec);
+
+	rec_found = 0;
+	if ((results_p != NULL) && (num_rec > 0)) {
+		/* Update the PathInfo with the response Path Records */
+		pr_resp = (sa_path_record_t *)results_p;
+		for (i = 0; i < num_rec; i++, pr_resp++) {
+			if (prim_mtu > pr_resp->Mtu) {
+				IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_alt_path: "
+				    "Alt PathMTU(%d) must be GT or EQU to Pri "
+				    "PathMTU(%d). Ignore this rec",
+				    pr_resp->Mtu, prim_mtu);
+				continue;
+			}
+
+			if ((new_sgid.gid_guid == 0) &&
+			    (new_dgid.gid_guid == 0)) {
+				/* Reject PathRec if it same as Primary Path. */
+				if (ibcm_compare_paths(pr_resp,
+				    &qp_attr.qp_info.qp_transport.rc.rc_path,
+				    &c_hp) == B_TRUE) {
+					IBTF_DPRINTF_L3(cmlog,
+					    "ibt_get_ip_alt_path: PathRec "
+					    "obtained is similar to Prim Path, "
+					    "ignore this record");
+					continue;
+				}
+			}
+
+			if (new_sgid.gid_guid == 0) {
+				retval = ibcm_update_cep_info(pr_resp, NULL,
+				    &c_hp, &api_p->ap_alt_cep_path);
+			} else {
+				retval = ibcm_update_cep_info(pr_resp, NULL,
+				    &n_hp, &api_p->ap_alt_cep_path);
+			}
+			if (retval != IBT_SUCCESS)
+				continue;
+
+			/* Update some leftovers */
+			_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*api_p))
+
+			api_p->ap_alt_pkt_lt = pr_resp->PacketLifeTime;
+
+			_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*api_p))
+
+			rec_found = 1;
+			break;
+		}
+		kmem_free(results_p, length);
+	}
+
+	if (rec_found == 0) {
+		IBTF_DPRINTF_L3(cmlog, "ibt_get_ip_alt_path: AltPath cannot"
+		    " be established");
+		retval = IBT_PATH_RECORDS_NOT_FOUND;
+	} else
+		retval = IBT_SUCCESS;
+
+get_ip_alt_path_done:
+	if ((snum) && (sgids_p))
+		kmem_free(sgids_p, snum * sizeof (ib_gid_t));
+
+	if ((dnum) && (dgids_p))
+		kmem_free(dgids_p, dnum * sizeof (ib_gid_t));
+
+	ibcm_dec_hca_acc_cnt(hcap);
+
+	IBTF_DPRINTF_L3(cmlog, "ibt_get_ip_alt_path: Done (status %d)", retval);
+
+	return (retval);
+}
+
+
 /* Routines for warlock */
 
 /* ARGSUSED */
@@ -3223,5 +4931,18 @@ ibcm_dummy_path_handler(void *arg, ibt_status_t retval, ibt_path_info_t *paths,
 	dummy_path.func = ibcm_dummy_path_handler;
 
 	IBTF_DPRINTF_L5(cmlog, "ibcm_dummy_path_handler: "
+	    "dummy_path.func %p", dummy_path.func);
+}
+
+/* ARGSUSED */
+static void
+ibcm_dummy_ip_path_handler(void *arg, ibt_status_t retval,
+    ibt_path_info_t *paths, uint8_t num_path, ibt_path_ip_src_t *src_ip)
+{
+	ibcm_ip_path_tqargs_t	dummy_path;
+
+	dummy_path.func = ibcm_dummy_ip_path_handler;
+
+	IBTF_DPRINTF_L5(cmlog, "ibcm_dummy_ip_path_handler: "
 	    "dummy_path.func %p", dummy_path.func);
 }

@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -53,6 +53,23 @@ root	ibt_get_companion_port_gids
 root	ibt_get_paths
 root	ibt_get_alt_path
 root	ibt_aget_paths
+root	ibt_get_ip_paths
+root	ibt_aget_ip_paths
+root	ibt_get_ip_alt_path
+root	ibt_format_ip_private_data
+root	ibt_get_ip_data
+root	ibt_get_ip_dst_port
+root	ibt_get_ip_protocol_num
+root	ibt_get_ip_sid
+root	ibt_release_ip_sid 
+root	ibt_get_src_ip
+
+root	ibcm_arp_timeout
+root	ibcm_arp_get_srcip_plist
+root	ibcm_arp_lrput
+root	ibcm_arp_lwsrv
+root	ibcm_arp_lrsrv
+root	ibcm_arp_get_ibd_insts_cb
 
 # callback entry points from ibmf
 root	ibcm_recv_cb
@@ -99,6 +116,7 @@ root	ibcm_recv_task
 root	ibcm_init_saa
 root	ibcm_process_abort_via_taskq
 root	ibcm_process_async_get_paths
+root	ibcm_process_get_ip_paths
 root	ibcm_service_record_rewrite_task
 
 # kernel callbacks to ibcm

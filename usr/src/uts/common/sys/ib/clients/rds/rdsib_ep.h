@@ -304,6 +304,7 @@ typedef struct rds_session_s {
 	krwlock_t		session_remote_portmap_lock;
 	uint8_t			session_local_portmap[RDS_PORT_MAP_SIZE];
 	uint8_t			session_remote_portmap[RDS_PORT_MAP_SIZE];
+	ibt_path_info_t		session_pinfo;
 } rds_session_t;
 
 /* defined in rds_ep.c */

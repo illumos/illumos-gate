@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -83,7 +83,7 @@ extern "C" {
 
 #include <netinet/in.h>
 
-#define	RDS_VERSION	2
+#define	RDS_VERSION	3
 
 /*
  * RDS Well known service id
@@ -146,6 +146,7 @@ extern "C" {
  *     same size on the both active and passive nodes.
  */
 typedef struct rds_cm_private_data_s {
+	uint8_t		cmp_ip_pvt[IBT_IP_HDR_PRIV_DATA_SZ];
 	uint8_t		cmp_version;
 	uint8_t		cmp_arch;
 	uint8_t		cmp_eptype;

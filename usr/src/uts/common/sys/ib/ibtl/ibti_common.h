@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1615,6 +1614,230 @@ ibt_failure_type_t ibt_check_failure(ibt_status_t status, uint64_t *reserved_p);
  */
 int ibt_hw_is_present();
 
+/*
+ * Fast Memory Registration (FMR).
+ *
+ * ibt_create_fmr_pool
+ *	Not fast-path.
+ *	ibt_create_fmr_pool() verifies that the HCA supports FMR and allocates
+ *	and initializes an "FMR pool".  This pool contains state specific to
+ *	this registration, including the watermark setting to determine when
+ *	to sync, and the total number of FMR regions available within this pool.
+ *
+ * ibt_destroy_fmr_pool
+ *	ibt_destroy_fmr_pool() deallocates all of the FMR regions in a specific
+ *	pool.  All state and information regarding the pool are destroyed and
+ *	returned as free space once again.  No more use of FMR regions in this
+ *	pool are possible without a subsequent call to ibt_create_fmr_pool().
+ *
+ * ibt_flush_fmr_pool
+ *	ibt_flush_fmr_pool forces a flush to occur.  At the client's request,
+ *	any unmapped FMR regions (See 'ibt_deregister_mr())') are returned to
+ *	a free state.  This function allows for an asynchronous cleanup of
+ *	formerly used FMR regions.  Sync operation is also performed internally
+ *	by HCA driver, when 'watermark' settings for the number of free FMR
+ *	regions left in the "pool" is reached.
+ *
+ * ibt_register_physical_fmr
+ *	ibt_register_physical_fmr() assigns a "free" entry from the FMR Pool.
+ *	It first consults the "FMR cache" to see if this is a duplicate memory
+ *	registration to something already in use.  If not, then a free entry
+ *	in the "pool" is marked used.
+ *
+ * ibt_deregister_fmr
+ *	The ibt_deregister_fmr un-maps the resources reserved from the FMR
+ *	pool by ibt_register_physical_fmr().   The ibt_deregister_fmr() will
+ *	mark the region as free in the FMR Pool.
+ */
+ibt_status_t ibt_create_fmr_pool(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd,
+    ibt_fmr_pool_attr_t *fmr_params, ibt_fmr_pool_hdl_t *fmr_pool_p);
+
+ibt_status_t ibt_destroy_fmr_pool(ibt_hca_hdl_t hca_hdl,
+    ibt_fmr_pool_hdl_t fmr_pool);
+
+ibt_status_t ibt_flush_fmr_pool(ibt_hca_hdl_t hca_hdl,
+    ibt_fmr_pool_hdl_t fmr_pool);
+
+ibt_status_t ibt_register_physical_fmr(ibt_hca_hdl_t hca_hdl,
+    ibt_fmr_pool_hdl_t fmr_pool, ibt_pmr_attr_t *mem_pattr,
+    ibt_mr_hdl_t *mr_hdl_p, ibt_pmr_desc_t *mem_desc_p);
+
+ibt_status_t ibt_deregister_fmr(ibt_hca_hdl_t hca, ibt_mr_hdl_t mr_hdl);
+
+/*
+ * IP SUPPORT
+ */
+
+/*
+ * IP get_paths
+ * Returns an array (or single) of paths and source IP addresses. In the
+ * simplest form just the destination IP address is specified, and one path
+ * is requested, then one ibt_path_info_t struct and one source IP.
+ *
+ * More than one path can be requested to a single destination, in which case
+ * the requested number of ibt_path_info_t's are returned, and the same
+ * number of SRC IP address, with the first SRC IP address corrosponding
+ * to the first ibt_path_info_t, etc.
+ *
+ * Restrictions on the source end point can be specified, in the form of a
+ * source IP address (this implicitly defines the HCA, HCA port and Pkey)
+ * HCA, HCA port, and sgid (implicitly defines HCA and HCA port).
+ * Combinations are allowed but they  must be consistent.
+ *
+ * Path attributes can also be specified, these can also affect local HCA
+ * selection.
+ *
+ * ibt_get_ip_paths()  internally does (among other things):
+ *
+ *   o ibt_get_list_of_ibd_ipaddr_and_macaddr( OUT list_ipaddr_macaddr)
+ *
+ *   o extract_pkey_and_sgid(IN list_ipaddr_macaddr, OUT list_pkey_and_sgid)
+ *
+ *   o map_dst_ip_addr(IN dst_ip_addr, OUT dst_pkey, OUT dgid) - See Note
+ *
+ *   o filter_by_pkey(IN list_pkey_and_sgid, IN dst_pkey, OUT list_of_sgid)
+ *
+ *   o do_multipath_query(IN list_of_sgid, IN dst_pkey, IN dgid, OUT path_list)
+ *
+ *   o pick_a_good_path(IN path_list, OUT the_path)
+ *
+ *   o find_matching_src_ip(IN the_path, IN list_ipaddr_macaddr, OUT src_ip)
+ *
+ * The ibd instance which got the ARP response is only on one P_Key
+ * knowing the ibd instance (or which IPonIB MCG) got the ARP response
+ * determins the P_Key associated with a dgid. If the proposedi "ip2mac()"
+ * API is used to get an IP to GID translations, then returned 'sockaddr_dl'
+ * contains the interface name and index.
+ *
+ *
+ * Example:
+ *   ip_path_attr.ipa_dst_ip = dst_ip_addr;
+ *   ip_path_attr.ipa_ndst = 1;
+ *   ip_path_attr.ipa_max_paths = 1;
+ *
+ *   status = ibt_get_ip_paths(clnt_hdl, flags, &ip_path_attr, &paths,
+ *      &num_paths_p, &src_ip);
+ *
+ *   sid = ibt_get_ip_sid(protocol_num, dst_port);
+ *   path_info->sid = sid;
+ *
+ *   ip_cm_info.src_addr = src_ip;
+ *   ip_cm_info.dst_addr = dst_ip_addr;
+ *   ip_cm_info.src_port = src_port
+ *
+ *   ibt_format_ip_private_data(ip_cm_info, priv_data_len, &priv_data);
+ *   ibt_open_rc_channel(chan, private_data);
+ */
+typedef struct ibt_ip_path_attr_s {
+	ibt_ip_addr_t		*ipa_dst_ip;		/* Required */
+	ibt_ip_addr_t		ipa_src_ip;		/* Optional */
+	ib_guid_t		ipa_hca_guid;		/* Optional */
+	uint8_t			ipa_hca_port_num;	/* Optional */
+	uint8_t			ipa_max_paths;		/* Required */
+	uint8_t			ipa_ndst;		/* Required */
+	uint8_t			ipa_sl:4;		/* Optional */
+	ibt_mtu_req_t		ipa_mtu;		/* Optional */
+	ibt_srate_req_t		ipa_srate;		/* Optional */
+	ibt_pkt_lt_req_t	ipa_pkt_lt;		/* Optional */
+	uint_t			ipa_flow:20;		/* Optional */
+	uint8_t			ipa_hop;		/* Optional */
+	uint8_t			ipa_tclass;		/* Optional */
+} ibt_ip_path_attr_t;
+
+/*
+ * Path SRC IP addresses
+ */
+typedef struct ibt_path_ip_src_s {
+	ibt_ip_addr_t	ip_primary;
+	ibt_ip_addr_t	ip_alternate;
+} ibt_path_ip_src_t;
+
+
+ibt_status_t ibt_get_ip_paths(ibt_clnt_hdl_t ibt_hdl, ibt_path_flags_t flags,
+    ibt_ip_path_attr_t *attr, ibt_path_info_t *paths_p, uint8_t *num_paths_p,
+    ibt_path_ip_src_t *src_ip_p);
+
+ibt_status_t ibt_get_src_ip(ib_gid_t gid, ib_pkey_t pkey,
+    ibt_ip_addr_t *src_ip);
+
+/*
+ * Callback function that can be used in ibt_aget_ip_paths(), a Non-Blocking
+ * version of ibt_get_ip_paths().
+ */
+typedef void (*ibt_ip_path_handler_t)(void *arg, ibt_status_t retval,
+    ibt_path_info_t *paths_p, uint8_t num_paths, ibt_path_ip_src_t *src_ip_p);
+
+/*
+ * Find path(s) to a given destination or service asynchronously.
+ * ibt_aget_ip_paths() is a Non-Blocking version of ibt_get_ip_paths().
+ */
+ibt_status_t ibt_aget_ip_paths(ibt_clnt_hdl_t ibt_hdl, ibt_path_flags_t flags,
+    ibt_ip_path_attr_t *attr, ibt_ip_path_handler_t func, void  *arg);
+
+/*
+ * IP RDMA protocol functions
+ */
+
+/*
+ * IBTF manages the port number space for non well known ports. If a ULP
+ * is not using TCP/UDP and a well known port, then ibt_get_ip_sid() returns
+ * an sid based on the IP protocol number '0' (reserved) and an IBTF assigned
+ * port number.  ibt_release_ip_sid() should be used to release the hold
+ * of SID created by ibt_get_ip_sid().
+ */
+ib_svc_id_t ibt_get_ip_sid(uint8_t protocol_num, in_port_t dst_port);
+ibt_status_t ibt_release_ip_sid(ib_svc_id_t sid);
+
+uint8_t ibt_get_ip_protocol_num(ib_svc_id_t sid);
+in_port_t ibt_get_ip_dst_port(ib_svc_id_t sid);
+
+/*
+ * Functions to format/extract the RDMA IP CM private data
+ */
+typedef struct ibt_ip_cm_info_s {
+	ibt_ip_addr_t	src_addr;
+	ibt_ip_addr_t	dst_addr;
+	in_port_t	src_port;
+} ibt_ip_cm_info_t;
+
+/*
+ * If a ULP is using IP addressing as defined by the RDMA IP CM Service IBTA
+ * Annex 11, then it must always allocate a private data buffer for use in
+ * the ibt_open_rc_channel(9F) call. The minimum size of the buffer is
+ * IBT_IP_HDR_PRIV_DATA_SZ, if the ULP has no ULP specific private data.
+ * This allows ibt_format_ip_private_data() to place the RDMA IP CM service
+ * hello message in the private data of the REQ. If the ULP has some ULP
+ * specific private data then it should allocate a buffer big enough to
+ * contain that data plus an additional IBT_IP_HDR_PRIV_DATA_SZ bytes.
+ * The ULP should place its  ULP specific private data at offset
+ * IBT_IP_HDR_PRIV_DATA_SZ in the allocated buffer before calling
+ * ibt_format_ip_private_data().
+ */
+ibt_status_t ibt_format_ip_private_data(ibt_ip_cm_info_t *ip_cm_info,
+    ibt_priv_data_len_t priv_data_len, void *priv_data_p);
+ibt_status_t ibt_get_ip_data(ibt_priv_data_len_t priv_data_len,
+    void *priv_data, ibt_ip_cm_info_t *ip_info_p);
+
+/*
+ * The ibt_alt_ip_path_attr_t structure is used to specify additional optional
+ * attributes when requesting an alternate path for an existing channel.
+ *
+ * Attributes that are don't care should be set to NULL or '0'.
+ */
+typedef struct ibt_alt_ip_path_attr_s {
+	ibt_ip_addr_t		apa_dst_ip;
+	ibt_ip_addr_t		apa_src_ip;
+	ibt_srate_req_t		apa_srate;
+	ibt_pkt_lt_req_t	apa_pkt_lt;	/* Packet Life Time Request */
+	uint_t			apa_flow:20;
+	uint8_t			apa_sl:4;
+	uint8_t			apa_hop;
+	uint8_t			apa_tclass;
+} ibt_alt_ip_path_attr_t;
+
+ibt_status_t ibt_get_ip_alt_path(ibt_channel_hdl_t rc_chan,
+    ibt_path_flags_t flags, ibt_alt_ip_path_attr_t *attr,
+    ibt_alt_path_info_t *alt_path);
 
 /*
  * CONTRACT PRIVATE ONLY INTERFACES
@@ -1679,57 +1902,6 @@ ibt_status_t ibt_get_port_state(ibt_hca_hdl_t hca_hdl, uint8_t port,
 
 ibt_status_t ibt_get_port_state_byguid(ib_guid_t hca_guid, uint8_t port,
     ib_gid_t *sgid_p, ib_lid_t *base_lid_p);
-
-
-/*
- * Fast Memory Registration (FMR).
- *
- * ibt_create_fmr_pool
- *	Not fast-path.
- *	ibt_create_fmr_pool() verifies that the HCA supports FMR and allocates
- *	and initializes an "FMR pool".  This pool contains state specific to
- *	this registration, including the watermark setting to determine when
- *	to sync, and the total number of FMR regions available within this pool.
- *
- * ibt_destroy_fmr_pool
- *	ibt_destroy_fmr_pool() deallocates all of the FMR regions in a specific
- *	pool.  All state and information regarding the pool are destroyed and
- *	returned as free space once again.  No more use of FMR regions in this
- *	pool are possible without a subsequent call to ibt_create_fmr_pool().
- *
- * ibt_flush_fmr_pool
- *	ibt_flush_fmr_pool forces a flush to occur.  At the client's request,
- *	any unmapped FMR regions (See 'ibt_deregister_mr())') are returned to
- *	a free state.  This function allows for an asynchronous cleanup of
- *	formerly used FMR regions.  Sync operation is also performed internally
- *	by HCA driver, when 'watermark' settings for the number of free FMR
- *	regions left in the "pool" is reached.
- *
- * ibt_register_physical_fmr
- *	ibt_register_physical_fmr() assigns a "free" entry from the FMR Pool.
- *	It first consults the "FMR cache" to see if this is a duplicate memory
- *	registration to something already in use.  If not, then a free entry
- *	in the "pool" is marked used.
- *
- * ibt_deregister_fmr
- *	The ibt_deregister_fmr un-maps the resources reserved from the FMR
- *	pool by ibt_register_physical_fmr().   The ibt_deregister_fmr() will
- *	mark the region as free in the FMR Pool.
- */
-ibt_status_t ibt_create_fmr_pool(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd,
-    ibt_fmr_pool_attr_t *fmr_params, ibt_fmr_pool_hdl_t *fmr_pool_p);
-
-ibt_status_t ibt_destroy_fmr_pool(ibt_hca_hdl_t hca_hdl,
-    ibt_fmr_pool_hdl_t fmr_pool);
-
-ibt_status_t ibt_flush_fmr_pool(ibt_hca_hdl_t hca_hdl,
-    ibt_fmr_pool_hdl_t fmr_pool);
-
-ibt_status_t ibt_register_physical_fmr(ibt_hca_hdl_t hca_hdl,
-    ibt_fmr_pool_hdl_t fmr_pool, ibt_pmr_attr_t *mem_pattr,
-    ibt_mr_hdl_t *mr_hdl_p, ibt_pmr_desc_t *mem_desc_p);
-
-ibt_status_t ibt_deregister_fmr(ibt_hca_hdl_t hca, ibt_mr_hdl_t mr_hdl);
 
 #ifdef __cplusplus
 }

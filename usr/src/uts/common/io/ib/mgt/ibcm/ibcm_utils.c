@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,10 +42,11 @@
 
 /* statics */
 static vmem_t		*ibcm_local_sid_arena;
+static vmem_t		*ibcm_ip_sid_arena;
 static ib_svc_id_t	ibcm_local_sid_seed;
 static ib_com_id_t	ibcm_local_cid_seed;
 _NOTE(READ_ONLY_DATA({ibcm_local_sid_arena ibcm_local_sid_seed
-    ibcm_local_cid_seed}))
+    ibcm_ip_sid_arena ibcm_local_cid_seed}))
 static void		ibcm_delete_state_from_avl(ibcm_state_data_t *statep);
 static void		ibcm_init_conn_trace(ibcm_state_data_t *statep);
 static void		ibcm_fini_conn_trace(ibcm_state_data_t *statep);
@@ -354,8 +354,8 @@ ibcm_delete_state_from_avl(ibcm_state_data_t *statep)
 	avl_index_t			p_where = 0;
 	avl_index_t			pcomid_where = 0;
 	ibcm_hca_info_t			*hcap;
-	ibcm_state_data_t		*active_nodep, *passive_nodep,
-					*passive_comid_nodep;
+	ibcm_state_data_t		*active_nodep, *passive_nodep;
+	ibcm_state_data_t		*passive_comid_nodep;
 	ibcm_passive_node_info_t	info;
 	ibcm_passive_comid_node_info_t	info_comid;
 
@@ -584,10 +584,10 @@ ibcm_find_sidr_entry(ibcm_sidr_srch_t *srch_param, ibcm_hca_info_t *hcap,
 		if ((usp->ud_sidr_req_lid == srch_param->srch_lid) &&
 		    ((srch_param->srch_gid.gid_prefix == 0) ||
 		    (srch_param->srch_gid.gid_prefix ==
-			usp->ud_sidr_req_gid.gid_prefix)) &&
+		    usp->ud_sidr_req_gid.gid_prefix)) &&
 		    ((srch_param->srch_gid.gid_guid == 0) ||
 		    (srch_param->srch_gid.gid_guid ==
-			usp->ud_sidr_req_gid.gid_guid)) &&
+		    usp->ud_sidr_req_gid.gid_guid)) &&
 		    (srch_param->srch_req_id == usp->ud_req_id) &&
 		    (usp->ud_grh_exists == srch_param->srch_grh_exists) &&
 		    (usp->ud_mode == srch_param->srch_mode)) { /* found match */
@@ -825,6 +825,7 @@ ibcm_init_ids(void)
 	timespec_t tv;
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(ibcm_local_sid_arena))
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(ibcm_ip_sid_arena))
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(ibcm_local_sid_seed))
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(ibcm_local_cid_seed))
 
@@ -835,14 +836,23 @@ ibcm_init_ids(void)
 	if (!ibcm_local_sid_arena)
 		return (IBCM_FAILURE);
 
+	ibcm_ip_sid_arena = vmem_create("ibcm_ip_sid", (void *)IBCM_INITIAL_SID,
+	    IBCM_MAX_IP_SIDS, 1, NULL, NULL, NULL, 0,
+	    VM_SLEEP | VMC_IDENTIFIER);
+
+	if (!ibcm_ip_sid_arena)
+		return (IBCM_FAILURE);
+
 	/* create a random starting value for local service ids */
 	gethrestime(&tv);
 	ibcm_local_sid_seed = ((uint64_t)tv.tv_sec << 20) & 0x007FFFFFFFF00000;
 	ASSERT((ibcm_local_sid_seed & IB_SID_AGN_MASK) == 0);
 	ibcm_local_sid_seed |= IB_SID_AGN_LOCAL;
+
 	ibcm_local_cid_seed = (ib_com_id_t)tv.tv_sec;
 	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(ibcm_local_sid_arena))
 	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(ibcm_local_sid_seed))
+	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(ibcm_ip_sid_arena))
 	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(ibcm_local_cid_seed))
 
 	return (IBCM_SUCCESS);
@@ -894,6 +904,7 @@ ibcm_fini_ids(void)
 {
 	/* All arenas shall be valid */
 	vmem_destroy(ibcm_local_sid_arena);
+	vmem_destroy(ibcm_ip_sid_arena);
 }
 
 /*
@@ -1023,6 +1034,40 @@ ibcm_free_local_sids(ib_svc_id_t service_id, int num_sids)
 	vmem_free(ibcm_local_sid_arena,
 	    (void *)(uintptr_t)service_id, num_sids);
 }
+
+/*
+ * ibcm_alloc_ip_sid:
+ *	Allocate a local IP SID.
+ */
+ib_svc_id_t
+ibcm_alloc_ip_sid()
+{
+	ib_svc_id_t sid;
+
+	sid = (ib_svc_id_t)(uintptr_t)vmem_alloc(ibcm_ip_sid_arena, 1,
+	    VM_SLEEP | VM_NEXTFIT);
+	if (sid == 0) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_alloc_ip_sid: no more RDMA IP "
+		    "SIDs available");
+	} else {
+		sid += IB_SID_IPADDR_PREFIX;
+		IBTF_DPRINTF_L4(cmlog, "ibcm_alloc_ip_sid: Success: RDMA IP SID"
+		    " allocated : 0x%016llX", sid);
+	}
+	return (sid);
+}
+
+/*
+ * ibcm_free_ip_sid:
+ *	Releases the given IP Service ID
+ */
+void
+ibcm_free_ip_sid(ib_svc_id_t sid)
+{
+	sid -= IB_SID_IPADDR_PREFIX;
+	vmem_free(ibcm_ip_sid_arena, (void *)(uintptr_t)sid, 1);
+}
+
 
 /* Allocate and free request id routines for SIDR */
 

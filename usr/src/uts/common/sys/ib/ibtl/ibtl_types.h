@@ -39,6 +39,8 @@
 #include <sys/sunddi.h>
 #include <sys/ib/ib_types.h>
 #include <sys/ib/ibtl/ibtl_status.h>
+#include <sys/socket.h>
+
 
 #ifdef	__cplusplus
 extern "C" {
@@ -1340,7 +1342,18 @@ typedef enum ibt_failure_type_e {
 	IBT_FAILURE_IBSM
 } ibt_failure_type_t;
 
-#ifdef	__cplusplus
+/*
+ * RDMA IP CM service Annex definitions
+ */
+typedef struct ibt_ip_addr_s {
+	sa_family_t family;		/* AF_INET or AF_INET6 */
+	union {
+		in_addr_t	ip4addr;
+		in6_addr_t	ip6addr;
+	} un;
+} ibt_ip_addr_t;
+
+#ifdef __cplusplus
 }
 #endif
 

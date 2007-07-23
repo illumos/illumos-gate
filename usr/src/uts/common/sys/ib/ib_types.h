@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -198,6 +197,11 @@ typedef	uint8_t			ib_time_t;	/* 6 bits of timeout exponent */
 #define	IB_SID_AGN_IBTA		0x0000000000000000
 #define	IB_SID_AGN_IETF		0x0100000000000000
 #define	IB_SID_AGN_LOCAL	0x0200000000000000
+
+#define	IB_SID_IPADDR_PREFIX		0x0000000001000000	/* Byte 4 */
+#define	IB_SID_IPADDR_PREFIX_MASK	0xFFFFFFFFFE000000
+#define	IB_SID_IPADDR_IPNUM_MASK	0x0000000000FF0000	/* Byte 5 */
+#define	IB_SID_IPADDR_PORTNUM_MASK	0x000000000000FFFF	/* Byte 6 & 7 */
 
 #ifdef __cplusplus
 }

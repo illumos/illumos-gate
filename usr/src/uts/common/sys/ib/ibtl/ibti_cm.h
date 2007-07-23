@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +54,7 @@ extern "C" {
 #define	IBT_REQ_PRIV_DATA_SZ		92
 #define	IBT_SIDR_REQ_PRIV_DATA_SZ	216
 #define	IBT_SIDR_REP_PRIV_DATA_SZ	136
+#define	IBT_IP_HDR_PRIV_DATA_SZ		36
 
 #define	IBT_CM_ADDL_REJ_LEN	72	/* Additional Rej Info len */
 					/* This is the max consumer addl */
@@ -68,7 +68,30 @@ typedef	uint8_t	ibt_priv_data_len_t;
  * CM channel handler reject reasons.
  *
  * Refer to InfiniBand Architecture Release Volume 1 Rev 1.0a:
- * Section 12.6.7.2	Rejection Reason
+ * Section 12.6.7.2 Rejection Reason, and RDMA IP CM Service Annex
+ *
+ * Note:
+ *	When a REJ happens for an RDMA-aware ULP, a consumer reject code
+ *	indicating an IP CM Service reject or a RDMA-Aware ULP reject can
+ *	be returned. In the IBTA spec both use the consumer reject code, but
+ *	are distinguished by the REJ layer byte (table 3 of the annex 11).
+ *	The IBTF CM can thus tell what type of reject has been returned. When
+ *	a RDMA ULP issues a consumer REJ to an RDMA REQ then the CM will
+ *	return an IBT_CM_CONSUMER ibt_cm_reason_t. The ARI data is returned
+ *	in an ibt_ari_con_t struct accessed by the 'ari_consumer' member of
+ *	the ibt_arej_info_t. However the consumer reject data begins at
+ *	'ari_consumer.rej_ari[1]', and is of length
+ *	'ari_consumer.rej_ari_len - 1' (the first byte is the REJ layer byte),
+ *	where as for a non RDMA-aware ULP consumer REJ, the ARI data begins
+ *	at 'ari_consumer.rej_ari[0]' and is of length 'ari_consumer.rej_ari_len'
+ *
+ *	If an RDMA-aware ULP REQ is rejected by the IP CM Service layer, the
+ *	CM will return the new IBT_CM_RDMA_IP ibt_cm_reason_t, and the
+ *	private data is returned in an ibt_ari_ip_t struct accessed via the
+ *	'ari_ip' member of the ibt_arej_info_t struct.
+ *
+ *	If an RDMA IP CM REQ is sent to a non RDMA-aware ULP consumer, then
+ *	the REQ is Rejected with an IBT_CM_INVALID_SID ibt_cm_reason_t.
  */
 typedef enum ibt_cm_reason_e {
 	IBT_CM_SUCCESS		= 0,	/* Success */
@@ -118,9 +141,9 @@ typedef enum ibt_cm_reason_e {
 	IBT_CM_ABORT		= 1001,	/* Connection aborted */
 	IBT_CM_CI_FAILURE	= 1002,	/* A call to CI failed, could be */
 					/* query/modify channel */
-	IBT_CM_CHAN_INVALID_STATE = 1003 /* Passive's QP is not in Init */
+	IBT_CM_CHAN_INVALID_STATE = 1003, /* Passive's QP is not in Init */
 					/* state */
-
+	IBT_CM_RDMA_IP		= 1004 /* RDMA IP CM reject */
 } ibt_cm_reason_t;
 
 /*
@@ -269,6 +292,11 @@ typedef struct ibt_cm_lap_rcv_s {
 						/* return to the CM */
 } ibt_cm_lap_rcv_t;
 
+#define	IBT_CM_IP_MAJ_VER	0
+#define	IBT_CM_IP_MIN_VER	0
+#define	IBT_CM_IP_IPV_V4	0x4
+#define	IBT_CM_IP_IPV_V6	0x6
+
 /*
  * Consumer defined Additional reject information.
  */
@@ -276,6 +304,30 @@ typedef struct ibt_ari_con_s {
 	uint8_t		rej_ari_len;			/* Length */
 	uint8_t		rej_ari[IBT_CM_ADDL_REJ_LEN];	/* Buffer */
 } ibt_ari_con_t;
+
+/*
+ * Consumer defined Additional reject information.
+ * For RDMA IP CM Service.
+ */
+typedef uint8_t ibt_ari_ip_reason_t;
+#define	IBT_ARI_IP_UNSPECIFIED		0x0
+#define	IBT_ARI_IP_MAJOR_VERSION	0x1
+#define	IBT_ARI_IP_MINOR_VERSION	0x2
+#define	IBT_ARI_IP_IPV			0x3
+#define	IBT_ARI_IP_SRC_ADDR		0x4
+#define	IBT_ARI_IP_DST_ADDR		0x5
+#define	IBT_ARI_IP_UNKNOWN_ADDR		0x6
+
+typedef struct ibt_ari_ip_s {
+	ibt_ip_addr_t		ip_suggested_addr;	/* IP_UNKNOWN_ADDR */
+	boolean_t		ip_suggested;	/* suggested valid */
+	ibt_ari_ip_reason_t	ip_reason;
+	uint8_t			ip_suggested_version:4;	/* IP_MAJOR_VERSION */
+							/* IP_MINOR_VERSION */
+							/* IP_IPV, */
+							/* IP_SRC_ADDR, */
+							/* IP_DST_ADDR */
+} ibt_ari_ip_t;
 
 /*
  * Additional reject information.
@@ -299,6 +351,7 @@ typedef union ibt_arej_info_u {
 						/* IBT_CM_INVALID_ALT_RATE */
 	ib_mtu_t		ari_mtu;	/* IBT_CM_INVALID_MTU */
 	ibt_redirect_info_t	ari_redirect;	/* IBT_CM_REDIRECT_CM */
+	ibt_ari_ip_t		ari_ip;		/* IBT_CM_RDMA_IP */
 } ibt_arej_info_t;
 
 /*

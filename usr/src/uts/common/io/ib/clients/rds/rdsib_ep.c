@@ -88,18 +88,14 @@
  * This File contains the endpoint related calls
  */
 
-extern int rds_get_ibaddr(ipaddr_t, ipaddr_t, ib_gid_t *, ib_gid_t *);
 extern boolean_t rds_islocal(ipaddr_t addr);
 extern uint_t rds_wc_signal;
-
-#define	RDS_GET_IBADDR_SUCCESS(ret, lgid, rgid)				\
-	((ret == 0) && (lgid.gid_prefix != 0) &&			\
-	    (lgid.gid_guid != 0) && (rgid.gid_prefix != 0) &&		\
-	    (rgid.gid_guid != 0))
 
 #define	RDS_LOOPBACK	0
 #define	RDS_LOCAL	1
 #define	RDS_REMOTE	2
+
+#define	IBT_IPADDR	1
 
 static uint8_t
 rds_is_port_marked(rds_session_t *sp, in_port_t port, uint_t qualifier)
@@ -561,34 +557,16 @@ rds_session_connect(rds_session_t *sp)
 {
 	ibt_channel_hdl_t	ctrlchan, datachan;
 	rds_ep_t		*ep;
-	ibt_path_info_t		pinfo;
-	ibt_path_attr_t		pattr;
-	ib_gid_t		lgid, rgid;
 	int			ret;
 
 	RDS_DPRINTF2("rds_session_connect", "Enter SP(%p)", sp);
 
-	rw_enter(&sp->session_lock, RW_READER);
-	rgid = sp->session_rgid;
-	lgid = sp->session_lgid;
-	rw_exit(&sp->session_lock);
-
-	/* get paths to the destination */
-	bzero(&pattr, sizeof (ibt_path_attr_t));
-	pattr.pa_dgids = &rgid;
-	pattr.pa_sgid = lgid;
-	pattr.pa_num_dgids = 1;
-	ret = ibt_get_paths(rdsib_statep->rds_ibhdl, IBT_PATH_NO_FLAGS,
-	    &pattr, 1, &pinfo, NULL);
-	if (ret != IBT_SUCCESS) {
-		RDS_DPRINTF2(LABEL, "ibt_get_paths failed: %d", ret);
-		return (-1);
-	}
-	pinfo.pi_sid = RDS_SERVICE_ID;
+	sp->session_pinfo.pi_sid = rdsib_statep->rds_service_id;
 
 	/* Override the packet life time based on the conf file */
 	if (IBPktLifeTime != 0) {
-		pinfo.pi_prim_cep_path.cep_cm_opaque1 = IBPktLifeTime;
+		sp->session_pinfo.pi_prim_cep_path.cep_cm_opaque1 =
+		    IBPktLifeTime;
 	}
 
 	/* Session type may change if we run into peer-to-peer case. */
@@ -607,7 +585,8 @@ rds_session_connect(rds_session_t *sp)
 	if (ep->ep_state == RDS_EP_STATE_UNCONNECTED) {
 		ep->ep_state = RDS_EP_STATE_ACTIVE_PENDING;
 		mutex_exit(&ep->ep_lock);
-		ret = rds_open_rc_channel(ep, &pinfo, IBT_BLOCKING, &datachan);
+		ret = rds_open_rc_channel(ep, &sp->session_pinfo, IBT_BLOCKING,
+		    &datachan);
 		if (ret != IBT_SUCCESS) {
 			RDS_DPRINTF2(LABEL, "EP(%p): rds_open_rc_channel "
 			    "failed: %d", ep, ret);
@@ -629,7 +608,8 @@ rds_session_connect(rds_session_t *sp)
 	if (ep->ep_state == RDS_EP_STATE_UNCONNECTED) {
 		ep->ep_state = RDS_EP_STATE_ACTIVE_PENDING;
 		mutex_exit(&ep->ep_lock);
-		ret = rds_open_rc_channel(ep, &pinfo, IBT_BLOCKING, &ctrlchan);
+		ret = rds_open_rc_channel(ep, &sp->session_pinfo, IBT_BLOCKING,
+		    &ctrlchan);
 		if (ret != IBT_SUCCESS) {
 			RDS_DPRINTF2(LABEL, "EP(%p): rds_open_rc_channel "
 			    "failed: %d", ep, ret);
@@ -701,8 +681,8 @@ rds_session_close(rds_session_t *sp, ibt_execution_mode_t mode, uint_t wait)
 	}
 
 	if (ep->ep_state == RDS_EP_STATE_CONNECTED) {
-		mutex_exit(&ep->ep_lock);
 		ep->ep_state = RDS_EP_STATE_CLOSING;
+		mutex_exit(&ep->ep_lock);
 		(void) rds_close_rc_channel(ep->ep_chanhdl, mode);
 		mutex_enter(&ep->ep_lock);
 	}
@@ -817,6 +797,9 @@ rds_failover_session(void *arg)
 	delay(drv_usectohz(1000000));
 
 	do {
+		ibt_ip_path_attr_t	ipattr;
+		ibt_ip_addr_t		dstip;
+
 		/* The ipaddr should be in the network order */
 		myip = sp->session_myip;
 		remip = sp->session_remip;
@@ -830,21 +813,36 @@ rds_failover_session(void *arg)
 		lgid.gid_guid = 0;
 		rgid.gid_prefix = 0;
 		rgid.gid_guid = 0;
-		ret = rds_get_ibaddr(htonl(myip), htonl(remip), &lgid, &rgid);
-		if (RDS_GET_IBADDR_SUCCESS(ret, lgid, rgid)) {
+
+		bzero(&ipattr, sizeof (ibt_ip_path_attr_t));
+		dstip.family = AF_INET;
+		dstip.un.ip4addr = htonl(remip);
+		ipattr.ipa_dst_ip = &dstip;
+		ipattr.ipa_src_ip.family = AF_INET;
+		ipattr.ipa_src_ip.un.ip4addr = htonl(myip);
+		ipattr.ipa_ndst = 1;
+		ipattr.ipa_max_paths = 1;
+		RDS_DPRINTF2(LABEL, "ibt_get_ip_paths: 0x%x <-> 0x%x ",
+		    myip, remip);
+		ret = ibt_get_ip_paths(rdsib_statep->rds_ibhdl,
+		    IBT_PATH_NO_FLAGS, &ipattr, &sp->session_pinfo, NULL, NULL);
+		if (ret == IBT_SUCCESS) {
+			RDS_DPRINTF2(LABEL, "ibt_get_ip_paths success");
+			lgid = sp->session_pinfo.
+			    pi_prim_cep_path.cep_adds_vect.av_sgid;
+			rgid = sp->session_pinfo.
+			    pi_prim_cep_path.cep_adds_vect.av_dgid;
 			break;
 		}
 
-		RDS_DPRINTF1(LABEL, "rds_get_ibaddr failed, ret: %d "
-		    "lgid: %llx:%llx rgid: %llx:%llx", lgid.gid_prefix,
-		    lgid.gid_guid, rgid.gid_prefix, rgid.gid_guid);
+		RDS_DPRINTF1(LABEL, "ibt_get_ip_paths failed, ret: %d ", ret);
 
 		/* wait 1 sec before re-trying */
 		delay(drv_usectohz(1000000));
 		cnt++;
 	} while (cnt < 5);
 
-	if (!RDS_GET_IBADDR_SUCCESS(ret, lgid, rgid)) {
+	if (ret != IBT_SUCCESS) {
 		rw_enter(&sp->session_lock, RW_WRITER);
 		if (sp->session_type == RDS_SESSION_ACTIVE) {
 			rds_session_fini(sp);
@@ -1226,6 +1224,8 @@ rds_session_create(rds_state_t *statep, ipaddr_t localip, ipaddr_t remip,
 
 	if (type == RDS_SESSION_ACTIVE) {
 		ipaddr_t localip1, remip1;
+		ibt_ip_path_attr_t	ipattr;
+		ibt_ip_addr_t		dstip;
 
 		/* The ipaddr should be in the network order */
 		localip1 = localip;
@@ -1241,16 +1241,33 @@ rds_session_create(rds_state_t *statep, ipaddr_t localip, ipaddr_t remip,
 		lgid.gid_guid = 0;
 		rgid.gid_prefix = 0;
 		rgid.gid_guid = 0;
-		ret = rds_get_ibaddr(ntohl(localip1), ntohl(remip1),
-		    &lgid, &rgid);
-		if (!RDS_GET_IBADDR_SUCCESS(ret, lgid, rgid)) {
-			RDS_DPRINTF1(LABEL, "rds_get_ibaddr failed, ret: %d "
+
+		bzero(&ipattr, sizeof (ibt_ip_path_attr_t));
+		dstip.family = AF_INET;
+		dstip.un.ip4addr = ntohl(remip1);
+		ipattr.ipa_dst_ip = &dstip;
+		ipattr.ipa_src_ip.family = AF_INET;
+		ipattr.ipa_src_ip.un.ip4addr = ntohl(localip1);
+		ipattr.ipa_ndst = 1;
+		ipattr.ipa_max_paths = 1;
+		RDS_DPRINTF2(LABEL, "ibt_get_ip_paths: 0x%x <-> 0x%x ",
+		    localip1, remip1);
+		ret = ibt_get_ip_paths(rdsib_statep->rds_ibhdl,
+		    IBT_PATH_NO_FLAGS, &ipattr, &newp->session_pinfo,
+		    NULL, NULL);
+		if (ret != IBT_SUCCESS) {
+			RDS_DPRINTF1(LABEL, "ibt_get_ip_paths failed, ret: %d "
 			    "lgid: %llx:%llx rgid: %llx:%llx", lgid.gid_prefix,
 			    lgid.gid_guid, rgid.gid_prefix, rgid.gid_guid);
 
 			RDS_SESSION_TRANSITION(newp, RDS_SESSION_STATE_FAILED);
 			return (NULL);
 		}
+		RDS_DPRINTF2(LABEL, "ibt_get_ip_paths success");
+		lgid =
+		    newp->session_pinfo.pi_prim_cep_path.cep_adds_vect.av_sgid;
+		rgid =
+		    newp->session_pinfo.pi_prim_cep_path.cep_adds_vect.av_dgid;
 
 		RDS_DPRINTF2(LABEL, "lgid: %llx:%llx rgid: %llx:%llx",
 		    lgid.gid_prefix, lgid.gid_guid, rgid.gid_prefix,
@@ -1948,6 +1965,9 @@ rds_sendmsg(uio_t *uiop, ipaddr_t sendip, ipaddr_t recvip, in_port_t sendport,
 		rw_enter(&sp->session_lock, RW_WRITER);
 		if ((sp->session_state == RDS_SESSION_STATE_FAILED) ||
 		    (sp->session_state == RDS_SESSION_STATE_FINI)) {
+			ibt_ip_path_attr_t	ipattr;
+			ibt_ip_addr_t		dstip;
+
 			sp->session_state = RDS_SESSION_STATE_CREATED;
 			sp->session_type = RDS_SESSION_ACTIVE;
 			RDS_DPRINTF3("rds_sendmsg", "SP(%p) State "
@@ -1969,14 +1989,23 @@ rds_sendmsg(uio_t *uiop, ipaddr_t sendip, ipaddr_t recvip, in_port_t sendport,
 			lgid.gid_guid = 0;
 			rgid.gid_prefix = 0;
 			rgid.gid_guid = 0;
-			ret = rds_get_ibaddr(htonl(sendip1), htonl(recvip1),
-			    &lgid, &rgid);
-			if (!RDS_GET_IBADDR_SUCCESS(ret, lgid, rgid)) {
+
+			bzero(&ipattr, sizeof (ibt_ip_path_attr_t));
+			dstip.family = AF_INET;
+			dstip.un.ip4addr = htonl(recvip1);
+			ipattr.ipa_dst_ip = &dstip;
+			ipattr.ipa_src_ip.family = AF_INET;
+			ipattr.ipa_src_ip.un.ip4addr = htonl(sendip1);
+			ipattr.ipa_ndst = 1;
+			ipattr.ipa_max_paths = 1;
+			RDS_DPRINTF2(LABEL, "ibt_get_ip_paths: 0x%x <-> 0x%x ",
+			    sendip1, recvip1);
+			ret = ibt_get_ip_paths(rdsib_statep->rds_ibhdl,
+			    IBT_PATH_NO_FLAGS, &ipattr, &sp->session_pinfo,
+			    NULL, NULL);
+			if (ret != IBT_SUCCESS) {
 				RDS_DPRINTF1("rds_sendmsg",
-				    "rds_get_ibaddr failed, ret: %d "
-				    "lgid: %llx:%llx rgid: %llx:%llx",
-				    lgid.gid_prefix, lgid.gid_guid,
-				    rgid.gid_prefix, rgid.gid_guid);
+				    "ibt_get_ip_paths failed, ret: %d ", ret);
 
 				rw_enter(&sp->session_lock, RW_WRITER);
 				if (sp->session_type == RDS_SESSION_ACTIVE) {
@@ -1992,6 +2021,11 @@ rds_sendmsg(uio_t *uiop, ipaddr_t sendip, ipaddr_t recvip, in_port_t sendport,
 					return (ENOMEM);
 				}
 			}
+			RDS_DPRINTF2(LABEL, "ibt_get_ip_paths success");
+			lgid = sp->session_pinfo.
+			    pi_prim_cep_path.cep_adds_vect.av_sgid;
+			rgid = sp->session_pinfo.
+			    pi_prim_cep_path.cep_adds_vect.av_dgid;
 
 			RDS_DPRINTF2(LABEL, "lgid: %llx:%llx rgid: %llx:%llx",
 			    lgid.gid_prefix, lgid.gid_guid, rgid.gid_prefix,

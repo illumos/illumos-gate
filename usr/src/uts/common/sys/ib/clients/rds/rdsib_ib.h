@@ -182,6 +182,8 @@ typedef struct rds_state_s {
 	uint_t			rds_nhcas;
 	rds_hca_t		*rds_hcalistp;
 	ibt_srv_hdl_t		rds_srvhdl;
+	ibt_srv_hdl_t		rds_old_srvhdl;
+	ib_svc_id_t		rds_service_id;
 } rds_state_t;
 
 extern rds_state_t	*rdsib_statep; /* global */

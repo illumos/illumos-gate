@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,6 +27,7 @@
 
 #include <sys/ib/mgt/ibcm/ibcm_impl.h>
 #include <sys/ib/ibtl/ibti.h>
+#include <sys/ib/mgt/ibcm/ibcm_arp.h>
 
 /*
  * ibcm_ti.c
@@ -1259,7 +1260,7 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 	mutex_enter(&statep->state_mutex);
 
 	if (statep->dreq_msg == NULL) {
-		IBTF_DPRINTF_L2(cmlog, "ibcm_close_rc_channel: chan 0x%p "
+		IBTF_DPRINTF_L2(cmlog, "ibt_close_rc_channel: chan 0x%p "
 		    "Fatal Error: dreq_msg is NULL", channel);
 		IBCM_RELEASE_CHAN_PRIVATE(channel);
 		mutex_exit(&statep->state_mutex);
@@ -1549,9 +1550,7 @@ ibcm_close_rc_channel(ibt_channel_hdl_t channel, ibcm_state_data_t *statep,
 		IBTF_DPRINTF_L4(cmlog, "ibcm_close_rc_channel: "
 		    "NOCALLBACKS on in statep = %p", statep);
 	}
-	mutex_exit(&statep->state_mutex);
 
-	mutex_enter(&statep->state_mutex);
 	if (statep->state != IBCM_STATE_ESTABLISHED) {
 		goto lost_race;
 	}
@@ -2385,7 +2384,7 @@ ibt_cm_delay(ibt_cmdelay_flags_t flags, void *cm_session_id,
 	mutex_exit(&statep->state_mutex);
 
 	IBCM_OUT_HDRP(statep->mra_msg)->TransactionID =
-		IBCM_OUT_HDRP(statep->stored_msg)->TransactionID;
+	    IBCM_OUT_HDRP(statep->stored_msg)->TransactionID;
 
 	/* post the MRA mad in blocking mode, as no timers involved */
 	ibcm_post_rc_mad(statep, statep->mra_msg, ibcm_post_mra_complete,
@@ -3244,9 +3243,9 @@ ibt_register_ar(ibt_clnt_hdl_t ibt_hdl, ibt_ar_t *arp)
 	/* verify GID/pkey is valid for a local port, etc. */
 	hcap = NULL;
 	if ((s1 = ibtl_cm_get_hca_port(arp->ar_gid, 0, &cm_port))
-		!= IBT_SUCCESS ||
+	    != IBT_SUCCESS ||
 	    (s2 = ibt_pkey2index_byguid(cm_port.hp_hca_guid, cm_port.hp_port,
-		arp->ar_pkey, &pkey_ix)) != IBT_SUCCESS ||
+	    arp->ar_pkey, &pkey_ix)) != IBT_SUCCESS ||
 	    (hcap = ibcm_find_hca_entry(cm_port.hp_hca_guid)) == NULL) {
 		cv_destroy(&new->ar_cv);
 		ibcm_ar_list = new->ar_link;
@@ -6063,6 +6062,236 @@ get_comp_pgid_exit:
 	    "Found %d GIDs", retval, *num_gids_p);
 
 	return (retval);
+}
+
+/* RDMA IP CM Support routines */
+ibt_status_t
+ibt_get_src_ip(ib_gid_t gid, ib_pkey_t pkey, ibt_ip_addr_t *src_ip)
+{
+	ibcm_arp_ip_t		*ipp;
+	ibcm_arp_ibd_insts_t	ibds;
+	int			i;
+	boolean_t		found = B_FALSE;
+	ibt_status_t		retval = IBT_SUCCESS;
+
+	IBTF_DPRINTF_L4(cmlog, "ibt_get_src_ip(%llX:%llX, %X, %p)",
+	    gid.gid_prefix, gid.gid_guid, pkey, src_ip);
+
+	if (gid.gid_prefix == 0 || gid.gid_guid == 0) {
+		IBTF_DPRINTF_L3(cmlog, "ibt_get_src_ip: Invalid GID.");
+		return (IBT_INVALID_PARAM);
+	}
+
+	if (src_ip == NULL) {
+		IBTF_DPRINTF_L3(cmlog, "ibt_get_src_ip: ERROR: src_ip NULL");
+		return (IBT_INVALID_PARAM);
+	}
+
+	bzero(&ibds, sizeof (ibcm_arp_ibd_insts_t));
+	ibds.ibcm_arp_ibd_alloc = IBCM_ARP_IBD_INSTANCES;
+	ibds.ibcm_arp_ibd_cnt = 0;
+	ibds.ibcm_arp_ip = (ibcm_arp_ip_t *)kmem_zalloc(
+	    ibds.ibcm_arp_ibd_alloc * sizeof (ibcm_arp_ip_t), KM_SLEEP);
+
+	retval = ibcm_arp_get_ibds(&ibds);
+	if (retval != IBT_SUCCESS) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_get_src_ip: ibcm_arp_get_ibds "
+		    "failed to get IBD Instances: ret 0x%x", retval);
+		goto get_src_ip_end;
+	}
+
+	for (i = 0, ipp = ibds.ibcm_arp_ip; i < ibds.ibcm_arp_ibd_cnt;
+	    i++, ipp++) {
+		if (ipp->ip_port_gid.gid_prefix == gid.gid_prefix &&
+		    ipp->ip_port_gid.gid_guid == gid.gid_guid) {
+			if (pkey) {
+				if (ipp->ip_pkey == pkey) {
+					found = B_TRUE;
+					break;
+				} else
+					continue;
+			}
+			found = B_TRUE;
+			break;
+		}
+	}
+
+	if (found == B_FALSE) {
+		retval = IBT_SRC_IP_NOT_FOUND;
+	} else {
+		src_ip->family = ipp->ip_inet_family;
+		if (src_ip->family == AF_INET) {
+			bcopy(&ipp->ip_cm_sin.sin_addr, &src_ip->un.ip4addr,
+			    sizeof (in_addr_t));
+			IBTF_DPRINTF_L4(cmlog, "ibt_get_src_ip: Got %lX",
+			    src_ip->un.ip4addr);
+		} else if (src_ip->family == AF_INET6) {
+			bcopy(&ipp->ip_cm_sin6.sin6_addr, &src_ip->un.ip6addr,
+			    sizeof (in6_addr_t));
+		}
+	}
+
+get_src_ip_end:
+	if (ibds.ibcm_arp_ip)
+		kmem_free(ibds.ibcm_arp_ip,
+		    ibds.ibcm_arp_ibd_alloc * sizeof (ibcm_arp_ip_t));
+
+	return (retval);
+}
+
+ib_svc_id_t
+ibt_get_ip_sid(uint8_t protocol_num, in_port_t dst_port)
+{
+	ib_svc_id_t	sid;
+
+	IBTF_DPRINTF_L4(cmlog, "ibt_get_ip_sid(%X, %lX)", protocol_num,
+	    dst_port);
+
+	/*
+	 * If protocol_num is non-zero, then formulate the SID and return it.
+	 * If protocol_num is zero, then we need to assign a locally generated
+	 * IP SID with IB_SID_IPADDR_PREFIX.
+	 */
+	if (protocol_num) {
+		sid = IB_SID_IPADDR_PREFIX | protocol_num << 16 | dst_port;
+	} else {
+		sid = ibcm_alloc_ip_sid();
+	}
+
+	IBTF_DPRINTF_L3(cmlog, "ibt_get_ip_sid: SID: 0x%016llX", sid);
+	return (sid);
+}
+
+ibt_status_t
+ibt_release_ip_sid(ib_svc_id_t ip_sid)
+{
+	IBTF_DPRINTF_L4(cmlog, "ibt_release_ip_sid(%llX)", ip_sid);
+
+	if (((ip_sid & IB_SID_IPADDR_PREFIX_MASK) != 0) ||
+	    (!(ip_sid & IB_SID_IPADDR_PREFIX))) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_release_ip_sid(0x%016llX): ERROR: "
+		    "Called for Non-RDMA IP SID", ip_sid);
+		return (IBT_INVALID_PARAM);
+	}
+
+	/*
+	 * If protocol_num in ip_sid are all ZEROs, then this SID is allocated
+	 * by IBTF. If not, then the specified ip_sid is invalid.
+	 */
+	if (ip_sid & IB_SID_IPADDR_IPNUM_MASK) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_release_ip_sid(0x%016llX): ERROR: "
+		    "Called for Non-IBTF assigned RDMA IP SID", ip_sid);
+		return (IBT_INVALID_PARAM);
+	}
+
+	ibcm_free_ip_sid(ip_sid);
+
+	return (IBT_SUCCESS);
+}
+
+
+uint8_t
+ibt_get_ip_protocol_num(ib_svc_id_t sid)
+{
+	return ((sid & IB_SID_IPADDR_IPNUM_MASK) >> 16);
+}
+
+in_port_t
+ibt_get_ip_dst_port(ib_svc_id_t sid)
+{
+	return (sid & IB_SID_IPADDR_PORTNUM_MASK);
+}
+
+_NOTE(SCHEME_PROTECTS_DATA("Unshared data", ibt_ip_cm_info_t))
+_NOTE(SCHEME_PROTECTS_DATA("Unshared data", ibcm_ip_pvtdata_t))
+
+ibt_status_t
+ibt_format_ip_private_data(ibt_ip_cm_info_t *ip_cm_info,
+    ibt_priv_data_len_t priv_data_len, void *priv_data_p)
+{
+	ibcm_ip_pvtdata_t	*ip_data;
+
+	IBTF_DPRINTF_L4(cmlog, "ibt_format_ip_private_data(%p, %d, %p)",
+	    ip_cm_info, priv_data_len, priv_data_p);
+
+	if ((ip_cm_info == NULL) || (priv_data_p == NULL) ||
+	    (priv_data_len < IBT_IP_HDR_PRIV_DATA_SZ)) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_format_ip_private_data: ERROR "
+		    "Invalid Inputs.");
+		return (IBT_INVALID_PARAM);
+	}
+
+	/* bzero'ing just IP_HDR part */
+	bzero(priv_data_p, IBT_IP_HDR_PRIV_DATA_SZ);
+	ip_data = (ibcm_ip_pvtdata_t *)priv_data_p;
+	ip_data->ip_srcport = b2h16(ip_cm_info->src_port); /* Source Port */
+
+	/* IPV = 0x4, if IP-Addr are IPv4 format, else 0x6 for IPv6 */
+	if (ip_cm_info->src_addr.family == AF_INET) {
+		ip_data->ip_ipv = IBT_CM_IP_IPV_V4;
+		ip_data->ip_srcv4 = ntohl(ip_cm_info->src_addr.un.ip4addr);
+		ip_data->ip_dstv4 = ntohl(ip_cm_info->dst_addr.un.ip4addr);
+	} else if (ip_cm_info->src_addr.family == AF_INET6) {
+		ip_data->ip_ipv = IBT_CM_IP_IPV_V6;
+		bcopy(&ip_cm_info->src_addr.un.ip6addr,
+		    &ip_data->ip_srcv6, sizeof (in6_addr_t));
+		bcopy(&ip_cm_info->dst_addr.un.ip6addr,
+		    &ip_data->ip_dstv6, sizeof (in6_addr_t));
+	} else {
+		IBTF_DPRINTF_L2(cmlog, "ibt_format_ip_private_data: ERROR "
+		    "IP Addr needs to be either AF_INET or AF_INET6 family.");
+		return (IBT_INVALID_PARAM);
+	}
+
+	ip_data->ip_MajV = IBT_CM_IP_MAJ_VER;
+	ip_data->ip_MinV = IBT_CM_IP_MIN_VER;
+
+	return (IBT_SUCCESS);
+}
+
+
+ibt_status_t
+ibt_get_ip_data(ibt_priv_data_len_t priv_data_len, void *priv_data,
+    ibt_ip_cm_info_t *ip_cm_infop)
+{
+	ibcm_ip_pvtdata_t	*ip_data;
+
+	IBTF_DPRINTF_L4(cmlog, "ibt_get_ip_data(%d, %p, %p)",
+	    priv_data_len, priv_data, ip_cm_infop);
+
+	if ((ip_cm_infop == NULL) || (priv_data == NULL) ||
+	    (priv_data_len < IBT_IP_HDR_PRIV_DATA_SZ)) {
+		IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_data: ERROR Invalid Inputs");
+		return (IBT_INVALID_PARAM);
+	}
+
+	bzero(ip_cm_infop, sizeof (ibt_ip_cm_info_t));
+
+	ip_data = (ibcm_ip_pvtdata_t *)priv_data;
+	ip_cm_infop->src_port = b2h16(ip_data->ip_srcport); /* Source Port */
+
+	/* IPV = 0x4, if IP Address are IPv4 format, else 0x6 for IPv6 */
+	if (ip_data->ip_ipv == IBT_CM_IP_IPV_V4) {
+		/* Copy IPv4 Addr */
+		ip_cm_infop->src_addr.family = AF_INET;
+		ip_cm_infop->src_addr.un.ip4addr = ntohl(ip_data->ip_srcv4);
+		ip_cm_infop->dst_addr.family = AF_INET;
+		ip_cm_infop->dst_addr.un.ip4addr = ntohl(ip_data->ip_dstv4);
+	} else if (ip_data->ip_ipv == IBT_CM_IP_IPV_V6) {
+		/* Copy IPv6 Addr */
+		ip_cm_infop->src_addr.family = AF_INET6;
+		bcopy(&ip_data->ip_srcv6, &ip_cm_infop->src_addr.un.ip6addr,
+		    sizeof (in6_addr_t));
+		ip_cm_infop->dst_addr.family = AF_INET6;
+		bcopy(&ip_data->ip_dstv6, &ip_cm_infop->dst_addr.un.ip6addr,
+		    sizeof (in6_addr_t));
+	} else {
+		IBTF_DPRINTF_L2(cmlog, "ibt_get_ip_data: ERROR: IP Addr needs"
+		    " to be either AF_INET or AF_INET6 family.");
+		return (IBT_INVALID_PARAM);
+	}
+
+	return (IBT_SUCCESS);
 }
 
 
