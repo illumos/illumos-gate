@@ -524,7 +524,7 @@ invalid_security(char *options)
 static int
 nfs_parse_legacy_options(sa_group_t group, char *options)
 {
-	char *dup = strdup(options);
+	char *dup;
 	char *base;
 	char *token;
 	sa_optionset_t optionset;
@@ -587,6 +587,11 @@ nfs_parse_legacy_options(sa_group_t group, char *options)
 	} else {
 		iszfs = sa_group_is_zfs(group);
 	}
+
+	/* We need a copy of options for the next part. */
+	dup = strdup(options);
+	if (dup == NULL)
+		return (SA_NO_MEMORY);
 
 	/*
 	 * we need to step through each option in the string and then
@@ -713,8 +718,8 @@ nfs_parse_legacy_options(sa_group_t group, char *options)
 	}
 	if (security_list != NULL)
 		free_security_list(security_list);
-	if (dup != NULL)
-		free(dup);
+
+	free(dup);
 	return (ret);
 }
 
