@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1131,6 +1131,77 @@ sata_check_target_node(di_node_t node, void *arg)
 	return (DI_WALK_CONTINUE);
 }
 
+struct chk_dev {
+	int c_isblk;
+	char *c_minor;
+};
+
+/*ARGSUSED*/
+static int
+chk_dev_fcn(di_node_t node, di_minor_t minor, void *arg)
+{
+	char	*mn;
+	struct chk_dev *chkp = (struct chk_dev *)arg;
+
+	mn = di_minor_name(minor);
+	if (mn == NULL)
+		return (DI_WALK_CONTINUE);
+
+	if (strcmp(mn, chkp->c_minor) != 0)
+		return (DI_WALK_CONTINUE);
+
+	chkp->c_isblk = di_minor_spectype(minor) == S_IFBLK ? 1 : 0;
+
+	return (DI_WALK_TERMINATE);
+}
+
+/*
+ * Don't use devfs if stat() in /devices fails. Use libdevinfo instead.
+ * Retired devices don't show up in devfs.
+ *
+ *	Returns:
+ *		1 - minor exists and is of type BLK
+ *		0 - minor does not exist or is not of type BLK.
+ */
+static int
+is_devinfo_blk(char *minor_path)
+{
+	char	*minor_portion;
+	struct chk_dev chk_dev;
+	di_node_t node;
+	int	rv;
+
+	/*
+	 * prune minor path for di_init() - no /devices prefix and no minor name
+	 */
+	if (strncmp(minor_path, "/devices/", strlen("/devices/")) != 0)
+		return (0);
+
+	minor_portion = strrchr(minor_path, *MINOR_SEP);
+	if (minor_portion == NULL)
+		return (0);
+
+	*minor_portion = 0;
+
+	node = di_init(minor_path + strlen("/devices"), DINFOMINOR);
+
+	*minor_portion = *MINOR_SEP;
+
+	if (node == DI_NODE_NIL)
+		return (0);
+
+	chk_dev.c_isblk = 0;
+	chk_dev.c_minor = minor_portion + 1;
+
+	rv = di_walk_minor(node, NULL, 0, &chk_dev, chk_dev_fcn);
+
+	di_fini(node);
+
+	if (rv == 0 && chk_dev.c_isblk)
+		return (1);
+	else
+		return (0);
+}
 
 /*
  * The dynamic component buffer returned by this function has to be freed!
@@ -1212,11 +1283,23 @@ sata_make_dyncomp(const char *ap_id, char **dyncomp)
 			(void) snprintf(minor_path, MAXPATHLEN,
 			    "%s/%s", devpath, dep->d_name);
 
-			if (stat(minor_path, &sb) < 0)
-				continue;
+			/*
+			 * If stat() fails, the device *may* be retired.
+			 * Check via libdevinfo if the device has a BLK minor.
+			 * We don't use libdevinfo all the time, since taking
+			 * a snapshot is slower than a stat().
+			 */
+			if (stat(minor_path, &sb) < 0) {
+				if (is_devinfo_blk(minor_path)) {
+					break;
+				} else {
+					continue;
+				}
+			}
 
 			if (S_ISBLK(sb.st_mode))
 				break;
+
 		}
 
 		(void) closedir(dp);
