@@ -110,6 +110,7 @@ proc		PROCSIZE
 	p_pidp
 	p_fixalignment
 	p_utraps
+	p_agenttp
 	p_brand
 	p_brand_data
 
