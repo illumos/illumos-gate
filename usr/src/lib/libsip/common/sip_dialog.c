@@ -120,6 +120,10 @@ sip_release_dialog_res(_sip_dialog_t *dialog)
 		sip_free_header(dialog->sip_dlg_remote_uri_tag);
 	if (dialog->sip_dlg_remote_target != NULL)
 		sip_free_header(dialog->sip_dlg_remote_target);
+	if (dialog->sip_dlg_local_contact != NULL)
+		sip_free_header(dialog->sip_dlg_local_contact);
+	if (dialog->sip_dlg_new_local_contact != NULL)
+		sip_free_header(dialog->sip_dlg_new_local_contact);
 	if (dialog->sip_dlg_route_set != NULL)
 		sip_free_header(dialog->sip_dlg_route_set);
 	if (dialog->sip_dlg_event != NULL)
@@ -660,6 +664,16 @@ sip_seed_dialog(sip_conn_object_t obj, _sip_msg_t *sip_msg,
 		    NULL) {
 			goto dia_err;
 		}
+		/*
+		 * We take the local contact from the originating request on
+		 * UAC. For the UAS, we will take it from the response.
+		 */
+		if ((dialog->sip_dlg_local_contact = sip_dup_header(chdr)) ==
+		    NULL) {
+			goto dia_err;
+		} else {
+			dialog->sip_dlg_new_local_contact = NULL;
+		}
 	}
 	if ((dialog->sip_dlg_call_id = sip_dup_header(cihdr)) == NULL)
 		goto dia_err;
@@ -1020,6 +1034,28 @@ sip_complete_dialog(_sip_msg_t *sip_msg, _sip_dialog_t *dialog)
 				    &dialog->sip_dlg_mutex);
 				goto terminate_new_dlg;
 			}
+		}
+	}
+
+	/*
+	 * We take the local contact for UAS Dialog from the response (either
+	 * NOTIFY for SUBSCRIBE request or from final response 2xx to INVITE
+	 * request)
+	 */
+	if ((dialog->sip_dlg_type == SIP_UAS_DIALOG) && (dialog->sip_dlg_state
+	    == SIP_DLG_CONFIRMED)) {
+		if (chdr == NULL) {
+			(void) pthread_mutex_lock(&sip_msg->sip_msg_mutex);
+			chdr = sip_search_for_header(sip_msg, SIP_CONTACT,
+			    NULL);
+			(void) pthread_mutex_unlock(&sip_msg->sip_msg_mutex);
+		}
+		if ((chdr == NULL) || ((dialog->sip_dlg_local_contact =
+		    sip_dup_header(chdr)) == NULL)) {
+			(void) pthread_mutex_unlock(&dialog->sip_dlg_mutex);
+			if (alloc_thdr)
+				sip_free_header(thdr);
+			goto terminate_new_dlg;
 		}
 	}
 
@@ -1430,6 +1466,16 @@ sip_dialog_process(_sip_msg_t *sip_msg, sip_dialog_t *sip_dialog)
 						    _dialog->sip_dlg_state);
 					}
 					return (0);
+				} else if (_dialog->sip_dlg_new_local_contact
+				    != NULL) {
+					assert(_dialog->sip_dlg_local_contact
+					    != NULL);
+					sip_free_header(_dialog->
+						    sip_dlg_local_contact);
+					_dialog->sip_dlg_local_contact =
+					    _dialog->sip_dlg_new_local_contact;
+					_dialog->sip_dlg_new_local_contact =
+					    NULL;
 				}
 			}
 		}
@@ -1496,6 +1542,8 @@ sip_copy_partial_dialog(_sip_dialog_t *dialog)
 	    sip_dup_header(dialog->sip_dlg_local_uri_tag)) == NULL ||
 	    (new_dlg->sip_dlg_remote_target =
 	    sip_dup_header(dialog->sip_dlg_remote_target)) == NULL ||
+	    (new_dlg->sip_dlg_local_contact =
+	    sip_dup_header(dialog->sip_dlg_local_contact)) == NULL ||
 	    (new_dlg->sip_dlg_call_id =
 	    sip_dup_header(dialog->sip_dlg_call_id)) == NULL) {
 		sip_release_dialog_res(new_dlg);
@@ -1548,6 +1596,11 @@ sip_update_dialog(sip_dialog_t dialog, _sip_msg_t *sip_msg)
 			(void) pthread_mutex_unlock(&_dialog->sip_dlg_mutex);
 			return (dialog);
 		}
+		method = sip_get_callseq_method((sip_msg_t)sip_msg, &error);
+		if (error != 0) {
+			(void) pthread_mutex_unlock(&_dialog->sip_dlg_mutex);
+			return (dialog);
+		}
 	}
 	prev_state = _dialog->sip_dlg_state;
 	if (_dialog->sip_dlg_state == SIP_DLG_CONFIRMED) {
@@ -1560,6 +1613,26 @@ sip_update_dialog(sip_dialog_t dialog, _sip_msg_t *sip_msg)
 		assert(!isreq);
 		if (SIP_OK_RESP(resp_code)) {
 			_dialog->sip_dlg_state = SIP_DLG_CONFIRMED;
+			/*
+			 * If we recieved provisional response before we would
+			 * not have captured local contact. So store it now.
+			 */
+			if (_dialog->sip_dlg_type == SIP_UAS_DIALOG && _dialog->
+			    sip_dlg_method == INVITE && method == INVITE) {
+				sip_header_t chdr;
+				(void) pthread_mutex_lock(&sip_msg->
+				    sip_msg_mutex);
+				chdr = sip_search_for_header(sip_msg,
+				    SIP_CONTACT, NULL);
+				(void) pthread_mutex_unlock(&sip_msg->
+				    sip_msg_mutex);
+				if (chdr != NULL) {
+					_dialog->sip_dlg_local_contact
+					    = sip_dup_header(chdr);
+					_dialog->sip_dlg_new_local_contact =
+					    NULL;
+				}
+			}
 			(void) pthread_mutex_unlock(&_dialog->sip_dlg_mutex);
 			(void) sip_dlg_recompute_rset(_dialog, sip_msg,
 			    SIP_UAS_DIALOG);
@@ -1675,4 +1748,35 @@ sip_dialog_init(void (*ulp_dlg_del) (sip_dialog_t, sip_msg_t, void *),
 
 	if (ulp_state_cb != NULL)
 		sip_dlg_ulp_state_cb = ulp_state_cb;
+}
+
+/*
+ * Copy the new contact header of re-INVITE
+ */
+void
+sip_dialog_add_new_contact(sip_dialog_t dialog, _sip_msg_t *sip_msg)
+{
+	sip_header_t chdr = NULL;
+	sip_header_t nhdr = NULL;
+
+	(void) pthread_mutex_lock(&sip_msg->sip_msg_mutex);
+	chdr = sip_search_for_header(sip_msg, SIP_CONTACT, NULL);
+	(void) pthread_mutex_unlock(&sip_msg->sip_msg_mutex);
+
+	if (chdr == NULL)
+		return;
+
+	(void) pthread_mutex_lock(&dialog->sip_dlg_mutex);
+	if (dialog->sip_dlg_method != INVITE || dialog->sip_dlg_state
+	    != SIP_DLG_CONFIRMED) {
+		(void) pthread_mutex_unlock(&dialog->sip_dlg_mutex);
+		return;
+	}
+
+	if (((nhdr = sip_dup_header(chdr)) != NULL)) {
+		if (dialog->sip_dlg_new_local_contact != NULL)
+			sip_free_header(dialog->sip_dlg_new_local_contact);
+		dialog->sip_dlg_new_local_contact = nhdr;
+	}
+	(void) pthread_mutex_unlock(&dialog->sip_dlg_mutex);
 }

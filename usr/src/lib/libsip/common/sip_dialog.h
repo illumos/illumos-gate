@@ -68,6 +68,8 @@ typedef struct sip_dialog
 	_sip_header_t		*sip_dlg_remote_uri_tag;
 	_sip_header_t		*sip_dlg_local_uri_tag;
 	_sip_header_t		*sip_dlg_remote_target;
+	_sip_header_t		*sip_dlg_local_contact;
+	_sip_header_t		*sip_dlg_new_local_contact; /* for re-INVITE */
 	_sip_header_t		*sip_dlg_route_set;
 	_sip_header_t		*sip_dlg_event;
 	sip_str_t		sip_dlg_rset;
@@ -95,6 +97,7 @@ sip_dialog_t		sip_dialog_create(_sip_msg_t *, _sip_msg_t *, int);
 sip_dialog_t		sip_dialog_find(_sip_msg_t *);
 int			sip_dialog_process(_sip_msg_t *, sip_dialog_t *);
 sip_dialog_t		sip_update_dialog(sip_dialog_t, _sip_msg_t *);
+void			sip_dialog_add_new_contact(sip_dialog_t, _sip_msg_t *);
 void			sip_dialog_terminate(sip_dialog_t, sip_msg_t);
 sip_dialog_t		sip_seed_dialog(sip_conn_object_t, _sip_msg_t *,
 			    boolean_t, int);

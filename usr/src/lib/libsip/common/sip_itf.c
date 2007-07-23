@@ -312,6 +312,9 @@ sip_sendmsg(sip_conn_object_t obj, sip_msg_t sip_msg, sip_dialog_t dialog,
 		} else if (dialog != NULL && (!sip_msg_info->is_request ||
 		    sip_msg_info->sip_req_method == NOTIFY)) {
 			(void) sip_update_dialog(dialog, _sip_msg);
+		} else if (dialog != NULL && sip_msg_info->is_request &&
+		    sip_msg_info->sip_req_method == INVITE) {
+			(void) sip_dialog_add_new_contact(dialog, _sip_msg);
 		}
 	}
 

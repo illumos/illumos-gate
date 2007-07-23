@@ -76,6 +76,8 @@ sip_create_dialog_req(sip_method_t method, sip_dialog_t dialog,
 	    0) {
 		goto err_ret;
 	}
+	if (sip_copy_header(sip_msg, _dialog->sip_dlg_local_contact, NULL) != 0)
+		goto err_ret;
 	if (sip_add_via(sip_msg, transport, sent_by, sent_by_port, via_param) !=
 	    0) {
 		goto err_ret;
