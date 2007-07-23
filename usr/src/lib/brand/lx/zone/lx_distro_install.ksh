@@ -1136,6 +1136,14 @@ read_discinfo()
 
 			rd_rpmdir=${rd_line[5]}
 
+			#
+			# If the specified RPM directory doesn't exist, this is
+			# not a valid binary RPM disc (it's most likely a
+			# source RPM disc), so don't add it to the list of
+			# valid ISO files.
+			#
+			[[ ! -d "$1/$rd_rpmdir" ]] && return 1
+
 			if [[ "$rd_cdnum" = "1" &&
 			   "$rd_release" = "Red Hat"* ]]; then
 				typeset rh_glob
