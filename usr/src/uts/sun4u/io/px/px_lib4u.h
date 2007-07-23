@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,6 +96,7 @@ typedef struct pxu {
 	uint32_t	tsb_size;
 	uint64_t	*tsb_vaddr;
 	uint64_t	tsb_paddr;	/* Only used for Oberon */
+	sysino_t	hp_sysino;	/* Oberon hotplug interrupt */
 
 	void		*msiq_mapped_p;
 	px_cb_t		*px_cb_p;

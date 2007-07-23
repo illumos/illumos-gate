@@ -2482,8 +2482,9 @@ px_cpr_rem_callb(px_t *px_p)
 static uint_t
 px_hp_intr(caddr_t arg1, caddr_t arg2)
 {
-	px_t *px_p = (px_t *)arg1;
-	int rval;
+	px_t	*px_p = (px_t *)arg1;
+	pxu_t 	*pxu_p = (pxu_t *)px_p->px_plat_p;
+	int	rval;
 
 	rval = pciehpc_intr(px_p->px_dip);
 
@@ -2494,6 +2495,11 @@ px_hp_intr(caddr_t arg1, caddr_t arg2)
 		ddi_get_instance(px_p->px_dip));
 #endif
 
+	/* Set the interrupt state to idle */
+	if (px_lib_intr_setstate(px_p->px_dip,
+	    pxu_p->hp_sysino, INTR_IDLE_STATE) != DDI_SUCCESS)
+		return (DDI_INTR_UNCLAIMED);
+
 	return (rval);
 }
 
@@ -2501,13 +2507,12 @@ int
 px_lib_hotplug_init(dev_info_t *dip, void *arg)
 {
 	px_t	*px_p = DIP_TO_STATE(dip);
+	pxu_t 	*pxu_p = (pxu_t *)px_p->px_plat_p;
 	uint64_t ret;
 
 	if ((ret = hvio_hotplug_init(dip, arg)) == DDI_SUCCESS) {
-		sysino_t sysino;
-
 		if (px_lib_intr_devino_to_sysino(px_p->px_dip,
-		    px_p->px_inos[PX_INTR_HOTPLUG], &sysino) !=
+		    px_p->px_inos[PX_INTR_HOTPLUG], &pxu_p->hp_sysino) !=
 		    DDI_SUCCESS) {
 #ifdef	DEBUG
 			cmn_err(CE_WARN, "%s%d: devino_to_sysino fails\n",
@@ -2517,7 +2522,7 @@ px_lib_hotplug_init(dev_info_t *dip, void *arg)
 			return (DDI_FAILURE);
 		}
 
-		VERIFY(add_ivintr(sysino, PX_PCIEHP_PIL,
+		VERIFY(add_ivintr(pxu_p->hp_sysino, PX_PCIEHP_PIL,
 		    (intrfunc)px_hp_intr, (caddr_t)px_p, NULL, NULL) == 0);
 
 		px_ib_intr_enable(px_p, intr_dist_cpuid(),
@@ -2532,23 +2537,12 @@ px_lib_hotplug_uninit(dev_info_t *dip)
 {
 	if (hvio_hotplug_uninit(dip) == DDI_SUCCESS) {
 		px_t	*px_p = DIP_TO_STATE(dip);
-		sysino_t sysino;
-
-		if (px_lib_intr_devino_to_sysino(px_p->px_dip,
-		    px_p->px_inos[PX_INTR_HOTPLUG], &sysino) !=
-		    DDI_SUCCESS) {
-#ifdef	DEBUG
-			cmn_err(CE_WARN, "%s%d: devino_to_sysino fails\n",
-			    ddi_driver_name(px_p->px_dip),
-			    ddi_get_instance(px_p->px_dip));
-#endif
-			return;
-		}
+		pxu_t 	*pxu_p = (pxu_t *)px_p->px_plat_p;
 
 		px_ib_intr_disable(px_p->px_ib_p,
 		    px_p->px_inos[PX_INTR_HOTPLUG], IB_INTR_WAIT);
 
-		VERIFY(rem_ivintr(sysino, PX_PCIEHP_PIL) == 0);
+		VERIFY(rem_ivintr(pxu_p->hp_sysino, PX_PCIEHP_PIL) == 0);
 	}
 }
 
