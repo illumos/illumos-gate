@@ -31,21 +31,6 @@
 #define	BGE_DBG		BGE_DBG_STATS	/* debug flag for this code	*/
 
 /*
- * Type of transceiver currently in use.  The IEEE 802.3 std aPhyType
- * enumerates the following set
- */
-enum xcvr_type {
-	XCVR_TYPE_UNDEFINED = 0,    /* 0 = undefined, or not yet known */
-	XCVR_TYPE_NONE,		/* 1= MII present & nothing connected */
-	XCVR_TYPE_10BASE_T,		/* 2 = 10 Mbps copper */
-	XCVR_TYPE_100BASE_T4,	/* 3 = 10 Mbps copper */
-	XCVR_TYPE_100BASE_X,	/* 4 = 100 Mbps copper */
-	XCVR_TYPE_100BASE_T2,	/* 5 = 100 Mbps copper */
-	XCVR_TYPE_1000BASE_X,	/* 6 = 1000 Mbps SerDes */
-	XCVR_TYPE_1000BASE_T	/* 7 = 1000 Mbps copper */
-};
-
-/*
  * Local datatype for defining tables of (Offset, Name) pairs
  */
 typedef struct {
@@ -278,23 +263,6 @@ bge_statistics_update(kstat_t *ksp, int flag)
 	return (0);
 }
 
-static int
-bge_params_update(kstat_t *ksp, int flag)
-{
-	bge_t *bgep;
-	kstat_named_t *knp;
-	int i;
-
-	if (flag != KSTAT_READ)
-		return (EACCES);
-
-	bgep = ksp->ks_private;
-	for (knp = ksp->ks_data, i = 0; i < PARAM_COUNT; ++knp, ++i)
-		knp->value.ui64 = bgep->nd_params[i].ndp_val;
-
-	return (0);
-}
-
 static const bge_ksindex_t bge_chipid[] = {
 	{ 0,				"asic_rev"		},
 	{ 1,				"businfo"		},
@@ -365,17 +333,17 @@ bge_chipid_update(kstat_t *ksp, int flag)
 	 */
 	tmp = bgep->chipid.businfo;
 	bge_set_char_kstat(knp++,
-		tmp & PCISTATE_BUS_IS_PCI ? "PCI" : "PCI-X");
+	    tmp & PCISTATE_BUS_IS_PCI ? "PCI" : "PCI-X");
 	bge_set_char_kstat(knp++,
-		tmp & PCISTATE_BUS_IS_FAST ? "fast" : "normal");
+	    tmp & PCISTATE_BUS_IS_FAST ? "fast" : "normal");
 	bge_set_char_kstat(knp++,
-		tmp & PCISTATE_BUS_IS_32_BIT ? "32 bit" : "64 bit");
+	    tmp & PCISTATE_BUS_IS_32_BIT ? "32 bit" : "64 bit");
 
 	tmp = bgep->chipid.flags;
 	bge_set_char_kstat(knp++,
-		tmp & CHIP_FLAG_SUPPORTED ? "yes" : "no");
+	    tmp & CHIP_FLAG_SUPPORTED ? "yes" : "no");
 	bge_set_char_kstat(knp++,
-		tmp & CHIP_FLAG_SERDES ? "serdes" : "copper");
+	    tmp & CHIP_FLAG_SERDES ? "serdes" : "copper");
 
 	return (0);
 }
@@ -481,186 +449,6 @@ bge_driverinfo_update(kstat_t *ksp, int flag)
 		return (EIO);
 	}
 	mutex_exit(bgep->genlock);
-
-	return (0);
-}
-
-static const bge_ksindex_t bge_mii_kstats[] = {
-	{ 0,				"%xcvr_addr"		},
-	{ 1,				"%xcvr_id"		},
-	{ 2,				"%xcvr_inuse"		},
-
-	{ 3,				"%cap_1000fdx"		},
-	{ 4,				"%cap_1000hdx"		},
-	{ 5,				"%cap_100fdx"		},
-	{ 6,				"%cap_100hdx"		},
-	{ 7,				"%cap_10fdx"		},
-	{ 8,				"%cap_10hdx"		},
-	{ 9,				"%cap_asmpause"		},
-	{ 10,				"%cap_pause"		},
-	{ 11,				"%cap_rem_fault"	},
-	{ 12,				"%cap_autoneg"		},
-
-	{ 13,				"%adv_cap_1000fdx"	},
-	{ 14,				"%adv_cap_1000hdx"	},
-	{ 15,				"%adv_cap_100fdx"	},
-	{ 16,				"%adv_cap_100hdx"	},
-	{ 17,				"%adv_cap_10fdx"	},
-	{ 18,				"%adv_cap_10hdx"	},
-	{ 19,				"%adv_cap_asmpause"	},
-	{ 20,				"%adv_cap_pause"	},
-	{ 21,				"%adv_rem_fault"	},
-	{ 22,				"%adv_cap_autoneg"	},
-
-	{ 23,				"%lp_cap_1000fdx"	},
-	{ 24,				"%lp_cap_1000hdx"	},
-	{ 25,				"%lp_cap_100fdx"	},
-	{ 26,				"%lp_cap_100hdx"	},
-	{ 27,				"%lp_cap_10fdx"		},
-	{ 28,				"%lp_cap_10hdx"		},
-	{ 29,				"%lp_cap_asmpause"	},
-	{ 30,				"%lp_cap_pause"		},
-	{ 31,				"%lp_rem_fault"		},
-	{ 32,				"%lp_cap_autoneg"	},
-
-	{ 33,				"%link_asmpause"	},
-	{ 34,				"%link_pause"		},
-	{ 35,				"%link_duplex"		},
-	{ 36,				"%link_up"		},
-
-	{ -1,				NULL 			}
-};
-
-/*
- * Derive and publish the standard "mii" kstats.
- *
- * The information required is somewhat scattered: some is already held
- * in driver softstate, some is available in the MII registers, and some
- * has to be computed from combinations of both ...
- */
-static int
-bge_mii_update(kstat_t *ksp, int flag)
-{
-	bge_t *bgep;
-	kstat_named_t *knp;
-	uint16_t anlpar;
-	uint16_t anar;
-	uint32_t xcvr_id;
-	uint32_t xcvr_inuse;
-	boolean_t asym_pause;
-
-	if (flag != KSTAT_READ)
-		return (EACCES);
-
-	bgep = ksp->ks_private;
-	if (bgep->bge_chip_state == BGE_CHIP_FAULT)
-		return (EIO);
-
-	knp = ksp->ks_data;
-
-	/*
-	 * Read all the relevant PHY registers
-	 */
-	mutex_enter(bgep->genlock);
-	anlpar = bge_mii_get16(bgep, MII_AN_LPABLE);
-	anar = bge_mii_get16(bgep, MII_AN_ADVERT);
-
-	/*
-	 * Derive PHY characterisation parameters
-	 */
-	xcvr_id = bge_mii_get16(bgep, MII_PHYIDH);
-	xcvr_id <<= 16;
-	xcvr_id |= bge_mii_get16(bgep, MII_PHYIDL);
-	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK) {
-		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
-		mutex_exit(bgep->genlock);
-		return (EIO);
-	}
-	mutex_exit(bgep->genlock);
-
-	switch (bgep->param_link_speed) {
-	case 1000:
-		if (bgep->chipid.flags & CHIP_FLAG_SERDES)
-			xcvr_inuse = XCVR_TYPE_1000BASE_X;
-		else
-			xcvr_inuse = XCVR_TYPE_1000BASE_T;
-		break;
-
-	case 100:
-		xcvr_inuse = XCVR_TYPE_100BASE_X;
-		break;
-
-	case 10:
-		xcvr_inuse = XCVR_TYPE_10BASE_T;
-		break;
-
-	default:
-		xcvr_inuse = XCVR_TYPE_UNDEFINED;
-		break;
-	}
-
-	/*
-	 * Other miscellaneous transformations ...
-	 */
-	asym_pause = bgep->param_link_rx_pause != bgep->param_link_tx_pause;
-
-	/*
-	 * All required values are now available; assign them to the
-	 * actual kstats, in the sequence defined by the table above.
-	 */
-	(knp++)->value.ui32 = bgep->phy_mii_addr;
-	(knp++)->value.ui32 = xcvr_id;
-	(knp++)->value.ui32 = xcvr_inuse;
-
-	/*
-	 * Our capabilities
-	 */
-	(knp++)->value.ui32 = bgep->nd_params[PARAM_1000FDX_CAP].ndp_val;
-	(knp++)->value.ui32 = bgep->nd_params[PARAM_1000HDX_CAP].ndp_val;
-	(knp++)->value.ui32 = bgep->nd_params[PARAM_100FDX_CAP].ndp_val;
-	(knp++)->value.ui32 = bgep->nd_params[PARAM_100HDX_CAP].ndp_val;
-	(knp++)->value.ui32 = bgep->nd_params[PARAM_10FDX_CAP].ndp_val;
-	(knp++)->value.ui32 = bgep->nd_params[PARAM_10HDX_CAP].ndp_val;
-	(knp++)->value.ui32 = bgep->nd_params[PARAM_ASYM_PAUSE_CAP].ndp_val;
-	(knp++)->value.ui32 = bgep->nd_params[PARAM_PAUSE_CAP].ndp_val;
-	(knp++)->value.ui32 = B_TRUE;
-	(knp++)->value.ui32 = bgep->nd_params[PARAM_AUTONEG_CAP].ndp_val;
-
-	/*
-	 * Our *advertised* capabilities
-	 */
-	(knp++)->value.ui32 = bgep->param_adv_1000fdx;
-	(knp++)->value.ui32 = bgep->param_adv_1000hdx;
-	(knp++)->value.ui32 = bgep->param_adv_100fdx;
-	(knp++)->value.ui32 = bgep->param_adv_100hdx;
-	(knp++)->value.ui32 = bgep->param_adv_10fdx;
-	(knp++)->value.ui32 = bgep->param_adv_10hdx;
-	(knp++)->value.ui32 = bgep->param_adv_asym_pause;
-	(knp++)->value.ui32 = bgep->param_adv_pause;
-	(knp++)->value.ui32 = (anar & MII_AN_ADVERT_REMFAULT) ? 1 : 0;
-	(knp++)->value.ui32 = bgep->param_adv_autoneg;
-
-	/*
-	 * Link Partner's advertised capabilities
-	 */
-	(knp++)->value.ui32 = bgep->param_lp_1000fdx;
-	(knp++)->value.ui32 = bgep->param_lp_1000hdx;
-	(knp++)->value.ui32 = bgep->param_lp_100fdx;
-	(knp++)->value.ui32 = bgep->param_lp_100hdx;
-	(knp++)->value.ui32 = bgep->param_lp_10fdx;
-	(knp++)->value.ui32 = bgep->param_lp_10hdx;
-	(knp++)->value.ui32 = bgep->param_lp_asym_pause;
-	(knp++)->value.ui32 = bgep->param_lp_pause;
-	(knp++)->value.ui32 = (anlpar & MII_AN_ADVERT_REMFAULT) ? 1 : 0;
-	(knp++)->value.ui32 = bgep->param_lp_autoneg;
-
-	/*
-	 * Current operating modes
-	 */
-	(knp++)->value.ui32 = asym_pause;
-	(knp++)->value.ui32 = bgep->param_link_rx_pause;
-	(knp++)->value.ui32 = bgep->param_link_duplex;
-	(knp++)->value.ui32 = bgep->param_link_up;
 
 	return (0);
 }
@@ -781,7 +569,7 @@ bge_setup_named_kstat(bge_t *bgep, int instance, char *name,
 
 	size /= sizeof (bge_ksindex_t);
 	ksp = kstat_create(BGE_DRIVER_NAME, instance, name, "net",
-		KSTAT_TYPE_NAMED, size-1, KSTAT_FLAG_PERSISTENT);
+	    KSTAT_TYPE_NAMED, size-1, KSTAT_FLAG_PERSISTENT);
 	if (ksp == NULL)
 		return (NULL);
 
@@ -824,13 +612,13 @@ bge_setup_params_kstat(bge_t *bgep, int instance, char *name,
 	int i;
 
 	ksp = kstat_create(BGE_DRIVER_NAME, instance, name, "net",
-		KSTAT_TYPE_NAMED, PARAM_COUNT, KSTAT_FLAG_PERSISTENT);
+	    KSTAT_TYPE_NAMED, PARAM_COUNT, KSTAT_FLAG_PERSISTENT);
 	if (ksp != NULL) {
 		ksp->ks_private = bgep;
 		ksp->ks_update = update;
 		for (knp = ksp->ks_data, i = 0; i < PARAM_COUNT; ++knp, ++i)
 			kstat_named_init(knp, bgep->nd_params[i].ndp_name+1,
-				KSTAT_DATA_UINT64);
+			    KSTAT_DATA_UINT64);
 		kstat_install(ksp);
 	}
 
@@ -847,46 +635,40 @@ bge_init_kstats(bge_t *bgep, int instance)
 	if (bgep->chipid.statistic_type == BGE_STAT_BLK) {
 		DMA_ZERO(bgep->statistics);
 		bgep->bge_kstats[BGE_KSTAT_RAW] = ksp =
-			kstat_create(BGE_DRIVER_NAME, instance,
-				"raw_statistics", "net", KSTAT_TYPE_RAW,
-				sizeof (bge_statistics_t), KSTAT_FLAG_VIRTUAL);
+		    kstat_create(BGE_DRIVER_NAME, instance,
+		    "raw_statistics", "net", KSTAT_TYPE_RAW,
+		    sizeof (bge_statistics_t), KSTAT_FLAG_VIRTUAL);
 		if (ksp != NULL) {
 			ksp->ks_data = DMA_VPTR(bgep->statistics);
 			kstat_install(ksp);
 		}
 
 		bgep->bge_kstats[BGE_KSTAT_STATS] = bge_setup_named_kstat(bgep,
-			instance, "statistics", bge_statistics,
-			sizeof (bge_statistics), bge_statistics_update);
+		    instance, "statistics", bge_statistics,
+		    sizeof (bge_statistics), bge_statistics_update);
 	} else {
 		bgep->bge_kstats[BGE_KSTAT_STATS] = bge_setup_named_kstat(bgep,
-			instance, "statistics", bge_stat_val,
-			sizeof (bge_stat_val), bge_statistics_update);
+		    instance, "statistics", bge_stat_val,
+		    sizeof (bge_stat_val), bge_statistics_update);
 	}
 
 	bgep->bge_kstats[BGE_KSTAT_CHIPID] = bge_setup_named_kstat(bgep,
-		instance, "chipid", bge_chipid,
-		sizeof (bge_chipid), bge_chipid_update);
+	    instance, "chipid", bge_chipid,
+	    sizeof (bge_chipid), bge_chipid_update);
 
 	bgep->bge_kstats[BGE_KSTAT_DRIVER] = bge_setup_named_kstat(bgep,
-		instance, "driverinfo", bge_driverinfo,
-		sizeof (bge_driverinfo), bge_driverinfo_update);
-
-	bgep->bge_kstats[BGE_KSTAT_MII] = bge_setup_named_kstat(bgep,
-		instance, "mii", bge_mii_kstats,
-		sizeof (bge_mii_kstats), bge_mii_update);
+	    instance, "driverinfo", bge_driverinfo,
+	    sizeof (bge_driverinfo), bge_driverinfo_update);
 
 	if (bgep->chipid.flags & CHIP_FLAG_SERDES)
 		bgep->bge_kstats[BGE_KSTAT_PHYS] = bge_setup_named_kstat(bgep,
-			instance, "serdes", bge_serdes,
-			sizeof (bge_serdes), bge_serdes_update);
+		    instance, "serdes", bge_serdes,
+		    sizeof (bge_serdes), bge_serdes_update);
 	else
 		bgep->bge_kstats[BGE_KSTAT_PHYS] = bge_setup_named_kstat(bgep,
-			instance, "phydata", bge_phydata,
-			sizeof (bge_phydata), bge_phydata_update);
+		    instance, "phydata", bge_phydata,
+		    sizeof (bge_phydata), bge_phydata_update);
 
-	bgep->bge_kstats[BGE_KSTAT_PARAMS] = bge_setup_params_kstat(bgep,
-		instance, "parameters", bge_params_update);
 }
 
 void
