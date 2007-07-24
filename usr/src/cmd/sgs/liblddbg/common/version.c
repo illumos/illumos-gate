@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -60,7 +60,7 @@ Dbg_ver_need_title(Lm_list *lml, const char *file)
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_VER_NEED_TITLE), file);
-	Elf_ver_need_title(lml);
+	Elf_ver_need_title(lml, 0);
 }
 
 void
@@ -166,10 +166,18 @@ Elf_ver_def_title(Lm_list *lml)
 	dbg_print(lml, MSG_INTL(MSG_VER_DEF));
 }
 
+/*
+ * entry:
+ *	gnuver - If True (non-zero), the version rules used by the
+ *		GNU ld are assumed. If False (0), Solaris ld rules apply.
+ */
 void
-Elf_ver_need_title(Lm_list *lml)
+Elf_ver_need_title(Lm_list *lml, int gnuver)
 {
-	dbg_print(lml, MSG_INTL(MSG_VER_NEED));
+	if (gnuver)
+		dbg_print(lml, MSG_INTL(MSG_VER_NEED_GNUVER));
+	else
+		dbg_print(lml, MSG_INTL(MSG_VER_NEED));
 }
 
 void

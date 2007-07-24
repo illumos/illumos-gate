@@ -141,7 +141,6 @@
 			 header\n"
 @ MSG_WARN_INVCAP3	"%s: capabilities section: %s: and PT_CAP program \
 			 header have conflicting size or offsets\n"
-@ MSG_WARN_GNUVER	"%s: %s: index[%d]: GNU hidden symbol with version %d\n"
 
 # Elf Output Messages
 
@@ -256,8 +255,6 @@
 @ MSG_STR_OPTIONS	"CcdeGgHhiI:klmN:nPprSsuvw:y"
 
 @ MSG_STR_EMPTY		""
-
-@ MSG_GNU_VERNAMPREFIX	".gnu.version"
 
 @ MSG_FMT_INDENT	"	%s"
 @ MSG_FMT_INDEX		" [%lld]"

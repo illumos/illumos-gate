@@ -46,18 +46,35 @@ conv_ver_flags(Half flags)
 
 /*
  * Format a version index as contained in a VERSYM section
+ *
+ * entry:
+ *	verndx - Version index to format
+ *	gnuver - If True (non-zero), the version rules used by the
+ *		GNU ld are assumed. If False (0), Solaris ld rules apply.
  */
 const char *
-conv_ver_index(Versym verndx)
+conv_ver_index(Versym verndx, int gnuver)
 {
 	static Conv_inv_buf_t	string;
+	const char		*fmt;
 
 	/* Special case versions starting at VER_NDX_LORESERVE */
 	if (verndx == VER_NDX_ELIMINATE)
 		return (MSG_ORIG(MSG_VERSYM_ELIMINATE));
 
+	/*
+	 * The GNU style of versioning uses the top bit of the
+	 * 16-bit version index (0x8000) as a "hidden bit". A
+	 * hidden symbol is supposed to be ignored by the linker.
+	 */
+	if (gnuver && (verndx & 0x8000)) {
+		verndx &= ~0x8000;
+		fmt = MSG_ORIG(MSG_VERSYM_GNUH_FMT);
+	} else {
+		fmt = MSG_ORIG(MSG_VERSYM_FMT);
+	}
+
 	/* format as numeric */
-	(void) snprintf(string, sizeof (string), MSG_ORIG(MSG_VERSYM_FMT),
-	    EC_HALF(verndx));
+	(void) snprintf(string, sizeof (string), fmt, EC_HALF(verndx));
 	return (string);
 }

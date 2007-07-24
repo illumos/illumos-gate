@@ -334,8 +334,8 @@ SUNWprivate_4.60 {
 		Dbg64_syms_global;
 		Dbg32_syms_ignore;
 		Dbg64_syms_ignore;
-		Dbg32_syms_ignore_badver;
-		Dbg64_syms_ignore_badver;
+		Dbg32_syms_ignore_gnuver;
+		Dbg64_syms_ignore_gnuver;
 		Dbg32_syms_lazy_rescan;
 		Dbg64_syms_lazy_rescan;
 		Dbg32_syms_lookup;
@@ -431,7 +431,7 @@ SUNWprivate_4.60 {
 		Dbg32_ver_symbol;
 		Dbg64_ver_symbol;
 
-} SUNWprivate_3.22;
+} SUNWprivate_3.23;
 
 
 # The following interfaces are used by various parts of the link-editors and
@@ -440,7 +440,7 @@ SUNWprivate_4.60 {
 # this interface, and thus by separating in from the ever changing Dbg_*
 # interfaces we can provide a stable versioning environment for this utility.
 
-SUNWprivate_3.22 {
+SUNWprivate_3.23 {
 	global:
 		Elf_syminfo_entry;
 		Elf_syminfo_title;

@@ -438,7 +438,7 @@ const char *Elf_demangle_name(const char *);
 void Elf_syminfo_entry(Lm_list *, Word, Syminfo *, const char *, const char *);
 void Elf_syminfo_title(Lm_list *);
 void Elf_ver_def_title(Lm_list *);
-void Elf_ver_need_title(Lm_list *);
+void Elf_ver_need_title(Lm_list *, int gnuver);
 void Elf_ver_line_1(Lm_list *, const char *, const char *, const char *,
     const char *);
 void Elf_ver_line_2(Lm_list *, const char *, const char *);
@@ -492,8 +492,8 @@ void Elf64_shdr(Lm_list *, Elf64_Half, Elf64_Shdr *);
 void Elf32_shdr(Lm_list *, Elf32_Half, Elf32_Shdr *);
 
 void Elf64_syms_table_entry(Lm_list *, int, const char *, Elf64_Half,
-    Elf64_Sym *, Elf64_Versym, const char *, const char *);
+    Elf64_Sym *, Elf64_Versym, int, const char *, const char *);
 void Elf32_syms_table_entry(Lm_list *, int, const char *, Elf32_Half,
-    Elf32_Sym *, Elf32_Versym, const char *, const char *);
+    Elf32_Sym *, Elf32_Versym, int, const char *, const char *);
 void Elf64_syms_table_title(Lm_list *, int);
 void Elf32_syms_table_title(Lm_list *, int);

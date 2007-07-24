@@ -48,14 +48,28 @@
  * in the object being analyzed. It is filled in by versions(), and used
  * by init_symtbl_state() when displaying symbol information.
  *
- * Note that the value of the gnu field is a hueristic guess,
- * based on the section names.
+ * max_verndx contains the largest version index that can appear
+ * in a Versym entry. This can never be less than 1: In the case where
+ * there is no verdef/verneed sections, the [0] index is reserved
+ * for local symbols, and the [1] index for globals. If Solaris versioning
+ * rules are in effect and there is a verdef section, then the number
+ * of defined versions provides this number. If GNU versioning is in effect,
+ * then:
+ *	- If there is no verneed section, it is the same as for
+ *		Solaris versioning.
+ *	- If there is a verneed section, the vna_other field of the
+ *		Vernaux structs contain versions, and max_verndx is the
+ *		largest such index.
+ *
+ * The value of the gnu field is based on the presence of
+ * a DT_VERSYM entry in the dynamic section: GNU ld produces these, and
+ * Solaris ld does not.
  */
 typedef struct {
 	Cache	*cache;		/* Pointer to cache entry for VERSYM */
 	Versym	*data;		/* Pointer to versym array */
-	int	num_verdef;	/* # of versions defined in object */
-	int	gnu;		/* True if we think obj produced by GNU tools */
+	int	gnu;		/* True if object uses GNU versioning rules */
+	int	max_verndx;	/* largest versym index value */
 } VERSYM_STATE;
 
 /*
@@ -943,7 +957,7 @@ syminfo(Cache *cache, Word shnum, const char *file)
  * Print version definition section entries.
  */
 static void
-version_def(Verdef *vdf, Word shnum, Cache *vcache, Cache *scache,
+version_def(Verdef *vdf, Word vdf_num, Cache *vcache, Cache *scache,
     const char *file)
 {
 	Word	cnt;
@@ -951,7 +965,7 @@ version_def(Verdef *vdf, Word shnum, Cache *vcache, Cache *scache,
 
 	Elf_ver_def_title(0);
 
-	for (cnt = 1; cnt <= shnum; cnt++,
+	for (cnt = 1; cnt <= vdf_num; cnt++,
 	    vdf = (Verdef *)((uintptr_t)vdf + vdf->vd_next)) {
 		const char	*name, *dep;
 		Half		vcnt = vdf->vd_cnt - 1;
@@ -990,17 +1004,58 @@ version_def(Verdef *vdf, Word shnum, Cache *vcache, Cache *scache,
 }
 
 /*
- * Print a version needed section entries.
+ * Print version needed section entries.
+ *
+ * entry:
+ *	vnd - Address of verneed data
+ *	vnd_num - # of Verneed entries
+ *	vcache - Cache of verneed section being processed
+ *	scache - Cache of associated string table section
+ *	file - Name of object being processed.
+ *	versym - Information about versym section
+ *
+ * exit:
+ *	The versions have been printed. If GNU style versioning
+ *	is in effect, versym->max_verndx has been updated to
+ *	contain the largest version index seen.
  */
 static void
-version_need(Verneed *vnd, Word shnum, Cache *vcache, Cache *scache,
-    const char *file)
+version_need(Verneed *vnd, Word vnd_num, Cache *vcache, Cache *scache,
+    const char *file, VERSYM_STATE *versym)
 {
-	Word	cnt;
+	Word		cnt;
+	char		index[MAXNDXSIZE];
+	const char	*index_str;
 
-	Elf_ver_need_title(0);
+	Elf_ver_need_title(0, versym->gnu);
 
-	for (cnt = 1; cnt <= shnum; cnt++,
+	/*
+	 * The versym section in an object that follows Solaris versioning
+	 * rules contains indexes into the verdef section. Symbols defined
+	 * in other objects (UNDEF) are given a version of 0, indicating that
+	 * they are not defined by this file, and the Verneed entries do not
+	 * have associated version indexes. For these reasons, we do not
+	 * display a version index for Solaris Verneed sections.
+	 *
+	 * The GNU versioning rules are different: Symbols defined in other
+	 * objects receive a version index in the range above those defined
+	 * by the Verdef section, and the vna_other field of the Vernaux
+	 * structs inside the Verneed section contain the version index for
+	 * that item. We therefore  display the index when showing the
+	 * contents of a GNU Verneed section. You should not expect these
+	 * indexes to appear in sorted order --- it seems that the GNU ld
+	 * assigns the versions as symbols are encountered during linking,
+	 * and then the results are assembled into the Verneed section
+	 * afterwards.
+	 */
+	if (versym->gnu) {
+		index_str = index;
+	} else {
+		/* For Solaris versioning, display a NULL string */
+		index_str = MSG_ORIG(MSG_STR_EMPTY);
+	}
+
+	for (cnt = 1; cnt <= vnd_num; cnt++,
 	    vnd = (Verneed *)((uintptr_t)vnd + vnd->vn_next)) {
 		const char	*name, *dep;
 		Half		vcnt = vnd->vn_cnt;
@@ -1018,7 +1073,14 @@ version_need(Verneed *vnd, Word shnum, Cache *vcache, Cache *scache,
 		else
 			dep = MSG_INTL(MSG_STR_NULL);
 
-		Elf_ver_line_1(0, MSG_ORIG(MSG_STR_EMPTY), name, dep,
+		if (versym->gnu) {
+			/* Format the version index value */
+			(void) snprintf(index, MAXNDXSIZE,
+			    MSG_ORIG(MSG_FMT_INDEX), EC_XWORD(vnap->vna_other));
+			if (vnap->vna_other > versym->max_verndx)
+				versym->max_verndx = vnap->vna_other;
+		}
+		Elf_ver_line_1(0, index_str, name, dep,
 		    conv_ver_flags(vnap->vna_flags));
 
 		/*
@@ -1031,8 +1093,65 @@ version_need(Verneed *vnd, Word shnum, Cache *vcache, Cache *scache,
 			    vnap->vna_next)) {
 				dep = string(vcache, cnt, scache, file,
 				    vnap->vna_name);
-				Elf_ver_line_3(0, MSG_ORIG(MSG_STR_EMPTY), dep,
-				    conv_ver_flags(vnap->vna_flags));
+				if (versym->gnu) {
+					/* Format the next index value */
+					(void) snprintf(index, MAXNDXSIZE,
+					    MSG_ORIG(MSG_FMT_INDEX),
+					    EC_XWORD(vnap->vna_other));
+					Elf_ver_line_1(0, index_str,
+					    MSG_ORIG(MSG_STR_EMPTY), dep,
+					    conv_ver_flags(vnap->vna_flags));
+					if (vnap->vna_other >
+					    versym->max_verndx)
+						versym->max_verndx =
+						    vnap->vna_other;
+				} else {
+					Elf_ver_line_3(0,
+					    MSG_ORIG(MSG_STR_EMPTY), dep,
+					    conv_ver_flags(vnap->vna_flags));
+				}
+			}
+		}
+	}
+}
+
+/*
+ * Compute the max_verndx value for a GNU style object with
+ * a Verneed section. This is only needed if version_need() is not
+ * called.
+ *
+ * entry:
+ *	vnd - Address of verneed data
+ *	vnd_num - # of Verneed entries
+ *	versym - Information about versym section
+ *
+ * exit:
+ *	versym->max_verndx has been updated to contain the largest
+ *	version index seen.
+ */
+static void
+update_gnu_max_verndx(Verneed *vnd, Word vnd_num, VERSYM_STATE *versym)
+{
+	Word		cnt;
+
+	for (cnt = 1; cnt <= vnd_num; cnt++,
+	    vnd = (Verneed *)((uintptr_t)vnd + vnd->vn_next)) {
+		Half	vcnt = vnd->vn_cnt;
+		Vernaux	*vnap = (Vernaux *)((uintptr_t)vnd + vnd->vn_aux);
+
+		if (vnap->vna_other > versym->max_verndx)
+			versym->max_verndx = vnap->vna_other;
+
+		/*
+		 * Check any additional version dependencies.
+		 */
+		if (vcnt) {
+			vnap = (Vernaux *)((uintptr_t)vnap + vnap->vna_next);
+			for (vcnt--; vcnt; vcnt--,
+			    vnap = (Vernaux *)((uintptr_t)vnap +
+			    vnap->vna_next)) {
+				if (vnap->vna_other > versym->max_verndx)
+					versym->max_verndx = vnap->vna_other;
 			}
 		}
 	}
@@ -1054,87 +1173,136 @@ versions(Cache *cache, Word shnum, const char *file, uint_t flags,
     VERSYM_STATE *versym)
 {
 	GElf_Word	cnt;
-	const char	*gnu_prefix;
-	size_t		gnu_prefix_len;
+	Cache		*verdef_cache = NULL, *verneed_cache = NULL;
 
+
+	/* Gather information about the version sections */
 	bzero(versym, sizeof (*versym));
-	gnu_prefix = MSG_ORIG(MSG_GNU_VERNAMPREFIX);
-	gnu_prefix_len = strlen(gnu_prefix);
-
+	versym->max_verndx = 1;
 	for (cnt = 1; cnt < shnum; cnt++) {
-		void		*ver;
-		uint_t		num;
 		Cache		*_cache = &cache[cnt];
 		Shdr		*shdr = _cache->c_shdr;
-		const char	*secname = _cache->c_name;
+		Dyn		*dyn;
+		ulong_t		numdyn;
 
-		/*
-		 * If the section names starts with the .gnu.version prefix,
-		 * then this object was almost certainly produced by the
-		 * GNU ld and not the native Solaris ld.
-		 */
-		if (strncmp(gnu_prefix, secname, gnu_prefix_len) == 0)
-			versym->gnu = 1;
+		switch (shdr->sh_type) {
+		case SHT_DYNAMIC:
+			/*
+			 * The GNU ld puts a DT_VERSYM entry in the dynamic
+			 * section so that the runtime linker can use it to
+			 * implement their versioning rules. They allow multiple
+			 * incompatible functions with the same name to exist
+			 * in different versions. The Solaris ld does not
+			 * support this mechanism, and as such, does not
+			 * produce DT_VERSYM. We use this fact to determine
+			 * which ld produced this object, and how to interpret
+			 * the version values.
+			 */
+			if ((shdr->sh_entsize == 0) || (shdr->sh_size == 0) ||
+			    (_cache->c_data == NULL))
+				continue;
+			numdyn = shdr->sh_size / shdr->sh_entsize;
+			dyn = (Dyn *)_cache->c_data->d_buf;
+			for (; numdyn-- > 0; dyn++)
+				if (dyn->d_tag == DT_VERSYM) {
+					versym->gnu = 1;
+					break;
+				}
+			break;
 
-		/*
-		 * If this is the version symbol table record its data
-		 * address for later symbol processing.
-		 */
-		if ((shdr->sh_type == SHT_SUNW_versym) &&
-		    (_cache->c_data != NULL)) {
-			versym->cache = _cache;
-			versym->data = _cache->c_data->d_buf;
-			continue;
+		case SHT_SUNW_versym:
+			/* Record data address for later symbol processing */
+			if (_cache->c_data != NULL) {
+				versym->cache = _cache;
+				versym->data = _cache->c_data->d_buf;
+				continue;
+			}
+			break;
+
+		case SHT_SUNW_verdef:
+		case SHT_SUNW_verneed:
+			/*
+			 * Ensure the data is non-NULL and the number
+			 * of items is non-zero. Otherwise, we don't
+			 * understand the section, and will not use it.
+			 */
+			if ((_cache->c_data == NULL) ||
+			    (_cache->c_data->d_buf == NULL)) {
+				(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
+				    file, _cache->c_name);
+				continue;
+			}
+			if (shdr->sh_info == 0) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_BADSHINFO),
+				    file, _cache->c_name,
+				    EC_WORD(shdr->sh_info));
+				continue;
+			}
+
+			/* Make sure the string table index is in range */
+			if ((shdr->sh_link == 0) || (shdr->sh_link >= shnum)) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_ERR_BADSHLINK), file,
+				    _cache->c_name, EC_WORD(shdr->sh_link));
+				continue;
+			}
+
+			/*
+			 * The section is usable. Save the cache entry.
+			 */
+			if (shdr->sh_type == SHT_SUNW_verdef) {
+				verdef_cache = _cache;
+				/*
+				 * Under Solaris rules, if there is a verdef
+				 * section, the max versym index is number
+				 * of version definitions it supplies.
+				 */
+				versym->max_verndx = shdr->sh_info;
+			} else {
+				verneed_cache = _cache;
+			}
+			break;
 		}
+	}
 
+	if ((flags & FLG_VERSIONS) == 0) {
 		/*
-		 * If this is a version definition section, retain # of
-		 * version definitions for later symbol processing.
+		 * If GNU versioning applies to this object, and there
+		 * is a Verneed section, then examine it to determine
+		 * the maximum Versym version index for this file.
 		 */
-		if (shdr->sh_type == SHT_SUNW_verdef)
-			versym->num_verdef = shdr->sh_info;
+		if ((versym->gnu) && (verneed_cache != NULL))
+			update_gnu_max_verndx(
+			    (Verneed *)verneed_cache->c_data->d_buf,
+			    verneed_cache->c_shdr->sh_info, versym);
+		return;
+	}
 
-		if ((flags & FLG_VERSIONS) == 0)
-			continue;
-
-		if ((shdr->sh_type != SHT_SUNW_verdef) &&
-		    (shdr->sh_type != SHT_SUNW_verneed))
-			continue;
-
-		/*
-		 * Determine the version section data and number.
-		 */
-		if ((_cache->c_data == NULL) ||
-		    ((ver = (void *)_cache->c_data->d_buf) == NULL)) {
-			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSZ),
-			    file, secname);
-			continue;
-		}
-		if ((num = shdr->sh_info) == 0) {
-			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHINFO),
-			    file, secname, EC_WORD(shdr->sh_info));
-			continue;
-		}
-
-		/*
-		 * Get the data buffer for the associated string table.
-		 */
-		if ((shdr->sh_link == 0) || (shdr->sh_link >= shnum)) {
-			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADSHLINK),
-			    file, secname, EC_WORD(shdr->sh_link));
-			continue;
-		}
-
+	/*
+	 * Now that all the information is available, display the
+	 * Verdef and Verneed section contents.
+	 */
+	if (verdef_cache != NULL) {
 		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
-		if (shdr->sh_type == SHT_SUNW_verdef) {
-			dbg_print(0, MSG_INTL(MSG_ELF_SCN_VERDEF), secname);
-			version_def((Verdef *)ver, num, _cache,
-			    &cache[shdr->sh_link], file);
-		} else if (shdr->sh_type == SHT_SUNW_verneed) {
-			dbg_print(0, MSG_INTL(MSG_ELF_SCN_VERNEED), secname);
-			version_need((Verneed *)ver, num, _cache,
-			    &cache[shdr->sh_link], file);
-		}
+		dbg_print(0, MSG_INTL(MSG_ELF_SCN_VERDEF),
+		    verdef_cache->c_name);
+		version_def((Verdef *)verdef_cache->c_data->d_buf,
+		    verdef_cache->c_shdr->sh_info, verdef_cache,
+		    &cache[verdef_cache->c_shdr->sh_link], file);
+	}
+	if (verneed_cache != NULL) {
+		dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));
+		dbg_print(0, MSG_INTL(MSG_ELF_SCN_VERNEED),
+		    verneed_cache->c_name);
+		/*
+		 * If GNU versioning applies to this object, version_need()
+		 * will update versym->max_verndx, and it is not
+		 * necessary to call update_gnu_max_verndx().
+		 */
+		version_need((Verneed *)verneed_cache->c_data->d_buf,
+		    verneed_cache->c_shdr->sh_info, verneed_cache,
+		    &cache[verneed_cache->c_shdr->sh_link], file, versym);
 	}
 }
 
@@ -1275,6 +1443,7 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word disp_symndx, Sym *sym)
 	char		index[MAXNDXSIZE];
 	const char	*symname, *sec;
 	Versym		verndx;
+	int		gnuver;
 	uchar_t		type;
 	Shdr		*tshdr;
 	Word		shndx;
@@ -1355,40 +1524,36 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word disp_symndx, Sym *sym)
 	 * version index. If not, then use 0.
 	 */
 	if (state->versym) {
-		verndx = state->versym->data[symndx];
+		Versym test_verndx;
+
+		verndx = test_verndx = state->versym->data[symndx];
+		gnuver = state->versym->gnu;
 
 		/*
 		 * Check to see if this is a defined symbol with a
 		 * version index that is outside the valid range for
-		 * the file. If so, then there are two possiblities:
+		 * the file. The interpretation of this depends on
+		 * the style of versioning used by the object.
 		 *
-		 *	- Files produced by the GNU ld use the top (16th) bit
-		 *		as a "hidden symbol" marker. If we have
-		 *		detected that this object comes from GNU ld,
-		 *		then check to see if this is the case and that
-		 *		the resulting masked version is in range. If so,
-		 *		issue a warning describing it.
-		 *	- If this is not a GNU "hidden bit" issue, then
-		 *		issue a generic "out of range" error.
+		 * Versions >= VER_NDX_LORESERVE have special meanings,
+		 * and are exempt from this checking.
+		 *
+		 * GNU style version indexes use the top bit of the
+		 * 16-bit index value (0x8000) as the "hidden bit".
+		 * We must mask off this bit in order to compare
+		 * the version against the maximum value.
 		 */
-		if (VERNDX_INVALID_DIAG(sym->st_shndx,
-		    state->versym->num_verdef, state->versym->data, symndx)) {
-			if (state->versym->gnu && (verndx & 0x8000) &&
-			    ((verndx & ~0x8000) <=
-			    state->versym->num_verdef)) {
-				(void) fprintf(stderr,
-				    MSG_INTL(MSG_WARN_GNUVER), state->file,
-				    state->secname, EC_WORD(symndx),
-				    EC_HALF(verndx & ~0x8000));
-			} else {	/* Generic version range error */
-				(void) fprintf(stderr,
-				    MSG_INTL(MSG_ERR_BADVER), state->file,
-				    state->secname, EC_WORD(symndx),
-				    EC_HALF(verndx), state->versym->num_verdef);
-			}
-		}
+		if (gnuver)
+			test_verndx &= ~0x8000;
+
+		if ((test_verndx > state->versym->max_verndx) &&
+		    (verndx < VER_NDX_LORESERVE))
+			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADVER),
+			    state->file, state->secname, EC_WORD(symndx),
+			    EC_HALF(test_verndx), state->versym->max_verndx);
 	} else {
 		verndx = 0;
+		gnuver = 0;
 	}
 
 	/*
@@ -1444,7 +1609,7 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word disp_symndx, Sym *sym)
 	(void) snprintf(index, MAXNDXSIZE,
 	    MSG_ORIG(MSG_FMT_INDEX), EC_XWORD(disp_symndx));
 	Elf_syms_table_entry(0, ELF_DBG_ELFDUMP, index,
-	    state->ehdr->e_machine, sym, verndx, sec, symname);
+	    state->ehdr->e_machine, sym, verndx, gnuver, sec, symname);
 }
 
 /*

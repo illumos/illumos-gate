@@ -78,7 +78,7 @@ ifl_verify(Ehdr * ehdr, Ofl_desc * ofl, Rej_desc * rej)
  * for the file being processed.
  */
 static Ifl_desc *
-ifl_setup(const char *name, Ehdr *ehdr, Elf *elf, Half flags, Ofl_desc *ofl,
+ifl_setup(const char *name, Ehdr *ehdr, Elf *elf, Word flags, Ofl_desc *ofl,
     Rej_desc *rej)
 {
 	Ifl_desc	*ifl;
@@ -511,7 +511,7 @@ process_progbits(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	    MSG_SCN_STAB_SIZE) == 0)) {
 		if ((ofl->ofl_flags & FLG_OF_STRIP) ||
 		    (strcmp((name + MSG_SCN_STAB_SIZE),
-			MSG_ORIG(MSG_SCN_EXCL)) == 0))
+		    MSG_ORIG(MSG_SCN_EXCL)) == 0))
 			return (1);
 
 		if (strcmp((name + MSG_SCN_STAB_SIZE),
@@ -747,6 +747,15 @@ process_rel_dynamic(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 			    (const char *)S_ERROR)
 				return (S_ERROR);
 			break;
+		case DT_VERSYM:
+			/*
+			 * The Solaris ld does not put DT_VERSYM in the
+			 * dynamic section. If the object has DT_VERSYM,
+			 * then it must have been produced by the GNU ld,
+			 * and is using the GNU style of versioning.
+			 */
+			ifl->ifl_flags |= FLG_IF_GNUVER;
+			break;
 		}
 	}
 	return (1);
@@ -926,7 +935,7 @@ expand(const char *parent, const char *name, char **next)
 				mlen = ((hlen + tlen) * (isa->isa_optno - 1)) +
 				    isa->isa_listsz - opt->isa_namesz;
 				if (*next)
-				    mlen += strlen(*next);
+					mlen += strlen(*next);
 				if ((_next = lptr = libld_malloc(mlen)) == 0)
 					return (0);
 
@@ -983,6 +992,38 @@ expand(const char *parent, const char *name, char **next)
 		return (nptr);
 	}
 	return ((char *)name);
+}
+
+/*
+ * The Solaris ld does not put DT_VERSYM in the dynamic section, but the
+ * GNU ld does, and it is used by the runtime linker to implement their
+ * versioning scheme. Use this fact to determine if the sharable object
+ * was produced by the GNU ld rather than the Solaris one, and to set
+ * FLG_IF_GNUVER if so. This needs to be done before the symbols are
+ * processed, since the answer determines whether we interpret the
+ * symbols versions according to Solaris or GNU rules.
+ */
+/*ARGSUSED*/
+static uintptr_t
+process_dynamic_isgnu(const char *name, Ifl_desc *ifl, Shdr *shdr,
+    Elf_Scn *scn, Word ndx, int ident, Ofl_desc *ofl)
+{
+	Dyn		*dyn;
+	Elf_Data	*dp;
+
+	if (process_section(name, ifl, shdr, scn, ndx, ident, ofl) == S_ERROR)
+		return (S_ERROR);
+
+	/* Get the .dynamic data */
+	dp = elf_getdata(scn, NULL);
+
+	for (dyn = (Dyn *)dp->d_buf; dyn->d_tag != DT_NULL; dyn++) {
+		if (dyn->d_tag == DT_VERSYM) {
+			ifl->ifl_flags |= FLG_IF_GNUVER;
+			break;
+		}
+	}
+	return (1);
 }
 
 /*
@@ -1204,7 +1245,7 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		 * Broken input file.
 		 */
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVSHINFO),
-			ifl->ifl_name, isc->is_name, EC_XWORD(rndx));
+		    ifl->ifl_name, isc->is_name, EC_XWORD(rndx));
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
@@ -1312,7 +1353,7 @@ process_amd64_unwind(const char *name, Ifl_desc *ifl, Shdr *shdr,
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_unwind, lnp, eosp))
 		if (osp == eosp)
-		    return (1);
+			return (1);
 
 	if (list_appendc(&ofl->ofl_unwind, osp) == 0)
 		return (S_ERROR);
@@ -1338,7 +1379,7 @@ static uintptr_t (*Initial[SHT_NUM][2])() = {
 /* SHT_STRTAB	*/	process_strtab,		process_strtab,
 /* SHT_RELA	*/	process_reloc,		process_reloc,
 /* SHT_HASH	*/	invalid_section,	NULL,
-/* SHT_DYNAMIC	*/	process_rel_dynamic,	process_section,
+/* SHT_DYNAMIC	*/	process_rel_dynamic,	process_dynamic_isgnu,
 /* SHT_NOTE	*/	process_section,	NULL,
 /* SHT_NOBITS	*/	process_nobits,		process_nobits,
 /* SHT_REL	*/	process_reloc,		process_reloc,
@@ -1811,7 +1852,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
  */
 Ifl_desc *
 ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
-    Half flags, Ofl_desc * ofl, Rej_desc * rej)
+    Word flags, Ofl_desc * ofl, Rej_desc * rej)
 {
 	Ifl_desc	*ifl;
 	Ehdr		*ehdr;
@@ -1957,9 +1998,11 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 					 * descriptive diagnostic.
 					 */
 					if (strcmp(name, ifl->ifl_name) == 0)
-					    errmsg = MSG_INTL(MSG_FIL_MULINC_1);
+						errmsg =
+						    MSG_INTL(MSG_FIL_MULINC_1);
 					else
-					    errmsg = MSG_INTL(MSG_FIL_MULINC_2);
+						errmsg =
+						    MSG_INTL(MSG_FIL_MULINC_2);
 
 					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    errmsg, name, ifl->ifl_name);
@@ -2071,7 +2114,7 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
  */
 Ifl_desc *
 ld_process_open(const char *opath, const char *ofile, int *fd, Ofl_desc *ofl,
-    Half flags, Rej_desc *rej)
+    Word flags, Rej_desc *rej)
 {
 	Elf		*elf;
 	const char	*npath = opath;
@@ -2154,7 +2197,7 @@ process_req_lib(Sdf_desc *sdf, const char *dir, const char *file,
 		if ((_path = libld_malloc(strlen(path) + 1)) == 0)
 			return ((Ifl_desc *)S_ERROR);
 		(void) strcpy(_path, path);
-		ifl = ld_process_open(_path, &_path[dlen], &fd, ofl, NULL, rej);
+		ifl = ld_process_open(_path, &_path[dlen], &fd, ofl, 0, rej);
 		if (fd != -1)
 			(void) close(fd);
 		return (ifl);
@@ -2232,7 +2275,7 @@ ld_finish_libs(Ofl_desc *ofl)
 				Rej_desc	_rej = { 0 };
 
 				ifl = ld_process_open(file, ++slash, &fd, ofl,
-				    NULL, &_rej);
+				    0, &_rej);
 				if (fd != -1)
 					(void) close(fd);
 
@@ -2297,16 +2340,15 @@ ld_finish_libs(Ofl_desc *ofl)
 					    &next);
 
 					ifl = process_req_lib(sdf, path,
-						file, ofl, &_rej);
+					    file, ofl, &_rej);
 					if (ifl == (Ifl_desc *)S_ERROR) {
 						return (S_ERROR);
 					}
-					if (_rej.rej_type) {
-						if (rej.rej_type == 0) {
-						    rej = _rej;
-						    rej.rej_name =
-							strdup(_rej.rej_name);
-						}
+					if ((_rej.rej_type) &&
+					    (rej.rej_type == 0)) {
+						rej = _rej;
+						rej.rej_name =
+						    strdup(_rej.rej_name);
 					}
 					if (ifl) {
 						sdf->sdf_file = ifl;

@@ -494,37 +494,38 @@ struct ifl_desc {			/* input file descriptor */
 	List		ifl_relsect;	/* relocation section list */
 	Alist		*ifl_groups;	/* SHT_GROUP section list */
 	Half		ifl_neededndx;	/* index to NEEDED in .dyn section */
-	Half		ifl_flags;	/* Explicit/implicit reference */
+	Word		ifl_flags;	/* Explicit/implicit reference */
 };
 
-#define	FLG_IF_CMDLINE	0x00001		/* full filename specified from the */
+#define	FLG_IF_CMDLINE	0x00000001	/* full filename specified from the */
 					/*	command line (no -l) */
-#define	FLG_IF_NEEDED	0x00002		/* shared object should be recorded */
-#define	FLG_IF_DIRECT	0x00004		/* establish direct bindings to this */
+#define	FLG_IF_NEEDED	0x00000002	/* shared object should be recorded */
+#define	FLG_IF_DIRECT	0x00000004	/* establish direct bindings to this */
 					/*	object */
-#define	FLG_IF_EXTRACT	0x00008		/* file extracted from an archive */
-#define	FLG_IF_VERNEED	0x00010		/* version dependency information is */
+#define	FLG_IF_EXTRACT	0x00000008	/* file extracted from an archive */
+#define	FLG_IF_VERNEED	0x00000010	/* version dependency information is */
 					/*	required */
-#define	FLG_IF_DEPREQD	0x00020		/* dependency is required to satisfy */
+#define	FLG_IF_DEPREQD	0x00000020	/* dependency is required to satisfy */
 					/*	symbol references */
-#define	FLG_IF_NEEDSTR	0x00040		/* dependency specified by -Nn */
+#define	FLG_IF_NEEDSTR	0x00000040	/* dependency specified by -Nn */
 					/*	flag */
-#define	FLG_IF_IGNORE	0x00080		/* ignore unused dependencies */
-#define	FLG_IF_NODIRECT	0x00100		/* object contains symbols that */
+#define	FLG_IF_IGNORE	0x00000080	/* ignore unused dependencies */
+#define	FLG_IF_NODIRECT	0x00000100	/* object contains symbols that */
 					/*	cannot be directly bound to. */
-#define	FLG_IF_LAZYLD	0x00200		/* bindings to this object should be */
+#define	FLG_IF_LAZYLD	0x00000200	/* bindings to this object should be */
 					/*	lazy loaded */
-#define	FLG_IF_GRPPRM	0x00400		/* this dependency should have the */
+#define	FLG_IF_GRPPRM	0x00000400	/* this dependency should have the */
 					/*	DF_P1_GROUPPERM flag set */
-#define	FLG_IF_DISPPEND 0x00800		/* displacement relocation done */
+#define	FLG_IF_DISPPEND 0x00000800	/* displacement relocation done */
 					/*	in the ld time. */
-#define	FLG_IF_DISPDONE 0x01000		/* displacement relocation done */
+#define	FLG_IF_DISPDONE 0x00001000	/* displacement relocation done */
 					/* 	at the run time */
-#define	FLG_IF_MAPFILE	0x02000		/* file is a mapfile */
-#define	FLG_IF_HSTRTAB	0x04000		/* file has a string section */
-#define	FLG_IF_FILEREF	0x08000		/* file contains a section which */
+#define	FLG_IF_MAPFILE	0x00002000	/* file is a mapfile */
+#define	FLG_IF_HSTRTAB	0x00004000	/* file has a string section */
+#define	FLG_IF_FILEREF	0x00008000	/* file contains a section which */
 					/*	is included in the output */
 					/*	allocatable image */
+#define	FLG_IF_GNUVER	0x00010000	/* file used GNU-style versioning */
 
 struct is_desc {			/* input section descriptor */
 	const char	*is_name;	/* the section name */
@@ -933,77 +934,6 @@ struct	ver_index {
 
 
 /*
- * Test to see if a symbol verson index is outside of the valid range
- * of version indexes.
- *
- * entry:
- *	_shndx - Symbol section index
- *	_vercnt - # of versions defined by object containing symbol
- *		in its verdef section. 0 implies that there is no verdef.
- *	_versym - Pointer to versym array, or NULL if there isn't one.
- *	_symndx - Index of symbol within containing symbol table
- *		Used to index _versym, but only if _versym is non-NULL.
- *
- * note:
- *	_vercnt and _versym[_symndx] are evaluated more than once.
- *	Beware of expensive computations, or computations with side effects.
- *
- * There are two versions of this macro:
- *
- *	VERNDX_INVALID - Used by ld and rtld
- *	VERNDX_INVALID_DIAG - Used by diagnostic tools such as elfdump.
- *
- * The difference is that VERNDX_INVALID does not examine the versym
- * array if the number of defined versions is 0. This allows us to
- * run GNU binaries (See below for details). However, the diagnostic
- * tools will report them.
- *
- * If we encounter a defined symbol with a version that is outside the
- * range of the valid versions supplied by the file, then we quietly
- * ignore that symbol. This can't  happen in a native Solaris object.
- * However, the GNU 'ld' uses the top bit (0x8000) of the version as a
- * flag to the system that says the symbol should be treated as if it
- * doesn't exist. The Solaris linker does not support this mechanism,
- * or the model of interface evolution that it allows. However, we do
- * wish to be able to link against objects produced that way. Ignoring
- * such symbols gives the desired GNU-compatible "ignore" behavior,
- * without committing us to their model, while reserving the ability
- * to adopt it or do something different at a later date.
- *
- * Note that it is possible to see "version 1" in a file that contains 0
- * version definitions. This happens when a mapfile is used to reduce
- * global symbols to local. For instance:
- *
- *	{
- *		global:
- *			main;
- *			eprintf;
- *		local:
- *			*;
- *	};
- *
- * In this case, there will be a versym section (containing version
- * indexes 0 and 1). However, there are no versions defined, and
- * hence no corresponding verdef section.
- *
- * We have also seen objects produced by the GNU ld in which an object
- * with no verdef section contains symbols with version symbols greater
- * than 1. For both of these reasons, we allow and ignore arbitrary
- * versions in the case where there is a versym section but the vesion
- * count (_vercnt) is 0.
- */
-#define	VERNDX_INVALID_DIAG(_shndx, _vercnt, _versym, _symndx) \
-	(((_shndx) != SHN_UNDEF) && (_versym != NULL) && \
-	((_versym)[_symndx] > ((_vercnt == 0) ? 1 : _vercnt)) && \
-	((_versym)[_symndx] < VER_NDX_LORESERVE))
-#define	VERNDX_INVALID(_shndx, _vercnt, _versym, _symndx) \
-	(((_shndx) != SHN_UNDEF) && (_versym != NULL) && \
-	((_versym)[_symndx] > _vercnt) && ((_vercnt) > 0) && \
-	((_versym)[_symndx] < VER_NDX_LORESERVE))
-
-
-
-/*
  * isalist(1) descriptor - used to break an isalist string into its component
  * options.
  */
@@ -1146,7 +1076,7 @@ extern uintptr_t	ld_init_strings(Ofl_desc *);
 extern uintptr_t	ld_make_sections(Ofl_desc *);
 extern void		ld_ofl_cleanup(Ofl_desc *);
 extern Ifl_desc		*ld_process_open(const char *, const char *, int *,
-			    Ofl_desc *, Half, Rej_desc *);
+			    Ofl_desc *, Word, Rej_desc *);
 extern uintptr_t	ld_reloc_init(Ofl_desc *);
 extern uintptr_t	ld_reloc_process(Ofl_desc *);
 extern uintptr_t	ld_sym_validate(Ofl_desc *);

@@ -58,7 +58,7 @@ const char	*conv_seg_flags(Half);
 int		conv_sys_eclass(void);
 Uts_desc	*conv_uts(void);
 const char	*conv_ver_flags(Half);
-const char	*conv_ver_index(Versym verndx);
+const char	*conv_ver_index(Versym verndx, int gnuver);
 
 /*
  * Define all class specific routines.

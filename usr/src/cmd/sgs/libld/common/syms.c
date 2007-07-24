@@ -1709,6 +1709,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	int		etype_rel;
 	const char	*symsecname, *strsecname;
 	avl_index_t	where;
+	int		test_gnu_hidden_bit;
 
 	/*
 	 * Its possible that a file may contain more that one symbol table,
@@ -2012,6 +2013,19 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	}
 
 	/*
+	 * The GNU ld interprets the top bit of the 16-bit Versym value
+	 * (0x8000) as the "hidden" bit. If this bit is set, the linker
+	 * is supposed to act as if that symbol does not exist. The Solaris
+	 * linker does not support this mechanism, or the model of interface
+	 * evolution that it allows, but we honor it in GNU ld produced
+	 * objects in order to interoperate with them.
+	 *
+	 * Determine if we should honor the GNU hidden bit for this file.
+	 */
+	test_gnu_hidden_bit = ((ifl->ifl_flags & FLG_IF_GNUVER) != 0) &&
+	    (ifl->ifl_versym != NULL);
+
+	/*
 	 * Now scan the global symbols entering them in the internal symbol
 	 * table or resolving them as necessary.
 	 */
@@ -2043,14 +2057,11 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		}
 
 		/*
-		 * To accomodate objects built with the GNU ld, we quietly
-		 * ignore symbols with a version that is outside the range
-		 * of the valid versions supplied by the file. See the
-		 * comment that accompanies the VERSYM_INVALID macro in libld.h
-		 * for additional details.
+		 * Test for the GNU hidden bit, and ignore symbols that
+		 * have it set.
 		 */
-		if (VERNDX_INVALID(shndx, ifl->ifl_vercnt,
-		    ifl->ifl_versym, ndx))
+		if (test_gnu_hidden_bit &&
+		    ((ifl->ifl_versym[ndx] & 0x8000) != 0))
 			continue;
 
 		/*

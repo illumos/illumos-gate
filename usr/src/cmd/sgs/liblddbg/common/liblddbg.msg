@@ -643,8 +643,8 @@
 @ MSG_SYM_DUPSORTADDR	"section %s: symbol `%s' and symbol `%s' have the \
 			 same address: %#llx"
 
-@ MSG_SYM_IGNBADVER	"symbol=%s;  hash index=%d;  version=%d;  skipping \
-			 symbol with out of range version in file=%s"
+@ MSG_SYM_IGNGNUVER	"symbol=%s;  hash index=%d;  version=%d;  skipping \
+			 symbol with GNU version hidden bit set in file=%s"
 
 # Syminfo string
 
@@ -915,6 +915,7 @@
 # Version table entries.
 @ MSG_VER_DEF		"     index  version                     dependency"
 @ MSG_VER_NEED		"            file                        version"
+@ MSG_VER_NEED_GNUVER	"     index  file                        version"
 
 @ MSG_VER_LINE_1	"%10.10s  %-26.26s  %-20s %s"
 @ MSG_VER_LLINE_1	"%10s  %-26s  %-20s %s"

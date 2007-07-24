@@ -1853,15 +1853,22 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo)
 		}
 
 		/*
-		 * To accomodate objects built with the GNU ld, we quietly
-		 * ignore symbols with a version that is outside the range
-		 * of the valid versions supplied by the file. See the
-		 * comment that accompanies the VERSYM_INVALID macro in libld.h
-		 * for additional details.
+		 * The Solaris ld does not put DT_VERSYM in the dynamic
+		 * section, but the GNU ld does. The GNU runtime linker
+		 * interprets the top bit of the 16-bit Versym value
+		 * (0x8000) as the "hidden" bit. If this bit is set,
+		 * the linker is supposed to act as if that symbol does
+		 * not exist. The hidden bit supports their versioning
+		 * scheme, which allows multiple incompatible functions
+		 * with the same name to exist at different versions
+		 * within an object. The Solaris linker does not support this
+		 * mechanism, or the model of interface evolution that
+		 * it allows, but we honor the hidden bit in GNU ld
+		 * produced objects in order to interoperate with them.
 		 */
-		if (VERNDX_INVALID(sym->st_shndx, VERDEFNUM(ilmp),
-		    VERSYM(ilmp), ndx)) {
-			DBG_CALL(Dbg_syms_ignore_badver(ilmp, name,
+		if ((VERSYM(ilmp) != NULL) &&
+		    ((VERSYM(ilmp)[ndx] & 0x8000) != 0)) {
+			DBG_CALL(Dbg_syms_ignore_gnuver(ilmp, name,
 			    ndx, VERSYM(ilmp)[ndx]));
 			if ((ndx = chainptr[ndx]) != 0)
 				continue;
@@ -2240,6 +2247,17 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				VERDEFNUM(lmp) = (int)ld->d_un.d_val;
 				break;
 			case DT_VERSYM:
+				/*
+				 * The Solaris ld does not produce DT_VERSYM,
+				 * but the GNU ld does, in order to support
+				 * their style of versioning, which differs
+				 * from ours in some ways, while using the
+				 * same data structures. The presence of
+				 * DT_VERSYM therefore means that GNU
+				 * versioning rules apply to the given file.
+				 * If DT_VERSYM is not present, then Solaris
+				 * versioning rules apply.
+				 */
 				VERSYM(lmp) = (Versym *)(ld->d_un.d_ptr + base);
 				break;
 			case DT_BIND_NOW:

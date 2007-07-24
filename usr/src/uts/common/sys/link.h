@@ -204,7 +204,8 @@ typedef struct {
  * The following DT_* entries should have been assigned within one of the
  * DT_* ranges, but existed before such ranges had been established.
  */
-#define	DT_VERSYM	0x6ffffff0	/* version symbol table - unused */
+#define	DT_VERSYM	0x6ffffff0	/* version symbol table - unused by */
+					/*	Solaris (see libld/update.c) */
 
 #define	DT_RELACOUNT	0x6ffffff9	/* number of RELATIVE relocations */
 #define	DT_RELCOUNT	0x6ffffffa	/* number of RELATIVE relocations */

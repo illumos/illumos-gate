@@ -33,3 +33,4 @@
 @ MSG_GBL_NULL		""
 
 @ MSG_VERSYM_FMT	"%d"
+@ MSG_VERSYM_GNUH_FMT	"%dH"

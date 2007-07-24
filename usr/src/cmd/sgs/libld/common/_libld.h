@@ -580,7 +580,7 @@ extern uintptr_t	ld_process_archive(const char *, int, Ar_desc *,
 extern uintptr_t	ld_process_files(Ofl_desc *, int, char **);
 extern uintptr_t	ld_process_flags(Ofl_desc *, int, char **);
 extern Ifl_desc		*ld_process_ifl(const char *, const char *, int, Elf *,
-			    Half, Ofl_desc *, Rej_desc *);
+			    Word, Ofl_desc *, Rej_desc *);
 extern uintptr_t	ld_process_ordered(Ifl_desc *, Ofl_desc *, Word, Word);
 extern uintptr_t	ld_process_sym_reloc(Ofl_desc *, Rel_desc *, Rel *,
 			    Is_desc *, const char *);
