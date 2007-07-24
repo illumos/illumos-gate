@@ -964,10 +964,13 @@ sa_sharetab_fill_zfs(sa_share_t share, share_t *sh, char *proto)
 {
 	char *path;
 
+	/* Make sure path is valid */
+
 	path = sa_get_share_attr(share, "path");
 	if (path != NULL) {
 		(void) memset(sh, 0, sizeof (sh));
 		(void) sa_fillshare(share, proto, sh);
+		sa_free_attr_string(path);
 		return (0);
 	} else
 		return (1);

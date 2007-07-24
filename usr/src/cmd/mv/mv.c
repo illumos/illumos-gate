@@ -1617,6 +1617,7 @@ copydir(char *source, char *target)
 		s1save = s1;
 		if (s1acl != NULL) {
 			s1acl_save = acl_dup(s1acl);
+#ifdef XPG4
 			if (s1acl_save == NULL) {
 				(void) fprintf(stderr, gettext("%s: "
 				    "Insufficient memory to save acl"
@@ -1624,14 +1625,6 @@ copydir(char *source, char *target)
 				if (pflg)
 					return (1);
 
-			}
-#ifdef XPG4
-			else {
-				(void) fprintf(stderr, gettext("%s: "
-				    "Insufficient memory to save acl"
-				    " entry\n"), cmd);
-				if (pflg)
-					return (1);
 			}
 #endif
 		}
