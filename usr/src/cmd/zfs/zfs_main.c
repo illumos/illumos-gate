@@ -3019,8 +3019,16 @@ share_mount(int op, int argc, char **argv)
 			do_all = 1;
 			break;
 		case 'o':
-			options = optarg;
+			if (strlen(optarg) <= MNT_LINE_MAX) {
+				options = optarg;
+				break;
+			}
+			(void) fprintf(stderr, gettext("the opts argument for "
+			    "'%c' option is too long (more than %d chars)\n"),
+			    optopt, MNT_LINE_MAX);
+			usage(B_FALSE);
 			break;
+
 		case 'O':
 			flags |= MS_OVERLAY;
 			break;
@@ -3086,9 +3094,9 @@ share_mount(int op, int argc, char **argv)
 	} else if (argc == 0) {
 		struct mnttab entry;
 
-		if (op == OP_SHARE) {
+		if ((op == OP_SHARE) || (options != NULL)) {
 			(void) fprintf(stderr, gettext("missing filesystem "
-			    "argument\n"));
+			    "argument (specify -a for all)\n"));
 			usage(B_FALSE);
 		}
 
