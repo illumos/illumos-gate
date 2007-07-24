@@ -793,11 +793,9 @@ ip_find_unused_squeue(squeue_set_t *sqs, boolean_t fanout)
 				 * Check and make sure the CPU that sqs
 				 * is bound to is valid. There could be
 				 * sqs's around whose CPUs could have
-				 * been DR'd out. Also note cpu_lock is
-				 * not held here. It is ok as later we
-				 * do cpu_lock when we access cpu_t
-				 * members.
+				 * been DR'd out.
 				 */
+				mutex_enter(&cpu_lock);
 				if (cpu_get(curr_sqs->sqs_bind) != NULL) {
 					if (best_sqs == NULL) {
 						best_sqs = curr_sqs;
@@ -808,6 +806,7 @@ ip_find_unused_squeue(squeue_set_t *sqs, boolean_t fanout)
 						min_sq = curr_sqs->sqs_size;
 					}
 				}
+				mutex_exit(&cpu_lock);
 			}
 
 			ASSERT(best_sqs != NULL);
