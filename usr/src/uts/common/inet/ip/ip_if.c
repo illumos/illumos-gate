@@ -7004,7 +7004,6 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 			    ipif->ipif_rq,		/* recv-from queue */
 			    NULL,			/* no send-to queue */
 			    ipif->ipif_ire_type,	/* LOOPBACK */
-			    NULL,
 			    ipif,
 			    NULL,
 			    0,
@@ -7188,7 +7187,6 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 		    rfq,
 		    stq,
 		    ipif->ipif_net_type,
-		    ipif->ipif_resolver_mp,
 		    ipif,
 		    in_ill,
 		    0,
@@ -7326,11 +7324,10 @@ ip_rt_add(ipaddr_t dst_addr, ipaddr_t mask, ipaddr_t gw_addr,
 	    (uchar_t *)&gw_addr,		/* gateway address */
 	    NULL,				/* no in-srcaddress */
 	    &gw_ire->ire_max_frag,
-	    NULL,				/* no Fast Path header */
+	    NULL,				/* no src nce */
 	    NULL,				/* no recv-from queue */
 	    NULL,				/* no send-to queue */
 	    (ushort_t)type,			/* IRE type */
-	    NULL,
 	    ipif_arg,
 	    NULL,
 	    0,
@@ -15305,11 +15302,10 @@ ill_bcast_delete_and_add(ill_t *ill, ipaddr_t addr)
 		    (uchar_t *)&ire->ire_in_src_addr,
 		    ire->ire_stq == NULL ? &ip_loopback_mtu :
 		    &ire->ire_ipif->ipif_mtu,
-		    (ire->ire_nce != NULL ? ire->ire_nce->nce_fp_mp : NULL),
+		    ire->ire_nce,
 		    ire->ire_rfq,
 		    ire->ire_stq,
 		    ire->ire_type,
-		    (ire->ire_nce != NULL? ire->ire_nce->nce_res_mp : NULL),
 		    ire->ire_ipif,
 		    ire->ire_in_ill,
 		    ire->ire_cmask,
@@ -15603,13 +15599,8 @@ redo:
 	 */
 	if (clear_ire != NULL && irep != NULL && *irep != clear_ire) {
 		ire_t *clear_ire_stq = NULL;
-		mblk_t *fp_mp = NULL, *res_mp = NULL;
 
 		bzero(new_lb_ire, sizeof (ire_t));
-		if (clear_ire->ire_nce != NULL) {
-			fp_mp = clear_ire->ire_nce->nce_fp_mp;
-			res_mp = clear_ire->ire_nce->nce_res_mp;
-		}
 		/* XXX We need a recovery strategy here. */
 		if (ire_init(new_lb_ire,
 		    (uchar_t *)&clear_ire->ire_addr,
@@ -15618,11 +15609,10 @@ redo:
 		    (uchar_t *)&clear_ire->ire_gateway_addr,
 		    (uchar_t *)&clear_ire->ire_in_src_addr,
 		    &clear_ire->ire_max_frag,
-		    fp_mp,
+		    NULL, /* let ire_nce_init derive the resolver info */
 		    clear_ire->ire_rfq,
 		    clear_ire->ire_stq,
 		    clear_ire->ire_type,
-		    res_mp,
 		    clear_ire->ire_ipif,
 		    clear_ire->ire_in_ill,
 		    clear_ire->ire_cmask,
@@ -15644,14 +15634,6 @@ redo:
 				clear_ire_stq = ire_next;
 
 				bzero(new_nlb_ire, sizeof (ire_t));
-				if (clear_ire_stq->ire_nce != NULL) {
-					fp_mp =
-					    clear_ire_stq->ire_nce->nce_fp_mp;
-					res_mp =
-					    clear_ire_stq->ire_nce->nce_res_mp;
-				} else {
-					fp_mp = res_mp = NULL;
-				}
 				/* XXX We need a recovery strategy here. */
 				if (ire_init(new_nlb_ire,
 				    (uchar_t *)&clear_ire_stq->ire_addr,
@@ -15660,11 +15642,10 @@ redo:
 				    (uchar_t *)&clear_ire_stq->ire_gateway_addr,
 				    (uchar_t *)&clear_ire_stq->ire_in_src_addr,
 				    &clear_ire_stq->ire_max_frag,
-				    fp_mp,
+				    NULL,
 				    clear_ire_stq->ire_rfq,
 				    clear_ire_stq->ire_stq,
 				    clear_ire_stq->ire_type,
-				    res_mp,
 				    clear_ire_stq->ire_ipif,
 				    clear_ire_stq->ire_in_ill,
 				    clear_ire_stq->ire_cmask,
@@ -18872,8 +18853,9 @@ conn_cleanup_stale_ire(conn_t *connp, caddr_t arg)
  *
  * nce's reference ill's thru nce_ill and the count of nce's associated with
  * an ill is recorded in ill_nce_cnt. This is incremented atomically in
- * ndp_add() where the nce is actually added to the table. Similarly it is
- * decremented in ndp_inactive where the nce is destroyed.
+ * ndp_add_v4()/ndp_add_v6() where the nce is actually added to the
+ * table. Similarly it is decremented in ndp_inactive() where the nce
+ * is destroyed.
  *
  * Flow of ioctls involving interface down/up
  *
@@ -19953,7 +19935,6 @@ ipif_recover_ire(ipif_t *ipif)
 		ifrt_t		*ifrt;
 		uchar_t		*src_addr;
 		uchar_t		*gateway_addr;
-		mblk_t		*resolver_mp;
 		ushort_t	type;
 
 		/*
@@ -19969,11 +19950,9 @@ ipif_recover_ire(ipif_t *ipif)
 		 * routes using the the loopback interface's address as a
 		 * gateway.
 		 *
-		 * As ifrt->ifrt_type reflects the already updated ire_type and
-		 * since ire_create() expects that IRE_IF_NORESOLVER will have
-		 * a valid nce_res_mp field (which doesn't make sense for a
-		 * IRE_LOOPBACK), ire_create() will be called in the same way
-		 * here as in ip_rt_add(), namely using ipif->ipif_net_type when
+		 * As ifrt->ifrt_type reflects the already updated ire_type,
+		 * ire_create() will be called in the same way here as
+		 * in ip_rt_add(), namely using ipif->ipif_net_type when
 		 * the route looks like a traditional interface route (where
 		 * ifrt->ifrt_type & IRE_INTERFACE is true) and otherwise using
 		 * the saved ifrt->ifrt_type.  This means that in the case where
@@ -19982,6 +19961,7 @@ ipif_recover_ire(ipif_t *ipif)
 		 * into an IRE_IF_NORESOLVER and then added by ire_add().
 		 */
 		ifrt = (ifrt_t *)mp->b_rptr;
+		ASSERT(ifrt->ifrt_type != IRE_CACHE);
 		if (ifrt->ifrt_type & IRE_INTERFACE) {
 			rfq = NULL;
 			stq = (ipif->ipif_net_type == IRE_IF_RESOLVER)
@@ -19990,7 +19970,6 @@ ipif_recover_ire(ipif_t *ipif)
 			    ? (uint8_t *)&ifrt->ifrt_src_addr
 			    : (uint8_t *)&ipif->ipif_src_addr;
 			gateway_addr = NULL;
-			resolver_mp = ipif->ipif_resolver_mp;
 			type = ipif->ipif_net_type;
 		} else if (ifrt->ifrt_type & IRE_BROADCAST) {
 			/* Recover multiroute broadcast IRE. */
@@ -20000,7 +19979,6 @@ ipif_recover_ire(ipif_t *ipif)
 			    ? (uint8_t *)&ifrt->ifrt_src_addr
 			    : (uint8_t *)&ipif->ipif_src_addr;
 			gateway_addr = (uint8_t *)&ifrt->ifrt_gateway_addr;
-			resolver_mp = ipif->ipif_bcast_mp;
 			type = ifrt->ifrt_type;
 		} else {
 			rfq = NULL;
@@ -20008,7 +19986,6 @@ ipif_recover_ire(ipif_t *ipif)
 			src_addr = (ifrt->ifrt_flags & RTF_SETSRC)
 			    ? (uint8_t *)&ifrt->ifrt_src_addr : NULL;
 			gateway_addr = (uint8_t *)&ifrt->ifrt_gateway_addr;
-			resolver_mp = NULL;
 			type = ifrt->ifrt_type;
 		}
 
@@ -20031,7 +20008,6 @@ ipif_recover_ire(ipif_t *ipif)
 		    rfq,
 		    stq,
 		    type,
-		    resolver_mp,
 		    ipif,
 		    NULL,
 		    0,
@@ -20547,7 +20523,6 @@ ipif_up_done(ipif_t *ipif)
 		    ipif->ipif_rq,			/* recv-from queue */
 		    NULL,				/* no send-to queue */
 		    ipif->ipif_ire_type,		/* LOCAL or LOOPBACK */
-		    NULL,
 		    ipif,
 		    NULL,
 		    0,
@@ -20614,7 +20589,6 @@ ipif_up_done(ipif_t *ipif)
 		    NULL,				/* no recv queue */
 		    stq,				/* send-to queue */
 		    ill->ill_net_type,			/* IF_[NO]RESOLVER */
-		    ill->ill_resolver_mp,		/* xmit header */
 		    ipif,
 		    NULL,
 		    0,
@@ -21527,11 +21501,10 @@ ipif_recreate_interface_routes(ipif_t *old_ipif, ipif_t *ipif)
 	    NULL,				/* no gateway */
 	    NULL,
 	    &ipif->ipif_mtu,			/* max frag */
-	    NULL,				/* fast path header */
+	    NULL,				/* no src nce */
 	    NULL,				/* no recv from queue */
 	    stq,				/* send-to queue */
 	    ill->ill_net_type,			/* IF_[NO]RESOLVER */
-	    ill->ill_resolver_mp,		/* xmit header */
 	    ipif,
 	    NULL,
 	    0,
@@ -23686,7 +23659,6 @@ ip_mrtun_rt_add(ipaddr_t in_src_addr, int flags, ipif_t *ipif_arg,
 	    NULL,				/* rfq */
 	    stq,
 	    IRE_MIPRTUN,
-	    dlureq_mp,
 	    ipif,
 	    in_ill,
 	    0,
@@ -23950,7 +23922,6 @@ ip_cgtp_bcast_add(ire_t *ire, ire_t *ire_dst, ip_stack_t *ipst)
 		    ipif_prim->ipif_rq,
 		    ipif_prim->ipif_wq,
 		    IRE_BROADCAST,
-		    ipif_prim->ipif_bcast_mp,
 		    ipif_prim,
 		    NULL,
 		    0,

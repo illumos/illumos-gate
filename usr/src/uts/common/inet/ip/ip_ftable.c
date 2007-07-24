@@ -918,8 +918,7 @@ create_irecache:
 	/* Obtain dst_ill */
 	dst_ill = ip_newroute_get_dst_ill(ire->ire_ipif->ipif_ill);
 	if (dst_ill == NULL) {
-		ip2dbg(("ire_forward no dst ill; ire 0x%p\n",
-			(void *)ire));
+		ip2dbg(("ire_forward no dst ill; ire 0x%p\n", (void *)ire));
 		goto icmp_err_ret;
 	}
 
@@ -1002,11 +1001,12 @@ create_irecache:
 
 		save_ire = ire;
 		/*
-		 * create an incomplete ire-cache with a null dlureq_mp.
-		 * The dlureq_mp will be created in ire_arpresolve.
+		 * create an incomplete IRE_CACHE.
+		 * An areq_mp will be generated in ire_arpresolve() for
+		 * RESOLVER interfaces.
 		 */
 		ire = ire_create(
-			(uchar_t *)&dst,		/* dest address */
+		    (uchar_t *)&dst,		/* dest address */
 		    (uchar_t *)&ip_g_all_ones,	/* mask */
 		    (uchar_t *)&src_ipif->ipif_src_addr, /* src addr */
 		    (uchar_t *)&gw,		/* gateway address */
@@ -1017,7 +1017,6 @@ create_irecache:
 		    dst_ill->ill_rq,		/* recv-from queue */
 		    dst_ill->ill_wq,		/* send-to queue */
 		    IRE_CACHE,			/* IRE type */
-		    NULL,
 		    src_ipif,
 		    NULL,
 		    ire->ire_mask,		/* Parent mask */
@@ -1209,7 +1208,7 @@ route_to_dst(const struct sockaddr *dst_addr, zoneid_t zoneid, ip_stack_t *ipst)
 	if (dst_addr->sa_family == AF_INET) {
 		ire = ire_route_lookup(
 		    ((struct sockaddr_in *)dst_addr)->sin_addr.s_addr,
-			0, 0, 0, NULL, NULL, zoneid, NULL, match_flags, ipst);
+		    0, 0, 0, NULL, NULL, zoneid, NULL, match_flags, ipst);
 	} else {
 		ire = ire_route_lookup_v6(
 		    &((struct sockaddr_in6 *)dst_addr)->sin6_addr,

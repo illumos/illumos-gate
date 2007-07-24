@@ -1419,9 +1419,7 @@ typedef struct ipif_s {
 #define	ipif_wq			ipif_ill->ill_wq
 #define	ipif_rq			ipif_ill->ill_rq
 #define	ipif_net_type		ipif_ill->ill_net_type
-#define	ipif_resolver_mp	ipif_ill->ill_resolver_mp
 #define	ipif_ipif_up_count	ipif_ill->ill_ipif_up_count
-#define	ipif_bcast_mp		ipif_ill->ill_bcast_mp
 #define	ipif_type		ipif_ill->ill_type
 #define	ipif_isv6		ipif_ill->ill_isv6
 

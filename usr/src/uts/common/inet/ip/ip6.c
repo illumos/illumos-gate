@@ -1302,7 +1302,7 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 	opt = (nd_opt_hdr_t *)&rd[1];
 	opt = ndp_get_option(opt, optlen, ND_OPT_TARGET_LINKADDR);
 	if (opt != NULL) {
-		err = ndp_lookup_then_add(ill,
+		err = ndp_lookup_then_add_v6(ill,
 		    (uchar_t *)&opt[1],		/* Link layer address */
 		    gateway,
 		    &ipv6_all_ones,		/* prefix mask */
@@ -1310,9 +1310,7 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		    0,
 		    nce_flags,
 		    ND_STALE,
-		    &nce,
-		    NULL,
-		    NULL);
+		    &nce);
 		switch (err) {
 		case 0:
 			NCE_REFRELE(nce);
@@ -1346,11 +1344,10 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		    &prev_ire->ire_src_addr_v6,	/* source addr */
 		    gateway,			/* gateway addr */
 		    &prev_ire->ire_max_frag,	/* max frag */
-		    NULL,			/* Fast Path header */
+		    NULL,			/* no src nce */
 		    NULL, 			/* no rfq */
 		    NULL,			/* no stq */
 		    IRE_HOST,
-		    NULL,
 		    prev_ire->ire_ipif,
 		    NULL,
 		    0,
@@ -1375,11 +1372,10 @@ icmp_redirect_v6(queue_t *q, mblk_t *mp, ill_t *ill)
 		    &prev_ire->ire_src_addr_v6,		/* source addr */
 		    &ipv6_all_zeros,			/* gateway addr */
 		    &prev_ire->ire_max_frag,		/* max frag */
-		    NULL,				/* Fast Path header */
+		    NULL,				/* no src nce */
 		    NULL,				/* ire rfq */
 		    stq,				/* ire stq */
 		    ipif->ipif_net_type,		/* IF_[NO]RESOLVER */
-		    NULL,
 		    prev_ire->ire_ipif,
 		    &ipv6_all_ones,
 		    0,
@@ -4377,7 +4373,6 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 	ill_t		*dst_ill = NULL;
 	ire_t		*sire = NULL;
 	ire_t		*save_ire;
-	mblk_t		*dlureq_mp;
 	ip6_t		*ip6h;
 	int		err = 0;
 	mblk_t		*first_mp;
@@ -4917,11 +4912,10 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 			    &src_ipif->ipif_v6src_addr, /* source address */
 			    &v6gw,			/* gateway address */
 			    &save_ire->ire_max_frag,
-			    NULL,			/* Fast Path header */
+			    NULL,			/* src nce */
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,
-			    NULL,
 			    src_ipif,
 			    &sire->ire_mask_v6,		/* Parent mask */
 			    sire->ire_phandle,		/* Parent handle */
@@ -5017,35 +5011,10 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 			/*
 			 * We have what we need to build an IRE_CACHE.
 			 *
-			 * Create a new dlureq_mp with the IPv6 gateway
-			 * address in destination address in the DLPI hdr
-			 * if the physical length is exactly 16 bytes.
+			 * handle the Gated case, where we create
+			 * a NORESOLVER route for loopback.
 			 */
-			if (dst_ill->ill_phys_addr_length == IPV6_ADDR_LEN) {
-				const in6_addr_t *addr;
-
-				if (!IN6_IS_ADDR_UNSPECIFIED(&v6gw))
-					addr = &v6gw;
-				else
-					addr = v6dstp;
-
-				dlureq_mp = ill_dlur_gen((uchar_t *)addr,
-				    dst_ill->ill_phys_addr_length,
-				    dst_ill->ill_sap,
-				    dst_ill->ill_sap_length);
-			} else {
-				/*
-				 * handle the Gated case, where we create
-				 * a NORESOLVER route for loopback.
-				 */
-				if (dst_ill->ill_net_type != IRE_IF_NORESOLVER)
-					break;
-				dlureq_mp = ill_dlur_gen(NULL,
-				    dst_ill->ill_phys_addr_length,
-				    dst_ill->ill_sap,
-				    dst_ill->ill_sap_length);
-			}
-			if (dlureq_mp == NULL)
+			if (dst_ill->ill_net_type != IRE_IF_NORESOLVER)
 				break;
 			/*
 			 * TSol note: We are creating the ire cache for the
@@ -5077,11 +5046,10 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 			    &src_ipif->ipif_v6src_addr, /* source address */
 			    &v6gw,			/* gateway address */
 			    &save_ire->ire_max_frag,
-			    NULL,			/* Fast Path header */
+			    NULL,			/* no src nce */
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,
-			    dlureq_mp,
 			    src_ipif,
 			    &save_ire->ire_mask_v6,	/* Parent mask */
 			    (sire != NULL) ?		/* Parent handle */
@@ -5094,8 +5062,6 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 			    NULL,
 			    gcgrp,
 			    ipst);
-
-			freeb(dlureq_mp);
 
 			if (ire == NULL) {
 				if (gcgrp != NULL) {
@@ -5238,18 +5204,16 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 				    &src_ipif->ipif_v6src_addr,
 				    /* source address */
 				    &v6gw,		/* gateway address */
-				    NULL,		/* Fast Path header */
+				    NULL,		/* no src nce */
 				    dst_ill->ill_rq,	/* recv-from queue */
-				    dst_ill->ill_wq,	/* send-to queue */
+				    dst_ill->ill_wq, 	/* send-to queue */
 				    IRE_CACHE,
-				    NULL,
 				    src_ipif,
-				    &save_ire->ire_mask_v6,
-				    /* Parent mask */
+				    &save_ire->ire_mask_v6, /* Parent mask */
 				    0,
 				    save_ire->ire_ihandle,
 				    /* Interface handle */
-				    0,			/* flags if any */
+				    0,		/* flags if any */
 				    &(save_ire->ire_uinfo),
 				    NULL,
 				    NULL,
@@ -5430,11 +5394,10 @@ ip_newroute_v6(queue_t *q, mblk_t *mp, const in6_addr_t *v6dstp,
 			    &src_ipif->ipif_v6src_addr, /* source address */
 			    &v6gw,			/* gateway address */
 			    &save_ire->ire_max_frag,
-			    NULL,			/* Fast Path header */
+			    NULL,			/* no src nce */
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,
-			    NULL,
 			    src_ipif,
 			    &save_ire->ire_mask_v6,	/* Parent mask */
 			    0,
@@ -5981,34 +5944,13 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 		ASSERT((attach_ill == NULL) || (dst_ill == attach_ill));
 		switch (ire->ire_type) {
 		case IRE_IF_NORESOLVER: {
-			/* We have what we need to build an IRE_CACHE. */
-			mblk_t	*dlureq_mp;
-
 			/*
-			 * Create a new dlureq_mp with the
-			 * IPv6 gateway address in destination address in the
-			 * DLPI hdr if the physical length is exactly 16 bytes.
+			 * We have what we need to build an IRE_CACHE.
+			 *
+			 * handle the Gated case, where we create
+			 * a NORESOLVER route for loopback.
 			 */
-			ASSERT(dst_ill->ill_isv6);
-			if (dst_ill->ill_phys_addr_length == IPV6_ADDR_LEN) {
-				dlureq_mp = ill_dlur_gen((uchar_t *)v6dstp,
-				    dst_ill->ill_phys_addr_length,
-				    dst_ill->ill_sap,
-				    dst_ill->ill_sap_length);
-			} else {
-				/*
-				 * handle the Gated case, where we create
-				 * a NORESOLVER route for loopback.
-				 */
-				if (dst_ill->ill_net_type != IRE_IF_NORESOLVER)
-					break;
-				dlureq_mp = ill_dlur_gen(NULL,
-				    dst_ill->ill_phys_addr_length,
-				    dst_ill->ill_sap,
-				    dst_ill->ill_sap_length);
-			}
-
-			if (dlureq_mp == NULL)
+			if (dst_ill->ill_net_type != IRE_IF_NORESOLVER)
 				break;
 			/*
 			 * The newly created ire will inherit the flags of the
@@ -6020,11 +5962,10 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 			    &src_ipif->ipif_v6src_addr, /* source address */
 			    NULL,			/* gateway address */
 			    &save_ire->ire_max_frag,
-			    NULL,			/* Fast Path header */
+			    NULL,			/* no src nce */
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,
-			    dlureq_mp,
 			    src_ipif,
 			    NULL,
 			    (fire != NULL) ?		/* Parent handle */
@@ -6037,8 +5978,6 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 			    NULL,
 			    NULL,
 			    ipst);
-
-			freeb(dlureq_mp);
 
 			if (ire == NULL) {
 				ire_refrele(save_ire);
@@ -6153,11 +6092,10 @@ ip_newroute_ipif_v6(queue_t *q, mblk_t *mp, ipif_t *ipif,
 			    &src_ipif->ipif_v6src_addr, /* source address */
 			    NULL,			/* gateway address */
 			    &save_ire->ire_max_frag,
-			    NULL,			/* Fast Path header */
+			    NULL,			/* src nce */
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,
-			    NULL,
 			    src_ipif,
 			    NULL,
 			    (fire != NULL) ?		/* Parent handle */

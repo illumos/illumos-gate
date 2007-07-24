@@ -489,7 +489,6 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 			    NULL,
 			    NULL,
 			    ipif->ipif_net_type,
-			    ipif->ipif_resolver_mp,
 			    ipif,
 			    NULL,
 			    0,
@@ -640,7 +639,6 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 		    NULL,
 		    stq,
 		    ipif->ipif_net_type,
-		    ipif->ipif_resolver_mp,
 		    ipif,
 		    NULL,
 		    0,
@@ -768,11 +766,10 @@ ip_rt_add_v6(const in6_addr_t *dst_addr, const in6_addr_t *mask,
 	    src_addr : NULL),
 	    gw_addr,				/* gateway address */
 	    &gw_ire->ire_max_frag,
-	    NULL,				/* no Fast Path header */
+	    NULL,				/* no src nce */
 	    NULL,				/* no recv-from queue */
 	    NULL,				/* no send-to queue */
 	    (ushort_t)type,			/* IRE type */
-	    NULL,
 	    ipif_arg,
 	    NULL,
 	    0,
@@ -1357,7 +1354,7 @@ ipif_ndp_setup_multicast(ipif_t *ipif, nce_t **ret_nce)
 	    (ill->ill_flags & ILLF_MULTICAST) ||
 	    (phyi->phyint_flags & PHYI_MULTI_BCAST)) {
 		mutex_enter(&ipst->ips_ndp6->ndp_g_lock);
-		err = ndp_add(ill,
+		err = ndp_add_v6(ill,
 		    phys_addr,
 		    &v6_mcast_addr,	/* v6 address */
 		    &v6_mcast_mask,	/* v6 mask */
@@ -1365,9 +1362,7 @@ ipif_ndp_setup_multicast(ipif_t *ipif, nce_t **ret_nce)
 		    hw_extract_start,
 		    NCE_F_MAPPING | NCE_F_PERMANENT | NCE_F_NONUD,
 		    ND_REACHABLE,
-		    &mnce,
-		    NULL,
-		    NULL);
+		    &mnce);
 		mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 		if (err == 0) {
 			if (ret_nce != NULL) {
@@ -1449,7 +1444,7 @@ ipif_ndp_up(ipif_t *ipif, const in6_addr_t *addr)
 				flags |= NCE_F_UNSOL_ADV;
 			}
 		}
-		err = ndp_lookup_then_add(ill,
+		err = ndp_lookup_then_add_v6(ill,
 		    hw_addr,
 		    addr,
 		    &ipv6_all_ones,
@@ -1457,9 +1452,7 @@ ipif_ndp_up(ipif_t *ipif, const in6_addr_t *addr)
 		    0,
 		    flags,
 		    ND_PROBE,	/* Causes Duplicate Address Detection to run */
-		    &nce,
-		    NULL,
-		    NULL);
+		    &nce);
 		switch (err) {
 		case 0:
 			ip1dbg(("ipif_ndp_up: NCE created for %s\n",
@@ -1557,7 +1550,6 @@ ipif_recover_ire_v6(ipif_t *ipif)
 		ifrt_t		*ifrt;
 		in6_addr_t	*src_addr;
 		in6_addr_t	*gateway_addr;
-		mblk_t		*resolver_mp;
 		char		buf[INET6_ADDRSTRLEN];
 		ushort_t	type;
 
@@ -1574,18 +1566,16 @@ ipif_recover_ire_v6(ipif_t *ipif)
 		 * software like GateD and Sun Cluster which creates routes
 		 * using the the loopback interface's address as a gateway.
 		 *
-		 * As ifrt->ifrt_type reflects the already updated ire_type and
-		 * since ire_create_v6() expects that IRE_IF_NORESOLVER will
-		 * have a valid ire_dlureq_mp field (which doesn't make sense
-		 * for a IRE_LOOPBACK), ire_create_v6() will be called in the
-		 * same way here as in ip_rt_add_v6(), namely using
-		 * ipif->ipif_net_type when the route looks like a traditional
-		 * interface route (where ifrt->ifrt_type & IRE_INTERFACE is
-		 * true) and otherwise using the saved ifrt->ifrt_type.  This
-		 * means that in the case where ipif->ipif_net_type is
-		 * IRE_LOOPBACK, the ire created by ire_create_v6() will be an
-		 * IRE_LOOPBACK, it will then be turned into an
-		 * IRE_IF_NORESOLVER and then added by ire_add_v6().
+		 * As ifrt->ifrt_type reflects the already updated ire_type,
+		 * ire_create_v6() will be called in the same way here as in
+		 * ip_rt_add_v6(), namely using ipif->ipif_net_type when the
+		 * route looks like a traditional interface route (where
+		 * ifrt->ifrt_type & IRE_INTERFACE is true) and otherwise
+		 * using the saved ifrt->ifrt_type.  This means that in
+		 * the case where ipif->ipif_net_type is IRE_LOOPBACK,
+		 * the ire created by ire_create_v6() will be an IRE_LOOPBACK,
+		 * it will then be turned into an IRE_IF_NORESOLVER and then
+		 * added by ire_add_v6().
 		 */
 		ifrt = (ifrt_t *)mp->b_rptr;
 		if (ifrt->ifrt_type & IRE_INTERFACE) {
@@ -1596,7 +1586,6 @@ ipif_recover_ire_v6(ipif_t *ipif)
 			    ? &ifrt->ifrt_v6src_addr
 			    : &ipif->ipif_v6src_addr;
 			gateway_addr = NULL;
-			resolver_mp = ipif->ipif_resolver_mp;
 			type = ipif->ipif_net_type;
 		} else {
 			rfq = NULL;
@@ -1604,7 +1593,6 @@ ipif_recover_ire_v6(ipif_t *ipif)
 			src_addr = (ifrt->ifrt_flags & RTF_SETSRC)
 			    ? &ifrt->ifrt_v6src_addr : NULL;
 			gateway_addr = &ifrt->ifrt_v6gateway_addr;
-			resolver_mp = NULL;
 			type = ifrt->ifrt_type;
 		}
 
@@ -1625,7 +1613,6 @@ ipif_recover_ire_v6(ipif_t *ipif)
 		    rfq,
 		    stq,
 		    type,
-		    resolver_mp,
 		    ipif,
 		    NULL,
 		    0,
@@ -2549,11 +2536,10 @@ ipif_recreate_interface_routes_v6(ipif_t *old_ipif, ipif_t *ipif)
 	    &nipif->ipif_v6src_addr,	/* src addr */
 	    NULL,			/* no gateway */
 	    &ipif->ipif_mtu,		/* max frag */
-	    NULL,			/* no Fast path header */
+	    NULL,			/* no src nce */
 	    NULL,			/* no recv from queue */
 	    stq,			/* send-to queue */
 	    ill->ill_net_type,		/* IF_[NO]RESOLVER */
-	    ill->ill_resolver_mp,	/* xmit header */
 	    ipif,
 	    NULL,
 	    0,
@@ -2940,7 +2926,6 @@ ipif_up_done_v6(ipif_t *ipif)
 		    ipif->ipif_rq,			/* recv-from queue */
 		    NULL,				/* no send-to queue */
 		    ipif->ipif_ire_type,		/* LOCAL or LOOPBACK */
-		    NULL,
 		    ipif,				/* interface */
 		    NULL,
 		    0,
@@ -2979,11 +2964,10 @@ ipif_up_done_v6(ipif_t *ipif)
 		    &src_ipif->ipif_v6src_addr,	/* src addr */
 		    NULL,			/* no gateway */
 		    &ipif->ipif_mtu,		/* max frag */
-		    NULL,			/* no Fast path header */
+		    NULL,			/* no src nce */
 		    NULL,			/* no recv from queue */
 		    stq,			/* send-to queue */
 		    ill->ill_net_type,		/* IF_[NO]RESOLVER */
-		    ill->ill_resolver_mp,	/* xmit header */
 		    ipif,
 		    NULL,
 		    0,
@@ -3033,11 +3017,10 @@ ipif_up_done_v6(ipif_t *ipif)
 			    &ipif->ipif_v6lcl_addr, 	/* src addr */
 			    NULL, 			/* gateway */
 			    &ipif->ipif_mtu, 		/* max_frag */
-			    NULL, 			/* no Fast Path hdr */
+			    NULL, 			/* no src nce */
 			    NULL, 			/* no rfq */
 			    ill->ill_wq, 		/* stq */
 			    IRE_IF_NORESOLVER,		/* type */
-			    ill->ill_resolver_mp,	/* dlureq_mp */
 			    ipif,			/* interface */
 			    NULL,			/* v6cmask */
 			    0,

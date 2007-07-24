@@ -62,7 +62,7 @@ typedef struct nce_s {
 	uint32_t	nce_ll_extract_start;	/* For mappings */
 #define	nce_first_mp_to_free	nce_fp_mp
 	mblk_t		*nce_fp_mp;	/* link layer fast path mp */
-	mblk_t		*nce_res_mp;	/* DL_UNITDATA_REQ or link layer mp */
+	mblk_t		*nce_res_mp;	/* DL_UNITDATA_REQ */
 	mblk_t		*nce_qd_mp;	/* Head outgoing queued packets */
 #define	nce_last_mp_to_free	nce_qd_mp
 	mblk_t		*nce_timer_mp;	/* NDP timer mblk */
@@ -109,6 +109,13 @@ typedef struct nce_s {
  * the ndp_g_lock (i.e global lock) and marks NCEs to be deleted with
  * NCE_F_CONDEMNED.  When all active users of such NCEs are gone the walk
  * routine passes a list for deletion to nce_ire_delete_list().
+ *
+ * When the link-layer address of some onlink host changes, ARP will send
+ * an AR_CN_ANNOUNCE message to ip so that stale neighbor-cache
+ * information will not get used. This message is processed in ip_arp_news()
+ * by walking the nce list, and updating as appropriate. The ndp_g_hw_change
+ * flag is set by ip_arp_news() to notify nce_t users that ip_arp_news() is
+ * in progress.
  */
 typedef	struct ndp_g_s {
 	kmutex_t	ndp_g_lock;	/* Lock protecting  cache hash table */
@@ -116,7 +123,20 @@ typedef	struct ndp_g_s {
 	nce_t		*nce_hash_tbl[NCE_TABLE_SIZE];
 	int		ndp_g_walker; /* # of active thread walking hash list */
 	boolean_t	ndp_g_walker_cleanup; /* true implies defer deletion. */
+	int		ndp_g_hw_change; /* non-zero if nce flush in progress */
 } ndp_g_t;
+
+#define	NDP_HW_CHANGE_INCR(ndp) {		\
+	mutex_enter(&(ndp)->ndp_g_lock);	\
+	(ndp)->ndp_g_hw_change++;		\
+	mutex_exit(&(ndp)->ndp_g_lock);		\
+}
+
+#define	NDP_HW_CHANGE_DECR(ndp) {		\
+	mutex_enter(&(ndp)->ndp_g_lock);	\
+	(ndp)->ndp_g_hw_change--;		\
+	mutex_exit(&(ndp)->ndp_g_lock);		\
+}
 
 /* nce_flags  */
 #define	NCE_F_PERMANENT		0x1
@@ -303,9 +323,6 @@ extern	void	ndp_input(ill_t *, mblk_t *, mblk_t *);
 extern	boolean_t ndp_lookup_ipaddr(in_addr_t, netstack_t *);
 extern	nce_t	*ndp_lookup_v6(ill_t *, const in6_addr_t *, boolean_t);
 extern	nce_t	*ndp_lookup_v4(ill_t *, const in_addr_t *, boolean_t);
-extern	int	ndp_lookup_then_add(ill_t *, uchar_t *, const void *,
-    const void *, const void *, uint32_t, uint16_t,
-    uint16_t, nce_t **, mblk_t *, mblk_t *);
 extern	int	ndp_mcastreq(ill_t *, const in6_addr_t *, uint32_t, uint32_t,
     mblk_t *);
 extern	int	ndp_noresolver(ill_t *, const in6_addr_t *);
@@ -319,9 +336,6 @@ extern	void	ndp_timer(void *);
 extern	void	ndp_walk(ill_t *, pfi_t, void *, ip_stack_t *);
 extern	void	ndp_walk_common(ndp_g_t *, ill_t *, pfi_t,
     void *, boolean_t);
-extern	int	ndp_add(ill_t *, uchar_t *, const void *,
-		    const void *, const void *,
-		    uint32_t, uint16_t, uint16_t, nce_t **, mblk_t *, mblk_t *);
 extern	boolean_t	ndp_restart_dad(nce_t *);
 extern	void	ndp_do_recovery(ipif_t *);
 extern	void	nce_resolv_failed(nce_t *);
@@ -334,6 +348,14 @@ extern	void	nce_queue_mp_common(nce_t *, mblk_t *, boolean_t);
 extern	void	ndp_flush_qd_mp(nce_t *);
 extern	void	nce_delete_hw_changed(nce_t *, void *);
 extern	void	nce_fastpath(nce_t *);
+extern	int	ndp_add_v6(ill_t *, uchar_t *, const in6_addr_t *,
+    const in6_addr_t *, const in6_addr_t *, uint32_t, uint16_t, uint16_t,
+    nce_t **);
+extern	int	ndp_lookup_then_add_v6(ill_t *, uchar_t *,
+    const in6_addr_t *, const in6_addr_t *, const in6_addr_t *, uint32_t,
+    uint16_t, uint16_t, nce_t **);
+extern	int	ndp_lookup_then_add_v4(ill_t *,
+    const in_addr_t *, uint16_t, nce_t **, nce_t *);
 
 #ifdef NCE_DEBUG
 extern	void	nce_trace_inactive(nce_t *);

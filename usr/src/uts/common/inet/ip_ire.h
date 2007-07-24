@@ -137,13 +137,13 @@ extern "C" {
  * nce association should all effectively use the NOTR variants.
  * To understand the *effectively* part read on.
  *
- * ndp_lookup() and ndp_add() implicitly does NCE_REFHOLD. So wherever we
- * make ire to nce association after calling these functions,
- * we effectively want to end up with NCE_REFHOLD_NOTR,
- * We call this macro to achieve this effect. This macro changes
- * a NCE_REFHOLD to a NCE_REFHOLD_NOTR. The macro's NCE_REFRELE
- * cancels off ndp_lookup[ndp_add]'s implicit NCE_REFHOLD, and what
- * you are left with is a NCE_REFHOLD_NOTR
+ * ndp_lookup() and ndp_add_v4()/ndp_add_v6() implicitly do
+ * NCE_REFHOLD. So wherever we make ire to nce association after
+ * calling these functions, we effectively want to end up with
+ * NCE_REFHOLD_NOTR. We call this macro to achieve this effect. This
+ * macro changes a NCE_REFHOLD to a NCE_REFHOLD_NOTR. The macro's
+ * NCE_REFRELE cancels off ndp_lookup[ndp_add]'s implicit NCE_REFHOLD,
+ * and what you are left with is a NCE_REFHOLD_NOTR
  */
 #define	NCE_REFHOLD_TO_REFHOLD_NOTR(nce) {	\
 	NCE_REFHOLD_NOTR(nce);			\
@@ -197,6 +197,7 @@ typedef struct {
 
 #ifdef _KERNEL
 struct ts_label_s;
+struct nce_s;
 
 extern	ipaddr_t	ip_plen_to_mask(uint_t);
 extern	in6_addr_t	*ip_plen_to_mask_v6(uint_t, in6_addr_t *);
@@ -240,11 +241,11 @@ extern	void	ire_check_bcast_present(ipif_t *, ipaddr_t, int, boolean_t *,
     boolean_t *);
 
 extern	ire_t	*ire_create_mp(uchar_t *, uchar_t *, uchar_t *, uchar_t *,
-    uchar_t *, uint_t, mblk_t *, queue_t *, queue_t *, ushort_t, mblk_t *,
+    uchar_t *, uint_t, struct nce_s *, queue_t *, queue_t *, ushort_t,
     ipif_t *, ill_t *, ipaddr_t, uint32_t, uint32_t, uint32_t, const iulp_t *,
     tsol_gc_t *, tsol_gcgrp_t *, ip_stack_t *);
 extern	ire_t	*ire_create(uchar_t *, uchar_t *, uchar_t *, uchar_t *,
-    uchar_t *, uint_t *, mblk_t *, queue_t *, queue_t *, ushort_t, mblk_t *,
+    uchar_t *, uint_t *, struct nce_s *, queue_t *, queue_t *, ushort_t,
     ipif_t *, ill_t *, ipaddr_t, uint32_t, uint32_t, uint32_t, const iulp_t *,
     tsol_gc_t *, tsol_gcgrp_t *, ip_stack_t *);
 
@@ -252,32 +253,27 @@ extern	ire_t	**ire_check_and_create_bcast(ipif_t *, ipaddr_t,
     ire_t **, int);
 extern	ire_t	**ire_create_bcast(ipif_t *, ipaddr_t, ire_t **);
 extern	ire_t	*ire_init(ire_t *, uchar_t *, uchar_t *, uchar_t *,
-    uchar_t *, uchar_t *, uint_t *, mblk_t *, queue_t *, queue_t *, ushort_t,
-    mblk_t *, ipif_t *, ill_t *, ipaddr_t, uint32_t, uint32_t, uint32_t,
+    uchar_t *, uchar_t *, uint_t *, struct nce_s *, queue_t *, queue_t *,
+    ushort_t, ipif_t *, ill_t *, ipaddr_t, uint32_t, uint32_t, uint32_t,
     const iulp_t *, tsol_gc_t *, tsol_gcgrp_t *, ip_stack_t *);
 
-extern	boolean_t ire_init_common(ire_t *, uint_t *, mblk_t *, queue_t *,
-    queue_t *, ushort_t, mblk_t *, ipif_t *, ill_t *, uint32_t,
+extern	boolean_t ire_init_common(ire_t *, uint_t *, struct nce_s *, queue_t *,
+    queue_t *, ushort_t, ipif_t *, ill_t *, uint32_t,
     uint32_t, uint32_t, uchar_t, const iulp_t *, tsol_gc_t *, tsol_gcgrp_t *,
     ip_stack_t *);
 
 extern	ire_t	*ire_create_v6(const in6_addr_t *, const in6_addr_t *,
-    const in6_addr_t *, const in6_addr_t *, uint_t *, mblk_t *, queue_t *,
-    queue_t *, ushort_t, mblk_t *, ipif_t *,
+    const in6_addr_t *, const in6_addr_t *, uint_t *, struct nce_s *, queue_t *,
+    queue_t *, ushort_t, ipif_t *,
     const in6_addr_t *, uint32_t, uint32_t, uint_t, const iulp_t *,
     tsol_gc_t *, tsol_gcgrp_t *, ip_stack_t *);
 
 extern	ire_t	*ire_create_mp_v6(const in6_addr_t *, const in6_addr_t *,
-    const in6_addr_t *, const in6_addr_t *, mblk_t *, queue_t *,
-    queue_t *, ushort_t, mblk_t *, ipif_t *,
+    const in6_addr_t *, const in6_addr_t *, struct nce_s *, queue_t *,
+    queue_t *, ushort_t, ipif_t *,
     const in6_addr_t *, uint32_t, uint32_t, uint_t, const iulp_t *,
     tsol_gc_t *, tsol_gcgrp_t *, ip_stack_t *);
 
-extern	ire_t	*ire_init_v6(ire_t *, const in6_addr_t *, const in6_addr_t *,
-    const in6_addr_t *, const in6_addr_t *, uint_t *, mblk_t *, queue_t *,
-    queue_t *, ushort_t, mblk_t *, ipif_t *,
-    const in6_addr_t *, uint32_t, uint32_t, uint_t, const iulp_t *,
-    tsol_gc_t *, tsol_gcgrp_t *, ip_stack_t *);
 
 extern	void	ire_clookup_delete_cache_gw(ipaddr_t, zoneid_t,
     ip_stack_t *);
@@ -370,8 +366,7 @@ extern  void	ire_arpresolve(ire_t *,  ill_t *);
 extern  void	ire_freemblk(ire_t *);
 extern boolean_t	ire_match_args(ire_t *, ipaddr_t, ipaddr_t, ipaddr_t,
     int, const ipif_t *, zoneid_t, uint32_t, const struct ts_label_s *, int);
-extern  int	ire_nce_init(ire_t *, mblk_t *, mblk_t *);
-extern  boolean_t	ire_nce_valid_dlureq_mp(mblk_t *);
+extern  int	ire_nce_init(ire_t *, struct nce_s *);
 extern  boolean_t	ire_walk_ill_match(uint_t, uint_t, ire_t *, ill_t *,
     zoneid_t, ip_stack_t *);
 

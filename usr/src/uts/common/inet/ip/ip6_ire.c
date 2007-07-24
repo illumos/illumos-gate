@@ -71,6 +71,10 @@ static boolean_t ire_match_args_v6(ire_t *ire, const in6_addr_t *addr,
     const in6_addr_t *mask, const in6_addr_t *gateway, int type,
     const ipif_t *ipif, zoneid_t zoneid, uint32_t ihandle,
     const ts_label_t *tsl, int match_flags);
+static	ire_t	*ire_init_v6(ire_t *, const in6_addr_t *, const in6_addr_t *,
+    const in6_addr_t *, const in6_addr_t *, uint_t *, queue_t *, queue_t *,
+    ushort_t, ipif_t *, const in6_addr_t *, uint32_t, uint32_t, uint_t,
+    const iulp_t *, tsol_gc_t *, tsol_gcgrp_t *, ip_stack_t *);
 
 /*
  * Named Dispatch routine to produce a formatted report on all IREs.
@@ -141,7 +145,7 @@ ire_report_ftable_v6(ire_t *ire, char *mp)
 
 	ASSERT(ire->ire_ipversion == IPV6_VERSION);
 	if (ire->ire_type & IRE_CACHETABLE)
-	    return;
+		return;
 	buf_len = ((mblk_t *)mp)->b_datap->db_lim - ((mblk_t *)mp)->b_wptr;
 	if (buf_len <= 0)
 		return;
@@ -258,14 +262,13 @@ ire_report_ctable_v6(ire_t *ire, char *mp)
  * Initialize the ire that is specific to IPv6 part and call
  * ire_init_common to finish it.
  */
-ire_t *
-ire_init_v6(ire_t *ire, const in6_addr_t *v6addr,
-    const in6_addr_t *v6mask, const in6_addr_t *v6src_addr,
-    const in6_addr_t *v6gateway, uint_t *max_fragp,
-    mblk_t *fp_mp, queue_t *rfq, queue_t *stq, ushort_t type,
-    mblk_t *dlureq_mp, ipif_t *ipif, const in6_addr_t *v6cmask,
-    uint32_t phandle, uint32_t ihandle, uint_t flags, const iulp_t *ulp_info,
-    tsol_gc_t *gc, tsol_gcgrp_t *gcgrp, ip_stack_t *ipst)
+static ire_t *
+ire_init_v6(ire_t *ire, const in6_addr_t *v6addr, const in6_addr_t *v6mask,
+    const in6_addr_t *v6src_addr, const in6_addr_t *v6gateway,
+    uint_t *max_fragp, queue_t *rfq, queue_t *stq, ushort_t type,
+    ipif_t *ipif, const in6_addr_t *v6cmask, uint32_t phandle,
+    uint32_t ihandle, uint_t flags, const iulp_t *ulp_info, tsol_gc_t *gc,
+    tsol_gcgrp_t *gcgrp, ip_stack_t *ipst)
 {
 
 	/*
@@ -275,30 +278,6 @@ ire_init_v6(ire_t *ire, const in6_addr_t *v6addr,
 	if ((gc != NULL || gcgrp != NULL) && !is_system_labeled())
 		return (NULL);
 
-	if (fp_mp != NULL) {
-		/*
-		 * We can't dupb() here as multiple threads could be
-		 * calling dupb on the same mp which is incorrect.
-		 * First dupb() should be called only by one thread.
-		 */
-		fp_mp = copyb(fp_mp);
-		if (fp_mp == NULL)
-			return (NULL);
-	}
-
-	if (dlureq_mp != NULL) {
-		/*
-		 * We can't dupb() here as multiple threads could be
-		 * calling dupb on the same mp which is incorrect.
-		 * First dupb() should be called only by one thread.
-		 */
-		dlureq_mp = copyb(dlureq_mp);
-		if (dlureq_mp == NULL) {
-			if (fp_mp != NULL)
-				freeb(fp_mp);
-			return (NULL);
-		}
-	}
 
 	BUMP_IRE_STATS(ipst->ips_ire_stats_v6, ire_stats_alloced);
 	ire->ire_addr_v6 = *v6addr;
@@ -325,7 +304,7 @@ ire_init_v6(ire_t *ire, const in6_addr_t *v6addr,
 	}
 
 	/* ire_init_common will free the mblks upon encountering any failure */
-	if (!ire_init_common(ire, max_fragp, fp_mp, rfq, stq, type, dlureq_mp,
+	if (!ire_init_common(ire, max_fragp, NULL, rfq, stq, type,
 	    ipif, NULL, phandle, ihandle, flags, IPV6_VERSION, ulp_info,
 	    gc, gcgrp, ipst))
 		return (NULL);
@@ -337,12 +316,19 @@ ire_init_v6(ire_t *ire, const in6_addr_t *v6addr,
  * Similar to ire_create_v6 except that it is called only when
  * we want to allocate ire as an mblk e.g. we have a external
  * resolver. Do we need this in IPv6 ?
+ *
+ * IPv6 initializes the ire_nce in ire_add_v6, which expects to
+ * find the ire_nce to be null when it is called. So, although
+ * we have a src_nce parameter (in the interest of matching up with
+ * the argument list of the v4 version), we ignore the src_nce
+ * argument here.
  */
+/* ARGSUSED */
 ire_t *
 ire_create_mp_v6(const in6_addr_t *v6addr, const in6_addr_t *v6mask,
     const in6_addr_t *v6src_addr, const in6_addr_t *v6gateway,
-    mblk_t *fp_mp, queue_t *rfq, queue_t *stq, ushort_t type,
-    mblk_t *dlureq_mp, ipif_t *ipif, const in6_addr_t *v6cmask,
+    nce_t *src_nce, queue_t *rfq, queue_t *stq, ushort_t type,
+    ipif_t *ipif, const in6_addr_t *v6cmask,
     uint32_t phandle, uint32_t ihandle, uint_t flags, const iulp_t *ulp_info,
     tsol_gc_t *gc, tsol_gcgrp_t *gcgrp, ip_stack_t *ipst)
 {
@@ -368,7 +354,7 @@ ire_create_mp_v6(const in6_addr_t *v6addr, const in6_addr_t *v6mask,
 	mp->b_datap->db_type = IRE_DB_TYPE;
 
 	ret_ire = ire_init_v6(ire, v6addr, v6mask, v6src_addr, v6gateway,
-	    NULL, fp_mp, rfq, stq, type, dlureq_mp, ipif, v6cmask, phandle,
+	    NULL, rfq, stq, type, ipif, v6cmask, phandle,
 	    ihandle, flags, ulp_info, gc, gcgrp, ipst);
 
 	if (ret_ire == NULL) {
@@ -383,12 +369,16 @@ ire_create_mp_v6(const in6_addr_t *v6addr, const in6_addr_t *v6mask,
  *
  * NOTE : This is called as writer sometimes though not required
  * by this function.
+ *
+ * See comments above ire_create_mp_v6() for the rationale behind the
+ * unused src_nce argument.
  */
+/* ARGSUSED */
 ire_t *
 ire_create_v6(const in6_addr_t *v6addr, const in6_addr_t *v6mask,
     const in6_addr_t *v6src_addr, const in6_addr_t *v6gateway,
-    uint_t *max_fragp, mblk_t *fp_mp, queue_t *rfq, queue_t *stq, ushort_t type,
-    mblk_t *dlureq_mp, ipif_t *ipif, const in6_addr_t *v6cmask,
+    uint_t *max_fragp, nce_t *src_nce, queue_t *rfq, queue_t *stq,
+    ushort_t type, ipif_t *ipif, const in6_addr_t *v6cmask,
     uint32_t phandle, uint32_t ihandle, uint_t flags, const iulp_t *ulp_info,
     tsol_gc_t *gc, tsol_gcgrp_t *gcgrp, ip_stack_t *ipst)
 {
@@ -405,7 +395,7 @@ ire_create_v6(const in6_addr_t *v6addr, const in6_addr_t *v6mask,
 	*ire = ire_null;
 
 	ret_ire = ire_init_v6(ire, v6addr, v6mask, v6src_addr, v6gateway,
-	    max_fragp, fp_mp, rfq, stq, type, dlureq_mp, ipif, v6cmask, phandle,
+	    max_fragp, rfq, stq, type, ipif, v6cmask, phandle,
 	    ihandle, flags, ulp_info, gc, gcgrp, ipst);
 
 	if (ret_ire == NULL) {
@@ -1143,7 +1133,7 @@ ip_ire_clookup_and_delete_v6(const in6_addr_t *addr, ip_stack_t *ipst)
 	boolean_t	found = B_FALSE;
 
 	irb = &ipst->ips_ip_cache_table_v6[IRE_ADDR_HASH_V6(*addr,
-					    ipst->ips_ip6_cache_table_size)];
+	    ipst->ips_ip6_cache_table_size)];
 	IRB_REFHOLD(irb);
 	for (cire = irb->irb_ire; cire != NULL; cire = cire->ire_next) {
 		if (cire->ire_marks & IRE_MARK_CONDEMNED)
@@ -1212,10 +1202,10 @@ ire_delete_cache_v6(ire_t *ire, char *arg)
 	    (ire->ire_flags & RTF_DYNAMIC)) {
 		ip1dbg(("ire_delete_cache_v6: deleted %s type %d through %s\n",
 		    inet_ntop(AF_INET6, &ire->ire_addr_v6,
-			addrstr1, sizeof (addrstr1)),
+		    addrstr1, sizeof (addrstr1)),
 		    ire->ire_type,
 		    inet_ntop(AF_INET6, &ire->ire_gateway_addr_v6,
-			addrstr2, sizeof (addrstr2))));
+		    addrstr2, sizeof (addrstr2))));
 		ire_delete(ire);
 	}
 
@@ -1286,7 +1276,7 @@ ire_flush_cache_v6(ire_t *ire, int flag)
 	ip_stack_t	*ipst = ire->ire_ipst;
 
 	if (ire->ire_type & IRE_CACHE)
-	    return;
+		return;
 
 	/*
 	 * If a default is just created, there is no point
@@ -1541,28 +1531,28 @@ ire_match_args_v6(ire_t *ire, const in6_addr_t *addr, const in6_addr_t *mask,
 
 	if (V6_MASK_EQ(*addr, *mask, ire->ire_addr_v6) &&
 	    ((!(match_flags & MATCH_IRE_GW)) ||
-		IN6_ARE_ADDR_EQUAL(&gw_addr_v6, gateway)) &&
+	    IN6_ARE_ADDR_EQUAL(&gw_addr_v6, gateway)) &&
 	    ((!(match_flags & MATCH_IRE_TYPE)) ||
-		(ire->ire_type & type)) &&
+	    (ire->ire_type & type)) &&
 	    ((!(match_flags & MATCH_IRE_SRC)) ||
-		IN6_ARE_ADDR_EQUAL(&ire->ire_src_addr_v6,
-		&ipif->ipif_v6src_addr)) &&
+	    IN6_ARE_ADDR_EQUAL(&ire->ire_src_addr_v6,
+	    &ipif->ipif_v6src_addr)) &&
 	    ((!(match_flags & MATCH_IRE_IPIF)) ||
-		(ire->ire_ipif == ipif)) &&
+	    (ire->ire_ipif == ipif)) &&
 	    ((!(match_flags & MATCH_IRE_MARK_HIDDEN)) ||
-		(ire->ire_type != IRE_CACHE ||
-		ire->ire_marks & IRE_MARK_HIDDEN)) &&
+	    (ire->ire_type != IRE_CACHE ||
+	    ire->ire_marks & IRE_MARK_HIDDEN)) &&
 	    ((!(match_flags & MATCH_IRE_ILL)) ||
-		(ire_ill == ipif_ill)) &&
+	    (ire_ill == ipif_ill)) &&
 	    ((!(match_flags & MATCH_IRE_IHANDLE)) ||
-		(ire->ire_ihandle == ihandle)) &&
+	    (ire->ire_ihandle == ihandle)) &&
 	    ((!(match_flags & MATCH_IRE_ILL_GROUP)) ||
-		(ire_ill == ipif_ill) ||
-		(ire_ill_group != NULL &&
-		ire_ill_group == ipif_ill_group)) &&
+	    (ire_ill == ipif_ill) ||
+	    (ire_ill_group != NULL &&
+	    ire_ill_group == ipif_ill_group)) &&
 	    ((!(match_flags & MATCH_IRE_SECATTR)) ||
-		(!is_system_labeled()) ||
-		(tsol_ire_match_gwattr(ire, tsl) == 0))) {
+	    (!is_system_labeled()) ||
+	    (tsol_ire_match_gwattr(ire, tsl) == 0))) {
 		/* We found the matched IRE */
 		return (B_TRUE);
 	}
@@ -1687,7 +1677,7 @@ ire_ftable_lookup_v6(const in6_addr_t *addr, const in6_addr_t *mask,
 			return (NULL);
 		irb_ptr = &(ipst->ips_ip_forwarding_table_v6[masklen][
 		    IRE_ADDR_MASK_HASH_V6(*addr, *mask,
-			ipst->ips_ip6_ftable_hash_size)]);
+		    ipst->ips_ip6_ftable_hash_size)]);
 		rw_enter(&irb_ptr->irb_lock, RW_READER);
 		for (ire = irb_ptr->irb_ire; ire != NULL;
 		    ire = ire->ire_next) {
@@ -2149,7 +2139,7 @@ ire_ctable_lookup_v6(const in6_addr_t *addr, const in6_addr_t *gateway,
 		return (NULL);
 
 	irb_ptr = &ipst->ips_ip_cache_table_v6[IRE_ADDR_HASH_V6(*addr,
-				    ipst->ips_ip6_cache_table_size)];
+	    ipst->ips_ip6_cache_table_size)];
 	rw_enter(&irb_ptr->irb_lock, RW_READER);
 	for (ire = irb_ptr->irb_ire; ire; ire = ire->ire_next) {
 		if (ire->ire_marks & IRE_MARK_CONDEMNED)
@@ -2502,13 +2492,13 @@ ire_multirt_need_resolve_v6(const in6_addr_t *v6dstp, const ts_label_t *tsl,
 	/* Then subtract the number of routes to that dst that are resolved */
 	IRB_REFHOLD(cirb);
 	for (cire = first_cire; cire != NULL; cire = cire->ire_next) {
-	    if (!(cire->ire_flags & RTF_MULTIRT))
-		continue;
-	    if (!IN6_ARE_ADDR_EQUAL(&cire->ire_addr_v6, v6dstp))
-		continue;
-	    if (cire->ire_marks & (IRE_MARK_CONDEMNED|IRE_MARK_HIDDEN))
-		continue;
-	    unres_cnt--;
+		if (!(cire->ire_flags & RTF_MULTIRT))
+			continue;
+		if (!IN6_ARE_ADDR_EQUAL(&cire->ire_addr_v6, v6dstp))
+			continue;
+		if (cire->ire_marks & (IRE_MARK_CONDEMNED|IRE_MARK_HIDDEN))
+			continue;
+		unres_cnt--;
 	}
 	IRB_REFRELE(cirb);
 
@@ -2644,7 +2634,7 @@ ire_multirt_lookup_v6(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
 						continue;
 					if (cire->ire_marks &
 					    (IRE_MARK_CONDEMNED|
-						IRE_MARK_HIDDEN))
+					    IRE_MARK_HIDDEN))
 						continue;
 
 					if (cire->ire_gw_secattr != NULL &&
@@ -2732,7 +2722,7 @@ ire_multirt_lookup_v6(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
 
 			res = (boolean_t)
 			    ((delta > ipst->
-				ips_ip_multirt_resolution_interval) ||
+			    ips_ip_multirt_resolution_interval) ||
 			    (!(flags & MULTIRT_USESTAMP)));
 
 			ip2dbg(("ire_multirt_lookup_v6: fire %p, delta %lu, "
@@ -2846,7 +2836,7 @@ ire_multirt_lookup_v6(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
 						continue;
 					if (cire->ire_marks &
 					    (IRE_MARK_CONDEMNED|
-						IRE_MARK_HIDDEN))
+					    IRE_MARK_HIDDEN))
 						continue;
 
 					if (cire->ire_gw_secattr != NULL &&
@@ -2895,7 +2885,7 @@ ire_multirt_lookup_v6(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
 
 			res = (boolean_t)
 			    ((delta > ipst->
-				ips_ip_multirt_resolution_interval) ||
+			    ips_ip_multirt_resolution_interval) ||
 			    (!(flags & MULTIRT_USESTAMP)));
 
 			ip3dbg(("ire_multirt_lookup_v6: fire %p, delta %lx, "

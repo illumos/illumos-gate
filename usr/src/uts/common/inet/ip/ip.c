@@ -3162,20 +3162,19 @@ icmp_redirect(ill_t *ill, mblk_t *mp)
 	    (uchar_t *)&gateway,		/* gateway addr */
 	    NULL,				/* no in_srcaddr */
 	    &save_ire->ire_max_frag,		/* max frag */
-	    NULL,				/* Fast Path header */
+	    NULL,				/* no src nce */
 	    NULL,				/* no rfq */
 	    NULL,				/* no stq */
 	    IRE_HOST,
-	    NULL,
-	    NULL,
-	    NULL,
-	    0,
-	    0,
-	    0,
+	    NULL,				/* ipif */
+	    NULL,				/* in_ill */
+	    0,					/* cmask */
+	    0,					/* phandle */
+	    0,					/* ihandle */
 	    (RTF_DYNAMIC | RTF_GATEWAY | RTF_HOST),
 	    &ulp_info,
-	    NULL,
-	    NULL,
+	    NULL,				/* tsol_gc_t */
+	    NULL,				/* gcgrp */
 	    ipst);
 
 	if (ire == NULL) {
@@ -4133,8 +4132,10 @@ ip_arp_news(queue_t *q, mblk_t *mp)
 			hwm.hwm_addr = src;
 			hwm.hwm_hwlen = arh->arh_hlen;
 			hwm.hwm_hwaddr = (uchar_t *)(arh + 1);
+			NDP_HW_CHANGE_INCR(ipst->ips_ndp4);
 			ndp_walk_common(ipst->ips_ndp4, NULL,
 			    (pfi_t)nce_delete_hw_changed, &hwm, ALL_ZONES);
+			NDP_HW_CHANGE_DECR(ipst->ips_ndp4);
 		}
 		break;
 	case AR_CN_READY:
@@ -8532,7 +8533,6 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 		switch (ire->ire_type) {
 		case IRE_CACHE: {
 			ire_t	*ipif_ire;
-			mblk_t	*ire_fp_mp;
 
 			ASSERT(save_ire->ire_nce->nce_state == ND_REACHABLE);
 			if (gw == 0)
@@ -8564,16 +8564,6 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 				    "ire_ihandle_lookup_offlink failed\n"));
 				goto icmp_err_ret;
 			}
-			/*
-			 * XXX We are using the same res_mp
-			 * (DL_UNITDATA_REQ) though the save_ire is not
-			 * pointing at the same ill.
-			 * This is incorrect. We need to send it up to the
-			 * resolver to get the right res_mp. For ethernets
-			 * this may be okay (ill_type == DL_ETHER).
-			 */
-			res_mp = save_ire->ire_nce->nce_res_mp;
-			ire_fp_mp = NULL;
 
 			/*
 			 * Check cached gateway IRE for any security
@@ -8587,6 +8577,16 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 				mutex_exit(&attrp->igsa_lock);
 			}
 
+			/*
+			 * XXX For the source of the resolver mp,
+			 * we are using the same DL_UNITDATA_REQ
+			 * (from save_ire->ire_nce->nce_res_mp)
+			 * though the save_ire is not pointing at the same ill.
+			 * This is incorrect. We need to send it up to the
+			 * resolver to get the right res_mp. For ethernets
+			 * this may be okay (ill_type == DL_ETHER).
+			 */
+
 			ire = ire_create(
 			    (uchar_t *)&dst,		/* dest address */
 			    (uchar_t *)&ip_g_all_ones,	/* mask */
@@ -8594,11 +8594,10 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 			    (uchar_t *)&gw,		/* gateway address */
 			    NULL,
 			    &save_ire->ire_max_frag,
-			    ire_fp_mp,			/* Fast Path header */
+			    save_ire->ire_nce,		/* src nce */
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,			/* IRE type */
-			    res_mp,
 			    src_ipif,
 			    in_ill,			/* incoming ill */
 			    (sire != NULL) ?
@@ -8707,38 +8706,14 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 			return;
 		}
 		case IRE_IF_NORESOLVER: {
-			/*
-			 * We have what we need to build an IRE_CACHE.
-			 *
-			 * Create a new res_mp with the IP gateway address
-			 * in destination address in the DLPI hdr if the
-			 * physical length is exactly 4 bytes.
-			 */
-			if (dst_ill->ill_phys_addr_length == IP_ADDR_LEN) {
-				uchar_t *addr;
 
-				if (gw)
-					addr = (uchar_t *)&gw;
-				else
-					addr = (uchar_t *)&dst;
-
-				res_mp = ill_dlur_gen(addr,
-				    dst_ill->ill_phys_addr_length,
-				    dst_ill->ill_sap,
-				    dst_ill->ill_sap_length);
-
-				if (res_mp == NULL) {
-					ip1dbg(("ip_newroute: res_mp NULL\n"));
-					break;
-				}
-			} else if (dst_ill->ill_resolver_mp == NULL) {
+			if (dst_ill->ill_phys_addr_length != IP_ADDR_LEN &&
+			    dst_ill->ill_resolver_mp == NULL) {
 				ip1dbg(("ip_newroute: dst_ill %p "
-				    "for IF_NORESOLV ire %p has "
+				    "for IRE_IF_NORESOLVER ire %p has "
 				    "no ill_resolver_mp\n",
 				    (void *)dst_ill, (void *)ire));
 				break;
-			} else {
-				res_mp = NULL;
 			}
 
 			/*
@@ -8765,11 +8740,10 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 			    (uchar_t *)&gw,		/* gateway address */
 			    NULL,
 			    &save_ire->ire_max_frag,
-			    NULL,			/* Fast Path header */
+			    NULL,			/* no src nce */
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,
-			    res_mp,
 			    src_ipif,
 			    in_ill,			/* Incoming ill */
 			    save_ire->ire_mask,		/* Parent mask */
@@ -8782,9 +8756,6 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 			    NULL,
 			    gcgrp,
 			    ipst);
-
-			if (dst_ill->ill_phys_addr_length == IP_ADDR_LEN)
-				freeb(res_mp);
 
 			if (ire == NULL) {
 				if (gcgrp != NULL) {
@@ -8936,11 +8907,10 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp,
 			    (uchar_t *)&gw,		/* gateway address */
 			    NULL,			/* no in_src_addr */
 			    NULL,			/* ire_max_frag */
-			    NULL,			/* Fast Path header */
+			    NULL,			/* no src nce */
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,
-			    NULL,
 			    src_ipif,			/* Interface ipif */
 			    in_ill,			/* Incoming ILL */
 			    save_ire->ire_mask,		/* Parent mask */
@@ -9513,34 +9483,16 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 		switch (ipif->ipif_net_type) {
 		case IRE_IF_NORESOLVER: {
 			/* We have what we need to build an IRE_CACHE. */
-			mblk_t	*res_mp;
 
-			/*
-			 * Create a new res_mp with the
-			 * IP gateway address as destination address in the
-			 * DLPI hdr if the physical length is exactly 4 bytes.
-			 */
-			if (dst_ill->ill_phys_addr_length == IP_ADDR_LEN) {
-				res_mp = ill_dlur_gen((uchar_t *)&dst,
-				    dst_ill->ill_phys_addr_length,
-				    dst_ill->ill_sap,
-				    dst_ill->ill_sap_length);
-			} else if (dst_ill->ill_resolver_mp == NULL) {
-				ip1dbg(("ip_newroute: dst_ill %p "
-				    "for IF_NORESOLV ire %p has "
+			if ((dst_ill->ill_phys_addr_length != IP_ADDR_LEN) &&
+			    (dst_ill->ill_resolver_mp == NULL)) {
+				ip1dbg(("ip_newroute_ipif: dst_ill %p "
+				    "for IRE_IF_NORESOLVER ire %p has "
 				    "no ill_resolver_mp\n",
 				    (void *)dst_ill, (void *)ire));
 				break;
-			} else {
-				/* use the value set in ip_ll_subnet_defaults */
-				res_mp = ill_dlur_gen(NULL,
-				    dst_ill->ill_phys_addr_length,
-				    dst_ill->ill_sap,
-				    dst_ill->ill_sap_length);
 			}
 
-			if (res_mp == NULL)
-				break;
 			/*
 			 * The new ire inherits the IRE_OFFSUBNET flags
 			 * and source address, if this was requested.
@@ -9552,11 +9504,10 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			    NULL,			/* gateway address */
 			    NULL,
 			    &ipif->ipif_mtu,
-			    NULL,			/* Fast Path header */
+			    NULL,			/* no src nce */
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,
-			    res_mp,
 			    src_ipif,
 			    NULL,
 			    (save_ire != NULL ? save_ire->ire_mask : 0),
@@ -9571,8 +9522,6 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			    NULL,
 			    NULL,
 			    ipst);
-
-			freeb(res_mp);
 
 			if (ire == NULL) {
 				if (save_ire != NULL)
@@ -9715,12 +9664,11 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			    NULL,			/* gateway address */
 			    NULL,			/* no in_src_addr */
 			    (ire_marks & IRE_MARK_NOADD) ?
-			    ipif->ipif_mtu : 0,	/* max_frag */
-			    NULL,			/* Fast path header */
+			    ipif->ipif_mtu : 0,		/* max_frag */
+			    NULL,			/* no src nce */
 			    dst_ill->ill_rq,		/* recv-from queue */
 			    dst_ill->ill_wq,		/* send-to queue */
 			    IRE_CACHE,
-			    NULL,	/* let ire_nce_init figure res_mp out */
 			    src_ipif,
 			    NULL,
 			    (save_ire != NULL ? save_ire->ire_mask : 0),
@@ -28050,8 +27998,7 @@ nak:
 				 */
 				freeb(mp1);
 			} else {
-				if (arpce->nce_res_mp != NULL)
-					freemsg(arpce->nce_res_mp);
+				ASSERT(arpce->nce_res_mp == NULL);
 				arpce->nce_res_mp = mp1;
 				arpce->nce_state = ND_REACHABLE;
 			}
@@ -28175,10 +28122,7 @@ nak:
 			mutex_exit(&nce->nce_lock);
 			freeb(mp1);  /* dl_unitdata response */
 		} else {
-			if (nce->nce_res_mp != NULL) {
-				freemsg(nce->nce_res_mp);
-				/* existing dl_unitdata template */
-			}
+			ASSERT(nce->nce_res_mp == NULL);
 			nce->nce_res_mp = mp1;
 			nce->nce_state = ND_REACHABLE;
 			mutex_exit(&nce->nce_lock);
@@ -28186,7 +28130,7 @@ nak:
 		}
 		/*
 		 * The cached nce_t has been updated to be reachable;
-		 * Set the IRE_MARK_UNCACHED flag and free the fake_ire.
+		 * Clear the IRE_MARK_UNCACHED flag and free the fake_ire.
 		 */
 		fake_ire->ire_marks &= ~IRE_MARK_UNCACHED;
 		freemsg(mp);
