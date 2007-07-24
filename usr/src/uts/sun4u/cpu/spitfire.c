@@ -701,8 +701,8 @@ send_one_mondo(int cpuid)
 			if (panic_quiesce)
 				return;
 			cmn_err(CE_PANIC,
-			"send mondo timeout (target 0x%x) [%d NACK %d BUSY]",
-			upaid, nack, busy);
+			    "send mondo timeout (target 0x%x) [%d NACK %d "
+			    "BUSY]", upaid, nack, busy);
 		}
 		if (idsr & IDSR_BUSY) {
 			busy++;
@@ -839,7 +839,7 @@ cpu_ce_error(struct regs *rp, ulong_t p_afar, ulong_t p_afsr,
 	ecc->flt_pc = (caddr_t)rp->r_pc;
 	ecc->flt_func = log_ce_err;
 	ecc->flt_in_memory =
-		(pf_is_memory(ecc->flt_addr >> MMU_PAGESHIFT)) ? 1: 0;
+	    (pf_is_memory(ecc->flt_addr >> MMU_PAGESHIFT)) ? 1: 0;
 	spf_flt.flt_sdbh = sdbh;
 	spf_flt.flt_sdbl = sdbl;
 
@@ -853,8 +853,8 @@ cpu_ce_error(struct regs *rp, ulong_t p_afar, ulong_t p_afsr,
 	 */
 	if ((t_afsr & P_AFSR_CE) == 0) {
 		cpu_aflt_log(CE_PANIC, 1, &spf_flt, CMN_LFLAGS,
-			"** Panic due to CE bit not set in the AFSR",
-			"  Corrected Memory Error on");
+		    "** Panic due to CE bit not set in the AFSR",
+		    "  Corrected Memory Error on");
 	}
 
 	/*
@@ -882,8 +882,8 @@ cpu_ce_error(struct regs *rp, ulong_t p_afar, ulong_t p_afsr,
 
 	if (((sdbh & P_DER_CE) == 0) && ((sdbl & P_DER_CE) == 0)) {
 		cpu_aflt_log(CE_PANIC, 1, &spf_flt, CMN_LFLAGS,
-			"** Panic due to CE bits not set in the UDBs",
-			" Corrected Memory Error on");
+		    "** Panic due to CE bits not set in the UDBs",
+		    " Corrected Memory Error on");
 	}
 
 	if ((sdbh >> 8) & 1) {
@@ -976,8 +976,8 @@ cpu_ce_log_status(spitf_async_flt *spf_flt, char *unum)
 		status2_str = "Persistent";
 
 	cpu_aflt_log(CE_CONT, 0, spf_flt, CPU_ERRID_FIRST,
-		NULL, " Corrected %s Error on %s is %s",
-		status1_str, unum, status2_str);
+	    NULL, " Corrected %s Error on %s is %s",
+	    status1_str, unum, status2_str);
 }
 
 /*
@@ -1005,7 +1005,7 @@ cpu_ce_scrub_mem_err(struct async_flt *ecc, boolean_t triedcpulogout)
 	kpreempt_disable();
 	eer = get_error_enable();
 	if (eer & (EER_CEEN | EER_NCEEN))
-	    set_error_enable(eer & ~(EER_CEEN | EER_NCEEN));
+		set_error_enable(eer & ~(EER_CEEN | EER_NCEEN));
 
 	/*
 	 * To check if the error detected by IO is persistent, sticky or
@@ -1026,13 +1026,13 @@ cpu_ce_scrub_mem_err(struct async_flt *ecc, boolean_t triedcpulogout)
 		 */
 		set_asyncflt(afsr & (P_AFSR_TO | P_AFSR_BERR));
 		if (eer & (EER_CEEN | EER_NCEEN))
-		    set_error_enable(eer);
+			set_error_enable(eer);
 		kpreempt_enable();
 		return;
 	}
 
 	if (eer & EER_NCEEN)
-	    set_error_enable(eer & ~EER_CEEN);
+		set_error_enable(eer & ~EER_CEEN);
 
 	/*
 	 * Check and clear any ECC errors from the scrub.  If the scrub did
@@ -1051,7 +1051,7 @@ cpu_ce_scrub_mem_err(struct async_flt *ecc, boolean_t triedcpulogout)
 		status = ECC_INTERMITTENT;
 
 	if (eer & (EER_CEEN | EER_NCEEN))
-	    set_error_enable(eer);
+		set_error_enable(eer);
 	kpreempt_enable();
 
 	ecc->flt_status &= ~(ECC_INTERMITTENT | ECC_PERSISTENT | ECC_STICKY);
@@ -1107,7 +1107,7 @@ cpu_ce_log_err(struct async_flt *ecc, errorq_elem_t *eqep)
 		cpu_ce_log_status(&sflt, unum);
 
 		synd_code = synd_to_synd_code(AFLT_STAT_VALID,
-				SYND(ecc->flt_synd));
+		    SYND(ecc->flt_synd));
 
 		if (SYND_IS_SINGLE_BIT_DATA(synd_code)) {
 			cpu_aflt_log(CE_CONT, 0, &sflt, CPU_ERRID_FIRST,
@@ -1428,7 +1428,7 @@ cpu_async_error(struct regs *rp, ulong_t p_afar, ulong_t p_afsr,
 
 		spf_flt.flt_type = CPU_UE_ERR;
 		aflt->flt_in_memory = (pf_is_memory(aflt->flt_addr >>
-			MMU_PAGESHIFT)) ? 1: 0;
+		    MMU_PAGESHIFT)) ? 1: 0;
 
 		/*
 		 * With UE, we have the PA of the fault.
@@ -1445,7 +1445,7 @@ cpu_async_error(struct regs *rp, ulong_t p_afar, ulong_t p_afsr,
 			acc_afsr |= read_and_clear_afsr();
 			(void) lddphys(faultpa);
 			acc_afsr |= (read_and_clear_afsr() &
-				    ~(P_AFSR_EDP | P_AFSR_UE));
+			    ~(P_AFSR_EDP | P_AFSR_UE));
 
 			ec_set_size = cpunodes[CPU->cpu_id].ecache_size /
 			    ecache_associativity;
@@ -1454,8 +1454,8 @@ cpu_async_error(struct regs *rp, ulong_t p_afar, ulong_t p_afsr,
 				ecache_idx = i * ec_set_size +
 				    (aflt->flt_addr % ec_set_size);
 				get_ecache_dtag(P2ALIGN(ecache_idx, 64),
-					(uint64_t *)&spf_flt.flt_ec_data[0],
-					&spf_flt.flt_ec_tag, &oafsr, &acc_afsr);
+				    (uint64_t *)&spf_flt.flt_ec_data[0],
+				    &spf_flt.flt_ec_tag, &oafsr, &acc_afsr);
 				acc_afsr |= oafsr;
 
 				state = (uchar_t)((spf_flt.flt_ec_tag &
@@ -1479,13 +1479,13 @@ cpu_async_error(struct regs *rp, ulong_t p_afar, ulong_t p_afsr,
 			    (spf_flt.flt_ec_tag & cpu_ec_tag_mask) !=
 			    ((uint64_t)aflt->flt_addr >> cpu_ec_tag_shift)) {
 				for (i = 0; i < 8; i++, faultpa += 8) {
-				    ec_data_t *ecdptr;
+					ec_data_t *ecdptr;
 
 					ecdptr = &spf_flt.flt_ec_data[i];
 					acc_afsr |= read_and_clear_afsr();
 					ecdptr->ec_d8 = lddphys(faultpa);
 					acc_afsr |= (read_and_clear_afsr() &
-						    ~(P_AFSR_EDP | P_AFSR_UE));
+					    ~(P_AFSR_EDP | P_AFSR_UE));
 					ecdptr->ec_afsr = 0;
 							/* null afsr value */
 				}
@@ -1502,7 +1502,7 @@ cpu_async_error(struct regs *rp, ulong_t p_afar, ulong_t p_afsr,
 			 * Flush out the bad line
 			 */
 			flushecacheline(P2ALIGN(aflt->flt_addr, 64),
-				cpunodes[CPU->cpu_id].ecache_size);
+			    cpunodes[CPU->cpu_id].ecache_size);
 
 			acc_afsr |= clear_errors(NULL, NULL);
 		}
@@ -1571,7 +1571,7 @@ cpu_async_error(struct regs *rp, ulong_t p_afar, ulong_t p_afsr,
 		 */
 		aflt->flt_addr = AFLT_INV_ADDR;
 		scan_ecache(&aflt->flt_addr, &spf_flt.flt_ec_data[0],
-			&spf_flt.flt_ec_tag, &spf_flt.flt_ec_lcnt, &oafsr);
+		    &spf_flt.flt_ec_tag, &spf_flt.flt_ec_lcnt, &oafsr);
 		acc_afsr |= (oafsr & ~P_AFSR_WP);
 
 		/*
@@ -1581,7 +1581,7 @@ cpu_async_error(struct regs *rp, ulong_t p_afar, ulong_t p_afsr,
 		 */
 		if (aflt->flt_addr != AFLT_INV_ADDR) {
 			aflt->flt_in_memory = (pf_is_memory(aflt->flt_addr >>
-				MMU_PAGESHIFT)) ? 1 : 0;
+			    MMU_PAGESHIFT)) ? 1 : 0;
 		}
 
 		if (isus2i || isus2e)
@@ -1676,8 +1676,8 @@ cpu_async_error(struct regs *rp, ulong_t p_afar, ulong_t p_afsr,
 			 */
 			aflt->flt_addr = AFLT_INV_ADDR;
 			scan_ecache(&aflt->flt_addr, &spf_flt.flt_ec_data[0],
-				&spf_flt.flt_ec_tag, &spf_flt.flt_ec_lcnt,
-				&oafsr);
+			    &spf_flt.flt_ec_tag, &spf_flt.flt_ec_lcnt,
+			    &oafsr);
 			acc_afsr |= oafsr;
 
 			/*
@@ -1686,8 +1686,8 @@ cpu_async_error(struct regs *rp, ulong_t p_afar, ulong_t p_afsr,
 			 */
 			if (aflt->flt_addr != AFLT_INV_ADDR) {
 				aflt->flt_in_memory =
-					(pf_is_memory(aflt->flt_addr >>
-						MMU_PAGESHIFT)) ? 1 : 0;
+				    (pf_is_memory(aflt->flt_addr >>
+				    MMU_PAGESHIFT)) ? 1 : 0;
 			}
 			read_all_memscrub = 1;
 			cpu_errorq_dispatch(FM_EREPORT_CPU_USII_CP,
@@ -1831,7 +1831,7 @@ check_misc_err(spitf_async_flt *spf_flt)
 		fatal_str = " Interrupt Vector Uncorrectable Error on";
 	if (fatal_str != NULL) {
 		cpu_aflt_log(CE_PANIC, 1, spf_flt, CMN_LFLAGS,
-			NULL, fatal_str);
+		    NULL, fatal_str);
 	}
 }
 
@@ -1921,8 +1921,8 @@ cpu_get_mem_unum_aflt(int synd_status, struct async_flt *aflt,
     char *buf, int buflen, int *lenp)
 {
 	return (cpu_get_mem_unum(synd_status, SYND(aflt->flt_synd),
-		aflt->flt_stat, aflt->flt_addr, aflt->flt_bus_id,
-		aflt->flt_in_memory, aflt->flt_status, buf, buflen, lenp));
+	    aflt->flt_stat, aflt->flt_addr, aflt->flt_bus_id,
+	    aflt->flt_in_memory, aflt->flt_status, buf, buflen, lenp));
 }
 
 /*
@@ -2060,7 +2060,7 @@ cpu_async_log_err(void *flt)
 	char *ecache_scrub_logstr = NULL;
 
 	switch (spf_flt->flt_type) {
-	    case CPU_UE_ERR:
+	case CPU_UE_ERR:
 		/*
 		 * We want to skip logging only if ALL the following
 		 * conditions are true:
@@ -2101,7 +2101,7 @@ cpu_async_log_err(void *flt)
 			cpu_check_allcpus(aflt);
 		break;
 
-	    case CPU_EDP_LDP_ERR:
+	case CPU_EDP_LDP_ERR:
 		if (aflt->flt_stat & P_AFSR_EDP)
 			cpu_aflt_log(CE_WARN, 1, spf_flt, PARERR_LFLAGS,
 			    NULL, " EDP event on");
@@ -2123,7 +2123,7 @@ cpu_async_log_err(void *flt)
 		}
 		break;
 
-	    case CPU_WP_ERR:
+	case CPU_WP_ERR:
 		/*
 		 * If the memscrub thread hasn't yet read
 		 * all of memory, as we requested in the
@@ -2137,7 +2137,7 @@ cpu_async_log_err(void *flt)
 		    " WP event on");
 		return;
 
-	    case CPU_BTO_BERR_ERR:
+	case CPU_BTO_BERR_ERR:
 		/*
 		 * A bus timeout or error occurred that was in user mode or not
 		 * in a protected kernel code region.
@@ -2158,7 +2158,7 @@ cpu_async_log_err(void *flt)
 
 		return;
 
-	    case CPU_PANIC_CP_ERR:
+	case CPU_PANIC_CP_ERR:
 		/*
 		 * Process the Copyback (CP) error info (if any) obtained from
 		 * polling all the cpus in the panic flow. This case is only
@@ -2189,7 +2189,7 @@ cpu_async_log_err(void *flt)
 
 		return;
 
-	    case CPU_TRAPPING_CP_ERR:
+	case CPU_TRAPPING_CP_ERR:
 		/*
 		 * For sabre only.  This is a copyback ecache parity error due
 		 * to a PCI DMA read.  We should be panicking if we get here.
@@ -2207,32 +2207,32 @@ cpu_async_log_err(void *flt)
 		 * dirty_bad_busy if ecache_scrub_verbose is set and panic
 		 * in addition to logging if ecache_scrub_panic is set.
 		 */
-	    case CPU_BADLINE_CI_ERR:
+	case CPU_BADLINE_CI_ERR:
 		ecache_scrub_logstr = "CBI";
 		/* FALLTHRU */
 
-	    case CPU_BADLINE_CB_ERR:
+	case CPU_BADLINE_CB_ERR:
 		if (ecache_scrub_logstr == NULL)
 			ecache_scrub_logstr = "CBB";
 		/* FALLTHRU */
 
-	    case CPU_BADLINE_DI_ERR:
+	case CPU_BADLINE_DI_ERR:
 		if (ecache_scrub_logstr == NULL)
 			ecache_scrub_logstr = "DBI";
 		/* FALLTHRU */
 
-	    case CPU_BADLINE_DB_ERR:
+	case CPU_BADLINE_DB_ERR:
 		if (ecache_scrub_logstr == NULL)
 			ecache_scrub_logstr = "DBB";
 
 		cpu_aflt_log(CE_NOTE, 2, spf_flt,
-			(CPU_ERRID_FIRST | CPU_FLTCPU), NULL,
-			" %s event on", ecache_scrub_logstr);
+		    (CPU_ERRID_FIRST | CPU_FLTCPU), NULL,
+		    " %s event on", ecache_scrub_logstr);
 		cpu_log_ecmem_info(spf_flt);
 
 		return;
 
-	    case CPU_ORPHAN_CP_ERR:
+	case CPU_ORPHAN_CP_ERR:
 		/*
 		 * Orphan CPs, where the CP bit is set, but when a CPU
 		 * doesn't report a UE.
@@ -2241,49 +2241,49 @@ cpu_async_log_err(void *flt)
 			memscrub_run();
 
 		cpu_aflt_log(CE_NOTE, 2, spf_flt, (CP_LFLAGS | CPU_FLTCPU),
-			NULL, " Orphan CP event on");
+		    NULL, " Orphan CP event on");
 
 		/* Log ecache info if exist */
 		if (spf_flt->flt_ec_lcnt > 0)
 			cpu_log_ecmem_info(spf_flt);
 		else
 			cpu_aflt_log(CE_NOTE, 2, spf_flt,
-				(CP_LFLAGS | CPU_FLTCPU), NULL,
-				" No error found in ecache (No fault "
-				"PA available");
+			    (CP_LFLAGS | CPU_FLTCPU), NULL,
+			    " No error found in ecache (No fault "
+			    "PA available");
 		return;
 
-	    case CPU_ECACHE_ADDR_PAR_ERR:
+	case CPU_ECACHE_ADDR_PAR_ERR:
 		cpu_aflt_log(CE_WARN, 1, spf_flt, PARERR_LFLAGS, NULL,
-				" E$ Tag Address Parity error on");
+		    " E$ Tag Address Parity error on");
 		cpu_log_ecmem_info(spf_flt);
 		return;
 
-	    case CPU_ECACHE_STATE_ERR:
+	case CPU_ECACHE_STATE_ERR:
 		cpu_aflt_log(CE_WARN, 1, spf_flt, PARERR_LFLAGS, NULL,
-				" E$ Tag State Parity error on");
+		    " E$ Tag State Parity error on");
 		cpu_log_ecmem_info(spf_flt);
 		return;
 
-	    case CPU_ECACHE_TAG_ERR:
+	case CPU_ECACHE_TAG_ERR:
 		cpu_aflt_log(CE_WARN, 1, spf_flt, PARERR_LFLAGS, NULL,
-				" E$ Tag scrub event on");
+		    " E$ Tag scrub event on");
 		cpu_log_ecmem_info(spf_flt);
 		return;
 
-	    case CPU_ECACHE_ETP_ETS_ERR:
+	case CPU_ECACHE_ETP_ETS_ERR:
 		cpu_aflt_log(CE_WARN, 1, spf_flt, PARERR_LFLAGS, NULL,
-				" AFSR.ETP is set and AFSR.ETS is zero on");
+		    " AFSR.ETP is set and AFSR.ETS is zero on");
 		cpu_log_ecmem_info(spf_flt);
 		return;
 
 
-	    case CPU_ADDITIONAL_ERR:
+	case CPU_ADDITIONAL_ERR:
 		cpu_aflt_log(CE_WARN, 1, spf_flt, CMN_LFLAGS & ~CPU_SPACE, NULL,
 		    " Additional errors detected during error processing on");
 		return;
 
-	    default:
+	default:
 		cmn_err(CE_WARN, "cpu_async_log_err: fault %p has unknown "
 		    "fault type %x", (void *)spf_flt, spf_flt->flt_type);
 		return;
@@ -2450,8 +2450,8 @@ get_cpu_status(uint64_t arg)
 		for (i = 0, ec_idx = (aflt->flt_addr % ec_set_size);
 		    i < ecache_associativity; i++, ec_idx += ec_set_size) {
 			get_ecache_dtag(P2ALIGN(ec_idx, 64),
-				(uint64_t *)&ec_data[0], &ec_tag, &oafsr,
-				    acc_afsr);
+			    (uint64_t *)&ec_data[0], &ec_tag, &oafsr,
+			    acc_afsr);
 
 			if ((ec_tag & cpu_ec_tag_mask) != flt_addr_tag)
 				continue;
@@ -2547,12 +2547,13 @@ cpu_read_paddr(struct async_flt *ecc, short verbose, short ce_err)
 		data = lddphys(paddr);
 		if (verbose) {
 			if (ce_err) {
-			    ecc_0 = ecc_gen((uint32_t)(data>>32),
-			    (uint32_t)data);
-			    cpu_aflt_log(CE_CONT, 0, NULL, NO_LFLAGS,
-				NULL, "    Paddr 0x%" PRIx64 ", "
-				"Data 0x%08x.%08x, ECC 0x%x", paddr,
-				(uint32_t)(data>>32), (uint32_t)data, ecc_0);
+				ecc_0 = ecc_gen((uint32_t)(data>>32),
+				    (uint32_t)data);
+				cpu_aflt_log(CE_CONT, 0, NULL, NO_LFLAGS,
+				    NULL, "    Paddr 0x%" PRIx64 ", "
+				    "Data 0x%08x.%08x, ECC 0x%x", paddr,
+				    (uint32_t)(data>>32), (uint32_t)data,
+				    ecc_0);
 			} else {
 				cpu_aflt_log(CE_CONT, 0, NULL, NO_LFLAGS,
 				    NULL, "    Paddr 0x%" PRIx64 ", "
@@ -2699,7 +2700,7 @@ check_ecc(struct async_flt *ecc)
 		if (ce_debug || ue_debug) {
 			spitf_async_flt spf_flt; /* for logging */
 			struct async_flt *aflt =
-				(struct async_flt *)&spf_flt;
+			    (struct async_flt *)&spf_flt;
 
 			/* Package the info nicely in the spf_flt struct */
 			bzero(&spf_flt, sizeof (spitf_async_flt));
@@ -2897,7 +2898,7 @@ cpu_change_speed(uint64_t new_divisor, uint64_t arg2)
 		CHANGE_REFRESH_COUNT(HB_SPEED_UP, cur_divisor, new_divisor);
 	}
 	CPU->cpu_m.divisor = (uchar_t)new_divisor;
-	pi->pi_curr_clock =
+	CPU->cpu_curr_clock =
 	    (((uint64_t)pi->pi_clock * 1000000) / new_divisor);
 #endif
 }
@@ -3009,7 +3010,7 @@ scan_ecache(uint64_t *t_afar, ec_data_t *ecache_data,
 
 				/* clean up the cache line */
 				flushecacheline(P2ALIGN(errpa, 64),
-					cpunodes[CPU->cpu_id].ecache_size);
+				    cpunodes[CPU->cpu_id].ecache_size);
 
 				oafsr = clear_errors(NULL, cpu_afsr);
 				acc_afsr |= oafsr;
@@ -3178,7 +3179,7 @@ cpu_aflt_log(int ce_code, int tagnum, spitf_async_flt *spflt, uint_t logflags,
 	int console_log_flag;
 
 	if ((aflt == NULL) || ((aflt->flt_class == CPU_FAULT) &&
-				(aflt->flt_stat & P_AFSR_LEVEL1)) ||
+	    (aflt->flt_stat & P_AFSR_LEVEL1)) ||
 	    (aflt->flt_panic)) {
 		console_log_flag = (tagnum < 2) || aft_verbose;
 	} else {
@@ -3493,26 +3494,26 @@ scrub_ecache_line()
 			 * whole cache is scanned every second.
 			 */
 			scan_lines = (nlines * ecache_scan_rate) /
-					(1000 * ecache_calls_a_sec);
+			    (1000 * ecache_calls_a_sec);
 			if (!(ssmp->ecache_busy)) {
 				if (ecache_idle_factor > 0) {
 					scan_lines *= ecache_idle_factor;
 				}
 			} else {
 				flush_clean_busy = (scan_lines *
-					ecache_flush_clean_good_busy) / 100;
+				    ecache_flush_clean_good_busy) / 100;
 				flush_dirty_busy = (scan_lines *
-					ecache_flush_dirty_good_busy) / 100;
+				    ecache_flush_dirty_good_busy) / 100;
 			}
 
 			ec_timeout_calls = (ecache_calls_a_sec ?
-						ecache_calls_a_sec : 1);
+			    ecache_calls_a_sec : 1);
 			break;
 
 		case ECACHE_CPU_MIRROR:
 			scan_lines = ecache_lines_per_call_mirrored;
 			ec_timeout_calls = (ecache_calls_a_sec_mirrored ?
-					ecache_calls_a_sec_mirrored : 1);
+			    ecache_calls_a_sec_mirrored : 1);
 			break;
 	}
 
@@ -3536,7 +3537,7 @@ scrub_ecache_line()
 		 */
 		ec_tag = get_ecache_tag(index, &nafsr, acc_afsr);
 		state = (uchar_t)((ec_tag & cpu_ec_state_mask) >>
-				cpu_ec_state_shift);
+		    cpu_ec_state_shift);
 
 		/*
 		 * ETP is set try to scrub the ecache tag.
@@ -3557,10 +3558,10 @@ scrub_ecache_line()
 				mpb |= ECACHE_STATE_PARITY;
 
 				if (ecache_scrub_verbose ||
-							ecache_scrub_panic) {
+				    ecache_scrub_panic) {
 					get_ecache_dtag(P2ALIGN(index, 64),
-						(uint64_t *)&ec_data[0],
-						&ec_tag, &oafsr, acc_afsr);
+					    (uint64_t *)&ec_data[0],
+					    &ec_tag, &oafsr, acc_afsr);
 				}
 			}
 
@@ -3571,7 +3572,7 @@ scrub_ecache_line()
 			ec_knp->value.ul++;
 
 			paddr = ((ec_tag & cpu_ec_tag_mask) <<
-				cpu_ec_tag_shift) | (index % ec_set_size);
+			    cpu_ec_tag_shift) | (index % ec_set_size);
 
 			/*
 			 * We flush the E$ lines depending on the ec_flush,
@@ -3581,8 +3582,8 @@ scrub_ecache_line()
 			if (ec_action[mpb].ec_flush == ALWAYS_FLUSH) {
 				flushecacheline(paddr, ec_size);
 			} else if ((ec_mirror == ECACHE_CPU_MIRROR) &&
-				(ec_action[mpb].ec_flush == MIRROR_FLUSH)) {
-					flushecacheline(paddr, ec_size);
+			    (ec_action[mpb].ec_flush == MIRROR_FLUSH)) {
+				flushecacheline(paddr, ec_size);
 			} else if (ec_action[mpb].ec_flush == NEVER_FLUSH) {
 				softcall(ecache_page_retire, (void *)paddr);
 			}
@@ -3596,16 +3597,16 @@ scrub_ecache_line()
 				flushecacheline(paddr, ec_size);
 				ec_ksp->clean_good_busy_flush.value.ul++;
 			} else if (DGB(mpb, ec_mirror) &&
-						(flush_dirty_busy > 0)) {
+			    (flush_dirty_busy > 0)) {
 				flush_dirty_busy--;
 				flushecacheline(paddr, ec_size);
 				ec_ksp->dirty_good_busy_flush.value.ul++;
 			}
 
 			if (ec_action[mpb].ec_log && (ecache_scrub_verbose ||
-						ecache_scrub_panic)) {
+			    ecache_scrub_panic)) {
 				ecache_scrub_log(ec_data, ec_tag, paddr, mpb,
-						tafsr);
+				    tafsr);
 			}
 
 		} else {
@@ -3668,12 +3669,12 @@ do_scrub_ecache_line(void)
 	if (ecache_calls_a_sec > hz)
 		ecache_calls_a_sec = hz;
 	else if (ecache_calls_a_sec <= 0)
-	    ecache_calls_a_sec = 1;
+		ecache_calls_a_sec = 1;
 
 	if (ecache_calls_a_sec_mirrored > hz)
 		ecache_calls_a_sec_mirrored = hz;
 	else if (ecache_calls_a_sec_mirrored <= 0)
-	    ecache_calls_a_sec_mirrored = 1;
+		ecache_calls_a_sec_mirrored = 1;
 
 	if (ecache_scrub_enable) {
 		xt_all(ecache_scrubreq_tl1, ecache_scrub_inum, 0);
@@ -3683,7 +3684,7 @@ do_scrub_ecache_line(void)
 	}
 
 	(void) realtime_timeout((void(*)(void *))do_scrub_ecache_line, 0,
-		delta);
+	    delta);
 }
 
 /*
@@ -3721,7 +3722,7 @@ cpu_idle_ecache_scrub(struct cpu *cp)
 {
 	if (CPU_PRIVATE(cp) != NULL) {
 		spitfire_scrub_misc_t *ssmp = CPU_PRIVATE_PTR(cp,
-							sfpr_scrub_misc);
+		    sfpr_scrub_misc);
 		ssmp->ecache_busy = ECACHE_CPU_IDLE;
 	}
 }
@@ -3734,7 +3735,7 @@ cpu_busy_ecache_scrub(struct cpu *cp)
 {
 	if (CPU_PRIVATE(cp) != NULL) {
 		spitfire_scrub_misc_t *ssmp = CPU_PRIVATE_PTR(cp,
-							sfpr_scrub_misc);
+		    sfpr_scrub_misc);
 		ssmp->ecache_busy = ECACHE_CPU_BUSY;
 	}
 }
@@ -3758,7 +3759,7 @@ cpu_init_ecache_scrub_dr(struct cpu *cp)
 	ssmp->ecache_flush_index = 0;
 
 	ssmp->ecache_nlines =
-		cpunodes[cpuid].ecache_size / cpunodes[cpuid].ecache_linesize;
+	    cpunodes[cpuid].ecache_size / cpunodes[cpuid].ecache_linesize;
 
 	/*
 	 * Determine whether we are running on mirrored SRAM
@@ -3821,8 +3822,8 @@ cpu_init_private(struct cpu *cp)
 	 */
 	if (sf_private_cache == NULL) {
 		sf_private_cache = kmem_cache_create("sf_private_cache",
-			sizeof (spitfire_private_t), S_ECACHE_MAX_LSIZE, NULL,
-			NULL, NULL, NULL, NULL, 0);
+		    sizeof (spitfire_private_t), S_ECACHE_MAX_LSIZE, NULL,
+		    NULL, NULL, NULL, NULL, 0);
 		ASSERT(sf_private_cache);
 	}
 
@@ -3923,7 +3924,7 @@ ecache_scrub_log(ec_data_t *ec_data, uint64_t ec_tag, uint64_t paddr, int mpb,
 
 	if (aflt->flt_panic)
 		cmn_err(CE_PANIC, "ecache_scrub_panic set and bad E$"
-					"line detected");
+		    "line detected");
 }
 
 /*
@@ -3947,7 +3948,7 @@ ecache_scrub_misc_err(int type, uint64_t afsr)
 	 */
 	aflt->flt_addr = AFLT_INV_ADDR;
 	scan_ecache(&aflt->flt_addr, &spf_flt.flt_ec_data[0],
-		&spf_flt.flt_ec_tag, &spf_flt.flt_ec_lcnt, &oafsr);
+	    &spf_flt.flt_ec_tag, &spf_flt.flt_ec_lcnt, &oafsr);
 
 	if (oafsr & P_AFSR_CP) {
 		uint64_t *cp_afsr = CPU_PRIVATE_PTR(CPU, sfpr_scrub_afsr);
@@ -3960,7 +3961,7 @@ ecache_scrub_misc_err(int type, uint64_t afsr)
 	 */
 	if (aflt->flt_addr != AFLT_INV_ADDR) {
 		aflt->flt_in_memory = (pf_is_memory(aflt->flt_addr >>
-			MMU_PAGESHIFT)) ? 1 : 0;
+		    MMU_PAGESHIFT)) ? 1 : 0;
 	}
 
 	spf_flt.flt_type = (ushort_t)type;
@@ -3977,7 +3978,7 @@ ecache_scrub_misc_err(int type, uint64_t afsr)
 	 */
 	if (spf_flt.flt_ec_lcnt > 0) {
 		flushecacheline(P2ALIGN(aflt->flt_addr, 64),
-			cpunodes[CPU->cpu_id].ecache_size);
+		    cpunodes[CPU->cpu_id].ecache_size);
 		read_all_memscrub = 1;
 		memscrub_run();
 	}
@@ -3999,13 +4000,13 @@ ecache_scrub_tag_err(uint64_t afsr, uchar_t state, uint32_t index)
 	ec_data_t ec_data[8];
 	int cpuid = CPU->cpu_id;
 	uint32_t ec_set_size = cpunodes[cpuid].ecache_size /
-						ecache_associativity;
+	    ecache_associativity;
 	uint64_t *cpu_afsr = CPU_PRIVATE_PTR(CPU, sfpr_scrub_afsr);
 
 	get_ecache_dtag(P2ALIGN(index, 64), (uint64_t *)&ec_data[0], &ec_tag,
-			&oafsr, cpu_afsr);
+	    &oafsr, cpu_afsr);
 	paddr = ((ec_tag & cpu_ec_tag_mask) << cpu_ec_tag_shift) |
-						(index % ec_set_size);
+	    (index % ec_set_size);
 
 	/*
 	 * E$ tag state has good parity
@@ -4028,32 +4029,32 @@ ecache_scrub_tag_err(uint64_t afsr, uchar_t state, uint32_t index)
 
 				/* Sync with the dual tag */
 				flushecacheline(0,
-					cpunodes[CPU->cpu_id].ecache_size);
+				    cpunodes[CPU->cpu_id].ecache_size);
 				ec_ksp->tags_cleared.value.ul++;
 				ecache_scrub_log(ec_data, ec_tag, paddr,
-					CPU_ECACHE_TAG_ERR, afsr);
+				    CPU_ECACHE_TAG_ERR, afsr);
 				return;
 			} else {
 				ecache_scrub_log(ec_data, ec_tag, paddr,
-					CPU_ECACHE_ADDR_PAR_ERR, afsr);
+				    CPU_ECACHE_ADDR_PAR_ERR, afsr);
 				cmn_err(CE_PANIC, " E$ tag address has bad"
-							" parity");
+				    " parity");
 			}
 		} else if ((afsr_ets & cpu_ec_parity) == 0) {
 			/*
 			 * ETS is zero but ETP is set
 			 */
 			ecache_scrub_log(ec_data, ec_tag, paddr,
-				CPU_ECACHE_ETP_ETS_ERR, afsr);
+			    CPU_ECACHE_ETP_ETS_ERR, afsr);
 			cmn_err(CE_PANIC, "AFSR.ETP is set and"
-				" AFSR.ETS is zero");
+			    " AFSR.ETS is zero");
 		}
 	} else {
 		/*
 		 * E$ tag state bit has a bad parity
 		 */
 		ecache_scrub_log(ec_data, ec_tag, paddr,
-				CPU_ECACHE_STATE_ERR, afsr);
+		    CPU_ECACHE_STATE_ERR, afsr);
 		cmn_err(CE_PANIC, "E$ tag state has bad parity");
 	}
 }

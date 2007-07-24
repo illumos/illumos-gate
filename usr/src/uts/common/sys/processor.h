@@ -82,7 +82,9 @@ typedef int	chipid_t;
 #define	PS_SPARE	"spare"
 
 /*
- * Structure filled in by processor_info(2).
+ * Structure filled in by processor_info(2). This structure
+ * SHOULD NOT BE MODIFIED. Changes to the structure would
+ * negate ABI compatibility.
  *
  * The string fields are guaranteed to contain a NULL.
  *
@@ -97,8 +99,6 @@ typedef struct {
 	char	pi_processor_type[PI_TYPELEN];	/* ASCII CPU type */
 	char	pi_fputypes[PI_FPUTYPE];	/* ASCII FPU types */
 	int	pi_clock;			/* CPU clock freq in MHz */
-	uint64_t pi_curr_clock;			/* current clock freq in Hz */
-	char	*pi_supp_freqs;			/* supported freqs in Hz */
 } processor_info_t;
 
 /*

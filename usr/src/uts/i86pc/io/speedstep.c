@@ -169,7 +169,6 @@ speedstep_pstate_transition(int *ret, cpudrv_devstate_t *cpudsp,
 	speedstep_state_t *speedstep_state = cpudsp->module_state;
 	cpu_acpi_handle_t handle = cpudsp->acpi_handle;
 	cpu_acpi_pstate_t *req_pstate;
-	processor_info_t *pi = &(CPU->cpu_type_info);
 	uint32_t ctrl;
 	uint32_t stat;
 	int i;
@@ -198,7 +197,7 @@ speedstep_pstate_transition(int *ret, cpudrv_devstate_t *cpudsp,
 	}
 
 	speedstep_state->ss_state = req_state;
-	pi->pi_curr_clock =
+	CPU->cpu_curr_clock =
 	    (((uint64_t)CPU_ACPI_FREQ(req_pstate) * 1000000));
 	*ret = ESS_RET_SUCCESS;
 }

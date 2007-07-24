@@ -477,7 +477,7 @@ cpudrv_power(dev_info_t *dip, int comp, int level)
 	 * if the change is due to a request to throttle the max speed.
 	 */
 	if (!cpudrv_direct_pm && (cpupm->pm_busycnt >= 1) &&
-		!cpudrv_pm_is_throttle_thread(cpupm)) {
+	    !cpudrv_pm_is_throttle_thread(cpupm)) {
 		if ((cpupm->cur_spd != NULL) &&
 		    (level < cpupm->cur_spd->pm_level)) {
 			mutex_exit(&cpudsp->lock);
@@ -590,7 +590,7 @@ set_supp_freqs(cpu_t *cp, cpudrv_pm_t *cpupm)
 			sfptr = supp_freqs + strlen(supp_freqs);
 		}
 	}
-	cp->cpu_type_info.pi_supp_freqs = supp_freqs;
+	cp->cpu_supp_freqs = supp_freqs;
 	kmem_free(speeds, cpupm->num_spd * sizeof (uint64_t));
 }
 
@@ -1012,7 +1012,7 @@ cpudrv_pm_monitor(void *arg)
 		    "cpu_t", ddi_get_instance(dip));
 		goto do_return;
 	}
-	if (cp->cpu_type_info.pi_supp_freqs == NULL)
+	if (cp->cpu_supp_freqs == NULL)
 		set_supp_freqs(cp, cpupm);
 
 	cpudrv_get_cpu_mstate(cp, msnsecs);

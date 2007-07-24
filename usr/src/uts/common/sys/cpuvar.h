@@ -210,6 +210,9 @@ typedef struct cpu {
 
 	struct cpu_physid *cpu_physid;	/* physical associations */
 
+	uint64_t	cpu_curr_clock;		/* current clock freq in Hz */
+	char		*cpu_supp_freqs;	/* supported freqs in Hz */
+
 	/*
 	 * New members must be added /before/ this member, as the CTF tools
 	 * rely on this being the last field before cpu_m, so they can

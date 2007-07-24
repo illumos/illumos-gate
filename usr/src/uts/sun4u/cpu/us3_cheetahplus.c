@@ -290,7 +290,7 @@ send_mondo_set(cpuset_t set)
 			uint16_t next = (uint16_t)index;
 
 			cpus_left = ~(IDSR_NACK_TO_BUSY(curnack) | curbusy) &
-				busymask;
+			    busymask;
 
 			if (cpus_left) {
 				do {
@@ -776,7 +776,7 @@ cpu_change_speed(uint64_t divisor, uint64_t arg2)
 		reg |= bceclk->mask;
 		set_safari_config(reg);
 		CPU->cpu_m.divisor = (uchar_t)divisor;
-		pi->pi_curr_clock =
+		CPU->cpu_curr_clock =
 		    (((uint64_t)pi->pi_clock * 1000000) / divisor);
 		return;
 	}
@@ -1109,7 +1109,7 @@ cpu_payload_add_pcache(struct async_flt *aflt, nvlist_t *nvl)
 		pcp = &ch_flt->parity_data.dpe.cpl_pc[i];
 		if (pcp->pc_logflag == PC_LOGFLAG_MAGIC) {
 			bcopy(pcp, &pcdata[ways_logged],
-				sizeof (ch_pc_data_t));
+			    sizeof (ch_pc_data_t));
 			ways_logged++;
 		}
 	}

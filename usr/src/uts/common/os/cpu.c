@@ -1416,8 +1416,8 @@ again:	for (loop_count = 0; (*bound_func)(cp, 0); loop_count++) {
 				 * Update CPU last ran on if it was this CPU
 				 */
 				if (t->t_cpu == cp && t->t_bound_cpu != cp)
-				    t->t_cpu = disp_lowpri_cpu(ncp, t->t_lpl,
-					t->t_pri, NULL);
+					t->t_cpu = disp_lowpri_cpu(ncp,
+					    t->t_lpl, t->t_pri, NULL);
 				ASSERT(t->t_cpu != cp || t->t_bound_cpu == cp ||
 				    t->t_weakbound_cpu == cp);
 
@@ -1992,7 +1992,7 @@ register_cpu_setup_func(cpu_setup_func_t *func, void *arg)
 
 	for (i = 0; i < NCPU_SETUPS; i++)
 		if (cpu_setups[i].func == NULL)
-		    break;
+			break;
 	if (i >= NCPU_SETUPS)
 		cmn_err(CE_PANIC, "Ran out of cpu_setup callback entries");
 
@@ -2010,7 +2010,7 @@ unregister_cpu_setup_func(cpu_setup_func_t *func, void *arg)
 	for (i = 0; i < NCPU_SETUPS; i++)
 		if ((cpu_setups[i].func == func) &&
 		    (cpu_setups[i].arg == arg))
-		    break;
+			break;
 	if (i >= NCPU_SETUPS)
 		cmn_err(CE_PANIC, "Could not find cpu_setup callback to "
 		    "deregister");
@@ -2162,15 +2162,15 @@ cpu_info_kstat_update(kstat_t *ksp, int rw)
 	kstat_named_setstr(&cpu_info_template.ci_brandstr, cp->cpu_brandstr);
 	cpu_info_template.ci_core_id.value.l = pg_plat_get_core_id(cp);
 	cpu_info_template.ci_curr_clock_Hz.value.ui64 =
-	    cp->cpu_type_info.pi_curr_clock;
-	if (cp->cpu_type_info.pi_supp_freqs == NULL) {
+	    cp->cpu_curr_clock;
+	if (cp->cpu_supp_freqs == NULL) {
 		char clkstr[sizeof ("18446744073709551615") + 1]; /* ui64 MAX */
 		(void) snprintf(clkstr, sizeof (clkstr), "%"PRIu64,
 		    cpu_info_template.ci_curr_clock_Hz.value.ui64);
 		kstat_named_setstr(&cpu_info_template.ci_supp_freq_Hz, clkstr);
 	} else {
 		kstat_named_setstr(&cpu_info_template.ci_supp_freq_Hz,
-		    cp->cpu_type_info.pi_supp_freqs);
+		    cp->cpu_supp_freqs);
 	}
 #if defined(__sparcv9)
 	cpu_info_template.ci_device_ID.value.ui64 =
@@ -2202,8 +2202,8 @@ cpu_info_kstat_create(cpu_t *cp)
 		zoneid = ALL_ZONES;
 	if ((cp->cpu_info_kstat = kstat_create_zone("cpu_info", cp->cpu_id,
 	    NULL, "misc", KSTAT_TYPE_NAMED,
-		    sizeof (cpu_info_template) / sizeof (kstat_named_t),
-		    KSTAT_FLAG_VIRTUAL, zoneid)) != NULL) {
+	    sizeof (cpu_info_template) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL, zoneid)) != NULL) {
 		cp->cpu_info_kstat->ks_data_size += 2 * CPU_IDSTRLEN;
 #if defined(__sparcv9)
 		cp->cpu_info_kstat->ks_data_size +=

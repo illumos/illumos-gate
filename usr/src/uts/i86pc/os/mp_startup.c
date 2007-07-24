@@ -118,7 +118,7 @@ init_cpu_info(struct cpu *cp)
 	/*
 	 * Current frequency in Hz.
 	 */
-	pi->pi_curr_clock = cpu_freq_hz;
+	cp->cpu_curr_clock = cpu_freq_hz;
 
 	(void) strcpy(pi->pi_processor_type, "i386");
 	if (fpu_exists)
