@@ -892,14 +892,12 @@ zfs_ioctl(libzfs_handle_t *hdl, int request, zfs_cmd_t *zc)
 	int error;
 
 	zc->zc_history = (uint64_t)(uintptr_t)hdl->libzfs_log_str;
-	zc->zc_history_offset = hdl->libzfs_log_type;
 	error = ioctl(hdl->libzfs_fd, request, zc);
 	if (hdl->libzfs_log_str) {
 		free(hdl->libzfs_log_str);
 		hdl->libzfs_log_str = NULL;
 	}
 	zc->zc_history = 0;
-	zc->zc_history_offset = 0;
 
 	return (error);
 }

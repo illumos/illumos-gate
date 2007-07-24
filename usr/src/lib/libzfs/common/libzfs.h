@@ -299,7 +299,7 @@ extern char *zpool_vdev_name(libzfs_handle_t *, zpool_handle_t *, nvlist_t *);
 extern int zpool_upgrade(zpool_handle_t *);
 extern int zpool_get_history(zpool_handle_t *, nvlist_t **);
 extern void zpool_stage_history(libzfs_handle_t *, int, char **,
-    boolean_t zfs_cmd, boolean_t pool_create);
+    boolean_t zfs_cmd);
 extern void zpool_obj_to_path(zpool_handle_t *, uint64_t, uint64_t, char *,
     size_t len);
 extern int zfs_ioctl(libzfs_handle_t *, int, struct zfs_cmd *);

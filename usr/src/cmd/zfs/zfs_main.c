@@ -1384,7 +1384,7 @@ upgrade_set_callback(zfs_handle_t *zhp, void *data)
 			 * to log this history once to each pool.
 			 */
 			zpool_stage_history(g_zfs, first_argc, first_argv,
-			    B_TRUE, B_FALSE);
+			    B_TRUE);
 		}
 		if (zfs_prop_set(zhp, "version", verstr) == 0)
 			cb->cb_numupgraded++;
@@ -3783,7 +3783,7 @@ main(int argc, char **argv)
 		return (1);
 	}
 
-	zpool_stage_history(g_zfs, argc, argv, B_TRUE, B_FALSE);
+	zpool_stage_history(g_zfs, argc, argv, B_TRUE);
 
 	libzfs_print_on_error(g_zfs, B_TRUE);
 

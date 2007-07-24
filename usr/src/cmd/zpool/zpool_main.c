@@ -3804,9 +3804,9 @@ main(int argc, char **argv)
 
 	/* Handle special case of pool create for staging history */
 	if (strcmp(cmdname, "create") != 0)
-		zpool_stage_history(g_zfs, argc, argv, B_FALSE, B_FALSE);
+		zpool_stage_history(g_zfs, argc, argv, B_FALSE);
 	else
-		zpool_stage_history(g_zfs, argc, argv, B_FALSE, B_TRUE);
+		zpool_stage_history(g_zfs, argc, argv, B_FALSE);
 
 	/*
 	 * Special case '-?'

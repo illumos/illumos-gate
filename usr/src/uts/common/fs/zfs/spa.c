@@ -1137,7 +1137,8 @@ out:
  * Pool Creation
  */
 int
-spa_create(const char *pool, nvlist_t *nvroot, const char *altroot)
+spa_create(const char *pool, nvlist_t *nvroot, const char *altroot,
+    const char *history_str)
 {
 	spa_t *spa;
 	vdev_t *rvd;
@@ -1275,6 +1276,9 @@ spa_create(const char *pool, nvlist_t *nvroot, const char *altroot)
 	txg_wait_synced(spa->spa_dsl_pool, txg);
 
 	spa_config_sync();
+
+	if (history_str != NULL)
+		(void) spa_history_log(spa, history_str, LOG_CMD_POOL_CREATE);
 
 	mutex_exit(&spa_namespace_lock);
 

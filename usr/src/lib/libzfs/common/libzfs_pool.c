@@ -1795,27 +1795,23 @@ zpool_upgrade(zpool_handle_t *zhp)
 /*
  * Log command history.
  *
- * 'pool' is B_TRUE if we are logging a command for 'zpool'; B_FALSE
- * otherwise ('zfs').  'pool_create' is B_TRUE if we are logging the creation
- * of the pool; B_FALSE otherwise.  'path' is the pathname containing the
- * poolname.  'argc' and 'argv' are used to construct the command string.
+ * 'zfs_cmd' is B_TRUE if we are logging a command for 'zfs'; B_FALSE
+ * otherwise ('zpool').  'argc' and 'argv' are used to construct the
+ * command string.
  */
 void
 zpool_stage_history(libzfs_handle_t *hdl, int argc, char **argv,
-    boolean_t zfs_cmd, boolean_t pool_create)
+    boolean_t zfs_cmd)
 {
 	char *cmd_buf;
 	int i;
 
-	if (hdl->libzfs_log_str != NULL) {
+	if (hdl->libzfs_log_str != NULL)
 		free(hdl->libzfs_log_str);
-	}
 
 	if ((hdl->libzfs_log_str = zfs_alloc(hdl, HIS_MAX_RECORD_LEN)) == NULL)
 		return;
 
-	hdl->libzfs_log_type =
-	    (pool_create == B_TRUE) ? LOG_CMD_POOL_CREATE : LOG_CMD_NORMAL;
 	cmd_buf = hdl->libzfs_log_str;
 
 	/* construct the command string */

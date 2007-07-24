@@ -127,37 +127,46 @@ __dprintf(const char *file, const char *func, int line, const char *fmt, ...)
 }
 
 static void
+history_str_free(char *buf)
+{
+	kmem_free(buf, HIS_MAX_RECORD_LEN);
+}
+
+static char *
+history_str_get(zfs_cmd_t *zc)
+{
+	char *buf;
+
+	if (zc->zc_history == NULL)
+		return (NULL);
+
+	buf = kmem_alloc(HIS_MAX_RECORD_LEN, KM_SLEEP);
+	if (copyinstr((void *)(uintptr_t)zc->zc_history,
+	    buf, HIS_MAX_RECORD_LEN, NULL) != 0) {
+		history_str_free(buf);
+		return (NULL);
+	}
+
+	buf[HIS_MAX_RECORD_LEN -1] = '\0';
+
+	return (buf);
+}
+
+static void
 zfs_log_history(zfs_cmd_t *zc)
 {
 	spa_t *spa;
 	char *buf;
 
-	if (zc->zc_history == NULL)
+	if ((buf = history_str_get(zc)) == NULL)
 		return;
 
-	if (zc->zc_history_offset != LOG_CMD_POOL_CREATE &&
-	    zc->zc_history_offset != LOG_CMD_NORMAL)
-		return;
-
-	buf = kmem_alloc(HIS_MAX_RECORD_LEN, KM_SLEEP);
-	if (copyinstr((void *)(uintptr_t)zc->zc_history,
-	    buf, HIS_MAX_RECORD_LEN, NULL) != 0) {
-		kmem_free(buf, HIS_MAX_RECORD_LEN);
-		return;
+	if (spa_open(zc->zc_name, &spa, FTAG) == 0) {
+		if (spa_version(spa) >= SPA_VERSION_ZPOOL_HISTORY)
+			(void) spa_history_log(spa, buf, LOG_CMD_NORMAL);
+		spa_close(spa, FTAG);
 	}
-
-	buf[HIS_MAX_RECORD_LEN -1] = '\0';
-
-	if (spa_open(zc->zc_name, &spa, FTAG) != 0) {
-		kmem_free(buf, HIS_MAX_RECORD_LEN);
-		return;
-	}
-
-	if (spa_version(spa) >= SPA_VERSION_ZPOOL_HISTORY)
-		(void) spa_history_log(spa, buf, zc->zc_history_offset);
-
-	spa_close(spa, FTAG);
-	kmem_free(buf, HIS_MAX_RECORD_LEN);
+	history_str_free(buf);
 }
 
 /*
@@ -650,14 +659,21 @@ zfs_ioc_pool_create(zfs_cmd_t *zc)
 {
 	int error;
 	nvlist_t *config;
+	char *buf;
 
-	if ((error = get_nvlist(zc, &config)) != 0)
+	if ((buf = history_str_get(zc)) == NULL)
+		return (EINVAL);
+
+	if ((error = get_nvlist(zc, &config)) != 0) {
+		history_str_free(buf);
 		return (error);
+	}
 
 	error = spa_create(zc->zc_name, config, zc->zc_value[0] == '\0' ?
-	    NULL : zc->zc_value);
+	    NULL : zc->zc_value, buf);
 
 	nvlist_free(config);
+	history_str_free(buf);
 
 	return (error);
 }
@@ -2108,7 +2124,7 @@ zfs_ioc_share(zfs_cmd_t *zc)
  * of those commands.
  */
 static zfs_ioc_vec_t zfs_ioc_vec[] = {
-	{ zfs_ioc_pool_create, zfs_secpolicy_config, POOL_NAME, B_TRUE },
+	{ zfs_ioc_pool_create, zfs_secpolicy_config, POOL_NAME, B_FALSE },
 	{ zfs_ioc_pool_destroy,	zfs_secpolicy_config, POOL_NAME, B_FALSE },
 	{ zfs_ioc_pool_import, zfs_secpolicy_config, POOL_NAME, B_TRUE },
 	{ zfs_ioc_pool_export, zfs_secpolicy_config, POOL_NAME, B_FALSE },

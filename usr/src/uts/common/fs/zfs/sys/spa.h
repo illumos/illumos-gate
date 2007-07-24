@@ -318,7 +318,8 @@ typedef struct blkptr {
 extern int spa_open(const char *pool, spa_t **, void *tag);
 extern int spa_get_stats(const char *pool, nvlist_t **config,
     char *altroot, size_t buflen);
-extern int spa_create(const char *pool, nvlist_t *config, const char *altroot);
+extern int spa_create(const char *pool, nvlist_t *config, const char *altroot,
+    const char *history_str);
 extern int spa_import(const char *pool, nvlist_t *config, const char *altroot);
 extern nvlist_t *spa_tryimport(nvlist_t *tryconfig);
 extern int spa_destroy(char *pool);

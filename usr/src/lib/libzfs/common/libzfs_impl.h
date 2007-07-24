@@ -56,7 +56,6 @@ struct libzfs_handle {
 	char libzfs_action[1024];
 	char libzfs_desc[1024];
 	char *libzfs_log_str;
-	int libzfs_log_type;
 	int libzfs_printerr;
 	void *libzfs_sharehdl; /* libshare handle */
 };
