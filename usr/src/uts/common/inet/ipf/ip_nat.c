@@ -3730,7 +3730,7 @@ u_32_t nflags;
 	csump = NULL;
 	np = nat->nat_ptr;
 
-	if ((natadd != 0) && (fin->fin_flx & FI_FRAG) && (np != NULL))
+	if ((natadd != 0) && (fin->fin_flx & FI_FRAG))
 		(void) fr_nat_newfrag(fin, 0, nat);
 
 	MUTEX_ENTER(&nat->nat_lock);
@@ -4044,9 +4044,10 @@ u_32_t nflags;
 	np = nat->nat_ptr;
 	fin->fin_fr = nat->nat_fr;
 
+	if ((natadd != 0) && (fin->fin_flx & FI_FRAG))
+		(void) fr_nat_newfrag(fin, 0, nat);
+
 	if (np != NULL) {
-		if ((natadd != 0) && (fin->fin_flx & FI_FRAG))
-			(void) fr_nat_newfrag(fin, 0, nat);
 
 	/* ------------------------------------------------------------- */
 	/* A few quick notes:						 */
