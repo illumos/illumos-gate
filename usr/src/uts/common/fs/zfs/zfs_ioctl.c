@@ -2341,6 +2341,9 @@ static struct modlinkage modlinkage = {
 	NULL
 };
 
+
+uint_t zfs_fsyncer_key;
+
 int
 _init(void)
 {
@@ -2356,6 +2359,8 @@ _init(void)
 		spa_fini();
 		return (error);
 	}
+
+	tsd_create(&zfs_fsyncer_key, NULL);
 
 	error = ldi_ident_from_mod(&modlinkage, &zfs_li);
 	ASSERT(error == 0);
@@ -2383,6 +2388,7 @@ _fini(void)
 		(void) ddi_modclose(sharefs_mod);
 	}
 
+	tsd_destroy(&zfs_fsyncer_key);
 	ldi_ident_release(zfs_li);
 	zfs_li = NULL;
 	mutex_destroy(&zfs_share_lock);

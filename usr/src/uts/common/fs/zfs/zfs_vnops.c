@@ -1788,6 +1788,8 @@ update:
 	return (error);
 }
 
+ulong_t zfs_fsync_sync_cnt = 4;
+
 static int
 zfs_fsync(vnode_t *vp, int syncflag, cred_t *cr)
 {
@@ -1803,6 +1805,8 @@ zfs_fsync(vnode_t *vp, int syncflag, cred_t *cr)
 	if (vn_has_cached_data(vp) && !(syncflag & FNODSYNC) &&
 	    (vp->v_type == VREG) && !(IS_SWAPVP(vp)))
 		(void) VOP_PUTPAGE(vp, (offset_t)0, (size_t)0, B_ASYNC, cr);
+
+	(void) tsd_set(zfs_fsyncer_key, (void *)zfs_fsync_sync_cnt);
 
 	ZFS_ENTER(zfsvfs);
 	zil_commit(zfsvfs->z_log, zp->z_last_itx, zp->z_id);
