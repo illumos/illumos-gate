@@ -875,7 +875,8 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf, zio_t *zio)
 		lr->lr_blkoff = off - boff;
 		error = dmu_sync(zio, db, &lr->lr_blkptr,
 		    lr->lr_common.lrc_txg, zfs_get_done, zgd);
-		ASSERT(error == EEXIST || lr->lr_length <= zp->z_blksz);
+		ASSERT((error && error != EINPROGRESS) ||
+		    lr->lr_length <= zp->z_blksz);
 		if (error == 0) {
 			zil_add_vdev(zfsvfs->z_log,
 			    DVA_GET_VDEV(BP_IDENTITY(&lr->lr_blkptr)));
@@ -2810,8 +2811,10 @@ zfs_putapage(vnode_t *vp, page_t *pp, u_offset_t *offp,
 	rl_t		*rl;
 	u_offset_t	off, koff;
 	size_t		len, klen;
+	uint64_t	filesz;
 	int		err;
 
+	filesz = zp->z_phys->zp_size;
 	off = pp->p_offset;
 	len = PAGESIZE;
 	/*
@@ -2819,9 +2822,7 @@ zfs_putapage(vnode_t *vp, page_t *pp, u_offset_t *offp,
 	 * muiltiple pages so that we write a full block (thus avoiding
 	 * a read-modify-write).
 	 */
-	if (zp->z_blksz > PAGESIZE) {
-		uint64_t filesz = zp->z_phys->zp_size;
-
+	if (off < filesz && zp->z_blksz > PAGESIZE) {
 		if (!ISP2(zp->z_blksz)) {
 			/* Only one block in the file. */
 			klen = P2ROUNDUP((ulong_t)zp->z_blksz, PAGESIZE);
@@ -2841,20 +2842,20 @@ top:
 	/*
 	 * Can't push pages past end-of-file.
 	 */
-	if (off >= zp->z_phys->zp_size) {
-		/* discard all pages */
-		flags |= B_INVAL;
+	filesz = zp->z_phys->zp_size;
+	if (off >= filesz) {
+		/* ignore all pages */
 		err = 0;
 		goto out;
-	} else if (off + len > zp->z_phys->zp_size) {
-		int npages = btopr(zp->z_phys->zp_size - off);
+	} else if (off + len > filesz) {
+		int npages = btopr(filesz - off);
 		page_t *trunc;
 
 		page_list_break(&pp, &trunc, npages);
-		/* discard pages past end of file */
+		/* ignore pages past end of file */
 		if (trunc)
-			pvn_write_done(trunc, B_INVAL | flags);
-		len = zp->z_phys->zp_size - off;
+			pvn_write_done(trunc, flags);
+		len = filesz - off;
 	}
 
 	tx = dmu_tx_create(zfsvfs->z_os);
@@ -2890,7 +2891,7 @@ top:
 
 out:
 	zfs_range_unlock(rl);
-	pvn_write_done(pp, (err ? B_ERROR : 0) | B_WRITE | flags);
+	pvn_write_done(pp, (err ? B_ERROR : 0) | flags);
 	if (offp)
 		*offp = off;
 	if (lenp)

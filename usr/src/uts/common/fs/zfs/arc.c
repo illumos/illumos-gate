@@ -379,6 +379,7 @@ static arc_buf_hdr_t arc_eviction_hdr;
 static void arc_get_data_buf(arc_buf_t *buf);
 static void arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock);
 static int arc_evict_needed(arc_buf_contents_t type);
+static void arc_evict_ghost(arc_state_t *state, int64_t bytes);
 
 #define	GHOST_STATE(state)	\
 	((state) == arc_mru_ghost || (state) == arc_mfu_ghost)
@@ -842,7 +843,6 @@ arc_change_state(arc_state_t *new_state, arc_buf_hdr_t *ab, kmutex_t *hash_lock)
 				to_delta = ab->b_size;
 			}
 			atomic_add_64(size, to_delta);
-			ASSERT3U(new_state->arcs_size + to_delta, >=, *size);
 
 			if (use_mutex)
 				mutex_exit(&new_state->arcs_mtx);
@@ -1257,6 +1257,27 @@ arc_evict(arc_state_t *state, int64_t bytes, boolean_t recycle,
 
 	if (missed)
 		ARCSTAT_INCR(arcstat_mutex_miss, missed);
+
+	/*
+	 * We have just evicted some date into the ghost state, make
+	 * sure we also adjust the ghost state size if necessary.
+	 */
+	if (arc_no_grow &&
+	    arc_mru_ghost->arcs_size + arc_mfu_ghost->arcs_size > arc_c) {
+		int64_t mru_over = arc_anon->arcs_size + arc_mru->arcs_size +
+		    arc_mru_ghost->arcs_size - arc_c;
+
+		if (mru_over > 0 && arc_mru_ghost->arcs_lsize[type] > 0) {
+			int64_t todelete =
+			    MIN(arc_mru_ghost->arcs_lsize[type], mru_over);
+			arc_evict_ghost(arc_mru_ghost, todelete);
+		} else if (arc_mfu_ghost->arcs_lsize[type] > 0) {
+			int64_t todelete = MIN(arc_mfu_ghost->arcs_lsize[type],
+			    arc_mru_ghost->arcs_size +
+			    arc_mfu_ghost->arcs_size - arc_c);
+			arc_evict_ghost(arc_mfu_ghost, todelete);
+		}
+	}
 
 	return (stolen);
 }

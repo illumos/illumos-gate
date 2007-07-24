@@ -698,6 +698,7 @@ dsl_dir_tempreserve_impl(dsl_dir_t *dd,
 	uint64_t est_used, quota, parent_rsrv;
 	int edquot = EDQUOT;
 	int txgidx = txg & TXG_MASK;
+	boolean_t ismos;
 	int i;
 	struct tempreserve *tr;
 
@@ -713,30 +714,31 @@ dsl_dir_tempreserve_impl(dsl_dir_t *dd,
 	for (i = 0; i < TXG_SIZE; i++)
 		est_used += dd->dd_tempreserved[i];
 
-	quota = UINT64_MAX;
-
-	if (dd->dd_phys->dd_quota)
+	/*
+	 * If this transaction will result in a net free of space, we want
+	 * to let it through.
+	 */
+	if (netfree || dd->dd_phys->dd_quota == 0)
+		quota = UINT64_MAX;
+	else
 		quota = dd->dd_phys->dd_quota;
 
 	/*
-	 * If this transaction will result in a net free of space, we want
-	 * to let it through, but we have to be careful: the space that it
-	 * frees won't become available until *after* this txg syncs.
-	 * Therefore, to ensure that it's possible to remove files from
-	 * a full pool without inducing transient overcommits, we throttle
+	 * Adjust the quota against the actual pool size at the root.
+	 * To ensure that it's possible to remove files from a full
+	 * pool without inducing transient overcommits, we throttle
 	 * netfree transactions against a quota that is slightly larger,
 	 * but still within the pool's allocation slop.  In cases where
 	 * we're very close to full, this will allow a steady trickle of
 	 * removes to get through.
 	 */
-	if (dd->dd_parent == NULL) {
+	ismos = (dd->dd_phys->dd_head_dataset_obj == 0);
+	if (dd->dd_parent == NULL || ismos) {
 		uint64_t poolsize = dsl_pool_adjustedsize(dd->dd_pool, netfree);
 		if (poolsize < quota) {
 			quota = poolsize;
 			edquot = ENOSPC;
 		}
-	} else if (netfree) {
-		quota = UINT64_MAX;
 	}
 
 	/*
@@ -771,7 +773,7 @@ dsl_dir_tempreserve_impl(dsl_dir_t *dd,
 	list_insert_tail(tr_list, tr);
 
 	/* see if it's OK with our parent */
-	if (dd->dd_parent && parent_rsrv) {
+	if (dd->dd_parent && parent_rsrv && !ismos) {
 		return (dsl_dir_tempreserve_impl(dd->dd_parent,
 		    parent_rsrv, netfree, tr_list, tx));
 	} else {
