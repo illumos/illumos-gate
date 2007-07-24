@@ -283,6 +283,7 @@ extern "C" {
 #define	fcntl				_fcntl
 #define	fconvert			_fconvert
 #define	fcvt				_fcvt
+#define	fdatasync			_fdatasync
 #define	fdetach				_fdetach
 #define	fdopendir			_fdopendir
 #define	fdopen				_fdopen

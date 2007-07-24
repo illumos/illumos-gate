@@ -694,6 +694,15 @@ fcntl(int fildes, int cmd, ...)
 }
 
 int
+fdatasync(int fildes)
+{
+	extern int _fdatasync(int);
+	int rv;
+
+	PERFORM(_fdatasync(fildes))
+}
+
+int
 fsync(int fildes)
 {
 	extern int _fsync(int);

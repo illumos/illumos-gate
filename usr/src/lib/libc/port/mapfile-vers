@@ -1504,6 +1504,7 @@ SUNWprivate_1.1 {
 	_F_cplx_div_rx;
 	_F_cplx_mul;
 	_fcvt;
+	_fdatasync;
 	_ffs;
 	_fgetgrent;
 	_fgetgrent_r;
