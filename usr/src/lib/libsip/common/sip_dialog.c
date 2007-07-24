@@ -1471,7 +1471,7 @@ sip_dialog_process(_sip_msg_t *sip_msg, sip_dialog_t *sip_dialog)
 					assert(_dialog->sip_dlg_local_contact
 					    != NULL);
 					sip_free_header(_dialog->
-						    sip_dlg_local_contact);
+					    sip_dlg_local_contact);
 					_dialog->sip_dlg_local_contact =
 					    _dialog->sip_dlg_new_local_contact;
 					_dialog->sip_dlg_new_local_contact =
