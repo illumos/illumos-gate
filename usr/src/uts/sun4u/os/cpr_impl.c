@@ -218,8 +218,6 @@ void
 i_cpr_mp_setup(void)
 {
 	extern void restart_other_cpu(int);
-	ihandle_t tmpout = 0;
-	char *str;
 	cpu_t *cp;
 
 	uint64_t kctx = kcontextreg;
@@ -253,13 +251,6 @@ i_cpr_mp_setup(void)
 	if (ncpus > 1) {
 		sfmmu_init_tsbs();
 
-		if (cpr_debug & CPR_DEBUG1) {
-			prom_interpret("stdout @ swap l!", (uintptr_t)&tmpout,
-			    0, 0, 0, 0);
-			str = "MP startup...\r\n";
-			(void) prom_write(tmpout, str, strlen(str), 0, 0);
-		}
-
 		mutex_enter(&cpu_lock);
 		/*
 		 * All of the slave cpus are not ready at this time,
@@ -278,11 +269,6 @@ i_cpr_mp_setup(void)
 
 		pause_cpus(NULL);
 		mutex_exit(&cpu_lock);
-
-		if (cpr_debug & CPR_DEBUG1) {
-			str = "MP paused...\r\n";
-			(void) prom_write(tmpout, str, strlen(str), 0, 0);
-		}
 
 		i_cpr_xcall(i_cpr_clear_entries);
 	} else
@@ -1331,7 +1317,7 @@ cpr_dump_sensitive(vnode_t *vp, csd_t *descp)
 		CPR_DEBUG(CPR_DEBUG7, "descp: %p\n", descp);
 #ifdef DEBUG
 		debug_enter("cpr_dump_sensitive: cpr_write() page "
-			"descriptor failed!\n");
+		    "descriptor failed!\n");
 #endif
 		return (error);
 	}
@@ -1344,7 +1330,7 @@ cpr_dump_sensitive(vnode_t *vp, csd_t *descp)
 		CPR_DEBUG(CPR_DEBUG7, "error: %x\n", error);
 		CPR_DEBUG(CPR_DEBUG7, "descp: %p\n", descp);
 		CPR_DEBUG(CPR_DEBUG7, "cpr_write(%p, %p , %lx)\n", vp, datap,
-			cpd.cpd_length);
+		    cpd.cpd_length);
 #ifdef DEBUG
 		debug_enter("cpr_dump_sensitive: cpr_write() data failed!\n");
 #endif
