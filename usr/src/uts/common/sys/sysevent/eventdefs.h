@@ -128,6 +128,7 @@ extern "C" {
 /* Attachment point state change */
 #define	ESC_DR_AP_STATE_CHANGE	"ESC_dr_ap_state_change"
 #define	ESC_DR_REQ		"ESC_dr_req"	/* Request DR */
+#define	ESC_DR_TARGET_STATE_CHANGE	"ESC_dr_target_state_change"
 
 /*
  * EC_ENV subclass definitions - supporting attributes (name/value pairs)
