@@ -322,6 +322,10 @@ zio_read(blkptr_t *bp, void *buf, char *stack)
 	comp = BP_GET_COMPRESS(bp);
 	cksum = BP_GET_CHECKSUM(bp);
 
+	if ((unsigned int)comp >= ZIO_COMPRESS_FUNCTIONS ||
+	    comp != ZIO_COMPRESS_OFF && decomp_table[comp].decomp_func == NULL)
+		return (ERR_FSYS_CORRUPT);
+
 	/* pick a good dva from the block pointer */
 	for (i = 0; i < SPA_DVAS_PER_BP; i++) {
 
@@ -380,8 +384,13 @@ dmu_read(dnode_phys_t *dn, uint64_t blkid, void *buf, char *stack)
 		*bp = bp_array[idx];
 		if (level == 0)
 			tmpbuf = buf;
-		if (errnum = zio_read(bp, tmpbuf, stack))
+		if (BP_IS_HOLE(bp)) {
+			grub_memset(buf, 0,
+			    dn->dn_datablkszsec << SPA_MINBLOCKSHIFT);
+			break;
+		} else if (errnum = zio_read(bp, tmpbuf, stack)) {
 			return (errnum);
+		}
 
 		bp_array = tmpbuf;
 	}
@@ -763,9 +772,9 @@ get_default_bootfsobj(dnode_phys_t *mosmdn, uint64_t *obj, char *stack)
 	dnode_phys_t *dn = (dnode_phys_t *)stack;
 	stack += DNODE_SIZE;
 
-	if (dnode_get(mosmdn, DMU_POOL_DIRECTORY_OBJECT,
+	if (errnum = dnode_get(mosmdn, DMU_POOL_DIRECTORY_OBJECT,
 	    DMU_OT_OBJECT_DIRECTORY, dn, stack))
-		return (ERR_FILESYSTEM_NOT_FOUND);
+		return (errnum);
 
 	/*
 	 * find the object number for 'pool_props', and get the dnode
@@ -774,8 +783,8 @@ get_default_bootfsobj(dnode_phys_t *mosmdn, uint64_t *obj, char *stack)
 	if (zap_lookup(dn, DMU_POOL_PROPS, &objnum, stack))
 		return (ERR_FILESYSTEM_NOT_FOUND);
 
-	if (dnode_get(mosmdn, objnum, DMU_OT_POOL_PROPS, dn, stack))
-		return (ERR_FILESYSTEM_NOT_FOUND);
+	if (errnum = dnode_get(mosmdn, objnum, DMU_OT_POOL_PROPS, dn, stack))
+		return (errnum);
 
 	if (zap_lookup(dn, ZPOOL_PROP_BOOTFS, &objnum, stack))
 		return (ERR_FILESYSTEM_NOT_FOUND);
@@ -853,8 +862,8 @@ get_objset_mdn(dnode_phys_t *mosmdn, char *fsname, uint64_t *obj,
 		    DMU_OT_DSL_DIR_CHILD_MAP, mdn, stack))
 			return (errnum);
 
-		if (errnum = zap_lookup(mdn, cname, &objnum, stack))
-			return (errnum);
+		if (zap_lookup(mdn, cname, &objnum, stack))
+			return (ERR_FILESYSTEM_NOT_FOUND);
 
 		if (errnum = dnode_get(mosmdn, objnum, DMU_OT_DSL_DIR,
 		    mdn, stack))
@@ -1098,11 +1107,9 @@ zfs_open(char *filename)
 	} else {
 		if (current_bootfs[0] == '\0') {
 			/* Get the default root filesystem object number */
-			if (get_default_bootfsobj(MOS,
-			    &current_bootfs_obj, stack)) {
-				errnum = ERR_FILESYSTEM_NOT_FOUND;
+			if (errnum = get_default_bootfsobj(MOS,
+			    &current_bootfs_obj, stack))
 				return (0);
-			}
 
 			if (errnum = get_objset_mdn(MOS, NULL,
 			    &current_bootfs_obj, mdn, stack))
