@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@ extern "C" {
 #define	PCFEXTSIZE	3
 #define	PCMAXPATHLEN	MAXPATHLEN
 #define	PCMAXNAMLEN	255
+#define	PCMAXNAM_UTF16	(256 * sizeof (uint16_t))	/* for UTF-16 */
 #define	PCLFNCHUNKSIZE	13
 
 struct pctime {
@@ -234,12 +235,13 @@ struct pcslot {
  * length, but this is the maximum size.
  *
  * This _must_ match a dirent64 structure in format.
+ * d_name is 512 bytes long to accomodate 256 UTF-16 characters.
  */
 struct pc_dirent {
 	ino64_t		d_ino;		/* "inode number" of entry */
 	off64_t		d_off;		/* offset of disk directory entry */
 	unsigned short	d_reclen;	/* length of this record */
-	char		d_name[PCMAXNAMLEN + 1];
+	char		d_name[PCMAXNAM_UTF16];
 };
 
 /*
@@ -287,7 +289,7 @@ extern int pc_match_short_fn(struct pcnode *, char *,
     struct pcdir **, struct pcslot *, offset_t *);
 extern uchar_t pc_checksum_long_fn(char *, char *);
 extern void set_long_fn_chunk(struct pcdir_lfn *, char *, int);
-extern int pc_valid_long_fn(char *);
+extern int pc_valid_long_fn(char *, int);
 extern int pc_extract_long_fn(struct pcnode *, char *,
     struct pcdir **, offset_t *offset, struct buf **);
 extern int pc_fname_ext_to_name(char *, char *, char *, int);

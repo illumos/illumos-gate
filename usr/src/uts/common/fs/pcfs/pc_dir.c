@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/cmn_err.h>
+#include <sys/sunddi.h>
 #include <sys/fs/pc_label.h>
 #include <sys/fs/pc_fs.h>
 #include <sys/fs/pc_dir.h>
@@ -174,7 +175,7 @@ pc_direnter(
 		if (pcpp) {
 			*pcpp =
 			    pc_getnode(fsp, slot.sl_blkno, slot.sl_offset,
-				slot.sl_ep);
+			    slot.sl_ep);
 			error = EEXIST;
 		}
 		brelse(slot.sl_bp);
@@ -410,7 +411,7 @@ pc_dirremove(
 	} else {
 		pcp =
 		    pc_getnode(VFSTOPCFS(vp->v_vfsp),
-			slot.sl_blkno, slot.sl_offset, slot.sl_ep);
+		    slot.sl_blkno, slot.sl_offset, slot.sl_ep);
 	}
 	if (error) {
 		brelse(slot.sl_bp);
@@ -1312,9 +1313,10 @@ pc_find_free_space(struct pcnode *pcp, int ndirentries)
 static int
 direntries_needed(struct pcnode *dp, char *namep)
 {
-	int	ndirentries;
-	int	n;
 	struct pcdir ep;
+	uint16_t *w2_str;
+	size_t  u8l, u16l;
+	int ret;
 
 	if (enable_long_filenames == 0) {
 		return (1);
@@ -1325,12 +1327,23 @@ direntries_needed(struct pcnode *dp, char *namep)
 			return (1);
 		}
 	}
-	if (pc_valid_long_fn(namep)) {
-		n = strlen(namep);
-		ndirentries = 1 + n / PCLFNCHUNKSIZE;
-		if ((n % PCLFNCHUNKSIZE) != 0)
-			ndirentries++;
-		return (ndirentries);
+	if (pc_valid_long_fn(namep, 1)) {
+		/*
+		 * convert to UTF-16 or UNICODE for calculating the entries
+		 * needed. Conversion will consume at the most 512 bytes
+		 */
+		u16l = PCMAXNAMLEN + 1;
+		w2_str = (uint16_t *)kmem_zalloc(PCMAXNAM_UTF16, KM_SLEEP);
+		u8l = strlen(namep);
+		ret = uconv_u8tou16((const uchar_t *)namep, &u8l,
+		    w2_str, &u16l, UCONV_OUT_LITTLE_ENDIAN);
+		kmem_free((caddr_t)w2_str, PCMAXNAM_UTF16);
+		if (ret == 0) {
+			ret = 1 + u16l / PCLFNCHUNKSIZE;
+			if (u16l % PCLFNCHUNKSIZE != 0)
+				ret++;
+			return (ret);
+		}
 	}
 	return (-1);
 }
@@ -1351,8 +1364,10 @@ pc_name_to_pcdir(struct pcnode *dp, char *namep, int ndirentries, int *errret)
 	uchar_t	cksum;
 	int	nchars;
 	int	error = 0;
-	int	n;
 	char	*nameend;
+	uint16_t *w2_str;
+	size_t  u8l, u16l;
+	int ret;
 
 	bpcdir = kmem_zalloc(ndirentries * sizeof (struct pcdir), KM_SLEEP);
 	ep = &bpcdir[ndirentries - 1];
@@ -1360,13 +1375,28 @@ pc_name_to_pcdir(struct pcnode *dp, char *namep, int ndirentries, int *errret)
 		(void) pc_parsename(namep, ep->pcd_filename, ep->pcd_ext);
 		return (bpcdir);
 	}
-	n = strlen(namep);
-	nchars = PCLFNCHUNKSIZE;
-	nameend = namep + n;
-	if ((n % PCLFNCHUNKSIZE) != 0) {
-		nchars = (n % PCLFNCHUNKSIZE) + 1; /* null */
-		nameend++;
+
+	/* Here we need to convert to UTF-16 or UNICODE for writing */
+
+	u16l = PCMAXNAMLEN + 1;
+	w2_str = (uint16_t *)kmem_zalloc(PCMAXNAM_UTF16, KM_SLEEP);
+	u8l = strlen(namep);
+	ret = uconv_u8tou16((const uchar_t *)namep, &u8l, w2_str, &u16l,
+	    UCONV_OUT_LITTLE_ENDIAN);
+	if (ret != 0) {
+		kmem_free((caddr_t)w2_str, PCMAXNAM_UTF16);
+		*errret = ret;
+		return (NULL);
 	}
+	nameend = (char *)(w2_str + u16l);
+	u16l %= PCLFNCHUNKSIZE;
+	if (u16l != 0) {
+		nchars = u16l + 1;
+		nameend += 2;
+	} else {
+		nchars = PCLFNCHUNKSIZE;
+	}
+	nchars *= sizeof (uint16_t);
 
 	/* short file name */
 	error = generate_short_name(dp, namep, ep);
@@ -1384,8 +1414,9 @@ pc_name_to_pcdir(struct pcnode *dp, char *namep, int ndirentries, int *errret)
 		lep->pcdl_attr = PCDL_LFN_BITS;
 		lep->pcdl_checksum = cksum;
 		lep->pcdl_ordinal = (uchar_t)(ndirentries - i - 1);
-		nchars = PCLFNCHUNKSIZE;
+		nchars = PCLFNCHUNKSIZE * sizeof (uint16_t);
 	}
+	kmem_free((caddr_t)w2_str, PCMAXNAM_UTF16);
 	lep = (struct pcdir_lfn *)&bpcdir[0];
 	lep->pcdl_ordinal |= 0x40;
 	return (bpcdir);
@@ -1432,8 +1463,6 @@ generate_short_name(struct pcnode *dp, char *namep, struct pcdir *inep)
 			continue;
 		break;
 	}
-	if (*namep == '\0')
-		return (EINVAL);
 	dot = strrchr(namep, '.');
 	if (dot != NULL) {
 		dot++;
@@ -1489,10 +1518,6 @@ generate_short_name(struct pcnode *dp, char *namep, struct pcdir *inep)
 				fname[j++] = namep[i];
 			else if (pc_validchar(toupper(namep[i])))
 				fname[j++] = toupper(namep[i]);
-		}
-		if (j == 0) {
-			/* no characters in the prefix? */
-			return (EINVAL);
 		}
 		if (rev) {
 			(void) sprintf(scratch, "~%d", rev);

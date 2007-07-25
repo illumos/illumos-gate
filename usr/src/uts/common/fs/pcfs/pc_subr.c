@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -248,50 +248,52 @@ pc_pcttotv(
 }
 
 /*
- * Determine whether a character is valid for a pc 8.3 file system file name.
- * The Windows 95 Resource Kit claims that these are valid:
- *	uppercase letters and numbers
- *	blank
- *	ASCII characters greater than 127
- *	$%'-_@~`!()^#&
- * Long file names can also have
- *	lowercase letters
- *	+,;=[].
+ * Determine whether a character is valid for a long file name.
+ * It is easier to determine by filtering out invalid characters.
+ * Following are invalid characters in a long filename.
+ *	/ \ : * ? < > | "
  */
 int
 pc_valid_lfn_char(char c)
 {
-	char *cp;
+	const char *cp;
 	int n;
-	static char valtab[] = {
-		"+,;=[].$#&@!%()-{}<>`_^~|' "
+
+	static const char invaltab[] = {
+		"/\\:*?<>|\""
 	};
 
-	if (c >= 'a' && c <= 'z')
-		return (1);
-	if (c >= 'A' && c <= 'Z')
-		return (1);
-	if (c >= '0' && c <= '9')
-		return (1);
-	cp = valtab;
-	n = sizeof (valtab);
+	cp = invaltab;
+	n = sizeof (invaltab) - 1;
 	while (n--) {
 		if (c == *cp++)
-			return (1);
+			return (0);
 	}
-	return (0);
+	return (1);
 }
 
 int
-pc_valid_long_fn(char *namep)
+pc_valid_long_fn(char *namep, int utf8)
 {
 	char *tmp;
 
-	for (tmp = namep; *tmp != '\0'; tmp++)
-		if (!pc_valid_lfn_char(*tmp))
+	if (utf8) {
+		/* UTF-8 */
+		for (tmp = namep; *tmp != '\0'; tmp++)
+			if (!pc_valid_lfn_char(*tmp))
+				return (0);
+		if ((tmp - namep) > PCMAXNAMLEN)
 			return (0);
-	if ((tmp - namep) >= PCMAXNAMLEN)
-		return (0);
+	} else {
+		/* UTF-16 */
+		for (tmp = namep; (*tmp != '\0') && (*(tmp+1) != '\0');
+		    tmp += 2) {
+			if ((*(tmp+1) == '\0') && !pc_valid_lfn_char(*tmp))
+				return (0);
+		}
+		if ((tmp - namep) > (PCMAXNAMLEN * sizeof (uint16_t)))
+			return (0);
+	}
 	return (1);
 }
 

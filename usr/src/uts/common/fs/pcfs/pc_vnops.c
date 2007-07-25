@@ -56,6 +56,7 @@
 #include <sys/flock.h>
 #include <sys/policy.h>
 #include <sys/sdt.h>
+#include <sys/sunddi.h>
 
 #include <vm/seg.h>
 #include <vm/page.h>
@@ -388,10 +389,10 @@ rwpcp(
 				uint_t ncl, lcn;
 
 				ncl = (uint_t)howmany((offset_t)pcp->pc_size,
-					fsp->pcfs_clsize);
+				    fsp->pcfs_clsize);
 				if (uio->uio_loffset > pcp->pc_size &&
 				    ncl < (uint_t)howmany(uio->uio_loffset,
-							fsp->pcfs_clsize)) {
+				    fsp->pcfs_clsize)) {
 					/*
 					 * Allocate and zerofill skipped
 					 * clusters. This may not be worth the
@@ -406,7 +407,7 @@ rwpcp(
 				}
 				if (!error &&
 				    ncl < (uint_t)howmany(uio->uio_loffset + n,
-							fsp->pcfs_clsize))
+				    fsp->pcfs_clsize))
 					/*
 					 * allocate clusters w/o zerofill
 					 */
@@ -447,13 +448,13 @@ rwpcp(
 
 					if (error == ENOSPC &&
 					    (pcp->pc_size - uio->uio_loffset)
-						> 0) {
+					    > 0) {
 						PC_DPRINTF3(2, "rwpcp ENOSPC "
 						    "off=%lld n=%d size=%d\n",
 						    uio->uio_loffset,
 						    n, pcp->pc_size);
 						n = (int)(pcp->pc_size -
-							uio->uio_loffset);
+						    uio->uio_loffset);
 					} else {
 						PC_DPRINTF1(1,
 						    "rwpcp error1=%d\n", error);
@@ -467,19 +468,19 @@ rwpcp(
 				}
 				if (mapon == 0) {
 					newpage = segmap_pagecreate(segkmap,
-						base, (size_t)n, 0);
+					    base, (size_t)n, 0);
 					pagecreate = 1;
 				}
 			} else if (n == MAXBSIZE) {
 				newpage = segmap_pagecreate(segkmap, base,
-						(size_t)n, 0);
+				    (size_t)n, 0);
 				pagecreate = 1;
 			}
 		}
 		error = uiomove(base + mapon, (size_t)n, rw, uio);
 
 		if (pagecreate && uio->uio_loffset <
-			roundup(off + mapon + n, PAGESIZE)) {
+		    roundup(off + mapon + n, PAGESIZE)) {
 			offset_t nzero, nmoved;
 
 			nmoved = uio->uio_loffset - (off + mapon);
@@ -493,7 +494,7 @@ rwpcp(
 		 */
 		if (newpage)
 			segmap_pageunlock(segkmap, base, (size_t)n,
-				rw == UIO_WRITE ? S_WRITE : S_READ);
+			    rw == UIO_WRITE ? S_WRITE : S_READ);
 
 		if (error) {
 			PC_DPRINTF1(1, "rwpcp error2=%d\n", error);
@@ -644,7 +645,7 @@ pcfs_getattr(
 
 	vap->va_rdev = 0;
 	vap->va_nblocks = (fsblkcnt64_t)howmany((offset_t)pcp->pc_size,
-				DEV_BSIZE);
+	    DEV_BSIZE);
 	vap->va_blksize = fsp->pcfs_clsize;
 	pc_unlockfs(fsp);
 	return (0);
@@ -1041,7 +1042,7 @@ pcfs_create(
 				error = EISDIR;
 			} else if (mode) {
 				error = pcfs_access(PCTOV(pcp), mode, 0,
-					cr);
+				    cr);
 			} else {
 				error = 0;
 			}
@@ -1049,7 +1050,7 @@ pcfs_create(
 		if (error) {
 			VN_RELE(PCTOV(pcp));
 		} else if ((vp->v_type == VREG) && (vap->va_mask & AT_SIZE) &&
-			(vap->va_size == 0)) {
+		    (vap->va_size == 0)) {
 			error = pc_truncate(pcp, 0L);
 			if (error)
 				VN_RELE(PCTOV(pcp));
@@ -1642,18 +1643,18 @@ pcfs_putpage(
 			 */
 			if ((flags & B_INVAL) || ((flags & B_ASYNC) == 0)) {
 				pp = page_lookup(vp, io_off,
-					(flags & (B_INVAL | B_FREE)) ?
-					    SE_EXCL : SE_SHARED);
+				    (flags & (B_INVAL | B_FREE)) ?
+				    SE_EXCL : SE_SHARED);
 			} else {
 				pp = page_lookup_nowait(vp, io_off,
-					(flags & B_FREE) ? SE_EXCL : SE_SHARED);
+				    (flags & B_FREE) ? SE_EXCL : SE_SHARED);
 			}
 
 			if (pp == NULL || pvn_getdirty(pp, flags) == 0)
 				io_len = PAGESIZE;
 			else {
 				err = pcfs_putapage(vp, pp, &io_off, &io_len,
-					flags, cr);
+				    flags, cr);
 				if (err != 0)
 					break;
 				/*
@@ -1674,7 +1675,7 @@ pcfs_putpage(
 		 * gone.
 		 */
 		cmn_err(CE_PANIC,
-			"pcfs_putpage: B_INVAL, pages not gone");
+		    "pcfs_putpage: B_INVAL, pages not gone");
 	} else if (err) {
 		PC_DPRINTF1(1, "pcfs_putpage err=%d\n", err);
 	}
@@ -2020,42 +2021,39 @@ pcfs_space(
 void
 set_long_fn_chunk(struct pcdir_lfn *ep, char *buf, int len)
 {
-	char 	*tmp = buf;
 	int	i;
 
+	ASSERT(buf != NULL);
 
 	for (i = 0; i < PCLF_FIRSTNAMESIZE; i += 2) {
 		if (len > 0) {
-			ep->pcdl_firstfilename[i] = *tmp;
-			ep->pcdl_firstfilename[i+1] = 0;
-			len--;
-			tmp++;
+			ep->pcdl_firstfilename[i] = *buf++;
+			ep->pcdl_firstfilename[i + 1] = *buf++;
+			len -= 2;
 		} else {
 			ep->pcdl_firstfilename[i] = (uchar_t)0xff;
-			ep->pcdl_firstfilename[i+1] = (uchar_t)0xff;
+			ep->pcdl_firstfilename[i + 1] = (uchar_t)0xff;
 		}
 	}
 
 	for (i = 0; i < PCLF_SECONDNAMESIZE; i += 2) {
 		if (len > 0) {
-			ep->pcdl_secondfilename[i] = *tmp;
-			ep->pcdl_secondfilename[i+1] = 0;
-			len--;
-			tmp++;
+			ep->pcdl_secondfilename[i] = *buf++;
+			ep->pcdl_secondfilename[i + 1] = *buf++;
+			len -= 2;
 		} else {
 			ep->pcdl_secondfilename[i] = (uchar_t)0xff;
-			ep->pcdl_secondfilename[i+1] = (uchar_t)0xff;
+			ep->pcdl_secondfilename[i + 1] = (uchar_t)0xff;
 		}
 	}
 	for (i = 0; i < PCLF_THIRDNAMESIZE; i += 2) {
 		if (len > 0) {
-			ep->pcdl_thirdfilename[i] = *tmp;
-			ep->pcdl_thirdfilename[i+1] = 0;
-			len--;
-			tmp++;
+			ep->pcdl_thirdfilename[i] = *buf++;
+			ep->pcdl_thirdfilename[i + 1] = *buf++;
+			len -= 2;
 		} else {
 			ep->pcdl_thirdfilename[i] = (uchar_t)0xff;
-			ep->pcdl_thirdfilename[i+1] = (uchar_t)0xff;
+			ep->pcdl_thirdfilename[i + 1] = (uchar_t)0xff;
 		}
 	}
 }
@@ -2070,37 +2068,38 @@ get_long_fn_chunk(struct pcdir_lfn *ep, char *buf, int foldcase)
 	char 	*tmp = buf;
 	int	i;
 
-	for (i = 0; i < PCLF_FIRSTNAMESIZE; i += 2, tmp++) {
-		if (ep->pcdl_firstfilename[i+1] != '\0')
-			return (-1);
-		if (foldcase)
-			*tmp = tolower(ep->pcdl_firstfilename[i]);
-		else
-			*tmp = ep->pcdl_firstfilename[i];
-		if (*tmp == '\0')
+	/* Copy all the names, no filtering now */
+
+	for (i = 0; i < PCLF_FIRSTNAMESIZE; i += 2, tmp += 2) {
+		*tmp = ep->pcdl_firstfilename[i];
+		*(tmp + 1) = ep->pcdl_firstfilename[i + 1];
+
+		if ((*tmp == '\0') && (*(tmp+1) == '\0'))
 			return (tmp - buf);
+		if (*(tmp + 1) == '\0' && foldcase) {
+			*tmp = toupper(*tmp);
+		}
 	}
-	for (i = 0; i < PCLF_SECONDNAMESIZE; i += 2, tmp++) {
-		if (ep->pcdl_secondfilename[i+1] != '\0')
-			return (-1);
-		if (foldcase)
-			*tmp = tolower(ep->pcdl_secondfilename[i]);
-		else
-			*tmp = ep->pcdl_secondfilename[i];
-		if (*tmp == '\0')
+	for (i = 0; i < PCLF_SECONDNAMESIZE; i += 2, tmp += 2) {
+		*tmp = ep->pcdl_secondfilename[i];
+		*(tmp + 1) = ep->pcdl_secondfilename[i + 1];
+
+		if ((*tmp == '\0') && (*(tmp+1) == '\0'))
 			return (tmp - buf);
+		if (*(tmp + 1) == '\0' && foldcase) {
+			*tmp = toupper(*tmp);
+		}
 	}
-	for (i = 0; i < PCLF_THIRDNAMESIZE; i += 2, tmp++) {
-		if (ep->pcdl_thirdfilename[i+1] != '\0')
-			return (-1);
-		if (foldcase)
-			*tmp = tolower(ep->pcdl_thirdfilename[i]);
-		else
-			*tmp = ep->pcdl_thirdfilename[i];
-		if (*tmp == '\0')
+	for (i = 0; i < PCLF_THIRDNAMESIZE; i += 2, tmp += 2) {
+		*tmp = ep->pcdl_thirdfilename[i];
+		*(tmp + 1) = ep->pcdl_thirdfilename[i + 1];
+
+		if ((*tmp == '\0') && (*(tmp+1) == '\0'))
 			return (tmp - buf);
+		if (*(tmp + 1) == '\0' && foldcase) {
+			*tmp = toupper(*tmp);
+		}
 	}
-	*tmp = '\0';
 	return (tmp - buf);
 }
 
@@ -2160,22 +2159,22 @@ pc_extract_long_fn(struct pcnode *pcp, char *namep,
 	char	*lfn_base;
 	int	boff;
 	int	i, cs;
-	char	buf[20];
+	char 	*buf;
 	uchar_t	cksum;
-	int	detached = 0;
+	int 	detached = 0;
 	int	error = 0;
 	int	foldcase;
+	int	count = 0;
+	size_t u16l = 0, u8l = 0;
 
 	foldcase = (fsp->pcfs_flags & PCFS_FOLDCASE);
-	/* use callers buffer unless we didn't get one */
-	if (namep)
-		lfn_base = namep;
-	else
-		lfn_base = kmem_alloc(PCMAXNAMLEN+1, KM_SLEEP);
-	lfn = lfn_base + PCMAXNAMLEN - 1;
+	lfn_base = kmem_alloc(PCMAXNAM_UTF16, KM_SLEEP);
+	lfn = lfn_base + PCMAXNAM_UTF16 - sizeof (uint16_t);
 	*lfn = '\0';
+	*(lfn + 1) = '\0';
 	cksum = lep->pcdl_checksum;
 
+	buf = kmem_alloc(PCMAXNAM_UTF16, KM_SLEEP);
 	for (i = (lep->pcdl_ordinal & ~0xc0); i > 0; i--) {
 		/* read next block if necessary */
 		boff = pc_blkoff(fsp, *offset);
@@ -2186,8 +2185,8 @@ pc_extract_long_fn(struct pcnode *pcp, char *namep,
 			}
 			error = pc_blkatoff(pcp, *offset, bp, &ep);
 			if (error) {
-				if (namep == NULL)
-					kmem_free(lfn_base, PCMAXNAMLEN+1);
+				kmem_free(lfn_base, PCMAXNAM_UTF16);
+				kmem_free(buf, PCMAXNAM_UTF16);
 				return (error);
 			}
 			lep = (struct pcdir_lfn *)ep;
@@ -2201,20 +2200,18 @@ pc_extract_long_fn(struct pcnode *pcp, char *namep,
 			detached = 1;
 		/* process current entry */
 		cs = get_long_fn_chunk(lep, buf, foldcase);
-		if (cs == -1) {
-			detached = 1;
-		} else {
-			for (; cs > 0; cs--) {
-				/* see if we underflow */
-				if (lfn >= lfn_base)
-					*--lfn = buf[cs - 1];
-				else
-					detached = 1;
-			}
+		count += cs;
+		for (; cs > 0; cs--) {
+			/* see if we underflow */
+			if (lfn >= lfn_base)
+				*--lfn = buf[cs - 1];
+			else
+				detached = 1;
 		}
 		lep++;
 		*offset += sizeof (struct pcdir);
 	}
+	kmem_free(buf, PCMAXNAM_UTF16);
 	/* read next block if necessary */
 	boff = pc_blkoff(fsp, *offset);
 	ep = (struct pcdir *)lep;
@@ -2225,8 +2222,7 @@ pc_extract_long_fn(struct pcnode *pcp, char *namep,
 		}
 		error = pc_blkatoff(pcp, *offset, bp, &ep);
 		if (error) {
-			if (namep == NULL)
-				kmem_free(lfn_base, PCMAXNAMLEN+1);
+			kmem_free(lfn_base, PCMAXNAM_UTF16);
 			return (error);
 		}
 	}
@@ -2237,14 +2233,13 @@ pc_extract_long_fn(struct pcnode *pcp, char *namep,
 	}
 	if (detached ||
 	    (cksum != pc_checksum_long_fn(ep->pcd_filename, ep->pcd_ext)) ||
-	    !pc_valid_long_fn(lfn)) {
+	    !pc_valid_long_fn(lfn, 0)) {
 		/*
 		 * process current entry again. This may end up another lfn
 		 * or a short name.
 		 */
 		*epp = ep;
-		if (namep == NULL)
-			kmem_free(lfn_base, PCMAXNAMLEN+1);
+		kmem_free(lfn_base, PCMAXNAM_UTF16);
 		return (EINVAL);
 	}
 	if (PCA_IS_HIDDEN(fsp, ep->pcd_attr)) {
@@ -2255,19 +2250,27 @@ pc_extract_long_fn(struct pcnode *pcp, char *namep,
 		*offset += sizeof (struct pcdir);
 		ep++;
 		*epp = ep;
-		if (namep == NULL)
-			kmem_free(lfn_base, PCMAXNAMLEN+1);
+		kmem_free(lfn_base, PCMAXNAM_UTF16);
 		return (EINVAL);
 	}
 	if (namep) {
-		/* lfn is part of namep, but shifted. shift it back */
-		cs = strlen(lfn);
-		for (i = 0; i < cs; i++)
-			namep[i] = lfn[i];
-		namep[i] = '\0';
-	} else {
-		kmem_free(lfn_base, PCMAXNAMLEN+1);
+		u16l = count / 2;
+		u8l = PCMAXNAMLEN;
+		error = uconv_u16tou8((const uint16_t *)lfn, &u16l,
+		    (uchar_t *)namep, &u8l, UCONV_IN_LITTLE_ENDIAN);
+		/*
+		 * uconv_u16tou8() will catch conversion errors including
+		 * the case where there is not enough room to write the
+		 * converted result and the u8l will never go over the given
+		 * PCMAXNAMLEN.
+		 */
+		if (error != 0) {
+			kmem_free(lfn_base, PCMAXNAM_UTF16);
+			return (EINVAL);
+		}
+		namep[u8l] = '\0';
 	}
+	kmem_free(lfn_base, PCMAXNAM_UTF16);
 	*epp = ep;
 	return (0);
 }
