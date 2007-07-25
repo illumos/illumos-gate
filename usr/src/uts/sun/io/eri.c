@@ -1588,6 +1588,34 @@ eri_init_macregs_generic(struct eri *erip)
 		PUT_MACREG(spcmd, BMAC_SEND_PAUSE_CMD);
 	else
 		PUT_MACREG(spcmd, 0);
+
+	/*
+	 * Program BigMAC with local individual ethernet address.
+	 */
+
+	PUT_MACREG(madd0, (erip->ouraddr[4] << 8) | erip->ouraddr[5]);
+	PUT_MACREG(madd1, (erip->ouraddr[2] << 8) | erip->ouraddr[3]);
+	PUT_MACREG(madd2, (erip->ouraddr[0] << 8) | erip->ouraddr[1]);
+
+	/*
+	 * Install multicast address filter.
+	 */
+
+	PUT_MACREG(hash0, erip->ladrf[0]);
+	PUT_MACREG(hash1, erip->ladrf[1]);
+	PUT_MACREG(hash2, erip->ladrf[2]);
+	PUT_MACREG(hash3, erip->ladrf[3]);
+	PUT_MACREG(hash4, erip->ladrf[4]);
+	PUT_MACREG(hash5, erip->ladrf[5]);
+	PUT_MACREG(hash6, erip->ladrf[6]);
+	PUT_MACREG(hash7, erip->ladrf[7]);
+	PUT_MACREG(hash8, erip->ladrf[8]);
+	PUT_MACREG(hash9, erip->ladrf[9]);
+	PUT_MACREG(hash10, erip->ladrf[10]);
+	PUT_MACREG(hash11, erip->ladrf[11]);
+	PUT_MACREG(hash12, erip->ladrf[12]);
+	PUT_MACREG(hash13, erip->ladrf[13]);
+	PUT_MACREG(hash14, erip->ladrf[14]);
 }
 
 static int
@@ -2297,7 +2325,7 @@ eri_init(struct eri *erip)
 	HSTAT(erip, inits);
 	erip->txhung = 0;
 
-	if (erip->stats.inits > 1)
+	if ((erip->stats.inits > 1) && (erip->init_macregs == 0))
 		eri_savecntrs(erip);
 
 	mutex_enter(&erip->xcvrlock);
@@ -3532,8 +3560,13 @@ eri_send_msg(struct eri *erip, mblk_t *mp)
 	    NULL, NULL, &flags);
 
 	if (flags & HCK_PARTIALCKSUM) {
-		start_offset += ETHERHEADER_SIZE;
-		stuff_offset += ETHERHEADER_SIZE;
+		if (get_ether_type(mp->b_rptr) == ETHERTYPE_VLAN) {
+			start_offset += ETHERHEADER_SIZE + 4;
+			stuff_offset += ETHERHEADER_SIZE + 4;
+		} else {
+			start_offset += ETHERHEADER_SIZE;
+			stuff_offset += ETHERHEADER_SIZE;
+		}
 		tmdcsum = ERI_TMD_CSENABL;
 	}
 #endif /* ERI_HWCSUM */
@@ -4516,7 +4549,7 @@ eri_param_register(struct eri *erip, param_t *eripa, int cnt)
 
 	int i;
 
-	for (i = 0; i < cnt; i++) {
+	for (i = 0; i < cnt; i++, eripa++) {
 		pfi_t	setter = (pfi_t)eri_param_set;
 
 		switch (eripa->param_name[0]) {
@@ -4534,7 +4567,7 @@ eri_param_register(struct eri *erip, param_t *eripa, int cnt)
 		}
 
 		if (!eri_nd_load(&erip->g_nd, eripa->param_name + 1,
-		    (pfi_t)eri_param_get, setter, (caddr_t)erip)) {
+		    (pfi_t)eri_param_get, setter, (caddr_t)eripa)) {
 			(void) eri_nd_free(&erip->g_nd);
 			return (B_FALSE);
 		}
