@@ -1355,17 +1355,27 @@ dhstr(int grp)
 
 	switch (grp) {
 	case 0:
-		return (gettext("<unknown>"));
+		return (gettext("<unavailable>"));
 	case IKE_GRP_DESC_MODP_768:
-		return (gettext("768-bit MODP"));
+		return (gettext("768-bit MODP (group 1)"));
 	case IKE_GRP_DESC_MODP_1024:
-		return (gettext("1024-bit MODP"));
+		return (gettext("1024-bit MODP (group 2)"));
 	case IKE_GRP_DESC_EC2N_155:
 		return (gettext("EC2N group on GP[2^155]"));
 	case IKE_GRP_DESC_EC2N_185:
 		return (gettext("EC2N group on GP[2^185]"));
 	case IKE_GRP_DESC_MODP_1536:
-		return (gettext("1536-bit MODP"));
+		return (gettext("1536-bit MODP (group 5)"));
+	case IKE_GRP_DESC_MODP_2048:
+		return (gettext("2048-bit MODP (group 14)"));
+	case IKE_GRP_DESC_MODP_3072:
+		return (gettext("3072-bit MODP (group 15)"));
+	case IKE_GRP_DESC_MODP_4096:
+		return (gettext("4096-bit MODP (group 16)"));
+	case IKE_GRP_DESC_MODP_6144:
+		return (gettext("6144-bit MODP (group 17)"));
+	case IKE_GRP_DESC_MODP_8192:
+		return (gettext("8192-bit MODP (group 18)"));
 	default:
 		(void) snprintf(rtn, MAXLINESIZE, gettext("<unknown %d>"), grp);
 		return (rtn);

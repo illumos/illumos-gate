@@ -234,7 +234,13 @@ typedef struct {
 #define	IKE_GRP_DESC_MODP_1024	2
 #define	IKE_GRP_DESC_EC2N_155	3
 #define	IKE_GRP_DESC_EC2N_185	4
+/* values for p1xf_dh_group (aligned with RFC3526) */
 #define	IKE_GRP_DESC_MODP_1536	5
+#define	IKE_GRP_DESC_MODP_2048	14
+#define	IKE_GRP_DESC_MODP_3072	15
+#define	IKE_GRP_DESC_MODP_4096	16
+#define	IKE_GRP_DESC_MODP_6144	17
+#define	IKE_GRP_DESC_MODP_8192	18
 
 /* values for p1xf_auth_meth (aligned with RFC2409, Appendix A) */
 #define	IKE_AUTH_METH_PRE_SHARED_KEY	1
