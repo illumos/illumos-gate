@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -449,6 +449,10 @@ lx_socket(ulong_t *args)
 		return (err);
 
 	lx_debug("\tsocket(%d, %d, %d)", domain, type, protocol);
+
+	/* Right now IPv6 sockets don't work */
+	if (domain == AF_INET6)
+		return (-EAFNOSUPPORT);
 	fd = socket(domain, type, protocol);
 	if (fd >= 0)
 		return (fd);
@@ -727,14 +731,14 @@ lx_send(ulong_t *args)
 	 * call, and resetting the action back to its previous value.
 	 */
 	if (nosigpipe) {
-	    newact.sa_handler = SIG_IGN;
-	    newact.sa_flags = 0;
-	    (void) sigemptyset(&newact.sa_mask);
+		newact.sa_handler = SIG_IGN;
+		newact.sa_flags = 0;
+		(void) sigemptyset(&newact.sa_mask);
 
-	    if (sigaction(SIGPIPE, &newact, &oact) < 0)
-		    lx_err_fatal(gettext(
-			"%s: could not ignore SIGPIPE to emulate "
-			"LX_MSG_NOSIGNAL"), "send()");
+		if (sigaction(SIGPIPE, &newact, &oact) < 0)
+			lx_err_fatal(gettext(
+			    "%s: could not ignore SIGPIPE to emulate "
+			    "LX_MSG_NOSIGNAL"), "send()");
 	}
 
 	r = send(sockfd, buf, len, flags);
@@ -774,14 +778,14 @@ lx_recv(ulong_t *args)
 	 * call, and resetting the action back to its previous value.
 	 */
 	if (nosigpipe) {
-	    newact.sa_handler = SIG_IGN;
-	    newact.sa_flags = 0;
-	    (void) sigemptyset(&newact.sa_mask);
+		newact.sa_handler = SIG_IGN;
+		newact.sa_flags = 0;
+		(void) sigemptyset(&newact.sa_mask);
 
-	    if (sigaction(SIGPIPE, &newact, &oact) < 0)
-		    lx_err_fatal(gettext(
-			"%s: could not ignore SIGPIPE to emulate "
-			"LX_MSG_NOSIGNAL"), "recv()");
+		if (sigaction(SIGPIPE, &newact, &oact) < 0)
+			lx_err_fatal(gettext(
+			    "%s: could not ignore SIGPIPE to emulate "
+			    "LX_MSG_NOSIGNAL"), "recv()");
 	}
 
 	r = recv(sockfd, buf, len, flags);
@@ -831,14 +835,14 @@ lx_sendto(ulong_t *args)
 	 * call, and resetting the action back to its previous value.
 	 */
 	if (nosigpipe) {
-	    newact.sa_handler = SIG_IGN;
-	    newact.sa_flags = 0;
-	    (void) sigemptyset(&newact.sa_mask);
+		newact.sa_handler = SIG_IGN;
+		newact.sa_flags = 0;
+		(void) sigemptyset(&newact.sa_mask);
 
-	    if (sigaction(SIGPIPE, &newact, &oact) < 0)
-		    lx_err_fatal(gettext(
-			"%s: could not ignore SIGPIPE to emulate "
-			"LX_MSG_NOSIGNAL"), "sendto()");
+		if (sigaction(SIGPIPE, &newact, &oact) < 0)
+			lx_err_fatal(gettext(
+			    "%s: could not ignore SIGPIPE to emulate "
+			    "LX_MSG_NOSIGNAL"), "sendto()");
 	}
 
 	r = sendto(sockfd, buf, len, flags, to, tolen);
@@ -891,14 +895,14 @@ lx_recvfrom(ulong_t *args)
 	 * call, and resetting the action back to its previous value.
 	 */
 	if (nosigpipe) {
-	    newact.sa_handler = SIG_IGN;
-	    newact.sa_flags = 0;
-	    (void) sigemptyset(&newact.sa_mask);
+		newact.sa_handler = SIG_IGN;
+		newact.sa_flags = 0;
+		(void) sigemptyset(&newact.sa_mask);
 
-	    if (sigaction(SIGPIPE, &newact, &oact) < 0)
-		    lx_err_fatal(gettext(
-			"%s: could not ignore SIGPIPE to emulate "
-			"LX_MSG_NOSIGNAL"), "recvfrom()");
+		if (sigaction(SIGPIPE, &newact, &oact) < 0)
+			lx_err_fatal(gettext(
+			    "%s: could not ignore SIGPIPE to emulate "
+			    "LX_MSG_NOSIGNAL"), "recvfrom()");
 	}
 
 	r = recvfrom(sockfd, buf, len, flags, from, from_lenp);
@@ -1147,14 +1151,14 @@ lx_sendmsg(ulong_t *args)
 	 * call, and resetting the action back to its previous value.
 	 */
 	if (nosigpipe) {
-	    newact.sa_handler = SIG_IGN;
-	    newact.sa_flags = 0;
-	    (void) sigemptyset(&newact.sa_mask);
+		newact.sa_handler = SIG_IGN;
+		newact.sa_flags = 0;
+		(void) sigemptyset(&newact.sa_mask);
 
-	    if (sigaction(SIGPIPE, &newact, &oact) < 0)
-		    lx_err_fatal(gettext(
-			"%s: could not ignore SIGPIPE to emulate "
-			"LX_MSG_NOSIGNAL"), "sendmsg()");
+		if (sigaction(SIGPIPE, &newact, &oact) < 0)
+			lx_err_fatal(gettext(
+			    "%s: could not ignore SIGPIPE to emulate "
+			    "LX_MSG_NOSIGNAL"), "sendmsg()");
 	}
 
 	r = _so_sendmsg(sockfd, (struct msghdr *)&msg, flags | MSG_XPG4_2);
@@ -1225,14 +1229,14 @@ lx_recvmsg(ulong_t *args)
 	 * call, and resetting the action back to its previous value.
 	 */
 	if (nosigpipe) {
-	    newact.sa_handler = SIG_IGN;
-	    newact.sa_flags = 0;
-	    (void) sigemptyset(&newact.sa_mask);
+		newact.sa_handler = SIG_IGN;
+		newact.sa_flags = 0;
+		(void) sigemptyset(&newact.sa_mask);
 
-	    if (sigaction(SIGPIPE, &newact, &oact) < 0)
-		    lx_err_fatal(gettext(
-			"%s: could not ignore SIGPIPE to emulate "
-			"LX_MSG_NOSIGNAL"), "recvmsg()");
+		if (sigaction(SIGPIPE, &newact, &oact) < 0)
+			lx_err_fatal(gettext(
+			    "%s: could not ignore SIGPIPE to emulate "
+			    "LX_MSG_NOSIGNAL"), "recvmsg()");
 	}
 
 	r = _so_recvmsg(sockfd, (struct msghdr *)&msg, flags | MSG_XPG4_2);

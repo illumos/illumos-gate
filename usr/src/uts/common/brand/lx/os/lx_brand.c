@@ -711,15 +711,41 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 			 * calculated address from above.
 			 */
 			edp->ed_ldentry = edp->ed_entry;
+
+			/*
+			 * In all situations except an ET_DYN elf object with no
+			 * interpreter, we want to leave the brk and base
+			 * values set by mapexec_brand alone. Normally when
+			 * running ET_DYN objects on Solaris (most likely
+			 * /lib/ld.so.1) the kernel sets brk and base to 0 since
+			 * it doesn't know where to put the heap, and later the
+			 * linker will call brk() to initialize the heap in:
+			 *	usr/src/cmd/sgs/rtld/common/setup.c:setup()
+			 * after it has determined where to put it.  (This
+			 * decision is made after the linker loads and inspects
+			 * elf properties of the target executable being run.)
+			 *
+			 * So for ET_DYN Linux executables, we also don't know
+			 * where the heap should go, so we'll set the brk and
+			 * base to 0.  But in this case the Solaris linker will
+			 * not initialize the heap, so when the Linux linker
+			 * starts running there is no heap allocated.  This
+			 * seems to be ok on Linux 2.4 based systems because the
+			 * Linux linker/libc fall back to using mmap() to
+			 * allocate memory. But on 2.6 systems, running
+			 * applications by specifying them as command line
+			 * arguments to the linker results in segfaults for an
+			 * as yet undetermined reason (which seems to indicatej
+			 * that a more permanent fix for heap initalization in
+			 * these cases may be necessary).
+			 */
+			if (ehdr.e_type == ET_DYN) {
+				env.ex_bssbase = (caddr_t)0;
+				env.ex_brkbase = (caddr_t)0;
+				env.ex_brksize = 0;
+			}
 		}
 
-		/*
-		 * Delay setting the brkbase until the first call to brk();
-		 * see elfexec() for details.
-		 */
-		env.ex_bssbase = (caddr_t)0;
-		env.ex_brkbase = (caddr_t)0;
-		env.ex_brksize = 0;
 	}
 
 	env.ex_vp = vp;
@@ -732,6 +758,14 @@ lx_elfexec(struct vnode *vp, struct execa *uap, struct uarg *args,
 	 * what's on the process stack.
 	 */
 	phdr_auxv32[0].a_un.a_val = edp->ed_phdr;
+
+	/*
+	 * Linux 2.6 programs such as ps will print an error message if the
+	 * following aux entry is missing
+	 */
+	phdr_auxv32[1].a_type = AT_CLKTCK;
+	phdr_auxv32[1].a_un.a_val = hz;
+
 	if (copyout(&phdr_auxv32, args->auxp_brand,
 	    sizeof (phdr_auxv32)) == -1)
 		return (EFAULT);

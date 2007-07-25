@@ -1124,6 +1124,22 @@ mapelfexec(
 		if (addr == NULL)
 			return (ENOMEM);
 		*voffset = (intptr_t)addr;
+
+		/*
+		 * Calculate the minimum vaddr so it can be subtracted out.
+		 * According to the ELF specification, since PT_LOAD sections
+		 * must be sorted by increasing p_vaddr values, this is
+		 * guaranteed to be the first PT_LOAD section.
+		 */
+		phdr = (Phdr *)phdrbase;
+		for (i = nphdrs; i > 0; i--) {
+			if (phdr->p_type == PT_LOAD) {
+				*voffset -= (uintptr_t)phdr->p_vaddr;
+				break;
+			}
+			phdr = (Phdr *)((caddr_t)phdr + hsize);
+		}
+
 	} else {
 		*voffset = 0;
 	}

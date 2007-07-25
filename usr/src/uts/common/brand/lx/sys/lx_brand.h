@@ -80,6 +80,9 @@ extern "C" {
 /* Aux vector containing phdr of linux executable, used by lx_librtld_db */
 #define	AT_SUN_BRAND_LX_PHDR	AT_SUN_BRAND_AUX1
 
+/* Aux vector containing hz value */
+#define	AT_CLKTCK	17
+
 #ifndef	_ASM
 
 typedef struct lx_brand_registration {

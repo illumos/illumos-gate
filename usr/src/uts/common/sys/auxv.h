@@ -92,7 +92,8 @@ typedef struct {
  * in the draft amd64 ABI.
  *
  * At the time of writing, Solaris doesn't place any of these values into
- * the aux vector; we do similar things via AT_SUN_ values.
+ * the aux vector, except AT_CLKTCK which is placed on the aux vector for
+ * lx branded processes; also, we do similar things via AT_SUN_ values.
  *
  * AT_NOTELF		10	program is not ELF?
  * AT_UID		11	real user id
@@ -139,7 +140,7 @@ typedef struct {
  * These attributes communicate performance -hints- about processor
  * hardware capabilities that might be useful to library implementations.
  */
-#define	AT_SUN_HWCAP    2009
+#define	AT_SUN_HWCAP	2009
 
 #if defined(_KERNEL)
 /*
