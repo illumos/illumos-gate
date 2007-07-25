@@ -36,7 +36,6 @@
 #include <sys/varargs.h>
 #include <sys/fs/zfs.h>
 #include <sys/avl.h>
-#include <libuutil.h>
 #include <ucred.h>
 
 #ifdef	__cplusplus
