@@ -1019,7 +1019,13 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 			return (ret);
 	}
 
-	(void) dnlc_purge_vfsp(vfsp, 0);
+	/*
+	 * We purge the parent filesystem's vfsp as the parent filesystem
+	 * and all of its snapshots have their vnode's v_vfsp set to the
+	 * parent's filesystem's vfsp.  Note, 'z_parent' is self
+	 * referential for non-snapshots.
+	 */
+	(void) dnlc_purge_vfsp(zfsvfs->z_parent->z_vfs, 0);
 
 	/*
 	 * Unmount any snapshots mounted under .zfs before unmounting the

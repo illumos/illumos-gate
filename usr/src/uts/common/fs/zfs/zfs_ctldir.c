@@ -719,6 +719,10 @@ domount:
 	if (err == 0) {
 		/*
 		 * Fix up the root vnode.
+		 *
+		 * This is where we lie about our v_vfsp in order to
+		 * make .zfs/snapshot/<snapdir> accessible over NFS
+		 * without requiring manual mounts of <snapdir>.
 		 */
 		ASSERT(VTOZ(*vpp)->z_zfsvfs != zfsvfs);
 		VTOZ(*vpp)->z_zfsvfs->z_parent = zfsvfs;
