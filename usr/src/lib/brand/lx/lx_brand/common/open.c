@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,12 +78,6 @@ lx_open(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	if (p2 & LX_O_NOFOLLOW)
 		flags |= O_NOFOLLOW;
 
-	if (p2 & LX_O_ASYNC) {
-		lx_unsupported(
-		    gettext("%s(): operation with O_ASYNC flag set"), "open");
-		return (-ENOTSUP);
-	}
-
 	/*
 	 * Linux uses the LX_O_DIRECT flag to do raw, synchronous I/O to the
 	 * device backing the fd in question.  Solaris doesn't have similar
@@ -116,21 +110,31 @@ lx_open(uintptr_t p1, uintptr_t p2, uintptr_t p3)
 	 * and an open().
 	 */
 	if (p2 & LX_O_DIRECTORY) {
-		int ret = fd;
-
 		if (fstat64(fd, &statbuf) < 0) {
-			ret = -errno;
-			(void) close(fd);
-		} else if (!S_ISDIR(statbuf.st_mode)) {
-			ret = -ENOTDIR;
-			(void) close(fd);
-		}
+			int ret = -errno;
 
-		return (ret);
+			(void) close(fd);
+			return (ret);
+		} else if (!S_ISDIR(statbuf.st_mode)) {
+			(void) close(fd);
+			return (-ENOTDIR);
+		}
 	}
 
 	if (p2 & LX_O_DIRECT)
 		(void) directio(fd, DIRECTIO_ON);
+
+	/*
+	 * Set the ASYNC flag if passsed.
+	 */
+	if (p2 & LX_O_ASYNC) {
+		if (fcntl(fd, F_SETFL, FASYNC) < 0) {
+			int ret = -errno;
+
+			(void) close(fd);
+			return (ret);
+		}
+	}
 
 	return (fd);
 }

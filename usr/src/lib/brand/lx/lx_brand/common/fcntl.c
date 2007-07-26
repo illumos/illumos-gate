@@ -309,6 +309,8 @@ lx_fcntl_getfl(int fd)
 		rc |= LX_O_SYNC;
 	if (retval & O_LARGEFILE)
 		rc |= LX_O_LARGEFILE;
+	if (retval & FASYNC)
+		rc |= LX_O_ASYNC;
 
 	return (rc);
 }
@@ -328,6 +330,8 @@ lx_fcntl_setfl(int fd, ulong_t arg)
 		new_arg |= O_SYNC;
 	if (arg & LX_O_LARGEFILE)
 		new_arg |= O_LARGEFILE;
+	if (arg & LX_O_ASYNC)
+		new_arg |= FASYNC;
 
 	return ((fcntl(fd, F_SETFL, new_arg) == 0) ? 0 : -errno);
 }
