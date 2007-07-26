@@ -488,9 +488,11 @@ static uintptr_t
 invalid_section(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
     Word ndx, int ident, Ofl_desc *ofl)
 {
+	Conv_inv_buf_t inv_buf;
+
 	eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_FIL_INVALSEC),
 	    ifl->ifl_name, name, conv_sec_type(ifl->ifl_ehdr->e_machine,
-	    shdr->sh_type, 0));
+	    shdr->sh_type, 0, &inv_buf));
 	return (1);
 }
 
@@ -1220,6 +1222,7 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	Is_desc	*risc;
 	Os_desc	*osp;
 	Shdr	*shdr = isc->is_shdr;
+	Conv_inv_buf_t inv_buf;
 
 	/*
 	 * Make sure this is a valid relocation we can handle.
@@ -1227,7 +1230,8 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	if (shdr->sh_type != M_REL_SHT_TYPE) {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_FIL_INVALSEC),
 		    ifl->ifl_name, isc->is_name,
-		    conv_sec_type(ifl->ifl_ehdr->e_machine, shdr->sh_type, 0));
+		    conv_sec_type(ifl->ifl_ehdr->e_machine,
+		    shdr->sh_type, 0, &inv_buf));
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return (0);
 	}
@@ -1578,12 +1582,15 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 			 * really know what to do with it, issue a warning
 			 * message but do the basic section processing anyway.
 			 */
-			if (row < (Word)SHT_LOSUNW)
+			if (row < (Word)SHT_LOSUNW) {
+				Conv_inv_buf_t inv_buf;
+
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_FIL_INVALSEC), ifl->ifl_name,
 				    name,
 				    conv_sec_type(ifl->ifl_ehdr->e_machine,
-				    shdr->sh_type, 0));
+				    shdr->sh_type, 0, &inv_buf));
+			}
 
 			/*
 			 * Handle sections greater than SHT_LOSUNW.
@@ -1997,13 +2004,10 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 					 * so as to provide the most
 					 * descriptive diagnostic.
 					 */
-					if (strcmp(name, ifl->ifl_name) == 0)
-						errmsg =
-						    MSG_INTL(MSG_FIL_MULINC_1);
-					else
-						errmsg =
-						    MSG_INTL(MSG_FIL_MULINC_2);
-
+					errmsg =
+					    (strcmp(name, ifl->ifl_name) == 0) ?
+					    MSG_INTL(MSG_FIL_MULINC_1) :
+					    MSG_INTL(MSG_FIL_MULINC_2);
 					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    errmsg, name, ifl->ifl_name);
 				}
@@ -2283,11 +2287,13 @@ ld_finish_libs(Ofl_desc *ofl)
 					return (S_ERROR);
 				}
 				if (_rej.rej_type) {
+					Conv_reject_desc_buf_t rej_buf;
+
 					eprintf(ofl->ofl_lml, ERR_WARNING,
 					    MSG_INTL(reject[_rej.rej_type]),
 					    _rej.rej_name ? rej.rej_name :
 					    MSG_INTL(MSG_STR_UNKNOWN),
-					    conv_reject_desc(&_rej));
+					    conv_reject_desc(&_rej, &rej_buf));
 				} else
 					sdf->sdf_file = ifl;
 			}
@@ -2392,10 +2398,13 @@ ld_finish_libs(Ofl_desc *ofl)
 		 * generic "not found" diagnostic.
 		 */
 		if (rej.rej_type) {
+			Conv_reject_desc_buf_t rej_buf;
+
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(reject[rej.rej_type]),
 			    rej.rej_name ? rej.rej_name :
-			    MSG_INTL(MSG_STR_UNKNOWN), conv_reject_desc(&rej));
+			    MSG_INTL(MSG_STR_UNKNOWN),
+			    conv_reject_desc(&rej, &rej_buf));
 		} else {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_FIL_NOTFOUND), file, sdf->sdf_rfile);

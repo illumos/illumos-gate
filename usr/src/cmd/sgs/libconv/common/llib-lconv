@@ -39,95 +39,120 @@
  * Define all generic interfaces.
  */
 uchar_t		conv_check_native(char **, char **);
-const char      *conv_config_feat(int);
-const char	*conv_config_obj(ushort_t);
+const char      *conv_config_feat(int, Conv_config_feat_buf_t *);
+const char	*conv_config_obj(ushort_t, Conv_config_obj_buf_t *);
 const char	*conv_config_upm(const char *, const char *, const char *,
 		    size_t);
-const char	*conv_def_tag(Symref);
+const char	*conv_def_tag(Symref, Conv_inv_buf_t *);
 const char	*conv_demangle_name(const char *);
-const char	*conv_dl_flag(int, int);
-const char	*conv_dl_mode(int, int);
-const char	*conv_dwarf_ehe(uint_t);
-const char	*conv_elfdata_type(Elf_Type);
+const char	*conv_dl_flag(int, int, Conv_dl_flag_buf_t *);
+const char	*conv_dl_mode(int, int, Conv_dl_mode_buf_t *);
+const char	*conv_dwarf_ehe(uint_t, Conv_dwarf_ehe_buf_t *);
+const char	*conv_elfdata_type(Elf_Type, Conv_inv_buf_t *);
 int		conv_expn_field(CONV_EXPN_FIELD_ARG *);
-const char	*conv_grphdl_flags(uint_t);
-const char	*conv_grpdesc_flags(uint_t);
+const char	*conv_grphdl_flags(uint_t, Conv_grphdl_flags_buf_t *);
+const char	*conv_grpdesc_flags(uint_t, Conv_grpdesc_flags_buf_t *);
 Isa_desc	*conv_isalist(void);
 const char	*conv_lddstub(int);
-const char	*conv_seg_flags(Half);
+const char	*conv_seg_flags(Half, Conv_seg_flags_buf_t *);
 int		conv_sys_eclass(void);
 Uts_desc	*conv_uts(void);
 const char	*conv_ver_flags(Half);
-const char	*conv_ver_index(Versym verndx, int gnuver);
+const char	*conv_ver_index(Versym, int, Conv_inv_buf_t *);
+
 
 /*
  * Define all class specific routines.
  */
-const char	*conv32_bnd_obj(uint_t);
-const char	*conv64_bnd_obj(uint_t);
-const char	*conv32_bnd_type(uint_t);
-const char	*conv64_bnd_type(uint_t);
-const char	*conv32_cap_tag(Elf32_Word);
-const char	*conv64_cap_tag(Elf64_Xword);
-const char	*conv32_cap_val(Elf32_Word, Elf32_Word, Half);
-const char	*conv64_cap_val(Elf64_Xword, Elf64_Xword, Half);
-const char	*conv32_cap_val_hw1(Elf32_Word, Half);
-const char	*conv64_cap_val_hw1(Elf64_Xword, Half);
-const char	*conv32_cap_val_sf1(Elf32_Word, Half);
-const char	*conv64_cap_val_sf1(Elf64_Xword, Half);
-const char	*conv32_dyn_flag1(Elf32_Word);
-const char	*conv64_dyn_flag1(Elf64_Xword);
-const char	*conv32_dyn_flag(Elf32_Word, int);
-const char	*conv64_dyn_flag(Elf64_Xword, int);
-const char	*conv32_dyn_posflag1(Elf32_Word, int);
-const char	*conv64_dyn_posflag1(Elf64_Xword, int);
-const char	*conv32_dyn_tag(Elf32_Word, Elf32_Half, int);
-const char	*conv64_dyn_tag(Elf64_Xword, Elf64_Half, int);
-const char	*conv32_dyn_feature1(Elf32_Word, int);
-const char	*conv64_dyn_feature1(Elf64_Xword, int);
-const char	*conv32_ehdr_class(uchar_t, int);
-const char	*conv64_ehdr_class(uchar_t, int);
-const char	*conv32_ehdr_data(uchar_t, int);
-const char	*conv64_ehdr_data(uchar_t, int);
-const char	*conv32_ehdr_flags(Elf32_Half, Elf32_Word);
-const char	*conv64_ehdr_flags(Elf64_Half, Elf64_Word);
-const char	*conv32_ehdr_mach(Elf32_Half, int);
-const char	*conv64_ehdr_mach(Elf64_Half, int);
-const char	*conv32_ehdr_type(Elf32_Half, int);
-const char	*conv64_ehdr_type(Elf64_Half, int);
-const char	*conv32_ehdr_vers(Elf32_Word, int);
-const char	*conv64_ehdr_vers(Elf64_Word, int);
-const char	*conv32_invalid_val(char *, size_t, Elf32_Word, int);
-const char	*conv64_invalid_val(char *, size_t, Elf64_Xword, int);
-const char	*conv32_phdr_flags(Word);
-const char	*conv64_phdr_flags(Word);
-const char	*conv32_phdr_type(Elf32_Half, Word, int);
-const char	*conv64_phdr_type(Elf64_Half, Word, int);
-const char	*conv32_reject_desc(Rej_desc *);
-const char	*conv64_reject_desc(Rej_desc *);
-const char	*conv32_reloc_type(Half, Word, int);
-const char	*conv64_reloc_type(Half, Word, int);
-const char	*conv32_reloc_386_type(Word, int);
-const char	*conv64_reloc_386_type(Word, int);
-const char	*conv32_reloc_amd64_type(Word, int);
-const char	*conv64_reloc_amd64_type(Word, int);
-const char	*conv32_reloc_SPARC_type(Word, int);
-const char	*conv64_reloc_SPARC_type(Word, int);
-const char	*conv32_sec_flags(Elf32_Word);
-const char	*conv64_sec_flags(Elf64_Xword);
-const char	*conv32_sec_linkinfo(Elf32_Word, Elf32_Word, Conv_inv_buf_t);
-const char	*conv64_sec_linkinfo(Elf64_Word, Elf64_Xword, Conv_inv_buf_t);
-const char	*conv32_sec_type(Elf32_Half, Elf32_Word, int);
-const char	*conv64_sec_type(Elf64_Half, Elf64_Word, int);
-const char	*conv32_sym_info_bind(uchar_t, int);
-const char	*conv64_sym_info_bind(uchar_t, int);
-const char	*conv32_sym_info_type(Elf32_Half, uchar_t, int);
-const char	*conv64_sym_info_type(Elf64_Half, uchar_t, int);
-const char	*conv32_sym_shndx(Elf32_Half);
-const char	*conv64_sym_shndx(Elf64_Half);
-const char	*conv32_sym_other(uchar_t);
-const char	*conv64_sym_other(uchar_t);
-const char	*conv32_sym_value(Elf32_Half, uchar_t, Elf32_Addr);
-const char	*conv64_sym_value(Elf64_Half, uchar_t, Elf64_Addr);
-const char	*conv32_sym_SPARC_value(Elf32_Addr, int);
-const char	*conv64_sym_SPARC_value(Elf64_Addr, int);
+const char	*conv32_bnd_obj(uint_t, Conv32_bnd_obj_buf_t *);
+const char	*conv64_bnd_obj(uint_t, Conv64_bnd_obj_buf_t *);
+const char	*conv32_bnd_type(uint_t, Conv32_bnd_type_buf_t *);
+const char	*conv64_bnd_type(uint_t, Conv64_bnd_type_buf_t *);
+const char	*conv32_cap_tag(Elf32_Word, Conv32_inv_buf_t *);
+const char	*conv64_cap_tag(Elf64_Xword, Conv64_inv_buf_t *);
+const char	*conv32_cap_val(Elf32_Word, Elf32_Word, Half,
+		    Conv32_cap_val_buf_t *);
+const char	*conv64_cap_val(Elf64_Xword, Elf64_Xword, Half,
+		    Conv64_cap_val_buf_t *);
+const char	*conv32_cap_val_hw1(Elf32_Word, Half,
+		    Conv32_cap_val_hw1_buf_t *);
+const char	*conv64_cap_val_hw1(Elf64_Xword, Half,
+		    Conv64_cap_val_hw1_buf_t *);
+const char	*conv32_cap_val_sf1(Elf32_Word, Half,
+		    Conv32_cap_val_sf1_buf_t *);
+const char	*conv64_cap_val_sf1(Elf64_Xword, Half,
+		    Conv64_cap_val_sf1_buf_t *);
+const char	*conv32_dyn_flag1(Elf32_Word, Conv32_dyn_flag1_buf_t *);
+const char	*conv64_dyn_flag1(Elf64_Xword, Conv64_dyn_flag1_buf_t *);
+const char	*conv32_dyn_flag(Elf32_Word, int, Conv32_dyn_flag_buf_t *);
+const char	*conv64_dyn_flag(Elf64_Xword, int, Conv64_dyn_flag_buf_t *);
+const char	*conv32_dyn_posflag1(Elf32_Word, int,
+		    Conv32_dyn_posflag1_buf_t *);
+const char	*conv64_dyn_posflag1(Elf64_Xword, int,
+		    Conv64_dyn_posflag1_buf_t *);
+const char	*conv32_dyn_tag(Elf32_Word, Elf32_Half, int,
+		    Conv32_inv_buf_t *);
+const char	*conv64_dyn_tag(Elf64_Xword, Elf64_Half, int,
+		    Conv64_inv_buf_t *);
+const char	*conv32_dyn_feature1(Elf32_Word, int,
+		    Conv32_dyn_feature1_buf_t *);
+const char	*conv64_dyn_feature1(Elf64_Xword, int,
+		    Conv64_dyn_feature1_buf_t *);
+const char	*conv32_ehdr_class(uchar_t, int, Conv32_inv_buf_t *);
+const char	*conv64_ehdr_class(uchar_t, int, Conv64_inv_buf_t *);
+const char	*conv32_ehdr_data(uchar_t, int, Conv32_inv_buf_t *);
+const char	*conv64_ehdr_data(uchar_t, int, Conv64_inv_buf_t *);
+const char	*conv32_ehdr_flags(Elf32_Half, Elf32_Word,
+		    Conv32_ehdr_flags_buf_t *);
+const char	*conv64_ehdr_flags(Elf64_Half, Elf64_Word,
+		    Conv64_ehdr_flags_buf_t *);
+const char	*conv32_ehdr_mach(Elf32_Half, int, Conv32_inv_buf_t *);
+const char	*conv64_ehdr_mach(Elf64_Half, int, Conv64_inv_buf_t *);
+const char	*conv32_ehdr_type(Elf32_Half, int, Conv32_inv_buf_t *);
+const char	*conv64_ehdr_type(Elf64_Half, int, Conv64_inv_buf_t *);
+const char	*conv32_ehdr_vers(Elf32_Word, int, Conv32_inv_buf_t *);
+const char	*conv64_ehdr_vers(Elf64_Word, int, Conv64_inv_buf_t *);
+const char	*conv32_invalid_val(Conv32_inv_buf_t *, Elf32_Word, int);
+const char	*conv64_invalid_val(Conv64_inv_buf_t *, Elf64_Xword, int);
+const char	*conv32_phdr_flags(Word, Conv32_phdr_flags_buf_t *);
+const char	*conv64_phdr_flags(Word, Conv64_phdr_flags_buf_t *);
+const char	*conv32_phdr_type(Elf32_Half, Word, int, Conv32_inv_buf_t *);
+const char	*conv64_phdr_type(Elf64_Half, Word, int, Conv64_inv_buf_t *);
+const char	*conv32_reject_desc(Rej_desc *, Conv32_reject_desc_buf_t *);
+const char	*conv64_reject_desc(Rej_desc *, Conv64_reject_desc_buf_t *);
+const char	*conv32_reloc_type(Half, Word, int, Conv32_inv_buf_t *);
+const char	*conv64_reloc_type(Half, Word, int, Conv64_inv_buf_t *);
+const char	*conv32_reloc_type_static(Half, Word, int);
+const char	*conv64_reloc_type_static(Half, Word, int);
+const char	*conv32_reloc_386_type(Word, int, Conv32_inv_buf_t *);
+const char	*conv64_reloc_386_type(Word, int, Conv64_inv_buf_t *);
+const char	*conv32_reloc_amd64_type(Word, int, Conv32_inv_buf_t *);
+const char	*conv64_reloc_amd64_type(Word, int, Conv64_inv_buf_t *);
+const char	*conv32_reloc_SPARC_type(Word, int, Conv32_inv_buf_t *);
+const char	*conv64_reloc_SPARC_type(Word, int, Conv64_inv_buf_t *);
+const char	*conv32_sec_flags(Elf32_Word, Conv32_sec_flags_buf_t *);
+const char	*conv64_sec_flags(Elf64_Xword, Conv64_sec_flags_buf_t *);
+const char	*conv32_sec_linkinfo(Elf32_Word, Elf32_Word,
+		    Conv32_inv_buf_t *);
+const char	*conv64_sec_linkinfo(Elf64_Word, Elf64_Xword,
+		    Conv64_inv_buf_t *);
+const char	*conv32_sec_type(Elf32_Half, Elf32_Word, int,
+		    Conv32_inv_buf_t *);
+const char	*conv64_sec_type(Elf64_Half, Elf64_Word, int,
+		    Conv64_inv_buf_t *);
+const char	*conv32_sym_info_bind(uchar_t, int, Conv32_inv_buf_t *);
+const char	*conv64_sym_info_bind(uchar_t, int, Conv64_inv_buf_t *);
+const char	*conv32_sym_info_type(Elf32_Half, uchar_t, int,
+		    Conv32_inv_buf_t *);
+const char	*conv64_sym_info_type(Elf64_Half, uchar_t, int,
+		    Conv64_inv_buf_t *);
+const char	*conv32_sym_shndx(Elf32_Half, Conv32_inv_buf_t *);
+const char	*conv64_sym_shndx(Elf64_Half, Conv64_inv_buf_t *);
+const char	*conv32_sym_other(uchar_t, Conv32_inv_buf_t *);
+const char	*conv64_sym_other(uchar_t, Conv64_inv_buf_t *);
+const char	*conv32_sym_value(Elf32_Half, uchar_t, Elf32_Addr,
+		    Conv32_inv_buf_t *);
+const char	*conv64_sym_value(Elf64_Half, uchar_t, Elf64_Addr,
+		    Conv64_inv_buf_t *);
+const char	*conv32_sym_SPARC_value(Elf32_Addr, int, Conv32_inv_buf_t *);
+const char	*conv64_sym_SPARC_value(Elf64_Addr, int, Conv64_inv_buf_t *);

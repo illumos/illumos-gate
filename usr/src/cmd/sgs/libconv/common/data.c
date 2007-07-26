@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,9 +33,8 @@
 #include	"data_msg.h"
 
 const char *
-conv_elfdata_type(Elf_Type type)
+conv_elfdata_type(Elf_Type type, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
 	static const Msg	types[] = {
 		MSG_DATA_BYTE,		MSG_DATA_ADDR,
 		MSG_DATA_DYN,		MSG_DATA_EHDR,
@@ -51,7 +50,7 @@ conv_elfdata_type(Elf_Type type)
 	};
 
 	if (type >= ELF_T_NUM)
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, type, 0));
+		return (conv_invalid_val(inv_buf, type, 0));
 	else
 		return (MSG_ORIG(types[type]));
 }

@@ -133,7 +133,7 @@ plt_entry(Ofl_desc * ofl, Word rel_off, Sym_desc * sdp)
 		pltent += 2;
 		/* LINTED */
 		*(Word *)pltent = (Word)(ofl->ofl_osgot->os_shdr->sh_addr +
-			got_off);
+		    got_off);
 	} else {
 		pltent[0] = M_SPECIAL_INST;
 		pltent[1] = M_JMP_REG_DISP_IND;
@@ -202,7 +202,7 @@ ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 		    orsp->rel_roffset)))) {
 			DBG_CALL(Dbg_move_outsctadj(ofl->ofl_lml, psym));
 			sectmoved = 1;
-		    }
+		}
 	}
 
 	value = sdp->sd_sym->st_value;
@@ -556,11 +556,17 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		/*
 		 * Unexpected instruction sequence - fatal error.
 		 */
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_BADTLSINS),
-		    conv_reloc_386_type(arsp->rel_rtype, 0),
-		    arsp->rel_isdesc->is_file->ifl_name,
-		    demangle(arsp->rel_sname), arsp->rel_isdesc->is_name,
-		    EC_OFF(arsp->rel_roffset));
+		{
+			Conv_inv_buf_t	inv_buf;
+
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_REL_BADTLSINS),
+			    conv_reloc_386_type(arsp->rel_rtype, 0, &inv_buf),
+			    arsp->rel_isdesc->is_file->ifl_name,
+			    demangle(arsp->rel_sname),
+			    arsp->rel_isdesc->is_name,
+			    EC_OFF(arsp->rel_roffset));
+		}
 		return (FIX_ERROR);
 
 	case R_386_TLS_IE:
@@ -617,11 +623,17 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		/*
 		 * Unexpected instruction sequence - fatal error.
 		 */
-		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_BADTLSINS),
-		    conv_reloc_386_type(arsp->rel_rtype, 0),
-		    arsp->rel_isdesc->is_file->ifl_name,
-		    demangle(arsp->rel_sname), arsp->rel_isdesc->is_name,
-		    EC_OFF(arsp->rel_roffset));
+		{
+			Conv_inv_buf_t	inv_buf;
+
+			eprintf(ofl->ofl_lml, ERR_FATAL,
+			    MSG_INTL(MSG_REL_BADTLSINS),
+			    conv_reloc_386_type(arsp->rel_rtype, 0, &inv_buf),
+			    arsp->rel_isdesc->is_file->ifl_name,
+			    demangle(arsp->rel_sname),
+			    arsp->rel_isdesc->is_name,
+			    EC_OFF(arsp->rel_roffset));
+		}
 		return (FIX_ERROR);
 	}
 	return (FIX_RELOC);
@@ -913,9 +925,12 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			 * see this.
 			 */
 			if (arsp->rel_isdesc->is_indata->d_buf == 0) {
+				Conv_inv_buf_t	inv_buf;
+
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_REL_EMPTYSEC),
-				    conv_reloc_386_type(arsp->rel_rtype, 0),
+				    conv_reloc_386_type(arsp->rel_rtype,
+				    0, &inv_buf),
 				    ifl_name, demangle(arsp->rel_sname),
 				    arsp->rel_isdesc->is_name);
 				return (S_ERROR);
@@ -936,7 +951,8 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			if ((((uintptr_t)addr - (uintptr_t)ofl->ofl_nehdr) >
 			    ofl->ofl_size) || (arsp->rel_roffset >
 			    arsp->rel_osdesc->os_shdr->sh_size)) {
-				int	class;
+				Conv_inv_buf_t	inv_buf;
+				int		class;
 
 				if (((uintptr_t)addr -
 				    (uintptr_t)ofl->ofl_nehdr) > ofl->ofl_size)
@@ -946,7 +962,8 @@ ld_do_activerelocs(Ofl_desc *ofl)
 
 				eprintf(ofl->ofl_lml, class,
 				    MSG_INTL(MSG_REL_INVALOFFSET),
-				    conv_reloc_386_type(arsp->rel_rtype, 0),
+				    conv_reloc_386_type(arsp->rel_rtype,
+				    0, &inv_buf),
 				    ifl_name, arsp->rel_isdesc->is_name,
 				    demangle(arsp->rel_sname),
 				    EC_ADDR((uintptr_t)addr -
@@ -1186,6 +1203,8 @@ ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 	    ((shndx == SHN_UNDEF) ||
 	    ((sdp->sd_ref == REF_DYN_NEED) &&
 	    ((sdp->sd_flags & FLG_SY_MVTOCOMM) == 0)))) {
+		Conv_inv_buf_t inv_buf;
+
 		/*
 		 * If the relocation is against a SHT_SUNW_ANNOTATE
 		 * section - then silently ignore that the relocation
@@ -1195,7 +1214,7 @@ ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 		    (rsp->rel_osdesc->os_shdr->sh_type == SHT_SUNW_ANNOTATE))
 			return (0);
 		eprintf(ofl->ofl_lml, ERR_WARNING, MSG_INTL(MSG_REL_EXTERNSYM),
-		    conv_reloc_386_type(rsp->rel_rtype, 0),
+		    conv_reloc_386_type(rsp->rel_rtype, 0, &inv_buf),
 		    rsp->rel_isdesc->is_file->ifl_name,
 		    demangle(rsp->rel_sname), rsp->rel_osdesc->os_name);
 		return (1);
@@ -1473,28 +1492,28 @@ ld_fillin_gotplt(Ofl_desc *ofl)
 			pltent += 2;
 			/* LINTED */
 			*(Word *)pltent = (Word)(ofl->ofl_osgot->os_shdr->
-				sh_addr + M_GOT_XLINKMAP * M_GOT_ENTSIZE);
+			    sh_addr + M_GOT_XLINKMAP * M_GOT_ENTSIZE);
 			pltent += 4;
 			pltent[0] = M_SPECIAL_INST;
 			pltent[1] = M_JMP_DISP_IND;
 			pltent += 2;
 			/* LINTED */
 			*(Word *)pltent = (Word)(ofl->ofl_osgot->os_shdr->
-				sh_addr + M_GOT_XRTLD * M_GOT_ENTSIZE);
+			    sh_addr + M_GOT_XRTLD * M_GOT_ENTSIZE);
 		} else {
 			pltent[0] = M_SPECIAL_INST;
 			pltent[1] = M_PUSHL_REG_DISP;
 			pltent += 2;
 			/* LINTED */
 			*(Word *)pltent = (Word)(M_GOT_XLINKMAP *
-				M_GOT_ENTSIZE);
+			    M_GOT_ENTSIZE);
 			pltent += 4;
 			pltent[0] = M_SPECIAL_INST;
 			pltent[1] = M_JMP_REG_DISP_IND;
 			pltent += 2;
 			/* LINTED */
 			*(Word *)pltent = (Word)(M_GOT_XRTLD *
-				M_GOT_ENTSIZE);
+			    M_GOT_ENTSIZE);
 		}
 	}
 	return (1);

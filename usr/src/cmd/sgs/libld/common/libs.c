@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -605,12 +605,13 @@ ld_process_archive(const char *name, int fd, Ar_desc *adp, Ofl_desc *ofl)
 	 * and if one had occurred issue a warning - its possible a user has
 	 * pointed at an archive containing the wrong class of elf members.
 	 */
-	if (found == 0) {
-		if (rej.rej_type)
-			eprintf(ofl->ofl_lml, ERR_WARNING,
-			    MSG_INTL(reject[rej.rej_type]),
-			    rej.rej_name ? rej.rej_name :
-			    MSG_INTL(MSG_STR_UNKNOWN), conv_reject_desc(&rej));
+	if ((found == 0) && (rej.rej_type)) {
+		Conv_reject_desc_buf_t rej_buf;
+
+		eprintf(ofl->ofl_lml, ERR_WARNING,
+		    MSG_INTL(reject[rej.rej_type]),
+		    rej.rej_name ? rej.rej_name : MSG_INTL(MSG_STR_UNKNOWN),
+		    conv_reject_desc(&rej, &rej_buf));
 	}
 
 	/*

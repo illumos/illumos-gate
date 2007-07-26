@@ -37,15 +37,27 @@
 		MSG_GPH_PARENT_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_GPH_FILTEE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_GPH_INITIAL_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-		CONV_INV_STRSIZE	+ CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+		CONV_INV_BUFSIZE	+ CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+
+/*
+ * Ensure that Conv_grphdl_flags_buf_t is large enough:
+ *
+ * HDLSZ is the real minimum size of the buffer required by conv_grphdl_flags().
+ * However, Conv_grphdl_flags_buf_t uses CONV_GRPHDL_FLAGS_BUFSIZE to set the
+ * buffer size. We do things this way because the definition of HDLSZ uses
+ * information that is not available in the environment of other programs
+ * that include the conv.h header file.
+ */
+#if (CONV_GRPHDL_FLAGS_BUFSIZE < HDLSZ) && !defined(__lint)
+#error "CONV_GRPHDL_FLAGS_BUFSIZE is not large enough"
+#endif
 
 /*
  * String conversion routine for Grp_hdl flags.
  */
 const char *
-conv_grphdl_flags(uint_t flags)
+conv_grphdl_flags(uint_t flags, Conv_grphdl_flags_buf_t *grphdl_flags_buf)
 {
-	static char	string[HDLSZ];
 	static Val_desc vda[] = {
 		{ GPH_ZERO,		MSG_ORIG(MSG_GPH_ZERO) },
 		{ GPH_LDSO,		MSG_ORIG(MSG_GPH_LDSO) },
@@ -55,15 +67,17 @@ conv_grphdl_flags(uint_t flags)
 		{ GPH_INITIAL,		MSG_ORIG(MSG_GPH_INITIAL) },
 		{ 0,			0 }
 	};
-	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
+	static CONV_EXPN_FIELD_ARG conv_arg = {
+	    NULL, sizeof (grphdl_flags_buf->buf), vda };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_NULL));
 
+	conv_arg.buf = grphdl_flags_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
 	(void) conv_expn_field(&conv_arg);
 
-	return ((const char *)string);
+	return ((const char *)grphdl_flags_buf->buf);
 }
 
 #define	DESCSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
@@ -73,14 +87,27 @@ conv_grphdl_flags(uint_t flags)
 		MSG_GPD_PARENT_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_GPD_FILTER_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_GPD_REMOVE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-		CONV_INV_STRSIZE	+ CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+		CONV_INV_BUFSIZE	+ CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+
+/*
+ * Ensure that Conv_grpdesc_flags_buf_t is large enough:
+ *
+ * DESCSZ is the real min size of the buffer required by conv_grpdesc_flags().
+ * However, Conv_grpdesc_flags_buf_t uses CONV_GRPDESC_FLAGS_BUFSIZE to set the
+ * buffer size. We do things this way because the definition of DESCSZ uses
+ * information that is not available in the environment of other programs
+ * that include the conv.h header file.
+ */
+#if (CONV_GRPDESC_FLAGS_BUFSIZE < DESCSZ) && !defined(__lint)
+#error "CONV_GRPDESC_FLAGS_BUFSIZE is not large enough"
+#endif
+
 /*
  * String conversion routine for Grp_desc flags.
  */
 const char *
-conv_grpdesc_flags(uint_t flags)
+conv_grpdesc_flags(uint_t flags, Conv_grpdesc_flags_buf_t *grpdesc_flags_buf)
 {
-	static char	string[DESCSZ];
 	static Val_desc vda[] = {
 		{ GPD_DLSYM,		MSG_ORIG(MSG_GPD_DLSYM) },
 		{ GPD_RELOC,		MSG_ORIG(MSG_GPD_RELOC) },
@@ -90,13 +117,15 @@ conv_grpdesc_flags(uint_t flags)
 		{ GPD_REMOVE,		MSG_ORIG(MSG_GPD_REMOVE) },
 		{ 0,			0 }
 	};
-	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
+	static CONV_EXPN_FIELD_ARG conv_arg = {
+	    NULL, sizeof (grpdesc_flags_buf->buf), vda };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_NULL));
 
+	conv_arg.buf = grpdesc_flags_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
 	(void) conv_expn_field(&conv_arg);
 
-	return ((const char *)string);
+	return ((const char *)grpdesc_flags_buf->buf);
 }

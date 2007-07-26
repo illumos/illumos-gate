@@ -91,7 +91,8 @@ Dbg_map_size_new(Lm_list *lml, const char *name)
 void
 Dbg_map_size_old(Ofl_desc *ofl, Sym_desc *sdp)
 {
-	Lm_list	*lml = ofl->ofl_lml;
+	Conv_inv_buf_t	inv_buf;
+	Lm_list		*lml = ofl->ofl_lml;
 
 	if (DBG_NOTCLASS(DBG_C_MAP))
 		return;
@@ -105,13 +106,14 @@ Dbg_map_size_old(Ofl_desc *ofl, Sym_desc *sdp)
 	Elf_syms_table_entry(lml, ELF_DBG_LD, MSG_INTL(MSG_STR_UP_2),
 	    ofl->ofl_dehdr->e_machine, sdp->sd_sym,
 	    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
-	    conv_def_tag(sdp->sd_ref));
+	    conv_def_tag(sdp->sd_ref, &inv_buf));
 }
 
 void
 Dbg_map_symbol(Ofl_desc *ofl, Sym_desc *sdp)
 {
-	Lm_list	*lml = ofl->ofl_lml;
+	Conv_inv_buf_t	inv_buf;
+	Lm_list		*lml = ofl->ofl_lml;
 
 	if (DBG_NOTCLASS(DBG_C_MAP))
 		return;
@@ -126,7 +128,7 @@ Dbg_map_symbol(Ofl_desc *ofl, Sym_desc *sdp)
 		Elf_syms_table_entry(lml, ELF_DBG_LD, MSG_INTL(MSG_STR_ENTERED),
 		    ofl->ofl_dehdr->e_machine, sdp->sd_sym,
 		    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
-		    conv_def_tag(sdp->sd_ref));
+		    conv_def_tag(sdp->sd_ref, &inv_buf));
 }
 
 void

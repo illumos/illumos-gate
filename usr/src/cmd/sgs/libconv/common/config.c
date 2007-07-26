@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,15 +42,27 @@
 		MSG_CONF_MEMRESV_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_CONF_ENVS_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_CONF_FLTR_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+		CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+
+/*
+ * Ensure that Conv_config_feat_buf_t is large enough:
+ *
+ * FEATSZ is the real minimum size of the buffer required by conv_config_feat().
+ * However, Conv_config_feat_buf_t uses CONV_CONFIG_FEAT_BUFSIZE to set the
+ * buffer size. We do things this way because the definition of FEATSZ uses
+ * information that is not available in the environment of other programs
+ * that include the conv.h header file.
+ */
+#if (CONV_CONFIG_FEAT_BUFSIZE < FEATSZ) && !defined(__lint)
+#error "CONV_CONFIG_FEAT_BUFSIZE is not large enough"
+#endif
 
 /*
  * String conversion routine for configuration file information.
  */
 const char *
-conv_config_feat(int features)
+conv_config_feat(int features, Conv_config_feat_buf_t *config_feat_buf)
 {
-	static	char	string[FEATSZ];
 	static Val_desc	vda[] = {
 		{ CONF_EDLIBPATH,	MSG_ORIG(MSG_CONF_EDLIBPATH) },
 		{ CONF_ESLIBPATH,	MSG_ORIG(MSG_CONF_ESLIBPATH) },
@@ -63,12 +75,14 @@ conv_config_feat(int features)
 		{ CONF_FLTR,		MSG_ORIG(MSG_CONF_FLTR) },
 		{ 0,			0 }
 	};
-	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
+	static CONV_EXPN_FIELD_ARG conv_arg = {
+	    NULL, sizeof (config_feat_buf->buf), vda };
 
+	conv_arg.buf = config_feat_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = features;
 	(void) conv_expn_field(&conv_arg);
 
-	return ((const char *)string);
+	return ((const char *)config_feat_buf->buf);
 }
 
 #define	FLAGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
@@ -86,15 +100,27 @@ conv_config_feat(int features)
 		MSG_CONF_CMDLINE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_CONF_FILTER_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_CONF_FILTEE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+		CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+
+/*
+ * Ensure that Conv_config_obj_buf_t is large enough:
+ *
+ * FLAGSZ is the real minimum size of the buffer required by conv_config_obj().
+ * However, Conv_config_obj_buf_t uses CONV_CONFIG_OBJ_BUFSIZE to set the
+ * buffer size. We do things this way because the definition of FLAGSZ uses
+ * information that is not available in the environment of other programs
+ * that include the conv.h header file.
+ */
+#if (CONV_CONFIG_OBJ_BUFSIZE < FLAGSZ) && !defined(__lint)
+#error "CONV_CONFIG_OBJ_BUFSIZE is not large enough"
+#endif
 
 /*
  * String conversion routine for object flags.
  */
 const char *
-conv_config_obj(ushort_t flags)
+conv_config_obj(ushort_t flags, Conv_config_obj_buf_t *config_obj_buf)
 {
-	static char	string[FLAGSZ];
 	static Val_desc vda[] = {
 		{ RTC_OBJ_DIRENT,	MSG_ORIG(MSG_CONF_DIRENT) },
 		{ RTC_OBJ_ALLENTS,	MSG_ORIG(MSG_CONF_ALLENTS) },
@@ -112,14 +138,15 @@ conv_config_obj(ushort_t flags)
 		{ 0,			0 }
 	};
 	static const char *leading_str_arr[2];
-	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda,
-		leading_str_arr };
+	static CONV_EXPN_FIELD_ARG conv_arg = {
+	    NULL, sizeof (config_obj_buf->buf), vda, leading_str_arr };
 
 	const char **lstr = leading_str_arr;
 
 	if ((flags == 0) || (flags == RTC_OBJ_OPTINAL))
 		return (MSG_ORIG(MSG_GBL_NULL));
 
+	conv_arg.buf = config_obj_buf->buf;
 	conv_arg.rflags = flags;
 
 	/*
@@ -135,7 +162,7 @@ conv_config_obj(ushort_t flags)
 
 	(void) conv_expn_field(&conv_arg);
 
-	return ((const char *)string);
+	return ((const char *)config_obj_buf->buf);
 }
 
 /*

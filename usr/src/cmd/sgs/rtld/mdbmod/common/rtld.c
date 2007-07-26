@@ -1396,6 +1396,7 @@ dcmd_ElfDyn(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	Dyn		dyn;
 	const char	*dynstr;
+	Conv_inv_buf_t	inv_buf;
 
 	if ((flags & DCMD_ADDRSPEC) == 0)
 		return (DCMD_USAGE);
@@ -1406,7 +1407,7 @@ dcmd_ElfDyn(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	mdb_printf(MSG_ORIG(MSG_ELFDYN_TITLE), addr);
-	dynstr = conv_dyn_tag(dyn.d_tag, M_MACH, 0);
+	dynstr = conv_dyn_tag(dyn.d_tag, M_MACH, 0, &inv_buf);
 	mdb_printf(MSG_ORIG(MSG_ELFDYN_LINE1), addr, dynstr, dyn.d_un.d_ptr);
 
 	mdb_set_dot(addr + sizeof (Dyn));
@@ -1424,9 +1425,12 @@ static int
 /* ARGSUSED2 */
 dcmd_ElfEhdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	Ehdr		ehdr;
-	Byte		*byte;
-	const char	*flgs;
+	Ehdr			ehdr;
+	Byte			*byte;
+	const char		*flgs;
+	Conv_inv_buf_t		inv_buf1, inv_buf2;
+	Conv_ehdr_flags_buf_t	ehdr_flags_buf;
+
 
 	if ((flags & DCMD_ADDRSPEC) == 0)
 		return (DCMD_USAGE);
@@ -1444,20 +1448,21 @@ dcmd_ElfEhdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    (byte[EI_MAG2] ? byte[EI_MAG2] : '0'),
 	    (byte[EI_MAG3] ? byte[EI_MAG3] : '0'));
 	mdb_printf(MSG_ORIG(MSG_EHDR_LINE2),
-	    conv_ehdr_class(ehdr.e_ident[EI_CLASS], 0),
-	    conv_ehdr_data(ehdr.e_ident[EI_DATA], 0));
+	    conv_ehdr_class(ehdr.e_ident[EI_CLASS], 0, &inv_buf1),
+	    conv_ehdr_data(ehdr.e_ident[EI_DATA], 0, &inv_buf2));
 
 	mdb_printf(MSG_ORIG(MSG_EHDR_LINE3),
-	    conv_ehdr_mach(ehdr.e_machine, 0),
-	    conv_ehdr_vers(ehdr.e_version, 0));
-	mdb_printf(MSG_ORIG(MSG_EHDR_LINE4), conv_ehdr_type(ehdr.e_type, 0));
+	    conv_ehdr_mach(ehdr.e_machine, 0, &inv_buf1),
+	    conv_ehdr_vers(ehdr.e_version, 0, &inv_buf2));
+	mdb_printf(MSG_ORIG(MSG_EHDR_LINE4),
+	    conv_ehdr_type(ehdr.e_type, 0, &inv_buf1));
 
 	/*
 	 * Line up the flags differently depending on whether we
 	 * received a numeric (e.g. "0x200") or text representation
 	 * (e.g. "[ EF_SPARC_SUN_US1 ]").
 	 */
-	flgs = conv_ehdr_flags(ehdr.e_machine, ehdr.e_flags);
+	flgs = conv_ehdr_flags(ehdr.e_machine, ehdr.e_flags, &ehdr_flags_buf);
 	if (flgs[0] == '[')
 		mdb_printf(MSG_ORIG(MSG_EHDR_LINE5), flgs);
 	else
@@ -1485,7 +1490,9 @@ static int
 /* ARGSUSED2 */
 dcmd_ElfPhdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
-	Phdr	phdr;
+	Phdr			phdr;
+	Conv_inv_buf_t		inv_buf;
+	Conv_phdr_flags_buf_t	phdr_flags_buf;
 
 	if ((flags & DCMD_ADDRSPEC) == 0)
 		return (DCMD_USAGE);
@@ -1498,9 +1505,9 @@ dcmd_ElfPhdr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_printf(MSG_ORIG(MSG_EPHDR_TITLE), addr);
 	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE1), phdr.p_vaddr,
-	    conv_phdr_flags(phdr.p_flags));
+	    conv_phdr_flags(phdr.p_flags, &phdr_flags_buf));
 	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE2), phdr.p_paddr,
-	    conv_phdr_type(M_MACH, phdr.p_type, 0));
+	    conv_phdr_type(M_MACH, phdr.p_type, 0, &inv_buf));
 	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE3), phdr.p_filesz, phdr.p_memsz);
 	mdb_printf(MSG_ORIG(MSG_EPHDR_LINE4), phdr.p_offset, phdr.p_align);
 

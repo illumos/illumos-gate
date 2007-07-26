@@ -65,8 +65,9 @@ static void
 sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	int ndx, Word nshndx, Word nsymflags)
 {
-	uchar_t	otype = ELF_ST_TYPE(sdp->sd_sym->st_info);
-	uchar_t	ntype = ELF_ST_TYPE(nsym->st_info);
+	uchar_t		otype = ELF_ST_TYPE(sdp->sd_sym->st_info);
+	uchar_t		ntype = ELF_ST_TYPE(nsym->st_info);
+	Conv_inv_buf_t	inv_buf1, inv_buf2;
 
 	/*
 	 * Perform any machine specific type checking.
@@ -88,7 +89,7 @@ sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		if ((nvis > STV_DEFAULT) &&
 		    ((ovis == STV_DEFAULT) || (nvis < ovis))) {
 			osym->st_other =
-				(osym->st_other & ~MSK_SYM_VISIBILITY) | nvis;
+			    (osym->st_other & ~MSK_SYM_VISIBILITY) | nvis;
 		}
 	}
 
@@ -103,9 +104,9 @@ sym_typecheck(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	    demangle(sdp->sd_name));
 	eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
 	    sdp->sd_file->ifl_name,
-	    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype, 0),
+	    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype, 0, &inv_buf1),
 	    ifl->ifl_name,
-	    conv_sym_info_type(ofl->ofl_dehdr->e_machine, ntype, 0));
+	    conv_sym_info_type(ofl->ofl_dehdr->e_machine, ntype, 0, &inv_buf2));
 }
 
 /*ARGSUSED4*/
@@ -237,7 +238,7 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		if ((ovis > STV_DEFAULT) &&
 		    ((nvis == STV_DEFAULT) || (ovis < nvis))) {
 			osym->st_other =
-				(osym->st_other & ~MSK_SYM_VISIBILITY) | ovis;
+			    (osym->st_other & ~MSK_SYM_VISIBILITY) | ovis;
 		}
 		sdp->sd_ref = REF_REL_NEED;
 
@@ -282,8 +283,7 @@ sym_override(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		 * Visibility from a DYN symbol does not override
 		 * previous symbol visibility.
 		 */
-		osym->st_other = (osym->st_other & ~MSK_SYM_VISIBILITY) |
-			ovis;
+		osym->st_other = (osym->st_other & ~MSK_SYM_VISIBILITY) | ovis;
 
 		/*
 		 * Determine the symbols availability.  A symbol is determined
@@ -375,6 +375,7 @@ static void
 sym_tworeals(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	int ndx, Word nshndx, Word nsymflags)
 {
+	Conv_inv_buf_t inv_buf1, inv_buf2;
 	Sym	*osym = sdp->sd_sym;
 	uchar_t	otype = ELF_ST_TYPE(osym->st_info);
 	uchar_t	obind = ELF_ST_BIND(osym->st_info);
@@ -394,9 +395,10 @@ sym_tworeals(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		    demangle(sdp->sd_name));
 		eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
 		    sdp->sd_file->ifl_name,
-		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype, 0),
-		    ifl->ifl_name,
-		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, ntype, 0));
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype,
+		    0, &inv_buf1), ifl->ifl_name,
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, ntype,
+		    0, &inv_buf2));
 		ofl->ofl_flags |= FLG_OF_FATAL;
 		return;
 	}
@@ -415,9 +417,10 @@ sym_tworeals(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		    demangle(sdp->sd_name));
 		eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
 		    sdp->sd_file->ifl_name,
-		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype, 0),
-		    ifl->ifl_name, conv_sym_info_type(ofl->ofl_dehdr->e_machine,
-		    ntype, 0));
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype,
+		    0, &inv_buf1), ifl->ifl_name,
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, ntype,
+		    0, &inv_buf2));
 		warn++;
 	} else if ((otype == STT_OBJECT) && (osym->st_size != nsym->st_size)) {
 		if (!(ofl->ofl_flags & FLG_OF_NOWARN)) {
@@ -474,6 +477,7 @@ static void
 sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	int ndx, Word nshndx, Word nsymflags)
 {
+	Conv_inv_buf_t inv_buf1, inv_buf2;
 	Sym	*osym = sdp->sd_sym;
 	uchar_t otype = ELF_ST_TYPE(osym->st_info);
 	uchar_t obind = ELF_ST_BIND(osym->st_info);
@@ -505,7 +509,7 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_SYM_DIFFTYPE), demangle(sdp->sd_name));
 			sym_promote(sdp, nsym, ifl, ofl, ndx,
-				nshndx, nsymflags);
+			    nshndx, nsymflags);
 		} else {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_SYM_MULDEF), demangle(sdp->sd_name));
@@ -513,9 +517,10 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		}
 		eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
 		    sdp->sd_file->ifl_name,
-		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype, 0),
-		    ifl->ifl_name, conv_sym_info_type(ofl->ofl_dehdr->e_machine,
-		    ntype, 0));
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype,
+		    0, &inv_buf1), ifl->ifl_name,
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, ntype,
+		    0, &inv_buf2));
 		return;
 	} else if (ofile != nfile) {
 
@@ -532,7 +537,7 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		if ((nfile == ET_DYN) && (ntype == STT_FUNC)) {
 			if ((ntype != STB_WEAK) && (otype == STB_WEAK)) {
 				sym_override(sdp, nsym, ifl, ofl, ndx,
-					nshndx, nsymflags);
+				    nshndx, nsymflags);
 				return;
 			} else
 				return;
@@ -553,9 +558,10 @@ sym_realtent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 		    demangle(sdp->sd_name));
 		eprintf(ofl->ofl_lml, ERR_NONE, MSG_INTL(MSG_SYM_FILETYPES),
 		    sdp->sd_file->ifl_name,
-		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype, 0),
-		    ifl->ifl_name, conv_sym_info_type(ofl->ofl_dehdr->e_machine,
-		    ntype, 0));
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, otype,
+		    0, &inv_buf1), ifl->ifl_name,
+		    conv_sym_info_type(ofl->ofl_dehdr->e_machine, ntype,
+		    0, &inv_buf2));
 		warn++;
 	} else if (osym->st_size != nsym->st_size) {
 		/*
@@ -690,6 +696,7 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 	 * have a displacement value rather than an alignment.  In other words
 	 * we can only test this for two relocatable objects.
 	 */
+	/* BEGIN CSTYLED */
 	if ((osym->st_value != nsym->st_value) &&
 	    ((sdp->sd_flags & FLG_SY_SPECSEC) &&
 	    (sdp->sd_sym->st_shndx == SHN_COMMON) &&
@@ -703,6 +710,8 @@ sym_twotent(Sym_desc *sdp, Sym *nsym, Ifl_desc *ifl, Ofl_desc *ofl,
 #else
 	    (nsym->st_shndx == SHN_COMMON))) {
 #endif
+	/* END CSTYLED */
+
 		const char	*emsg = MSG_INTL(MSG_SYM_DEFTAKEN);
 		const char	*file;
 		Xword		salign;

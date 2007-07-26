@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -259,28 +259,28 @@ extern	const char *demangle(const char *);
 
 #define	REL_ERR_UNSUPSZ(lml, file, sym, rtype, size) \
 	(eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_UNSUPSZ), \
-	    conv_reloc_type(M_MACH, (rtype), 0), (file), \
+	    conv_reloc_type_static(M_MACH, (rtype), 0), (file), \
 	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), (int)(size)))
 
 #define	REL_ERR_NONALIGN(lml, file, sym, rtype, off) \
 	(eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NONALIGN), \
-	    conv_reloc_type(M_MACH, (rtype), 0), (file), \
+	    conv_reloc_type_static(M_MACH, (rtype), 0), (file), \
 	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), EC_OFF((off))))
 
 #define	REL_ERR_UNNOBITS(lml, file, sym, rtype, nbits) \
 	(eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_UNNOBITS), \
-	    conv_reloc_type(M_MACH, (rtype), 0), (file), \
+	    conv_reloc_type_static(M_MACH, (rtype), 0), (file), \
 	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), (nbits)))
 
 #define	REL_ERR_LOSEBITS(lml, file, sym, rtype, uvalue, nbits, off) \
 	(eprintf(lml, ERR_FATAL,  MSG_INTL(MSG_REL_LOSEBITS), \
-	    conv_reloc_type(M_MACH, (rtype), 0), (file), \
+	    conv_reloc_type_static(M_MACH, (rtype), 0), (file), \
 	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), \
 	    EC_XWORD((uvalue)), (nbits), EC_NATPTR((off))))
 
 #define	REL_ERR_NOFIT(lml, file, sym, rtype, uvalue) \
 	(eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_NOFIT), \
-	    conv_reloc_type(M_MACH, (rtype), 0), (file), \
+	    conv_reloc_type_static(M_MACH, (rtype), 0), (file), \
 	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), \
 	    EC_XWORD((uvalue))))
 

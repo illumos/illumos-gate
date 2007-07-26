@@ -36,9 +36,8 @@
 #include	"symbols_msg.h"
 
 const char *
-conv_sym_other(uchar_t other)
+conv_sym_other(uchar_t other, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
 	static const char	visibility[4] = {
 		'D',	/* STV_DEFAULT */
 		'I',	/* STV_INTERNAL */
@@ -48,22 +47,22 @@ conv_sym_other(uchar_t other)
 	uint_t		vis = ELF_ST_VISIBILITY(other);
 	uint_t		ndx = 0;
 
-	string[ndx++] = visibility[vis];
+	inv_buf->buf[ndx++] = visibility[vis];
 
 	/*
 	 * If unkown bits are present in stother - throw out a '?'
 	 */
 	if (other & ~MSK_SYM_VISIBILITY)
-		string[ndx++] = '?';
-	string[ndx++] = '\0';
+		inv_buf->buf[ndx++] = '?';
+	inv_buf->buf[ndx++] = '\0';
 
-	return (string);
+	return (inv_buf->buf);
 }
 
 const char *
-conv_sym_info_type(Half mach, uchar_t type, int fmt_flags)
+conv_sym_info_type(Half mach, uchar_t type, int fmt_flags,
+    Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
 	static const Msg	types[] = {
 		MSG_STT_NOTYPE,		MSG_STT_OBJECT,		MSG_STT_FUNC,
 		MSG_STT_SECTION,	MSG_STT_FILE,		MSG_STT_COMMON,
@@ -76,31 +75,26 @@ conv_sym_info_type(Half mach, uchar_t type, int fmt_flags)
 	    (mach == EM_SPARCV9)) && (type == STT_SPARC_REGISTER)) {
 		return (MSG_ORIG(MSG_STT_REGISTER));
 	} else {
-		return (conv_invalid_val(string, CONV_INV_STRSIZE,
-			type, fmt_flags));
+		return (conv_invalid_val(inv_buf, type, fmt_flags));
 	}
 }
 
 const char *
-conv_sym_info_bind(uchar_t bind, int fmt_flags)
+conv_sym_info_bind(uchar_t bind, int fmt_flags, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
 	static const Msg	binds[] = {
 		MSG_STB_LOCAL,		MSG_STB_GLOBAL,		MSG_STB_WEAK
 	};
 
 	if (bind >= STB_NUM)
-		return (conv_invalid_val(string, CONV_INV_STRSIZE,
-			bind, fmt_flags));
+		return (conv_invalid_val(inv_buf, bind, fmt_flags));
 	else
 		return (MSG_ORIG(binds[bind]));
 }
 
 const char *
-conv_sym_shndx(Half shndx)
+conv_sym_shndx(Half shndx, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
-
 	switch (shndx) {
 	case SHN_UNDEF:
 		return (MSG_ORIG(MSG_SHN_UNDEF));
@@ -119,21 +113,18 @@ conv_sym_shndx(Half shndx)
 	case SHN_XINDEX:
 		return (MSG_ORIG(MSG_SHN_XINDEX));
 	default:
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, shndx,
-		    CONV_FMT_DECIMAL));
+		return (conv_invalid_val(inv_buf, shndx, CONV_FMT_DECIMAL));
 	}
 }
 
 const char *
-conv_sym_value(Half mach, uchar_t type, Addr value)
+conv_sym_value(Half mach, uchar_t type, Addr value, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
-
 	if (((mach == EM_SPARC) || (mach == EM_SPARC32PLUS) ||
 	    (mach == EM_SPARCV9)) && (type == STT_SPARC_REGISTER))
-		return (conv_sym_SPARC_value(value, 0));
+		return (conv_sym_SPARC_value(value, 0, inv_buf));
 
-	(void) snprintf(string, sizeof (string), MSG_ORIG(MSG_SYM_FMT_VAL),
-	    EC_ADDR(value));
-	return (string);
+	(void) snprintf(inv_buf->buf, sizeof (inv_buf->buf),
+	    MSG_ORIG(MSG_SYM_FMT_VAL), EC_ADDR(value));
+	return (inv_buf->buf);
 }

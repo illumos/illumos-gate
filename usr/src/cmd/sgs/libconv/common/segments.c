@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -47,12 +47,24 @@
 		MSG_FLG_SG_KEY_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_FLG_SG_DISABLED_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_FLG_SG_PHREQ_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+		CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+
+/*
+ * Ensure that Conv_seg_flags_buf_t is large enough:
+ *
+ * SEGSZ is the real minimum size of the buffer required by conv_seg_flags().
+ * However, Conv_seg_flags_buf_t uses CONV_SEG_FLAGS_BUFSIZE to set the
+ * buffer size. We do things this way because the definition of SEGSZ uses
+ * information that is not available in the environment of other programs
+ * that include the conv.h header file.
+ */
+#if (CONV_SEG_FLAGS_BUFSIZE < SEGSZ) && !defined(__lint)
+#error "CONV_SEG_FLAGS_BUFSIZE is not large enough"
+#endif
 
 const char *
-conv_seg_flags(Half flags)
+conv_seg_flags(Half flags, Conv_seg_flags_buf_t *seg_flags_buf)
 {
-	static char	string[SEGSZ];
 	static Val_desc vda[] = {
 		{ FLG_SG_VADDR,		MSG_ORIG(MSG_FLG_SG_VADDR) },
 		{ FLG_SG_PADDR,		MSG_ORIG(MSG_FLG_SG_PADDR) },
@@ -69,13 +81,15 @@ conv_seg_flags(Half flags)
 		{ FLG_SG_PHREQ,		MSG_ORIG(MSG_FLG_SG_PHREQ) },
 		{ 0,			0 }
 	};
-	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
+	static CONV_EXPN_FIELD_ARG conv_arg = {
+	    NULL, sizeof (seg_flags_buf->buf), vda };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
+	conv_arg.buf = seg_flags_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
 	(void) conv_expn_field(&conv_arg);
 
-	return ((const char *)string);
+	return ((const char *)seg_flags_buf->buf);
 }

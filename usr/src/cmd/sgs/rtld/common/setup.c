@@ -414,9 +414,11 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		 */
 		(void) fstat(fd, &status);
 		if ((ftp = are_u_this(&rej, fd, &status, argvname)) == 0) {
+			Conv_reject_desc_buf_t rej_buf;
+
 			eprintf(&lml_main, ERR_FATAL,
 			    MSG_INTL(err_reject[rej.rej_type]), argvname,
-			    conv_reject_desc(&rej));
+			    conv_reject_desc(&rej, &rej_buf));
 			return (0);
 		}
 
@@ -450,7 +452,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			if ((FCT(mlmp) == &elf_fct) &&
 			    (ehdr->e_type == ET_EXEC)) {
 				int	i;
-				Phdr *	_phdr = (Phdr *)((uintptr_t)ADDR(mlmp) +
+				Phdr *_phdr = (Phdr *)((uintptr_t)ADDR(mlmp) +
 				    ehdr->e_phoff);
 
 				/*
@@ -703,7 +705,10 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		ulong_t	mhwcap;
 
 		if ((mhwcap = (HWCAP(mlmp) & ~hwcap)) != 0) {
-			const char	*str = conv_cap_val_hw1(mhwcap, M_MACH);
+			Conv_cap_val_hw1_buf_t cap_val_hw1_buf;
+
+			const char *str =
+			    conv_cap_val_hw1(mhwcap, M_MACH, &cap_val_hw1_buf);
 
 			if (lml_main.lm_flags & LML_FLG_TRC_ENABLE) {
 				(void) printf(MSG_INTL(MSG_LDD_GEN_HWCAP_1),

@@ -33,12 +33,13 @@
 void
 Elf_shdr(Lm_list *lml, Half mach, Shdr *shdr)
 {
-	Conv_inv_buf_t	link, info;
+	Conv_inv_buf_t		inv_buf1, inv_buf2;
+	Conv_sec_flags_buf_t	sec_flags_buf;
 
 	dbg_print(lml, MSG_ORIG(MSG_SHD_ADDR), EC_ADDR(shdr->sh_addr),
-	    conv_sec_flags(shdr->sh_flags));
+	    conv_sec_flags(shdr->sh_flags, &sec_flags_buf));
 	dbg_print(lml, MSG_ORIG(MSG_SHD_SIZE), EC_XWORD(shdr->sh_size),
-	    conv_sec_type(mach, shdr->sh_type, 0));
+	    conv_sec_type(mach, shdr->sh_type, 0, &inv_buf1));
 	if (shdr->sh_entsize == 0) {
 		dbg_print(lml, MSG_ORIG(MSG_SHD_OFFSET),
 		    EC_OFF(shdr->sh_offset), EC_XWORD(shdr->sh_entsize));
@@ -52,8 +53,8 @@ Elf_shdr(Lm_list *lml, Half mach, Shdr *shdr)
 		    EC_XWORD(nelts), entstr);
 	}
 	dbg_print(lml, MSG_ORIG(MSG_SHD_LINK),
-	    conv_sec_linkinfo(shdr->sh_link, shdr->sh_flags, link),
-	    conv_sec_linkinfo(shdr->sh_info, shdr->sh_flags, info));
+	    conv_sec_linkinfo(shdr->sh_link, shdr->sh_flags, &inv_buf1),
+	    conv_sec_linkinfo(shdr->sh_info, shdr->sh_flags, &inv_buf2));
 	dbg_print(lml, MSG_ORIG(MSG_SHD_ALIGN), EC_XWORD(shdr->sh_addralign));
 }
 

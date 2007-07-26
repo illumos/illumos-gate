@@ -40,14 +40,15 @@
 void
 Dbg_file_analyze(Rt_map *lmp)
 {
-	Lm_list	*lml = LIST(lmp);
+	Conv_dl_mode_buf_t	dl_mode_buf;
+	Lm_list			*lml = LIST(lmp);
 
 	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_FIL_ANALYZE), NAME(lmp),
-	    conv_dl_mode(MODE(lmp), 1));
+	    conv_dl_mode(MODE(lmp), 1, &dl_mode_buf));
 }
 
 void
@@ -145,32 +146,43 @@ Dbg_file_hdl_title(int type)
 
 	/*
 	 * Establish a binding title for later use in Dbg_file_bind_entry.
+	 * These are to be used with the MSG_INTL() macro.
+	 *
+	 * Note: The following are to convince chkmsg.sh that these
+	 * messages are actually used:
+	 *
+	 *	MSG_INTL(MSG_FIL_HDL_CREATE)
+	 *	MSG_INTL(MSG_FIL_HDL_ADD)
+	 *	MSG_INTL(MSG_FIL_HDL_DELETE)
+	 *	MSG_INTL(MSG_FIL_HDL_ORPHAN)
+	 *	MSG_INTL(MSG_FIL_HDL_REINST)
 	 */
 	switch (type) {
 	case DBG_DEP_CREATE:
-	    hdl_str = MSG_FIL_HDL_CREATE;  /* MSG_INTL(MSG_FIL_HDL_CREATE) */
-	    break;
+		hdl_str = MSG_FIL_HDL_CREATE;
+		break;
 	case DBG_DEP_ADD:
-	    hdl_str = MSG_FIL_HDL_ADD;	   /* MSG_INTL(MSG_FIL_HDL_ADD) */
-	    break;
+		hdl_str = MSG_FIL_HDL_ADD;
+		break;
 	case DBG_DEP_DELETE:
-	    hdl_str = MSG_FIL_HDL_DELETE;  /* MSG_INTL(MSG_FIL_HDL_DELETE) */
-	    break;
+		hdl_str = MSG_FIL_HDL_DELETE;
+		break;
 	case DBG_DEP_ORPHAN:
-	    hdl_str = MSG_FIL_HDL_ORPHAN;  /* MSG_INTL(MSG_FIL_HDL_ORPHAN) */
-	    break;
+		hdl_str = MSG_FIL_HDL_ORPHAN;
+		break;
 	case DBG_DEP_REINST:
-	    hdl_str = MSG_FIL_HDL_REINST;  /* MSG_INTL(MSG_FIL_HDL_REINST) */
-	    break;
+		hdl_str = MSG_FIL_HDL_REINST;
+		break;
 	default:
-	    hdl_str = 0;
-	    break;
+		hdl_str = 0;
+		break;
 	}
 }
 
 void
 Dbg_file_hdl_collect(Grp_hdl *ghp, const char *name)
 {
+	Conv_grphdl_flags_buf_t	grphdl_flags_buf;
 	Lm_list		*lml = ghp->gh_ownlml;
 	const char	*str;
 
@@ -192,12 +204,13 @@ Dbg_file_hdl_collect(Grp_hdl *ghp, const char *name)
 		dbg_print(lml, MSG_INTL(MSG_FIL_HDL_RETAIN), str, name);
 	else
 		dbg_print(lml, MSG_INTL(MSG_FIL_HDL_COLLECT), str,
-		    conv_grphdl_flags(ghp->gh_flags));
+		    conv_grphdl_flags(ghp->gh_flags, &grphdl_flags_buf));
 }
 
 void
 Dbg_file_hdl_action(Grp_hdl *ghp, Rt_map *lmp, int type, uint_t flags)
 {
+	Conv_grpdesc_flags_buf_t grpdesc_flags_buf;
 	const char	*mode, *group;
 	Lm_list		*lml = LIST(lmp);
 	Msg		str;
@@ -226,31 +239,42 @@ Dbg_file_hdl_action(Grp_hdl *ghp, Rt_map *lmp, int type, uint_t flags)
 		hdl_title = 0;
 	}
 
+	/*
+	 * Note: The following are to convince chkmsg.sh that these
+	 * messages are actually used:
+	 *
+	 *	MSG_INTL(MSG_FIL_DEP_ADD)
+	 *	MSG_INTL(MSG_FIL_DEP_DELETE)
+	 *	MSG_INTL(MSG_FIL_DEP_REMOVE)
+	 *	MSG_INTL(MSG_FIL_DEP_REMAIN)
+	 *	MSG_INTL(MSG_FIL_DEP_ORPHAN)
+	 *	MSG_INTL(MSG_FIL_DEP_REINST)
+	 */
 	switch (type) {
 	case DBG_DEP_ADD:
-	    str = MSG_FIL_DEP_ADD;	/* MSG_INTL(MSG_FIL_DEP_ADD) */
-	    break;
+		str = MSG_FIL_DEP_ADD;
+		break;
 	case DBG_DEP_DELETE:
-	    str = MSG_FIL_DEP_DELETE;	/* MSG_INTL(MSG_FIL_DEP_DELETE) */
-	    break;
+		str = MSG_FIL_DEP_DELETE;
+		break;
 	case DBG_DEP_REMOVE:
-	    str = MSG_FIL_DEP_REMOVE;	/* MSG_INTL(MSG_FIL_DEP_REMOVE) */
-	    break;
+		str = MSG_FIL_DEP_REMOVE;
+		break;
 	case DBG_DEP_REMAIN:
-	    str = MSG_FIL_DEP_REMAIN;	/* MSG_INTL(MSG_FIL_DEP_REMAIN) */
-	    break;
+		str = MSG_FIL_DEP_REMAIN;
+		break;
 	case DBG_DEP_ORPHAN:
-	    str = MSG_FIL_DEP_ORPHAN;	/* MSG_INTL(MSG_FIL_DEP_ORPHAN) */
-	    break;
+		str = MSG_FIL_DEP_ORPHAN;
+		break;
 	case DBG_DEP_REINST:
-	    str = MSG_FIL_DEP_REINST;	/* MSG_INTL(MSG_FIL_DEP_REINST) */
-	    break;
+		str = MSG_FIL_DEP_REINST;
+		break;
 	default:
-	    return;
+		return;
 	}
 
 	if ((type == DBG_DEP_ADD) && flags)
-		group = conv_grpdesc_flags(flags);
+		group = conv_grpdesc_flags(flags, &grpdesc_flags_buf);
 	else
 		group = MSG_ORIG(MSG_STR_EMPTY);
 
@@ -271,6 +295,8 @@ Dbg_file_hdl_action(Grp_hdl *ghp, Rt_map *lmp, int type, uint_t flags)
 void
 Dbg_file_bind_entry(Lm_list *lml, Bnd_desc *bdp)
 {
+	Conv_bnd_type_buf_t bnd_type_buf;
+
 	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 	if (DBG_NOTDETAIL())
@@ -282,12 +308,14 @@ Dbg_file_bind_entry(Lm_list *lml, Bnd_desc *bdp)
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_FIL_BND_ADD), NAME(bdp->b_caller));
 	dbg_print(lml, MSG_INTL(MSG_FIL_BND_FILE), NAME(bdp->b_depend),
-	    conv_bnd_type(bdp->b_flags));
+	    conv_bnd_type(bdp->b_flags, &bnd_type_buf));
 }
 
 void
 Dbg_file_bindings(Rt_map *lmp, int flag)
 {
+	Conv_bnd_obj_buf_t	bnd_obj_buf;
+	Conv_bnd_type_buf_t	bnd_type_buf;
 	const char	*str;
 	Rt_map		*tlmp;
 	Lm_list		*lml = LIST(lmp);
@@ -305,7 +333,7 @@ Dbg_file_bindings(Rt_map *lmp, int flag)
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_FIL_DEP_TITLE), str,
-	    conv_bnd_obj(lml->lm_flags));
+	    conv_bnd_obj(lml->lm_flags, &bnd_obj_buf));
 
 	/* LINTED */
 	for (tlmp = lmp; tlmp; tlmp = (Rt_map *)NEXT(tlmp)) {
@@ -345,7 +373,8 @@ Dbg_file_bindings(Rt_map *lmp, int flag)
 			for (ALIST_TRAVERSE(DEPENDS(tlmp), off, bdpp)) {
 				dbg_print(lml, MSG_INTL(MSG_FIL_BND_FILE),
 				    NAME((*bdpp)->b_depend),
-				    conv_bnd_type((*bdpp)->b_flags));
+				    conv_bnd_type((*bdpp)->b_flags,
+				    &bnd_type_buf));
 			}
 		}
 	}
@@ -355,14 +384,15 @@ Dbg_file_bindings(Rt_map *lmp, int flag)
 void
 Dbg_file_dlopen(Rt_map *clmp, const char *name, int mode)
 {
-	Lm_list	*lml = LIST(clmp);
+	Conv_dl_mode_buf_t	dl_mode_buf;
+	Lm_list			*lml = LIST(clmp);
 
 	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_FIL_DLOPEN), name, NAME(clmp),
-	    conv_dl_mode(mode, 1));
+	    conv_dl_mode(mode, 1, &dl_mode_buf));
 }
 
 void
@@ -385,14 +415,15 @@ Dbg_file_dlclose(Lm_list *lml, const char *name, int flag)
 void
 Dbg_file_dldump(Rt_map *lmp, const char *path, int flags)
 {
-	Lm_list	*lml = LIST(lmp);
+	Conv_dl_flag_buf_t	dl_flag_buf;
+	Lm_list			*lml = LIST(lmp);
 
 	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_FIL_DLDUMP), NAME(lmp), path,
-		conv_dl_flag(flags, 0));
+	    conv_dl_flag(flags, 0, &dl_flag_buf));
 }
 
 void
@@ -518,7 +549,8 @@ Dbg_file_output(Ofl_desc *ofl)
 void
 Dbg_file_config_dis(Lm_list *lml, const char *config, int features)
 {
-	const char	*str;
+	Conv_config_feat_buf_t	config_feat_buf;
+	const char		*str;
 
 	switch (features & ~CONF_FEATMSK) {
 	case DBG_CONF_IGNORE:
@@ -537,7 +569,7 @@ Dbg_file_config_dis(Lm_list *lml, const char *config, int features)
 		str = MSG_INTL(MSG_FIL_CONFIG_ERR_5);
 		break;
 	default:
-		str = conv_config_feat(features);
+		str = conv_config_feat(features, &config_feat_buf);
 		break;
 	}
 
@@ -578,14 +610,15 @@ Dbg_file_del_rescan(Lm_list *lml)
 void
 Dbg_file_mode_promote(Rt_map *lmp, int mode)
 {
-	Lm_list	*lml = LIST(lmp);
+	Conv_dl_mode_buf_t	dl_mode_buf;
+	Lm_list			*lml = LIST(lmp);
 
 	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_FIL_PROMOTE), NAME(lmp),
-	    conv_dl_mode(mode, 0));
+	    conv_dl_mode(mode, 0, &dl_mode_buf));
 	Dbg_util_nl(lml, DBG_NL_STD);
 }
 
@@ -646,12 +679,14 @@ Dbg_file_ar(Lm_list *lml, const char *name, int again)
 void
 Dbg_file_generic(Lm_list *lml, Ifl_desc *ifl)
 {
+	Conv_inv_buf_t inv_buf;
+
 	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_FIL_BASIC), ifl->ifl_name,
-		conv_ehdr_type(ifl->ifl_ehdr->e_type, 0));
+	    conv_ehdr_type(ifl->ifl_ehdr->e_type, 0, &inv_buf));
 }
 
 static const Msg
@@ -674,12 +709,15 @@ reject[] = {
 void
 Dbg_file_rejected(Lm_list *lml, Rej_desc *rej)
 {
+	Conv_reject_desc_buf_t rej_buf;
+
 	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(reject[rej->rej_type]), rej->rej_name ?
-	    rej->rej_name : MSG_INTL(MSG_STR_UNKNOWN), conv_reject_desc(rej));
+	    rej->rej_name : MSG_INTL(MSG_STR_UNKNOWN),
+	    conv_reject_desc(rej, &rej_buf));
 	Dbg_util_nl(lml, DBG_NL_STD);
 }
 

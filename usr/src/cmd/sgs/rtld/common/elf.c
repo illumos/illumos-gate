@@ -2620,13 +2620,15 @@ elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
 	 * If this isn't a dynamic executable or shared object we can't process
 	 * it.  If this is a dynamic executable then all addresses are fixed.
 	 */
-	if (etype == ET_EXEC)
+	if (etype == ET_EXEC) {
 		fixed = 1;
-	else if (etype == ET_DYN)
+	} else if (etype == ET_DYN) {
 		fixed = 0;
-	else {
+	} else {
+		Conv_inv_buf_t inv_buf;
+
 		eprintf(lml, ERR_ELF, MSG_INTL(MSG_GEN_BADTYPE), pname,
-		    conv_ehdr_type(etype, 0));
+		    conv_ehdr_type(etype, 0, &inv_buf));
 		return (0);
 	}
 

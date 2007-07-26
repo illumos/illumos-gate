@@ -37,9 +37,8 @@
 DEFINE_conv_map2str
 
 const char *
-conv_phdr_type(Half mach, Word type, int fmt_flags)
+conv_phdr_type(Half mach, Word type, int fmt_flags, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
 	static const Msg	phdrs[] = {
 		MSG_PT_NULL,		MSG_PT_LOAD,
 		MSG_PT_DYNAMIC,		MSG_PT_INTERP,
@@ -68,19 +67,17 @@ error "PT_NUM has grown. Update phdrs[]"
 #endif
 
 	if (type < PT_NUM) {
-		return (conv_map2str(string, sizeof (string),
-		    type, fmt_flags, ARRAY_NELTS(phdrs),
-		    phdrs, phdrs_alt, phdrs_alt));
+		return (conv_map2str(inv_buf, type, fmt_flags,
+		    ARRAY_NELTS(phdrs), phdrs, phdrs_alt, phdrs_alt));
 	} else if ((type >= PT_SUNWBSS) && (type <= PT_HISUNW)) {
-		return (conv_map2str(string, sizeof (string),
-		    (type - PT_SUNWBSS), fmt_flags, ARRAY_NELTS(uphdrs),
-		    uphdrs, uphdrs_alt, uphdrs_alt));
+		return (conv_map2str(inv_buf, (type - PT_SUNWBSS), fmt_flags,
+		    ARRAY_NELTS(uphdrs), uphdrs, uphdrs_alt, uphdrs_alt));
 	} else if ((type == PT_SUNW_UNWIND) && (mach == EM_AMD64)) {
 		return ((fmt_flags & CONV_FMTALTMASK) ?
 		    MSG_ORIG(MSG_PT_SUNW_UNWIND_ALT) :
 		    MSG_ORIG(MSG_PT_SUNW_UNWIND));
 	} else
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, type, 0));
+		return (conv_invalid_val(inv_buf, type, 0));
 }
 
 #define	PHDRSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
@@ -88,12 +85,24 @@ error "PT_NUM has grown. Update phdrs[]"
 		MSG_PF_W_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_PF_R_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_PF_SUNW_FAILURE_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+		CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+
+/*
+ * Ensure that Conv_phdr_flags_buf_t is large enough:
+ *
+ * PHDRSZ is the real minimum size of the buffer required by conv_phdr_flags().
+ * However, Conv_phdr_flags_buf_t uses CONV_PHDR_FLAGS_BUFSIZE to set the
+ * buffer size. We do things this way because the definition of PHDRSZ uses
+ * information that is not available in the environment of other programs
+ * that include the conv.h header file.
+ */
+#if CONV_PHDR_FLAGS_BUFSIZE < PHDRSZ
+#error "CONV_PHDR_FLAGS_BUFSIZE is not large enough"
+#endif
 
 const char *
-conv_phdr_flags(Word flags)
+conv_phdr_flags(Word flags, Conv_phdr_flags_buf_t *phdr_flags_buf)
 {
-	static char string[PHDRSZ];
 	static Val_desc vda[] = {
 		{ PF_X,			MSG_ORIG(MSG_PF_X) },
 		{ PF_W,			MSG_ORIG(MSG_PF_W) },
@@ -101,13 +110,15 @@ conv_phdr_flags(Word flags)
 		{ PF_SUNW_FAILURE,	MSG_ORIG(MSG_PF_SUNW_FAILURE) },
 		{ 0,			0 }
 	};
-	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
+	static CONV_EXPN_FIELD_ARG conv_arg = {
+	    NULL, sizeof (phdr_flags_buf->buf), vda };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
+	conv_arg.buf = phdr_flags_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
 	(void) conv_expn_field(&conv_arg);
 
-	return ((const char *)string);
+	return ((const char *)phdr_flags_buf->buf);
 }

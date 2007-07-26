@@ -45,26 +45,40 @@ DEFINE_conv_map2str
 #define	POSSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
 		MSG_DFP_LAZYLOAD_ALT_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_DFP_GROUPPERM_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+		CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+
+/*
+ * Ensure that Conv_dyn_posflag1_buf_t is large enough:
+ *
+ * POSSZ is the real minimum size of the buffer required by conv_dyn_posflag1().
+ * However, Conv_dyn_posflag1_buf_t uses CONV_DYN_POSFLAG1_BUFSIZE to set the
+ * buffer size. We do things this way because the definition of POSSZ uses
+ * information that is not available in the environment of other programs
+ * that include the conv.h header file.
+ */
+#if CONV_DYN_POSFLAG1_BUFSIZE < POSSZ
+#error "CONV_DYN_POSFLAG1_BUFSIZE is not large enough"
+#endif
 
 const char *
-conv_dyn_posflag1(Xword flags, int fmt_flags)
+conv_dyn_posflag1(Xword flags, int fmt_flags,
+    Conv_dyn_posflag1_buf_t *dyn_posflag1_buf)
 {
-	static char	string[POSSZ];
 	static Val_desc vda[] = {
 		{ DF_P1_LAZYLOAD,	MSG_ORIG(MSG_DFP_LAZYLOAD) },
 		{ DF_P1_GROUPPERM,	MSG_ORIG(MSG_DFP_GROUPPERM) },
 		{ 0,			0 }
 	};
-	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
+	static CONV_EXPN_FIELD_ARG conv_arg = {
+	    NULL, sizeof (dyn_posflag1_buf->buf), vda };
 	static Val_desc vda_alt[] = {
 		{ DF_P1_LAZYLOAD,	MSG_ORIG(MSG_DFP_LAZYLOAD_ALT) },
 		{ DF_P1_GROUPPERM,	MSG_ORIG(MSG_DFP_GROUPPERM) },
 		{ 0,			0 }
 	};
-	static CONV_EXPN_FIELD_ARG conv_arg_alt = { string, sizeof (string),
-		vda_alt, NULL, 0, 0, MSG_ORIG(MSG_STR_EMPTY), NULL,
-		MSG_ORIG(MSG_STR_EMPTY) };
+	static CONV_EXPN_FIELD_ARG conv_arg_alt = {
+	    NULL, sizeof (dyn_posflag1_buf->buf), vda_alt, NULL, 0, 0,
+	    MSG_ORIG(MSG_STR_EMPTY), NULL, MSG_ORIG(MSG_STR_EMPTY) };
 
 	CONV_EXPN_FIELD_ARG *arg;
 
@@ -72,10 +86,11 @@ conv_dyn_posflag1(Xword flags, int fmt_flags)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
 	arg = (fmt_flags & CONV_FMT_ALTDUMP) ? &conv_arg_alt : &conv_arg;
+	arg->buf = dyn_posflag1_buf->buf;
 	arg->oflags = arg->rflags = flags;
 	(void) conv_expn_field(arg);
 
-	return ((const char *)string);
+	return ((const char *)dyn_posflag1_buf);
 }
 
 #define	FLAGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
@@ -84,12 +99,24 @@ conv_dyn_posflag1(Xword flags, int fmt_flags)
 		MSG_DF_TEXTREL_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_DF_BIND_NOW_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_DF_STATIC_TLS_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+		CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+
+/*
+ * Ensure that Conv_dyn_flag_buf_t is large enough:
+ *
+ * FLAGSZ is the real minimum size of the buffer required by conv_dyn_flag().
+ * However, Conv_dyn_flag_buf_t uses CONV_DYN_FLAG_BUFSIZE to set the
+ * buffer size. We do things this way because the definition of FLAGSZ uses
+ * information that is not available in the environment of other programs
+ * that include the conv.h header file.
+ */
+#if CONV_DYN_FLAG_BUFSIZE < FLAGSZ
+#error "CONV_DYN_FLAG_BUFSIZE is not large enough"
+#endif
 
 const char *
-conv_dyn_flag(Xword flags, int fmt_flags)
+conv_dyn_flag(Xword flags, int fmt_flags, Conv_dyn_flag_buf_t *dyn_flag_buf)
 {
-	static char	string[FLAGSZ];
 	static Val_desc vda[] = {
 		{ DF_ORIGIN,		MSG_ORIG(MSG_DF_ORIGIN) },
 		{ DF_SYMBOLIC,		MSG_ORIG(MSG_DF_SYMBOLIC) },
@@ -98,11 +125,13 @@ conv_dyn_flag(Xword flags, int fmt_flags)
 		{ DF_STATIC_TLS,	MSG_ORIG(MSG_DF_STATIC_TLS) },
 		{ 0,			0 }
 	};
-	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
+	static CONV_EXPN_FIELD_ARG conv_arg = {
+	    NULL, sizeof (dyn_flag_buf->buf), vda };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
+	conv_arg.buf = dyn_flag_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
 	if (fmt_flags & CONV_FMT_ALTDUMP) {
 		conv_arg.prefix = conv_arg.suffix = MSG_ORIG(MSG_STR_EMPTY);
@@ -111,7 +140,7 @@ conv_dyn_flag(Xword flags, int fmt_flags)
 	}
 	(void) conv_expn_field(&conv_arg);
 
-	return ((const char *)string);
+	return ((const char *)dyn_flag_buf->buf);
 }
 
 #define	FLAG1SZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
@@ -139,12 +168,24 @@ conv_dyn_flag(Xword flags, int fmt_flags)
 		MSG_DF1_NORELOC_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_DF1_SYMINTPOSE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_DF1_GLOBAUDIT_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+		CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+
+/*
+ * Ensure that Conv_dyn_flag1_buf_t is large enough:
+ *
+ * FLAG1SZ is the real minimum size of the buffer required by conv_dyn_flag1().
+ * However, Conv_dyn_flag1_buf_t uses CONV_DYN_FLAG1_BUFSIZE to set the
+ * buffer size. We do things this way because the definition of FLAG1SZ uses
+ * information that is not available in the environment of other programs
+ * that include the conv.h header file.
+ */
+#if CONV_DYN_FLAG1_BUFSIZE < FLAG1SZ
+#error "CONV_DYN_FLAG1_BUFSIZE is not large enough"
+#endif
 
 const char *
-conv_dyn_flag1(Xword flags)
+conv_dyn_flag1(Xword flags, Conv_dyn_flag1_buf_t *dyn_flag1_buf)
 {
-	static char	string[FLAG1SZ];
 	static Val_desc vda[] = {
 		{ DF_1_NOW,		MSG_ORIG(MSG_DF1_NOW) },
 		{ DF_1_GLOBAL,		MSG_ORIG(MSG_DF1_GLOBAL) },
@@ -173,36 +214,53 @@ conv_dyn_flag1(Xword flags)
 		{ DF_1_GLOBAUDIT,	MSG_ORIG(MSG_DF1_GLOBAUDIT) },
 		{ 0,			0 }
 	};
-	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
+	static CONV_EXPN_FIELD_ARG conv_arg = {
+	    NULL, sizeof (dyn_flag1_buf->buf), vda };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
 	conv_arg.oflags = conv_arg.rflags = flags;
+	conv_arg.buf = dyn_flag1_buf->buf;
 	(void) conv_expn_field(&conv_arg);
 
-	return ((const char *)string);
+	return ((const char *)dyn_flag1_buf->buf);
 }
 
 #define	FEATSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
 		MSG_DTF_PARINIT_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_DTF_CONFEXP_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+		CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+
+/*
+ * Ensure that Conv_dyn_feature1_buf_t is large enough:
+ *
+ * FEATSZ is the real min size of the buffer required by conv_dyn_feature1().
+ * However, Conv_dyn_feature1_buf_t uses CONV_DYN_FEATURE1_BUFSIZE to set the
+ * buffer size. We do things this way because the definition of FEATSZ uses
+ * information that is not available in the environment of other programs
+ * that include the conv.h header file.
+ */
+#if CONV_DYN_FEATURE1_BUFSIZE < FEATSZ
+#error "CONV_DYN_FEATURE1_BUFSIZE is not large enough"
+#endif
 
 const char *
-conv_dyn_feature1(Xword flags, int fmt_flags)
+conv_dyn_feature1(Xword flags, int fmt_flags,
+    Conv_dyn_feature1_buf_t *dyn_feature1_buf)
 {
-	static char	string[FEATSZ];
 	static Val_desc vda[] = {
 		{ DTF_1_PARINIT,	MSG_ORIG(MSG_DTF_PARINIT) },
 		{ DTF_1_CONFEXP,	MSG_ORIG(MSG_DTF_CONFEXP) },
 		{ 0,			0 }
 	};
-	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
+	static CONV_EXPN_FIELD_ARG conv_arg = {
+	    NULL, sizeof (dyn_feature1_buf->buf), vda };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
+	conv_arg.buf = dyn_feature1_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
 	if (fmt_flags & CONV_FMT_ALTDUMP) {
 		conv_arg.prefix = conv_arg.suffix = MSG_ORIG(MSG_STR_EMPTY);
@@ -211,14 +269,12 @@ conv_dyn_feature1(Xword flags, int fmt_flags)
 	}
 	(void) conv_expn_field(&conv_arg);
 
-	return ((const char *)string);
+	return ((const char *)dyn_feature1_buf->buf);
 }
 
 const char *
-conv_dyn_tag(Xword tag, Half mach, int fmt_flags)
+conv_dyn_tag(Xword tag, Half mach, int fmt_flags, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
-
 	/*
 	 * Dynamic tag values are sparse, cover a wide range, and have
 	 * holes. To handle this efficiently, we fall through a series
@@ -344,9 +400,8 @@ conv_dyn_tag(Xword tag, Half mach, int fmt_flags)
 
 
 	if (tag <= DT_FLAGS)
-		return (conv_map2str(string, sizeof (string), tag,
-		    fmt_flags, ARRAY_NELTS(tags_null), tags_null,
-		    tags_null_alt, NULL));
+		return (conv_map2str(inv_buf, tag, fmt_flags,
+		    ARRAY_NELTS(tags_null), tags_null, tags_null_alt, NULL));
 	DYN_RANGE(DT_PREINIT_ARRAY, tags_preinit_array);
 	DYN_RANGE(DT_SUNW_AUXILIARY, tags_sunw_auxiliary);
 	if (tag == DT_SUNW_STRPAD)
@@ -370,7 +425,7 @@ conv_dyn_tag(Xword tag, Half mach, int fmt_flags)
 		return (MSG_ORIG(MSG_DYN_REGISTER));
 
 	/* Unknown item */
-	return (conv_invalid_val(string, CONV_INV_STRSIZE, tag, fmt_flags));
+	return (conv_invalid_val(inv_buf, tag, fmt_flags));
 
 #undef DYN_RANGE
 }
@@ -379,27 +434,41 @@ conv_dyn_tag(Xword tag, Half mach, int fmt_flags)
 		MSG_BND_NEEDED_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_BND_REFER_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_BND_FILTER_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+		CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+
+/*
+ * Ensure that Conv_bnd_type_buf_t is large enough:
+ *
+ * BINDTSZ is the real minimum size of the buffer required by conv_bnd_type().
+ * However, Conv_bnd_type_buf_t uses CONV_BND_TYPE_BUFSIZE to set the
+ * buffer size. We do things this way because the definition of BINDTSZ uses
+ * information that is not available in the environment of other programs
+ * that include the conv.h header file.
+ */
+#if CONV_BND_TYPE_BUFSIZE < BINDTSZ
+#error "CONV_BND_TYPE_BUFSIZE is not large enough"
+#endif
 
 const char *
-conv_bnd_type(uint_t flags)
+conv_bnd_type(uint_t flags, Conv_bnd_type_buf_t *bnd_type_buf)
 {
-	static char	string[BINDTSZ];
 	static Val_desc vda[] = {
 		{ BND_NEEDED,		MSG_ORIG(MSG_BND_NEEDED) },
 		{ BND_REFER,		MSG_ORIG(MSG_BND_REFER) },
 		{ BND_FILTER,		MSG_ORIG(MSG_BND_FILTER) },
 		{ 0,			0 }
 	};
-	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
+	static CONV_EXPN_FIELD_ARG conv_arg = {
+	    NULL, sizeof (bnd_type_buf->buf), vda };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_STR_EMPTY));
 
+	conv_arg.buf = bnd_type_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
 	(void) conv_expn_field(&conv_arg);
 
-	return ((const char *)string);
+	return ((const char *)bnd_type_buf->buf);
 }
 
 /*
@@ -411,12 +480,24 @@ conv_bnd_type(uint_t flags)
 #define	BINDOSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
 		MSG_BND_ADDED_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_BND_REEVAL_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+		CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+
+/*
+ * Ensure that Conv_bnd_obj_buf_t is large enough:
+ *
+ * BINDOSZ is the real minimum size of the buffer required by conv_bnd_obj().
+ * However, Conv_bnd_obj_buf_t uses CONV_BND_OBJ_BUFSIZE to set the
+ * buffer size. We do things this way because the definition of BINDOSZ uses
+ * information that is not available in the environment of other programs
+ * that include the conv.h header file.
+ */
+#if CONV_BND_OBJ_BUFSIZE < BINDOSZ
+#error "CONV_BND_OBJ_BUFSIZE is not large enough"
+#endif
 
 const char *
-conv_bnd_obj(uint_t flags)
+conv_bnd_obj(uint_t flags, Conv_bnd_obj_buf_t *bnd_obj_buf)
 {
-	static char	string[BINDOSZ];
 	static Val_desc vda[] = {
 		{ LML_FLG_OBJADDED,	MSG_ORIG(MSG_BND_ADDED) },
 		{ LML_FLG_OBJREEVAL,	MSG_ORIG(MSG_BND_REEVAL) },
@@ -424,7 +505,8 @@ conv_bnd_obj(uint_t flags)
 		{ LML_FLG_ATEXIT,	MSG_ORIG(MSG_BND_ATEXIT) },
 		{ 0,			0 }
 	};
-	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
+	static CONV_EXPN_FIELD_ARG conv_arg = {
+	    NULL, sizeof (bnd_obj_buf->buf), vda };
 
 	if ((flags & (LML_FLG_OBJADDED | LML_FLG_OBJREEVAL |
 	    LML_FLG_OBJDELETED | LML_FLG_ATEXIT)) == 0)
@@ -435,8 +517,9 @@ conv_bnd_obj(uint_t flags)
 	 * the selected flags are of interest, so we leave conv_arg.rflags
 	 * set to 0.
 	 */
+	conv_arg.buf = bnd_obj_buf->buf;
 	conv_arg.oflags = flags;
 	(void) conv_expn_field(&conv_arg);
 
-	return ((const char *)string);
+	return ((const char *)bnd_obj_buf->buf);
 }

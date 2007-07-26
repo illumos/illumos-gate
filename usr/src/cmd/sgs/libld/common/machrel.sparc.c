@@ -232,7 +232,7 @@ plt_far_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 
 
 	farblkcnt = ((ofl->ofl_pltcnt - 1 +
-		M_PLT_XNumber - M64_PLT_NEARPLTS) / M64_PLT_FBLKCNTS);
+	    M_PLT_XNumber - M64_PLT_NEARPLTS) / M64_PLT_FBLKCNTS);
 
 	/*
 	 * Determine the 'Far' PLT index.
@@ -250,10 +250,10 @@ plt_far_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 	 * that this PLT is a member of.
 	 */
 	pltblockoff = (M64_PLT_NEARPLTS * M_PLT_ENTSIZE) +
-		(blockndx * M64_PLT_FBLOCKSZ);
+	    (blockndx * M64_PLT_FBLOCKSZ);
 
 	pltoff = pltblockoff +
-		(farpltblkndx * M64_PLT_FENTSIZE);
+	    (farpltblkndx * M64_PLT_FENTSIZE);
 
 	pltptroff = pltblockoff;
 
@@ -264,7 +264,7 @@ plt_far_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 		 * after 160 fplts.
 		 */
 		pltptroff += (M64_PLT_FBLKCNTS * M64_PLT_FENTSIZE) +
-			(farpltblkndx * M64_PLT_PSIZE);
+		    (farpltblkndx * M64_PLT_PSIZE);
 	} else {
 		Xword	lastblkpltndx;
 		/*
@@ -272,9 +272,9 @@ plt_far_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 		 * after the last FPLT instruction sequence.
 		 */
 		lastblkpltndx = (ofl->ofl_pltcnt - 1 + M_PLT_XNumber -
-			M64_PLT_NEARPLTS) % M64_PLT_FBLKCNTS;
+		    M64_PLT_NEARPLTS) % M64_PLT_FBLKCNTS;
 		pltptroff += ((lastblkpltndx + 1) * M64_PLT_FENTSIZE) +
-			(farpltblkndx * M64_PLT_PSIZE);
+		    (farpltblkndx * M64_PLT_PSIZE);
 	}
 	pltbuf = (uchar_t *)ofl->ofl_osplt->os_outdata->d_buf;
 
@@ -349,8 +349,7 @@ plt_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 	}
 
 	pltoff = M_PLT_RESERVSZ + (pltndx - 1) * M_PLT_ENTSIZE;
-	pltent = (uchar_t *)ofl->ofl_osplt->os_outdata->d_buf +
-		pltoff;
+	pltent = (uchar_t *)ofl->ofl_osplt->os_outdata->d_buf + pltoff;
 
 	*roffset = pltoff + (Xword)(ofl->ofl_osplt->os_shdr->sh_addr);
 	*raddend = 0;
@@ -370,7 +369,7 @@ plt_entry(Ofl_desc *ofl, Xword pltndx, Xword *roffset, Sxword *raddend)
 	pltoff = -pltoff;
 	/* LINTED */
 	*(Word *)pltent = M_BA_A_XCC |
-		(((pltoff + M_PLT_ENTSIZE) >> 2) & S_MASK(19));
+	    (((pltoff + M_PLT_ENTSIZE) >> 2) & S_MASK(19));
 
 	/*
 	 * PLT[2]: sethi 0, %g0 (NOP for delay slot of eventual CTI).
@@ -567,13 +566,13 @@ ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 			raddend += (Off)_elf_getxoff(psym->sd_isc->is_indata);
 			if (psym->sd_isc->is_shdr->sh_flags & SHF_ALLOC)
 				raddend +=
-				psym->sd_isc->is_osdesc->os_shdr->sh_addr;
+				    psym->sd_isc->is_osdesc->os_shdr->sh_addr;
 		} else {
 			/* LINTED */
 			raddend += (Off)_elf_getxoff(sdp->sd_isc->is_indata);
 			if (sdp->sd_isc->is_shdr->sh_flags & SHF_ALLOC)
 				raddend +=
-				sdp->sd_isc->is_osdesc->os_shdr->sh_addr;
+				    sdp->sd_isc->is_osdesc->os_shdr->sh_addr;
 		}
 	}
 
@@ -634,9 +633,11 @@ ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 		if (((rep->re_fsize == 2) && (roffset & 0x1)) ||
 		    ((rep->re_fsize == 4) && (roffset & 0x3)) ||
 		    ((rep->re_fsize == 8) && (roffset & 0x7))) {
+			Conv_inv_buf_t inv_buf;
+
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_REL_NONALIGN),
-			    conv_reloc_SPARC_type(orsp->rel_rtype, 0),
+			    conv_reloc_SPARC_type(orsp->rel_rtype, 0, &inv_buf),
 			    orsp->rel_isdesc->is_file->ifl_name,
 			    demangle(orsp->rel_sname), EC_XWORD(roffset));
 			return (S_ERROR);
@@ -686,7 +687,7 @@ ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 	relbits = (char *)relosp->os_outdata->d_buf;
 
 	rea.r_info = ELF_R_INFO(ndx, ELF_R_TYPE_INFO(orsp->rel_typedata,
-			orsp->rel_rtype));
+	    orsp->rel_rtype));
 	rea.r_offset = roffset;
 	rea.r_addend = raddend;
 	DBG_CALL(Dbg_reloc_out(ofl, ELF_DBG_LD, SHT_RELA, &rea, relosp->os_name,
@@ -743,8 +744,8 @@ tls_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 	uint_t		*offset;
 
 	offset = (uint_t *)((uintptr_t)arsp->rel_roffset +
-		(uintptr_t)_elf_getxoff(arsp->rel_isdesc->is_indata) +
-		(uintptr_t)arsp->rel_osdesc->os_outdata->d_buf);
+	    (uintptr_t)_elf_getxoff(arsp->rel_isdesc->is_indata) +
+	    (uintptr_t)arsp->rel_osdesc->os_outdata->d_buf);
 
 	if (sdp->sd_ref == REF_DYN_NEED) {
 		/*
@@ -878,6 +879,7 @@ gotop_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 	Word		rtype = arsp->rel_rtype;
 	uint_t		*offset;
 	const char	*ifl_name;
+	Conv_inv_buf_t	inv_buf;
 
 	switch (rtype) {
 	case R_SPARC_GOTDATA_OP_HIX22:
@@ -920,7 +922,7 @@ gotop_fixups(Ofl_desc *ofl, Rel_desc *arsp)
 		ifl_name = MSG_INTL(MSG_STR_NULL);
 
 	eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_REL_BADGOTFIX),
-	    conv_reloc_SPARC_type(arsp->rel_rtype, 0),
+	    conv_reloc_SPARC_type(arsp->rel_rtype, 0, &inv_buf),
 	    ifl_name, demangle(arsp->rel_sname));
 
 	assert(0);
@@ -1152,7 +1154,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			} else if (IS_GOT_BASED(arsp->rel_rtype) &&
 			    ((flags & FLG_OF_RELOBJ) == 0)) {
 				value -= (ofl->ofl_osgot->os_shdr->sh_addr +
-					(-neggotoffset * M_GOT_ENTSIZE));
+				    (-neggotoffset * M_GOT_ENTSIZE));
 
 			} else if (IS_PC_RELATIVE(arsp->rel_rtype)) {
 				value -= refaddr;
@@ -1215,10 +1217,13 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			 * see this.
 			 */
 			if (arsp->rel_isdesc->is_indata->d_buf == 0) {
+				Conv_inv_buf_t	inv_buf;
+
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_REL_EMPTYSEC),
-				    conv_reloc_SPARC_type(arsp->rel_rtype, 0),
-				    ifl_name, demangle(arsp->rel_sname),
+				    conv_reloc_SPARC_type(arsp->rel_rtype,
+				    0, &inv_buf), ifl_name,
+				    demangle(arsp->rel_sname),
 				    arsp->rel_isdesc->is_name);
 				return (S_ERROR);
 			}
@@ -1239,7 +1244,8 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			if ((((uintptr_t)addr - (uintptr_t)ofl->ofl_nehdr) >
 			    ofl->ofl_size) || (arsp->rel_roffset >
 			    arsp->rel_osdesc->os_shdr->sh_size)) {
-				int	class;
+				Conv_inv_buf_t	inv_buf;
+				int		class;
 
 				if (((uintptr_t)addr -
 				    (uintptr_t)ofl->ofl_nehdr) > ofl->ofl_size)
@@ -1249,8 +1255,9 @@ ld_do_activerelocs(Ofl_desc *ofl)
 
 				eprintf(ofl->ofl_lml, class,
 				    MSG_INTL(MSG_REL_INVALOFFSET),
-				    conv_reloc_SPARC_type(arsp->rel_rtype, 0),
-				    ifl_name, arsp->rel_isdesc->is_name,
+				    conv_reloc_SPARC_type(arsp->rel_rtype,
+				    0, &inv_buf), ifl_name,
+				    arsp->rel_isdesc->is_name,
 				    demangle(arsp->rel_sname),
 				    EC_ADDR((uintptr_t)addr -
 				    (uintptr_t)ofl->ofl_nehdr));
@@ -1283,6 +1290,7 @@ ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 	Rel_desc	*orsp;
 	Rel_cache	*rcp;
 	Sym_desc	*sdp = rsp->rel_sym;
+	Conv_inv_buf_t	inv_buf;
 
 	/*
 	 * Static executables *do not* want any relocations against them.
@@ -1306,11 +1314,10 @@ ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 		 * are not relative they make no sense to create in a shared
 		 * object - so emit the proper error message if that occurs.
 		 */
-		if ((rtype == R_SPARC_HIPLT22) ||
-		    (rtype == R_SPARC_LOPLT10)) {
+		if ((rtype == R_SPARC_HIPLT22) || (rtype == R_SPARC_LOPLT10)) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_REL_UNRELREL),
-			    conv_reloc_SPARC_type(rsp->rel_rtype, 0),
+			    conv_reloc_SPARC_type(rsp->rel_rtype, 0, &inv_buf),
 			    rsp->rel_isdesc->is_file->ifl_name,
 			    demangle(rsp->rel_sname));
 			return (S_ERROR);
@@ -1327,7 +1334,7 @@ ld_add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 		    (rtype == R_SPARC_L44)) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_REL_SHOBJABS44),
-			    conv_reloc_SPARC_type(rsp->rel_rtype, 0),
+			    conv_reloc_SPARC_type(rsp->rel_rtype, 0, &inv_buf),
 			    rsp->rel_isdesc->is_file->ifl_name,
 			    demangle(rsp->rel_sname));
 			return (S_ERROR);
@@ -1570,6 +1577,8 @@ ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 	    ((shndx == SHN_UNDEF) ||
 	    ((sdp->sd_ref == REF_DYN_NEED) &&
 	    ((sdp->sd_flags & FLG_SY_MVTOCOMM) == 0)))) {
+		Conv_inv_buf_t	inv_buf;
+
 		/*
 		 * If the relocation is against a SHT_SUNW_ANNOTATE
 		 * section - then silently ignore that the relocation
@@ -1580,7 +1589,7 @@ ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 			return (0);
 		(void) eprintf(ofl->ofl_lml, ERR_WARNING,
 		    MSG_INTL(MSG_REL_EXTERNSYM),
-		    conv_reloc_SPARC_type(rsp->rel_rtype, 0),
+		    conv_reloc_SPARC_type(rsp->rel_rtype, 0, &inv_buf),
 		    rsp->rel_isdesc->is_file->ifl_name,
 		    demangle(rsp->rel_sname), rsp->rel_osdesc->os_name);
 		return (1);

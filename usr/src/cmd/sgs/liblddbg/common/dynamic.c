@@ -44,11 +44,13 @@ Elf_dyn_title(Lm_list *lml)
 void
 Elf_dyn_entry(Lm_list *lml, Dyn *dyn, int ndx, const char *name, Half mach)
 {
-	char	index[INDEX_STR_SIZE];
+	Conv_inv_buf_t	inv_buf;
+	char		index[INDEX_STR_SIZE];
 
 	(void) snprintf(index, sizeof (index), MSG_ORIG(MSG_FMT_INDEX), ndx);
 	dbg_print(lml, MSG_INTL(MSG_DYN_ENTRY), index,
-	    conv_dyn_tag(dyn->d_tag, mach, 0), EC_XWORD(dyn->d_un.d_val), name);
+	    conv_dyn_tag(dyn->d_tag, mach, 0, &inv_buf),
+	    EC_XWORD(dyn->d_un.d_val), name);
 }
 
 /*
@@ -59,7 +61,8 @@ Elf_dyn_entry(Lm_list *lml, Dyn *dyn, int ndx, const char *name, Half mach)
 void
 Elf_dyn_null_entry(Lm_list *lml, Dyn *dyn, int start_ndx, int end_ndx)
 {
-	char	index[2 * INDEX_STR_SIZE];
+	Conv_inv_buf_t	inv_buf;
+	char		index[2 * INDEX_STR_SIZE];
 
 	if (start_ndx == end_ndx) {
 		Elf_dyn_entry(lml, dyn, start_ndx, MSG_ORIG(MSG_STR_EMPTY), 0);
@@ -67,7 +70,7 @@ Elf_dyn_null_entry(Lm_list *lml, Dyn *dyn, int start_ndx, int end_ndx)
 		(void) snprintf(index, sizeof (index),
 		    MSG_ORIG(MSG_FMT_INDEX_RANGE), start_ndx, end_ndx);
 		dbg_print(lml, MSG_INTL(MSG_DYN_ENTRY), index,
-		    conv_dyn_tag(DT_NULL, 0, 0), EC_XWORD(dyn->d_un.d_val),
-		    MSG_ORIG(MSG_STR_EMPTY));
+		    conv_dyn_tag(DT_NULL, 0, 0, &inv_buf),
+		    EC_XWORD(dyn->d_un.d_val), MSG_ORIG(MSG_STR_EMPTY));
 	}
 }

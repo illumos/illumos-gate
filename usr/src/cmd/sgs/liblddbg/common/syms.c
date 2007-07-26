@@ -188,7 +188,8 @@ Dbg_syms_discarded(Lm_list *lml, Sym_desc *sdp, Is_desc *disp)
 void
 Dbg_syms_entered(Ofl_desc *ofl, Sym *sym, Sym_desc *sdp)
 {
-	Lm_list	*lml = ofl->ofl_lml;
+	Conv_inv_buf_t	inv_buf;
+	Lm_list		*lml = ofl->ofl_lml;
 
 	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
 		return;
@@ -198,18 +199,20 @@ Dbg_syms_entered(Ofl_desc *ofl, Sym *sym, Sym_desc *sdp)
 	Elf_syms_table_entry(lml, ELF_DBG_LD, MSG_INTL(MSG_STR_ENTERED),
 	    ofl->ofl_dehdr->e_machine, sym,
 	    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
-	    conv_def_tag(sdp->sd_ref));
+	    conv_def_tag(sdp->sd_ref, &inv_buf));
 }
 
 void
 Dbg_syms_process(Lm_list *lml, Ifl_desc *ifl)
 {
+	Conv_inv_buf_t	inv_buf;
+
 	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
 		return;
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_SYM_PROCESS), ifl->ifl_name,
-	    conv_ehdr_type(ifl->ifl_ehdr->e_type, 0));
+	    conv_ehdr_type(ifl->ifl_ehdr->e_type, 0, &inv_buf));
 }
 
 void
@@ -298,6 +301,8 @@ Dbg_syms_old(Ofl_desc *ofl, Sym_desc *sdp)
 void
 Dbg_syms_new(Ofl_desc *ofl, Sym *sym, Sym_desc *sdp)
 {
+	Conv_inv_buf_t	inv_buf;
+
 	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
 		return;
 	if (DBG_NOTDETAIL())
@@ -306,13 +311,14 @@ Dbg_syms_new(Ofl_desc *ofl, Sym *sym, Sym_desc *sdp)
 	Elf_syms_table_entry(ofl->ofl_lml, ELF_DBG_LD, MSG_INTL(MSG_STR_NEW),
 	    ofl->ofl_dehdr->e_machine, sym,
 	    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
-	    conv_def_tag(sdp->sd_ref));
+	    conv_def_tag(sdp->sd_ref, &inv_buf));
 }
 
 void
 Dbg_syms_updated(Ofl_desc *ofl, Sym_desc *sdp, const char *name)
 {
-	Lm_list	*lml = ofl->ofl_lml;
+	Conv_inv_buf_t	inv_buf;
+	Lm_list		*lml = ofl->ofl_lml;
 
 	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
 		return;
@@ -325,7 +331,7 @@ Dbg_syms_updated(Ofl_desc *ofl, Sym_desc *sdp, const char *name)
 	Elf_syms_table_entry(ofl->ofl_lml, ELF_DBG_LD, MSG_ORIG(MSG_STR_EMPTY),
 	    ofl->ofl_dehdr->e_machine, sdp->sd_sym,
 	    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
-	    conv_def_tag(sdp->sd_ref));
+	    conv_def_tag(sdp->sd_ref, &inv_buf));
 }
 
 void
@@ -364,6 +370,8 @@ Dbg_syms_resolving(Ofl_desc *ofl, Word ndx, const char *name, int row,
 void
 Dbg_syms_resolved(Ofl_desc *ofl, Sym_desc *sdp)
 {
+	Conv_inv_buf_t	inv_buf;
+
 	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
 		return;
 	if (DBG_NOTDETAIL())
@@ -372,13 +380,14 @@ Dbg_syms_resolved(Ofl_desc *ofl, Sym_desc *sdp)
 	Elf_syms_table_entry(ofl->ofl_lml, ELF_DBG_LD,
 	    MSG_INTL(MSG_STR_RESOLVED), ofl->ofl_dehdr->e_machine, sdp->sd_sym,
 	    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
-	    conv_def_tag(sdp->sd_ref));
+	    conv_def_tag(sdp->sd_ref, &inv_buf));
 }
 
 void
 Dbg_syms_reloc(Ofl_desc *ofl, Sym_desc *sdp)
 {
 	static Boolean	symbol_title = TRUE;
+	Conv_inv_buf_t	inv_buf;
 	Lm_list	*lml = ofl->ofl_lml;
 
 	if (DBG_NOTCLASS(DBG_C_SYMBOLS))
@@ -399,7 +408,7 @@ Dbg_syms_reloc(Ofl_desc *ofl, Sym_desc *sdp)
 	Elf_syms_table_entry(lml, ELF_DBG_LD, MSG_ORIG(MSG_SYM_COPY),
 	    ofl->ofl_dehdr->e_machine, sdp->sd_sym,
 	    sdp->sd_aux ? sdp->sd_aux->sa_overndx : 0, 0, NULL,
-	    conv_def_tag(sdp->sd_ref));
+	    conv_def_tag(sdp->sd_ref, &inv_buf));
 }
 
 void
@@ -520,6 +529,8 @@ void
 Elf_syms_table_entry(Lm_list *lml, int caller, const char *prestr, Half mach,
     Sym *sym, Versym verndx, int gnuver, const char *sec, const char *poststr)
 {
+	Conv_inv_buf_t	inv_buf1, inv_buf2, inv_buf3;
+	Conv_inv_buf_t	inv_buf4, inv_buf5, inv_buf6;
 	uchar_t		type = ELF_ST_TYPE(sym->st_info);
 	uchar_t		bind = ELF_ST_BIND(sym->st_info);
 	const char	*msg;
@@ -532,11 +543,12 @@ Elf_syms_table_entry(Lm_list *lml, int caller, const char *prestr, Half mach,
 			msg = MSG_INTL(MSG_SYM_EFL_ENTRY);
 
 		dbg_print(lml, msg, prestr,
-		    conv_sym_value(mach, type, sym->st_value), sym->st_size,
-		    conv_sym_info_type(mach, type, 0),
-		    conv_sym_info_bind(bind, 0), conv_sym_other(sym->st_other),
-		    conv_ver_index(verndx, gnuver),
-		    sec ? sec : conv_sym_shndx(sym->st_shndx),
+		    conv_sym_value(mach, type, sym->st_value, &inv_buf1),
+		    sym->st_size, conv_sym_info_type(mach, type, 0, &inv_buf2),
+		    conv_sym_info_bind(bind, 0, &inv_buf3),
+		    conv_sym_other(sym->st_other, &inv_buf4),
+		    conv_ver_index(verndx, gnuver, &inv_buf5),
+		    sec ? sec : conv_sym_shndx(sym->st_shndx, &inv_buf6),
 		    Elf_demangle_name(poststr));
 	}
 }

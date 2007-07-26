@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,19 +35,22 @@
 void
 Dbg_ent_entry(Lm_list *lml, Half mach, Ent_desc *enp)
 {
-	Listnode	*lnp;
-	char		*cp;
+	Conv_inv_buf_t		inv_buf;
+	Conv_sec_flags_buf_t	sec_flags_buf;
+	Listnode		*lnp;
+	char			*cp;
 
 	dbg_print(lml, MSG_ORIG(MSG_ECR_NAME),
 	    (enp->ec_name ? enp->ec_name : MSG_INTL(MSG_STR_NULL)),
-	    conv_sec_flags(enp->ec_attrmask));
+	    conv_sec_flags(enp->ec_attrmask, &sec_flags_buf));
 
 	dbg_print(lml, MSG_ORIG(MSG_ECR_SEGMENT),
 	    (enp->ec_segment->sg_name ? enp->ec_segment->sg_name :
-	    MSG_INTL(MSG_STR_NULL)), conv_sec_flags(enp->ec_attrbits));
+	    MSG_INTL(MSG_STR_NULL)),
+	    conv_sec_flags(enp->ec_attrbits, &sec_flags_buf));
 
-	dbg_print(lml, MSG_ORIG(MSG_ECR_NDX),
-	    EC_WORD(enp->ec_ndx), conv_sec_type(mach, enp->ec_type, 0));
+	dbg_print(lml, MSG_ORIG(MSG_ECR_NDX), EC_WORD(enp->ec_ndx),
+	    conv_sec_type(mach, enp->ec_type, 0, &inv_buf));
 
 	if (enp->ec_files.head) {
 		dbg_print(lml, MSG_ORIG(MSG_ECR_FILES));

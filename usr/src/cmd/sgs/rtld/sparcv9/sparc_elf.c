@@ -539,8 +539,10 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	 */
 	if (!lmp || (!farplt && (addr % M_PLT_ENTSIZE) != 0) ||
 	    (farplt && (addr % M_PLT_INSSIZE))) {
+		Conv_inv_buf_t	inv_buf;
+
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_REL_PLTREF),
-		    conv_reloc_SPARC_type(R_SPARC_JMP_SLOT, 0),
+		    conv_reloc_SPARC_type(R_SPARC_JMP_SLOT, 0, &inv_buf),
 		    EC_NATPTR(lmp), EC_XWORD(pltoff), EC_NATPTR(from));
 		rtldexit(lml, 1);
 	}
@@ -1368,9 +1370,12 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 			if ((rtype == R_SPARC_GLOB_DAT) ||
 			    (rtype == R_SPARC_64)) {
 				if (roffset & 0x7) {
+					Conv_inv_buf_t	inv_buf;
+
 					eprintf(LIST(lmp), ERR_FATAL,
 					    MSG_INTL(MSG_REL_NONALIGN),
-					    conv_reloc_SPARC_type(rtype, 0),
+					    conv_reloc_SPARC_type(rtype,
+					    0, &inv_buf),
 					    NAME(lmp), demangle(name),
 					    EC_OFF(roffset));
 					ret = 0;
@@ -1440,5 +1445,7 @@ elf_reloc(Rt_map *lmp, uint_t plt)
 const char *
 _conv_reloc_type(uint_t rel)
 {
-	return (conv_reloc_SPARC_type(rel, 0));
+	static Conv_inv_buf_t	inv_buf;
+
+	return (conv_reloc_SPARC_type(rel, 0, &inv_buf));
 }

@@ -205,8 +205,8 @@ set_range(char *s, int  *low, int  *high)
 				*high = (int)atol(w);
 			else {
 				(void) fprintf(stderr,
-					"%s: too many arguments - %s ignored\n",
-					prog_name, w);
+				    "%s: too many arguments - %s ignored\n",
+				    prog_name, w);
 				return;
 			}
 		s = NULL;
@@ -242,7 +242,7 @@ print_static(SCNTAB *l_scns, char *filename)
 		topath = temp[1];
 		path = strtab + (topath*sizeof (long));
 		(void) strncpy((char *)buf, (char *)path,
-			(total - topath)*sizeof (long));
+		    (total - topath)*sizeof (long));
 		(void) fprintf(stdout, "%s\n", buf);
 		strtab += total*sizeof (long);
 		section_size -= (total*sizeof (long));
@@ -333,7 +333,7 @@ print_rela(Elf *elf_file, SCNTAB *p_scns, Elf_Data *rdata, Elf_Data *sym_data,
 		}
 		(void) gelf_getsym(sym_data, symid, &sym);
 		sym_name = (char *)elf_strptr(elf_file,
-			reloc_symtab->p_shdr.sh_link, sym.st_name);
+		    reloc_symtab->p_shdr.sh_link, sym.st_name);
 		if (sym_name == NULL)
 			sym_name = (char *)UNKNOWN;
 		if (r_flag && rn_flag) {
@@ -362,13 +362,15 @@ print_rela(Elf *elf_file, SCNTAB *p_scns, Elf_Data *rdata, Elf_Data *sym_data,
 		if (!v_flag) {
 			(void) printf("%-22d%-18d", symid, type);
 		} else {
+			Conv_inv_buf_t	inv_buf;
+
 			if (strlen(sym_name)) {
 				size_t len = strlen(sym_name) + 1;
 				char tmpstr[10];
 				if (len > 22) {
 					(void) sprintf(tmpstr, "%%-%ds",
-						/* LINTED */
-						(int)len);
+					    /* LINTED */
+					    (int)len);
 					/*LINTED: E_SEC_PRINTF_VAR_FMT*/
 					(void) printf(tmpstr, sym_name);
 				} else
@@ -377,8 +379,8 @@ print_rela(Elf *elf_file, SCNTAB *p_scns, Elf_Data *rdata, Elf_Data *sym_data,
 				(void) printf("%-22d", symid);
 			}
 			(void) printf("%-20s",
-				conv_reloc_type(p_ehdr->e_machine,
-				type, DUMP_CONVFMT));
+			    conv_reloc_type(p_ehdr->e_machine,
+			    type, DUMP_CONVFMT, &inv_buf));
 		}
 		(void) printf("%lld\n", EC_SXWORD(rela.r_addend));
 		ndx++;
@@ -436,7 +438,7 @@ print_rel(Elf *elf_file, SCNTAB *p_scns, Elf_Data *rdata, Elf_Data *sym_data,
 		}
 		(void) gelf_getsym(sym_data, symid, &sym);
 		sym_name = (char *)elf_strptr(elf_file,
-			reloc_symtab->p_shdr.sh_link, sym.st_name);
+		    reloc_symtab->p_shdr.sh_link, sym.st_name);
 		if (sym_name == NULL)
 			sym_name = (char *)UNKNOWN;
 		if (r_flag && rn_flag) {
@@ -464,14 +466,16 @@ print_rel(Elf *elf_file, SCNTAB *p_scns, Elf_Data *rdata, Elf_Data *sym_data,
 		if (!v_flag) {
 			(void) printf("%-20d%-18d", symid, type);
 		} else {
+			Conv_inv_buf_t	inv_buf;
+
 			if (strlen(sym_name))
 				(void) printf("%-20s", sym_name);
 			else {
 				(void) printf("%-20d", sym.st_name);
 			}
 			(void) printf("%-20s",
-				conv_reloc_type(p_ehdr->e_machine,
-				type, DUMP_CONVFMT));
+			    conv_reloc_type(p_ehdr->e_machine,
+			    type, DUMP_CONVFMT, &inv_buf));
 		}
 		(void) printf("\n");
 		ndx++;
@@ -525,6 +529,8 @@ print_symtab(Elf *elf_file, SCNTAB *p_symtab, Elf_Data *sym_data,
 	int adj = 0;		/* field adjustment for elf64 */
 	Elf32_Word	*symshndx = 0;
 	unsigned int	nosymshndx = 0;
+	Conv_inv_buf_t	inv_buf;
+
 
 	if (gelf_getclass(elf_file) == ELFCLASS64)
 		adj = 8;
@@ -587,7 +593,8 @@ print_symtab(Elf *elf_file, SCNTAB *p_symtab, Elf_Data *sym_data,
 			 *  to be consistent with output from elfdump(1).
 			 */
 			(void) printf("%-*s", 12 + adj,
-			    conv_sym_SPARC_value(sym.st_value, DUMP_CONVFMT));
+			    conv_sym_SPARC_value(sym.st_value,
+			    DUMP_CONVFMT, &inv_buf));
 		} else {
 			(void) printf("0x%-*llx", 10 + adj,
 			    EC_ADDR(sym.st_value));
@@ -602,15 +609,16 @@ print_symtab(Elf *elf_file, SCNTAB *p_symtab, Elf_Data *sym_data,
 			GElf_Ehdr p_ehdr;
 			(void) gelf_getehdr(elf_file, &p_ehdr);
 			(void) printf("%s\t",
-				conv_sym_info_type(p_ehdr.e_machine, type,
-				DUMP_CONVFMT));
+			    conv_sym_info_type(p_ehdr.e_machine, type,
+			    DUMP_CONVFMT, &inv_buf));
 			(void) printf("%s",
-				conv_sym_info_bind(bind, DUMP_CONVFMT));
+			    conv_sym_info_bind(bind, DUMP_CONVFMT, &inv_buf));
 			(void) printf("\t  %d\t", EC_WORD(sym.st_other));
 
-			if (specsec) {
-				(void) printf("%s", conv_sym_shndx(shndx));
-			} else
+			if (specsec)
+				(void) printf("%s",
+				    conv_sym_shndx(shndx, &inv_buf));
+			else
 				(void) printf("%d", EC_WORD(shndx));
 			(void) printf("\t");
 		}
@@ -621,13 +629,12 @@ print_symtab(Elf *elf_file, SCNTAB *p_symtab, Elf_Data *sym_data,
 		else
 			if (C_flag)
 				sym_name = demangled_name(
-					(char *)elf_strptr(elf_file,
-					p_symtab->p_shdr.sh_link,
-					sym.st_name));
+				    (char *)elf_strptr(elf_file,
+				    p_symtab->p_shdr.sh_link,
+				    sym.st_name));
 		else
 			sym_name = (char *)elf_strptr(elf_file,
-				p_symtab->p_shdr.sh_link,
-				sym.st_name);
+			    p_symtab->p_shdr.sh_link, sym.st_name);
 		if (sym_name == NULL)
 			sym_name = (char *)UNKNOWN;
 		(void) printf("%s\n", sym_name);
@@ -663,12 +670,14 @@ print_shdr(Elf *elf_file, SCNTAB *s, int num_scns, int index)
 		(void) printf("[%d]\t", index++);
 		if (!v_flag) {
 			(void) printf("%u\t%llu\t",
-			EC_WORD(p->p_shdr.sh_type),
-			EC_XWORD(p->p_shdr.sh_flags));
+			    EC_WORD(p->p_shdr.sh_type),
+			    EC_XWORD(p->p_shdr.sh_flags));
 		} else {
+			Conv_inv_buf_t inv_buf;
+
 			/*LINTED: E_SEC_PRINTF_VAR_FMT*/
 			(void) printf(conv_sec_type(p_ehdr.e_machine,
-				p->p_shdr.sh_type, DUMP_CONVFMT));
+			    p->p_shdr.sh_type, DUMP_CONVFMT, &inv_buf));
 			(void) printf("    ");
 
 			if (p->p_shdr.sh_flags & SHF_WRITE)
@@ -693,17 +702,17 @@ print_shdr(Elf *elf_file, SCNTAB *s, int num_scns, int index)
 
 		}
 		(void) printf("%-#*llx%-#*llx%-#*llx%s%s\n",
-			field, EC_ADDR(p->p_shdr.sh_addr),
-			field, EC_OFF(p->p_shdr.sh_offset),
-			field, EC_XWORD(p->p_shdr.sh_size),
-			/* compatibility:  tab for elf32 */
-			(field == 13) ? "\t" : " ", p->scn_name);
+		    field, EC_ADDR(p->p_shdr.sh_addr),
+		    field, EC_OFF(p->p_shdr.sh_offset),
+		    field, EC_XWORD(p->p_shdr.sh_size),
+		    /* compatibility:  tab for elf32 */
+		    (field == 13) ? "\t" : " ", p->scn_name);
 
 		(void) printf("\t%u\t%u\t%-#*llx%-#*llx\n\n",
-			EC_WORD(p->p_shdr.sh_link),
-			EC_WORD(p->p_shdr.sh_info),
-			field, EC_XWORD(p->p_shdr.sh_addralign),
-			field, EC_XWORD(p->p_shdr.sh_entsize));
+		    EC_WORD(p->p_shdr.sh_link),
+		    EC_WORD(p->p_shdr.sh_info),
+		    field, EC_XWORD(p->p_shdr.sh_addralign),
+		    field, EC_XWORD(p->p_shdr.sh_entsize));
 	}
 }
 
@@ -720,21 +729,21 @@ check_range(int low, int hi, size_t bound, char *filename)
 {
 	if (((size_t)low > bound) || (low <= 0)) {
 		(void) fprintf(stderr,
-			"%s: %s: number out of range, %d\n",
-			prog_name, filename, low);
+		    "%s: %s: number out of range, %d\n",
+		    prog_name, filename, low);
 		return (-1);
 	}
 	if (((size_t)hi > bound) || (hi < 0)) {
 		(void) fprintf(stderr,
-			"%s: %s: number out of range, %d\n",
-			prog_name, filename, hi);
-			return (-1);
+		    "%s: %s: number out of range, %d\n",
+		    prog_name, filename, hi);
+		return (-1);
 	}
 
 	if (hi && (low > hi)) {
 		(void) fprintf(stderr,
-			"%s: %s: invalid range, %d,%d\n",
-			prog_name, filename, low, hi);
+		    "%s: %s: invalid range, %d,%d\n",
+		    prog_name, filename, low, hi);
 		return (-1);
 	}
 	if (hi)
@@ -788,8 +797,8 @@ dump_reloc_table(Elf *elf_file, GElf_Ehdr *p_ehdr,
 
 	if (elf_getshnum(elf_file, &shnum) == 0) {
 		(void) fprintf(stderr,
-			"%s: %s: elf_getshnum failed: %s\n",
-			prog_name, filename, elf_errmsg(-1));
+		    "%s: %s: elf_getshnum failed: %s\n",
+		    prog_name, filename, elf_errmsg(-1));
 		return;
 	}
 
@@ -797,10 +806,10 @@ dump_reloc_table(Elf *elf_file, GElf_Ehdr *p_ehdr,
 	    /* LINTED */
 	    (p_scns->p_shdr.sh_link >= (GElf_Word)shnum)) {
 		(void) fprintf(stderr, "%s: %s: invalid sh_link field: "
-			"section #: %d sh_link: %d\n",
-			/* LINTED */
-			prog_name, filename, (int)elf_ndxscn(p_scns->p_sd),
-			(int)p_scns->p_shdr.sh_link);
+		    "section #: %d sh_link: %d\n",
+		    /* LINTED */
+		    prog_name, filename, (int)elf_ndxscn(p_scns->p_sd),
+		    (int)p_scns->p_shdr.sh_link);
 		return;
 	}
 	head_scns += (p_scns->p_shdr.sh_link -1);
@@ -849,16 +858,16 @@ dump_reloc_table(Elf *elf_file, GElf_Ehdr *p_ehdr,
 		if (n_flag) {
 			rn_flag = 1;
 			print_rela(elf_file, p_scns, rel_data, sym_data, p_ehdr,
-				reloc_size, sym_size, filename, reloc_symtab);
+			    reloc_size, sym_size, filename, reloc_symtab);
 		}
 		if (d_flag) {
 			rn_flag = 0;
 			print_rela(elf_file, p_scns, rel_data, sym_data, p_ehdr,
-				reloc_size, sym_size, filename, reloc_symtab);
+			    reloc_size, sym_size, filename, reloc_symtab);
 		}
 		if (!n_flag && !d_flag)
 			print_rela(elf_file, p_scns, rel_data, sym_data, p_ehdr,
-				reloc_size, sym_size, filename, reloc_symtab);
+			    reloc_size, sym_size, filename, reloc_symtab);
 	} else {
 		if (p_scns->p_shdr.sh_type == SHT_REL) {
 			if (!n_flag && r_flag)
@@ -877,19 +886,19 @@ dump_reloc_table(Elf *elf_file, GElf_Ehdr *p_ehdr,
 			if (n_flag) {
 				rn_flag = 1;
 				print_rel(elf_file, p_scns, rel_data, sym_data,
-					p_ehdr, reloc_size, sym_size,
-					filename, reloc_symtab);
+				    p_ehdr, reloc_size, sym_size,
+				    filename, reloc_symtab);
 			}
 			if (d_flag) {
 				rn_flag = 0;
 				print_rel(elf_file, p_scns, rel_data, sym_data,
-					p_ehdr, reloc_size, sym_size,
-					filename, reloc_symtab);
+				    p_ehdr, reloc_size, sym_size,
+				    filename, reloc_symtab);
 			}
 			if (!n_flag && !d_flag)
 				print_rel(elf_file, p_scns, rel_data, sym_data,
-					p_ehdr, reloc_size, sym_size,
-					filename, reloc_symtab);
+				    p_ehdr, reloc_size, sym_size,
+				    filename, reloc_symtab);
 		}
 	}
 	p_scns++;
@@ -1018,7 +1027,7 @@ dump_symbol_table(Elf *elf_file, SCNTAB *p_symtab, char *filename)
 "\n              ***** SYMBOL TABLE INFORMATION *****\n");
 					(void) printf(
 "[Index]  %-*s%-*sType\tBind\tOther\tShndx\tName",
-			    12 + adj, "Value", 9 + adj, "Size");
+					    12 + adj, "Value", 9 + adj, "Size");
 				}
 				(void) printf("\n%s:\n", p_symtab->scn_name);
 				print_symtab(elf_file, p_symtab, sym_data,
@@ -1027,7 +1036,7 @@ dump_symbol_table(Elf *elf_file, SCNTAB *p_symtab, char *filename)
 		}   /* end for */
 		if (!found_it) {
 			(void) fprintf(stderr, "%s: %s: %s not found\n",
-			prog_name, filename, name);
+			    prog_name, filename, name);
 		}
 	} else if (T_flag) {
 		T_num = check_range(T_low, T_hi, count, filename);
@@ -1110,9 +1119,17 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 
 		(void) gelf_getdyn(dyn_data, ii++, &p_dyn);
 		while (p_dyn.d_tag != DT_NULL) {
+			union {
+				Conv_inv_buf_t		inv;
+				Conv_dyn_flag_buf_t	dyn_flag;
+				Conv_dyn_flag1_buf_t	dyn_flag1;
+				Conv_dyn_feature1_buf_t	dyn_feature1;
+				Conv_dyn_posflag1_buf_t	dyn_posflag1;
+			} conv_buf;
+
 			(void) printf("[%d]\t%-15.15s ", index++,
-				conv_dyn_tag(p_dyn.d_tag, p_ehdr.e_machine,
-				DUMP_CONVFMT));
+			    conv_dyn_tag(p_dyn.d_tag, p_ehdr.e_machine,
+			    DUMP_CONVFMT, &conv_buf.inv));
 
 			/*
 			 * It would be nice to use a table driven loop
@@ -1155,7 +1172,7 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 			case DT_VERDEFNUM:
 			case DT_VERNEED:
 				(void) printf(pdyn_Fmtptr,
-					EC_ADDR(p_dyn.d_un.d_ptr));
+				    EC_ADDR(p_dyn.d_un.d_ptr));
 				break;
 
 			/*
@@ -1175,13 +1192,13 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 			case DT_FILTER:
 				if (v_flag) {	/* Look up the string */
 					str = (char *)elf_strptr(elf_file, link,
-						p_dyn.d_un.d_ptr);
+					    p_dyn.d_un.d_ptr);
 					if (!(str && *str))
 						str = (char *)UNKNOWN;
 					(void) printf("%s", str);
 				} else {	/* Show the address */
 					(void) printf(pdyn_Fmtptr,
-						EC_ADDR(p_dyn.d_un.d_ptr));
+					    EC_ADDR(p_dyn.d_un.d_ptr));
 				}
 				break;
 
@@ -1211,7 +1228,7 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 			case DT_SUNW_TLSSORTSZ:
 			case DT_SUNW_STRPAD:
 				(void) printf(pdyn_Fmtptr,
-					EC_XWORD(p_dyn.d_un.d_val));
+				    EC_XWORD(p_dyn.d_un.d_val));
 				break;
 
 			/*
@@ -1226,22 +1243,26 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 					switch (p_dyn.d_tag) {
 					case DT_FLAGS:
 						str = conv_dyn_flag(
-							p_dyn.d_un.d_val,
-							DUMP_CONVFMT);
-					break;
+						    p_dyn.d_un.d_val,
+						    DUMP_CONVFMT,
+						    &conv_buf.dyn_flag);
+						break;
 					case DT_FEATURE_1:
 						str = conv_dyn_feature1(
-							p_dyn.d_un.d_val,
-							DUMP_CONVFMT);
+						    p_dyn.d_un.d_val,
+						    DUMP_CONVFMT,
+						    &conv_buf.dyn_feature1);
 						break;
 					case DT_POSFLAG_1:
 						str = conv_dyn_posflag1(
-							p_dyn.d_un.d_val,
-							DUMP_CONVFMT);
+						    p_dyn.d_un.d_val,
+						    DUMP_CONVFMT,
+						    &conv_buf.dyn_posflag1);
 						break;
 					case DT_FLAGS_1:
 						str = conv_dyn_flag1(
-							p_dyn.d_un.d_val);
+						    p_dyn.d_un.d_val,
+						    &conv_buf.dyn_flag1);
 						break;
 					}
 				}
@@ -1249,7 +1270,7 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 					(void) printf("%s", str);
 				} else {	/* Numeric form */
 					(void) printf(pdyn_Fmtptr,
-						EC_ADDR(p_dyn.d_un.d_ptr));
+					    EC_ADDR(p_dyn.d_un.d_ptr));
 				}
 				break;
 
@@ -1258,8 +1279,8 @@ dump_dynamic(Elf *elf_file, SCNTAB *p_scns, int num_scns, char *filename)
 			 */
 			case DT_DEPRECATED_SPARC_REGISTER:
 				(void) printf(pdyn_Fmtptr
-					"  (deprecated value)",
-					EC_XWORD(p_dyn.d_un.d_val));
+				    "  (deprecated value)",
+				    EC_XWORD(p_dyn.d_un.d_val));
 				break;
 
 			/* Ignored items */
@@ -1332,42 +1353,43 @@ dump_elf_header(Elf *elf_file, char *filename, GElf_Ehdr * elf_head_p)
 
 	if (!v_flag) {
 		(void) printf("%-*d%-11d%-*d%-12d%d\n",
-			field, elf_head_p->e_ident[4],
-			elf_head_p->e_ident[5],
-			field, (int)elf_head_p->e_type,
-			(int)elf_head_p->e_machine,
-			elf_head_p->e_version);
+		    field, elf_head_p->e_ident[4], elf_head_p->e_ident[5],
+		    field, (int)elf_head_p->e_type, (int)elf_head_p->e_machine,
+		    elf_head_p->e_version);
 	} else {
+		Conv_inv_buf_t	inv_buf;
+
 		(void) printf("%-*s", field,
-			conv_ehdr_class(class, DUMP_CONVFMT));
+		    conv_ehdr_class(class, DUMP_CONVFMT, &inv_buf));
 		(void) printf("%-11s",
-			conv_ehdr_data(elf_head_p->e_ident[5], DUMP_CONVFMT));
+		    conv_ehdr_data(elf_head_p->e_ident[5], DUMP_CONVFMT,
+		    &inv_buf));
 		(void) printf("%-*s", field,
-			conv_ehdr_type(elf_head_p->e_type, DUMP_CONVFMT));
+		    conv_ehdr_type(elf_head_p->e_type, DUMP_CONVFMT, &inv_buf));
 		(void) printf("%-12s",
-			conv_ehdr_mach(elf_head_p->e_machine, DUMP_CONVFMT));
+		    conv_ehdr_mach(elf_head_p->e_machine, DUMP_CONVFMT,
+		    &inv_buf));
 		(void) printf("%s\n",
-			conv_ehdr_vers(elf_head_p->e_version, DUMP_CONVFMT));
+		    conv_ehdr_vers(elf_head_p->e_version, DUMP_CONVFMT,
+		    &inv_buf));
 	}
 	(void) printf("%-#*llx%-#11llx%-#*llx%-#12x%#x\n",
-		field, EC_ADDR(elf_head_p->e_entry),
-		EC_OFF(elf_head_p->e_phoff),
-		field, EC_OFF(elf_head_p->e_shoff),
-		EC_WORD(elf_head_p->e_flags),
-		EC_WORD(elf_head_p->e_ehsize));
+	    field, EC_ADDR(elf_head_p->e_entry), EC_OFF(elf_head_p->e_phoff),
+	    field, EC_OFF(elf_head_p->e_shoff), EC_WORD(elf_head_p->e_flags),
+	    EC_WORD(elf_head_p->e_ehsize));
 	if (!v_flag || (elf_head_p->e_shstrndx != SHN_XINDEX)) {
 		(void) printf("%-#*x%-11u%-#*x%-12u%u\n",
-			field, EC_WORD(elf_head_p->e_phentsize),
-			EC_WORD(elf_head_p->e_phnum),
-			field, EC_WORD(elf_head_p->e_shentsize),
-			EC_WORD(elf_head_p->e_shnum),
-			EC_WORD(elf_head_p->e_shstrndx));
+		    field, EC_WORD(elf_head_p->e_phentsize),
+		    EC_WORD(elf_head_p->e_phnum),
+		    field, EC_WORD(elf_head_p->e_shentsize),
+		    EC_WORD(elf_head_p->e_shnum),
+		    EC_WORD(elf_head_p->e_shstrndx));
 	} else {
 		(void) printf("%-#*x%-11u%-#*x%-12uXINDEX\n",
-			field, EC_WORD(elf_head_p->e_phentsize),
-			EC_WORD(elf_head_p->e_phnum),
-			field, EC_WORD(elf_head_p->e_shentsize),
-			EC_WORD(elf_head_p->e_shnum));
+		    field, EC_WORD(elf_head_p->e_phentsize),
+		    EC_WORD(elf_head_p->e_phnum),
+		    field, EC_WORD(elf_head_p->e_shentsize),
+		    EC_WORD(elf_head_p->e_shnum));
 	}
 	if ((elf_head_p->e_shnum == 0) && (elf_head_p->e_shoff > 0)) {
 		Elf_Scn		*scn;
@@ -1392,32 +1414,32 @@ dump_elf_header(Elf *elf_file, char *filename, GElf_Ehdr * elf_head_p)
 		}
 		if ((scn = elf_getscn(elf_file, 0)) == NULL) {
 			(void) fprintf(stderr,
-				"%s: %s: elf_getscn failed: %s\n",
-				prog_name, filename, elf_errmsg(-1));
+			    "%s: %s: elf_getscn failed: %s\n",
+			    prog_name, filename, elf_errmsg(-1));
 			return (NULL);
 		}
 		if (gelf_getshdr(scn, &shdr0) == 0) {
 			(void) fprintf(stderr,
-				"%s: %s: gelf_getshdr: %s\n",
-				prog_name, filename, elf_errmsg(-1));
+			    "%s: %s: gelf_getshdr: %s\n",
+			    prog_name, filename, elf_errmsg(-1));
 			return (NULL);
 		}
 		(void) printf("[0]\t%u\t%llu\t", EC_WORD(shdr0.sh_type),
-			EC_XWORD(shdr0.sh_flags));
+		    EC_XWORD(shdr0.sh_flags));
 
 		(void) printf("%-#*llx %-#*llx%-*llu%s%-*u\n",
-			field, EC_ADDR(shdr0.sh_addr),
-			field, EC_OFF(shdr0.sh_offset),
-			field, EC_XWORD(shdr0.sh_size),
-			/* compatibility:  tab for elf32 */
-			((field == 13) ? "\t" : "  "),
-			field, EC_WORD(shdr0.sh_name));
+		    field, EC_ADDR(shdr0.sh_addr),
+		    field, EC_OFF(shdr0.sh_offset),
+		    field, EC_XWORD(shdr0.sh_size),
+		    /* compatibility:  tab for elf32 */
+		    ((field == 13) ? "\t" : "  "),
+		    field, EC_WORD(shdr0.sh_name));
 
 		(void) printf("\t%u\t%u\t%-#*llx %-#*llx\n",
-			EC_WORD(shdr0.sh_link),
-			EC_WORD(shdr0.sh_info),
-			field, EC_XWORD(shdr0.sh_addralign),
-			field, EC_XWORD(shdr0.sh_entsize));
+		    EC_WORD(shdr0.sh_link),
+		    EC_WORD(shdr0.sh_info),
+		    field, EC_XWORD(shdr0.sh_addralign),
+		    field, EC_XWORD(shdr0.sh_entsize));
 	}
 	(void) printf("\n");
 
@@ -1518,13 +1540,13 @@ dump_section(Elf *elf_file,
 			else {
 				found_it = 1;
 				print_section(elf_file, p_ehdr,
-					n_range, 1, filename);
+				    n_range, 1, filename);
 			}
 		}
 
 		if (!found_it) {
 			(void) fprintf(stderr, "%s: %s: %s not found\n",
-				prog_name, filename, name);
+			    prog_name, filename, name);
 		}
 	} /* end n_flag */
 
@@ -1590,7 +1612,7 @@ dump_shdr(Elf *elf_file, SCNTAB *s, int num_scns, char *filename)
 
 		if (!found_it) {
 			(void) fprintf(stderr, "%s: %s: %s not found\n",
-				prog_name, filename, name);
+			    prog_name, filename, name);
 		}
 	} /* end n_flag */
 
@@ -1635,20 +1657,20 @@ dump_section_table(Elf *elf_file, GElf_Ehdr *elf_head_p, char *filename)
 
 	if (elf_getshnum(elf_file, &shnum) == 0) {
 		(void) fprintf(stderr,
-			"%s: %s: elf_getshnum failed: %s\n",
-			prog_name, filename, elf_errmsg(-1));
+		    "%s: %s: elf_getshnum failed: %s\n",
+		    prog_name, filename, elf_errmsg(-1));
 		return;
 	}
 	if (elf_getshstrndx(elf_file, &shstrndx) == 0) {
 		(void) fprintf(stderr,
-			"%s: %s: elf_getshstrndx failed: %s\n",
-			prog_name, filename, elf_errmsg(-1));
+		    "%s: %s: elf_getshstrndx failed: %s\n",
+		    prog_name, filename, elf_errmsg(-1));
 		return;
 	}
 
 	if ((buffer = calloc(shnum, sizeof (SCNTAB))) == NULL) {
 		(void) fprintf(stderr, "%s: %s: cannot calloc space\n",
-			prog_name, filename);
+		    prog_name, filename);
 		return;
 	}
 	/* LINTED */
@@ -1662,11 +1684,12 @@ dump_section_table(Elf *elf_file, GElf_Ehdr *elf_head_p, char *filename)
 	while ((scn = elf_nextscn(elf_file, scn)) != 0) {
 		if ((gelf_getshdr(scn, &buffer->p_shdr)) == 0) {
 			(void) fprintf(stderr,
-			"%s: %s: %s\n", prog_name, filename, elf_errmsg(-1));
+			    "%s: %s: %s\n", prog_name, filename,
+			    elf_errmsg(-1));
 			return;
 		}
-		s_name = (char *)elf_strptr(elf_file,
-			shstrndx, buffer->p_shdr.sh_name);
+		s_name = (char *)
+		    elf_strptr(elf_file, shstrndx, buffer->p_shdr.sh_name);
 		buffer->scn_name = s_name ? s_name : (char *)UNKNOWN;
 		buffer->p_sd   =  scn;
 
@@ -1694,14 +1717,14 @@ dump_section_table(Elf *elf_file, GElf_Ehdr *elf_head_p, char *filename)
 	}
 	if (r_flag) {
 		dump_reloc_table(elf_file, elf_head_p,
-			p_scns, num_scns, filename);
+		    p_scns, num_scns, filename);
 	}
 	if (L_flag) {
 		dump_dynamic(elf_file, p_scns, num_scns, filename);
 	}
 	if (s_flag) {
 		dump_section(elf_file, elf_head_p, p_scns,
-			num_scns, filename);
+		    num_scns, filename);
 	}
 }
 
@@ -1736,12 +1759,12 @@ load_arstring_table(struct stab_list_s *STabList,
 		here = elf_getbase(elf_file);
 		if ((lseek(fd, here, 0)) != here) {
 			(void) fprintf(stderr,
-			"%s: %s: could not lseek\n", prog_name, filename);
+			    "%s: %s: could not lseek\n", prog_name, filename);
 		}
 
 		if ((read(fd, STL_entry->strings, p_ar->ar_size)) == -1) {
 			(void) fprintf(stderr,
-			"%s: %s: could not read\n", prog_name, filename);
+			    "%s: %s: could not read\n", prog_name, filename);
 		}
 	}
 	return (STabList);
@@ -1774,7 +1797,8 @@ dump_ar_hdr(int fd, Elf *elf_file, char *filename)
 		p_ar = elf_getarhdr(arf);
 		if (p_ar == NULL) {
 			(void) fprintf(stderr,
-			"%s: %s: %s\n", prog_name, filename, elf_errmsg(-1));
+			    "%s: %s: %s\n", prog_name, filename,
+			    elf_errmsg(-1));
 			continue;
 		}
 		if (strcmp(p_ar->ar_name, "/") == 0) {
@@ -1782,15 +1806,14 @@ dump_ar_hdr(int fd, Elf *elf_file, char *filename)
 				ar_sym_read(elf_file, filename);
 		} else if (strcmp(p_ar->ar_name, "//") == 0) {
 			StringTableList = load_arstring_table(
-				StringTableList, fd, arf, p_ar,
-				filename);
+			    StringTableList, fd, arf, p_ar, filename);
 			cmd = elf_next(arf);
 			(void) elf_end(arf);
 			continue;
 		} else {
 			if (a_flag) {
 				(void) printf("%s[%s]:\n", filename,
-					p_ar->ar_name);
+				    p_ar->ar_name);
 				if (!p_flag && title == 0) {
 					if (!v_flag)
 						(void) printf(
@@ -1805,12 +1828,10 @@ dump_ar_hdr(int fd, Elf *elf_file, char *filename)
 				if (!v_flag) {
 					(void) printf(
 "\t0x%.8lx  %6d  %6d  0%.6ho  0x%.8lx  %-s\n\n",
-						p_ar->ar_date,
-						(int)p_ar->ar_uid,
-						(int)p_ar->ar_gid,
-						(int)p_ar->ar_mode,
-						p_ar->ar_size,
-						p_ar->ar_name);
+					    p_ar->ar_date, (int)p_ar->ar_uid,
+					    (int)p_ar->ar_gid,
+					    (int)p_ar->ar_mode,
+					    p_ar->ar_size, p_ar->ar_name);
 				} else {
 					if ((strftime(buf, DATESIZE,
 					    "%b %d %H:%M:%S %Y",
@@ -1821,13 +1842,11 @@ dump_ar_hdr(int fd, Elf *elf_file, char *filename)
 						exit(1);
 					}
 					(void) printf(
-					"\t%s %6d %6d 0%.6ho 0x%.8lx %-s\n\n",
-						buf,
-						(int)p_ar->ar_uid,
-						(int)p_ar->ar_gid,
-						(int)p_ar->ar_mode,
-						p_ar->ar_size,
-						p_ar->ar_name);
+"\t%s %6d %6d 0%.6ho 0x%.8lx %-s\n\n",
+					    buf, (int)p_ar->ar_uid,
+					    (int)p_ar->ar_gid,
+					    (int)p_ar->ar_mode,
+					    p_ar->ar_size, p_ar->ar_name);
 				}
 			}
 		}
@@ -1838,7 +1857,7 @@ dump_ar_hdr(int fd, Elf *elf_file, char *filename)
 	err = elf_errno();
 	if (err != 0) {
 		(void) fprintf(stderr,
-		"%s: %s: %s\n", prog_name, filename, elf_errmsg(err));
+		    "%s: %s: %s\n", prog_name, filename, elf_errmsg(err));
 	}
 }
 
@@ -1863,13 +1882,12 @@ dump_ar_files(int fd, Elf *elf_file, char *filename)
 
 		p_ar = elf_getarhdr(arf);
 		if (p_ar == NULL) {
-			(void) fprintf(stderr,
-				"%s: %s: %s\n",
-				prog_name, filename, elf_errmsg(-1));
+			(void) fprintf(stderr, "%s: %s: %s\n",
+			    prog_name, filename, elf_errmsg(-1));
 			return;
 		}
 		if ((strcmp(p_ar->ar_name, "/") == 0) ||
-			(strcmp(p_ar->ar_name, "//") == 0)) {
+		    (strcmp(p_ar->ar_name, "//") == 0)) {
 			cmd = elf_next(arf);
 			(void) elf_end(arf);
 			continue;
@@ -1887,13 +1905,12 @@ dump_ar_files(int fd, Elf *elf_file, char *filename)
 				return;
 			if (o_flag)
 				dump_exec_header(arf,
-					(unsigned)elf_head.e_phnum, fullname);
+				    (unsigned)elf_head.e_phnum, fullname);
 			if (x_flag)
 				dump_section_table(arf, &elf_head, fullname);
 		} else {
-			(void) fprintf(stderr,
-				"%s: %s: invalid file type\n",
-				prog_name, fullname);
+			(void) fprintf(stderr, "%s: %s: invalid file type\n",
+			    prog_name, fullname);
 			cmd = elf_next(arf);
 			(void) elf_end(arf);
 			continue;

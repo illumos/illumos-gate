@@ -433,6 +433,7 @@ static void
 unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
     Elf *elf)
 {
+	Conv_dwarf_ehe_buf_t	dwarf_ehe_buf;
 	Word	cnt;
 	Phdr	*uphdr = 0;
 
@@ -484,7 +485,6 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 		if ((uphdr && (shdr->sh_addr == uphdr->p_vaddr)) ||
 		    (strncmp(_cache->c_name, MSG_ORIG(MSG_SCN_FRMHDR),
 		    MSG_SCN_FRMHDR_SIZE) == 0)) {
-
 			dbg_print(0, MSG_ORIG(MSG_UNW_FRMHDR));
 			ndx = 0;
 
@@ -499,15 +499,17 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 			    ehdr->e_ident, shdr->sh_addr + ndx);
 
 			dbg_print(0, MSG_ORIG(MSG_UNW_FRPTRENC),
-			    conv_dwarf_ehe(frame_ptr_enc), EC_XWORD(frame_ptr));
+			    conv_dwarf_ehe(frame_ptr_enc, &dwarf_ehe_buf),
+			    EC_XWORD(frame_ptr));
 
 			fde_cnt = dwarf_ehe_extract(data, &ndx, fde_cnt_enc,
 			    ehdr->e_ident, shdr->sh_addr + ndx);
 
 			dbg_print(0, MSG_ORIG(MSG_UNW_FDCNENC),
-			    conv_dwarf_ehe(fde_cnt_enc), EC_XWORD(fde_cnt));
+			    conv_dwarf_ehe(fde_cnt_enc, &dwarf_ehe_buf),
+			    EC_XWORD(fde_cnt));
 			dbg_print(0, MSG_ORIG(MSG_UNW_TABENC),
-			    conv_dwarf_ehe(table_enc));
+			    conv_dwarf_ehe(table_enc, &dwarf_ehe_buf));
 			dbg_print(0, MSG_ORIG(MSG_UNW_BINSRTAB1));
 			dbg_print(0, MSG_ORIG(MSG_UNW_BINSRTAB2));
 
@@ -606,7 +608,8 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 						dbg_print(0,
 						    MSG_ORIG(MSG_UNW_CIEAXPERS),
 						    ciePflag,
-						    conv_dwarf_ehe(ciePflag),
+						    conv_dwarf_ehe(ciePflag,
+						    &dwarf_ehe_buf),
 						    EC_XWORD(persVal));
 						break;
 					case 'R':
@@ -614,7 +617,8 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 						ndx += 1;
 						dbg_print(0,
 						    MSG_ORIG(MSG_UNW_CIEAXCENC),
-						    val, conv_dwarf_ehe(val));
+						    val, conv_dwarf_ehe(val,
+						    &dwarf_ehe_buf));
 						cieRflag = val;
 						break;
 					case 'L':
@@ -622,7 +626,8 @@ unwind(Cache *cache, Word shnum, Word phnum, Ehdr *ehdr, const char *file,
 						ndx += 1;
 						dbg_print(0,
 						    MSG_ORIG(MSG_UNW_CIEAXLSDA),
-						    val, conv_dwarf_ehe(val));
+						    val, conv_dwarf_ehe(val,
+						    &dwarf_ehe_buf));
 						cieLflag = val;
 						break;
 					default:
@@ -1447,6 +1452,7 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word disp_symndx, Sym *sym)
 	uchar_t		type;
 	Shdr		*tshdr;
 	Word		shndx;
+	Conv_inv_buf_t	inv_buf;
 
 	/* Ensure symbol index is in range */
 	if (symndx >= state->symn) {
@@ -1480,7 +1486,7 @@ output_symbol(SYMTBL_STATE *state, Word symndx, Word disp_symndx, Sym *sym)
 		 * The section names are not available, so all we can
 		 * do is to display them in numeric form.
 		 */
-		sec = conv_sym_shndx(sym->st_shndx);
+		sec = conv_sym_shndx(sym->st_shndx, &inv_buf);
 	} else if ((sym->st_shndx < SHN_LORESERVE) &&
 	    (sym->st_shndx < state->shnum)) {
 		shndx = sym->st_shndx;
@@ -1669,6 +1675,7 @@ sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
 	Word		*ndx;
 	Word		ndxn;
 	int		output_cnt = 0;
+	Conv_inv_buf_t	inv_buf;
 
 	for (sortsecndx = 1; sortsecndx < shnum; sortsecndx++) {
 
@@ -1733,7 +1740,7 @@ sunw_sort(Cache *cache, Word shnum, Ehdr *ehdr, VERSYM_STATE *versym,
 		default:
 			(void) fprintf(stderr, MSG_INTL(MSG_ERR_BADNDXSEC),
 			    file, sortcache->c_name, conv_sec_type(
-			    ehdr->e_machine, symshdr->sh_type, 0));
+			    ehdr->e_machine, symshdr->sh_type, 0, &inv_buf));
 			continue;
 		}
 
@@ -1806,6 +1813,7 @@ reloc(Cache *cache, Word shnum, Ehdr *ehdr, const char *file,
 		Cache		*_cache = &cache[cnt];
 		Shdr		*shdr = _cache->c_shdr;
 		char		*relname = _cache->c_name;
+		Conv_inv_buf_t	inv_buf;
 
 		if (((type = shdr->sh_type) != SHT_RELA) &&
 		    (type != SHT_REL))
@@ -1909,7 +1917,8 @@ reloc(Cache *cache, Word shnum, Ehdr *ehdr, const char *file,
 				if (badrel) {
 					(void) fprintf(stderr,
 					    MSG_INTL(MSG_ERR_BADREL1), file,
-					    conv_reloc_type(mach, reltype, 0));
+					    conv_reloc_type(mach, reltype,
+					    0, &inv_buf));
 				}
 			}
 
@@ -1961,6 +1970,12 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 		Elf_dyn_title(0);
 
 		for (ndx = 0; ndx < numdyn; dyn++, ndx++) {
+			union {
+				Conv_dyn_flag_buf_t	flag;
+				Conv_dyn_flag1_buf_t	flag1;
+				Conv_dyn_posflag1_buf_t	posflag1;
+				Conv_dyn_feature1_buf_t	feature1;
+			} c_buf;
 			const char	*name;
 
 			/*
@@ -2004,16 +2019,20 @@ dynamic(Cache *cache, Word shnum, Ehdr *ehdr, const char *file)
 				break;
 
 			case DT_FLAGS:
-				name = conv_dyn_flag(dyn->d_un.d_val, 0);
+				name = conv_dyn_flag(dyn->d_un.d_val,
+				    0, &c_buf.flag);
 				break;
 			case DT_FLAGS_1:
-				name = conv_dyn_flag1(dyn->d_un.d_val);
+				name = conv_dyn_flag1(dyn->d_un.d_val,
+				    &c_buf.flag1);
 				break;
 			case DT_POSFLAG_1:
-				name = conv_dyn_posflag1(dyn->d_un.d_val, 0);
+				name = conv_dyn_posflag1(dyn->d_un.d_val, 0,
+				    &c_buf.posflag1);
 				break;
 			case DT_FEATURE_1:
-				name = conv_dyn_feature1(dyn->d_un.d_val, 0);
+				name = conv_dyn_feature1(dyn->d_un.d_val, 0,
+				    &c_buf.feature1);
 				break;
 			case DT_DEPRECATED_SPARC_REGISTER:
 				name = MSG_INTL(MSG_STR_DEPRECATED);
@@ -3184,7 +3203,8 @@ regular(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 	 * Print the program headers.
 	 */
 	if ((flags & FLG_PHDR) && (phnum != 0)) {
-		Phdr *phdr;
+		Conv_inv_buf_t	inv_buf;
+		Phdr		*phdr;
 
 		if ((phdr = elf_getphdr(elf)) == NULL) {
 			failure(file, MSG_ORIG(MSG_ELF_GETPHDR));
@@ -3193,7 +3213,7 @@ regular(const char *file, int fd, Elf *elf, uint_t flags, int wfd)
 
 		for (ndx = 0; ndx < phnum; phdr++, ndx++) {
 			if (!match(0, conv_phdr_type(ehdr->e_machine,
-			    phdr->p_type, CONV_FMT_ALTFILE), ndx))
+			    phdr->p_type, CONV_FMT_ALTFILE, &inv_buf), ndx))
 				continue;
 
 			dbg_print(0, MSG_ORIG(MSG_STR_EMPTY));

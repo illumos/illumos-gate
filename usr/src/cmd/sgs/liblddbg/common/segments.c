@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,7 +36,8 @@
 void
 Dbg_seg_desc_entry(Lm_list *lml, Half mach, int ndx, Sg_desc *sgp)
 {
-	const char	*str;
+	Conv_seg_flags_buf_t	seg_flags_buf;
+	const char		*str;
 
 	if (sgp->sg_name && *sgp->sg_name)
 		str = sgp->sg_name;
@@ -50,7 +51,7 @@ Dbg_seg_desc_entry(Lm_list *lml, Half mach, int ndx, Sg_desc *sgp)
 
 	dbg_print(lml, MSG_ORIG(MSG_SEG_LENGTH), EC_ADDR(sgp->sg_length));
 	dbg_print(lml, MSG_ORIG(MSG_SEG_FLAGS),
-	    conv_seg_flags(sgp->sg_flags));
+	    conv_seg_flags(sgp->sg_flags, &seg_flags_buf));
 
 	if (sgp->sg_sizesym && sgp->sg_sizesym->sd_name)
 		dbg_print(lml, MSG_ORIG(MSG_SEG_SIZESYM),
@@ -118,6 +119,7 @@ Dbg_seg_list(Lm_list *lml, Half mach, List *lsg)
 void
 Dbg_seg_os(Ofl_desc *ofl, Os_desc *osp, int ndx)
 {
+	Conv_inv_buf_t	inv_buf;
 	Lm_list		*lml = ofl->ofl_lml;
 	Listnode	*lnp;
 	Is_desc		*isp;
@@ -134,7 +136,7 @@ Dbg_seg_os(Ofl_desc *ofl, Os_desc *osp, int ndx)
 	shdr = osp->os_shdr;
 	data = osp->os_outdata;
 	dbg_print(lml, MSG_INTL(MSG_EDATA_ENTRY), MSG_INTL(MSG_STR_OUT),
-	    EC_ADDR(shdr->sh_addr), conv_elfdata_type(data->d_type),
+	    EC_ADDR(shdr->sh_addr), conv_elfdata_type(data->d_type, &inv_buf),
 	    EC_XWORD(data->d_size), EC_OFF(data->d_off),
 	    EC_XWORD(data->d_align), MSG_ORIG(MSG_STR_EMPTY),
 	    MSG_ORIG(MSG_STR_EMPTY));
@@ -162,7 +164,7 @@ Dbg_seg_os(Ofl_desc *ofl, Os_desc *osp, int ndx)
 			file = MSG_ORIG(MSG_STR_EMPTY);
 
 		dbg_print(lml, MSG_INTL(MSG_EDATA_ENTRY), MSG_INTL(MSG_STR_IN),
-		    EC_ADDR(addr), conv_elfdata_type(data->d_type),
+		    EC_ADDR(addr), conv_elfdata_type(data->d_type, &inv_buf),
 		    EC_XWORD(data->d_size), EC_OFF(data->d_off),
 		    EC_XWORD(data->d_align), file, str);
 	}

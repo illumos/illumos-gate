@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,9 +96,10 @@ process_lib_path(Ofl_desc *ofl, List *list, char *path, Boolean subsflag)
 		if (cp == NULL) {
 			if (*path == '\0') {
 				if (seenflg)
-				    if (list_appendc(list, subsflag ?
-					compat_YL_YU(ofl, dot, i) : dot) == 0)
-					    return ((char *)S_ERROR);
+					if (list_appendc(list, subsflag ?
+					    compat_YL_YU(ofl, dot, i) : dot) ==
+					    0)
+						return ((char *)S_ERROR);
 			} else
 				if (list_appendc(list, subsflag ?
 				    compat_YL_YU(ofl, path, i) : path) == 0)
@@ -307,13 +308,16 @@ ld_find_library(const char *name, Ofl_desc *ofl)
 	 * diagnostic to that effect, otherwise generate a generic "not found"
 	 * diagnostic.
 	 */
-	if (rej.rej_type)
+	if (rej.rej_type) {
+		Conv_reject_desc_buf_t rej_buf;
+
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(reject[rej.rej_type]),
 		    rej.rej_name ? rej.rej_name : MSG_INTL(MSG_STR_UNKNOWN),
-		    conv_reject_desc(&rej));
-	else
+		    conv_reject_desc(&rej, &rej_buf));
+	} else {
 		eprintf(ofl->ofl_lml, ERR_FATAL, MSG_INTL(MSG_LIB_NOTFOUND),
 		    name);
+	}
 
 	ofl->ofl_flags |= FLG_OF_FATAL;
 	return (0);
@@ -349,7 +353,7 @@ ld_lib_setup(Ofl_desc * ofl)
 #else
 		if ((cp = getenv(MSG_ORIG(MSG_LD_LIBPATH_32))) == NULL)
 #endif
-		    cp  = getenv(MSG_ORIG(MSG_LD_LIBPATH));
+			cp  = getenv(MSG_ORIG(MSG_LD_LIBPATH));
 	}
 
 	if ((cp != NULL) && (*cp != '\0')) {

@@ -1697,6 +1697,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	_sdp->sd_isc && _sdp->sd_isc->is_shdr && \
 	((_sym->st_value + _sym->st_size) > _sdp->sd_isc->is_shdr->sh_size))
 
+	Conv_inv_buf_t	inv_buf;
 	Sym		*sym = (Sym *)isc->is_indata->d_buf;
 	Word		*symshndx = 0;
 	Shdr		*shdr = isc->is_shdr;
@@ -1927,7 +1928,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 					    MSG_INTL(MSG_SYM_INVSHNDX),
 					    demangle(sdp->sd_name),
 					    ifl->ifl_name,
-					    conv_sym_shndx(sym->st_shndx));
+					    conv_sym_shndx(sym->st_shndx,
+					    &inv_buf));
 				}
 				continue;
 			}
@@ -1978,7 +1980,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_SYM_INVSHNDX),
 				    demangle(sdp->sd_name), ifl->ifl_name,
-				    conv_sym_shndx(sym->st_shndx));
+				    conv_sym_shndx(sym->st_shndx, &inv_buf));
 				sdp->sd_isc = NULL;
 				sdp->sd_flags |= FLG_SY_INVALID;
 				continue;
@@ -2092,7 +2094,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		if ((bind != STB_GLOBAL) && (bind != STB_WEAK)) {
 			eprintf(ofl->ofl_lml, ERR_WARNING,
 			    MSG_INTL(MSG_SYM_NONGLOB), demangle(name),
-			    ifl->ifl_name, conv_sym_info_bind(bind, 0));
+			    ifl->ifl_name,
+			    conv_sym_info_bind(bind, 0, &inv_buf));
 			continue;
 		}
 
@@ -2114,7 +2117,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_SYM_INVSHNDX), demangle(name),
 				    ifl->ifl_name,
-				    conv_sym_shndx(sym->st_shndx));
+				    conv_sym_shndx(sym->st_shndx, &inv_buf));
 				continue;
 			}
 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -136,7 +136,7 @@ plt_entry(Ofl_desc * ofl, Sym_desc * sdp)
 	 * NOTE: 0x06 represents next instruction.
 	 */
 	val1 = (ofl->ofl_osgot->os_shdr->sh_addr + got_off) -
-		(ofl->ofl_osplt->os_shdr->sh_addr + plt_off) - 0x06;
+	    (ofl->ofl_osplt->os_shdr->sh_addr + plt_off) - 0x06;
 
 	/*
 	 * If '-z noreloc' is specified - skip the do_reloc
@@ -257,13 +257,13 @@ ld_perform_outreloc(Rel_desc * orsp, Ofl_desc * ofl)
 			raddend += (Off)_elf_getxoff(psym->sd_isc->is_indata);
 			if (psym->sd_isc->is_shdr->sh_flags & SHF_ALLOC)
 				raddend +=
-				psym->sd_isc->is_osdesc->os_shdr->sh_addr;
+				    psym->sd_isc->is_osdesc->os_shdr->sh_addr;
 		} else {
 			/* LINTED */
 			raddend += (Off)_elf_getxoff(sdp->sd_isc->is_indata);
 			if (sdp->sd_isc->is_shdr->sh_flags & SHF_ALLOC)
 				raddend +=
-				sdp->sd_isc->is_osdesc->os_shdr->sh_addr;
+				    sdp->sd_isc->is_osdesc->os_shdr->sh_addr;
 		}
 	}
 
@@ -715,8 +715,9 @@ ld_do_activerelocs(Ofl_desc *ofl)
 					    sdp->sd_isc->is_indata);
 					if (sdp->sd_isc->is_shdr->sh_flags &
 					    SHF_ALLOC)
-					    value += sdp->sd_isc->is_osdesc->
-					    os_shdr->sh_addr;
+						value +=
+						    sdp->sd_isc->is_osdesc->
+						    os_shdr->sh_addr;
 				}
 				if (sdp->sd_isc->is_shdr->sh_flags & SHF_TLS)
 					value -= ofl->ofl_tlsphdr->p_vaddr;
@@ -909,10 +910,13 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			 * see this.
 			 */
 			if (arsp->rel_isdesc->is_indata->d_buf == 0) {
+				Conv_inv_buf_t inv_buf;
+
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_REL_EMPTYSEC),
-				    conv_reloc_amd64_type(arsp->rel_rtype, 0),
-				    ifl_name, demangle(arsp->rel_sname),
+				    conv_reloc_amd64_type(arsp->rel_rtype,
+				    0, &inv_buf), ifl_name,
+				    demangle(arsp->rel_sname),
 				    arsp->rel_isdesc->is_name);
 				return (S_ERROR);
 			}
@@ -932,7 +936,8 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			if ((((uintptr_t)addr - (uintptr_t)ofl->ofl_nehdr) >
 			    ofl->ofl_size) || (arsp->rel_roffset >
 			    arsp->rel_osdesc->os_shdr->sh_size)) {
-				int	class;
+				int		class;
+				Conv_inv_buf_t inv_buf;
 
 				if (((uintptr_t)addr -
 				    (uintptr_t)ofl->ofl_nehdr) > ofl->ofl_size)
@@ -942,8 +947,9 @@ ld_do_activerelocs(Ofl_desc *ofl)
 
 				eprintf(ofl->ofl_lml, class,
 				    MSG_INTL(MSG_REL_INVALOFFSET),
-				    conv_reloc_amd64_type(arsp->rel_rtype, 0),
-				    ifl_name, arsp->rel_isdesc->is_name,
+				    conv_reloc_amd64_type(arsp->rel_rtype,
+				    0, &inv_buf), ifl_name,
+				    arsp->rel_isdesc->is_name,
 				    demangle(arsp->rel_sname),
 				    EC_ADDR((uintptr_t)addr -
 				    (uintptr_t)ofl->ofl_nehdr));
@@ -1189,6 +1195,8 @@ ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 	    ((shndx == SHN_UNDEF) ||
 	    ((sdp->sd_ref == REF_DYN_NEED) &&
 	    ((sdp->sd_flags & FLG_SY_MVTOCOMM) == 0)))) {
+		Conv_inv_buf_t inv_buf;
+
 		/*
 		 * If the relocation is against a SHT_SUNW_ANNOTATE
 		 * section - then silently ignore that the relocation
@@ -1199,7 +1207,7 @@ ld_reloc_local(Rel_desc * rsp, Ofl_desc * ofl)
 			return (0);
 		(void) eprintf(ofl->ofl_lml, ERR_WARNING,
 		    MSG_INTL(MSG_REL_EXTERNSYM),
-		    conv_reloc_amd64_type(rsp->rel_rtype, 0),
+		    conv_reloc_amd64_type(rsp->rel_rtype, 0, &inv_buf),
 		    rsp->rel_isdesc->is_file->ifl_name,
 		    demangle(rsp->rel_sname), rsp->rel_osdesc->os_name);
 		return (1);
@@ -1489,8 +1497,8 @@ ld_fillin_gotplt(Ofl_desc *ofl)
 		 *	 be pointing at.
 		 */
 		val1 = (ofl->ofl_osgot->os_shdr->sh_addr) +
-			(M_GOT_XLINKMAP * M_GOT_ENTSIZE) -
-			ofl->ofl_osplt->os_shdr->sh_addr - 0x06;
+		    (M_GOT_XLINKMAP * M_GOT_ENTSIZE) -
+		    ofl->ofl_osplt->os_shdr->sh_addr - 0x06;
 
 		/*
 		 * If '-z noreloc' is specified - skip the do_reloc
@@ -1512,8 +1520,8 @@ ld_fillin_gotplt(Ofl_desc *ofl)
 		 *  JMP	*GOT+16(%rip)
 		 */
 		val1 = (ofl->ofl_osgot->os_shdr->sh_addr) +
-			(M_GOT_XRTLD * M_GOT_ENTSIZE) -
-			ofl->ofl_osplt->os_shdr->sh_addr - 0x0c;
+		    (M_GOT_XRTLD * M_GOT_ENTSIZE) -
+		    ofl->ofl_osplt->os_shdr->sh_addr - 0x0c;
 		/*
 		 * If '-z noreloc' is specified - skip the do_reloc
 		 * stage.

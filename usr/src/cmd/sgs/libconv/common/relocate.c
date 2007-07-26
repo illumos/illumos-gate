@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,23 +35,33 @@
  * Generic front-end that determines machine specific relocations.
  */
 const char *
-conv_reloc_type(Half mach, Word type, int fmt_flags)
+conv_reloc_type(Half mach, Word type, int fmt_flags, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
-
 	switch (mach) {
 	case EM_386:
-		return (conv_reloc_386_type(type, fmt_flags));
+		return (conv_reloc_386_type(type, fmt_flags, inv_buf));
 
 	case EM_SPARC:
 	case EM_SPARC32PLUS:
 	case EM_SPARCV9:
-		return (conv_reloc_SPARC_type(type, fmt_flags));
+		return (conv_reloc_SPARC_type(type, fmt_flags, inv_buf));
 
 	case EM_AMD64:
-		return (conv_reloc_amd64_type(type, fmt_flags));
+		return (conv_reloc_amd64_type(type, fmt_flags, inv_buf));
 	}
 
 	/* If didn't match a machine type, use integer value */
-	return (conv_invalid_val(string, CONV_INV_STRSIZE, type, fmt_flags));
+	return (conv_invalid_val(inv_buf, type, fmt_flags));
+}
+
+/*
+ * This version supplies a static buffer. It is for the benefit of
+ * do_reloc().
+ */
+const char *
+conv_reloc_type_static(Half mach, Word type, int fmt_flags)
+{
+	static Conv_inv_buf_t inv_buf;
+
+	return (conv_reloc_type(mach, type, fmt_flags, &inv_buf));
 }

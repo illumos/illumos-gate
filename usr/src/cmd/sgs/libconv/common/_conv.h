@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,7 +100,7 @@ extern "C" {
 #define	DEFINE_conv_map2str \
 static \
 const char * \
-conv_map2str(char *buf, size_t bufsize, int val, int flags, int num_msg, \
+conv_map2str(Conv_inv_buf_t *inv_buf, int val, int flags, int num_msg, \
 	const Msg *msg, const Msg *msg_altdump, const Msg *msg_altfile) \
 { \
 	if ((val >= 0) && (val < num_msg)) { \
@@ -114,7 +114,7 @@ conv_map2str(char *buf, size_t bufsize, int val, int flags, int num_msg, \
 	} \
 \
 	/* If we get here, it's an unknown value */ \
-	return (conv_invalid_val(buf, bufsize, val, flags)); \
+	return (conv_invalid_val(inv_buf, val, flags)); \
 }
 
 /* # of elements in an array */

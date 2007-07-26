@@ -93,8 +93,10 @@ hwcap_check(Rej_desc *rej, Ehdr *ehdr)
 			break;
 
 		if ((val = (cptr->c_un.c_val & ~hwcap)) != 0) {
+			static Conv_cap_val_hw1_buf_t cap_buf;
+
 			rej->rej_type = SGS_REJ_HWCAP_1;
-			rej->rej_str = conv_cap_val_hw1(val, M_MACH);
+			rej->rej_str = conv_cap_val_hw1(val, M_MACH, &cap_buf);
 			return (0);
 		}
 

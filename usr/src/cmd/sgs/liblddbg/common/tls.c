@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,7 @@
 
 #define	FLAGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
 		MSG_TLS_FLAG_STATIC_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+		CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
 
 static void
 Dbg_tls_modent(Lm_list *lml, TLS_modinfo * tmodent)

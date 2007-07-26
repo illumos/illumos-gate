@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,7 +38,7 @@ Dbg_bind_plt_summary(Lm_list *lml, Half mach, Word pltcnt21d, Word pltcnt24d,
     Word pltcntu32, Word pltcntu44, Word pltcntfull, Word pltcntfar)
 {
 	Word plttotal = pltcnt21d + pltcnt24d + pltcntu32 +
-		pltcntu44 + pltcntfull + pltcntfar;
+	    pltcntu44 + pltcntfull + pltcntfar;
 
 	if (DBG_NOTCLASS(DBG_C_BINDINGS))
 		return;
@@ -77,7 +77,7 @@ static const char	*pltbindtypes[PLT_T_NUM] = {
 		MSG_BINFO_COPYREF_SIZE +	MSG_BINFO_SEP_SIZE + \
 		MSG_BINFO_FILTEE_SIZE +		MSG_BINFO_SEP_SIZE + \
 		MSG_BINFO_PLTADDR_SIZE + \
-		CONV_INV_STRSIZE + MSG_BINFO_END_SIZE
+		CONV_INV_BUFSIZE + MSG_BINFO_END_SIZE
 
 
 void

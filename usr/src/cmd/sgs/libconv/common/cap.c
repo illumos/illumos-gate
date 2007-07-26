@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -57,48 +57,33 @@ conv_cap_1(Xword val, char *str, size_t len, Half mach,
 	return (1);
 }
 
-/*
- * Establish a buffer size based on the maximum number of hardware capabilities
- * that exist.  See common/elfcap.
- */
-#define	HW1SZ	200
-
 const char *
-conv_cap_val_hw1(Xword val, Half mach)
+conv_cap_val_hw1(Xword val, Half mach, Conv_cap_val_hw1_buf_t *cap_val_hw1_buf)
 {
-	static char	string[HW1SZ];
-
 	if (val == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
-	if (conv_cap_1(val, string, HW1SZ, mach, hwcap_1_val2str) == 0)
-		return (conv_invalid_val(string, HW1SZ, val, 0));
-	return ((const char *)string);
+	if (conv_cap_1(val, cap_val_hw1_buf->buf, sizeof (cap_val_hw1_buf->buf),
+	    mach, hwcap_1_val2str) == 0)
+		return (conv_invalid_val(&cap_val_hw1_buf->inv_buf, val, 0));
+	return ((const char *)cap_val_hw1_buf->buf);
 }
 
-/*
- * Establish a buffer size based on the maximum number of software capabilities
- * that exist.  See common/elfcap.
- */
-#define	SF1SZ	50
-
 const char *
-conv_cap_val_sf1(Xword val, Half mach)
+conv_cap_val_sf1(Xword val, Half mach, Conv_cap_val_sf1_buf_t *cap_val_sf1_buf)
 {
-	static char	string[SF1SZ];
-
 	if (val == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
-	if (conv_cap_1(val, string, SF1SZ, mach, sfcap_1_val2str) == 0)
-		return (conv_invalid_val(string, SF1SZ, val, 0));
-	return ((const char *)string);
+	if (conv_cap_1(val, cap_val_sf1_buf->buf, sizeof (cap_val_sf1_buf->buf),
+	    mach, sfcap_1_val2str) == 0)
+		return (conv_invalid_val(&cap_val_sf1_buf->inv_buf, val, 0));
+	return ((const char *)cap_val_sf1_buf->buf);
 }
 
 const char *
-conv_cap_tag(Xword tag)
+conv_cap_tag(Xword tag, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
 	static const Msg	tags[] = {
 		MSG_CA_SUNW_NULL,	MSG_CA_SUNW_HW_1,
 		MSG_CA_SUNW_SF_1
@@ -107,18 +92,18 @@ conv_cap_tag(Xword tag)
 	if (tag <= CA_SUNW_SF_1)
 		return (MSG_ORIG(tags[tag]));
 	else
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, tag, 0));
+		return (conv_invalid_val(inv_buf, tag, 0));
 }
 
 const char *
-conv_cap_val(Xword tag, Xword val, Half mach)
+conv_cap_val(Xword tag, Xword val, Half mach, Conv_cap_val_buf_t *cap_val_buf)
 {
-	static Conv_inv_buf_t	string;
-
 	if (tag == CA_SUNW_HW_1)
-		return (conv_cap_val_hw1(val, mach));
+		return (conv_cap_val_hw1(val, mach,
+		    &cap_val_buf->cap_val_hw1_buf));
 	else if (tag == CA_SUNW_SF_1)
-		return (conv_cap_val_sf1(val, mach));
+		return (conv_cap_val_sf1(val, mach,
+		    &cap_val_buf->cap_val_sf1_buf));
 	else
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, val, 0));
+		return (conv_invalid_val(&cap_val_buf->inv_buf, val, 0));
 }

@@ -42,9 +42,8 @@ DEFINE_conv_map2str
 
 
 const char *
-conv_ehdr_class(uchar_t class, int fmt_flags)
+conv_ehdr_class(uchar_t class, int fmt_flags, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
 	static const Msg	classes[] = {
 		MSG_ELFCLASSNONE, MSG_ELFCLASS32, MSG_ELFCLASS64
 	};
@@ -52,14 +51,13 @@ conv_ehdr_class(uchar_t class, int fmt_flags)
 		MSG_ELFCLASSNONE_ALT, MSG_ELFCLASS32_ALT, MSG_ELFCLASS64_ALT
 	};
 
-	return (conv_map2str(string, sizeof (string), class, fmt_flags,
-		ARRAY_NELTS(classes), classes, classes_alt, classes_alt));
+	return (conv_map2str(inv_buf, class, fmt_flags,
+	    ARRAY_NELTS(classes), classes, classes_alt, classes_alt));
 }
 
 const char *
-conv_ehdr_data(uchar_t data, int fmt_flags)
+conv_ehdr_data(uchar_t data, int fmt_flags, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
 	static const Msg	datas[] = {
 		MSG_ELFDATANONE, MSG_ELFDATA2LSB, MSG_ELFDATA2MSB
 	};
@@ -70,8 +68,8 @@ conv_ehdr_data(uchar_t data, int fmt_flags)
 		MSG_ELFDATANONE_ALT, MSG_ELFDATA2LSB_ALT2, MSG_ELFDATA2MSB_ALT2
 	};
 
-	return (conv_map2str(string, sizeof (string), data, fmt_flags,
-		ARRAY_NELTS(datas), datas, datas_dump, datas_file));
+	return (conv_map2str(inv_buf, data, fmt_flags,
+	    ARRAY_NELTS(datas), datas, datas_dump, datas_file));
 }
 
 static const Msg machines[EM_NUM] = {
@@ -147,19 +145,16 @@ static const Msg machines_alt[EM_NUM] = {
 #endif
 
 const char *
-conv_ehdr_mach(Half machine, int fmt_flags)
+conv_ehdr_mach(Half machine, int fmt_flags, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
-
-	return (conv_map2str(string, sizeof (string), machine, fmt_flags,
-		ARRAY_NELTS(machines), machines, machines_alt, machines_alt));
+	return (conv_map2str(inv_buf, machine, fmt_flags,
+	    ARRAY_NELTS(machines), machines, machines_alt, machines_alt));
 }
 
 
 const char *
-conv_ehdr_type(Half etype, int fmt_flags)
+conv_ehdr_type(Half etype, int fmt_flags, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
 	static const Msg	etypes[] = {
 		MSG_ET_NONE,		MSG_ET_REL,		MSG_ET_EXEC,
 		MSG_ET_DYN,		MSG_ET_CORE
@@ -171,19 +166,18 @@ conv_ehdr_type(Half etype, int fmt_flags)
 
 	if (etype == ET_SUNWPSEUDO) {
 		return ((fmt_flags & CONV_FMTALTMASK)
-			? MSG_ORIG(MSG_ET_SUNWPSEUDO_ALT)
-			: MSG_ORIG(MSG_ET_SUNWPSEUDO));
+		    ? MSG_ORIG(MSG_ET_SUNWPSEUDO_ALT)
+		    : MSG_ORIG(MSG_ET_SUNWPSEUDO));
 	}
 
-	return (conv_map2str(string, sizeof (string), etype, fmt_flags,
-		ARRAY_NELTS(etypes), etypes, etypes_alt, etypes_alt));
+	return (conv_map2str(inv_buf, etype, fmt_flags,
+	    ARRAY_NELTS(etypes), etypes, etypes_alt, etypes_alt));
 
 }
 
 const char *
-conv_ehdr_vers(Word version, int fmt_flags)
+conv_ehdr_vers(Word version, int fmt_flags, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
 	static const Msg	versions[] = {
 		MSG_EV_NONE,		MSG_EV_CURRENT
 	};
@@ -191,8 +185,8 @@ conv_ehdr_vers(Word version, int fmt_flags)
 		MSG_EV_NONE_ALT,	MSG_EV_CURRENT_ALT
 	};
 
-	return (conv_map2str(string, sizeof (string), version, fmt_flags,
-		ARRAY_NELTS(versions), versions, versions_alt, versions_alt));
+	return (conv_map2str(inv_buf, version, fmt_flags,
+	    ARRAY_NELTS(versions), versions, versions_alt, versions_alt));
 }
 
 #define	EFLAGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
@@ -200,15 +194,27 @@ conv_ehdr_vers(Word version, int fmt_flags)
 		MSG_EF_SPARC_SUN_US1_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE +  \
 		MSG_EF_SPARC_HAL_R1_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE +  \
 		MSG_EF_SPARC_SUN_US3_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE +  \
-		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+		CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+
+/*
+ * Ensure that Conv_ehdr_flags_buf_t is large enough:
+ *
+ * EFLAGSZ is the real minimum size of the buffer required by conv_ehdr_flags().
+ * However, Conv_ehdr_flags_buf_t uses CONV_EHDR_FLAG_BUFSIZE to set the
+ * buffer size. We do things this way because the definition of EFLAGSZ uses
+ * information that is not available in the environment of other programs
+ * that include the conv.h header file.
+ */
+#if CONV_EHDR_FLAGS_BUFSIZE < EFLAGSZ
+#error "CONV_EHDR_FLAGS_BUFSIZE is not large enough"
+#endif
 
 /*
  * Make a string representation of the e_flags field.
  */
 const char *
-conv_ehdr_flags(Half mach, Word flags)
+conv_ehdr_flags(Half mach, Word flags, Conv_ehdr_flags_buf_t *flags_buf)
 {
-	static char	string[EFLAGSZ];
 	static Val_desc vda[] = {
 		{ EF_SPARC_32PLUS,	MSG_ORIG(MSG_EF_SPARC_32PLUS) },
 		{ EF_SPARC_SUN_US1,	MSG_ORIG(MSG_EF_SPARC_SUN_US1) },
@@ -221,10 +227,12 @@ conv_ehdr_flags(Half mach, Word flags)
 		MSG_EF_SPARCV9_RMO
 	};
 	static const char *leading_str_arr[2];
-	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda,
-		leading_str_arr };
+	static CONV_EXPN_FIELD_ARG conv_arg = {
+	    NULL, sizeof (flags_buf->buf), vda, leading_str_arr };
 
 	const char **lstr = leading_str_arr;
+
+	conv_arg.buf = flags_buf->buf;
 
 	/*
 	 * Non-SPARC architectures presently provide no known flags.
@@ -245,18 +253,18 @@ conv_ehdr_flags(Half mach, Word flags)
 
 		(void) conv_expn_field(&conv_arg);
 
-		return (string);
+		return (conv_arg.buf);
 	}
-	return (conv_invalid_val(string, EFLAGSZ, flags, CONV_FMT_DECIMAL));
+
+	return (conv_invalid_val(&flags_buf->inv_buf, flags, CONV_FMT_DECIMAL));
 }
 
 /*
  * Make a string representation of the e_ident[EI_OSABI] field.
  */
 const char *
-conv_ehdr_osabi(uchar_t osabi, int fmt_flags)
+conv_ehdr_osabi(uchar_t osabi, int fmt_flags, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
 	static const Msg	osabi_arr[] = {
 		MSG_OSABI_NONE,		MSG_OSABI_HPUX,
 		MSG_OSABI_NETBSD,	MSG_OSABI_LINUX,
@@ -293,9 +301,9 @@ conv_ehdr_osabi(uchar_t osabi, int fmt_flags)
 		break;
 
 	default:
-		str = conv_map2str(string, sizeof (string), osabi, fmt_flags,
-		    ARRAY_NELTS(osabi_arr), osabi_arr,
-		    osabi_arr_alt, osabi_arr_alt);
+		str = conv_map2str(inv_buf, osabi, fmt_flags,
+		    ARRAY_NELTS(osabi_arr), osabi_arr, osabi_arr_alt,
+		    osabi_arr_alt);
 		break;
 	}
 
@@ -307,30 +315,34 @@ conv_ehdr_osabi(uchar_t osabi, int fmt_flags)
  * terms of a string.
  */
 const char *
-conv_reject_desc(Rej_desc * rej)
+conv_reject_desc(Rej_desc * rej, Conv_reject_desc_buf_t *reject_desc_buf)
 {
-	static Conv_inv_buf_t	string;
-	ushort_t		type = rej->rej_type;
-	uint_t			info = rej->rej_info;
+	ushort_t	type = rej->rej_type;
+	uint_t		info = rej->rej_info;
 
 	if (type == SGS_REJ_MACH)
 		/* LINTED */
-		return (conv_ehdr_mach((Half)info, 0));
+		return (conv_ehdr_mach((Half)info, 0,
+		    &reject_desc_buf->inv_buf));
 	else if (type == SGS_REJ_CLASS)
 		/* LINTED */
-		return (conv_ehdr_class((uchar_t)info, 0));
+		return (conv_ehdr_class((uchar_t)info, 0,
+		    &reject_desc_buf->inv_buf));
 	else if (type == SGS_REJ_DATA)
 		/* LINTED */
-		return (conv_ehdr_data((uchar_t)info, 0));
+		return (conv_ehdr_data((uchar_t)info, 0,
+		    &reject_desc_buf->inv_buf));
 	else if (type == SGS_REJ_TYPE)
 		/* LINTED */
-		return (conv_ehdr_type((Half)info, 0));
+		return (conv_ehdr_type((Half)info, 0,
+		    &reject_desc_buf->inv_buf));
 	else if ((type == SGS_REJ_BADFLAG) || (type == SGS_REJ_MISFLAG) ||
 	    (type == SGS_REJ_HAL) || (type == SGS_REJ_US3))
 		/*
 		 * Only called from ld.so.1, thus M_MACH is hardcoded.
 		 */
-		return (conv_ehdr_flags(M_MACH, (Word)info));
+		return (conv_ehdr_flags(M_MACH, (Word)info,
+		    &reject_desc_buf->flags_buf));
 	else if (type == SGS_REJ_UNKFILE)
 		return ((const char *)0);
 	else if ((type == SGS_REJ_STR) || (type == SGS_REJ_HWCAP_1)) {
@@ -339,6 +351,6 @@ conv_reject_desc(Rej_desc * rej)
 		else
 			return (MSG_ORIG(MSG_STR_EMPTY));
 	} else
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, info,
+		return (conv_invalid_val(&reject_desc_buf->inv_buf, info,
 		    CONV_FMT_DECIMAL));
 }

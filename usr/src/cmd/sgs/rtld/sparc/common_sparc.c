@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -116,9 +116,10 @@ elf_regsyms(Rt_map * lmp)
 		 */
 		rsymndx = dyn->d_un.d_val;
 		symdef = (Sym *)((unsigned long)SYMTAB(lmp) +
-				(rsymndx * SYMENT(lmp)));
+		    (rsymndx * SYMENT(lmp)));
 
 		for (rp = reglist; rp; rp = rp->rl_next) {
+			Conv_inv_buf_t	inv_buf;
 			const char	*str, *sym1, *sym2;
 
 			if (rp->rl_sym == symdef) {
@@ -143,13 +144,15 @@ elf_regsyms(Rt_map * lmp)
 
 			if (LIST(lmp)->lm_flags & LML_FLG_TRC_WARN) {
 				(void) printf(MSG_INTL(MSG_LDD_REG_SYMCONF),
-				    conv_sym_SPARC_value(symdef->st_value, 0),
-				    NAME(rp->rl_lmp), sym1, NAME(lmp), sym2);
+				    conv_sym_SPARC_value(symdef->st_value,
+				    0, &inv_buf), NAME(rp->rl_lmp),
+				    sym1, NAME(lmp), sym2);
 			} else {
 				eprintf(LIST(lmp), ERR_FATAL,
 				    MSG_INTL(MSG_REG_SYMCONF),
-				    conv_sym_SPARC_value(symdef->st_value, 0),
-				    NAME(rp->rl_lmp), sym1, NAME(lmp), sym2);
+				    conv_sym_SPARC_value(symdef->st_value,
+				    0, &inv_buf), NAME(rp->rl_lmp),
+				    sym1, NAME(lmp), sym2);
 				return (0);
 			}
 		}

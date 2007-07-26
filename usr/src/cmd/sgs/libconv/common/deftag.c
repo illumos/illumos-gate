@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,15 +32,14 @@
 #include	"deftag_msg.h"
 
 const char *
-conv_def_tag(Symref ref)
+conv_def_tag(Symref ref, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
 	static const Msg	refs[] = {
 		MSG_REF_DYN_SEEN,	MSG_REF_DYN_NEED,	MSG_REF_REL_NEED
 	};
 
 	if (ref >= REF_NUM)
-		return (conv_invalid_val(string, CONV_INV_STRSIZE, ref, 0));
+		return (conv_invalid_val(inv_buf, ref, 0));
 	else
 		return (MSG_ORIG(refs[ref]));
 }

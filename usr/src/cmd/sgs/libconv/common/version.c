@@ -53,9 +53,8 @@ conv_ver_flags(Half flags)
  *		GNU ld are assumed. If False (0), Solaris ld rules apply.
  */
 const char *
-conv_ver_index(Versym verndx, int gnuver)
+conv_ver_index(Versym verndx, int gnuver, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
 	const char		*fmt;
 
 	/* Special case versions starting at VER_NDX_LORESERVE */
@@ -75,6 +74,7 @@ conv_ver_index(Versym verndx, int gnuver)
 	}
 
 	/* format as numeric */
-	(void) snprintf(string, sizeof (string), fmt, EC_HALF(verndx));
-	return (string);
+	(void) snprintf(inv_buf->buf, sizeof (inv_buf->buf),
+	    fmt, EC_HALF(verndx));
+	return (inv_buf->buf);
 }

@@ -1251,3 +1251,4 @@ Bugid   Risk Synopsis
 	PSARC/2007/413 Add -zglobalaudit option to ld
 6573641 ld.so.1 does not maintain parent relationship to a dlopen() caller.
 6577462 Additional improvements needed to handling of gcc's symbol versioning
+6583742 ELF string conversion library needs to lose static writable buffers

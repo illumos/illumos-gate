@@ -90,16 +90,14 @@ static const Msg usecs_alt[SHT_HISUNW - SHT_LOSUNW + 1] = {
 
 
 const char *
-conv_sec_type(Half mach, Word sec, int fmt_flags)
+conv_sec_type(Half mach, Word sec, int fmt_flags, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
-
 	if (sec < SHT_NUM) {
-		return (conv_map2str(string, sizeof (string), sec, fmt_flags,
-			ARRAY_NELTS(secs), secs, secs_alt, NULL));
+		return (conv_map2str(inv_buf, sec, fmt_flags,
+		    ARRAY_NELTS(secs), secs, secs_alt, NULL));
 	} else if ((sec >= SHT_LOSUNW) && (sec <= SHT_HISUNW)) {
-		return (conv_map2str(string, sizeof (string), sec - SHT_LOSUNW,
-			fmt_flags, ARRAY_NELTS(usecs), usecs, usecs_alt, NULL));
+		return (conv_map2str(inv_buf, sec - SHT_LOSUNW,
+		    fmt_flags, ARRAY_NELTS(usecs), usecs, usecs_alt, NULL));
 	} else if ((sec >= SHT_LOPROC) && (sec <= SHT_HIPROC)) {
 		switch (mach) {
 		case EM_SPARC:
@@ -107,21 +105,21 @@ conv_sec_type(Half mach, Word sec, int fmt_flags)
 		case EM_SPARCV9:
 			if (sec == SHT_SPARC_GOTDATA) {
 				return (fmt_flags & CONV_FMT_ALTDUMP)
-					? MSG_ORIG(MSG_SHT_SPARC_GOTDATA_ALT)
-					: MSG_ORIG(MSG_SHT_SPARC_GOTDATA);
+				    ? MSG_ORIG(MSG_SHT_SPARC_GOTDATA_ALT)
+				    : MSG_ORIG(MSG_SHT_SPARC_GOTDATA);
 			}
 			break;
 		case EM_AMD64:
 			if (sec == SHT_AMD64_UNWIND) {
 				return (fmt_flags & CONV_FMT_ALTDUMP)
-					? MSG_ORIG(MSG_SHT_AMD64_UNWIND_ALT)
-					: MSG_ORIG(MSG_SHT_AMD64_UNWIND);
+				    ? MSG_ORIG(MSG_SHT_AMD64_UNWIND_ALT)
+				    : MSG_ORIG(MSG_SHT_AMD64_UNWIND);
 			}
 		}
 	}
 
 	/* If we get here, it's an unknown type */
-	return (conv_invalid_val(string, CONV_INV_STRSIZE, sec, fmt_flags));
+	return (conv_invalid_val(inv_buf, sec, fmt_flags));
 }
 
 #define	FLAGSZ	CONV_EXPN_FIELD_DEF_PREFIX_SIZE + \
@@ -138,12 +136,24 @@ conv_sec_type(Half mach, Word sec, int fmt_flags)
 		MSG_SHF_EXCLUDE_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_SHF_ORDERED_SIZE	+ CONV_EXPN_FIELD_DEF_SEP_SIZE + \
 		MSG_SHF_AMD64_LARGE_SIZE + CONV_EXPN_FIELD_DEF_SEP_SIZE + \
-		CONV_INV_STRSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+		CONV_INV_BUFSIZE + CONV_EXPN_FIELD_DEF_SUFFIX_SIZE
+
+/*
+ * Ensure that Conv_sec_flags_buf_t is large enough:
+ *
+ * FLAGSZ is the real minimum size of the buffer required by conv_sec_flags().
+ * However, Conv_sec_flags_buf_t uses CONV_SEC_FLAGS_BUFSIZE to set the
+ * buffer size. We do things this way because the definition of FLAGSZ uses
+ * information that is not available in the environment of other programs
+ * that include the conv.h header file.
+ */
+#if CONV_SEC_FLAGS_BUFSIZE < FLAGSZ
+#error "CONV_SEC_FLAGS_BUFSIZE is not large enough"
+#endif
 
 const char *
-conv_sec_flags(Xword flags)
+conv_sec_flags(Xword flags, Conv_sec_flags_buf_t *sec_flags_buf)
 {
-	static	char	string[FLAGSZ];
 	static Val_desc vda[] = {
 		{ SHF_WRITE,		MSG_ORIG(MSG_SHF_WRITE) },
 		{ SHF_ALLOC,		MSG_ORIG(MSG_SHF_ALLOC) },
@@ -160,24 +170,21 @@ conv_sec_flags(Xword flags)
 		{ SHF_AMD64_LARGE,	MSG_ORIG(MSG_SHF_AMD64_LARGE) },
 		{ 0,			0 }
 	};
-	static CONV_EXPN_FIELD_ARG conv_arg = { string, sizeof (string), vda };
+	static CONV_EXPN_FIELD_ARG conv_arg = {
+	    NULL, sizeof (sec_flags_buf->buf), vda };
 
 	if (flags == 0)
 		return (MSG_ORIG(MSG_GBL_ZERO));
 
+	conv_arg.buf = sec_flags_buf->buf;
 	conv_arg.oflags = conv_arg.rflags = flags;
 	(void) conv_expn_field(&conv_arg);
 
-	return ((const char *)string);
+	return ((const char *)sec_flags_buf->buf);
 }
 
-/*
- * conv_sec_linkinfo() is one of the few conversion routines that can be called
- * twice for the same diagnostic (see liblddbg:Elf_Shdr()), hence the caller
- * has to supply different string buffers.
- */
 const char *
-conv_sec_linkinfo(Word info, Xword flags, Conv_inv_buf_t buffer)
+conv_sec_linkinfo(Word info, Xword flags, Conv_inv_buf_t *inv_buf)
 {
 	if (flags & ALL_SHF_ORDER) {
 		if (info == SHN_BEFORE)
@@ -185,6 +192,7 @@ conv_sec_linkinfo(Word info, Xword flags, Conv_inv_buf_t buffer)
 		else if (info == SHN_AFTER)
 			return (MSG_ORIG(MSG_SHN_AFTER));
 	}
-	(void) conv_invalid_val(buffer, CONV_INV_STRSIZE, info, 1);
-	return ((const char *)buffer);
+
+	(void) conv_invalid_val(inv_buf, info, 1);
+	return ((const char *)inv_buf->buf);
 }

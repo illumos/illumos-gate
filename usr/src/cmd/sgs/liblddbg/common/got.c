@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -130,6 +130,7 @@ Elf_got_entry(Lm_list *lml, Sword ndx, Addr addr, Xword value, Half mach,
 	Rela		*rela;
 	Rel		*rel;
 	const char	*str;
+	Conv_inv_buf_t	inv_buf;
 	char		index[INDEX_STR_SIZE];
 
 	(void) snprintf(index, INDEX_STR_SIZE, MSG_ORIG(MSG_GOT_INDEX),
@@ -139,11 +140,11 @@ Elf_got_entry(Lm_list *lml, Sword ndx, Addr addr, Xword value, Half mach,
 		if (type == SHT_RELA) {
 			rela = (Rela *)reloc;
 			str = conv_reloc_type(mach, ELF_R_TYPE(rela->r_info),
-				0);
+			    0, &inv_buf);
 		} else {
 			rel = (Rel *)reloc;
 			str = conv_reloc_type(mach, ELF_R_TYPE(rel->r_info),
-				0);
+			    0, &inv_buf);
 		}
 
 		if (name)

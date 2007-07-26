@@ -892,9 +892,12 @@ trace_so(Rt_map *clmp, Rej_desc *rej, const char *name, const char *path,
 	 * found and the reason for its rejection.
 	 */
 	if (rej) {
+		Conv_reject_desc_buf_t rej_buf;
+
 		/* LINTED */
 		(void) snprintf(_reject, PATH_MAX,
-		    MSG_INTL(ldd_reject[rej->rej_type]), conv_reject_desc(rej));
+		    MSG_INTL(ldd_reject[rej->rej_type]),
+		    conv_reject_desc(rej, &rej_buf));
 		if (rej->rej_name)
 			path = rej->rej_name;
 		reject = (char *)_reject;
@@ -1156,9 +1159,11 @@ file_notfound(Lm_list *lml, const char *name, Rt_map *clmp, uint_t flags,
 	}
 
 	if (rej->rej_type) {
+		Conv_reject_desc_buf_t rej_buf;
+
 		eprintf(lml, ERR_FATAL, MSG_INTL(err_reject[rej->rej_type]),
 		    rej->rej_name ? rej->rej_name : MSG_INTL(MSG_STR_UNKNOWN),
-		    conv_reject_desc(rej));
+		    conv_reject_desc(rej, &rej_buf));
 		return;
 	}
 

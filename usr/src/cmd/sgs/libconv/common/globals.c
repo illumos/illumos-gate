@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,17 +36,16 @@
  * Given an integer value, generate an ASCII representation of it.
  *
  * entry:
- *	string - Buffer into which the resulting string is generated.
- *	size - Size of string buffer (i.e. sizeof(string))
+ *	inv_buf - Buffer into which the resulting string is generated.
  *	value - Value to be formatted.
  *	fmt_flags - CONV_FMT_* values, used to specify formatting details.
  *
  * exit:
- *	The formatted string, or as much as will fit, is placed into
- *	string. String is returned.
+ *	The formatted string is placed into inv_buf. The pointer
+ *	to the string is returned.
  */
 const char *
-conv_invalid_val(char *string, size_t size, Xword value, int fmt_flags)
+conv_invalid_val(Conv_inv_buf_t *inv_buf, Xword value, int fmt_flags)
 {
 	const char	*fmt;
 
@@ -61,8 +60,8 @@ conv_invalid_val(char *string, size_t size, Xword value, int fmt_flags)
 		else
 			fmt = MSG_ORIG(MSG_GBL_FMT_HEX);
 	}
-	(void) snprintf(string, size, fmt, value);
-	return ((const char *)string);
+	(void) snprintf(inv_buf->buf, sizeof (inv_buf->buf), fmt, value);
+	return ((const char *)inv_buf->buf);
 }
 
 
@@ -100,6 +99,7 @@ static int
 cef_cp(CONV_EXPN_FIELD_ARG *arg, CONV_EXPN_FIELD_STATE *state,
 	int list_item, const char *str)
 {
+	Conv_inv_buf_t inv_buf;
 	int n;
 
 	if (list_item) {	/* This is a list item */
@@ -110,7 +110,7 @@ cef_cp(CONV_EXPN_FIELD_ARG *arg, CONV_EXPN_FIELD_STATE *state,
 		if (state->list_cnt != 0) {
 			if (state->sep_str_len < state->room) {
 				(void) memcpy(state->cur, state->sep_str,
-					state->sep_str_len);
+				    state->sep_str_len);
 				state->cur += state->sep_str_len;
 				state->room -= state->sep_str_len;
 			} else {
@@ -130,7 +130,8 @@ cef_cp(CONV_EXPN_FIELD_ARG *arg, CONV_EXPN_FIELD_STATE *state,
 	}
 
 	/* Buffer too small. Fill in the numeric value and report failure */
-	(void) conv_invalid_val(arg->buf, arg->bufsize, arg->oflags, 0);
+	(void) conv_invalid_val(&inv_buf, arg->oflags, 0);
+	(void) strlcpy(arg->buf, inv_buf.buf, arg->bufsize);
 	return (FALSE);
 }
 
@@ -198,10 +199,10 @@ conv_expn_field(CONV_EXPN_FIELD_ARG *arg)
 	 * representation of these flags to the users output buffer.
 	 */
 	if (rflags) {
-		Conv_inv_buf_t ibuf;
+		Conv_inv_buf_t inv_buf;
 
-		(void) conv_invalid_val(ibuf, sizeof (ibuf), rflags, 0);
-		if (!cef_cp(arg, &state, TRUE, ibuf))
+		(void) conv_invalid_val(&inv_buf, rflags, 0);
+		if (!cef_cp(arg, &state, TRUE, inv_buf.buf))
 			return (FALSE);
 	}
 

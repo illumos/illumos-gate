@@ -1117,7 +1117,6 @@ parseopt_pass1(Ofl_desc *ofl, int argc, char **argv, int *error)
 				    MSG_INTL(MSG_ARG_ILLEGAL),
 				    MSG_ORIG(MSG_ARG_Z), optarg);
 				ofl->ofl_flags |= FLG_OF_FATAL;
-
 			}
 
 			break;
@@ -1554,10 +1553,13 @@ process_files_com(Ofl_desc *ofl, int argc, char **argv)
 		 * Check for mismatched input.
 		 */
 		if (rej.rej_type) {
+			Conv_reject_desc_buf_t rej_buf;
+
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(reject[rej.rej_type]),
 			    rej.rej_name ? rej.rej_name :
-			    MSG_INTL(MSG_STR_UNKNOWN), conv_reject_desc(&rej));
+			    MSG_INTL(MSG_STR_UNKNOWN),
+			    conv_reject_desc(&rej, &rej_buf));
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			return (1);
 		}

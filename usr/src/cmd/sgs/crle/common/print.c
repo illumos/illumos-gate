@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -211,6 +211,8 @@ getflags(Half flags)
 static INSCFG_RET
 scanconfig(Crle_desc * crle, Addr addr, int c_class)
 {
+	Conv_inv_buf_t 		inv_buf1, inv_buf2, inv_buf3, inv_buf4;
+	Conv_dl_flag_buf_t	dl_flag_buf;
 	Rtc_id		*id;
 	Rtc_head	*head;
 	Rtc_dir		*dirtbl;
@@ -251,7 +253,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 	/* 64-bit program with an existing 32-bit file? Abort. */
 	if (!(head->ch_cnflags & RTC_HDR_64)) {
 		(void) fprintf(stderr, MSG_INTL(MSG_ARG_CLASS),
-			crle->c_name, crle->c_confil);
+		    crle->c_name, crle->c_confil);
 		return (INSCFG_RET_FAIL);
 	}
 #else
@@ -265,7 +267,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 	 */
 	if (c_class != ELFCLASS32) {
 		(void) fprintf(stderr, MSG_INTL(MSG_ARG_CLASS),
-			crle->c_name, crle->c_confil);
+		    crle->c_name, crle->c_confil);
 		return (INSCFG_RET_FAIL);
 	}
 #endif
@@ -284,10 +286,13 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		if ((id->id_data != M_DATA) || (id->id_machine != M_MACH)) {
 			(void) fprintf(stderr, MSG_INTL(MSG_ARG_WRONGARCH),
 			    crle->c_name, crle->c_confil,
-			    conv_ehdr_data(id->id_data, CONV_FMT_ALTFILE),
-			    conv_ehdr_mach(id->id_machine, CONV_FMT_ALTFILE),
-			    conv_ehdr_data(M_DATA, CONV_FMT_ALTFILE),
-			    conv_ehdr_mach(M_MACH, CONV_FMT_ALTFILE));
+			    conv_ehdr_data(id->id_data, CONV_FMT_ALTFILE,
+			    &inv_buf1),
+			    conv_ehdr_mach(id->id_machine, CONV_FMT_ALTFILE,
+			    &inv_buf2),
+			    conv_ehdr_data(M_DATA, CONV_FMT_ALTFILE, &inv_buf3),
+			    conv_ehdr_mach(M_MACH, CONV_FMT_ALTFILE,
+			    &inv_buf4));
 			return (INSCFG_RET_FAIL);
 		}
 	}
@@ -312,13 +317,13 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 	if (head->ch_version > RTC_VER_CURRENT) {
 		if (crle->c_flags & CRLE_UPDATE) {
 			(void) fprintf(stderr, MSG_INTL(MSG_ARG_UPDATEVER),
-				crle->c_name, crle->c_confil,
-				(int)head->ch_version, RTC_VER_CURRENT);
+			    crle->c_name, crle->c_confil,
+			    (int)head->ch_version, RTC_VER_CURRENT);
 			return (INSCFG_RET_FAIL);
 		} else {
 			(void) fprintf(stderr, MSG_INTL(MSG_ARG_PRINTVER),
-				crle->c_name, crle->c_confil,
-				(int)head->ch_version, RTC_VER_CURRENT);
+			    crle->c_name, crle->c_confil,
+			    (int)head->ch_version, RTC_VER_CURRENT);
 		}
 	}
 
@@ -349,7 +354,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		const char	*fmt;
 
 		if (head->ch_dlflags)
-			fmt = conv_dl_flag(head->ch_dlflags, 0);
+			fmt = conv_dl_flag(head->ch_dlflags, 0, &dl_flag_buf);
 		else
 			fmt = MSG_ORIG(MSG_STR_EMPTY);
 
@@ -360,10 +365,13 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		 * If the file has an id block, show the information
 		 */
 		if (id)
-		    (void) printf(MSG_INTL(MSG_DMP_PLATFORM),
-			conv_ehdr_class(id->id_class, CONV_FMT_ALTFILE),
-			conv_ehdr_data(id->id_data, CONV_FMT_ALTFILE),
-			conv_ehdr_mach(id->id_machine, CONV_FMT_ALTFILE));
+			(void) printf(MSG_INTL(MSG_DMP_PLATFORM),
+			    conv_ehdr_class(id->id_class, CONV_FMT_ALTFILE,
+			    &inv_buf1),
+			    conv_ehdr_data(id->id_data, CONV_FMT_ALTFILE,
+			    &inv_buf2),
+			    conv_ehdr_mach(id->id_machine, CONV_FMT_ALTFILE,
+			    &inv_buf3));
 
 		/*
 		 * Construct the original command line argument.
@@ -380,7 +388,8 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		if (head->ch_dlflags &&
 		    (head->ch_dlflags != RTLD_REL_RELATIVE)) {
 			(void) snprintf(_cmd, PATH_MAX, MSG_ORIG(MSG_CMD_FLAGS),
-			    conv_dl_flag(head->ch_dlflags, CONV_FMT_ALTCRLE));
+			    conv_dl_flag(head->ch_dlflags, CONV_FMT_ALTCRLE,
+			    &dl_flag_buf));
 			cmd = strcpy(alloca(strlen(_cmd) + 1), _cmd);
 			if (list_append(&cmdline, cmd) == 0)
 				return (INSCFG_RET_FAIL);
@@ -706,10 +715,10 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 
 			/* LINTED */
 			fltrtbl = (Rtc_fltr *)
-				(CAST_PTRINT(char *, head->ch_fltr) + addr);
+			    (CAST_PTRINT(char *, head->ch_fltr) + addr);
 			/* LINTED */
 			fltetbl = (Rtc_flte *)
-				(CAST_PTRINT(char *, head->ch_flte) + addr);
+			    (CAST_PTRINT(char *, head->ch_flte) + addr);
 
 			(void) printf(MSG_INTL(MSG_FLT_TITLE));
 
@@ -744,9 +753,9 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 	 */
 	if (head->ch_resbgn && ((crle->c_flags & CRLE_UPDATE) == 0))
 		(void) printf(MSG_INTL(MSG_DMP_RESV),
-			(u_longlong_t)head->ch_resbgn,
-			(u_longlong_t)head->ch_resend,
-			(u_longlong_t)(head->ch_resend - head->ch_resbgn));
+		    (u_longlong_t)head->ch_resbgn,
+		    (u_longlong_t)head->ch_resend,
+		    (u_longlong_t)(head->ch_resend - head->ch_resbgn));
 
 	/*
 	 * If there's no hash table there's nothing else to process.
@@ -952,9 +961,10 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 	 * Scan the hash buckets looking for valid entries.
 	 */
 	for (ndx = 0; ndx < bkts; ndx++, hash++) {
-		Rtc_obj		*obj;
-		const char	*str;
-		Word		_ndx;
+		Conv_config_obj_buf_t	config_obj_buf;
+		Rtc_obj			*obj;
+		const char		*str;
+		Word			_ndx;
 
 		if (*hash == 0)
 			continue;
@@ -963,7 +973,7 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 		str = strtbl + obj->co_name;
 
 		(void) printf(MSG_INTL(MSG_DMP_HASHENT_1), obj->co_id, ndx,
-			str, conv_config_obj(obj->co_flags));
+		    str, conv_config_obj(obj->co_flags, &config_obj_buf));
 
 		/*
 		 * Determine whether there are other objects chained to this
@@ -974,7 +984,8 @@ scanconfig(Crle_desc * crle, Addr addr, int c_class)
 			str = strtbl + obj->co_name;
 
 			(void) printf(MSG_INTL(MSG_DMP_HASHENT_2), obj->co_id,
-			    str, conv_config_obj(obj->co_flags));
+			    str, conv_config_obj(obj->co_flags,
+			    &config_obj_buf));
 		}
 	}
 	(void) printf(MSG_ORIG(MSG_STR_NL));
@@ -991,6 +1002,7 @@ inspectconfig(Crle_desc * crle, int c_class)
 	Addr		addr;
 	struct stat	status;
 	const char	*caller = crle->c_name, *file = crle->c_confil;
+	Conv_inv_buf_t	inv_buf1, inv_buf2, inv_buf3;
 
 	/*
 	 * Open the configuration file, determine its size and map it in.
@@ -1039,12 +1051,12 @@ inspectconfig(Crle_desc * crle, int c_class)
 				 */
 				(void) printf(MSG_INTL(MSG_DEF_NOCONF), file);
 				(void) printf(MSG_INTL(MSG_DMP_PLATFORM),
-					conv_ehdr_class(M_CLASS,
-						CONV_FMT_ALTFILE),
-					conv_ehdr_data(M_DATA,
-						CONV_FMT_ALTFILE),
-					conv_ehdr_mach(M_MACH,
-						CONV_FMT_ALTFILE));
+				    conv_ehdr_class(M_CLASS,
+				    CONV_FMT_ALTFILE, &inv_buf1),
+				    conv_ehdr_data(M_DATA,
+				    CONV_FMT_ALTFILE, &inv_buf2),
+				    conv_ehdr_mach(M_MACH,
+				    CONV_FMT_ALTFILE, &inv_buf3));
 
 
 				if (crle->c_flags & CRLE_AOUT) {

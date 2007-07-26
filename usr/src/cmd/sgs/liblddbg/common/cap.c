@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,8 +56,11 @@ Dbg_cap_hw_filter(Lm_list *lml, const char *dir, Rt_map *flmp)
 void
 Dbg_cap_val_hw1(Lm_list *lml, Xword val, Half mach)
 {
+	Conv_cap_val_hw1_buf_t cap_val_hw1_buf;
+
 	Dbg_util_nl(lml, DBG_NL_FRC);
-	dbg_print(lml, MSG_INTL(MSG_CAP_VAL_HW1), conv_cap_val_hw1(val, mach));
+	dbg_print(lml, MSG_INTL(MSG_CAP_VAL_HW1),
+	    conv_cap_val_hw1(val, mach, &cap_val_hw1_buf));
 	Dbg_util_nl(lml, DBG_NL_FRC);
 }
 
@@ -82,11 +85,15 @@ Dbg_cap_mapfile(Lm_list *lml, Xword tag, Xword val, Half mach)
 void
 Dbg_cap_sec_entry(Lm_list *lml, uint_t type, Xword tag, Xword val, Half mach)
 {
+	Conv_inv_buf_t		inv_buf;
+	Conv_cap_val_buf_t	cap_val_buf;
+
 	if (DBG_NOTCLASS(DBG_C_CAP))
 		return;
 
 	dbg_print(lml, MSG_INTL(MSG_CAP_SEC_ENTRY), MSG_INTL(captype[type]),
-	    conv_cap_tag(tag), conv_cap_val(tag, val, mach));
+	    conv_cap_tag(tag, &inv_buf), conv_cap_val(tag, val, mach,
+	    &cap_val_buf));
 }
 
 void
@@ -110,10 +117,12 @@ Elf_cap_title(Lm_list *lml)
 void
 Elf_cap_entry(Lm_list *lml, Cap *cap, int ndx, Half mach)
 {
-	char	index[INDEX_STR_SIZE];
+	Conv_inv_buf_t		inv_buf;
+	Conv_cap_val_buf_t	cap_val_buf;
+	char			index[INDEX_STR_SIZE];
 
 	(void) snprintf(index, INDEX_STR_SIZE, MSG_ORIG(MSG_FMT_INDEX), ndx);
 	dbg_print(lml, MSG_INTL(MSG_CAP_ELF_ENTRY), index,
-	    conv_cap_tag(cap->c_tag),
-	    conv_cap_val(cap->c_tag, cap->c_un.c_val, mach));
+	    conv_cap_tag(cap->c_tag, &inv_buf),
+	    conv_cap_val(cap->c_tag, cap->c_un.c_val, mach, &cap_val_buf));
 }

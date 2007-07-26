@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -88,12 +88,9 @@ static const Msg rels[R_SPARC_NUM] = {
 #endif
 
 const char *
-conv_reloc_SPARC_type(Word type, int fmt_flags)
+conv_reloc_SPARC_type(Word type, int fmt_flags, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
-
 	if (type >= R_SPARC_NUM)
-		return (conv_invalid_val(string, CONV_INV_STRSIZE,
-			type, fmt_flags));
+		return (conv_invalid_val(inv_buf, type, fmt_flags));
 	return (MSG_ORIG(rels[type]));
 }

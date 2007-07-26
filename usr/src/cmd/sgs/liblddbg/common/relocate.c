@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -199,6 +199,7 @@ void
 Dbg_reloc_doact(Lm_list *lml, int caller, Half mach, Word type, Word rtype,
     Xword off, Xword value, const char *symname, Os_desc *osp)
 {
+	Conv_inv_buf_t	inv_buf;
 	const char	*secname;
 
 	if (DBG_NOTCLASS(DBG_C_RELOC))
@@ -213,8 +214,8 @@ Dbg_reloc_doact(Lm_list *lml, int caller, Half mach, Word type, Word rtype,
 		secname = MSG_ORIG(MSG_STR_EMPTY);
 
 	Elf_reloc_entry_2(lml, caller, MSG_ORIG(MSG_STR_EMPTY), type,
-	    conv_reloc_type(mach, rtype, 0), off, value, secname, symname,
-	    MSG_ORIG(MSG_STR_EMPTY));
+	    conv_reloc_type(mach, rtype, 0, &inv_buf),
+	    off, value, secname, symname, MSG_ORIG(MSG_STR_EMPTY));
 }
 
 void
@@ -233,7 +234,8 @@ Dbg_reloc_dooutrel(Lm_list *lml, Word type)
 void
 Dbg_reloc_discard(Lm_list *lml, Half mach, Rel_desc *rsp)
 {
-	Is_desc	*isp;
+	Conv_inv_buf_t	inv_buf;
+	Is_desc		*isp;
 
 	if (DBG_NOTCLASS(DBG_C_RELOC))
 		return;
@@ -242,23 +244,26 @@ Dbg_reloc_discard(Lm_list *lml, Half mach, Rel_desc *rsp)
 
 	isp = rsp->rel_isdesc;
 	dbg_print(lml, MSG_INTL(MSG_REL_DISCARDED), isp->is_basename,
-	    isp->is_file->ifl_name, conv_reloc_type(mach, rsp->rel_rtype, 0),
+	    isp->is_file->ifl_name,
+	    conv_reloc_type(mach, rsp->rel_rtype, 0, &inv_buf),
 	    EC_OFF(rsp->rel_roffset));
 }
 
 void
 Dbg_reloc_transition(Lm_list *lml, Half mach, Word rtype, Rel_desc *rsp)
 {
-	Is_desc	*isp;
+	Conv_inv_buf_t	inv_buf1, inv_buf2;
+	Is_desc		*isp;
 
 	if (DBG_NOTCLASS(DBG_C_RELOC))
 		return;
 
 	isp = rsp->rel_isdesc;
 	dbg_print(lml, MSG_INTL(MSG_REL_TRANSITION),
-	    conv_reloc_type(mach, rsp->rel_rtype, 0), isp->is_basename,
-	    isp->is_file->ifl_name, EC_OFF(rsp->rel_roffset), rsp->rel_sname,
-	    conv_reloc_type(mach, rtype, 0));
+	    conv_reloc_type(mach, rsp->rel_rtype, 0, &inv_buf1),
+	    isp->is_basename, isp->is_file->ifl_name,
+	    EC_OFF(rsp->rel_roffset), rsp->rel_sname,
+	    conv_reloc_type(mach, rtype, 0, &inv_buf2));
 }
 
 void
@@ -306,7 +311,7 @@ Dbg_reloc_sloppycomdat(Lm_list *lml, const char *secname, Sym_desc *sdp)
 		return;
 
 	nfname = (sdp && sdp->sd_file && sdp->sd_file->ifl_name)
-		? sdp->sd_file->ifl_name : MSG_INTL(MSG_STR_NULL);
+	    ? sdp->sd_file->ifl_name : MSG_INTL(MSG_STR_NULL);
 
 	dbg_print(lml, MSG_INTL(MSG_REL_SLOPPYCOMDAT), secname, nfname);
 }
@@ -318,6 +323,7 @@ void
 Dbg_reloc_ors_entry(Lm_list *lml, int caller, Word type, Half mach,
     Rel_desc *orsp)
 {
+	Conv_inv_buf_t	inv_buf;
 	const char	*secname, *symname;
 
 	if (DBG_NOTCLASS(DBG_C_RELOC))
@@ -346,8 +352,9 @@ Dbg_reloc_ors_entry(Lm_list *lml, int caller, Word type, Half mach,
 		symname = MSG_ORIG(MSG_STR_EMPTY);
 
 	Elf_reloc_entry_2(lml, caller, MSG_INTL(MSG_STR_OUT), type,
-	    conv_reloc_type(mach, orsp->rel_rtype, 0), orsp->rel_roffset,
-	    orsp->rel_raddend, secname, symname, MSG_ORIG(MSG_STR_EMPTY));
+	    conv_reloc_type(mach, orsp->rel_rtype, 0, &inv_buf),
+	    orsp->rel_roffset, orsp->rel_raddend, secname, symname,
+	    MSG_ORIG(MSG_STR_EMPTY));
 }
 
 /*
@@ -357,6 +364,7 @@ void
 Dbg_reloc_ars_entry(Lm_list *lml, int caller, Word type, Half mach,
     Rel_desc *arsp)
 {
+	Conv_inv_buf_t	inv_buf;
 	const char	*secname;
 
 	if (DBG_NOTCLASS(DBG_C_RELOC))
@@ -370,9 +378,9 @@ Dbg_reloc_ars_entry(Lm_list *lml, int caller, Word type, Half mach,
 		secname = arsp->rel_osdesc->os_name;
 
 	Elf_reloc_entry_2(lml, caller, MSG_INTL(MSG_STR_ACT), type,
-	    conv_reloc_type(mach, arsp->rel_rtype, 0), arsp->rel_roffset,
-	    arsp->rel_raddend, secname, arsp->rel_sym->sd_name,
-	    MSG_ORIG(MSG_STR_EMPTY));
+	    conv_reloc_type(mach, arsp->rel_rtype, 0, &inv_buf),
+	    arsp->rel_roffset, arsp->rel_raddend, secname,
+	    arsp->rel_sym->sd_name, MSG_ORIG(MSG_STR_EMPTY));
 }
 
 void
@@ -578,6 +586,7 @@ Elf_reloc_entry_1(Lm_list *lml, int caller, const char *prestr, Half mach,
     Word type, void *reloc, const char *secname, const char *symname,
     const char *poststr)
 {
+	Conv_inv_buf_t	inv_buf;
 	Addr		off;
 	Sxword		add;
 	const char	*str;
@@ -585,13 +594,15 @@ Elf_reloc_entry_1(Lm_list *lml, int caller, const char *prestr, Half mach,
 	if (type == SHT_RELA) {
 		Rela	*rela = (Rela *)reloc;
 
-		str = conv_reloc_type(mach, ELF_R_TYPE(rela->r_info), 0);
+		str = conv_reloc_type(mach, ELF_R_TYPE(rela->r_info),
+		    0, &inv_buf);
 		off = rela->r_offset;
 		add = rela->r_addend;
 	} else {
 		Rel	*rel = (Rel *)reloc;
 
-		str = conv_reloc_type(mach, ELF_R_TYPE(rel->r_info), 0);
+		str = conv_reloc_type(mach, ELF_R_TYPE(rel->r_info),
+		    0, &inv_buf);
 		off = rel->r_offset;
 		add = 0;
 	}
@@ -615,8 +626,10 @@ void
 Elf_reloc_apply_reg(Lm_list *lml, int caller, Half mach, Xword offset,
     Xword value)
 {
+	Conv_inv_buf_t inv_buf;
+
 	if (caller == ELF_DBG_RTLD)
 		dbg_print(lml, MSG_INTL(MSG_REL_RT_APLREG),
-		    conv_sym_value(mach, STT_SPARC_REGISTER, offset),
-		    EC_XWORD(value));
+		    conv_sym_value(mach, STT_SPARC_REGISTER,
+		    offset, &inv_buf), EC_XWORD(value));
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,13 +42,10 @@ static const Msg registers[] = { 0,
 };
 
 const char *
-conv_sym_SPARC_value(Addr val, int fmt_flags)
+conv_sym_SPARC_value(Addr val, int fmt_flags, Conv_inv_buf_t *inv_buf)
 {
-	static Conv_inv_buf_t	string;
-
 	if ((val < STO_SPARC_REGISTER_G1) || (val > STO_SPARC_REGISTER_G7)) {
-		return (conv_invalid_val(string, CONV_INV_STRSIZE,
-			val, fmt_flags));
+		return (conv_invalid_val(inv_buf, val, fmt_flags));
 	} else {
 		return (MSG_ORIG(registers[val]));
 	}

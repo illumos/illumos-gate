@@ -254,7 +254,8 @@ void
 Dbg_util_edge_in(Lm_list *lml, Rt_map *clmp, uint_t flags, Rt_map *dlmp,
     int ndx, int flag)
 {
-	const char	*str;
+	Conv_bnd_type_buf_t	bnd_type_buf;
+	const char		*str;
 
 	if (DBG_NOTCLASS(DBG_C_INIT))
 		return;
@@ -277,7 +278,7 @@ Dbg_util_edge_in(Lm_list *lml, Rt_map *clmp, uint_t flags, Rt_map *dlmp,
 		dbg_print(lml, MSG_INTL(MSG_UTL_EDGE_START), ndx, NAME(dlmp));
 	} else
 		dbg_print(lml, MSG_INTL(MSG_UTL_EDGE_IN), ndx, NAME(dlmp),
-		    NAME(clmp), conv_bnd_type(flags));
+		    NAME(clmp), conv_bnd_type(flags, &bnd_type_buf));
 
 	ectoggle = 1;
 }
@@ -334,8 +335,8 @@ static const Msg	tags[] = {
 void
 Dbg_util_lcinterface(Rt_map *lmp, int tag, char *val)
 {
-	const char		*str;
-	static Conv_inv_buf_t	string;
+	const char	*str;
+	Conv_inv_buf_t	inv_buf;
 
 	if (DBG_NOTDETAIL())
 		return;
@@ -343,7 +344,7 @@ Dbg_util_lcinterface(Rt_map *lmp, int tag, char *val)
 	if (tag < CI_MAX)
 		str = MSG_ORIG(tags[tag]);
 	else
-		str = conv_invalid_val(string, CONV_INV_STRSIZE, tag, 0);
+		str = conv_invalid_val(&inv_buf, tag, 0);
 
 	dbg_print(LIST(lmp), MSG_INTL(MSG_UTL_LCINTERFACE), NAME(lmp), str,
 	    EC_NATPTR(val));
@@ -352,8 +353,8 @@ Dbg_util_lcinterface(Rt_map *lmp, int tag, char *val)
 void
 Dbg_unused_lcinterface(Rt_map *nlmp, Rt_map *olmp, int tag)
 {
-	const char		*str;
-	static Conv_inv_buf_t	string;
+	const char	*str;
+	Conv_inv_buf_t	inv_buf;
 
 	if (DBG_NOTCLASS(DBG_C_UNUSED))
 		return;
@@ -361,7 +362,7 @@ Dbg_unused_lcinterface(Rt_map *nlmp, Rt_map *olmp, int tag)
 	if (tag < CI_MAX)
 		str = MSG_ORIG(tags[tag]);
 	else
-		str = conv_invalid_val(string, CONV_INV_STRSIZE, tag, 0);
+		str = conv_invalid_val(&inv_buf, tag, 0);
 
 	dbg_print(LIST(nlmp), MSG_INTL(MSG_USD_LCINTERFACE), NAME(nlmp), str,
 	    NAME(olmp));
