@@ -74,6 +74,56 @@ typedef enum  {
 
 #define	MAC_ADDR_REG_MASK		0xFFFF
 
+/*
+ * Neptune port PHY type and Speed encoding.
+ *
+ * Per port, 4 bits are reserved for port speed (1G/10G) and 4 bits
+ * are reserved for port PHY type (Copper/Fibre). Bits 0 thru 3 are for port0
+ * speed, bits 4 thru 7 are for port1 speed, bits 8 thru 11 are for port2 speed
+ * and bits 12 thru 15 are for port3 speed. Thus, the first 16 bits hold the
+ * speed encoding for the 4 ports. The next 16 bits (16 thru 31) hold the phy
+ * type encoding for the ports 0 thru 3.
+ *
+ *  p3phy  p2phy  p1phy  p0phy  p3spd p2spd  p1spd p0spd
+ *    |      |      |      |      |     |      |     |
+ *   ---    ---    ---    ---    ---   ---    ---   ---
+ *  /   \  /   \  /   \  /   \  /   \ /   \  /   \ /   \
+ * 31..28 27..24 23..20 19..16 15..12 11.. 8 7.. 4 3.. 0
+ */
+#define	NXGE_PORT_SPD_NONE	0x0
+#define	NXGE_PORT_SPD_1G	0x1
+#define	NXGE_PORT_SPD_10G	0x2
+#define	NXGE_PORT_SPD_RSVD	0x7
+
+#define	NXGE_PHY_NONE		0x0
+#define	NXGE_PHY_COPPER		0x1
+#define	NXGE_PHY_FIBRE		0x2
+#define	NXGE_PHY_RSVD		0x7
+
+#define	NXGE_PORT_SPD_SHIFT	0
+#define	NXGE_PORT_SPD_MASK	0x0f
+
+#define	NXGE_PHY_SHIFT		16
+#define	NXGE_PHY_MASK		0x0f0000
+
+#define	NXGE_PORT_1G_COPPER	(NXGE_PORT_SPD_1G |	\
+	(NXGE_PHY_COPPER << NXGE_PHY_SHIFT))
+#define	NXGE_PORT_10G_COPPER	(NXGE_PORT_SPD_10G |	\
+	(NXGE_PHY_COPPER << NXGE_PHY_SHIFT))
+#define	NXGE_PORT_1G_FIBRE	(NXGE_PORT_SPD_1G |	\
+	(NXGE_PHY_FIBRE << NXGE_PHY_SHIFT))
+#define	NXGE_PORT_10G_FIBRE	(NXGE_PORT_SPD_10G |	\
+	(NXGE_PHY_FIBRE << NXGE_PHY_SHIFT))
+#define	NXGE_PORT_NONE		(NXGE_PORT_SPD_NONE |	\
+	(NXGE_PHY_NONE << NXGE_PHY_SHIFT))
+#define	NXGE_PORT_RSVD		(NXGE_PORT_SPD_RSVD |	\
+	(NXGE_PHY_RSVD << NXGE_PHY_SHIFT))
+
+#define	NXGE_PORT_TYPE_MASK	(NXGE_PORT_SPD_MASK | NXGE_PHY_MASK)
+
+/* number of bits used for phy/spd encoding per port */
+#define	NXGE_PORT_TYPE_SHIFT	4
+
 /* Network Modes */
 
 typedef enum nxge_network_mode {

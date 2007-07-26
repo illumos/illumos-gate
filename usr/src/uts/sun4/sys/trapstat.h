@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,7 +107,8 @@ typedef struct tstat_data {
 #define	TSTAT_PROBE_NLAPS	10
 
 #ifdef sun4v
-#define	TSTAT_TLBENT_NINSTR	32
+#define	TSTAT_TRAPCNT_NINSTR	8
+#define	TSTAT_TLBENT_NINSTR	64
 #define	TSTAT_ENT_IMMUMISS	0x09
 #define	TSTAT_ENT_DMMUMISS	0x31
 #endif
@@ -140,6 +140,7 @@ typedef struct tstat_instr {
 #ifdef sun4v
 	tstat_tlbent_t	tinst_immumiss;
 	tstat_tlbent_t	tinst_dmmumiss;
+	uint32_t	tinst_trapcnt[TSTAT_TRAPCNT_NINSTR];
 #endif
 } tstat_instr_t;
 
@@ -151,20 +152,33 @@ typedef struct tstat_tsbmiss_patch_entry {
 #endif
 
 #ifdef sun4v
-#if (NCPU > 128)
-#error "sun4v trapstat supports upto 128 cpus"
+
+#if (NCPU > 508)
+#error "sun4v trapstat supports up to 508 cpus"
 #endif
+
 #define	TSTAT_TLB_STATS		0x1		/* cpu_tstat_flags */
-#define	TSTAT_INSTR_SIZE	(sizeof (tstat_instr_t))
-#define	TSTAT_TBA_MASK		~((1 << 15) - 1)	/* 32K per cpu */
+#define	TSTAT_INSTR_SIZE	\
+	((sizeof (tstat_instr_t) + MMU_PAGESIZE - 1) & ~(MMU_PAGESIZE - 1))
+#define	TSTAT_DATA_SHIFT	13
+#define	TSTAT_DATA_SIZE		(1 << TSTAT_DATA_SHIFT)	/* 8K per CPU */
+#define	TSTAT_TBA_MASK		~((1 << 15) - 1)	/* 32K boundary */
+
+#define	TSTAT_CPU0_DATA_OFFS(tcpu, mem)	\
+	((uintptr_t)(tcpu)->tcpu_ibase + TSTAT_INSTR_SIZE + \
+	    offsetof(tstat_data_t, mem))
+
 #else /* sun4v */
+
 #define	TSTAT_INSTR_PAGES	((sizeof (tstat_instr_t) >> MMU_PAGESHIFT) + 1)
 #define	TSTAT_INSTR_SIZE	(TSTAT_INSTR_PAGES * MMU_PAGESIZE)
 #define	TSTAT_TBA_MASK		~((1 << 16) - 1)	/* 64K per cpu */
-#endif /* sun4v */
 
 #define	TSTAT_DATA_OFFS(tcpu, mem)	\
 	((uintptr_t)(tcpu)->tcpu_dbase + offsetof(tstat_data_t, mem))
+
+#endif /* sun4v */
+
 #define	TSTAT_INSTR_OFFS(tcpu, mem)	\
 	((uintptr_t)(tcpu)->tcpu_ibase + offsetof(tstat_instr_t, mem))
 

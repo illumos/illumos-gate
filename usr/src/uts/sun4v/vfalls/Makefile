@@ -19,23 +19,32 @@
 # CDDL HEADER END
 #
 #
+# uts/sun4v/vfalls/Makefile
 # Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# This Makefile builds the UltraSPARC-T2 Performance Counter BackEnd (PCBE).
+#	This makefile drives the production of the UltraSPARC-T2+ cpu module.
+#
+#	sun4v implementation architecture dependent
 #
 
-UTSBASE = ../..
+#
+#	Path to the base of the uts directory tree (usually /usr/src/uts).
+#
+UTSBASE	= ../..
 
 #
-#	Define module and object file sets.
+#	Define the module and object file sets.
 #
-MODULE		= pcbe.SUNW,UltraSPARC-T2
-OBJECTS		= $(N2_PCBE_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(N2_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_PSM_PCBE_DIR)/$(MODULE)
+MODULE		= SUNW,UltraSPARC-T2+
+OBJECTS		= $(NIAGARA2CPU_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(NIAGARA2CPU_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_PSM_CPU_DIR)/$(MODULE)
+
+CPU_DIR		= .
+HERE		= ../vfalls
 
 #
 #	Include common rules.
@@ -43,23 +52,27 @@ ROOTMODULE	= $(ROOT_PSM_PCBE_DIR)/$(MODULE)
 include $(UTSBASE)/sun4v/Makefile.sun4v
 
 #
-#	Define targets.
+#	Override defaults
 #
-ALL_TARGET	= $(BINARY)
-LINT_MODULE	= niagara2_pcbe
-LINT_TARGET	= $(LINT_MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+CLEANFILES	+= $(CPULIB) $(SYM_MOD)
+
+#
+#	Define targets
+#
+ALL_TARGET	= $(SYM_MOD)
+LINT_TARGET	= $(MODULE).lint
+INSTALL_TARGET	= def $(BINARY) $(ROOTMODULE)
 
 #
 # lint pass one enforcement
 #
-CFLAGS += -DNIAGARA2_IMPL
+CFLAGS += $(CCVERBOSE) -DVFALLS_IMPL -DN2_ERRATUM_181_WORKAROUND
 
 #
-# niagara2-specific flags
+# cpu-module-specific flags
 #
-CPPFLAGS += -DNIAGARA2_IMPL
-AS_CPPFLAGS += -DNIAGARA2_IMPL
+CPPFLAGS += -DCPU_MODULE -DVFALLS_IMPL -DN2_ERRATUM_181_WORKAROUND
+AS_CPPFLAGS += -DCPU_MODULE -DVFALLS_IMPL -DN2_ERRATUM_181_WORKAROUND
 
 #
 #	Default build targets.
@@ -82,7 +95,14 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-#
+$(CPULIB):	$(BINARY)
+	$(BUILD.SO) $(BINARY)
+
+$(SYM_MOD):	$(UNIX_O) $(CPULIB)
+	@echo "resolving symbols against unix.o"
+	@(cd $(UNIX_DIR); pwd; \
+	    CPU_DIR=$(HERE) SYM_MOD=$(HERE)/$(SYM_MOD) $(MAKE) symcheck)
+
 #	Include common targets.
 #
-include $(UTSBASE)/sun4v/Makefile.targ
+include $(UTSBASE)/$(PLATFORM)/Makefile.targ

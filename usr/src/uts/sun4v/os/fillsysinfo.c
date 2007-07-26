@@ -185,12 +185,12 @@ fill_cpu(md_t *mdp, mde_cookie_t cpuc)
 	cpunode->ecache_setsize =
 	    cpunode->ecache_size / cpunode->ecache_associativity;
 
-		/*
-		 * Start off by assigning the cpu id as the default
-		 * mapping index.
-		 */
-
+	/*
+	 * Initialize the mapping for exec unit, chip and core.
+	 */
 	cpunode->exec_unit_mapping = NO_EU_MAPPING_FOUND;
+	cpunode->l2_cache_mapping = NO_MAPPING_FOUND;
+	cpunode->core_mapping = NO_CORE_MAPPING_FOUND;
 
 	if (ecache_setsize == 0)
 		ecache_setsize = cpunode->ecache_setsize;
@@ -203,6 +203,64 @@ void
 empty_cpu(int cpuid)
 {
 	bzero(&cpunodes[cpuid], sizeof (struct cpu_node));
+}
+
+/*
+ * Use L2 cache node to derive the chip mapping.
+ */
+void
+setup_chip_mappings(md_t *mdp)
+{
+	uint64_t ncache, ncpu;
+	mde_cookie_t *node, *cachelist;
+	int i, j;
+	processorid_t cpuid;
+	int idx = 0;
+
+	ncache = md_alloc_scan_dag(mdp, md_root_node(mdp), "cache",
+	    "fwd", &cachelist);
+
+	/*
+	 * The "cache" node is optional in MD, therefore ncaches can be 0.
+	 */
+	if (ncache < 1) {
+		return;
+	}
+
+	for (i = 0; i < ncache; i++) {
+		uint64_t cache_level;
+		uint64_t lcpuid;
+
+		if (md_get_prop_val(mdp, cachelist[i], "level", &cache_level))
+			continue;
+
+		if (cache_level != 2)
+			continue;
+
+		/*
+		 * Found a l2 cache node. Find out the cpu nodes it
+		 * points to.
+		 */
+		ncpu = md_alloc_scan_dag(mdp, cachelist[i], "cpu",
+		    "back", &node);
+
+		if (ncpu < 1)
+			continue;
+
+		for (j = 0; j < ncpu; j++) {
+			if (md_get_prop_val(mdp, node[j], "id", &lcpuid))
+				continue;
+			if (lcpuid >= NCPU)
+				continue;
+			cpuid = (processorid_t)lcpuid;
+			cpunodes[cpuid].l2_cache_mapping = idx;
+		}
+		md_free_scan_dag(mdp, &node);
+
+		idx++;
+	}
+
+	md_free_scan_dag(mdp, &cachelist);
 }
 
 void
@@ -344,6 +402,7 @@ cpu_setup_common(char **cpu_module_isa_set)
 	for (i = 0; i < nocpus; i++)
 		fill_cpu(mdp, cpulist[i]);
 
+	setup_chip_mappings(mdp);
 	setup_exec_unit_mappings(mdp);
 
 	/*

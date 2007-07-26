@@ -267,6 +267,40 @@
  * be added via a hybrid scheme, where the same 4M virtual address is used
  * on different MMUs.
  *
+ * On sun4v architecture, we currently don't use hybrid scheme as it imposes
+ * additional restriction on live migration and transparent CPU replacement.
+ * Instead, we increase the number of supported CPUs by reducing the virtual
+ * address space requirements per CPU via shared interposing trap table as
+ * follows:
+ *
+ *                                          Offset (within 4MB page)
+ *       +------------------------------------+- 0x400000
+ *       |  CPU 507 trap statistics (8KB)     |   .
+ *       |- - - - - - - - - - - - - - - - - - +- 0x3fe000
+ *       |                                    |
+ *       |   ...                              |
+ *       |                                    |
+ *       |- - - - - - - - - - - - - - - - - - +- 0x00c000
+ *       |  CPU 1 trap statistics (8KB)       |   .
+ *       |- - - - - - - - - - - - - - - - - - +- 0x00a000
+ *       |  CPU 0 trap statistics (8KB)       |   .
+ *       |- - - - - - - - - - - - - - - - - - +- 0x008000
+ *       |  Shared trap handler continuation  |   .
+ *       |- - - - - - - - - - - - - - - - - - +- 0x006000
+ *       |  Non-trap instruction, TL>0        |   .
+ *       |- - - - - - - - - - - - - - - - - - +- 0x004000
+ *       |  Trap instruction, TL=0            |   .
+ *       |- - - - - - - - - - - - - - - - - - +- 0x002000
+ *       |  Non-trap instruction, TL=0        |   .
+ *       +------------------------------------+- 0x000000
+ *
+ * Note that each CPU has its own 8K space for its trap statistics but
+ * shares the same interposing trap handlers.  Interposing trap handlers
+ * use the CPU ID to determine the location of per CPU trap statistics
+ * area dynamically. This increases the interposing trap handler overhead,
+ * but is acceptable as it allows us to support up to 508 CPUs with one
+ * 4MB page on sun4v architecture. Support for additional CPUs can be
+ * added via hybrid scheme as mentioned earlier.
  *
  * TLB Statistics
  *
@@ -504,15 +538,21 @@ static uint_t		tstat_user_pgszs;	/* # of user page sizes */
 static size_t		tstat_data_t_size;
 static size_t		tstat_data_t_exported_size;
 
+#ifndef sun4v
+
 static size_t		tstat_data_pages;  /* number of pages of tstat data */
 static size_t		tstat_data_size;   /* tstat data size in bytes */
 static size_t		tstat_total_pages; /* #data pages + #instr pages */
 static size_t		tstat_total_size;  /* tstat data size + instr size */
-#ifdef sun4v
+
+#else /* sun4v */
+
 static caddr_t		tstat_va;	/* VA of memory reserved for TBA */
 static pfn_t		tstat_pfn;	/* PFN of memory reserved for TBA */
 static boolean_t	tstat_fast_tlbstat = B_FALSE;
-#endif
+static int		tstat_traptab_initialized;
+
+#endif /* sun4v */
 
 /*
  * In the above block comment, see "TLB Statistics: TLB Misses versus
@@ -573,25 +613,25 @@ trapstat_load_tlb(void)
 #ifndef sun4v
 	for (i = 0; i < tstat_total_pages; i++, va += MMU_PAGESIZE) {
 		tte.tte_inthi = TTE_VALID_INT | TTE_SZ_INT(TTE8K) |
-			TTE_PFN_INTHI(tcpu->tcpu_pfn[i]);
+		    TTE_PFN_INTHI(tcpu->tcpu_pfn[i]);
 		if (i < TSTAT_INSTR_PAGES) {
 			tte.tte_intlo = TTE_PFN_INTLO(tcpu->tcpu_pfn[i]) |
-				TTE_LCK_INT | TTE_CP_INT | TTE_PRIV_INT;
+			    TTE_LCK_INT | TTE_CP_INT | TTE_PRIV_INT;
 			sfmmu_itlb_ld_kva(va, &tte);
 		} else {
 			tte.tte_intlo = TTE_PFN_INTLO(tcpu->tcpu_pfn[i]) |
-				TTE_LCK_INT | TTE_CP_INT | TTE_CV_INT |
-				TTE_PRIV_INT | TTE_HWWR_INT;
+			    TTE_LCK_INT | TTE_CP_INT | TTE_CV_INT |
+			    TTE_PRIV_INT | TTE_HWWR_INT;
 			sfmmu_dtlb_ld_kva(va, &tte);
 		}
 	}
 #else /* sun4v */
 	tte.tte_inthi = TTE_VALID_INT | TTE_PFN_INTHI(tstat_pfn);
 	tte.tte_intlo = TTE_PFN_INTLO(tstat_pfn) | TTE_CP_INT |
-		TTE_CV_INT | TTE_PRIV_INT | TTE_HWWR_INT |
-		TTE_SZ_INTLO(TTE4M);
+	    TTE_CV_INT | TTE_PRIV_INT | TTE_HWWR_INT |
+	    TTE_SZ_INTLO(TTE4M);
 	ret = hv_mmu_map_perm_addr(va, KCONTEXT, *(uint64_t *)&tte,
-		MAP_ITLB | MAP_DTLB);
+	    MAP_ITLB | MAP_DTLB);
 
 	if (ret != H_EOK)
 		cmn_err(CE_PANIC, "trapstat: cannot map new TBA "
@@ -963,15 +1003,16 @@ trapstat_snapshot()
 #define	TSTAT_RETENT_TIME_LD	19
 #define	TSTAT_RETENT_TIME_ST	21
 #else /* sun4v */
-#define	TSTAT_RETENT_STATHI	1
-#define	TSTAT_RETENT_STATLO	2
-#define	TSTAT_RETENT_SHIFT	5
-#define	TSTAT_RETENT_COUNT_LD	7
-#define	TSTAT_RETENT_COUNT_ST	9
-#define	TSTAT_RETENT_TMPTSHI	10
-#define	TSTAT_RETENT_TMPTSLO	11
-#define	TSTAT_RETENT_TIME_LD	13
-#define	TSTAT_RETENT_TIME_ST	15
+#define	TSTAT_RETENT_TDATASHFT	2
+#define	TSTAT_RETENT_STATHI	4
+#define	TSTAT_RETENT_STATLO	6
+#define	TSTAT_RETENT_SHIFT	9
+#define	TSTAT_RETENT_COUNT_LD	11
+#define	TSTAT_RETENT_COUNT_ST	13
+#define	TSTAT_RETENT_TMPTSHI	14
+#define	TSTAT_RETENT_TMPTSLO	16
+#define	TSTAT_RETENT_TIME_LD	18
+#define	TSTAT_RETENT_TIME_ST	20
 #endif /* sun4v */
 
 static void
@@ -979,7 +1020,12 @@ trapstat_tlbretent(tstat_percpu_t *tcpu, tstat_tlbretent_t *ret,
     tstat_missdata_t *data)
 {
 	uint32_t *ent = ret->ttlbrent_instr, shift;
-	uintptr_t base, tmptick = TSTAT_DATA_OFFS(tcpu, tdata_tmptick);
+	uintptr_t base;
+#ifndef sun4v
+	uintptr_t tmptick = TSTAT_DATA_OFFS(tcpu, tdata_tmptick);
+#else
+	uintptr_t tmptick = TSTAT_CPU0_DATA_OFFS(tcpu, tdata_tmptick);
+#endif
 
 	/*
 	 * This is the entry executed upon return from the TLB/TSB miss
@@ -1018,8 +1064,12 @@ trapstat_tlbretent(tstat_percpu_t *tcpu, tstat_tlbretent_t *ret,
 	    0xc4706000,		/* stx   %g2, [%g1 + tmiss_time]	*/
 	    0x83f00000		/* retry				*/
 #else /* sun4v */
+	    0x82102008,		/* mov   SCRATCHPAD_CPUID, %g1 		*/
+	    0xced84400,		/* ldxa  [%g1]ASI_SCRATCHPAD, %g7	*/
+	    0x8f29f000,		/* sllx  %g7, TSTAT_DATA_SHIFT, %g7	*/
 	    0x87410000,		/* rd    %tick, %g3			*/
 	    0x03000000, 	/* sethi %hi(stat), %g1			*/
+	    0x82004007,		/* add   %g1, %g7, %g1			*/
 	    0x82106000,		/* or    %g1, %lo(stat), %g1		*/
 	    0x8929703d,		/* sllx  %g5, 61, %g4			*/
 	    0x8931303d,		/* srlx  %g4, 61, %g4			*/
@@ -1029,6 +1079,7 @@ trapstat_tlbretent(tstat_percpu_t *tcpu, tstat_tlbretent_t *ret,
 	    0x8400a001,		/* add   %g2, 1, %g2			*/
 	    0xc4706000,		/* stx   %g2, [%g1 + tmiss_count]	*/
 	    0x0d000000, 	/* sethi %hi(tdata_tmptick), %g6	*/
+	    0x8c018007,		/* add   %g6, %g7, %g6			*/
 	    0xc459a000, 	/* ldx   [%g6 + %lo(tdata_tmptick)], %g2 */
 	    0x8620c002,		/* sub   %g3, %g2, %g3			*/
 	    0xc4586000,		/* ldx   [%g1 + tmiss_time], %g2	*/
@@ -1049,11 +1100,14 @@ trapstat_tlbretent(tstat_percpu_t *tcpu, tstat_tlbretent_t *ret,
 	for (shift = 1; (1 << shift) != sizeof (tstat_pgszdata_t); shift++)
 		continue;
 
-	base = (uintptr_t)tcpu->tcpu_dbase +
+	base = (uintptr_t)tcpu->tcpu_ibase + TSTAT_INSTR_SIZE +
 	    ((uintptr_t)data - (uintptr_t)tcpu->tcpu_data);
 
 	bcopy(retent, ent, sizeof (retent));
 
+#if defined(sun4v)
+	ent[TSTAT_RETENT_TDATASHFT] |= LO10((uintptr_t)TSTAT_DATA_SHIFT);
+#endif
 	ent[TSTAT_RETENT_STATHI] |= HI22(base);
 	ent[TSTAT_RETENT_STATLO] |= LO10(base);
 	ent[TSTAT_RETENT_SHIFT] |= shift;
@@ -1067,6 +1121,9 @@ trapstat_tlbretent(tstat_percpu_t *tcpu, tstat_tlbretent_t *ret,
 	ent[TSTAT_RETENT_TIME_ST] |= offsetof(tstat_missdata_t, tmiss_time);
 }
 
+#if defined(sun4v)
+#undef TSTAT_RETENT_TDATASHFT
+#endif
 #undef TSTAT_RETENT_STATHI
 #undef TSTAT_RETENT_STATLO
 #undef TSTAT_RETENT_SHIFT
@@ -1096,16 +1153,17 @@ trapstat_tlbretent(tstat_percpu_t *tcpu, tstat_tlbretent_t *ret,
 #define	TSTAT_TLBENT_TSLO	27
 #define	TSTAT_TLBENT_BA		28
 #else /* sun4v */
-#define	TSTAT_TLBENT_STATHI	0
-#define	TSTAT_TLBENT_STATLO_LD	1
-#define	TSTAT_TLBENT_STATLO_ST	3
-#define	TSTAT_TLBENT_TAGTARGET	19
-#define	TSTAT_TLBENT_TPCHI	21
-#define	TSTAT_TLBENT_TPCLO_USER	22
-#define	TSTAT_TLBENT_TPCLO_KERN	24
-#define	TSTAT_TLBENT_TSHI	28
-#define	TSTAT_TLBENT_TSLO	30
-#define	TSTAT_TLBENT_BA		31
+#define	TSTAT_TLBENT_TDATASHFT	2
+#define	TSTAT_TLBENT_STATHI	3
+#define	TSTAT_TLBENT_STATLO_LD	5
+#define	TSTAT_TLBENT_STATLO_ST	7
+#define	TSTAT_TLBENT_TAGTARGET	23
+#define	TSTAT_TLBENT_TPCHI	25
+#define	TSTAT_TLBENT_TPCLO_USER	26
+#define	TSTAT_TLBENT_TPCLO_KERN	28
+#define	TSTAT_TLBENT_TSHI	32
+#define	TSTAT_TLBENT_TSLO	35
+#define	TSTAT_TLBENT_BA		36
 #endif /* sun4v */
 
 static void
@@ -1115,19 +1173,22 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	uintptr_t orig, va, baoffs;
 #ifndef sun4v
 	int itlb = entno == TSTAT_ENT_ITLBMISS;
+	uint32_t asi = itlb ? ASI(ASI_IMMU) : ASI(ASI_DMMU);
 #else
 	int itlb = (entno == TSTAT_ENT_IMMUMISS || entno == TSTAT_ENT_ITLBMISS);
+	uint32_t tagtarget_off = itlb ? MMFSA_I_CTX : MMFSA_D_CTX;
+	uint32_t *tent;			/* MMU trap vector entry */
+	uintptr_t tentva;		/* MMU trap vector entry va */
+	static const uint32_t mmumiss[TSTAT_ENT_NINSTR] = {
+	    0x30800000,			/* ba,a addr */
+	    NOP, NOP, NOP, NOP, NOP, NOP, NOP
+	};
 #endif
 	int entoffs = entno << TSTAT_ENT_SHIFT;
 	uintptr_t tmptick, stat, tpc, utpc;
 	tstat_pgszdata_t *data = &tcpu->tcpu_data->tdata_pgsz[0];
 	tstat_tlbdata_t *udata, *kdata;
 	tstat_tlbret_t *ret;
-#ifndef sun4v
-	uint32_t asi = itlb ? ASI(ASI_IMMU) : ASI(ASI_DMMU);
-#else
-	uint32_t tagtarget_off = itlb ? MMFSA_I_CTX : MMFSA_D_CTX;
-#endif
 
 	/*
 	 * When trapstat is run with TLB statistics, this is the entry for
@@ -1180,7 +1241,11 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	    0x30800000,			/* ba,a  addr			*/
 	    NOP, NOP, NOP
 #else /* sun4v */
+	    0x82102008,			/* mov SCRATCHPAD_CPUID, %g1	*/
+	    0xc8d84400,			/* ldxa [%g1]ASI_SCRATCHPAD, %g4 */
+	    0x89293000,			/* sllx %g4, TSTAT_DATA_SHIFT, %g4 */
 	    0x03000000, 		/* sethi %hi(stat), %g1		*/
+	    0x82004004,			/* add %g1, %g4, %g1		*/
 	    0xc4586000,			/* ldx   [%g1 + %lo(stat)], %g2	*/
 	    0x8400a001,			/* add   %g2, 1, %g2		*/
 	    0xc4706000,			/* stx   %g2, [%g1 + %lo(stat)]	*/
@@ -1209,6 +1274,7 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	    0x82006004,			/* add   %g1, 4, %g1		*/
 	    0x83904000,			/* wrpr  %g1, %g0, %tnpc	*/
 	    0x03000000, 		/* sethi %hi(tmptick), %g1	*/
+	    0x82004004,			/* add %g1, %g4, %g1		*/
 	    0x85410000,			/* rd    %tick, %g2		*/
 	    0xc4706000,			/* stx   %g2, [%g1 + %lo(tmptick)] */
 	    0x30800000			/* ba,a  addr			*/
@@ -1218,13 +1284,16 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	ASSERT(MUTEX_HELD(&tstat_lock));
 #ifndef sun4v
 	ASSERT(entno == TSTAT_ENT_ITLBMISS || entno == TSTAT_ENT_DTLBMISS);
-#else
-	ASSERT(entno == TSTAT_ENT_ITLBMISS || entno == TSTAT_ENT_DTLBMISS ||
-	    entno == TSTAT_ENT_IMMUMISS || entno == TSTAT_ENT_DMMUMISS);
-#endif
 
 	stat = TSTAT_DATA_OFFS(tcpu, tdata_traps) + entoffs;
 	tmptick = TSTAT_DATA_OFFS(tcpu, tdata_tmptick);
+#else /* sun4v */
+	ASSERT(entno == TSTAT_ENT_ITLBMISS || entno == TSTAT_ENT_DTLBMISS ||
+	    entno == TSTAT_ENT_IMMUMISS || entno == TSTAT_ENT_DMMUMISS);
+
+	stat = TSTAT_CPU0_DATA_OFFS(tcpu, tdata_traps) + entoffs;
+	tmptick = TSTAT_CPU0_DATA_OFFS(tcpu, tdata_tmptick);
+#endif /* sun4v */
 
 	if (itlb) {
 		ret = &tcpu->tcpu_instr->tinst_itlbret;
@@ -1249,37 +1318,34 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	baoffs = TSTAT_TLBENT_BA * sizeof (uint32_t);
 
 #ifdef sun4v
-	if (entno == TSTAT_ENT_IMMUMISS || entno == TSTAT_ENT_DMMUMISS) {
-		/*
-		 * Because of lack of space, interposing tlbent trap
-		 * handler for IMMU_miss and DMMU_miss traps cannot be
-		 * placed in-line. Instead, we copy it to the space set
-		 * aside for these traps in per CPU trapstat area and
-		 * invoke it by placing a branch in the trap table itself.
-		 */
-		static const uint32_t mmumiss[TSTAT_ENT_NINSTR] = {
-		    0x30800000,			/* ba,a addr */
-		    NOP, NOP, NOP, NOP, NOP, NOP, NOP
-		};
-		uint32_t *tent = ent;		/* trap vector entry */
-		uintptr_t tentva = va;		/* trap vector entry va */
+	/*
+	 * Because of lack of space, interposing tlbent trap handler
+	 * for TLB and MMU miss traps cannot be placed in-line. Instead,
+	 * we copy it to the space set aside for shared trap handlers
+	 * continuation in the interposing trap table and invoke it by
+	 * placing a branch in the trap table itself.
+	 */
+	tent = ent;		/* trap vector entry */
+	tentva = va;		/* trap vector entry va */
 
-		if (itlb) {
-			ent = (uint32_t *)((uintptr_t)
-				&tcpu->tcpu_instr->tinst_immumiss);
-			va = TSTAT_INSTR_OFFS(tcpu, tinst_immumiss);
-		} else {
-			ent = (uint32_t *)((uintptr_t)
-				&tcpu->tcpu_instr->tinst_dmmumiss);
-			va = TSTAT_INSTR_OFFS(tcpu, tinst_dmmumiss);
-		}
-		bcopy(mmumiss, tent, sizeof (mmumiss));
-		tent[0] |= DISP22(tentva, va);
+	if (itlb) {
+		ent = (uint32_t *)((uintptr_t)
+		    &tcpu->tcpu_instr->tinst_immumiss);
+		va = TSTAT_INSTR_OFFS(tcpu, tinst_immumiss);
+	} else {
+		ent = (uint32_t *)((uintptr_t)
+		    &tcpu->tcpu_instr->tinst_dmmumiss);
+		va = TSTAT_INSTR_OFFS(tcpu, tinst_dmmumiss);
 	}
+	bcopy(mmumiss, tent, sizeof (mmumiss));
+	tent[0] |= DISP22(tentva, va);
 #endif /* sun4v */
 
 	bcopy(tlbent, ent, sizeof (tlbent));
 
+#if defined(sun4v)
+	ent[TSTAT_TLBENT_TDATASHFT] |= LO10((uintptr_t)TSTAT_DATA_SHIFT);
+#endif
 	ent[TSTAT_TLBENT_STATHI] |= HI22(stat);
 	ent[TSTAT_TLBENT_STATLO_LD] |= LO10(stat);
 	ent[TSTAT_TLBENT_STATLO_ST] |= LO10(stat);
@@ -1304,6 +1370,9 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	trapstat_tlbretent(tcpu, &ret->ttlbr_utsb, &udata->ttlb_tsb);
 }
 
+#if defined(sun4v)
+#undef TSTAT_TLBENT_TDATASHFT
+#endif
 #undef TSTAT_TLBENT_STATHI
 #undef TSTAT_TLBENT_STATLO_LD
 #undef TSTAT_TLBENT_STATLO_ST
@@ -1326,6 +1395,7 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
  * #undef'd immediately afterwards.  Any change to "enabled" or "disabled"
  * in trapstat_make_traptab() will likely require changes to these constants.
  */
+#ifndef sun4v
 #define	TSTAT_ENABLED_STATHI	0
 #define	TSTAT_ENABLED_STATLO_LD	1
 #define	TSTAT_ENABLED_STATLO_ST 3
@@ -1401,6 +1471,137 @@ trapstat_make_traptab(tstat_percpu_t *tcpu)
 #undef TSTAT_ENABLED_BA
 #undef TSTAT_DISABLED_BA
 
+#else /* sun4v */
+
+#define	TSTAT_ENABLED_STATHI	0
+#define	TSTAT_ENABLED_STATLO	1
+#define	TSTAT_ENABLED_ADDRHI	2
+#define	TSTAT_ENABLED_ADDRLO	3
+#define	TSTAT_ENABLED_CONTBA	6
+#define	TSTAT_ENABLED_TDATASHFT	7
+#define	TSTAT_DISABLED_BA	0
+
+static void
+trapstat_make_traptab(tstat_percpu_t *tcpu)
+{
+	uint32_t *ent;
+	uint64_t *stat;
+	uintptr_t orig, va, en_baoffs, dis_baoffs;
+	uintptr_t tstat_cont_va;
+	int nent;
+
+	/*
+	 * This is the entry in the interposing trap table for enabled trap
+	 * table entries.  It loads a counter, increments it and stores it
+	 * back before branching to the actual trap table entry.
+	 *
+	 * All CPUs share the same interposing trap entry to count the
+	 * number of traps. Note that the trap counter is kept in per CPU
+	 * trap statistics area. Its address is obtained dynamically by
+	 * adding the offset of that CPU's trap statistics area from CPU 0
+	 * (i.e. cpu_id * TSTAT_DATA_SIZE) to the address of the CPU 0
+	 * trap counter already coded in the interposing trap entry itself.
+	 *
+	 * Since this interposing code sequence to count traps takes more
+	 * than 8 instructions, it's split in two parts as follows:
+	 *
+	 *   tstat_trapcnt:
+	 *	sethi %hi(stat), %g1
+	 *	or    %g1, %lo[stat), %g1	! %g1 = CPU0 trap counter addr
+	 *	sethi %hi(addr), %g2
+	 *	or    %g2, %lo(addr), %g2	! %g2 = real trap handler addr
+	 *	mov   ASI_SCRATCHPAD_CPUID, %g3
+	 *	ldxa [%g3]ASI_SCRATCHPAD, %g3	! %g3 = CPU ID
+	 *	ba tstat_trapcnt_cont		! branch to tstat_trapcnt_cont
+	 *	sllx %g3, TSTAT_DATA_SHIFT, %g3	! %g3 = CPU trapstat data offset
+	 *
+	 *   tstat_trapcnt_cont:
+	 *	ldx [%g1 + %g3], %g4		! get counter value
+	 *	add %g4, 1, %g4			! increment value
+	 *	jmp %g2				! jump to original trap handler
+	 *	stx %g4, [%g1 + %g3]		! store counter value
+	 *
+	 * First part, i.e. tstat_trapcnt, is per trap and is kept in-line in
+	 * the interposing trap table. However, the tstat_trapcnt_cont code
+	 * sequence is shared by all traps and is kept right after the
+	 * the interposing trap table.
+	 */
+	static const uint32_t enabled[TSTAT_ENT_NINSTR] = {
+	    0x03000000, 		/* sethi %hi(stat), %g1		*/
+	    0x82106000,			/* or   %g1, %lo[stat), %g1	*/
+	    0x05000000, 		/* sethi %hi(addr), %g2		*/
+	    0x8410a000,			/* or   %g2, %lo(addr), %g2	*/
+	    0x86102008,			/* mov	ASI_SCRATCHPAD_CPUID, %g3 */
+	    0xc6d8c400,			/* ldxa [%g3]ASI_SCRATCHPAD, %g3 */
+	    0x10800000,			/* ba enabled_cont		*/
+	    0x8728f000			/* sllx %g3, TSTAT_DATA_SHIFT, %g3 */
+	};
+
+	static const uint32_t enabled_cont[TSTAT_ENT_NINSTR] = {
+	    0xc8584003, 		/* ldx [%g1 + %g3], %g4		*/
+	    0x88012001,			/* add %g4, 1, %g4		*/
+	    0x81c08000,			/* jmp %g2			*/
+	    0xc8704003,			/* stx %g4, [%g1 + %g3]		*/
+	    NOP, NOP, NOP, NOP
+	};
+
+	/*
+	 * This is the entry in the interposing trap table for disabled trap
+	 * table entries.  It simply branches to the actual, underlying trap
+	 * table entry.  As explained in the "Implementation Details" section
+	 * of the block comment, all TL>0 traps _must_ use the disabled entry;
+	 * additional entries may be explicitly disabled through the use
+	 * of TSTATIOC_ENTRY/TSTATIOC_NOENTRY.
+	 */
+	static const uint32_t disabled[TSTAT_ENT_NINSTR] = {
+	    0x30800000,			/* ba,a addr			*/
+	    NOP, NOP, NOP, NOP, NOP, NOP, NOP,
+	};
+
+	ASSERT(MUTEX_HELD(&tstat_lock));
+	ent = tcpu->tcpu_instr->tinst_traptab;
+	stat = (uint64_t *)TSTAT_CPU0_DATA_OFFS(tcpu, tdata_traps);
+	orig = KERNELBASE;
+	va = (uintptr_t)tcpu->tcpu_ibase;
+	en_baoffs = TSTAT_ENABLED_CONTBA * sizeof (uint32_t);
+	dis_baoffs = TSTAT_DISABLED_BA * sizeof (uint32_t);
+	tstat_cont_va = TSTAT_INSTR_OFFS(tcpu, tinst_trapcnt);
+
+	for (nent = 0; nent < TSTAT_TOTAL_NENT; nent++) {
+		if (tstat_enabled[nent]) {
+			bcopy(enabled, ent, sizeof (enabled));
+			ent[TSTAT_ENABLED_STATHI] |= HI22((uintptr_t)stat);
+			ent[TSTAT_ENABLED_STATLO] |= LO10((uintptr_t)stat);
+			ent[TSTAT_ENABLED_ADDRHI] |= HI22((uintptr_t)orig);
+			ent[TSTAT_ENABLED_ADDRLO] |= LO10((uintptr_t)orig);
+			ent[TSTAT_ENABLED_CONTBA] |=
+			    DISP22(va + en_baoffs, tstat_cont_va);
+			ent[TSTAT_ENABLED_TDATASHFT] |=
+			    LO10((uintptr_t)TSTAT_DATA_SHIFT);
+		} else {
+			bcopy(disabled, ent, sizeof (disabled));
+			ent[TSTAT_DISABLED_BA] |= DISP22(va + dis_baoffs, orig);
+		}
+
+		stat++;
+		orig += sizeof (enabled);
+		ent += sizeof (enabled) / sizeof (*ent);
+		va += sizeof (enabled);
+	}
+	bcopy(enabled_cont, (uint32_t *)tcpu->tcpu_instr->tinst_trapcnt,
+	    sizeof (enabled_cont));
+}
+
+#undef	TSTAT_ENABLED_TDATASHFT
+#undef	TSTAT_ENABLED_STATHI
+#undef	TSTAT_ENABLED_STATLO
+#undef	TSTAT_ENABLED_ADDRHI
+#undef	TSTAT_ENABLED_ADDRLO
+#undef	TSTAT_ENABLED_CONTBA
+#undef	TSTAT_DISABLED_BA
+
+#endif /* sun4v */
+
 #ifndef sun4v
 /*
  * See Section A.6 in SPARC v9 Manual.
@@ -1430,11 +1631,11 @@ trapstat_setup(processorid_t cpu)
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT(MUTEX_HELD(&tstat_lock));
 
+#ifndef sun4v
 	/*
 	 * The lower fifteen bits of the %tba are always read as zero; we must
 	 * align our instruction base address appropriately.
 	 */
-#ifndef sun4v
 	tstat_offset = tstat_total_size;
 
 	cp = cpu_get(cpu);
@@ -1458,7 +1659,7 @@ trapstat_setup(processorid_t cpu)
 	}
 
 	tcpu->tcpu_ibase = (caddr_t)((KERNELBASE - tstat_offset)
-		& TSTAT_TBA_MASK);
+	    & TSTAT_TBA_MASK);
 	tcpu->tcpu_dbase = tcpu->tcpu_ibase + TSTAT_INSTR_SIZE;
 	tcpu->tcpu_vabase = tcpu->tcpu_ibase;
 
@@ -1487,20 +1688,6 @@ trapstat_setup(processorid_t cpu)
 	va = (caddr_t)tcpu->tcpu_data;
 	for (i = 0; i < tstat_data_pages; i++, va += MMU_PAGESIZE)
 		*pfn++ = hat_getpfnum(kas.a_hat, va);
-#else /* sun4v */
-	ASSERT(!(tstat_total_size > (1 + ~TSTAT_TBA_MASK)));
-	tcpu->tcpu_vabase = (caddr_t)(KERNELBASE - MMU_PAGESIZE4M);
-	tcpu->tcpu_ibase = tcpu->tcpu_vabase + (cpu * (1 + ~TSTAT_TBA_MASK));
-	tcpu->tcpu_dbase = tcpu->tcpu_ibase + TSTAT_INSTR_SIZE;
-
-	tcpu->tcpu_pfn = &tstat_pfn;
-	tcpu->tcpu_instr = (tstat_instr_t *)(tstat_va + (cpu *
-		(1 + ~TSTAT_TBA_MASK)));
-	tcpu->tcpu_data = (tstat_data_t *)(tstat_va + (cpu *
-		(1 + ~TSTAT_TBA_MASK)) + TSTAT_INSTR_SIZE);
-	bzero(tcpu->tcpu_data, tstat_data_size);
-	tcpu->tcpu_data->tdata_cpuid = cpu;
-#endif /* sun4v */
 
 	/*
 	 * Now that we have all of the instruction and data pages allocated,
@@ -1513,19 +1700,53 @@ trapstat_setup(processorid_t cpu)
 		 * TLB Statistics have been specified; set up the I- and D-TLB
 		 * entries and corresponding TLB return entries.
 		 */
-#ifndef sun4v
 		trapstat_tlbent(tcpu, TSTAT_ENT_ITLBMISS);
 		trapstat_tlbent(tcpu, TSTAT_ENT_DTLBMISS);
-#else
-		if (tstat_fast_tlbstat) {
-			trapstat_tlbent(tcpu, TSTAT_ENT_IMMUMISS);
-			trapstat_tlbent(tcpu, TSTAT_ENT_DMMUMISS);
-		} else {
-			trapstat_tlbent(tcpu, TSTAT_ENT_ITLBMISS);
-			trapstat_tlbent(tcpu, TSTAT_ENT_DTLBMISS);
-		}
-#endif
 	}
+
+#else /* sun4v */
+
+	/*
+	 * The lower fifteen bits of the %tba are always read as zero; hence
+	 * it must be aligned at least on 512K boundary.
+	 */
+	tcpu->tcpu_vabase = (caddr_t)(KERNELBASE - MMU_PAGESIZE4M);
+	tcpu->tcpu_ibase = tcpu->tcpu_vabase;
+	tcpu->tcpu_dbase = tcpu->tcpu_ibase + TSTAT_INSTR_SIZE +
+	    cpu * TSTAT_DATA_SIZE;
+
+	tcpu->tcpu_pfn = &tstat_pfn;
+	tcpu->tcpu_instr = (tstat_instr_t *)tstat_va;
+	tcpu->tcpu_data = (tstat_data_t *)(tstat_va + TSTAT_INSTR_SIZE +
+	    cpu * TSTAT_DATA_SIZE);
+	bzero(tcpu->tcpu_data, TSTAT_DATA_SIZE);
+	tcpu->tcpu_data->tdata_cpuid = cpu;
+
+	/*
+	 * Now that we have all of the instruction and data pages allocated,
+	 * make the trap table from scratch. It should be done only once
+	 * as it is shared by all CPUs.
+	 */
+	if (!tstat_traptab_initialized)
+		trapstat_make_traptab(tcpu);
+
+	if (tstat_options & TSTAT_OPT_TLBDATA) {
+		/*
+		 * TLB Statistics have been specified; set up the I- and D-TLB
+		 * entries and corresponding TLB return entries.
+		 */
+		if (!tstat_traptab_initialized) {
+			if (tstat_fast_tlbstat) {
+				trapstat_tlbent(tcpu, TSTAT_ENT_IMMUMISS);
+				trapstat_tlbent(tcpu, TSTAT_ENT_DMMUMISS);
+			} else {
+				trapstat_tlbent(tcpu, TSTAT_ENT_ITLBMISS);
+				trapstat_tlbent(tcpu, TSTAT_ENT_DTLBMISS);
+			}
+		}
+	}
+	tstat_traptab_initialized = 1;
+#endif /* sun4v */
 
 	tcpu->tcpu_flags |= TSTAT_CPU_ALLOCATED;
 
@@ -1607,6 +1828,7 @@ trapstat_go()
 	if (tstat_options & TSTAT_OPT_TLBDATA) {
 		int error;
 
+		tstat_fast_tlbstat = B_FALSE;
 		error = cpu_trapstat_conf(CPU_TSTATCONF_INIT);
 		if (error == 0)
 			tstat_fast_tlbstat = B_TRUE;
@@ -1617,7 +1839,7 @@ trapstat_go()
 			return (error);
 		}
 	}
-#endif
+#endif /* sun4v */
 
 	/*
 	 * First, perform any necessary hot patching.
@@ -1676,6 +1898,7 @@ trapstat_stop()
 	}
 
 #ifdef sun4v
+	tstat_traptab_initialized = 0;
 	if (tstat_options & TSTAT_OPT_TLBDATA)
 		cpu_trapstat_conf(CPU_TSTATCONF_FINI);
 	contig_mem_free(tstat_va, MMU_PAGESIZE4M);
@@ -2138,11 +2361,7 @@ trapstat_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	tstat_data_size = tstat_data_pages * MMU_PAGESIZE;
 	tstat_total_size = TSTAT_INSTR_SIZE + tstat_data_size;
 #else
-	tstat_data_pages = 0;
-	tstat_data_size = tstat_data_t_size;
-	tstat_total_pages = ((TSTAT_INSTR_SIZE + tstat_data_size) >>
-		MMU_PAGESHIFT) + 1;
-	tstat_total_size = tstat_total_pages * MMU_PAGESIZE;
+	ASSERT(tstat_data_t_size <= TSTAT_DATA_SIZE);
 #endif
 
 	tstat_percpu = kmem_zalloc((max_cpuid + 1) *

@@ -541,7 +541,7 @@ nxge_fflp_hw_reset(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, FFLP_CTL, " ==> nxge_fflp_hw_reset"));
 
-	if (nxgep->niu_type == NEPTUNE) {
+	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
 		status = nxge_fflp_fcram_init(nxgep);
 		if (status != NXGE_OK) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -596,7 +596,7 @@ nxge_fflp_hw_reset(p_nxge_t nxgep)
 	}
 
 	/* invalidate FCRAM entries */
-	if (nxgep->niu_type == NEPTUNE) {
+	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
 		status = nxge_fflp_fcram_invalidate_all(nxgep);
 		if (status != NXGE_OK) {
 			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
@@ -836,7 +836,7 @@ nxge_classify_init_sw(p_nxge_t nxgep)
 	classify_ptr->tcam_size = TCAM_NIU_TCAM_MAX_ENTRY;
 
 	/* init data structures, based on HW type */
-	if (nxgep->niu_type == NEPTUNE) {
+	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
 		classify_ptr->tcam_size = TCAM_NXGE_TCAM_MAX_ENTRY;
 		/*
 		 * check if fcram based classification is required and init the
@@ -1441,7 +1441,7 @@ nxge_add_flow(p_nxge_t nxgep, flow_resource_t *flow_res)
 	int insert_hash = 0;
 	nxge_status_t status = NXGE_OK;
 
-	if (nxgep->niu_type == NEPTUNE) {
+	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
 		/* determine whether to do TCAM or Hash flow */
 		insert_hash = nxge_flow_need_hash_lookup(nxgep, flow_res);
 	}

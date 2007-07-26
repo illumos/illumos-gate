@@ -811,6 +811,7 @@ lib/sparcv9/libc_i18n.a			sparc
 #
 usr/platform/SUNW,Sun-Blade-T6320/lib/llib-lpcp.ln	sparc
 usr/platform/SUNW,Sun-Blade-T6300/lib/llib-lpcp.ln	sparc
+usr/platform/SUNW,T5140/lib/llib-lpcp.ln		sparc
 usr/platform/SUNW,Sun-Fire-T200/lib/llib-lpcp.ln	sparc
 usr/platform/SUNW,Netra-CP3060/lib/llib-lpcp.ln		sparc
 usr/platform/SUNW,SPARC-Enterprise-T5120/lib/llib-lpcp.ln		sparc

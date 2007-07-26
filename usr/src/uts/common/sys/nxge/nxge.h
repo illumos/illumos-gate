@@ -533,6 +533,7 @@ struct _nxge_t {
 	npi_handle_t		npi_vreg_handle;
 	npi_handle_t		npi_v2reg_handle;
 
+	nxge_xcvr_table_t	xcvr;
 	nxge_mac_t		mac;
 	nxge_ipp_t		ipp;
 	nxge_txc_t		txc;

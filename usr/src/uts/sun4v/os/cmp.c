@@ -85,7 +85,7 @@ cmp_error_resteer(processorid_t cpuid)
 chipid_t
 cmp_cpu_to_chip(processorid_t cpuid)
 {
-	return (0);
+	return (cpu[cpuid]->cpu_m.cpu_chip);
 }
 
 /*ARGSUSED*/
@@ -121,7 +121,7 @@ pg_plat_hw_instance_id(cpu_t *cpu, pghw_type_t hw)
 	case PGHW_IPIPE:
 		return (cpu->cpu_m.cpu_ipipe);
 	case PGHW_CHIP:
-		return (cmp_cpu_to_chip(cpu->cpu_id));
+		return (cpu->cpu_m.cpu_chip);
 	case PGHW_FPU:
 		return (cpu->cpu_m.cpu_fpu);
 	default:

@@ -334,7 +334,7 @@ ddi_dma_attr_t nxge_rx_dma_attr = {
 	0xffffffffffffffff,	/* maximum segment size */
 	1,			/* scatter/gather list length */
 	(unsigned int) 1,	/* granularity */
-	DDI_DMA_RELAXED_ORDERING /* attribute flags */
+	0			/* attribute flags */
 };
 
 ddi_dma_lim_t nxge_dma_limits = {
@@ -462,6 +462,16 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto nxge_attach_fail;
 	}
 
+	if (nxgep->niu_type == NEPTUNE_2_10GF) {
+		if (nxgep->function_num > 1) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "Unsupported"
+			    " function %d. Only functions 0 and 1 are "
+			    "supported for this card.", nxgep->function_num));
+			status = NXGE_ERROR;
+			goto nxge_attach_fail;
+		}
+	}
+
 	portn = NXGE_GET_PORT_NUM(nxgep->function_num);
 	nxgep->mac.portnum = portn;
 	if ((portn == 0) || (portn == 1))
@@ -494,7 +504,7 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* init stats ptr */
 	nxge_init_statsp(nxgep);
 
-	if (nxgep->niu_type != N2_NIU) {
+	if (nxgep->nxge_hw_p->platform_type == P_NEPTUNE_ATLAS) {
 		/*
 		 * read the vpd info from the eeprom into local data
 		 * structure and check for the VPD info validity
@@ -502,25 +512,12 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		(void) nxge_vpd_info_get(nxgep);
 	}
 
-	status = nxge_get_xcvr_type(nxgep);
+	status = nxge_setup_xcvr_table(nxgep);
 
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "nxge_attach: "
 				    " Couldn't determine card type"
 				    " .... exit "));
-		goto nxge_attach_fail;
-	}
-
-	if ((nxgep->niu_type == NEPTUNE) &&
-		(nxgep->mac.portmode == PORT_10G_FIBER)) {
-		nxgep->niu_type = NEPTUNE_2;
-	}
-
-	if ((nxgep->niu_type == NEPTUNE_2) && (nxgep->function_num > 1)) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "Unsupported function %d."
-		    "Only functions 0 and 1 are supported by this card",
-		    nxgep->function_num));
-		status = NXGE_ERROR;
 		goto nxge_attach_fail;
 	}
 
@@ -810,7 +807,7 @@ nxge_map_regs(p_nxge_t nxgep)
 	dev_regs->nxge_msix_regh = NULL;
 	dev_regs->nxge_vir_regh = NULL;
 	dev_regs->nxge_vir2_regh = NULL;
-	nxgep->niu_type = NEPTUNE;
+	nxgep->niu_type = NIU_TYPE_NONE;
 
 	devname = ddi_pathname(nxgep->dip, buf);
 	ASSERT(strlen(devname) > 0);
@@ -852,8 +849,6 @@ nxge_map_regs(p_nxge_t nxgep)
 	}
 
 	switch (nxgep->niu_type) {
-	case NEPTUNE:
-	case NEPTUNE_2:
 	default:
 		(void) ddi_dev_regsize(nxgep->dip, 0, &regsize);
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
@@ -1147,10 +1142,10 @@ nxge_setup_mutexes(p_nxge_t nxgep)
 		 * handlers.
 		 */
 	MUTEX_INIT(&classify_ptr->tcam_lock, NULL,
-			    NXGE_MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
-	if (nxgep->niu_type == NEPTUNE) {
+	    NXGE_MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
+	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
 		MUTEX_INIT(&classify_ptr->fcram_lock, NULL,
-			    NXGE_MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
+		    NXGE_MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
 		for (partition = 0; partition < MAX_PARTITION; partition++) {
 			MUTEX_INIT(&classify_ptr->hash_lock[partition], NULL,
 			    NXGE_MUTEX_DRIVER, (void *)nxgep->interrupt_cookie);
@@ -1159,7 +1154,7 @@ nxge_setup_mutexes(p_nxge_t nxgep)
 
 nxge_setup_mutexes_exit:
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"<== nxge_setup_mutexes status = %x", status));
+	    "<== nxge_setup_mutexes status = %x", status));
 
 	if (ddi_status != DDI_SUCCESS)
 		status |= (NXGE_ERROR | NXGE_DDI_FAILED);
@@ -1187,7 +1182,7 @@ nxge_destroy_mutexes(p_nxge_t nxgep)
 	cv_destroy(&nxgep->poll_cv);
 
 	/* free data structures, based on HW type */
-	if (nxgep->niu_type == NEPTUNE) {
+	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
 		MUTEX_DESTROY(&classify_ptr->fcram_lock);
 		for (partition = 0; partition < MAX_PARTITION; partition++) {
 			MUTEX_DESTROY(&classify_ptr->hash_lock[partition]);
@@ -1549,50 +1544,50 @@ nxge_test_map_regs(p_nxge_t nxgep)
 	dev_handle = nxgep->dev_regs->nxge_regh;
 	dev_ptr = (char *)nxgep->dev_regs->nxge_regp;
 
-	if (nxgep->niu_type == NEPTUNE) {
+	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
 		cfg_handle = nxgep->dev_regs->nxge_pciregh;
 		cfg_ptr = (void *)nxgep->dev_regs->nxge_pciregp;
 
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"Neptune PCI regp cfg_ptr 0x%llx", (char *)cfg_ptr));
+		    "Neptune PCI regp cfg_ptr 0x%llx", (char *)cfg_ptr));
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"Neptune PCI cfg_ptr vendor id ptr 0x%llx",
-			&cfg_ptr->vendorid));
+		    "Neptune PCI cfg_ptr vendor id ptr 0x%llx",
+		    &cfg_ptr->vendorid));
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"\tvendorid 0x%x devid 0x%x",
-			NXGE_PIO_READ16(cfg_handle, &cfg_ptr->vendorid, 0),
-			NXGE_PIO_READ16(cfg_handle, &cfg_ptr->devid,    0)));
+		    "\tvendorid 0x%x devid 0x%x",
+		    NXGE_PIO_READ16(cfg_handle, &cfg_ptr->vendorid, 0),
+		    NXGE_PIO_READ16(cfg_handle, &cfg_ptr->devid,    0)));
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"PCI BAR: base 0x%x base14 0x%x base 18 0x%x "
-			"bar1c 0x%x",
-			NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base,   0),
-			NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base14, 0),
-			NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base18, 0),
-			NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base1c, 0)));
+		    "PCI BAR: base 0x%x base14 0x%x base 18 0x%x "
+		    "bar1c 0x%x",
+		    NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base,   0),
+		    NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base14, 0),
+		    NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base18, 0),
+		    NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base1c, 0)));
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"\nNeptune PCI BAR: base20 0x%x base24 0x%x "
-			"base 28 0x%x bar2c 0x%x\n",
-			NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base20, 0),
-			NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base24, 0),
-			NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base28, 0),
-			NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base2c, 0)));
+		    "\nNeptune PCI BAR: base20 0x%x base24 0x%x "
+		    "base 28 0x%x bar2c 0x%x\n",
+		    NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base20, 0),
+		    NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base24, 0),
+		    NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base28, 0),
+		    NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base2c, 0)));
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"\nNeptune PCI BAR: base30 0x%x\n",
-			NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base30, 0)));
+		    "\nNeptune PCI BAR: base30 0x%x\n",
+		    NXGE_PIO_READ32(cfg_handle, &cfg_ptr->base30, 0)));
 
 		cfg_handle = nxgep->dev_regs->nxge_pciregh;
 		cfg_ptr = (void *)nxgep->dev_regs->nxge_pciregp;
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			"first  0x%llx second 0x%llx third 0x%llx "
-			"last 0x%llx ",
-			NXGE_PIO_READ64(dev_handle,
-				    (uint64_t *)(dev_ptr + 0),  0),
-			NXGE_PIO_READ64(dev_handle,
-				    (uint64_t *)(dev_ptr + 8),  0),
-			NXGE_PIO_READ64(dev_handle,
-				    (uint64_t *)(dev_ptr + 16), 0),
-			NXGE_PIO_READ64(cfg_handle,
-				    (uint64_t *)(dev_ptr + 24), 0)));
+		    "first  0x%llx second 0x%llx third 0x%llx "
+		    "last 0x%llx ",
+		    NXGE_PIO_READ64(dev_handle,
+		    (uint64_t *)(dev_ptr + 0),  0),
+		    NXGE_PIO_READ64(dev_handle,
+		    (uint64_t *)(dev_ptr + 8),  0),
+		    NXGE_PIO_READ64(dev_handle,
+		    (uint64_t *)(dev_ptr + 16), 0),
+		    NXGE_PIO_READ64(cfg_handle,
+		    (uint64_t *)(dev_ptr + 24), 0)));
 	}
 }
 
@@ -1636,15 +1631,7 @@ nxge_setup_dev(p_nxge_t nxgep)
 	nxge_status_t	status = NXGE_OK;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_setup_dev port %d",
-			nxgep->mac.portnum));
-
-	status = nxge_xcvr_find(nxgep);
-	if (status != NXGE_OK) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			    " nxge_setup_dev status "
-			    " (xcvr find 0x%08x)", status));
-		goto nxge_setup_dev_exit;
-	}
+	    nxgep->mac.portnum));
 
 	status = nxge_link_init(nxgep);
 
@@ -4147,8 +4134,6 @@ nxge_add_intrs_adv_type(p_nxge_t nxgep, uint32_t int_type)
 
 	nrequired = 0;
 	switch (nxgep->niu_type) {
-	case NEPTUNE:
-	case NEPTUNE_2:
 	default:
 		status = nxge_ldgv_init(nxgep, &nactual, &nrequired);
 		break;
@@ -4311,8 +4296,6 @@ nxge_add_intrs_adv_type_fix(p_nxge_t nxgep, uint32_t int_type)
 
 	nrequired = 0;
 	switch (nxgep->niu_type) {
-	case NEPTUNE:
-	case NEPTUNE_2:
 	default:
 		status = nxge_ldgv_init(nxgep, &nactual, &nrequired);
 		break;
@@ -4694,6 +4677,13 @@ nxge_init_common_dev(p_nxge_t nxgep)
 		hw_p->ndevs++;
 		hw_p->nxge_p[nxgep->function_num] = nxgep;
 		hw_p->next = nxge_hw_list;
+		if (nxgep->niu_type == N2_NIU) {
+			hw_p->niu_type = N2_NIU;
+			hw_p->platform_type = P_NEPTUNE_NIU;
+		} else {
+			hw_p->niu_type = NIU_TYPE_NONE;
+			hw_p->platform_type = P_NEPTUNE_ATLAS;
+		}
 
 		MUTEX_INIT(&hw_p->nxge_cfg_lock, NULL, MUTEX_DRIVER, NULL);
 		MUTEX_INIT(&hw_p->nxge_tcam_lock, NULL, MUTEX_DRIVER, NULL);
@@ -4702,9 +4692,22 @@ nxge_init_common_dev(p_nxge_t nxgep)
 		MUTEX_INIT(&hw_p->nxge_mii_lock, NULL, MUTEX_DRIVER, NULL);
 
 		nxge_hw_list = hw_p;
+
+		(void) nxge_scan_ports_phy(nxgep, nxge_hw_list);
 	}
 
 	MUTEX_EXIT(&nxge_common_lock);
+
+	if (nxgep->niu_type != N2_NIU) {
+		nxgep->niu_type = hw_p->niu_type;
+		if (!NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    "<== nxge_init_common_device"
+			    " Invalid Neptune type [0x%x]", nxgep->niu_type));
+			return (NXGE_ERROR);
+		}
+	}
+
 	NXGE_DEBUG_MSG((nxgep, MOD_CTL,
 		"==> nxge_init_common_device (nxge_hw_list) $%p",
 		nxge_hw_list));
@@ -4803,4 +4806,34 @@ nxge_uninit_common_dev(p_nxge_t nxgep)
 		nxge_hw_list));
 
 	NXGE_DEBUG_MSG((nxgep, MOD_CTL, "<= nxge_uninit_common_device"));
+}
+
+/*
+ * Determines the number of ports from the given niu_type.
+ * Returns the number of ports, or returns zero on failure.
+ */
+
+int
+nxge_nports_from_niu_type(niu_type_t niu_type)
+{
+	int	nports = 0;
+
+	switch (niu_type) {
+	case N2_NIU:
+		nports = 2;
+		break;
+	case NEPTUNE_2_10GF:
+		nports = 2;
+		break;
+	case NEPTUNE_4_1GC:
+	case NEPTUNE_2_10GF_2_1GC:
+	case NEPTUNE_1_10GF_3_1GC:
+	case NEPTUNE_1_1GC_1_10GF_2_1GC:
+		nports = 4;
+		break;
+	default:
+		break;
+	}
+
+	return (nports);
 }

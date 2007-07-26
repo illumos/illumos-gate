@@ -190,6 +190,12 @@ cpu_map_exec_units(struct cpu *cp)
 	 * Niagara defines the the core to be at the ipipe level
 	 */
 	cp->cpu_m.cpu_core = cp->cpu_m.cpu_ipipe;
+
+	/*
+	 * Niagara systems just have one chip. Therefore, the chip id
+	 * is always 0.
+	 */
+	cp->cpu_m.cpu_chip = 0;
 }
 
 static int niagara_cpucnt;

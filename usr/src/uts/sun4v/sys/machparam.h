@@ -60,7 +60,7 @@ extern "C" {
  * makefile.
  */
 #ifndef NCPU
-#define	NCPU	64
+#define	NCPU	256
 #endif
 
 /*

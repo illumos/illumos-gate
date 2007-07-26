@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,7 @@ extern "C" {
 #define	HSVC_GROUP_FIRE_PERF		0x0201
 #define	HSVC_GROUP_NIAGARA2_CPU		0x0202
 #define	HSVC_GROUP_NIU			0x0204
+#define	HSVC_GROUP_VFALLS_CPU		0x0205
 #define	HSVC_GROUP_DIAG			0x0300
 
 #ifndef _ASM

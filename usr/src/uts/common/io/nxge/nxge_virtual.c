@@ -44,7 +44,7 @@ static void nxge_set_hw_class_config(p_nxge_t);
 static nxge_status_t nxge_use_default_dma_config_n2(p_nxge_t);
 static void nxge_ldgv_setup(p_nxge_ldg_t *, p_nxge_ldv_t *, uint8_t,
 	uint8_t, int *);
-static void nxge_init_mmac(p_nxge_t);
+static void nxge_init_mmac(p_nxge_t, boolean_t);
 
 uint32_t nxge_use_hw_property = 1;
 uint32_t nxge_groups_per_port = 2;
@@ -83,7 +83,6 @@ static uint8_t p4_tx_fair[4] = {6, 6, 6, 6};
 static uint8_t p4_tx_equal[4] = {6, 6, 6, 6};
 static uint8_t p2_rx_fair[2] = {8, 8};
 static uint8_t p2_rx_equal[2] = {8, 8};
-
 static uint8_t p4_rx_fair[4] = {4, 4, 4, 4};
 static uint8_t p4_rx_equal[4] = {4, 4, 4, 4};
 
@@ -93,6 +92,18 @@ static uint8_t p4_rdcgrp_fair[4] = {2, 2, 1, 1};
 static uint8_t p4_rdcgrp_equal[4] = {2, 2, 2, 2};
 static uint8_t p2_rdcgrp_cls[2] = {1, 1};
 static uint8_t p4_rdcgrp_cls[4] = {1, 1, 1, 1};
+
+static uint8_t rx_4_1G[4] = {4, 4, 4, 4};
+static uint8_t rx_2_10G[2] = {8, 8};
+static uint8_t rx_2_10G_2_1G[4] = {6, 6, 2, 2};
+static uint8_t rx_1_10G_3_1G[4] = {10, 2, 2, 2};
+static uint8_t rx_1_1G_1_10G_2_1G[4] = {2, 10, 2, 2};
+
+static uint8_t tx_4_1G[4] = {6, 6, 6, 6};
+static uint8_t tx_2_10G[2] = {12, 12};
+static uint8_t tx_2_10G_2_1G[4] = {10, 10, 2, 2};
+static uint8_t tx_1_10G_3_1G[4] = {12, 4, 4, 4};
+static uint8_t tx_1_1G_1_10G_2_1G[4] = {4, 12, 4, 4};
 
 typedef enum {
 	DEFAULT = 0,
@@ -349,7 +360,7 @@ nxge_get_niu_property(dev_info_t *dip, niu_type_t *niu_type)
 	uchar_t *prop_val;
 	uint_t prop_len;
 
-	*niu_type = NEPTUNE;
+	*niu_type = NIU_TYPE_NONE;
 	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, dip, 0,
 			"niu-type", (uchar_t **)&prop_val,
 			&prop_len) == DDI_PROP_SUCCESS) {
@@ -1602,58 +1613,16 @@ nxge_get_config_properties(p_nxge_t nxgep)
 	/*
 	 * Get info on how many ports Neptune card has.
 	 */
-	switch (nxgep->niu_type) {
-	case N2_NIU:
-		nxgep->nports = 2;
-		nxgep->classifier.tcam_size = TCAM_NIU_TCAM_MAX_ENTRY;
-		if (nxgep->function_num > 1) {
-			return (NXGE_ERROR);
-		}
-		break;
-
-	case NEPTUNE_2:
-	case NEPTUNE:
-	default:
-
-		if ((nxgep->niu_type == NEPTUNE_2) &&
-				(nxgep->function_num > 1)) {
-			return (NXGE_ERROR);
-		}
-		if (!nxgep->vpd_info.ver_valid) {
-			status = nxge_espc_num_ports_get(nxgep);
-			if (status != NXGE_OK) {
-				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				    "EEPROM version [%s] invalid...please "
-				    "update", nxgep->vpd_info.ver));
-				return (status);
-			}
-			nxgep->classifier.tcam_size = TCAM_NXGE_TCAM_MAX_ENTRY;
-			break;
-		}
-		/*
-		 * First try to get the no. of ports from the info
-		 * in the VPD read off the EEPROM.
-		 */
-		if ((strncmp(nxgep->vpd_info.bd_model, NXGE_QGC_LP_BM_STR,
-		    strlen(NXGE_QGC_LP_BM_STR)) == 0) ||
-		    (strncmp(nxgep->vpd_info.bd_model, NXGE_QGC_PEM_BM_STR,
-		    strlen(NXGE_QGC_PEM_BM_STR)) == 0)) {
-			nxgep->nports = NXGE_NUM_OF_PORTS_QUAD;
-		} else if ((strncmp(nxgep->vpd_info.bd_model,
-		    NXGE_2XGF_LP_BM_STR, strlen(NXGE_2XGF_LP_BM_STR)) == 0) ||
-		    (strncmp(nxgep->vpd_info.bd_model, NXGE_2XGF_PEM_BM_STR,
-		    strlen(NXGE_2XGF_PEM_BM_STR)) == 0)) {
-			nxgep->nports = NXGE_NUM_OF_PORTS_DUAL;
-		} else {
-			NXGE_DEBUG_MSG((nxgep, VPD_CTL,
-			    "nxge_get_config_properties: port num not set in"
-			    " EEPROM...Reading from SEEPROM"));
-			status = nxge_espc_num_ports_get(nxgep);
-			if (status != NXGE_OK)
-				return (status);
-		}
-		nxgep->classifier.tcam_size = TCAM_NXGE_TCAM_MAX_ENTRY;
-		break;
+	nxgep->nports = nxge_nports_from_niu_type(nxgep->niu_type);
+	if (nxgep->nports <= 0) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "<==nxge_get_config_properties: Invalid Neptune type 0x%x",
+		    nxgep->niu_type));
+		return (NXGE_ERROR);
+	}
+	nxgep->classifier.tcam_size = TCAM_NIU_TCAM_MAX_ENTRY;
+	if (nxgep->function_num >= nxgep->nports) {
+		return (NXGE_ERROR);
 	}
 
 	status = nxge_get_mac_addr_properties(nxgep);
@@ -1690,8 +1659,14 @@ nxge_get_config_properties(p_nxge_t nxgep)
 		MUTEX_EXIT(&hw_p->nxge_cfg_lock);
 		status = nxge_use_cfg_n2niu_properties(nxgep);
 		break;
+	default:
+		if (!NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
+			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+			    " nxge_get_config_properties:"
+			    " unknown NIU type 0x%x", nxgep->niu_type));
+			return (NXGE_ERROR);
+		}
 
-	case NEPTUNE:
 		NXGE_DEBUG_MSG((nxgep, VPD_CTL,
 			" ==> nxge_get_config_properties: Neptune"));
 		status = nxge_cfg_verify_set_quick_config(nxgep);
@@ -1712,38 +1687,6 @@ nxge_get_config_properties(p_nxge_t nxgep)
 		nxge_use_cfg_neptune_properties(nxgep);
 		status = NXGE_OK;
 		break;
-
-	case NEPTUNE_2:
-		NXGE_DEBUG_MSG((nxgep, VPD_CTL,
-			" ==> nxge_get_config_properties: Neptune-2"));
-		if (nxgep->function_num > 1)
-			return (NXGE_ERROR);
-		status = nxge_cfg_verify_set_quick_config(nxgep);
-		MUTEX_ENTER(&hw_p->nxge_cfg_lock);
-
-		if ((hw_p->flags & COMMON_CFG_VALID) !=
-			COMMON_CFG_VALID) {
-			status = nxge_cfg_verify_set(nxgep,
-				COMMON_TXDMA_CFG);
-			status = nxge_cfg_verify_set(nxgep,
-				COMMON_RXDMA_CFG);
-			status = nxge_cfg_verify_set(nxgep,
-				COMMON_RXDMA_GRP_CFG);
-			status = nxge_cfg_verify_set(nxgep,
-				COMMON_CLASS_CFG);
-			hw_p->flags |= COMMON_CFG_VALID;
-		}
-		MUTEX_EXIT(&hw_p->nxge_cfg_lock);
-
-		nxge_use_cfg_neptune_properties(nxgep);
-		status = NXGE_OK;
-		break;
-
-	default:
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			" nxge_get_config_properties:"
-			" unknown NIU type %x", nxgep->niu_type));
-		return (NXGE_ERROR);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, VPD_CTL, " <== nxge_get_config_properties"));
@@ -1990,7 +1933,7 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 static void
 nxge_use_cfg_dma_config(p_nxge_t nxgep)
 {
-	int tx_ndmas, rx_ndmas, nrxgp;
+	int tx_ndmas, rx_ndmas, nrxgp, st_txdma, st_rxdma;
 	p_nxge_dma_pt_cfg_t p_dma_cfgp;
 	p_nxge_hw_pt_cfg_t p_cfgp;
 	dev_info_t *dip;
@@ -1998,6 +1941,8 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 	char *prop;
 	int *prop_val;
 	uint_t prop_len;
+	int i;
+	uint8_t *ch_arr_p;
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, " ==> nxge_use_cfg_dma_config"));
 	param_arr = nxgep->param_arr;
@@ -2013,14 +1958,33 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 		p_cfgp->start_tdc = *prop_val;
 		ddi_prop_free(prop_val);
 	} else {
-		if (nxgep->nports == 2) {
-			tx_ndmas = (nxgep->function_num * p2_tx_equal[0]);
-		} else {
-			tx_ndmas = (nxgep->function_num * p4_tx_equal[0]);
+		switch (nxgep->niu_type) {
+		case NEPTUNE_4_1GC:
+			ch_arr_p = &tx_4_1G[0];
+			break;
+		case NEPTUNE_2_10GF:
+			ch_arr_p = &tx_2_10G[0];
+			break;
+		case NEPTUNE_2_10GF_2_1GC:
+			ch_arr_p = &tx_2_10G_2_1G[0];
+			break;
+		case NEPTUNE_1_10GF_3_1GC:
+			ch_arr_p = &tx_1_10G_3_1G[0];
+			break;
+		case NEPTUNE_1_1GC_1_10GF_2_1GC:
+			ch_arr_p = &tx_1_1G_1_10G_2_1G[0];
+			break;
+		default:
+			ch_arr_p = &p4_tx_equal[0];
+			break;
 		}
+		st_txdma = 0;
+		for (i = 0; i < nxgep->function_num; i++, ch_arr_p++)
+			st_txdma += *ch_arr_p;
+
 		(void) ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,
-			prop, tx_ndmas);
-		p_cfgp->start_tdc = tx_ndmas;
+		    prop, st_txdma);
+		p_cfgp->start_tdc = st_txdma;
 	}
 
 	prop = param_arr[param_txdma_channels].fcode_name;
@@ -2029,10 +1993,25 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 		tx_ndmas = *prop_val;
 		ddi_prop_free(prop_val);
 	} else {
-		if (nxgep->nports == 2) {
-			tx_ndmas = p2_tx_equal[0];
-		} else {
-			tx_ndmas = p4_tx_equal[0];
+		switch (nxgep->niu_type) {
+		case NEPTUNE_4_1GC:
+			tx_ndmas = tx_4_1G[nxgep->function_num];
+			break;
+		case NEPTUNE_2_10GF:
+			tx_ndmas = tx_2_10G[nxgep->function_num];
+			break;
+		case NEPTUNE_2_10GF_2_1GC:
+			tx_ndmas = tx_2_10G_2_1G[nxgep->function_num];
+			break;
+		case NEPTUNE_1_10GF_3_1GC:
+			tx_ndmas = tx_1_10G_3_1G[nxgep->function_num];
+			break;
+		case NEPTUNE_1_1GC_1_10GF_2_1GC:
+			tx_ndmas = tx_1_1G_1_10G_2_1G[nxgep->function_num];
+			break;
+		default:
+			tx_ndmas = p4_tx_equal[nxgep->function_num];
+			break;
 		}
 		(void) ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,
 			prop, tx_ndmas);
@@ -2051,14 +2030,33 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 		p_cfgp->start_rdc = *prop_val;
 		ddi_prop_free(prop_val);
 	} else {
-		if (nxgep->nports == 2) {
-			rx_ndmas = (nxgep->function_num * p2_rx_equal[0]);
-		} else {
-			rx_ndmas = (nxgep->function_num * p4_rx_equal[0]);
+		switch (nxgep->niu_type) {
+		case NEPTUNE_4_1GC:
+			ch_arr_p = &rx_4_1G[0];
+			break;
+		case NEPTUNE_2_10GF:
+			ch_arr_p = &rx_2_10G[0];
+			break;
+		case NEPTUNE_2_10GF_2_1GC:
+			ch_arr_p = &rx_2_10G_2_1G[0];
+			break;
+		case NEPTUNE_1_10GF_3_1GC:
+			ch_arr_p = &rx_1_10G_3_1G[0];
+			break;
+		case NEPTUNE_1_1GC_1_10GF_2_1GC:
+			ch_arr_p = &rx_1_1G_1_10G_2_1G[0];
+			break;
+		default:
+			ch_arr_p = &p4_rx_equal[0];
+			break;
 		}
+		st_rxdma = 0;
+		for (i = 0; i < nxgep->function_num; i++, ch_arr_p++)
+			st_rxdma += *ch_arr_p;
+
 		(void) ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,
-			prop, rx_ndmas);
-		p_cfgp->start_rdc = rx_ndmas;
+		    prop, st_rxdma);
+		p_cfgp->start_rdc = st_rxdma;
 	}
 
 	prop = param_arr[param_rxdma_channels].fcode_name;
@@ -2068,10 +2066,25 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 		rx_ndmas = *prop_val;
 		ddi_prop_free(prop_val);
 	} else {
-		if (nxgep->nports == 2) {
-			rx_ndmas = p2_rx_equal[0];
-		} else {
-			rx_ndmas = p4_rx_equal[0];
+		switch (nxgep->niu_type) {
+		case NEPTUNE_4_1GC:
+			rx_ndmas = rx_4_1G[nxgep->function_num];
+			break;
+		case NEPTUNE_2_10GF:
+			rx_ndmas = rx_2_10G[nxgep->function_num];
+			break;
+		case NEPTUNE_2_10GF_2_1GC:
+			rx_ndmas = rx_2_10G_2_1G[nxgep->function_num];
+			break;
+		case NEPTUNE_1_10GF_3_1GC:
+			rx_ndmas = rx_1_10G_3_1G[nxgep->function_num];
+			break;
+		case NEPTUNE_1_1GC_1_10GF_2_1GC:
+			rx_ndmas = rx_1_1G_1_10G_2_1G[nxgep->function_num];
+			break;
+		default:
+			rx_ndmas = p4_rx_equal[nxgep->function_num];
+			break;
 		}
 		(void) ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,
 			prop, rx_ndmas);
@@ -2156,6 +2169,11 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 		ddi_prop_free(prop_val);
 	}
 	nxge_set_hw_dma_config(nxgep);
+
+	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "<== nxge_use_cfg_dma_config: "
+	    "sTDC[%d] nTDC[%d] sRDC[%d] nRDC[%d]",
+	    p_cfgp->start_tdc, p_cfgp->max_tdcs,
+	    p_cfgp->start_rdc, p_cfgp->max_rdcs));
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "<== nxge_use_cfg_dma_config"));
 }
@@ -3374,11 +3392,14 @@ nxge_intr_mask_mgmt_set(p_nxge_t nxgep, boolean_t on)
 static nxge_status_t
 nxge_get_mac_addr_properties(p_nxge_t nxgep)
 {
+#if defined(_BIG_ENDIAN)
 	uchar_t *prop_val;
 	uint_t prop_len;
+	uint_t j;
+#endif
 	uint_t i;
 	uint8_t func_num;
-	uint8_t total_factory_macs;
+	boolean_t compute_macs = B_TRUE;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_get_mac_addr_properties "));
 
@@ -3417,8 +3438,8 @@ nxge_get_mac_addr_properties(p_nxge_t nxgep)
 		nxgep->ouraddr = nxgep->factaddr;
 	}
 
-	if ((nxgep->niu_type == N2_NIU) ||
-	    nxge_is_valid_local_mac(nxgep->factaddr))
+	if ((nxgep->nxge_hw_p->platform_type != P_NEPTUNE_ATLAS) ||
+	    (nxge_is_valid_local_mac(nxgep->factaddr)))
 		goto got_mac_addr;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "nxge_get_mac_addr_properties: "
@@ -3441,7 +3462,7 @@ nxge_get_mac_addr_properties(p_nxge_t nxgep)
 	 * from the EEPROM.
 	 */
 	nxge_espc_get_next_mac_addr(nxgep->vpd_info.mac_addr,
-	    nxgep->mac.portnum, &nxgep->factaddr);
+	    nxgep->function_num, &nxgep->factaddr);
 
 	if (!nxge_is_valid_local_mac(nxgep->factaddr)) {
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
@@ -3463,91 +3484,70 @@ got_mac_addr:
 	func_num = nxgep->function_num;
 
 	/*
-	 * total_factory_macs is the total number of MACs the factory assigned
-	 * to the whole Neptune device.  NIU does not need this parameter
-	 * because it derives the number of factory MACs for each port from
-	 * the device properties.
+	 * Note: mac-addresses property is the list of mac addresses for a
+	 * port. NXGE_MAX_MMAC_ADDRS is the total number of MAC addresses
+	 * allocated for a board.
 	 */
-	if (nxgep->niu_type == NEPTUNE || nxgep->niu_type == NEPTUNE_2) {
-		/* First get VPD data from EEPROM */
-		if (nxgep->vpd_info.ver_valid && nxgep->vpd_info.num_macs) {
-			nxgep->nxge_mmac_info.total_factory_macs =
-			    nxgep->vpd_info.num_macs;
-		} else {
-			NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-			    "nxge_get_mac_addr_properties: Number of MAC "
-			    "addresses in EEPROM VPD data not valid"
-			    "...reading from NCR registers"));
-			if (nxge_espc_num_macs_get(nxgep,
-			    &total_factory_macs) == NXGE_OK) {
-				nxgep->nxge_mmac_info.total_factory_macs =
-					total_factory_macs;
-			} else {
-				NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-				    "EEPROM version [%s] invalid...please "
-				    "update", nxgep->vpd_info.ver));
-				return (NXGE_ERROR);
-			}
-		}
-	}
+	nxgep->nxge_mmac_info.total_factory_macs = NXGE_MAX_MMAC_ADDRS;
 
-	/*
-	 * Note: mac-addresses of n2-niu is the list of mac addresses for a
-	 * port. #mac-addresses stored in Neptune's SEEPROM is the total number
-	 * of MAC addresses allocated for a board.
-	 */
-	if (nxgep->niu_type == N2_NIU) {
-		if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, nxgep->dip, 0,
-				"mac-addresses", &prop_val, &prop_len) ==
-			DDI_PROP_SUCCESS) {
-			/*
-			 * XAUI may have up to 18 MACs, more than the XMAC can
-			 * use (1 unique MAC plus 16 alternate MACs)
-			 */
-			nxgep->nxge_mmac_info.num_factory_mmac
-			    = prop_len / ETHERADDRL - 1;
-			if (nxgep->nxge_mmac_info.num_factory_mmac >
-				XMAC_MAX_ALT_ADDR_ENTRY) {
-				nxgep->nxge_mmac_info.num_factory_mmac =
-					XMAC_MAX_ALT_ADDR_ENTRY;
-			}
-			ddi_prop_free(prop_val);
-		}
-	} else {
+#if defined(_BIG_ENDIAN)
+	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, nxgep->dip, 0,
+	    "mac-addresses", &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		/*
-		 * total_factory_macs = 32
-		 * num_factory_mmac = (32 >> (nports/2)) - 1
-		 * So if nports = 4, then num_factory_mmac =  7
-		 *    if nports = 2, then num_factory_mmac = 15
+		 * XAUI may have up to 18 MACs, more than the XMAC can
+		 * use (1 unique MAC plus 16 alternate MACs)
 		 */
-		nxgep->nxge_mmac_info.num_factory_mmac
-			= ((nxgep->nxge_mmac_info.total_factory_macs >>
-			(nxgep->nports >> 1))) - 1;
+		nxgep->nxge_mmac_info.num_factory_mmac =
+		    prop_len / ETHERADDRL - 1;
+		if (nxgep->nxge_mmac_info.num_factory_mmac >
+		    XMAC_MAX_ALT_ADDR_ENTRY) {
+			nxgep->nxge_mmac_info.num_factory_mmac =
+			    XMAC_MAX_ALT_ADDR_ENTRY;
+		}
 
-		if (nxgep->nxge_mmac_info.num_factory_mmac < 1) {
-			NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-			    "Invalid value [0x%x] for num_factory_mmac",
-			    nxgep->nxge_mmac_info.num_factory_mmac));
-			return (NXGE_ERROR);
+		for (i = 1; i <= nxgep->nxge_mmac_info.num_factory_mmac; i++) {
+			for (j = 0; j < ETHERADDRL; j++) {
+				nxgep->nxge_mmac_info.factory_mac_pool[i][j] =
+				    *(prop_val + (i * ETHERADDRL) + j);
+			}
+			NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+			    "nxge_get_mac_addr_properties: Alt mac[%d] from "
+			    "mac-addresses property[%2x:%2x:%2x:%2x:%2x:%2x]",
+			    i, nxgep->nxge_mmac_info.factory_mac_pool[i][0],
+			    nxgep->nxge_mmac_info.factory_mac_pool[i][1],
+			    nxgep->nxge_mmac_info.factory_mac_pool[i][2],
+			    nxgep->nxge_mmac_info.factory_mac_pool[i][3],
+			    nxgep->nxge_mmac_info.factory_mac_pool[i][4],
+			    nxgep->nxge_mmac_info.factory_mac_pool[i][5]));
 		}
-		if ((nxgep->function_num < 2) &&
-		    (nxgep->nxge_mmac_info.num_factory_mmac >
-		    XMAC_MAX_ALT_ADDR_ENTRY)) {
-			nxgep->nxge_mmac_info.num_factory_mmac =
-				XMAC_MAX_ALT_ADDR_ENTRY;
-		} else if ((nxgep->function_num > 1) &&
-		    (nxgep->nxge_mmac_info.num_factory_mmac >
-		    BMAC_MAX_ALT_ADDR_ENTRY)) {
-			nxgep->nxge_mmac_info.num_factory_mmac =
-				BMAC_MAX_ALT_ADDR_ENTRY;
-		}
+
+		compute_macs = B_FALSE;
+		ddi_prop_free(prop_val);
+		goto got_mmac_info;
 	}
+#endif
+	/*
+	 * total_factory_macs = 32
+	 * num_factory_mmac = (32 >> (nports/2)) - 1
+	 * So if nports = 4, then num_factory_mmac =  7
+	 *    if nports = 2, then num_factory_mmac = 15
+	 */
+	nxgep->nxge_mmac_info.num_factory_mmac =
+	    ((nxgep->nxge_mmac_info.total_factory_macs >>
+	    (nxgep->nports >> 1))) - 1;
 
-	if (nxgep->nxge_mmac_info.num_mmac < 1) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		    "Invalid value [0x%x] for num_mmac",
-		    nxgep->nxge_mmac_info.num_mmac));
-		return (NXGE_ERROR);
+got_mmac_info:
+
+	if ((nxgep->function_num < 2) &&
+	    (nxgep->nxge_mmac_info.num_factory_mmac >
+	    XMAC_MAX_ALT_ADDR_ENTRY)) {
+		nxgep->nxge_mmac_info.num_factory_mmac =
+		    XMAC_MAX_ALT_ADDR_ENTRY;
+	} else if ((nxgep->function_num > 1) &&
+	    (nxgep->nxge_mmac_info.num_factory_mmac >
+	    BMAC_MAX_ALT_ADDR_ENTRY)) {
+		nxgep->nxge_mmac_info.num_factory_mmac =
+		    BMAC_MAX_ALT_ADDR_ENTRY;
 	}
 
 	for (i = 0; i <= nxgep->nxge_mmac_info.num_mmac; i++) {
@@ -3555,7 +3555,7 @@ got_mac_addr:
 			NXGE_GET_PORT_NUM(func_num), i);
 	}
 
-	(void) nxge_init_mmac(nxgep);
+	(void) nxge_init_mmac(nxgep, compute_macs);
 	return (NXGE_OK);
 }
 
@@ -3676,10 +3676,14 @@ nxge_ldgv_setup(p_nxge_ldg_t *ldgp, p_nxge_ldv_t *ldvp, uint8_t ldv,
  *     --------------
  *
  * For N2/NIU the mac addresses is from XAUI card.
+ *
+ * When 'compute_addrs' is true, the alternate mac addresses are computed
+ * using the unique mac address as base. Otherwise the alternate addresses
+ * are assigned from the list read off the 'mac-addresses' property.
  */
 
 static void
-nxge_init_mmac(p_nxge_t nxgep)
+nxge_init_mmac(p_nxge_t nxgep, boolean_t compute_addrs)
 {
 	int slot;
 	uint8_t func_num;
@@ -3694,14 +3698,18 @@ nxge_init_mmac(p_nxge_t nxgep)
 	base_mmac_addr = (uint16_t *)&nxgep->factaddr;
 	mmac_info = (nxge_mmac_t *)&nxgep->nxge_mmac_info;
 
-	base_mac_ls4b = ((uint32_t)base_mmac_addr[1]) << 16 |
-		base_mmac_addr[2];
+	if (compute_addrs) {
+		base_mac_ls4b = ((uint32_t)base_mmac_addr[1]) << 16 |
+		    base_mmac_addr[2];
 
-	if (nxgep->niu_type == N2_NIU) {
-		alt_mac_ls4b = base_mac_ls4b + 1; /* ls4b of 1st altmac */
-	} else {			/* Neptune */
-		alt_mac_ls4b = base_mac_ls4b + (nxgep->nports - func_num)
-			+ (func_num * (mmac_info->num_factory_mmac));
+		if (nxgep->niu_type == N2_NIU) {
+			/* ls4b of 1st altmac */
+			alt_mac_ls4b = base_mac_ls4b + 1;
+		} else {			/* Neptune */
+			alt_mac_ls4b = base_mac_ls4b +
+			    (nxgep->nports - func_num) +
+			    (func_num * (mmac_info->num_factory_mmac));
+		}
 	}
 
 	/* Set flags for unique MAC */
@@ -3718,22 +3726,38 @@ nxge_init_mmac(p_nxge_t nxgep)
 	/* Generate and store factory alternate MACs */
 	for (slot = 1; slot <= mmac_info->num_factory_mmac; slot++) {
 		mmac_addr = (uint16_t *)&mmac_info->factory_mac_pool[slot];
-		mmac_addr[0] = base_mmac_addr[0];
-		mac_addr.w2 = mmac_addr[0];
+		if (compute_addrs) {
+			mmac_addr[0] = base_mmac_addr[0];
+			mac_addr.w2 = mmac_addr[0];
 
-		mmac_addr[1] = (alt_mac_ls4b >> 16) & 0x0FFFF;
-		mac_addr.w1 = mmac_addr[1];
+			mmac_addr[1] = (alt_mac_ls4b >> 16) & 0x0FFFF;
+			mac_addr.w1 = mmac_addr[1];
 
-		mmac_addr[2] = alt_mac_ls4b & 0x0FFFF;
-		mac_addr.w0 = mmac_addr[2];
+			mmac_addr[2] = alt_mac_ls4b & 0x0FFFF;
+			mac_addr.w0 = mmac_addr[2];
+
+			alt_mac_ls4b++;
+		} else {
+			mac_addr.w2 = mmac_addr[0];
+			mac_addr.w1 = mmac_addr[1];
+			mac_addr.w0 = mmac_addr[2];
+		}
+
+		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
+		    "mac_pool_addr[%2x:%2x:%2x:%2x:%2x:%2x] npi_addr[%x%x%x]",
+		    mmac_info->factory_mac_pool[slot][0],
+		    mmac_info->factory_mac_pool[slot][1],
+		    mmac_info->factory_mac_pool[slot][2],
+		    mmac_info->factory_mac_pool[slot][3],
+		    mmac_info->factory_mac_pool[slot][4],
+		    mmac_info->factory_mac_pool[slot][5],
+		    mac_addr.w0, mac_addr.w1, mac_addr.w2));
 		/*
-		 * slot minus 1 because npi_mac_alraddr_entry expects 0
+		 * slot minus 1 because npi_mac_altaddr_entry expects 0
 		 * for the first alternate mac address.
 		 */
 		(void) npi_mac_altaddr_entry(nxgep->npi_handle, OP_SET,
 			NXGE_GET_PORT_NUM(func_num), slot - 1, &mac_addr);
-
-		alt_mac_ls4b++;
 	}
 	/* Initialize the first two parameters for mmac kstat */
 	nxgep->statsp->mmac_stats.mmac_max_cnt = mmac_info->num_mmac;

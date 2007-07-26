@@ -41,6 +41,9 @@ extern "C" {
 #define	NIAGARA2_HSVC_MAJOR	1
 #define	NIAGARA2_HSVC_MINOR	0
 
+#define	VFALLS_HSVC_MAJOR	1
+#define	VFALLS_HSVC_MINOR	0
+
 #define	NIAGARA2_PREALLOC_BASE	MB(196)
 
 /* PIC overflow range is -16 to -1 */
@@ -84,10 +87,17 @@ extern "C" {
 
 /*
  * Hypervisor FAST_TRAP API function numbers to get/set DRAM
- * performance counters
+ * performance counters for Niagara2
  */
 #define	HV_NIAGARA2_GETPERF		0x104
 #define	HV_NIAGARA2_SETPERF		0x105
+
+/*
+ * Hypervisor FAST_TRAP API function numbers to get/set DRAM
+ * performance counters for Victoria Falls
+ */
+#define	HV_VFALLS_GETPERF		0x106
+#define	HV_VFALLS_SETPERF		0x107
 
 /*
  * Niagara2 DRAM performance counters
@@ -102,9 +112,10 @@ extern "C" {
 #define	NIAGARA_DRAM_PIC1_SHIFT		0x0
 #define	NIAGARA_DRAM_PIC1_MASK		0x7fffffff
 
+#if defined(NIAGARA2_IMPL)
 /*
  * SPARC/DRAM performance counter register numbers for HV_NIAGARA2_GETPERF
- * and HV_NIAGARA2_SETPERF
+ * and HV_NIAGARA2_SETPERF for Niagara2
  */
 #define	HV_NIAGARA_SPARC_CTL		0x0
 #define	HV_NIAGARA_DRAM_CTL0		0x1
@@ -115,6 +126,28 @@ extern "C" {
 #define	HV_NIAGARA_DRAM_COUNT2		0x6
 #define	HV_NIAGARA_DRAM_CTL3		0x7
 #define	HV_NIAGARA_DRAM_COUNT3		0x8
+
+#elif defined(VFALLS_IMPL)
+/*
+ * SPARC/DRAM performance counter register numbers for HV_VFALLS_GETPERF
+ * and HV_VFALLS_SETPERF for Victoria Falls
+ * Support for 2-node configuration
+ */
+#define	HV_NIAGARA_SPARC_CTL		0x0
+#define	HV_NIAGARA_L2_CTL		0x1
+#define	HV_NIAGARA_DRAM_CTL0		0x2
+#define	HV_NIAGARA_DRAM_COUNT0		0x3
+#define	HV_NIAGARA_DRAM_CTL1		0x4
+#define	HV_NIAGARA_DRAM_COUNT1		0x5
+#define	HV_NIAGARA_DRAM_CTL2		0x6
+#define	HV_NIAGARA_DRAM_COUNT2		0x7
+#define	HV_NIAGARA_DRAM_CTL3		0x8
+#define	HV_NIAGARA_DRAM_COUNT3		0x9
+
+#define	VFALLS_L2_CTL_MASK		0x3
+#define	VFALLS_SL3_MASK			0x300
+
+#endif
 
 #ifndef _ASM
 /*

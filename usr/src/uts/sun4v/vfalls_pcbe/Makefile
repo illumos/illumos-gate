@@ -24,7 +24,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# This Makefile builds the UltraSPARC-T2 Performance Counter BackEnd (PCBE).
+# This Makefile builds the UltraSPARC-T2+ Performance Counter BackEnd (PCBE).
 #
 
 UTSBASE = ../..
@@ -32,7 +32,7 @@ UTSBASE = ../..
 #
 #	Define module and object file sets.
 #
-MODULE		= pcbe.SUNW,UltraSPARC-T2
+MODULE		= pcbe.SUNW,UltraSPARC-T2+
 OBJECTS		= $(N2_PCBE_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(N2_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_PCBE_DIR)/$(MODULE)
@@ -46,20 +46,20 @@ include $(UTSBASE)/sun4v/Makefile.sun4v
 #	Define targets.
 #
 ALL_TARGET	= $(BINARY)
-LINT_MODULE	= niagara2_pcbe
+LINT_MODULE	= vfalls_pcbe
 LINT_TARGET	= $(LINT_MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 # lint pass one enforcement
 #
-CFLAGS += -DNIAGARA2_IMPL
+CFLAGS += -DVFALLS_IMPL
 
 #
-# niagara2-specific flags
+# vfalls-specific flags
 #
-CPPFLAGS += -DNIAGARA2_IMPL
-AS_CPPFLAGS += -DNIAGARA2_IMPL
+CPPFLAGS += -DVFALLS_IMPL
+AS_CPPFLAGS += -DVFALLS_IMPL
 
 #
 #	Default build targets.

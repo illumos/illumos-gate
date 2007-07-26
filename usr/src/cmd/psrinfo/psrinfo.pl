@@ -20,7 +20,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -301,7 +301,7 @@ sub expand
 sub property_list
 {
 	my $prop_name = shift;
-	return (uniqsort(map { $cpu_list{$_}->{$prop_name} || 0 } @_));
+	return (grep {$_ >= 0} uniqsort(map { $cpu_list{$_}->{$prop_name} || 0 } @_));
 }
 
 #

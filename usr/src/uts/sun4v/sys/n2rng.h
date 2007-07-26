@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -176,6 +176,7 @@ typedef struct n2rng {
 	uint64_t		n_rng_state; /* as last known in this drvr. */
 	uint64_t		n_sticks_per_usec;
 	uint64_t		n_anlg_settle_cycles;
+	ddi_taskq_t		*n_taskq;
 } n2rng_t;
 
 

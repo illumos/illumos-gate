@@ -118,6 +118,7 @@ d none usr/platform/sun4v/lib/fm 755 root bin
 d none usr/platform/sun4v/lib/fm/eft 755 root bin
 f none usr/platform/sun4v/lib/fm/eft/fire.eft 444 root bin
 f none usr/platform/sun4v/lib/fm/eft/n2piu.eft 444 root bin
+f none usr/platform/sun4v/lib/fm/eft/vfncx.eft 444 root bin
 d none usr/platform/sun4v/lib/fm/fmd 755 root bin
 d none usr/platform/sun4v/lib/fm/fmd/plugins 755 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-diagnosis.so 555 root bin
@@ -192,3 +193,10 @@ d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/topo 755 root bin
 d none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/topo/maps 755 root bin
 f none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/topo/maps/SPARC-Enterprise-T5120-hc-topology.xml 444 root bin
 f none usr/platform/SUNW,SPARC-Enterprise-T5120/lib/fm/topo/maps/SPARC-Enterprise-T5220-hc-topology.xml 444 root bin
+d none usr/platform/SUNW,T5140 755 root sys
+d none usr/platform/SUNW,T5140/lib 755 root bin
+d none usr/platform/SUNW,T5140/lib/fm 755 root bin
+d none usr/platform/SUNW,T5140/lib/fm/topo 755 root bin
+d none usr/platform/SUNW,T5140/lib/fm/topo/maps 755 root bin
+f none usr/platform/SUNW,T5140/lib/fm/topo/maps/T5140-hc-topology.xml 444 root bin
+f none usr/platform/SUNW,T5140/lib/fm/topo/maps/T5240-hc-topology.xml 444 root bin

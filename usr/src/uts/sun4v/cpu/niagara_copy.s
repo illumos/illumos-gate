@@ -261,6 +261,8 @@
 	faddd	%f0, %f2, %f60		;\
 	fmuld	%f0, %f2, %f62
 
+#if !defined(lint)
+
 /*
  * Macros to save and restore fp registers to/from the stack.
  * Used to save and restore in-use fp registers when we want to use FP.
@@ -288,6 +290,7 @@
 	membar	#Sync
 #endif	/* NIAGARA_IMPL */
 
+#endif	/* lint */
 /*
  * Copy a block of storage, returning an error code if `from' or
  * `to' takes a kernel pagefault which cannot be resolved.

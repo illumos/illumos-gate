@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +35,7 @@
 #include <sys/kstat.h>
 #if defined(NIAGARA_IMPL)
 #include <sys/niagararegs.h>
-#elif defined(NIAGARA2_IMPL)
+#elif defined(NIAGARA2_IMPL) || defined(VFALLS_IMPL)
 #include <sys/niagara2regs.h>
 #endif
 
@@ -110,7 +110,7 @@ static int	ni_perf_debug;
 #endif
 
 /*
- * Niagara and Niagara2 DRAM Performance Events
+ * Niagara, Niagara2 and VFalls DRAM Performance Events
  */
 static ni_kev_mask_t
 niagara_dram_events[] = {
@@ -155,6 +155,7 @@ niagara_kstat_init()
 {
 	int i;
 	ni_ksinfo_t *ksinfop;
+	uint64_t pic;
 
 #ifdef DEBUG
 	if (ni_perf_debug)
@@ -165,35 +166,44 @@ niagara_kstat_init()
 	 * Create DRAM perf events kstat
 	 */
 	for (i = 0; i < NIAGARA_DRAM_BANKS; i++) {
-		ksinfop = (ni_ksinfo_t *)kmem_zalloc(sizeof (ni_ksinfo_t),
-		    KM_NOSLEEP);
+#ifdef VFALLS_IMPL
+		/* check if this dram instance is enabled in the HW */
+		if (hv_niagara_getperf(dram_perf_regs[i].pic_reg, &pic) !=
+		    H_EINVAL) {
+#endif
+			ksinfop = (ni_ksinfo_t *)kmem_zalloc(
+			    sizeof (ni_ksinfo_t), KM_NOSLEEP);
 
-		if (ksinfop == NULL) {
-			cmn_err(CE_WARN,
-			    "%s: no space for niagara dram kstat\n",
-			    cpu_module_name);
-			break;
-		}
-		ksinfop->pic_no_evs =
-			sizeof (niagara_dram_events) / sizeof (ni_kev_mask_t);
-		ksinfop->pic_sel_shift[0] = NIAGARA_DRAM_PIC0_SEL_SHIFT;
-		ksinfop->pic_shift[0] = NIAGARA_DRAM_PIC0_SHIFT;
-		ksinfop->pic_mask[0] = NIAGARA_DRAM_PIC0_MASK;
-		ksinfop->pic_sel_shift[1] = NIAGARA_DRAM_PIC1_SEL_SHIFT;
-		ksinfop->pic_shift[1] = NIAGARA_DRAM_PIC1_SHIFT;
-		ksinfop->pic_mask[1] = NIAGARA_DRAM_PIC1_MASK;
-		ksinfop->pic_reg = dram_perf_regs[i].pic_reg;
-		ksinfop->pcr_reg = dram_perf_regs[i].pcr_reg;
-		ni_dram_kstats[i] = ksinfop;
+			if (ksinfop == NULL) {
+				cmn_err(CE_WARN,
+				    "%s: no space for dram kstat\n",
+				    cpu_module_name);
+				break;
+			}
+			ksinfop->pic_no_evs =
+			    sizeof (niagara_dram_events) /
+			    sizeof (ni_kev_mask_t);
+			ksinfop->pic_sel_shift[0] = NIAGARA_DRAM_PIC0_SEL_SHIFT;
+			ksinfop->pic_shift[0] = NIAGARA_DRAM_PIC0_SHIFT;
+			ksinfop->pic_mask[0] = NIAGARA_DRAM_PIC0_MASK;
+			ksinfop->pic_sel_shift[1] = NIAGARA_DRAM_PIC1_SEL_SHIFT;
+			ksinfop->pic_shift[1] = NIAGARA_DRAM_PIC1_SHIFT;
+			ksinfop->pic_mask[1] = NIAGARA_DRAM_PIC1_MASK;
+			ksinfop->pic_reg = dram_perf_regs[i].pic_reg;
+			ksinfop->pcr_reg = dram_perf_regs[i].pcr_reg;
+			ni_dram_kstats[i] = ksinfop;
 
-		/* create basic pic event/mask pair (only once) */
-		if (i == 0)
-			ni_create_name_kstat("dram", ksinfop,
+			/* create basic pic event/mask pair (only once) */
+			if (i == 0)
+				ni_create_name_kstat("dram", ksinfop,
 				    niagara_dram_events);
 
-		/* create counter kstats */
-		ni_dram_kstats[i]->cntr_ksp = ni_create_cntr_kstat("dram", i,
-		    ni_cntr_kstat_update, ksinfop);
+			/* create counter kstats */
+			ni_dram_kstats[i]->cntr_ksp = ni_create_cntr_kstat(
+			    "dram", i, ni_cntr_kstat_update, ksinfop);
+#ifdef VFALLS_IMPL
+		}
+#endif
 	}
 
 #if defined(NIAGARA_IMPL)
@@ -201,14 +211,14 @@ niagara_kstat_init()
 	 * Create JBUS perf events kstat
 	 */
 	ni_jbus_kstat = (ni_ksinfo_t *)kmem_alloc(sizeof (ni_ksinfo_t),
-		KM_NOSLEEP);
+	    KM_NOSLEEP);
 
 	if (ni_jbus_kstat == NULL) {
 		cmn_err(CE_WARN, "%s: no space for niagara jbus kstat\n",
 		    cpu_module_name);
 	} else {
 		ni_jbus_kstat->pic_no_evs =
-			sizeof (niagara_jbus_events) / sizeof (ni_kev_mask_t);
+		    sizeof (niagara_jbus_events) / sizeof (ni_kev_mask_t);
 		ni_jbus_kstat->pic_sel_shift[0] = NIAGARA_JBUS_PIC0_SEL_SHIFT;
 		ni_jbus_kstat->pic_shift[0] = NIAGARA_JBUS_PIC0_SHIFT;
 		ni_jbus_kstat->pic_mask[0] = NIAGARA_JBUS_PIC0_MASK;
@@ -266,7 +276,7 @@ ni_create_name_kstat(char *name, ni_ksinfo_t *pp, ni_kev_mask_t *ev)
 #endif
 	for (i = 0; i < NUM_OF_PICS; i++) {
 		pp->pic_name_ksp[i] = ni_create_picN_kstat(name,
-			i, pp->pic_sel_shift[i], pp->pic_no_evs, ev);
+		    i, pp->pic_sel_shift[i], pp->pic_no_evs, ev);
 
 		if (pp->pic_name_ksp[i] == NULL) {
 			cmn_err(CE_WARN, "%s: unable to create name kstat",
@@ -307,7 +317,7 @@ ni_create_picN_kstat(char *mod_name, int pic, int pic_sel_shift,
 	if ((picN_ksp = kstat_create(mod_name, inst, pic_name,
 	    "bus", KSTAT_TYPE_NAMED, num_ev, NULL)) == NULL) {
 		cmn_err(CE_WARN, "%s %s : kstat create failed",
-			mod_name, pic_name);
+		    mod_name, pic_name);
 
 		/*
 		 * It is up to the calling function to delete any kstats
@@ -327,18 +337,18 @@ ni_create_picN_kstat(char *mod_name, int pic, int pic_sel_shift,
 	 */
 	for (event = 0; event < num_ev - 1; event++) {
 		pic_named_data[event].value.ui64 =
-			(ev_array[event].pcr_mask << pic_sel_shift);
+		    (ev_array[event].pcr_mask << pic_sel_shift);
 
 		kstat_named_init(&pic_named_data[event],
-			ev_array[event].event_name,
-			KSTAT_DATA_UINT64);
+		    ev_array[event].event_name,
+		    KSTAT_DATA_UINT64);
 	}
 
 	/*
 	 * add the clear_pic entry.
 	 */
 	pic_named_data[event].value.ui64 =
-		(uint64_t)~(ev_array[event].pcr_mask << pic_sel_shift);
+	    (uint64_t)~(ev_array[event].pcr_mask << pic_sel_shift);
 
 	kstat_named_init(&pic_named_data[event], ev_array[event].event_name,
 	    KSTAT_DATA_UINT64);

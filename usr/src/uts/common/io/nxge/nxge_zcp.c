@@ -44,13 +44,16 @@ nxge_zcp_init(p_nxge_t nxgep)
 	handle = nxgep->npi_handle;
 	portn = NXGE_GET_PORT_NUM(nxgep->function_num);
 
-	if ((nxgep->niu_type == NEPTUNE) || (nxgep->niu_type == NEPTUNE_2)) {
+	if (nxgep->niu_type == N2_NIU) {
+		cfifo_depth = ZCP_NIU_CFIFO_DEPTH;
+	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
 		if (portn < 2)
 			cfifo_depth = ZCP_P0_P1_CFIFO_DEPTH;
 		else
 			cfifo_depth = ZCP_P2_P3_CFIFO_DEPTH;
-	} else if (nxgep->niu_type == N2_NIU)
-		cfifo_depth = ZCP_NIU_CFIFO_DEPTH;
+	} else {
+		goto fail;
+	}
 
 	/* Clean up CFIFO */
 	w_data.w0 = 0;
@@ -417,13 +420,16 @@ nxge_zcp_fatal_err_recover(p_nxge_t nxgep)
 	}
 
 	/* Clear up CFIFO */
-	if ((nxgep->niu_type == NEPTUNE) || (nxgep->niu_type == NEPTUNE_2)) {
+	if (nxgep->niu_type == N2_NIU) {
+		cfifo_depth = ZCP_NIU_CFIFO_DEPTH;
+	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
 		if (portn < 2)
 			cfifo_depth = ZCP_P0_P1_CFIFO_DEPTH;
 		else
 			cfifo_depth = ZCP_P2_P3_CFIFO_DEPTH;
-	} else if (nxgep->niu_type == N2_NIU)
-		cfifo_depth = ZCP_NIU_CFIFO_DEPTH;
+	} else {
+		goto fail;
+	}
 
 	w_data.w0 = 0;
 	w_data.w1 = 0;

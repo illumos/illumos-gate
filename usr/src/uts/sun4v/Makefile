@@ -1,4 +1,4 @@
-#
+ #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -33,6 +33,8 @@ UTSBASE = ..
 include Makefile.sun4v
 include Makefile.stpaul
 include Makefile.huron
+include Makefile.maramba
+
 USR_GLENDALE_DIR	= $(USR_PLAT_DIR)/SUNW,Sun-Blade-T6320
 USR_GLENDALE_SBIN_DIR	= $(USR_GLENDALE_DIR)/sbin
 USR_GLENDALE_LIB_DIR	= $(USR_GLENDALE_DIR)/lib
@@ -175,12 +177,14 @@ $(USR_PLAT_DIRS): $(USR_PLAT_DIR)
 
 PLATFORMS	+= $(IMPLEMENTED_PLATFORM)
 
+
 #
 # Make the /platforms directories.  This is hardwired here because
 # the first stage of the project (KBI) only implements the userland
 # changes, but the only reasonable place to record the aliases is
 # here in kernel land.
 #
+
 install_platforms:	$(ROOT_PSM_DIR) $(USR_PSM_DIR) \
 			$(ROOT_PLAT_DIRS) $(USR_PLAT_DIRS) \
 			$(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%) \
@@ -191,7 +195,10 @@ install_platforms:	$(ROOT_PSM_DIR) $(USR_PSM_DIR) \
 			$(USR_GLENDALE_DIR) $(USR_GLENDALE_SBIN_DIR) \
 			$(USR_GLENDALE_LIB_DIR) \
 			$(USR_HURON_DIR) \
-			$(USR_HURON_SBIN_DIR) $(USR_HURON_LIB_DIR)
+			$(USR_HURON_SBIN_DIR) $(USR_HURON_LIB_DIR) \
+			$(USR_MARAMBA_DIR) $(USR_MARAMBA_SBIN_DIR) \
+			$(USR_MARAMBA_LIB_DIR)
+
 
 #
 # rules for making include, sbin, lib dirs/links in
@@ -232,6 +239,16 @@ $(USR_GLENDALE_SBIN_DIR):		$(USR_GLENDALE_DIR)
 
 $(USR_GLENDALE_LIB_DIR):		$(USR_GLENDALE_DIR)
 	-$(INS.dir.root.bin)
+
+$(USR_MARAMBA_DIR):		$(USR_SUN4V_PLAT_DIR)
+	-$(INS.dir.root.sys)
+
+$(USR_MARAMBA_SBIN_DIR):	$(USR_MARAMBA_DIR)
+	$(INS.slink5)
+
+$(USR_MARAMBA_LIB_DIR):		$(USR_MARAMBA_DIR)
+	-$(INS.dir.root.bin)
+
 #
 #	Full kernel lint target.
 #

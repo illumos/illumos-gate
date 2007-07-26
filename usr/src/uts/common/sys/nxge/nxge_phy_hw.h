@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,9 +35,37 @@ extern "C" {
 
 #include <nxge_defs.h>
 
+#define	NXGE_MAX_PHY_PORTS		32
+#define	NXGE_EXT_PHY_PORT_ST		8
+
+#define	NXGE_PMA_PMD_DEV_ADDR		1
+#define	NXGE_PCS_DEV_ADDR		3
+#define	NXGE_DEV_ID_REG_1		2
+#define	NXGE_DEV_ID_REG_2		3
+#define	NXGE_PHY_ID_REG_1		2
+#define	NXGE_PHY_ID_REG_2		3
+
+#define	BCM8704_DEV_ID			0x206033
+#define	BCM5464R_PHY_ID			0x2060b1
+#define	PHY_10G_FIBRE			BCM8704_DEV_ID
+#define	PHY_1G_COPPER			BCM5464R_PHY_ID
+#define	PHY_ID_MASK			0xfffff0f0
+
+#define	CLAUSE_45_TYPE	1
+#define	CLAUSE_22_TYPE	2
+
 #define	BCM5464_NEPTUNE_PORT_ADDR_BASE		10
 #define	BCM8704_NEPTUNE_PORT_ADDR_BASE		8
 #define	BCM8704_N2_PORT_ADDR_BASE		16
+
+/*
+ * Phy addresses for Maramba support. Support for P0 will eventually
+ * be removed.
+ */
+#define	BCM5464_MARAMBA_P0_PORT_ADDR_BASE	10
+#define	BCM5464_MARAMBA_P1_PORT_ADDR_BASE	26
+#define	BCM8704_MARAMBA_PORT_ADDR_BASE		16
+
 #define	BCM8704_PMA_PMD_DEV_ADDR		1
 #define	BCM8704_PCS_DEV_ADDR			3
 #define	BCM8704_USER_DEV3_ADDR			3

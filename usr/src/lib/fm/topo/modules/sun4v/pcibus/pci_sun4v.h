@@ -68,11 +68,21 @@ pphysnm_t plat_pnames[] = {
 	    t5120_pnms },
 	{ "SPARC-Enterprise-T5220",
 	    sizeof (t5220_pnms) / sizeof (physnm_t),
+	    t5220_pnms },
+	/*
+	 * T5140/T5240 uses the same chassis as T5120/T5220, hence
+	 * the same PCI slot mappings
+	 */
+	{ "T5140",
+	    sizeof (t5120_pnms) / sizeof (physnm_t),
+	    t5120_pnms },
+	{ "T5240",
+	    sizeof (t5220_pnms) / sizeof (physnm_t),
 	    t5220_pnms }
 };
 
 physlot_names_t PhyslotNMs = {
-	3,
+	sizeof (plat_pnames) / sizeof (pphysnm_t),
 	plat_pnames
 };
 
@@ -91,11 +101,17 @@ pdevlabs_t plats_missing[] = {
 	    NULL },
 	{ "SPARC-Enterprise-T5220",
 	    0,
+	    NULL },
+	{ "T5140",
+	    0,
+	    NULL },
+	{ "T5240",
+	    0,
 	    NULL }
 };
 
 missing_names_t Missing = {
-	3,
+	sizeof (plats_missing) / sizeof (pdevlabs_t),
 	plats_missing
 };
 

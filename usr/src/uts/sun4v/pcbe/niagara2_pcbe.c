@@ -43,6 +43,7 @@
 #include <sys/hypervisor_api.h>
 #include <sys/disp.h>
 
+/*LINTLIBRARY*/
 static int ni2_pcbe_init(void);
 static uint_t ni2_pcbe_ncounters(void);
 static const char *ni2_pcbe_impl_name(void);
@@ -152,7 +153,6 @@ static ni2_event_t ni2_events[] = {
 	EV_END
 };
 
-static const char	*ni2_impl_name = "UltraSPARC T2";
 static char		*evlist;
 static size_t		evlist_sz;
 static uint16_t 	pcr_pic0_mask;
@@ -161,18 +161,32 @@ static uint16_t 	pcr_pic1_mask;
 #define	CPU_REF_URL " Documentation for Sun processors can be found at: " \
 			"http://www.sun.com/processors/manuals"
 
-static const char *niagara2_cpuref = "See the \"UltraSPARC T2 User's Manual\" "
+#if defined(NIAGARA2_IMPL)
+static const char	*cpu_impl_name = "UltraSPARC T2";
+static const char *cpu_pcbe_ref = "See the \"UltraSPARC T2 User's Manual\" "
 			"for descriptions of these events." CPU_REF_URL;
+#elif defined(VFALLS_IMPL)
+static const char	*cpu_impl_name = "UltraSPARC T2+";
+static const char *cpu_pcbe_ref = "See the \"UltraSPARC T2+ User's Manual\" "
+			"for descriptions of these events." CPU_REF_URL;
+#endif
 
-static boolean_t niagara2_hsvc_available = B_TRUE;
+static boolean_t cpu_hsvc_available = B_TRUE;
 
 static int
 ni2_pcbe_init(void)
 {
 	ni2_event_t	*evp;
 	int		status;
-	uint64_t	niagara2_hsvc_major;
-	uint64_t	niagara2_hsvc_minor;
+	uint64_t	cpu_hsvc_major;
+	uint64_t	cpu_hsvc_minor;
+#if defined(NIAGARA2_IMPL)
+	uint64_t	hsvc_cpu_group = HSVC_GROUP_NIAGARA2_CPU;
+	uint64_t	hsvc_cpu_major = NIAGARA2_HSVC_MAJOR;
+#elif defined(VFALLS_IMPL)
+	uint64_t	hsvc_cpu_group = HSVC_GROUP_VFALLS_CPU;
+	uint64_t	hsvc_cpu_major = VFALLS_HSVC_MAJOR;
+#endif
 
 	pcr_pic0_mask = CPC_NIAGARA2_PCR_PIC0_MASK;
 	pcr_pic1_mask = CPC_NIAGARA2_PCR_PIC1_MASK;
@@ -180,14 +194,14 @@ ni2_pcbe_init(void)
 	/*
 	 * Validate API version for Niagara2 specific hypervisor services
 	 */
-	status = hsvc_version(HSVC_GROUP_NIAGARA2_CPU, &niagara2_hsvc_major,
-	    &niagara2_hsvc_minor);
-	if ((status != 0) || (niagara2_hsvc_major != NIAGARA2_HSVC_MAJOR)) {
+	status = hsvc_version(hsvc_cpu_group, &cpu_hsvc_major,
+	    &cpu_hsvc_minor);
+	if ((status != 0) || (cpu_hsvc_major != hsvc_cpu_major)) {
 		cmn_err(CE_WARN, "hypervisor services not negotiated "
-		    "or unsupported major number: group: 0x%x major: 0x%lx "
-		    "minor: 0x%lx errno: %d", HSVC_GROUP_NIAGARA2_CPU,
-		    niagara2_hsvc_major, niagara2_hsvc_minor, status);
-		niagara2_hsvc_available = B_FALSE;
+		    "or unsupported major number: group: 0x%lx major: 0x%lx "
+		    "minor: 0x%lx errno: %d", hsvc_cpu_group,
+		    cpu_hsvc_major, cpu_hsvc_minor, status);
+		cpu_hsvc_available = B_FALSE;
 	}
 
 	/*
@@ -225,13 +239,13 @@ ni2_pcbe_ncounters(void)
 static const char *
 ni2_pcbe_impl_name(void)
 {
-	return (ni2_impl_name);
+	return (cpu_impl_name);
 }
 
 static const char *
 ni2_pcbe_cpuref(void)
 {
-	return (niagara2_cpuref);
+	return (cpu_pcbe_ref);
 }
 
 static char *
@@ -245,8 +259,12 @@ ni2_pcbe_list_events(uint_t picnum)
 static char *
 ni2_pcbe_list_attrs(void)
 {
-	if (niagara2_hsvc_available == B_TRUE)
+	if (cpu_hsvc_available == B_TRUE)
+#if defined(NIAGARA2_IMPL)
 		return ("hpriv,emask");
+#elif defined(VFALLS_IMPL)
+		return ("hpriv,l2ctl,emask");
+#endif
 	else
 		return ("emask");
 }
@@ -364,6 +382,21 @@ ni2_pcbe_configure(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 			    evp->emask_valid)
 				return (CPC_ATTRIBUTE_OUT_OF_RANGE);
 			evsel |= attrs[i].ka_val;
+#if defined(VFALLS_IMPL)
+		} else if (strcmp(attrs[i].ka_name, "l2ctl") == 0) {
+			if ((attrs[i].ka_val | VFALLS_L2_CTL_MASK) !=
+			    VFALLS_L2_CTL_MASK)
+				return (CPC_ATTRIBUTE_OUT_OF_RANGE);
+			/*
+			 * Set PERF_CONTROL bits in L2_CONTROL_REG
+			 * only when events have SL bits equal to 3.
+			 */
+			if ((evsel & VFALLS_SL3_MASK) == VFALLS_SL3_MASK) {
+				if ((hv_niagara_setperf(HV_NIAGARA_L2_CTL,
+				    attrs[i].ka_val)) != 0)
+					return (CPC_HV_NO_ACCESS);
+			}
+#endif
 		} else
 			return (CPC_INVALID_ATTRIBUTE);
 	}
@@ -454,7 +487,7 @@ ni2_pcbe_program(void *token)
 	}
 
 	if (pic0->pcbe_picno != 0 || pic1->pcbe_picno != 1)
-		panic("%s: bad config on token %p\n", ni2_impl_name, token);
+		panic("%s: bad config on token %p\n", cpu_impl_name, token);
 
 	/*
 	 * UltraSPARC does not allow pic0 to be configured differently
@@ -550,7 +583,7 @@ ni2_pcbe_sample(void *token)
 	DTRACE_PROBE1(niagara2__getpic, uint64_t, curpic);
 
 	if ((pic0 = kcpc_next_config(token, NULL, &pic0_data)) == NULL)
-		panic("%s: token %p has no configs", ni2_impl_name, token);
+		panic("%s: token %p has no configs", cpu_impl_name, token);
 
 	if ((pic1 = kcpc_next_config(token, pic0, &pic1_data)) == NULL) {
 		pic1 = &nullcfg;
@@ -568,7 +601,7 @@ ni2_pcbe_sample(void *token)
 	}
 
 	if (pic0->pcbe_picno != 0 || pic1->pcbe_picno != 1)
-		panic("%s: bad config on token %p\n", ni2_impl_name, token);
+		panic("%s: bad config on token %p\n", cpu_impl_name, token);
 
 
 	if (pic0->pcbe_flags & CPC_COUNT_HV) {
@@ -610,7 +643,11 @@ ni2_pcbe_free(void *config)
 
 static struct modlpcbe modlpcbe = {
 	&mod_pcbeops,
+#if defined(NIAGARA2_IMPL)
 	"UltraSPARC T2 Performance Counters v%I%",
+#elif defined(VFALLS_IMPL)
+	"UltraSPARC T2+ Performance Counters v%I%",
+#endif
 	&ni2_pcbe_ops
 };
 

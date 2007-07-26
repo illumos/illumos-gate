@@ -99,6 +99,13 @@ typedef struct ptl1_state {
 } ptl1_state_t;
 
 /*
+ * For cpu_chip and cpu_core in machcpu structure if we cannot get
+ * any chip id or core id information from MD.
+ */
+#define	CPU_CHIPID_INVALID	-1
+#define	CPU_COREID_INVALID	-1
+
+/*
  * Machine specific fields of the cpu struct
  * defined in common/sys/cpuvar.h.
  */
@@ -172,6 +179,7 @@ struct	machcpu {
 	id_t		cpu_ipipe;		/* cpu int exec unit id */
 	id_t		cpu_fpu;		/* cpu fpu unit id */
 	id_t		cpu_core;		/* cpu core id */
+	id_t		cpu_chip;		/* cpu chip id */
 	kthread_t	*startup_thread;
 };
 
@@ -226,6 +234,8 @@ struct cpu_node {
 	uint64_t	device_id;
 	id_t	exec_unit_mapping;
 	id_t	fpu_mapping;
+	id_t	l2_cache_mapping;
+	id_t	core_mapping;
 };
 
 extern struct cpu_node cpunodes[];

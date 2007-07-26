@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,6 +50,8 @@ d none platform/sun4v/kernel 755 root sys
 d none platform/sun4v/kernel/cpu 755 root sys
 d none platform/sun4v/kernel/cpu/sparcv9 755 root sys
 f none platform/sun4v/kernel/cpu/sparcv9/SUNW,UltraSPARC-T2 755 root sys
+f none platform/sun4v/kernel/cpu/sparcv9/SUNW,UltraSPARC-T2+ 755 root sys
 d none platform/sun4v/kernel/pcbe 755 root sys
 d none platform/sun4v/kernel/pcbe/sparcv9 755 root sys
 f none platform/sun4v/kernel/pcbe/sparcv9/pcbe.SUNW,UltraSPARC-T2 755 root sys
+f none platform/sun4v/kernel/pcbe/sparcv9/pcbe.SUNW,UltraSPARC-T2+ 755 root sys

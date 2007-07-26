@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,25 +119,20 @@ nxge_fzc_intr_init(p_nxge_t nxgep)
 		return (status);
 	}
 
-	switch (nxgep->niu_type) {
-	case NEPTUNE:
-	case NEPTUNE_2:
+	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
 		/*
 		 * Set up the logical device group's logical devices that
 		 * the group owns.
 		 */
-		if ((status = nxge_fzc_intr_ldg_num_set(nxgep))
-				!= NXGE_OK) {
-			break;
-		}
+		if ((status = nxge_fzc_intr_ldg_num_set(nxgep)) != NXGE_OK)
+			goto fzc_intr_init_exit;
 
 		/* Configure the system interrupt data */
-		if ((status = nxge_fzc_intr_sid_set(nxgep)) != NXGE_OK) {
-			break;
-		}
-
-		break;
+		if ((status = nxge_fzc_intr_sid_set(nxgep)) != NXGE_OK)
+			goto fzc_intr_init_exit;
 	}
+
+fzc_intr_init_exit:
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "<== nxge_fzc_intr_init"));
 
@@ -269,25 +264,12 @@ nxge_init_fzc_rxdma_channel(p_nxge_t nxgep, uint16_t channel,
 	nxge_status_t	status = NXGE_OK;
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_init_fzc_rxdma_channel"));
 
-	switch (nxgep->niu_type) {
-	case NEPTUNE:
-	case NEPTUNE_2:
-	default:
-		/* Initialize the RXDMA logical pages */
-		status = nxge_init_fzc_rxdma_channel_pages(nxgep, channel,
-			rbr_p);
-		if (status != NXGE_OK) {
-			return (status);
-		}
-
-		break;
-
+	if (nxgep->niu_type == N2_NIU) {
 #ifndef	NIU_HV_WORKAROUND
-	case N2_NIU:
 #if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
 		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"==> nxge_init_fzc_rxdma_channel: N2_NIU - call HV "
-			"set up logical pages"));
+		    "==> nxge_init_fzc_rxdma_channel: N2_NIU - call HV "
+		    "set up logical pages"));
 		/* Initialize the RXDMA logical pages */
 		status = nxge_init_hv_fzc_rxdma_channel_pages(nxgep, channel,
 			rbr_p);
@@ -295,21 +277,27 @@ nxge_init_fzc_rxdma_channel(p_nxge_t nxgep, uint16_t channel,
 			return (status);
 		}
 #endif
-		break;
+		status = NXGE_OK;
 #else
-	case N2_NIU:
 		NXGE_DEBUG_MSG((nxgep, RX_CTL,
-			"==> nxge_init_fzc_rxdma_channel: N2_NIU - NEED to "
-			"set up logical pages"));
+		    "==> nxge_init_fzc_rxdma_channel: N2_NIU - NEED to "
+		    "set up logical pages"));
 		/* Initialize the RXDMA logical pages */
 		status = nxge_init_fzc_rxdma_channel_pages(nxgep, channel,
-			rbr_p);
+		    rbr_p);
 		if (status != NXGE_OK) {
 			return (status);
 		}
-
-		break;
 #endif
+	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
+		/* Initialize the RXDMA logical pages */
+		status = nxge_init_fzc_rxdma_channel_pages(nxgep,
+		    channel, rbr_p);
+		if (status != NXGE_OK) {
+			return (status);
+		}
+	} else {
+		return (NXGE_ERROR);
 	}
 
 	/* Configure RED parameters */
@@ -419,38 +407,33 @@ nxge_init_fzc_txdma_channel(p_nxge_t nxgep, uint16_t channel,
 	NXGE_DEBUG_MSG((nxgep, DMA_CTL,
 		"==> nxge_init_fzc_txdma_channel"));
 
-	switch (nxgep->niu_type) {
-	case NEPTUNE:
-	case NEPTUNE_2:
-	default:
-		/* Initialize the TXDMA logical pages */
-		(void) nxge_init_fzc_txdma_channel_pages(nxgep, channel,
-			tx_ring_p);
-		break;
-
+	if (nxgep->niu_type == N2_NIU) {
 #ifndef	NIU_HV_WORKAROUND
-	case N2_NIU:
 #if	defined(sun4v) && defined(NIU_LP_WORKAROUND)
 		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-			"==> nxge_init_fzc_txdma_channel "
-			"N2_NIU: call HV to set up txdma logical pages"));
+		    "==> nxge_init_fzc_txdma_channel "
+		    "N2_NIU: call HV to set up txdma logical pages"));
 		status = nxge_init_hv_fzc_txdma_channel_pages(nxgep, channel,
-			tx_ring_p);
+		    tx_ring_p);
 		if (status != NXGE_OK) {
 			return (status);
 		}
 #endif
-		break;
+		status = NXGE_OK;
 #else
-	case N2_NIU:
 		NXGE_DEBUG_MSG((nxgep, DMA_CTL,
-			"==> nxge_init_fzc_txdma_channel "
-			"N2_NIU: NEED to set up txdma logical pages"));
+		    "==> nxge_init_fzc_txdma_channel "
+		    "N2_NIU: NEED to set up txdma logical pages"));
 		/* Initialize the TXDMA logical pages */
 		(void) nxge_init_fzc_txdma_channel_pages(nxgep, channel,
-			tx_ring_p);
-		break;
+		    tx_ring_p);
 #endif
+	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
+		/* Initialize the TXDMA logical pages */
+		(void) nxge_init_fzc_txdma_channel_pages(nxgep,
+		    channel, tx_ring_p);
+	} else {
+		return (NXGE_ERROR);
 	}
 
 	/*
@@ -589,12 +572,12 @@ nxge_init_fzc_rxdma_port(p_nxge_t nxgep)
 	 * npi_rxdma_cfg_port_ddr_weight();
 	 */
 
-	if (nxgep->niu_type == NEPTUNE) {
+	if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
 		if ((nxgep->mac.portmode == PORT_1G_COPPER) ||
-			(nxgep->mac.portmode == PORT_1G_FIBER)) {
+		    (nxgep->mac.portmode == PORT_1G_FIBER)) {
 			rs = npi_rxdma_cfg_port_ddr_weight(handle,
-							    nxgep->function_num,
-							    NXGE_RX_DRR_WT_1G);
+			    nxgep->function_num,
+			    NXGE_RX_DRR_WT_1G);
 			if (rs != NPI_SUCCESS) {
 				return (NXGE_ERROR | rs);
 			}

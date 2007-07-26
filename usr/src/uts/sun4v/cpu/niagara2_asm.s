@@ -60,7 +60,11 @@ hv_niagara_setperf(uint64_t perfreg, uint64_t data)
 	 */
 	ENTRY(hv_niagara_getperf)
 	mov     %o1, %o4                        ! save datap
+#if defined(NIAGARA2_IMPL)
 	mov     HV_NIAGARA2_GETPERF, %o5
+#elif defined(VFALLS_IMPL)
+	mov	HV_VFALLS_GETPERF, %o5
+#endif
 	ta      FAST_TRAP
 	brz,a   %o0, 1f
 	stx     %o1, [%o4]
@@ -73,7 +77,11 @@ hv_niagara_setperf(uint64_t perfreg, uint64_t data)
 	 * hv_niagara_setperf(uint64_t perfreg, uint64_t data)
 	 */
 	ENTRY(hv_niagara_setperf)
+#if defined(NIAGARA2_IMPL)
 	mov     HV_NIAGARA2_SETPERF, %o5
+#elif defined(VFALLS_IMPL)
+	mov     HV_VFALLS_SETPERF, %o5
+#endif
 	ta      FAST_TRAP
 	retl
 	nop

@@ -779,6 +779,8 @@ nxge_destroy_param(p_nxge_t nxgep)
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_destroy_param"));
 
+	if (nxgep->param_arr == NULL)
+		return;
 	/*
 	 * Make sure the param_instance is set to a valid device instance.
 	 */

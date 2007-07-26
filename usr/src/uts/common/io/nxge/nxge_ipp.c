@@ -51,15 +51,16 @@ nxge_ipp_init(p_nxge_t nxgep)
 	NXGE_DEBUG_MSG((nxgep, IPP_CTL, "==> nxge_ipp_init: port%d", portn));
 
 	/* Initialize ECC and parity in SRAM of DFIFO and PFIFO */
-	if ((nxgep->niu_type == NEPTUNE) || (nxgep->niu_type == NEPTUNE_2)) {
+	if (nxgep->niu_type == N2_NIU) {
+		dfifo_entries = IPP_NIU_DFIFO_ENTRIES;
+	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
 		if (portn < 2)
 			dfifo_entries = IPP_P0_P1_DFIFO_ENTRIES;
 		else
 			dfifo_entries = IPP_P2_P3_DFIFO_ENTRIES;
-	} else if (nxgep->niu_type == N2_NIU) {
-		dfifo_entries = IPP_NIU_DFIFO_ENTRIES;
-	} else
+	} else {
 		goto fail;
+	}
 
 	for (i = 0; i < dfifo_entries; i++) {
 		if ((rs = npi_ipp_write_dfifo(handle,
@@ -558,15 +559,16 @@ nxge_ipp_fatal_err_recover(p_nxge_t nxgep)
 		 */
 	}
 
-	if ((nxgep->niu_type == NEPTUNE) || (nxgep->niu_type == NEPTUNE_2)) {
+	if (nxgep->niu_type == N2_NIU) {
+		dfifo_entries = IPP_NIU_DFIFO_ENTRIES;
+	} else if (NXGE_IS_VALID_NEPTUNE_TYPE(nxgep->niu_type)) {
 		if (portn < 2)
 			dfifo_entries = IPP_P0_P1_DFIFO_ENTRIES;
 		else
 			dfifo_entries = IPP_P2_P3_DFIFO_ENTRIES;
-	} else if (nxgep->niu_type == N2_NIU) {
-		dfifo_entries = IPP_NIU_DFIFO_ENTRIES;
-	} else
+	} else {
 		goto fail;
+	}
 
 	/* Clean up DFIFO SRAM entries */
 	for (i = 0; i < dfifo_entries; i++) {

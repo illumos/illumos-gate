@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -28,7 +28,7 @@
 include ../sun4/Makefile.sun4
 
 EFT_PLAT= sun4v
-SUN4VEFTFILES= n2piu.eft
+SUN4VEFTFILES= n2piu.eft vfncx.eft
 EFT_PLAT_FILES= $(SUN4VEFTFILES) $(SUN4EFTFILES)
 
 include ../../Makefile.com

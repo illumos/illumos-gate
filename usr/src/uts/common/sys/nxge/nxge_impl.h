@@ -301,10 +301,59 @@ struct _nxge_block_mv_t {
 typedef struct _nxge_block_mv_t nxge_block_mv_t, *p_nxge_block_mv_t;
 
 typedef enum {
-	NEPTUNE,	/* 4 ports */
-	NEPTUNE_2,	/* 2 ports */
-	N2_NIU		/* N2/NIU 2 ports */
+	NIU_TYPE_NONE = 0,
+
+	NEPTUNE_4_1GC =
+	    (NXGE_PORT_1G_COPPER |
+	    (NXGE_PORT_1G_COPPER << 4) |
+	    (NXGE_PORT_1G_COPPER << 8) |
+	    (NXGE_PORT_1G_COPPER << 12)),
+
+	NEPTUNE_2_10GF =
+	    (NXGE_PORT_10G_FIBRE |
+	    (NXGE_PORT_10G_FIBRE << 4) |
+	    (NXGE_PORT_NONE << 8) |
+	    (NXGE_PORT_NONE << 12)),
+
+	NEPTUNE_2_10GF_2_1GC =
+	    (NXGE_PORT_10G_FIBRE |
+	    (NXGE_PORT_10G_FIBRE << 4) |
+	    (NXGE_PORT_1G_COPPER << 8) |
+	    (NXGE_PORT_1G_COPPER << 12)),
+
+	NEPTUNE_1_10GF_3_1GC =
+	    (NXGE_PORT_10G_FIBRE |
+	    (NXGE_PORT_1G_COPPER << 4) |
+	    (NXGE_PORT_1G_COPPER << 8) |
+	    (NXGE_PORT_1G_COPPER << 12)),
+
+	NEPTUNE_1_1GC_1_10GF_2_1GC =
+	    (NXGE_PORT_1G_COPPER |
+	    (NXGE_PORT_10G_FIBRE << 4) |
+	    (NXGE_PORT_1G_COPPER << 8) |
+	    (NXGE_PORT_1G_COPPER << 12)),
+
+	N2_NIU =
+	    (NXGE_PORT_RSVD |
+	    (NXGE_PORT_RSVD << 4) |
+	    (NXGE_PORT_RSVD << 8) |
+	    (NXGE_PORT_RSVD << 12))
+
 } niu_type_t;
+
+typedef enum {
+	P_NEPTUNE_NONE,
+	P_NEPTUNE_ATLAS,
+	P_NEPTUNE_MARAMBA_P0,
+	P_NEPTUNE_MARAMBA_P1,
+	P_NEPTUNE_NIU
+} platform_type_t;
+
+#define	NXGE_IS_VALID_NEPTUNE_TYPE(niu_type)	\
+	((niu_type) == NEPTUNE_4_1GC || (niu_type) == NEPTUNE_2_10GF ||	\
+	    (niu_type) == NEPTUNE_2_10GF_2_1GC ||	\
+	    (niu_type) == NEPTUNE_1_10GF_3_1GC ||	\
+	    (niu_type) == NEPTUNE_1_1GC_1_10GF_2_1GC)
 
 typedef enum {
 	CFG_DEFAULT = 0,	/* default cfg */
@@ -349,6 +398,21 @@ typedef queue_t *p_queue_t;
 #if !defined(IODIAG)
 typedef mblk_t *p_mblk_t;
 #endif
+
+/*
+ * Generic phy table to support different phy types.
+ */
+typedef struct _nxge_xcvr_table {
+	nxge_status_t	(*serdes_init)	();	/* Serdes init routine */
+	nxge_status_t	(*xcvr_init)	();	/* xcvr init routine */
+	nxge_status_t	(*link_intr_stop) ();	/* Link intr disable routine */
+	nxge_status_t	(*link_intr_start) ();	/* Link intr enable routine */
+	nxge_status_t	(*check_link) ();	/* Link check routine */
+
+	uint32_t	device_id;
+	uint32_t	xcvr_inuse;
+	uint32_t	xcvr_addr;
+} nxge_xcvr_table_t, *p_nxge_xcvr_table_t;
 
 /*
  * Common DMA data elements.
@@ -574,10 +638,6 @@ typedef struct _nxge_mmac_stats_t {
 #define	NXGE_NUM_OF_PORTS_QUAD	4
 #define	NXGE_NUM_OF_PORTS_DUAL	2
 
-#define	NXGE_QGC_LP_BM_STR		"501-7606"
-#define	NXGE_2XGF_LP_BM_STR		"501-7283"
-#define	NXGE_QGC_PEM_BM_STR		"501-7765"
-#define	NXGE_2XGF_PEM_BM_STR		"501-7626"
 #define	NXGE_EROM_LEN			1048576
 
 #endif
@@ -797,10 +857,7 @@ nxge_status_t nxge_link_init(p_nxge_t);
 nxge_status_t nxge_xif_init(p_nxge_t);
 nxge_status_t nxge_pcs_init(p_nxge_t);
 nxge_status_t nxge_serdes_init(p_nxge_t);
-nxge_status_t nxge_n2_serdes_init(p_nxge_t);
-nxge_status_t nxge_neptune_serdes_init(p_nxge_t);
-nxge_status_t nxge_xcvr_find(p_nxge_t);
-nxge_status_t nxge_get_xcvr_type(p_nxge_t);
+nxge_status_t nxge_setup_xcvr_table(p_nxge_t);
 nxge_status_t nxge_xcvr_init(p_nxge_t);
 nxge_status_t nxge_tx_mac_init(p_nxge_t);
 nxge_status_t nxge_rx_mac_init(p_nxge_t);
@@ -825,9 +882,6 @@ nxge_status_t nxge_mii_check(p_nxge_t, mii_bmsr_t,
 nxge_status_t nxge_add_mcast_addr(p_nxge_t, struct ether_addr *);
 nxge_status_t nxge_del_mcast_addr(p_nxge_t, struct ether_addr *);
 nxge_status_t nxge_set_mac_addr(p_nxge_t, struct ether_addr *);
-nxge_status_t nxge_check_mii_link(p_nxge_t);
-nxge_status_t nxge_check_10g_link(p_nxge_t);
-nxge_status_t nxge_check_serdes_link(p_nxge_t);
 nxge_status_t nxge_check_bcm8704_link(p_nxge_t, boolean_t *);
 void nxge_link_is_down(p_nxge_t);
 void nxge_link_is_up(p_nxge_t);
@@ -837,6 +891,7 @@ nxge_status_t nxge_set_promisc(p_nxge_t, boolean_t);
 nxge_status_t nxge_mac_handle_sys_errors(p_nxge_t);
 nxge_status_t nxge_10g_link_led_on(p_nxge_t);
 nxge_status_t nxge_10g_link_led_off(p_nxge_t);
+nxge_status_t nxge_scan_ports_phy(p_nxge_t, p_nxge_hw_list_t);
 boolean_t nxge_is_valid_local_mac(ether_addr_st);
 
 /* espc (sprom) prototypes */
@@ -844,11 +899,13 @@ nxge_status_t nxge_espc_mac_addrs_get(p_nxge_t);
 nxge_status_t nxge_espc_num_macs_get(p_nxge_t, uint8_t *);
 nxge_status_t nxge_espc_num_ports_get(p_nxge_t);
 nxge_status_t nxge_espc_phy_type_get(p_nxge_t);
+nxge_status_t nxge_espc_verify_chksum(p_nxge_t);
 void nxge_espc_get_next_mac_addr(uint8_t *, uint8_t, struct ether_addr *);
 nxge_status_t nxge_vpd_info_get(p_nxge_t);
 
 
 void nxge_debug_msg(p_nxge_t, uint64_t, char *, ...);
+int nxge_nports_from_niu_type(niu_type_t);
 
 uint64_t hv_niu_rx_logical_page_conf(uint64_t, uint64_t,
 	uint64_t, uint64_t);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -478,6 +478,8 @@ typedef struct nxge_hw_list {
 	uint32_t		ndevs;
 	uint32_t 		flags;
 	uint32_t 		magic;
+	uint32_t		niu_type;
+	uint32_t		platform_type;
 } nxge_hw_list_t, *p_nxge_hw_list_t;
 
 #ifdef	__cplusplus

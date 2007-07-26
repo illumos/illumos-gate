@@ -65,3 +65,4 @@ fault.io.n2.siu=34
 fault.io.n2.soc=35
 fault.io.n2.crossbar=36
 fault.io.fire.fw-epkt fault.io.fire.sw-epkt fault.io.fire.sw-fw-mismatch=37
+fault.io.vf.ncx=38

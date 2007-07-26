@@ -617,3 +617,19 @@ msgid "SUN4V-8001-5Q.impact"
 msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
 msgid "SUN4V-8001-5Q.action"
 msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+#
+# code: SUN4V-8001-64
+# keys: fault.io.vf.ncx
+#
+msgid "SUN4V-8001-64.type"
+msgstr "Fault"
+msgid "SUN4V-8001-64.severity"
+msgstr "Critical"
+msgid "SUN4V-8001-64.description"
+msgstr "An uncorrectable problem was detected in the NCX subsystem.\n  Refer to %s for more information."
+msgid "SUN4V-8001-64.response"
+msgstr "One or more device instances may be disabled\n"
+msgid "SUN4V-8001-64.impact"
+msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
+msgid "SUN4V-8001-64.action"
+msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"

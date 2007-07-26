@@ -50,7 +50,6 @@
 #include <sys/hypervisor_api.h>
 #include <sys/n2rng.h>
 
-
 static int	n2rng_attach(dev_info_t *, ddi_attach_cmd_t);
 static int	n2rng_detach(dev_info_t *, ddi_detach_cmd_t);
 static int	n2rng_suspend(n2rng_t *);
@@ -63,6 +62,8 @@ int	n2rng_uninit(n2rng_t *n2rng);
 
 static uint64_t sticks_per_usec(void);
 u_longlong_t gettick(void);
+
+static void n2rng_config_task(void * targ);
 
 /*
  * Device operations.
@@ -210,6 +211,16 @@ n2rng_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 	rng_hsvc_available = B_TRUE;
+
+	/* Allocate single thread task queue for rng diags and registration */
+	n2rng->n_taskq = ddi_taskq_create(dip, "n2rng_taskq", 1,
+	    TASKQ_DEFAULTPRI, 0);
+
+	if (n2rng->n_taskq == NULL) {
+		n2rng_diperror(dip, "ddi_taskq_create() failed");
+		goto errorexit;
+	}
+
 	/* No locking, but it is okay */
 	n2rng->n_sticks_per_usec = sticks_per_usec();
 	/*
@@ -247,27 +258,12 @@ n2rng_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	n2rng->n_preferred_config.ctlwds[3].fields.rnc_vcoctl = 0;
 	n2rng->n_preferred_config.ctlwds[3].fields.rnc_selbits = 7;
 
-	rv = n2rng_do_health_check(n2rng);
-
-	switch (rv) {
-	case 0:
-		/* We are a control domain.  Success. */
-		break;
-	case EPERM:
-		/* We must not be a control domain, declare success. */
-		rv = 0;
-		break;
-	default:
+	/* Dispatch task to configure the RNG and register with KCF */
+	if (ddi_taskq_dispatch(n2rng->n_taskq, n2rng_config_task,
+	    (void *)n2rng, DDI_SLEEP) != DDI_SUCCESS) {
+		n2rng_diperror(dip, "ddi_taskq_dispatch() failed");
 		goto errorexit;
 	}
-
-	/* Register with KCF---also sets up FIPS state */
-	rv = n2rng_init(n2rng);
-	if (rv != DDI_SUCCESS) {
-		goto errorexit;
-	}
-
-	n2rng->n_flags &= ~N2RNG_FAILED;
 
 	return (DDI_SUCCESS);
 
@@ -276,6 +272,12 @@ errorexit:
 		(void) hsvc_unregister(&rng_hsvc);
 		rng_hsvc_available = B_FALSE;
 	}
+
+	if (n2rng->n_taskq != NULL) {
+		ddi_taskq_destroy(n2rng->n_taskq);
+		n2rng->n_taskq = NULL;
+	}
+
 	mutex_destroy(&n2rng->n_health_check_mutex);
 	ddi_soft_state_free(n2rng_softstate, instance);
 
@@ -305,9 +307,13 @@ n2rng_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-
 	/* unregister with KCF---also tears down FIPS state */
 	rv = n2rng_uninit(n2rng) ? DDI_FAILURE : DDI_SUCCESS;
+
+	if (n2rng->n_taskq != NULL) {
+		ddi_taskq_destroy(n2rng->n_taskq);
+		n2rng->n_taskq = NULL;
+	}
 
 	if (rng_hsvc_available == B_TRUE) {
 		(void) hsvc_unregister(&rng_hsvc);
@@ -653,4 +659,47 @@ sticks_per_usec(void)
 	endtime = gethrtime();
 
 	return ((1000 * (endtick - starttick)) / (endtime - starttime));
+}
+
+/*
+ * n2rng_config_task()
+ *
+ * Runs health checks on the RNG hardware
+ * Configures the RNG hardware
+ * Registers with crypto framework if successful.
+ */
+static void
+n2rng_config_task(void * targ)
+{
+	int		rv;
+	n2rng_t		*n2rng = (n2rng_t *)targ;
+
+	thread_affinity_set(curthread, CPU_CURRENT);
+	rv = n2rng_do_health_check(n2rng);
+	thread_affinity_clear(curthread);
+
+	switch (rv) {
+	case 0:
+		/* We are a control domain.  Success. */
+		break;
+	case EPERM:
+		/* We must not be a control domain, declare success. */
+		rv = 0;
+		break;
+	default:
+		goto errorexit;
+	}
+
+	/* Register with KCF and initialize FIPS state */
+	rv = n2rng_init(n2rng);
+	if (rv != DDI_SUCCESS) {
+		goto errorexit;
+	}
+
+	n2rng->n_flags &= ~N2RNG_FAILED;
+	return;
+
+errorexit:
+	cmn_err(CE_WARN, "n2rng_config_task: RNG configuration failed");
+	n2rng->n_flags |= N2RNG_FAILED;
 }

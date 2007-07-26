@@ -61,17 +61,29 @@
 #include <sys/trapstat.h>
 
 uint_t root_phys_addr_lo_mask = 0xffffffffU;
+#if defined(NIAGARA2_IMPL)
 char cpu_module_name[] = "SUNW,UltraSPARC-T2";
+#elif defined(VFALLS_IMPL)
+char cpu_module_name[] = "SUNW,UltraSPARC-T2+";
+#endif
 
 /*
- * Hypervisor services information for the NIAGARA2 CPU module
+ * Hypervisor services information for the NIAGARA2 and Victoria Falls
+ * CPU module
  */
-static boolean_t niagara2_hsvc_available = B_TRUE;
-static uint64_t niagara2_sup_minor;		/* Supported minor number */
-static hsvc_info_t niagara2_hsvc = {
+static boolean_t cpu_hsvc_available = B_TRUE;
+static uint64_t cpu_sup_minor;		/* Supported minor number */
+#if defined(NIAGARA2_IMPL)
+static hsvc_info_t cpu_hsvc = {
 	HSVC_REV_1, NULL, HSVC_GROUP_NIAGARA2_CPU, NIAGARA2_HSVC_MAJOR,
 	NIAGARA2_HSVC_MINOR, cpu_module_name
 };
+#elif defined(VFALLS_IMPL)
+static hsvc_info_t cpu_hsvc = {
+	HSVC_REV_1, NULL, HSVC_GROUP_VFALLS_CPU, VFALLS_HSVC_MAJOR,
+	VFALLS_HSVC_MINOR, cpu_module_name
+};
+#endif
 
 void
 cpu_setup(void)
@@ -85,13 +97,13 @@ cpu_setup(void)
 	 * Negotiate the API version for Niagara2 specific hypervisor
 	 * services.
 	 */
-	status = hsvc_register(&niagara2_hsvc, &niagara2_sup_minor);
+	status = hsvc_register(&cpu_hsvc, &cpu_sup_minor);
 	if (status != 0) {
 		cmn_err(CE_WARN, "%s: cannot negotiate hypervisor services "
 		    "group: 0x%lx major: 0x%lx minor: 0x%lx errno: %d",
-		    niagara2_hsvc.hsvc_modname, niagara2_hsvc.hsvc_group,
-		    niagara2_hsvc.hsvc_major, niagara2_hsvc.hsvc_minor, status);
-		niagara2_hsvc_available = B_FALSE;
+		    cpu_hsvc.hsvc_modname, cpu_hsvc.hsvc_group,
+		    cpu_hsvc.hsvc_major, cpu_hsvc.hsvc_minor, status);
+		cpu_hsvc_available = B_FALSE;
 	}
 
 	/*
@@ -179,9 +191,19 @@ cpu_map_exec_units(struct cpu *cp)
 	 * Niagara 2 defines the core to be at the FPU level
 	 */
 	cp->cpu_m.cpu_core = cp->cpu_m.cpu_fpu;
+
+	/*
+	 * The cpu_chip field is initialized based on the information
+	 * in the MD and assume that all cpus within a chip
+	 * share the same L2 cache. If no such info is available, we
+	 * set the cpu to belong to the defacto chip 0.
+	 */
+	cp->cpu_m.cpu_chip = cpunodes[cp->cpu_id].l2_cache_mapping;
+	if (cp->cpu_m.cpu_chip == NO_CHIP_MAPPING_FOUND)
+		cp->cpu_m.cpu_chip = 0;
 }
 
-static int niagara2_cpucnt;
+static int cpucnt;
 
 void
 cpu_init_private(struct cpu *cp)
@@ -192,8 +214,8 @@ cpu_init_private(struct cpu *cp)
 
 	cpu_map_exec_units(cp);
 
-	if ((niagara2_cpucnt++ == 0) && (niagara2_hsvc_available == B_TRUE))
-		niagara_kstat_init();
+	if ((cpucnt++ == 0) && (cpu_hsvc_available == B_TRUE))
+		(void) niagara_kstat_init();
 }
 
 /*ARGSUSED*/
@@ -203,9 +225,8 @@ cpu_uninit_private(struct cpu *cp)
 	extern void niagara_kstat_fini(void);
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
-
-	if ((--niagara2_cpucnt == 0) && (niagara2_hsvc_available == B_TRUE))
-		niagara_kstat_fini();
+	if ((--cpucnt == 0) && (cpu_hsvc_available == B_TRUE))
+		(void) niagara_kstat_fini();
 }
 
 /*
@@ -483,7 +504,7 @@ page_set_colorequiv_arr_cpu(void)
 			if (a > (colorequivszc[i] & 0xf) +
 			    (colorequivszc[i] >> 4)) {
 				if (a <= nequiv_shades_log2[i]) {
-					colorequivszc[i] = a;
+					colorequivszc[i] = (uchar_t)a;
 				} else {
 					colorequivszc[i] =
 					    ((a - nequiv_shades_log2[i]) << 4) |

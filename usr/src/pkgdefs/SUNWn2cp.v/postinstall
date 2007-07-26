@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -111,7 +111,7 @@ fi
 grep -w n2cp ${NAMEMAJOR} > /dev/null 2>&1
 if [ $? -ne 0 ]
 then
-    $ADD_DRV -i "SUNW,n2-cwq" n2cp || exit 1
+    $ADD_DRV -i '"SUNW,n2-cwq" "SUNW,vf-cwq"' n2cp || exit 1
 fi
 
 exit 0

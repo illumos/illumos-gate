@@ -831,7 +831,7 @@ nxge_set_lb(p_nxge_t nxgep, queue_t *wq, p_mblk_t mp)
 		(nxgep->statsp->port_stats.lb_mode == nxge_lb_phy)) {
 
 		(void) nxge_link_monitor(nxgep, LINK_MONITOR_STOP);
-		(void) nxge_xcvr_find(nxgep);
+		(void) nxge_setup_xcvr_table(nxgep);
 		(void) nxge_link_init(nxgep);
 		(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
 	}
@@ -889,7 +889,7 @@ nxge_set_lb_normal(p_nxge_t nxgep)
 	nxge_global_reset(nxgep);
 
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_STOP);
-	(void) nxge_xcvr_find(nxgep);
+	(void) nxge_setup_xcvr_table(nxgep);
 	(void) nxge_link_init(nxgep);
 	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
 

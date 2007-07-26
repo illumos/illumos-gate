@@ -105,6 +105,7 @@ event ereport.io.n2.dmu.iotsbdesc_dpe@hostbridge/pciexrc{within(5s)};
  * Additional "PEC" errors to fire.
  */
 event ereport.io.n2.peu.err_sds_los@hostbridge/pciexrc{within(5s)}; 
+event ereport.io.n2.peu.lwc@hostbridge/pciexrc{within(5s)};
 event ereport.io.n2.peu.nfp@hostbridge/pciexrc{within(5s)}; 
 
 /*
@@ -201,7 +202,8 @@ prop fault.io.fire.asic@hostbridge/pciexrc (0)->
  * don't diag.
  */
 prop upset.io.fire.nodiag@hostbridge (0)-> 
-    ereport.io.n2.peu.err_sds_los@hostbridge/pciexrc;
+    ereport.io.n2.peu.err_sds_los@hostbridge/pciexrc,
+    ereport.io.n2.peu.lwc@hostbridge/pciexrc;
 
 /* SOC Errors */ 
 /* fault.io.n2.soc */

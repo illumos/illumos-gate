@@ -30,13 +30,13 @@
 # common to all SunOS systems.
 
 i386_CORE_OBJS += \
+		atomic.o	\
 		avintr.o	\
 		pic.o
 
 sparc_CORE_OBJS +=
 
 COMMON_CORE_OBJS +=		\
-		atomic.o	\
 		bitset.o	\
 		bp_map.o	\
 		brand.o		\

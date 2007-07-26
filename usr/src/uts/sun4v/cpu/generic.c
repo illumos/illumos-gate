@@ -168,6 +168,11 @@ cpu_map_exec_units(struct cpu *cp)
 		cp->cpu_m.cpu_fpu = (id_t)(cp->cpu_id);
 
 	cp->cpu_m.cpu_core = (id_t)(cp->cpu_id);
+
+	/*
+	 * The cpu_chip field is set to invalid(unknown) for generic cpu.
+	 */
+	cp->cpu_m.cpu_chip = CPU_CHIPID_INVALID;
 }
 
 void
