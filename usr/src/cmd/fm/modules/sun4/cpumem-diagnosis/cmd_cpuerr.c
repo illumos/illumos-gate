@@ -239,6 +239,8 @@ static const errdata_t l3errdata =
 	{ &cmd.cmd_l3data_serd, "l3cachedata", CMD_PTR_CPU_L3DATA  };
 static const errdata_t l2errdata =
 	{ &cmd.cmd_l2data_serd, "l2cachedata", CMD_PTR_CPU_L2DATA };
+static const errdata_t miscregsdata =
+	{ &cmd.cmd_miscregs_serd, "misc_reg", CMD_PTR_CPU_MISC_REGS };
 
 /*ARGSUSED*/
 static void
@@ -313,12 +315,22 @@ cmd_xxu_hdlr(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep)
 static void
 cmd_xxc_hdlr(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep)
 {
-	int isl3 = CMD_ERRCL_ISL3XXCU(xr->xr_clcode);
-	const errdata_t *ed = isl3 ? &l3errdata : &l2errdata;
+	const errdata_t *ed;
 	cmd_cpu_t *cpu = xr->xr_cpu;
-	cmd_case_t *cc = isl3 ? &cpu->cpu_l3data : &cpu->cpu_l2data;
+	cmd_case_t *cc;
 	const char *uuid;
 	nvlist_t *rsrc = NULL;
+
+	if (CMD_ERRCL_ISMISCREGS(xr->xr_clcode)) {
+		ed = &miscregsdata;
+		cc = &cpu->cpu_misc_regs;
+	} else if (CMD_ERRCL_ISL2XXCU(xr->xr_clcode)) {
+		ed = &l2errdata;
+		cc = &cpu->cpu_l2data;
+	} else {
+		ed = &l3errdata;
+		cc = &cpu->cpu_l3data;
+	}
 
 	if (cpu->cpu_faulting || (cc->cc_cp != NULL &&
 	    fmd_case_solved(hdl, cc->cc_cp)))
@@ -371,7 +383,7 @@ cmd_xxcu_resolve(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep,
 		afar = xr->xr_afar;
 
 	if ((trw = cmd_trw_lookup(xr->xr_ena,
-		xr->xr_afar_status, afar)) == NULL) {
+	    xr->xr_afar_status, afar)) == NULL) {
 		fmd_hdl_debug(hdl, "cmd_trw_lookup: Not found\n");
 		return;
 	}
@@ -442,7 +454,13 @@ cmd_xxcu_initial(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	    level)) == NULL || cpu->cpu_faulting)
 		return (CMD_EVD_UNUSED);
 
-	cc = CMD_ERRCL_ISL2XXCU(clcode) ? &cpu->cpu_l2data : &cpu->cpu_l3data;
+	if (CMD_ERRCL_ISMISCREGS(clcode))
+		cc = &cpu->cpu_misc_regs;
+	else if (CMD_ERRCL_ISL2XXCU(clcode))
+		cc = &cpu->cpu_l2data;
+	else
+		cc = &cpu->cpu_l3data;
+
 	if (cc->cc_cp != NULL && fmd_case_solved(hdl, cc->cc_cp))
 		return (CMD_EVD_REDUND);
 
@@ -514,6 +532,14 @@ cmd_xxc(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 		return (cmd_l2c(hdl, ep, nvl, class, clcode));
 #endif /* sun4v */
 	return (cmd_xxcu_initial(hdl, ep, nvl, class, clcode, CMD_XR_HDLR_XXC));
+}
+
+cmd_evdisp_t
+cmd_miscregs_train(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
+    const char *class, cmd_errcl_t clcode)
+{
+	return (cmd_xxcu_initial(hdl, ep, nvl, class, clcode,
+	    CMD_XR_HDLR_XXC));
 }
 
 void

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,6 +86,11 @@ extern "C" {
 #define	CMD_ERRCL_LDRU		0x0400000000000000ULL
 #define	CMD_ERRCL_LDSU		0x0800000000000000ULL
 
+#define	CMD_ERRCL_SBDPC		0x1000000000000000ULL
+#define	CMD_ERRCL_SBDLC		0x2000000000000000ULL
+#define	CMD_ERRCL_TCCP		0x4000000000000000ULL
+#define	CMD_ERRCL_TCCD		0x8000000000000000ULL
+
 #ifdef sun4u
 #define	CMD_ERRCL_ISL2XXCU(clcode) \
 	((clcode) >= CMD_ERRCL_UCC && (clcode) <= CMD_ERRCL_EDU_BL)
@@ -100,6 +105,9 @@ extern "C" {
 #define	CMD_ERRCL_ISL3XXCU(clcode) 0
 
 #endif /* sun4u */
+
+#define	CMD_ERRCL_ISMISCREGS(clcode) \
+	((clcode) >= CMD_ERRCL_SBDPC && (clcode) <= CMD_ERRCL_TCCD)
 
 #define	CMD_ERRCL_MATCH(clcode, mask) \
 	(((clcode) & (mask)) != 0)
@@ -182,6 +190,8 @@ typedef struct cmd {
 	uint64_t cmd_thresh_tpct_sysmem; /* Pg ret warning thresh (% of mem) */
 	uint64_t cmd_thresh_abs_sysmem;	/* Pg ret warning thresh (# of pages) */
 	uint64_t cmd_thresh_abs_badrw;	/* Bad r/w retire thresh (# of pages) */
+	cmd_serd_t cmd_miscregs_serd;   /* params for misregs serd */
+	hrtime_t cmd_miscregs_trdelay;  /* delay for redelivery misregs */
 #ifdef sun4u
 	uint16_t cmd_dp_flag;		/* datapath error in progress if set */
 #endif

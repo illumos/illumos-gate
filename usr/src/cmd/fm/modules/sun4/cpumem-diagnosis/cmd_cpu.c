@@ -509,7 +509,12 @@ cmd_xr_create(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 
 	err |= nvlist_lookup_uint64(nvl, FM_EREPORT_ENA, &xr->xr_ena);
 
-	err |= cmd_xr_fill(hdl, nvl, xr, clcode);
+	/*
+	 * Skip the cmd_xr_fill() for misc reg errors because
+	 * these data are not in the misc reg ereport
+	 */
+	if (!CMD_ERRCL_ISMISCREGS(clcode))
+		err |= cmd_xr_fill(hdl, nvl, xr, clcode);
 
 	(void) nvlist_lookup_nvlist(nvl, FM_EREPORT_PAYLOAD_NAME_RESOURCE,
 	    &rsrc);
@@ -543,8 +548,15 @@ cmd_xr_reschedule(fmd_hdl_t *hdl, cmd_xr_t *xr, uint_t hdlrid)
 
 	xr->xr_hdlrid = hdlrid;
 	xr->xr_hdlr = cmd_xr_id2hdlr(hdl, hdlrid);
-	xr->xr_id = fmd_timer_install(hdl, (void *)CMD_TIMERTYPE_CPU_XR_WAITER,
-	    NULL, cmd.cmd_xxcu_trdelay);
+
+	if (CMD_ERRCL_ISMISCREGS(xr->xr_clcode))
+		xr->xr_id = fmd_timer_install(hdl,
+		    (void *)CMD_TIMERTYPE_CPU_XR_WAITER, NULL,
+		    cmd.cmd_miscregs_trdelay);
+	else
+		xr->xr_id = fmd_timer_install(hdl,
+		    (void *)CMD_TIMERTYPE_CPU_XR_WAITER,
+		    NULL, cmd.cmd_xxcu_trdelay);
 
 	if (xr->xr_ref++ == 0)
 		cmd_list_append(&cmd.cmd_xxcu_redelivs, xr);
@@ -1252,6 +1264,12 @@ static const cmd_xxcu_train_t cmd_xxcu_trains[] = {
 	CMD_TRAIN(CMD_ERRCL_LDAU,	CMD_ERRCL_LDWU),
 	CMD_TRAIN(CMD_ERRCL_LDRU,	CMD_ERRCL_LDWU),
 	CMD_TRAIN(CMD_ERRCL_LDSU,	CMD_ERRCL_LDWU),
+	/* SBDLC: SBDPC */
+	CMD_TRAIN(CMD_ERRCL_SBDLC,	CMD_ERRCL_SBDPC),
+	/* TCCP: TCCD */
+	CMD_TRAIN(CMD_ERRCL_TCCP,	CMD_ERRCL_TCCD),
+	/* TCCD: TCCD */
+	CMD_TRAIN(CMD_ERRCL_TCCD,	CMD_ERRCL_TCCD),
 #endif /* sun4u */
 	CMD_TRAIN(0, 0)
 };
@@ -1537,10 +1555,10 @@ static void
 cpu_buf_write(fmd_hdl_t *hdl, cmd_cpu_t *cpu)
 {
 	if (fmd_buf_size(hdl, NULL, cpu->cpu_bufname) !=
-		    sizeof (cmd_cpu_pers_t))
-			fmd_buf_destroy(hdl, NULL, cpu->cpu_bufname);
+	    sizeof (cmd_cpu_pers_t))
+		fmd_buf_destroy(hdl, NULL, cpu->cpu_bufname);
 
-		fmd_buf_write(hdl, NULL, cpu->cpu_bufname, &cpu->cpu_pers,
+	fmd_buf_write(hdl, NULL, cpu->cpu_bufname, &cpu->cpu_pers,
 	    sizeof (cmd_cpu_pers_t));
 }
 

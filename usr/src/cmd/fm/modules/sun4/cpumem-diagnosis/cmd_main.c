@@ -283,8 +283,8 @@ static cmd_subscriber_t cmd_subscribers[] = {
 		CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.cwql2u",	cmd_xxu,	CMD_ERRCL_LDAU |
 		CMD_CPU_LEVEL_CHIP },
-	{ "ereport.cpu.*.lvf",		cmd_l2ctl },
-	{ "ereport.cpu.*.lrf",		cmd_l2ctl },
+	{ "ereport.cpu.*.lvf",		cmd_l2ctl,	CMD_CPU_LEVEL_CHIP },
+	{ "ereport.cpu.*.lrf",		cmd_l2ctl,	CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.itl2nd",	cmd_nop },
 	{ "ereport.cpu.*.dtl2nd",	cmd_nop },
 	{ "ereport.cpu.*.icl2nd",	cmd_nop },
@@ -314,10 +314,10 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.cpu.*.dsc",		cmd_ce,		CMD_ERRCL_DSC },
 	{ "ereport.cpu.*.dau",		cmd_ue,		CMD_ERRCL_DAU },
 	{ "ereport.cpu.*.dsu",		cmd_ue,		CMD_ERRCL_DSU },
-	{ "ereport.cpu.*.sbdpc",	cmd_miscregs_ce,
-	    CMD_CPU_LEVEL_THREAD },
-	{ "ereport.cpu.*.sbdlc",	cmd_miscregs_ce,
-	    CMD_CPU_LEVEL_THREAD },
+	{ "ereport.cpu.*.sbdpc",	cmd_miscregs_train,
+	    CMD_ERRCL_SBDPC | CMD_CPU_LEVEL_THREAD },
+	{ "ereport.cpu.*.sbdlc",	cmd_miscregs_train,
+	    CMD_ERRCL_SBDLC | CMD_CPU_LEVEL_THREAD },
 	{ "ereport.cpu.*.sbdpu",	cmd_miscregs_ue,
 	    CMD_CPU_LEVEL_THREAD },
 	{ "ereport.cpu.*.sbdlu",	cmd_miscregs_ue,
@@ -326,20 +326,20 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	    CMD_CPU_LEVEL_THREAD },
 	{ "ereport.cpu.*.sbapp",	cmd_miscregs_ue,
 	    CMD_CPU_LEVEL_THREAD },
-	{ "ereport.cpu.*.scac",		cmd_miscregs_ce,
-	    CMD_CPU_LEVEL_THREAD },
+	{ "ereport.cpu.*.scac",		cmd_miscregs_train,
+	    CMD_ERRCL_SBDPC | CMD_CPU_LEVEL_THREAD },
 	{ "ereport.cpu.*.scau",		cmd_miscregs_ue,
 	    CMD_CPU_LEVEL_THREAD },
-	{ "ereport.cpu.*.tccp",		cmd_miscregs_ce,
-	    CMD_CPU_LEVEL_THREAD },
-	{ "ereport.cpu.*.tccd",		cmd_miscregs_ce,
-	    CMD_CPU_LEVEL_THREAD },
+	{ "ereport.cpu.*.tccp",		cmd_miscregs_train,
+	    CMD_ERRCL_TCCP | CMD_CPU_LEVEL_THREAD },
+	{ "ereport.cpu.*.tccd",		cmd_miscregs_train,
+	    CMD_ERRCL_TCCD | CMD_CPU_LEVEL_THREAD },
 	{ "ereport.cpu.*.tcup",		cmd_miscregs_ue,
 	    CMD_CPU_LEVEL_THREAD },
 	{ "ereport.cpu.*.tcud",		cmd_miscregs_ue,
 	    CMD_CPU_LEVEL_THREAD },
-	{ "ereport.cpu.*.tsac",		cmd_miscregs_ce,
-	    CMD_CPU_LEVEL_THREAD },
+	{ "ereport.cpu.*.tsac",		cmd_miscregs_train,
+	    CMD_ERRCL_SBDPC | CMD_CPU_LEVEL_THREAD },
 	{ "ereport.cpu.*.tsau",		cmd_miscregs_ue,
 	    CMD_CPU_LEVEL_THREAD },
 #endif /* sun4u */
@@ -506,6 +506,7 @@ static const fmd_prop_t fmd_props[] = {
 	{ "thresh_abs_sysmem", FMD_TYPE_UINT64, "0" },
 	{ "thresh_abs_badrw", FMD_TYPE_UINT64, "128" },
 	{ "max_perm_ce_dimm", FMD_TYPE_UINT32, "128" },
+	{ "miscregs_trdelay", FMD_TYPE_TIME, "45s"},
 	{ NULL, 0, NULL }
 };
 
@@ -726,6 +727,11 @@ _fmd_init(fmd_hdl_t *hdl)
 	cmd.cmd_l3data_serd.cs_name = "l3data";
 	cmd.cmd_l3data_serd.cs_n = fmd_prop_get_int32(hdl, "l3data_n");
 	cmd.cmd_l3data_serd.cs_t = fmd_prop_get_int64(hdl, "l3data_t");
+
+	cmd.cmd_miscregs_trdelay = fmd_prop_get_int64(hdl, "miscregs_trdelay");
+	cmd.cmd_miscregs_serd.cs_name = "misc_regs";
+	cmd.cmd_miscregs_serd.cs_n = fmd_prop_get_int32(hdl, "misc_regs_n");
+	cmd.cmd_miscregs_serd.cs_t = fmd_prop_get_int64(hdl, "misc_regs_t");
 
 	if (cmd_state_restore(hdl) < 0) {
 		_fmd_fini(hdl);

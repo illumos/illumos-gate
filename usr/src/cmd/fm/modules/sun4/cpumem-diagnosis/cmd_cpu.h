@@ -652,6 +652,8 @@ extern cmd_evdisp_t cmd_miscregs_ce(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
 extern cmd_evdisp_t cmd_miscregs_ue(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
 
+extern cmd_evdisp_t cmd_miscregs_train(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
 
 /*
  * CPUs are described by FMRIs.  This routine will retrieve the CPU state
