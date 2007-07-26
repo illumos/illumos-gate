@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -79,7 +79,7 @@ fi
 # Mount all ZFS filesystems.
 
 if [ -x /usr/sbin/zfs ]; then
-	/usr/sbin/zfs mount -a >/dev/msglog 2>&1 
+	/usr/sbin/zfs mount -va >/dev/msglog 2>&1
 	rc=$?
 	if [ $rc -ne 0 ]; then
 		msg="WARNING: /usr/sbin/zfs mount -a failed: exit status $rc"

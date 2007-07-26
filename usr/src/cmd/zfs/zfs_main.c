@@ -207,8 +207,8 @@ get_usage(zfs_help_t idx)
 		    "\t    [filesystem|volume|snapshot] ...\n"));
 	case HELP_MOUNT:
 		return (gettext("\tmount\n"
-		    "\tmount [-o opts] [-O] -a\n"
-		    "\tmount [-o opts] [-O] <filesystem>\n"));
+		    "\tmount [-o opts] [-vO] -a\n"
+		    "\tmount [-o opts] [-vO] <filesystem>\n"));
 	case HELP_PROMOTE:
 		return (gettext("\tpromote <clone filesystem>\n"));
 	case HELP_RECEIVE:
@@ -2718,13 +2718,34 @@ typedef struct get_all_cbdata {
 	size_t		cb_alloc;
 	size_t		cb_used;
 	uint_t		cb_types;
+	boolean_t	cb_verbose;
 } get_all_cbdata_t;
+
+#define	CHECK_SPINNER 30
+#define	SPINNER_TIME 3		/* seconds */
+#define	MOUNT_TIME 5		/* seconds */
 
 static int
 get_one_dataset(zfs_handle_t *zhp, void *data)
 {
+	static char spin[] = { '-', '\\', '|', '/' };
+	static int spinval = 0;
+	static int spincheck = 0;
+	static time_t last_spin_time = (time_t)0;
 	get_all_cbdata_t *cbp = data;
 	zfs_type_t type = zfs_get_type(zhp);
+
+	if (cbp->cb_verbose) {
+		if (--spincheck < 0) {
+			time_t now = time(NULL);
+			if (last_spin_time + SPINNER_TIME < now) {
+				(void) printf("\b%c", spin[spinval++ % 4]);
+				(void) fflush(stdout);
+				last_spin_time = now;
+			}
+			spincheck = CHECK_SPINNER;
+		}
+	}
 
 	/*
 	 * Interate over any nested datasets.
@@ -2768,15 +2789,26 @@ get_one_dataset(zfs_handle_t *zhp, void *data)
 }
 
 static void
-get_all_datasets(uint_t types, zfs_handle_t ***dslist, size_t *count)
+get_all_datasets(uint_t types, zfs_handle_t ***dslist, size_t *count,
+    boolean_t verbose)
 {
 	get_all_cbdata_t cb = { 0 };
 	cb.cb_types = types;
+	cb.cb_verbose = verbose;
+
+	if (verbose) {
+		(void) printf("%s: *", gettext("Reading ZFS config"));
+		(void) fflush(stdout);
+	}
 
 	(void) zfs_iter_root(g_zfs, get_one_dataset, &cb);
 
 	*dslist = cb.cb_handles;
 	*count = cb.cb_used;
+
+	if (verbose) {
+		(void) printf("\b%s\n", gettext("done."));
+	}
 }
 
 static int
@@ -3003,20 +3035,57 @@ share_mount_one(zfs_handle_t *zhp, int op, int flags, boolean_t explicit,
 	return (0);
 }
 
+/*
+ * Reports progress in the form "(current/total)".  Not thread-safe.
+ */
+static void
+report_mount_progress(int current, int total)
+{
+	static int len;
+	static char *reverse = "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b"
+	    "\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b\b";
+	static time_t last_progress_time;
+	time_t now = time(NULL);
+
+	/* report 1..n instead of 0..n-1 */
+	++current;
+
+	/* display header if we're here for the first time */
+	if (current == 1) {
+		(void) printf(gettext("Mounting ZFS filesystems: "));
+		len = 0;
+	} else if (current != total && last_progress_time + MOUNT_TIME >= now)
+		return;		/* too soon to report again */
+
+	last_progress_time = now;
+
+	/* back up to prepare for overwriting */
+	if (len)
+		(void) printf("%*.*s", len, len, reverse);
+
+	/* We put a newline at the end if this is the last one.  */
+	len = printf("(%d/%d)%s", current, total, current == total ? "\n" : "");
+	(void) fflush(stdout);
+}
+
 static int
 share_mount(int op, int argc, char **argv)
 {
 	int do_all = 0;
+	boolean_t verbose = B_FALSE;
 	int c, ret = 0;
 	const char *options = NULL;
 	int types, flags = 0;
 
 	/* check options */
-	while ((c = getopt(argc, argv, op == OP_MOUNT ? ":ao:O" : "a"))
+	while ((c = getopt(argc, argv, op == OP_MOUNT ? ":avo:O" : "a"))
 	    != -1) {
 		switch (c) {
 		case 'a':
 			do_all = 1;
+			break;
+		case 'v':
+			verbose = B_TRUE;
 			break;
 		case 'o':
 			if (strlen(optarg) <= MNT_LINE_MAX) {
@@ -3076,7 +3145,7 @@ share_mount(int op, int argc, char **argv)
 			usage(B_FALSE);
 		}
 
-		get_all_datasets(types, &dslist, &count);
+		get_all_datasets(types, &dslist, &count, verbose);
 
 		if (count == 0)
 			return (0);
@@ -3084,6 +3153,9 @@ share_mount(int op, int argc, char **argv)
 		qsort(dslist, count, sizeof (void *), dataset_cmp);
 
 		for (i = 0; i < count; i++) {
+			if (verbose)
+				report_mount_progress(i, count);
+
 			if (share_mount_one(dslist[i], op, flags, B_FALSE,
 			    options) != 0)
 				ret = 1;
@@ -3441,7 +3513,8 @@ unshare_unmount(int op, int argc, char **argv)
 			zfs_handle_t **dslist = NULL;
 			size_t i, count = 0;
 
-			get_all_datasets(ZFS_TYPE_VOLUME, &dslist, &count);
+			get_all_datasets(ZFS_TYPE_VOLUME, &dslist, &count,
+			    B_FALSE);
 
 			if (count != 0) {
 				qsort(dslist, count, sizeof (void *),
