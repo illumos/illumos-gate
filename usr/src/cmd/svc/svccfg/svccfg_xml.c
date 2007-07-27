@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +35,10 @@
 #include <libuutil.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "svccfg.h"
 
@@ -1187,8 +1190,10 @@ lxml_get_loctext(entity_t *service, pgroup_t *pg, xmlNodePtr loctext)
 	if ((stripped = strdup((const char *)cursor->content)) == NULL)
 		uu_die(gettext("Out of memory\n"));
 
-	for (; isspace(*stripped); stripped++);
-	for (cp = stripped + strlen(stripped) - 1; isspace(*cp); cp--);
+	for (; isspace(*stripped); stripped++)
+		;
+	for (cp = stripped + strlen(stripped) - 1; isspace(*cp); cp--)
+		;
 	*(cp + 1) = '\0';
 
 	p = internal_property_create((const char *)val, SCF_TYPE_USTRING, 1,
@@ -1794,7 +1799,16 @@ lxml_get_bundle_file(bundle_t *bundle, const char *filename, int apply)
 	xmlValidCtxtPtr vcp;
 	boolean_t do_validate;
 	char *dtdpath = NULL;
+	struct stat	st;
 	int r;
+
+	/*
+	 * Verify we can read the file before we try to parse it.
+	 */
+	if (access(filename, R_OK | F_OK) == -1) {
+		semerr(gettext("unable to open file: %s\n"), strerror(errno));
+		return (-1);
+	}
 
 	/*
 	 * Until libxml2 addresses DTD-based validation with XInclude, we don't
@@ -1807,8 +1821,7 @@ lxml_get_bundle_file(bundle_t *bundle, const char *filename, int apply)
 	if (dtdpath != NULL)
 		xmlLoadExtDtdDefaultValue = 0;
 
-	if ((document = xmlReadFile(filename, NULL,
-	    XML_PARSE_NOERROR | XML_PARSE_NOWARNING)) == NULL) {
+	if ((document = xmlReadFile(filename, NULL, 0)) == NULL) {
 		semerr(gettext("couldn't parse document\n"));
 		return (-1);
 	}
@@ -1853,9 +1866,9 @@ lxml_get_bundle_file(bundle_t *bundle, const char *filename, int apply)
 		document->extSubset = dtd;
 	}
 
-	if (xmlXIncludeProcessFlags(document, XML_PARSE_XINCLUDE) == -1) {;
+	if (xmlXIncludeProcessFlags(document, XML_PARSE_XINCLUDE) == -1) {
 		semerr(gettext("couldn't handle XInclude statements "
-			"in document\n"));
+		    "in document\n"));
 		return (-1);
 	}
 

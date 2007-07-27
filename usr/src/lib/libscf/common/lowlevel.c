@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1604,7 +1604,7 @@ datael_get_parent(const scf_datael_t *dp, scf_datael_t *pp)
  * too big, bad id, iter already exists, element cannot have children of type,
  * type is invalid, iter was reset, sequence was bad, iter walks values, iter
  * does not walk type entities), _NOT_SET, _DELETED, _NO_RESOURCES,
- * _BACKEND_ACCESS.
+ * _BACKEND_ACCESS, _NOT_FOUND.
  */
 static int
 datael_get_child_composed_locked(const scf_datael_t *dp, const char *name,
@@ -1732,6 +1732,14 @@ datael_get_child_locked(const scf_datael_t *dp, const char *name,
 	return (0);
 }
 
+/*
+ * Fails with _HANDLE_MISMATCH, _INVALID_ARGUMENT (out does not have type type,
+ * name is invalid), _NOT_BOUND, _CONNECTION_BROKEN, _INTERNAL (server response
+ * too big, bad id, iter already exists, element cannot have children of type,
+ * type is invalid, iter was reset, sequence was bad, iter walks values, iter
+ * does not walk type entities), _NOT_SET, _DELETED, _NO_RESOURCES,
+ * _BACKEND_ACCESS, _NOT_FOUND.
+ */
 static int
 datael_get_child(const scf_datael_t *dp, const char *name, uint32_t type,
     scf_datael_t *out, boolean_t composed)
@@ -2557,6 +2565,22 @@ scf_service_create(scf_handle_t *handle)
 	return (ret);
 }
 
+
+/*
+ * Fails with
+ *   _HANDLE_MISMATCH
+ *   _INVALID_ARGUMENT
+ *   _NOT_BOUND
+ *   _CONNECTION_BROKEN
+ *   _INTERNAL
+ *   _EXISTS
+ *   _DELETED
+ *   _NOT_SET
+ *   _NO_RESOURCES
+ *   _PERMISSION_DENIED
+ *   _BACKEND_ACCESS
+ *   _BACKEND_READONLY
+ */
 int
 scf_scope_add_service(const scf_scope_t *scope, const char *name,
     scf_service_t *svc)
@@ -2565,6 +2589,11 @@ scf_scope_add_service(const scf_scope_t *scope, const char *name,
 	    REP_PROTOCOL_ENTITY_SERVICE, (svc != NULL)? &svc->rd_d : NULL));
 }
 
+/*
+ * Fails with _HANDLE_MISMATCH, _INVALID_ARGUMENT, _NOT_BOUND,
+ * _CONNECTION_BROKEN, _INTERNAL, _NOT_SET, _DELETED, _NO_RESOURCES,
+ * _BACKEND_ACCESS, _NOT_FOUND.
+ */
 int
 scf_scope_get_service(const scf_scope_t *s, const char *name,
     scf_service_t *svc)
@@ -2603,6 +2632,21 @@ _scf_snapshot_delete(scf_snapshot_t *snap)
 	return (datael_delete(&snap->rd_d));
 }
 
+/*
+ * Fails with
+ *   _HANDLE_MISMATCH
+ *   _INVALID_ARGUMENT
+ *   _NOT_BOUND
+ *   _CONNECTION_BROKEN
+ *   _INTERNAL
+ *   _EXISTS
+ *   _DELETED
+ *   _NOT_SET
+ *   _NO_RESOURCES
+ *   _PERMISSION_DENIED
+ *   _BACKEND_ACCESS
+ *   _BACKEND_READONLY
+ */
 int
 scf_service_add_instance(const scf_service_t *svc, const char *name,
     scf_instance_t *instance)
@@ -2612,6 +2656,12 @@ scf_service_add_instance(const scf_service_t *svc, const char *name,
 	    (instance != NULL)? &instance->rd_d : NULL));
 }
 
+
+/*
+ * Fails with _HANDLE_MISMATCH, _INVALID_ARGUMENT, _NOT_BOUND,
+ * _CONNECTION_BROKEN, _INTERNAL, _NOT_SET, _DELETED, _NO_RESOURCES,
+ * _BACKEND_ACCESS, _NOT_FOUND.
+ */
 int
 scf_service_get_instance(const scf_service_t *svc, const char *name,
     scf_instance_t *inst)
@@ -2628,6 +2678,11 @@ scf_service_add_pg(const scf_service_t *svc, const char *name,
 	    (pg != NULL)?&pg->rd_d : NULL));
 }
 
+/*
+ * Fails with _HANDLE_MISMATCH, _INVALID_ARGUMENT, _NOT_BOUND,
+ * _CONNECTION_BROKEN, _INTERNAL, _NOT_SET, _DELETED, _NO_RESOURCES,
+ * _BACKEND_ACCESS, _NOT_FOUND.
+ */
 int
 scf_service_get_pg(const scf_service_t *svc, const char *name,
     scf_propertygroup_t *pg)
@@ -2644,6 +2699,11 @@ scf_instance_add_pg(const scf_instance_t *inst, const char *name,
 	    (pg != NULL)?&pg->rd_d : NULL));
 }
 
+/*
+ * Fails with _HANDLE_MISMATCH, _INVALID_ARGUMENT, _NOT_BOUND,
+ * _CONNECTION_BROKEN, _INTERNAL, _NOT_SET, _DELETED, _NO_RESOURCES,
+ * _BACKEND_ACCESS, _NOT_FOUND.
+ */
 int
 scf_instance_get_snapshot(const scf_instance_t *inst, const char *name,
     scf_snapshot_t *pg)
@@ -2652,6 +2712,11 @@ scf_instance_get_snapshot(const scf_instance_t *inst, const char *name,
 	    REP_PROTOCOL_ENTITY_SNAPSHOT, pg ? &pg->rd_d : NULL, 0));
 }
 
+/*
+ * Fails with _HANDLE_MISMATCH, _INVALID_ARGUMENT, _NOT_BOUND,
+ * _CONNECTION_BROKEN, _INTERNAL, _NOT_SET, _DELETED, _NO_RESOURCES,
+ * _BACKEND_ACCESS, _NOT_FOUND.
+ */
 int
 scf_instance_get_pg(const scf_instance_t *inst, const char *name,
     scf_propertygroup_t *pg)
@@ -2660,6 +2725,11 @@ scf_instance_get_pg(const scf_instance_t *inst, const char *name,
 	    REP_PROTOCOL_ENTITY_PROPERTYGRP, pg ? &pg->rd_d : NULL, 0));
 }
 
+/*
+ * Fails with _HANDLE_MISMATCH, _INVALID_ARGUMENT, _NOT_BOUND,
+ * _CONNECTION_BROKEN, _INTERNAL, _NOT_SET, _DELETED, _NO_RESOURCES,
+ * _BACKEND_ACCESS, _NOT_FOUND.
+ */
 int
 scf_instance_get_pg_composed(const scf_instance_t *inst,
     const scf_snapshot_t *snap, const char *name, scf_propertygroup_t *pg)
@@ -2671,6 +2741,11 @@ scf_instance_get_pg_composed(const scf_instance_t *inst,
 	    REP_PROTOCOL_ENTITY_PROPERTYGRP, pg ? &pg->rd_d : NULL, 1));
 }
 
+/*
+ * Fails with _HANDLE_MISMATCH, _INVALID_ARGUMENT, _NOT_BOUND,
+ * _CONNECTION_BROKEN, _INTERNAL, _NOT_SET, _DELETED, _NO_RESOURCES,
+ * _BACKEND_ACCESS, _NOT_FOUND.
+ */
 int
 scf_pg_get_property(const scf_propertygroup_t *pg, const char *name,
     scf_property_t *prop)
@@ -2847,6 +2922,11 @@ scf_snaplevel_get_instance_name(const scf_snaplevel_t *rep, char *out,
 	    RP_ENTITY_NAME_SNAPLEVEL_INSTANCE));
 }
 
+/*
+ * Fails with _HANDLE_MISMATCH, _INVALID_ARGUMENT, _NOT_BOUND,
+ * _CONNECTION_BROKEN, _INTERNAL, _NOT_SET, _DELETED, _NO_RESOURCES,
+ * _BACKEND_ACCESS, _NOT_FOUND.
+ */
 int
 scf_snaplevel_get_pg(const scf_snaplevel_t *snap, const char *name,
     scf_propertygroup_t *pg)
@@ -3014,6 +3094,13 @@ datael_update(scf_datael_t *dp)
 
 	if (r < 0)
 		DOOR_ERRORS_BLOCK(r);
+
+	/*
+	 * This should never happen but if it does something has
+	 * gone terribly wrong and we should abort.
+	 */
+	if (response.rpr_response == REP_PROTOCOL_FAIL_BAD_REQUEST)
+		abort();
 
 	if (response.rpr_response != REP_PROTOCOL_SUCCESS &&
 	    response.rpr_response != REP_PROTOCOL_DONE) {
@@ -3564,6 +3651,11 @@ entry_destroy_locked(scf_transaction_entry_t *entry)
 	uu_free(entry);
 }
 
+/*
+ * Fails with _HANDLE_MISMATCH, _INVALID_ARGUMENT, _NOT_BOUND,
+ * _CONNECTION_BROKEN, _INTERNAL, _NOT_SET, _DELETED, _NO_RESOURCES,
+ * _BACKEND_ACCESS, _IN_USE, _NOT_FOUND, _EXISTS, _TYPE_MISMATCH.
+ */
 static int
 transaction_add(scf_transaction_t *tran, scf_transaction_entry_t *entry,
     enum rep_protocol_transaction_action action,
@@ -3672,6 +3764,11 @@ error:
 	return (scf_set_error(error));
 }
 
+/*
+ * Fails with _HANDLE_MISMATCH, _INVALID_ARGUMENT, _NOT_BOUND,
+ * _CONNECTION_BROKEN, _INTERNAL, _NOT_SET, _DELETED, _NO_RESOURCES,
+ * _BACKEND_ACCESS, _IN_USE, _NOT_FOUND, _EXISTS, _TYPE_MISMATCH.
+ */
 int
 scf_transaction_property_new(scf_transaction_t *tx,
     scf_transaction_entry_t *entry, const char *prop, scf_type_t type)
@@ -3680,6 +3777,11 @@ scf_transaction_property_new(scf_transaction_t *tx,
 	    prop, scf_type_to_protocol_type(type)));
 }
 
+/*
+ * Fails with _HANDLE_MISMATCH, _INVALID_ARGUMENT, _NOT_BOUND,
+ * _CONNECTION_BROKEN, _INTERNAL, _NOT_SET, _DELETED, _NO_RESOURCES,
+ * _BACKEND_ACCESS, _IN_USE, _NOT_FOUND, _EXISTS, _TYPE_MISMATCH.
+ */
 int
 scf_transaction_property_change(scf_transaction_t *tx,
     scf_transaction_entry_t *entry, const char *prop, scf_type_t type)
@@ -3688,6 +3790,11 @@ scf_transaction_property_change(scf_transaction_t *tx,
 	    prop, scf_type_to_protocol_type(type)));
 }
 
+/*
+ * Fails with _HANDLE_MISMATCH, _INVALID_ARGUMENT, _NOT_BOUND,
+ * _CONNECTION_BROKEN, _INTERNAL, _NOT_SET, _DELETED, _NO_RESOURCES,
+ * _BACKEND_ACCESS, _IN_USE, _NOT_FOUND, _EXISTS, _TYPE_MISMATCH.
+ */
 int
 scf_transaction_property_change_type(scf_transaction_t *tx,
     scf_transaction_entry_t *entry, const char *prop, scf_type_t type)
@@ -3696,6 +3803,11 @@ scf_transaction_property_change_type(scf_transaction_t *tx,
 	    prop, scf_type_to_protocol_type(type)));
 }
 
+/*
+ * Fails with _HANDLE_MISMATCH, _INVALID_ARGUMENT, _NOT_BOUND,
+ * _CONNECTION_BROKEN, _INTERNAL, _NOT_SET, _DELETED, _NO_RESOURCES,
+ * _BACKEND_ACCESS, _IN_USE, _NOT_FOUND, _EXISTS, _TYPE_MISMATCH.
+ */
 int
 scf_transaction_property_delete(scf_transaction_t *tx,
     scf_transaction_entry_t *entry, const char *prop)
@@ -5100,7 +5212,7 @@ scf_parse_fmri(char *fmri, int *type, const char **scope, const char **service,
 		if (type)
 			*type = SCF_FMRI_TYPE_SVC;
 		return (scf_parse_svc_fmri(fmri, scope, service, instance,
-			    propertygroup, property));
+		    propertygroup, property));
 	} else if (strncmp(fmri, SCF_FMRI_FILE_PREFIX,
 	    sizeof (SCF_FMRI_FILE_PREFIX) - 1) == 0) {
 		if (type)
@@ -5169,6 +5281,11 @@ scf_canonify_fmri(const char *fmri, char *buf, size_t bufsz)
 	return (len);
 }
 
+/*
+ * Fails with _HANDLE_MISMATCH, _INVALID_ARGUMENT, _CONSTRAINT_VIOLATED,
+ * _NOT_FOUND, _NOT_BOUND, _CONNECTION_BROKEN, _INTERNAL, _NOT_SET, _DELETED,
+ * _NO_RESOURCES, _BACKEND_ACCESS.
+ */
 int
 scf_handle_decode_fmri(scf_handle_t *h, const char *fmri, scf_scope_t *sc,
     scf_service_t *svc, scf_instance_t *inst, scf_propertygroup_t *pg,
@@ -5664,6 +5781,16 @@ scf_property_to_fmri(const scf_property_t *prop, char *out, size_t sz)
 	return (len);
 }
 
+/*
+ * Fails with _HANDLE_MISMATCH, _NOT_BOUND, _CONNECTION_BROKEN, _INTERNAL
+ * (server response too big, bad entity id, request not applicable to entity,
+ * name too long for buffer, bad element id, iter already exists, element
+ * cannot have children of type, type is invalid, iter was reset, sequence
+ * was bad, iter walks values, iter does not walk type entities),
+ * _NOT_SET, _DELETED, or _CONSTRAINT_VIOLATED,
+ * _NOT_FOUND (scope has no parent),  _INVALID_ARGUMENT, _NO_RESOURCES,
+ * _BACKEND_ACCESS.
+ */
 int
 scf_pg_get_underlying_pg(const scf_propertygroup_t *pg,
     scf_propertygroup_t *out)
@@ -5984,6 +6111,12 @@ scf_pattern_match(scf_matchkey_t **htable, char *fmri, const char *legacy,
 	return (0);
 }
 
+/*
+ * Fails with _INVALID_ARGUMENT, _HANDLE_DESTROYED, _INTERNAL (bad server
+ * response or id in use), _NO_MEMORY, _HANDLE_MISMATCH, _CONSTRAINT_VIOLATED,
+ * _NOT_FOUND, _NOT_BOUND, _CONNECTION_BROKEN, _NOT_SET, _DELETED,
+ * _NO_RESOURCES, _BACKEND_ACCESS, _TYPE_MISMATCH.
+ */
 scf_error_t
 scf_walk_fmri(scf_handle_t *h, int argc, char **argv, int flags,
     scf_walk_callback callback, void *data, int *err,
