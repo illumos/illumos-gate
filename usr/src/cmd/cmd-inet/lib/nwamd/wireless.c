@@ -1651,9 +1651,9 @@ get_specific_lan(void)
 	response = get_zenity_response(zargv);
 	/* "none" was set as the default earlier */
 	if (response != NULL) {
-		if (strcmp(response, "wep") == 0)
+		if (strcmp(response, "WEP") == 0)
 			wlp->sec_mode = DLADM_WLAN_SECMODE_WEP;
-		else if (strcmp(response, "wpa") == 0)
+		else if (strcmp(response, "WPA") == 0)
 			wlp->sec_mode = DLADM_WLAN_SECMODE_WPA;
 	}
 cleanup:
