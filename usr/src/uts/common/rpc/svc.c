@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,14 +112,12 @@
  *   thread processes a request and sends a reply it returns to svc_run()
  *   and svc_run() calls svc_poll() to find new input.
  *
- *   There is an "inconsistent" but "safe" optimization in the
- *   svc_queuereq() code. The request is queued under the transport's
- *   request lock, while the `pending-requests' count is incremented
- *   independently under the pool request lock. Thus, a request can be picked
- *   up by a service thread before the counter is incremented. It may also
- *   happen that the service thread will win the race condition on the pool
- *   lock and it will decrement the count even before the interrupt thread
- *   increments it (so the count can be temporarily negative).
+ *   There is no longer an "inconsistent" but "safe" optimization in the
+ *   svc_queuereq() code. This "inconsistent" state was leading to
+ *   inconsistencies between the actual number of requests and the value
+ *   of p_reqs (the total number of requests). Because of this, hangs were
+ *   occurring in svc_poll() where p_reqs was greater than one and no
+ *   requests were found on the request queues.
  *
  * svc_poll().
  *   In order to avoid unnecessary locking, which causes performance
@@ -981,24 +979,6 @@ svc_xprt_qget(SVCPOOL *pool)
 	mutex_exit(&pool->p_qend_lock);
 
 	return (xprt);
-}
-
-/*
- * Reset an overflow in the xprt-ready queue after
- * all the pending requests has been drained.
- * This switches svc_poll back to getting hints from the
- * xprt-ready queue.
- *
- * NOTICE: pool->p_qtop is protected by the the pool's request lock
- * and the caller (svc_poll()) must hold the lock.
- */
-static void
-svc_xprt_qreset(SVCPOOL *pool)
-{
-	ASSERT(MUTEX_HELD(&pool->p_req_lock));
-
-	pool->p_qend = pool->p_qtop;
-	pool->p_qoverflow = FALSE;
 }
 
 /*
@@ -1893,6 +1873,8 @@ svc_poll(SVCPOOL *pool, SVCMASTERXPRT *xprt, SVCXPRT *clone_xprt)
 			if (xprt->xp_req_head) {
 				mutex_enter(&pool->p_req_lock);
 				pool->p_reqs--;
+				if (pool->p_reqs == 0)
+					pool->p_qoverflow = FALSE;
 				mutex_exit(&pool->p_req_lock);
 
 				return (xprt);
@@ -1939,6 +1921,8 @@ svc_poll(SVCPOOL *pool, SVCMASTERXPRT *xprt, SVCXPRT *clone_xprt)
 
 					mutex_enter(&pool->p_req_lock);
 					pool->p_reqs--;
+					if (pool->p_reqs == 0)
+						pool->p_qoverflow = FALSE;
 					pool->p_walkers--;
 					mutex_exit(&pool->p_req_lock);
 
@@ -2010,6 +1994,8 @@ svc_poll(SVCPOOL *pool, SVCMASTERXPRT *xprt, SVCXPRT *clone_xprt)
 
 					mutex_enter(&pool->p_req_lock);
 					pool->p_reqs--;
+					if (pool->p_reqs == 0)
+						pool->p_qoverflow = FALSE;
 					pool->p_walkers--;
 					mutex_exit(&pool->p_req_lock);
 
@@ -2025,14 +2011,8 @@ svc_poll(SVCPOOL *pool, SVCMASTERXPRT *xprt, SVCXPRT *clone_xprt)
 			 * a lock first to avoid contention on a mutex.
 			 */
 			if (pool->p_reqs < pool->p_walkers) {
-				/*
-				 * Check again, now with the lock.
-				 * If all the pending requests have been
-				 * picked up than clear the overflow flag.
-				 */
+				/* Check again, now with the lock. */
 				mutex_enter(&pool->p_req_lock);
-				if (pool->p_reqs <= 0)
-					svc_xprt_qreset(pool);
 				if (pool->p_reqs < pool->p_walkers)
 					break;	/* goto sleep */
 				mutex_exit(&pool->p_req_lock);
@@ -2306,14 +2286,20 @@ svc_queueclean(queue_t *q)
 {
 	SVCMASTERXPRT *xprt = ((void **) q->q_ptr)[0];
 	mblk_t *mp;
+	SVCPOOL *pool;
 
 	/*
 	 * clean up the requests
 	 */
 	mutex_enter(&xprt->xp_req_lock);
+	pool = xprt->xp_pool;
 	while ((mp = xprt->xp_req_head) != NULL) {
+		/* remove the request from the list and decrement p_reqs */
 		xprt->xp_req_head = mp->b_next;
+		mutex_enter(&pool->p_req_lock);
 		mp->b_next = (mblk_t *)0;
+		pool->p_reqs--;
+		mutex_exit(&pool->p_req_lock);
 		(*RELE_PROC(xprt)) (xprt->xp_wq, mp);
 	}
 	mutex_exit(&xprt->xp_req_lock);
@@ -2411,27 +2397,27 @@ svc_queuereq(queue_t *q, mblk_t *mp)
 
 	/*
 	 * Step 1.
-	 * Grab the transport's request lock and put
+	 * Grab the transport's request lock and the
+	 * pool's request lock so that when we put
 	 * the request at the tail of the transport's
-	 * request queue.
+	 * request queue, possibly put the request on
+	 * the xprt ready queue and increment the
+	 * pending request count it looks atomic.
 	 */
 	mutex_enter(&xprt->xp_req_lock);
+	mutex_enter(&pool->p_req_lock);
 	if (xprt->xp_req_head == NULL)
 		xprt->xp_req_head = mp;
 	else
 		xprt->xp_req_tail->b_next = mp;
 	xprt->xp_req_tail = mp;
 
-	mutex_exit(&xprt->xp_req_lock);
-
 	/*
 	 * Step 2.
-	 * Grab the pool request lock, insert a hint into
-	 * the xprt-ready queue, increment `pending-requests'
-	 * count for the pool, and wake up a thread sleeping
-	 * in svc_poll() if necessary.
+	 * Insert a hint into the xprt-ready queue, increment
+	 * `pending-requests' count for the pool, and wake up
+	 * a thread sleeping in svc_poll() if necessary.
 	 */
-	mutex_enter(&pool->p_req_lock);
 
 	/* Insert pointer to this transport into the xprt-ready queue */
 	svc_xprt_qput(pool, xprt);
@@ -2463,6 +2449,7 @@ svc_queuereq(queue_t *q, mblk_t *mp)
 		cv_signal(&pool->p_req_cv);
 		mutex_exit(&pool->p_req_lock);
 	}
+	mutex_exit(&xprt->xp_req_lock);
 
 	/*
 	 * Step 3.
@@ -2476,7 +2463,7 @@ svc_queuereq(queue_t *q, mblk_t *mp)
 	 * decision is not essential.
 	 */
 	if (pool->p_asleep == 0 && !pool->p_drowsy &&
-		pool->p_threads + pool->p_detached_threads < pool->p_maxthreads)
+	    pool->p_threads + pool->p_detached_threads < pool->p_maxthreads)
 		svc_creator_signal(pool);
 
 	TRACE_1(TR_FAC_KRPC, TR_SVC_QUEUEREQ_END,
@@ -2511,7 +2498,7 @@ svc_reserve_thread(SVCXPRT *clone_xprt)
 	/* Check pool counts if there is room for reservation */
 	mutex_enter(&pool->p_thread_lock);
 	if (pool->p_reserved_threads + pool->p_detached_threads >=
-		pool->p_maxthreads - pool->p_redline) {
+	    pool->p_maxthreads - pool->p_redline) {
 		mutex_exit(&pool->p_thread_lock);
 		return (0);
 	}
@@ -2616,6 +2603,7 @@ rdma_stop(rdma_xprt_group_t rdma_xprts)
 	queue_t *q;
 	mblk_t *mp;
 	int i;
+	SVCPOOL *pool;
 
 	if (rdma_xprts.rtg_count == 0)
 		return;
@@ -2629,9 +2617,17 @@ rdma_stop(rdma_xprt_group_t rdma_xprts)
 		svc_rdma_kstop(xprt);
 
 		mutex_enter(&xprt->xp_req_lock);
+		pool = xprt->xp_pool;
 		while ((mp = xprt->xp_req_head) != NULL) {
+			/*
+			 * remove the request from the list and
+			 * decrement p_reqs
+			 */
 			xprt->xp_req_head = mp->b_next;
+			mutex_enter(&pool->p_req_lock);
 			mp->b_next = (mblk_t *)0;
+			pool->p_reqs--;
+			mutex_exit(&pool->p_req_lock);
 			if (mp)
 				freemsg(mp);
 		}

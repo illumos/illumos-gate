@@ -27,7 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -769,124 +768,125 @@ rpcmodrput(queue_t *q, mblk_t *mp)
 		 * Forward this message to krpc if it is data.
 		 */
 		if (pptr->type == T_UNITDATA_IND) {
-		    mblk_t *nmp;
+			mblk_t *nmp;
 
 		/*
 		 * Check if the module is being popped.
 		 */
-		    mutex_enter(&rmp->rm_lock);
-		    if (rmp->rm_state & RM_CLOSING) {
-			mutex_exit(&rmp->rm_lock);
-			putnext(q, mp);
-			break;
-		    }
+			mutex_enter(&rmp->rm_lock);
+			if (rmp->rm_state & RM_CLOSING) {
+				mutex_exit(&rmp->rm_lock);
+				putnext(q, mp);
+				break;
+			}
 
-		    switch (rmp->rm_type) {
-		    case RPC_CLIENT:
-			mutex_exit(&rmp->rm_lock);
+			switch (rmp->rm_type) {
+			case RPC_CLIENT:
+				mutex_exit(&rmp->rm_lock);
+				hdrsz = mp->b_wptr - mp->b_rptr;
+
+				/*
+				 * Make sure the header is sane.
+				 */
+				if (hdrsz < TUNITDATAINDSZ ||
+				    hdrsz < (pptr->unitdata_ind.OPT_length +
+				    pptr->unitdata_ind.OPT_offset) ||
+				    hdrsz < (pptr->unitdata_ind.SRC_length +
+				    pptr->unitdata_ind.SRC_offset)) {
+					freemsg(mp);
+					return;
+				}
+
+				/*
+				 * Call clnt_clts_dispatch_notify, so that it
+				 * can pass the message to the proper caller.
+				 * Don't discard the header just yet since the
+				 * client may need the sender's address.
+				 */
+				clnt_clts_dispatch_notify(mp, hdrsz,
+				    rmp->rm_zoneid);
+				return;
+			case RPC_SERVER:
+				/*
+				 * rm_krpc_cell is exclusively used by the kRPC
+				 * CLTS server
+				 */
+				if (rmp->rm_krpc_cell) {
+#ifdef DEBUG
+					/*
+					 * Test duplicate request cache and
+					 * rm_ref count handling by sending a
+					 * duplicate every so often, if
+					 * desired.
+					 */
+					if (rpcmod_send_dup &&
+					    rpcmod_send_dup_cnt++ %
+					    rpcmod_send_dup)
+						nmp = copymsg(mp);
+					else
+						nmp = NULL;
+#endif
+					/*
+					 * Raise the reference count on this
+					 * module to prevent it from being
+					 * popped before krpc generates the
+					 * reply.
+					 */
+					rmp->rm_ref++;
+					mutex_exit(&rmp->rm_lock);
+
+					/*
+					 * Submit the message to krpc.
+					 */
+					svc_queuereq(q, mp);
+#ifdef DEBUG
+					/*
+					 * Send duplicate if we created one.
+					 */
+					if (nmp) {
+						mutex_enter(&rmp->rm_lock);
+						rmp->rm_ref++;
+						mutex_exit(&rmp->rm_lock);
+						svc_queuereq(q, nmp);
+					}
+#endif
+				} else {
+					mutex_exit(&rmp->rm_lock);
+					freemsg(mp);
+				}
+				return;
+			default:
+				mutex_exit(&rmp->rm_lock);
+				freemsg(mp);
+				return;
+			} /* end switch(rmp->rm_type) */
+		} else if (pptr->type == T_UDERROR_IND) {
+			mutex_enter(&rmp->rm_lock);
 			hdrsz = mp->b_wptr - mp->b_rptr;
 
 			/*
-			 * Make sure the header is sane.
+			 * Make sure the header is sane
 			 */
-			if (hdrsz < TUNITDATAINDSZ ||
-				hdrsz < (pptr->unitdata_ind.OPT_length +
-					pptr->unitdata_ind.OPT_offset) ||
-				hdrsz < (pptr->unitdata_ind.SRC_length +
-					pptr->unitdata_ind.SRC_offset)) {
-					freemsg(mp);
-					return;
-			}
-
-			/*
-			 * Call clnt_clts_dispatch_notify, so that it can
-			 * pass the message to the proper caller.  Don't
-			 * discard the header just yet since the client may
-			 * need the sender's address.
-			 */
-			clnt_clts_dispatch_notify(mp, hdrsz, rmp->rm_zoneid);
-			return;
-		    case RPC_SERVER:
-			/*
-			 * rm_krpc_cell is exclusively used by the kRPC
-			 * CLTS server
-			 */
-			if (rmp->rm_krpc_cell) {
-#ifdef DEBUG
-				/*
-				 * Test duplicate request cache and
-				 * rm_ref count handling by sending a
-				 * duplicate every so often, if
-				 * desired.
-				 */
-				if (rpcmod_send_dup &&
-				    rpcmod_send_dup_cnt++ %
-				    rpcmod_send_dup)
-					nmp = copymsg(mp);
-				else
-					nmp = NULL;
-#endif
-				/*
-				 * Raise the reference count on this
-				 * module to prevent it from being
-				 * popped before krpc generates the
-				 * reply.
-				 */
-				rmp->rm_ref++;
-				mutex_exit(&rmp->rm_lock);
-
-				/*
-				 * Submit the message to krpc.
-				 */
-				svc_queuereq(q, mp);
-#ifdef DEBUG
-				/*
-				 * Send duplicate if we created one.
-				 */
-				if (nmp) {
-					mutex_enter(&rmp->rm_lock);
-					rmp->rm_ref++;
-					mutex_exit(&rmp->rm_lock);
-					svc_queuereq(q, nmp);
-				}
-#endif
-			} else {
+			if (hdrsz < TUDERRORINDSZ ||
+			    hdrsz < (pptr->uderror_ind.OPT_length +
+			    pptr->uderror_ind.OPT_offset) ||
+			    hdrsz < (pptr->uderror_ind.DEST_length +
+			    pptr->uderror_ind.DEST_offset)) {
 				mutex_exit(&rmp->rm_lock);
 				freemsg(mp);
+				return;
 			}
-			return;
-		    default:
+
+			/*
+			 * In the case where a unit data error has been
+			 * received, all we need to do is clear the message from
+			 * the queue.
+			 */
 			mutex_exit(&rmp->rm_lock);
 			freemsg(mp);
+			RPCLOG(32, "rpcmodrput: unitdata error received at "
+			    "%ld\n", gethrestime_sec());
 			return;
-		    } /* end switch(rmp->rm_type) */
-		} else if (pptr->type == T_UDERROR_IND) {
-		    mutex_enter(&rmp->rm_lock);
-		    hdrsz = mp->b_wptr - mp->b_rptr;
-
-		/*
-		 * Make sure the header is sane
-		 */
-		    if (hdrsz < TUDERRORINDSZ ||
-			hdrsz < (pptr->uderror_ind.OPT_length +
-				pptr->uderror_ind.OPT_offset) ||
-			hdrsz < (pptr->uderror_ind.DEST_length +
-				pptr->uderror_ind.DEST_offset)) {
-			    mutex_exit(&rmp->rm_lock);
-			    freemsg(mp);
-			    return;
-		    }
-
-		/*
-		 * In the case where a unit data error has been
-		 * received, all we need to do is clear the message from
-		 * the queue.
-		 */
-		    mutex_exit(&rmp->rm_lock);
-		    freemsg(mp);
-		    RPCLOG(32, "rpcmodrput: unitdata error received at "
-				"%ld\n", gethrestime_sec());
-		    return;
 		} /* end else if (pptr->type == T_UDERROR_IND) */
 
 		putnext(q, mp);
@@ -894,7 +894,7 @@ rpcmodrput(queue_t *q, mblk_t *mp)
 	} /* end switch (mp->b_datap->db_type) */
 
 	TRACE_0(TR_FAC_KRPC, TR_RPCMODRPUT_END,
-		"rpcmodrput_end:");
+	    "rpcmodrput_end:");
 	/*
 	 * Return codes are not looked at by the STREAMS framework.
 	 */
@@ -911,12 +911,12 @@ rpcmodwput(queue_t *q, mblk_t *mp)
 	ASSERT(q != NULL);
 
 	switch (mp->b_datap->db_type) {
-	    case M_PROTO:
-	    case M_PCPROTO:
-		    break;
-	    default:
-		    rpcmodwput_other(q, mp);
-		    return;
+		case M_PROTO:
+		case M_PCPROTO:
+			break;
+		default:
+			rpcmodwput_other(q, mp);
+			return;
 	}
 
 	/*
@@ -965,21 +965,21 @@ rpcmodwput_other(queue_t *q, mblk_t *mp)
 			iocp = (struct iocblk *)mp->b_rptr;
 			ASSERT(iocp != NULL);
 			switch (iocp->ioc_cmd) {
-			    case RPC_CLIENT:
-			    case RPC_SERVER:
-				    mutex_enter(&rmp->rm_lock);
-				    rmp->rm_type = iocp->ioc_cmd;
-				    mutex_exit(&rmp->rm_lock);
-				    mp->b_datap->db_type = M_IOCACK;
-				    qreply(q, mp);
-				    return;
-			    default:
+				case RPC_CLIENT:
+				case RPC_SERVER:
+					mutex_enter(&rmp->rm_lock);
+					rmp->rm_type = iocp->ioc_cmd;
+					mutex_exit(&rmp->rm_lock);
+					mp->b_datap->db_type = M_IOCACK;
+					qreply(q, mp);
+					return;
+				default:
 				/*
 				 * pass the ioctl downstream and hope someone
 				 * down there knows how to handle it.
 				 */
-				    putnext(q, mp);
-				    return;
+					putnext(q, mp);
+					return;
 			}
 		default:
 			break;
@@ -1223,7 +1223,7 @@ mir_close(queue_t *q)
 		while ((!MIR_SVC_QUIESCED(mir)) || mir->mir_inwservice == 1) {
 
 			if (mir->mir_ref_cnt && !mir->mir_inrservice &&
-					(queue_cleaned == FALSE)) {
+			    (queue_cleaned == FALSE)) {
 				/*
 				 * call into SVC to clean the queue
 				 */
@@ -1298,7 +1298,7 @@ mir_svc_idle_start(queue_t *q, mir_t *mir)
 	 */
 	if (mir->mir_closing) {
 		RPCLOG(16, "mir_svc_idle_start - closing: 0x%p\n",
-			(void *)q);
+		    (void *)q);
 
 		/*
 		 * We will call mir_svc_idle_start() whenever MIR_SVC_QUIESCED()
@@ -1311,7 +1311,7 @@ mir_svc_idle_start(queue_t *q, mir_t *mir)
 
 	} else {
 		RPCLOG(16, "mir_svc_idle_start - reset %s timer\n",
-			mir->mir_ordrel_pending ? "ordrel" : "normal");
+		    mir->mir_ordrel_pending ? "ordrel" : "normal");
 		/*
 		 * Normal condition, start the idle timer.  If an orderly
 		 * release has been sent, set the timeout to wait for the
@@ -1465,7 +1465,7 @@ mir_do_rput(queue_t *q, mblk_t *mp, int srv)
 
 			stropts = (struct stroptions *)mp->b_rptr;
 			if ((stropts->so_flags & SO_HIWAT) &&
-				!(stropts->so_flags & SO_BAND)) {
+			    !(stropts->so_flags & SO_BAND)) {
 				(void) strqset(q, QHIWAT, 0, stropts->so_hiwat);
 			}
 		}
@@ -1571,7 +1571,7 @@ same_mblk:;
 						mblk_t *smp = head_mp;
 
 						while ((smp->b_cont != NULL) &&
-							(smp->b_cont != mp))
+						    (smp->b_cont != mp))
 							smp = smp->b_cont;
 						smp->b_cont = cont_mp;
 						/*
@@ -1683,9 +1683,9 @@ same_mblk:;
 				 * block.
 				 */
 				if (!(frag_header & MIR_LASTFRAG) ||
-					(frag_len -
-					(frag_header & ~MIR_LASTFRAG)) ||
-					!head_mp)
+				    (frag_len -
+				    (frag_header & ~MIR_LASTFRAG)) ||
+				    !head_mp)
 					goto same_mblk;
 
 				/*
@@ -1862,28 +1862,29 @@ same_mblk:;
 			 */
 
 			if (!mir->mir_hold_inbound) {
-			    if (mir->mir_krpc_cell) {
-				/*
-				 * If the reference count is 0
-				 * (not including this request),
-				 * then the stream is transitioning
-				 * from idle to non-idle.  In this case,
-				 * we cancel the idle timer.
-				 */
-				if (mir->mir_ref_cnt++ == 0)
-					stop_timer = B_TRUE;
-				if (mir_check_len(q,
-					(int32_t)msgdsize(mp), mp))
+				if (mir->mir_krpc_cell) {
+					/*
+					 * If the reference count is 0
+					 * (not including this request),
+					 * then the stream is transitioning
+					 * from idle to non-idle.  In this case,
+					 * we cancel the idle timer.
+					 */
+					if (mir->mir_ref_cnt++ == 0)
+						stop_timer = B_TRUE;
+					if (mir_check_len(q,
+					    (int32_t)msgdsize(mp), mp))
 						return;
-				svc_queuereq(q, head_mp); /* to KRPC */
-			    } else {
-				/*
-				 * Count # of times this happens. Should be
-				 * never, but experience shows otherwise.
-				 */
-				mir_krpc_cell_null++;
-				freemsg(head_mp);
-			    }
+					svc_queuereq(q, head_mp); /* to KRPC */
+				} else {
+					/*
+					 * Count # of times this happens. Should
+					 * be never, but experience shows
+					 * otherwise.
+					 */
+					mir_krpc_cell_null++;
+					freemsg(head_mp);
+				}
 
 			} else {
 				/*
@@ -1901,7 +1902,7 @@ same_mblk:;
 			break;
 		default:
 			RPCLOG(1, "mir_rput: unknown mir_type %d\n",
-				mir->mir_type);
+			    mir->mir_type);
 			freemsg(head_mp);
 			break;
 		}
@@ -1920,7 +1921,7 @@ same_mblk:;
 	 * getting excessively large, shut down the connection.
 	 */
 	if (head_mp != NULL && mir->mir_setup_complete &&
-		mir_check_len(q, frag_len, head_mp))
+	    mir_check_len(q, frag_len, head_mp))
 		return;
 
 	/* Save our local copies back in the mir structure. */
@@ -1968,8 +1969,8 @@ mir_rput_proto(queue_t *q, mblk_t *mp)
 	case RPC_CLIENT:
 		switch (type) {
 		case T_DISCON_IND:
-		    reason =
-			((struct T_discon_ind *)(mp->b_rptr))->DISCON_reason;
+			reason = ((struct T_discon_ind *)
+			    (mp->b_rptr))->DISCON_reason;
 		    /*FALLTHROUGH*/
 		case T_ORDREL_IND:
 			mutex_enter(&mir->mir_mutex);
@@ -2013,11 +2014,11 @@ mir_rput_proto(queue_t *q, mblk_t *mp)
 
 			terror = (struct T_error_ack *)mp->b_rptr;
 			RPCLOG(1, "mir_rput_proto T_ERROR_ACK for queue 0x%p",
-				(void *)q);
+			    (void *)q);
 			RPCLOG(1, " ERROR_prim: %s,",
-				rpc_tpiprim2name(terror->ERROR_prim));
+			    rpc_tpiprim2name(terror->ERROR_prim));
 			RPCLOG(1, " TLI_error: %s,",
-				rpc_tpierr2name(terror->TLI_error));
+			    rpc_tpierr2name(terror->TLI_error));
 			RPCLOG(1, " UNIX_error: %d\n", terror->UNIX_error);
 			if (terror->ERROR_prim == T_DISCON_REQ)  {
 				clnt_dispatch_notifyall(WR(q), type, reason);
@@ -2087,8 +2088,8 @@ mir_rput_proto(queue_t *q, mblk_t *mp)
 		case T_DISCON_IND:
 		case T_ORDREL_IND:
 			RPCLOG(16, "mir_rput_proto: got %s indication\n",
-				type == T_DISCON_IND ? "disconnect"
-				: "orderly release");
+			    type == T_DISCON_IND ? "disconnect"
+			    : "orderly release");
 
 			/*
 			 * For listen endpoint just pass
@@ -2116,8 +2117,8 @@ mir_rput_proto(queue_t *q, mblk_t *mp)
 			}
 
 			RPCLOG(16, "mir_rput_proto: not idle, so "
-				"disconnect/ord rel indication not passed "
-				"upstream on 0x%p\n", (void *)q);
+			    "disconnect/ord rel indication not passed "
+			    "upstream on 0x%p\n", (void *)q);
 
 			/*
 			 * Hold the indication until we get idle
@@ -2233,7 +2234,8 @@ mir_rsrv(queue_t *q)
 			return;
 		}
 		while (mp = getq(q)) {
-			if (mir->mir_krpc_cell) {
+			if (mir->mir_krpc_cell &&
+			    (mir->mir_svc_no_more_msgs == 0)) {
 				/*
 				 * If we were idle, turn off idle timer since
 				 * we aren't idle any more.
@@ -2241,15 +2243,16 @@ mir_rsrv(queue_t *q)
 				if (mir->mir_ref_cnt++ == 0)
 					stop_timer = B_TRUE;
 				if (mir_check_len(q,
-					(int32_t)msgdsize(mp), mp))
-						return;
+				    (int32_t)msgdsize(mp), mp))
+					return;
 				svc_queuereq(q, mp);
 			} else {
 				/*
 				 * Count # of times this happens. Should be
 				 * never, but experience shows otherwise.
 				 */
-				mir_krpc_cell_null++;
+				if (mir->mir_krpc_cell == NULL)
+					mir_krpc_cell_null++;
 				freemsg(mp);
 			}
 		}
@@ -2294,8 +2297,8 @@ mir_rsrv(queue_t *q)
 
 		if (cmp != NULL) {
 			RPCLOG(16, "mir_rsrv: line %d: sending a held "
-				"disconnect/ord rel indication upstream\n",
-				__LINE__);
+			    "disconnect/ord rel indication upstream\n",
+			    __LINE__);
 			putnext(q, cmp);
 		}
 
@@ -2330,7 +2333,7 @@ mir_svc_policy_notify(queue_t *q, int event)
 
 		mir_svc_policy_fails++;
 		RPCLOG(16, "mir_svc_policy_notify: could not allocate event "
-			"%d\n", event);
+		    "%d\n", event);
 		return (ENOMEM);
 	}
 
@@ -2536,13 +2539,14 @@ mir_timer(void *arg)
 			clock_t tout;
 
 			tout = mir->mir_idle_timeout -
-				TICK_TO_MSEC(lbolt - mir->mir_use_timestamp);
+			    TICK_TO_MSEC(lbolt - mir->mir_use_timestamp);
 			if (tout < 0)
 				tout = 1000;
 #if 0
-printf("mir_timer[%d < %d + %d]: reset client timer to %d (ms)\n",
-TICK_TO_MSEC(lbolt), TICK_TO_MSEC(mir->mir_use_timestamp),
-mir->mir_idle_timeout, tout);
+			printf("mir_timer[%d < %d + %d]: reset client timer "
+			    "to %d (ms)\n", TICK_TO_MSEC(lbolt),
+			    TICK_TO_MSEC(mir->mir_use_timestamp),
+			    mir->mir_idle_timeout, tout);
 #endif
 			mir->mir_clntreq = 0;
 			mir_timer_start(wq, mir, tout);
@@ -2609,7 +2613,7 @@ printf("mir_timer[%d]: doing client timeout\n", lbolt / hz);
 		return;
 	default:
 		RPCLOG(1, "mir_timer: unexpected mir_type %d\n",
-			mir->mir_type);
+		    mir->mir_type);
 		mutex_exit(&mir->mir_mutex);
 		return;
 	}
@@ -2639,7 +2643,7 @@ mir_wput(queue_t *q, mblk_t *mp)
 	if (mir->mir_ordrel_pending == 1) {
 		freemsg(mp);
 		RPCLOG(16, "mir_wput wq 0x%p: got data after T_ORDREL_REQ\n",
-			(void *)q);
+		    (void *)q);
 		return;
 	}
 
@@ -2824,7 +2828,7 @@ ioc_eperm:
 			flush_in_svc = TRUE;
 		}
 		if ((mp->b_wptr - rptr) < sizeof (uint32_t) ||
-				!IS_P2ALIGNED(rptr, sizeof (uint32_t)))
+		    !IS_P2ALIGNED(rptr, sizeof (uint32_t)))
 			break;
 
 		switch (((union T_primitives *)rptr)->type) {
@@ -2956,7 +2960,7 @@ ioc_eperm:
 					    "wq 0x%p\n", (void *)q);
 					if (*mp->b_rptr & FLUSHBAND) {
 						flushband(q, *(mp->b_rptr + 1),
-							FLUSHDATA);
+						    FLUSHDATA);
 					} else {
 						flushq(q, FLUSHDATA);
 					}
@@ -3033,8 +3037,8 @@ mir_wsrv(queue_t *q)
 		 * T_ORDREL_REQ downstream.
 		 */
 		if (mir->mir_type != RPC_SERVER ||
-			    ((union T_primitives *)mp->b_rptr)->type !=
-			    T_ORDREL_REQ) {
+		    ((union T_primitives *)mp->b_rptr)->type !=
+		    T_ORDREL_REQ) {
 			mutex_exit(&mir->mir_mutex);
 			putnext(q, mp);
 			mutex_enter(&mir->mir_mutex);
@@ -3057,7 +3061,7 @@ mir_wsrv(queue_t *q)
 		 */
 		mir->mir_ordrel_pending = 1;
 		RPCLOG(16, "mir_wsrv: sending ordrel req on q 0x%p\n",
-								(void *)q);
+		    (void *)q);
 		/*
 		 * Send the orderly release downstream. If there are other
 		 * pending replies we won't be able to send them.  However,
@@ -3137,8 +3141,8 @@ mir_disconnect(queue_t *q, mir_t *mir)
 		mir_svc_idle_stop(WR(q), mir);
 		mutex_exit(&mir->mir_mutex);
 		RPCLOG(16, "mir_disconnect: telling "
-			"stream head listener to disconnect stream "
-			"(0x%p)\n", (void *) q);
+		    "stream head listener to disconnect stream "
+		    "(0x%p)\n", (void *) q);
 		(void) mir_svc_policy_notify(q, 2);
 		break;
 
@@ -3166,7 +3170,7 @@ mir_check_len(queue_t *q, int32_t frag_len,
 	 */
 
 	if ((frag_len <= 0) || (mir->mir_max_msg_sizep == NULL) ||
-		(frag_len <= *mir->mir_max_msg_sizep)) {
+	    (frag_len <= *mir->mir_max_msg_sizep)) {
 		return (0);
 	}
 
@@ -3175,12 +3179,12 @@ mir_check_len(queue_t *q, int32_t frag_len,
 	mir->mir_frag_len = -(int)sizeof (uint32_t);
 	if (mir->mir_type != RPC_SERVER || mir->mir_setup_complete) {
 		cmn_err(CE_NOTE,
-		"KRPC: record fragment from %s of size(%d) exceeds "
-		"maximum (%u). Disconnecting",
-		(mir->mir_type == RPC_CLIENT) ? "server" :
-		(mir->mir_type == RPC_SERVER) ? "client" :
-		"test tool",
-		frag_len, *mir->mir_max_msg_sizep);
+		    "KRPC: record fragment from %s of size(%d) exceeds "
+		    "maximum (%u). Disconnecting",
+		    (mir->mir_type == RPC_CLIENT) ? "server" :
+		    (mir->mir_type == RPC_SERVER) ? "client" :
+		    "test tool",
+		    frag_len, *mir->mir_max_msg_sizep);
 	}
 
 	mir_disconnect(q, mir);
