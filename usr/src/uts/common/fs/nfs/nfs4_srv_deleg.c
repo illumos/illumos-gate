@@ -442,7 +442,6 @@ rfs4_cbch_init(rfs4_cbinfo_t *cbp)
 	in_port_t *pp;
 	int af;
 	char *devnam;
-	int err;
 	struct netbuf nb;
 	int size;
 	CLIENT *ch = NULL;
@@ -486,8 +485,7 @@ rfs4_cbch_init(rfs4_cbinfo_t *cbp)
 		goto cb_init_out;
 	}
 
-	if ((err = lookupname(devnam, UIO_SYSSPACE, FOLLOW,
-	    NULLVPP, &vp)) != 0) {
+	if (lookupname(devnam, UIO_SYSSPACE, FOLLOW, NULLVPP, &vp) != 0) {
 
 		goto cb_init_out;
 	}
@@ -527,7 +525,7 @@ rfs4_cbch_init(rfs4_cbinfo_t *cbp)
 	nb.maxlen = nb.len = size;
 	nb.buf = (char *)taddr;
 
-	if (err = clnt_tli_kcreate(&knc, &nb, cbp->cb_callback.cb_program,
+	if (clnt_tli_kcreate(&knc, &nb, cbp->cb_callback.cb_program,
 	    NFS_CB, 0, 0, curthread->t_cred, &ch)) {
 
 		ch = NULL;
