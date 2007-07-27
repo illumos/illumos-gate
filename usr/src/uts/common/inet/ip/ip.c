@@ -6943,10 +6943,10 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 			first_mp = mp;
 		}
 	}
-
 	BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsHCInDelivers);
 	if (IPCL_IS_TCP(connp)) {
-		(*ip_input_proc)(connp->conn_sqp, first_mp,
+		/* do not drain, certain use cases can blow the stack */
+		squeue_enter_nodrain(connp->conn_sqp, first_mp,
 		    connp->conn_recv, connp, SQTAG_IP_FANOUT_TCP);
 	} else {
 		putnext(connp->conn_rq, first_mp);
