@@ -64,6 +64,8 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
+def:
+
 lintlib:      unix
 
 IMPLEMENTED_PLATFORM	= SUNW,SPARC-Enterprise-T5120
