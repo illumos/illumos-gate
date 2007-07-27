@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,7 +40,7 @@
 #include <sys/ddi.h>
 
 #include <sys/vnode.h>
-
+#include <sys/sdt.h>
 #include <inet/common.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
@@ -122,7 +122,7 @@ uaddr2sockaddr(int af, char *ua, void *ap, in_port_t *pp)
 				/* reset to network order */
 				if (af == AF_INET) {
 					*(uint32_t *)ap =
-						htonl(*(uint32_t *)ap);
+					    htonl(*(uint32_t *)ap);
 					*pp = htons(port);
 				} else {
 					int ix;
@@ -220,12 +220,6 @@ rfs4_do_cb_null(rfs4_client_t *cp)
 	rfs4_cbstate_t newstate;
 	rfs4_cbinfo_t *cbp = &cp->cbinfo;
 
-	if (cp == NULL) {
-		NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-			"rfs4_do_cb_null: no rfs4_client specified\n"));
-		return;
-	}
-
 	mutex_enter(cbp->cb_lock);
 	/* If another thread is doing CB_NULL RPC then return */
 	if (cbp->cb_nullcaller == TRUE) {
@@ -267,15 +261,15 @@ retry:
 
 		/* Move over the addr/netid */
 		cbp->cb_callback.cb_location.r_addr =
-			cbp->cb_newer.cb_callback.cb_location.r_addr;
+		    cbp->cb_newer.cb_callback.cb_location.r_addr;
 		cbp->cb_newer.cb_callback.cb_location.r_addr = NULL;
 		cbp->cb_callback.cb_location.r_netid =
-			cbp->cb_newer.cb_callback.cb_location.r_netid;
+		    cbp->cb_newer.cb_callback.cb_location.r_netid;
 		cbp->cb_newer.cb_callback.cb_location.r_netid = NULL;
 
 		/* Get the program number */
 		cbp->cb_callback.cb_program =
-			cbp->cb_newer.cb_callback.cb_program;
+		    cbp->cb_newer.cb_callback.cb_program;
 		cbp->cb_newer.cb_callback.cb_program = 0;
 
 		/* Don't forget the protocol's "cb_ident" field */
@@ -308,8 +302,6 @@ retry:
 
 	/* get/generate a client handle */
 	if ((ch = rfs4_cb_getch(cbp)) == NULL) {
-		NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-			"rfs4_do_cb_null: failed to get client handle\n"));
 		mutex_enter(cbp->cb_lock);
 		cbp->cb_state = CB_BAD;
 		cbp->cb_timefailed = gethrestime_sec(); /* observability */
@@ -320,9 +312,6 @@ retry:
 	tv.tv_sec = 30;
 	tv.tv_usec = 0;
 	if (clnt_call(ch, CB_NULL, xdr_void, NULL, xdr_void, NULL, tv) != 0) {
-		NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-			"rfs4_do_cb_null: clnt_call failed\n"));
-
 		newstate = CB_BAD;
 	} else {
 		newstate = CB_OK;
@@ -428,9 +417,9 @@ rfs4_cbinfo_rele(rfs4_cbinfo_t *cbp, rfs4_cbstate_t newstate)
 	 * caller so they can do the CB_NULL
 	 */
 	if (cbp->cb_refcnt == 0 &&
-		cbp->cb_nullcaller == FALSE &&
-		cbp->cb_newer.cb_new == TRUE &&
-		cbp->cb_newer.cb_confirmed == TRUE)
+	    cbp->cb_nullcaller == FALSE &&
+	    cbp->cb_newer.cb_new == TRUE &&
+	    cbp->cb_newer.cb_confirmed == TRUE)
 		cb_new = TRUE;
 
 	mutex_exit(cbp->cb_lock);
@@ -453,14 +442,11 @@ rfs4_cbch_init(rfs4_cbinfo_t *cbp)
 	in_port_t *pp;
 	int af;
 	char *devnam;
-	int err = 0;
+	int err;
 	struct netbuf nb;
 	int size;
 	CLIENT *ch = NULL;
 	int useresvport = 0;
-
-	NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-		"rfs4_cbch_init: entry cbp->%p\n", (void *)cbp));
 
 	mutex_enter(cbp->cb_lock);
 
@@ -476,47 +462,37 @@ rfs4_cbch_init(rfs4_cbinfo_t *cbp)
 		devnam = "/dev/tcp";
 		af = AF_INET;
 	} else if (strcmp(cbp->cb_callback.cb_location.r_netid, "udp")
-		== 0) {
+	    == 0) {
 		knc.knc_semantics = NC_TPI_CLTS;
 		knc.knc_protofmly = "inet";
 		knc.knc_proto = "udp";
 		devnam = "/dev/udp";
 		af = AF_INET;
 	} else if (strcmp(cbp->cb_callback.cb_location.r_netid, "tcp6")
-		== 0) {
+	    == 0) {
 		knc.knc_semantics = NC_TPI_COTS;
 		knc.knc_protofmly = "inet6";
 		knc.knc_proto = "tcp";
 		devnam = "/dev/tcp6";
 		af = AF_INET6;
 	} else if (strcmp(cbp->cb_callback.cb_location.r_netid, "udp6")
-		== 0) {
+	    == 0) {
 		knc.knc_semantics = NC_TPI_CLTS;
 		knc.knc_protofmly = "inet6";
 		knc.knc_proto = "udp";
 		devnam = "/dev/udp6";
 		af = AF_INET6;
 	} else {
-		NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-			"rfs4_cbch_init: unknown transport %s\n",
-			cbp->cb_callback.cb_location.r_netid));
-
 		goto cb_init_out;
 	}
 
 	if ((err = lookupname(devnam, UIO_SYSSPACE, FOLLOW,
 	    NULLVPP, &vp)) != 0) {
 
-		NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-			"rfs4_cbch_init: lookupname failed %d\n", err));
-
 		goto cb_init_out;
 	}
 
 	if (vp->v_type != VCHR) {
-
-		NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-			"rfs4_cbch_init: %s is not VCHR", devnam));
 		VN_RELE(vp);
 		goto cb_init_out;
 	}
@@ -542,11 +518,7 @@ rfs4_cbch_init(rfs4_cbinfo_t *cbp)
 	}
 
 	if (uaddr2sockaddr(af,
-		cbp->cb_callback.cb_location.r_addr, addr, pp)) {
-
-		NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-			"rfs4_cbch_init: malformed universal addr: %s\n",
-			cbp->cb_callback.cb_location.r_addr));
+	    cbp->cb_callback.cb_location.r_addr, addr, pp)) {
 
 		goto cb_init_out;
 	}
@@ -558,8 +530,6 @@ rfs4_cbch_init(rfs4_cbinfo_t *cbp)
 	if (err = clnt_tli_kcreate(&knc, &nb, cbp->cb_callback.cb_program,
 	    NFS_CB, 0, 0, curthread->t_cred, &ch)) {
 
-		NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-			"rfs4_cbch_init: clnt_tli_kcreate failed %d\n", err));
 		ch = NULL;
 	}
 
@@ -579,10 +549,6 @@ static void
 rfs4_cb_chflush(rfs4_cbinfo_t *cbp)
 {
 	CLIENT *ch;
-
-	NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-		"rfs4_cb_flush: enter cbp->%p, cb_chc_free=%d\n",
-		(void *)cbp, cbp->cb_chc_free));
 
 	while (cbp->cb_chc_free) {
 		cbp->cb_chc_free--;
@@ -606,18 +572,11 @@ rfs4_cb_getch(rfs4_cbinfo_t *cbp)
 	CLIENT *cbch = NULL;
 	uint32_t zilch = 0;
 
-	NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-		"rfs4_cb_getch: enter cbp->%p, cb_chc_free=%d\n",
-		(void *)cbp, cbp->cb_chc_free));
-
 	mutex_enter(cbp->cb_lock);
 
 	if (cbp->cb_chc_free) {
 		cbp->cb_chc_free--;
 		cbch = cbp->cb_chc[ cbp->cb_chc_free ];
-		NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-			"rfs4_cb_getch: cb_chc_free=%d ch->%p\n",
-			cbp->cb_chc_free, (void *)cbch));
 		mutex_exit(cbp->cb_lock);
 		(void) CLNT_CONTROL(cbch, CLSET_XID, (char *)&zilch);
 		return (cbch);
@@ -625,14 +584,8 @@ rfs4_cb_getch(rfs4_cbinfo_t *cbp)
 
 	mutex_exit(cbp->cb_lock);
 
-	NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-		"rfs4_cb_getch: calling rfs4_cbch_init\n"));
-
 	/* none free so make it now */
 	cbch = rfs4_cbch_init(cbp);
-
-	NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-		"rfs4_cb_getch: returning cbch->%p\n", (void *)cbch));
 
 	return (cbch);
 }
@@ -651,17 +604,10 @@ rfs4_cb_freech(rfs4_cbinfo_t *cbp, CLIENT *ch, bool_t lockheld)
 		cbp->cb_chc[ cbp->cb_chc_free++ ] = ch;
 		if (lockheld == FALSE)
 			mutex_exit(cbp->cb_lock);
-		NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-		    "rfs4_cb_freech: caching cbp->%p, ch->%p, cb_chc_free=%d\n",
-			(void *)cbp, (void *)ch, cbp->cb_chc_free));
 		return;
 	}
 	if (lockheld == FALSE)
 		mutex_exit(cbp->cb_lock);
-
-	NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-		"rfs4_cb_freech: destroying cbp->%p, ch->%p, cb_chc_free=%d\n",
-		(void *)cbp, (void *)ch, cbp->cb_chc_free));
 
 	/*
 	 * cache maxed out of free entries, obliterate
@@ -740,7 +686,7 @@ rfs4_deleg_cb_check(rfs4_client_t *cp)
 	rfs4_dbe_hold(cp->dbe); /* hold the client struct for thread */
 
 	(void) thread_create(NULL, 0, rfs4_do_cb_null, cp, 0, &p0, TS_RUN,
-			    minclsyspri);
+	    minclsyspri);
 }
 
 static void
@@ -787,8 +733,6 @@ rfs4freeargres(CB_COMPOUND4args *args, CB_COMPOUND4res *resp)
 			break;
 
 		default:
-			NFS4_DEBUG(rfs4_deleg_debug, (CE_NOTE,
-				"rfs4freeargres: unknown op"));
 			return;
 		}
 	}
@@ -816,9 +760,6 @@ rfs4_do_callback(rfs4_client_t	*cp, CB_COMPOUND4args *args,
 	res->tag.utf8string_val = NULL;
 	res->array = NULL;
 
-	NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-		"rfs4_do_callback: enter cp->%p\n", (void *)cp));
-
 retry:
 	cbp = rfs4_cbinfo_hold(cp);
 	if (cbp == NULL)
@@ -833,16 +774,12 @@ retry:
 		args->callback_ident = cbp->cb_ident;
 
 		stat = clnt_call(ch, CB_COMPOUND, xdr_CB_COMPOUND4args_srv,
-			(caddr_t)args, xdr_CB_COMPOUND4res,
-			(caddr_t)res, timeout);
+		    (caddr_t)args, xdr_CB_COMPOUND4res,
+		    (caddr_t)res, timeout);
 
 		/* free client handle */
 		rfs4_cb_freech(cbp, ch, FALSE);
 	}
-
-	NFS4_DEBUG(rfs4_cb_debug, (CE_NOTE,
-		"rfs4_do_callback: exit with RPC status %d, %s",
-		stat, clnt_sperrno(stat)));
 
 	/*
 	 * If the rele says that there may be new callback info then
@@ -850,7 +787,7 @@ retry:
 	 * new callback path
 	 */
 	if (rfs4_cbinfo_rele(cbp,
-		(stat == RPC_SUCCESS ? CB_NOCHANGE : CB_FAILED)) == TRUE)
+	    (stat == RPC_SUCCESS ? CB_NOCHANGE : CB_FAILED)) == TRUE)
 		goto retry;
 
 	return (stat);
@@ -909,7 +846,6 @@ rfs4_do_cb_recall(rfs4_deleg_state_t *dsp, bool_t trunc)
 	nfs_fh4			*fhp;
 	enum clnt_stat		call_stat;
 
-	NFS4_DEBUG(rfs4_deleg_debug, (CE_NOTE, "rfs4_do_cb_recall: enter"));
 	/*
 	 * set up the compound args
 	 */
@@ -934,7 +870,7 @@ rfs4_do_cb_recall(rfs4_deleg_state_t *dsp, bool_t trunc)
 
 	fhp = &dsp->finfo->filehandle;
 	rec_argp->fh.nfs_fh4_val = kmem_alloc(sizeof (char) *
-					    fhp->nfs_fh4_len, KM_SLEEP);
+	    fhp->nfs_fh4_len, KM_SLEEP);
 	nfs_fh4_copy(fhp, &rec_argp->fh);
 
 	/* Keep track of when we did this for observability */
@@ -947,14 +883,10 @@ rfs4_do_cb_recall(rfs4_deleg_state_t *dsp, bool_t trunc)
 	timeout.tv_sec = (rfs4_lease_time * 80) / 100;
 	timeout.tv_usec = 0;
 
-	call_stat = rfs4_do_callback(dsp->client, &cb4_args,
-		&cb4_res, timeout);
+	call_stat = rfs4_do_callback(dsp->client, &cb4_args, &cb4_res, timeout);
 
 	if (call_stat != RPC_SUCCESS || cb4_res.status != NFS4_OK) {
 		rfs4_revoke_deleg(dsp);
-		NFS4_DEBUG(rfs4_deleg_debug, (CE_NOTE,
-			"rfs4_do_cb_recall: rpcstat=%d cbstat=%d ",
-			call_stat, cb4_res.status));
 	}
 
 	rfs4freeargres(&cb4_args, &cb4_res);
@@ -984,9 +916,10 @@ do_recall(struct recall_arg *arg)
 	 * recall callback.
 	 */
 	if (dsp->dtype != OPEN_DELEGATE_NONE) {
-		NFS4_DEBUG(rfs4_deleg_debug,
-		    (CE_NOTE, "recall = %p, state = %p, fp = %p trunc = %d",
-		    (void*)arg->recall, (void*)dsp, (void*)fp, arg->trunc));
+		DTRACE_PROBE3(nfss__i__recall,
+		    struct recall_arg *, arg,
+		    struct rfs4_deleg_state_t *, dsp,
+		    struct rfs4_file_t *, fp);
 
 		if (arg->recall)
 			(void) (*arg->recall)(dsp, arg->trunc);
@@ -1030,34 +963,51 @@ do_recall_file(struct master_recall_args *map)
 	int32_t recall_count;
 
 	rfs4_dbe_lock(fp->dbe);
-	/* Recall already in progress */
+
+	/* Recall already in progress ? */
+	mutex_enter(fp->dinfo->recall_lock);
 	if (fp->dinfo->recall_count != 0) {
+		mutex_exit(fp->dinfo->recall_lock);
 		rfs4_dbe_rele_nolock(fp->dbe);
 		rfs4_dbe_unlock(fp->dbe);
 		kmem_free(map, sizeof (struct master_recall_args));
 		return;
 	}
 
+	mutex_exit(fp->dinfo->recall_lock);
+
 	mutex_init(&cpr_lock, NULL, MUTEX_DEFAULT, NULL);
-	CALLB_CPR_INIT(&cpr_info, &cpr_lock, callb_generic_cpr,
-			"nfsv4RecallFile");
+	CALLB_CPR_INIT(&cpr_info, &cpr_lock, callb_generic_cpr,	"v4RecallFile");
 
 	recall_count = 0;
 	for (dsp = fp->delegationlist.next->dsp; dsp != NULL;
-		dsp = dsp->delegationlist.next->dsp) {
+	    dsp = dsp->delegationlist.next->dsp) {
+
+		rfs4_dbe_lock(dsp->dbe);
+		/*
+		 * if this delegation state
+		 * is being reaped skip it
+		 */
+		if (rfs4_dbe_is_invalid(dsp->dbe)) {
+			rfs4_dbe_unlock(dsp->dbe);
+			continue;
+		}
+
+		/* hold for receiving thread */
+		rfs4_dbe_hold(dsp->dbe);
+		rfs4_dbe_unlock(dsp->dbe);
+
 		arg = kmem_alloc(sizeof (struct recall_arg), KM_SLEEP);
 		arg->recall = map->recall;
 		arg->trunc = map->trunc;
-
-		rfs4_dbe_hold(dsp->dbe);	/* hold for receiving thread */
-
 		arg->dsp = dsp;
 
 		recall_count++;
 
 		(void) thread_create(NULL, 0, do_recall, arg, 0, &p0, TS_RUN,
-				    minclsyspri);
+		    minclsyspri);
 	}
+
 	rfs4_dbe_unlock(fp->dbe);
 
 	mutex_enter(fp->dinfo->recall_lock);
@@ -1073,8 +1023,7 @@ do_recall_file(struct master_recall_args *map)
 
 	mutex_exit(fp->dinfo->recall_lock);
 
-	NFS4_DEBUG(rfs4_deleg_debug, (CE_NOTE, "Recall complete for %p",
-		    (void*)fp));
+	DTRACE_PROBE1(nfss__i__recall_done, rfs4_file_t *, fp);
 	rfs4_file_rele(fp);
 	kmem_free(map, sizeof (struct master_recall_args));
 	mutex_enter(&cpr_lock);
@@ -1116,7 +1065,7 @@ rfs4_recall_file(rfs4_file_t *fp,
 	args->trunc = trunc;
 
 	(void) thread_create(NULL, 0, do_recall_file, args, 0, &p0, TS_RUN,
-			    minclsyspri);
+	    minclsyspri);
 }
 
 void
@@ -1129,7 +1078,7 @@ rfs4_recall_deleg(rfs4_file_t *fp, bool_t trunc, rfs4_client_t *cp)
 		elapsed2 = gethrestime_sec() - fp->dinfo->time_lastwrite;
 		/* First check to see if a revocation should occur */
 		if (elapsed1 > rfs4_lease_time &&
-			elapsed2 > rfs4_lease_time) {
+		    elapsed2 > rfs4_lease_time) {
 			rfs4_revoke_file(fp);
 			return;
 		}
@@ -1219,7 +1168,7 @@ rfs4_check_delegation(rfs4_state_t *sp, rfs4_file_t *fp)
 		 * access to others, return a read delegation.
 		 */
 		if ((access & ~OPEN4_SHARE_ACCESS_WRITE) ||
-			(deny & ~OPEN4_SHARE_DENY_READ))
+		    (deny & ~OPEN4_SHARE_DENY_READ))
 			return (OPEN_DELEGATE_READ);
 
 		/* Shouldn't get here */
@@ -1234,7 +1183,7 @@ rfs4_check_delegation(rfs4_state_t *sp, rfs4_file_t *fp)
 		 */
 		if ((access & OPEN4_SHARE_ACCESS_WRITE) ||
 		    (deny & OPEN4_SHARE_DENY_READ))
-		    return (OPEN_DELEGATE_NONE);
+			return (OPEN_DELEGATE_NONE);
 		return (OPEN_DELEGATE_READ);
 
 	case OPEN_DELEGATE_WRITE:
@@ -1278,7 +1227,7 @@ rfs4_delegation_policy(open_delegation_type4 dtype,
 
 	/* Limit the number of read grants */
 	if (dtype == OPEN_DELEGATE_READ &&
-		dinfo->rdgrants > MAX_READ_DELEGATIONS)
+	    dinfo->rdgrants > MAX_READ_DELEGATIONS)
 		return (OPEN_DELEGATE_NONE);
 
 	/*
@@ -1319,8 +1268,6 @@ rfs4_grant_delegation(delegreq_t dreq, rfs4_state_t *sp, int *recall)
 
 	/* Don't grant a delegation if a deletion is impending. */
 	if (fp->dinfo->hold_grant > 0) {
-		NFS4_DEBUG(rfs4_deleg_debug,
-			(CE_NOTE, "rfs4_grant_delegation: hold_grant is set"));
 		return (NULL);
 	}
 
@@ -1337,8 +1284,6 @@ rfs4_grant_delegation(delegreq_t dreq, rfs4_state_t *sp, int *recall)
 	 * immediately recalled (if there's a conflict), so we're safe.
 	 */
 	if (lm_vp_active(fp->vp)) {
-		NFS4_DEBUG(rfs4_deleg_debug,
-		    (CE_NOTE, "rfs4_grant_delegation: NLM lock"));
 		return (NULL);
 	}
 
@@ -1398,10 +1343,8 @@ rfs4_grant_delegation(delegreq_t dreq, rfs4_state_t *sp, int *recall)
 		 * actual delegation.
 		 */
 		dtype = rfs4_delegation_policy(dtype, fp->dinfo,
-			sp->owner->client->clientid);
+		    sp->owner->client->clientid);
 
-		NFS4_DEBUG(rfs4_deleg_debug,
-			(CE_NOTE, "Grant policy dtype = %d", dtype));
 		if (dtype == OPEN_DELEGATE_NONE)
 			return (NULL);
 		break;
@@ -1565,7 +1508,7 @@ rfs4_check_delegated(int mode, vnode_t *vp, bool_t trunc)
 		fp = rfs4_findfile(vp, NULL, &create);
 		if (fp != NULL) {
 			if (rfs4_check_delegated_byfp(mode, fp, trunc,
-						TRUE, FALSE, NULL)) {
+			    TRUE, FALSE, NULL)) {
 				rc = TRUE;
 			}
 			rfs4_file_rele(fp);
@@ -1612,8 +1555,8 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 
 	/* Shouldn't happen */
 	if (fp->dinfo->recall_count != 0 ||
-		(fp->dinfo->dtype == OPEN_DELEGATE_READ &&
-			dtype != OPEN_DELEGATE_READ)) {
+	    (fp->dinfo->dtype == OPEN_DELEGATE_READ &&
+	    dtype != OPEN_DELEGATE_READ)) {
 		return (NULL);
 	}
 
@@ -1655,9 +1598,9 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 	 * client
 	 */
 	if (fp->dinfo->recall_count != 0 ||
-		fp->dinfo->dtype == OPEN_DELEGATE_WRITE ||
-		(fp->dinfo->dtype == OPEN_DELEGATE_READ &&
-			dtype != OPEN_DELEGATE_READ)) {
+	    fp->dinfo->dtype == OPEN_DELEGATE_WRITE ||
+	    (fp->dinfo->dtype == OPEN_DELEGATE_READ &&
+	    dtype != OPEN_DELEGATE_READ)) {
 		rfs4_deleg_state_rele(dsp);
 		return (NULL);
 	}
@@ -1680,13 +1623,13 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 			}
 		}
 		(void) fem_install(vp, deleg_rdops, (void *)fp, OPUNIQ,
-				rfs4_mon_hold, rfs4_mon_rele);
+		    rfs4_mon_hold, rfs4_mon_rele);
 		if (vn_is_opened(vp, V_WRITE) || vn_is_mapped(vp, V_WRITE)) {
 			if (open_prev) {
 				*recall = 1;
 			} else {
 				(void) fem_uninstall(vp, deleg_rdops,
-						    (void *)fp);
+				    (void *)fp);
 				rfs4_deleg_state_rele(dsp);
 				return (NULL);
 			}
@@ -1701,13 +1644,13 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 			}
 		}
 		(void) fem_install(vp, deleg_wrops, (void *)fp, OPUNIQ,
-				rfs4_mon_hold, rfs4_mon_rele);
+		    rfs4_mon_hold, rfs4_mon_rele);
 		if (vn_is_opened(vp, V_RDORWR) || vn_is_mapped(vp, V_RDORWR)) {
 			if (open_prev) {
 				*recall = 1;
 			} else {
 				(void) fem_uninstall(vp, deleg_wrops,
-							(void *)fp);
+				    (void *)fp);
 				rfs4_deleg_state_rele(dsp);
 				return (NULL);
 			}
@@ -1747,7 +1690,7 @@ rfs4_return_deleg(rfs4_deleg_state_t *dsp, bool_t revoked)
 
 	remque(&dsp->delegationlist);
 	dsp->delegationlist.next = dsp->delegationlist.prev =
-		&dsp->delegationlist;
+	    &dsp->delegationlist;
 
 	if (&fp->delegationlist == fp->delegationlist.next) {
 		dtypewas = fp->dinfo->dtype;
@@ -1758,10 +1701,10 @@ rfs4_return_deleg(rfs4_deleg_state_t *dsp, bool_t revoked)
 		if (fp->vp != NULL) {
 			if (dtypewas == OPEN_DELEGATE_READ)
 				(void) fem_uninstall(fp->vp, deleg_rdops,
-						(void *)fp);
+				    (void *)fp);
 			else
 				(void) fem_uninstall(fp->vp, deleg_wrops,
-						(void *)fp);
+				    (void *)fp);
 		}
 	}
 
@@ -1825,8 +1768,8 @@ rfs4_revoke_file(rfs4_file_t *fp)
 	 * and locking the rfs4_file_t struct on init and end
 	 */
 	for (rfs4_dbe_lock(fp->dbe);
-		&fp->delegationlist != fp->delegationlist.next;
-		rfs4_dbe_lock(fp->dbe)) {
+	    &fp->delegationlist != fp->delegationlist.next;
+	    rfs4_dbe_lock(fp->dbe)) {
 
 		dsp = fp->delegationlist.next->dsp;
 		rfs4_dbe_hold(dsp->dbe);
@@ -1852,18 +1795,10 @@ rfs4_is_deleg(rfs4_state_t *state)
 	rfs4_file_t *fp = state->finfo;
 	rfs4_client_t *cp = state->owner->client;
 
-	NFS4_DEBUG(rfs4_deleg_debug,
-		(CE_NOTE, "rfs4_is_deleg enter: cp = %p", (void*)cp));
-
 	ASSERT(rfs4_dbe_islocked(fp->dbe));
 	for (dsp = fp->delegationlist.next->dsp; dsp != NULL;
-		dsp = dsp->delegationlist.next->dsp) {
-		NFS4_DEBUG(rfs4_deleg_debug,
-			(CE_NOTE, "rfs4_is_deleg: client = %p",
-			(void*)dsp->client));
+	    dsp = dsp->delegationlist.next->dsp) {
 		if (cp != dsp->client) {
-			NFS4_DEBUG(rfs4_deleg_debug,
-				(CE_NOTE, "rfs4_is_deleg is true"));
 			return (TRUE);
 		}
 	}

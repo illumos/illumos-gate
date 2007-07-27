@@ -38,6 +38,7 @@
 #include <nfs/nfssys.h>
 #include <nfs/lm.h>
 #include <sys/pathname.h>
+#include <sys/sdt.h>
 #include <sys/nvpair.h>
 
 
@@ -170,7 +171,7 @@ deep_open_copy(OPEN4res *dres, OPEN4res *sres)
 		break;
 	}
 	dacep->who.utf8string_val =
-		kmem_alloc(sacep->who.utf8string_len, KM_SLEEP);
+	    kmem_alloc(sacep->who.utf8string_len, KM_SLEEP);
 	bcopy(sacep->who.utf8string_val, dacep->who.utf8string_val,
 	    sacep->who.utf8string_len);
 }
@@ -222,11 +223,11 @@ rfs4_copy_reply(nfs_resop4 *dst, nfs_resop4 *src)
 	switch (src->resop) {
 	case OP_LOCK:
 		deep_lock_copy(&dst->nfs_resop4_u.oplock,
-			    &src->nfs_resop4_u.oplock);
+		    &src->nfs_resop4_u.oplock);
 		break;
 	case OP_OPEN:
 		deep_open_copy(&dst->nfs_resop4_u.opopen,
-			    &src->nfs_resop4_u.opopen);
+		    &src->nfs_resop4_u.opopen);
 		break;
 	default:
 		break;
@@ -421,8 +422,8 @@ rfs4_ss_pnalloc(char *dir, char *leaf)
 	 * (account for the '/' and trailing null)
 	 */
 	if ((dir_len = strlen(dir)) > MAXPATHLEN ||
-		(leaf_len = strlen(leaf)) > MAXNAMELEN ||
-		(dir_len + leaf_len + 2) > MAXPATHLEN) {
+	    (leaf_len = strlen(leaf)) > MAXNAMELEN ||
+	    (dir_len + leaf_len + 2) > MAXPATHLEN) {
 		return (NULL);
 	}
 
@@ -514,7 +515,7 @@ rfs4_ss_getstate(vnode_t *dvp, rfs4_ss_pn_t *ss_pn)
 	err = VOP_GETATTR(vp, &va, 0, CRED());
 
 	kill_file = (va.va_size == 0 || va.va_size <
-		(NFS4_VERIFIER_SIZE + sizeof (uint_t)+1));
+	    (NFS4_VERIFIER_SIZE + sizeof (uint_t)+1));
 
 	if (err || kill_file) {
 		VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, NULL);
@@ -657,7 +658,7 @@ rfs4_ss_oldstate(rfs4_oldstate_t *oldstate, char *statedir, char *destdir)
 		 * readdir chunk
 		 */
 		for (dep = (struct dirent64 *)dirt; size > 0;
-			dep = nextdp(dep)) {
+		    dep = nextdp(dep)) {
 
 			size -= dep->d_reclen;
 			dirchunk_offset = dep->d_off;
@@ -676,7 +677,7 @@ rfs4_ss_oldstate(rfs4_oldstate_t *oldstate, char *statedir, char *destdir)
 				if (destdir != NULL) {
 					rfs4_ss_pnfree(ss_pn);
 					cl_ss->ss_pn = rfs4_ss_movestate(
-						statedir, destdir, dep->d_name);
+					    statedir, destdir, dep->d_name);
 				} else {
 					cl_ss->ss_pn = ss_pn;
 				}
@@ -865,7 +866,7 @@ rfs4_ss_chkclid_sip(rfs4_client_t *cp, rfs4_servinst_t *sip)
 	while (osp != os_head) {
 		if (osp->cl_id4.id_len == cp->nfs_client.id_len) {
 			if (bcmp(osp->cl_id4.id_val, cp->nfs_client.id_val,
-					osp->cl_id4.id_len) == 0) {
+			    osp->cl_id4.id_len) == 0) {
 				cp->can_reclaim = 1;
 				break;
 			}
@@ -907,18 +908,18 @@ rfs4_ss_clid(rfs4_client_t *cp, struct svc_req *req)
 	if (ca->sa_family == AF_INET) {
 
 		bcopy(svc_getrpccaller(req->rq_xprt)->buf, &cp->cl_addr,
-			sizeof (struct sockaddr_in));
+		    sizeof (struct sockaddr_in));
 		b = (uchar_t *)&((struct sockaddr_in *)ca)->sin_addr;
 		(void) sprintf(buf, "%03d.%03d.%03d.%03d", b[0] & 0xFF,
-				b[1] & 0xFF, b[2] & 0xFF, b[3] & 0xFF);
+		    b[1] & 0xFF, b[2] & 0xFF, b[3] & 0xFF);
 	} else if (ca->sa_family == AF_INET6) {
 		struct sockaddr_in6 *sin6;
 
 		sin6 = (struct sockaddr_in6 *)ca;
 		bcopy(svc_getrpccaller(req->rq_xprt)->buf, &cp->cl_addr,
-				sizeof (struct sockaddr_in6));
+		    sizeof (struct sockaddr_in6));
 		(void) kinet_ntop6((uchar_t *)&sin6->sin6_addr,
-				buf, INET6_ADDRSTRLEN);
+		    buf, INET6_ADDRSTRLEN);
 	}
 
 	(void) snprintf(leaf, MAXNAMELEN, "%s-%llx", buf,
@@ -993,7 +994,7 @@ rfs4_ss_clid_write_one(rfs4_client_t *cp, char *dss_path, char *leaf)
 		return;
 
 	if (vn_open(ss_pn->pn, UIO_SYSSPACE, FCREAT|FWRITE, 0600, &vp,
-			    CRCREAT, 0)) {
+	    CRCREAT, 0)) {
 		rfs4_ss_pnfree(ss_pn);
 		return;
 	}
@@ -1035,7 +1036,7 @@ rfs4_ss_clid_write_one(rfs4_client_t *cp, char *dss_path, char *leaf)
 	uio.uio_segflg = UIO_SYSSPACE;
 	uio.uio_llimit = (rlim64_t)MAXOFFSET_T;
 	uio.uio_resid = cl_id4->id_len + sizeof (int) +
-		NFS4_VERIFIER_SIZE + sizeof (uint_t);
+	    NFS4_VERIFIER_SIZE + sizeof (uint_t);
 
 	ioflag = uio.uio_fmode = (FWRITE|FSYNC);
 	uio.uio_extflg = UIO_COPY_DEFAULT;
@@ -1238,141 +1239,151 @@ rfs4_state_init()
 	/* Now create the individual tables */
 	rfs4_client_cache_time *= rfs4_lease_time;
 	rfs4_client_tab = rfs4_table_create(rfs4_server_state,
-					    "Client",
-					    rfs4_client_cache_time,
-					    2,
-					    rfs4_client_create,
-					    rfs4_client_destroy,
-					    rfs4_client_expiry,
-					    sizeof (rfs4_client_t),
-					    TABSIZE,
-					    MAXTABSZ/8, 100);
+	    "Client",
+	    rfs4_client_cache_time,
+	    2,
+	    rfs4_client_create,
+	    rfs4_client_destroy,
+	    rfs4_client_expiry,
+	    sizeof (rfs4_client_t),
+	    TABSIZE,
+	    MAXTABSZ/8, 100);
 	rfs4_nfsclnt_idx = rfs4_index_create(rfs4_client_tab,
-					    "nfs_client_id4", nfsclnt_hash,
-					    nfsclnt_compare, nfsclnt_mkkey,
-					    TRUE);
+	    "nfs_client_id4", nfsclnt_hash,
+	    nfsclnt_compare, nfsclnt_mkkey,
+	    TRUE);
 	rfs4_clientid_idx = rfs4_index_create(rfs4_client_tab,
-					    "client_id", clientid_hash,
-					    clientid_compare, clientid_mkkey,
-					    FALSE);
+	    "client_id", clientid_hash,
+	    clientid_compare, clientid_mkkey,
+	    FALSE);
 
 	rfs4_openowner_cache_time *= rfs4_lease_time;
 	rfs4_openowner_tab = rfs4_table_create(rfs4_server_state,
-					    "OpenOwner",
-					    rfs4_openowner_cache_time,
-					    1,
-					    rfs4_openowner_create,
-					    rfs4_openowner_destroy,
-					    rfs4_openowner_expiry,
-					    sizeof (rfs4_openowner_t),
-					    TABSIZE,
-					    MAXTABSZ, 100);
+	    "OpenOwner",
+	    rfs4_openowner_cache_time,
+	    1,
+	    rfs4_openowner_create,
+	    rfs4_openowner_destroy,
+	    rfs4_openowner_expiry,
+	    sizeof (rfs4_openowner_t),
+	    TABSIZE,
+	    MAXTABSZ, 100);
 	rfs4_openowner_idx = rfs4_index_create(rfs4_openowner_tab,
-					    "open_owner4", openowner_hash,
-					    openowner_compare,
-					    openowner_mkkey, TRUE);
+	    "open_owner4", openowner_hash,
+	    openowner_compare,
+	    openowner_mkkey, TRUE);
 
 	rfs4_state_cache_time *= rfs4_lease_time;
 	rfs4_state_tab = rfs4_table_create(rfs4_server_state,
-					"OpenStateID",
-					rfs4_state_cache_time,
-					3,
-					rfs4_state_create,
-					rfs4_state_destroy,
-					rfs4_state_expiry,
-					sizeof (rfs4_state_t),
-					TABSIZE,
-					MAXTABSZ, 100);
+	    "OpenStateID",
+	    rfs4_state_cache_time,
+	    3,
+	    rfs4_state_create,
+	    rfs4_state_destroy,
+	    rfs4_state_expiry,
+	    sizeof (rfs4_state_t),
+	    TABSIZE,
+	    MAXTABSZ, 100);
+
 	rfs4_state_owner_file_idx = rfs4_index_create(rfs4_state_tab,
-						"Openowner-File",
-						state_owner_file_hash,
-						state_owner_file_compare,
-						state_owner_file_mkkey, TRUE);
+	    "Openowner-File",
+	    state_owner_file_hash,
+	    state_owner_file_compare,
+	    state_owner_file_mkkey, TRUE);
+
 	rfs4_state_idx = rfs4_index_create(rfs4_state_tab,
-					"State-id", state_hash,
-					state_compare, state_mkkey, FALSE);
+	    "State-id", state_hash,
+	    state_compare, state_mkkey, FALSE);
+
 	rfs4_state_file_idx = rfs4_index_create(rfs4_state_tab,
-					"File", state_file_hash,
-					state_file_compare, state_file_mkkey,
-					FALSE);
+	    "File", state_file_hash,
+	    state_file_compare, state_file_mkkey,
+	    FALSE);
 
 	rfs4_lo_state_cache_time *= rfs4_lease_time;
 	rfs4_lo_state_tab = rfs4_table_create(rfs4_server_state,
-					    "LockStateID",
-					    rfs4_lo_state_cache_time,
-					    2,
-					    rfs4_lo_state_create,
-					    rfs4_lo_state_destroy,
-					    rfs4_lo_state_expiry,
-					    sizeof (rfs4_lo_state_t),
-					    TABSIZE,
-					    MAXTABSZ, 100);
+	    "LockStateID",
+	    rfs4_lo_state_cache_time,
+	    2,
+	    rfs4_lo_state_create,
+	    rfs4_lo_state_destroy,
+	    rfs4_lo_state_expiry,
+	    sizeof (rfs4_lo_state_t),
+	    TABSIZE,
+	    MAXTABSZ, 100);
+
 	rfs4_lo_state_owner_idx = rfs4_index_create(rfs4_lo_state_tab,
-						    "lockownerxstate",
-						    lo_state_lo_hash,
-						    lo_state_lo_compare,
-						    lo_state_lo_mkkey, TRUE);
+	    "lockownerxstate",
+	    lo_state_lo_hash,
+	    lo_state_lo_compare,
+	    lo_state_lo_mkkey, TRUE);
+
 	rfs4_lo_state_idx = rfs4_index_create(rfs4_lo_state_tab,
-					    "State-id",
-					    lo_state_hash, lo_state_compare,
-					    lo_state_mkkey, FALSE);
+	    "State-id",
+	    lo_state_hash, lo_state_compare,
+	    lo_state_mkkey, FALSE);
 
 	rfs4_lockowner_cache_time *= rfs4_lease_time;
+
 	rfs4_lockowner_tab = rfs4_table_create(rfs4_server_state,
-					    "Lockowner",
-					    rfs4_lockowner_cache_time,
-					    2,
-					    rfs4_lockowner_create,
-					    rfs4_lockowner_destroy,
-					    rfs4_lockowner_expiry,
-					    sizeof (rfs4_lockowner_t),
-					    TABSIZE,
-					    MAXTABSZ, 100);
+	    "Lockowner",
+	    rfs4_lockowner_cache_time,
+	    2,
+	    rfs4_lockowner_create,
+	    rfs4_lockowner_destroy,
+	    rfs4_lockowner_expiry,
+	    sizeof (rfs4_lockowner_t),
+	    TABSIZE,
+	    MAXTABSZ, 100);
+
 	rfs4_lockowner_idx = rfs4_index_create(rfs4_lockowner_tab,
-					    "lock_owner4", lockowner_hash,
-					    lockowner_compare,
-					    lockowner_mkkey, TRUE);
+	    "lock_owner4", lockowner_hash,
+	    lockowner_compare,
+	    lockowner_mkkey, TRUE);
+
 	rfs4_lockowner_pid_idx = rfs4_index_create(rfs4_lockowner_tab,
-						"pid", pid_hash,
-						pid_compare, pid_mkkey,
-						FALSE);
+	    "pid", pid_hash,
+	    pid_compare, pid_mkkey,
+	    FALSE);
 
 	rfs4_file_cache_time *= rfs4_lease_time;
 	rfs4_file_tab = rfs4_table_create(rfs4_server_state,
-					"File",
-					rfs4_file_cache_time,
-					1,
-					rfs4_file_create,
-					rfs4_file_destroy,
-					NULL,
-					sizeof (rfs4_file_t),
-					TABSIZE,
-					MAXTABSZ, -1);
+	    "File",
+	    rfs4_file_cache_time,
+	    1,
+	    rfs4_file_create,
+	    rfs4_file_destroy,
+	    NULL,
+	    sizeof (rfs4_file_t),
+	    TABSIZE,
+	    MAXTABSZ, -1);
+
 	rfs4_file_idx = rfs4_index_create(rfs4_file_tab,
-					"Filehandle", file_hash,
-					file_compare, file_mkkey, TRUE);
+	    "Filehandle", file_hash,
+	    file_compare, file_mkkey, TRUE);
 
 	rfs4_deleg_state_cache_time *= rfs4_lease_time;
 	rfs4_deleg_state_tab = rfs4_table_create(rfs4_server_state,
-					"DelegStateID",
-					rfs4_deleg_state_cache_time,
-					2,
-					rfs4_deleg_state_create,
-					rfs4_deleg_state_destroy,
-					rfs4_deleg_state_expiry,
-					sizeof (rfs4_deleg_state_t),
-					TABSIZE,
-					MAXTABSZ, 100);
+	    "DelegStateID",
+	    rfs4_deleg_state_cache_time,
+	    2,
+	    rfs4_deleg_state_create,
+	    rfs4_deleg_state_destroy,
+	    rfs4_deleg_state_expiry,
+	    sizeof (rfs4_deleg_state_t),
+	    TABSIZE,
+	    MAXTABSZ, 100);
 	rfs4_deleg_idx = rfs4_index_create(rfs4_deleg_state_tab,
-						"DelegByFileClient",
-						deleg_hash,
-						deleg_compare,
-						deleg_mkkey, TRUE);
+	    "DelegByFileClient",
+	    deleg_hash,
+	    deleg_compare,
+	    deleg_mkkey, TRUE);
+
 	rfs4_deleg_state_idx = rfs4_index_create(rfs4_deleg_state_tab,
-						"DelegState",
-						deleg_state_hash,
-						deleg_state_compare,
-						deleg_state_mkkey, FALSE);
+	    "DelegState",
+	    deleg_state_hash,
+	    deleg_state_compare,
+	    deleg_state_mkkey, FALSE);
 
 	/*
 	 * Init the stable storage.
@@ -1517,7 +1528,7 @@ nfsclnt_compare(rfs4_entry_t entry, void *key)
 		return (FALSE);
 
 	return (bcmp(client->nfs_client.id_val, nfs_client->id_val,
-						nfs_client->id_len) == 0);
+	    nfs_client->id_len) == 0);
 }
 
 static void *
@@ -1543,8 +1554,8 @@ rfs4_client_expiry(rfs4_entry_t u_entry)
 	 * has exceeded its lease period.
 	 */
 	cp_expired = (cp->forced_expire ||
-		(gethrestime_sec() - cp->last_access
-			> rfs4_lease_time));
+	    (gethrestime_sec() - cp->last_access
+	    > rfs4_lease_time));
 
 	if (!cp->ss_remove && cp_expired)
 		cp->ss_remove = 1;
@@ -1667,7 +1678,7 @@ rfs4_client_create(rfs4_entry_t u_entry, void *arg)
 	cp->sysidt = LM_NOSYSID;
 
 	cp->clientdeleglist.next = cp->clientdeleglist.prev =
-		&cp->clientdeleglist;
+	    &cp->clientdeleglist;
 	cp->clientdeleglist.dsp = NULL;
 
 	/* set up the callback control structure */
@@ -1723,7 +1734,7 @@ rfs4_findclient(nfs_client_id4 *client, bool_t *create,	rfs4_client_t *oldcp)
 	}
 
 	cp = (rfs4_client_t *)rfs4_dbsearch(rfs4_nfsclnt_idx, client,
-					create, (void *)client, RFS4_DBS_VALID);
+	    create, (void *)client, RFS4_DBS_VALID);
 
 	if (oldcp)
 		rfs4_dbe_unhide(oldcp->dbe);
@@ -1747,7 +1758,7 @@ rfs4_findclient_by_id(clientid4 clientid, bool_t find_unconfirmed)
 	rw_enter(&rfs4_findclient_lock, RW_READER);
 
 	cp = (rfs4_client_t *)rfs4_dbsearch(rfs4_clientid_idx, &clientid,
-					&create, NULL, RFS4_DBS_VALID);
+	    &create, NULL, RFS4_DBS_VALID);
 
 	rw_exit(&rfs4_findclient_lock);
 
@@ -1858,7 +1869,7 @@ rfs4_openowner_expiry(rfs4_entry_t u_entry)
 	if (rfs4_dbe_is_invalid(op->dbe))
 		return (TRUE);
 	return ((gethrestime_sec() - op->client->last_access
-		> rfs4_lease_time));
+	    > rfs4_lease_time));
 }
 
 static void
@@ -1912,8 +1923,8 @@ rfs4_openowner_create(rfs4_entry_t u_entry, void *arg)
 	rw_enter(&rfs4_findclient_lock, RW_READER);
 
 	cp = (rfs4_client_t *)rfs4_dbsearch(rfs4_clientid_idx,
-					&openowner->clientid,
-					&create, NULL, RFS4_DBS_VALID);
+	    &openowner->clientid,
+	    &create, NULL, RFS4_DBS_VALID);
 
 	rw_exit(&rfs4_findclient_lock);
 
@@ -1925,9 +1936,11 @@ rfs4_openowner_create(rfs4_entry_t u_entry, void *arg)
 
 	op->owner.clientid = openowner->clientid;
 	op->owner.owner_val =
-		kmem_alloc(openowner->owner_len, KM_SLEEP);
+	    kmem_alloc(openowner->owner_len, KM_SLEEP);
+
 	bcopy(openowner->owner_val,
 	    op->owner.owner_val, openowner->owner_len);
+
 	op->owner.owner_len = openowner->owner_len;
 
 	op->need_confirm = TRUE;
@@ -1963,7 +1976,7 @@ rfs4_findopenowner(open_owner4 *openowner, bool_t *create, seqid4 seqid)
 	arg.owner = *openowner;
 	arg.open_seqid = seqid;
 	op = (rfs4_openowner_t *)rfs4_dbsearch(rfs4_openowner_idx, openowner,
-					    create, &arg, RFS4_DBS_VALID);
+	    create, &arg, RFS4_DBS_VALID);
 
 	return (op);
 }
@@ -1994,12 +2007,12 @@ rfs4_update_open_resp(rfs4_openowner_t *op, nfs_resop4 *resp, nfs_fh4 *fh)
 	    fh && fh->nfs_fh4_len) {
 		if (op->reply_fh.nfs_fh4_val == NULL)
 			op->reply_fh.nfs_fh4_val =
-				kmem_alloc(fh->nfs_fh4_len, KM_SLEEP);
+			    kmem_alloc(fh->nfs_fh4_len, KM_SLEEP);
 		nfs_fh4_copy(fh, &op->reply_fh);
 	} else {
 		if (op->reply_fh.nfs_fh4_val) {
 			kmem_free(op->reply_fh.nfs_fh4_val,
-				op->reply_fh.nfs_fh4_len);
+			    op->reply_fh.nfs_fh4_len);
 			op->reply_fh.nfs_fh4_val = NULL;
 			op->reply_fh.nfs_fh4_len = 0;
 		}
@@ -2021,7 +2034,7 @@ lockowner_compare(rfs4_entry_t u_entry, void *key)
 		return (FALSE);
 
 	return (bcmp(lo->owner.owner_val, b->owner_val,
-					lo->owner.owner_len) == 0);
+	    lo->owner.owner_len) == 0);
 }
 
 void *
@@ -2109,8 +2122,8 @@ rfs4_lockowner_create(rfs4_entry_t u_entry, void *arg)
 	rw_enter(&rfs4_findclient_lock, RW_READER);
 
 	cp = (rfs4_client_t *)rfs4_dbsearch(rfs4_clientid_idx,
-					&lockowner->clientid,
-					&create, NULL, RFS4_DBS_VALID);
+	    &lockowner->clientid,
+	    &create, NULL, RFS4_DBS_VALID);
 
 	rw_exit(&rfs4_findclient_lock);
 
@@ -2134,7 +2147,7 @@ rfs4_findlockowner(lock_owner4 *lockowner, bool_t *create)
 	rfs4_lockowner_t *lo;
 
 	lo = (rfs4_lockowner_t *)rfs4_dbsearch(rfs4_lockowner_idx, lockowner,
-					    create, lockowner, RFS4_DBS_VALID);
+	    create, lockowner, RFS4_DBS_VALID);
 
 	return (lo);
 }
@@ -2146,7 +2159,7 @@ rfs4_findlockowner_by_pid(pid_t pid)
 	bool_t create = FALSE;
 
 	lo = (rfs4_lockowner_t *)rfs4_dbsearch(rfs4_lockowner_pid_idx,
-		(void *)(uintptr_t)pid, &create, NULL, RFS4_DBS_VALID);
+	    (void *)(uintptr_t)pid, &create, NULL, RFS4_DBS_VALID);
 
 	return (lo);
 }
@@ -2182,7 +2195,7 @@ rfs4_file_destroy(rfs4_entry_t u_entry)
 	ASSERT(fp->delegationlist.next == &fp->delegationlist);
 	if (fp->filehandle.nfs_fh4_val)
 		kmem_free(fp->filehandle.nfs_fh4_val,
-			fp->filehandle.nfs_fh4_len);
+		    fp->filehandle.nfs_fh4_len);
 	cv_destroy(fp->dinfo->recall_cv);
 	if (fp->vp) {
 		VN_RELE(fp->vp);
@@ -2231,14 +2244,14 @@ rfs4_file_create(rfs4_entry_t u_entry, void *arg)
 	ASSERT(fh && fh->nfs_fh4_len);
 	if (fh && fh->nfs_fh4_len) {
 		fp->filehandle.nfs_fh4_val =
-			kmem_alloc(fh->nfs_fh4_len, KM_SLEEP);
+		    kmem_alloc(fh->nfs_fh4_len, KM_SLEEP);
 		nfs_fh4_copy(fh, &fp->filehandle);
 	}
 	fp->vp = vp;
 
 	/* Init list for remque/insque */
 	fp->delegationlist.next = fp->delegationlist.prev =
-		&fp->delegationlist;
+	    &fp->delegationlist;
 	fp->delegationlist.dsp = NULL; /* NULL since this is state list */
 
 	fp->share_deny = fp->share_access = fp->access_read = 0;
@@ -2264,7 +2277,7 @@ rfs4_findfile(vnode_t *vp, nfs_fh4 *fh, bool_t *create)
 	arg.fh = fh;
 
 	fp = (rfs4_file_t *)rfs4_dbsearch(rfs4_file_idx, vp, create,
-					&arg, RFS4_DBS_VALID);
+	    &arg, RFS4_DBS_VALID);
 	return (fp);
 }
 
@@ -2288,7 +2301,7 @@ retry:
 	arg.fh = fh;
 
 	fp = (rfs4_file_t *)rfs4_dbsearch(rfs4_file_idx, vp, create,
-					&arg, RFS4_DBS_VALID);
+	    &arg, RFS4_DBS_VALID);
 	if (fp != NULL) {
 		rw_enter(&fp->file_rwlock, RW_WRITER);
 		if (fp->vp == NULL) {
@@ -2343,7 +2356,7 @@ rfs4_lo_state_expiry(rfs4_entry_t u_entry)
 	if (lsp->state->closed)
 		return (TRUE);
 	return ((gethrestime_sec() - lsp->state->owner->client->last_access
-		> rfs4_lease_time));
+	    > rfs4_lease_time));
 }
 
 static void
@@ -2369,9 +2382,8 @@ rfs4_lo_state_destroy(rfs4_entry_t u_entry)
 				 * This PxFS routine removes file locks for a
 				 * client over all nodes of a cluster.
 				 */
-				NFS4_DEBUG(rfs4_debug, (CE_NOTE,
-				    "lm_remove_file_locks(sysid=0x%x)\n",
-				    new_sysid));
+				DTRACE_PROBE1(nfss_i_clust_rm_lck,
+				    int, new_sysid);
 				(*lm_remove_file_locks)(new_sysid);
 			} else {
 				(void) cleanlocks(lsp->state->finfo->vp,
@@ -2385,7 +2397,7 @@ rfs4_lo_state_destroy(rfs4_entry_t u_entry)
 
 	remque(&lsp->lockownerlist);
 	lsp->lockownerlist.next = lsp->lockownerlist.prev =
-		&lsp->lockownerlist;
+	    &lsp->lockownerlist;
 
 	rfs4_dbe_unlock(lsp->state->dbe);
 
@@ -2424,7 +2436,7 @@ rfs4_lo_state_create(rfs4_entry_t u_entry, void *arg)
 	lsp->locker = lo;
 
 	lsp->lockownerlist.next = lsp->lockownerlist.prev =
-		&lsp->lockownerlist;
+	    &lsp->lockownerlist;
 	lsp->lockownerlist.lsp = lsp;
 
 	rfs4_dbe_lock(sp->dbe);
@@ -2453,7 +2465,7 @@ rfs4_findlo_state(stateid_t *id, bool_t lock_fp)
 	bool_t create = FALSE;
 
 	lsp = (rfs4_lo_state_t *)rfs4_dbsearch(rfs4_lo_state_idx, id,
-					    &create, NULL, RFS4_DBS_VALID);
+	    &create, NULL, RFS4_DBS_VALID);
 	if (lock_fp == TRUE && lsp != NULL)
 		rw_enter(&lsp->state->finfo->file_rwlock, RW_READER);
 
@@ -2495,7 +2507,7 @@ rfs4_findlo_state_by_owner(rfs4_lockowner_t *lo,
 	arg.state = sp;
 
 	lsp = (rfs4_lo_state_t *)rfs4_dbsearch(rfs4_lo_state_owner_idx, &arg,
-					    create, &arg, RFS4_DBS_VALID);
+	    create, &arg, RFS4_DBS_VALID);
 
 	return (lsp);
 }
@@ -2701,9 +2713,14 @@ rfs4_deleg_state_expiry(rfs4_entry_t u_entry)
 
 	if (rfs4_dbe_is_invalid(dsp->dbe))
 		return (TRUE);
-	return ((gethrestime_sec() - dsp->client->last_access
-		> rfs4_lease_time));
 
+	if ((gethrestime_sec() - dsp->client->last_access
+	    > rfs4_lease_time)) {
+		rfs4_dbe_invalidate(dsp->dbe);
+		return (TRUE);
+	}
+
+	return (FALSE);
 }
 
 static bool_t
@@ -2727,11 +2744,11 @@ rfs4_deleg_state_create(rfs4_entry_t u_entry, void *argp)
 
 	/* Init lists for remque/insque */
 	dsp->delegationlist.next = dsp->delegationlist.prev =
-		&dsp->delegationlist;
+	    &dsp->delegationlist;
 	dsp->delegationlist.dsp = dsp;
 
 	dsp->clientdeleglist.next = dsp->clientdeleglist.prev =
-		&dsp->clientdeleglist;
+	    &dsp->clientdeleglist;
 	dsp->clientdeleglist.dsp = dsp;
 
 	/* Insert state on per open owner's list */
@@ -2761,7 +2778,7 @@ rfs4_deleg_state_destroy(rfs4_entry_t u_entry)
 
 	remque(&dsp->clientdeleglist);
 	dsp->clientdeleglist.next = dsp->clientdeleglist.prev =
-		&dsp->clientdeleglist;
+	    &dsp->clientdeleglist;
 
 	rfs4_dbe_unlock(dsp->client->dbe);
 
@@ -2778,7 +2795,7 @@ rfs4_finddeleg(rfs4_state_t *sp, bool_t *create)
 	ds.finfo = sp->finfo;
 
 	dsp = (rfs4_deleg_state_t *)rfs4_dbsearch(rfs4_deleg_idx, &ds,
-					create, &ds, RFS4_DBS_VALID);
+	    create, &ds, RFS4_DBS_VALID);
 
 	return (dsp);
 }
@@ -2790,7 +2807,7 @@ rfs4_finddelegstate(stateid_t *id)
 	bool_t create = FALSE;
 
 	dsp = (rfs4_deleg_state_t *)rfs4_dbsearch(rfs4_deleg_state_idx, id,
-					&create, NULL, RFS4_DBS_VALID);
+	    &create, NULL, RFS4_DBS_VALID);
 
 	return (dsp);
 }
@@ -2841,7 +2858,7 @@ rfs4_free_opens(rfs4_openowner_t *op, bool_t invalidate,
 	rfs4_dbe_lock(op->dbe);
 
 	for (sp = op->ownerstateids.next->sp; sp != NULL;
-		sp = sp->ownerstateids.next->sp) {
+	    sp = sp->ownerstateids.next->sp) {
 		rfs4_state_close(sp, FALSE, close_of_client, CRED());
 		if (invalidate == TRUE)
 			rfs4_dbe_invalidate(sp->dbe);
@@ -2914,7 +2931,7 @@ rfs4_findstate_by_owner_file(rfs4_openowner_t *op, rfs4_file_t *file,
 	key.finfo = file;
 
 	sp = (rfs4_state_t *)rfs4_dbsearch(rfs4_state_owner_file_idx, &key,
-					create, &key, RFS4_DBS_VALID);
+	    create, &key, RFS4_DBS_VALID);
 
 	return (sp);
 }
@@ -2926,7 +2943,7 @@ rfs4_findstate_by_file(rfs4_file_t *fp)
 	bool_t create = FALSE;
 
 	return ((rfs4_state_t *)rfs4_dbsearch(rfs4_state_file_idx, fp,
-		&create, fp, RFS4_DBS_VALID));
+	    &create, fp, RFS4_DBS_VALID));
 }
 
 static bool_t
@@ -2939,11 +2956,11 @@ rfs4_state_expiry(rfs4_entry_t u_entry)
 
 	if (sp->closed == TRUE &&
 	    ((gethrestime_sec() - rfs4_dbe_get_timerele(sp->dbe))
-		> rfs4_lease_time))
+	    > rfs4_lease_time))
 		return (TRUE);
 
 	return ((gethrestime_sec() - sp->owner->client->last_access
-		> rfs4_lease_time));
+	    > rfs4_lease_time));
 }
 
 static bool_t
@@ -2984,7 +3001,7 @@ rfs4_findstate(stateid_t *id, rfs4_dbsearch_type_t find_invalid,
 	bool_t create = FALSE;
 
 	sp = (rfs4_state_t *)rfs4_dbsearch(rfs4_state_idx, id,
-					&create, NULL, find_invalid);
+	    &create, NULL, find_invalid);
 	if (lock_fp == TRUE && sp != NULL)
 		rw_enter(&sp->finfo->file_rwlock, RW_READER);
 
@@ -3027,7 +3044,7 @@ rfs4_client_state_remove(rfs4_client_t *cp)
 	rfs4_dbe_lock(cp->dbe);
 
 	for (oop = cp->openownerlist.next->oop;  oop != NULL;
-		oop = oop->openownerlist.next->oop) {
+	    oop = oop->openownerlist.next->oop) {
 		rfs4_free_opens(oop, TRUE, TRUE);
 	}
 
@@ -3395,7 +3412,7 @@ rfs4_check_stateid(int mode, vnode_t *vp,
 			return (NFS4_OK);
 		}
 		if (mode == FWRITE ||
-			fp->dinfo->dtype == OPEN_DELEGATE_WRITE) {
+		    fp->dinfo->dtype == OPEN_DELEGATE_WRITE) {
 			rfs4_recall_deleg(fp, trunc, NULL);
 			rfs4_file_rele(fp);
 			return (NFS4ERR_DELAY);
@@ -3417,7 +3434,7 @@ rfs4_check_stateid(int mode, vnode_t *vp,
 			if (id->bits.type == LOCKID) {
 				/* Seqid in the future? - that's bad */
 				if (lsp->lockid.bits.chgseq <
-					id->bits.chgseq) {
+				    id->bits.chgseq) {
 					rfs4_lo_state_rele(lsp, FALSE);
 					if (sp != NULL)
 						rfs4_state_rele_nounlock(sp);
@@ -3425,7 +3442,7 @@ rfs4_check_stateid(int mode, vnode_t *vp,
 				}
 				/* Seqid in the past? - that's old */
 				if (lsp->lockid.bits.chgseq >
-					id->bits.chgseq) {
+				    id->bits.chgseq) {
 					rfs4_lo_state_rele(lsp, FALSE);
 					if (sp != NULL)
 						rfs4_state_rele_nounlock(sp);
@@ -3452,13 +3469,13 @@ rfs4_check_stateid(int mode, vnode_t *vp,
 			if (id->bits.type == OPENID) {
 				/* Seqid in the future? - that's bad */
 				if (sp->stateid.bits.chgseq <
-					id->bits.chgseq) {
+				    id->bits.chgseq) {
 					rfs4_state_rele_nounlock(sp);
 					return (NFS4ERR_BAD_STATEID);
 				}
 				/* Seqid in the past - that's old */
 				if (sp->stateid.bits.chgseq >
-					id->bits.chgseq) {
+				    id->bits.chgseq) {
 					rfs4_state_rele_nounlock(sp);
 					return (NFS4ERR_OLD_STATEID);
 				}
@@ -3508,9 +3525,9 @@ rfs4_check_stateid(int mode, vnode_t *vp,
 			 * time to indicate that activity is present.
 			 */
 			if (sp->finfo->dinfo->dtype == OPEN_DELEGATE_WRITE &&
-				mode == FWRITE) {
+			    mode == FWRITE) {
 				sp->finfo->dinfo->time_lastwrite =
-					gethrestime_sec();
+				    gethrestime_sec();
 			}
 
 			rfs4_state_rele_nounlock(sp);
@@ -3550,9 +3567,9 @@ rfs4_check_stateid(int mode, vnode_t *vp,
 			 * time to indicate that activity is present.
 			 */
 			if (dsp->finfo->dinfo->dtype == OPEN_DELEGATE_WRITE &&
-				mode == FWRITE) {
+			    mode == FWRITE) {
 				dsp->finfo->dinfo->time_lastwrite =
-					gethrestime_sec();
+				    gethrestime_sec();
 			}
 
 			/*
@@ -3657,11 +3674,11 @@ rfs4_lo_state_walk_callout(rfs4_entry_t u_entry, void *e)
 	FH_TO_FMT4(efhp, exi_fhp);
 
 	finfo_fhp =
-		(nfs_fh4_fmt_t *)lsp->state->finfo->filehandle.nfs_fh4_val;
+	    (nfs_fh4_fmt_t *)lsp->state->finfo->filehandle.nfs_fh4_val;
 
 	if (EQFSID(&finfo_fhp->fh4_fsid, &exi_fhp->fh4_fsid) &&
 	    bcmp(&finfo_fhp->fh4_xdata, &exi_fhp->fh4_xdata,
-		exi_fhp->fh4_xlen) == 0) {
+	    exi_fhp->fh4_xlen) == 0) {
 		rfs4_state_close(lsp->state, FALSE, FALSE, CRED());
 		rfs4_dbe_invalidate(lsp->dbe);
 		rfs4_dbe_invalidate(lsp->state->dbe);
@@ -3691,11 +3708,11 @@ rfs4_state_walk_callout(rfs4_entry_t u_entry, void *e)
 	FH_TO_FMT4(efhp, exi_fhp);
 
 	finfo_fhp =
-		(nfs_fh4_fmt_t *)sp->finfo->filehandle.nfs_fh4_val;
+	    (nfs_fh4_fmt_t *)sp->finfo->filehandle.nfs_fh4_val;
 
 	if (EQFSID(&finfo_fhp->fh4_fsid, &exi_fhp->fh4_fsid) &&
 	    bcmp(&finfo_fhp->fh4_xdata, &exi_fhp->fh4_xdata,
-		exi_fhp->fh4_xlen) == 0) {
+	    exi_fhp->fh4_xlen) == 0) {
 		rfs4_state_close(sp, TRUE, FALSE, CRED());
 		rfs4_dbe_invalidate(sp->dbe);
 	}
@@ -3724,11 +3741,11 @@ rfs4_deleg_state_walk_callout(rfs4_entry_t u_entry, void *e)
 	FH_TO_FMT4(efhp, exi_fhp);
 
 	finfo_fhp =
-		(nfs_fh4_fmt_t *)dsp->finfo->filehandle.nfs_fh4_val;
+	    (nfs_fh4_fmt_t *)dsp->finfo->filehandle.nfs_fh4_val;
 
 	if (EQFSID(&finfo_fhp->fh4_fsid, &exi_fhp->fh4_fsid) &&
 	    bcmp(&finfo_fhp->fh4_xdata, &exi_fhp->fh4_xdata,
-		exi_fhp->fh4_xlen) == 0) {
+	    exi_fhp->fh4_xlen) == 0) {
 		rfs4_dbe_invalidate(dsp->dbe);
 	}
 }
@@ -3758,15 +3775,15 @@ rfs4_file_walk_callout(rfs4_entry_t u_entry, void *e)
 
 	if (EQFSID(&finfo_fhp->fh4_fsid, &exi_fhp->fh4_fsid) &&
 	    bcmp(&finfo_fhp->fh4_xdata, &exi_fhp->fh4_xdata,
-		exi_fhp->fh4_xlen) == 0) {
+	    exi_fhp->fh4_xlen) == 0) {
 		if (fp->vp) {
 			/* don't leak monitors */
 			if (fp->dinfo->dtype == OPEN_DELEGATE_READ)
 				(void) fem_uninstall(fp->vp, deleg_rdops,
-						(void *)fp);
+				    (void *)fp);
 			else if (fp->dinfo->dtype == OPEN_DELEGATE_WRITE)
 				(void) fem_uninstall(fp->vp, deleg_wrops,
-						(void *)fp);
+				    (void *)fp);
 			VN_RELE(fp->vp);
 			fp->vp = NULL;
 		}
