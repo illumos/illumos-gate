@@ -93,7 +93,29 @@ HTMLENTS = \
 	LinkSecurity.html \
 	IdmapRules.html \
 	SmfIdmapStates.html \
-	SmfValueIdmap.html
+	SmfValueIdmap.html \
+	FileChown.html \
+	FileHeader.html \
+	FileOwner.html \
+	LabelFileDowngrade.html \
+	LabelFileUpgrade.html \
+	LabelHeader.html \
+	LabelPrint.html \
+	LabelRange.html \
+	LabelServer.html \
+	LabelWinDowngrade.html \
+	LabelWinNoView.html \
+	LabelWinUpgrade.html \
+	PrintAdmin.html \
+	PrintCancel.html \
+	PrintHeader.html \
+	PrintList.html \
+	PrintNoBanner.html \
+	PrintPs.html \
+	PrintUnlabeled.html \
+	TNDaemon.html \
+	TNctl.html \
+	ValueTND.html
 
 HELPDIR=$(ROOT)/usr/lib/help
 AUTHDIR=$(HELPDIR)/auths

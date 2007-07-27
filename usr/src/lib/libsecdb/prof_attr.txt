@@ -36,7 +36,7 @@ Audit Control:::Configure BSM auditing:auths=solaris.audit.config,solaris.jobs.a
 Audit Review:::Review BSM auditing logs:auths=solaris.audit.read;help=RtAuditReview.html
 Contract Observer:::Reliably observe any/all contract events:help=RtContractObserver.html
 Device Management:::Control Access to Removable Media:auths=solaris.device.*;help=RtDeviceMngmnt.html
-Printer Management:::Manage printers, daemons, spooling:auths=solaris.print.admin:help=RtPrntAdmin.html
+Printer Management:::Manage printers, daemons, spooling:auths=solaris.print.*,solaris.label.print;help=RtPrntAdmin.html
 Cron Management:::Manage at and cron jobs:auths=solaris.jobs.*,solaris.smf.manage.cron;help=RtCronMngmnt.html
 Log Management:::Manage log files:help=RtLogMngmnt.html
 Basic Solaris User:::Automatically assigned rights:auths=solaris.profmgr.read,solaris.jobs.user,solaris.mail.mailq,solaris.device.mount.removable;profiles=All;help=RtDefault.html
@@ -46,11 +46,11 @@ File System Management:::Manage, mount, share file systems:auths=solaris.smf.man
 File System Security:::Manage file system security attributes:help=RtFileSysSecurity.html
 HAL Management:::Manage HAL SMF service:auths=solaris.smf.manage.hal;help=RtHALMngmnt.html
 Mail Management:::Manage sendmail & queues:auths=solaris.smf.manage.sendmail;help=RtMailMngmnt.html
-Maintenance and Repair:::Maintain and repair a system:auths=solaris.smf.manage.system-log;help=RtMaintAndRepair.html
+Maintenance and Repair:::Maintain and repair a system:auths=solaris.smf.manage.system-log,solaris.label.range;help=RtMaintAndRepair.html
 Media Backup:::Backup files and file systems:help=RtMediaBkup.html
 Media Restore:::Restore files and file systems from backups:help=RtMediaRestore.html
-Network Management:::Manage the host and network configuration:auths=solaris.smf.manage.name-service-cache,solaris.smf.manage.bind,solaris.smf.value.routing,solaris.smf.manage.routing,solaris.smf.value.nwam,solaris.smf.manage.nwam,solaris.smf.manage.wpa;profiles=Network Wifi Management;help=RtNetMngmnt.html
-Network Security:::Manage network and host security:auths=solaris.smf.manage.ssh;profiles=Network Wifi Security,Network Link Security,Network IPsec Management;help=RtNetSecure.html
+Network Management:::Manage the host and network configuration:auths=solaris.smf.manage.name-service-cache,solaris.smf.manage.bind,solaris.smf.value.routing,solaris.smf.manage.routing,solaris.smf.value.nwam,solaris.smf.manage.nwam,solaris.smf.manage.tnd,solaris.smf.manage.tnctl,solaris.smf.manage.wpa;profiles=Network Wifi Management;help=RtNetMngmnt.html
+Network Security:::Manage network and host security:auths=solaris.smf.manage.ssh,solaris.smf.value.tnd;profiles=Network Wifi Security,Network Link Security,Network IPsec Management;help=RtNetSecure.html
 Network Wifi Management:::Manage wifi network configuration:auths=solaris.network.wifi.config;help=RtNetWifiMngmnt.html
 Network Wifi Security:::Manage wifi network security:auths=solaris.network.wifi.wep;help=RtNetWifiSecure.html
 Network Link Security:::Manage network link security:auths=solaris.network.link.security;help=RtNetLinkSecure.html
@@ -68,7 +68,7 @@ Service Operator:::Administer services:auths=solaris.smf.manage,solaris.smf.modi
 Software Installation:::Add application software to the system:help=RtSoftwareInstall.html
 System Event Management:::Manage system events and system event channels:help=RtSysEvMngmnt.html
 User Management:::Manage users, groups, home directory:auths=solaris.profmgr.read;help=RtUserMngmnt.html
-User Security:::Manage passwords, clearances:auths=solaris.role.*,solaris.profmgr.*;help=RtUserSecurity.html
+User Security:::Manage passwords, clearances:auths=solaris.role.*,solaris.profmgr.*,solaris.label.range;help=RtUserSecurity.html
 FTP Management:::Manage the FTP server:help=RtFTPMngmnt.html
 Crypto Management:::Cryptographic Framework Administration:help=RtCryptoMngmnt.html
 Kerberos Client Management:::Maintain and Administer Kerberos excluding the servers:help=RtKerberosClntMngmnt.html
@@ -79,3 +79,9 @@ ZFS Storage Management:::Create and Manage ZFS Storage Pools:help=RtZFSStorageMn
 Zone Management:::Zones Virtual Application Environment Administration:help=RtZoneMngmnt.html
 IP Filter Management:::IP Filter Administration:help=RtIPFilterMngmnt.html
 Project Management:::Add/Modify/Remove projects:help=RtProjManagement.html
+#
+# Trusted Extensions profiles:
+#
+Information Security:::Maintains MAC and DAC security policies:profiles=Device Security,File System Security,Name Service Security,Network Security,Object Access Management,Object Label Management;help=RtInfoSec.html
+Object Label Management:::Change labels on files.:auths=solaris.device.allocate,solaris.label.file.downgrade,solaris.label.win.downgrade,solaris.label.win.upgrade,solaris.label.file.upgrade,solaris.label.range,solaris.smf.manage.labels;help=RtObjectLabelMngmnt.html
+Outside Accred:::Allow a user to operate outside the user accreditation range.:auths=solaris.label.range;help=RtOutsideAccred.html

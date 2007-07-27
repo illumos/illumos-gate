@@ -386,6 +386,7 @@ COMMON_SUBDIRS=		\
 	troff		\
 	true		\
 	truss		\
+	tsol		\
 	tty		\
 	ttymon		\
 	uadmin		\
@@ -667,6 +668,7 @@ MSGSUBDIRS=		\
 	touch		\
 	tput		\
 	troff		\
+	tsol		\
 	tty		\
 	ttymon		\
 	ul		\
@@ -824,6 +826,10 @@ MANIFEST_SUBDIRS=			\
 	cmd-inet/usr.sbin/in.routed	\
 	cmd-inet/usr.sbin/in.talkd	\
 	cmd-inet/usr.sbin/routeadm	\
+	cmd/tsol/labeld			\
+	cmd/tsol/tnctl			\
+	cmd/tsol/tnd			\
+	cmd/tsol/tsol-zones		\
 	dcs/sparc/sun4u			\
 	fs.d/autofs			\
 	fs.d/cachefs			\

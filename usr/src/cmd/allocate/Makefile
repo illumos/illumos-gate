@@ -20,11 +20,13 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
+
+ETCTSOLFILES =	devalloc_defaults
 
 include		../Makefile.cmd
 
@@ -34,18 +36,28 @@ ROOTSECLIB =	$(ROOTSEC)/lib
 ROOTDIRS =	$(ROOTSECDEV) $(ROOTSECLIB)
 
 RTLCKS =	audio fd0 sr0 st0 st1
-SCRIPTS =	fd_clean  sr_clean  st_clean
+CLEANfd =	fd_clean
+CLEANsr =	sr_clean
+CLEANst =	st_clean
+CLEANaudio =	audio_clean_wrapper
+CLEANdisk =	disk_clean
+CLEAN_SCRIPTS =	$(CLEANfd) $(CLEANsr) $(CLEANst) $(CLEANaudio) $(CLEANdisk)
+WDW_SCRIPTS =	wdwmsg wdwwrapper
+WDW_LINKS =	$(CLEANaudio) $(CLEANdisk) $(CLEANst)
+SCRIPTS =	$(CLEAN_SCRIPTS) $(WDW_SCRIPTS)
 ALLSCRIPTS =	allscripts.sh
 
 PROGalloc =	allocate
 PROGmkdevalloc =	mkdevalloc
 PROGdminfo =	dminfo
 PROGaudio =	audio_clean
-PROG =		$(PROGalloc) $(PROGmkdevalloc) $(PROGdminfo) $(PROGaudio)
+PROGaddalloc =	add_allocatable
+PROG =		$(PROGalloc) $(PROGmkdevalloc) $(PROGdminfo) \
+	$(PROGaudio) $(PROGaddalloc)
 
 LINKPROGalloc =	deallocate list_devices
 LINKPROGmkdevalloc = mkdevmaps
-
+LINKPROGaddalloc = remove_allocatable
 
 POFILE =	allocate_all.po
 POFILES =	$(OBJS:%.o=%.po) $(ALLSCRIPTS:%.sh=%.po)
@@ -55,24 +67,29 @@ CPPFLAGS +=	$(DFLAGS)
 
 ROOTLOCKS =	$(RTLCKS:%=$(ROOTSECDEV)/%)
 ROOTSCRIPTS =	$(SCRIPTS:%=$(ROOTSECLIB)/%)
+ROOTWDWLINKS =	$(WDW_LINKS:%=$(ROOTSECLIB)/%.windowing)
 
 ROOTPROG =	$(PROGallocate:%=$(ROOTUSRSBIN)/%) \
 		$(PROGmkdevalloc:%=$(ROOTUSRSBIN)/%) \
 		$(PROGdminfo:%=$(ROOTUSRSBIN)/%) \
-		$(PROGaudio:%=$(ROOTSECLIB)/%)
+		$(PROGaudio:%=$(ROOTSECLIB)/%) \
+		$(PROGaddaloc:%=$(ROOTUSRSBIN)/%)
 ROOTLINKalloc =	$(LINKPROGalloc:%=$(ROOTUSRSBIN)/%)
 ROOTLINKmkdevalloc = $(LINKPROGmkdevalloc:%=$(ROOTUSRSBIN)/%)
-ROOTLINKS =	$(ROOTLINKalloc) $(ROOTLINKmkdevalloc)
+ROOTLINKaddalloc = $(LINKPROGaddalloc:%=$(ROOTUSRSBIN)/%)
+ROOTLINKS =	$(ROOTLINKalloc) $(ROOTLINKmkdevalloc) $(ROOTLINKaddalloc)
 
 PROGallocOBJS =		allocate.o allocate3.o
 PROGmkdevallocOBJS =	mkdevalloc.o
 PROGdminfoOBJS =	dminfo.o
 PROGaudioOBJS =		audio_clean.o
+PROGaddallocOBJS =	add_allocatable.o
 
 OBJS =		$(PROGallocOBJS) \
 		$(PROGmkdevallocOBJS) \
 		$(PROGdminfoOBJS) \
-		$(PROGaudioOBJS)
+		$(PROGaudioOBJS) \
+		$(PROGaddallocOBJS)
 
 SRCS =		$(OBJS:%.o=%.c)
 
@@ -93,6 +110,7 @@ $(PROGalloc) :=		LDLIBS += -lbsm -lsec -lsecdb -ldevinfo $(LAZYLIBS)
 $(PROGmkdevalloc) :=	LDLIBS += -lbsm
 $(PROGdminfo) :=	LDLIBS += -lbsm
 $(PROGaudio) :=		LDLIBS += -lbsm
+$(PROGaddalloc) :=	LDLIBS += -lbsm -lsecdb $(LAZYLIBS)
 
 CLOBBERFILES +=	$(SCRIPTS)
 
@@ -101,7 +119,7 @@ CLOBBERFILES +=	$(SCRIPTS)
 all :		$(PROG) $(RTLCKS) $(SCRIPTS)
 
 install :	$(PROG) $(ROOTDIRS) $(ROOTPROG) $(ROOTLOCKS) \
-		$(ROOTSCRIPTS) $(ROOTLINKS)
+		$(ROOTSCRIPTS) $(ROOTLINKS) $(ROOTWDWLINKS) $(ROOTETCTSOLFILES)
 
 $(RTLCKS):
 		$(TOUCH) $@
@@ -111,6 +129,10 @@ $(ROOTSECLIB)/%: %.sh
 
 $(PROGalloc) :	$(PROGallocOBJS)
 		$(LINK.c) $(PROGallocOBJS) -o $@ $(LDLIBS)
+		$(POST_PROCESS)
+
+$(PROGaddalloc) :	$(PROGaddallocOBJS)
+		$(LINK.c) $(PROGaddallocOBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
 $(PROGmkdevalloc) :	$(PROGmkdevallocOBJS)
@@ -143,9 +165,18 @@ $(ROOTLINKalloc) :	$(PROGalloc:%=$(ROOTUSRSBIN)/%)
 			$(RM) $@
 			$(LN) $(PROGalloc:%=$(ROOTUSRSBIN)/%) $@
 
+$(ROOTLINKaddalloc) :	$(PROGaddalloc:%=$(ROOTUSRSBIN)/%)
+			$(RM) $@
+			$(LN) $(PROGaddalloc:%=$(ROOTUSRSBIN)/%) $@
+
 $(ROOTLINKmkdevalloc) :	$(PROGmkdevalloc:%=$(ROOTUSRSBIN)/%)
 			$(RM) $@
 			$(LN) $(PROGmkdevalloc:%=$(ROOTUSRSBIN)/%) $@
+
+
+$(ROOTETCSECLIB)/%.windowing: %
+	$(RM) $@
+	$(SYMLINK) $< $@
 
 $(POFILE):      $(POFILES)
 		$(RM) $@

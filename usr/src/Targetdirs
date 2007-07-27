@@ -102,6 +102,7 @@ ROOT.SYS= \
 	/etc/iscsi \
 	/etc/rpcsec	\
 	/etc/security	\
+	/etc/security/tsol	\
 	/etc/gss	\
 	/etc/init.d  \
 	/etc/dhcp	\
@@ -179,7 +180,9 @@ ROOT.SYS= \
 	/var/svc/manifest/platform/sun4u \
 	/var/svc/manifest/platform/sun4v \
 	/var/svc/manifest/site \
-	/var/svc/profile
+	/var/svc/profile \
+	/var/tsol \
+	/var/tsol/doors
 
 # EXPORT DELETE START
 XROOT.BIN= \

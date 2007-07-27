@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,7 @@
 #include <libintl.h>
 #include <libdevinfo.h>
 #include <secdb.h>
+#include <deflt.h>
 #include <auth_attr.h>
 #include <auth_list.h>
 #include <bsm/devices.h>
@@ -163,7 +164,6 @@ main(int argc, char **argv)
 {
 	int		cd_count = 0;
 	char		*progname;
-	struct stat	tx_stat;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
@@ -181,25 +181,34 @@ main(int argc, char **argv)
 
 	system_labeled = is_system_labeled();
 
+	if (!system_labeled) {
+		/*
+		 * is_system_labeled() will return false in case we are
+		 * starting before the first reboot after Trusted Extensions
+		 * is enabled.  Check the setting in /etc/system to see if
+		 * TX is enabled (even if not yet booted).
+		 */
+		if (defopen("/etc/system") == 0) {
+			if (defread("set sys_labeling=1") != NULL)
+				system_labeled = 1;
+
+			/* close defaults file */
+			(void) defopen(NULL);
+		}
+	}
+
+#ifdef DEBUG
 	/* test hook: see also devfsadm.c and allocate.c */
 	if (!system_labeled) {
+		struct stat	tx_stat;
+
 		system_labeled = is_system_labeled_debug(&tx_stat);
 		if (system_labeled) {
 			fprintf(stderr, "/ALLOCATE_FORCE_LABEL is set,\n"
 			    "forcing system label on for testing...\n");
 		}
 	}
-
-	if (system_labeled == 0) {
-		/*
-		 * is_system_labeled() will return false in case we are
-		 * starting before the first reboot after Trusted Extensions
-		 * is installed. we check for a well known TX binary to
-		 * to see if TX is installed.
-		 */
-		if (stat(DA_LABEL_CHECK, &tx_stat) == 0)
-			system_labeled = 1;
-	}
+#endif
 
 	if (system_labeled && do_devalloc && (argc == 2) &&
 	    (strcmp(argv[1], DA_IS_LABELED) == 0)) {
@@ -261,7 +270,7 @@ dotape()
 		if (i == ntape) {
 			/* will exit(1) if insufficient memory */
 			ntape = expandmem(i, (void **)&tape,
-					sizeof (struct tape));
+			    sizeof (struct tape));
 		}
 
 		/* save name (/dev + / + d_name + \0) */
@@ -282,7 +291,7 @@ dotape()
 
 		/* get name from symbolic link */
 		if ((sz = readlink(tape[i].name, linkvalue,
-				sizeof (linkvalue))) < 0)
+		    sizeof (linkvalue))) < 0)
 			continue;
 		nm = (char *)malloc(sz + 1);
 		if (nm == NULL)
@@ -319,7 +328,7 @@ dotape()
 		if (i == ntape) {
 			/* will exit(1) if insufficient memory */
 			ntape = expandmem(i, (void **)&tape,
-					sizeof (struct tape));
+			    sizeof (struct tape));
 		}
 
 		/* save name (/dev/rmt + / + d_name + \0) */
@@ -468,7 +477,7 @@ doaudio()
 		if (i == naudio) {
 			/* will exit(1) if insufficient memory */
 			naudio = expandmem(i, (void **)&audio,
-					sizeof (struct audio));
+			    sizeof (struct audio));
 		}
 
 		/* save name (/dev + 1 + d_name + \0) */
@@ -489,7 +498,7 @@ doaudio()
 
 		/* get name from symbolic link */
 		if ((sz = readlink(audio[i].name, linkvalue,
-				sizeof (linkvalue))) < 0)
+		    sizeof (linkvalue))) < 0)
 			continue;
 		nm = (char *)malloc(sz + 1);
 		if (nm == NULL)
@@ -520,7 +529,7 @@ doaudio()
 		if (i == naudio) {
 			/* will exit(1) if insufficient memory */
 			naudio = expandmem(i, (void **)&audio,
-					sizeof (struct audio));
+			    sizeof (struct audio));
 		}
 
 		/* save name (/dev/sound + / + d_name + \0) */

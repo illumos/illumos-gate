@@ -51,10 +51,23 @@ solaris.device.mount.removable:::Device Mount Removable::help=DevMount.html
 solaris.dhcpmgr.:::DHCP Service Management::help=DhcpmgrHeader.html
 solaris.dhcpmgr.write:::Modify DHCP Service Configuration::help=DhcpmgrWrite.html
 #
+solaris.file.:::File Operations::help=FileHeader.html
+solaris.file.chown:::Change File Owner::help=FileChown.html
+solaris.file.owner:::Act as File Owner::help=FileOwner.html
+#
 solaris.jobs.:::Job Scheduler::help=JobHeader.html
 solaris.jobs.admin:::Manage All Jobs::help=AuthJobsAdmin.html
 solaris.jobs.grant:::Delegate Cron & At Administration::help=JobsGrant.html
 solaris.jobs.user:::Manage Owned Jobs::help=AuthJobsUser.html
+#
+solaris.label.:::Label Management::help=LabelHeader.html
+solaris.label.file.downgrade:::Downgrade File Label::help=LabelFileDowngrade.html
+solaris.label.file.upgrade:::Upgrade File Label::help=LabelFileUpgrade.html
+solaris.label.print:::View Printer Queue at All Labels::help=LabelPrint.html
+solaris.label.range:::Set Label Outside User Accred Range::help=LabelRange.html
+solaris.label.win.downgrade:::Downgrade DragNDrop or CutPaste Info::help=LabelWinDowngrade.html
+solaris.label.win.noview:::DragNDrop or CutPaste without viewing contents::help=LabelWinNoView.html
+solaris.label.win.upgrade:::Upgrade DragNDrop or CutPaste Info::help=LabelWinUpgrade.html
 #
 solaris.login.:::Login Control::help=LoginHeader.html
 solaris.login.enable:::Enable Logins::help=LoginEnable.html
@@ -67,6 +80,14 @@ solaris.network.:::Network::help=NetworkHeader.html
 solaris.network.link.security:::Link Security::help=LinkSecurity.html
 solaris.network.wifi.config:::Wifi Config::help=WifiConfig.html
 solaris.network.wifi.wep:::Wifi Wep::help=WifiWep.html
+#
+solaris.print.:::Printer Management::help=PrintHeader.html
+solaris.print.admin:::Administer Printer::help=PrintAdmin.html
+solaris.print.cancel:::Cancel Print Job::help=PrintCancel.html
+solaris.print.list:::List Jobs in Printer Queue::help=PrintList.html
+solaris.print.nobanner:::Print without Banner::help=PrintNoBanner.html
+solaris.print.ps:::Print Postscript::help=PrintPs.html
+solaris.print.unlabeled:::Print without Label::help=PrintUnlabeled.html
 #
 solaris.profmgr.:::Rights::help=ProfmgrHeader.html
 solaris.profmgr.assign:::Assign All Rights::help=AuthProfmgrAssign.html
@@ -93,6 +114,7 @@ solaris.smf.manage.cron:::Manage Cron Service States::help=SmfCronStates.html
 solaris.smf.manage.hal:::Manage HAL Service States::help=SmfHALStates.html
 solaris.smf.manage.ipsec:::Manage IPsec Service States::help=SmfIPsecStates.html
 solaris.smf.manage.idmap:::Manage Identity Mapping Service States::help=SmfIdmapStates.html
+solaris.smf.manage.labels:::Manage label server::help=LabelServer.html
 solaris.smf.manage.name-service-cache:::Manage Name Service Cache Daemon Service States::help=SmfNscdStates.html
 solaris.smf.manage.nwam:::Manage Network Auto-Magic Service States::help=SmfNWAMStates.html
 solaris.smf.manage.power:::Manage Power Management Service States::help=SmfPowerStates.html
@@ -102,11 +124,14 @@ solaris.smf.manage.rpc.bind:::Manage RPC Program number mapper::help=SmfRPCBind.
 solaris.smf.manage.sendmail:::Manage Sendmail Service States::help=SmfSendmailStates.html
 solaris.smf.manage.ssh:::Manage Secure Shell Service States::help=SmfSshStates.html
 solaris.smf.manage.system-log:::Manage Syslog Service States::help=SmfSyslogStates.html
+solaris.smf.manage.tnctl:::Manage Refresh of Trusted Network Parameters::help=TNctl.html
+solaris.smf.manage.tnd:::Manage Trusted Network Daemon::help=TNDaemon.html
 solaris.smf.manage.wpa:::Manage WPA Service States::help=SmfWpaStates.html
 solaris.smf.value.:::Change Values of SMF Service Properties::help=SmfValueHeader.html
 solaris.smf.value.ipsec:::Change Values of SMF IPsec Properties::help=SmfValueIPsec.html
 solaris.smf.value.nwam:::Change Values of SMF Network Auto-Magic Properties::help=SmfValueNWAM.html
 solaris.smf.value.routing:::Change Values of SMF Routing Properties::help=SmfValueRouting.html
+solaris.smf.value.tnd:::Change Trusted Network Daemon Service Property Values::help=ValueTND.html
 solaris.smf.value.idmap:::Change Values of SMF Identity Mapping Service Properties::help=SmfValueIdmap.html
 #
 solaris.system.:::Machine Administration::help=SysHeader.html

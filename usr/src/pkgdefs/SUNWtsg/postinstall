@@ -1,0 +1,57 @@
+#!/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+PATH=/usr/bin:/usr/sbin
+CLEANUP=/tmp/CLEANUP
+
+LBLMOD1=$BASEDIR/kernel/sys/lbl_edition
+LBLMOD2=$BASEDIR/kernel/sys/amd64/lbl_edition
+LBLMOD3=$BASEDIR/kernel/sys/sparcv9/lbl_edition
+
+if [ -f $LBLMOD1 -o -f $LBLMOD2 -o -f $LBLMOD3 ]; then
+	# Set sys_labeling in etc/system
+	grep -v "sys_labeling=" $BASEDIR/etc/system > /tmp/etc.system.$$
+	echo "set sys_labeling=1" >> /tmp/etc.system.$$
+	mv /tmp/etc.system.$$ $BASEDIR/etc/system
+	grep "set sys_labeling=1" ${BASEDIR}/etc/system > /dev/null 2>&1
+	if [ $? -ne 0 ]; then
+    		echo "cannot set sys_labeling in $BASEDIR/etc/system"
+		exit 1
+	fi
+
+	rm -f $LBLMOD1 > /dev/null 2>&1
+	rm -f $LBLMOD2 > /dev/null 2>&1
+	rm -f $LBLMOD3 > /dev/null 2>&1
+
+	cat >> $BASEDIR/var/svc/profile/upgrade <<\__SMF_ENABLE
+		/usr/sbin/svcadm enable -s svc:/system/labeld:default
+__SMF_ENABLE
+
+fi
+
+exit 0

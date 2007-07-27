@@ -67,7 +67,6 @@ extern "C" {
 #define	DA_ON_STR		"DEVICE_ALLOCATION=ON\n"
 #define	DA_OFF_STR		"DEVICE_ALLOCATION=OFF\n"
 #define	DA_IS_LABELED		"system_labeled"
-#define	DA_LABEL_CHECK		"/usr/bin/plabel"
 #define	DA_DBMODE		0644
 #define	DA_COUNT		5	/* allocatable devices suppported */
 					/* audio, cd, floppy, rmdisk, tape */

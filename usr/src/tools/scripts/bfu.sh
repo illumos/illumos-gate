@@ -210,6 +210,12 @@ global_zone_only_files="
 	etc/ppp/pap-secrets
 	etc/security/device_policy
 	etc/security/extra_privs
+	etc/security/tsol/tnrhdb
+	etc/security/tsol/tnrhtp
+	etc/security/tsol/tnzonecfg
+	etc/security/tsol/label_encodings
+	etc/security/tsol/relabel
+	etc/security/tsol/devalloc_defaults
 	etc/system
 	etc/zones/index
 	kernel/drv/elxl.conf
@@ -302,6 +308,7 @@ superfluous_nonglobal_zone_files="
 	lib/svc/method/svc-dumpadm
 	lib/svc/method/svc-intrd
 	lib/svc/method/svc-hal
+	lib/svc/method/svc-labeld
 	lib/svc/method/svc-mdmonitor
 	lib/svc/method/svc-metainit
 	lib/svc/method/svc-metasync
@@ -314,6 +321,8 @@ superfluous_nonglobal_zone_files="
 	lib/svc/method/svc-scheduler
 	lib/svc/method/svc-sckmd
 	lib/svc/method/svc-syseventd
+	lib/svc/method/svc-tnctl
+	lib/svc/method/svc-tnd
 	lib/svc/method/svc-vntsd
 	lib/svc/method/svc-zones
 	platform/*/kernel
@@ -350,6 +359,8 @@ superfluous_nonglobal_zone_files="
 	var/svc/manifest/network/rpc/meta.xml
 	var/svc/manifest/network/rpc/metamed.xml
 	var/svc/manifest/network/rpc/metamh.xml
+	var/svc/manifest/network/tnctl.xml
+	var/svc/manifest/network/tnd.xml
 	var/svc/manifest/platform/i86pc/eeprom.xml
 	var/svc/manifest/platform/sun4u/dcs.xml
 	var/svc/manifest/platform/sun4u/dscp.xml
@@ -363,6 +374,7 @@ superfluous_nonglobal_zone_files="
 	var/svc/manifest/system/fmd.xml
 	var/svc/manifest/system/hal.xml
 	var/svc/manifest/system/intrd.xml
+	var/svc/manifest/system/labeld.xml
 	var/svc/manifest/system/mdmonitor.xml
 	var/svc/manifest/system/metainit.xml
 	var/svc/manifest/system/metasync.xml

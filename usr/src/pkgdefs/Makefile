@@ -371,6 +371,9 @@ COMMON_SUBDIRS= \
 	SUNWtnfc  \
 	SUNWtnfd  \
 	SUNWtoo  \
+	SUNWtsg  \
+	SUNWtsr  \
+	SUNWtsu  \
 	SUNWudaplr \
 	SUNWudaplu \
 	SUNWuedg \

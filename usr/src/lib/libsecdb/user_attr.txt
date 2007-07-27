@@ -27,7 +27,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-root::::auths=solaris.*,solaris.grant;profiles=All;lock_after_retries=no
+root::::auths=solaris.*,solaris.grant;profiles=All;lock_after_retries=no;min_label=admin_low;clearance=admin_high
 lp::::profiles=Printer Management
 adm::::profiles=Log Management
 dladm::::auths=solaris.smf.manage.wpa,solaris.smf.modify

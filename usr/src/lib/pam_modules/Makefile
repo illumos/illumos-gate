@@ -44,6 +44,7 @@ SUBDIRS = \
 	rhosts_auth	\
 	roles		\
 	sample		\
+	tsol_acct	\
 	unix_auth	\
 	unix_account	\
 	unix_cred	\

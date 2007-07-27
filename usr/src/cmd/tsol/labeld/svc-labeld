@@ -1,0 +1,282 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+
+. /lib/svc/share/smf_include.sh
+
+ROOT_PATH=""
+if [ $# -gt 1 ]; then
+	if [ $# -ne 3 -o "$2" != "-R" ]; then
+		echo "$0: invalid syntax"
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
+	if [ "$3" != "/" ]; then
+		ROOT_PATH=$3
+	fi
+fi
+if [ -n "$ROOT_PATH" -a "$1" != "start" ]; then
+	echo "$0: invalid syntax: -R allowed for start method only"
+	exit $SMF_EXIT_ERR_CONFIG
+fi
+if [ -n "$ROOT_PATH" -a ! -d "$ROOT_PATH" ]; then
+	echo "$0: invalid -R rootpath dir specified"
+	exit $SMF_EXIT_ERR_CONFIG
+fi
+
+if smf_is_nonglobalzone; then
+	echo "$0: not supported in a local zone"
+	exit $SMF_EXIT_ERR_CONFIG
+fi
+
+do_logindev()
+{
+	# Comment out audio and usb device entries in /etc/logindevperm.
+	LOGINDEVPERM=$ROOT_PATH/etc/logindevperm
+	if [ -f $LOGINDEVPERM ]; then
+		line="\/dev\/console	0600	\/dev\/sound\/\*"
+		sed -e "s/^$line/#$line/" $LOGINDEVPERM > /tmp/tmp.$$
+		cp /tmp/tmp.$$ $LOGINDEVPERM
+		line="\/dev\/console	0600	\/dev\/usb\/\[0-9a-f\]+\[.\]\[0-9a-f\]+\/\[0-9\]+\/\*"
+		sed -e "s/^$line/#$line/" $LOGINDEVPERM > /tmp/tmp.$$
+		cp /tmp/tmp.$$ $LOGINDEVPERM
+		rm -f /tmp/tmp.$$
+	fi
+}
+
+do_otherservices()
+{
+	# Setup dependent services
+	cat >> $ROOT_PATH/var/svc/profile/upgrade <<\__ENABLE_OTHERS
+		/usr/sbin/svcadm enable -s svc:/network/tnd:default
+		/usr/sbin/svcadm enable -s svc:/system/tsol-zones:default
+		/usr/sbin/svccfg -s svc:/application/x11/x11-server \
+		    setprop options/tcp_listen = true
+		/usr/sbin/svcadm enable svc:/network/rpc/rstat:default
+__ENABLE_OTHERS
+
+}
+
+do_bsmconv()
+{
+	# Run bsmconv so audit and device allocation is enabled by
+	# default with Trusted Extensions.
+	if [ "$ROOT_PATH" = "/" -o "$ROOT_PATH" = "" ]; then
+		BSMDIR=""
+	else
+		BSMDIR=$ROOT_PATH
+	fi
+	echo "Running bsmconv ..."
+	echo `TEXTDOMAIN="SUNW_OST_OSCMD" gettext "y"` | \
+	    $ROOT_PATH/etc/security/bsmconv $ROOT_PATH
+}
+
+do_nscd()
+{
+# For Trusted Extensions, make nscd service transient in local zones.
+cat >> $ROOT_PATH/var/svc/profile/upgrade <<\_DEL_LOCAL_NSCD
+	if [ `/sbin/zonename` != "global" ]; then
+		nscd="svc:/system/name-service-cache"
+		duration=""
+		if /bin/svcprop -q -c -p startd/duration $nscd ; then
+			duration=`/bin/svcprop -c -p startd/duration $nscd`
+		fi
+		if [ "$duration" != "transient" ]; then
+			/usr/sbin/svccfg -s $nscd addpg startd framework
+			/usr/sbin/svccfg -s $nscd setprop \
+			    startd/duration = astring: transient
+			/usr/sbin/svccfg -s $nscd setprop stop/exec = :true
+			/usr/sbin/svcadm refresh $nscd
+		fi
+	fi
+_DEL_LOCAL_NSCD
+}
+
+do_bootupd()
+{
+	if [ -f $ROOT_PATH/platform/`/sbin/uname -m`/boot_archive ]; then
+		if [ -z "$ROOT_PATH" -o "$ROOT_PATH" = "/" ]; then
+			/sbin/bootadm update-archive
+		else
+			/sbin/bootadm update-archive -R $ROOT_PATH
+		fi
+	fi
+}
+
+do_commonstart()
+{
+	echo "$0: Updating $ROOT_PATH/etc/system..."
+	if [ ! -f ${ROOT_PATH}/etc/system ]; then
+		touch ${ROOT_PATH}/etc/system
+	fi
+
+	# Set sys_labeling in etc/system
+	grep -v "sys_labeling=" ${ROOT_PATH}/etc/system > /tmp/etc.system.$$
+	echo "set sys_labeling=1" >> /tmp/etc.system.$$
+	mv /tmp/etc.system.$$ ${ROOT_PATH}/etc/system
+	grep "set sys_labeling=1" ${ROOT_PATH}/etc/system > /dev/null 2>&1
+	if [ $? -ne 0 ]; then
+    		echo "$0: ERROR: cannot set sys_labeling in $ROOT_PATH/etc/system"
+		exit $SMF_EXIT_ERR_FATAL
+	fi
+
+	do_bootupd
+
+	# Setup dependent services
+	do_otherservices
+
+	do_logindev
+	do_bsmconv
+	do_nscd
+}
+
+
+daemon_start()
+{
+	# If a labeld door exists, check for a labeld process and exit
+	# if the daemon is already running.
+	if [ -r /var/tsol/doors/labeld ]; then
+		if /usr/bin/pgrep -x -u 0 -P 1 labeld >/dev/null 2>&1; then
+			echo "$0: labeld is already running"
+			exit $SMF_EXIT_ERR_FATAL
+		fi
+	fi
+	/usr/bin/rm -f /var/tsol/doors/labeld
+	/usr/lib/labeld
+}
+
+PATH=/usr/sbin:/usr/bin; export PATH
+
+case "$1" in
+'start')
+	if [ -z "$ROOT_PATH" -o "$ROOT_PATH" = "/" ]; then
+		# native
+
+		if [ -z "$SMF_FMRI" ]; then
+			echo "$0: this script can only be invoked by smf(5)"
+			exit $SMF_EXIT_ERR_NOSMF
+		fi
+
+		tx_enabled=`/usr/bin/svcprop -c -p general/enabled $SMF_FMRI`
+		if [ "$tx_enabled" = "false" ]; then
+			# A sign of trying temporary enablement...no-no
+			echo "$0: Temporarily enabling Trusted Extensions is not allowed."
+			exit $SMF_EXIT_ERR_CONFIG
+		fi
+
+		if (smf_is_system_labeled); then
+			daemon_start
+			exit $SMF_EXIT_OK
+		fi
+
+		# Make changes to enable Trusted Extensions
+		grep "^set sys_labeling=1" ${ROOT_PATH}/etc/system > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			echo "$0: already enabled. Exiting."
+			exit $SMF_EXIT_OK
+		fi
+
+		if [ "`/usr/sbin/zoneadm list -c`" != "global" ]; then
+			echo "$0: Must remove zones before enabling Trusted Extensions."
+			exit $SMF_EXIT_ERR_CONFIG
+		fi
+
+		do_commonstart
+
+		# start daemon proccess so our service doesn't go into
+		# maintenance state
+		daemon_start
+
+		echo "$0: Started.  Must reboot and configure Trusted Extensions."
+	else
+		# Support jumpstart etc
+
+		# Make changes to enable Trusted Extensions
+		grep "^set sys_labeling=1" ${ROOT_PATH}/etc/system > /dev/null 2>&1
+		if [ $? -eq 0 ]; then
+			echo "$0: already enabled. Exiting."
+			exit $SMF_EXIT_OK
+		fi
+
+		# Setup dependent services
+		cat >> $ROOT_PATH/var/svc/profile/upgrade <<\__TRUSTED_ENABLE
+			/usr/sbin/svcadm enable -s svc:/system/labeld:default
+__TRUSTED_ENABLE
+
+		do_commonstart
+		echo "$0: Started.  Must configure Trusted Extensions before booting."
+	fi
+	;;
+
+'stop')
+	tx_enabled=`/usr/bin/svcprop -c -p general/enabled $SMF_FMRI`
+	if [ "$tx_enabled" = "true" ]; then
+		/usr/bin/pkill -x -u 0 -P 1 -z `smf_zonename` labeld
+		exit $SMF_EXIT_OK
+	fi
+
+	if [ "`/usr/sbin/zoneadm list -c`" != "global" ]; then
+		echo "$0: Must remove zones before disabling Trusted Extensions."
+		exit $SMF_EXIT_ERR_CONFIG
+	fi
+
+	# Stop Trusted services.
+	/usr/sbin/svcadm disable svc:/system/tsol-zones:default 2>/dev/null
+	/usr/sbin/svcadm disable svc:/network/tnd:default 2>/dev/null
+
+	# Uncomment audio and usb device entries in /etc/logindevperm.
+	LOGINDEVPERM=$ROOT_PATH/etc/logindevperm
+	if [ -f $LOGINDEVPERM ]; then
+		line="\/dev\/console	0600	\/dev\/sound\/\*"
+		sed -e "s/^#$line/$line/" $LOGINDEVPERM > /tmp/tmp.$$
+		cp /tmp/tmp.$$ $LOGINDEVPERM
+		line="\/dev\/console	0600	\/dev\/usb\/\[0-9a-f\]+\[.\]\[0-9a-f\]+\/\[0-9\]+\/\*"
+		sed -e "s/^#$line/$line/" $LOGINDEVPERM > /tmp/tmp.$$
+		cp /tmp/tmp.$$ $LOGINDEVPERM
+		rm -f /tmp/tmp.$$
+	fi
+
+	# Remove sys_labeling from /etc/system
+	grep -v "sys_labeling" ${ROOT_PATH}/etc/system > /tmp/etc.system.$$
+	mv /tmp/etc.system.$$ ${ROOT_PATH}/etc/system
+	grep "sys_labeling" ${ROOT_PATH}/etc/system > /dev/null 2>&1
+	if [ $? -eq 0 ]; then
+    		echo "$0: ERROR: cannot remove sys_labeling in $ROOT_PATH/etc/system"
+		exit $SMF_EXIT_ERR_FATAL
+	fi
+
+	do_bootupd
+
+	/usr/bin/pkill -x -u 0 -P 1 -z `smf_zonename` labeld
+	echo "$0: Stopped.  Will take effect at next boot."
+	;;
+
+*)
+	echo "Usage: $0 { start | stop }"
+	exit 1
+	;;
+esac
+
+exit $SMF_EXIT_OK
+

@@ -37,6 +37,7 @@
  */
 
 #include <string.h>
+#include <deflt.h>
 #include <tsol/label.h>
 #include <bsm/devices.h>
 #include <bsm/devalloc.h>
@@ -254,7 +255,6 @@ static void process_syseventq();
 int
 main(int argc, char *argv[])
 {
-	struct stat tx_stat;
 	struct passwd *pw;
 	struct group *gp;
 	pid_t pid;
@@ -301,16 +301,26 @@ main(int argc, char *argv[])
 		/*
 		 * is_system_labeled() will return false in case we are
 		 * starting before the first reboot after Trusted Extensions
-		 * is installed. we check for a well known TX binary to
-		 * to see if TX is installed.
+		 * is enabled.  Check the setting in /etc/system to see if
+		 * TX is enabled (even if not yet booted).
 		 */
-		if (stat(DA_LABEL_CHECK, &tx_stat) == 0)
-			system_labeled = TRUE;
-		else {
-			/* test hook: see also mkdevalloc.c and allocate.c */
-			system_labeled = is_system_labeled_debug(&tx_stat);
+		if (defopen("/etc/system") == 0) {
+			if (defread("set sys_labeling=1") != NULL)
+				system_labeled = TRUE;
+
+			/* close defaults file */
+			(void) defopen(NULL);
 		}
 	}
+
+#ifdef DEBUG
+	if (system_labeled == FALSE) {
+		struct stat tx_stat;
+
+		/* test hook: see also mkdevalloc.c and allocate.c */
+		system_labeled = is_system_labeled_debug(&tx_stat);
+	}
+#endif
 
 	parse_args(argc, argv);
 

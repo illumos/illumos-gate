@@ -49,7 +49,7 @@
 #include <sys/dnlc.h>
 
 
-int sys_labeling = -1;			/* initially unset */
+int sys_labeling = 0;			/* the default is "off" */
 
 static kmem_cache_t *tslabel_cache;
 ts_label_t *l_admin_low;
@@ -69,14 +69,9 @@ label_init(void)
 	bslabel_t label;
 
 	/*
-	 * Use the value of "label_services" within the edition module.
-	 * If for some reason label_services is not found, this will
-	 * result in the appropriate default -- "off."
+	 * sys_labeling will default to "off" unless it is overridden
+	 * in /etc/system.
 	 */
-	if (modgetsymvalue("label_services", B_FALSE) != 0)
-		sys_labeling = 1;
-	else
-		sys_labeling = 0;
 
 	tslabel_cache = kmem_cache_create("tslabel_cache", sizeof (ts_label_t),
 	    0, NULL, NULL, NULL, NULL, NULL, 0);

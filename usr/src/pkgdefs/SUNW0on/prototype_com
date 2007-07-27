@@ -257,6 +257,29 @@ f none usr/lib/help/auths/locale/DevCDRW.html 0444 root bin
 f none usr/lib/help/auths/locale/IdmapRules.html 0444 root bin
 f none usr/lib/help/auths/locale/SmfIdmapStates.html 0444 root bin
 f none usr/lib/help/auths/locale/SmfValueIdmap.html 0444 root bin
+f none usr/lib/help/auths/locale/FileChown.html 444 root bin
+f none usr/lib/help/auths/locale/FileHeader.html 444 root bin
+f none usr/lib/help/auths/locale/FileOwner.html 444 root bin
+f none usr/lib/help/auths/locale/LabelHeader.html 444 root bin
+f none usr/lib/help/auths/locale/LabelFileDowngrade.html 444 root bin
+f none usr/lib/help/auths/locale/LabelFileUpgrade.html 444 root bin
+f none usr/lib/help/auths/locale/LabelPrint.html 444 root bin
+f none usr/lib/help/auths/locale/LabelRange.html 444 root bin
+f none usr/lib/help/auths/locale/LabelServer.html 444 root bin
+f none usr/lib/help/auths/locale/LabelWinDowngrade.html 444 root bin
+f none usr/lib/help/auths/locale/LabelWinNoView.html 444 root bin
+f none usr/lib/help/auths/locale/LabelWinUpgrade.html 444 root bin
+f none usr/lib/help/auths/locale/PrintHeader.html 444 root bin
+f none usr/lib/help/auths/locale/PrintAdmin.html 444 root bin
+f none usr/lib/help/auths/locale/PrintCancel.html 444 root bin
+f none usr/lib/help/auths/locale/PrintList.html 444 root bin
+f none usr/lib/help/auths/locale/PrintNoBanner.html 444 root bin
+f none usr/lib/help/auths/locale/PrintPs.html 444 root bin
+f none usr/lib/help/auths/locale/PrintUnlabeled.html 444 root bin
+f none usr/lib/help/auths/locale/TNDaemon.html 444 root bin
+f none usr/lib/help/auths/locale/TNctl.html 444 root bin
+f none usr/lib/help/auths/locale/ValueTND.html 444 root bin
+#
 d none usr/lib/help/profiles 755 root bin
 d none usr/lib/help/profiles/locale 755 root bin
 f none usr/lib/help/profiles/locale/RtAll.html 444 root bin
@@ -302,6 +325,9 @@ f none usr/lib/help/profiles/locale/RtZFSStorageMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtZoneMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtIdmapMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtIdmapNameRulesMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtInfoSec.html 444 root bin
+f none usr/lib/help/profiles/locale/RtObjectLabelMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtOutsideAccred.html 444 root bin
 #
 #
 # OCF Messages

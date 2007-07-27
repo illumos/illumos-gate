@@ -34,6 +34,7 @@ SUBDIRS =		netpr
 PROG =			lp.set		\
 			lp.cat		\
 			lp.tell		\
+			lp.tsol_separator	\
 			drain.output
 
 SRCS =			$(PROG:%=%.c)
@@ -42,6 +43,10 @@ OBJS =			$(PROG:%=%.o)
 
 MODELS =		standard	\
 			netstandard	\
+			tsol_standard	\
+			tsol_netstandard	\
+			tsol_standard_foomatic	\
+			tsol_netstandard_foomatic	\
 			uri
 
 MISC =			alert.proto
@@ -59,6 +64,7 @@ CPPFLAGS =		-I$(LPINC) $(CPPFLAGS.master)
 # conditional assignments
 lp.tell :=			LDLIBS += $(LIBMSG) $(LIBLP)
 lp.set drain.output lp.cat :=	LDLIBS += $(LIBLP) -lcurses
+lp.tsol_separator :=		LDLIBS += -ltsol
 
 $(ROOTMISC) :=		FILEMODE = 0444
 

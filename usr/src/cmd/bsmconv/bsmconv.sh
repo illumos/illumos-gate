@@ -20,7 +20,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -158,10 +158,18 @@ fi
 
 form=`gettext "%s: INFO: initializing device allocation."`
 printf "${form}\n" $PROG
-if [ -x /usr/bin/plabel ]
-then
-	# Trusted Extensions is installed. This is not currently done
-	# for alternate boot environments.
+
+# Need to determine if Trusted Extensions is enabled.  This is tricky
+# because we need to know if TX will be active on the boot following
+# bsmconv.  Check the setting in etc/system (other methods won't work
+# because TX is likely not yet fully active.)
+#
+grep "^[ 	]*set[ 	][ 	]*sys_labeling[ 	]*=[ 	]*1" \
+    $ROOT/etc/system > /dev/null 2>&1
+
+if [ $? = 0 ]; then
+	# Trusted Extensions is enabled (but possibly not yet booted).
+	# This is not currently done for alternate boot environments.
 	if [ -z "$ROOT" -o "$ROOT" = "/" ]
 	then
 		/usr/sbin/devfsadm -e
