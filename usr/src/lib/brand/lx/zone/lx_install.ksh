@@ -272,10 +272,11 @@ ZONE_SUBPROC_NOTCOMPLETE=254
 ZONE_SUBPROC_FATAL=255
 
 #
-# Exit code to return if install is interrupted or exit code is otherwise
-# unspecified.
+# An unspecified exit or interrupt should exit with ZONE_SUBPROC_NOTCOMPLETE,
+# meaning a user will not need to do an uninstall before attempting another
+# install.
 #
-int_code=$ZONE_SUBPROC_USAGE
+int_code=$ZONE_SUBPROC_NOTCOMPLETE
 
 trap trap_cleanup INT
 
@@ -338,7 +339,8 @@ fi
 # The install can't be both verbose AND silent...
 if [[ -n $silent_mode && -n $verbose_mode ]]; then
 	screenlog "$both_modes" "zoneadm install"
-	exit $int_code
+	screenlog ""
+	usage
 fi
 
 #
@@ -354,7 +356,7 @@ procinfo=$(LC_ALL=C psrinfo -vp | grep family)
 if [[ "$procinfo" != *" x86 "* ]] ||
     [[ "$procinfo" != *" family 6 "* && "$procinfo" != *" family 15 "* ]] ; then
 	screenlog "$unsupported_cpu" "i686"
-	exit $ZONE_SUBPROC_NOTCOMPLETE
+	exit $int_code
 fi
 
 if [[ -n $install_src ]]; then
@@ -447,14 +449,6 @@ fi
 
 [[ -n $gtaropts ]] && gtaropts="${gtaropts}f"
 
-#
-# From here on out, an unspecified exit or interrupt should exit with
-# ZONE_SUBPROC_NOTCOMPLETE, meaning a user will need to do an uninstall before
-# attempting another install, as we've modified the directories we were going
-# to install to in some way.
-#
-int_code=$ZONE_SUBPROC_NOTCOMPLETE
-
 if [[ ! -d "$install_root" ]]
 then
 	if ! mkdir -p "$install_root" 2>/dev/null; then
@@ -474,6 +468,14 @@ fi
 logfile="${logdir}/$zonename.install.$$.log"
 
 exec 2>"$logfile"
+
+#
+# From here on out, an unspecified exit or interrupt should exit with
+# ZONE_SUBPROC_FATAL, meaning a user will need to do an uninstall before
+# attempting another install, as we've modified the directories we were going
+# to install to in some way.
+#
+int_code=$ZONE_SUBPROC_FATAL
 
 log "Installation started for zone \"$zonename\" `/usr/bin/date`"
 
