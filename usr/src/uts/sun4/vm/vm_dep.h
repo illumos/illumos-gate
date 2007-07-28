@@ -335,9 +335,16 @@ typedef	struct {
  * when memory is added (kphysm_add_memory_dynamic) or deleted
  * (kphysm_del_cleanup).
  */
-#define	PLCNT_MODIFY_MAX(pfn, cnt) {					\
-	int	mn = PFN_2_MEM_NODE(pfn);				\
-	atomic_add_long(&plcnt[mn][MTYPE_RELOC].plc_mt_pgmax, (cnt));	\
+#define	PLCNT_MODIFY_MAX(startpfn, cnt) {				\
+	pfn_t	pfn = startpfn, endpfn = startpfn + ABS(cnt);		\
+	while (pfn < endpfn) {						\
+		int mn = PFN_2_MEM_NODE(pfn);				\
+		long inc = MIN(endpfn, mem_node_config[mn].physmax + 1)	\
+		    - pfn;						\
+		pfn += inc;						\
+		atomic_add_long(&plcnt[mn][MTYPE_RELOC].plc_mt_pgmax, 	\
+		    ((cnt) < 0) ? -inc: inc);				\
+	}								\
 }
 
 extern plcnt_t	plcnt;
