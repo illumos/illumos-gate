@@ -834,7 +834,6 @@ startup_memlist(void)
 	caddr_t page_ctrs_mem;
 	size_t page_ctrs_size;
 	struct memlist *current;
-	extern size_t textrepl_size_thresh;
 	extern void startup_build_mem_nodes(struct memlist *);
 
 	/* XX64 fix these - they should be in include files */
@@ -1080,10 +1079,13 @@ startup_memlist(void)
 
 	PRM_DEBUG(valloc_sz);
 
-	if ((availrmem >> (30 - MMU_PAGESHIFT)) >= textrepl_min_gb &&
-	    l2cache_sz <= 2 << 20) {
+#if defined(__amd64)
+	if ((availrmem >> (30 - MMU_PAGESHIFT)) >=
+	    textrepl_min_gb && l2cache_sz <= 2 << 20) {
+		extern size_t textrepl_size_thresh;
 		textrepl_size_thresh = (16 << 20) - 1;
 	}
+#endif
 }
 
 /*

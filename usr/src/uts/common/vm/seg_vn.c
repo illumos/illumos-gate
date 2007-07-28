@@ -198,8 +198,8 @@ static int segvn_claim_pages(struct seg *, struct vpage *, u_offset_t,
 static void segvn_hat_rgn_unload_callback(caddr_t, caddr_t, caddr_t,
     size_t, void *, u_offset_t);
 
-static int segvn_pp_lock_anonpages(page_t *, int);
-static void segvn_pp_unlock_anonpages(page_t *, int);
+static int segvn_slock_anonpages(page_t *, int);
+static void segvn_sunlock_anonpages(page_t *, int);
 
 static struct kmem_cache *segvn_cache;
 
@@ -427,6 +427,7 @@ segvn_init(void)
 		segvn_disable_textrepl = 1;
 	}
 
+#if defined(_LP64)
 	if (lgrp_optimizations() && textrepl_size_thresh != (size_t)-1 &&
 	    !segvn_disable_textrepl) {
 		ulong_t i;
@@ -448,6 +449,7 @@ segvn_init(void)
 		(void) thread_create(NULL, 0, segvn_trasync_thread,
 		    NULL, 0, &p0, TS_RUN, minclsyspri);
 	}
+#endif
 }
 
 #define	SEGVN_PAGEIO	((void *)0x1)
@@ -2250,7 +2252,12 @@ segvn_free(struct seg *seg)
 	kmem_cache_free(segvn_cache, svd);
 }
 
+#ifdef DEBUG
+uint32_t segvn_slock_mtbf = 0;
+#endif
+
 ulong_t segvn_lpglck_limit = 0;
+
 /*
  * Support routines used by segvn_pagelock() and softlock faults for anonymous
  * pages to implement availrmem accounting in a way that makes sure the
@@ -2277,7 +2284,7 @@ ulong_t segvn_lpglck_limit = 0;
  * page was locked.
  */
 static int
-segvn_pp_lock_anonpages(page_t *pp, int first)
+segvn_slock_anonpages(page_t *pp, int first)
 {
 	pgcnt_t		pages;
 	pfn_t		pfn;
@@ -2317,6 +2324,12 @@ segvn_pp_lock_anonpages(page_t *pp, int first)
 #endif /* DEBUG */
 	}
 
+#ifdef DEBUG
+	if (segvn_slock_mtbf && !(gethrtime() % segvn_slock_mtbf)) {
+		return (0);
+	}
+#endif /* DEBUG */
+
 	/*
 	 * pp is a root page.
 	 * We haven't locked this large page yet.
@@ -2346,7 +2359,7 @@ segvn_pp_lock_anonpages(page_t *pp, int first)
 }
 
 static void
-segvn_pp_unlock_anonpages(page_t *pp, int first)
+segvn_sunlock_anonpages(page_t *pp, int first)
 {
 	pgcnt_t		pages;
 	pfn_t		pfn;
@@ -2457,7 +2470,7 @@ segvn_softunlock(struct seg *seg, caddr_t addr, size_t len, enum seg_rw rw)
 		TRACE_3(TR_FAC_VM, TR_SEGVN_FAULT,
 			"segvn_fault:pp %p vp %p offset %llx", pp, vp, offset);
 		if (svd->vp == NULL) {
-			segvn_pp_unlock_anonpages(pp, adr == addr);
+			segvn_sunlock_anonpages(pp, adr == addr);
 		}
 		page_unlock(pp);
 	}
@@ -2665,7 +2678,7 @@ segvn_faultpage(
 				page_migrate(seg, addr, &pp, 1);
 
 			if (type == F_SOFTLOCK) {
-				if (!segvn_pp_lock_anonpages(pp, first)) {
+				if (!segvn_slock_anonpages(pp, first)) {
 					page_unlock(pp);
 					err = ENOMEM;
 					goto out;
@@ -2843,7 +2856,7 @@ segvn_faultpage(
 			    (svd->type == MAP_SHARED &&
 				amp != NULL && amp->a_szc != 0));
 
-			if (!segvn_pp_lock_anonpages(opp, first)) {
+			if (!segvn_slock_anonpages(opp, first)) {
 				page_unlock(opp);
 				err = ENOMEM;
 				goto out;
@@ -2981,7 +2994,7 @@ segvn_faultpage(
 
 	ASSERT(pp->p_szc == 0);
 	if (type == F_SOFTLOCK && svd->vp == NULL) {
-		if (!segvn_pp_lock_anonpages(pp, first)) {
+		if (!segvn_slock_anonpages(pp, first)) {
 			page_unlock(pp);
 			err = ENOMEM;
 			goto out;
@@ -4704,16 +4717,33 @@ segvn_fault_anonpages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			ASSERT(svd->rcookie == HAT_INVALID_REGION_COOKIE);
 			if (type == F_SOFTLOCK && svd->vp == NULL) {
 				/*
-				 * All pages in ppa array belong to the same
-				 * large page. This means it's ok to call
-				 * segvn_pp_lock_anonpages just for ppa[0].
+				 * If all pages in ppa array belong to the same
+				 * large page call segvn_slock_anonpages()
+				 * just for ppa[0].
 				 */
-				if (!segvn_pp_lock_anonpages(ppa[0], first)) {
-					for (i = 0; i < pages; i++) {
-						page_unlock(ppa[i]);
+				for (i = 0; i < pages; i++) {
+					if (!segvn_slock_anonpages(ppa[i],
+					    i == 0 && first)) {
+						ulong_t j;
+						for (j = 0; j < i; j++) {
+							segvn_sunlock_anonpages(
+								ppa[j],
+								j == 0 &&
+								first);
+							page_unlock(ppa[j]);
+						}
+						for (j = i; j < pages; j++) {
+							page_unlock(ppa[j]);
+						}
+						anon_array_exit(&cookie);
+						err = FC_MAKE_ERR(ENOMEM);
+						goto error;
 					}
-					err = FC_MAKE_ERR(ENOMEM);
-					goto error;
+					if (i == 0 && ppa[0]->p_szc >= szc) {
+						ASSERT(!(page_pptonum(ppa[0]) &
+						    (pages - 1)));
+						break;
+					}
 				}
 				first = 0;
 				mutex_enter(&freemem_lock);
@@ -8588,8 +8618,8 @@ segvn_pagelock(struct seg *seg, caddr_t addr, size_t len, struct page ***ppp,
 	}
 
 	/*
-	 * Avoid per page overhead of segvn_pp_lock_anonpages() for small
-	 * pages. For large pages segvn_pp_lock_anonpages() only does real
+	 * Avoid per page overhead of segvn_slock_anonpages() for small
+	 * pages. For large pages segvn_slock_anonpages() only does real
 	 * work once per large page.  The tradeoff is that we may decrement
 	 * availrmem more than once for the same page but this is ok
 	 * for small pages.
@@ -8648,7 +8678,7 @@ segvn_pagelock(struct seg *seg, caddr_t addr, size_t len, struct page ***ppp,
 			break;
 		}
 		if (seg->s_szc != 0 || pp->p_szc != 0) {
-			if (!segvn_pp_lock_anonpages(pp, a == addr)) {
+			if (!segvn_slock_anonpages(pp, a == addr)) {
 				page_unlock(pp);
 				break;
 			}
@@ -8691,7 +8721,7 @@ segvn_pagelock(struct seg *seg, caddr_t addr, size_t len, struct page ***ppp,
 	while (np > (uint_t)0) {
 		ASSERT(PAGE_LOCKED(*pplist));
 		if (seg->s_szc != 0 || (*pplist)->p_szc != 0) {
-			segvn_pp_unlock_anonpages(*pplist, pplist == pl);
+			segvn_sunlock_anonpages(*pplist, pplist == pl);
 		}
 		page_unlock(*pplist);
 		np--;
@@ -8748,7 +8778,7 @@ segvn_reclaim(struct seg *seg, caddr_t addr, size_t len, struct page **pplist,
 			hat_setref(*pplist);
 		}
 		if (seg->s_szc != 0 || (*pplist)->p_szc != 0) {
-			segvn_pp_unlock_anonpages(*pplist, pplist == pl);
+			segvn_sunlock_anonpages(*pplist, pplist == pl);
 		} else {
 			szc0_npages++;
 		}
