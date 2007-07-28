@@ -1799,7 +1799,6 @@ lxml_get_bundle_file(bundle_t *bundle, const char *filename, int apply)
 	xmlValidCtxtPtr vcp;
 	boolean_t do_validate;
 	char *dtdpath = NULL;
-	struct stat	st;
 	int r;
 
 	/*
