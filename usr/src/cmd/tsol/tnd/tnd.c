@@ -207,6 +207,7 @@ char time_buf[_SZ_TIME_BUF];
 #define	STRING_PRIVS_SIZE 4800
 #define	ID_ENT_SIZE 500
 
+int
 main(int argc, char **argv)
 {
 
@@ -543,7 +544,7 @@ static int
 isnumber(s)
 char *s;
 {
-	register c;
+	register int c;
 
 	/* LINTED */
 	while (c = *s++)
