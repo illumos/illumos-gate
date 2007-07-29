@@ -55,6 +55,7 @@
 #include <sys/cnex.h>
 #include <sys/mach_descrip.h>
 #include <sys/hsvc.h>
+#include <sys/sdt.h>
 
 /*
  * Internal functions/information
@@ -78,6 +79,8 @@ static void *cnex_state;
 
 static void cnex_intr_redist(void *arg);
 static uint_t cnex_intr_wrapper(caddr_t arg);
+static dev_info_t *cnex_find_chan_dip(dev_info_t *dip, uint64_t chan_id,
+    md_t *mdp, mde_cookie_t mde);
 
 /*
  * Debug info
@@ -245,7 +248,7 @@ _init(void)
 	}
 
 	if ((err = ddi_soft_state_init(&cnex_state,
-		sizeof (cnex_soft_state_t), 0)) != 0) {
+	    sizeof (cnex_soft_state_t), 0)) != 0) {
 		return (err);
 	}
 	if ((err = mod_install(&modlinkage)) != 0) {
@@ -350,6 +353,7 @@ cnex_intr_redist(void *arg)
 
 			} while (!panicstr && ++retries <= cnex_wait_retries);
 
+			cldcp->tx.cpuid = cpuid;
 			(void) hvldc_intr_settarget(cnex_ssp->cfghdl,
 			    cldcp->tx.ino, cpuid);
 			(void) hvldc_intr_setvalid(cnex_ssp->cfghdl,
@@ -412,6 +416,7 @@ cnex_intr_redist(void *arg)
 
 			} while (!panicstr && ++retries <= cnex_wait_retries);
 
+			cldcp->rx.cpuid = cpuid;
 			(void) hvldc_intr_settarget(cnex_ssp->cfghdl,
 			    cldcp->rx.ino, cpuid);
 			(void) hvldc_intr_setvalid(cnex_ssp->cfghdl,
@@ -444,6 +449,7 @@ cnex_reg_chan(dev_info_t *dip, uint64_t id, ldc_dev_t devclass)
 	uint64_t	txino = (uint64_t)-1;
 	cnex_soft_state_t *cnex_ssp;
 	int		status, instance;
+	dev_info_t	*chan_dip = NULL;
 
 	/* Get device instance and structure */
 	instance = ddi_get_instance(dip);
@@ -518,6 +524,8 @@ cnex_reg_chan(dev_info_t *dip, uint64_t id, ldc_dev_t devclass)
 			mutex_exit(&cnex_ssp->clist_lock);
 			return (ENXIO);
 		}
+		chan_dip = cnex_find_chan_dip(dip, id, mdp, listp[idx]);
+		ASSERT(chan_dip != NULL);
 	}
 	kmem_free(listp, listsz);
 	(void) md_fini_handle(mdp);
@@ -542,6 +550,7 @@ cnex_reg_chan(dev_info_t *dip, uint64_t id, ldc_dev_t devclass)
 	cldcp->tx.ino = txino;
 	cldcp->rx.ino = rxino;
 	cldcp->devclass = devclass;
+	cldcp->dip = chan_dip;
 
 	/* add channel to nexus channel list */
 	cldcp->next = cnex_ssp->clist;
@@ -562,7 +571,6 @@ cnex_add_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype,
 	int		rv, idx, pil;
 	cnex_ldc_t	*cldcp;
 	cnex_intr_t	*iinfo;
-	uint64_t	cpuid;
 	cnex_soft_state_t *cnex_ssp;
 	int		instance;
 
@@ -611,7 +619,7 @@ cnex_add_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype,
 	iinfo->arg1 = arg1;
 	iinfo->arg2 = arg2;
 
-	iinfo->ssp = cnex_ssp;
+	iinfo->cldcp = cldcp;
 
 	/*
 	 * FIXME - generate the interrupt cookie
@@ -638,10 +646,10 @@ cnex_add_intr(dev_info_t *dip, uint64_t id, cnex_intrtype_t itype,
 	rv = hvldc_intr_setcookie(cnex_ssp->cfghdl, iinfo->ino, iinfo->icookie);
 
 	/* pick next CPU in the domain for this channel */
-	cpuid = intr_dist_cpuid();
+	iinfo->cpuid = intr_dist_cpuid();
 
 	/* set the target CPU and then enable interrupts */
-	rv = hvldc_intr_settarget(cnex_ssp->cfghdl, iinfo->ino, cpuid);
+	rv = hvldc_intr_settarget(cnex_ssp->cfghdl, iinfo->ino, iinfo->cpuid);
 	if (rv) {
 		DWARN("cnex_add_intr: ino=0x%llx, cannot set target cpu\n",
 		    iinfo->ino);
@@ -912,8 +920,29 @@ cnex_intr_wrapper(caddr_t arg)
 	handler_arg1 = iinfo->arg1;
 	handler_arg2 = iinfo->arg2;
 
-	D1("cnex_intr_wrapper: ino=0x%llx invoke client handler\n", iinfo->ino);
+	/*
+	 * The 'interrupt__start' and 'interrupt__complete' probes
+	 * are provided to support 'intrstat' command. These probes
+	 * help monitor the interrupts on a per device basis only.
+	 * In order to provide the ability to monitor the
+	 * activity on a per channel basis, two additional
+	 * probes('channelintr__start','channelintr__complete')
+	 * are provided here.
+	 */
+	DTRACE_PROBE4(channelintr__start, uint64_t, iinfo->cldcp->id,
+	    cnex_intr_t *, iinfo, void *, handler, caddr_t, handler_arg1);
+
+	DTRACE_PROBE4(interrupt__start, dev_info_t, iinfo->cldcp->dip,
+	    void *, handler, caddr_t, handler_arg1, caddr_t, handler_arg2);
+
+	D1("cnex_intr_wrapper:ino=0x%llx invoke client handler\n", iinfo->ino);
 	res = (*handler)(handler_arg1, handler_arg2);
+
+	DTRACE_PROBE4(interrupt__complete, dev_info_t, iinfo->cldcp->dip,
+	    void *, handler, caddr_t, handler_arg1, int, res);
+
+	DTRACE_PROBE4(channelintr__complete, uint64_t, iinfo->cldcp->id,
+	    cnex_intr_t *, iinfo, void *, handler, caddr_t, handler_arg1);
 
 	return (res);
 }
@@ -949,7 +978,7 @@ cnex_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	cnex_ssp->clist = NULL;
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
-		"reg", (caddr_t)&reg_p, &reglen) != DDI_SUCCESS) {
+	    "reg", (caddr_t)&reg_p, &reglen) != DDI_SUCCESS) {
 		return (DDI_FAILURE);
 	}
 
@@ -1108,8 +1137,8 @@ cnex_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 		dev_info_t *child = (dev_info_t *)arg;
 
 		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, child,
-			DDI_PROP_DONTPASS, "reg",
-			&cnex_regspec, &reglen) != DDI_SUCCESS) {
+		    DDI_PROP_DONTPASS, "reg",
+		    &cnex_regspec, &reglen) != DDI_SUCCESS) {
 			return (DDI_FAILURE);
 		}
 
@@ -1165,6 +1194,137 @@ cnex_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 		 */
 		return (ddi_ctlops(dip, rdip, ctlop, arg, result));
 	}
+}
+
+/*
+ * cnex_find_chan_dip -- Find the dip of a device that is corresponding
+ * 	to the specific channel. Below are the details on how the dip
+ *	is derived.
+ *
+ *	- In the MD, the cfg-handle is expected to be unique for
+ *	  virtual-device nodes that have the same 'name' property value.
+ *	  This value is expected to be the same as that of "reg" property
+ *	  of the corresponding OBP device node.
+ *
+ *	- The value of the 'name' property of a virtual-device node
+ *	  in the MD is expected to be the same for the corresponding
+ *	  OBP device node.
+ *
+ *	- Find the virtual-device node corresponding to a channel-endpoint
+ *	  by walking backwards. Then obtain the values for the 'name' and
+ *	  'cfg-handle' properties.
+ *
+ *	- Walk all the children of the cnex, find a matching dip which
+ *	  has the same 'name' and 'reg' property values.
+ *
+ *	- The channels that have no corresponding device driver are
+ *	  treated as if they  correspond to the cnex driver,
+ *	  that is, return cnex dip for them. This means, the
+ *	  cnex acts as an umbrella device driver. Note, this is
+ *	  for 'intrstat' statistics purposes only. As a result of this,
+ *	  the 'intrstat' shows cnex as the device that is servicing the
+ *	  interrupts corresponding to these channels.
+ *
+ *	  For now, only one such case is known, that is, the channels that
+ *	  are used by the "domain-services".
+ */
+static dev_info_t *
+cnex_find_chan_dip(dev_info_t *dip, uint64_t chan_id,
+    md_t *mdp, mde_cookie_t mde)
+{
+	int listsz;
+	int num_nodes;
+	int num_devs;
+	uint64_t cfghdl;
+	char *md_name;
+	mde_cookie_t *listp;
+	dev_info_t *cdip = NULL;
+
+	num_nodes = md_node_count(mdp);
+	ASSERT(num_nodes > 0);
+	listsz = num_nodes * sizeof (mde_cookie_t);
+	listp = (mde_cookie_t *)kmem_zalloc(listsz, KM_SLEEP);
+
+	num_devs = md_scan_dag(mdp, mde, md_find_name(mdp, "virtual-device"),
+	    md_find_name(mdp, "back"), listp);
+	ASSERT(num_devs <= 1);
+	if (num_devs <= 0) {
+		DWARN("cnex_find_chan_dip:channel(0x%llx): "
+		    "No virtual-device found\n", chan_id);
+		goto fdip_exit;
+	}
+	if (md_get_prop_str(mdp, listp[0], "name", &md_name) != 0) {
+		DWARN("cnex_find_chan_dip:channel(0x%llx): "
+		    "name property not found\n", chan_id);
+		goto fdip_exit;
+	}
+
+	D1("cnex_find_chan_dip: channel(0x%llx): virtual-device "
+	    "name property value = %s\n", chan_id, md_name);
+
+	if (md_get_prop_val(mdp, listp[0], "cfg-handle", &cfghdl) != 0) {
+		DWARN("cnex_find_chan_dip:channel(0x%llx): virtual-device's "
+		    "cfg-handle property not found\n", chan_id);
+		goto fdip_exit;
+	}
+
+	D1("cnex_find_chan_dip:channel(0x%llx): virtual-device cfg-handle "
+	    " property value = 0x%x\n", chan_id, cfghdl);
+
+	for (cdip = ddi_get_child(dip); cdip != NULL;
+	    cdip = ddi_get_next_sibling(cdip)) {
+
+		int *cnex_regspec;
+		uint32_t reglen;
+		char	*dev_name;
+
+		if (ddi_prop_lookup_string(DDI_DEV_T_ANY, cdip,
+		    DDI_PROP_DONTPASS, "name",
+		    &dev_name) != DDI_PROP_SUCCESS) {
+			DWARN("cnex_find_chan_dip: name property not"
+			    " found for dip(0x%p)\n", cdip);
+			continue;
+		}
+		if (strcmp(md_name, dev_name) != 0) {
+			ddi_prop_free(dev_name);
+			continue;
+		}
+		ddi_prop_free(dev_name);
+		if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, cdip,
+		    DDI_PROP_DONTPASS, "reg",
+		    &cnex_regspec, &reglen) != DDI_SUCCESS) {
+			DWARN("cnex_find_chan_dip: reg property not"
+			    " found for dip(0x%p)\n", cdip);
+			continue;
+		}
+		if (*cnex_regspec == cfghdl) {
+			D1("cnex_find_chan_dip:channel(0x%llx): found "
+			    "dip(0x%p) drvname=%s\n", chan_id, cdip,
+			    ddi_driver_name(cdip));
+			break;
+		}
+		ddi_prop_free(cnex_regspec);
+	}
+
+fdip_exit:
+	if (cdip == NULL) {
+		/*
+		 * If a virtual-device node exists but no dip found,
+		 * then for now print a DEBUG error message only.
+		 */
+		if (num_devs > 0) {
+			DERR("cnex_find_chan_dip:channel(0x%llx): "
+			    "No device found\n", chan_id);
+		}
+
+		/* If no dip was found, return cnex device's dip. */
+		cdip = dip;
+	}
+
+	kmem_free(listp, listsz);
+	D1("cnex_find_chan_dip:channel(0x%llx): returning dip=0x%p\n",
+	    chan_id, cdip);
+	return (cdip);
 }
 
 /* -------------------------------------------------------------------------- */

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,11 +54,12 @@ struct cnex_pil_map {
  */
 typedef struct cnex_intr {
 	uint64_t	ino;		/* dev intr number */
+	uint64_t	cpuid;		/* Target CPU */
 	uint64_t	icookie;	/* dev intr cookie */
 	uint_t		(*hdlr)();	/* intr handler */
 	caddr_t		arg1;		/* intr argument 1 */
 	caddr_t		arg2;		/* intr argument 2 */
-	void		*ssp;		/* back ptr to soft state */
+	struct cnex_ldc *cldcp;		/* back pointer to the ldc */
 } cnex_intr_t;
 
 /* cnex interrupt types */
@@ -79,6 +80,7 @@ typedef struct cnex_ldc {
 
 	cnex_intr_t	tx;		/* Transmit interrupt */
 	cnex_intr_t	rx;		/* Receive interrupt */
+	dev_info_t	*dip;		/* dip of the associated device */
 } cnex_ldc_t;
 
 /*
