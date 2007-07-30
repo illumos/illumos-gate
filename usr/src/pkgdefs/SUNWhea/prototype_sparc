@@ -256,17 +256,6 @@ f none usr/platform/sun4u/include/sys/xc_impl.h 644 root bin
 f none usr/platform/sun4u/include/sys/x_call.h 644 root bin
 f none usr/platform/sun4u/include/sys/zsmach.h 644 root bin
 f none usr/platform/sun4u/include/sys/cvc.h 644 root bin
-f none usr/platform/sun4u/include/sys/wci_common.h 644 root bin 
-f none usr/platform/sun4u/include/sys/wci_regs.h 644 root bin 
-f none usr/platform/sun4u/include/sys/wci_offsets.h 644 root bin
-f none usr/platform/sun4u/include/sys/wci_cmmu.h 644 root bin
-f none usr/platform/sun4u/include/sys/wrsm.h 644 root bin 
-f none usr/platform/sun4u/include/sys/wrsm_common.h 644 root bin
-f none usr/platform/sun4u/include/sys/wrsm_config.h 644 root bin 
-f none usr/platform/sun4u/include/sys/wrsm_types.h 644 root bin 
-f none usr/platform/sun4u/include/sys/wrsm_plat.h 644 root bin
-f none usr/platform/sun4u/include/sys/wrsm_plugin.h 644 root bin
-f none usr/platform/sun4u/include/sys/wrsmconf.h 644 root bin
 d none usr/platform/sun4u/include/vm 755 root bin
 f none usr/platform/sun4u/include/vm/hat_sfmmu.h 644 root bin
 f none usr/platform/sun4u/include/vm/mach_sfmmu.h 644 root bin

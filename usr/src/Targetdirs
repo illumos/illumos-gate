@@ -313,12 +313,10 @@ ROOT.BIN= \
 	/var/spool
 
 sparcv9_ROOT.BIN64= \
-	/platform/sun4u/sbin \
 	/platform/sun4u/lib \
 	/platform/sun4u/lib/$(MACH64) \
 	/usr/platform/sun4u/sbin \
 	/usr/platform/sun4u/lib \
-	/usr/platform/sun4u/lib/$(MACH64) \
 	/platform/sun4v/lib \
 	/platform/sun4v/lib/$(MACH64) \
 	/usr/platform/sun4v/sbin \
@@ -1400,16 +1398,6 @@ $(ROOT)/usr/lib/$(MACH64)/nss_nisplus.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/nss_nisplus.so.1
 $(ROOT)/usr/lib/$(MACH64)/nss_user.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/nss_user.so.1
-$(ROOT)/usr/platform/sun4u/lib/$(MACH64)/libwrsmconf.so.1:= \
-	REALPATH=../../../../../platform/sun4u/lib/$(MACH64)/libwrsmconf.so.1
-$(ROOT)/usr/platform/sun4u/lib/$(MACH64)/libwrsmconf.so:= \
-	REALPATH=../../../../../platform/sun4u/lib/$(MACH64)/libwrsmconf.so.1
-$(ROOT)/usr/platform/sun4u/lib/libwrsmconf.so.1:= \
-	REALPATH=../../../../platform/sun4u/lib/libwrsmconf.so.1
-$(ROOT)/usr/platform/sun4u/lib/libwrsmconf.so:= \
-	REALPATH=../../../../platform/sun4u/lib/libwrsmconf.so.1
-$(ROOT)/usr/platform/sun4u/sbin/wrsmconf:= \
-	REALPATH=../../../../platform/sun4u/sbin/wrsmconf
 
 SYM.USRLIB= \
 	/lib/libposix4.so \
@@ -1646,12 +1634,7 @@ SYM.USRLIB= \
 	/usr/lib/nss_nisplus.so.1 \
 	/usr/lib/nss_user.so.1
 
-sparcv9_SYM.USRLIB64= \
-	/usr/platform/sun4u/lib/$(MACH64)/libwrsmconf.so	\
-	/usr/platform/sun4u/lib/$(MACH64)/libwrsmconf.so.1	\
-	/usr/platform/sun4u/lib/libwrsmconf.so			\
-	/usr/platform/sun4u/lib/libwrsmconf.so.1		\
-	/usr/platform/sun4u/sbin/wrsmconf
+sparcv9_SYM.USRLIB64= 
 
 amd64_SYM.USRLIB64=
 

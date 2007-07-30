@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +36,6 @@
 
 extern int system_labeled;
 
-static int node_name(di_minor_t minor, di_node_t node);
-
 
 static int ddi_other(di_minor_t minor, di_node_t node);
 static int diskette(di_minor_t minor, di_node_t node);
@@ -45,7 +43,6 @@ static int ecpp_create(di_minor_t minor, di_node_t node);
 static int mc_node(di_minor_t minor, di_node_t node);
 static int ddi_cardreader(di_minor_t minor, di_node_t node);
 static int starcat_sbbc_node(di_minor_t minor, di_node_t node);
-static int wrsm(di_minor_t minor, di_node_t node);
 static int lom(di_minor_t minor, di_node_t node);
 static int ntwdt_create(di_minor_t minor, di_node_t node);
 
@@ -67,12 +64,6 @@ static devfsadm_create_t misc_cbt[] = {
 	},
 	{ "card-reader", "ddi_smartcard_reader", NULL,
 		TYPE_EXACT, ILEVEL_0, ddi_cardreader
-	},
-	{ "pseudo", "(^ddi_pseudo$)|(^ddi_ctl:devctl$)", "wrsm",
-	    TYPE_RE | DRV_EXACT, ILEVEL_0, wrsm,
-	},
-	{ "network", "ddi_net", "wrsmd",
-	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, node_name,
 	},
 	{ "pseudo", "ddi_pseudo", "lw8",
 	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, lom
@@ -140,17 +131,6 @@ diskette(di_minor_t minor, di_node_t node)
 		(void) devfsadm_mklink("rdiskette0", node, minor, flags);
 
 	}
-	return (DEVFSADM_CONTINUE);
-}
-
-/*
- * Handles links of the form:
- * type=ddi_pseudo;name=xyz  \D
- */
-static int
-node_name(di_minor_t minor, di_node_t node)
-{
-	(void) devfsadm_mklink(di_node_name(node), node, minor, 0);
 	return (DEVFSADM_CONTINUE);
 }
 
@@ -295,59 +275,6 @@ starcat_sbbc_node(di_minor_t minor, di_node_t node)
 	}
 	return (DEVFSADM_CONTINUE);
 
-}
-
-int
-wrsm(di_minor_t minor, di_node_t node)
-{
-	const char *node_name = di_node_name(node);
-	const char *minor_name = di_minor_name(minor);
-	char path[PATH_MAX + 1];
-
-	if (minor_name == NULL || node_name == NULL) {
-		return (DEVFSADM_CONTINUE);
-	}
-	if (strcmp(minor_name, "admin") == 0) {
-		/* admin pseudo device */
-		(void) snprintf(path, sizeof (path), "%s%s", node_name,
-		    minor_name);
-	} else if (strcmp(minor_name, "ctrl") == 0) {
-		/* controller pseudo device */
-		dev_t dev = di_minor_devt(minor);
-		minor_t dev_minor = minor(dev);
-		(void) snprintf(path, sizeof (path), "%s%u", node_name,
-		    (uint_t)dev_minor);
-	} else {
-		/*
-		 * For hardware devices, the devlink must be
-		 * /dev/<node_name><portid>. devpath is of the format
-		 * ".../<node_name>@<portid>,0". Need to extract the
-		 * <portid> for use in bulding devlink.
-		 */
-		char devpath[PATH_MAX + 1];
-		char *devfs_path;
-		int i;
-
-		devfs_path = di_devfs_path(node);
-		if (devfs_path == NULL) {
-			return (DEVFSADM_CONTINUE);
-		}
-		(void) strcpy(devpath, devfs_path);
-		di_devfs_path_free(devfs_path);
-
-		for (i = strlen(devpath); devpath[i] != '@' && i > 0; i--) {
-			if (devpath[i] == ',') {
-				devpath[i] = 0;
-			}
-		}
-		if (i == 0) {
-			return (DEVFSADM_CONTINUE);
-		}
-		(void) snprintf(path, sizeof (path), "wci%s", &devpath[i+1]);
-	}
-	(void) devfsadm_mklink(path, node, minor, 0);
-
-	return (DEVFSADM_CONTINUE);
 }
 
 /*

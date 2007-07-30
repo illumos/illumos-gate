@@ -2916,6 +2916,80 @@ remove_perl_500503()
 }
 
 #
+# Remove Wildcat (aka Sun Fire Link)
+#
+remove_eof_wildcat()
+{
+	# Packages to remove
+	typeset -r wildcat_pkgs='SUNWwrsa SUNWwrsd SUNWwrsu SUNWwrsm'
+	typeset -r pkgroot=${rootprefix:+-R $rootprefix}
+	typeset pkg
+
+	#
+	# First, attempt to remove the packages cleanly if possible.
+	# Use a custom "admin" file to specify that removal scripts
+	# in the packages being removed should be run even if they
+	# will run as root.
+	#
+	typeset -r admfile='/tmp/wcat_eof.$$'
+	echo "action=nocheck" > $admfile
+
+	printf 'Removing Wildcat packages...'
+	for pkg in $wildcat_pkgs
+	do
+		if pkginfo $pkgroot -q $pkg; then
+			printf ' %s' $pkg
+			pkgrm $pkgroot -n -a $admfile $pkg >/dev/null 2>&1
+		fi
+	done
+	printf '\n'
+
+	#
+	# In case that didn't work, do it manually.
+	#
+	printf 'Removing Wildcat from %s/var/sadm/install/contents...' \
+	    $rootprefix
+	for pkg in $wildcat_pkgs
+	do
+		printf ' %s' $pkg
+		if [ -d $rootprefix/var/sadm/pkg/$pkg ]; then
+			rm -rf $rootprefix/var/sadm/pkg/$pkg
+			grep -vw $pkg $rootprefix/var/sadm/install/contents > \
+			    /tmp/contents.$$
+			cp /tmp/contents.$$ \
+			    $rootprefix/var/sadm/install/contents
+			rm /tmp/contents.$$
+		fi
+	done
+	printf '\n'
+
+	#
+	# Cleanup any remaining Wildcat files, symlinks, and directories.
+	#
+	rm -f $usr/platform/sun4u/include/sys/wci_common.h
+	rm -f $usr/platform/sun4u/include/sys/wci_regs.h
+	rm -f $usr/platform/sun4u/include/sys/wci_offsets.h
+	rm -f $usr/platform/sun4u/include/sys/wci_cmmu.h
+	rm -f $usr/platform/sun4u/include/sys/wrsm.h
+	rm -f $usr/platform/sun4u/include/sys/wrsm_common.h
+	rm -f $usr/platform/sun4u/include/sys/wrsm_config.h
+	rm -f $usr/platform/sun4u/include/sys/wrsm_types.h
+	rm -f $usr/platform/sun4u/include/sys/wrsm_plat.h
+	rm -f $usr/platform/sun4u/include/sys/wrsm_plugin.h
+	rm -f $usr/platform/sun4u/include/sys/wrsmconf.h
+
+	rm -f $usr/platform/sun4u/lib/mdb/kvm/sparcv9/wrsm.so
+	rm -f $usr/platform/sun4u/lib/mdb/kvm/sparcv9/wrsmd.so
+
+	rm -f $rootprefix/platform/SUNW,Sun-Fire-15000/kernel/misc/sparcv9/gptwo_wci
+
+	rm -f $rootprefix/platform/sun4u/kernel/kmdb/sparcv9/wrsm
+	rm -f $rootprefix/platform/sun4u/kernel/kmdb/sparcv9/wrsmd
+
+	rm -f $admfile
+}
+
+#
 # Remove ASET
 #
 remove_eof_aset()
@@ -5669,6 +5743,17 @@ mondo_loop() {
 	     -d $rootprefix/etc/dmi -o \
 	     -d $rootprefix/var/dmi ]; then
 	        remove_eof_dmi
+	fi
+
+	#
+	# Remove Wildcat
+	#
+	if [ -f $rootprefix/platform/SUNW,Sun-Fire-15000/kernel/misc/sparcv9/gptwo_wci -o \
+	     -f $usr/platform/SUNW,Sun-Fire/lib/rsmlib/wrsm.so.1 -o \
+	     -f $rootprefix/platform/sun4u/kernel/drv/wrsmd.conf -o \
+	     -d $rootprefix/etc/wrsm -o \
+	     -f $usr/platform/sun4u/sbin/wrsmstat ]; then
+		remove_eof_wildcat
 	fi
 
 	#

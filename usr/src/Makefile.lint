@@ -440,12 +440,8 @@ sparc_SUBDIRS= \
 	cmd/prtfru \
 	cmd/sckmd \
 	cmd/vntsd \
-	cmd/wrsmconf \
-	cmd/wrsmstat \
 	lib/libdscp \
 	lib/libpri \
-	lib/libwrsmconf \
-	lib/wrsm \
 	lib/libpcp \
 	stand
 

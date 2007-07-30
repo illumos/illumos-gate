@@ -472,9 +472,7 @@ sparc_SUBDIRS=		\
 	scadm		\
 	sckmd		\
 	sf880drd	\
-	vntsd		\
-	wrsmconf	\
-	wrsmstat
+	vntsd
 
 #
 # Commands that are messaged.  Note that 'lp' and 'man' come first
@@ -722,9 +720,7 @@ sparc_MSGSUBDIRS=	\
 	fruadm		\
 	prtdscp		\
 	prtfru		\
-	vntsd		\
-	wrsmconf	\
-	wrsmstat
+	vntsd
 
 i386_MSGSUBDIRS=	\
 	ucodeadm

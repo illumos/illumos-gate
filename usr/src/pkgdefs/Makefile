@@ -96,11 +96,7 @@ sparc_SUBDIRS= \
 	SUNWstc.u \
 	SUNWus.u \
 	SUNWust1.v \
-	SUNWust2.v \
-	SUNWwrsa.u \
-	SUNWwrsd.u \
-	SUNWwrsm.u \
-	SUNWwrsu.u
+	SUNWust2.v
 
 sparc_XMODS=
 

@@ -71,8 +71,6 @@ d none platform/sun4u/kernel/kmdb/sparcv9 755 root sys
 f none platform/sun4u/kernel/kmdb/sparcv9/sgenv 555 root sys
 f none platform/sun4u/kernel/kmdb/sparcv9/sgsbbc 555 root sys
 f none platform/sun4u/kernel/kmdb/sparcv9/unix 555 root sys
-f none platform/sun4u/kernel/kmdb/sparcv9/wrsm 555 root sys
-f none platform/sun4u/kernel/kmdb/sparcv9/wrsmd 555 root sys
 f none platform/sun4u/kernel/kmdb/sparcv9/oplhwd 555 root sys
 #
 d none platform/sun4v 755 root sys

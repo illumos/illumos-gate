@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,7 +46,6 @@ DMAN_OBJS +=	dman.o dman_domain.o
 DRMACH_OBJS +=	drmach.o drmach_asm.o dr_util.o drmach_err.o
 FCGP2_OBJS +=	fcgp2.o
 GPTWO_PCI_OBJS +=	gptwo_pci.o
-GPTWO_WCI_OBJS +=	gptwo_wci.o
 IOSRAM_OBJS +=	iosram.o
 MBOXSC_OBJS +=	mboxsc.o
 SC_GPTWO_OBJS +=	sc_gptwocfg.o

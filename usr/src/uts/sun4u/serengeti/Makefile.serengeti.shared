@@ -97,7 +97,7 @@ include $(UTSTREE)/sun4u/Makefile.sun4u
 #	Define modules
 #
 SERENGETI_KMODS	= cheetah cheetahplus  
-SERENGETI_KMODS	+= platmod sbdp sgcn sghsc sgsbbc ssm wrsm wrsmplat
+SERENGETI_KMODS	+= platmod sbdp sgcn sghsc sgsbbc ssm
 
 #
 #       Everybody needs to know how to build modstubs.o and to locate unix.o

@@ -100,17 +100,7 @@ HDRS=	\
 	sysioerr.h		\
 	sysiosbus.h		\
 	todmostek.h		\
-	traptrace.h		\
-	wci_cmmu.h		\
-	wci_common.h		\
-	wci_offsets.h		\
-	wci_regs.h		\
-	wrsm.h			\
-	wrsm_config.h		\
-	wrsm_plugin.h		\
-	wrsm_plat.h		\
-	wrsm_common.h		\
-	wrsm_types.h
+	traptrace.h
 
 $(CLOSED_BUILD)CLOSED_HDRS=	\
 	memtestio_ch.h		\

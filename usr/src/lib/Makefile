@@ -242,9 +242,7 @@ sparc_SUBDIRS= .WAIT	\
 	librsc		\
 	libfruutils	.WAIT	\
 	libfru		\
-	libwrsmconf	\
 	storage		\
-	wrsm		\
 	libpcp
 
 FM_sparc_DEPLIBS= libpri
@@ -414,8 +412,7 @@ $(CLOSED_BUILD)HDRSUBDIRS += \
 
 sparc_HDRSUBDIRS=	\
 	libdscp		\
-	libpri		\
-	libwrsmconf
+	libpri
 
 all :=		TARGET= all
 check :=	TARGET= check

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -90,7 +90,6 @@ STARCAT_KMODS	+= dr
 STARCAT_KMODS	+= drmach
 STARCAT_KMODS	+= fcgp2
 STARCAT_KMODS	+= gptwo_pci
-STARCAT_KMODS	+= gptwo_wci
 STARCAT_KMODS	+= iosram
 STARCAT_KMODS	+= mboxsc
 STARCAT_KMODS	+= platmod
@@ -98,7 +97,6 @@ STARCAT_KMODS	+= sc_gptwocfg
 STARCAT_KMODS	+= schpc
 STARCAT_KMODS	+= sckmdrv
 STARCAT_KMODS	+= scosmb
-STARCAT_KMODS	+= wrsmplat
 
 #
 #	Define CPU modules.

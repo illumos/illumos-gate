@@ -26,6 +26,6 @@
 
 include $(SRC)/Makefile.master
 
-SUBDIRS = unix wrsm lw8 serengeti wrsmd opl
+SUBDIRS = unix lw8 serengeti opl
 
 include ../../Makefile.subdirs

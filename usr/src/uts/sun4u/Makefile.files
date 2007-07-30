@@ -92,7 +92,6 @@ PCI_COMMON_OBJS	+= pci.o pci_util.o pci_dma.o pci_devctl.o \
 			pci_space.o pci_counters.o pci_axq.o \
 			pci_fm.o pci_reloc.o pci_tools.o pci_asm.o
 RMCLOMV_OBJS	+= rmclomv.o
-WRSMD_OBJS	+= wrsmd.o
 
 PSYCHO_PCI_OBJS	+= $(PCI_COMMON_OBJS) pcipsy.o
 SCHIZO_PCI_OBJS	+= $(PCI_COMMON_OBJS) pcisch_asm.o pcisch.o pcix.o
@@ -136,27 +135,6 @@ TRAPSTAT_OBJS	+= trapstat.o
 I2BSC_OBJS	+= i2bsc.o
 GPTWOCFG_OBJS	+= gptwocfg.o
 GPTWO_CPU_OBJS	+= gptwo_cpu.o
-WRSM_OBJS	+= wci_common.o \
-			wrsm_barrier.o \
-			wrsm_cf.o \
-			wrsm_cmmu.o \
-			wrsm_common.o \
-			wrsm_confpack.o \
-			wrsm_copy.o \
-			wrsm_driver.o \
-			wrsm_getput.o \
-			wrsm_intr.o \
-			wrsm_lc.o \
-			wrsm_memseg.o \
-			wrsm_memseg_export.o \
-			wrsm_memseg_import.o \
-			wrsm_mh.o \
-			wrsm_nc.o \
-			wrsm_nr.o \
-			wrsm_rsmpi.o \
-			wrsm_session.o \
-			wrsm_tl.o \
-			wrsm_trap.o
 ZULUVM_OBJS  	+= zuluvm.o zulu_asm.o zulu_hat.o zulu_hat_asm.o
 
 JBUSPPM_OBJS	+= jbusppm.o 

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,6 @@
 #include <sys/gp2cfg.h>
 #include <sys/gptwo_cpu.h>
 #include <sys/gptwo_pci.h>
-#include <sys/gptwo_wci.h>
 #include <sys/sc_gptwocfg.h>
 #include <post/scat_dcd.h>
 #include <sys/machsystm.h>

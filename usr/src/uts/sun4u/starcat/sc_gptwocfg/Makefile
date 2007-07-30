@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -64,7 +64,7 @@ CFLAGS += $(CCVERBOSE) -I../sys -I$(UTSBASE)/sun4u/starcat/sys
 #
 # module dependencies
 #
-LDFLAGS += -dy -Nmisc/gptwocfg -Nmisc/gptwo_cpu -Nmisc/gptwo_wci -Nmisc/gptwo_pci -Ndrv/iosram
+LDFLAGS += -dy -Nmisc/gptwocfg -Nmisc/gptwo_cpu -Nmisc/gptwo_pci -Ndrv/iosram
 
 #
 #	Default build targets.

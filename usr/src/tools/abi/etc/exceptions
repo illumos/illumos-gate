@@ -442,15 +442,12 @@ PSARC 2004/619: RULE W4: usr/lib/amd64/mpss.so.1
 4480868: RULE W4: usr/platform/SUNW,Sun-Fire-280R/lib/libpsvcpolicy_psr.so.1
 4480868: RULE W4: usr/platform/SUNW,Sun-Fire-480R/lib/libpsvcpolicy_psr.so.1
 4480868: RULE W4: usr/platform/SUNW,Sun-Fire-880/lib/libpsvcpolicy_psr.so.1
-4480868: RULE W4: usr/platform/SUNW,Sun-Fire/lib/rsmlib/sparcv9/wrsm.so.1
-4480868: RULE W4: usr/platform/SUNW,Sun-Fire/lib/rsmlib/wrsm.so.1
 4941466: RULE W4: usr/platform/SUNW,Netra-CP2300/lib/libfruaccess.so.1
 4941466: RULE W4: usr/platform/SUNW,Netra-CP2300/lib/libctsmc.so.1
 4480868: RULE W4: usr/platform/sun4u/lib/libfruaccess.so.1
 4480868: RULE W4: usr/platform/sun4u/lib/libprtdiag.so.1
 4480868: RULE W4: usr/platform/sun4u/lib/libpsvcobj.so.1
 4480868: RULE W4: usr/platform/sun4u/lib/libpsvcpolicy.so.1
-4480868: RULE W4: usr/platform/sun4u/lib/libwrsmconf.so.1
 4480868: RULE W4: usr/sadm/admin/dhcpmgr/dhcpmgr.so.1
 4480868: RULE W4: usr/sadm/admin/printmgr/lib/libpmgr.so.1
 4480868: RULE W4: usr/lib/fs/hsfs/ident_hsfs.so.1
@@ -485,8 +482,6 @@ PSARC 2004/619: RULE W4: usr/lib/amd64/madv.so.1
 4480868: RULE W4: usr/platform/SUNW,Sun-Blade-1500/lib/picl/plugins/libpiclenvd.so.1
 4480868: RULE W4: usr/platform/SUNW,Sun-Blade-2500/lib/picl/plugins/libpiclenvd.so.1
 4480868: RULE W4: usr/platform/SUNW,A70/lib/picl/plugins/libpiclenvd.so.1
-4480868: RULE W4: platform/sun4u/lib/libwrsmconf.so.1
-4480868: RULE W4: platform/sun4u/lib/sparcv9/libwrsmconf.so.1
 4897400: RULE W4: usr/lib/libcryptoutil.so.1
 4897400: RULE W4: usr/lib/sparcv9/libcryptoutil.so.1
 PSARC 2004/619: RULE W4: usr/lib/amd64/libcryptoutil.so.1
