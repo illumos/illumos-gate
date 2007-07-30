@@ -3287,7 +3287,7 @@ copyin_blalign:
 	mov	ASI_USER, %asi
 
 	andn	%i1, 0x3f, %l0		! %l0 has block aligned src address
-	prefetch [%l0+0x0], #one_read
+	prefetcha [%l0+0x0]%asi, #one_read
 	andcc	%i1, 0x3f, %g0		! is src 64B aligned
 	bz,pn	%ncc, .ci_blkcpy
 	nop
@@ -3332,8 +3332,8 @@ ci_fqtr:
 	nop
 
 	ldda	[%l0+0x38]%asi, %d14
-	prefetch [%l0+0x40], #one_read
-	prefetch [%l0+0x80], #one_read
+	prefetcha [%l0+0x40]%asi, #one_read
+	prefetcha [%l0+0x80]%asi, #one_read
 7:
 	add	%l0, 0x40, %l0
 	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
@@ -3346,14 +3346,14 @@ ci_fqtr:
 	subcc	%i3, 0x40, %i3
 	add	%i0, 0x40, %i0
 	bgu,pt	%ncc, 7b
-	prefetch [%l0+0x80], #one_read
+	prefetcha [%l0+0x80]%asi, #one_read
 	ba	.ci_blkdone
 	membar	#Sync
 
 ci_off7:
 	ldda	[%l0]ASI_BLK_AIUS, %d0
-	prefetch [%l0+0x40], #one_read
-	prefetch [%l0+0x80], #one_read
+	prefetcha [%l0+0x40]%asi, #one_read
+	prefetcha [%l0+0x80]%asi, #one_read
 0:
 	add	%l0, 0x40, %l0
 	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
@@ -3373,7 +3373,7 @@ ci_off7:
 	subcc	%i3, 0x40, %i3
 	add	%i0, 0x40, %i0
 	bgu,pt	%ncc, 0b
-	prefetch [%l0+0x80], #one_read
+	prefetcha [%l0+0x80]%asi, #one_read
 	ba	.ci_blkdone
 	membar	#Sync
 
@@ -3385,8 +3385,8 @@ ci_off15:
 	ldda	[%l0+0x28]%asi, %d10
 	ldda	[%l0+0x30]%asi, %d12
 	ldda	[%l0+0x38]%asi, %d14
-	prefetch [%l0+0x40], #one_read
-	prefetch [%l0+0x80], #one_read
+	prefetcha [%l0+0x40]%asi, #one_read
+	prefetcha [%l0+0x80]%asi, #one_read
 1:
 	add	%l0, 0x40, %l0
 	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
@@ -3405,7 +3405,7 @@ ci_off15:
 	subcc	%i3, 0x40, %i3
 	add	%i0, 0x40, %i0
 	bgu,pt	%ncc, 1b
-	prefetch [%l0+0x80], #one_read
+	prefetcha [%l0+0x80]%asi, #one_read
 	ba	.ci_blkdone
 	membar	#Sync
 
@@ -3416,8 +3416,8 @@ ci_off23:
 	ldda	[%l0+0x28]%asi, %d10
 	ldda	[%l0+0x30]%asi, %d12
 	ldda	[%l0+0x38]%asi, %d14
-	prefetch [%l0+0x40], #one_read
-	prefetch [%l0+0x80], #one_read
+	prefetcha [%l0+0x40]%asi, #one_read
+	prefetcha [%l0+0x80]%asi, #one_read
 2:
 	add	%l0, 0x40, %l0
 	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
@@ -3435,7 +3435,7 @@ ci_off23:
 	subcc	%i3, 0x40, %i3
 	add	%i0, 0x40, %i0
 	bgu,pt	%ncc, 2b
-	prefetch [%l0+0x80], #one_read
+	prefetcha [%l0+0x80]%asi, #one_read
 	ba	.ci_blkdone
 	membar	#Sync
 
@@ -3445,8 +3445,8 @@ ci_off31:
 	ldda	[%l0+0x28]%asi, %d10
 	ldda	[%l0+0x30]%asi, %d12
 	ldda	[%l0+0x38]%asi, %d14
-	prefetch [%l0+0x40], #one_read
-	prefetch [%l0+0x80], #one_read
+	prefetcha [%l0+0x40]%asi, #one_read
+	prefetcha [%l0+0x80]%asi, #one_read
 3:
 	add	%l0, 0x40, %l0
 	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
@@ -3463,7 +3463,7 @@ ci_off31:
 	subcc	%i3, 0x40, %i3
 	add	%i0, 0x40, %i0
 	bgu,pt	%ncc, 3b
-	prefetch [%l0+0x80], #one_read
+	prefetcha [%l0+0x80]%asi, #one_read
 	ba	.ci_blkdone
 	membar	#Sync
 
@@ -3472,8 +3472,8 @@ ci_off39:
 	ldda	[%l0+0x28]%asi, %d10
 	ldda	[%l0+0x30]%asi, %d12
 	ldda	[%l0+0x38]%asi, %d14
-	prefetch [%l0+0x40], #one_read
-	prefetch [%l0+0x80], #one_read
+	prefetcha [%l0+0x40]%asi, #one_read
+	prefetcha [%l0+0x80]%asi, #one_read
 4:
 	add	%l0, 0x40, %l0
 	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
@@ -3489,7 +3489,7 @@ ci_off39:
 	subcc	%i3, 0x40, %i3
 	add	%i0, 0x40, %i0
 	bgu,pt	%ncc, 4b
-	prefetch [%l0+0x80], #one_read
+	prefetcha [%l0+0x80]%asi, #one_read
 	ba	.ci_blkdone
 	membar	#Sync
 
@@ -3497,8 +3497,8 @@ ci_off47:
 	ldda	[%l0+0x28]%asi, %d10
 	ldda	[%l0+0x30]%asi, %d12
 	ldda	[%l0+0x38]%asi, %d14
-	prefetch [%l0+0x40], #one_read
-	prefetch [%l0+0x80], #one_read
+	prefetcha [%l0+0x40]%asi, #one_read
+	prefetcha [%l0+0x80]%asi, #one_read
 5:
 	add	%l0, 0x40, %l0
 	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
@@ -3513,15 +3513,15 @@ ci_off47:
 	subcc	%i3, 0x40, %i3
 	add	%i0, 0x40, %i0
 	bgu,pt	%ncc, 5b
-	prefetch [%l0+0x80], #one_read
+	prefetcha [%l0+0x80]%asi, #one_read
 	ba	.ci_blkdone
 	membar	#Sync
 
 ci_off55:
 	ldda	[%l0+0x30]%asi, %d12
 	ldda	[%l0+0x38]%asi, %d14
-	prefetch [%l0+0x40], #one_read
-	prefetch [%l0+0x80], #one_read
+	prefetcha [%l0+0x40]%asi, #one_read
+	prefetcha [%l0+0x80]%asi, #one_read
 6:
 	add	%l0, 0x40, %l0
 	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
@@ -3535,13 +3535,13 @@ ci_off55:
 	subcc	%i3, 0x40, %i3
 	add	%i0, 0x40, %i0
 	bgu,pt	%ncc, 6b
-	prefetch [%l0+0x80], #one_read
+	prefetcha [%l0+0x80]%asi, #one_read
 	ba	.ci_blkdone
 	membar	#Sync
 
 .ci_blkcpy:
-	prefetch [%i1+0x40], #one_read
-	prefetch [%i1+0x80], #one_read
+	prefetcha [%i1+0x40]%asi, #one_read
+	prefetcha [%i1+0x80]%asi, #one_read
 8:
 	stxa	%g0, [%i0]ASI_BLK_INIT_ST_QUAD_LDD_P ! initialize the cache line
 	ldda	[%i1]ASI_BLK_AIUS, %d0
@@ -3551,7 +3551,7 @@ ci_off55:
 	subcc	%i3, 0x40, %i3
 	add	%i0, 0x40, %i0
 	bgu,pt	%ncc, 8b
-	prefetch [%i1+0x80], #one_read
+	prefetcha [%i1+0x80]%asi, #one_read
 	membar	#Sync
 
 .ci_blkdone:
@@ -3573,13 +3573,14 @@ ci_off55:
 
 	sub	%i1, %o2, %i1		! align the src at 16 bytes.
 	andn	%i1, 0x3f, %l0		! %l0 has block aligned source
-	prefetch [%l0+0x0], #one_read
+	prefetcha [%l0]ASI_USER, #one_read
 	ldda	[%i1]ASI_BLK_INIT_QUAD_LDD_AIUS, %l2
+	add	%l0, 0x40, %l0
 .ci_loop0:
 	add	%i1, 0x10, %i1
 	ldda	[%i1]ASI_BLK_INIT_QUAD_LDD_AIUS, %l4
 
-	prefetch [%l0+0x40], #one_read
+	prefetcha [%l0]ASI_USER, #one_read
 
 	stxa	%l3, [%i0+0x0]%asi
 	stxa	%l4, [%i0+0x8]%asi
@@ -3617,10 +3618,11 @@ ci_off55:
 	mov	0x40, %o1
 	sub	%o1, %o0, %o1		! %o1 right shift = (64 - left shift)
 	andn	%i1, 0x3f, %l0		! %l0 has block aligned source
-	prefetch [%l0+0x0], #one_read
+	prefetcha [%l0]ASI_USER, #one_read
 	ldda	[%i1]ASI_BLK_INIT_QUAD_LDD_AIUS, %l2	! partial data in %l2
 							! and %l3 has complete
 							! data
+	add	%l0, 0x40, %l0
 .ci_loop1:
 	add	%i1, 0x10, %i1
 	ldda	[%i1]ASI_BLK_INIT_QUAD_LDD_AIUS, %l4	! %l4 has partial data
@@ -3628,7 +3630,7 @@ ci_off55:
 	ALIGN_DATA(%l2, %l3, %l4, %o0, %o1, %l6)	! merge %l2, %l3 and %l4
 							! into %l2 and %l3
 
-	prefetch [%l0+0x40], #one_read
+	prefetcha [%l0]ASI_USER, #one_read
 
 	stxa	%l2, [%i0+0x0]%asi
 	stxa	%l3, [%i0+0x8]%asi
@@ -3673,17 +3675,18 @@ ci_off55:
 	mov	0x40, %o1
 	sub	%o1, %o0, %o1		! %o1 right shift = (64 - left shift)
 	andn	%i1, 0x3f, %l0		! %l0 has block aligned source
-	prefetch [%l0+0x0], #one_read
+	prefetcha [%l0]ASI_USER, #one_read
 	ldda	[%i1]ASI_BLK_INIT_QUAD_LDD_AIUS, %l2	! partial data in %l3
 							! for this read and
 							! no data in %l2
+	add	%l0, 0x40, %l0
 .ci_loop2:
 	add	%i1, 0x10, %i1
 	ldda	[%i1]ASI_BLK_INIT_QUAD_LDD_AIUS, %l4	! %l4 has complete data
 							! and %l5 has partial
 	ALIGN_DATA(%l3, %l4, %l5, %o0, %o1, %l6)	! merge %l3, %l4 and %l5
 							! into %l3 and %l4
-	prefetch [%l0+0x40], #one_read
+	prefetcha [%l0]ASI_USER, #one_read
 
 	stxa	%l3, [%i0+0x0]%asi
 	stxa	%l4, [%i0+0x8]%asi
@@ -3726,14 +3729,15 @@ ci_off55:
 .ci_blkcpy:
 
 	andn	%i1, 0x3f, %o0		! %o0 has block aligned source
-	prefetch [%o0+0x0], #one_read
+	prefetcha [%o0]ASI_USER, #one_read
+	add	%o0, 0x40, %o0
 1:
 	ldda	[%i1]ASI_BLK_INIT_QUAD_LDD_AIUS, %l0
 	add	%i1, 0x10, %i1
 	ldda	[%i1]ASI_BLK_INIT_QUAD_LDD_AIUS, %l2
 	add	%i1, 0x10, %i1
 
-	prefetch [%o0+0x40], #one_read
+	prefetcha [%o0]ASI_USER, #one_read
 
 	stxa	%l0, [%i0+0x0]%asi
 
