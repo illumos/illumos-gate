@@ -144,10 +144,10 @@ static int			nfs4_idcache_tout;
 /*
  * Some useful macros
  */
-#define		MOD2(a, pow_of_2)	a & (pow_of_2 - 1)
-#define		_CACHE_TOUT		60*60		/* secs in 1 hour */
+#define		MOD2(a, pow_of_2)	((a) & ((pow_of_2) - 1))
+#define		_CACHE_TOUT		(60*60)		/* secs in 1 hour */
 #define		TIMEOUT(x)		(gethrestime_sec() > \
-					(x + nfs4_idcache_tout))
+					((x) + nfs4_idcache_tout))
 
 /*
  * Max length of valid id string including the trailing null
@@ -342,7 +342,7 @@ nfs_idmap_str_uid(utf8string *u8s, uid_t *uid, bool_t isserver)
 	ASSERT(nig != NULL);
 
 	if (!u8s || !u8s->utf8string_val || u8s->utf8string_len == 0 ||
-			(u8s->utf8string_val[0] == '\0')) {
+	    (u8s->utf8string_val[0] == '\0')) {
 		*uid = UID_NOBODY;
 		return (isserver ? EINVAL : 0);
 	}
@@ -371,7 +371,7 @@ retry:
 	mutex_exit(&nig->nfsidmap_daemon_lock);
 
 	if (dh == NULL || nig->nfsidmap_pid == curproc->p_pid ||
-			(!utf8_strchr(u8s, '@') && !isserver)) {
+	    (!utf8_strchr(u8s, '@') && !isserver)) {
 		if (dh)
 			door_ki_rele(dh);
 		error = nfs_idmap_s2i_literal(u8s, uid, isserver);
@@ -617,7 +617,7 @@ retry:
 			 */
 			(void) str_to_utf8(resp->str, u8s);
 			nfs_idmap_cache_i2s_insert(&nig->u2s_ci, uid,
-				u8s, HQ_HASH_HINT, hashno);
+			    u8s, HQ_HASH_HINT, hashno);
 			break;
 
 		case NFSMAPID_INVALID:
@@ -721,7 +721,7 @@ nfs_idmap_str_gid(utf8string *u8s, gid_t *gid, bool_t isserver)
 	ASSERT(nig != NULL);
 
 	if (!u8s || !u8s->utf8string_val || u8s->utf8string_len == 0 ||
-			(u8s->utf8string_val[0] == '\0')) {
+	    (u8s->utf8string_val[0] == '\0')) {
 		*gid = GID_NOBODY;
 		return (isserver ? EINVAL : 0);
 	}
@@ -750,7 +750,7 @@ retry:
 	mutex_exit(&nig->nfsidmap_daemon_lock);
 
 	if (dh == NULL || nig->nfsidmap_pid == curproc->p_pid ||
-			(!utf8_strchr(u8s, '@') && !isserver)) {
+	    (!utf8_strchr(u8s, '@') && !isserver)) {
 		if (dh)
 			door_ki_rele(dh);
 		error = nfs_idmap_s2i_literal(u8s, gid, isserver);
@@ -997,7 +997,7 @@ retry:
 			 */
 			(void) str_to_utf8(resp->str, u8s);
 			nfs_idmap_cache_i2s_insert(&nig->g2s_ci, gid,
-				u8s, HQ_HASH_HINT, hashno);
+			    u8s, HQ_HASH_HINT, hashno);
 			break;
 
 		case NFSMAPID_INVALID:
@@ -1092,7 +1092,7 @@ nfs_idmap_cache_create(idmap_cache_info_t *cip, const char *name)
 	nfsidhq_t	*hq = NULL;
 
 	cip->table = kmem_alloc((NFSID_CACHE_ANCHORS * sizeof (nfsidhq_t)),
-				KM_SLEEP);
+	    KM_SLEEP);
 
 	for (i = 0, hq = cip->table; i < NFSID_CACHE_ANCHORS; i++, hq++) {
 		hq->hq_que_forw = hq;
