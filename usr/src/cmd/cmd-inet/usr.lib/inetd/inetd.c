@@ -1654,8 +1654,35 @@ handle_restarter_event(instance_t *instance, restarter_event_type_t event,
 	    "curr state: %d", instance->fmri, event, instance->cur_istate);
 
 	switch (event) {
+	case RESTARTER_EVENT_TYPE_ADD_INSTANCE:
+		/*
+		 * When startd restarts, it sends _ADD_INSTANCE to delegated
+		 * restarters for all those services managed by them. We should
+		 * acknowledge this event, as startd's graph needs to be updated
+		 * about the current state of the service, when startd is
+		 * restarting.
+		 * update_state() is ok to be called here, as commands for
+		 * instances in transition are deferred by
+		 * process_restarter_event().
+		 */
+		update_state(instance, instance->cur_istate, RERR_NONE);
+		goto done;
 	case RESTARTER_EVENT_TYPE_ADMIN_REFRESH:
 		refresh_instance(instance);
+		goto done;
+	case RESTARTER_EVENT_TYPE_ADMIN_RESTART:
+		/*
+		 * We've got a restart event, so if the instance is online
+		 * in any way initiate taking it offline, and rely upon
+		 * our restarter to send us an online event to bring
+		 * it back online.
+		 */
+		switch (instance->cur_istate) {
+		case IIS_ONLINE:
+		case IIS_DEGRADED:
+			destroy_bound_fds(instance);
+			(void) run_method(instance, IM_OFFLINE, NULL);
+		}
 		goto done;
 	case RESTARTER_EVENT_TYPE_REMOVE_INSTANCE:
 		remove_instance(instance);
@@ -1681,20 +1708,6 @@ handle_restarter_event(instance_t *instance, restarter_event_type_t event,
 			goto done;
 		}
 		break;
-	case RESTARTER_EVENT_TYPE_ADMIN_RESTART:
-		/*
-		 * We've got a restart event, so if the instance is online
-		 * in any way initiate taking it offline, and rely upon
-		 * our restarter to send us an online event to bring
-		 * it back online.
-		 */
-		switch (instance->cur_istate) {
-		case IIS_ONLINE:
-		case IIS_DEGRADED:
-			destroy_bound_fds(instance);
-			(void) run_method(instance, IM_OFFLINE, NULL);
-		}
-		goto done;
 	}
 
 	switch (instance->cur_istate) {
