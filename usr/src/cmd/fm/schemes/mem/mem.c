@@ -29,11 +29,8 @@
 #include <mem.h>
 #include <fm/fmd_fmri.h>
 
-#include <fcntl.h>
-#include <unistd.h>
 #include <string.h>
 #include <strings.h>
-#include <time.h>
 #include <sys/mem.h>
 
 #ifdef	sparc
@@ -42,358 +39,6 @@ ldom_hdl_t *mem_scheme_lhp;
 #endif	/* sparc */
 
 mem_t mem;
-
-#ifdef	sparc
-
-extern int mem_update_mdesc(void);
-
-/*
- * Retry values for handling the case where the kernel is not yet ready
- * to provide DIMM serial ids.  Some platforms acquire DIMM serial id
- * information from their System Controller via a mailbox interface.
- * The values chosen are for 10 retries 3 seconds apart to approximate the
- * possible 30 second timeout length of a mailbox message request.
- */
-#define	MAX_MEM_SID_RETRIES	10
-#define	MEM_SID_RETRY_WAIT	3
-
-static mem_dimm_map_t *
-dm_lookup(const char *name)
-{
-	mem_dimm_map_t *dm;
-
-	for (dm = mem.mem_dm; dm != NULL; dm = dm->dm_next) {
-		if (strcmp(name, dm->dm_label) == 0)
-			return (dm);
-	}
-
-	return (NULL);
-}
-
-/*
- * Returns 0 with serial numbers if found, -1 (with errno set) for errors.  If
- * the unum (or a component of same) wasn't found, -1 is returned with errno
- * set to ENOENT.  If the kernel doesn't have support for serial numbers,
- * -1 is returned with errno set to ENOTSUP.
- */
-static int
-mem_get_serids_from_kernel(const char *unum, char ***seridsp, size_t *nseridsp)
-{
-	char **dimms, **serids;
-	size_t ndimms, nserids;
-	int i, rc = 0;
-	int fd;
-	int retries = MAX_MEM_SID_RETRIES;
-	mem_name_t mn;
-	struct timespec rqt;
-
-	if ((fd = open("/dev/mem", O_RDONLY)) < 0)
-		return (-1);
-
-	if (mem_unum_burst(unum, &dimms, &ndimms) < 0) {
-		(void) close(fd);
-		return (-1); /* errno is set for us */
-	}
-
-	serids = fmd_fmri_zalloc(sizeof (char *) * ndimms);
-	nserids = ndimms;
-
-	bzero(&mn, sizeof (mn));
-
-	for (i = 0; i < ndimms; i++) {
-		mn.m_namelen = strlen(dimms[i]) + 1;
-		mn.m_sidlen = MEM_SERID_MAXLEN;
-
-		mn.m_name = fmd_fmri_alloc(mn.m_namelen);
-		mn.m_sid = fmd_fmri_alloc(mn.m_sidlen);
-
-		(void) strcpy(mn.m_name, dimms[i]);
-
-		do {
-			rc = ioctl(fd, MEM_SID, &mn);
-
-			if (rc >= 0 || errno != EAGAIN)
-				break;
-
-			if (retries == 0) {
-				errno = ETIMEDOUT;
-				break;
-			}
-
-			/*
-			 * EAGAIN indicates the kernel is
-			 * not ready to provide DIMM serial
-			 * ids.  Sleep MEM_SID_RETRY_WAIT seconds
-			 * and try again.
-			 * nanosleep() is used instead of sleep()
-			 * to avoid interfering with fmd timers.
-			 */
-			rqt.tv_sec = MEM_SID_RETRY_WAIT;
-			rqt.tv_nsec = 0;
-			(void) nanosleep(&rqt, NULL);
-
-		} while (retries--);
-
-		if (rc < 0) {
-			/*
-			 * ENXIO can happen if the kernel memory driver
-			 * doesn't have the MEM_SID ioctl (e.g. if the
-			 * kernel hasn't been patched to provide the
-			 * support).
-			 *
-			 * If the MEM_SID ioctl is available but the
-			 * particular platform doesn't support providing
-			 * serial ids, ENOTSUP will be returned by the ioctl.
-			 */
-			if (errno == ENXIO)
-				errno = ENOTSUP;
-			fmd_fmri_free(mn.m_name, mn.m_namelen);
-			fmd_fmri_free(mn.m_sid, mn.m_sidlen);
-			mem_strarray_free(serids, nserids);
-			mem_strarray_free(dimms, ndimms);
-			(void) close(fd);
-			return (-1);
-		}
-
-		serids[i] = fmd_fmri_strdup(mn.m_sid);
-
-		fmd_fmri_free(mn.m_name, mn.m_namelen);
-		fmd_fmri_free(mn.m_sid, mn.m_sidlen);
-	}
-
-	mem_strarray_free(dimms, ndimms);
-
-	(void) close(fd);
-
-	*seridsp = serids;
-	*nseridsp = nserids;
-
-	return (0);
-}
-
-/*
- * Returns 0 with serial numbers if found, -1 (with errno set) for errors.  If
- * the unum (or a component of same) wasn't found, -1 is returned with errno
- * set to ENOENT.
- */
-static int
-mem_get_serids_from_cache(const char *unum, char ***seridsp, size_t *nseridsp)
-{
-	uint64_t drgen = fmd_fmri_get_drgen();
-	char **dimms, **serids;
-	size_t ndimms, nserids;
-	mem_dimm_map_t *dm;
-	int i, rc = 0;
-
-	if (mem_unum_burst(unum, &dimms, &ndimms) < 0)
-		return (-1); /* errno is set for us */
-
-	serids = fmd_fmri_zalloc(sizeof (char *) * ndimms);
-	nserids = ndimms;
-
-	for (i = 0; i < ndimms; i++) {
-		if ((dm = dm_lookup(dimms[i])) == NULL) {
-			rc = fmd_fmri_set_errno(EINVAL);
-			break;
-		}
-
-		if (*dm->dm_serid == '\0' || dm->dm_drgen != drgen) {
-			/*
-			 * We don't have a cached copy, or the copy we've got is
-			 * out of date.  Look it up again.
-			 */
-			if (mem_get_serid(dm->dm_device, dm->dm_serid,
-			    sizeof (dm->dm_serid)) < 0) {
-				rc = -1; /* errno is set for us */
-				break;
-			}
-
-			dm->dm_drgen = drgen;
-		}
-
-		serids[i] = fmd_fmri_strdup(dm->dm_serid);
-	}
-
-	mem_strarray_free(dimms, ndimms);
-
-	if (rc == 0) {
-		*seridsp = serids;
-		*nseridsp = nserids;
-	} else {
-		mem_strarray_free(serids, nserids);
-	}
-
-	return (rc);
-}
-
-/*
- * Returns 0 with serial numbers if found, -1 (with errno set) for errors.  If
- * the unum (or a component of same) wasn't found, -1 is returned with errno
- * set to ENOENT.
- */
-static int
-mem_get_serids_from_mdesc(const char *unum, char ***seridsp, size_t *nseridsp)
-{
-	uint64_t drgen = fmd_fmri_get_drgen();
-	char **dimms, **serids;
-	size_t ndimms, nserids;
-	mem_dimm_map_t *dm;
-	int i, rc = 0;
-
-	if (mem_unum_burst(unum, &dimms, &ndimms) < 0)
-		return (-1); /* errno is set for us */
-
-	serids = fmd_fmri_zalloc(sizeof (char *) * ndimms);
-	nserids = ndimms;
-
-	/*
-	 * first go through dimms and see if dm_drgen entries are outdated
-	 */
-	for (i = 0; i < ndimms; i++) {
-		if ((dm = dm_lookup(dimms[i])) == NULL ||
-		    dm->dm_drgen != drgen)
-			break;
-	}
-
-	if (i < ndimms && mem_update_mdesc() != 0) {
-		mem_strarray_free(dimms, ndimms);
-		return (-1);
-	}
-
-	/*
-	 * get to this point if an up-to-date mdesc (and corresponding
-	 * entries in the global mem list) exists
-	 */
-	for (i = 0; i < ndimms; i++) {
-		if ((dm = dm_lookup(dimms[i])) == NULL) {
-			rc = fmd_fmri_set_errno(EINVAL);
-			break;
-		}
-
-		if (dm->dm_drgen != drgen)
-			dm->dm_drgen = drgen;
-
-		/*
-		 * mdesc and dm entry was updated by an earlier call to
-		 * mem_update_mdesc, so we go ahead and dup the serid
-		 */
-		serids[i] = fmd_fmri_strdup(dm->dm_serid);
-	}
-
-	mem_strarray_free(dimms, ndimms);
-
-	if (rc == 0) {
-		*seridsp = serids;
-		*nseridsp = nserids;
-	} else {
-		mem_strarray_free(serids, nserids);
-	}
-
-	return (rc);
-}
-
-/*
- * Returns 0 with part numbers if found, returns -1 for errors.
- */
-static int
-mem_get_parts_from_mdesc(const char *unum, char ***partsp, size_t *npartsp)
-{
-	uint64_t drgen = fmd_fmri_get_drgen();
-	char **dimms, **parts;
-	size_t ndimms, nparts;
-	mem_dimm_map_t *dm;
-	int i, rc = 0;
-
-	if (mem_unum_burst(unum, &dimms, &ndimms) < 0)
-		return (-1); /* errno is set for us */
-
-	parts = fmd_fmri_zalloc(sizeof (char *) * ndimms);
-	nparts = ndimms;
-
-	/*
-	 * first go through dimms and see if dm_drgen entries are outdated
-	 */
-	for (i = 0; i < ndimms; i++) {
-		if ((dm = dm_lookup(dimms[i])) == NULL ||
-		    dm->dm_drgen != drgen)
-			break;
-	}
-
-	if (i < ndimms && mem_update_mdesc() != 0) {
-		mem_strarray_free(dimms, ndimms);
-		mem_strarray_free(parts, nparts);
-		return (-1);
-	}
-
-	/*
-	 * get to this point if an up-to-date mdesc (and corresponding
-	 * entries in the global mem list) exists
-	 */
-	for (i = 0; i < ndimms; i++) {
-		if ((dm = dm_lookup(dimms[i])) == NULL) {
-			rc = fmd_fmri_set_errno(EINVAL);
-			break;
-		}
-
-		if (dm->dm_drgen != drgen)
-			dm->dm_drgen = drgen;
-
-		/*
-		 * mdesc and dm entry was updated by an earlier call to
-		 * mem_update_mdesc, so we go ahead and dup the part
-		 */
-		if (dm->dm_part == NULL) {
-			rc = -1;
-			break;
-		}
-		parts[i] = fmd_fmri_strdup(dm->dm_part);
-	}
-
-	mem_strarray_free(dimms, ndimms);
-
-	if (rc == 0) {
-		*partsp = parts;
-		*npartsp = nparts;
-	} else {
-		mem_strarray_free(parts, nparts);
-	}
-
-	return (rc);
-}
-
-static int
-mem_get_parts_by_unum(const char *unum, char ***partp, size_t *npartp)
-{
-	if (mem.mem_dm == NULL)
-		return (-1);
-	else
-		return (mem_get_parts_from_mdesc(unum, partp, npartp));
-}
-
-#endif	/* sparc */
-
-/*ARGSUSED*/
-
-static int
-mem_get_serids_by_unum(const char *unum, char ***seridsp, size_t *nseridsp)
-{
-	/*
-	 * Some platforms do not support the caching of serial ids by the
-	 * mem scheme plugin but instead support making serial ids available
-	 * via the kernel.
-	 */
-#ifdef	sparc
-	if (mem.mem_dm == NULL)
-		return (mem_get_serids_from_kernel(unum, seridsp, nseridsp));
-	else if (mem_get_serids_from_mdesc(unum, seridsp, nseridsp) == 0)
-		return (0);
-	else
-		return (mem_get_serids_from_cache(unum, seridsp, nseridsp));
-#else
-	errno = ENOTSUP;
-	return (-1);
-#endif	/* sparc */
-}
 
 static int
 mem_fmri_get_unum(nvlist_t *nvl, char **unump)
@@ -492,19 +137,16 @@ fmd_fmri_expand(nvlist_t *nvl)
 	char *unum, **serids;
 	uint_t nnvlserids;
 	size_t nserids;
-#ifdef sparc
-	char **parts;
-	size_t nparts;
-#endif
 	int rc;
 
 	if ((mem_fmri_get_unum(nvl, &unum) < 0) || (*unum == '\0'))
 		return (fmd_fmri_set_errno(EINVAL));
 
 	if ((rc = nvlist_lookup_string_array(nvl, FM_FMRI_MEM_SERIAL_ID,
-	    &serids, &nnvlserids)) == 0)
-		return (0); /* fmri is already expanded */
-	else if (rc != ENOENT)
+	    &serids, &nnvlserids)) == 0) { /* already have serial #s */
+		mem_expand_opt(nvl, unum, serids);
+		return (0);
+	} else if (rc != ENOENT)
 		return (fmd_fmri_set_errno(EINVAL));
 
 	if (mem_get_serids_by_unum(unum, &serids, &nserids) < 0) {
@@ -517,24 +159,14 @@ fmd_fmri_expand(nvlist_t *nvl)
 
 	rc = nvlist_add_string_array(nvl, FM_FMRI_MEM_SERIAL_ID, serids,
 	    nserids);
+	mem_expand_opt(nvl, unum, serids);
 
 	mem_strarray_free(serids, nserids);
 
 	if (rc != 0)
 		return (fmd_fmri_set_errno(EINVAL));
-
-#ifdef sparc
-	/*
-	 * Continue with the process if there are no part numbers.
-	 */
-	if (mem_get_parts_by_unum(unum, &parts, &nparts) < 0)
+	else
 		return (0);
-
-	rc = nvlist_add_string_array(nvl, FM_FMRI_HC_PART, parts, nparts);
-
-	mem_strarray_free(parts, nparts);
-#endif
-	return (0);
 }
 
 static int
@@ -726,12 +358,18 @@ void
 fmd_fmri_fini(void)
 {
 	mem_dimm_map_t *dm, *em;
+	mem_seg_map_t *sm, *tm;
 
 	for (dm = mem.mem_dm; dm != NULL; dm = em) {
 		em = dm->dm_next;
 		fmd_fmri_strfree(dm->dm_label);
+		fmd_fmri_strfree(dm->dm_part);
 		fmd_fmri_strfree(dm->dm_device);
 		fmd_fmri_free(dm, sizeof (mem_dimm_map_t));
+	}
+	for (sm = mem.mem_seg; sm != NULL; sm = tm) {
+		tm = sm->sm_next;
+		fmd_fmri_free(sm, sizeof (mem_seg_map_t));
 	}
 #ifdef	sparc
 	ldom_fini(mem_scheme_lhp);

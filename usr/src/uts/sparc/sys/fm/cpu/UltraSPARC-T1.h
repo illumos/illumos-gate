@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,7 @@ extern "C" {
 #define	FM_EREPORT_PAYLOAD_NAME_L2_SYND		"l2-synd"
 #define	FM_EREPORT_PAYLOAD_NAME_L2_ESR		"l2-esr"
 #define	FM_EREPORT_PAYLOAD_NAME_L2_EAR		"l2-ear"
+#define	FM_EREPORT_PAYLOAD_NAME_L2_ESYR		"l2-esyr"
 
 #define	FM_EREPORT_PAYLOAD_NAME_DRAM_AFSR	"dram-afsr"
 #define	FM_EREPORT_PAYLOAD_NAME_DRAM_AFAR	"dram-afar"
@@ -49,6 +50,8 @@ extern "C" {
 #define	FM_EREPORT_PAYLOAD_NAME_DRAM_SYND	"dram-synd"
 #define	FM_EREPORT_PAYLOAD_NAME_DRAM_ESR	"dram-esr"
 #define	FM_EREPORT_PAYLOAD_NAME_DRAM_EAR	"dram-ear"
+
+#define	FM_EREPORT_PAYLOAD_NAME_TS3_FCR		"ts3-fcr"
 
 #define	FM_EREPORT_CPU_UST1_DAU			"dau"
 #define	FM_EREPORT_CPU_UST1_DAC			"dac"

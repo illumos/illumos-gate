@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,7 +71,12 @@ typedef enum cmd_nodetype {
 	CMD_NT_DIMM,
 	CMD_NT_BANK,
 	CMD_NT_PAGE,
+#ifdef sun4u
 	CMD_NT_DP
+#endif
+#ifdef sun4v
+	CMD_NT_BRANCH
+#endif
 } cmd_nodetype_t;
 
 /*
@@ -123,7 +128,9 @@ typedef enum cmd_ptrsubtype {
 	CMD_PTR_CPU_UGESR_DAE,
 	CMD_PTR_CPU_UGESR_IAE,
 	CMD_PTR_CPU_UGESR_UGE,
-	CMD_PTR_CPU_MISC_REGS
+	CMD_PTR_CPU_MISC_REGS,
+	CMD_PTR_CPU_LFU,
+	CMD_PTR_BRANCH_CASE
 } cmd_ptrsubtype_t;
 
 /*

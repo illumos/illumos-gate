@@ -34,6 +34,8 @@
 #include <cmd_bank.h>
 #include <cmd_page.h>
 #include <cmd_cpu.h>
+#include <cmd_branch.h>
+#include <cmd_state.h>
 #include <cmd.h>
 
 #include <assert.h>
@@ -52,6 +54,11 @@
 #include <sys/niagararegs.h>
 #include <sys/fm/ldom.h>
 #include <ctype.h>
+
+#define	VF_TS3_FCR	0x000000000000FFFFULL
+#define	VF_L2ESYR_C2C	0x8000000000000000ULL
+#define	UTS2_CPUS_PER_CHIP	64
+#define	FBR_ERROR	".fbr"
 
 extern ldom_hdl_t *cpumem_diagnosis_lhp;
 
@@ -96,6 +103,73 @@ cmd_mem_synd_check(fmd_hdl_t *hdl, uint64_t afar, uint8_t afar_status,
 	return (CMD_EVD_OK);
 }
 
+static int
+cpu_present(fmd_hdl_t *hdl, nvlist_t *asru, uint32_t *cpuid)
+{
+	nvlist_t *cp_asru;
+	uint32_t i;
+
+	if (nvlist_dup(asru, &cp_asru, 0) != 0) {
+		fmd_hdl_debug(hdl, "unable to alloc asru for thread\n");
+		return (-1);
+	}
+
+	for (i = *cpuid; i < *cpuid + UTS2_CPUS_PER_CHIP; i++) {
+
+		(void) nvlist_remove_all(cp_asru, FM_FMRI_CPU_ID);
+
+		if (nvlist_add_uint32(cp_asru, FM_FMRI_CPU_ID, i) == 0) {
+			if (fmd_nvl_fmri_present(hdl, cp_asru) &&
+			    !fmd_nvl_fmri_unusable(hdl, cp_asru)) {
+				nvlist_free(cp_asru);
+				*cpuid = i;
+				return (0);
+			}
+		}
+	}
+	nvlist_free(cp_asru);
+	return (-1);
+}
+
+/*ARGSUSED*/
+cmd_evdisp_t
+cmd_c2c(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
+    cmd_errcl_t clcode)
+{
+	uint32_t cpuid;
+	nvlist_t *det;
+	int rc;
+
+	(void) nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR, &det);
+	if (nvlist_lookup_uint32(det, FM_FMRI_CPU_ID, &cpuid) == 0) {
+		/*
+		 * If the c2c bit is set, the sending cache of the
+		 * cpu must be faulted instead of the memory.
+		 * If the detector is chip0, the cache of the chip1
+		 * is faulted and vice versa.
+		 */
+		if (cpuid < UTS2_CPUS_PER_CHIP)
+			cpuid = UTS2_CPUS_PER_CHIP;
+		else
+			cpuid = 0;
+
+		rc = cpu_present(hdl, det, &cpuid);
+
+		if (rc != -1) {
+			(void) nvlist_remove(det, FM_FMRI_CPU_ID,
+			    DATA_TYPE_UINT32);
+			if (nvlist_add_uint32(det,
+			    FM_FMRI_CPU_ID, cpuid) == 0) {
+				clcode |= CMD_CPU_LEVEL_CHIP;
+				return (cmd_l2u(hdl, ep, nvl, class, clcode));
+			}
+
+		}
+	}
+	fmd_hdl_debug(hdl, "cmd_c2c: no cpuid discarding C2C error");
+	return (CMD_EVD_BAD);
+}
+
 /*
  * sun4v's xe_common routine has an extra argument, clcode, compared
  * to routine of same name in sun4u.
@@ -106,7 +180,7 @@ xe_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
     const char *class, cmd_errcl_t clcode, cmd_xe_handler_f *hdlr)
 {
 	uint64_t afar, l2_afar, dram_afar;
-	uint64_t l2_afsr, dram_afsr;
+	uint64_t l2_afsr, dram_afsr, l2_esyr;
 	uint16_t synd;
 	uint8_t afar_status, synd_status;
 	nvlist_t *rsrc;
@@ -176,6 +250,13 @@ xe_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		afar_status = ((l2_afsr & NI_L2AFSR_P05) == 0) ?
 		    AFLT_STAT_VALID : AFLT_STAT_INVALID;
 		synd_status = AFLT_STAT_VALID;
+
+		if (nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_NAME_L2_ESYR,
+		    &l2_esyr) == 0) {
+			if (l2_esyr & VF_L2ESYR_C2C) {
+				return (cmd_c2c(hdl, ep, nvl, class, clcode));
+			}
+		}
 		break;
 	case CMD_ERRCL_DSU:
 		afar = dram_afar;
@@ -190,6 +271,7 @@ xe_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	return (hdlr(hdl, ep, nvl, class, afar, afar_status, synd,
 	    synd_status, cmd_mem_name2type(typenm, minorvers), disp, rsrc));
 }
+
 
 /*ARGSUSED*/
 cmd_evdisp_t
@@ -214,6 +296,110 @@ cmd_frx(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 {
 	return (CMD_EVD_UNUSED);
 }
+
+
+/*ARGSUSED*/
+cmd_evdisp_t
+cmd_fb(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
+    cmd_errcl_t clcode)
+{
+	cmd_branch_t *branch;
+	const char *uuid;
+	nvlist_t *asru, *det;
+	uint64_t ts3_fcr;
+
+	if (nvlist_lookup_nvlist(nvl, FM_RSRC_RESOURCE, &asru) < 0) {
+		CMD_STAT_BUMP(bad_mem_asru);
+		return (NULL);
+	}
+
+	if (nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR, &det) < 0) {
+		CMD_STAT_BUMP(bad_mem_asru);
+		return (NULL);
+	}
+
+	if (fmd_nvl_fmri_expand(hdl, det) < 0) {
+		fmd_hdl_debug(hdl, "Failed to expand detector");
+		return (NULL);
+	}
+
+	branch = cmd_branch_lookup(hdl, asru);
+	if (branch == NULL) {
+		if ((branch = cmd_branch_create(hdl, asru)) == NULL)
+			return (CMD_EVD_UNUSED);
+	}
+
+	if (branch->branch_case.cc_cp != NULL &&
+	    fmd_case_solved(hdl, branch->branch_case.cc_cp)) {
+		fmd_hdl_debug(hdl, "Case solved\n");
+		return (CMD_EVD_REDUND);
+	}
+
+	if (branch->branch_case.cc_cp == NULL) {
+		branch->branch_case.cc_cp = cmd_case_create(hdl,
+		    &branch->branch_header, CMD_PTR_BRANCH_CASE, &uuid);
+	}
+
+	if (strcmp(strrchr(class, '.'), FBR_ERROR) == 0) {
+		if (nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_NAME_TS3_FCR,
+		    &ts3_fcr) == 0 && (ts3_fcr != VF_TS3_FCR)) {
+			fmd_hdl_debug(hdl,
+			    "Processing fbr with lane failover\n");
+			cmd_branch_create_fault(hdl, branch,
+			    "fault.memory.link-f", det);
+
+		} else {
+			fmd_hdl_debug(hdl, "Adding fbr event to serd engine\n");
+			if (branch->branch_case.cc_serdnm == NULL) {
+				branch->branch_case.cc_serdnm =
+				    cmd_mem_serdnm_create(hdl,
+				    "branch", branch->branch_unum);
+
+				fmd_serd_create(hdl,
+				    branch->branch_case.cc_serdnm,
+				    fmd_prop_get_int32(hdl, "fbr_n"),
+				    fmd_prop_get_int64(hdl, "fbr_t"));
+			}
+
+			if (fmd_serd_record(hdl,
+			    branch->branch_case.cc_serdnm, ep) == FMD_B_FALSE)
+				return (CMD_EVD_OK); /* engine hasn't fired */
+
+			fmd_hdl_debug(hdl, "fbr serd fired\n");
+
+			fmd_case_add_serd(hdl, branch->branch_case.cc_cp,
+			    branch->branch_case.cc_serdnm);
+
+			cmd_branch_create_fault(hdl, branch,
+			    "fault.memory.link-c", det);
+		}
+	} else {
+		fmd_hdl_debug(hdl, "Processing fbu event");
+		cmd_branch_create_fault(hdl, branch, "fault.memory.link-u",
+		    det);
+	}
+
+	branch->branch_flags |= CMD_MEM_F_FAULTING;
+
+	if (branch->branch_case.cc_serdnm != NULL) {
+		fmd_serd_destroy(hdl, branch->branch_case.cc_serdnm);
+		fmd_hdl_strfree(hdl, branch->branch_case.cc_serdnm);
+		branch->branch_case.cc_serdnm = NULL;
+	}
+
+	fmd_case_add_ereport(hdl, branch->branch_case.cc_cp, ep);
+	fmd_case_solve(hdl, branch->branch_case.cc_cp);
+	cmd_branch_dirty(hdl, branch);
+
+	return (CMD_EVD_OK);
+}
+
+void
+cmd_branch_close(fmd_hdl_t *hdl, void *arg)
+{
+	cmd_branch_destroy(hdl, arg);
+}
+
 
 /*ARGSUSED*/
 ulong_t
@@ -250,10 +436,10 @@ cmd_mem_get_phys_pages(fmd_hdl_t *hdl)
 	}
 
 	listp = (mde_cookie_t *)cpumem_alloc(sizeof (mde_cookie_t) *
-						num_nodes);
+	    num_nodes);
 	nmblocks = md_scan_dag(mdp, MDE_INVAL_ELEM_COOKIE,
-				md_find_name(mdp, "mblock"),
-				md_find_name(mdp, "fwd"), listp);
+	    md_find_name(mdp, "mblock"),
+	    md_find_name(mdp, "fwd"), listp);
 	for (i = 0; i < nmblocks; i++) {
 		if (md_get_prop_val(mdp, listp[i], "size", &bmem) < 0) {
 			physmem = 0;
@@ -429,7 +615,7 @@ breakup_components(char *str, char *sep, nvlist_t **hc_nvl)
 		namebuf[namelen] = '\0';
 
 		if ((j = map_name(namebuf)) < 0)
-		    continue; /* skip names that don't map */
+			continue; /* skip names that don't map */
 
 		if (instlen == 0) {
 			(void) strncpy(instbuf, "0", 2);

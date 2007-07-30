@@ -78,6 +78,9 @@ typedef struct cmd_iorxefrx {
 
 typedef struct cmd_dimm cmd_dimm_t;
 typedef struct cmd_bank cmd_bank_t;
+#ifdef sun4v
+typedef struct cmd_branch cmd_branch_t;
+#endif
 
 /*
  * Correctable and Uncorrectable memory errors
@@ -129,6 +132,11 @@ extern cmd_evdisp_t cmd_mem_synd_check(fmd_hdl_t *, uint64_t, uint8_t,
     uint16_t, uint8_t, cmd_cpu_t *);
 extern void cmd_dimm_close(fmd_hdl_t *, void *);
 extern void cmd_bank_close(fmd_hdl_t *, void *);
+#ifdef sun4v
+extern void cmd_branch_close(fmd_hdl_t *, void *);
+extern cmd_evdisp_t cmd_fb(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+#endif
 
 /*
  * US-IIIi I/O, Remote and Foreign Read memory errors

@@ -36,6 +36,9 @@ extern "C" {
 #endif
 
 extern nvlist_t *cmd_fault_add_location(fmd_hdl_t *, nvlist_t *, const char *);
+extern nvlist_t *cmd_motherboard_fru_create(fmd_hdl_t *, nvlist_t *);
+extern nvlist_t *cmd_motherboard_create_fault(fmd_hdl_t *, nvlist_t *,
+    const char *, uint_t);
 
 #ifdef __cplusplus
 }

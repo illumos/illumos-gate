@@ -26,7 +26,8 @@
 
 ARCH = sun4v
 
-sun4v_SRCS = cmd_hc_sun4v.c
+sun4v_SRCS = cmd_hc_sun4v.c \
+	     cmd_branch.c
 
 INCDIRS = $(SRC)/uts/sun4v \
 	$(ROOT)/usr/platform/sun4v/include

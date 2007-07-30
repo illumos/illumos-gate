@@ -70,7 +70,8 @@ static const char *const cpu_names[] = {
 	"ultraSPARC-IIIiplus",
 	"ultraSPARC-T1",
 	"SPARC64-VI",
-	"ultraSPARC-T2"
+	"ultraSPARC-T2",
+	"ultraSPARC-T2plus"
 };
 
 /*
@@ -179,6 +180,7 @@ core2cpus(uint32_t core, cmd_cpu_type_t type, uint8_t level,
 			return;
 		}
 	case CPU_ULTRASPARC_T2:
+	case CPU_ULTRASPARC_T2plus:
 		switch (level) {
 		case CMD_CPU_LEVEL_CORE:
 			*cpuinit = core * UST2_CPUS_PER_CORE;
@@ -238,6 +240,7 @@ cmd_cpu2core(uint32_t cpuid, cmd_cpu_type_t type, uint8_t level) {
 			return (cpuid);
 		}
 	case CPU_ULTRASPARC_T2:
+	case CPU_ULTRASPARC_T2plus:
 		switch (level) {
 		case CMD_CPU_LEVEL_CORE:
 			return (cpuid/UST2_CPUS_PER_CORE);
@@ -2015,6 +2018,9 @@ cmd_cpu_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 	case CMD_PTR_CPU_MISC_REGS:
 		cpu_case_restore(hdl, cpu, &cpu->cpu_misc_regs, cp,
 		    "misc_regs");
+		break;
+	case CMD_PTR_CPU_LFU:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_lfu, cp, "lfu");
 		break;
 #ifdef sun4u
 	case CMD_PTR_CPU_INV_SFSR:

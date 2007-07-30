@@ -158,6 +158,9 @@ typedef struct cmd_stat {
 	fmd_stat_t dp_ignored_ue;	/* # of UEs ignored due to DP fault */
 	fmd_stat_t dp_deferred_ue;	/* # of UEs deferred due to DP error */
 #endif
+#ifdef sun4v
+	fmd_stat_t branch_creat;	/* # of branch state structs created */
+#endif
 } cmd_stat_t;
 
 typedef struct cmd_serd {
@@ -194,6 +197,9 @@ typedef struct cmd {
 	hrtime_t cmd_miscregs_trdelay;  /* delay for redelivery misregs */
 #ifdef sun4u
 	uint16_t cmd_dp_flag;		/* datapath error in progress if set */
+#endif
+#ifdef sun4v
+	cmd_list_t cmd_branches;	/* List of branches state structures */
 #endif
 } cmd_t;
 

@@ -45,6 +45,7 @@
 #include <sys/nvpair.h>
 #ifdef sun4v
 #include <cmd_hc_sun4v.h>
+#include <cmd_branch.h>
 #endif /* sun4v */
 
 /*
@@ -99,6 +100,9 @@ cmd_dimm_free(fmd_hdl_t *hdl, cmd_dimm_t *dimm, int destroy)
 {
 	cmd_case_t *cc = &dimm->dimm_case;
 
+#ifdef sun4v
+	cmd_branch_t *branch;
+#endif
 	if (cc->cc_cp != NULL) {
 		cmd_case_fini(hdl, cc->cc_cp, destroy);
 		if (cc->cc_serdnm != NULL) {
@@ -111,6 +115,11 @@ cmd_dimm_free(fmd_hdl_t *hdl, cmd_dimm_t *dimm, int destroy)
 
 	if (dimm->dimm_bank != NULL)
 		cmd_bank_remove_dimm(hdl, dimm->dimm_bank, dimm);
+#ifdef sun4v
+	branch = cmd_branch_lookup_by_unum(hdl, dimm->dimm_unum);
+	if (branch != NULL)
+		cmd_branch_remove_dimm(hdl, branch, dimm);
+#endif
 
 	cmd_fmri_fini(hdl, &dimm->dimm_asru, destroy);
 

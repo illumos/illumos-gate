@@ -50,11 +50,15 @@
 #include <mem.h>
 #include <fm/fmd_fmri.h>
 
+#include <fcntl.h>
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <errno.h>
+#include <time.h>
+#include <sys/mem.h>
 #include <sys/fm/ldom.h>
 
 extern ldom_hdl_t *mem_scheme_lhp;
@@ -344,144 +348,106 @@ path_map_destroy(mem_path_map_t *pm)
 	}
 }
 
-int
-mem_discover_mdesc(md_t *mdp, size_t mdbufsz)
+uint16_t
+mem_log2(uint64_t v)
 {
-	mde_cookie_t *listp;
-	int num_nodes, idx, mdesc_dimm_count, unique_ch;
-	mem_dimm_map_t *dm;
+	uint16_t i;
+	for (i = 0; v > 1; i++) {
+		v = v >> 1;
+	}
+	return (i);
+}
+
+static mem_dimm_map_t *
+get_dimm_by_sn(char *sn)
+{
+	mem_dimm_map_t *dp;
+
+	for (dp = mem.mem_dm; dp != NULL; dp = dp->dm_next) {
+		if (strcmp(sn, dp->dm_serid) == 0)
+			return (dp);
+	}
+
+	return (NULL);
+}
+
+#define	MEM_BYTES_PER_CACHELINE	64
+
+static void
+mdesc_init_n1(md_t *mdp, mde_cookie_t *listp)
+{
+	int idx, mdesc_dimm_count;
+	mem_dimm_map_t *dm, *d;
 	uint64_t sysmem_size, i, drgen = fmd_fmri_get_drgen();
-	char curr_ch;
-	int num_comps = 0;
-	char *unum, *serial, *part, *dash;
+	int dimms, min_chan, max_chan, min_rank, max_rank;
+	int chan, rank, dimm, chans, chan_step;
+	uint64_t mask, chan_mask, chan_value;
+	uint64_t rank_mask, rank_value;
+	char *unum, *serial, *part;
+	mem_seg_map_t *seg;
+	char s[20];
 
-	num_nodes = md_node_count(mdp);
-	listp = fmd_fmri_alloc(sizeof (mde_cookie_t) * num_nodes);
-
-	num_comps = md_scan_dag(mdp,
-		MDE_INVAL_ELEM_COOKIE,
-		md_find_name(mdp, "component"),
-		md_find_name(mdp, "fwd"),
-		listp);
-	if (num_comps == 0) {
-
-		/*
-		 * Find first 'memory' node -- there should only be one.
-		 * Extract 'memory-generation-id#' value from it.
-		 */
-		mdesc_dimm_count = md_scan_dag(mdp,
-		    MDE_INVAL_ELEM_COOKIE, md_find_name(mdp, "memory"),
-		    md_find_name(mdp, "fwd"), listp);
-
-		if (md_get_prop_val(mdp, listp[0], "memory-generation-id#",
-		    &mem.mem_memconfig))
-			mem.mem_memconfig = 0;
-
-		mdesc_dimm_count = md_scan_dag(mdp,
-		    MDE_INVAL_ELEM_COOKIE, md_find_name(mdp, "dimm_data"),
-		    md_find_name(mdp, "fwd"), listp);
-
-		for (idx = 0; idx < mdesc_dimm_count; idx++) {
-
-			if (md_get_prop_str(mdp, listp[idx], "nac", &unum) < 0)
-				unum = "";
-			if (md_get_prop_str(mdp, listp[idx], "serial#",
-				&serial) < 0)
-				serial = "";
-			if (md_get_prop_str(mdp, listp[idx], "part#",
-				&part) < 0)
-				part = "";
-
-			dm = fmd_fmri_zalloc(sizeof (mem_dimm_map_t));
-			dm->dm_label = fmd_fmri_strdup(unum);
-			(void) strncpy(dm->dm_serid, serial,
-				MEM_SERID_MAXLEN - 1);
-			dm->dm_part = fmd_fmri_strdup(part);
-			dm->dm_drgen = drgen;
-
-			dm->dm_next = mem.mem_dm;
-			mem.mem_dm = dm;
-		}
-	} else {
-		char *type, *sp, *jnum, *nac;
-		size_t ss;
-		for (idx = 0; idx < num_comps; idx++) {
-			if (md_get_prop_str(mdp, listp[idx], "type", &type) < 0)
-				continue;
-			if (strcmp(type, "dimm") == 0) {
-				if (md_get_prop_str(mdp, listp[idx], "nac",
-				    &nac) < 0)
-					nac = "";
-				if (md_get_prop_str(mdp, listp[idx], "label",
-				    &jnum) < 0)
-					jnum = "";
-				if (md_get_prop_str(mdp, listp[idx],
-				    "serial_number", &serial) < 0)
-					serial = "";
-				if (md_get_prop_str(mdp, listp[idx],
-				    "part_number", &part) < 0)
-					part = "";
-				if (md_get_prop_str(mdp, listp[idx],
-				    "dash_number", &dash) < 0)
-					dash = "";
-
-				ss = strlen(part) + strlen(dash) + 1;
-				sp = fmd_fmri_alloc(ss);
-				sp = strcpy(sp, part);
-				sp = strncat(sp, dash, strlen(dash) + 1);
-
-				dm = fmd_fmri_zalloc(sizeof (mem_dimm_map_t));
-
-				if ((strcmp(nac, "") != 0) &&
-				    (strcmp(jnum, "") != 0)) {
-					ss = strlen(nac) + strlen(jnum) + 2;
-					unum = fmd_fmri_alloc(ss);
-					(void) snprintf(unum, ss, "%s/%s", nac,
-					    jnum);
-					dm->dm_label = unum;
-				} else {
-					unum = "";
-					dm->dm_label = fmd_fmri_strdup(unum);
-				}
-
-				(void) strncpy(dm->dm_serid, serial,
-				    MEM_SERID_MAXLEN - 1);
-				dm->dm_part = sp;
-				dm->dm_drgen = drgen;
-
-				dm->dm_next = mem.mem_dm;
-				mem.mem_dm = dm;
-			}
-		}
-	}
-
-	if (strstr(mem.mem_dm->dm_label, "BR") != NULL) { /* N2 */
-		mem.mem_rank_str = "CH";
-	} else  { /* Niagara-1 */
-		mem.mem_rank_str = "/R";
-	}
-
-	curr_ch = '\0';
-	unique_ch = 0;
-	for (dm = mem.mem_dm; dm != NULL; dm = dm->dm_next) {
-		char my_ch;
-		if (mem.mem_rank_str == "CH")
-			my_ch = *(strstr(dm->dm_label, "BR") + 2);
-		else my_ch = *(strstr(dm->dm_label, "CH") + 2);
-		if (curr_ch != my_ch) {
-			unique_ch++;
-			curr_ch = my_ch;
-		}
-	}
-
-	if (unique_ch == 1) mem.mem_ch_shift = 0;
-	else if (unique_ch == 2) mem.mem_ch_shift = 1;
-	else mem.mem_ch_shift = 2;
-
+	/*
+	 * Find first 'memory' node -- there should only be one.
+	 * Extract 'memory-generation-id#' value from it.
+	 */
 	mdesc_dimm_count = md_scan_dag(mdp,
-	    MDE_INVAL_ELEM_COOKIE, md_find_name(mdp, "mblock"),
+	    MDE_INVAL_ELEM_COOKIE, md_find_name(mdp, "memory"),
 	    md_find_name(mdp, "fwd"), listp);
 
+	if (md_get_prop_val(mdp, listp[0], "memory-generation-id#",
+	    &mem.mem_memconfig))
+		mem.mem_memconfig = 0;
+
+	mdesc_dimm_count = md_scan_dag(mdp,
+	    MDE_INVAL_ELEM_COOKIE, md_find_name(mdp, "dimm_data"),
+	    md_find_name(mdp, "fwd"), listp);
+
+	for (idx = 0; idx < mdesc_dimm_count; idx++) {
+
+		if (md_get_prop_str(mdp, listp[idx], "nac", &unum) < 0)
+			unum = "";
+		if (md_get_prop_str(mdp, listp[idx], "serial#",
+		    &serial) < 0)
+			serial = "";
+		if (md_get_prop_str(mdp, listp[idx], "part#",
+		    &part) < 0)
+			part = "";
+
+		dm = fmd_fmri_zalloc(sizeof (mem_dimm_map_t));
+		dm->dm_label = fmd_fmri_strdup(unum);
+		(void) strncpy(dm->dm_serid, serial,
+		    MEM_SERID_MAXLEN - 1);
+		dm->dm_part = fmd_fmri_strdup(part);
+		dm->dm_drgen = drgen;
+
+		dm->dm_next = mem.mem_dm;
+		mem.mem_dm = dm;
+	}
+	/* N1 (MD) specific segment initialization */
+
+	dimms = 0;
+	min_chan = 99;
+	max_chan = -1;
+	min_rank = 99;
+	max_rank = -1;
+
+	for (d = mem.mem_dm; d != NULL; d = d->dm_next) {
+		if (sscanf(d->dm_label, "MB/CMP0/CH%d/R%d/D%d",
+		    &chan, &rank, &dimm) != 3) /* didn't scan all 3 values */
+			return;
+		min_chan = MIN(min_chan, chan);
+		max_chan = MAX(max_chan, chan);
+		min_rank = MIN(min_rank, rank);
+		max_rank = MAX(max_rank, rank);
+		dimms++;
+	}
+
+	mdesc_dimm_count = md_scan_dag(mdp,
+	    MDE_INVAL_ELEM_COOKIE,
+	    md_find_name(mdp, "mblock"),
+	    md_find_name(mdp, "fwd"),
+	    listp);
 	sysmem_size = 0;
 	for (idx = 0; idx < mdesc_dimm_count; idx++) {
 		uint64_t size = 0;
@@ -489,8 +455,180 @@ mem_discover_mdesc(md_t *mdp, size_t mdbufsz)
 			sysmem_size += size;
 	}
 
-	for (i = 1 << 30; i < sysmem_size; i <<= 1); /* round up to 2^i */
-	mem.mem_rank_mask = i >> 1; /* PA high order bit */
+	for (i = 1 << 30; i < sysmem_size; i = i << 1)
+		;
+	if (max_rank > min_rank) {
+		chans = dimms/4;
+		rank_mask = i >> 1;
+	} else {
+		chans = dimms/2;
+		rank_mask = 0;
+	}
+
+	chan_mask = (uint64_t)((chans - 1) * MEM_BYTES_PER_CACHELINE);
+	mask = rank_mask | chan_mask;
+
+	if (chans > 2)
+		chan_step = 1;
+	else
+		chan_step = max_chan - min_chan;
+
+	for (rank = min_rank, rank_value = 0;
+	    rank <= max_rank;
+	    rank++, rank_value += rank_mask) {
+		for (chan = min_chan, chan_value = 0;
+		    chan <= max_chan;
+		    chan += chan_step,
+		    chan_value += MEM_BYTES_PER_CACHELINE) {
+			seg = fmd_fmri_zalloc(sizeof (mem_seg_map_t));
+			seg->sm_next = mem.mem_seg;
+			mem.mem_seg = seg;
+			seg->sm_base = 0;
+			seg->sm_size = sysmem_size;
+			seg->sm_mask = mask;
+			seg->sm_match = chan_value | rank_value;
+			seg->sm_shift = 1;
+			(void) sprintf(s, "MB/CMP0/CH%1d/R%1d", chan, rank);
+			for (d = mem.mem_dm; d != NULL; d = d->dm_next) {
+				if (strncmp(s, d->dm_label, strlen(s)) == 0)
+					d->dm_seg = seg;
+			}
+		}
+	}
+}
+
+static void
+mdesc_init_n2(md_t *mdp, mde_cookie_t *listp, int num_comps)
+{
+	mde_cookie_t *dl, t;
+	int idx, mdesc_dimm_count, mdesc_bank_count;
+	mem_dimm_map_t *dm, *dp;
+	uint64_t i, drgen = fmd_fmri_get_drgen();
+	int n;
+	uint64_t mask, match, base, size;
+	char *unum, *serial, *part, *dash;
+	mem_seg_map_t *smp;
+	char *type, *sp, *jnum, *nac;
+	size_t ss;
+
+	mdesc_dimm_count = 0;
+	for (idx = 0; idx < num_comps; idx++) {
+		if (md_get_prop_str(mdp, listp[idx], "type", &type) < 0)
+			continue;
+		if (strcmp(type, "dimm") == 0) {
+			mdesc_dimm_count++;
+			if (md_get_prop_str(mdp, listp[idx], "nac",
+			    &nac) < 0)
+				nac = "";
+			if (md_get_prop_str(mdp, listp[idx], "label",
+			    &jnum) < 0)
+				jnum = "";
+			if (md_get_prop_str(mdp, listp[idx],
+			    "serial_number", &serial) < 0)
+				serial = "";
+			if (md_get_prop_str(mdp, listp[idx],
+			    "part_number", &part) < 0)
+				part = "";
+			if (md_get_prop_str(mdp, listp[idx],
+			    "dash_number", &dash) < 0)
+				dash = "";
+
+			ss = strlen(part) + strlen(dash) + 1;
+			sp = fmd_fmri_alloc(ss);
+			sp = strcpy(sp, part);
+			sp = strncat(sp, dash, strlen(dash) + 1);
+
+			dm = fmd_fmri_zalloc(sizeof (mem_dimm_map_t));
+
+			if ((strcmp(nac, "") != 0) &&
+			    (strcmp(jnum, "") != 0)) {
+				ss = strlen(nac) + strlen(jnum) + 2;
+				unum = fmd_fmri_alloc(ss);
+				(void) snprintf(unum, ss, "%s/%s", nac,
+				    jnum);
+				dm->dm_label = unum;
+			} else {
+				unum = "";
+				dm->dm_label = fmd_fmri_strdup(unum);
+			}
+
+			(void) strncpy(dm->dm_serid, serial,
+			    MEM_SERID_MAXLEN - 1);
+			dm->dm_part = sp;
+			dm->dm_drgen = drgen;
+
+			dm->dm_next = mem.mem_dm;
+			mem.mem_dm = dm;
+		}
+	}
+
+	/* N2 (PRI) specific segment initialization occurs here */
+
+	mdesc_bank_count = md_scan_dag(mdp, MDE_INVAL_ELEM_COOKIE,
+	    md_find_name(mdp, "memory-bank"),
+	    md_find_name(mdp, "fwd"),
+	    listp);
+
+	dl = fmd_fmri_zalloc(mdesc_dimm_count * sizeof (mde_cookie_t));
+
+	for (idx = 0; idx < mdesc_bank_count; idx++) {
+		if (md_get_prop_val(mdp, listp[idx], "mask", &mask) < 0)
+			mask = 0;
+		if (md_get_prop_val(mdp, listp[idx], "match", &match) < 0)
+			match = 0;
+		n = md_scan_dag(mdp, listp[idx],
+		    md_find_name(mdp, "memory-segment"),
+		    md_find_name(mdp, "back"),
+		    &t); /* only 1 "back" arc, so n must equal 1 here */
+		if (md_get_prop_val(mdp, t, "base", &base) < 0)
+			base = 0;
+		if (md_get_prop_val(mdp, t, "size", &size) < 0)
+			size = 0;
+		smp = fmd_fmri_zalloc(sizeof (mem_seg_map_t));
+		smp->sm_next = mem.mem_seg;
+		mem.mem_seg = smp;
+		smp->sm_base = base;
+		smp->sm_size = size;
+		smp->sm_mask = mask;
+		smp->sm_match = match;
+
+		n = md_scan_dag(mdp, listp[idx],
+		    md_find_name(mdp, "component"),
+		    md_find_name(mdp, "fwd"),
+		    dl);
+		smp->sm_shift = mem_log2(n);
+
+		for (i = 0; i < n; i++) {
+			if (md_get_prop_str(mdp, dl[i],
+			    "serial_number", &serial) < 0)
+				continue;
+			if ((dp = get_dimm_by_sn(serial)) == NULL)
+				continue;
+			dp->dm_seg = smp;
+		}
+	}
+	fmd_fmri_free(dl, mdesc_dimm_count * sizeof (mde_cookie_t));
+}
+
+int
+mem_discover_mdesc(md_t *mdp, size_t mdbufsz)
+{
+	mde_cookie_t *listp;
+	int num_nodes;
+	int num_comps = 0;
+
+	num_nodes = md_node_count(mdp);
+	listp = fmd_fmri_alloc(sizeof (mde_cookie_t) * num_nodes);
+
+	num_comps = md_scan_dag(mdp,
+	    MDE_INVAL_ELEM_COOKIE,
+	    md_find_name(mdp, "component"),
+	    md_find_name(mdp, "fwd"),
+	    listp);
+	if (num_comps == 0)
+		mdesc_init_n1(mdp, listp);
+	else
+		mdesc_init_n2(mdp, listp, num_comps);
 
 	fmd_fmri_free(listp, sizeof (mde_cookie_t) * num_nodes);
 	fmd_fmri_free(*mdp, mdbufsz);
@@ -593,10 +731,469 @@ mem_update_mdesc(void)
 		for (dm = mem.mem_dm; dm != NULL; dm = next) {
 			next = dm->dm_next;
 			fmd_fmri_strfree(dm->dm_label);
+			fmd_fmri_strfree(dm->dm_part);
 			fmd_fmri_free(dm, sizeof (mem_dimm_map_t));
 		}
 		mem.mem_dm = NULL;
 
 		return (mem_discover_mdesc(mdp, mdbufsz));
+	}
+}
+
+/*
+ * Retry values for handling the case where the kernel is not yet ready
+ * to provide DIMM serial ids.  Some platforms acquire DIMM serial id
+ * information from their System Controller via a mailbox interface.
+ * The values chosen are for 10 retries 3 seconds apart to approximate the
+ * possible 30 second timeout length of a mailbox message request.
+ */
+#define	MAX_MEM_SID_RETRIES	10
+#define	MEM_SID_RETRY_WAIT	3
+
+/*
+ * The comparison is asymmetric. It compares up to the length of the
+ * argument unum.
+ */
+static mem_dimm_map_t *
+dm_lookup(const char *name)
+{
+	mem_dimm_map_t *dm;
+
+	for (dm = mem.mem_dm; dm != NULL; dm = dm->dm_next) {
+		if (strncmp(name, dm->dm_label, strlen(name)) == 0)
+			return (dm);
+	}
+
+	return (NULL);
+}
+
+/*
+ * Returns 0 with serial numbers if found, -1 (with errno set) for errors.  If
+ * the unum (or a component of same) wasn't found, -1 is returned with errno
+ * set to ENOENT.  If the kernel doesn't have support for serial numbers,
+ * -1 is returned with errno set to ENOTSUP.
+ */
+static int
+mem_get_serids_from_kernel(const char *unum, char ***seridsp, size_t *nseridsp)
+{
+	char **dimms, **serids;
+	size_t ndimms, nserids;
+	int i, rc = 0;
+	int fd;
+	int retries = MAX_MEM_SID_RETRIES;
+	mem_name_t mn;
+	struct timespec rqt;
+
+	if ((fd = open("/dev/mem", O_RDONLY)) < 0)
+		return (-1);
+
+	if (mem_unum_burst(unum, &dimms, &ndimms) < 0) {
+		(void) close(fd);
+		return (-1); /* errno is set for us */
+	}
+
+	serids = fmd_fmri_zalloc(sizeof (char *) * ndimms);
+	nserids = ndimms;
+
+	bzero(&mn, sizeof (mn));
+
+	for (i = 0; i < ndimms; i++) {
+		mn.m_namelen = strlen(dimms[i]) + 1;
+		mn.m_sidlen = MEM_SERID_MAXLEN;
+
+		mn.m_name = fmd_fmri_alloc(mn.m_namelen);
+		mn.m_sid = fmd_fmri_alloc(mn.m_sidlen);
+
+		(void) strcpy(mn.m_name, dimms[i]);
+
+		do {
+			rc = ioctl(fd, MEM_SID, &mn);
+
+			if (rc >= 0 || errno != EAGAIN)
+				break;
+
+			if (retries == 0) {
+				errno = ETIMEDOUT;
+				break;
+			}
+
+			/*
+			 * EAGAIN indicates the kernel is
+			 * not ready to provide DIMM serial
+			 * ids.  Sleep MEM_SID_RETRY_WAIT seconds
+			 * and try again.
+			 * nanosleep() is used instead of sleep()
+			 * to avoid interfering with fmd timers.
+			 */
+			rqt.tv_sec = MEM_SID_RETRY_WAIT;
+			rqt.tv_nsec = 0;
+			(void) nanosleep(&rqt, NULL);
+
+		} while (retries--);
+
+		if (rc < 0) {
+			/*
+			 * ENXIO can happen if the kernel memory driver
+			 * doesn't have the MEM_SID ioctl (e.g. if the
+			 * kernel hasn't been patched to provide the
+			 * support).
+			 *
+			 * If the MEM_SID ioctl is available but the
+			 * particular platform doesn't support providing
+			 * serial ids, ENOTSUP will be returned by the ioctl.
+			 */
+			if (errno == ENXIO)
+				errno = ENOTSUP;
+			fmd_fmri_free(mn.m_name, mn.m_namelen);
+			fmd_fmri_free(mn.m_sid, mn.m_sidlen);
+			mem_strarray_free(serids, nserids);
+			mem_strarray_free(dimms, ndimms);
+			(void) close(fd);
+			return (-1);
+		}
+
+		serids[i] = fmd_fmri_strdup(mn.m_sid);
+
+		fmd_fmri_free(mn.m_name, mn.m_namelen);
+		fmd_fmri_free(mn.m_sid, mn.m_sidlen);
+	}
+
+	mem_strarray_free(dimms, ndimms);
+
+	(void) close(fd);
+
+	*seridsp = serids;
+	*nseridsp = nserids;
+
+	return (0);
+}
+
+/*
+ * Returns 0 with serial numbers if found, -1 (with errno set) for errors.  If
+ * the unum (or a component of same) wasn't found, -1 is returned with errno
+ * set to ENOENT.
+ */
+static int
+mem_get_serids_from_cache(const char *unum, char ***seridsp, size_t *nseridsp)
+{
+	uint64_t drgen = fmd_fmri_get_drgen();
+	char **dimms, **serids;
+	size_t ndimms, nserids;
+	mem_dimm_map_t *dm;
+	int i, rc = 0;
+
+	if (mem_unum_burst(unum, &dimms, &ndimms) < 0)
+		return (-1); /* errno is set for us */
+
+	serids = fmd_fmri_zalloc(sizeof (char *) * ndimms);
+	nserids = ndimms;
+
+	for (i = 0; i < ndimms; i++) {
+		if ((dm = dm_lookup(dimms[i])) == NULL) {
+			rc = fmd_fmri_set_errno(EINVAL);
+			break;
+		}
+
+		if (*dm->dm_serid == '\0' || dm->dm_drgen != drgen) {
+			/*
+			 * We don't have a cached copy, or the copy we've got is
+			 * out of date.  Look it up again.
+			 */
+			if (mem_get_serid(dm->dm_device, dm->dm_serid,
+			    sizeof (dm->dm_serid)) < 0) {
+				rc = -1; /* errno is set for us */
+				break;
+			}
+
+			dm->dm_drgen = drgen;
+		}
+
+		serids[i] = fmd_fmri_strdup(dm->dm_serid);
+	}
+
+	mem_strarray_free(dimms, ndimms);
+
+	if (rc == 0) {
+		*seridsp = serids;
+		*nseridsp = nserids;
+	} else {
+		mem_strarray_free(serids, nserids);
+	}
+
+	return (rc);
+}
+
+/*
+ * Returns 0 with serial numbers if found, -1 (with errno set) for errors.  If
+ * the unum (or a component of same) wasn't found, -1 is returned with errno
+ * set to ENOENT.
+ */
+static int
+mem_get_serids_from_mdesc(const char *unum, char ***seridsp, size_t *nseridsp)
+{
+	uint64_t drgen = fmd_fmri_get_drgen();
+	char **dimms, **serids;
+	size_t ndimms, nserids;
+	mem_dimm_map_t *dm;
+	int i, rc = 0;
+
+	if (mem_unum_burst(unum, &dimms, &ndimms) < 0)
+		return (-1); /* errno is set for us */
+
+	serids = fmd_fmri_zalloc(sizeof (char *) * ndimms);
+	nserids = ndimms;
+
+	/*
+	 * first go through dimms and see if dm_drgen entries are outdated
+	 */
+	for (i = 0; i < ndimms; i++) {
+		if ((dm = dm_lookup(dimms[i])) == NULL ||
+		    dm->dm_drgen != drgen)
+			break;
+	}
+
+	if (i < ndimms && mem_update_mdesc() != 0) {
+		mem_strarray_free(dimms, ndimms);
+		return (-1);
+	}
+
+	/*
+	 * get to this point if an up-to-date mdesc (and corresponding
+	 * entries in the global mem list) exists
+	 */
+	for (i = 0; i < ndimms; i++) {
+		if ((dm = dm_lookup(dimms[i])) == NULL) {
+			rc = fmd_fmri_set_errno(EINVAL);
+			break;
+		}
+
+		if (dm->dm_drgen != drgen)
+			dm->dm_drgen = drgen;
+
+		/*
+		 * mdesc and dm entry was updated by an earlier call to
+		 * mem_update_mdesc, so we go ahead and dup the serid
+		 */
+		serids[i] = fmd_fmri_strdup(dm->dm_serid);
+	}
+
+	mem_strarray_free(dimms, ndimms);
+
+	if (rc == 0) {
+		*seridsp = serids;
+		*nseridsp = nserids;
+	} else {
+		mem_strarray_free(serids, nserids);
+	}
+
+	return (rc);
+}
+
+/*
+ * Returns 0 with part numbers if found, returns -1 for errors.
+ */
+static int
+mem_get_parts_from_mdesc(const char *unum, char ***partsp, uint_t *npartsp)
+{
+	uint64_t drgen = fmd_fmri_get_drgen();
+	char **dimms, **parts;
+	size_t ndimms, nparts;
+	mem_dimm_map_t *dm;
+	int i, rc = 0;
+
+	if (mem_unum_burst(unum, &dimms, &ndimms) < 0)
+		return (-1); /* errno is set for us */
+
+	parts = fmd_fmri_zalloc(sizeof (char *) * ndimms);
+	nparts = ndimms;
+
+	/*
+	 * first go through dimms and see if dm_drgen entries are outdated
+	 */
+	for (i = 0; i < ndimms; i++) {
+		if ((dm = dm_lookup(dimms[i])) == NULL ||
+		    dm->dm_drgen != drgen)
+			break;
+	}
+
+	if (i < ndimms && mem_update_mdesc() != 0) {
+		mem_strarray_free(dimms, ndimms);
+		mem_strarray_free(parts, nparts);
+		return (-1);
+	}
+
+	/*
+	 * get to this point if an up-to-date mdesc (and corresponding
+	 * entries in the global mem list) exists
+	 */
+	for (i = 0; i < ndimms; i++) {
+		if ((dm = dm_lookup(dimms[i])) == NULL) {
+			rc = fmd_fmri_set_errno(EINVAL);
+			break;
+		}
+
+		if (dm->dm_drgen != drgen)
+			dm->dm_drgen = drgen;
+
+		/*
+		 * mdesc and dm entry was updated by an earlier call to
+		 * mem_update_mdesc, so we go ahead and dup the part
+		 */
+		if (dm->dm_part == NULL) {
+			rc = -1;
+			break;
+		}
+		parts[i] = fmd_fmri_strdup(dm->dm_part);
+	}
+
+	mem_strarray_free(dimms, ndimms);
+
+	if (rc == 0) {
+		*partsp = parts;
+		*npartsp = nparts;
+	} else {
+		mem_strarray_free(parts, nparts);
+	}
+
+	return (rc);
+}
+
+static int
+mem_get_parts_by_unum(const char *unum, char ***partp, uint_t *npartp)
+{
+	if (mem.mem_dm == NULL)
+		return (-1);
+	else
+		return (mem_get_parts_from_mdesc(unum, partp, npartp));
+}
+
+static int
+get_seg_by_sn(char *sn, mem_seg_map_t **segmap)
+{
+	mem_dimm_map_t *dm;
+
+	for (dm = mem.mem_dm; dm != NULL; dm = dm->dm_next) {
+		if (strcmp(sn, dm->dm_serid) == 0) {
+			*segmap = dm->dm_seg;
+			return (0);
+		}
+	}
+	return (-1);
+}
+
+/*
+ * Niagara-1, Niagara-2, and Victoria Falls all have physical address
+ * spaces of 40 bits.
+ */
+
+#define	MEM_PHYS_ADDRESS_LIMIT	0x10000000000ULL
+
+/*
+ * The 'mask' argument to extract_bits has 1's in those bit positions of
+ * the physical address used to select the DIMM (or set of DIMMs) which will
+ * store the contents of the physical address.  If we extract those bits, ie.
+ * remove them and collapse the holes, the result is the 'address' within the
+ * DIMM or set of DIMMs where the contents are stored.
+ */
+
+static uint64_t
+extract_bits(uint64_t paddr, uint64_t mask)
+{
+	uint64_t from, to;
+	uint64_t result = 0;
+
+	to = 1;
+	for (from = 1; from <= MEM_PHYS_ADDRESS_LIMIT; from <<= 1) {
+		if ((from & mask) == 0) {
+			if ((from & paddr) != 0)
+				result |= to;
+			to <<= 1;
+		}
+	}
+	return (result);
+}
+
+/*
+ * insert_bits is the reverse operation to extract_bits.  Where extract_bits
+ * removes from the physical address those bits which select a DIMM or set
+ * of DIMMs, insert_bits reconstitutes a physical address given the DIMM
+ * selection 'mask' and the 'value' for the address bits denoted by 1s in
+ * the 'mask'.
+ */
+static uint64_t
+insert_bits(uint64_t offset, uint64_t mask, uint64_t value)
+{
+	uint64_t result = 0;
+	uint64_t from, to;
+
+	from = 1;
+	for (to = 1; to <= MEM_PHYS_ADDRESS_LIMIT; to <<= 1) {
+		if ((to & mask) == 0) {
+			if ((offset & from) != 0)
+				result |= to;
+			from <<= 1;
+		} else {
+			result |= to & value;
+		}
+	}
+	return (result);
+}
+
+int
+mem_get_serids_by_unum(const char *unum, char ***seridsp, size_t *nseridsp)
+{
+	/*
+	 * Some platforms do not support the caching of serial ids by the
+	 * mem scheme plugin but instead support making serial ids available
+	 * via the kernel.
+	 */
+	if (mem.mem_dm == NULL)
+		return (mem_get_serids_from_kernel(unum, seridsp, nseridsp));
+	else if (mem_get_serids_from_mdesc(unum, seridsp, nseridsp) == 0)
+		return (0);
+	else
+		return (mem_get_serids_from_cache(unum, seridsp, nseridsp));
+}
+
+void
+mem_expand_opt(nvlist_t *nvl, char *unum, char **serids)
+{
+	mem_seg_map_t *seg;
+	uint64_t offset, physaddr;
+	char **parts;
+	uint_t nparts;
+
+	/*
+	 * The following additional expansions are all optional.
+	 * Failure to retrieve a data value, or failure to add it
+	 * successfully to the FMRI, does NOT cause a failure of
+	 * fmd_fmri_expand.  All optional expansions will be attempted
+	 * once expand_opt is entered.
+	 */
+
+	if ((mem.mem_seg != NULL) &&
+	    (get_seg_by_sn(*serids, &seg) == 0)) {
+
+		if (nvlist_lookup_uint64(nvl,
+		    FM_FMRI_MEM_OFFSET, &offset) == 0) {
+			physaddr = insert_bits((offset<<seg->sm_shift),
+			    seg->sm_mask, seg->sm_match);
+			(void) nvlist_add_uint64(nvl, FM_FMRI_MEM_PHYSADDR,
+			    physaddr); /* displaces any previous physaddr */
+		} else if (nvlist_lookup_uint64(nvl,
+		    FM_FMRI_MEM_PHYSADDR, &physaddr) == 0) {
+			offset = extract_bits(physaddr,
+			    seg->sm_mask) >> seg->sm_shift;
+			(void) (nvlist_add_uint64(nvl, FM_FMRI_MEM_OFFSET,
+			    offset));
+		}
+	}
+
+	if ((nvlist_lookup_string_array(nvl, FM_FMRI_HC_PART,
+	    &parts, &nparts) < 0) &&
+	    (mem_get_parts_by_unum(unum, &parts, &nparts) == 0)) {
+		(void) nvlist_add_string_array(nvl,
+		    FM_FMRI_HC_PART, parts, nparts);
+		mem_strarray_free(parts, nparts);
 	}
 }

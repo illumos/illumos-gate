@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,9 +80,8 @@ extern "C" {
  *     generated.  No attempt is made to determine whether or not the named
  *     item is still present in the system.
  *
- *   - expand: At the time of this writing, no platforms include bank or DIMM
- *     serial numbers in their ereports.  As such, the serial number(s) must
- *     be added by the diagnosis engine.  This entry point will read the
+ *   - expand: For platforms which do not include bank or DIMM
+ *     serial numbers in their ereports, this entry point will read the
  *     serial number(s) for the named item, and will add it/them to the passed
  *     FMRI.  Errors will be returned if the FMRI (unum) was unparseable, or if
  *     the serial number could not be retrieved.
@@ -108,6 +107,15 @@ extern "C" {
  */
 #define	MEM_SERID_MAXLEN	64
 
+typedef struct mem_seg_map {
+	struct mem_seg_map *sm_next;	/* the next segment map */
+	uint64_t	sm_base;	/* base address for this segment */
+	uint64_t	sm_size;	/* size for this segment */
+	uint64_t	sm_mask;	/* mask denoting dimm selection bits */
+	uint64_t	sm_match;	/* value selecting this set of DIMMs */
+	uint16_t	sm_shift;	/* dimms-per-reference shift */
+} mem_seg_map_t;
+
 typedef struct mem_dimm_map {
 	struct mem_dimm_map *dm_next;	/* The next DIMM map */
 	char *dm_label;			/* The UNUM for this DIMM */
@@ -115,18 +123,19 @@ typedef struct mem_dimm_map {
 	char dm_serid[MEM_SERID_MAXLEN]; /* Cached serial number */
 	char *dm_part;			/* DIMM part number */
 	uint64_t dm_drgen;		/* DR gen count for cached S/N */
+	mem_seg_map_t *dm_seg;		/* segment for this DIMM */
 } mem_dimm_map_t;
 
 typedef struct mem {
 	mem_dimm_map_t *mem_dm;		/* List supported DIMMs */
 	uint64_t mem_memconfig;		/* HV memory-configuration-id# */
-	uint64_t mem_rank_mask;		/* "rank" bit */
-	int mem_ch_shift;		/* # bits for "CH" */
-	const char *mem_rank_str;	/* string denoting "rank" */
+	mem_seg_map_t *mem_seg;		/* list of defined segments */
 } mem_t;
 
 extern int mem_discover(void);
 extern int mem_get_serid(const char *, char *, size_t);
+extern int mem_get_serids_by_unum(const char *, char ***, size_t *);
+extern void mem_expand_opt(nvlist_t *, char *, char **);
 
 extern int mem_unum_burst(const char *, char ***, size_t *);
 extern int mem_unum_contains(const char *, const char *);

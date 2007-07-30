@@ -36,6 +36,9 @@
 #ifdef sun4u
 #include <cmd_dp.h>
 #endif
+#ifdef sun4v
+#include <cmd_branch.h>
+#endif
 
 #include <errno.h>
 #include <strings.h>
@@ -253,6 +256,9 @@ cmd_mem_gc(fmd_hdl_t *hdl)
 {
 	cmd_dimm_gc(hdl);
 	cmd_bank_gc(hdl);
+#ifdef sun4v
+	cmd_branch_gc(hdl);
+#endif
 }
 
 void
@@ -262,6 +268,9 @@ cmd_mem_fini(fmd_hdl_t *hdl)
 
 	cmd_dimm_fini(hdl);
 	cmd_bank_fini(hdl);
+#ifdef sun4v
+	cmd_branch_fini(hdl);
+#endif
 
 	while ((rf = cmd_list_next(&cmd.cmd_iorxefrx)) != NULL)
 		cmd_iorxefrx_free(hdl, rf);

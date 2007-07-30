@@ -95,7 +95,9 @@ static const bank_dimm_t bank_dimm[] = {
 	{ "/MBU_B/MEMB%*d/%n%nMEM%*d%*1c%n",	" MEM%*d%*1c%n" },
 	{ "/CMU%*2d/%n%nMEM%*2d%*1c%n",		" MEM%*2d%*1c%n" },
 	{ "MB/CMP%*d/BR%*d%n:%n%n",		" CH%*d/D%*d/J%*4d%n", "/" },
-	{ "MB/CMP%*d/BR%*d%n%n%n",		"/CH%*d/D%*d/J%*4d%n" },
+	{ "%n%nMB/CMP%*d/BR%*d/CH%*d/D%*d/J%*4d%n",
+	    "MB/CMP%*d/BR%*d/CH%*d/D%*d/J%*4d%n" },
+	{ "%n%nMB/CMP%*d/BR%*d/CH%*d/D%*d%n", "MB/CMP%*d/BR%*d/CH%*d/D%*d%n" },
 	{ NULL }
 };
 
@@ -179,7 +181,6 @@ mem_unum_burst_pattern(const char *pat, char ***dimmsp, size_t *ndimmsp)
 		(void) sscanf(pat, bd->bd_pat, &replace, &start, &matched);
 		if (matched == -1)
 			continue;
-
 		(void) strlcpy(dimmname, pat, sizeof (dimmname));
 		if (bd->bd_subst != NULL) {
 			(void) strlcpy(dimmname+replace, bd->bd_subst,

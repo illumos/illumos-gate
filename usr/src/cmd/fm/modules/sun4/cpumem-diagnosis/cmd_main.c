@@ -308,8 +308,8 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	    CMD_CPU_LEVEL_CHIP },
 	{ "ereport.cpu.*.lvu",		cmd_l2ctl },
 	{ "ereport.cpu.*.lru",		cmd_l2ctl },
-	{ "ereport.cpu.*.fbr",		cmd_nop },
-	{ "ereport.cpu.*.fbu",		cmd_ue,		CMD_ERRCL_DAU },
+	{ "ereport.cpu.*.fbr",		cmd_fb },
+	{ "ereport.cpu.*.fbu",		cmd_fb },
 	{ "ereport.cpu.*.dac",		cmd_ce,		CMD_ERRCL_DAC },
 	{ "ereport.cpu.*.dsc",		cmd_ce,		CMD_ERRCL_DSC },
 	{ "ereport.cpu.*.dau",		cmd_ue,		CMD_ERRCL_DAU },
@@ -342,6 +342,19 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	    CMD_ERRCL_SBDPC | CMD_CPU_LEVEL_THREAD },
 	{ "ereport.cpu.*.tsau",		cmd_miscregs_ue,
 	    CMD_CPU_LEVEL_THREAD },
+	{ "ereport.cpu.*.cbce",		cmd_xxc,	CMD_CPU_LEVEL_CHIP },
+	{ "ereport.cpu.*.dce",		cmd_nop },
+	{ "ereport.cpu.*.wbue",		cmd_nop },
+	{ "ereport.cpu.*.lfu-slf",	cmd_lfu_ce,	CMD_CPU_LEVEL_CHIP },
+	{ "ereport.cpu.*.lfu-rtf",	cmd_lfu_ue,	CMD_CPU_LEVEL_CHIP },
+	{ "ereport.cpu.*.lfu-tto",	cmd_lfu_ue,	CMD_CPU_LEVEL_CHIP },
+	{ "ereport.cpu.*.lfu-cto",	cmd_lfu_ue,	CMD_CPU_LEVEL_CHIP },
+	{ "ereport.cpu.*.lfu-mlf",	cmd_lfu_ue,	CMD_CPU_LEVEL_CHIP },
+	{ "ereport.cpu.*.frack",	cmd_lfu_pe,	CMD_CPU_LEVEL_CHIP },
+	{ "ereport.cpu.*.fsr",		cmd_lfu_pe,	CMD_CPU_LEVEL_CHIP },
+	{ "ereport.cpu.*.fdr", 		cmd_lfu_pe,	CMD_CPU_LEVEL_CHIP },
+	{ "ereport.cpu.*.to",  		cmd_lfu_pe,	CMD_CPU_LEVEL_CHIP },
+	{ "ereport.cpu.*.snptyp",	cmd_lfu_pe,	CMD_CPU_LEVEL_CHIP },
 #endif /* sun4u */
 	{ "ereport.cpu.*.fpu.hwcopy",	cmd_fpu },
 	{ NULL, NULL }
@@ -456,6 +469,9 @@ static cmd_stat_t cmd_stats = {
 	{ "dp_deferred_ue", FMD_TYPE_UINT64,
 	    "memory UEs deferred due to DP error" },
 #endif
+#ifdef sun4v
+	{ "branch_creat", FMD_TYPE_UINT64, "created new mem branch structure" },
+#endif
 };
 
 static const fmd_prop_t fmd_props[] = {
@@ -507,6 +523,10 @@ static const fmd_prop_t fmd_props[] = {
 	{ "thresh_abs_badrw", FMD_TYPE_UINT64, "128" },
 	{ "max_perm_ce_dimm", FMD_TYPE_UINT32, "128" },
 	{ "miscregs_trdelay", FMD_TYPE_TIME, "45s"},
+#ifdef sun4v
+	{ "fbr_n", FMD_TYPE_UINT32, "14" },
+	{ "fbr_t", FMD_TYPE_TIME, "30min"},
+#endif
 	{ NULL, 0, NULL }
 };
 
@@ -588,6 +608,7 @@ _fmd_init(fmd_hdl_t *hdl)
 	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-IV.*");
 	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-IVplus.*");
 	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T2.*");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T2plus.*");
 	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.*");
 
 	fmd_hdl_subscribe(hdl, "ereport.io.tom.ecc.drce");

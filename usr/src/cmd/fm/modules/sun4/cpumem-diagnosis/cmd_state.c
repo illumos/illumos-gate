@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,9 @@
 #endif
 #include <cmd_bank.h>
 #include <cmd.h>
+#ifdef sun4v
+#include <cmd_branch.h>
+#endif
 
 #include <string.h>
 #include <fm/fmd_api.h>
@@ -98,7 +101,13 @@ static cmd_case_closer_f *const cmd_case_closers[] = {
 	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_DAE */
 	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_IAE */
 	cmd_cpuerr_close,	/* CMD_PTR_CPU_UGESR_UGE */
-	cmd_cpuerr_close	/* CMD_PTR_CPU_MISC_REGS */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_MISC_REGS */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_LFU */
+#ifdef sun4v
+	cmd_branch_close	/* CMD_PTR_BRANCH_CASE */
+#else
+	NULL
+#endif
 };
 
 fmd_case_t *
@@ -171,6 +180,9 @@ static cmd_case_restorer_f *const cmd_case_restorers[] = {
 #ifdef sun4u
 	cmd_dp_restore		/* CMD_NT_DP */
 #endif
+#ifdef sun4v
+	cmd_branch_restore	/* CMD_NT_BRANCH */
+#endif
 };
 
 int
@@ -222,6 +234,9 @@ cmd_state_restore(fmd_hdl_t *hdl)
 	cmd_dp_validate(hdl);
 #endif
 	cmd_page_validate(hdl);
+#ifdef sun4v
+	cmd_branch_validate(hdl);
+#endif
 
 	return (0);
 }

@@ -100,7 +100,8 @@ typedef enum cmd_cpu_type {
 	CPU_ULTRASPARC_IIIiplus,
 	CPU_ULTRASPARC_T1,
 	CPU_SPARC64_VI,
-	CPU_ULTRASPARC_T2
+	CPU_ULTRASPARC_T2,
+	CPU_ULTRASPARC_T2plus
 } cmd_cpu_type_t;
 
 typedef struct cmd_cpu_cases {
@@ -122,6 +123,7 @@ typedef struct cmd_cpu_cases {
 					/* Tick compare (TC) */
 					/* Store buffer (SBD) */
 					/* Trap stack array errors (TSA) */
+	cmd_case_t cpuc_lfu;		/* Coherency link error (LFU) */
 #ifdef sun4u
 	cmd_case_t cpuc_opl_invsfsr;	/* Olympus-C cpu inv-sfsr errors */
 	cmd_case_t cpuc_oplue_detcpu;	/* Olympus-C cpu det. ue (eid=CPU) */
@@ -424,6 +426,7 @@ struct cmd_cpu {
 #define	cpu_mau			cpu_cases.cpuc_mau
 #define	cpu_l2ctl		cpu_cases.cpuc_l2ctl
 #define	cpu_misc_regs		cpu_cases.cpuc_misc_regs
+#define	cpu_lfu			cpu_cases.cpuc_lfu
 #ifdef sun4u
 #define	cpu_opl_invsfsr		cpu_cases.cpuc_opl_invsfsr
 #define	cpu_oplue_detcpu	cpu_cases.cpuc_oplue_detcpu
@@ -653,6 +656,37 @@ extern cmd_evdisp_t cmd_miscregs_ue(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
 
 extern cmd_evdisp_t cmd_miscregs_train(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+
+/*
+ * Type                                          Fault
+ * ---------------------------------------------------------------------
+ * LFU-RTF   uncorrectable link retrain fail error    fault.cpu.T2plus.lfu-u
+ * LFU-TTO   uncorrectable training timeout error
+ * LFU-CTO   uncorrectable config timeout error
+ * LFU-MLF   uncorrectable multi lanes link fail error
+ * LFU-SLF   correctable single lane failover	      fault.cpu.T2plus.lfu-f
+ *
+ * The expected resolution of lfu faults is the repair of the indicated CPU.
+ */
+extern cmd_evdisp_t cmd_lfu_ue(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+extern cmd_evdisp_t cmd_lfu_ce(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+/*
+ * Type                                          Fault
+ * ---------------------------------------------------------------------
+ * Coherency link protocol errors
+ * to        Transaction timed out  		fault.cpu.T2plus.lfu-p
+ * frack     Invalid or redundant request ack
+ * fsr       Invalid or redundant snoop response
+ * fdr       Invalid or redundant data return
+ * snptyp    Invalid snoop type received from
+ *           coherency link
+ *
+ * The expected resolution of lfu faults is the repair of the indicated CPU.
+ */
+extern cmd_evdisp_t cmd_lfu_pe(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
 
 /*

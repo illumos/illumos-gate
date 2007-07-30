@@ -39,3 +39,60 @@ cmd_fault_add_location(fmd_hdl_t *hdl, nvlist_t *flt, const char *locstr) {
 		fmd_hdl_error(hdl, "unable to alloc location for fault\n");
 	return (flt);
 }
+
+nvlist_t *
+cmd_motherboard_fru_create(fmd_hdl_t *hdl, nvlist_t *asru)
+{
+	nvlist_t *fru, *hcelem;
+	char *serialstr, *partstr;
+
+	if (nvlist_lookup_string(asru, FM_FMRI_HC_SERIAL_ID, &serialstr) != 0)
+		serialstr = NULL;
+	if (nvlist_lookup_string(asru, FM_FMRI_HC_PART, &partstr) != 0)
+		partstr = NULL;
+
+	if (nvlist_alloc(&hcelem, NV_UNIQUE_NAME, 0) != 0)
+		return (NULL);
+
+	if (nvlist_add_string(hcelem, FM_FMRI_HC_NAME, "motherboard") != 0 ||
+	    nvlist_add_string(hcelem, FM_FMRI_HC_ID, "0") != 0) {
+		nvlist_free(hcelem);
+		return (NULL);
+	}
+
+	if (nvlist_alloc(&fru, NV_UNIQUE_NAME, 0) != 0) {
+		fmd_hdl_debug(hdl, "Failed to allocate memory");
+		nvlist_free(hcelem);
+		return (NULL);
+	}
+
+	if (nvlist_add_uint8(fru, FM_VERSION, FM_HC_SCHEME_VERSION) != 0 ||
+	    nvlist_add_string(fru, FM_FMRI_SCHEME, FM_FMRI_SCHEME_HC) != 0 ||
+	    nvlist_add_string(fru, FM_FMRI_HC_ROOT, "/") != 0 ||
+	    nvlist_add_uint32(fru, FM_FMRI_HC_LIST_SZ, 1) != 0 ||
+	    nvlist_add_nvlist_array(fru, FM_FMRI_HC_LIST, &hcelem, 1) != 0 ||
+	    (serialstr != NULL &&
+	    nvlist_add_string(fru, FM_FMRI_HC_SERIAL_ID, serialstr) != 0) ||
+	    (partstr != NULL &&
+	    nvlist_add_string(fru, FM_FMRI_HC_PART, partstr) != 0)) {
+		nvlist_free(hcelem);
+		nvlist_free(fru);
+		return (NULL);
+	}
+	nvlist_free(hcelem);
+	return (fru);
+}
+
+nvlist_t *
+cmd_motherboard_create_fault(fmd_hdl_t *hdl, nvlist_t *asru, const char *fltnm,
+    uint_t cert)
+{
+	nvlist_t *mb_fru, *flt;
+
+	mb_fru = cmd_motherboard_fru_create(hdl, asru);
+	flt = fmd_nvl_create_fault(hdl, fltnm, cert, mb_fru, mb_fru, NULL);
+	flt = cmd_fault_add_location(hdl, flt, "MB");
+	if (mb_fru != NULL)
+		nvlist_free(mb_fru);
+	return (flt);
+}

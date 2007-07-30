@@ -96,7 +96,8 @@ HDRS=	\
 CLOSED_HDRS=	\
 	memtestio_ni.h		\
 	memtestio_n2.h		\
-	memtestio_v.h
+	memtestio_v.h		\
+	memtestio_vf.h
 
 ROOTHDRS=		$(HDRS:%=$(USR_PSM_ISYS_DIR)/%)
 $(CLOSED_BUILD)ROOTHDRS += $(CLOSED_HDRS:%=$(USR_PSM_ISYS_DIR)/%)

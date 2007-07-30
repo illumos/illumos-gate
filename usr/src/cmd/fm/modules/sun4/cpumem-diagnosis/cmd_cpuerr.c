@@ -128,7 +128,7 @@ CMD_CPU_SIMPLEHANDLER(irc, ireg, CMD_PTR_CPU_IREG, "ireg", "ireg")
 CMD_CPU_SIMPLEHANDLER(frc, freg, CMD_PTR_CPU_FREG, "freg", "freg")
 CMD_CPU_SIMPLEHANDLER(mau, mau, CMD_PTR_CPU_MAU, "mau", "mau")
 CMD_CPU_SIMPLEHANDLER(miscregs_ce, misc_regs, CMD_PTR_CPU_MISC_REGS,
-	"misc_regs", "misc_regs")
+	"misc_regs", "misc_reg")
 CMD_CPU_SIMPLEHANDLER(l2c, l2data, CMD_PTR_CPU_L2DATA, "l2data", "l2data-c")
 
 CMD_CPU_SIMPLEHANDLER(fpu, fpu, CMD_PTR_CPU_FPU, "", "fpu")
@@ -136,8 +136,11 @@ CMD_CPU_SIMPLEHANDLER(l2ctl, l2ctl, CMD_PTR_CPU_L2CTL, "", "l2cachectl")
 CMD_CPU_SIMPLEHANDLER(iru, ireg, CMD_PTR_CPU_IREG, "", "ireg")
 CMD_CPU_SIMPLEHANDLER(fru, freg, CMD_PTR_CPU_FREG, "", "freg")
 CMD_CPU_SIMPLEHANDLER(miscregs_ue, misc_regs, CMD_PTR_CPU_MISC_REGS,
-	"", "misc_regs")
+	"", "misc_reg")
 CMD_CPU_SIMPLEHANDLER(l2u, l2data, CMD_PTR_CPU_L2DATA, "", "l2data-u")
+CMD_CPU_SIMPLEHANDLER(lfu_ue, lfu, CMD_PTR_CPU_LFU, "", "lfu-u")
+CMD_CPU_SIMPLEHANDLER(lfu_ce, lfu, CMD_PTR_CPU_LFU, "", "lfu-f")
+CMD_CPU_SIMPLEHANDLER(lfu_pe, lfu, CMD_PTR_CPU_LFU, "", "lfu-p")
 
 
 #ifdef sun4u

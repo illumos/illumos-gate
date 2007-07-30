@@ -633,3 +633,259 @@ msgid "SUN4V-8001-64.impact"
 msgstr "Loss of services provided by the device\ninstances associated with this fault\n"
 msgid "SUN4V-8001-64.action"
 msgstr "Schedule a repair procedure to replace the affected\ndevice if necessary, or contact Sun for support.\n"
+#
+# code: SUN4V-8001-7R
+# keys: fault.memory.link-f
+#
+msgid "SUN4V-8001-7R.type"
+msgstr "Fault"
+msgid "SUN4V-8001-7R.severity"
+msgstr "Major"
+msgid "SUN4V-8001-7R.description"
+msgstr "A problem was detected in the interconnect between a memory DIMM module and\nits memory controller.  A lane failover has taken place.\n  Refer to %s for more information."
+msgid "SUN4V-8001-7R.response"
+msgstr "No automated response.\n"
+msgid "SUN4V-8001-7R.impact"
+msgstr "System performance may be impacted.\n"
+msgid "SUN4V-8001-7R.action"
+msgstr "At convenient time, try reseating the memory module(s).  If problem persists,\ncontact Sun to schedule part replacement.\n"
+#
+# code: SUN4V-8001-8H
+# keys: fault.cpu.ultraSPARC-T2plus.ireg
+#
+msgid "SUN4V-8001-8H.type"
+msgstr "Fault"
+msgid "SUN4V-8001-8H.severity"
+msgstr "Minor"
+msgid "SUN4V-8001-8H.description"
+msgstr "The number of integer register errors associated with this thread has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8001-8H.response"
+msgstr "The fault manager will attempt to remove the affected thread\nfrom service.\n"
+msgid "SUN4V-8001-8H.impact"
+msgstr "System performance may be affected. \n"
+msgid "SUN4V-8001-8H.action"
+msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-9D
+# keys: fault.cpu.ultraSPARC-T2plus.freg
+#
+msgid "SUN4V-8001-9D.type"
+msgstr "Fault"
+msgid "SUN4V-8001-9D.severity"
+msgstr "Minor"
+msgid "SUN4V-8001-9D.description"
+msgstr "The number of floating register errors associated with this thread has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8001-9D.response"
+msgstr "The fault manager will attempt to remove the affected thread\nfrom service.\n"
+msgid "SUN4V-8001-9D.impact"
+msgstr "System performance may be affected. \n"
+msgid "SUN4V-8001-9D.action"
+msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-AY
+# keys: fault.cpu.ultraSPARC-T2plus.misc_reg
+#
+msgid "SUN4V-8001-AY.type"
+msgstr "Fault"
+msgid "SUN4V-8001-AY.severity"
+msgstr "Minor"
+msgid "SUN4V-8001-AY.description"
+msgstr "The number of ancillary register errors associated with this thread has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8001-AY.response"
+msgstr "The fault manager will attempt to remove the affected thread\nfrom service.\n"
+msgid "SUN4V-8001-AY.impact"
+msgstr "System performance may be affected. \n"
+msgid "SUN4V-8001-AY.action"
+msgstr "Schedule a repair procedure to replace the affected CPU, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-C3
+# keys: fault.cpu.ultraSPARC-T2plus.itlb
+#
+msgid "SUN4V-8001-C3.type"
+msgstr "Fault"
+msgid "SUN4V-8001-C3.severity"
+msgstr "Major"
+msgid "SUN4V-8001-C3.description"
+msgstr "The number of ITLB errors associated with this thread has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8001-C3.response"
+msgstr "The fault manager will attempt to remove all threads associated with\nthis resource from service.\n"
+msgid "SUN4V-8001-C3.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8001-C3.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-DS
+# keys: fault.cpu.ultraSPARC-T2plus.dtlb
+#
+msgid "SUN4V-8001-DS.type"
+msgstr "Fault"
+msgid "SUN4V-8001-DS.severity"
+msgstr "Major"
+msgid "SUN4V-8001-DS.description"
+msgstr "The number of DTLB errors associated with this thread has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8001-DS.response"
+msgstr "The fault manager will attempt to remove all threads associated with\nthis resource from service.\n"
+msgid "SUN4V-8001-DS.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8001-DS.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-E5
+# keys: fault.cpu.ultraSPARC-T2plus.icache
+#
+msgid "SUN4V-8001-E5.type"
+msgstr "Fault"
+msgid "SUN4V-8001-E5.severity"
+msgstr "Major"
+msgid "SUN4V-8001-E5.description"
+msgstr "The number of I-cache errors associated with this thread has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8001-E5.response"
+msgstr "The fault manager will attempt to remove all threads associated with\nthis resource from service.\n"
+msgid "SUN4V-8001-E5.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8001-E5.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-FP
+# keys: fault.cpu.ultraSPARC-T2plus.dcache
+#
+msgid "SUN4V-8001-FP.type"
+msgstr "Fault"
+msgid "SUN4V-8001-FP.severity"
+msgstr "Major"
+msgid "SUN4V-8001-FP.description"
+msgstr "The number of D-cache errors associated with this thread has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8001-FP.response"
+msgstr "The fault manager will attempt to remove all threads associated with\nthis resource from service.\n"
+msgid "SUN4V-8001-FP.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8001-FP.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-GA
+# keys: fault.cpu.ultraSPARC-T2plus.mau
+#
+msgid "SUN4V-8001-GA.type"
+msgstr "Fault"
+msgid "SUN4V-8001-GA.severity"
+msgstr "Major"
+msgid "SUN4V-8001-GA.description"
+msgstr "The number of modular arithmetic unit errors associated with this thread has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8001-GA.response"
+msgstr "Cryptographic software will not use this modular arithmetic unit.\n\n"
+msgid "SUN4V-8001-GA.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8001-GA.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-HJ
+# keys: fault.cpu.ultraSPARC-T2plus.l2data-c
+#
+msgid "SUN4V-8001-HJ.type"
+msgstr "Fault"
+msgid "SUN4V-8001-HJ.severity"
+msgstr "Critical"
+msgid "SUN4V-8001-HJ.description"
+msgstr "The number of level 2 cache correctable data errors has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8001-HJ.response"
+msgstr "No automated response.\n"
+msgid "SUN4V-8001-HJ.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8001-HJ.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-JE
+# keys: fault.cpu.ultraSPARC-T2plus.l2cachetag
+#
+msgid "SUN4V-8001-JE.type"
+msgstr "Fault"
+msgid "SUN4V-8001-JE.severity"
+msgstr "Critical"
+msgid "SUN4V-8001-JE.description"
+msgstr "The number of level 2 cache tag errors has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8001-JE.response"
+msgstr "No automated response.\n"
+msgid "SUN4V-8001-JE.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8001-JE.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-KX
+# keys: fault.cpu.ultraSPARC-T2plus.l2cachectl
+#
+msgid "SUN4V-8001-KX.type"
+msgstr "Fault"
+msgid "SUN4V-8001-KX.severity"
+msgstr "Critical"
+msgid "SUN4V-8001-KX.description"
+msgstr "The number of level 2 cache control errors has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8001-KX.response"
+msgstr "No automated response.\n"
+msgid "SUN4V-8001-KX.impact"
+msgstr "System performance is likely to be affected. System may be unstable.\n"
+msgid "SUN4V-8001-KX.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-L2
+# keys: fault.cpu.ultraSPARC-T2plus.l2data-u
+#
+msgid "SUN4V-8001-L2.type"
+msgstr "Fault"
+msgid "SUN4V-8001-L2.severity"
+msgstr "Critical"
+msgid "SUN4V-8001-L2.description"
+msgstr "The number of level 2 cache uncorrectable data errors has exceeded acceptable levels.\n  Refer to %s for more information."
+msgid "SUN4V-8001-L2.response"
+msgstr "No automated response.\n"
+msgid "SUN4V-8001-L2.impact"
+msgstr "System performance is likely to be affected. \n"
+msgid "SUN4V-8001-L2.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-MR
+# keys: fault.cpu.ultraSPARC-T2plus.lfu-f
+#
+msgid "SUN4V-8001-MR.type"
+msgstr "Fault"
+msgid "SUN4V-8001-MR.severity"
+msgstr "Major"
+msgid "SUN4V-8001-MR.description"
+msgstr "A CPU chip's Link Framing Unit has stopped using a bad lane.\n  Refer to %s for more information."
+msgid "SUN4V-8001-MR.response"
+msgstr "No other automated response.\n"
+msgid "SUN4V-8001-MR.impact"
+msgstr "The system's capacity to correct transmission errors between CPU chips has been reduced.\n"
+msgid "SUN4V-8001-MR.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-N4
+# keys: fault.cpu.ultraSPARC-T2plus.lfu-p
+#
+msgid "SUN4V-8001-N4.type"
+msgstr "Fault"
+msgid "SUN4V-8001-N4.severity"
+msgstr "Major"
+msgid "SUN4V-8001-N4.description"
+msgstr "A CPU chip's Link Framing Unit has encountered a protocol error.\n  Refer to %s for more information."
+msgid "SUN4V-8001-N4.response"
+msgstr "No automated response.\n"
+msgid "SUN4V-8001-N4.impact"
+msgstr "The system has most likely taken a fatal reset.\n"
+msgid "SUN4V-8001-N4.action"
+msgstr "Schedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
+#
+# code: SUN4V-8001-PQ
+# keys: fault.cpu.ultraSPARC-T2plus.lfu-u
+#
+msgid "SUN4V-8001-PQ.type"
+msgstr "Fault"
+msgid "SUN4V-8001-PQ.severity"
+msgstr "Major"
+msgid "SUN4V-8001-PQ.description"
+msgstr "A CPU chip's Link Framing Unit has encountered an unrecoverable lane failure.\n  Refer to %s for more information."
+msgid "SUN4V-8001-PQ.response"
+msgstr "No automated response.\n"
+msgid "SUN4V-8001-PQ.impact"
+msgstr "The system's integrity is seriously compromised.\n"
+msgid "SUN4V-8001-PQ.action"
+msgstr "Do not rely on this system for mission-critical tasks.\nSchedule a repair procedure to replace the affected resource, the identity of which can be determined using fmdump -v -u <EVENT_ID>.\n"
