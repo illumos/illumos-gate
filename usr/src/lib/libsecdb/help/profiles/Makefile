@@ -42,6 +42,7 @@ HTMLENTS = \
 	RtFileSysMngmnt.html \
 	RtFileSysSecurity.html \
 	RtFTPMngmnt.html \
+	RtInetdMngmnt.html \
 	RtIPFilterMngmnt.html \
 	RtKerberosClntMngmnt.html \
 	RtKerberosSrvrMngmnt.html \

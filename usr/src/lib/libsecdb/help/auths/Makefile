@@ -68,6 +68,7 @@ HTMLENTS = \
 	SmfAutofsStates.html \
 	SmfCronStates.html \
 	SmfHeader.html \
+	SmfInetdStates.html \
 	SmfIPsecStates.html \
 	SmfManageHeader.html \
 	SmfModifyAppl.html \
@@ -83,6 +84,7 @@ HTMLENTS = \
 	SmfSshStates.html \
 	SmfSyslogStates.html \
 	SmfValueHeader.html \
+	SmfValueInetd.html \
 	SmfValueIPsec.html \
 	SmfValueNWAM.html \
 	SmfValueRouting.html \
